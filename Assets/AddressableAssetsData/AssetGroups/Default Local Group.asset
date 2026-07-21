@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Default Local Group
+  m_EditorClassIdentifier: 
+  m_GroupName: Default Local Group
+  m_Data:
+    m_SerializedData: []
+  m_GUID: 14d31794b2ffd944c93f9d90b507687b
+  m_SerializeEntries:
+  - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
+    m_Address: Assets/Assets/Prefabs/PooledCardElement.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+  - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
+    m_Address: Assets/Prefabs/UI/SimpleYNPopup.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+  - m_GUID: 033413085f3b87a42920a62c5ea7462c
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/EffectNotifyUI.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+  - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/KeywordExplain.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+  - m_GUID: f1b37da6ebdd20e48954602bec574405
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: e29ad2635c81a7c4e87a1b02f79ff820, type: 2}
+    - {fileID: 11400000, guid: a9f43d889b690ff46ab09c5dc00c80e4, type: 2}

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "Read(//c/Users/cookapps/.unity/mcp/connections/**)",
+      "Bash(grep -viE \"//|Trace|McpLog|Warning\")",
+      "Bash(grep -viE \"///|Trace|McpLog\")",
+      "Bash(timeout 15 ./relay_win.exe --mcp)",
+      "mcp__unity-mcp__Unity_ReadConsole",
+      "mcp__unity-mcp__Unity_ManageEditor"
+    ]
+  }
+}

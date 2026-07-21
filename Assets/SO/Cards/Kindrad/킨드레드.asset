@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
+  m_Name: "\uD0A8\uB4DC\uB808\uB4DC"
+  m_EditorClassIdentifier: 
+  displayName: "\uD0A8\uB4DC\uB808\uB4DC"
+  keywords: 1
+  maxHp: 3
+  bonusHp: 0
+  mainSynergy: {fileID: 11400000, guid: 90718cdfeee817f449b0862384827ab1, type: 2}
+  subClass: {fileID: 11400000, guid: a5519bfe6370e0544aaa7b39256b93d5, type: 2}
+  fullImage: {fileID: 21300000, guid: d28c02f0ab1d2fc4fa8530c32962c53d, type: 3}
+  portrait: {fileID: 21300000, guid: bb39dcbbc0c806349a9694ed7e644851, type: 3}
+  battleImage: {fileID: 21300000, guid: 27ebb0f99c7a78144a6ecbb3b6db0b60, type: 3}
+  deckPreview: {fileID: 21300000, guid: a25a2399910a2f54dadd40d684719b30, type: 3}
+  weaponPrefab: {fileID: 1428246708018051932, guid: 7c024df1a16c25047b7b75d180f7348b, type: 3}
+  enemyWeaponEuler: {x: 90, y: 180, z: 0}
+  attackEffect: {fileID: 11400000, guid: 0d673f5d40e2c62479e0d4a045f682ed, type: 2}
+  passive: {fileID: 11400000, guid: a8352289062768143b2687ad980af122, type: 2}
+  spawnVoices:
+  - {fileID: 8300000, guid: fe132f707d940854a80ad67bbdc74f2a, type: 3}
+  - {fileID: 8300000, guid: cc6c60d3dec341b40aaa888dc2fb4455, type: 3}
+  attackVoices:
+  - {fileID: 8300000, guid: e33892121b57c8947bc597c1ac095e3b, type: 3}
+  - {fileID: 8300000, guid: 60499d9d3cdd3044e917f26c41a39d71, type: 3}
+  killVoices:
+  - {fileID: 8300000, guid: 323406b4aed24e54da9548cd73cff2da, type: 3}
+  - {fileID: 8300000, guid: 6ee7100927532004ca348e67b43529c5, type: 3}
+  deathVoices:
+  - {fileID: 8300000, guid: 222e624b6dbf683479e2ca7faf4c58f3, type: 3}
+  effectVoices:
+  - {fileID: 8300000, guid: dedb597df64263748b5784dbd5a9a49e, type: 3}
+  - {fileID: 8300000, guid: acc4777fa02aa104ba47b0dcb7f7b081, type: 3}
+  effectClips:
+  - {fileID: 8300000, guid: b5d70a1d332b7804698018b2948ae6a4, type: 3}
+  cardExplain: "\uC6D0\uAC70\uB9AC, \uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD55C
+    \uD6C4, \uACF5\uACA9\uB2F9\uD55C \uC801\uC774 \uD45C\uC2DD\uC744 \uC5BB\uC2B5\uB2C8\uB2E4."
+  explainKeywords: 32

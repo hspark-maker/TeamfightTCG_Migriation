@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7db3001cbfb7c7241956c26b0f14b66e, type: 3}
+  m_Name: MaokaiAttackEffect
+  m_EditorClassIdentifier: 
+  animTrigger: Attack
+  hitDelay: 0.4
+  duration: 0.6
+  attackClips:
+  - {fileID: 8300000, guid: 673901a6547ce2144a775cd36345407b, type: 3}
+  projectile:
+    prefab: {fileID: 0}
+    impactPrefab: {fileID: 0}
+    localOffset: {x: 0, y: 0, z: 0}
+    spawnDelay: 0
+  particles:
+  - prefab: {fileID: 7931352654368573385, guid: 9b7645f351a8d71429f3841b481c7aa0, type: 3}
+    spawnDelay: 0.4
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    spawnTarget: 1

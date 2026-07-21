@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
+  m_Name: "\uB9C8\uC624\uCE74\uC774"
+  m_EditorClassIdentifier: 
+  displayName: "\uB9C8\uC624\uCE74\uC774"
+  keywords: 72
+  maxHp: 6
+  bonusHp: 0
+  mainSynergy: {fileID: 11400000, guid: 90718cdfeee817f449b0862384827ab1, type: 2}
+  subClass: {fileID: 11400000, guid: 5c38d384fdfd62f48b2acf49e1653c61, type: 2}
+  fullImage: {fileID: 21300000, guid: 38de89c018243a14eabeaf0ba5ba1392, type: 3}
+  portrait: {fileID: 21300000, guid: 392c35861ad911c47a6b20cfa367c5df, type: 3}
+  battleImage: {fileID: 21300000, guid: 3fc7b134bcb15ec4bbeaeecd89a51a2a, type: 3}
+  deckPreview: {fileID: 21300000, guid: bf7be586577f43c41b042b4a28698082, type: 3}
+  weaponPrefab: {fileID: 3647343419806691647, guid: 1af8cbb5adcaf8541916541d9c26b339, type: 3}
+  enemyWeaponEuler: {x: 90, y: 180, z: 0}
+  attackEffect: {fileID: 11400000, guid: cde09d2c5a1d49540869fee9b27835a2, type: 2}
+  passive: {fileID: 11400000, guid: 7787b5e7ce473fe439916bac7fcfa4d4, type: 2}
+  spawnVoices:
+  - {fileID: 8300000, guid: 48599dd0c353bb0429e79d5f857031a5, type: 3}
+  - {fileID: 8300000, guid: c3a9c1afc42203c4d815aee53dbbb5af, type: 3}
+  attackVoices:
+  - {fileID: 8300000, guid: 9afac2822fb9ba149a354b7e7577a788, type: 3}
+  - {fileID: 8300000, guid: e45afaf47c421af4486b317d204a1bd7, type: 3}
+  killVoices:
+  - {fileID: 8300000, guid: e400bf014c93cd34d97102b8f1cb60ea, type: 3}
+  - {fileID: 8300000, guid: 13a994c50a2d19841a05475eef924539, type: 3}
+  deathVoices:
+  - {fileID: 8300000, guid: b86a7347b6504a045b0e26b4be73d087, type: 3}
+  effectVoices: []
+  effectClips:
+  - {fileID: 8300000, guid: aa04f075995886e44b47acc7466c28e4, type: 3}
+  cardExplain: "\uB3C4\uBC1C, \uD790\uB7EC, \uC774 \uCE74\uB4DC\uAC00 \uCC98\uCE58\uB418\uBA74,
+    \uBAA8\uB4E0 \uC544\uAD70 \uCE74\uB4DC\uAC00 \uCD94\uAC00 \uC0DD\uBA85\uB825\uC744
+    3 \uC5BB\uC2B5\uB2C8\uB2E4."
+  explainKeywords: 256

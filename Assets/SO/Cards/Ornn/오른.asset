@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
+  m_Name: "\uC624\uB978"
+  m_EditorClassIdentifier: 
+  displayName: "\uC624\uB978"
+  keywords: 8
+  maxHp: 6
+  bonusHp: 0
+  mainSynergy: {fileID: 11400000, guid: 9a748de058dfad143b00b1622b0e2e60, type: 2}
+  subClass: {fileID: 11400000, guid: 41d50875a2eb99441ac401add383fa58, type: 2}
+  fullImage: {fileID: 21300000, guid: 85041931fd2ce7842a2a0958398a9838, type: 3}
+  portrait: {fileID: 21300000, guid: b271bcd3d011c9a4c93d5218339a1f3c, type: 3}
+  battleImage: {fileID: 21300000, guid: 656acdc13383b78408f5f69c9218197a, type: 3}
+  deckPreview: {fileID: 21300000, guid: 7d9baf907e87bdf4ba0947bd5862c21e, type: 3}
+  weaponPrefab: {fileID: 3348311273568306376, guid: 2e348571627de7044ad993fc50d848ce, type: 3}
+  enemyWeaponEuler: {x: 90, y: 180, z: 0}
+  attackEffect: {fileID: 11400000, guid: fcab7360dc49be044b09ce917c2070c3, type: 2}
+  passive: {fileID: 11400000, guid: 210d9963f2672a54ba78059e6908c328, type: 2}
+  spawnVoices:
+  - {fileID: 8300000, guid: 2a65259b22eb07e4ab787b036dadaf57, type: 3}
+  - {fileID: 8300000, guid: cc4be651503dd8c46aa2c0ce81ec5e7e, type: 3}
+  attackVoices:
+  - {fileID: 8300000, guid: b0595080c13c1ba4e8b225fea001eb19, type: 3}
+  killVoices:
+  - {fileID: 8300000, guid: da4dd171c03b33c47a83868a9efecdb5, type: 3}
+  deathVoices:
+  - {fileID: 8300000, guid: baf8c66ad8a9a9c4bbe4e53527e92db6, type: 3}
+  - {fileID: 8300000, guid: 8b232e76d6c9eae449584d4c3aa179cb, type: 3}
+  effectVoices:
+  - {fileID: 8300000, guid: 883886bfe60151947b17e3652d847d8b, type: 3}
+  - {fileID: 8300000, guid: 1ef8ca311c1dd7f42964115dfdd89b4c, type: 3}
+  effectClips:
+  - {fileID: 8300000, guid: 1a784d00434f5b643ab20e464e58fb54, type: 3}
+  cardExplain: "\uB3C4\uBC1C, \uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD558\uBA74,
+    \uB2E4\uB978 \uBB34\uC791\uC704 \uC544\uAD70 \uD558\uB098\uAC00 \uCD94\uAC00
+    \uC0DD\uBA85\uB825\uC744 2 \uC5BB\uC2B5\uB2C8\uB2E4."
+  explainKeywords: 256

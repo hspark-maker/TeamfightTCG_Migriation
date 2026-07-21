@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8f25a248745cc546baeb96ec728ad99, type: 3}
+  m_Name: KeywordIcon
+  m_EditorClassIdentifier: 
+  entries:
+  - keyword: 1
+    icon: {fileID: 1726162682, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uC6D0\uAC70\uB9AC"
+    explain: "\uC774 \uCE74\uB4DC\uB294 \uBC18\uACA9 \uD53C\uD574\uB97C \uBC1B\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    effectLabel: "\uBC18\uACA9 \uD53C\uD574 \uBB34\uC2DC!"
+    glowStartColor: {r: 1, g: 0.85961777, b: 0.65471697, a: 1}
+    glowEndColor: {r: 0.9960785, g: 0.854902, b: 0.6509804, a: 0}
+  - keyword: 2
+    icon: {fileID: -332659774, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uBB34\uC30D"
+    explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD560 \uB54C,  \uC778\uC811\uD55C
+      \uCE74\uB4DC 1\uAC1C\uC5D0 \uC808\uBC18\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
+    effectLabel: "\uC778\uC811 \uCE74\uB4DC\uC5D0 \uD53C\uD574!"
+    glowStartColor: {r: 1, g: 0, b: 0, a: 1}
+    glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+  - keyword: 4
+    icon: {fileID: 1064390119, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uCC98\uD615"
+    explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uC73C\uB85C \uC801\uC744 \uCC98\uCE58\uD558\uBA74,
+      \uD55C \uBC88 \uB354 \uACF5\uACA9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+    effectLabel: "\uCD94\uAC00 \uACF5\uACA9!"
+    glowStartColor: {r: 1, g: 0, b: 0, a: 1}
+    glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+  - keyword: 16
+    icon: {fileID: -385580173, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uAD50\uD65C"
+    explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD55C \uB4A4, \uB300\uAE30\uC911\uC778
+      \uCE74\uB4DC\uC640 \uAD50\uCCB4\uD569\uB2C8\uB2E4."
+    effectLabel: "\uB371\uC758 \uC544\uAD70\uACFC \uAD50\uCCB4!"
+    glowStartColor: {r: 0.87529755, g: 0, b: 1, a: 1}
+    glowEndColor: {r: 0.8745099, g: 0, b: 1, a: 0}
+  - keyword: 8
+    icon: {fileID: 2062767409, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uB3C4\uBC1C"
+    explain: "\uC801\uC740 \uC774 \uCE74\uB4DC\uB97C \uBA3C\uC800 \uACF5\uACA9\uD574\uC57C
+      \uD569\uB2C8\uB2E4. \uC774 \uCE74\uB4DC\uAC00 \uC785\uD788\uB294 \uD53C\uD574\uAC00
+      \uC808\uBC18\uC774 \uB429\uB2C8\uB2E4."
+    effectLabel: 
+    glowStartColor: {r: 0.8196079, g: 0.26666668, b: 0, a: 1}
+    glowEndColor: {r: 0.8196079, g: 0.26666668, b: 0, a: 0}
+  - keyword: 32
+    icon: {fileID: 21300000, guid: b1a7355f8bb83b749a9f60295acefafa, type: 3}
+    displayName: "\uD45C\uC2DD"
+    explain: "\uC774 \uCE74\uB4DC\uB97C \uACF5\uACA9\uD558\uB294 \uCE74\uB4DC\uB294
+      \uBC18\uACA9 \uD53C\uD574\uB97C \uC785\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    effectLabel: "\uBC18\uACA9 \uD53C\uD574 \uBE44\uD65C\uC131\uD654\uB428!"
+    glowStartColor: {r: 1, g: 0, b: 0, a: 1}
+    glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+  - keyword: 64
+    icon: {fileID: -159116842, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uD790\uB7EC"
+    explain: "\uC790\uC2E0\uC758 \uD134 \uC2DC\uC791\uC2DC \uBAA8\uB4E0 \uC544\uAD70
+      \uCE74\uB4DC\uC758 \uC0DD\uBA85\uB825\uC744 1 \uD68C\uBCF5\uC2DC\uD0B5\uB2C8\uB2E4."
+    effectLabel: "\uC544\uAD70 \uD68C\uBCF5!"
+    glowStartColor: {r: 0, g: 1, b: 0.12375021, a: 1}
+    glowEndColor: {r: 0, g: 1, b: 0.1254902, a: 1}
+  - keyword: 128
+    icon: {fileID: 935439490, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uBB34\uC801"
+    explain: "\uB2E4\uC74C \uD134\uAE4C\uC9C0 \uD53C\uD574\uB97C \uBC1B\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    effectLabel: "\uD53C\uD574 \uBB34\uC2DC!"
+    glowStartColor: {r: 1, g: 0.7955961, b: 0, a: 1}
+    glowEndColor: {r: 1, g: 0.7960785, b: 0, a: 1}
+  - keyword: 256
+    icon: {fileID: 1402199165, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    displayName: "\uCD94\uAC00 \uCCB4\uB825"
+    explain: "\uD68C\uBCF5\uD560 \uC218 \uC5C6\uACE0, \uACF5\uACA9 \uD53C\uD574\uC5D0
+      \uD3EC\uD568\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uAE30\uBCF8 \uCCB4\uB825\uBCF4\uB2E4
+      \uBA3C\uC800 \uC18C\uBAA8\uB429\uB2C8\uB2E4."
+    effectLabel: "\uCD94\uAC00 \uCCB4\uB825 \uD68D\uB4DD!"
+    glowStartColor: {r: 1, g: 0.7955961, b: 0, a: 1}
+    glowEndColor: {r: 1, g: 0.7960785, b: 0, a: 1}
