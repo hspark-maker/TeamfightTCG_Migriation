@@ -35,7 +35,6 @@ public static class ParticlePooler
         if (t_obj.TryGetComponent<PooledParticle>(out var t_pooled))
             t_pooled.id = _id;
         t_obj.SetActive(true);
-        LogUtil.Log(_rot.eulerAngles.ToString());
         return t_obj;
     }
 

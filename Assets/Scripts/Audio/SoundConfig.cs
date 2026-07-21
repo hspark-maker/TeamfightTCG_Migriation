@@ -5,7 +5,6 @@ public class SoundConfig : ScriptableObject
 {
     [Header("BGM")]
     public AudioClip bgm;
-    [Range(0f, 1f)] public float bgmVolume = 0.5f;
 
     [Header("SFX")]
     public AudioClip[] uiClickClips;

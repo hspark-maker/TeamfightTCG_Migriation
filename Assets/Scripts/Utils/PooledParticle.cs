@@ -8,7 +8,6 @@ public class PooledParticle : MonoBehaviour
 {
     public string id;
     ParticleSystem ps;
-    [SerializeField] float particleOffset;
     [SerializeField] float releaseTime;
     CancellationTokenSource cts;
 

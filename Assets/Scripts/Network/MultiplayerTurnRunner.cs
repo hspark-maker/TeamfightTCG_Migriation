@@ -91,8 +91,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
         if (t_card != null) this.enemySpawnBuffer.Enqueue(t_card);
     }
 
-    public void OnTurnEndReceived(PlayerRef _sender) { }
-
     public void OnInitialDeckReceived(int[] _cardIds, int _ownerIndex)
     {
         this.enemyField?.InitializeFromRemote(_cardIds, _ownerIndex, this.cardRegistry);

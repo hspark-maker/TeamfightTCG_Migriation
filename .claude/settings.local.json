@@ -7,7 +7,15 @@
       "Bash(grep -viE \"///|Trace|McpLog\")",
       "Bash(timeout 15 ./relay_win.exe --mcp)",
       "mcp__unity-mcp__Unity_ReadConsole",
-      "mcp__unity-mcp__Unity_ManageEditor"
+      "mcp__unity-mcp__Unity_ManageEditor",
+      "Read(//c/Users/cookapps/AppData/Local/Temp/claude/C--Users-cookapps-TeamfightTCG-Migriation/**)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python -c ' *)",
+      "mcp__unity-mcp__Unity_GetConsoleLogs",
+      "mcp__unity-mcp__Unity_ValidateScript",
+      "mcp__unity-mcp__Unity_RunCommand",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

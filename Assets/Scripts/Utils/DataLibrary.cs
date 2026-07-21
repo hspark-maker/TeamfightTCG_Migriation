@@ -12,7 +12,6 @@ public class DataLibrary : MonoBehaviour
     public Dictionary<Type, GameObject> uiPrefabs;
 
     [SerializeField] public KeywordIconConfig keywordIconConfig;
-    [SerializeField] Transform particlePool;
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 

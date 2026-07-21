@@ -20,7 +20,6 @@ public class NetworkGameController : MonoBehaviour
         CardSpawn   = 2,
         AnimReady   = 3,
         InitialDeck = 4,
-        TurnEnd     = 5,
         SeedCommit  = 6,   // commit-reveal: SHA256(nonce) 32바이트
         SeedReveal  = 7,   // commit-reveal: nonce 8바이트
     }
@@ -92,10 +91,6 @@ public class NetworkGameController : MonoBehaviour
                 MultiplayerTurnRunner.Instance?.OnInitialDeckReceived(t_ids, t_ownerIdx);
                 break;
             }
-            case MsgType.TurnEnd:
-                MultiplayerTurnRunner.Instance?.OnTurnEndReceived(_sender);
-                break;
-
             case MsgType.SeedCommit:
             {
                 byte[] t_hash = new byte[32];
@@ -146,9 +141,6 @@ public class NetworkGameController : MonoBehaviour
             WriteInt(t_msg, 9 + i * 4, _cardIds[i]);
         SendToOpponents(t_msg);
     }
-
-    public void SendTurnEnd()
-        => SendToOpponents(new byte[] { (byte)MsgType.TurnEnd });
 
     public void SendSeedCommit(byte[] _hash)
     {

@@ -5,8 +5,6 @@ public class CardInputModeToggle : MonoBehaviour
 {
     [SerializeField] TMP_Text modeLabel;
 
-    const string PREFS_KEY = "CardInputMode";
-
     void Start()
     {
         CardView.currentInputMode = CardView.InputMode.DragToEnemy;
@@ -19,7 +17,6 @@ public class CardInputModeToggle : MonoBehaviour
             ? CardView.InputMode.DragToEnemy
             : CardView.InputMode.DragBack;
 
-        PlayerPrefs.SetInt(PREFS_KEY, (int)CardView.currentInputMode);
         RefreshLabel();
     }
 

@@ -8,8 +8,8 @@ public class RangedAttack : NormalAttack
                                          CardInstance _preSelectedSplash = null,
                                          bool? _forceCunningSwap = null)
     {
-        int t_dmg = GetDamage(_attacker);
-        int t_actualDmg = Mathf.Min(t_dmg, _defender.hp + _defender.bonusHp);
+        int t_dmg = _attacker.AttackDamage();
+        int t_actualDmg = _defender.ClampDamage(t_dmg);
         _defender.TakeDamage(t_dmg);
         _defender.data.passive?.OnAttackedBy(_defender, _attacker).Forget();
         _attacker.data.passive?.OnDealDamage(_attacker, t_actualDmg).Forget();
