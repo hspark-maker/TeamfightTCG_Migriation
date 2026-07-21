@@ -8,19 +8,20 @@ public class NormalAttack : IAttackBehavior
                                         CardInstance _preSelectedSplash = null,
                                         bool? _forceCunningSwap = null)
     {
-        int t_atkDmg = GetDamage(_attacker);
-        int t_ctrDmg = GetDamage(_defender);  // 동시 해결: 공격 전 수치로 반격 (도발 시 50%)
+        int t_atkDmg = _attacker.AttackDamage();
+        int t_ctrDmg = _defender.AttackDamage();  // 동시 해결: 공격 전 수치로 반격 (도발 시 50%)
+        bool t_takesCounter  = _attacker.TakesCounterFrom(_defender);  // 반격 자격(단일 진실원)
         bool t_markedCounter = _defender.HasKeyword(CardKeyword.Mark);
 
-        int t_actualAtkDmg = Mathf.Min(t_atkDmg, _defender.hp + _defender.bonusHp);
-        int t_actualCtrDmg = Mathf.Min(t_ctrDmg, _attacker.hp + _attacker.bonusHp);
+        int t_actualAtkDmg = _defender.ClampDamage(t_atkDmg);
+        int t_actualCtrDmg = _attacker.ClampDamage(t_ctrDmg);
 
         _defender.TakeDamage(t_atkDmg);
-        if (!t_markedCounter)
+        if (t_takesCounter)
             _attacker.TakeDamage(t_ctrDmg);
 
         _defender.data.passive?.OnAttackedBy(_defender, _attacker).Forget();
-        if (!t_markedCounter)
+        if (t_takesCounter)
             _defender.data.passive?.OnDealDamage(_defender, t_actualCtrDmg, true).Forget();
         _attacker.data.passive?.OnDealDamage(_attacker, t_actualAtkDmg).Forget();
 
@@ -33,9 +34,6 @@ public class NormalAttack : IAttackBehavior
             t_result.defenderKeywords |= CardKeyword.Mark;
         return t_result;
     }
-
-    protected static int GetDamage(CardInstance _c) =>
-        _c.data.HasKeyword(CardKeyword.Taunt) ? Mathf.Max(1, Mathf.FloorToInt(_c.hp * 0.5f)) : _c.hp;
 
     protected static AttackResult MakeResult(CardInstance _attacker, bool _defKilled)
     {

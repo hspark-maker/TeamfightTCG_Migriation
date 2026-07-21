@@ -8,17 +8,18 @@ public class CunningAttack : NormalAttack
                                          CardInstance _preSelectedSplash = null,
                                          bool? _forceCunningSwap = null)
     {
-        int t_atkDmg = GetDamage(_attacker);
-        int t_ctrDmg = GetDamage(_defender);
+        int t_atkDmg = _attacker.AttackDamage();
+        int t_ctrDmg = _defender.AttackDamage();
+        bool t_takesCounter  = _attacker.TakesCounterFrom(_defender);  // 반격 자격(단일 진실원): 원거리 무반격 + 표식 무반격
         bool t_markedCounter = _defender.HasKeyword(CardKeyword.Mark);
-        int t_actualAtkDmg = Mathf.Min(t_atkDmg, _defender.hp + _defender.bonusHp);
-        int t_actualCtrDmg = Mathf.Min(t_ctrDmg, _attacker.hp + _attacker.bonusHp);
+        int t_actualAtkDmg = _defender.ClampDamage(t_atkDmg);
+        int t_actualCtrDmg = _attacker.ClampDamage(t_ctrDmg);
 
         bool t_shouldSwap = _forceCunningSwap ?? _attackerField.CanSwapWithWaiting(_attacker);
 
         _defender.TakeDamage(t_atkDmg);
 
-        if (!t_markedCounter && !_attacker.HasKeyword(CardKeyword.Ranged))
+        if (t_takesCounter)
         {
             _attacker.TakeDamage(t_ctrDmg);
             _defender.data.passive?.OnDealDamage(_defender, t_actualCtrDmg, true).Forget();

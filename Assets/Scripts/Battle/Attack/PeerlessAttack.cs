@@ -13,13 +13,13 @@ public class PeerlessAttack : NormalAttack
                                          bool? _forceCunningSwap = null)
     {
         int t_origHp = _attacker.hp;
-        int t_ctrDmg = GetDamage(_defender);  // 도발 시 50%
+        int t_ctrDmg = _defender.AttackDamage();  // 도발 시 50%
 
-        int t_atkDmg = GetDamage(_attacker);
-        int t_actualAtkDmg = Mathf.Min(t_atkDmg, _defender.hp + _defender.bonusHp);
+        int t_atkDmg = _attacker.AttackDamage();
+        int t_actualAtkDmg = _defender.ClampDamage(t_atkDmg);
         _defender.TakeDamage(t_atkDmg);
         _defender.data.passive?.OnAttackedBy(_defender, _attacker).Forget();
-        if (!_defender.HasKeyword(CardKeyword.Mark))
+        if (_attacker.TakesCounterFrom(_defender))  // 반격 자격(단일 진실원). 무쌍은 Ranged가 아니므로 !Mark와 등가
             _attacker.TakeDamage(t_ctrDmg);
         _attacker.data.passive?.OnDealDamage(_attacker, t_actualAtkDmg).Forget();
 

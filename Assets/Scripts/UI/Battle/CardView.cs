@@ -52,7 +52,6 @@ public class CardView : MonoBehaviour
     [SerializeField] float dragThreshold = 30f;
     [SerializeField] float deadZoneRadius = 80f;
     [SerializeField] float dirThreshold = 0.35f;
-    [SerializeField] float snapRadius = 0.6f;
     [SerializeField] HintArrow hintArrow;
     [SerializeField] SwipeGuide swipeGuide;
     [SerializeField] LineRenderer dragLine;
@@ -176,7 +175,7 @@ public class CardView : MonoBehaviour
                 s_anyDragging  = true;
                 var t_validTargets = GetValidEnemyViews();
                 foreach (var t_cv in t_validTargets)
-                    if (t_cv.boundCard.data.HasKeyword(CardKeyword.Taunt))
+                    if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
                         t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
                 FadeAll(0.3f);
                 FadeCards(1f, this);
@@ -223,7 +222,7 @@ public class CardView : MonoBehaviour
             s_anyDragging  = true;
             var t_validTargets = GetValidEnemyViews();
             foreach (var t_cv in t_validTargets)
-                if (t_cv.boundCard.data.HasKeyword(CardKeyword.Taunt))
+                if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
                     t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
             FadeAll(0.3f);
             FadeCards(1f, this);
@@ -264,7 +263,16 @@ public class CardView : MonoBehaviour
 
     void OnMouseUp()
     {
-        if (!TurnState.InputAllowed || this.boundCard == null) return;
+        // 드래그 중 턴 종료·카드 사망으로 early-return해도 정적 드래그 상태(s_anyDragging)가
+        // true로 고착되지 않도록 가드 통과 전에 반드시 해제한다.
+        if (!TurnState.InputAllowed || this.boundCard == null)
+        {
+            s_anyDragging  = false;
+            this.dragState = DragState.Idle;
+            this.swipeGuide?.SetVisible(false);
+            HideDragLine();
+            return;
+        }
         s_anyDragging = false;
         this.swipeGuide?.SetVisible(false);
         HideDragLine();
@@ -380,7 +388,7 @@ public class CardView : MonoBehaviour
             if (t_cv.boundCard.ownerIndex == this.boundCard?.ownerIndex) continue;
             t_enemies.Add(t_cv);
         }
-        var t_taunt = t_enemies.FindAll(cv => cv.boundCard.data.HasKeyword(CardKeyword.Taunt));
+        var t_taunt = t_enemies.FindAll(cv => cv.boundCard.HasKeyword(CardKeyword.Taunt));
         return t_taunt.Count > 0 ? t_taunt : t_enemies;
     }
 
@@ -459,26 +467,19 @@ public class CardView : MonoBehaviour
 
     void ShowPreviewForTarget(CardView _target)
     {
-        if (this.boundCard == null || _target.BoundCard == null) return;
+        CardInstance t_atk = this.boundCard;
+        CardInstance t_def = _target.BoundCard;
+        if (t_atk == null || t_def == null) return;
 
-        bool t_targetInvincible = _target.BoundCard.HasKeyword(CardKeyword.Invincible);
-        int t_dmg = t_targetInvincible ? 0 : (this.boundCard.HasKeyword(CardKeyword.Taunt)
-            ? Mathf.FloorToInt(this.boundCard.hp * 0.5f)
-            : this.boundCard.hp);
-        bool t_targetDies = !t_targetInvincible && t_dmg >= _target.BoundCard.hp + _target.BoundCard.bonusHp;
-        _target.ShowAttackPreview(t_dmg, t_targetDies);
+        bool t_defInvincible = t_def.HasKeyword(CardKeyword.Invincible);
+        int  t_dmg = t_defInvincible ? 0 : t_atk.AttackDamage();
+        _target.ShowAttackPreview(t_dmg, t_def.WouldDieFrom(t_atk.AttackDamage()));
 
-        bool t_hasCounter = !this.boundCard.HasKeyword(CardKeyword.Ranged)
-                         && !this.boundCard.HasKeyword(CardKeyword.Peerless)
-                         && !this.boundCard.HasKeyword(CardKeyword.Mark);
-        if (t_hasCounter)
-        {
-            bool t_selfInvincible = this.boundCard.HasKeyword(CardKeyword.Invincible);
-            int t_counter = t_selfInvincible ? 0 : (_target.BoundCard.HasKeyword(CardKeyword.Taunt)
-                ? Mathf.FloorToInt(_target.BoundCard.hp * 0.5f)
-                : _target.BoundCard.hp);
-            ShowAttackPreview(t_counter, !t_selfInvincible && t_counter >= this.boundCard.hp + this.boundCard.bonusHp);
-        }
+        if (!t_atk.TakesCounterFrom(t_def)) return;
+
+        bool t_atkInvincible = t_atk.HasKeyword(CardKeyword.Invincible);
+        int  t_counter = t_atkInvincible ? 0 : t_def.AttackDamage();
+        ShowAttackPreview(t_counter, t_atk.WouldDieFrom(t_def.AttackDamage()));
     }
     #endregion
 
@@ -569,9 +570,7 @@ public class CardView : MonoBehaviour
         if (this.hpText == null || this.boundCard == null) return;
         this.hpTextOriginalColor = this.hpText.color;
         this.hpText.DOKill();
-        int t_bonusDrain = Mathf.Min(this.boundCard.bonusHp, _damage);
-        int t_hpAfter    = Mathf.Max(0, this.boundCard.hp - (_damage - t_bonusDrain));
-        int t_bonusAfter = this.boundCard.bonusHp - t_bonusDrain;
+        (int t_hpAfter, int t_bonusAfter) = this.boundCard.PreviewAfterDamage(_damage);
         SetHpDisplay(t_hpAfter.ToString(), t_bonusAfter > 0 ? $"+{t_bonusAfter}" : "");
         this.hpText.color = Color.red;
 
