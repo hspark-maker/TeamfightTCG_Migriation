@@ -31,7 +31,15 @@ public class GameInitializer : MonoBehaviour
         InitializeViews();
 
         if (DeckConfig.IsMultiplayer && MultiplayerTurnRunner.Instance != null)
-            await MultiplayerTurnRunner.Instance.SyncInitialDecks();
+        {
+            // false = 초기화 중 상대 이탈 → 전투 시작 없이 부전승 처리 후 조기 종료
+            bool t_synced = await MultiplayerTurnRunner.Instance.SyncInitialDecks();
+            if (!t_synced)
+            {
+                GetComponent<TurnRunner>()?.HandleOpponentLeftDuringInit();
+                return;
+            }
+        }
 
         SoundManager.Instance?.PlayBGM(this.battleBGM);
 

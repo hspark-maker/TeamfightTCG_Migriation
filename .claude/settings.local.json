@@ -15,7 +15,8 @@
       "mcp__unity-mcp__Unity_ValidateScript",
       "mcp__unity-mcp__Unity_RunCommand",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(xargs grep -l \"CardAnimator\\\\|HintArrow\\\\|SwipeGuide\")"
     ]
   }
 }

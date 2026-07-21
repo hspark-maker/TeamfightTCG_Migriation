@@ -46,7 +46,7 @@ public class SwipeGuide : MonoBehaviour
         foreach (SpriteRenderer t_sr in this.allSprites)
         {
             t_sr.DOKill();
-            t_sr.DOFade(t_sr == t_next ? this.highlightAlpha : this.dimAlpha, this.switchDuration);
+            t_sr.DOFade(t_sr == t_next ? this.highlightAlpha : this.dimAlpha, this.switchDuration).SetLink(gameObject);
         }
     }
 
@@ -63,7 +63,7 @@ public class SwipeGuide : MonoBehaviour
             t_c.a = 0f;
             t_sr.color = t_c;
             float t_target = t_sr == this.centerSr ? this.highlightAlpha : this.dimAlpha;
-            t_sr.DOFade(t_target, this.fadeInDuration);
+            t_sr.DOFade(t_target, this.fadeInDuration).SetLink(gameObject);
         }
     }
 
@@ -71,8 +71,17 @@ public class SwipeGuide : MonoBehaviour
     {
         this.hideSeq?.Kill();
         this.hideSeq = DOTween.Sequence();
+        this.hideSeq.SetLink(gameObject);
         foreach (SpriteRenderer t_sr in this.allSprites)
             this.hideSeq.Join(t_sr.DOFade(0f, this.fadeInDuration));
         this.hideSeq.AppendCallback(() => gameObject.SetActive(false));
+    }
+
+    void OnDestroy()
+    {
+        this.hideSeq?.Kill();
+        if (this.allSprites != null)
+            foreach (SpriteRenderer t_sr in this.allSprites)
+                if (t_sr != null) t_sr.DOKill();
     }
 }

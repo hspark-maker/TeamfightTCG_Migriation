@@ -96,7 +96,11 @@ public class CardView : MonoBehaviour
             this.dragLine.enabled       = false;
         }
     }
-    void OnDestroy() => allViews.Remove(this);
+    void OnDestroy()
+    {
+        allViews.Remove(this);
+        if (this.hpText != null) this.hpText.DOKill();
+    }
 
     void Update()
     {
@@ -576,7 +580,7 @@ public class CardView : MonoBehaviour
 
         if (_wouldDie)
         {
-            this.hpText.DOFade(0f, 0.55f).SetLoops(-1, LoopType.Yoyo);
+            this.hpText.DOFade(0f, 0.55f).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
             this.cardAnim.ShowDeathPreview();
         }
     }

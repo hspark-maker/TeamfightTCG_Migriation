@@ -146,6 +146,18 @@ public class TurnRunner : MonoBehaviour
         this.winPopup?.Show();
     }
 
+    /// <summary>
+    /// 초기화 단계(StartBattle 이전)에서 상대 이탈이 감지된 경우 GameInitializer가 호출.
+    /// RunTurns가 아직 시작 전이므로 기존 이탈 시맨틱(부전승)과 일관되게 승리 팝업만 노출.
+    /// StartBattle을 호출하지 않으므로 OnPlayerLeftRoom(HandlePlayerLeft) 구독도 발생하지 않아 이중 처리 없음.
+    /// </summary>
+    public void HandleOpponentLeftDuringInit()
+    {
+        if (!DeckConfig.IsMultiplayer) return;
+        this.disconnectWin = true;
+        this.winPopup?.Show();
+    }
+
     bool CheckGameOver()
     {
         if (this.enemyField.IsEmpty)

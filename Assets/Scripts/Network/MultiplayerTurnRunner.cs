@@ -33,6 +33,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
     byte[] opponentCommit;
     byte[] opponentNonce;
 
+    // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
+    // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
+    bool opponentLeftDuringInit;
+
     // 상대 카드 스폰 버퍼 — RPC 순서 보장으로 WaitForOpponentReady 이후 전부 수신됨
     readonly Queue<(int attackerSlot, int defenderSlot, bool cunningSwap)> attackBuffer = new Queue<(int, int, bool)>();
     readonly Queue<CardInstance> enemySpawnBuffer = new Queue<CardInstance>();
@@ -40,6 +44,12 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void Awake()
     {
         InitializeRuntimeState();
+    }
+
+    void OnDestroy()
+    {
+        // 파괴 시에도 초기화 구독이 남지 않도록 대칭 해제(예외/조기 파괴 안전장치).
+        UnsubscribeInitAbort();
     }
 
     void InitializeRuntimeState()
@@ -127,22 +137,33 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// <summary>
     /// 배틀 시작 시 호출. 내 덱 broadcast + 상대 덱 수신 대기.
     /// GameInitializer 또는 TurnRunner.StartBattle 전에 await.
+    /// 반환 false = 초기화 중 상대 이탈/연결실패(정상 완료 아님) → 호출부가 이탈 처리.
     /// </summary>
-    public async UniTask SyncInitialDecks()
+    public async UniTask<bool> SyncInitialDecks()
     {
-        int[] t_myIds = this.playerField?.GetShuffledIds(this.cardRegistry);
-        NetworkGameController.Instance?.SendInitialDeck(t_myIds ?? System.Array.Empty<int>(), this.MyOwnerIndex);
+        SubscribeInitAbort();
+        try
+        {
+            int[] t_myIds = this.playerField?.GetShuffledIds(this.cardRegistry);
+            NetworkGameController.Instance?.SendInitialDeck(t_myIds ?? System.Array.Empty<int>(), this.MyOwnerIndex);
 
-        if (!this.enemyDeckReceived)
-            await this.initSyncTcs.Task;
+            if (!this.enemyDeckReceived)
+                await this.initSyncTcs.Task;
+            if (this.opponentLeftDuringInit) return false;
 
-        ResetDeckSyncState();
+            ResetDeckSyncState();
 
-        // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
-        await SyncMatchSeed();
+            // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
+            if (!await SyncMatchSeed()) return false;
 
-        this.enemyFieldView?.Refresh();
-        this.playerFieldView?.Refresh();
+            this.enemyFieldView?.Refresh();
+            this.playerFieldView?.Refresh();
+            return true;
+        }
+        finally
+        {
+            UnsubscribeInitAbort();
+        }
     }
 
     void ResetDeckSyncState()
@@ -154,24 +175,28 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// <summary>
     /// commit-reveal로 양쪽이 조작 못 하는 공유 시드 합의.
     /// 1) H(nonce) 교환(commit) 2) nonce 교환(reveal) 3) 검증 4) seed = 내nonce XOR 상대nonce.
+    /// 반환 false = 대기 중 상대 이탈(시드 미확정, opponentNonce 접근 금지).
     /// </summary>
-    async UniTask SyncMatchSeed()
+    async UniTask<bool> SyncMatchSeed()
     {
         byte[] t_myNonce  = MatchRandom.NewNonce();
         byte[] t_myCommit = MatchRandom.Hash(t_myNonce);
 
         NetworkGameController.Instance?.SendSeedCommit(t_myCommit);
         await WaitOpponentCommit();
+        if (this.opponentLeftDuringInit) return false;
 
         // 상대 commit 확보 후에야 내 nonce 공개
         NetworkGameController.Instance?.SendSeedReveal(t_myNonce);
         await WaitOpponentReveal();
+        if (this.opponentLeftDuringInit) return false;
 
         if (!MatchRandom.VerifyCommit(this.opponentNonce, this.opponentCommit))
             Debug.LogError("[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심");
 
         ulong t_seed = MatchRandom.ReadU64(t_myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
         MatchRandom.Seed(t_seed);
+        return true;
     }
 
     UniTask WaitOpponentCommit()
@@ -196,6 +221,37 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.seedRevealReceived = false;
         this.opponentCommit     = null;
         this.opponentNonce      = null;
+    }
+
+    // ── 초기화 단계 이탈 감지 ─────────────────────────────────────────────
+    // StartBattle 이전(덱교환·시드 commit-reveal) 구간에서 상대 이탈 시 3 TCS가
+    // 아무도 해제 안 해 StartBattleAsync가 영구 정지되는 것을 방지.
+
+    void SubscribeInitAbort()
+    {
+        this.opponentLeftDuringInit = false;
+        if (NetworkSession.Instance == null) return;
+        NetworkSession.Instance.OnPlayerLeftRoom   += OnInitPlayerLeft;
+        NetworkSession.Instance.OnConnectionFailed += OnInitConnectionFailed;
+    }
+
+    void UnsubscribeInitAbort()
+    {
+        if (NetworkSession.Instance == null) return;
+        NetworkSession.Instance.OnPlayerLeftRoom   -= OnInitPlayerLeft;
+        NetworkSession.Instance.OnConnectionFailed -= OnInitConnectionFailed;
+    }
+
+    void OnInitPlayerLeft(PlayerRef _p)        => HandleInitAbort();
+    void OnInitConnectionFailed(string _reason) => HandleInitAbort();
+
+    /// <summary>초기화 중 상대 이탈: 3 TCS를 멱등 해제해 각 await를 즉시 깨움.</summary>
+    void HandleInitAbort()
+    {
+        this.opponentLeftDuringInit = true;
+        this.initSyncTcs?.TrySetResult();
+        this.seedCommitTcs?.TrySetResult();
+        this.seedRevealTcs?.TrySetResult();
     }
 
     // ── 대기 API ───────────────────────────────────────────────────────────

@@ -28,6 +28,19 @@ public class CardAnimator : MonoBehaviour
         this.slotPosition = transform.position;
     }
 
+    void OnDestroy()
+    {
+        transform.DOKill();
+        if (this.hitOverlay != null) this.hitOverlay.DOKill();
+        if (this.dieOverlay != null) this.dieOverlay.DOKill();
+        if (this.cachedRenderers != null)
+            foreach (SpriteRenderer t_sr in this.cachedRenderers)
+                if (t_sr != null) t_sr.DOKill();
+        if (this.cachedTexts != null)
+            foreach (TMP_Text t_tmp in this.cachedTexts)
+                if (t_tmp != null) t_tmp.DOKill();
+    }
+
     public void Initialize()
     {
         RefreshVisualCache();
@@ -93,12 +106,12 @@ public class CardAnimator : MonoBehaviour
             if (t_sr == this.dieOverlay) continue;
             if (this.fadeExcludes.Contains(t_sr)) continue;
             t_sr.DOKill();
-            t_sr.DOFade(_alpha, _duration);
+            t_sr.DOFade(_alpha, _duration).SetLink(gameObject);
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
         {
             t_tmp.DOKill();
-            t_tmp.DOFade(_alpha, _duration);
+            t_tmp.DOFade(_alpha, _duration).SetLink(gameObject);
         }
     }
 
@@ -111,12 +124,12 @@ public class CardAnimator : MonoBehaviour
             if (t_sr == this.hitOverlay) continue;
             if (t_sr == this.dieOverlay) continue;
             t_sr.DOKill();
-            t_sr.DOFade(_alpha, this.moveDuration);
+            t_sr.DOFade(_alpha, this.moveDuration).SetLink(gameObject);
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
         {
             t_tmp.DOKill();
-            t_tmp.DOFade(_alpha, this.moveDuration);
+            t_tmp.DOFade(_alpha, this.moveDuration).SetLink(gameObject);
         }
     }
 
@@ -130,7 +143,7 @@ public class CardAnimator : MonoBehaviour
         Color t_c = this.dieOverlay.color;
         t_c.a = 0f;
         this.dieOverlay.color = t_c;
-        this.dieOverlay.DOFade(0.7f, 0.55f).SetLoops(-1, LoopType.Yoyo);
+        this.dieOverlay.DOFade(0.7f, 0.55f).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
     }
 
     public void HideDeathPreview()
@@ -153,8 +166,8 @@ public class CardAnimator : MonoBehaviour
         Color t_c = this.hitOverlay.color;
         t_c.a = 0f;
         this.hitOverlay.color = t_c;
-        await this.hitOverlay.DOFade(0.5f, _duration).ToUniTask();
-        await this.hitOverlay.DOFade(0f, _duration).ToUniTask();
+        await this.hitOverlay.DOFade(0.5f, _duration).SetLink(gameObject).ToUniTask();
+        await this.hitOverlay.DOFade(0f, _duration).SetLink(gameObject).ToUniTask();
     }
 
     public async UniTask PlayDeathAnim(float _duration = 0.4f)
@@ -164,6 +177,7 @@ public class CardAnimator : MonoBehaviour
         SoundManager.Instance?.PlayDeath();
         SoundManager.Instance?.PlayDeathVoice(this.boundCard?.data?.deathVoices);
         var t_seq = DOTween.Sequence();
+        t_seq.SetLink(gameObject);
         t_seq.Join(transform.DOScale(0f, _duration).SetEase(Ease.InBack));
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {

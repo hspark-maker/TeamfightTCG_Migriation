@@ -58,6 +58,7 @@ public class HintArrow : MonoBehaviour
             t_seq.AppendCallback(() => t_tr.localPosition = t_base);
             if (t_padAfter > 0f) t_seq.AppendInterval(t_padAfter);
             t_seq.SetLoops(-1, LoopType.Restart);
+            t_seq.SetLink(gameObject);
 
             this.loopSeqs[t_i] = t_seq;
         }
@@ -75,4 +76,6 @@ public class HintArrow : MonoBehaviour
         foreach (Sequence t_seq in this.loopSeqs)
             t_seq?.Kill();
     }
+
+    void OnDestroy() => KillLoops();
 }
