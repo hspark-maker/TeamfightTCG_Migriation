@@ -12,6 +12,7 @@
 - 새 시스템·기능 설계 / 이해가 먼저 필요한 일 → `cavecrew-investigator`(실태 매핑) + 도메인 팀(`battle-engineer`/`net-engineer`/`architecture-engineer`) **병렬** 소집 → 취합 제안
 - 전투·턴·공격 로직 → `battle-engineer`
 - 멀티플레이·결정론·와이어 프로토콜 → `net-engineer`
+- 아웃게임(세이브·재화·시간/생산·도감 소유상태·성장/보상) → `outgame-engineer`
 - 구조·경계·협업성·단일진실원 판정 → `architecture-engineer`
 - 코드 리뷰·검수 → `tcg-reviewer`
 - 위치 찾기 / 기계적 1~2파일 수정 → `cavecrew-investigator`/`cavecrew-builder`
