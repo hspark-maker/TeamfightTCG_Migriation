@@ -16,7 +16,11 @@
       "mcp__unity-mcp__Unity_RunCommand",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(xargs grep -l \"CardAnimator\\\\|HintArrow\\\\|SwipeGuide\")"
+      "Bash(xargs grep -l \"CardAnimator\\\\|HintArrow\\\\|SwipeGuide\")",
+      "Bash(xargs wc -l)",
+      "Bash(grep -n \"^#\\\\{1,3\\\\} \" docs/ARCHITECTURE.md)",
+      "Bash(grep -n -B8 \"m_Spacing: {x: 100, y: 100}\" Assets/Scenes/MainMenu.unity)",
+      "Bash(grep -n -A8 \"m_Spacing: {x: 100, y: 100}\" Assets/Scenes/MainMenu.unity)"
     ]
   }
 }
