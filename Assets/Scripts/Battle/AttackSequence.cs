@@ -55,9 +55,9 @@ public static class AttackSequence
         float t_origDefenderZ = _defender.SlotPosition.z;
         float t_origSplashZ   = _splashView?.SlotPosition.z ?? 0f;
 
-        _attacker?.transform.DOMoveZ(t_origAttackerZ - 5f, CINEMA_DURATION);
-        _defender.transform.DOMoveZ(t_origDefenderZ - 5f, CINEMA_DURATION);
-        _splashView?.transform.DOMoveZ(t_origSplashZ - 5f, CINEMA_DURATION);
+        _ = _attacker?.transform.DOMoveZ(t_origAttackerZ - 5f, CINEMA_DURATION);
+        _ = _defender.transform.DOMoveZ(t_origDefenderZ - 5f, CINEMA_DURATION);
+        _ = _splashView?.transform.DOMoveZ(t_origSplashZ - 5f, CINEMA_DURATION);
 
         SoundManager.Instance?.PlayCinemaEnter();
         if (BattleCamera.Instance != null)

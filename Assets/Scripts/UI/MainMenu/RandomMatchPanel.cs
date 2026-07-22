@@ -68,9 +68,7 @@ public class RandomMatchPanel : MonoBehaviour
     void HandleConnectionFailed(string _reason)
         => SetStatus($"연결 끊김: {_reason}");
 
-    void StartBattle() => StartBattleAsync().Forget();
-
-    async UniTaskVoid StartBattleAsync()
+    void StartBattle()
     {
         SceneTransitionVideo.Instance?.PlayOverlay();
 

@@ -45,7 +45,7 @@ public class BattleIntro : MonoBehaviour
             Vector3 t_pos = Camera.main.transform.position;
             t_pos.z = this.cameraStartZ;
             Camera.main.transform.position = t_pos;
-            Camera.main.transform.DOMoveZ(this.cameraTargetZ, this.cameraDuration);
+            _ = Camera.main.transform.DOMoveZ(this.cameraTargetZ, this.cameraDuration);
         }
 
         Vector3 t_playerFrom = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 2f, 0f, 10f));

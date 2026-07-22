@@ -117,9 +117,7 @@ public class MultiplayerLobbyPanel : MonoBehaviour
         SetConnectButtonInteractable(true);
     }
 
-    void StartBattle() => StartBattleAsync().Forget();
-
-    async UniTaskVoid StartBattleAsync()
+    void StartBattle()
     {
         SceneTransitionVideo.Instance?.PlayOverlay();
 

@@ -523,6 +523,10 @@ public class CardView : MonoBehaviour
     {
         if (this.weaponInstance != null)
         {
+            // 무기 자식 스프라이트가 FadeView tween 대상으로 잡혀있을 수 있음.
+            // 루트(SetLink 대상)는 살아있어 kill이 안 걸리므로 파괴 전 직접 DOKill.
+            foreach (SpriteRenderer t_sr in this.weaponInstance.GetComponentsInChildren<SpriteRenderer>(true))
+                t_sr.DOKill();
             this.weaponInstance.transform.SetParent(null);
             Destroy(this.weaponInstance);
             this.weaponInstance = null;
@@ -619,7 +623,12 @@ public class CardView : MonoBehaviour
         if (this.keywordIconRoot == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
 
         foreach (Transform t_child in this.keywordIconRoot)
+        {
+            // 아이콘 스프라이트가 FadeView tween 대상일 수 있음. 파괴 전 DOKill (루트 SetLink는 안 걸림).
+            foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>(true))
+                t_sr.DOKill();
             Destroy(t_child.gameObject);
+        }
 
         this.iconMap.Clear();
 

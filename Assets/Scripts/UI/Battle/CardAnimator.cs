@@ -176,16 +176,16 @@ public class CardAnimator : MonoBehaviour
 
         SoundManager.Instance?.PlayDeath();
         SoundManager.Instance?.PlayDeathVoice(this.boundCard?.data?.deathVoices);
-        var t_seq = DOTween.Sequence();
-        t_seq.SetLink(gameObject);
-        t_seq.Join(transform.DOScale(0f, _duration).SetEase(Ease.InBack));
+        var t_seq = DOTween.Sequence()
+            .SetLink(gameObject)
+            .Join(transform.DOScale(0f, _duration).SetEase(Ease.InBack));
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay) continue;
-            t_seq.Join(t_sr.DOFade(0f, _duration));
+            _ = t_seq.Join(t_sr.DOFade(0f, _duration));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            t_seq.Join(t_tmp.DOFade(0f, _duration));
+            _ = t_seq.Join(t_tmp.DOFade(0f, _duration));
         await t_seq.ToUniTask();
 
         if (this == null) return;
@@ -234,19 +234,19 @@ public class CardAnimator : MonoBehaviour
             Color t_c = t_tmp.color; t_c.a = 1f; t_tmp.color = t_c;
         }
 
-        var t_seq1 = DOTween.Sequence();
-        t_seq1.Join(transform.DOMove(_mid, t_half).SetEase(Ease.OutCubic));
-        t_seq1.Join(transform.DOScale(1.5f, t_half).SetEase(Ease.OutCubic));
+        var t_seq1 = DOTween.Sequence()
+            .Join(transform.DOMove(_mid, t_half).SetEase(Ease.OutCubic))
+            .Join(transform.DOScale(1.5f, t_half).SetEase(Ease.OutCubic));
         bool t_cancelled = await t_seq1.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
         if (t_cancelled) return;
 
         t_cancelled = await UniTask.Delay(500, cancellationToken: t_ct).SuppressCancellationThrow();
         if (t_cancelled) return;
 
-        var t_seq2 = DOTween.Sequence();
-        t_seq2.Join(transform.DOMove(_dest, t_half).SetEase(Ease.InCubic));
-        t_seq2.Join(transform.DOScale(1f, t_half).SetEase(Ease.InCubic));
-        t_seq2.Join(transform.DORotate(new Vector3(0f, 360f, 0f), t_half, RotateMode.FastBeyond360));
+        var t_seq2 = DOTween.Sequence()
+            .Join(transform.DOMove(_dest, t_half).SetEase(Ease.InCubic))
+            .Join(transform.DOScale(1f, t_half).SetEase(Ease.InCubic))
+            .Join(transform.DORotate(new Vector3(0f, 360f, 0f), t_half, RotateMode.FastBeyond360));
         t_cancelled = await t_seq2.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
         if (t_cancelled) return;
 
