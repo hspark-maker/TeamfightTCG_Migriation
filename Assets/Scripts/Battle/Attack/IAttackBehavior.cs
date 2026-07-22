@@ -14,4 +14,5 @@ public struct AttackResult
     public CardInstance splashDefender;   // 무쌍: 광역 피해 대상
     public CardKeyword  attackerKeywords; // 발동된 공격자 키워드
     public CardKeyword  defenderKeywords; // 발동된 수비자 키워드 (e.g. 표식)
+    public int          damageDealt;      // 주 대상에 실제 적용된 데미지(ClampDamage 결과). 트리거(청소부 회복 등)용. struct 기본 0.
 }

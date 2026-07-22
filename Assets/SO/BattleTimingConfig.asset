@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25215ec81c6a5e64eafec7630faa005f, type: 3}
   m_Name: BattleTimingConfig
   m_EditorClassIdentifier: Assembly-CSharp::BattleTimingConfig
-  globalSpeed: 2
+  globalSpeed: 1.5
   cinemaDuration: 0.25
   cameraIntroDuration: 0.8
   cardDealDelay: 0.15
@@ -33,3 +33,4 @@ MonoBehaviour:
   enemyExtraAttackDelay: 0.4
   opponentTurnStartDelay: 0.5
   opponentExtraAttackDelay: 0.4
+  turnThinkTime: 30

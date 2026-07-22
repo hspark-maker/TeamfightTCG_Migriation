@@ -111,6 +111,10 @@ public class TurnRunner : MonoBehaviour
             await t_turn.Execute();
             t_turn.OnExit();
 
+            // 유산: 이번 턴 필드의 소속 카드 legacyStack++ (사망 시 아군 회복량). 동기, RNG 미소비.
+            foreach (var t_c in t_field.GetActiveCards())
+                SynergyTriggers.OnTurnEnd(t_c, t_field);
+
             if (this.disconnectWin || CheckGameOver()) break;
 
             if (t_current == 1)

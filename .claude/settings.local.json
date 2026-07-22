@@ -16,7 +16,8 @@
       "mcp__unity-mcp__Unity_RunCommand",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(xargs grep -l \"CardAnimator\\\\|HintArrow\\\\|SwipeGuide\")"
+      "Bash(xargs grep -l \"CardAnimator\\\\|HintArrow\\\\|SwipeGuide\")",
+      "mcp__unity-mcp__Unity_ManageMenuItem"
     ]
   }
 }

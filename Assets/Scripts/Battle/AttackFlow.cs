@@ -27,6 +27,24 @@ public static class AttackFlow
         return (t_splash, t_view);
     }
 
+    /// <summary>공격 개시 직전 공격자 소속 시너지 패시브 발동(무리 선피해 등).
+    /// AttackSequence.Play 직전(PreSelectSplash 이후)에 호출 → Execute 전 원자 완료. RNG 미소비(splash 스트림 미교란).</summary>
+    public static async UniTask RunBeforeAttackPassives(
+        CardInstance _attacker, CardInstance _defender, BattleField _attackerField)
+    {
+        if (!_attacker.IsAlive) return;
+        await SynergyTriggers.OnBeforeAttack(_attacker, _defender, _attackerField);
+    }
+
+    /// <summary>피격 시 방어자 트리거 발동(패시브 OnAttackedBy + 시너지 성벽 반격 등).
+    /// 동기 void 계약 — behavior의 counter 해결 직후 RemoveDead 전에 인라인 호출(hp 기준시점 통일).</summary>
+    public static void RunAttackedBy(
+        CardInstance _defender, CardInstance _attacker, BattleField _defenderField)
+    {
+        _defender.data.passive?.OnAttackedBy(_defender, _attacker).Forget();
+        SynergyTriggers.OnAttackedBy(_defender, _defenderField, _attacker);
+    }
+
     /// <summary>공격 직후 공격자 패시브 발동 (OnAfterAttack, 처치 시 OnKill).</summary>
     public static async UniTask RunAfterAttackPassives(
         CardInstance _attacker, CardInstance _defender, BattleField _attackerField, AttackResult _result)
@@ -35,6 +53,8 @@ public static class AttackFlow
         await (_attacker.data.passive?.OnAfterAttack(_attacker, _defender, _attackerField) ?? UniTask.CompletedTask);
         if (_result.defenderKilled)
             await (_attacker.data.passive?.OnKill(_attacker, _defender) ?? UniTask.CompletedTask);
+        // 시너지 공격-후 트리거(청소부 회복 등). 패시브 발화 직후, 생존 가드 이후.
+        await SynergyTriggers.OnAfterAttack(_attacker, _attackerField, _result.damageDealt);
     }
 
     /// <summary>발동 키워드 글로우 + 교활(swap) 등장 스케일 연출.</summary>

@@ -51,7 +51,10 @@ public class CardView : MonoBehaviour
     [Header("Synergy")]
     [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
     [SerializeField] SynergyBadgeView synergyBadgePrefab; // 색+텍스트 배지 프리팹.
-    [SerializeField] float synergyBadgeSpacing = 0.35f;
+    [SerializeField] float synergyBadgeXPos   = 0.55f;  // 배지 세로열 X(synergyBadgeRoot 기준).
+    [SerializeField] float synergyBadgeYStart = 0.95f;  // 첫 배지(i=0) Y.
+    [SerializeField] float synergyBadgeYStep  = -0.5f;  // 배지 간 Y 간격(아래로 쌓기).
+    [SerializeField] int   synergyMaxBadges   = 3;      // 표시 최대 배지 수(초과분 드롭).
 
     [Header("Input")]
     [SerializeField] float dragThreshold = 30f;
@@ -480,13 +483,14 @@ public class CardView : MonoBehaviour
 
         bool t_defInvincible = t_def.HasKeyword(CardKeyword.Invincible);
         int  t_dmg = t_defInvincible ? 0 : t_atk.AttackDamage();
-        _target.ShowAttackPreview(t_dmg, t_def.WouldDieFrom(t_atk.AttackDamage()));
+        _target.ShowAttackPreview(t_dmg, t_def.WouldDieFrom(t_atk.AttackDamage()));   // 직격(공격): 비늘 감소 반영(기본 true)
 
         if (!t_atk.TakesCounterFrom(t_def)) return;
 
         bool t_atkInvincible = t_atk.HasKeyword(CardKeyword.Invincible);
         int  t_counter = t_atkInvincible ? 0 : t_def.AttackDamage();
-        ShowAttackPreview(t_counter, t_atk.WouldDieFrom(t_def.AttackDamage()));
+        // 반격 맥락: 비늘 감소 없음(false). 실제 반격 TakeDamage(false)와 사망 프리뷰/HP표시 일치.
+        ShowAttackPreview(t_counter, t_atk.WouldDieFrom(t_def.AttackDamage(), false), false);
     }
     #endregion
 
@@ -578,12 +582,13 @@ public class CardView : MonoBehaviour
             this.selectedHighlight.enabled = _active;
     }
 
-    public void ShowAttackPreview(int _damage, bool _wouldDie)
+    public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)
     {
         if (this.hpText == null || this.boundCard == null) return;
         this.hpTextOriginalColor = this.hpText.color;
         this.hpText.DOKill();
-        (int t_hpAfter, int t_bonusAfter) = this.boundCard.PreviewAfterDamage(_damage);
+        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → WouldDieFrom과 동일 소스로 HP표시 일치.
+        (int t_hpAfter, int t_bonusAfter) = this.boundCard.PreviewAfterDamage(_damage, _isAttackHit);
         SetHpDisplay(t_hpAfter.ToString(), t_bonusAfter > 0 ? $"+{t_bonusAfter}" : "");
         this.hpText.color = Color.red;
 
@@ -660,12 +665,24 @@ public class CardView : MonoBehaviour
         }
     }
 
-    // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 0~N개 표시.
-    // 활성 판정은 소유 필드의 확정 SynergyState.Active 참조 조회(재계산·카운트 집계 금지).
+    // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 세로 정렬 표시(최대 synergyMaxBadges개).
+    // 정렬: 활성 우선 → requiredCount 내림차순. 활성/티어 판정은 확정 SynergyState.Active 참조 조회(재계산·집계 금지).
     // _synergy는 이 카드가 속한 BattleField.Synergy(BattleFieldView가 Render로 주입). null이면 전부 비활성 취급.
+    CardInstance _lastBadgeCard;
+    SynergyState _lastBadgeState;
+
     void RefreshSynergyBadges(SynergyState _synergy)
     {
         if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
+
+        // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →
+        // 매 Render(턴 시작 Refresh)마다 배지가 재-Set되어 pop이 반복되는 문제 방지.
+        // 배지가 이미 존재할 때만 스킵(없으면 재생성 필요). 첫 등장/리바인드 시에만 rebuild+pop.
+        if (this.boundCard == this._lastBadgeCard && _synergy == this._lastBadgeState
+            && this.synergyBadgeRoot.childCount > 0)
+            return;
+        this._lastBadgeCard  = this.boundCard;
+        this._lastBadgeState = _synergy;
 
         // 기존 배지 정리. 배경 SpriteRenderer/라벨 TMP_Text가 CardAnimator FadeView tween 대상일 수 있어
         // 파괴 전 직접 DOKill(SetLink는 CardView GO 기준이라 자식 단독 파괴 시 안 걸림). 키워드 아이콘과 동일 규약.
@@ -693,11 +710,20 @@ public class CardView : MonoBehaviour
         }
         if (t_tags.Count == 0) return;
 
-        float t_startX = -(t_tags.Count - 1) * this.synergyBadgeSpacing * 0.5f;
-        for (int t_i = 0; t_i < t_tags.Count; t_i++)
+        // 활성 우선(위쪽), 동급이면 requiredCount 높은 순. 정렬 후 상위 synergyMaxBadges개만 표시.
+        t_tags.Sort((_a, _b) =>
+        {
+            bool t_activeA = IsSynergyActive(_synergy, _a);
+            bool t_activeB = IsSynergyActive(_synergy, _b);
+            if (t_activeA != t_activeB) return t_activeB.CompareTo(t_activeA);       // 활성(true) 먼저
+            return GetBadgeRequiredCount(_synergy, _b).CompareTo(GetBadgeRequiredCount(_synergy, _a)); // requiredCount 내림차순
+        });
+
+        int t_shown = Mathf.Min(t_tags.Count, this.synergyMaxBadges);
+        for (int t_i = 0; t_i < t_shown; t_i++)
         {
             SynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
-            t_badge.transform.localPosition = new Vector3(t_startX + t_i * this.synergyBadgeSpacing, 0f, 0f);
+            t_badge.transform.localPosition = new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f);
             t_badge.Set(t_tags[t_i], IsSynergyActive(_synergy, t_tags[t_i]));
         }
     }
@@ -711,11 +737,45 @@ public class CardView : MonoBehaviour
         return false;
     }
 
+    // 정렬용 requiredCount: 활성이면 확정 스냅샷의 활성 티어 requiredCount, 비활성이면 tiers 중 최고값(없으면 0).
+    static int GetBadgeRequiredCount(SynergyState _synergy, SynergyData _tag)
+    {
+        if (_tag == null) return 0;
+        if (_synergy != null)
+        {
+            foreach (ActiveSynergy t_a in _synergy.Active)
+                if (t_a.Synergy == _tag)
+                    return t_a.Tier != null ? t_a.Tier.requiredCount : 0;
+        }
+        // 비활성: 정의된 티어 중 최고 requiredCount.
+        int t_max = 0;
+        if (_tag.tiers != null)
+            foreach (SynergyTier t_tier in _tag.tiers)
+                if (t_tier != null && t_tier.requiredCount > t_max) t_max = t_tier.requiredCount;
+        return t_max;
+    }
+
     public static CardView GetView(CardInstance _card)
     {
         foreach (CardView t_cv in allViews)
             if (t_cv.boundCard == _card) return t_cv;
         return null;
+    }
+
+    // 시너지 효과가 실제 발동한 순간, 이 카드의 해당 시너지 배지를 pop시킨다(순수 연출, 게임상태/RNG 무관).
+    // synergyBadgeRoot 자식에는 활성 배지만 존재하므로 Synergy 참조 일치 배지를 찾아 PlayPop. null/미발견이면 no-op.
+    public void PopSynergyBadge(SynergyData _synergy)
+    {
+        if (this.synergyBadgeRoot == null || _synergy == null) return;
+        foreach (Transform t_child in this.synergyBadgeRoot)
+        {
+            SynergyBadgeView t_badge = t_child.GetComponent<SynergyBadgeView>();
+            if (t_badge != null && t_badge.Synergy == _synergy)
+            {
+                t_badge.PlayPop();
+                return;
+            }
+        }
     }
 
     public async UniTask PlayKeywordGlow(CardKeyword _kw)

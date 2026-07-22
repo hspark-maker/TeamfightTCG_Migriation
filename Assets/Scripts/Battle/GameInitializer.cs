@@ -66,6 +66,7 @@ public class GameInitializer : MonoBehaviour
         this.enemyField.Initialize(this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>(), 1);
 
         // 시너지: 양 덱 확정 후 각 필드에 1회 적용 (전투 중 재계산 없음)
+        // 초기배치는 OnSpawn 미발화 — 등장 트리거(돌보미/흐름)는 런타임 스폰(FillEmptySlots/Swap/PlaceDirect)에서만.
         this.playerField.ApplyDeckSynergy();
         this.enemyField.ApplyDeckSynergy();
     }

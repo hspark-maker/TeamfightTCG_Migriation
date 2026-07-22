@@ -17,8 +17,8 @@ MonoBehaviour:
   maxHp: 6
   bonusHp: 0
   synergies:
-  - {fileID: 11400000, guid: 90718cdfeee817f449b0862384827ab1, type: 2}
-  - {fileID: 11400000, guid: 5c38d384fdfd62f48b2acf49e1653c61, type: 2}
+  - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
+  - {fileID: 11400000, guid: dee4791a461125448898b01d9b781ae5, type: 2}
   fullImage: {fileID: 21300000, guid: 38de89c018243a14eabeaf0ba5ba1392, type: 3}
   portrait: {fileID: 21300000, guid: 392c35861ad911c47a6b20cfa367c5df, type: 3}
   battleImage: {fileID: 21300000, guid: 3fc7b134bcb15ec4bbeaeecd89a51a2a, type: 3}

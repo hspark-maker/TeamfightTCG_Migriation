@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f07f34679d9ae14e8a7a514834dc90b, type: 3}
+  m_Name: "\uBE44\uB298_DmgReduction"
+  m_EditorClassIdentifier: Assembly-CSharp::StatSynergyEffect
+  bonusAtk: 0
+  bonusHp: 0
+  grantedKeywords: 0
+  dmgReduction: 1

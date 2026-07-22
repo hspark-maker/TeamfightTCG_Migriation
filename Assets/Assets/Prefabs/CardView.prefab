@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 43555196370063002}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -0.027999967, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -279,7 +279,7 @@ Transform:
   m_GameObject: {fileID: 1044034781206452747}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.029999971, y: -0.02, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5263,7 +5263,7 @@ Transform:
   m_GameObject: {fileID: 2281274103933067746}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.099, y: -0.767, z: 0}
+  m_LocalPosition: {x: -0.099, y: -0.79499996, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5362,7 +5362,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.32, y: -0.753}
+  m_AnchoredPosition: {x: 0.32, y: -0.781}
   m_SizeDelta: {x: 1.4, y: 0.34}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &9073132313180193461
@@ -5482,7 +5482,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 3
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
@@ -5919,7 +5919,7 @@ Transform:
   m_GameObject: {fileID: 5056942167285924962}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.53900003, z: 0}
+  m_LocalPosition: {x: 0, y: -0.56700003, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6100,7 +6100,7 @@ Transform:
   m_GameObject: {fileID: 6324481928867156522}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.75, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6474,7 +6474,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -0.43300003}
+  m_AnchoredPosition: {x: 0, y: -0.461}
   m_SizeDelta: {x: 1.4, y: 0.3}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &8681528259622043954
@@ -6592,7 +6592,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 3
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
@@ -6917,7 +6917,10 @@ MonoBehaviour:
   iconSpacing: 0.3
   synergyBadgeRoot: {fileID: 3242344529736856691}
   synergyBadgePrefab: {fileID: 8437468774932756809, guid: 8d611272942ca6d4fb970a8928035eaf, type: 3}
-  synergyBadgeSpacing: 0.35
+  synergyBadgeXPos: 0.55
+  synergyBadgeYStart: 0.95
+  synergyBadgeYStep: -0.5
+  synergyMaxBadges: 3
   dragThreshold: 30
   deadZoneRadius: 80
   dirThreshold: 0.35
@@ -6985,7 +6988,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.106, y: -0.753}
+  m_AnchoredPosition: {x: 0.106, y: -0.781}
   m_SizeDelta: {x: 1.4, y: 0.34}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &8681528261154911475
@@ -7105,7 +7108,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 3
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1

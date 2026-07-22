@@ -1,0 +1,18 @@
+using UnityEngine;
+
+// 언데드 시너지(덱 3장↑ 활성). 순수 사망 트리거형 — 정적 스탯 없음.
+// 파괴되는 순간 체력 50%(최소 1)로 게임당 1회 부활. 부활 규칙은 CardInstance.ReviveAtHalf에 위임(단일 진실원).
+// 동기 void — RemoveDead가 OnDeath 직후 IsAlive면 RemoveCard를 스킵(제자리 부활, 라이프사이클 재진입 없음).
+// 디스패처가 self(죽는 카드) 소속에 대해서만 발화하므로 여기서 소속 재판정 불필요. RNG 미소비.
+[CreateAssetMenu(fileName = "UndeadSynergyEffect", menuName = "Card Battle/Synergy Effect/Undead")]
+public class UndeadSynergyEffect : SynergyEffect
+{
+    public override void Apply(CardInstance card, SynergyState state) { }   // 정적 효과 없음(순수 사망 트리거)
+
+    public override void OnDeath(CardInstance self, BattleField field, SynergyData synergy)
+    {
+        if (self == null) return;
+        if (self.ReviveAtHalf())   // 게임당 1회, 성공 시 제자리 hp 복구
+            SynergyTriggers.Fire(self, synergy);   // 부활 성공 시에만 배너+배지 pop(라벨=시너지 설명 통일)
+    }
+}

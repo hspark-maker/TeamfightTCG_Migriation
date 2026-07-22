@@ -17,10 +17,9 @@ public class PeerlessAttack : NormalAttack
 
         int t_atkDmg = _attacker.AttackDamage();
         int t_actualAtkDmg = _defender.ClampDamage(t_atkDmg);
-        _defender.TakeDamage(t_atkDmg);
-        _defender.data.passive?.OnAttackedBy(_defender, _attacker).Forget();
+        _defender.TakeDamage(t_atkDmg, true);   // 직격: 비늘 감소 대상
         if (_attacker.TakesCounterFrom(_defender))  // 반격 자격(단일 진실원). 무쌍은 Ranged가 아니므로 !Mark와 등가
-            _attacker.TakeDamage(t_ctrDmg);
+            _attacker.TakeDamage(t_ctrDmg);   // 반격: 비늘 감소 없음(기본 false)
         _attacker.data.passive?.OnDealDamage(_attacker, t_actualAtkDmg).Forget();
 
         CardInstance t_splash = _preSelectedSplash ?? PickSplash(_defender.slotIndex, _defenderField);
@@ -28,14 +27,18 @@ public class PeerlessAttack : NormalAttack
         {
             int t_dmg = Mathf.FloorToInt(t_origHp * 0.5f);
             if (t_dmg > 0)
-                t_splash.TakeDamage(t_dmg);
+                t_splash.TakeDamage(t_dmg, true);   // 스플래시도 공격 직격: 비늘 감소 대상
         }
+
+        // counter+splash 뒤(RemoveDead 직전)로 이동 → 4 behavior hp 기준시점 통일. 성벽 반격 포함(동기).
+        AttackFlow.RunAttackedBy(_defender, _attacker, _defenderField);
 
         bool t_defKilled = _defender.hp == 0;
         RemoveDead(_attackerField, _attackerField);
         RemoveDead(_defenderField, _defenderField);
 
         var t_result = MakeResult(_attacker, t_defKilled);
+        t_result.damageDealt = t_actualAtkDmg;   // 주 대상만(splash 합산 안 함 = v1). 트리거용
         t_result.splashDefender = t_splash;
         return t_result;
     }

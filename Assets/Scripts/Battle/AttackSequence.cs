@@ -8,24 +8,28 @@ public static class AttackSequence
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null,
         CardKeyword _preEffectKw = CardKeyword.None,
-        CardKeyword _atEffectKw  = CardKeyword.None)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, null);
+        CardKeyword _atEffectKw  = CardKeyword.None,
+        Func<UniTask> _afterHit = null)
+        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, null, _afterHit);
 
     public static UniTask PlaySplash(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null, CardView _splashView = null,
         CardKeyword _preEffectKw = CardKeyword.None,
-        CardKeyword _atEffectKw  = CardKeyword.None)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView);
+        CardKeyword _atEffectKw  = CardKeyword.None,
+        Func<UniTask> _afterHit = null)
+        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
-    /// <summary>splashView 유무로 splash/single 자동 선택. 호출부의 if/else 제거용.</summary>
+    /// <summary>splashView 유무로 splash/single 자동 선택. 호출부의 if/else 제거용.
+    /// _afterHit: 히트/사망 연출 완료 후·제자리 복귀 직전에 실행되는 공격후 효과 콜백.</summary>
     public static UniTask Play(CardView _attacker, CardView _defender, CardView _splashView,
         AttackEffect _effect, Action _onEffect,
-        CardKeyword _preEffectKw, CardKeyword _atEffectKw)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView);
+        CardKeyword _preEffectKw, CardKeyword _atEffectKw,
+        Func<UniTask> _afterHit = null)
+        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
     static async UniTask PlayCore(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect,
-        CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView)
+        CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit)
     {
         float t_hitDelay = _effect?.hitDelay ?? 0f;
         float t_duration = _effect?.duration ?? 0f;
@@ -121,6 +125,10 @@ public static class AttackSequence
 
         if (t_attackerKilled)
             await (_attacker?.PlayDeathAnim() ?? UniTask.CompletedTask);
+
+        // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(청소부 heal/OnAfterAttack 등) 실행
+        if (_afterHit != null)
+            await _afterHit();
 
         BattleCamera.Instance?.ExitCinema();
 

@@ -10,10 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
-  m_Name: N.O.V.A
+  m_Name: "\uBD88\uD55C\uB2F9"
   m_EditorClassIdentifier: 
-  displayName: N.O.V.A
-  requiredCount: 3
-  effectDescription: "\uC801\uC744 \uCC98\uCE58\uD558\uBA74 \uBAA8\uB4E0 N.O.V.A
-    \uCE74\uB4DC\uAC00 \uCD94\uAC00 \uC0DD\uBA85\uB825 3 \uD68D\uB4DD."
-  color: {r: 0.4, g: 0.7, b: 1, a: 1}
+  displayName: "\uBD88\uD55C\uB2F9"
+  effectDescription: "\uD53C\uACA9 \uD6C4 \uC0DD\uC874 \uC2DC \uC544\uC9C1 \uCD9C\uACA9\uD558\uC9C0
+    \uC54A\uC740 \uCE74\uB4DC\uC640 \uAD50\uCCB4."
+  color: {r: 0.55, g: 0.3, b: 0.7, a: 1}
+  icon: {fileID: 21300000, guid: c543d6ad75ae96440a48b8fef82976a0, type: 3}
+  tiers: []

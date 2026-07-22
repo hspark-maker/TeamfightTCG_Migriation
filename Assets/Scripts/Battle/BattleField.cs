@@ -15,6 +15,10 @@ public class BattleField : MonoBehaviour
     public int WaitingCount => this.waitingQueue.Count;
     public bool IsEmpty => !HasAnyCard();
 
+    /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifySpawn)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
+    /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
+    public int FlowStack { get; private set; }
+
     /// <summary>이 덱으로 산출된 시너지 상태. 배틀 시작 시 1회 확정, 전투 중 불변. UI(SynergyPanelUI) 참조용.</summary>
     public SynergyState Synergy { get; private set; }
 
@@ -25,6 +29,7 @@ public class BattleField : MonoBehaviour
         this.ownerIndex = _ownerIndex;
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
+        this.FlowStack = 0;
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -73,6 +78,7 @@ public class BattleField : MonoBehaviour
                 this.slots[i] = t_card;
                 t_card.data.passive?.OnSpawn(t_card).Forget();
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
+                NotifySpawn(t_card);   // 시너지 스폰 훅(돌보미 힐/흐름 스택). 초기배치가 아닌 런타임 스폰만.
                 t_placed.Add(t_card);
             }
         }
@@ -93,6 +99,7 @@ public class BattleField : MonoBehaviour
         this.slots[t_slot]     = t_next;
         t_next.data.passive?.OnSpawn(t_next).Forget();
         t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible);
+        NotifySpawn(t_next);   // 시너지 스폰 훅(돌보미 힐/흐름 스택).
 
         _card.savedHp      = _card.data.maxHp;
         _card.savedBonusHp = _card.data.bonusHp;
@@ -136,6 +143,7 @@ public class BattleField : MonoBehaviour
         this.ownerIndex = _ownerIndex;
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
+        this.FlowStack = 0;
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -160,24 +168,50 @@ public class BattleField : MonoBehaviour
         }
     }
 
-    /// <summary>RPC로 받은 상대 카드 정보를 직접 슬롯에 배치. 대기 큐를 소비하지 않음.</summary>
+    /// <summary>
+    /// RPC로 받은 상대 스폰을 원격 미러 대기 큐에서 꺼내 슬롯에 배치.
+    /// 소유 클라 FillEmptySlots와 100% 동형 — fresh 재파생/시너지 재적용을 하지 않고 미러 인스턴스를
+    /// 그대로 배치한다. bonusHp(덩치) 같은 stateful 값을 원격에서 재부여하면 divergence가 나므로,
+    /// 이미 ApplyDeckSynergy로 시너지를 받고(초기 대기) / SwapWithWaiting으로 savedBonusHp=base가 저장된
+    /// (Cunning 복귀) 미러 인스턴스를 재사용해 소유 클라와 값이 정확히 일치하게 한다.
+    /// </summary>
     public CardInstance PlaceCardDirectly(int _slot, CardData _data)
     {
         if (_data == null || _slot < 0 || _slot >= SLOT_COUNT) return null;
-        var t_card = new CardInstance(_data, this.ownerIndex);
-        // 원격 스폰은 새 인스턴스라 시너지가 없음 → 이미 확정된 필드 시너지를 재적용(재계산 아님).
-        // 소유 클라의 FillEmptySlots 인스턴스와 스탯·키워드를 일치시켜 멀티 divergence 방지.
-        if (this.Synergy != null)
-            SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
+
+        // 미러 대기 인스턴스 dequeue (소유 클라 FillEmptySlots 소비와 lockstep: SwapWithWaiting은 양측이
+        // 동일 순서로 큐를 변형, FillEmptySlots dequeue를 이 dequeue가 미러). cardId(참조 동일성)로 정합 검증.
+        CardInstance t_card;
+        if (this.waitingQueue.Count > 0 && this.waitingQueue.Peek().data == _data)
+        {
+            t_card = this.waitingQueue.Dequeue();
+        }
+        else
+        {
+            // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
+            Debug.LogWarning($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
+                             $"(slot={_slot}, card={_data.name}, waiting={this.waitingQueue.Count})");
+            t_card = new CardInstance(_data, this.ownerIndex);
+            if (this.Synergy != null)
+                SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
+        }
+
+        // FillEmptySlots와 동형: savedHp/savedBonusHp 복원 + 슬롯 세팅 + justSpawned 판정.
+        bool t_cunningReturn = t_card.savedHp >= 0 && t_card.HasKeyword(CardKeyword.Cunning);
+        if (t_card.savedHp >= 0)
+        {
+            t_card.hp          = t_card.savedHp;
+            t_card.bonusHp     = t_card.savedBonusHp;
+            t_card.savedHp     = -1;
+            t_card.savedBonusHp = -1;
+        }
         t_card.slotIndex       = _slot;
         t_card.isRevealed      = true;
         t_card.wasEverRevealed = true;
         this.slots[_slot] = t_card;
         t_card.data.passive?.OnSpawn(t_card).Forget();
-        t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_card.HasKeyword(CardKeyword.Cunning);
-        // 원격 스폰 수신 시 대기 큐 소비 → IsEmpty / WaitingCount 동기화
-        if (this.waitingQueue.Count > 0)
-            this.waitingQueue.Dequeue();
+        t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
+        NotifySpawn(t_card);   // 시너지 스폰 훅(돌보미 힐/흐름 스택). 원격 미러도 소유 클라와 동형 발화.
         return t_card;
     }
 
@@ -194,6 +228,13 @@ public class BattleField : MonoBehaviour
         this.Synergy = SynergyResolver.Resolve(t_cards.ConvertAll(c => c.data));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
     }
+
+    /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
+    public void AddFlowStack() => this.FlowStack++;
+
+    // 런타임 스폰 공통 후처리: 시너지 OnSpawn 발화(돌보미 힐/흐름 스택).
+    // 초기배치(Initialize/InitializeFromRemote)엔 호출 금지 — 오프닝은 미발화(등장=런타임 스폰만).
+    void NotifySpawn(CardInstance _card) => SynergyTriggers.OnSpawn(_card, this);
 
     public CardInstance GetSlot(int _index) => this.slots[_index];
     public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;

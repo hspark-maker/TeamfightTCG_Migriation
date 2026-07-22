@@ -159,6 +159,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
             // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
             // 대칭성: 내 playerField(내 덱) / enemyField(상대 덱 원격 재구성) 각각을 그 덱으로 Resolve →
             // 상대 클라도 동일 두 덱으로 동일 산출 → 결과 일치, 전투 중 재계산 없음.
+            // 초기배치는 OnSpawn 미발화 — 등장 트리거(돌보미/흐름)는 런타임 스폰(FillEmptySlots/Swap/PlaceDirect)에서만.
             this.playerField?.ApplyDeckSynergy();
             this.enemyField?.ApplyDeckSynergy();
 
