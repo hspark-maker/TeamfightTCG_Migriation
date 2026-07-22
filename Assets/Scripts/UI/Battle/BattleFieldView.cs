@@ -18,7 +18,7 @@ public class BattleFieldView : MonoBehaviour
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardInstance t_card = this.field.GetSlot(i);
-            this.slotViews[i].Render(t_card);
+            this.slotViews[i].Render(t_card, this.field.Synergy);
             if (t_card == null && !t_hasWaiting)
                 this.slotViews[i].HideSlot();
         }

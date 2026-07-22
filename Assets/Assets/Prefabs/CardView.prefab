@@ -67,6 +67,7 @@ Transform:
   - {fileID: 9121825581378058478}
   - {fileID: 4710163934471474645}
   - {fileID: 7977979387202345921}
+  - {fileID: 3242344529736856691}
   m_Father: {fileID: 8681528261072580252}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &853532566536810389
@@ -5485,7 +5486,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
-  m_ActiveFontFeatures: 00000000
+  m_ActiveFontFeatures: 6e72656b
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -6074,6 +6075,37 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &6324481928867156522
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3242344529736856691}
+  m_Layer: 0
+  m_Name: SynergyBadgeRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3242344529736856691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6324481928867156522}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.75, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2310979913566655346}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7019840124608661817
 GameObject:
   m_ObjectHideFlags: 0
@@ -6564,7 +6596,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
-  m_ActiveFontFeatures: 00000000
+  m_ActiveFontFeatures: 6e72656b
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -6883,10 +6915,12 @@ MonoBehaviour:
   keywordIconPrefab: {fileID: 2919412587841445740, guid: 54491c579fc1c4b41858c46a28206e8c, type: 3}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   iconSpacing: 0.3
+  synergyBadgeRoot: {fileID: 3242344529736856691}
+  synergyBadgePrefab: {fileID: 8437468774932756809, guid: 8d611272942ca6d4fb970a8928035eaf, type: 3}
+  synergyBadgeSpacing: 0.35
   dragThreshold: 30
   deadZoneRadius: 80
   dirThreshold: 0.35
-  snapRadius: 0.6
   hintArrow: {fileID: 560874983196405025}
   swipeGuide: {fileID: 8938337104574230937}
   dragLine: {fileID: 1804318811369308941}
@@ -6904,7 +6938,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hitOverlay: {fileID: 4895275159703288052}
   dieOverlay: {fileID: 4260057851493078351}
-  moveDuration: 0.3
 --- !u!210 &1536455536639633097
 SortingGroup:
   m_ObjectHideFlags: 0
@@ -7076,7 +7109,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 1
-  m_ActiveFontFeatures: 00000000
+  m_ActiveFontFeatures: 6e72656b
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1

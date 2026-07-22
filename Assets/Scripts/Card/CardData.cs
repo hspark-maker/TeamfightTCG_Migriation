@@ -7,8 +7,9 @@ public class CardData : ScriptableObject
     public CardKeyword keywords;
     public int maxHp;
     public int bonusHp;
-    public SynergyData mainSynergy;
-    public SynergyData subClass;
+    // 카드가 가진 시너지들(가변 개수). main/sub 구분은 개념적일 뿐 같은 종류의 synergy.
+    // 같은 SynergyData가 중복 나열돼도 카운트/적용/배지에서는 1회로 취급(소비측 Distinct).
+    public SynergyData[] synergies;
     public Sprite fullImage;
     public Sprite portrait;
     public Sprite battleImage;

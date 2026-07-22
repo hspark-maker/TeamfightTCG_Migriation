@@ -43,6 +43,8 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float enemyExtraAttackDelay   = 0.4f;
     [SerializeField] float opponentTurnStartDelay  = 0.5f;
     [SerializeField] float opponentExtraAttackDelay = 0.4f;
+    // 내 턴 생각시간(초). 초과 시 자동 공격. 배속과 무관해야 공정 → SpeedFactor 미적용(raw 그대로).
+    [SerializeField] float turnThinkTime           = 30f;
 
     // ── 배율 적용 노출 (초 단위) ─────────────────────────────
     public float CinemaDuration     => cinemaDuration     * SpeedFactor;
@@ -65,4 +67,6 @@ public class BattleTimingConfig : ScriptableObject
     public float EnemyExtraAttackDelay    => enemyExtraAttackDelay    * SpeedFactor;
     public float OpponentTurnStartDelay   => opponentTurnStartDelay   * SpeedFactor;
     public float OpponentExtraAttackDelay => opponentExtraAttackDelay * SpeedFactor;
+    // 생각시간만은 배율 미적용 raw 노출 (배속 켜도 안 줄어듦 = 공정성).
+    public float TurnThinkTime            => turnThinkTime;
 }

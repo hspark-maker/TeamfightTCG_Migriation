@@ -131,5 +131,8 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     public void OnSceneLoadStart(NetworkRunner _r) { }
     public void OnSessionListUpdated(NetworkRunner _r, List<SessionInfo> _list) { }
     public void OnShutdown(NetworkRunner _r, ShutdownReason _reason) { }
+#pragma warning disable CS0618 
+    // SimulationMessagePtr는 Fusion에서 obsolete지만 INetworkRunnerCallbacks 구현상 시그니처 유지 필수
     public void OnUserSimulationMessage(NetworkRunner _r, SimulationMessagePtr _msg) { }
+#pragma warning restore CS0618
 }

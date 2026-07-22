@@ -36,10 +36,11 @@ public static class SynergyApplier
         }
     }
 
-    // 카드가 해당 시너지 소속인지(mainSynergy 또는 subClass 참조 동일성).
+    // 카드가 해당 시너지 소속인지(synergies 배열에 참조 동일성으로 존재하는지).
+    // 배열에 중복 나열돼도 존재 여부만 보므로 카드당 1회 판정 → effect 이중적용 없음.
     private static bool BelongsTo(CardInstance _card, SynergyData _synergy)
     {
-        if (_card?.data == null || _synergy == null) return false;
-        return _card.data.mainSynergy == _synergy || _card.data.subClass == _synergy;
+        if (_card?.data?.synergies == null || _synergy == null) return false;
+        return System.Array.IndexOf(_card.data.synergies, _synergy) >= 0;
     }
 }

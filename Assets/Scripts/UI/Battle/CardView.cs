@@ -48,6 +48,11 @@ public class CardView : MonoBehaviour
     [SerializeField] KeywordIconConfig keywordIconConfig;
     [SerializeField] float iconSpacing = 0.3f;
 
+    [Header("Synergy")]
+    [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
+    [SerializeField] SynergyBadgeView synergyBadgePrefab; // 색+텍스트 배지 프리팹.
+    [SerializeField] float synergyBadgeSpacing = 0.35f;
+
     [Header("Input")]
     [SerializeField] float dragThreshold = 30f;
     [SerializeField] float deadZoneRadius = 80f;
@@ -486,7 +491,7 @@ public class CardView : MonoBehaviour
     #endregion
 
     #region Visual State
-    public void Render(CardInstance _card)
+    public void Render(CardInstance _card, SynergyState _synergy = null)
     {
         this.boundCard = _card;
         this.cardAnim.SetBoundCard(_card);
@@ -500,6 +505,7 @@ public class CardView : MonoBehaviour
             this.faceDownOverlay.SetActive(false);
             SetupWeapon(null);
             RefreshKeywordIcons(CardKeyword.None);
+            RefreshSynergyBadges(null);
             return;
         }
 
@@ -515,6 +521,7 @@ public class CardView : MonoBehaviour
 
         SetupWeapon(_card.data);
         RefreshKeywordIcons(t_isFaceDown ? CardKeyword.None : (_card.data.keywords | _card.runtimeKeywords));
+        RefreshSynergyBadges(_synergy);
     }
 
     void SetupWeapon(CardData _data)
@@ -651,6 +658,57 @@ public class CardView : MonoBehaviour
             if (t_sr != null) t_sr.sprite = t_icons[t_i];
             this.iconMap[t_kwList[t_i]] = t_obj;
         }
+    }
+
+    // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 0~N개 표시.
+    // 활성 판정은 소유 필드의 확정 SynergyState.Active 참조 조회(재계산·카운트 집계 금지).
+    // _synergy는 이 카드가 속한 BattleField.Synergy(BattleFieldView가 Render로 주입). null이면 전부 비활성 취급.
+    void RefreshSynergyBadges(SynergyState _synergy)
+    {
+        if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
+
+        // 기존 배지 정리. 배경 SpriteRenderer/라벨 TMP_Text가 CardAnimator FadeView tween 대상일 수 있어
+        // 파괴 전 직접 DOKill(SetLink는 CardView GO 기준이라 자식 단독 파괴 시 안 걸림). 키워드 아이콘과 동일 규약.
+        foreach (Transform t_child in this.synergyBadgeRoot)
+        {
+            foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>(true))
+                t_sr.DOKill();
+            foreach (TMP_Text t_tx in t_child.GetComponentsInChildren<TMP_Text>(true))
+                t_tx.DOKill();
+            Destroy(t_child.gameObject);
+        }
+
+        // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
+        if (this.boundCard == null || this.boundCard.data == null || !this.boundCard.isRevealed) return;
+
+        var t_tags = new List<SynergyData>();
+        if (this.boundCard.data.synergies != null)
+        {
+            foreach (SynergyData t_syn in this.boundCard.data.synergies)
+            {
+                if (t_syn == null) continue;
+                if (t_tags.Contains(t_syn)) continue;  // 중복 나열 방어(배지 1회)
+                t_tags.Add(t_syn);
+            }
+        }
+        if (t_tags.Count == 0) return;
+
+        float t_startX = -(t_tags.Count - 1) * this.synergyBadgeSpacing * 0.5f;
+        for (int t_i = 0; t_i < t_tags.Count; t_i++)
+        {
+            SynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
+            t_badge.transform.localPosition = new Vector3(t_startX + t_i * this.synergyBadgeSpacing, 0f, 0f);
+            t_badge.Set(t_tags[t_i], IsSynergyActive(_synergy, t_tags[t_i]));
+        }
+    }
+
+    // 활성 = 확정 스냅샷 Active에 해당 SynergyData가 참조로 존재하는지. 카운트/티어 재계산 없음.
+    static bool IsSynergyActive(SynergyState _synergy, SynergyData _tag)
+    {
+        if (_synergy == null || _tag == null) return false;
+        foreach (ActiveSynergy t_a in _synergy.Active)
+            if (t_a.Synergy == _tag) return true;
+        return false;
     }
 
     public static CardView GetView(CardInstance _card)

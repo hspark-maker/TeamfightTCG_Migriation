@@ -16,8 +16,9 @@ MonoBehaviour:
   keywords: 16
   maxHp: 5
   bonusHp: 0
-  mainSynergy: {fileID: 11400000, guid: 9d302e852f209024aa9712f85995ab68, type: 2}
-  subClass: {fileID: 11400000, guid: a5519bfe6370e0544aaa7b39256b93d5, type: 2}
+  synergies:
+  - {fileID: 11400000, guid: 9d302e852f209024aa9712f85995ab68, type: 2}
+  - {fileID: 11400000, guid: a5519bfe6370e0544aaa7b39256b93d5, type: 2}
   fullImage: {fileID: 21300000, guid: 5d43bb8a2dbb7484f9cceb95c32f4965, type: 3}
   portrait: {fileID: 21300000, guid: 2cc95ab120e5ba746a0b22fc71052132, type: 3}
   battleImage: {fileID: 21300000, guid: c2927de9cd0281d49af7597cc2289522, type: 3}

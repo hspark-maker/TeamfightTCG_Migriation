@@ -13,6 +13,10 @@ MonoBehaviour:
   m_Name: "\uC2F8\uC6C0\uAFBC"
   m_EditorClassIdentifier: 
   displayName: "\uC2F8\uC6C0\uAFBC"
-  requiredCount: 2
   effectDescription: "\uCD94\uAC00 \uC0DD\uBA85\uB825 +3."
   color: {r: 0.9, g: 0.4, b: 0.3, a: 1}
+  tiers:
+  - requiredCount: 0
+    label: 
+    effects:
+    - {fileID: 0}
