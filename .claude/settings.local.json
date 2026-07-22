@@ -22,7 +22,10 @@
       "Bash(grep -n -B8 \"m_Spacing: {x: 100, y: 100}\" Assets/Scenes/MainMenu.unity)",
       "Bash(grep -n -A8 \"m_Spacing: {x: 100, y: 100}\" Assets/Scenes/MainMenu.unity)",
       "WebSearch",
-      "PowerShell(Get-ChildItem *)"
+      "PowerShell(Get-ChildItem *)",
+      "Bash(grep -v '\\\\.meta$')",
+      "Bash(git check-ignore *)",
+      "Bash(git status *)"
     ]
   }
 }
