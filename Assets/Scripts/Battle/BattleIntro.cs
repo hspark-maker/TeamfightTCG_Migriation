@@ -6,13 +6,15 @@ public class BattleIntro : MonoBehaviour
 {
     [SerializeField] BattleFieldView playerFieldView;
     [SerializeField] BattleFieldView enemyFieldView;
-    [SerializeField] float cardDealDelay = 0.15f;
-    [SerializeField] float cardDealDuration = 0.6f;
 
     [Header("Camera Intro")]
     [SerializeField] float cameraStartZ = -20f;
     [SerializeField] float cameraTargetZ = -11f;
-    [SerializeField] float cameraDuration = 0.8f;
+
+    // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용). 아래 프로퍼티로 위임.
+    float cardDealDelay    => GameTiming.Battle.CardDealDelay;
+    float cardDealDuration => GameTiming.Battle.CardDealDuration;
+    float cameraDuration   => GameTiming.Battle.CameraIntroDuration;
 
     [Header("Deck Fill Intro")]
     [SerializeField] GameObject playerFaceDownPrefab;
@@ -21,8 +23,9 @@ public class BattleIntro : MonoBehaviour
     [SerializeField] RectTransform playerDeckTransform;
     [SerializeField] RectTransform enemyDeckTransform;
     [SerializeField] int deckCardCount = 3;
-    [SerializeField] float deckDealDelay = 0.12f;
-    [SerializeField] float deckDealDuration = 0.35f;
+
+    float deckDealDelay    => GameTiming.Battle.DeckDealDelay;
+    float deckDealDuration => GameTiming.Battle.DeckDealDuration;
 
 
     Vector3[] m_playerDests;

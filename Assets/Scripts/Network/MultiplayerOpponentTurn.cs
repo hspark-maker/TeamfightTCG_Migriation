@@ -19,7 +19,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
     public override async UniTask Execute()
     {
-        await UniTask.Delay(500);
+        await UniTask.Delay((int)(GameTiming.Battle.OpponentTurnStartDelay * 1000));
 
         while (true)
         {
@@ -80,7 +80,7 @@ public class MultiplayerOpponentTurn : TurnBase
             if (t_result.canAttackAgain && t_atk.IsAlive)
             {
                 CardPassive.Notify(t_atk, CardKeyword.Execution);
-                await UniTask.Delay(400);
+                await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
                 // 루프 → 다음 공격 RPC 대기
             }
             else

@@ -15,6 +15,9 @@ public class BattleField : MonoBehaviour
     public int WaitingCount => this.waitingQueue.Count;
     public bool IsEmpty => !HasAnyCard();
 
+    /// <summary>이 덱으로 산출된 시너지 상태. 배틀 시작 시 1회 확정, 전투 중 불변. UI(SynergyPanelUI) 참조용.</summary>
+    public SynergyState Synergy { get; private set; }
+
     void OnDestroy() => this.healerEffect?.Unsubscribe();
 
     public void Initialize(List<CardData> _deckData, int _ownerIndex)
@@ -162,6 +165,10 @@ public class BattleField : MonoBehaviour
     {
         if (_data == null || _slot < 0 || _slot >= SLOT_COUNT) return null;
         var t_card = new CardInstance(_data, this.ownerIndex);
+        // 원격 스폰은 새 인스턴스라 시너지가 없음 → 이미 확정된 필드 시너지를 재적용(재계산 아님).
+        // 소유 클라의 FillEmptySlots 인스턴스와 스탯·키워드를 일치시켜 멀티 divergence 방지.
+        if (this.Synergy != null)
+            SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
         t_card.slotIndex       = _slot;
         t_card.isRevealed      = true;
         t_card.wasEverRevealed = true;
@@ -172,6 +179,20 @@ public class BattleField : MonoBehaviour
         if (this.waitingQueue.Count > 0)
             this.waitingQueue.Dequeue();
         return t_card;
+    }
+
+    /// <summary>
+    /// 덱 시너지를 산출해 이 필드의 모든 카드(슬롯+대기)에 1회 적용. 배틀 시작 시 호출.
+    /// 시너지는 덱 확정으로 결정되므로 전투 중 재계산 없음. 산출 결과는 Synergy에 보관.
+    /// 멀티 결정론: 양 클라가 동일 덱(동일 CardData 집합)으로 Resolve → 동일 결과.
+    /// </summary>
+    public void ApplyDeckSynergy()
+    {
+        var t_cards = new List<CardInstance>(GetActiveCards());
+        t_cards.AddRange(this.waitingQueue);
+
+        this.Synergy = SynergyResolver.Resolve(t_cards.ConvertAll(c => c.data));
+        SynergyApplier.ApplyAll(this.Synergy, t_cards);
     }
 
     public CardInstance GetSlot(int _index) => this.slots[_index];

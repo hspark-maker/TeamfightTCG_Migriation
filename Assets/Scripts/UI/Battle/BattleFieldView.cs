@@ -6,9 +6,11 @@ public class BattleFieldView : MonoBehaviour
 {
     [SerializeField] CardView[] slotViews;  // length must equal BattleField.SLOT_COUNT
     [SerializeField] BattleField field;
-    [SerializeField] float cardDealDelay    = 0.15f;
-    [SerializeField] float cardDealDuration = 0.6f;
     public BattleField Field => this.field;
+
+    // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
+    float cardDealDelay    => GameTiming.Battle.CardDealDelay;
+    float cardDealDuration => GameTiming.Battle.CardDealDuration;
 
     public void Refresh()
     {

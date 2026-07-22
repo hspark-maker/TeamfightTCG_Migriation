@@ -5,8 +5,6 @@ using UnityEngine;
 
 public static class AttackSequence
 {
-    const float CINEMA_DURATION = 0.25f;
-
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null,
         CardKeyword _preEffectKw = CardKeyword.None,
@@ -31,6 +29,7 @@ public static class AttackSequence
     {
         float t_hitDelay = _effect?.hitDelay ?? 0f;
         float t_duration = _effect?.duration ?? 0f;
+        float t_cinema   = GameTiming.Battle.CinemaDuration;
 
         Vector3 t_defenderOrigin = _defender.SlotPosition;
         Vector3 t_splashOrigin   = _splashView?.SlotPosition ?? Vector3.zero;
@@ -55,15 +54,15 @@ public static class AttackSequence
         float t_origDefenderZ = _defender.SlotPosition.z;
         float t_origSplashZ   = _splashView?.SlotPosition.z ?? 0f;
 
-        _ = _attacker?.transform.DOMoveZ(t_origAttackerZ - 5f, CINEMA_DURATION);
-        _ = _defender.transform.DOMoveZ(t_origDefenderZ - 5f, CINEMA_DURATION);
-        _ = _splashView?.transform.DOMoveZ(t_origSplashZ - 5f, CINEMA_DURATION);
+        _ = _attacker?.transform.DOMoveZ(t_origAttackerZ - 5f, t_cinema);
+        _ = _defender.transform.DOMoveZ(t_origDefenderZ - 5f, t_cinema);
+        _ = _splashView?.transform.DOMoveZ(t_origSplashZ - 5f, t_cinema);
 
         SoundManager.Instance?.PlayCinemaEnter();
         if (BattleCamera.Instance != null)
             await BattleCamera.Instance.EnterCinema();
         else
-            await UniTask.Delay((int)(CINEMA_DURATION * 1000));
+            await UniTask.Delay((int)(t_cinema * 1000));
 
         bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();

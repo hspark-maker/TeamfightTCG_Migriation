@@ -56,8 +56,6 @@ public class CardView : MonoBehaviour
     [SerializeField] SwipeGuide swipeGuide;
     [SerializeField] LineRenderer dragLine;
 
-    const float LONG_PRESS_SEC = 0.45f;
-
     CardInstance boundCard;
     Vector3 centerPos;
     Vector2 dragStartScreenPos;
@@ -354,7 +352,7 @@ public class CardView : MonoBehaviour
     {
         try
         {
-            await UniTask.Delay((int)(LONG_PRESS_SEC * 1000), cancellationToken: _ct);
+            await UniTask.Delay((int)(GameTiming.Battle.LongPress * 1000), cancellationToken: _ct);
             if (this.boundCard == null || !this.boundCard.isRevealed) return;
             UIPoolManager.instance?.AddOrUpdateUI<PooledCardElement>(
                 new PooledCardElementData { card = this.boundCard.data });
@@ -584,7 +582,7 @@ public class CardView : MonoBehaviour
 
         if (_wouldDie)
         {
-            this.hpText.DOFade(0f, 0.55f).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
+            this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
             this.cardAnim.ShowDeathPreview();
         }
     }
@@ -698,7 +696,7 @@ public class CardView : MonoBehaviour
 
         try
         {
-            await UniTask.Delay(1500, cancellationToken: this.GetCancellationTokenOnDestroy());
+            await UniTask.Delay((int)(GameTiming.Battle.KeywordGlowHold * 1000), cancellationToken: this.GetCancellationTokenOnDestroy());
         }
         catch (OperationCanceledException) { }
 
@@ -743,7 +741,7 @@ public class CardView : MonoBehaviour
         foreach (CardView t_cv in allViews)
         {
             if (!IsAliveView(t_cv)) continue;
-            t_cv.FadeView(_alpha, 0.3f);
+            t_cv.FadeView(_alpha, GameTiming.Battle.FadeViewDuration);
         }
     }
 
@@ -753,7 +751,7 @@ public class CardView : MonoBehaviour
         {
             if (!IsAliveView(t_cv)) continue;
             if (t_cv.boundCard.ownerIndex == _ownerIndex)
-                t_cv.FadeView(_alpha, 0.3f);
+                t_cv.FadeView(_alpha, GameTiming.Battle.FadeViewDuration);
         }
     }
 
@@ -762,7 +760,7 @@ public class CardView : MonoBehaviour
         foreach (CardView t_cv in _cards)
         {
             if (!IsAliveView(t_cv)) continue;
-            t_cv.FadeView(_alpha, 0.3f);
+            t_cv.FadeView(_alpha, GameTiming.Battle.FadeViewDuration);
         }
     }
 

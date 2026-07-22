@@ -15,7 +15,7 @@ public class EnemyTurn : TurnBase
 
     public override async UniTask Execute()
     {
-        await UniTask.Delay(800);
+        await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
 
         CardInstance t_forcedAttacker = null;
 
@@ -55,7 +55,7 @@ public class EnemyTurn : TurnBase
             {
                 CardPassive.Notify(t_atk, CardKeyword.Execution);
                 t_forcedAttacker = t_atk;
-                await UniTask.Delay(400);
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
             }
             else
             {

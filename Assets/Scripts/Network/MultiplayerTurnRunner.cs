@@ -156,6 +156,12 @@ public class MultiplayerTurnRunner : MonoBehaviour
             // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
             if (!await SyncMatchSeed()) return false;
 
+            // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
+            // 대칭성: 내 playerField(내 덱) / enemyField(상대 덱 원격 재구성) 각각을 그 덱으로 Resolve →
+            // 상대 클라도 동일 두 덱으로 동일 산출 → 결과 일치, 전투 중 재계산 없음.
+            this.playerField?.ApplyDeckSynergy();
+            this.enemyField?.ApplyDeckSynergy();
+
             this.enemyFieldView?.Refresh();
             this.playerFieldView?.Refresh();
             return true;

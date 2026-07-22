@@ -64,6 +64,10 @@ public class GameInitializer : MonoBehaviour
     {
         this.playerField.Initialize(DeckConfig.PlayerDeck, 0);
         this.enemyField.Initialize(this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>(), 1);
+
+        // 시너지: 양 덱 확정 후 각 필드에 1회 적용 (전투 중 재계산 없음)
+        this.playerField.ApplyDeckSynergy();
+        this.enemyField.ApplyDeckSynergy();
     }
 
     void InitializeViews()

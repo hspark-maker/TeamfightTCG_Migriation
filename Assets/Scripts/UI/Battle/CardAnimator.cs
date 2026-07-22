@@ -7,7 +7,9 @@ public class CardAnimator : MonoBehaviour
 {
     [SerializeField] SpriteRenderer hitOverlay;
     [SerializeField] SpriteRenderer dieOverlay;
-    [SerializeField] float moveDuration = 0.3f;
+
+    // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
+    float moveDuration => GameTiming.Battle.CardMoveDuration;
 
     static readonly float[] CINEMA_X_FRACTIONS = { 0.25f, 0.5f, 0.75f };
 
@@ -143,7 +145,7 @@ public class CardAnimator : MonoBehaviour
         Color t_c = this.dieOverlay.color;
         t_c.a = 0f;
         this.dieOverlay.color = t_c;
-        this.dieOverlay.DOFade(0.7f, 0.55f).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
+        this.dieOverlay.DOFade(0.7f, GameTiming.Battle.DeathPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
     }
 
     public void HideDeathPreview()
@@ -158,8 +160,9 @@ public class CardAnimator : MonoBehaviour
 
     // ── Hit / Death / Deal ───────────────────────────────────────────────
 
-    public async UniTask PlayHitAnim(float _duration = 0.15f)
+    public async UniTask PlayHitAnim(float _duration = -1f)
     {
+        if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();
@@ -170,8 +173,9 @@ public class CardAnimator : MonoBehaviour
         await this.hitOverlay.DOFade(0f, _duration).SetLink(gameObject).ToUniTask();
     }
 
-    public async UniTask PlayDeathAnim(float _duration = 0.4f)
+    public async UniTask PlayDeathAnim(float _duration = -1f)
     {
+        if (_duration < 0f) _duration = GameTiming.Battle.DeathDuration;
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDeath();
@@ -206,8 +210,9 @@ public class CardAnimator : MonoBehaviour
         }
     }
 
-    public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+    public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
     {
+        if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDealCard();
@@ -240,7 +245,7 @@ public class CardAnimator : MonoBehaviour
         bool t_cancelled = await t_seq1.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
         if (t_cancelled) return;
 
-        t_cancelled = await UniTask.Delay(500, cancellationToken: t_ct).SuppressCancellationThrow();
+        t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000), cancellationToken: t_ct).SuppressCancellationThrow();
         if (t_cancelled) return;
 
         var t_seq2 = DOTween.Sequence()
