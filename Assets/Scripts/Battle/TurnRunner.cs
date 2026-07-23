@@ -78,7 +78,10 @@ public class TurnRunner : MonoBehaviour
             foreach (var t_c in t_field.GetActiveCards())
             {
                 if (t_c.justSpawned) { t_c.justSpawned = false; continue; }
-                await (t_c.data.passive?.OnTurnBegan(new TurnCtx(t_c, t_field)) ?? UniTask.CompletedTask);
+                // [TurnBegan] 카드 단위. 패시브 → 시너지 순.
+                var t_beganCtx = new TurnCtx(t_c, t_field);
+                await (t_c.data.passive?.OnTurnBegan(t_beganCtx) ?? UniTask.CompletedTask);
+                await SynergyTriggers.TurnBegan(t_beganCtx);
             }
             this.ctx.RefreshViews();
 
@@ -111,9 +114,14 @@ public class TurnRunner : MonoBehaviour
             await t_turn.Execute();
             t_turn.OnExit();
 
-            // 유산: 이번 턴 필드의 소속 카드 legacyStack++ (사망 시 아군 회복량). 동기, RNG 미소비.
+            // [TurnEnded] 이번 턴 필드의 라이브 카드마다 패시브 → 시너지 순(유산 legacyStack++ 등).
+            // 동기 void, RNG 미소비. CheckGameOver 전에 인라인 완결.
             foreach (var t_c in t_field.GetActiveCards())
-                SynergyTriggers.TurnEnded(new TurnCtx(t_c, t_field));
+            {
+                var t_endedCtx = new TurnCtx(t_c, t_field);
+                t_c.data.passive?.OnTurnEnded(t_endedCtx);
+                SynergyTriggers.TurnEnded(t_endedCtx);
+            }
 
             if (this.disconnectWin || CheckGameOver()) break;
 

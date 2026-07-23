@@ -96,15 +96,32 @@ public class PooledCardElement : PooledUIBase
         SynergyIconStrip.Build(this.cardData, this.synergyIconRoot, this.synergyIconPrefab);
     }
 
+    /// <summary>설명 목록. **시너지를 먼저, 키워드를 나중에** 깐다 — 시너지가 카드의 정체성에
+    /// 더 가까워서 위에 오는 게 읽기 좋다. 같은 행 프리팹(KeywordExplainItem)을 공용으로 쓴다.</summary>
     void RefreshKeywordList(CardData _card)
     {
-        if (this.keywordListRoot == null || this.keywordExplainItemPrefab == null || this.keywordIconConfig == null) return;
+        if (this.keywordListRoot == null || this.keywordExplainItemPrefab == null) return;
 
         foreach (Transform t_child in this.keywordListRoot)
             Destroy(t_child.gameObject);
 
         if (_card == null) return;
 
+        // 1) 시너지 (키워드보다 먼저)
+        if (_card.synergies != null)
+        {
+            var t_seen = new HashSet<SynergyData>();
+            foreach (SynergyData t_syn in _card.synergies)
+            {
+                if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
+                var t_row = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
+                t_row.GetComponent<KeywordExplainItem>()?.Init(
+                    t_syn.icon, SynergyText.Name(t_syn), t_syn.effectDescription);
+            }
+        }
+
+        // 2) 키워드
+        if (this.keywordIconConfig == null) return;
         foreach (CardKeyword t_kw in System.Enum.GetValues(typeof(CardKeyword)))
         {
             if (t_kw == CardKeyword.None) continue;

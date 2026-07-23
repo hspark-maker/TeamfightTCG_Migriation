@@ -59,6 +59,8 @@ public class CardView : MonoBehaviour
     [Header("Input")]
     [SerializeField] float dragThreshold = 30f;
     [SerializeField] float deadZoneRadius = 80f;
+
+    Collider2D selfCollider;   // 롱프레스 팝업을 끌 때 "카드 범위를 벗어났는지" 판정용
     [SerializeField] float dirThreshold = 0.35f;
     [SerializeField] HintArrow hintArrow;
     [SerializeField] SwipeGuide swipeGuide;
@@ -75,6 +77,7 @@ public class CardView : MonoBehaviour
     Animator weaponAnimator;
     Quaternion weaponBaseRot;
     bool longPressFired;
+    bool longPressSynergyShown;   // true면 카드 정보가 아니라 시너지 설명 팝업을 띄운 상태
     CancellationTokenSource longPressCts;
     Color hpTextOriginalColor;
     readonly Dictionary<CardKeyword, GameObject> iconMap = new Dictionary<CardKeyword, GameObject>();
@@ -88,6 +91,7 @@ public class CardView : MonoBehaviour
         allViews.Add(this);
         if (this.cardAnim == null) this.cardAnim = GetComponent<CardAnimator>();
         this.cardAnim.ExcludeFromFade(this.selectedHighlight);
+        this.selfCollider = GetComponentInChildren<Collider2D>();   // OnMouse* 를 받는 콜라이더
 
         if (this.dragLine == null)
         {
@@ -157,6 +161,13 @@ public class CardView : MonoBehaviour
     {
         if (!TurnState.InputAllowed || this.boundCard == null) return;
         this.currentDragScreenPos = (Vector2)Input.mousePosition;
+
+        // 카드 범위를 벗어나면 즉시 설명 팝업을 닫는다.
+        // dragThreshold 조기 return보다 **앞**에 둬야 한다 — 적 카드는 dragStartScreenPos가
+        // 터치 지점이라 작은 드래그가 아래 return에 걸려 취소 판정 자체를 못 받는다.
+        if (this.longPressFired && PointerLeftSelf())
+            CancelLongPress();
+
         Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;
         if (t_drag.magnitude < this.dragThreshold) return;
 
@@ -362,19 +373,100 @@ public class CardView : MonoBehaviour
         {
             await UniTask.Delay((int)(GameTiming.Battle.LongPress * 1000), cancellationToken: _ct);
             if (this.boundCard == null || !this.boundCard.isRevealed) return;
-            UIPoolManager.instance?.AddOrUpdateUI<PooledCardElement>(
-                new PooledCardElementData { card = this.boundCard.data });
+
+            // 누른 지점이 시너지 배지 위면 카드 정보 대신 시너지 설명을 띄운다.
+            SynergyBadgeView t_badge = FindBadgeAt(this.touchStartScreenPos);
+            if (t_badge != null && t_badge.Synergy != null)
+            {
+                UIPoolManager.instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
+                {
+                    synergy        = t_badge.Synergy,
+                    hasWorldAnchor = true,                       // 배지는 월드 스페이스라 RectTransform이 없다
+                    worldAnchor    = t_badge.transform.position,
+                    worldHalfWidth = BadgeHalfWidth(t_badge),
+                    ownedCount     = OwnedCountOf(t_badge.Synergy),
+                });
+                this.longPressSynergyShown = true;
+            }
+            else
+            {
+                UIPoolManager.instance?.AddOrUpdateUI<PooledCardElement>(
+                    new PooledCardElementData { card = this.boundCard.data });
+            }
             this.longPressFired = true;
         }
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>화면 좌표 아래에 있는 시너지 배지. 없으면 null.
+    /// 배지에 콜라이더를 붙이면 카드 드래그 입력을 가로채므로, 스프라이트 bounds로만 판정한다.</summary>
+    SynergyBadgeView FindBadgeAt(Vector2 _screenPos)
+    {
+        if (this.synergyBadgeRoot == null || Camera.main == null) return null;
+
+        Vector3 t_world = Camera.main.ScreenToWorldPoint(
+            new Vector3(_screenPos.x, _screenPos.y, -Camera.main.transform.position.z));
+
+        foreach (Transform t_child in this.synergyBadgeRoot)
+        {
+            SynergyBadgeView t_badge = t_child.GetComponent<SynergyBadgeView>();
+            if (t_badge == null || !t_child.gameObject.activeInHierarchy) continue;
+
+            foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>())
+            {
+                if (!t_sr.enabled || !t_sr.gameObject.activeInHierarchy) continue;
+                Bounds b = t_sr.bounds;
+                if (t_world.x >= b.min.x && t_world.x <= b.max.x &&
+                    t_world.y >= b.min.y && t_world.y <= b.max.y)
+                    return t_badge;
+            }
+        }
+        return null;
+    }
+
+    static float BadgeHalfWidth(SynergyBadgeView _badge)
+    {
+        float t_max = 0.15f;
+        foreach (SpriteRenderer t_sr in _badge.GetComponentsInChildren<SpriteRenderer>())
+            if (t_sr.enabled && t_sr.bounds.extents.x > t_max) t_max = t_sr.bounds.extents.x;
+        return t_max;
+    }
+
+    /// <summary>이 필드의 확정 시너지 스냅샷에서 보유 장수. 없으면 -1(팝업이 ●/○ 마커를 생략).</summary>
+    int OwnedCountOf(SynergyData _synergy)
+    {
+        if (this._lastBadgeState?.Active == null) return -1;
+        foreach (var t_a in this._lastBadgeState.Active)
+            if (t_a != null && t_a.Synergy == _synergy) return t_a.Count;
+        return -1;
+    }
+
+    /// <summary>롱프레스 취소. **이미 떠 있던 설명 팝업도 같이 닫는다.**
+    /// 예전엔 플래그만 지워서, 드래그로 취소된 경우 OnMouseUp의 t_wasLongPress가 false가 되어
+    /// 팝업을 닫는 분기를 건너뛰고 화면에 그대로 남았다(잔류 버그).</summary>
     void CancelLongPress()
     {
+        if (this.longPressFired)
+        {
+            // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
+            if (this.longPressSynergyShown) UIPoolManager.instance?.HideUI<SynergyExplainPopupUI>();
+            else                            UIPoolManager.instance?.HideUI<PooledCardElement>();
+        }
+
+        this.longPressSynergyShown = false;
         this.longPressFired = false;
         this.longPressCts?.Cancel();
         this.longPressCts?.Dispose();
         this.longPressCts = null;
+    }
+
+    /// <summary>현재 드래그 좌표가 이 카드의 콜라이더 밖인가. 카메라/콜라이더 없으면 false(취소 안 함).</summary>
+    bool PointerLeftSelf()
+    {
+        if (this.selfCollider == null || Camera.main == null) return false;
+        Vector3 t_screen = new Vector3(this.currentDragScreenPos.x, this.currentDragScreenPos.y,
+                                       -Camera.main.transform.position.z);
+        return !this.selfCollider.OverlapPoint(Camera.main.ScreenToWorldPoint(t_screen));
     }
 
 

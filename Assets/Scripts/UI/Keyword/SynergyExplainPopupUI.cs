@@ -33,12 +33,13 @@ public class SynergyExplainPopupUI : PooledUIBase
         if (this.explainText != null) this.explainText.text = SynergyText.Body(t_s, t_d.ownedCount);
         if (this.accent      != null) this.accent.color     = t_s.TintOrWhite;   // 미배정 색이면 투명해지므로 폴백
 
-        if (t_d.iconRect != null) PositionNearIcon(t_d.iconRect);
+        // 배치 규칙은 PopupPlacer가 단독 소유(키워드 팝업/시너지 툴팁과 동일 동작).
+        if (t_d.iconRect != null)
+            PopupPlacer.PlaceBesideAnchor((RectTransform)transform, t_d.iconRect, this.iconGap);
+        else if (t_d.hasWorldAnchor)   // 인게임 카드 배지 = 월드 스페이스
+            PopupPlacer.PlaceBesideWorldPoint((RectTransform)transform,
+                t_d.worldAnchor, t_d.worldHalfWidth, this.iconGap);
     }
-
-    // 배치 규칙은 PopupPlacer가 단독 소유(키워드 팝업/시너지 툴팁과 동일 동작).
-    void PositionNearIcon(RectTransform _iconRect)
-        => PopupPlacer.PlaceBesideAnchor((RectTransform)transform, _iconRect, this.iconGap);
 
     public override void Show()
     {
@@ -56,7 +57,14 @@ public class SynergyExplainPopupUI : PooledUIBase
 public class SynergyExplainData : UIData
 {
     public SynergyData   synergy;
+    /// <summary>uGUI 아이콘 옆에 띄울 때. 인게임 배지처럼 월드 오브젝트면 null로 두고 아래를 쓴다.</summary>
     public RectTransform iconRect;
+
+    /// <summary>인게임 카드 위 시너지 배지처럼 월드 스페이스 대상 옆에 띄울 때 사용.</summary>
+    public bool    hasWorldAnchor;
+    public Vector3 worldAnchor;
+    public float   worldHalfWidth = 0.2f;
+
     /// <summary>덱에서 보유 중인 장수. 음수면 덱 문맥 없음(마커 표시 안 함).</summary>
-    public int           ownedCount = -1;
+    public int ownedCount = -1;
 }

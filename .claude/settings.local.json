@@ -31,7 +31,18 @@
       "mcp__unity-mcp__Unity_ManageScript",
       "mcp__unity-mcp__Unity_ManageScript_capabilities",
       "Bash(rm -f Assets/Scripts/UI/MainMenu/DeckSynergyPanel.cs* Assets/Scripts/UI/MainMenu/SynergyProgressRow.cs*)",
-      "Bash(rm -f Assets/Assets/Prefabs/UI/MainMenu/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/MainMenu/SynergyProgressRow.prefab* Assets/Assets/Prefabs/UI/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/SynergyProgressRow.prefab*)"
+      "Bash(rm -f Assets/Assets/Prefabs/UI/MainMenu/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/MainMenu/SynergyProgressRow.prefab* Assets/Assets/Prefabs/UI/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/SynergyProgressRow.prefab*)",
+      "Bash(xargs grep -l \"CardRegistry\")",
+      "Bash(grep -v \"//\")",
+      "Bash(python -c ' *)",
+      "Bash(python \"C:/Users/cookapps/AppData/Local/Temp/claude/C--Users-cookapps-TeamfightTCG-Migriation/f206dbfb-2d2f-4068-9b62-b33f48daf70e/scratchpad/pdftext.py\" \"BMonster-카드 컨셉 이미지-230726-063722.pdf\")",
+      "Bash(PYTHONIOENCODING=utf-8 python \"C:/Users/cookapps/AppData/Local/Temp/claude/C--Users-cookapps-TeamfightTCG-Migriation/f206dbfb-2d2f-4068-9b62-b33f48daf70e/scratchpad/pdftext.py\" \"BMonster-카드 컨셉 이미지-230726-063722.pdf\")",
+      "Bash(PYTHONIOENCODING=utf-8 python __TRACKED_VAR__/pdfimg.py 'BMonster-카드 컨셉 이미지-230726-063722.pdf' __TRACKED_VAR__/pdfimgs)",
+      "Bash(PYTHONIOENCODING=utf-8 python __TRACKED_VAR__/pdf2png.py 'BMonster-카드 컨셉 이미지-230726-063722.pdf' __TRACKED_VAR__/pages)",
+      "Bash(mkdir -p \"C:/Users/cookapps/TeamfightTCG_Migriation/Assets/Assets/Images/Cards/Concept\")",
+      "Bash(PYTHONIOENCODING=utf-8 python __TRACKED_VAR__/cardimg.py 'BMonster-카드 컨셉 이미지-230726-063722.pdf' C:/Users/cookapps/TeamfightTCG_Migriation/Assets/Assets/Images/Cards/Concept)",
+      "mcp__unity-mcp__Unity_ManageGameObject",
+      "Bash(PYTHONIOENCODING=utf-8 python *)"
     ]
   }
 }

@@ -10,23 +10,31 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "FlowSynergyEffect", menuName = "Card Battle/Synergy Effect/Flow")]
 public class FlowSynergyEffect : SynergyEffect
 {
-    public override void OnDeckResolved(CardInstance _card, SynergyState _state) { }   // 정적 효과 없음(순수 스폰 트리거)
-
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
-    public override UniTask OnEntered(SpawnCtx _ctx, SynergyData _synergy)
+    public override UniTask OnEntered(SpawnCtx _ctx)
     {
         if (_ctx.self == null || _ctx.field == null) return UniTask.CompletedTask;
 
         // 흐름 카드 등장일 때만 발동. 비흐름 카드 등장은 무시(flowBonus 상속 없음).
-        if (!SynergyApplier.BelongsTo(_ctx.self, _synergy)) return UniTask.CompletedTask;
+        if (!SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return UniTask.CompletedTask;
 
         // 매 등장마다 스택 +1(Cunning 재진입 포함, 무제한 성장).
         _ctx.field.AddFlowStack();
         // 흐름 카드들만 현재 스택으로 재동기(비흐름 카드는 건드리지 않음).
         foreach (var t_card in _ctx.field.GetActiveCards())
-            if (t_card != null && SynergyApplier.BelongsTo(t_card, _synergy))
+            if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
-        SynergyTriggers.Fire(_ctx.self, _synergy);   // 흐름 카드 등장 시 배너+배지 pop
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 흐름 카드 등장 시 배너+배지 pop
+        return UniTask.CompletedTask;
+    }
+
+    // 공격 시에도 표시. flowBonus가 AttackDamage에 실제로 가산되는 순간이라 여기가 체감 지점이다.
+    // (등장 트리거만 있으면 초기 3장이 안 바뀌는 판에서는 한 번도 안 보인다.)
+    // 상태변이 없음 — 순수 표시. 스택 0이면 가산이 없으므로 스킵.
+    public override UniTask OnBeforeAttack(BeforeAttackCtx _ctx)
+    {
+        if (_ctx.self == null || _ctx.self.flowBonus <= 0) return UniTask.CompletedTask;
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);
         return UniTask.CompletedTask;
     }
 }

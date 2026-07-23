@@ -7,14 +7,12 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "CleanerSynergyEffect", menuName = "Card Battle/Synergy Effect/Cleaner")]
 public class CleanerSynergyEffect : SynergyEffect
 {
-    public override void OnDeckResolved(CardInstance _card, SynergyState _state) { }   // 정적 효과 없음(순수 트리거)
-
-    public override UniTask OnAfterAttack(AfterAttackCtx _ctx, SynergyData _synergy)
+    public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
         int t_heal = _ctx.damageDealt / 2;   // 준 피해의 절반(정수 내림)
         if (t_heal <= 0) return UniTask.CompletedTask;
         _ctx.self.Heal(t_heal);
-        SynergyTriggers.Fire(_ctx.self, _synergy);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)
         return UniTask.CompletedTask;
     }
 }

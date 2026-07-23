@@ -30,6 +30,7 @@ public class BattleField : MonoBehaviour
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
         this.FlowStack = 0;
+        this.Synergy   = null;   // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -45,7 +46,7 @@ public class BattleField : MonoBehaviour
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
                 this.slots[i] = t_card;
-                t_card.data.passive?.OnPlaced(new SpawnCtx(t_card, this)).Forget();   // [Placed] 오프닝 배치 — 등장(Entered) 아님
+                NotifyPlaced(t_card);   // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -119,6 +120,7 @@ public class BattleField : MonoBehaviour
         if (this.slots[_slotIndex] != null)
             this.slots[_slotIndex].slotIndex = -1;
         this.slots[_slotIndex] = null;
+        NotifyBoardChanged();   // 보드 구성 변화 → 라이브 카운트 파생 상태 재동기(성벽 등)
     }
 
     /// <summary>셔플된 카드 ID 배열 반환. 배틀 초기화 후 broadcast용.</summary>
@@ -142,6 +144,7 @@ public class BattleField : MonoBehaviour
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
         this.FlowStack = 0;
+        this.Synergy   = null;   // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -156,7 +159,7 @@ public class BattleField : MonoBehaviour
                 t_card.isRevealed      = true;
                 t_card.wasEverRevealed = true;
                 this.slots[i] = t_card;
-                t_card.data.passive?.OnPlaced(new SpawnCtx(t_card, this)).Forget();   // [Placed] 오프닝 배치 — 등장(Entered) 아님
+                NotifyPlaced(t_card);   // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -224,6 +227,46 @@ public class BattleField : MonoBehaviour
 
         this.Synergy = SynergyResolver.Resolve(t_cards.ConvertAll(c => c.data));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
+        // [DeckResolved] 패시브 몫. **DeckResolved만 synergy→passive 역순인데 구조적 제약이다** —
+        // ApplyAll 안에 ClearSynergy가 있어서 패시브를 먼저 돌리면 패시브가 넣은 정적 스탯이 지워진다.
+        // (BattleTimings ◆ 참조.) ctx.state = 확정 스냅샷, ctx.synergy = null. 동기 void.
+        foreach (var t_card in t_cards)
+            t_card.data.passive?.OnDeckResolved(new DeckCtx(t_card, this.Synergy));
+
+        // [Placed] 시너지 몫. Initialize 시점엔 this.Synergy가 아직 null이라 거기선 발화가 불가능하다
+        // (패시브 Placed만 Initialize에서 발화 — justSpawned 판정에 무적 부여를 반영해야 하므로).
+        // 그래서 시너지 Placed는 스냅샷이 확정된 여기서 슬롯 카드에 대해 발화한다.
+        for (int i = 0; i < SLOT_COUNT; i++)
+            if (this.slots[i] != null)
+                SynergyTriggers.Placed(new SpawnCtx(this.slots[i], this));
+
+        NotifyBoardChanged();   // 오프닝 배치분에도 라이브 카운트 파생 상태를 깔아준다(Entered는 오프닝에 미발화)
+    }
+
+    // [BoardChanged] 필드의 라이브 카드 구성이 바뀐 직후. 발화점은 이 클래스 안 3곳뿐이다:
+    // ApplyDeckSynergy(배치 확정) / NotifyEntered(등장) / RemoveCard(제거).
+    // "필드의 X 수만큼" 류 효과가 파생 상태를 재동기하는 지점 — 동기 완결, RNG 미소비.
+    // 패시브는 라이브 카드마다(self=그 카드), 시너지는 필드당 1회(self=null) — 순서는 패시브 → 시너지.
+    void NotifyBoardChanged()
+    {
+        // IsAlive 게이트 필수 — RemoveDead 루프 중간에 불리면 아직 제거 안 된 시체가 슬롯에 남아 있다.
+        // 시너지 쪽(RampartSynergyEffect)도 IsAlive로 거르므로 "라이브"의 정의를 양쪽 일치시킨다.
+        for (int i = 0; i < SLOT_COUNT; i++)
+        {
+            CardInstance t_c = this.slots[i];
+            if (t_c == null || !t_c.IsAlive) continue;
+            t_c.data.passive?.OnBoardChanged(new BoardCtx(this, t_c));
+        }
+        SynergyTriggers.BoardChanged(new BoardCtx(this));
+    }
+
+    // [Placed] 오프닝 배치 확정 공통 후처리(패시브 → 시너지 순서 고정). 런타임 등장(Entered)과 혼동 금지.
+    // 호출 위치는 justSpawned 판정 '전'이어야 한다(효과가 무적을 부여하는 경우를 판정에 반영).
+    void NotifyPlaced(CardInstance _card)
+    {
+        var t_ctx = new SpawnCtx(_card, this);
+        _card.data.passive?.OnPlaced(t_ctx).Forget();
+        SynergyTriggers.Placed(t_ctx);
     }
 
     /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
@@ -237,6 +280,7 @@ public class BattleField : MonoBehaviour
         var t_ctx = new SpawnCtx(_card, this);
         _card.data.passive?.OnEntered(t_ctx).Forget();
         SynergyTriggers.Entered(t_ctx);
+        NotifyBoardChanged();   // 등장으로 라이브 구성이 바뀜 → 파생 상태 재동기(성벽 등)
     }
 
     public CardInstance GetSlot(int _index) => this.slots[_index];

@@ -87,7 +87,8 @@ public static class DeckSaveManager
 
             if (t_slot.cards == null || _registry == null) continue;
             slots[i] = t_slot.cards
-                .Select(n => _registry.FirstOrDefault(c => c.name == n))
+                // CardRegistry.All에는 ID 보존용 빈 칸(null)이 섞일 수 있다 — c.name 접근 전에 걸러야 NRE가 안 난다.
+                .Select(n => _registry.FirstOrDefault(c => c != null && c.name == n))
                 .Where(c => c != null)
                 .ToList();
         }
