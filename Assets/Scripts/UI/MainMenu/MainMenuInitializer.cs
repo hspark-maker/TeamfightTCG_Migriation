@@ -11,6 +11,7 @@ public class MainMenuInitializer : MonoBehaviour
     {
         DeckSaveManager.SetCardRegistry(this.allCards);
         DeckSaveManager.LoadFromFile();
+        OutgameSaveManager.Load();
     }
 
     void Start() => SoundManager.Instance?.PlayBGM(mainMenuBgm);
