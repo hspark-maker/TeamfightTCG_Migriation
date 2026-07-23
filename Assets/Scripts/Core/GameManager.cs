@@ -44,5 +44,7 @@ public class GameManager : MonoBehaviour
     void Flush()
     {
         CurrencyManager.Save();
+        // 도감 진행도 스냅샷(현재 누적·정산시각). 미초기화 시 no-op이라 빈 캐시로 덮어쓸 위험 없음.
+        CollectionProductionManager.Save();
     }
 }

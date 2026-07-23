@@ -16,6 +16,10 @@ public class MainMenuInitializer : MonoBehaviour
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();
 
+        // 도감 방치 생산 캐싱 — 세이브(DataSaveManager.Load)만 읽으므로 순서 무관하나
+        // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
+        CollectionProductionManager.Init();
+
         // 덱 복원은 CardCatalog로 키를 재수화하므로 SetSource 이후여야 한다.
         DeckSaveManager.LoadFromFile();
     }

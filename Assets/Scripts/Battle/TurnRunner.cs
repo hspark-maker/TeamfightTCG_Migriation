@@ -24,6 +24,7 @@ public class TurnRunner : MonoBehaviour
     TurnContext ctx;
     bool disconnectWin;
     bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
+    long lastRewardGold; // CaptureResult에서 확정한 지급 골드. F-20 팝업 표시용(표시만, 재지급 없음).
 
     void OnDestroy()
     {
@@ -34,8 +35,8 @@ public class TurnRunner : MonoBehaviour
 #if UNITY_EDITOR
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show();
-        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show();
+        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(0);
+        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(0);
     }
 #endif
 
@@ -143,7 +144,7 @@ public class TurnRunner : MonoBehaviour
         
         this.resultCaptured = true;
         int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
-        RewardService.GrantBattleReward(_won, t_remaining);
+        this.lastRewardGold = RewardService.GrantBattleReward(t_remaining);
     }
 
     public static void Cleanup()
@@ -160,7 +161,7 @@ public class TurnRunner : MonoBehaviour
         NetworkGameController.Instance?.ForceOpponentReady();
         MultiplayerTurnRunner.Instance?.ForceOpponentAttackResolve();
         CaptureResult(true);
-        this.winPopup?.Show();
+        this.winPopup?.Show(this.lastRewardGold);
     }
 
     /// <summary>
@@ -173,7 +174,7 @@ public class TurnRunner : MonoBehaviour
         if (!DeckConfig.IsMultiplayer) return;
         this.disconnectWin = true;
         CaptureResult(true);
-        this.winPopup?.Show();
+        this.winPopup?.Show(this.lastRewardGold);
     }
 
     bool CheckGameOver()
@@ -181,13 +182,13 @@ public class TurnRunner : MonoBehaviour
         if (this.enemyField.IsEmpty)
         {
             CaptureResult(true);
-            this.winPopup?.Show();
+            this.winPopup?.Show(this.lastRewardGold);
             return true;
         }
         if (this.playerField.IsEmpty)
         {
             CaptureResult(false);
-            this.losePopup?.Show();
+            this.losePopup?.Show(this.lastRewardGold);
             return true;
         }
         return false;

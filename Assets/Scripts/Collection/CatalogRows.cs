@@ -2,27 +2,31 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 도감 행의 읽기전용 static 파사드. 고정 배치 소스에서 행 구조를 파생하고 완성 여부를 조회한다.
-/// 배치 소스 주입점 + fallback(GameTiming/BattleTimingConfig 관용구):
-///   - SetLayout(CollectionLayoutConfig) 주입 시 그 배치 순서 사용.
-///   - 미배선(또는 빈 배치) 시 CardCatalog.All 순서로 fallback → 씬 배선 없이도 동작.
-/// 행 구조는 배치 소스 시그니처가 같으면 캐시 재사용하되, 소유 조회는 캐시하지 않고 매 호출 실시간이다.
-/// 의존 방향: Collection → CardCatalog(읽기)/OwnershipManager(읽기)/CollectionLayoutConfig(읽기). 역참조 없음.
+/// 도감 행의 읽기전용 static 파사드. 행 authoring 소스에서 행 구조·해석된 튜닝을 파생하고 완성 여부를 조회한다.
 /// </summary>
 public static class CatalogRows
 {
-    // 행당 열 수. 카드 수가 3의 배수가 아니면 마지막 행은 부분행(1~2칸)으로 정식 포함된다.
+    // 행당 카드 수(고정). fallback 청크 폭이자 정상 행의 카드 슬롯 수.
     public const int ColumnsPerRow = 3;
 
-    // 주입된 배치 SO(선택). null이면 CardCatalog.All로 fallback.
+    // 주입된 배치 SO(선택). null이거나 rows 0개면 CardCatalog.All fallback + 전역 기본 튜닝.
     static CollectionLayoutConfig s_layout;
 
-    // 파생 행 구조 캐시(소유 상태는 담지 않음).
+    // 전역 기본 튜닝 소스: 배선 SO 미존재 시 코드 기본값(SO field initializer) 제공용 lazy 인스턴스.
+    static CollectionLayoutConfig s_fallbackConfig;
+
+    // 파생 행 구조 캐시(소유/생산 상태는 담지 않음).
     static List<CatalogRow> s_rows;
     static IReadOnlyList<CatalogRow> s_rowsReadonly;
     static Dictionary<string, CatalogRow> s_rowByKey;
     static LayoutSignature s_signature;
     static bool s_hasCache;
+
+    // 전역 기본 튜닝 소스. 배선 SO 우선, 없으면 코드 기본값 lazy 인스턴스(GameTiming.Battle 관용구).
+    static CollectionLayoutConfig Tuning
+        => s_layout != null
+            ? s_layout
+            : (s_fallbackConfig != null ? s_fallbackConfig : (s_fallbackConfig = ScriptableObject.CreateInstance<CollectionLayoutConfig>()));
 
     /// <summary>배치 SO 주입(선택). 부트/배선에서 호출. null도 허용(fallback 복귀).</summary>
     public static void SetLayout(CollectionLayoutConfig _layout)
@@ -31,7 +35,7 @@ public static class CatalogRows
         Invalidate();
     }
 
-    /// <summary>배치 소스가 바뀌었을 때 행 구조 재빌드를 강제(에디터 authoring·카탈로그 재주입 대응).</summary>
+    /// <summary>행 소스가 바뀌었을 때 행 구조 재빌드를 강제(에디터 authoring·카탈로그 재주입 대응).</summary>
     public static void Invalidate()
     {
         s_hasCache = false;
@@ -42,7 +46,7 @@ public static class CatalogRows
 
     // ── 공개 조회 API ─────────────────────────────────────────
 
-    /// <summary>배치 순서대로 파생된 행 목록(읽기 전용).</summary>
+    /// <summary>행 목록(읽기 전용, 순서 = authoring 순서).</summary>
     public static IReadOnlyList<CatalogRow> Rows
     {
         get { EnsureBuilt(); return s_rowsReadonly; }
@@ -61,7 +65,7 @@ public static class CatalogRows
         return s_rowByKey.TryGetValue(_rowKey, out _row);
     }
 
-    /// <summary>행 완성 = 행의 모든 자리를 소유. 소유는 실시간 조회(캐시 없음). 빈/미해결 행은 미완성.</summary>
+    /// <summary>행 완성 = 행의 모든 카드를 소유. 소유는 실시간 조회(캐시 없음). 빈/미해결 행은 미완성.</summary>
     public static bool IsRowComplete(CatalogRow _row)
     {
         if (_row == null) return false;
@@ -83,6 +87,12 @@ public static class CatalogRows
         return TryGetRow(_rowKey, out var t_row) && IsRowComplete(t_row);
     }
 
+    /// <summary>도감 전체 완성 1회성 보상 종류(전역 튜닝). 배선 SO 우선, 미배선 시 코드 기본값(fallback 인스턴스).</summary>
+    public static ECurrencyType CompletionRewardType => Tuning.CompletionRewardType;
+
+    /// <summary>도감 전체 완성 1회성 보상량(전역 튜닝). 배선 SO 우선, 미배선 시 코드 기본값(fallback 인스턴스).</summary>
+    public static long CompletionRewardAmount => Tuning.CompletionRewardAmount;
+
     /// <summary>모든 행 완성 여부. 빈 도감(행 0개)은 완성이 아니다.</summary>
     public static bool IsAllComplete
     {
@@ -102,7 +112,7 @@ public static class CatalogRows
     // ── 드리프트 진단 (에디터/디버그 전용, 정상 흐름 예외 없음) ──
 
     /// <summary>
-    /// 배치 SO ↔ 카탈로그 드리프트를 로그로 진단한다(디버그 전용).
+    /// 행 authoring ↔ 카탈로그 드리프트를 로그로 진단한다(디버그 전용).
     /// 카탈로그엔 있는데 배치 누락 / 배치엔 있는데 카탈로그 미존재를 각각 보고. 정상 흐름 예외를 던지지 않는다.
     /// </summary>
     public static void ValidateLayout()
@@ -160,69 +170,131 @@ public static class CatalogRows
     // 시그니처가 유지되면 캐시 재사용. 소유 상태는 여기 캐시하지 않는다(조회 시 실시간).
     static void EnsureBuilt()
     {
-        var t_source = ResolveSource(out var t_sourceObj);
-        var t_sig = new LayoutSignature(t_sourceObj, t_source.Count);
+        bool t_fromLayout = s_layout != null && s_layout.RowDefCount > 0;
+        // 시그니처: 소스 객체 동일성 + 소스 요소 수. 소스 스왑/개수 변화 시 재빌드.
+        Object t_sourceObj = t_fromLayout ? (Object)s_layout : null;
+        int t_count = t_fromLayout ? s_layout.RowDefCount : (CardCatalog.IsReady ? CardCatalog.Count : 0);
+        var t_sig = new LayoutSignature(t_sourceObj, t_count);
 
         if (s_hasCache && s_signature.Equals(t_sig)) return;
 
-        Build(t_source);
+        if (t_fromLayout) BuildFromLayout();
+        else BuildFallback();
+
         s_signature = t_sig;
         s_hasCache = true;
     }
 
-    // 배치 소스 결정: 배선된 배치 SO(자리 1개 이상) 우선, 아니면 CardCatalog.All fallback.
-    // 배선됐지만 비어 있는 SO(미authoring)도 fallback으로 취급 → 컬렉션이 통째로 빈 상태로 고착되지 않게.
-    static IReadOnlyList<CardData> ResolveSource(out Object _sourceObj)
+    // 배선 SO의 rows 리스트를 그대로 행으로 파생(각 def → 1 CatalogRow, 튜닝 해석 적용).
+    static void BuildFromLayout()
     {
-        if (s_layout != null && s_layout.SlotCount > 0)
+        BeginBuild();
+
+        var t_defs = s_layout.Rows;
+        int t_rowIndex = 0;
+
+        for (int t_i = 0; t_i < t_defs.Count; t_i++)
         {
-            _sourceObj = s_layout;
-            return s_layout.Slots;
+            var t_def = t_defs[t_i];
+
+            var t_cards = new List<CardData>(ColumnsPerRow) { t_def.card1, t_def.card2, t_def.card3 };
+            var t_keys = new List<string>(ColumnsPerRow)
+            {
+                CardCatalog.KeyOf(t_def.card1),
+                CardCatalog.KeyOf(t_def.card2),
+                CardCatalog.KeyOf(t_def.card3),
+            };
+
+            ResolveTuning(t_def, out float t_perHour, out ECurrencyType t_rewardType, out long t_cap);
+            AddRow(t_rowIndex++, t_cards, t_keys, t_perHour, t_rewardType, t_cap);
         }
 
-        _sourceObj = null;
-        return CardCatalog.All;
+        EndBuild();
     }
 
-    static void Build(IReadOnlyList<CardData> _source)
+    // fallback: CardCatalog.All을 3장씩 청크. 튜닝은 전역 기본값(Tuning)만 적용. 마지막 부분 청크는 null 패딩.
+    static void BuildFallback()
     {
-        s_rows = new List<CatalogRow>();
-        s_rowByKey = new Dictionary<string, CatalogRow>();
+        BeginBuild();
 
-        int t_count = _source != null ? _source.Count : 0;
+        var t_source = CardCatalog.IsReady ? CardCatalog.All : (IReadOnlyList<CardData>)System.Array.Empty<CardData>();
+        int t_count = t_source.Count;
         int t_rowIndex = 0;
+
+        // 전역 기본 튜닝(1회 해석 — fallback 행은 모두 동일 기본값).
+        var t_cfg = Tuning;
+        float t_perHour = t_cfg.DefaultProductionPerHour;
+        ECurrencyType t_rewardType = t_cfg.DefaultRewardType;
+        long t_cap = t_cfg.DefaultCap;
 
         for (int t_i = 0; t_i < t_count; t_i += ColumnsPerRow)
         {
-            int t_end = Mathf.Min(t_i + ColumnsPerRow, t_count); // 부분행 포함(모든 자리는 정확히 한 행에 소속)
-            var t_cards = new List<CardData>(t_end - t_i);
-            var t_keys = new List<string>(t_end - t_i);
+            var t_cards = new List<CardData>(ColumnsPerRow);
+            var t_keys = new List<string>(ColumnsPerRow);
 
-            for (int t_s = t_i; t_s < t_end; t_s++)
+            // 3장 슬롯 고정 — 모자란 마지막 행은 null로 패딩(Cards.Count 항상 3).
+            for (int t_c = 0; t_c < ColumnsPerRow; t_c++)
             {
-                var t_card = _source[t_s];             // 배치가 참조하는 CardData(카탈로그와 동일 에셋)
+                int t_idx = t_i + t_c;
+                var t_card = t_idx < t_count ? t_source[t_idx] : null;
                 t_cards.Add(t_card);
-                t_keys.Add(CardCatalog.KeyOf(t_card)); // 미authoring 슬롯(null 카드)은 null 키
+                t_keys.Add(CardCatalog.KeyOf(t_card));
             }
 
-            // 행 안정 키 = 행 첫 자리 카드의 안정 키.
-            string t_rowKey = t_keys.Count > 0 ? t_keys[0] : null;
-
-            var t_row = new CatalogRow(t_rowKey, t_rowIndex, t_cards.AsReadOnly(), t_keys.AsReadOnly());
-            s_rows.Add(t_row);
-
-            // 빈 키 행은 키 조회 색인에서 제외(null 충돌 방지). Rows 열거에는 그대로 포함.
-            if (!string.IsNullOrEmpty(t_rowKey) && !s_rowByKey.ContainsKey(t_rowKey))
-                s_rowByKey.Add(t_rowKey, t_row);
-
-            t_rowIndex++;
+            AddRow(t_rowIndex++, t_cards, t_keys, t_perHour, t_rewardType, t_cap);
         }
 
+        EndBuild();
+    }
+
+    // 행 튜닝 해석: 전역 기본값 ↔ 행 오버라이드.
+    //  - productionPerHour>0 → 그 값, 아니면 전역 기본.
+    //  - cap>0               → 그 값, 아니면 전역 기본.
+    //  - rewardType          → authored 행 값을 그대로 정본으로 사용.
+    //    (ECurrencyType은 Gold=0이라 "미설정" 센티널이 없고, 예전의 amount 오버라이드 신호도
+    //     사라졌으므로 행의 rewardType 필드를 직접 최종값으로 쓴다. 전역 DefaultRewardType은
+    //     def가 없는 fallback 청크 행에서만 쓰인다.)
+    static void ResolveTuning(CollectionRowDef _def, out float _perHour, out ECurrencyType _rewardType, out long _cap)
+    {
+        var t_cfg = Tuning;
+
+        _perHour = _def.productionPerHour > 0f ? _def.productionPerHour : t_cfg.DefaultProductionPerHour;
+        _rewardType = _def.rewardType;
+        _cap = _def.cap > 0 ? _def.cap : t_cfg.DefaultCap;
+    }
+
+    // ── 빌드 공용 헬퍼 ─────────────────────────────────────────
+
+    static void BeginBuild()
+    {
+        s_rows = new List<CatalogRow>();
+        s_rowByKey = new Dictionary<string, CatalogRow>();
+    }
+
+    static void AddRow(int _index, List<CardData> _cards, List<string> _keys, float _perHour, ECurrencyType _rewardType, long _cap)
+    {
+        // 행 안정 키 = 첫 non-null 카드 키(3장 중 앞선 것부터). 전부 미해결이면 null.
+        string t_rowKey = null;
+        for (int t_i = 0; t_i < _keys.Count; t_i++)
+        {
+            if (!string.IsNullOrEmpty(_keys[t_i])) { t_rowKey = _keys[t_i]; break; }
+        }
+
+        var t_row = new CatalogRow(t_rowKey, _index, _cards.AsReadOnly(), _keys.AsReadOnly(), _perHour, _rewardType, _cap);
+        s_rows.Add(t_row);
+
+        // 빈 키/중복 키 행은 조회 색인에서 제외(null·충돌 방지). Rows 열거에는 그대로 포함.
+        if (!string.IsNullOrEmpty(t_rowKey) && !s_rowByKey.ContainsKey(t_rowKey))
+            s_rowByKey.Add(t_rowKey, t_row);
+    }
+
+    static void EndBuild()
+    {
         s_rowsReadonly = s_rows.AsReadOnly();
     }
 
-    // 배치 소스 시그니처: 소스 객체 동일성 + 자리 수. 같으면 행 구조 캐시 재사용.
-    // (고정 배치 전제 — 개수 불변인 authoring 변경은 Invalidate()/SetLayout으로 반영.)
+    // 행 소스 시그니처: 소스 객체 동일성 + 요소 수. 같으면 행 구조 캐시 재사용.
+    // (authoring 값 변경은 개수 불변이어도 Invalidate()/SetLayout으로 반영해야 한다.)
     readonly struct LayoutSignature : System.IEquatable<LayoutSignature>
     {
         readonly Object m_source; // 배치 SO 또는 null(fallback)

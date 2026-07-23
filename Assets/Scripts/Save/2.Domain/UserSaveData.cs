@@ -13,5 +13,5 @@ public class UserSaveData
     public CurrencySaveData currency = new CurrencySaveData();       // A-3 재화
     public OwnershipSaveData ownership = new OwnershipSaveData();    // B-5 소유
     public DeckSaveData deck = new DeckSaveData();                   // B-6 덱
-    // public CollectionSaveData collection = new CollectionSaveData(); // C 도감
+    public CollectionSaveData collection = new CollectionSaveData(); // C 도감(방치 생산)
 }

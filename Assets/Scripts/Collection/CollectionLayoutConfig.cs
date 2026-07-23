@@ -2,22 +2,57 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 도감 배치의 단일 진실원(배치 오버레이). 자리 번호 = slots 인덱스 순서(위→아래·좌→우).
-/// 소유·미소유 카드 전부가 사전 정의된 고정 자리에 박혀 있고, 카드 획득은 예약된 자리를 채울 뿐이다.
-/// 카드 마스터를 복제하지 않는다 — CardData 참조(배치)만 담고 스탯/키는 CardCatalog가 소유한다.
-/// raw 값은 [SerializeField] private, 노출은 읽기전용 프로퍼티만. (BattleTimingConfig 관용구)
-/// 실제 .asset 인스턴스 생성·배치 데이터 입력은 에디터에서 사용자가 authoring — 비어도 안전해야 한다.
+/// 도감 배치 데이터 
 /// </summary>
 [CreateAssetMenu(fileName = "CollectionLayoutConfig", menuName = "Card Battle/Collection Layout Config")]
 public class CollectionLayoutConfig : ScriptableObject
 {
-    // 배치 순서(= 자리 번호). 미소유 카드도 자리 예약용으로 포함한다. 3의 배수가 아니어도 됨(부분행 허용).
-    [Header("도감 배치 (순서 = 자리 번호, 위→아래·좌→우). 미소유 카드도 자리 예약용으로 포함.")]
-    [SerializeField] List<CardData> slots = new List<CardData>();
+    [Header("전역 기본 튜닝 (행 값이 0이면 이 값 사용)")]
+    [SerializeField] ECurrencyType defaultRewardType = ECurrencyType.Gold; // 기본 보상 종류. 행 rewardType 미설정(=Gold)이면 이 값과 동일.
+    [Min(0f)] [SerializeField] float defaultProductionPerHour = 10f; // 기본 시간당 생산량. 행 productionPerHour가 0일 때 적용. 음수 오설정 방지.
+    [Min(0)] [SerializeField] long defaultCap = 240;                 // 기본 누적 상한(수확 전 최대 누적량). 행 cap이 0일 때 적용. 음수 오설정 방지.
 
-    // 배치 자리 총 개수(부분행 포함). null 방어.
-    public int SlotCount => slots != null ? slots.Count : 0;
+    [Header("도감 전체 완성 1회성 보상 (모든 행 완성 시 딱 1번 지급)")]
+    [SerializeField] ECurrencyType completionRewardType = ECurrencyType.Gold; // 완성 보상 종류. 기본 Gold.
+    [Min(0)] [SerializeField] long completionRewardAmount = 1000;              // 완성 보상량. 기본 1000. 음수 오설정 방지.
 
-    // 읽기 전용 배치 순서. null이면 빈 목록(미authoring 상태 안전 처리).
-    public IReadOnlyList<CardData> Slots => slots != null ? slots : (IReadOnlyList<CardData>)System.Array.Empty<CardData>();
+    // ── 행 목록 (순서 = 도감 표시 순서) ──
+    [Header("도감 행 목록 (순서 = 위→아래). 각 행 = 카드 3장 고정.")]
+    [SerializeField] List<CollectionRowDef> rows = new List<CollectionRowDef>();
+
+    // 전역 기본값 읽기전용 노출.
+    public ECurrencyType DefaultRewardType => defaultRewardType;
+    public float DefaultProductionPerHour => defaultProductionPerHour;
+    public long DefaultCap => defaultCap;
+
+    // 도감 전체 완성 1회성 보상 읽기전용 노출.
+    public ECurrencyType CompletionRewardType => completionRewardType;
+    public long CompletionRewardAmount => completionRewardAmount;
+
+    // 행 정의 총 개수. null 방어.
+    public int RowDefCount => rows != null ? rows.Count : 0;
+
+    // 읽기 전용 행 목록. null이면 빈 목록(미authoring 상태 안전 처리).
+    public IReadOnlyList<CollectionRowDef> Rows
+        => rows != null ? rows : (IReadOnlyList<CollectionRowDef>)System.Array.Empty<CollectionRowDef>();
+}
+
+/// <summary>
+/// 도감 행 하나의 authoring 데이터(인스펙터 입력용)
+/// </summary>
+[System.Serializable]
+public struct CollectionRowDef
+{
+    [Header("행 카드 3장 (고정)")]
+    public CardData card1;
+    public CardData card2;
+    public CardData card3;
+
+    [Header("생산 튜닝 (0 = 전역 기본값 사용)")]
+    [Tooltip("수확 시 지급할 재화 종류. 이 행에서는 이 값이 그대로 정본(Gold=0 센티널 부재라 오버라이드 신호 없음).")]
+    public ECurrencyType rewardType;
+    [Min(0f)] [Tooltip("완성 행이 시간당 누적하는 생산량. 0이면 전역 기본 생산량. >0이면 이 값으로 오버라이드.")]
+    public float productionPerHour;
+    [Min(0)] [Tooltip("수확 전 누적 상한(방치 상한). 0이면 전역 기본 상한. >0이면 이 값으로 오버라이드.")]
+    public long cap;
 }

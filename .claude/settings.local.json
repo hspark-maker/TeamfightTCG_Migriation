@@ -33,7 +33,11 @@
       "Bash(rm -f Assets/Scripts/UI/MainMenu/DeckSynergyPanel.cs* Assets/Scripts/UI/MainMenu/SynergyProgressRow.cs*)",
       "Bash(rm -f Assets/Assets/Prefabs/UI/MainMenu/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/MainMenu/SynergyProgressRow.prefab* Assets/Assets/Prefabs/UI/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/SynergyProgressRow.prefab*)",
       "Skill(artifact-design)",
-      "Artifact"
+      "Artifact",
+      "Bash(xargs grep -l \"TMP_FontAsset\\\\|MonoBehaviour\")",
+      "mcp__unity-mcp__Unity_SceneView_Capture2DScene",
+      "mcp__unity-mcp__Unity_Camera_Capture",
+      "Bash(grep -oE \"m_fontAsset: \\\\{fileID: [0-9]+, guid: [a-f0-9]+\" Assets/Scenes/MainMenu.unity)"
     ]
   }
 }
