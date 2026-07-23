@@ -1,11 +1,3 @@
-public interface IAttackBehavior
-{
-    AttackResult Execute(CardInstance _attacker, CardInstance _defender,
-                         BattleField _attackerField, BattleField _defenderField,
-                         CardInstance _preSelectedSplash = null,
-                         bool? _forceCunningSwap = null);
-}
-
 public struct AttackResult
 {
     public bool         defenderKilled;

@@ -45,11 +45,11 @@ public class MultiplayerOpponentTurn : TurnBase
 
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
-            await AttackFlow.RunBeforeAttackPassives(t_atk, t_def, this.ctx.enemyField);   // 무리 선피해(Execute 전 원자)
+            await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField);   // 무리 선피해(Execute 전 원자)
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
                 t_atk.data.attackEffect, t_onEffect, t_preKw, t_atKw,
-                () => AttackFlow.RunAfterAttackPassives(t_atk, t_def, this.ctx.enemyField, t_result));
+                () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 내 field만 로컬 채움 + 브로드캐스트
             List<CardInstance> t_playerPlaced = this.ctx.playerField.FillEmptySlots();

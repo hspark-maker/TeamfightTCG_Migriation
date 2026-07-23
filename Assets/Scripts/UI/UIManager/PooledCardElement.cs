@@ -21,6 +21,11 @@ public class PooledCardElement : PooledUIBase
     [SerializeField] GameObject keywordExplainItemPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
 
+    [Header("Synergy Icons")]
+    // 카드 정보 창의 시너지 아이콘 줄. 아이콘을 누르면 SynergyExplainPopupUI가 뜬다.
+    [SerializeField] Transform synergyIconRoot;
+    [SerializeField] GameObject synergyIconPrefab;
+
     [SerializeField] RectTransform keywordPanel;
     [SerializeField] float keywordOffsetX = 300f;
 
@@ -88,6 +93,7 @@ public class PooledCardElement : PooledUIBase
 
 
         RefreshKeywordList(this.cardData);
+        SynergyIconStrip.Build(this.cardData, this.synergyIconRoot, this.synergyIconPrefab);
     }
 
     void RefreshKeywordList(CardData _card)

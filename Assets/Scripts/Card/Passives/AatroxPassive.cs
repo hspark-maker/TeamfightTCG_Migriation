@@ -7,15 +7,15 @@ public class AatroxPassive : CardPassive
     [SerializeField] string peerlessLabel;
     [SerializeField] string executionLabel;
 
-    public override async UniTask OnAfterAttack(CardInstance _self, CardInstance _target, BattleField _ownField)
+    public override async UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
-        _self.attackCount++;
-        switch (_self.attackCount)
+        _ctx.self.attackCount++;
+        switch (_ctx.self.attackCount)
         {
-            case 1: _self.runtimeKeywords |= CardKeyword.Peerless;  Notify(_self, this.peerlessLabel);  break;
-            case 2: _self.runtimeKeywords |= CardKeyword.Execution; Notify(_self, this.executionLabel); break;
+            case 1: _ctx.self.runtimeKeywords |= CardKeyword.Peerless;  Notify(_ctx.self, this.peerlessLabel);  break;
+            case 2: _ctx.self.runtimeKeywords |= CardKeyword.Execution; Notify(_ctx.self, this.executionLabel); break;
             default: return;
         }
-        await Glow(_self);
+        await Glow(_ctx.self);
     }
 }

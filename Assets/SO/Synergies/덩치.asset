@@ -16,7 +16,7 @@ MonoBehaviour:
   effectDescription: "\uCC98\uC74C \uC804\uC7A5\uC5D0 \uBC30\uCE58\uB420 \uB54C,
     \uCD94\uAC00 \uC0DD\uBA85\uB825 +3"
   color: {r: 0, g: 0, b: 0, a: 0}
-  icon: {fileID: 21300000, guid: c543d6ad75ae96440a48b8fef82976a0, type: 3}
+  icon: {fileID: 21300000, guid: 3098f3c397ee38c46b1884a41489d3aa, type: 3}
   tiers:
   - requiredCount: 2
     label: "\uB369\uCE58"

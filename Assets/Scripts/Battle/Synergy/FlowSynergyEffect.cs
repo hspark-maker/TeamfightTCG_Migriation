@@ -6,27 +6,27 @@ using UnityEngine;
 // flowBonus는 **흐름 카드에만** FlowStack으로 세팅 → CardInstance.AttackDamage에 가산.
 // 스택 1당 "흐름 카드가 공격으로 주는 데미지 +1"(비흐름 카드는 flowBonus=0, 영향 없음).
 // 값 규칙은 CardInstance에 위임. RNG 미소비, 순수 산술.
-// "등장"은 런타임 스폰(NotifySpawn)만 — 초기배치는 미발화(BattleField 스폰 경로가 게이팅).
+// "등장"은 런타임 스폰(NotifyEntered)만 — 오프닝 배치(Placed)는 미발화(BattleField 스폰 경로가 게이팅).
 [CreateAssetMenu(fileName = "FlowSynergyEffect", menuName = "Card Battle/Synergy Effect/Flow")]
 public class FlowSynergyEffect : SynergyEffect
 {
-    public override void Apply(CardInstance card, SynergyState state) { }   // 정적 효과 없음(순수 스폰 트리거)
+    public override void OnDeckResolved(CardInstance _card, SynergyState _state) { }   // 정적 효과 없음(순수 스폰 트리거)
 
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
-    public override UniTask OnSpawn(CardInstance self, BattleField field, SynergyData synergy)
+    public override UniTask OnEntered(SpawnCtx _ctx, SynergyData _synergy)
     {
-        if (self == null || field == null) return UniTask.CompletedTask;
+        if (_ctx.self == null || _ctx.field == null) return UniTask.CompletedTask;
 
         // 흐름 카드 등장일 때만 발동. 비흐름 카드 등장은 무시(flowBonus 상속 없음).
-        if (!SynergyApplier.BelongsTo(self, synergy)) return UniTask.CompletedTask;
+        if (!SynergyApplier.BelongsTo(_ctx.self, _synergy)) return UniTask.CompletedTask;
 
         // 매 등장마다 스택 +1(Cunning 재진입 포함, 무제한 성장).
-        field.AddFlowStack();
+        _ctx.field.AddFlowStack();
         // 흐름 카드들만 현재 스택으로 재동기(비흐름 카드는 건드리지 않음).
-        foreach (var t_card in field.GetActiveCards())
-            if (t_card != null && SynergyApplier.BelongsTo(t_card, synergy))
-                t_card.flowBonus = field.FlowStack;
-        SynergyTriggers.Fire(self, synergy);   // 흐름 카드 등장 시 배너+배지 pop
+        foreach (var t_card in _ctx.field.GetActiveCards())
+            if (t_card != null && SynergyApplier.BelongsTo(t_card, _synergy))
+                t_card.flowBonus = _ctx.field.FlowStack;
+        SynergyTriggers.Fire(_ctx.self, _synergy);   // 흐름 카드 등장 시 배너+배지 pop
         return UniTask.CompletedTask;
     }
 }

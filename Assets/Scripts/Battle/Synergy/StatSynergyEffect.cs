@@ -10,9 +10,9 @@ public class StatSynergyEffect : SynergyEffect
     [SerializeField] private CardKeyword grantedKeywords;
     [SerializeField] private int         dmgReduction;   // 비늘: 받는 피해 상시 -N (정적, 멱등)
 
-    public override void Apply(CardInstance card, SynergyState state)
+    public override void OnDeckResolved(CardInstance _card, SynergyState _state)
     {
-        if (card == null) return;
-        card.ApplySynergy(bonusAtk, bonusHp, grantedKeywords, dmgReduction);
+        if (_card == null) return;
+        _card.ApplySynergy(bonusAtk, bonusHp, grantedKeywords, dmgReduction);
     }
 }

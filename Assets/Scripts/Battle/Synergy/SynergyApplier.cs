@@ -30,7 +30,7 @@ public static class SynergyApplier
                 foreach (var t_effect in t_active.Tier.effects)
                 {
                     if (t_effect == null) continue;
-                    t_effect.Apply(t_card, state);
+                    t_effect.OnDeckResolved(t_card, state);   // [DeckResolved] ClearSynergy 선행 → 멱등
                 }
             }
         }

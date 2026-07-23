@@ -7,29 +7,29 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "LegacySynergyEffect", menuName = "Card Battle/Synergy Effect/Legacy")]
 public class LegacySynergyEffect : SynergyEffect
 {
-    public override void Apply(CardInstance card, SynergyState state) { }   // 정적 효과 없음(순수 트리거)
+    public override void OnDeckResolved(CardInstance _card, SynergyState _state) { }   // 정적 효과 없음(순수 트리거)
 
     // 턴 종료: 소속 카드 스택 적립. TurnRunner가 OnExit 직후 인라인 발화.
     // 스택 적립은 상시 진행이라 notify 안 함(스팸 방지) — 표시는 사망 회복 발동 시점에만.
-    public override void OnTurnEnd(CardInstance self, SynergyData synergy)
+    public override void OnTurnEnded(TurnCtx _ctx, SynergyData _synergy)
     {
-        if (self == null) return;
-        self.legacyStack++;
+        if (_ctx.self == null) return;
+        _ctx.self.legacyStack++;
     }
 
     // 사망: 축적한 스택만큼 아군(자신 제외 라이브) 전원 회복. 스택 0이면 no-op.
-    public override void OnDeath(CardInstance self, BattleField field, SynergyData synergy)
+    public override void OnLethal(DeathCtx _ctx, SynergyData _synergy)
     {
-        if (self == null || field == null || self.legacyStack <= 0) return;
+        if (_ctx.self == null || _ctx.field == null || _ctx.self.legacyStack <= 0) return;
 
         bool t_healed = false;
-        foreach (var t_card in field.GetActiveCards())   // ownField 아군
+        foreach (var t_card in _ctx.field.GetActiveCards())   // ownField 아군
         {
-            if (t_card == null || t_card == self || !t_card.IsAlive) continue;
-            t_card.Heal(self.legacyStack);
+            if (t_card == null || t_card == _ctx.self || !t_card.IsAlive) continue;
+            t_card.Heal(_ctx.self.legacyStack);
             t_healed = true;
         }
         if (t_healed)
-            SynergyTriggers.Fire(self, synergy);   // 실제 회복 발생 시에만 배너+배지 pop
+            SynergyTriggers.Fire(_ctx.self, _synergy);   // 실제 회복 발생 시에만 배너+배지 pop
     }
 }

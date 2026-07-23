@@ -481,16 +481,13 @@ public class CardView : MonoBehaviour
         CardInstance t_def = _target.BoundCard;
         if (t_atk == null || t_def == null) return;
 
-        bool t_defInvincible = t_def.HasKeyword(CardKeyword.Invincible);
-        int  t_dmg = t_defInvincible ? 0 : t_atk.AttackDamage();
-        _target.ShowAttackPreview(t_dmg, t_def.WouldDieFrom(t_atk.AttackDamage()));   // 직격(공격): 비늘 감소 반영(기본 true)
+        // 계산은 AttackPreview가 단독 소유(실제 전투와 갈라지지 않도록). 여기선 표시만.
+        AttackPreview t_p = AttackPreview.Compute(t_atk, t_def);
 
-        if (!t_atk.TakesCounterFrom(t_def)) return;
-
-        bool t_atkInvincible = t_atk.HasKeyword(CardKeyword.Invincible);
-        int  t_counter = t_atkInvincible ? 0 : t_def.AttackDamage();
+        _target.ShowAttackPreview(t_p.attackDamage, t_p.defenderWouldDie);   // 직격(공격): 비늘 감소 반영(기본 true)
+        if (!t_p.hasCounter) return;
         // 반격 맥락: 비늘 감소 없음(false). 실제 반격 TakeDamage(false)와 사망 프리뷰/HP표시 일치.
-        ShowAttackPreview(t_counter, t_atk.WouldDieFrom(t_def.AttackDamage(), false), false);
+        ShowAttackPreview(t_p.counterDamage, t_p.attackerWouldDie, false);
     }
     #endregion
 

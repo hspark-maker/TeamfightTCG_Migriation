@@ -7,10 +7,10 @@ public class RammusPassive : CardPassive
     [SerializeField] int    thornDamage = 1;
     [SerializeField] string effectLabel;
 
-    public override async UniTask OnAttackedBy(CardInstance _self, CardInstance _attacker)
+    public override async UniTask OnAttacked(AttackedCtx _ctx)
     {
-        _attacker.TakeDamage(this.thornDamage);
-        Notify(_self, this.effectLabel);
-        await Glow(_self);
+        _ctx.attacker.TakeDamage(this.thornDamage);
+        Notify(_ctx.self, this.effectLabel);
+        await Glow(_ctx.self);
     }
 }

@@ -6,11 +6,11 @@ public class KindredPassive : CardPassive
 {
     [SerializeField] string effectLabel;
 
-    public override async UniTask OnAfterAttack(CardInstance _self, CardInstance _target, BattleField _ownField)
+    public override async UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
-        if (!_target.IsAlive) return;
-        _target.runtimeKeywords |= CardKeyword.Mark;
-        Notify(_self, this.effectLabel);
-        await Glow(_self);
+        if (!_ctx.target.IsAlive) return;
+        _ctx.target.runtimeKeywords |= CardKeyword.Mark;
+        Notify(_ctx.self, this.effectLabel);
+        await Glow(_ctx.self);
     }
 }

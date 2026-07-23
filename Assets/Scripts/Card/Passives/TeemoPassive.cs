@@ -7,10 +7,10 @@ public class TeemoPassive : CardPassive
     [SerializeField] int    bonusHpGrant = 1;
     [SerializeField] string effectLabel;
 
-    public override async UniTask OnSwapOut(CardInstance _self, CardInstance _incoming)
+    public override async UniTask OnSwappedOut(SwapOutCtx _ctx)
     {
-        _incoming.bonusHp += this.bonusHpGrant;
-        Notify(_self, this.effectLabel);
-        await Glow(_incoming);
+        _ctx.incoming.bonusHp += this.bonusHpGrant;
+        Notify(_ctx.self, this.effectLabel);
+        await Glow(_ctx.incoming);
     }
 }

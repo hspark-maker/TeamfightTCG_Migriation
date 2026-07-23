@@ -16,7 +16,7 @@ MonoBehaviour:
   effectDescription: "\uD750\uB984 \uCE74\uB4DC\uAC00 \uB098\uC62C \uB54C \uD750\uB984
     \uC911\uCCA9+1. \uC911\uCCA9\uB2F9 \uC801 \uBC1B\uB294 \uD53C\uD574 +1"
   color: {r: 0, g: 0, b: 0, a: 0}
-  icon: {fileID: 21300000, guid: c543d6ad75ae96440a48b8fef82976a0, type: 3}
+  icon: {fileID: 21300000, guid: 7c55d015ef814ab4fbafac237ca9ea8a, type: 3}
   tiers:
   - requiredCount: 4
     label: "\uD750\uB984"

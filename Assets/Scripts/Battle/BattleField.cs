@@ -15,7 +15,7 @@ public class BattleField : MonoBehaviour
     public int WaitingCount => this.waitingQueue.Count;
     public bool IsEmpty => !HasAnyCard();
 
-    /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifySpawn)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
+    /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifyEntered)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
     /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
     public int FlowStack { get; private set; }
 
@@ -45,7 +45,7 @@ public class BattleField : MonoBehaviour
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
                 this.slots[i] = t_card;
-                t_card.data.passive?.OnSpawn(t_card).Forget();
+                t_card.data.passive?.OnPlaced(new SpawnCtx(t_card, this)).Forget();   // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -76,9 +76,8 @@ public class BattleField : MonoBehaviour
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
                 this.slots[i] = t_card;
-                t_card.data.passive?.OnSpawn(t_card).Forget();
+                NotifyEntered(t_card);   // [Entered] 런타임 등장(패시브+시너지). justSpawned 판정 전 — 패시브가 무적 부여 가능.
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
-                NotifySpawn(t_card);   // 시너지 스폰 훅(돌보미 힐/흐름 스택). 초기배치가 아닌 런타임 스폰만.
                 t_placed.Add(t_card);
             }
         }
@@ -97,9 +96,8 @@ public class BattleField : MonoBehaviour
         t_next.wasEverRevealed = true;
         t_next.slotIndex       = t_slot;
         this.slots[t_slot]     = t_next;
-        t_next.data.passive?.OnSpawn(t_next).Forget();
+        NotifyEntered(t_next);   // [Entered] 런타임 등장(패시브+시너지).
         t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible);
-        NotifySpawn(t_next);   // 시너지 스폰 훅(돌보미 힐/흐름 스택).
 
         _card.savedHp      = _card.data.maxHp;
         _card.savedBonusHp = _card.data.bonusHp;
@@ -158,7 +156,7 @@ public class BattleField : MonoBehaviour
                 t_card.isRevealed      = true;
                 t_card.wasEverRevealed = true;
                 this.slots[i] = t_card;
-                t_card.data.passive?.OnSpawn(t_card).Forget();
+                t_card.data.passive?.OnPlaced(new SpawnCtx(t_card, this)).Forget();   // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -209,9 +207,8 @@ public class BattleField : MonoBehaviour
         t_card.isRevealed      = true;
         t_card.wasEverRevealed = true;
         this.slots[_slot] = t_card;
-        t_card.data.passive?.OnSpawn(t_card).Forget();
+        NotifyEntered(t_card);   // [Entered] 런타임 등장. 원격 미러도 소유 클라와 동형 발화.
         t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
-        NotifySpawn(t_card);   // 시너지 스폰 훅(돌보미 힐/흐름 스택). 원격 미러도 소유 클라와 동형 발화.
         return t_card;
     }
 
@@ -232,9 +229,15 @@ public class BattleField : MonoBehaviour
     /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
     public void AddFlowStack() => this.FlowStack++;
 
-    // 런타임 스폰 공통 후처리: 시너지 OnSpawn 발화(돌보미 힐/흐름 스택).
-    // 초기배치(Initialize/InitializeFromRemote)엔 호출 금지 — 오프닝은 미발화(등장=런타임 스폰만).
-    void NotifySpawn(CardInstance _card) => SynergyTriggers.OnSpawn(_card, this);
+    // [Entered] 런타임 등장 공통 후처리(패시브 → 시너지 순서 고정).
+    // Placed(오프닝 배치)와 혼동 금지 — 오프닝은 시너지 미발화가 의도(등장=런타임 스폰만).
+    // 호출 위치는 justSpawned 판정 '전'이어야 한다(패시브가 무적을 부여하는 경우를 판정에 반영).
+    void NotifyEntered(CardInstance _card)
+    {
+        var t_ctx = new SpawnCtx(_card, this);
+        _card.data.passive?.OnEntered(t_ctx).Forget();
+        SynergyTriggers.Entered(t_ctx);
+    }
 
     public CardInstance GetSlot(int _index) => this.slots[_index];
     public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;

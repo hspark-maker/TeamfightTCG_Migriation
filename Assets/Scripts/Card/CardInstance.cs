@@ -1,5 +1,3 @@
-using Cysharp.Threading.Tasks;
-
 public class CardInstance
 {
     public CardData data;
@@ -28,7 +26,7 @@ public class CardInstance
     public int savedHp      = -1;
     public int savedBonusHp = -1;
 
-    // 스폰 직후 OnTurnStart 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
+    // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
 
     public bool IsAlive => this.hp > 0;
@@ -39,6 +37,9 @@ public class CardInstance
     public int AttackDamage() =>
         (HasKeyword(CardKeyword.Taunt) ? UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.hp * 0.5f)) : this.hp)
         + this.synergyAtk + this.flowBonus;   // 가산(synergyAtk/흐름 스택)은 도발 반감 뒤에 더함(보너스는 반감 안 받음)
+
+    /// <summary>무쌍 광역 피해량. AttackDamage()와 별개 규칙 — 도발/시너지 보정 없는 순수 hp 기준(v1 시맨틱 보존).</summary>
+    public int SplashDamage() => UnityEngine.Mathf.FloorToInt(this.hp * 0.5f);
 
     /// <summary>받는 피해 단일 폴딩 지점. 공격 직격(_isAttackHit=true)일 때만 비늘 감소(-synergyDmgReduction) 적용, 하한 0.
     /// 반격/가시/기타 패시브 피해는 감소 없음(소스를 호출부가 정적 결정 → 양클라 대칭).
@@ -126,7 +127,5 @@ public class CardInstance
             return;
         }
         (this.hp, this.bonusHp) = PreviewAfterDamage(_damage, _isAttackHit);
-        if (_damage > 0)
-            this.data.passive?.OnHit(this, _damage).Forget();
     }
 }

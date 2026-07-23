@@ -18,10 +18,16 @@ public static class MatchRandom
 
     public static bool IsSeeded => s_seeded;
 
+    /// <summary>스트림 전진 횟수. Range(n)은 n&lt;=1이면 전진하지 않으므로 이 값이 곧 '실제 소비 횟수'.
+    /// 양 클라가 같은 시점에 같은 값이어야 함 — 어긋나면 그 순간부터 영구 divergence.
+    /// 테스트 assert용 + 멀티 desync 카나리아용(현재 divergence 탐지 수단이 이것뿐).</summary>
+    public static int DrawCount { get; private set; }
+
     public static void Seed(ulong _seed)
     {
-        s_state  = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;  // 0-state 회피
-        s_seeded = true;
+        s_state   = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;  // 0-state 회피
+        s_seeded  = true;
+        DrawCount = 0;
     }
 
     /// <summary>싱글플레이용 로컬 랜덤 시드.</summary>
@@ -29,13 +35,15 @@ public static class MatchRandom
 
     public static void Reset()
     {
-        s_state  = 0;
-        s_seeded = false;
+        s_state   = 0;
+        s_seeded  = false;
+        DrawCount = 0;
     }
 
     // splitmix64
     static ulong NextU64()
     {
+        DrawCount++;
         s_state += 0x9E3779B97F4A7C15UL;
         ulong z = s_state;
         z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;

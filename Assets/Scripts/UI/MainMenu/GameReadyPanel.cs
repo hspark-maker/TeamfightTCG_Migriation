@@ -78,6 +78,6 @@ public class GameReadyPanel : MonoBehaviour
     {
         if (!DeckSaveManager.IsSlotValid(_slotIndex)) return;
         DeckConfig.Set(DeckSaveManager.GetSlot(_slotIndex));
-        this.deckGroup?.LoadSlot(_slotIndex);
+        this.deckGroup?.LoadSlot(_slotIndex);   // 시너지 아이콘은 DeckGroup이 SetDeck에서 함께 갱신
     }
 }

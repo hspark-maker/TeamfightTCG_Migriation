@@ -15,7 +15,7 @@ MonoBehaviour:
   displayName: "\uBE44\uB298"
   effectDescription: "\uACF5\uACA9\uC73C\uB85C \uBC1B\uB294 \uD53C\uD574 -1"
   color: {r: 0, g: 0, b: 0, a: 0}
-  icon: {fileID: 21300000, guid: c543d6ad75ae96440a48b8fef82976a0, type: 3}
+  icon: {fileID: 21300000, guid: 9d8929220db26bd4cab0382e073a76c8, type: 3}
   tiers:
   - requiredCount: 2
     label: "\uBE44\uB298"
