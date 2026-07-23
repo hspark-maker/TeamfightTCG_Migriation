@@ -6970,6 +6970,7 @@ GameObject:
   - component: {fileID: 1804696322}
   - component: {fileID: 1804696324}
   - component: {fileID: 1804696323}
+  - component: {fileID: 1804696325}
   m_Layer: 0
   m_Name: CollectionScreen
   m_TagString: Untagged
@@ -7037,6 +7038,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1804696321}
   m_CullTransparentMesh: 1
+--- !u!114 &1804696325
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804696321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b2a391fa1bbca24d9fc3bacff1eae2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionGalleryController
+  content: {fileID: 2087608116}
+  rowPrefab: {fileID: 1494497271913118075, guid: 16e7445f533f71647ba418e4538453fb, type: 3}
+  fallbackAllCards:
+  - {fileID: 11400000, guid: c6df53ffc91ed3a44a49f574bdf186f2, type: 2}
+  - {fileID: 11400000, guid: 3ec842c5f9da74e47bb7df7e2e2a95df, type: 2}
+  - {fileID: 11400000, guid: 9d9ad74818355ed4bb04b3e714fc0472, type: 2}
+  - {fileID: 11400000, guid: 310af593e7c2c0440a165d68cf442915, type: 2}
+  - {fileID: 11400000, guid: e122db8c1c526bf47adcfc89225db6c2, type: 2}
+  - {fileID: 11400000, guid: e050548f826485349931ac034d127c22, type: 2}
+  - {fileID: 11400000, guid: 5932854a57d69b74282dcc6379802343, type: 2}
+  - {fileID: 11400000, guid: ed0fba83ed5de2141b9d59a9165ce43e, type: 2}
+  - {fileID: 11400000, guid: eeb9460e9589d5f4ea99880c9988f942, type: 2}
 --- !u!1 &1819384392
 GameObject:
   m_ObjectHideFlags: 0

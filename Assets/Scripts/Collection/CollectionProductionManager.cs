@@ -2,15 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 도감 방치 생산의 static 단일 창구. 행별 진행도(마지막 정산 시각·누적량)를 메모리 캐싱하고
-// 세이브 슬롯(CollectionSaveData) 매핑을 여기서만 안다. OwnershipManager/CurrencyManager와 동일한 부트/영속 결.
-//
-// 생산은 프레임 누산이 아니라 "조회 시점 경과시간" 순수 계산이다:
-//   누적 = min(cap, 저장누적 + productionPerHour × GameClock.Since(마지막정산).시간)
-// 앱이 꺼진 동안(오프라인)도 GameClock.Since가 경과를 계산하므로 자연 누적된다.
-//
-// 의존: CatalogRows/CatalogRow(읽기)·OwnershipManager(행 완성 판정, 간접)·GameClock·CurrencyManager(Earn/Save)·
-//       CollectionSaveData/DataSaveManager. 전부 아웃게임 — Battle/·Network/·CardRegistry 미참조.
+// 도감 방치 생산 매니저 
 public static class CollectionProductionManager
 {
     // 행 키 → 진행도(메모리 캐시). 값은 세이브 슬롯에 넣을 값 객체와 동일 참조.

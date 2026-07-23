@@ -37,7 +37,9 @@
       "Bash(xargs grep -l \"TMP_FontAsset\\\\|MonoBehaviour\")",
       "mcp__unity-mcp__Unity_SceneView_Capture2DScene",
       "mcp__unity-mcp__Unity_Camera_Capture",
-      "Bash(grep -oE \"m_fontAsset: \\\\{fileID: [0-9]+, guid: [a-f0-9]+\" Assets/Scenes/MainMenu.unity)"
+      "Bash(grep -oE \"m_fontAsset: \\\\{fileID: [0-9]+, guid: [a-f0-9]+\" Assets/Scenes/MainMenu.unity)",
+      "Bash(grep -v \"m_Name: $\")",
+      "Bash(sed 's/.*m_EditorClassIdentifier: //')"
     ]
   }
 }
