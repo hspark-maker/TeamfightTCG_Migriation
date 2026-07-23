@@ -39,7 +39,17 @@
       "mcp__unity-mcp__Unity_Camera_Capture",
       "Bash(grep -oE \"m_fontAsset: \\\\{fileID: [0-9]+, guid: [a-f0-9]+\" Assets/Scenes/MainMenu.unity)",
       "Bash(grep -v \"m_Name: $\")",
-      "Bash(sed 's/.*m_EditorClassIdentifier: //')"
+      "Bash(sed 's/.*m_EditorClassIdentifier: //')",
+      "Bash(grep -n \"Scripts\\\\\\\\\\\\\\\\Currency\\\\\\\\\\\\\\\\\" *.csproj)",
+      "Bash(grep -oE 'Assets\\\\\\\\Scripts\\\\\\\\[A-Za-z0-9.]+\\\\\\\\' Assembly-CSharp.csproj)",
+      "Bash(python *)",
+      "WebSearch",
+      "Read(//c/Users/sea51/.unity/relay/**)",
+      "Read(//c/Users/sea51/.unity/mcp/connections/**)",
+      "Bash(powershell -NoProfile -Command \"Get-Process Unity -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,StartTime | Format-Table -AutoSize\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "unity-mcp"
+  ]
 }

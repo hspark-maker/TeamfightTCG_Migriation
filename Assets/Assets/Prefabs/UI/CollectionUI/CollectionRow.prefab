@@ -34,9 +34,9 @@ RectTransform:
   - {fileID: 1114749959999367512}
   m_Father: {fileID: 2670923934587620924}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 4, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &619461825089262168
@@ -132,9 +132,9 @@ RectTransform:
   - {fileID: 9177006264473934148}
   m_Father: {fileID: 2670923934587620924}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 48, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &8070855692333878357
@@ -274,10 +274,10 @@ RectTransform:
   - {fileID: 5338090873865452038}
   m_Father: {fileID: 769934302483368149}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 50, y: -58}
+  m_SizeDelta: {x: 52, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &294868380106760769
 MonoBehaviour:
@@ -432,9 +432,9 @@ RectTransform:
   - {fileID: 1623456879515541589}
   m_Father: {fileID: 2670923934587620924}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 26, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7125497139307560422
@@ -818,6 +818,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CollectionRowView
   cardsContainer: {fileID: 7959429857538687069}
   cardPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  stateLabel: {fileID: 0}
+  amountText: {fileID: 0}
+  harvestButton: {fileID: 0}
 --- !u!1 &6473581186439347505
 GameObject:
   m_ObjectHideFlags: 0

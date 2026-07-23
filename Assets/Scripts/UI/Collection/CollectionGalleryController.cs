@@ -2,13 +2,18 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 도감 갤러리 컨트롤러(CollectionScreen에 부착).
-// CatalogRows로부터 행/카드 타일을 생성하고 소유상태(잠김)를 반영한다.
-// 범위: 카드목록 연동만 — 골드 HUD·행 생산상태·수확·완성보상은 다음 패스.
+// CatalogRows로부터 행/카드 타일을 생성하고 소유상태(잠김)·생산상태를 반영한다.
+// 생산 누적은 시간 함수라 매니저가 통지하지 않으므로, 열린 동안 폴링 틱으로 각 행을 주기 갱신한다.
+// 수확/완성수령/리셋은 OnChanged로, 소유변경은 OnOwnershipChanged로 즉시 갱신한다.
 public class CollectionGalleryController : MonoBehaviour
 {
     [Header("배선")]
     [SerializeField] Transform content;            // 행이 세로로 쌓일 Content(VerticalLayoutGroup)
     [SerializeField] CollectionRowView rowPrefab;  // 행 프리팹
+
+    [Header("생산 표시 폴링")]
+    [Tooltip("열린 동안 각 행 생산상태(누적량)를 이 간격(초)마다 갱신. 시간 누적은 이벤트가 없어 폴링이 필요하다.")]
+    [SerializeField] float refreshInterval = 0.5f;
 
     [Header("독립 실행 부트스트랩 (테스트 씬 전용)")]
     [Tooltip("CardCatalog가 아직 주입 안 된 독립 씬에서만 사용. 실제 통합 시엔 부트가 이미 주입해 무시된다(4번째 마스터목록 아님).")]
@@ -16,16 +21,40 @@ public class CollectionGalleryController : MonoBehaviour
 
     readonly List<CollectionRowView> m_rows = new List<CollectionRowView>();
 
+    // 폴링 누적 타이머(열린 동안만 누산).
+    float m_refreshTimer;
+
     void OnEnable()
     {
         EnsureBoot();
         Build();
         OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+        CollectionProductionManager.OnChanged += OnProductionChanged;
+        m_refreshTimer = 0f;
     }
 
     void OnDisable()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        CollectionProductionManager.OnChanged -= OnProductionChanged;
+    }
+
+    // 폴링 틱: 열린 동안 refreshInterval마다 각 행 생산 표시를 갱신(시간 누적 반영).
+    void Update()
+    {
+        m_refreshTimer += Time.deltaTime;
+        if (m_refreshTimer < refreshInterval) return;
+        m_refreshTimer = 0f;
+
+        for (int t_i = 0; t_i < m_rows.Count; t_i++)
+            if (m_rows[t_i] != null) m_rows[t_i].RefreshProduction();
+    }
+
+    // 수확/완성수령/리셋 시 매니저가 통지 — 모든 행 즉시 갱신(완성보상 뷰는 자체 구독).
+    void OnProductionChanged()
+    {
+        for (int t_i = 0; t_i < m_rows.Count; t_i++)
+            if (m_rows[t_i] != null) m_rows[t_i].RefreshProduction();
     }
 
     // 독립 실행 시 카탈로그/소유/생산 부트를 보장. 이미 준비됐으면(실제 통합) 아무것도 하지 않는다.
