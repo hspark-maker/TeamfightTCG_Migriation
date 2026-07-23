@@ -31,7 +31,9 @@
       "mcp__unity-mcp__Unity_ManageScript",
       "mcp__unity-mcp__Unity_ManageScript_capabilities",
       "Bash(rm -f Assets/Scripts/UI/MainMenu/DeckSynergyPanel.cs* Assets/Scripts/UI/MainMenu/SynergyProgressRow.cs*)",
-      "Bash(rm -f Assets/Assets/Prefabs/UI/MainMenu/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/MainMenu/SynergyProgressRow.prefab* Assets/Assets/Prefabs/UI/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/SynergyProgressRow.prefab*)"
+      "Bash(rm -f Assets/Assets/Prefabs/UI/MainMenu/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/MainMenu/SynergyProgressRow.prefab* Assets/Assets/Prefabs/UI/DeckSynergyPanel.prefab* Assets/Assets/Prefabs/UI/SynergyProgressRow.prefab*)",
+      "Skill(artifact-design)",
+      "Artifact"
     ]
   }
 }

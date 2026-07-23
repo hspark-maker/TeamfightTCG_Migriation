@@ -3,6 +3,7 @@ using UnityEngine;
 
 // 카드 마스터의 읽기 전용 단일 창구. 부트에서 카드 목록을 주입받아 안정 문자열 키로 조회한다.
 // 안정 키 = CardData.name(SO 에셋 파일명). 덱·소유권 세이브 키와 정합. displayName은 키로 쓰지 않는다.
+// TODO  : 지금은 카드 데이터 자체가 SO고 그 이름을 키로 쓰는데, 나중에 CardData에 id추가하고 그걸 키로 쓰면 이거 없어도 될듯
 public static class CardCatalog
 {
     // 주입 순서 보존용 원본 목록.

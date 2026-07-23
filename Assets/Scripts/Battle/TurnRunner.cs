@@ -23,6 +23,7 @@ public class TurnRunner : MonoBehaviour
 
     TurnContext ctx;
     bool disconnectWin;
+    bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
 
     void OnDestroy()
     {
@@ -134,6 +135,17 @@ public class TurnRunner : MonoBehaviour
             this.turnCountLabel.text = $"{TurnCount} 턴";
     }
 
+    // 승패 확정 시점에 보상 지급
+    void CaptureResult(bool _won)
+    {
+        // 이미 승패가 확정된 뒤에는 이탈-부전승 등 후속 콜백이 결과를 덮어쓰지 못하게 한다.
+        if (this.resultCaptured) return;
+        
+        this.resultCaptured = true;
+        int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
+        RewardService.GrantBattleReward(_won, t_remaining);
+    }
+
     public static void Cleanup()
     {
         TurnEvents.Reset();
@@ -147,6 +159,7 @@ public class TurnRunner : MonoBehaviour
         this.disconnectWin = true;
         NetworkGameController.Instance?.ForceOpponentReady();
         MultiplayerTurnRunner.Instance?.ForceOpponentAttackResolve();
+        CaptureResult(true);
         this.winPopup?.Show();
     }
 
@@ -159,6 +172,7 @@ public class TurnRunner : MonoBehaviour
     {
         if (!DeckConfig.IsMultiplayer) return;
         this.disconnectWin = true;
+        CaptureResult(true);
         this.winPopup?.Show();
     }
 
@@ -166,11 +180,13 @@ public class TurnRunner : MonoBehaviour
     {
         if (this.enemyField.IsEmpty)
         {
+            CaptureResult(true);
             this.winPopup?.Show();
             return true;
         }
         if (this.playerField.IsEmpty)
         {
+            CaptureResult(false);
             this.losePopup?.Show();
             return true;
         }
