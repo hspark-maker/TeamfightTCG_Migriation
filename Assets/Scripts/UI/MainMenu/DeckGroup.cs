@@ -11,6 +11,9 @@ public class DeckGroup : MonoBehaviour
     [Header("Deck Name UI")]
     [SerializeField] TMP_Text deckNameText;
     [SerializeField] TMP_InputField deckNameInput;
+    // 덱 타이틀 옆 시너지 아이콘 줄. 덱과 타이틀을 여기서 소유하므로 시너지 표시도 여기서 갱신한다
+    // → DeckBuilderUI(편성)와 GameReadyPanel(출전 선택) 양쪽이 자동으로 따라온다.
+    [SerializeField] DeckSynergyStrip synergyStrip;
 
     public event Action<string> OnNameSubmit;
 
@@ -34,13 +37,18 @@ public class DeckGroup : MonoBehaviour
             this.deck[i] = i < _deck.Length ? _deck[i] : null;
         for (int i = 0; i < this.deckSlots.Length; i++)
             this.deckSlots[i].Init(this.deck[i], CardElementMod.Simple);
+        RefreshSynergies();
     }
 
     public void SetSlot(int _index, CardData _card)
     {
         this.deck[_index] = _card;
         this.deckSlots[_index].Init(_card, CardElementMod.Simple);
+        RefreshSynergies();
     }
+
+    /// <summary>덱이 바뀔 때마다 타이틀 옆 시너지 아이콘을 다시 그린다. 미배선이면 무동작.</summary>
+    public void RefreshSynergies() => this.synergyStrip?.Refresh(this.deck);
 
     public void SetDeckName(string _name)
     {

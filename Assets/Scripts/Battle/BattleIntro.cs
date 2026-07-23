@@ -135,22 +135,15 @@ public class BattleIntro : MonoBehaviour
             new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 10f));
         t_screenCenter.z = t_fieldCenter.z;
 
-        var t_tasks = new UniTask[BattleField.SLOT_COUNT];
+        // 순차 배치: 한 카드 딜 애니가 끝난 뒤 다음 카드 시작(사이에 cardDealDelay 간격).
+        bool t_first = true;
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardView t_view = _fieldView.GetSlotView(i);
-            t_tasks[i] = t_view.BoundCard != null
-                ? DealWithDelay(t_view, _from, t_screenCenter, _dests[i], i)
-                : UniTask.CompletedTask;
+            if (t_view.BoundCard == null) continue;
+            if (!t_first) await UniTask.Delay((int)(this.cardDealDelay * 1000));
+            t_first = false;
+            await t_view.PlayDealAnim(_from, t_screenCenter, _dests[i], this.cardDealDuration);
         }
-
-        await UniTask.WhenAll(t_tasks);
-    }
-
-    async UniTask DealWithDelay(CardView _view, Vector3 _from, Vector3 _mid, Vector3 _dest, int _index)
-    {
-        if (_index > 0)
-            await UniTask.Delay((int)(this.cardDealDelay * _index * 1000));
-        await _view.PlayDealAnim(_from, _mid, _dest, this.cardDealDuration);
     }
 }

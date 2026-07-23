@@ -18,30 +18,10 @@ public class KeywordExplainPopupUI : PooledUIBase
         if (t_d.iconRect != null) PositionNearIcon(t_d.iconRect);
     }
 
+    // 배치 규칙은 PopupPlacer가 단독 소유(시너지 팝업/툴팁과 동일 구현).
+    // 세로 클램프는 기존 동작 보존을 위해 끈 상태 — 위/아래로 넘치는 게 문제가 되면 true로.
     void PositionNearIcon(RectTransform _iconRect)
-    {
-        Canvas t_canvas = GetComponentInParent<Canvas>();
-        if (t_canvas == null) return;
-
-        Camera t_cam = t_canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : t_canvas.worldCamera;
-        Vector2 t_screenPos = RectTransformUtility.WorldToScreenPoint(t_cam, _iconRect.position);
-
-        RectTransform t_canvasRect = t_canvas.GetComponent<RectTransform>();
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            t_canvasRect, t_screenPos, t_cam, out Vector2 t_local);
-
-        RectTransform t_rt   = GetComponent<RectTransform>();
-        float t_halfPopup    = t_rt.sizeDelta.x * 0.5f;
-        float t_halfIcon     = _iconRect.sizeDelta.x * 0.5f;
-        float t_offsetX      = t_halfPopup + t_halfIcon + this.iconGap;
-        float t_canvasHalfW  = t_canvasRect.rect.width * 0.5f;
-
-        Vector2 t_pos = t_local + new Vector2(t_offsetX, 0f);
-        if (t_pos.x + t_halfPopup > t_canvasHalfW)
-            t_pos = t_local - new Vector2(t_offsetX, 0f);
-
-        t_rt.anchoredPosition = t_pos;
-    }
+        => PopupPlacer.PlaceBesideAnchor((RectTransform)transform, _iconRect, this.iconGap, _clampVertical: false);
 
     public override void Show()
     {

@@ -42,7 +42,13 @@ public class EffectNotifyUI : PooledUIBase
 
     async UniTask PlayOne(EffectNotifyData _data)
     {
-        if (this.portrait != null) this.portrait.sprite = _data.portrait;
+        if (this.portrait != null)
+        {
+            this.portrait.sprite = _data.portrait;
+            // 카드 초상화는 배너 프레임을 꽉 채우지만 시너지/키워드 아이콘은 정사각이라
+            // 그대로 늘리면 찌그러진다. 소스가 아이콘일 때만 비율 유지.
+            this.portrait.preserveAspect = _data.preserveAspect;
+        }
         if (this.cardNameText != null) this.cardNameText.text = _data.cardName;
         if (this.effectLabelText != null) this.effectLabelText.text = _data.effectLabel;
 
@@ -77,4 +83,6 @@ public class EffectNotifyData : UIData
     public string cardName;
     public string effectLabel;
     public float displayDuration = 0f; // 0 = 컴포넌트 기본값 사용
+    /// <summary>portrait가 아이콘(정사각)일 때 true. 카드 초상화면 false로 두어 기존 꽉찬 표시 유지.</summary>
+    public bool preserveAspect;
 }

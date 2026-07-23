@@ -7,11 +7,11 @@ public class MaokaiPassive : CardPassive
     [SerializeField] int    bonusHpGrant = 3;
     [SerializeField] string effectLabel;
 
-    public override UniTask OnDeath(CardInstance _self, BattleField _ownField)
+    public override UniTask OnRemoved(DeathCtx _ctx)
     {
-        foreach (CardInstance t_ally in _ownField.GetActiveCards())
+        foreach (CardInstance t_ally in _ctx.field.GetActiveCards())
             t_ally.bonusHp += this.bonusHpGrant;
-        Notify(_self, this.effectLabel);
+        Notify(_ctx.self, this.effectLabel);
         // glow 생략 (CardView가 이미 사라짐)
         return UniTask.CompletedTask;
     }

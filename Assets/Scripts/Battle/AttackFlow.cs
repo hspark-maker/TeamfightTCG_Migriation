@@ -22,19 +22,44 @@ public static class AttackFlow
         BattleField _defenderField, BattleFieldView _defenderFieldView)
     {
         if (!_attacker.HasKeyword(CardKeyword.Peerless)) return (null, null);
-        CardInstance t_splash = PeerlessAttack.PreSelect(_defender.slotIndex, _defenderField);
+        CardInstance t_splash = AttackProcessor.PreSelectSplash(_defender.slotIndex, _defenderField);
         CardView t_view = t_splash != null ? _defenderFieldView.GetSlotView(t_splash.slotIndex) : null;
         return (t_splash, t_view);
     }
 
-    /// <summary>공격 직후 공격자 패시브 발동 (OnAfterAttack, 처치 시 OnKill).</summary>
-    public static async UniTask RunAfterAttackPassives(
-        CardInstance _attacker, CardInstance _defender, BattleField _attackerField, AttackResult _result)
+    /// <summary>[BeforeAttack] 공격 개시 직전 공격자 소속 시너지 발동(무리 선피해 등).
+    /// AttackSequence.Play 직전(PreSelectSplash 이후)에 호출 → Execute 전 원자 완료. RNG 미소비(splash 스트림 미교란).</summary>
+    public static async UniTask RunBeforeAttack(
+        CardInstance _attacker, CardInstance _defender,
+        BattleField _attackerField, BattleField _defenderField)
     {
         if (!_attacker.IsAlive) return;
-        await (_attacker.data.passive?.OnAfterAttack(_attacker, _defender, _attackerField) ?? UniTask.CompletedTask);
-        if (_result.defenderKilled)
-            await (_attacker.data.passive?.OnKill(_attacker, _defender) ?? UniTask.CompletedTask);
+        await SynergyTriggers.BeforeAttack(
+            new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField));
+    }
+
+    /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 성벽 반격 등).
+    /// 동기 완결 계약 — AttackProcessor의 counter 해결 직후 치사 래치 전에 인라인 호출(hp 기준시점 통일).</summary>
+    public static void RunAttacked(
+        CardInstance _defender, CardInstance _attacker,
+        BattleField _defenderField, BattleField _attackerField)
+    {
+        var t_ctx = new AttackedCtx(_defender, _attacker, _defenderField, _attackerField);
+        _defender.data.passive?.OnAttacked(t_ctx).Forget();
+        SynergyTriggers.Attacked(t_ctx);
+    }
+
+    /// <summary>[AfterAttack] 공격 직후 공격자 패시브 + 시너지 발동. 처치 판정은 ctx.defenderKilled(구 OnKill 게이트와 동일 소스).</summary>
+    public static async UniTask RunAfterAttack(
+        CardInstance _attacker, CardInstance _defender,
+        BattleField _attackerField, BattleField _defenderField, AttackResult _result)
+    {
+        if (!_attacker.IsAlive) return;
+        var t_ctx = new AfterAttackCtx(_attacker, _defender, _attackerField, _defenderField,
+                                       _result.damageDealt, _result.defenderKilled);
+        await (_attacker.data.passive?.OnAfterAttack(t_ctx) ?? UniTask.CompletedTask);
+        // 시너지 공격-후 트리거(청소부 회복 등). 패시브 발화 직후, 생존 가드 이후.
+        await SynergyTriggers.AfterAttack(t_ctx);
     }
 
     /// <summary>발동 키워드 글로우 + 교활(swap) 등장 스케일 연출.</summary>

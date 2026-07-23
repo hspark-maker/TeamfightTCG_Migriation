@@ -19,7 +19,7 @@ public class GameInitializer : MonoBehaviour
     async UniTask StartBattleAsync()
     {
         this.battleIntro.Await();
-        // 씬 전환 영상이 재생 중이면 끝날 때까지 대기 (OnSpawn 소리 차단)
+        // 씬 전환 영상이 재생 중이면 끝날 때까지 대기 (오프닝 배치(Placed) 소리 차단)
         await UniTask.WaitUntil(() => SceneTransitionVideo.Instance == null
                                    || !SceneTransitionVideo.Instance.IsPlaying);
 
@@ -66,6 +66,7 @@ public class GameInitializer : MonoBehaviour
         this.enemyField.Initialize(this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>(), 1);
 
         // 시너지: 양 덱 확정 후 각 필드에 1회 적용 (전투 중 재계산 없음)
+        // 오프닝 배치는 Placed만 발화하고 시너지 Entered는 미발화 — 등장 트리거(돌보미/흐름)는 런타임 등장(FillEmptySlots/Swap/PlaceDirect)에서만.
         this.playerField.ApplyDeckSynergy();
         this.enemyField.ApplyDeckSynergy();
     }

@@ -100,10 +100,11 @@ public class PlayerTurn : TurnBase
 
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
-        await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw);
+        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField);   // 무리 선피해(Execute 전 원자)
 
-        await AttackFlow.RunAfterAttackPassives(_attacker, _defender, this.ctx.playerField, t_result);
+        await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
+            _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw,
+            () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         await this.ctx.FillAndAnimate();
 

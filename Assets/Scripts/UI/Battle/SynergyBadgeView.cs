@@ -17,17 +17,23 @@ public class SynergyBadgeView : MonoBehaviour
     [SerializeField] GameObject inactiveBg;
 
     [Header("Active Pop")]
-    // 활성 시 살짝 튀는 연출. 기준스케일(=배치 시 프리팹 로컬스케일) 기준 punch.
-    [SerializeField] float popScale    = 1.25f;   // 기준스케일 대비 최대 배율
+    // 효과 발동 순간 튀는 연출. 기준스케일(=배치 시 프리팹 로컬스케일) 기준 punch.
+    // Set 시 자동 재생 안 함 — CardView.PopSynergyBadge가 실제 발동 게이트에서만 호출한다.
+    [SerializeField] float popScale    = 1.6f;    // 기준스케일 대비 최대 배율(효과 발동시 큰 pop)
     [SerializeField] float popDuration = 0.25f;   // pop 전체 시간(초)
 
     Vector3 _baseScale;   // 기준 로컬스케일. 첫 Set 전에 캐시.
     bool    _baseCached;
 
+    /// <summary>이 배지가 표시 중인 시너지. PopSynergyBadge가 대상 배지를 매칭하는 데 사용.</summary>
+    public SynergyData Synergy { get; private set; }
+
     /// <summary>배지를 특정 시너지로 세팅. _synergy null이면 비활성화(빈 태그 슬롯).</summary>
     public void Set(SynergyData _synergy, bool _active)
     {
         CacheBaseScale();
+
+        this.Synergy = _synergy;
 
         if (_synergy == null)
         {
@@ -43,13 +49,12 @@ public class SynergyBadgeView : MonoBehaviour
         if (this.activeBg   != null) this.activeBg.SetActive(_active);
         if (this.inactiveBg != null) this.inactiveBg.SetActive(!_active);
 
-        if (_active)
-            PlayPop();
-        else
+        // 자동 pop 없음. 활성/비활성 무관하게 기준스케일로 정렬(효과 발동시에만 PlayPop).
+        if (!_active)
             RestoreBaseScale();
     }
 
-    /// <summary>활성 pop 연출을 재생한다. 향후 "효과 발동 순간" 이벤트에서 단독 호출 가능하도록 공개.</summary>
+    /// <summary>효과 발동 순간의 pop 연출을 재생한다. 실제 발동 게이트에서 CardView.PopSynergyBadge가 호출.</summary>
     public void PlayPop()
     {
         CacheBaseScale();

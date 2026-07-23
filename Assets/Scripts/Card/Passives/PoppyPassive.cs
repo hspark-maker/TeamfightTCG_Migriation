@@ -6,11 +6,11 @@ public class PoppyPassive : CardPassive
 {
     [SerializeField] string effectLabel;
 
-    public override async UniTask OnDealDamage(CardInstance _self, int _damage, bool _isRetaliation = false)
+    public override async UniTask OnDamageDealt(DamageDealtCtx _ctx)
     {
-        if (_isRetaliation) return;
-        _self.bonusHp += Mathf.FloorToInt(_damage * 0.5f);
-        Notify(_self, this.effectLabel);
-        await Glow(_self);
+        if (_ctx.isRetaliation) return;
+        _ctx.self.bonusHp += Mathf.FloorToInt(_ctx.damage * 0.5f);
+        Notify(_ctx.self, this.effectLabel);
+        await Glow(_ctx.self);
     }
 }

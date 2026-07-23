@@ -65,7 +65,7 @@ public class DeckBuilderUI : MonoBehaviour
     {
         this.deckGroup.SetSlot(_index, _card);
         this.isDirty = true;
-        RefreshCollectionInteractable();
+        RefreshDeckDependentUI();
     }
 
     public void SaveCurrentDeck()
@@ -100,7 +100,7 @@ public class DeckBuilderUI : MonoBehaviour
         this.deckGroup.SetDeck(t_loaded.ToArray());
         this.deckGroup.SetDeckName(DeckSaveManager.GetName(this.currentSlotIndex));
         this.isDirty = false;
-        RefreshCollectionInteractable();
+        RefreshDeckDependentUI();
     }
 
     void OnDeckNameSubmit(string _name)
@@ -137,6 +137,13 @@ public class DeckBuilderUI : MonoBehaviour
             t_element.onEndDrag   = OnCardEndDrag;
             this.spawnedCards.Add(t_element);
         }
+        RefreshCollectionInteractable();
+    }
+
+    /// <summary>덱 내용이 바뀔 때 함께 갱신돼야 하는 UI 묶음. 새 덱 파생 표시가 생기면 여기에 추가할 것.
+    /// (시너지 아이콘은 DeckGroup이 SetDeck/SetSlot에서 스스로 갱신한다.)</summary>
+    void RefreshDeckDependentUI()
+    {
         RefreshCollectionInteractable();
     }
 

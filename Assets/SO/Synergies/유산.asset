@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
+  m_Name: "\uC720\uC0B0"
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyData
+  displayName: "\uC720\uC0B0"
+  effectDescription: "\uB0B4 \uD134 \uB05D\uB0A0 \uB54C \uC2A4\uD0DD+1. \uD30C\uAD34
+    \uC2DC \uC2A4\uD0DD\uB9CC\uD07C \uC544\uAD70 \uD68C\uBCF5"
+  color: {r: 0, g: 0, b: 0, a: 0}
+  icon: {fileID: 21300000, guid: 950812b0d9524f24db20b2e2a6aaf6fd, type: 3}
+  tiers:
+  - requiredCount: 2
+    label: "\uC720\uC0B0"
+    effects:
+    - {fileID: 11400000, guid: 1e5efc108928d354c81febdcd1d78e48, type: 2}

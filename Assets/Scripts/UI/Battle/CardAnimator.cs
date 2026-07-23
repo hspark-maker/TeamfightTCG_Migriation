@@ -193,21 +193,10 @@ public class CardAnimator : MonoBehaviour
         await t_seq.ToUniTask();
 
         if (this == null) return;
+        // 스케일만 재사용 대비 복원. 알파는 페이드아웃(0) 상태로 남긴다 —
+        // 여기서 알파를 1로 되돌리면 죽은 카드가 잠깐 되살아나 보인 뒤 HideSlot이 다시 숨김(플래시).
+        // 슬롯 재사용 시 알파=1 복원은 PlayDealAnim(시작 시 리셋)이 담당하므로 중복 불필요.
         transform.localScale = Vector3.one;
-        foreach (SpriteRenderer t_sr in this.cachedRenderers)
-        {
-            if (t_sr == null) continue;
-            Color t_c = t_sr.color;
-            t_c.a = (t_sr == this.hitOverlay || t_sr == this.dieOverlay) ? 0f : 1f;
-            t_sr.color = t_c;
-        }
-        foreach (TMP_Text t_tmp in this.cachedTexts)
-        {
-            if (t_tmp == null) continue;
-            Color t_c = t_tmp.color;
-            t_c.a = 1f;
-            t_tmp.color = t_c;
-        }
     }
 
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
