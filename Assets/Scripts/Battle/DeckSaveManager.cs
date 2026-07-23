@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using UnityEngine;
 
 public static class DeckSaveManager
 {
@@ -9,9 +7,6 @@ public static class DeckSaveManager
     public const int DECK_SIZE  = 6;
     static readonly List<CardData>[] slots = new List<CardData>[SLOT_COUNT];
     static readonly string[] names = new string[SLOT_COUNT];
-
-    static IReadOnlyList<CardData> _registry;
-    static string SavePath => Path.Combine(Application.persistentDataPath, "decks.json");
 
     public static List<CardData> GetSlot(int _index) => slots[_index];
     public static string GetName(int _index) => string.IsNullOrEmpty(names[_index]) ? $"덱 {_index + 1}" : names[_index];
@@ -39,55 +34,45 @@ public static class DeckSaveManager
 
     public static List<CardData> Load(int _index) => slots[_index] ?? new List<CardData>();
 
-    // 카드 전체 목록 등록 (LoadFromFile 전에 반드시 호출)
-    public static void SetCardRegistry(IEnumerable<CardData> _cards)
-        => _registry = _cards.ToList();
-
-    [System.Serializable]
-    class SlotData
-    {
-        public string slotName;
-        public string[] cards;
-    }
-
-    [System.Serializable]
-    class SaveData
-    {
-        public SlotData[] slots = new SlotData[SLOT_COUNT];
-    }
-
+    // 메모리 slots/names를 아웃게임 세이브(outgame_save.json)의 deck 섹션으로 flush 후 저장.
+    // 카드→키 변환·복원은 전부 CardCatalog에 위임(사설 목록 주입 폐기).
     public static void SaveToFile()
     {
-        var t_data = new SaveData();
+        var t_deck = DataSaveManager.Data.deck ?? (DataSaveManager.Data.deck = new DeckSaveData());
+        t_deck.slots = new DeckSlotSaveData[SLOT_COUNT];
+
         for (int i = 0; i < SLOT_COUNT; i++)
         {
-            t_data.slots[i] = new SlotData
+            t_deck.slots[i] = new DeckSlotSaveData
             {
-                slotName = names[i] ?? "",
-                cards    = slots[i]?.Select(c => c != null ? c.name : "").ToArray()
+                name     = names[i] ?? "",
+                cardKeys = slots[i]?.Select(c => CardCatalog.KeyOf(c) ?? "").ToArray()
                            ?? new string[0],
             };
         }
-        File.WriteAllText(SavePath, JsonUtility.ToJson(t_data));
+
+        DataSaveManager.Save();
     }
 
+    // deck 섹션에서 slots를 읽어 cardKeys를 CardCatalog로 재수화해 메모리 복원.
+    // 섹션 null·슬롯 길이 부족·키 미해석은 모두 안전하게 기본값 처리.
     public static void LoadFromFile()
     {
-        if (!File.Exists(SavePath)) return;
-
-        var t_data = JsonUtility.FromJson<SaveData>(File.ReadAllText(SavePath));
-        if (t_data?.slots == null) return;
+        var t_deck = DataSaveManager.Data.deck;
+        if (t_deck?.slots == null) return;
 
         for (int i = 0; i < SLOT_COUNT; i++)
         {
-            var t_slot = t_data.slots[i];
+            if (i >= t_deck.slots.Length) break;
+
+            var t_slot = t_deck.slots[i];
             if (t_slot == null) continue;
 
-            names[i] = t_slot.slotName ?? "";
+            names[i] = t_slot.name ?? "";
 
-            if (t_slot.cards == null || _registry == null) continue;
-            slots[i] = t_slot.cards
-                .Select(n => _registry.FirstOrDefault(c => c.name == n))
+            if (t_slot.cardKeys == null) continue;
+            slots[i] = t_slot.cardKeys
+                .Select(k => CardCatalog.Get(k))
                 .Where(c => c != null)
                 .ToList();
         }

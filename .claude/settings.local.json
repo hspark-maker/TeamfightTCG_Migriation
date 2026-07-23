@@ -28,7 +28,10 @@
       "Bash(git status *)",
       "Bash(cd C:\\\\mgJeon\\\\TeamfightTCG_Migriation\\\\Assets\\\\Scripts\\\\Currency *)",
       "Bash(rm -f 'Currency/2.Manager/CurrencySaveLifecycle.cs' 'Currency/2.Manager/CurrencySaveLifecycle.cs.meta')",
-      "Bash(mkdir -p Core)"
+      "Bash(mkdir -p Core)",
+      "Bash(xargs grep -l \"CardData\\\\|m_Script\")",
+      "mcp__unity-mcp__Unity_Camera_Capture",
+      "Bash(xargs grep -l \"TMP_FontAsset\\\\|MonoBehaviour\")"
     ]
   }
 }

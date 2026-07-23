@@ -11,6 +11,7 @@ public class UserSaveData
 
     // 도메인 값 객체 조립 지점. 각 도메인은 자기 값 객체를 2.Domain에 정의하고 여기 얹는다.
     public CurrencySaveData currency = new CurrencySaveData();       // A-3 재화
-    // public OwnershipSaveData ownership = new OwnershipSaveData();   // B-5 소유
+    public OwnershipSaveData ownership = new OwnershipSaveData();    // B-5 소유
+    public DeckSaveData deck = new DeckSaveData();                   // B-6 덱
     // public CollectionSaveData collection = new CollectionSaveData(); // C 도감
 }
