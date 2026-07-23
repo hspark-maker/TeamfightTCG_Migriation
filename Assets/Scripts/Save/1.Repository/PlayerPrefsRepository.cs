@@ -1,8 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// IRepository의 PlayerPrefs 구현. 문자열 값을 PlayerPrefs 키에 저장한다.
-/// </summary>
+// IRepository의 PlayerPrefs 구현.
 public class PlayerPrefsRepository : IRepository
 {
     public bool Has(string _key) => PlayerPrefs.HasKey(_key);

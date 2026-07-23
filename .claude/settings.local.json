@@ -25,7 +25,10 @@
       "PowerShell(Get-ChildItem *)",
       "Bash(grep -v '\\\\.meta$')",
       "Bash(git check-ignore *)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(cd C:\\\\mgJeon\\\\TeamfightTCG_Migriation\\\\Assets\\\\Scripts\\\\Currency *)",
+      "Bash(rm -f 'Currency/2.Manager/CurrencySaveLifecycle.cs' 'Currency/2.Manager/CurrencySaveLifecycle.cs.meta')",
+      "Bash(mkdir -p Core)"
     ]
   }
 }
