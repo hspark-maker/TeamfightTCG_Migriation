@@ -16,6 +16,10 @@ public class CardView : MonoBehaviour
     static readonly List<CardView> allViews = new List<CardView>();
     static bool s_anyDragging;
 
+    // ForcedAttacker 활성 시 나머지 로컬 카드에 적용할 암전 alpha. 일반 전투(처형 재무장)는 0.3,
+    // 튜토리얼은 "그 카드 말고 다 검게" 위해 더 낮은 값으로 덮어쓴다(PlayerTurn이 설정).
+    public static float ForcedDimAlpha = 0.3f;
+
     enum DragState { Idle, AttackDrag, ReturnDrag }
 
     public enum InputMode { DragBack, DragToEnemy }
@@ -112,9 +116,18 @@ public class CardView : MonoBehaviour
         if (this.hpText != null) this.hpText.DOKill();
     }
 
+    // 튜토리얼: hintArrow를 강제 표시(정상 Update 로직 무시). 안내 중 "여기서 드래그" 포인터.
+    bool tutorialPointer;
+    public void SetTutorialPointer(bool _on)
+    {
+        this.tutorialPointer = _on;
+        if (this.hintArrow != null) this.hintArrow.SetVisible(_on);
+    }
+
     void Update()
     {
         if (this.hintArrow == null) return;
+        if (this.tutorialPointer) { this.hintArrow.SetVisible(true); return; }   // 튜토리얼 강제 포인터
         bool t_show = TurnState.InputAllowed
             && this.boundCard != null
             && this.boundCard.ownerIndex == TurnState.LocalOwnerIndex
@@ -160,7 +173,15 @@ public class CardView : MonoBehaviour
     void OnMouseDrag()
     {
         if (!TurnState.InputAllowed || this.boundCard == null) return;
+
+        // 처형/튜토리얼 지정 공격자 외 카드는 조작 불가(완전 무반응).
+        if (TurnState.ForcedAttacker != null && this.boundCard != TurnState.ForcedAttacker) return;
+
         this.currentDragScreenPos = (Vector2)Input.mousePosition;
+
+        // 튜토리얼 Inspect: 적 카드 롱프레스 팝업은 손 뗄 때까지 유지 — 작은 드리프트/데드존으로
+        // 사라지지 않게 취소 로직을 건너뛴다(실제 소비는 OnMouseUp의 NotifyInspected).
+        if (this.longPressFired && IsTutorialInspectTarget()) return;
 
         // 카드 범위를 벗어나면 즉시 설명 팝업을 닫는다.
         // dragThreshold 조기 return보다 **앞**에 둬야 한다 — 적 카드는 dragStartScreenPos가
@@ -284,6 +305,12 @@ public class CardView : MonoBehaviour
 
     void OnMouseUp()
     {
+        // 처형/튜토리얼 지정 공격자 외 카드는 완전 무반응(클릭·탭 무시). 드래그를 시작한 적 없으니
+        // s_anyDragging도 건드리지 않는다.
+        if (TurnState.ForcedAttacker != null && this.boundCard != null
+            && this.boundCard != TurnState.ForcedAttacker)
+            return;
+
         // 드래그 중 턴 종료·카드 사망으로 early-return해도 정적 드래그 상태(s_anyDragging)가
         // true로 고착되지 않도록 가드 통과 전에 반드시 해제한다.
         if (!TurnState.InputAllowed || this.boundCard == null)
@@ -303,6 +330,13 @@ public class CardView : MonoBehaviour
         if (t_wasLongPress)
         {
             UIPoolManager.instance?.HideUI<PooledCardElement>();
+
+            // 튜토리얼 Inspect 스텝: 적 카드 롱프레스 = "상대 정보 확인" 레슨. 팝업이 뜨는 순간이 아니라
+            // **손을 뗀 순간**에 인정한다 — 뜨자마자 스텝이 소비되어 팝업을 못 읽는 버그 방지.
+            if (TutorialConfig.IsActive && this.boundCard != null
+                && this.boundCard.ownerIndex != TurnState.LocalOwnerIndex)
+                TutorialOverlayUI.Instance?.NotifyInspected();
+
             if (this.boundCard?.ownerIndex == TurnState.LocalOwnerIndex)
             {
                 if (this.currentTarget != null)
@@ -394,6 +428,7 @@ public class CardView : MonoBehaviour
                     new PooledCardElementData { card = this.boundCard.data });
             }
             this.longPressFired = true;
+            // Inspect 통지는 손을 뗀 순간(OnMouseUp)으로 이동 — 팝업이 뜨자마자 스텝이 넘어가지 않도록.
         }
         catch (OperationCanceledException) { }
     }
@@ -458,6 +493,16 @@ public class CardView : MonoBehaviour
         this.longPressCts?.Cancel();
         this.longPressCts?.Dispose();
         this.longPressCts = null;
+    }
+
+    /// <summary>현재 튜토리얼 스텝이 Inspect이고 이 카드가 적(정보확인 대상)인가.
+    /// 참이면 롱프레스 팝업을 드리프트로 닫지 않고 손 뗄 때까지 유지한다.</summary>
+    bool IsTutorialInspectTarget()
+    {
+        if (!TutorialConfig.IsActive || this.boundCard == null) return false;
+        if (this.boundCard.ownerIndex == TurnState.LocalOwnerIndex) return false;
+        return TutorialConfig.TryPeekPlayerStep(out var t_step)
+            && t_step.kind == TutorialScenarioData.StepKind.Inspect;
     }
 
     /// <summary>현재 드래그 좌표가 이 카드의 콜라이더 밖인가. 카메라/콜라이더 없으면 false(취소 안 함).</summary>
@@ -978,7 +1023,7 @@ public class CardView : MonoBehaviour
     {
         FadeAll(1f);
         if (TurnState.ForcedAttacker == null) return;
-        FadeTeam(0.3f, TurnState.LocalOwnerIndex);
+        FadeTeam(ForcedDimAlpha, TurnState.LocalOwnerIndex);
         CardView t_forced = GetView(TurnState.ForcedAttacker);
         if (t_forced != null) FadeCards(1f, t_forced);
     }
@@ -988,6 +1033,7 @@ public class CardView : MonoBehaviour
         OnAnyClicked  = null;
         OnAttack      = null;
         s_anyDragging = false;
+        ForcedDimAlpha = 0.3f;
         TurnState.Reset();
         allViews.Clear();
     }

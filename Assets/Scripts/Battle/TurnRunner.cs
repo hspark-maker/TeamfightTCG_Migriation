@@ -46,7 +46,10 @@ public class TurnRunner : MonoBehaviour
         TurnCount = 1;
         SetTurnCountLabel();
         // 멀티는 SyncInitialDecks의 commit-reveal에서 이미 시드됨. 싱글만 로컬 시드.
-        if (!DeckConfig.IsMultiplayer)
+        // 튜토리얼: 고정 시드 = 스플래시/랜덤효과까지 실행마다 재현(무셔플만으론 게임로직 RNG가 안 고정).
+        if (TutorialConfig.IsActive)
+            MatchRandom.Seed(0x7507_0521_1A11_0A15UL);   // 튜토리얼 고정 시드(임의 상수)
+        else if (!DeckConfig.IsMultiplayer)
             MatchRandom.SeedRandomLocal();
         if (DeckConfig.IsMultiplayer && NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom += HandlePlayerLeft;
@@ -159,6 +162,7 @@ public class TurnRunner : MonoBehaviour
     {
         TurnEvents.Reset();
         MatchRandom.Reset();
+        TutorialConfig.End();   // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
         TurnCount = 1;
     }
 

@@ -30,6 +30,9 @@ public class GameInitializer : MonoBehaviour
 
         InitializeViews();
 
+        // 튜토리얼: 순차 안내 오버레이 부트스트랩(연출 전용, 규칙 무접촉).
+        if (TutorialConfig.IsActive) TutorialOverlayUI.Ensure();
+
         if (DeckConfig.IsMultiplayer && MultiplayerTurnRunner.Instance != null)
         {
             // false = 초기화 중 상대 이탈 → 전투 시작 없이 부전승 처리 후 조기 종료
@@ -62,12 +65,22 @@ public class GameInitializer : MonoBehaviour
 
     void InitializeSinglePlayerFields()
     {
-        this.playerField.Initialize(DeckConfig.PlayerDeck, 0);
-        // 로비 매칭에서 상대 덱을 미리 확정해 넘겼으면 그 값을 쓰고, 아니면 기존대로 랜덤 폴백(기존 MainMenu 경로 유지).
-        var t_enemyDeck = DeckConfig.HasEnemyDeck
-            ? DeckConfig.EnemyDeck
-            : (this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>());
-        this.enemyField.Initialize(t_enemyDeck, 1);
+        if (TutorialConfig.IsActive)
+        {
+            // 튜토리얼: 양 덱 고정 주입(무셔플·6장 이하 허용). 적덱 GetRandomDeck 우회.
+            this.playerField.Initialize(TutorialConfig.PlayerDeck, 0);
+            this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1);
+        }
+        else
+        {
+            this.playerField.Initialize(DeckConfig.PlayerDeck, 0);
+            // 로비 매칭에서 상대 덱을 미리 확정해 넘겼으면 그 값을 쓰고, 아니면 기존대로 랜덤 폴백(기존 MainMenu 경로 유지).
+            var t_enemyDeck = DeckConfig.HasEnemyDeck
+                ? DeckConfig.EnemyDeck
+                : (this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>());
+            this.enemyField.Initialize(t_enemyDeck, 1);
+        }
+
 
         // 시너지: 양 덱 확정 후 각 필드에 1회 적용 (전투 중 재계산 없음)
         // 오프닝 배치는 Placed만 발화하고 시너지 Entered는 미발화 — 등장 트리거(돌보미/흐름)는 런타임 등장(FillEmptySlots/Swap/PlaceDirect)에서만.

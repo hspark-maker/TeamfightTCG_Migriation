@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c77d53f76141dc9498adade58910761d, type: 3}
+  m_Name: TutorialScenario3
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
+  playerDeck:
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
+  - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
+  - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
+  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  enemyDeck:
+  - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+  - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  playerScript:
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "이번 전투엔 '시너지'가 등장한다! 내 앞줄 3장(꿀꿀비·모래몽·와글도도)은 전부 '무리' 시너지 카드다. 무리 카드가 4장 모이면 시너지가 활성화된다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "무리 효과 — 공격할 때, 필드의 무리 아군 수만큼 '선피해'를 먼저 준다. 지금 무리가 3장이라 공격마다 3의 선피해가 추가로 들어간다!"
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 2
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "적도 시너지가 있다. 적 '자석게'를 손가락으로 길게 눌러 정보를 확인해봐라 — '비늘' 시너지 배지가 보인다. 비늘은 받는 피해를 -1 줄인다."
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: "와글도도로 자석게를 공격! 무리 선피해 3이지만 자석게의 '비늘'이 -1 해서 2만 들어간다. 자석게 4→2."
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 0
+    guideMessage: "모래몽으로 마무리 — 무리 선피해만으로 자석게를 처치한다!"
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "꿀꿀비로 톱니두더(비늘) 공격! 선피해 2 + 본피해 2 = 처치. 비늘이 양쪽 다 -1씩 깎은 결과다."
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 2
+    guideMessage: "이번 적 '수정뿔루'는 비늘이 없다 — 선피해 3이 깎임 없이 그대로 들어가 즉시 처치! 시너지 유무 차이를 봐라."
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: "와글도도로 계속 공격! 원거리라 반격을 안 받아 안전하다."
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 1
+    guideMessage: "모래몽으로 공격!"
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 2
+    guideMessage: "꿀꿀비로 마지막 적을 처치 — 승리! 내 무리 시너지와 적 비늘 시너지를 모두 배웠다."
+    waitForTap: 0
+    dimBackground: 0
+  enemyScript: []

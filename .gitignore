@@ -78,6 +78,15 @@ crashlytics-build.properties
 # 개인 로컬 지침 (Claude Code)
 CLAUDE.local.md
 
+# Claude Code 개인 로컬 설정 (권한/경로는 사람마다 달라 공유 금지 — 공유 항목은 .claude/settings.json)
+.claude/settings.local.json
+
+# orch 세션 상태 (append 로그, 동시작업 충돌원)
+.orch/
+
+# orch 자동생성 경로맵 (1만+ 파일 목록, 재생성 잦음 = 충돌원. 머신별 로컬 생성)
+.claude/orch-pathmap.md
+
 # TMP 폰트 아틀라스 재생성물 (conflict 방지, meta는 추적 유지)
 Assets/Fonts/MalgunGothic_TMP.asset
 Assets/Fonts/MalgunGothic_OutlinfFont.asset
