@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "mcp__unity-mcp__Unity_ReadConsole",
+      "mcp__unity-mcp__Unity_GetConsoleLogs",
+      "mcp__unity-mcp__Unity_RunCommand",
+      "mcp__unity-mcp__Unity_ValidateScript",
+      "mcp__unity-mcp__Unity_Grep",
+      "mcp__unity-mcp__Unity_FindInFile",
+      "mcp__unity-mcp__Unity_FindProjectAssets",
+      "mcp__unity-mcp__Unity_GetProjectData",
+      "mcp__unity-mcp__Unity_ListResources",
+      "mcp__unity-mcp__Unity_ReadResource",
+      "mcp__unity-mcp__Unity_ManageScript",
+      "mcp__unity-mcp__Unity_ManageScript_capabilities"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "unity-mcp"
+  ]
+}
