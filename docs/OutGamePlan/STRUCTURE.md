@@ -18,6 +18,10 @@
 | 2026-07-24 | **E. 카드팩 경제 클래스 구조 추가 (⬜ 설계 승인 대기)** — `CardPackData`/`CardShop`(SO)·`CardPackOpener`(static)·`OpenedPack`(값). E는 자체 세이브 없는 **A(재화)·B(소유) 오케스트레이터**. 구매=즉시개봉(팩 재고 없음)·**팩별 지정 풀 드로우**·**중복 시 소액 골드 환급**. 신규 노드 `:::new` | ⬜ |
 | 2026-07-24 | **E. 카드팩 경제 구현 완료 (E-14/15/16)** — `OutGame/CardPack/`에 4파일 생성. 설계와 일치. API 확정: 배선 `SetShop(CardShop)`, 결과 `OpenedPack`(class)+`DrawnCard`(readonly struct)+`EPackOpenResult`(enum: Success/PackNotFound/InsufficientGold/EmptyPool/SpendFailed). 로컬 `System.Random`. 재화·소유 계약 순수 소비(불변). SO 에셋 생성·상점 배선은 사용자/메인 검증 | ✅ |
 | 2026-07-24 | **tcg-reviewer 심화 재검 반영 (2건 수정)** — ① **무료팩 허용**: 공유 재화 API `CurrencyManager.Spend` 계약 변경(0 이하 거부→음수만 거부, 0은 잔액변경 없이 성공). price=0 팩 구매 가능해짐(사용자 지시). Spend 사용처는 CardPackOpener 1곳뿐 → 회귀 없음. ② **null 풀 방어**: 드로우 시 null 카드 항목 `continue` 스킵(환급 오지급 차단). #3 저장순서(유저 유리, 재화 유실 없음)는 프로토타입 무시·기록만. 컴파일 에러 0 | ✅ |
+| 2026-07-24 | **F-19 카드팩 개봉 루프 (✅ 구현+검수 완료)** — 스코프 최종 축소: 상점 목록·독립 씬·MainMenu 진입 전부 제외. **카드팩 클릭→개봉 연출+카드 순차 등장→획득** 루프만. `PackOpeningView`(연출 오케스트레이션·옵션 EnsureBoot)+`RevealCardView`(카드 등장 애니·신규/중복 뱃지) 2클래스. 단일 팩 버튼(고정 packId), 팝업 풀링 미사용(씬 상주 뷰), DOTween 연출. 순수 뷰(세이브 없음), E `CardPackOpener` 소비. **tcg-reviewer 검수: 계약·경계·이중처리 무결, 코루틴 안전성 2건(좀비 잠금·트윈 미정리) 수정**(try/finally+OnDisable StopAllCoroutines/DOKill, RevealCardView OnDestroy DOKill). 컴파일 0. 연출·배선은 Play 검증 대기 | ✅ |
+| 2026-07-24 | **F-19 개봉 인터랙션 재구현 (스택→드래그 넘김→2×3 그리드)** — `PackOpeningView`를 순차 등장 코루틴에서 **상태머신(Idle/Stacking/Grid)** 으로 재작성. `RevealCardView`에 월드 드래그(`OnMouseDown/Drag/Up`+`ScreenToWorldPoint`)·`SetDraggable`/`SetSortingOrder`/`FadeIn/Out`/`MoveTo`·`SetSwipeCallback` 추가(스케일인 Reveal→데이터 바인딩만). 넘긴 카드는 파괴 안 하고 그리드 재사용. 재진입=상태가드, `OnDisable`에서 카드 트윈 `KillAllTweens`. 계약(CardPackOpener/OpenedPack/CurrencyManager/OwnershipManager) 불변·순수 뷰. 컴파일·드래그/연출은 메인/사용자 검증 대기 | ✅ |
+| 2026-07-24 | **tcg-reviewer 검수 + nit 3건 수정** — critical/warn 0(이중처리·계약·경계·재클릭·좀비트윈 무결). 개선: ① Grid enum 데드상태→그리드 연출 완료까지 Grid 유지 후 Idle(`CoGridToIdle`) ② 드래그 중 `SetDraggable(false)` 시 홈으로 즉시 리셋(잔상 방지) ③ 복귀 중 재드래그 드리프트→홈 슬롯(`m_homeLocalPos`) 기준 고정. OnDisable 잔상 2건은 의도(다음 개봉 ClearSpawned 정리)로 유지. 컴파일 0 | ✅ |
+| 2026-07-24 | **구매 흐름 디버그 E2E 검증 통과 (Unity_RunCommand, 인메모리 격리)** — 6케이스: 잔액부족(InsufficientGold·차감0)/성공신규(−50+환급, 소유부여)/중복환급(−50+10×중복)/무료팩(price0 Success=Spend수정검증)/팩없음(PackNotFound·차감0)/실SO진단. 차감·환급 산술 정확, 격리로 실 세이브 미오염 확인. **미결(사용자 조치): 실제 `NormalPack.Pool` 비어있음(poolCount=0→EmptyPool), packId='0'** — 에디터에서 Pool 카드 채우고 packId 의미있는 값 권장 | ✅ |
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -375,3 +379,97 @@ sequenceDiagram
 | `CardShop` (SO) | `OutGame/CardPack/CardShop.cs` — `List<CardPackData> packs · duplicateRefundGold` | E-14 |
 | `CardPackOpener` (static) | `OutGame/CardPack/CardPackOpener.cs` — `Packs · GetPack · TryPurchase` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
+
+---
+
+### F-19 카드팩 개봉 루프 (F. UI) — ✅ 구현 완료 (프리팹/씬 배선 사용자 인계)
+
+> **스코프(최종)**: 상점 목록·독립 씬·MainMenu 통합 진입 전부 제외. 핵심 루프 하나만 —
+> **카드팩 클릭(구매) → 개봉 연출 + 카드 순차 등장 → 카드 획득**.
+> **F-19는 순수 뷰**(세이브 없음): E `CardPackOpener`를 소비. 로직은 E가 원자적으로 끝내고, 뷰는 연출만. `:::new` = 이번 신규.
+> 결정: 단일 카드팩 버튼(고정 packId) / `PackOpeningView`에 옵션 `EnsureBoot` 내장(아무 씬에서 테스트, 통합 시 no-op).
+
+```mermaid
+flowchart TD
+    subgraph view["F-19 개봉 루프 (씬 상주 뷰)"]
+        POV["PackOpeningView<br/>팩 버튼 클릭·개봉/등장 연출 오케스트레이션<br/>(+옵션 EnsureBoot)"]:::new
+        RCV["RevealCardView<br/>카드 1장 등장 애니·신규/중복 뱃지"]:::new
+    end
+    subgraph fb["옵션 부트 (도감 EnsureBoot 선례)"]
+        FB["fallbackShop / fallbackAllCards<br/>(SerializeField)"]:::new
+    end
+    OPENER["CardPackOpener (E)<br/>SetShop · TryPurchase"]
+    CARD["CollectionCardView 패턴 참고<br/>portrait=fullImage · name=displayName"]
+
+    FB -.->|"IsReady false시 SetShop/SetSource"| POV
+    POV -->|"팩 클릭 → TryPurchase(packId)"| OPENER
+    OPENER -->|"OpenedPack{cards,refund} (차감·드로우·소유 완료)"| POV
+    POV -->|"카드마다 순차 Reveal(card, isNew)"| RCV
+    RCV -.->|"바인딩 관용구 차용"| CARD
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+```
+
+**흐름 — 개봉 인터랙션 3단계 (스택→드래그 넘김→2×3 그리드)**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Stack : 팩 클릭 → TryPurchase 성공\n(카드 N장을 덱처럼 겹쳐 스택)
+    Idle --> Idle : 실패(InsufficientGold 등)\n버튼 흔들림
+    Stack --> Stack : 맨 위 카드 드래그\nthreshold 미달 → 원위치 복귀
+    Stack --> Flip : 맨 위 카드 드래그\nthreshold 넘김 → 페이드아웃\n다음 카드 top
+    Flip --> Stack : 남은 카드 있음
+    Flip --> Grid : 스택 소진\n전체 카드 2×3(3열) 재배치·페이드인
+    Grid --> [*]
+```
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant POV as PackOpeningView
+    participant OP as CardPackOpener
+    participant RCV as RevealCardView
+
+    U->>POV: 카드팩 버튼 클릭
+    POV->>OP: TryPurchase(packId)
+    OP-->>POV: OpenedPack{cards, refund}  (구매·소유부여 완료)
+    alt Success
+        POV->>RCV: N장 생성·스택 배치(offset+sortingOrder), 맨 위만 드래그 활성
+        loop 스택 소진까지
+            U->>RCV: 맨 위 카드 드래그(OnMouseDrag, 월드)
+            alt threshold 넘김
+                RCV->>RCV: 페이드아웃(SpriteRenderer/TMP DOFade)
+                RCV-->>POV: 넘김 콜백 → 다음 카드 top 활성
+            else 미달
+                RCV->>RCV: 원위치 복귀
+            end
+        end
+        POV->>RCV: 전체 2×3(3열) 그리드 위치로 이동·페이드인
+    else 실패
+        POV->>U: 버튼 흔들림 피드백
+    end
+```
+
+**설계 요지 (원리 카드)**
+- **로직은 E, 뷰는 연출만**: `TryPurchase`가 차감·드로우·소유부여를 원자적으로 끝냄 → 뷰는 "이미 획득한" `OpenedPack.Cards`를 인터랙션으로 공개할 뿐. 연출·데이터가 분리돼 정합 안전(연출 중단돼도 데이터 정상, 그리드에서 카드 파괴 안 함).
+- **상태머신 3단계(Idle→Stacking→Grid→Idle)로 재진입 차단**: `PackOpeningView.m_state`가 Idle일 때만 개봉 허용. Stacking(드래그 진행) 중 재클릭 무시. 그리드 배치 시작과 동시에 Idle 복귀 → 다음 클릭이 `ClearSpawned`로 그리드 정리.
+- **월드 드래그(uGUI 아님)**: 카드는 SpriteRenderer+BoxCollider2D라 `OnMouseDown/Drag/Up` + `Camera.main.ScreenToWorldPoint`로 넘김. 시작점 대비 월드 이동거리가 `dragThreshold` 이상이면 페이드아웃+콜백, 미만이면 `DOLocalMove` 원위치. 맨 위 카드만 `SetDraggable(true)`.
+- **스택 겹침 = sortingOrder 밴드**: `SetSortingOrder(rank)`가 카드마다 `rank*밴드 + 내부 baseOrder`로 정렬 → 카드끼리 렌더 순서 섞임 방지, 카드 내부 아트↔텍스트 앞뒤 관계는 baseOrder로 보존. 페이드는 자식 SpriteRenderer/TMP 전체 `DOFade`(CardAnimator.FadeView 관용구).
+- **팝업 풀링 미사용**: 단일 루프라 씬 상주 뷰가 더 단순(`PooledUIBase`/`UIPrefab` 라벨 불필요).
+- **옵션 EnsureBoot**: 도감 `CollectionGalleryController.EnsureBoot` 선례 — `CardCatalog.IsReady` false일 때만 `Load`·`SetSource(fallbackAllCards)`·`Init`·`SetShop(fallbackShop)`. 통합 시 no-op.
+- **수정 가능성 높은 지점**: 스택 오프셋·그리드 간격·연출 타이밍 `PackOpeningView.cs`(SerializeField) / 드래그 threshold·복귀·페이드 `RevealCardView.cs`(SerializeField) / 그리드 정렬 수식 `PackOpeningView.LayoutGrid`.
+
+| 클래스 | 파일 | 책임 | 태스크 |
+|---|---|---|---|
+| `PackOpeningView` (MonoBehaviour) ✅ | `Assets/Scripts/UI/Shop/PackOpeningView.cs` | 팩 클릭·구매·상태머신(스택 배치/넘김 오케스트레이션/그리드)·옵션 EnsureBoot | F-19 |
+| `RevealCardView` (MonoBehaviour) ✅ | `Assets/Scripts/UI/Shop/RevealCardView.cs` | 카드 1장: 데이터 바인딩·월드 드래그 넘김·페이드/이동·sortingOrder 겹침 | F-19 |
+
+**프리팹/씬 배선 (문서화 → 실배선 사용자/메인)**
+- `PackOpeningView` 부착 오브젝트: `packButton`(Button) + `cardsContainer`(Transform, 스택/그리드 부모) + `cardPrefab`(RevealCardView) + 튜닝값(`stackOffset`/`gridCellSize`/각 duration) + 옵션 부트(`fallbackShop`/`fallbackAllCards`).
+- `RevealCardView` 카드 프리팹 필수: **`BoxCollider2D`**(월드 드래그 피킹) + `illustration`(SpriteRenderer)·`nameText`/`hpText`/`refundText`(월드 TMP_Text)·`newBadge`/`dupBadge`(GameObject) + `dragThreshold`/`swipeFadeDuration`/`returnDuration`.
+- **페이드 대상은 코드가 자동 수집**(자식 전체 SpriteRenderer/TMP_Text) — 필드 배선 불필요, 카드 프리팹 하위에 두기만 하면 됨. sortingOrder도 자식 전체 Renderer에 적용.
+- `cardsContainer`는 **직교 카메라 평면(z 고정) 하위**에 두고 카드 프리팹에 BoxCollider2D가 있어야 `OnMouse*`가 동작(누락 시 컴파일 통과·드래그 무반응).
+- 팝업 풀링 미사용이라 `UIPrefab` 라벨 **불필요**(씬 상주).
+
+> ~~상점 목록(ShopController/ShopPackTileView)·독립 씬·MainMenu 통합 진입~~ — **이번 스코프 전부 제외, 후속.**

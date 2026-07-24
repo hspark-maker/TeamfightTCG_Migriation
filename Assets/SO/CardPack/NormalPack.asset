@@ -16,4 +16,13 @@ MonoBehaviour:
   displayName: "\uC77C\uBC18 \uCE74\uB4DC\uD329"
   price: 50
   drawCount: 6
-  pool: []
+  pool:
+  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
+  - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
+  - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+  - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
+  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
+  - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
+  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
