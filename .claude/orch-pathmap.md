@@ -1,5 +1,5 @@
 # 프로젝트 경로 맵 (orch 자동 생성 · git 추적 파일)
-# 모드: 디렉터리 요약 · 범위: 전체 · 생성: 2026-07-24T02:50:20.911Z · 파일 13689개
+# 모드: 디렉터리 요약 · 범위: 전체 · 생성: 2026-07-24T03:30:50.713Z · 파일 10297개
 # 형식: "디렉터리/ : N개". 폴더 구조 파악용 — 해당 폴더 안에서 Glob 으로 좁혀 찾아라.
 
 (루트) : 12개
@@ -65,53 +65,6 @@
 "Assets/Assets/Images/Cards/Concept//355/231/224/353/245/264/353/243/251/354/212/ : 6개
 "Assets/Assets/Images/Cards/Maokai//352/271/234/353/260/244/354/235/ : 2개
 "Assets/Assets/Images/UI/statspanel_atlas-/353/263/265/354/202/254/353/263/ : 2개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/ : 5개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/ : 4개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/Animations/ : 2개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/Materials/ : 34개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/Textures/ : 18개
-"Assets/Assets/Models/Aatrox/drx_/354/225/204/355/212/270/353/241/235/354/212/244 (1)_Extracted/drx_/354/225/204/355/212/270/353/241/235/354/212/ : 2개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/ : 3개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted/ : 6개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/ : 2개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted/Animations/ : 4개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted/Materials/ : 16개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/Fizz//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/355/224/274/354/246/210_Extracted/Textures/ : 4개
-"Assets/Assets/Models/Gwen//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/352/267/270/354/233/ : 5개
-"Assets/Assets/Models/Gwen//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/352/267/270/354/233/254_Extracted/ : 204개
-"Assets/Assets/Models/Gwen//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/352/267/270/354/233/254_Extracted//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/352/267/270/354/233/ : 2개
-"Assets/Assets/Models/Kindread/drx_/355/202/250/353/223/234/353/240/210/353/223/ : 5개
-"Assets/Assets/Models/Kindread/drx_/355/202/250/353/223/234/353/240/210/353/223/234 (1)_Extracted/ : 6개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/ : 5개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/ : 4개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/Animations/ : 4개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/Materials/ : 12개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/Textures/ : 4개
-"Assets/Assets/Models/Maokai/drx_/353/247/210/354/230/244/354/271/264/354/235/264 (1)_Extracted/drx_/353/247/210/354/230/244/354/271/264/354/235/ : 2개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/ : 3개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted/ : 4개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/ : 2개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted/Animations/ : 6개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted/Materials/ : 18개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/Poppy//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/275/200/354/202/220_Extracted/Textures/ : 8개
-"Assets/Assets/Models/Rammus//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/236/214/353/250/270/354/212/ : 3개
-"Assets/Assets/Models/Rammus//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/236/214/353/250/270/354/212/244_Extracted/ : 5개
-"Assets/Assets/Models/Rammus//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/236/214/353/250/270/354/212/244_Extracted/Materials/ : 12개
-"Assets/Assets/Models/Rammus//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/236/214/353/250/270/354/212/244_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/Rammus//354/232/260/354/243/274/353/271/204/355/226/211/354/202/254_/353/236/214/353/250/270/354/212/244_Extracted/Textures/ : 8개
-"Assets/Assets/Models/Teemo//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/355/213/260/353/252/ : 5개
-"Assets/Assets/Models/Teemo//354/232/260/354/243/274_/352/267/270/353/243/250/353/270/214_/355/213/260/353/252/250_Extracted/ : 58개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/ : 3개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted/ : 4개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/ : 2개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted/Animations/ : 4개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted/Materials/ : 12개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted/Meshes/ : 2개
-"Assets/Assets/Models/ornn//355/217/255/354/243/274_/352/270/260/352/264/200/354/260/250_/354/230/244/353/245/270_Extracted/Textures/ : 6개
 "Assets/BMonster-/354/271/264/353/223/234 /354/273/250/354/205/211 /354/235/264/353/257/270/354/247/ : 2개
 "Assets/Layer Lab/GUI Pro-SimpleCasual/Prefabs/Prefabs_Component_Frames/BasicFrame-/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/ : 2개
 "Assets/Layer Lab/GUI Pro-SimpleCasual/Prefabs/Prefabs_Component_Frames/CardFrame-/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/223/342/206/ : 2개
@@ -213,12 +166,6 @@
 "Assets/SO/Synergies/Effects//354/234/240/354/202/ : 2개
 "Assets/SO/Synergies/Effects//354/262/255/354/206/214/353/266/ : 2개
 "Assets/SO/Synergies/Effects//355/235/220/353/246/ : 2개
-"Assets/SO/Synergies/Lagycy//353/266/210/355/225/234/353/213/ : 2개
-"Assets/SO/Synergies/Lagycy//354/212/265/352/262/251/354/236/ : 2개
-"Assets/SO/Synergies/Lagycy//354/213/270/354/233/200/352/276/ : 2개
-"Assets/SO/Synergies/Lagycy//354/232/224/354/203/ : 2개
-"Assets/SO/Synergies/Lagycy//354/232/260/354/243/274 /352/267/270/353/243/250/353/270/ : 2개
-"Assets/SO/Synergies/Lagycy//354/240/225/353/240/271/354/241/ : 2개
 .claude/ : 2개
 .claude/agents/ : 4개
 .codex/ : 1개
@@ -235,7 +182,7 @@ Assets/Assets/ : 9개
 Assets/Assets/Audio/ : 1개
 Assets/Assets/Audio/UI/ : 1개
 Assets/Assets/Audio/UI/Use/ : 28개
-Assets/Assets/Images/ : 13개
+Assets/Assets/Images/ : 15개
 Assets/Assets/Images/Cards/ : 11개
 Assets/Assets/Images/Cards/Fizz/ : 8개
 Assets/Assets/Images/Cards/Gwen/ : 8개
@@ -250,38 +197,7 @@ Assets/Assets/Images/Icons/ : 22개
 Assets/Assets/Images/UI/ : 92개
 Assets/Assets/Images/UI/CardFrame/ : 4개
 Assets/Assets/Images/UI/Synergy/ : 4개
-Assets/Assets/Models/ : 19개
-Assets/Assets/Models/Aatrox/ : 6개
-Assets/Assets/Models/Aatrox/Image/ : 362개
-Assets/Assets/Models/Aatrox/Mat/ : 11개
-Assets/Assets/Models/Aatrox/Mat/Q1/ : 10개
-Assets/Assets/Models/Aatrox/Mat/Q2/ : 8개
-Assets/Assets/Models/Aatrox/Mat/Q3/ : 8개
-Assets/Assets/Models/Fizz/ : 2개
-Assets/Assets/Models/Fizz/Mat/ : 10개
-Assets/Assets/Models/Fizz/ParticlePNG/ : 290개
-Assets/Assets/Models/Gwen/ : 5개
-Assets/Assets/Models/Gwen/Mat/ : 12개
-Assets/Assets/Models/Gwen/ParticlePNG/ : 78개
-Assets/Assets/Models/Gwen/adf/ : 4개
-Assets/Assets/Models/Kindread/ : 4개
-Assets/Assets/Models/Kindread/Mat/ : 8개
-Assets/Assets/Models/Kindread/ParticlePNG/ : 428개
-Assets/Assets/Models/Maokai/ : 6개
-Assets/Assets/Models/Maokai/Mat/ : 6개
-Assets/Assets/Models/Maokai/ParticlePNG/ : 206개
-Assets/Assets/Models/Poppy/ : 4개
-Assets/Assets/Models/Poppy/Mat/ : 16개
-Assets/Assets/Models/Poppy/ParticlePNG/ : 304개
-Assets/Assets/Models/Rammus/ : 8개
-Assets/Assets/Models/Rammus/Mat/ : 4개
-Assets/Assets/Models/Rammus/ParticlePNG/ : 220개
-Assets/Assets/Models/Teemo/ : 8개
-Assets/Assets/Models/Teemo/Mat/ : 14개
-Assets/Assets/Models/Teemo/ParticlePrefab/ : 378개
-Assets/Assets/Models/ornn/ : 4개
-Assets/Assets/Models/ornn/Mat/ : 8개
-Assets/Assets/Models/ornn/ParticlePNG/ : 402개
+Assets/Assets/Models/ : 4개
 Assets/Assets/Prefabs/ : 12개
 Assets/Assets/Prefabs/Particle/ : 2개
 Assets/Assets/Prefabs/Particle/Cards/ : 22개
@@ -291,7 +207,7 @@ Assets/Assets/Prefabs/UI/MainMenu/ : 2개
 Assets/Assets/Prefabs/UI/PooledUI/ : 12개
 Assets/Assets/Video/ : 8개
 Assets/Editor/ : 2개
-Assets/Fonts/ : 6개
+Assets/Fonts/ : 4개
 Assets/Layer Lab/ : 2개
 Assets/Layer Lab/GUI Pro-SimpleCasual/ : 6개
 Assets/Layer Lab/GUI Pro-SimpleCasual/+README+/ : 2개
@@ -428,9 +344,8 @@ Assets/SO/Cards/Ornn/ : 4개
 Assets/SO/Cards/Poppy/ : 4개
 Assets/SO/Cards/Rammus/ : 4개
 Assets/SO/Cards/Teemo/ : 4개
-Assets/SO/Synergies/ : 2개
+Assets/SO/Synergies/ : 1개
 Assets/SO/Synergies/Effects/ : 2개
-Assets/SO/Synergies/Lagycy/ : 2개
 Assets/Scenes/ : 8개
 Assets/Scripts/ : 8개
 Assets/Scripts/Audio/ : 6개

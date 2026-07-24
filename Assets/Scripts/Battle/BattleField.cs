@@ -35,7 +35,8 @@ public class BattleField : MonoBehaviour
         this.healerEffect = new HealerEffect(this);
 
         List<CardData> t_shuffled = new List<CardData>(_deckData);
-        Shuffle(t_shuffled);
+        if (!TutorialConfig.IsActive)   // 튜토리얼: 무셔플 = 리스트 순서가 곧 등장 순서(결정론)
+            Shuffle(t_shuffled);
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {

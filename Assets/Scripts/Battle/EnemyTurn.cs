@@ -8,6 +8,8 @@ public class EnemyTurn : TurnBase
 {
     public EnemyTurn(TurnContext _ctx) : base(_ctx) { }
 
+    static bool InSlotRange(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
+
     public override void OnEnter()
     {
         if (this.ctx.turnLabel != null) this.ctx.turnLabel.text = "AI 턴";
@@ -25,8 +27,27 @@ public class EnemyTurn : TurnBase
             List<CardInstance> t_targets   = this.ctx.playerField.GetValidTargets();
             if (t_attackers.Count == 0 || t_targets.Count == 0) return;
 
-            CardInstance t_atk = t_forcedAttacker ?? t_attackers[UnityEngine.Random.Range(0, t_attackers.Count)];
-            CardInstance t_def = t_targets[UnityEngine.Random.Range(0, t_targets.Count)];
+            CardInstance t_atk;
+            CardInstance t_def;
+            if (TutorialConfig.IsActive)
+            {
+                // 튜토리얼: Random 대체. 스텝의 슬롯으로 직접 선택. 스텝 소진 = 턴 종료.
+                if (!TutorialConfig.TryNextEnemyStep(out var t_step)) return;
+                // 디자이너 입력 슬롯 무검증 전달 방지 — GetSlot은 경계검사가 없어 범위 밖이면 크래시.
+                if (!InSlotRange(t_step.attackerSlot) || !InSlotRange(t_step.targetSlot))
+                {
+                    Debug.LogWarning($"[Tutorial] 적 스텝 슬롯 범위 초과 (atk={t_step.attackerSlot}, def={t_step.targetSlot}) → 턴 종료");
+                    return;
+                }
+                t_atk = this.ctx.enemyField.GetSlot(t_step.attackerSlot);
+                t_def = this.ctx.playerField.GetSlot(t_step.targetSlot);
+                if (t_atk == null || t_def == null || !t_def.IsAlive) return;
+            }
+            else
+            {
+                t_atk = t_forcedAttacker ?? t_attackers[UnityEngine.Random.Range(0, t_attackers.Count)];
+                t_def = t_targets[UnityEngine.Random.Range(0, t_targets.Count)];
+            }
 
             if (!t_atk.IsAlive) return;
 

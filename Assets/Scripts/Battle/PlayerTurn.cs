@@ -20,9 +20,20 @@ public class PlayerTurn : TurnBase
     public override async UniTask Execute()
     {
         this.turnDone = false;
-        // 생각시간 감시 기동. ct는 턴 수명(씬 파괴)에 묶고, turnDone 세팅 시 자연 종료.
-        var t_ct = this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
-        TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone, ForceTimeoutAttack, t_ct).Forget();
+        // 튜토리얼: 스텝 소진 상태로 턴 진입 시 타이머도 유효입력도 없어 hang → 방어적으로 턴 스킵.
+        if (TutorialConfig.IsActive && !TutorialConfig.TryPeekPlayerStep(out _))
+        {
+            Debug.LogWarning("[Tutorial] 플레이어 스텝 소진 상태로 턴 진입 → 턴 스킵(hang 방지)");
+            this.turnDone = true;
+            return;
+        }
+        // 튜토리얼: 생각시간 타이머 미기동(자동공격이 스크립트 스텝을 깨므로). 스텝 소진까지 대기.
+        if (!TutorialConfig.IsActive)
+        {
+            // 생각시간 감시 기동. ct는 턴 수명(씬 파괴)에 묶고, turnDone 세팅 시 자연 종료.
+            var t_ct = this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
+            TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone, ForceTimeoutAttack, t_ct).Forget();
+        }
         await UniTask.WaitUntil(() => this.turnDone);
     }
 
@@ -44,6 +55,15 @@ public class PlayerTurn : TurnBase
         if (t_attCard == null || t_attCard.ownerIndex != TurnState.LocalOwnerIndex) return;
         if (t_defCard == null || t_defCard.ownerIndex == TurnState.LocalOwnerIndex) return;
         if (this.forcedAttacker != null && t_attCard != this.forcedAttacker) return;
+
+        // 튜토리얼: 스크립트 스텝(공격자 슬롯·타깃 슬롯)과 일치하는 공격만 허용. 불일치 = 입력 무시.
+        if (TutorialConfig.IsActive)
+        {
+            if (!TutorialConfig.TryPeekPlayerStep(out var t_step)) return;   // 스텝 소진 → 무시
+            if (t_attCard.slotIndex != t_step.attackerSlot) return;
+            if (t_defCard.slotIndex != t_step.targetSlot) return;
+            TutorialConfig.ConsumePlayerStep();
+        }
 
         ExecuteAttack(t_attCard, t_defCard);
     }
