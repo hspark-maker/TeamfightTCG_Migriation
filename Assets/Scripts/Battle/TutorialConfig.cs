@@ -70,15 +70,22 @@ public static class TutorialConfig
             playerScript.Dequeue();
     }
 
-    /// <summary>적 다음 스텝 소비(dequeue). 적 공격 선택용.</summary>
-    public static bool TryNextEnemyStep(out ScriptedAttack _step)
+    /// <summary>적 현재 스텝 조회(소비 안 함). 스텝 종류(Attack/Message) 판정용.</summary>
+    public static bool TryPeekEnemyStep(out ScriptedAttack _step)
     {
         if (IsActive && enemyScript != null && enemyScript.Count > 0)
         {
-            _step = enemyScript.Dequeue();
+            _step = enemyScript.Peek();
             return true;
         }
         _step = default;
         return false;
+    }
+
+    /// <summary>적 스텝 소비(dequeue). 스텝 처리 완료 시 호출.</summary>
+    public static void ConsumeEnemyStep()
+    {
+        if (IsActive && enemyScript != null && enemyScript.Count > 0)
+            enemyScript.Dequeue();
     }
 }

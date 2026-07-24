@@ -30,6 +30,9 @@ public class GameInitializer : MonoBehaviour
 
         InitializeViews();
 
+        // 튜토리얼: 순차 안내 오버레이 부트스트랩(연출 전용, 규칙 무접촉).
+        if (TutorialConfig.IsActive) TutorialOverlayUI.Ensure();
+
         if (DeckConfig.IsMultiplayer && MultiplayerTurnRunner.Instance != null)
         {
             // false = 초기화 중 상대 이탈 → 전투 시작 없이 부전승 처리 후 조기 종료

@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c77d53f76141dc9498adade58910761d, type: 3}
+  m_Name: TutorialScenario2
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
+  playerDeck:
+  - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+  - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
+  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
+  enemyDeck:
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  playerScript:
+  - kind: 2
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "적 카드를 손가락으로 길게 누르면 그 카드의 정보(체력·키워드)를 볼 수 있다. 적 '철갑몽치'를 길게 눌러 확인해보자!"
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "확인했나? '철갑몽치'는 '도발(Taunt)' 카드다. 적 진영에 도발이 있으면 반드시 그 카드부터 공격해야 한다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "도발 카드는 공격력이 절반이라 반격도 약하다 — 체력 5의 절반, 2뿐이다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "번개뿔(체력 5)을 드래그해 도발 철갑몽치를 공격! 처치한다. 반격은 2뿐이라 번개뿔은 5→3."
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "내 힐러 '별토리'는 매 턴 시작마다 아군 전체를 1 회복한다! 방금 번개뿔이 3→4로 회복된 걸 봐라."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 2
+    guideMessage: "우드혼(체력 5)으로 앞의 폭탄밤을 공격!"
+    waitForTap: 1
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "번개뿔로 계속 공격! 힐러가 회복시켜 줘서 버틸 수 있다."
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: "힐러 '별토리'도 직접 공격할 수 있다!"
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 1
+    guideMessage: "번개뿔로 공격!"
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 2
+    guideMessage: "우드혼으로 마지막 적을 처치! 승리!"
+    waitForTap: 0
+    dimBackground: 0
+  enemyScript: []

@@ -58,6 +58,7 @@ public class TutorialSetupUI : MonoBehaviour
         var t_infoGo = new GameObject("Info");
         t_infoGo.transform.SetParent(t_canvasGo.transform, false);
         var t_info = t_infoGo.AddComponent<TextMeshProUGUI>();
+        TutorialUIStyle.ApplyFont(t_info);
         t_info.text      = $"튜토리얼 셋업\n<size=60%>플레이어 {this.playerDeck.Count}장 · 적 {this.enemyDeck.Count}장</size>";
         t_info.fontSize  = 48f;
         t_info.color     = Color.white;
@@ -82,6 +83,7 @@ public class TutorialSetupUI : MonoBehaviour
         var t_labelGo = new GameObject("Label");
         t_labelGo.transform.SetParent(t_btnGo.transform, false);
         var t_label = t_labelGo.AddComponent<TextMeshProUGUI>();
+        TutorialUIStyle.ApplyFont(t_label);
         t_label.text      = "배틀 시작";
         t_label.fontSize  = 42f;
         t_label.color     = Color.white;

@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
-  m_Name: "\uBC14\uC704\uCF69"
+  m_Name: 바너구
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  displayName: "\uBC14\uC704\uCF69"
+  displayName: 바너구
   keywords: 0
-  maxHp: 4
+  maxHp: 5
   bonusHp: 0
   synergies: []
-  fullImage: {fileID: 21300000, guid: aef1f4b53b7c39c44987b315af8907da, type: 3}
-  portrait: {fileID: 21300000, guid: aef1f4b53b7c39c44987b315af8907da, type: 3}
-  battleImage: {fileID: 21300000, guid: 437601e9c33045c4a840e5da95932fe1, type: 3}
-  deckPreview: {fileID: 21300000, guid: 8bd4a6f6eb6fbf84888f2be9b556f8da, type: 3}
+  fullImage: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
+  portrait: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
+  battleImage: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
+  deckPreview: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}
@@ -31,5 +31,5 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: 
+  cardExplain: '이끼 갑옷을 두른 웜뱃. 튼튼한 앞줄 몸빵.'
   explainKeywords: 0
