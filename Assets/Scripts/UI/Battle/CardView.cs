@@ -743,13 +743,16 @@ public class CardView : MonoBehaviour
             if (t_icon != null) { t_icons.Add(t_icon); t_kwList.Add(t_kw); }
         }
 
-        float t_startX = -(t_icons.Count - 1) * this.iconSpacing * 0.5f;
+        // keywordIconRoot 를 카드 왼쪽 아래 코너에 두고, 아이콘은 원점에서 오른쪽으로 가로 정렬.
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
             GameObject t_obj = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
-            t_obj.transform.localPosition = new Vector3(t_startX + t_i * this.iconSpacing, -1f, 0f);
-            SpriteRenderer t_sr = t_obj.GetComponent<SpriteRenderer>();
-            if (t_sr != null) t_sr.sprite = t_icons[t_i];
+            t_obj.transform.localPosition = new Vector3(t_i * this.iconSpacing, 0f, 0f);
+            // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
+            SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
+                ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
+                : t_obj.GetComponent<SpriteRenderer>();
+            if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i];
             this.iconMap[t_kwList[t_i]] = t_obj;
         }
     }

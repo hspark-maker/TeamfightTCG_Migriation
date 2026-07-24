@@ -89,7 +89,11 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
             if (t_entry.icon == null) continue;
 
             GameObject t_obj = Instantiate(this.keywordIconPrefab, this.keywordIconContainer);
-            t_obj.GetComponent<Image>().sprite = t_entry.icon;
+            // prefab = 배경(루트 Image) + 아이콘(자식 Image). 배경 유지, 자식에만 키워드 스프라이트 주입.
+            Image t_iconImg = t_obj.transform.childCount > 0
+                ? t_obj.transform.GetChild(0).GetComponent<Image>()
+                : t_obj.GetComponent<Image>();
+            if (t_iconImg != null) t_iconImg.sprite = t_entry.icon;
 
             LongPressDetector t_lp      = t_obj.GetComponent<LongPressDetector>();
             KeywordIconButton  t_btn     = t_obj.GetComponent<KeywordIconButton>();
