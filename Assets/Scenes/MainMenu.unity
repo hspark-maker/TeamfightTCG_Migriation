@@ -2138,16 +2138,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37923906acba1234cad5b872c4896106, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  allCards:
-  - {fileID: 11400000, guid: 9d9ad74818355ed4bb04b3e714fc0472, type: 2}
-  - {fileID: 11400000, guid: ed0fba83ed5de2141b9d59a9165ce43e, type: 2}
-  - {fileID: 11400000, guid: e122db8c1c526bf47adcfc89225db6c2, type: 2}
-  - {fileID: 11400000, guid: 5932854a57d69b74282dcc6379802343, type: 2}
-  - {fileID: 11400000, guid: c6df53ffc91ed3a44a49f574bdf186f2, type: 2}
-  - {fileID: 11400000, guid: e050548f826485349931ac034d127c22, type: 2}
-  - {fileID: 11400000, guid: 310af593e7c2c0440a165d68cf442915, type: 2}
-  - {fileID: 11400000, guid: eeb9460e9589d5f4ea99880c9988f942, type: 2}
-  - {fileID: 11400000, guid: 3ec842c5f9da74e47bb7df7e2e2a95df, type: 2}
+  cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
   collectionGrid: {fileID: 274079192}
   cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
   canvas: {fileID: 337653093}
@@ -3558,16 +3549,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mainMenuBgm: {fileID: 8300000, guid: 07077fdf6ae092d44a466a5af0e23f0e, type: 3}
-  allCards:
-  - {fileID: 11400000, guid: 9d9ad74818355ed4bb04b3e714fc0472, type: 2}
-  - {fileID: 11400000, guid: ed0fba83ed5de2141b9d59a9165ce43e, type: 2}
-  - {fileID: 11400000, guid: e122db8c1c526bf47adcfc89225db6c2, type: 2}
-  - {fileID: 11400000, guid: 5932854a57d69b74282dcc6379802343, type: 2}
-  - {fileID: 11400000, guid: c6df53ffc91ed3a44a49f574bdf186f2, type: 2}
-  - {fileID: 11400000, guid: e050548f826485349931ac034d127c22, type: 2}
-  - {fileID: 11400000, guid: 310af593e7c2c0440a165d68cf442915, type: 2}
-  - {fileID: 11400000, guid: eeb9460e9589d5f4ea99880c9988f942, type: 2}
-  - {fileID: 11400000, guid: 3ec842c5f9da74e47bb7df7e2e2a95df, type: 2}
+  cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
 --- !u!4 &540481062
 Transform:
   m_ObjectHideFlags: 0

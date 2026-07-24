@@ -27,25 +27,26 @@ public static class AttackFlow
         return (t_splash, t_view);
     }
 
-    /// <summary>[BeforeAttack] 공격 개시 직전 공격자 소속 시너지 발동(무리 선피해 등).
+    /// <summary>[BeforeAttack] 공격 개시 직전 공격자 트리거 발동(패시브 → 시너지 무리 선피해 등).
     /// AttackSequence.Play 직전(PreSelectSplash 이후)에 호출 → Execute 전 원자 완료. RNG 미소비(splash 스트림 미교란).</summary>
     public static async UniTask RunBeforeAttack(
         CardInstance _attacker, CardInstance _defender,
         BattleField _attackerField, BattleField _defenderField)
     {
         if (!_attacker.IsAlive) return;
-        await SynergyTriggers.BeforeAttack(
-            new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField));
+        var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField);
+        await (_attacker.data.passive?.OnBeforeAttack(t_ctx) ?? UniTask.CompletedTask);
+        await SynergyTriggers.BeforeAttack(t_ctx);
     }
 
     /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 성벽 반격 등).
-    /// 동기 완결 계약 — AttackProcessor의 counter 해결 직후 치사 래치 전에 인라인 호출(hp 기준시점 통일).</summary>
+    /// 양쪽 다 동기 void — AttackProcessor의 counter 해결 직후 치사 래치 전에 인라인 완결(hp 기준시점 통일).</summary>
     public static void RunAttacked(
         CardInstance _defender, CardInstance _attacker,
         BattleField _defenderField, BattleField _attackerField)
     {
         var t_ctx = new AttackedCtx(_defender, _attacker, _defenderField, _attackerField);
-        _defender.data.passive?.OnAttacked(t_ctx).Forget();
+        _defender.data.passive?.OnAttacked(t_ctx);
         SynergyTriggers.Attacked(t_ctx);
     }
 

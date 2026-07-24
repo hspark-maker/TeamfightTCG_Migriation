@@ -60,9 +60,16 @@ public static class AttackProcessor
         }
 
         AttackFlow.RunAttacked(_defender, _attacker, _defenderField, _attackerField); // 패시브 Attacked + 성벽 반격(동기)
+        // [DamageDealt] 패시브 → 시너지 순. ctx가 소속 필드를 들고 있다(디스패처 BelongsTo 판정용).
         if (t_takesCounter)
-            _defender.data.passive?.OnDamageDealt(new DamageDealtCtx(_defender, t_actualCtrDmg, true)).Forget();
-        _attacker.data.passive?.OnDamageDealt(new DamageDealtCtx(_attacker, t_actualAtkDmg, false)).Forget();
+        {
+            var t_ctrCtx = new DamageDealtCtx(_defender, _defenderField, t_actualCtrDmg, true);
+            _defender.data.passive?.OnDamageDealt(t_ctrCtx).Forget();
+            SynergyTriggers.DamageDealt(t_ctrCtx);
+        }
+        var t_atkCtx = new DamageDealtCtx(_attacker, _attackerField, t_actualAtkDmg, false);
+        _attacker.data.passive?.OnDamageDealt(t_atkCtx).Forget();
+        SynergyTriggers.DamageDealt(t_atkCtx);
         if (t_ranged)
             CardPassive.Notify(_attacker, CardKeyword.Ranged);
 
@@ -76,7 +83,12 @@ public static class AttackProcessor
             : null;
         bool t_swapped = t_incoming != null;
         if (t_swapped)
-            _attacker.data.passive?.OnSwappedOut(new SwapOutCtx(_attacker, t_incoming, _attackerField)).Forget();
+        {
+            // [SwappedOut] 패시브 → 시너지 순.
+            var t_swapCtx = new SwapOutCtx(_attacker, t_incoming, _attackerField);
+            _attacker.data.passive?.OnSwappedOut(t_swapCtx).Forget();
+            SynergyTriggers.SwappedOut(t_swapCtx);
+        }
 
         RemoveDead(_attackerField);
         RemoveDead(_defenderField);
@@ -120,7 +132,7 @@ public static class AttackProcessor
         };
     }
 
-    /// <summary>필드의 사망 카드 정리. 시너지 Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.</summary>
+    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.</summary>
     static void RemoveDead(BattleField _field)
     {
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
@@ -128,12 +140,16 @@ public static class AttackProcessor
             CardInstance t_c = _field.GetSlot(i);
             if (t_c != null && !t_c.IsAlive)
             {
-                // [Lethal] 시너지 치사 트리거 먼저(언데드 부활 / 유산 아군 회복). 동기 완결 — 부활은 제자리 hp 복구.
-                SynergyTriggers.Lethal(new DeathCtx(t_c, _field));
-                // 부활(언데드)했으면 슬롯 유지 → passive Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
+                // [Lethal] 치사 트리거 먼저(언데드 부활 / 유산 아군 회복). 패시브 → 시너지 순.
+                // 둘 다 동기 완결 — 부활은 제자리 hp 복구이므로 아래 IsAlive 게이트가 양쪽 결과를 함께 본다.
+                var t_deathCtx = new DeathCtx(t_c, _field);
+                t_c.data.passive?.OnLethal(t_deathCtx);
+                SynergyTriggers.Lethal(t_deathCtx);
+                // 부활(언데드)했으면 슬롯 유지 → Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
                 if (t_c.IsAlive) continue;
-                // [Removed] 제거 직전. 취소 불가.
-                t_c.data.passive?.OnRemoved(new DeathCtx(t_c, _field)).Forget();
+                // [Removed] 제거 직전. 취소 불가. 패시브 → 시너지 순.
+                t_c.data.passive?.OnRemoved(t_deathCtx).Forget();
+                SynergyTriggers.Removed(t_deathCtx);
                 _field.RemoveCard(i);
             }
         }

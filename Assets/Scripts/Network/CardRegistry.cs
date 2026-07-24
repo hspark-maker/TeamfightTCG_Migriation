@@ -3,11 +3,21 @@ using UnityEngine;
 
 /// <summary>
 /// CardData SO ↔ int ID 매핑. 양쪽 클라이언트가 동일한 allCards 리스트 순서를 가져야 함.
+///
+/// **게임에 존재하는 카드 전체 목록의 단일 진실원이기도 하다.** 덱 편성 컬렉션(DeckBuilderUI),
+/// 세이브 복원(DeckSaveManager)이 전부 이 목록을 참조한다 — 씬 컴포넌트가 카드 목록을 따로
+/// 들고 있으면 카드 추가 시 한쪽만 갱신되어 조용히 어긋난다(실제로 그랬음).
+///
+/// **배열 인덱스가 곧 와이어 ID다.** 추가는 항상 맨 뒤에만. 중간 삽입·삭제·재정렬은
+/// 뒤쪽 카드 ID를 전부 밀어 양 클라 해석이 갈린다 = 즉시 divergence.
 /// </summary>
 [CreateAssetMenu(fileName = "CardRegistry", menuName = "Card Battle/Card Registry")]
 public class CardRegistry : ScriptableObject
 {
     [SerializeField] CardData[] allCards;
+
+    /// <summary>등록된 카드 전체(등록 순서 = ID 순서). null 칸이 섞여 있을 수 있으니 소비측에서 걸러라.</summary>
+    public IReadOnlyList<CardData> All => this.allCards ?? System.Array.Empty<CardData>();
 
     readonly Dictionary<CardData, int> dataToId = new Dictionary<CardData, int>();
     readonly Dictionary<int, CardData> idToData  = new Dictionary<int, CardData>();

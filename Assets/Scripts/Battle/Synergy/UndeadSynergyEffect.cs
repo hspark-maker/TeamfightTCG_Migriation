@@ -7,12 +7,10 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "UndeadSynergyEffect", menuName = "Card Battle/Synergy Effect/Undead")]
 public class UndeadSynergyEffect : SynergyEffect
 {
-    public override void OnDeckResolved(CardInstance _card, SynergyState _state) { }   // 정적 효과 없음(순수 사망 트리거)
-
-    public override void OnLethal(DeathCtx _ctx, SynergyData _synergy)
+    public override void OnLethal(DeathCtx _ctx)
     {
         if (_ctx.self == null) return;
         if (_ctx.self.ReviveAtHalf())   // 게임당 1회, 성공 시 제자리 hp 복구
-            SynergyTriggers.Fire(_ctx.self, _synergy);   // 부활 성공 시에만 배너+배지 pop(라벨=시너지 설명 통일)
+            SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 부활 성공 시에만 배너+배지 pop(라벨=시너지 설명 통일)
     }
 }

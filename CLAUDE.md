@@ -24,3 +24,8 @@
 - 설계 확정 후 다건 구현은 `Workflow`로 파이프라인(정찰→설계→시공(worktree 격리)→검수→통합). 단 Workflow는 토큰 많이 쓰므로 큰 구현 단계에서만.
 
 상세: 메모리 [[agent-team-workflow]], [[refactor-backlog]].
+
+## 경로 맵 (orch 관리)
+<!-- orch:pathmap:start -->
+@.claude/orch-pathmap.md
+<!-- orch:pathmap:end -->

@@ -30,7 +30,8 @@ public static class SynergyApplier
                 foreach (var t_effect in t_active.Tier.effects)
                 {
                     if (t_effect == null) continue;
-                    t_effect.OnDeckResolved(t_card, state);   // [DeckResolved] ClearSynergy 선행 → 멱등
+                    // [DeckResolved] ClearSynergy 선행 → 멱등. ctx.synergy = 이 발화를 일으킨 시너지.
+                    t_effect.OnDeckResolved(new DeckCtx(t_card, state, t_active.Synergy));
                 }
             }
         }

@@ -19,22 +19,51 @@ public static class PopupPlacer
         float _gap, float _edgePadding = 0f, bool _clampVertical = true)
     {
         if (_self == null || _anchor == null) return;
+        Canvas t_canvas = _self.GetComponentInParent<Canvas>();
+        if (t_canvas == null) return;
+        Camera t_cam = t_canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : t_canvas.worldCamera;
+
+        Vector2 t_screen = RectTransformUtility.WorldToScreenPoint(
+            t_cam, _anchor.TransformPoint(_anchor.rect.center));
+        PlaceBesideScreenPoint(_self, t_screen, _anchor.rect.width * 0.5f, _gap, _edgePadding, _clampVertical);
+    }
+
+    /// <summary>월드 오브젝트(스프라이트 배지 등) 옆에 배치. 인게임 카드 위 시너지 배지처럼
+    /// uGUI가 아닌 대상에 쓴다. _worldHalfWidth는 대상의 월드 반폭(화면 px로 환산해 간격 계산).</summary>
+    public static void PlaceBesideWorldPoint(RectTransform _self, Vector3 _worldPos, float _worldHalfWidth,
+        float _gap, float _edgePadding = 0f, bool _clampVertical = true)
+    {
+        if (_self == null) return;
+        Camera t_worldCam = Camera.main;
+        if (t_worldCam == null) return;
+
+        Vector2 t_screen = t_worldCam.WorldToScreenPoint(_worldPos);
+        // 월드 반폭을 화면 px로: 중심과 (중심+반폭)의 화면 거리
+        Vector2 t_edge = t_worldCam.WorldToScreenPoint(_worldPos + Vector3.right * _worldHalfWidth);
+        PlaceBesideScreenPoint(_self, t_screen, Mathf.Abs(t_edge.x - t_screen.x), _gap, _edgePadding, _clampVertical);
+    }
+
+    /// <summary>화면 좌표 기준 공통 배치. 위 두 진입점이 여기로 수렴한다.</summary>
+    public static void PlaceBesideScreenPoint(RectTransform _self, Vector2 _screenPos, float _anchorHalfPx,
+        float _gap, float _edgePadding = 0f, bool _clampVertical = true)
+    {
+        if (_self == null) return;
 
         Canvas t_canvas = _self.GetComponentInParent<Canvas>();
         if (t_canvas == null) return;
         RectTransform t_canvasRect = (RectTransform)t_canvas.transform;
         Camera t_cam = t_canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : t_canvas.worldCamera;
 
-        // 앵커 중심을 캔버스 로컬 좌표로
-        Vector2 t_screen = RectTransformUtility.WorldToScreenPoint(
-            t_cam, _anchor.TransformPoint(_anchor.rect.center));
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                t_canvasRect, t_screen, t_cam, out Vector2 t_local))
+                t_canvasRect, _screenPos, t_cam, out Vector2 t_local))
             return;
 
+        // 화면 px -> 캔버스 로컬 단위 (CanvasScaler 배율 보정)
+        float t_scale = t_canvasRect.rect.width / Mathf.Max(1f, Screen.width);
+
         Rect  t_bounds     = t_canvasRect.rect;
-        float t_halfSelf   = _self.rect.width  * 0.5f;
-        float t_halfAnchor = _anchor.rect.width * 0.5f;
+        float t_halfSelf   = _self.rect.width * 0.5f;
+        float t_halfAnchor = _anchorHalfPx * t_scale;
         float t_offsetX    = t_halfSelf + t_halfAnchor + _gap;
 
         // 기본은 오른쪽. 넘치면 왼쪽으로 뒤집는다.

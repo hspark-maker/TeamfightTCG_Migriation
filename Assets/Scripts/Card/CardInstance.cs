@@ -20,6 +20,9 @@ public class CardInstance
     // 양 클라가 동일 스폰/사망/턴종료 경로에서 순수 산술로 동일하게 파생 → 동기화 불필요.
     public int  flowBonus;     // 흐름: AttackDamage에 가산되는 흐름 스택(스택 1당 공격력 +1). 등장마다 성장(무제한).
     public int  legacyStack;   // 유산: 내 턴 종료마다 +1, 사망 시 아군 회복량.
+    // 성벽: 필드의 라이브 성벽 아군 수. EffectiveDamage에 synergyDmgReduction과 함께 가산(공격 직격만).
+    // BoardChanged 타이밍마다 RampartSynergyEffect가 재동기 — 여기 직접 쓰지 말 것.
+    public int  rampartReduction;
     public bool reviveUsed;    // 언데드: 게임당 1회 부활 소진 플래그.
 
     // 덱 복귀 시 체력 보존용 (-1 = 미저장)
@@ -45,7 +48,7 @@ public class CardInstance
     /// 반격/가시/기타 패시브 피해는 감소 없음(소스를 호출부가 정적 결정 → 양클라 대칭).
     /// Clamp/사망판정/프리뷰/실적용이 모두 이 식을 통과해야 프리뷰↔실제·양클라 일치.</summary>
     int EffectiveDamage(int _raw, bool _isAttackHit) =>
-        UnityEngine.Mathf.Max(0, _raw - (_isAttackHit ? this.synergyDmgReduction : 0));
+        UnityEngine.Mathf.Max(0, _raw - (_isAttackHit ? this.synergyDmgReduction + this.rampartReduction : 0));
 
     /// <summary>실제 적용 데미지(현재 체력+보너스로 상한). _isAttackHit=공격 직격 소스(비늘 감소 대상, 기본 true).
     /// 반격 맥락 호출부는 false 전달 → 실제 TakeDamage(false)와 프리뷰/계산 일치.</summary>
