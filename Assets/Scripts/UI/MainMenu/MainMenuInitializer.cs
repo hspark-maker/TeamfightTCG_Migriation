@@ -12,7 +12,7 @@ public class MainMenuInitializer : MonoBehaviour
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
         // 세이브 로드·재화 캐싱 등 씬 무관한 전역 부트는 GameManager가 앱 시작 시 처리한다.
-        CardCatalog.SetSource(this.allCards);
+        CardCatalog.SetSource(cardRegistry.All);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();

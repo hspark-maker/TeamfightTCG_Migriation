@@ -41,9 +41,11 @@ public static class CurrencyManager
     }
 
     // 사용. 잔액 부족이면 아무것도 하지 않고 false.
+    // 비용 0은 무료(0원) 결제로 허용 — 잔액 변경·이벤트 없이 성공(true). 음수만 거부.
     public static bool Spend(ECurrencyType _type, long _cost)
     {
-        if (_cost <= 0) return false;
+        if (_cost < 0) return false;
+        if (_cost == 0) return true;
         if (s_currencies[(int)_type] < _cost) return false;
 
         s_currencies[(int)_type] -= _cost;

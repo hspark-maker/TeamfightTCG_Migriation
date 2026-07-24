@@ -15,6 +15,9 @@
 | 2026-07-24 | **F-17/F-18 생산 UI 배선 구현 완료 (Phase 2)** — RowView 상태칩·수확, Controller 폴링, ProgressView/CompletionRewardView 신규. 매니저·세이브·재화 계약 불변(순수 소비). 손 배선 인계 `COLLECTION_UI_WIRING.md` | ✅ |
 | 2026-07-24 | **씬/프리팹 실배선 완료 (`CollectionTest.unity`)** — RowView `stateLabel`/`harvestButton`/신규 `productionFill`(Fill을 Filled로 전환·진행바 구동)+Status 활성화, 씬 `CompletionRewardView`(BottomBar)·`GoldHud` 부착. `EnsureBoot`에 Load/CurrencyInit 보강. 에디터 검증: 5h경과 fill 0→0.208, 수확 gold 0→50, 에러 0 | ✅ |
 | 2026-07-24 | **생산 진행바 = 단위 사이클 + 행별 전용 뷰로 정리** — 진행바 의미를 `누적/상한`→`다음 1단위까지 사이클 진행률`(`CycleProgress01`)로. `CollectionProgressView`를 소유 집계 바에서 **행별 생산 진행바**로 재작성(행 키 `Bind`), RowView는 원시 `productionFill` 제거 후 이 뷰에 위임. 프리팹 `Status/Progress`에 ProgressView 부착. 저장·수확 계약 불변 | ✅ |
+| 2026-07-24 | **E. 카드팩 경제 클래스 구조 추가 (⬜ 설계 승인 대기)** — `CardPackData`/`CardShop`(SO)·`CardPackOpener`(static)·`OpenedPack`(값). E는 자체 세이브 없는 **A(재화)·B(소유) 오케스트레이터**. 구매=즉시개봉(팩 재고 없음)·**팩별 지정 풀 드로우**·**중복 시 소액 골드 환급**. 신규 노드 `:::new` | ⬜ |
+| 2026-07-24 | **E. 카드팩 경제 구현 완료 (E-14/15/16)** — `OutGame/CardPack/`에 4파일 생성. 설계와 일치. API 확정: 배선 `SetShop(CardShop)`, 결과 `OpenedPack`(class)+`DrawnCard`(readonly struct)+`EPackOpenResult`(enum: Success/PackNotFound/InsufficientGold/EmptyPool/SpendFailed). 로컬 `System.Random`. 재화·소유 계약 순수 소비(불변). SO 에셋 생성·상점 배선은 사용자/메인 검증 | ✅ |
+| 2026-07-24 | **tcg-reviewer 심화 재검 반영 (2건 수정)** — ① **무료팩 허용**: 공유 재화 API `CurrencyManager.Spend` 계약 변경(0 이하 거부→음수만 거부, 0은 잔액변경 없이 성공). price=0 팩 구매 가능해짐(사용자 지시). Spend 사용처는 CardPackOpener 1곳뿐 → 회귀 없음. ② **null 풀 방어**: 드로우 시 null 카드 항목 `continue` 스킵(환급 오지급 차단). #3 저장순서(유저 유리, 재화 유실 없음)는 프로토타입 무시·기록만. 컴파일 에러 0 | ✅ |
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -288,3 +291,87 @@ sequenceDiagram
 | IRepository · JsonFileRepository · PlayerPrefsRepository | `OutGame/Save/1.Repository/` |
 | UserSaveData 외 값 객체 4종 | `OutGame/Save/2.Domain/` |
 | CurrencyManager · ECurrencyType | `OutGame/Currency/` |
+
+---
+
+### E. 카드팩 경제 도메인 — ✅ 구현 완료 (2026-07-24, `OutGame/CardPack/`)
+
+> 목표 루프 3단계: `골드 → 카드팩 구매 → 신규 카드셋 획득 → 덱 강화`.
+> 핵심 성질: **E는 자체 영속 상태가 없다.** 골드 차감은 `CurrencyManager`가, 카드 소유는 `OwnershipManager`가 이미 영속하므로
+> E는 둘을 잇는 **오케스트레이터**일 뿐. **구매=즉시 개봉**(미개봉 팩 재고 없음), 팩 정의는 SO(에디터 데이터), 결과는 소유권에 위임. `:::new` = 이번 신규.
+
+```mermaid
+flowchart TD
+    subgraph shop["상점 진입 (F-19, 후속)"]
+        SHOP["상점 UI"]
+    end
+    subgraph def["E-14 정의 (SO, 에디터 데이터)"]
+        CFG["CardShop (SO)<br/>[#1 fallback]<br/>팩 리스트 + duplicateRefundGold"]:::new
+        DEF["CardPackData (SO)<br/>packId·price·drawCount·pool(지정 카드셋)"]:::new
+    end
+    subgraph svc["E-15 구매·드로우"]
+        SVC["CardPackOpener<br/>[#1 static+fallback]<br/>Packs · TryPurchase · 로컬 랜덤"]:::new
+    end
+    RES["OpenedPack / DrawnCard<br/>[#6 UI 스냅샷] card · isNew · refund"]:::new
+
+    CUR["CurrencyManager<br/>Spend · Earn · Save (기존)"]
+    OWN["OwnershipManager<br/>Grant (기존)"]
+    KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
+
+    SHOP -->|"TryPurchase(packId)"| SVC
+    CFG --> DEF
+    CFG -->|"SetShop / fallback"| SVC
+    SVC -->|"Spend(Gold, price)"| CUR
+    SVC -->|"DEF.pool 지정셋 균등 드로우"| DEF
+    SVC -->|"KeyOf(card)"| KEY
+    SVC -->|"Grant(key) 루프 → isNew"| OWN
+    SVC -->|"중복이면 Earn(Gold, refund)"| CUR
+    SVC -->|"결과 조립"| RES
+    RES -->|"신규/중복·환급 연출"| SHOP
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+```
+
+**흐름 시퀀스 — 팩 구매·개봉 (지정 풀 + 중복 환급)**
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant SHOP as 상점UI
+    participant SVC as CardPackOpener
+    participant CUR as CurrencyManager
+    participant OWN as OwnershipManager
+
+    U->>SHOP: 팩 구매 클릭
+    SHOP->>SVC: TryPurchase(packId)
+    SVC->>CUR: CanAfford(Gold, price)?
+    alt 잔액 부족
+        SVC-->>SHOP: 실패(구매 불가, 차감 없음)
+    else 충분
+        SVC->>CUR: Spend(Gold, price)
+        loop drawCount 회 (DEF.pool에서 균등 드로우)
+            SVC->>OWN: Grant(KeyOf(card)) → isNew
+            alt 중복(isNew=false)
+                SVC->>CUR: Earn(Gold, duplicateRefundGold)
+            end
+        end
+        SVC->>CUR: Save() (즉시 영속)
+        SVC-->>SHOP: OpenedPack(카드 + isNew + refund)
+        SHOP->>U: 개봉 연출(신규/중복·환급 표시)
+    end
+```
+
+**설계 요지 (원리 카드)**
+- **오케스트레이터라 세이브 섹션 없음**: E는 `Spend`·`Earn`(재화)·`Grant`(소유)만 호출하고 모두 이미 영속. E 자체 세이브를 만들면 이중 진실원. 트레이드오프: 구매 이력·pity 카운터가 필요해지면 그때 세이브 섹션 추가.
+- **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
+- **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
+- **중복 = 소액 골드 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(Gold, duplicateRefundGold)`. 환급액은 `CardShop` 전역값. Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
+- **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성 = `CardPackData` SO(코드 미수정) / 환급액 = `CardShop.duplicateRefundGold` / 등급 가중치가 필요해지면 `DEF.pool`을 가중 목록으로 확장.
+
+| 클래스 | 파일(예정) | 태스크 |
+|---|---|---|
+| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·price·drawCount·pool(List<CardData>)` | E-14 |
+| `CardShop` (SO) | `OutGame/CardPack/CardShop.cs` — `List<CardPackData> packs · duplicateRefundGold` | E-14 |
+| `CardPackOpener` (static) | `OutGame/CardPack/CardPackOpener.cs` — `Packs · GetPack · TryPurchase` | E-15 |
+| `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
