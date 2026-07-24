@@ -53,7 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   panel: {fileID: 3669285588173230799}
   mainMenuButton: {fileID: 3653734389269605131}
-  mainMenuScene: MainMenu
+  mainMenuScene: LobbyScene
   enterDuration: 0.45
 --- !u!1 &3669285588003552999
 GameObject:

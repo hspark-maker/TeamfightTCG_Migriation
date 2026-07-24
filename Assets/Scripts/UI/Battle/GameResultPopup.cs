@@ -7,7 +7,7 @@ public class GameResultPopup : MonoBehaviour
 {
     [SerializeField] RectTransform panel;
     [SerializeField] Button mainMenuButton;
-    [SerializeField] string mainMenuScene = "MainMenu";
+    [SerializeField] string mainMenuScene = "LobbyScene";
     [SerializeField] float enterDuration = 0.45f;
     [SerializeField] TMP_Text rewardGoldText; // 지급된 골드 표시용(표시 전용, 재계산·재지급 없음).
 

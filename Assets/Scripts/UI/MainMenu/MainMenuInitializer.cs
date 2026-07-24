@@ -21,8 +21,9 @@ public class MainMenuInitializer : MonoBehaviour
         // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
         CollectionProductionManager.Init();
 
-        // 덱 복원은 CardCatalog로 키를 재수화하므로 SetSource 이후여야 한다.
-
+        // 덱 복원은 카드 이름 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
+        // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
+        DeckSaveManager.SetCardRegistry(cardRegistry.All);
         DeckSaveManager.LoadFromFile();
     }
 
