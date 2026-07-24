@@ -20,7 +20,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: a59a9ebdd6705f84fac97090c1cc310e, type: 2}
   fullImage: {fileID: 21300000, guid: 53561b409e2d4ac4eac879e6272ce8e6, type: 3}
   portrait: {fileID: 21300000, guid: 53561b409e2d4ac4eac879e6272ce8e6, type: 3}
-  battleImage: {fileID: 21300000, guid: 4a80def594a0c1e42afb1e1031be593a, type: 3}
+  battleImage: {fileID: 21300000, guid: 6fbc8471a5d1d7f4ab1a3e4ff91c4a07, type: 3}
   deckPreview: {fileID: 21300000, guid: 6a52585fffc5c4141ba07c5549bd4fbe, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
