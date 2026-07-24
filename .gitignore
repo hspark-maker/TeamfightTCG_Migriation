@@ -73,3 +73,7 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# TMP 폰트 아틀라스 재생성물 (conflict 방지, meta는 추적 유지)
+Assets/Fonts/MalgunGothic_TMP.asset
+Assets/Fonts/MalgunGothic_OutlinfFont.asset
