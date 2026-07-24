@@ -62,8 +62,10 @@ public class CollectionGalleryController : MonoBehaviour
     {
         if (CardCatalog.IsReady) return;
 
+        DataSaveManager.Load();      // 저장된 진행도·재화 로드(독립 씬에서도 영속 검증 가능)
         CardCatalog.SetSource(fallbackAllCards);
         OwnershipManager.Init();
+        CurrencyManager.Init();      // 저장된 골드로 HUD 초기값 맞춤
         CollectionProductionManager.Init();
     }
 

@@ -63,12 +63,6 @@ public static class CollectionProductionManager
         return (long)Math.Floor(ResolveByKey(_rowKey));
     }
 
-    // 현재 누적 원시값(소수 포함). UI 진행바 등에서 cap 대비 비율 계산용.
-    public static double GetAccumulatedRaw(string _rowKey)
-    {
-        return ResolveByKey(_rowKey);
-    }
-
     // 행 누적 상한. 미존재 키는 0.
     public static long GetCap(string _rowKey)
     {
@@ -83,7 +77,7 @@ public static class CollectionProductionManager
 
     // 행 생산 상태(3종 배타). 수확가능은 이 상태와 교차하는 별도 축이므로 CanHarvest로 조회한다.
     //   Locked   : 행 미완성 → 생산 정지(기존 누적은 보존, CanHarvest는 여전히 true일 수 있음)
-    //   Producing: 완성 & 누적 < cap → 시간당 productionPerHour 누적 중
+    //   Producing: 완성 & 누적 < cap → cycleSeconds마다 1단위 누적 중
     //   Capped   : 완성 & 누적 >= cap → 상한 도달, 더 안 쌓임
     public static EProductionState GetState(string _rowKey)
     {
@@ -110,7 +104,7 @@ public static class CollectionProductionManager
         EProductionState t_state = Classify(t_row, t_raw);
 
         return new RowProductionInfo(
-            t_row.Key, t_state, t_whole, t_raw, t_row.Cap, t_whole >= 1, t_row.RewardType, t_row.ProductionPerHour);
+            t_row.Key, t_state, t_whole, t_raw, t_row.Cap, t_whole >= 1, t_row.RewardType, t_row.ProductionCycleSeconds);
     }
 
     // ── 수확 ────────────────────────────────────────────────
@@ -273,13 +267,17 @@ public static class CollectionProductionManager
         // 실제시각이 따라잡을 때까지 Since가 0 클램프 → 그 기간 생산 정지. 프로덕션은 오프셋이 없어 무영향이며,
         // 디버그 검증은 한 세션 안에서(재시작 없이) DebugAdvance→조회/수확으로 하면 정확하다.
         var t_since = GameClock.Since(new DateTime(t_entry.lastSettleUtcTicks, DateTimeKind.Utc));
-        double t_hours = t_since.TotalHours;
-        if (t_hours > 0.0)
+        double t_seconds = t_since.TotalSeconds;
+        if (t_seconds > 0.0)
         {
             double t_cap = _row.Cap;
-            double t_rate = _row.ProductionPerHour > 0f ? _row.ProductionPerHour : 0.0; // 음수 오설정 방어(하한 0)
-            double t_next = t_entry.accumulated + t_rate * t_hours;
-            t_entry.accumulated = t_next < t_cap ? t_next : t_cap; // cap 클램프(상한)
+            double t_cycle = _row.ProductionCycleSeconds > 0f ? _row.ProductionCycleSeconds : 0.0; // 0/음수 오설정 방어
+            if (t_cycle > 0.0)
+            {
+                double t_next = t_entry.accumulated + t_seconds / t_cycle; // 초당 1/cycle 단위 누적
+                t_entry.accumulated = t_next < t_cap ? t_next : t_cap;     // cap 클램프(상한)
+            }
+            // cycle이 0/음수(생산 정지)라도 lastSettle은 당겨 시간 낭비 방지.
             t_entry.lastSettleUtcTicks = GameClock.UtcNow.Ticks;
         }
         return t_entry.accumulated;
@@ -304,11 +302,16 @@ public readonly struct RowProductionInfo
     public readonly long Cap;                 // 누적 상한
     public readonly bool CanHarvest;          // Accumulated >= 1
     public readonly ECurrencyType RewardType; // 수확 시 지급 재화 종류
-    public readonly float ProductionPerHour;  // 시간당 생산량
+    public readonly float ProductionCycleSeconds;  // 생산 사이클 시간(초)
+
+    // 다음 1단위까지의 진행률(0~1). 정수 누적분(수확 가능분)을 뺀 소수부 = 현재 생산 사이클 진행.
+    // 한 사이클(=재화 1단위)이 차면 소수부가 1→0으로 돌며 Accumulated가 +1 된다(진행바 리셋·누적 증가).
+    // Capped(만땅)는 소수부가 0이라 여기서도 0 — 만땅의 "가득 참" 표시는 뷰에서 처리한다.
+    public float CycleProgress01 => (float)(AccumulatedRaw - Accumulated);
 
     public RowProductionInfo(
         string _rowKey, EProductionState _state, long _accumulated, double _accumulatedRaw,
-        long _cap, bool _canHarvest, ECurrencyType _rewardType, float _productionPerHour)
+        long _cap, bool _canHarvest, ECurrencyType _rewardType, float _productionCycleSeconds)
     {
         RowKey = _rowKey;
         State = _state;
@@ -317,7 +320,7 @@ public readonly struct RowProductionInfo
         Cap = _cap;
         CanHarvest = _canHarvest;
         RewardType = _rewardType;
-        ProductionPerHour = _productionPerHour;
+        ProductionCycleSeconds = _productionCycleSeconds;
     }
 }
 

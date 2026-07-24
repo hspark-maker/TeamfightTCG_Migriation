@@ -23,8 +23,8 @@ public sealed class CatalogRow
 
     // ── 해석된 튜닝 (전역 기본값 적용 완료 — 이 값이 최종값) ──
 
-    // 완성 행이 시간당 누적하는 생산량(해석 완료). 행 오버라이드(>0) 또는 전역 기본.
-    public float ProductionPerHour { get; }
+    // 완성 행의 생산 사이클 시간(초). 행 오버라이드(>0) 또는 전역 기본.
+    public float ProductionCycleSeconds { get; }
 
     // 수확 시 지급할 재화 종류(해석 완료). 수확 로직(C-7)이 CurrencyManager.Earn에 쓸 값.
     public ECurrencyType RewardType { get; }
@@ -37,7 +37,7 @@ public sealed class CatalogRow
         int _index,
         IReadOnlyList<CardData> _cards,
         IReadOnlyList<string> _cardKeys,
-        float _productionPerHour,
+        float _productionCycleSeconds,
         ECurrencyType _rewardType,
         long _cap)
     {
@@ -45,7 +45,7 @@ public sealed class CatalogRow
         Index = _index;
         Cards = _cards;
         CardKeys = _cardKeys;
-        ProductionPerHour = _productionPerHour;
+        ProductionCycleSeconds = _productionCycleSeconds;
         RewardType = _rewardType;
         Cap = _cap;
     }

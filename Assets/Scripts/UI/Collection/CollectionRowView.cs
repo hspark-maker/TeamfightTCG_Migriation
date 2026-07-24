@@ -12,9 +12,9 @@ public class CollectionRowView : MonoBehaviour
     [SerializeField] CollectionCardView cardPrefab; // 카드 타일 프리팹
 
     [Header("생산 상태(선택 — 미배선 시 null 가드)")]
-    [SerializeField] TMP_Text stateLabel;           // 상태칩: 잠김/생산 중/만땅
-    [SerializeField] TMP_Text amountText;           // 누적/상한 표시(예: "12 / 100")
-    [SerializeField] Button harvestButton;          // 수확 버튼
+    [SerializeField] TMP_Text amountText;                // 누적/상한 표시(Get 버튼 텍스트에 통합, 예: "12 / 100")
+    [SerializeField] CollectionProgressView progressView; // 생산 사이클 진행바(행 전용, 위임)
+    [SerializeField] Button harvestButton;               // 수확 버튼
 
     readonly List<CollectionCardView> m_cards = new List<CollectionCardView>();
 
@@ -28,6 +28,9 @@ public class CollectionRowView : MonoBehaviour
         m_cards.Clear();
 
         m_rowKey = _row != null ? _row.Key : null;
+
+        // 진행바에 이 행 키 위임(이후 갱신은 RefreshProduction이 progressView.Refresh로 구동).
+        if (progressView != null) progressView.Bind(m_rowKey);
 
         // 수확 버튼 리스너 1회 배선(재빌드마다 중복 등록 방지).
         if (harvestButton != null)
@@ -75,25 +78,13 @@ public class CollectionRowView : MonoBehaviour
 
         var t_info = CollectionProductionManager.GetInfo(m_rowKey);
 
-        switch (t_info.State)
-        {
-            case EProductionState.Locked:
-                if (stateLabel != null) stateLabel.text = "잠김";
-                if (amountText != null) amountText.text = string.Empty;
-                break;
+        // 누적/상한을 Get 버튼 텍스트에 통합 표시(상태 칩 제거 — 잠김/만땅 구분은 진행바·버튼 활성으로 전달).
+        // 상태 무관하게 "현재누적 / 상한"으로 통일: Capped는 누적==상한이라 "cap / cap", 잠김은 굳은 누적(0일 수 있음).
+        if (amountText != null)
+            amountText.text = $"{t_info.Accumulated:N0} / {t_info.Cap:N0}";
 
-            case EProductionState.Producing:
-                if (stateLabel != null) stateLabel.text = "생산 중";
-                if (amountText != null)
-                    amountText.text = $"{t_info.Accumulated:N0} / {t_info.Cap:N0}";
-                break;
-
-            case EProductionState.Capped:
-                if (stateLabel != null) stateLabel.text = "만땅";
-                if (amountText != null)
-                    amountText.text = $"{t_info.Cap:N0} / {t_info.Cap:N0}";
-                break;
-        }
+        // 생산 사이클 진행바는 전용 뷰에 위임(행마다 1개). 시간 누적 반영을 위해 매 폴링 틱 갱신.
+        if (progressView != null) progressView.Refresh();
 
         // 수확 버튼: 굳은 누적이 1 이상일 때만 활성(잠김이어도 굳은 누적은 청구 가능).
         if (harvestButton != null) harvestButton.interactable = t_info.CanHarvest;

@@ -3882,6 +3882,7 @@ GameObject:
   - component: {fileID: 1572004610}
   - component: {fileID: 1572004612}
   - component: {fileID: 1572004611}
+  - component: {fileID: 1572004613}
   m_Layer: 0
   m_Name: BottomBar
   m_TagString: Untagged
@@ -3948,6 +3949,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1572004609}
   m_CullTransparentMesh: 1
+--- !u!114 &1572004613
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1572004609}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2aafe80006efb344a980b2b09ad3198, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCompletionRewardView
+  root: {fileID: 993395681}
+  claimButton: {fileID: 993395683}
+  rewardText: {fileID: 1636889205}
 --- !u!1 &1622336470
 GameObject:
   m_ObjectHideFlags: 0
@@ -4877,6 +4893,7 @@ GameObject:
   - component: {fileID: 1937051766}
   - component: {fileID: 1937051768}
   - component: {fileID: 1937051767}
+  - component: {fileID: 1937051769}
   m_Layer: 0
   m_Name: GoldHud
   m_TagString: Untagged
@@ -4943,6 +4960,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1937051765}
   m_CullTransparentMesh: 1
+--- !u!114 &1937051769
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1937051765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09e95a830ee22a3458e89448ad75c311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GoldHud
+  goldText: {fileID: 2146173462}
 --- !u!1 &1951284995
 GameObject:
   m_ObjectHideFlags: 0

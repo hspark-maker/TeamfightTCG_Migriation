@@ -205,8 +205,8 @@ public static class CatalogRows
                 CardCatalog.KeyOf(t_def.card3),
             };
 
-            ResolveTuning(t_def, out float t_perHour, out ECurrencyType t_rewardType, out long t_cap);
-            AddRow(t_rowIndex++, t_cards, t_keys, t_perHour, t_rewardType, t_cap);
+            ResolveTuning(t_def, out float t_cycleSeconds, out ECurrencyType t_rewardType, out long t_cap);
+            AddRow(t_rowIndex++, t_cards, t_keys, t_cycleSeconds, t_rewardType, t_cap);
         }
 
         EndBuild();
@@ -223,7 +223,7 @@ public static class CatalogRows
 
         // 전역 기본 튜닝(1회 해석 — fallback 행은 모두 동일 기본값).
         var t_cfg = Tuning;
-        float t_perHour = t_cfg.DefaultProductionPerHour;
+        float t_cycleSeconds = t_cfg.DefaultProductionCycleSeconds;
         ECurrencyType t_rewardType = t_cfg.DefaultRewardType;
         long t_cap = t_cfg.DefaultCap;
 
@@ -241,24 +241,24 @@ public static class CatalogRows
                 t_keys.Add(CardCatalog.KeyOf(t_card));
             }
 
-            AddRow(t_rowIndex++, t_cards, t_keys, t_perHour, t_rewardType, t_cap);
+            AddRow(t_rowIndex++, t_cards, t_keys, t_cycleSeconds, t_rewardType, t_cap);
         }
 
         EndBuild();
     }
 
     // 행 튜닝 해석: 전역 기본값 ↔ 행 오버라이드.
-    //  - productionPerHour>0 → 그 값, 아니면 전역 기본.
-    //  - cap>0               → 그 값, 아니면 전역 기본.
-    //  - rewardType          → authored 행 값을 그대로 정본으로 사용.
+    //  - productionCycleSeconds>0 → 그 값, 아니면 전역 기본.
+    //  - cap>0                    → 그 값, 아니면 전역 기본.
+    //  - rewardType               → authored 행 값을 그대로 정본으로 사용.
     //    (ECurrencyType은 Gold=0이라 "미설정" 센티널이 없고, 예전의 amount 오버라이드 신호도
     //     사라졌으므로 행의 rewardType 필드를 직접 최종값으로 쓴다. 전역 DefaultRewardType은
     //     def가 없는 fallback 청크 행에서만 쓰인다.)
-    static void ResolveTuning(CollectionRowDef _def, out float _perHour, out ECurrencyType _rewardType, out long _cap)
+    static void ResolveTuning(CollectionRowDef _def, out float _cycleSeconds, out ECurrencyType _rewardType, out long _cap)
     {
         var t_cfg = Tuning;
 
-        _perHour = _def.productionPerHour > 0f ? _def.productionPerHour : t_cfg.DefaultProductionPerHour;
+        _cycleSeconds = _def.productionCycleSeconds > 0f ? _def.productionCycleSeconds : t_cfg.DefaultProductionCycleSeconds;
         _rewardType = _def.rewardType;
         _cap = _def.cap > 0 ? _def.cap : t_cfg.DefaultCap;
     }
@@ -271,7 +271,7 @@ public static class CatalogRows
         s_rowByKey = new Dictionary<string, CatalogRow>();
     }
 
-    static void AddRow(int _index, List<CardData> _cards, List<string> _keys, float _perHour, ECurrencyType _rewardType, long _cap)
+    static void AddRow(int _index, List<CardData> _cards, List<string> _keys, float _cycleSeconds, ECurrencyType _rewardType, long _cap)
     {
         // 행 안정 키 = 첫 non-null 카드 키(3장 중 앞선 것부터). 전부 미해결이면 null.
         string t_rowKey = null;
@@ -280,7 +280,7 @@ public static class CatalogRows
             if (!string.IsNullOrEmpty(_keys[t_i])) { t_rowKey = _keys[t_i]; break; }
         }
 
-        var t_row = new CatalogRow(t_rowKey, _index, _cards.AsReadOnly(), _keys.AsReadOnly(), _perHour, _rewardType, _cap);
+        var t_row = new CatalogRow(t_rowKey, _index, _cards.AsReadOnly(), _keys.AsReadOnly(), _cycleSeconds, _rewardType, _cap);
         s_rows.Add(t_row);
 
         // 빈 키/중복 키 행은 조회 색인에서 제외(null·충돌 방지). Rows 열거에는 그대로 포함.

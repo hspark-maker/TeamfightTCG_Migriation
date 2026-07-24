@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: CollectionLayoutConfig
   m_EditorClassIdentifier: Assembly-CSharp::CollectionLayoutConfig
   defaultRewardType: 0
-  defaultProductionPerHour: 10
+  defaultProductionCycleSeconds: 15
   defaultCap: 240
   completionRewardType: 0
   completionRewardAmount: 1000
@@ -22,17 +22,17 @@ MonoBehaviour:
     card2: {fileID: 11400000, guid: ed0fba83ed5de2141b9d59a9165ce43e, type: 2}
     card3: {fileID: 11400000, guid: e122db8c1c526bf47adcfc89225db6c2, type: 2}
     rewardType: 0
-    productionPerHour: 5
+    productionCycleSeconds: 0
     cap: 100
   - card1: {fileID: 11400000, guid: c6df53ffc91ed3a44a49f574bdf186f2, type: 2}
     card2: {fileID: 11400000, guid: 5932854a57d69b74282dcc6379802343, type: 2}
     card3: {fileID: 11400000, guid: 3ec842c5f9da74e47bb7df7e2e2a95df, type: 2}
     rewardType: 0
-    productionPerHour: 6
+    productionCycleSeconds: 0
     cap: 120
   - card1: {fileID: 11400000, guid: 310af593e7c2c0440a165d68cf442915, type: 2}
     card2: {fileID: 11400000, guid: eeb9460e9589d5f4ea99880c9988f942, type: 2}
     card3: {fileID: 11400000, guid: e050548f826485349931ac034d127c22, type: 2}
     rewardType: 0
-    productionPerHour: 7
+    productionCycleSeconds: 0
     cap: 140
