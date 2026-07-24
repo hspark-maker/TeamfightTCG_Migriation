@@ -42,6 +42,9 @@ public class MainMenuManager : MonoBehaviour
     public void GameStart()
     {
         if (!DeckConfig.HasDeck) { ShowInvalidDeckPopup(); return; }
+        // 레거시 MainMenu 경로는 상대 덱을 사전 확정하지 않으므로, 로비 매칭이 남긴 홀더를
+        // 비워 GameInitializer가 랜덤 폴백을 쓰게 한다(홀더 오염 방지).
+        DeckConfig.ClearEnemyDeck();
         DeckConfig.SetMultiplayer(false);
         SceneTransitionVideo.Instance?.PlayOverlay();
         SceneManager.LoadScene("BattleScene");
