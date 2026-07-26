@@ -81,6 +81,9 @@ CLAUDE.local.md
 # Claude Code 개인 로컬 설정 (권한/경로는 사람마다 달라 공유 금지 — 공유 항목은 .claude/settings.json)
 .claude/settings.local.json
 
+# Codex 지침
+.codex
+
 # orch 세션 상태 (append 로그, 동시작업 충돌원)
 .orch/
 

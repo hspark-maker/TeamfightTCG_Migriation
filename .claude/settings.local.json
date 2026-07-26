@@ -55,7 +55,10 @@
       "Bash(grep -n -A2 \"&1021287990$\\\\|&6708018236351210544$\" LobbyScene.unity)",
       "Bash(grep -nE \"m_Calls.Array.size|StartAiBattle|value: [01]$\")",
       "Bash(grep -aiv \"^  m_Name: $\")",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Read(//c/Harbor/claude-personal/TeamfightTCG_Migriation/skills/outgame-design-session/**)",
+      "Read(//c/Harbor/claude-personal/TeamfightTCG_Migriation/skills/outgame-visual-recap/**)",
+      "Bash(echo \"exit=$?\")"
     ]
   },
   "enabledMcpjsonServers": [
