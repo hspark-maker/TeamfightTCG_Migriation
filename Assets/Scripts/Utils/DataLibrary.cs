@@ -13,6 +13,7 @@ public class DataLibrary : MonoBehaviour
 
     [SerializeField] public KeywordIconConfig keywordIconConfig;
     [SerializeField] BattleTimingConfig battleTimingConfig;   // 미배선 시 GameTiming 기본값 fallback
+    [SerializeField] BattleReward battleRewardConfig;         // 미배선 시 RewardService 기본값 fallback
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 
@@ -33,6 +34,7 @@ public class DataLibrary : MonoBehaviour
         instance = this;
         DontDestroyOnLoad(gameObject);
         GameTiming.SetConfig(this.battleTimingConfig);
+        RewardService.SetConfig(this.battleRewardConfig);
         return true;
     }
 

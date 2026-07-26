@@ -13,7 +13,4 @@ MonoBehaviour:
   m_Name: RewardConfig
   m_EditorClassIdentifier: Assembly-CSharp::BattleReward
   goldPerCard: 10
-  winBonus: 50
-  lossBonus: 10
-  minGold: 10
-  maxGold: 1000
+  minGold: 5

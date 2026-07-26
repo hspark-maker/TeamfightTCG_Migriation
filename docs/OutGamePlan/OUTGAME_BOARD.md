@@ -32,7 +32,7 @@
 | 생산 API | `CollectionProductionManager` (GetInfo/Harvest/OnChanged) | 🧊 동결 | |
 | 팩 API | `CardPackOpener` (SetShop/TryPurchase→OpenedPack) | 🧊 동결 | |
 | 보상 API | `RewardService.GrantBattleReward → BattleReward` | 🧊 동결 | 반환값이 팝업 입력 |
-| **통합 부트 순서** | `MainMenuInitializer` | ⚠️ **미완** | Load·CurrencyInit·SetShop 누락 → **PKG-BOOT가 동결시킴** |
+| **통합 부트 순서** | `MainMenuInitializer` + `GameManager.Boot()` | 🧊 동결 | Load·CurrencyInit=GameManager(BeforeSceneLoad), SetSource·Ownership·Production·SetShop=MainMenuInitializer. PKG-BOOT 완료 |
 
 ---
 
@@ -40,8 +40,10 @@
 
 | ID | 패키지 | 산출(무엇을 동결하나) | 담당 | 상태 | 검증 |
 |---|---|---|---|---|---|
-| **PKG-BOOT** | 통합 부트 배선 | `MainMenuInitializer`에 `DataSaveManager.Load()`+`CurrencyManager.Init()`+`CardPackOpener.SetShop()` 추가. 실행순서·null 가드. 테스트 씬 `EnsureBoot`와 이중 실행 방지(IsReady 가드) | outgame-engineer | ⬜ 준비 | 통합 씬 부트 시 골드·소유·팩 로드, 재시작 후 값 유지 |
-| **PKG-TUNE** | 튜닝 SO 배선 | `RewardConfig`/`CardShop`(+`NormalPack.Pool`·packId)/`CollectionLayoutConfig` 에셋 생성+매니저 배선(D-12 `SetConfig` 연결). ※ `.asset`은 에디터 작업(사용자) | outgame-engineer(코드)+사용자(에셋) | ⬜ 준비 | 팩 개봉 시 Pool 카드 나옴, 보상 환산이 SO 값 반영 |
+| **PKG-BOOT** | 통합 부트 배선 | `MainMenuInitializer`에 `CardPackOpener.SetShop(cardShop)` 배선(+`[SerializeField] CardShop`, null→빈 상점 fallback). ※ `DataSaveManager.Load()`+`CurrencyManager.Init()`은 이미 `GameManager.Boot()`(BeforeSceneLoad) 소유 → 중복 추가 안 함. `EnsureBoot`는 `CardCatalog.IsReady` 가드로 이미 no-op | outgame-engineer | ✅ 완료 | 통합 씬 부트 시 골드·소유·팩 로드, 재시작 후 값 유지 |
+| **PKG-TUNE** | 튜닝 SO 배선 | `RewardConfig`/`CardShop`(+`NormalPack.Pool`·packId)/`CollectionLayoutConfig` 에셋 생성+매니저 배선(D-12 `SetConfig` 연결). ※ `.asset`은 에디터 작업(사용자) | outgame-engineer(코드)+사용자(에셋) | ✅ 완료(코드·검수) — 인계 있음 | 팩 개봉 시 Pool 카드 나옴, 보상 환산이 SO 값 반영 |
+
+> **PKG-TUNE 코드 배선 완료(검수 통과, feature_Collection)**: `RewardService.SetConfig`→`DataLibrary`, `CatalogRows.SetLayout`→`MainMenuInitializer` 2곳 배선(+`[SerializeField]` 슬롯). CardShop은 PKG-BOOT에서 이미 배선됨. **사용자 인계(에디터)**: ① `RewardConfig.asset` 생성(`Create→TCG/Reward Config`) ② 인스펙터 할당 3건(`DataLibrary.battleRewardConfig`, `MainMenuInitializer.cardShop`←CardShop.asset, `MainMenuInitializer.collectionLayout`←CollectionLayoutConfig.asset) ③ `NormalPack.asset` packId="0" ↔ `PackOpeningView.packId` 정합 확인. Unity 콘솔 컴파일·Play E2E는 사용자 재량(정적 타입·시그니처는 검증됨).
 
 > **PKG-BOOT가 끝나기 전엔 🟠/🟢 전부 통합 씬 검증 불가**(테스트 씬 EnsureBoot로만 부분 검증). PKG-BOOT를 최우선 단독 처리. PKG-TUNE은 PKG-BOOT와 파일이 겹치지 않으면 병행 가능(코드부는 독립, SO 에셋은 사용자).
 
@@ -53,8 +55,8 @@
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
-| **PKG-ENTRY** | MainMenu 통합 진입(도감·상점 토글) | 기존 뷰 | `UI/MainMenu/MainMenuManager.cs` + 로비 씬 | PKG-BOOT | UI | ⬜ 대기 |
-| **PKG-HUD** | F-17 골드 HUD 상주 | `CurrencyManager.OnCurrencyChanged` | `UI/HUD/GoldHud.cs`(존재) + 로비 헤더 | PKG-BOOT | UI | ⬜ 대기 |
+| **PKG-ENTRY** | MainMenu 통합 진입(도감·상점 토글) | 기존 뷰 | `UI/MainMenu/MainMenuManager.cs` + 로비 씬 | PKG-BOOT ✅ | UI | ⬜ 준비 |
+| **PKG-HUD** | F-17 골드 HUD 상주 | `CurrencyManager.OnCurrencyChanged` | `UI/HUD/GoldHud.cs`(존재) + 로비 헤더 | PKG-BOOT ✅ | UI | ⬜ 준비 |
 | **PKG-SHOPTAB** | Shop 탭 레이아웃(진행 중) | `PackOpeningView` | `UI/Shop/*` + 로비 씬 | PKG-BOOT | UI | 🔄 진행(기존 브랜치) |
 
 ---
@@ -65,8 +67,8 @@
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
-| **PKG-POPUP** | F-20 전투 보상 팝업 | `RewardService`/`BattleReward` | 신규 `UI/Reward/*`(PooledUIBase) | PKG-BOOT | UI | ⬜ 대기 |
-| **PKG-FILTER** | F-21 덱빌더 소유 필터 | `OwnershipManager.IsOwned` | `UI/MainMenu/DeckBuilderUI.cs` 단일 | PKG-BOOT | UI | ⬜ 대기 |
+| **PKG-POPUP** | F-20 전투 보상 팝업 | `RewardService`/`BattleReward` | 신규 `UI/Reward/*`(PooledUIBase) | PKG-BOOT ✅ | UI | ⬜ 준비 |
+| **PKG-FILTER** | F-21 덱빌더 소유 필터 | `OwnershipManager.IsOwned` | `UI/MainMenu/DeckBuilderUI.cs` 단일 | PKG-BOOT ✅ | UI | ⬜ 준비 |
 
 > ※ `PKG-FILTER`는 `MainMenu` 폴더지만 **`DeckBuilderUI.cs` 단일 파일**이라 🟠 그룹(`MainMenuManager`)과 파일이 안 겹침 → 병렬 안전.
 
