@@ -67,7 +67,8 @@
       "Bash(awk 'NR>=604 && NR<=616{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
       "Bash(awk 'NR>=672 && NR<=684{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
       "Bash(awk 'NR>=31 && NR<=40{print NR\": \"substr\\($0,1,120\\)}' docs/OutGamePlan/STRUCTURE.md)",
-      "Bash(awk 'NR==34{print substr\\($0,1,90\\)} NR==35{print \"next: \"substr\\($0,1,60\\)}' docs/OutGamePlan/STRUCTURE.md)"
+      "Bash(awk 'NR==34{print substr\\($0,1,90\\)} NR==35{print \"next: \"substr\\($0,1,60\\)}' docs/OutGamePlan/STRUCTURE.md)",
+      "Bash([ -f \"$f\" ])"
     ]
   },
   "enabledMcpjsonServers": [

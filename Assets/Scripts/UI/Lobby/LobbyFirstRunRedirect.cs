@@ -22,7 +22,7 @@ public class LobbyFirstRunRedirect : MonoBehaviour
     void Start()
     {
         // 첫실행 판정은 세이브 소유 여부만으로(단일 창구 OwnershipManager, 세이브 직접 조회).
-        //if (OwnershipManager.HasAnyOwnedSaved()) return;   // 기존 유저 → 로비 그대로
+        if (OwnershipManager.HasAnyOwnedSaved()) return;   // 기존 유저 → 로비 그대로
 
         var t_opened = CardPackOpener.TryPurchase(this.starterPackId);
         if (t_opened == null || !t_opened.Success)
