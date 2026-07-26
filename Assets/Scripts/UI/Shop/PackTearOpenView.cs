@@ -1,23 +1,24 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.UI;
 
-// 카드팩 개봉 루프의 씬 상주 뷰(F-19). 단일 고정 packId 버튼 클릭 → CardPackOpener.TryPurchase →
-// 결과 OpenedPack를 "스택 → 드래그 넘김 → 2×3 그리드" 인터랙션으로 오케스트레이션한다.
-// 순수 뷰: 차감·드로우·소유부여·Save는 TryPurchase가 원자적으로 끝냈으므로 여기선 연출만(이중 처리 금지).
-// 상점 목록·독립 씬·MainMenu 진입은 스코프 밖(단일 팩 버튼 하나).
-//
-// 상태머신(STRUCTURE.md F-19 stateDiagram 기준):
-//   Idle → (팩 클릭·성공) → Stacking → (스택 소진) → Grid → Idle
-//   Stacking 중엔 재클릭 무시(재진입 차단). 실패는 상태 전이 없이 버튼 흔들림만.
-public class PackOpeningView : MonoBehaviour
+// 3D 팩 뜯기 개봉 뷰(도메인 G 재구성). 진입은 컨트롤러가 넘겨주는 OpenedPack(BeginOpen)뿐 —
+// 구매·packButton·부트는 이 뷰 밖(상점/부트/컨트롤러)의 책임이다(구 PackOpeningView의 구매부 제거).
+// 흐름: 3D 팩 등장 → 가로 드래그로 봉인 뜯기(PackTearHandle) → 카드 스택 → 드래그로 넘김 →
+//   소진되면 2×3 그리드로 전개 → OnOpenComplete 발화(컨트롤러가 획득 버튼 노출).
+// 스택/그리드/OnOpenComplete 로직은 구 PackOpeningView에서 그대로 이식했다(검증된 안전 패턴 유지).
+public class PackTearOpenView : MonoBehaviour
 {
-    [Header("팩")]
-    [Tooltip("이 뷰가 여는 고정 packId(CardShop의 CardPackData.PackId와 일치해야 함).")]
-    [SerializeField] string packId;
-    [SerializeField] Button packButton;             // 카드팩 구매 버튼
+    // 개봉 완료(그리드 배치 종료) 시 1회 발화. 컨트롤러가 구독해 획득 버튼을 노출한다.
+    public event Action OnOpenComplete;
+
+    [Header("3D 팩")]
+    [Tooltip("씬에 배치된 3D 팩 모델(CardPack.prefab 인스턴스)의 뜯기 핸들. BeginOpen에서 활성·ArmTear.")]
+    [SerializeField] PackTearHandle packHandle;
+    [Tooltip("팩 모델 루트(뜯김 후 스택 등장 시 숨김). 미배선이면 packHandle의 오브젝트를 쓴다.")]
+    [SerializeField] GameObject packRoot;
 
     [Header("카드 스택")]
     [SerializeField] Transform cardsContainer;      // 스택/그리드 카드가 놓일 컨테이너
@@ -35,22 +36,16 @@ public class PackOpeningView : MonoBehaviour
     [Tooltip("그리드에서 페이드인하는 시간(초).")]
     [SerializeField] float gridFadeDuration = 0.3f;
 
-    [Header("실패 피드백")]
-    [Tooltip("실패(잔액 부족 등) 시 팩 버튼 흔들림 시간(초).")]
-    [SerializeField] float failShakeDuration = 0.4f;
-
-    [Header("독립 실행 부트스트랩 (테스트 씬 전용)")]
-    [Tooltip("CardCatalog 미주입 독립 씬에서만 사용. 통합 시 IsReady 가드로 no-op(4번째 마스터목록 아님).")]
-    [SerializeField] CardShop fallbackShop;
-    [SerializeField] List<CardData> fallbackAllCards = new List<CardData>();
-
     // 그리드 열 수(고정 3열, 행은 ceil(count/3)로 유동).
     const int GRID_COLUMNS = 3;
 
-    enum EViewState { Idle, Stacking, Grid }
+    // Idle → PackShown(팩 등장·뜯기 대기) → Tearing(봉인 뜯김 확정 순간) → Stacking(넘김) → Grid.
+    enum EViewState { Idle, PackShown, Tearing, Stacking, Grid }
 
-    // 개봉/드래그 진행 중 재진입 차단용 상태(Stacking이면 재클릭 무시).
     EViewState m_state = EViewState.Idle;
+
+    // 이번 개봉 세션의 결과(뜯김 완료 시 이 카드로 스택 빌드). 재진입/중복 뜯기 가드에도 쓴다.
+    OpenedPack m_pending;
 
     // 이번 개봉으로 생성된 카드 뷰들(드로우 순서 = 인덱스 순서). 넘겨도 파괴하지 않고 그리드에서 재사용.
     readonly List<RevealCardView> m_cards = new List<RevealCardView>();
@@ -58,53 +53,70 @@ public class PackOpeningView : MonoBehaviour
     // 현재 스택 top(드래그 가능) 카드의 인덱스. 넘길 때마다 +1, count 도달 시 그리드로.
     int m_topIndex;
 
-    void Start()
-    {
-        EnsureBoot();
-        if (packButton != null) packButton.onClick.AddListener(OnPackClicked);
-    }
+    // ── 공개 API ──────────────────────────────────────────────
 
-    // 독립 실행 시 카탈로그/소유/재화/상점 부트를 보장. 이미 준비됐으면(통합) 아무것도 하지 않는다.
-    // 도감 CollectionGalleryController.EnsureBoot 선례를 따른다.
-    void EnsureBoot()
+    /// <summary>개봉 세션 시작: 3D 팩을 보이고 뜯기 대기(PackShown). 컨트롤러가 캐리어 결과로 호출.</summary>
+    public void BeginOpen(OpenedPack _opened)
     {
-        if (CardCatalog.IsReady) return;
-
-        DataSaveManager.Load();                 // 저장된 진행도·재화 로드
-        CardCatalog.SetSource(fallbackAllCards);
-        OwnershipManager.Init();
-        CurrencyManager.Init();                 // 저장된 골드로 잔액 맞춤
-        CardPackOpener.SetShop(fallbackShop);   // 상점 SO 주입(null이면 빈 상점 fallback)
-    }
-
-    // 팩 버튼 클릭 → 구매 시도 → 결과 분기.
-    void OnPackClicked()
-    {
-        // Idle이 아니면(스택/드래그 진행 중) 무시 — 재진입 차단(이중 구매 연출 방지).
+        // 이미 진행 중(재진입)이면 무시 — 중복 개봉/뜯기 연출 방지.
         if (m_state != EViewState.Idle) return;
-
-        var t_opened = CardPackOpener.TryPurchase(packId);
-
-        if (t_opened != null && t_opened.Success)
+        if (_opened == null || !_opened.Success)
         {
-            BuildStack(t_opened);
+            Debug.LogWarning("[PackTearOpenView] BeginOpen에 유효하지 않은 OpenedPack — 개봉 취소.");
+            return;
         }
-        else
-        {
-            // 실패(InsufficientGold/EmptyPool/PackNotFound/SpendFailed): 예외 던지지 않고 가벼운 피드백.
-            var t_result = t_opened != null ? t_opened.Result : EPackOpenResult.PackNotFound;
-            Debug.LogWarning($"[PackOpeningView] 개봉 실패 packId={packId}, result={t_result}");
-            PlayFailFeedback();
-        }
+
+        m_pending = _opened;
+        ClearSpawned();
+
+        ShowPack();
     }
 
-    // 성공 경로: 이전 카드 정리 → 뽑힌 카드 N장을 덱처럼 겹쳐 스택 배치 → 맨 위만 드래그 활성.
+    // ── 3D 팩 뜯기 단계 ───────────────────────────────────────
+
+    // 팩 모델을 보이고 뜯기 입력 대기. 뜯김 확정 콜백을 등록한다.
+    void ShowPack()
+    {
+        m_state = EViewState.PackShown;
+
+        var t_root = packRoot != null ? packRoot : (packHandle != null ? packHandle.gameObject : null);
+        if (t_root != null) t_root.SetActive(true);
+
+        if (packHandle == null)
+        {
+            // 팩 핸들 미배선: 뜯기 인터랙션 없이 바로 스택으로(소프트락 방지).
+            Debug.LogWarning("[PackTearOpenView] packHandle 미배선 → 뜯기 생략하고 바로 스택 진행.");
+            OnPackTorn();
+            return;
+        }
+
+        packHandle.SetTearCallback(OnPackTorn);
+        packHandle.ArmTear();
+    }
+
+    // 봉인 뜯김 확정 콜백. 팩을 숨기고 캐리어 카드로 스택을 빌드한다(1회 가드).
+    void OnPackTorn()
+    {
+        if (m_state != EViewState.PackShown) return;   // 중복 뜯기/오작동 방어.
+        m_state = EViewState.Tearing;
+
+        // 봉인 슬라이드 연출은 PackTearHandle이 자기 완결로 처리 중 — 팩 루트는 스택 등장과 함께 숨긴다.
+        var t_root = packRoot != null ? packRoot : (packHandle != null ? packHandle.gameObject : null);
+        if (t_root != null) t_root.SetActive(false);
+
+        BuildStack(m_pending);
+    }
+
+    // ── 스택/그리드(구 PackOpeningView 이식) ───────────────────
+
+    // 뽑힌 카드 N장을 덱처럼 겹쳐 스택 배치 → 맨 위만 드래그 활성.
     void BuildStack(OpenedPack _opened)
     {
         ClearSpawned();
 
-        var t_cards = _opened.Cards;
-        for (int t_i = 0; t_i < t_cards.Count; t_i++)
+        var t_cards = _opened != null ? _opened.Cards : null;
+        int t_count = t_cards != null ? t_cards.Count : 0;
+        for (int t_i = 0; t_i < t_count; t_i++)
         {
             if (cardPrefab == null || cardsContainer == null) break;
 
@@ -116,7 +128,15 @@ public class PackOpeningView : MonoBehaviour
         }
 
         m_topIndex = 0;
-        if (m_cards.Count == 0) { m_state = EViewState.Idle; return; }
+        if (m_cards.Count == 0)
+        {
+            // 구매는 이미 원자 처리(소유 부여·Save)됐으나 시각화할 카드가 없음(프리팹/컨테이너 미배선 등).
+            // 개봉은 성공했으므로 완료로 간주해 콜백을 발화한다 — 획득 버튼 대기 데드락 방지.
+            Debug.LogWarning("[PackTearOpenView] 개봉 성공했으나 표시할 카드가 없음(프리팹/컨테이너 배선 확인). 완료 처리.");
+            m_state = EViewState.Idle;
+            OnOpenComplete?.Invoke();
+            return;
+        }
 
         m_state = EViewState.Stacking;
         PlaceStack(false);   // 초기 배치는 즉시
@@ -194,24 +214,23 @@ public class PackOpeningView : MonoBehaviour
             t_card.FadeIn(gridFadeDuration);                    // 넘기며 사라졌던 카드 되살림
         }
 
-        // 그리드 연출이 끝날 때까지 Grid 유지(연출 중 재클릭 잠금) → 완료 후 Idle 복귀.
+        // 그리드 연출이 끝날 때까지 Grid 유지(연출 중 잠금) → 완료 후 Idle 복귀.
         StartCoroutine(CoGridToIdle());
     }
 
-    // 그리드 이동·페이드 연출 시간만큼 대기 후 Idle 복귀(다음 개봉 허용).
+    // 그리드 이동·페이드 연출 시간만큼 대기 후 Idle 복귀 + 완료 콜백.
     IEnumerator CoGridToIdle()
     {
         float t_wait = Mathf.Max(gridMoveDuration, gridFadeDuration);
         if (t_wait > 0f) yield return new WaitForSeconds(t_wait);
-        if (m_state == EViewState.Grid) m_state = EViewState.Idle;
-    }
 
-    // 실패 피드백: 팩 버튼 짧은 흔들림.
-    void PlayFailFeedback()
-    {
-        if (packButton == null) return;
-        packButton.transform.DOKill();
-        packButton.transform.DOShakePosition(failShakeDuration, new Vector3(12f, 0f, 0f));
+        // Grid에서만 완료로 인정 → Idle 전이. 이 가드가 개봉당 1회 발화를 보장한다.
+        // (OnDisable로 중간에 끊기면 코루틴이 죽어 발화하지 않음 = 개봉 미완료 취급.)
+        if (m_state == EViewState.Grid)
+        {
+            m_state = EViewState.Idle;
+            OnOpenComplete?.Invoke();   // 컨트롤러가 여기서 획득 버튼 노출
+        }
     }
 
     // 이전 개봉 카드 정리(파괴 + 트윈 정리).
@@ -234,12 +253,6 @@ public class PackOpeningView : MonoBehaviour
             if (m_cards[t_i] == null) continue;
             m_cards[t_i].SetDraggable(false);
             m_cards[t_i].KillAllTweens();
-        }
-
-        if (packButton != null)
-        {
-            packButton.transform.DOKill();
-            packButton.interactable = true;
         }
 
         m_state = EViewState.Idle;

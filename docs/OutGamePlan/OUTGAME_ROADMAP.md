@@ -46,6 +46,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 | **D** ✅ | 전투 보상 브리지 | 전투 종료 시 남은 카드 수 → `RewardService`로 직접 골드 지급 | battle-engineer + outgame-engineer |
 | **E** | 카드팩 경제 | 팩 정의 · 구매(골드 차감) · 드로우 → 소유 부여 | outgame-engineer |
 | **F** | 아웃게임 UI | 골드 HUD · 도감 갤러리 · 상점 · 덱빌더 소유 필터 | UI(배선 문서화) |
+| **G** | 신규 유저 온보딩 | 첫실행 감지(소유==0) → 스타터팩(6장) 개봉 → 튜토리얼 전투 직행 라우팅 | outgame-engineer + UI (+battle-engineer 선택) |
 
 > 랭크(엔드포인트)는 별도 도메인 없이 문서 표기만 — 향후 서버 권위 전환(ARCHITECTURE §10 리스크①)과 함께 기획.
 
@@ -73,7 +74,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 
 ### D. 전투 보상 브리지 (경계 교차) — ✅ 구현 완료
 
-> **최종 구조(구현됨)**: 초기 계획의 "중립 캐리어(BattleResult) → 로비 소비" 우회 레이어는 **폐기**. 소비자가 보상 지급 하나뿐이라 캐리어·씬간 전달·로비 소비가 순수 오버헤드였고, `CurrencyManager`는 메타 진행이 아니라 **범용 재화 매니저**라 전투가 직접 참조해도 방향상 문제없음(선례: `DeckConfig`→`DeckSaveManager`). 그래서 전투 종료 시점에 `RewardService.GrantBattleReward(...)`로 **직접 지급**한다. 트레이드오프: 전투 엔진이 "보상"을 알게 됨 → 보상 없는 전투(튜토리얼 등) 필요 시 분기 필요(현재 계획 없음).
+> **최종 구조(구현됨)**: 초기 계획의 "중립 캐리어(BattleResult) → 로비 소비" 우회 레이어는 **폐기**. 소비자가 보상 지급 하나뿐이라 캐리어·씬간 전달·로비 소비가 순수 오버헤드였고, `CurrencyManager`는 메타 진행이 아니라 **범용 재화 매니저**라 전투가 직접 참조해도 방향상 문제없음(선례: `DeckConfig`→`DeckSaveManager`). 그래서 전투 종료 시점에 `RewardService.GrantBattleReward(...)`로 **직접 지급**한다. 트레이드오프: 전투 엔진이 "보상"을 알게 됨 → 보상 없는 전투(튜토리얼 등) 필요 시 분기 필요(→ G-보상분기에서 대응, 선택·후속).
 
 - **D-11 (battle) 결과 산출·지급 트리거**: `TurnRunner`의 4개 승패 확정 지점(`CheckGameOver()` 승/패, `HandlePlayerLeft()`, `HandleOpponentLeftDuringInit()`)에서 헬퍼 `CaptureResult(bool won)` 호출. 인스턴스 플래그 `resultCaptured`로 **전투당 1회 보장**(이탈-부전승 등 후속 콜백이 결과를 덮어쓰는 레이스 차단). 남은 카드 수 = `playerField.GetActiveCards().Count + playerField.WaitingCount`(항상 로컬=나, 모드 분기 없음). 멀티에서도 각 클라가 자기 로컬 값으로 자기 `CurrencyManager`에 지급 → RPC 불필요, 결정론 무관.
 - **D-12 (신규 `Assets/Scripts/Reward/`)**: `RewardService`(static 파사드 + SO fallback, `GameTiming` 관용구) — `GrantBattleReward(bool won, int remainingCards)` : 환산 → `CurrencyManager.Earn(Gold)` → `Save()`(즉시 영속) → 지급액 반환(F-20 팝업용). `RewardConfig`(SO): `goldPerCard`/`winBonus`/`lossBonus`/`minGold`/`maxGold`. 환산식 `clamp(remainingCards*goldPerCard + (won?winBonus:lossBonus), minGold, maxGold)` — **하한=minGold floor**(패배·소액도 최소 보장). ※ `SetConfig` 배선은 미완 → 코드 기본값 fallback 동작(프리팹/씬 배선은 F/튜닝 단계로 이월).
@@ -93,6 +94,22 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 - **F-20 전투 보상 팝업**: 로비 진입 시 획득 골드 연출.
 - **F-21 덱빌더 소유 필터**: `DeckBuilderUI.InitializeSlots`를 소유 카드만/미소유 비활성으로 필터.
 - **F-22 배선 문서**: 신규 프리팹 목록 + Addressable `UIPrefab` 라벨 등록 + `MainMenuManager` 진입 버튼 위치.
+
+### G. 신규 유저 온보딩 (첫 게임 흐름)
+
+> 목표 루프의 **진입부**: 신규 유저가 로비를 보기 전에 스타터 카드 6장을 획득하고 첫 전투(튜토리얼)를 경험하게 한다.
+> 핵심 성질: **G도 자체 세이브가 없다.** 첫실행 판정을 `OwnershipManager.OwnedCount==0`으로 하고, 스타터팩은 기존 E 파이프라인(구매=즉시개봉)을 price=0으로 재사용한다. → 소유 6장이 채워지면 다음 부트부터 자동으로 로비 직행.
+> 기존 자산 재사용: 개봉 뷰 `PackOpeningView`/`RevealCardView`(F-19), 획득·영속 `CardPackOpener`→`OwnershipManager.Grant`(E), 첫 전투 `TutorialConfig`(Battle).
+> ⚠️ 이 도메인은 동결 계약 2개(**소유 API의 GrantDefaults 동작**, **부트 진입 순서**)를 바꾸므로 그 둘은 🔴 순차 게이트로 먼저 동결한다(BOARD 참조).
+
+- **G-23 소유 기본지급 제거(계약 변경)**: `OwnershipManager.GrantDefaults()`의 카탈로그 전체 자동지급을 제거 → 신규 유저 소유 0. `Init` 경로에서 호출 차단/no-op. 판정 기준 `OwnedCount==0` 확립. 소비처(도감·덱빌더 소유필터) 회귀 확인.
+- **G-24 로비 첫실행 리다이렉트(BootScene 없음)**: 앱은 기존대로 `LobbyScene`(index 0) 직행. 로비 상주 `LobbyFirstRunRedirect.Start`(MainMenuInitializer.Awake[-100] 주입 후)가 `HasAnyOwnedSaved()==false`면 `TryPurchase(starter)`→캐리어→`LoadScene("PackTest")`(실패 시 로비 유지). 상점→팩 전환과 동일 경로를 첫실행이 자동으로 탄다.
+- **G-25 스타터팩 정의**: `CardPackData`(SO) 재사용 — `price=0`·`drawCount=6`·`pool`=기본 6장. `StarterPack.asset` 생성(에디터). packId ↔ 온보딩 뷰 정합.
+- **G-26 개봉 화면(3D 팩 뜯기)**: 공용 팩 오픈 씬 `PackTest.unity`(상점 개봉과 공유). 구매는 **뷰 밖**(상점/부트)에서 끝나고 결과를 캐리어 `PackHandoff`로 전달 → `PackTearOpenView`가 3D `CardPack.prefab` 등장 → **가로 드래그로 SealStrip 뜯기**(`PackTearHandle`) → 스택→넘김→2×3 그리드(구 로직 이식) → `OnOpenComplete`. 순수 뷰(구매·소유 미참조).
+- **G-27 구매 캐리어 + [획득] 목적지**: `PackHandoff`(static, Pack·NextScene·StartTutorial) — 구매한 쪽이 "이 팩 열고 획득 후 이 씬으로(+튜토리얼)"를 실어 전달. `PackAcquireController` — 캐리어 소비→`BeginOpen`, `OnOpenComplete`시 **[획득] 버튼** 노출, 클릭 시 `StartTutorial`이면 `TutorialConfig.Begin(scenario)` 후 `NextScene` 이동. **첫시작 재판정 없이 캐리어 값으로만 분기**(구 `FirstStartBattleRedirect` 폐기). `BootRouter` 첫시작 분기가 `TryPurchase(starterPackId)`→캐리어 세팅(Battle+튜토리얼)→PackTest 로드(실패 시 로비 fallback). 전투 종료 후 `GameResultPopup`가 `LobbyScene` 복귀.
+- **G-보상분기(선택, 경계 교차)**: D-11 노트대로 전투 종료 시 `RewardService.GrantBattleReward`가 무조건 지급 → 튜토리얼 전투도 골드 발생. 미지급이 목표면 `TurnRunner.CaptureResult`/`RewardService`에 `TutorialConfig.IsActive` 가드 1개(**battle-engineer**). 우선순위 낮음(지급 허용해도 무해) → 후속 분리 가능.
+
+> **세이브 스키마 불변(권장)**: 판정을 `OwnedCount==0`으로 하므로 `UserSaveData` 변경 없음. **엣지**: 개봉(6장 영속) 후 전투 전 종료 시 다음 부트는 로비 직행(튜토리얼 전투 미경험) — 허용 동작. 전투까지 보장하려면 후속으로 `tutorialBattleDone` 플래그(필드 추가만).
 
 ---
 

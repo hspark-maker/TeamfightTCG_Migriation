@@ -7,7 +7,7 @@ using UnityEngine;
 // CardView.prefab(전투 카드) 복사본에서 카드 표현 요소만 남긴 프리팹 기준 — uGUI가 아니라
 // 아트=SpriteRenderer(Illustration), 이름/체력=TextMeshPro(월드, MeshRenderer 기반).
 // 드래그 입력도 월드 방식: 프리팹에 BoxCollider2D가 있어 OnMouse* 콜백이 마우스/터치로 매핑된다.
-// 순수 뷰 — 세이브·소유 갱신 없음. PackOpeningView가 이미 획득된 DrawnCard를 넘겨주면 표시만 하고,
+// 순수 뷰 — 세이브·소유 갱신 없음. PackTearOpenView가 이미 획득된 DrawnCard를 넘겨주면 표시만 하고,
 // 스택 겹침(SetSortingOrder)·드래그 넘김(OnMouse*)·페이드/이동을 자기 완결적으로 처리한다.
 // (바인딩값 정본: fullImage/displayName/maxHp)
 public class RevealCardView : MonoBehaviour
@@ -37,13 +37,13 @@ public class RevealCardView : MonoBehaviour
     int[] m_baseOrders;     // 카드 내부의 원래 sortingOrder(아트↔텍스트 앞뒤 관계 보존용)
 
     // 드래그 상태.
-    bool m_draggable;                 // 맨 위 카드만 true(PackOpeningView가 SetDraggable로 지정)
+    bool m_draggable;                 // 맨 위 카드만 true(PackTearOpenView가 SetDraggable로 지정)
     bool m_dragging;                  // OnMouseDown~Up 사이
     float m_dragDepth;                // ScreenToWorldPoint용 깊이(카드 평면까지 스크린 z), OnMouseDown에서 고정
     Vector3 m_pointerStartWorld;      // 드래그 시작 시 포인터 월드 좌표
     Vector3 m_dragStartLocalPos;      // 드래그 시작 시 카드 로컬 좌표(복귀 목표)
     Vector3 m_homeLocalPos;           // 스택/그리드 슬롯 좌표(MoveTo가 갱신). 드래그 기준·복귀 목표.
-    Action<RevealCardView> m_onSwiped;// 넘김 확정 콜백(PackOpeningView가 다음 top 활성)
+    Action<RevealCardView> m_onSwiped;// 넘김 확정 콜백(PackTearOpenView가 다음 top 활성)
 
     void Awake()
     {
@@ -65,7 +65,7 @@ public class RevealCardView : MonoBehaviour
 
     // 카드 1장 공개(데이터 바인딩만). _isNew=신규 여부, _refund=중복 시 환급된 Gold(신규면 0).
     // 재화·소유는 이미 TryPurchase가 영속화했으므로 여기선 표시만 한다(이중 처리 금지).
-    // 스택 배치·드래그 활성·정렬은 PackOpeningView가 이어서 지정한다.
+    // 스택 배치·드래그 활성·정렬은 PackTearOpenView가 이어서 지정한다.
     public void Reveal(CardData _card, bool _isNew, long _refund)
     {
         // 아트 바인딩(스프라이트 없으면 렌더러 비활성으로 빈칸 방지).
@@ -103,7 +103,7 @@ public class RevealCardView : MonoBehaviour
         SetAlphaImmediate(1f);
     }
 
-    // ── PackOpeningView가 지시하는 인터랙션 API ────────────────────────────
+    // ── PackTearOpenView가 지시하는 인터랙션 API ────────────────────────────
 
     // 맨 위 카드만 true. false면 OnMouse 입력을 무시하고 진행 중 드래그도 취소(홈으로 즉시 리셋 — 잔상 방지).
     public void SetDraggable(bool _on)

@@ -7,5 +7,8 @@ using System.Collections.Generic;
 public class OwnershipSaveData
 {
     public List<string> ownedCardKeys = new List<string>();
-    public bool defaultsGranted = false;   // 최초 1회 기본 지급 완료 플래그
+
+    // [G-23 이후 미사용] 과거 최초 1회 전체 기본지급 완료 플래그. 신규 유저 소유 0 정책으로 자동지급을 제거했다.
+    // 하위호환을 위해 필드는 유지(삭제·리네임 금지) — 구 세이브가 이 키를 갖고 있어도 크래시 없이 읽힌다.
+    public bool defaultsGranted = false;
 }

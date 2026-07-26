@@ -58,7 +58,9 @@
       "Bash(grep *)",
       "Read(//c/Harbor/claude-personal/TeamfightTCG_Migriation/skills/outgame-design-session/**)",
       "Read(//c/Harbor/claude-personal/TeamfightTCG_Migriation/skills/outgame-visual-recap/**)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "mcp__unity-mcp__Unity_SceneView_CaptureMultiAngleSceneView",
+      "Bash(echo \"--- exit: $? \\(empty = missing asset\\) ---\")"
     ]
   },
   "enabledMcpjsonServers": [
