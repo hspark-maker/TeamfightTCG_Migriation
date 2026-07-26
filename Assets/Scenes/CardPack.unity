@@ -746,6 +746,7 @@ GameObject:
   - component: {fileID: 1717812448}
   - component: {fileID: 1717812449}
   - component: {fileID: 1717812450}
+  - component: {fileID: 1717812451}
   m_Layer: 0
   m_Name: PackOpenDirector
   m_TagString: Untagged
@@ -801,6 +802,22 @@ MonoBehaviour:
   cardGrid: {fileID: 2001865976}
   cardPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
   panelFadeDuration: 0.35
+--- !u!114 &1717812451
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717812446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f3c1d2e4b5a6c7d8e9f0a1b2c3d4e5f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PackStandaloneBoot
+  dummyPack: {fileID: 11400000, guid: 8f37683e21484b14baba7c0a0eea43a2, type: 2}
+  dummyCards: []
+  nextScene:
+  startTutorial: 0
 --- !u!1 &1803048085
 GameObject:
   m_ObjectHideFlags: 0

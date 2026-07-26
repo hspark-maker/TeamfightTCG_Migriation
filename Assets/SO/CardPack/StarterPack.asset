@@ -15,7 +15,7 @@ MonoBehaviour:
   packId: StarterPack
   displayName: "\uC2A4\uD0C0\uD130\uD329"
   price: 0
-  drawCount: 6
+  drawCount: 3
   pool:
   - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
