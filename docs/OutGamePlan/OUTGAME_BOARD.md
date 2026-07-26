@@ -82,8 +82,8 @@
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
-| **PKG-STARTER-PACK** | 스타터팩 정의 + 개봉 흐름(3D 뜯기) | `CardPackOpener`(팩 API)·`CardPack.prefab` | 신규 `UI/Shop/PackTearOpenView.cs`·`PackTearHandle.cs`·`OutGame/CardPack/PackHandoff.cs` + `StarterPack.asset`·씬배선(사용자) | PKG-ONBOARD-BOOT | outgame-engineer+UI | ✅ 완료(검수·에셋/씬/컴파일 대기) |
-| **PKG-FIRSTBATTLE** | 구매→캐리어→PackTest·[획득]→목적지 이동 | `PackHandoff`·`TutorialConfig.Begin`·`CardPackOpener` | 신규 `UI/Shop/PackAcquireController.cs` + `Core/BootRouter.cs`(첫시작 구매→캐리어) + `PackTest.unity`·`CardPack.prefab` 배선(사용자) | PKG-STARTER-PACK | UI+outgame | ✅ 완료(코드·검수 중·씬/컴파일 대기) |
+| **PKG-STARTER-PACK** | 스타터팩 정의 + 개봉 흐름(클릭 1회, G-28에서 3D 뜯기 폐기) | `CardPackOpener`(팩 API)·`CardPack.prefab` | `UI/Shop/PackRevealView.cs`·`PackClickHandle.cs`·`OutGame/CardPack/PackHandoff.cs` + `StarterPack.asset` + `CardPack.unity`·`CardPack.prefab` 배선 | PKG-ONBOARD-BOOT | outgame-engineer+UI | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
+| **PKG-FIRSTBATTLE** | 구매→캐리어→CardPack 씬·[획득]→덱 슬롯0 저장→목적지 이동 | `PackHandoff`·`DeckSaveManager`·`DeckConfig`·`TutorialConfig.Begin` | `UI/Shop/PackAcquireController.cs` + `UI/Lobby/LobbyFirstRunRedirect.cs`(첫시작 구매→캐리어) + `CardPack.unity` 배선 | PKG-STARTER-PACK | UI+outgame | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
 
 | **PKG-TUT-REWARD** (선택·후속) | 튜토리얼 전투 보상 미지급 가드 | `TutorialConfig.IsActive` | `Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | PKG-FIRSTBATTLE | battle-engineer | ⬜ 보류(선택) |
 

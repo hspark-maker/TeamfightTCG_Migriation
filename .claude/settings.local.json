@@ -60,7 +60,14 @@
       "Read(//c/Harbor/claude-personal/TeamfightTCG_Migriation/skills/outgame-visual-recap/**)",
       "Bash(echo \"exit=$?\")",
       "mcp__unity-mcp__Unity_SceneView_CaptureMultiAngleSceneView",
-      "Bash(echo \"--- exit: $? \\(empty = missing asset\\) ---\")"
+      "Bash(echo \"--- exit: $? \\(empty = missing asset\\) ---\")",
+      "Bash(:)",
+      "Bash(awk '/m_OnClick/{found=NR} {lines[NR]=$0} END{for\\(i=found-32;i<=found+8;i++\\) print i\": \"lines[i]}' \"Assets/Assets/Prefabs/UI/CardElement.prefab\")",
+      "Bash(awk 'NR>=616 && /^\\\\| |^---|^#/{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
+      "Bash(awk 'NR>=604 && NR<=616{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
+      "Bash(awk 'NR>=672 && NR<=684{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
+      "Bash(awk 'NR>=31 && NR<=40{print NR\": \"substr\\($0,1,120\\)}' docs/OutGamePlan/STRUCTURE.md)",
+      "Bash(awk 'NR==34{print substr\\($0,1,90\\)} NR==35{print \"next: \"substr\\($0,1,60\\)}' docs/OutGamePlan/STRUCTURE.md)"
     ]
   },
   "enabledMcpjsonServers": [

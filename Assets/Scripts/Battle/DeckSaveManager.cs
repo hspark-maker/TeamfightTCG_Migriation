@@ -71,6 +71,40 @@ public static class DeckSaveManager
         File.WriteAllText(SavePath, JsonUtility.ToJson(t_data));
     }
 
+    // 슬롯 하나만 파일에 반영한다(나머지 슬롯은 디스크 값 보존).
+    // SaveToFile은 메모리 6슬롯을 통째로 flush하므로, LoadFromFile을 거치지 않은 씬에서 호출하면
+    // 로드 안 된 슬롯이 빈 값으로 영속돼 기존 덱이 사라진다. 부트 미경유 경로는 이 API를 쓸 것.
+    public static void SaveSlotToFile(int _index, IEnumerable<CardData> _deck)
+    {
+        if (_index < 0 || _index >= SLOT_COUNT) return;
+
+        Save(_index, _deck);
+
+        var t_data = ReadFileOrEmpty();
+        t_data.slots[_index] = new SlotData
+        {
+            slotName = names[_index] ?? "",
+            cards    = slots[_index]?.Select(c => c != null ? c.name : "").ToArray() ?? new string[0],
+        };
+        File.WriteAllText(SavePath, JsonUtility.ToJson(t_data));
+    }
+
+    // 디스크 세이브를 SLOT_COUNT 길이로 정규화해 읽는다(없거나 깨졌으면 빈 슬롯). 겹치는 슬롯은 보존.
+    static SaveData ReadFileOrEmpty()
+    {
+        SaveData t_read = null;
+        if (File.Exists(SavePath))
+            t_read = JsonUtility.FromJson<SaveData>(File.ReadAllText(SavePath));
+
+        var t_data = new SaveData();
+        for (int i = 0; i < SLOT_COUNT; i++)
+        {
+            var t_src = t_read?.slots != null && i < t_read.slots.Length ? t_read.slots[i] : null;
+            t_data.slots[i] = t_src ?? new SlotData { slotName = "", cards = new string[0] };
+        }
+        return t_data;
+    }
+
     public static void LoadFromFile()
     {
         if (!File.Exists(SavePath)) return;

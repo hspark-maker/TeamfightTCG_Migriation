@@ -31,6 +31,7 @@
 | 2026-07-27 | **G 진입 = BootScene 제거 + 로비 첫실행 리다이렉트 (✅ 코드, 컴파일 대기)** — 사용자 결정: 별도 `BootScene`/`BootRouter` 폐기. 앱은 기존대로 `LobbyScene`(index0) 직행하고, 로비 상주 신규 `UI/Lobby/LobbyFirstRunRedirect`가 `Start`(MainMenuInitializer.Awake[-100] 주입 후)에서 `HasAnyOwnedSaved()==false`면 `TryPurchase(starterPackId)`→`PackHandoff.Set(opened, "BattleScene", true)`→`LoadScene("PackTest")`, 실패 시 로비 유지. 상점→팩 전환과 동일 경로를 첫실행이 자동으로 탄다. Build Settings에 BootScene 불필요(PackTest/BattleScene만 등록). 잔여 엣지(획득 전 종료 시 튜토리얼 스킵)는 현행 유지 | ✅(코드) |
 | 2026-07-27 | **G 카드팩 오픈 3D 뜯기 재구성 (✅ 코드+검수, 씬/컴파일 대기)** — 사용자 결정: `PackOpeningView`(팩버튼 구매) 폐기, **구매를 뷰 밖으로**(상점/`BootRouter`가 `TryPurchase` 후 static 캐리어 `PackHandoff`(Pack·NextScene·StartTutorial)로 전달), 앞단을 **3D `CardPack.prefab` 가로 드래그 봉인뜯기**로 교체. 신규 4: `PackHandoff`(OutGame/CardPack), `PackTearOpenView`(뜯기→스택→그리드, 구 꼬리 이식), `PackTearHandle`(SealStrip 월드드래그), `PackAcquireController`(캐리어 소비·획득버튼·목적지 이동). `BootRouter` 첫시작 분기가 스타터 구매→캐리어→PackTest(실패 시 로비 fallback). 목적지·튜토리얼이 캐리어에 실려 **첫시작 재판정 불필요 → `FirstStartBattleRedirect`·`PackOpenSceneController` 폐기**. 삭제 3파일 GUID 전수검색 참조 0. `RevealCardView` 재사용. tcg-reviewer 검수 진행. **씬 배선(CardPack에 PackTearHandle·MainCamera 태그)·Unity 컴파일은 사용자** | ✅(코드) |
 | 2026-07-27 | **G-25/26/27 온보딩 흐름 (✅ 코드+검수, 씬/컴파일 대기) — 흐름 재설계 반영** [※ 아래 항목은 위 3D 뜯기 재구성으로 대체됨] — 사용자 결정: 공용 팩 오픈 씬 `PackTest.unity` 재사용(상점 개봉 = 첫시작 온보딩 공유), 개봉 후 **[획득] 버튼** 클릭 게이트, **일반=로비 고정 / 첫시작=튜토리얼 전투** 분기. 구현: `PackOpeningView.OnOpenComplete`(빈개봉도 발화=데드락 방어), 신규 `UI/Shop/PackOpenSceneController`(획득버튼 게이트·[획득]→`DestinationScene`(기본 로비)·`BeforeLeave` 훅, **Battle 미참조 순수 UI**), 신규 `UI/Onboarding/FirstStartBattleRedirect`(`[RequireComponent]`, 첫시작만 `HasAnyOwnedSaved()`로 판정해 목적지→배틀+`TutorialConfig.Begin`, scenario null이면 로비 fallback). 첫시작 판정은 **개봉 전 Start**에 캡처. tcg-reviewer 2라운드: 경계·타이밍·중복전이 무결, 미배선 소프트락 warn 2건 수정(경고 로그·scenario null 로비 fallback). ~~FirstTimeOnboardingController~~ 폐기(2컴포넌트로 분리). 씬 배선·Unity 컴파일은 사용자 인계 | ✅(코드) |
+| 2026-07-27 | **G-28 개봉 연출 단순화 (✅ 코드+검수+씬배선+컴파일 완료, Play 검증 대기)** — 사용자 결정: 드래그 뜯기·카드별 스와이프 스택 전면 폐기. **3D 팩 클릭 1회 → 팩 숨김 → UI 패널(CanvasGroup) fade in → fade 완료 후 3열 GridLayoutGroup 배치 → [획득] → 덱 슬롯0 저장 → 목적지 씬**. 삭제 4: `PackTearOpenView`·`PackTearHandle`·`RevealCardView`·`RevealCardView.prefab`(GUID 잔존 참조 0). 신규 2: `PackRevealView`(Idle→PackShown→Revealing→Done), `PackClickHandle`(OnMouseUpAsButton·Arm/Disarm). 카드 표시는 도감 타일 `CollectionCardView` 재사용(표시 진실원 1개), 3열 좌표 계산은 GridLayoutGroup에 이임. **공유 계약 추가: `DeckSaveManager.SaveSlotToFile(index, deck)`** — 기존 `SaveToFile`은 6슬롯을 통째로 flush해서 `LoadFromFile` 미경유 씬(개봉 씬)에서 다른 덱을 지우므로, 단일 슬롯만 반영하는 비파괴 API로 교체. tcg-reviewer critical 2건(파괴적 전슬롯 flush) → 수정, warn(`m_left` 소프트록·DOTween OnComplete 생존·scenario 미배선) → 수정. 씬 배선 완료(UICanvas/RevealPanel/CardGrid/AcquireButton/EventSystem 신설, CardStackPos·SealStrip 제거, Missing 0·미배선 0). 레이아웃 수치 검증: 420×560 셀 3열×2행, 획득 버튼 비겹침. Play E2E는 사용자 | ✅ |
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -396,95 +397,7 @@ sequenceDiagram
 
 ---
 
-### F-19 카드팩 개봉 루프 (F. UI) — ✅ 구현 완료 (프리팹/씬 배선 사용자 인계)
 
-> **스코프(최종)**: 상점 목록·독립 씬·MainMenu 통합 진입 전부 제외. 핵심 루프 하나만 —
-> **카드팩 클릭(구매) → 개봉 연출 + 카드 순차 등장 → 카드 획득**.
-> **F-19는 순수 뷰**(세이브 없음): E `CardPackOpener`를 소비. 로직은 E가 원자적으로 끝내고, 뷰는 연출만. `:::new` = 이번 신규.
-> 결정: 단일 카드팩 버튼(고정 packId) / `PackOpeningView`에 옵션 `EnsureBoot` 내장(아무 씬에서 테스트, 통합 시 no-op).
-
-```mermaid
-flowchart TD
-    subgraph view["F-19 개봉 루프 (씬 상주 뷰)"]
-        POV["PackOpeningView<br/>팩 버튼 클릭·개봉/등장 연출 오케스트레이션<br/>(+옵션 EnsureBoot)"]:::new
-        RCV["RevealCardView<br/>카드 1장 등장 애니·신규/중복 뱃지"]:::new
-    end
-    subgraph fb["옵션 부트 (도감 EnsureBoot 선례)"]
-        FB["fallbackShop / fallbackAllCards<br/>(SerializeField)"]:::new
-    end
-    OPENER["CardPackOpener (E)<br/>SetShop · TryPurchase"]
-    CARD["CollectionCardView 패턴 참고<br/>portrait=fullImage · name=displayName"]
-
-    FB -.->|"IsReady false시 SetShop/SetSource"| POV
-    POV -->|"팩 클릭 → TryPurchase(packId)"| OPENER
-    OPENER -->|"OpenedPack{cards,refund} (차감·드로우·소유 완료)"| POV
-    POV -->|"카드마다 순차 Reveal(card, isNew)"| RCV
-    RCV -.->|"바인딩 관용구 차용"| CARD
-
-    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
-```
-
-**흐름 — 개봉 인터랙션 3단계 (스택→드래그 넘김→2×3 그리드)**
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Stack : 팩 클릭 → TryPurchase 성공\n(카드 N장을 덱처럼 겹쳐 스택)
-    Idle --> Idle : 실패(InsufficientGold 등)\n버튼 흔들림
-    Stack --> Stack : 맨 위 카드 드래그\nthreshold 미달 → 원위치 복귀
-    Stack --> Flip : 맨 위 카드 드래그\nthreshold 넘김 → 페이드아웃\n다음 카드 top
-    Flip --> Stack : 남은 카드 있음
-    Flip --> Grid : 스택 소진\n전체 카드 2×3(3열) 재배치·페이드인
-    Grid --> [*]
-```
-
-```mermaid
-sequenceDiagram
-    participant U as 유저
-    participant POV as PackOpeningView
-    participant OP as CardPackOpener
-    participant RCV as RevealCardView
-
-    U->>POV: 카드팩 버튼 클릭
-    POV->>OP: TryPurchase(packId)
-    OP-->>POV: OpenedPack{cards, refund}  (구매·소유부여 완료)
-    alt Success
-        POV->>RCV: N장 생성·스택 배치(offset+sortingOrder), 맨 위만 드래그 활성
-        loop 스택 소진까지
-            U->>RCV: 맨 위 카드 드래그(OnMouseDrag, 월드)
-            alt threshold 넘김
-                RCV->>RCV: 페이드아웃(SpriteRenderer/TMP DOFade)
-                RCV-->>POV: 넘김 콜백 → 다음 카드 top 활성
-            else 미달
-                RCV->>RCV: 원위치 복귀
-            end
-        end
-        POV->>RCV: 전체 2×3(3열) 그리드 위치로 이동·페이드인
-    else 실패
-        POV->>U: 버튼 흔들림 피드백
-    end
-```
-
-**설계 요지 (원리 카드)**
-- **로직은 E, 뷰는 연출만**: `TryPurchase`가 차감·드로우·소유부여를 원자적으로 끝냄 → 뷰는 "이미 획득한" `OpenedPack.Cards`를 인터랙션으로 공개할 뿐. 연출·데이터가 분리돼 정합 안전(연출 중단돼도 데이터 정상, 그리드에서 카드 파괴 안 함).
-- **상태머신 3단계(Idle→Stacking→Grid→Idle)로 재진입 차단**: `PackOpeningView.m_state`가 Idle일 때만 개봉 허용. Stacking(드래그 진행) 중 재클릭 무시. 그리드 배치 시작과 동시에 Idle 복귀 → 다음 클릭이 `ClearSpawned`로 그리드 정리.
-- **월드 드래그(uGUI 아님)**: 카드는 SpriteRenderer+BoxCollider2D라 `OnMouseDown/Drag/Up` + `Camera.main.ScreenToWorldPoint`로 넘김. 시작점 대비 월드 이동거리가 `dragThreshold` 이상이면 페이드아웃+콜백, 미만이면 `DOLocalMove` 원위치. 맨 위 카드만 `SetDraggable(true)`.
-- **스택 겹침 = sortingOrder 밴드**: `SetSortingOrder(rank)`가 카드마다 `rank*밴드 + 내부 baseOrder`로 정렬 → 카드끼리 렌더 순서 섞임 방지, 카드 내부 아트↔텍스트 앞뒤 관계는 baseOrder로 보존. 페이드는 자식 SpriteRenderer/TMP 전체 `DOFade`(CardAnimator.FadeView 관용구).
-- **팝업 풀링 미사용**: 단일 루프라 씬 상주 뷰가 더 단순(`PooledUIBase`/`UIPrefab` 라벨 불필요).
-- **옵션 EnsureBoot**: 도감 `CollectionGalleryController.EnsureBoot` 선례 — `CardCatalog.IsReady` false일 때만 `Load`·`SetSource(fallbackAllCards)`·`Init`·`SetShop(fallbackShop)`. 통합 시 no-op.
-- **수정 가능성 높은 지점**: 스택 오프셋·그리드 간격·연출 타이밍 `PackOpeningView.cs`(SerializeField) / 드래그 threshold·복귀·페이드 `RevealCardView.cs`(SerializeField) / 그리드 정렬 수식 `PackOpeningView.LayoutGrid`.
-
-| 클래스 | 파일 | 책임 | 태스크 |
-|---|---|---|---|
-| `PackOpeningView` (MonoBehaviour) ✅ | `Assets/Scripts/UI/Shop/PackOpeningView.cs` | 팩 클릭·구매·상태머신(스택 배치/넘김 오케스트레이션/그리드)·옵션 EnsureBoot | F-19 |
-| `RevealCardView` (MonoBehaviour) ✅ | `Assets/Scripts/UI/Shop/RevealCardView.cs` | 카드 1장: 데이터 바인딩·월드 드래그 넘김·페이드/이동·sortingOrder 겹침 | F-19 |
-
-**프리팹/씬 배선 (문서화 → 실배선 사용자/메인)**
-- `PackOpeningView` 부착 오브젝트: `packButton`(Button) + `cardsContainer`(Transform, 스택/그리드 부모) + `cardPrefab`(RevealCardView) + 튜닝값(`stackOffset`/`gridCellSize`/각 duration) + 옵션 부트(`fallbackShop`/`fallbackAllCards`).
-- `RevealCardView` 카드 프리팹 필수: **`BoxCollider2D`**(월드 드래그 피킹) + `illustration`(SpriteRenderer)·`nameText`/`hpText`/`refundText`(월드 TMP_Text)·`newBadge`/`dupBadge`(GameObject) + `dragThreshold`/`swipeFadeDuration`/`returnDuration`.
-- **페이드 대상은 코드가 자동 수집**(자식 전체 SpriteRenderer/TMP_Text) — 필드 배선 불필요, 카드 프리팹 하위에 두기만 하면 됨. sortingOrder도 자식 전체 Renderer에 적용.
-- `cardsContainer`는 **직교 카메라 평면(z 고정) 하위**에 두고 카드 프리팹에 BoxCollider2D가 있어야 `OnMouse*`가 동작(누락 시 컴파일 통과·드래그 무반응).
-- 팝업 풀링 미사용이라 `UIPrefab` 라벨 **불필요**(씬 상주).
 
 > ~~상점 목록(ShopController/ShopPackTileView)·독립 씬·MainMenu 통합 진입~~ — **이번 스코프 전부 제외, 후속.**
 
@@ -599,13 +512,87 @@ sequenceDiagram
 | `LobbyFirstRunRedirect` (로비 상주·첫시작 구매→캐리어→PackTest) | 신규 `Assets/Scripts/UI/Lobby/LobbyFirstRunRedirect.cs` | G-24 ✅ |
 | ~~BootScene / BootRouter~~ | **폐기** — BootScene 없이 LobbyScene(index0) 직행 + 로비 리다이렉트 | — |
 | `PackHandoff` (static 캐리어) | 신규 `Assets/Scripts/OutGame/CardPack/PackHandoff.cs` | G-27 ✅ |
-| `PackTearOpenView` (팩 등장·뜯기·스택·그리드·완료콜백) | 신규 `Assets/Scripts/UI/Shop/PackTearOpenView.cs` | G-26/27 ✅ |
-| `PackTearHandle` (3D 가로드래그 봉인뜯기) | 신규 `Assets/Scripts/UI/Shop/PackTearHandle.cs` | G-27 ✅ |
-| `PackAcquireController` (캐리어 소비·획득버튼·목적지 이동) | 신규 `Assets/Scripts/UI/Shop/PackAcquireController.cs` | G-27 ✅ |
-| `RevealCardView` (카드 넘김, 재사용) | `Assets/Scripts/UI/Shop/RevealCardView.cs` | 유지 |
+| ~~`PackTearOpenView`~~ → `PackRevealView` | `Assets/Scripts/UI/Shop/PackRevealView.cs` | G-28 ✅ (아래 절) |
+| ~~`PackTearHandle`~~ → `PackClickHandle` | `Assets/Scripts/UI/Shop/PackClickHandle.cs` | G-28 ✅ |
+| `PackAcquireController` (캐리어 소비·획득버튼·덱 저장·목적지 이동) | 신규 `Assets/Scripts/UI/Shop/PackAcquireController.cs` | G-27 ✅ / G-28 덱저장 |
+| ~~`RevealCardView`~~ | **폐기**(G-28) — 결과 표시는 `CollectionCardView` 재사용 | — |
+| `DeckSaveManager.SaveSlotToFile` (공유 계약 **추가**) | `Assets/Scripts/Battle/DeckSaveManager.cs` — 단일 슬롯만 비파괴 저장(전슬롯 flush 금지) | G-28 ✅ |
 | `OwnershipManager` (GrantDefaults 삭제 + HasAnyOwnedSaved) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` | G-23/24 ✅ |
-| 3D 팩 모델 = `Assets/Assets/Prefabs/CardPack.prefab` (Body+SealStrip+BoxCollider) | `PackTearHandle` 부착·`sealStrip` 배선 (사용자) | G-27 |
-| 공용 팩 오픈 씬 = `Assets/Scenes/PackTest.unity` | CardPack+PackTearOpenView+PackAcquireController+획득버튼+MainCamera 태그 (사용자) | G-27 |
+| 3D 팩 모델 = `Assets/Assets/Prefabs/CardPack.prefab` (BoxCollider) | `PackClickHandle` 부착 (사용자) | G-28 |
+| 공용 팩 오픈 씬 = `Assets/Scenes/CardPack.unity` | CardPack+PackRevealView+PackAcquireController+결과패널+획득버튼+MainCamera 태그 (사용자) | G-28 |
 | `StarterPack.asset` (CardPackData) | 신규 에셋 (사용자) — price0·drawCount6·pool=기본6장 | G-25 |
 | ~~`PackOpeningView`·`PackOpenSceneController`·`FirstStartBattleRedirect`~~ | **폐기**(구매 분리·캐리어 도입으로 대체) | — |
 | (선택) 튜토리얼 보상 가드 | `Assets/Scripts/Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | G-보상분기 |
+
+---
+
+### G-28 — 개봉 연출 단순화 (클릭 1회 → 패널 fade → 3열 그리드)
+
+#### 구조 위치 (변경분만)
+
+```mermaid
+flowchart TD
+    HAND["PackHandoff (static 캐리어)<br/>Pack · NextScene · StartTutorial"]
+
+    subgraph scene["CardPack 씬 (공용 개봉 씬)"]
+        CTRL["PackAcquireController<br/>Consume→BeginOpen · 카드 캐시 · [획득]"]:::chg
+        VIEW["PackRevealView<br/>Idle→PackShown→Revealing→Done · OnRevealComplete"]:::new
+        HDL["PackClickHandle (CardPack.prefab)<br/>클릭 1회(OnMouseUpAsButton)"]:::new
+        PANEL["revealPanel (CanvasGroup)<br/>DOFade → cardGrid(GridLayoutGroup 3열)"]:::new
+        TILE["CollectionCardView (재사용)<br/>Bind(card, owned:true)"]
+        DEAD["~~PackTearHandle · RevealCardView<br/>PackTearOpenView~~ 삭제"]:::dead
+    end
+
+    DECK["DeckSaveManager.Save(0,·)+SaveToFile<br/>DeckConfig.Set (Battle, 읽기전용 사용)"]
+    LOBBY["LobbyScene"]
+    BATTLE["BattleScene"]
+
+    HAND -->|"Consume"| CTRL
+    CTRL -->|"BeginOpen(opened)"| VIEW
+    VIEW -->|"Arm(onClicked)"| HDL
+    VIEW -->|"fade 완료 후 Instantiate"| PANEL
+    PANEL --> TILE
+    VIEW -.->|"OnRevealComplete"| CTRL
+    CTRL -->|"[획득] 1) 덱 슬롯0 저장"| DECK
+    CTRL -->|"[획득] 2) NextScene"| LOBBY
+    CTRL -->|"[획득] 2) NextScene"| BATTLE
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+    classDef dead fill:#5a1f1f,stroke:#e57373,color:#fff;
+```
+
+#### 흐름 시퀀스 — 개봉 1회
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant C as PackAcquireController
+    participant V as PackRevealView
+    participant H as PackClickHandle
+    participant P as revealPanel (CanvasGroup)
+    participant D as DeckSaveManager
+
+    C->>C: Consume() → 카드 목록 캐시(m_cards)
+    C->>V: BeginOpen(opened)
+    V->>V: packRoot 활성 · panel alpha0/입력off · 이전 타일 정리
+    V->>H: Arm(OnPackClicked)
+    U->>H: 팩 클릭 (OnMouseUpAsButton, 1회 가드)
+    H-->>V: OnPackClicked
+    V->>V: packRoot SetActive(false)
+    V->>P: DOFade(1, panelFadeDuration)
+    P-->>V: OnComplete → blocksRaycasts/interactable = true
+    V->>V: Cards 순서대로 CollectionCardView.Bind(card, true) (3열은 GridLayoutGroup)
+    V-->>C: OnRevealComplete → [획득] 버튼 노출
+    U->>C: [획득] 클릭
+    C->>D: SaveSlotToFile(0, m_cards) + DeckConfig.Set
+    C->>C: (StartTutorial) TutorialConfig.Begin → LoadScene(NextScene)
+```
+
+#### 원리 카드
+
+- **연출을 인터랙션 1개로 축약**: 드래그 뜯기·카드별 스와이프 스택은 상태·입력 축이 많아 배선 실패가 곧 소프트락이었다. 클릭 1회 + CanvasGroup fade + `GridLayoutGroup`으로 줄여, 좌표 계산 코드를 레이아웃 컴포넌트에 넘겼다.
+- **표시 뷰 단일화**: 결과 카드는 도감 타일 `CollectionCardView`를 그대로 재사용(월드 스프라이트 뷰 폐기) → 카드 표시 진실원이 하나(`displayName`/`fullImage`).
+- **데드락 방지 우선**: `packHandle`/`revealPanel`/`cardPrefab`/`cardGrid` 미배선·카드 0장 모두 경고 후 `OnRevealComplete`를 발화 — 획득 버튼이 영구히 숨는 경로를 남기지 않는다.
+
+**수정 가능성 높은 지점**: fade 시간·전이 가드 `PackRevealView.cs`(`panelFadeDuration`, `OnPackClicked`) / 덱 저장 슬롯·정책 `PackAcquireController.SaveOpenedDeck`(슬롯 0 고정).
