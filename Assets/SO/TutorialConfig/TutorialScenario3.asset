@@ -44,7 +44,7 @@ MonoBehaviour:
       \uB54C, \uD544\uB4DC\uC758 \uBB34\uB9AC \uC544\uAD70 \uC218\uB9CC\uD07C \uD53C\uD574\uB97C
       \uBA3C\uC800 \uC8FC\uB294 \uD6A8\uACFC\uC785\uB2C8\uB2E4. \uC9C0\uAE08 \uD544\uB4DC\uC5D0\uB294
       \uBB34\uB9AC\uAC00 3\uC7A5\uC774\uB77C \uACF5\uACA9\uB9C8\uB2E4 3\uC758 \uD53C\uD574\uB97C
-      \uBA3C\uC800 \uC90D\uB2C8!"
+      \uBA3C\uC800 \uC90D\uB2C8\uB2E4!"
     waitForTap: 1
     dimBackground: 1
   - kind: 2
@@ -71,12 +71,18 @@ MonoBehaviour:
     guideMessage: "\uBAA8\uB798\uBABD\uC73C\uB85C \uB9C8\uBB34\uB9AC!"
     waitForTap: 1
     dimBackground: 0
+  - kind: 0
+    attackerSlot: -1
+    targetSlot: -1
+    guideMessage: "\uC774\uC81C\uBD80\uD130 \uC9C1\uC811 \uD50C\uB808\uC774\uD558\uBA70
+      \uAC8C\uC784\uC5D0\uC11C \uC2B9\uD574\uBCF4\uC138\uC694!"
+    waitForTap: 1
+    dimBackground: 0
   enemyScript:
   - kind: 0
     attackerSlot: 1
     targetSlot: 0
-    guideMessage: "\uC774\uC81C\uBD80\uD130 \uC9C1\uC811 \uD50C\uB808\uC774\uD558\uBA70
-      \uAC8C\uC784\uC5D0\uC11C \uC2B9\uD574\uBCF4\uC138\uC694!"
-    waitForTap: 1
+    guideMessage: 
+    waitForTap: 0
     dimBackground: 0
   freePlayAfterScript: 1
