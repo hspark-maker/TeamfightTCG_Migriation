@@ -7,7 +7,8 @@ using UnityEngine.UI;
 // 카드팩 개봉 연출의 진행자. 스테이지를 순서대로 몰고 가며, 각 단계의 실제 조작·표현은
 // PackTearHandle(뜯기) · PackCardStack(더미 넘기기) · PackCardView(카드 표시)가 나눠 맡는다.
 //
-// 흐름: 입장 → 뜯기(스와이프) → 분출 → 한 장씩 넘기기(스와이프) → 요약 → OnRevealComplete.
+// 흐름: 입장 → 뜯기(스와이프) → 분출 → 한 장씩 밀어내기(스와이프) → 결과 격자 → OnRevealComplete.
+// 밀어낸 카드는 그 자리에서 사라지고, 마지막 장까지 넘긴 뒤 결과 패널이 떠오르며 전부를 3열로 되짚어 준다.
 // 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
 // 연출은 이미 끝난 거래(TryPurchase가 원자 영속)를 보여줄 뿐, 경제를 건드리지 않는다.
 public class PackRevealView : MonoBehaviour
@@ -43,6 +44,8 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] TMP_Text remainingText;       // 남은 장수
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
+    [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
+    [SerializeField] PackResultGrid resultGrid;
     [SerializeField] Button skipButton;            // 명시적 건너뛰기(뜯기 단계에서도 빠져나갈 수 있게)
 
     // Idle → Entering(팩 등장) → Tearing(뜯기 대기) → Bursting(분출) → Flicking(넘기기) → Summary.
@@ -58,6 +61,9 @@ public class PackRevealView : MonoBehaviour
 
     // 스킵 횟수. 첫 번째는 현재 단계만, 두 번째부터는 요약까지 단번에.
     int m_skips;
+
+    // 이번 세션에서 개봉 신호를 이미 쐈는지. 분출과 스킵 어느 쪽으로 열려도 정확히 1회여야 한다.
+    bool m_announced;
 
     // packRoot 원위치(등장 트윈 기준).
     Vector3 m_packHome;
@@ -75,9 +81,11 @@ public class PackRevealView : MonoBehaviour
 
         m_pending = _opened;
         m_skips = 0;
+        m_announced = false;
 
         ResetPanel();
         if (cardStack != null) cardStack.Clear();
+        if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
         if (skipButton != null) skipButton.gameObject.SetActive(true);
 
@@ -194,7 +202,7 @@ public class PackRevealView : MonoBehaviour
     {
         m_stage = EStage.Bursting;
 
-        OnAnyPackOpened?.Invoke();
+        AnnounceOpened();
 
         if (burstEffect != null) burstEffect.Play();
         if (shakeTarget != null)
@@ -245,15 +253,15 @@ public class PackRevealView : MonoBehaviour
         cardStack.BeginInteraction();
     }
 
-    // 더미가 비었다 → 요약.
+    // 더미가 비었다 → 요약. 넘기기 단계에서만 온다(스킵으로 걷을 땐 Clear라 이 이벤트가 없다).
     void HandleStackEmptied()
     {
-        if (m_stage != EStage.Flicking && m_stage != EStage.Bursting) return;
+        if (m_stage != EStage.Flicking) return;
         EnterSummary();
     }
 
-    // 요약: 라인업과 총 환급을 보여주고 획득을 넘긴다.
-    void EnterSummary()
+    // 요약: 뽑은 카드 전부를 3열 격자로 되짚어 주고 총 환급과 함께 획득을 넘긴다.
+    void EnterSummary(bool _instant = false)
     {
         if (m_stage == EStage.Summary) return;
         m_stage = EStage.Summary;
@@ -263,6 +271,9 @@ public class PackRevealView : MonoBehaviour
         if (skipButton != null) skipButton.gameObject.SetActive(false);
         if (remainingText != null) remainingText.gameObject.SetActive(false);
         if (summaryGroup != null) summaryGroup.SetActive(true);
+
+        // 격자는 더미와 별개로 결과 사본을 새로 세운다 — 밀려나 사라진 카드를 여기서 다시 만난다.
+        if (resultGrid != null) resultGrid.Show(m_pending != null ? m_pending.Cards : null, _instant);
 
         if (totalRefundText != null)
         {
@@ -308,6 +319,10 @@ public class PackRevealView : MonoBehaviour
 
         if (tearHandle != null) tearHandle.ForceTornInstant();
 
+        // 분출 전(입장·뜯기)에서 요약으로 직행하면 EnterBursting을 거치지 않는다 —
+        // 팩이 열렸다는 사실은 연출을 건너뛰어도 참이므로 여기서 보장한다(튜토리얼이 이 신호를 기다린다).
+        AnnounceOpened();
+
         var t_root = ResolvePackRoot();
         if (t_root != null) t_root.SetActive(false);
 
@@ -319,16 +334,11 @@ public class PackRevealView : MonoBehaviour
             revealPanel.interactable = true;
         }
 
-        if (cardStack != null)
-        {
-            // 분출 전에 스킵했다면 더미가 아직 없다 — 세운 뒤 곧장 정리한다.
-            if (cardStack.Remaining == 0 && m_stage != EStage.Flicking)
-                cardStack.Build(m_pending != null ? m_pending.Cards : null);
+        // 더미는 걷어내기만 한다 — 카드는 요약 격자가 전부 다시 보여주므로 넘기는 시늉이 필요 없다
+        // (분출 전에 스킵했다면 더미가 아예 서지도 않았다).
+        if (cardStack != null) cardStack.Clear();
 
-            cardStack.FlickAllImmediate();   // OnEmptied → EnterSummary
-        }
-
-        EnterSummary();
+        EnterSummary(true);
     }
 
     // ── 카드 단계 콜백 ──────────────────────────────────────────
@@ -347,6 +357,15 @@ public class PackRevealView : MonoBehaviour
     }
 
     // ── 보조 ────────────────────────────────────────────────────
+
+    // "팩이 열렸다"를 세션당 1회만 알린다. 발화 시점은 뜯기 확정 — 튜토리얼이 물려 있어 의미를 옮기지 않는다.
+    void AnnounceOpened()
+    {
+        if (m_announced) return;
+        m_announced = true;
+
+        OnAnyPackOpened?.Invoke();
+    }
 
     // 패널 초기화: 완전 투명 + 입력 차단(fade 완료까지 아무것도 눌리지 않게).
     void ResetPanel()

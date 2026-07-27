@@ -809,7 +809,7 @@ sequenceDiagram
 
 ---
 
-### H. 랭크 — 표시용 티어 진행도 — ⬜ 설계 승인 완료, 구현 대기 (2026-07-27)
+### H. 랭크 — 표시용 티어 진행도 — 🔄 CORE 완료(H-29·H-30 코드), WIRE·BATTLE·HUD 대기 (2026-07-27)
 
 > 목표 루프의 **엔드포인트 표기**를 실물로 세운다. 단 실력 지표가 아니라 **표시용 진행도**(칭호)다.
 > **왜 로컬로 가능한가**: 로비 Match 탭은 100% AI전이고(`LobbyMatchLauncher.StartAiBattle` 단일 배선), PvP UI는 런타임에 도달 불가한 `MainMenu.unity`에만 있다. 클라 권위 + RPC 무검증이라 위조 가능하지만, **보상·난이도·매칭에 아무 영향이 없으므로 위조돼도 잃는 게 없다** → 서버 권위가 전제되지 않는다.
@@ -917,8 +917,16 @@ Tab_Match / MatchContent
 | 클래스 | 파일 | 태스크 | 상태 |
 |---|---|---|---|
 | `RankSaveData` | `OutGame/Save/2.Domain/RankSaveData.cs` (+ `UserSaveData.rank` 슬롯) | H-28 | ✅ 코드 |
-| `RankConfig` · `RankTier` (SO) | `OutGame/Rank/RankConfig.cs` | H-30 | ⬜ |
-| `RankManager` · `RankInfo` | `OutGame/Rank/RankManager.cs` | H-29 | ⬜ |
+| `RankConfig` · `RankTier` (SO) | `OutGame/Rank/RankConfig.cs` | H-30 | ✅ 코드 |
+| `RankManager` · `RankInfo` | `OutGame/Rank/RankManager.cs` | H-29 | ✅ 코드 |
 | 전투 훅 | `Battle/TurnRunner.cs` `CaptureResult` 2줄 | H-31 | ⬜ |
 | SO 주입 | `Utils/DataLibrary.cs` 필드1+호출1 | H-30 | ⬜ |
 | `RankHud` | `UI/HUD/RankHud.cs` | H-32 | ⬜ |
+
+#### CORE 구현 결과 (2026-07-27) — 소비자가 알아야 할 것
+
+- **기본 테이블(코드 필드 초기화자)**: `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`, `winPoints=10` · `losePoints=5`. `RankConfig.asset`이 없어도 이 5티어로 동작한다 → **배지 아트 5장**이 사용자 인계분. `long` 필드에 `[Min]`은 붙이지 않는다(Unity `MinDrawer`가 `intValue`로 잘라낸다 — `BattleReward` 선례).
+- **최대 티어면 `NextRequired == Points`**(0 아님) — "남은 = `NextRequired - Points`"가 모든 티어에서 성립해 HUD가 `IsMaxTier` 분기 없이 진행률을 계산해도 0 나눗셈이 안 난다.
+- **`DisplayName`은 항상 non-null**(미저작·빈 테이블이면 `string.Empty`). **`Badge`는 null 가능** → HUD는 non-null일 때만 스프라이트를 교체한다(아트 미배선 시 씬 기존 이미지 유지).
+- **`Config`·`Save()`는 private** — 공개 API는 `Points`/`GetInfo`/`ApplyBattleResult`/`SetConfig`/`ResetForDebug` 5개뿐.
+- ⚠️ **이름 겹침**: 로비 씬 노드 `RankInfo`(RectTransform, `RankHud` 부착 지점)와 C# `RankInfo`(struct)는 이름만 같고 무관하다.

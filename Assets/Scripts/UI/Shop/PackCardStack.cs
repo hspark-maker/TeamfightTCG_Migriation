@@ -6,8 +6,10 @@ using UnityEngine.EventSystems;
 
 // 개봉 카드 더미. 카드를 한 자리에 겹쳐 쌓고, 맨 위부터 스와이프로 한 장씩 밀어낸다.
 // 카드는 앞면이라 맨 위가 처음부터 보인다 — 서스펜스는 "밀어냈을 때 그 아래 뭐가 있나"에 있다.
+// 밀린 카드는 민 방향으로 날아가며 사라진다. 결과 라인업은 더미가 다 빈 뒤 PackResultGrid가 따로 세운다 —
+//   밀어내기(좌표 직접 조작)와 결과 배치(레이아웃)가 같은 오브젝트를 두고 다투지 않게 하려는 분리다.
 //
-// 배선 전제: 카드·stackAnchor·discardArea가 모두 cardLayer의 자식이고 앵커가 같아야 한다
+// 배선 전제: 카드와 stackAnchor가 모두 cardLayer의 자식이고 앵커가 같아야 한다
 //   (anchoredPosition을 같은 좌표계로 직접 비교·보간하므로).
 // 입력은 이 컴포넌트가 붙은 오브젝트의 Graphic(raycastTarget)이 받는다 — 카드 프리팹은 입력을 모른다.
 public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
@@ -29,21 +31,12 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     [SerializeField] RectTransform cardLayer;
     [Tooltip("더미가 쌓이는 자리. 모든 카드가 여기 겹쳐 놓인다.")]
     [SerializeField] RectTransform stackAnchor;
-    [Tooltip("밀어낸 카드가 정리되는 자리(하단 라인업 중심).")]
-    [SerializeField] RectTransform discardArea;
     [SerializeField] PackCardView cardPrefab;
 
     [Header("더미 겹침")]
     [Tooltip("겹친 카드 사이의 미세 어긋남. 0이면 종이 느낌이 죽는다.")]
     [SerializeField] float stackJitterPos = 2f;
     [SerializeField] float stackJitterAngle = 1f;
-
-    [Header("정리 라인업")]
-    [Tooltip("라인업 전체가 이 폭을 넘으면 간격을 자동으로 줄인다. 팩 장수가 늘어도 화면 밖으로 나가지 않게.")]
-    [SerializeField] float discardMaxWidth = 1300f;
-    [SerializeField] float discardSpacing = 220f;
-    [SerializeField] float discardScale = 0.7f;
-    [SerializeField] float discardDuration = 0.35f;
 
     [Header("스와이프")]
     [Tooltip("이만큼 밀면 넘어간다. 못 미치면 제자리로 되돌아온다.")]
@@ -52,12 +45,18 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     [SerializeField] float dragTiltPerPixel = 0.06f;
     [SerializeField] float returnDuration = 0.25f;
 
+    [Header("밀어내기")]
+    [Tooltip("넘긴 카드가 민 방향으로 더 날아가는 거리. 화면 밖까지 가도록 넉넉히.")]
+    [SerializeField] float dismissDistance = 900f;
+    [SerializeField] float dismissDuration = 0.28f;
+    [Tooltip("날아가며 추가로 기우는 각도(도).")]
+    [SerializeField] float dismissTiltAngle = 12f;
+
     // 더미(위→아래 순). 인덱스 0이 항상 현재 맨 위다.
     readonly List<PackCardView> m_stack = new List<PackCardView>();
 
-    // 밀어낸 카드가 갈 자리를 정하는 카운터. 최종 라인업 기준이라 재정렬이 필요 없다.
-    int m_discarded;
-    int m_total;
+    // 날아가는 중인 카드. 연출이 끝나기 전에 Clear가 들어와도 화면에 유령이 남지 않게 추적한다.
+    readonly List<PackCardView> m_dismissing = new List<PackCardView>();
 
     // 카드가 처음 놓인 자리(되감기 기준). 미세 지터가 섞여 있어 앵커 값과 다르다.
     readonly Dictionary<PackCardView, Vector2> m_home = new Dictionary<PackCardView, Vector2>();
@@ -85,8 +84,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         int t_count = _cards != null ? _cards.Count : 0;
-        m_total = t_count;
-        m_discarded = 0;
 
         // 뒤에서부터 만들어 인덱스 0이 마지막 sibling(=가장 위에 그려짐)이 되게 한다.
         for (int t_i = t_count - 1; t_i >= 0; t_i--)
@@ -120,7 +117,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (m_stack.Count > 0) OnCardRevealed?.Invoke(m_stack[0]);
     }
 
-    /// <summary>남은 카드를 전부 즉시 라인업으로 정리한다(스킵). 강조는 즉시 모드로 남긴다.</summary>
+    /// <summary>남은 카드를 전부 즉시 치운다(스킵). 결과는 곧이어 뜨는 결과 격자가 보여준다.</summary>
     public void FlickAllImmediate()
     {
         m_interactable = false;
@@ -131,24 +128,30 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             var t_view = m_stack[0];
             m_stack.RemoveAt(0);
 
-            t_view.PlayRevealAccent(true);
-            SendToDiscard(t_view, true);
+            m_home.Remove(t_view);
+            if (t_view != null)
+            {
+                t_view.transform.DOKill();
+                Destroy(t_view.gameObject);
+            }
         }
 
         OnRemainingChanged?.Invoke(0);
         OnEmptied?.Invoke();
     }
 
-    /// <summary>생성된 카드를 모두 제거(다음 개봉 세션 대비).</summary>
+    /// <summary>생성된 카드를 모두 제거(다음 개봉 세션 대비). 날아가는 중인 카드도 함께 걷는다.</summary>
     public void Clear()
     {
         for (int t_i = 0; t_i < m_stack.Count; t_i++)
             if (m_stack[t_i] != null) Destroy(m_stack[t_i].gameObject);
 
+        for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
+            if (m_dismissing[t_i] != null) Destroy(m_dismissing[t_i].gameObject);
+
         m_stack.Clear();
+        m_dismissing.Clear();
         m_home.Clear();
-        m_discarded = 0;
-        m_total = 0;
         m_interactable = false;
         m_dragging = false;
     }
@@ -199,7 +202,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         m_stack.RemoveAt(0);
-        SendToDiscard(t_top, false);
+        DismissCard(t_top, Mathf.Sign(t_dx));   // 민 방향 그대로 날려보낸다.
 
         OnRemainingChanged?.Invoke(m_stack.Count);
 
@@ -215,45 +218,34 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         OnSkipRequested?.Invoke();
     }
 
-    // 밀려난 카드를 최종 라인업 자리로 보낸다. 자리는 밀린 순서로 이미 정해져 있어 재정렬이 없다.
-    void SendToDiscard(PackCardView _view, bool _instant)
+    // 밀려난 카드를 민 방향으로 날려보내며 지운다. 결과는 남기지 않는다 — 전부 넘긴 뒤 결과 격자가 다시 보여준다.
+    void DismissCard(PackCardView _view, float _dirX)
     {
         if (_view == null) return;
+
+        m_home.Remove(_view);
 
         var t_rt = (RectTransform)_view.transform;
         t_rt.DOKill();
 
-        var t_target = DiscardSlot(m_discarded);
-        m_discarded++;
+        var t_target = t_rt.anchoredPosition + new Vector2(_dirX * dismissDistance, 0f);
+        var t_group  = _view.Group;
 
-        if (_instant)
-        {
-            t_rt.anchoredPosition = t_target;
-            t_rt.localRotation = Quaternion.identity;
-            t_rt.localScale = Vector3.one * discardScale;
-            return;
-        }
+        m_dismissing.Add(_view);
 
-        DOTween.Sequence()
+        var t_seq = DOTween.Sequence()
             .SetLink(_view.gameObject)
-            .Join(t_rt.DOAnchorPos(t_target, discardDuration).SetEase(Ease.OutCubic))
-            .Join(t_rt.DOScale(discardScale, discardDuration).SetEase(Ease.OutCubic))
-            .Join(t_rt.DOLocalRotate(Vector3.zero, discardDuration));
-    }
+            .Join(t_rt.DOAnchorPos(t_target, dismissDuration).SetEase(Ease.OutCubic))
+            .Join(t_rt.DOLocalRotate(new Vector3(0f, 0f, -_dirX * dismissTiltAngle), dismissDuration));
 
-    // 라인업 i번째 자리. 전체 장수를 알고 있으므로 중앙 정렬을 미리 계산한다.
-    Vector2 DiscardSlot(int _index)
-    {
-        var t_center = discardArea != null ? discardArea.anchoredPosition : Vector2.zero;
-        float t_offset = (_index - (m_total - 1) * 0.5f) * DiscardStep();
-        return t_center + new Vector2(t_offset, 0f);
-    }
+        if (t_group != null)
+            t_seq.Join(t_group.DOFade(0f, dismissDuration).SetEase(Ease.InQuad));
 
-    // 실제 간격. 장수가 많으면 지정 간격을 줄여 라인업이 화면 밖으로 밀려나지 않게 한다.
-    float DiscardStep()
-    {
-        if (m_total <= 1) return 0f;
-        return Mathf.Min(discardSpacing, discardMaxWidth / (m_total - 1));
+        t_seq.OnComplete(() =>
+        {
+            m_dismissing.Remove(_view);
+            if (_view != null) Destroy(_view.gameObject);
+        });
     }
 
     // 임계에 못 미친 카드를 원래 자리로 되돌린다.
@@ -278,6 +270,11 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         // 연출 도중 비활성 시 좀비 트윈 정리 + 입력 상태 리셋(재활성 후 유령 드래그 방지).
         for (int t_i = 0; t_i < m_stack.Count; t_i++)
             if (m_stack[t_i] != null) m_stack[t_i].transform.DOKill();
+
+        // 날아가던 카드는 도착지가 화면 밖이다 — 트윈만 끊으면 반투명 유령이 남으므로 여기서 정리한다.
+        for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
+            if (m_dismissing[t_i] != null) Destroy(m_dismissing[t_i].gameObject);
+        m_dismissing.Clear();
 
         m_interactable = false;
         m_dragging = false;

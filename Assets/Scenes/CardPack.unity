@@ -198,7 +198,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -285,7 +285,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1369735609}
-  - {fileID: 989208751}
   m_Father: {fileID: 497097068}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -355,7 +354,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 130962626}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -567,7 +566,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -678,17 +677,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PackCardStack
   cardLayer: {fileID: 94768938}
   stackAnchor: {fileID: 1369735609}
-  discardArea: {fileID: 989208751}
   cardPrefab: {fileID: 578743590242808315, guid: 538e09231d0498c45ab05cfea2c1f107, type: 3}
   stackJitterPos: 6
   stackJitterAngle: 1
-  discardMaxWidth: 1300
-  discardSpacing: 300
-  discardScale: 0.28
-  discardDuration: 0.35
   flickThreshold: 220
   dragTiltPerPixel: 0.06
   returnDuration: 0.25
+  dismissDistance: 900
+  dismissDuration: 0.28
+  dismissTiltAngle: 12
 --- !u!114 &497097070
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1082,41 +1079,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &989208750
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 989208751}
-  m_Layer: 0
-  m_Name: DiscardArea
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &989208751
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 989208750}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 94768938}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -700}
-  m_SizeDelta: {x: 100, y: 100}
-  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1032428258
 GameObject:
   m_ObjectHideFlags: 0
@@ -1487,6 +1449,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1535240952}
+  - component: {fileID: 1535240954}
+  - component: {fileID: 1535240953}
   m_Layer: 0
   m_Name: SummaryGroup
   m_TagString: Untagged
@@ -1507,6 +1471,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1376200664}
+  - {fileID: 1937311101}
   m_Father: {fileID: 130962627}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1514,6 +1479,41 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1535240953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1535240951}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 376f0611ee129284888268e4a2413cfc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PackResultGrid
+  panel: {fileID: 1535240954}
+  content: {fileID: 1937311101}
+  cardPrefab: {fileID: 578743590242808315, guid: 538e09231d0498c45ab05cfea2c1f107, type: 3}
+  fadeDuration: 0.35
+  cellWidth: 420
+  cellHeight: 590
+  spacingX: 24
+  spacingY: 24
+  cardStagger: 0.05
+  cardPopDuration: 0.25
+  cardPopFromScale: 0.7
+--- !u!225 &1535240954
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1535240951}
+  m_Enabled: 1
+  m_Alpha: 0
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &1650995550
 GameObject:
   m_ObjectHideFlags: 0
@@ -1683,6 +1683,7 @@ MonoBehaviour:
   remainingText: {fileID: 454058481}
   totalRefundText: {fileID: 1376200665}
   summaryGroup: {fileID: 1535240951}
+  resultGrid: {fileID: 1535240953}
   skipButton: {fileID: 1416537400}
 --- !u!114 &1717812451
 MonoBehaviour:
@@ -1752,7 +1753,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: -1260}
+  m_AnchoredPosition: {x: 0, y: 400}
   m_SizeDelta: {x: 640, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1803048087
@@ -1850,6 +1851,41 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
   key: 4
+--- !u!1 &1937311100
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1937311101}
+  m_Layer: 0
+  m_Name: ResultGrid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1937311101
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1937311100}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1535240952}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &2060397253
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -28,6 +28,19 @@ public class PackCardView : MonoBehaviour
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
 
+    // 카드 한 장 통째로 페이드하는 손잡이(밀어내기가 쓴다). 프리팹에 없으면 인스턴스에 붙여준다 —
+    // 이 값이 알파를 쥐는 단일 지점이라, 프리팹에 컴포넌트가 있든 없든 페이드는 항상 성립한다.
+    CanvasGroup m_group;
+    public CanvasGroup Group
+    {
+        get
+        {
+            if (m_group == null) m_group = GetComponent<CanvasGroup>();
+            if (m_group == null) m_group = gameObject.AddComponent<CanvasGroup>();
+            return m_group;
+        }
+    }
+
     // 강조가 이미 재생됐는지. 스킵과 정상 진행이 겹쳐도 두 번 터지지 않게 한다.
     bool m_accented;
 
@@ -71,6 +84,8 @@ public class PackCardView : MonoBehaviour
     // 강조 요소를 전부 내린 초기 상태. 재사용(풀링 없이 Instantiate이지만 Bind 재호출 대비)에도 안전하게.
     void ResetAccent()
     {
+        Group.alpha = 1f;   // 더미에서든 결과 격자에서든 카드는 선명한 상태로 시작한다.
+
         if (newBadge != null) newBadge.SetActive(false);
 
         if (glow != null)
