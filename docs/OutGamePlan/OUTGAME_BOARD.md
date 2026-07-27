@@ -89,6 +89,7 @@
 | **PKG-FIRSTBATTLE** | 구매→캐리어→CardPack 씬·[획득]→덱 슬롯0 저장→목적지 이동 | `PackHandoff`·`DeckSaveManager`·`DeckConfig`·`TutorialConfig.Begin` | `UI/Shop/PackAcquireController.cs` + ~~`UI/Lobby/LobbyFirstRunRedirect.cs`~~(→ 튜토리얼 스텝 0) + `CardPack.unity` 배선 | PKG-STARTER-PACK | UI+outgame | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
 | **PKG-OUTGAME-TUT** | 아웃게임 첫시작 튜토리얼 **P1~P4** — 진행도 영속 + 스텝 해석 + 강제 게이트 | `CardPackOpener`·`PackHandoff`·`OwnershipManager.HasAnyOwnedSaved`·`TutorialConfig.Begin`(전부 순수 소비) | 신규 `OutGame/Tutorial/`(6) + `UI/Tutorial/`(2) + `Save/2.Domain/TutorialSaveData.cs` / 수정 `UserSaveData`·`GameManager`·`LobbyTabController`·`OwnershipManager`(주석)·`OwnershipDebugTool` / **삭제 `UI/Lobby/LobbyFirstRunRedirect.cs`** | PKG-FIRSTBATTLE | outgame-engineer | ✅ 완료(코드+검수+컴파일 에러 0) — **씬 배선·SO 저작 대기** |
 | **PKG-OUTGAME-TUT-WIRE** | 동 **P5·P6** — Pack 탭·구매 버튼 앵커 배선 + **14스텝 저작(전투 3회·구매 사이클 2회)** + 팩 개봉 안내 + 결과 기반 커밋 | `OutgameTutorialData`(SO 저작)·`EOutgameTutorialAnchor`·`PackRevealView`/`PackShowcaseController` 결과 이벤트 | `LobbyScene.unity`(탭1 `tutorialAnchor`·buyButton 앵커) + `OutgameTutorial.asset` + `OutgameTutorialData`/`Runner`/`Bridge`/`GateUI` + `PackRevealView`/`PackShowcaseController` | PKG-OUTGAME-TUT | outgame-engineer+사용자(씬) | ✅ 완료(컴파일 에러 0, Play 검증 대기) |
+| **PKG-PACK-HINT** | 개봉 씬 가이드 제거 + 뜯기 상시 안내 (2026-07-27) | `OutgameTutorialGateUI`(무수정)·`PackRevealView` 스테이지 | `UI/Tutorial/OutgameTutorialBridge.cs`(`suppressGuideUI` + 클릭 직접 구독) · `UI/Shop/PackRevealView.cs`(`tearHint`) + `CardPack.unity` 배선(**사용자**) | PKG-OUTGAME-TUT-WIRE | outgame-engineer | ✅ 완료(컴파일 에러 0) — **씬 배선 대기** |
 
 | **PKG-TUT-REWARD** (선택·후속) | 튜토리얼 전투 보상 미지급 가드 | `TutorialConfig.IsActive` | `Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | PKG-FIRSTBATTLE | battle-engineer | ⬜ 보류(선택) |
 
@@ -96,6 +97,8 @@
 >
 > **PKG-OUTGAME-TUT-WIRE 결과**: 예상과 달리 씬 배선·SO 저작만으로 끝나지 않았다 — 3D 팩 개봉과 구매 성공은 **uGUI 클릭으로 판정할 수 없어** kind 2개(`WaitPackOpen`/`WaitPurchase`)와 결과 신호 경로가 추가됐다. 뷰가 static 이벤트로 "일어난 일"만 알리고 브리지가 구독한다(`PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased`) → 뷰는 여전히 튜토리얼을 모른다. **결과 기반 커밋** 해결됨. 튜토리얼 구매 스텝은 `pack` 저작으로 상점 진열까지 덮어써 `AutoPurchase`처럼 결과가 고정된다. **경제 데드락**은 `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고 게이트가 딤을 자동으로 걷는 탈출로로 대응(경제 값 무수정) — Play 실측 후 필요하면 `minGold`/`price` 조정.
 
+> **PKG-PACK-HINT 결과(2026-07-27)**: `CardPack` 씬은 팩 1개·[획득] 1개뿐이라 강제 게이트가 길잡이가 아니라 연출을 가리는 잡음이었다 → 브리지에 씬 스위치 `suppressGuideUI`를 두어 **그 씬에서만** 딤·배너를 끄고 **스텝 진행은 그대로** 둔다. 함정 1개: `WaitPackOpen`은 완료가 `OnAnyPackOpened`라 배너만 빼면 되지만 `WaitClick`의 완료는 **게이트가 대신 걸던 `onClick` 구독**이라, 억제 시 브리지가 직접 물어야 한다(`HookSilently`/`DetachSilent`). `GateUI` 무수정. 대체 안내는 튜토리얼이 아니라 **씬 상시 표시**(`PackRevealView.tearHint`, 뜯기 대기 중 표시 → 뜯김 확정에 소멸) — 온보딩이 끝나도 조작법은 필요하기 때문. **사용자 인계(에디터)**: ① `PackOpenDirector` 브리지 `Suppress Guide UI` 체크 ② `UICanvas` **직속**(`RevealPanel` 형제)에 안내 TMP + `CanvasGroup`(alpha 0 저장, Raycast Target 해제) → `PackRevealView.tearHint` 배선 ③ `AcquireButton`의 `TutorialAnchor`는 **떼지 말 것**(억제 모드의 클릭 감지 경로).
+>
 > PKG-TUT-REWARD는 Battle 경계 교차라 **battle-engineer** 전용. 첫 전투 보상 지급을 허용해도 무해 → 필수 아님.
 
 ---
