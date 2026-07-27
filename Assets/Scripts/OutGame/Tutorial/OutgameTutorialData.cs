@@ -33,10 +33,10 @@ public class OutgameTutorialData : ScriptableObject
         [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
         [TextArea] public string guideMessage;
 
-        [Tooltip("구매할 카드팩. AutoPurchase 전용")]
+        [Tooltip("구매할 카드팩. AutoPurchase는 이걸 자동 구매하고, WaitPurchase는 상점 진열·판매 대상을 이걸로 덮어쓴다(미지정이면 상점 기본 진열)")]
         public CardPackData pack;
 
-        [Tooltip("중복 카드 1장당 환급 골드. AutoPurchase 전용")]
+        [Tooltip("중복 카드 1장당 환급 골드. AutoPurchase / WaitPurchase 전용")]
         public long duplicateRefundGold;
 
         [Tooltip("개봉 연출 후 돌아올 씬 이름. AutoPurchase 전용")]

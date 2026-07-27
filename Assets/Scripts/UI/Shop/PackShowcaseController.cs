@@ -10,6 +10,7 @@ using UnityEngine.SceneManagement;
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 대상 팩(packData)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
 //   — 상점 SO 미개입(팩 미할당이면 구매 잠금).
+// 단 튜토리얼 구매 스텝 중에는 저작된 팩이 진열을 덮어쓴다(ResolvePack) — 튜토리얼 구매 결과를 자동구매처럼 고정하기 위해.
 public class PackShowcaseController : MonoBehaviour
 {
     // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
@@ -30,7 +31,6 @@ public class PackShowcaseController : MonoBehaviour
     void OnEnable()
     {
         s_transitioning = false;
-        Bind();
 
         if (buyButton != null)
         {
@@ -38,19 +38,39 @@ public class PackShowcaseController : MonoBehaviour
             buyButton.onClick.AddListener(OnBuyPressed);
         }
 
-        CurrencyManager.OnCurrencyChanged += OnCurrencyChanged;
-        RefreshBuyLock();
+        CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
+        OutgameTutorialRunner.OnStepChanged  += Refresh;
+        Refresh();
     }
 
     void OnDisable()
     {
         if (buyButton != null) buyButton.onClick.RemoveListener(OnBuyPressed);
-        CurrencyManager.OnCurrencyChanged -= OnCurrencyChanged;
+        CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
+        OutgameTutorialRunner.OnStepChanged  -= Refresh;
     }
 
     void OnCurrencyChanged(ECurrencyType _type, long _balance)
     {
         if (_type == ECurrencyType.Gold) RefreshBuyLock();
+    }
+
+    // 진열 대상 갱신. 탭을 여는 시점과 스텝이 바뀌는 시점이 다르므로(탭 활성화가 스텝 커밋보다 먼저다)
+    // 두 시점 모두에서 다시 해석해야 표시와 결제가 갈리지 않는다.
+    void Refresh()
+    {
+        Bind();
+        RefreshBuyLock();
+    }
+
+    // 진열·구매 대상 해석. 튜토리얼 구매 스텝이 팩을 지정했으면 그것이 이긴다 —
+    // 해석을 한 곳에 모아 표시 가격과 실제 결제가 갈리지 않게 한다.
+    void ResolvePack(out CardPackData _pack, out long _refundGold)
+    {
+        if (OutgameTutorialRunner.TryGetForcedPack(out _pack, out _refundGold)) return;
+
+        _pack       = packData;
+        _refundGold = duplicateRefundGold;
     }
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
@@ -59,23 +79,28 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (buyButton == null) return;
 
-        buyButton.interactable = packData != null && CurrencyManager.CanAfford(ECurrencyType.Gold, packData.Price);
+        ResolvePack(out var t_pack, out _);
+        buyButton.interactable = t_pack != null && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
     }
 
     // 대표 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
     void Bind()
     {
-        if (packNameText != null) packNameText.text = packData != null ? packData.DisplayName : string.Empty;
-        if (priceText != null) priceText.text = packData != null ? $"{packData.Price:N0}" : string.Empty;
+        ResolvePack(out var t_pack, out _);
+
+        if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
+        if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
     }
 
     // 구매 클릭: 성공이면 캐리어에 실어 CardPack 씬으로, 실패면 사유별 팝업(전역 1회 가드).
     void OnBuyPressed()
     {
         if (s_transitioning) return;
-        if (packData == null) return;
 
-        var t_opened = CardPackOpener.TryPurchase(packData, duplicateRefundGold);
+        ResolvePack(out var t_pack, out long t_refundGold);
+        if (t_pack == null) return;
+
+        var t_opened = CardPackOpener.TryPurchase(t_pack, t_refundGold);
         if (t_opened != null && t_opened.Success)
         {
             s_transitioning = true;

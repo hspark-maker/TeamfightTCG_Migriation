@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -9,6 +10,9 @@ public static class OutgameTutorialRunner
     const string PackOpenScene = "CardPack";
 
     static OutgameTutorialData s_data;
+
+    /// <summary>진행도가 다음 스텝으로 넘어갈 때 발화. 진열 대상이 스텝에 따라 달라지는 화면(상점)이 갱신 시점을 잡는다.</summary>
+    public static event Action OnStepChanged;
 
     /// <summary>데이터가 주입됐고 아직 완료 전이면 진행 중. 완료는 항상 진행도의 스칼라가 우선한다.</summary>
     public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted;
@@ -88,6 +92,22 @@ public static class OutgameTutorialRunner
         }
     }
 
+    /// <summary>튜토리얼이 이번 구매 스텝에서 팔 팩을 지정했으면 true. 상점은 진열·가격·구매 대상을 이걸로 덮어써
+    /// 튜토리얼 중 구매 결과가 저작대로 고정되게 한다. 미지정이면 false → 상점 기본 진열.</summary>
+    public static bool TryGetForcedPack(out CardPackData _pack, out long _refundGold)
+    {
+        _pack       = null;
+        _refundGold = 0;
+
+        if (!TryGetCurrentStep(out var t_step)) return false;
+        if (t_step.kind != OutgameTutorialData.EStepKind.WaitPurchase) return false;
+        if (t_step.pack == null) return false;
+
+        _pack       = t_step.pack;
+        _refundGold = t_step.duplicateRefundGold;
+        return true;
+    }
+
     /// <summary>앵커 클릭 감지 시 브리지가 호출. 다음 인덱스를 커밋하고 시퀀스를 넘어서면 완료 처리한다.</summary>
     public static void NotifyStepSatisfied()
     {
@@ -130,5 +150,8 @@ public static class OutgameTutorialRunner
 
         // 완료를 인덱스 비교로 파생시키지 않고 여기서 한 번만 확정한다(스텝을 나중에 추가해도 완료 유저가 되살아나지 않게).
         if (_nextIndex >= StepCount) OutgameTutorialProgress.Complete();
+
+        // 게이트를 걸기 전에 알린다 — 구매 스텝의 진열 교체가 끝난 뒤 게이트가 그 버튼 상태를 읽어야 한다.
+        OnStepChanged?.Invoke();
     }
 }

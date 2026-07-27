@@ -74,7 +74,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4283579699
   m_fontColor: {r: 0.2, g: 0.24, b: 0.32, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -87,7 +87,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -111,7 +111,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
+  m_overflowMode: 1
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
@@ -189,7 +189,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 618452707129372243}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -248,7 +248,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 130}
+  m_SizeDelta: {x: 0, y: 100}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &8005317925040599641
 CanvasRenderer:
@@ -265,7 +265,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1519512247151887085}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -278,7 +278,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 9ddf5a11b36f64f55a120645c3441b76, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -516,6 +516,7 @@ GameObject:
   - component: {fileID: 3801725761839909293}
   - component: {fileID: 664581996931586262}
   - component: {fileID: 4347278968915174198}
+  - component: {fileID: 2387532502086018912}
   m_Layer: 0
   m_Name: DeckCard
   m_TagString: Untagged
@@ -542,7 +543,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 495, y: 760}
+  m_SizeDelta: {x: 495, y: 700}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3801725761839909293
 CanvasRenderer:
@@ -622,10 +623,30 @@ MonoBehaviour:
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
   m_Interactable: 1
-  m_TargetGraphic: {fileID: 664581996931586262}
+  m_TargetGraphic: {fileID: 2810858644483735295}
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2387532502086018912
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5161141881003963513}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d48da4b245a2e5d45af8602d89ba836c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckSlotView
+  clickButton: {fileID: 4347278968915174198}
+  nameText: {fileID: 6009419354791385288}
+  numberText: {fileID: 8544743425643335251}
+  previewImage: {fileID: 2111409693208561249}
+  plusObject: {fileID: 2838407606237088250}
+  bannerObject: {fileID: 618452707129372243}
+  createLabel: "\uC2E0\uADDC \uC0DD\uC131"
+  fullLabel: "\uAC00\uB4DD \uCC38"
 --- !u!1 &6945564528204836835
 GameObject:
   m_ObjectHideFlags: 0
@@ -700,8 +721,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 0.92}
+    rgba: 3942645760
+  m_fontColor: {r: 0, g: 0, b: 0, a: 0.92}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -713,7 +734,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2

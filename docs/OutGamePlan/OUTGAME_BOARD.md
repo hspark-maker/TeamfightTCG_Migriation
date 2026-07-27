@@ -92,7 +92,7 @@
 
 > **PKG-OUTGAME-TUT 사용자 인계(에디터)**: ① `LobbyScene`의 구 `LobbyFirstRunRedirect` 오브젝트 Missing Script 제거 후 `OutgameTutorialBridge` 부착(`data` 배선) + `PlayBtn`에 `TutorialAnchor(LobbyPlayButton)` ② `CardPack.unity`의 `AcquireButton`에 `TutorialAnchor(PackAcquireButton)` + `PackOpenDirector`에 브리지 ③ `Assets/SO/Tutorial/OutgameTutorial.asset` 스텝 0~2 저작 ④ **`UIPoolManager` 캔버스 `sortingOrder` 1 → 400**(게이트 300이 실패 팝업을 덮음). 상세는 `STRUCTURE.md` G-TUT 절.
 >
-> **PKG-OUTGAME-TUT-WIRE 결과**: 예상과 달리 씬 배선·SO 저작만으로 끝나지 않았다 — 3D 팩 개봉과 구매 성공은 **uGUI 클릭으로 판정할 수 없어** kind 2개(`WaitPackOpen`/`WaitPurchase`)와 결과 신호 경로가 추가됐다. 뷰가 static 이벤트로 "일어난 일"만 알리고 브리지가 구독한다(`PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased`) → 뷰는 여전히 튜토리얼을 모른다. **결과 기반 커밋** 해결됨. **경제 데드락**은 `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고 게이트가 딤을 자동으로 걷는 탈출로로 대응(경제 값 무수정) — Play 실측 후 필요하면 `minGold`/`price` 조정.
+> **PKG-OUTGAME-TUT-WIRE 결과**: 예상과 달리 씬 배선·SO 저작만으로 끝나지 않았다 — 3D 팩 개봉과 구매 성공은 **uGUI 클릭으로 판정할 수 없어** kind 2개(`WaitPackOpen`/`WaitPurchase`)와 결과 신호 경로가 추가됐다. 뷰가 static 이벤트로 "일어난 일"만 알리고 브리지가 구독한다(`PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased`) → 뷰는 여전히 튜토리얼을 모른다. **결과 기반 커밋** 해결됨. 튜토리얼 구매 스텝은 `pack` 저작으로 상점 진열까지 덮어써 `AutoPurchase`처럼 결과가 고정된다. **경제 데드락**은 `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고 게이트가 딤을 자동으로 걷는 탈출로로 대응(경제 값 무수정) — Play 실측 후 필요하면 `minGold`/`price` 조정.
 
 > PKG-TUT-REWARD는 Battle 경계 교차라 **battle-engineer** 전용. 첫 전투 보상 지급을 허용해도 무해 → 필수 아님.
 

@@ -758,5 +758,7 @@ sequenceDiagram
   - `PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased` (둘 다 static event) → `OutgameTutorialBridge`가 구독. **뷰는 구독자를 모른다** — `TutorialAnchorRegistry.OnRegistered`와 같은 방향의 관용구.
   - `GateUI.ShowGate(_onSatisfied: null)` = 클릭 리스너 미부착(딤 유지). 이것이 `WaitPurchase`의 구현.
 - **결과 기반 커밋 해결**: 구매 실패 시 진행도가 앞서 나가지 않는다.
+- **튜토리얼 구매 대상 고정**: `WaitPurchase` 스텝의 `pack`/`duplicateRefundGold`가 상점 진열을 덮어쓴다(`OutgameTutorialRunner.TryGetForcedPack` → `PackShowcaseController.ResolvePack`). `AutoPurchase`와 같은 원리 — 튜토리얼 중 구매 결과가 저작대로 고정된다. 표시명·가격·구매 잠금 판정도 같은 해석을 쓰므로 **표시 가격과 실제 결제가 갈리지 않는다**. 미지정이면 상점 기본 진열(`packData`)로 폴백.
+  - 갱신 시점이 둘인 이유: 탭 활성화(`OnEnable`)가 스텝 커밋보다 **먼저** 일어난다(탭 버튼의 `Select` 리스너가 게이트 리스너보다 앞에 등록됨). 그래서 `OutgameTutorialRunner.OnStepChanged`로도 재해석한다.
 - **경제 데드락 대응(값 무수정)**: `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고(`CurrencyManager.CanAfford` + `OnCurrencyChanged` 구독), `GateUI.RefreshVisibility`의 기존 소프트락 방어가 딤을 자동으로 걷는다 → 유저가 전투로 골드를 벌고 돌아오면 그 스텝이 그대로 재개된다. Play 실측 후 부족하면 `RewardConfig.minGold` / `NormalPack.price` 조정(코드 무수정).
 - **전투 사이 진입 깜빡임 제거**: `BattleEntry` 완료 직후에는 다음 스텝을 이 씬에서 진입시키지 않는다(`PlayBtn`이 이미 `LoadScene`을 걸어 곧 사라질 게이트가 한 프레임 뜬다) — 로비 복귀 시 그 씬의 브리지가 재개한다.
