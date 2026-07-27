@@ -16,14 +16,31 @@ public class RankConfig : ScriptableObject
     public long losePoints = 5;
 
     // 필드 초기화자로 기본 테이블을 코드가 보증한다 — SO 미배선(CreateInstance fallback) 시에도 티어가 비지 않게.
+    // 5개 랭크 × 4단계(1~4) = 20티어. 단계 숫자가 클수록 상위이며, 각 랭크 4단계에서 임계치를 넘기면 다음 랭크 1단계로 승급한다
+    // (예: 브론즈 4 → 실버 1). 균등 25포인트 간격 기본값 — 실제 튜닝은 RankConfig.asset에서.
     [Tooltip("티어 테이블. requiredPoints 오름차순으로 저작한다. 인덱스 0이 최하위이며, 도달 티어는 points의 순수 파생이라 세이브에 저장하지 않는다.")]
     public List<RankTier> tiers = new List<RankTier>
     {
-        new RankTier { displayName = "브론즈",     requiredPoints = 0 },
-        new RankTier { displayName = "실버",       requiredPoints = 50 },
-        new RankTier { displayName = "골드",       requiredPoints = 150 },
-        new RankTier { displayName = "플래티넘",   requiredPoints = 300 },
-        new RankTier { displayName = "다이아몬드", requiredPoints = 500 },
+        new RankTier { displayName = "브론즈 1",     requiredPoints = 0 },
+        new RankTier { displayName = "브론즈 2",     requiredPoints = 25 },
+        new RankTier { displayName = "브론즈 3",     requiredPoints = 50 },
+        new RankTier { displayName = "브론즈 4",     requiredPoints = 75 },
+        new RankTier { displayName = "실버 1",       requiredPoints = 100 },
+        new RankTier { displayName = "실버 2",       requiredPoints = 125 },
+        new RankTier { displayName = "실버 3",       requiredPoints = 150 },
+        new RankTier { displayName = "실버 4",       requiredPoints = 175 },
+        new RankTier { displayName = "골드 1",       requiredPoints = 200 },
+        new RankTier { displayName = "골드 2",       requiredPoints = 225 },
+        new RankTier { displayName = "골드 3",       requiredPoints = 250 },
+        new RankTier { displayName = "골드 4",       requiredPoints = 275 },
+        new RankTier { displayName = "플래티넘 1",   requiredPoints = 300 },
+        new RankTier { displayName = "플래티넘 2",   requiredPoints = 325 },
+        new RankTier { displayName = "플래티넘 3",   requiredPoints = 350 },
+        new RankTier { displayName = "플래티넘 4",   requiredPoints = 375 },
+        new RankTier { displayName = "다이아몬드 1", requiredPoints = 400 },
+        new RankTier { displayName = "다이아몬드 2", requiredPoints = 425 },
+        new RankTier { displayName = "다이아몬드 3", requiredPoints = 450 },
+        new RankTier { displayName = "다이아몬드 4", requiredPoints = 475 },
     };
 }
 

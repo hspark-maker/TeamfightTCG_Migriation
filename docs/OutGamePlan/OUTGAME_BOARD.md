@@ -32,7 +32,7 @@
 | 생산 API | `CollectionProductionManager` (GetInfo/Harvest/OnChanged) | 🧊 동결 | |
 | 팩 API | `CardPackOpener` (SetShop/TryPurchase→OpenedPack) | 🧊 동결 | |
 | 보상 API | `RewardService.GrantBattleReward → BattleReward` | 🧊 동결 | 반환값이 팝업 입력 |
-| 랭크 API | `RankManager` (Points/GetInfo/ApplyBattleResult/SetConfig/ResetForDebug) | 🧊 신규 동결(PKG-RANKTIER-CORE, 2026-07-27) | 캐시 없음 = **`Init` 없음 → 부트 순서 무접촉**. 불변식: 티어=`points` 순수 파생(도달티어 별도 저장 금지) · 강등없음=가감 시 하한 클램프 · 예외 미발생(`try/catch` 0). `Config`·`Save()`는 private. `GetInfo→RankInfo`(TierIndex/DisplayName/Badge/Points/NextRequired/IsMaxTier) — **최대 티어면 `NextRequired == Points`**(0 아님). `RankConfig.tiers`는 코드 필드 초기화자로 5티어 기본 테이블 보증 |
+| 랭크 API | `RankManager` (Points/GetInfo/ApplyBattleResult/SetConfig/ResetForDebug) | 🧊 신규 동결(PKG-RANKTIER-CORE, 2026-07-27) | 캐시 없음 = **`Init` 없음 → 부트 순서 무접촉**. 불변식: 티어=`points` 순수 파생(도달티어 별도 저장 금지) · 강등없음=가감 시 하한 클램프 · 예외 미발생(`try/catch` 0). `Config`·`Save()`는 private. `GetInfo→RankInfo`(TierIndex/DisplayName/Badge/Points/NextRequired/IsMaxTier) — **최대 티어면 `NextRequired == Points`**(0 아님). `RankConfig.tiers`는 코드 필드 초기화자로 20티어(5랭크×4단계) 기본 테이블 보증 |
 | **통합 부트 순서** | `GameManager.Boot()` + `MainMenuInitializer` + `OutgameTutorialBridge` | 🧊 재동결(G-TUT, 2026-07-27) | BootScene 없음. GameManager(BeforeSceneLoad: `Load` → **`OutgameTutorialProgress.Init`** → `CurrencyInit`) → LobbyScene `MainMenuInitializer.Awake`[-100](SetSource·Init) → 씬 브리지 `Awake`(EnsureData 멱등)/`Start`(현재 스텝 진입). ~~`LobbyFirstRunRedirect`~~ **삭제** — 첫실행 자동 구매는 스텝 0 `AutoPurchase`. 검수 통과 |
 | **튜토리얼 진행도 API** | `OutgameTutorialProgress` (IsCompleted/StepIndex/Init/Save/CommitStep/Complete/ResetForDebug) | 🧊 신규 동결(2026-07-27) | 진행도 슬롯 매핑을 아는 **유일 창구**(러너·브리지·UI는 이 API로만). 불변식: `outgameCompleted` 우선(인덱스 파생 금지) · 커밋은 스텝 실행 **전** · `migrationChecked` 낙인으로 레거시 판정 계정당 1회 |
 
@@ -112,9 +112,9 @@
 | ID | 패키지 | 소비 계약 | 산출 계약 | 만지는 파일 | deps | 담당 | 등급 | 상태 |
 |---|---|---|---|---|---|---|---|---|
 | **PKG-RANKTIER-CORE** | 랭크 창구 + 튜닝 SO (H-29·H-30) | `DataSaveManager.Data`/`Save` | **`RankManager` 창구 동결** + `RankConfig` 스키마 | 신규 `OutGame/Rank/RankConfig.cs`·`RankManager.cs` | RANKTIER-SAVE | outgame-engineer | 🟢 (전부 신규 파일) | ✅ 완료(검수 통과·컴파일 에러 0) |
-| **PKG-RANKTIER-WIRE** | SO 주입 (H-30) | `RankManager.SetConfig` | `RankConfig.asset` 저작 | 수정 `Utils/DataLibrary.cs`(필드1+호출1) + `Assets/SO/Rank/RankConfig.asset`(**사용자**) | CORE ✅ | outgame-engineer(코드)+사용자(에셋) | 🟢 | ⬜ 준비 |
+| **PKG-RANKTIER-WIRE** | SO 주입 (H-30) | `RankManager.SetConfig` | `RankConfig.asset` 저작 | 수정 `Utils/DataLibrary.cs`(필드1+호출1) + `Assets/SO/Rank/RankConfig.asset`(**사용자**) | CORE ✅ | outgame-engineer(코드)+사용자(에셋) | 🟢 | ✅ 완료(코드·검수 통과) — 사용자 에셋 인계 잔여 |
 | **PKG-RANKTIER-BATTLE** | 전투 종료 훅 (H-31) | `RankManager.ApplyBattleResult`·`DeckConfig.IsMultiplayer` | 없음(순수 소비) | 수정 `Battle/TurnRunner.cs`(`CaptureResult` 내부 2줄) | CORE ✅ | **battle-engineer** | 🟠 (TurnRunner 그룹) | ⬜ 준비 |
-| **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선(**사용자**) | CORE ✅, WIRE | UI | 🟠 **로비 씬 그룹** | ⬜ 대기(WIRE 미완) |
+| **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선(**사용자**) | CORE ✅, WIRE ✅(코드) | UI | 🟠 **로비 씬 그룹** | ⬜ 대기(SHOPTAB 반납 대기) |
 | **PKG-RANKTIER-REWARD** (선택·후속) | 티어 승급 보상 | `CurrencyManager.Earn` | 세이브 필드 추가(수령 티어) | `OutGame/Rank/*` + 씬 `RankReward` 버튼 | HUD | outgame-engineer | 🟠 | ⬜ 보류(범위 밖) |
 
 **격리 판정 — 착수 전 반드시 확인**
@@ -126,9 +126,13 @@
 | `Utils/DataLibrary.cs` | `PKG-TUNE`(✅ 완료) | ✅ 충돌 없음 |
 | `Save/2.Domain/UserSaveData.cs` | 없음 | ✅ 단독 — 그래서 SAVE 게이트가 수 분에 끝났다 |
 
-**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE` ∥ `BATTLE`) ← **여기부터 병렬 가능** → `HUD`(SHOPTAB 반납 후) → 사용자 에디터 인계(`RankConfig.asset` 저작 + 티어 배지 아트 5장 + `RankHud` 배선 + `RankReward` 버튼 비활성) → 문서 정합.
+**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE` ∥ `BATTLE`) ← **여기부터 병렬 가능** → `HUD`(SHOPTAB 반납 후) → 사용자 에디터 인계(`RankConfig.asset` 저작 + 티어 배지 아트(랭크당 재사용 또는 20단계 개별) + `RankHud` 배선 + `RankReward` 버튼 비활성) → 문서 정합.
 
-> **CORE 반납 결과(2026-07-27)**: 신규 파일 2개만 추가, **수정 파일 0**. `RankConfig.tiers` 기본 테이블은 코드 필드 초기화자에 `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`(승 +10 · 패 −5) — **배지 아트 5장**이 사용자 인계분이다. `RankConfig.asset`은 아직 없고, 없어도 `CreateInstance` fallback으로 5티어가 살아 있다(WIRE는 순수 튜닝·아트 주입).
+> **CORE 반납 결과(2026-07-27)**: 신규 파일 2개만 추가, **수정 파일 0**. `RankConfig.tiers` 기본 테이블은 코드 필드 초기화자에 `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`(승 +10 · 패 −5) — 배지 아트가 사용자 인계분이다. `RankConfig.asset`은 아직 없고, 없어도 `CreateInstance` fallback으로 기본 테이블이 살아 있다(WIRE는 순수 튜닝·아트 주입). ※ 기본 테이블은 이후 20티어로 세분화됨(아래 노트).
+>
+> **WIRE 반납 결과(2026-07-27)**: `Utils/DataLibrary.cs`에 `[SerializeField] RankConfig rankConfig` 필드 + `InitializeSingleton()`에 `RankManager.SetConfig(this.rankConfig)` 1줄(기존 `RewardService.SetConfig` 선례와 동형). tcg-reviewer 검수 통과(계약 소비만·이중 진실원 없음·부트 무접촉). ⚠️ **컴파일 검증은 사용자 재량** — 세션에서 Unity MCP 연결이 끊겨(`Connection revoked`) 콘솔 확인 불가. **사용자 에디터 인계**: ① `Assets/SO/Rank/RankConfig.asset` 생성(`Create → Card Battle/Rank Config`) ② PKG-TUNE에서 `battleRewardConfig`를 배선한 **동일 `DataLibrary` GameObject**의 `Rank Config` 슬롯에 할당 ③ (선택) 티어 배지는 HUD 인계와 함께. 미배선이어도 fallback으로 크래시 없음.
+>
+> **RankConfig 세분화(2026-07-27, WIRE 후속)**: 기본 테이블을 5티어 → **20티어(5랭크 × 4단계 1~4)** 로 세분화(`RankConfig.cs` 필드 초기화자만 수정, `RankManager` 로직·`RankConfig` 스키마 무변경 = 계약 불변). 균등 25포인트 간격(`브론즈 1`=0 … `다이아몬드 4`=475), 각 랭크 4단계에서 승급(브론즈 4 → 실버 1). `RankManager`는 `tiers`를 오름차순 임의 개수로 일반 처리하므로 코드 무영향. 배지 인계분이 최대 20슬롯으로 늘지만 랭크당 1장 재사용 가능(HUD 저작 재량).
 > ⚠️ **이름 겹침 주의**: 로비 씬의 `RankInfo`(RectTransform 노드, `RankHud` 부착 지점)와 C# `RankInfo`(`GetInfo` 반환 struct)는 **이름만 같고 무관**하다.
 > 검수 유보 2건(구현엔 반영 안 함, 소비처 생길 때 재판단): ① `tiers`가 빈/전원 null이면 `TierIndex=0`인데 `IsMaxTier=true`("0번이자 최대 티어" — 승인된 동작이나 HUD가 `IsMaxTier`로 연출을 분기하면 오표시) ② `ResetForDebug`는 현재 소비처 0 — 필요하면 `OwnershipDebugTool`(`OutgameTutorialProgress.ResetForDebug` 선례)에 배선.
 

@@ -932,7 +932,7 @@ Tab_Match / MatchContent
 
 #### CORE 구현 결과 (2026-07-27) — 소비자가 알아야 할 것
 
-- **기본 테이블(코드 필드 초기화자)**: `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`, `winPoints=10` · `losePoints=5`. `RankConfig.asset`이 없어도 이 5티어로 동작한다 → **배지 아트 5장**이 사용자 인계분. `long` 필드에 `[Min]`은 붙이지 않는다(Unity `MinDrawer`가 `intValue`로 잘라낸다 — `BattleReward` 선례).
+- **기본 테이블(코드 필드 초기화자)**: **5랭크 × 4단계 = 20티어**. `브론즈 1~4(0/25/50/75) → 실버 1~4(100~175) → 골드 1~4(200~275) → 플래티넘 1~4(300~375) → 다이아몬드 1~4(400~475)`, 균등 25포인트 간격. `winPoints=10` · `losePoints=5`. 각 랭크 4단계에서 임계치를 넘기면 다음 랭크 1단계로 승급(브론즈 4 → 실버 1). `RankConfig.asset`이 없어도 이 20티어로 동작한다 → **배지 아트**가 사용자 인계분(랭크당 1장 재사용 또는 20장 개별 저작, HUD 저작 재량). `long` 필드에 `[Min]`은 붙이지 않는다(Unity `MinDrawer`가 `intValue`로 잘라낸다 — `BattleReward` 선례).
 - **최대 티어면 `NextRequired == Points`**(0 아님) — "남은 = `NextRequired - Points`"가 모든 티어에서 성립해 HUD가 `IsMaxTier` 분기 없이 진행률을 계산해도 0 나눗셈이 안 난다.
 - **`DisplayName`은 항상 non-null**(미저작·빈 테이블이면 `string.Empty`). **`Badge`는 null 가능** → HUD는 non-null일 때만 스프라이트를 교체한다(아트 미배선 시 씬 기존 이미지 유지).
 - **`Config`·`Save()`는 private** — 공개 API는 `Points`/`GetInfo`/`ApplyBattleResult`/`SetConfig`/`ResetForDebug` 5개뿐.

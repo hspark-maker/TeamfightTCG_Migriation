@@ -14,6 +14,7 @@ public class DataLibrary : MonoBehaviour
     [SerializeField] public KeywordIconConfig keywordIconConfig;
     [SerializeField] BattleTimingConfig battleTimingConfig;   // 미배선 시 GameTiming 기본값 fallback
     [SerializeField] BattleReward battleRewardConfig;         // 미배선 시 RewardService 기본값 fallback
+    [SerializeField] RankConfig rankConfig;                   // 미배선 시 RankManager 기본 티어 테이블 fallback
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 
@@ -35,6 +36,7 @@ public class DataLibrary : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         GameTiming.SetConfig(this.battleTimingConfig);
         RewardService.SetConfig(this.battleRewardConfig);
+        RankManager.SetConfig(this.rankConfig);
         return true;
     }
 
