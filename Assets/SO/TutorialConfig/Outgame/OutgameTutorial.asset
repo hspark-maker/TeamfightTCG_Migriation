@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
+  m_Name: OutgameTutorial
+  m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
+  steps:
+  - kind: 0
+    anchor: 0
+    guideMessage: 
+    pack: {fileID: 11400000, guid: 8f37683e21484b14baba7c0a0eea43a2, type: 2}
+    duplicateRefundGold: 10
+    nextScene: LobbyScene
+    scenario: {fileID: 0}
+  - kind: 1
+    anchor: 4
+    guideMessage: "\uCE74\uB4DC\uB97C \uD68D\uB4DD\uD558\uC138\uC694 "
+    pack: {fileID: 0}
+    duplicateRefundGold: 0
+    nextScene: LobbyScene
+    scenario: {fileID: 0}
+  - kind: 2
+    anchor: 1
+    guideMessage: "\uCCAB \uC804\uD22C\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4"
+    pack: {fileID: 0}
+    duplicateRefundGold: 0
+    nextScene: LobbyScene
+    scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}

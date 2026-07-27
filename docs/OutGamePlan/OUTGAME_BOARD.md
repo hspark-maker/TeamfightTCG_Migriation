@@ -25,14 +25,15 @@
 | 계약 | 소유 창구 | 상태 | 비고 |
 |---|---|---|---|
 | 재화 API | `CurrencyManager` (Earn/Spend/CanAfford/OnCurrencyChanged/Save) | 🧊 동결 | Spend는 0 허용·음수 거부 |
-| 소유 API | `OwnershipManager` (Grant/Revoke/IsOwned/OwnedCount/OnOwnershipChanged) | 🧊 재동결(G-23) | 시그니처 불변. `GrantDefaults` 삭제(신규=소유0). 검수 통과, 전체지급은 `OwnershipDebugTool`로 일원화 |
+| 소유 API | `OwnershipManager` (Grant/Revoke/IsOwned/OwnedCount/OnOwnershipChanged) | 🧊 재동결(G-23) | 시그니처 불변. `GrantDefaults` 삭제(신규=소유0). 검수 통과, 전체지급은 `OwnershipDebugTool`로 일원화. **`HasAnyOwnedSaved()`는 레거시 세이브 마이그레이션 1회 판정 전용**(2026-07-27) — 첫실행 판정 대리로 쓰지 말 것 |
 | 카드 창구 | `CardCatalog` (SetSource/KeyOf/Count/IsReady) | 🧊 동결 | KeyOf = SO 파일명 |
 | 시각 창구 | `GameClock` (Since/디버그 점프) | 🧊 동결 | |
-| 세이브 스키마 | `UserSaveData` (version=1, 값 객체 조립) | 🧊 동결 | 필드 추가만 |
+| 세이브 스키마 | `UserSaveData` (version=1, 값 객체 조립) | 🧊 동결 | 필드 추가만. `tutorial` 슬롯 추가(2026-07-27)도 **VERSION 1 유지** — 구 세이브는 노드 없이 기본값(0/false)으로 읽힘 |
 | 생산 API | `CollectionProductionManager` (GetInfo/Harvest/OnChanged) | 🧊 동결 | |
 | 팩 API | `CardPackOpener` (SetShop/TryPurchase→OpenedPack) | 🧊 동결 | |
 | 보상 API | `RewardService.GrantBattleReward → BattleReward` | 🧊 동결 | 반환값이 팝업 입력 |
-| **통합 부트 순서** | `GameManager.Boot()` + `MainMenuInitializer` + `LobbyFirstRunRedirect` | 🧊 재동결(G-24) | BootScene 없음. GameManager(BeforeSceneLoad Load·CurrencyInit) → LobbyScene `MainMenuInitializer.Awake`[-100](SetSource·Init·SetShop) → 로비 `LobbyFirstRunRedirect.Start`(첫실행이면 PackTest 전환). 검수 통과 |
+| **통합 부트 순서** | `GameManager.Boot()` + `MainMenuInitializer` + `OutgameTutorialBridge` | 🧊 재동결(G-TUT, 2026-07-27) | BootScene 없음. GameManager(BeforeSceneLoad: `Load` → **`OutgameTutorialProgress.Init`** → `CurrencyInit`) → LobbyScene `MainMenuInitializer.Awake`[-100](SetSource·Init) → 씬 브리지 `Awake`(EnsureData 멱등)/`Start`(현재 스텝 진입). ~~`LobbyFirstRunRedirect`~~ **삭제** — 첫실행 자동 구매는 스텝 0 `AutoPurchase`. 검수 통과 |
+| **튜토리얼 진행도 API** | `OutgameTutorialProgress` (IsCompleted/StepIndex/Init/Save/CommitStep/Complete/ResetForDebug) | 🧊 신규 동결(2026-07-27) | 진행도 슬롯 매핑을 아는 **유일 창구**(러너·브리지·UI는 이 API로만). 불변식: `outgameCompleted` 우선(인덱스 파생 금지) · 커밋은 스텝 실행 **전** · `migrationChecked` 낙인으로 레거시 판정 계정당 1회 |
 
 ---
 
@@ -43,7 +44,7 @@
 | **PKG-BOOT** | 통합 부트 배선 | `MainMenuInitializer`에 `CardPackOpener.SetShop(cardShop)` 배선(+`[SerializeField] CardShop`, null→빈 상점 fallback). ※ `DataSaveManager.Load()`+`CurrencyManager.Init()`은 이미 `GameManager.Boot()`(BeforeSceneLoad) 소유 → 중복 추가 안 함. `EnsureBoot`는 `CardCatalog.IsReady` 가드로 이미 no-op | outgame-engineer | ✅ 완료 | 통합 씬 부트 시 골드·소유·팩 로드, 재시작 후 값 유지 |
 | **PKG-TUNE** | 튜닝 SO 배선 | `RewardConfig`/`CardShop`(+`NormalPack.Pool`·packId)/`CollectionLayoutConfig` 에셋 생성+매니저 배선(D-12 `SetConfig` 연결). ※ `.asset`은 에디터 작업(사용자) | outgame-engineer(코드)+사용자(에셋) | ✅ 완료(코드·검수) — 인계 있음 | 팩 개봉 시 Pool 카드 나옴, 보상 환산이 SO 값 반영 |
 | **PKG-ONBOARD-OWN** | 소유 기본지급 제거(계약 변경) | `OwnershipManager.GrantDefaults()` **삭제**(Init 호출 제거, 전체지급은 `OwnershipDebugTool`로 일원화) → 신규 유저 소유 0. 판정 기준 `OwnedCount==0` 확립 (G-23). 실경로 `OutGame/Collection/` | outgame-engineer | ✅ 완료(검수 통과·컴파일 대기) | 세이브 초기화 후 부팅 시 소유 0, 도감 전부 잠김(정상). 스타터팩 후 6장 |
-| **PKG-ONBOARD-BOOT** | 로비 첫실행 리다이렉트(BootScene 없음) | 신규 `UI/Lobby/LobbyFirstRunRedirect.cs`: 로비 `Start`에서 `HasAnyOwnedSaved()==false`면 `TryPurchase(starter)`→캐리어→`LoadScene("PackTest")`, 실패 시 로비 유지 (G-24). ~~BootScene/BootRouter 폐기~~. ※ 씬 배치·PackTest/BattleScene 빌드 등록은 사용자 | outgame-engineer(코드)+사용자(씬) | ✅ 완료(검수·씬/컴파일 대기) | 첫실행=PackTest 자동전환, 기존=로비 |
+| **PKG-ONBOARD-BOOT** | 로비 첫실행 리다이렉트(BootScene 없음) | 신규 `UI/Lobby/LobbyFirstRunRedirect.cs`: 로비 `Start`에서 `HasAnyOwnedSaved()==false`면 `TryPurchase(starter)`→캐리어→`LoadScene("PackTest")`, 실패 시 로비 유지 (G-24). ~~BootScene/BootRouter 폐기~~. **2026-07-27: 이 패키지는 `PKG-OUTGAME-TUT`에 흡수 — `LobbyFirstRunRedirect.cs` 삭제, 첫실행 진입은 튜토리얼 스텝 0(`AutoPurchase`)** | outgame-engineer(코드)+사용자(씬) | ✅ 완료 → 대체됨(PKG-OUTGAME-TUT) | 첫실행=CardPack 자동전환, 기존=로비 |
 
 > **PKG-TUNE 코드 배선 완료(검수 통과, feature_Collection)**: `RewardService.SetConfig`→`DataLibrary`, `CatalogRows.SetLayout`→`MainMenuInitializer` 2곳 배선(+`[SerializeField]` 슬롯). CardShop은 PKG-BOOT에서 이미 배선됨. **사용자 인계(에디터)**: ① `RewardConfig.asset` 생성(`Create→TCG/Reward Config`) ② 인스펙터 할당 3건(`DataLibrary.battleRewardConfig`, `MainMenuInitializer.cardShop`←CardShop.asset, `MainMenuInitializer.collectionLayout`←CollectionLayoutConfig.asset) ③ `NormalPack.asset` packId="0" ↔ `PackOpeningView.packId` 정합 확인. Unity 콘솔 컴파일·Play E2E는 사용자 재량(정적 타입·시그니처는 검증됨).
 
@@ -78,14 +79,20 @@
 
 ## 🟠 온보딩 흐름 그룹 — 도메인 G (Wave 0 후, 그룹 내 순차)
 
-> 두 패키지는 온보딩 씬/컨트롤러 흐름을 공유 → **같은 세션에서 하나씩** 또는 worktree 격리. deps = 🔴 PKG-ONBOARD-OWN·BOOT 완료(소유0 판정·부트 라우팅 동결).
+> 이 그룹의 패키지들은 온보딩 씬/컨트롤러 흐름(로비·CardPack 씬)을 공유 → **같은 세션에서 하나씩** 또는 worktree 격리. deps = 🔴 PKG-ONBOARD-OWN·BOOT 완료(소유0 판정·부트 순서 동결).
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
 | **PKG-STARTER-PACK** | 스타터팩 정의 + 개봉 흐름(클릭 1회, G-28에서 3D 뜯기 폐기) | `CardPackOpener`(팩 API)·`CardPack.prefab` | `UI/Shop/PackRevealView.cs`·`PackClickHandle.cs`·`OutGame/CardPack/PackHandoff.cs` + `StarterPack.asset` + `CardPack.unity`·`CardPack.prefab` 배선 | PKG-ONBOARD-BOOT | outgame-engineer+UI | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
-| **PKG-FIRSTBATTLE** | 구매→캐리어→CardPack 씬·[획득]→덱 슬롯0 저장→목적지 이동 | `PackHandoff`·`DeckSaveManager`·`DeckConfig`·`TutorialConfig.Begin` | `UI/Shop/PackAcquireController.cs` + `UI/Lobby/LobbyFirstRunRedirect.cs`(첫시작 구매→캐리어) + `CardPack.unity` 배선 | PKG-STARTER-PACK | UI+outgame | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
+| **PKG-FIRSTBATTLE** | 구매→캐리어→CardPack 씬·[획득]→덱 슬롯0 저장→목적지 이동 | `PackHandoff`·`DeckSaveManager`·`DeckConfig`·`TutorialConfig.Begin` | `UI/Shop/PackAcquireController.cs` + ~~`UI/Lobby/LobbyFirstRunRedirect.cs`~~(→ 튜토리얼 스텝 0) + `CardPack.unity` 배선 | PKG-STARTER-PACK | UI+outgame | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
+| **PKG-OUTGAME-TUT** | 아웃게임 첫시작 튜토리얼 **P1~P4** — 진행도 영속 + 스텝 해석 + 강제 게이트 | `CardPackOpener`·`PackHandoff`·`OwnershipManager.HasAnyOwnedSaved`·`TutorialConfig.Begin`(전부 순수 소비) | 신규 `OutGame/Tutorial/`(6) + `UI/Tutorial/`(2) + `Save/2.Domain/TutorialSaveData.cs` / 수정 `UserSaveData`·`GameManager`·`LobbyTabController`·`OwnershipManager`(주석)·`OwnershipDebugTool` / **삭제 `UI/Lobby/LobbyFirstRunRedirect.cs`** | PKG-FIRSTBATTLE | outgame-engineer | ✅ 완료(코드+검수+컴파일 에러 0) — **씬 배선·SO 저작 대기** |
+| **PKG-OUTGAME-TUT-WIRE** | 동 **P5·P6** — Pack 탭 앵커 배선 + 11스텝 저작 + 결과 기반 커밋 | `OutgameTutorialData`(SO 저작)·`EOutgameTutorialAnchor` | `LobbyScene.unity`(탭1 `tutorialAnchor`·`packData`·buyButton 앵커) + `OutgameTutorial.asset` + (러너 커밋 정책) | PKG-OUTGAME-TUT | outgame-engineer+사용자(씬) | ⏸ **보류 — 아웃게임 레이아웃 확정까지** |
 
 | **PKG-TUT-REWARD** (선택·후속) | 튜토리얼 전투 보상 미지급 가드 | `TutorialConfig.IsActive` | `Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | PKG-FIRSTBATTLE | battle-engineer | ⬜ 보류(선택) |
+
+> **PKG-OUTGAME-TUT 사용자 인계(에디터)**: ① `LobbyScene`의 구 `LobbyFirstRunRedirect` 오브젝트 Missing Script 제거 후 `OutgameTutorialBridge` 부착(`data` 배선) + `PlayBtn`에 `TutorialAnchor(LobbyPlayButton)` ② `CardPack.unity`의 `AcquireButton`에 `TutorialAnchor(PackAcquireButton)` + `PackOpenDirector`에 브리지 ③ `Assets/SO/Tutorial/OutgameTutorial.asset` 스텝 0~2 저작 ④ **`UIPoolManager` 캔버스 `sortingOrder` 1 → 400**(게이트 300이 실패 팝업을 덮음). 상세는 `STRUCTURE.md` G-TUT 절.
+>
+> **PKG-OUTGAME-TUT-WIRE 보류 근거**: P1~P4 코드는 UI 레이아웃을 전혀 모른다(게이트=임의 `RectTransform`, 타깃=enum 앵커) → 보류분은 **씬 배선 + SO 저작만으로** 완료되고 코드 재작성이 없다. 착수 시 함께 처리할 미해결: **결과 기반 커밋**(현재는 클릭 자체를 완료로 봐서 구매 실패·덱 없음에도 스텝이 넘어감)과 **경제 데드락 실측**(NormalPack 10골드 vs 보상 `minGold` 5, 초기 골드 0).
 
 > PKG-TUT-REWARD는 Battle 경계 교차라 **battle-engineer** 전용. 첫 전투 보상 지급을 허용해도 무해 → 필수 아님.
 
@@ -138,4 +145,5 @@
 |---|---|---|---|
 | 2026-07-26 | 워크플로우를 Phase 순차 → 동시성 등급(🔴/🟠/🟢) 분류로 전환. 사람이 다중 세션으로 병렬 실행하는 모델. 보드 신설 | (전체 운영 방식) | 문서만 |
 | 2026-07-27 | **F-20/PKG-POPUP 스코프 확정 — 로비 팝업 폐기, 전투씬 처리.** 신규 `UI/Reward/*` 로비 진입 팝업·`BattleRewardHandoff` 대신 기존 전투씬 `GameResultPopup`에서 보상 골드 연출(스케일-인+`+N0 골드` 순차 팝, 심플)로 마무리. 전투 로직·`RewardService` 무수정(순수 표시). `RewardService` 계약 불변 | PKG-POPUP만(순수 추가) | 문서+단일 파일 |
+| 2026-07-27 | **아웃게임 첫시작 튜토리얼 편입(P1~P4 완료) — 계약 변경 2건 + 파일 삭제 1.** ① **세이브 스키마 추가**: `UserSaveData.tutorial`(`TutorialSaveData`) 슬롯 1개 — 필드 추가라 **VERSION 1 유지**, 구 세이브는 기본값으로 읽힘(하위호환·재작업 없음). ② **부트 순서 추가**: `GameManager.Boot()`에 `OutgameTutorialProgress.Init()`(Load 직후·CurrencyInit 앞) → 통합 부트 순서 재동결. ③ **`LobbyFirstRunRedirect.cs` 삭제** — 첫실행 자동 구매가 튜토리얼 스텝 0(`AutoPurchase`)으로 흡수(존치 시 "소유 0"·"stepIndex 0" 이중 판정 → 이중 구매). 이로써 **첫실행 판정 창구가 진행도로 단일화**되고 `OwnershipManager.HasAnyOwnedSaved()`는 레거시 마이그레이션 1회 판정 전용으로 축소(시그니처 불변, 주석만 정정). 신규 계약 `OutgameTutorialProgress` 동결 | PKG-ONBOARD-BOOT(→ PKG-OUTGAME-TUT에 흡수) · PKG-FIRSTBATTLE(구매 진입부만 이동, 개봉 이후 구간 불변) | 코드+문서 |
 | 2026-07-27 | **도메인 G(신규 유저 온보딩) 편입 — 계약 변경 2건.** ① 소유 API `GrantDefaults` 동작: 신규 유저 전체지급→미지급(소유0 시작). 시그니처 불변, 소비처(도감·덱빌더 소유필터)는 빈 상태 대응만 확인. ② 부트 진입: BootScene(index 0) 라우팅 앞단 추가(기존 2계층 불변). 둘 다 🔴 PKG-ONBOARD-OWN/BOOT로 선행·재동결 | 소유 API 소비처(도감·덱빌더): 회귀 확인만(빈 상태). 신규 온보딩 패키지 3종 편입 | 코드+문서 |

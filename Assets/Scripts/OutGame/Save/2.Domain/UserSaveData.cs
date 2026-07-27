@@ -14,4 +14,8 @@ public class UserSaveData
     public OwnershipSaveData ownership = new OwnershipSaveData();    // B-5 소유
     public DeckSaveData deck = new DeckSaveData();                   // B-6 덱
     public CollectionSaveData collection = new CollectionSaveData(); // C 도감(방치 생산)
+
+    // 아웃게임 첫시작 튜토리얼 진행도. 슬롯 추가만 — VERSION 유지(하위호환).
+    // 구 세이브엔 노드가 없어 기본 인스턴스(0/false)로 시작하며, 레거시 유저는 Init에서 완료 처리된다.
+    public TutorialSaveData tutorial = new TutorialSaveData();
 }

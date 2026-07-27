@@ -16,7 +16,7 @@ public static class OwnershipManager
     // 외부 변조 차단용 스냅샷(라이브 뷰 아님 — 순회 중 Revoke해도 안전).
     public static IReadOnlyCollection<string> OwnedKeys => new List<string>(s_owned);
 
-    // 부트 라우팅용: 세이브 소유 여부를 메모리 캐시(Init)·CardCatalog 없이 조회한다.
+    // 레거시 세이브 마이그레이션 판정용: 세이브 소유 여부를 메모리 캐시(Init)·CardCatalog 없이 조회한다.
     // 소유 세이브 슬롯(ownership.ownedCardKeys) 매핑을 이 창구만 알아야 하므로 첫실행 판정도 여기서 답한다.
     // DataSaveManager.Load() 이후면 유효(BootScene 시점엔 GameManager.Boot가 이미 로드함).
     public static bool HasAnyOwnedSaved()

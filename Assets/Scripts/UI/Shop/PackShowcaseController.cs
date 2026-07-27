@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 
 // Tab_Pack의 단일 카드팩 쇼케이스 컨트롤러. 진열할 대표 팩을 인스펙터에서 직접 할당받아
 // 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → CardPack 씬 전환을 수행한다.
-// 이 흐름은 LobbyFirstRunRedirect가 첫실행용으로 이미 검증한 경로를 버튼 트리거로 재현한 것.
+// 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 대상 팩(packData)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
 //   — 상점 SO 미개입(팩 미할당이면 구매 잠금).
