@@ -39,6 +39,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     [SerializeField] float stackJitterAngle = 1f;
 
     [Header("정리 라인업")]
+    [Tooltip("라인업 전체가 이 폭을 넘으면 간격을 자동으로 줄인다. 팩 장수가 늘어도 화면 밖으로 나가지 않게.")]
+    [SerializeField] float discardMaxWidth = 1300f;
     [SerializeField] float discardSpacing = 220f;
     [SerializeField] float discardScale = 0.7f;
     [SerializeField] float discardDuration = 0.35f;
@@ -243,8 +245,15 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Vector2 DiscardSlot(int _index)
     {
         var t_center = discardArea != null ? discardArea.anchoredPosition : Vector2.zero;
-        float t_offset = (_index - (m_total - 1) * 0.5f) * discardSpacing;
+        float t_offset = (_index - (m_total - 1) * 0.5f) * DiscardStep();
         return t_center + new Vector2(t_offset, 0f);
+    }
+
+    // 실제 간격. 장수가 많으면 지정 간격을 줄여 라인업이 화면 밖으로 밀려나지 않게 한다.
+    float DiscardStep()
+    {
+        if (m_total <= 1) return 0f;
+        return Mathf.Min(discardSpacing, discardMaxWidth / (m_total - 1));
     }
 
     // 임계에 못 미친 카드를 원래 자리로 되돌린다.
