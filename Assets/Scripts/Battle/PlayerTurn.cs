@@ -12,7 +12,7 @@ public class PlayerTurn : TurnBase
 
     public override void OnEnter()
     {
-        if (this.ctx.turnLabel != null) this.ctx.turnLabel.text = "플레이어 턴";
+        if (this.ctx.turnLabel != null) this.ctx.turnLabel.text = "내 턴";
         TurnState.InputAllowed = true;
         CardView.OnAttack    += HandleCardViewAttack;
     }
@@ -25,9 +25,17 @@ public class PlayerTurn : TurnBase
         {
             if (!await PrepareTutorialStepsAsync())
             {
-                Debug.LogWarning("[Tutorial] 플레이어 스텝 소진 → 턴 스킵(hang 방지)");
-                this.turnDone = true;
-                return;
+                // 스크립트 소진: 자유 전환 시나리오면 턴 스킵 대신 자유 공격 턴을 연다(안내 없음).
+                if (TutorialConfig.FreePlayAfterScript)
+                {
+                    EnterFreePlay();   // 아래 WaitUntil(turnDone)로 진행(일반 전투처럼 입력 대기)
+                }
+                else
+                {
+                    Debug.LogWarning("[Tutorial] 플레이어 스텝 소진 → 턴 스킵(hang 방지)");
+                    this.turnDone = true;
+                    return;
+                }
             }
         }
         // 튜토리얼: 생각시간 타이머 미기동(자동공격이 스크립트 스텝을 깨므로). 스텝 소진까지 대기.
@@ -44,6 +52,7 @@ public class PlayerTurn : TurnBase
     {
         TurnState.InputAllowed   = false;
         TurnState.ForcedAttacker = null;
+        TurnState.ForcedTarget   = null;
         CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복
         CardView.RestoreAllFades();
         CardView.OnAttack      -= HandleCardViewAttack;
@@ -72,14 +81,23 @@ public class PlayerTurn : TurnBase
             {
                 // Inspect: 배너만 띄우고(마스크 off) 입력 허용 → OnMouseDown/롱프레스 동작.
                 // 롱프레스 통지(WaitForInspectAsync) 대기 후, 다음 스텝 준비 위해 입력 재차단.
+                // "상대 정보 확인" 집중: 확인 대상(적 targetSlot) 1장만 밝게, 나머지 전부 암전. 대기 후 원복.
                 t_overlay?.ShowInspect(t_step0.guideMessage);
+                CardView.ForcedDimAlpha = 0.1f;
+                CardView.FadeAll(CardView.ForcedDimAlpha);
+                if (InSlotRange(t_step0.targetSlot))
+                {
+                    CardView t_inspectView = this.ctx.enemyFieldView.GetSlotView(t_step0.targetSlot);
+                    if (t_inspectView != null) CardView.FadeCards(1f, t_inspectView);
+                }
                 TurnState.InputAllowed = true;
                 if (t_overlay != null) await t_overlay.WaitForInspectAsync(t_ct);
                 TurnState.InputAllowed = false;
+                CardView.RestoreAllFades();
             }
             else if (t_overlay != null)
             {
-                t_overlay.ShowMessage(t_step0.guideMessage, t_step0.dimBackground);
+                t_overlay.ShowMessage(t_step0.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
                 await t_overlay.WaitForTapAsync(t_ct);
             }
             TutorialConfig.ConsumePlayerStep();
@@ -90,7 +108,7 @@ public class PlayerTurn : TurnBase
 
         // 재무장(처형) 중이면 스텝 공격자 슬롯이 처형 공격자와 일치해야 진행 가능(불일치=이번 턴 불가).
         // 스텝은 소비하지 않는다 — 다음 정규 턴에서 forced 없이 재시도되어 자연 복구.
-        if (_forced != null && t_step.attackerSlot != _forced.slotIndex)
+        if (_forced != null && !IsFreeStep(t_step) && t_step.attackerSlot != _forced.slotIndex)
         {
             Debug.LogWarning($"[Tutorial] 재무장 스텝 attackerSlot({t_step.attackerSlot}) != 처형 공격자 슬롯({_forced.slotIndex}) → 턴 종료");
             return false;
@@ -108,7 +126,7 @@ public class PlayerTurn : TurnBase
         // 공격 전 설명 탭 게이트(입력은 아직 차단 상태).
         if (t_step.waitForTap && t_overlay != null)
         {
-            t_overlay.ShowMessage(t_step.guideMessage, t_step.dimBackground);
+            t_overlay.ShowMessage(t_step.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
             await t_overlay.WaitForTapAsync(t_ct);
         }
 
@@ -120,6 +138,10 @@ public class PlayerTurn : TurnBase
     /// <summary>튜토리얼 공격 스텝이 지금 실행 가능한가(범위·생존). 도발 필터는 의도적 미적용.</summary>
     bool IsAttackStepPlayable(TutorialScenarioData.ScriptedAttack _step)
     {
+        // 자유공격: 생존 아군·적이 각각 1장 이상이면 실행 가능(슬롯 무관).
+        if (IsFreeStep(_step))
+            return this.ctx.playerField.GetActiveCards().Count > 0
+                && this.ctx.enemyField.GetActiveCards().Count > 0;
         if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
         CardInstance t_atk = this.ctx.playerField.GetSlot(_step.attackerSlot);
         CardInstance t_def = this.ctx.enemyField.GetSlot(_step.targetSlot);
@@ -131,19 +153,49 @@ public class PlayerTurn : TurnBase
     /// (OnMouseDown 게이트) (2)나머지 로컬 카드를 검게 암전(RestoreAllFades). "그 카드 말고 다 검게".</summary>
     void ShowTutorialStep(TutorialScenarioData.ScriptedAttack _step)
     {
+        // 자유공격: 강제 지정 없음 → 전 카드 조작 허용, 암전/하이라이트/포인터 없이 안내 문구만.
+        if (IsFreeStep(_step))
+        {
+            TurnState.ForcedAttacker = null;
+            TurnState.ForcedTarget   = null;
+            CardView.ForcedDimAlpha  = 0.3f;   // 기본값 원복
+            CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
+            TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false);
+            return;
+        }
+
         CardView t_atkView = InSlotRange(_step.attackerSlot) ? this.ctx.playerFieldView.GetSlotView(_step.attackerSlot) : null;
         CardView t_defView = InSlotRange(_step.targetSlot)   ? this.ctx.enemyFieldView.GetSlotView(_step.targetSlot)   : null;
 
         // 선택 게이트+집중 암전: 스크립트 공격자만 조작/밝게, 나머지 로컬 카드는 검게 덮는다.
         CardInstance t_atkCard = InSlotRange(_step.attackerSlot) ? this.ctx.playerField.GetSlot(_step.attackerSlot) : null;
+        CardInstance t_defCard = InSlotRange(_step.targetSlot)   ? this.ctx.enemyField.GetSlot(_step.targetSlot)    : null;
         TurnState.ForcedAttacker = t_atkCard;
+        TurnState.ForcedTarget   = t_defCard;   // 지정 타깃 외 적 카드 암전(집중 유도)
         CardView.ForcedDimAlpha  = 0.1f;   // 튜토리얼: 거의 검게(일반 전투 0.3보다 진하게)
-        CardView.RestoreAllFades();        // ForcedAttacker 기준 재적용 → 공격자만 full, 나머지 로컬 암전
+        CardView.RestoreAllFades();        // 공격자/타깃 기준 재적용 → 공격자·타깃만 full, 나머지 암전
 
         TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, t_atkView, t_defView, true);
     }
 
+    /// <summary>튜토리얼 자유 꼬리: 스크립트 소진 후 일반 전투처럼 자유 공격 턴을 연다.
+    /// 강제 지정·암전·안내 배너 없이 아무 로컬 카드로 아무 적 카드를 공격 가능. 스텝 소비 없음.</summary>
+    void EnterFreePlay()
+    {
+        this.forcedAttacker      = null;
+        TurnState.ForcedAttacker = null;
+        TurnState.ForcedTarget   = null;
+        CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복(일반 전투 기본)
+        CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
+        TutorialOverlayUI.Instance?.Clear();   // 안내 배너/힌트 제거
+        TurnState.InputAllowed   = true;
+    }
+
     static bool InSlotRange(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
+
+    /// <summary>자유공격 스텝: 공격자·타깃 슬롯 둘 다 -1 → 강제 지정 없이 아무 카드로 아무 적을 공격 가능.</summary>
+    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step)
+        => _step.attackerSlot < 0 && _step.targetSlot < 0;
 
     void HandleCardViewAttack(CardView _attacker, CardView _target)
     {
@@ -157,11 +209,22 @@ public class PlayerTurn : TurnBase
         // 튜토리얼: 스크립트 스텝(공격자 슬롯·타깃 슬롯)과 일치하는 공격만 허용. 불일치 = 입력 무시.
         if (TutorialConfig.IsActive)
         {
-            if (!TutorialConfig.TryPeekPlayerStep(out var t_step)) return;   // 스텝 소진 → 무시
-            if (t_step.kind != TutorialScenarioData.StepKind.Attack) return; // 설명 스텝 중 공격 차단(탭으로만 진행)
-            if (t_attCard.slotIndex != t_step.attackerSlot) return;
-            if (t_defCard.slotIndex != t_step.targetSlot) return;
-            TutorialConfig.ConsumePlayerStep();
+            if (!TutorialConfig.TryPeekPlayerStep(out var t_step))
+            {
+                // 스텝 소진: 자유 전환이면 소비 없이 통과(아무 카드로 아무 적 공격), 아니면 무시.
+                if (!TutorialConfig.FreePlayAfterScript) return;
+            }
+            else
+            {
+                if (t_step.kind != TutorialScenarioData.StepKind.Attack) return; // 설명 스텝 중 공격 차단(탭으로만 진행)
+                // 자유공격이 아니면 스크립트 슬롯과 일치하는 공격만 허용(불일치=입력 무시).
+                if (!IsFreeStep(t_step))
+                {
+                    if (t_attCard.slotIndex != t_step.attackerSlot) return;
+                    if (t_defCard.slotIndex != t_step.targetSlot) return;
+                }
+                TutorialConfig.ConsumePlayerStep();
+            }
         }
 
         ExecuteAttack(t_attCard, t_defCard);
@@ -206,6 +269,9 @@ public class PlayerTurn : TurnBase
     async UniTask ExecuteAttackAsync(CardInstance _attacker, CardInstance _defender)
     {
         TurnState.InputAllowed = false;
+
+        // 튜토리얼: 공격 연출 동안 안내 힌트(배너·탭힌트·하이라이트·포인터·dim) 전부 숨김. 다음 스텝에서 재표시.
+        if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
 
         CardView t_attackerView = this.ctx.playerFieldView.GetSlotView(_attacker.slotIndex);
         CardView t_defenderView = this.ctx.enemyFieldView.GetSlotView(_defender.slotIndex);
@@ -253,6 +319,13 @@ public class PlayerTurn : TurnBase
             {
                 if (!await PrepareTutorialStepsAsync(_attacker))
                 {
+                    // 자유 전환: 처형 재공격은 규칙상 그 카드로만 계속 → forcedAttacker(_attacker) 유지,
+                    // 암전/하이라이트도 위에서 잡은 그대로 두고 입력만 재개(안내 없음).
+                    if (TutorialConfig.FreePlayAfterScript)
+                    {
+                        TurnState.InputAllowed = true;
+                        return;
+                    }
                     this.forcedAttacker      = null;
                     TurnState.ForcedAttacker = null;
                     CardView.RestoreAllFades();

@@ -16,6 +16,12 @@ public static class TutorialConfig
 {
     public static bool IsActive { get; private set; }
 
+    /// <summary>이 튜토리얼에서 시너지 배지 표시 + 덱 시너지 적용 여부. 기본 false(초반 튜토리얼).</summary>
+    public static bool SynergyEnabled { get; private set; }
+
+    /// <summary>스크립트 큐 소진 후 플레이어 자유 공격 전환 여부. 기본 false(디자이너가 턴 종료 스텝 저작).</summary>
+    public static bool FreePlayAfterScript { get; private set; }
+
     /// <summary>고정 플레이어 덱(순서 = 등장 순서). 셔플 없음.</summary>
     public static List<CardData> PlayerDeck { get; private set; }
     /// <summary>고정 적 덱(순서 = 등장 순서). 셔플 없음.</summary>
@@ -27,14 +33,18 @@ public static class TutorialConfig
     public static void Begin(TutorialScenarioData _scenario)
     {
         if (_scenario == null) { End(); return; }
-        Begin(_scenario.playerDeck, _scenario.enemyDeck, _scenario.playerScript, _scenario.enemyScript);
+        Begin(_scenario.playerDeck, _scenario.enemyDeck, _scenario.playerScript, _scenario.enemyScript,
+              _scenario.enableSynergy, _scenario.freePlayAfterScript);
     }
 
     /// <summary>SO 없이 리스트로 직접 시작(셋업 씬 인스펙터 저작용).</summary>
     public static void Begin(List<CardData> _playerDeck, List<CardData> _enemyDeck,
-                             List<ScriptedAttack> _playerScript, List<ScriptedAttack> _enemyScript)
+                             List<ScriptedAttack> _playerScript, List<ScriptedAttack> _enemyScript,
+                             bool _enableSynergy = false, bool _freePlayAfterScript = false)
     {
         IsActive = true;
+        SynergyEnabled = _enableSynergy;
+        FreePlayAfterScript = _freePlayAfterScript;
         DeckConfig.SetMultiplayer(false);   // 튜토리얼은 항상 싱글 경로
         PlayerDeck   = new List<CardData>(_playerDeck ?? new List<CardData>());
         EnemyDeck    = new List<CardData>(_enemyDeck  ?? new List<CardData>());
@@ -44,7 +54,9 @@ public static class TutorialConfig
 
     public static void End()
     {
-        IsActive     = false;
+        IsActive       = false;
+        SynergyEnabled = false;
+        FreePlayAfterScript = false;
         PlayerDeck   = null;
         EnemyDeck    = null;
         playerScript = null;

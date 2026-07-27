@@ -41,16 +41,18 @@ public class BattleIntro : MonoBehaviour
         this.m_enemyDests = CacheAndHide(this.enemyFieldView, t_enemyFrom);
     }
 
+    /// <summary>카메라 확대 인트로(줌 인). 코인 토스 전에 먼저 실행. 완료까지 대기.</summary>
+    public async UniTask PlayCameraIntro()
+    {
+        if (Camera.main == null) return;
+        Vector3 t_pos = Camera.main.transform.position;
+        t_pos.z = this.cameraStartZ;
+        Camera.main.transform.position = t_pos;
+        await Camera.main.transform.DOMoveZ(this.cameraTargetZ, this.cameraDuration).ToUniTask();
+    }
+
     public async UniTask Play()
     {
-        if (Camera.main != null)
-        {
-            Vector3 t_pos = Camera.main.transform.position;
-            t_pos.z = this.cameraStartZ;
-            Camera.main.transform.position = t_pos;
-            _ = Camera.main.transform.DOMoveZ(this.cameraTargetZ, this.cameraDuration);
-        }
-
         Vector3 t_playerFrom = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 2f, 0f, 10f));
         Vector3 t_enemyFrom = Camera.main.ScreenToWorldPoint(new Vector3(-Screen.width, Screen.height, 10f));
 
