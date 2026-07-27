@@ -904,7 +904,7 @@ sequenceDiagram
 
 ```
 LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
-├── RankReward  (BasicFrame 프리팹 인스턴스 + Button 추가, 배선 없음)  → 스코프 밖: 비활성 ✅
+├── RankReward  (BasicFrame 프리팹 인스턴스 + Button 추가)  → H-33에서 활성화 + onClick = RankRewardPanel.Open ✅
 │   └── RankText (TMP = "랭크보상")   ⚠️ 티어 라벨이 아니라 버튼 캡션 — 건드리지 말 것
 └── PlayBtn
     └── RankInfo  (RectTransform만)           ← RankHud 부착 ✅
@@ -943,7 +943,7 @@ LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
 
 ---
 
-### H-33. 랭크 티어 달성 보상 — ✅ 코드 완료·검수 통과 (2026-07-27, 씬 배선 대기)
+### H-33. 랭크 티어 달성 보상 — ✅ 완료 (2026-07-27, 코드 + 씬 저작)
 
 > 표시용 진행도였던 랭크에 **보상 엔드포인트**를 붙인다. 티어에 도달하면 골드를 **순차로 1회씩** 수령한다.
 > **`RankManager`는 무수정** — 보상은 신규 static 창구 `RankRewardManager`로만 흐르고, 달성 판정만 `RankManager.GetInfo()`에 위임한다(동결 계약 무접촉).
@@ -1005,7 +1005,37 @@ flowchart TD
 |---|---|---|
 | `rowPrefab`을 Content 안의 목업 행으로 배선 | `Build()`가 Content 자식을 전부 지우면 프리팹 참조가 fake-null이 되어 **다음 Open부터 행 0개** | 원본은 숨기기만 하고 Destroy 제외 + 사본을 `SetActive(true)` (구현 반영됨) |
 | `RankConfig.asset`의 `rewardGold` | YAML엔 키가 **없는데** 런타임엔 값이 산다 — Unity가 `List<RankTier>` 초기화자로 만든 원소를 재사용하고 없는 필드를 덮어쓰지 않기 때문. 즉 **값이 에셋이 아니라 코드에 묶여 있다** | 지금은 저작 없이 동작하나, 인스펙터에서 `tiers` 크기를 건드리면 0으로 리셋될 수 있다 → 한 번 저장해 YAML에 굳힌다 |
-| `RankReward` 활성화만 하고 중복 `RankHud`를 방치 | `Tab_Match`에 붙은 두 번째 `RankHud`의 `badgeImage`가 **`RankReward` 프리팹 내부 Image**를 가리킨다 → 배지 아트를 저작하는 순간 보상 버튼 아이콘이 티어 배지로 덮인다 | 버튼 활성화와 컴포넌트 제거를 **한 세트로** 처리 |
+| `RankReward` 활성화만 하고 중복 `RankHud`를 방치 | `Tab_Match`에 붙은 두 번째 `RankHud`의 `badgeImage`가 **`RankReward` 프리팹 내부 Image**를 가리킨다 → 배지 아트를 저작하는 순간 보상 버튼 아이콘이 티어 배지로 덮인다 | 버튼 활성화와 컴포넌트 제거를 **한 세트로** 처리 → ✅ **해소(2026-07-27)**: 활성화와 동시에 `Tab_Match`의 `RankHud` 제거. 정상본(`PlayBtn/RankInfo`) 1개만 잔존 |
+
+#### 씬 저작 (2026-07-27, Unity MCP `Unity_RunCommand`)
+
+`RankRewardOverlay`는 `LobbyCanvas` **직속**(`LobbyRoot` 밖, `DragLayer` 다음 = 최상단 렌더).
+
+```
+LobbyCanvas
+└── RankRewardOverlay        RankRewardPanel        ← 항상 활성 (OnEnable 구독이 살아야 한다)
+    └── Root                                        ← 토글 대상(= root 필드). 저작 기본값 비활성
+        ├── Dim              Image(α .72) + Button  → onClick = RankRewardPanel.Close
+        ├── Panel            940 × (H−360)
+        │   ├── TitleRibbon 560×116 → TitleText "랭크 보상"
+        │   ├── CloseButton ⌀104 (onClick 영구배선 없음 — OnEnable이 런타임 등록)
+        │   └── Scroll       ScrollRect(vertical)
+        │       └── Viewport RectMask2D
+        │           └── Content  VerticalLayoutGroup + ContentSizeFitter
+        │               └── MockRow_0..2 (디자인타임 목업 — 런타임 Build()가 파괴)
+        └── ClaimPopup       RankRewardClaimPopup   ← Root 안 = Root가 꺼지면 구조적으로 못 남는다
+            ├── PopupDim     Button → onClick = RankRewardClaimPopup.Hide  (취소 경로)
+            └── PopupFrame   760×760 (리본 · 골드 아이콘 · 금액 · [획득])
+```
+
+행 프리팹 `RankRewardRow.prefab` (848×208 = 카드 164 + 쉐브론 44):
+`RowCard`(연하늘) → `Badge` · `TierName` · `RewardBox`(Button, 골드아이콘+금액) · `Highlight`(9-slice 링, `fillCenter=false` + `pixelsPerUnitMultiplier=4`) · `ClaimedMark` · `LockDim`(raycastTarget ✔ = 미달성 클릭 물리 차단) → `LockIcon`. 형제 순서상 `LockDim`이 최상단.
+
+> **`Highlight`에 `pixelsPerUnitMultiplier`가 필요한 이유**: `BasicFrame_Rectangle01_l`은 원본 92×93에 보더 46/46/46/47이다. 높이 164 카드에 `fillCenter=false`로 깔면 상하 보더 93이 카드 대부분을 먹어 **링이 아니라 노란 판**이 된다. 배율 4로 보더를 ~11px로 줄여야 테두리로 읽힌다.
+>
+> **상태 아이콘을 보상 박스 안 우측에 두는 이유**: 박스 정중앙에 두면 `x100` 텍스트를 가린다. 박스를 340으로 넓히고 `AmountText`의 `offsetMax`를 −78로 밀어 아이콘 자리를 비웠다.
+>
+> **캡처 방법**: `LobbyCanvas`는 ScreenSpaceOverlay라 `Unity_Camera_Capture`·`Capture2DScene` 어느 쪽에도 렌더되지 않는다. 검수 스크린샷은 `Root`를 임시 WorldSpace 캔버스에 복제해 찍고 복제본을 지웠다(원본 무접촉).
 
 #### 파일 대응
 
@@ -1016,6 +1046,7 @@ flowchart TD
 | 보상 테이블 | `OutGame/Rank/RankConfig.cs` (`RankTier.rewardGold`) | ✅ 필드 추가 |
 | SO 주입 | `Utils/DataLibrary.cs` 1줄 | ✅ |
 | 패널 · 행 · 수령 팝업 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` · `RankRewardClaimPopup.cs` | ✅ 신규 |
-| 씬 노드 · 행 프리팹 | `LobbyScene.unity` · `Assets/Assets/Prefabs/UI/RankUI/RankRewardRow.prefab` | ⬜ 사용자 저작 대기 |
+| 씬 노드 · 행 프리팹 | `LobbyScene.unity`(`RankRewardOverlay`) · `Assets/Assets/Prefabs/UI/RankUI/RankRewardRow.prefab` | ✅ 저작 완료 (Addressable 등록 없음 — 풀드 UI가 아니다) |
 
-- 미해결(후속 후보): `HasAnyClaimable` 소비처(진입 버튼 알림점) · 수령 팝업 취소 경로(딤에 Button → `Hide()`면 코드 수정 불요) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음).
+- ✅ 해소: 수령 팝업 취소 경로(`PopupDim` Button → `Hide()`, 코드 수정 0) · 중복 `RankHud`(제거 완료).
+- 미해결(후속 후보): `HasAnyClaimable` 소비처(진입 버튼 알림점 — 갱신할 런타임 스크립트가 없어 이번 스코프 밖) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음) · `RankConfig.asset`의 `rewardGold`가 여전히 YAML 미저작(코드 초기화자에 의존) · 티어 배지 아트 미저작 → 행 프리팹의 별 아이콘 1종이 전 티어 공통.

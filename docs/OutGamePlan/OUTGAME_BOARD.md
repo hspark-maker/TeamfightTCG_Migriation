@@ -115,7 +115,7 @@
 | **PKG-RANKTIER-WIRE** | SO 주입 (H-30) | `RankManager.SetConfig` | `RankConfig.asset` 저작 | 수정 `Utils/DataLibrary.cs`(필드1+호출1) + `Assets/SO/Rank/RankConfig.asset`(**사용자**) | CORE ✅ | outgame-engineer(코드)+사용자(에셋) | 🟢 | ✅ 완료(코드·검수 통과) — 사용자 에셋 인계 잔여 |
 | **PKG-RANKTIER-BATTLE** | 전투 종료 훅 (H-31) | `RankManager.ApplyBattleResult` (멀티 배제 게이트 제거 — 프로토 스코프 밖) | 없음(순수 소비) | 수정 `Battle/TurnRunner.cs`(`CaptureResult` 내부 1줄) | CORE ✅ | **battle-engineer** | 🟠 (TurnRunner 그룹) | ✅ 완료(검수 통과·컴파일 에러 0, Play 검증은 HUD 후 일괄) |
 | **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선 | CORE ✅, WIRE ✅(코드) | UI | 🟠 **로비 씬 그룹** | ✅ 완료(검수 발견 0·컴파일 에러 0·씬 배선 완료, **사용자 저장 필요**) |
-| **PKG-RANKTIER-REWARD** | 티어 달성 보상 (H-33) | `CurrencyManager.Earn/Save` · `RankManager.GetInfo` | **`RankRewardManager` 창구** + 세이브 필드 `RankSaveData.claimedCount` + `RankTier.rewardGold` | 신규 `OutGame/Rank/RankRewardManager.cs` · `UI/Rank/`(3) / 수정 `RankSaveData`·`RankConfig`·`DataLibrary`(1줄) / 씬 `RankReward` 버튼 | HUD ✅ | outgame-engineer | 🟠 | ✅ 완료(검수 통과·컴파일 에러 0·런타임 스모크 OK) — **씬 배선·프리팹 저작 대기** |
+| **PKG-RANKTIER-REWARD** | 티어 달성 보상 (H-33) | `CurrencyManager.Earn/Save` · `RankManager.GetInfo` | **`RankRewardManager` 창구** + 세이브 필드 `RankSaveData.claimedCount` + `RankTier.rewardGold` | 신규 `OutGame/Rank/RankRewardManager.cs` · `UI/Rank/`(3) / 수정 `RankSaveData`·`RankConfig`·`DataLibrary`(1줄) / 씬 `RankReward` 버튼 | HUD ✅ | outgame-engineer | 🟠 | ✅ 완료(검수 통과·컴파일 에러 0·런타임 스모크 OK) — **씬 배선·프리팹 저작 완료(2026-07-27, Unity MCP)** |
 
 **격리 판정 — 착수 전 반드시 확인**
 
