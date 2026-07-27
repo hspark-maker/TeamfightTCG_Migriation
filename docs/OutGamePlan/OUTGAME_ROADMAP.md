@@ -132,7 +132,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 - **H-28 랭크 세이브 슬롯**: `RankSaveData { long points }` + `UserSaveData.rank` 슬롯. 필드 추가만이라 **VERSION 1 유지**(`tutorial` 슬롯 선례).
 - **H-29 랭크 창구**: `RankManager`(static). **캐시 없이 세이브 슬롯 직접 읽기**(`OutgameTutorialProgress` 패턴) → `GameManager.Boot()` **무수정**(부트 계약 무접촉). 예외를 던지지 않는다(config null·빈 tiers·슬롯 null 전부 폴백).
 - **H-30 튜닝 SO**: `RankConfig` — 티어 테이블(`displayName`/`requiredPoints`/`badge`) + `winPoints`/`losePoints`. **`tiers`는 C# 필드 초기화자로 기본 테이블을 채운다** — `List<>`는 `CreateInstance` fallback에서 빈 리스트가 되고, `DataLibrary`가 **BattleScene에 없어** 전투 씬 직접 Play 시 항상 fallback이 타기 때문. 주입은 `DataLibrary`(전역, `RewardService.SetConfig` 선례).
-- **H-31 (battle) 전투 훅**: `TurnRunner.CaptureResult`에서 **보상 지급 뒤** `if (!DeckConfig.IsMultiplayer) RankManager.ApplyBattleResult(_won)`. 보상이 이미 영속된 뒤라 랭크가 실패해도 골드는 안전. **`_won`의 첫 소비자**(현재 보상 공식은 승패 무관).
+- **H-31 (battle) 전투 훅** ✅ **완료(2026-07-27)**: `TurnRunner.CaptureResult`에서 **보상 지급 뒤** `RankManager.ApplyBattleResult(_won)`. 보상이 이미 영속된 뒤라 랭크가 실패해도 골드는 안전. **`_won`의 첫 소비자**(현재 보상 공식은 승패 무관). ⚠️ **원안의 멀티 배제 게이트(`if (!DeckConfig.IsMultiplayer)`)는 제거됨** — 어뷰징 차단은 프로토 스코프 밖이라 모든 전투 결과를 무조건 가감(사용자 결정 2026-07-27). 아래 "멀티 제외"·"별도 disconnectWin 가드 불필요" 항목도 이 결정으로 무효.
 - **H-32 랭크 HUD**: `RankHud` — `RankBadge`(Image)·`RankPower` 내부 TMP 바인딩. **최초 렌더는 `Start()`**(아래 주의 참조).
 
 **불변식 4개**
