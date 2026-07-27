@@ -1,45 +1,72 @@
 using System;
-using System.Collections.Generic;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
-// 카드팩 개봉 연출 뷰. 흐름: 3D 팩 표시 → 클릭 1회 → 팩 숨김 → 결과 패널 fade in →
-// fade 완료 후 뽑힌 카드 타일 생성 → OnRevealComplete(컨트롤러가 획득 버튼 노출).
-// 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임.
+// 카드팩 개봉 연출의 진행자. 스테이지를 순서대로 몰고 가며, 각 단계의 실제 조작·표현은
+// PackTearHandle(뜯기) · PackCardStack(더미 넘기기) · PackCardView(카드 표시)가 나눠 맡는다.
+//
+// 흐름: 입장 → 뜯기(스와이프) → 분출 → 한 장씩 넘기기(스와이프) → 요약 → OnRevealComplete.
+// 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
+// 연출은 이미 끝난 거래(TryPurchase가 원자 영속)를 보여줄 뿐, 경제를 건드리지 않는다.
 public class PackRevealView : MonoBehaviour
 {
-    // 카드 배치 완료 시 1회 발화.
+    // 요약 도달 시 1회 발화(스킵으로 건너뛰어도 반드시 발화 — 획득 버튼 데드락 방지).
     public event Action OnRevealComplete;
 
     // 어느 씬의 어느 뷰든 팩이 열린 순간 발화(구독자는 씬 참조 없이 개봉 시점을 알 수 있다).
-    // 이 뷰는 구독자를 모른다 — "일어난 일"만 알린다.
+    // 발화 시점은 "팩이 열린 순간" = 뜯기 확정. 튜토리얼이 물려 있어 의미를 옮기지 않는다.
     public static event Action OnAnyPackOpened;
 
     [Header("3D 팩")]
-    [SerializeField] PackClickHandle packHandle;   // 씬의 3D 팩(클릭 인터랙션)
-    [SerializeField] GameObject packRoot;          // 팩 모델 루트. 미배선이면 packHandle의 오브젝트를 쓴다.
+    [SerializeField] PackTearHandle tearHandle;    // 봉인 뜯기 제스처
+    [SerializeField] GameObject packRoot;          // 팩 모델 루트. 미배선이면 tearHandle의 오브젝트를 쓴다.
+    [Tooltip("팩이 이만큼 아래에서 올라오며 등장한다(로컬).")]
+    [SerializeField] float packEnterDrop = 3f;
+    [SerializeField] float packEnterDuration = 0.45f;
 
-    [Header("결과 패널")]
+    [Header("분출")]
+    [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
+    [SerializeField] Transform shakeTarget;        // 보통 Main Camera(옵션)
+    [SerializeField] float shakeDuration = 0.3f;
+    [SerializeField] float shakeStrength = 0.25f;
+    [Tooltip("분출 후 카드 조작을 열기까지의 여유.")]
+    [SerializeField] float burstHold = 0.4f;
+
+    [Header("결과 화면")]
     [SerializeField] CanvasGroup revealPanel;      // 결과 패널(시작 alpha 0 / 입력 off)
-    [SerializeField] Transform cardGrid;           // GridLayoutGroup(3열) 컨테이너
-    [SerializeField] CollectionCardView cardPrefab;// 카드 타일 프리팹(Card.prefab)
+    [SerializeField] PackCardStack cardStack;      // 카드 더미 + 넘기기
     [SerializeField] float panelFadeDuration = 0.35f;
 
-    // Idle → PackShown(클릭 대기) → Revealing(fade+배치) → Done.
-    enum EViewState { Idle, PackShown, Revealing, Done }
+    [Header("표시 (옵션)")]
+    [SerializeField] TMP_Text remainingText;       // 남은 장수
+    [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
+    [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
+    [SerializeField] Button skipButton;            // 명시적 건너뛰기(뜯기 단계에서도 빠져나갈 수 있게)
 
-    EViewState m_state = EViewState.Idle;
+    // Idle → Entering(팩 등장) → Tearing(뜯기 대기) → Bursting(분출) → Flicking(넘기기) → Summary.
+    enum EStage { Idle, Entering, Tearing, Bursting, Flicking, Summary }
 
-    // 이번 개봉 세션 결과(클릭 시 이 카드로 타일 생성).
+    EStage m_stage = EStage.Idle;
+
+    // 이번 개봉 세션 결과.
     OpenedPack m_pending;
 
-    // 이번 개봉으로 생성된 카드 타일들(정리용).
-    readonly List<CollectionCardView> m_spawned = new List<CollectionCardView>();
+    // 현재 스테이지의 시간 기반 연출. 스킵은 이걸 Complete로 밀어 다음 단계로 넘긴다.
+    Sequence m_stageSeq;
 
-    /// <summary>개봉 세션 시작: 3D 팩을 보이고 클릭 대기.</summary>
+    // 스킵 횟수. 첫 번째는 현재 단계만, 두 번째부터는 요약까지 단번에.
+    int m_skips;
+
+    // packRoot 원위치(등장 트윈 기준).
+    Vector3 m_packHome;
+    bool m_packHomeCaptured;
+
+    /// <summary>개봉 세션 시작: 팩이 등장하고 뜯기 대기로 이어진다.</summary>
     public void BeginOpen(OpenedPack _opened)
     {
-        if (m_state != EViewState.Idle) return;   // 재진입 = 중복 개봉 방지
+        if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
         if (_opened == null || !_opened.Success)
         {
             Debug.LogWarning("[PackRevealView] BeginOpen에 유효하지 않은 OpenedPack — 개봉 취소.");
@@ -47,26 +74,281 @@ public class PackRevealView : MonoBehaviour
         }
 
         m_pending = _opened;
-        ClearSpawned();
-        ResetPanel();
+        m_skips = 0;
 
-        m_state = EViewState.PackShown;
+        ResetPanel();
+        if (cardStack != null) cardStack.Clear();
+        if (summaryGroup != null) summaryGroup.SetActive(false);
+        if (skipButton != null) skipButton.gameObject.SetActive(true);
+
+        EnterEntering();
+    }
+
+    /// <summary>건너뛰기. 첫 요청은 현재 단계를 즉시 끝내고, 이후 요청은 요약까지 단번에 간다.</summary>
+    public void RequestSkip()
+    {
+        if (m_stage == EStage.Idle || m_stage == EStage.Summary) return;
+
+        m_skips++;
+        if (m_skips == 1) SkipCurrentStage();
+        else SkipToSummary();
+    }
+
+    void OnEnable()
+    {
+        if (tearHandle != null) tearHandle.OnTorn += HandleTorn;
+
+        if (cardStack != null)
+        {
+            cardStack.OnCardRevealed    += HandleCardRevealed;
+            cardStack.OnRemainingChanged += HandleRemainingChanged;
+            cardStack.OnEmptied         += HandleStackEmptied;
+            cardStack.OnSkipRequested   += RequestSkip;
+        }
+
+        if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
+    }
+
+    void OnDisable()
+    {
+        if (tearHandle != null)
+        {
+            tearHandle.OnTorn -= HandleTorn;
+            tearHandle.Disarm();
+        }
+
+        if (cardStack != null)
+        {
+            cardStack.OnCardRevealed    -= HandleCardRevealed;
+            cardStack.OnRemainingChanged -= HandleRemainingChanged;
+            cardStack.OnEmptied         -= HandleStackEmptied;
+            cardStack.OnSkipRequested   -= RequestSkip;
+        }
+
+        if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
+
+        // 연출 중 비활성 시 좀비 트윈 정리 + 상태 리셋(재활성 후 "중간 단계에 갇힘" 방지).
+        KillStageSeq();
+        if (revealPanel != null) revealPanel.DOKill();
+        if (packRoot != null) packRoot.transform.DOKill();
+
+        m_stage = EStage.Idle;
+    }
+
+    // ── 스테이지 ────────────────────────────────────────────────
+
+    // 입장: 팩이 아래에서 올라와 안착한다.
+    void EnterEntering()
+    {
+        m_stage = EStage.Entering;
 
         var t_root = ResolvePackRoot();
-        if (t_root != null) t_root.SetActive(true);
-
-        if (packHandle == null)
+        if (t_root == null)
         {
-            // 클릭 인터랙션 미배선: 바로 다음 단계로(소프트락 방지).
-            Debug.LogWarning("[PackRevealView] packHandle 미배선 → 클릭 생략하고 바로 공개 진행.");
-            OnPackClicked();
+            Debug.LogWarning("[PackRevealView] 팩 오브젝트 미배선 → 등장 생략.");
+            EnterTearing();
             return;
         }
 
-        packHandle.Arm(OnPackClicked);
+        t_root.SetActive(true);
+
+        var t_tr = t_root.transform;
+        CapturePackHome(t_tr);
+
+        t_tr.DOKill();
+        t_tr.localPosition = m_packHome - new Vector3(0f, packEnterDrop, 0f);
+        t_tr.localScale = Vector3.one;
+
+        KillStageSeq();
+        m_stageSeq = DOTween.Sequence()
+            .SetLink(t_root)
+            .Append(t_tr.DOLocalMove(m_packHome, packEnterDuration).SetEase(Ease.OutBack))
+            .OnComplete(EnterTearing);
     }
 
-    // 패널 초기화: 완전 투명 + 입력 차단(fade 완료까지 획득 버튼도 못 눌리게).
+    // 뜯기: 유저가 스와이프로 봉인을 그을 때까지 기다린다(시간 기반 아님).
+    void EnterTearing()
+    {
+        m_stage = EStage.Tearing;
+
+        if (tearHandle == null)
+        {
+            // 제스처 미배선: 소프트락을 만들지 않고 바로 다음 단계로.
+            Debug.LogWarning("[PackRevealView] tearHandle 미배선 → 뜯기 생략.");
+            HandleTorn();
+            return;
+        }
+
+        tearHandle.Arm();
+    }
+
+    // 뜯김 확정 → 분출.
+    void HandleTorn()
+    {
+        if (m_stage != EStage.Tearing) return;
+        EnterBursting();
+    }
+
+    // 분출: 팩이 사라지고 빛·파티클이 터지며 결과 화면이 올라온다. 카드 더미도 여기서 세운다.
+    void EnterBursting()
+    {
+        m_stage = EStage.Bursting;
+
+        OnAnyPackOpened?.Invoke();
+
+        if (burstEffect != null) burstEffect.Play();
+        if (shakeTarget != null)
+        {
+            shakeTarget.DOKill();
+            shakeTarget.DOShakePosition(shakeDuration, shakeStrength).SetLink(shakeTarget.gameObject);
+        }
+
+        var t_root = ResolvePackRoot();
+        if (t_root != null) t_root.SetActive(false);
+
+        // 카드는 흩어졌다 모이지 않는다 — 곧장 최종 더미 자리에 선다.
+        if (cardStack != null) cardStack.Build(m_pending != null ? m_pending.Cards : null);
+        else Debug.LogWarning("[PackRevealView] cardStack 미배선 → 카드 표시 생략.");
+
+        KillStageSeq();
+        m_stageSeq = DOTween.Sequence().SetLink(gameObject);
+
+        if (revealPanel != null)
+        {
+            revealPanel.DOKill();
+            revealPanel.alpha = 0f;
+            m_stageSeq.Append(revealPanel.DOFade(1f, panelFadeDuration))
+                      .AppendCallback(() =>
+                      {
+                          if (revealPanel == null) return;
+                          revealPanel.blocksRaycasts = true;
+                          revealPanel.interactable = true;
+                      });
+        }
+
+        m_stageSeq.AppendInterval(burstHold)
+                  .OnComplete(EnterFlicking);
+    }
+
+    // 넘기기: 맨 위부터 스와이프로 한 장씩. 여기부터는 유저 페이스다.
+    void EnterFlicking()
+    {
+        m_stage = EStage.Flicking;
+
+        if (cardStack == null || cardStack.Remaining == 0)
+        {
+            // 표시할 카드가 없어도 요약까지는 간다(획득 버튼 대기 데드락 방지).
+            EnterSummary();
+            return;
+        }
+
+        cardStack.BeginInteraction();
+    }
+
+    // 더미가 비었다 → 요약.
+    void HandleStackEmptied()
+    {
+        if (m_stage != EStage.Flicking && m_stage != EStage.Bursting) return;
+        EnterSummary();
+    }
+
+    // 요약: 라인업과 총 환급을 보여주고 획득을 넘긴다.
+    void EnterSummary()
+    {
+        if (m_stage == EStage.Summary) return;
+        m_stage = EStage.Summary;
+
+        KillStageSeq();
+
+        if (skipButton != null) skipButton.gameObject.SetActive(false);
+        if (remainingText != null) remainingText.gameObject.SetActive(false);
+        if (summaryGroup != null) summaryGroup.SetActive(true);
+
+        if (totalRefundText != null)
+        {
+            long t_refund = m_pending != null ? m_pending.TotalRefund : 0;
+            // 환급이 없으면 줄 자체를 숨긴다 — "+0"은 정보가 아니라 잡음이다.
+            totalRefundText.gameObject.SetActive(t_refund > 0);
+            if (t_refund > 0) totalRefundText.text = $"+{t_refund:N0}";
+        }
+
+        OnRevealComplete?.Invoke();
+    }
+
+    // ── 스킵 ────────────────────────────────────────────────────
+
+    // 현재 단계만 즉시 끝낸다. 시간 기반 단계는 Complete로 밀고, 입력 대기 단계는 직접 넘긴다.
+    void SkipCurrentStage()
+    {
+        switch (m_stage)
+        {
+            case EStage.Entering:
+            case EStage.Bursting:
+                // Complete(true)면 OnComplete가 실행되며 다음 단계로 이어진다.
+                if (m_stageSeq != null && m_stageSeq.IsActive()) m_stageSeq.Complete(true);
+                break;
+
+            case EStage.Tearing:
+                if (tearHandle != null) tearHandle.ForceTornInstant();
+                EnterBursting();
+                break;
+
+            case EStage.Flicking:
+                // 넘기기의 "현재 단계 완료"는 남은 전부 정리다 — 한 장만 넘기는 건 스킵이 아니다.
+                if (cardStack != null) cardStack.FlickAllImmediate();
+                else EnterSummary();
+                break;
+        }
+    }
+
+    // 어느 단계든 요약으로 직행.
+    void SkipToSummary()
+    {
+        KillStageSeq();
+
+        if (tearHandle != null) tearHandle.ForceTornInstant();
+
+        var t_root = ResolvePackRoot();
+        if (t_root != null) t_root.SetActive(false);
+
+        if (revealPanel != null)
+        {
+            revealPanel.DOKill();
+            revealPanel.alpha = 1f;
+            revealPanel.blocksRaycasts = true;
+            revealPanel.interactable = true;
+        }
+
+        if (cardStack != null)
+        {
+            // 분출 전에 스킵했다면 더미가 아직 없다 — 세운 뒤 곧장 정리한다.
+            if (cardStack.Remaining == 0 && m_stage != EStage.Flicking)
+                cardStack.Build(m_pending != null ? m_pending.Cards : null);
+
+            cardStack.FlickAllImmediate();   // OnEmptied → EnterSummary
+        }
+
+        EnterSummary();
+    }
+
+    // ── 카드 단계 콜백 ──────────────────────────────────────────
+
+    // 새 맨 위 카드가 드러났다 — 신규/중복 강조는 이 시점에 터진다.
+    void HandleCardRevealed(PackCardView _view)
+    {
+        if (_view != null) _view.PlayRevealAccent();
+    }
+
+    void HandleRemainingChanged(int _remaining)
+    {
+        if (remainingText == null) return;
+        remainingText.text = $"{_remaining}";
+        remainingText.gameObject.SetActive(_remaining > 0);
+    }
+
+    // ── 보조 ────────────────────────────────────────────────────
+
+    // 패널 초기화: 완전 투명 + 입력 차단(fade 완료까지 아무것도 눌리지 않게).
     void ResetPanel()
     {
         if (revealPanel == null) return;
@@ -77,84 +359,19 @@ public class PackRevealView : MonoBehaviour
         revealPanel.interactable = false;
     }
 
-    // 팩 클릭 확정: 팩 숨김 → 패널 fade in → 완료 시 카드 배치.
-    void OnPackClicked()
+    void CapturePackHome(Transform _tr)
     {
-        if (m_state != EViewState.PackShown) return;   // 중복 클릭/오작동 방어
-        m_state = EViewState.Revealing;
-
-        OnAnyPackOpened?.Invoke();
-
-        var t_root = ResolvePackRoot();
-        if (t_root != null) t_root.SetActive(false);
-
-        if (revealPanel == null)
-        {
-            Debug.LogWarning("[PackRevealView] revealPanel 미배선 → fade 생략하고 카드 배치.");
-            SpawnCards();
-            return;
-        }
-
-        revealPanel.DOKill();
-        revealPanel.DOFade(1f, panelFadeDuration)
-            .SetLink(revealPanel.gameObject)   // 패널이 파괴되면 트윈도 함께 죽는다.
-            .OnComplete(() =>
-            {
-                if (revealPanel == null) return;
-                revealPanel.blocksRaycasts = true;
-                revealPanel.interactable = true;
-                SpawnCards();
-            });
-    }
-
-    // 뽑힌 카드를 그리드에 생성. 3열 배치는 GridLayoutGroup 담당(좌표 계산 없음).
-    void SpawnCards()
-    {
-        if (m_state != EViewState.Revealing) return;
-
-        var t_cards = m_pending != null ? m_pending.Cards : null;
-        int t_count = t_cards != null ? t_cards.Count : 0;
-
-        if (cardPrefab == null || cardGrid == null)
-            Debug.LogWarning("[PackRevealView] cardPrefab/cardGrid 미배선 → 카드 표시 생략.");
-        else if (t_count == 0)
-            Debug.LogWarning("[PackRevealView] 개봉 성공했으나 표시할 카드가 없음.");
-        else
-        {
-            for (int t_i = 0; t_i < t_count; t_i++)
-            {
-                var t_drawn = t_cards[t_i];
-                if (t_drawn.Card == null) continue;
-
-                var t_view = Instantiate(cardPrefab, cardGrid);
-                t_view.Bind(t_drawn.Card, true);   // 개봉 카드는 항상 소유
-                m_spawned.Add(t_view);
-            }
-        }
-
-        // 미배선/0장이어도 발화 — 획득 버튼 대기 데드락 방지.
-        m_state = EViewState.Done;
-        OnRevealComplete?.Invoke();
+        if (m_packHomeCaptured) return;
+        m_packHome = _tr.localPosition;
+        m_packHomeCaptured = true;
     }
 
     GameObject ResolvePackRoot()
-        => packRoot != null ? packRoot : (packHandle != null ? packHandle.gameObject : null);
+        => packRoot != null ? packRoot : (tearHandle != null ? tearHandle.gameObject : null);
 
-    // 이전 개봉 타일 정리.
-    void ClearSpawned()
+    void KillStageSeq()
     {
-        for (int t_i = 0; t_i < m_spawned.Count; t_i++)
-            if (m_spawned[t_i] != null) Destroy(m_spawned[t_i].gameObject);
-        m_spawned.Clear();
-    }
-
-    // 연출 중 비활성 시 좀비 트윈 정리 + 상태 리셋(타일은 다음 BeginOpen의 ClearSpawned가 정리).
-    // 클릭 입력도 함께 내려야 재활성 후 "armed지만 Idle" 상태로 클릭이 먹히는 교착을 막는다.
-    void OnDisable()
-    {
-        if (revealPanel != null) revealPanel.DOKill();
-        if (packHandle != null) packHandle.Disarm();
-
-        m_state = EViewState.Idle;
+        if (m_stageSeq != null && m_stageSeq.IsActive()) m_stageSeq.Kill();
+        m_stageSeq = null;
     }
 }

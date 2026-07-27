@@ -19,7 +19,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 |---|---|
 | 범위 | 전체 루프를 **단계별 Phase**로 순차 구현 (기반→성장). 뽑기·카드팩·전투보상 포함 |
 | 재화 | **단일 골드** — 전투 보상·도감 생산·카드팩 구매가 하나의 골드 공유 |
-| 랭크 | **범위 밖** — 엔드포인트 표기만. 기존 랜덤매칭 유지 (향후 서버 권위 전환과 함께 기획) |
+| 랭크 | **2단 분리**(2026-07-27 갱신). **표시용 티어 진행도 = 도메인 H로 로컬 구현**(AI전 결과로 포인트 가감, 보상·난이도·매칭 영향 없음). **PvP 실력 랭크 = 여전히 범위 밖** — 서버 권위 전환과 함께 기획 |
 
 ## 반드시 지킬 경계·규약
 
@@ -47,8 +47,9 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 | **E** | 카드팩 경제 | 팩 정의 · 구매(골드 차감) · 드로우 → 소유 부여 | outgame-engineer |
 | **F** | 아웃게임 UI | 골드 HUD · 도감 갤러리 · 상점 · 덱빌더 소유 필터 | UI(배선 문서화) |
 | **G** | 신규 유저 온보딩 | 첫실행 감지(소유==0) → 스타터팩(6장) 개봉 → 튜토리얼 전투 직행 라우팅 | outgame-engineer + UI (+battle-engineer 선택) |
+| **H** | 랭크(표시용 티어) | 전투 결과 → 포인트 가감 · 티어 파생 · 로비 배지 표시 | outgame-engineer + battle-engineer(훅 1줄) |
 
-> 랭크(엔드포인트)는 별도 도메인 없이 문서 표기만 — 향후 서버 권위 전환(ARCHITECTURE §10 리스크①)과 함께 기획.
+> **PvP 실력 랭크**는 여전히 별도 도메인 없이 문서 표기만 — 서버 권위 전환(ARCHITECTURE §10 리스크①)과 함께 기획. 도메인 H는 그 전 단계로, **실력 지표가 아니라 표시용 진행도**(칭호)다. 근거는 H 절 참조.
 
 ---
 
@@ -111,6 +112,47 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 
 > **세이브 스키마 불변(권장)**: 판정을 `OwnedCount==0`으로 하므로 `UserSaveData` 변경 없음. **엣지**: 개봉(6장 영속) 후 전투 전 종료 시 다음 부트는 로비 직행(튜토리얼 전투 미경험) — 허용 동작. 전투까지 보장하려면 후속으로 `tutorialBattleDone` 플래그(필드 추가만).
 
+### H. 랭크 — 표시용 티어 진행도 (2026-07-27 설계 승인)
+
+> 목표 루프의 **엔드포인트 표기**를 실물로 세운다. 단 **실력 지표가 아니라 진행도 표시**(칭호)다.
+>
+> **왜 로컬 구현이 가능한가 — 스코프를 표시용으로 좁혔기 때문**: 실측상 로비 Match 탭은 `LobbyMatchLauncher.StartAiBattle` 하나만 배선돼 **100% AI전**이고, `RandomMatchPanel`/`MultiplayerLobbyPanel`은 `MainMenu.unity`에만 있는데 **그 씬을 런타임에 로드하는 코드가 프로젝트에 없다**. 게다가 Fusion Shared + 공격 RPC 무검증이라 서버 권위 없이는 랭크 위조가 가능하다(ARCHITECTURE §10 리스크①). 그래서 **보상·난이도·매칭에 일절 영향을 주지 않는 표시 전용**으로 한정했다 — 위조돼도 잃는 게 없으므로 서버 권위가 전제되지 않는다. PvP 실력 랭크를 하려면 (a) 랜덤매칭 UI의 로비 이식 (b) 서버 권위 전환이 선행이다.
+
+**확정 스코프**
+
+| 항목 | 결정 |
+|---|---|
+| 성격 | 표시용 진행도. **보상·난이도·매칭 영향 없음** |
+| 승강 | 포인트 누적 + 티어 구간 (승 +N / 패 −M) |
+| 난이도 | **고정** — `AIDeckConfig`·`EnemyTurn` 무수정 |
+| 강등 | **티어 강등 없음**, 포인트만 감소 |
+| 표시 | 배지 = 티어(스프라이트) / 오벌 = 포인트. **씬 노드 신규 생성 0** |
+| 티어 테이블 후속 수정 | 소급 강등 **수용** — SO 툴팁에 "임계치는 하향만" 저작 규칙 |
+
+- **H-28 랭크 세이브 슬롯**: `RankSaveData { long points }` + `UserSaveData.rank` 슬롯. 필드 추가만이라 **VERSION 1 유지**(`tutorial` 슬롯 선례).
+- **H-29 랭크 창구**: `RankManager`(static). **캐시 없이 세이브 슬롯 직접 읽기**(`OutgameTutorialProgress` 패턴) → `GameManager.Boot()` **무수정**(부트 계약 무접촉). 예외를 던지지 않는다(config null·빈 tiers·슬롯 null 전부 폴백).
+- **H-30 튜닝 SO**: `RankConfig` — 티어 테이블(`displayName`/`requiredPoints`/`badge`) + `winPoints`/`losePoints`. **`tiers`는 C# 필드 초기화자로 기본 테이블을 채운다** — `List<>`는 `CreateInstance` fallback에서 빈 리스트가 되고, `DataLibrary`가 **BattleScene에 없어** 전투 씬 직접 Play 시 항상 fallback이 타기 때문. 주입은 `DataLibrary`(전역, `RewardService.SetConfig` 선례).
+- **H-31 (battle) 전투 훅**: `TurnRunner.CaptureResult`에서 **보상 지급 뒤** `if (!DeckConfig.IsMultiplayer) RankManager.ApplyBattleResult(_won)`. 보상이 이미 영속된 뒤라 랭크가 실패해도 골드는 안전. **`_won`의 첫 소비자**(현재 보상 공식은 승패 무관).
+- **H-32 랭크 HUD**: `RankHud` — `RankBadge`(Image)·`RankPower` 내부 TMP 바인딩. **최초 렌더는 `Start()`**(아래 주의 참조).
+
+**불변식 4개**
+
+1. **티어 = `points`의 순수 파생** — "`requiredPoints <= points`를 만족하는 최대 인덱스, 없으면 0 클램프". 도달 티어를 따로 저장하지 않는다(이중 진실원 회피).
+2. **강등 없음 = 가감 시 하한 클램프** — `max(points + delta, max(가감 "전" 티어의 requiredPoints, 0))`. 이중 하한이라 음수 불가.
+3. **부트 무수정** — 캐시가 없으므로 `Init()`이 없다. `GameManager`가 `BeforeSceneLoad`+`DontDestroyOnLoad`라 어느 씬에서 Play를 시작하든 `Load()`가 끝나 있다.
+4. **즉시 `Save()`** — 전투 씬→로비 씬 왕복을 견뎌야 하므로 지연 flush에 맡기지 않는다(`OutgameTutorialProgress.CommitStep` 선례). `GameManager.Flush()`에 얹는 건 부트 계약 접촉 + pause/quit에만 도는 문제로 **채택 안 함**.
+
+**집계 제외/포함**
+
+- **멀티 제외**: 스코프가 PvP 아님 + 상대 이탈 유도 시 `HandlePlayerLeft`가 `CaptureResult(true)`를 불러 **전투 없이 무한 가산**되는 어뷰징 차단. 부전승 경로 2개는 둘 다 `if (!DeckConfig.IsMultiplayer) return;`으로 시작하므로 **별도 `disconnectWin` 가드 불필요**.
+- **튜토리얼 포함**: `PKG-TUT-REWARD`(튜토리얼 보상 미지급 가드)가 "보류(선택)·지급 허용해도 무해"인 현행 정책과 일관. 표시용이라 해악 0이고, 신규 유저가 로비 복귀 시 배지가 켜져 있는 게 온보딩에 유리.
+
+**의도적으로 덜어낸 것** — `OnRankChanged` 이벤트(랭크는 **로비에서 변동할 경로가 0**, 전투 씬에서만 변함 → `Start`/`OnEnable` 재조회로 충분), 구간 진행률 필드(씬에 진행바 없음 = 소비처 0), `ApplyBattleResult` 반환값(결과 팝업 표시를 보류했으므로 소비처 0).
+
+> **⚠️ `RankHud`에 `GoldHud` 패턴을 그대로 복제하면 버그**: `GoldHud`의 `OnEnable` 즉시 렌더가 안전한 건 `CurrencyManager.Init()`이 `BeforeSceneLoad`에서 끝나기 때문이다. `RankConfig` 주입은 `DataLibrary.Awake`(실행순서 0)에서 일어나고 `Tab_Match`·`RankInfo`가 모두 씬에 활성 저장돼 있어 **`RankHud.OnEnable`이 `DataLibrary.Awake`보다 먼저 돌 수 있다**(비결정). 이벤트를 뺐으므로 잘못된 첫 렌더가 그대로 굳는다. → **최초 렌더는 `Start()`**, `OnEnable`은 `m_started` 가드.
+
+> **범위 밖(후속)**: 씬의 `RankReward`("랭크보상") 버튼 — 티어 승급 보상은 이번 스코프에 없으므로 **비활성**. 필요해지면 도감 완성보상(`ClaimCompletionReward`) 패턴을 복제해 순수 추가로 붙인다. 결과 팝업의 랭크 변동 연출도 후속(`Show(long)` 확장은 `WinUI`/`LoseUI` 프리팹 2개 저작 + 완료·검수된 `PKG-POPUP` 재개봉을 유발).
+
 ---
 
 ## 워크플로우 — 의존 웨이브 & 병렬 규칙
@@ -170,4 +212,5 @@ flowchart LR
 - **Phase 1**: 싱글/멀티 승·패·이탈 각각 → 전투 종료 시 남은 카드 수 비례 골드 지급·영속. 전투당 1회(`resultCaptured` 가드)로 중복 지급 없음. HUD 반영은 F-17 구현 후. (환산·지급 로직은 디버그 E2E 8/8 통과, 실전 전투 캡처는 Play 모드 검증 대기)
 - **Phase 2**: 행 완성 → 생산 시작, 디버그 시각 점프로 오프라인 누적·상한·수확 검증. 카드 1장 추가 후 기존 진행도·완성 플래그 불변.
 - **Phase 3**: 골드로 팩 구매 → 차감·신규 소유 부여 → 덱빌더 소유 카드만 편성. 골드 부족 시 구매 실패.
+- **도메인 H(랭크)**: 단위(인메모리 세이브 격리) — ① 승리 반복 → 임계치 넘는 순간 티어 상승 ② **강등 없음**: 승급 직후 패배 반복해도 포인트가 현 티어 임계치 밑으로 안 내려가고 티어 불변 ③ 티어0에서 패배 반복 → 포인트 ≥ 0 ④ **config 미배선**(`SetConfig(null)`)에서 전 API 예외 0 + 기본 테이블로 티어 산출 ⑤ 빈 `tiers` → `TierIndex=-1`, 예외 0 ⑥ 구 세이브(rank 노드 없음) 로드 → `points=0` 정상(VERSION 1 유지). 통합(Play) — 로비→AI전 승/패→로비 복귀 시 배지·포인트 갱신, **보상 회귀**(랭크 추가가 지급 골드에 영향 없음).
 - **공통**: Phase 구현 후 `tcg-reviewer` 검수 + 메인이 Unity 콘솔 컴파일 검증.

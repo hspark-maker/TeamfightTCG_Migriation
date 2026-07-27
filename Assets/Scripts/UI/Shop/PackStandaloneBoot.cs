@@ -12,6 +12,12 @@ public class PackStandaloneBoot : MonoBehaviour
     [Tooltip("팩 미배선 시 쓸 카드 목록. 팩이 있으면 무시된다.")]
     [SerializeField] List<CardData> dummyCards = new List<CardData>();
 
+    [Header("신규/중복 섞기")]
+    [Tooltip("켜면 홀수 번째 카드를 중복으로 만든다. 신규 연출만 반복되면 중복 표현을 검증할 수 없다.")]
+    [SerializeField] bool alternateDuplicates;
+    [Tooltip("중복으로 만든 카드에 붙일 환급 Gold(표시용 — 실제 지갑은 건드리지 않는다).")]
+    [Min(0)] [SerializeField] long dummyRefund = 10;
+
     [Header("획득 후 목적지")]
     [Tooltip("비우면 획득해도 씬 전이 없이 이 씬에 머문다(단독 실행 기본값).")]
     [SerializeField] string nextScene = "";
@@ -30,10 +36,13 @@ public class PackStandaloneBoot : MonoBehaviour
             return;
         }
 
-        // 더미는 전부 신규·환급 0으로 고정(소유 세이브를 읽지 않으므로 사후 판정 불가).
+        // 소유 세이브를 읽지 않으므로 신규 여부는 사후 판정이 불가하다 — 여기서 저작한 값을 그대로 태운다.
         var t_drawn = new List<DrawnCard>(t_cards.Count);
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
-            t_drawn.Add(new DrawnCard(t_cards[t_i], true, 0));
+        {
+            bool t_isNew = !alternateDuplicates || (t_i % 2 == 0);
+            t_drawn.Add(new DrawnCard(t_cards[t_i], t_isNew, t_isNew ? 0 : dummyRefund));
+        }
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
         PackHandoff.Set(OpenedPack.CreateSuccess(t_packId, t_drawn), nextScene, startTutorial);
