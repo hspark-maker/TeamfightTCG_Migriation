@@ -11,8 +11,7 @@ public class TurnContext
     public TMP_Text turnLabel;
     public DeckPileUI playerDeckUI;
     public DeckPileUI enemyDeckUI;
-    public TurnBannerUI playerTurnBanner;
-    public TurnBannerUI enemyTurnBanner;
+    public TurnBannerUI turnBanner;
 
     public void RefreshViews()
     {

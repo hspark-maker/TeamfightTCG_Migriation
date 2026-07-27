@@ -7,6 +7,24 @@ public class UIPoolManager : MonoBehaviour
 {
     public static UIPoolManager instance;
 
+    static bool s_nullWarned;
+
+    /// <summary>외부 접근용. instance가 없으면(씬에 UIPoolManager 미배치) 에러 로그를 1회 남긴다.
+    /// 예전엔 `instance?.`로 조용히 무시돼 팝업/오버레이가 안 떠도 원인을 알 수 없었다(튜토리얼 정보확인 버그).</summary>
+    public static UIPoolManager Instance
+    {
+        get
+        {
+            if (instance == null && !s_nullWarned)
+            {
+                s_nullWarned = true;
+                Debug.LogError("[UIPoolManager] instance 없음 — 현재 씬에 UIPoolManager가 배치되지 않았습니다. " +
+                               "팝업/오버레이(카드 정보, 시너지 설명, YN 팝업 등)가 동작하지 않습니다.");
+            }
+            return instance;
+        }
+    }
+
     [SerializeField] Canvas canvas;
     [SerializeField] Transform uiRoot;
 
@@ -27,6 +45,7 @@ public class UIPoolManager : MonoBehaviour
         }
 
         instance = this;
+        s_nullWarned = false;
         DontDestroyOnLoad(gameObject);
         return true;
     }

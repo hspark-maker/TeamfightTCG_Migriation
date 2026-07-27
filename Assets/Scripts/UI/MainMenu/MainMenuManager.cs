@@ -9,6 +9,10 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] GameObject multiplayerLobbyPanel;
     [SerializeField] GameObject randomMatchPanel;
 
+    // 튜토리얼 전투 시나리오 SO. 덱/스크립트는 코드 하드코딩 금지 — 인스펙터에서 배선한다.
+    // 예: Assets/SO/TutorialScenario.asset
+    [SerializeField] TutorialScenarioData tutorialScenario;
+
     void Start()
     {
         this.mainPanelUI.SetActive(true);
@@ -25,7 +29,7 @@ public class MainMenuManager : MonoBehaviour
     {
         if (!DeckSaveManager.HasAnyValidSlot())
         {
-            UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+            UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
             {
                 titleText = "유효한 덱이 없습니다.\n덱 구성 화면으로 이동하시겠습니까?",
                 yesText   = "이동",
@@ -70,13 +74,34 @@ public class MainMenuManager : MonoBehaviour
 
     void ShowInvalidDeckPopup()
     {
-        UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = "유효한 덱이 없습니다.\n덱 구성 화면으로 이동하시겠습니까?",
             yesText   = "이동",
             noText    = "취소",
             yesAction = OnDeckPressed,
         });
+    }
+
+    // 메인 → 튜토리얼 전투 진입. 버튼 onClick에 배선.
+    // TutorialConfig.Begin이 IsActive/고정덱/스크립트큐를 세팅하면
+    // BattleScene의 GameInitializer가 나머지(오버레이·고정덱 초기화)를 자동 처리한다.
+    public void OnTutorialPressed()
+    {
+        if (this.tutorialScenario == null)
+        {
+            // 시나리오 미배선이면 씬 로드 금지(빈 튜토리얼로 진입해 크래시/무한대기 방지).
+            Debug.LogWarning("[MainMenuManager] tutorialScenario SO가 배선되지 않았습니다. 튜토리얼 진입 취소.");
+            return;
+        }
+
+        // TODO(outgame-save): 튜토리얼 "완료" 영속 플래그가 세이브 레이어에 없다.
+        // 첫 실행 자동 진입/1회성 재진입 방지를 하려면 UserSaveData에 진행 도메인(예: progress.tutorialDone)
+        // 추가가 선행돼야 함(세이브 스키마 변경 = 공유 계약, 별도 스코프). 현재는 수동 진입 버튼만 제공.
+
+        TutorialConfig.Begin(this.tutorialScenario);
+        SceneTransitionVideo.Instance?.PlayOverlay();
+        SceneManager.LoadScene("BattleScene");
     }
 
     public void OnDeckPressed()
@@ -98,6 +123,6 @@ public class MainMenuManager : MonoBehaviour
 
     public void OnSettingButton()
     {
-        UIPoolManager.instance.AddOrUpdateUI<SettingsPanel>();
+        UIPoolManager.Instance?.AddOrUpdateUI<SettingsPanel>();
     }
 }

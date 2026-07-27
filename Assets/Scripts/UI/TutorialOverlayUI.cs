@@ -30,7 +30,9 @@ public class TutorialOverlayUI : MonoBehaviour
     Image           dimMask;       // 풀스크린 어둡게 + 입력 차단 + 탭 감지
     CanvasGroup     dimGroup;
 
-    bool tapped;   // dim 활성 중 탭 발생 플래그(WaitForTapAsync가 소비)
+    bool tapped;      // dim 활성 중 탭(release) 발생 플래그(WaitForTapAsync가 소비)
+    bool tapArmed;    // 탭 대기 활성 구간(이 구간에서 시작된 press만 인정)
+    bool pressActive; // 이번 대기 구간 안에서 pointer down이 발생했는가
     bool inspected; // Inspect 대기 중 적 카드 롱프레스 발생 플래그(WaitForInspectAsync가 소비)
 
     // 직전 스텝에서 켠 하이라이트/포인터(교체/정리 시 되돌리기 위해 추적).
@@ -96,12 +98,24 @@ public class TutorialOverlayUI : MonoBehaviour
         SetBanner(_message);
     }
 
-    /// <summary>dim 마스크가 활성인 동안 화면 탭을 대기. 탭되면 완료. ct로 씬 파괴 취소.</summary>
+    /// <summary>dim 마스크가 활성인 동안 화면 탭을 대기. **손을 뗄 때(release)** 완료된다.
+    /// 단, 이 대기 구간 안에서 새로 시작된 press의 release만 인정한다 — 직전 스텝/롱프레스에서부터
+    /// 이어져 눌려 있던 손가락은 무시해 다이얼로그 즉시 스킵을 막는다. ct로 씬 파괴 취소.</summary>
     public async UniTask WaitForTapAsync(CancellationToken _ct)
     {
-        this.tapped = false;
-        await UniTask.WaitUntil(() => this.tapped, cancellationToken: _ct);
-        this.tapped = false;
+        this.tapped      = false;
+        this.pressActive = false;
+        this.tapArmed    = true;
+        try
+        {
+            await UniTask.WaitUntil(() => this.tapped, cancellationToken: _ct);
+        }
+        finally
+        {
+            this.tapArmed    = false;
+            this.tapped      = false;
+            this.pressActive = false;
+        }
     }
 
     /// <summary>
@@ -177,7 +191,18 @@ public class TutorialOverlayUI : MonoBehaviour
         this.dimGroup.DOFade(0f, 0.15f).SetLink(this.dimGroup.gameObject);
     }
 
-    void OnMaskTapped() => this.tapped = true;
+    // pointer down: 대기 중이면 "이번 구간에서 시작된 press"로 표시.
+    void OnMaskDown()
+    {
+        if (this.tapArmed) this.pressActive = true;
+    }
+
+    // pointer up: 이번 구간에서 시작된 press의 release만 진행으로 인정.
+    void OnMaskUp()
+    {
+        if (this.tapArmed && this.pressActive) this.tapped = true;
+        this.pressActive = false;
+    }
 
     void ClearHighlight()
     {
@@ -220,9 +245,9 @@ public class TutorialOverlayUI : MonoBehaviour
         t_dimRect.anchorMin = Vector2.zero;
         t_dimRect.anchorMax = Vector2.one;
         t_dimRect.offsetMin = t_dimRect.offsetMax = Vector2.zero;
-        var t_dimBtn = t_dimGo.AddComponent<Button>();
-        t_dimBtn.transition = Selectable.Transition.None;
-        t_dimBtn.onClick.AddListener(OnMaskTapped);
+        var t_tapCatcher = t_dimGo.AddComponent<TutorialTapCatcher>();
+        t_tapCatcher.OnDown = OnMaskDown;
+        t_tapCatcher.OnUp   = OnMaskUp;
 
         // 배너(상단). dim보다 위에 그려지도록 나중에 생성.
         var t_bgGo = new GameObject("Banner");

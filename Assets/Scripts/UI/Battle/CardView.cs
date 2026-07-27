@@ -209,7 +209,7 @@ public class CardView : MonoBehaviour
     {
         if (_touchDrag.y < 0f)
         {
-            UIPoolManager.instance?.HideUI<PooledCardElement>();
+            UIPoolManager.Instance?.HideUI<PooledCardElement>();
 
             if (this.dragState != DragState.AttackDrag)
             {
@@ -259,7 +259,7 @@ public class CardView : MonoBehaviour
     {
         if (this.dragState != DragState.AttackDrag)
         {
-            UIPoolManager.instance?.HideUI<PooledCardElement>();
+            UIPoolManager.Instance?.HideUI<PooledCardElement>();
             this.dragState = DragState.AttackDrag;
             s_anyDragging  = true;
             var t_validTargets = GetValidEnemyViews();
@@ -329,7 +329,7 @@ public class CardView : MonoBehaviour
 
         if (t_wasLongPress)
         {
-            UIPoolManager.instance?.HideUI<PooledCardElement>();
+            UIPoolManager.Instance?.HideUI<PooledCardElement>();
 
             // 튜토리얼 Inspect 스텝: 적 카드 롱프레스 = "상대 정보 확인" 레슨. 팝업이 뜨는 순간이 아니라
             // **손을 뗀 순간**에 인정한다 — 뜨자마자 스텝이 소비되어 팝업을 못 읽는 버그 방지.
@@ -412,7 +412,7 @@ public class CardView : MonoBehaviour
             SynergyBadgeView t_badge = FindBadgeAt(this.touchStartScreenPos);
             if (t_badge != null && t_badge.Synergy != null)
             {
-                UIPoolManager.instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
+                UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
                 {
                     synergy        = t_badge.Synergy,
                     hasWorldAnchor = true,                       // 배지는 월드 스페이스라 RectTransform이 없다
@@ -424,7 +424,7 @@ public class CardView : MonoBehaviour
             }
             else
             {
-                UIPoolManager.instance?.AddOrUpdateUI<PooledCardElement>(
+                UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
                     new PooledCardElementData { card = this.boundCard.data });
             }
             this.longPressFired = true;
@@ -484,8 +484,8 @@ public class CardView : MonoBehaviour
         if (this.longPressFired)
         {
             // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
-            if (this.longPressSynergyShown) UIPoolManager.instance?.HideUI<SynergyExplainPopupUI>();
-            else                            UIPoolManager.instance?.HideUI<PooledCardElement>();
+            if (this.longPressSynergyShown) UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+            else                            UIPoolManager.Instance?.HideUI<PooledCardElement>();
         }
 
         this.longPressSynergyShown = false;

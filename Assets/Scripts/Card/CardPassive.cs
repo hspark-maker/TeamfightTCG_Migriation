@@ -31,7 +31,7 @@ public abstract class CardPassive : BattleEffect
         SoundManager.Instance?.PlayPassive();
         SoundManager.Instance?.PlayRandom(_self.data?.effectClips);
         SoundManager.Instance?.PlayEffectVoice(_self.data?.effectVoices);
-        UIPoolManager.instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
+        UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
         {
             portrait       = _iconOverride != null ? _iconOverride : _self.data.fullImage,
             preserveAspect = _iconOverride != null,   // 아이콘은 정사각이라 늘리면 찌그러짐

@@ -11,7 +11,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (!DeckConfig.HasDeck && !TryApplyFirstValidDeck())
         {
-            UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+            UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
             {
                 titleText = "유효한 덱이 없습니다.\n덱을 먼저 구성해 주세요.",
                 yesText   = "확인",

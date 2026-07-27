@@ -100,6 +100,6 @@ public class GameInitializer : MonoBehaviour
     
     public void OnSettingButton()
     {
-        UIPoolManager.instance.AddOrUpdateUI<SettingsPanel>();
+        UIPoolManager.Instance?.AddOrUpdateUI<SettingsPanel>();
     }
 }

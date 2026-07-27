@@ -55,12 +55,12 @@ public static class SynergyIconStrip
 
     static void Show(SynergyData _synergy, RectTransform _iconRect)
     {
-        UIPoolManager.instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
+        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
         {
             synergy  = _synergy,
             iconRect = _iconRect,
         });
     }
 
-    static void Hide() => UIPoolManager.instance?.HideUI<SynergyExplainPopupUI>();
+    static void Hide() => UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
 }
