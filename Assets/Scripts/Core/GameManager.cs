@@ -36,8 +36,9 @@ public class GameManager : MonoBehaviour
     // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
     void Boot()
     {
-        DataSaveManager.Load();     // 세이브 로드
-        CurrencyManager.Init();     // 세이브 → 재화 메모리 캐싱
+        DataSaveManager.Load();             // 세이브 로드
+        OutgameTutorialProgress.Init();     // 튜토리얼 진행도 판정(레거시 세이브 마이그레이션 포함)
+        CurrencyManager.Init();             // 세이브 → 재화 메모리 캐싱
     }
 
     // 앱이 떠날 때 영속화를 flush(모바일 종료 콜백 누락 대비).

@@ -14,6 +14,7 @@ public class LobbyTabController : MonoBehaviour
         public Button button;             // 하단바 탭 버튼
         public GameObject content;        // 중앙에 표시할 콘텐츠 패널
         public GameObject selectedMark;   // 선택 표시(옵션) — 없으면 무시
+        public EOutgameTutorialAnchor tutorialAnchor;   // 튜토리얼 안내 타깃 키(옵션) — None이면 등록 안 함
     }
 
     [SerializeField] List<Tab> tabs = new List<Tab>();
@@ -26,6 +27,11 @@ public class LobbyTabController : MonoBehaviour
             int idx = i; // 클로저 캡처 방지
             Button btn = this.tabs[i].button;
             if (btn != null) btn.onClick.AddListener(() => this.Select(idx));
+
+            // 탭 버튼은 Layer Lab 프리팹 인스턴스 내부의 stripped Button이라 TutorialAnchor를 직접 못 붙인다 → 여기서 대신 등록.
+            // 콘텐츠와 달리 탭 버튼은 항상 활성이므로 Unregister는 불필요하다.
+            if (btn != null && this.tabs[i].tutorialAnchor != EOutgameTutorialAnchor.None)
+                TutorialAnchorRegistry.Register(this.tabs[i].tutorialAnchor, btn.transform as RectTransform, btn);
         }
     }
 

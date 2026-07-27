@@ -4,5 +4,5 @@ using System;
 [Serializable]
 public class CurrencySaveData
 {
-    public long gold;
+    public long gold = 100;
 }

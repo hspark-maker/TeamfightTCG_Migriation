@@ -28,4 +28,20 @@ public class OwnershipDebugTool : MonoBehaviour
     {
         Debug.Log($"[OwnershipDebugTool] 소유 {OwnershipManager.OwnedCount}장: {string.Join(", ", OwnershipManager.OwnedKeys)}");
     }
+
+    // 튜토리얼 진행도만 초기화(소유는 유지). 마이그레이션 낙인은 남으므로 소유가 있어도 다시 완료 처리되지 않는다.
+    [ContextMenu("튜토리얼 진행도 리셋")]
+    void ResetTutorial()
+    {
+        OutgameTutorialProgress.ResetForDebug();
+        Debug.Log($"[OwnershipDebugTool] 튜토리얼 진행도 리셋 — step {OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
+    }
+
+    // 첫실행 재현 원샷: 소유까지 비워 스텝 0의 자동 구매(중복 없는 스타터팩)를 원상태로 돌린다.
+    [ContextMenu("튜토리얼 처음부터 (소유 회수 + 진행도 리셋)")]
+    void ResetTutorialFromScratch()
+    {
+        RevokeAll();
+        ResetTutorial();
+    }
 }

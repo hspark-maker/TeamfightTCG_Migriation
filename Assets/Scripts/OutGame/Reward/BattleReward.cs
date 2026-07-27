@@ -9,7 +9,7 @@ public class BattleReward : ScriptableObject
     [Tooltip("전투 종료 시 남은 카드 1장당 지급 골드.")]
     public long goldPerCard = 10;
 
-    [Tooltip("한 판에서 지급되는 골드 하한(클램프")]
+    [Tooltip("한 판에서 지급되는 골드 하한(클램프)")]
     public long minGold = 5;
     
 }

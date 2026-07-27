@@ -24,7 +24,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 비워 GameInitializer가 랜덤 폴백을 쓰게 한다(홀더 오염 방지).
         DeckConfig.ClearEnemyDeck();
         DeckConfig.SetMultiplayer(false);
-        SceneTransitionVideo.Instance?.PlayOverlay();
+        //SceneTransitionVideo.Instance?.PlayOverlay();
         SceneManager.LoadScene("BattleScene");
     }
 

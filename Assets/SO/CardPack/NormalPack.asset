@@ -12,17 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ef172436211a3934fb172f7d6ab7ebab, type: 3}
   m_Name: NormalPack
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
-  packId: 0
-  displayName: "\uC77C\uBC18 \uCE74\uB4DC\uD329"
-  price: 50
+  packId: NormalPack
+  displayName: "\uC77C\uBC18 \uD329"
+  price: 10
   drawCount: 6
+  uniqueDraw: 0
   pool:
   - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
   - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
   - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
   - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
   - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
+  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
   - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
+  - {fileID: 11400000, guid: c0ffee1234abcd5678ef90a1b2c3d4e5, type: 2}
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
