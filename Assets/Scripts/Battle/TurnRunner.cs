@@ -17,6 +17,7 @@ public class TurnRunner : MonoBehaviour
     [SerializeField] DeckPileUI playerDeckUI;
     [SerializeField] DeckPileUI enemyDeckUI;
     [SerializeField] TurnBannerUI    turnBanner;
+    [SerializeField] CoinFlipUI      coinFlip;       // 선/후공 결정 연출(싱글 AI전 전용, 비우면 스킵)
     [SerializeField] GameResultPopup winPopup;
     [SerializeField] GameResultPopup losePopup;
 
@@ -39,7 +40,21 @@ public class TurnRunner : MonoBehaviour
     }
 #endif
 
-    public void StartBattle()
+    /// <summary>외부 직접 호출용(딜 연출 없음). 정상 경로는 GameInitializer가 <see cref="PlayIntroAndStart"/>로 호출.</summary>
+    public void StartBattle() => PlayIntroAndStart(null).Forget();
+
+    /// <summary>턴 정보(배경+레이블) 즉시 숨김. 인트로 확대 전에 GameInitializer가 호출 → 코인 결과 전까지 안 보이게.</summary>
+    public void HideTurnInfo()
+    {
+        GameObject t_go = this.turnBanner != null ? this.turnBanner.gameObject
+                        : (this.turnLabel != null ? this.turnLabel.gameObject : null);
+        if (t_go != null) t_go.SetActive(false);
+    }
+
+    /// <summary>전투 인트로 시퀀스 후 턴 루프 시작.
+    /// 순서: (1) 코인 토스로 선/후공 결정 → (2) 선공 턴 전환 연출 → (3) 카드 배치(<paramref name="_dealCards"/>)
+    /// → (4) 턴 루프(선공 배너는 이미 재생했으므로 첫 턴 배너 스킵). 코인은 싱글 AI전 전용(멀티 스킵).</summary>
+    public async UniTask PlayIntroAndStart(System.Func<UniTask> _dealCards)
     {
         this.disconnectWin = false;
         TurnCount = 1;
@@ -63,12 +78,51 @@ public class TurnRunner : MonoBehaviour
             enemyDeckUI     = this.enemyDeckUI,
             turnBanner       = this.turnBanner,
         };
-        RunTurns().Forget();
+
+        // (선/후공 판정 — 시드 확정 후) 멀티는 기존 고정(발산 방지), 싱글은 코인 랜덤.
+        bool t_playerFirst = DecideFirstPlayer();
+        int  t_first = t_playerFirst ? 0 : 1;   // 멀티는 playerFirst=true → 0(기존 동작)
+
+        // 코인 토스 전에는 턴 정보(배경+레이블) 숨김(선/후공 미정 상태). 배너 GO에 배경 스프라이트+WhosTurn 라벨이 함께 있음.
+        GameObject t_turnInfo = this.turnBanner != null ? this.turnBanner.gameObject
+                              : (this.turnLabel != null ? this.turnLabel.gameObject : null);
+        if (t_turnInfo != null) t_turnInfo.SetActive(false);
+
+        // (1) 코인 토스 — 카드 배치 전. 싱글 AI전 전용.
+        if (this.coinFlip != null && !DeckConfig.IsMultiplayer)
+        {
+            this.coinFlip.gameObject.SetActive(true);
+            await this.coinFlip.Play(t_playerFirst);   // 앞면=선공(플레이어 먼저)
+            await UniTask.Delay(500);                   // 결과 잠깐 유지
+            this.coinFlip.gameObject.SetActive(false);
+        }
+
+        // 코인 결과 확정 → 턴 정보 다시 표시(배너 Play 전에 활성화 필요). 텍스트는 각 턴 OnEnter에서 세팅.
+        if (t_turnInfo != null) t_turnInfo.SetActive(true);
+
+        // (2) 선공 턴 전환 연출.
+        if (this.ctx.turnBanner != null)
+        {
+            SoundManager.Instance?.PlayTurnChange();
+            await this.ctx.turnBanner.Play(IsMyTurn(t_first));
+        }
+
+        // (3) 카드 배치.
+        if (_dealCards != null) await _dealCards();
+
+        // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
+        RunTurns(t_first, _skipFirstBanner: true).Forget();
     }
 
-    async UniTask RunTurns()
+    // 해당 t_current가 로컬(내) 턴인가. 멀티에서 P2는 t_current=1이 내 턴.
+    bool IsMyTurn(int _current) => DeckConfig.IsMultiplayer
+        ? _current == (MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? 0)
+        : _current == 0;
+
+    async UniTask RunTurns(int _startCurrent, bool _skipFirstBanner)
     {
-        int t_current = 0;
+        int  t_current    = _startCurrent;
+        bool t_skipBanner = _skipFirstBanner;
 
         while (true)
         {
@@ -89,14 +143,14 @@ public class TurnRunner : MonoBehaviour
             this.ctx.RefreshViews();
 
             // 내 턴인지 기준으로 배너 선택 (멀티에서 P2는 t_current=1이 내 턴)
-            bool t_isMyTurn = DeckConfig.IsMultiplayer
-                ? t_current == (MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? 0)
-                : t_current == 0;
-            if (this.ctx.turnBanner != null)
+            bool t_isMyTurn = IsMyTurn(t_current);
+            // 선공 배너는 인트로(PlayIntroAndStart)에서 이미 재생 → 첫 턴만 스킵.
+            if (!t_skipBanner && this.ctx.turnBanner != null)
             {
                 SoundManager.Instance?.PlayTurnChange();
                 await this.ctx.turnBanner.Play(t_isMyTurn);
             }
+            t_skipBanner = false;
 
             TurnBase t_turn;
             if (DeckConfig.IsMultiplayer)
@@ -136,6 +190,15 @@ public class TurnRunner : MonoBehaviour
 
             t_current = 1 - t_current;
         }
+    }
+
+    /// <summary>선공(플레이어 먼저)인가. 멀티=기존 고정, 튜토리얼=스크립트 전제(플레이어 선공 고정),
+    /// 일반 싱글(AI전)=MatchRandom 코인. MatchRandom은 StartBattle에서 이미 시드됨.</summary>
+    bool DecideFirstPlayer()
+    {
+        if (DeckConfig.IsMultiplayer) return true;   // 멀티(일시중지): 기존 동작 유지
+        if (TutorialConfig.IsActive)  return true;   // 튜토리얼: 플레이어 선공 고정(스크립트 순서 전제)
+        return MatchRandom.Range(2) == 0;            // 일반 싱글: 코인 랜덤(0=플레이어 선공)
     }
 
     void SetTurnCountLabel()

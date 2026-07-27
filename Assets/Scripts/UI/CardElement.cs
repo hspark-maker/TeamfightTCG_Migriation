@@ -53,7 +53,7 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         if (_mod == CardElementMod.Full)
         {
             this.cardPortrait.sprite = _card.fullImage;
-            this.explainText.text = _card.cardExplain;
+            //this.explainText.text = _card.cardExplain;
             this.hpText.text = (_displayHp >= 0 ? _displayHp : _card.maxHp).ToString();
         }
         else

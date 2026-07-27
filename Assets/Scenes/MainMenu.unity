@@ -10210,6 +10210,7 @@ MonoBehaviour:
   gameReadyPanel: {fileID: 602913171}
   multiplayerLobbyPanel: {fileID: 7998211616612579499}
   randomMatchPanel: {fileID: 117580445}
+  tutorialScenario: {fileID: 0}
 --- !u!4 &1667146438
 Transform:
   m_ObjectHideFlags: 0

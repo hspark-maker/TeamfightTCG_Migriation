@@ -25,10 +25,18 @@ public class TutorialOverlayUI : MonoBehaviour
 {
     public static TutorialOverlayUI Instance { get; private set; }
 
-    TextMeshProUGUI banner;
-    CanvasGroup     bannerGroup;
-    Image           dimMask;       // 풀스크린 어둡게 + 입력 차단 + 탭 감지
-    CanvasGroup     dimGroup;
+    // 프리팹으로 저작/수정 가능하도록 직렬화. 프리팹이 있으면 이 참조들이 이미 배선된 채 로드되고,
+    // 없으면 Awake에서 BuildUI가 코드로 생성해 채운다(폴백). 프리팹 재생성은 아래 에디터 메뉴 참조.
+    [SerializeField] TextMeshProUGUI  banner;
+    [SerializeField] CanvasGroup      bannerGroup;
+    [SerializeField] Image            dimMask;       // 풀스크린 어둡게 + 입력 차단 + 탭 감지
+    [SerializeField] CanvasGroup      dimGroup;
+    [SerializeField] TutorialTapCatcher tapCatcher;  // OnDown/OnUp 콜백은 런타임 배선(delegate는 직렬화 안 됨)
+    [SerializeField] GameObject       tapHint;       // "탭하여 계속" 힌트. 배너와 함께 표시/숨김(null 허용)
+
+    // dim 어둡기 세기. Image 색 alpha가 아니라 CanvasGroup alpha로 제어 → 프리팹의 Image 투명도와 무관하게
+    // 항상 동일한 어둡기 보장. (프리팹에서 DimMask Image alpha를 0으로 저장해도 dim 정상 작동.)
+    const float DimStrength = 0.6f;
 
     bool tapped;      // dim 활성 중 탭(release) 발생 플래그(WaitForTapAsync가 소비)
     bool tapArmed;    // 탭 대기 활성 구간(이 구간에서 시작된 press만 인정)
@@ -40,19 +48,57 @@ public class TutorialOverlayUI : MonoBehaviour
     CardView highlightedTarget;
     CardView pointerCard;
 
-    /// <summary>튜토리얼 활성 시 오버레이를 1회 생성. 이미 있으면 재사용.</summary>
-    public static TutorialOverlayUI Ensure()
+    /// <summary>튜토리얼 활성 시 오버레이를 1회 생성. 이미 있으면 재사용.
+    /// <paramref name="_prefab"/>이 지정되면 그것을 인스턴스화(디자이너 저작 프리팹),
+    /// 없으면 코드로 빌드(<see cref="BuildUI"/> 폴백). Instance는 어느 경로든 Awake에서 설정.
+    /// 프리팹은 호출측(GameInitializer)이 [SerializeField]로 보유해 전달한다.</summary>
+    public static TutorialOverlayUI Ensure(TutorialOverlayUI _prefab = null)
     {
         if (Instance != null) return Instance;
-        var t_go = new GameObject("TutorialOverlay");
-        return Instance = t_go.AddComponent<TutorialOverlayUI>();
+        if (_prefab != null) { Instantiate(_prefab).name = "TutorialOverlay"; return Instance; }
+        new GameObject("TutorialOverlay").AddComponent<TutorialOverlayUI>();
+        return Instance;
     }
 
     void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-        BuildUI();
+        if (this.dimMask == null) BuildUI();   // 프리팹 참조 미배선 = 코드 빌드 폴백
+        WireTapCatcher();                       // 탭 콜백은 항상 런타임 배선(프리팹/코드 공통)
+        ResetToHidden();                        // 프리팹 저작 alpha가 1이어도 시작 시 강제 숨김
+        EnsureEventSystem();
+    }
+
+    // 시작 시 배너/마스크를 즉시 숨김(트윈 없음). 프리팹에서 CanvasGroup alpha=1로 저장돼 있어도
+    // 첫 스텝 표시 전까지 배너/TapHint/dim이 보이지 않도록 한다. 코드 빌드 경로에도 무해.
+    void ResetToHidden()
+    {
+        if (this.bannerGroup != null) this.bannerGroup.alpha = 0f;
+        if (this.tapHint != null) this.tapHint.SetActive(false);
+        if (this.dimGroup != null)
+        {
+            this.dimGroup.alpha          = 0f;
+            this.dimGroup.blocksRaycasts = false;
+        }
+        if (this.dimMask != null)
+        {
+            this.dimMask.raycastTarget = false;
+            // 어둡기는 CanvasGroup alpha로만 제어하므로 Image는 불투명 검정으로 강제(저작 alpha 무시).
+            this.dimMask.color = new Color(0f, 0f, 0f, 1f);
+        }
+    }
+
+    // dim 마스크의 TapCatcher에 press/release 콜백 연결. delegate는 직렬화 안 되므로 런타임에서만.
+    void WireTapCatcher()
+    {
+        if (this.tapCatcher == null && this.dimMask != null)
+            this.tapCatcher = this.dimMask.GetComponent<TutorialTapCatcher>();
+        if (this.tapCatcher != null)
+        {
+            this.tapCatcher.OnDown = OnMaskDown;
+            this.tapCatcher.OnUp   = OnMaskUp;
+        }
     }
 
     void OnDestroy()
@@ -128,6 +174,8 @@ public class TutorialOverlayUI : MonoBehaviour
         ClearPointer();
         DeactivateMask();
         SetBanner(_message);
+        // Inspect는 탭이 아니라 롱프레스로 진행 → "탭하여 계속" 힌트 숨김(오해 방지).
+        if (this.tapHint != null) this.tapHint.SetActive(false);
     }
 
     /// <summary>Inspect 대기 중 적 카드 롱프레스 발생을 통지. 대기 중일 때만 의미 있다.</summary>
@@ -156,6 +204,7 @@ public class TutorialOverlayUI : MonoBehaviour
     {
         if (string.IsNullOrEmpty(_message)) { HideBanner(); return; }
 
+        if (this.tapHint != null) this.tapHint.SetActive(true);
         this.banner.text = _message;
         this.bannerGroup.DOKill();
         this.banner.transform.DOKill();
@@ -167,6 +216,7 @@ public class TutorialOverlayUI : MonoBehaviour
 
     void HideBanner()
     {
+        if (this.tapHint != null) this.tapHint.SetActive(false);
         if (this.bannerGroup == null) return;
         this.bannerGroup.DOKill();
         this.bannerGroup.DOFade(0f, 0.15f).SetLink(this.bannerGroup.gameObject);
@@ -179,7 +229,7 @@ public class TutorialOverlayUI : MonoBehaviour
         this.dimMask.raycastTarget   = true;
         this.dimGroup.blocksRaycasts = true;
         this.dimGroup.DOKill();
-        this.dimGroup.DOFade(_darken ? 1f : 0f, 0.15f).SetLink(this.dimGroup.gameObject);
+        this.dimGroup.DOFade(_darken ? DimStrength : 0f, 0.15f).SetLink(this.dimGroup.gameObject);
     }
 
     void DeactivateMask()
@@ -230,7 +280,6 @@ public class TutorialOverlayUI : MonoBehaviour
         t_scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         t_scaler.referenceResolution = new Vector2(1080f, 1920f);
         t_canvasGo.AddComponent<GraphicRaycaster>();
-        EnsureEventSystem();
 
         // dim 마스크(풀스크린, 탭 감지 버튼) — 기본 비활성(raycast off).
         var t_dimGo = new GameObject("DimMask");
@@ -239,15 +288,13 @@ public class TutorialOverlayUI : MonoBehaviour
         this.dimGroup.alpha = 0f;
         this.dimGroup.blocksRaycasts = false;
         this.dimMask = t_dimGo.AddComponent<Image>();
-        this.dimMask.color = new Color(0f, 0f, 0f, 0.6f);
+        this.dimMask.color = new Color(0f, 0f, 0f, 1f);   // 어둡기는 CanvasGroup alpha로 제어(불투명 검정)
         this.dimMask.raycastTarget = false;
         var t_dimRect = this.dimMask.GetComponent<RectTransform>();
         t_dimRect.anchorMin = Vector2.zero;
         t_dimRect.anchorMax = Vector2.one;
         t_dimRect.offsetMin = t_dimRect.offsetMax = Vector2.zero;
-        var t_tapCatcher = t_dimGo.AddComponent<TutorialTapCatcher>();
-        t_tapCatcher.OnDown = OnMaskDown;
-        t_tapCatcher.OnUp   = OnMaskUp;
+        this.tapCatcher = t_dimGo.AddComponent<TutorialTapCatcher>();   // 콜백은 WireTapCatcher에서 배선
 
         // 배너(상단). dim보다 위에 그려지도록 나중에 생성.
         var t_bgGo = new GameObject("Banner");
@@ -280,8 +327,9 @@ public class TutorialOverlayUI : MonoBehaviour
         t_txtRect.offsetMin = new Vector2(32f, 20f);
         t_txtRect.offsetMax = new Vector2(-32f, -20f);
 
-        // "탭하여 계속" 힌트(배너 하단).
+        // "탭하여 계속" 힌트(배너 하단). 배너와 함께 표시/숨김되도록 필드로 보관.
         var t_hintGo = new GameObject("TapHint");
+        this.tapHint = t_hintGo;
         t_hintGo.transform.SetParent(t_bgGo.transform, false);
         var t_hint = t_hintGo.AddComponent<TextMeshProUGUI>();
         TutorialUIStyle.ApplyFont(t_hint);
@@ -306,4 +354,29 @@ public class TutorialOverlayUI : MonoBehaviour
         t_es.AddComponent<UnityEngine.EventSystems.EventSystem>();
         t_es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
     }
+
+#if UNITY_EDITOR
+    // 코드 빌드(BuildUI)와 동일한 레이아웃을 프리팹으로 저장. 디자이너가 프리팹에서 dim/배너/문구를
+    // 직접 수정한 뒤 GameInitializer의 tutorialOverlayPrefab [SerializeField]에 물려주면 런타임이 사용한다.
+    [UnityEditor.MenuItem("Tools/Tutorial/Rebuild Overlay Prefab")]
+    static void RebuildOverlayPrefab()
+    {
+        const string t_dir  = "Assets/Prefabs/Tutorial";
+        const string t_path = t_dir + "/TutorialOverlay.prefab";
+        if (!UnityEditor.AssetDatabase.IsValidFolder("Assets/Prefabs"))
+            UnityEditor.AssetDatabase.CreateFolder("Assets", "Prefabs");
+        if (!UnityEditor.AssetDatabase.IsValidFolder(t_dir))
+            UnityEditor.AssetDatabase.CreateFolder("Assets/Prefabs", "Tutorial");
+
+        var t_go = new GameObject("TutorialOverlay");
+        try
+        {
+            t_go.AddComponent<TutorialOverlayUI>().BuildUI();   // 참조 배선된 채로 저장(탭 콜백만 런타임)
+            UnityEditor.PrefabUtility.SaveAsPrefabAsset(t_go, t_path);
+            Debug.Log($"[Tutorial] Overlay prefab saved: {t_path}");
+        }
+        finally { DestroyImmediate(t_go); }
+        UnityEditor.AssetDatabase.Refresh();
+    }
+#endif
 }

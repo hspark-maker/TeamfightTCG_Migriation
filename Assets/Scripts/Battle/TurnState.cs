@@ -12,6 +12,9 @@ public static class TurnState
     /// <summary>연속 공격 강제 대상. null 아니면 이 카드만 조작 가능.</summary>
     public static CardInstance ForcedAttacker { get; set; }
 
+    /// <summary>튜토리얼: 지정 공격 타깃(적 카드). null 아니면 이 적만 밝게, 나머지 적은 암전(집중 유도).</summary>
+    public static CardInstance ForcedTarget { get; set; }
+
     /// <summary>로컬 플레이어 ownerIndex. 싱글=0, 멀티P2=1.</summary>
     public static int LocalOwnerIndex { get; set; }
 
@@ -19,6 +22,7 @@ public static class TurnState
     {
         InputAllowed    = false;
         ForcedAttacker  = null;
+        ForcedTarget    = null;
         LocalOwnerIndex = 0;
     }
 }

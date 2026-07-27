@@ -37,6 +37,9 @@ public class TutorialScenarioData : ScriptableObject
         public bool dimBackground;
     }
 
+    [Header("시너지 표시/적용 (기본 off — 초반 튜토리얼은 시너지 개념 미도입, 3편부터 on)")]
+    public bool enableSynergy;
+
     [Header("고정 덱 (순서 = 등장 순서, 셔플 없음, 6장 이하 허용)")]
     public List<CardData> playerDeck;
     public List<CardData> enemyDeck;
@@ -46,4 +49,7 @@ public class TutorialScenarioData : ScriptableObject
 
     [Header("적 강제 공격 순서 (턴당 1건, 처형 재공격 시 연속 소비)")]
     public List<ScriptedAttack> enemyScript;
+
+    [Header("스크립트 소진 후 자유 공격 전환 (기본 off — on이면 큐 소진 시 플레이어가 자유롭게 공격, 안내 없음)")]
+    public bool freePlayAfterScript;
 }

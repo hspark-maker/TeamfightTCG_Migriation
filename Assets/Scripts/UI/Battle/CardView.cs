@@ -219,9 +219,7 @@ public class CardView : MonoBehaviour
                 foreach (var t_cv in t_validTargets)
                     if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
                         t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
-                FadeAll(0.3f);
-                FadeCards(1f, this);
-                FadeCards(1f, t_validTargets.ToArray());
+                ApplyDragTargetFade(t_validTargets);
                 this.cardAnim.MoveTo(this.centerPos).Forget();
                 this.swipeGuide?.SetVisible(true);
             }
@@ -266,9 +264,7 @@ public class CardView : MonoBehaviour
             foreach (var t_cv in t_validTargets)
                 if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
                     t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
-            FadeAll(0.3f);
-            FadeCards(1f, this);
-            FadeCards(1f, t_validTargets.ToArray());
+            ApplyDragTargetFade(t_validTargets);
             Vector3 t_liftPos = this.cardAnim.SlotPosition + Vector3.up * 0.25f;
             this.cardAnim.MoveTo(t_liftPos).Forget();
         }
@@ -524,6 +520,21 @@ public class CardView : MonoBehaviour
         }
         HideAttackPreview();
         this.currentTarget = null;
+    }
+
+    /// <summary>드래그 시작 시 유효 타깃 강조 페이드.
+    /// **튜토리얼 지정 타깃 집중 중(ForcedTarget)엔** 도발 등 유효 타깃 전체를 밝히지 않고
+    /// RestoreAllFades로 공격자+지정 타깃만 밝게 유지한다 — 도발 로직이 미리 건 fade를 풀지 않게.</summary>
+    void ApplyDragTargetFade(List<CardView> _validTargets)
+    {
+        if (TutorialConfig.IsActive && TurnState.ForcedTarget != null)
+        {
+            RestoreAllFades();
+            return;
+        }
+        FadeAll(0.3f);
+        FadeCards(1f, this);
+        FadeCards(1f, _validTargets.ToArray());
     }
 
     List<CardView> GetValidEnemyViews()
@@ -832,6 +843,9 @@ public class CardView : MonoBehaviour
             Destroy(t_child.gameObject);
         }
 
+        // 튜토리얼: 시너지 개념 미도입 구간은 배지 숨김. SynergyEnabled(3편~)이면 정상 표시.
+        if (TutorialConfig.IsActive && !TutorialConfig.SynergyEnabled) return;
+
         // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
         if (this.boundCard == null || this.boundCard.data == null || !this.boundCard.isRevealed) return;
 
@@ -1022,10 +1036,22 @@ public class CardView : MonoBehaviour
     public static void RestoreAllFades()
     {
         FadeAll(1f);
-        if (TurnState.ForcedAttacker == null) return;
-        FadeTeam(ForcedDimAlpha, TurnState.LocalOwnerIndex);
-        CardView t_forced = GetView(TurnState.ForcedAttacker);
-        if (t_forced != null) FadeCards(1f, t_forced);
+
+        // 공격자 지정: 로컬 팀을 암전하고 공격자만 밝게.
+        if (TurnState.ForcedAttacker != null)
+        {
+            FadeTeam(ForcedDimAlpha, TurnState.LocalOwnerIndex);
+            CardView t_forced = GetView(TurnState.ForcedAttacker);
+            if (t_forced != null) FadeCards(1f, t_forced);
+        }
+
+        // 타깃 지정(튜토리얼): 적 팀을 암전하고 지정 타깃만 밝게 — "이 적을 쳐라" 집중 유도.
+        if (TurnState.ForcedTarget != null)
+        {
+            FadeTeam(ForcedDimAlpha, 1 - TurnState.LocalOwnerIndex);
+            CardView t_target = GetView(TurnState.ForcedTarget);
+            if (t_target != null) FadeCards(1f, t_target);
+        }
     }
 
     public static void Cleanup()

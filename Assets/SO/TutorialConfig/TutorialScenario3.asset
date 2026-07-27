@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c77d53f76141dc9498adade58910761d, type: 3}
   m_Name: TutorialScenario3
   m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
+  enableSynergy: 1
   playerDeck:
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
   - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
@@ -30,61 +31,52 @@ MonoBehaviour:
   - kind: 1
     attackerSlot: 0
     targetSlot: 0
-    guideMessage: "이번 전투엔 '시너지'가 등장한다! 내 앞줄 3장(꿀꿀비·모래몽·와글도도)은 전부 '무리' 시너지 카드다. 무리 카드가 4장 모이면 시너지가 활성화된다."
+    guideMessage: "\uC774\uBC88 \uC804\uD22C\uC5D4 '\uC2DC\uB108\uC9C0'\uAC00 \uB4F1\uC7A5\uD569\uB2C8\uB2E4!
+      \uB0B4 \uCE74\uB4DC\uB294 \uC804\uBD80 '\uBB34\uB9AC' \uC2DC\uB108\uC9C0 \uCE74\uB4DC\uC785\uB2C8\uB2E4.
+      \uBB34\uB9AC \uC2DC\uB108\uC9C0\uB294 \uBB34\uB9AC \uCE74\uB4DC\uAC00 4\uC7A5\uC77C
+      \uB54C \uD65C\uC131\uD654\uB429\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 1
   - kind: 1
     attackerSlot: 0
     targetSlot: 0
-    guideMessage: "무리 효과 — 공격할 때, 필드의 무리 아군 수만큼 '선피해'를 먼저 준다. 지금 무리가 3장이라 공격마다 3의 선피해가 추가로 들어간다!"
+    guideMessage: "\uBB34\uB9AC \uC2DC\uB108\uC9C0\uC758 \uD6A8\uACFC\uB294 \uACF5\uACA9\uD560
+      \uB54C, \uD544\uB4DC\uC758 \uBB34\uB9AC \uC544\uAD70 \uC218\uB9CC\uD07C \uD53C\uD574\uB97C
+      \uBA3C\uC800 \uC8FC\uB294 \uD6A8\uACFC\uC785\uB2C8\uB2E4. \uC9C0\uAE08 \uD544\uB4DC\uC5D0\uB294
+      \uBB34\uB9AC\uAC00 3\uC7A5\uC774\uB77C \uACF5\uACA9\uB9C8\uB2E4 3\uC758 \uD53C\uD574\uB97C
+      \uBA3C\uC800 \uC90D\uB2C8!"
     waitForTap: 1
     dimBackground: 1
   - kind: 2
     attackerSlot: 0
     targetSlot: 0
-    guideMessage: "적도 시너지가 있다. 적 '자석게'를 손가락으로 길게 눌러 정보를 확인해봐라 — '비늘' 시너지 배지가 보인다. 비늘은 받는 피해를 -1 줄인다."
+    guideMessage: "\uC801\uB3C4 \uC2DC\uB108\uC9C0\uAC00 \uC788\uC2B5\uB2C8\uB2E4.
+      \uC801 '\uC790\uC11D\uAC8C'\uB97C \uC190\uAC00\uB77D\uC73C\uB85C \uAE38\uAC8C
+      \uB204\uB974\uBA74 \uC801\uC758 \uC2DC\uB108\uC9C0\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.
+      \uC790\uC11D\uAC8C\uB294 \uBE44\uB298 \uC2DC\uB108\uC9C0\uB85C, \uBE44\uB298
+      \uC2DC\uB108\uC9C0\uB294 \uBC1B\uB294 \uD53C\uD574\uB97C -1 \uC904\uC785\uB2C8\uB2E4."
     waitForTap: 0
     dimBackground: 0
   - kind: 0
     attackerSlot: 2
     targetSlot: 0
-    guideMessage: "와글도도로 자석게를 공격! 무리 선피해 3이지만 자석게의 '비늘'이 -1 해서 2만 들어간다. 자석게 4→2."
+    guideMessage: "\uC640\uAE00\uB3C4\uB3C4\uB85C \uC790\uC11D\uAC8C\uB97C \uACF5\uACA9!
+      \uBB34\uB9AC \uC120\uD53C\uD574 3\uC774\uC9C0\uB9CC \uC790\uC11D\uAC8C\uC758
+      '\uBE44\uB298'\uC758 \uD6A8\uACFC\uB85C \uD53C\uD574\uAC00 1 \uAC10\uC18C\uD569\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 0
   - kind: 0
     attackerSlot: 1
     targetSlot: 0
-    guideMessage: "모래몽으로 마무리 — 무리 선피해만으로 자석게를 처치한다!"
+    guideMessage: "\uBAA8\uB798\uBABD\uC73C\uB85C \uB9C8\uBB34\uB9AC!"
     waitForTap: 1
     dimBackground: 0
-  - kind: 0
-    attackerSlot: 0
-    targetSlot: 1
-    guideMessage: "꿀꿀비로 톱니두더(비늘) 공격! 선피해 2 + 본피해 2 = 처치. 비늘이 양쪽 다 -1씩 깎은 결과다."
-    waitForTap: 1
-    dimBackground: 0
+  enemyScript:
   - kind: 0
     attackerSlot: 1
-    targetSlot: 2
-    guideMessage: "이번 적 '수정뿔루'는 비늘이 없다 — 선피해 3이 깎임 없이 그대로 들어가 즉시 처치! 시너지 유무 차이를 봐라."
-    waitForTap: 1
-    dimBackground: 0
-  - kind: 0
-    attackerSlot: 2
     targetSlot: 0
-    guideMessage: "와글도도로 계속 공격! 원거리라 반격을 안 받아 안전하다."
-    waitForTap: 0
+    guideMessage: "\uC774\uC81C\uBD80\uD130 \uC9C1\uC811 \uD50C\uB808\uC774\uD558\uBA70
+      \uAC8C\uC784\uC5D0\uC11C \uC2B9\uD574\uBCF4\uC138\uC694!"
+    waitForTap: 1
     dimBackground: 0
-  - kind: 0
-    attackerSlot: 1
-    targetSlot: 1
-    guideMessage: "모래몽으로 공격!"
-    waitForTap: 0
-    dimBackground: 0
-  - kind: 0
-    attackerSlot: 0
-    targetSlot: 2
-    guideMessage: "꿀꿀비로 마지막 적을 처치 — 승리! 내 무리 시너지와 적 비늘 시너지를 모두 배웠다."
-    waitForTap: 0
-    dimBackground: 0
-  enemyScript: []
+  freePlayAfterScript: 1
