@@ -116,7 +116,7 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
 
     void ShowKeywordExplain(KeywordIconConfig.Entry _entry, RectTransform _iconRect)
     {
-        UIPoolManager.instance?.AddOrUpdateUI<KeywordExplainPopupUI>(new KeywordExplainData
+        UIPoolManager.Instance?.AddOrUpdateUI<KeywordExplainPopupUI>(new KeywordExplainData
         {
             icon        = _entry.icon,
             displayName = _entry.displayName,
@@ -125,7 +125,7 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         });
     }
 
-    void HideKeywordExplain() => UIPoolManager.instance?.HideUI<KeywordExplainPopupUI>();
+    void HideKeywordExplain() => UIPoolManager.Instance?.HideUI<KeywordExplainPopupUI>();
 
     void EmptySlotInit()
     {

@@ -1,36 +1,73 @@
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 
+/// <summary>턴 전환 연출. 월드 오브젝트(TurnInfo)에 붙는다.
+/// 스케일이 커졌다 작아지며 한 바퀴 회전하고, 배경 스프라이트 색이
+/// 내 턴=파랑 / 상대 턴=빨강으로 바뀐다.</summary>
 public class TurnBannerUI : MonoBehaviour
 {
-    [SerializeField] RectTransform bannerRect;
-    [SerializeField] float enterDuration = 0.45f;
-    [SerializeField] float driftDuration = 0.55f;
-    [SerializeField] float driftX        = 80f;
-    [SerializeField] float exitDuration  = 0.22f;
-    [SerializeField] float offscreenX    = 1200f;
+    [Header("연출 대상")]
+    [SerializeField] Transform      target;          // 스케일·회전 대상(보통 self)
+    [SerializeField] SpriteRenderer background;      // 색을 바꿀 배경
+    [SerializeField] TMP_Text       whosTurnLabel;   // "누구 턴" 라벨(선택)
 
-    public async UniTask Play()
+    [Header("배경 스프라이트")]
+    [SerializeField] Sprite playerSprite; // 내 턴 스프라이트
+    [SerializeField] Sprite enemySprite;  // 상대 턴 스프라이트
+
+    [Header("라벨 문구")]
+    [SerializeField] string playerText = "내 턴";
+    [SerializeField] string enemyText  = "상대 턴";
+
+    [Header("타이밍")]
+    [SerializeField] float startScale   = 0.6f;   // 시작 스케일 배율(작게)
+    [SerializeField] float peakScale    = 1.25f;  // 커질 때 최대 배율
+    [SerializeField] float growDuration = 0.35f;  // 커지며 회전
+    [SerializeField] float settleDuration = 0.25f;// 원래 크기로 안착
+
+    Vector3 baseScale;
+    bool cached;
+
+    void Awake()
+    {
+        if (this.target == null) this.target = this.transform;
+        this.baseScale = this.target.localScale;
+        this.cached = true;
+    }
+
+    public async UniTask Play(bool _isMyTurn)
     {
         TurnState.InputAllowed = false;
-        gameObject.SetActive(true);
 
-        this.bannerRect.DOKill();
-        this.bannerRect.anchoredPosition = new Vector2(this.offscreenX, this.bannerRect.anchoredPosition.y);
+        if (!this.cached) { this.baseScale = this.target.localScale; this.cached = true; }
 
-        // 오른쪽에서 중앙으로 — OutBack으로 살짝 오버슈트 후 안착
-        await this.bannerRect.DOAnchorPosX(0f, this.enterDuration)
-            .SetEase(Ease.OutBack).ToUniTask();
+        this.target.DOKill();
 
-        // 가운데에서 아주 천천히 좌측으로 흘러가기
-        await this.bannerRect.DOAnchorPosX(-this.driftX, this.driftDuration)
-            .SetEase(Ease.Linear).ToUniTask();
+        // 배경 스프라이트 스왑(내 턴 / 상대 턴)
+        if (this.background != null)
+        {
+            Sprite t_sprite = _isMyTurn ? this.playerSprite : this.enemySprite;
+            if (t_sprite != null) this.background.sprite = t_sprite;
+        }
 
-        // 지수 가속으로 빠르게 화면 밖으로
-        await this.bannerRect.DOAnchorPosX(-this.offscreenX, this.exitDuration)
-            .SetEase(Ease.InExpo).ToUniTask();
+        // 라벨 문구
+        if (this.whosTurnLabel != null)
+            this.whosTurnLabel.text = _isMyTurn ? this.playerText : this.enemyText;
 
-        gameObject.SetActive(false);
+        // 스케일 팝 + 한 바퀴 회전
+        this.target.localScale       = this.baseScale * this.startScale;
+        this.target.localEulerAngles = Vector3.zero;
+
+        Sequence t_seq = DOTween.Sequence();
+        t_seq.Append(this.target.DOScale(this.baseScale * this.peakScale, this.growDuration).SetEase(Ease.OutQuad));
+        t_seq.Join(this.target.DOLocalRotate(new Vector3(360f, 0f, 0f), this.growDuration + this.settleDuration,
+                                             RotateMode.FastBeyond360).SetEase(Ease.OutCubic));
+        t_seq.Append(this.target.DOScale(this.baseScale, this.settleDuration).SetEase(Ease.OutBack));
+
+        await t_seq.ToUniTask();
+
+        this.target.localEulerAngles = Vector3.zero;
     }
 }

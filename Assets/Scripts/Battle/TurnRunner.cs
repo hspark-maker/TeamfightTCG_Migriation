@@ -16,8 +16,7 @@ public class TurnRunner : MonoBehaviour
     [SerializeField] TMP_Text turnCountLabel;
     [SerializeField] DeckPileUI playerDeckUI;
     [SerializeField] DeckPileUI enemyDeckUI;
-    [SerializeField] TurnBannerUI    playerTurnBanner;
-    [SerializeField] TurnBannerUI    enemyTurnBanner;
+    [SerializeField] TurnBannerUI    turnBanner;
     [SerializeField] GameResultPopup winPopup;
     [SerializeField] GameResultPopup losePopup;
 
@@ -62,8 +61,7 @@ public class TurnRunner : MonoBehaviour
             turnLabel       = this.turnLabel,
             playerDeckUI    = this.playerDeckUI,
             enemyDeckUI     = this.enemyDeckUI,
-            playerTurnBanner = this.playerTurnBanner,
-            enemyTurnBanner  = this.enemyTurnBanner,
+            turnBanner       = this.turnBanner,
         };
         RunTurns().Forget();
     }
@@ -94,11 +92,10 @@ public class TurnRunner : MonoBehaviour
             bool t_isMyTurn = DeckConfig.IsMultiplayer
                 ? t_current == (MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? 0)
                 : t_current == 0;
-            TurnBannerUI t_banner = t_isMyTurn ? this.ctx.playerTurnBanner : this.ctx.enemyTurnBanner;
-            if (t_banner != null)
+            if (this.ctx.turnBanner != null)
             {
                 SoundManager.Instance?.PlayTurnChange();
-                await t_banner.Play();
+                await this.ctx.turnBanner.Play(t_isMyTurn);
             }
 
             TurnBase t_turn;

@@ -31,11 +31,12 @@ public class EnemyTurn : TurnBase
             CardInstance t_atk;
             CardInstance t_def;
             string t_tutorialMsg = null;
-            if (TutorialConfig.IsActive)
-            {
-                // 튜토리얼: Random 대체. 선행 Message 스텝을 탭 게이트로 소진 후 공격 스텝 선택.
-                if (!await DrainEnemyMessagesAsync()) return;   // 스텝 소진 = 턴 종료
 
+            // 튜토리얼: 적 스크립트에 Attack 스텝이 있으면 스크립트대로, 없으면(=enemyScript 미저작/소진)
+            // 일반 AI로 폴백해 상대도 공격한다. (선행 Message 스텝은 폴백 여부와 무관하게 먼저 소진.)
+            bool t_scripted = TutorialConfig.IsActive && await DrainEnemyMessagesAsync();
+            if (t_scripted)
+            {
                 TutorialConfig.TryPeekEnemyStep(out var t_step);   // Drain 성공 = Attack 스텝 존재 보장
                 t_tutorialMsg = t_step.guideMessage;
                 // 디자이너 입력 슬롯 무검증 전달 방지 — GetSlot은 경계검사가 없어 범위 밖이면 크래시.
@@ -60,8 +61,14 @@ public class EnemyTurn : TurnBase
             }
             else
             {
-                t_atk = t_forcedAttacker ?? t_attackers[UnityEngine.Random.Range(0, t_attackers.Count)];
-                t_def = t_targets[UnityEngine.Random.Range(0, t_targets.Count)];
+                // 일반 AI 랜덤 공격. 튜토리얼 폴백은 재현성 위해 고정 시드(MatchRandom) 사용.
+                if (t_forcedAttacker != null)          t_atk = t_forcedAttacker;
+                else if (TutorialConfig.IsActive)      t_atk = t_attackers[MatchRandom.Range(t_attackers.Count)];
+                else                                   t_atk = t_attackers[UnityEngine.Random.Range(0, t_attackers.Count)];
+
+                t_def = TutorialConfig.IsActive
+                    ? t_targets[MatchRandom.Range(t_targets.Count)]
+                    : t_targets[UnityEngine.Random.Range(0, t_targets.Count)];
             }
 
             if (!t_atk.IsAlive) return;

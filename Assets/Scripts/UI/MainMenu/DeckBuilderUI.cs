@@ -82,7 +82,7 @@ public class DeckBuilderUI : MonoBehaviour
     public void DeleteCurrentDeck()
     {
         if (!DeckSaveManager.IsSlotValid(this.currentSlotIndex)) return;
-        UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = $"'{DeckSaveManager.GetName(this.currentSlotIndex)}' 덱을 삭제하시겠습니까?",
             yesText   = "삭제",
@@ -172,7 +172,7 @@ public class DeckBuilderUI : MonoBehaviour
     void OnCardBeginDrag(CardData _card, PointerEventData _eventData)
     {
         this.currentDragCard = _card;
-        this.dragGhost = UIPoolManager.instance.AddOrUpdateUI<PooledCardElement>(
+        this.dragGhost = UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
             new PooledCardElementData { card = _card, mod = CardElementMod.Simple });
         this.dragGhost.transform.SetAsLastSibling();
         MoveGhostToPointer(_eventData);
@@ -190,7 +190,7 @@ public class DeckBuilderUI : MonoBehaviour
         if (t_slotIndex >= 0 && this.currentDragCard != null)
             SetSlot(t_slotIndex, this.currentDragCard);
 
-        UIPoolManager.instance.HideUI<PooledCardElement>();
+        UIPoolManager.Instance?.HideUI<PooledCardElement>();
         this.dragGhost      = null;
         this.currentDragCard = null;
     }
@@ -239,7 +239,7 @@ public class DeckBuilderUI : MonoBehaviour
 
     void ShowSavePopup(Action _onYes, Action _onNo)
     {
-        UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = "덱을 저장하시겠습니까?",
             yesText   = "저장",

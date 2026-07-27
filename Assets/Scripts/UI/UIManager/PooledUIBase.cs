@@ -21,12 +21,12 @@ public abstract class PooledUIBase : MonoBehaviour, IUIController
 
     protected virtual void Awake()
     {
-        UIPoolManager.instance?.RegisterUI(this);
+        UIPoolManager.Instance?.RegisterUI(this);
     }
 
     protected virtual void OnDestroy()
     {
-        UIPoolManager.instance?.UnregisterUI(this);
+        UIPoolManager.Instance?.UnregisterUI(this);
     }
 }
 
