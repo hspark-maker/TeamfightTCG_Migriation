@@ -9,13 +9,16 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
 public class OutgameTutorialData : ScriptableObject
 {
-    /// <summary>스텝 종류. 완료 조건은 kind가 곧 정의한다(AutoPurchase=즉시, 나머지=앵커 클릭) — 별도 조건식 필드 없음.
+    /// <summary>스텝 종류. 완료 조건은 kind가 곧 정의한다 — 별도 조건식 필드 없음.
+    /// 클릭이 곧 완료인 것(WaitClick/BattleEntry)과 결과가 완료인 것(WaitPackOpen/WaitPurchase)이 나뉜다.
     /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
     public enum EStepKind
     {
         AutoPurchase = 0,   // 입력 없음. 팩 구매 → 캐리어 → 지정 씬 자동 전환
         WaitClick    = 1,   // 앵커 버튼 클릭 대기
         BattleEntry  = 2,   // 앵커 클릭 대기 + 진입 시 튜토리얼 시나리오 시작
+        WaitPackOpen = 3,   // 3D 팩 개봉 대기. 앵커 없음(딤 못 뚫음) → 배너만 띄우고 개봉 결과로 완료
+        WaitPurchase = 4,   // 앵커에 딤만 걸고 구매 "성공"으로 완료(클릭 자체는 완료가 아니다 — 골드 부족 시 실패)
     }
 
     /// <summary>튜토리얼 스텝 1개. 아래 필드는 kind별 전용이라 무관한 kind에서는 무시된다.</summary>
@@ -24,7 +27,7 @@ public class OutgameTutorialData : ScriptableObject
     {
         public EStepKind kind;
 
-        [Tooltip("안내 타깃 위젯. WaitClick / BattleEntry 전용 (AutoPurchase는 None)")]
+        [Tooltip("안내 타깃 위젯. WaitClick / BattleEntry / WaitPurchase 전용 (AutoPurchase·WaitPackOpen은 None)")]
         public EOutgameTutorialAnchor anchor;
 
         [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]

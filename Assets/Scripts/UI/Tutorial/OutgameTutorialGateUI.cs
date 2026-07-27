@@ -15,6 +15,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     const float BannerMargin  = 36f;    // 구멍과 배너 사이 간격
     const float BannerWidth   = 900f;
     const float BannerHeight  = 200f;
+    const float BannerBottom  = 220f;   // 배너 전용 모드의 하단 여백(화면 중앙 연출을 가리지 않게)
 
     RectTransform     m_canvasRect;
     GameObject        m_gateRoot;
@@ -41,7 +42,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     /// <summary>타깃만 남기는 게이트를 건다(_onSatisfied는 1회만 호출).
-    /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.</summary>
+    /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.
+    /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
+    /// (구매처럼 눌러도 실패할 수 있는 스텝).</summary>
     public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied)
     {
         if (_target == null)
@@ -67,10 +70,33 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_blockWarned  = false;
         m_armed        = true;
 
-        m_targetButton.onClick.AddListener(OnTargetClicked);
+        if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
         SetBanner(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
+    }
+
+    /// <summary>딤 없이 안내 배너만 띄운다. 3D 팩처럼 uGUI 구멍을 뚫을 수 없는 타깃용
+    /// (Overlay 딤을 깔면 3D 오브젝트가 그 아래로 가려져 강조가 아니라 은폐가 된다).</summary>
+    public void ShowBanner(string _message)
+    {
+        DetachButton();
+        m_target       = null;
+        m_targetCanvas = null;
+        m_onSatisfied  = null;
+        m_satisfied    = false;
+        m_blockWarned  = false;
+        m_armed        = false;   // 추종할 구멍이 없다 → LateUpdate 미개입
+
+        if (string.IsNullOrEmpty(_message)) { HideGate(); return; }
+
+        for (int t_i = 0; t_i < m_panels.Length; t_i++) SetPanel(m_panels[t_i], 0f, 0f, 0f, 0f);
+
+        SetBanner(_message);
+        m_bannerRect.anchoredPosition =
+            new Vector2(0f, m_canvasRect.rect.yMin + m_bannerRect.sizeDelta.y * 0.5f + BannerBottom);
+
+        m_gateRoot.SetActive(true);
     }
 
     /// <summary>딤을 숨기고 리스너를 해제한다(앵커 미등장 시 대기 상태). 콜백은 유지되지 않는다.</summary>

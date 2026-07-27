@@ -76,7 +76,9 @@ public static class OutgameTutorialRunner
                 return true;
 
             case OutgameTutorialData.EStepKind.WaitClick:
-                // 클릭이 곧 완료라 여기서 커밋하지 않는다(NotifyStepSatisfied가 커밋).
+            case OutgameTutorialData.EStepKind.WaitPackOpen:
+            case OutgameTutorialData.EStepKind.WaitPurchase:
+                // 완료 시점(클릭 또는 결과 신호)에 브리지가 NotifyStepSatisfied로 커밋한다.
                 return true;
 
             default:

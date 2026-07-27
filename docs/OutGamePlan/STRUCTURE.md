@@ -737,7 +737,7 @@ sequenceDiagram
 | `LobbyTabController.Tab.tutorialAnchor` (탭 버튼 대리 등록) | `Assets/Scripts/UI/Lobby/LobbyTabController.cs` — 필드 1 + `Awake` 3줄 | P4 ✅ |
 | `OwnershipManager.HasAnyOwnedSaved` 용도 축소(주석) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` — 레거시 마이그레이션 판정 전용 | P4 ✅ |
 | ~~`LobbyFirstRunRedirect`~~ | **삭제** — 스텝 0 `AutoPurchase`가 흡수 | P4 ✅ |
-| `Assets/SO/Tutorial/OutgameTutorial.asset` (스텝 0~2) | **에디터 저작 대기(사용자)** | P4 |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~13) | 저작 완료 — 전투 3회 · 구매 사이클 2회 | P6 ✅ |
 
 #### 씬/에셋 인계 (코드 밖 — 사용자)
 
@@ -745,14 +745,18 @@ sequenceDiagram
 |---|---|
 | `Assets/Scenes/New/LobbyScene.unity` | 구 `LobbyFirstRunRedirect` GameObject의 **Missing Script 제거** 후 `OutgameTutorialBridge` 부착(`data` ← `OutgameTutorial.asset`) / `MatchContent/PlayBtn`에 `TutorialAnchor`(`key = LobbyPlayButton`) |
 | `Assets/Scenes/CardPack.unity` | `AcquireButton`에 `TutorialAnchor`(`key = PackAcquireButton`) / `PackOpenDirector`에 `OutgameTutorialBridge`(같은 에셋) |
-| `Assets/SO/Tutorial/OutgameTutorial.asset` | 스텝 0=`AutoPurchase`(pack←StarterPack, `nextScene`=**LobbyScene**, refund 10) · 1=`WaitClick`(PackAcquireButton) · 2=`BattleEntry`(LobbyPlayButton, scenario←TutorialScenario) |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` | 14스텝. 0=`AutoPurchase`(pack←StarterPack, `nextScene`=**LobbyScene**, refund 10) · 1=`WaitPackOpen` · 2=`WaitClick`(PackAcquireButton) · 3=`BattleEntry`(scenario←TutorialScenario) · 4~8·9~13=구매 사이클(`WaitClick`(LobbyPackTab) → `WaitPurchase`(PackBuyButton) → `WaitPackOpen` → `WaitClick`(PackAcquireButton) → `BattleEntry`(TutorialScenario2/3)) |
 | `UIPoolManager` 캔버스 | `sortingOrder` **1 → 400** (`LobbyScene.unity` / `MainMenu.unity`). 게이트 300 > 팝업 상속값 1이라 **실패 팝업이 딤 아래로 묻혀 [확인]을 못 누른다** |
 
 > `nextScene`은 **개봉 후 목적지**다(개봉 씬 `"CardPack"`은 러너 상수). 스텝 0의 `nextScene`을 `BattleScene`으로 두면 안 된다 — 전투 진입은 스텝 2가 담당한다.
 > 게이트 UI는 코드 빌드라 **신규 프리팹·Addressable 등록이 없다**(`UIPrefab` 라벨 체크 대상 아님).
 
-#### 보류·미해결 (P5·P6에서 함께 처리)
+#### P5·P6 해결 내역
 
-- **P5·P6은 아웃게임 레이아웃 확정까지 의도적 보류.** 코드는 레이아웃을 모르게 설계됐다(게이트=임의 `RectTransform`, 타깃=enum 앵커) → 보류분은 **씬 배선 + SO 저작만으로 완료**되고 코드 재작성이 없다. 잔여: `LobbyTabController.tabs[1].tutorialAnchor = LobbyPackTab` / `PackShowcaseController.packData` ← `NormalPack.asset`(현재 미할당이라 구매 버튼 잠김) + 그 `buyButton`에 `TutorialAnchor(PackBuyButton)` / 스텝 SO를 11스텝으로 확장.
-- **결과 기반 커밋 부재**: 현재 `NotifyStepSatisfied()`는 **클릭 자체**를 완료로 본다. 구매 실패(골드 부족)·유효 덱 없음이면 원래 동작은 팝업만 띄우는데 튜토리얼은 다음 스텝으로 넘어가 **다음 앵커가 영영 안 나타나 정지**하거나 전투 없이 완료 처리된다. 구매 스텝이 실제로 저작되는 P5·P6에서 도입.
-- **경제 데드락 가능성**: NormalPack 10골드 vs 전투 보상 `max(remaining×10, minGold=5)` + 초기 골드 0 → 튜토리얼 전투 결과가 나쁘면 구매 스텝에서 영구히 막힐 수 있다. SO 저작만으로 조정 가능(대상 팩 교체·`minGold` 상향)하도록 설계했고, P6 E2E에서 실측 필요.
+- **앵커 배선 완료**: `LobbyTabController.tabs[1].tutorialAnchor = LobbyPackTab` / `PackShowcaseController.packData` ← `NormalPack.asset` / 그 `buyButton`(BuyBtn_0)에 `TutorialAnchor(PackBuyButton)`.
+- **완료 판정이 두 갈래로 갈렸다**: 3D 팩 개봉은 `PackClickHandle`의 물리 클릭이라 uGUI 게이트를 걸 수 없고(Overlay 딤이 3D를 덮어 강조가 은폐가 된다), 구매는 눌러도 실패할 수 있다. → kind `WaitPackOpen`(딤 없이 배너만, `GateUI.ShowBanner`)과 `WaitPurchase`(딤만 걸고 클릭은 완료가 아님)를 추가하고, 완료는 **결과 신호**가 확정한다.
+  - `PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased` (둘 다 static event) → `OutgameTutorialBridge`가 구독. **뷰는 구독자를 모른다** — `TutorialAnchorRegistry.OnRegistered`와 같은 방향의 관용구.
+  - `GateUI.ShowGate(_onSatisfied: null)` = 클릭 리스너 미부착(딤 유지). 이것이 `WaitPurchase`의 구현.
+- **결과 기반 커밋 해결**: 구매 실패 시 진행도가 앞서 나가지 않는다.
+- **경제 데드락 대응(값 무수정)**: `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고(`CurrencyManager.CanAfford` + `OnCurrencyChanged` 구독), `GateUI.RefreshVisibility`의 기존 소프트락 방어가 딤을 자동으로 걷는다 → 유저가 전투로 골드를 벌고 돌아오면 그 스텝이 그대로 재개된다. Play 실측 후 부족하면 `RewardConfig.minGold` / `NormalPack.price` 조정(코드 무수정).
+- **전투 사이 진입 깜빡임 제거**: `BattleEntry` 완료 직후에는 다음 스텝을 이 씬에서 진입시키지 않는다(`PlayBtn`이 이미 `LoadScene`을 걸어 곧 사라질 게이트가 한 프레임 뜬다) — 로비 복귀 시 그 씬의 브리지가 재개한다.

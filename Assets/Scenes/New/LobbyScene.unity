@@ -8149,7 +8149,7 @@ MonoBehaviour:
     button: {fileID: 123451426}
     content: {fileID: 97104067}
     selectedMark: {fileID: 829733659}
-    tutorialAnchor: 0
+    tutorialAnchor: 2
   - name: Match
     button: {fileID: 123451425}
     content: {fileID: 1503635144}
@@ -12868,6 +12868,7 @@ GameObject:
   - component: {fileID: 1842127859}
   - component: {fileID: 1842127858}
   - component: {fileID: 1842127857}
+  - component: {fileID: 1842127860}
   m_Layer: 0
   m_Name: BuyBtn_0
   m_TagString: Untagged
@@ -12979,6 +12980,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1842127855}
   m_CullTransparentMesh: 1
+--- !u!114 &1842127860
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1842127855}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 3
 --- !u!1 &1845068516
 GameObject:
   m_ObjectHideFlags: 0

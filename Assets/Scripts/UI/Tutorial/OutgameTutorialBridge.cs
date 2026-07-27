@@ -1,7 +1,10 @@
+using System;
 using UnityEngine;
 
 // 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개, 로비·개봉 씬).
 // 씬 이름을 보지 않는다 — 현재 스텝의 앵커가 이 씬에 등록되는 순간에만 게이트가 켜지고, 없으면 조용히 대기한다.
+// 완료 판정은 두 갈래: 클릭이 곧 완료인 스텝(WaitClick/BattleEntry)과, 결과 신호가 완료인 스텝
+// (WaitPackOpen=개봉, WaitPurchase=구매 성공). 후자는 눌러도 실패할 수 있어 클릭으로 커밋하면 진행도가 앞서 나간다.
 public class OutgameTutorialBridge : MonoBehaviour
 {
     [Tooltip("튜토리얼 스텝 시퀀스 SO. 모든 씬의 브리지에 같은 에셋을 배선한다(주입은 멱등).")]
@@ -11,6 +14,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     EOutgameTutorialAnchor m_waiting = EOutgameTutorialAnchor.None;
     string m_message;
     bool m_subscribed;
+
+    // 현재 스텝 종류. AutoPurchase는 "대기 중인 스텝 없음"과 같은 뜻이다(자동 스텝이라 여기서 대기하지 않는다).
+    OutgameTutorialData.EStepKind m_kind = OutgameTutorialData.EStepKind.AutoPurchase;
 
     void Awake() => OutgameTutorialRunner.EnsureData(data);
 
@@ -32,12 +38,23 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 현재 스텝을 진입시키고, 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
     void ApplyCurrentStep()
     {
-        m_waiting = EOutgameTutorialAnchor.None;
-        m_message = null;
+        // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면(개봉 연출 중의 획득 버튼 등)
+        // 옛 안내가 화면에 남는다.
+        CloseGate();
 
         // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!OutgameTutorialRunner.EnterCurrentStep()) { CloseGate(); return; }
-        if (!OutgameTutorialRunner.TryGetCurrentStep(out var t_step)) { CloseGate(); return; }
+        if (!OutgameTutorialRunner.EnterCurrentStep()) return;
+        if (!OutgameTutorialRunner.TryGetCurrentStep(out var t_step)) return;
+
+        m_kind    = t_step.kind;
+        m_message = t_step.guideMessage;
+
+        // 3D 팩은 Overlay 딤 아래로 가려져 구멍을 뚫을 수 없다 → 앵커 없이 배너만 띄우고 개봉 신호로 완료한다.
+        if (m_kind == OutgameTutorialData.EStepKind.WaitPackOpen)
+        {
+            OutgameTutorialGateUI.Ensure().ShowBanner(m_message);
+            return;
+        }
 
         if (t_step.anchor == EOutgameTutorialAnchor.None)
         {
@@ -48,7 +65,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
 
         m_waiting = t_step.anchor;
-        m_message = t_step.guideMessage;
         TryOpenGate();
     }
 
@@ -58,7 +74,13 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_waiting == EOutgameTutorialAnchor.None) return;
         if (!TutorialAnchorRegistry.TryGet(m_waiting, out var t_rect, out var t_button)) return;
 
-        OutgameTutorialGateUI.Ensure().ShowGate(t_rect, t_button, m_message, OnGateSatisfied);
+        // 구매는 눌러도 실패할 수 있다(골드 부족) → 클릭을 완료로 넘기지 않는다. 딤만 유지하고
+        // 완료는 구매 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로).
+        Action t_onSatisfied = m_kind == OutgameTutorialData.EStepKind.WaitPurchase
+            ? null
+            : (Action)OnGateSatisfied;
+
+        OutgameTutorialGateUI.Ensure().ShowGate(t_rect, t_button, m_message, t_onSatisfied);
     }
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
@@ -68,17 +90,38 @@ public class OutgameTutorialBridge : MonoBehaviour
         TryOpenGate();
     }
 
-    // 클릭 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
+    // 팩 개봉 신호. 다음 스텝(획득 버튼)이 같은 씬이라 그대로 이어간다.
+    void OnPackOpened()
+    {
+        if (m_kind != OutgameTutorialData.EStepKind.WaitPackOpen) return;
+
+        OnGateSatisfied();
+    }
+
+    // 구매 성공 신호. 곧바로 개봉 씬 로드가 뒤따르므로 커밋만 하고 다음 스텝은 그 씬의 브리지가 재개한다.
+    void OnPurchased()
+    {
+        if (m_kind != OutgameTutorialData.EStepKind.WaitPurchase) return;
+
+        OutgameTutorialRunner.NotifyStepSatisfied();
+        CloseGate();
+    }
+
+    // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
     void OnGateSatisfied()
     {
+        var t_completed = m_kind;
+
         OutgameTutorialRunner.NotifyStepSatisfied();
 
         if (!OutgameTutorialRunner.IsRunning) { CloseGate(); return; }
 
-        // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 AutoPurchase까지 진입시키면
-        // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집힌다. 자동 전환 스텝은 다음 씬의 브리지가 재개한다.
-        if (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
-            && t_next.kind == OutgameTutorialData.EStepKind.AutoPurchase)
+        // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
+        // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(AutoPurchase), 곧 사라질 게이트가 한 프레임 깜빡인다(BattleEntry).
+        // 두 경우 모두 다음 씬의 브리지가 재개한다.
+        if (t_completed == OutgameTutorialData.EStepKind.BattleEntry
+            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
+                && t_next.kind == OutgameTutorialData.EStepKind.AutoPurchase))
         {
             CloseGate();
             return;
@@ -91,6 +134,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         m_waiting = EOutgameTutorialAnchor.None;
         m_message = null;
+        m_kind    = OutgameTutorialData.EStepKind.AutoPurchase;
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }
 
@@ -98,7 +142,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_subscribed) return;
 
-        TutorialAnchorRegistry.OnRegistered += OnAnchorRegistered;
+        TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
+        PackRevealView.OnAnyPackOpened        += OnPackOpened;
+        PackShowcaseController.OnAnyPurchased += OnPurchased;
         m_subscribed = true;
     }
 
@@ -106,7 +152,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (!m_subscribed) return;
 
-        TutorialAnchorRegistry.OnRegistered -= OnAnchorRegistered;
+        TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
+        PackRevealView.OnAnyPackOpened        -= OnPackOpened;
+        PackShowcaseController.OnAnyPurchased -= OnPurchased;
         m_subscribed = false;
     }
 }

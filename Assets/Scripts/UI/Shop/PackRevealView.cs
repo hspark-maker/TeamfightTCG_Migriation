@@ -11,6 +11,10 @@ public class PackRevealView : MonoBehaviour
     // 카드 배치 완료 시 1회 발화.
     public event Action OnRevealComplete;
 
+    // 어느 씬의 어느 뷰든 팩이 열린 순간 발화(구독자는 씬 참조 없이 개봉 시점을 알 수 있다).
+    // 이 뷰는 구독자를 모른다 — "일어난 일"만 알린다.
+    public static event Action OnAnyPackOpened;
+
     [Header("3D 팩")]
     [SerializeField] PackClickHandle packHandle;   // 씬의 3D 팩(클릭 인터랙션)
     [SerializeField] GameObject packRoot;          // 팩 모델 루트. 미배선이면 packHandle의 오브젝트를 쓴다.
@@ -78,6 +82,8 @@ public class PackRevealView : MonoBehaviour
     {
         if (m_state != EViewState.PackShown) return;   // 중복 클릭/오작동 방어
         m_state = EViewState.Revealing;
+
+        OnAnyPackOpened?.Invoke();
 
         var t_root = ResolvePackRoot();
         if (t_root != null) t_root.SetActive(false);

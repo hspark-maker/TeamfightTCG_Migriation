@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,6 +12,9 @@ using UnityEngine.SceneManagement;
 //   — 상점 SO 미개입(팩 미할당이면 구매 잠금).
 public class PackShowcaseController : MonoBehaviour
 {
+    // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
+    public static event Action OnAnyPurchased;
+
     [SerializeField] Button buyButton;              // 구매 → 개봉 씬 전환 트리거.
     [SerializeField] TextMeshProUGUI packNameText;  // 대표 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
@@ -32,13 +36,30 @@ public class PackShowcaseController : MonoBehaviour
         {
             buyButton.onClick.RemoveListener(OnBuyPressed);
             buyButton.onClick.AddListener(OnBuyPressed);
-            buyButton.interactable = packData != null;   // 팩 미할당이면 구매 잠금.
         }
+
+        CurrencyManager.OnCurrencyChanged += OnCurrencyChanged;
+        RefreshBuyLock();
     }
 
     void OnDisable()
     {
         if (buyButton != null) buyButton.onClick.RemoveListener(OnBuyPressed);
+        CurrencyManager.OnCurrencyChanged -= OnCurrencyChanged;
+    }
+
+    void OnCurrencyChanged(ECurrencyType _type, long _balance)
+    {
+        if (_type == ECurrencyType.Gold) RefreshBuyLock();
+    }
+
+    // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
+    // 튜토리얼 게이트도 이 상태를 보고 딤을 자동으로 걷어 유저가 골드를 벌러 나갈 수 있다(소프트락 방지).
+    void RefreshBuyLock()
+    {
+        if (buyButton == null) return;
+
+        buyButton.interactable = packData != null && CurrencyManager.CanAfford(ECurrencyType.Gold, packData.Price);
     }
 
     // 대표 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
@@ -58,6 +79,8 @@ public class PackShowcaseController : MonoBehaviour
         if (t_opened != null && t_opened.Success)
         {
             s_transitioning = true;
+            // 구독자가 씬 전환 전에 결과를 처리할 수 있도록 LoadScene보다 먼저 알린다.
+            OnAnyPurchased?.Invoke();
             // 일반 구매 목적지는 로비 복귀, 튜토리얼 없음(첫실행 경로와 구분).
             PackHandoff.Set(t_opened, "LobbyScene", false);
             SceneManager.LoadScene("CardPack");
