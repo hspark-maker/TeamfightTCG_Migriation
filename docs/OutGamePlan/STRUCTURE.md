@@ -34,7 +34,9 @@
 | 2026-07-27 | **G-28 개봉 연출 단순화 (✅ 코드+검수+씬배선+컴파일 완료, Play 검증 대기)** — 사용자 결정: 드래그 뜯기·카드별 스와이프 스택 전면 폐기. **3D 팩 클릭 1회 → 팩 숨김 → UI 패널(CanvasGroup) fade in → fade 완료 후 3열 GridLayoutGroup 배치 → [획득] → 덱 슬롯0 저장 → 목적지 씬**. 삭제 4: `PackTearOpenView`·`PackTearHandle`·`RevealCardView`·`RevealCardView.prefab`(GUID 잔존 참조 0). 신규 2: `PackRevealView`(Idle→PackShown→Revealing→Done), `PackClickHandle`(OnMouseUpAsButton·Arm/Disarm). 카드 표시는 도감 타일 `CollectionCardView` 재사용(표시 진실원 1개), 3열 좌표 계산은 GridLayoutGroup에 이임. **공유 계약 추가: `DeckSaveManager.SaveSlotToFile(index, deck)`** — 기존 `SaveToFile`은 6슬롯을 통째로 flush해서 `LoadFromFile` 미경유 씬(개봉 씬)에서 다른 덱을 지우므로, 단일 슬롯만 반영하는 비파괴 API로 교체. tcg-reviewer critical 2건(파괴적 전슬롯 flush) → 수정, warn(`m_left` 소프트록·DOTween OnComplete 생존·scenario 미배선) → 수정. 씬 배선 완료(UICanvas/RevealPanel/CardGrid/AcquireButton/EventSystem 신설, CardStackPos·SealStrip 제거, Missing 0·미배선 0). 레이아웃 수치 검증: 420×560 셀 3열×2행, 획득 버튼 비겹침. Play E2E는 사용자 | ✅ |
 | 2026-07-27 | **아웃게임 첫시작 튜토리얼 P1~P4 (✅ 코드+검수+컴파일 에러 0, 씬 배선·SO 저작 대기)** — 신규 서브트리 `OutGame/Tutorial/` 6파일: 진행도 단일 창구 `OutgameTutorialProgress`(static), 스텝 해석·실행 `OutgameTutorialRunner`(static), 저작 데이터 `OutgameTutorialData`(SO, `EStepKind{AutoPurchase,WaitClick,BattleEntry}`+`List<Step>`), 타깃 앵커 3종(`EOutgameTutorialAnchor`·`TutorialAnchorRegistry`·`TutorialAnchor`). 신규 `UI/Tutorial/` 2파일: 4패널 딤 강제 게이트 `OutgameTutorialGateUI`(코드 빌드 캔버스 sortingOrder 300), 씬 수명 ↔ static 러너 연결 `OutgameTutorialBridge`(씬당 1개 — LobbyScene·CardPack). **세이브 확장**: `2.Domain/TutorialSaveData.cs` 신규(`outgameStepIndex`/`outgameCompleted`/`migrationChecked`) + `UserSaveData`에 `tutorial` 슬롯 1개 — **`VERSION`은 1 유지**(필드 추가만 = 하위호환, 구 세이브는 노드 없이 기본값). `GameManager.Boot()`에 `OutgameTutorialProgress.Init()` 1줄(Load 직후·CurrencyInit 앞). **`UI/Lobby/LobbyFirstRunRedirect.cs` 삭제** — 첫실행 스타터팩 자동 구매→캐리어→CardPack 전환이 스텝 0 `AutoPurchase`로 흡수됨(존치 시 "소유 0" 판정과 "stepIndex 0" 판정이 같은 사건에 반응해 **이중 구매**). 첫실행 판정 창구가 `OwnershipManager.HasAnyOwnedSaved()` 대리에서 `OutgameTutorialProgress`로 단일화되고, `HasAnyOwnedSaved()`는 **레거시 세이브 마이그레이션 1회 판정 전용**으로 축소(주석만 정정). `LobbyTabController.Tab`에 `tutorialAnchor` 필드 1개 + `Awake` 등록(탭 버튼이 Layer Lab 프리팹 내부 stripped Button이라 컴포넌트 직접 부착 회피). `OwnershipDebugTool`에 진행도 리셋 2종. P5·P6(Pack 탭 앵커 배선·11스텝 저작)은 **아웃게임 레이아웃 확정까지 의도적 보류** — 코드가 레이아웃을 모르게 설계돼(게이트=임의 RectTransform, 타깃=enum 앵커) 보류분은 씬 배선+SO 저작만으로 완료된다 | ✅ |
 | 2026-07-27 | **H. 랭크(표시용 티어 진행도) 도메인 설계 승인 (⬜ 구현 대기 — SAVE 게이트만 코드 적용)** — `outgame-design-session` 결과. 스코프를 **표시용**(보상·난이도·매칭 무영향)으로 좁혀 서버 권위 전제를 제거. 신규 4파일(`RankSaveData`·`RankConfig`·`RankManager`·`RankHud`) + 기존 3파일 소규모 수정(`UserSaveData` 1줄·`DataLibrary` 2줄·`TurnRunner.CaptureResult` 2줄). 핵심: **티어 = `points` 순수 파생**(도달티어 별도 저장 금지) · **강등 없음 = 가감 시 하한 클램프** · **캐시 없이 슬롯 직접 읽기 → `GameManager.Boot()` 무수정**. 의도적 제거 3건(`OnRankChanged`·진행률 필드·반환값). 신규 노드 `:::new` | ✅ 설계 |
+| 2026-07-27 | **F-20 도감 전체완성 1회성 보상 폐기 → 푸터 일괄수령으로 교체 (✅ 코드+배선, 컴파일·배선 검증 완료)** — 사용자 결정: 완성보상 기능 전면 제거. 삭제: `CollectionProductionManager`의 `s_completionRewardClaimed`·`IsCompletionRewardClaimed`·`CompletionRewardType/Amount`·`CanClaimCompletionReward`·`GetCompletionRewardInfo`·`ClaimCompletionReward`·`CompletionRewardInfo` struct, `CatalogRows.IsAllComplete`/`CompletionRewardType/Amount`, `CollectionLayoutConfig.completionRewardType/Amount`(+`.asset` 키 2줄), `CollectionSaveData.completionRewardClaimed`(**VERSION 1 유지** — 구 세이브의 남은 키는 JsonUtility가 무시, 진행도 무영향). 추가: **`GetTotalHarvestable() → long`**(전 행 수확가능 정수 합계) — 신규 private `HarvestableOf(CatalogRow)`를 `HarvestCore`와 공유해 **표시값 == 실제 지급 총량**(이중 진실원 없음). 뷰 컴포넌트는 **삭제**(`CollectionCompletionRewardView.cs` 제거) — 사용자 판단으로 푸터 로직을 `CollectionGalleryController`가 흡수했다(`harvestAllButton` 필드 1개 + 기존 폴링 틱·`OnChanged`에 편승, 별도 폴링 타이머·구독 중복 제거). 버튼 라벨은 프리팹 저작값 `일괄 수령` 고정(수량 표기 없음), `GetTotalHarvestable() >= 1`일 때만 `interactable`. 배선 3곳(`CollectionScreen.prefab`·`Canvas.prefab`·`CollectionTest.unity`)은 에디터 API로 이관(구 뷰 컴포넌트 제거 + 컨트롤러에 버튼 연결). 검증: 컴파일 성공, 3곳 모두 버튼 바인딩·라벨 정상·Missing Script 0 | ✅ |
 | 2026-07-27 | **CardShop(SO) 폐기 — 구매처가 팩 SO·환급액 직접 소유 (✅ 코드+컴파일 완료, 씬 재배선 대기)** — 사용자 결정: 상점 목록·환급 전역값을 쥐던 `CardShop` SO(+`CardShop.cs`·`CardShop.asset`) 및 `MainMenuInitializer.SetShop` 주입 제거. `CardPackOpener`는 **무상태 파사드**가 되고(`s_shop`/`Shop`/`SetShop`/`Packs`/`GetPack` 삭제), API를 `TryPurchase(string packId)`→**`TryPurchase(CardPackData pack, long refundGold)`**로 교체 — 대상 팩 SO와 중복 환급액을 호출부가 직접 넘긴다. 구매처 2곳이 인스펙터로 소유: `PackShowcaseController`(`packData`+`duplicateRefundGold`), `LobbyFirstRunRedirect`(`starterPackId` string→`starterPack` SO+`duplicateRefundGold`). 재화·소유 계약 순수 소비(불변), 로컬 랜덤·null 풀 방어·환급 로직 무변경. Unity 컴파일 에러 0. **씬 재배선(LobbyScene의 FirstRunRedirect `starterPack`·쇼케이스 버튼 `packData` 할당)은 사용자 — 구 string 필드가 SO 참조로 바뀌어 재할당 필요** | ✅(코드) |
+| 2026-07-27 | **H-33 랭크 티어 달성 보상 편입 — ✅ 코드 완료·검수 통과(씬 배선 대기)** — 표시용 진행도였던 랭크에 **보상 엔드포인트**를 붙였다. 신규 4파일(`OutGame/Rank/RankRewardManager.cs` + `UI/Rank/` 3개), 수정 3파일(`RankSaveData.claimedCount` · `RankTier.rewardGold` · `DataLibrary` 1줄). **`RankManager` 무수정**(동결 계약 무접촉) · **`UserSaveData` VERSION 1 유지**(필드 추가만). 핵심: 수령 상태 = **단조 증가 커서**(강등이 없어 수령 집합이 항상 프리픽스 → 정수 1개로 접힘, 기본값 0 = 미수령이라 센티널 불요) · 보상량은 **티어와 같은 원소**(`RankTier.rewardGold`)라 인덱스 드리프트 구조적 차단 · 상태 판정에서 **`Claimed` 최우선**(`RankManager.ResetForDebug` 후 재수령 차단) · 영속은 **`CurrencyManager.Save()` 하나**(중간 상태 디스크 기록 방지). 패널은 사용자 결정으로 **씬 직접 저작**(`PooledUIBase` 아님). tcg-reviewer 계약 위반 0. 상세는 아래 H-33 절 | ✅ |
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -107,7 +109,7 @@ flowchart TD
     subgraph prod["C-생산 (순수 시간)"]
         CLOCK["GameClock<br/>[#4 시각 창구]"]
         PROD["CollectionProductionManager<br/>[#2 Init/Save][#5 Resolve][#7 0덮금지]<br/>s_progress 진행도"]
-        INFO["RowProductionInfo /<br/>CompletionRewardInfo<br/>[#6 UI 스냅샷]"]
+        INFO["RowProductionInfo<br/>[#6 UI 스냅샷]"]
     end
 
     subgraph save["세이브 슬롯"]
@@ -153,7 +155,7 @@ flowchart TD
 
 ### F-17/F-18 도감 생산 UI 배선 (F. UI) — ✅ 씬/프리팹 배선 완료 (CollectionTest.unity)
 
-> 목표: 이미 완비된 `CollectionProductionManager` API(GetInfo/Harvest/HarvestAll/ClaimCompletionReward/OnChanged)를
+> 목표: 이미 완비된 `CollectionProductionManager` API(GetInfo/Harvest/HarvestAll/GetTotalHarvestable/OnChanged)를
 > 도감 갤러리 UI에 연결. 매니저·세이브·재화 계약은 **변경 없음**(소비만 추가). `:::new` = 이번 신규/확장.
 
 ```mermaid
@@ -166,11 +168,10 @@ flowchart TD
     end
 
     subgraph ui["F. 도감 갤러리 UI"]
-        GAL["CollectionGalleryController<br/>+ 폴링 틱 · OnChanged 구독"]:::new
+        GAL["CollectionGalleryController<br/>+ 폴링 틱 · OnChanged 구독<br/>+ 푸터 일괄수령 버튼"]:::new
         RV["CollectionRowView<br/>+ 상태칩·수확버튼 · 진행바 위임"]:::new
         CV["CollectionCardView (기존)"]
         PV["CollectionProgressView<br/>행별 생산 사이클 진행바"]:::new
-        CR["CollectionCompletionRewardView<br/>푸터 완성보상 버튼"]:::new
         HUD["GoldHud (기존 코드,<br/>씬 부착만)"]:::new
     end
 
@@ -181,16 +182,14 @@ flowchart TD
     GAL --> CV
     RV -->|"Bind(rowKey)·틱마다 Refresh"| PV
     PV -->|"GetInfo(rowKey).CycleProgress01"| PROD
-    CR -->|"GetCompletionRewardInfo / Claim"| PROD
-    PROD -->|"OnChanged"| CR
-    OWN -->|"OnOwnershipChanged"| CR
+    GAL -->|"GetTotalHarvestable 폴링 / HarvestAll"| PROD
     CUR -->|"OnCurrencyChanged"| HUD
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
 ```
 
 **설계 요지**
-- 생산 누적은 시간 함수라 `OnChanged`가 안 뜬다 → 컨트롤러가 **0.5s 폴링 틱**으로 열린 동안 각 행 `RefreshProduction()` 갱신. 수확/완성수령/소유변경은 `OnChanged`/`OnOwnershipChanged`로 즉시 갱신.
+- 생산 누적은 시간 함수라 `OnChanged`가 안 뜬다 → 컨트롤러가 **0.5s 폴링 틱**으로 열린 동안 각 행 `RefreshProduction()` 갱신. 푸터 일괄수령 뷰는 소유자(컨트롤러)가 없어 **자체 0.5s 폴링**. 수확/소유변경은 `OnChanged`/`OnOwnershipChanged`로 즉시 갱신.
 - 행 상태 4종 표시: 잠김(수확버튼 off) / 생산중(누적 표시) / 수확가능(버튼 on) / 상한(만땅). 상태는 `GetInfo`의 `State`+`CanHarvest` 조합.
 - 매니저/세이브/재화 계약 **불변** — UI는 순수 소비자(경계 준수).
 
@@ -220,17 +219,16 @@ sequenceDiagram
     CUR-->>HUD: OnCurrencyChanged → 골드 갱신
 ```
 
-> 근거: 코드 실물 확인(2026-07-24). `CollectionRowView.cs`(상태칩·진행바·수확), `CollectionGalleryController.cs`(Update 폴링+OnChanged), `CollectionProgressView.cs`/`CollectionCompletionRewardView.cs`(신규).
+> 근거: 코드 실물 확인(2026-07-27). `CollectionRowView.cs`(상태칩·진행바·수확), `CollectionGalleryController.cs`(Update 폴링+OnChanged+푸터 일괄수령), `CollectionProgressView.cs`.
 
 **실제 배선 결과 (2026-07-24, `Assets/Scenes/CollectionTest.unity` + `CollectionRow.prefab`)**
 
 | 컴포넌트 | 부착 위치 | 연결된 필드 → 대상 |
 |---|---|---|
-| `CollectionGalleryController` | 씬 `CollectionScreen` | `content`→`Gallery/Viewport/Content`, `rowPrefab`→CollectionRow.prefab, `fallbackAllCards`→카드 9장 |
+| `CollectionGalleryController` | 씬/프리팹 `CollectionScreen` | `content`→`Gallery/Viewport/Content`, `rowPrefab`→CollectionRow.prefab, `fallbackAllCards`→카드 9장, `harvestAllButton`→`BottomBar`의 일괄수령 Button |
 | `CollectionRowView` | `CollectionRow.prefab`(루트) | `cardsContainer`→`Cards`, `cardPrefab`→Card.prefab, `stateLabel`→`Status/StateChip/T`, `harvestButton`→`Status/Action`, `progressView`→`Status/Progress`(ProgressView) (`amountText`는 미배선=옵션) |
 | `CollectionProgressView` | `CollectionRow.prefab`의 `Status/Progress` | `fillImage`→`Status/Progress/BarBg/Fill` (`progressText`는 미배선=옵션). **행별 생산 사이클 진행바** |
 | `CollectionCardView` | `Card.prefab` | `portrait`/`nameText`/`lockOverlay` (기존) |
-| `CollectionCompletionRewardView` | 씬 `BottomBar` | `root`→`CompleteReward`, `claimButton`→`CompleteReward`(Button), `rewardText`→`CompleteReward/In/RT` |
 | `GoldHud` | 씬 `TopBar/GoldHud` | `goldText`→`GoldHud/Gold` |
 
 **생산 진행바 = 행별 사이클 진행바 (`CollectionProgressView`)**
@@ -238,7 +236,7 @@ sequenceDiagram
 - `RowProductionInfo.CycleProgress01`(파생 프로퍼티 = `AccumulatedRaw - Accumulated`, 소수부): 한 사이클(재화 1단위)이 차면 바가 0으로 리셋되고 누적 정수가 +1(실시간 채움→완료→누적↑). 사이클 길이 = productionCycleSeconds(기본 15초/단위). **저장 스키마·수확 로직 불변**(표시/파생만). `Status` 컨테이너는 프리팹 기본 비활성이라 **활성화**함.
 - `CollectionGalleryController.EnsureBoot()`(독립 씬 전용, `CardCatalog.IsReady`면 no-op): `DataSaveManager.Load()` + `CurrencyManager.Init()` 추가 → 테스트 씬에서도 저장된 골드·진행도 로드. 실제 통합 부트에선 IsReady 가드로 미실행.
 
-> **배선 시 주의(다음 수정 지점)**: `CompletionRewardView`는 `BottomBar`에 붙이고 `root`만 `CompleteReward`를 토글한다 — 뷰를 `CompleteReward` 자신에 붙이면 `root.SetActive(false)` 시 뷰의 `OnDisable`이 구독을 끊어 **다시 못 켜지는 자기비활성 버그**가 난다. / `amountText`는 목업에 대응 노드가 없어 미배선(진행바가 대체) — 숫자 표기가 필요하면 노드 추가 후 연결.
+> **푸터 일괄수령**: 전용 뷰를 두지 않고 `CollectionGalleryController`가 겸한다 — 필요한 게 폴링 틱과 `OnChanged` 구독뿐인데 둘 다 컨트롤러에 이미 있어, 별도 컴포넌트는 같은 배선의 중복이었다. 버튼은 항상 노출하고 `GetTotalHarvestable() >= 1`일 때만 `interactable`(오브젝트 토글 없음 → 자기비활성 버그 소지 자체가 사라졌다). 라벨은 프리팹 저작값 고정(수량 표기 없음). 클릭 시 `HarvestAll()` 1회로 여러 행·여러 재화를 지급하고 영속·통지는 1회로 묶인다.
 
 **배선 검증(에디터 인메모리 세이브, 실 저장 미오염)**: fallback 3행 전량 소유→완성, 행0 빌드→시간점프. RowView→ProgressView 위임으로 바 구동: +3분 `사이클 0.5·바 0.5` → 롤오버 시 `누적 +1·바 0` → +24h `Capped·바 1`. 수확 `earned·gold` 반영, 콘솔 에러 0.
 
@@ -942,3 +940,82 @@ LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
 - **렌더 진입점은 `Render()` 하나**, 호출자는 `Start()`(최초 1회)와 `OnEnable()`(`m_started` 가드 → 탭 재진입만). 이벤트 구독 0이라 `OnDisable`이 없다 — 해제 누락 위험도 구조적으로 없다.
 - **배지 진실원은 `RankConfig.tiers[].badge` 단 하나**(사용자 결정). HUD에 `Sprite[]` 폴백 배열을 두지 않는다 — 아트 미저작이면 `Badge == null`이라 씬에 배선된 기존 스프라이트가 그대로 남는다.
 - 도메인 H는 이걸로 **코드 100% 종결**. 남은 건 전부 에셋/아트: `RankConfig.asset` 저작·배선, 티어 배지 스프라이트. 둘 다 없어도 20티어 기본 테이블 + 씬 기본 배지로 동작한다.
+
+---
+
+### H-33. 랭크 티어 달성 보상 — ✅ 코드 완료·검수 통과 (2026-07-27, 씬 배선 대기)
+
+> 표시용 진행도였던 랭크에 **보상 엔드포인트**를 붙인다. 티어에 도달하면 골드를 **순차로 1회씩** 수령한다.
+> **`RankManager`는 무수정** — 보상은 신규 static 창구 `RankRewardManager`로만 흐르고, 달성 판정만 `RankManager.GetInfo()`에 위임한다(동결 계약 무접촉).
+> 스코프: 골드 1종(프로젝트 재화가 `Gold` 단일) · 20티어 전부 · 광고 2배 없음.
+
+#### 구조 지도 — 판정/영속/표시
+
+```mermaid
+flowchart TD
+    subgraph save["세이브 (슬롯 추가 없음, 필드 1개)"]
+        RSD["RankSaveData<br/>points (기존)<br/>claimedCount ← 수령 커서"]:::chg
+    end
+
+    subgraph rank["랭크 (기존 + 신규)"]
+        CFG["RankConfig / RankTier<br/>rewardGold 컬럼 추가"]:::chg
+        MGR["RankManager<br/>[동결·무수정]<br/>GetInfo → 도달 티어"]
+        RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
+        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>RewardGold · State"]:::new
+    end
+
+    subgraph ui["UI (씬 직접 저작 — PooledUIBase 아님)"]
+        PANEL["RankRewardPanel<br/>행 20개 Build · OnChanged 구독"]:::new
+        ROW["RankRewardRowView<br/>인덱스만 보유 · 매번 재조회"]:::new
+        POP["RankRewardClaimPopup<br/>표시 + 확인 콜백"]:::new
+    end
+
+    CUR["CurrencyManager<br/>Earn → Save (내부에서 DataSaveManager.Save)"]
+
+    RMGR -->|"슬롯 직접 읽기"| RSD
+    CFG -->|SetConfig| RMGR
+    MGR -->|"도달 티어 조회"| RMGR
+    RMGR --> INFO
+    INFO --> ROW
+    PANEL --> ROW
+    ROW -->|"클릭 → 인덱스"| PANEL
+    PANEL --> POP
+    POP -->|"획득 콜백"| PANEL
+    PANEL -->|Claim| RMGR
+    RMGR -->|"지급 + 영속 1회"| CUR
+    RMGR -.->|OnChanged| PANEL
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+#### 원리 카드 — 왜 이렇게 생겼나
+
+- **수령 상태가 정수 1개인 이유**: 티어는 강등이 없으므로(`ApplyBattleResult`의 하한 클램프) 도달 집합이 항상 `[0..TierIndex]` **프리픽스**다. 수령 집합도 프리픽스로 두면 상태공간이 정수 하나로 접힌다. `bool[20]`이나 키 리스트는 "구멍 뚫린 수령"처럼 **불변식이 허용하지 않는 상태까지 표현**할 수 있어 버그 표면이 넓어지고, 티어 테이블 길이가 바뀌면 마이그레이션이 필요하다.
+- **센티널(`-1`) 대신 개수인 이유**: 세이브는 `JsonUtility.FromJson`으로 읽는다. `0`이 곧 "미수령"이면 구 세이브·노드 재작성 어느 경로에서도 "이미 받음"으로 오판할 수 없다. `-1` 초기화자에 의존하면 직렬화기 동작에 안전성이 묶인다.
+- **보상량을 `RankTier`에 넣은 이유**: 별도 SO로 분리하면 두 리스트를 인덱스 정렬 상태로 **사람이** 유지해야 한다(도감이 이미 rowKey 드리프트로 겪은 문제). 같은 원소에 두면 어긋남이 구조적으로 불가능하다.
+- **`Claimed`를 가장 먼저 판정하는 이유**: `RankManager.ResetForDebug()`는 `points`만 0으로 되돌려 `claimedCount > 도달티어` 구간을 만든다. `Claimable`을 먼저 보면 그 구간에서 **재수령이 뚫린다**.
+- **영속을 `CurrencyManager.Save()` 하나로 끝내는 이유**: 그 메서드가 골드를 슬롯에 flush한 뒤 `DataSaveManager.Save()`를 부른다. 앞에 `DataSaveManager.Save()`를 따로 세우면 **"커서만 오르고 골드는 미반영"인 중간 상태가 한 번 디스크에 쓰인다**(그 사이 크래시 = 골드만 유실).
+- **행이 스냅샷을 캐싱하지 않는 이유**: `RankRewardRowView`는 티어 인덱스만 들고 `Refresh()`마다 `GetInfo`를 재조회한다. struct를 캐싱하면 수령 후 stale이 되고, 패널이 갱신 때마다 스냅샷을 나눠줘야 해서 결합이 늘어난다.
+- **패널이 `PooledUIBase`가 아닌 이유**: 사용자 결정으로 씬 직접 저작이다. `UIPoolManager` 캔버스(1440×2960)는 `LobbyCanvas`(1080×1920)와 해상도가 달라 큰 레이아웃에서 좌표계가 어긋난다. 씬 저작이면 Addressable 등록·소팅 오더 문제도 함께 사라지고, 수령 팝업이 패널의 자식이라 항상 그 위에 뜬다.
+
+#### 함정 3개
+
+| 함정 | 왜 | 처방 |
+|---|---|---|
+| `rowPrefab`을 Content 안의 목업 행으로 배선 | `Build()`가 Content 자식을 전부 지우면 프리팹 참조가 fake-null이 되어 **다음 Open부터 행 0개** | 원본은 숨기기만 하고 Destroy 제외 + 사본을 `SetActive(true)` (구현 반영됨) |
+| `RankConfig.asset`의 `rewardGold` | YAML엔 키가 **없는데** 런타임엔 값이 산다 — Unity가 `List<RankTier>` 초기화자로 만든 원소를 재사용하고 없는 필드를 덮어쓰지 않기 때문. 즉 **값이 에셋이 아니라 코드에 묶여 있다** | 지금은 저작 없이 동작하나, 인스펙터에서 `tiers` 크기를 건드리면 0으로 리셋될 수 있다 → 한 번 저장해 YAML에 굳힌다 |
+| `RankReward` 활성화만 하고 중복 `RankHud`를 방치 | `Tab_Match`에 붙은 두 번째 `RankHud`의 `badgeImage`가 **`RankReward` 프리팹 내부 Image**를 가리킨다 → 배지 아트를 저작하는 순간 보상 버튼 아이콘이 티어 배지로 덮인다 | 버튼 활성화와 컴포넌트 제거를 **한 세트로** 처리 |
+
+#### 파일 대응
+
+| 산출 | 경로 | 상태 |
+|---|---|---|
+| 보상 창구 · `RankRewardInfo` · `ERankRewardState` | `OutGame/Rank/RankRewardManager.cs` | ✅ 신규 |
+| 수령 커서 | `OutGame/Save/2.Domain/RankSaveData.cs` (`claimedCount`) | ✅ 필드 추가 |
+| 보상 테이블 | `OutGame/Rank/RankConfig.cs` (`RankTier.rewardGold`) | ✅ 필드 추가 |
+| SO 주입 | `Utils/DataLibrary.cs` 1줄 | ✅ |
+| 패널 · 행 · 수령 팝업 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` · `RankRewardClaimPopup.cs` | ✅ 신규 |
+| 씬 노드 · 행 프리팹 | `LobbyScene.unity` · `Assets/Assets/Prefabs/UI/RankUI/RankRewardRow.prefab` | ⬜ 사용자 저작 대기 |
+
+- 미해결(후속 후보): `HasAnyClaimable` 소비처(진입 버튼 알림점) · 수령 팝업 취소 경로(딤에 Button → `Hide()`면 코드 수정 불요) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음).

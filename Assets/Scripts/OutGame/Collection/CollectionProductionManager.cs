@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 // 도감 방치 생산 매니저 
 public static class CollectionProductionManager
@@ -9,10 +8,6 @@ public static class CollectionProductionManager
     static readonly Dictionary<string, CollectionRowProgress> s_progress = new Dictionary<string, CollectionRowProgress>();
 
     static bool s_initialized;
-
-    // 도감 전체 완성 1회성 보상 수령 플래그(메모리 캐시). 세이브(CollectionSaveData.completionRewardClaimed)와 동기.
-    // 부트에서 세이브값을 읽고, Save() 때 세이브에 함께 flush한다(true를 false로 덮지 않도록 메모리를 단일 진실로 유지).
-    static bool s_completionRewardClaimed;
 
     // 수확·생산 상태 변동 통지 — UI 갱신용(F-18). 누적 성장 자체는 시간 기반이라 통지하지 않는다(폴링 조회).
     public static event Action OnChanged;
@@ -36,9 +31,6 @@ public static class CollectionProductionManager
             }
         }
 
-        // 완성 보상 수령 플래그 복원. 슬롯 미존재/구 세이브는 false(미수령)로 안전 처리 — 진행도 후퇴 아님.
-        s_completionRewardClaimed = t_data != null && t_data.completionRewardClaimed;
-
         s_initialized = true;
     }
 
@@ -51,7 +43,6 @@ public static class CollectionProductionManager
         var t_data = DataSaveManager.Data.collection ?? (DataSaveManager.Data.collection = new CollectionSaveData());
         t_data.version = CollectionSaveData.VERSION;
         t_data.rows = new List<CollectionRowProgress>(s_progress.Values);
-        t_data.completionRewardClaimed = s_completionRewardClaimed; // 메모리 캐시를 함께 flush(rows 재작성에도 플래그 유실 없음).
         DataSaveManager.Save();
     }
 
@@ -60,7 +51,22 @@ public static class CollectionProductionManager
     // 현재 수확 가능한 정수 누적량(소수 버림). 미완성·미존재·엔트리 없음이면 0.
     public static long GetAccumulated(string _rowKey)
     {
-        return (long)Math.Floor(ResolveByKey(_rowKey));
+        return CatalogRows.TryGetRow(_rowKey, out var t_row) ? HarvestableOf(t_row) : 0;
+    }
+
+    // 전 행의 수확 가능한 정수 누적 합계(일괄 수령 버튼 표시·활성용).
+    // HarvestAll과 같은 행별 판정(HarvestableOf)을 쓰므로 표시값 == 실제 지급 총량.
+    // 조회지만 다른 Get*과 동일하게 Resolve 정산(누적 갱신·최초 완성 행 lazy 생성)을 유발한다.
+    public static long GetTotalHarvestable()
+    {
+        long t_total = 0;
+
+        var t_rows = CatalogRows.Rows;
+        for (int t_i = 0; t_i < t_rows.Count; t_i++)
+        {
+            t_total += HarvestableOf(t_rows[t_i]);
+        }
+        return t_total;
     }
 
     // 행 누적 상한. 미존재 키는 0.
@@ -143,66 +149,28 @@ public static class CollectionProductionManager
         return t_total;
     }
 
-    // 수확 코어(영속·통지 없음). Resolve로 정산 후 정수분을 Earn하고 소수만 남긴다.
+    // 수확 코어(영속·통지 없음). 정산 후 정수분을 Earn하고 소수만 남긴다.
     // 잠긴 행이라도 이미 굳은 누적은 청구 가능(생산만 멈춰 있을 뿐이므로).
     static long HarvestCore(CatalogRow _row)
     {
-        if (_row == null || string.IsNullOrEmpty(_row.Key)) return 0;
-
-        double t_raw = Resolve(_row);
-        long t_earned = (long)Math.Floor(t_raw);
+        long t_earned = HarvestableOf(_row); // 내부 Resolve가 엔트리 정산까지 끝낸다.
         if (t_earned <= 0) return 0;
 
         if (!s_progress.TryGetValue(_row.Key, out var t_entry)) return 0; // Resolve가 엔트리를 만들었어야 정상.
 
-        t_entry.accumulated = t_raw - t_earned;                 // 정수분 제거, 소수 잔여 보존
+        t_entry.accumulated -= t_earned;                        // 정수분 제거, 소수 잔여 보존
         t_entry.lastSettleUtcTicks = GameClock.UtcNow.Ticks;    // 정산 기준점 갱신
 
         CurrencyManager.Earn(_row.RewardType, t_earned);
         return t_earned;
     }
 
-    // ── 도감 전체 완성 1회성 보상 ───────────────────────────
-
-    // 완성 보상을 이미 수령했는지(플래그 조회).
-    public static bool IsCompletionRewardClaimed => s_completionRewardClaimed;
-
-    // 완성 보상 종류(전역 튜닝). UI(F-20) 표시용.
-    public static ECurrencyType CompletionRewardType => CatalogRows.CompletionRewardType;
-
-    // 완성 보상량(전역 튜닝). UI(F-20) 표시용.
-    public static long CompletionRewardAmount => CatalogRows.CompletionRewardAmount;
-
-    // 지금 수령 가능한가 = 모든 행 완성 & 미수령. 미완성이거나 이미 수령이면 false.
-    public static bool CanClaimCompletionReward => CatalogRows.IsAllComplete && !s_completionRewardClaimed;
-
-    // 완성 보상 UI 1회 스냅샷(완성 여부·수령 여부·수령 가능·보상 종류/양). 표시 시점마다 다시 받는다.
-    public static CompletionRewardInfo GetCompletionRewardInfo()
+    // 행 하나의 수확 가능한 정수 누적량(소수 버림). 조회와 지급이 공유하는 단일 판정.
+    // Resolve는 반환값 == 엔트리 accumulated로 정산해두므로, 호출부가 소수 잔여를 다시 계산할 필요가 없다.
+    static long HarvestableOf(CatalogRow _row)
     {
-        bool t_allComplete = CatalogRows.IsAllComplete;
-        return new CompletionRewardInfo(
-            t_allComplete,
-            s_completionRewardClaimed,
-            t_allComplete && !s_completionRewardClaimed,
-            CatalogRows.CompletionRewardType,
-            CatalogRows.CompletionRewardAmount);
-    }
-
-    // 완성 보상 수령: 수령 가능하면 재화 지급 → 플래그 true → 컬렉션+재화 즉시 영속 → 통지 → true.
-    // 미초기화/미완성/이미 수령이면 아무것도 하지 않고 false(중복 지급·부트 전 지급 방지).
-    public static bool ClaimCompletionReward()
-    {
-        // 부트 전 지급 방지: Save가 no-op이라 플래그가 안 남으면 재수령으로 중복 지급될 수 있다.
-        if (!s_initialized) return false;
-        if (!CanClaimCompletionReward) return false;
-
-        CurrencyManager.Earn(CatalogRows.CompletionRewardType, CatalogRows.CompletionRewardAmount);
-        s_completionRewardClaimed = true;
-
-        Save();                 // 컬렉션 플래그 즉시 영속(수확과 동일 결)
-        CurrencyManager.Save(); // 재화 즉시 영속(Earn은 지연 flush라 크래시 유실 방지)
-        OnChanged?.Invoke();
-        return true;
+        if (_row == null || string.IsNullOrEmpty(_row.Key)) return 0;
+        return (long)Math.Floor(Resolve(_row));
     }
 
     // ── 디버그/유지보수 ─────────────────────────────────────
@@ -211,18 +179,11 @@ public static class CollectionProductionManager
     public static void DebugResetAll()
     {
         s_progress.Clear();
-        s_completionRewardClaimed = false; // 완성 보상 재수령 가능 상태로 되돌림(디버그 전용).
         Save();
         OnChanged?.Invoke();
     }
 
     // ── 내부: 생산 정산(순수 시간 기반) ─────────────────────
-
-    // 행 키로 현재 누적 원시값 계산. 미존재 키는 0.
-    static double ResolveByKey(string _rowKey)
-    {
-        return CatalogRows.TryGetRow(_rowKey, out var t_row) ? Resolve(t_row) : 0.0;
-    }
 
     // 행의 현재 누적 원시값을 계산하고, 필요 시 lazy 초기화·정산을 수행한다.
     //  - 미완성(잠김): 생산 정지. 기존 누적 보존. 마지막정산을 현재로 당겨(메모리) 재완성 시 잠금 구간을 계상하지 않는다.
@@ -321,24 +282,5 @@ public readonly struct RowProductionInfo
         CanHarvest = _canHarvest;
         RewardType = _rewardType;
         ProductionCycleSeconds = _productionCycleSeconds;
-    }
-}
-
-// 도감 전체 완성 1회성 보상 1회 스냅샷(UI F-20용). 상태가 바뀌므로 표시 시점마다 GetCompletionRewardInfo로 다시 받는다.
-public readonly struct CompletionRewardInfo
-{
-    public readonly bool AllComplete;         // 모든 행 완성 여부
-    public readonly bool Claimed;             // 이미 수령했는지
-    public readonly bool CanClaim;            // AllComplete && !Claimed
-    public readonly ECurrencyType RewardType; // 수령 시 지급 재화 종류
-    public readonly long RewardAmount;        // 수령 시 지급 재화량
-
-    public CompletionRewardInfo(bool _allComplete, bool _claimed, bool _canClaim, ECurrencyType _rewardType, long _rewardAmount)
-    {
-        AllComplete = _allComplete;
-        Claimed = _claimed;
-        CanClaim = _canClaim;
-        RewardType = _rewardType;
-        RewardAmount = _rewardAmount;
     }
 }

@@ -115,7 +115,7 @@
 | **PKG-RANKTIER-WIRE** | SO 주입 (H-30) | `RankManager.SetConfig` | `RankConfig.asset` 저작 | 수정 `Utils/DataLibrary.cs`(필드1+호출1) + `Assets/SO/Rank/RankConfig.asset`(**사용자**) | CORE ✅ | outgame-engineer(코드)+사용자(에셋) | 🟢 | ✅ 완료(코드·검수 통과) — 사용자 에셋 인계 잔여 |
 | **PKG-RANKTIER-BATTLE** | 전투 종료 훅 (H-31) | `RankManager.ApplyBattleResult` (멀티 배제 게이트 제거 — 프로토 스코프 밖) | 없음(순수 소비) | 수정 `Battle/TurnRunner.cs`(`CaptureResult` 내부 1줄) | CORE ✅ | **battle-engineer** | 🟠 (TurnRunner 그룹) | ✅ 완료(검수 통과·컴파일 에러 0, Play 검증은 HUD 후 일괄) |
 | **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선 | CORE ✅, WIRE ✅(코드) | UI | 🟠 **로비 씬 그룹** | ✅ 완료(검수 발견 0·컴파일 에러 0·씬 배선 완료, **사용자 저장 필요**) |
-| **PKG-RANKTIER-REWARD** (선택·후속) | 티어 승급 보상 | `CurrencyManager.Earn` | 세이브 필드 추가(수령 티어) | `OutGame/Rank/*` + 씬 `RankReward` 버튼 | HUD | outgame-engineer | 🟠 | ⬜ 보류(범위 밖) |
+| **PKG-RANKTIER-REWARD** | 티어 달성 보상 (H-33) | `CurrencyManager.Earn/Save` · `RankManager.GetInfo` | **`RankRewardManager` 창구** + 세이브 필드 `RankSaveData.claimedCount` + `RankTier.rewardGold` | 신규 `OutGame/Rank/RankRewardManager.cs` · `UI/Rank/`(3) / 수정 `RankSaveData`·`RankConfig`·`DataLibrary`(1줄) / 씬 `RankReward` 버튼 | HUD ✅ | outgame-engineer | 🟠 | ✅ 완료(검수 통과·컴파일 에러 0·런타임 스모크 OK) — **씬 배선·프리팹 저작 대기** |
 
 **격리 판정 — 착수 전 반드시 확인**
 
@@ -126,7 +126,7 @@
 | `Utils/DataLibrary.cs` | `PKG-TUNE`(✅ 완료) | ✅ 충돌 없음 |
 | `Save/2.Domain/UserSaveData.cs` | 없음 | ✅ 단독 — 그래서 SAVE 게이트가 수 분에 끝났다 |
 
-**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE`✅ ∥ `BATTLE`✅) → `HUD`(✅ 코드+씬배선) → 문서 정합(✅). **도메인 H 코드 종결.** 남은 사용자 인계는 에셋/아트뿐 — `RankConfig.asset` 저작·`DataLibrary` 배선 + 티어 배지 아트(랭크당 재사용 또는 20단계 개별). 둘 다 없어도 동작한다.
+**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE`✅ ∥ `BATTLE`✅) → `HUD`(✅ 코드+씬배선) → `REWARD`(✅ 코드) → 문서 정합(✅). **도메인 H 코드 종결.** 남은 사용자 인계는 에셋/아트뿐 — `RankConfig.asset` 저작·`DataLibrary` 배선 + 티어 배지 아트(랭크당 재사용 또는 20단계 개별). 둘 다 없어도 동작한다.
 
 > **CORE 반납 결과(2026-07-27)**: 신규 파일 2개만 추가, **수정 파일 0**. `RankConfig.tiers` 기본 테이블은 코드 필드 초기화자에 `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`(승 +10 · 패 −5) — 배지 아트가 사용자 인계분이다. `RankConfig.asset`은 아직 없고, 없어도 `CreateInstance` fallback으로 기본 테이블이 살아 있다(WIRE는 순수 튜닝·아트 주입). ※ 기본 테이블은 이후 20티어로 세분화됨(아래 노트).
 >
@@ -144,6 +144,15 @@
 >
 > ⚠️ **`RankConfig.tiers`는 C# 필드 초기화자로 기본 테이블 필수** — `List<>`는 `CreateInstance` fallback에서 빈 리스트가 되고(`BattleReward`의 스칼라 기본값과 다름), `DataLibrary`가 **BattleScene에 없어** 전투 씬 직접 Play는 항상 fallback을 탄다.
 
+> **REWARD 반납 결과(2026-07-27)**: 신규 4파일(`OutGame/Rank/RankRewardManager.cs` + `UI/Rank/` 3개), 수정 3파일(`RankSaveData` +4줄 · `RankConfig` rewardGold 컬럼 · `DataLibrary` +1줄). **`RankManager` 무수정**(동결 계약 무접촉) · `UserSaveData.VERSION` 1 유지.
+> 설계 결정 3개: ① 수령 상태 = **단조 증가 커서** `claimedCount`(수령 완료 개수). 강등이 없어 수령 집합이 항상 프리픽스라 정수 1개로 접힌다 — `bool[20]`/키 리스트는 표현 못 할 상태(구멍 뚫린 수령)를 허용하고 테이블 길이 변경에 취약. **기본값 0 = 미수령**이라 센티널 불필요. ② 보상량은 `RankTier.rewardGold` — 티어와 **같은 원소**라 인덱스 드리프트가 구조적으로 불가능(별도 SO 분리 대비). ③ 패널은 **씬 직접 저작**(사용자 결정) — `PooledUIBase` 아님, `SetActive` 토글.
+> 상태 3종(`Locked`/`Claimable`/`Claimed`)은 `StateOf` 단일 판정이고 **`Claimed`를 가장 먼저 검사**한다 — `RankManager.ResetForDebug()`가 points만 0으로 되돌려 `claimedCount > 도달티어`가 되는 구간에서 재수령이 뚫리기 때문. "달성했지만 순차 차례 아님"은 `Locked`에 포함(하이라이트는 항상 1개).
+> tcg-reviewer 검수 **계약 위반 0**(warn 5·nit 8). 그중 2건은 반영: ① `Claim`이 `DataSaveManager.Save()`+`CurrencyManager.Save()`를 둘 다 부르던 것을 **후자 하나로** — `CurrencyManager.Save()`가 내부에서 `DataSaveManager.Save()`를 부르므로 앞세우면 "커서만 오르고 골드 미반영" 상태가 한 번 디스크에 쓰인다. ② `Build()`가 Content 자식을 전부 Destroy해 **`rowPrefab`이 씬 목업 행으로 배선되면 첫 Open 후 행 0개**가 되던 경로 → 원본은 숨기기만 하고 사본을 `SetActive(true)`.
+> Unity 실측: 컴파일 에러 0 · 신규 타입 어셈블리 등록 확인 · 경계 인덱스(-5/9999) 예외 없이 `Locked`+`Claim` false·부작용 0 · 현재 세이브(브론즈 2, claimedCount 0)에서 행0만 `Claimable`.
+> ⚠️ **`RankConfig.asset`의 `rewardGold`는 코드 초기화자에 매달려 있다** — 에셋 YAML엔 `rewardGold` 키가 **0개**인데 런타임엔 20개 값이 살아 있다(합계 15,800). Unity가 `List<RankTier>` 초기화자로 만든 원소를 재사용하고 YAML에 없는 필드를 덮어쓰지 않기 때문. **지금은 저작 없이 동작하지만** 인스펙터에서 `tiers` 크기를 건드리면 0으로 리셋될 수 있다 → 한 번 저장해 YAML에 굳히는 것을 권장.
+> **사용자 인계(에디터)**: ① `LobbyCanvas` 직속(`LobbyRoot` 밖, `DragLayer` 형제)에 `RankRewardOverlay` + `RankRewardPanel` — **스크립트 노드는 켜둔 채** 딤+패널 자식을 `root`에 배선 ② `RankRewardRow.prefab` 저작(`Assets/Assets/Prefabs/UI/RankUI/`, **Addressable 불필요**) ③ `ClaimPopup` + `RankRewardClaimPopup` ④ **`Tab_Match`의 중복 `RankHud` 제거**(정상본은 `PlayBtn/RankInfo`) ⑤ `RankReward` 활성화 + `onClick`→`Open()` — **④와 한 세트**(따로 하면 배지 저작 시 보상 버튼 아이콘이 덮인다). 티어명 TMP는 반드시 `MalgunGothic_TMP`(Quicksand는 한글 글리프 없음).
+> 미해결로 남긴 검수 지적: `HasAnyClaimable` 소비처 0(알림점 미도입) · 수령 팝업에 취소 경로 없음(딤에 Button 달아 `Hide()` 연결하면 코드 수정 없이 해결) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 `RankManager`/`RankRewardManager` 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음).
+>
 > **HUD 반납 결과(2026-07-27)**: 신규 `UI/HUD/RankHud.cs` 1개(수정 파일 0, 산출 계약 0). `Start()` 최초 렌더 + `OnEnable`의 `m_started` 가드로 위 함정 회피, 이벤트 구독 0(`OnDisable` 없음), `Badge`/`Points` 2필드만 소비(`IsMaxTier` 미참조 → 검수 유보 ① 회피), 배지 폴백 배열 없음(진실원 = `RankConfig.tiers[].badge` 단일). tcg-reviewer 검수 **발견 0**, Unity 콘솔 컴파일 에러 0.
 > **씬 배선도 이 세션에서 완료**(`RankInfo`에 `RankHud` 부착 + `badgeImage`→`RankBadge`, `pointText`→`RankPower/Text`, `RankReward` 비활성). 배선은 `LobbyScene`이 에디터에 **dirty 상태로 열려 있어** YAML 직접 편집 대신 에디터 API(Undo 등록)로 수행했고, **씬 저장은 사용자 몫으로 남겨 뒀다**(사용자의 다른 미저장 변경과 함께 저장 여부를 판단하도록). ⚠️ 저장 전에 씬을 discard하면 배선이 날아간다.
 > **도메인 H 코드 종결** — 남은 건 `RankConfig.asset` 저작·배선 + 티어 배지 아트(에셋/아트 인계분).

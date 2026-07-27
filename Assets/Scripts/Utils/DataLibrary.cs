@@ -37,6 +37,7 @@ public class DataLibrary : MonoBehaviour
         GameTiming.SetConfig(this.battleTimingConfig);
         RewardService.SetConfig(this.battleRewardConfig);
         RankManager.SetConfig(this.rankConfig);
+        RankRewardManager.SetConfig(this.rankConfig); // 보상 테이블이 티어 테이블과 같은 SO라 필드를 재사용한다(이중 진실원 방지).
         return true;
     }
 

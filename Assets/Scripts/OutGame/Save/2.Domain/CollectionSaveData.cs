@@ -7,16 +7,14 @@ using System.Collections.Generic;
 [Serializable]
 public class CollectionSaveData
 {
-    public const int VERSION = 1;   // 도감 스키마를 바꿔야 할 때만 올린다(마이그레이션 진입점).
+    // 도감 스키마를 바꿔야 할 때만 올린다(마이그레이션 진입점).
+    // 폐기된 completionRewardClaimed 키가 구 세이브에 남아 있어도 JsonUtility가 무시하므로 버전은 유지.
+    public const int VERSION = 1;
 
     public int version = VERSION;
 
     // 행별 진행도 목록(순서 무의미 — 키로 조회). null 방어는 소비자(CollectionProductionManager)에서.
     public List<CollectionRowProgress> rows = new List<CollectionRowProgress>();
-
-    // 도감 전체 완성 1회성 보상 수령 여부(스칼라). 기본 false=미수령.
-    // 필드 추가만 — 버전 유지(하위호환). 구 세이브엔 없어 false로 읽히며, 이는 "미수령"이라 진행도 후퇴가 아니다.
-    public bool completionRewardClaimed = false;
 }
 
 // 행 하나의 방치 생산 진행도. 인덱스가 아닌 행 안정 키로 식별한다.

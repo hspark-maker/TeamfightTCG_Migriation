@@ -21,31 +21,31 @@ public class RankConfig : ScriptableObject
     [Tooltip("티어 테이블. requiredPoints 오름차순으로 저작한다. 인덱스 0이 최하위이며, 도달 티어는 points의 순수 파생이라 세이브에 저장하지 않는다.")]
     public List<RankTier> tiers = new List<RankTier>
     {
-        new RankTier { displayName = "브론즈 1",     requiredPoints = 0 },
-        new RankTier { displayName = "브론즈 2",     requiredPoints = 25 },
-        new RankTier { displayName = "브론즈 3",     requiredPoints = 50 },
-        new RankTier { displayName = "브론즈 4",     requiredPoints = 75 },
-        new RankTier { displayName = "실버 1",       requiredPoints = 100 },
-        new RankTier { displayName = "실버 2",       requiredPoints = 125 },
-        new RankTier { displayName = "실버 3",       requiredPoints = 150 },
-        new RankTier { displayName = "실버 4",       requiredPoints = 175 },
-        new RankTier { displayName = "골드 1",       requiredPoints = 200 },
-        new RankTier { displayName = "골드 2",       requiredPoints = 225 },
-        new RankTier { displayName = "골드 3",       requiredPoints = 250 },
-        new RankTier { displayName = "골드 4",       requiredPoints = 275 },
-        new RankTier { displayName = "플래티넘 1",   requiredPoints = 300 },
-        new RankTier { displayName = "플래티넘 2",   requiredPoints = 325 },
-        new RankTier { displayName = "플래티넘 3",   requiredPoints = 350 },
-        new RankTier { displayName = "플래티넘 4",   requiredPoints = 375 },
-        new RankTier { displayName = "다이아몬드 1", requiredPoints = 400 },
-        new RankTier { displayName = "다이아몬드 2", requiredPoints = 425 },
-        new RankTier { displayName = "다이아몬드 3", requiredPoints = 450 },
-        new RankTier { displayName = "다이아몬드 4", requiredPoints = 475 },
+        new RankTier { displayName = "브론즈 1",     requiredPoints = 0,   rewardGold = 100 },
+        new RankTier { displayName = "브론즈 2",     requiredPoints = 25,  rewardGold = 150 },
+        new RankTier { displayName = "브론즈 3",     requiredPoints = 50,  rewardGold = 200 },
+        new RankTier { displayName = "브론즈 4",     requiredPoints = 75,  rewardGold = 250 },
+        new RankTier { displayName = "실버 1",       requiredPoints = 100, rewardGold = 300 },
+        new RankTier { displayName = "실버 2",       requiredPoints = 125, rewardGold = 350 },
+        new RankTier { displayName = "실버 3",       requiredPoints = 150, rewardGold = 400 },
+        new RankTier { displayName = "실버 4",       requiredPoints = 175, rewardGold = 450 },
+        new RankTier { displayName = "골드 1",       requiredPoints = 200, rewardGold = 500 },
+        new RankTier { displayName = "골드 2",       requiredPoints = 225, rewardGold = 600 },
+        new RankTier { displayName = "골드 3",       requiredPoints = 250, rewardGold = 700 },
+        new RankTier { displayName = "골드 4",       requiredPoints = 275, rewardGold = 800 },
+        new RankTier { displayName = "플래티넘 1",   requiredPoints = 300, rewardGold = 900 },
+        new RankTier { displayName = "플래티넘 2",   requiredPoints = 325, rewardGold = 1000 },
+        new RankTier { displayName = "플래티넘 3",   requiredPoints = 350, rewardGold = 1100 },
+        new RankTier { displayName = "플래티넘 4",   requiredPoints = 375, rewardGold = 1200 },
+        new RankTier { displayName = "다이아몬드 1", requiredPoints = 400, rewardGold = 1400 },
+        new RankTier { displayName = "다이아몬드 2", requiredPoints = 425, rewardGold = 1600 },
+        new RankTier { displayName = "다이아몬드 3", requiredPoints = 450, rewardGold = 1800 },
+        new RankTier { displayName = "다이아몬드 4", requiredPoints = 475, rewardGold = 2000 },
     };
 }
 
 /// <summary>
-/// 티어 1개 정의(표시명·진입 임계치·뱃지)
+/// 티어 1개 정의(표시명·진입 임계치·뱃지·달성 보상)
 /// </summary>
 [Serializable]
 public class RankTier
@@ -58,4 +58,8 @@ public class RankTier
 
     [Tooltip("티어 뱃지 스프라이트(선택). 비워두면 UI가 기존 표시를 유지한다.")]
     public Sprite badge;
+
+    // long 필드라 [Min]을 붙이지 않는다(MinDrawer가 intValue로 잘라낸다) — 음수·0은 Earn이 무시하므로 지급 경로는 안전하다.
+    [Tooltip("이 티어 달성 시 1회 수령하는 골드. 0이면 수령해도 지급이 없다(진행만 넘어간다).")]
+    public long rewardGold;
 }

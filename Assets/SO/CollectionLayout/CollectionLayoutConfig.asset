@@ -15,8 +15,6 @@ MonoBehaviour:
   defaultRewardType: 0
   defaultProductionCycleSeconds: 15
   defaultCap: 240
-  completionRewardType: 0
-  completionRewardAmount: 1000
   rows:
   - card1: {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
     card2: {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}

@@ -151,7 +151,10 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 
 > **⚠️ `RankHud`에 `GoldHud` 패턴을 그대로 복제하면 버그**: `GoldHud`의 `OnEnable` 즉시 렌더가 안전한 건 `CurrencyManager.Init()`이 `BeforeSceneLoad`에서 끝나기 때문이다. `RankConfig` 주입은 `DataLibrary.Awake`(실행순서 0)에서 일어나고 `Tab_Match`·`RankInfo`가 모두 씬에 활성 저장돼 있어 **`RankHud.OnEnable`이 `DataLibrary.Awake`보다 먼저 돌 수 있다**(비결정). 이벤트를 뺐으므로 잘못된 첫 렌더가 그대로 굳는다. → **최초 렌더는 `Start()`**, `OnEnable`은 `m_started` 가드.
 
-> **범위 밖(후속)**: 씬의 `RankReward`("랭크보상") 버튼 — 티어 승급 보상은 이번 스코프에 없으므로 **비활성**. 필요해지면 도감 완성보상(`ClaimCompletionReward`) 패턴을 복제해 순수 추가로 붙인다. 결과 팝업의 랭크 변동 연출도 후속(`Show(long)` 확장은 `WinUI`/`LoseUI` 프리팹 2개 저작 + 완료·검수된 `PKG-POPUP` 재개봉을 유발).
+> **~~범위 밖(후속)~~ → 편입·구현 완료(H-33, 2026-07-27)**: 씬의 `RankReward`("랭크보상") 버튼이 여는 **티어 달성 보상**. 표시용 진행도였던 랭크가 여기서 **보상 엔드포인트**로 승격된다. 스코프는 골드 1종·20티어 전부·순차 1회 수령.
+> 수령 상태는 예고했던 `bool` 플래그가 아니라 **단조 증가 커서** `RankSaveData.claimedCount`(수령 완료 티어 개수)다 — 티어가 20개인데 강등이 없어 수령 집합이 항상 프리픽스이기 때문. 기본값 `0`이 곧 미수령이라 센티널도 필요 없다. 보상량은 `RankTier.rewardGold`로 티어 테이블과 **같은 원소**에 둬 인덱스 드리프트를 구조적으로 차단했다(별도 SO 분리 대비).
+> `RankManager`는 **무수정** — 보상은 신규 static 창구 `RankRewardManager`로만 흐르고 달성 판정만 `RankManager.GetInfo()`에 위임한다.
+> 결과 팝업의 랭크 변동 연출은 여전히 후속(`Show(long)` 확장은 `WinUI`/`LoseUI` 프리팹 2개 저작 + 완료·검수된 `PKG-POPUP` 재개봉을 유발).
 
 ---
 
