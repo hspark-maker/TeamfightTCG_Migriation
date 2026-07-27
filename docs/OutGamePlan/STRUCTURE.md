@@ -32,6 +32,7 @@
 | 2026-07-27 | **G 카드팩 오픈 3D 뜯기 재구성 (✅ 코드+검수, 씬/컴파일 대기)** — 사용자 결정: `PackOpeningView`(팩버튼 구매) 폐기, **구매를 뷰 밖으로**(상점/`BootRouter`가 `TryPurchase` 후 static 캐리어 `PackHandoff`(Pack·NextScene·StartTutorial)로 전달), 앞단을 **3D `CardPack.prefab` 가로 드래그 봉인뜯기**로 교체. 신규 4: `PackHandoff`(OutGame/CardPack), `PackTearOpenView`(뜯기→스택→그리드, 구 꼬리 이식), `PackTearHandle`(SealStrip 월드드래그), `PackAcquireController`(캐리어 소비·획득버튼·목적지 이동). `BootRouter` 첫시작 분기가 스타터 구매→캐리어→PackTest(실패 시 로비 fallback). 목적지·튜토리얼이 캐리어에 실려 **첫시작 재판정 불필요 → `FirstStartBattleRedirect`·`PackOpenSceneController` 폐기**. 삭제 3파일 GUID 전수검색 참조 0. `RevealCardView` 재사용. tcg-reviewer 검수 진행. **씬 배선(CardPack에 PackTearHandle·MainCamera 태그)·Unity 컴파일은 사용자** | ✅(코드) |
 | 2026-07-27 | **G-25/26/27 온보딩 흐름 (✅ 코드+검수, 씬/컴파일 대기) — 흐름 재설계 반영** [※ 아래 항목은 위 3D 뜯기 재구성으로 대체됨] — 사용자 결정: 공용 팩 오픈 씬 `PackTest.unity` 재사용(상점 개봉 = 첫시작 온보딩 공유), 개봉 후 **[획득] 버튼** 클릭 게이트, **일반=로비 고정 / 첫시작=튜토리얼 전투** 분기. 구현: `PackOpeningView.OnOpenComplete`(빈개봉도 발화=데드락 방어), 신규 `UI/Shop/PackOpenSceneController`(획득버튼 게이트·[획득]→`DestinationScene`(기본 로비)·`BeforeLeave` 훅, **Battle 미참조 순수 UI**), 신규 `UI/Onboarding/FirstStartBattleRedirect`(`[RequireComponent]`, 첫시작만 `HasAnyOwnedSaved()`로 판정해 목적지→배틀+`TutorialConfig.Begin`, scenario null이면 로비 fallback). 첫시작 판정은 **개봉 전 Start**에 캡처. tcg-reviewer 2라운드: 경계·타이밍·중복전이 무결, 미배선 소프트락 warn 2건 수정(경고 로그·scenario null 로비 fallback). ~~FirstTimeOnboardingController~~ 폐기(2컴포넌트로 분리). 씬 배선·Unity 컴파일은 사용자 인계 | ✅(코드) |
 | 2026-07-27 | **G-28 개봉 연출 단순화 (✅ 코드+검수+씬배선+컴파일 완료, Play 검증 대기)** — 사용자 결정: 드래그 뜯기·카드별 스와이프 스택 전면 폐기. **3D 팩 클릭 1회 → 팩 숨김 → UI 패널(CanvasGroup) fade in → fade 완료 후 3열 GridLayoutGroup 배치 → [획득] → 덱 슬롯0 저장 → 목적지 씬**. 삭제 4: `PackTearOpenView`·`PackTearHandle`·`RevealCardView`·`RevealCardView.prefab`(GUID 잔존 참조 0). 신규 2: `PackRevealView`(Idle→PackShown→Revealing→Done), `PackClickHandle`(OnMouseUpAsButton·Arm/Disarm). 카드 표시는 도감 타일 `CollectionCardView` 재사용(표시 진실원 1개), 3열 좌표 계산은 GridLayoutGroup에 이임. **공유 계약 추가: `DeckSaveManager.SaveSlotToFile(index, deck)`** — 기존 `SaveToFile`은 6슬롯을 통째로 flush해서 `LoadFromFile` 미경유 씬(개봉 씬)에서 다른 덱을 지우므로, 단일 슬롯만 반영하는 비파괴 API로 교체. tcg-reviewer critical 2건(파괴적 전슬롯 flush) → 수정, warn(`m_left` 소프트록·DOTween OnComplete 생존·scenario 미배선) → 수정. 씬 배선 완료(UICanvas/RevealPanel/CardGrid/AcquireButton/EventSystem 신설, CardStackPos·SealStrip 제거, Missing 0·미배선 0). 레이아웃 수치 검증: 420×560 셀 3열×2행, 획득 버튼 비겹침. Play E2E는 사용자 | ✅ |
+| 2026-07-27 | **CardShop(SO) 폐기 — 구매처가 팩 SO·환급액 직접 소유 (✅ 코드+컴파일 완료, 씬 재배선 대기)** — 사용자 결정: 상점 목록·환급 전역값을 쥐던 `CardShop` SO(+`CardShop.cs`·`CardShop.asset`) 및 `MainMenuInitializer.SetShop` 주입 제거. `CardPackOpener`는 **무상태 파사드**가 되고(`s_shop`/`Shop`/`SetShop`/`Packs`/`GetPack` 삭제), API를 `TryPurchase(string packId)`→**`TryPurchase(CardPackData pack, long refundGold)`**로 교체 — 대상 팩 SO와 중복 환급액을 호출부가 직접 넘긴다. 구매처 2곳이 인스펙터로 소유: `PackShowcaseController`(`packData`+`duplicateRefundGold`), `LobbyFirstRunRedirect`(`starterPackId` string→`starterPack` SO+`duplicateRefundGold`). 재화·소유 계약 순수 소비(불변), 로컬 랜덤·null 풀 방어·환급 로직 무변경. Unity 컴파일 에러 0. **씬 재배선(LobbyScene의 FirstRunRedirect `starterPack`·쇼케이스 버튼 `packData` 할당)은 사용자 — 구 string 필드가 SO 참조로 바뀌어 재할당 필요** | ✅(코드) |
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -112,7 +113,7 @@ flowchart TD
     end
 
     CUR["CurrencyManager<br/>[#2 단일 골드]"]
-    OPENER["CardPackOpener (E)<br/>SetShop 주입 · 빈 상점 fallback"]:::new
+    OPENER["CardPackOpener (E)<br/>TryPurchase(pack, refund) · 무상태"]:::new
 
     subgraph ui["F. UI (도감 갤러리)"]
         GAL["CollectionGalleryController"]
@@ -123,7 +124,6 @@ flowchart TD
     INIT -->|SetSource| CAT
     INIT -->|Init| OWN
     INIT -->|Init| PROD
-    INIT -->|"SetShop(cardShop)"| OPENER
     CAT --> OWN
     CFG -->|SetLayout| ROWS
     CAT --> ROWS
@@ -141,7 +141,7 @@ flowchart TD
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
 ```
 
-> **부트 2계층(PKG-BOOT 확정)**: 씬무관 전역(`DataSaveManager.Load`·`CurrencyManager.Init`)은 `GameManager.Boot()`(BeforeSceneLoad)가, 씬 카드목록 의존(`SetSource`·`OwnershipManager.Init`·`ProductionManager.Init`·`CardPackOpener.SetShop`)은 `MainMenuInitializer.Awake()`(ExecutionOrder -100)가 담당. `SetShop`은 `CardShop` SO 의존이라 후자에 속함(null이면 빈 상점 fallback). `EnsureBoot`(테스트 씬)는 `CardCatalog.IsReady` 가드로 통합 시 no-op.
+> **부트 2계층(PKG-BOOT 확정)**: 씬무관 전역(`DataSaveManager.Load`·`CurrencyManager.Init`)은 `GameManager.Boot()`(BeforeSceneLoad)가, 씬 카드목록 의존(`SetSource`·`OwnershipManager.Init`·`ProductionManager.Init`)은 `MainMenuInitializer.Awake()`(ExecutionOrder -100)가 담당. `CardPackOpener`는 무상태 파사드가 돼 부트 주입이 없다 — 대상 팩 SO·환급액은 구매처(버튼/첫실행)가 직접 소유해 `TryPurchase`에 넘긴다. `EnsureBoot`(테스트 씬)는 `CardCatalog.IsReady` 가드로 통합 시 no-op.
 
 **핵심 흐름 2줄**
 - 소유: 부트가 `CardCatalog.SetSource → OwnershipManager.Init` → 갤러리가 `CatalogRows.Rows`를 그리고 `IsOwned`로 잠금 표시 → `Grant/Revoke` 시 `OnOwnershipChanged`로 재바인딩.
@@ -325,11 +325,10 @@ flowchart TD
         SHOP["상점 UI"]
     end
     subgraph def["E-14 정의 (SO, 에디터 데이터)"]
-        CFG["CardShop (SO)<br/>[#1 fallback]<br/>팩 리스트 + duplicateRefundGold"]:::new
         DEF["CardPackData (SO)<br/>packId·price·drawCount·pool(지정 카드셋)"]:::new
     end
     subgraph svc["E-15 구매·드로우"]
-        SVC["CardPackOpener<br/>[#1 static+fallback]<br/>Packs · TryPurchase · 로컬 랜덤"]:::new
+        SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack, refund) · 로컬 랜덤"]:::new
     end
     RES["OpenedPack / DrawnCard<br/>[#6 UI 스냅샷] card · isNew · refund"]:::new
 
@@ -337,9 +336,8 @@ flowchart TD
     OWN["OwnershipManager<br/>Grant (기존)"]
     KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
 
-    SHOP -->|"TryPurchase(packId)"| SVC
-    CFG --> DEF
-    CFG -->|"SetShop / fallback"| SVC
+    SHOP -->|"TryPurchase(pack, refund)"| SVC
+    SHOP -.->|"대상 팩 SO 참조"| DEF
     SVC -->|"Spend(Gold, price)"| CUR
     SVC -->|"DEF.pool 지정셋 균등 드로우"| DEF
     SVC -->|"KeyOf(card)"| KEY
@@ -362,7 +360,7 @@ sequenceDiagram
     participant OWN as OwnershipManager
 
     U->>SHOP: 팩 구매 클릭
-    SHOP->>SVC: TryPurchase(packId)
+    SHOP->>SVC: TryPurchase(pack, refund)
     SVC->>CUR: CanAfford(Gold, price)?
     alt 잔액 부족
         SVC-->>SHOP: 실패(구매 불가, 차감 없음)
@@ -384,15 +382,15 @@ sequenceDiagram
 - **오케스트레이터라 세이브 섹션 없음**: E는 `Spend`·`Earn`(재화)·`Grant`(소유)만 호출하고 모두 이미 영속. E 자체 세이브를 만들면 이중 진실원. 트레이드오프: 구매 이력·pity 카운터가 필요해지면 그때 세이브 섹션 추가.
 - **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
 - **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
-- **중복 = 소액 골드 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(Gold, duplicateRefundGold)`. 환급액은 `CardShop` 전역값. Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
+- **중복 = 소액 골드 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(Gold, refundGold)`. 환급액은 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘긴다(상점 SO 전역값 폐기). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
 - **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
-- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성 = `CardPackData` SO(코드 미수정) / 환급액 = `CardShop.duplicateRefundGold` / 등급 가중치가 필요해지면 `DEF.pool`을 가중 목록으로 확장.
+- **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, 대상 팩 SO·환급액은 각 구매처 뷰가 인스펙터로 소유해 `TryPurchase(pack, refund)`에 직접 넘긴다(진열=뷰 책임).
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드 / 등급 가중치가 필요해지면 `DEF.pool`을 가중 목록으로 확장.
 
-| 클래스 | 파일(예정) | 태스크 |
+| 클래스 | 파일 | 태스크 |
 |---|---|---|
 | `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·price·drawCount·pool(List<CardData>)` | E-14 |
-| `CardShop` (SO) | `OutGame/CardPack/CardShop.cs` — `List<CardPackData> packs · duplicateRefundGold` | E-14 |
-| `CardPackOpener` (static) | `OutGame/CardPack/CardPackOpener.cs` — `Packs · GetPack · TryPurchase` | E-15 |
+| `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData, long refund)` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
 
 ---
@@ -419,7 +417,7 @@ flowchart TD
 
     subgraph buy["구매처 (뷰 밖, TryPurchase는 여기서만)"]
         SHOP["상점 (향후) — 일반 구매<br/>버튼 → TryPurchase"]
-        FIRST["LobbyFirstRunRedirect (로비 상주)<br/>첫시작만: TryPurchase(starterPackId)"]:::new
+        FIRST["LobbyFirstRunRedirect (로비 상주)<br/>첫시작만: TryPurchase(starterPack SO, refund)"]:::new
     end
 
     HAND["PackHandoff (static 캐리어)<br/>Pack · NextScene · StartTutorial"]:::new
@@ -476,7 +474,7 @@ sequenceDiagram
     alt 소유 있음 (기존 유저)
         FR->>FR: 아무것도 안 함 → 로비 그대로
     else 소유 없음 (첫시작)
-        FR->>OP: TryPurchase(starterPackId)
+        FR->>OP: TryPurchase(starterPack SO, refund)
         OP-->>FR: OpenedPack(Success, 소유·차감 영속)
         FR->>H: Set(opened, "BattleScene", startTutorial:true)
         FR->>FR: LoadScene("PackTest")
@@ -497,13 +495,13 @@ sequenceDiagram
 #### 원리 카드 — 왜 이렇게 생겼나
 
 - **구매를 뷰 밖으로, 목적지를 구매한 쪽으로**: `TryPurchase`(소유·차감 원자 영속)와 "획득 후 어디로/튜토리얼 여부"를 상점·`LobbyFirstRunRedirect`가 쥐고 `PackHandoff`에 실어 넘긴다. PackTest는 **첫시작 재판정 없이 캐리어 값으로만 분기** → 별도 리다이렉트 레이어(구 FirstStartBattleRedirect)가 소멸(브레인 1개 = `PackAcquireController`).
-- **BootScene 없음(사용자 결정)**: 앱은 기존대로 `LobbyScene`(index 0)으로 직행하고, 로비 상주 `LobbyFirstRunRedirect`가 첫실행만 갈라 즉시 `PackTest`로 전환한다 — 상점→팩 전환과 동일 경로를 첫실행이 자동으로 탄다. 순서: `MainMenuInitializer.Awake`([-100], `SetSource`·`OwnershipManager.Init`·`SetShop`) 완료 후 `FirstRunRedirect.Start`가 판정하므로 `HasAnyOwnedSaved`·`TryPurchase` 준비됨.
+- **BootScene 없음(사용자 결정)**: 앱은 기존대로 `LobbyScene`(index 0)으로 직행하고, 로비 상주 `LobbyFirstRunRedirect`가 첫실행만 갈라 즉시 `PackTest`로 전환한다 — 상점→팩 전환과 동일 경로를 첫실행이 자동으로 탄다. 순서: `MainMenuInitializer.Awake`([-100], `SetSource`·`OwnershipManager.Init`) 완료 후 `FirstRunRedirect.Start`가 판정하므로 `HasAnyOwnedSaved` 준비됨. `TryPurchase`는 무상태라 부트 주입 불요 — `starterPack` SO를 인스펙터로 직접 소유.
 - **검증된 꼬리 재사용, 리스크는 앞단에 국한**: 스택→넘김→그리드·`OnOpenComplete`는 구 `PackOpeningView`의 상태머신 가드·`OnDisable` 트윈 정리까지 무변경 이식. 새로 만든 건 앞단(3D 팩 등장 + 가로 드래그 뜯기 `PackTearHandle`)뿐.
 - **입력은 월드 방식 통일**: 팩(3D BoxCollider)·카드(2D BoxCollider2D)가 같은 `Camera.main` + `OnMouse*` 패턴. 트레이드오프: **씬 카메라 `MainCamera` 태그가 인터랙션 전체를 좌우**(미태그 시 컴파일 통과·런타임 무반응).
 - **[획득] 버튼 게이트**: 개봉(그리드 배열) 완료 = `PackTearOpenView.OnOpenComplete` → 컨트롤러가 획득 버튼 노출. 유저가 능동적으로 [획득]을 눌러야 전이.
 - **소유==0 신호의 함의**: `GrantDefaults` 전체지급을 **끈 것이 전제**(G-23). 판정은 세이브 직접 조회 `HasAnyOwnedSaved()`(G-24)로 씬 config 순서 무관.
 
-**수정 가능성 높은 지점**: 뜯기 판정·연출 `PackTearHandle.cs`(`tearThreshold`/슬라이드) / 첫시작 라우팅 값 `LobbyFirstRunRedirect.cs`(`starterPackId`/`packOpenScene`/`battleSceneName`) / 캐리어 계약 `PackHandoff.cs`(NextScene·StartTutorial) / 튜토리얼 시나리오 `PackAcquireController.scenario` / 튜토리얼 보상 여부 `TurnRunner.CaptureResult`(선택 가드).
+**수정 가능성 높은 지점**: 뜯기 판정·연출 `PackTearHandle.cs`(`tearThreshold`/슬라이드) / 첫시작 라우팅 값 `LobbyFirstRunRedirect.cs`(`starterPack` SO/`duplicateRefundGold`/`packOpenScene`/`battleSceneName`) / 캐리어 계약 `PackHandoff.cs`(NextScene·StartTutorial) / 튜토리얼 시나리오 `PackAcquireController.scenario` / 튜토리얼 보상 여부 `TurnRunner.CaptureResult`(선택 가드).
 
 #### 파일 지도 — 다이어그램에서 코드로
 

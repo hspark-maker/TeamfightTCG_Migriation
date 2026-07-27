@@ -69,7 +69,7 @@
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
-| **PKG-POPUP** | F-20 전투 보상 팝업 | `RewardService`/`BattleReward` | 신규 `UI/Reward/*`(PooledUIBase) | PKG-BOOT ✅ | UI | ⬜ 준비 |
+| **PKG-POPUP** | F-20 전투 보상 팝업 | `RewardService`/`BattleReward` | `UI/Battle/GameResultPopup.cs`(전투씬 처리로 스코프 확정) | PKG-BOOT ✅ | UI | ✅ 완료(검수 통과·컴파일 OK, Play 검증 대기) |
 | **PKG-FILTER** | F-21 덱빌더 소유 필터 | `OwnershipManager.IsOwned` | `UI/MainMenu/DeckBuilderUI.cs` 단일 | PKG-BOOT ✅ | UI | ⬜ 준비 |
 
 > ※ `PKG-FILTER`는 `MainMenu` 폴더지만 **`DeckBuilderUI.cs` 단일 파일**이라 🟠 그룹(`MainMenuManager`)과 파일이 안 겹침 → 병렬 안전.
@@ -137,4 +137,5 @@
 | 날짜 | 변경 | 영향 패키지 | 재작업? |
 |---|---|---|---|
 | 2026-07-26 | 워크플로우를 Phase 순차 → 동시성 등급(🔴/🟠/🟢) 분류로 전환. 사람이 다중 세션으로 병렬 실행하는 모델. 보드 신설 | (전체 운영 방식) | 문서만 |
+| 2026-07-27 | **F-20/PKG-POPUP 스코프 확정 — 로비 팝업 폐기, 전투씬 처리.** 신규 `UI/Reward/*` 로비 진입 팝업·`BattleRewardHandoff` 대신 기존 전투씬 `GameResultPopup`에서 보상 골드 연출(스케일-인+`+N0 골드` 순차 팝, 심플)로 마무리. 전투 로직·`RewardService` 무수정(순수 표시). `RewardService` 계약 불변 | PKG-POPUP만(순수 추가) | 문서+단일 파일 |
 | 2026-07-27 | **도메인 G(신규 유저 온보딩) 편입 — 계약 변경 2건.** ① 소유 API `GrantDefaults` 동작: 신규 유저 전체지급→미지급(소유0 시작). 시그니처 불변, 소비처(도감·덱빌더 소유필터)는 빈 상태 대응만 확인. ② 부트 진입: BootScene(index 0) 라우팅 앞단 추가(기존 2계층 불변). 둘 다 🔴 PKG-ONBOARD-OWN/BOOT로 선행·재동결 | 소유 API 소비처(도감·덱빌더): 회귀 확인만(빈 상태). 신규 온보딩 패키지 3종 편입 | 코드+문서 |

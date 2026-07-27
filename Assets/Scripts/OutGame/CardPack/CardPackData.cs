@@ -17,6 +17,9 @@ public class CardPackData : ScriptableObject
     [Min(0)] [SerializeField] long price = 100;   // Gold 가격. 음수 오설정 방지.
     [Min(1)] [SerializeField] int drawCount = 3;  // 개봉 시 뽑는 장수. 최소 1.
 
+    [Tooltip("켜면 한 팩 안에서 같은 카드를 두 번 뽑지 않는다(비복원 추출). 풀이 뽑을 장수보다 작으면 풀 크기만큼만 나온다.")]
+    [SerializeField] bool uniqueDraw;             // 팩 내 중복 금지. '이미 소유한 카드 제외'와는 다른 축.
+
     [Header("드로우 풀 (이 팩 전용 지정 카드셋)")]
     [Tooltip("이 팩에서 뽑을 수 있는 카드셋. 마스터 전체가 아닌 큐레이션된 부분집합. 균등 확률로 drawCount회 뽑는다.")]
     [SerializeField] List<CardData> pool = new List<CardData>();
@@ -26,6 +29,7 @@ public class CardPackData : ScriptableObject
     public string DisplayName => displayName;
     public long Price => price;
     public int DrawCount => drawCount;
+    public bool UniqueDraw => uniqueDraw;
 
     // 풀 총 장수. null 방어.
     public int PoolCount => pool != null ? pool.Count : 0;

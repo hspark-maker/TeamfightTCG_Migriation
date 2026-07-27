@@ -6,8 +6,6 @@ public class MainMenuInitializer : MonoBehaviour
     [SerializeField] AudioClip mainMenuBgm;
     // 카드 목록은 CardRegistry(SO)가 단일 진실원. 씬에 사본을 두면 카드 추가 시 한쪽만 갱신된다.
     [SerializeField] CardRegistry cardRegistry;
-    // 카드팩 상점 SO. 미배선(null)이면 CardPackOpener가 빈 상점 fallback으로 동작 → 부트 안전.
-    [SerializeField] CardShop cardShop;
     // 도감 레이아웃/생산 튜닝 SO. 미배선(null)이면 CatalogRows가 CardCatalog 3장씩 청크 fallback.
     [SerializeField] CollectionLayoutConfig collectionLayout;
 
@@ -27,9 +25,6 @@ public class MainMenuInitializer : MonoBehaviour
         // 도감 방치 생산 캐싱 — 세이브(DataSaveManager.Load)만 읽으므로 순서 무관하나
         // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
         CollectionProductionManager.Init();
-
-        // 카드팩 상점 주입 — 순서 무관(주입만). null이면 빈 상점 fallback으로 부트가 깨지지 않는다.
-        CardPackOpener.SetShop(cardShop);
 
         // 덱 복원은 카드 이름 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
