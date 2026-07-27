@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 // 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개, 로비·개봉 씬).
 // 씬 이름을 보지 않는다 — 현재 스텝의 앵커가 이 씬에 등록되는 순간에만 게이트가 켜지고, 없으면 조용히 대기한다.
@@ -10,10 +11,17 @@ public class OutgameTutorialBridge : MonoBehaviour
     [Tooltip("튜토리얼 스텝 시퀀스 SO. 모든 씬의 브리지에 같은 에셋을 배선한다(주입은 멱등).")]
     [SerializeField] OutgameTutorialData data;
 
+    [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 씬 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다.")]
+    [SerializeField] bool suppressGuideUI;
+
     // 게이트가 기다리는 앵커. None이면 이 씬에서 걸 게이트가 없다.
     EOutgameTutorialAnchor m_waiting = EOutgameTutorialAnchor.None;
     string m_message;
     bool m_subscribed;
+
+    // 억제 모드에서 클릭을 직접 듣는 타깃. 게이트가 없으니 리스너 부착·해제를 브리지가 진다.
+    Button m_silentButton;
+    bool m_silentDone;
 
     // 현재 스텝 종류. AutoPurchase는 "대기 중인 스텝 없음"과 같은 뜻이다(자동 스텝이라 여기서 대기하지 않는다).
     OutgameTutorialData.EStepKind m_kind = OutgameTutorialData.EStepKind.AutoPurchase;
@@ -50,9 +58,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         m_message = t_step.guideMessage;
 
         // 3D 팩은 Overlay 딤 아래로 가려져 구멍을 뚫을 수 없다 → 앵커 없이 배너만 띄우고 개봉 신호로 완료한다.
+        // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_kind == OutgameTutorialData.EStepKind.WaitPackOpen)
         {
-            OutgameTutorialGateUI.Ensure().ShowBanner(m_message);
+            if (!suppressGuideUI) OutgameTutorialGateUI.Ensure().ShowBanner(m_message);
             return;
         }
 
@@ -80,7 +89,42 @@ public class OutgameTutorialBridge : MonoBehaviour
             ? null
             : (Action)OnGateSatisfied;
 
+        // 억제 씬에는 게이트가 없다 → 게이트가 대신 걸어주던 클릭 구독을 브리지가 직접 진다.
+        if (suppressGuideUI)
+        {
+            HookSilently(t_button, t_onSatisfied);
+            return;
+        }
+
         OutgameTutorialGateUI.Ensure().ShowGate(t_rect, t_button, m_message, t_onSatisfied);
+    }
+
+    // 딤 없이 클릭만 듣는다. onSatisfied가 null인 스텝(WaitPurchase)은 딤이 유일한 표시였으므로 걸 것이 없다
+    // — 완료는 구매 성공 신호가 확정한다.
+    void HookSilently(Button _button, Action _onSatisfied)
+    {
+        DetachSilent();
+
+        if (_button == null || _onSatisfied == null) return;
+
+        m_silentButton = _button;
+        m_silentDone   = false;
+        m_silentButton.onClick.AddListener(OnSilentClicked);
+    }
+
+    void OnSilentClicked()
+    {
+        if (m_silentDone) return;
+        m_silentDone = true;
+
+        DetachSilent();      // 콜백이 다음 스텝을 걸 수 있도록 먼저 정리(GateUI.OnTargetClicked와 같은 순서)
+        OnGateSatisfied();
+    }
+
+    void DetachSilent()
+    {
+        if (m_silentButton != null) m_silentButton.onClick.RemoveListener(OnSilentClicked);
+        m_silentButton = null;
     }
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
@@ -135,6 +179,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         m_waiting = EOutgameTutorialAnchor.None;
         m_message = null;
         m_kind    = OutgameTutorialData.EStepKind.AutoPurchase;
+
+        DetachSilent();   // 리스너가 남으면 다음 스텝·다음 씬에서 오발화한다
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }
 

@@ -48,6 +48,10 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] PackResultGrid resultGrid;
     [SerializeField] Button skipButton;            // 명시적 건너뛰기(뜯기 단계에서도 빠져나갈 수 있게)
 
+    [Tooltip("뜯기 대기 중에만 보이는 씬 안내(\"스와이프하여 오픈\"). 뜯김 확정 시 사라진다. 미배선이면 안내 없음.")]
+    [SerializeField] CanvasGroup tearHint;         // RevealPanel 바깥에 두어야 한다 — 그 패널은 분출 전까지 alpha 0이다
+    [SerializeField] float tearHintFade = 0.2f;
+
     // Idle → Entering(팩 등장) → Tearing(뜯기 대기) → Bursting(분출) → Flicking(넘기기) → Summary.
     enum EStage { Idle, Entering, Tearing, Bursting, Flicking, Summary }
 
@@ -84,6 +88,7 @@ public class PackRevealView : MonoBehaviour
         m_announced = false;
 
         ResetPanel();
+        SetTearHint(false, true);
         if (cardStack != null) cardStack.Clear();
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
@@ -139,6 +144,7 @@ public class PackRevealView : MonoBehaviour
         KillStageSeq();
         if (revealPanel != null) revealPanel.DOKill();
         if (packRoot != null) packRoot.transform.DOKill();
+        SetTearHint(false, true);
 
         m_stage = EStage.Idle;
     }
@@ -188,6 +194,7 @@ public class PackRevealView : MonoBehaviour
         }
 
         tearHandle.Arm();
+        SetTearHint(true);
     }
 
     // 뜯김 확정 → 분출.
@@ -203,6 +210,7 @@ public class PackRevealView : MonoBehaviour
         m_stage = EStage.Bursting;
 
         AnnounceOpened();
+        SetTearHint(false);   // 뜯김이 확정된 순간 = 안내의 수명 끝
 
         if (burstEffect != null) burstEffect.Play();
         if (shakeTarget != null)
@@ -322,6 +330,7 @@ public class PackRevealView : MonoBehaviour
         // 분출 전(입장·뜯기)에서 요약으로 직행하면 EnterBursting을 거치지 않는다 —
         // 팩이 열렸다는 사실은 연출을 건너뛰어도 참이므로 여기서 보장한다(튜토리얼이 이 신호를 기다린다).
         AnnounceOpened();
+        SetTearHint(false, true);   // EnterBursting을 거치지 않는 유일한 경로
 
         var t_root = ResolvePackRoot();
         if (t_root != null) t_root.SetActive(false);
@@ -365,6 +374,21 @@ public class PackRevealView : MonoBehaviour
         m_announced = true;
 
         OnAnyPackOpened?.Invoke();
+    }
+
+    // 뜯기 안내 표시/숨김. 입력은 절대 먹지 않는다 — 문구가 3D 팩 드래그를 가로막으면 개봉 자체가 막힌다.
+    void SetTearHint(bool _show, bool _instant = false)
+    {
+        if (tearHint == null) return;
+
+        tearHint.DOKill();
+        tearHint.blocksRaycasts = false;
+        tearHint.interactable   = false;
+
+        float t_to = _show ? 1f : 0f;
+        if (_instant || tearHintFade <= 0f) { tearHint.alpha = t_to; return; }
+
+        tearHint.DOFade(t_to, tearHintFade).SetLink(tearHint.gameObject);
     }
 
     // 패널 초기화: 완전 투명 + 입력 차단(fade 완료까지 아무것도 눌리지 않게).

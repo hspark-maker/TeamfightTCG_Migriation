@@ -68,7 +68,13 @@
       "Bash(awk 'NR>=672 && NR<=684{print NR\": \"$0}' docs/OutGamePlan/STRUCTURE.md)",
       "Bash(awk 'NR>=31 && NR<=40{print NR\": \"substr\\($0,1,120\\)}' docs/OutGamePlan/STRUCTURE.md)",
       "Bash(awk 'NR==34{print substr\\($0,1,90\\)} NR==35{print \"next: \"substr\\($0,1,60\\)}' docs/OutGamePlan/STRUCTURE.md)",
-      "Bash([ -f \"$f\" ])"
+      "Bash([ -f \"$f\" ])",
+      "PowerShell(echo \"=== d7e01482 commit deleted files ===\"; git show --name-status --diff-filter=D --format=\"\" d7e01482; echo \"=== full status \\(deleted markers\\) ===\"; git status --short | Where-Object { $_ -match 'D' }; echo \"=== ls-files vs disk missing ===\"; git ls-files --deleted | Select-Object -First 50; echo \"=== gitignore diff ===\"; git diff -- .gitignore)",
+      "PowerShell(echo \"=== worktree vs d7e01482: deleted ===\"; git diff --name-status --diff-filter=D d7e01482; echo \"=== worktree vs d7e01482: all \\(summary\\) ===\"; git diff --name-status d7e01482 | Group-Object { $_.Substring\\(0,1\\) } | Select-Object Name,Count)",
+      "PowerShell(git diff --name-status -M d7e01482 HEAD | Where-Object { $_ -match '^\\(R|D\\)' }; echo \"=== meta still tracked? ===\"; git ls-files \"Assets/Assets/Prefabs/UI/\")",
+      "Bash(awk '/^--- !u!225 /,/^--- !u!/' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/&1947172434$/,/^--- !u!1 /' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!224 &209687145$/,/^--- !u!1 /' Assets/Scenes/CardPack.unity)"
     ]
   },
   "enabledMcpjsonServers": [
