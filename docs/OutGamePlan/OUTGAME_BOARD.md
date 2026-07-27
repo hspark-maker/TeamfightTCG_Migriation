@@ -114,19 +114,19 @@
 | **PKG-RANKTIER-CORE** | 랭크 창구 + 튜닝 SO (H-29·H-30) | `DataSaveManager.Data`/`Save` | **`RankManager` 창구 동결** + `RankConfig` 스키마 | 신규 `OutGame/Rank/RankConfig.cs`·`RankManager.cs` | RANKTIER-SAVE | outgame-engineer | 🟢 (전부 신규 파일) | ✅ 완료(검수 통과·컴파일 에러 0) |
 | **PKG-RANKTIER-WIRE** | SO 주입 (H-30) | `RankManager.SetConfig` | `RankConfig.asset` 저작 | 수정 `Utils/DataLibrary.cs`(필드1+호출1) + `Assets/SO/Rank/RankConfig.asset`(**사용자**) | CORE ✅ | outgame-engineer(코드)+사용자(에셋) | 🟢 | ✅ 완료(코드·검수 통과) — 사용자 에셋 인계 잔여 |
 | **PKG-RANKTIER-BATTLE** | 전투 종료 훅 (H-31) | `RankManager.ApplyBattleResult` (멀티 배제 게이트 제거 — 프로토 스코프 밖) | 없음(순수 소비) | 수정 `Battle/TurnRunner.cs`(`CaptureResult` 내부 1줄) | CORE ✅ | **battle-engineer** | 🟠 (TurnRunner 그룹) | ✅ 완료(검수 통과·컴파일 에러 0, Play 검증은 HUD 후 일괄) |
-| **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선(**사용자**) | CORE ✅, WIRE ✅(코드) | UI | 🟠 **로비 씬 그룹** | ⬜ 대기(SHOPTAB 반납 대기) |
+| **PKG-RANKTIER-HUD** | 로비 랭크 표시 (H-32) | `RankManager.GetInfo` | 없음 | 신규 `UI/HUD/RankHud.cs` + `LobbyScene.unity` 배선 | CORE ✅, WIRE ✅(코드) | UI | 🟠 **로비 씬 그룹** | ✅ 완료(검수 발견 0·컴파일 에러 0·씬 배선 완료, **사용자 저장 필요**) |
 | **PKG-RANKTIER-REWARD** (선택·후속) | 티어 승급 보상 | `CurrencyManager.Earn` | 세이브 필드 추가(수령 티어) | `OutGame/Rank/*` + 씬 `RankReward` 버튼 | HUD | outgame-engineer | 🟠 | ⬜ 보류(범위 밖) |
 
 **격리 판정 — 착수 전 반드시 확인**
 
 | 대상 | 경합 | 판정 |
 |---|---|---|
-| `LobbyScene.unity` | **`PKG-SHOPTAB`(🔄 진행 중)**, `PKG-ENTRY`(⬜), `PKG-HUD`(⬜) | ⚠️ **충돌.** `.unity` YAML은 머지 불가라 **만지는 노드가 달라도 동시 편집 금지**. `PKG-RANKTIER-HUD` 씬 배선은 **`PKG-SHOPTAB` 반납 후에만** |
+| `LobbyScene.unity` | ~~`PKG-SHOPTAB`~~(✅ 반납 확인 2026-07-27), `PKG-ENTRY`(⬜), `PKG-HUD`(⬜) | ✅ **해소.** `PKG-RANKTIER-HUD` 씬 배선 완료. 다만 `.unity` YAML은 머지 불가라 **남은 `PKG-ENTRY`/`PKG-HUD`도 만지는 노드가 달라도 동시 편집 금지** 원칙은 유지 |
 | `Battle/TurnRunner.cs` | **`PKG-TUT-REWARD`(⬜ 보류)** — 후보 파일이 정확히 같은 `CaptureResult` | ⚠️ **동일 메서드 경합.** 둘 다 battle-engineer 전용 → 같은 세션에서 하나씩. ~~착수 시 튜토리얼 집계 정책 결론~~ → **BATTLE 완료(2026-07-27)**: 랭크 훅은 멀티/튜토리얼 구분 없이 무조건 가감으로 결론. PKG-TUT-REWARD 착수 시엔 보상 지급 가드만 다루면 됨(랭크 라인과 무충돌) |
 | `Utils/DataLibrary.cs` | `PKG-TUNE`(✅ 완료) | ✅ 충돌 없음 |
 | `Save/2.Domain/UserSaveData.cs` | 없음 | ✅ 단독 — 그래서 SAVE 게이트가 수 분에 끝났다 |
 
-**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE`✅ ∥ `BATTLE`✅) ← **여기부터 병렬 가능** → `HUD`(SHOPTAB 반납 후) → 사용자 에디터 인계(`RankConfig.asset` 저작 + 티어 배지 아트(랭크당 재사용 또는 20단계 개별) + `RankHud` 배선 + `RankReward` 버튼 비활성) → 문서 정합.
+**착수 순서**: `SAVE`(✅) → `CORE`(✅) → (`WIRE`✅ ∥ `BATTLE`✅) → `HUD`(✅ 코드+씬배선) → 문서 정합(✅). **도메인 H 코드 종결.** 남은 사용자 인계는 에셋/아트뿐 — `RankConfig.asset` 저작·`DataLibrary` 배선 + 티어 배지 아트(랭크당 재사용 또는 20단계 개별). 둘 다 없어도 동작한다.
 
 > **CORE 반납 결과(2026-07-27)**: 신규 파일 2개만 추가, **수정 파일 0**. `RankConfig.tiers` 기본 테이블은 코드 필드 초기화자에 `브론즈 0 / 실버 50 / 골드 150 / 플래티넘 300 / 다이아몬드 500`(승 +10 · 패 −5) — 배지 아트가 사용자 인계분이다. `RankConfig.asset`은 아직 없고, 없어도 `CreateInstance` fallback으로 기본 테이블이 살아 있다(WIRE는 순수 튜닝·아트 주입). ※ 기본 테이블은 이후 20티어로 세분화됨(아래 노트).
 >
@@ -143,6 +143,10 @@
 > ⚠️ **`RankHud`에 `GoldHud` 패턴 복제 금지** — `GoldHud`의 `OnEnable` 즉시 렌더는 `CurrencyManager.Init()`이 `BeforeSceneLoad`에서 끝나기에 안전한 것이다. `RankConfig` 주입은 `DataLibrary.Awake`(순서 0)라 `RankHud.OnEnable`이 먼저 돌 수 있고(비결정), 이벤트를 의도적으로 뺐으므로 잘못된 첫 렌더가 굳는다. **최초 렌더는 `Start()`**, `OnEnable`은 `m_started` 가드.
 >
 > ⚠️ **`RankConfig.tiers`는 C# 필드 초기화자로 기본 테이블 필수** — `List<>`는 `CreateInstance` fallback에서 빈 리스트가 되고(`BattleReward`의 스칼라 기본값과 다름), `DataLibrary`가 **BattleScene에 없어** 전투 씬 직접 Play는 항상 fallback을 탄다.
+
+> **HUD 반납 결과(2026-07-27)**: 신규 `UI/HUD/RankHud.cs` 1개(수정 파일 0, 산출 계약 0). `Start()` 최초 렌더 + `OnEnable`의 `m_started` 가드로 위 함정 회피, 이벤트 구독 0(`OnDisable` 없음), `Badge`/`Points` 2필드만 소비(`IsMaxTier` 미참조 → 검수 유보 ① 회피), 배지 폴백 배열 없음(진실원 = `RankConfig.tiers[].badge` 단일). tcg-reviewer 검수 **발견 0**, Unity 콘솔 컴파일 에러 0.
+> **씬 배선도 이 세션에서 완료**(`RankInfo`에 `RankHud` 부착 + `badgeImage`→`RankBadge`, `pointText`→`RankPower/Text`, `RankReward` 비활성). 배선은 `LobbyScene`이 에디터에 **dirty 상태로 열려 있어** YAML 직접 편집 대신 에디터 API(Undo 등록)로 수행했고, **씬 저장은 사용자 몫으로 남겨 뒀다**(사용자의 다른 미저장 변경과 함께 저장 여부를 판단하도록). ⚠️ 저장 전에 씬을 discard하면 배선이 날아간다.
+> **도메인 H 코드 종결** — 남은 건 `RankConfig.asset` 저작·배선 + 티어 배지 아트(에셋/아트 인계분).
 
 ---
 

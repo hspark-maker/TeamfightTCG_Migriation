@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f355f7becae7e6942b0928d26746a712, type: 3}
+  m_Name: RankConfig
+  m_EditorClassIdentifier: Assembly-CSharp::RankConfig
+  winPoints: 10
+  losePoints: 5
+  tiers:
+  - displayName: "\uBE0C\uB860\uC988 1"
+    requiredPoints: 0
+    badge: {fileID: 0}
+  - displayName: "\uBE0C\uB860\uC988 2"
+    requiredPoints: 25
+    badge: {fileID: 0}
+  - displayName: "\uBE0C\uB860\uC988 3"
+    requiredPoints: 50
+    badge: {fileID: 0}
+  - displayName: "\uBE0C\uB860\uC988 4"
+    requiredPoints: 75
+    badge: {fileID: 0}
+  - displayName: "\uC2E4\uBC84 1"
+    requiredPoints: 100
+    badge: {fileID: 0}
+  - displayName: "\uC2E4\uBC84 2"
+    requiredPoints: 125
+    badge: {fileID: 0}
+  - displayName: "\uC2E4\uBC84 3"
+    requiredPoints: 150
+    badge: {fileID: 0}
+  - displayName: "\uC2E4\uBC84 4"
+    requiredPoints: 175
+    badge: {fileID: 0}
+  - displayName: "\uACE8\uB4DC 1"
+    requiredPoints: 200
+    badge: {fileID: 0}
+  - displayName: "\uACE8\uB4DC 2"
+    requiredPoints: 225
+    badge: {fileID: 0}
+  - displayName: "\uACE8\uB4DC 3"
+    requiredPoints: 250
+    badge: {fileID: 0}
+  - displayName: "\uACE8\uB4DC 4"
+    requiredPoints: 275
+    badge: {fileID: 0}
+  - displayName: "\uD50C\uB798\uD2F0\uB118 1"
+    requiredPoints: 300
+    badge: {fileID: 0}
+  - displayName: "\uD50C\uB798\uD2F0\uB118 2"
+    requiredPoints: 325
+    badge: {fileID: 0}
+  - displayName: "\uD50C\uB798\uD2F0\uB118 3"
+    requiredPoints: 350
+    badge: {fileID: 0}
+  - displayName: "\uD50C\uB798\uD2F0\uB118 4"
+    requiredPoints: 375
+    badge: {fileID: 0}
+  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 1"
+    requiredPoints: 400
+    badge: {fileID: 0}
+  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 2"
+    requiredPoints: 425
+    badge: {fileID: 0}
+  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 3"
+    requiredPoints: 450
+    badge: {fileID: 0}
+  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 4"
+    requiredPoints: 475
+    badge: {fileID: 0}

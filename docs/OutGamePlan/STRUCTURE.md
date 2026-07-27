@@ -816,7 +816,7 @@ sequenceDiagram
 
 ---
 
-### H. 랭크 — 표시용 티어 진행도 — 🔄 CORE 완료(H-29·H-30 코드), WIRE·BATTLE·HUD 대기 (2026-07-27)
+### H. 랭크 — 표시용 티어 진행도 — ✅ 코드 전량 완료(H-28~H-32) + 로비 씬 배선 완료 (2026-07-27)
 
 > 목표 루프의 **엔드포인트 표기**를 실물로 세운다. 단 실력 지표가 아니라 **표시용 진행도**(칭호)다.
 > **왜 로컬로 가능한가**: 로비 Match 탭은 100% AI전이고(`LobbyMatchLauncher.StartAiBattle` 단일 배선), PvP UI는 런타임에 도달 불가한 `MainMenu.unity`에만 있다. 클라 권위 + RPC 무검증이라 위조 가능하지만, **보상·난이도·매칭에 아무 영향이 없으므로 위조돼도 잃는 게 없다** → 서버 권위가 전제되지 않는다.
@@ -852,7 +852,7 @@ flowchart TD
     CFG -->|SetConfig| MGR
     DL -->|"Awake · InitializeSingleton"| CFG
     TR --> RS
-    TR -->|"멀티 아니면 ApplyBattleResult(_won)"| MGR
+    TR -->|"ApplyBattleResult(_won) — 무조건"| MGR
     MGR --> INFO
     INFO -->|"Start에서 1회 조회"| HUD
 
@@ -873,15 +873,12 @@ sequenceDiagram
     Note over TR: 승패 확정 4지점 → CaptureResult(_won)<br/>resultCaptured 가드로 전투당 1회
     TR->>RS: GrantBattleReward(remaining)
     RS-->>TR: 지급액 (골드는 이미 영속 완료)
-    alt 멀티 (DeckConfig.IsMultiplayer)
-        Note over TR: 랭크 집계 제외 — 이탈 유도 부전승 어뷰징 차단
-    else 싱글(AI전·튜토리얼 포함)
-        TR->>MGR: ApplyBattleResult(_won)
-        MGR->>MGR: delta = 승? +winPoints : -losePoints
-        MGR->>MGR: 하한 = max(가감 "전" 티어 requiredPoints, 0)
-        MGR->>MGR: points = max(points + delta, 하한)
-        MGR->>DSM: Save() — 씬 왕복을 견디게 즉시 영속
-    end
+    Note over TR: 멀티 배제 게이트는 제거됨(프로토 스코프 밖)<br/>싱글·멀티·튜토리얼·부전승 전부 가감
+    TR->>MGR: ApplyBattleResult(_won)
+    MGR->>MGR: delta = 승? +winPoints : -losePoints
+    MGR->>MGR: 하한 = max(가감 "전" 티어 requiredPoints, 0)
+    MGR->>MGR: points = max(points + delta, 하한)
+    MGR->>DSM: Save() — 씬 왕복을 견디게 즉시 영속
     Note over TR,HUD: BattleCleanup.LoadScene("LobbyScene")
     HUD->>MGR: Start()에서 GetInfo() 1회
     MGR-->>HUD: RankInfo(TierIndex/Badge/Points)
@@ -905,19 +902,20 @@ sequenceDiagram
 | `RankHud`에 `GoldHud` 패턴 복제 | `GoldHud`의 `OnEnable` 즉시 렌더가 안전한 건 `CurrencyManager.Init()`이 `BeforeSceneLoad`에서 끝나기 때문. `RankConfig` 주입은 `DataLibrary.Awake`(순서 0)라 `RankHud.OnEnable`이 **먼저 돌 수 있다**(같은 씬, 둘 다 순서 0 = 비결정). 이벤트를 뺐으므로 잘못된 첫 렌더가 그대로 굳는다 | **최초 렌더는 `Start()`**(모든 `Awake` 이후 보장), `OnEnable`은 `m_started` 가드로 탭 재진입만 처리. `DataLibrary`에 `[DefaultExecutionOrder]`를 붙이는 건 전역 부트 계약 접촉이라 금지 |
 | `RankConfig.tiers`를 빈 리스트로 방치 | `BattleReward`는 스칼라 필드라 `CreateInstance` fallback에서 기본값이 살지만 **`List<>`는 빈 리스트**가 된다. 게다가 `DataLibrary`는 **BattleScene에 없어서** 에디터에서 전투 씬을 직접 Play하면 **항상** fallback이 탄다 | `tiers`를 **C# 필드 초기화자로 기본 테이블** 채움(필드 초기화자는 `CreateInstance`에서 실행됨). 배지만 null → SO는 "튜닝·아트 주입 전용"으로 강등되고 기능은 코드가 보증 |
 
-#### 씬 배선 대상 (실측, 신규 노드 생성 0)
+#### 씬 배선 (실측, 신규 노드 생성 0) — ✅ 완료
 
 ```
-Tab_Match / MatchContent
-├── RankReward  (BasicFrame 프리팹 인스턴스 + Button 추가, 배선 없음)  → 이번 스코프 밖: 비활성
+LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
+├── RankReward  (BasicFrame 프리팹 인스턴스 + Button 추가, 배선 없음)  → 스코프 밖: 비활성 ✅
 │   └── RankText (TMP = "랭크보상")   ⚠️ 티어 라벨이 아니라 버튼 캡션 — 건드리지 말 것
 └── PlayBtn
-    └── RankInfo  (RectTransform만)           ← RankHud 부착 지점
-        ├── RankPower (오벌 프레임 프리팹, 내부 TMP "82")  ← 포인트
-        └── RankBadge (Image 230×230, y=+450)             ← 티어 배지
+    └── RankInfo  (RectTransform만)           ← RankHud 부착 ✅
+        ├── RankPower (오벌 프레임 프리팹, 내부 TMP "Text" = "82")  → pointText ✅
+        └── RankBadge (Image 230×230, y=+450)                     → badgeImage ✅
 ```
 
 > 티어명은 **배지 스프라이트로 표현**하기로 결정(사용자) — `RankInfo` 하위에 티어명 TMP를 새로 만들지 않는다.
+> `pointText`가 가리키는 TMP는 `RankPower` **프리팹 인스턴스 내부**의 자식(`Text`)이다 — 프리팹 자체를 수정한 게 아니라 씬 인스턴스의 자식을 참조만 한다.
 
 #### 파일 지도 — 다이어그램에서 코드로
 
@@ -926,9 +924,9 @@ Tab_Match / MatchContent
 | `RankSaveData` | `OutGame/Save/2.Domain/RankSaveData.cs` (+ `UserSaveData.rank` 슬롯) | H-28 | ✅ 코드 |
 | `RankConfig` · `RankTier` (SO) | `OutGame/Rank/RankConfig.cs` | H-30 | ✅ 코드 |
 | `RankManager` · `RankInfo` | `OutGame/Rank/RankManager.cs` | H-29 | ✅ 코드 |
-| 전투 훅 | `Battle/TurnRunner.cs` `CaptureResult` 2줄 | H-31 | ⬜ |
-| SO 주입 | `Utils/DataLibrary.cs` 필드1+호출1 | H-30 | ⬜ |
-| `RankHud` | `UI/HUD/RankHud.cs` | H-32 | ⬜ |
+| 전투 훅 | `Battle/TurnRunner.cs` `CaptureResult` 1줄 | H-31 | ✅ 코드 |
+| SO 주입 | `Utils/DataLibrary.cs` 필드1+호출1 | H-30 | ✅ 코드 (`RankConfig.asset`은 사용자 인계) |
+| `RankHud` | `UI/HUD/RankHud.cs` | H-32 | ✅ 코드 + 씬 배선 |
 
 #### CORE 구현 결과 (2026-07-27) — 소비자가 알아야 할 것
 
@@ -937,3 +935,10 @@ Tab_Match / MatchContent
 - **`DisplayName`은 항상 non-null**(미저작·빈 테이블이면 `string.Empty`). **`Badge`는 null 가능** → HUD는 non-null일 때만 스프라이트를 교체한다(아트 미배선 시 씬 기존 이미지 유지).
 - **`Config`·`Save()`는 private** — 공개 API는 `Points`/`GetInfo`/`ApplyBattleResult`/`SetConfig`/`ResetForDebug` 5개뿐.
 - ⚠️ **이름 겹침**: 로비 씬 노드 `RankInfo`(RectTransform, `RankHud` 부착 지점)와 C# `RankInfo`(struct)는 이름만 같고 무관하다.
+
+#### HUD 구현 결과 (2026-07-27) — 도메인 H 코드 종결
+
+- `RankHud`는 **`RankInfo` 스냅샷의 6필드 중 2개만 소비**한다 — `Badge`(Image 교체) · `Points`(TMP). `DisplayName`은 티어를 배지로 표현하기로 해서 소비처가 없고, `TierIndex`/`NextRequired`/`IsMaxTier`도 미소비(진행바 없음 + `IsMaxTier` 분기는 빈 tiers 오표시 위험).
+- **렌더 진입점은 `Render()` 하나**, 호출자는 `Start()`(최초 1회)와 `OnEnable()`(`m_started` 가드 → 탭 재진입만). 이벤트 구독 0이라 `OnDisable`이 없다 — 해제 누락 위험도 구조적으로 없다.
+- **배지 진실원은 `RankConfig.tiers[].badge` 단 하나**(사용자 결정). HUD에 `Sprite[]` 폴백 배열을 두지 않는다 — 아트 미저작이면 `Badge == null`이라 씬에 배선된 기존 스프라이트가 그대로 남는다.
+- 도메인 H는 이걸로 **코드 100% 종결**. 남은 건 전부 에셋/아트: `RankConfig.asset` 저작·배선, 티어 배지 스프라이트. 둘 다 없어도 20티어 기본 테이블 + 씬 기본 배지로 동작한다.
