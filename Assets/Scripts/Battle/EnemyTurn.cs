@@ -63,8 +63,10 @@ public class EnemyTurn : TurnBase
                     if (t_atk == null || t_def == null || !t_def.IsAlive) { TutorialConfig.ConsumeEnemyStep(); return; }
                 }
 
-                // 공격 전 설명 탭 게이트.
-                if (t_step.waitForTap && TutorialOverlayUI.Instance != null)
+                // 공격 전 설명 탭 게이트. 메시지 없으면 게이트 자체를 건너뛴다 —
+                // 빈 텍스트로 dim 가이드 화면이 떴다 사라지는 문제 방지(탭 대기도 무의미).
+                if (t_step.waitForTap && !string.IsNullOrWhiteSpace(t_step.guideMessage)
+                    && TutorialOverlayUI.Instance != null)
                 {
                     TutorialOverlayUI.Instance.ShowMessage(t_step.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
                     await TutorialOverlayUI.Instance.WaitForTapAsync(GetCt());
@@ -90,11 +92,12 @@ public class EnemyTurn : TurnBase
             CardView t_defenderView = this.ctx.playerFieldView.GetSlotView(t_def.slotIndex);
 
             // 튜토리얼: 적 공격 순차 안내(문구+하이라이트, dim off) 후 읽기 딜레이. 연출 전용.
-            if (TutorialConfig.IsActive && TutorialOverlayUI.Instance != null)
+            // 메시지 없으면 오버레이 자체를 띄우지 않는다 — 빈 가이드가 순간 깜빡였다 사라지는 문제 방지.
+            if (TutorialConfig.IsActive && TutorialOverlayUI.Instance != null
+                && !string.IsNullOrWhiteSpace(t_tutorialMsg))
             {
                 TutorialOverlayUI.Instance.ShowAttack(t_tutorialMsg, t_attackerView, t_defenderView, false);
-                if (!string.IsNullOrEmpty(t_tutorialMsg))
-                    await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
 
                 // 안내 읽기 딜레이 후, 실제 공격 연출 동안 힌트(배너·하이라이트) 전부 숨김. 다음 스텝에서 재표시.
                 TutorialOverlayUI.Instance.Clear();
@@ -146,7 +149,7 @@ public class EnemyTurn : TurnBase
         while (TutorialConfig.TryPeekEnemyStep(out var t_msg)
                && t_msg.kind == TutorialScenarioData.StepKind.Message)
         {
-            if (t_overlay != null)
+            if (t_overlay != null && !string.IsNullOrWhiteSpace(t_msg.guideMessage))
             {
                 t_overlay.ShowMessage(t_msg.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
                 await t_overlay.WaitForTapAsync(GetCt());

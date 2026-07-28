@@ -121,22 +121,13 @@ public class CardView : MonoBehaviour
     public void SetTutorialPointer(bool _on)
     {
         this.tutorialPointer = _on;
-        if (this.hintArrow != null) this.hintArrow.SetVisible(_on);
+        if (this.hintArrow != null) this.hintArrow.SetVisible(false);   // 화살표 완전 비표시
     }
 
     void Update()
     {
         if (this.hintArrow == null) return;
-        if (this.tutorialPointer) { this.hintArrow.SetVisible(true); return; }   // 튜토리얼 강제 포인터
-        bool t_show = TurnState.InputAllowed
-            && this.boundCard != null
-            && this.boundCard.ownerIndex == TurnState.LocalOwnerIndex
-            && this.boundCard.isRevealed
-            && this.dragState == DragState.Idle
-            && !this.longPressFired
-            && !s_anyDragging
-            && currentInputMode == InputMode.DragBack;
-        this.hintArrow.SetVisible(t_show);
+        this.hintArrow.SetVisible(false);   // 가이드 화살표 완전 비표시(일반+튜토리얼)
     }
     #endregion
 

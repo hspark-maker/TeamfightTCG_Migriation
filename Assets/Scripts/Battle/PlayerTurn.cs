@@ -95,7 +95,7 @@ public class PlayerTurn : TurnBase
                 TurnState.InputAllowed = false;
                 CardView.RestoreAllFades();
             }
-            else if (t_overlay != null)
+            else if (t_overlay != null && !string.IsNullOrWhiteSpace(t_step0.guideMessage))
             {
                 t_overlay.ShowMessage(t_step0.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
                 await t_overlay.WaitForTapAsync(t_ct);
@@ -123,8 +123,9 @@ public class PlayerTurn : TurnBase
             return false;
         }
 
-        // 공격 전 설명 탭 게이트(입력은 아직 차단 상태).
-        if (t_step.waitForTap && t_overlay != null)
+        // 공격 전 설명 탭 게이트(입력은 아직 차단 상태). 메시지 없으면 게이트 스킵 —
+        // 빈 텍스트 dim 가이드 화면이 떴다 사라지는 문제 방지(적 턴과 대칭).
+        if (t_step.waitForTap && !string.IsNullOrWhiteSpace(t_step.guideMessage) && t_overlay != null)
         {
             t_overlay.ShowMessage(t_step.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
             await t_overlay.WaitForTapAsync(t_ct);

@@ -33,4 +33,4 @@ MonoBehaviour:
   enemyExtraAttackDelay: 0.4
   opponentTurnStartDelay: 0.5
   opponentExtraAttackDelay: 0.4
-  turnThinkTime: 50000
+  turnThinkTime: 30

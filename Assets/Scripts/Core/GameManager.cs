@@ -36,6 +36,10 @@ public class GameManager : MonoBehaviour
     // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
     void Boot()
     {
+        // 모바일 60프레임: 기본 30이라 명시 지정. vSync가 targetFrameRate를 덮어쓰지 않게 끔.
+        Application.targetFrameRate = 60;
+        QualitySettings.vSyncCount  = 0;
+
         DataSaveManager.Load();             // 세이브 로드
         OutgameTutorialProgress.Init();     // 튜토리얼 진행도 판정(레거시 세이브 마이그레이션 포함)
         CurrencyManager.Init();             // 세이브 → 재화 메모리 캐싱

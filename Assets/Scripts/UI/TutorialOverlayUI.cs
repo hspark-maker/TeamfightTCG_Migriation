@@ -202,7 +202,7 @@ public class TutorialOverlayUI : MonoBehaviour
 
     void SetBanner(string _message)
     {
-        if (string.IsNullOrEmpty(_message)) { HideBanner(); return; }
+        if (string.IsNullOrWhiteSpace(_message)) { HideBanner(); return; }
 
         if (this.tapHint != null) this.tapHint.SetActive(true);
         this.banner.text = _message;
