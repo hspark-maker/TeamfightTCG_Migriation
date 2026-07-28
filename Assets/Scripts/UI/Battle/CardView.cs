@@ -10,11 +10,11 @@ using TMPro;
 public class CardView : MonoBehaviour
 {
     #region Static / Events
-    public static event System.Action<CardView> OnAnyClicked;
     public static event System.Action<CardView, CardView> OnAttack;
 
     static readonly List<CardView> allViews = new List<CardView>();
     static bool s_anyDragging;
+    static CardView s_selectedAttacker;   // 탭 공격(제스처3)으로 무장된 공격자. null=미무장.
 
     // ForcedAttacker 활성 시 나머지 로컬 카드에 적용할 암전 alpha. 일반 전투(처형 재무장)는 0.3,
     // 튜토리얼은 "그 카드 말고 다 검게" 위해 더 낮은 값으로 덮어쓴다(PlayerTurn이 설정).
@@ -22,8 +22,9 @@ public class CardView : MonoBehaviour
 
     enum DragState { Idle, AttackDrag, ReturnDrag }
 
-    public enum InputMode { DragBack, DragToEnemy }
-    public static InputMode currentInputMode = InputMode.DragToEnemy;
+    // 한 터치의 제스처 종류. 손가락이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정, 그 터치 끝까지 고정.
+    // DragUp=위로 떠서 적에게 끌기(콜라이더 타깃). DragDown=아래로 끌기(좌우반전 방향 타깃). None=미확정/탭.
+    enum Gesture { None, DragUp, DragDown }
     #endregion
 
     #region Fields
@@ -76,6 +77,7 @@ public class CardView : MonoBehaviour
     Vector2 currentDragScreenPos;
     Vector2 touchStartScreenPos;
     DragState dragState;
+    Gesture activeGesture;   // 이번 터치의 제스처(위/아래 드래그). 탭은 None 유지.
     CardView currentTarget;
     GameObject weaponInstance;
     Animator weaponAnimator;
@@ -126,6 +128,9 @@ public class CardView : MonoBehaviour
 
     void Update()
     {
+        // 입력이 닫히면(턴 종료/타임아웃 등) 무장된 탭 공격자 강조가 고착되지 않게 해제.
+        if (s_selectedAttacker != null && !TurnState.InputAllowed)
+            ClearAttackerSelection();
         if (this.hintArrow == null) return;
         this.hintArrow.SetVisible(false);   // 가이드 화살표 완전 비표시(일반+튜토리얼)
     }
@@ -145,6 +150,7 @@ public class CardView : MonoBehaviour
         this.touchStartScreenPos  = (Vector2)Input.mousePosition;
         this.dragStartScreenPos   = this.touchStartScreenPos;
         this.currentDragScreenPos = this.touchStartScreenPos;
+        this.activeGesture        = Gesture.None;   // 새 터치 — 제스처 미확정(탭/드래그 판정 대기).
 
         if (this.boundCard.ownerIndex != TurnState.LocalOwnerIndex) return;
 
@@ -180,17 +186,24 @@ public class CardView : MonoBehaviour
         if (this.longPressFired && PointerLeftSelf())
             CancelLongPress();
 
-        Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;
-        if (t_drag.magnitude < this.dragThreshold) return;
+        Vector2 t_touchDrag = this.currentDragScreenPos - this.touchStartScreenPos;
+
+        // 제스처 미확정: 손가락 이동이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정(위=적에게 끌기, 아래=좌우반전).
+        if (this.activeGesture == Gesture.None)
+        {
+            if (t_touchDrag.magnitude < this.dragThreshold) return;   // 아직 탭 범위 — 대기.
+            this.activeGesture = t_touchDrag.y >= 0f ? Gesture.DragUp : Gesture.DragDown;
+            ClearAttackerSelection();   // 드래그 시작 — 대기 중인 탭 무장 취소(입력 상호배타).
+        }
 
         if (Vector2.Distance(this.currentDragScreenPos, this.touchStartScreenPos) > this.deadZoneRadius)
             CancelLongPress();
 
         if (this.boundCard == null || this.boundCard.ownerIndex != TurnState.LocalOwnerIndex) return;
 
-        Vector2 t_touchDrag = this.currentDragScreenPos - this.touchStartScreenPos;
+        Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;   // DragBack 조준용(화면 중앙 기준).
 
-        if (currentInputMode == InputMode.DragBack)
+        if (this.activeGesture == Gesture.DragDown)
             HandleDragBack(t_drag, t_touchDrag);
         else
             HandleDragToEnemy(t_touchDrag);
@@ -342,25 +355,26 @@ public class CardView : MonoBehaviour
             return;
         }
 
-        if (this.boundCard == null || this.boundCard.ownerIndex != TurnState.LocalOwnerIndex)
+        // 탭 판정: 이 터치가 드래그로 확정되지 않았고(제스처 None) 손가락 이동이 데드존 이내.
+        bool t_isTap = this.activeGesture == Gesture.None
+            && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius;
+
+        // 적/비로컬 카드: 탭이면 "무장된 공격자 → 이 적" 공격(제스처3 2단계).
+        if (this.boundCard.ownerIndex != TurnState.LocalOwnerIndex)
         {
-            OnAnyClicked?.Invoke(this);
+            if (t_isTap) HandleEnemyTap();
+            this.dragState     = DragState.Idle;
+            this.activeGesture = Gesture.None;
             return;
         }
 
-        Vector2 t_releasePos = (Vector2)Input.mousePosition;
-        Vector2 t_deadZoneOrigin = currentInputMode == InputMode.DragToEnemy
-            ? this.touchStartScreenPos
-            : this.dragStartScreenPos;
-        bool t_inDeadZone = Vector2.Distance(t_releasePos, t_deadZoneOrigin) < this.deadZoneRadius;
-
-        if (t_inDeadZone)
+        // 로컬 카드 탭: 공격자 무장 토글(제스처3 1단계). ForcedAttacker(처형/튜토리얼) 중엔 탭 게이트 오프 → 드래그만.
+        if (t_isTap)
         {
-            ClearTargetPreview();
-            RestoreAllFades();
-            FocusWeapon(false);
-            this.cardAnim.MoveToSlot().Forget();
-            this.dragState = DragState.Idle;
+            if (TurnState.ForcedAttacker == null) ToggleSelectAttacker();
+            else { FocusWeapon(false); this.cardAnim.MoveToSlot().Forget(); }
+            this.dragState     = DragState.Idle;
+            this.activeGesture = Gesture.None;
             return;
         }
 
@@ -372,7 +386,6 @@ public class CardView : MonoBehaviour
 
             ClearTargetPreview();
 
-
             if (!t_attacked)
             {
                 RestoreAllFades();
@@ -383,9 +396,10 @@ public class CardView : MonoBehaviour
         else
         {
             FocusWeapon(false);
-            OnAnyClicked?.Invoke(this);
+            this.cardAnim.MoveToSlot().Forget();
         }
-        this.dragState = DragState.Idle;
+        this.dragState     = DragState.Idle;
+        this.activeGesture = Gesture.None;
     }
 
     async UniTask WaitLongPress(CancellationToken _ct)
@@ -511,6 +525,52 @@ public class CardView : MonoBehaviour
         }
         HideAttackPreview();
         this.currentTarget = null;
+    }
+
+    // ── 탭 공격(제스처3): 내 카드 탭으로 공격자 무장 → 적 카드 탭으로 발사(2단계) ──
+
+    // 내 카드 탭: 공격자 무장 토글. 무장 시 자신+유효 적 강조(무기 조준 텔레그래프). 이미 무장이면 해제.
+    void ToggleSelectAttacker()
+    {
+        if (s_selectedAttacker == this) { ClearAttackerSelection(); return; }
+        ClearAttackerSelection();
+
+        s_selectedAttacker = this;
+        SetHighlight(true);
+        FocusWeapon(true);
+
+        var t_targets = GetValidEnemyViews();
+        FadeAll(0.3f);
+        FadeCards(1f, this);
+        FadeCards(1f, t_targets.ToArray());
+        foreach (var t_cv in t_targets)
+            if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
+                t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
+    }
+
+    // 무장 해제: 강조/무기/페이드 원복.
+    static void ClearAttackerSelection()
+    {
+        if (s_selectedAttacker == null) return;
+        CardView t_prev = s_selectedAttacker;
+        s_selectedAttacker = null;
+        t_prev.SetHighlight(false);
+        t_prev.FocusWeapon(false);
+        RestoreAllFades();
+    }
+
+    // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(도발 필터는 공격자 기준).
+    void HandleEnemyTap()
+    {
+        if (s_selectedAttacker == null) return;                       // 미무장 — 무동작(정보는 롱프레스).
+        if (s_selectedAttacker.boundCard == null) { ClearAttackerSelection(); return; }
+
+        var t_valid = s_selectedAttacker.GetValidEnemyViews();
+        if (!t_valid.Contains(this)) return;                          // 도발 등 무효 타깃 무시.
+
+        CardView t_attacker = s_selectedAttacker;
+        ClearAttackerSelection();
+        OnAttack?.Invoke(t_attacker, this);
     }
 
     /// <summary>드래그 시작 시 유효 타깃 강조 페이드.
@@ -1047,9 +1107,9 @@ public class CardView : MonoBehaviour
 
     public static void Cleanup()
     {
-        OnAnyClicked  = null;
         OnAttack      = null;
         s_anyDragging = false;
+        s_selectedAttacker = null;
         ForcedDimAlpha = 0.3f;
         TurnState.Reset();
         allViews.Clear();
@@ -1099,7 +1159,7 @@ public class CardView : MonoBehaviour
             Gizmos.DrawLine(transform.position, this.currentTarget.transform.position);
         }
 
-        if (this.dragState == DragState.AttackDrag && currentInputMode == InputMode.DragBack)
+        if (this.dragState == DragState.AttackDrag && this.activeGesture == Gesture.DragDown)
         {
             float t_boundY    = Mathf.Sqrt(Mathf.Max(0f, 1f - this.dirThreshold * this.dirThreshold));
             Vector3 t_cardScreen = Camera.main.WorldToScreenPoint(transform.position);
