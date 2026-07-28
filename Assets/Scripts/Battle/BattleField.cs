@@ -284,6 +284,15 @@ public class BattleField : MonoBehaviour
         NotifyBoardChanged();   // 등장으로 라이브 구성이 바뀜 → 파생 상태 재동기(성벽 등)
     }
 
+    /// <summary>튜토리얼 확정승: 슬롯+대기 카드의 현재 체력을 _hp 이하로 낮춤(공격력=체력이라 적이 약해짐).
+    /// bonusHp 제거. data.maxHp(공유 에셋)는 건드리지 않음 — 인스턴스 hp만.</summary>
+    public void OverrideAllHp(int _hp)
+    {
+        if (_hp <= 0) return;
+        foreach (CardInstance t_c in GetActiveCards()) { t_c.hp = Mathf.Min(t_c.hp, _hp); t_c.bonusHp = 0; }
+        foreach (CardInstance t_c in this.waitingQueue)  { t_c.hp = Mathf.Min(t_c.hp, _hp); t_c.bonusHp = 0; }
+    }
+
     public CardInstance GetSlot(int _index) => this.slots[_index];
     public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;
 

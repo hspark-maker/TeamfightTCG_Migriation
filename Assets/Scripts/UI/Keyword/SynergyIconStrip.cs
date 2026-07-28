@@ -9,6 +9,12 @@ using UnityEngine.UI;
 /// </summary>
 public static class SynergyIconStrip
 {
+    /// <summary>시너지 아이콘 오브젝트에 곱할 배율. 시너지 PNG는 512 캔버스에 배지가 ~60%만 차지해
+    /// (나머지는 투명 여백) 같은 슬롯 크기의 키워드 아이콘 옆에서 혼자 작아 보인다.
+    /// 이미지를 자르는 대신 오브젝트를 키워 보정한다 — 보이는 배지가 슬롯을 거의 채운다.
+    /// 아이콘 PNG의 여백 비율을 바꾸면 이 값도 같이 바꿀 것(시너지 아이콘 크기의 단일 진실원).</summary>
+    public const float IconPadCompensation = 1.55f;
+
     /// <summary>_parent를 비우고 _card의 시너지 아이콘을 깐다.
     /// 아이콘이 없는(icon 미배정) 시너지는 건너뛴다 — 빈 사각형이 뜨는 것보다 낫다.</summary>
     public static void Build(CardData _card, Transform _parent, GameObject _iconPrefab, bool _clearFirst = true)
@@ -48,6 +54,9 @@ public static class SynergyIconStrip
 
             RectTransform t_rt       = t_obj.GetComponent<RectTransform>();
             SynergyData   t_captured = t_synergy;
+
+            // 투명 여백 보정. localScale이라 레이아웃 칸 크기는 그대로 — 보이는 배지만 커진다.
+            if (t_rt != null) t_rt.localScale = Vector3.one * IconPadCompensation;
             t_btn.onPointerDown = () => Show(t_captured, t_rt);
             t_btn.onPointerUp   = Hide;
         }

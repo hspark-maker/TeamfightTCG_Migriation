@@ -35,6 +35,10 @@ public class TutorialScenarioData : ScriptableObject
 
         [Tooltip("안내 중 배경 어둡게 + 입력 차단(탭만 허용). 설명 집중용")]
         public bool dimBackground;
+
+        [Tooltip("이 스텝에 허용할 조작. Any = 제한 없음. 지정하면 그 제스처 외 조작은 완전 무반응 " +
+                 "(한 조작법을 배우는 동안 다른 조작법 차단). Attack 스텝 전용")]
+        public InputGesture allowedGesture;   // 기본값 0 = Any → 기존 시나리오 호환
     }
 
     [Header("시너지 표시/적용 (기본 off — 초반 튜토리얼은 시너지 개념 미도입, 3편부터 on)")]
@@ -52,4 +56,7 @@ public class TutorialScenarioData : ScriptableObject
 
     [Header("스크립트 소진 후 자유 공격 전환 (기본 off — on이면 큐 소진 시 플레이어가 자유롭게 공격, 안내 없음)")]
     public bool freePlayAfterScript;
+
+    [Header("적 체력 상한 (0 = off. >0이면 적 카드 현재 체력을 이 값 이하로 클램프 — 확정승/스텝 소진 보장용)")]
+    public int enemyMaxHpOverride;
 }

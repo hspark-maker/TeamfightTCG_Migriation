@@ -101,7 +101,10 @@ public class CardInstance
     public void Heal(int _amount)
     {
         if (_amount <= 0) return;
+        int t_before = this.hp;
         this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.data.maxHp);
+        // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
+        if (this.hp > t_before) CardView.GetView(this)?.PlayHealEffect(this.hp - t_before);
     }
 
     /// <summary>돌보미: bonusHp 부여(양수만). stateful(데미지로 소진) → ClearSynergy 리셋 제외.</summary>
@@ -117,6 +120,7 @@ public class CardInstance
         if (this.reviveUsed || IsAlive) return false;
         this.reviveUsed = true;
         this.hp = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.data.maxHp * 0.5f));
+        CardView.GetView(this)?.PlayHealEffect(this.hp);   // 언데드 부활도 회복 연출(복구된 hp만큼). 순수 연출.
         return true;
     }
 

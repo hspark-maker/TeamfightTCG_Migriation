@@ -35,6 +35,11 @@ public class EnemyTurn : TurnBase
             CardInstance t_atk;
             CardInstance t_def;
             string t_tutorialMsg = null;
+            bool   t_scriptedSlots = false;   // 슬롯 지정 스텝대로 진행했는가(기준선 재동기 대상)
+
+            // 실행 불가 스텝(공격자·타깃이 죽었거나 그 자리를 다른 카드가 채움)은 안내 묶음째 먼저 폐기.
+            // 전부 폐기되면 아래 t_scripted가 false → 일반 AI 폴백(턴이 비지 않는다).
+            if (TutorialConfig.IsActive) DiscardUnplayableEnemySteps();
 
             // 튜토리얼: 적 스크립트에 Attack 스텝이 있으면 스크립트대로, 없으면(=enemyScript 미저작/소진)
             // 일반 AI로 폴백해 상대도 공격한다. (선행 Message 스텝은 폴백 여부와 무관하게 먼저 소진.)
@@ -51,16 +56,16 @@ public class EnemyTurn : TurnBase
                 }
                 else
                 {
-                    // 디자이너 입력 슬롯 무검증 전달 방지 — GetSlot은 경계검사가 없어 범위 밖이면 크래시.
-                    if (!InSlotRange(t_step.attackerSlot) || !InSlotRange(t_step.targetSlot))
+                    // 위 폐기 루프를 통과한 스텝이지만 방어 유지 — 범위 밖 저작값이 GetSlot에 그대로 들어가면 크래시.
+                    if (!IsEnemyStepPlayable(t_step))
                     {
-                        Debug.LogWarning($"[Tutorial] 적 스텝 슬롯 범위 초과 (atk={t_step.attackerSlot}, def={t_step.targetSlot}) → 스텝 폐기·턴 종료");
-                        TutorialConfig.ConsumeEnemyStep();
+                        Debug.LogWarning($"[Tutorial] 적 스텝 무효(atk={t_step.attackerSlot}, def={t_step.targetSlot}) → 스텝 폐기·턴 종료");
+                        TutorialConfig.DiscardEnemyStep();
                         return;
                     }
                     t_atk = this.ctx.enemyField.GetSlot(t_step.attackerSlot);
                     t_def = this.ctx.playerField.GetSlot(t_step.targetSlot);
-                    if (t_atk == null || t_def == null || !t_def.IsAlive) { TutorialConfig.ConsumeEnemyStep(); return; }
+                    t_scriptedSlots = true;
                 }
 
                 // 공격 전 설명 탭 게이트. 메시지 없으면 게이트 자체를 건너뛴다 —
@@ -120,6 +125,10 @@ public class EnemyTurn : TurnBase
 
             await this.ctx.FillAndAnimate();
 
+            // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드를 기준선으로 재동기(PlayerTurn과 대칭).
+            if (TutorialConfig.IsActive && t_scriptedSlots)
+                TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
+
             await AttackFlow.PlayResultFlourish(t_attackerView, t_atk, t_def, t_result);
 
             if (t_result.canAttackAgain && t_atk.IsAlive)
@@ -138,6 +147,44 @@ public class EnemyTurn : TurnBase
     public override void OnExit()
     {
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
+    }
+
+    /// <summary>
+    /// 큐 앞의 "선행 안내 + 공격 스텝 1개"를 한 묶음으로 보고, 실행 불가한 묶음을 통째로 조용히 폐기한다.
+    /// 공격 스텝이 더 없는 꼬리(안내만 남음)는 손대지 않는다. PlayerTurn.DiscardUnplayableSteps와 대칭.
+    /// </summary>
+    void DiscardUnplayableEnemySteps()
+    {
+        while (true)
+        {
+            int t_ahead = 0;
+            while (TutorialConfig.TryPeekEnemyStep(t_ahead, out var t_lead)
+                   && t_lead.kind != TutorialScenarioData.StepKind.Attack)
+                t_ahead++;
+
+            if (!TutorialConfig.TryPeekEnemyStep(t_ahead, out var t_attack)) return;   // 남은 공격 스텝 없음
+            if (IsEnemyStepPlayable(t_attack)) return;                                 // 유효 묶음 도달
+
+            Debug.LogWarning($"[Tutorial] 적 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
+                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
+            for (int i = 0; i <= t_ahead; i++) TutorialConfig.DiscardEnemyStep();
+        }
+    }
+
+    /// <summary>적 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). PlayerTurn과 대칭.
+    /// 기준선 대조 = 죽은 카드 자리를 채운 다른 카드가 스크립트 공격자/타깃이 되는 것을 막는다.</summary>
+    bool IsEnemyStepPlayable(TutorialScenarioData.ScriptedAttack _step)
+    {
+        // 자유공격: 생존 적·아군이 각각 1장 이상이면 실행 가능(슬롯 무관, 대상은 AI가 선택).
+        if (IsFreeStep(_step))
+            return this.ctx.enemyField.GetActiveCards().Count > 0
+                && this.ctx.playerField.GetActiveCards().Count > 0;
+        if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
+        CardInstance t_atk = this.ctx.enemyField.GetSlot(_step.attackerSlot);
+        CardInstance t_def = this.ctx.playerField.GetSlot(_step.targetSlot);
+        if (t_atk == null || !t_atk.IsAlive || t_def == null || !t_def.IsAlive) return false;
+        return TutorialConfig.MatchesEnemyBaseline(_step.attackerSlot, t_atk)
+            && TutorialConfig.MatchesPlayerBaseline(_step.targetSlot, t_def);
     }
 
     /// <summary>

@@ -7,6 +7,7 @@ public class PlayerTurn : TurnBase
 {
     CardInstance forcedAttacker;
     bool turnDone;
+    bool scriptedStepAttack;   // 진행 중인 공격이 슬롯 지정 스텝대로인가(기준선 재동기 대상). 자유공격은 false
 
     public PlayerTurn(TurnContext _ctx) : base(_ctx) { }
 
@@ -26,7 +27,8 @@ public class PlayerTurn : TurnBase
             if (!await PrepareTutorialStepsAsync())
             {
                 // 스크립트 소진: 자유 전환 시나리오면 턴 스킵 대신 자유 공격 턴을 연다(안내 없음).
-                if (TutorialConfig.FreePlayAfterScript)
+                // 무효 스텝 폐기로 스크립트가 끊긴 경우(ScriptDerailed)도 마찬가지 — 안내 없는 턴 잠김 방지.
+                if (TutorialConfig.FreePlayAfterScript || TutorialConfig.ScriptDerailed)
                 {
                     EnterFreePlay();   // 아래 WaitUntil(turnDone)로 진행(일반 전투처럼 입력 대기)
                 }
@@ -53,6 +55,7 @@ public class PlayerTurn : TurnBase
         TurnState.InputAllowed   = false;
         TurnState.ForcedAttacker = null;
         TurnState.ForcedTarget   = null;
+        TurnState.AllowedGesture = InputGesture.Any;   // 턴 종료 — 조작 제한 해제
         CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복
         CardView.RestoreAllFades();
         CardView.OnAttack      -= HandleCardViewAttack;
@@ -72,6 +75,10 @@ public class PlayerTurn : TurnBase
 
         TurnState.InputAllowed = false;   // 게이트/드레인 중 드래그 공격 차단(공격 스텝 준비 완료 시 재허용)
 
+        // 실행 불가 스텝은 안내를 띄우기 '전에' 통째로 버린다(문구·오버레이도 안 뜨게).
+        // 여기부터 공격 실행 전까지 보드는 변하지 않는다(입력 차단 상태) → 이 한 번의 검사로 충분.
+        DiscardUnplayableSteps();
+
         // 선행 Message/Inspect 스텝 소진. Message = 탭 대기, Inspect = 적 카드 롱프레스 대기.
         while (TutorialConfig.TryPeekPlayerStep(out var t_step0)
                && (t_step0.kind == TutorialScenarioData.StepKind.Message
@@ -90,9 +97,11 @@ public class PlayerTurn : TurnBase
                     CardView t_inspectView = this.ctx.enemyFieldView.GetSlotView(t_step0.targetSlot);
                     if (t_inspectView != null) CardView.FadeCards(1f, t_inspectView);
                 }
+                TurnState.AllowedGesture = InputGesture.LongPressOnly;   // 정보 확인 레슨 — 드래그·탭 차단
                 TurnState.InputAllowed = true;
                 if (t_overlay != null) await t_overlay.WaitForInspectAsync(t_ct);
                 TurnState.InputAllowed = false;
+                TurnState.AllowedGesture = InputGesture.Any;
                 CardView.RestoreAllFades();
             }
             else if (t_overlay != null && !string.IsNullOrWhiteSpace(t_step0.guideMessage))
@@ -114,15 +123,6 @@ public class PlayerTurn : TurnBase
             return false;
         }
 
-        // 공격 스텝 슬롯 유효성(범위밖/빈슬롯/죽은카드 = 영구 소프트락 방지 → 스텝 폐기·턴 스킵).
-        // EnemyTurn과 대칭. 도발 필터는 의도적으로 미적용(스크립트가 비-도발 타깃 저작 허용).
-        if (!IsAttackStepPlayable(t_step))
-        {
-            Debug.LogWarning($"[Tutorial] 플레이어 공격 스텝 무효(atk={t_step.attackerSlot}, def={t_step.targetSlot}) → 스텝 폐기·턴 스킵");
-            TutorialConfig.ConsumePlayerStep();
-            return false;
-        }
-
         // 공격 전 설명 탭 게이트(입력은 아직 차단 상태). 메시지 없으면 게이트 스킵 —
         // 빈 텍스트 dim 가이드 화면이 떴다 사라지는 문제 방지(적 턴과 대칭).
         if (t_step.waitForTap && !string.IsNullOrWhiteSpace(t_step.guideMessage) && t_overlay != null)
@@ -136,7 +136,30 @@ public class PlayerTurn : TurnBase
         return true;
     }
 
-    /// <summary>튜토리얼 공격 스텝이 지금 실행 가능한가(범위·생존). 도발 필터는 의도적 미적용.</summary>
+    /// <summary>
+    /// 큐 앞의 "선행 안내 + 공격 스텝 1개"를 한 묶음으로 보고, 실행 불가한 묶음을 통째로 조용히 폐기한다.
+    /// 안내까지 함께 버리는 이유: 죽은 카드를 설명하는 문구가 뜨는 것 자체가 버그다.
+    /// 공격 스텝이 더 없는 꼬리(안내만 남음)는 손대지 않는다 — 마무리 문구는 그대로 보여준다.
+    /// </summary>
+    void DiscardUnplayableSteps()
+    {
+        while (true)
+        {
+            int t_ahead = 0;
+            while (TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_lead)
+                   && t_lead.kind != TutorialScenarioData.StepKind.Attack)
+                t_ahead++;
+
+            if (!TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_attack)) return;   // 남은 공격 스텝 없음
+            if (IsAttackStepPlayable(t_attack)) return;                                 // 유효 묶음 도달
+
+            Debug.LogWarning($"[Tutorial] 플레이어 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
+                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
+            for (int i = 0; i <= t_ahead; i++) TutorialConfig.DiscardPlayerStep();
+        }
+    }
+
+    /// <summary>튜토리얼 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). 도발 필터는 의도적 미적용.</summary>
     bool IsAttackStepPlayable(TutorialScenarioData.ScriptedAttack _step)
     {
         // 자유공격: 생존 아군·적이 각각 1장 이상이면 실행 가능(슬롯 무관).
@@ -146,7 +169,11 @@ public class PlayerTurn : TurnBase
         if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
         CardInstance t_atk = this.ctx.playerField.GetSlot(_step.attackerSlot);
         CardInstance t_def = this.ctx.enemyField.GetSlot(_step.targetSlot);
-        return t_atk != null && t_atk.IsAlive && t_def != null && t_def.IsAlive;
+        if (t_atk == null || !t_atk.IsAlive || t_def == null || !t_def.IsAlive) return false;
+        // 생존만으론 부족하다 — 죽은 카드 자리를 대기 카드가 채우면 슬롯 지정이 엉뚱한 카드에 붙는다.
+        // 스크립트가 그 슬롯에서 기대한 카드와 실제 점유 카드가 다르면 실행 불가로 본다.
+        return TutorialConfig.MatchesPlayerBaseline(_step.attackerSlot, t_atk)
+            && TutorialConfig.MatchesEnemyBaseline(_step.targetSlot, t_def);
     }
 
     /// <summary>튜토리얼: 공격 스텝을 오버레이에 안내(문구+공격자/타깃 하이라이트+드래그 포인터).
@@ -159,6 +186,7 @@ public class PlayerTurn : TurnBase
         {
             TurnState.ForcedAttacker = null;
             TurnState.ForcedTarget   = null;
+            TurnState.AllowedGesture = InputGesture.Any;   // 자유공격 = 조작 제한 없음
             CardView.ForcedDimAlpha  = 0.3f;   // 기본값 원복
             CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
             TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false);
@@ -173,6 +201,7 @@ public class PlayerTurn : TurnBase
         CardInstance t_defCard = InSlotRange(_step.targetSlot)   ? this.ctx.enemyField.GetSlot(_step.targetSlot)    : null;
         TurnState.ForcedAttacker = t_atkCard;
         TurnState.ForcedTarget   = t_defCard;   // 지정 타깃 외 적 카드 암전(집중 유도)
+        TurnState.AllowedGesture = _step.allowedGesture;   // 이 스텝이 가르치는 조작만 허용(나머지 무반응)
         CardView.ForcedDimAlpha  = 0.1f;   // 튜토리얼: 거의 검게(일반 전투 0.3보다 진하게)
         CardView.RestoreAllFades();        // 공격자/타깃 기준 재적용 → 공격자·타깃만 full, 나머지 암전
 
@@ -186,6 +215,7 @@ public class PlayerTurn : TurnBase
         this.forcedAttacker      = null;
         TurnState.ForcedAttacker = null;
         TurnState.ForcedTarget   = null;
+        TurnState.AllowedGesture = InputGesture.Any;   // 자유 꼬리 = 조작 제한 해제
         CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복(일반 전투 기본)
         CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
         TutorialOverlayUI.Instance?.Clear();   // 안내 배너/힌트 제거
@@ -208,12 +238,14 @@ public class PlayerTurn : TurnBase
         if (this.forcedAttacker != null && t_attCard != this.forcedAttacker) return;
 
         // 튜토리얼: 스크립트 스텝(공격자 슬롯·타깃 슬롯)과 일치하는 공격만 허용. 불일치 = 입력 무시.
+        this.scriptedStepAttack = false;
         if (TutorialConfig.IsActive)
         {
             if (!TutorialConfig.TryPeekPlayerStep(out var t_step))
             {
                 // 스텝 소진: 자유 전환이면 소비 없이 통과(아무 카드로 아무 적 공격), 아니면 무시.
-                if (!TutorialConfig.FreePlayAfterScript) return;
+                // 무효 스텝 폐기로 스크립트가 끊긴 경우도 자유 통과 — Execute가 이미 자유 플레이를 열었다.
+                if (!TutorialConfig.FreePlayAfterScript && !TutorialConfig.ScriptDerailed) return;
             }
             else
             {
@@ -223,6 +255,7 @@ public class PlayerTurn : TurnBase
                 {
                     if (t_attCard.slotIndex != t_step.attackerSlot) return;
                     if (t_defCard.slotIndex != t_step.targetSlot) return;
+                    this.scriptedStepAttack = true;   // 스크립트대로 진행 → 결과 보드를 기준선으로 재동기
                 }
                 TutorialConfig.ConsumePlayerStep();
             }
@@ -294,6 +327,11 @@ public class PlayerTurn : TurnBase
 
         await this.ctx.FillAndAnimate();
 
+        // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드 = 스크립트가 기대하는 보드 → 기준선 재동기.
+        // 자유공격/자유플레이 결과는 재동기하지 않는다(뒤 스텝이 어긋남을 감지해야 하므로).
+        if (TutorialConfig.IsActive && this.scriptedStepAttack)
+            TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
+
         await AttackFlow.PlayResultFlourish(t_attackerView, _attacker, _defender, t_result);
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
@@ -322,7 +360,10 @@ public class PlayerTurn : TurnBase
                 {
                     // 자유 전환: 처형 재공격은 규칙상 그 카드로만 계속 → forcedAttacker(_attacker) 유지,
                     // 암전/하이라이트도 위에서 잡은 그대로 두고 입력만 재개(안내 없음).
-                    if (TutorialConfig.FreePlayAfterScript)
+                    // 단 큐가 비었을 때만 — 스텝이 남아 있는데(공격자 슬롯 불일치로 준비 실패) 입력을 열면
+                    // HandleCardViewAttack의 슬롯 게이트가 모든 공격을 거절해 턴이 잠긴다(턴 종료로 자연 복구).
+                    if ((TutorialConfig.FreePlayAfterScript || TutorialConfig.ScriptDerailed)
+                        && !TutorialConfig.TryPeekPlayerStep(out _))
                     {
                         TurnState.InputAllowed = true;
                         return;

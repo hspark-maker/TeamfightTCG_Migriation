@@ -1,0 +1,102 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c77d53f76141dc9498adade58910761d, type: 3}
+  m_Name: TutorialScenario0
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
+  enableSynergy: 0
+  playerDeck:
+  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+  - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
+  - {fileID: 11400000, guid: c0ffee1234abcd5678ef90a1b2c3d4e5, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  enemyDeck:
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
+  playerScript:
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "게임에 오신 것을 환영합니다! 기본 조작법을 배워봅시다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "① 위로 드래그: 내 카드를 위로 끌어 상대 카드에 놓으면 그 카드를 공격합니다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "위로 드래그해서 앞의 적을 공격해보세요!"
+    waitForTap: 1
+    dimBackground: 0
+    allowedGesture: 1
+  - kind: 1
+    attackerSlot: 1
+    targetSlot: 0
+    guideMessage: "② 아래로 드래그: 아래로 끌면 좌우 방향으로 조준되고, 놓으면 그 방향의 적을 공격합니다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 0
+    guideMessage: "아래로 드래그해서 왼쪽 적을 조준하고 공격해보세요!"
+    waitForTap: 1
+    dimBackground: 0
+    allowedGesture: 2
+  - kind: 1
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: "③ 탭: 내 카드를 탭하면 무장되고, 상대 카드를 탭하면 공격합니다."
+    waitForTap: 1
+    dimBackground: 1
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: "내 카드를 탭해 무장하고, 왼쪽 적을 탭해서 공격해보세요!"
+    waitForTap: 1
+    dimBackground: 0
+    allowedGesture: 3
+  - kind: 1
+    attackerSlot: 0
+    targetSlot: 0
+    guideMessage: "조작을 모두 익혔어요! 상대 카드를 모두 쓰러뜨리면 승리합니다. 남은 적을 자유롭게 공격해 처치하세요!"
+    waitForTap: 1
+    dimBackground: 1
+  enemyScript:
+  - kind: 0
+    attackerSlot: 1
+    targetSlot: 0
+    guideMessage:
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 1
+    guideMessage:
+    waitForTap: 0
+    dimBackground: 0
+  - kind: 0
+    attackerSlot: 0
+    targetSlot: 2
+    guideMessage:
+    waitForTap: 0
+    dimBackground: 0
+  freePlayAfterScript: 1
+  enemyMaxHpOverride: 0

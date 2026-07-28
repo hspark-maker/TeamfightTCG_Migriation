@@ -5,12 +5,34 @@ using UnityEngine;
 
 public static class AttackSequence
 {
+    // ── 박치기(일반) 연출 튜닝. 기본값은 프로덕션용. 테스트 씬(AttackAnimTester)이 런타임에 덮어써 조정. ──
+    public struct NormalTuning
+    {
+        public float windDur;     // 윈드업(뒤로 살짝) 시간.
+        public float windDist;    // 윈드업 거리(적 반대 방향).
+        public float inDur;       // 돌진(접촉까지) 시간.
+        public float recoilDur;   // 접촉 후 뒤로 반동 시간.
+        public float recoilDist;  // 반동 거리(슬롯 뒤).
+        public float outDur;      // 반동 → 슬롯 복귀 시간.
+        public float lungeT;      // 방어자까지 이동 비율(1=완전겹침).
+        public float maxLean;     // 적 방향 최대 lean 각(도).
+
+        public static NormalTuning Default => new NormalTuning
+        {
+            windDur = 0.07f, windDist = 0.22f, inDur = 0.09f,
+            recoilDur = 0.09f, recoilDist = 0.35f, outDur = 0.16f,
+            lungeT = 0.62f, maxLean = 40f,
+        };
+    }
+    public static NormalTuning Normal = NormalTuning.Default;
+
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null,
         CardKeyword _preEffectKw = CardKeyword.None,
         CardKeyword _atEffectKw  = CardKeyword.None,
-        Func<UniTask> _afterHit = null)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, null, _afterHit);
+        Func<UniTask> _afterHit = null,
+        bool? _forceSpecial = null)
+        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, null, _afterHit, _forceSpecial);
 
     public static UniTask PlaySplash(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null, CardView _splashView = null,
@@ -27,12 +49,106 @@ public static class AttackSequence
         Func<UniTask> _afterHit = null)
         => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
-    static async UniTask PlayCore(CardView _attacker, CardView _defender,
+    /// <summary>연출 디스패치. 두 프레젠테이션 공유 히트해결(ResolveHits)로 데미지/사망 타이밍 일치.
+    /// - 일반(PlayNormal): 자기 위치에서 적 방향으로 각도 틀고 박치기.
+    /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1.
+    /// TODO(판정 보류): 지금은 전부 일반. 특별 조건이 정해지면 t_special만 세팅.</summary>
+    static UniTask PlayCore(CardView _attacker, CardView _defender,
+        AttackEffect _effect, Action _onEffect,
+        CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit,
+        bool? _forceSpecial = null)
+    {
+        // 테스트/특수 호출이 강제하면 그 값, 아니면 판정(현재 전부 일반).
+        bool t_special = _forceSpecial ?? false;   // TODO: 특별 연출 판정 기준 배선 지점.
+        return t_special
+            ? PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit)
+            : PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+    }
+
+    // ── 일반 연출: 박치기 ─────────────────────────────────────────────────
+    // 나머지 암전, 공격자가 제자리에서 적 방향으로 기울며 돌진 → 접촉(히트) → 튕겨 복귀.
+    static async UniTask PlayNormal(CardView _attacker, CardView _defender, CardView _splashView,
+        AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+    {
+        float t_hitDelay = _effect?.hitDelay ?? 0f;
+        NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
+
+        CardView.FadeAll(0.3f);
+        if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
+        else                     CardView.FadeCards(1f, _attacker, _defender);
+
+        bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
+        _attacker?.PlayAttackAnim();
+        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
+        SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
+        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip);
+
+        if (_preEffectKw != CardKeyword.None)
+            await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
+
+        // 공격자 없음(환경 피해 등): 이동/회전 없이 히트만.
+        if (_attacker == null)
+        {
+            await ResolveHits(null, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
+            CardView.RestoreAllFades();
+            return;
+        }
+
+        Transform  t_atk     = _attacker.transform;
+        Vector3    t_origin  = t_atk.position;            // 공격 시작점 = 현재 위치(드래그-백이면 띄운 자리).
+        Vector3    t_home    = _attacker.SlotPosition;    // 공격 후 복귀 = 원래 슬롯.
+        Quaternion t_baseRot = t_atk.localRotation;
+
+        // 적 방향으로 기우는 각도(Z lean). 세로 부호 무시(적/아군 위아래 뒤집힘 방지), 좌우 성분으로만 기울임.
+        Vector3 t_dir  = _defender.transform.position - t_origin;
+        Vector3 t_dirN = t_dir.sqrMagnitude > 0.0001f ? t_dir.normalized : Vector3.up;
+        float   t_lean = Mathf.Clamp(
+            -Mathf.Atan2(t_dir.x, Mathf.Max(0.0001f, Mathf.Abs(t_dir.y))) * Mathf.Rad2Deg,
+            -t_cfg.maxLean, t_cfg.maxLean);
+        Quaternion t_leanRot = t_baseRot * Quaternion.Euler(0f, 0f, t_lean);
+
+        Vector3 t_windback = t_origin - t_dirN * t_cfg.windDist;   // 현재 위치서 뒤로 살짝(적 반대 방향).
+        t_windback.z = t_origin.z;
+        Vector3 t_impact = Vector3.Lerp(t_origin, _defender.transform.position, t_cfg.lungeT);
+        t_impact.z = t_origin.z;   // 평면 유지(뒤로 파고들지 않게).
+
+        // 윈드업(뒤로 살짝) → 박치기 돌진(각도 틀며 접촉). 끊김 없이 연속.
+        t_atk.DOKill();
+        await DOTween.Sequence().SetLink(_attacker.gameObject)
+            .Append(t_atk.DOMove(t_windback, t_cfg.windDur).SetEase(Ease.OutQuad))
+            .Append(t_atk.DOMove(t_impact, t_cfg.inDur).SetEase(Ease.InQuad))
+            .Join(t_atk.DOLocalRotateQuaternion(t_leanRot, t_cfg.inDur).SetEase(Ease.OutQuad))
+            .ToUniTask();
+
+        // 접촉: 히트/사망 해결과 공격자 반동/복귀를 동시 진행 → 중간 대기 없이 시퀀스 계속.
+        // 데미지(_onEffect)는 ResolveHits 진입 즉시(=접촉 시점) 적용되고, 방어자 히트/사망 연출이
+        // 공격자의 반동→복귀 모션과 병렬로 흐른다.
+        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
+
+        Vector3 t_recoil = t_impact - t_dirN * t_cfg.recoilDist;   // 충격 지점 기준 뒤로 반동(적 반대 방향).
+        t_recoil.z = t_home.z;
+
+        // 반동(각도 유지) → 끝난 뒤 복귀(이동+각도 원복). 순차. 방어자 히트/사망(ResolveHits)과는 병렬.
+        async UniTask RecoilThenReturn()
+        {
+            await t_atk.DOMove(t_recoil, t_cfg.recoilDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask();
+            await UniTask.WhenAll(
+                t_atk.DOMove(t_home, t_cfg.outDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
+                t_atk.DOLocalRotateQuaternion(t_baseRot, t_cfg.outDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask());
+        }
+
+        await UniTask.WhenAll(t_resolve, RecoilThenReturn());
+
+        CardView.RestoreAllFades();
+    }
+
+    // ── 특별 연출: 카메라 시네마 1vs1 ────────────────────────────────────
+    // 둘만(스플래시 포함) 앞으로 떠서 카메라가 확대, 무기 애니/파티클/발사체 후 히트.
+    static async UniTask PlayCinema(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit)
     {
         float t_hitDelay = _effect?.hitDelay ?? 0f;
-        float t_duration = _effect?.duration ?? 0f;
         float t_cinema   = GameTiming.Battle.CinemaDuration;
 
         Vector3 t_defenderOrigin = _defender.SlotPosition;
@@ -78,21 +194,49 @@ public static class AttackSequence
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
 
-        // TEMP_ATTACK_MOTION: 아트 도착 전 임시 돌진 연출. TempAttackMotion.cs 삭제 시 이 줄도 제거.
-        await TempAttackMotion.Lunge(_attacker, _defender);
-
         if (t_hitDelay > 0f)
             await UniTask.Delay((int)(t_hitDelay * 1000));
 
-        int t_attackerHpBefore = _attacker?.BoundCard?.hp ?? 0;
+        await ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit);
+
+        BattleCamera.Instance?.ExitCinema();
+
+        await UniTask.WhenAll(
+            _attacker?.RestoreAfterAttack() ?? UniTask.CompletedTask,
+            _defender.MoveTo(t_defenderOrigin),
+            _splashView?.MoveTo(t_splashOrigin) ?? UniTask.CompletedTask);
+
+        CardView.RestoreAllFades();
+    }
+
+    // ── 공유: 히트/반격/사망/공격후 해결 ────────────────────────────────
+    // 데미지 적용(_onEffect)부터 사망 연출·afterHit까지. 두 연출이 동일 순서/타이밍을 쓰도록 단일화.
+    // 이동/카메라 같은 프레젠테이션은 호출부가 담당, 여기선 상태변화 반영 연출만.
+    // 카드 총 체력(hp+bonusHp). 뷰/카드 없으면 0.
+    static int HpTotal(CardView _v) => _v?.BoundCard != null ? _v.BoundCard.hp + _v.BoundCard.bonusHp : 0;
+
+    static async UniTask ResolveHits(CardView _attacker, CardView _defender, CardView _splashView,
+        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit,
+        bool _skipRemain = false)
+    {
+        float t_hitDelay = _effect?.hitDelay ?? 0f;
+        float t_duration = _effect?.duration ?? 0f;
+
+        // 데미지 숫자 = onEffect 전후 총 체력(hp+bonusHp) 감소분. 각 피격 뷰에 전달.
+        int t_defBefore = HpTotal(_defender);
+        int t_splBefore = HpTotal(_splashView);
+        int t_atkBefore = HpTotal(_attacker);
         _onEffect?.Invoke();
-        bool t_attackerHit = _attacker?.BoundCard != null && _attacker.BoundCard.hp < t_attackerHpBefore;
+        int t_defDmg = t_defBefore - HpTotal(_defender);
+        int t_splDmg = t_splBefore - HpTotal(_splashView);
+        int t_atkDmg = t_atkBefore - HpTotal(_attacker);
+        bool t_attackerHit = t_atkDmg > 0;
 
         UniTask t_defHit = _splashView != null
-            ? UniTask.WhenAll(_defender.PlayHitAnim(), _splashView.PlayHitAnim())
-            : _defender.PlayHitAnim();
+            ? UniTask.WhenAll(_defender.PlayHitAnim(_damage: t_defDmg), _splashView.PlayHitAnim(_damage: t_splDmg))
+            : _defender.PlayHitAnim(_damage: t_defDmg);
         if (t_attackerHit)
-            await UniTask.WhenAll(t_defHit, _attacker?.PlayHitAnim() ?? UniTask.CompletedTask);
+            await UniTask.WhenAll(t_defHit, _attacker?.PlayHitAnim(_damage: t_atkDmg) ?? UniTask.CompletedTask);
         else
             await t_defHit;
 
@@ -104,7 +248,7 @@ public static class AttackSequence
         bool t_splashKilled   = _splashView?.BoundCard != null && _splashView.BoundCard.hp <= 0;
 
         float t_remain = t_duration - t_hitDelay;
-        if (t_remain > 0f)
+        if (!_skipRemain && t_remain > 0f)
             await UniTask.Delay((int)(t_remain * 1000));
 
         _attacker?.FocusWeapon(false);
@@ -112,18 +256,15 @@ public static class AttackSequence
         if (_splashView != null)
         {
             await UniTask.WhenAll(
-                t_defenderKilled ? _defender.PlayDeathAnim()                           : UniTask.CompletedTask,
+                t_defenderKilled ? _defender.PlayDeathAnim()                             : UniTask.CompletedTask,
                 t_splashKilled   ? (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask) : UniTask.CompletedTask);
             if (t_defenderKilled || t_splashKilled)
                 SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
         }
-        else
+        else if (t_defenderKilled)
         {
-            if (t_defenderKilled)
-            {
-                await _defender.PlayDeathAnim();
-                SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
-            }
+            await _defender.PlayDeathAnim();
+            SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
         }
 
         if (t_attackerKilled)
@@ -132,15 +273,6 @@ public static class AttackSequence
         // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(청소부 heal/OnAfterAttack 등) 실행
         if (_afterHit != null)
             await _afterHit();
-
-        BattleCamera.Instance?.ExitCinema();
-
-        await UniTask.WhenAll(
-            _attacker?.RestoreAfterAttack() ?? UniTask.CompletedTask,
-            _defender.MoveTo(t_defenderOrigin),
-            _splashView?.MoveTo(t_splashOrigin) ?? UniTask.CompletedTask);
-
-        CardView.RestoreAllFades();
     }
 
     static async UniTask LaunchProjectile(ProjectileData _proj, Transform _attacker, Transform _defender, float _duration, bool _flipOffset = false)
