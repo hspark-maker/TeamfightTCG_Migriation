@@ -18,6 +18,22 @@ public class DataLibrary : MonoBehaviour
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 
+    bool m_loaded;
+
+    // 부트 로딩 완료 여부. 시작 화면(LoadingCoverView)이 커버를 걷는 기준.
+    public static bool IsLoaded => instance != null && instance.m_loaded;
+
+    // 부트 로딩 진행도(0~1). 인스턴스가 아직 없으면 0 — 진행도의 단일 진실원.
+    public static float LoadProgress
+    {
+        get
+        {
+            if (instance == null)  return 0f;
+            if (instance.m_loaded) return 1f;
+            return instance.uiHandle.IsValid() ? instance.uiHandle.PercentComplete : 0f;
+        }
+    }
+
     public void Awake()
     {
         if (!InitializeSingleton()) return;
@@ -44,6 +60,7 @@ public class DataLibrary : MonoBehaviour
     public async UniTask Initialization()
     {
         await LoadUIPrefab();
+        this.m_loaded = true;
         LogUtil.Log("All Good");
     }
 
