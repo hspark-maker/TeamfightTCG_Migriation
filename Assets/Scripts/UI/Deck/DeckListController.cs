@@ -69,7 +69,10 @@ public class DeckListController : MonoBehaviour
         if (countText != null) countText.text = $"{t_display - 1} / {DeckSaveManager.SLOT_COUNT}";
     }
 
-    // 덱 첫 카드의 deckPreview → 없으면 fullImage → 둘 다 없으면 null.
+    // 덱 첫 카드의 deckPreview → 없으면 일반 카드 아트 → 둘 다 없으면 null.
+    // deckPreview를 앞에 두는 건 그게 "덱 대표 이미지" 전용 필드라서다(가로 배너용 크롭 등 목적이 따로 있다).
+    // 그 뒤 폴백은 카드 아트 선택 규칙이므로 CardVisualRules에 맡긴다 — 여기서 fullImage를 직접 적어두면
+    // 같은 카드가 덱 목록에서만 다른 그림으로 뜨는 드리프트가 생긴다.
     // null이면 DeckSlotView가 sprite 대입을 건너뛰어 프리팹 기본 스프라이트가 남는다.
     static Sprite ResolvePreview(List<CardData> _deck)
     {
@@ -78,7 +81,7 @@ public class DeckListController : MonoBehaviour
         var t_first = _deck[0];
         if (t_first == null) return null;
 
-        return t_first.deckPreview != null ? t_first.deckPreview : t_first.fullImage;
+        return t_first.deckPreview != null ? t_first.deckPreview : CardVisualRules.PickCardArt(t_first);
     }
 
     // 신규 덱이 쓸 슬롯. IsSlotValid 기준이라 6장 미만으로 저장된 불완전 슬롯도 재사용 대상이 된다

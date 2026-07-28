@@ -1,19 +1,21 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 // 덱 편집 화면 상단 편성 6칸 중 한 칸.
 // 칸 자체는 상태를 갖지 않고 Bind로 받은 값만 그린다 — 진실원은 DeckEditController.m_working 배열 하나뿐이라
 // "화면엔 있는데 배열엔 없는" 불일치가 성립하지 않는다.
+//
+// 카드 표시(아트/이름/HP/키워드/시너지)는 전부 CardVisualView에 위임한다 — 도감·컬렉션 타일과 같은 컴포넌트를
+// 쓰므로 편성 칸의 카드가 다른 화면과 다르게 보일 수 없다. 이 클래스가 남겨 가진 책임은
+// 슬롯 상태(빈칸 표시 / 드래그 오버 하이라이트 / 클릭 해제)뿐이다.
 // 드래그 드롭 판정은 DeckEditDragController가 Rect(월드 코너)로 하므로 이 클래스는 클릭(해제)만 다룬다.
 public class DeckEditSlotView : MonoBehaviour
 {
-    [SerializeField] Button     clickButton;      // 칸 전체 버튼(클릭 = 해제)
-    [SerializeField] Image      portrait;         // 카드 일러스트
-    [SerializeField] TMP_Text   nameText;         // 카드명
-    [SerializeField] GameObject emptyMark;        // 빈 칸 표시(+ 아이콘 등)
-    [SerializeField] GameObject highlightFrame;   // 드래그 오버 하이라이트 테두리
+    [SerializeField] Button         clickButton;      // 칸 전체 버튼(클릭 = 해제)
+    [SerializeField] CardVisualView cardVisual;       // 카드 비주얼 단일 진실원(빈 칸이면 스스로 숨는다)
+    [SerializeField] GameObject     emptyMark;        // 빈 칸 표시(+ 아이콘 등). cardVisual 바깥에 두어야 통째로 꺼져도 남는다.
+    [SerializeField] GameObject     highlightFrame;   // 드래그 오버 하이라이트 테두리
 
     int         m_index = -1;
     CardData    m_card;
@@ -38,19 +40,10 @@ public class DeckEditSlotView : MonoBehaviour
 
         bool t_has = _card != null;
 
-        if (portrait != null)
-        {
-            portrait.sprite  = t_has ? _card.fullImage : null;
-            // 스프라이트가 없는 카드는 Image를 꺼야 한다 — 켠 채 두면 흰 사각형이 남는다.
-            portrait.enabled = portrait.sprite != null;
-        }
-
-        if (nameText != null)
-        {
-            // 표기 정본은 displayName. 에셋 파일명(_card.name)은 저장 키 전용이다(CardElement의 오용을 복제하지 않는다).
-            nameText.text = t_has ? _card.displayName : string.Empty;
-            nameText.gameObject.SetActive(t_has);
-        }
+        // 편성 칸에는 소유한 카드만 올라간다(컬렉션 목록 자체가 소유분만 노출) → _owned는 true 고정.
+        // 여기서 소유여부를 다시 계산하면 편성 배열과 소유 세이브라는 두 진실원이 생긴다.
+        // _card가 null이면 cardVisual이 자기 오브젝트를 꺼서 빈 칸이 된다.
+        if (cardVisual != null) cardVisual.Bind(_card, true);
 
         if (emptyMark != null) emptyMark.SetActive(!t_has);
 

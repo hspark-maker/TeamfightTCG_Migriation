@@ -16,6 +16,19 @@ public static class CardVisualRules
     /// 프리팹 직렬화 값(CardView / CardVisualView의 synergyMaxBadges)의 기본값 소스 = 여기 하나.</summary>
     public const int MaxSynergyBadges = 3;
 
+    /// <summary>카드 한 장에 그릴 아트 스프라이트를 고른다(없으면 null → 호출부가 렌더러를 끈다).
+    /// 우선순위 battleImage → fullImage → portrait.
+    /// battleImage가 최우선인 이유: 인게임 CardView.Render가 그리는 게 battleImage라, 로비 비주얼을
+    /// 인게임과 통일하려면 같은 소스를 써야 한다. battleImage가 비어 있는 카드만 기존 아웃게임 소스로 폴백한다.
+    /// 덱 대표 이미지(deckPreview)처럼 "카드 아트가 아닌 목적 전용" 필드는 여기 넣지 않는다 — 호출부가 앞단에서 고른다.</summary>
+    public static Sprite PickCardArt(CardData _card)
+    {
+        if (_card == null) return null;
+        if (_card.battleImage != null) return _card.battleImage;
+        if (_card.fullImage   != null) return _card.fullImage;
+        return _card.portrait;
+    }
+
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
     /// 인게임은 키워드까지 필요하고(iconMap → PlayKeywordGlow 역참조), 아웃게임은 스프라이트만 쓴다.
     /// 두 값이 항상 짝이라 병렬 리스트 대신 한 덩어리로 돌려준다.</summary>

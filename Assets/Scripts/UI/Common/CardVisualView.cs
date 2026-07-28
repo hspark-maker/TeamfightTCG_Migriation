@@ -53,11 +53,9 @@ public class CardVisualView : MonoBehaviour
 
         if (this.portrait != null)
         {
-            // 인게임 CardView.Render는 battleImage를 그린다. 로비 비주얼을 인게임과 통일하는 게 목적이므로
-            // battleImage를 최우선으로 쓰고, 비어 있는 카드만 기존 아웃게임 소스(fullImage) → portrait 순으로
-            // 폴백한다(어느 쪽도 없으면 렌더러를 끈다).
-            Sprite t_art = _card.battleImage != null ? _card.battleImage
-                         : (_card.fullImage != null ? _card.fullImage : _card.portrait);
+            // 아트 선택(폴백 체인)은 표시 규칙이라 CardVisualRules가 정본이다 — 소비자(덱편집 칸/개봉 카드)가
+            // 늘어난 뒤 각자 폴백을 적어두면 같은 카드가 화면마다 다른 그림으로 뜬다.
+            Sprite t_art = CardVisualRules.PickCardArt(_card);
             this.portrait.sprite  = t_art;
             this.portrait.enabled = t_art != null;
         }
