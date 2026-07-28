@@ -78,7 +78,13 @@
       "Bash(git mv *)",
       "Bash(awk '/--- !u!114 &876835956527137396/,/^--- !u!/{print}' Assets/Assets/Prefabs/UI/CollectionUI/Canvas.prefab)",
       "Bash(awk '/--- !u!114 &1636889205/,/^--- !u!/{print}' Assets/Scenes/TEST/CollectionTest.unity)",
-      "Bash(echo \"--- exit:$? \\(1=no leftover refs\\) ---\")"
+      "Bash(echo \"--- exit:$? \\(1=no leftover refs\\) ---\")",
+      "Bash(sed 's/guid: //')",
+      "Bash(sed 's/.*guid: \\\\\\([a-f0-9]*\\\\\\).*/\\\\1/')",
+      "Bash(cd *)",
+      "Bash(mkdir -p Common)",
+      "Bash(mv Collection/CollectionCardView.cs Common/CardVisualView.cs)",
+      "Bash(mv Collection/CollectionCardView.cs.meta Common/CardVisualView.cs.meta)"
     ]
   },
   "enabledMcpjsonServers": [

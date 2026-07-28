@@ -3,7 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 개봉으로 뽑힌 카드 한 장의 표시. 도감 타일(CollectionCardView)과 분리한 이유는 요구가 다르기 때문 —
+// 개봉으로 뽑힌 카드 한 장의 표시. 도감 타일(CardVisualView)과 분리한 이유는 요구가 다르기 때문 —
 // 개봉 카드는 항상 소유라 잠금 표현이 없고, 대신 신규/중복이라는 이 화면에만 있는 축을 드러낸다.
 // 순수 표시 뷰다. 더미 배치·스와이프 이동은 PackCardStack이 이 오브젝트의 RectTransform을 직접 다룬다.
 public class PackCardView : MonoBehaviour

@@ -9,14 +9,14 @@ using TMPro;
 public class CollectionRowView : MonoBehaviour
 {
     [SerializeField] Transform cardsContainer;      // 카드 타일 부모(HorizontalLayoutGroup)
-    [SerializeField] CollectionCardView cardPrefab; // 카드 타일 프리팹
+    [SerializeField] CardVisualView cardPrefab;     // 카드 타일 프리팹
 
     [Header("생산 상태(선택 — 미배선 시 null 가드)")]
     [SerializeField] TMP_Text amountText;                // 누적/상한 표시(Get 버튼 텍스트에 통합, 예: "12 / 100")
     [SerializeField] CollectionProgressView progressView; // 생산 사이클 진행바(행 전용, 위임)
     [SerializeField] Button harvestButton;               // 수확 버튼
 
-    readonly List<CollectionCardView> m_cards = new List<CollectionCardView>();
+    readonly List<CardVisualView> m_cards = new List<CardVisualView>();
 
     // 행 안정 키(생산 조회·수확의 식별자). Build에서 저장, RefreshProduction/OnHarvestClicked가 사용.
     string m_rowKey;

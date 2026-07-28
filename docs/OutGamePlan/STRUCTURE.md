@@ -9,6 +9,7 @@
 | 날짜 | 변경 | 승인 |
 |---|---|---|
 | (초기) | 문서 생성. 도메인 수준 뼈대만 반영, 클래스 수준 구조도는 idioms-onboarding 역주행 및 다음 설계 세션에서 채운다 | - |
+| 2026-07-28 | **카드 비주얼 통일 (✅ 코드+프리팹+검수+컴파일 완료, Play 검증 대기)** — 인게임 `CardView.prefab`은 월드스페이스 SpriteRenderer(루트 Transform·BoxCollider2D 입력), 로비는 ScreenSpaceOverlay uGUI라 **프리팹 복사가 불가** → 비주얼 레이어만 uGUI로 미러링. `CollectionCardView` → **`CardVisualView`**(`Scripts/UI/Common/`, **.meta 동반 이동으로 guid `6f92e16a…` 보존** → 씬·프리팹 배선 무손실), `Bind(CardData,bool)` 시그니처 불변. 신규 `CardKeywordIconView`/`CardSynergyBadgeView` + 프리팹 `UI/Common/CardKeywordIcon`·`CardSynergyBadge`. `Card.prefab`에 `Frame`/`HpPanel`/`KeywordIconRoot`/`SynergyBadgeRoot` 추가(**697줄 추가·삭제 0**, 기존 노드 보존) → 이 한 곳이 도감 그리드·도감 생산행·덱편집 타일·드래그 고스트 4곳의 공유 원본. **표시 규칙 단일 진실원 `Assets/Scripts/Card/CardVisualRules.cs`** 신설(키워드 순회 순서·시너지 dedupe·`활성 우선→requiredCount 내림차순` 정렬·`MaxSynergyBadges=3`)을 `CardView`/`CardVisualView`가 공유 — 이전엔 아웃게임이 정렬 **전** 상한을 적용해 배지 순서가 갈라질 수 있었다(현 에셋 6장은 이미 내림차순이라 화면 변화 0). 아트 소스 `fullImage`→**`battleImage`**(40장 전수 보유, 폴백 0). 범위 밖: `DeckEditSlot`(편성 6칸)·`PackCard`·`DeckCard` | ✅ |
 | 2026-07-23 | Collection(B/C) 클래스 수준 구조도 추가 (idioms-onboarding 역주행, 구현 완료분 기준) | - |
 | 2026-07-24 | Save·재화(A) 섹션 추가 — **시각 브리핑 형식 기준 예시**(구조 지도+시퀀스+원리 카드+파일 지도). 이후 모든 브리핑·recap은 이 형식을 따른다 | - |
 | 2026-07-24 | **F-17/F-18 생산 UI 배선 설계 추가 (⬜ 승인 대기)** — 도감 갤러리에 행 생산상태·수확·진행바·완성보상·골드 HUD를 매니저 API에 연결. 신규 노드는 `:::new` 표식 | ⬜ |
@@ -122,7 +123,7 @@ flowchart TD
     subgraph ui["F. UI (도감 갤러리)"]
         GAL["CollectionGalleryController"]
         RV["CollectionRowView"]
-        CV["CollectionCardView"]
+        CV["CardVisualView"]
     end
 
     INIT -->|SetSource| CAT
@@ -170,7 +171,7 @@ flowchart TD
     subgraph ui["F. 도감 갤러리 UI"]
         GAL["CollectionGalleryController<br/>+ 폴링 틱 · OnChanged 구독<br/>+ 푸터 일괄수령 버튼"]:::new
         RV["CollectionRowView<br/>+ 상태칩·수확버튼 · 진행바 위임"]:::new
-        CV["CollectionCardView (기존)"]
+        CV["CardVisualView (구 CollectionCardView)"]
         PV["CollectionProgressView<br/>행별 생산 사이클 진행바"]:::new
         HUD["GoldHud (기존 코드,<br/>씬 부착만)"]:::new
     end
@@ -228,7 +229,7 @@ sequenceDiagram
 | `CollectionGalleryController` | 씬/프리팹 `CollectionScreen` | `content`→`Gallery/Viewport/Content`, `rowPrefab`→CollectionRow.prefab, `fallbackAllCards`→카드 9장, `harvestAllButton`→`BottomBar`의 일괄수령 Button |
 | `CollectionRowView` | `CollectionRow.prefab`(루트) | `cardsContainer`→`Cards`, `cardPrefab`→Card.prefab, `stateLabel`→`Status/StateChip/T`, `harvestButton`→`Status/Action`, `progressView`→`Status/Progress`(ProgressView) (`amountText`는 미배선=옵션) |
 | `CollectionProgressView` | `CollectionRow.prefab`의 `Status/Progress` | `fillImage`→`Status/Progress/BarBg/Fill` (`progressText`는 미배선=옵션). **행별 생산 사이클 진행바** |
-| `CollectionCardView` | `Card.prefab` | `portrait`/`nameText`/`lockOverlay` (기존) |
+| `CardVisualView` (구 `CollectionCardView`, `Scripts/UI/Common/`) | `Card.prefab` | `portrait`/`nameText`/`lockOverlay` (기존) + `frame`/`hpPanel`/`hpText`/`bonusHpText`/`keywordIconRoot`/`synergyBadgeRoot`/`keywordIconPrefab`/`synergyBadgePrefab`/`keywordIconConfig` (카드 비주얼 통일) |
 | `GoldHud` | 씬 `TopBar/GoldHud` | `goldText`→`GoldHud/Gold` |
 
 **생산 진행바 = 행별 사이클 진행바 (`CollectionProgressView`)**
