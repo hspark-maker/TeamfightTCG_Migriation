@@ -1,5 +1,63 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1657798342503256227
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6643905990147842171}
+  - component: {fileID: 8555565048897266977}
+  m_Layer: 5
+  m_Name: Burst
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &6643905990147842171
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1657798342503256227}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3669285587999233025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &8555565048897266977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1657798342503256227}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 310bcf2be7becd049b083a3b72b6fce7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CoinBurstEffect
+  coinSprite: {fileID: 21300000, guid: 1e0204e4d32684272b7718888c21dd55, type: 3}
+  spawnCenter: {fileID: 0}
+  target: {fileID: 5278209700511343708}
+  coinCount: 10
+  coinSize: 96
+  scatterRadius: 240
+  scatterDuration: 0.28
+  gatherDuration: 0.32
+  coinInterval: 0.06
+  popDuration: 0.12
 --- !u!1 &3636215258633558399
 GameObject:
   m_ObjectHideFlags: 0
@@ -169,6 +227,7 @@ RectTransform:
   - {fileID: 3669285588003552998}
   - {fileID: 3669285588173230799}
   - {fileID: 1129909259971080481}
+  - {fileID: 6643905990147842171}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -191,9 +250,19 @@ MonoBehaviour:
   panel: {fileID: 3669285588173230799}
   mainMenuButton: {fileID: 3653734389269605131}
   mainMenuScene: LobbyScene
-  enterDuration: 0.45
-  rewardRevealDuration: 0.3
+  dimGroup: {fileID: 7550376149298931392}
+  titleRect: {fileID: 3669285588205711693}
   rewardGoldText: {fileID: 6106385387900694247}
+  coinBurst: {fileID: 0}
+  hintGroup: {fileID: 0}
+  dimDuration: 0.2
+  enterDuration: 0.45
+  titleDuration: 0.35
+  rewardRevealDuration: 0.3
+  goldRollDuration: 0.15
+  hintFadeDuration: 0.25
+  titleDrop: 120
+  goldPunch: 0.3
 --- !u!1 &3669285588003552999
 GameObject:
   m_ObjectHideFlags: 0
@@ -206,6 +275,7 @@ GameObject:
   - component: {fileID: 3669285588003552996}
   - component: {fileID: 3669285588003552997}
   - component: {fileID: 3653734389269605131}
+  - component: {fileID: 7550376149298931392}
   m_Layer: 5
   m_Name: Image
   m_TagString: Untagged
@@ -314,6 +384,18 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!225 &7550376149298931392
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3669285588003552999}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &3669285588173230792
 GameObject:
   m_ObjectHideFlags: 0
@@ -326,7 +408,7 @@ GameObject:
   - component: {fileID: 3669285588173230797}
   - component: {fileID: 3669285588173230798}
   m_Layer: 5
-  m_Name: Image
+  m_Name: VictoryPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -344,6 +426,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1876410368735806900}
   - {fileID: 3669285588205711693}
   - {fileID: 433631282471626747}
   m_Father: {fileID: 3669285587999233025}
@@ -351,7 +434,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 600}
+  m_SizeDelta: {x: -60, y: 300}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3669285588173230797
 CanvasRenderer:
@@ -381,8 +464,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 3ed65e7c661a37048ac4cd6498a5bd1c, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 78ea5f23849754b389d07043552d1ea4, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -403,7 +486,7 @@ GameObject:
   - component: {fileID: 3669285588205711683}
   - component: {fileID: 3669285588205711692}
   m_Layer: 5
-  m_Name: TExt
+  m_Name: VictoryText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -700,4 +783,39 @@ RectTransform:
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &6844130754945827937
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1876410368735806900}
+  m_Layer: 5
+  m_Name: Images
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1876410368735806900
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6844130754945827937}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3669285588173230799}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}

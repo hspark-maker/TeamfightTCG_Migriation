@@ -35,8 +35,9 @@ public class TurnRunner : MonoBehaviour
 #if UNITY_EDITOR
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(0);
-        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(0);
+        // 연출 확인용 샘플 보상 — 0이면 코인·수치 롤링이 통째로 생략돼 볼 게 없다.
+        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(1234);
+        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(1234);
     }
 #endif
 

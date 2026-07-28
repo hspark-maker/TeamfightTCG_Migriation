@@ -20,18 +20,21 @@ public class PackRevealView : MonoBehaviour
     // 발화 시점은 "팩이 열린 순간" = 뜯기 확정. 튜토리얼이 물려 있어 의미를 옮기지 않는다.
     public static event Action OnAnyPackOpened;
 
-    [Header("3D 팩")]
+    [Header("팩")]
     [SerializeField] PackTearHandle tearHandle;    // 봉인 뜯기 제스처
-    [SerializeField] GameObject packRoot;          // 팩 모델 루트. 미배선이면 tearHandle의 오브젝트를 쓴다.
-    [Tooltip("팩이 이만큼 아래에서 올라오며 등장한다(로컬).")]
-    [SerializeField] float packEnterDrop = 3f;
+    [SerializeField] GameObject packRoot;          // 팩 루트(UI RectTransform). 미배선이면 tearHandle의 오브젝트를 쓴다.
+    [Tooltip("팩이 이만큼 아래에서 올라오며 등장한다(부모 로컬 = 캔버스 참조px, 1440x3120 기준).")]
+    [SerializeField] float packEnterDrop = 811f;
     [SerializeField] float packEnterDuration = 0.45f;
 
     [Header("분출")]
+    // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
     [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
-    [SerializeField] Transform shakeTarget;        // 보통 Main Camera(옵션)
+    // 팩은 셰이크 시작 직후 꺼지므로(EnterBursting) 팩을 걸면 no-op다. 배경처럼 계속 보이는 것을 건다.
+    [SerializeField] Transform shakeTarget;        // 배경 RectTransform(옵션)
     [SerializeField] float shakeDuration = 0.3f;
-    [SerializeField] float shakeStrength = 0.25f;
+    [Tooltip("DOShakePosition은 월드 좌표를 흔든다 — Overlay 캔버스의 월드는 디바이스 스크린px다(참조px 아님).")]
+    [SerializeField] float shakeStrength = 68f;
     [Tooltip("분출 후 카드 조작을 열기까지의 여유.")]
     [SerializeField] float burstHold = 0.4f;
 
@@ -144,6 +147,8 @@ public class PackRevealView : MonoBehaviour
         KillStageSeq();
         if (revealPanel != null) revealPanel.DOKill();
         if (packRoot != null) packRoot.transform.DOKill();
+        // 셰이크도 같이 끊는다 — 대상은 팩과 달리 계속 보이는 배경이라, 중간에 멈추면 어긋난 자리에 그대로 굳는다.
+        if (shakeTarget != null) shakeTarget.DOKill();
         SetTearHint(false, true);
 
         m_stage = EStage.Idle;
@@ -171,6 +176,8 @@ public class PackRevealView : MonoBehaviour
 
         t_tr.DOKill();
         t_tr.localPosition = m_packHome - new Vector3(0f, packEnterDrop, 0f);
+        // 매 개봉마다 스케일을 1로 스탬프한다 — 팩 크기를 packRoot의 localScale로 표현하면 여기서 지워진다.
+        // 크기는 자식 Image의 sizeDelta로 잡을 것.
         t_tr.localScale = Vector3.one;
 
         KillStageSeq();
@@ -376,7 +383,7 @@ public class PackRevealView : MonoBehaviour
         OnAnyPackOpened?.Invoke();
     }
 
-    // 뜯기 안내 표시/숨김. 입력은 절대 먹지 않는다 — 문구가 3D 팩 드래그를 가로막으면 개봉 자체가 막힌다.
+    // 뜯기 안내 표시/숨김. 입력은 절대 먹지 않는다 — 문구가 팩 드래그를 가로막으면 개봉 자체가 막힌다.
     void SetTearHint(bool _show, bool _instant = false)
     {
         if (tearHint == null) return;

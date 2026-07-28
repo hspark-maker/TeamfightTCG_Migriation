@@ -8,6 +8,7 @@
 
 | 날짜 | 변경 | 승인 |
 |---|---|---|
+| 2026-07-28 | **카드팩 개봉 3D → 2D uGUI 전환 (🔵 진행중 — 코드 주석·문서 완료, 씬 재구성은 사용자)** — `CardPack.unity`에서 팩만 3D(절차적 메시 + URP Lit)로 남아 있었는데, **머티리얼 3종에 텍스처가 하나도 없어**(전 슬롯 `fileID: 0`) 3D가 만들어내는 건 단색 실루엣 + 라이팅뿐이었다. 그 하나 때문에 씬이 Perspective 카메라·Directional Light·콜라이더·스카이박스 ambient를 끌고 다닌다 → 팩을 UI Image로 옮겨 렌더 계층을 하나로 합친다. **목표는 동작 동등성 유지** — 룩·타이밍·입력 규칙을 그대로 두고 구현 매체만 바꾼다(`PACK_FEEL_PLAN.md`의 게임필 개선은 이 결정으로 **폐기**). **코드 로직 변경 0** — 조사 결과 3D 의존이 이미 거의 없었다: `PackCardStack`·`PackResultGrid`·`PackCardView`는 순수 uGUI(0건), `PackTearHandle`은 `Input.mousePosition` 폴링이라 `OnMouse*`·콜라이더·`Camera` 참조가 애초에 없고, `PackRevealView`는 `Transform`/`GameObject` 인터페이스뿐이라 RectTransform에 그대로 동작한다. `CardPack.prefab:38`의 `BoxCollider`는 아무도 안 보는 **vestigial**(코드베이스 전수 grep에서 `Physics`/`Collider`/`OnMouse` 0건). 그래서 산출물은 **주석·Tooltip 정리 + 씬 배선 스펙 + 문서 개정**뿐이다. 목표 노드: `UICanvas > BG`(Image, `shakeTarget`) · `PackRoot`(빈 컨테이너) `> Pack`(Image + `PackTearHandle`) `> Seal`(Image) — **세 Image 전부 `raycastTarget` OFF**(안 그러면 `PackTearHandle.IsPointerOverUI()` 가드에 막혀 팩 위에서 시작한 드래그로 개봉이 안 된다). 환산 기준 **270.2 참조px/world**. 함정 2개를 문서화: ① `PackRevealView`가 매 `BeginOpen`마다 `packRoot.localScale`을 1로 스탬프하므로 **팩 크기를 `localScale`로 주면 안 된다**(`sizeDelta`로) ② `shakeTarget`에 팩을 걸면 셰이크 시작 직후 `SetActive(false)`라 no-op → **배경**에 건다(오늘 화면에서 실제로 흔들리던 것도 BG 하나였다). 단위 혼재(`tearDistance`=디바이스px ↔ `flickThreshold`=참조px)는 **알려진 편차로 기록만**(동등성 원칙과 충돌). 상세·씬 배선 체크리스트의 진실원 = [`docs/PACK_OPEN_DIRECTION.md`](../PACK_OPEN_DIRECTION.md) | ✅ |
 | (초기) | 문서 생성. 도메인 수준 뼈대만 반영, 클래스 수준 구조도는 idioms-onboarding 역주행 및 다음 설계 세션에서 채운다 | - |
 | 2026-07-28 | **카드 비주얼 통일 (✅ 코드+프리팹+검수+컴파일 완료, Play 검증 대기)** — 인게임 `CardView.prefab`은 월드스페이스 SpriteRenderer(루트 Transform·BoxCollider2D 입력), 로비는 ScreenSpaceOverlay uGUI라 **프리팹 복사가 불가** → 비주얼 레이어만 uGUI로 미러링. `CollectionCardView` → **`CardVisualView`**(`Scripts/UI/Common/`, **.meta 동반 이동으로 guid `6f92e16a…` 보존** → 씬·프리팹 배선 무손실), `Bind(CardData,bool)` 시그니처 불변. 신규 `CardKeywordIconView`/`CardSynergyBadgeView` + 프리팹 `UI/Common/CardKeywordIcon`·`CardSynergyBadge`. `Card.prefab`에 `Frame`/`HpPanel`/`KeywordIconRoot`/`SynergyBadgeRoot` 추가(**697줄 추가·삭제 0**, 기존 노드 보존) → 이 한 곳이 도감 그리드·도감 생산행·덱편집 타일·드래그 고스트 4곳의 공유 원본. **표시 규칙 단일 진실원 `Assets/Scripts/Card/CardVisualRules.cs`** 신설(키워드 순회 순서·시너지 dedupe·`활성 우선→requiredCount 내림차순` 정렬·`MaxSynergyBadges=3`)을 `CardView`/`CardVisualView`가 공유 — 이전엔 아웃게임이 정렬 **전** 상한을 적용해 배지 순서가 갈라질 수 있었다(현 에셋 6장은 이미 내림차순이라 화면 변화 0). 아트 소스 `fullImage`→**`battleImage`**(40장 전수 보유, 폴백 0). 범위 밖: `DeckEditSlot`(편성 6칸)·`PackCard`·`DeckCard` | ✅ |
 | 2026-07-28 | **카드 비주얼 통일 2차 — 남은 3종 (✅ 코드+프리팹+컴파일 완료, Play 검증 대기)** — 1차에서 범위 밖이던 3종을 같은 진실원에 붙였다. **`DeckEditSlot`/`PackCard`**: `Background`에 `CardVisualView`를 부착하고 `Card.prefab`과 같은 노드 세트를 추가 → `DeckEditSlotView`/`PackCardView`는 `portrait`/`nameText` 직렬화 필드를 버리고 `cardVisual.Bind(card, true)` 한 줄로 위임(슬롯 상태·강조 축만 각자 담당). **`Frame`과 `EmptyMark`는 `Background` 밖(루트)에 둔다** — `Bind(null)`이 `Background`를 통째로 끄므로 안에 있으면 빈 칸에서 테두리·빈칸표시까지 사라진다. 같은 이유로 두 프리팹의 `CardVisualView.frame`은 **의도적 미배선**(프레임은 카드별 데이터가 아니라 슬롯 크롬). **`DeckCard`**는 카드가 아니라 "덱 한 칸"(번호·배너·덱이름)이라 HP/키워드/시너지를 얹지 않고 `Tile`에 `Frame`만 씌워 크롬만 맞춤 + `Tile` 흰색→어두운색, `Number` 검정→금색(대비 확보). 아트 폴백은 `CardVisualRules.PickCardArt`로 이관(`deckPreview` 우선은 목적 전용 필드라 호출부 `DeckListController`에 남김). 부수 보정: `PackCard`의 NEW 리본이 우상단 HP와 겹쳐 좌상단으로 이동, `DeckEditSlot` 루트 금색→어두운색(빈 칸/채운 칸 바탕 일치). **미해결(이번 변경 이전부터)**: `DeckCard.prefab`의 `NamePill`/`Banner` Image가 `enabled=false`이고, 프리팹 저작 495×700 vs 씬 셀 480×780 불일치로 세로 80px 여백이 생겨 덱 이름이 타일에서 떨어져 보인다 | ✅ |
@@ -412,7 +413,9 @@ sequenceDiagram
 >
 > **⚠️ 2026-07-27 갱신 — 첫실행 진입부는 아래 `G-TUT` 절로 대체됐다.** `LobbyFirstRunRedirect`는 **삭제**됐고 그 역할(스타터팩 자동 구매→캐리어→CardPack 전환)은 튜토리얼 스텝 0(`AutoPurchase`)이 수행한다. 첫실행 판정도 `HasAnyOwnedSaved()==false` 대리에서 **영속 진행도(`OutgameTutorialProgress`)** 로 단일화됐다(`HasAnyOwnedSaved()`는 레거시 마이그레이션 1회 판정 전용으로 축소). 아래 구조 지도·시퀀스의 `LobbyFirstRunRedirect` 경로는 **이력 보존용**이며, 캐리어(`PackHandoff`)→`CardPack` 씬 이후 구간만 현재 실물과 같다.
 
-#### 구조 지도 — 구매(뷰 밖) → 캐리어 → PackTest 3D 뜯기
+#### 구조 지도 — 구매(뷰 밖) → 캐리어 → PackTest 3D 뜯기 [^pack2d]
+
+[^pack2d]: 제목의 "3D 뜯기"·"PackTest"는 **이력 보존용 표기**다. 개봉 씬은 `CardPack.unity`로 개명됐고(G-28), 팩은 2026-07-28 **2D uGUI로 전환**돼 3D는 남아 있지 않다. 현행 개봉 화면의 진실원 = [`docs/PACK_OPEN_DIRECTION.md`](../PACK_OPEN_DIRECTION.md) + 코드.
 
 ```mermaid
 flowchart TD
@@ -464,7 +467,7 @@ flowchart TD
     classDef dead fill:#5a1f1f,stroke:#e57373,color:#fff;
 ```
 
-#### 흐름 시퀀스 — 첫 부팅 (로비 진입 → 즉시 리다이렉트 → 3D 뜯기 → [획득] → 튜토리얼 전투)
+#### 흐름 시퀀스 — 첫 부팅 (로비 진입 → 즉시 리다이렉트 → 3D 뜯기 → [획득] → 튜토리얼 전투) [^pack2d]
 
 ```mermaid
 sequenceDiagram
@@ -504,7 +507,7 @@ sequenceDiagram
 - **구매를 뷰 밖으로, 목적지를 구매한 쪽으로**: `TryPurchase`(소유·차감 원자 영속)와 "획득 후 어디로/튜토리얼 여부"를 상점·`LobbyFirstRunRedirect`가 쥐고 `PackHandoff`에 실어 넘긴다. PackTest는 **첫시작 재판정 없이 캐리어 값으로만 분기** → 별도 리다이렉트 레이어(구 FirstStartBattleRedirect)가 소멸(브레인 1개 = `PackAcquireController`).
 - **BootScene 없음(사용자 결정)**: 앱은 기존대로 `LobbyScene`(index 0)으로 직행하고, 로비 상주 컴포넌트가 첫실행만 갈라 즉시 개봉 씬으로 전환한다 — 상점→팩 전환과 동일 경로를 첫실행이 자동으로 탄다. `TryPurchase`는 무상태라 부트 주입 불요 — 대상 팩 SO를 호출부가 직접 소유. **(2026-07-27 갱신)** 그 로비 상주 컴포넌트는 `LobbyFirstRunRedirect`에서 `OutgameTutorialBridge`(스텝 0 `AutoPurchase`)로 대체됐고, 판정 순서도 `MainMenuInitializer.Awake`[-100] 이후 브리지 `Start`가 아니라 **`GameManager.Boot()`가 로드한 진행도**를 읽는 방식이 됐다 → 소유 캐시 준비 여부와 무관.
 - **검증된 꼬리 재사용, 리스크는 앞단에 국한**: 스택→넘김→그리드·`OnOpenComplete`는 구 `PackOpeningView`의 상태머신 가드·`OnDisable` 트윈 정리까지 무변경 이식. 새로 만든 건 앞단(3D 팩 등장 + 가로 드래그 뜯기 `PackTearHandle`)뿐.
-- **입력은 월드 방식 통일**: 팩(3D BoxCollider)·카드(2D BoxCollider2D)가 같은 `Camera.main` + `OnMouse*` 패턴. 트레이드오프: **씬 카메라 `MainCamera` 태그가 인터랙션 전체를 좌우**(미태그 시 컴파일 통과·런타임 무반응).
+- ~~**입력은 월드 방식 통일**: 팩(3D BoxCollider)·카드(2D BoxCollider2D)가 같은 `Camera.main` + `OnMouse*` 패턴. 트레이드오프: 씬 카메라 `MainCamera` 태그가 인터랙션 전체를 좌우~~ → **2026-07-28 정정: 이 서술은 그 시점의 `PackTearOpenView`/구 `PackTearHandle` 기준이며 현재 코드에는 해당 사항이 없다.** 지금의 `PackTearHandle`은 `Update()`에서 `Input.mousePosition`을 폴링하고 콜라이더·`Camera`를 참조하지 않는다 → **`MainCamera` 태그 의존 없음.** 실제 함정은 `EventSystem.IsPointerOverGameObject()` 가드로, **팩·배경 Image의 `raycastTarget`이 켜져 있으면 개봉이 막힌다**(갱신 이력 2026-07-28 · [`PACK_OPEN_DIRECTION.md`](../PACK_OPEN_DIRECTION.md) §1).
 - **[획득] 버튼 게이트**: 개봉(그리드 배열) 완료 = `PackTearOpenView.OnOpenComplete` → 컨트롤러가 획득 버튼 노출. 유저가 능동적으로 [획득]을 눌러야 전이.
 - **소유==0 신호의 함의**: `GrantDefaults` 전체지급을 **끈 것이 전제**(G-23). 판정은 세이브 직접 조회 `HasAnyOwnedSaved()`(G-24)로 씬 config 순서 무관. **(2026-07-27 갱신)** 첫실행 판정 자체는 진행도(`OutgameTutorialProgress`)로 옮겨졌고 `HasAnyOwnedSaved()`는 레거시 마이그레이션 1회 판정에만 쓰인다 — "소유 0"을 첫실행의 **대리 신호로 쓰던 구조가 소멸**(구매 직후 종료 시 온보딩 영구 스킵 구멍의 원인).
 
@@ -524,9 +527,9 @@ sequenceDiagram
 | ~~`RevealCardView`~~ | ~~**폐기**(G-28) — 결과 표시는 `CollectionCardView` 재사용~~ → **(2026-07-27) 개봉 전용 `PackCardView`로 재분리**(G-29). 도감 타일은 잠금 표현이 필요하고 개봉 카드는 신규/중복 강조가 필요해 요구가 갈렸다 | G-28 → G-29 |
 | `DeckSaveManager.SaveSlotToFile` (공유 계약 **추가**) | `Assets/Scripts/Battle/DeckSaveManager.cs` — 단일 슬롯만 비파괴 저장(전슬롯 flush 금지) | G-28 ✅ |
 | `OwnershipManager` (GrantDefaults 삭제 + HasAnyOwnedSaved) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` | G-23/24 ✅ |
-| 3D 팩 모델 = `Assets/Assets/Prefabs/CardPack.prefab` (BoxCollider) | `PackTearHandle` + **`Seal` 자식 부착**(2026-07-27) | G-28 → G-29 ✅ |
+| ~~3D 팩 모델 = `Assets/Assets/Prefabs/CardPack.prefab` (BoxCollider)~~ | **폐기**(2026-07-28 2D 전환) — 팩은 씬 UI 노드(`UICanvas > PackRoot > Pack`(Image + `PackTearHandle`) `> Seal`)로 대체. 프리팹·메시 2종·머티리얼 3종은 색 A/B 대조용으로 Play 검증 전까지만 보존(참조는 `CardPack.unity` 하나뿐, guid 전수 검증 완료). `BoxCollider`는 원래부터 참조 0인 vestigial이었다 | G-28 → G-29 → **폐기** |
 | 개봉 전용 카드 = `Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab` | 860×1204 · `Glow`/`NewBadge`/`RefundBadge` | G-29 ✅ |
-| 공용 팩 오픈 씬 = `Assets/Scenes/CardPack.unity` | CardPack+PackRevealView+PackAcquireController+결과패널+획득버튼+MainCamera 태그 / **(G-29) `StackInput`>`CardLayer`>`StackAnchor`·`DiscardArea` · `RemainingText` · `SummaryGroup` · `SkipButton` 추가, `CardGrid` 제거** | G-28 → G-29 ✅ |
+| 공용 팩 오픈 씬 = `Assets/Scenes/CardPack.unity` | `PackOpenDirector`(`PackRevealView`+`PackAcquireController`+브리지) · `UICanvas`(Overlay) > **`BG`**(Image, `shakeTarget`) · **`PackRoot`**(빈 컨테이너) > **`Pack`**(Image + `PackTearHandle`) > **`Seal`**(Image) · `RevealPanel`(CanvasGroup) > `SkipButton`·`AcquireButton`·`SummaryGroup`·`ResultGrid` · `StackInput`(+`PackCardStack`) > `CardLayer` > `StackAnchor` · `RemainingText` · `TearHint`. **(2026-07-28 2D 전환)** `CardPack` 프리팹 인스턴스·`Directional Light`·BG SpriteRenderer 제거, `Main Camera`는 AudioListener 숙주 겸 백버퍼 클리어용으로만 유지(ClearFlags=Solid Color, Culling Mask=Nothing) — **`MainCamera` 태그 의존 없음**. `DiscardArea`는 실재한 적 없다(문서 오기, 2026-07-28 정정) | G-28 → G-29 → **2D 전환 🔵** |
 | `StarterPack.asset` (CardPackData) | 신규 에셋 (사용자) — price0·drawCount6·pool=기본6장 | G-25 |
 | ~~`PackOpeningView`·`PackOpenSceneController`·`FirstStartBattleRedirect`~~ | **폐기**(구매 분리·캐리어 도입으로 대체) | — |
 | (선택) 튜토리얼 보상 가드 | `Assets/Scripts/Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | G-보상분기 |
@@ -618,7 +621,7 @@ sequenceDiagram
 flowchart TD
     subgraph scene["CardPack 씬"]
         VIEW["PackRevealView<br/>Entering→Tearing→Bursting→Flicking→Summary<br/>스킵 총괄 · OnRevealComplete"]:::chg
-        TEAR["PackTearHandle (CardPack.prefab)<br/>스와이프 진행도 · OnProgress/OnTorn · sealRoot 훅"]:::new
+        TEAR["PackTearHandle (UICanvas > PackRoot > Pack)<br/>스와이프 진행도 · OnProgress/OnTorn · sealRoot 훅"]:::new
         STACK["PackCardStack (StackInput)<br/>더미 겹침 · 스와이프 넘기기 · 라인업"]:::new
         CARD["PackCardView (PackCard.prefab)<br/>Bind(DrawnCard) · 신규 광채/NEW · 중복 환급"]:::new
     end
@@ -635,13 +638,14 @@ flowchart TD
 
 #### 원리 카드
 
-- **G-28의 폐기 사유를 구조로 막았다**: 폐기 이유는 연출 품질이 아니라 "배선 실패 = 소프트락"이었다. 이번엔 `tearHandle`·`cardStack`·`packRoot`·`revealPanel` **어느 것이 비어도 경고 후 다음 단계로 진행**해 요약에 도달하고 `OnRevealComplete`가 발화한다. 카드 0장·`Build` 실패도 같다. 다만 **배선 지점 자체는 늘었다**(과거 4 → `cardLayer`/`stackAnchor`/`discardArea`/`sealRoot`/`skipButton` 추가).
+- **G-28의 폐기 사유를 구조로 막았다**: 폐기 이유는 연출 품질이 아니라 "배선 실패 = 소프트락"이었다. 이번엔 `tearHandle`·`cardStack`·`packRoot`·`revealPanel` **어느 것이 비어도 경고 후 다음 단계로 진행**해 요약에 도달하고 `OnRevealComplete`가 발화한다. 카드 0장·`Build` 실패도 같다. 다만 **배선 지점 자체는 늘었다**(과거 4 → `cardLayer`/`stackAnchor`/`sealRoot`/`shakeTarget`/`skipButton` 추가).
 - **`IsNew`/`Refund`가 처음으로 화면에 나온다**: G-28은 `Bind(card, true)`로 둘 다 버렸다. 희귀도를 도입하지 않기로 한 이상 이 둘이 연출의 유일한 감정 축이다.
-- **좌표계 전제**: 카드·`stackAnchor`·`discardArea`가 모두 `cardLayer`의 자식이고 앵커가 같아야 한다(`anchoredPosition`을 직접 보간). `CardLayer`가 `StackInput`의 **자식**인 것도 필수 — 카드가 raycast를 먹어도 드래그가 부모로 버블링돼야 스택이 입력을 받는다.
-- **장수 확장 대응**: 팩은 전부 `drawCount=6`. 라인업이 화면을 넘지 않게 `discardMaxWidth`로 간격을 자동 축소한다.
-- **스킵 입력이 두 경로인 이유**: 넘기기 단계는 `StackInput` 탭, 그 외는 `SkipButton`. 3D `OnMouse*`와 uGUI 전체화면 캐처가 충돌하기 때문.
+- **좌표계 전제**: 카드와 `stackAnchor`가 모두 `cardLayer`의 자식이고 앵커가 같아야 한다(`anchoredPosition`을 직접 보간). `CardLayer`가 `StackInput`의 **자식**인 것도 필수 — 카드가 raycast를 먹어도 드래그가 부모로 버블링돼야 스택이 입력을 받는다.
+- **장수 확장 대응**: 팩은 전부 `drawCount=6`. 밀린 카드는 라인업으로 남지 않고 날아가며 파괴되고, 결과는 `PackResultGrid`가 **새 인스턴스를 3열로** 세운다(마지막 행이 덜 차면 그 행만 가운데 정렬) → 장수가 늘어도 행이 늘 뿐이다. ※ ~~`discardArea`/`discardMaxWidth`로 라인업 간격을 자동 축소~~ 는 실재한 적 없는 서술이다(2026-07-28 정정).
+- **스킵 입력이 두 경로인 이유**: 넘기기 단계는 `StackInput` 탭, 그 외는 `SkipButton`. **`RevealPanel`의 `CanvasGroup`이 단계를 갈라놓기 때문**이다 — 분출 전까지 `alpha 0` + `blocksRaycasts false`라 그 아래의 `StackInput`은 뜯기 단계에 입력을 받을 수 없다. ~~3D `OnMouse*`와 uGUI 전체화면 캐처가 충돌하기 때문~~ 은 **근거가 소멸한 서술**이다(2026-07-28 정정 — `PackTearHandle`은 `OnMouse*`를 쓰지 않고 2D 전환으로 3D 자체가 사라졌다).
+  - ⚠️ 알려진 문제: `SkipButton`이 씬에서 `RevealPanel`의 **자식**이라 같은 `alpha 0`/`blocksRaycasts false`를 뒤집어쓴다 → **Entering·Tearing 동안 스킵 버튼이 보이지도 눌리지도 않는다**(`PackRevealView.cs:52` 주석과 실배선 불일치). 소프트락은 아니며, 2D 씬 재구성 시 캔버스 직속으로 올리는 것이 권장안. 상세 = `PACK_OPEN_DIRECTION.md` §3 Stage 5.
 
-**수정 가능성 높은 지점**: 뜯기 감도 `PackTearHandle`(`tearDistance`/`commitThreshold`) / 넘기기 감도·라인업 `PackCardStack`(`flickThreshold`/`discardSpacing`/`discardMaxWidth`/`discardScale`) / 분출 타이밍 `PackRevealView`(`burstHold`/`panelFadeDuration`).
+**수정 가능성 높은 지점**: 뜯기 감도 `PackTearHandle`(`tearDistance`/`commitThreshold`/`flickSpeed`) / 넘기기 감도 `PackCardStack`(`flickThreshold`/`flickSpeed`/`dismissDistance`) / 결과 격자 `PackResultGrid`(`cellWidth`/`cellHeight`/`spacing*`/`cardStagger`) / 분출 타이밍 `PackRevealView`(`burstHold`/`panelFadeDuration`). **값 단위는 한 가지가 아니다** — `PACK_OPEN_DIRECTION.md` §7 표를 먼저 볼 것.
 
 **미완**: SFX 전무(`SoundConfig` 슬롯 추가 필요) · `burstEffect` 파티클 미배선 · 봉인 표현은 `Seal` 통째로 밀기(찢김 아님) · **Play 검증 대기**.
 
@@ -808,7 +812,9 @@ sequenceDiagram
 #### P5·P6 해결 내역
 
 - **앵커 배선 완료**: `LobbyTabController.tabs[1].tutorialAnchor = LobbyPackTab` / `PackShowcaseController.packData` ← `NormalPack.asset` / 그 `buyButton`(BuyBtn_0)에 `TutorialAnchor(PackBuyButton)`.
-- **완료 판정이 두 갈래로 갈렸다**: 3D 팩 개봉은 `PackClickHandle`의 물리 클릭이라 uGUI 게이트를 걸 수 없고(Overlay 딤이 3D를 덮어 강조가 은폐가 된다), 구매는 눌러도 실패할 수 있다. → kind `WaitPackOpen`(딤 없이 배너만, `GateUI.ShowBanner`)과 `WaitPurchase`(딤만 걸고 클릭은 완료가 아님)를 추가하고, 완료는 **결과 신호**가 확정한다.
+- **완료 판정이 두 갈래로 갈렸다**: 팩 개봉은 uGUI 게이트를 걸 수 **없고**, 구매는 눌러도 실패할 수 있다.
+  - 게이트를 못 거는 이유는 **팩에 `Button`이 없기 때문**이다. `OutgameTutorialGateUI.ShowGate`는 타깃에 `Button`이 없으면 경고 후 게이트를 걸지 않는다(`OutgameTutorialGateUI.cs:57-61`) — 완료 판정을 `onClick` 구독으로만 하는 설계라 버튼이 없으면 "딤은 걸렸는데 완료시킬 방법이 없는" 소프트락이 되기 때문이다. 팩은 그때나 지금이나 `Button`이 아니라 제스처 컴포넌트(`PackTearHandle`)로 조작된다. → `WaitPackOpen`은 딤 없이 배너만 띄우는 `ShowBanner` 경로.
+  - ~~"`PackClickHandle`의 물리 클릭이라 … Overlay 딤이 3D를 덮어 강조가 은폐가 된다"~~ 는 **이중으로 낡은 서술**이었다(2026-07-28 정정): ① `PackClickHandle`은 G-29에서 **삭제된 클래스**다(현재 코드베이스에 남은 건 `PackTearHandle.cs:13`의 성격 계승 언급뿐) ② 2D 전환으로 3D 자체가 사라졌다. **결론(`WaitPackOpen` = `ShowBanner` 경로)은 그대로 유효하다** — 근거만 바뀌었다. → kind `WaitPackOpen`(딤 없이 배너만, `GateUI.ShowBanner`)과 `WaitPurchase`(딤만 걸고 클릭은 완료가 아님)를 추가하고, 완료는 **결과 신호**가 확정한다.
   - `PackRevealView.OnAnyPackOpened` / `PackShowcaseController.OnAnyPurchased` (둘 다 static event) → `OutgameTutorialBridge`가 구독. **뷰는 구독자를 모른다** — `TutorialAnchorRegistry.OnRegistered`와 같은 방향의 관용구.
   - `GateUI.ShowGate(_onSatisfied: null)` = 클릭 리스너 미부착(딤 유지). 이것이 `WaitPurchase`의 구현.
 - **결과 기반 커밋 해결**: 구매 실패 시 진행도가 앞서 나가지 않는다.

@@ -3,11 +3,11 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-// 3D 카드팩의 "봉인 뜯기" 제스처. 손가락을 그은 만큼 찢어지고,
+// 카드팩의 "봉인 뜯기" 제스처. 손가락을 그은 만큼 찢어지고,
 // 임계를 넘기거나 충분히 빠르게 튕기면 손을 떼도 나머지가 자동으로 완주한다. 못 미치면 되감겨 다시 시도할 수 있다.
 //
-// 입력은 화면 전체에서 받는다(콜라이더 위가 아니어도 된다) — 팩을 정확히 집어야 열리는 조작은
-// 개봉이라는 보상 연출에 어울리지 않는다. 그래서 OnMouse*(콜라이더 히트 전제)를 쓰지 않고 포인터를 직접 폴링한다.
+// 입력은 화면 전체에서 포인터를 직접 폴링해 받는다 — 팩을 정확히 집어야 열리는 조작은
+// 개봉이라는 보상 연출에 어울리지 않는다. 덕분에 콜라이더도 카메라도 필요 없다(팩은 UI Image다).
 // 방향도 가리지 않는다: 어느 쪽으로 그어도 그은 거리만큼 찢긴다.
 //
 // 이 컴포넌트는 구매·개봉·소유를 모른다 — 제스처 진행도와 "뜯겼다"만 알린다(PackClickHandle의 성격 계승).
@@ -21,7 +21,8 @@ public class PackTearHandle : MonoBehaviour
     public event Action OnTorn;
 
     [Header("제스처")]
-    [Tooltip("완전히 찢기까지 필요한 스크린 이동 픽셀(방향 무관 — 그은 거리 그대로).")]
+    [Tooltip("완전히 찢기까지 필요한 스크린 이동 픽셀(방향 무관 — 그은 거리 그대로). " +
+             "Input.mousePosition 기준이라 디바이스 픽셀이다 — scaleFactor로 정규화하는 PackCardStack.flickThreshold와 단위가 다르다.")]
     [SerializeField] float tearDistance = 160f;
     [Tooltip("이 진행도를 넘기면 손을 떼도 자동 완주한다.")]
     [Range(0.1f, 1f)] [SerializeField] float commitThreshold = 0.4f;
@@ -35,8 +36,8 @@ public class PackTearHandle : MonoBehaviour
     [Header("찢김 표현 (옵션)")]
     [Tooltip("진행도에 따라 밀려나는 봉인 조각. 미배선이면 표현 없이 제스처만 동작한다.")]
     [SerializeField] Transform sealRoot;
-    [Tooltip("완전히 찢겼을 때 sealRoot가 밀려나는 로컬 오프셋.")]
-    [SerializeField] Vector3 sealTornOffset = new Vector3(0f, 0.35f, 0f);
+    [Tooltip("완전히 찢겼을 때 sealRoot가 밀려나는 오프셋(부모 로컬 = 캔버스 참조px).")]
+    [SerializeField] Vector3 sealTornOffset = new Vector3(0f, 95f, 0f);
 
     bool m_armed;
     bool m_committed;   // 뜯기 확정 후 재입력 차단
@@ -48,6 +49,8 @@ public class PackTearHandle : MonoBehaviour
     float m_progress;
 
     // sealRoot 원위치(되감기 기준). Awake에서 1회 캡처.
+    // 앵커·피벗을 중앙(0.5, 0.5)으로 둘 것 — stretch 앵커면 localPosition이 부모 rect에 의존하는데,
+    // 그 rect는 Canvas가 런타임에 드라이브하므로 Awake 시점에 잘못된 홈을 잡는다.
     Vector3 m_sealHome;
     bool m_sealHomeCaptured;
 
@@ -180,6 +183,7 @@ public class PackTearHandle : MonoBehaviour
     static Vector2 CurrentPointer() => Input.mousePosition;
 
     // 레이캐스트를 받는 UI 위인지. 개봉 단계의 RevealPanel은 blocksRaycasts=false라 여기 걸리지 않는다.
+    // ⚠ 팩·배경 Image는 raycastTarget을 꺼야 한다 — 켜져 있으면 팩 위에서 시작한 드래그가 여기서 막혀 개봉 자체가 안 된다.
     static bool IsPointerOverUI()
         => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 

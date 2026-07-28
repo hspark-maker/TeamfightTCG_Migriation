@@ -74,7 +74,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         m_kind    = t_step.kind;
         m_message = t_step.guideMessage;
 
-        // 3D 팩은 Overlay 딤 아래로 가려져 구멍을 뚫을 수 없다 → 앵커 없이 배너만 띄우고 개봉 신호로 완료한다.
+        // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(CardPack 씬의 팩엔 TutorialAnchor가 없다).
+        // 그래서 게이트를 건너뛰고 배너만 띄운다. 아래 앵커 조회에 도달하지 않는 유일한 스텝이다.
         // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_kind == OutgameTutorialData.EStepKind.WaitPackOpen)
         {
