@@ -34,6 +34,11 @@ public class LoadingCoverView : MonoBehaviour
 
     Tween m_fade;
 
+    // 커버가 화면을 덮고 있는 동안 true. 커버 뒤에서 곧장 씬을 떠나는 자동 흐름(튜토리얼 AutoBattle)이
+    // 로딩화면을 통째로 건너뛰지 않도록, 기다려야 하는 쪽이 이 신호를 본다.
+    // 커버가 없는 씬에서는 항상 false다.
+    public static bool IsCovering { get; private set; }
+
     void Awake()
     {
         if (canvasGroup == null)
@@ -46,6 +51,7 @@ public class LoadingCoverView : MonoBehaviour
         // 씬 저작값이 어긋나 있어도 첫 프레임은 반드시 덮고 입력을 막는다.
         canvasGroup.alpha          = 1f;
         canvasGroup.blocksRaycasts = true;
+        IsCovering                 = true;
 
         if (progressBar != null) progressBar.normalizedValue = 0f;
     }
@@ -60,6 +66,9 @@ public class LoadingCoverView : MonoBehaviour
         // 씬 전환으로 파괴되는 것이 정상 경로라 트윈이 살아 있는 채 죽는다.
         m_fade?.Kill();
         m_fade = null;
+
+        // 커버째로 씬을 떠나는 경로 — 다음 씬까지 신호가 켜진 채 남으면 대기자가 영영 풀리지 않는다.
+        IsCovering = false;
     }
 
     IEnumerator CoDismiss()
@@ -97,13 +106,17 @@ public class LoadingCoverView : MonoBehaviour
         }
 
         // 로딩 중 timeScale이 0인 화면에서도 걷히도록 unscaled.
+        // 해제 신호는 페이드 완료가 아니라 시작 시점에 준다 — 조작이 허용되는 순간과 같아야
+        // 그 사이 입력이 튜토리얼 게이트보다 앞서지 않는다.
         canvasGroup.blocksRaycasts = false;   // 페이드 시작 = 조작 허용
+        IsCovering = false;
         m_fade = canvasGroup.DOFade(0f, fadeDuration).SetUpdate(true).OnComplete(Hide);
     }
 
     void Hide()
     {
         m_fade = null;
+        IsCovering = false;
         canvasGroup.blocksRaycasts = false;
         gameObject.SetActive(false);   // Overlay 캔버스 드로우콜 제거
     }

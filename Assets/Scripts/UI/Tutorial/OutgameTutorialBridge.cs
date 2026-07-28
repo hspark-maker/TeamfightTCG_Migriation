@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -33,7 +34,12 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!OutgameTutorialRunner.IsRunning) return;
 
         Subscribe();          // 타깃이 나중에 등장하는 경우를 기다린다(구독은 스텝 진입 전에).
-        ApplyCurrentStep();
+
+        // 부트 로딩 커버가 떠 있는 동안은 스텝을 진입시키지 않는다 — 자동 스텝(AutoBattle/AutoPurchase)이
+        // 커버 뒤에서 곧장 씬을 떠나 로딩화면이 통째로 스킵되고, 로딩이 덜 끝난 채 다음 씬에 들어간다.
+        // 커버가 없는 씬에서는 IsCovering이 false라 이 대기가 없다.
+        if (LoadingCoverView.IsCovering) StartCoroutine(CoApplyStepAfterCover());
+        else                             ApplyCurrentStep();
     }
 
     void OnDestroy()
@@ -41,6 +47,17 @@ public class OutgameTutorialBridge : MonoBehaviour
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         Unsubscribe();
         CloseGate();
+    }
+
+    // 커버가 걷힌 뒤 스텝을 진입시킨다. 씬을 떠나면 코루틴째로 죽으므로 해제 처리가 없다.
+    IEnumerator CoApplyStepAfterCover()
+    {
+        while (LoadingCoverView.IsCovering)
+            yield return null;
+
+        if (!OutgameTutorialRunner.IsRunning) yield break;   // 대기 중 완료됐을 수 있다.
+
+        ApplyCurrentStep();
     }
 
     // 현재 스텝을 진입시키고, 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
