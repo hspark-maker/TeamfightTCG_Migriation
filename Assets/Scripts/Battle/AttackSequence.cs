@@ -279,9 +279,9 @@ public static class AttackSequence
 
         if (_splashView != null)
         {
-            await UniTask.WhenAll(
-                t_defenderKilled ? _defender.PlayDeathAnim()                             : UniTask.CompletedTask,
-                t_splashKilled   ? (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask) : UniTask.CompletedTask);
+            // 무쌍 등 다중 파괴: 동시 재생하면 "따닥"으로 뭉쳐 보인다 → 대상→스플래시 순차 재생.
+            if (t_defenderKilled) await _defender.PlayDeathAnim();
+            if (t_splashKilled)   await (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask);
             if (t_defenderKilled || t_splashKilled)
                 SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
         }
