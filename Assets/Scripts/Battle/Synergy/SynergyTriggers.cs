@@ -24,7 +24,7 @@ public static class SynergyTriggers
         if (self == null || synergy == null) return;
         // 배너 그림은 카드 초상화가 아니라 시너지 아이콘 — 어느 시너지가 터졌는지가 핵심 정보다.
         // (icon 미배정이면 null 전달 = 기존대로 카드 초상화 폴백)
-        CardPassive.Notify(self, synergy.effectDescription, synergy.icon);
+        CardPassive.Notify(self, synergy.effectDescription, synergy.activeIcon);
         CardView.GetView(self)?.PopSynergyBadge(synergy);       // 발동 주체 카드의 해당 배지 pop
     }
 

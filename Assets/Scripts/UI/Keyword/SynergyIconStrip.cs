@@ -26,14 +26,14 @@ public static class SynergyIconStrip
         {
             if (t_synergy == null) continue;
             if (!t_shown.Add(t_synergy)) continue;   // 카드가 같은 시너지를 중복 나열해도 1개만
-            if (t_synergy.icon == null) continue;
+            if (t_synergy.activeIcon == null) continue;
 
             GameObject t_obj = Object.Instantiate(_iconPrefab, _parent);
 
             Image t_img = t_obj.GetComponent<Image>();
             if (t_img != null)
             {
-                t_img.sprite  = t_synergy.icon;
+                t_img.sprite  = t_synergy.activeIcon;
                 t_img.enabled = true;
             }
 

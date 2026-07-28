@@ -59,8 +59,8 @@ public class SynergyCountIcon : MonoBehaviour,
 
         if (this.icon != null)
         {
-            this.icon.sprite  = t_data.icon;
-            this.icon.enabled = t_data.icon != null;
+            this.icon.sprite  = t_data.activeIcon;
+            this.icon.enabled = t_data.activeIcon != null;
             this.icon.color   = t_tint;
         }
 

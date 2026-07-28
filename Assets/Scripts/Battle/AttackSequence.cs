@@ -78,6 +78,9 @@ public static class AttackSequence
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
 
+        // TEMP_ATTACK_MOTION: 아트 도착 전 임시 돌진 연출. TempAttackMotion.cs 삭제 시 이 줄도 제거.
+        await TempAttackMotion.Lunge(_attacker, _defender);
+
         if (t_hitDelay > 0f)
             await UniTask.Delay((int)(t_hitDelay * 1000));
 

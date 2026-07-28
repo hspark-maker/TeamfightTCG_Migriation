@@ -116,7 +116,7 @@ public class PooledCardElement : PooledUIBase
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
                 var t_row = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
                 t_row.GetComponent<KeywordExplainItem>()?.Init(
-                    t_syn.icon, SynergyText.Name(t_syn), t_syn.effectDescription);
+                    t_syn.activeIcon, SynergyText.Name(t_syn), t_syn.effectDescription);
             }
         }
 
