@@ -7,7 +7,13 @@ using UnityEngine.UI;
 // 카드팩 개봉 연출의 진행자. 스테이지를 순서대로 몰고 가며, 각 단계의 실제 조작·표현은
 // PackTearHandle(뜯기) · PackCardStack(더미 넘기기) · PackCardView(카드 표시)가 나눠 맡는다.
 //
-// 흐름: 입장 → 뜯기(스와이프) → 분출 → 한 장씩 밀어내기(스와이프) → 결과 격자 → OnRevealComplete.
+// 흐름: 입장 → 뜯기(스와이프) → 뽑기 → 한 장씩 밀어내기(스와이프) → 결과 격자 → OnRevealComplete.
+// 뽑기는 "팩에서 카드셋을 빼낸다"를 한 동작으로 보여준다 — 더미가 팩 자리에서 제 크기로 펴진 뒤,
+//   팩이 그 아래로 쑥 빠진다. 순서를 뒤집으면 팩과 카드가 따로 노는 화면이 된다.
+// ⚠ 계층 전제: packRoot가 revealPanel보다 뒤 sibling이어야 한다(= 팩이 카드를 덮는다).
+//   그래야 카드가 팩에 가려진 채 커지다 삐져나오며 "속에서 나왔다"로 읽힌다.
+//   대신 팩은 카드·결과 패널을 가리므로, 빠져나간 직후 반드시 꺼야 한다(EnterBursting이 그 시점에 끈다).
+//   스킵 버튼·뜯기 안내는 그보다 더 뒤 sibling으로 두어 팩에 묻히지 않게 한다.
 // 밀어낸 카드는 그 자리에서 사라지고, 마지막 장까지 넘긴 뒤 결과 패널이 떠오르며 전부를 3열로 되짚어 준다.
 // 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
 // 연출은 이미 끝난 거래(TryPurchase가 원자 영속)를 보여줄 뿐, 경제를 건드리지 않는다.
@@ -27,16 +33,30 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] float packEnterDrop = 811f;
     [SerializeField] float packEnterDuration = 0.45f;
 
-    [Header("분출")]
+    [Header("뽑기")]
     // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
     [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
-    // 팩은 셰이크 시작 직후 꺼지므로(EnterBursting) 팩을 걸면 no-op다. 배경처럼 계속 보이는 것을 건다.
+    // 팩은 빠져나가는 중이라 제 위치를 트윈에 내주고 있다 — 팩을 걸면 두 트윈이 다투므로 배경처럼 가만히 있는 것을 건다.
     [SerializeField] Transform shakeTarget;        // 배경 RectTransform(옵션)
     [SerializeField] float shakeDuration = 0.3f;
     [Tooltip("DOShakePosition은 월드 좌표를 흔든다 — Overlay 캔버스의 월드는 디바이스 스크린px다(참조px 아님).")]
     [SerializeField] float shakeStrength = 68f;
-    [Tooltip("분출 후 카드 조작을 열기까지의 여유.")]
+    [Tooltip("뽑기가 끝난 뒤 카드 조작을 열기까지의 여유.")]
     [SerializeField] float burstHold = 0.4f;
+
+    [Tooltip("카드셋이 팩 속에 들어있을 때의 크기 배율. 최종 크기와 갭이 크면 \"뽑혔다\"가 아니라 \"커졌다\"로 읽힌다 " +
+             "— 팩 안에 겨우 들어갈 만큼만 줄이고, 부족하면 팩을 키울 것.")]
+    [Range(0.1f, 1f)] [SerializeField] float cardEmergeScale = 0.9f;
+    [Tooltip("카드셋이 잠겨 있는 지점(팩 중심 기준, 캔버스 참조px). 아래로 내릴수록 팩 깊숙이 박혀 있다 길게 뽑혀 나온다.")]
+    [SerializeField] Vector2 cardEmergeOffset = new Vector2(0f, -180f);
+    [Tooltip("카드셋이 팩 자리에서 제 크기로 펴지는 시간.")]
+    [SerializeField] float cardEmergeDuration = 0.5f;
+    [Tooltip("카드가 이만큼 나온 뒤에 팩이 빠지기 시작한다(뽑기 시간 대비 비율). 0이면 동시에 움직인다. " +
+             "카드가 다 나온 뒤에 빠지면(1에 가까우면) 두 동작이 끊겨 보인다 — 겹쳐야 서로 반대로 미끄러지며 뽑힌다.")]
+    [Range(0f, 1f)] [SerializeField] float packPullDelay = 0.35f;
+    [Tooltip("팩이 빠져나가며 내려가는 거리(부모 로컬 = 캔버스 참조px). 화면 밖까지 가도록 넉넉히.")]
+    [SerializeField] float packPullDrop = 2400f;
+    [SerializeField] float packPullDuration = 0.45f;
 
     [Header("결과 화면")]
     [SerializeField] CanvasGroup revealPanel;      // 결과 패널(시작 alpha 0 / 입력 off)
@@ -72,8 +92,9 @@ public class PackRevealView : MonoBehaviour
     // 이번 세션에서 개봉 신호를 이미 쐈는지. 분출과 스킵 어느 쪽으로 열려도 정확히 1회여야 한다.
     bool m_announced;
 
-    // packRoot 원위치(등장 트윈 기준).
+    // packRoot 원위치·원크기(등장 트윈 기준). 크기는 씬에 놓인 값이 곧 팩의 실제 크기다.
     Vector3 m_packHome;
+    Vector3 m_packHomeScale = Vector3.one;
     bool m_packHomeCaptured;
 
     /// <summary>개봉 세션 시작: 팩이 등장하고 뜯기 대기로 이어진다.</summary>
@@ -176,9 +197,10 @@ public class PackRevealView : MonoBehaviour
 
         t_tr.DOKill();
         t_tr.localPosition = m_packHome - new Vector3(0f, packEnterDrop, 0f);
-        // 매 개봉마다 스케일을 1로 스탬프한다 — 팩 크기를 packRoot의 localScale로 표현하면 여기서 지워진다.
-        // 크기는 자식 Image의 sizeDelta로 잡을 것.
-        t_tr.localScale = Vector3.one;
+        // 매 개봉마다 크기를 씬에 놓인 값으로 되돌린다(연출이 남긴 스케일이 다음 개봉에 누적되지 않게).
+        // 팩 크기는 packRoot의 localScale로 잡는 것이 정석이다 — 자식 sizeDelta를 일일이 고치면
+        // Glow·Shadow·마스크 오프셋까지 따라 손봐야 하고, 카드와의 크기 관계가 한눈에 안 잡힌다.
+        t_tr.localScale = m_packHomeScale;
 
         KillStageSeq();
         m_stageSeq = DOTween.Sequence()
@@ -211,7 +233,9 @@ public class PackRevealView : MonoBehaviour
         EnterBursting();
     }
 
-    // 분출: 팩이 사라지고 빛·파티클이 터지며 결과 화면이 올라온다. 카드 더미도 여기서 세운다.
+    // 뽑기: 팩 속에 겹쳐 있던 카드셋이 제 크기로 펴지고, 뒤이어 팩이 그 아래로 빠진다.
+    // 세 트윈(패널 페이드·카드 펴기·팩 빼기)을 한 시퀀스에 모아 스킵 한 번이 셋을 함께 끝내게 한다 —
+    //   따로 재생하면 스킵 후 팩만 화면에 남는 상태가 생긴다.
     void EnterBursting()
     {
         m_stage = EStage.Bursting;
@@ -227,10 +251,13 @@ public class PackRevealView : MonoBehaviour
         }
 
         var t_root = ResolvePackRoot();
-        if (t_root != null) t_root.SetActive(false);
 
-        // 카드는 흩어졌다 모이지 않는다 — 곧장 최종 더미 자리에 선다.
-        if (cardStack != null) cardStack.Build(m_pending != null ? m_pending.Cards : null);
+        // 카드는 흩어졌다 모이지 않는다 — 팩 자리에 줄어든 채 겹쳐 있다가 그대로 최종 더미 자리로 펴진다.
+        if (cardStack != null)
+        {
+            cardStack.Build(m_pending != null ? m_pending.Cards : null);
+            if (t_root != null) cardStack.PrepareEmerge(t_root.transform.position, cardEmergeOffset, cardEmergeScale);
+        }
         else Debug.LogWarning("[PackRevealView] cardStack 미배선 → 카드 표시 생략.");
 
         KillStageSeq();
@@ -240,13 +267,33 @@ public class PackRevealView : MonoBehaviour
         {
             revealPanel.DOKill();
             revealPanel.alpha = 0f;
-            m_stageSeq.Append(revealPanel.DOFade(1f, panelFadeDuration))
-                      .AppendCallback(() =>
+            // 카드가 나오는 동안 화면이 같이 밝아진다 — 페이드를 앞세우면 뽑기 전에 빈 판이 먼저 뜬다.
+            m_stageSeq.Insert(0f, revealPanel.DOFade(1f, panelFadeDuration))
+                      .InsertCallback(panelFadeDuration, () =>
                       {
                           if (revealPanel == null) return;
                           revealPanel.blocksRaycasts = true;
                           revealPanel.interactable = true;
                       });
+        }
+
+        if (cardStack != null)
+        {
+            var t_emerge = cardStack.PlayEmerge(cardEmergeDuration);
+            if (t_emerge != null) m_stageSeq.Insert(0f, t_emerge);
+        }
+
+        if (t_root != null)
+        {
+            var t_tr = t_root.transform;
+            CapturePackHome(t_tr);
+            t_tr.DOKill();
+
+            // 카드가 어느 정도 나온 뒤에 빠진다 — 먼저 내려가면 "빼냈다"가 아니라 "따로 사라졌다"가 된다.
+            // InBack이라 살짝 버티다 쑥 내려간다(잡아당겨 빼는 손맛).
+            float t_pullAt = cardEmergeDuration * packPullDelay;
+            m_stageSeq.Insert(t_pullAt, t_tr.DOLocalMoveY(m_packHome.y - packPullDrop, packPullDuration).SetEase(Ease.InBack))
+                      .InsertCallback(t_pullAt + packPullDuration, () => t_root.SetActive(false));
         }
 
         m_stageSeq.AppendInterval(burstHold)
@@ -413,6 +460,7 @@ public class PackRevealView : MonoBehaviour
     {
         if (m_packHomeCaptured) return;
         m_packHome = _tr.localPosition;
+        m_packHomeScale = _tr.localScale;
         m_packHomeCaptured = true;
     }
 

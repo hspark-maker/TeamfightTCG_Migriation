@@ -70,6 +70,12 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     bool m_interactable;
     bool m_dragging;
 
+    // 팩에서 뽑혀 나오는 등장 연출의 기준(=평소 자리). 더미 전체를 cardLayer 한 덩어리로 줄였다 펴므로
+    // 개별 카드의 홈 좌표(m_home)는 건드리지 않는다 — 등장과 넘기기가 같은 좌표를 두고 다투지 않게 한 분리다.
+    Vector2 m_layerHome;
+    Vector3 m_layerScaleHome;
+    bool m_layerHomeCaptured;
+
     // 최근 프레임의 미는 속도(카드 좌표계 단위/초). 짧고 빠른 플릭을 거리 대신 이 값으로 살린다.
     float m_dragSpeed;
 
@@ -78,6 +84,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     void Awake()
     {
         m_canvas = GetComponentInParent<Canvas>();
+        // anchoredPosition·localScale은 부모 rect 크기와 무관하다 — Canvas가 rect를 드라이브하기 전에 잡아도 안전하다.
+        CaptureLayerHome();
     }
 
     /// <summary>뽑힌 카드로 더미를 만든다. 아직 입력은 받지 않는다(분출 연출이 끝난 뒤 BeginInteraction).</summary>
@@ -116,6 +124,51 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         OnRemainingChanged?.Invoke(m_stack.Count);
+    }
+
+    /// <summary>
+    /// 더미를 팩 속에 든 것처럼 줄여 _worldPoint(팩 자리)에서 _offset만큼 옮긴 지점에 겹쳐 둔다.
+    /// Build 직후, PlayEmerge 전에 호출. _offset은 캔버스 참조px — 팩 속 어디에 잠겨 있을지를 정한다.
+    /// 배선 전제: cardLayer와 그 부모의 pivot이 모두 중앙(0.5, 0.5)이어야 한다(로컬 좌표 원점을 맞바꿔 쓴다).
+    /// </summary>
+    public void PrepareEmerge(Vector3 _worldPoint, Vector2 _offset, float _scale)
+    {
+        if (cardLayer == null || stackAnchor == null) return;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+
+        cardLayer.localScale = m_layerScaleHome * _scale;
+        // 레이어를 줄이면 그 안의 앵커 자리도 같이 당겨진다 — 그만큼 되밀어야 더미가 정확히 팩 위에 겹친다.
+        cardLayer.anchoredPosition = ParentLocalOf(_worldPoint) + _offset - stackAnchor.anchoredPosition * _scale;
+    }
+
+    /// <summary>
+    /// 줄여 둔 더미를 제자리로 펴 올린다(팩에서 뽑혀 나오는 연출).
+    /// 반환 시퀀스를 호출부의 흐름에 끼우면 스킵 한 번으로 등장까지 함께 완료된다.
+    /// </summary>
+    public Sequence PlayEmerge(float _duration)
+    {
+        if (cardLayer == null) return null;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+
+        return DOTween.Sequence()
+            .SetLink(cardLayer.gameObject)
+            .Join(cardLayer.DOAnchorPos(m_layerHome, _duration).SetEase(Ease.OutCubic))
+            .Join(cardLayer.DOScale(m_layerScaleHome, _duration).SetEase(Ease.OutBack));
+    }
+
+    /// <summary>등장 연출을 건너뛰고 평소 자리로 되돌린다(스킵·재개봉 대비).</summary>
+    public void SnapEmerged()
+    {
+        if (cardLayer == null) return;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+        cardLayer.anchoredPosition = m_layerHome;
+        cardLayer.localScale = m_layerScaleHome;
     }
 
     /// <summary>입력을 켜고 첫 장이 드러났음을 알린다(앞면이라 이미 보이고 있다).</summary>
@@ -162,6 +215,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_home.Clear();
         m_interactable = false;
         m_dragging = false;
+
+        // 등장 도중 걷어냈다면 레이어가 축소된 채 굳는다 — 다음 개봉이 그 상태를 물려받지 않게 되돌린다.
+        SnapEmerged();
     }
 
     public void OnBeginDrag(PointerEventData _e)
@@ -284,6 +340,29 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Vector2 HomeOf(PackCardView _view)
         => _view != null && m_home.TryGetValue(_view, out var t_home) ? t_home : Vector2.zero;
 
+    void CaptureLayerHome()
+    {
+        if (m_layerHomeCaptured || cardLayer == null) return;
+        m_layerHome = cardLayer.anchoredPosition;
+        m_layerScaleHome = cardLayer.localScale;
+        m_layerHomeCaptured = true;
+    }
+
+    // 월드 지점을 cardLayer의 anchoredPosition과 같은 계(부모 rect 로컬)로 옮긴다.
+    Vector2 ParentLocalOf(Vector3 _worldPoint)
+    {
+        var t_parent = cardLayer != null ? cardLayer.parent as RectTransform : null;
+        if (t_parent == null) return Vector2.zero;
+
+        var t_cam = m_canvas != null && m_canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? m_canvas.worldCamera
+            : null;
+
+        var t_screen = RectTransformUtility.WorldToScreenPoint(t_cam, _worldPoint);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(t_parent, t_screen, t_cam, out var t_local);
+        return t_local;
+    }
+
     void OnDisable()
     {
         // 연출 도중 비활성 시 좀비 트윈 정리 + 입력 상태 리셋(재활성 후 유령 드래그 방지).
@@ -294,6 +373,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
             if (m_dismissing[t_i] != null) Destroy(m_dismissing[t_i].gameObject);
         m_dismissing.Clear();
+
+        SnapEmerged();
 
         m_interactable = false;
         m_dragging = false;

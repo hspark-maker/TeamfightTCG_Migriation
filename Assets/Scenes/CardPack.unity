@@ -554,8 +554,8 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3489426}
-  - {fileID: 1903978943}
   - {fileID: 130962627}
+  - {fileID: 1903978943}
   - {fileID: 1416537399}
   - {fileID: 1947172433}
   m_Father: {fileID: 0}
@@ -1106,7 +1106,7 @@ RectTransform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 727724695}
   - {fileID: 419582120}
@@ -1114,7 +1114,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 14.55}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 677, y: 1015.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &702702570
@@ -2054,6 +2054,12 @@ MonoBehaviour:
   shakeDuration: 0.3
   shakeStrength: 68
   burstHold: 0.4
+  cardEmergeScale: 0.9
+  cardEmergeOffset: {x: 0, y: -180}
+  cardEmergeDuration: 0.5
+  packPullDelay: 0.35
+  packPullDrop: 2400
+  packPullDuration: 0.45
   revealPanel: {fileID: 130962628}
   cardStack: {fileID: 497097069}
   panelFadeDuration: 0.35
@@ -2259,7 +2265,7 @@ RectTransform:
   m_GameObject: {fileID: 1903978942}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.55, y: 1.55, z: 1.55}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1146284219}
@@ -2269,7 +2275,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -160}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1903978944

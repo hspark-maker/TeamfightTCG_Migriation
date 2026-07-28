@@ -84,7 +84,8 @@
       "Bash(cd *)",
       "Bash(mkdir -p Common)",
       "Bash(mv Collection/CollectionCardView.cs Common/CardVisualView.cs)",
-      "Bash(mv Collection/CollectionCardView.cs.meta Common/CardVisualView.cs.meta)"
+      "Bash(mv Collection/CollectionCardView.cs.meta Common/CardVisualView.cs.meta)",
+      "PowerShell($d = Get-Content \"C:\\\\Users\\\\cookapps\\\\.claude\\\\projects\\\\C--mgJeon-TeamfightTCG-Migriation\\\\b7b4ec88-adcd-4017-b5f3-acf6e421bb2d\\\\tool-results\\\\mcp-unity-mcp-Unity_RunCommand-1785240755460.txt\" -Raw | ConvertFrom-Json; $log = $d.data.executionLogs; $log.Substring\\(0, [Math]::Min\\(7000, $log.Length\\)\\))"
     ]
   },
   "enabledMcpjsonServers": [
