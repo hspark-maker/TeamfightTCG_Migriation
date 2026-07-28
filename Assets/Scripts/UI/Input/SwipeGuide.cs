@@ -19,8 +19,17 @@ public class SwipeGuide : MonoBehaviour
 
     void Awake()
     {
-        this.allSprites = new[] { this.leftSr, this.centerSr, this.rightSr };
-        gameObject.SetActive(false);
+        EnsureInit();
+        // 시작 시 숨김은 알파 0으로 처리. (예전 gameObject.SetActive(false)는 GO가 비활성으로 시작한 경우
+        //  첫 Show()의 SetActive(true)가 뒤늦게 Awake를 돌려 다시 꺼버려 → 첫 드래그-백에서 가이드가 안 보였다.)
+        foreach (SpriteRenderer t_sr in this.allSprites)
+            if (t_sr != null) { Color t_c = t_sr.color; t_c.a = 0f; t_sr.color = t_c; }
+    }
+
+    void EnsureInit()
+    {
+        if (this.allSprites == null)
+            this.allSprites = new[] { this.leftSr, this.centerSr, this.rightSr };
     }
 
     public void SetVisible(bool _visible)
@@ -52,6 +61,7 @@ public class SwipeGuide : MonoBehaviour
 
     void Show()
     {
+        EnsureInit();
         this.hideSeq?.Kill();
         gameObject.SetActive(true);
         this.currentHighlight = this.centerSr;

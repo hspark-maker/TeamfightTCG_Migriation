@@ -7,6 +7,7 @@ public class CardAnimator : MonoBehaviour
 {
     [SerializeField] SpriteRenderer hitOverlay;
     [SerializeField] SpriteRenderer dieOverlay;
+    [SerializeField] HitEffectView  hitEffect;   // 피격 붐(카드 자식). 없으면 무시.
 
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
     float moveDuration => GameTiming.Battle.CardMoveDuration;
@@ -55,6 +56,9 @@ public class CardAnimator : MonoBehaviour
     }
 
     public void SetBoundCard(CardInstance _card) => this.boundCard = _card;
+
+    /// <summary>진행 중인 피격 연출(붐/데미지 숫자) 즉시 제거. 슬롯에 새 카드가 들어오기 전 호출 → 잔여 연출 이월 방지.</summary>
+    public void ResetHitEffect() => this.hitEffect?.Stop();
 
     // ── Move ─────────────────────────────────────────────────────────────
 
@@ -160,10 +164,11 @@ public class CardAnimator : MonoBehaviour
 
     // ── Hit / Death / Deal ───────────────────────────────────────────────
 
-    public async UniTask PlayHitAnim(float _duration = -1f)
+    public async UniTask PlayHitAnim(float _duration = -1f, int _damage = 0)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
+        this.hitEffect?.Play(_damage);   // 피격 붐 + 데미지 숫자(있으면). 위치=이 카드.
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();
         Color t_c = this.hitOverlay.color;
