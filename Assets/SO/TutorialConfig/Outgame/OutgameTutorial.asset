@@ -13,33 +13,12 @@ MonoBehaviour:
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
   steps:
-  - kind: 0
+  - kind: 5
     anchor: 0
-    guideMessage: 
-    pack: {fileID: 11400000, guid: 8f37683e21484b14baba7c0a0eea43a2, type: 2}
-    duplicateRefundGold: 10
-    nextScene: LobbyScene
-    scenario: {fileID: 0}
-  - kind: 3
-    anchor: 0
-    guideMessage: "\uCE74\uB4DC\uD329 \uC624\uD508"
+    guideMessage:
     pack: {fileID: 0}
     duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 1
-    anchor: 4
-    guideMessage: "\uCE74\uB4DC \uD68D\uB4DD"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 2
-    anchor: 1
-    guideMessage: "\uCCAB \uC804\uD22C\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
+    nextScene:
     scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
   - kind: 1
     anchor: 2

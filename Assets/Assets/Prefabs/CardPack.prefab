@@ -68,9 +68,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2f8782e43f9b70418a7ec103910e3c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PackTearHandle
-  tearAxis: {x: 1, y: 0}
-  tearDistance: 300
-  commitThreshold: 0.55
+  tearDistance: 160
+  commitThreshold: 0.4
+  flickSpeed: 900
+  flickMinProgress: 0.12
   finishDuration: 0.18
   rewindDuration: 0.25
   sealRoot: {fileID: 8485197871063174032}

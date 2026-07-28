@@ -20,6 +20,7 @@
 | 2026-07-24 | **E. 카드팩 경제 클래스 구조 추가 (⬜ 설계 승인 대기)** — `CardPackData`/`CardShop`(SO)·`CardPackOpener`(static)·`OpenedPack`(값). E는 자체 세이브 없는 **A(재화)·B(소유) 오케스트레이터**. 구매=즉시개봉(팩 재고 없음)·**팩별 지정 풀 드로우**·**중복 시 소액 골드 환급**. 신규 노드 `:::new` | ⬜ |
 | 2026-07-24 | **E. 카드팩 경제 구현 완료 (E-14/15/16)** — `OutGame/CardPack/`에 4파일 생성. 설계와 일치. API 확정: 배선 `SetShop(CardShop)`, 결과 `OpenedPack`(class)+`DrawnCard`(readonly struct)+`EPackOpenResult`(enum: Success/PackNotFound/InsufficientGold/EmptyPool/SpendFailed). 로컬 `System.Random`. 재화·소유 계약 순수 소비(불변). SO 에셋 생성·상점 배선은 사용자/메인 검증 | ✅ |
 | 2026-07-24 | **tcg-reviewer 심화 재검 반영 (2건 수정)** — ① **무료팩 허용**: 공유 재화 API `CurrencyManager.Spend` 계약 변경(0 이하 거부→음수만 거부, 0은 잔액변경 없이 성공). price=0 팩 구매 가능해짐(사용자 지시). Spend 사용처는 CardPackOpener 1곳뿐 → 회귀 없음. ② **null 풀 방어**: 드로우 시 null 카드 항목 `continue` 스킵(환급 오지급 차단). #3 저장순서(유저 유리, 재화 유실 없음)는 프로토타입 무시·기록만. 컴파일 에러 0 | ✅ |
+| 2026-07-28 | **G-TUT 온보딩 진입 단축 — 첫 전투 직행 (✅ 코드+에셋+컴파일 검증)** — 사용자 결정: 첫 실행의 "자동 팩 구매 → 3D 개봉 → [획득] → 로비 [플레이]" 4단계 앞머리를 걷어내고 **부트 직후 곧장 첫 튜토리얼 전투**로 보낸다. `EStepKind`에 `AutoBattle = 5` 추가(SO int 직렬화 규칙대로 **끝에만** 추가) + 러너에 `EnterAutoBattle`(`TutorialConfig.Begin(scenario)` → `LoadScene("BattleScene")`, 상수 `BattleScene` 신설). `AutoPurchase`와 같은 **커밋 선행** 불변식 — 씬을 떠나면 롤백 지점이 없어 커밋을 미루면 전투 중 강제종료가 이 스텝을 무한 반복시킨다(구매와 달리 되돌릴 부작용이 없어 롤백 분기 자체가 없다). 첫 전투의 양 덱은 `TutorialConfig`가 고정 주입하므로(`GameInitializer.InitializeSinglePlayerFields`) **저장 덱이 0인 신규 유저도 그대로 진입**한다 → `LobbyMatchLauncher`의 유효덱 가드는 무수정(이 경로를 타지 않음). 첫 카드 소유는 전투 1 종료 후 기존 구매 사이클이 담당. 에셋은 14→**11스텝**(0=`AutoBattle`, 1~5·6~10 구매 사이클 2회). ⚠️ 진행 중이던 세이브는 인덱스가 3칸 밀리므로 `OwnershipDebugTool` 리셋 필요 | ✅ |
 | 2026-07-27 | **PKG-BOOT 통합 부트 배선 (✅ 구현+검수 완료)** — `MainMenuInitializer`에 `[SerializeField] CardShop cardShop` + `CardPackOpener.SetShop(cardShop)` 1줄 추가. `Load`/`CurrencyInit`은 `GameManager.Boot()`가 이미 소유 → 중복 미추가(부트 2계층 확정). null→빈 상점 fallback으로 PKG-TUNE 에셋과 독립 진행. 계약 동결 표 "통합 부트 순서" 🧊 동결. tcg-reviewer 검수: 발견 0(경계·이중진실원·계약 무결). 에셋 배선·Play 통합검증은 사용자 재량 | ✅ |
 | 2026-07-24 | **F-19 카드팩 개봉 루프 (✅ 구현+검수 완료)** — 스코프 최종 축소: 상점 목록·독립 씬·MainMenu 진입 전부 제외. **카드팩 클릭→개봉 연출+카드 순차 등장→획득** 루프만. `PackOpeningView`(연출 오케스트레이션·옵션 EnsureBoot)+`RevealCardView`(카드 등장 애니·신규/중복 뱃지) 2클래스. 단일 팩 버튼(고정 packId), 팝업 풀링 미사용(씬 상주 뷰), DOTween 연출. 순수 뷰(세이브 없음), E `CardPackOpener` 소비. **tcg-reviewer 검수: 계약·경계·이중처리 무결, 코루틴 안전성 2건(좀비 잠금·트윈 미정리) 수정**(try/finally+OnDisable StopAllCoroutines/DOKill, RevealCardView OnDestroy DOKill). 컴파일 0. 연출·배선은 Play 검증 대기 | ✅ |
 | 2026-07-24 | **F-19 개봉 인터랙션 재구현 (스택→드래그 넘김→2×3 그리드)** — `PackOpeningView`를 순차 등장 코루틴에서 **상태머신(Idle/Stacking/Grid)** 으로 재작성. `RevealCardView`에 월드 드래그(`OnMouseDown/Drag/Up`+`ScreenToWorldPoint`)·`SetDraggable`/`SetSortingOrder`/`FadeIn/Out`/`MoveTo`·`SetSwipeCallback` 추가(스케일인 Reveal→데이터 바인딩만). 넘긴 카드는 파괴 안 하고 그리드 재사용. 재진입=상태가드, `OnDisable`에서 카드 트윈 `KillAllTweens`. 계약(CardPackOpener/OpenedPack/CurrencyManager/OwnershipManager) 불변·순수 뷰. 컴파일·드래그/연출은 메인/사용자 검증 대기 | ✅ |
@@ -666,7 +667,7 @@ flowchart TD
 
     subgraph run["해석 — 스텝 실행 (씬 오브젝트를 모름)"]
         RUN["OutgameTutorialRunner (static)<br/>IsRunning · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied"]:::new
-        DATA["OutgameTutorialData (SO)<br/>EStepKind{AutoPurchase,WaitClick,BattleEntry}<br/>List&lt;Step&gt; (인덱스 = 세이브 진행도)"]:::new
+        DATA["OutgameTutorialData (SO)<br/>EStepKind{AutoPurchase,WaitClick,BattleEntry,<br/>WaitPackOpen,WaitPurchase,AutoBattle}<br/>List&lt;Step&gt; (인덱스 = 세이브 진행도)"]:::new
     end
 
     subgraph scene["씬 레이어 (UI/Tutorial/)"]
@@ -684,6 +685,7 @@ flowchart TD
     OPENER["CardPackOpener.TryPurchase (E)<br/>Grant→Save 원자 영속"]
     HAND["PackHandoff (static 캐리어)"]
     TUT["TutorialConfig.Begin (Battle, 읽기 사용)"]
+    BATTLE["BattleScene<br/>브리지 없음 (복귀 시 로비 브리지가 재개)"]
     OWN["OwnershipManager.HasAnyOwnedSaved<br/>레거시 마이그레이션 판정 전용으로 축소"]:::chg
     DEAD["~~LobbyFirstRunRedirect~~ 삭제<br/>= 스텝 0 AutoPurchase"]:::dead
 
@@ -696,7 +698,8 @@ flowchart TD
     RUN -->|"StepIndex 읽기 · CommitStep"| PRG
     RUN -->|"AutoPurchase"| OPENER
     RUN -->|"Set(opened, nextScene, false)"| HAND
-    RUN -->|"BattleEntry 진입 시"| TUT
+    RUN -->|"BattleEntry · AutoBattle 진입 시"| TUT
+    RUN -->|"AutoBattle → LoadScene(BattleScene)"| BATTLE
     BRG -->|"ShowGate(rect, button, msg)"| GATE
     GATE -->|"onClick → onSatisfied"| BRG
     BRG -->|"NotifyStepSatisfied"| RUN
@@ -710,7 +713,7 @@ flowchart TD
     classDef dead fill:#5a1f1f,stroke:#e57373,color:#fff;
 ```
 
-#### 흐름 시퀀스 — 스텝 0~2 (자동 구매 → 개봉 [획득] → 로비 [플레이] → 튜토리얼 전투)
+#### 흐름 시퀀스 — 스텝 0~2 (부트 → 첫 전투 직행 → 로비 복귀 → 상점 [구매])
 
 ```mermaid
 sequenceDiagram
@@ -718,40 +721,36 @@ sequenceDiagram
     participant PRG as TutorialProgress
     participant BRG as Bridge(씬당 1개)
     participant RUN as Runner
+    participant TUT as TutorialConfig
     participant REG as AnchorRegistry
     participant GATE as GateUI
-    participant OP as CardPackOpener
 
     GM->>PRG: Init() [Load 직후 · 레거시 판정 1회]
     Note over BRG: LobbyScene 진입 · Awake: EnsureData(SO)
     BRG->>RUN: Start → EnterCurrentStep()
-    RUN->>PRG: StepIndex=0 → 스텝0(AutoPurchase)
+    RUN->>PRG: StepIndex=0 → 스텝0(AutoBattle)
     RUN->>PRG: CommitStep(1) + Save  ← 실행보다 커밋이 먼저
-    RUN->>OP: TryPurchase(pack, refund)
-    alt 구매 실패
-        RUN->>PRG: CommitStep(0) 롤백 + 경고 → 로비 유지
-    else 성공
-        RUN->>RUN: PackHandoff.Set(opened, nextScene, false) → LoadScene("CardPack")
-        Note over BRG: CardPack 씬 브리지 Start → StepIndex=1(WaitClick)
-        BRG->>REG: TryGet(PackAcquireButton) → 미등록이면 OnRegistered 대기
-        Note over REG: 개봉 완료로 AcquireButton이 SetActive(true)<br/>= TutorialAnchor.OnEnable이 그 순간 등록
-        REG-->>BRG: OnRegistered(PackAcquireButton)
-        BRG->>GATE: ShowGate(rect, button, "카드를 획득해 보세요")
-        Note over GATE: 4패널 딤이 타깃만 비움 · 원래 onClick은 그대로 실행
-        GATE-->>BRG: onSatisfied (1회 가드)
-        BRG->>RUN: NotifyStepSatisfied() → CommitStep(2)
-        Note over BRG: [획득]이 로비로 LoadScene → 로비 브리지가 스텝2 재개
-        BRG->>RUN: EnterCurrentStep() → BattleEntry
-        RUN->>RUN: TutorialConfig.Begin(scenario) [진입 시 미리]
-        BRG->>GATE: ShowGate(PlayBtn, "첫 전투를 시작합니다")
-        Note over GATE: 클릭 → 씬 PersistentCall(StartAiBattle)이 전투 진입<br/>BattleScene엔 브리지를 두지 않는다(전투 후 로비 브리지가 재개)
-    end
+    RUN->>TUT: Begin(scenario) [양 덱 고정 주입 = 저장 덱 불필요]
+    RUN->>RUN: LoadScene("BattleScene")
+    Note over BRG: 로비는 한 프레임만 스쳐간다(딤·배너 없음)
+    Note over TUT: 전투 종료 → GameResultPopup가 LobbyScene 복귀<br/>BattleCleanup이 TutorialConfig.End()
+
+    Note over BRG: 로비 브리지 Start → StepIndex=1(WaitClick)
+    BRG->>REG: TryGet(LobbyPackTab) → 미등록이면 OnRegistered 대기
+    REG-->>BRG: 등록됨(LobbyTabController.Awake 대리 등록)
+    BRG->>GATE: ShowGate(rect, button, "상점으로 이동하세요")
+    Note over GATE: 4패널 딤이 타깃만 비움 · 원래 onClick은 그대로 실행
+    GATE-->>BRG: onSatisfied (1회 가드)
+    BRG->>RUN: NotifyStepSatisfied() → CommitStep(2)
+    BRG->>RUN: EnterCurrentStep() → WaitPurchase(구매 성공이 완료)
+    Note over BRG: 이후 개봉 → [획득] → BattleEntry(PlayBtn) 사이클 2회
 ```
 
 #### 원리 카드 — 왜 이렇게 생겼나
 
 - **완료는 파생이 아니라 스칼라**: `outgameCompleted`가 `outgameStepIndex`보다 **항상 우선**한다. 완료를 `stepIndex >= steps.Count`로 파생시키면 나중에 스텝을 추가한 순간 **이미 끝낸 유저의 튜토리얼이 되살아난다**. 러너는 `CommitAdvance`에서 한 번만 `Complete()`를 확정한다. — `TutorialSaveData.cs` / `OutgameTutorialRunner.cs`
-- **커밋이 실행보다 앞선다**: 스텝 0(`AutoPurchase`)은 `CommitStep(idx+1)`+`Save` **후에** `TryPurchase`를 호출한다. 반대 순서면 "구매 직후 앱 종료 → 소유는 생겼는데 진행도는 0" 상태가 되어 온보딩이 영구 스킵된다. 실패는 차감 없이 반환되므로 `CommitStep(idx)` 롤백만으로 원상복구(다음 부트 재시도). — `OutgameTutorialRunner.EnterAutoPurchase`
+- **커밋이 실행보다 앞선다**: 자동 스텝(`AutoPurchase`·`AutoBattle`)은 `CommitStep(idx+1)`+`Save` **후에** 실행한다. `AutoPurchase`가 반대 순서면 "구매 직후 앱 종료 → 소유는 생겼는데 진행도는 0"이 되어 온보딩이 영구 스킵되고, `AutoBattle`이 반대 순서면 전투 중 강제종료가 그 스텝을 **영원히 되풀이**한다(씬을 떠난 뒤엔 커밋할 지점이 없다). 롤백 분기는 `AutoPurchase`에만 있다 — 구매는 실패할 수 있고(차감 없이 반환되므로 `CommitStep(idx)`로 원상복구) 씬 로드는 실패하지 않는다. — `OutgameTutorialRunner.EnterAutoPurchase` / `EnterAutoBattle`
+- **첫 전투는 저장 덱을 요구하지 않는다(2026-07-28)**: 온보딩 앞머리의 팩 구매·개봉을 걷어내 신규 유저는 첫 전투 시점에 소유 카드도 덱도 0이다. 그래도 성립하는 이유는 `GameInitializer.InitializeSinglePlayerFields`가 `TutorialConfig.IsActive`일 때 **양 덱을 시나리오에서 고정 주입**하기 때문 — `DeckConfig`를 아예 읽지 않는다. 그래서 `LobbyMatchLauncher`의 "유효한 덱이 없습니다" 가드는 **손대지 않았다**: `AutoBattle`은 `PlayBtn`을 거치지 않으므로 그 가드를 통과할 일이 없고, 그 가드를 만나는 2·3회차 `BattleEntry`는 이미 첫 팩을 획득한 뒤다.
 - **레거시 판정은 계정당 1회(`migrationChecked` 낙인)**: "소유 있음 + 진행도 0 = 구버전 유저" 판정을 매 부트 반복하면, 러너가 아직 한 번도 돌지 못한 상태(SO 미배선·구매 실패 롤백 — **P5·P6 보류 중인 지금의 실제 상태**)에서 수동 구매한 신규 유저까지 완료 처리된다. `stepIndex == 0` 항은 함께 남긴다 — 없으면 **현재 빌드로 진행 중인 세이브**가 업데이트 첫 부팅에 완료 낙인을 맞는다. `ResetForDebug()`는 낙인을 **true로 유지**(되돌리면 남은 소유 탓에 다음 부트가 곧장 완료 처리해 리셋이 무의미). — `OutgameTutorialProgress.Init`
 - **타깃은 씬 경로가 아니라 enum 앵커**: 탭 버튼이 Layer Lab 프리팹 내부라 경로 문자열은 취약하고 오타가 검출되지 않는다. `TutorialAnchor`의 `OnEnable/OnDisable`이 그대로 등록/해제가 되므로 **"타깃이 나타나는 시점"을 감지하는 코드가 0줄** — `AcquireButton`의 `SetActive(true)`가 곧 개봉 완료 시점이고, 탭 콘텐츠 토글이 곧 등록 시점이다. enum은 SO에 int로 직렬화되므로 **새 값은 끝에만 추가**(재배치·삭제 금지).
 - **구멍은 4패널(셰이더 아님)**: 타깃 rect 기준 상/하/좌/우 `Image` 4장으로 덮어 타깃만 비운다. 구멍이 물리적 공백이라 클릭 통과가 `ICanvasRaycastFilter` 0줄로 성립한다. 완료는 `onClick` **구독**으로만 감지 → 원래 리스너(`StartAiBattle`·`Select`·`OnBuyPressed`·`OnAcquirePressed`)가 그대로 실행되고, 게이트는 `HideGate`/`Clear`/`OnDestroy`에서 반드시 `RemoveListener`.
@@ -760,10 +759,10 @@ sequenceDiagram
 - **SO 주입은 브리지가(부트가 아니라)**: `CardPack.unity`에는 `MainMenuInitializer`가 없다. static은 씬 전환에 살아남지만 **CardPack 단독 Play**(`PackStandaloneBoot` 워크플로)에서 깨진다 → 브리지가 `Awake`에서 멱등 주입(다른 에셋 주입 시도는 경고 후 기존 유지).
 - **전투 시작은 클릭 리스너가 아니라 스텝 진입 시**: `TutorialConfig.Begin`을 `BattleEntry` 진입 순간에 호출한다. 클릭 리스너로 하면 `PlayBtn`의 씬 PersistentCall이 런타임 리스너보다 먼저 `LoadScene`을 돌려 순서 의존이 생긴다. `Begin`은 덱/스크립트 큐 세팅뿐이고 `TutorialConfig`는 휘발이라 재진입도 멱등. → **`LobbyMatchLauncher`·`PackShowcaseController`·`PackAcquireController` 무수정.**
 
-- **개봉 씬은 가이드를 끄고 씬 안내로 대체(2026-07-27)**: `CardPack`은 화면에 3D 팩 하나, 요약엔 [획득] 하나뿐이라 강제 게이트가 길잡이가 아니라 **연출을 가리는 잡음**이다. 브리지에 `suppressGuideUI`(씬 스위치)를 두어 그 씬에서만 딤·배너를 끈다 — **스텝 진행은 불변**. 단 완료 감지 경로가 갈린다: `WaitPackOpen`은 원래부터 `OnAnyPackOpened`가 완료를 확정하므로 배너만 빼면 끝이지만, `WaitClick`의 완료는 **게이트가 대신 걸어주던 `onClick` 구독**이라 게이트를 끄면 브리지가 직접 물어야 한다(`HookSilently`/`DetachSilent`, `m_silentDone` 1회 가드 = `GateUI.m_satisfied`와 같은 역할). `GateUI`는 무수정 — "아무것도 안 그리는 모드"를 넣는 대신 소비처에서 끊었다. ⚠️ 그래서 **`AcquireButton`의 `TutorialAnchor`는 억제 모드에서도 필수**다(떼면 스텝 2·7·12가 영구 정지).
+- **개봉 씬은 가이드를 끄고 씬 안내로 대체(2026-07-27)**: `CardPack`은 화면에 3D 팩 하나, 요약엔 [획득] 하나뿐이라 강제 게이트가 길잡이가 아니라 **연출을 가리는 잡음**이다. 브리지에 `suppressGuideUI`(씬 스위치)를 두어 그 씬에서만 딤·배너를 끈다 — **스텝 진행은 불변**. 단 완료 감지 경로가 갈린다: `WaitPackOpen`은 원래부터 `OnAnyPackOpened`가 완료를 확정하므로 배너만 빼면 끝이지만, `WaitClick`의 완료는 **게이트가 대신 걸어주던 `onClick` 구독**이라 게이트를 끄면 브리지가 직접 물어야 한다(`HookSilently`/`DetachSilent`, `m_silentDone` 1회 가드 = `GateUI.m_satisfied`와 같은 역할). `GateUI`는 무수정 — "아무것도 안 그리는 모드"를 넣는 대신 소비처에서 끊었다. ⚠️ 그래서 **`AcquireButton`의 `TutorialAnchor`는 억제 모드에서도 필수**다(떼면 스텝 4·9가 영구 정지).
 - **뜯기 안내는 튜토리얼이 아니다**: "스와이프하여 오픈"은 `PackRevealView.tearHint`(씬 저작 TMP + `CanvasGroup`)로, **튜토리얼 진행 여부와 무관하게 항상** 뜯기 대기 중 표시되고 뜯김 확정(`EnterBursting`)에 사라진다. 튜토리얼 배너였다면 2회차 이후 구매에서는 안내가 사라진다 — 조작법은 온보딩이 끝나도 필요하므로 씬의 상시 안내로 둔다. ⚠️ 배치는 **`RevealPanel` 바깥**이어야 한다(그 `CanvasGroup`은 분출 전까지 `alpha 0`이라 그 아래 두면 정작 뜯기 단계에 안 보인다).
 
-**수정 가능성 높은 지점**: 스텝 순서·문구·팩·시나리오 = `OutgameTutorial.asset`(코드 미수정) / 새 타깃 = `EOutgameTutorialAnchor` 끝에 값 추가 + 씬에 `TutorialAnchor` 부착 / 게이트 외형 = `OutgameTutorialGateUI.BuildUI`(현재 코드 빌드, 아트 스킨 교체는 이 메서드 내부만) / 개봉 씬 경로 = `OutgameTutorialRunner.PackOpenScene` 상수 / 개봉 씬 가이드 on·off = 씬 브리지의 `suppressGuideUI` 체크박스.
+**수정 가능성 높은 지점**: 스텝 순서·문구·팩·시나리오 = `OutgameTutorial.asset`(코드 미수정) / 새 타깃 = `EOutgameTutorialAnchor` 끝에 값 추가 + 씬에 `TutorialAnchor` 부착 / 게이트 외형 = `OutgameTutorialGateUI.BuildUI`(현재 코드 빌드, 아트 스킨 교체는 이 메서드 내부만) / 개봉 씬·전투 씬 경로 = `OutgameTutorialRunner.PackOpenScene` / `BattleScene` 상수 / 개봉 씬 가이드 on·off = 씬 브리지의 `suppressGuideUI` 체크박스 / 첫 전투를 다시 "로비에서 눌러서 시작"으로 되돌리려면 스텝 0의 kind를 `AutoBattle`→`BattleEntry`(anchor=`LobbyPlayButton`)로 바꾸면 된다(코드 무수정).
 
 #### 파일 지도 — 다이어그램에서 코드로
 
@@ -786,7 +785,8 @@ sequenceDiagram
 | `LobbyTabController.Tab.tutorialAnchor` (탭 버튼 대리 등록) | `Assets/Scripts/UI/Lobby/LobbyTabController.cs` — 필드 1 + `Awake` 3줄 | P4 ✅ |
 | `OwnershipManager.HasAnyOwnedSaved` 용도 축소(주석) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` — 레거시 마이그레이션 판정 전용 | P4 ✅ |
 | ~~`LobbyFirstRunRedirect`~~ | **삭제** — 스텝 0 `AutoPurchase`가 흡수 | P4 ✅ |
-| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~13) | 저작 완료 — 전투 3회 · 구매 사이클 2회 | P6 ✅ |
+| `OutgameTutorialData.EStepKind.AutoBattle` + `Runner.EnterAutoBattle`/`BattleScene` 상수 | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` · `OutgameTutorialRunner.cs` | 2026-07-28 ✅ |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~10) | 저작 완료 — 전투 3회 · 구매 사이클 2회 (2026-07-28 앞머리 3스텝 제거) | P6 ✅ |
 
 #### 씬/에셋 인계 (코드 밖 — 사용자)
 
@@ -795,11 +795,12 @@ sequenceDiagram
 | `Assets/Scenes/New/LobbyScene.unity` | 구 `LobbyFirstRunRedirect` GameObject의 **Missing Script 제거** 후 `OutgameTutorialBridge` 부착(`data` ← `OutgameTutorial.asset`) / `MatchContent/PlayBtn`에 `TutorialAnchor`(`key = LobbyPlayButton`) |
 | `Assets/Scenes/CardPack.unity` | `AcquireButton`에 `TutorialAnchor`(`key = PackAcquireButton`) / `PackOpenDirector`에 `OutgameTutorialBridge`(같은 에셋) |
 | `Assets/Scenes/CardPack.unity` (2026-07-27 추가) | ① `PackOpenDirector`의 브리지 → **`Suppress Guide UI` 체크** ② **`UICanvas` 직속**(`RevealPanel`의 **형제**)에 안내 TMP 신규(예: `TearHint`, "스와이프하여 오픈") — `CanvasGroup` 추가 후 **alpha 0으로 저장**, TMP `Raycast Target` 해제 → `PackRevealView.tearHint`에 배선 ③ `AcquireButton`의 `TutorialAnchor`는 **유지**(억제 모드에서도 브리지가 이 앵커로 클릭을 감지) |
-| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` | 14스텝. 0=`AutoPurchase`(pack←StarterPack, `nextScene`=**LobbyScene**, refund 10) · 1=`WaitPackOpen` · 2=`WaitClick`(PackAcquireButton) · 3=`BattleEntry`(scenario←TutorialScenario) · 4~8·9~13=구매 사이클(`WaitClick`(LobbyPackTab) → `WaitPurchase`(PackBuyButton) → `WaitPackOpen` → `WaitClick`(PackAcquireButton) → `BattleEntry`(TutorialScenario2/3)) |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` | **11스텝**(2026-07-28 개정). 0=`AutoBattle`(scenario←TutorialScenario, anchor·pack·nextScene 전부 비움) · 1~5·6~10=구매 사이클(`WaitClick`(LobbyPackTab) → `WaitPurchase`(PackBuyButton, pack←NormalPack, refund 10) → `WaitPackOpen` → `WaitClick`(PackAcquireButton) → `BattleEntry`(TutorialScenario2/3, anchor←LobbyPlayButton)) |
 | `UIPoolManager` 캔버스 | `sortingOrder` **1 → 400** (`LobbyScene.unity` / `MainMenu.unity`). 게이트 300 > 팝업 상속값 1이라 **실패 팝업이 딤 아래로 묻혀 [확인]을 못 누른다** |
 
-> `nextScene`은 **개봉 후 목적지**다(개봉 씬 `"CardPack"`은 러너 상수). 스텝 0의 `nextScene`을 `BattleScene`으로 두면 안 된다 — 전투 진입은 스텝 2가 담당한다.
-> 개봉 씬 스텝(1·6·11 `WaitPackOpen`, 2·7·12 `WaitClick`)의 `guideMessage`는 `suppressGuideUI` 이후 **표시되지 않는다**. 비워도 되고 두어도 무해하다(로비 브리지는 이 스텝들을 만나지 않는다).
+> `nextScene`은 **개봉 후 목적지**이며 `AutoPurchase` 전용이다(개봉 씬 `"CardPack"`·전투 씬 `"BattleScene"`은 러너 상수). `AutoBattle`은 이 필드를 읽지 않는다.
+> 개봉 씬 스텝(3·8 `WaitPackOpen`, 4·9 `WaitClick`)의 `guideMessage`는 `suppressGuideUI` 이후 **표시되지 않는다**. 비워도 되고 두어도 무해하다(로비 브리지는 이 스텝들을 만나지 않는다).
+> ⚠️ 스텝 인덱스가 곧 세이브 진행도라, 앞머리 3스텝 제거로 **진행 중이던 세이브는 3칸 밀린다** — `OwnershipDebugTool`의 진행도 리셋으로 처음부터 확인할 것.
 > 게이트 UI는 코드 빌드라 **신규 프리팹·Addressable 등록이 없다**(`UIPrefab` 라벨 체크 대상 아님).
 
 #### P5·P6 해결 내역

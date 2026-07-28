@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 
 // 개봉 카드 더미. 카드를 한 자리에 겹쳐 쌓고, 맨 위부터 스와이프로 한 장씩 밀어낸다.
 // 카드는 앞면이라 맨 위가 처음부터 보인다 — 서스펜스는 "밀어냈을 때 그 아래 뭐가 있나"에 있다.
+// 방향은 가리지 않는다(좌우·위아래·대각 전부) — 민 쪽으로 그대로 날아간다. 짧아도 빠르게 튕기면 넘어간다.
 // 밀린 카드는 민 방향으로 날아가며 사라진다. 결과 라인업은 더미가 다 빈 뒤 PackResultGrid가 따로 세운다 —
 //   밀어내기(좌표 직접 조작)와 결과 배치(레이아웃)가 같은 오브젝트를 두고 다투지 않게 하려는 분리다.
 //
@@ -39,8 +40,12 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     [SerializeField] float stackJitterAngle = 1f;
 
     [Header("스와이프")]
-    [Tooltip("이만큼 밀면 넘어간다. 못 미치면 제자리로 되돌아온다.")]
-    [SerializeField] float flickThreshold = 120f;
+    [Tooltip("이만큼 밀면 넘어간다(방향 무관 — 민 거리 그대로). 못 미치면 제자리로 되돌아온다.")]
+    [SerializeField] float flickThreshold = 90f;
+    [Tooltip("이 속도(단위/초) 이상으로 튕기면 거리가 부족해도 넘어간다. 0이면 속도 판정 없음.")]
+    [SerializeField] float flickSpeed = 700f;
+    [Tooltip("속도로 넘길 때 최소한 이만큼은 밀어야 한다(스치는 터치를 넘김으로 오인하지 않게).")]
+    [SerializeField] float flickMinDistance = 20f;
     [Tooltip("미는 양에 비례해 카드가 기우는 정도(도/픽셀).")]
     [SerializeField] float dragTiltPerPixel = 0.06f;
     [SerializeField] float returnDuration = 0.25f;
@@ -64,6 +69,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Canvas m_canvas;
     bool m_interactable;
     bool m_dragging;
+
+    // 최근 프레임의 미는 속도(카드 좌표계 단위/초). 짧고 빠른 플릭을 거리 대신 이 값으로 살린다.
+    float m_dragSpeed;
 
     public int Remaining => m_stack.Count;
 
@@ -160,6 +168,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         if (!m_interactable || m_stack.Count == 0) return;
         m_dragging = true;
+        m_dragSpeed = 0f;
 
         var t_top = m_stack[0];
         if (t_top != null) t_top.transform.DOKill();
@@ -176,9 +185,14 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         float t_scale = m_canvas != null ? m_canvas.scaleFactor : 1f;
         if (t_scale <= 0f) t_scale = 1f;
 
-        t_rt.anchoredPosition += _e.delta / t_scale;
+        var t_move = _e.delta / t_scale;
+        t_rt.anchoredPosition += t_move;
 
-        // 민 만큼 기운다 — 손에 붙는 느낌은 위치보다 회전에서 온다.
+        // 속도는 거리와 같은 좌표계에서 재야 두 임계를 나란히 비교할 수 있다.
+        float t_dt = Time.unscaledDeltaTime;
+        if (t_dt > 0f) m_dragSpeed = t_move.magnitude / t_dt;
+
+        // 민 만큼 기운다 — 손에 붙는 느낌은 위치보다 회전에서 온다(기울기는 좌우 성분만 반영).
         float t_dx = t_rt.anchoredPosition.x - HomeOf(m_stack[0]).x;
         t_rt.localRotation = Quaternion.Euler(0f, 0f, -t_dx * dragTiltPerPixel);
     }
@@ -192,17 +206,22 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         var t_rt = TopRect();
         if (t_rt == null) return;
 
-        float t_dx = t_rt.anchoredPosition.x - HomeOf(t_top).x;
+        // 방향을 가리지 않는다 — 어느 쪽으로 밀었든 민 거리로 판정하고 그 방향으로 날려보낸다.
+        var t_offset = t_rt.anchoredPosition - HomeOf(t_top);
+        float t_dist = t_offset.magnitude;
 
-        // 임계 미만은 되감기 — 실수로 건드린 것을 넘김으로 처리하지 않는다.
-        if (Mathf.Abs(t_dx) < flickThreshold)
+        // 거리가 찼거나, 짧아도 충분히 빠르게 튕겼으면 넘긴다.
+        bool t_flicked = flickSpeed > 0f && m_dragSpeed >= flickSpeed && t_dist >= flickMinDistance;
+
+        // 둘 다 아니면 되감기 — 실수로 건드린 것을 넘김으로 처리하지 않는다.
+        if (t_dist < flickThreshold && !t_flicked)
         {
             ReturnHome(t_top);
             return;
         }
 
         m_stack.RemoveAt(0);
-        DismissCard(t_top, Mathf.Sign(t_dx));   // 민 방향 그대로 날려보낸다.
+        DismissCard(t_top, t_offset / Mathf.Max(0.0001f, t_dist));   // 민 방향 그대로 날려보낸다.
 
         OnRemainingChanged?.Invoke(m_stack.Count);
 
@@ -219,7 +238,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     }
 
     // 밀려난 카드를 민 방향으로 날려보내며 지운다. 결과는 남기지 않는다 — 전부 넘긴 뒤 결과 격자가 다시 보여준다.
-    void DismissCard(PackCardView _view, float _dirX)
+    void DismissCard(PackCardView _view, Vector2 _dir)
     {
         if (_view == null) return;
 
@@ -228,7 +247,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         var t_rt = (RectTransform)_view.transform;
         t_rt.DOKill();
 
-        var t_target = t_rt.anchoredPosition + new Vector2(_dirX * dismissDistance, 0f);
+        var t_target = t_rt.anchoredPosition + _dir * dismissDistance;
         var t_group  = _view.Group;
 
         m_dismissing.Add(_view);
@@ -236,7 +255,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         var t_seq = DOTween.Sequence()
             .SetLink(_view.gameObject)
             .Join(t_rt.DOAnchorPos(t_target, dismissDuration).SetEase(Ease.OutCubic))
-            .Join(t_rt.DOLocalRotate(new Vector3(0f, 0f, -_dirX * dismissTiltAngle), dismissDuration));
+            .Join(t_rt.DOLocalRotate(new Vector3(0f, 0f, -_dir.x * dismissTiltAngle), dismissDuration));
 
         if (t_group != null)
             t_seq.Join(t_group.DOFade(0f, dismissDuration).SetEase(Ease.InQuad));
