@@ -49,17 +49,24 @@ public static class AttackSequence
         Func<UniTask> _afterHit = null)
         => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
+    /// <summary>공격력이 이 값 이상이면 특별(시네마) 연출. 표시 공격력과 동일한 CardInstance.AttackDamage() 기준.</summary>
+    public const int CINEMA_ATTACK_THRESHOLD = 6;
+
+    /// <summary>시네마 연출 대상인가. 공격자의 실제 공격력(도발 반감·시너지·흐름 포함) ≥ 임계값.
+    /// 히트 해결 전에 평가하므로 카드 UI에 표시 중인 값과 일치. 순수 판정 — RNG 미소비, 양 클라 동일 입력 → 동일 결과.</summary>
+    static bool IsCinemaAttack(CardView _attacker)
+        => (_attacker?.BoundCard?.AttackDamage() ?? 0) >= CINEMA_ATTACK_THRESHOLD;
+
     /// <summary>연출 디스패치. 두 프레젠테이션 공유 히트해결(ResolveHits)로 데미지/사망 타이밍 일치.
     /// - 일반(PlayNormal): 자기 위치에서 적 방향으로 각도 틀고 박치기.
-    /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1.
-    /// TODO(판정 보류): 지금은 전부 일반. 특별 조건이 정해지면 t_special만 세팅.</summary>
+    /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1. 공격력 CINEMA_ATTACK_THRESHOLD 이상일 때.</summary>
     static UniTask PlayCore(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit,
         bool? _forceSpecial = null)
     {
-        // 테스트/특수 호출이 강제하면 그 값, 아니면 판정(현재 전부 일반).
-        bool t_special = _forceSpecial ?? false;   // TODO: 특별 연출 판정 기준 배선 지점.
+        // 테스트/특수 호출이 강제하면 그 값, 아니면 공격력 기준 판정.
+        bool t_special = _forceSpecial ?? IsCinemaAttack(_attacker);
         return t_special
             ? PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit)
             : PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
@@ -71,7 +78,6 @@ public static class AttackSequence
         AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
         float t_hitDelay = _effect?.hitDelay ?? 0f;
-        NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
 
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
@@ -94,9 +100,23 @@ public static class AttackSequence
             return;
         }
 
+        await Headbutt(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+            _home: _attacker.SlotPosition);
+
+        CardView.RestoreAllFades();
+    }
+
+    // ── 공유: 박치기 모션 ────────────────────────────────────────────────
+    /// <summary>윈드업(뒤로 살짝) → 돌진(각도 틀며 접촉=히트) → 반동 → _home 복귀.
+    /// 히트/사망 해결(ResolveHits)과 반동/복귀는 병렬 — 데미지는 접촉 시점에 적용.
+    /// 일반 연출은 _home=원래 슬롯, 시네마 연출은 _home=시네마 위치(이후 호출부가 슬롯으로 복귀시킴).</summary>
+    static async UniTask Headbutt(CardView _attacker, CardView _defender, CardView _splashView,
+        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit, Vector3 _home)
+    {
+        NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
+
         Transform  t_atk     = _attacker.transform;
         Vector3    t_origin  = t_atk.position;            // 공격 시작점 = 현재 위치(드래그-백이면 띄운 자리).
-        Vector3    t_home    = _attacker.SlotPosition;    // 공격 후 복귀 = 원래 슬롯.
         Quaternion t_baseRot = t_atk.localRotation;
 
         // 적 방향으로 기우는 각도(Z lean). 세로 부호 무시(적/아군 위아래 뒤집힘 방지), 좌우 성분으로만 기울임.
@@ -126,20 +146,18 @@ public static class AttackSequence
         UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
 
         Vector3 t_recoil = t_impact - t_dirN * t_cfg.recoilDist;   // 충격 지점 기준 뒤로 반동(적 반대 방향).
-        t_recoil.z = t_home.z;
+        t_recoil.z = _home.z;
 
         // 반동(각도 유지) → 끝난 뒤 복귀(이동+각도 원복). 순차. 방어자 히트/사망(ResolveHits)과는 병렬.
         async UniTask RecoilThenReturn()
         {
             await t_atk.DOMove(t_recoil, t_cfg.recoilDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask();
             await UniTask.WhenAll(
-                t_atk.DOMove(t_home, t_cfg.outDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
+                t_atk.DOMove(_home, t_cfg.outDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
                 t_atk.DOLocalRotateQuaternion(t_baseRot, t_cfg.outDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask());
         }
 
         await UniTask.WhenAll(t_resolve, RecoilThenReturn());
-
-        CardView.RestoreAllFades();
     }
 
     // ── 특별 연출: 카메라 시네마 1vs1 ────────────────────────────────────
@@ -197,7 +215,13 @@ public static class AttackSequence
         if (t_hitDelay > 0f)
             await UniTask.Delay((int)(t_hitDelay * 1000));
 
-        await ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit);
+        // 시네마 자리에서 일반 연출과 동일한 박치기(윈드업→돌진→반동). 복귀점=시네마 위치,
+        // 슬롯 복귀는 아래 RestoreAfterAttack가 담당. 공격자 없음(환경 피해)이면 히트만.
+        if (_attacker != null)
+            await Headbutt(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+                _home: _attacker.transform.position);
+        else
+            await ResolveHits(null, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
 
         BattleCamera.Instance?.ExitCinema();
 
@@ -255,9 +279,9 @@ public static class AttackSequence
 
         if (_splashView != null)
         {
-            await UniTask.WhenAll(
-                t_defenderKilled ? _defender.PlayDeathAnim()                             : UniTask.CompletedTask,
-                t_splashKilled   ? (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask) : UniTask.CompletedTask);
+            // 무쌍 등 다중 파괴: 동시 재생하면 "따닥"으로 뭉쳐 보인다 → 대상→스플래시 순차 재생.
+            if (t_defenderKilled) await _defender.PlayDeathAnim();
+            if (t_splashKilled)   await (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask);
             if (t_defenderKilled || t_splashKilled)
                 SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
         }

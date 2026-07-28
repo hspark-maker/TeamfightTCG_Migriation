@@ -110,6 +110,9 @@ public class TurnRunner : MonoBehaviour
         // (3) 카드 배치.
         if (_dealCards != null) await _dealCards();
 
+        // (3.5) 후공 어드밴티지 멀리건 — 첫 턴 시작 전, 보드가 채워진 뒤. 싱글 전용(멀티는 내부에서 no-op).
+        await MulliganPhase.Run(this.ctx, t_first, this.GetCancellationTokenOnDestroy());
+
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
         RunTurns(t_first, _skipFirstBanner: true).Forget();
     }

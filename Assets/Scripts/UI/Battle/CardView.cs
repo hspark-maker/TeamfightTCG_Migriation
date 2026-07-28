@@ -617,6 +617,7 @@ public class CardView : MonoBehaviour
 
         s_selectedAttacker = this;
         SetHighlight(true);
+        SetTargetFocus(true);   // 무장된 내 카드 살짝 확대 — 지금 누가 공격자인지 즉시 보이게.
         FocusWeapon(true);
 
         var t_targets = GetValidEnemyViews();   // 지정 타깃이면 그 하나, 아니면 도발 있을 때 도발 카드만.
@@ -637,8 +638,8 @@ public class CardView : MonoBehaviour
         }
     }
 
-    // 무장 해제: 강조/무기/페이드 원복.
-    static void ClearAttackerSelection()
+    // 무장 해제: 강조/확대/무기/페이드 원복. _instant=공격 발동 직전(뒤이어 AttackSequence가 transform 장악).
+    static void ClearAttackerSelection(bool _instant = false)
     {
         if (s_selectedAttacker == null) return;
         CardView t_prev = s_selectedAttacker;
@@ -652,6 +653,7 @@ public class CardView : MonoBehaviour
         }
 
         t_prev.SetHighlight(false);
+        t_prev.SetTargetFocus(false, _instant);
         t_prev.FocusWeapon(false);
         RestoreAllFades();
     }
@@ -666,7 +668,7 @@ public class CardView : MonoBehaviour
         if (!t_valid.Contains(this)) return;                          // 지정 타깃/도발로 걸러진 무효 타깃 무시.
 
         CardView t_attacker = s_selectedAttacker;
-        ClearAttackerSelection();
+        ClearAttackerSelection(_instant: true);   // 확대 즉시 원복 — 공격 연출의 DOKill에 트윈이 잘려 커진 채 굳는 것 방지.
         OnAttack?.Invoke(t_attacker, this);
     }
 
@@ -910,11 +912,16 @@ public class CardView : MonoBehaviour
             this.selectedHighlight.enabled = _active;
     }
 
-    // 드래그 조준 타겟 포커스: 이 카드를 확대(_on)/원복. 타겟 전환/취소 시 호출. 카드 이동 tween과 겹치지 않는 idle 상태에서만 사용.
-    public void SetTargetFocus(bool _on)
+    // 조준 포커스: 이 카드를 확대(_on)/원복. 드래그 타겟 전환·탭 무장/해제 시 호출.
+    // 카드 이동 tween과 겹치지 않는 idle 상태에서만 사용.
+    // _instant: 공격 발동 직전 원복처럼 뒤이어 AttackSequence의 DOKill이 들어오는 경로 — 트윈이 중간에 죽어
+    // 확대된 채 고착되지 않도록 스케일을 즉시 되돌린다.
+    public void SetTargetFocus(bool _on, bool _instant = false)
     {
         transform.DOKill();
-        transform.DOScale(_on ? this.targetFocusScale : 1f, this.targetFocusDur)
+        float t_scale = _on ? this.targetFocusScale : 1f;
+        if (_instant) { transform.localScale = Vector3.one * t_scale; return; }
+        transform.DOScale(t_scale, this.targetFocusDur)
                  .SetEase(Ease.OutBack).SetLink(gameObject);
     }
 

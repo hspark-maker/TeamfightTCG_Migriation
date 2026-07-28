@@ -37,24 +37,24 @@ public class BattleFieldView : MonoBehaviour
 
         Vector3 t_mid = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_wz);
 
-        var t_tasks = new List<UniTask>();
+        // 배치 전 전원 화면 밖으로 선이동 — 순차 재생 중 아직 안 나온 카드가 슬롯에 먼저 보이지 않게.
+        var t_dests = new Vector3[_placed.Count];
         for (int i = 0; i < _placed.Count; i++)
         {
             CardView t_view = this.slotViews[_placed[i].slotIndex];
-            Vector3 t_dest  = t_view.transform.position;
-            Vector3 t_hide  = t_from;
-            t_hide.z = t_dest.z;
+            t_dests[i] = t_view.transform.position;
+            Vector3 t_hide = t_from;
+            t_hide.z = t_dests[i].z;
             t_view.transform.position = t_hide;
-            t_tasks.Add(DealWithDelay(t_view, t_from, t_mid, t_dest, i));
         }
-        await UniTask.WhenAll(t_tasks);
-    }
 
-    async UniTask DealWithDelay(CardView _view, Vector3 _from, Vector3 _mid, Vector3 _dest, int _index)
-    {
-        if (_index > 0)
-            await UniTask.Delay((int)(this.cardDealDelay * _index * 1000));
-        await _view.PlayDealAnim(_from, _mid, _dest, this.cardDealDuration);
+        // 순차 배치: 한 장이 슬롯에 안착한 뒤 cardDealDelay 만큼 쉬고 다음 장(겹침 없음).
+        for (int i = 0; i < _placed.Count; i++)
+        {
+            if (i > 0) await UniTask.Delay((int)(this.cardDealDelay * 1000));
+            await this.slotViews[_placed[i].slotIndex]
+                .PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
+        }
     }
 
     public void InitializeAnimators()
