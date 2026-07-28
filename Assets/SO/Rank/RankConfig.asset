@@ -14,64 +14,39 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RankConfig
   winPoints: 10
   losePoints: 5
-  tiers:
-  - displayName: "\uBE0C\uB860\uC988 1"
-    requiredPoints: 0
+  grades:
+  - grade: 0
+    displayName: Bronze
     badge: {fileID: 0}
-  - displayName: "\uBE0C\uB860\uC988 2"
-    requiredPoints: 25
+    entryPoints: 0
+    pointsPerDivision: 25
+    rewardGold: 100
+    rewardGoldPerDivision: 50
+  - grade: 1
+    displayName: Silver
     badge: {fileID: 0}
-  - displayName: "\uBE0C\uB860\uC988 3"
-    requiredPoints: 50
+    entryPoints: 100
+    pointsPerDivision: 25
+    rewardGold: 300
+    rewardGoldPerDivision: 50
+  - grade: 2
+    displayName: Gold
     badge: {fileID: 0}
-  - displayName: "\uBE0C\uB860\uC988 4"
-    requiredPoints: 75
+    entryPoints: 200
+    pointsPerDivision: 25
+    rewardGold: 500
+    rewardGoldPerDivision: 100
+  - grade: 3
+    displayName: Platinum
     badge: {fileID: 0}
-  - displayName: "\uC2E4\uBC84 1"
-    requiredPoints: 100
+    entryPoints: 300
+    pointsPerDivision: 25
+    rewardGold: 900
+    rewardGoldPerDivision: 100
+  - grade: 4
+    displayName: Diamond
     badge: {fileID: 0}
-  - displayName: "\uC2E4\uBC84 2"
-    requiredPoints: 125
-    badge: {fileID: 0}
-  - displayName: "\uC2E4\uBC84 3"
-    requiredPoints: 150
-    badge: {fileID: 0}
-  - displayName: "\uC2E4\uBC84 4"
-    requiredPoints: 175
-    badge: {fileID: 0}
-  - displayName: "\uACE8\uB4DC 1"
-    requiredPoints: 200
-    badge: {fileID: 0}
-  - displayName: "\uACE8\uB4DC 2"
-    requiredPoints: 225
-    badge: {fileID: 0}
-  - displayName: "\uACE8\uB4DC 3"
-    requiredPoints: 250
-    badge: {fileID: 0}
-  - displayName: "\uACE8\uB4DC 4"
-    requiredPoints: 275
-    badge: {fileID: 0}
-  - displayName: "\uD50C\uB798\uD2F0\uB118 1"
-    requiredPoints: 300
-    badge: {fileID: 0}
-  - displayName: "\uD50C\uB798\uD2F0\uB118 2"
-    requiredPoints: 325
-    badge: {fileID: 0}
-  - displayName: "\uD50C\uB798\uD2F0\uB118 3"
-    requiredPoints: 350
-    badge: {fileID: 0}
-  - displayName: "\uD50C\uB798\uD2F0\uB118 4"
-    requiredPoints: 375
-    badge: {fileID: 0}
-  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 1"
-    requiredPoints: 400
-    badge: {fileID: 0}
-  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 2"
-    requiredPoints: 425
-    badge: {fileID: 0}
-  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 3"
-    requiredPoints: 450
-    badge: {fileID: 0}
-  - displayName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 4"
-    requiredPoints: 475
-    badge: {fileID: 0}
+    entryPoints: 400
+    pointsPerDivision: 25
+    rewardGold: 1400
+    rewardGoldPerDivision: 200

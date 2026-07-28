@@ -831,9 +831,9 @@ flowchart TD
     end
 
     subgraph rank["H. 랭크 (신규 OutGame/Rank/)"]
-        CFG["RankConfig (SO)<br/>[#1 fallback]<br/>tiers · winPoints · losePoints<br/>필드 초기화자 = 코드 기본 테이블"]:::new
+        CFG["RankConfig (SO)<br/>[#1 fallback] 테이블 해석 단일 진실원<br/>grades(등급 5행) · DivisionsPerGrade=4<br/>TierCount · ResolveTierIndex · TryGetTier<br/>필드 초기화자 = 코드 기본 테이블"]:::new
         MGR["RankManager<br/>[#1 static창구] 캐시 없음 · 예외 미발생<br/>Points · GetInfo · ApplyBattleResult"]:::new
-        INFO["RankInfo (readonly struct)<br/>[#6 UI 스냅샷]<br/>TierIndex · DisplayName · Badge<br/>Points · NextRequired · IsMaxTier"]:::new
+        INFO["RankInfo (readonly struct)<br/>[#6 UI 스냅샷]<br/>TierIndex · Grade · Division<br/>DisplayName · Badge<br/>Points · NextRequired · IsMaxTier"]:::new
     end
 
     subgraph battle["Battle (경계 교차, 2줄)"]
@@ -889,7 +889,7 @@ sequenceDiagram
 - **강등 없음의 구현**: 별도 상태가 아니라 **가감 시 하한 클램프**다 — `max(points + delta, max(가감 전 티어의 requiredPoints, 0))`. 이중 하한이라 음수도 불가능. 부작용: **갓 승급한 유저는 다음 승리 전까지 패배 비용이 0**(설계된 사각지대, 표시용이라 수용).
 - **`Init`이 없는 이유**: 캐시를 두지 않고 세이브 슬롯을 직접 읽는다(`OutgameTutorialProgress` 패턴). 캐시의 유일한 이득인 읽기 성능이 여기선 0인 반면(조회 = 로비 진입당 1회), 캐시의 비용은 **`GameManager.Boot()` 수정 = 통합 부트 순서(동결 계약) 접촉**으로 최대다. `GameManager`가 `BeforeSceneLoad`+`DontDestroyOnLoad`라 **어느 씬에서 Play를 시작하든 `Load()`가 끝나 있다** — 캐시 패턴은 이 보장을 못 준다.
 - **보상 뒤에 랭크를 두는 이유**: 랭크가 실패해도 골드는 이미 지급·영속 완료. 또 `RewardService`가 `CurrencyManager.Save()`로 캐시→슬롯 flush를 끝낸 뒤라 랭크의 `DataSaveManager.Save()`가 최신 골드를 쓴다(뒤집으면 낡은 골드 슬롯을 한 번 디스크에 쓰게 됨).
-- **`try/catch`를 안 쓰는 이유**: 프로젝트에서 예외를 삼키는 곳은 `DataSaveManager.Load` 하나뿐. 대신 `RankManager`를 **예외를 던질 수 없게** 짠다(config null·빈 tiers·null 원소·슬롯 null 전부 폴백) — `RewardService`/`OutgameTutorialProgress`가 쓰는 방식.
+- **`try/catch`를 안 쓰는 이유**: 프로젝트에서 예외를 삼키는 곳은 `DataSaveManager.Load` 하나뿐. 대신 `RankManager`를 **예외를 던질 수 없게** 짠다(config null·빈 `grades`·null 등급 행·범위 밖 인덱스·슬롯 null 전부 폴백 — 등급 재설계 후에는 `RankConfig.ResolveTierIndex`/`TryGetTier`가 이 폴백을 한 곳에서 책임진다) — `RewardService`/`OutgameTutorialProgress`가 쓰는 방식.
 - **의도적으로 덜어낸 3건**: ① `OnRankChanged` 이벤트 — 골드와 달리 **랭크는 로비에서 변동할 경로가 0**(전투 씬에서만 변함)이라 `Start`/`OnEnable` 재조회로 충분. 필요해지면 순수 추가라 🟢로 언제든 붙는다. ② 구간 진행률 필드 — 씬에 진행바가 없어 소비처 0. ③ `ApplyBattleResult` 반환값 — 결과 팝업 표시를 보류했으므로 소비처 0.
 - **수정 가능성 높은 지점**: 티어 수·이름·임계치·승패 포인트 = `RankConfig.asset`(코드 무수정) / 티어 배지 아트 = SO의 `badge` 슬롯 / 집계 제외 규칙(튜토리얼 등) = `CaptureResult`의 조건 1줄.
 
@@ -920,15 +920,17 @@ LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
 | 클래스 | 파일 | 태스크 | 상태 |
 |---|---|---|---|
 | `RankSaveData` | `OutGame/Save/2.Domain/RankSaveData.cs` (+ `UserSaveData.rank` 슬롯) | H-28 | ✅ 코드 |
-| `RankConfig` · `RankTier` (SO) | `OutGame/Rank/RankConfig.cs` | H-30 | ✅ 코드 |
-| `RankManager` · `RankInfo` | `OutGame/Rank/RankManager.cs` | H-29 | ✅ 코드 |
+| `RankConfig`(SO) · `ERankGrade` · `RankGradeConfig`(저작) · `RankTier`(파생 struct) | `OutGame/Rank/RankConfig.cs` | H-30 | ✅ 코드 (`RankTier.Index`는 **예약 — 읽는 소비처 없음**) |
+| `RankManager` · `RankInfo` | `OutGame/Rank/RankManager.cs` | H-29 | ✅ 코드 (`RankInfo.Grade`·`Division`은 **예약 — 읽는 소비처 없음**) |
 | 전투 훅 | `Battle/TurnRunner.cs` `CaptureResult` 1줄 | H-31 | ✅ 코드 |
 | SO 주입 | `Utils/DataLibrary.cs` 필드1+호출1 | H-30 | ✅ 코드 (`RankConfig.asset`은 사용자 인계) |
 | `RankHud` | `UI/HUD/RankHud.cs` | H-32 | ✅ 코드 + 씬 배선 |
 
 #### CORE 구현 결과 (2026-07-27) — 소비자가 알아야 할 것
 
-- **기본 테이블(코드 필드 초기화자)**: **5랭크 × 4단계 = 20티어**. `브론즈 1~4(0/25/50/75) → 실버 1~4(100~175) → 골드 1~4(200~275) → 플래티넘 1~4(300~375) → 다이아몬드 1~4(400~475)`, 균등 25포인트 간격. `winPoints=10` · `losePoints=5`. 각 랭크 4단계에서 임계치를 넘기면 다음 랭크 1단계로 승급(브론즈 4 → 실버 1). `RankConfig.asset`이 없어도 이 20티어로 동작한다 → **배지 아트**가 사용자 인계분(랭크당 1장 재사용 또는 20장 개별 저작, HUD 저작 재량). `long` 필드에 `[Min]`은 붙이지 않는다(Unity `MinDrawer`가 `intValue`로 잘라낸다 — `BattleReward` 선례).
+- **기본 테이블(코드 필드 초기화자)**: **등급 5행 × 4단계 = 20티어**(20행 손저작이 아니라 등급 5행에서 **파생**). `브론즈 1~4(0/25/50/75) → 실버 1~4(100~175) → 골드 1~4(200~275) → 플래티넘 1~4(300~375) → 다이아몬드 1~4(400~475)`, 균등 25포인트 간격. `winPoints=10` · `losePoints=5`. 각 등급 4단계에서 다음 등급 `entryPoints`를 넘기면 **인덱스 연속성으로** 다음 등급 1단계가 된다(브론즈 4 → 실버 1). `RankConfig.asset`이 없어도 이 20티어로 동작한다 → **배지 아트**가 사용자 인계분(등급당 1장 = `RankGradeConfig.badge`, 4단계 공용). `long` 필드에 `[Min]`은 붙이지 않는다(Unity `MinDrawer`가 `intValue`로 잘라낸다 — `BattleReward` 선례).
+- **등급 × 단계 재설계(후속)**: 등급이 `ERankGrade` enum으로 승격돼 코드에서 참조 가능해졌고, 승급 규칙이 `RankConfig`의 파생 공식(`tierIndex = gradeIndex * 4 + (division-1)`)으로 명시됐다. 티어 해석은 `RankConfig.ResolveTierIndex` / `TryGetTier` **단일 진실원**에 모였고(두 매니저에 흩어져 있던 `ResolveTierIndex`/`ResolveTierFloor`/`FindNextTier`/`FindTier` 제거), `RankTier`는 저작 class → **파생 `readonly struct`**가 됐다. `DisplayName`은 생성자에서 정규화돼 조회 실패(`RankTier.None`)에도 빈 문자열이 보장된다 — 단 **조회 실패 판정은 `TryGetTier` 반환값으로만** 한다(`None`의 `Index=0`·`Grade=Bronze`는 유효한 브론즈 1과 값으로 구분되지 않는다). 세이브 스키마(`points`/`claimedCount`)와 티어 인덱스 의미는 **불변**.
+- **예약 API(읽는 소비처 0, 데드코드 아님)**: `RankInfo.Grade` · `RankInfo.Division` · `RankTier.Index`. 등급을 코드에서 참조 가능하게 만든 것이 이번 재설계의 목적이고, 등급 단위 뱃지/색상 분기·"실버 3" 형태 분해 표시가 붙을 확장 축이다. 제거하지 말 것.
 - **최대 티어면 `NextRequired == Points`**(0 아님) — "남은 = `NextRequired - Points`"가 모든 티어에서 성립해 HUD가 `IsMaxTier` 분기 없이 진행률을 계산해도 0 나눗셈이 안 난다.
 - **`DisplayName`은 항상 non-null**(미저작·빈 테이블이면 `string.Empty`). **`Badge`는 null 가능** → HUD는 non-null일 때만 스프라이트를 교체한다(아트 미배선 시 씬 기존 이미지 유지).
 - **`Config`·`Save()`는 private** — 공개 API는 `Points`/`GetInfo`/`ApplyBattleResult`/`SetConfig`/`ResetForDebug` 5개뿐.
@@ -938,8 +940,8 @@ LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
 
 - `RankHud`는 **`RankInfo` 스냅샷의 6필드 중 2개만 소비**한다 — `Badge`(Image 교체) · `Points`(TMP). `DisplayName`은 티어를 배지로 표현하기로 해서 소비처가 없고, `TierIndex`/`NextRequired`/`IsMaxTier`도 미소비(진행바 없음 + `IsMaxTier` 분기는 빈 tiers 오표시 위험).
 - **렌더 진입점은 `Render()` 하나**, 호출자는 `Start()`(최초 1회)와 `OnEnable()`(`m_started` 가드 → 탭 재진입만). 이벤트 구독 0이라 `OnDisable`이 없다 — 해제 누락 위험도 구조적으로 없다.
-- **배지 진실원은 `RankConfig.tiers[].badge` 단 하나**(사용자 결정). HUD에 `Sprite[]` 폴백 배열을 두지 않는다 — 아트 미저작이면 `Badge == null`이라 씬에 배선된 기존 스프라이트가 그대로 남는다.
-- 도메인 H는 이걸로 **코드 100% 종결**. 남은 건 전부 에셋/아트: `RankConfig.asset` 저작·배선, 티어 배지 스프라이트. 둘 다 없어도 20티어 기본 테이블 + 씬 기본 배지로 동작한다.
+- **배지 진실원은 `RankGradeConfig.badge` 단 하나**(사용자 결정, 등급 재설계 전에는 `RankConfig.tiers[].badge`). HUD에 `Sprite[]` 폴백 배열을 두지 않는다 — 아트 미저작이면 `Badge == null`이라 씬에 배선된 기존 스프라이트가 그대로 남는다.
+- 도메인 H는 이걸로 **코드 100% 종결**. 남은 건 전부 에셋/아트: `RankConfig.asset` 저작·배선(✅ 완료), **등급 배지 스프라이트 5장**(등급 단위, 4단계 공용 — L931과 동일 규약). 없어도 20티어 기본 테이블 + 씬 기본 배지로 동작한다.
 
 ---
 
@@ -947,6 +949,7 @@ LobbyCanvas/LobbyRoot/Content/Tab_Match/MatchContent
 
 > 표시용 진행도였던 랭크에 **보상 엔드포인트**를 붙인다. 티어에 도달하면 골드를 **순차로 1회씩** 수령한다.
 > **`RankManager`는 무수정** — 보상은 신규 static 창구 `RankRewardManager`로만 흐르고, 달성 판정만 `RankManager.GetInfo()`에 위임한다(동결 계약 무접촉).
+> ⚠️ 이 "무수정·동결" 서술은 **H-33 시점 기록**이다. 이후 등급 재설계에서 **동결이 해제**돼 `GetInfo`·`ApplyBattleResult`가 재작성되고 private 헬퍼 3개(`ResolveTierIndex`/`ResolveTierFloor`/`FindNextTier`)가 제거됐다. 공개 API·불변식은 보존됐다(아래 재설계 항목 참조).
 > 스코프: 골드 1종(프로젝트 재화가 `Gold` 단일) · 20티어 전부 · 광고 2배 없음.
 
 #### 구조 지도 — 판정/영속/표시
@@ -958,8 +961,8 @@ flowchart TD
     end
 
     subgraph rank["랭크 (기존 + 신규)"]
-        CFG["RankConfig / RankTier<br/>rewardGold 컬럼 추가"]:::chg
-        MGR["RankManager<br/>[동결·무수정]<br/>GetInfo → 도달 티어"]
+        CFG["RankConfig / RankGradeConfig<br/>rewardGold · rewardGoldPerDivision"]:::chg
+        MGR["RankManager<br/>[H-33 시점 무수정 → 등급 재설계에서 동결 해제]<br/>GetInfo → 도달 티어"]
         RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
         INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>RewardGold · State"]:::new
     end
@@ -993,18 +996,20 @@ flowchart TD
 
 - **수령 상태가 정수 1개인 이유**: 티어는 강등이 없으므로(`ApplyBattleResult`의 하한 클램프) 도달 집합이 항상 `[0..TierIndex]` **프리픽스**다. 수령 집합도 프리픽스로 두면 상태공간이 정수 하나로 접힌다. `bool[20]`이나 키 리스트는 "구멍 뚫린 수령"처럼 **불변식이 허용하지 않는 상태까지 표현**할 수 있어 버그 표면이 넓어지고, 티어 테이블 길이가 바뀌면 마이그레이션이 필요하다.
 - **센티널(`-1`) 대신 개수인 이유**: 세이브는 `JsonUtility.FromJson`으로 읽는다. `0`이 곧 "미수령"이면 구 세이브·노드 재작성 어느 경로에서도 "이미 받음"으로 오판할 수 없다. `-1` 초기화자에 의존하면 직렬화기 동작에 안전성이 묶인다.
-- **보상량을 `RankTier`에 넣은 이유**: 별도 SO로 분리하면 두 리스트를 인덱스 정렬 상태로 **사람이** 유지해야 한다(도감이 이미 rowKey 드리프트로 겪은 문제). 같은 원소에 두면 어긋남이 구조적으로 불가능하다.
+- **보상량을 등급 행에 넣은 이유**: 별도 SO로 분리하면 두 리스트를 인덱스 정렬 상태로 **사람이** 유지해야 한다(도감이 이미 rowKey 드리프트로 겪은 문제). 임계치와 같은 원소(`RankGradeConfig`)에 두면 어긋남이 구조적으로 불가능하다.
 - **`Claimed`를 가장 먼저 판정하는 이유**: `RankManager.ResetForDebug()`는 `points`만 0으로 되돌려 `claimedCount > 도달티어` 구간을 만든다. `Claimable`을 먼저 보면 그 구간에서 **재수령이 뚫린다**.
 - **영속을 `CurrencyManager.Save()` 하나로 끝내는 이유**: 그 메서드가 골드를 슬롯에 flush한 뒤 `DataSaveManager.Save()`를 부른다. 앞에 `DataSaveManager.Save()`를 따로 세우면 **"커서만 오르고 골드는 미반영"인 중간 상태가 한 번 디스크에 쓰인다**(그 사이 크래시 = 골드만 유실).
 - **행이 스냅샷을 캐싱하지 않는 이유**: `RankRewardRowView`는 티어 인덱스만 들고 `Refresh()`마다 `GetInfo`를 재조회한다. struct를 캐싱하면 수령 후 stale이 되고, 패널이 갱신 때마다 스냅샷을 나눠줘야 해서 결합이 늘어난다.
 - **패널이 `PooledUIBase`가 아닌 이유**: 사용자 결정으로 씬 직접 저작이다. `UIPoolManager` 캔버스(1440×2960)는 `LobbyCanvas`(1080×1920)와 해상도가 달라 큰 레이아웃에서 좌표계가 어긋난다. 씬 저작이면 Addressable 등록·소팅 오더 문제도 함께 사라지고, 수령 팝업이 패널의 자식이라 항상 그 위에 뜬다.
 
-#### 함정 3개
+#### 함정 5개
 
 | 함정 | 왜 | 처방 |
 |---|---|---|
+| **인스펙터에서 `grades`에 빈 행 추가** | 신규 원소는 `entryPoints=0`·`pointsPerDivision=0`이라 **역순 스캔이 그 행의 4단계를 즉시 매치**한다 → 포인트와 무관하게 전 유저가 최상위 티어로 점프하고, 20행 보상이 통째로 수령 가능해진다(순차 커서가 끝까지 열림) | 저작 규율로만 막는다 — **신규 행은 값을 채운 뒤 저장**. `OnValidate` 검증 가드는 프로토 스코프 밖이라 넣지 않는다 |
+| **`grades`에 null 등급 행** | `TierCount`는 null 행도 4티어로 세지만 `TryGetTier`는 그 행에서 `false` → 패널은 행을 만들되 `Claim`이 커서를 못 올려 **그 지점부터 순차 수령이 영구 정지** | 구 `List<RankTier>` 구조와 동일한 성질이라 **회귀 아님**. Unity 직렬화상 null 원소 실현이 어려워 코드 가드 없이 방치(기록만) |
 | `rowPrefab`을 Content 안의 목업 행으로 배선 | `Build()`가 Content 자식을 전부 지우면 프리팹 참조가 fake-null이 되어 **다음 Open부터 행 0개** | 원본은 숨기기만 하고 Destroy 제외 + 사본을 `SetActive(true)` (구현 반영됨) |
-| `RankConfig.asset`의 `rewardGold` | YAML엔 키가 **없는데** 런타임엔 값이 산다 — Unity가 `List<RankTier>` 초기화자로 만든 원소를 재사용하고 없는 필드를 덮어쓰지 않기 때문. 즉 **값이 에셋이 아니라 코드에 묶여 있다** | 지금은 저작 없이 동작하나, 인스펙터에서 `tiers` 크기를 건드리면 0으로 리셋될 수 있다 → 한 번 저장해 YAML에 굳힌다 |
+| ~~`RankConfig.asset`의 `rewardGold`~~ | YAML엔 키가 **없는데** 런타임엔 값이 산다 — Unity가 초기화자로 만든 원소를 재사용하고 없는 필드를 덮어쓰지 않기 때문. 즉 **값이 에셋이 아니라 코드에 묶여 있었다**(전 티어 0골드 표시) | ✅ **해소(등급 재설계 시)**: `grades` 5행을 YAML에 직접 저작하며 `rewardGold`/`rewardGoldPerDivision`를 굳혔다. 코드 필드 초기화자와 값 일치 |
 | `RankReward` 활성화만 하고 중복 `RankHud`를 방치 | `Tab_Match`에 붙은 두 번째 `RankHud`의 `badgeImage`가 **`RankReward` 프리팹 내부 Image**를 가리킨다 → 배지 아트를 저작하는 순간 보상 버튼 아이콘이 티어 배지로 덮인다 | 버튼 활성화와 컴포넌트 제거를 **한 세트로** 처리 → ✅ **해소(2026-07-27)**: 활성화와 동시에 `Tab_Match`의 `RankHud` 제거. 정상본(`PlayBtn/RankInfo`) 1개만 잔존 |
 
 #### 씬 저작 (2026-07-27, Unity MCP `Unity_RunCommand`)
@@ -1043,10 +1048,11 @@ LobbyCanvas
 |---|---|---|
 | 보상 창구 · `RankRewardInfo` · `ERankRewardState` | `OutGame/Rank/RankRewardManager.cs` | ✅ 신규 |
 | 수령 커서 | `OutGame/Save/2.Domain/RankSaveData.cs` (`claimedCount`) | ✅ 필드 추가 |
-| 보상 테이블 | `OutGame/Rank/RankConfig.cs` (`RankTier.rewardGold`) | ✅ 필드 추가 |
+| 보상 테이블 | `OutGame/Rank/RankConfig.cs` (`RankGradeConfig.rewardGold` + `rewardGoldPerDivision`) | ✅ 필드 추가 |
 | SO 주입 | `Utils/DataLibrary.cs` 1줄 | ✅ |
 | 패널 · 행 · 수령 팝업 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` · `RankRewardClaimPopup.cs` | ✅ 신규 |
 | 씬 노드 · 행 프리팹 | `LobbyScene.unity`(`RankRewardOverlay`) · `Assets/Assets/Prefabs/UI/RankUI/RankRewardRow.prefab` | ✅ 저작 완료 (Addressable 등록 없음 — 풀드 UI가 아니다) |
 
 - ✅ 해소: 수령 팝업 취소 경로(`PopupDim` Button → `Hide()`, 코드 수정 0) · 중복 `RankHud`(제거 완료).
-- 미해결(후속 후보): `HasAnyClaimable` 소비처(진입 버튼 알림점 — 갱신할 런타임 스크립트가 없어 이번 스코프 밖) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음) · `RankConfig.asset`의 `rewardGold`가 여전히 YAML 미저작(코드 초기화자에 의존) · 티어 배지 아트 미저작 → 행 프리팹의 별 아이콘 1종이 전 티어 공통.
+- 미해결(후속 후보): `HasAnyClaimable` 소비처(진입 버튼 알림점 — 갱신할 런타임 스크립트가 없어 이번 스코프 밖) · 스크롤 위치가 행 인덱스 비율 근사(행 높이 미반영) · `RankConfig`가 두 static 캐시에 이중 보관(부트가 둘 다 주입해 현재 실해 없음) · 등급 배지 아트 미저작 → 행 프리팹의 별 아이콘 1종이 전 티어 공통.
+  - ✅ 목록에서 제거: `RankConfig.asset`의 `rewardGold` YAML 미저작 — 등급 재설계 때 `grades` 5행을 직접 저작하며 해소(위 함정 표 참조).

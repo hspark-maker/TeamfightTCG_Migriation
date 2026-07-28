@@ -225,6 +225,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: DeckEditCardTile
       objectReference: {fileID: 0}
+    - target: {fileID: 713961551648157017, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5

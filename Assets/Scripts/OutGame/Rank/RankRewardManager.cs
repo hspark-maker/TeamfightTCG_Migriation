@@ -1,9 +1,8 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 // 랭크 티어 달성 보상의 static 단일 창구.
-// RankManager는 동결 계약이라 건드리지 않고, 보상은 여기로만 흐른다(달성 판정은 RankManager.GetInfo에 위임).
+// 보상은 여기로만 흐른다(달성 판정은 RankManager.GetInfo, 티어 해석은 RankConfig에 위임 — 판정 로직을 복제하지 않는다).
 // RankManager와 같은 결로 캐시 없이 슬롯을 직접 읽는다(Init 없음 = 부트 계약 무접촉, Load가 Data를 교체해도 stale 없음).
 public static class RankRewardManager
 {
@@ -12,7 +11,7 @@ public static class RankRewardManager
     // 수령 통지 — 패널이 행 상태를 다시 그리는 유일한 트리거.
     public static event Action OnChanged;
 
-    public static int TierCount => Config.tiers != null ? Config.tiers.Count : 0;
+    public static int TierCount => Config.TierCount;
 
     public static int ClaimedCount => Slot.claimedCount;
 
@@ -40,16 +39,16 @@ public static class RankRewardManager
         if (_config != null) s_config = _config;
     }
 
-    // UI 1회 스냅샷. 범위 밖·null 원소도 예외 없이 Locked 기본값으로 떨어뜨린다.
+    // UI 1회 스냅샷. 범위 밖·null 등급 행도 예외 없이 RankTier.None + Locked로 떨어뜨린다.
     public static RankRewardInfo GetInfo(int _tierIndex)
     {
-        RankTier t_tier = FindTier(_tierIndex);
+        Config.TryGetTier(_tierIndex, out RankTier t_tier);
 
         return new RankRewardInfo(
             _tierIndex,
-            t_tier != null && t_tier.displayName != null ? t_tier.displayName : string.Empty, // TMP 소비처 NRE 방지 — null 대신 빈 문자열.
-            t_tier != null ? t_tier.badge : null,                                             // 뱃지는 null 허용(뷰가 non-null일 때만 교체).
-            t_tier != null ? t_tier.rewardGold : 0,
+            t_tier.DisplayName,
+            t_tier.Badge,       // 뱃지는 null 허용(뷰가 non-null일 때만 교체).
+            t_tier.RewardGold,
             StateOf(_tierIndex));
     }
 
@@ -60,10 +59,9 @@ public static class RankRewardManager
     {
         if (!CanClaim(_tierIndex)) return false;
 
-        var t_tier = FindTier(_tierIndex);
-        if (t_tier == null) return false;
+        if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return false;
 
-        CurrencyManager.Earn(ECurrencyType.Gold, t_tier.rewardGold); // 0/음수는 Earn이 무시 — 커서는 그대로 넘긴다.
+        CurrencyManager.Earn(ECurrencyType.Gold, t_tier.RewardGold); // 0/음수는 Earn이 무시 — 커서는 그대로 넘긴다.
         Slot.claimedCount = _tierIndex + 1;
 
         // CurrencyManager.Save()가 골드를 슬롯에 flush한 뒤 DataSaveManager.Save()를 부른다 —
@@ -93,14 +91,6 @@ public static class RankRewardManager
         bool t_reached = _tierIndex <= RankManager.GetInfo().TierIndex;
         return t_reached && _tierIndex == Slot.claimedCount ? ERankRewardState.Claimable : ERankRewardState.Locked;
     }
-
-    // 범위·null 원소 방어를 한 곳에 모은다.
-    static RankTier FindTier(int _tierIndex)
-    {
-        List<RankTier> t_tiers = Config.tiers;
-        if (t_tiers == null || _tierIndex < 0 || _tierIndex >= t_tiers.Count) return null;
-        return t_tiers[_tierIndex];
-    }
 }
 
 // 티어 보상 행 상태(3종 배타). "달성했지만 차례 아님"은 Locked에 포함된다(순차 수령).
@@ -116,7 +106,7 @@ public readonly struct RankRewardInfo
 {
     public readonly int TierIndex;          // 티어 인덱스(0 = 최하위)
     public readonly string DisplayName;     // 티어 표시명(항상 non-null)
-    public readonly Sprite Badge;           // 티어 뱃지(없을 수 있음)
+    public readonly Sprite Badge;           // 등급 뱃지(없을 수 있음)
     public readonly long RewardGold;        // 달성 시 1회 수령 골드
     public readonly ERankRewardState State;
 
