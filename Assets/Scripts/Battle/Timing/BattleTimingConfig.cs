@@ -38,6 +38,10 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float attackPreviewFlash = 0.55f;
     [SerializeField] float keywordGlowHold    = 1.5f;
 
+    [Header("Effect Notify (우측 컷인 배너)")]
+    [SerializeField] float effectNotifyDisplay = 1.8f;   // 배너가 떠 있는 유지 시간
+    [SerializeField] float effectNotifySlide   = 0.25f;  // 슬라이드 인/아웃 각 1회 시간
+
     [Header("Turn Pacing (AI 사고/상대 턴 지연 — 연출과 개념축 다름)")]
     [SerializeField] float enemyTurnStartDelay     = 0.8f;
     [SerializeField] float enemyExtraAttackDelay   = 0.4f;
@@ -63,6 +67,8 @@ public class BattleTimingConfig : ScriptableObject
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;
+    public float EffectNotifyDisplay => effectNotifyDisplay * SpeedFactor;
+    public float EffectNotifySlide   => effectNotifySlide   * SpeedFactor;
     public float EnemyTurnStartDelay      => enemyTurnStartDelay      * SpeedFactor;
     public float EnemyExtraAttackDelay    => enemyExtraAttackDelay    * SpeedFactor;
     public float OpponentTurnStartDelay   => opponentTurnStartDelay   * SpeedFactor;

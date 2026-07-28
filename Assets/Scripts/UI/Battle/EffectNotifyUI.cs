@@ -12,8 +12,10 @@ public class EffectNotifyUI : PooledUIBase
     [SerializeField] TextMeshProUGUI effectLabelText;
     [SerializeField] RectTransform panel;
     [SerializeField] float hiddenOffsetX = 400f;
-    [SerializeField] float displayDuration = 1.8f;
-    [SerializeField] float animDuration = 0.25f;
+
+    // 타이밍은 BattleTimingConfig 단일 진실원(전역 배속 적용). 프리팹 개별 값 없음.
+    static float DisplayDuration => GameTiming.Battle.EffectNotifyDisplay;
+    static float SlideDuration   => GameTiming.Battle.EffectNotifySlide;
 
     readonly Queue<EffectNotifyData> _queue = new Queue<EffectNotifyData>();
     bool _isPlaying;
@@ -56,12 +58,13 @@ public class EffectNotifyUI : PooledUIBase
 
         Vector2 t_shown = Vector2.zero;
         Vector2 t_hidden = new Vector2(this.hiddenOffsetX, 0f);
-        float t_dur = _data.displayDuration > 0f ? _data.displayDuration : this.displayDuration;
+        float t_dur   = _data.displayDuration > 0f ? _data.displayDuration : DisplayDuration;   // 호출부 지정이 있으면 우선.
+        float t_slide = SlideDuration;
 
         this.panel.anchoredPosition = t_hidden;
-        await this.panel.DOAnchorPos(t_shown, this.animDuration).SetEase(Ease.OutCubic).ToUniTask();
+        await this.panel.DOAnchorPos(t_shown, t_slide).SetEase(Ease.OutCubic).ToUniTask();
         await UniTask.Delay((int)(t_dur * 1000));
-        await this.panel.DOAnchorPos(t_hidden, this.animDuration).SetEase(Ease.InCubic).ToUniTask();
+        await this.panel.DOAnchorPos(t_hidden, t_slide).SetEase(Ease.InCubic).ToUniTask();
     }
 
     public override void Show()

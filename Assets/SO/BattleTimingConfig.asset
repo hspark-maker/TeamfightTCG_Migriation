@@ -29,6 +29,8 @@ MonoBehaviour:
   fadeViewDuration: 0.3
   attackPreviewFlash: 0.55
   keywordGlowHold: 1.5
+  effectNotifyDisplay: 1
+  effectNotifySlide: 0.2
   enemyTurnStartDelay: 0.8
   enemyExtraAttackDelay: 0.4
   opponentTurnStartDelay: 0.5
