@@ -109,6 +109,45 @@ public class BattleField : MonoBehaviour
         return t_next;
     }
 
+    /// <summary>후공 어드밴티지 멀리건: _slotIndex 슬롯 카드를 대기열의 _deckIndex 카드와 교환.
+    /// 전투 시작 1회. 스왑-인 카드는 오프닝 배치와 동일한 [Placed] 경로(런타임 등장 [Entered] 아님) —
+    /// [Entered]로 발화하면 돌보미/흐름 등 런타임 스폰 보너스가 이 카드에만 붙어 나머지 오프닝 카드와
+    /// 비대칭이 생긴다. 시너지는 ApplyDeckSynergy에서 대기 카드까지 이미 적용됨 → 재적용 금지(bonusHp 이중가산).
+    /// _deckIndex는 호출부가 MatchRandom으로 산출(결정론, 멀티 확장 대비). 반환: 새로 슬롯에 들어온 카드(실패 시 null).</summary>
+    public CardInstance MulliganSwap(int _slotIndex, int _deckIndex)
+    {
+        if (_slotIndex < 0 || _slotIndex >= SLOT_COUNT) return null;
+        if (this.waitingQueue.Count == 0) return null;
+        CardInstance t_out = this.slots[_slotIndex];
+        if (t_out == null) return null;
+
+        // 대기열에서 _deckIndex 카드 추출. Queue는 임의 위치 제거가 없어 리스트(FIFO 순서) 경유로 재구성 — 양측 동일 알고리즘이라 결정론.
+        int t_idx = Mathf.Clamp(_deckIndex, 0, this.waitingQueue.Count - 1);
+        var t_list = new List<CardInstance>(this.waitingQueue);
+        CardInstance t_in = t_list[t_idx];
+        t_list.RemoveAt(t_idx);
+
+        // 스왑-인 배치(오프닝 슬롯 카드와 동형). 시너지 재적용 없음.
+        t_in.isRevealed      = true;
+        t_in.wasEverRevealed = true;
+        t_in.slotIndex       = _slotIndex;
+        this.slots[_slotIndex] = t_in;
+
+        // 스왑-아웃 카드 → 대기열 뒤로. savedHp는 건드리지 않는다(-1 유지) — 전투 시작 무피해라 현재 hp/bonusHp가
+        // 곧 정확값이고, ApplyDeckSynergy가 준 시너지 덩치(bonusHp)를 담고 있다. base로 저장하면 재등장 시
+        // FillEmptySlots가 그 덩치를 소실시켜 스왑 안 된 대기 카드(-1 유지)와 비대칭이 생긴다.
+        t_out.slotIndex    = -1;
+        t_out.isRevealed   = false;
+        t_list.Add(t_out);
+
+        this.waitingQueue = new Queue<CardInstance>(t_list);
+
+        NotifyPlaced(t_in);   // [Placed] 오프닝 배치 경로(패시브 OnPlaced + 시너지 Placed). Initialize+ApplyDeckSynergy가 슬롯 카드에 준 것과 동형.
+        t_in.justSpawned = t_in.HasKeyword(CardKeyword.Invincible);
+        NotifyBoardChanged(); // 보드 구성 변화 → 성벽 등 라이브 카운트 파생 재동기(Placed는 미발화라 명시 호출).
+        return t_in;
+    }
+
     public bool CanSwapWithWaiting(CardInstance _card)
     {
         if (this.waitingQueue.Count == 0) return false;
