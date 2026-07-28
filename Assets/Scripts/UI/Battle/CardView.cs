@@ -16,6 +16,11 @@ public class CardView : MonoBehaviour
     static bool s_anyDragging;
     static CardView s_selectedAttacker;   // 탭 공격(제스처3)으로 무장된 공격자. null=미무장.
     static List<CardView> s_previewTargets;   // 무장 시 HP 프리뷰를 켠 타겟들(해제 시 끄기용).
+    static bool s_tauntNoticeShown;   // 이번 무장에서 도발 차단 안내를 이미 띄웠나(연타 배너 스팸 방지).
+
+    const string TAUNT_BLOCKED_TEXT = "도발 카드를 먼저 공격해야 합니다";
+    const float  REJECT_SHAKE_DUR      = 0.22f;
+    const float  REJECT_SHAKE_STRENGTH = 0.12f;
 
     // ForcedAttacker 활성 시 나머지 로컬 카드에 적용할 암전 alpha. 일반 전투(처형 재무장)는 0.3,
     // 튜토리얼은 "그 카드 말고 다 검게" 위해 더 낮은 값으로 덮어쓴다(PlayerTurn이 설정).
@@ -84,6 +89,7 @@ public class CardView : MonoBehaviour
     DragState dragState;
     Gesture activeGesture;   // 이번 터치의 제스처(위/아래 드래그). 탭은 None 유지.
     CardView currentTarget;
+    CardView rejectedTarget;   // 직전에 거절 연출을 띄운 무효 타깃(프레임마다 반복 발화 방지). 대상이 바뀌면 다시 발화.
     GameObject weaponInstance;
     Animator weaponAnimator;
     Quaternion weaponBaseRot;
@@ -289,6 +295,7 @@ public class CardView : MonoBehaviour
             {
                 this.dragState = DragState.AttackDrag;
                 s_anyDragging  = true;
+                BeginTargeting();
                 var t_validTargets = GetValidEnemyViews();
                 foreach (var t_cv in t_validTargets)
                     if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
@@ -334,6 +341,7 @@ public class CardView : MonoBehaviour
             UIPoolManager.Instance?.HideUI<PooledCardElement>();
             this.dragState = DragState.AttackDrag;
             s_anyDragging  = true;
+            BeginTargeting();
             var t_validTargets = GetValidEnemyViews();
             foreach (var t_cv in t_validTargets)
                 if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
@@ -605,6 +613,7 @@ public class CardView : MonoBehaviour
         }
         HideAttackPreview();
         this.currentTarget = null;
+        ClearRejectFocus();   // 조준 해제 → 확대 원복 + 같은 카드에 다시 갖다 대면 거절 연출 재발화.
     }
 
     // ── 탭 공격(제스처3): 내 카드 탭으로 공격자 무장 → 적 카드 탭으로 발사(2단계) ──
@@ -616,6 +625,7 @@ public class CardView : MonoBehaviour
         ClearAttackerSelection();
 
         s_selectedAttacker = this;
+        BeginTargeting();   // 무장 1회 = 안내 1회.
         SetHighlight(true);
         SetTargetFocus(true);   // 무장된 내 카드 살짝 확대 — 지금 누가 공격자인지 즉시 보이게.
         FocusWeapon(true);
@@ -665,11 +675,79 @@ public class CardView : MonoBehaviour
         if (s_selectedAttacker.boundCard == null) { ClearAttackerSelection(); return; }
 
         var t_valid = s_selectedAttacker.GetValidEnemyViews();
-        if (!t_valid.Contains(this)) return;                          // 지정 타깃/도발로 걸러진 무효 타깃 무시.
+        if (!t_valid.Contains(this))
+        {
+            RejectAsTarget(t_valid);   // 침묵 무시 금지 — "저기 말고 여기"를 흔들기+펄스+문구로.
+            return;
+        }
 
         CardView t_attacker = s_selectedAttacker;
         ClearAttackerSelection(_instant: true);   // 확대 즉시 원복 — 공격 연출의 DOKill에 트윈이 잘려 커진 채 굳는 것 방지.
         OnAttack?.Invoke(t_attacker, this);
+    }
+
+    // ── 무효 타깃 거절 피드백 ────────────────────────────────────────────
+    // 못 치는 적을 탭했을 때 무반응이면 "버그"로 읽힌다. 거절 대상은 흔들고, 쳐야 할 카드는 펄스로 끌어당긴다.
+    // 도발로 막힌 경우에 한해 이유 문구까지(무장 1회당 1번 — 연타 배너 스팸 방지).
+    // _keepFocus: 조준이 그 카드에 머무는 동안 확대 유지(드래그). 탭은 머무는 개념이 없어 false.
+    void RejectAsTarget(List<CardView> _validTargets, bool _keepFocus = false)
+    {
+        PlayRejectShake(_keepFocus);
+        if (_validTargets != null)
+            foreach (CardView t_cv in _validTargets)
+                if (t_cv != null) t_cv.PlayAttentionPulse();
+
+        if (s_tauntNoticeShown || _validTargets == null || _validTargets.Count == 0) return;
+
+        // 지정 타깃(튜토리얼)로 걸러진 경우는 스크립트가 따로 안내한다 → 도발로 막힌 경우만 문구.
+        CardView t_taunt = _validTargets.Find(cv => cv?.boundCard != null && cv.boundCard.HasKeyword(CardKeyword.Taunt));
+        if (t_taunt == null) return;
+
+        s_tauntNoticeShown = true;
+        ShowTauntBlockedNotice(t_taunt.boundCard);
+    }
+
+    /// <summary>못 치는 대상임을 알리는 짧은 흔들기. idle 슬롯 카드 전용(공격/이동 연출 중 호출 금지).
+    /// _focus면 흔들면서 확대도 유지 — "조준은 됐다(포커스), 다만 못 친다(흔들림)"를 동시에 말한다.
+    /// 확대 해제는 조준이 벗어날 때 호출부(ClearRejectFocus)가 담당.</summary>
+    public void PlayRejectShake(bool _focus = false)
+    {
+        Vector3 t_home = transform.position;
+        transform.DOKill();
+        transform.position = t_home;
+        // 위치(흔들림)와 스케일(포커스)은 서로 다른 트윈 → DOKill 이후 동시에 걸어야 둘 다 산다.
+        transform.DOShakePosition(REJECT_SHAKE_DUR, REJECT_SHAKE_STRENGTH, vibrato: 14, randomness: 0f)
+                 .SetLink(gameObject)
+                 .OnComplete(() => transform.position = t_home);
+        if (_focus)
+            transform.DOScale(this.targetFocusScale, this.targetFocusDur).SetEase(Ease.OutBack).SetLink(gameObject);
+    }
+
+    /// <summary>"이쪽을 쳐라" 주목 펄스. 유효 타깃(도발 등)에 사용.</summary>
+    public void PlayAttentionPulse()
+    {
+        transform.DOKill();
+        transform.localScale = Vector3.one;
+        transform.DOPunchScale(Vector3.one * (this.targetFocusScale - 1f), this.targetFocusDur * 2f, vibrato: 4, elasticity: 0.4f)
+                 .SetLink(gameObject)
+                 .OnComplete(() => transform.localScale = Vector3.one);
+        if (this.boundCard != null && this.boundCard.HasKeyword(CardKeyword.Taunt))
+            PlayKeywordGlow(CardKeyword.Taunt).Forget();
+    }
+
+    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.</summary>
+    static void ShowTauntBlockedNotice(CardInstance _tauntCard)
+    {
+        if (_tauntCard?.data == null) return;
+
+        Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
+        UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
+        {
+            portrait       = t_icon != null ? t_icon : _tauntCard.data.fullImage,
+            preserveAspect = t_icon != null,
+            cardName       = _tauntCard.data.displayName,
+            effectLabel    = TAUNT_BLOCKED_TEXT,
+        });
     }
 
     /// <summary>드래그 시작 시 유효 타깃 강조 페이드 — 밝기는 곧 "유효 타깃"의 시각화다.
@@ -697,13 +775,7 @@ public class CardView : MonoBehaviour
     /// ForcedTarget 존재 자체가 조건(IsActive 등 별도 조건 금지) — RestoreAllFades의 암전 기준과 동일해야 개념이 안 쪼개진다.</summary>
     List<CardView> GetValidEnemyViews()
     {
-        var t_enemies = new List<CardView>();
-        foreach (CardView t_cv in allViews)
-        {
-            if (t_cv == this || t_cv.boundCard == null) continue;
-            if (t_cv.boundCard.ownerIndex == this.boundCard?.ownerIndex) continue;
-            t_enemies.Add(t_cv);
-        }
+        var t_enemies = GetEnemyViews();
 
         // ① 지정 타깃이 이 공격자의 적 목록에 있으면 그 하나만 유효(도발보다 우선).
         if (TurnState.ForcedTarget != null)
@@ -718,25 +790,72 @@ public class CardView : MonoBehaviour
         return t_taunt.Count > 0 ? t_taunt : t_enemies;
     }
 
+    /// <summary>좌/중앙/우 조준 방향이 가리키는 적 1장. 목록은 x좌표로 정렬해 판단(기존 규칙 그대로).</summary>
+    CardView PickByAimDirection(List<CardView> _candidates, Vector2 _aimDir)
+    {
+        if (_candidates == null || _candidates.Count == 0) return null;
+        _candidates.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+
+        if (_aimDir.x >  this.dirThreshold) return _candidates[_candidates.Count - 1];
+        if (_aimDir.x < -this.dirThreshold) return _candidates[0];
+        return _candidates[_candidates.Count / 2];
+    }
+
+    /// <summary>필터 전 적 카드 전체. 거절 피드백은 "필터로 빠진 적"을 알아야 하므로 이 목록이 기준.</summary>
+    List<CardView> GetEnemyViews()
+    {
+        var t_enemies = new List<CardView>();
+        foreach (CardView t_cv in allViews)
+        {
+            if (t_cv == this || t_cv.boundCard == null) continue;
+            if (t_cv.boundCard.ownerIndex == this.boundCard?.ownerIndex) continue;
+            t_enemies.Add(t_cv);
+        }
+        return t_enemies;
+    }
+
+    /// <summary>도발 때문에 타깃이 좁혀졌나(지정 타깃 필터는 제외). 지정 타깃은 튜토리얼 스크립트 소관이라
+    /// 기존 스냅 동작을 유지하고, 도발일 때만 "그쪽 아님"을 강하게 알린다.</summary>
+    bool IsTauntFiltered(List<CardView> _valid, List<CardView> _all)
+        => TurnState.ForcedTarget == null && _valid.Count < _all.Count;
+
+    /// <summary>조준 시작(드래그 진입/탭 무장) 공통 리셋 — 이번 조준에서 거절 이력/안내 1회 카운트를 새로 시작.</summary>
+    void BeginTargeting()
+    {
+        ClearRejectFocus();
+        s_tauntNoticeShown = false;
+    }
+
+    /// <summary>같은 대상에 대해 프레임마다 거절 연출이 반복되지 않게 1회만 발화.
+    /// 못 치는 카드도 조준 중엔 확대 포커스 유지 — 조준이 먹었다는 사실 자체는 보여준다.</summary>
+    void RejectOnce(CardView _rejected, List<CardView> _valid)
+    {
+        if (this.rejectedTarget == _rejected) return;
+        ClearRejectFocus();
+        this.rejectedTarget = _rejected;
+        _rejected.RejectAsTarget(_valid, _keepFocus: true);
+    }
+
+    /// <summary>거절 포커스 해제(조준이 벗어남/조준 종료). 확대만 원복, 다른 상태 없음.</summary>
+    void ClearRejectFocus()
+    {
+        if (this.rejectedTarget != null) this.rejectedTarget.SetTargetFocus(false);
+        this.rejectedTarget = null;
+    }
+
     void UpdateTarget(Vector2 _aimDir)
     {
-        var t_enemies = GetValidEnemyViews();
+        var t_valid = GetValidEnemyViews();
+        var t_all   = GetEnemyViews();
 
-        CardView t_best = null;
-        if (t_enemies.Count > 0)
-        {
-            t_enemies.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+        // 도발로 좁혀진 상태면 조준은 전체 적 기준으로 판정한다 — 못 치는 쪽을 겨누면 스냅 대신 거절.
+        // (지정 타깃/필터 없음이면 종전대로 유효 목록에서 스냅.)
+        bool t_strict = IsTauntFiltered(t_valid, t_all);
+        CardView t_aimed = PickByAimDirection(t_strict ? t_all : t_valid, _aimDir);
+        CardView t_best  = (t_aimed != null && t_valid.Contains(t_aimed)) ? t_aimed : null;
 
-            int t_idx;
-            if (_aimDir.x > this.dirThreshold)
-                t_idx = t_enemies.Count - 1;
-            else if (_aimDir.x < -this.dirThreshold)
-                t_idx = 0;
-            else
-                t_idx = t_enemies.Count / 2;
-
-            t_best = t_enemies[t_idx];
-        }
+        if (t_strict && t_aimed != null && t_best == null) RejectOnce(t_aimed, t_valid);
+        else if (t_best != null)                           ClearRejectFocus();
 
         if (this.currentTarget == t_best) return;
 
@@ -770,16 +889,20 @@ public class CardView : MonoBehaviour
         Collider2D t_hit = Physics2D.OverlapPoint(t_worldPos);
         CardView t_best = null;
 
+        var  t_validViews = GetValidEnemyViews();
+        bool t_rejected   = false;
+
         if (t_hit != null)
         {
             CardView t_cv = t_hit.GetComponentInParent<CardView>();
             if (t_cv != null && t_cv != this)
             {
-                var t_valid = GetValidEnemyViews();
-                if (t_valid.Contains(t_cv))
-                    t_best = t_cv;
+                if (t_validViews.Contains(t_cv)) t_best = t_cv;
+                // 못 치는 적 카드 위로 끌어왔다 → 흔들기+펄스(+도발이면 문구). 커서가 떠나면 다시 발화 가능.
+                else if (GetEnemyViews().Contains(t_cv)) { RejectOnce(t_cv, t_validViews); t_rejected = true; }
             }
         }
+        if (!t_rejected) ClearRejectFocus();
 
         if (this.currentTarget == t_best) return;
 
@@ -1213,6 +1336,7 @@ public class CardView : MonoBehaviour
         OnAttack      = null;
         s_anyDragging = false;
         s_selectedAttacker = null;
+        s_tauntNoticeShown = false;
         ForcedDimAlpha = 0.3f;
         TurnState.Reset();
         allViews.Clear();
