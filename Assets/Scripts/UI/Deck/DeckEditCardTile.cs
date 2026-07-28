@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 // 덱 편집 화면 하단 컬렉션 그리드의 카드 타일 1장.
-// 표시는 CollectionCardView에 전부 위임하고, 여기서는 "롱프레스 → 드래그 요청 중계"와 "장착중 딤"만 한다.
+// 표시는 CardVisualView에 전부 위임하고, 여기서는 "롱프레스 → 드래그 요청 중계"와 "장착중 딤"만 한다.
 //
 // IDragHandler 계열(IBeginDragHandler/IDragHandler/IEndDragHandler)은 절대 구현하지 않는다 —
 // 구현하면 uGUI가 드래그 타깃을 이 타일로 잡아버려 부모 ScrollRect가 드래그를 못 받는다
@@ -11,7 +11,7 @@ using UnityEngine.EventSystems;
 // 그래서 드래그 개시는 롱프레스로만 하고, 실제 이동은 DeckEditDragController가 Update 폴링으로 처리한다.
 public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler
 {
-    [SerializeField] CollectionCardView view;
+    [SerializeField] CardVisualView     view;
     [SerializeField] LongPressDetector  longPress;
     [SerializeField] GameObject         inDeckOverlay;
     [SerializeField] CanvasGroup        canvasGroup;

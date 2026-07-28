@@ -681,7 +681,9 @@ MonoBehaviour:
   cardPrefab: {fileID: 578743590242808315, guid: 538e09231d0498c45ab05cfea2c1f107, type: 3}
   stackJitterPos: 6
   stackJitterAngle: 1
-  flickThreshold: 220
+  flickThreshold: 110
+  flickSpeed: 700
+  flickMinDistance: 20
   dragTiltPerPixel: 0.06
   returnDuration: 0.25
   dismissDistance: 900

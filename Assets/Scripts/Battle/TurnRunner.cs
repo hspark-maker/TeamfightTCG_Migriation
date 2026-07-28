@@ -219,6 +219,9 @@ public class TurnRunner : MonoBehaviour
         this.resultCaptured = true;
         int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
         this.lastRewardGold = RewardService.GrantBattleReward(t_remaining);
+
+        // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
+        RankManager.ApplyBattleResult(_won);
     }
 
     public static void Cleanup()

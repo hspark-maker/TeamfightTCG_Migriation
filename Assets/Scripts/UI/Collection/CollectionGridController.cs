@@ -9,13 +9,13 @@ public class CollectionGridController : MonoBehaviour
 {
     [Header("배선")]
     [SerializeField] Transform content;             // 카드가 채워질 Content(GridLayoutGroup)
-    [SerializeField] CollectionCardView cardPrefab;  // 카드 타일 프리팹(Card.prefab)
+    [SerializeField] CardVisualView cardPrefab;  // 카드 타일 프리팹(Card.prefab)
 
     [Header("독립 실행 부트스트랩 (테스트 씬 전용)")]
     [Tooltip("CardCatalog가 아직 주입 안 된 독립 씬에서만 사용. 실제 통합 시엔 부트가 이미 주입해 무시된다(마스터목록 아님).")]
     [SerializeField] List<CardData> fallbackAllCards = new List<CardData>();
 
-    readonly List<CollectionCardView> m_tiles = new List<CollectionCardView>();
+    readonly List<CardVisualView> m_tiles = new List<CardVisualView>();
 
     void OnEnable()
     {

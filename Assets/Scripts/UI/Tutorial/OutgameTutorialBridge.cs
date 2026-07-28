@@ -161,11 +161,12 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!OutgameTutorialRunner.IsRunning) { CloseGate(); return; }
 
         // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
-        // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(AutoPurchase), 곧 사라질 게이트가 한 프레임 깜빡인다(BattleEntry).
+        // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(자동 스텝), 곧 사라질 게이트가 한 프레임 깜빡인다(BattleEntry).
         // 두 경우 모두 다음 씬의 브리지가 재개한다.
         if (t_completed == OutgameTutorialData.EStepKind.BattleEntry
             || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
-                && t_next.kind == OutgameTutorialData.EStepKind.AutoPurchase))
+                && (t_next.kind == OutgameTutorialData.EStepKind.AutoPurchase
+                    || t_next.kind == OutgameTutorialData.EStepKind.AutoBattle)))
         {
             CloseGate();
             return;

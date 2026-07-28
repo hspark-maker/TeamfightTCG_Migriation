@@ -62,7 +62,9 @@ public class CardView : MonoBehaviour
     [SerializeField] float synergyBadgeXPos   = 0.55f;  // 배지 세로열 X(synergyBadgeRoot 기준).
     [SerializeField] float synergyBadgeYStart = 0.95f;  // 첫 배지(i=0) Y.
     [SerializeField] float synergyBadgeYStep  = -0.5f;  // 배지 간 Y 간격(아래로 쌓기).
-    [SerializeField] int   synergyMaxBadges   = 3;      // 표시 최대 배지 수(초과분 드롭).
+    // 표시 최대 배지 수(초과분 드롭). 기본값은 CardVisualRules 상수 하나에서 — 프리팹 오버라이드는 남지만
+    // 아웃게임 타일과 기본값이 따로 놀지 않게 코드 소스를 통일한다.
+    [SerializeField] int   synergyMaxBadges   = CardVisualRules.MaxSynergyBadges;
 
     [Header("Input")]
     [SerializeField] float dragThreshold = 30f;
@@ -983,17 +985,9 @@ public class CardView : MonoBehaviour
 
         this.iconMap.Clear();
 
-        if (_keywords == CardKeyword.None) return;
-
-        var t_icons  = new List<Sprite>();
-        var t_kwList = new List<CardKeyword>();
-        foreach (CardKeyword t_kw in System.Enum.GetValues(typeof(CardKeyword)))
-        {
-            if (t_kw == CardKeyword.None) continue;
-            if (!_keywords.HasFlag(t_kw)) continue;
-            Sprite t_icon = this.keywordIconConfig.GetIcon(t_kw);
-            if (t_icon != null) { t_icons.Add(t_icon); t_kwList.Add(t_kw); }
-        }
+        // "어떤 키워드를 어떤 순서로" 는 CardVisualRules 단독(아웃게임 CardVisualView와 같은 호출).
+        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
+        List<CardVisualRules.KeywordIcon> t_icons = CardVisualRules.CollectKeywordIcons(_keywords, this.keywordIconConfig);
 
         // keywordIconRoot 를 카드 오른쪽 아래 코너에 두고, 아이콘은 원점에서 왼쪽으로 가로 정렬.
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
@@ -1004,13 +998,14 @@ public class CardView : MonoBehaviour
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
                 : t_obj.GetComponent<SpriteRenderer>();
-            if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i];
-            this.iconMap[t_kwList[t_i]] = t_obj;
+            if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i].Icon;
+            this.iconMap[t_icons[t_i].Keyword] = t_obj;
         }
     }
 
     // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 세로 정렬 표시(최대 synergyMaxBadges개).
-    // 정렬: 활성 우선 → requiredCount 내림차순. 활성/티어 판정은 확정 SynergyState.Active 참조 조회(재계산·집계 금지).
+    // 선택·정렬 규칙(활성 우선 → requiredCount 내림차순)은 CardVisualRules 소유 — 아웃게임 타일과 순서가 갈라지지 않게.
+    // 활성/티어 판정은 확정 SynergyState.Active 참조 조회(재계산·집계 금지).
     // _synergy는 이 카드가 속한 BattleField.Synergy(BattleFieldView가 Render로 주입). null이면 전부 비활성 취급.
     CardInstance _lastBadgeCard;
     SynergyState _lastBadgeState;
@@ -1045,61 +1040,16 @@ public class CardView : MonoBehaviour
         // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
         if (this.boundCard == null || this.boundCard.data == null || !this.boundCard.isRevealed) return;
 
-        var t_tags = new List<SynergyData>();
-        if (this.boundCard.data.synergies != null)
-        {
-            foreach (SynergyData t_syn in this.boundCard.data.synergies)
-            {
-                if (t_syn == null) continue;
-                if (t_tags.Contains(t_syn)) continue;  // 중복 나열 방어(배지 1회)
-                t_tags.Add(t_syn);
-            }
-        }
-        if (t_tags.Count == 0) return;
+        // 표시 대상·순서(중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한 적용)는 CardVisualRules 단독.
+        // 여기 남는 건 세로 배치와 배지 Set뿐. 활성 판정도 같은 규칙 헬퍼를 재사용해 정렬과 아이콘이 어긋나지 않게 한다.
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(this.boundCard.data.synergies, _synergy, this.synergyMaxBadges);
 
-        // 활성 우선(위쪽), 동급이면 requiredCount 높은 순. 정렬 후 상위 synergyMaxBadges개만 표시.
-        t_tags.Sort((_a, _b) =>
-        {
-            bool t_activeA = IsSynergyActive(_synergy, _a);
-            bool t_activeB = IsSynergyActive(_synergy, _b);
-            if (t_activeA != t_activeB) return t_activeB.CompareTo(t_activeA);       // 활성(true) 먼저
-            return GetBadgeRequiredCount(_synergy, _b).CompareTo(GetBadgeRequiredCount(_synergy, _a)); // requiredCount 내림차순
-        });
-
-        int t_shown = Mathf.Min(t_tags.Count, this.synergyMaxBadges);
-        for (int t_i = 0; t_i < t_shown; t_i++)
+        for (int t_i = 0; t_i < t_tags.Count; t_i++)
         {
             SynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
             t_badge.transform.localPosition = new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f);
-            t_badge.Set(t_tags[t_i], IsSynergyActive(_synergy, t_tags[t_i]));
+            t_badge.Set(t_tags[t_i], CardVisualRules.IsSynergyActive(_synergy, t_tags[t_i]));
         }
-    }
-
-    // 활성 = 확정 스냅샷 Active에 해당 SynergyData가 참조로 존재하는지. 카운트/티어 재계산 없음.
-    static bool IsSynergyActive(SynergyState _synergy, SynergyData _tag)
-    {
-        if (_synergy == null || _tag == null) return false;
-        foreach (ActiveSynergy t_a in _synergy.Active)
-            if (t_a.Synergy == _tag) return true;
-        return false;
-    }
-
-    // 정렬용 requiredCount: 활성이면 확정 스냅샷의 활성 티어 requiredCount, 비활성이면 tiers 중 최고값(없으면 0).
-    static int GetBadgeRequiredCount(SynergyState _synergy, SynergyData _tag)
-    {
-        if (_tag == null) return 0;
-        if (_synergy != null)
-        {
-            foreach (ActiveSynergy t_a in _synergy.Active)
-                if (t_a.Synergy == _tag)
-                    return t_a.Tier != null ? t_a.Tier.requiredCount : 0;
-        }
-        // 비활성: 정의된 티어 중 최고 requiredCount.
-        int t_max = 0;
-        if (_tag.tiers != null)
-            foreach (SynergyTier t_tier in _tag.tiers)
-                if (t_tier != null && t_tier.requiredCount > t_max) t_max = t_tier.requiredCount;
-        return t_max;
     }
 
     public static CardView GetView(CardInstance _card)

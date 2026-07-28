@@ -19,6 +19,7 @@ public class OutgameTutorialData : ScriptableObject
         BattleEntry  = 2,   // 앵커 클릭 대기 + 진입 시 튜토리얼 시나리오 시작
         WaitPackOpen = 3,   // 3D 팩 개봉 대기. 앵커 없음(딤 못 뚫음) → 배너만 띄우고 개봉 결과로 완료
         WaitPurchase = 4,   // 앵커에 딤만 걸고 구매 "성공"으로 완료(클릭 자체는 완료가 아니다 — 골드 부족 시 실패)
+        AutoBattle   = 5,   // 입력 없음. 시나리오 시작 → 전투 씬 자동 전환(로비를 거치지 않는 첫 전투)
     }
 
     /// <summary>튜토리얼 스텝 1개. 아래 필드는 kind별 전용이라 무관한 kind에서는 무시된다.</summary>
@@ -42,7 +43,7 @@ public class OutgameTutorialData : ScriptableObject
         [Tooltip("개봉 연출 후 돌아올 씬 이름. AutoPurchase 전용")]
         public string nextScene;
 
-        [Tooltip("전투에 넘길 튜토리얼 시나리오. BattleEntry 전용")]
+        [Tooltip("전투에 넘길 튜토리얼 시나리오. BattleEntry / AutoBattle 전용")]
         public TutorialScenarioData scenario;
     }
 

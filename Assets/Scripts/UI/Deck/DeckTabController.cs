@@ -17,7 +17,6 @@ public class DeckTabController : MonoBehaviour
         // 편집 중 탭이 꺼졌다 켜지면 여기서 무저장 폐기된다.
         // 편집은 DeckEditController의 메모리 사본에서만 일어나고 decks.json은 손대지 않으므로
         // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 목록으로 되돌려도 안전하다.
-        // 애초에 편집 중 이탈은 DeckEditController가 bottomBarGroup을 잠가 1차 차단하고, 이건 그 폴백이다.
         ShowList();
     }
 

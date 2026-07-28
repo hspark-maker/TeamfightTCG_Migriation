@@ -87,28 +87,6 @@ public static class CatalogRows
         return TryGetRow(_rowKey, out var t_row) && IsRowComplete(t_row);
     }
 
-    /// <summary>도감 전체 완성 1회성 보상 종류(전역 튜닝). 배선 SO 우선, 미배선 시 코드 기본값(fallback 인스턴스).</summary>
-    public static ECurrencyType CompletionRewardType => Tuning.CompletionRewardType;
-
-    /// <summary>도감 전체 완성 1회성 보상량(전역 튜닝). 배선 SO 우선, 미배선 시 코드 기본값(fallback 인스턴스).</summary>
-    public static long CompletionRewardAmount => Tuning.CompletionRewardAmount;
-
-    /// <summary>모든 행 완성 여부. 빈 도감(행 0개)은 완성이 아니다.</summary>
-    public static bool IsAllComplete
-    {
-        get
-        {
-            EnsureBuilt();
-            if (s_rows.Count == 0) return false;
-
-            for (int t_i = 0; t_i < s_rows.Count; t_i++)
-            {
-                if (!IsRowComplete(s_rows[t_i])) return false;
-            }
-            return true;
-        }
-    }
-
     // ── 드리프트 진단 (에디터/디버그 전용, 정상 흐름 예외 없음) ──
 
     /// <summary>

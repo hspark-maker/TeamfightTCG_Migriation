@@ -14,8 +14,25 @@ public class DataLibrary : MonoBehaviour
     [SerializeField] public KeywordIconConfig keywordIconConfig;
     [SerializeField] BattleTimingConfig battleTimingConfig;   // 미배선 시 GameTiming 기본값 fallback
     [SerializeField] BattleReward battleRewardConfig;         // 미배선 시 RewardService 기본값 fallback
+    [SerializeField] RankConfig rankConfig;                   // 미배선 시 RankManager 기본 티어 테이블 fallback
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
+
+    bool m_loaded;
+
+    // 부트 로딩 완료 여부. 시작 화면(LoadingCoverView)이 커버를 걷는 기준.
+    public static bool IsLoaded => instance != null && instance.m_loaded;
+
+    // 부트 로딩 진행도(0~1). 인스턴스가 아직 없으면 0 — 진행도의 단일 진실원.
+    public static float LoadProgress
+    {
+        get
+        {
+            if (instance == null)  return 0f;
+            if (instance.m_loaded) return 1f;
+            return instance.uiHandle.IsValid() ? instance.uiHandle.PercentComplete : 0f;
+        }
+    }
 
     public void Awake()
     {
@@ -35,12 +52,15 @@ public class DataLibrary : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         GameTiming.SetConfig(this.battleTimingConfig);
         RewardService.SetConfig(this.battleRewardConfig);
+        RankManager.SetConfig(this.rankConfig);
+        RankRewardManager.SetConfig(this.rankConfig); // 보상 테이블이 티어 테이블과 같은 SO라 필드를 재사용한다(이중 진실원 방지).
         return true;
     }
 
     public async UniTask Initialization()
     {
         await LoadUIPrefab();
+        this.m_loaded = true;
         LogUtil.Log("All Good");
     }
 

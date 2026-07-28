@@ -12,7 +12,7 @@ using TMPro;
 // 취소 경로에서 복원할 원본이 사라진다.
 public class DeckEditController : MonoBehaviour
 {
-    [SerializeField] TMP_Text          titleText;      // 임시 — 어떤 슬롯이 열렸는지 눈으로 검증용
+    [SerializeField] TMP_InputField    nameInput;      // 덱 이름 입력/표시
     [SerializeField] Button            backButton;
     [SerializeField] DeckTabController tabController;
 
@@ -26,8 +26,8 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] Button unequipAllButton;
     [SerializeField] Button autoEquipButton;   // 이번 범위 미구현 → 항상 비활성
 
-    [Header("이탈 차단")]
-    [SerializeField] CanvasGroup bottomBarGroup;   // 로비 하단 탭바 — 편집 중 다른 탭으로 새는 경로 차단
+    // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
+    const int NAME_MAX_LENGTH = 12;
 
     // 편집 중인 덱 사본. 길이는 항상 DECK_SIZE 고정이고 빈 칸은 null이다(리스트로 두면 "3번 칸이 비었다"를 표현할 수 없다).
     readonly CardData[] m_working = new CardData[DeckSaveManager.DECK_SIZE];
@@ -35,6 +35,9 @@ public class DeckEditController : MonoBehaviour
     // 현재 편집 중인 저장 슬롯 인덱스(닫힌 상태는 -1).
     int  m_slotIndex = -1;
     bool m_dirty;
+
+    // 편집 진입 시점의 이름. 이름 변경 여부 판정 기준이자 빈 입력의 복구값이다.
+    string m_savedName;
 
     public int  SlotIndex => m_slotIndex;
     public bool IsOpen    => m_slotIndex >= 0;
@@ -54,6 +57,13 @@ public class DeckEditController : MonoBehaviour
         {
             unequipAllButton.onClick.RemoveAllListeners();
             unequipAllButton.onClick.AddListener(ClearAll);
+        }
+
+        if (nameInput != null)
+        {
+            nameInput.characterLimit = NAME_MAX_LENGTH;
+            nameInput.onEndEdit.RemoveAllListeners();
+            nameInput.onEndEdit.AddListener(OnNameEndEdit);
         }
 
         // 자동 편성은 이번 범위 밖 — 버튼을 지우면 씬 배선이 깨지므로 자리는 두고 비활성으로 고정한다.
@@ -84,12 +94,9 @@ public class DeckEditController : MonoBehaviour
 
         m_dirty = false;   // 로드 직후 = 디스크와 동일 → 그냥 나가면 파일 쓰기 없음
 
-        if (titleText != null)
-            titleText.text = DeckSaveManager.IsSlotValid(_slotIndex)
-                ? $"{DeckSaveManager.GetName(_slotIndex)} (슬롯 {_slotIndex})"
-                : $"새 덱 (슬롯 {_slotIndex})";
-
-        LockBottomBar();
+        // GetName은 이름이 비어 있으면 "덱 N" 폴백을 준다 → 신규 덱도 그대로 기본 이름이 된다.
+        m_savedName = DeckSaveManager.GetName(_slotIndex);
+        if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
 
         if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest);
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
@@ -101,26 +108,48 @@ public class DeckEditController : MonoBehaviour
     {
         m_slotIndex = -1;
         m_dirty     = false;
+        m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
 
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
-
-        RestoreBottomBar();
+        if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
-    // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 하단바 잠금과 드래그 고스트가 남지 않게 하는 최종 방어선.
-    // Close()는 DeckTabController를 거치는 경로에서만 불리므로 여기서 한 번 더 되돌린다.
+    // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
+    // Close()는 DeckTabController를 거치는 경로에서만 불린다.
     // 편집 상태(m_slotIndex)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
     // DeckTabController.IsEditing이 거짓을 보고한다.
     void OnDisable()
     {
         m_slotIndex = -1;
         m_dirty     = false;
+        m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
 
         if (dragController != null) dragController.Cancel();
-        RestoreBottomBar();
+        if (nameInput      != null) nameInput.DeactivateInputField();
+    }
+
+    // 이름 입력 확정. 여기서는 표시만 정리하고 dirty를 세우지 않는다 —
+    // 저장 여부는 나갈 때 실제 입력값과 m_savedName을 비교해 판정한다(발화 순서에 기대지 않는다).
+    void OnNameEndEdit(string _value)
+    {
+        // OnDisable로 편집이 내려간 뒤 포커스 해제로 늦게 불릴 수 있다.
+        if (!IsOpen || nameInput == null) return;
+
+        string t_name = (_value ?? string.Empty).Trim();
+
+        // 빈 이름은 저장하지 않는다 — 편집 진입 시점 이름으로 되돌린다.
+        nameInput.SetTextWithoutNotify(string.IsNullOrEmpty(t_name) ? m_savedName : t_name);
+    }
+
+    // 지금 화면에 입력된 이름(트림). 비어 있으면 진입 시점 이름을 그대로 쓴다.
+    string ResolveName()
+    {
+        string t_name = nameInput != null ? (nameInput.text ?? string.Empty).Trim() : string.Empty;
+
+        return string.IsNullOrEmpty(t_name) ? m_savedName : t_name;
     }
 
     // 컬렉션 칸에서 드래그가 시작될 때. 스크롤뷰 소유권을 넘겨줘야 드래그와 스크롤이 서로를 잡아먹지 않는다.
@@ -207,7 +236,17 @@ public class DeckEditController : MonoBehaviour
             // (DeckSaveManager.cs:74-76 주석). 그래서 이 슬롯만 반영하는 SaveSlotToFile을 쓴다.
             // m_working에는 null이 섞일 수 있지만 내부 Save()가 Where(d => d != null)로 거르고,
             // 애초에 6/6일 때만 이 분기에 들어오므로 안전하다.
-            if (m_dirty) DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
+            //
+            // 이름은 SetName으로 메모리에 올려두면 SaveSlotToFile이 slotName까지 같이 직렬화한다.
+            // SetName을 저장 경로 안에서만 부르는 게 중요하다 — 밖에서 부르면 미완성 폐기 경로에서도
+            // 메모리 이름이 바뀐 채로 남는다.
+            // 이름이 그대로면 SetName을 부르지 않는다 — m_savedName은 GetName의 표시용 폴백("덱 1")일 수 있고,
+            // 그걸 되쓰면 "이름 미지정(빈 문자열)" 상태가 실데이터로 굳어버린다.
+            string t_name    = ResolveName();
+            bool   t_renamed = t_name != m_savedName;
+
+            if (t_renamed) DeckSaveManager.SetName(m_slotIndex, t_name);
+            if (m_dirty || t_renamed) DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
             ExitToList();
             return;
         }
@@ -223,8 +262,7 @@ public class DeckEditController : MonoBehaviour
             noAction  = null,
         });
 
-        // 편집 중에는 하단 탭바를 잠가 뒤로가기 버튼이 유일한 출구다.
-        // 팝업이 못 뜨면(UIPoolManager 미배치·프리팹 미등록) 확인을 못 받은 채 화면에 갇힌다 → 그냥 내보낸다.
+        // 팝업이 못 뜨면(UIPoolManager 미배치·프리팹 미등록) 확인을 못 받은 채 화면에 갇힐 수 있다 → 그냥 내보낸다.
         if (t_popup == null)
         {
             Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 목록으로 복귀한다.");
@@ -234,26 +272,6 @@ public class DeckEditController : MonoBehaviour
 
     void ExitToList()
     {
-        RestoreBottomBar();
         if (tabController != null) tabController.CloseEditor();
-    }
-
-    // 편집 중 하단 탭바로 새면 무저장 폐기가 된다 → 입력 자체를 막고 흐리게 표시한다.
-    void LockBottomBar()
-    {
-        if (bottomBarGroup == null) return;
-
-        bottomBarGroup.interactable   = false;
-        bottomBarGroup.blocksRaycasts = false;
-        bottomBarGroup.alpha          = 0.5f;
-    }
-
-    void RestoreBottomBar()
-    {
-        if (bottomBarGroup == null) return;
-
-        bottomBarGroup.interactable   = true;
-        bottomBarGroup.blocksRaycasts = true;
-        bottomBarGroup.alpha          = 1f;
     }
 }

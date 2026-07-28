@@ -3,14 +3,16 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 개봉으로 뽑힌 카드 한 장의 표시. 도감 타일(CollectionCardView)과 분리한 이유는 요구가 다르기 때문 —
-// 개봉 카드는 항상 소유라 잠금 표현이 없고, 대신 신규/중복이라는 이 화면에만 있는 축을 드러낸다.
+// 개봉으로 뽑힌 카드 한 장의 표시.
+// 카드 비주얼 자체(아트/이름/HP/키워드/시너지)는 도감 타일과 동일하게 CardVisualView에 위임한다 —
+// 뽑은 카드가 도감에서 보던 그 카드와 다르게 생기면 안 된다.
+// 이 클래스가 따로 존재하는 이유는 강조 축이 다르기 때문 — 개봉 카드는 항상 소유라 잠금 표현이 없고,
+// 대신 신규/중복이라는 이 화면에만 있는 축(NEW 리본·광채·환급 숫자)을 얹는다.
 // 순수 표시 뷰다. 더미 배치·스와이프 이동은 PackCardStack이 이 오브젝트의 RectTransform을 직접 다룬다.
 public class PackCardView : MonoBehaviour
 {
     [Header("카드")]
-    [SerializeField] Image portrait;          // 카드 아트
-    [SerializeField] TMP_Text nameText;       // 카드 이름
+    [SerializeField] CardVisualView cardVisual;   // 카드 비주얼 단일 진실원
 
     [Header("신규 강조")]
     [SerializeField] GameObject newBadge;     // NEW 리본(신규일 때만)
@@ -55,15 +57,8 @@ public class PackCardView : MonoBehaviour
         Refund = _drawn.Refund;
         m_accented = false;
 
-        var t_card = _drawn.Card;
-
-        if (portrait != null)
-        {
-            portrait.sprite = t_card != null ? t_card.fullImage : null;
-            portrait.enabled = portrait.sprite != null;
-        }
-
-        if (nameText != null) nameText.text = t_card != null ? t_card.displayName : string.Empty;
+        // 개봉 카드는 항상 소유(위 헤더 주석) → _owned는 true 고정.
+        if (cardVisual != null) cardVisual.Bind(_drawn.Card, true);
 
         ResetAccent();
     }

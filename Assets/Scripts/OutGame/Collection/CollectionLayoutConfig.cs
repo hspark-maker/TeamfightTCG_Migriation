@@ -12,10 +12,6 @@ public class CollectionLayoutConfig : ScriptableObject
     [Min(0f)] [SerializeField] float defaultProductionCycleSeconds = 15f; // 기본 생산 사이클 시간(초). 한 사이클마다 재화 1단위. 기본 15초. 행 productionCycleSeconds가 0일 때 적용. 음수 오설정 방지.
     [Min(0)] [SerializeField] long defaultCap = 240;                 // 기본 누적 상한(수확 전 최대 누적량). 행 cap이 0일 때 적용. 음수 오설정 방지.
 
-    [Header("도감 전체 완성 1회성 보상 (모든 행 완성 시 딱 1번 지급)")]
-    [SerializeField] ECurrencyType completionRewardType = ECurrencyType.Gold; // 완성 보상 종류. 기본 Gold.
-    [Min(0)] [SerializeField] long completionRewardAmount = 1000;              // 완성 보상량. 기본 1000. 음수 오설정 방지.
-
     // ── 행 목록 (순서 = 도감 표시 순서) ──
     [Header("도감 행 목록 (순서 = 위→아래). 각 행 = 카드 3장 고정.")]
     [SerializeField] List<CollectionRowDef> rows = new List<CollectionRowDef>();
@@ -24,10 +20,6 @@ public class CollectionLayoutConfig : ScriptableObject
     public ECurrencyType DefaultRewardType => defaultRewardType;
     public float DefaultProductionCycleSeconds => defaultProductionCycleSeconds;
     public long DefaultCap => defaultCap;
-
-    // 도감 전체 완성 1회성 보상 읽기전용 노출.
-    public ECurrencyType CompletionRewardType => completionRewardType;
-    public long CompletionRewardAmount => completionRewardAmount;
 
     // 행 정의 총 개수. null 방어.
     public int RowDefCount => rows != null ? rows.Count : 0;

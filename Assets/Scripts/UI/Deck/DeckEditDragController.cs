@@ -20,8 +20,8 @@ public class DeckEditDragController : MonoBehaviour
     Func<IReadOnlyList<DeckEditSlotView>> m_slotProvider;
     Action<int, CardData>                 m_onDropped;
 
-    RectTransform      m_ghostRect;
-    CollectionCardView m_ghostView;
+    RectTransform  m_ghostRect;
+    CardVisualView m_ghostView;
 
     bool             m_dragging;
     CardData         m_card;
@@ -178,8 +178,8 @@ public class DeckEditDragController : MonoBehaviour
         // DragLayer에는 레이아웃 그룹이 없어 그대로 두면 고스트가 0x0으로 렌더링돼 화면에 아무것도 안 보인다.
         m_ghostRect.sizeDelta = ghostSize;
 
-        m_ghostView = t_go.GetComponent<CollectionCardView>();
-        if (m_ghostView == null) m_ghostView = t_go.GetComponentInChildren<CollectionCardView>(true);
+        m_ghostView = t_go.GetComponent<CardVisualView>();
+        if (m_ghostView == null) m_ghostView = t_go.GetComponentInChildren<CardVisualView>(true);
 
         t_go.SetActive(false);
     }

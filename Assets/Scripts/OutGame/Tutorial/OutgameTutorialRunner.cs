@@ -6,8 +6,9 @@ using UnityEngine.SceneManagement;
 // 불변식: 커밋이 실행보다 앞선다 — 자동구매는 CommitStep 후에 구매하고, 실패했을 때만 롤백한다.
 public static class OutgameTutorialRunner
 {
-    // 개봉 연출 씬. 저작 데이터가 아니라 시스템 고정 경로라 SO 필드가 아닌 상수로 둔다.
+    // 개봉 연출·전투 씬. 저작 데이터가 아니라 시스템 고정 경로라 SO 필드가 아닌 상수로 둔다.
     const string PackOpenScene = "CardPack";
+    const string BattleScene   = "BattleScene";
 
     static OutgameTutorialData s_data;
 
@@ -70,6 +71,9 @@ public static class OutgameTutorialRunner
         {
             case OutgameTutorialData.EStepKind.AutoPurchase:
                 return EnterAutoPurchase(t_step, t_index);
+
+            case OutgameTutorialData.EStepKind.AutoBattle:
+                return EnterAutoBattle(t_step, t_index);
 
             case OutgameTutorialData.EStepKind.BattleEntry:
                 // 클릭 리스너가 아니라 진입 시 미리 시작한다 — PlayBtn의 씬 PersistentCall(StartAiBattle)이
@@ -141,6 +145,23 @@ public static class OutgameTutorialRunner
         // 전투 진입은 BattleEntry 스텝(로비 PlayBtn)이 담당 → 캐리어의 튜토리얼 시작은 항상 false.
         PackHandoff.Set(t_opened, _step.nextScene, false);
         SceneManager.LoadScene(PackOpenScene);
+        return false;
+    }
+
+    // 로비를 거치지 않고 곧장 전투로. 게이트는 필요 없다(입력 없는 자동 스텝).
+    static bool EnterAutoBattle(OutgameTutorialData.Step _step, int _index)
+    {
+        // AutoPurchase와 같은 불변식: 커밋이 실행보다 앞선다. 씬을 떠나면 되돌릴 지점이 없어,
+        // 커밋을 미루면 전투 중 강제종료가 이 스텝을 영원히 되풀이한다.
+        OutgameTutorialProgress.CommitStep(_index + 1);
+        if (_index + 1 >= StepCount) OutgameTutorialProgress.Complete();
+
+        if (_step.scenario == null)
+            Debug.LogWarning($"[OutgameTutorialRunner] 스텝 {_index}(AutoBattle)에 시나리오가 미배선 — 일반 전투로 진입합니다.");
+
+        // 양 덱은 TutorialConfig가 고정 주입한다(GameInitializer) → 저장 덱이 없는 첫 실행도 그대로 진입 가능.
+        TutorialConfig.Begin(_step.scenario);
+        SceneManager.LoadScene(BattleScene);
         return false;
     }
 
