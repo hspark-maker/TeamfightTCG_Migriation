@@ -97,6 +97,14 @@ public class GameInitializer : MonoBehaviour
             this.playerField.ApplyDeckSynergy();
             this.enemyField.ApplyDeckSynergy();
         }
+
+        // 확정승 튜토리얼: 적 체력을 낮춰(공격력=체력) 플레이어가 무조건 이기게. 시너지 적용 뒤 최종 반영.
+        if (TutorialConfig.IsActive && TutorialConfig.EnemyMaxHpOverride > 0)
+            this.enemyField.OverrideAllHp(TutorialConfig.EnemyMaxHpOverride);
+
+        // 튜토리얼: 스크립트 기준선 최초 스냅샷. 이후 슬롯 지정 스텝은 "그때 그 카드"인지 여기 기준으로 대조된다.
+        if (TutorialConfig.IsActive)
+            TutorialConfig.SyncBoardBaseline(this.playerField, this.enemyField);
     }
 
     void InitializeViews()

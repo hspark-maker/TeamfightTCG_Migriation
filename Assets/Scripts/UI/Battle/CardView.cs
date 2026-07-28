@@ -163,7 +163,8 @@ public class CardView : MonoBehaviour
     void OnMouseDown()
     {
         if (!TurnState.InputAllowed || this.boundCard == null) return;
-        if (TurnState.ForcedAttacker != null && this.boundCard != TurnState.ForcedAttacker) return;
+        if (TurnState.ForcedAttacker != null && this.boundCard.ownerIndex == TurnState.LocalOwnerIndex
+            && this.boundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
         CancelLongPress();
         this.longPressCts = CancellationTokenSource.CreateLinkedTokenSource(
@@ -195,7 +196,8 @@ public class CardView : MonoBehaviour
         if (!TurnState.InputAllowed || this.boundCard == null) return;
 
         // 처형/튜토리얼 지정 공격자 외 카드는 조작 불가(완전 무반응).
-        if (TurnState.ForcedAttacker != null && this.boundCard != TurnState.ForcedAttacker) return;
+        if (TurnState.ForcedAttacker != null && this.boundCard.ownerIndex == TurnState.LocalOwnerIndex
+            && this.boundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
         this.currentDragScreenPos = (Vector2)Input.mousePosition;
 
@@ -215,7 +217,11 @@ public class CardView : MonoBehaviour
         if (this.activeGesture == Gesture.None)
         {
             if (t_touchDrag.magnitude < this.dragThreshold) return;   // 아직 탭 범위 — 대기.
-            this.activeGesture = t_touchDrag.y >= 0f ? Gesture.DragUp : Gesture.DragDown;
+            Gesture t_new = t_touchDrag.y >= 0f ? Gesture.DragUp : Gesture.DragDown;
+            // 튜토리얼: 이번 스텝이 가르치는 조작이 아니면 확정하지 않고 무반응 —
+            // 미확정(None)으로 남으므로 이후 반대 방향으로 끌면 그때 정상 확정된다.
+            if (!GestureAllowed(t_new)) return;
+            this.activeGesture = t_new;
             ClearAttackerSelection();   // 드래그 시작 — 대기 중인 탭 무장 취소(입력 상호배타).
         }
         else
@@ -225,6 +231,8 @@ public class CardView : MonoBehaviour
             Gesture t_switch = this.activeGesture;
             if (this.activeGesture == Gesture.DragDown && t_touchDrag.y >  this.deadZoneRadius) t_switch = Gesture.DragUp;
             else if (this.activeGesture == Gesture.DragUp && t_touchDrag.y < -this.deadZoneRadius) t_switch = Gesture.DragDown;
+
+            if (!GestureAllowed(t_switch)) t_switch = this.activeGesture;   // 튜토리얼: 차단된 모드로는 전환 금지
 
             if (t_switch != this.activeGesture)
             {
@@ -244,6 +252,20 @@ public class CardView : MonoBehaviour
             HandleDragBack(t_drag, t_touchDrag);
         else
             HandleDragToEnemy(t_touchDrag);
+    }
+
+    /// <summary>튜토리얼 조작 게이트: 이번 스텝이 가르치는 제스처만 통과. 탭은 Gesture.None으로 표현한다.
+    /// Any면 전부 허용(일반 전투). 차단된 제스처는 상태를 남기지 않고 완전 무반응 처리한다.</summary>
+    static bool GestureAllowed(Gesture _g)
+    {
+        switch (TurnState.AllowedGesture)
+        {
+            case InputGesture.DragUp:        return _g == Gesture.DragUp;
+            case InputGesture.DragDown:      return _g == Gesture.DragDown;
+            case InputGesture.Tap:           return _g == Gesture.None;
+            case InputGesture.LongPressOnly: return false;
+            default:                         return true;
+        }
     }
 
     // 드래그 모드 전환 시 이전 모드 UI/상태 정리. dragState=Idle로 리셋 → 새 핸들러가 첫 프레임에 카드 이동/페이드를 재초기화.
@@ -354,8 +376,9 @@ public class CardView : MonoBehaviour
         // 처형/튜토리얼 지정 공격자 외 카드는 완전 무반응(클릭·탭 무시). 드래그를 시작한 적 없으니
         // s_anyDragging도 건드리지 않는다.
         if (TurnState.ForcedAttacker != null && this.boundCard != null
+            && this.boundCard.ownerIndex == TurnState.LocalOwnerIndex
             && this.boundCard != TurnState.ForcedAttacker)
-            return;
+            return;   // 적 카드는 통과(무장된 공격자 → 적 탭 발사 위해)
 
         // 드래그 중 턴 종료·카드 사망으로 early-return해도 정적 드래그 상태(s_anyDragging)가
         // true로 고착되지 않도록 가드 통과 전에 반드시 해제한다.
@@ -405,6 +428,14 @@ public class CardView : MonoBehaviour
         bool t_isTap = this.activeGesture == Gesture.None
             && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius;
 
+        // 튜토리얼: 탭이 이번 스텝의 조작이 아니면 무반응(무장·발사 둘 다 차단).
+        if (t_isTap && !GestureAllowed(Gesture.None))
+        {
+            this.dragState     = DragState.Idle;
+            this.activeGesture = Gesture.None;
+            return;
+        }
+
         // 적/비로컬 카드: 탭이면 "무장된 공격자 → 이 적" 공격(제스처3 2단계).
         if (this.boundCard.ownerIndex != TurnState.LocalOwnerIndex)
         {
@@ -414,11 +445,11 @@ public class CardView : MonoBehaviour
             return;
         }
 
-        // 로컬 카드 탭: 공격자 무장 토글(제스처3 1단계). ForcedAttacker(처형/튜토리얼) 중엔 탭 게이트 오프 → 드래그만.
+        // 로컬 카드 탭: 공격자 무장 토글(제스처3 1단계). ForcedAttacker 중에도 이 카드는 상단 가드를
+        // 통과한 지정 공격자이므로 그대로 무장 허용(튜토리얼 탭 공격 스텝 진행).
         if (t_isTap)
         {
-            if (TurnState.ForcedAttacker == null) ToggleSelectAttacker();
-            else { FocusWeapon(false); this.cardAnim.MoveToSlot().Forget(); }
+            ToggleSelectAttacker();
             this.dragState     = DragState.Idle;
             this.activeGesture = Gesture.None;
             return;
@@ -586,8 +617,8 @@ public class CardView : MonoBehaviour
         SetHighlight(true);
         FocusWeapon(true);
 
-        var t_targets = GetValidEnemyViews();   // 도발 있으면 도발 카드만.
-        FadeAll(0.3f);
+        var t_targets = GetValidEnemyViews();   // 지정 타깃이면 그 하나, 아니면 도발 있을 때 도발 카드만.
+        FadeAll(ForcedDimAlpha);
         FadeCards(1f, this);
         FadeCards(1f, t_targets.ToArray());
         foreach (var t_cv in t_targets)
@@ -623,46 +654,43 @@ public class CardView : MonoBehaviour
         RestoreAllFades();
     }
 
-    // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(도발 필터는 공격자 기준).
+    // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(유효 필터는 공격자 기준).
     void HandleEnemyTap()
     {
         if (s_selectedAttacker == null) return;                       // 미무장 — 무동작(정보는 롱프레스).
         if (s_selectedAttacker.boundCard == null) { ClearAttackerSelection(); return; }
 
         var t_valid = s_selectedAttacker.GetValidEnemyViews();
-        if (!t_valid.Contains(this)) return;                          // 도발 등 무효 타깃 무시.
+        if (!t_valid.Contains(this)) return;                          // 지정 타깃/도발로 걸러진 무효 타깃 무시.
 
         CardView t_attacker = s_selectedAttacker;
         ClearAttackerSelection();
         OnAttack?.Invoke(t_attacker, this);
     }
 
-    /// <summary>드래그 시작 시 유효 타깃 강조 페이드.
-    /// **튜토리얼 지정 타깃 집중 중(ForcedTarget)엔** 도발 등 유효 타깃 전체를 밝히지 않고
-    /// RestoreAllFades로 공격자+지정 타깃만 밝게 유지한다 — 도발 로직이 미리 건 fade를 풀지 않게.</summary>
+    /// <summary>드래그 시작 시 유효 타깃 강조 페이드 — 밝기는 곧 "유효 타깃"의 시각화다.
+    /// 유효 목록은 GetValidEnemyViews 하나가 정하므로(지정 타깃/도발 필터 포함) 여기엔 별도 분기가 없다.
+    /// 지정 타깃 중엔 유효 타깃이 그 하나뿐 → 결과가 RestoreAllFades의 강제 상태와 같아진다.</summary>
     void ApplyDragTargetFade(List<CardView> _validTargets)
     {
-        if (TutorialConfig.IsActive && TurnState.ForcedTarget != null)
-        {
-            RestoreAllFades();
-            return;
-        }
-        FadeAll(0.3f);
+        FadeAll(ForcedDimAlpha);
         FadeCards(1f, this);
         FadeCards(1f, _validTargets.ToArray());
     }
 
     // 타겟 하나에 집중: 나머지(다른 유효 타겟 포함) 약간 fade, 자신+포커스 타겟만 밝게.
     // 기존 fade 파이프 재사용 → 드래그 종료 시 RestoreAllFades가 일괄 복원(튜토리얼 dim 포함). 새 fade 상태 없음.
+    // 암전 alpha는 ForcedDimAlpha 공유 — 튜토리얼이 이 값을 덮어써도 드래그 중 밝기가 튀지 않게.
     void ApplyFocusFade(CardView _target)
     {
-        // 튜토리얼 지정 타깃 집중 중엔 도발 등 유효타겟 전체를 건드리지 않고 강제 상태 유지.
-        if (TutorialConfig.IsActive && TurnState.ForcedTarget != null) { RestoreAllFades(); return; }
-        FadeAll(0.3f);
+        FadeAll(ForcedDimAlpha);
         FadeCards(1f, this);
         if (_target != null) FadeCards(1f, _target);
     }
 
+    /// <summary>"유효 타깃 = 밝게 = 프리뷰 표시 = 공격 가능"의 단일 진실원.
+    /// 필터 우선순위 ① 지정 타깃(ForcedTarget) ② 도발. ①이 우선 — 튜토리얼 스크립트가 규칙이다.
+    /// ForcedTarget 존재 자체가 조건(IsActive 등 별도 조건 금지) — RestoreAllFades의 암전 기준과 동일해야 개념이 안 쪼개진다.</summary>
     List<CardView> GetValidEnemyViews()
     {
         var t_enemies = new List<CardView>();
@@ -672,6 +700,16 @@ public class CardView : MonoBehaviour
             if (t_cv.boundCard.ownerIndex == this.boundCard?.ownerIndex) continue;
             t_enemies.Add(t_cv);
         }
+
+        // ① 지정 타깃이 이 공격자의 적 목록에 있으면 그 하나만 유효(도발보다 우선).
+        if (TurnState.ForcedTarget != null)
+        {
+            CardView t_forced = GetView(TurnState.ForcedTarget);
+            if (t_forced != null && t_enemies.Contains(t_forced))
+                return new List<CardView> { t_forced };
+        }
+
+        // ② 도발이 있으면 도발 카드만.
         var t_taunt = t_enemies.FindAll(cv => cv.boundCard.HasKeyword(CardKeyword.Taunt));
         return t_taunt.Count > 0 ? t_taunt : t_enemies;
     }
@@ -1139,6 +1177,14 @@ public class CardView : MonoBehaviour
         await this.cardAnim.PlayHitAnim(_d, _damage);
     }
     public UniTask PlayDeathAnim(float _d = 0.4f)  => this.cardAnim.PlayDeathAnim(_d);
+
+    /// <summary>회복 연출(HealEffect: 붐 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.</summary>
+    public void PlayHealEffect(int _amount)
+    {
+        if (this.boundCard != null)
+            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+        this.cardAnim.PlayHealEffect(_amount);
+    }
     public void FadeView(float _alpha, float _dur) => this.cardAnim.FadeView(_alpha, _dur);
 
     public void HideSlot()

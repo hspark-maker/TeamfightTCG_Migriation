@@ -3,9 +3,10 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 피격 연출. CardView 프리팹의 자식(루트)으로, 붐 스프라이트 팝 + 데미지 숫자 플로팅을 함께 재생.
+/// 피격/회복 연출. CardView 프리팹의 자식(루트)으로, 붐 스프라이트 팝 + 숫자 플로팅을 함께 재생.
 /// 구조: 루트(HitEffectView) ─ Boom(SpriteRenderer) / DmgText(TMP). 붐 스케일이 텍스트에 영향 안 가게 자식 분리.
 /// CardAnimator.PlayHitAnim(_damage)가 매 피격마다 Play(damage) 호출. 슬롯에 새 카드가 들어오면 Stop()으로 잔여 제거.
+/// isHeal=1인 인스턴스(HealEffect)는 같은 연출을 "+N" 부호로 재생 — 회복 시 CardAnimator.PlayHealEffect가 호출.
 /// </summary>
 public class HitEffectView : MonoBehaviour
 {
@@ -16,13 +17,14 @@ public class HitEffectView : MonoBehaviour
     [SerializeField] float boomScale = 1.4f;   // 붐 최대 스케일.
     [SerializeField] float textFloat = 0.6f;   // 데미지 텍스트 상승 거리.
     [SerializeField] float textDurMul = 1.6f;  // 텍스트 지속 = dur*배율.
+    [SerializeField] bool  isHeal;             // true면 숫자 부호를 "+"로(회복 연출용 인스턴스).
 
     bool     cached;
     float    baseAlpha = 1f;
     Vector3  textHome;
     Sequence playSeq;
 
-    public void Play(int _damage = 0)
+    public void Play(int _amount = 0)
     {
         if (this.sr == null && this.boom != null) this.sr = this.boom.GetComponent<SpriteRenderer>();
         if (!this.cached)
@@ -51,13 +53,13 @@ public class HitEffectView : MonoBehaviour
             this.playSeq.Insert(0f, this.sr.DOFade(0f, this.dur));
         }
 
-        // 데미지 숫자: 위로 뜨며 페이드. 0 이하면 숨김.
+        // 숫자: 위로 뜨며 페이드. 0 이하면 숨김. 부호는 isHeal에 따라 +/-.
         if (this.dmgText != null)
         {
-            if (_damage > 0)
+            if (_amount > 0)
             {
                 this.dmgText.gameObject.SetActive(true);
-                this.dmgText.text = $"-{_damage}";
+                this.dmgText.text = this.isHeal ? $"+{_amount}" : $"-{_amount}";
                 Transform t_tt = this.dmgText.transform;
                 t_tt.localPosition = this.textHome;
                 Color t_col = this.dmgText.color; t_col.a = 1f; this.dmgText.color = t_col;

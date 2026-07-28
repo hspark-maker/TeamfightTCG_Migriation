@@ -280,7 +280,7 @@ MonoBehaviour:
   enemyDeck: []
   playerScript: []
   enemyScript: []
-  scenario: {fileID: 11400000, guid: 8c3d4e5f6071829300b5c6d7e8f90a1b, type: 2}
+  scenario: {fileID: 11400000, guid: b7e3f1a92c8d4e6f0a1b2c3d4e5f6071, type: 2}
 --- !u!4 &288437682
 Transform:
   m_ObjectHideFlags: 0
@@ -511,6 +511,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   battleTimingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
+  battleRewardConfig: {fileID: 0}
 --- !u!4 &1632216523
 Transform:
   m_ObjectHideFlags: 0

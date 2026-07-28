@@ -27,6 +27,8 @@ public class SynergyExplainPopupUI : PooledUIBase
         {
             this.iconImage.sprite  = t_s.activeIcon;
             this.iconImage.enabled = t_s.activeIcon != null;
+            // 아이콘 PNG 투명 여백 보정 — 팝업 아이콘도 정보 창 아이콘과 같은 크기로 보이게.
+            this.iconImage.rectTransform.localScale = Vector3.one * SynergyIconStrip.IconPadCompensation;
         }
         if (this.nameText    != null) this.nameText.text    = SynergyText.Name(t_s);
         // ownedCount 미지정(-1) → 카드 정보 창에는 덱 문맥이 없으므로 ●/○ 마커 없이 요구치만.
