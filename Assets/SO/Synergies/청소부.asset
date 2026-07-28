@@ -16,7 +16,8 @@ MonoBehaviour:
   effectDescription: "\uACF5\uACA9 \uD6C4 \uC0DD\uC874 \uC2DC \uC900 \uD53C\uD574\uC758
     \uC808\uBC18\uB9CC\uD07C \uC0DD\uBA85\uB825 \uD68C\uBCF5."
   color: {r: 0, g: 0, b: 0, a: 0}
-  icon: {fileID: 21300000, guid: 4d1aeed4ad03029489ff65fc085f43a5, type: 3}
+  activeIcon: {fileID: 21300000, guid: 763e9b46d1a622641b325f242f859e28, type: 3}
+  inactiveIcon: {fileID: 21300000, guid: 2123fa51233d082408b2f6f50647a349, type: 3}
   tiers:
   - requiredCount: 2
     label: "\uCCAD\uC18C\uBD80"

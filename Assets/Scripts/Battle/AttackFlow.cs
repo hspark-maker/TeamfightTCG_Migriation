@@ -8,11 +8,14 @@ using UnityEngine;
 /// </summary>
 public static class AttackFlow
 {
-    /// <summary>공격자 키워드로 연출용 pre/at 키워드 산출.</summary>
+    /// <summary>공격자 키워드로 연출용 pre/at 키워드 산출.
+    /// 무쌍/원거리 모두 히트 후(at) 글로우 — 다른 공격과 동일하게 히트 앞에 대기(딜레이) 없음.</summary>
     public static (CardKeyword pre, CardKeyword at) Keywords(CardInstance _attacker)
     {
-        CardKeyword t_pre = _attacker.HasKeyword(CardKeyword.Peerless) ? CardKeyword.Peerless : CardKeyword.None;
-        CardKeyword t_at  = _attacker.HasKeyword(CardKeyword.Ranged)   ? CardKeyword.Ranged   : CardKeyword.None;
+        CardKeyword t_pre = CardKeyword.None;
+        CardKeyword t_at  = CardKeyword.None;
+        if (_attacker.HasKeyword(CardKeyword.Ranged))   t_at |= CardKeyword.Ranged;
+        if (_attacker.HasKeyword(CardKeyword.Peerless)) t_at |= CardKeyword.Peerless;
         return (t_pre, t_at);
     }
 

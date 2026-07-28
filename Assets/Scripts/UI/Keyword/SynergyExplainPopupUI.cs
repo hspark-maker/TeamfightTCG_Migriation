@@ -25,8 +25,8 @@ public class SynergyExplainPopupUI : PooledUIBase
 
         if (this.iconImage != null)
         {
-            this.iconImage.sprite  = t_s.icon;
-            this.iconImage.enabled = t_s.icon != null;
+            this.iconImage.sprite  = t_s.activeIcon;
+            this.iconImage.enabled = t_s.activeIcon != null;
         }
         if (this.nameText    != null) this.nameText.text    = SynergyText.Name(t_s);
         // ownedCount 미지정(-1) → 카드 정보 창에는 덱 문맥이 없으므로 ●/○ 마커 없이 요구치만.

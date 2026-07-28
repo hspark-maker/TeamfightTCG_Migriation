@@ -6,24 +6,23 @@ using DG.Tweening;
 // 전투 중 재계산·변동 없음 → 배지도 Set 이후 스스로 갱신하지 않는다.
 public class SynergyBadgeView : MonoBehaviour
 {
-    [SerializeField] SpriteRenderer icon;   // 시너지 아이콘(SynergyData.icon). 텍스트 대신 표시.
+    [SerializeField] SpriteRenderer icon; // 시너지 아이콘(SynergyData.icon). 텍스트 대신 표시.
 
     [Header("Active / Inactive BG")]
     // 활성/비활성 구분은 알파/RGB dim이 아니라 오브젝트 토글로 인코딩한다.
     // CardAnimator.FadeView/Deal/Death가 자식 SpriteRenderer/TMP_Text의 알파를 tween으로 덮어쓰므로
     // 알파/RGB dim은 카드 페이드 복귀 시 사라진다. 서로 다른 BG 오브젝트를 켜고 끄면
     // 페이드(알파)와 무관하게 활성/비활성 구분이 유지된다.
-    [SerializeField] GameObject activeBg;
-    [SerializeField] GameObject inactiveBg;
-
     [Header("Active Pop")]
     // 효과 발동 순간 튀는 연출. 기준스케일(=배치 시 프리팹 로컬스케일) 기준 punch.
     // Set 시 자동 재생 안 함 — CardView.PopSynergyBadge가 실제 발동 게이트에서만 호출한다.
-    [SerializeField] float popScale    = 1.6f;    // 기준스케일 대비 최대 배율(효과 발동시 큰 pop)
-    [SerializeField] float popDuration = 0.25f;   // pop 전체 시간(초)
+    [SerializeField]
+    float popScale = 1.6f; // 기준스케일 대비 최대 배율(효과 발동시 큰 pop)
 
-    Vector3 _baseScale;   // 기준 로컬스케일. 첫 Set 전에 캐시.
-    bool    _baseCached;
+    [SerializeField] float popDuration = 0.25f; // pop 전체 시간(초)
+
+    Vector3 _baseScale; // 기준 로컬스케일. 첫 Set 전에 캐시.
+    bool _baseCached;
 
     /// <summary>이 배지가 표시 중인 시너지. PopSynergyBadge가 대상 배지를 매칭하는 데 사용.</summary>
     public SynergyData Synergy { get; private set; }
@@ -40,14 +39,17 @@ public class SynergyBadgeView : MonoBehaviour
             gameObject.SetActive(false);
             return;
         }
+
         gameObject.SetActive(true);
 
         if (this.icon != null)
-            this.icon.sprite = _synergy.icon;
+        {
+            if (_active)
+                this.icon.sprite = _synergy.activeIcon;
+            else
+                this.icon.sprite = _synergy.inactiveIcon;
+        }
 
-        // 활성/비활성 BG 오브젝트 토글. 페이드와 무관하게 구분 유지.
-        if (this.activeBg   != null) this.activeBg.SetActive(_active);
-        if (this.inactiveBg != null) this.inactiveBg.SetActive(!_active);
 
         // 자동 pop 없음. 활성/비활성 무관하게 기준스케일로 정렬(효과 발동시에만 PlayPop).
         if (!_active)
@@ -76,7 +78,7 @@ public class SynergyBadgeView : MonoBehaviour
     void CacheBaseScale()
     {
         if (this._baseCached) return;
-        this._baseScale  = this.transform.localScale;
+        this._baseScale = this.transform.localScale;
         this._baseCached = true;
     }
 }

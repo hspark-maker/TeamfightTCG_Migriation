@@ -14,7 +14,8 @@ public class SynergyData : ScriptableObject
     public string displayName;
     [TextArea] public string effectDescription;
     public Color  color;
-    public Sprite icon;   // 배지에 표시할 시너지 아이콘 스프라이트(SynergyBadgeView가 사용)
+    public Sprite activeIcon;   // 배지에 표시할 시너지 아이콘 스프라이트(SynergyBadgeView가 사용)
+    public Sprite inactiveIcon;
 
     /// <summary>UI 틴트용 색. **color 미배정이면 기본값이 (0,0,0,0) = 완전 투명**이라
     /// 그대로 곱하면 아이콘이 사라진다. 알파가 0이면 틴트 없음(흰색)으로 폴백한다.
