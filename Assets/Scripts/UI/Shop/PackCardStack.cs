@@ -12,6 +12,8 @@ using UnityEngine.EventSystems;
 //
 // 배선 전제: 카드와 stackAnchor가 모두 cardLayer의 자식이고 앵커가 같아야 한다
 //   (anchoredPosition을 같은 좌표계로 직접 비교·보간하므로).
+// 그리고 cardLayer는 팩 앞뒷면 껍데기와 같은 무대(PackStage)의 자식이어야 한다 —
+//   앞뒷면 사이에 끼어야 "팩 속"이 성립하고, 같은 좌표계라 PlaceInsidePack이 값 하나로 자리를 정할 수 있다.
 // 입력은 이 컴포넌트가 붙은 오브젝트의 Graphic(raycastTarget)이 받는다 — 카드 프리팹은 입력을 모른다.
 public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
@@ -127,11 +129,14 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     }
 
     /// <summary>
-    /// 더미를 팩 속에 든 것처럼 줄여 _worldPoint(팩 자리)에서 _offset만큼 옮긴 지점에 겹쳐 둔다.
-    /// Build 직후, PlayEmerge 전에 호출. _offset은 캔버스 참조px — 팩 속 어디에 잠겨 있을지를 정한다.
-    /// 배선 전제: cardLayer와 그 부모의 pivot이 모두 중앙(0.5, 0.5)이어야 한다(로컬 좌표 원점을 맞바꿔 쓴다).
+    /// 더미를 팩 속에 든 것처럼 줄여 _stackCenter(무대 로컬 좌표)에 겹쳐 둔다.
+    /// 팩이 등장하기 전에 호출한다 — 카드는 처음부터 팩 속에 들어 있어야 하고,
+    /// 봉인이 찢기는 순간 그 구멍으로 카드 끝이 저절로 드러난다(따로 등장시키지 않는다).
+    ///
+    /// 배선 전제: cardLayer와 팩 껍데기가 같은 무대(PackStage)의 자식이어야 한다 —
+    /// 같은 좌표계라 월드 변환 없이 값 하나로 "팩 속 어디"를 지정할 수 있다.
     /// </summary>
-    public void PrepareEmerge(Vector3 _worldPoint, Vector2 _offset, float _scale)
+    public void PlaceInsidePack(Vector2 _stackCenter, float _scale)
     {
         if (cardLayer == null || stackAnchor == null) return;
 
@@ -139,13 +144,14 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         cardLayer.DOKill();
 
         cardLayer.localScale = m_layerScaleHome * _scale;
-        // 레이어를 줄이면 그 안의 앵커 자리도 같이 당겨진다 — 그만큼 되밀어야 더미가 정확히 팩 위에 겹친다.
-        cardLayer.anchoredPosition = ParentLocalOf(_worldPoint) + _offset - stackAnchor.anchoredPosition * _scale;
+        // 레이어를 줄이면 그 안의 앵커 자리도 같이 당겨진다 — 그만큼 되밀어야 더미 중심이 정확히 지정 지점에 온다.
+        cardLayer.anchoredPosition = _stackCenter - stackAnchor.anchoredPosition * _scale;
     }
 
     /// <summary>
-    /// 줄여 둔 더미를 제자리로 펴 올린다(팩에서 뽑혀 나오는 연출).
+    /// 팩 속에 있던 더미를 제자리로 솟아오르게 한다(뭉치째 뽑혀 나오는 연출).
     /// 반환 시퀀스를 호출부의 흐름에 끼우면 스킵 한 번으로 등장까지 함께 완료된다.
+    /// 아래쪽은 팩 앞면이 계속 가리므로, 뽑히는 동안 카드가 입구에서 빠져나오는 것처럼 읽힌다.
     /// </summary>
     public Sequence PlayEmerge(float _duration)
     {
@@ -156,12 +162,14 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         return DOTween.Sequence()
             .SetLink(cardLayer.gameObject)
-            .Join(cardLayer.DOAnchorPos(m_layerHome, _duration).SetEase(Ease.OutCubic))
-            .Join(cardLayer.DOScale(m_layerScaleHome, _duration).SetEase(Ease.OutBack));
+            // 살짝 넘겼다 내려앉는다 — 뽑혀 나온 물건은 관성으로 한 번 튄다. 과하면 "커졌다"로 읽히므로 약하게.
+            .Join(cardLayer.DOAnchorPos(m_layerHome, _duration).SetEase(Ease.OutBack, 1.05f))
+            .Join(cardLayer.DOScale(m_layerScaleHome, _duration).SetEase(Ease.OutCubic));
     }
 
-    /// <summary>등장 연출을 건너뛰고 평소 자리로 되돌린다(스킵·재개봉 대비).</summary>
-    public void SnapEmerged()
+    // 등장 연출을 건너뛰고 평소 자리로 되돌린다(걷어내기·비활성 대비). 외부에서 부를 일은 없다 —
+    // 자리를 되돌릴 시점은 "더미를 치울 때"뿐이고 그 판단은 이 클래스가 쥔다.
+    void SnapEmerged()
     {
         if (cardLayer == null) return;
 
@@ -346,21 +354,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_layerHome = cardLayer.anchoredPosition;
         m_layerScaleHome = cardLayer.localScale;
         m_layerHomeCaptured = true;
-    }
-
-    // 월드 지점을 cardLayer의 anchoredPosition과 같은 계(부모 rect 로컬)로 옮긴다.
-    Vector2 ParentLocalOf(Vector3 _worldPoint)
-    {
-        var t_parent = cardLayer != null ? cardLayer.parent as RectTransform : null;
-        if (t_parent == null) return Vector2.zero;
-
-        var t_cam = m_canvas != null && m_canvas.renderMode != RenderMode.ScreenSpaceOverlay
-            ? m_canvas.worldCamera
-            : null;
-
-        var t_screen = RectTransformUtility.WorldToScreenPoint(t_cam, _worldPoint);
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(t_parent, t_screen, t_cam, out var t_local);
-        return t_local;
     }
 
     void OnDisable()

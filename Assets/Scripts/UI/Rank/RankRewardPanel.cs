@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,13 +18,21 @@ public class RankRewardPanel : MonoBehaviour
 
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
 
+    // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩돼 있다 — 매개변수를 붙이면 배선이 끊긴다(진입점을 따로 추가할 것).
     public void Open()
     {
-        this.SetVisible(true);
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        this.OpenAt(RankRewardManager.ClaimedCount);
+    }
 
-        this.Build();
-        this.ScrollToFirstClaimable();
+    /// <summary>전투에서 티어가 올라 자동으로 열릴 때. 새로 도달한 행으로 스크롤하고 그 행만 연출한다.</summary>
+    public void OpenForTierUp(in RankApplyResult _result)
+    {
+        int t_target = _result.TierIndex;
+
+        this.OpenAt(t_target);
+
+        if (t_target >= 0 && t_target < this.m_rows.Count && this.m_rows[t_target] != null)
+            this.m_rows[t_target].PlayTierUpEffect();
     }
 
     public void Close()
@@ -47,6 +56,28 @@ public class RankRewardPanel : MonoBehaviour
     void OnDisable()
     {
         RankRewardManager.OnChanged -= this.RefreshRows;
+    }
+
+    // 전투에서 넘어온 티어 상승을 소비해 자동으로 연다.
+    // Awake/OnEnable이 아니라 Start인 이유: RankConfig 주입(DataLibrary.Awake)이 끝난 뒤여야 행 정보가 제대로 나온다.
+    // 오버레이는 항상 활성이고 root만 토글되므로 이 Start는 보장 실행된다.
+    IEnumerator Start()
+    {
+        // 씬 로드 첫 프레임에는 ScrollRect 자신의 초기화가 뒤에 와서 스크롤 위치를 덮는다 — 한 프레임 양보한 뒤에 연다.
+        yield return null;
+
+        // 소비는 반드시 양보 뒤에. 양보 전에 소비하면 그 사이 씬이 바뀔 때 결과가 증발한다.
+        if (RankUpHandoff.TryConsume(out var t_rankUp)) this.OpenForTierUp(t_rankUp);
+    }
+
+    // Open 경로 공통부. 스크롤 타겟만 호출자가 정한다.
+    void OpenAt(int _scrollRow)
+    {
+        this.SetVisible(true);
+        if (this.claimPopup != null) this.claimPopup.Hide();
+
+        this.Build();
+        this.ScrollToRow(_scrollRow);
     }
 
     // Content의 목업 하드코딩 행을 지우고 티어 수만큼 재생성(행 수는 RankConfig에서 파생 — 상수 하드코딩 금지).
@@ -103,22 +134,22 @@ public class RankRewardPanel : MonoBehaviour
         if (this.claimPopup != null) this.claimPopup.Hide();
     }
 
-    // 첫 수령 가능 행으로 스크롤. 레이아웃이 확정되기 전에 세팅하면 무시되므로 강제 리빌드 후 적용한다.
-    void ScrollToFirstClaimable()
+    // 지정한 행으로 스크롤. 레이아웃이 확정되기 전에 세팅하면 무시되므로 강제 리빌드 후 적용한다.
+    // 행 높이를 무시한 인덱스 비율 근사다(행 높이가 균일한 지금은 충분).
+    void ScrollToRow(int _index)
     {
         if (this.scrollRect == null) return;
 
         int t_count = this.m_rows.Count;
         if (t_count <= 1) return;
 
-        int t_target = RankRewardManager.ClaimedCount;
-        if (t_target < 0 || t_target >= t_count) return;
+        if (_index < 0 || _index >= t_count) return;
 
         Canvas.ForceUpdateCanvases();
         if (this.content is RectTransform t_rect) LayoutRebuilder.ForceRebuildLayoutImmediate(t_rect);
 
         // 행은 인덱스 0이 맨 위 → 위쪽이 normalized 1.
-        float t_ratio = (float)t_target / (t_count - 1);
+        float t_ratio = (float)_index / (t_count - 1);
         this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - t_ratio);
     }
 

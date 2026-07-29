@@ -48,8 +48,8 @@ public static class RankManager
 
     // 강등이 없도록 "가감 전" 티어의 임계치를 하한으로 클램프한다(해석을 가감 뒤로 미루면 하한도 내려가 강등이 성립).
     // 전투 씬 → 로비 씬 왕복을 견뎌야 하므로 지연 flush에 맡기지 않고 즉시 Save.
-    /// <summary>실제로 반영된 증감을 돌려준다 — 클램프 뒤 차이라 결과 팝업 표시액과 저장값이 어긋나지 않는다.</summary>
-    public static long ApplyBattleResult(bool _won)
+    /// <summary>정산 결과를 통째로 돌려준다 — 실제 증감·총 포인트·티어 변화가 한 값에 묶여 있어야 승급 연출이 재조회 없이 판정된다.</summary>
+    public static RankApplyResult ApplyBattleResult(bool _won)
     {
         var t_config = Config;
         var t_slot = Slot;
@@ -57,14 +57,17 @@ public static class RankManager
         long t_points = t_slot.points;
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
-        int t_index = t_config.ResolveTierIndex(t_points);
+        int t_index = t_config.ResolveTierIndex(t_points);                          // 하한 계산용이자 "가감 전 티어"다(승급 판정에 그대로 재사용).
         // 임계치 오설정(음수)·조회 실패는 하한 0으로 떨어뜨린다.
         long t_floor = t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
 
         t_slot.points = Math.Max(t_points + t_delta, t_floor);
         Save();
 
-        return t_slot.points - t_points;
+        return new RankApplyResult(
+            t_slot.points - t_points,
+            t_index,
+            t_config.ResolveTierIndex(t_slot.points));
     }
 
     /// <summary>부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
@@ -82,6 +85,24 @@ public static class RankManager
 
     // 포인트는 슬롯에 직접 쓰이므로 영속화만 한다(별도 캐시 flush 없음).
     static void Save() => DataSaveManager.Save();
+}
+
+// 전투 1회 정산 결과. 델타만 넘기면 소비처가 티어 변화를 알 수 없어 다시 조회해야 하고, 그 사이 값이 바뀌면 연출과 저장값이 어긋난다.
+public readonly struct RankApplyResult
+{
+    public readonly long Delta;         // 클램프 뒤 실제 증감(하한에 걸리면 요청 델타보다 작다)
+    public readonly int PrevTierIndex;  // 가감 전 티어 인덱스
+    public readonly int TierIndex;      // 정산 후 티어 인덱스
+
+    public bool IsTierUp => this.TierIndex > this.PrevTierIndex;
+
+    // 정산 후 총 포인트는 담지 않는다 — RankManager.Points가 이미 단일 진실원이다.
+    public RankApplyResult(long _delta, int _prevTierIndex, int _tierIndex)
+    {
+        Delta = _delta;
+        PrevTierIndex = _prevTierIndex;
+        TierIndex = _tierIndex;
+    }
 }
 
 // 랭크 표시 1회 스냅샷(UI용). 포인트가 바뀌면 값이 달라지므로 표시 시점마다 GetInfo로 다시 받는다.

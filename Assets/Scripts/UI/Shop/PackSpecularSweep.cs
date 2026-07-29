@@ -7,10 +7,16 @@ using UnityEngine.UI;
 // 재질(금속·코팅)이 읽힌다. 실제 반사가 아니라 마스킹된 그라디언트 슬라이드다.
 //
 // band는 팩의 RectMask2D 안에 있어야 한다. 밖으로 새면 광채가 아니라 화면을 가로지르는 막대가 된다.
+//
+// 봉인이 조금이라도 찢기면 멈춘다. 팩 위쪽에 구멍이 생겼는데 그 위를 빛줄기가 지나가면
+// 팩 속(카드)에 표면 반사가 얹혀 "통이 뚫렸다"가 깨진다 — 멀쩡한 팩일 때만 도는 표현이다.
+// 끄는 게 아니라 멈추는 것이라, 임계에 못 미쳐 되감기면 멀쩡해진 팩에서 다시 돈다.
 public class PackSpecularSweep : MonoBehaviour
 {
     [Tooltip("훑고 지나가는 빛줄기. 팩(RectMask2D)의 자식이어야 한다.")]
     [SerializeField] RectTransform band;
+    [Tooltip("뜯기 진행도를 구독해 찢기 시작과 함께 멈춘다. 미배선이면 항상 동작.")]
+    [SerializeField] PackTearHandle tearHandle;
 
     [Tooltip("스윕 간격(초). 이 주기마다 한 번 지나간다.")]
     [SerializeField] float period = 3.6f;
@@ -23,6 +29,7 @@ public class PackSpecularSweep : MonoBehaviour
 
     Graphic m_graphic;
     float m_time;
+    bool m_paused;
 
     void Awake()
     {
@@ -32,17 +39,27 @@ public class PackSpecularSweep : MonoBehaviour
     void OnEnable()
     {
         m_time = 0f;
+        m_paused = false;
         SetAlpha(0f);
+        if (tearHandle != null) tearHandle.OnProgress += HandleTearProgress;
     }
 
     void OnDisable()
     {
+        if (tearHandle != null) tearHandle.OnProgress -= HandleTearProgress;
         SetAlpha(0f);
+    }
+
+    // 진행도가 조금이라도 붙으면 = 봉인이 찢기기 시작했다. 되감겨 0으로 돌아오면 다시 돈다.
+    void HandleTearProgress(float _progress)
+    {
+        m_paused = _progress > 0.001f;
+        if (m_paused) SetAlpha(0f);
     }
 
     void Update()
     {
-        if (band == null || period <= 0f) return;
+        if (m_paused || band == null || period <= 0f) return;
 
         m_time += Time.unscaledDeltaTime;
         float t_phase = m_time % period;
