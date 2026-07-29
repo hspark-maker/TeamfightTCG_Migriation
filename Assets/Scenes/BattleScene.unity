@@ -250,6 +250,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3669285587999233025, guid: 506b492b655722d4089dd54075454005, type: 3}
+      propertyPath: m_RootOrder
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 3669285587999233025, guid: 506b492b655722d4089dd54075454005, type: 3}
       propertyPath: m_AnchorMax.x
       value: 1
       objectReference: {fileID: 0}
@@ -328,6 +332,14 @@ PrefabInstance:
     - target: {fileID: 3669285587999233026, guid: 506b492b655722d4089dd54075454005, type: 3}
       propertyPath: m_IsActive
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3669285588205711692, guid: 506b492b655722d4089dd54075454005, type: 3}
+      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
+      value: 1801810542
+      objectReference: {fileID: 0}
+    - target: {fileID: 4135730048257302649, guid: 506b492b655722d4089dd54075454005, type: 3}
+      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
+      value: 1801810542
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1470,6 +1482,10 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3669285587999233025, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
+      propertyPath: m_RootOrder
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 3669285587999233025, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_AnchorMax.x
       value: 1
       objectReference: {fileID: 0}
@@ -1548,6 +1564,14 @@ PrefabInstance:
     - target: {fileID: 3669285587999233026, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_IsActive
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3669285588205711692, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
+      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
+      value: 1801810542
+      objectReference: {fileID: 0}
+    - target: {fileID: 4135730048257302649, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
+      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
+      value: 1801810542
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3018,6 +3042,7 @@ MonoBehaviour:
   battleIntro: {fileID: 1572181725}
   battleBGM: {fileID: 8300000, guid: 2a13429062d06ae4fbeeec8b5ca1fdc3, type: 3}
   tutorialOverlayPrefab: {fileID: 1373953528122502585, guid: 7e3565f15335afd45905a0d13c508ae8, type: 3}
+  battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!4 &1572181723
 Transform:
   m_ObjectHideFlags: 0
@@ -3409,9 +3434,6 @@ MonoBehaviour:
   spinDuration: 1.1
   popScale: 1.18
   popDuration: 0.12
-  resultText: {fileID: 0}
-  frontText: "\uC120\uACF5"
-  backText: "\uD6C4\uACF5"
 --- !u!114 &1755558531
 MonoBehaviour:
   m_ObjectHideFlags: 0

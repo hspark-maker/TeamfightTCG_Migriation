@@ -97,14 +97,18 @@ public class CardInstance
         return (t_hpAfter, t_bonusAfter);
     }
 
-    /// <summary>체력 회복(단일 진실원). hp만 회복하며 maxHp 상한(보너스HP는 회복 대상 아님).</summary>
-    public void Heal(int _amount)
+    /// <summary>체력 회복(단일 진실원). hp만 회복하며 maxHp 상한(보너스HP는 회복 대상 아님).
+    /// 반환값 = **실제 회복량**(상한에 걸리면 0). _showEffect=false면 연출을 생략한다 —
+    /// 힐러 투사체처럼 회복 표기를 **도착 시점으로 미루는** 호출부 전용(상태 변경 시점은 그대로).</summary>
+    public int Heal(int _amount, bool _showEffect = true)
     {
-        if (_amount <= 0) return;
+        if (_amount <= 0) return 0;
         int t_before = this.hp;
         this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.data.maxHp);
+        int t_healed = this.hp - t_before;
         // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
-        if (this.hp > t_before) CardView.GetView(this)?.PlayHealEffect(this.hp - t_before);
+        if (_showEffect && t_healed > 0) CardView.GetView(this)?.PlayHealEffect(t_healed);
+        return t_healed;
     }
 
     /// <summary>돌보미: bonusHp 부여(양수만). stateful(데미지로 소진) → ClearSynergy 리셋 제외.</summary>

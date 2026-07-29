@@ -11,6 +11,14 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] BattleIntro battleIntro;
     [SerializeField] AudioClip battleBGM;
     [SerializeField] TutorialOverlayUI tutorialOverlayPrefab;   // 튜토리얼 오버레이 프리팹(비우면 코드 빌드 폴백)
+    [SerializeField] BattleVfxLibrary battleVfxLibrary;         // 규칙 기반 연출 배선 단일 지점(비우면 해당 연출만 생략)
+
+    void Awake()
+    {
+        // 전투 씬 단독 실행에서도 배선되게 여기서 주입(DataLibrary 비의존).
+        // 연출이 늘어도 이 필드는 하나로 고정 — 새 연출은 라이브러리 에셋의 목록에만 추가한다.
+        BattleVfx.SetLibrary(this.battleVfxLibrary);
+    }
 
     async UniTaskVoid Start()
     {

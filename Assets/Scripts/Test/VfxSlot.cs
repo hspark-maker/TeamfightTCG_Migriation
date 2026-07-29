@@ -2,6 +2,7 @@
 using UnityEditor;
 #endif
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
@@ -28,8 +29,6 @@ public class VfxSlot
     public float   lifetime     = 2f;    // 이 시간 뒤 파괴.
     public int     sortingOrder = 100;   // 카드(SpriteRenderer) 위로 올리기.
     [Min(0f)] public float spawnDelay = 0f;
-    [Tooltip("대상 트랜스폼에 붙여 따라가게 한다(박치기로 카드가 움직여도 이펙트가 같이 이동).")]
-    public bool follow = false;
 
     List<string> paths;          // 에디터 폴더 스캔 결과(경로만, 프리팹은 지연 로드).
     int          index;
@@ -93,6 +92,10 @@ public class VfxSlot
         this.cached = null; this.cachedKey = null;
     }
 
+    /// <summary>지금 선택된 후보 프리팹(끔 상태거나 후보 없으면 null). 무장 VFX처럼
+    /// 스폰 시점을 다른 쪽(CardView)이 쥐고 있는 경우 프리팹만 넘겨주기 위해 공개한다.</summary>
+    public GameObject Current => this.use ? CurrentPrefab() : null;
+
     GameObject CurrentPrefab()
     {
         if (this.prefabs != null && this.prefabs.Length > 0) return this.prefabs[this.Index];
@@ -108,25 +111,27 @@ public class VfxSlot
     }
 
     /// <summary>대상 위치에 현재 후보를 즉시 생성. spawnDelay는 호출부가 처리(await 후 호출).
-    /// _flip=true면 좌우 오프셋 반전 + Y축 180도 회전(적 방향 공격용).</summary>
+    /// _flip=true면 좌우 오프셋 반전 + Y축 180도 회전(적 방향 공격용).
+    ///
+    /// 이펙트는 **앵커(CardView) 자식으로 붙는다** — 박치기로 카드가 움직이면 이펙트도 같이 간다.
+    /// 생성/파괴 대신 ParticlePooler로 재사용한다(연출마다 Instantiate하면 프레임이 튄다).</summary>
     public GameObject Spawn(Transform _anchor, bool _flip = false)
     {
         if (!this.use || _anchor == null) return null;
         GameObject t_prefab = CurrentPrefab();
         if (t_prefab == null) return null;
 
-        Vector3    t_offset = _flip ? new Vector3(-this.localOffset.x, -this.localOffset.y, this.localOffset.z) : this.localOffset;
-        Quaternion t_rot    = _flip ? Quaternion.Euler(0f, 180f, 0f) : Quaternion.identity;
+        // 부착·flip·풀 대여 규약은 BattleVfx 하나가 소유한다(프로덕션 경로와 동일 규칙).
+        GameObject t_go = BattleVfx.SpawnAttached(t_prefab, _anchor, this.localOffset, Vector3.zero, _flip, out string t_id);
+        if (t_go == null) return null;
 
-        GameObject t_go = Object.Instantiate(t_prefab, _anchor.TransformPoint(t_offset), t_rot);
-        if (this.follow) t_go.transform.SetParent(_anchor, worldPositionStays: true);
+        // 풀 재사용분은 지난 값이 남아 있다 → 스케일·정렬을 매번 다시 잡는다.
         t_go.transform.localScale = t_prefab.transform.localScale * this.scale;
+        BattleVfx.ApplySorting(t_go, SortingLayer.NameToID("Card"), this.sortingOrder);
 
-        // 구매 에셋 VFX는 대개 sortingOrder 0 → 카드 스프라이트에 가려진다. 전부 위로 올린다.
-        foreach (Renderer t_r in t_go.GetComponentsInChildren<Renderer>(true))
-            t_r.sortingOrder = this.sortingOrder;
+        if (!BattleVfx.SelfReleasing(t_go))
+            BattleVfx.ReleaseAfter(t_id, t_go, this.lifetime).Forget();
 
-        Object.Destroy(t_go, Mathf.Max(0.05f, this.lifetime));
         return t_go;
     }
 }

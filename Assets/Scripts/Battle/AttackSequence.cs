@@ -5,7 +5,9 @@ using UnityEngine;
 
 public static class AttackSequence
 {
-    // ── 박치기(일반) 연출 튜닝. 기본값은 프로덕션용. 테스트 씬(AttackAnimTester)이 런타임에 덮어써 조정. ──
+    // ── 박치기(일반) 연출 튜닝 ──
+    // 값의 진실원은 BattleTimingConfig(SO) → 인게임 설정 지점이 여기 하나다.
+    // 테스트 씬(AttackAnimTester)만 런타임에 덮어써 슬라이더로 굴린다.
     public struct NormalTuning
     {
         public float windDur;     // 윈드업(뒤로 살짝) 시간.
@@ -17,14 +19,19 @@ public static class AttackSequence
         public float lungeT;      // 방어자까지 이동 비율(1=완전겹침).
         public float maxLean;     // 적 방향 최대 lean 각(도).
 
-        public static NormalTuning Default => new NormalTuning
-        {
-            windDur = 0.07f, windDist = 0.22f, inDur = 0.09f,
-            recoilDur = 0.09f, recoilDist = 0.35f, outDur = 0.16f,
-            lungeT = 0.62f, maxLean = 40f,
-        };
     }
-    public static NormalTuning Normal = NormalTuning.Default;
+
+    static NormalTuning? s_normalOverride;   // 테스터 런타임 조정분. null이면 SO 값을 쓴다.
+
+    /// <summary>이번 공격에 쓸 튜닝. 기본은 BattleTimingConfig(배속 반영된 값),
+    /// 테스터가 대입하면 그 값이 우선한다. ClearNormalOverride로 SO 값으로 되돌린다.</summary>
+    public static NormalTuning Normal
+    {
+        get => s_normalOverride ?? GameTiming.Battle.NormalAttack;
+        set => s_normalOverride = value;
+    }
+
+    public static void ClearNormalOverride() => s_normalOverride = null;
 
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null,
@@ -152,6 +159,11 @@ public static class AttackSequence
         async UniTask RecoilThenReturn()
         {
             await t_atk.DOMove(t_recoil, t_cfg.recoilDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask();
+
+            // 무장 이펙트는 반동이 끝나는 지점에서 꺼진다. 접촉 프레임(돌진 트윈 직후)에 끄면
+            // 충돌 연출이 보이기 전에 사라져 "닿기 전에 꺼진" 것처럼 읽힌다.
+            _attacker.SetArmedVfx(false);
+
             await UniTask.WhenAll(
                 t_atk.DOMove(_home, t_cfg.outDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
                 t_atk.DOLocalRotateQuaternion(t_baseRot, t_cfg.outDur).SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask());
@@ -256,11 +268,14 @@ public static class AttackSequence
         int t_atkDmg = t_atkBefore - HpTotal(_attacker);
         bool t_attackerHit = t_atkDmg > 0;
 
+        // 피격 방향: 맞은 쪽은 "때린 쪽"을 넘긴다(먼지 등이 반대로 튀게). 반격은 방향이 뒤집힌다.
         UniTask t_defHit = _splashView != null
-            ? UniTask.WhenAll(_defender.PlayHitAnim(_damage: t_defDmg), _splashView.PlayHitAnim(_damage: t_splDmg))
-            : _defender.PlayHitAnim(_damage: t_defDmg);
+            ? UniTask.WhenAll(_defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker),
+                              _splashView.PlayHitAnim(_damage: t_splDmg, _hitFrom: _attacker))
+            : _defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker);
         if (t_attackerHit)
-            await UniTask.WhenAll(t_defHit, _attacker?.PlayHitAnim(_damage: t_atkDmg) ?? UniTask.CompletedTask);
+            await UniTask.WhenAll(t_defHit,
+                _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender) ?? UniTask.CompletedTask);
         else
             await t_defHit;
 

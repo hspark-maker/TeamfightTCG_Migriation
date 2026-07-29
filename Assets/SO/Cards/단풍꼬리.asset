@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
-  m_Name: 단풍꼬리
+  m_Name: "\uB2E8\uD48D\uAF2C\uB9AC"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  displayName: 단풍꼬리
+  displayName: "\uB2E8\uD48D\uAF2C\uB9AC"
   keywords: 0
   maxHp: 5
   bonusHp: 0
   synergies: []
   fullImage: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
   portrait: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
-  battleImage: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
+  battleImage: {fileID: 21300000, guid: be8ca3718794a704083e1a32f2855238, type: 3}
   deckPreview: {fileID: 21300000, guid: 1834b24023ce27c43ad1ad50497b3934, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
@@ -31,5 +31,6 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: '단풍 꼬리 여우. 균형 잡힌 체력의 튜토리얼 딜러.'
+  cardExplain: "\uB2E8\uD48D \uAF2C\uB9AC \uC5EC\uC6B0. \uADE0\uD615 \uC7A1\uD78C
+    \uCCB4\uB825\uC758 \uD29C\uD1A0\uB9AC\uC5BC \uB51C\uB7EC."
   explainKeywords: 0
