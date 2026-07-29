@@ -26,6 +26,18 @@ public class BattleFieldView : MonoBehaviour
 
     public CardView GetSlotView(int _index) => this.slotViews[_index];
 
+    /// <summary>이 필드의 가운데 자리(월드). 시네마에서 카드가 모이는 지점 —
+    /// 화면 중앙(카메라 기준)이 아니라 **필드 격자 기준**이라 화면 비율이 바뀌어도 슬롯과 어긋나지 않는다.
+    /// 슬롯 뷰의 배치 좌표(SlotPosition)를 쓴다 — 카드가 연출 중 움직여 있어도 원래 자리 기준.</summary>
+    public Vector3 FieldCenter
+    {
+        get
+        {
+            CardView t_mid = this.slotViews[BattleField.SLOT_COUNT / 2];
+            return t_mid != null ? t_mid.SlotPosition : transform.position;
+        }
+    }
+
     public async UniTask PlayFillAnim(List<CardInstance> _placed)
     {
         if (_placed == null || _placed.Count == 0) return;

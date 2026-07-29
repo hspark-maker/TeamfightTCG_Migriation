@@ -109,7 +109,10 @@ public class CardVisualView : MonoBehaviour
 
         if (!_show || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
 
-        foreach (CardVisualRules.KeywordIcon t_entry in CardVisualRules.CollectKeywordIcons(_card.keywords, this.keywordIconConfig))
+        // 아웃게임엔 전투 런타임 상태가 없다 → 상태 전용 키워드(무적·추가체력)는 애초에 제외.
+        // 판정은 인게임 특성 줄과 같은 CardVisualRules.TraitKeywords 하나. 로비/전투 표시가 갈리지 않는다.
+        foreach (CardVisualRules.KeywordIcon t_entry in
+                 CardVisualRules.CollectKeywordIcons(CardVisualRules.TraitKeywords(_card), this.keywordIconConfig))
         {
             CardKeywordIconView t_view = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
             t_view.SetIcon(t_entry.Icon);

@@ -27,5 +27,5 @@
 
 ## 경로 맵 (orch 관리)
 <!-- orch:pathmap:start -->
-@.claude/orch-pathmap.md
+<!-- 항상 로드 금지. 경로 맵은 `.claude/orch-pathmap.md`에 있음 — 필요할 때 Read/Glob으로 조회. (@import 시 세션당 ~15k 토큰 상주) -->
 <!-- orch:pathmap:end -->

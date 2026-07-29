@@ -13102,6 +13102,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   battleTimingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
+  battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!4 &2101392797
 Transform:
   m_ObjectHideFlags: 0

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 844324d8a9ade8a4ab9fa236ac0d8edc
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_SpiralDark.mat
+  uploadId: 755856

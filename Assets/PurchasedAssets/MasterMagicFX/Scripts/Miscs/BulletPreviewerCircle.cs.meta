@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cd63e81997c382f4e80004c7e5c07c6f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Scripts/Miscs/BulletPreviewerCircle.cs
+  uploadId: 755856

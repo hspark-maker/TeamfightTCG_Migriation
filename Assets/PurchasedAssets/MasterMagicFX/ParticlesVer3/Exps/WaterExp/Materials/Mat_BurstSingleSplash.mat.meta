@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fc5a5c03037172c4ca429d75a9d1b2e5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer3/Exps/WaterExp/Materials/Mat_BurstSingleSplash.mat
+  uploadId: 755856

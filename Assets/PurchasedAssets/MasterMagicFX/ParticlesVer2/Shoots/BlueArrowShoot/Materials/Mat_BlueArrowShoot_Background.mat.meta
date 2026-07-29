@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7dc49ade47823264fa8c6c9b99b003cd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/BlueArrowShoot/Materials/Mat_BlueArrowShoot_Background.mat
+  uploadId: 755856

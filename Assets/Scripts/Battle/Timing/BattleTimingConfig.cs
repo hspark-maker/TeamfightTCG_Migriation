@@ -17,6 +17,18 @@ public class BattleTimingConfig : ScriptableObject
     [Header("Cinema / Attack")]
     [SerializeField] float cinemaDuration = 0.25f;   // 시네마 진입/카드 Z 이동
 
+    [Header("Attack Headbutt (일반 공격: 뒤로 → 박치기 → 반동 → 복귀)")]
+    // 시간 4개만 배속(SpeedFactor)을 먹는다. 거리·비율·각도는 시간이 아니라 배속과 무관해야 한다
+    // — 여기에 배율을 곱하면 빠르게 돌릴 때 이동 거리까지 줄어 연출이 뭉개진다.
+    [SerializeField] float atkWindDur    = 0.07f;   // 윈드업(뒤로 살짝) 시간
+    [SerializeField] float atkWindDist   = 0.22f;   // 윈드업 거리(적 반대 방향)
+    [SerializeField] float atkInDur      = 0.09f;   // 돌진(접촉까지) 시간
+    [SerializeField] float atkRecoilDur  = 0.09f;   // 접촉 후 반동 시간
+    [SerializeField] float atkRecoilDist = 0.35f;   // 반동 거리
+    [SerializeField] float atkOutDur     = 0.16f;   // 반동 → 슬롯 복귀 시간
+    [Range(0f, 1f)]  [SerializeField] float atkLungeT  = 0.62f;   // 방어자까지 이동 비율(1=완전겹침)
+    [Range(0f, 80f)] [SerializeField] float atkMaxLean = 40f;     // 적 방향 최대 lean 각(도)
+
     [Header("Intro")]
     [SerializeField] float cameraIntroDuration = 0.8f;
     [SerializeField] float cardDealDelay       = 0.15f;
@@ -37,6 +49,12 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float fadeViewDuration   = 0.3f;
     [SerializeField] float attackPreviewFlash = 0.55f;
     [SerializeField] float keywordGlowHold    = 1.5f;
+
+    [Header("Heal Vfx (힐러 회복 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
+    [SerializeField] float healLaunchLead     = 0.15f;   // 발동 이펙트 → 첫 투사체 사이 간격
+    [SerializeField] float healLaunchStagger  = 0.06f;   // 대상별 발사 간격
+    [SerializeField] float healTravelDuration = 0.45f;   // 투사체 비행 시간
+    [SerializeField] float healTrailLinger    = 0.25f;   // 도착 후 트레일 잔상 유지
 
     [Header("Mulligan")]
     [SerializeField] float mulliganNoticeHold = 1.2f;   // "상대가 교환 중" 안내를 띄워두는 시간
@@ -70,6 +88,10 @@ public class BattleTimingConfig : ScriptableObject
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;
+    public float HealLaunchLead      => healLaunchLead      * SpeedFactor;
+    public float HealLaunchStagger   => healLaunchStagger   * SpeedFactor;
+    public float HealTravelDuration  => healTravelDuration  * SpeedFactor;
+    public float HealTrailLinger     => healTrailLinger     * SpeedFactor;
     public float MulliganNoticeHold  => mulliganNoticeHold  * SpeedFactor;
     public float EffectNotifyDisplay => effectNotifyDisplay * SpeedFactor;
     public float EffectNotifySlide   => effectNotifySlide   * SpeedFactor;
@@ -79,4 +101,18 @@ public class BattleTimingConfig : ScriptableObject
     public float OpponentExtraAttackDelay => opponentExtraAttackDelay * SpeedFactor;
     // 생각시간만은 배율 미적용 raw 노출 (배속 켜도 안 줄어듦 = 공정성).
     public float TurnThinkTime            => turnThinkTime;
+
+    /// <summary>일반 공격(박치기) 연출 튜닝 한 벌. 시간 항목만 배속이 적용된 상태로 나간다.
+    /// AttackSequence가 공격 시작 시 한 번 읽어 스냅샷으로 쓴다.</summary>
+    public AttackSequence.NormalTuning NormalAttack => new AttackSequence.NormalTuning
+    {
+        windDur    = atkWindDur   * SpeedFactor,
+        inDur      = atkInDur     * SpeedFactor,
+        recoilDur  = atkRecoilDur * SpeedFactor,
+        outDur     = atkOutDur    * SpeedFactor,
+        windDist   = atkWindDist,
+        recoilDist = atkRecoilDist,
+        lungeT     = atkLungeT,
+        maxLean    = atkMaxLean,
+    };
 }

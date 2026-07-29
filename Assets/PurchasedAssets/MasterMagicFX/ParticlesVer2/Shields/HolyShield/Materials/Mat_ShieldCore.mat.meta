@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c502da3e3157ffb499fc7e2062545bdd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shields/HolyShield/Materials/Mat_ShieldCore.mat
+  uploadId: 755856

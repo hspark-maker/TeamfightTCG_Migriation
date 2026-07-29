@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 616b43c802093e44a9828fb199d494ad
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/FlameThrower/NormalFlameThrower/Materials/Mat_FlameThrowerFlame.mat
+  uploadId: 755856

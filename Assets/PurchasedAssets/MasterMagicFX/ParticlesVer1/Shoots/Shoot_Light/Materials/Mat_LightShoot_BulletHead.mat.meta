@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ce01a9d40d76e294da5548ca5b11a57c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Light/Materials/Mat_LightShoot_BulletHead.mat
+  uploadId: 755856

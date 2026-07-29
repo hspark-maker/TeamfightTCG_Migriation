@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b8316386d8e5ff84093866f81e518acc
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 216008
+  packageName: Anime Stylized VFX
+  packageVersion: 1.1.2023.01
+  assetPath: Assets/Vefects/Anime Stylized VFX/Shared/Shaders/SH_VFX_Stylized_Dissolve_BIRP.shader
+  uploadId: 741610

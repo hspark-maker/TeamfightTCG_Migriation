@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 83049a91715cb624287a3c222f3ed2a2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/BlueEnergyShoot/Materials/Mat_BlueEnergyShoot_BasicParticles.mat
+  uploadId: 755856

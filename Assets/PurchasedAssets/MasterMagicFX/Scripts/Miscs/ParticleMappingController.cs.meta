@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 86106ccc68f42a84ab84f6d543a40519
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Scripts/Miscs/ParticleMappingController.cs
+  uploadId: 755856
