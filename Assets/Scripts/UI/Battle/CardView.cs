@@ -256,10 +256,7 @@ public class CardView : MonoBehaviour
 
         Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;   // DragBack 조준용(화면 중앙 기준).
 
-        if (this.activeGesture == Gesture.DragDown)
-            HandleDragBack(t_drag, t_touchDrag);
-        else
-            HandleDragToEnemy(t_touchDrag);
+        HandleAimDrag(t_drag, t_touchDrag, _forward: this.activeGesture != Gesture.DragDown);
     }
 
     /// <summary>튜토리얼 조작 게이트: 이번 스텝이 가르치는 제스처만 통과. 탭은 Gesture.None으로 표현한다.
@@ -285,9 +282,13 @@ public class CardView : MonoBehaviour
         this.dragState = DragState.Idle;
     }
 
-    void HandleDragBack(Vector2 _drag, Vector2 _touchDrag)
+    /// <summary>조준 드래그 공통 처리. 드래그-백/포워드는 딱 두 가지만 다르다:
+    /// ① 조준이 켜지는 손가락 방향(_forward=위로 / false=아래로) ② 조준 방향 부호(밀기 = 그 방향, 당기기 = 반대 방향).
+    /// 가이드는 조준 방향(t_aimDir.x)을 그대로 받으므로 모드가 바뀌면 자연히 반전된다.
+    /// 데드존 진입 시 타깃 취소, 카드 센터 이동, 되돌리기 복귀는 두 모드가 동일하다.</summary>
+    void HandleAimDrag(Vector2 _drag, Vector2 _touchDrag, bool _forward)
     {
-        if (_touchDrag.y < 0f)
+        if (_forward ? _touchDrag.y > 0f : _touchDrag.y < 0f)
         {
             UIPoolManager.Instance?.HideUI<PooledCardElement>();
 
@@ -306,7 +307,7 @@ public class CardView : MonoBehaviour
             }
 
 
-            Vector2 t_aimDir = -_drag.normalized;
+            Vector2 t_aimDir = (_forward ? _drag : -_drag).normalized;
             this.swipeGuide?.UpdateDirection(t_aimDir.x);
 
             if (_drag.magnitude < this.deadZoneRadius)
@@ -332,35 +333,6 @@ public class CardView : MonoBehaviour
                 transform.position = Vector3.Lerp(this.centerPos, this.cardAnim.SlotPosition, t_alpha);
             }
         }
-    }
-
-    void HandleDragToEnemy(Vector2 _touchDrag)
-    {
-        if (this.dragState != DragState.AttackDrag)
-        {
-            UIPoolManager.Instance?.HideUI<PooledCardElement>();
-            this.dragState = DragState.AttackDrag;
-            s_anyDragging  = true;
-            BeginTargeting();
-            var t_validTargets = GetValidEnemyViews();
-            foreach (var t_cv in t_validTargets)
-                if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
-                    t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
-            ApplyDragTargetFade(t_validTargets);
-            Vector3 t_liftPos = this.cardAnim.SlotPosition + Vector3.up * 0.25f;
-            this.cardAnim.MoveTo(t_liftPos).Forget();
-        }
-
-        Vector3 t_mouseWorld = GetMouseWorldOnCardPlane();
-
-        if (this.dragLine != null)
-        {
-            this.dragLine.enabled = true;
-            this.dragLine.SetPosition(0, transform.position);
-            this.dragLine.SetPosition(1, t_mouseWorld);
-        }
-
-        UpdateTargetByCollider();
     }
 
     Vector3 GetMouseWorldOnCardPlane()
@@ -869,52 +841,6 @@ public class CardView : MonoBehaviour
 
         this.currentTarget = t_best;
 
-        if (this.currentTarget != null)
-        {
-            this.currentTarget.SetHighlight(true);
-            this.currentTarget.SetTargetFocus(true);
-            ShowPreviewForTarget(this.currentTarget);
-            ApplyFocusFade(this.currentTarget);
-        }
-        else
-        {
-            ApplyDragTargetFade(GetValidEnemyViews());   // 타겟 없음 → 드래그 기본(유효타겟 다 밝게)로 복귀.
-        }
-    }
-
-    void UpdateTargetByCollider()
-    {
-        Vector3 t_screenPos = new Vector3(this.currentDragScreenPos.x, this.currentDragScreenPos.y, -Camera.main.transform.position.z);
-        Vector2 t_worldPos = Camera.main.ScreenToWorldPoint(t_screenPos);
-        Collider2D t_hit = Physics2D.OverlapPoint(t_worldPos);
-        CardView t_best = null;
-
-        var  t_validViews = GetValidEnemyViews();
-        bool t_rejected   = false;
-
-        if (t_hit != null)
-        {
-            CardView t_cv = t_hit.GetComponentInParent<CardView>();
-            if (t_cv != null && t_cv != this)
-            {
-                if (t_validViews.Contains(t_cv)) t_best = t_cv;
-                // 못 치는 적 카드 위로 끌어왔다 → 흔들기+펄스(+도발이면 문구). 커서가 떠나면 다시 발화 가능.
-                else if (GetEnemyViews().Contains(t_cv)) { RejectOnce(t_cv, t_validViews); t_rejected = true; }
-            }
-        }
-        if (!t_rejected) ClearRejectFocus();
-
-        if (this.currentTarget == t_best) return;
-
-        if (this.currentTarget != null)
-        {
-            this.currentTarget.SetHighlight(false);
-            this.currentTarget.HideAttackPreview();
-            this.currentTarget.SetTargetFocus(false);
-            HideAttackPreview();
-        }
-
-        this.currentTarget = t_best;
         if (this.currentTarget != null)
         {
             this.currentTarget.SetHighlight(true);
