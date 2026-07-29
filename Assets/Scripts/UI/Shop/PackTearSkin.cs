@@ -32,15 +32,20 @@ public class PackTearSkin : MonoBehaviour
     [Tooltip("조각이 도는 축. 위치는 진행도에서 계산해 매 프레임 찢김 선단(아직 붙어 있는 지점)에 붙인다 " +
              "— 축을 고정하면 아직 안 뜯긴 자리까지 들려서 조각이 공중에 뜬 것처럼 보인다.")]
     [SerializeField] RectTransform lidPivot;
-    [Tooltip("다 뜯었을 때 조각이 들린 각도(도). 작으면 조각이 제가 뚫은 입구를 도로 덮어 아무것도 안 보인다.")]
-    [SerializeField] float peelAngle = 26f;
+    [Tooltip("다 뜯었을 때 조각이 들린 각도(도). 조각 띠가 축의 왼쪽으로 뻗어 있어 부호가 곧 방향이다 — " +
+             "음수(시계)라야 위로 들리고, 양수(반시계)면 되레 아래로 처져 제가 뚫은 입구를 도로 덮는다.")]
+    [SerializeField] float peelAngle = -30f;
     [Tooltip("다 뜯었을 때 조각이 떠오른 거리(부모 로컬 = 캔버스 참조px).")]
     [SerializeField] float peelLift = 40f;
 
     [Header("조각 비산")]
-    [SerializeField] Vector2 flyOffset = new Vector2(-180f, 420f);
-    [SerializeField] float flySpin = 55f;
-    [SerializeField] float flyDuration = 0.45f;
+    [Tooltip("날아가는 방향·거리(껍데기 로컬). 조각 띠가 통째로 화면 밖에 나가야 카드를 가리지 않는다 " +
+             "— 껍데기 배율이 곱해지므로 띠 길이보다 넉넉히 잡는다.")]
+    [SerializeField] Vector2 flyOffset = new Vector2(-220f, 700f);
+    [Tooltip("날아가며 더 도는 각도(도). 축이 조각 띠의 오른쪽 끝이라 부호가 곧 방향이다 — " +
+             "양수(반시계)면 왼쪽으로 뻗은 띠가 아래로 쓸려 카드를 덮고, 음수(시계)면 위로 젖혀진다.")]
+    [SerializeField] float flySpin = -60f;
+    [SerializeField] float flyDuration = 0.28f;
     [Tooltip("조각을 사라지게 할 CanvasGroup. 미배선이면 날아가기만 한다.")]
     [SerializeField] CanvasGroup lidGroup;
 
@@ -114,8 +119,9 @@ public class PackTearSkin : MonoBehaviour
         if (lidGroup != null)
         {
             lidGroup.DOKill();
-            // 절반쯤 날아간 뒤부터 사라진다 — 즉시 페이드하면 뜯긴 조각을 볼 새가 없다.
-            t_seq.Insert(flyDuration * 0.4f, lidGroup.DOFade(0f, flyDuration * 0.6f).SetEase(Ease.InQuad));
+            // 카드 영역을 벗어나기 시작하는 즉시 옅어진다 — 늦게 지우면 솟아오르는 카드를 조각이 스친다.
+            // 그렇다고 0에서 시작하면 뜯긴 조각을 볼 새가 없으므로 초반 한 뼘은 또렷이 남긴다.
+            t_seq.Insert(flyDuration * 0.25f, lidGroup.DOFade(0f, flyDuration * 0.75f).SetEase(Ease.InQuad));
         }
 
         return t_seq;

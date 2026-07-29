@@ -48,11 +48,16 @@ public class PackRevealView : MonoBehaviour
     [Tooltip("팩 속에 있을 때의 더미 배율. 팩 안쪽 폭에 겨우 들어갈 만큼만 줄인다 " +
              "— 최종 크기와 갭이 크면 \"뽑혔다\"가 아니라 \"커졌다\"로 읽힌다.")]
     [Range(0.3f, 1f)] [SerializeField] float cardInPackScale = 0.8f;
+    [Tooltip("뽑혀 나온 더미가 정착하는 중심(무대 로컬 = 캔버스 참조px). 팩 속 위치와의 차이가 곧 " +
+             "\"뽑혀 나온 거리\"다 — 차이가 없으면 팩만 내려가고 더미는 제자리인 그림이 된다. " +
+             "다만 카드가 1376x1926로 커서 y가 ~597를 넘으면 윗변이 화면 밖으로 나간다.")]
+    [SerializeField] Vector2 cardEmergeCenter = new Vector2(0f, 500f);
 
     [Header("뽑기")]
-    [Tooltip("봉인이 다 뜯긴 뒤 카드가 올라오기까지의 뜸. 조각이 날아가는 걸 볼 틈을 준다.")]
+    [Tooltip("봉인이 다 뜯긴 뒤 팩과 더미가 움직이기까지의 뜸. 조각이 날아가 화면에서 빠질 틈을 준다.")]
     [SerializeField] float cardPullDelay = 0.12f;
-    [Tooltip("카드 뭉치가 팩 입구에서 제자리까지 솟아오르는 시간.")]
+    [Tooltip("뽑는 데 걸리는 시간. 더미가 솟아오르는 시간이자 팩이 빠져나가는 시간이다 — " +
+             "둘은 같은 한 동작이라 값을 나누지 않는다.")]
     [SerializeField] float cardPullDuration = 0.55f;
     // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
     [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
@@ -65,18 +70,15 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] float pullHold = 0.35f;
 
     [Header("팩 퇴장")]
-    [Tooltip("카드가 딸려 올라가며 팩이 함께 들리는 거리. 팩이 미동도 없으면 카드만 따로 노는 것으로 보인다.")]
-    [SerializeField] float packLift = 26f;
     [Tooltip("속을 비운 팩이 시드는 정도(x, y 배율). 부피가 남아 있으면 아직 뭔가 든 봉지로 보인다.")]
     [SerializeField] Vector2 packSagSquash = new Vector2(0.97f, 0.93f);
-    [Tooltip("카드가 이만큼 나온 뒤에 팩이 빠지기 시작한다(뽑기 시간 대비 비율). " +
-             "카드가 다 나온 뒤에 빠지면(1에 가까우면) 두 동작이 끊겨 보인다 — 겹쳐야 서로 반대로 미끄러지며 뽑힌다.")]
-    [Range(0f, 1f)] [SerializeField] float packExitDelay = 0.45f;
     [Tooltip("팩이 빠져나가며 내려가는 거리(캔버스 참조px). 화면 밖까지 가도록 넉넉히.")]
     [SerializeField] float packExitDrop = 2400f;
     [Tooltip("빠져나가며 기우는 각도(도). 곧게 내려가면 사라지는 UI로 읽힌다.")]
     [SerializeField] float packExitTilt = -9f;
-    [SerializeField] float packExitDuration = 0.5f;
+    [Tooltip("내려가기 직전 팩이 되레 들리는 정도(InBack 오버슈트). 카드에 딸려 한 번 들렸다 빠지는 " +
+             "이 한 박자가 \"붙잡고 있던 걸 빼냈다\"를 만든다 — 0이면 그냥 아래로 사라지는 UI가 된다.")]
+    [SerializeField] float packExitBack = 0.5f;
 
     [Header("결과 화면")]
     [Tooltip("결과 UI 묶음. 페이드하지 않는다 — 입력 개폐(blocksRaycasts)만 담당한다. " +
@@ -257,7 +259,8 @@ public class PackRevealView : MonoBehaviour
         EnterPulling();
     }
 
-    // 뽑기: 뜯긴 조각이 날아가고, 팩 속 카드 뭉치가 입구에서 통째로 솟아오른다. 팩은 딸려 올라갔다 시들며 빠진다.
+    // 뽑기: 뜯긴 조각이 먼저 화면 밖으로 날아가 길을 비우고, 그다음 팩이 아래로·더미가 위로 동시에 미끄러진다.
+    // 그 이동이 끝난 뒤에야 넘기기로 넘어간다 — 뽑히는 중에 조작이 열리면 두 동작이 겹쳐 읽힌다.
     // 조각 비산·카드 솟기·팩 퇴장을 한 시퀀스에 모아 스킵 한 번이 셋을 함께 끝내게 한다 —
     //   따로 재생하면 스킵 후 팩만 화면에 남는 상태가 생긴다.
     void EnterPulling()
@@ -287,37 +290,33 @@ public class PackRevealView : MonoBehaviour
             if (t_fly != null) m_stageSeq.Insert(0f, t_fly);
         }
 
-        // 카드 뭉치가 솟아오른다. 아래쪽은 팩 앞면이 계속 가리므로 입구에서 빠져나오는 것으로 읽힌다.
+        // 더미가 솟고 팩이 빠진다 — 시작 시각도 길이도 같게 묶는다.
+        // 이 한 쌍이 연출의 축이다: 어긋나면 "서로 반대로 미끄러지며 뽑혔다"가 아니라 각자 따로 노는 것으로 읽힌다.
+        // 아래쪽은 팩 앞면이 계속 가리므로, 그동안 카드는 입구에서 빠져나오는 것으로 보인다.
         if (cardStack != null)
         {
-            var t_pull = cardStack.PlayEmerge(cardPullDuration);
+            var t_pull = cardStack.PlayEmerge(cardEmergeCenter, cardPullDuration);
             if (t_pull != null) m_stageSeq.Insert(cardPullDelay, t_pull);
         }
 
         if (shellRig != null)
         {
-            // 카드에 딸려 팩이 잠깐 들린다 — 이 한 박자가 "붙잡고 있던 걸 빼냈다"를 만든다.
+            // InBack이라 내려가기 전에 살짝 들렸다 쑥 빠진다 — 그 오버슈트가 곧 "카드에 딸려 들린" 한 박자다.
+            // 들림을 따로 트윈하지 않는 이유: 같은 ShellOffset을 두 트윈이 동시에 몰면 서로를 덮어쓴다.
             m_stageSeq.Insert(cardPullDelay,
                 DOTween.To(() => shellRig.ShellOffset, _v => shellRig.ShellOffset = _v,
-                           new Vector2(0f, packLift), cardPullDuration * 0.35f).SetEase(Ease.OutQuad));
+                           new Vector2(0f, -packExitDrop), cardPullDuration).SetEase(Ease.InBack, packExitBack));
+            m_stageSeq.Insert(cardPullDelay,
+                DOTween.To(() => shellRig.ShellAngle, _v => shellRig.ShellAngle = _v,
+                           packExitTilt, cardPullDuration).SetEase(Ease.InQuad));
 
-            // 속이 빈 만큼 시든다.
+            // 속이 빈 만큼 시든다(별개 축이라 퇴장과 다투지 않는다).
             m_stageSeq.Insert(cardPullDelay,
                 DOTween.To(() => shellRig.ShellSquash, _v => shellRig.ShellSquash = _v,
                            packSagSquash, cardPullDuration * 0.8f).SetEase(Ease.OutCubic));
 
-            // 카드가 어느 정도 나온 뒤에 빠진다 — 먼저 내려가면 "빼냈다"가 아니라 "따로 사라졌다"가 된다.
-            // InBack이라 살짝 버티다 쑥 내려간다.
-            float t_exitAt = cardPullDelay + cardPullDuration * packExitDelay;
-            m_stageSeq.Insert(t_exitAt,
-                DOTween.To(() => shellRig.ShellOffset, _v => shellRig.ShellOffset = _v,
-                           new Vector2(0f, -packExitDrop), packExitDuration).SetEase(Ease.InBack));
-            m_stageSeq.Insert(t_exitAt,
-                DOTween.To(() => shellRig.ShellAngle, _v => shellRig.ShellAngle = _v,
-                           packExitTilt, packExitDuration).SetEase(Ease.InQuad));
-
             // 다 빠진 뒤엔 꺼 둔다 — 팩은 화면 밖이지만 카드·결과 패널 위를 계속 덮고 있다.
-            m_stageSeq.InsertCallback(t_exitAt + packExitDuration, () => shellRig.HideShells());
+            m_stageSeq.InsertCallback(cardPullDelay + cardPullDuration, () => shellRig.HideShells());
         }
 
         m_stageSeq.AppendInterval(pullHold)

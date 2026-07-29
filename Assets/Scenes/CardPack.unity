@@ -2309,6 +2309,7 @@ MonoBehaviour:
   cardStack: {fileID: 497097069}
   cardInPackCenter: {x: 0, y: 219}
   cardInPackScale: 0.8
+  cardEmergeCenter: {x: 0, y: 500}
   cardPullDelay: 0.12
   cardPullDuration: 0.55
   burstEffect: {fileID: 0}
@@ -2316,12 +2317,10 @@ MonoBehaviour:
   shakeDuration: 0.3
   shakeStrength: 48
   pullHold: 0.35
-  packLift: 26
   packSagSquash: {x: 0.97, y: 0.93}
-  packExitDelay: 0.45
   packExitDrop: 2400
   packExitTilt: -9
-  packExitDuration: 0.5
+  packExitBack: 0.5
   revealPanel: {fileID: 130962628}
   remainingText: {fileID: 454058481}
   totalRefundText: {fileID: 1376200665}
@@ -2622,11 +2621,11 @@ MonoBehaviour:
   mouthShadow: {fileID: 585077948}
   tearGlow: {fileID: 1679413697}
   lidPivot: {fileID: 740126996}
-  peelAngle: 26
+  peelAngle: -30
   peelLift: 40
-  flyOffset: {x: -180, y: 420}
-  flySpin: 55
-  flyDuration: 0.45
+  flyOffset: {x: -220, y: 700}
+  flySpin: -60
+  flyDuration: 0.28
   lidGroup: {fileID: 1065962473}
   jagSegments: 14
   jagSeed: 20260729
