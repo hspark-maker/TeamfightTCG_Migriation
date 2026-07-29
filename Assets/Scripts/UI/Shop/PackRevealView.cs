@@ -137,8 +137,9 @@ public class PackRevealView : MonoBehaviour
     // 이번 세션에서 개봉 신호를 이미 쐈는지. 뜯김과 스킵 어느 쪽으로 열려도 정확히 1회여야 한다.
     bool m_announced;
 
-    /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.</summary>
-    public void BeginOpen(OpenedPack _opened)
+    /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
+    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 씬 기본 그림).</summary>
+    public void BeginOpen(OpenedPack _opened, CardPackData _pack)
     {
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
         if (_opened == null || !_opened.Success)
@@ -155,7 +156,12 @@ public class PackRevealView : MonoBehaviour
         SetTearHint(false, true);
 
         if (shellRig != null) { shellRig.ShowShells(); shellRig.ResetPose(); }
-        if (tearSkin != null) tearSkin.ResetTear();
+        if (tearSkin != null)
+        {
+            // 그림을 먼저 갈고 상태를 되돌린다 — 진행도·조각 자리는 그림과 무관하지만 순서를 고정해 둔다.
+            tearSkin.ApplyPackArt(_pack != null ? _pack.PackArt : null);
+            tearSkin.ResetTear();
+        }
 
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);

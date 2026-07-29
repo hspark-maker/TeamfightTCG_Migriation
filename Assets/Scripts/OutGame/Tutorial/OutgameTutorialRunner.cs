@@ -143,7 +143,7 @@ public static class OutgameTutorialRunner
         if (_index + 1 >= StepCount) OutgameTutorialProgress.Complete();
 
         // 전투 진입은 BattleEntry 스텝(로비 PlayBtn)이 담당 → 캐리어의 튜토리얼 시작은 항상 false.
-        PackHandoff.Set(t_opened, _step.nextScene, false);
+        PackHandoff.Set(t_opened, _step.pack, _step.nextScene, false);
         SceneManager.LoadScene(PackOpenScene);
         return false;
     }

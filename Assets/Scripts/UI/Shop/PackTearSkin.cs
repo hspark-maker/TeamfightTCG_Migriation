@@ -91,6 +91,18 @@ public class PackTearSkin : MonoBehaviour
         if (m_jag != null) Destroy(m_jag);
     }
 
+    /// <summary>팩 그림을 이번에 산 팩의 것으로 갈아끼운다(개봉 시작마다). null이면 씬에 배치된 기본 그림을 유지.
+    /// 다섯 그래픽이 같은 스프라이트를 써야 한다 — 그늘·빛은 팩 실루엣의 알파로 자기 범위를 잡으므로
+    /// 한 장만 갈면 몸통과 윤곽이 어긋난다. 찢김 결은 시드 생성이라 그림이 바뀌어도 그대로 동작한다.</summary>
+    public void ApplyPackArt(Sprite _art)
+    {
+        if (_art == null) return;
+
+        var t_targets = TearTargets();
+        for (int t_i = 0; t_i < t_targets.Length; t_i++)
+            if (t_targets[t_i] is Image t_image) t_image.sprite = _art;
+    }
+
     /// <summary>진행도 반영 지점 하나. 네 그래픽과 조각 들림이 여기서만 갈라져 결이 어긋나지 않는다.</summary>
     public void SetProgress(float _value)
     {
@@ -183,10 +195,13 @@ public class PackTearSkin : MonoBehaviour
         m_homeCaptured = true;
     }
 
+    // 찢김선을 공유하는 그래픽 묶음. 재질 사본과 그림 교체가 같은 목록을 봐야 한 장만 빠지는 일이 없다.
+    Graphic[] TearTargets() => new[] { front, back, lid, mouthShadow, tearGlow };
+
     // 네 그래픽의 재질을 사본으로 갈고, 공유 노이즈를 물린다.
     void InstanceMaterials()
     {
-        var t_targets = new[] { front, back, lid, mouthShadow, tearGlow };
+        var t_targets = TearTargets();
         m_mats = new Material[t_targets.Length];
 
         for (int t_i = 0; t_i < t_targets.Length; t_i++)

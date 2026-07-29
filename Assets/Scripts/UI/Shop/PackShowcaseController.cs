@@ -191,7 +191,7 @@ public class PackShowcaseController : MonoBehaviour
             // 구독자가 씬 전환 전에 결과를 처리할 수 있도록 LoadScene보다 먼저 알린다.
             OnAnyPurchased?.Invoke();
             // 일반 구매 목적지는 로비 복귀, 튜토리얼 없음(첫실행 경로와 구분).
-            PackHandoff.Set(t_opened, "LobbyScene", false);
+            PackHandoff.Set(t_opened, t_pack, "LobbyScene", false);
             SceneManager.LoadScene("CardPack");
             return;
         }

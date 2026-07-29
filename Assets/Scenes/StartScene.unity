@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1250903378}
   - component: {fileID: 1250903377}
+  - component: {fileID: 1250903379}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -202,6 +203,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1250903379
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1250903376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1001 &1535538700
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -214,6 +259,30 @@ PrefabInstance:
       propertyPath: m_Name
       value: LoadingCover
       objectReference: {fileID: 0}
+    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_text
+      value: "\uB85C\uB529 \uC911\uC785\uB2C8\uB2E4 "
+      objectReference: {fileID: 0}
+    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
+    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: -4999335185947324146, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
+    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4378495238760489521, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5461712091178586427, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 92d72755a61855c4bb522273996f2343, type: 3}
     - target: {fileID: 6074598872349822445, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_Pivot.x
       value: 0
