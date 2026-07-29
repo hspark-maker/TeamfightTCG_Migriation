@@ -10326,7 +10326,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1204875450
 Transform:
   m_ObjectHideFlags: 0
@@ -15580,6 +15580,7 @@ MonoBehaviour:
   snapRatio: 0.22
   flickSpeed: 700
   flickMinRatio: 0.03
+  loop: 1
   edgeResistance: 0.35
   snapDuration: 0.28
   pageStepOverride: 0
