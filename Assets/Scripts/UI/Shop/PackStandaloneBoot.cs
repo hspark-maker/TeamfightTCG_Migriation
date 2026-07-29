@@ -45,7 +45,7 @@ public class PackStandaloneBoot : MonoBehaviour
         }
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
-        PackHandoff.Set(OpenedPack.CreateSuccess(t_packId, t_drawn), nextScene, startTutorial);
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_packId, t_drawn), dummyPack, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneBoot] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
     }

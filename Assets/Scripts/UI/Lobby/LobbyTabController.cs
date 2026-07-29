@@ -13,12 +13,14 @@ public class LobbyTabController : MonoBehaviour
         public string name;               // 에디터 식별용 라벨
         public Button button;             // 하단바 탭 버튼
         public GameObject content;        // 중앙에 표시할 콘텐츠 패널
-        public GameObject selectedMark;   // 선택 표시(옵션) — 없으면 무시
+        public Image tint;                // 선택 표시용 이미지(옵션) — 선택 여부에 따라 색만 바뀐다
         public EOutgameTutorialAnchor tutorialAnchor;   // 튜토리얼 안내 타깃 키(옵션) — None이면 등록 안 함
     }
 
     [SerializeField] List<Tab> tabs = new List<Tab>();
     [SerializeField] int defaultIndex = 2; // 시작 시 열릴 탭 (기본 = 경기)
+    [SerializeField] Color selectedColor = Color.white;
+    [SerializeField] Color unselectedColor = new Color(1f, 1f, 1f, 0.4f);
 
     void Awake()
     {
@@ -47,7 +49,7 @@ public class LobbyTabController : MonoBehaviour
         {
             bool on = (i == _index);
             if (this.tabs[i].content != null) this.tabs[i].content.SetActive(on);
-            if (this.tabs[i].selectedMark != null) this.tabs[i].selectedMark.SetActive(on);
+            if (this.tabs[i].tint != null) this.tabs[i].tint.color = on ? this.selectedColor : this.unselectedColor;
         }
     }
 }

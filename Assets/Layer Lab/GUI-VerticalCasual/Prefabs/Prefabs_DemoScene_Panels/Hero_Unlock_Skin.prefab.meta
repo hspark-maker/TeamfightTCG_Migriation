@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 03a8a29fee9c04a339d478296d3f7102
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_DemoScene_Panels/Hero_Unlock_Skin.prefab
+  uploadId: 924690

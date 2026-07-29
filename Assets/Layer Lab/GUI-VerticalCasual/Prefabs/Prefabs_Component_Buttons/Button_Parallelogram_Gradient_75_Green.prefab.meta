@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: c3d76e765b45f4e9c8a7fbba615f1b1f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_Component_Buttons/Button_Parallelogram_Gradient_75_Green.prefab
+  uploadId: 924690

@@ -46,7 +46,7 @@ public class UIPoolManager : MonoBehaviour
 
         instance = this;
         s_nullWarned = false;
-        DontDestroyOnLoad(gameObject);
+        DontDestroyOnLoad(transform.root.gameObject);   // 부트 프리팹의 자식이라 루트 기준(단독 배치면 자기 자신)
         return true;
     }
 

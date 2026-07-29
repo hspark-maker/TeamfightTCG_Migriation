@@ -13,6 +13,10 @@ public class CardPackData : ScriptableObject
     [SerializeField] string packId;              // 상점·구매 요청의 안정 문자열 키. 에셋 리네임과 무관하게 고정.
     [SerializeField] string displayName;         // 표시명(CardData.displayName과 동일 규약 — 정본 표시명).
 
+    [Header("표시")]
+    [Tooltip("진열·개봉에 쓰는 팩 아트. 미지정이면 진열 뷰가 자기 기본 이미지를 유지한다.")]
+    [SerializeField] Sprite packArt;             // 축소 아이콘이 아니라 진열 본체 아트(개봉 씬도 같은 필드를 소비할 여지).
+
     [Header("가격·드로우")]
     [Min(0)] [SerializeField] long price = 100;   // Gold 가격. 음수 오설정 방지.
     [Min(1)] [SerializeField] int drawCount = 3;  // 개봉 시 뽑는 장수. 최소 1.
@@ -27,6 +31,7 @@ public class CardPackData : ScriptableObject
     // ── 읽기 전용 노출 ─────────────────────────────────────────
     public string PackId => packId;
     public string DisplayName => displayName;
+    public Sprite PackArt => packArt;
     public long Price => price;
     public int DrawCount => drawCount;
     public bool UniqueDraw => uniqueDraw;

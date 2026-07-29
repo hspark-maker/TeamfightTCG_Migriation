@@ -18,35 +18,35 @@ MonoBehaviour:
   - grade: 0
     displayName: Bronze
     badge: {fileID: 0}
-    entryPoints: 0
+    entryPoints: 100
     pointsPerDivision: 25
     rewardGold: 100
     rewardGoldPerDivision: 50
   - grade: 1
     displayName: Silver
     badge: {fileID: 0}
-    entryPoints: 100
+    entryPoints: 200
     pointsPerDivision: 25
     rewardGold: 300
     rewardGoldPerDivision: 50
   - grade: 2
     displayName: Gold
     badge: {fileID: 0}
-    entryPoints: 200
+    entryPoints: 300
     pointsPerDivision: 25
     rewardGold: 500
     rewardGoldPerDivision: 100
   - grade: 3
     displayName: Platinum
     badge: {fileID: 0}
-    entryPoints: 300
+    entryPoints: 400
     pointsPerDivision: 25
     rewardGold: 900
     rewardGoldPerDivision: 100
   - grade: 4
     displayName: Diamond
     badge: {fileID: 0}
-    entryPoints: 400
+    entryPoints: 500
     pointsPerDivision: 25
     rewardGold: 1400
     rewardGoldPerDivision: 200

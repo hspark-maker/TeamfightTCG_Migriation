@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fcc106cfb619f4f6e9d6d91c161e7b0b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_DemoScene_Panels/Reward_Open.prefab
+  uploadId: 924690
