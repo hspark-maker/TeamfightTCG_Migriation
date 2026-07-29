@@ -13,9 +13,11 @@ public class CardAnimator : MonoBehaviour
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
     float moveDuration => GameTiming.Battle.CardMoveDuration;
 
-    static readonly float[] CINEMA_X_FRACTIONS = { 0.25f, 0.5f, 0.75f };
+    // 시네마에서 여러 장을 세울 때 좌우 간격(월드). 슬롯 간격(2.0)보다 좁게 모아 붙인다.
+    [SerializeField] float cinemaSpacing = 1.6f;
 
     CardInstance boundCard;
+    BattleFieldView fieldView;   // 이 카드가 속한 필드(시네마 집결 좌표의 기준). 없으면 폴백.
     Vector3 slotPosition;
     readonly System.Collections.Generic.HashSet<SpriteRenderer> fadeExcludes
         = new System.Collections.Generic.HashSet<SpriteRenderer>();
@@ -40,7 +42,14 @@ public class CardAnimator : MonoBehaviour
     void Awake()
     {
         this.slotPosition = transform.position;
+        this.fieldView    = GetComponentInParent<BattleFieldView>();
     }
+
+    /// <summary>이 카드가 속한 필드의 가운데 자리(월드). 시네마 집결 지점 —
+    /// 카메라(화면 중앙)가 아니라 필드 격자가 기준이다. 필드를 못 찾으면 자기 슬롯 y/z에 x만 0.</summary>
+    Vector3 FieldCenter => this.fieldView != null
+        ? this.fieldView.FieldCenter
+        : new Vector3(0f, this.slotPosition.y, this.slotPosition.z);
 
     void OnDestroy()
     {
@@ -80,10 +89,11 @@ public class CardAnimator : MonoBehaviour
 
     // ── Move ─────────────────────────────────────────────────────────────
 
+    /// <summary>내 필드의 가운데로. 공격자·피격자가 각자 자기 필드 중앙에 선다(세로 줄은 그대로 유지).
+    /// z는 슬롯 z 그대로 — 카메라 쪽으로 띄우는 z 이동은 AttackSequence가 따로 트윈한다.</summary>
     public async UniTask MoveToCenter()
     {
-        Vector3 t_wc = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, this.slotPosition.z);
-        t_wc.y = this.slotPosition.y;
+        Vector3 t_wc = new Vector3(FieldCenter.x, this.slotPosition.y, this.slotPosition.z);
         FadeSpriteRenderers(1f);
         await MoveTo(t_wc);
     }
@@ -91,20 +101,19 @@ public class CardAnimator : MonoBehaviour
     public async UniTask MoveToCinemaSlot()
     {
         int t_slot = Mathf.Clamp(this.boundCard?.slotIndex ?? 1, 0, BattleField.SLOT_COUNT - 1);
-        Vector3 t_wc = CameraUtil.ScreenFractionToWorld(CINEMA_X_FRACTIONS[t_slot], 0.5f, this.slotPosition.z);
-        t_wc.y = this.slotPosition.y;
+        float t_offset = (t_slot - (BattleField.SLOT_COUNT - 1) * 0.5f) * this.cinemaSpacing;
+        Vector3 t_wc = new Vector3(FieldCenter.x + t_offset, this.slotPosition.y, this.slotPosition.z);
         FadeSpriteRenderers(1f);
         await MoveTo(t_wc);
     }
 
     public UniTask MoveToSlot() => MoveTo(this.slotPosition);
 
+    /// <summary>여러 장(무쌍 스플래시 등)을 자기 필드 중앙 기준 좌우 대칭으로 세운다.</summary>
     public async UniTask MoveToCinemaPosition(int _posIndex, int _totalCount)
     {
-        const float t_spacing = 0.25f;
-        float t_x = 0.5f - (_totalCount - 1) * t_spacing * 0.5f + _posIndex * t_spacing;
-        Vector3 t_wc = CameraUtil.ScreenFractionToWorld(t_x, 0.5f, this.slotPosition.z);
-        t_wc.y = this.slotPosition.y;
+        float t_offset = (_posIndex - (_totalCount - 1) * 0.5f) * this.cinemaSpacing;
+        Vector3 t_wc = new Vector3(FieldCenter.x + t_offset, this.slotPosition.y, this.slotPosition.z);
         FadeSpriteRenderers(1f);
         await MoveTo(t_wc);
     }

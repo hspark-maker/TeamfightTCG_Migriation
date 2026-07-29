@@ -8142,6 +8142,10 @@ MonoBehaviour:
     overlay: {fileID: 1972510696962177717}
   - keyword: 16
     overlay: {fileID: 8790257693425486236}
+  - keyword: 2
+    overlay: {fileID: 6697701302518551064}
+  - keyword: 32
+    overlay: {fileID: 1928933477296888043}
   synergyBadgeRoot: {fileID: 3242344529736856691}
   synergyBadgePrefab: {fileID: 8437468774932756809, guid: 8d611272942ca6d4fb970a8928035eaf, type: 3}
   synergyBadgeXPos: -0.6

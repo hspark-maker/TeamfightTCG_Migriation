@@ -70,7 +70,7 @@ public class CardView : MonoBehaviour
     [SerializeField] bool keywordIconsUseSynergySlot = true;
 
     // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
-    // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다(무쌍 제작중).
+    // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.
     // 이름 매칭이 아니라 참조 배선인 이유: 오브젝트 이름을 바꿔도 조용히 꺼지지 않게.
     [System.Serializable]
     public struct KeywordFrame
@@ -453,8 +453,11 @@ public class CardView : MonoBehaviour
                 if (this.currentTarget != null)
                 {
                     ResetAimTilt();   // 기울어진 채 넘기면 Headbutt이 그 각도를 복귀 목표로 잡는다
-                    OnAttack?.Invoke(this, this.currentTarget);
+                    // 조준 정리를 **공격 발동보다 먼저** — 발동 뒤에 정리하면 정리 쪽 트윈/Kill이
+                    // 막 시작한 연출 이동을 건드린다(피격자가 제자리에 남던 원인).
+                    CardView t_target = this.currentTarget;
                     ClearTargetPreview();
+                    OnAttack?.Invoke(this, t_target);
                     this.dragState = DragState.Idle;
                     return;
                 }
@@ -502,12 +505,15 @@ public class CardView : MonoBehaviour
 
         if (this.dragState != DragState.Idle)
         {
-            bool t_attacked = this.currentTarget != null;
+            CardView t_target  = this.currentTarget;
+            bool     t_attacked = t_target != null;
             ResetAimTilt();   // 공격이든 취소든 조준 기울기는 여기서 끝(공격이면 Headbutt이 기준각을 다시 잡는다)
-            if (t_attacked)
-                OnAttack?.Invoke(this, this.currentTarget);
 
+            // 조준 정리를 먼저, 공격 발동은 그 다음 — 순서가 반대면 정리 쪽 트윈/Kill이
+            // 막 시작한 연출 이동을 죽인다(피격자가 중앙으로 안 오던 원인).
             ClearTargetPreview();
+            if (t_attacked)
+                OnAttack?.Invoke(this, t_target);
 
             if (!t_attacked)
             {
@@ -1103,16 +1109,22 @@ public class CardView : MonoBehaviour
     }
 
     // 조준 포커스: 이 카드를 확대(_on)/원복. 드래그 타겟 전환·탭 무장/해제 시 호출.
-    // 카드 이동 tween과 겹치지 않는 idle 상태에서만 사용.
+    // **transform.DOKill 금지** — 해제 호출이 공격 발동 직후에 오는 경로가 있어(OnMouseUp: OnAttack → ClearTargetPreview)
+    // 전체 DOKill을 하면 막 시작한 시네마 이동(DOMove)까지 같이 죽는다. 실제로 피격자만 제자리에 남는 버그가 그것.
+    // 그래서 이 확대 트윈만 따로 들고 있다가 그것만 끈다.
     // _instant: 공격 발동 직전 원복처럼 뒤이어 AttackSequence의 DOKill이 들어오는 경로 — 트윈이 중간에 죽어
     // 확대된 채 고착되지 않도록 스케일을 즉시 되돌린다.
+    Tween focusTween;
+
     public void SetTargetFocus(bool _on, bool _instant = false)
     {
-        transform.DOKill();
+        this.focusTween?.Kill();
+        this.focusTween = null;
+
         float t_scale = _on ? this.targetFocusScale : 1f;
         if (_instant) { transform.localScale = Vector3.one * t_scale; return; }
-        transform.DOScale(t_scale, this.targetFocusDur)
-                 .SetEase(Ease.OutBack).SetLink(gameObject);
+        this.focusTween = transform.DOScale(t_scale, this.targetFocusDur)
+                                   .SetEase(Ease.OutBack).SetLink(gameObject);
     }
 
     public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)

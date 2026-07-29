@@ -8,8 +8,11 @@ public class BattleIntro : MonoBehaviour
     [SerializeField] BattleFieldView enemyFieldView;
 
     [Header("Camera Intro")]
-    [SerializeField] float cameraStartZ = -20f;
-    [SerializeField] float cameraTargetZ = -11f;
+    // 인트로 줌은 **fit이 계산한 기준 거리 기준의 상대값**이다. 절대 z로 두면 화면 비율에 따라
+    // 카메라 거리가 달라졌을 때(BattleCameraFit) 인트로가 끝나는 위치가 기준과 어긋나 카드가 잘린다.
+    [SerializeField] float introBackDistance = 9f;    // 시작 시 기준보다 얼마나 더 뒤에서 출발하는가(구 -20 → -11)
+    // fit이 없는 씬(테스트 등) 폴백. fit이 있으면 무시된다.
+    [SerializeField] float fallbackTargetZ = -11f;
 
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용). 아래 프로퍼티로 위임.
     float cardDealDelay    => GameTiming.Battle.CardDealDelay;
@@ -31,9 +34,24 @@ public class BattleIntro : MonoBehaviour
     Vector3[] m_playerDests;
     Vector3[] m_enemyDests;
 
+    /// <summary>인트로가 끝나며 카메라가 돌아갈 기준 z. fit이 있으면 화면 비율에 맞춰 계산된 값.</summary>
+    float TargetZ
+    {
+        get
+        {
+            BattleCameraFit t_fit = Camera.main != null ? Camera.main.GetComponent<BattleCameraFit>() : null;
+            return t_fit != null ? t_fit.BaseCameraZ : this.fallbackTargetZ;
+        }
+    }
+
     public void Await()
     {
-        Camera.main.transform.position = new Vector3(0, 0, -20f);
+        if (Camera.main == null) return;
+
+        // 인트로가 카메라를 몰기 시작 — fit이 매 프레임 z를 되돌리지 않게 잠근다(PlayCameraIntro 끝에서 해제).
+        BattleCameraFit.BeginExternalControl();
+
+        Camera.main.transform.position = new Vector3(0f, 0f, TargetZ - this.introBackDistance);
         Vector3 t_playerFrom = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 2f, 0f, 10f));
         Vector3 t_enemyFrom = Camera.main.ScreenToWorldPoint(new Vector3(-Screen.width, Screen.height, 10f));
 
@@ -41,14 +59,26 @@ public class BattleIntro : MonoBehaviour
         this.m_enemyDests = CacheAndHide(this.enemyFieldView, t_enemyFrom);
     }
 
-    /// <summary>카메라 확대 인트로(줌 인). 코인 토스 전에 먼저 실행. 완료까지 대기.</summary>
+    /// <summary>카메라 확대 인트로(줌 인). 코인 토스 전에 먼저 실행. 완료까지 대기.
+    /// 도착점은 fit의 기준 z — 인트로가 끝나면 보드 전체가 딱 들어오는 거리에 선다.</summary>
     public async UniTask PlayCameraIntro()
     {
         if (Camera.main == null) return;
+
+        float t_target = TargetZ;   // 잠금 해제 전에 읽는다(해제 후엔 fit이 곧바로 덮을 수 있음)
         Vector3 t_pos = Camera.main.transform.position;
-        t_pos.z = this.cameraStartZ;
+        t_pos.z = t_target - this.introBackDistance;
         Camera.main.transform.position = t_pos;
-        await Camera.main.transform.DOMoveZ(this.cameraTargetZ, this.cameraDuration).ToUniTask();
+
+        try
+        {
+            await Camera.main.transform.DOMoveZ(t_target, this.cameraDuration).ToUniTask();
+        }
+        finally
+        {
+            // 이후엔 fit이 다시 카메라 z를 관리(해상도 전환·회전 대응).
+            BattleCameraFit.EndExternalControl();
+        }
     }
 
     public async UniTask Play()

@@ -51,6 +51,9 @@ public class GameInitializer : MonoBehaviour
             bool t_synced = await MultiplayerTurnRunner.Instance.SyncInitialDecks();
             if (!t_synced)
             {
+                // 인트로 줌을 못 타고 빠지는 경로 — Await가 걸어둔 카메라 잠금을 여기서 풀지 않으면
+                // 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다.
+                BattleCameraFit.ClearExternalControl();
                 GetComponent<TurnRunner>()?.HandleOpponentLeftDuringInit();
                 return;
             }
