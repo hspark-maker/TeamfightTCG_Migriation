@@ -800,6 +800,7 @@ GameObject:
   m_Component:
   - component: {fileID: 419582120}
   - component: {fileID: 419582121}
+  - component: {fileID: 419582122}
   m_Layer: 0
   m_Name: SealClip
   m_TagString: Untagged
@@ -841,6 +842,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
+--- !u!225 &419582122
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 419582119}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &454058479
 GameObject:
   m_ObjectHideFlags: 0
@@ -2049,6 +2062,14 @@ MonoBehaviour:
   packRoot: {fileID: 1903978942}
   packEnterDrop: 811
   packEnterDuration: 0.45
+  cutScaleUp: 1.35
+  cutDescend: 240
+  cutMoveDuration: 0.4
+  cutPiece: {fileID: 419582120}
+  cutPieceFlyOffset: {x: 320, y: 520, z: 0}
+  cutPieceSpin: -40
+  cutPieceDuration: 0.35
+  cutPieceGroup: {fileID: 419582122}
   burstEffect: {fileID: 0}
   shakeTarget: {fileID: 3489426}
   shakeDuration: 0.3
@@ -2338,8 +2359,8 @@ MonoBehaviour:
   flickMinProgress: 0.12
   finishDuration: 0.18
   rewindDuration: 0.25
-  sealRoot: {fileID: 419582120}
-  sealTornOffset: {x: 0, y: 129.6, z: 0}
+  sealRoot: {fileID: 0}
+  sealTornOffset: {x: 0, y: 95, z: 0}
 --- !u!1 &1937311100
 GameObject:
   m_ObjectHideFlags: 0

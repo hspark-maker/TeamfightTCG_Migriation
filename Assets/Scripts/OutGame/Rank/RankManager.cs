@@ -48,7 +48,8 @@ public static class RankManager
 
     // 강등이 없도록 "가감 전" 티어의 임계치를 하한으로 클램프한다(해석을 가감 뒤로 미루면 하한도 내려가 강등이 성립).
     // 전투 씬 → 로비 씬 왕복을 견뎌야 하므로 지연 flush에 맡기지 않고 즉시 Save.
-    public static void ApplyBattleResult(bool _won)
+    /// <summary>실제로 반영된 증감을 돌려준다 — 클램프 뒤 차이라 결과 팝업 표시액과 저장값이 어긋나지 않는다.</summary>
+    public static long ApplyBattleResult(bool _won)
     {
         var t_config = Config;
         var t_slot = Slot;
@@ -62,6 +63,8 @@ public static class RankManager
 
         t_slot.points = Math.Max(t_points + t_delta, t_floor);
         Save();
+
+        return t_slot.points - t_points;
     }
 
     /// <summary>부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>

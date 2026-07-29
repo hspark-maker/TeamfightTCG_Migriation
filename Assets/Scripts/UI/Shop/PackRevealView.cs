@@ -33,6 +33,24 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] float packEnterDrop = 811f;
     [SerializeField] float packEnterDuration = 0.45f;
 
+    [Header("컷 (스와이프 → 확대·하강)")]
+    [Tooltip("스와이프 확정 시 팩이 커지는 배율(씬 배치 크기 대비). 두 번째 사진처럼 화면을 채우게 키운다.")]
+    [Range(1f, 3f)] [SerializeField] float cutScaleUp = 1.35f;
+    [Tooltip("팩이 중앙에서 아래로 내려가는 거리(부모 로컬 = 캔버스 참조px). 상단만 화면에 크게 남도록.")]
+    [SerializeField] float cutDescend = 240f;
+    [Tooltip("확대·하강에 걸리는 시간.")]
+    [SerializeField] float cutMoveDuration = 0.4f;
+    [Tooltip("뜯겨 날아가는 상단 컷 조각(구 sealRoot 재활용). 미배선이면 컷 조각 없이 확대·하강만.")]
+    [SerializeField] Transform cutPiece;
+    [Tooltip("컷 조각이 뜯겨 날아가는 오프셋(부모 로컬 = 캔버스 참조px). 세 번째 사진처럼 위·바깥으로.")]
+    [SerializeField] Vector3 cutPieceFlyOffset = new Vector3(320f, 520f, 0f);
+    [Tooltip("컷 조각이 날아가며 도는 각도(도).")]
+    [SerializeField] float cutPieceSpin = -40f;
+    [Tooltip("컷 조각 비산에 걸리는 시간.")]
+    [SerializeField] float cutPieceDuration = 0.35f;
+    [Tooltip("컷 조각을 페이드아웃할 CanvasGroup(옵션). 미배선이면 날아가기만 한다.")]
+    [SerializeField] CanvasGroup cutPieceGroup;
+
     [Header("뽑기")]
     // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
     [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
@@ -75,8 +93,8 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] CanvasGroup tearHint;         // RevealPanel 바깥에 두어야 한다 — 그 패널은 분출 전까지 alpha 0이다
     [SerializeField] float tearHintFade = 0.2f;
 
-    // Idle → Entering(팩 등장) → Tearing(뜯기 대기) → Bursting(분출) → Flicking(넘기기) → Summary.
-    enum EStage { Idle, Entering, Tearing, Bursting, Flicking, Summary }
+    // Idle → Entering(팩 등장) → Tearing(스와이프 대기) → Cutting(확대·하강·컷) → Bursting(분출) → Flicking(넘기기) → Summary.
+    enum EStage { Idle, Entering, Tearing, Cutting, Bursting, Flicking, Summary }
 
     EStage m_stage = EStage.Idle;
 
@@ -97,6 +115,12 @@ public class PackRevealView : MonoBehaviour
     Vector3 m_packHomeScale = Vector3.one;
     bool m_packHomeCaptured;
 
+    // 컷 조각 원위치·원회전·원알파(개봉마다 되돌리는 기준 — 지난 개봉이 날려 보낸 자리를 물려받지 않게).
+    Vector3 m_cutPieceHome;
+    Quaternion m_cutPieceHomeRot = Quaternion.identity;
+    float m_cutPieceHomeAlpha = 1f;
+    bool m_cutHomeCaptured;
+
     /// <summary>개봉 세션 시작: 팩이 등장하고 뜯기 대기로 이어진다.</summary>
     public void BeginOpen(OpenedPack _opened)
     {
@@ -113,6 +137,7 @@ public class PackRevealView : MonoBehaviour
 
         ResetPanel();
         SetTearHint(false, true);
+        RestoreCutPiece();
         if (cardStack != null) cardStack.Clear();
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
@@ -168,6 +193,8 @@ public class PackRevealView : MonoBehaviour
         KillStageSeq();
         if (revealPanel != null) revealPanel.DOKill();
         if (packRoot != null) packRoot.transform.DOKill();
+        if (cutPiece != null) cutPiece.DOKill();
+        if (cutPieceGroup != null) cutPieceGroup.DOKill();
         // 셰이크도 같이 끊는다 — 대상은 팩과 달리 계속 보이는 배경이라, 중간에 멈추면 어긋난 자리에 그대로 굳는다.
         if (shakeTarget != null) shakeTarget.DOKill();
         SetTearHint(false, true);
@@ -226,11 +253,59 @@ public class PackRevealView : MonoBehaviour
         SetTearHint(true);
     }
 
-    // 뜯김 확정 → 분출.
+    // 스와이프 확정 → 컷(확대·하강·조각 비산).
     void HandleTorn()
     {
         if (m_stage != EStage.Tearing) return;
-        EnterBursting();
+        EnterCutting();
+    }
+
+    // 컷: 팩이 확대되며 중앙에서 아래로 내려가고, 상단 조각이 뜯겨 날아간다. 끝나면 자동으로 분출로 이어진다.
+    // 확대·하강·조각 비산을 한 시퀀스에 모아 스킵 한 번이 셋을 함께 끝내고 분출로 넘어가게 한다.
+    void EnterCutting()
+    {
+        m_stage = EStage.Cutting;
+
+        AnnounceOpened();     // 스와이프가 확정된 순간 = 팩이 열린 시점(튜토리얼이 이 신호를 기다린다).
+        SetTearHint(false);
+
+        var t_root = ResolvePackRoot();
+        if (t_root == null)
+        {
+            // 팩 오브젝트가 없으면 확대·하강할 대상이 없다 — 바로 분출로.
+            EnterBursting();
+            return;
+        }
+
+        var t_tr = t_root.transform;
+        CapturePackHome(t_tr);
+        t_tr.DOKill();
+
+        KillStageSeq();
+        m_stageSeq = DOTween.Sequence().SetLink(gameObject);
+
+        // 확대 + 하강(동시) — 팩을 키우며 아래로 당겨 "열 준비"를 만든다.
+        m_stageSeq.Insert(0f, t_tr.DOScale(m_packHomeScale * cutScaleUp, cutMoveDuration).SetEase(Ease.OutCubic));
+        m_stageSeq.Insert(0f, t_tr.DOLocalMoveY(m_packHome.y - cutDescend, cutMoveDuration).SetEase(Ease.OutCubic));
+
+        // 상단 컷 조각 비산 — 확대가 반쯤 진행된 뒤 뜯겨 위·바깥으로 날아간다.
+        if (cutPiece != null)
+        {
+            CaptureCutHome();
+            cutPiece.DOKill();
+
+            float t_cutAt = cutMoveDuration * 0.5f;
+            m_stageSeq.Insert(t_cutAt, cutPiece.DOLocalMove(m_cutPieceHome + cutPieceFlyOffset, cutPieceDuration).SetEase(Ease.InCubic));
+            m_stageSeq.Insert(t_cutAt, cutPiece.DOLocalRotate(new Vector3(0f, 0f, cutPieceSpin), cutPieceDuration));
+
+            if (cutPieceGroup != null)
+            {
+                cutPieceGroup.DOKill();
+                m_stageSeq.Insert(t_cutAt, cutPieceGroup.DOFade(0f, cutPieceDuration).SetEase(Ease.InQuad));
+            }
+        }
+
+        m_stageSeq.OnComplete(EnterBursting);
     }
 
     // 뽑기: 팩 속에 겹쳐 있던 카드셋이 제 크기로 펴지고, 뒤이어 팩이 그 아래로 빠진다.
@@ -291,8 +366,9 @@ public class PackRevealView : MonoBehaviour
 
             // 카드가 어느 정도 나온 뒤에 빠진다 — 먼저 내려가면 "빼냈다"가 아니라 "따로 사라졌다"가 된다.
             // InBack이라 살짝 버티다 쑥 내려간다(잡아당겨 빼는 손맛).
+            // 현재 위치 기준으로 내린다 — Cutting에서 이미 아래로 내려온 상태라 원위치 기준이면 도로 위로 튈 수 있다.
             float t_pullAt = cardEmergeDuration * packPullDelay;
-            m_stageSeq.Insert(t_pullAt, t_tr.DOLocalMoveY(m_packHome.y - packPullDrop, packPullDuration).SetEase(Ease.InBack))
+            m_stageSeq.Insert(t_pullAt, t_tr.DOLocalMoveY(t_tr.localPosition.y - packPullDrop, packPullDuration).SetEase(Ease.InBack))
                       .InsertCallback(t_pullAt + packPullDuration, () => t_root.SetActive(false));
         }
 
@@ -356,13 +432,17 @@ public class PackRevealView : MonoBehaviour
         switch (m_stage)
         {
             case EStage.Entering:
+            case EStage.Cutting:
             case EStage.Bursting:
                 // Complete(true)면 OnComplete가 실행되며 다음 단계로 이어진다.
                 if (m_stageSeq != null && m_stageSeq.IsActive()) m_stageSeq.Complete(true);
                 break;
 
             case EStage.Tearing:
+                // Cutting을 건너뛰고 분출로 직행 — 조각 비산 연출을 안 거치므로 여기서 조각을 감춘다
+                // (형제 배치 시 팩만 빠지고 조각이 요약까지 남는 것을 막는다).
                 if (tearHandle != null) tearHandle.ForceTornInstant();
+                HideCutPiece();
                 EnterBursting();
                 break;
 
@@ -388,6 +468,9 @@ public class PackRevealView : MonoBehaviour
 
         var t_root = ResolvePackRoot();
         if (t_root != null) t_root.SetActive(false);
+
+        // 컷 조각을 팩과 별개(형제)로 두었다면 팩을 꺼도 남는다 — 여기서 함께 감춘다.
+        HideCutPiece();
 
         if (revealPanel != null)
         {
@@ -462,6 +545,44 @@ public class PackRevealView : MonoBehaviour
         m_packHome = _tr.localPosition;
         m_packHomeScale = _tr.localScale;
         m_packHomeCaptured = true;
+    }
+
+    // 컷 조각의 원위치·원회전·원알파를 1회 캡처(씬에 놓인 값이 곧 붙어 있는 자리).
+    void CaptureCutHome()
+    {
+        if (m_cutHomeCaptured || cutPiece == null) return;
+        m_cutPieceHome = cutPiece.localPosition;
+        m_cutPieceHomeRot = cutPiece.localRotation;
+        m_cutPieceHomeAlpha = cutPieceGroup != null ? cutPieceGroup.alpha : 1f;
+        m_cutHomeCaptured = true;
+    }
+
+    // 컷 조각을 붙어 있던 자리로 되돌린다(개봉마다 — 지난 개봉이 날려 보낸/감춘 상태를 물려받지 않게).
+    void RestoreCutPiece()
+    {
+        if (cutPiece == null) return;
+        CaptureCutHome();
+
+        cutPiece.DOKill();
+        cutPiece.gameObject.SetActive(true);   // HideCutPiece가 껐을 수 있으므로 되살린다.
+        cutPiece.localPosition = m_cutPieceHome;
+        cutPiece.localRotation = m_cutPieceHomeRot;
+
+        if (cutPieceGroup != null)
+        {
+            cutPieceGroup.DOKill();
+            cutPieceGroup.alpha = m_cutPieceHomeAlpha;
+        }
+    }
+
+    // 컷 조각을 즉시 감춘다(Cutting 비산 연출을 건너뛴 스킵 경로용). 다음 개봉의 RestoreCutPiece가 되살린다.
+    void HideCutPiece()
+    {
+        if (cutPiece == null) return;
+
+        cutPiece.DOKill();
+        if (cutPieceGroup != null) { cutPieceGroup.DOKill(); cutPieceGroup.alpha = 0f; }
+        else cutPiece.gameObject.SetActive(false);   // 페이드 그룹이 없으면 오브젝트째 끈다.
     }
 
     GameObject ResolvePackRoot()
