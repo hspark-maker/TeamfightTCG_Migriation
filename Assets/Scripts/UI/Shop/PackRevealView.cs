@@ -62,6 +62,10 @@ public class PackRevealView : MonoBehaviour
              "팩 아래쪽이 화면 밖으로 조금 잠길 만큼 내려야 \"손에 쥔 팩에서 뽑아 올린다\"가 성립한다. " +
              "카드는 아직 팩 속이라 무대째 함께 내려간다 — 따로 움직이면 그 순간 \"속에 들어 있다\"가 깨진다.")]
     [SerializeField] Vector2 packOpenOffset = new Vector2(0f, -900f);
+    [Tooltip("자리를 잡으며 팩이 커지는 배율. 다가오는 만큼 시선이 팩에 묶인다 — 뒤이어 씰이 찢기는 곳이 여기다. " +
+             "뽑혀 나오는 카드는 이 값을 되물려 제 크기로 서므로, 키워도 결과 카드 크기는 변하지 않는다. " +
+             "다만 팩이 커진 만큼 아래로 더 잠기니 offset과 함께 본다.")]
+    [Range(1f, 2f)] [SerializeField] float packOpenScale = 1.15f;
     [SerializeField] float packShiftDuration = 0.4f;
     [Tooltip("자리를 잡고 봉인이 찢기기까지의 뜸. 팩이 멈춘 것을 눈이 확인할 틈이다.")]
     [SerializeField] float packShiftHold = 0.1f;
@@ -303,7 +307,10 @@ public class PackRevealView : MonoBehaviour
         KillStageSeq();
         m_stageSeq = DOTween.Sequence()
             .SetLink(gameObject)
+            // 내려감과 커짐은 한 동작이라 같은 시간·같은 이즈로 묶는다 — 어긋나면 "다가온다"가 아니라 두 애니메이션이 겹친 것으로 읽힌다.
             .Append(DOTween.To(() => shellRig.StageOffset, _v => shellRig.StageOffset = _v, packOpenOffset, packShiftDuration)
+                .SetEase(Ease.OutCubic))
+            .Join(DOTween.To(() => shellRig.StageScale, _v => shellRig.StageScale = _v, packOpenScale, packShiftDuration)
                 .SetEase(Ease.OutCubic))
             .AppendInterval(packShiftHold)
             .OnComplete(EnterTearing);
@@ -365,10 +372,15 @@ public class PackRevealView : MonoBehaviour
         // 아래쪽은 팩 앞면이 계속 가리므로, 그동안 카드는 입구에서 빠져나오는 것으로 보인다.
         if (cardStack != null)
         {
-            // 목표는 화면 기준으로 잡되, 무대가 자리잡기로 내려간 만큼을 빼서 무대 로컬로 되돌린다 —
-            // 카드는 무대의 자식이라 이미 그만큼 함께 내려가 있다. 빼지 않으면 팩을 내린 만큼 더미가 위로 뜬다.
+            // 목표는 화면 기준으로 잡되, 자리잡기가 무대에 건 이동·확대를 되물려 무대 로컬로 되돌린다 —
+            // 카드는 무대의 자식이라 이미 그만큼 내려가 있고 그만큼 커져 있다.
+            // 되물리지 않으면 팩을 내리고 키운 만큼 더미가 위로 뜨고 함께 커진다(카드 윗변이 화면 밖으로 나간다).
             var t_stageOffset = shellRig != null ? shellRig.StageOffset : Vector2.zero;
-            var t_pull = cardStack.PlayEmerge(cardEmergeCenter - t_stageOffset, cardPullDuration);
+            float t_stageScale = shellRig != null ? shellRig.StageScale : 1f;
+            if (t_stageScale <= 0f) t_stageScale = 1f;
+
+            var t_pull = cardStack.PlayEmerge(
+                (cardEmergeCenter - t_stageOffset) / t_stageScale, 1f / t_stageScale, cardPullDuration);
             if (t_pull != null) m_stageSeq.Insert(cardPullDelay, t_pull);
         }
 

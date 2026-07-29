@@ -59,6 +59,9 @@ public class PackShellRig : MonoBehaviour
     // ── 연출이 쓰는 축 ──────────────────────────────────────────
     /// <summary>무대 오프셋(팩+카드 함께). 등장·자리잡기 트윈이 쓴다.</summary>
     public Vector2 StageOffset { get; set; }
+    /// <summary>무대 배율(팩+카드 함께). 자리잡기에서 팩을 키워 시선을 모으는 데 쓴다.
+    /// 펄스와 곱해지므로 여기 1이 곧 씬 배치 크기다.</summary>
+    public float StageScale { get; set; } = 1f;
     /// <summary>껍데기 오프셋(팩만). 퇴장 트윈이 쓴다.</summary>
     public Vector2 ShellOffset { get; set; }
     /// <summary>껍데기 배율(팩만). 카드를 빼낸 뒤 팩이 시드는 표현에 쓴다.</summary>
@@ -108,6 +111,7 @@ public class PackShellRig : MonoBehaviour
     public void ResetPose()
     {
         StageOffset = Vector2.zero;
+        StageScale = 1f;
         ShellOffset = Vector2.zero;
         ShellSquash = Vector2.one;
         ShellAngle = 0f;
@@ -169,7 +173,7 @@ public class PackShellRig : MonoBehaviour
         if (stage != null)
         {
             stage.anchoredPosition = m_stageHome + StageOffset + new Vector2(0f, t_float * floatDistance);
-            stage.localScale = m_stageHomeScale * Mathf.Lerp(1f, pulseScale, t_pulse);
+            stage.localScale = m_stageHomeScale * StageScale * Mathf.Lerp(1f, pulseScale, t_pulse);
         }
 
         // 껍데기: 씬 배치 + 퇴장 오프셋. 무대 위에 겹쳐 적용되므로 카드와 어긋나지 않는다.
@@ -197,8 +201,9 @@ public class PackShellRig : MonoBehaviour
     {
         if (shadow == null) return;
 
-        shadow.anchoredPosition = m_shadowHome + StageOffset;
-        shadow.localScale = m_shadowHomeScale * Mathf.Lerp(1f, shadowScaleAtTop, _up01);
+        // 무대 배율은 자리에도 곱해야 한다 — 그림자는 무대 밖이라, 크기만 키우면 팩 밑바닥에서 떨어져 뜬다.
+        shadow.anchoredPosition = m_shadowHome * StageScale + StageOffset;
+        shadow.localScale = m_shadowHomeScale * StageScale * Mathf.Lerp(1f, shadowScaleAtTop, _up01);
 
         var t_g = shadow.GetComponent<Graphic>();
         if (t_g == null) return;

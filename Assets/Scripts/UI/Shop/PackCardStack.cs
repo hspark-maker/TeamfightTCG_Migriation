@@ -78,9 +78,10 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Vector3 m_layerScaleHome;
     bool m_layerHomeCaptured;
 
-    // 뽑혀 나온 더미가 정착하는 자리. 씬 배치값에서 출발하되 PlayEmerge가 실제 목표로 갱신한다 —
-    // 연출을 건너뛰고 자리를 되돌릴 때 씬 배치값으로 돌아가면 뽑아 올린 만큼이 도로 내려앉는다.
+    // 뽑혀 나온 더미가 정착하는 자리·크기. 씬 배치값에서 출발하되 PlayEmerge가 실제 목표로 갱신한다 —
+    // 연출을 건너뛰고 되돌릴 때 씬 배치값으로 돌아가면 뽑아 올린 만큼이 도로 내려앉고 크기도 어긋난다.
     Vector2 m_layerSettled;
+    Vector3 m_layerSettledScale = Vector3.one;
 
     // 최근 프레임의 미는 속도(카드 좌표계 단위/초). 짧고 빠른 플릭을 거리 대신 이 값으로 살린다.
     float m_dragSpeed;
@@ -152,27 +153,31 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     }
 
     /// <summary>
-    /// 팩 속에 있던 더미를 _targetCenter(무대 로컬 좌표)로 솟아오르게 한다(뭉치째 뽑혀 나오는 연출).
+    /// 팩 속에 있던 더미를 _targetCenter(무대 로컬 좌표)·_targetScale(씬 배치 대비 배율)로
+    /// 솟아오르게 한다(뭉치째 뽑혀 나오는 연출).
     /// 반환 시퀀스를 호출부의 흐름에 끼우면 스킵 한 번으로 등장까지 함께 완료된다.
     /// 아래쪽은 팩 앞면이 계속 가리므로, 뽑히는 동안 카드가 입구에서 빠져나오는 것처럼 읽힌다.
     ///
     /// 목표를 밖에서 받는 이유: 팩 속 자리와의 차이가 곧 "뽑혀 나온 거리"다 —
     /// 그 거리를 씬 배치에 묶어 두면 팩만 내려가고 더미는 제자리인 그림이 된다.
+    /// 배율까지 받는 이유: 무대가 통째로 확대돼 있으면 그 배율이 더미에도 곱해진다 —
+    /// 되물릴 몫을 호출부가 넘겨야 팩을 얼마나 키우든 뽑힌 카드는 늘 같은 크기로 선다.
     /// </summary>
-    public Sequence PlayEmerge(Vector2 _targetCenter, float _duration)
+    public Sequence PlayEmerge(Vector2 _targetCenter, float _targetScale, float _duration)
     {
         if (cardLayer == null || stackAnchor == null) return null;
 
         CaptureLayerHome();
         cardLayer.DOKill();
 
-        m_layerSettled = LayerPosFor(_targetCenter, 1f);
+        m_layerSettled = LayerPosFor(_targetCenter, _targetScale);
+        m_layerSettledScale = m_layerScaleHome * _targetScale;
 
         return DOTween.Sequence()
             .SetLink(cardLayer.gameObject)
             // 살짝 넘겼다 내려앉는다 — 뽑혀 나온 물건은 관성으로 한 번 튄다. 과하면 "커졌다"로 읽히므로 약하게.
             .Join(cardLayer.DOAnchorPos(m_layerSettled, _duration).SetEase(Ease.OutBack, 1.05f))
-            .Join(cardLayer.DOScale(m_layerScaleHome, _duration).SetEase(Ease.OutCubic));
+            .Join(cardLayer.DOScale(m_layerSettledScale, _duration).SetEase(Ease.OutCubic));
     }
 
     // 지정 중심(무대 로컬)에 더미를 놓기 위한 레이어 좌표.
@@ -189,7 +194,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         CaptureLayerHome();
         cardLayer.DOKill();
         cardLayer.anchoredPosition = m_layerSettled;
-        cardLayer.localScale = m_layerScaleHome;
+        cardLayer.localScale = m_layerSettledScale;
     }
 
     /// <summary>입력을 켜고 첫 장이 드러났음을 알린다(앞면이라 이미 보이고 있다).</summary>
@@ -366,7 +371,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (m_layerHomeCaptured || cardLayer == null) return;
         m_layerHome = cardLayer.anchoredPosition;
         m_layerScaleHome = cardLayer.localScale;
-        m_layerSettled = m_layerHome;   // PlayEmerge가 실제 목표로 덮어쓴다.
+        // PlayEmerge가 실제 목표로 덮어쓴다.
+        m_layerSettled = m_layerHome;
+        m_layerSettledScale = m_layerScaleHome;
         m_layerHomeCaptured = true;
     }
 

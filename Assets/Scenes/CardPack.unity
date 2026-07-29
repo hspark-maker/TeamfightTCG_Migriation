@@ -2311,6 +2311,7 @@ MonoBehaviour:
   cardInPackScale: 0.8
   cardEmergeCenter: {x: 0, y: 0}
   packOpenOffset: {x: 0, y: -1200}
+  packOpenScale: 1.15
   packShiftDuration: 0.4
   packShiftHold: 0.1
   sealTearDuration: 0.45

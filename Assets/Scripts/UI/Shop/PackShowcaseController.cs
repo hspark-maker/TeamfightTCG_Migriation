@@ -1,32 +1,48 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-// Tab_Pack의 단일 카드팩 쇼케이스 컨트롤러. 진열할 대표 팩을 인스펙터에서 직접 할당받아
-// 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → CardPack 씬 전환을 수행한다.
+// Tab_Pack의 카드팩 쇼케이스 컨트롤러. 진열할 팩들을 인스펙터에서 직접 받아 캐러셀에 그림을 공급하고,
+// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → CardPack 씬 전환을 수행한다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
-// 진열 대상 팩(packData)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
-//   — 상점 SO 미개입(팩 미할당이면 구매 잠금).
-// 단 튜토리얼 구매 스텝 중에는 저작된 팩이 진열을 덮어쓴다(ResolvePack) — 튜토리얼 구매 결과를 자동구매처럼 고정하기 위해.
+// 진열 목록(packs)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
+//   — 상점 SO 미개입(목록이 비면 구매 잠금).
+// 제스처·스냅은 PackCarouselView가 쥔다. 그쪽은 팩을 모르고 "그림 N장 중 몇 번째"만 안다 —
+//   돈을 쥔 이 클래스가 포인터 물리까지 소유하지 않게 한 분리다.
+//
+// 튜토리얼 구매 스텝 중에는 저작된 팩이 진열 "목록 자체"를 대체한다(ResolveDisplay).
+//   우선순위 규칙으로 두면 캐러셀은 팩 A를, 가격·결제는 팩 B를 가리키는 상태가 생긴다 —
+//   목록으로 흡수하면 그림·이름·가격·결제가 전부 한 곳에서 나오므로 갈릴 여지가 구조적으로 없다.
 public class PackShowcaseController : MonoBehaviour
 {
     // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 씬 전환 트리거.
-    [SerializeField] TextMeshProUGUI packNameText;  // 대표 팩 표시명(옵션 — 미배선 무시).
+    [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
-    [Tooltip("진열할 대표 팩 SO. 미할당이면 구매 잠금.")]
-    [SerializeField] CardPackData packData;         // 진열·구매 대상(TryPurchase에 이 SO를 직접 넘긴다).
+    [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
+    [SerializeField] List<CardPackData> packs = new List<CardPackData>();
+    [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
+    [SerializeField] PackCarouselView carousel;
     [Tooltip("이 팩에서 이미 소유한 카드를 뽑았을 때(중복) 되돌려주는 Gold.")]
     [Min(0)] [SerializeField] long duplicateRefundGold = 10;
 
     // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 씬을 떠나므로 리셋 불필요하나,
     // 탭 재진입·로비 복귀 시 다시 살 수 있게 OnEnable에서 해제한다.
     static bool s_transitioning;
+
+    readonly List<CardPackData> m_display = new List<CardPackData>();   // 실제 진열 목록(해석 결과).
+    readonly List<CardPackData> m_built = new List<CardPackData>();     // 캐러셀에 마지막으로 넘긴 목록.
+    readonly List<Sprite> m_arts = new List<Sprite>();
+
+    int m_index;
+    bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
+    long m_forcedRefund;
 
     void OnEnable()
     {
@@ -37,6 +53,11 @@ public class PackShowcaseController : MonoBehaviour
             buyButton.onClick.RemoveListener(OnBuyPressed);
             buyButton.onClick.AddListener(OnBuyPressed);
         }
+        if (carousel != null)
+        {
+            carousel.OnIndexChanged -= OnPageChanged;
+            carousel.OnIndexChanged += OnPageChanged;
+        }
 
         CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  += Refresh;
@@ -46,6 +67,8 @@ public class PackShowcaseController : MonoBehaviour
     void OnDisable()
     {
         if (buyButton != null) buyButton.onClick.RemoveListener(OnBuyPressed);
+        if (carousel != null) carousel.OnIndexChanged -= OnPageChanged;
+
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  -= Refresh;
     }
@@ -55,22 +78,83 @@ public class PackShowcaseController : MonoBehaviour
         if (_type == ECurrencyType.Gold) RefreshBuyLock();
     }
 
-    // 진열 대상 갱신. 탭을 여는 시점과 스텝이 바뀌는 시점이 다르므로(탭 활성화가 스텝 커밋보다 먼저다)
-    // 두 시점 모두에서 다시 해석해야 표시와 결제가 갈리지 않는다.
-    void Refresh()
+    // 페이지가 바뀌면 표시와 잠금이 함께 따라간다 — 둘 중 하나만 갱신하면 "보이는 팩과 살 팩"이 갈린다.
+    void OnPageChanged(int _index)
     {
+        m_index = _index;
         Bind();
         RefreshBuyLock();
     }
 
-    // 진열·구매 대상 해석. 튜토리얼 구매 스텝이 팩을 지정했으면 그것이 이긴다 —
-    // 해석을 한 곳에 모아 표시 가격과 실제 결제가 갈리지 않게 한다.
+    // 진열 갱신. 탭을 여는 시점과 스텝이 바뀌는 시점이 다르므로(탭 활성화가 스텝 커밋보다 먼저다)
+    // 두 시점 모두에서 다시 해석해야 표시와 결제가 갈리지 않는다.
+    void Refresh()
+    {
+        ResolveDisplay();
+        SyncCarousel();
+        Bind();
+        RefreshBuyLock();
+    }
+
+    // 진열 목록 해석. 튜토리얼 구매 스텝이 팩을 지정했으면 그 팩 하나만 진열한다 —
+    // 잠그기는 그 다음 문제일 뿐, 표시·결제 일치는 목록이 지킨다.
+    void ResolveDisplay()
+    {
+        m_display.Clear();
+        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced, out m_forcedRefund);
+
+        if (m_forced)
+        {
+            if (t_forced != null) m_display.Add(t_forced);
+            return;
+        }
+
+        for (int t_i = 0; t_i < packs.Count; t_i++)
+            if (packs[t_i] != null) m_display.Add(packs[t_i]);   // 미할당 슬롯이 빈 페이지가 되지 않게 거른다.
+    }
+
+    // 캐러셀 동기화. 목록이 실제로 달라졌을 때만 재구축한다 —
+    // OnStepChanged는 자주 도는데 매번 다시 세우면 유저가 보던 페이지를 잃는다.
+    void SyncCarousel()
+    {
+        if (carousel == null)
+        {
+            m_index = m_display.Count > 0 ? Mathf.Clamp(m_index, 0, m_display.Count - 1) : 0;
+            return;
+        }
+
+        if (!SameAsBuilt(carousel.PageCount))
+        {
+            m_arts.Clear();
+            for (int t_i = 0; t_i < m_display.Count; t_i++) m_arts.Add(m_display[t_i].PackArt);
+            carousel.Build(m_arts);
+
+            m_built.Clear();
+            m_built.AddRange(m_display);
+        }
+
+        // 튜토리얼 중엔 페이지가 하나뿐이라 넘길 것도 없지만, 잠금을 명시해 화살표·드래그를 함께 죽인다.
+        carousel.SetInteractable(!m_forced);
+        m_index = carousel.Index;
+    }
+
+    // 캐러셀 실물 페이지 수까지 함께 본다 — 캐시만 믿으면 실물과 어긋난 상태를 그대로 통과시킨다.
+    bool SameAsBuilt(int _pageCount)
+    {
+        if (_pageCount != m_display.Count) return false;
+        if (m_built.Count != m_display.Count) return false;
+
+        for (int t_i = 0; t_i < m_built.Count; t_i++)
+            if (m_built[t_i] != m_display[t_i]) return false;
+
+        return true;
+    }
+
+    // 구매 대상 해석. 캐러셀이 가리키는 페이지가 곧 결제 대상이다.
     void ResolvePack(out CardPackData _pack, out long _refundGold)
     {
-        if (OutgameTutorialRunner.TryGetForcedPack(out _pack, out _refundGold)) return;
-
-        _pack       = packData;
-        _refundGold = duplicateRefundGold;
+        _pack = m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
+        _refundGold = m_forced ? m_forcedRefund : duplicateRefundGold;
     }
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
@@ -83,7 +167,7 @@ public class PackShowcaseController : MonoBehaviour
         buyButton.interactable = t_pack != null && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
     }
 
-    // 대표 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
+    // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
     void Bind()
     {
         ResolvePack(out var t_pack, out _);
