@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bc9091e35fb030c469fd06c4da935857
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Teleport/BlueTeleport/Materials/Mat_Smoke2.mat
+  uploadId: 755856

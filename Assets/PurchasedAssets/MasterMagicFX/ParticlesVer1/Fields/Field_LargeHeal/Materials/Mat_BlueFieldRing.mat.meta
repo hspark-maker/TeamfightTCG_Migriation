@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b8b7f1b8022dbce468f14e48265a9bb1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Fields/Field_LargeHeal/Materials/Mat_BlueFieldRing.mat
+  uploadId: 755856

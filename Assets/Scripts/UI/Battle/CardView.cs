@@ -60,6 +60,10 @@ public class CardView : MonoBehaviour
     [SerializeField] GameObject keywordIconPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
     [SerializeField] float iconSpacing = 0.3f;
+    // true면 키워드 아이콘을 시너지 배지 자리(좌측 세로열)에 그리고, 시너지 배지는 표시하지 않는다.
+    // 한 자리에 둘 다 그리면 겹치므로 "그 자리의 주인"은 이 스위치 하나가 정한다(양쪽 분기의 단일 진실원).
+    // false로 되돌리면 종전대로 키워드=우하단 가로줄 + 시너지 배지 복귀.
+    [SerializeField] bool keywordIconsUseSynergySlot = true;
 
     [Header("Synergy")]
     [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
@@ -887,7 +891,7 @@ public class CardView : MonoBehaviour
         {
             this.faceDownOverlay.SetActive(false);
             SetupWeapon(null);
-            RefreshKeywordIcons(CardKeyword.None);
+            RefreshKeywordIcons(null);   // 빈 슬롯: 아이콘 없음.
             RefreshSynergyBadges(null);
             return;
         }
@@ -903,7 +907,7 @@ public class CardView : MonoBehaviour
             this.illustration.sprite = _card.data.battleImage;
 
         SetupWeapon(_card.data);
-        RefreshKeywordIcons(t_isFaceDown ? CardKeyword.None : (_card.data.keywords | _card.runtimeKeywords));
+        RefreshKeywordIcons(_card);   // 뒷면 은닉·표시 대상 판정은 RefreshKeywordIcons 안에서.
         RefreshSynergyBadges(_synergy);
     }
 
@@ -1020,11 +1024,19 @@ public class CardView : MonoBehaviour
         await UniTask.Delay((int)(t_dur * 1000), cancellationToken: this.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
     }
 
-    void RefreshKeywordIcons(CardKeyword _keywords)
-    {
-        if (this.keywordIconRoot == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
+    // 아이콘 줄에는 캐릭터 고유 특성만 그린다. 일회용/디버프(무적·추가체력·전투 중 걸린 표식)는
+    // 아예 표시하지 않는다 — 무엇을 띄울지 판정은 CardVisualRules 단독(아웃게임과 같은 호출).
+    /// <summary>키워드 아이콘이 실제로 붙는 앵커. 시너지 자리를 쓰면 synergyBadgeRoot(좌측 세로열),
+    /// 아니면 종전 keywordIconRoot(우하단 가로줄). 앵커 미배선이면 기존 루트로 폴백한다.</summary>
+    Transform KeywordAnchor => this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
+        ? this.synergyBadgeRoot : this.keywordIconRoot;
 
-        foreach (Transform t_child in this.keywordIconRoot)
+    void RefreshKeywordIcons(CardInstance _card)
+    {
+        Transform t_root = KeywordAnchor;
+        if (t_root == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
+
+        foreach (Transform t_child in t_root)
         {
             // 아이콘 스프라이트가 FadeView tween 대상일 수 있음. 파괴 전 DOKill (루트 SetLink는 안 걸림).
             foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>(true))
@@ -1034,15 +1046,21 @@ public class CardView : MonoBehaviour
 
         this.iconMap.Clear();
 
-        // "어떤 키워드를 어떤 순서로" 는 CardVisualRules 단독(아웃게임 CardVisualView와 같은 호출).
-        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
-        List<CardVisualRules.KeywordIcon> t_icons = CardVisualRules.CollectKeywordIcons(_keywords, this.keywordIconConfig);
+        // 뒷면/빈 슬롯이면 아무것도 노출하지 않는다(정보 은닉).
+        if (_card == null || !_card.isRevealed) return;
 
-        // keywordIconRoot 를 카드 오른쪽 아래 코너에 두고, 아이콘은 원점에서 왼쪽으로 가로 정렬.
+        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
+        List<CardVisualRules.KeywordIcon> t_icons =
+            CardVisualRules.CollectKeywordIcons(CardVisualRules.TraitKeywords(_card), this.keywordIconConfig);
+
+        // 배치 두 가지. 시너지 자리: 배지와 동일한 세로열 좌표(같은 필드를 써야 "그 자리 그대로"가 성립).
+        // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
-            GameObject t_obj = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
-            t_obj.transform.localPosition = new Vector3(-t_i * this.iconSpacing, 0f, 0f);
+            GameObject t_obj = Instantiate(this.keywordIconPrefab, t_root);
+            t_obj.transform.localPosition = this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
+                ? new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f)
+                : new Vector3(-t_i * this.iconSpacing, 0f, 0f);
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
@@ -1061,6 +1079,9 @@ public class CardView : MonoBehaviour
 
     void RefreshSynergyBadges(SynergyState _synergy)
     {
+        // 그 자리를 키워드 아이콘이 쓰는 모드면 배지를 아예 만들지 않는다(겹침 방지).
+        // 배지가 존재하지 않으므로 FindBadgeAt은 null → 롱프레스는 카드 정보 팝업으로, PopSynergyBadge는 no-op.
+        if (this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null) return;
         if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
 
         // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →

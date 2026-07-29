@@ -84,7 +84,12 @@
       "Bash(cd *)",
       "Bash(mkdir -p Common)",
       "Bash(mv Collection/CollectionCardView.cs Common/CardVisualView.cs)",
-      "Bash(mv Collection/CollectionCardView.cs.meta Common/CardVisualView.cs.meta)"
+      "Bash(mv Collection/CollectionCardView.cs.meta Common/CardVisualView.cs.meta)",
+      "Bash(claude --version)",
+      "Bash(npm -g config get prefix)",
+      "Read(//c/Users/cookapps/.claude/**)",
+      "Read(//c/Users/cookapps/**)",
+      "Bash(xargs stat -c '%y')"
     ]
   },
   "enabledMcpjsonServers": [

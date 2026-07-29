@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 26ab656dc14e9374cba0d222813c6885
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/FireLaser/Materials/Mat_FireLaser_Background.mat
+  uploadId: 755856

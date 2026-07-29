@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: df88d61206ef4b744b697ef3595d3523
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Auras/LargeFrostAura/Materials/Mat_Sparkle.mat
+  uploadId: 755856

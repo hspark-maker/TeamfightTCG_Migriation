@@ -21,6 +21,13 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("체크=특별(시네마 1vs1), 해제=일반(박치기).")]
     [SerializeField] bool useSpecialCinema = false;
 
+    [Header("공격 VFX (공격자 기준, 모션 시작 시)")]
+    [SerializeField] VfxSlot attackVfx = new VfxSlot { localOffset = new Vector3(0f, 0f, -0.5f), lifetime = 2f };
+    [Header("피격 VFX (방어자 기준, 접촉 시점)")]
+    [SerializeField] VfxSlot hitVfx    = new VfxSlot { localOffset = new Vector3(0f, 0f, -0.5f), lifetime = 1.5f };
+    [Tooltip("반격 데미지가 있으면 공격자에게도 피격 VFX 재생.")]
+    [SerializeField] bool hitVfxOnCounter = true;
+
     [Header("Test Damage (체력 깎임/데미지 숫자 확인용)")]
     [SerializeField] int sampleDamage        = 10;   // 방어자에게.
     [SerializeField] int sampleCounterDamage = 5;    // 공격자에게(반격). 0이면 반격 없음.
@@ -72,9 +79,41 @@ public class AttackAnimTester : MonoBehaviour
 
     void Update()
     {
+        HandleVfxKeys();
         if (this.busy) return;
         if (Input.GetKeyDown(KeyCode.P)) TryAttack(this.playerFieldView, 0, this.enemyFieldView, 0);
         if (Input.GetKeyDown(KeyCode.E)) TryAttack(this.enemyFieldView, 0, this.playerFieldView, 0);
+    }
+
+    // ── VFX 브라우징 키 ────────────────────────────────────────────────
+    // ←/→ 공격 VFX 넘기기, ↑/↓ 피격 VFX 넘기기, 1/2 각각 on/off,
+    // V 공격 VFX 미리보기, B 피격 VFX 미리보기, R 폴더 재스캔, L 현재 선택 경로 로그.
+    void HandleVfxKeys()
+    {
+        if (Input.GetKeyDown(KeyCode.RightArrow)) this.attackVfx.Cycle(+1);
+        if (Input.GetKeyDown(KeyCode.LeftArrow))  this.attackVfx.Cycle(-1);
+        if (Input.GetKeyDown(KeyCode.UpArrow))    this.hitVfx.Cycle(+1);
+        if (Input.GetKeyDown(KeyCode.DownArrow))  this.hitVfx.Cycle(-1);
+
+        if (Input.GetKeyDown(KeyCode.Alpha1)) this.attackVfx.use = !this.attackVfx.use;
+        if (Input.GetKeyDown(KeyCode.Alpha2)) this.hitVfx.use    = !this.hitVfx.use;
+
+        if (Input.GetKeyDown(KeyCode.R)) { this.attackVfx.Rescan(); this.hitVfx.Rescan(); }
+        if (Input.GetKeyDown(KeyCode.L))
+            Debug.Log($"[AttackTest] 공격VFX = {this.attackVfx.CurrentPath}\n          피격VFX = {this.hitVfx.CurrentPath}");
+
+        // 미리보기: 공격 모션 없이 슬롯0에 이펙트만 터뜨려 본다.
+        if (Input.GetKeyDown(KeyCode.V)) this.attackVfx.Spawn(this.playerFieldView?.GetSlotView(0)?.transform);
+        if (Input.GetKeyDown(KeyCode.B)) this.hitVfx.Spawn(this.enemyFieldView?.GetSlotView(0)?.transform);
+    }
+
+    /// <summary>spawnDelay 만큼 기다렸다가 스폰. 공격 시퀀스와 병렬(대기 안 함).</summary>
+    async UniTaskVoid SpawnVfxDelayed(VfxSlot _slot, Transform _anchor, bool _flip)
+    {
+        if (_slot == null || !_slot.use || _anchor == null) return;
+        if (_slot.spawnDelay > 0f) await UniTask.Delay((int)(_slot.spawnDelay * 1000));
+        if (_anchor == null) return;   // 대기 중 파괴 대비.
+        _slot.Spawn(_anchor, _flip);
     }
 
     void TryAttack(BattleFieldView _atkFv, int _atkSlot, BattleFieldView _defFv, int _defSlot)
@@ -99,13 +138,20 @@ public class AttackAnimTester : MonoBehaviour
         PushTuning();
         AttackEffect t_effect = _attacker.BoundCard?.data?.attackEffect;
 
+        // 적(비로컬) 공격이면 오프셋/회전 반전 — AttackSequence의 t_flip 규칙과 동일.
+        bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
+        SpawnVfxDelayed(this.attackVfx, _attacker.transform, t_flip).Forget();
+
         // _onEffect = 접촉 시 방어자에 sampleDamage, 공격자에 sampleCounterDamage(반격) 적용
-        //             → 양쪽 체력 깎임 + HitEffect(붐+데미지 숫자) 표시.
+        //             → 양쪽 체력 깎임 + HitEffect(붐+데미지 숫자) 표시. 피격 VFX도 이 시점에.
         await AttackSequence.PlaySingle(_attacker, _defender, t_effect,
             _onEffect: () =>
             {
                 ApplyTestDamage(_defender, this.sampleDamage);
                 ApplyTestDamage(_attacker, this.sampleCounterDamage);
+                this.hitVfx.Spawn(_defender.transform, t_flip);
+                if (this.hitVfxOnCounter && this.sampleCounterDamage > 0)
+                    this.hitVfx.Spawn(_attacker.transform, !t_flip);
             },
             _forceSpecial: this.useSpecialCinema);
 
@@ -156,5 +202,11 @@ public class AttackAnimTester : MonoBehaviour
             $"[P] 플레이어 공격   [E] 적 공격   |   연출: {(this.useSpecialCinema ? "특별(시네마)" : "일반(박치기)")}   |   카드 탭/드래그도 가능");
         GUI.Label(new Rect(12, 34, 760, 24),
             $"박치기 초: wind {this.windDur:0.00} / in {this.inDur:0.00} / recoil {this.recoilDur:0.00} / out {this.outDur:0.00}");
+        GUI.Label(new Rect(12, 58, 1100, 24),
+            $"공격VFX [←/→] {this.attackVfx.Index + 1}/{this.attackVfx.Count}  {this.attackVfx.CurrentName}");
+        GUI.Label(new Rect(12, 82, 1100, 24),
+            $"피격VFX [↑/↓] {this.hitVfx.Index + 1}/{this.hitVfx.Count}  {this.hitVfx.CurrentName}");
+        GUI.Label(new Rect(12, 106, 1100, 24),
+            "[1] 공격VFX on/off  [2] 피격VFX on/off  [V] 공격VFX 미리보기  [B] 피격VFX 미리보기  [R] 폴더 재스캔  [L] 선택 경로 로그");
     }
 }

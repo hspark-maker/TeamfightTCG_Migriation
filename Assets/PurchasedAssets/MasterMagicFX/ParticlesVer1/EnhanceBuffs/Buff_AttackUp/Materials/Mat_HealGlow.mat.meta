@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cab76741dca15f54e9a9f3b22ff2381a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/EnhanceBuffs/Buff_AttackUp/Materials/Mat_HealGlow.mat
+  uploadId: 755856

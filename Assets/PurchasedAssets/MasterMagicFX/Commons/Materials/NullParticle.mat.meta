@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f0377b2155b32b148913dbb451b56e6a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Commons/Materials/NullParticle.mat
+  uploadId: 755856

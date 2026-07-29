@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f1cc32973e0919246a248c5ee95fe5f4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Etcs/HealOnce/Materials/Mat_VerticalLight.mat
+  uploadId: 755856

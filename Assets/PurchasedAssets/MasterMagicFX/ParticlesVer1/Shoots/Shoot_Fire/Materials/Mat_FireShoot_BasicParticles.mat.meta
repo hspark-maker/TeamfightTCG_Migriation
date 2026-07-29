@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ec9eb9bd02846484a994682709f8132b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Fire/Materials/Mat_FireShoot_BasicParticles.mat
+  uploadId: 755856

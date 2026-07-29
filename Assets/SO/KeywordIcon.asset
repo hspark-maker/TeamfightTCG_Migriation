@@ -11,10 +11,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a8f25a248745cc546baeb96ec728ad99, type: 3}
   m_Name: KeywordIcon
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
+  defaultIcon: {fileID: 21300000, guid: 78558ad01585c8b43a6729a179712f11, type: 3}
   entries:
   - keyword: 1
-    icon: {fileID: 1726162682, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: 661b51da39d6eeb4b9a73a415cd374bc, type: 3}
     displayName: "\uC6D0\uAC70\uB9AC"
     explain: "\uC774 \uCE74\uB4DC\uB294 \uBC18\uACA9 \uD53C\uD574\uB97C \uBC1B\uC9C0
       \uC54A\uC2B5\uB2C8\uB2E4."
@@ -22,7 +23,7 @@ MonoBehaviour:
     glowStartColor: {r: 1, g: 0.85961777, b: 0.65471697, a: 1}
     glowEndColor: {r: 0.9960785, g: 0.854902, b: 0.6509804, a: 0}
   - keyword: 2
-    icon: {fileID: -332659774, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: 4cceb8fb0dec19742a555fc0464b1115, type: 3}
     displayName: "\uBB34\uC30D"
     explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD560 \uB54C,  \uC778\uC811\uD55C
       \uCE74\uB4DC 1\uAC1C\uC5D0 \uC808\uBC18\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
@@ -30,7 +31,7 @@ MonoBehaviour:
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
   - keyword: 4
-    icon: {fileID: 1064390119, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: 8709db639ab9fe5478a3226a9e3b3662, type: 3}
     displayName: "\uCC98\uD615"
     explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uC73C\uB85C \uC801\uC744 \uCC98\uCE58\uD558\uBA74,
       \uD55C \uBC88 \uB354 \uACF5\uACA9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
@@ -38,7 +39,7 @@ MonoBehaviour:
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
   - keyword: 16
-    icon: {fileID: -385580173, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: d5ea8296ad448fd4d8ec3895855d4547, type: 3}
     displayName: "\uAD50\uD65C"
     explain: "\uC774 \uCE74\uB4DC\uAC00 \uACF5\uACA9\uD55C \uB4A4, \uB300\uAE30\uC911\uC778
       \uCE74\uB4DC\uC640 \uAD50\uCCB4\uD569\uB2C8\uB2E4."
@@ -46,7 +47,7 @@ MonoBehaviour:
     glowStartColor: {r: 0.87529755, g: 0, b: 1, a: 1}
     glowEndColor: {r: 0.8745099, g: 0, b: 1, a: 0}
   - keyword: 8
-    icon: {fileID: 2062767409, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: 91d60cf8fd0347543af0444939e31e34, type: 3}
     displayName: "\uB3C4\uBC1C"
     explain: "\uC801\uC740 \uC774 \uCE74\uB4DC\uB97C \uBA3C\uC800 \uACF5\uACA9\uD574\uC57C
       \uD569\uB2C8\uB2E4. \uC774 \uCE74\uB4DC\uAC00 \uC785\uD788\uB294 \uD53C\uD574\uAC00
@@ -63,7 +64,7 @@ MonoBehaviour:
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
   - keyword: 64
-    icon: {fileID: -159116842, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
+    icon: {fileID: 21300000, guid: e26739d221404d6419107760944cf4a3, type: 3}
     displayName: "\uD790\uB7EC"
     explain: "\uC790\uC2E0\uC758 \uD134 \uC2DC\uC791\uC2DC \uBAA8\uB4E0 \uC544\uAD70
       \uCE74\uB4DC\uC758 \uC0DD\uBA85\uB825\uC744 1 \uD68C\uBCF5\uC2DC\uD0B5\uB2C8\uB2E4."

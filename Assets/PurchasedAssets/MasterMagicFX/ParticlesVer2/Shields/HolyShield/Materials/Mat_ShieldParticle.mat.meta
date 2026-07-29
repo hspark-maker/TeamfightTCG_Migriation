@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: da577412161aa3f4e9d1838989f0cea6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shields/HolyShield/Materials/Mat_ShieldParticle.mat
+  uploadId: 755856

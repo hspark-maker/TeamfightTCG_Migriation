@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0b3df745a46ef7b4690dbb211dc7deb7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/FireLaser/Materials/Mat_FireLaser_Sparkle.mat
+  uploadId: 755856

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d51ed9cd3d365af4b8cc955071ee641f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Blue/Materials/Mat_BlueShoot_BasicParticles.mat
+  uploadId: 755856

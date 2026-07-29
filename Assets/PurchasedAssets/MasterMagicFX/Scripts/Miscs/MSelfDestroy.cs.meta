@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ceaa77ac270cc854682b545d55da170c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Scripts/Miscs/MSelfDestroy.cs
+  uploadId: 755856

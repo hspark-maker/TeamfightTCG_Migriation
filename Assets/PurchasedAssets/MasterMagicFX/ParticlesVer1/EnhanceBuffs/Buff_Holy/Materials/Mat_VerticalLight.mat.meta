@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 25edcf1e150cddb4690cbdfe58a5751e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/EnhanceBuffs/Buff_Holy/Materials/Mat_VerticalLight.mat
+  uploadId: 755856
