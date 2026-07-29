@@ -26,7 +26,7 @@ public class CardView : MonoBehaviour
     // 튜토리얼은 "그 카드 말고 다 검게" 위해 더 낮은 값으로 덮어쓴다(PlayerTurn이 설정).
     public static float ForcedDimAlpha = 0.3f;
 
-    enum DragState { Idle, AttackDrag, ReturnDrag }
+    enum DragState { Idle, AttackDrag }
 
     // 한 터치의 제스처 종류. 손가락이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정, 그 터치 끝까지 고정.
     // DragUp=위로 떠서 적에게 끌기(콜라이더 타깃). DragDown=아래로 끌기(좌우반전 방향 타깃). None=미확정/탭.
@@ -193,8 +193,11 @@ public class CardView : MonoBehaviour
         this.dragState   = DragState.Idle;
 
 
-        this.centerPos = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, transform.position.z - 0.5f);
-        this.centerPos.y = transform.position.y;
+        // 떠오르는 자리는 CardAnimator.MoveToCenter와 같은 규칙으로 잡는다 — 슬롯의 z·y를 그대로 두고
+        // 화면 가로 중앙만 취한다. transform.position.z에서 0.5를 빼면 원근 때문에 그 점이 소실점 쪽으로
+        // 끌려가 카드가 자기 줄보다 위로 떠 보인다(= 필드 중앙이 아니라 화면 중앙으로 가는 증상).
+        this.centerPos   = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, this.cardAnim.SlotPosition.z);
+        this.centerPos.y = this.cardAnim.SlotPosition.y;
 
         float t_destY = Camera.main.WorldToScreenPoint(this.centerPos).y;
         this.dragStartScreenPos   = new Vector2(Screen.width * 0.5f, t_destY);
@@ -260,7 +263,7 @@ public class CardView : MonoBehaviour
 
         Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;   // DragBack 조준용(화면 중앙 기준).
 
-        HandleAimDrag(t_drag, t_touchDrag, _forward: this.activeGesture != Gesture.DragDown);
+        HandleAimDrag(t_drag, _forward: this.activeGesture != Gesture.DragDown);
     }
 
     /// <summary>튜토리얼 조작 게이트: 이번 스텝이 가르치는 제스처만 통과. 탭은 Gesture.None으로 표현한다.
@@ -277,66 +280,54 @@ public class CardView : MonoBehaviour
         }
     }
 
-    // 드래그 모드 전환 시 이전 모드 UI/상태 정리. dragState=Idle로 리셋 → 새 핸들러가 첫 프레임에 카드 이동/페이드를 재초기화.
+    // 드래그 모드 전환 시 이전 모드 조준만 정리. 카드는 센터에 그대로 둔다(dragState 유지) —
+    // 예전엔 Idle로 리셋해 재초기화를 유도했지만, 그러면 전환 때마다 슬롯 복귀→센터 재이동 왕복이 보인다.
+    // 위/아래가 둘 다 같은 조준 모드가 된 뒤로는 자리를 바꿀 이유가 없다.
     void SwitchGesture()
     {
-        this.swipeGuide?.SetVisible(false);
         HideDragLine();
         ClearTargetPreview();
-        this.dragState = DragState.Idle;
     }
 
-    /// <summary>조준 드래그 공통 처리. 드래그-백/포워드는 딱 두 가지만 다르다:
-    /// ① 조준이 켜지는 손가락 방향(_forward=위로 / false=아래로) ② 조준 방향 부호(밀기 = 그 방향, 당기기 = 반대 방향).
-    /// 가이드는 조준 방향(t_aimDir.x)을 그대로 받으므로 모드가 바뀌면 자연히 반전된다.
-    /// 데드존 진입 시 타깃 취소, 카드 센터 이동, 되돌리기 복귀는 두 모드가 동일하다.</summary>
-    void HandleAimDrag(Vector2 _drag, Vector2 _touchDrag, bool _forward)
+    /// <summary>조준 드래그 공통 처리. 드래그-백/포워드는 딱 하나만 다르다:
+    /// 조준 방향 부호(밀기 = 그 방향, 당기기 = 반대 방향). 가이드는 조준 방향(t_aimDir.x)을 그대로 받으므로
+    /// 모드가 바뀌면 자연히 반전되고, 가이드가 놓이는 쪽(위/아래)만 _forward를 따른다.
+    ///
+    /// 손가락이 시작점 기준 위/아래 어디에 있든 조준을 유지한다 — 제스처는 OnMouseDrag가 이미 확정했고,
+    /// 양쪽 다 조준 모드라 "반대편으로 넘어감 = 취소"가 성립하지 않는다. 예전의 슬롯 복귀(ReturnDrag)는
+    /// 모드 전환 구간에서 슬롯→센터 왕복으로만 보였다. 취소는 그냥 손을 떼면 된다(OnMouseUp이 복귀시킨다).</summary>
+    void HandleAimDrag(Vector2 _drag, bool _forward)
     {
-        if (_forward ? _touchDrag.y > 0f : _touchDrag.y < 0f)
+        UIPoolManager.Instance?.HideUI<PooledCardElement>();
+
+        if (this.dragState != DragState.AttackDrag)
         {
-            UIPoolManager.Instance?.HideUI<PooledCardElement>();
-
-            if (this.dragState != DragState.AttackDrag)
-            {
-                this.dragState = DragState.AttackDrag;
-                s_anyDragging  = true;
-                BeginTargeting();
-                var t_validTargets = GetValidEnemyViews();
-                foreach (var t_cv in t_validTargets)
-                    if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
-                        t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
-                ApplyDragTargetFade(t_validTargets);
-                this.cardAnim.MoveTo(this.centerPos).Forget();
-                this.swipeGuide?.SetVisible(true);
-            }
-
-
-            Vector2 t_aimDir = (_forward ? _drag : -_drag).normalized;
-            this.swipeGuide?.UpdateDirection(t_aimDir.x);
-
-            if (_drag.magnitude < this.deadZoneRadius)
-            {
-                ClearTargetPreview();
-                return;
-            }
-
-            UpdateTarget(t_aimDir);
+            this.dragState = DragState.AttackDrag;
+            s_anyDragging  = true;
+            BeginTargeting();
+            var t_validTargets = GetValidEnemyViews();
+            foreach (var t_cv in t_validTargets)
+                if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
+                    t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
+            ApplyDragTargetFade(t_validTargets);
+            this.cardAnim.MoveTo(this.centerPos).Forget();
+            this.swipeGuide?.SetVisible(true);
         }
-        else
+
+        // 포워드(위로 끌기)는 가이드도 카드 위, 드래그-백은 아래. 모드가 바뀌는 순간 자리가 따라오게
+        // 매 프레임 갱신한다(같은 쪽이면 SetAbove가 내부에서 무시).
+        this.swipeGuide?.SetAbove(_forward);
+
+        Vector2 t_aimDir = (_forward ? _drag : -_drag).normalized;
+        this.swipeGuide?.UpdateDirection(t_aimDir.x);
+
+        if (_drag.magnitude < this.deadZoneRadius)
         {
-            this.swipeGuide?.SetVisible(false);
             ClearTargetPreview();
-            if (this.dragState == DragState.AttackDrag || this.dragState == DragState.ReturnDrag)
-            {
-                this.dragState = DragState.ReturnDrag;
-                float t_screenDist = Vector2.Distance(
-                    Camera.main.WorldToScreenPoint(this.cardAnim.SlotPosition),
-                    Camera.main.WorldToScreenPoint(this.centerPos));
-                float t_alpha = t_screenDist > 0f ? Mathf.Clamp01(_touchDrag.magnitude / t_screenDist) : 0f;
-                transform.DOKill();
-                transform.position = Vector3.Lerp(this.centerPos, this.cardAnim.SlotPosition, t_alpha);
-            }
+            return;
         }
+
+        UpdateTarget(t_aimDir);
     }
 
     Vector3 GetMouseWorldOnCardPlane()
