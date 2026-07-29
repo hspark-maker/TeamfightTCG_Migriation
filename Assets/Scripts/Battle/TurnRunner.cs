@@ -25,6 +25,7 @@ public class TurnRunner : MonoBehaviour
     bool disconnectWin;
     bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
     long lastRewardGold; // CaptureResult에서 확정한 지급 골드. F-20 팝업 표시용(표시만, 재지급 없음).
+    long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
 
     void OnDestroy()
     {
@@ -35,8 +36,10 @@ public class TurnRunner : MonoBehaviour
 #if UNITY_EDITOR
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(0);
-        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(0);
+        // 연출 확인용 샘플 보상 — 0이면 코인·수치 롤링이 통째로 생략돼 볼 게 없다.
+        // 패배(F2)는 설계상 분출·롤링이 없다 — 값만 박힌 채 뜨는 게 정상이다.
+        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(1234, 10, _won: true);
+        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(1234, -5, _won: false);
     }
 #endif
 
@@ -221,7 +224,11 @@ public class TurnRunner : MonoBehaviour
         this.lastRewardGold = RewardService.GrantBattleReward(t_remaining);
 
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
-        RankManager.ApplyBattleResult(_won);
+        var t_rank = RankManager.ApplyBattleResult(_won);
+        this.lastRankDelta = t_rank.Delta;
+
+        // 티어가 올랐으면 캐리어에 실어 둔다 — 로비 진입 시 보상 패널이 소비해 자동으로 열린다.
+        if (t_rank.IsTierUp) RankUpHandoff.Set(t_rank);
     }
 
     public static void Cleanup()
@@ -239,7 +246,7 @@ public class TurnRunner : MonoBehaviour
         NetworkGameController.Instance?.ForceOpponentReady();
         MultiplayerTurnRunner.Instance?.ForceOpponentAttackResolve();
         CaptureResult(true);
-        this.winPopup?.Show(this.lastRewardGold);
+        this.winPopup?.Show(this.lastRewardGold, this.lastRankDelta, _won: true);
     }
 
     /// <summary>
@@ -252,7 +259,7 @@ public class TurnRunner : MonoBehaviour
         if (!DeckConfig.IsMultiplayer) return;
         this.disconnectWin = true;
         CaptureResult(true);
-        this.winPopup?.Show(this.lastRewardGold);
+        this.winPopup?.Show(this.lastRewardGold, this.lastRankDelta, _won: true);
     }
 
     bool CheckGameOver()
@@ -260,13 +267,13 @@ public class TurnRunner : MonoBehaviour
         if (this.enemyField.IsEmpty)
         {
             CaptureResult(true);
-            this.winPopup?.Show(this.lastRewardGold);
+            this.winPopup?.Show(this.lastRewardGold, this.lastRankDelta, _won: true);
             return true;
         }
         if (this.playerField.IsEmpty)
         {
             CaptureResult(false);
-            this.losePopup?.Show(this.lastRewardGold);
+            this.losePopup?.Show(this.lastRewardGold, this.lastRankDelta, _won: false);
             return true;
         }
         return false;

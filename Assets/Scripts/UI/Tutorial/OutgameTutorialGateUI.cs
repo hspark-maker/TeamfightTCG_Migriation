@@ -76,8 +76,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
 
-    /// <summary>딤 없이 안내 배너만 띄운다. 3D 팩처럼 uGUI 구멍을 뚫을 수 없는 타깃용
-    /// (Overlay 딤을 깔면 3D 오브젝트가 그 아래로 가려져 강조가 아니라 은폐가 된다).</summary>
+    /// <summary>딤 없이 안내 배너만 띄운다. 걸 타깃이 아예 없거나(개봉 대기처럼 클릭이 아닌 신호로 끝나는 스텝),
+    /// 타깃에 Button이 없어 ShowGate가 거부하는 경우용 — 완료를 onClick 구독으로만 감지하므로 그런 타깃엔 게이트를 걸 수 없다.</summary>
     public void ShowBanner(string _message)
     {
         DetachButton();

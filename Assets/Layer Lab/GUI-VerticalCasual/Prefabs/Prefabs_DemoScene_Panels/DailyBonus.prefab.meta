@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a6fa9d1754e6740b2aed06cd1784cb99
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_DemoScene_Panels/DailyBonus.prefab
+  uploadId: 924690

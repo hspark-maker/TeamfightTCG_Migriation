@@ -147,7 +147,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 - **멀티 제외**: 스코프가 PvP 아님 + 상대 이탈 유도 시 `HandlePlayerLeft`가 `CaptureResult(true)`를 불러 **전투 없이 무한 가산**되는 어뷰징 차단. 부전승 경로 2개는 둘 다 `if (!DeckConfig.IsMultiplayer) return;`으로 시작하므로 **별도 `disconnectWin` 가드 불필요**.
 - **튜토리얼 포함**: `PKG-TUT-REWARD`(튜토리얼 보상 미지급 가드)가 "보류(선택)·지급 허용해도 무해"인 현행 정책과 일관. 표시용이라 해악 0이고, 신규 유저가 로비 복귀 시 배지가 켜져 있는 게 온보딩에 유리.
 
-**의도적으로 덜어낸 것** — `OnRankChanged` 이벤트(랭크는 **로비에서 변동할 경로가 0**, 전투 씬에서만 변함 → `Start`/`OnEnable` 재조회로 충분), 구간 진행률 필드(씬에 진행바 없음 = 소비처 0), `ApplyBattleResult` 반환값(결과 팝업 표시를 보류했으므로 소비처 0).
+**의도적으로 덜어낸 것** — `OnRankChanged` 이벤트(랭크는 **로비에서 변동할 경로가 0**, 전투 씬에서만 변함 → `Start`/`OnEnable` 재조회로 충분), 구간 진행률 필드(씬에 진행바 없음 = 소비처 0). `ApplyBattleResult` 반환값은 **해제** — 결과 팝업이 랭크 증감을 연출하면서 클램프 뒤 실제 증감을 돌려준다.
 
 > **⚠️ `RankHud`에 `GoldHud` 패턴을 그대로 복제하면 버그**: `GoldHud`의 `OnEnable` 즉시 렌더가 안전한 건 `CurrencyManager.Init()`이 `BeforeSceneLoad`에서 끝나기 때문이다. `RankConfig` 주입은 `DataLibrary.Awake`(실행순서 0)에서 일어나고 `Tab_Match`·`RankInfo`가 모두 씬에 활성 저장돼 있어 **`RankHud.OnEnable`이 `DataLibrary.Awake`보다 먼저 돌 수 있다**(비결정). 이벤트를 뺐으므로 잘못된 첫 렌더가 그대로 굳는다. → **최초 렌더는 `Start()`**, `OnEnable`은 `m_started` 가드.
 

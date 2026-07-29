@@ -85,11 +85,13 @@
 
 | ID | 패키지 | 소비 계약 | 만지는 파일 | deps | 담당 | 상태 |
 |---|---|---|---|---|---|---|
-| **PKG-STARTER-PACK** | 스타터팩 정의 + 개봉 흐름 **(2026-07-27 G-29: 스와이프 뜯기 + 카드 더미 넘기기로 재확장)** | `CardPackOpener`(팩 API)·`CardPack.prefab` | `UI/Shop/PackRevealView.cs`·`PackTearHandle.cs`·`PackCardStack.cs`·`PackCardView.cs`·`OutGame/CardPack/PackHandoff.cs` + `StarterPack.asset` + `CardPack.unity`·`CardPack.prefab`·`PackCard.prefab` 배선 | PKG-ONBOARD-BOOT | outgame-engineer+UI | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
+| **PKG-STARTER-PACK** | 스타터팩 정의 + 개봉 흐름 **(2026-07-27 G-29: 스와이프 뜯기 + 카드 더미 넘기기로 재확장)** | `CardPackOpener`(팩 API)·~~`CardPack.prefab`~~ | `UI/Shop/PackRevealView.cs`·`PackTearHandle.cs`·`PackCardStack.cs`·`PackCardView.cs`·`OutGame/CardPack/PackHandoff.cs` + `StarterPack.asset` + `CardPack.unity`·~~`CardPack.prefab`~~·`PackCard.prefab` 배선 | PKG-ONBOARD-BOOT | outgame-engineer+UI | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
+| | ↳ ⚠️ **`CardPack.prefab`(3D 팩)은 2026-07-28 `PKG-PACK-2D`로 폐기됨** — 팩은 씬 UI 노드(`UICanvas > PackRoot > Pack > Seal`)로 대체. 이 행의 나머지 산출물(코드 5파일·`StarterPack.asset`·`PackCard.prefab`)은 그대로 유효 | | | | | |
 | **PKG-FIRSTBATTLE** | 구매→캐리어→CardPack 씬·[획득]→덱 슬롯0 저장→목적지 이동 | `PackHandoff`·`DeckSaveManager`·`DeckConfig`·`TutorialConfig.Begin` | `UI/Shop/PackAcquireController.cs` + ~~`UI/Lobby/LobbyFirstRunRedirect.cs`~~(→ 튜토리얼 스텝 0) + `CardPack.unity` 배선 | PKG-STARTER-PACK | UI+outgame | ✅ 완료(컴파일·씬배선 완료, Play 검증 대기) |
 | **PKG-OUTGAME-TUT** | 아웃게임 첫시작 튜토리얼 **P1~P4** — 진행도 영속 + 스텝 해석 + 강제 게이트 | `CardPackOpener`·`PackHandoff`·`OwnershipManager.HasAnyOwnedSaved`·`TutorialConfig.Begin`(전부 순수 소비) | 신규 `OutGame/Tutorial/`(6) + `UI/Tutorial/`(2) + `Save/2.Domain/TutorialSaveData.cs` / 수정 `UserSaveData`·`GameManager`·`LobbyTabController`·`OwnershipManager`(주석)·`OwnershipDebugTool` / **삭제 `UI/Lobby/LobbyFirstRunRedirect.cs`** | PKG-FIRSTBATTLE | outgame-engineer | ✅ 완료(코드+검수+컴파일 에러 0) — **씬 배선·SO 저작 대기** |
 | **PKG-OUTGAME-TUT-WIRE** | 동 **P5·P6** — Pack 탭·구매 버튼 앵커 배선 + **14스텝 저작(전투 3회·구매 사이클 2회)** + 팩 개봉 안내 + 결과 기반 커밋 | `OutgameTutorialData`(SO 저작)·`EOutgameTutorialAnchor`·`PackRevealView`/`PackShowcaseController` 결과 이벤트 | `LobbyScene.unity`(탭1 `tutorialAnchor`·buyButton 앵커) + `OutgameTutorial.asset` + `OutgameTutorialData`/`Runner`/`Bridge`/`GateUI` + `PackRevealView`/`PackShowcaseController` | PKG-OUTGAME-TUT | outgame-engineer+사용자(씬) | ✅ 완료(컴파일 에러 0, Play 검증 대기) |
 | **PKG-PACK-HINT** | 개봉 씬 가이드 제거 + 뜯기 상시 안내 (2026-07-27) | `OutgameTutorialGateUI`(무수정)·`PackRevealView` 스테이지 | `UI/Tutorial/OutgameTutorialBridge.cs`(`suppressGuideUI` + 클릭 직접 구독) · `UI/Shop/PackRevealView.cs`(`tearHint`) + `CardPack.unity` 배선(**사용자**) | PKG-OUTGAME-TUT-WIRE | outgame-engineer | ✅ 완료(컴파일 에러 0) — **씬 배선 대기** |
+| **PKG-PACK-2D** | 카드팩 개봉 3D→2D uGUI 전환 (2026-07-28) | `CardPackOpener`·`OpenedPack`·`CardPackData`·`PackHandoff`(**전부 무접촉**)·`PackRevealView.OnAnyPackOpened`(발화 시점 불변) | `CardPack.unity` 씬 재구성(**사용자 에디터**) + `UI/Shop/PackRevealView.cs`·`PackTearHandle.cs` **주석·Tooltip만**(로직 0) + `UI/Tutorial/OutgameTutorialBridge.cs`·`OutgameTutorialGateUI.cs` **주석 근거 갱신**(결론 불변) + 문서(`PACK_OPEN_DIRECTION.md`·`PACK_FEEL_PLAN.md` 폐기 배너·`STRUCTURE.md`·이 보드) | PKG-STARTER-PACK ✅ | 사용자(씬)+메인(주석·문서) | 🔵 진행중 |
 
 | **PKG-TUT-REWARD** (선택·후속) | 튜토리얼 전투 보상 미지급 가드 | `TutorialConfig.IsActive` | `Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | PKG-FIRSTBATTLE | battle-engineer | ⬜ 보류(선택) |
 
@@ -100,6 +102,10 @@
 > **PKG-PACK-HINT 결과(2026-07-27)**: `CardPack` 씬은 팩 1개·[획득] 1개뿐이라 강제 게이트가 길잡이가 아니라 연출을 가리는 잡음이었다 → 브리지에 씬 스위치 `suppressGuideUI`를 두어 **그 씬에서만** 딤·배너를 끄고 **스텝 진행은 그대로** 둔다. 함정 1개: `WaitPackOpen`은 완료가 `OnAnyPackOpened`라 배너만 빼면 되지만 `WaitClick`의 완료는 **게이트가 대신 걸던 `onClick` 구독**이라, 억제 시 브리지가 직접 물어야 한다(`HookSilently`/`DetachSilent`). `GateUI` 무수정. 대체 안내는 튜토리얼이 아니라 **씬 상시 표시**(`PackRevealView.tearHint`, 뜯기 대기 중 표시 → 뜯김 확정에 소멸) — 온보딩이 끝나도 조작법은 필요하기 때문. **사용자 인계(에디터)**: ① `PackOpenDirector` 브리지 `Suppress Guide UI` 체크 ② `UICanvas` **직속**(`RevealPanel` 형제)에 안내 TMP + `CanvasGroup`(alpha 0 저장, Raycast Target 해제) → `PackRevealView.tearHint` 배선 ③ `AcquireButton`의 `TutorialAnchor`는 **떼지 말 것**(억제 모드의 클릭 감지 경로).
 >
 > PKG-TUT-REWARD는 Battle 경계 교차라 **battle-engineer** 전용. 첫 전투 보상 지급을 허용해도 무해 → 필수 아님.
+>
+> **PKG-PACK-2D 등급 판정 = 🟠(그룹 내 순차).** 규약대로 읽으면: 🔴가 아니다 — 동결 계약(재화·소유·세이브·부트·팩 API)을 **하나도 만들지도 바꾸지도 않는다**(코드 변경이 주석·Tooltip뿐이라 시그니처·발화 시점 전부 불변). 🟢도 아니다 — 이 그룹의 완료 패키지들과 **`CardPack.unity`·`PackRevealView.cs`를 공유**하고, 특히 `.unity` YAML은 머지가 불가하다. → **`CardPack.unity`를 만지는 다른 작업과 동시 진행 금지**, 그룹 밖과는 병렬 OK.
+>
+> **작업 성격이 이 보드에서 이례적이다**: 본체가 **씬 재구성(사용자 에디터)**이고 코드 산출물은 주석뿐이다. 조사에서 3D 의존이 이미 거의 없다는 게 드러났기 때문 — `PackCardStack`·`PackResultGrid`·`PackCardView`는 순수 uGUI(3D 참조 0건), `PackTearHandle`은 `Input.mousePosition` 폴링이라 콜라이더·`Camera`를 안 쓰고, `CardPack.prefab`의 `BoxCollider`는 참조 0인 vestigial이다. **씬 배선 체크리스트·값 환산표·함정 3종의 진실원 = [`docs/PACK_OPEN_DIRECTION.md`](../PACK_OPEN_DIRECTION.md)**(특히 §7 좌표 단위 표 — `tearDistance`는 디바이스px, `flickThreshold`·`packEnterDrop`·`sealTornOffset`은 참조px로 **단위가 섞여 있다**). 동반 결정: `PACK_FEEL_PLAN.md`의 게임필 개선 계획(`PKG-FEEL-*` 5종)은 **전제 소멸로 폐기** — 보드에 편입하지 않는다.
 
 ---
 

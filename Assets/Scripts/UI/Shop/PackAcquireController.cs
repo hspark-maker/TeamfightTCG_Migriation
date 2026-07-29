@@ -41,13 +41,14 @@ public class PackAcquireController : MonoBehaviour
             return;
         }
 
-        // 목적지 컨텍스트를 먼저 캡처한 뒤 Consume(캐리어를 통째로 비움 → 다음 개봉 세션 격리).
+        // 목적지·팩 컨텍스트를 먼저 캡처한 뒤 Consume(캐리어를 통째로 비움 → 다음 개봉 세션 격리).
         m_nextScene = PackHandoff.NextScene;
         m_startTutorial = PackHandoff.StartTutorial;
+        var t_pack = PackHandoff.Pack;
         var t_opened = PackHandoff.Consume();
         CacheCards(t_opened);
 
-        if (view != null) view.BeginOpen(t_opened);
+        if (view != null) view.BeginOpen(t_opened, t_pack);
         else Debug.LogWarning("[PackAcquireController] view 미배선 → 개봉 진행 불가.");
     }
 

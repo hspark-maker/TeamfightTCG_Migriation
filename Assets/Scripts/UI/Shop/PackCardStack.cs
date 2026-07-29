@@ -12,6 +12,8 @@ using UnityEngine.EventSystems;
 //
 // 배선 전제: 카드와 stackAnchor가 모두 cardLayer의 자식이고 앵커가 같아야 한다
 //   (anchoredPosition을 같은 좌표계로 직접 비교·보간하므로).
+// 그리고 cardLayer는 팩 앞뒷면 껍데기와 같은 무대(PackStage)의 자식이어야 한다 —
+//   앞뒷면 사이에 끼어야 "팩 속"이 성립하고, 같은 좌표계라 PlaceInsidePack이 값 하나로 자리를 정할 수 있다.
 // 입력은 이 컴포넌트가 붙은 오브젝트의 Graphic(raycastTarget)이 받는다 — 카드 프리팹은 입력을 모른다.
 public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
 {
@@ -70,6 +72,17 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     bool m_interactable;
     bool m_dragging;
 
+    // 팩에서 뽑혀 나오는 등장 연출의 기준(=평소 자리). 더미 전체를 cardLayer 한 덩어리로 줄였다 펴므로
+    // 개별 카드의 홈 좌표(m_home)는 건드리지 않는다 — 등장과 넘기기가 같은 좌표를 두고 다투지 않게 한 분리다.
+    Vector2 m_layerHome;
+    Vector3 m_layerScaleHome;
+    bool m_layerHomeCaptured;
+
+    // 뽑혀 나온 더미가 정착하는 자리·크기. 씬 배치값에서 출발하되 PlayEmerge가 실제 목표로 갱신한다 —
+    // 연출을 건너뛰고 되돌릴 때 씬 배치값으로 돌아가면 뽑아 올린 만큼이 도로 내려앉고 크기도 어긋난다.
+    Vector2 m_layerSettled;
+    Vector3 m_layerSettledScale = Vector3.one;
+
     // 최근 프레임의 미는 속도(카드 좌표계 단위/초). 짧고 빠른 플릭을 거리 대신 이 값으로 살린다.
     float m_dragSpeed;
 
@@ -78,6 +91,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     void Awake()
     {
         m_canvas = GetComponentInParent<Canvas>();
+        // anchoredPosition·localScale은 부모 rect 크기와 무관하다 — Canvas가 rect를 드라이브하기 전에 잡아도 안전하다.
+        CaptureLayerHome();
     }
 
     /// <summary>뽑힌 카드로 더미를 만든다. 아직 입력은 받지 않는다(분출 연출이 끝난 뒤 BeginInteraction).</summary>
@@ -116,6 +131,70 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         OnRemainingChanged?.Invoke(m_stack.Count);
+    }
+
+    /// <summary>
+    /// 더미를 팩 속에 든 것처럼 줄여 _stackCenter(무대 로컬 좌표)에 겹쳐 둔다.
+    /// 팩이 등장하기 전에 호출한다 — 카드는 처음부터 팩 속에 들어 있어야 하고,
+    /// 봉인이 찢기는 순간 그 구멍으로 카드 끝이 저절로 드러난다(따로 등장시키지 않는다).
+    ///
+    /// 배선 전제: cardLayer와 팩 껍데기가 같은 무대(PackStage)의 자식이어야 한다 —
+    /// 같은 좌표계라 월드 변환 없이 값 하나로 "팩 속 어디"를 지정할 수 있다.
+    /// </summary>
+    public void PlaceInsidePack(Vector2 _stackCenter, float _scale)
+    {
+        if (cardLayer == null || stackAnchor == null) return;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+
+        cardLayer.localScale = m_layerScaleHome * _scale;
+        cardLayer.anchoredPosition = LayerPosFor(_stackCenter, _scale);
+    }
+
+    /// <summary>
+    /// 팩 속에 있던 더미를 _targetCenter(무대 로컬 좌표)·_targetScale(씬 배치 대비 배율)로
+    /// 솟아오르게 한다(뭉치째 뽑혀 나오는 연출).
+    /// 반환 시퀀스를 호출부의 흐름에 끼우면 스킵 한 번으로 등장까지 함께 완료된다.
+    /// 아래쪽은 팩 앞면이 계속 가리므로, 뽑히는 동안 카드가 입구에서 빠져나오는 것처럼 읽힌다.
+    ///
+    /// 목표를 밖에서 받는 이유: 팩 속 자리와의 차이가 곧 "뽑혀 나온 거리"다 —
+    /// 그 거리를 씬 배치에 묶어 두면 팩만 내려가고 더미는 제자리인 그림이 된다.
+    /// 배율까지 받는 이유: 무대가 통째로 확대돼 있으면 그 배율이 더미에도 곱해진다 —
+    /// 되물릴 몫을 호출부가 넘겨야 팩을 얼마나 키우든 뽑힌 카드는 늘 같은 크기로 선다.
+    /// </summary>
+    public Sequence PlayEmerge(Vector2 _targetCenter, float _targetScale, float _duration)
+    {
+        if (cardLayer == null || stackAnchor == null) return null;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+
+        m_layerSettled = LayerPosFor(_targetCenter, _targetScale);
+        m_layerSettledScale = m_layerScaleHome * _targetScale;
+
+        return DOTween.Sequence()
+            .SetLink(cardLayer.gameObject)
+            // 살짝 넘겼다 내려앉는다 — 뽑혀 나온 물건은 관성으로 한 번 튄다. 과하면 "커졌다"로 읽히므로 약하게.
+            .Join(cardLayer.DOAnchorPos(m_layerSettled, _duration).SetEase(Ease.OutBack, 1.05f))
+            .Join(cardLayer.DOScale(m_layerSettledScale, _duration).SetEase(Ease.OutCubic));
+    }
+
+    // 지정 중심(무대 로컬)에 더미를 놓기 위한 레이어 좌표.
+    // 레이어를 줄이면 그 안의 앵커 자리도 같이 당겨진다 — 그만큼 되밀어야 더미 중심이 정확히 그 지점에 온다.
+    Vector2 LayerPosFor(Vector2 _center, float _scale)
+        => _center - stackAnchor.anchoredPosition * (m_layerScaleHome.x * _scale);
+
+    // 등장 연출을 건너뛰고 평소 자리로 되돌린다(걷어내기·비활성 대비). 외부에서 부를 일은 없다 —
+    // 자리를 되돌릴 시점은 "더미를 치울 때"뿐이고 그 판단은 이 클래스가 쥔다.
+    void SnapEmerged()
+    {
+        if (cardLayer == null) return;
+
+        CaptureLayerHome();
+        cardLayer.DOKill();
+        cardLayer.anchoredPosition = m_layerSettled;
+        cardLayer.localScale = m_layerSettledScale;
     }
 
     /// <summary>입력을 켜고 첫 장이 드러났음을 알린다(앞면이라 이미 보이고 있다).</summary>
@@ -162,6 +241,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_home.Clear();
         m_interactable = false;
         m_dragging = false;
+
+        // 등장 도중 걷어냈다면 레이어가 축소된 채 굳는다 — 다음 개봉이 그 상태를 물려받지 않게 되돌린다.
+        SnapEmerged();
     }
 
     public void OnBeginDrag(PointerEventData _e)
@@ -284,6 +366,17 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Vector2 HomeOf(PackCardView _view)
         => _view != null && m_home.TryGetValue(_view, out var t_home) ? t_home : Vector2.zero;
 
+    void CaptureLayerHome()
+    {
+        if (m_layerHomeCaptured || cardLayer == null) return;
+        m_layerHome = cardLayer.anchoredPosition;
+        m_layerScaleHome = cardLayer.localScale;
+        // PlayEmerge가 실제 목표로 덮어쓴다.
+        m_layerSettled = m_layerHome;
+        m_layerSettledScale = m_layerScaleHome;
+        m_layerHomeCaptured = true;
+    }
+
     void OnDisable()
     {
         // 연출 도중 비활성 시 좀비 트윈 정리 + 입력 상태 리셋(재활성 후 유령 드래그 방지).
@@ -294,6 +387,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
             if (m_dismissing[t_i] != null) Destroy(m_dismissing[t_i].gameObject);
         m_dismissing.Clear();
+
+        SnapEmerged();
 
         m_interactable = false;
         m_dragging = false;
