@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 03eaecd89875da847ad628bb0b11ff95
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/EnhanceBuffs/Buff_MPHealBlue/Materials/NullParticle.mat
+  uploadId: 755856

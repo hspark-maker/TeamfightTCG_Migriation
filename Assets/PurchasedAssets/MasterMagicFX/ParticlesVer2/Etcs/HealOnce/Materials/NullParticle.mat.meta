@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 577e99985aedb6644887d2c6014a1765
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Etcs/HealOnce/Materials/NullParticle.mat
+  uploadId: 755856

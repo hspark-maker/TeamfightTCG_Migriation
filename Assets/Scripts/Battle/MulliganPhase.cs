@@ -35,9 +35,17 @@ public static class MulliganPhase
         if (t_field.WaitingCount == 0) return;   // 교환할 덱 카드 없음 — no-op(양측 대칭).
 
         // 슬롯 선택: 후공이 플레이어면 사람 입력(스킵 가능), AI면 결정론 휴리스틱.
-        int t_slot = t_secondIsPlayer
-            ? await WaitPlayerSelect(t_field, _ctx, _ct)
-            : PickAiSlot(t_field);
+        int t_slot;
+        if (t_secondIsPlayer)
+        {
+            t_slot = await WaitPlayerSelect(t_field, _ctx, _ct);
+        }
+        else
+        {
+            t_slot = PickAiSlot(t_field);
+            // 상대(AI)가 멀리건을 쓴다는 사실을 잠깐 보여준다 — 안 그러면 카드가 이유 없이 바뀐 것처럼 보인다.
+            if (t_slot >= 0) await ShowAiNotice(t_field, t_slot, _ctx, _ct);
+        }
         if (t_slot < 0) return;   // 스킵/취소/무효 — 교환 없음(draw 미소비).
 
         // 무작위 덱 카드 인덱스(결정론). 슬롯 선택 확정 뒤 1회 소비.
@@ -113,6 +121,35 @@ public static class MulliganPhase
         return t_chosen;
     }
 
+    /// <summary>상대(AI) 멀리건 예고: 교체될 카드만 밝게+하이라이트하고 안내 문구를 잠깐 띄운다.
+    /// 순수 연출 — RNG 미소비, 상태 변경 없음(스왑은 호출부가 이 대기 후 수행). 취소 시 즉시 정리하고 빠진다.</summary>
+    static async UniTask ShowAiNotice(BattleField _field, int _slot, TurnContext _ctx, CancellationToken _ct)
+    {
+        CardView t_target = CardView.GetView(_field.GetSlot(_slot));
+
+        CardView.FadeAll(0.3f);
+        if (t_target != null)
+        {
+            CardView.FadeCards(1f, t_target);
+            t_target.SetHighlight(true);
+            t_target.PlayAttentionPulse();
+        }
+
+        var t_ui = new MulliganOverlay(_ctx?.turnLabel != null ? _ctx.turnLabel.font : null,
+            "상대가 카드를 교환합니다", _showSkip: false);
+        try
+        {
+            await UniTask.Delay((int)(GameTiming.Battle.MulliganNoticeHold * 1000), cancellationToken: _ct)
+                         .SuppressCancellationThrow();
+        }
+        finally
+        {
+            t_ui.Destroy();
+            if (t_target != null) t_target.SetHighlight(false);
+            CardView.RestoreAllFades();
+        }
+    }
+
     /// <summary>AI 후공 슬롯 선택(결정론, RNG 미소비). 가장 약한 카드(현재 hp 최소, 동률이면 낮은 슬롯) 교체.</summary>
     static int PickAiSlot(BattleField _field)
     {
@@ -134,7 +171,8 @@ public static class MulliganPhase
         readonly GameObject root;
         public bool SkipPressed { get; private set; }
 
-        public MulliganOverlay(TMP_FontAsset _font)
+        // _showSkip=false면 안내 문구만(상대 멀리건 예고처럼 입력이 없는 표시용).
+        public MulliganOverlay(TMP_FontAsset _font, string _message = "교환할 카드를 선택하세요", bool _showSkip = true)
         {
             EnsureEventSystem();
 
@@ -151,11 +189,11 @@ public static class MulliganPhase
             TMP_FontAsset t_f = _font != null ? _font : TMP_Settings.defaultFontAsset;
 
             // 안내 텍스트(상단).
-            CreateText("Instruction", "교환할 카드를 선택하세요", t_f, 48,
+            CreateText("Instruction", _message, t_f, 48,
                 new Vector2(0.5f, 1f), new Vector2(0f, -160f), new Vector2(900f, 120f));
 
             // 스킵 버튼(하단).
-            CreateSkipButton(t_f);
+            if (_showSkip) CreateSkipButton(t_f);
         }
 
         void CreateText(string _name, string _msg, TMP_FontAsset _font, float _size,

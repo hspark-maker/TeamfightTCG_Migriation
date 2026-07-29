@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 243b48ac15433af49979a65ccaa27bdb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Lasers/Laser_Yellow/Materials/Mat_YellowLaser_Wave.mat
+  uploadId: 755856

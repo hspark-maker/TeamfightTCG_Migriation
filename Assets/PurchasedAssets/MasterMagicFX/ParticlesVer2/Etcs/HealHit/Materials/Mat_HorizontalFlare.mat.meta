@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d2b8f12a3cc35114cb748a1247a68efe
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Etcs/HealHit/Materials/Mat_HorizontalFlare.mat
+  uploadId: 755856

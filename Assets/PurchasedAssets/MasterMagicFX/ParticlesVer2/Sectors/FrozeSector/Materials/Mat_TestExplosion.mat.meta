@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3b61a9c89fee84445be3ecb23b1419a4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Sectors/FrozeSector/Materials/Mat_TestExplosion.mat
+  uploadId: 755856

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 94f2755dfb25e874eb58f2fafc98bddf
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/SwordShoot/Materials/Mat_SwordShoot_BasicParticles.mat
+  uploadId: 755856

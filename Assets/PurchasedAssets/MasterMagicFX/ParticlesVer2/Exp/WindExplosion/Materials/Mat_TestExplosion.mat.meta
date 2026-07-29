@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b147d8c092260fb47a08c478dce4925b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Exp/WindExplosion/Materials/Mat_TestExplosion.mat
+  uploadId: 755856

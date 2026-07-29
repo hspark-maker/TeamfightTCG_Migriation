@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd5b4132bd603ae4f8e564208d3b0409, type: 3}
+  m_Name: BattleVfxLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::BattleVfxLibrary
+  entries:
+  - id: 1
+    prefab: {fileID: 6653574458408915337, guid: 4de4be9a8b431e0408056eb0ded4dd68, type: 3}
+    localOffset: {x: 0, y: -0.15, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 25
+    alignToDirection: 0
+  - id: 2
+    prefab: {fileID: 5865500980904363483, guid: 24bd12dd4dca10c48840972c3ae92522, type: 3}
+    localOffset: {x: 0, y: -0.1, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1
+    sortingOrder: 25
+    alignToDirection: 0
+  - id: 5
+    prefab: {fileID: 152564, guid: 38ab0c40c3b705e48b5dab95bb9927f3, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 30
+    alignToDirection: 0
+  - id: 4
+    prefab: {fileID: 194966, guid: dee124e64b251e947b79230a951ccada, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1
+    sortingOrder: 30
+    alignToDirection: 0
+  - id: 4
+    prefab: {fileID: 3993081043635493482, guid: feb549b44db8f2a47be7b333d8a2d3b1, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 30
+    alignToDirection: 1
+  healCurveHeight: 0.8
+  healAlternateCurve: 1

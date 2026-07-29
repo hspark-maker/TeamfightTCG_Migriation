@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b17410d4be42b8244985bcffe0b08e4a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/PurpleThinLaser/Materials/Mat_Laser_PurpleThin_Smoke.mat
+  uploadId: 755856

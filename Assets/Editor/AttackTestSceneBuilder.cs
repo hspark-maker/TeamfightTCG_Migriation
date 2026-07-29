@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 public static class AttackTestSceneBuilder
 {
     const string BattlePath = "Assets/Scenes/BattleScene.unity";
-    const string TestPath   = "Assets/Scenes/AttackTestScene.unity";
+    const string TestPath   = "Assets/Scenes/TEST/AttackTestScene.unity";
 
     static readonly string[] PlayerCardPaths =
     {

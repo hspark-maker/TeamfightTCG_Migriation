@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a55644633fa0fb6459efc1dd63237cac
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/ThickBlueLaser/Materials/Mat_Laser_ThickBlue_LaserMain.mat
+  uploadId: 755856

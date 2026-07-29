@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 35dd52c3caf702346a6cb5d2adbdaced
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/PurpleThinLaser/Materials/Mat_Laser_PurpleThin_BasicParticles.mat
+  uploadId: 755856

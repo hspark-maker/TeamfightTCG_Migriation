@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e0c8e1db2360c2e47a7d49ac6566bf28
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/PurpleAbsorbShoot/Materials/Mat_PurpleAbsorbShoot_BasicParticles.mat
+  uploadId: 755856
