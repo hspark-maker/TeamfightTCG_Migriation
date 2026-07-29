@@ -11,7 +11,7 @@ using UnityEngine.UI;
 //     ShellFront         ← 팩 앞면(카드 앞). 찢긴 구멍으로만 카드가 보인다.
 //   PackShadow           ← 바닥 그림자. 무대 밖에 두어야 팩만 뜬다.
 //
-// 축이 둘이다. Stage축은 팩과 카드를 함께 움직이고(등장·부유), Shell축은 껍데기만 움직인다(퇴장).
+// 축이 둘이다. Stage축은 팩과 카드를 함께 움직이고(등장·자리잡기·부유), Shell축은 껍데기만 움직인다(퇴장).
 // 카드를 빼낸 뒤 팩만 빠져나가는 장면이 Shell축으로 성립하고, 그동안 카드는 CardHost가 따로 몬다
 // — 한 노드를 두 연출이 함께 쓰지 않게 하려는 분리다.
 //
@@ -57,7 +57,7 @@ public class PackShellRig : MonoBehaviour
     [SerializeField] float settleSpeed = 12f;
 
     // ── 연출이 쓰는 축 ──────────────────────────────────────────
-    /// <summary>무대 오프셋(팩+카드 함께). 등장 트윈이 쓴다.</summary>
+    /// <summary>무대 오프셋(팩+카드 함께). 등장·자리잡기 트윈이 쓴다.</summary>
     public Vector2 StageOffset { get; set; }
     /// <summary>껍데기 오프셋(팩만). 퇴장 트윈이 쓴다.</summary>
     public Vector2 ShellOffset { get; set; }
@@ -71,6 +71,7 @@ public class PackShellRig : MonoBehaviour
     Vector3 m_stageHomeScale = Vector3.one;
     Vector3 m_backHomeScale = Vector3.one, m_frontHomeScale = Vector3.one;
     Vector2 m_backHome, m_frontHome;
+    Vector2 m_shadowHome;
     Vector3 m_shadowHomeScale = Vector3.one;
     float m_shadowHomeAlpha = 1f;
     bool m_homeCaptured;
@@ -189,10 +190,14 @@ public class PackShellRig : MonoBehaviour
     }
 
     // 뜰수록 그림자가 작아지고 옅어져야 "떠 있다"가 성립한다. 고정이면 팩은 벽에 붙은 스티커로 읽힌다.
+    //
+    // 자리는 무대 오프셋만 따라간다 — 부유는 따르지 않는다. 팩이 위아래로 흔들릴 때 그림자까지 같이 흔들리면
+    // 뜬 게 아니라 판 전체가 움직이는 그림이 되지만, 팩이 화면 아래로 옮겨 갈 때 그림자만 남으면 주인 없는 얼룩이 된다.
     void ApplyShadow(float _up01)
     {
         if (shadow == null) return;
 
+        shadow.anchoredPosition = m_shadowHome + StageOffset;
         shadow.localScale = m_shadowHomeScale * Mathf.Lerp(1f, shadowScaleAtTop, _up01);
 
         var t_g = shadow.GetComponent<Graphic>();
@@ -225,6 +230,7 @@ public class PackShellRig : MonoBehaviour
         if (shellBack != null)  { m_backHome  = shellBack.anchoredPosition;  m_backHomeScale  = shellBack.localScale; }
         if (shellFront != null) { m_frontHome = shellFront.anchoredPosition; m_frontHomeScale = shellFront.localScale; }
 
+        m_shadowHome = shadow != null ? shadow.anchoredPosition : Vector2.zero;
         m_shadowHomeScale = shadow != null ? shadow.localScale : Vector3.one;
 
         var t_g = shadow != null ? shadow.GetComponent<Graphic>() : null;

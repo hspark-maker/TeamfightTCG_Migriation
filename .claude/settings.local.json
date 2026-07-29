@@ -89,7 +89,10 @@
       "Bash(node -e \"console.log\\(process.version\\)\")",
       "Bash(node *)",
       "Bash(awk 'NR>=1780 && NR<=1800' Assets/Scenes/BattleScene.unity)",
-      "Bash(awk 'NR>=475 && NR<=600' Assets/Scenes/CardPack.unity)"
+      "Bash(awk 'NR>=475 && NR<=600' Assets/Scenes/CardPack.unity)",
+      "Bash(awk 'NR>=2570 && NR<=2660' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/m_Name: PackFront/,0' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/m_Name: PackLid/,0' Assets/Scenes/CardPack.unity)"
     ]
   },
   "enabledMcpjsonServers": [

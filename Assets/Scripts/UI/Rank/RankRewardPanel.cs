@@ -16,7 +16,14 @@ public class RankRewardPanel : MonoBehaviour
     [SerializeField] Button closeButton;
     [SerializeField] RankRewardClaimPopup claimPopup;
 
+    [Header("연출")]
+    [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
+    [SerializeField] PopupTransition transition = new PopupTransition();
+
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
+
+    // 행 생성 여부. 티어 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
+    bool m_built;
 
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩돼 있다 — 매개변수를 붙이면 배선이 끊긴다(진입점을 따로 추가할 것).
     public void Open()
@@ -56,6 +63,9 @@ public class RankRewardPanel : MonoBehaviour
     void OnDisable()
     {
         RankRewardManager.OnChanged -= this.RefreshRows;
+
+        // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
+        this.transition.HandleDisabled(this.ResolveTarget());
     }
 
     // 전투에서 넘어온 티어 상승을 소비해 자동으로 연다.
@@ -73,10 +83,15 @@ public class RankRewardPanel : MonoBehaviour
     // Open 경로 공통부. 스크롤 타겟만 호출자가 정한다.
     void OpenAt(int _scrollRow)
     {
-        this.SetVisible(true);
+        // 패널보다 먼저 닫는다 — 아직 화면에 없는 동안이라 팝업이 트윈 없이 즉시 정리된다(퇴장 중 열림 경합 차단).
         if (this.claimPopup != null) this.claimPopup.Hide();
 
-        this.Build();
+        this.SetVisible(true);
+
+        // 열 때마다 재생성하면 등장 첫 프레임에 20행 Destroy+Instantiate가 얹힌다 — 생성은 1회, 이후엔 표시만 갱신.
+        if (this.m_built) this.RefreshRows();
+        else this.Build();
+
         this.ScrollToRow(_scrollRow);
     }
 
@@ -104,6 +119,9 @@ public class RankRewardPanel : MonoBehaviour
             t_row.Bind(t_i, t_i == t_count - 1, this.OnRowClicked);
             this.m_rows.Add(t_row);
         }
+
+        // 행이 하나도 안 나왔으면(설정 미주입 등) 다음 열기에서 다시 시도한다 — 빈 패널로 세션 내내 고착되지 않게.
+        this.m_built = t_count > 0;
     }
 
     // 수령 통지 → 전 행 재바인딩(수령한 행 = 완료, 다음 행 = 수령 가능). 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
@@ -128,10 +146,11 @@ public class RankRewardPanel : MonoBehaviour
     }
 
     // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshRows를 유발한다.
-    void Claim(int _tierIndex)
+    // 팝업 닫기는 여기서 하지 않는다 — 팝업이 이 반환값을 보고 연출 여부를 정한 뒤 스스로 닫는다.
+    // 반환값을 버리면 팝업이 뜬 사이 상태가 바뀌어 가드에 걸렸을 때 안 준 골드를 준 것처럼 연출한다.
+    bool Claim(int _tierIndex)
     {
-        RankRewardManager.Claim(_tierIndex);
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        return RankRewardManager.Claim(_tierIndex);
     }
 
     // 지정한 행으로 스크롤. 레이아웃이 확정되기 전에 세팅하면 무시되므로 강제 리빌드 후 적용한다.
@@ -153,9 +172,12 @@ public class RankRewardPanel : MonoBehaviour
         this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - t_ratio);
     }
 
+    // 오버레이는 항상 활성이고 root만 토글되므로 이 뷰의 OnDisable은 열고 닫아도 오지 않는다 —
+    // 재진입마다 트윈을 걷고 시작값을 다시 잡는 PopupTransition 쪽 처리가 실질 방어선이다.
     void SetVisible(bool _visible)
     {
-        var t_target = this.root != null ? this.root : this.gameObject;
-        t_target.SetActive(_visible);
+        this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
+
+    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

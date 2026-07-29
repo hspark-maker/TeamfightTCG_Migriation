@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;   // 분출 시퀀스의 OnComplete·Play 확장 메서드
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,10 +15,17 @@ public class RankRewardClaimPopup : MonoBehaviour
     [SerializeField] TMP_Text amountText; // 보상 금액("x100")
     [SerializeField] Button claimButton;  // [획득]
 
-    // 확인 콜백. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
-    Action m_onConfirm;
+    [Header("연출")]
+    [SerializeField] PopupTransition transition = new PopupTransition();
 
-    public void Show(RankRewardInfo _info, Action _onConfirm)
+    [Tooltip("수령 코인 분출(선택). 미배선이면 지급 즉시 닫는다.\n" +
+             "팝업 root 하위에 배선하면 Hide와 함께 꺼져 CoinBurstEffect.OnDisable이 코인을 걷는다 — 반드시 팝업 밖 노드에 둘 것.")]
+    [SerializeField] CoinBurstEffect claimBurst;
+
+    // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
+    Func<bool> m_onConfirm;
+
+    public void Show(RankRewardInfo _info, Func<bool> _onConfirm)
     {
         this.m_onConfirm = _onConfirm;
 
@@ -40,6 +48,13 @@ public class RankRewardClaimPopup : MonoBehaviour
         this.SetVisible(false);
     }
 
+    // 팝업은 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리와 표시 원복을 여기서 위임한다.
+    // 분출 시퀀스는 죽이지 않는다(팝업 밖 노드에서 도는 연출이라 끊으면 코인이 허공에 굳는다).
+    void OnDisable()
+    {
+        this.transition.HandleDisabled(this.ResolveTarget());
+    }
+
     void OnClaimClicked()
     {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
@@ -48,12 +63,26 @@ public class RankRewardClaimPopup : MonoBehaviour
 
         if (this.claimButton != null) this.claimButton.interactable = false;
 
-        t_callback?.Invoke();
+        // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
+        bool t_granted = t_callback != null && t_callback.Invoke();
+
+        // 실패(팝업이 뜬 사이 상태가 바뀌어 가드에 걸림)면 줄 것이 없으니 연출도 없다.
+        if (!t_granted || this.claimBurst == null)
+        {
+            this.Hide();
+            return;
+        }
+
+        // BuildBurst는 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
+        var t_burst = this.claimBurst.BuildBurst(null);
+        t_burst.OnComplete(this.Hide);
+        t_burst.Play();
     }
 
     void SetVisible(bool _visible)
     {
-        var t_target = this.root != null ? this.root : this.gameObject;
-        t_target.SetActive(_visible);
+        this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
+
+    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

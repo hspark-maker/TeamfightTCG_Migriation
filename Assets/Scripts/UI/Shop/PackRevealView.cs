@@ -5,10 +5,14 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 카드팩 개봉 연출의 진행자. 스테이지를 순서대로 몰고 가며, 각 단계의 실제 조작·표현은
-// PackTearHandle(찢기 제스처) · PackTearSkin(찢김 그림) · PackShellRig(팩의 몸짓) ·
+// PackTearHandle(스와이프 제스처) · PackTearSkin(찢김 그림) · PackShellRig(팩의 몸짓) ·
 // PackCardStack(카드 더미)이 나눠 맡는다.
 //
-// 흐름: 입장 → 찢기(가로로 그어) → 뽑기(뭉치째 솟아오름) → 한 장씩 밀어내기 → 결과 격자 → OnRevealComplete.
+// 흐름: 입장 → 스와이프 대기 → 자리잡기(팩이 화면 아래로) → 씰 찢기 → 뽑기(뭉치째 솟아오름)
+//       → 한 장씩 밀어내기 → 결과 격자 → OnRevealComplete.
+//
+// 유저가 손을 대는 지점은 둘뿐이다 — 개봉을 여는 스와이프 한 번과, 그 뒤 카드를 넘기는 스와이프.
+// 그 사이(자리잡기 → 씰 찢기 → 뽑기)는 손을 떼는 순간 끊기지 않고 자동으로 이어진다.
 //
 // 이 연출의 전제는 단 하나 — 카드는 처음부터 팩 속에 들어 있다.
 //   BeginOpen 시점에 더미를 만들어 팩 앞뒷면 사이에 끼워 두고(PlaceInsidePack), 그 뒤로는 아무것도 "등장"시키지 않는다.
@@ -28,11 +32,11 @@ public class PackRevealView : MonoBehaviour
     public event Action OnRevealComplete;
 
     // 어느 씬의 어느 뷰든 팩이 열린 순간 발화(구독자는 씬 참조 없이 개봉 시점을 알 수 있다).
-    // 발화 시점은 "팩이 열린 순간" = 찢기 확정. 튜토리얼이 물려 있어 의미를 옮기지 않는다.
+    // 발화 시점은 "팩이 열린 순간" = 스와이프 확정. 튜토리얼이 물려 있어 의미를 옮기지 않는다.
     public static event Action OnAnyPackOpened;
 
     [Header("팩")]
-    [SerializeField] PackTearHandle tearHandle;    // 찢기 제스처
+    [SerializeField] PackTearHandle tearHandle;    // 개봉을 여는 스와이프 제스처
     [SerializeField] PackTearSkin tearSkin;        // 찢김 그림(구멍·조각·그늘·빛)
     [SerializeField] PackShellRig shellRig;        // 팩의 몸짓(등장·부유·퇴장)
 
@@ -48,10 +52,23 @@ public class PackRevealView : MonoBehaviour
     [Tooltip("팩 속에 있을 때의 더미 배율. 팩 안쪽 폭에 겨우 들어갈 만큼만 줄인다 " +
              "— 최종 크기와 갭이 크면 \"뽑혔다\"가 아니라 \"커졌다\"로 읽힌다.")]
     [Range(0.3f, 1f)] [SerializeField] float cardInPackScale = 0.8f;
-    [Tooltip("뽑혀 나온 더미가 정착하는 중심(무대 로컬 = 캔버스 참조px). 팩 속 위치와의 차이가 곧 " +
-             "\"뽑혀 나온 거리\"다 — 차이가 없으면 팩만 내려가고 더미는 제자리인 그림이 된다. " +
-             "다만 카드가 1376x1926로 커서 y가 ~597를 넘으면 윗변이 화면 밖으로 나간다.")]
-    [SerializeField] Vector2 cardEmergeCenter = new Vector2(0f, 500f);
+    [Tooltip("뽑혀 나온 더미가 정착하는 중심(화면 기준 = 캔버스 참조px, 0,0이 화면 한가운데). " +
+             "팩은 화면 아래에 잠겨 있고 더미는 여기까지 올라온다 — 둘의 거리가 곧 \"뽑혀 나온 거리\"다. " +
+             "카드가 1376x1926로 커서 y가 ~597를 넘으면 윗변이 화면 밖으로 나간다.")]
+    [SerializeField] Vector2 cardEmergeCenter = Vector2.zero;
+
+    [Header("자리잡기 (스와이프 직후)")]
+    [Tooltip("스와이프가 확정되면 팩이 여기로 옮겨 간다(무대 오프셋, 캔버스 참조px). " +
+             "팩 아래쪽이 화면 밖으로 조금 잠길 만큼 내려야 \"손에 쥔 팩에서 뽑아 올린다\"가 성립한다. " +
+             "카드는 아직 팩 속이라 무대째 함께 내려간다 — 따로 움직이면 그 순간 \"속에 들어 있다\"가 깨진다.")]
+    [SerializeField] Vector2 packOpenOffset = new Vector2(0f, -900f);
+    [SerializeField] float packShiftDuration = 0.4f;
+    [Tooltip("자리를 잡고 봉인이 찢기기까지의 뜸. 팩이 멈춘 것을 눈이 확인할 틈이다.")]
+    [SerializeField] float packShiftHold = 0.1f;
+
+    [Header("씰 찢기")]
+    [Tooltip("봉인이 저절로 그어지는 시간. 스와이프는 방아쇠일 뿐이고 찢김은 여기서 자동으로 진행된다.")]
+    [SerializeField] float sealTearDuration = 0.45f;
 
     [Header("뽑기")]
     [Tooltip("봉인이 다 뜯긴 뒤 팩과 더미가 움직이기까지의 뜸. 조각이 날아가 화면에서 빠질 틈을 준다.")]
@@ -93,12 +110,14 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] PackResultGrid resultGrid;
     [SerializeField] Button skipButton;            // 명시적 건너뛰기(찢기 단계에서도 빠져나갈 수 있게)
 
-    [Tooltip("찢기 대기 중에만 보이는 씬 안내(\"옆으로 그어 뜯기\"). 뜯김 확정 시 사라진다. 미배선이면 안내 없음.")]
+    [Tooltip("스와이프 대기 중에만 보이는 씬 안내(\"옆으로 그어 열기\"). 스와이프 확정 시 사라진다. 미배선이면 안내 없음.")]
     [SerializeField] CanvasGroup tearHint;         // RevealPanel 바깥에 두어야 한다 — 그 패널은 입력을 막고 있다
     [SerializeField] float tearHintFade = 0.2f;
 
-    // Idle → Entering(팩 등장) → Tearing(그어 찢기) → Pulling(뭉치째 뽑기) → Flicking(넘기기) → Summary.
-    enum EStage { Idle, Entering, Tearing, Pulling, Flicking, Summary }
+    // Idle → Entering(팩 등장) → Swipe(그어 열기 대기) → Shifting(팩이 화면 아래로 자리잡기)
+    // → Tearing(씰이 저절로 찢김) → Pulling(뭉치째 뽑기) → Flicking(넘기기) → Summary.
+    // Swipe만 유저 입력을 기다린다 — Shifting부터 Pulling까지는 한 흐름으로 자동 진행된다.
+    enum EStage { Idle, Entering, Swipe, Shifting, Tearing, Pulling, Flicking, Summary }
 
     EStage m_stage = EStage.Idle;
 
@@ -219,7 +238,7 @@ public class PackRevealView : MonoBehaviour
         if (shellRig == null)
         {
             Debug.LogWarning("[PackRevealView] shellRig 미배선 → 등장 생략.");
-            EnterTearing();
+            EnterSwipe();
             return;
         }
 
@@ -231,19 +250,19 @@ public class PackRevealView : MonoBehaviour
             .SetLink(gameObject)
             .Append(DOTween.To(() => shellRig.StageOffset, _v => shellRig.StageOffset = _v, Vector2.zero, packEnterDuration)
                 .SetEase(Ease.OutBack))
-            .OnComplete(EnterTearing);
+            .OnComplete(EnterSwipe);
     }
 
-    // 찢기: 유저가 가로로 그어 봉인을 찢을 때까지 기다린다(시간 기반 아님).
-    // 그어지는 만큼 구멍이 벌어지고 그 너머로 카드 끝이 드러난다 — 표현은 전부 PackTearSkin이 그린다.
-    void EnterTearing()
+    // 스와이프 대기: 유저가 가로로 그을 때까지 기다린다(시간 기반 아님).
+    // 긋는 동안에는 아무것도 찢기지 않는다 — 제스처는 개봉의 방아쇠일 뿐이다.
+    void EnterSwipe()
     {
-        m_stage = EStage.Tearing;
+        m_stage = EStage.Swipe;
 
         if (tearHandle == null)
         {
             // 제스처 미배선: 소프트락을 만들지 않고 바로 다음 단계로.
-            Debug.LogWarning("[PackRevealView] tearHandle 미배선 → 찢기 생략.");
+            Debug.LogWarning("[PackRevealView] tearHandle 미배선 → 스와이프 생략.");
             HandleTorn();
             return;
         }
@@ -252,11 +271,66 @@ public class PackRevealView : MonoBehaviour
         SetTearHint(true);
     }
 
-    // 찢김 확정 → 뽑기.
+    // 스와이프 확정 → 자리잡기.
     void HandleTorn()
     {
-        if (m_stage != EStage.Tearing) return;
-        EnterPulling();
+        if (m_stage != EStage.Swipe) return;
+        EnterShifting();
+    }
+
+    // 자리잡기: 팩이 화면 아래로 내려가 뽑기 자세를 잡는다. 아래쪽이 화면 밖으로 조금 잠기는 자리다.
+    // 카드는 아직 팩 속이므로 무대(Stage축)를 통째로 옮긴다 — 껍데기만 옮기면 카드가 제자리에 남아 팩 밖으로 드러난다.
+    //
+    // 여기서 개봉을 알리는 이유: 유저가 손을 뗀 순간이 곧 "팩이 열렸다"이고,
+    // 그 뒤는 되돌릴 수 없는 자동 흐름이다 — 씰이 찢길 때까지 미루면 신호가 연출 길이만큼 늦어진다.
+    void EnterShifting()
+    {
+        if (m_stage != EStage.Swipe) return;
+        m_stage = EStage.Shifting;
+
+        AnnounceOpened();
+        SetTearHint(false);
+
+        if (shellRig == null)
+        {
+            Debug.LogWarning("[PackRevealView] shellRig 미배선 → 자리잡기 생략.");
+            EnterTearing();
+            return;
+        }
+
+        shellRig.SetIdle(false);   // 자리를 옮기는 동안 부유가 겹치면 목표 지점이 흔들린다.
+
+        KillStageSeq();
+        m_stageSeq = DOTween.Sequence()
+            .SetLink(gameObject)
+            .Append(DOTween.To(() => shellRig.StageOffset, _v => shellRig.StageOffset = _v, packOpenOffset, packShiftDuration)
+                .SetEase(Ease.OutCubic))
+            .AppendInterval(packShiftHold)
+            .OnComplete(EnterTearing);
+    }
+
+    // 씰 찢기: 자리를 잡은 팩의 봉인이 저절로 그어진다. 그어지는 만큼 구멍이 벌어지고
+    // 그 너머로 카드 끝이 드러난다 — 표현은 전부 PackTearSkin이 그린다(여기서는 진행도만 민다).
+    void EnterTearing()
+    {
+        if (m_stage != EStage.Shifting) return;
+        m_stage = EStage.Tearing;
+
+        if (tearSkin == null)
+        {
+            Debug.LogWarning("[PackRevealView] tearSkin 미배선 → 씰 찢기 생략.");
+            EnterPulling();
+            return;
+        }
+
+        KillStageSeq();
+        float t_progress = 0f;
+        m_stageSeq = DOTween.Sequence()
+            .SetLink(gameObject)
+            // InCubic — 처음엔 버티다 끝에서 쭉 갈라진다. 등속이면 찢김이 아니라 게이지가 차는 것으로 읽힌다.
+            .Append(DOTween.To(() => t_progress, _v => { t_progress = _v; tearSkin.SetProgress(_v); }, 1f, sealTearDuration)
+                .SetEase(Ease.InCubic))
+            .OnComplete(EnterPulling);
     }
 
     // 뽑기: 뜯긴 조각이 먼저 화면 밖으로 날아가 길을 비우고, 그다음 팩이 아래로·더미가 위로 동시에 미끄러진다.
@@ -265,14 +339,10 @@ public class PackRevealView : MonoBehaviour
     //   따로 재생하면 스킵 후 팩만 화면에 남는 상태가 생긴다.
     void EnterPulling()
     {
-        // 찢김 확정과 "찢기 단계 스킵"이 겹쳐도 뽑기가 두 번 재생되지 않게(조각 비산·카드 솟기 중복 방지).
+        // 씰 찢기 완료와 "찢기 단계 스킵"이 겹쳐도 뽑기가 두 번 재생되지 않게(조각 비산·카드 솟기 중복 방지).
         if (m_stage != EStage.Tearing) return;
         m_stage = EStage.Pulling;
 
-        AnnounceOpened();     // 봉인이 다 뜯긴 순간 = 팩이 열린 시점(튜토리얼이 이 신호를 기다린다).
-        SetTearHint(false);
-
-        if (shellRig != null) shellRig.SetIdle(false);   // 뽑는 손맛이 부유에 흔들리지 않게.
         if (burstEffect != null) burstEffect.Play();
         if (shakeTarget != null)
         {
@@ -295,7 +365,10 @@ public class PackRevealView : MonoBehaviour
         // 아래쪽은 팩 앞면이 계속 가리므로, 그동안 카드는 입구에서 빠져나오는 것으로 보인다.
         if (cardStack != null)
         {
-            var t_pull = cardStack.PlayEmerge(cardEmergeCenter, cardPullDuration);
+            // 목표는 화면 기준으로 잡되, 무대가 자리잡기로 내려간 만큼을 빼서 무대 로컬로 되돌린다 —
+            // 카드는 무대의 자식이라 이미 그만큼 함께 내려가 있다. 빼지 않으면 팩을 내린 만큼 더미가 위로 뜬다.
+            var t_stageOffset = shellRig != null ? shellRig.StageOffset : Vector2.zero;
+            var t_pull = cardStack.PlayEmerge(cardEmergeCenter - t_stageOffset, cardPullDuration);
             if (t_pull != null) m_stageSeq.Insert(cardPullDelay, t_pull);
         }
 
@@ -382,15 +455,17 @@ public class PackRevealView : MonoBehaviour
         switch (m_stage)
         {
             case EStage.Entering:
+            case EStage.Shifting:
+            case EStage.Tearing:
             case EStage.Pulling:
                 // Complete(true)면 OnComplete가 실행되며 다음 단계로 이어진다.
                 if (m_stageSeq != null && m_stageSeq.IsActive()) m_stageSeq.Complete(true);
                 break;
 
-            case EStage.Tearing:
-                // 손으로 긋는 대신 즉시 다 뜯긴 상태로 만들고 뽑기로 넘어간다.
-                if (tearHandle != null) tearHandle.ForceTornInstant();
-                EnterPulling();
+            case EStage.Swipe:
+                // 그은 셈 치고 자동 흐름을 연다 — 스킵이 개봉 자체를 건너뛰지는 않는다.
+                if (tearHandle != null) tearHandle.Disarm();
+                EnterShifting();
                 break;
 
             case EStage.Flicking:
@@ -406,9 +481,9 @@ public class PackRevealView : MonoBehaviour
     {
         KillStageSeq();
 
-        if (tearHandle != null) tearHandle.ForceTornInstant();
+        if (tearHandle != null) tearHandle.Disarm();
 
-        // 뽑기 전(입장·찢기)에서 요약으로 직행하면 EnterPulling을 거치지 않는다 —
+        // 스와이프 전에 요약으로 직행하면 EnterShifting을 거치지 않는다 —
         // 팩이 열렸다는 사실은 연출을 건너뛰어도 참이므로 여기서 보장한다(튜토리얼이 이 신호를 기다린다).
         AnnounceOpened();
         SetTearHint(false, true);

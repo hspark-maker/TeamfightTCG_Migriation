@@ -2309,7 +2309,11 @@ MonoBehaviour:
   cardStack: {fileID: 497097069}
   cardInPackCenter: {x: 0, y: 219}
   cardInPackScale: 0.8
-  cardEmergeCenter: {x: 0, y: 500}
+  cardEmergeCenter: {x: 0, y: 0}
+  packOpenOffset: {x: 0, y: -1200}
+  packShiftDuration: 0.4
+  packShiftHold: 0.1
+  sealTearDuration: 0.45
   cardPullDelay: 0.12
   cardPullDuration: 0.55
   burstEffect: {fileID: 0}
@@ -2568,13 +2572,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2f8782e43f9b70418a7ec103910e3c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PackTearHandle
-  skin: {fileID: 1903978948}
   tearScreenRatio: 0.55
   commitThreshold: 0.45
   flickSpeed: 1400
   flickMinProgress: 0.15
   deadZone: 12
-  finishDuration: 0.22
   rewindDuration: 0.28
 --- !u!114 &1903978947
 MonoBehaviour:

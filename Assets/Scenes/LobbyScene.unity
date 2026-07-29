@@ -640,7 +640,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &97104068
 RectTransform:
   m_ObjectHideFlags: 0
@@ -855,6 +855,10 @@ PrefabInstance:
     - target: {fileID: 5503725279446131139, guid: 67bdefa60b0964c869b4ee933565ad3f, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5503725279613658547, guid: 67bdefa60b0964c869b4ee933565ad3f, type: 3}
+      propertyPath: m_Enabled
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5503725279613658558, guid: 67bdefa60b0964c869b4ee933565ad3f, type: 3}
       propertyPath: m_Pivot.x
@@ -6242,6 +6246,11 @@ MonoBehaviour:
   rowPrefab: {fileID: 2277039532059551791, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
   closeButton: {fileID: 367333792}
   claimPopup: {fileID: 1562381567}
+  panel: {fileID: 0}
+  openDuration: 0.28
+  closeDuration: 0.18
+  openFromScale: 0.92
+  closeToScale: 0.92
 --- !u!1001 &664862926
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14037,7 +14046,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1503635145
 RectTransform:
   m_ObjectHideFlags: 0
@@ -14519,6 +14528,12 @@ MonoBehaviour:
   titleText: {fileID: 1796689652}
   amountText: {fileID: 1338157299}
   claimButton: {fileID: 1152996422}
+  panel: {fileID: 0}
+  claimBurst: {fileID: 0}
+  openDuration: 0.25
+  closeDuration: 0.15
+  openFromScale: 0.9
+  closeToScale: 0.9
 --- !u!1 &1565021131
 GameObject:
   m_ObjectHideFlags: 0
