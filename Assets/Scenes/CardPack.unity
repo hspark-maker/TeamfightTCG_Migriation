@@ -1999,6 +1999,7 @@ GameObject:
   - component: {fileID: 1683600891}
   - component: {fileID: 1683600893}
   - component: {fileID: 1683600892}
+  - component: {fileID: 1683600894}
   m_Layer: 0
   m_Name: Dim
   m_TagString: Untagged
@@ -2063,6 +2064,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1683600890}
   m_CullTransparentMesh: 1
+--- !u!114 &1683600894
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1683600890}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc6f6cdc7771dcc478abbb64823491b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PackScreenFlash
+  dim: {fileID: 1683600892}
+  flashColor: {r: 0.28, g: 0.34, b: 0.52, a: 1}
+  riseDuration: 0.1
+  fallDuration: 0.4
 --- !u!1 &1703803931
 GameObject:
   m_ObjectHideFlags: 0
@@ -2191,6 +2208,7 @@ MonoBehaviour:
   packExitTilt: -9
   packExitBack: 0.5
   revealPanel: {fileID: 130962628}
+  newCardFlash: {fileID: 1683600894}
   totalRefundText: {fileID: 1376200665}
   summaryGroup: {fileID: 1535240951}
   resultGrid: {fileID: 1535240953}
@@ -2468,7 +2486,7 @@ MonoBehaviour:
   glowAlphaMin: 0.18
   glowAlphaMax: 0.34
   glowSpinPeriod: 24
-  glowFadeSpeed: 3.5
+  glowFadeDuration: 0.4
   tearHandle: {fileID: 1903978946}
   settleSpeed: 12
 --- !u!114 &1903978948

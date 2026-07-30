@@ -54,9 +54,10 @@ public class PackShellRig : MonoBehaviour
              "⚠ 광채 노드의 rect가 정사각이어야 한다. 가로세로가 다르면 늘어난 타원이 통째로 도는 게 보여 " +
              "빛살이 도는 게 아니라 후광이 흔들리는 것으로 읽힌다.")]
     [SerializeField] float glowSpinPeriod = 24f;
-    [Tooltip("개봉이 시작되면(자리잡기) 광채가 걷히는 속도(초당 비율). settleSpeed보다 느리게 잡아야 " +
-             "팩이 내려가는 동안 빛이 뒤따라 사그라든다 — 같이 빠르면 빛만 먼저 사라져 팩이 맨몸으로 움직인다.")]
-    [SerializeField] float glowFadeSpeed = 3.5f;
+    [Tooltip("개봉이 시작되면(자리잡기) 광채가 완전히 걷히는 데 걸리는 시간(초). " +
+             "PackRevealView의 packShiftDuration과 맞춰야 빛이 꺼지는 것과 팩이 내려가는 것이 한 동작으로 읽힌다 — " +
+             "길면 팩이 다 내려간 뒤에도 빛이 남고, 짧으면 빛만 먼저 꺼져 팩이 맨몸으로 움직인다.")]
+    [SerializeField] float glowFadeDuration = 0.4f;
 
     [Header("연결")]
     [Tooltip("뜯기 진행도를 구독해 손가락이 닿은 동안 아이들을 멈춘다. 미배선이면 항상 동작.")]
@@ -171,8 +172,14 @@ public class PackShellRig : MonoBehaviour
         m_settle = Mathf.Lerp(m_settle, t_target, 1f - Mathf.Exp(-settleSpeed * t_dt));
 
         // 광채만 IdleRunning이 아니라 m_idleAllowed를 따른다(m_glowFade 선언부 주석 참고).
+        //
+        // ⚠ 위 m_settle과 달리 지수 감쇠를 쓰지 않는다. 지수는 0에 닿지 않아 꼬리가 남는데,
+        //   그 꼬리가 곧 "팩은 이미 다 내려갔는데 빛만 늦게 꺼진다"로 보인다.
+        //   여기 필요한 것은 부드러운 수렴이 아니라 이동과 같은 시각에 끝나는 유한한 시간이라 등속으로 민다.
         float t_glowTarget = m_idleAllowed ? 1f : 0f;
-        m_glowFade = Mathf.Lerp(m_glowFade, t_glowTarget, 1f - Mathf.Exp(-glowFadeSpeed * t_dt));
+        m_glowFade = glowFadeDuration > 0.001f
+            ? Mathf.MoveTowards(m_glowFade, t_glowTarget, t_dt / glowFadeDuration)
+            : t_glowTarget;
 
         Apply();
     }
