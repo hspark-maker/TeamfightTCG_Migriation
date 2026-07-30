@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   displayName: "\uCC0C\uB9BF\uD540 3"
   keywords: 4
-  maxHp: 5
+  maxHp: 7
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
@@ -35,6 +35,7 @@ MonoBehaviour:
   defaultEvolutionStage: 3
   appearCinematic: {fileID: 32900000, guid: e548ea1c2cc017e49a1ec1843b00bd89, type: 3}
   cinemaAttackStyle: 1
+  cinemaOrbPrefab: {fileID: 8379521604733118929, guid: b0bea5251d594d62974930fcb29b4cdd, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 11400000, guid: 77b6d36e1a62ff546919cdb5f5771344, type: 2}

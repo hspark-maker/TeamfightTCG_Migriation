@@ -45,10 +45,12 @@ public class CardView : MonoBehaviour
     [SerializeField] TMP_Text damagePreviewText;
     [SerializeField] TMP_Text nameText;
     [SerializeField] SpriteRenderer illustration;
-    [SerializeField] GameObject faceDownOverlay;
-    // 뒷면일 때 일러스트 자리에 대신 깔리는 그림(덱 뒷면). 미배선이면 앞면 그림이 그대로 남는다 —
-    // faceDownOverlay만으로 가려지는 프리팹도 있어 여기선 "있으면 쓴다"로 둔다.
+    // 뒷면일 때 일러스트 자리에 대신 깔리는 그림(덱 뒷면). 미배선이면 앞면 그림이 그대로 남는다.
     [SerializeField] Sprite cardBackSprite;
+    // 뒷면일 때 통째로 숨기는 것들: 카드 테두리(키워드 프레임 포함)와 이름·체력 표시.
+    // 뒷면은 "덱에 꽂힌 카드 한 장"이라 앞면 장식이 하나라도 남으면 반쯤 뒤집힌 것처럼 보인다.
+    [SerializeField] GameObject frameRoot;
+    [SerializeField] GameObject infoRoot;
     [SerializeField] GameObject emptyOverlay;
 
     [Header("Highlight / Glow")]
@@ -998,7 +1000,7 @@ public class CardView : MonoBehaviour
 
         if (t_isEmpty)
         {
-            this.faceDownOverlay.SetActive(false);
+            SetFaceDownLook(false);
             SetupWeapon(null);
             RefreshKeywordIcons(null);   // 빈 슬롯: 아이콘 없음.
             RefreshKeywordFrames(null);
@@ -1007,25 +1009,67 @@ public class CardView : MonoBehaviour
         }
 
         bool t_isFaceDown = !_card.isRevealed;
-        this.faceDownOverlay.SetActive(t_isFaceDown);
 
         if (t_isFaceDown) SetHpDisplay("?", "");
         else SetHpDisplay(_card.hp.ToString(), _card.bonusHp > 0 ? $"+{_card.bonusHp}" : "");
         this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
 
-        // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 오버레이 틈으로 비친다.
-        if (this.illustration != null)
-        {
-            if (t_isFaceDown && this.cardBackSprite != null)
-                this.illustration.sprite = this.cardBackSprite;
-            else if (!t_isFaceDown && _card.data.battleImage != null)
-                this.illustration.sprite = _card.data.battleImage;
-        }
+        // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
+        if (this.illustration != null && !t_isFaceDown && _card.data.battleImage != null)
+            this.illustration.sprite = _card.data.battleImage;
+
+        SetFaceDownLook(t_isFaceDown);
 
         SetupWeapon(_card.data);
         RefreshKeywordIcons(_card);   // 뒷면 은닉·표시 대상 판정은 RefreshKeywordIcons 안에서.
         RefreshKeywordFrames(_card);
         RefreshSynergyBadges(_synergy);
+    }
+
+    Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
+    bool    illustrationScaleCached;
+
+    /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
+    ///
+    /// 뒷면 그림은 카드 아트와 원본 크기가 달라(덱 더미용 이미지) 그대로 넣으면 카드 밖으로 삐져나온다.
+    /// 그래서 **테두리 높이에 맞춰 스케일을 계산**한다 — 매직넘버를 두면 뒷면 이미지를 교체할 때마다 어긋난다.</summary>
+    void SetFaceDownLook(bool _faceDown)
+    {
+        if (!this.illustrationScaleCached && this.illustration != null)
+        {
+            this.illustrationBaseScale  = this.illustration.transform.localScale;
+            this.illustrationScaleCached = true;
+        }
+
+        if (this.frameRoot != null) this.frameRoot.SetActive(!_faceDown);
+        if (this.infoRoot  != null) this.infoRoot.SetActive(!_faceDown);
+
+        if (this.illustration == null) return;
+
+        if (!_faceDown || this.cardBackSprite == null)
+        {
+            this.illustration.transform.localScale = this.illustrationBaseScale;
+            return;
+        }
+
+        this.illustration.sprite = this.cardBackSprite;
+        this.illustration.transform.localScale = FitBackScale();
+    }
+
+    /// <summary>뒷면 그림을 카드 테두리 높이에 맞추는 로컬 스케일. 테두리가 없으면 원래 스케일 유지.</summary>
+    Vector3 FitBackScale()
+    {
+        SpriteRenderer t_frame = this.frameRoot != null ? this.frameRoot.GetComponent<SpriteRenderer>() : null;
+        if (t_frame == null || t_frame.sprite == null) return this.illustrationBaseScale;
+
+        float t_target  = t_frame.sprite.bounds.size.y * t_frame.transform.lossyScale.y;
+        Transform t_parent = this.illustration.transform.parent;
+        float t_parentY = t_parent != null ? t_parent.lossyScale.y : 1f;
+        float t_natural = this.cardBackSprite.bounds.size.y * t_parentY;
+        if (t_natural <= 0.0001f) return this.illustrationBaseScale;
+
+        float t_k = t_target / t_natural;
+        return new Vector3(t_k, t_k, this.illustrationBaseScale.z);
     }
 
     void SetupWeapon(CardData _data)
@@ -1484,9 +1528,25 @@ public class CardView : MonoBehaviour
     /// **공격 시네마와 같은 축을 쓴다**(같은 에너지 구체를 공유하는 한 몸 연출이라 배선을 갈라두지 않는다).
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => this.boundCard?.data != null && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash
+        => UsesOrbAppear
             ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
             : this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+
+    /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
+    /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
+    ///
+    /// 구체 등장(EnergyOrbCurve)은 쪼갤 지점이 없다 — 카드가 중앙에 서는 구간 자체가 없고 구체가 날아온다.
+    /// 그래서 앞 토막은 무동작이고 뒤 토막이 통째로 구체 연출을 돌린다(컷씬 뒤에 등장하는 순서는 같다).</summary>
+    public UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+        => UsesOrbAppear ? UniTask.CompletedTask : this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+
+    public UniTask PlayDealToSlot(Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+        => UsesOrbAppear
+            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
+            : this.cardAnim.PlayDealToSlot(_dest, _duration);
+
+    bool UsesOrbAppear => this.boundCard?.data != null
+                       && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;
 
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();

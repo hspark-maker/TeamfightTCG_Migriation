@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
-  m_Name: 깜밤이 3
+  m_Name: "\uAE5C\uBC24\uC774 3"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  displayName: 깜밤이 3
+  displayName: "\uAE5C\uBC24\uC774 3"
   keywords: 8
-  maxHp: 3
+  maxHp: 7
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: a59a9ebdd6705f84fac97090c1cc310e, type: 2}
@@ -34,6 +34,8 @@ MonoBehaviour:
     battleImage: {fileID: 0}
   defaultEvolutionStage: 3
   appearCinematic: {fileID: 32900000, guid: 56e33f7a820755e4d810ac84483ead98, type: 3}
+  cinemaAttackStyle: 1
+  cinemaOrbPrefab: {fileID: 4345869209838094697, guid: 6e4443a71e3c1314390feb7dd3b4b29a, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}

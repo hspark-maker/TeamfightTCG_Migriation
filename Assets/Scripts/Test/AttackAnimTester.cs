@@ -249,8 +249,11 @@ public class AttackAnimTester : MonoBehaviour
 
         await CunningVfx.PlayExit(t_cv);
 
+        // 교대 카드 등장분. 테스터엔 대기 큐가 없어 같은 카드가 앞면으로 되돌아오며 들어온다.
         t_card.isRevealed = true;
         if (t_cv != null) t_cv.Render(t_card);
+        await CunningVfx.PlayEnter(t_cv);
+
         this.busy = false;
     }
 

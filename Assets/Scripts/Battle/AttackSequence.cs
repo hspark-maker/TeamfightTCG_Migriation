@@ -682,7 +682,12 @@ public static class AttackSequence
 
         // 1) 카드가 사라지며 구체 등장. 구체는 카드 자리에서 태어난다.
         _attacker.FadeView(0f, t_morph);
-        VfxHandle t_orb = BattleVfx.Spawn(BattleVfxId.CinemaEnergyOrb, t_home, _attacker.VfxSortingLayerId);
+        // 구체는 카드마다 테마가 다르다(전기/물/안개…). 카드에 지정된 게 있으면 그걸 쓰고,
+        // 없으면 라이브러리 기본 구체로 떨어진다 — 배선을 안 해도 연출이 비지는 않게.
+        GameObject t_orbPrefab = _attacker.BoundCard?.data?.cinemaOrbPrefab;
+        VfxHandle  t_orb       = t_orbPrefab != null
+            ? BattleVfx.SpawnPrefab(t_orbPrefab, t_home, _attacker.VfxSortingLayerId)
+            : BattleVfx.Spawn(BattleVfxId.CinemaEnergyOrb, t_home, _attacker.VfxSortingLayerId);
         await UniTask.Delay((int)(t_morph * 1000));
 
         Transform t_orbTr = t_orb.Valid ? t_orb.Go.transform : null;

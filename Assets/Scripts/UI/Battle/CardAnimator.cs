@@ -283,6 +283,24 @@ public class CardAnimator : MonoBehaviour
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
+
+        await PlayDealToMid(_from, _mid, _dest, _duration);
+        if (this == null) return;
+
+        bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
+                cancellationToken: this.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (t_cancelled) return;
+
+        await PlayDealToSlot(_dest, _duration);
+    }
+
+    /// <summary>배치 연출 전반부: 화면 밖 → 중앙에서 확대. **중앙에 멈춘 채로 끝난다** —
+    /// 등장 컷씬이 있는 카드는 이 상태로 컷씬을 보여주고, 끝난 뒤 PlayDealToSlot으로 이어 붙인다.
+    /// 컷씬이 없으면 PlayDealAnim이 중간 정지만 두고 곧바로 이어 붙인다(예전과 같은 흐름).</summary>
+    public async UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
+    {
+        if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDealCard();
@@ -309,21 +327,26 @@ public class CardAnimator : MonoBehaviour
             Color t_c = t_tmp.color; t_c.a = 1f; t_tmp.color = t_c;
         }
 
-        var t_seq1 = DOTween.Sequence()
+        var t_seq = DOTween.Sequence()
             .Join(transform.DOMove(_mid, t_half).SetEase(Ease.OutCubic))
             .Join(transform.DOScale(1.5f, t_half).SetEase(Ease.OutCubic));
-        bool t_cancelled = await t_seq1.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
-        if (t_cancelled) return;
+        await t_seq.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
+    }
 
-        t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000), cancellationToken: t_ct).SuppressCancellationThrow();
-        if (t_cancelled) return;
+    /// <summary>배치 연출 후반부: 중앙 → 슬롯(축소 + 한 바퀴). 중앙에 서 있는 상태에서만 의미가 있다.</summary>
+    public async UniTask PlayDealToSlot(Vector3 _dest, float _duration = -1f)
+    {
+        if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
 
-        var t_seq2 = DOTween.Sequence()
+        float t_half = _duration * 0.5f;
+        var   t_ct   = this.GetCancellationTokenOnDestroy();
+
+        var t_seq = DOTween.Sequence()
             .Join(transform.DOMove(_dest, t_half).SetEase(Ease.InCubic))
             .Join(transform.DOScale(1f, t_half).SetEase(Ease.InCubic))
             .Join(transform.DORotate(new Vector3(0f, 360f, 0f), t_half, RotateMode.FastBeyond360));
-        t_cancelled = await t_seq2.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
-        if (t_cancelled) return;
+        bool t_cancelled = await t_seq.ToUniTask(cancellationToken: t_ct).SuppressCancellationThrow();
+        if (t_cancelled || this == null) return;
 
         transform.localRotation = Quaternion.identity;
         transform.localScale    = Vector3.one;

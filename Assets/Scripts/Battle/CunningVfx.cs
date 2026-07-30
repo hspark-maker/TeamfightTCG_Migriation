@@ -45,10 +45,8 @@ public static class CunningVfx
 
         if (_view == null) return;
 
-        // 덱 쪽 = **카드가 들어오던 그 지점**(BattleFieldView.PlayFillAnim의 출발점과 같은 규약).
-        // 나가는 곳과 들어오는 곳이 같아야 "덱으로 돌아갔다"로 읽힌다.
         float t_exit = Mathf.Max(0.05f, GameTiming.Battle.CunningExitDuration);
-        Vector3 t_to = DeckSidePoint(_view, t_home.z);
+        Vector3 t_to = DeckPoint(_view, t_home.z);
 
         // 축소는 이동보다 먼저 끝난다 — 작아진 뒤 남은 거리를 미끄러져야 덱에 빨려 들어간 것으로 보인다.
         float t_shrink = Mathf.Max(0.05f, t_exit * GameTiming.Battle.CunningShrinkRatio);
@@ -65,9 +63,25 @@ public static class CunningVfx
         t_tr.localScale    = t_scale;
     }
 
-    /// <summary>이 카드 진영의 덱 방향 월드 좌표. BattleFieldView가 새 카드를 날려 보내는 출발점과 같은 값.</summary>
-    static Vector3 DeckSidePoint(CardView _view, float _z)
+    /// <summary>교대해 들어온 카드의 등장. **덱에서 나오는 배치 연출**을 그대로 쓴다(죽어서 새 카드가 채워질 때와 동형) —
+    /// 스왑만 제자리 스케일 팝이면 같은 "덱에서 온 카드"인데 등장 방식이 둘로 갈린다.
+    /// 슬롯 뷰에 들어온 카드가 이미 그려져 있어야 한다(호출 전 Refresh).</summary>
+    public static UniTask PlayEnter(CardView _view)
+    {
+        if (_view == null) return UniTask.CompletedTask;
+
+        Vector3 t_dest = _view.SlotPosition;
+        Vector3 t_from = DeckPoint(_view, t_dest.z);
+        Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
+
+        return _view.PlayDealAnim(t_from, t_mid, t_dest, GameTiming.Battle.CardDealDuration);
+    }
+
+    /// <summary>카드가 빨려 들어가는 지점. **화면 기준 고정** — 아군은 오른쪽 아래, 적은 왼쪽 위 바깥.
+    /// 덱 UI 좌표를 따라가 봤지만 캔버스 스케일·앵커 조합에 따라 엉뚱한 자리로 튀어서, 화면 모서리로 고정한다
+    /// (덱 더미가 각 진영 그 방향에 있으므로 결과는 같고, 씬 배선에 의존하지 않는다).</summary>
+    static Vector3 DeckPoint(CardView _view, float _z)
         => _view.IsEnemySide
-            ? CameraUtil.ScreenFractionToWorld(-1f, 1f, _z)
-            : CameraUtil.ScreenFractionToWorld( 2f, 0f, _z);
+            ? CameraUtil.ScreenFractionToWorld(-0.15f, 1.15f, _z)
+            : CameraUtil.ScreenFractionToWorld( 1.15f, -0.15f, _z);
 }
