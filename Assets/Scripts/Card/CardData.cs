@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Video;
 
 /// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 세 장이 세트로 바뀐다.
 /// 단계별로 Sprite 필드를 평평하게 늘어놓으면(evolved2BattleImage…) 단계 추가 때마다 필드가 3개씩 늘고
@@ -36,6 +37,13 @@ public class CardData : ScriptableObject
     // 렌더러를 끄면 안 된다. 폴백 규칙 자체는 CardVisualRules에 둔다(로비/전투가 갈라지지 않게).
     // deckPreview는 대응 필드를 두지 않는다: 덱 대표 배너는 아웃게임 정적 표시라 전투 중 진화 상태와 무관하다.
     public CardArtSet[] evolvedArts = new CardArtSet[MaxEvolutionStage];
+
+    [Header("Evolution / Cinematic (임시 입력 — 등급 시스템 들어오면 세이브로 이관)")]
+    // 0=미진화. 등급 획득/성장 시스템이 없으므로 지금은 이 값이 런타임 진화 단계의 유일한 입력원이다.
+    // CardInstance 생성 시 1회 복사되며, 세이브 연동이 들어오면 이 필드 대신 세이브가 주입한다.
+    public int defaultEvolutionStage;
+    // 등장 컷씬. null이면 컷씬 없음(대부분의 카드가 여기 해당 — 판정은 CardCinematicRules 단일 지점).
+    public VideoClip appearCinematic;
 
     [Header("Weapon")]
     public GameObject weaponPrefab;
