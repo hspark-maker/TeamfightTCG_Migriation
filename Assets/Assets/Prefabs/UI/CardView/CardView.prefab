@@ -8300,6 +8300,7 @@ MonoBehaviour:
   nameText: {fileID: 8681528259622043953}
   illustration: {fileID: 8681528260152137749}
   faceDownOverlay: {fileID: 8681528259345627011}
+  cardBackSprite: {fileID: 21300000, guid: 907ce29f21f022949991206a7677b268, type: 3}
   emptyOverlay: {fileID: 8327822384652261773}
   selectedHighlight: {fileID: 8502626170652285422}
   passiveGlowSystem: {fileID: 2328157398231393809}

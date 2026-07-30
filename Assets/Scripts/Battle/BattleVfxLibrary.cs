@@ -13,6 +13,11 @@ public enum BattleVfxId
     Hit              = 4,   // 피격 파티클(맞은 카드에 부착 — 숫자는 CardView 프리팹의 HitEffectView 담당)
     Heal             = 5,   // 회복 파티클(회복된 카드에 부착 — 힐러/돌보미/청소부/유산 등 모든 회복 경로 공통)
     CinemaEnergyOrb  = 6,   // 시네마 공격(EnergyOrbDash): 카드가 변하는 에너지 구체. 수명은 호출부가 관리
+    PeerlessSlash    = 7,   // 무쌍 연출의 베기 섬광(대상 위치에 방향 맞춰 1회). 수명은 항목 lifetime
+    PeerlessSwing    = 8,   // 무쌍 연출의 휘두름(공격자 앞에서 대상 쪽으로). 베기와 짝 — 벨 때마다 같이 난다
+    ExecutionSpark   = 9,   // 처형 발동: 처형자 무기(도끼) **양 끝**에 하나씩
+    ExecutionCircle  = 10,  // 처형 발동: 처형자 카드 자리에 한 번
+    CunningFog       = 11,  // 교활 퇴장: 카드가 덱으로 돌아가기 직전 자리에 깔리는 안개
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —
@@ -48,6 +53,10 @@ public class BattleVfxLibrary : ScriptableObject
     [Header("힐러 비행 형태값 (시간은 BattleTimingConfig)")]
     public float healCurveHeight    = 0.8f;    // 베지어 제어점을 직선에서 밀어내는 거리(0이면 직선)
     public bool  healAlternateCurve = true;    // 대상마다 커브 방향 교차 → 여러 발이 부채꼴로 갈라진다
+
+    [Header("처형 형태값")]
+    // 스파크 두 점의 위치 = 카드 중심에서 (±x, +y). 카드 로컬 기준이라 연출 중 카드가 기울면 같이 기운다.
+    public Vector2 executionSparkOffset = new Vector2(0.45f, 0.6f);
 
     /// <summary>같은 id의 항목을 **전부** 모은다(0개 가능). 한 연출을 여러 프리팹으로 겹쳐 쓰기 위한 것 —
     /// 예: 피격 = 임팩트 섬광 + 반대 방향 먼지. 재생 순서는 목록 순서 그대로.</summary>

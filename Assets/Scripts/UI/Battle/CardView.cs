@@ -46,6 +46,9 @@ public class CardView : MonoBehaviour
     [SerializeField] TMP_Text nameText;
     [SerializeField] SpriteRenderer illustration;
     [SerializeField] GameObject faceDownOverlay;
+    // 뒷면일 때 일러스트 자리에 대신 깔리는 그림(덱 뒷면). 미배선이면 앞면 그림이 그대로 남는다 —
+    // faceDownOverlay만으로 가려지는 프리팹도 있어 여기선 "있으면 쓴다"로 둔다.
+    [SerializeField] Sprite cardBackSprite;
     [SerializeField] GameObject emptyOverlay;
 
     [Header("Highlight / Glow")]
@@ -1010,8 +1013,14 @@ public class CardView : MonoBehaviour
         else SetHpDisplay(_card.hp.ToString(), _card.bonusHp > 0 ? $"+{_card.bonusHp}" : "");
         this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
 
-        if (this.illustration != null && _card.data.battleImage != null)
-            this.illustration.sprite = _card.data.battleImage;
+        // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 오버레이 틈으로 비친다.
+        if (this.illustration != null)
+        {
+            if (t_isFaceDown && this.cardBackSprite != null)
+                this.illustration.sprite = this.cardBackSprite;
+            else if (!t_isFaceDown && _card.data.battleImage != null)
+                this.illustration.sprite = _card.data.battleImage;
+        }
 
         SetupWeapon(_card.data);
         RefreshKeywordIcons(_card);   // 뒷면 은닉·표시 대상 판정은 RefreshKeywordIcons 안에서.

@@ -506,7 +506,7 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   playerCards:
-  - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
+  - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
   - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
   - {fileID: 11400000, guid: 63e7eda3bd74481a9d6c2f799ad20a16, type: 2}
   enemyCards:
@@ -514,6 +514,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
   - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
   useSpecialCinema: 0
+  usePeerless: 1
+  useExecution: 1
   attackVfx:
     folder: Assets/PurchasedAssets
     filter: 
@@ -537,7 +539,8 @@ MonoBehaviour:
     spawnDelay: 0
   hitVfxOnCounter: 1
   killWeakerSide: 1
-  timingConfig: {fileID: 0}
+  timingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
+  autoReloadConfig: 1
   windDur: 0.2
   windDist: 0.4
   inDur: 0.1

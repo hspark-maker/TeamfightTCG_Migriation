@@ -22,6 +22,17 @@ MonoBehaviour:
   atkOutDur: 0.3
   atkLungeT: 0.62
   atkMaxLean: 40
+  prlApproachDur: 0.22
+  prlTurnDur: 0.2
+  prlReturnDur: 0.2
+  prlHitStop: 0.05
+  prlAfterHitHold: 0.01
+  prlApproachT: 0.401
+  prlMaxTurn: 16.3
+  prlSwingFront: 0
+  prlTurnSideStep: 2
+  prlWindupAngle: 30.7
+  prlSlashMaxTurn: 30
   cameraIntroDuration: 0.8
   cardDealDelay: 0.1
   cardDealDuration: 0.4

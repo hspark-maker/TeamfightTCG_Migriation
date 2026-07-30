@@ -29,6 +29,28 @@ public class BattleTimingConfig : ScriptableObject
     [Range(0f, 1f)]  [SerializeField] float atkLungeT  = 0.62f;   // 방어자까지 이동 비율(1=완전겹침)
     [Range(0f, 80f)] [SerializeField] float atkMaxLean = 40f;     // 적 방향 최대 lean 각(도)
 
+    [Header("Attack Peerless (무쌍: 대상 앞으로 → 베기 → 광역 대상 쪽으로 회전 → 베기 → 복귀)")]
+    // 박치기와 같은 규약 — 시간 4개만 배속을 먹고, 비율·각도는 배속과 무관하다.
+    [SerializeField] float prlApproachDur = 0.22f;   // 주 대상 앞까지 가는 시간
+    [SerializeField] float prlTurnDur     = 0.16f;   // 광역 대상 쪽으로 도는 시간
+    [SerializeField] float prlReturnDur   = 0.26f;   // 슬롯 복귀 시간
+    [SerializeField] float prlHitStop     = 0.1f;    // 벨 때마다 멈칫하는 시간(데미지 표시 직전)
+    [SerializeField] float prlAfterHitHold = 0.12f;  // 한 대 때린 뒤 다음 동작까지 머무는 시간(타격 여운)
+    [Range(0f, 1f)]  [SerializeField] float prlApproachT = 0.6f;   // 주 대상까지 파고드는 비율(1=완전겹침)
+    [Range(0f, 90f)] [SerializeField] float prlMaxTurn   = 70f;    // 최대 회전각(도). 넘기면 카드가 드러눕는다
+    [SerializeField] float prlSwingFront = 0.6f;   // 휘두름 이펙트가 공격자 앞으로 나가는 거리(월드)
+    [SerializeField] float prlTurnSideStep = 0.5f; // 마무리로 광역 대상 쪽으로 더 미끄러지는 거리(월드)
+    [Range(0f, 60f)] [SerializeField] float prlWindupAngle = 25f;  // 베기 전 반대쪽으로 더 트는 각(도)
+    [Range(0f, 90f)] [SerializeField] float prlSlashMaxTurn = 30f; // 베기 자국이 수평에서 기울 수 있는 최대 각(도)
+
+    [Header("Cunning Exit (교활: 안개 → 한 바퀴 돌며 뒷면 → 덱으로)")]
+    [SerializeField] float cunFogLead = 0.15f;   // 안개가 먼저 깔리는 시간
+    [SerializeField] float cunSpinDur = 0.45f;   // 한 바퀴 도는 시간(중간에 뒷면으로 바뀐다)
+    [SerializeField] float cunExitDur = 0.35f;   // 덱 쪽으로 빨려 들어가는 시간
+    // 축소는 이동보다 **먼저 끝난다**. 같은 길이로 두면 끝까지 커다란 카드가 미끄러지다 사라져
+    // "빨려 들어간다"가 아니라 "화면 밖으로 나간다"로 보인다. 이동 시간 대비 비율.
+    [Range(0.1f, 1f)] [SerializeField] float cunShrinkRatio = 0.5f;
+
     [Header("Intro")]
     [SerializeField] float cameraIntroDuration = 0.8f;
     [SerializeField] float cardDealDelay       = 0.15f;
@@ -92,6 +114,11 @@ public class BattleTimingConfig : ScriptableObject
     public float HealLaunchStagger   => healLaunchStagger   * SpeedFactor;
     public float HealTravelDuration  => healTravelDuration  * SpeedFactor;
     public float HealTrailLinger     => healTrailLinger     * SpeedFactor;
+    public float CunningFogLead      => cunFogLead          * SpeedFactor;
+    public float CunningSpinDuration => cunSpinDur          * SpeedFactor;
+    public float CunningExitDuration => cunExitDur          * SpeedFactor;
+    // 배속은 CunningExitDuration에서 이미 걸리므로 비율은 raw로 노출한다(두 번 곱하면 축소가 사라진다).
+    public float CunningShrinkRatio  => cunShrinkRatio;
     public float MulliganNoticeHold  => mulliganNoticeHold  * SpeedFactor;
     public float EffectNotifyDisplay => effectNotifyDisplay * SpeedFactor;
     public float EffectNotifySlide   => effectNotifySlide   * SpeedFactor;
@@ -114,5 +141,22 @@ public class BattleTimingConfig : ScriptableObject
         recoilDist = atkRecoilDist,
         lungeT     = atkLungeT,
         maxLean    = atkMaxLean,
+    };
+
+    /// <summary>무쌍 연출 튜닝 한 벌. NormalAttack과 같은 규약 — 시간 항목만 배속이 적용된 상태로 나간다.
+    /// AttackSequence가 공격 시작 시 한 번 읽어 스냅샷으로 쓴다.</summary>
+    public AttackSequence.PeerlessTuning PeerlessAttack => new AttackSequence.PeerlessTuning
+    {
+        approachDur = prlApproachDur * SpeedFactor,
+        turnDur     = prlTurnDur     * SpeedFactor,
+        returnDur   = prlReturnDur   * SpeedFactor,
+        hitStop      = prlHitStop      * SpeedFactor,
+        afterHitHold = prlAfterHitHold * SpeedFactor,
+        approachT   = prlApproachT,
+        maxTurn     = prlMaxTurn,
+        swingFront   = prlSwingFront,
+        turnSideStep = prlTurnSideStep,
+        windupAngle   = prlWindupAngle,
+        slashMaxTurn  = prlSlashMaxTurn,
     };
 }

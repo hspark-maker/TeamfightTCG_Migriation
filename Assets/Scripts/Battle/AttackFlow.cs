@@ -66,10 +66,21 @@ public static class AttackFlow
         await SynergyTriggers.AfterAttack(t_ctx);
     }
 
+    /// <summary>교활 스왑으로 물러나는 카드의 퇴장 연출. **보드 보충(FillEmptySlots/Refresh) 직전에** 부를 것 —
+    /// 그 뒤엔 슬롯 뷰가 들어온 카드를 그리고 있어 엉뚱한 카드가 나가는 그림이 된다.
+    /// 스왑 여부는 AttackProcessor가 세운 결과 그대로 읽는다.</summary>
+    public static UniTask PlayCunningExit(CardView _attackerView, AttackResult _result)
+        => _result.attackerSwapped ? CunningVfx.PlayExit(_attackerView) : UniTask.CompletedTask;
+
     /// <summary>발동 키워드 글로우 + 교활(swap) 등장 스케일 연출.</summary>
     public static async UniTask PlayResultFlourish(
         CardView _attackerView, CardInstance _attacker, CardInstance _defender, AttackResult _result)
     {
+        // 처형 발동(처치 + 재공격 권한)이면 전용 연출을 글로우와 같은 프레임에 얹는다.
+        // 판정은 AttackProcessor가 세운 attackerKeywords 그대로 — 여기서 처치/키워드를 다시 보지 않는다.
+        if (_result.attackerKeywords.HasFlag(CardKeyword.Execution))
+            ExecutionVfx.Play(CardView.GetView(_attacker));
+
         await UniTask.WhenAll(
             CardView.GetView(_attacker)?.PlayKeywordGlow(_result.attackerKeywords) ?? UniTask.CompletedTask,
             CardView.GetView(_defender)?.PlayKeywordGlow(_result.defenderKeywords) ?? UniTask.CompletedTask);
