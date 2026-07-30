@@ -90,4 +90,35 @@ public static class OwnershipManager
         OnOwnershipChanged?.Invoke();
         return true;
     }
+
+    // 여러 키 일괄 지급. 신규 지급 장수를 돌려준다.
+    // 낱장 Grant 반복은 장수만큼 파일 쓰기와 UI 재빌드를 유발하므로 대량 지급은 이 창구로 모은다(Save·이벤트 1회).
+    public static int GrantAll(IEnumerable<string> _keys)
+    {
+        if (_keys == null) return 0;
+
+        int t_added = 0;
+        foreach (var t_key in _keys)
+        {
+            if (string.IsNullOrEmpty(t_key)) continue;
+            if (s_owned.Add(t_key)) t_added++;
+        }
+        if (t_added == 0) return 0;   // 변화 없으면 디스크·UI를 건드리지 않는다
+
+        Save();
+        OnOwnershipChanged?.Invoke();
+        return t_added;
+    }
+
+    // 전체 회수. 제거된 장수를 돌려준다(Save·이벤트 1회). 디버그용.
+    public static int RevokeAll()
+    {
+        int t_removed = s_owned.Count;
+        if (t_removed == 0) return 0;
+
+        s_owned.Clear();
+        Save();
+        OnOwnershipChanged?.Invoke();
+        return t_removed;
+    }
 }
