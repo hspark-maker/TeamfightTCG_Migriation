@@ -42,6 +42,12 @@ public class BattleFieldView : MonoBehaviour
     {
         if (_placed == null || _placed.Count == 0) return;
 
+        // 고등급 카드 등장 컷씬: 배치 연출 시작 전에 순차 재생.
+        // 자격 판정은 CardCinematicRules 단독(여기서 stage 비교 금지), 일반 카드는 Resolve가 null →
+        // Play가 즉시 완료되어 프레임 손실 없음. 순수 연출이라 _placed 순서/게임 상태는 건드리지 않는다.
+        foreach (var t_card in _placed)
+            await CardCinematicPlayer.Play(CardCinematicRules.Resolve(t_card));
+
         float t_wz = this.slotViews[0].transform.position.z;
         Vector3 t_from = this.field.OwnerIndex == TurnState.LocalOwnerIndex
             ? CameraUtil.ScreenFractionToWorld( 2f, 0f, t_wz)

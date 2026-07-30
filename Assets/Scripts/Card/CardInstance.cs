@@ -32,6 +32,15 @@ public class CardInstance
     // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
 
+    // 런타임 진화 단계. 0=미진화, 1~CardData.MaxEvolutionStage.
+    // 등급/진화 획득 시스템 미구현 — 지금은 CardData의 임시 기본값(defaultEvolutionStage)에서 주입,
+    // 세이브 연동 시 이 필드에 주입하는 지점만 바뀐다(필드 위치·소비측은 그대로).
+    public int evolutionStage;
+    // 등장 컷씬 1회성 래치. 스왑으로 대기열에 갔다가 다시 필드로 돌아오는 등 같은 인스턴스가
+    // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
+    // 세팅/조회는 CardCinematicRules에서만 한다(호출부에 판정이 흩어지지 않게).
+    public bool cinematicShown;
+
     public bool IsAlive => this.hp > 0;
     public bool HasKeyword(CardKeyword _kw) => (this.data.keywords | this.runtimeKeywords | this.synergyKeywords).HasFlag(_kw);
 
@@ -72,6 +81,8 @@ public class CardInstance
         this.slotIndex   = -1;
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
+        // 진화 단계 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과) — 세이브가 들어와도 여기만 교체한다.
+        this.evolutionStage = _data.defaultEvolutionStage;
     }
 
     // ── 시너지 적용 (SynergyApplier가 호출하는 계약: 덱 확정 시 1회, 가산/합집합) ──

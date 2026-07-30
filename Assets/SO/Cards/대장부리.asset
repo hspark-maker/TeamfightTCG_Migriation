@@ -22,6 +22,18 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 1f6607fce8404174db1a645d76f36db0, type: 3}
   battleImage: {fileID: 21300000, guid: bd4c691efeae73346ac7ccaa78d571b0, type: 3}
   deckPreview: {fileID: 21300000, guid: 79f44ccb10240c64f9659c0600b118c3, type: 3}
+  evolvedArts:
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  defaultEvolutionStage: 1
+  appearCinematic: {fileID: 32900000, guid: c0c6b8b9b2847234b9d97489d188bb54, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}
