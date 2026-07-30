@@ -9,13 +9,18 @@ using UnityEngine.UI;
 // 카드 비주얼 자체(아트/이름/HP/키워드/시너지)는 도감 타일과 동일하게 CardVisualView에 위임한다 —
 // 뽑은 카드가 도감에서 보던 그 카드와 다르게 생기면 안 된다.
 // 이 클래스가 따로 존재하는 이유는 강조 축이 다르기 때문 — 개봉 카드는 항상 소유라 잠금 표현이 없고,
-// 대신 이 화면에만 있는 축을 얹는다: 한 장이 드러날 때마다 오는 타격(펀치·플래시)과, 신규/중복 구분(NEW 리본·환급 숫자).
+// 대신 이 화면에만 있는 축을 얹는다: 한 장이 드러날 때마다 오는 타격(펀치·플래시)과, 신규/중복 구분(NEW 리본·환급 칩).
 // 순수 표시 뷰다. 더미 배치·스와이프 이동은 PackCardStack이 이 오브젝트의 RectTransform을 직접 다룬다.
+//
+// 신규/중복 표식은 둘 다 **카드 밖**에 앉는다 — NEW 워드마크는 윗변 위로, 환급 칩은 아랫변 아래로.
+// 아트를 덮지 않으면서 서로 자리로 갈리므로, 한눈에 어느 쪽인지 읽히고 카드 그림도 온전히 남는다.
 //
 // 강조는 두 순간으로 갈린다. 섞으면 결과 화면이 개봉 연출의 잔상처럼 보이거나, 반대로 낱장 확인이
 // 결과판처럼 밋밋해진다:
-//   PlayRevealAccent() — 지금 이 한 장이 드러난 순간. 펀치·플래시(전 카드) + 신규 전용 림라이트.
+//   PlayRevealAccent() — 지금 이 한 장이 드러난 순간. 펀치·플래시(전 카드) + 신규 전용 림라이트,
+//                        그리고 중복이면 환급 칩이 올라와 머물다 사라진다.
 //   ApplyResultContrast() — 결과 격자에 놓인 상태. 신규는 림라이트가 계속 돌고 중복은 탈채도된 채 놓인다.
+//                        환급 칩은 여기 없다 — 격자 배율(0.42배)에서는 읽히지 않아 총합 한 줄이 대신 말한다.
 // 화면 전체가 반응하는 축(Dim 번쩍임)은 여기 없다 — 그것은 카드 한 장의 것이 아니라 화면의 것이라
 // 진행자(PackRevealView)가 신규일 때만 쏜다.
 public class PackCardView : MonoBehaviour
@@ -113,11 +118,31 @@ public class PackCardView : MonoBehaviour
     [SerializeField] float newBadgeOvershoot = 0.18f;
     [SerializeField] float newBadgeDuration = 0.2f;
 
+    // 중복 환급 칩. 카드 위가 아니라 카드 **밖 아래**에 앉는다 — 이 배지가 답하는 질문("이 카드로 무엇을 얻었나")은
+    // 아트가 답하는 질문("무엇을 뽑았나")과 다른 축이라, 하나가 다른 하나를 덮으면 둘 다 죽는다.
+    // NEW 워드마크가 위쪽 밖, 환급 칩이 아래쪽 밖 — 두 신호를 자리로 갈랐다.
+    //
+    // ⚠ 프리팹의 배지 위치는 **최종으로 앉을 자리**다(출발점이 아니다). 코드는 그보다 refundRiseDistance만큼
+    //   아래에서 출발해 올라와 그 자리에 앉힌다. 반대로 잡으면(프리팹=출발점, 위로 떠나가기) 배지가 카드 안으로
+    //   파고들고, 떠난 자리에서 되돌아올 근거가 없어 그대로 굳는다 — 실제로 그게 이전 구현의 버그였다.
     [Header("중복 환급")]
-    [SerializeField] GameObject refundBadge;  // "+10" 묶음(중복이고 환급이 있을 때만)
+    [Tooltip("코인+숫자 칩 묶음(중복이고 환급이 있을 때만). 카드 하단 밖에 앉도록 배선한다.")]
+    [SerializeField] GameObject refundBadge;
     [SerializeField] TMP_Text refundText;
-    [SerializeField] float refundRiseDistance = 40f;
-    [SerializeField] float refundDuration = 0.6f;
+    [Tooltip("칩 전체를 페이드하는 손잡이. 미배선이면 배지에서 찾고, 없으면 붙여준다 — " +
+             "이 값이 알파를 쥐는 단일 지점이라 배선 여부와 무관하게 퇴장이 성립한다.")]
+    [SerializeField] CanvasGroup refundGroup;
+    [Tooltip("제자리보다 이만큼 아래에서 출발해 올라와 앉는다. 카드 높이 대비 넉넉해야 움직임으로 읽힌다 — " +
+             "40쯤이면 1230 높이 카드에서 3%라 움직였는지조차 알 수 없다.")]
+    [SerializeField] float refundRiseDistance = 110f;
+    [Tooltip("올라와 앉기까지의 시간.")]
+    [FormerlySerializedAs("refundDuration")] [SerializeField] float refundRiseDuration = 0.32f;
+    [Tooltip("등장하는 순간 즉시 이만큼 커진 뒤 제자리로 꽂힌다(카드 펀치와 같은 규약 — 충격은 t=0에 다 들어간다).")]
+    [SerializeField] float refundPopOvershoot = 0.35f;
+    [Tooltip("다 올라온 뒤 읽히도록 머무는 시간. 이 구간이 없으면 숫자를 읽기 전에 사라진다.")]
+    [SerializeField] float refundHoldDuration = 0.75f;
+    [Tooltip("머문 뒤 사라지는 시간. 0이면 사라지지 않고 카드에 박힌 채 남는다 — 그 상태가 결과 격자까지 따라간다.")]
+    [SerializeField] float refundFadeDuration = 0.3f;
 
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
@@ -138,9 +163,15 @@ public class PackCardView : MonoBehaviour
     // 강조가 이미 재생됐는지. 스킵과 정상 진행이 겹쳐도 두 번 터지지 않게 한다.
     bool m_accented;
 
-    // refundBadge의 원위치. 떠오른 뒤 되돌릴 기준이라 최초 1회만 캡처한다.
+    // refundBadge가 앉을 자리와 그 배율. 프리팹이 쥔 값이라 최초 1회만 캡처한다 —
+    // 재생이 끝나면 여기로 되돌려 놓는다(다음 Bind가 어긋난 자리에서 시작하지 않게).
     Vector3 m_refundHome;
+    Vector3 m_refundRestScale = Vector3.one;
     bool m_refundHomeCaptured;
+
+    // 환급 칩의 등장→체류→퇴장 한 묶음. 트랜스폼과 CanvasGroup 두 대상에 걸쳐 있어
+    // 걷어낼 때 타깃 두 곳을 각각 Kill하는 대신 이 손잡이 하나로 끊는다.
+    Sequence m_refundSeq;
 
     // 펀치를 걸기 전의 배율. 도중에 끊겼을 때 돌아갈 자리다(SnapPunchToRest).
     Vector3 m_punchRestScale = Vector3.one;
@@ -164,8 +195,9 @@ public class PackCardView : MonoBehaviour
 
     /// <summary>
     /// 카드가 완전히 드러난 순간의 강조. 펀치·플래시는 전 카드 공통이고, 그 위에 신규는 NEW 리본,
-    /// 중복은 환급 숫자가 얹힌다.
-    /// _instant면 트윈 없이 최종 상태만 — 스킵으로 건너뛴 카드도 결과 표시는 남는다.
+    /// 중복은 환급 칩이 카드 아래에 얹힌다.
+    /// _instant면 트윈 없이 최종 상태만 — 결과 격자가 이 경로로 카드를 세운다(유일한 호출처: PackResultGrid).
+    /// 그 상태에 환급 칩은 포함되지 않는다(PlayRefundAccent 주석 참고).
     /// </summary>
     public void PlayRevealAccent(bool _instant = false)
     {
@@ -210,6 +242,11 @@ public class PackCardView : MonoBehaviour
         }
 
         SetRim(false);
+
+        // 환급 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
+        // 격자가 아닌 경로로 이 상태에 들어오는 카드(낱장 확인 중 요약으로 넘어간 경우)도 있어 여기서 못 박는다.
+        KillRefundSeq();
+        HideRefundBadge();
 
         // 탈채도는 Frame의 UIEffect 한 곳에 걸면 Replica가 붙은 아트·프레임 장식까지 함께 빠진다
         // (이름·HP 패널은 Replica가 없어 색이 남는다 — 정보 레이어라 그대로 읽히는 편이 낫다).
@@ -322,12 +359,9 @@ public class PackCardView : MonoBehaviour
             revealFlash.gameObject.SetActive(false);
         }
 
-        if (refundBadge != null)
-        {
-            refundBadge.transform.DOKill();
-            if (m_refundHomeCaptured) refundBadge.transform.localPosition = m_refundHome;
-            refundBadge.SetActive(false);
-        }
+        // 환급 칩을 걷는다. 재생 중이었다면 위치·배율·알파가 모두 중간값이라 한 번에 되돌린다.
+        KillRefundSeq();
+        HideRefundBadge();
     }
 
     // 카드가 통째로 톡 커졌다 돌아온다. 이 트랜스폼의 위치·회전은 PackCardStack이 쥐고 있으므로
@@ -424,10 +458,24 @@ public class PackCardView : MonoBehaviour
         if (newGleam != null) newGleam.transitionRate = _rate;
     }
 
-    // 중복: 환급 숫자가 떠오르며 사라진다. 환급이 0이면 아무 말도 하지 않는다(조용한 정산).
+    // 중복: 코인 칩이 카드 아래에서 올라와 앉고, 읽을 만큼 머문 뒤 사라진다.
+    // 환급이 0이면 아무 말도 하지 않는다(조용한 정산).
+    //
+    // 퇴장이 이 연출의 핵심이다. 사라지지 않으면 칩이 그 카드에 영구히 박혀 낱장 확인 구간 내내,
+    // 그리고 결과 격자까지 따라간다 — 순간의 정산이 카드의 속성처럼 굳는다.
     void PlayRefundAccent(bool _instant)
     {
         if (refundBadge == null || Refund <= 0) return;
+
+        // 결과 격자에서는 칩을 띄우지 않는다. 거기서 카드는 셀에 맞춰 통째로 축소되므로(PackResultGrid.CardScale)
+        // 칩도 같은 배율로 줄어 읽히지 않는 얼룩이 된다 — 격자의 환급은 총합 한 줄이 대신 말한다.
+        // 중복이라는 사실 자체는 탈채도가 이미 쥐고 있다(ApplyResultContrast).
+        if (_instant)
+        {
+            KillRefundSeq();
+            HideRefundBadge();
+            return;
+        }
 
         if (refundText != null) refundText.text = $"+{Refund:N0}";
 
@@ -435,24 +483,74 @@ public class PackCardView : MonoBehaviour
         if (!m_refundHomeCaptured)
         {
             m_refundHome = t_tr.localPosition;
+            m_refundRestScale = t_tr.localScale;
             m_refundHomeCaptured = true;
         }
 
-        if (_instant)
+        var t_group = ResolveRefundGroup();
+
+        KillRefundSeq();
+        refundBadge.SetActive(true);
+
+        // 출발 상태: 앉을 자리보다 아래, 투명, 그리고 이미 커진 채.
+        // 커지는 구간을 트윈에 맡기지 않는 이유는 카드 펀치와 같다 — 눈이 봐야 하는 것은 회복이다.
+        t_tr.localPosition = m_refundHome - new Vector3(0f, refundRiseDistance, 0f);
+        t_tr.localScale = m_refundRestScale * (1f + refundPopOvershoot);
+        t_group.alpha = 0f;
+
+        // 페이드인은 상승보다 짧게 끊는다 — 올라오는 내내 반투명하면 도착이 아니라 스며듦으로 읽힌다.
+        float t_fadeIn = Mathf.Min(0.12f, refundRiseDuration);
+
+        m_refundSeq = DOTween.Sequence()
+            .SetLink(refundBadge)
+            .Append(t_tr.DOLocalMoveY(m_refundHome.y, refundRiseDuration).SetEase(Ease.OutCubic))
+            .Join(t_tr.DOScale(m_refundRestScale, refundRiseDuration).SetEase(Ease.OutQuint))
+            .Join(t_group.DOFade(1f, t_fadeIn))
+            .AppendInterval(refundHoldDuration)
+            .Append(t_group.DOFade(0f, refundFadeDuration))
+            .OnComplete(HideRefundBadge);
+    }
+
+    // 칩을 내리고 다음 재생이 쓸 출발 상태로 되돌린다. 자리를 아직 캡처하지 않았다면
+    // 프리팹 값이 그대로 제자리이므로 건드리지 않는다.
+    //
+    // ⚠ 여기서 시퀀스를 Kill하지 않는다 — 이 메서드는 그 시퀀스의 OnComplete로도 불리므로
+    //   자기를 재생 중인 트윈을 콜백 안에서 걷어내는 꼴이 된다. 걷어내기는 부르는 쪽(KillRefundSeq)의 몫이다.
+    void HideRefundBadge()
+    {
+        if (refundBadge == null) return;
+
+        m_refundSeq = null;
+
+        var t_tr = refundBadge.transform;
+        if (m_refundHomeCaptured)
         {
-            // 스킵 시엔 제자리에 띄워두기만 — 떠오르는 도중 스킵돼도 숫자가 남는다.
-            t_tr.DOKill();
             t_tr.localPosition = m_refundHome;
-            refundBadge.SetActive(true);
-            return;
+            t_tr.localScale = m_refundRestScale;
         }
 
-        t_tr.DOKill();
-        t_tr.localPosition = m_refundHome;
-        refundBadge.SetActive(true);
-        t_tr.DOLocalMoveY(m_refundHome.y + refundRiseDistance, refundDuration)
-            .SetEase(Ease.OutCubic)
-            .SetLink(refundBadge);
+        // 알파는 1로 되돌린다 — 0으로 남으면 다음 카드의 칩이 켜져도 보이지 않는다.
+        ResolveRefundGroup().alpha = 1f;
+        refundBadge.SetActive(false);
+    }
+
+    void KillRefundSeq()
+    {
+        if (m_refundSeq == null) return;
+
+        m_refundSeq.Kill();
+        m_refundSeq = null;
+    }
+
+    // 칩의 알파 손잡이. 프리팹 배선이 없어도 페이드가 성립해야 하므로 카드 본체의 Group과 같은 규약을 쓴다.
+    CanvasGroup ResolveRefundGroup()
+    {
+        if (refundGroup != null) return refundGroup;
+
+        refundGroup = refundBadge.GetComponent<CanvasGroup>();
+        if (refundGroup == null) refundGroup = refundBadge.AddComponent<CanvasGroup>();
+
+        return refundGroup;
     }
 
     static void SetAlpha(Graphic _graphic, float _alpha)

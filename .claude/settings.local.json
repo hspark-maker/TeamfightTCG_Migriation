@@ -99,7 +99,14 @@
       "Bash(node \"C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/6357b1b4-41a8-48d3-a2c0-2699bef25323/scratchpad/dump.js\" \"Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab\")",
       "Bash(node *)",
       "Bash(git ls-tree *)",
-      "Bash(git update-index *)"
+      "Bash(git update-index *)",
+      "PowerShell(Get-Process *)",
+      "Bash(awk '/^--- !u!225 /{f=1} f{print} f&&/^--- /&&NR>1{c++} c>1{exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!224 &1376200664$/{f=1} f{print; if\\(/m_Pivot:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!224 &1535240952$/{f=1} f{print; if\\(/m_Pivot:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!1 &1376200663$/{f=1} f{print; if\\(/m_IsActive:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(command -v dotnet)",
+      "Bash(dotnet --version)"
     ]
   },
   "enabledMcpjsonServers": [

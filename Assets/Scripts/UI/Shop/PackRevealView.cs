@@ -111,8 +111,17 @@ public class PackRevealView : MonoBehaviour
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
     [SerializeField] PackScreenFlash newCardFlash;
 
+    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 골드가 얼마 돌아왔나"를 말한다 —
+    // 결과 격자에는 칩이 없으므로(PackCardView.PlayRefundAccent) 이 줄이 그 축의 유일한 답이다.
+    //
+    // ⚠ 칩과 획득 버튼은 **같은 앵커 기준(화면 하단)**이어야 한다. 한쪽만 중앙 앵커면 화면비가 바뀔 때
+    //   서로 파고들고, 화면비가 낮으면(태블릿) 칩이 화면 밖으로 밀려난다.
     [Header("표시 (옵션)")]
+    [Tooltip("코인+합계 숫자 칩 묶음. 미배선이면 숫자만 토글된다(뒷배경 없이).")]
+    [SerializeField] GameObject totalRefundBadge;
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
+    [Tooltip("합계가 0에서 이 값까지 굴러 오르는 시간. 0이면 곧장 최종 숫자.")]
+    [SerializeField] float totalRefundCountUp = 0.5f;
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
     [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
     [SerializeField] PackResultGrid resultGrid;
@@ -134,6 +143,9 @@ public class PackRevealView : MonoBehaviour
 
     // 현재 스테이지의 시간 기반 연출. 스킵은 이걸 Complete로 밀어 다음 단계로 넘긴다.
     Sequence m_stageSeq;
+
+    // 환급 합계가 굴러 오르는 트윈. 다음 개봉이 시작될 때 끊지 않으면 이전 세션의 숫자가 계속 올라간다.
+    Tween m_totalRefundTween;
 
     // 스킵 횟수. 첫 번째는 현재 단계만, 두 번째부터는 요약까지 단번에.
     int m_skips;
@@ -170,6 +182,9 @@ public class PackRevealView : MonoBehaviour
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
         if (skipButton != null) skipButton.gameObject.SetActive(true);
+
+        // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
+        KillTotalRefundTween();
 
         // 카드는 여기서 단 한 번 세워 팩 속에 넣는다. 이후 어느 단계도 카드를 "등장"시키지 않는다.
         if (cardStack != null)
@@ -458,15 +473,52 @@ public class PackRevealView : MonoBehaviour
         // 격자는 더미와 별개로 결과 사본을 새로 세운다 — 밀려나 사라진 카드를 여기서 다시 만난다.
         if (resultGrid != null) resultGrid.Show(m_pending != null ? m_pending.Cards : null, _instant);
 
-        if (totalRefundText != null)
-        {
-            long t_refund = m_pending != null ? m_pending.TotalRefund : 0;
-            // 환급이 없으면 줄 자체를 숨긴다 — "+0"은 정보가 아니라 잡음이다.
-            totalRefundText.gameObject.SetActive(t_refund > 0);
-            if (t_refund > 0) totalRefundText.text = $"+{t_refund:N0}";
-        }
+        PlayTotalRefund(m_pending != null ? m_pending.TotalRefund : 0, _instant);
 
         OnRevealComplete?.Invoke();
+    }
+
+    // 환급 합계 줄을 세운다. 0이면 줄 자체를 숨긴다 — "+0"은 정보가 아니라 잡음이다.
+    // 숫자는 0에서 굴러 오른다: 합계는 이 화면의 정산이고, 정산은 세어 보이는 편이 받은 느낌을 준다.
+    void PlayTotalRefund(long _refund, bool _instant)
+    {
+        KillTotalRefundTween();
+
+        bool t_show = _refund > 0;
+        if (totalRefundBadge != null) totalRefundBadge.SetActive(t_show);
+
+        // 칩이 미배선이어도 숫자만으로 성립하도록 텍스트도 직접 토글한다.
+        if (totalRefundText != null) totalRefundText.gameObject.SetActive(t_show);
+
+        if (!t_show || totalRefundText == null) return;
+
+        if (_instant || totalRefundCountUp <= 0f)
+        {
+            totalRefundText.text = $"+{_refund:N0}";
+            return;
+        }
+
+        totalRefundText.text = "+0";
+
+        // long을 직접 트윈할 플러그인이 없어 float로 굴리고 표시할 때 되돌린다.
+        float t_shown = 0f;
+        m_totalRefundTween = DOTween.To(() => t_shown, _v =>
+                             {
+                                 t_shown = _v;
+                                 if (totalRefundText != null) totalRefundText.text = $"+{(long)_v:N0}";
+                             }, (float)_refund, totalRefundCountUp)
+                             .SetEase(Ease.OutCubic)
+                             .SetLink(totalRefundText.gameObject)
+                             // 굴리다 끊기면 최종 숫자가 아닌 중간값이 남는다 — 마지막 한 번을 못 박는다.
+                             .OnKill(() => { if (totalRefundText != null) totalRefundText.text = $"+{_refund:N0}"; });
+    }
+
+    void KillTotalRefundTween()
+    {
+        if (m_totalRefundTween == null) return;
+
+        m_totalRefundTween.Kill();
+        m_totalRefundTween = null;
     }
 
     // ── 스킵 ────────────────────────────────────────────────────

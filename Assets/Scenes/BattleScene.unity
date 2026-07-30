@@ -250,10 +250,6 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3669285587999233025, guid: 506b492b655722d4089dd54075454005, type: 3}
-      propertyPath: m_RootOrder
-      value: 9
-      objectReference: {fileID: 0}
-    - target: {fileID: 3669285587999233025, guid: 506b492b655722d4089dd54075454005, type: 3}
       propertyPath: m_AnchorMax.x
       value: 1
       objectReference: {fileID: 0}
@@ -332,14 +328,6 @@ PrefabInstance:
     - target: {fileID: 3669285587999233026, guid: 506b492b655722d4089dd54075454005, type: 3}
       propertyPath: m_IsActive
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3669285588205711692, guid: 506b492b655722d4089dd54075454005, type: 3}
-      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
-      value: 1801810542
-      objectReference: {fileID: 0}
-    - target: {fileID: 4135730048257302649, guid: 506b492b655722d4089dd54075454005, type: 3}
-      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
-      value: 1801810542
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1482,10 +1470,6 @@ PrefabInstance:
       value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3669285587999233025, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
-      propertyPath: m_RootOrder
-      value: 8
-      objectReference: {fileID: 0}
-    - target: {fileID: 3669285587999233025, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_AnchorMax.x
       value: 1
       objectReference: {fileID: 0}
@@ -1564,14 +1548,6 @@ PrefabInstance:
     - target: {fileID: 3669285587999233026, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_IsActive
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3669285588205711692, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
-      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
-      value: 1801810542
-      objectReference: {fileID: 0}
-    - target: {fileID: 4135730048257302649, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
-      propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
-      value: 1801810542
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2186,7 +2162,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -12.384163}
+  m_LocalPosition: {x: 0, y: 0, z: -12.068942}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2266,8 +2242,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.462  \uAC70\uB9AC 12.38  \uBC30\uC728 1.13\n\uAC00\uC2DC \xB13.30
-    x \xB17.15  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.474  \uAC70\uB9AC 12.07  \uBC30\uC728 1.10\n\uAC00\uC2DC \xB13.30
+    x \xB16.97  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!1 &982015555
 GameObject:
@@ -3116,8 +3092,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
-  cameraStartZ: -20
-  cameraTargetZ: -11
+  introBackDistance: 9
+  fallbackTargetZ: -11
   playerFaceDownPrefab: {fileID: 8213931047195785937, guid: e26cd5c9294b66d4fa5841e82931ea13, type: 3}
   enemyFaceDownPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   deckIntroParent: {fileID: 1944050833}
