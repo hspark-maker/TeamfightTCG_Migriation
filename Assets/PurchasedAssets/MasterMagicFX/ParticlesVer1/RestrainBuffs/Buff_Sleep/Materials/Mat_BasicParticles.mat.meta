@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 31e5f5a3fddeef94da0c79327d2ff791
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/RestrainBuffs/Buff_Sleep/Materials/Mat_BasicParticles.mat
+  uploadId: 755856

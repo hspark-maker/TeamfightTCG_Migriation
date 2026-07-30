@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 16c8ab5adce7b514bb5811418088a9e6
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/FrozeLaser/Materials/Mat_FrozeLaser_LaserInner
+    3.mat
+  uploadId: 755856

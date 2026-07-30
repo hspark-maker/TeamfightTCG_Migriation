@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ca691984168839c48baaacc9f5bca87e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/FireLaser/Materials/Mat_FireLaser_BasicParticles.mat
+  uploadId: 755856

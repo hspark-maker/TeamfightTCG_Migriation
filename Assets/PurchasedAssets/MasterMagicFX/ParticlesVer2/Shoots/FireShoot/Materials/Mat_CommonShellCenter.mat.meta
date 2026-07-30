@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b60f1cde62e778845bf092ec56762b2d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/FireShoot/Materials/Mat_CommonShellCenter.mat
+  uploadId: 755856

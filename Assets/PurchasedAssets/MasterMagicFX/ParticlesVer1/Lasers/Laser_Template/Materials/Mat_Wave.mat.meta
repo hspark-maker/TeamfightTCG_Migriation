@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b63a537bf7da12048ae8d776f6adcfe5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Lasers/Laser_Template/Materials/Mat_Wave.mat
+  uploadId: 755856

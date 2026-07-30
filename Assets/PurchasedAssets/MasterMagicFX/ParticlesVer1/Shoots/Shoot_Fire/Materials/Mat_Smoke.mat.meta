@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1234c1540f571eb408768fd1953e9ce9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Fire/Materials/Mat_Smoke.mat
+  uploadId: 755856

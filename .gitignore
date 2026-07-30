@@ -95,9 +95,3 @@ Assets/Fonts/MalgunGothic_TMP.asset
 Assets/Fonts/MalgunGothic_OutlinfFont.asset
 
 .mcp.json
-
-# 구매 에셋 원본 팩(2.5GB) — 저장소에 넣지 않는다. 각자 에셋스토어에서 임포트해 로컬에만 둔다.
-# 실제로 쓰는 프리팹/머티리얼/텍스처/셰이더는 Assets/Assets/Particle/_Vendor 로 추출 복사해 추적한다
-# (의존 클로저 180개 = 80MB). 그래서 이 폴더가 없어도 게임은 그대로 돌아간다.
-Assets/PurchasedAssets/
-Assets/PurchasedAssets.meta

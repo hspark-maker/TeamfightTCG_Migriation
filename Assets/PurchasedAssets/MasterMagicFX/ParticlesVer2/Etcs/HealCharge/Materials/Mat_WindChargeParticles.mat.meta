@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cb9211db4d1110243a369433a241c084
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Etcs/HealCharge/Materials/Mat_WindChargeParticles.mat
+  uploadId: 755856

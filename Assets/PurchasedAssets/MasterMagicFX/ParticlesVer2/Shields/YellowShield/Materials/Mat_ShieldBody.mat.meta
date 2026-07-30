@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 13ad6be6ed5d58847a844177dd084e54
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shields/YellowShield/Materials/Mat_ShieldBody.mat
+  uploadId: 755856

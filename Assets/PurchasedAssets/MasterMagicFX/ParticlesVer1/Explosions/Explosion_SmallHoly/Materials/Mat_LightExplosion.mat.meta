@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bde39411054f58944adaed5664d6cab5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Explosions/Explosion_SmallHoly/Materials/Mat_LightExplosion.mat
+  uploadId: 755856
