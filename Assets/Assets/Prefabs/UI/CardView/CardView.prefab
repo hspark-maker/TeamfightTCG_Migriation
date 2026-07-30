@@ -5755,7 +5755,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: -3035669431253209082, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
+  - {fileID: 21708942701909558, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -5799,12 +5799,10 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '3
-
-'
+  m_text: 4
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
-  m_sharedMaterial: {fileID: -3035669431253209082, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
+  m_sharedMaterial: {fileID: 21708942701909558, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -8177,6 +8175,7 @@ MonoBehaviour:
   dieOverlay: {fileID: 4205818147638631651}
   hitEffect: {fileID: 2830789661925194621}
   healEffect: {fileID: 9207694216773041194}
+  cinemaSpacing: 1.6
 --- !u!210 &1536455536639633097
 SortingGroup:
   m_ObjectHideFlags: 0
@@ -8252,7 +8251,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: -3035669431253209082, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
+  - {fileID: 21708942701909558, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8296,10 +8295,10 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 3
+  m_text: 4
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
-  m_sharedMaterial: {fileID: -3035669431253209082, guid: 0f9e80439b7b4ed42a6e1cb7d7793c48, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
+  m_sharedMaterial: {fileID: 21708942701909558, guid: e89eaa4e3b4de402f90d7aba0deeeb96, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
