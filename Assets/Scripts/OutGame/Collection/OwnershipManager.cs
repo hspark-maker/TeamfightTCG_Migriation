@@ -110,6 +110,25 @@ public static class OwnershipManager
         return t_added;
     }
 
+    // 카탈로그 전량 지급. 신규 지급 장수를 돌려준다(카탈로그 미준비면 0).
+    // "모든 카드"의 정의를 여기 하나로 고정한다 — 호출측이 각자 CardCatalog를 훑으면 필터가 갈린다.
+    public static int GrantEntireCatalog()
+    {
+        if (!CardCatalog.IsReady)
+        {
+            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(BootInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
+            return 0;
+        }
+
+        var t_keys = new List<string>(CardCatalog.Count);
+        foreach (var t_card in CardCatalog.All)
+        {
+            t_keys.Add(CardCatalog.KeyOf(t_card));
+        }
+
+        return GrantAll(t_keys);
+    }
+
     // 전체 회수. 제거된 장수를 돌려준다(Save·이벤트 1회). 디버그용.
     public static int RevokeAll()
     {

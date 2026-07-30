@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 // 아웃게임 디버그 조작의 단일 창구. 인스펙터 ContextMenu(OwnershipDebugTool)와 런타임 오버레이(OutgameDebugOverlay)가
@@ -6,21 +5,10 @@ using UnityEngine;
 public static class OutgameDebugActions
 {
     // 카탈로그 전량 지급. 덱 편성은 소유 카드만 허용하므로 인게임 덱 연동 테스트의 출발점이다.
+    // 실제 지급은 OwnershipManager가 소유 — 인게임 해금 버튼(UnlockAllCardsButton)과 같은 창구를 쓴다.
     public static void UnlockAllCards()
     {
-        if (!CardCatalog.IsReady)
-        {
-            Debug.LogWarning("[OutgameDebug] CardCatalog 미초기화 — 부트(BootInstaller)를 거친 뒤 다시 시도할 것.");
-            return;
-        }
-
-        var t_keys = new List<string>(CardCatalog.Count);
-        foreach (var t_card in CardCatalog.All)
-        {
-            t_keys.Add(CardCatalog.KeyOf(t_card));
-        }
-
-        int t_added = OwnershipManager.GrantAll(t_keys);
+        int t_added = OwnershipManager.GrantEntireCatalog();
         Debug.Log($"[OutgameDebug] 전체 해금 — 신규 {t_added}장 / 소유 {OwnershipManager.OwnedCount}장");
     }
 
