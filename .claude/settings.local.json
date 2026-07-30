@@ -89,7 +89,24 @@
       "Bash(npm -g config get prefix)",
       "Read(//c/Users/cookapps/.claude/**)",
       "Read(//c/Users/cookapps/**)",
-      "Bash(xargs stat -c '%y')"
+      "Bash(xargs stat -c '%y')",
+      "Bash(awk 'BEGIN{d=0}{n=gsub\\(/\\\\{/,\"{\"\\);m=gsub\\(/\\\\}/,\"}\"\\);d+=n-m}END{print FILENAME\" brace:\",d}' Assets/Scripts/UI/Shop/PackCardView.cs)",
+      "Bash(node \"C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/fefe48a2-76ac-4a79-b28f-7698ca55233e/scratchpad/kitguids.js\" \"Assets/Assets/Prefabs/UI/LobbyCanvas.prefab\")",
+      "Bash(node \"C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/fefe48a2-76ac-4a79-b28f-7698ca55233e/scratchpad/resolve.js\")",
+      "Bash(node .backup_lobby/tools/validate.js \"Assets/Assets/Prefabs/UI/LobbyCanvas.prefab\")",
+      "Bash(awk '/guid: 2d48dc1ed65a4bc479b284cadfb38ba4/{f=1} f{print NR\": \"$0} f&&/^--- /&&NR>1{if\\(++c>1\\)exit}' \"Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab\")",
+      "Bash(node -e ' *)",
+      "Bash(node \"C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/6357b1b4-41a8-48d3-a2c0-2699bef25323/scratchpad/dump.js\" \"Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab\")",
+      "Bash(node *)",
+      "Bash(git ls-tree *)",
+      "Bash(git update-index *)",
+      "PowerShell(Get-Process *)",
+      "Bash(awk '/^--- !u!225 /{f=1} f{print} f&&/^--- /&&NR>1{c++} c>1{exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!224 &1376200664$/{f=1} f{print; if\\(/m_Pivot:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!224 &1535240952$/{f=1} f{print; if\\(/m_Pivot:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(awk '/^--- !u!1 &1376200663$/{f=1} f{print; if\\(/m_IsActive:/\\) exit}' Assets/Scenes/CardPack.unity)",
+      "Bash(command -v dotnet)",
+      "Bash(dotnet --version)"
     ]
   },
   "enabledMcpjsonServers": [

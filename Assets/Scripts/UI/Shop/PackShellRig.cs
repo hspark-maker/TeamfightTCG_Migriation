@@ -49,6 +49,15 @@ public class PackShellRig : MonoBehaviour
     [Header("광채 연동")]
     [SerializeField] float glowAlphaMin = 0.18f;
     [SerializeField] float glowAlphaMax = 0.34f;
+    [Tooltip("빛살이 한 바퀴 도는 데 걸리는 시간(초). 음수면 반대 방향, 0이면 회전 없음. " +
+             "배경 기척이라 눈이 좇을 수 없을 만큼 느려야 한다 — 24초면 초당 15도다.\n" +
+             "⚠ 광채 노드의 rect가 정사각이어야 한다. 가로세로가 다르면 늘어난 타원이 통째로 도는 게 보여 " +
+             "빛살이 도는 게 아니라 후광이 흔들리는 것으로 읽힌다.")]
+    [SerializeField] float glowSpinPeriod = 24f;
+    [Tooltip("개봉이 시작되면(자리잡기) 광채가 완전히 걷히는 데 걸리는 시간(초). " +
+             "PackRevealView의 packShiftDuration과 맞춰야 빛이 꺼지는 것과 팩이 내려가는 것이 한 동작으로 읽힌다 — " +
+             "길면 팩이 다 내려간 뒤에도 빛이 남고, 짧으면 빛만 먼저 꺼져 팩이 맨몸으로 움직인다.")]
+    [SerializeField] float glowFadeDuration = 0.4f;
 
     [Header("연결")]
     [Tooltip("뜯기 진행도를 구독해 손가락이 닿은 동안 아이들을 멈춘다. 미배선이면 항상 동작.")]
@@ -88,6 +97,12 @@ public class PackShellRig : MonoBehaviour
     bool m_touching;             // 제스처가 거는 일시 정지
     bool IdleRunning => m_idleAllowed && !m_touching;
 
+    // 광채가 살아 있는 비율(1 = 완전, 0 = 꺼짐). m_settle과 나란히 두지 않고 따로 두는 이유는 기준이 다르기 때문이다 —
+    // 부유·펄스는 손가락이 닿는 동안 멈춰야 하지만(m_touching), 광채는 그때 꺼지면 안 된다.
+    // 스와이프하려고 팩을 만질 때마다 후광이 깜빡이면 그게 개봉보다 더 눈에 띈다.
+    // 광채를 걷는 사건은 "개봉이 시작됐다"(뷰의 SetIdle(false)) 하나뿐이라 m_idleAllowed만 본다.
+    float m_glowFade = 1f;
+
     void Awake() => CaptureHome();
 
     void OnEnable()
@@ -98,6 +113,9 @@ public class PackShellRig : MonoBehaviour
         // 손가락은 비활성 사이에 이미 떨어졌다. 뷰의 판단(m_idleAllowed)은 건드리지 않는다 —
         // 뽑기 도중 재활성됐다고 부유가 되살아나면 카드가 빠져나가는 중에 팩이 흔들린다.
         m_touching = false;
+        // 광채도 같은 이유로 뷰의 판단을 따라간다 — 뽑기 도중 재활성됐다고 걷어 둔 빛이 도로 켜지면 안 된다.
+        // 페이드 없이 즉시 맞춘다(재활성 순간에 빛이 차오르는 것도 되살아나는 것으로 보인다).
+        m_glowFade = m_idleAllowed ? 1f : 0f;
         if (tearHandle != null) tearHandle.OnProgress += HandleTearProgress;
     }
 
@@ -118,6 +136,7 @@ public class PackShellRig : MonoBehaviour
         m_idleAllowed = true;
         m_touching = false;
         m_settle = 1f;
+        m_glowFade = 1f;   // 개봉 시작마다 광채를 되살린다 — 지난 세션에서 걷어 둔 채로 시작하면 팩이 맨몸으로 등장한다.
         Apply();
     }
 
@@ -151,6 +170,16 @@ public class PackShellRig : MonoBehaviour
         // 정지/재개를 비율로 섞는다 — 툭 끊기면 그 자체가 눈에 띈다.
         float t_target = IdleRunning ? 1f : 0f;
         m_settle = Mathf.Lerp(m_settle, t_target, 1f - Mathf.Exp(-settleSpeed * t_dt));
+
+        // 광채만 IdleRunning이 아니라 m_idleAllowed를 따른다(m_glowFade 선언부 주석 참고).
+        //
+        // ⚠ 위 m_settle과 달리 지수 감쇠를 쓰지 않는다. 지수는 0에 닿지 않아 꼬리가 남는데,
+        //   그 꼬리가 곧 "팩은 이미 다 내려갔는데 빛만 늦게 꺼진다"로 보인다.
+        //   여기 필요한 것은 부드러운 수렴이 아니라 이동과 같은 시각에 끝나는 유한한 시간이라 등속으로 민다.
+        float t_glowTarget = m_idleAllowed ? 1f : 0f;
+        m_glowFade = glowFadeDuration > 0.001f
+            ? Mathf.MoveTowards(m_glowFade, t_glowTarget, t_dt / glowFadeDuration)
+            : t_glowTarget;
 
         Apply();
     }
@@ -213,13 +242,23 @@ public class PackShellRig : MonoBehaviour
         t_g.color = t_c;
     }
 
+    // 밝기는 펄스를 타고, 빛살은 제자리에서 천천히 돈다. 개봉이 시작되면 m_glowFade가 밝기를 걷어
+    // 빛이 사그라들고, 회전은 그와 무관하게 남은 밝기만큼만 보인다.
+    //
+    // 알파를 트윈으로 걷지 않는 이유는 이 클래스의 전제 그대로다(헤더 주석) — 여기가 glow.color를
+    // 매 프레임 쓰는 유일한 지점이라, 밖에서 트윈을 걸면 다음 LateUpdate가 그대로 덮어쓴다.
     void ApplyGlow(float _pulse01)
     {
         if (glow == null) return;
 
         var t_c = glow.color;
-        t_c.a = Mathf.Lerp(glowAlphaMin, glowAlphaMax, _pulse01);
+        t_c.a = Mathf.Lerp(glowAlphaMin, glowAlphaMax, _pulse01) * m_glowFade;
         glow.color = t_c;
+
+        // 회전에는 m_settle도 m_glowFade도 곱하지 않는다 — 누적 각도라 비율을 곱하면 멈출 때
+        // 빛살이 0도로 되감긴다. 손가락이 닿아 아이들이 서면 m_time이 멈추므로 회전도 그 자리에 선다(그게 의도한 정지다).
+        if (Mathf.Abs(glowSpinPeriod) > 0.01f)
+            glow.transform.localRotation = Quaternion.Euler(0f, 0f, m_time * 360f / glowSpinPeriod);
     }
 
     // 진행도가 조금이라도 붙으면 = 손가락이 팩을 잡고 있다.

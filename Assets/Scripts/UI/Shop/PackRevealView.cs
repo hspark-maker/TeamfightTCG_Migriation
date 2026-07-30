@@ -54,7 +54,7 @@ public class PackRevealView : MonoBehaviour
     [Range(0.3f, 1f)] [SerializeField] float cardInPackScale = 0.8f;
     [Tooltip("뽑혀 나온 더미가 정착하는 중심(화면 기준 = 캔버스 참조px, 0,0이 화면 한가운데). " +
              "팩은 화면 아래에 잠겨 있고 더미는 여기까지 올라온다 — 둘의 거리가 곧 \"뽑혀 나온 거리\"다. " +
-             "카드가 1376x1926로 커서 y가 ~597를 넘으면 윗변이 화면 밖으로 나간다.")]
+             "카드가 700x930이라 y가 ~1095를 넘으면 윗변이 화면 밖으로 나간다(3120 참조 높이 기준).")]
     [SerializeField] Vector2 cardEmergeCenter = Vector2.zero;
 
     [Header("자리잡기 (스와이프 직후)")]
@@ -106,9 +106,22 @@ public class PackRevealView : MonoBehaviour
              "화면을 덮는 어둠은 PackStage보다 앞 sibling의 별도 Dim이 상시 깔고 있다.")]
     [SerializeField] CanvasGroup revealPanel;
 
+    [Header("신규 카드 반응")]
+    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. 씬의 Dim에 붙인 PackScreenFlash를 물린다. " +
+             "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
+    [SerializeField] PackScreenFlash newCardFlash;
+
+    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 골드가 얼마 돌아왔나"를 말한다 —
+    // 결과 격자에는 칩이 없으므로(PackCardView.PlayRefundAccent) 이 줄이 그 축의 유일한 답이다.
+    //
+    // ⚠ 칩과 획득 버튼은 **같은 앵커 기준(화면 하단)**이어야 한다. 한쪽만 중앙 앵커면 화면비가 바뀔 때
+    //   서로 파고들고, 화면비가 낮으면(태블릿) 칩이 화면 밖으로 밀려난다.
     [Header("표시 (옵션)")]
-    [SerializeField] TMP_Text remainingText;       // 남은 장수
+    [Tooltip("코인+합계 숫자 칩 묶음. 미배선이면 숫자만 토글된다(뒷배경 없이).")]
+    [SerializeField] GameObject totalRefundBadge;
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
+    [Tooltip("합계가 0에서 이 값까지 굴러 오르는 시간. 0이면 곧장 최종 숫자.")]
+    [SerializeField] float totalRefundCountUp = 0.5f;
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
     [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
     [SerializeField] PackResultGrid resultGrid;
@@ -130,6 +143,9 @@ public class PackRevealView : MonoBehaviour
 
     // 현재 스테이지의 시간 기반 연출. 스킵은 이걸 Complete로 밀어 다음 단계로 넘긴다.
     Sequence m_stageSeq;
+
+    // 환급 합계가 굴러 오르는 트윈. 다음 개봉이 시작될 때 끊지 않으면 이전 세션의 숫자가 계속 올라간다.
+    Tween m_totalRefundTween;
 
     // 스킵 횟수. 첫 번째는 현재 단계만, 두 번째부터는 요약까지 단번에.
     int m_skips;
@@ -167,6 +183,9 @@ public class PackRevealView : MonoBehaviour
         if (summaryGroup != null) summaryGroup.SetActive(false);
         if (skipButton != null) skipButton.gameObject.SetActive(true);
 
+        // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
+        KillTotalRefundTween();
+
         // 카드는 여기서 단 한 번 세워 팩 속에 넣는다. 이후 어느 단계도 카드를 "등장"시키지 않는다.
         if (cardStack != null)
         {
@@ -194,10 +213,9 @@ public class PackRevealView : MonoBehaviour
 
         if (cardStack != null)
         {
-            cardStack.OnCardRevealed    += HandleCardRevealed;
-            cardStack.OnRemainingChanged += HandleRemainingChanged;
-            cardStack.OnEmptied         += HandleStackEmptied;
-            cardStack.OnSkipRequested   += RequestSkip;
+            cardStack.OnCardRevealed  += HandleCardRevealed;
+            cardStack.OnEmptied       += HandleStackEmptied;
+            cardStack.OnSkipRequested += RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
@@ -213,10 +231,9 @@ public class PackRevealView : MonoBehaviour
 
         if (cardStack != null)
         {
-            cardStack.OnCardRevealed    -= HandleCardRevealed;
-            cardStack.OnRemainingChanged -= HandleRemainingChanged;
-            cardStack.OnEmptied         -= HandleStackEmptied;
-            cardStack.OnSkipRequested   -= RequestSkip;
+            cardStack.OnCardRevealed  -= HandleCardRevealed;
+            cardStack.OnEmptied       -= HandleStackEmptied;
+            cardStack.OnSkipRequested -= RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
@@ -375,6 +392,8 @@ public class PackRevealView : MonoBehaviour
 
         // 더미가 솟고 팩이 빠진다 — 시작 시각도 길이도 같게 묶는다.
         // 이 한 쌍이 연출의 축이다: 어긋나면 "서로 반대로 미끄러지며 뽑혔다"가 아니라 각자 따로 노는 것으로 읽힌다.
+        // 단 더미 쪽 시퀀스는 cardPullDuration보다 조금 길다 — 뒷장이 앞장을 따라붙는 꼬리가 뒤에 붙기 때문이다
+        // (PackCardStack.PlayEmerge). 맞물려야 하는 것은 이 축의 시작·길이이고, 그 꼬리는 팩이 이미 화면 밖일 때 닫힌다.
         // 아래쪽은 팩 앞면이 계속 가리므로, 그동안 카드는 입구에서 빠져나오는 것으로 보인다.
         if (cardStack != null)
         {
@@ -407,6 +426,7 @@ public class PackRevealView : MonoBehaviour
                            packSagSquash, cardPullDuration * 0.8f).SetEase(Ease.OutCubic));
 
             // 다 빠진 뒤엔 꺼 둔다 — 팩은 화면 밖이지만 카드·결과 패널 위를 계속 덮고 있다.
+            // 기준은 팩 자신의 퇴장이 끝나는 시각이다(더미의 따라붙기 꼬리와는 무관 — 팩은 그 전에 이미 화면 밖이다).
             m_stageSeq.InsertCallback(cardPullDelay + cardPullDuration, () => shellRig.HideShells());
         }
 
@@ -448,21 +468,57 @@ public class PackRevealView : MonoBehaviour
         GateInput(true);
 
         if (skipButton != null) skipButton.gameObject.SetActive(false);
-        if (remainingText != null) remainingText.gameObject.SetActive(false);
         if (summaryGroup != null) summaryGroup.SetActive(true);
 
         // 격자는 더미와 별개로 결과 사본을 새로 세운다 — 밀려나 사라진 카드를 여기서 다시 만난다.
         if (resultGrid != null) resultGrid.Show(m_pending != null ? m_pending.Cards : null, _instant);
 
-        if (totalRefundText != null)
-        {
-            long t_refund = m_pending != null ? m_pending.TotalRefund : 0;
-            // 환급이 없으면 줄 자체를 숨긴다 — "+0"은 정보가 아니라 잡음이다.
-            totalRefundText.gameObject.SetActive(t_refund > 0);
-            if (t_refund > 0) totalRefundText.text = $"+{t_refund:N0}";
-        }
+        PlayTotalRefund(m_pending != null ? m_pending.TotalRefund : 0, _instant);
 
         OnRevealComplete?.Invoke();
+    }
+
+    // 환급 합계 줄을 세운다. 0이면 줄 자체를 숨긴다 — "+0"은 정보가 아니라 잡음이다.
+    // 숫자는 0에서 굴러 오른다: 합계는 이 화면의 정산이고, 정산은 세어 보이는 편이 받은 느낌을 준다.
+    void PlayTotalRefund(long _refund, bool _instant)
+    {
+        KillTotalRefundTween();
+
+        bool t_show = _refund > 0;
+        if (totalRefundBadge != null) totalRefundBadge.SetActive(t_show);
+
+        // 칩이 미배선이어도 숫자만으로 성립하도록 텍스트도 직접 토글한다.
+        if (totalRefundText != null) totalRefundText.gameObject.SetActive(t_show);
+
+        if (!t_show || totalRefundText == null) return;
+
+        if (_instant || totalRefundCountUp <= 0f)
+        {
+            totalRefundText.text = $"+{_refund:N0}";
+            return;
+        }
+
+        totalRefundText.text = "+0";
+
+        // long을 직접 트윈할 플러그인이 없어 float로 굴리고 표시할 때 되돌린다.
+        float t_shown = 0f;
+        m_totalRefundTween = DOTween.To(() => t_shown, _v =>
+                             {
+                                 t_shown = _v;
+                                 if (totalRefundText != null) totalRefundText.text = $"+{(long)_v:N0}";
+                             }, (float)_refund, totalRefundCountUp)
+                             .SetEase(Ease.OutCubic)
+                             .SetLink(totalRefundText.gameObject)
+                             // 굴리다 끊기면 최종 숫자가 아닌 중간값이 남는다 — 마지막 한 번을 못 박는다.
+                             .OnKill(() => { if (totalRefundText != null) totalRefundText.text = $"+{_refund:N0}"; });
+    }
+
+    void KillTotalRefundTween()
+    {
+        if (m_totalRefundTween == null) return;
+
+        m_totalRefundTween.Kill();
+        m_totalRefundTween = null;
     }
 
     // ── 스킵 ────────────────────────────────────────────────────
@@ -518,17 +574,16 @@ public class PackRevealView : MonoBehaviour
 
     // ── 카드 단계 콜백 ──────────────────────────────────────────
 
-    // 새 맨 위 카드가 드러났다 — 신규/중복 강조는 이 시점에 터진다.
+    // 새 맨 위 카드가 드러났다 — 등장 타격과 신규/중복 강조는 이 시점에 터진다.
     void HandleCardRevealed(PackCardView _view)
     {
-        if (_view != null) _view.PlayRevealAccent();
-    }
+        if (_view == null) return;
 
-    void HandleRemainingChanged(int _remaining)
-    {
-        if (remainingText == null) return;
-        remainingText.text = $"{_remaining}";
-        remainingText.gameObject.SetActive(_remaining > 0);
+        _view.PlayRevealAccent();
+
+        // 카드 한 장의 축(뷰)과 화면의 축(여기)을 갈라 둔다 — 화면 전체가 반응하는 것은 신규뿐이라
+        // 그 판단을 카드 프리팹 안에 두면 "이 화면에 Dim이 있는가"를 카드가 알아야 한다.
+        if (_view.IsNew && newCardFlash != null) newCardFlash.Play();
     }
 
     // ── 보조 ────────────────────────────────────────────────────
