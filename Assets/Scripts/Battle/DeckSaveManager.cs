@@ -9,6 +9,8 @@ public static class DeckSaveManager
     public const int DECK_SIZE  = 6;
     static readonly List<CardData>[] slots = new List<CardData>[SLOT_COUNT];
     static readonly string[] names = new string[SLOT_COUNT];
+    // 덱 대표 이미지 키(DeckImageCatalog의 스프라이트 이름). 여기서는 스프라이트를 모르고 문자열만 다룬다.
+    static readonly string[] imageKeys = new string[SLOT_COUNT];
 
     static IReadOnlyList<CardData> _registry;
     static string SavePath => Path.Combine(Application.persistentDataPath, "decks.json");
@@ -16,6 +18,17 @@ public static class DeckSaveManager
     public static List<CardData> GetSlot(int _index) => slots[_index];
     public static string GetName(int _index) => string.IsNullOrEmpty(names[_index]) ? $"덱 {_index + 1}" : names[_index];
     public static void SetName(int _index, string _name) => names[_index] = _name;
+
+    // 이미지 키는 표시 경로(DeckImages)가 슬롯 범위 밖까지 훑을 수 있어 이름과 달리 범위를 방어한다.
+    public static string GetImageKey(int _index)
+        => _index >= 0 && _index < SLOT_COUNT ? (imageKeys[_index] ?? "") : "";
+
+    public static void SetImageKey(int _index, string _key)
+    {
+        if (_index < 0 || _index >= SLOT_COUNT) return;
+
+        imageKeys[_index] = _key ?? "";
+    }
 
     public static bool IsSlotValid(int _index)
         => slots[_index] != null && slots[_index].Count == DECK_SIZE && slots[_index].All(d => d != null);
@@ -34,6 +47,7 @@ public static class DeckSaveManager
     {
         slots[_index] = null;
         names[_index] = "";
+        imageKeys[_index] = "";   // 슬롯 재사용 시 새 덱이 새 이미지를 받게
         SaveToFile();
     }
 
@@ -44,10 +58,12 @@ public static class DeckSaveManager
         => _registry = _cards.ToList();
 
     [System.Serializable]
+    // 필드는 추가만(하위호환). 구 세이브에 imageKey가 없으면 빈 값으로 읽히고 표시는 폴백으로 떨어진다.
     class SlotData
     {
         public string slotName;
         public string[] cards;
+        public string imageKey;
     }
 
     [System.Serializable]
@@ -66,6 +82,7 @@ public static class DeckSaveManager
                 slotName = names[i] ?? "",
                 cards    = slots[i]?.Select(c => c != null ? c.name : "").ToArray()
                            ?? new string[0],
+                imageKey = imageKeys[i] ?? "",
             };
         }
         File.WriteAllText(SavePath, JsonUtility.ToJson(t_data));
@@ -85,6 +102,7 @@ public static class DeckSaveManager
         {
             slotName = names[_index] ?? "",
             cards    = slots[_index]?.Select(c => c != null ? c.name : "").ToArray() ?? new string[0],
+            imageKey = imageKeys[_index] ?? "",
         };
         File.WriteAllText(SavePath, JsonUtility.ToJson(t_data));
     }
@@ -117,7 +135,8 @@ public static class DeckSaveManager
             var t_slot = t_data.slots[i];
             if (t_slot == null) continue;
 
-            names[i] = t_slot.slotName ?? "";
+            names[i]     = t_slot.slotName ?? "";
+            imageKeys[i] = t_slot.imageKey ?? "";
 
             if (t_slot.cards == null || _registry == null) continue;
             slots[i] = t_slot.cards

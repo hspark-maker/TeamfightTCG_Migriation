@@ -12,6 +12,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CollectionLayoutConfig collectionLayout;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
+    // 덱 대표 이미지 후보 SO. 미배선(null)이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
+    [SerializeField] DeckImageCatalog deckImageCatalog;
 
     static bool s_booted;
 
@@ -44,6 +46,9 @@ public class BootInstaller : MonoBehaviour
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
         DeckSaveManager.SetCardRegistry(cardRegistry.All);
         DeckSaveManager.LoadFromFile();
+
+        // 덱 대표 이미지 후보 주입 — 신규 덱 저장 시 여기서 키를 뽑는다.
+        DeckImages.SetSource(deckImageCatalog);
 
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);

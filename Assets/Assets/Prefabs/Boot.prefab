@@ -51,6 +51,7 @@ MonoBehaviour:
   cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
   collectionLayout: {fileID: 11400000, guid: e7990a7c604be694486685834716e120, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
+  deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0

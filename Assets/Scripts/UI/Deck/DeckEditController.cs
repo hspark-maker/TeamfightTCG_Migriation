@@ -264,7 +264,16 @@ public class DeckEditController : MonoBehaviour
             bool   t_renamed = t_name != m_savedName;
 
             if (t_renamed) DeckSaveManager.SetName(m_slotIndex, t_name);
-            if (m_dirty || t_renamed) DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
+            if (m_dirty || t_renamed)
+            {
+                // 덱 대표 이미지는 첫 저장 때 한 번만 발급하고 이후 카드 구성이 바뀌어도 유지한다.
+                // 발급을 파일 쓰기 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
+                // 메모리에만 키가 남아 디스크와 어긋난다.
+                if (string.IsNullOrEmpty(DeckSaveManager.GetImageKey(m_slotIndex)))
+                    DeckSaveManager.SetImageKey(m_slotIndex, DeckImages.PickRandomKey());
+
+                DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
+            }
             ExitToList();
             return;
         }

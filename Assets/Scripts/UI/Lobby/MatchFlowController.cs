@@ -195,10 +195,8 @@ public class MatchFlowController : MonoBehaviour
             this.deckButtons[t_i].interactable = t_valid;
 
             if (this.deckPreviewImages == null || t_i >= this.deckPreviewImages.Length || this.deckPreviewImages[t_i] == null) continue;
-            List<CardData> t_slot = DeckSaveManager.GetSlot(t_i);
-            this.deckPreviewImages[t_i].sprite = t_valid && t_slot != null && t_slot.Count > 0 && t_slot[0] != null
-                ? t_slot[0].deckPreview
-                : this.emptySlotSprite;
+            Sprite t_preview = t_valid ? DeckImages.ResolveForSlot(t_i) : null;
+            this.deckPreviewImages[t_i].sprite = t_preview != null ? t_preview : this.emptySlotSprite;
         }
     }
 
