@@ -48,6 +48,9 @@ public class CardData : ScriptableObject
     // **등장 연출도 이 값이 정한다**(EnergyOrbDash면 슬롯 배치도 같은 구체로 날아온다 — CardAppearVfx).
     // 등장용 축을 따로 두지 않는 이유: 공격과 등장이 같은 구체를 쓰는 한 몸 연출이라 배선이 갈라지면 어긋난다.
     public CinemaAttackStyle cinemaAttackStyle;
+    // EnergyOrbDash에서 카드가 변하는 구체 프리팹. 카드마다 테마가 달라 **카드 고유 축**에 둔다
+    // (라이브러리는 규칙 기반 연출 전용). 비우면 BattleVfxLibrary의 CinemaEnergyOrb로 떨어진다.
+    public GameObject cinemaOrbPrefab;
 
     [Header("Weapon")]
     public GameObject weaponPrefab;

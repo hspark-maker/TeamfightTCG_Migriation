@@ -66,13 +66,25 @@ public static class AttackFlow
         await SynergyTriggers.AfterAttack(t_ctx);
     }
 
-    /// <summary>교활 스왑으로 물러나는 카드의 퇴장 연출. **보드 보충(FillEmptySlots/Refresh) 직전에** 부를 것 —
-    /// 그 뒤엔 슬롯 뷰가 들어온 카드를 그리고 있어 엉뚱한 카드가 나가는 그림이 된다.
+    /// <summary>교활 스왑 교대 연출: 물러나는 카드 퇴장 → 슬롯 재렌더 → 들어온 카드가 덱에서 등장.
+    ///
+    /// **보드 보충(FillEmptySlots/Refresh) 직전에** 부를 것 — 그 전에는 슬롯 뷰가 아직 물러나는 카드를
+    /// 그리고 있고, 그 창을 놓치면 엉뚱한 카드가 나가는 그림이 된다.
+    /// 스왑된 슬롯은 비어 있지 않아 보충 연출(PlayFillAnim) 대상이 아니므로 등장도 여기서 책임진다.
     /// 스왑 여부는 AttackProcessor가 세운 결과 그대로 읽는다.</summary>
-    public static UniTask PlayCunningExit(CardView _attackerView, AttackResult _result)
-        => _result.attackerSwapped ? CunningVfx.PlayExit(_attackerView) : UniTask.CompletedTask;
+    public static async UniTask PlayCunningSwap(
+        BattleFieldView _attackerFieldView, CardView _attackerView, AttackResult _result)
+    {
+        if (!_result.attackerSwapped) return;
 
-    /// <summary>발동 키워드 글로우 + 교활(swap) 등장 스케일 연출.</summary>
+        await CunningVfx.PlayExit(_attackerView);
+
+        // 들어온 카드를 슬롯에 그린 뒤 등장 — 재렌더 전에 등장을 돌리면 나간 카드가 되돌아온다.
+        _attackerFieldView?.Refresh();
+        await CunningVfx.PlayEnter(_attackerView);
+    }
+
+    /// <summary>발동 키워드 글로우 + 처형 연출. 교활 등장은 PlayCunningSwap 담당(덱에서 나오는 배치 연출).</summary>
     public static async UniTask PlayResultFlourish(
         CardView _attackerView, CardInstance _attacker, CardInstance _defender, AttackResult _result)
     {
@@ -84,11 +96,5 @@ public static class AttackFlow
         await UniTask.WhenAll(
             CardView.GetView(_attacker)?.PlayKeywordGlow(_result.attackerKeywords) ?? UniTask.CompletedTask,
             CardView.GetView(_defender)?.PlayKeywordGlow(_result.defenderKeywords) ?? UniTask.CompletedTask);
-
-        if (_result.attackerSwapped)
-        {
-            _attackerView.transform.localScale = Vector3.zero;
-            await _attackerView.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack).ToUniTask();
-        }
     }
 }

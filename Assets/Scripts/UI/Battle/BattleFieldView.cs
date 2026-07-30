@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Video;
 
 public class BattleFieldView : MonoBehaviour
 {
@@ -42,12 +43,6 @@ public class BattleFieldView : MonoBehaviour
     {
         if (_placed == null || _placed.Count == 0) return;
 
-        // 고등급 카드 등장 컷씬: 배치 연출 시작 전에 순차 재생.
-        // 자격 판정은 CardCinematicRules 단독(여기서 stage 비교 금지), 일반 카드는 Resolve가 null →
-        // Play가 즉시 완료되어 프레임 손실 없음. 순수 연출이라 _placed 순서/게임 상태는 건드리지 않는다.
-        foreach (var t_card in _placed)
-            await CardCinematicPlayer.Play(CardCinematicRules.Resolve(t_card));
-
         float t_wz = this.slotViews[0].transform.position.z;
         Vector3 t_from = this.field.OwnerIndex == TurnState.LocalOwnerIndex
             ? CameraUtil.ScreenFractionToWorld( 2f, 0f, t_wz)
@@ -70,8 +65,22 @@ public class BattleFieldView : MonoBehaviour
         for (int i = 0; i < _placed.Count; i++)
         {
             if (i > 0) await UniTask.Delay((int)(this.cardDealDelay * 1000));
-            await this.slotViews[_placed[i].slotIndex]
-                .PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
+
+            CardView t_view = this.slotViews[_placed[i].slotIndex];
+
+            // 등장 컷씬이 있는 카드는 **중앙에 멈춘 채로** 컷씬을 보고, 끝나거나 스킵된 그 시점에 슬롯으로 들어간다.
+            // 자격 판정은 CardCinematicRules 단독(여기서 stage 비교 금지). 일반 카드는 Resolve가 null이라
+            // 예전처럼 한 번에 흐른다 — 컷씬 없는 카드에 중앙 정지가 생기지 않게 분기해 둔다.
+            VideoClip t_clip = CardCinematicRules.Resolve(_placed[i]);
+            if (t_clip == null)
+            {
+                await t_view.PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
+                continue;
+            }
+
+            await t_view.PlayDealToMid(t_from, t_mid, t_dests[i], this.cardDealDuration);
+            await CardCinematicPlayer.Play(t_clip);
+            await t_view.PlayDealToSlot(t_mid, t_dests[i], this.cardDealDuration);
         }
     }
 

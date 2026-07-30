@@ -25,20 +25,22 @@ MonoBehaviour:
   - kind: 1
     attackerSlot: 0
     targetSlot: 0
-    guideMessage: "\uCE74\uB4DC\uB97C \uB4DC\uB798\uADF8\uD574\uC11C \uC0C1\uB300
-      \uCE74\uB4DC\uB85C \uB04C\uC5B4\uB2E4 \uB193\uC73C\uBA74 \uADF8 \uCE74\uB4DC\uB97C
+    guideMessage: "\uB0B4 \uCE74\uB4DC\uB97C \uD0ED\uD574 \uBB34\uC7A5\uD558\uACE0,
+      \uC0C1\uB300 \uCE74\uB4DC\uB97C \uD0ED\uD558\uBA74 \uADF8 \uCE74\uB4DC\uB97C
       \uACF5\uACA9\uD569\uB2C8\uB2E4!"
     waitForTap: 1
     dimBackground: 1
+    allowedGesture: 0
   - kind: 0
     attackerSlot: 0
     targetSlot: 0
-    guideMessage: "\uBC88\uAC1C\uBFD4(\uCCB4\uB825 5)\uC744 \uB4DC\uB798\uADF8\uD574
-      \uC55E\uC758 \uC218\uC815\uBFD4\uB8E8(\uCCB4\uB825 3)\uB97C \uACF5\uACA9! \uC77C\uBC18
-      \uCE74\uB4DC\uB294 \uC0C1\uB300 \uCCB4\uB825\uB9CC\uD07C \uBC18\uACA9\uC744
+    guideMessage: "\uBC88\uAC1C\uBFD4(\uCCB4\uB825 5)\uC744 \uD0ED\uD574 \uBB34\uC7A5\uD558\uACE0
+      \uC55E\uC758 \uC218\uC815\uBFD4\uB8E8(\uCCB4\uB825 3)\uB97C \uD0ED\uD574 \uACF5\uACA9!
+      \uC77C\uBC18 \uCE74\uB4DC\uB294 \uC0C1\uB300 \uCCB4\uB825\uB9CC\uD07C \uBC18\uACA9\uC744
       \uBC1B\uC2B5\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 0
+    allowedGesture: 0
   - kind: 1
     attackerSlot: 1
     targetSlot: 1
@@ -46,14 +48,16 @@ MonoBehaviour:
       \uBC1B\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4!"
     waitForTap: 1
     dimBackground: 1
+    allowedGesture: 0
   - kind: 0
     attackerSlot: 1
     targetSlot: 1
-    guideMessage: "\uD30C\uB3C4\uB9AC(\uC6D0\uAC70\uB9AC, \uCCB4\uB825 3)\uB97C \uB4DC\uB798\uADF8\uD574
-      \uACF5\uACA9! \uBC18\uACA9 \uD53C\uD574\uB97C \uBC1B\uC9C0 \uC54A\uACE0 \uC801\uC744
-      \uACF5\uACA9\uD569\uB2C8\uB2E4."
+    guideMessage: "\uD30C\uB3C4\uB9AC(\uC6D0\uAC70\uB9AC, \uCCB4\uB825 3)\uB97C \uD0ED\uD574
+      \uBB34\uC7A5\uD558\uACE0 \uC801\uC744 \uD0ED\uD574 \uACF5\uACA9! \uBC18\uACA9
+      \uD53C\uD574\uB97C \uBC1B\uC9C0 \uC54A\uACE0 \uC801\uC744 \uACF5\uACA9\uD569\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 0
+    allowedGesture: 0
   enemyScript:
   - kind: 0
     attackerSlot: 2
@@ -61,4 +65,6 @@ MonoBehaviour:
     guideMessage: 
     waitForTap: 0
     dimBackground: 0
+    allowedGesture: 0
   freePlayAfterScript: 0
+  enemyMaxHpOverride: 0

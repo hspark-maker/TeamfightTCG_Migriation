@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
-  m_Name: 물방울룽 3
+  m_Name: "\uBB3C\uBC29\uC6B8\uB8FD 3"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  displayName: 물방울룽 3
+  displayName: "\uBB3C\uBC29\uC6B8\uB8FD 3"
   keywords: 16
-  maxHp: 2
+  maxHp: 7
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
@@ -34,6 +34,8 @@ MonoBehaviour:
     battleImage: {fileID: 0}
   defaultEvolutionStage: 3
   appearCinematic: {fileID: 32900000, guid: eecaef79dc05eac40871dcc77fe710da, type: 3}
+  cinemaAttackStyle: 1
+  cinemaOrbPrefab: {fileID: 4327367476428695880, guid: b3bc7e8c00b948e448c60006a5f5663b, type: 3}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}

@@ -326,7 +326,7 @@ public class PlayerTurn : TurnBase
             () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-        await AttackFlow.PlayCunningExit(t_attackerView, t_result);
+        await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
 
         await this.ctx.FillAndAnimate();
 

@@ -56,6 +56,22 @@ public static class BattleVfx
         return new VfxHandle(t_poolId, t_go, t_entry.lifetime);
     }
 
+    /// <summary>라이브러리를 거치지 않고 **프리팹을 직접** 빌려 쓰는 스폰. 카드마다 다른 연출처럼
+    /// 배선 지점이 CardData 쪽인 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
+    /// 풀·정렬 규약은 Spawn과 동일하고, 수명은 호출부가 쥔다.</summary>
+    public static VfxHandle SpawnPrefab(GameObject _prefab, Vector3 _pos, int _sortingLayerId, int _sortingOrder = 30)
+    {
+        if (_prefab == null) return default;
+
+        string t_poolId = _prefab.GetInstanceID().ToString();
+        ParticlePooler.Register(t_poolId, _prefab);
+        GameObject t_go = ParticlePooler.Spawn(t_poolId, _pos, Quaternion.identity);
+        if (t_go == null) return default;
+
+        ApplySorting(t_go, _sortingLayerId, _sortingOrder);
+        return new VfxHandle(t_poolId, t_go, 0f);
+    }
+
     // 같은 id의 항목을 겹쳐 재생할 때 쓰는 재사용 버퍼(피격 = 섬광 + 먼지처럼 여러 프리팹).
     // 연출 스폰은 전부 메인 스레드 한 프레임 안에서 끝나므로 정적 버퍼로 충분하다(할당 0).
     static readonly List<VfxEntry> s_collectBuffer = new List<VfxEntry>();
