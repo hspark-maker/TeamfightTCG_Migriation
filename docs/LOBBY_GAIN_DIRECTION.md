@@ -5,6 +5,9 @@
 - 골드 → 재화 텍스트 근처에서 코인이 생겨 흩어졌다가 텍스트로 빨려들고, 숫자가 오르며 텍스트가 튄다.
 - 카드 → 도감 탭 근처에서 카드가 펼쳐졌다가 탭으로 빨려들고, 탭 아이콘이 튄다.
 
+두 연출은 **동시에** 돈다(획득 하나를 두 번에 걸쳐 알리지 않는다).
+카드는 **신규 획득분만** 날아간다 — 중복 카드는 골드로 환급되므로 코인 쪽에 이미 표현된다.
+
 지급·저장은 각 씬이 이미 끝냈다. 이 연출은 **표시만** 하며 재화를 건드리지 않는다.
 
 ## 흐름
@@ -15,11 +18,12 @@
    └ BattleRewardHandoff.Set(보상골드)             ← 연출용 표시량만 싣는다
 
 [CardPack]     PackAcquireController.OnAcquirePressed
-   └ CardPackRewardHandoff.Set(환급골드, 획득카드)  ← 환급·소유는 개봉 시점에 이미 완료
+   └ CardPackRewardHandoff.Set(환급골드, 신규카드)  ← 환급·소유는 개봉 시점에 이미 완료
+                                                   신규 판정은 DrawnCard.IsNew (덱 저장용 m_cards와 별도로 m_newCards에 캐시)
 
-[LobbyScene]   LobbyGainEffectDirector.Start → 1프레임 양보 → 캐리어 소비
-   ├ 골드 단계: CoinBurstEffect      → GoldHud.TextRect 로 수렴 + GoldHud.HoldDisplay 로 숫자 롤업 + UiPunch
-   └ 카드 단계: CardGainFlightEffect → 도감 탭(Button_Collection) 으로 수렴 + UiPunch
+[LobbyScene]   LobbyGainEffectDirector.Start → 1프레임 양보 → 캐리어 소비 → 두 단계를 0초에 함께 꽂아 동시 재생
+   ├ 골드: CoinBurstEffect      → GoldHud.TextRect 로 수렴 + GoldHud.HoldDisplay 로 숫자 롤업 + UiPunch
+   └ 카드: CardGainFlightEffect → 도감 탭(Button_Collection) 으로 수렴 + UiPunch
 ```
 
 두 캐리어의 골드는 **합산해서 한 번에** 보여준다(전투 보상 + 중복 환급).
@@ -75,7 +79,6 @@
 - `coinCountMin/Max` — 코인 장수 범위(획득 골드량을 이 사이로 클램프). 기본 4~12
 - `coinAngleStart/Span` — 코인이 흩어지는 부채꼴. 기본 `195°~345°`(수치 아래쪽으로 퍼뜨려 화면 밖 이탈 방지)
 - `goldPunch` / `tabPunch` — 도착 강조 세기
-- `stageGap` — 골드 연출과 카드 연출 사이 간격
 
 `CardGainFlightEffect`
 - `cardSize` / `scatterRadius` / `angleStart`(기본 55°) / `angleSpan`(기본 70°, 위쪽 부채꼴)
@@ -86,5 +89,6 @@
 플레이 모드에서만 눈으로 확인 가능하다(에디트 모드에서는 트윈이 돌지 않는다).
 
 1. 로비 → 배틀 → 전투 승/패 → 결과 팝업 터치 → 로비 복귀 → 코인 연출 + 골드 롤업
-2. 로비 → 뽑기 탭 → 구매 → 개봉 → 획득 → 로비 복귀 → 카드가 도감 탭으로 빨려듦
-   (이미 가진 카드가 섞이면 환급 골드 연출도 함께 나온다)
+2. 로비 → 뽑기 탭 → 구매 → 개봉 → 획득 → 로비 복귀 → **신규** 카드가 도감 탭으로 빨려듦
+   - 중복 카드가 섞여 있으면 그 카드는 날아가지 않고, 대신 환급 골드가 코인 연출로 **동시에** 나온다
+   - 전부 중복이면 코인 연출만, 전부 신규면 카드 연출만 나온다

@@ -8,7 +8,8 @@ using UnityEngine.UI;
 // 전투(BattleRewardHandoff)와 카드팩(CardPackRewardHandoff) 캐리어를 소비해
 //   골드 → 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
-// 순서로 재생한다.
+// 두 단계를 동시에 재생한다(획득 하나를 두 번에 걸쳐 알리지 않는다).
+// 카드는 신규만 온다 — 중복분은 환급 골드로 코인 쪽에 이미 섞여 있다(PackAcquireController가 걸러 싣는다).
 //
 // 경계: 지급·저장은 각 씬이 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
 // 배선을 비워두면 이름으로 자동 탐색한다 — 로비 프리팹 수정 없이도 동작하게(자동 탐색 실패 시 그 단계만 건너뛴다).
@@ -35,8 +36,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
     [SerializeField] float coinAngleSpan = 150f;
     [SerializeField] float goldPunch = 0.35f;
     [SerializeField] float tabPunch = 0.3f;
-    [Tooltip("골드 연출과 카드 연출 사이 간격(초).")]
-    [SerializeField] float stageGap = 0.15f;
 
     // 런타임에 만든 하위 연출기(직렬화 배선이 있으면 그것을 쓴다).
     CoinBurstEffect m_coinBurst;
@@ -79,8 +78,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
         var t_master = DOTween.Sequence().SetLink(gameObject);
 
-        bool t_goldStaged = t_gold > 0L && TryAppendGoldStage(t_master, t_gold);
-        bool t_cardStaged = t_cardCount > 0 && TryAppendCardStage(t_master, t_cards, t_goldStaged);
+        bool t_goldStaged = t_gold > 0L && TryStageGold(t_master, t_gold);
+        bool t_cardStaged = t_cardCount > 0 && TryStageCards(t_master, t_cards);
 
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
         if (!t_goldStaged && !t_cardStaged)
@@ -93,7 +92,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (t_goldStaged) t_master.OnKill(() => { if (this.goldHud != null) this.goldHud.ReleaseDisplay(); });
     }
 
-    bool TryAppendGoldStage(Sequence _master, long _gold)
+    bool TryStageGold(Sequence _master, long _gold)
     {
         if (this.goldHud == null) this.goldHud = FindFirstObjectByType<GoldHud>(FindObjectsInactive.Include);
 
@@ -119,12 +118,15 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 수치 근처에서 생겨나 수치로 되돌아온다 — 원점과 목적지가 같고 흩어짐만 부채꼴로 준다.
         t_burst.Configure(this.coinSprite, t_textRect, t_textRect, t_count, this.coinAngleStart, this.coinAngleSpan);
 
-        _master.AppendCallback(() => this.goldHud.HoldDisplay(t_start));
-        _master.Append(t_burst.BuildBurst((_arrived, _total) => OnCoinArrived(t_start, _gold, _arrived, _total)));
+        // 되돌리기는 지금 바로 — 시퀀스는 이 프레임에 재생을 시작하므로 콜백으로 미룰 이유가 없다.
+        this.goldHud.HoldDisplay(t_start);
+
+        // 카드 단계와 같은 0초에 꽂아 동시에 돌린다.
+        _master.Insert(0f, t_burst.BuildBurst((_arrived, _total) => OnCoinArrived(t_start, _gold, _arrived, _total)));
         return true;
     }
 
-    bool TryAppendCardStage(Sequence _master, IReadOnlyList<CardData> _cards, bool _afterGold)
+    bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards)
     {
         if (this.collectionTabTarget == null) this.collectionTabTarget = FindTabTarget();
         if (this.collectionTabTarget == null)
@@ -136,8 +138,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_flight = EnsureCardFlight();
         t_flight.Configure(this.collectionTabTarget, this.collectionTabTarget);
 
-        if (_afterGold) _master.AppendInterval(this.stageGap);
-        _master.Append(t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
+        _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
         return true;
     }
 

@@ -3485,7 +3485,6 @@ MonoBehaviour:
   coinAngleSpan: 150
   goldPunch: 0.35
   tabPunch: 0.3
-  stageGap: 0.15
 --- !u!1 &1682686617818935015
 GameObject:
   m_ObjectHideFlags: 0
