@@ -813,8 +813,10 @@ MonoBehaviour:
   cardLayer: {fileID: 94768938}
   stackAnchor: {fileID: 1369735609}
   cardPrefab: {fileID: 578743590242808315, guid: 538e09231d0498c45ab05cfea2c1f107, type: 3}
-  stackJitterPos: 6
-  stackJitterAngle: 1
+  emergeLagStep: {x: 0, y: -5}
+  emergeLagStagger: 0.03
+  topFloatAmplitude: 4
+  topFloatPeriod: 2.5
   flickThreshold: 110
   flickSpeed: 700
   flickMinDistance: 20
@@ -2189,7 +2191,6 @@ MonoBehaviour:
   packExitTilt: -9
   packExitBack: 0.5
   revealPanel: {fileID: 130962628}
-  remainingText: {fileID: 0}
   totalRefundText: {fileID: 1376200665}
   summaryGroup: {fileID: 1535240951}
   resultGrid: {fileID: 1535240953}

@@ -54,7 +54,7 @@ public class PackRevealView : MonoBehaviour
     [Range(0.3f, 1f)] [SerializeField] float cardInPackScale = 0.8f;
     [Tooltip("뽑혀 나온 더미가 정착하는 중심(화면 기준 = 캔버스 참조px, 0,0이 화면 한가운데). " +
              "팩은 화면 아래에 잠겨 있고 더미는 여기까지 올라온다 — 둘의 거리가 곧 \"뽑혀 나온 거리\"다. " +
-             "카드가 1376x1926로 커서 y가 ~597를 넘으면 윗변이 화면 밖으로 나간다.")]
+             "카드가 700x930이라 y가 ~1095를 넘으면 윗변이 화면 밖으로 나간다(3120 참조 높이 기준).")]
     [SerializeField] Vector2 cardEmergeCenter = Vector2.zero;
 
     [Header("자리잡기 (스와이프 직후)")]
@@ -107,7 +107,6 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] CanvasGroup revealPanel;
 
     [Header("표시 (옵션)")]
-    [SerializeField] TMP_Text remainingText;       // 남은 장수
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
     [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
@@ -194,10 +193,9 @@ public class PackRevealView : MonoBehaviour
 
         if (cardStack != null)
         {
-            cardStack.OnCardRevealed    += HandleCardRevealed;
-            cardStack.OnRemainingChanged += HandleRemainingChanged;
-            cardStack.OnEmptied         += HandleStackEmptied;
-            cardStack.OnSkipRequested   += RequestSkip;
+            cardStack.OnCardRevealed  += HandleCardRevealed;
+            cardStack.OnEmptied       += HandleStackEmptied;
+            cardStack.OnSkipRequested += RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
@@ -213,10 +211,9 @@ public class PackRevealView : MonoBehaviour
 
         if (cardStack != null)
         {
-            cardStack.OnCardRevealed    -= HandleCardRevealed;
-            cardStack.OnRemainingChanged -= HandleRemainingChanged;
-            cardStack.OnEmptied         -= HandleStackEmptied;
-            cardStack.OnSkipRequested   -= RequestSkip;
+            cardStack.OnCardRevealed  -= HandleCardRevealed;
+            cardStack.OnEmptied       -= HandleStackEmptied;
+            cardStack.OnSkipRequested -= RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
@@ -375,6 +372,8 @@ public class PackRevealView : MonoBehaviour
 
         // 더미가 솟고 팩이 빠진다 — 시작 시각도 길이도 같게 묶는다.
         // 이 한 쌍이 연출의 축이다: 어긋나면 "서로 반대로 미끄러지며 뽑혔다"가 아니라 각자 따로 노는 것으로 읽힌다.
+        // 단 더미 쪽 시퀀스는 cardPullDuration보다 조금 길다 — 뒷장이 앞장을 따라붙는 꼬리가 뒤에 붙기 때문이다
+        // (PackCardStack.PlayEmerge). 맞물려야 하는 것은 이 축의 시작·길이이고, 그 꼬리는 팩이 이미 화면 밖일 때 닫힌다.
         // 아래쪽은 팩 앞면이 계속 가리므로, 그동안 카드는 입구에서 빠져나오는 것으로 보인다.
         if (cardStack != null)
         {
@@ -407,6 +406,7 @@ public class PackRevealView : MonoBehaviour
                            packSagSquash, cardPullDuration * 0.8f).SetEase(Ease.OutCubic));
 
             // 다 빠진 뒤엔 꺼 둔다 — 팩은 화면 밖이지만 카드·결과 패널 위를 계속 덮고 있다.
+            // 기준은 팩 자신의 퇴장이 끝나는 시각이다(더미의 따라붙기 꼬리와는 무관 — 팩은 그 전에 이미 화면 밖이다).
             m_stageSeq.InsertCallback(cardPullDelay + cardPullDuration, () => shellRig.HideShells());
         }
 
@@ -448,7 +448,6 @@ public class PackRevealView : MonoBehaviour
         GateInput(true);
 
         if (skipButton != null) skipButton.gameObject.SetActive(false);
-        if (remainingText != null) remainingText.gameObject.SetActive(false);
         if (summaryGroup != null) summaryGroup.SetActive(true);
 
         // 격자는 더미와 별개로 결과 사본을 새로 세운다 — 밀려나 사라진 카드를 여기서 다시 만난다.
@@ -518,17 +517,10 @@ public class PackRevealView : MonoBehaviour
 
     // ── 카드 단계 콜백 ──────────────────────────────────────────
 
-    // 새 맨 위 카드가 드러났다 — 신규/중복 강조는 이 시점에 터진다.
+    // 새 맨 위 카드가 드러났다 — 등장 타격과 신규/중복 강조는 이 시점에 터진다.
     void HandleCardRevealed(PackCardView _view)
     {
         if (_view != null) _view.PlayRevealAccent();
-    }
-
-    void HandleRemainingChanged(int _remaining)
-    {
-        if (remainingText == null) return;
-        remainingText.text = $"{_remaining}";
-        remainingText.gameObject.SetActive(_remaining > 0);
     }
 
     // ── 보조 ────────────────────────────────────────────────────

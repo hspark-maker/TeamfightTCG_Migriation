@@ -20,9 +20,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     // 새 카드가 맨 위로 드러났다(첫 장 포함). 강조 재생은 구독자가 결정한다.
     public event Action<PackCardView> OnCardRevealed;
 
-    // 남은 장수가 바뀌었다(카운터 표시용).
-    public event Action<int> OnRemainingChanged;
-
     // 마지막 장까지 밀려 더미가 비었다.
     public event Action OnEmptied;
 
@@ -36,10 +33,19 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     [SerializeField] RectTransform stackAnchor;
     [SerializeField] PackCardView cardPrefab;
 
-    [Header("더미 겹침")]
-    [Tooltip("겹친 카드 사이의 미세 어긋남. 0이면 종이 느낌이 죽는다.")]
-    [SerializeField] float stackJitterPos = 2f;
-    [SerializeField] float stackJitterAngle = 1f;
+    [Header("등장 따라붙기")]
+    [Tooltip("뒷장 한 장당 뒤처지는 거리(카드 로컬px). 팩 속에선 그만큼 더 깊이 잠겨 " +
+             "봉인이 찢겨도 맨 위 한 장의 윗변만 구멍으로 삐져나온다.")]
+    [SerializeField] Vector2 emergeLagStep = new Vector2(0f, -26f);
+    [Tooltip("뒷장이 앞장을 따라붙기 시작하는 시차(초). n장이면 마지막 장이 (n-1)×이 값만큼 늦게 도착한다 " +
+             "— 그 꼬리가 곧 \"탁 정리되는\" 한 박자다.")]
+    [SerializeField] float emergeLagStagger = 0.045f;
+
+    [Header("맨 위 카드 부유")]
+    [Tooltip("제자리 기준 상하 진폭(px). 정지한 UI가 아니라 손에 들린 물체로 읽히게 하는 최소한의 움직임.")]
+    [SerializeField] float topFloatAmplitude = 4f;
+    [Tooltip("부유 왕복 한 주기(초).")]
+    [SerializeField] float topFloatPeriod = 2.5f;
 
     [Header("스와이프")]
     [Tooltip("이만큼 밀면 넘어간다(방향 무관 — 민 거리 그대로). 못 미치면 제자리로 되돌아온다.")]
@@ -65,15 +71,19 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     // 날아가는 중인 카드. 연출이 끝나기 전에 Clear가 들어와도 화면에 유령이 남지 않게 추적한다.
     readonly List<PackCardView> m_dismissing = new List<PackCardView>();
 
-    // 카드가 처음 놓인 자리(되감기 기준). 미세 지터가 섞여 있어 앵커 값과 다르다.
-    readonly Dictionary<PackCardView, Vector2> m_home = new Dictionary<PackCardView, Vector2>();
+    // 카드가 쉬는 자리(되감기·부유의 기준). 모든 카드가 같은 자리에 정확히 겹쳐야 더미가 "한 장"으로 읽히므로
+    // 카드별로 갈라 둘 값이 아니다 — 등장 중의 어긋남은 좌표가 아니라 도착 시각의 차이로 만든다.
+    Vector2 m_cardHome;
 
     Canvas m_canvas;
     bool m_interactable;
     bool m_dragging;
 
-    // 팩에서 뽑혀 나오는 등장 연출의 기준(=평소 자리). 더미 전체를 cardLayer 한 덩어리로 줄였다 펴므로
-    // 개별 카드의 홈 좌표(m_home)는 건드리지 않는다 — 등장과 넘기기가 같은 좌표를 두고 다투지 않게 한 분리다.
+    // 등장(따라붙기)이 카드 자리를 쥐고 있는 동안만 참. 중첩된 트윈은 끊을 수 없으니 이 플래그로 손을 떼게 한다.
+    bool m_emerging;
+
+    // 팩에서 뽑혀 나오는 등장 연출의 기준(=평소 자리). 뭉치 이동은 cardLayer 한 덩어리로 처리하므로
+    // 카드가 쉬는 자리(m_cardHome)는 건드리지 않는다 — 등장과 넘기기가 같은 좌표를 두고 다투지 않게 한 분리다.
     Vector2 m_layerHome;
     Vector3 m_layerScaleHome;
     bool m_layerHomeCaptured;
@@ -106,6 +116,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return;
         }
 
+        m_cardHome = stackAnchor.anchoredPosition;
+
         int t_count = _cards != null ? _cards.Count : 0;
 
         // 뒤에서부터 만들어 인덱스 0이 마지막 sibling(=가장 위에 그려짐)이 되게 한다.
@@ -118,19 +130,61 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             t_view.Bind(t_drawn);
 
             var t_rt = (RectTransform)t_view.transform;
-            var t_home = stackAnchor.anchoredPosition + new Vector2(
-                UnityEngine.Random.Range(-stackJitterPos, stackJitterPos),
-                UnityEngine.Random.Range(-stackJitterPos, stackJitterPos));
 
-            t_rt.anchoredPosition = t_home;
-            t_rt.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-stackJitterAngle, stackJitterAngle));
+            // 회전은 처음부터 0이다 — 각도가 어긋나면 몇 장이 겹쳤는지 세어지고 "한 장"이 깨진다.
+            t_rt.localRotation = Quaternion.identity;
             t_rt.localScale = Vector3.one;
 
-            m_home[t_view] = t_home;
             m_stack.Insert(0, t_view);   // 역순 생성이라 앞에 꽂아야 위→아래 순서가 맞는다.
         }
 
-        OnRemainingChanged?.Invoke(m_stack.Count);
+        // 자리는 더미 순서가 확정된 뒤에 잡는다 — 빈 카드를 건너뛰면 원본 인덱스와 더미 깊이가 어긋나고,
+        // 뒤처짐은 "몇 번째 카드였나"가 아니라 "몇 장 아래에 깔렸나"에 따라야 한다.
+        ResetEmergeLag();
+    }
+
+    // 아직 아무것도 따라붙지 않은 상태 — 각 카드가 깊이만큼 뒤로 물려 있다.
+    void ResetEmergeLag() => ApplyEmergeLag(0f, 1f);
+
+    /// <summary>
+    /// 등장 경과 시각(_elapsed)에 맞춰 모든 카드의 자리를 다시 계산한다.
+    /// 쉬는 자리는 전부 같고 여기서 주는 것은 "아직 도착하지 않은 만큼"일 뿐이다 —
+    /// 깊은 카드가 늦게 출발하는 그 시차가 곧 "뒷장이 앞장을 따라 올라온다"로 읽힌다.
+    ///
+    /// 카드마다 트윈을 따로 만들지 않고 시각 하나로 전부 다시 계산하는 이유는 <see cref="PlayEmerge"/> 참고.
+    /// </summary>
+    void ApplyEmergeLag(float _elapsed, float _duration)
+    {
+        for (int t_i = 0; t_i < m_stack.Count; t_i++)
+        {
+            if (m_stack[t_i] == null) continue;
+
+            float t_progress = _duration > 0f
+                ? Mathf.Clamp01((_elapsed - t_i * emergeLagStagger) / _duration)
+                : 1f;
+
+            // InOutQuint — 잠깐 뒤처져 버티다 쭉 붙고 멈춘다. OutBack류는 쓸 수 없다(제자리를 지나쳐 다시 어긋난다).
+            float t_closed = DOVirtual.EasedValue(0f, 1f, t_progress, Ease.InOutQuint);
+
+            ((RectTransform)m_stack[t_i].transform).anchoredPosition =
+                m_cardHome + emergeLagStep * (t_i * (1f - t_closed));
+        }
+    }
+
+    // 카드를 전부 쉬는 상태로 되돌린다(연출 중단 대비). 등장 도중 끊기면 계단 모양으로 굳는데,
+    // 지터가 있던 시절엔 그냥 겹친 더미로 보였지만 정렬이 규약이 된 지금은 고장으로 보인다.
+    void SnapCardsHome()
+    {
+        for (int t_i = 0; t_i < m_stack.Count; t_i++)
+        {
+            // OnDisable은 씬이 걷히는 중에도 온다 — 이미 파괴된 카드가 섞여 있을 수 있는 유일한 경로다.
+            if (m_stack[t_i] == null) continue;
+
+            var t_rt = (RectTransform)m_stack[t_i].transform;
+            t_rt.anchoredPosition = m_cardHome;
+            t_rt.localRotation = Quaternion.identity;
+            m_stack[t_i].SnapPunchToRest();
+        }
     }
 
     /// <summary>
@@ -173,11 +227,36 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_layerSettled = LayerPosFor(_targetCenter, _targetScale);
         m_layerSettledScale = m_layerScaleHome * _targetScale;
 
-        return DOTween.Sequence()
+        var t_seq = DOTween.Sequence()
             .SetLink(cardLayer.gameObject)
             // 살짝 넘겼다 내려앉는다 — 뽑혀 나온 물건은 관성으로 한 번 튄다. 과하면 "커졌다"로 읽히므로 약하게.
             .Join(cardLayer.DOAnchorPos(m_layerSettled, _duration).SetEase(Ease.OutBack, 1.05f))
             .Join(cardLayer.DOScale(m_layerSettledScale, _duration).SetEase(Ease.OutCubic));
+
+        // 뒷장이 앞장을 따라붙는다. 뭉치 이동은 위에서 cardLayer가 통째로 맡고, 여기서 닫는 것은
+        // Build가 깊이만큼 벌려 둔 뒤처짐뿐이다 — 두 축이 겹쳐 "따라 올라온다"가 된다.
+        //
+        // ⚠ 카드마다 트윈을 만들어 이 시퀀스에 끼우면 안 된다. 시퀀스에 들어간 트윈은 DOTween의 active 목록에서
+        //   빠지므로 DOKill(target)이 닿지 않고 개별 Kill·SetLink도 거부된다 — 등장 도중 Clear가 들어오면
+        //   이미 파괴된 RectTransform에 계속 쓰는 트윈이 남는다. 그래서 굴리는 것은 경과 시각 하나뿐이고
+        //   자리는 setter가 매 프레임 현재 더미를 보고 다시 계산한다(더미가 비면 아무것도 하지 않는다).
+        // 시퀀스 길이도 이 트윈이 결정한다 — 따라붙기 꼬리까지 끝난 뒤에 다음 단계로 넘어가야 한다.
+        float t_span = _duration + Mathf.Max(0, m_stack.Count - 1) * emergeLagStagger;
+        float t_elapsed = 0f;
+
+        // 등장을 중단시키는 손잡이는 이 플래그 하나다. 반환한 시퀀스는 호출부의 흐름에 중첩되므로
+        // 이쪽에서 Kill·SnapEmerged·DOKill 어느 것으로도 멈출 수 없다(위 ⚠ 참고) — 그래서 트윈을 끊는 대신
+        // setter가 스스로 손을 떼게 한다. 이게 없으면 더미를 걷은 뒤에도 다음 프레임에 계단을 다시 그린다.
+        m_emerging = true;
+
+        // 가감속은 카드별로 setter가 따로 입힌다 → 굴리는 시각 자체는 등속이어야 한다.
+        t_seq.Join(DOTween.To(() => t_elapsed,
+                              _v => { t_elapsed = _v; if (m_emerging) ApplyEmergeLag(_v, _duration); },
+                              t_span, t_span)
+                          .SetEase(Ease.Linear)
+                          .OnComplete(() => m_emerging = false));
+
+        return t_seq;
     }
 
     // 지정 중심(무대 로컬)에 더미를 놓기 위한 레이어 좌표.
@@ -201,7 +280,39 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void BeginInteraction()
     {
         m_interactable = true;
-        if (m_stack.Count > 0) OnCardRevealed?.Invoke(m_stack[0]);
+        if (m_stack.Count == 0) return;
+
+        // 알림이 먼저다 — 구독자의 등장 강조(스케일 펀치)가 부유(위치)보다 뒤에 걸리면
+        // 그쪽이 이 트랜스폼을 DOKill하며 부유까지 함께 끊는다. 두 축은 타깃이 같다.
+        OnCardRevealed?.Invoke(m_stack[0]);
+        StartFloat(m_stack[0]);
+    }
+
+    // 맨 위 카드만 제자리에서 미세하게 뜬다. 아래 카드는 건드리지 않는다 — 하나만 살아 있어야 그 대비가 읽힌다.
+    // 대상을 인자로 받는 이유: 호출 시점(되감기 완료 콜백 포함)마다 "지금 맨 위"를 다시 물으면
+    // 그사이 맨 위가 바뀌었는지를 추론해야 한다. 걸 대상은 호출부가 이미 알고 있다.
+    //
+    // DOKill을 부르지 않는 이유: 카드가 맨 위가 되는 것은 생애 한 번이고, 되돌리기 경로는 OnBeginDrag가
+    // 이미 트윈을 걷어낸 뒤다. 여기서 걷으면 같은 트랜스폼에 방금 걸린 등장 펀치(스케일)까지 죽는다.
+    void StartFloat(PackCardView _view)
+    {
+        if (_view == null || topFloatAmplitude <= 0f || topFloatPeriod <= 0f) return;
+
+        var t_rt = (RectTransform)_view.transform;
+
+        // 제자리에서 그대로 떠오른다 — 진폭 끝으로 순간이동시켜 시작하면 등장·되감기가 착지한 바로 다음 프레임에
+        // 툭 튄다. 가장 매끄러워야 하는 두 지점이라 4px도 눈에 걸린다.
+        // 그래서 첫 구간만 1/4주기로 위 끝까지 올리고, 거기서부터 반주기 왕복(=한 주기 topFloatPeriod)에 넘긴다.
+        t_rt.DOAnchorPosY(m_cardHome.y + topFloatAmplitude, topFloatPeriod * 0.25f)
+            .SetEase(Ease.InOutSine)
+            .SetLink(t_rt.gameObject)
+            .OnComplete(() =>
+            {
+                t_rt.DOAnchorPosY(m_cardHome.y - topFloatAmplitude, topFloatPeriod * 0.5f)
+                    .SetEase(Ease.InOutSine)
+                    .SetLoops(-1, LoopType.Yoyo)
+                    .SetLink(t_rt.gameObject);
+            });
     }
 
     /// <summary>남은 카드를 전부 즉시 치운다(스킵). 결과는 곧이어 뜨는 결과 격자가 보여준다.</summary>
@@ -209,13 +320,13 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         m_interactable = false;
         m_dragging = false;
+        m_emerging = false;   // 카드를 지우는 중이다 — 등장 setter가 더 손대지 않게 먼저 뗀다.
 
         while (m_stack.Count > 0)
         {
             var t_view = m_stack[0];
             m_stack.RemoveAt(0);
 
-            m_home.Remove(t_view);
             if (t_view != null)
             {
                 t_view.transform.DOKill();
@@ -223,13 +334,15 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             }
         }
 
-        OnRemainingChanged?.Invoke(0);
         OnEmptied?.Invoke();
     }
 
     /// <summary>생성된 카드를 모두 제거(다음 개봉 세션 대비). 날아가는 중인 카드도 함께 걷는다.</summary>
     public void Clear()
     {
+        // 파괴보다 먼저 뗀다 — 등장 setter는 이 클래스가 끊을 수 없는 중첩 트윈이 굴린다(PlayEmerge의 ⚠ 참고).
+        m_emerging = false;
+
         for (int t_i = 0; t_i < m_stack.Count; t_i++)
             if (m_stack[t_i] != null) Destroy(m_stack[t_i].gameObject);
 
@@ -238,7 +351,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         m_stack.Clear();
         m_dismissing.Clear();
-        m_home.Clear();
         m_interactable = false;
         m_dragging = false;
 
@@ -253,7 +365,12 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_dragSpeed = 0f;
 
         var t_top = m_stack[0];
-        if (t_top != null) t_top.transform.DOKill();
+        if (t_top == null) return;
+
+        // DOKill은 타깃 단위라 부유(위치)와 함께 카드 뷰의 등장 펀치(스케일)도 걷힌다 —
+        // 재생 중에 끊기면 어긋난 배율에 굳으므로 뷰에 제자리를 되돌리게 한다.
+        t_top.transform.DOKill();
+        t_top.SnapPunchToRest();
     }
 
     public void OnDrag(PointerEventData _e)
@@ -275,7 +392,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (t_dt > 0f) m_dragSpeed = t_move.magnitude / t_dt;
 
         // 민 만큼 기운다 — 손에 붙는 느낌은 위치보다 회전에서 온다(기울기는 좌우 성분만 반영).
-        float t_dx = t_rt.anchoredPosition.x - HomeOf(m_stack[0]).x;
+        float t_dx = t_rt.anchoredPosition.x - m_cardHome.x;
         t_rt.localRotation = Quaternion.Euler(0f, 0f, -t_dx * dragTiltPerPixel);
     }
 
@@ -289,7 +406,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (t_rt == null) return;
 
         // 방향을 가리지 않는다 — 어느 쪽으로 밀었든 민 거리로 판정하고 그 방향으로 날려보낸다.
-        var t_offset = t_rt.anchoredPosition - HomeOf(t_top);
+        var t_offset = t_rt.anchoredPosition - m_cardHome;
         float t_dist = t_offset.magnitude;
 
         // 거리가 찼거나, 짧아도 충분히 빠르게 튕겼으면 넘긴다.
@@ -305,11 +422,16 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         m_stack.RemoveAt(0);
         DismissCard(t_top, t_offset / Mathf.Max(0.0001f, t_dist));   // 민 방향 그대로 날려보낸다.
 
-        OnRemainingChanged?.Invoke(m_stack.Count);
-
         // 위 장이 비켜난 순간 아래 장은 이미 완전히 드러나 있다.
-        if (m_stack.Count > 0) OnCardRevealed?.Invoke(m_stack[0]);
-        else OnEmptied?.Invoke();
+        if (m_stack.Count == 0)
+        {
+            OnEmptied?.Invoke();
+            return;
+        }
+
+        // 알림 → 부유 순서는 BeginInteraction과 같다(강조의 DOKill이 부유를 삼키지 않게).
+        OnCardRevealed?.Invoke(m_stack[0]);
+        StartFloat(m_stack[0]);
     }
 
     public void OnPointerClick(PointerEventData _e)
@@ -323,8 +445,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     void DismissCard(PackCardView _view, Vector2 _dir)
     {
         if (_view == null) return;
-
-        m_home.Remove(_view);
 
         var t_rt = (RectTransform)_view.transform;
         t_rt.DOKill();
@@ -349,22 +469,21 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         });
     }
 
-    // 임계에 못 미친 카드를 원래 자리로 되돌린다.
+    // 임계에 못 미친 카드를 원래 자리로 되돌린다. 되돌아온 뒤엔 부유를 되찾는다 —
+    // 손을 뗀 카드가 굳어 있으면 조금 밀어봤다는 이유로 맨 위가 죽은 것처럼 보인다.
     void ReturnHome(PackCardView _view)
     {
         if (_view == null) return;
 
         var t_rt = (RectTransform)_view.transform;
         t_rt.DOKill();
-        t_rt.DOAnchorPos(HomeOf(_view), returnDuration).SetEase(Ease.OutBack).SetLink(_view.gameObject);
+        t_rt.DOAnchorPos(m_cardHome, returnDuration).SetEase(Ease.OutBack)
+            .SetLink(_view.gameObject).OnComplete(() => StartFloat(_view));
         t_rt.DOLocalRotate(Vector3.zero, returnDuration).SetLink(_view.gameObject);
     }
 
     RectTransform TopRect()
         => m_stack.Count > 0 && m_stack[0] != null ? (RectTransform)m_stack[0].transform : null;
-
-    Vector2 HomeOf(PackCardView _view)
-        => _view != null && m_home.TryGetValue(_view, out var t_home) ? t_home : Vector2.zero;
 
     void CaptureLayerHome()
     {
@@ -379,9 +498,16 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     void OnDisable()
     {
+        // 등장 setter가 먼저 손을 떼야 아래 SnapCardsHome이 실제로 남는다 — 트윈 쪽은 끊을 수 없다.
+        m_emerging = false;
+
         // 연출 도중 비활성 시 좀비 트윈 정리 + 입력 상태 리셋(재활성 후 유령 드래그 방지).
         for (int t_i = 0; t_i < m_stack.Count; t_i++)
             if (m_stack[t_i] != null) m_stack[t_i].transform.DOKill();
+
+        // 등장·부유·미는 도중에 끊겼으면 카드가 그 자리에 굳는다 — 자리를 되돌려 다음 표시가 그 상태를 물려받지 않게 한다.
+        // 레이어만 되돌리고(SnapEmerged) 카드는 두면 계단 모양으로 어긋난 더미가 그대로 남는다.
+        SnapCardsHome();
 
         // 날아가던 카드는 도착지가 화면 밖이다 — 트윈만 끊으면 반투명 유령이 남으므로 여기서 정리한다.
         for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
