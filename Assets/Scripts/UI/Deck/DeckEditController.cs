@@ -116,12 +116,30 @@ public class DeckEditController : MonoBehaviour
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
+    void OnEnable()
+    {
+        OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+    }
+
+    // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
+    // 그리드는 스스로 Build 하지 않는다 — "장착중 딤"에 필요한 편성 상태를 아는 쪽이 여기뿐이라 재빌드도 여기서 건다.
+    void OnOwnershipChanged()
+    {
+        if (!IsOpen || collectionGrid == null) return;
+
+        // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
+        collectionGrid.Build(OnTileDragRequest);
+        RefreshAll();
+    }
+
     // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
     // Close()는 DeckTabController를 거치는 경로에서만 불린다.
     // 편집 상태(m_slotIndex)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
     // DeckTabController.IsEditing이 거짓을 보고한다.
     void OnDisable()
     {
+        OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+
         m_slotIndex = -1;
         m_dirty     = false;
         m_savedName = null;

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 전투 결과 팝업의 등장 연출 진행자.
-// 흐름: 암막 → 패널 팝 → 골드 라인(코인 분출·수렴, 도착마다 수치 롤링) → 랭크 라인(같은 문법) → 안내문.
+// 흐름: 암막 → 패널 팝 → 골드·랭크 라인 동시 진행(코인 분출·수렴, 도착마다 수치 롤링) → 안내문.
 // 패배 팝업은 라인 등장까지만 하고 분출·롤링을 접는다 — 같은 스크립트를 승패 플래그로 갈라 쓴다.
 //
 // 보상·랭크는 전투가 끝나는 순간 TurnRunner→RewardService/RankManager가 이미 지급·영속화했다.
@@ -78,8 +78,11 @@ public class GameResultPopup : MonoBehaviour
 
         this.revealSeq.Append(this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
 
-        AppendCounter(this.m_gold, this.coinBurst, _won);
-        AppendCounter(this.m_rank, this.rankBurst, _won);
+        bool t_lineStarted = false;
+
+        // 골드·랭크는 같은 시점에 함께 굴러간다 — 첫 라인만 Append하고 나머지는 Join으로 겹친다.
+        JoinCounter(BuildCounterLine(this.m_gold, this.coinBurst, _won), ref t_lineStarted);
+        JoinCounter(BuildCounterLine(this.m_rank, this.rankBurst, _won), ref t_lineStarted);
 
         if (this.hintGroup != null)
             this.revealSeq.Append(this.hintGroup.DOFade(1f, this.hintFadeDuration));
@@ -93,27 +96,40 @@ public class GameResultPopup : MonoBehaviour
         });
     }
 
-    // 라인 하나(수치 팝 → 아이콘 분출·수렴)를 등장 시퀀스에 잇는다.
+    // 라인 하나(수치 팝 → 아이콘 분출·수렴)를 독립 시퀀스로 만든다. 텍스트 미배선이면 null(라인 자체가 없음).
     // _animate=false면 라인이 등장만 하고 수치는 확정값에 박힌 채로 있는다(패배 팝업).
-    void AppendCounter(RollingCounter _counter, CoinBurstEffect _burst, bool _animate)
+    Sequence BuildCounterLine(RollingCounter _counter, CoinBurstEffect _burst, bool _animate)
     {
         Tween t_reveal = _counter.BuildReveal(this.rewardRevealDuration);
-        if (t_reveal == null) return;   // 텍스트 미배선 = 라인 자체가 없음.
+        if (t_reveal == null) return null;
 
-        this.revealSeq.Append(t_reveal);
+        Sequence t_line = DOTween.Sequence();
+        t_line.Append(t_reveal);
 
-        if (!_animate || _counter.Total == 0) return;   // 가감이 없으면 굴릴 것도 없다.
+        if (!_animate || _counter.Total == 0) return t_line;   // 가감이 없으면 굴릴 것도 없다.
 
         // 아이콘이 튀어 수치로 빨려들고, 닿을 때마다 그만큼 숫자가 굴러 오른다.
         if (_burst != null && _counter.Total > 0)
         {
-            this.revealSeq.Append(_burst.BuildBurst(_counter.HandleArrived));
-            return;
+            t_line.Append(_burst.BuildBurst(_counter.HandleArrived));
+            return t_line;
         }
 
         // 분출이 미배선이거나 값이 음수면 아이콘 없이 수치만 한 번에 굴린다.
-        this.revealSeq.AppendCallback(() => _counter.HandleArrived(1, 1));
-        this.revealSeq.AppendInterval(this.goldRollDuration);
+        t_line.AppendCallback(() => _counter.HandleArrived(1, 1));
+        t_line.AppendInterval(this.goldRollDuration);
+        return t_line;
+    }
+
+    // 첫 라인은 패널 등장 뒤에 붙이고(Append), 이후 라인은 같은 시점에 겹친다(Join).
+    void JoinCounter(Sequence _line, ref bool _started)
+    {
+        if (_line == null) return;
+
+        if (_started) this.revealSeq.Join(_line);
+        else          this.revealSeq.Append(_line);
+
+        _started = true;
     }
 
     // 연출 시작 상태로 되돌린다(재진입 대비).
