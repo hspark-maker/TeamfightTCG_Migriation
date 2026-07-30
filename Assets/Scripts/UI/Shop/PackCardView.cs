@@ -14,8 +14,8 @@ using UnityEngine.UI;
 //
 // 강조는 두 순간으로 갈린다. 섞으면 결과 화면이 개봉 연출의 잔상처럼 보이거나, 반대로 낱장 확인이
 // 결과판처럼 밋밋해진다:
-//   PlayRevealAccent() — 지금 이 한 장이 드러난 순간. 펀치·플래시(전 카드) + 신규 전용 광선·림라이트.
-//   ApplyResultContrast() — 결과 격자에 놓인 상태. 신규는 광채가 계속 돌고 중복은 탈채도된 채 놓인다.
+//   PlayRevealAccent() — 지금 이 한 장이 드러난 순간. 펀치·플래시(전 카드) + 신규 전용 림라이트.
+//   ApplyResultContrast() — 결과 격자에 놓인 상태. 신규는 림라이트가 계속 돌고 중복은 탈채도된 채 놓인다.
 // 화면 전체가 반응하는 축(Dim 번쩍임)은 여기 없다 — 그것은 카드 한 장의 것이 아니라 화면의 것이라
 // 진행자(PackRevealView)가 신규일 때만 쏜다.
 public class PackCardView : MonoBehaviour
@@ -94,11 +94,6 @@ public class PackCardView : MonoBehaviour
     [SerializeField] float rimSweepDuration = 0.6f;
     [Tooltip("결과 격자에서 신규 카드의 림라이트가 계속 도는 속도(회/초). 셰이더가 스스로 돌려 코드 트윈이 없다. 0이면 결과판에서는 멈춘다.")]
     [SerializeField] float rimResultSpeed = 0.12f;
-
-    [Header("신규 후광")]
-    [Tooltip("카드 뒤에서 터져 나와 천천히 도는 방사형 광선(신규 전용). " +
-             "카드보다 먼저 그려지는 sibling이어야 한다 — 앞에 두면 아트가 가려진다. 미배선이면 광선 없음.")]
-    [SerializeField] PackCardAura newAura;
 
     [Header("결과 격자 대비")]
     [Tooltip("결과 격자에서 중복 카드를 이만큼 탈채도한다(0=그대로, 1=완전 흑백). " +
@@ -189,13 +184,9 @@ public class PackCardView : MonoBehaviour
         // 펀치처럼 빼버리면 안 되는 이유는 반대다: 빼면 rate가 0에 남아 띠가 카드 앞에 걸린 채로 굳는다.
         PlayCardGleam(_instant);
 
-        // 카드 뒤 광선과 테두리 림라이트는 "지금 이 한 장이 나왔다"는 순간의 것이라 즉시 모드엔 없다.
+        // 테두리 림라이트는 "지금 이 한 장이 나왔다"는 순간의 것이라 즉시 모드엔 없다.
         // 결과 격자의 지속 대비는 ApplyResultContrast가 따로 쥔다 — 한 메서드가 두 순간을 겸하지 않게 갈랐다.
-        if (IsNew && !_instant)
-        {
-            if (newAura != null) newAura.PlayBurst();
-            PlayRim();
-        }
+        if (IsNew && !_instant) PlayRim();
 
         if (IsNew) PlayNewBadge(_instant);
         else PlayRefundAccent(_instant);
@@ -203,7 +194,7 @@ public class PackCardView : MonoBehaviour
 
     /// <summary>
     /// 결과 격자에 놓인 상태의 신규/중복 대비. 여기서 주는 것은 순간이 아니라 지속 상태다 —
-    /// 신규는 광채가 계속 돌고 중복은 탈채도된 채 놓여, 마지막 화면이 "이번에 뭘 건졌나"를 한눈에 말한다.
+    /// 신규는 림라이트가 계속 돌고 중복은 탈채도된 채 놓여, 마지막 화면이 "이번에 뭘 건졌나"를 한눈에 말한다.
     ///
     /// 격자의 팝(PackResultGrid.PlayPop)은 전 카드 동일하게 둔다. 정렬과 리듬이 어긋나면 격자가
     /// 결과판이 아니라 또 한 번의 연출로 읽힌다 — 대비는 움직임이 아니라 이 상태 차이로 준다.
@@ -212,15 +203,12 @@ public class PackCardView : MonoBehaviour
     {
         if (IsNew)
         {
-            if (newAura != null) newAura.ShowSustained();
-
             // 림라이트는 셰이더가 스스로 돌린다(autoPlaySpeed) — 카드가 여러 장이라 장당 트윈을 굴리지 않는다.
             SetRim(true);
             if (cardRim != null) cardRim.edgeShinyAutoPlaySpeed = rimResultSpeed;
             return;
         }
 
-        if (newAura != null) newAura.Hide();
         SetRim(false);
 
         // 탈채도는 Frame의 UIEffect 한 곳에 걸면 Replica가 붙은 아트·프레임 장식까지 함께 빠진다
@@ -323,11 +311,9 @@ public class PackCardView : MonoBehaviour
         }
 
         // 림라이트를 내린다. rate 0은 "안 보이는 상태"가 아니므로 노드째 꺼야 한다(SetRim 주석 참고).
+        // 더미에 깔린 카드들은 아직 자기 차례가 아니라 여기서 전부 내려간 상태로 시작한다.
         if (cardRim != null) DOTween.Kill(cardRim);
         SetRim(false);
-
-        // 뒤 광선은 신규가 드러나는 순간에만 켠다 — 더미에 깔린 카드들은 아직 자기 차례가 아니다.
-        if (newAura != null) newAura.Hide();
 
         if (revealFlash != null)
         {

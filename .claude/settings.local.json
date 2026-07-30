@@ -97,7 +97,9 @@
       "Bash(awk '/guid: 2d48dc1ed65a4bc479b284cadfb38ba4/{f=1} f{print NR\": \"$0} f&&/^--- /&&NR>1{if\\(++c>1\\)exit}' \"Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab\")",
       "Bash(node -e ' *)",
       "Bash(node \"C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/6357b1b4-41a8-48d3-a2c0-2699bef25323/scratchpad/dump.js\" \"Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab\")",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git ls-tree *)",
+      "Bash(git update-index *)"
     ]
   },
   "enabledMcpjsonServers": [
