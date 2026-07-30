@@ -21,4 +21,23 @@ public static class CardCinematicRules
         _card.cinematicShown = true;
         return t_clip;
     }
+
+    /// <summary>시네마 공격 연출(1vs1 클로즈업)을 받을 최소 진화 단계.</summary>
+    public const int CINEMA_ATTACK_STAGE = 3;
+
+    /// <summary>이 공격이 시네마 연출 대상인가. **3단계 카드의 첫 공격 1회만** —
+    /// 등장 컷씬으로 들어온 카드가 처음 치는 순간을 클로즈업으로 보여주고, 이후 공격은 일반 연출로 돌아간다.
+    ///
+    /// 판정 즉시 래치를 소비하므로 한 공격에 한 번만 호출해야 한다(AttackSequence.PlayCore 한 곳).
+    /// 입력은 stage(마스터데이터 파생, 양 클라 동일)와 인스턴스 래치뿐이고 RNG·게임상태를 건드리지 않는다 →
+    /// 같은 순서로 공격이 일어나는 두 클라에서 같은 결과가 나온다(연출만 갈릴 뿐 규칙 타임라인은 ResolveHits 공용).</summary>
+    public static bool TryConsumeCinemaAttack(CardInstance _attacker)
+    {
+        if (_attacker == null) return false;
+        if (_attacker.evolutionStage < CINEMA_ATTACK_STAGE) return false;
+        if (_attacker.cinemaAttackUsed) return false;
+
+        _attacker.cinemaAttackUsed = true;
+        return true;
+    }
 }

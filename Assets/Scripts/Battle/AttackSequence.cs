@@ -56,17 +56,20 @@ public static class AttackSequence
         Func<UniTask> _afterHit = null)
         => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
-    /// <summary>공격력이 이 값 이상이면 특별(시네마) 연출. 표시 공격력과 동일한 CardInstance.AttackDamage() 기준.</summary>
-    public const int CINEMA_ATTACK_THRESHOLD = 6;
-
-    /// <summary>시네마 연출 대상인가. 공격자의 실제 공격력(도발 반감·시너지·흐름 포함) ≥ 임계값.
-    /// 히트 해결 전에 평가하므로 카드 UI에 표시 중인 값과 일치. 순수 판정 — RNG 미소비, 양 클라 동일 입력 → 동일 결과.</summary>
+    /// <summary>시네마 연출 대상인가. **3단계 진화 카드의 첫 공격 1회만** — 등장 컷씬으로 들어온 카드가
+    /// 처음 치는 순간을 클로즈업으로 보여주고, 그 뒤로는 일반 연출(박치기)로 돌아간다.
+    /// 판정·래치는 CardCinematicRules 단독 소유(여기서 stage를 직접 비교하지 않는다).
+    ///
+    /// 구 규칙(공격력 ≥ 6이면 시네마)은 폐기했다 — 고체력 방어형이 시네마를 남발했고,
+    /// "진화 카드의 등장 후 첫 일격"이라는 연출 의도와 무관한 기준이었다.
+    ///
+    /// **래치를 소비하므로 한 공격에 한 번만 호출**해야 한다(PlayCore 한 곳).</summary>
     static bool IsCinemaAttack(CardView _attacker)
-        => (_attacker?.BoundCard?.AttackDamage() ?? 0) >= CINEMA_ATTACK_THRESHOLD;
+        => CardCinematicRules.TryConsumeCinemaAttack(_attacker?.BoundCard);
 
     /// <summary>연출 디스패치. 두 프레젠테이션 공유 히트해결(ResolveHits)로 데미지/사망 타이밍 일치.
     /// - 일반(PlayNormal): 자기 위치에서 적 방향으로 각도 틀고 박치기.
-    /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1. 공격력 CINEMA_ATTACK_THRESHOLD 이상일 때.</summary>
+    /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1. 3단계 진화 카드의 첫 공격 1회.</summary>
     static UniTask PlayCore(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit,
@@ -299,9 +302,14 @@ public static class AttackSequence
         if (t_hitDelay > 0f)
             await UniTask.Delay((int)(t_hitDelay * 1000));
 
-        // 시네마 자리에서 일반 연출과 동일한 박치기(윈드업→돌진→반동). 복귀점=시네마 위치,
-        // 슬롯 복귀는 아래 RestoreAfterAttack가 담당. 공격자 없음(환경 피해)이면 히트만.
-        if (_attacker != null)
+        // 시네마 자리에서의 타격 모션. 카드마다 다른 연출을 주는 분기점 — 어떤 카드가 어떤 연출인지는
+        // CardData.cinemaAttackStyle이 소유하고, 연출 구현은 여기 있다. 데미지 해결은 어느 쪽이든 ResolveHits 공용.
+        CinemaAttackStyle t_style = _attacker?.BoundCard?.data != null
+            ? _attacker.BoundCard.data.cinemaAttackStyle : CinemaAttackStyle.Default;
+
+        if (_attacker != null && t_style == CinemaAttackStyle.EnergyOrbDash)
+            await EnergyOrbDash(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit);
+        else if (_attacker != null)
             await Headbutt(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
                 _home: _attacker.transform.position);
         else
@@ -315,6 +323,83 @@ public static class AttackSequence
             _splashView?.MoveTo(t_splashOrigin) ?? UniTask.CompletedTask);
 
         CardView.RestoreAllFades();
+    }
+
+    // ── 시네마 연출 변형: 에너지 구체 돌진 ───────────────────────────────
+    // 카드가 알파로 사라지며 에너지 구체로 변해 상대에게 돌진 → 충돌(히트) → 구체가 제자리로 돌아오며 카드가 다시 나타난다.
+    // 프리팹은 BattleVfxLibrary(BattleVfxId.CinemaEnergyOrb) 소유 — 미배선이면 구체 없이 카드가 그대로 돌진한다(무동작 안전).
+
+    const float ORB_MORPH_DUR  = 0.14f;   // 카드 → 구체 (알파 아웃)
+    const float ORB_DASH_DUR   = 0.16f;   // 구체가 상대까지
+    const float ORB_RETURN_DUR = 0.22f;   // 구체가 제자리로
+    const float ORB_LUNGE_T    = 0.82f;   // 상대 쪽으로 얼마나 파고드는가(1=완전겹침)
+    const float ORB_DASH_SCALE = 1.8f;    // 돌진 중 구체가 커지는 배율(제자리 크기 대비) — 이동 궤적이 굵게 보이도록
+
+    static async UniTask EnergyOrbDash(CardView _attacker, CardView _defender, CardView _splashView,
+        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+    {
+        Transform t_atk  = _attacker.transform;
+        Vector3   t_home = t_atk.position;
+
+        Vector3 t_impact = Vector3.Lerp(t_home, _defender.transform.position, ORB_LUNGE_T);
+        t_impact.z = t_home.z;   // 평면 유지(뒤로 파고들지 않게) — 박치기와 같은 규약
+
+        float t_morph  = ORB_MORPH_DUR  * GameTiming.Factor;
+        float t_dash   = ORB_DASH_DUR   * GameTiming.Factor;
+        float t_return = ORB_RETURN_DUR * GameTiming.Factor;
+
+        // 1) 카드가 사라지며 구체 등장. 구체는 카드 자리에서 태어난다.
+        _attacker.FadeView(0f, t_morph);
+        VfxHandle t_orb = BattleVfx.Spawn(BattleVfxId.CinemaEnergyOrb, t_home, _attacker.VfxSortingLayerId);
+        await UniTask.Delay((int)(t_morph * 1000));
+
+        Transform t_orbTr = t_orb.Valid ? t_orb.Go.transform : null;
+
+        // 2) 돌진. 구체가 없으면(미배선) 카드 본체를 그대로 옮긴다 — 연출이 비어 보이지 않게.
+        Transform t_mover = t_orbTr != null ? t_orbTr : t_atk;
+        if (t_orbTr == null) _attacker.FadeView(1f, 0f);
+
+        t_mover.DOKill();
+
+        // 돌진하는 동안만 구체를 키운다(멈춰 있을 땐 원래 크기) — 이동 궤적이 굵고 세게 보이도록.
+        // **풀 반납 전 반드시 원복**한다(HealVfx와 같은 규약). 안 하면 다음 스폰이 커진 채로 나온다.
+        Vector3 t_orbScale = t_orbTr != null ? t_orbTr.localScale : Vector3.one;
+        if (t_orbTr != null)
+            t_orbTr.DOScale(t_orbScale * ORB_DASH_SCALE, t_dash).SetEase(Ease.OutQuad).SetLink(t_orbTr.gameObject);
+
+        await t_mover.DOMove(t_impact, t_dash).SetEase(Ease.InQuad).ToUniTask();
+
+        // 3) 충돌 = 데미지·피격·사망 해결(박치기와 동일 지점). 복귀 모션과 병렬로 흘린다.
+        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+            _skipRemain: true);
+
+        async UniTask ReturnHome()
+        {
+            // 복귀도 "이동"이므로 커진 채로 돌아오고, 제자리에 닿으면서 원래 크기로 줄어든다.
+            if (t_orbTr != null)
+                t_orbTr.DOScale(t_orbScale, t_return).SetEase(Ease.InQuad).SetLink(t_orbTr.gameObject);
+
+            await t_mover.DOMove(t_home, t_return).SetEase(Ease.OutQuad).ToUniTask();
+
+            _attacker.SetArmedVfx(false);   // 박치기의 반동 지점과 같은 의미 — 복귀가 끝나면 무장 해제
+            _attacker.FadeView(1f, t_morph);   // 구체가 카드 자리로 돌아오며 카드가 다시 나타난다
+            await UniTask.Delay((int)(t_morph * 1000));
+
+            // 반납 전 확정 원복(트윈이 중간에 끊겼을 수 있다) — 풀에서 다시 나올 때 커진 채로 나오지 않게.
+            if (t_orbTr != null)
+            {
+                t_orbTr.DOKill();
+                t_orbTr.localScale = t_orbScale;
+            }
+
+            t_orb.Release();   // 자기반납형 프리팹이면 무동작
+        }
+
+        await UniTask.WhenAll(t_resolve, ReturnHome());
+
+        // 페이드가 중간에 끊겼을 경우를 대비한 확정 복원(다음 연출이 반투명 카드로 시작하지 않게).
+        _attacker.FadeView(1f, 0f);
+        t_atk.position = t_home;
     }
 
     // ── 공유: 히트/반격/사망/공격후 해결 ────────────────────────────────

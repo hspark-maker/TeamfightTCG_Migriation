@@ -44,6 +44,10 @@ public class CardData : ScriptableObject
     public int defaultEvolutionStage;
     // 등장 컷씬. null이면 컷씬 없음(대부분의 카드가 여기 해당 — 판정은 CardCinematicRules 단일 지점).
     public VideoClip appearCinematic;
+    // 시네마 공격(3단계 첫 공격) 연출 종류. 카드마다 다른 연출을 주는 축 — 연출 구현은 AttackSequence 소유.
+    // **등장 연출도 이 값이 정한다**(EnergyOrbDash면 슬롯 배치도 같은 구체로 날아온다 — CardAppearVfx).
+    // 등장용 축을 따로 두지 않는 이유: 공격과 등장이 같은 구체를 쓰는 한 몸 연출이라 배선이 갈라지면 어긋난다.
+    public CinemaAttackStyle cinemaAttackStyle;
 
     [Header("Weapon")]
     public GameObject weaponPrefab;

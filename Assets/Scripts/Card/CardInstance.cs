@@ -40,6 +40,9 @@ public class CardInstance
     // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
     // 세팅/조회는 CardCinematicRules에서만 한다(호출부에 판정이 흩어지지 않게).
     public bool cinematicShown;
+    // 시네마 공격 1회성 래치. 3단계 카드가 **처음 공격할 때**만 클로즈업 연출을 받고 이후엔 일반 연출로 돌아간다.
+    // 세팅/조회는 CardCinematicRules.TryConsumeCinemaAttack에서만 한다.
+    public bool cinemaAttackUsed;
 
     public bool IsAlive => this.hp > 0;
     public bool HasKeyword(CardKeyword _kw) => (this.data.keywords | this.runtimeKeywords | this.synergyKeywords).HasFlag(_kw);

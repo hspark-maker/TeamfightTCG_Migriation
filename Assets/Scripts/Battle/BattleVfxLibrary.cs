@@ -12,6 +12,7 @@ public enum BattleVfxId
     HealerImpact     = 3,   // (사용 안 함) 투사체 도착 폭발 → 카드 회복 연출(Heal)로 통합됨. 값은 재사용 금지.
     Hit              = 4,   // 피격 파티클(맞은 카드에 부착 — 숫자는 CardView 프리팹의 HitEffectView 담당)
     Heal             = 5,   // 회복 파티클(회복된 카드에 부착 — 힐러/돌보미/청소부/유산 등 모든 회복 경로 공통)
+    CinemaEnergyOrb  = 6,   // 시네마 공격(EnergyOrbDash): 카드가 변하는 에너지 구체. 수명은 호출부가 관리
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

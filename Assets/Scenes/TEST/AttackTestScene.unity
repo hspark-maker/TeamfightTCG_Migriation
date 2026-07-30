@@ -506,14 +506,14 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   playerCards:
-  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-  - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
+  - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
+  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
+  - {fileID: 11400000, guid: 63e7eda3bd74481a9d6c2f799ad20a16, type: 2}
   enemyCards:
   - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
   - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
-  useSpecialCinema: 1
+  useSpecialCinema: 0
   attackVfx:
     folder: Assets/PurchasedAssets
     filter: 
@@ -1548,6 +1548,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurnTimerUI
   label: {fileID: 509993595}
+  ring: {fileID: 0}
+  ringTrack: {fileID: 0}
+  ringGlow: {fileID: 0}
+  normalColor: {r: 0.45, g: 0.85, b: 1, a: 1}
+  warnColor: {r: 1, g: 0.78, b: 0.25, a: 1}
+  dangerColor: {r: 1, g: 0.28, b: 0.28, a: 1}
+  warnSeconds: 10
+  dangerSeconds: 5
+  punchTarget: {fileID: 0}
+  punchSeconds: 15
+  punchScale: 1.18
+  punchDuration: 0.14
+  dangerPulsePerSec: 3
+  dangerPulseAmount: 0.06
 --- !u!114 &509993595
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2228,6 +2242,56 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &723546331
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 723546333}
+  - component: {fileID: 723546332}
+  m_Layer: 0
+  m_Name: VfxDebugWindow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &723546332
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 723546331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd96cdd8dc211684783ebfe7ab359eb4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VfxDebugWindow
+  playerFieldView: {fileID: 282937760}
+  enemyFieldView: {fileID: 1542130815}
+  library: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
+  toggleKey: 282
+  openOnStart: 1
+  uiScale: 1
+--- !u!4 &723546333
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 723546331}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &733305396 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8381650083676123027, guid: 93785a3a5186d5046bf2fe80c7b270b5, type: 3}
@@ -4396,3 +4460,4 @@ SceneRoots:
   - {fileID: 1202145488}
   - {fileID: 182972993}
   - {fileID: 355149588}
+  - {fileID: 723546333}

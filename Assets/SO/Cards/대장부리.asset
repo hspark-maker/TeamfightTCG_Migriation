@@ -32,8 +32,8 @@ MonoBehaviour:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
     battleImage: {fileID: 0}
-  defaultEvolutionStage: 1
-  appearCinematic: {fileID: 32900000, guid: c0c6b8b9b2847234b9d97489d188bb54, type: 3}
+  defaultEvolutionStage: 0
+  appearCinematic: {fileID: 0}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}

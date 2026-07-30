@@ -39,6 +39,18 @@ public static class HealVfx
             FlyOne(_source, _targets[i].view, _targets[i].amount, i).Forget();
     }
 
+    /// <summary>PlayHealBurst 한 번이 끝나기까지 걸리는 시간(초). 힐러가 여럿일 때 **순차로 세우는 간격**의 기준이다
+    /// — 호출부가 타이밍 값을 직접 조립하면 이 연출의 구성이 바뀔 때마다 같이 틀어진다(여기 하나만 고치면 되게).
+    /// 마지막 대상 기준: 발동 lead + (대상 수-1)×stagger + 비행 + 도착 마무리. 모두 배속이 적용된 값.</summary>
+    public static float BurstDuration(int _targetCount)
+    {
+        int t_n = Mathf.Max(1, _targetCount);
+        return GameTiming.Battle.HealLaunchLead
+             + ((t_n - 1) * GameTiming.Battle.HealLaunchStagger)
+             + GameTiming.Battle.HealTravelDuration
+             + Mathf.Max(0.05f, GameTiming.Battle.HealTrailLinger);
+    }
+
     /// <summary>대상 1명분 비행. 대상이 파괴되면(사망/씬 전환) 취소되고 투사체는 반납된다.</summary>
     static async UniTaskVoid FlyOne(CardView _source, CardView _target, int _amount, int _index)
     {
