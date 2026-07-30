@@ -32,6 +32,18 @@ public class CardInstance
     // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
 
+    // 런타임 진화 단계. 0=미진화, 1~CardData.MaxEvolutionStage.
+    // 등급/진화 획득 시스템 미구현 — 지금은 CardData의 임시 기본값(defaultEvolutionStage)에서 주입,
+    // 세이브 연동 시 이 필드에 주입하는 지점만 바뀐다(필드 위치·소비측은 그대로).
+    public int evolutionStage;
+    // 등장 컷씬 1회성 래치. 스왑으로 대기열에 갔다가 다시 필드로 돌아오는 등 같은 인스턴스가
+    // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
+    // 세팅/조회는 CardCinematicRules에서만 한다(호출부에 판정이 흩어지지 않게).
+    public bool cinematicShown;
+    // 시네마 공격 1회성 래치. 3단계 카드가 **처음 공격할 때**만 클로즈업 연출을 받고 이후엔 일반 연출로 돌아간다.
+    // 세팅/조회는 CardCinematicRules.TryConsumeCinemaAttack에서만 한다.
+    public bool cinemaAttackUsed;
+
     public bool IsAlive => this.hp > 0;
     public bool HasKeyword(CardKeyword _kw) => (this.data.keywords | this.runtimeKeywords | this.synergyKeywords).HasFlag(_kw);
 
@@ -72,6 +84,8 @@ public class CardInstance
         this.slotIndex   = -1;
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
+        // 진화 단계 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과) — 세이브가 들어와도 여기만 교체한다.
+        this.evolutionStage = _data.defaultEvolutionStage;
     }
 
     // ── 시너지 적용 (SynergyApplier가 호출하는 계약: 덱 확정 시 1회, 가산/합집합) ──
@@ -97,14 +111,18 @@ public class CardInstance
         return (t_hpAfter, t_bonusAfter);
     }
 
-    /// <summary>체력 회복(단일 진실원). hp만 회복하며 maxHp 상한(보너스HP는 회복 대상 아님).</summary>
-    public void Heal(int _amount)
+    /// <summary>체력 회복(단일 진실원). hp만 회복하며 maxHp 상한(보너스HP는 회복 대상 아님).
+    /// 반환값 = **실제 회복량**(상한에 걸리면 0). _showEffect=false면 연출을 생략한다 —
+    /// 힐러 투사체처럼 회복 표기를 **도착 시점으로 미루는** 호출부 전용(상태 변경 시점은 그대로).</summary>
+    public int Heal(int _amount, bool _showEffect = true)
     {
-        if (_amount <= 0) return;
+        if (_amount <= 0) return 0;
         int t_before = this.hp;
         this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.data.maxHp);
+        int t_healed = this.hp - t_before;
         // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
-        if (this.hp > t_before) CardView.GetView(this)?.PlayHealEffect(this.hp - t_before);
+        if (_showEffect && t_healed > 0) CardView.GetView(this)?.PlayHealEffect(t_healed);
+        return t_healed;
     }
 
     /// <summary>돌보미: bonusHp 부여(양수만). stateful(데미지로 소진) → ClearSynergy 리셋 제외.</summary>

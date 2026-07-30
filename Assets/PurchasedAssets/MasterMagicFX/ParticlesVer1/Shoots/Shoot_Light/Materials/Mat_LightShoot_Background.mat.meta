@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c0057bd462c01ee478a4a03828b4e93a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Light/Materials/Mat_LightShoot_Background.mat
+  uploadId: 755856

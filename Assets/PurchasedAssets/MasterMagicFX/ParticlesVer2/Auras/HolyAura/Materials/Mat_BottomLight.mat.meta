@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7e0d47ac5a8b4d44abd96c621ec8875d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Auras/HolyAura/Materials/Mat_BottomLight.mat
+  uploadId: 755856

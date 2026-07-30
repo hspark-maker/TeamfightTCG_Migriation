@@ -325,6 +325,9 @@ public class PlayerTurn : TurnBase
             _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw,
             () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
+        // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
+        await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
+
         await this.ctx.FillAndAnimate();
 
         // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드 = 스크립트가 기대하는 보드 → 기준선 재동기.

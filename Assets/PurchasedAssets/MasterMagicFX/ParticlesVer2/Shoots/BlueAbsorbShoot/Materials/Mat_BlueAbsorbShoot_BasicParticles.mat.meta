@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5b72944809412694ba86c0e6758ad549
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/BlueAbsorbShoot/Materials/Mat_BlueAbsorbShoot_BasicParticles.mat
+  uploadId: 755856

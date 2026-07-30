@@ -67,10 +67,8 @@ public class GameReadyPanel : MonoBehaviour
             this.deckButtons[t_i].interactable = t_valid;
 
             if (t_i >= this.deckPreviewImages.Length || this.deckPreviewImages[t_i] == null) continue;
-            List<CardData> t_deck = DeckSaveManager.GetSlot(t_i);
-            this.deckPreviewImages[t_i].sprite = t_valid && t_deck != null && t_deck.Count > 0 && t_deck[0] != null
-                ? t_deck[0].deckPreview
-                : this.emptySlotSprite;
+            Sprite t_preview = t_valid ? DeckImages.ResolveForSlot(t_i) : null;
+            this.deckPreviewImages[t_i].sprite = t_preview != null ? t_preview : this.emptySlotSprite;
         }
     }
 

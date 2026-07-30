@@ -14,6 +14,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleTimingConfig
   globalSpeed: 1.2
   cinemaDuration: 0.25
+  atkWindDur: 0.2
+  atkWindDist: 0.4
+  atkInDur: 0.1
+  atkRecoilDur: 0.2
+  atkRecoilDist: 1
+  atkOutDur: 0.3
+  atkLungeT: 0.62
+  atkMaxLean: 40
+  prlApproachDur: 0.22
+  prlTurnDur: 0.2
+  prlReturnDur: 0.2
+  prlHitStop: 0.05
+  prlAfterHitHold: 0.01
+  prlApproachT: 0.401
+  prlMaxTurn: 16.3
+  prlSwingFront: 0
+  prlTurnSideStep: 2
+  prlWindupAngle: 30.7
+  prlSlashMaxTurn: 30
   cameraIntroDuration: 0.8
   cardDealDelay: 0.1
   cardDealDuration: 0.4
@@ -29,10 +48,15 @@ MonoBehaviour:
   fadeViewDuration: 0.3
   attackPreviewFlash: 0.55
   keywordGlowHold: 1.5
+  healLaunchLead: 0.15
+  healLaunchStagger: 0.06
+  healTravelDuration: 0.45
+  healTrailLinger: 0.25
+  mulliganNoticeHold: 1.2
   effectNotifyDisplay: 1
   effectNotifySlide: 0.2
   enemyTurnStartDelay: 0.8
   enemyExtraAttackDelay: 0.4
   opponentTurnStartDelay: 0.5
   opponentExtraAttackDelay: 0.4
-  turnThinkTime: 30
+  turnThinkTime: 999

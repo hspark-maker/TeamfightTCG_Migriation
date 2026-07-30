@@ -26,7 +26,7 @@ public class CardView : MonoBehaviour
     // 튜토리얼은 "그 카드 말고 다 검게" 위해 더 낮은 값으로 덮어쓴다(PlayerTurn이 설정).
     public static float ForcedDimAlpha = 0.3f;
 
-    enum DragState { Idle, AttackDrag, ReturnDrag }
+    enum DragState { Idle, AttackDrag }
 
     // 한 터치의 제스처 종류. 손가락이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정, 그 터치 끝까지 고정.
     // DragUp=위로 떠서 적에게 끌기(콜라이더 타깃). DragDown=아래로 끌기(좌우반전 방향 타깃). None=미확정/탭.
@@ -40,9 +40,17 @@ public class CardView : MonoBehaviour
     [Header("UI")]
     [SerializeField] TMP_Text hpText;
     [SerializeField] TMP_Text bonusHpText;
+    // 공격 선택 시 이 카드가 받을 예상 데미지("-N"). HP 라벨을 덮어써 "맞은 뒤 남을 체력"을 보여주면
+    // 현재 체력과 헷갈리므로 수치는 별도 라벨에 띄운다. 미배선이면 HP 라벨 폴백(아래 ShowAttackPreview).
+    [SerializeField] TMP_Text damagePreviewText;
     [SerializeField] TMP_Text nameText;
     [SerializeField] SpriteRenderer illustration;
-    [SerializeField] GameObject faceDownOverlay;
+    // 뒷면일 때 일러스트 자리에 대신 깔리는 그림(덱 뒷면). 미배선이면 앞면 그림이 그대로 남는다.
+    [SerializeField] Sprite cardBackSprite;
+    // 뒷면일 때 통째로 숨기는 것들: 카드 테두리(키워드 프레임 포함)와 이름·체력 표시.
+    // 뒷면은 "덱에 꽂힌 카드 한 장"이라 앞면 장식이 하나라도 남으면 반쯤 뒤집힌 것처럼 보인다.
+    [SerializeField] GameObject frameRoot;
+    [SerializeField] GameObject infoRoot;
     [SerializeField] GameObject emptyOverlay;
 
     [Header("Highlight / Glow")]
@@ -55,11 +63,30 @@ public class CardView : MonoBehaviour
     [Header("Weapon")]
     [SerializeField] Transform weaponAnchor;
 
+    [Header("Armed VFX")]
+    // 무장 이펙트를 카드 아트 위로 올릴 정렬 order(레이어는 카드와 동일하게 맞춘다).
+    [SerializeField] int armedVfxSortingOrder = 20;
+
     [Header("Keywords")]
     [SerializeField] Transform keywordIconRoot;
     [SerializeField] GameObject keywordIconPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
     [SerializeField] float iconSpacing = 0.3f;
+    // true면 키워드 아이콘을 시너지 배지 자리(좌측 세로열)에 그리고, 시너지 배지는 표시하지 않는다.
+    // 한 자리에 둘 다 그리면 겹치므로 "그 자리의 주인"은 이 스위치 하나가 정한다(양쪽 분기의 단일 진실원).
+    // false로 되돌리면 종전대로 키워드=우하단 가로줄 + 시너지 배지 복귀.
+    [SerializeField] bool keywordIconsUseSynergySlot = true;
+
+    // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
+    // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.
+    // 이름 매칭이 아니라 참조 배선인 이유: 오브젝트 이름을 바꿔도 조용히 꺼지지 않게.
+    [System.Serializable]
+    public struct KeywordFrame
+    {
+        public CardKeyword keyword;
+        public GameObject  overlay;
+    }
+    [SerializeField] KeywordFrame[] keywordFrames;
 
     [Header("Synergy")]
     [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
@@ -70,6 +97,13 @@ public class CardView : MonoBehaviour
     // 표시 최대 배지 수(초과분 드롭). 기본값은 CardVisualRules 상수 하나에서 — 프리팹 오버라이드는 남지만
     // 아웃게임 타일과 기본값이 따로 놀지 않게 코드 소스를 통일한다.
     [SerializeField] int   synergyMaxBadges   = CardVisualRules.MaxSynergyBadges;
+
+    [Header("Aim Tilt")]
+    // 조준 중 카드가 조준 방향으로 기우는 최대 각(도). 공격 돌진의 lean(maxLean)보다 작게 둬야
+    // "조준=살짝, 타격=확 꺾임"으로 읽힌다.
+    [SerializeField] float aimTiltMaxAngle = 10f;
+    // 목표 각도로 수렴하는 속도. 값이 클수록 즉각적. 프레임레이트 무관 보간에 쓴다.
+    [SerializeField] float aimTiltSpeed    = 12f;
 
     [Header("Input")]
     [SerializeField] float dragThreshold = 30f;
@@ -91,6 +125,12 @@ public class CardView : MonoBehaviour
     CardView currentTarget;
     CardView rejectedTarget;   // 직전에 거절 연출을 띄운 무효 타깃(프레임마다 반복 발화 방지). 대상이 바뀌면 다시 발화.
     GameObject weaponInstance;
+    bool       hasAimTilt;    // 조준 기울기가 걸려 있나(복원 필요 여부)
+    Quaternion aimTiltBase;   // 기울기 걸기 직전의 로컬 회전 — 조준 종료 시 여기로 되돌린다
+
+    // 무장 중 카드에 붙어 있는 이펙트(풀 대여분 + 반납 키). 비어 있으면 꺼진 상태.
+    readonly List<(string Id, GameObject Go)> armedVfx = new List<(string, GameObject)>();
+    GameObject armedVfxPrefabOverride;  // 테스터가 후보를 갈아끼울 때만 사용. null=카드 에셋 값
     Animator weaponAnimator;
     Quaternion weaponBaseRot;
     bool longPressFired;
@@ -131,6 +171,7 @@ public class CardView : MonoBehaviour
     void OnDestroy()
     {
         allViews.Remove(this);
+        HideArmedVfx();   // 풀 대여분을 물고 죽으면 풀이 파괴된 오브젝트를 들고 있게 된다
         if (this.hpText != null) this.hpText.DOKill();
     }
 
@@ -159,6 +200,8 @@ public class CardView : MonoBehaviour
             ClearTargetPreview();
             RestoreAllFades();
             FocusWeapon(false);
+            SetArmedVfx(false);   // 입력이 닫혀 무장 해제 — 공격으로 이어지지 않으므로 여기서 정리
+            ResetAimTilt();
             this.cardAnim.MoveToSlot().Forget();
         }
 
@@ -189,14 +232,23 @@ public class CardView : MonoBehaviour
         this.dragState   = DragState.Idle;
 
 
-        this.centerPos = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, transform.position.z - 0.5f);
-        this.centerPos.y = transform.position.y;
+        // 떠오르는 자리는 CardAnimator.MoveToCenter와 같은 규칙으로 잡는다 — 슬롯의 z·y를 그대로 두고
+        // 화면 가로 중앙만 취한다. transform.position.z에서 0.5를 빼면 원근 때문에 그 점이 소실점 쪽으로
+        // 끌려가 카드가 자기 줄보다 위로 떠 보인다(= 필드 중앙이 아니라 화면 중앙으로 가는 증상).
+        this.centerPos   = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, this.cardAnim.SlotPosition.z);
+        this.centerPos.y = this.cardAnim.SlotPosition.y;
 
         float t_destY = Camera.main.WorldToScreenPoint(this.centerPos).y;
         this.dragStartScreenPos   = new Vector2(Screen.width * 0.5f, t_destY);
         this.currentDragScreenPos = this.dragStartScreenPos;
 
+        // 무장 연출(무기 조준 + 이펙트)은 드래그 조준일 때만 누르는 순간 켠다.
+        // 드래그가 꺼진 지금은 "선택된 공격자"만 무장 상태여야 하므로 ToggleSelectAttacker가 켠다 —
+        // 여기서 켜면 선택되지 않은 카드에 이펙트가 남아 누가 공격자인지 흐려진다.
+        if (!BattleUxFlags.DragAimAttack) return;
+
         FocusWeapon(true);
+        SetArmedVfx(true);   // 무장(드래그) 시작
     }
 
     void OnMouseDrag()
@@ -219,6 +271,17 @@ public class CardView : MonoBehaviour
         if (this.longPressFired && PointerLeftSelf())
             CancelLongPress();
 
+        // 드래그 조준 공격 블라인드: 기본 UX(탭 공격)만 남기기로 해서 제스처 확정 이전에 끊는다.
+        // 여기서 끊으면 HandleAimDrag/UpdateTarget/SwipeGuide/조준 기울기가 아예 실행되지 않고,
+        // activeGesture가 계속 None이라 손 뗄 때 탭 판정이 그대로 성립한다.
+        // 위쪽 롱프레스 취소 로직은 통과시킨다 — 정보 팝업은 공격 UX가 아니므로 유지.
+        if (!BattleUxFlags.DragAimAttack)
+        {
+            if (Vector2.Distance(this.currentDragScreenPos, this.touchStartScreenPos) > this.deadZoneRadius)
+                CancelLongPress();
+            return;
+        }
+
         Vector2 t_touchDrag = this.currentDragScreenPos - this.touchStartScreenPos;
 
         // 제스처 미확정: 손가락 이동이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정(위=적에게 끌기, 아래=좌우반전).
@@ -230,7 +293,10 @@ public class CardView : MonoBehaviour
             // 미확정(None)으로 남으므로 이후 반대 방향으로 끌면 그때 정상 확정된다.
             if (!GestureAllowed(t_new)) return;
             this.activeGesture = t_new;
-            ClearAttackerSelection();   // 드래그 시작 — 대기 중인 탭 무장 취소(입력 상호배타).
+            // 드래그 시작 — 대기 중인 탭 무장 취소(입력 상호배타).
+            // 무장돼 있던 카드가 곧 드래그될 이 카드면 즉시 원복(_instant): 바로 뒤 MoveTo의 DOKill이
+            // 축소 트윈을 잘라 1.15배로 굳는다(탭 무장 → 그대로 드래그 공격 시 확대 잔류 버그).
+            ClearAttackerSelection(_instant: s_selectedAttacker == this);
         }
         else
         {
@@ -256,10 +322,36 @@ public class CardView : MonoBehaviour
 
         Vector2 t_drag = this.currentDragScreenPos - this.dragStartScreenPos;   // DragBack 조준용(화면 중앙 기준).
 
-        if (this.activeGesture == Gesture.DragDown)
-            HandleDragBack(t_drag, t_touchDrag);
-        else
-            HandleDragToEnemy(t_touchDrag);
+        HandleAimDrag(t_drag, _forward: this.activeGesture != Gesture.DragDown);
+    }
+
+    /// <summary>조준 방향으로 카드를 살짝 기울인다. _aimX는 조준 방향의 좌우 성분(-1~1).
+    /// 오른쪽을 겨누면 오른쪽으로 눕는다 — Z축은 반시계가 +라 부호를 뒤집는다(돌진 lean과 같은 규약).
+    ///
+    /// 트윈 대신 매 프레임 보간이다. 드래그 프레임마다 DOTween을 새로 걸면 이전 트윈과 겹쳐 튀고,
+    /// SetTargetFocus 등의 DOKill에 조용히 잘린다. 지수 감쇠라 프레임레이트가 달라도 수렴 속도가 같다.</summary>
+    void ApplyAimTilt(float _aimX)
+    {
+        if (!this.hasAimTilt)
+        {
+            this.hasAimTilt = true;
+            this.aimTiltBase = transform.localRotation;   // 조준 시작 각도 = 복원 지점
+        }
+
+        float      t_angle  = -Mathf.Clamp(_aimX, -1f, 1f) * this.aimTiltMaxAngle;
+        Quaternion t_target = this.aimTiltBase * Quaternion.Euler(0f, 0f, t_angle);
+        float      t_t      = 1f - Mathf.Exp(-this.aimTiltSpeed * Time.deltaTime);
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, t_target, t_t);
+    }
+
+    /// <summary>조준 기울기 해제 — 시작 각도로 즉시 복원. 조준이 끝나는 모든 경로에서 부른다.
+    /// **공격 발동 전에도 반드시** 호출해야 한다: Headbutt이 현재 각도를 baseRot으로 잡아
+    /// 복귀 목표로 쓰므로, 기울어진 채 넘기면 공격 후 카드가 비스듬히 굳는다.</summary>
+    void ResetAimTilt()
+    {
+        if (!this.hasAimTilt) return;
+        this.hasAimTilt = false;
+        transform.localRotation = this.aimTiltBase;
     }
 
     /// <summary>튜토리얼 조작 게이트: 이번 스텝이 가르치는 제스처만 통과. 탭은 Gesture.None으로 표현한다.
@@ -276,69 +368,28 @@ public class CardView : MonoBehaviour
         }
     }
 
-    // 드래그 모드 전환 시 이전 모드 UI/상태 정리. dragState=Idle로 리셋 → 새 핸들러가 첫 프레임에 카드 이동/페이드를 재초기화.
+    // 드래그 모드 전환 시 이전 모드 조준만 정리. 카드는 센터에 그대로 둔다(dragState 유지) —
+    // 예전엔 Idle로 리셋해 재초기화를 유도했지만, 그러면 전환 때마다 슬롯 복귀→센터 재이동 왕복이 보인다.
+    // 위/아래가 둘 다 같은 조준 모드가 된 뒤로는 자리를 바꿀 이유가 없다.
     void SwitchGesture()
     {
-        this.swipeGuide?.SetVisible(false);
         HideDragLine();
         ClearTargetPreview();
-        this.dragState = DragState.Idle;
     }
 
-    void HandleDragBack(Vector2 _drag, Vector2 _touchDrag)
+    /// <summary>조준 드래그 공통 처리. 드래그-백/포워드는 딱 하나만 다르다:
+    /// 조준 방향 부호(밀기 = 그 방향, 당기기 = 반대 방향). 가이드는 조준 방향(t_aimDir.x)을 그대로 받으므로
+    /// 모드가 바뀌면 자연히 반전되고, 가이드가 놓이는 쪽(위/아래)만 _forward를 따른다.
+    ///
+    /// 손가락이 시작점 기준 위/아래 어디에 있든 조준을 유지한다 — 제스처는 OnMouseDrag가 이미 확정했고,
+    /// 양쪽 다 조준 모드라 "반대편으로 넘어감 = 취소"가 성립하지 않는다. 예전의 슬롯 복귀(ReturnDrag)는
+    /// 모드 전환 구간에서 슬롯→센터 왕복으로만 보였다. 취소는 그냥 손을 떼면 된다(OnMouseUp이 복귀시킨다).</summary>
+    void HandleAimDrag(Vector2 _drag, bool _forward)
     {
-        if (_touchDrag.y < 0f)
-        {
-            UIPoolManager.Instance?.HideUI<PooledCardElement>();
+        UIPoolManager.Instance?.HideUI<PooledCardElement>();
 
-            if (this.dragState != DragState.AttackDrag)
-            {
-                this.dragState = DragState.AttackDrag;
-                s_anyDragging  = true;
-                BeginTargeting();
-                var t_validTargets = GetValidEnemyViews();
-                foreach (var t_cv in t_validTargets)
-                    if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
-                        t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
-                ApplyDragTargetFade(t_validTargets);
-                this.cardAnim.MoveTo(this.centerPos).Forget();
-                this.swipeGuide?.SetVisible(true);
-            }
-
-
-            Vector2 t_aimDir = -_drag.normalized;
-            this.swipeGuide?.UpdateDirection(t_aimDir.x);
-
-            if (_drag.magnitude < this.deadZoneRadius)
-            {
-                ClearTargetPreview();
-                return;
-            }
-
-            UpdateTarget(t_aimDir);
-        }
-        else
-        {
-            this.swipeGuide?.SetVisible(false);
-            ClearTargetPreview();
-            if (this.dragState == DragState.AttackDrag || this.dragState == DragState.ReturnDrag)
-            {
-                this.dragState = DragState.ReturnDrag;
-                float t_screenDist = Vector2.Distance(
-                    Camera.main.WorldToScreenPoint(this.cardAnim.SlotPosition),
-                    Camera.main.WorldToScreenPoint(this.centerPos));
-                float t_alpha = t_screenDist > 0f ? Mathf.Clamp01(_touchDrag.magnitude / t_screenDist) : 0f;
-                transform.DOKill();
-                transform.position = Vector3.Lerp(this.centerPos, this.cardAnim.SlotPosition, t_alpha);
-            }
-        }
-    }
-
-    void HandleDragToEnemy(Vector2 _touchDrag)
-    {
         if (this.dragState != DragState.AttackDrag)
         {
-            UIPoolManager.Instance?.HideUI<PooledCardElement>();
             this.dragState = DragState.AttackDrag;
             s_anyDragging  = true;
             BeginTargeting();
@@ -347,20 +398,25 @@ public class CardView : MonoBehaviour
                 if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
                     t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
             ApplyDragTargetFade(t_validTargets);
-            Vector3 t_liftPos = this.cardAnim.SlotPosition + Vector3.up * 0.25f;
-            this.cardAnim.MoveTo(t_liftPos).Forget();
+            this.cardAnim.MoveTo(this.centerPos).Forget();
+            this.swipeGuide?.SetVisible(true);
         }
 
-        Vector3 t_mouseWorld = GetMouseWorldOnCardPlane();
+        // 포워드(위로 끌기)는 가이드도 카드 위, 드래그-백은 아래. 모드가 바뀌는 순간 자리가 따라오게
+        // 매 프레임 갱신한다(같은 쪽이면 SetAbove가 내부에서 무시).
+        this.swipeGuide?.SetAbove(_forward);
 
-        if (this.dragLine != null)
+        Vector2 t_aimDir = (_forward ? _drag : -_drag).normalized;
+        this.swipeGuide?.UpdateDirection(t_aimDir.x);
+        ApplyAimTilt(t_aimDir.x);
+
+        if (_drag.magnitude < this.deadZoneRadius)
         {
-            this.dragLine.enabled = true;
-            this.dragLine.SetPosition(0, transform.position);
-            this.dragLine.SetPosition(1, t_mouseWorld);
+            ClearTargetPreview();
+            return;
         }
 
-        UpdateTargetByCollider();
+        UpdateTarget(t_aimDir);
     }
 
     Vector3 GetMouseWorldOnCardPlane()
@@ -420,13 +476,19 @@ public class CardView : MonoBehaviour
             {
                 if (this.currentTarget != null)
                 {
-                    OnAttack?.Invoke(this, this.currentTarget);
+                    ResetAimTilt();   // 기울어진 채 넘기면 Headbutt이 그 각도를 복귀 목표로 잡는다
+                    // 조준 정리를 **공격 발동보다 먼저** — 발동 뒤에 정리하면 정리 쪽 트윈/Kill이
+                    // 막 시작한 연출 이동을 건드린다(피격자가 제자리에 남던 원인).
+                    CardView t_target = this.currentTarget;
                     ClearTargetPreview();
+                    OnAttack?.Invoke(this, t_target);
                     this.dragState = DragState.Idle;
                     return;
                 }
                 ClearTargetPreview();
                 FocusWeapon(false);
+                SetArmedVfx(false);   // 공격 없이 손 뗌
+                ResetAimTilt();
                 RestoreAllFades();
                 this.cardAnim.MoveToSlot().Forget();
             }
@@ -435,8 +497,12 @@ public class CardView : MonoBehaviour
         }
 
         // 탭 판정: 이 터치가 드래그로 확정되지 않았고(제스처 None) 손가락 이동이 데드존 이내.
-        bool t_isTap = this.activeGesture == Gesture.None
-            && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius;
+        // 드래그 조준이 꺼져 있으면(BattleUxFlags.DragAimAttack=false) 데드존 조건을 뺀다 —
+        // 드래그로 해석될 경로가 아예 없는데 데드존을 넘겼다고 무동작이 되면 "눌렀는데 반응 없음"이 된다
+        // (같은 카드 재탭 해제·다른 카드로 선택 전환이 손 떨림만으로 죽던 원인).
+        bool t_isTap = !BattleUxFlags.DragAimAttack
+            || (this.activeGesture == Gesture.None
+                && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius);
 
         // 튜토리얼: 탭이 이번 스텝의 조작이 아니면 무반응(무장·발사 둘 다 차단).
         if (t_isTap && !GestureAllowed(Gesture.None))
@@ -467,22 +533,30 @@ public class CardView : MonoBehaviour
 
         if (this.dragState != DragState.Idle)
         {
-            bool t_attacked = this.currentTarget != null;
-            if (t_attacked)
-                OnAttack?.Invoke(this, this.currentTarget);
+            CardView t_target  = this.currentTarget;
+            bool     t_attacked = t_target != null;
+            ResetAimTilt();   // 공격이든 취소든 조준 기울기는 여기서 끝(공격이면 Headbutt이 기준각을 다시 잡는다)
 
+            // 조준 정리를 먼저, 공격 발동은 그 다음 — 순서가 반대면 정리 쪽 트윈/Kill이
+            // 막 시작한 연출 이동을 죽인다(피격자가 중앙으로 안 오던 원인).
             ClearTargetPreview();
+            if (t_attacked)
+                OnAttack?.Invoke(this, t_target);
 
             if (!t_attacked)
             {
                 RestoreAllFades();
                 FocusWeapon(false);
+                SetArmedVfx(false);   // 조준만 하다 놓음
                 this.cardAnim.MoveToSlot().Forget();
             }
+            // 공격으로 이어진 경우 무장 이펙트는 끄지 않는다 — 반동 끝에서 AttackSequence가 끈다.
         }
         else
         {
             FocusWeapon(false);
+            SetArmedVfx(false);
+            ResetAimTilt();
             this.cardAnim.MoveToSlot().Forget();
         }
         this.dragState     = DragState.Idle;
@@ -629,6 +703,7 @@ public class CardView : MonoBehaviour
         SetHighlight(true);
         SetTargetFocus(true);   // 무장된 내 카드 살짝 확대 — 지금 누가 공격자인지 즉시 보이게.
         FocusWeapon(true);
+        SetArmedVfx(true);      // 무장(탭) — 해제 또는 공격 반동 끝까지 유지
 
         var t_targets = GetValidEnemyViews();   // 지정 타깃이면 그 하나, 아니면 도발 있을 때 도발 카드만.
         FadeAll(ForcedDimAlpha);
@@ -665,6 +740,7 @@ public class CardView : MonoBehaviour
         t_prev.SetHighlight(false);
         t_prev.SetTargetFocus(false, _instant);
         t_prev.FocusWeapon(false);
+        t_prev.SetArmedVfx(false);   // 무장 해제 = 이펙트도 끝(공격으로 이어지는 경우는 HandleEnemyTap이 다시 켠다)
         RestoreAllFades();
     }
 
@@ -683,6 +759,10 @@ public class CardView : MonoBehaviour
 
         CardView t_attacker = s_selectedAttacker;
         ClearAttackerSelection(_instant: true);   // 확대 즉시 원복 — 공격 연출의 DOKill에 트윈이 잘려 커진 채 굳는 것 방지.
+        // 위 해제가 무장 이펙트도 끈다. 탭 공격은 여기서 바로 공격이 이어지므로 다시 켜서
+        // 반동이 끝나는 지점(AttackSequence)까지 유지한다 — 드래그 공격 경로와 수명을 맞춘다.
+        t_attacker.SetArmedVfx(true);
+        t_attacker.ResetAimTilt();
         OnAttack?.Invoke(t_attacker, this);
     }
 
@@ -735,9 +815,12 @@ public class CardView : MonoBehaviour
             PlayKeywordGlow(CardKeyword.Taunt).Forget();
     }
 
-    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.</summary>
+    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.
+    /// BattleUxFlags.EffectNotifyBanner로 블라인드 중 — 우측 슬라이드 배너는 가독성·학습성이 낮다는 판단.
+    /// 배너가 없어도 거절 피드백은 남는다: 거절 대상 흔들기 + 도발 카드 펄스/글로우(RejectAsTarget).</summary>
     static void ShowTauntBlockedNotice(CardInstance _tauntCard)
     {
+        if (!BattleUxFlags.EffectNotifyBanner) return;
         if (_tauntCard?.data == null) return;
 
         Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
@@ -882,52 +965,6 @@ public class CardView : MonoBehaviour
         }
     }
 
-    void UpdateTargetByCollider()
-    {
-        Vector3 t_screenPos = new Vector3(this.currentDragScreenPos.x, this.currentDragScreenPos.y, -Camera.main.transform.position.z);
-        Vector2 t_worldPos = Camera.main.ScreenToWorldPoint(t_screenPos);
-        Collider2D t_hit = Physics2D.OverlapPoint(t_worldPos);
-        CardView t_best = null;
-
-        var  t_validViews = GetValidEnemyViews();
-        bool t_rejected   = false;
-
-        if (t_hit != null)
-        {
-            CardView t_cv = t_hit.GetComponentInParent<CardView>();
-            if (t_cv != null && t_cv != this)
-            {
-                if (t_validViews.Contains(t_cv)) t_best = t_cv;
-                // 못 치는 적 카드 위로 끌어왔다 → 흔들기+펄스(+도발이면 문구). 커서가 떠나면 다시 발화 가능.
-                else if (GetEnemyViews().Contains(t_cv)) { RejectOnce(t_cv, t_validViews); t_rejected = true; }
-            }
-        }
-        if (!t_rejected) ClearRejectFocus();
-
-        if (this.currentTarget == t_best) return;
-
-        if (this.currentTarget != null)
-        {
-            this.currentTarget.SetHighlight(false);
-            this.currentTarget.HideAttackPreview();
-            this.currentTarget.SetTargetFocus(false);
-            HideAttackPreview();
-        }
-
-        this.currentTarget = t_best;
-        if (this.currentTarget != null)
-        {
-            this.currentTarget.SetHighlight(true);
-            this.currentTarget.SetTargetFocus(true);
-            ShowPreviewForTarget(this.currentTarget);
-            ApplyFocusFade(this.currentTarget);
-        }
-        else
-        {
-            ApplyDragTargetFade(GetValidEnemyViews());   // 타겟 없음 → 드래그 기본(유효타겟 다 밝게)로 복귀.
-        }
-    }
-
     void ShowPreviewForTarget(CardView _target)
     {
         CardInstance t_atk = this.boundCard;
@@ -948,7 +985,11 @@ public class CardView : MonoBehaviour
     public void Render(CardInstance _card, SynergyState _synergy = null)
     {
         // 슬롯 점유 카드가 바뀌면(사망→새 카드 스폰 등) 이전 피격 연출 잔여 제거 → 새 카드에 이월 방지.
-        if (this.boundCard != _card) this.cardAnim.ResetHitEffect();
+        if (this.boundCard != _card)
+        {
+            this.cardAnim.ResetHitEffect();
+            HideArmedVfx();   // 이전 카드의 무장 이펙트가 새 카드에 남지 않게
+        }
 
         this.boundCard = _card;
         this.cardAnim.SetBoundCard(_card);
@@ -959,26 +1000,76 @@ public class CardView : MonoBehaviour
 
         if (t_isEmpty)
         {
-            this.faceDownOverlay.SetActive(false);
+            SetFaceDownLook(false);
             SetupWeapon(null);
-            RefreshKeywordIcons(CardKeyword.None);
+            RefreshKeywordIcons(null);   // 빈 슬롯: 아이콘 없음.
+            RefreshKeywordFrames(null);
             RefreshSynergyBadges(null);
             return;
         }
 
         bool t_isFaceDown = !_card.isRevealed;
-        this.faceDownOverlay.SetActive(t_isFaceDown);
 
         if (t_isFaceDown) SetHpDisplay("?", "");
         else SetHpDisplay(_card.hp.ToString(), _card.bonusHp > 0 ? $"+{_card.bonusHp}" : "");
         this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
 
-        if (this.illustration != null && _card.data.battleImage != null)
+        // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
+        if (this.illustration != null && !t_isFaceDown && _card.data.battleImage != null)
             this.illustration.sprite = _card.data.battleImage;
 
+        SetFaceDownLook(t_isFaceDown);
+
         SetupWeapon(_card.data);
-        RefreshKeywordIcons(t_isFaceDown ? CardKeyword.None : (_card.data.keywords | _card.runtimeKeywords));
+        RefreshKeywordIcons(_card);   // 뒷면 은닉·표시 대상 판정은 RefreshKeywordIcons 안에서.
+        RefreshKeywordFrames(_card);
         RefreshSynergyBadges(_synergy);
+    }
+
+    Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
+    bool    illustrationScaleCached;
+
+    /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
+    ///
+    /// 뒷면 그림은 카드 아트와 원본 크기가 달라(덱 더미용 이미지) 그대로 넣으면 카드 밖으로 삐져나온다.
+    /// 그래서 **테두리 높이에 맞춰 스케일을 계산**한다 — 매직넘버를 두면 뒷면 이미지를 교체할 때마다 어긋난다.</summary>
+    void SetFaceDownLook(bool _faceDown)
+    {
+        if (!this.illustrationScaleCached && this.illustration != null)
+        {
+            this.illustrationBaseScale  = this.illustration.transform.localScale;
+            this.illustrationScaleCached = true;
+        }
+
+        if (this.frameRoot != null) this.frameRoot.SetActive(!_faceDown);
+        if (this.infoRoot  != null) this.infoRoot.SetActive(!_faceDown);
+
+        if (this.illustration == null) return;
+
+        if (!_faceDown || this.cardBackSprite == null)
+        {
+            this.illustration.transform.localScale = this.illustrationBaseScale;
+            return;
+        }
+
+        this.illustration.sprite = this.cardBackSprite;
+        this.illustration.transform.localScale = FitBackScale();
+    }
+
+    /// <summary>뒷면 그림을 카드 테두리 높이에 맞추는 로컬 스케일. 테두리가 없으면 원래 스케일 유지.</summary>
+    Vector3 FitBackScale()
+    {
+        SpriteRenderer t_frame = this.frameRoot != null ? this.frameRoot.GetComponent<SpriteRenderer>() : null;
+        if (t_frame == null || t_frame.sprite == null) return this.illustrationBaseScale;
+
+        float t_target  = t_frame.sprite.bounds.size.y * t_frame.transform.lossyScale.y;
+        Transform t_parent = this.illustration.transform.parent;
+        float t_parentY = t_parent != null ? t_parent.lossyScale.y : 1f;
+        float t_natural = this.cardBackSprite.bounds.size.y * t_parentY;
+        if (t_natural <= 0.0001f) return this.illustrationBaseScale;
+
+        float t_k = t_target / t_natural;
+        return new Vector3(t_k, t_k, this.illustrationBaseScale.z);
     }
 
     void SetupWeapon(CardData _data)
@@ -1006,6 +1097,8 @@ public class CardView : MonoBehaviour
         this.weaponInstance.SetActive(false);
     }
 
+    // 무장 이펙트는 여기 얹지 않는다 — ResolveHits가 접촉 직후 FocusWeapon(false)를 부르기 때문에
+    // 같이 묶으면 반동이 끝나기도 전에 이펙트가 꺼진다. 무장/해제 시점에서 SetArmedVfx를 직접 부른다.
     public void FocusWeapon(bool _active)
     {
         if (this.weaponInstance == null) return;
@@ -1029,6 +1122,65 @@ public class CardView : MonoBehaviour
         }
     }
 
+    /// <summary>무장(포커스) 이펙트 토글. 카드 자식으로 붙어 공격 이동/기울기를 그대로 따라간다.
+    /// 켜지는 시점 = 무장(FocusWeapon(true)), 꺼지는 시점 = 적에 닿는 순간(AttackSequence가 false로 호출).
+    /// 중복 호출은 무시한다 — 드래그 중 여러 경로에서 불린다.</summary>
+    public void SetArmedVfx(bool _active)
+    {
+        if (_active) ShowArmedVfx();
+        else         HideArmedVfx();
+    }
+
+    /// <summary>무장 이펙트 프리팹을 갈아끼운다(null이면 카드의 AttackEffect가 정의한 Armed 항목 사용).
+    /// AttackAnimTester가 후보를 넘겨보며 고를 때 쓴다 — 카드 에셋을 건드리지 않는 런타임 오버라이드.
+    /// 켜져 있는 상태에서 바꾸면 즉시 교체된다.</summary>
+    public void SetArmedVfxPrefab(GameObject _prefab)
+    {
+        if (this.armedVfxPrefabOverride == _prefab) return;
+        bool t_wasOn = this.armedVfx.Count > 0;
+        HideArmedVfx();
+        this.armedVfxPrefabOverride = _prefab;
+        if (t_wasOn) ShowArmedVfx();
+    }
+
+    void ShowArmedVfx()
+    {
+        if (this.armedVfx.Count > 0) return;                                // 이미 켜져 있음
+        if (this.boundCard == null || !this.boundCard.isRevealed) return;   // 뒷면/빈 슬롯은 노출 금지
+
+        // 적 카드는 위아래가 뒤집힌 배치라 오프셋/회전도 뒤집는다(AttackEffect.particles와 같은 flip 규약).
+        bool t_flip    = IsEnemySide;
+        int  t_layerId = VfxSortingLayerId;
+
+        if (this.armedVfxPrefabOverride != null)
+        {
+            // 테스터 오버라이드: 배치값 없이 프리팹만 교체해 본다.
+            Spawn(this.armedVfxPrefabOverride, Vector3.zero, Vector3.zero);
+            return;
+        }
+
+        AttackEffect t_fx = this.boundCard.data?.attackEffect;
+        if (t_fx == null) return;
+        foreach (ParticleEntry t_entry in t_fx.ArmedEntries())
+            Spawn(t_entry.prefab, t_entry.localOffset, t_entry.initialRotation);
+
+        void Spawn(GameObject _prefab, Vector3 _offset, Vector3 _euler)
+        {
+            GameObject t_go = BattleVfx.SpawnAttached(_prefab, transform, _offset, _euler, t_flip, out string t_id);
+            if (t_go == null) return;
+            BattleVfx.ApplySorting(t_go, t_layerId, this.armedVfxSortingOrder);
+            this.armedVfx.Add((t_id, t_go));
+        }
+    }
+
+    void HideArmedVfx()
+    {
+        // 부모가 아직 나일 때만 반납 — 자기반납형(PooledParticle) 프리팹과 이중 반납 충돌 방지.
+        foreach ((string t_id, GameObject t_go) in this.armedVfx)
+            BattleVfx.Release(t_id, t_go, transform);
+        this.armedVfx.Clear();
+    }
+
     public void SetHighlight(bool _active)
     {
         if (this.selectedHighlight != null)
@@ -1036,43 +1188,85 @@ public class CardView : MonoBehaviour
     }
 
     // 조준 포커스: 이 카드를 확대(_on)/원복. 드래그 타겟 전환·탭 무장/해제 시 호출.
-    // 카드 이동 tween과 겹치지 않는 idle 상태에서만 사용.
+    // **transform.DOKill 금지** — 해제 호출이 공격 발동 직후에 오는 경로가 있어(OnMouseUp: OnAttack → ClearTargetPreview)
+    // 전체 DOKill을 하면 막 시작한 시네마 이동(DOMove)까지 같이 죽는다. 실제로 피격자만 제자리에 남는 버그가 그것.
+    // 그래서 이 확대 트윈만 따로 들고 있다가 그것만 끈다.
     // _instant: 공격 발동 직전 원복처럼 뒤이어 AttackSequence의 DOKill이 들어오는 경로 — 트윈이 중간에 죽어
     // 확대된 채 고착되지 않도록 스케일을 즉시 되돌린다.
+    Tween focusTween;
+
     public void SetTargetFocus(bool _on, bool _instant = false)
     {
-        transform.DOKill();
+        this.focusTween?.Kill();
+        this.focusTween = null;
+
         float t_scale = _on ? this.targetFocusScale : 1f;
         if (_instant) { transform.localScale = Vector3.one * t_scale; return; }
-        transform.DOScale(t_scale, this.targetFocusDur)
-                 .SetEase(Ease.OutBack).SetLink(gameObject);
+        this.focusTween = transform.DOScale(t_scale, this.targetFocusDur)
+                                   .SetEase(Ease.OutBack).SetLink(gameObject);
     }
 
+    // HP 라벨 폴백 프리뷰가 켜져 있는지. damagePreviewText가 배선돼 있으면 HP 라벨은 건드리지 않으므로
+    // 해제 때 색·텍스트를 되돌리면 안 된다(원본 색을 캡처한 적이 없어 검정으로 굳는다).
+    bool hpFallbackPreview;
+
+    /// <summary>공격 선택 시 이 카드가 받을 **예상 데미지**를 표시한다. HP 라벨은 현재 체력을 그대로 유지 —
+    /// "맞은 뒤 남을 체력"을 HP 자리에 쓰면 현재 체력과 구분이 안 돼 혼란했다.
+    /// 표시 수치는 실제 적용값(비늘·성벽 감소 + 체력 상한)이며 그 규칙은 CardInstance 단독 소유 —
+    /// 뷰는 ClampDamage 호출만 한다(수식 복제 금지).</summary>
     public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)
     {
-        if (this.hpText == null || this.boundCard == null) return;
-        this.hpTextOriginalColor = this.hpText.color;
-        this.hpText.DOKill();
-        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → WouldDieFrom과 동일 소스로 HP표시 일치.
-        (int t_hpAfter, int t_bonusAfter) = this.boundCard.PreviewAfterDamage(_damage, _isAttackHit);
-        SetHpDisplay(t_hpAfter.ToString(), t_bonusAfter > 0 ? $"+{t_bonusAfter}" : "");
-        this.hpText.color = Color.red;
+        if (this.boundCard == null) return;
 
-        if (_wouldDie)
+        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → 실제 TakeDamage와 일치.
+        int t_dmg = this.boundCard.ClampDamage(_damage, _isAttackHit);
+
+        if (this.damagePreviewText != null)
         {
-            this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
+            this.damagePreviewText.DOKill();
+            this.damagePreviewText.text = $"-{t_dmg}";
+            this.damagePreviewText.gameObject.SetActive(true);
+        }
+        else if (this.hpText != null)
+        {
+            // 폴백(프리팹 미배선): HP 라벨 자리에 데미지를 빨갛게. 해제 때 원복한다.
+            this.hpTextOriginalColor = this.hpText.color;
+            this.hpText.DOKill();
+            this.hpText.text  = $"-{t_dmg}";
+            this.hpText.color = Color.red;
+            this.hpFallbackPreview = true;
+        }
+
+        // 치사 예고(카드 흐려짐 + HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
+        // "이 카드는 못 잡는다"가 확정처럼 읽히고 흐려진 카드가 미관을 깬다는 판단. 되살릴 땐 플래그만 true.
+        if (_wouldDie && BattleUxFlags.DeathPreview)
+        {
+            if (this.hpText != null)
+                this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
             this.cardAnim.ShowDeathPreview();
         }
     }
 
     public void HideAttackPreview()
     {
-        if (this.hpText == null || this.boundCard == null) return;
-        this.hpText.DOKill();
-        Color t_c = this.hpTextOriginalColor;
-        t_c.a = 1f;
-        this.hpText.color = t_c;
-        SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+        if (this.damagePreviewText != null)
+        {
+            this.damagePreviewText.DOKill();
+            this.damagePreviewText.text = string.Empty;
+            this.damagePreviewText.gameObject.SetActive(false);
+        }
+
+        if (this.hpFallbackPreview && this.hpText != null && this.boundCard != null)
+        {
+            this.hpText.DOKill();
+            Color t_c = this.hpTextOriginalColor;
+            t_c.a = 1f;
+            this.hpText.color = t_c;
+            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+            this.hpFallbackPreview = false;
+        }
+
+        // 플래그로 꺼져 있어도 호출 — 과거 상태/플래그 전환 직후의 잔존 오버레이 정리.
         this.cardAnim.HideDeathPreview();
     }
 
@@ -1094,11 +1288,19 @@ public class CardView : MonoBehaviour
         await UniTask.Delay((int)(t_dur * 1000), cancellationToken: this.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
     }
 
-    void RefreshKeywordIcons(CardKeyword _keywords)
-    {
-        if (this.keywordIconRoot == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
+    // 아이콘 줄에는 캐릭터 고유 특성만 그린다. 일회용/디버프(무적·추가체력·전투 중 걸린 표식)는
+    // 아예 표시하지 않는다 — 무엇을 띄울지 판정은 CardVisualRules 단독(아웃게임과 같은 호출).
+    /// <summary>키워드 아이콘이 실제로 붙는 앵커. 시너지 자리를 쓰면 synergyBadgeRoot(좌측 세로열),
+    /// 아니면 종전 keywordIconRoot(우하단 가로줄). 앵커 미배선이면 기존 루트로 폴백한다.</summary>
+    Transform KeywordAnchor => this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
+        ? this.synergyBadgeRoot : this.keywordIconRoot;
 
-        foreach (Transform t_child in this.keywordIconRoot)
+    void RefreshKeywordIcons(CardInstance _card)
+    {
+        Transform t_root = KeywordAnchor;
+        if (t_root == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
+
+        foreach (Transform t_child in t_root)
         {
             // 아이콘 스프라이트가 FadeView tween 대상일 수 있음. 파괴 전 DOKill (루트 SetLink는 안 걸림).
             foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>(true))
@@ -1108,21 +1310,46 @@ public class CardView : MonoBehaviour
 
         this.iconMap.Clear();
 
-        // "어떤 키워드를 어떤 순서로" 는 CardVisualRules 단독(아웃게임 CardVisualView와 같은 호출).
-        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
-        List<CardVisualRules.KeywordIcon> t_icons = CardVisualRules.CollectKeywordIcons(_keywords, this.keywordIconConfig);
+        // 뒷면/빈 슬롯이면 아무것도 노출하지 않는다(정보 은닉).
+        if (_card == null || !_card.isRevealed) return;
 
-        // keywordIconRoot 를 카드 오른쪽 아래 코너에 두고, 아이콘은 원점에서 왼쪽으로 가로 정렬.
+        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
+        List<CardVisualRules.KeywordIcon> t_icons =
+            CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
+
+        // 배치 두 가지. 시너지 자리: 배지와 동일한 세로열 좌표(같은 필드를 써야 "그 자리 그대로"가 성립).
+        // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
-            GameObject t_obj = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
-            t_obj.transform.localPosition = new Vector3(-t_i * this.iconSpacing, 0f, 0f);
+            GameObject t_obj = Instantiate(this.keywordIconPrefab, t_root);
+            t_obj.transform.localPosition = this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
+                ? new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f)
+                : new Vector3(-t_i * this.iconSpacing, 0f, 0f);
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
                 : t_obj.GetComponent<SpriteRenderer>();
             if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i].Icon;
             this.iconMap[t_icons[t_i].Keyword] = t_obj;
+        }
+    }
+
+    // 프레임 키워드 장식. 기준은 TraitKeywords(아이콘 줄은 여기서 IconRowExcluded만 더 빼는 IconKeywords) —
+    // 즉 표식은 프레임엔 뜨고 아이콘 줄엔 안 뜬다. 그 차이의 유일한 선언 지점은 CardVisualRules.IconRowExcluded다.
+    // 빈 슬롯/뒷면은 전부 끈다(아이콘 줄과 동일한 정보 은닉).
+    void RefreshKeywordFrames(CardInstance _card)
+    {
+        if (this.keywordFrames == null) return;
+
+        CardKeyword t_keywords = _card != null && _card.isRevealed
+            ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
+
+        foreach (KeywordFrame t_frame in this.keywordFrames)
+        {
+            if (t_frame.overlay == null) continue;
+            // None 배선은 항상 꺼짐 — HasFlag(None)은 늘 true라 그대로 두면 모든 카드에서 켜진다.
+            bool t_on = t_frame.keyword != CardKeyword.None && (t_keywords & t_frame.keyword) != 0;
+            t_frame.overlay.SetActive(t_on);
         }
     }
 
@@ -1135,6 +1362,9 @@ public class CardView : MonoBehaviour
 
     void RefreshSynergyBadges(SynergyState _synergy)
     {
+        // 그 자리를 키워드 아이콘이 쓰는 모드면 배지를 아예 만들지 않는다(겹침 방지).
+        // 배지가 존재하지 않으므로 FindBadgeAt은 null → 롱프레스는 카드 정보 팝업으로, PopSynergyBadge는 no-op.
+        if (this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null) return;
         if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
 
         // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →
@@ -1245,25 +1475,46 @@ public class CardView : MonoBehaviour
 
     #region Animation delegates
     public Vector3 SlotPosition                    => this.cardAnim.SlotPosition;
+
+    /// <summary>카드 아래 중앙(월드). "카드 밑에서 뭔가 나오는" 연출의 발사점(힐 투사체 등).
+    /// 콜라이더가 없으면 카드 원점 폴백. z는 카드 평면을 그대로 쓴다(투사체가 카드 뒤로 빠지지 않게).</summary>
+    public Vector3 BottomCenter => this.selfCollider != null
+        ? new Vector3(this.selfCollider.bounds.center.x, this.selfCollider.bounds.min.y, transform.position.z)
+        : transform.position;
+
+    /// <summary>이 카드가 쓰는 정렬 레이어. 구매 에셋 VFX(Default 레이어)를 카드 앞으로 올릴 때 기준.</summary>
+    public int VfxSortingLayerId => this.illustration != null ? this.illustration.sortingLayerID : 0;
+
+    /// <summary>적 진영 카드인가. VFX 오프셋/회전 flip 판정의 단일 기준 — 아군/적 배치가 위아래로 뒤집혀 있다.</summary>
+    public bool IsEnemySide => this.boundCard != null && this.boundCard.ownerIndex != TurnState.LocalOwnerIndex;
     public UniTask MoveToCenter()                  => this.cardAnim.MoveToCenter();
     public UniTask MoveToCinemaSlot()              => this.cardAnim.MoveToCinemaSlot();
     public UniTask MoveToCinemaPosition(int _posIndex, int _totalCount) => this.cardAnim.MoveToCinemaPosition(_posIndex, _totalCount);
     public UniTask MoveTo(Vector3 _pos)            => this.cardAnim.MoveTo(_pos);
     public UniTask MoveToSlot()                    => this.cardAnim.MoveToSlot();
-    public async UniTask PlayHitAnim(float _d = 0.15f, int _damage = 0)
+    /// <summary>_hitFrom = 때린 쪽의 뷰(없으면 환경 피해). 먼지처럼 방향을 따르는 항목이
+    /// "맞은 방향의 반대"로 튀도록 진행 방향을 넘긴다.</summary>
+    public async UniTask PlayHitAnim(float _d = 0.15f, int _damage = 0, CardView _hitFrom = null)
     {
         if (this.boundCard != null)
             SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+        // 피격 파티클은 라이브러리 소유(미배선이면 무동작). 붐/숫자는 프리팹의 HitEffectView가 계속 담당 —
+        // 그쪽은 카드에 상주하며 상태(시퀀스/숫자)를 가지므로 1회성 파티클과 축이 다르다.
+        Vector3 t_awayDir = _hitFrom != null ? transform.position - _hitFrom.transform.position : default;
+        t_awayDir.z = 0f;   // 화면 평면 방향만 — 시네마 중 z가 벌어져 있으면 먼지가 카메라 쪽으로 튄다
+        BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir);
         await this.cardAnim.PlayHitAnim(_d, _damage);
     }
     public UniTask PlayDeathAnim(float _d = 0.4f)  => this.cardAnim.PlayDeathAnim(_d);
 
-    /// <summary>회복 연출(HealEffect: 붐 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.</summary>
+    /// <summary>회복 연출(회복 파티클 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
+    /// 회복이면 경로(힐러/돌보미/청소부/유산/부활) 불문 여기 하나로 수렴한다.</summary>
     public void PlayHealEffect(int _amount)
     {
         if (this.boundCard != null)
             SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
-        this.cardAnim.PlayHealEffect(_amount);
+        BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
+        this.cardAnim.PlayHealEffect(_amount);   // 숫자("+N") — 붐 스프라이트는 프리팹에서 비우면 파티클만 남는다
     }
     public void FadeView(float _alpha, float _dur) => this.cardAnim.FadeView(_alpha, _dur);
 
@@ -1273,8 +1524,29 @@ public class CardView : MonoBehaviour
         this.cardAnim.FadeView(0f, 0.3f);
     }
 
+    /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardData.cinemaAttackStyle 하나로,
+    /// **공격 시네마와 같은 축을 쓴다**(같은 에너지 구체를 공유하는 한 몸 연출이라 배선을 갈라두지 않는다).
+    /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+        => UsesOrbAppear
+            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
+            : this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+
+    /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
+    /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
+    ///
+    /// 구체 등장(EnergyOrbCurve)은 쪼갤 지점이 없다 — 카드가 중앙에 서는 구간 자체가 없고 구체가 날아온다.
+    /// 그래서 앞 토막은 무동작이고 뒤 토막이 통째로 구체 연출을 돌린다(컷씬 뒤에 등장하는 순서는 같다).</summary>
+    public UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+        => UsesOrbAppear ? UniTask.CompletedTask : this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+
+    public UniTask PlayDealToSlot(Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+        => UsesOrbAppear
+            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
+            : this.cardAnim.PlayDealToSlot(_dest, _duration);
+
+    bool UsesOrbAppear => this.boundCard?.data != null
+                       && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;
 
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();

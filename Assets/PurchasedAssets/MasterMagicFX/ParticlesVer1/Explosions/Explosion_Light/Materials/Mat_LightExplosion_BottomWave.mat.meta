@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 6dc15b5ca95e48c42867bab0a0911d8f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Explosions/Explosion_Light/Materials/Mat_LightExplosion_BottomWave.mat
+  uploadId: 755856

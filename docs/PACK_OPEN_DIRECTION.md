@@ -75,8 +75,8 @@
 |---|---|
 | ~~`Assets/Assets/Prefabs/CardPack.prefab`~~ | **폐기**(2026-07-28 2D 전환). 3D 팩 프리팹 · 메시 2종 · 머티리얼 3종은 색 A/B 대조용으로 Play 검증 전까지만 보존한다. 참조는 `CardPack.unity` 하나뿐 |
 | 팩 (2D 대체) | 씬 노드로 대체 — `Scenes/CardPack.unity > UICanvas > PackRoot > Pack`(Image + `PackTearHandle`) `> Seal`(Image). 프리팹 없음 |
-| `Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab` | 개봉 전용 카드. 860×1204. `Glow` / `NewBadge` / `RefundBadge` |
-| `Scenes/CardPack.unity` | `UICanvas`(Overlay) > `BG`(Image, **`shakeTarget`**) · `PackRoot`(빈 컨테이너, **`packRoot`**) > `Pack`(Image + `PackTearHandle`, **`tearHandle`**) > `Seal`(Image, **`sealRoot`**) · `RevealPanel`(CanvasGroup) · `TearHint`. 그리고 `StackInput`(입력판+`PackCardStack`) > `CardLayer` > `StackAnchor`, `RemainingText`, `SummaryGroup`, `ResultGrid`, `SkipButton`(**`RevealPanel`의 자식** — §3 Stage 5 참고) |
+| `Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab` | 개봉 전용 카드. **700×930.4**(실측 — 문서에 있던 860×1204는 오기였다). `Glow`(= `PackCardView.revealFlash`) / `NewBadge` / `RefundBadge` + `Background`의 `CardVisualView`(비주얼 단일 진실원). 이 프리팹에서는 `CardVisualView.keywordFrames`를 비워 **키워드별 프레임 장식을 끈다** — 개봉 화면에선 장식이 잡음이다. 도감·덱편집은 그대로 켜져 있으므로 공유 코드(`RefreshKeywordFrames`)는 건드리지 않는다 |
+| `Scenes/CardPack.unity` | `UICanvas`(Overlay) > `BG`(Image, **`shakeTarget`**) · `PackRoot`(빈 컨테이너, **`packRoot`**) > `Pack`(Image + `PackTearHandle`, **`tearHandle`**) > `Seal`(Image, **`sealRoot`**) · `RevealPanel`(CanvasGroup) · `TearHint`. 그리고 `StackInput`(입력판+`PackCardStack`) > `CardLayer` > `StackAnchor`, `SummaryGroup`, `ResultGrid`, `SkipButton`(**`RevealPanel`의 자식** — §3 Stage 5 참고) |
 
 ---
 
@@ -104,15 +104,20 @@
 ### Stage 3 — 한 장씩 넘기기 (핵심)
 
 **더미**
-- 뽑힌 카드 전원이 한 자리에 겹쳐 등장. 겉보기엔 카드 한 장.
-- `stackJitterPos`/`stackJitterAngle`로 미세 어긋남 — 완전 정렬은 종이 느낌이 죽는다.
-- 남은 장수는 `RemainingText`.
+- 뽑힌 카드 전원이 한 자리에 정확히 겹친다. 쉴 때는 **어긋남도 기울기도 0** — 겉보기에 완전한 카드 한 장이다.
+- 어긋남은 좌표가 아니라 **도착 시각의 차이**로만 만든다(2026-07-30 개편). `Build`가 더미 깊이 × `emergeLagStep`(기본 0,-26)만큼 뒷장을 뒤로 물려 두고, `PlayEmerge`가 그 뒤처짐을 닫는다 → 뽑히는 동안 **뒷장이 앞장을 따라 올라오고**, 마지막 장이 `(n-1) × emergeLagStagger`(0.045)초 늦게 도착하는 꼬리가 곧 "탁 정리되는" 한 박자가 된다. 별도 정리 스테이지는 없다.
+  > ~~`stackJitterPos`/`stackJitterAngle`(랜덤 영구 지터)~~ 는 **제거됐다.** 랜덤 어긋남을 Build 시점에 박아 고정하면 "종이 느낌"이 아니라 "어긋난 채 굳은 뭉치"가 된다.
+  > ⚠ **카드마다 트윈을 만들어 등장 시퀀스에 끼우면 안 된다.** 시퀀스에 들어간 트윈은 DOTween의 active 목록에서 빠져 `DOKill(target)`이 닿지 않고 개별 `Kill`·`SetLink`도 통하지 않는다 — 등장 도중 `Clear()`가 들어오면 파괴된 `RectTransform`에 계속 쓰는 트윈이 남는다. 그래서 굴리는 것은 **경과 시각 스칼라 하나**뿐이고(등속), 자리는 setter가 매 프레임 현재 더미를 보고 다시 계산한다(카드별 감쇠는 `DOVirtual.EasedValue(…, Ease.InOutQuint)`). 중단도 트윈을 끊는 게 아니라 `m_emerging` 플래그로 **setter가 손을 떼게** 한다 — 중첩 트윈은 이 클래스가 멈출 수 없기 때문이다.
+- 뽑혀 나온 뒤 **맨 위 카드만** 제자리에서 미세하게 부유한다(`topFloatAmplitude` ±4px / `topFloatPeriod` 2.5초). 아래 카드는 미동도 없다 — 하나만 살아 있어야 "손에 들린 물체"로 읽힌다. 개시점은 `BeginInteraction`이고, 다음 장으로 넘어갈 때와 임계 미달 되돌리기(`ReturnHome`) 후에 이어받는다.
+  > 진폭 끝으로 순간이동시켜 yoyo를 시작하면 등장·되감기가 착지한 **바로 다음 프레임에 4px 툭 튄다** — 가장 매끄러워야 하는 두 지점이라 눈에 걸린다. 그래서 첫 구간만 1/4주기로 위 끝까지 올린 뒤 반주기 yoyo 무한 루프에 넘긴다(`StartFloat`).
+  > 부유(위치)와 등장 펀치(배율)는 **같은 트랜스폼**을 타깃으로 한다. `DOKill`은 타깃 단위라 한쪽을 걷으면 다른 쪽도 죽는다 — 그래서 `StartFloat`은 `DOKill`을 부르지 않고, 트윈을 걷는 `PackCardStack`이 배율 복구를 `PackCardView.SnapPunchToRest()`에 되묻는다(쉬는 배율을 아는 쪽은 펀치를 건 뷰다).
+- 남은 장수 표시는 **없다**(2026-07-30 제거). ~~`RemainingText`~~ · ~~`PackCardStack.OnRemainingChanged`~~ 둘 다 삭제됐다 — 개봉 화면에서 카운터는 정보가 아니라 잡음이었다. `Remaining` 프로퍼티는 빈 더미 데드락 방지용으로 남아 있다.
 
 **넘기기**
 - 맨 위 카드를 **어느 방향으로든** 스와이프(좌우·상하·대각 전부). 미는 진행도에 카드가 따라붙고 그만큼 기운다(`dragTiltPerPixel` — 기울기만 좌우 성분을 쓴다).
 - `flickThreshold` 미만이면 제자리로 되돌아온다. 단 짧아도 `flickSpeed` 이상으로 튕기면 넘어간다.
 - **밀린 카드는 민 방향으로 날아가며 페이드아웃하고 `Destroy`된다**(`PackCardStack.DismissCard`). 라인업 자리 같은 건 없다.
-- 아래 카드는 **올라오지 않는다** — 전원이 처음부터 같은 자리(`stackAnchor` + 지터)에 놓이고 밀린 뒤에도 재배치가 없다. 더미가 줄어드는 게 아니라 맨 위 한 장만 사라진다. *(코드 확인: `Build`가 모든 카드에 같은 home을 주고, `OnEndDrag`는 `m_stack.RemoveAt(0)` 외에 남은 카드의 좌표를 건드리지 않는다.)*
+- 아래 카드는 **올라오지 않는다** — 전원이 같은 자리(`m_cardHome` = `stackAnchor`)에 놓이고 밀린 뒤에도 재배치가 없다. 더미가 줄어드는 게 아니라 맨 위 한 장만 사라진다. *(코드 확인: 쉬는 자리는 카드별로 갈리지 않는 단일 값이고, `OnEndDrag`는 `m_stack.RemoveAt(0)` 외에 남은 카드의 좌표를 건드리지 않는다 — 새 맨 위에 부유를 걸어주는 것이 전부다.)*
 - **결과는 `PackResultGrid`가 새 인스턴스를 3열로 세운다.** 더미의 카드는 이미 파괴됐으므로 요약에서 보는 것은 사본이다 — `PackCardStack`과 `PackResultGrid`는 **서로를 모른다**(밀어내기의 좌표 직접 조작과 결과 배치의 수명·좌표계를 갈라 놓은 분리). 그래서 넘기기 감도를 바꿔도 요약 레이아웃은 영향받지 않는다.
 
 > ⚠️ ~~"밀린 카드는 최종 라인업 자리로 직행"~~ · ~~`discardArea`~~ · ~~`discardMaxWidth`~~ 는 **구버전 서술**이었다(2026-07-28 정정, `PACK_FEEL_PLAN.md`에서 이관). `PackCardStack`에 그런 필드는 없고 씬에 `DiscardArea` 노드도 없다. **코드가 진실원.**
@@ -121,16 +126,19 @@
 
 | | 신규 | 중복 |
 |---|---|---|
-| 드러날 때 | 광채가 퍼졌다 잦아들고 `NEW` 리본이 튀어나옴 | 담백하게 그대로 |
-| 부가 | — | 환급 숫자가 떠오르며 사라짐(`Refund > 0`일 때만) |
+| 드러날 때(공통) | 임팩트 펀치 + 섬광이 퍼졌다 잦아든다 | **같다** |
+| 구분 | `NEW` 리본이 튀어나옴 | 환급 숫자가 떠오르며 사라짐(`Refund > 0`일 때만) |
 
-> 강조 발화 시점은 **카드가 완전히 드러난 뒤**(= 위 장이 비켜난 직후).
+> **펀치는 `DOPunchScale`이 아니다.** 그건 원래 크기에서 진동을 서서히 키우는 방식이라 충격이 램프로 퍼지고 "톡 부풀었다"로 읽힌다. 지금은 `punchOvershoot`(+`punchStretch`로 가로만 더 벌린 어긋난 확대)로 **즉시** 꽂아 넣고 `Ease.OutQuint`로 단단히 회수한다 — 충격은 t=0에 전부 들어가고 눈이 보는 것은 회복뿐이다. `OutBack`·`OutElastic`은 제자리를 지나쳐 흔들려 다시 말랑해지므로 금지.
+> **타격은 전 카드 공통이다**(2026-07-30 개편). 원래 섬광은 신규 전용(`glow`)이었는데, 그러면 중복 카드의 확인 순간이 밋밋해 "한 장 확인했다"는 감각이 매 장 달라진다. 신규를 가리는 신호는 `NEW` 리본 하나로 충분하다.
+> 섬광의 **에셋 교체 지점은 `PackCardView.revealFlash`** 하나다(옛 `glow`를 `[FormerlySerializedAs]`로 개명 승계 — 프리팹 재배선 불필요).
+> 강조 발화 시점은 **카드가 완전히 드러난 뒤**(= 위 장이 비켜난 직후). `_instant`(스킵·결과 격자 경로)면 펀치도 섬광도 재생하지 않는다 — 결과 격자는 자체 배율(`PackResultGrid.PlayPop`)로 카드를 세우므로 펀치가 걸리면 스케일을 두고 다툰다.
 > 환급은 이미 `TryPurchase` 시점에 지갑에 들어가 있다 — 연출은 **이미 일어난 일의 시각화**이지 이때 지급하는 게 아니다.
 
 ### Stage 4 — 요약
 결과 격자(3열, `PackResultGrid`) + 총 환급(`OpenedPack.TotalRefund`) + 획득 버튼.
 - 환급 0이면 줄 자체를 숨긴다 — `+0`은 정보가 아니라 잡음.
-- 세로 순서: 남은장수 → 더미 → 결과 격자 → 총환급 → 획득버튼.
+- 세로 순서: 더미 → 결과 격자 → 총환급 → 획득버튼.
 
 ### Stage 5 — 스킵
 - **1회차**: 현재 단계만 즉시 완료. 넘기기 단계에서는 "남은 전부 정리"다(한 장만 넘기는 건 스킵이 아니다).
@@ -158,6 +166,7 @@
 1. **Play 검증** — 씬 단독 실행(`PackStandaloneBoot`, `alternateDuplicates=true`)으로 뜯기·넘기기·신규/중복·스킵을 확인.
 2. **SFX** — 뜯기(진행도에 맞물리는 루프성), 분출, 카드 슬라이드, 신규 획득, 중복 정산. `SoundConfig`에 슬롯 추가 필요. 현재 무음.
 3. **분출 파티클** — `burstEffect` 미배선(null 허용). ⚠ **에셋만 만들어선 안 붙는다**: 캔버스가 Screen Space-Overlay라 `ParticleSystem`이 UI 위로 렌더되지 않는다. 선행 결정이 필요하다 — (a) 캔버스를 Screen Space-Camera로 전환 (b) UI 파티클 솔루션 도입 (c) 파티클 대신 Image 기반 플래시·광선 연출로 대체. 현재는 미배선이라 무해하다.
+   > 카드 한 장의 (c)는 처리됐다(2026-07-30) — `PackCardView.revealFlash`가 전 카드 공통 섬광이고 에셋 교체 지점이다. 남은 것은 **개봉 순간 화면 전체**의 분출뿐이다.
 4. **봉인 표현 고도화** — 현재는 `Seal` 오브젝트를 통째로 미는 최소 구현. 실제 "찢김"을 원하면 셰이더 컷오프나 스프라이트 분리로 교체(`OnProgress` 구독).
 5. **`SkipButton` 리페어런팅** — §3 Stage 5의 알려진 문제. 씬 재구성 시 `UICanvas` 직속으로.
 

@@ -15,6 +15,7 @@ public class DataLibrary : MonoBehaviour
     [SerializeField] BattleTimingConfig battleTimingConfig;   // 미배선 시 GameTiming 기본값 fallback
     [SerializeField] BattleReward battleRewardConfig;         // 미배선 시 RewardService 기본값 fallback
     [SerializeField] RankConfig rankConfig;                   // 미배선 시 RankManager 기본 티어 테이블 fallback
+    [SerializeField] BattleVfxLibrary battleVfxLibrary;       // 규칙 기반 연출 배선(전투 씬은 GameInitializer가 따로 주입)
 
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 
@@ -49,11 +50,12 @@ public class DataLibrary : MonoBehaviour
         }
 
         instance = this;
-        DontDestroyOnLoad(gameObject);
+        DontDestroyOnLoad(transform.root.gameObject);   // 부트 프리팹의 자식이라 루트 기준(단독 배치면 자기 자신)
         GameTiming.SetConfig(this.battleTimingConfig);
         RewardService.SetConfig(this.battleRewardConfig);
         RankManager.SetConfig(this.rankConfig);
         RankRewardManager.SetConfig(this.rankConfig); // 보상 테이블이 티어 테이블과 같은 SO라 필드를 재사용한다(이중 진실원 방지).
+        BattleVfx.SetLibrary(this.battleVfxLibrary);
         return true;
     }
 

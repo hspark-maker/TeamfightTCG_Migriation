@@ -90,4 +90,54 @@ public static class OwnershipManager
         OnOwnershipChanged?.Invoke();
         return true;
     }
+
+    // 여러 키 일괄 지급. 신규 지급 장수를 돌려준다.
+    // 낱장 Grant 반복은 장수만큼 파일 쓰기와 UI 재빌드를 유발하므로 대량 지급은 이 창구로 모은다(Save·이벤트 1회).
+    public static int GrantAll(IEnumerable<string> _keys)
+    {
+        if (_keys == null) return 0;
+
+        int t_added = 0;
+        foreach (var t_key in _keys)
+        {
+            if (string.IsNullOrEmpty(t_key)) continue;
+            if (s_owned.Add(t_key)) t_added++;
+        }
+        if (t_added == 0) return 0;   // 변화 없으면 디스크·UI를 건드리지 않는다
+
+        Save();
+        OnOwnershipChanged?.Invoke();
+        return t_added;
+    }
+
+    // 카탈로그 전량 지급. 신규 지급 장수를 돌려준다(카탈로그 미준비면 0).
+    // "모든 카드"의 정의를 여기 하나로 고정한다 — 호출측이 각자 CardCatalog를 훑으면 필터가 갈린다.
+    public static int GrantEntireCatalog()
+    {
+        if (!CardCatalog.IsReady)
+        {
+            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(BootInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
+            return 0;
+        }
+
+        var t_keys = new List<string>(CardCatalog.Count);
+        foreach (var t_card in CardCatalog.All)
+        {
+            t_keys.Add(CardCatalog.KeyOf(t_card));
+        }
+
+        return GrantAll(t_keys);
+    }
+
+    // 전체 회수. 제거된 장수를 돌려준다(Save·이벤트 1회). 디버그용.
+    public static int RevokeAll()
+    {
+        int t_removed = s_owned.Count;
+        if (t_removed == 0) return 0;
+
+        s_owned.Clear();
+        Save();
+        OnOwnershipChanged?.Invoke();
+        return t_removed;
+    }
 }

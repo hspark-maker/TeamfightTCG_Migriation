@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7d2569e756dcb514981d56a37c89345b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer3/Liquids/Water/WaterLaser/Materials/Mat_LaserMain.mat
+  uploadId: 755856

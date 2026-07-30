@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 87bdc125f27fa4cf7a893558cf897860
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_Component_UI_Etc/ToastMessage_FullWidth_HorizontalStriped.prefab
+  uploadId: 924690

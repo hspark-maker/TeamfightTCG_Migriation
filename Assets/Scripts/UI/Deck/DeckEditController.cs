@@ -116,12 +116,30 @@ public class DeckEditController : MonoBehaviour
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
+    void OnEnable()
+    {
+        OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+    }
+
+    // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
+    // 그리드는 스스로 Build 하지 않는다 — "장착중 딤"에 필요한 편성 상태를 아는 쪽이 여기뿐이라 재빌드도 여기서 건다.
+    void OnOwnershipChanged()
+    {
+        if (!IsOpen || collectionGrid == null) return;
+
+        // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
+        collectionGrid.Build(OnTileDragRequest);
+        RefreshAll();
+    }
+
     // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
     // Close()는 DeckTabController를 거치는 경로에서만 불린다.
     // 편집 상태(m_slotIndex)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
     // DeckTabController.IsEditing이 거짓을 보고한다.
     void OnDisable()
     {
+        OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+
         m_slotIndex = -1;
         m_dirty     = false;
         m_savedName = null;
@@ -232,12 +250,12 @@ public class DeckEditController : MonoBehaviour
 
         if (CountFilled() == DeckSaveManager.DECK_SIZE)
         {
-            // SaveToFile()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
-            // (DeckSaveManager.cs:74-76 주석). 그래서 이 슬롯만 반영하는 SaveSlotToFile을 쓴다.
+            // SaveAll()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
+            // (DeckSaveManager.SaveSlot 주석). 그래서 이 슬롯만 반영하는 SaveSlot을 쓴다.
             // m_working에는 null이 섞일 수 있지만 내부 Save()가 Where(d => d != null)로 거르고,
             // 애초에 6/6일 때만 이 분기에 들어오므로 안전하다.
             //
-            // 이름은 SetName으로 메모리에 올려두면 SaveSlotToFile이 slotName까지 같이 직렬화한다.
+            // 이름은 SetName으로 메모리에 올려두면 SaveSlot이 이름까지 같이 직렬화한다.
             // SetName을 저장 경로 안에서만 부르는 게 중요하다 — 밖에서 부르면 미완성 폐기 경로에서도
             // 메모리 이름이 바뀐 채로 남는다.
             // 이름이 그대로면 SetName을 부르지 않는다 — m_savedName은 GetName의 표시용 폴백("덱 1")일 수 있고,
@@ -246,7 +264,16 @@ public class DeckEditController : MonoBehaviour
             bool   t_renamed = t_name != m_savedName;
 
             if (t_renamed) DeckSaveManager.SetName(m_slotIndex, t_name);
-            if (m_dirty || t_renamed) DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
+            if (m_dirty || t_renamed)
+            {
+                // 덱 대표 이미지는 첫 저장 때 한 번만 발급하고 이후 카드 구성이 바뀌어도 유지한다.
+                // 발급을 저장 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
+                // 메모리에만 키가 남아 세이브와 어긋난다.
+                if (string.IsNullOrEmpty(DeckSaveManager.GetImageKey(m_slotIndex)))
+                    DeckSaveManager.SetImageKey(m_slotIndex, DeckImages.PickRandomKey());
+
+                DeckSaveManager.SaveSlot(m_slotIndex, m_working);
+            }
             ExitToList();
             return;
         }

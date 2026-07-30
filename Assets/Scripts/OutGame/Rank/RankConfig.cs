@@ -23,11 +23,11 @@ public class RankConfig : ScriptableObject
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
-        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 0,   pointsPerDivision = 25, rewardGold = 100,  rewardGoldPerDivision = 50 },
-        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 100, pointsPerDivision = 25, rewardGold = 300,  rewardGoldPerDivision = 50 },
-        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 200, pointsPerDivision = 25, rewardGold = 500,  rewardGoldPerDivision = 100 },
-        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 300, pointsPerDivision = 25, rewardGold = 900,  rewardGoldPerDivision = 100 },
-        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 400, pointsPerDivision = 25, rewardGold = 1400, rewardGoldPerDivision = 200 },
+        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100,   pointsPerDivision = 25, rewardGold = 100,  rewardGoldPerDivision = 50 },
+        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 200, pointsPerDivision = 25, rewardGold = 300,  rewardGoldPerDivision = 50 },
+        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 25, rewardGold = 500,  rewardGoldPerDivision = 100 },
+        new RankGradeConfig { grade = ERankGrade.Ruby, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewardGold = 900,  rewardGoldPerDivision = 100 },
+        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewardGold = 1400, rewardGoldPerDivision = 200 },
     };
 
     /// <summary>전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다(상수 하드코딩 금지).</summary>
@@ -85,7 +85,7 @@ public enum ERankGrade
     Bronze,
     Silver,
     Gold,
-    Platinum,
+    Ruby,
     Diamond,
 }
 

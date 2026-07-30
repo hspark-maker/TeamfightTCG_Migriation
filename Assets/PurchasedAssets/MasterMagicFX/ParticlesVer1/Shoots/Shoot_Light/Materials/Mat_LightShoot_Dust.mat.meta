@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 14fd1dccadf1a694aa87590976623132
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Shoots/Shoot_Light/Materials/Mat_LightShoot_Dust.mat
+  uploadId: 755856

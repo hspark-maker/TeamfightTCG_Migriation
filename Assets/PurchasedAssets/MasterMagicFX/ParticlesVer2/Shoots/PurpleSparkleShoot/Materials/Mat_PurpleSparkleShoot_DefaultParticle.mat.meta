@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eb9d6349318fcc44eb28dcc3dc8182df
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/PurpleSparkleShoot/Materials/Mat_PurpleSparkleShoot_DefaultParticle.mat
+  uploadId: 755856

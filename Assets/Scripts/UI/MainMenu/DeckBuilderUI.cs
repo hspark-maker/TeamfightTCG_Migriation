@@ -73,7 +73,7 @@ public class DeckBuilderUI : MonoBehaviour
     public void SaveCurrentDeck()
     {
         DeckSaveManager.Save(this.currentSlotIndex, this.deckGroup.Deck);
-        DeckSaveManager.SaveToFile();
+        DeckSaveManager.SaveAll();
         this.isDirty = false;
     }
 
@@ -108,7 +108,7 @@ public class DeckBuilderUI : MonoBehaviour
     void OnDeckNameSubmit(string _name)
     {
         DeckSaveManager.SetName(this.currentSlotIndex, _name);
-        DeckSaveManager.SaveToFile();
+        DeckSaveManager.SaveAll();
         RefreshDeckListButtons();
     }
 

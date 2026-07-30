@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 91e44ff80453c4e15aa6f1f977c9aef3
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_DemoScene_Panels/Hero_Detail.prefab
+  uploadId: 924690

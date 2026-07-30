@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Video;
 
 public class BattleFieldView : MonoBehaviour
 {
@@ -25,6 +26,18 @@ public class BattleFieldView : MonoBehaviour
     }
 
     public CardView GetSlotView(int _index) => this.slotViews[_index];
+
+    /// <summary>이 필드의 가운데 자리(월드). 시네마에서 카드가 모이는 지점 —
+    /// 화면 중앙(카메라 기준)이 아니라 **필드 격자 기준**이라 화면 비율이 바뀌어도 슬롯과 어긋나지 않는다.
+    /// 슬롯 뷰의 배치 좌표(SlotPosition)를 쓴다 — 카드가 연출 중 움직여 있어도 원래 자리 기준.</summary>
+    public Vector3 FieldCenter
+    {
+        get
+        {
+            CardView t_mid = this.slotViews[BattleField.SLOT_COUNT / 2];
+            return t_mid != null ? t_mid.SlotPosition : transform.position;
+        }
+    }
 
     public async UniTask PlayFillAnim(List<CardInstance> _placed)
     {
@@ -52,8 +65,22 @@ public class BattleFieldView : MonoBehaviour
         for (int i = 0; i < _placed.Count; i++)
         {
             if (i > 0) await UniTask.Delay((int)(this.cardDealDelay * 1000));
-            await this.slotViews[_placed[i].slotIndex]
-                .PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
+
+            CardView t_view = this.slotViews[_placed[i].slotIndex];
+
+            // 등장 컷씬이 있는 카드는 **중앙에 멈춘 채로** 컷씬을 보고, 끝나거나 스킵된 그 시점에 슬롯으로 들어간다.
+            // 자격 판정은 CardCinematicRules 단독(여기서 stage 비교 금지). 일반 카드는 Resolve가 null이라
+            // 예전처럼 한 번에 흐른다 — 컷씬 없는 카드에 중앙 정지가 생기지 않게 분기해 둔다.
+            VideoClip t_clip = CardCinematicRules.Resolve(_placed[i]);
+            if (t_clip == null)
+            {
+                await t_view.PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
+                continue;
+            }
+
+            await t_view.PlayDealToMid(t_from, t_mid, t_dests[i], this.cardDealDuration);
+            await CardCinematicPlayer.Play(t_clip);
+            await t_view.PlayDealToSlot(t_mid, t_dests[i], this.cardDealDuration);
         }
     }
 

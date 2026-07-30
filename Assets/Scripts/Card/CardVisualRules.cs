@@ -44,12 +44,55 @@ public static class CardVisualRules
         }
     }
 
+    // ── 키워드 아이콘 표시 대상 판정 ────────────────────────────────────────
+    //
+    // 키워드 아이콘 줄에는 **그 캐릭터의 고유 특성만** 띄운다. 일회용·디버프(무적, 추가 체력,
+    // 전투 중 걸린 표식 등)는 아이콘으로 뜨지 않는다 — 카드 정체성이 아니라 잠깐 붙은 상태이고,
+    // 아이콘 줄에 섞이면 "이 카드가 원래 뭐 하는 카드인지"가 안 읽힌다.
+    //
+    // 규칙 enum(CardKeyword)은 쪼개지 않는다. asset/prefab에 int로 직렬화돼 있어 비트 재넘버링은
+    // 컴파일 에러 없이 값을 오해석시키고, 표시 파이프(아이콘/글로우/배너/AttackResult)는 단일 어휘를 요구한다.
+    // 대신 "무엇을 띄울지"만 여기서 판정한다 — 전투 규칙은 이 파일을 보지 않는다.
+    //
+    // 제외 기준은 두 축이다:
+    //  1) 출처 — 같은 표식(Mark)이라도 CardData.keywords에 박힌 것(대장부리)은 그 카드의 특성이라 띄우고,
+    //     패시브가 전투 중 붙인 runtimeKeywords는 걸린 디버프라 안 띄운다.
+    //  2) 키워드 자체 — 무적/추가 체력은 어느 필드에서 오든 항상 상태다(AlwaysStatus).
+
+    /// <summary>출처와 무관하게 아이콘을 띄우지 않는 키워드. 카드 정체성이 아니라 걸렸다 풀리는 것들.
+    /// Invincible=피해 1회 면역(TakeDamage에서 소모), BonusHp=수치가 붙어 있는 임시 체력(HP 옆 "+N"으로 이미 보인다).</summary>
+    public const CardKeyword AlwaysStatus = CardKeyword.Invincible | CardKeyword.BonusHp;
+
+    /// <summary>아이콘으로 띄울 키워드 = 마스터 데이터 + 시너지 부여(둘 다 전투 내내 불변) − 항상상태.
+    /// runtimeKeywords(패시브가 전투 중 부여/해제하는 것)는 통째로 빠진다.</summary>
+    public static CardKeyword TraitKeywords(CardInstance _card)
+        => _card == null ? CardKeyword.None
+         : ((_card.data != null ? _card.data.keywords : CardKeyword.None) | _card.synergyKeywords) & ~AlwaysStatus;
+
+    /// <summary>전투 인스턴스가 없는 아웃게임(도감/로비)용 같은 판정. 판정식을 여기 한 곳에만 둔다 —
+    /// 호출부가 각자 `& ~AlwaysStatus`를 복제하면 로비와 전투 표시가 조용히 갈라진다.</summary>
+    public static CardKeyword TraitKeywords(CardData _card)
+        => _card == null ? CardKeyword.None : _card.keywords & ~AlwaysStatus;
+
+    /// <summary>아이콘 줄에서만 빼는 키워드. 프레임 장식으로는 그대로 보여준다.
+    /// Mark(표식)=반격을 못 주는 대가라 프레임 테두리로 알리는 편이 맞고, 아이콘 줄에 넣으면
+    /// 자리(최대 3칸)를 특성 키워드에서 빼앗는다. 프레임/아이콘이 갈라지는 지점은 이 상수 하나뿐.</summary>
+    public const CardKeyword IconRowExcluded = CardKeyword.Mark;
+
+    /// <summary>아이콘 줄에 띄울 키워드 = TraitKeywords − 아이콘 줄 제외분. 프레임은 TraitKeywords를 그대로 쓴다.</summary>
+    public static CardKeyword IconKeywords(CardInstance _card) => TraitKeywords(_card) & ~IconRowExcluded;
+
+    /// <summary>아웃게임(도감/로비) 아이콘 줄용. 인게임과 같은 제외 규칙.</summary>
+    public static CardKeyword IconKeywords(CardData _card) => TraitKeywords(_card) & ~IconRowExcluded;
+
     /// <summary>비트마스크에서 표시할 키워드 아이콘 목록을 뽑는다(표시 순서 = 리스트 순서).
-    /// None은 스킵, 아이콘이 등록되지 않은 키워드도 스킵(배경만 뜬 빈 아이콘 방지).</summary>
+    /// None은 스킵, 아이콘이 등록되지 않은 키워드도 스킵(배경만 뜬 빈 아이콘 방지).
+    /// 결과가 비면(키워드 없는 캐릭터, 또는 가진 키워드가 전부 위 조건에 걸린 경우)
+    /// config의 기본 아이콘 1개로 채운다 — 폴백 판정을 여기 한 곳에 두어야 로비/전투가 갈라지지 않는다.</summary>
     public static List<KeywordIcon> CollectKeywordIcons(CardKeyword _keywords, KeywordIconConfig _config)
     {
         var t_result = new List<KeywordIcon>();
-        if (_config == null || _keywords == CardKeyword.None) return t_result;
+        if (_config == null) return t_result;
 
         // 순회 순서 = CardKeyword 선언 순(Enum.GetValues). 이 순서가 곧 아이콘이 늘어서는 순서라
         // 바꾸면 같은 카드가 로비/전투에서 다른 배열로 보인다. 정렬을 끼워넣지 말 것.
@@ -63,6 +106,12 @@ public static class CardVisualRules
 
             t_result.Add(new KeywordIcon(t_kw, t_icon));
         }
+
+        // 폴백은 "아이콘이 0개일 때"만. 키워드는 None으로 둔다 —
+        // 실제 보유 키워드가 아니므로 CardView의 iconMap 역참조(PlayKeywordGlow)가 이걸 집으면 안 된다.
+        if (t_result.Count == 0 && _config.DefaultIcon != null)
+            t_result.Add(new KeywordIcon(CardKeyword.None, _config.DefaultIcon));
+
         return t_result;
     }
 

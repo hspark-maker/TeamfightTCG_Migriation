@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a72e56f49e69b35419e27b2ca26d5fda
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Shoots/PurpleAbsorbShoot/Materials/Mat_PurpleAbsorbShoot_Trail.mat
+  uploadId: 755856

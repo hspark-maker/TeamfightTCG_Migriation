@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 03d734f0cce27db43b15ea1cfa8dabc0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat__TestExplosion.mat
+  uploadId: 755856

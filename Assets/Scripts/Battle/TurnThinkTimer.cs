@@ -21,8 +21,16 @@ public static class TurnThinkTimer
     public static bool  Active    { get; private set; }
     public static float Remaining { get; private set; }
 
+    /// <summary>이번 창의 생각시간 총량(초). 링 게이지처럼 비율이 필요한 UI가 자기 상수로 30을 적지 않게 노출.</summary>
+    public static float Limit { get; private set; }
+
+    /// <summary>남은 비율 1→0. Limit이 0(워처 미기동)이면 0.</summary>
+    public static float Normalized => Limit > 0f ? Mathf.Clamp01(Remaining / Limit) : 0f;
+
     public static async UniTaskVoid Watch(float _limitSec, Func<bool> _isDone, Action _onTimeout, CancellationToken _ct)
     {
+        Limit = _limitSec;   // UI 비율 계산 기준. 워처가 값의 유일 소유자.
+
         float t_elapsed     = 0f;
         bool  t_prevAllowed = false;
 

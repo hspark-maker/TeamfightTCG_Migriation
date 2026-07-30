@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 672f8a7f2f567be4793266beb92091bf
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Lasers/FireLaser/Materials/Mat_FireLaser_LaserInner.mat
+  uploadId: 755856

@@ -144,8 +144,8 @@ Assets/Scripts/
 │                 BattleIntro.cs ··········· 인트로 연출
 │                 BattleCleanup.cs ········· static 상태 정리
 │                 DeckConfig.cs ············ 선택 덱 + 멀티 플래그
-│                 DeckSaveManager.cs ······· decks.json 저장/로드
 │                 AIDeckConfig.cs ·········· 싱글 AI 덱 풀 (SO)
+│                 ※ DeckSaveManager는 OutGame/Deck/으로 이동(2026-07-30)
 │
 ├── Card/ ───────────────────────────────── 카드 데이터 모델
 │   │

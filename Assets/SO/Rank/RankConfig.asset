@@ -17,36 +17,36 @@ MonoBehaviour:
   grades:
   - grade: 0
     displayName: Bronze
-    badge: {fileID: 0}
-    entryPoints: 0
+    badge: {fileID: 21300000, guid: 8baff83bfa190470482abd0dae5c881d, type: 3}
+    entryPoints: 100
     pointsPerDivision: 25
     rewardGold: 100
     rewardGoldPerDivision: 50
   - grade: 1
     displayName: Silver
-    badge: {fileID: 0}
-    entryPoints: 100
+    badge: {fileID: 21300000, guid: a41ce061db2614bfa8fe61cd0d085c38, type: 3}
+    entryPoints: 200
     pointsPerDivision: 25
     rewardGold: 300
     rewardGoldPerDivision: 50
   - grade: 2
     displayName: Gold
-    badge: {fileID: 0}
-    entryPoints: 200
+    badge: {fileID: 21300000, guid: 5e0c4d6941cc74f0da0fdae5cb820f39, type: 3}
+    entryPoints: 300
     pointsPerDivision: 25
     rewardGold: 500
     rewardGoldPerDivision: 100
   - grade: 3
-    displayName: Platinum
-    badge: {fileID: 0}
-    entryPoints: 300
+    displayName: Ruby
+    badge: {fileID: 21300000, guid: 3c8c79709eb3c47d99282852a7ca0958, type: 3}
+    entryPoints: 400
     pointsPerDivision: 25
     rewardGold: 900
     rewardGoldPerDivision: 100
   - grade: 4
     displayName: Diamond
-    badge: {fileID: 0}
-    entryPoints: 400
+    badge: {fileID: 21300000, guid: fba201cf2cb14452bae43a674add4f43, type: 3}
+    entryPoints: 500
     pointsPerDivision: 25
     rewardGold: 1400
     rewardGoldPerDivision: 200

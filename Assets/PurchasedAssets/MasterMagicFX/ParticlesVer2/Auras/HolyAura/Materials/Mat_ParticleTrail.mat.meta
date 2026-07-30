@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dee5258e6c8a0734ba43a8a20d86d58c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer2/Auras/HolyAura/Materials/Mat_ParticleTrail.mat
+  uploadId: 755856

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d4d222eff1f607b478ece2e2ae540d28
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer3/Exps/WaterExp/Materials/Mat_WaterSplash.mat
+  uploadId: 755856
