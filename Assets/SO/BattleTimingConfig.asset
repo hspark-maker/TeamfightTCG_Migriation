@@ -33,6 +33,10 @@ MonoBehaviour:
   prlTurnSideStep: 2
   prlWindupAngle: 30.7
   prlSlashMaxTurn: 30
+  cunFogLead: 0.15
+  cunSpinDur: 0.45
+  cunExitDur: 0.35
+  cunShrinkRatio: 0.5
   cameraIntroDuration: 0.8
   cardDealDelay: 0.1
   cardDealDuration: 0.4
@@ -59,4 +63,4 @@ MonoBehaviour:
   enemyExtraAttackDelay: 0.4
   opponentTurnStartDelay: 0.5
   opponentExtraAttackDelay: 0.4
-  turnThinkTime: 999
+  turnThinkTime: 30
