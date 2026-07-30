@@ -1,3 +1,4 @@
+using Coffee.UIEffects;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -33,7 +34,17 @@ public class PackCardView : MonoBehaviour
     [FormerlySerializedAs("glowFallDuration")] [SerializeField] float flashFallDuration = 0.45f;
 
     [Header("신규 강조")]
-    [SerializeField] GameObject newBadge;     // NEW 리본(신규일 때만)
+    [Tooltip("NEW 워드마크(신규일 때만). 카드 안이 아니라 윗변에 걸쳐 앉는다 — 카드 밖으로 삐져나온 글자가 시선을 먼저 잡는다.")]
+    [SerializeField] GameObject newBadge;
+    [Tooltip("워드마크를 훑는 광택. UIEffect의 Transition-Shiny 진행도를 이 코드가 밀어 준다. 미배선이면 등장만 하고 광택은 없다.")]
+    [SerializeField] UIEffect newGleam;
+    [Tooltip("워드마크가 자리를 잡은 뒤 광택이 지나가기까지의 뜸. 동시에 터지면 둘 다 뭉개진다.")]
+    [SerializeField] float newGleamDelay = 0.08f;
+    [SerializeField] float newGleamDuration = 0.45f;
+    [Tooltip("워드마크가 즉시 이만큼 커진 뒤 제자리로 꽂힌다(카드 펀치와 같은 규약). " +
+             "카드의 자식이라 카드 펀치가 곱해진다 — 카드 쪽보다 작게 잡는다.")]
+    [SerializeField] float newBadgeOvershoot = 0.18f;
+    [SerializeField] float newBadgeDuration = 0.2f;
 
     [Header("중복 환급")]
     [SerializeField] GameObject refundBadge;  // "+10" 묶음(중복이고 환급이 있을 때만)
@@ -66,6 +77,10 @@ public class PackCardView : MonoBehaviour
 
     // 펀치를 걸기 전의 배율. 도중에 끊겼을 때 돌아갈 자리다(SnapPunchToRest).
     Vector3 m_punchRestScale = Vector3.one;
+
+    // NEW 워드마크의 제자리 배율. 프리팹에서 기울이거나 키워 뒀을 수 있어 1로 단정하지 않는다(최초 1회 캡처).
+    Vector3 m_newBadgeRestScale = Vector3.one;
+    bool m_newBadgeRestCaptured;
 
     /// <summary>카드 데이터·신규여부·환급액을 태운다. 강조는 아직 재생하지 않는다(완전히 드러난 뒤가 발화 시점).</summary>
     public void Bind(DrawnCard _drawn)
@@ -110,6 +125,7 @@ public class PackCardView : MonoBehaviour
         Group.alpha = 1f;   // 더미에서든 결과 격자에서든 카드는 선명한 상태로 시작한다.
 
         if (newBadge != null) newBadge.SetActive(false);
+        SetGleam(0f);   // 광택 띠를 글자 앞으로 되돌린다 — 중간에 멈춘 채 재사용되면 얼룩이 박힌 상태로 뜬다.
 
         if (revealFlash != null)
         {
@@ -171,23 +187,53 @@ public class PackCardView : MonoBehaviour
             .OnComplete(() => { if (revealFlash != null) revealFlash.gameObject.SetActive(false); });
     }
 
-    // 신규: NEW 배지가 튀어나온다. 섬광은 전 카드 공통(PlayFlash)이므로 여기 남은 것은 배지뿐이다 —
-    // 신규를 가리는 신호는 배지 하나로 충분하고, 섬광까지 신규 전용으로 두면 중복 카드의 확인 순간이 밋밋해진다.
+    // 신규: NEW 워드마크가 꽂히고 그 위를 광택이 훑는다. 섬광은 전 카드 공통(PlayFlash)이므로 여기 남은 것은
+    // 워드마크뿐이다 — 신규를 가리는 신호는 이것으로 충분하고, 섬광까지 신규 전용으로 두면 중복 카드의 확인 순간이 밋밋해진다.
     void PlayNewBadge(bool _instant)
     {
         if (newBadge == null) return;
 
         newBadge.SetActive(true);
 
+        var t_tr = newBadge.transform;
+        if (!m_newBadgeRestCaptured)
+        {
+            m_newBadgeRestScale = t_tr.localScale;
+            m_newBadgeRestCaptured = true;
+        }
+
         if (_instant)
         {
-            newBadge.transform.localScale = Vector3.one;
+            // 결과 격자에선 이미 다 지나간 상태로 세운다 — 광택 띠가 한 장에 걸린 채 멈춰 있으면 얼룩으로 보인다.
+            t_tr.localScale = m_newBadgeRestScale;
+            SetGleam(1f);
             return;
         }
 
-        newBadge.transform.DOKill();
-        newBadge.transform.localScale = Vector3.zero;
-        newBadge.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack).SetLink(newBadge);
+        // 카드 펀치와 같은 규약 — 충격은 t=0에 다 들어가고 눈이 보는 것은 회복이다.
+        t_tr.DOKill();
+        t_tr.localScale = m_newBadgeRestScale * (1f + newBadgeOvershoot);
+        t_tr.DOScale(m_newBadgeRestScale, newBadgeDuration).SetEase(Ease.OutQuint).SetLink(newBadge);
+
+        PlayGleam();
+    }
+
+    // Transition-Shiny의 진행도를 0→1로 밀면 광택 띠가 글자를 훑고 지나간다.
+    // 0과 1 양쪽 끝에서는 띠가 글자 밖이라 아무것도 남지 않는다 — 그래서 시작·종료 상태를 따로 치울 필요가 없다.
+    void PlayGleam()
+    {
+        if (newGleam == null) return;
+
+        SetGleam(0f);
+        DOTween.To(() => newGleam.transitionRate, _v => newGleam.transitionRate = _v, 1f, newGleamDuration)
+               .SetDelay(newGleamDelay)
+               .SetEase(Ease.InOutSine)
+               .SetLink(newGleam.gameObject);
+    }
+
+    void SetGleam(float _rate)
+    {
+        if (newGleam != null) newGleam.transitionRate = _rate;
     }
 
     // 중복: 환급 숫자가 떠오르며 사라진다. 환급이 0이면 아무 말도 하지 않는다(조용한 정산).

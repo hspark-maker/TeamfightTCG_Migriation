@@ -89,7 +89,8 @@
       "Bash(npm -g config get prefix)",
       "Read(//c/Users/cookapps/.claude/**)",
       "Read(//c/Users/cookapps/**)",
-      "Bash(xargs stat -c '%y')"
+      "Bash(xargs stat -c '%y')",
+      "Bash(awk 'BEGIN{d=0}{n=gsub\\(/\\\\{/,\"{\"\\);m=gsub\\(/\\\\}/,\"}\"\\);d+=n-m}END{print FILENAME\" brace:\",d}' Assets/Scripts/UI/Shop/PackCardView.cs)"
     ]
   },
   "enabledMcpjsonServers": [
