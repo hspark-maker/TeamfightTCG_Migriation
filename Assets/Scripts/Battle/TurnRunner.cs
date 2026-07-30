@@ -223,6 +223,9 @@ public class TurnRunner : MonoBehaviour
         int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
         this.lastRewardGold = RewardService.GrantBattleReward(t_remaining);
 
+        // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
+        BattleRewardHandoff.Set(this.lastRewardGold);
+
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
         var t_rank = RankManager.ApplyBattleResult(_won);
         this.lastRankDelta = t_rank.Delta;

@@ -523,6 +523,7 @@ sequenceDiagram
 | ~~`LobbyFirstRunRedirect`~~ (로비 상주·첫시작 구매→캐리어→PackTest) | **폐기**(2026-07-27, 파일 삭제) — 스텝 0 `AutoPurchase`(`OutgameTutorialRunner`)가 흡수. 존치 시 "소유 0"·"stepIndex 0" 이중 판정으로 이중 구매 | G-24 → G-TUT |
 | ~~BootScene / BootRouter~~ | **폐기** — BootScene 없이 LobbyScene(index0) 직행 + 로비 리다이렉트 | — |
 | `PackHandoff` (static 캐리어) | 신규 `Assets/Scripts/OutGame/CardPack/PackHandoff.cs` | G-27 ✅ |
+| `CardPackRewardHandoff` (static 캐리어 — 개봉 결과를 로비 연출까지) | 신규 `Assets/Scripts/OutGame/CardPack/CardPackRewardHandoff.cs` — 환급골드 누적 + 획득카드 append, 1회 소비. 지급·소유는 `CardPackOpener.TryPurchase`가 이미 영속했고 이 캐리어는 **표시량만** 나른다. 훅은 `UI/Shop/PackAcquireController.OnAcquirePressed`(`SaveOpenedDeck()` 직후 1줄 + `m_refundGold` 캐시) | 로비 획득 연출 ✅ (2026-07-30) |
 | ~~`PackTearOpenView`~~ → `PackRevealView` | `Assets/Scripts/UI/Shop/PackRevealView.cs` | G-28 ✅ (아래 절) |
 | ~~`PackClickHandle`~~ → `PackTearHandle` | `Assets/Scripts/UI/Shop/PackTearHandle.cs` — **(2026-07-27) G-29에서 뜯기 제스처 복귀**, `PackClickHandle.cs` 삭제 | G-28 → G-29 ✅ |
 | `PackCardStack` / `PackCardView` (더미 스와이프 · 개봉 카드 표시) | 신규 `Assets/Scripts/UI/Shop/PackCardStack.cs` · `PackCardView.cs` | G-29 ✅ |
@@ -1077,6 +1078,7 @@ LobbyCanvas
 | SO 주입 | `Utils/DataLibrary.cs` 1줄 | ✅ |
 | 패널 · 행 · 수령 팝업 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` · `RankRewardClaimPopup.cs` | ✅ 신규 |
 | 승급 씬 캐리어 · `RankApplyResult` | `OutGame/Rank/RankUpHandoff.cs` · `OutGame/Rank/RankManager.cs`(struct 추가 + 반환 타입 승격) | ✅ 신규 (2026-07-29) |
+| 전투 보상 씬 캐리어 (보상 도메인 파일 — 같은 1회 소비 캐리어 규약이라 여기 나란히 기재) | `OutGame/Reward/BattleRewardHandoff.cs` · `Battle/TurnRunner.cs`(`CaptureResult` 1줄, `RankUpHandoff.Set` 바로 위) — 지급·영속은 `RewardService.GrantBattleReward`가 이미 끝냈고 캐리어는 표시량만. **F-20에서 폐기했던 캐리어를 로비 획득 연출 요구로 되살림** | ✅ 신규 (2026-07-30) |
 | 씬 노드 · 행 프리팹 | `LobbyScene.unity`(`RankRewardOverlay`) · `Assets/Assets/Prefabs/UI/RankUI/RankRewardRow.prefab` | ✅ 저작 완료 (Addressable 등록 없음 — 풀드 UI가 아니다) |
 | 알림 점 | `UI/Rank/RankRewardAlertDot.cs` (`HasAnyClaimable` 단일 판정 + `OnChanged` 구독) | ✅ 신규 (2026-07-29, 씬 배선 대기) |
 | 팝업 등장·퇴장 연출 | `UI/Common/PopupTransition.cs` (MonoBehaviour 아님 — 씬 저작 뷰가 필드로 소유. 패널·수령 팝업 공용) | ✅ 신규 (2026-07-29) |

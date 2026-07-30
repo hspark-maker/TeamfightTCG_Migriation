@@ -3426,6 +3426,66 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &1602550880231397688
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2760559286507228899}
+  - component: {fileID: 8707561417033275778}
+  m_Layer: 0
+  m_Name: GainEffectLayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2760559286507228899
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602550880231397688}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7199074612625639083}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &8707561417033275778
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602550880231397688}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4c41eea753c1b64f9a2f1d0fae0a74e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyGainEffectDirector
+  goldHud: {fileID: 0}
+  coinSprite: {fileID: 0}
+  collectionTabTarget: {fileID: 0}
+  collectionTabName: Button_Collection
+  tabFocusName: Button_Focus
+  coinCountMin: 4
+  coinCountMax: 12
+  coinAngleStart: 195
+  coinAngleSpan: 150
+  goldPunch: 0.35
+  tabPunch: 0.3
+  stageGap: 0.15
 --- !u!1 &1682686617818935015
 GameObject:
   m_ObjectHideFlags: 0
@@ -7671,6 +7731,7 @@ RectTransform:
   - {fileID: 4882084223444634776}
   - {fileID: 4488131515775845465}
   - {fileID: 6649639394596889925}
+  - {fileID: 2760559286507228899}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -10136,6 +10197,8 @@ MonoBehaviour:
   gatherDuration: 0.32
   coinInterval: 0.06
   popDuration: 0.12
+  angleStart: 18
+  angleSpan: 360
 --- !u!1 &5702788389745908895
 GameObject:
   m_ObjectHideFlags: 0

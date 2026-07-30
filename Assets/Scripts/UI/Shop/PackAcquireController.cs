@@ -25,6 +25,8 @@ public class PackAcquireController : MonoBehaviour
 
     // 이번 개봉으로 뽑힌 카드(획득 시 덱 슬롯 0에 저장). Consume은 1회뿐이라 여기 캐시한다.
     readonly List<CardData> m_cards = new List<CardData>();
+    // 이번 개봉의 중복 환급 합계(연출 표시용). 카드와 같은 시점에 캐시해야 짝이 갈라지지 않는다.
+    long m_refundGold;
 
     // 획득이 2회 이상 눌려도 씬 전이는 1회만.
     bool m_left;
@@ -64,10 +66,11 @@ public class PackAcquireController : MonoBehaviour
         if (acquireButton != null) acquireButton.onClick.RemoveListener(OnAcquirePressed);
     }
 
-    // 개봉 카드 목록 캐시(null 카드 제외).
+    // 개봉 카드 목록 + 환급 총액 캐시(null 카드 제외).
     void CacheCards(OpenedPack _opened)
     {
         m_cards.Clear();
+        m_refundGold = _opened != null ? _opened.TotalRefund : 0;
 
         var t_drawn = _opened != null ? _opened.Cards : null;
         if (t_drawn == null) return;
@@ -89,6 +92,10 @@ public class PackAcquireController : MonoBehaviour
         m_left = true;
 
         SaveOpenedDeck();
+
+        // 골드·카드가 같은 개봉 세션 결과라 로비 복귀 직전 한 지점에서 함께 싣는다(지급·저장은 이미 끝났다 — 표시량뿐).
+        // 튜토리얼 경로로 전투에 먼저 가는 경우엔 이후 로비 진입 시 재생된다(의도된 동작).
+        CardPackRewardHandoff.Set(m_refundGold, m_cards);
 
         // 튜토리얼 세팅은 목적지(전투) 진입 직전 1회. scenario null이면 Begin이 End로 안전 처리.
         if (m_startTutorial) TutorialConfig.Begin(scenario);

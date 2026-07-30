@@ -107,7 +107,9 @@
       "Bash(awk '/^--- !u!1 &1376200663$/{f=1} f{print; if\\(/m_IsActive:/\\) exit}' Assets/Scenes/CardPack.unity)",
       "Bash(command -v dotnet)",
       "Bash(dotnet --version)",
-      "Bash(sed 's/.*guid: //')"
+      "Bash(sed 's/.*guid: //')",
+      "Bash(sed -n '/^  keywordFrames:/,/^  showName/p' DeckUI/DeckEditSlot.prefab)",
+      "Bash(sed -n '/^  keywordFrames:/,/^  showName/p' PackUI/PackCard.prefab)"
     ]
   },
   "enabledMcpjsonServers": [

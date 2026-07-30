@@ -4,12 +4,12 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 보상 코인이 중앙에서 흩어졌다가 수치 쪽으로 빨려 들어가는 UI 연출.
+// 보상 코인이 원점에서 흩어졌다가 수치 쪽으로 빨려 들어가는 UI 연출.
+// 궤적 규칙은 UiGainBurst가 갖고, 이 컴포넌트는 "코인을 만들고 걷는" 일만 한다(카드 연출과 궤적이 갈라지지 않게).
 // 코인은 재생할 때 만들고 끝나면 지운다 — 한 번만 도는 결과 화면을 위한 최소 구현(풀링 없음).
 //
 // 시퀀스를 재생하지 않고 만들어서 돌려준다(BuildBurst). 호출자가 자기 연출 시퀀스에 붙여야
 // 스킵 한 번으로 코인까지 함께 최종 상태로 끌어당길 수 있다.
-// 도착 통지는 InsertCallback으로 시간축에 박는다 — 중첩 트윈의 콜백 동작에 기대지 않는다.
 public class CoinBurstEffect : MonoBehaviour
 {
     [Header("배선")]
@@ -28,12 +28,30 @@ public class CoinBurstEffect : MonoBehaviour
     [Tooltip("코인 한 장씩 출발이 밀리는 간격. 0이면 전부 동시에 튄다.")]
     [SerializeField] float coinInterval = 0.06f;
     [SerializeField] float popDuration = 0.12f;   // 코인이 생겨나며 커지는 시간
+    [Tooltip("흩어지는 부채꼴의 시작 각(도).")]
+    [SerializeField] float angleStart = 18f;
+    [Tooltip("흩어지는 부채꼴의 각도 폭. 360이면 전방위.")]
+    [SerializeField] float angleSpan = 360f;
 
     readonly List<GameObject> m_coins = new List<GameObject>();
 
     /// <summary>연출 전체 길이(초).</summary>
-    public float TotalDuration
-        => Mathf.Max(0, this.coinCount - 1) * this.coinInterval + this.scatterDuration + this.gatherDuration;
+    public float TotalDuration => BuildSettings().TotalDuration;
+
+    /// <summary>
+    /// 배선을 런타임에 갈아 끼운다(프리팹에 미리 꽂아둘 수 없는 상황용 — 로비 획득 연출이 이 경로를 쓴다).
+    /// 넘기지 않은 값(_coinCount 음수, 각도 null)은 직렬화된 값을 유지한다.
+    /// </summary>
+    public void Configure(Sprite _coinSprite, RectTransform _spawnCenter, RectTransform _target,
+                          int _coinCount = -1, float? _angleStart = null, float? _angleSpan = null)
+    {
+        this.coinSprite  = _coinSprite;
+        this.spawnCenter = _spawnCenter;
+        this.target      = _target;
+        if (_coinCount >= 0) this.coinCount = _coinCount;
+        if (_angleStart.HasValue) this.angleStart = _angleStart.Value;
+        if (_angleSpan.HasValue) this.angleSpan = _angleSpan.Value;
+    }
 
     /// <summary>
     /// 분출→수렴 시퀀스를 만들어 돌려준다(재생은 호출자 시퀀스에 맡긴다).
@@ -43,45 +61,23 @@ public class CoinBurstEffect : MonoBehaviour
     {
         ClearCoins();
 
-        var t_seq = DOTween.Sequence().SetLink(gameObject);
-
         // 스프라이트 미배선/장수 0 = 연출 없음. 그래도 수치는 최종값으로 확정해 진행을 막지 않는다.
         if (this.coinSprite == null || this.coinCount <= 0)
         {
-            t_seq.AppendCallback(() => _onArrived?.Invoke(1, 1));
-            return t_seq;
+            var t_empty = DOTween.Sequence().SetLink(gameObject);
+            t_empty.AppendCallback(() => _onArrived?.Invoke(1, 1));
+            return t_empty;
         }
 
         var t_self = (RectTransform)transform;
-        Vector2 t_from = this.spawnCenter != null ? ToSelfLocal(this.spawnCenter) : Vector2.zero;
-        Vector2 t_to   = this.target != null ? ToSelfLocal(this.target) : Vector2.zero;
+        Vector2 t_from = this.spawnCenter != null ? UiGainBurst.ToLayerLocal(t_self, this.spawnCenter) : Vector2.zero;
+        Vector2 t_to   = this.target != null ? UiGainBurst.ToLayerLocal(t_self, this.target) : Vector2.zero;
 
-        for (int i = 0; i < this.coinCount; i++)
-        {
-            var t_coin = CreateCoin(t_self, t_from);
-            var t_rt   = (RectTransform)t_coin.transform;
-
-            // 각도를 균등 분할해 흩뿌린다 — 난수 없이도 고르게 퍼지고 매번 같은 그림이 나온다.
-            float t_angle = 360f / this.coinCount * i + 18f;
-            float t_reach = this.scatterRadius * (0.7f + 0.15f * (i % 3));
-            Vector2 t_dir = new Vector2(Mathf.Cos(t_angle * Mathf.Deg2Rad), Mathf.Sin(t_angle * Mathf.Deg2Rad));
-            Vector2 t_mid = t_from + t_dir * t_reach;
-
-            float t_delay = i * this.coinInterval;
-
-            t_seq.Insert(t_delay, t_rt.DOScale(1f, this.popDuration).SetEase(Ease.OutBack));
-            t_seq.Insert(t_delay, t_rt.DOAnchorPos(t_mid, this.scatterDuration).SetEase(Ease.OutQuad));
-            // 수렴은 InBack — 잠깐 뒤로 물렸다 빨려드는 느낌.
-            t_seq.Insert(t_delay + this.scatterDuration,
-                         t_rt.DOAnchorPos(t_to, this.gatherDuration).SetEase(Ease.InBack));
-
-            int t_index = i + 1;   // 클로저가 루프 변수를 붙잡지 않게 복사.
-            t_seq.InsertCallback(t_delay + this.scatterDuration + this.gatherDuration, () =>
-            {
-                if (t_coin != null) t_coin.SetActive(false);
-                _onArrived?.Invoke(t_index, this.coinCount);
-            });
-        }
+        var t_seq = UiGainBurst.Build(t_self, t_from, t_to, BuildSettings(),
+                                      _spawn: _i => (RectTransform)CreateCoin().transform,
+                                      _despawn: _rt => { if (_rt != null) _rt.gameObject.SetActive(false); },
+                                      _onArrived: _onArrived);
+        t_seq.SetLink(gameObject);
 
         // 정상 종료든 스킵(Complete)이든 여기서 코인을 걷는다.
         t_seq.AppendCallback(ClearCoins);
@@ -94,16 +90,14 @@ public class CoinBurstEffect : MonoBehaviour
         ClearCoins();
     }
 
-    GameObject CreateCoin(RectTransform _parent, Vector2 _at)
+    UiGainBurst.Settings BuildSettings()
+        => new UiGainBurst.Settings(this.coinCount, this.scatterRadius, this.scatterDuration, this.gatherDuration,
+                                    this.coinInterval, this.popDuration, this.angleStart, this.angleSpan);
+
+    GameObject CreateCoin()
     {
         var t_go = new GameObject("Coin", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        var t_rt = (RectTransform)t_go.transform;
-        t_rt.SetParent(_parent, false);
-        t_rt.anchorMin = t_rt.anchorMax = new Vector2(0.5f, 0.5f);
-        t_rt.pivot     = new Vector2(0.5f, 0.5f);
-        t_rt.sizeDelta = new Vector2(this.coinSize, this.coinSize);
-        t_rt.anchoredPosition = _at;
-        t_rt.localScale = Vector3.zero;
+        ((RectTransform)t_go.transform).sizeDelta = new Vector2(this.coinSize, this.coinSize);
 
         var t_img = t_go.GetComponent<Image>();
         t_img.sprite = this.coinSprite;
@@ -114,17 +108,13 @@ public class CoinBurstEffect : MonoBehaviour
         return t_go;
     }
 
-    // 다른 좌표계의 RectTransform 위치를 이 오브젝트의 로컬(anchoredPosition 기준)로 옮긴다.
-    Vector2 ToSelfLocal(RectTransform _rt)
-        => transform.InverseTransformPoint(_rt.position);
-
     void ClearCoins()
     {
-        for (int i = 0; i < m_coins.Count; i++)
+        for (int t_i = 0; t_i < m_coins.Count; t_i++)
         {
-            if (m_coins[i] == null) continue;
-            m_coins[i].transform.DOKill();
-            Destroy(m_coins[i]);
+            if (m_coins[t_i] == null) continue;
+            m_coins[t_i].transform.DOKill();
+            Destroy(m_coins[t_i]);
         }
         m_coins.Clear();
     }
