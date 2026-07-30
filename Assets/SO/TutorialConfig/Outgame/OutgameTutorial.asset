@@ -20,34 +20,6 @@ MonoBehaviour:
     duplicateRefundGold: 0
     nextScene: 
     scenario: {fileID: 11400000, guid: b7e3f1a92c8d4e6f0a1b2c3d4e5f6071, type: 2}
-  - kind: 1
-    anchor: 2
-    guideMessage: "\uC0C1\uC810\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 4
-    anchor: 3
-    guideMessage: "\uCE74\uB4DC\uD329\uC744 \uAD6C\uB9E4\uD558\uC138\uC694"
-    pack: {fileID: 11400000, guid: 8aa5ce5e4eee46b4cbd2762c3c058a9c, type: 2}
-    duplicateRefundGold: 10
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 3
-    anchor: 0
-    guideMessage: "\uCE74\uB4DC\uD329 \uC624\uD508"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 1
-    anchor: 4
-    guideMessage: "\uCE74\uB4DC \uD68D\uB4DD"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
   - kind: 2
     anchor: 1
     guideMessage: "\uC804\uD22C\uB97C \uC2DC\uC791\uD558\uC138\uC694"

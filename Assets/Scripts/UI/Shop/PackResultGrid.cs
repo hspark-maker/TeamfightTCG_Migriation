@@ -9,6 +9,10 @@ using UnityEngine;
 // 배치는 레이아웃 그룹이 아니라 이 코드가 직접 잡는다. 카드 프리팹은 광채·NEW 배지가 고정 크기라
 //   셀에 맞춰 rect만 줄이면 배지가 카드를 덮어버린다 — 카드는 통째로 스케일을 낮춰야 비율이 산다.
 // 표시 전용이다. 획득·소유·환급은 이 화면 밖에서 이미 확정돼 있고 여기서는 결과만 읽는다.
+//
+// 이 화면이 답해야 하는 질문은 "이번에 뭘 건졌나" 하나다. 그 답은 배치나 팝이 아니라 카드의 상태 차이가 준다
+//   — 신규는 광채가 계속 돌고 중복은 탈채도된 채 놓인다(PackCardView.ApplyResultContrast).
+//   팝은 전 카드 동일하게 둔다: 정렬과 리듬까지 갈라지면 결과판이 또 한 번의 연출로 읽힌다.
 public class PackResultGrid : MonoBehaviour
 {
     // 3열은 이 화면의 고정 규격(열 수는 배선의 자유가 아니다).
@@ -94,6 +98,10 @@ public class PackResultGrid : MonoBehaviour
             var t_view = Instantiate(cardPrefab, t_parent);
             t_view.Bind(t_drawn);
             t_view.PlayRevealAccent(true);
+
+            // 결과판의 본론. 위 한 줄이 "연출 없이 최종 상태로 세운다"라면 이 한 줄이 "그래서 뭘 건졌나"다 —
+            // 신규는 광채가 계속 돌고 중복은 탈채도된 채 놓인다.
+            t_view.ApplyResultContrast();
 
             int t_index = m_views.Count;
             m_views.Add(t_view);

@@ -106,6 +106,11 @@ public class PackRevealView : MonoBehaviour
              "화면을 덮는 어둠은 PackStage보다 앞 sibling의 별도 Dim이 상시 깔고 있다.")]
     [SerializeField] CanvasGroup revealPanel;
 
+    [Header("신규 카드 반응")]
+    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. 씬의 Dim에 붙인 PackScreenFlash를 물린다. " +
+             "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
+    [SerializeField] PackScreenFlash newCardFlash;
+
     [Header("표시 (옵션)")]
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
@@ -520,7 +525,13 @@ public class PackRevealView : MonoBehaviour
     // 새 맨 위 카드가 드러났다 — 등장 타격과 신규/중복 강조는 이 시점에 터진다.
     void HandleCardRevealed(PackCardView _view)
     {
-        if (_view != null) _view.PlayRevealAccent();
+        if (_view == null) return;
+
+        _view.PlayRevealAccent();
+
+        // 카드 한 장의 축(뷰)과 화면의 축(여기)을 갈라 둔다 — 화면 전체가 반응하는 것은 신규뿐이라
+        // 그 판단을 카드 프리팹 안에 두면 "이 화면에 Dim이 있는가"를 카드가 알아야 한다.
+        if (_view.IsNew && newCardFlash != null) newCardFlash.Play();
     }
 
     // ── 보조 ────────────────────────────────────────────────────
