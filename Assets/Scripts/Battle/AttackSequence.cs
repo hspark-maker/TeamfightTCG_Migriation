@@ -74,10 +74,19 @@ public static class AttackSequence
     {
         // 테스트/특수 호출이 강제하면 그 값, 아니면 공격력 기준 판정.
         bool t_special = _forceSpecial ?? IsCinemaAttack(_attacker);
-        return t_special
-            ? PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit)
+        if (t_special)
+            return PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
+
+        // 원거리(Ranged)는 붙지 않는다 — 제자리에서 투사체를 쏘고, 투사체가 닿는 시점에 히트.
+        // 판정은 런타임 키워드 포함(HasKeyword) — 시너지/패시브가 준 원거리도 같은 연출이어야 한다.
+        return IsRangedAttack(_attacker)
+            ? PlayRanged(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit)
             : PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
     }
+
+    /// <summary>이 공격이 원거리 발사 연출인가. 공격자 없음(환경 피해)이면 false → 기존 경로.</summary>
+    static bool IsRangedAttack(CardView _attacker)
+        => _attacker?.BoundCard != null && _attacker.BoundCard.HasKeyword(CardKeyword.Ranged);
 
     // ── 일반 연출: 박치기 ─────────────────────────────────────────────────
     // 나머지 암전, 공격자가 제자리에서 적 방향으로 기울며 돌진 → 접촉(히트) → 튕겨 복귀.
@@ -111,6 +120,69 @@ public static class AttackSequence
             _home: _attacker.SlotPosition);
 
         CardView.RestoreAllFades();
+    }
+
+    // ── 원거리 연출: 제자리 발사 ─────────────────────────────────────────
+    /// <summary>원거리 공격. 공격자는 슬롯에 남아 반동(뒤로 살짝 → 복귀)만 하고, 투사체가 대신 날아간다.
+    /// 히트 시점은 박치기와 같은 기준인 `hitDelay` — 그래야 투사체 도착과 데미지·피격 연출이 맞는다
+    /// (LaunchProjectile의 비행 시간도 hitDelay - spawnDelay로 잡혀 있다).
+    ///
+    /// 데미지 적용 지점은 ResolveHits 하나로 박치기와 공유한다 — 연출이 갈라져도 규칙 타임라인은 같다.
+    /// 투사체 프리팹이 미배선이면 발사만 없고 나머지는 동일하게 흐른다(무동작 안전).</summary>
+    static async UniTask PlayRanged(CardView _attacker, CardView _defender, CardView _splashView,
+        AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+    {
+        float t_hitDelay = _effect?.hitDelay ?? 0f;
+
+        CardView.FadeAll(0.3f);
+        if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
+        else                     CardView.FadeCards(1f, _attacker, _defender);
+
+        bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
+        _attacker?.PlayAttackAnim();
+        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
+        SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
+        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip);
+        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay, t_flip).Forget();
+
+        if (_preEffectKw != CardKeyword.None)
+            await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
+
+        // 발사 반동: 적 반대 방향으로 살짝 밀렸다 제자리로. 거리·시간은 박치기와 같은 SO 값을 재사용한다
+        // (원거리 전용 값을 새로 만들면 배속·튜닝 지점이 또 갈라진다).
+        UniTask t_kick = RecoilInPlace(_attacker, _defender);
+
+        if (t_hitDelay > 0f)
+            await UniTask.Delay((int)(t_hitDelay * 1000));   // 투사체 비행 시간
+
+        await UniTask.WhenAll(
+            ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true),
+            t_kick);
+
+        _attacker?.SetArmedVfx(false);   // 박치기의 반동 지점과 같은 의미 — 발사가 끝나면 무장 해제
+        CardView.RestoreAllFades();
+    }
+
+    /// <summary>제자리 발사 반동. 이동하지 않고 슬롯에서 살짝 밀렸다 돌아온다(각도 변화 없음).</summary>
+    static async UniTask RecoilInPlace(CardView _attacker, CardView _defender)
+    {
+        if (_attacker == null) return;
+
+        NormalTuning t_cfg = Normal;
+        Transform t_atk  = _attacker.transform;
+        Vector3   t_home = t_atk.position;
+
+        Vector3 t_dir  = _defender.transform.position - t_home;
+        Vector3 t_dirN = t_dir.sqrMagnitude > 0.0001f ? t_dir.normalized : Vector3.up;
+
+        Vector3 t_back = t_home - t_dirN * t_cfg.windDist;
+        t_back.z = t_home.z;
+
+        t_atk.DOKill();
+        await DOTween.Sequence().SetLink(_attacker.gameObject)
+            .Append(t_atk.DOMove(t_back, t_cfg.windDur).SetEase(Ease.OutQuad))
+            .Append(t_atk.DOMove(t_home, t_cfg.outDur).SetEase(Ease.OutBack))
+            .ToUniTask();
     }
 
     // ── 공유: 박치기 모션 ────────────────────────────────────────────────

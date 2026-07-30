@@ -16,6 +16,16 @@ public class CardAnimator : MonoBehaviour
     // 시네마에서 여러 장을 세울 때 좌우 간격(월드). 슬롯 간격(2.0)보다 좁게 모아 붙인다.
     [SerializeField] float cinemaSpacing = 1.6f;
 
+    [Header("Hit Twitch (피격 순간 떨림)")]
+    // 흔들 대상은 카드 **비주얼 자식**(예: "Card"). 루트를 흔들면 이동/박치기 트윈과 충돌한다.
+    [SerializeField] Transform twitchTarget;
+    [SerializeField] float twitchDistance = 0.12f;   // 흔들림 폭(월드)
+    [SerializeField] float twitchDuration = 0.16f;   // 길이(초, 전역 배속 적용)
+    [SerializeField] float twitchAngle    = 5f;      // 함께 흔들리는 각도(0이면 회전 없음)
+
+    Vector3    twitchHome;      // 떨림 기준 자세 — 연타/중단 시 여기로 되돌린다
+    Quaternion twitchHomeRot;
+
     CardInstance boundCard;
     BattleFieldView fieldView;   // 이 카드가 속한 필드(시네마 집결 좌표의 기준). 없으면 폴백.
     Vector3 slotPosition;
@@ -43,6 +53,14 @@ public class CardAnimator : MonoBehaviour
     {
         this.slotPosition = transform.position;
         this.fieldView    = GetComponentInParent<BattleFieldView>();
+
+        // 떨림 대상 미배선이면 첫 자식(카드 비주얼 루트)을 쓴다 — 프리팹 배선 없이도 동작하게.
+        if (this.twitchTarget == null && transform.childCount > 0) this.twitchTarget = transform.GetChild(0);
+        if (this.twitchTarget != null)
+        {
+            this.twitchHome    = this.twitchTarget.localPosition;
+            this.twitchHomeRot = this.twitchTarget.localRotation;
+        }
     }
 
     /// <summary>이 카드가 속한 필드의 가운데 자리(월드). 시네마 집결 지점 —
@@ -195,11 +213,38 @@ public class CardAnimator : MonoBehaviour
 
     // ── Hit / Death / Deal ───────────────────────────────────────────────
 
+    /// <summary>피격 순간의 짧은 떨림. **카드 루트가 아니라 비주얼 자식을 흔든다** —
+    /// 루트 position/rotation은 이동·박치기·시네마 트윈이 쓰고 있어서 거기에 흔들기를 얹으면
+    /// 서로 덮어쓰거나 DOKill에 잘려 카드가 엉뚱한 자리에 굳는다.
+    /// 미배선이면(twitchTarget=null) Awake에서 첫 자식을 잡고, 그것도 없으면 조용히 생략한다.</summary>
+    void PlayHitTwitch()
+    {
+        Transform t_t = this.twitchTarget;
+        if (t_t == null || this.twitchDistance <= 0f || this.twitchDuration <= 0f) return;
+
+        float t_dur = this.twitchDuration * GameTiming.Factor;   // 전역 배속 반영(다른 연출과 같은 기준)
+
+        // 직전 떨림이 남아 있으면 끊고 기준 자세로 되돌린 뒤 다시 — 연타 피격에서 누적되어 밀리지 않게.
+        t_t.DOKill();
+        t_t.localPosition = this.twitchHome;
+        t_t.localRotation = this.twitchHomeRot;
+
+        t_t.DOShakePosition(t_dur, this.twitchDistance, vibrato: 18, randomness: 40f, fadeOut: true)
+           .SetLink(gameObject)
+           .OnComplete(() => { t_t.localPosition = this.twitchHome; });
+
+        if (this.twitchAngle > 0f)
+            t_t.DOPunchRotation(new Vector3(0f, 0f, this.twitchAngle), t_dur, vibrato: 8, elasticity: 0.6f)
+               .SetLink(gameObject)
+               .OnComplete(() => { t_t.localRotation = this.twitchHomeRot; });
+    }
+
     public async UniTask PlayHitAnim(float _duration = -1f, int _damage = 0)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
         this.hitEffect?.Play(_damage);   // 피격 붐 + 데미지 숫자(있으면). 위치=이 카드.
+        PlayHitTwitch();                 // 맞은 순간 잠깐 떨림(붐과 같은 프레임에 시작)
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();
         Color t_c = this.hitOverlay.color;

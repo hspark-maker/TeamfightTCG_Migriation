@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f3807fb206dd4de7aca2526d5a0b765e
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 255608
+  packageName: Master Stylized Projectile
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/Commons/Shaders/Mask.shadersubgraph
+  uploadId: 825804

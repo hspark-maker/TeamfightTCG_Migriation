@@ -74,6 +74,17 @@ public static class CardVisualRules
     public static CardKeyword TraitKeywords(CardData _card)
         => _card == null ? CardKeyword.None : _card.keywords & ~AlwaysStatus;
 
+    /// <summary>아이콘 줄에서만 빼는 키워드. 프레임 장식으로는 그대로 보여준다.
+    /// Mark(표식)=반격을 못 주는 대가라 프레임 테두리로 알리는 편이 맞고, 아이콘 줄에 넣으면
+    /// 자리(최대 3칸)를 특성 키워드에서 빼앗는다. 프레임/아이콘이 갈라지는 지점은 이 상수 하나뿐.</summary>
+    public const CardKeyword IconRowExcluded = CardKeyword.Mark;
+
+    /// <summary>아이콘 줄에 띄울 키워드 = TraitKeywords − 아이콘 줄 제외분. 프레임은 TraitKeywords를 그대로 쓴다.</summary>
+    public static CardKeyword IconKeywords(CardInstance _card) => TraitKeywords(_card) & ~IconRowExcluded;
+
+    /// <summary>아웃게임(도감/로비) 아이콘 줄용. 인게임과 같은 제외 규칙.</summary>
+    public static CardKeyword IconKeywords(CardData _card) => TraitKeywords(_card) & ~IconRowExcluded;
+
     /// <summary>비트마스크에서 표시할 키워드 아이콘 목록을 뽑는다(표시 순서 = 리스트 순서).
     /// None은 스킵, 아이콘이 등록되지 않은 키워드도 스킵(배경만 뜬 빈 아이콘 방지).
     /// 결과가 비면(키워드 없는 캐릭터, 또는 가진 키워드가 전부 위 조건에 걸린 경우)

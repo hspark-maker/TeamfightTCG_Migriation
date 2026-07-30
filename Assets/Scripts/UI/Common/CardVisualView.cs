@@ -154,10 +154,11 @@ public class CardVisualView : MonoBehaviour
         if (!_show || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
 
         // 아웃게임엔 전투 런타임 상태가 없다 → 상태 전용 키워드(무적·추가체력)는 애초에 제외.
-        // 판정은 인게임 특성 줄과 같은 CardVisualRules.TraitKeywords 하나. 로비/전투 표시가 갈리지 않는다.
+        // 판정은 인게임 특성 줄과 같은 CardVisualRules.IconKeywords 하나. 로비/전투 표시가 갈리지 않는다.
+        // (아이콘 줄 전용 제외분 = 표식. 프레임 장식은 아래 RefreshKeywordFrames가 TraitKeywords로 그대로 띄운다.)
         int t_index = 0;
         foreach (CardVisualRules.KeywordIcon t_entry in
-                 CardVisualRules.CollectKeywordIcons(CardVisualRules.TraitKeywords(_card), this.keywordIconConfig))
+                 CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig))
         {
             CardKeywordIconView t_view = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
             t_view.SetIcon(t_entry.Icon);
@@ -183,7 +184,7 @@ public class CardVisualView : MonoBehaviour
     }
 
     // 프레임 키워드 장식(처형·도발·힐러·원거리·교활·무쌍·표식). 인게임 CardView.RefreshKeywordFrames와 같은 규약:
-    // 판정 대상은 아이콘 줄과 **같은** TraitKeywords, 미소유/빈 카드는 전부 끈다(아이콘 줄과 동일한 정보 은닉).
+    // 기준은 TraitKeywords(아이콘 줄만 IconKeywords로 표식을 더 뺀다), 미소유/빈 카드는 전부 끈다(정보 은닉).
     void RefreshKeywordFrames(CardData _card, bool _show)
     {
         if (this.keywordFrames == null) return;

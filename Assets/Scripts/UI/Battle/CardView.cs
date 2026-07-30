@@ -40,6 +40,9 @@ public class CardView : MonoBehaviour
     [Header("UI")]
     [SerializeField] TMP_Text hpText;
     [SerializeField] TMP_Text bonusHpText;
+    // 공격 선택 시 이 카드가 받을 예상 데미지("-N"). HP 라벨을 덮어써 "맞은 뒤 남을 체력"을 보여주면
+    // 현재 체력과 헷갈리므로 수치는 별도 라벨에 띄운다. 미배선이면 HP 라벨 폴백(아래 ShowAttackPreview).
+    [SerializeField] TMP_Text damagePreviewText;
     [SerializeField] TMP_Text nameText;
     [SerializeField] SpriteRenderer illustration;
     [SerializeField] GameObject faceDownOverlay;
@@ -234,6 +237,11 @@ public class CardView : MonoBehaviour
         this.dragStartScreenPos   = new Vector2(Screen.width * 0.5f, t_destY);
         this.currentDragScreenPos = this.dragStartScreenPos;
 
+        // 무장 연출(무기 조준 + 이펙트)은 드래그 조준일 때만 누르는 순간 켠다.
+        // 드래그가 꺼진 지금은 "선택된 공격자"만 무장 상태여야 하므로 ToggleSelectAttacker가 켠다 —
+        // 여기서 켜면 선택되지 않은 카드에 이펙트가 남아 누가 공격자인지 흐려진다.
+        if (!BattleUxFlags.DragAimAttack) return;
+
         FocusWeapon(true);
         SetArmedVfx(true);   // 무장(드래그) 시작
     }
@@ -257,6 +265,17 @@ public class CardView : MonoBehaviour
         // 터치 지점이라 작은 드래그가 아래 return에 걸려 취소 판정 자체를 못 받는다.
         if (this.longPressFired && PointerLeftSelf())
             CancelLongPress();
+
+        // 드래그 조준 공격 블라인드: 기본 UX(탭 공격)만 남기기로 해서 제스처 확정 이전에 끊는다.
+        // 여기서 끊으면 HandleAimDrag/UpdateTarget/SwipeGuide/조준 기울기가 아예 실행되지 않고,
+        // activeGesture가 계속 None이라 손 뗄 때 탭 판정이 그대로 성립한다.
+        // 위쪽 롱프레스 취소 로직은 통과시킨다 — 정보 팝업은 공격 UX가 아니므로 유지.
+        if (!BattleUxFlags.DragAimAttack)
+        {
+            if (Vector2.Distance(this.currentDragScreenPos, this.touchStartScreenPos) > this.deadZoneRadius)
+                CancelLongPress();
+            return;
+        }
 
         Vector2 t_touchDrag = this.currentDragScreenPos - this.touchStartScreenPos;
 
@@ -473,8 +492,12 @@ public class CardView : MonoBehaviour
         }
 
         // 탭 판정: 이 터치가 드래그로 확정되지 않았고(제스처 None) 손가락 이동이 데드존 이내.
-        bool t_isTap = this.activeGesture == Gesture.None
-            && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius;
+        // 드래그 조준이 꺼져 있으면(BattleUxFlags.DragAimAttack=false) 데드존 조건을 뺀다 —
+        // 드래그로 해석될 경로가 아예 없는데 데드존을 넘겼다고 무동작이 되면 "눌렀는데 반응 없음"이 된다
+        // (같은 카드 재탭 해제·다른 카드로 선택 전환이 손 떨림만으로 죽던 원인).
+        bool t_isTap = !BattleUxFlags.DragAimAttack
+            || (this.activeGesture == Gesture.None
+                && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius);
 
         // 튜토리얼: 탭이 이번 스텝의 조작이 아니면 무반응(무장·발사 둘 다 차단).
         if (t_isTap && !GestureAllowed(Gesture.None))
@@ -787,9 +810,12 @@ public class CardView : MonoBehaviour
             PlayKeywordGlow(CardKeyword.Taunt).Forget();
     }
 
-    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.</summary>
+    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.
+    /// BattleUxFlags.EffectNotifyBanner로 블라인드 중 — 우측 슬라이드 배너는 가독성·학습성이 낮다는 판단.
+    /// 배너가 없어도 거절 피드백은 남는다: 거절 대상 흔들기 + 도발 카드 펄스/글로우(RejectAsTarget).</summary>
     static void ShowTauntBlockedNotice(CardInstance _tauntCard)
     {
+        if (!BattleUxFlags.EffectNotifyBanner) return;
         if (_tauntCard?.data == null) return;
 
         Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
@@ -1127,31 +1153,67 @@ public class CardView : MonoBehaviour
                                    .SetEase(Ease.OutBack).SetLink(gameObject);
     }
 
+    // HP 라벨 폴백 프리뷰가 켜져 있는지. damagePreviewText가 배선돼 있으면 HP 라벨은 건드리지 않으므로
+    // 해제 때 색·텍스트를 되돌리면 안 된다(원본 색을 캡처한 적이 없어 검정으로 굳는다).
+    bool hpFallbackPreview;
+
+    /// <summary>공격 선택 시 이 카드가 받을 **예상 데미지**를 표시한다. HP 라벨은 현재 체력을 그대로 유지 —
+    /// "맞은 뒤 남을 체력"을 HP 자리에 쓰면 현재 체력과 구분이 안 돼 혼란했다.
+    /// 표시 수치는 실제 적용값(비늘·성벽 감소 + 체력 상한)이며 그 규칙은 CardInstance 단독 소유 —
+    /// 뷰는 ClampDamage 호출만 한다(수식 복제 금지).</summary>
     public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)
     {
-        if (this.hpText == null || this.boundCard == null) return;
-        this.hpTextOriginalColor = this.hpText.color;
-        this.hpText.DOKill();
-        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → WouldDieFrom과 동일 소스로 HP표시 일치.
-        (int t_hpAfter, int t_bonusAfter) = this.boundCard.PreviewAfterDamage(_damage, _isAttackHit);
-        SetHpDisplay(t_hpAfter.ToString(), t_bonusAfter > 0 ? $"+{t_bonusAfter}" : "");
-        this.hpText.color = Color.red;
+        if (this.boundCard == null) return;
 
-        if (_wouldDie)
+        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → 실제 TakeDamage와 일치.
+        int t_dmg = this.boundCard.ClampDamage(_damage, _isAttackHit);
+
+        if (this.damagePreviewText != null)
         {
-            this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
+            this.damagePreviewText.DOKill();
+            this.damagePreviewText.text = $"-{t_dmg}";
+            this.damagePreviewText.gameObject.SetActive(true);
+        }
+        else if (this.hpText != null)
+        {
+            // 폴백(프리팹 미배선): HP 라벨 자리에 데미지를 빨갛게. 해제 때 원복한다.
+            this.hpTextOriginalColor = this.hpText.color;
+            this.hpText.DOKill();
+            this.hpText.text  = $"-{t_dmg}";
+            this.hpText.color = Color.red;
+            this.hpFallbackPreview = true;
+        }
+
+        // 치사 예고(카드 흐려짐 + HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
+        // "이 카드는 못 잡는다"가 확정처럼 읽히고 흐려진 카드가 미관을 깬다는 판단. 되살릴 땐 플래그만 true.
+        if (_wouldDie && BattleUxFlags.DeathPreview)
+        {
+            if (this.hpText != null)
+                this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
             this.cardAnim.ShowDeathPreview();
         }
     }
 
     public void HideAttackPreview()
     {
-        if (this.hpText == null || this.boundCard == null) return;
-        this.hpText.DOKill();
-        Color t_c = this.hpTextOriginalColor;
-        t_c.a = 1f;
-        this.hpText.color = t_c;
-        SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+        if (this.damagePreviewText != null)
+        {
+            this.damagePreviewText.DOKill();
+            this.damagePreviewText.text = string.Empty;
+            this.damagePreviewText.gameObject.SetActive(false);
+        }
+
+        if (this.hpFallbackPreview && this.hpText != null && this.boundCard != null)
+        {
+            this.hpText.DOKill();
+            Color t_c = this.hpTextOriginalColor;
+            t_c.a = 1f;
+            this.hpText.color = t_c;
+            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+            this.hpFallbackPreview = false;
+        }
+
+        // 플래그로 꺼져 있어도 호출 — 과거 상태/플래그 전환 직후의 잔존 오버레이 정리.
         this.cardAnim.HideDeathPreview();
     }
 
@@ -1200,7 +1262,7 @@ public class CardView : MonoBehaviour
 
         // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
         List<CardVisualRules.KeywordIcon> t_icons =
-            CardVisualRules.CollectKeywordIcons(CardVisualRules.TraitKeywords(_card), this.keywordIconConfig);
+            CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
 
         // 배치 두 가지. 시너지 자리: 배지와 동일한 세로열 좌표(같은 필드를 써야 "그 자리 그대로"가 성립).
         // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
@@ -1219,8 +1281,8 @@ public class CardView : MonoBehaviour
         }
     }
 
-    // 프레임 키워드 장식. 판정 대상은 아이콘 줄과 **같은** CardVisualRules.TraitKeywords —
-    // 두 표현이 다른 기준을 쓰면 아이콘은 떴는데 프레임은 안 뜨는 식으로 갈라진다.
+    // 프레임 키워드 장식. 기준은 TraitKeywords(아이콘 줄은 여기서 IconRowExcluded만 더 빼는 IconKeywords) —
+    // 즉 표식은 프레임엔 뜨고 아이콘 줄엔 안 뜬다. 그 차이의 유일한 선언 지점은 CardVisualRules.IconRowExcluded다.
     // 빈 슬롯/뒷면은 전부 끈다(아이콘 줄과 동일한 정보 은닉).
     void RefreshKeywordFrames(CardInstance _card)
     {

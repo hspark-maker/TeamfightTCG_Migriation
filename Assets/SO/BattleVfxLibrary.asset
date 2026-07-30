@@ -48,5 +48,12 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 1
+  - id: 4
+    prefab: {fileID: 1753279311565200, guid: 29776907ecb017543b3032870386ccb3, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 30
+    alignToDirection: 0
   healCurveHeight: 0.8
   healAlternateCurve: 1

@@ -31,6 +31,11 @@ public abstract class CardPassive : BattleEffect
         SoundManager.Instance?.PlayPassive();
         SoundManager.Instance?.PlayRandom(_self.data?.effectClips);
         SoundManager.Instance?.PlayEffectVoice(_self.data?.effectVoices);
+
+        // 우측 슬라이드 배너는 BattleUxFlags.EffectNotifyBanner로 블라인드 중(가독성·학습성 판단).
+        // 소리/보이스는 그대로 둔다 — 발동 자체의 피드백은 남겨야 한다. 배지 pop(SynergyTriggers.Fire)도 유지.
+        if (!BattleUxFlags.EffectNotifyBanner) return;
+
         UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
         {
             portrait       = _iconOverride != null ? _iconOverride : _self.data.fullImage,

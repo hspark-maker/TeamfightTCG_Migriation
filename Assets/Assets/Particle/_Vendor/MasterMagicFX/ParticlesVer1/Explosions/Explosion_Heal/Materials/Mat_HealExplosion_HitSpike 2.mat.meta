@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b0a5a4ed097f4462a6dbc2dd883f2a8d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 318586
+  packageName: Master MagicFX Bundle
+  packageVersion: 1.0
+  assetPath: Assets/MasterMagicFX/ParticlesVer1/Explosions/Explosion_Heal/Materials/Mat_HealExplosion_HitSpike
+    2.mat
+  uploadId: 755856
