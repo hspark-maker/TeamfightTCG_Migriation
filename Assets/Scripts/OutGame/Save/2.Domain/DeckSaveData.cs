@@ -14,4 +14,6 @@ public class DeckSlotSaveData
 {
     public string name;
     public string[] cardKeys;
+    // 덱 대표 이미지 키(DeckImageCatalog 스프라이트 이름). 구 세이브엔 없어 빈 값으로 읽히고 표시는 첫 카드 아트로 폴백.
+    public string imageKey;
 }

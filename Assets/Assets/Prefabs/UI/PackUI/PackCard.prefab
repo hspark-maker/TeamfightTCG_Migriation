@@ -1109,6 +1109,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Card
       objectReference: {fileID: 0}
+    - target: {fileID: 1835009869300166723, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: keywordFrames.Array.size
       value: 0

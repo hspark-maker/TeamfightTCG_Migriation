@@ -5,7 +5,7 @@ using TMPro;
 // 덱 목록 패널(DeckListPanel에 부착).
 // DeckSaveManager 6슬롯을 읽어 유효 덱만 칸으로 만들고, 0행 0열에 "신규 생성" 칸을 고정한다.
 // DeckSaveManager에 변경 통지 이벤트가 없으므로 "패널이 켜질 때 재빌드"가 유일한 갱신 경로다.
-// 덱 세이브 접근은 이 클래스에만 가둔다(향후 decks.json → UserSaveData.deck 통합 시 손댈 파일 1개).
+// 덱 세이브 접근은 이 클래스에만 가둔다(덱 목록 화면에서 세이브를 만지는 파일 1개).
 public class DeckListController : MonoBehaviour
 {
     [SerializeField] Transform         content;        // GridLayoutGroup(2열) + ContentSizeFitter
@@ -43,7 +43,7 @@ public class DeckListController : MonoBehaviour
 
         // 1) 신규 생성 칸 — 가장 먼저 Instantiate = 첫 자식 = GridLayoutGroup 0행 0열 고정.
         //    (Start Corner=Upper Left, Start Axis=Horizontal이라 자식 순서가 곧 배치 순서다)
-        int t_empty = FindFirstEmptySlot();
+        int t_empty = DeckSaveManager.FindFirstEmptySlot();
         var t_create = Instantiate(slotPrefab, content);
         t_create.BindCreate(t_empty, OnSlotClicked);
         m_slots.Add(t_create);
@@ -67,16 +67,6 @@ public class DeckListController : MonoBehaviour
         }
 
         if (countText != null) countText.text = $"{t_display - 1} / {DeckSaveManager.SLOT_COUNT}";
-    }
-
-    // 신규 덱이 쓸 슬롯. IsSlotValid 기준이라 6장 미만으로 저장된 불완전 슬롯도 재사용 대상이 된다
-    // (그렇지 않으면 목록에 보이지도 않으면서 슬롯만 영구 점유하는 유령 슬롯이 된다).
-    static int FindFirstEmptySlot()
-    {
-        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
-            if (!DeckSaveManager.IsSlotValid(t_i)) return t_i;
-
-        return -1;
     }
 
     void OnSlotClicked(int _slotIndex)

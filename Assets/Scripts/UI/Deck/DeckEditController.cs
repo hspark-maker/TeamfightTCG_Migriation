@@ -250,12 +250,12 @@ public class DeckEditController : MonoBehaviour
 
         if (CountFilled() == DeckSaveManager.DECK_SIZE)
         {
-            // SaveToFile()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
-            // (DeckSaveManager.cs:74-76 주석). 그래서 이 슬롯만 반영하는 SaveSlotToFile을 쓴다.
+            // SaveAll()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
+            // (DeckSaveManager.SaveSlot 주석). 그래서 이 슬롯만 반영하는 SaveSlot을 쓴다.
             // m_working에는 null이 섞일 수 있지만 내부 Save()가 Where(d => d != null)로 거르고,
             // 애초에 6/6일 때만 이 분기에 들어오므로 안전하다.
             //
-            // 이름은 SetName으로 메모리에 올려두면 SaveSlotToFile이 slotName까지 같이 직렬화한다.
+            // 이름은 SetName으로 메모리에 올려두면 SaveSlot이 이름까지 같이 직렬화한다.
             // SetName을 저장 경로 안에서만 부르는 게 중요하다 — 밖에서 부르면 미완성 폐기 경로에서도
             // 메모리 이름이 바뀐 채로 남는다.
             // 이름이 그대로면 SetName을 부르지 않는다 — m_savedName은 GetName의 표시용 폴백("덱 1")일 수 있고,
@@ -267,12 +267,12 @@ public class DeckEditController : MonoBehaviour
             if (m_dirty || t_renamed)
             {
                 // 덱 대표 이미지는 첫 저장 때 한 번만 발급하고 이후 카드 구성이 바뀌어도 유지한다.
-                // 발급을 파일 쓰기 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
-                // 메모리에만 키가 남아 디스크와 어긋난다.
+                // 발급을 저장 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
+                // 메모리에만 키가 남아 세이브와 어긋난다.
                 if (string.IsNullOrEmpty(DeckSaveManager.GetImageKey(m_slotIndex)))
                     DeckSaveManager.SetImageKey(m_slotIndex, DeckImages.PickRandomKey());
 
-                DeckSaveManager.SaveSlotToFile(m_slotIndex, m_working);
+                DeckSaveManager.SaveSlot(m_slotIndex, m_working);
             }
             ExitToList();
             return;
