@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -59,6 +60,7 @@ public class PlayerTurn : TurnBase
         CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복
         CardView.RestoreAllFades();
         CardView.OnAttack      -= HandleCardViewAttack;
+        EndGuidedFreeSelect();   // 턴이 끝나면 구독을 반드시 끊는다(턴 객체는 매 턴 새로 만들어진다)
         this.ctx.ClearAllHighlights();
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
         this.forcedAttacker = null;
@@ -106,8 +108,29 @@ public class PlayerTurn : TurnBase
             }
             else if (t_overlay != null && !string.IsNullOrWhiteSpace(t_step0.guideMessage))
             {
-                t_overlay.ShowMessage(t_step0.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
-                await t_overlay.WaitForTapAsync(t_ct);
+                CardView t_focus = ResolveFocusCard(t_step0);
+
+                // 아군 카드를 포커스한 설명은 **그 카드를 탭하는 것 자체가 진행**이다.
+                // 화면 아무 데나 탭해서 넘기는 게이트를 겹쳐 두면 "탭하여 계속"이 떠서
+                // 정작 눌러야 할 카드가 가려진다(부자연스러운 2단 조작).
+                if (t_focus != null && t_step0.cardFocusSide == TutorialScenarioData.CardFocusSide.Player)
+                {
+                    t_overlay.ShowCardFocus(t_step0.guideMessage, t_step0.bannerAnchor, _waitTap: false, t_focus);
+                    ApplyHandOverride(t_step0);
+                    await WaitForFocusCardArmedAsync(t_focus, t_ct);
+                }
+                else if (t_focus != null)
+                {
+                    // 적 카드 포커스: 탭해도 무장되지 않으므로(적 카드는 공격 대상) 화면 탭으로 진행.
+                    t_overlay.ShowCardFocus(t_step0.guideMessage, t_step0.bannerAnchor, _waitTap: true, t_focus);
+                    await t_overlay.WaitForTapAsync(t_ct);
+                }
+                else
+                {
+                    t_overlay.ShowMessage(t_step0.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
+                    await t_overlay.WaitForTapAsync(t_ct);
+                }
+                t_overlay.ClearFieldFocus();
             }
             TutorialConfig.ConsumePlayerStep();
         }
@@ -181,6 +204,8 @@ public class PlayerTurn : TurnBase
     /// (OnMouseDown 게이트) (2)나머지 로컬 카드를 검게 암전(RestoreAllFades). "그 카드 말고 다 검게".</summary>
     void ShowTutorialStep(TutorialScenarioData.ScriptedAttack _step)
     {
+        EndGuidedFreeSelect();   // 이전 스텝의 포커스/구독 정리(아래 자유 분기에서 필요하면 다시 건다)
+
         // 자유공격: 강제 지정 없음 → 전 카드 조작 허용, 암전/하이라이트/포인터 없이 안내 문구만.
         if (IsFreeStep(_step))
         {
@@ -189,7 +214,9 @@ public class PlayerTurn : TurnBase
             TurnState.AllowedGesture = InputGesture.Any;   // 자유공격 = 조작 제한 없음
             CardView.ForcedDimAlpha  = 0.3f;   // 기본값 원복
             CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
-            TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false);
+
+            if (_step.guidedFreeSelect) BeginGuidedFreeSelect(_step);
+            else TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false);
             return;
         }
 
@@ -206,7 +233,129 @@ public class PlayerTurn : TurnBase
         CardView.RestoreAllFades();        // 공격자/타깃 기준 재적용 → 공격자·타깃만 full, 나머지 암전
 
         TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, t_atkView, t_defView, true);
+
+        // 카드 낱장 포커스가 지정됐으면 배경까지 덮는다(ShowAttack은 카드 암전만 한다).
+        // 탭 대기는 없다 — 이 스텝은 공격 입력으로 진행한다.
+        CardView t_focus = ResolveFocusCard(_step);
+        if (t_focus != null)
+            TutorialOverlayUI.Instance?.ShowCardFocus(_step.guideMessage, _step.bannerAnchor, _waitTap: false, t_focus);
+
+        ApplyHandOverride(_step);
     }
+
+    // ── 필드 포커스 자유 선택 ────────────────────────────────────────────────
+    // 1단계: 아군 필드만 남기고 딤 → 아무 아군이나 탭.
+    // 2단계: 그 순간 적 필드만 남기고 딤 + 문구 교체 → 아무 적이나 탭해서 공격.
+    // 무장을 풀면 1단계로 되돌아간다. **강제는 없다** — 슬롯을 지정하지 않으므로 어떤 조합이든 통과한다.
+
+    TutorialScenarioData.ScriptedAttack guidedStep;
+    bool guidedActive;
+
+    /// <summary>포커스한 아군 카드가 탭으로 무장될 때까지 대기 = 이 설명 스텝의 진행 신호.
+    ///
+    /// 대기 동안 그 카드만 조작 가능하게 연다(ForcedAttacker) — 다른 아군을 눌러 엉뚱한 카드가
+    /// 무장되면 안내와 화면이 어긋난다. 적 카드는 눌려도 <see cref="HandleCardViewAttack"/>의
+    /// "설명 스텝 중 공격 차단"에 걸리므로 여기서 따로 막지 않는다.
+    ///
+    /// 무장은 남긴 채 끝난다 — 곧바로 이어지는 공격 스텝이 그 상태에서 자연스럽게 이어진다.</summary>
+    async UniTask WaitForFocusCardArmedAsync(CardView _card, CancellationToken _ct)
+    {
+        CardInstance t_prevForced = TurnState.ForcedAttacker;
+        TurnState.ForcedAttacker = _card.BoundCard;
+        TurnState.InputAllowed   = true;
+
+        try
+        {
+            if (CardView.SelectedAttacker == _card) return;   // 이미 무장 — 이벤트가 안 온다
+
+            bool t_armed = false;
+            void OnArmed(CardView _view) { if (_view == _card) t_armed = true; }
+
+            CardView.OnAttackerArmed += OnArmed;
+            try { await UniTask.WaitUntil(() => t_armed, cancellationToken: _ct); }
+            finally { CardView.OnAttackerArmed -= OnArmed; }
+        }
+        finally
+        {
+            // 다음 스텝 준비 동안 입력 재차단(Inspect 경로와 같은 규약). ForcedAttacker는 원상복구.
+            TurnState.InputAllowed   = false;
+            TurnState.ForcedAttacker = t_prevForced;
+        }
+    }
+
+    /// <summary>진영+슬롯 → 슬롯 뷰. None이거나 범위 밖이면 null.</summary>
+    CardView ResolveSlotView(TutorialScenarioData.CardFocusSide _side, int _slot)
+    {
+        if (_side == TutorialScenarioData.CardFocusSide.None) return null;
+        if (!InSlotRange(_slot)) return null;
+
+        BattleFieldView t_view = _side == TutorialScenarioData.CardFocusSide.Enemy
+            ? this.ctx.enemyFieldView : this.ctx.playerFieldView;
+        return t_view != null ? t_view.GetSlotView(_slot) : null;
+    }
+
+    /// <summary>스텝이 지정한 카드 낱장 포커스 대상. None이거나 슬롯이 비었으면 null(포커스 없음).</summary>
+    CardView ResolveFocusCard(TutorialScenarioData.ScriptedAttack _step)
+        => ResolveSlotView(_step.cardFocusSide, _step.cardFocusSlot);
+
+    /// <summary>가이드 핸드를 스텝 지정 슬롯으로 **덮어쓴다**. 지정이 없으면 자동 배치를 그대로 둔다.
+    /// 표시 API(ShowAttack/ShowCardFocus/ShowFieldFocus)가 자체 배치를 끝낸 <b>뒤</b>에 불러야 한다 —
+    /// 먼저 부르면 그 안의 자동 배치에 덮인다.</summary>
+    void ApplyHandOverride(TutorialScenarioData.ScriptedAttack _step)
+    {
+        CardView t_hand = ResolveSlotView(_step.handSide, _step.handSlot);
+        if (t_hand != null) TutorialOverlayUI.Instance?.ShowHandOn(t_hand);
+    }
+
+    void BeginGuidedFreeSelect(TutorialScenarioData.ScriptedAttack _step)
+    {
+        this.guidedStep = _step;
+        if (!this.guidedActive)
+        {
+            this.guidedActive = true;
+            CardView.OnAttackerArmed += HandleGuidedArm;
+        }
+        ShowGuidedPhase(null);
+    }
+
+    void EndGuidedFreeSelect()
+    {
+        if (!this.guidedActive) return;
+        this.guidedActive = false;
+        CardView.OnAttackerArmed -= HandleGuidedArm;
+        TutorialOverlayUI.Instance?.ClearFieldFocus();
+    }
+
+    // 무장(아군 선택) 상태 변화 → 포커스 진영 전환. _armed=null이면 다시 아군을 고를 차례.
+    void HandleGuidedArm(CardView _armed) => ShowGuidedPhase(_armed);
+
+    void ShowGuidedPhase(CardView _armed)
+    {
+        var t_overlay = TutorialOverlayUI.Instance;
+        if (t_overlay == null) return;
+
+        bool t_pickEnemy = _armed != null;
+        BattleFieldView t_view = t_pickEnemy ? this.ctx.enemyFieldView : this.ctx.playerFieldView;
+        if (t_view == null) return;
+
+        // 2단계 문구가 비어 있으면 1단계 문구를 유지한다(저작이 한 줄로 끝내고 싶은 경우).
+        string t_msg = t_pickEnemy && !string.IsNullOrWhiteSpace(this.guidedStep.targetGuideMessage)
+            ? this.guidedStep.targetGuideMessage
+            : this.guidedStep.guideMessage;
+
+        TutorialScenarioData.BannerAnchor t_anchor = t_pickEnemy
+            ? this.guidedStep.targetBannerAnchor
+            : this.guidedStep.bannerAnchor;
+
+        t_overlay.ShowFieldFocus(t_view.ScreenBounds(GuidedFocusPadding), t_msg, t_anchor);
+
+        // 지정 핸드는 그 진영 단계에서만 적용 — 아군 고르는 중에 적 슬롯을 가리키면 안 된다.
+        var t_wantSide = t_pickEnemy ? TutorialScenarioData.CardFocusSide.Enemy
+                                     : TutorialScenarioData.CardFocusSide.Player;
+        if (this.guidedStep.handSide == t_wantSide) ApplyHandOverride(this.guidedStep);
+    }
+
+    const float GuidedFocusPadding = 24f;   // 구멍 여유(px) — 카드 테두리가 딤에 물리지 않게
 
     /// <summary>튜토리얼 자유 꼬리: 스크립트 소진 후 일반 전투처럼 자유 공격 턴을 연다.
     /// 강제 지정·암전·안내 배너 없이 아무 로컬 카드로 아무 적 카드를 공격 가능. 스텝 소비 없음.</summary>
@@ -218,6 +367,7 @@ public class PlayerTurn : TurnBase
         TurnState.AllowedGesture = InputGesture.Any;   // 자유 꼬리 = 조작 제한 해제
         CardView.ForcedDimAlpha  = 0.3f;   // 튜토리얼 암전 강도 원복(일반 전투 기본)
         CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
+        EndGuidedFreeSelect();
         TutorialOverlayUI.Instance?.Clear();   // 안내 배너/힌트 제거
         TurnState.InputAllowed   = true;
     }
@@ -305,6 +455,7 @@ public class PlayerTurn : TurnBase
         TurnState.InputAllowed = false;
 
         // 튜토리얼: 공격 연출 동안 안내 힌트(배너·탭힌트·하이라이트·포인터·dim) 전부 숨김. 다음 스텝에서 재표시.
+        EndGuidedFreeSelect();   // 공격이 나갔으면 이번 선택 안내는 끝 — 연출 중 무장 통지에 반응하지 않게
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
 
         CardView t_attackerView = this.ctx.playerFieldView.GetSlotView(_attacker.slotIndex);

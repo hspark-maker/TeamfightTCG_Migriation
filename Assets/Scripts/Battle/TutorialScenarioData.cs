@@ -14,6 +14,15 @@ public class TutorialScenarioData : ScriptableObject
     /// Inspect = 적 카드 롱프레스(정보확인) 대기 후 진행. (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
     public enum StepKind { Attack, Message, Inspect }
 
+    /// <summary>안내 배너가 붙을 자리. 포커스가 아래(아군)로 내려가면 배너는 위로 비켜야 가려지지 않는다.
+    /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
+    public enum BannerAnchor { Top, Center, Bottom }
+
+    /// <summary>카드 낱장 포커스 대상 진영. None(0)이 기본이라 기존 시나리오는 자동으로 꺼진 상태다 —
+    /// 슬롯 번호만 두면 기본값 0이 "0번 슬롯 포커스 켜짐"이 돼버려서 진영 자체를 스위치로 쓴다.
+    /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
+    public enum CardFocusSide { None, Player, Enemy }
+
     /// <summary>
     /// 튜토리얼 스텝 1개. Attack이면 공격자 슬롯 → 타깃 슬롯(발동 시점 보드 슬롯 0~2).
     /// Message면 공격 없이 안내 문구만 띄우고 탭으로 넘어간다. (이름은 호환 위해 유지.)
@@ -39,6 +48,44 @@ public class TutorialScenarioData : ScriptableObject
         [Tooltip("이 스텝에 허용할 조작. Any = 제한 없음. 지정하면 그 제스처 외 조작은 완전 무반응 " +
                  "(한 조작법을 배우는 동안 다른 조작법 차단). Attack 스텝 전용")]
         public InputGesture allowedGesture;   // 기본값 0 = Any → 기존 시나리오 호환
+
+        // ── 필드 포커스 자유 선택 (자유 스텝 전용: attackerSlot/targetSlot 둘 다 -1) ──
+        // 슬롯을 지정하지 않고 "아무 아군 → 아무 적"을 고르게 하되, 지금 어느 진영을 고를 차례인지
+        // 딤 구멍으로 알려준다. 강제는 하지 않는다(자유도 유지, 도와만 주는 안내).
+
+        [Tooltip("자유 선택 안내. 켜면 1단계=아군 필드만 남기고 딤, 아군을 고르면 2단계=적 필드만 남기고 딤. " +
+                 "자유 스텝(attackerSlot=-1, targetSlot=-1)에서만 동작")]
+        public bool guidedFreeSelect;
+
+        [Tooltip("2단계(적 고르기) 안내 문구. 비우면 1단계 문구를 그대로 유지")]
+        [TextArea] public string targetGuideMessage;
+
+        [Tooltip("1단계(아군 고르기) 배너 위치")]
+        public BannerAnchor bannerAnchor;          // 기본값 0 = Top → 기존 배너 위치와 동일
+
+        [Tooltip("2단계(적 고르기) 배너 위치")]
+        public BannerAnchor targetBannerAnchor;
+
+        // ── 카드 낱장 포커스 ──
+        // 카드 한 장만 남기고 배경·나머지 카드를 딤. Message/Inspect/Attack 어느 스텝에서든 쓸 수 있다.
+        // Message 스텝이면 탭으로 진행하고, 그 동안 딤이 유지된다.
+
+        [Tooltip("카드 낱장 포커스 대상 진영. None = 사용 안 함")]
+        public CardFocusSide cardFocusSide;
+
+        [Tooltip("포커스할 슬롯(0~2). cardFocusSide가 None이면 무시")]
+        public int cardFocusSlot;
+
+        // ── 가이드 핸드 위치 지정 ──
+        // 기본은 자동(포커스한 카드 / 지정 공격자 / 포커스 영역 중앙)이다. 자동이 가리키는 곳과
+        // 실제로 눌러야 할 곳이 다른 스텝에서만 여기서 슬롯을 직접 찍는다.
+        // 자유 선택 스텝에서는 진영이 곧 단계다 — Player면 1단계(아군 고르기), Enemy면 2단계(적 고르기)에 적용.
+
+        [Tooltip("가이드 핸드를 띄울 진영. None = 자동 배치")]
+        public CardFocusSide handSide;
+
+        [Tooltip("핸드를 띄울 슬롯(0~2). handSide가 None이면 무시")]
+        public int handSlot;
     }
 
     [Header("시너지 표시/적용 (기본 off — 초반 튜토리얼은 시너지 개념 미도입, 3편부터 on)")]

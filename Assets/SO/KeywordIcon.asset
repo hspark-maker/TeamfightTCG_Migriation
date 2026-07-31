@@ -11,8 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a8f25a248745cc546baeb96ec728ad99, type: 3}
   m_Name: KeywordIcon
-  m_EditorClassIdentifier:
-  defaultIcon: {fileID: 21300000, guid: 78558ad01585c8b43a6729a179712f11, type: 3}
+  m_EditorClassIdentifier: 
   entries:
   - keyword: 1
     icon: {fileID: 21300000, guid: 661b51da39d6eeb4b9a73a415cd374bc, type: 3}
@@ -22,6 +21,9 @@ MonoBehaviour:
     effectLabel: "\uBC18\uACA9 \uD53C\uD574 \uBB34\uC2DC!"
     glowStartColor: {r: 1, g: 0.85961777, b: 0.65471697, a: 1}
     glowEndColor: {r: 0.9960785, g: 0.854902, b: 0.6509804, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 2
     icon: {fileID: 21300000, guid: 4cceb8fb0dec19742a555fc0464b1115, type: 3}
     displayName: "\uBB34\uC30D"
@@ -30,6 +32,9 @@ MonoBehaviour:
     effectLabel: "\uC778\uC811 \uCE74\uB4DC\uC5D0 \uD53C\uD574!"
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 4
     icon: {fileID: 21300000, guid: 8709db639ab9fe5478a3226a9e3b3662, type: 3}
     displayName: "\uCC98\uD615"
@@ -38,6 +43,9 @@ MonoBehaviour:
     effectLabel: "\uCD94\uAC00 \uACF5\uACA9!"
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 16
     icon: {fileID: 21300000, guid: d5ea8296ad448fd4d8ec3895855d4547, type: 3}
     displayName: "\uAD50\uD65C"
@@ -46,6 +54,9 @@ MonoBehaviour:
     effectLabel: "\uB371\uC758 \uC544\uAD70\uACFC \uAD50\uCCB4!"
     glowStartColor: {r: 0.87529755, g: 0, b: 1, a: 1}
     glowEndColor: {r: 0.8745099, g: 0, b: 1, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 8
     icon: {fileID: 21300000, guid: 91d60cf8fd0347543af0444939e31e34, type: 3}
     displayName: "\uB3C4\uBC1C"
@@ -55,6 +66,9 @@ MonoBehaviour:
     effectLabel: 
     glowStartColor: {r: 0.8196079, g: 0.26666668, b: 0, a: 1}
     glowEndColor: {r: 0.8196079, g: 0.26666668, b: 0, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 32
     icon: {fileID: 21300000, guid: b1a7355f8bb83b749a9f60295acefafa, type: 3}
     displayName: "\uD45C\uC2DD"
@@ -63,6 +77,9 @@ MonoBehaviour:
     effectLabel: "\uBC18\uACA9 \uD53C\uD574 \uBE44\uD65C\uC131\uD654\uB428!"
     glowStartColor: {r: 1, g: 0, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0, b: 0, a: 0}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 64
     icon: {fileID: 21300000, guid: e26739d221404d6419107760944cf4a3, type: 3}
     displayName: "\uD790\uB7EC"
@@ -71,6 +88,9 @@ MonoBehaviour:
     effectLabel: "\uC544\uAD70 \uD68C\uBCF5!"
     glowStartColor: {r: 0, g: 1, b: 0.12375021, a: 1}
     glowEndColor: {r: 0, g: 1, b: 0.1254902, a: 1}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 128
     icon: {fileID: 935439490, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
     displayName: "\uBB34\uC801"
@@ -78,6 +98,9 @@ MonoBehaviour:
     effectLabel: "\uD53C\uD574 \uBB34\uC2DC!"
     glowStartColor: {r: 1, g: 0.7955961, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0.7960785, b: 0, a: 1}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
   - keyword: 256
     icon: {fileID: 1402199165, guid: 27aa768078dd0eb4f8f873b4c8a00b57, type: 3}
     displayName: "\uCD94\uAC00 \uCCB4\uB825"
@@ -87,3 +110,10 @@ MonoBehaviour:
     effectLabel: "\uCD94\uAC00 \uCCB4\uB825 \uD68D\uB4DD!"
     glowStartColor: {r: 1, g: 0.7955961, b: 0, a: 1}
     glowEndColor: {r: 1, g: 0.7960785, b: 0, a: 1}
+    glowHoldOverride: 0
+    glowPrefabOverride: {fileID: 0}
+    glowScaleOverride: 0
+  defaultIcon: {fileID: 21300000, guid: 78558ad01585c8b43a6729a179712f11, type: 3}
+  defaultGlowScale: 3
+  iconPopScale: 1.5
+  iconPopDuration: 0.5

@@ -29,17 +29,26 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   playerScript:
   - kind: 1
-    attackerSlot: 0
-    targetSlot: 0
+    attackerSlot: -1
+    targetSlot: -1
     guideMessage: "\uC774\uBC88 \uC804\uD22C\uC5D4 '\uC2DC\uB108\uC9C0'\uAC00 \uB4F1\uC7A5\uD569\uB2C8\uB2E4!
       \uB0B4 \uCE74\uB4DC\uB294 \uC804\uBD80 '\uBB34\uB9AC' \uC2DC\uB108\uC9C0 \uCE74\uB4DC\uC785\uB2C8\uB2E4.
       \uBB34\uB9AC \uC2DC\uB108\uC9C0\uB294 \uBB34\uB9AC \uCE74\uB4DC\uAC00 4\uC7A5\uC77C
       \uB54C \uD65C\uC131\uD654\uB429\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 1
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 1
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
   - kind: 1
-    attackerSlot: 0
-    targetSlot: 0
+    attackerSlot: -1
+    targetSlot: -1
     guideMessage: "\uBB34\uB9AC \uC2DC\uB108\uC9C0\uC758 \uD6A8\uACFC\uB294 \uACF5\uACA9\uD560
       \uB54C, \uD544\uB4DC\uC758 \uBB34\uB9AC \uC544\uAD70 \uC218\uB9CC\uD07C \uD53C\uD574\uB97C
       \uBA3C\uC800 \uC8FC\uB294 \uD6A8\uACFC\uC785\uB2C8\uB2E4. \uC9C0\uAE08 \uD544\uB4DC\uC5D0\uB294
@@ -47,38 +56,96 @@ MonoBehaviour:
       \uBA3C\uC800 \uC90D\uB2C8\uB2E4!"
     waitForTap: 1
     dimBackground: 1
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 1
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
   - kind: 1
-    attackerSlot: 0
-    targetSlot: 0
-    guideMessage: "\uC801\uB3C4 \uC2DC\uB108\uC9C0\uAC00 \uC788\uC2B5\uB2C8\uB2E4. \uC801 '\uC790\uC11D\uAC8C'\uB294 '\uBE44\uB298' \uC2DC\uB108\uC9C0\uB85C, \uBC1B\uB294 \uD53C\uD574\uB97C 1 \uC904\uC785\uB2C8\uB2E4."
+    attackerSlot: -1
+    targetSlot: -1
+    guideMessage: "\uC801\uB3C4 \uC2DC\uB108\uC9C0\uAC00 \uC788\uC2B5\uB2C8\uB2E4.
+      \uC801 '\uC790\uC11D\uAC8C'\uB294 '\uBE44\uB298' \uC2DC\uB108\uC9C0\uB85C,
+      \uBC1B\uB294 \uD53C\uD574\uB97C 1 \uC904\uC785\uB2C8\uB2E4."
     waitForTap: 1
     dimBackground: 1
-  - kind: 0
-    attackerSlot: 2
-    targetSlot: 0
-    guideMessage: "\uC640\uAE00\uB3C4\uB3C4\uB85C \uC790\uC11D\uAC8C\uB97C \uACF5\uACA9!
-      \uBB34\uB9AC \uC120\uD53C\uD574 3\uC774\uC9C0\uB9CC \uC790\uC11D\uAC8C\uC758
-      '\uBE44\uB298'\uC758 \uD6A8\uACFC\uB85C \uD53C\uD574\uAC00 1 \uAC10\uC18C\uD569\uB2C8\uB2E4."
-    waitForTap: 1
-    dimBackground: 0
-  - kind: 0
-    attackerSlot: 1
-    targetSlot: 0
-    guideMessage: "\uBAA8\uB798\uBABD\uC73C\uB85C \uB9C8\uBB34\uB9AC!"
-    waitForTap: 1
-    dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 1
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
   - kind: 0
     attackerSlot: -1
     targetSlot: -1
-    guideMessage: "\uC774\uC81C\uBD80\uD130 \uC9C1\uC811 \uD50C\uB808\uC774\uD558\uBA70
-      \uAC8C\uC784\uC5D0\uC11C \uC2B9\uD574\uBCF4\uC138\uC694!"
-    waitForTap: 1
+    guideMessage: "\uACF5\uACA9\uD560 \uB0B4 \uCE74\uB4DC\uB97C \uC544\uBB34\uAC70\uB098
+      \uACE8\uB77C\uBCF4\uC138\uC694."
+    waitForTap: 0
     dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 1
+    targetGuideMessage: "\uBB34\uB9AC \uC120\uD53C\uD574\uAC00 \uBA3C\uC800 \uB4E4\uC5B4\uAC11\uB2C8\uB2E4.
+      \uACF5\uACA9\uD560 \uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE0\uB974\uC138\uC694."
+    bannerAnchor: 0
+    targetBannerAnchor: 2
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
+  - kind: 0
+    attackerSlot: -1
+    targetSlot: -1
+    guideMessage: "\uD55C \uBC88 \uB354, \uACF5\uACA9\uD560 \uB0B4 \uCE74\uB4DC\uB97C
+      \uACE0\uB974\uC138\uC694."
+    waitForTap: 0
+    dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 1
+    targetGuideMessage: "\uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE8\uB77C \uACF5\uACA9\uD558\uC138\uC694."
+    bannerAnchor: 0
+    targetBannerAnchor: 2
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 2
+    handSlot: 0
+  - kind: 1
+    attackerSlot: -1
+    targetSlot: -1
+    guideMessage: "\uC774\uC81C\uBD80\uD130 \uC9C1\uC811 \uD50C\uB808\uC774\uD558\uBA70
+      \uAC8C\uC784\uC5D0\uC11C \uC2B9\uB9AC\uD574\uBCF4\uC138\uC694!"
+    waitForTap: 1
+    dimBackground: 1
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 1
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
   enemyScript:
   - kind: 0
-    attackerSlot: 1
-    targetSlot: 0
+    attackerSlot: -1
+    targetSlot: -1
     guideMessage: 
     waitForTap: 0
     dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 0
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
   freePlayAfterScript: 1
+  enemyMaxHpOverride: 0

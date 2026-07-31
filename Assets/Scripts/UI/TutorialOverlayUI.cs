@@ -43,6 +43,35 @@ public class TutorialOverlayUI : MonoBehaviour
     bool pressActive; // 이번 대기 구간 안에서 pointer down이 발생했는가
     bool inspected; // Inspect 대기 중 적 카드 롱프레스 발생 플래그(WaitForInspectAsync가 소비)
 
+    // 필드 포커스(구멍 뚫린 딤). 풀스크린 dimMask로는 특정 영역만 남길 수 없어서 4패널로 감싼다 —
+    // 구멍이 물리적 공백이라 셰이더/마스크 없이 성립하고, 그 자리만 밝게 남는다
+    // (아웃게임 OutgameTutorialGateUI와 같은 방식). 프리팹 배선이 필요 없도록 최초 사용 시 코드로 만든다.
+    CanvasGroup     focusGroup;
+    RectTransform[] focusPanels;    // 0=Top 1=Bottom 2=Left 3=Right
+    RectTransform[] focusCorners;   // 0=BL 1=BR 2=TR 3=TL — 구멍 모서리를 덮어 라운드로 보이게
+
+    [Tooltip("포커스 구멍 모서리 라운드 반지름(캔버스 단위, 기준 해상도 1080x1920). 0이면 각진 사각")]
+    [SerializeField] float focusCornerRadius = 36f;
+
+    [Header("터치 유도 손 아이콘")]
+    [Tooltip("눌러야 할 자리에 떠 있는 손. 비우면 손 표시 자체를 생략한다(무동작 안전)")]
+    [SerializeField] Sprite handSprite;
+    [SerializeField] float  handSize      = 150f;   // 캔버스 단위
+    [SerializeField] float  handBobHeight = 26f;    // 위아래 떠 있는 폭
+    [SerializeField] float  handTapPeriod = 1.1f;   // 한 번 누르는 주기(초)
+
+    [Tooltip("목표 지점 기준 손 위치 보정(캔버스 단위). 오른쪽 아래로 빼면 손이 대상을 덜 가린다")]
+    [SerializeField] Vector2 handOffset = new Vector2(52f, -60f);
+
+    // 손은 프리팹 배선 없이 최초 사용 시 만든다(포커스 패널과 같은 규약).
+    RectTransform handRect;
+    CanvasGroup   handGroup;
+    Sequence      handSeq;
+
+    // 역필렛 조각 4장(호 중심 위치별). 구멍 안쪽 모서리를 덮는 부분만 불투명이라
+    // 겹쳐 놓으면 사각 구멍이 라운드 구멍이 된다. 전 인스턴스 공용.
+    static readonly Sprite[] s_cornerSprites = new Sprite[4];
+
     // 직전 스텝에서 켠 하이라이트/포인터(교체/정리 시 되돌리기 위해 추적).
     CardView highlightedAttacker;
     CardView highlightedTarget;
@@ -117,7 +146,8 @@ public class TutorialOverlayUI : MonoBehaviour
         ClearHighlight();
         ClearPointer();
         ActivateMask(_darken);
-        SetBanner(_message);
+        HideHand();   // 화면 아무 데나 탭하는 구간 — 특정 지점을 가리키면 안 된다
+        SetBanner(_message, _showTapHint: true);   // 이 스텝의 진행 수단이 탭이다
     }
 
     /// <summary>
@@ -141,7 +171,10 @@ public class TutorialOverlayUI : MonoBehaviour
         }
 
         DeactivateMask();
-        SetBanner(_message);
+        SetBanner(_message, _showTapHint: false);   // 진행은 공격 입력 — 탭 안내는 오해를 준다
+
+        // 슬롯 지정 스텝: 먼저 눌러야 하는 건 공격자 카드다. 지정이 없으면(자유공격) 손도 없다.
+        ShowHandOn(_attacker);
     }
 
     /// <summary>dim 마스크가 활성인 동안 화면 탭을 대기. **손을 뗄 때(release)** 완료된다.
@@ -161,6 +194,9 @@ public class TutorialOverlayUI : MonoBehaviour
             this.tapArmed    = false;
             this.tapped      = false;
             this.pressActive = false;
+            // 탭이 소비된 순간 힌트는 역할이 끝났다. 다음 표시 호출이 꺼주길 기대하지 않는다 —
+            // 그 사이(연출 대기·스텝 폐기 등)에 배너만 남고 힌트가 붙어 있는 프레임이 생긴다.
+            if (this.tapHint != null) this.tapHint.SetActive(false);
         }
     }
 
@@ -173,9 +209,9 @@ public class TutorialOverlayUI : MonoBehaviour
         ClearHighlight();
         ClearPointer();
         DeactivateMask();
-        SetBanner(_message);
+        HideHand();   // 롱프레스 유도라 탭 손은 오해를 준다
         // Inspect는 탭이 아니라 롱프레스로 진행 → "탭하여 계속" 힌트 숨김(오해 방지).
-        if (this.tapHint != null) this.tapHint.SetActive(false);
+        SetBanner(_message, _showTapHint: false);
     }
 
     /// <summary>Inspect 대기 중 적 카드 롱프레스 발생을 통지. 대기 중일 때만 의미 있다.</summary>
@@ -189,22 +225,201 @@ public class TutorialOverlayUI : MonoBehaviour
         this.inspected = false;
     }
 
+    /// <summary>
+    /// 필드 포커스 안내. <paramref name="_screenRect"/>(화면 px)만 남기고 나머지를 딤으로 덮는다.
+    /// 카드 입력은 Physics2D라 uGUI 패널로 막히지 않는다 — 여기서 하는 건 **어디를 볼지 알려주는 것뿐**이고,
+    /// 무엇을 고를 수 있는지는 호출측이 TurnState로 정한다(자유 선택은 일부러 제한하지 않는다).
+    ///
+    /// 탭 힌트는 끈다 — 이 구간은 화면 탭이 아니라 카드 선택으로 진행한다.
+    /// </summary>
+    public void ShowFieldFocus(Rect _screenRect, string _message, TutorialScenarioData.BannerAnchor _anchor)
+        => ShowFocus(_screenRect, _message, _anchor, _waitTap: false);
+
+    /// <summary>카드 낱장 포커스. 그 카드만 남기고 배경·나머지 카드를 전부 딤으로 덮는다
+    /// (다른 카드는 구멍 밖이라 패널에 덮인다 — 별도 스프라이트 암전이 필요 없다).
+    ///
+    /// <paramref name="_waitTap"/>=true면 탭으로 진행하는 설명 스텝용 —
+    /// 딤 패널은 입력을 흘려보내고 투명한 풀스크린 마스크가 탭을 받는다(WaitForTapAsync와 짝).
+    /// 여러 장을 넘기면 그 카드들을 **모두 감싸는 하나의 구멍**이 된다 — 떨어진 카드끼리 묶으면
+    /// 사이 공백까지 뚫리니 낱장 강조가 목적이면 한 장만 넘길 것.</summary>
+    public void ShowCardFocus(string _message, TutorialScenarioData.BannerAnchor _anchor, bool _waitTap,
+        params CardView[] _cards)
+    {
+        Rect t_rect = new Rect();
+        if (_cards != null)
+            foreach (CardView t_card in _cards)
+                if (t_card != null) t_rect = CameraUtil.Union(t_rect, t_card.ScreenBounds(CardFocusPadding));
+
+        ShowFocus(t_rect, _message, _anchor, _waitTap);
+    }
+
+    const float CardFocusPadding = 18f;   // 카드 구멍 여유(px) — 프레임 장식이 딤에 물리지 않게
+
+    void ShowFocus(Rect _screenRect, string _message, TutorialScenarioData.BannerAnchor _anchor, bool _waitTap)
+    {
+        ClearHighlight();
+        ClearPointer();
+
+        // 탭 대기 구간에서만 풀스크린 마스크를 **투명하게** 켠다(어둡기는 패널이 담당, 마스크는 탭만 받는다).
+        // 둘 다 어둡게 켜면 구멍까지 덮여 포커스가 무의미해진다.
+        if (_waitTap) ActivateMask(false);
+        else          DeactivateMask();
+
+        if (_screenRect.width <= 0f || _screenRect.height <= 0f) { ClearFieldFocus(); }
+        else
+        {
+            EnsureFocusPanels();
+            LayoutFocusPanels(_screenRect);
+            // 탭 모드면 패널이 raycast를 삼키지 않아야 아래 마스크가 탭을 받는다.
+            foreach (RectTransform t_panel in this.focusPanels)
+                t_panel.GetComponent<Image>().raycastTarget = !_waitTap;
+            foreach (RectTransform t_corner in this.focusCorners)
+                t_corner.GetComponent<Image>().raycastTarget = !_waitTap;
+
+            this.focusGroup.gameObject.SetActive(true);
+            this.focusGroup.blocksRaycasts = !_waitTap;
+            this.focusGroup.DOKill();
+            this.focusGroup.DOFade(DimStrength, 0.15f).SetLink(this.focusGroup.gameObject);
+        }
+
+        SetBannerAnchor(_anchor);
+        // 탭으로 진행하는 구간만 "탭하여 계속" 표시. 카드 선택으로 진행하는 구간에 띄우면 오해를 준다.
+        SetBanner(_message, _showTapHint: _waitTap);
+
+        // 손은 **그 자리를 눌러야 진행되는 구간**에만. 화면 아무 데나 탭하면 되는 구간(_waitTap)에
+        // 특정 지점을 가리키면 거기만 눌러야 하는 줄 알게 된다.
+        if (!_waitTap && _screenRect.width > 0f) ShowHandAt(_screenRect.center);
+        else                                     HideHand();
+    }
+
+    /// <summary>눌러야 할 화면 좌표(px) 위에 손 아이콘을 띄운다. 위아래로 떠 있다가 주기적으로 누르는 동작.
+    /// 스프라이트가 미배선이면 아무것도 하지 않는다(무동작 안전).</summary>
+    public void ShowHandAt(Vector2 _screenPos)
+    {
+        if (this.handSprite == null) return;
+        EnsureHand();
+
+        // 캔버스가 화면 전체 stretch → 정규화 앵커가 곧 화면 비율. 해상도·CanvasScaler와 무관하게 맞는다
+        // (포커스 패널과 같은 방식 — 픽셀 변환을 두 군데서 각자 하면 한쪽이 조용히 어긋난다).
+        this.handRect.anchorMin = this.handRect.anchorMax = new Vector2(
+            Mathf.Clamp01(_screenPos.x / Screen.width),
+            Mathf.Clamp01(_screenPos.y / Screen.height));
+        this.handRect.anchoredPosition = this.handOffset;
+
+        this.handRect.gameObject.SetActive(true);
+        this.handGroup.DOKill();
+        this.handGroup.alpha = 0f;
+        this.handGroup.DOFade(1f, 0.15f).SetLink(this.handRect.gameObject);
+
+        PlayHandLoop();
+    }
+
+    /// <summary>카드 위에 손을 띄운다. 카드가 null이면 숨긴다.</summary>
+    public void ShowHandOn(CardView _card)
+    {
+        if (_card == null) { HideHand(); return; }
+        Rect t_r = _card.ScreenBounds();
+        if (t_r.width <= 0f) { HideHand(); return; }
+        ShowHandAt(t_r.center);
+    }
+
+    public void HideHand()
+    {
+        if (this.handRect == null) return;
+        this.handSeq?.Kill();
+        this.handSeq = null;
+        this.handGroup.DOKill();
+        this.handRect.gameObject.SetActive(false);
+    }
+
+    /// <summary>떠 있기(위아래) + 누르는 축소를 한 몸으로 반복.
+    ///
+    /// <b>반주기만 만들고 Yoyo로 되돌린다.</b> 왕복을 직접 이어 붙이고 Restart로 돌리면
+    /// 끝 상태(내려온 y·눌린 scale)에서 시작 상태로 **순간 복귀**해 루프 이음매가 튄다.
+    /// Yoyo는 같은 트윈을 역재생하므로 값도 속도도 자동으로 이어진다.
+    ///
+    /// 이즈가 InOutSine인 이유: 양 끝 속도가 0이라 방향이 바뀌는 지점(맨 위·맨 아래)에서
+    /// 꺾임이 보이지 않는다. In/Out을 짝지어 쓰면 한쪽 끝은 최대 속도로 부딪힌다.</summary>
+    void PlayHandLoop()
+    {
+        this.handSeq?.Kill();
+        this.handRect.DOKill();
+
+        // 시작 = 눌린 상태(손끝이 대상에 닿아 있음). 여기서 떠올랐다가 되돌아온다.
+        // 기준선은 handOffset — 위아래 폭은 그 자리에서 재므로 보정을 바꿔도 진폭은 그대로다.
+        this.handRect.anchoredPosition = this.handOffset;
+        this.handRect.localScale       = Vector3.one * HandPressScale;
+
+        float t_half = this.handTapPeriod * 0.5f;
+
+        this.handSeq = DOTween.Sequence()
+            .SetLink(this.handRect.gameObject)
+            .SetLoops(-1, LoopType.Yoyo);
+        this.handSeq.Append(this.handRect
+            .DOAnchorPosY(this.handOffset.y + this.handBobHeight, t_half).SetEase(Ease.InOutSine));
+        this.handSeq.Join(this.handRect.DOScale(1f, t_half).SetEase(Ease.InOutSine));
+    }
+
+    const float HandPressScale = 0.86f;   // 누른 순간(맨 아래) 배율
+
+    void EnsureHand()
+    {
+        if (this.handRect != null) return;
+
+        Transform t_canvas = this.dimMask != null ? this.dimMask.transform.parent : transform;
+        var t_go = new GameObject("TutorialHand", typeof(RectTransform));
+        t_go.transform.SetParent(t_canvas, false);
+        t_go.transform.SetAsLastSibling();   // 딤·배너보다 위 — 가려지면 유도가 안 된다
+
+        this.handRect = (RectTransform)t_go.transform;
+        // 피벗을 손끝(위쪽 중앙)에 둔다 — 아이콘의 검지가 위를 가리키므로 이 점이 실제 터치 지점이 된다.
+        this.handRect.pivot      = new Vector2(0.5f, 1f);
+        this.handRect.sizeDelta  = new Vector2(this.handSize, this.handSize);
+
+        this.handGroup = t_go.AddComponent<CanvasGroup>();
+        this.handGroup.blocksRaycasts = false;   // 손이 입력을 먹으면 정작 그 자리를 못 누른다
+        this.handGroup.interactable   = false;
+
+        var t_img = t_go.AddComponent<Image>();
+        t_img.sprite        = this.handSprite;
+        t_img.raycastTarget = false;
+        t_img.preserveAspect = true;
+
+        t_go.SetActive(false);
+    }
+
+    /// <summary>필드 포커스 해제(딤 패널만 접는다 — 배너는 호출측 판단).</summary>
+    public void ClearFieldFocus()
+    {
+        HideHand();
+        if (this.focusGroup == null) return;
+        this.focusGroup.blocksRaycasts = false;
+        this.focusGroup.DOKill();
+        this.focusGroup.DOFade(0f, 0.15f)
+            .SetLink(this.focusGroup.gameObject)
+            .OnComplete(() => { if (this.focusGroup != null) this.focusGroup.gameObject.SetActive(false); });
+    }
+
     /// <summary>배너 숨기고 마스크 끄고 하이라이트/포인터 되돌림(턴 종료/정리).</summary>
     public void Clear()
     {
         ClearHighlight();
         ClearPointer();
         DeactivateMask();
+        ClearFieldFocus();
         HideBanner();
     }
 
     // ── 내부 ────────────────────────────────────────────────────────────────
 
-    void SetBanner(string _message)
+    /// <summary>배너 표시. <paramref name="_showTapHint"/>는 **호출부가 반드시 정한다** —
+    /// 예전엔 여기서 무조건 켜고 각 호출부가 알아서 껐는데, 안 끄는 경로(ShowAttack)가 있어
+    /// 탭으로 진행하지 않는 스텝에도 "탭하여 계속"이 남았다. 켜는 판단을 한 곳으로 모은다.</summary>
+    void SetBanner(string _message, bool _showTapHint)
     {
         if (string.IsNullOrWhiteSpace(_message)) { HideBanner(); return; }
 
-        if (this.tapHint != null) this.tapHint.SetActive(true);
+        if (this.tapHint != null) this.tapHint.SetActive(_showTapHint);
         this.banner.text = _message;
         this.bannerGroup.DOKill();
         this.banner.transform.DOKill();
@@ -212,6 +427,164 @@ public class TutorialOverlayUI : MonoBehaviour
         this.banner.transform.localScale = Vector3.one * 0.92f;
         this.bannerGroup.DOFade(1f, 0.2f).SetLink(this.bannerGroup.gameObject);
         this.banner.transform.DOScale(1f, 0.2f).SetEase(Ease.OutBack).SetLink(this.banner.gameObject);
+    }
+
+    /// <summary>배너를 화면 위/가운데/아래로 옮긴다. 포커스가 아군 필드(하단)로 내려가면
+    /// 배너가 그 위를 덮지 않도록 저작이 위치를 지정한다. 앵커·피벗을 같이 바꿔 화면 밖으로 새지 않게.</summary>
+    void SetBannerAnchor(TutorialScenarioData.BannerAnchor _anchor)
+    {
+        if (this.bannerGroup == null) return;
+        var t_rect = (RectTransform)this.bannerGroup.transform;
+
+        switch (_anchor)
+        {
+            case TutorialScenarioData.BannerAnchor.Center:
+                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 0.5f);
+                t_rect.pivot            = new Vector2(0.5f, 0.5f);
+                t_rect.anchoredPosition = Vector2.zero;
+                break;
+            case TutorialScenarioData.BannerAnchor.Bottom:
+                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 0f);
+                t_rect.pivot            = new Vector2(0.5f, 0f);
+                t_rect.anchoredPosition = new Vector2(0f, 160f);
+                break;
+            default:   // Top — BuildUI 기본값과 동일
+                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 1f);
+                t_rect.pivot            = new Vector2(0.5f, 1f);
+                t_rect.anchoredPosition = new Vector2(0f, -160f);
+                break;
+        }
+    }
+
+    // 4패널을 최초 1회 생성. 배너보다 **먼저** 넣어 배너가 항상 딤 위에 그려지게 한다.
+    void EnsureFocusPanels()
+    {
+        if (this.focusGroup != null) return;
+
+        Transform t_canvas = this.dimMask != null ? this.dimMask.transform.parent : transform;
+
+        var t_root = new GameObject("FieldFocus", typeof(RectTransform));
+        t_root.transform.SetParent(t_canvas, false);
+        var t_rootRect = (RectTransform)t_root.transform;
+        t_rootRect.anchorMin = Vector2.zero;
+        t_rootRect.anchorMax = Vector2.one;
+        t_rootRect.offsetMin = t_rootRect.offsetMax = Vector2.zero;
+        // dim 바로 뒤(배너 앞). 배너는 뒤에 생성돼 있으므로 여기서 앞으로 당기면 배너가 가려진다.
+        int t_dimIndex = this.dimMask != null ? this.dimMask.transform.GetSiblingIndex() : 0;
+        t_root.transform.SetSiblingIndex(t_dimIndex + 1);
+
+        this.focusGroup = t_root.AddComponent<CanvasGroup>();
+        this.focusGroup.alpha = 0f;
+        this.focusGroup.blocksRaycasts = false;
+        t_root.SetActive(false);
+
+        this.focusPanels = new RectTransform[4];
+        for (int i = 0; i < 4; i++)
+        {
+            var t_go = new GameObject("Panel" + i, typeof(RectTransform));
+            t_go.transform.SetParent(t_root.transform, false);
+            var t_img = t_go.AddComponent<Image>();
+            t_img.color = new Color(0f, 0f, 0f, 1f);   // 어둡기는 CanvasGroup alpha로만(dimMask와 같은 규약)
+            t_img.raycastTarget = true;                // 구멍 밖 UI 클릭 차단
+            this.focusPanels[i] = (RectTransform)t_go.transform;
+        }
+
+        // 모서리 조각. 회전 대신 방향별로 스프라이트를 따로 굽는다 —
+        // 회전은 피벗과 얽혀 배치가 헷갈리고, 64px 텍스처 4장은 사실상 공짜다.
+        this.focusCorners = new RectTransform[4];
+        for (int i = 0; i < 4; i++)
+        {
+            var t_go = new GameObject("Corner" + i, typeof(RectTransform));
+            t_go.transform.SetParent(t_root.transform, false);
+            var t_img = t_go.AddComponent<Image>();
+            t_img.sprite = CornerSprite(i);
+            t_img.color  = new Color(0f, 0f, 0f, 1f);
+            t_img.raycastTarget = true;
+            this.focusCorners[i] = (RectTransform)t_go.transform;
+        }
+    }
+
+    // 구멍 모서리(0=BL 1=BR 2=TR 3=TL)에 덮을 역필렛. 호 중심은 조각의 **구멍 안쪽 방향** 꼭짓점이고,
+    // 그 원 안쪽만 투명하다 → 조각이 모서리의 각진 부분만 덮어 구멍이 둥글어진다.
+    static Sprite CornerSprite(int _index)
+    {
+        if (s_cornerSprites[_index] != null) return s_cornerSprites[_index];
+
+        const int c_size = 64;
+        bool t_centerRight = _index == 0 || _index == 3;   // BL·TL 조각은 호 중심이 오른쪽
+        bool t_centerTop   = _index == 0 || _index == 1;   // BL·BR 조각은 호 중심이 위쪽
+
+        var t_tex = new Texture2D(c_size, c_size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var t_px  = new Color[c_size * c_size];
+        float t_cx = t_centerRight ? c_size : 0f;
+        float t_cy = t_centerTop   ? c_size : 0f;
+
+        for (int t_y = 0; t_y < c_size; t_y++)
+            for (int t_x = 0; t_x < c_size; t_x++)
+            {
+                float t_d = Vector2.Distance(new Vector2(t_x + 0.5f, t_y + 0.5f), new Vector2(t_cx, t_cy));
+                // 경계 1.5px에 걸쳐 부드럽게 — 딱 자르면 곡선에 계단이 보인다.
+                float t_a = Mathf.Clamp01((t_d - (c_size - 1.5f)) / 1.5f);
+                t_px[t_y * c_size + t_x] = new Color(1f, 1f, 1f, t_a);
+            }
+
+        t_tex.SetPixels(t_px);
+        t_tex.Apply();
+        s_cornerSprites[_index] = Sprite.Create(t_tex, new Rect(0f, 0f, c_size, c_size), new Vector2(0.5f, 0.5f));
+        return s_cornerSprites[_index];
+    }
+
+    // 구멍(_screenRect)을 뺀 나머지를 4패널로 덮는다. 캔버스가 화면 전체 stretch라
+    // **정규화 앵커 = 화면 비율**이 그대로 성립한다 → 해상도·CanvasScaler와 무관하게 맞는다.
+    void LayoutFocusPanels(Rect _screenRect)
+    {
+        float t_x0 = Mathf.Clamp01(_screenRect.xMin / Screen.width);
+        float t_x1 = Mathf.Clamp01(_screenRect.xMax / Screen.width);
+        float t_y0 = Mathf.Clamp01(_screenRect.yMin / Screen.height);
+        float t_y1 = Mathf.Clamp01(_screenRect.yMax / Screen.height);
+
+        SetPanel(0, new Vector2(0f,   t_y1), new Vector2(1f,   1f));    // Top
+        SetPanel(1, new Vector2(0f,   0f),   new Vector2(1f,   t_y0));  // Bottom
+        SetPanel(2, new Vector2(0f,   t_y0), new Vector2(t_x0, t_y1));  // Left
+        SetPanel(3, new Vector2(t_x1, t_y0), new Vector2(1f,   t_y1));  // Right
+
+        LayoutFocusCorners(t_x0, t_x1, t_y0, t_y1);
+    }
+
+    // 모서리 조각을 구멍 **안쪽**에 얹는다. 피벗을 그 모서리에 두면 회전 없이 안쪽으로만 뻗는다.
+    // 반지름은 구멍보다 커질 수 없다(작은 구멍에서 네 조각이 겹쳐 구멍이 막히는 것 방지).
+    void LayoutFocusCorners(float _x0, float _x1, float _y0, float _y1)
+    {
+        var t_canvasRect = (RectTransform)this.focusPanels[0].parent.parent;
+        Vector2 t_canvas = t_canvasRect.rect.size;
+
+        float t_r = Mathf.Min(this.focusCornerRadius,
+                              (_x1 - _x0) * t_canvas.x * 0.5f,
+                              (_y1 - _y0) * t_canvas.y * 0.5f);
+        t_r = Mathf.Max(0f, t_r);
+
+        SetCorner(0, new Vector2(_x0, _y0), new Vector2(0f, 0f), t_r);   // BottomLeft
+        SetCorner(1, new Vector2(_x1, _y0), new Vector2(1f, 0f), t_r);   // BottomRight
+        SetCorner(2, new Vector2(_x1, _y1), new Vector2(1f, 1f), t_r);   // TopRight
+        SetCorner(3, new Vector2(_x0, _y1), new Vector2(0f, 1f), t_r);   // TopLeft
+    }
+
+    void SetCorner(int _i, Vector2 _anchor, Vector2 _pivot, float _radius)
+    {
+        RectTransform t_r = this.focusCorners[_i];
+        t_r.gameObject.SetActive(_radius > 0.5f);
+        t_r.anchorMin = t_r.anchorMax = _anchor;
+        t_r.pivot     = _pivot;
+        t_r.anchoredPosition = Vector2.zero;
+        t_r.sizeDelta        = new Vector2(_radius, _radius);
+    }
+
+    void SetPanel(int _i, Vector2 _min, Vector2 _max)
+    {
+        RectTransform t_r = this.focusPanels[_i];
+        t_r.anchorMin = _min;
+        t_r.anchorMax = _max;
+        t_r.offsetMin = t_r.offsetMax = Vector2.zero;
     }
 
     void HideBanner()

@@ -87,10 +87,16 @@ public class CardAnimator : MonoBehaviour
         RefreshVisualCache();
     }
 
+    /// <summary>페이드 대상 캐시 갱신. <b>비활성 오브젝트까지 포함</b>한다(_includeInactive: true).
+    ///
+    /// 조건부로 켜지는 장식(키워드 프레임 등)은 평소 비활성이라, 제외하면 페이드에 참여하지 못하고
+    /// 알파 1로 남는다. 그 상태에서 슬롯이 재사용되면 — 죽은 카드가 알파 0으로 사라진 자리에
+    /// 새 카드의 프레임만 `SetActive(true)` 되며 **몸통 없이 프레임만 먼저 보인다**.
+    /// 카드의 알파는 카드에 속한 모든 렌더러에 걸린다는 불변식을 여기서 지킨다.</summary>
     void RefreshVisualCache()
     {
-        this.cachedRenderers = GetComponentsInChildren<SpriteRenderer>();
-        this.cachedTexts     = GetComponentsInChildren<TMP_Text>();
+        this.cachedRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+        this.cachedTexts     = GetComponentsInChildren<TMP_Text>(true);
     }
 
     public void SetBoundCard(CardInstance _card) => this.boundCard = _card;

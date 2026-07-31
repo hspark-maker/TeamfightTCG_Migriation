@@ -2,6 +2,14 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+/// <summary>덱 셔플에 어떤 난수를 쓸지 호출부가 정하는 정책. 필드 안에서 모드 플래그를 읽지 않는다.
+/// - None : 셔플 안 함. 리스트 순서 = 등장 순서(튜토리얼 저작 순서 보존).
+/// - Match: <see cref="MatchRandom"/>(시드 고정 결정론). 호출 전에 시드가 걸려 있어야 한다.
+/// - Local: <see cref="UnityEngine.Random"/>. 결과를 와이어로 broadcast하는 멀티 전용 —
+///          멀티는 시드 합의(commit-reveal)가 필드 Initialize **뒤**라 Match를 쓸 수 없다.
+///          대신 MatchRandom 스트림을 건드리지 않으므로 소비 순서가 어긋나지 않는다.</summary>
+public enum ShufflePolicy { None, Match, Local }
+
 public class BattleField : MonoBehaviour
 {
     public const int SLOT_COUNT = 3;
@@ -24,7 +32,7 @@ public class BattleField : MonoBehaviour
 
     void OnDestroy() => this.healerEffect?.Unsubscribe();
 
-    public void Initialize(List<CardData> _deckData, int _ownerIndex)
+    public void Initialize(List<CardData> _deckData, int _ownerIndex, ShufflePolicy _shuffle)
     {
         this.ownerIndex = _ownerIndex;
         this.slots = new CardInstance[SLOT_COUNT];
@@ -35,8 +43,7 @@ public class BattleField : MonoBehaviour
         this.healerEffect = new HealerEffect(this);
 
         List<CardData> t_shuffled = new List<CardData>(_deckData);
-        if (!TutorialConfig.IsActive)   // 튜토리얼: 무셔플 = 리스트 순서가 곧 등장 순서(결정론)
-            Shuffle(t_shuffled);
+        Shuffle(t_shuffled, _shuffle);
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {
@@ -346,11 +353,13 @@ public class BattleField : MonoBehaviour
         return t_result;
     }
 
-    // Taunt 카드가 있으면 그것만 반환, 없으면 전체 반환
+    // Taunt 카드가 있으면 그것만 반환, 없으면 전체 반환.
+    // 판정은 BattleRules.IsTaunt 단독 — CardView의 도발 강조/차단 안내와 같은 함수다.
+    // (구: c.data.HasKeyword → 시너지·패시브가 부여한 도발을 규칙만 못 보고 UI만 보는 이중 진실원)
     public List<CardInstance> GetValidTargets()
     {
         var t_all   = GetActiveCards();
-        var t_taunt = t_all.FindAll(c => c.data.HasKeyword(CardKeyword.Taunt));
+        var t_taunt = t_all.FindAll(BattleRules.IsTaunt);
         return t_taunt.Count > 0 ? t_taunt : t_all;
     }
 
@@ -363,11 +372,18 @@ public class BattleField : MonoBehaviour
         return this.waitingQueue.Count > 0;
     }
 
-    static void Shuffle(List<CardData> _list)
+    /// <summary>Fisher-Yates. 난수원은 정책이 정한다 — 필드가 모드 플래그를 읽지 않는다.
+    /// Match면 MatchRandom(결정론 스트림)을 소비하므로 **양측 소비 횟수가 같아야 한다**:
+    /// 지금 Match를 쓰는 건 싱글/튜토리얼뿐이라 스트림 공유 상대가 없다.</summary>
+    static void Shuffle(List<CardData> _list, ShufflePolicy _policy)
     {
+        if (_policy == ShufflePolicy.None) return;
+
         for (int i = _list.Count - 1; i > 0; i--)
         {
-            int t_j = Random.Range(0, i + 1);
+            int t_j = _policy == ShufflePolicy.Match
+                ? MatchRandom.Range(i + 1)
+                : Random.Range(0, i + 1);
             (_list[i], _list[t_j]) = (_list[t_j], _list[i]);
         }
     }

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Video;
 
 public class BattleFieldView : MonoBehaviour
 {
@@ -39,6 +38,20 @@ public class BattleFieldView : MonoBehaviour
         }
     }
 
+    /// <summary>이 필드 슬롯 전체를 감싸는 화면 좌표 사각(px). 튜토리얼 포커스 딤이 뚫을 구멍.
+    /// 기준은 각 슬롯의 <see cref="CardView.SlotWorldBounds"/> — 카드가 연출 중 움직여 있어도
+    /// 구멍이 따라 흔들리지 않는다. 카메라가 없으면 빈 Rect(호출부가 포커스를 접는다).</summary>
+    public Rect ScreenBounds(float _paddingPx = 0f)
+    {
+        Rect t_rect = new Rect();
+        foreach (CardView t_view in this.slotViews)
+        {
+            if (t_view == null) continue;
+            t_rect = CameraUtil.Union(t_rect, t_view.ScreenBounds(_paddingPx));
+        }
+        return t_rect;
+    }
+
     public async UniTask PlayFillAnim(List<CardInstance> _placed)
     {
         if (_placed == null || _placed.Count == 0) return;
@@ -68,19 +81,8 @@ public class BattleFieldView : MonoBehaviour
 
             CardView t_view = this.slotViews[_placed[i].slotIndex];
 
-            // 등장 컷씬이 있는 카드는 **중앙에 멈춘 채로** 컷씬을 보고, 끝나거나 스킵된 그 시점에 슬롯으로 들어간다.
-            // 자격 판정은 CardCinematicRules 단독(여기서 stage 비교 금지). 일반 카드는 Resolve가 null이라
-            // 예전처럼 한 번에 흐른다 — 컷씬 없는 카드에 중앙 정지가 생기지 않게 분기해 둔다.
-            VideoClip t_clip = CardCinematicRules.Resolve(_placed[i]);
-            if (t_clip == null)
-            {
-                await t_view.PlayDealAnim(t_from, t_mid, t_dests[i], this.cardDealDuration);
-                continue;
-            }
-
-            await t_view.PlayDealToMid(t_from, t_mid, t_dests[i], this.cardDealDuration);
-            await CardCinematicPlayer.Play(t_clip);
-            await t_view.PlayDealToSlot(t_mid, t_dests[i], this.cardDealDuration);
+            // 등장 순서(중앙 정지 → 컷씬 → 슬롯)는 CardAppearSequence 단독 — 교활 교대 등장과 공유한다.
+            await CardAppearSequence.Play(t_view, _placed[i], t_from, t_mid, t_dests[i], this.cardDealDuration);
         }
     }
 

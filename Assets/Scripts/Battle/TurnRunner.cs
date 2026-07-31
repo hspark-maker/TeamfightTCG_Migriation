@@ -95,12 +95,15 @@ public class TurnRunner : MonoBehaviour
         this.disconnectWin = false;
         TurnCount = 1;
         SetTurnCountLabel();
-        // 멀티는 SyncInitialDecks의 commit-reveal에서 이미 시드됨. 싱글만 로컬 시드.
-        // 튜토리얼: 고정 시드 = 스플래시/랜덤효과까지 실행마다 재현(무셔플만으론 게임로직 RNG가 안 고정).
-        if (TutorialConfig.IsActive)
-            MatchRandom.Seed(0x7507_0521_1A11_0A15UL);   // 튜토리얼 고정 시드(임의 상수)
-        else if (!DeckConfig.IsMultiplayer)
-            MatchRandom.SeedRandomLocal();
+        // 정상 경로의 시드 지점은 GameInitializer(덱 셔플이 MatchRandom을 소비하므로 필드 초기화 직전).
+        // 여기 남은 건 StartBattle() 단독 호출 같은 우회 진입용 폴백 — 이미 시드됐으면 손대지 않는다.
+        // (덮어쓰면 셔플로 이미 전진한 스트림이 리셋돼 시드 하나가 두 시퀀스를 내게 된다.)
+        // 멀티는 SyncInitialDecks의 commit-reveal이 시드하므로 여기서 제외.
+        if (!DeckConfig.IsMultiplayer && !MatchRandom.IsSeeded)
+        {
+            if (TutorialConfig.IsActive) MatchRandom.Seed(TutorialConfig.FixedSeed);
+            else                         MatchRandom.SeedRandomLocal();
+        }
         if (DeckConfig.IsMultiplayer && NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom += HandlePlayerLeft;
         this.ctx = new TurnContext

@@ -1123,7 +1123,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -83, y: -90.273}
+  m_AnchoredPosition: {x: -115, y: -127}
   m_SizeDelta: {x: 200, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &341400024
@@ -1290,7 +1290,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 27dbf120afbb1430a97b4f32b406bc93, type: 3}
+  m_Sprite: {fileID: 21300000, guid: c536c0bd2f1d3457da820864531f568c, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4114,7 +4114,7 @@ MonoBehaviour:
   glowImage: {fileID: 0}
   frontGlowColor: {r: 0.3, g: 0.65, b: 1, a: 0.85}
   backGlowColor: {r: 1, g: 0.28, b: 0.22, a: 0.85}
-  glowSize: 900
+  glowSize: 1800
   glowFade: 0.28
   glowPulseScale: 1.1
   glowPulseTime: 0.9

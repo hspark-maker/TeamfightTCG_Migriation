@@ -45,13 +45,13 @@ MonoBehaviour:
   cardMoveDuration: 0.3
   hitDuration: 0.15
   deathDuration: 0.4
-  dealAnimDuration: 0.6
+  dealAnimDuration: 1
   dealMidPause: 0.5
   deathPreviewFlash: 0.55
   longPress: 0.45
   fadeViewDuration: 0.3
   attackPreviewFlash: 0.55
-  keywordGlowHold: 1.5
+  keywordGlowHold: 0.8
   healLaunchLead: 0.15
   healLaunchStagger: 0.06
   healTravelDuration: 0.45

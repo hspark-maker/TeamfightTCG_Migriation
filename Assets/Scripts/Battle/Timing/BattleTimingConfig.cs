@@ -110,6 +110,11 @@ public class BattleTimingConfig : ScriptableObject
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;
+
+    /// <summary>다른 SO가 들고 있는 raw 초 값에 배속을 먹인다(키워드별 글로우 hold 등).
+    /// SpeedFactor 자체는 계속 비공개 — 곱하는 지점이 코드 여기저기로 흩어지면
+    /// "배속이 안 먹는 연출"이 조용히 생긴다. 외부 시간값은 반드시 이 출구를 통과할 것.</summary>
+    public float Scaled(float _seconds) => _seconds * SpeedFactor;
     public float HealLaunchLead      => healLaunchLead      * SpeedFactor;
     public float HealLaunchStagger   => healLaunchStagger   * SpeedFactor;
     public float HealTravelDuration  => healTravelDuration  * SpeedFactor;
