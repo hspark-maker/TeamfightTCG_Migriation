@@ -116,7 +116,9 @@
       "Bash(sed 's/^ *//')",
       "Bash(awk '{print \"  \"$0}')",
       "Bash(cp PackUI/PackCard.prefab PackUI/PackCard.prefab.meta C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/)",
-      "Bash(cp DeckUI/DeckEditSlot.prefab C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/DeckEditSlot.prefab.FINAL)"
+      "Bash(cp DeckUI/DeckEditSlot.prefab C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/DeckEditSlot.prefab.FINAL)",
+      "Bash(tee /tmp/targets.txt)",
+      "Bash(awk ' *)"
     ]
   },
   "enabledMcpjsonServers": [

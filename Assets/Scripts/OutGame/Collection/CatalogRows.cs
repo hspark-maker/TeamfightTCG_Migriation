@@ -6,9 +6,6 @@ using UnityEngine;
 /// </summary>
 public static class CatalogRows
 {
-    // 행당 카드 수(고정). fallback 청크 폭이자 정상 행의 카드 슬롯 수.
-    public const int ColumnsPerRow = 3;
-
     // 주입된 배치 SO(선택). null이거나 rows 0개면 CardCatalog.All fallback + 전역 기본 튜닝.
     static CollectionLayoutConfig s_layout;
 
@@ -175,13 +172,17 @@ public static class CatalogRows
         {
             var t_def = t_defs[t_i];
 
-            var t_cards = new List<CardData>(ColumnsPerRow) { t_def.card1, t_def.card2, t_def.card3 };
-            var t_keys = new List<string>(ColumnsPerRow)
+            // 카드 수는 행마다 자유 — 행 프리팹이 HorizontalLayoutGroup이라 개수에 맞춰 배치된다.
+            var t_source = t_def.cards;
+            int t_slots = t_source != null ? t_source.Count : 0;
+
+            var t_cards = new List<CardData>(t_slots);
+            var t_keys = new List<string>(t_slots);
+            for (int t_c = 0; t_c < t_slots; t_c++)
             {
-                CardCatalog.KeyOf(t_def.card1),
-                CardCatalog.KeyOf(t_def.card2),
-                CardCatalog.KeyOf(t_def.card3),
-            };
+                t_cards.Add(t_source[t_c]);
+                t_keys.Add(CardCatalog.KeyOf(t_source[t_c]));
+            }
 
             ResolveTuning(t_def, out float t_cycleSeconds, out ECurrencyType t_rewardType, out long t_cap);
             AddRow(t_rowIndex++, t_cards, t_keys, t_cycleSeconds, t_rewardType, t_cap);
@@ -190,7 +191,7 @@ public static class CatalogRows
         EndBuild();
     }
 
-    // fallback: CardCatalog.All을 3장씩 청크. 튜닝은 전역 기본값(Tuning)만 적용. 마지막 부분 청크는 null 패딩.
+    // fallback: CardCatalog.All을 DefaultCardsPerRow장씩 청크. 튜닝은 전역 기본값(Tuning)만 적용.
     static void BuildFallback()
     {
         BeginBuild();
@@ -204,17 +205,18 @@ public static class CatalogRows
         float t_cycleSeconds = t_cfg.DefaultProductionCycleSeconds;
         ECurrencyType t_rewardType = t_cfg.DefaultRewardType;
         long t_cap = t_cfg.DefaultCap;
+        int t_perRow = t_cfg.DefaultCardsPerRow;
 
-        for (int t_i = 0; t_i < t_count; t_i += ColumnsPerRow)
+        for (int t_i = 0; t_i < t_count; t_i += t_perRow)
         {
-            var t_cards = new List<CardData>(ColumnsPerRow);
-            var t_keys = new List<string>(ColumnsPerRow);
+            // 마지막 행은 남은 장수만 담는다(null 패딩 없음 — 행 프리팹이 개수에 맞춰 배치한다).
+            int t_slots = System.Math.Min(t_perRow, t_count - t_i);
+            var t_cards = new List<CardData>(t_slots);
+            var t_keys = new List<string>(t_slots);
 
-            // 3장 슬롯 고정 — 모자란 마지막 행은 null로 패딩(Cards.Count 항상 3).
-            for (int t_c = 0; t_c < ColumnsPerRow; t_c++)
+            for (int t_c = 0; t_c < t_slots; t_c++)
             {
-                int t_idx = t_i + t_c;
-                var t_card = t_idx < t_count ? t_source[t_idx] : null;
+                var t_card = t_source[t_i + t_c];
                 t_cards.Add(t_card);
                 t_keys.Add(CardCatalog.KeyOf(t_card));
             }

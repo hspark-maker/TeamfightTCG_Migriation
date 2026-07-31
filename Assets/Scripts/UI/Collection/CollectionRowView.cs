@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// 도감 한 행(카드 3장)의 타일 생성·바인딩 + 생산 상태 표시(Row 프리팹에 부착).
+// 도감 한 행의 타일 생성·바인딩 + 생산 상태 표시(Row 프리팹에 부착). 카드 수는 행 데이터가 정하고 HorizontalLayoutGroup이 배치한다.
 // 카드 타일(cardsContainer)에 더해 상태칩·누적량·수확버튼을 CollectionProductionManager API로 채운다.
 // 생산 누적값은 시간 함수라 매니저가 통지하지 않으므로, 컨트롤러의 폴링 틱이 RefreshProduction()을 주기 호출한다.
 public class CollectionRowView : MonoBehaviour

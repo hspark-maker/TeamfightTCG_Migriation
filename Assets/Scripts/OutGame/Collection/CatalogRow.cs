@@ -9,13 +9,13 @@ using System.Collections.Generic;
 public sealed class CatalogRow
 {
     // 행 안정 키 = 행의 첫 non-null 카드 안정 키(CardCatalog.KeyOf). 행 인덱스 같은 위치 기반 키가 아니다.
-    // 배치가 고정이라 이 키가 안정적. 3장 모두 미해결(드리프트)이면 null일 수 있다.
+    // 배치가 고정이라 이 키가 안정적. 카드가 전부 미해결(드리프트)이면 null일 수 있다.
     public string Key { get; }
 
     // 행 목록상 인덱스(0-base). 표시·정렬용 부가정보일 뿐 식별 키가 아니다.
     public int Index { get; }
 
-    // 행에 속한 카드들(3장 고정). 미authoring/미해결 슬롯은 null을 포함할 수 있다(드리프트).
+    // 행에 속한 카드들(개수는 행마다 자유). authoring 누락 슬롯은 null을 포함할 수 있다(드리프트).
     public IReadOnlyList<CardData> Cards { get; }
 
     // 행 카드들의 안정 키(Cards와 인덱스 정합). 미해결/미authoring 슬롯은 null일 수 있다.

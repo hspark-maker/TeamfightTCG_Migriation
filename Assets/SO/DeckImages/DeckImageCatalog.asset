@@ -14,3 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DeckImageCatalog
   images:
   - {fileID: 21300000, guid: 67be1702b02ade642a06e09df8ba56a8, type: 3}
+  - {fileID: 21300000, guid: ab2bad6c9c0b2194f921a15c6034a603, type: 3}
+  - {fileID: 21300000, guid: ffb1acaf90a17024986416f97fa34f06, type: 3}
+  - {fileID: 21300000, guid: 6381dcfdc1e1dbc4d8da4deb3600f5d3, type: 3}
