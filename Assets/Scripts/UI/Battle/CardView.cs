@@ -1348,6 +1348,7 @@ public class CardView : MonoBehaviour
 
         // 배치 두 가지. 시너지 자리: 배지와 동일한 세로열 좌표(같은 필드를 써야 "그 자리 그대로"가 성립).
         // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
+        float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
             GameObject t_obj = Instantiate(this.keywordIconPrefab, t_root);
@@ -1359,7 +1360,32 @@ public class CardView : MonoBehaviour
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
                 : t_obj.GetComponent<SpriteRenderer>();
             if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i].Icon;
+
+            // 아이콘은 **지금 막 생성**되므로 직전 페이드에 참여하지 못했다 → 프리팹 알파(1) 그대로다.
+            // 죽은 카드가 알파 0으로 사라진 자리에 새 카드가 렌더되면, 몸통은 아직 투명한데
+            // 아이콘만 불쑥 보인다. 태어나는 순간 카드 몸통 알파에 맞춰 둔다.
+            // (이후 페이드는 GetComponentsInChildren 캐시에 자동으로 잡히므로 여기 한 번이면 된다.)
+            ApplyAlpha(t_obj, t_alpha);
+
             this.iconMap[t_icons[t_i].Keyword] = t_obj;
+        }
+    }
+
+    /// <summary>지금 카드 몸통이 그려지는 알파. 연출 중 페이드 상태를 그대로 읽는다 —
+    /// 새로 만든 자식(아이콘/배지)을 여기에 맞춰야 카드와 따로 놀지 않는다.
+    /// 기준은 illustration: 페이드 제외 대상(hitOverlay/dieOverlay/fadeExcludes)이 아니라 항상 몸통을 따라간다.</summary>
+    float CurrentBodyAlpha => this.illustration != null ? this.illustration.color.a : 1f;
+
+    static void ApplyAlpha(GameObject _go, float _alpha)
+    {
+        if (_go == null || _alpha >= 1f) return;   // 1이면 프리팹 기본값 그대로가 맞다(불필요한 순회 생략)
+        foreach (SpriteRenderer t_sr in _go.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            Color t_c = t_sr.color; t_c.a = _alpha; t_sr.color = t_c;
+        }
+        foreach (TMP_Text t_tmp in _go.GetComponentsInChildren<TMP_Text>(true))
+        {
+            Color t_c = t_tmp.color; t_c.a = _alpha; t_tmp.color = t_c;
         }
     }
 
@@ -1426,11 +1452,17 @@ public class CardView : MonoBehaviour
         // 여기 남는 건 세로 배치와 배지 Set뿐. 활성 판정도 같은 규칙 헬퍼를 재사용해 정렬과 아이콘이 어긋나지 않게 한다.
         List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(this.boundCard.data.synergies, _synergy, this.synergyMaxBadges);
 
+        float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_tags.Count; t_i++)
         {
             SynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
             t_badge.transform.localPosition = new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f);
             t_badge.Set(t_tags[t_i], CardVisualRules.IsSynergyActive(_synergy, t_tags[t_i]));
+
+            // 키워드 아이콘과 같은 이유: 배지는 **지금 막 생성**돼 직전 페이드에 참여하지 못했다.
+            // 그대로 두면 죽은 카드가 사라진 자리에 몸통 없이 배지만 먼저 보인다.
+            // Set() 뒤에 호출해야 한다 — Set이 색을 다시 칠하므로 먼저 맞추면 덮인다.
+            ApplyAlpha(t_badge.gameObject, t_alpha);
         }
     }
 

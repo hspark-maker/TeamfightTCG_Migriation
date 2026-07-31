@@ -315,7 +315,10 @@ public class PlayerTurn : TurnBase
             this.guidedActive = true;
             CardView.OnAttackerArmed += HandleGuidedArm;
         }
-        ShowGuidedPhase(null);
+        // **현재 무장 상태에서 시작**한다. 앞 스텝(아군 카드 포커스 설명)이 무장을 남긴 채 끝나므로
+        // 무조건 1단계로 열면 화면과 실제가 어긋난다 — 그 상태에서 카드를 누르면 무장이 "풀려서"
+        // 1단계 그대로 보이고, 한 번 더 눌러야 2단계로 간다(탭 3번 요구).
+        ShowGuidedPhase(CardView.SelectedAttacker);
     }
 
     void EndGuidedFreeSelect()
@@ -323,6 +326,14 @@ public class PlayerTurn : TurnBase
         if (!this.guidedActive) return;
         this.guidedActive = false;
         CardView.OnAttackerArmed -= HandleGuidedArm;
+
+        // 1단계를 한 장으로 좁힌 스텝은 ForcedAttacker를 걸어 뒀다 → 반드시 풀어준다.
+        // 안 풀면 다음 스텝/자유 플레이에서 그 카드 말고는 아무것도 안 눌린다.
+        if (ResolveGuidedAttacker() != null)
+        {
+            TurnState.ForcedAttacker = null;
+            CardView.RestoreAllFades();
+        }
         TutorialOverlayUI.Instance?.ClearFieldFocus();
     }
 
@@ -347,12 +358,38 @@ public class PlayerTurn : TurnBase
             ? this.guidedStep.targetBannerAnchor
             : this.guidedStep.bannerAnchor;
 
-        t_overlay.ShowFieldFocus(t_view.ScreenBounds(GuidedFocusPadding), t_msg, t_anchor);
+        // 1단계에 한해 **지정 아군 한 장**으로 좁힐 수 있다(cardFocusSide=Player + cardFocusSlot).
+        // "이 카드로 공격해봐 → 상대는 아무나" 같은 스텝용. 지정이 없으면 종전대로 아군 필드 전체.
+        // 2단계(적 고르기)는 항상 필드 전체다 — 대상까지 찍을 거면 자유 스텝이 아니라 슬롯 지정 스텝을 쓴다.
+        CardView t_only = t_pickEnemy ? null : ResolveGuidedAttacker();
+
+        if (t_only != null)
+        {
+            // 그 카드만 조작 가능하게(다른 아군 탭 무시) + 나머지 암전. 무장 뒤에도 유지해
+            // 2단계에서 공격자가 바뀌지 않게 한다.
+            TurnState.ForcedAttacker = t_only.BoundCard;
+            CardView.RestoreAllFades();
+            t_overlay.ShowCardFocus(t_msg, t_anchor, _waitTap: false, t_only);
+        }
+        else
+        {
+            t_overlay.ShowFieldFocus(t_view.ScreenBounds(GuidedFocusPadding), t_msg, t_anchor);
+        }
 
         // 지정 핸드는 그 진영 단계에서만 적용 — 아군 고르는 중에 적 슬롯을 가리키면 안 된다.
         var t_wantSide = t_pickEnemy ? TutorialScenarioData.CardFocusSide.Enemy
                                      : TutorialScenarioData.CardFocusSide.Player;
         if (this.guidedStep.handSide == t_wantSide) ApplyHandOverride(this.guidedStep);
+    }
+
+    /// <summary>자유 선택 1단계를 좁힐 지정 아군. cardFocusSide가 Player일 때만 의미가 있다
+    /// (Enemy 지정은 카드 낱장 설명용이라 여기선 무시 — 아군 고르는 단계에 적을 열 수 없다).
+    /// 그 슬롯이 비었으면 null → 필드 전체로 자연 폴백한다.</summary>
+    CardView ResolveGuidedAttacker()
+    {
+        if (this.guidedStep.cardFocusSide != TutorialScenarioData.CardFocusSide.Player) return null;
+        CardView t_view = ResolveSlotView(this.guidedStep.cardFocusSide, this.guidedStep.cardFocusSlot);
+        return t_view != null && t_view.BoundCard != null ? t_view : null;
     }
 
     const float GuidedFocusPadding = 24f;   // 구멍 여유(px) — 카드 테두리가 딤에 물리지 않게
