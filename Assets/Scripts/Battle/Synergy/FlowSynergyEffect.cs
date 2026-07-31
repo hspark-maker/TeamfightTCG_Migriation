@@ -25,6 +25,7 @@ public class FlowSynergyEffect : SynergyEffect
             if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 흐름 카드 등장 시 배너+배지 pop
+        SynergyVfx.PlayFlowWind(_ctx.field);             // 필드 위로 바람 1회(순수 연출, await 없음)
         return UniTask.CompletedTask;
     }
 
@@ -35,6 +36,8 @@ public class FlowSynergyEffect : SynergyEffect
     {
         if (_ctx.self == null || _ctx.self.flowBonus <= 0) return UniTask.CompletedTask;
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy);
+        // 가산이 실제로 붙는 순간에도 바람. await 하지 않는다 — 여기서 기다리면 공격 개시가 밀린다.
+        SynergyVfx.PlayFlowWind(_ctx.ownField);
         return UniTask.CompletedTask;
     }
 }

@@ -1293,6 +1293,12 @@ public class CardView : MonoBehaviour
         this.cardAnim.HideDeathPreview();
     }
 
+    /// <summary>표시용 HP를 임의 값으로 덮어쓴다. 규칙상 hp는 이미 확정됐는데(결정론: 상태변이 선행)
+    /// 연출이 여러 번에 나눠 그 피해를 보여줄 때, 숫자만 단계적으로 따라오게 하는 용도다.
+    /// **표시 전용** — CardInstance는 건드리지 않는다. 다음 Render/PlayHitAnim이 실제 값으로 되돌린다.</summary>
+    public void OverrideHpDisplay(int _hp, int _bonusHp)
+        => SetHpDisplay(Mathf.Max(0, _hp).ToString(), _bonusHp > 0 ? $"+{_bonusHp}" : "");
+
     void SetHpDisplay(string _hp, string _bonus)
     {
         if (this.hpText != null) this.hpText.text = _hp;

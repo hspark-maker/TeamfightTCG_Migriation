@@ -54,7 +54,6 @@ public class CoinFlipUI : MonoBehaviour
         if (this.target == null) this.target = this.transform;
         this.baseScale = this.target.localScale;
         this.cached = true;
-        if (this.resultText == null) BuildResultText();
         if (this.backgroundImage == null) this.backgroundImage = BuildBackdrop("CoinFlipBackground", 4000f, null);
         if (this.glowImage       == null) this.glowImage       = BuildBackdrop("CoinFlipGlow", this.glowSize, RadialSprite());
         HideBackdrop();
@@ -115,27 +114,6 @@ public class CoinFlipUI : MonoBehaviour
         if (t_s != null && this.coinImage.sprite != t_s) this.coinImage.sprite = t_s;
     }
 
-    // 결과 텍스트가 미배선이면 코인 아래에 런타임 생성(씬 배선 불필요).
-    void BuildResultText()
-    {
-        var t_go = new GameObject("CoinResultText", typeof(RectTransform));
-        t_go.transform.SetParent(this.transform, false);
-        var t_rt = (RectTransform)t_go.transform;
-        t_rt.anchorMin = t_rt.anchorMax = new Vector2(0.5f, 0.5f);
-        t_rt.pivot = new Vector2(0.5f, 0.5f);
-        t_rt.anchoredPosition = new Vector2(0f, -240f);
-        t_rt.sizeDelta = new Vector2(600f, 160f);
-        var t_cg = t_go.AddComponent<CanvasGroup>();
-        t_cg.alpha = 0f; t_cg.blocksRaycasts = false; t_cg.interactable = false;
-        var t_txt = t_go.AddComponent<TextMeshProUGUI>();
-        TutorialUIStyle.ApplyFont(t_txt);
-        t_txt.alignment    = TextAlignmentOptions.Center;
-        t_txt.fontSize     = 96f;
-        t_txt.fontStyle    = FontStyles.Bold;
-        t_txt.color        = Color.white;
-        t_txt.raycastTarget = false;
-        this.resultText = t_txt;
-    }
 
     void HideResult()
     {
