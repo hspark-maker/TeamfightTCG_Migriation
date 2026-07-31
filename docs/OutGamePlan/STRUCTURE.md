@@ -246,6 +246,19 @@ sequenceDiagram
 - `RowProductionInfo.CycleProgress01`(파생 프로퍼티 = `AccumulatedRaw - Accumulated`, 소수부): 한 사이클(재화 1단위)이 차면 바가 0으로 리셋되고 누적 정수가 +1(실시간 채움→완료→누적↑). 사이클 길이 = productionCycleSeconds(기본 15초/단위). **저장 스키마·수확 로직 불변**(표시/파생만). `Status` 컨테이너는 프리팹 기본 비활성이라 **활성화**함.
 - `CollectionGalleryController.EnsureBoot()`(독립 씬 전용, `CardCatalog.IsReady`면 no-op): `DataSaveManager.Load()` + `CurrencyManager.Init()` 추가 → 테스트 씬에서도 저장된 골드·진행도 로드. 실제 통합 부트에선 IsReady 가드로 미실행.
 
+**수확 코인 연출 (2026-07-31)** — 수확은 `CurrencyManager.Earn` → `OnCurrencyChanged`로 골드 텍스트가 즉시 점프할 뿐 획득 체감이 없었다. 로비 진입 연출과 같은 손맛을 붙이되, 조립 순서(롤업 되감기 → 코인 버스트 → `OnKill` 고정 해제)가 이미 두 곳에 복붙돼 있어 **공용 재생기로 수렴**시켰다.
+
+| 산출 | 경로 | 상태 |
+|---|---|---|
+| 골드 획득 연출 단일 재생기 (`TryGet`/`Play`/`BuildGoldGain`) | 신규 `UI/Common/GoldGainEffectPlayer.cs` — `GoldHud`·코인 스프라이트를 런타임 자동 탐색, 없으면 `GainEffectLayer`(없으면 캔버스 루트)에 **자가 설치**해 프리팹 편집 0. 출발==수치면 제자리 모드, 다르면 원거리 모드(흩어짐 좁게·수렴 길게) | ✅ 신규 (2026-07-31) |
+| 골드 단계 이관 | `UI/Lobby/LobbyGainEffectDirector.cs` — `TryStageGold`가 `BuildGoldGain(null, gold)` 위임 3줄로 축소. 골드 직렬화·`EnsureCoinBurst`·`FindIconSpriteNear` 제거. 캐리어 소비·타이밍·카드 단계는 무수정 | ✅ 이관 (2026-07-31) |
+| 원거리 튜닝 주입구 | `UI/Common/CoinBurstEffect.cs` — `Configure`에 `_scatterRadius`/`_gatherDuration` 선택 파라미터 추가(직렬화 고정이면 한 인스턴스로 두 모드를 못 오간다). 기존 호출부 무수정 | ✅ 확장 (2026-07-31) |
+| 수확 훅 | `UI/Collection/CollectionRowView.OnHarvestClicked`(출발=`harvestButton`, `RewardType == Gold` 게이트) · `CollectionGalleryController.OnHarvestAllClicked`(출발=`harvestAllButton`, 반환 총합을 골드로 취급) — 둘 다 `Harvest`/`HarvestAll`의 **반환 지급량**을 그대로 연출에 넘긴다 | ✅ 신규 (2026-07-31) |
+
+- **재진입 = coalesce**: `Play`가 이전 시퀀스를 `Kill`한 뒤 새로 만든다. **`Kill` → `BeginGainRollUp` 순서가 정확성의 전부** — 뒤집으면 옛 `OnKill`의 `ReleaseDisplay`가 새 고정을 풀어 숫자가 뒤로 점프한다(`GoldHud.m_held`가 단일 bool). 끝값은 항상 `CurrencyManager.Gold` 직독이라 드리프트 불가.
+- **`CoinBurstEffect` 인스턴스는 하나만** — 코인 잔해 정리를 다음 `BuildBurst`의 `ClearCoins()`에 맡기는 구조라 인스턴스가 갈리면 옛 코인이 허공에 굳는다.
+- 재생기를 도감 계층에 두지 않은 이유: 화면은 탭 전환에 꺼지고 행 뷰는 `OnEnable`마다 재생성돼 `CoinBurstEffect.OnDisable`이 비행 중 코인을 걷어간다(`RankRewardClaimPopup`이 이미 경고하는 함정).
+
 > **푸터 일괄수령**: 전용 뷰를 두지 않고 `CollectionGalleryController`가 겸한다 — 필요한 게 폴링 틱과 `OnChanged` 구독뿐인데 둘 다 컨트롤러에 이미 있어, 별도 컴포넌트는 같은 배선의 중복이었다. 버튼은 항상 노출하고 `GetTotalHarvestable() >= 1`일 때만 `interactable`(오브젝트 토글 없음 → 자기비활성 버그 소지 자체가 사라졌다). 라벨은 프리팹 저작값 고정(수량 표기 없음). 클릭 시 `HarvestAll()` 1회로 여러 행·여러 재화를 지급하고 영속·통지는 1회로 묶인다.
 
 **배선 검증(에디터 인메모리 세이브, 실 저장 미오염)**: fallback 3행 전량 소유→완성, 행0 빌드→시간점프. RowView→ProgressView 위임으로 바 구동: +3분 `사이클 0.5·바 0.5` → 롤오버 시 `누적 +1·바 0` → +24h `Capped·바 1`. 수확 `earned·gold` 반영, 콘솔 에러 0.
