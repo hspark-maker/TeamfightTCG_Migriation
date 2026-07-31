@@ -55,6 +55,11 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("돌보미 1인당 회복량(HealVfx 재사용 — 힐러와 같은 연출)")]
     [SerializeField] int caretakerHeal = 1;
 
+    [Tooltip("[G] 엠블럼 테스트에 쓸 시너지 SO. emblem 그림이 배선된 것을 넣는다(비면 무동작)")]
+    [SerializeField] SynergyData emblemSynergy;
+    [Tooltip("엠블럼을 띄울 아군 슬롯")]
+    [Range(0, 2)] [SerializeField] int emblemSlot = 0;
+
     [Header("박치기 타이밍(초) / 거리 / 각도  — Play 중 조정 가능")]
     [SerializeField] float windDur    = 0.07f;
     [SerializeField] float windDist   = 0.22f;
@@ -139,6 +144,8 @@ public class AttackAnimTester : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.S)) PreviewSwarmVolley().Forget();
         if (Input.GetKeyDown(KeyCode.F)) SynergyVfx.PlayFlowWind(this.playerFieldView);
         if (Input.GetKeyDown(KeyCode.H)) PreviewCaretakerHeal();
+        if (Input.GetKeyDown(KeyCode.G))
+            SynergyEmblemVfx.Play(this.playerFieldView?.GetSlotView(this.emblemSlot), this.emblemSynergy);
         if (Input.GetKeyDown(KeyCode.R)) { this.attackVfx.Rescan(); this.hitVfx.Rescan(); t_armedChanged = true; }
         if (Input.GetKeyDown(KeyCode.T)) PullTuningFromConfig();
         if (Input.GetKeyDown(KeyCode.K)) ApplyTuningToConfig();
@@ -492,6 +499,7 @@ public class AttackAnimTester : MonoBehaviour
             $"[1] 무장VFX on/off  [2] 피격VFX on/off  [V] 무장VFX 미리보기({(this.armedPreview ? "ON" : "off")})  [B] 피격VFX 미리보기  [R] 폴더 재스캔  [L] 선택 경로 로그");
         GUI.Label(new Rect(12, 130, 1100, 24),
             "시너지: [S] 무리 볼리(아군 전원 → 적0)   [F] 흐름 바람(아군 필드)   [H] 돌보미 회복(HealVfx 재사용)"
+            + $"   [G] 엠블럼({(this.emblemSynergy != null ? this.emblemSynergy.name : "SO 미배선")} → 슬롯{this.emblemSlot})"
             + "   ※ 무리/흐름은 BattleVfxLibrary에 SwarmProjectile·FlowWind 배선 필요");
     }
 }

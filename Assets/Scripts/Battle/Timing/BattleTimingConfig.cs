@@ -83,6 +83,9 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float swarmTravelDuration = 0.26f;   // 투사체 비행 시간. 본 공격 앞에 붙는 시간이라 짧게
     [SerializeField] float swarmImpactHold     = 0.10f;   // 마지막 착탄 후 본 공격까지의 여운
 
+    [Header("Synergy Emblem (시너지 상징 — 카드 뒤 등장 연출)")]
+    [SerializeField] float synergyEmblemDuration = 1.1f;   // 등장~진동~소멸 전체 길이
+
     [Header("Mulligan")]
     [SerializeField] float mulliganNoticeHold = 1.2f;   // "상대가 교환 중" 안내를 띄워두는 시간
 
@@ -127,6 +130,7 @@ public class BattleTimingConfig : ScriptableObject
     public float SwarmLaunchStagger  => swarmLaunchStagger  * SpeedFactor;
     public float SwarmTravelDuration => swarmTravelDuration * SpeedFactor;
     public float SwarmImpactHold     => swarmImpactHold     * SpeedFactor;
+    public float SynergyEmblemDuration => synergyEmblemDuration * SpeedFactor;
     public float CunningFogLead      => cunFogLead          * SpeedFactor;
     public float CunningSpinDuration => cunSpinDur          * SpeedFactor;
     public float CunningExitDuration => cunExitDur          * SpeedFactor;
