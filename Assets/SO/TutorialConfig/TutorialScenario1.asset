@@ -76,11 +76,27 @@ MonoBehaviour:
     handSide: 0
     handSlot: 0
   - kind: 0
-    attackerSlot: 1
-    targetSlot: 1
+    attackerSlot: -1
+    targetSlot: -1
     guideMessage: "\uD30C\uB3C4\uB9AC(\uC6D0\uAC70\uB9AC, \uCCB4\uB825 3)\uB97C \uD0ED\uD574
-      \uBB34\uC7A5\uD558\uACE0 \uC801\uC744 \uD0ED\uD574 \uACF5\uACA9! \uBC18\uACA9
-      \uD53C\uD574\uB97C \uBC1B\uC9C0 \uC54A\uACE0 \uC801\uC744 \uACF5\uACA9\uD569\uB2C8\uB2E4."
+      \uBB34\uC7A5\uD574\uBCF4\uC138\uC694."
+    waitForTap: 0
+    dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 1
+    targetGuideMessage: "\uACF5\uACA9\uD560 \uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE0\uB974\uC138\uC694!
+      \uC6D0\uAC70\uB9AC \uCE74\uB4DC\uB294 \uBC18\uACA9 \uD53C\uD574\uB97C \uBC1B\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    bannerAnchor: 0
+    targetBannerAnchor: 2
+    cardFocusSide: 1
+    cardFocusSlot: 1
+    handSide: 0
+    handSlot: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 0
+    guideMessage: 
     waitForTap: 0
     dimBackground: 0
     allowedGesture: 0
@@ -94,8 +110,23 @@ MonoBehaviour:
     handSlot: 0
   enemyScript:
   - kind: 0
-    attackerSlot: 2
+    attackerSlot: 0
     targetSlot: 0
+    guideMessage: 
+    waitForTap: 0
+    dimBackground: 0
+    allowedGesture: 0
+    guidedFreeSelect: 0
+    targetGuideMessage: 
+    bannerAnchor: 0
+    targetBannerAnchor: 0
+    cardFocusSide: 0
+    cardFocusSlot: 0
+    handSide: 0
+    handSlot: 0
+  - kind: 0
+    attackerSlot: 2
+    targetSlot: 2
     guideMessage: 
     waitForTap: 0
     dimBackground: 0
