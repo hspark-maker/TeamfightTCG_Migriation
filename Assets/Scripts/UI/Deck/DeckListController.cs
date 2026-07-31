@@ -5,7 +5,7 @@ using TMPro;
 // 덱 목록 패널(DeckListPanel에 부착).
 // DeckSaveManager 6슬롯을 읽어 유효 덱만 칸으로 만들고, 0행 0열에 "신규 생성" 칸을 고정한다.
 // DeckSaveManager에 변경 통지 이벤트가 없으므로 "패널이 켜질 때 재빌드"가 유일한 갱신 경로다.
-// 덱 세이브 접근은 이 클래스에만 가둔다(향후 decks.json → UserSaveData.deck 통합 시 손댈 파일 1개).
+// 덱 세이브 접근은 이 클래스에만 가둔다(덱 목록 화면에서 세이브를 만지는 파일 1개).
 public class DeckListController : MonoBehaviour
 {
     [SerializeField] Transform         content;        // GridLayoutGroup(2열) + ContentSizeFitter
@@ -43,13 +43,17 @@ public class DeckListController : MonoBehaviour
 
         // 1) 신규 생성 칸 — 가장 먼저 Instantiate = 첫 자식 = GridLayoutGroup 0행 0열 고정.
         //    (Start Corner=Upper Left, Start Axis=Horizontal이라 자식 순서가 곧 배치 순서다)
-        int t_empty = FindFirstEmptySlot();
+        //    큐 구조라 삽입 좌표는 저장이 확정될 때 생긴다 → 여기서는 만석 여부만 넘긴다.
+        //    결과적으로 +칸 바로 다음이 가장 최근에 만든 덱이다.
         var t_create = Instantiate(slotPrefab, content);
-        t_create.BindCreate(t_empty, OnSlotClicked);
+        t_create.BindCreate(!DeckSaveManager.IsFull, OnCreateClicked);
+        // 재빌드마다 새 인스턴스가 같은 키를 덮어쓰고, 파괴된 옛 항목은 TutorialAnchorRegistry.TryGet의 fake-null 정리가 걷어낸다 → Unregister 불필요.
+        t_create.RegisterTutorialAnchor(EOutgameTutorialAnchor.DeckCreateSlot);
         m_slots.Add(t_create);
 
-        // 2) 유효 덱 칸 — 슬롯 순서대로 훑되 번호는 표시 순번(1-base)으로 다시 매긴다.
-        //    슬롯 인덱스를 그대로 쓰면 슬롯 1·4만 유효할 때 "02, 05"로 구멍 난 것처럼 보인다.
+        // 2) 유효 덱 칸 — 압축 불변식상 [0..DeckCount-1]이 연속 점유지만, 상한은 SLOT_COUNT로 둔다.
+        //    DeckCount로 끊으면 불변식이 깨진 세이브(중간 구멍)에서 뒤쪽 덱이 화면에서 통째로 사라진다.
+        //    IsSlotValid 가드와 표시 번호 재매핑도 그때만 발동한다("02, 05"처럼 구멍 난 번호 방지).
         int t_display = 1;
         for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
         {
@@ -59,44 +63,25 @@ public class DeckListController : MonoBehaviour
             t_view.BindDeck(
                 t_i,                                    // 슬롯 인덱스 = 클릭 시 전달값
                 t_display,                              // 표시 번호 = 화면 순번
-                DeckSaveManager.GetName(t_i),
-                ResolvePreview(DeckSaveManager.GetSlot(t_i)),
+                DeckSaveManager.GetDisplayName(t_i),
+                DeckImages.ResolveForSlot(t_i),
                 OnSlotClicked);
             m_slots.Add(t_view);
             t_display++;
         }
 
+        // 개수는 DeckCount가 아니라 실제로 그린 칸 수로 센다 — 불변식이 깨져도 화면과 숫자가 어긋나지 않게.
         if (countText != null) countText.text = $"{t_display - 1} / {DeckSaveManager.SLOT_COUNT}";
-    }
-
-    // 덱 첫 카드의 deckPreview → 없으면 일반 카드 아트 → 둘 다 없으면 null.
-    // deckPreview를 앞에 두는 건 그게 "덱 대표 이미지" 전용 필드라서다(가로 배너용 크롭 등 목적이 따로 있다).
-    // 그 뒤 폴백은 카드 아트 선택 규칙이므로 CardVisualRules에 맡긴다 — 여기서 fullImage를 직접 적어두면
-    // 같은 카드가 덱 목록에서만 다른 그림으로 뜨는 드리프트가 생긴다.
-    // null이면 DeckSlotView가 sprite 대입을 건너뛰어 프리팹 기본 스프라이트가 남는다.
-    static Sprite ResolvePreview(List<CardData> _deck)
-    {
-        if (_deck == null || _deck.Count == 0) return null;
-
-        var t_first = _deck[0];
-        if (t_first == null) return null;
-
-        return t_first.deckPreview != null ? t_first.deckPreview : CardVisualRules.PickCardArt(t_first);
-    }
-
-    // 신규 덱이 쓸 슬롯. IsSlotValid 기준이라 6장 미만으로 저장된 불완전 슬롯도 재사용 대상이 된다
-    // (그렇지 않으면 목록에 보이지도 않으면서 슬롯만 영구 점유하는 유령 슬롯이 된다).
-    static int FindFirstEmptySlot()
-    {
-        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
-            if (!DeckSaveManager.IsSlotValid(t_i)) return t_i;
-
-        return -1;
     }
 
     void OnSlotClicked(int _slotIndex)
     {
         if (tabController != null) tabController.OpenEditor(_slotIndex);
+    }
+
+    void OnCreateClicked()
+    {
+        if (tabController != null) tabController.OpenNewDeckEditor();
     }
 
     void ClearSlots()

@@ -17,7 +17,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     const float PANEL_WIDTH   = 190f;
     const float ROW_HEIGHT    = 26f;
     const float CLOSED_HEIGHT = 30f;
-    const float OPENED_HEIGHT = 214f;
+    const float OPENED_HEIGHT = 248f;   // 편 점프 한 줄 포함
 
     static OutgameDebugOverlay s_instance;
 
@@ -77,6 +77,22 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("SKIP TUTORIAL",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.SkipTutorial();
         if (GUILayout.Button("RESET TUTORIAL",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTutorial();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
+
+        DrawChapterJumps();
+    }
+
+    // 튜토리얼 N편 되감기. 저작된 편 수만큼 버튼을 자동 생성한다(에셋을 고쳐도 여기는 따라올 필요가 없다).
+    void DrawChapterJumps()
+    {
+        int t_count = OutgameTutorialRunner.ChapterCount;
+        if (t_count <= 0) return;
+
+        GUILayout.BeginHorizontal();
+        for (int i = 0; i < t_count; i++)
+        {
+            if (GUILayout.Button($"CH{i + 1}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RestartTutorialFromChapter(i);
+        }
+        GUILayout.EndHorizontal();
     }
 
     // 열려 있는 동안 uGUI 입력을 잠근다 — IMGUI는 EventSystem 레이캐스트를 막지 못해

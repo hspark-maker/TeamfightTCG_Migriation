@@ -67,7 +67,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uC7A5\uCC29\uC911"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: b8ffda38cc32cce4390406846a163820, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
   m_sharedMaterial: {fileID: 4690420638493661434, guid: b8ffda38cc32cce4390406846a163820, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -134,7 +134,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
+  m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &6453880068024036179
@@ -162,13 +162,13 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6453880068024036179}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4659606855069029574}
-  m_Father: {fileID: 6203613498996311940}
+  m_Father: {fileID: 4453605678255483283}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -312,7 +312,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 2756416467098498859, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6278921010982487849}
     m_AddedComponents:
@@ -384,8 +384,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
---- !u!224 &6203613498996311940 stripped
+--- !u!224 &4453605678255483283 stripped
 RectTransform:
-  m_CorrespondingSourceObject: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_CorrespondingSourceObject: {fileID: 2756416467098498859, guid: e114849808e011c4ea757d3c052285ca, type: 3}
   m_PrefabInstance: {fileID: 1985701406432419512}
   m_PrefabAsset: {fileID: 0}

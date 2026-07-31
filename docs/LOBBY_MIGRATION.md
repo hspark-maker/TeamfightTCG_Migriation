@@ -146,7 +146,7 @@ PlayBtn → ② 매칭중(AI 고정, 페이크 타이머 1.8s) → ③ 매칭완
 - **어셈블리**: asmdef 없음 → `Assembly-CSharp` 단일, 전역 네임스페이스.
 - **UI 에셋**: 로비/아웃게임 UI는 **Layer Lab GUI Pro-SimpleCasual 프리팹** 활용(플레인 Image 금지).
 - **씬 배선**: Unity MCP `Unity_RunCommand`(에디터 스크립트)로 수행이 안전. 컴파일 검증은 `Unity_GetConsoleLogs` 또는 `Unity_RunCommand`. 프리팹 인스턴스 버튼의 onClick은 프리팹 오버라이드로 저장됨.
-- **덱 데이터**: 덱 = `List<CardData>` 6장. 카드 안정 키 = `CardData.name`(SO 에셋 파일명, `displayName` 아님). 영속 = `DeckSaveManager`(6슬롯 `decks.json`). `DeckSaveManager.SetCardRegistry(...)`를 `LoadFromFile` 전에 반드시 호출(안 하면 덱 카드 복원 실패 — 과거 버그).
+- **덱 데이터**: 덱 = `List<CardData>` 6장. 카드 안정 키 = `CardData.name`(SO 에셋 파일명, `displayName` 아님). 영속 = `DeckSaveManager`(6슬롯, `Assets/Scripts/OutGame/Deck/`). **(2026-07-30)** 저장소가 `decks.json` 독립 파일 → `UserSaveData.deck`(`Save/outgame_save.json`)로 통합됐고, 구 파일은 부트 시 1회 이관 후 `decks_migrated.json`으로 보관된다. `DeckSaveManager.SetCardRegistry(...)`를 `LoadFromSave` 전에 반드시 호출(안 하면 덱 카드 복원 실패 — 과거 버그).
 - **AI 덱**: `Assets/SO/AIDeckConfig.asset` (9덱, 각 6장). `GetRandomDeck()`으로 무작위 선택.
 
 ---

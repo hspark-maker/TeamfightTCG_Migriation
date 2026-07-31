@@ -98,8 +98,8 @@ public class DeckSelectPopup : MonoBehaviour
             int  t_count  = DeckSaveManager.GetSlot(i)?.Count ?? 0;
             this.deckButtons[i].interactable = t_valid;
             this.deckLabels[i].text = t_valid
-                ? $"{DeckSaveManager.GetName(i)}\n<size=70%>{t_count}장</size>"
-                : $"{DeckSaveManager.GetName(i)}\n<size=70%><color=#777777>비어있음</color></size>";
+                ? $"{DeckSaveManager.GetDisplayName(i)}\n<size=70%>{t_count}장</size>"
+                : $"{DeckSaveManager.GetDisplayName(i)}\n<size=70%><color=#777777>비어있음</color></size>";
         }
     }
 

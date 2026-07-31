@@ -1,52 +1,13 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 아웃게임 첫시작 튜토리얼의 스텝 시퀀스(에디터 저작, SO). 스텝 추가·순서변경을 코드 수정 없이 한다.
-/// 진행도 영속은 OutgameTutorialProgress가, 실행은 러너가 맡는다 — 이 SO는 저작 데이터일 뿐.
+/// <summary>아웃게임 첫시작 튜토리얼의 챕터 시퀀스(에디터 저작, SO). 기획의 "N편"을 순서대로 꽂는 조립 목록일 뿐이다.
+/// 스텝 종류별 필드·실행은 각 스텝 SO가 갖고, 진행도 영속은 OutgameTutorialProgress가, 순서 해석은 러너가 맡는다.
 /// </summary>
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
 public class OutgameTutorialData : ScriptableObject
 {
-    /// <summary>스텝 종류. 완료 조건은 kind가 곧 정의한다 — 별도 조건식 필드 없음.
-    /// 클릭이 곧 완료인 것(WaitClick/BattleEntry)과 결과가 완료인 것(WaitPackOpen/WaitPurchase)이 나뉜다.
-    /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
-    public enum EStepKind
-    {
-        AutoPurchase = 0,   // 입력 없음. 팩 구매 → 캐리어 → 지정 씬 자동 전환
-        WaitClick    = 1,   // 앵커 버튼 클릭 대기
-        BattleEntry  = 2,   // 앵커 클릭 대기 + 진입 시 튜토리얼 시나리오 시작
-        WaitPackOpen = 3,   // 3D 팩 개봉 대기. 앵커 없음(딤 못 뚫음) → 배너만 띄우고 개봉 결과로 완료
-        WaitPurchase = 4,   // 앵커에 딤만 걸고 구매 "성공"으로 완료(클릭 자체는 완료가 아니다 — 골드 부족 시 실패)
-        AutoBattle   = 5,   // 입력 없음. 시나리오 시작 → 전투 씬 자동 전환(로비를 거치지 않는 첫 전투)
-    }
-
-    /// <summary>튜토리얼 스텝 1개. 아래 필드는 kind별 전용이라 무관한 kind에서는 무시된다.</summary>
-    [Serializable]
-    public struct Step
-    {
-        public EStepKind kind;
-
-        [Tooltip("안내 타깃 위젯. WaitClick / BattleEntry / WaitPurchase 전용 (AutoPurchase·WaitPackOpen은 None)")]
-        public EOutgameTutorialAnchor anchor;
-
-        [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
-        [TextArea] public string guideMessage;
-
-        [Tooltip("구매할 카드팩. AutoPurchase는 이걸 자동 구매하고, WaitPurchase는 상점 진열·판매 대상을 이걸로 덮어쓴다(미지정이면 상점 기본 진열)")]
-        public CardPackData pack;
-
-        [Tooltip("중복 카드 1장당 환급 골드. AutoPurchase / WaitPurchase 전용")]
-        public long duplicateRefundGold;
-
-        [Tooltip("개봉 연출 후 돌아올 씬 이름. AutoPurchase 전용")]
-        public string nextScene;
-
-        [Tooltip("전투에 넘길 튜토리얼 시나리오. BattleEntry / AutoBattle 전용")]
-        public TutorialScenarioData scenario;
-    }
-
-    [Header("스텝 시퀀스 (순서 = 진행 순서, 인덱스가 곧 세이브 진행도)")]
-    public List<Step> steps = new List<Step>();
+    [Header("챕터 시퀀스 (순서 = 진행 순서, 챕터·스텝 인덱스가 곧 세이브 진행도)")]
+    [Tooltip("챕터 하나 = 기획의 '튜토리얼 N편'. 스텝은 상태를 갖지 않으므로 같은 에셋을 여러 챕터에 재사용해도 된다")]
+    public List<OutgameTutorialChapter> chapters = new List<OutgameTutorialChapter>();
 }

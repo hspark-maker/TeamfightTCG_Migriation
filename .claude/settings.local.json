@@ -107,7 +107,19 @@
       "Bash(awk '/^--- !u!1 &1376200663$/{f=1} f{print; if\\(/m_IsActive:/\\) exit}' Assets/Scenes/CardPack.unity)",
       "Bash(command -v dotnet)",
       "Bash(dotnet --version)",
-      "Bash(sed 's/.*guid: //')"
+      "Bash(sed 's/.*guid: //')",
+      "Bash(sed -n '/^  keywordFrames:/,/^  showName/p' DeckUI/DeckEditSlot.prefab)",
+      "Bash(sed -n '/^  keywordFrames:/,/^  showName/p' PackUI/PackCard.prefab)",
+      "Bash(mkdir -p C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup)",
+      "Bash(cp DeckUI/DeckEditSlot.prefab DeckUI/DeckEditSlot.prefab.meta LobbyCanvas.prefab LobbyCanvas.prefab.meta CollectionUI/Card.prefab C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/)",
+      "PowerShell(Get-ChildItem C:\\\\mgJeon\\\\TeamfightTCG_Migriation\\\\Assets\\\\Scripts -Directory | Select-Object -ExpandProperty Name; \"---\"; Get-ChildItem C:\\\\mgJeon\\\\TeamfightTCG_Migriation\\\\Assets\\\\SO -Directory | Select-Object -ExpandProperty Name)",
+      "Bash(sed 's/^ *//')",
+      "Bash(awk '{print \"  \"$0}')",
+      "Bash(cp PackUI/PackCard.prefab PackUI/PackCard.prefab.meta C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/)",
+      "Bash(cp DeckUI/DeckEditSlot.prefab C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/DeckEditSlot.prefab.FINAL)",
+      "Bash(tee /tmp/targets.txt)",
+      "Bash(awk ' *)",
+      "Bash(awk '/^--- !u!1001 &7469000894678542274/,/^--- !u!/{print NR\": \"$0}' Assets/Assets/Prefabs/UI/LobbyCanvas.prefab)"
     ]
   },
   "enabledMcpjsonServers": [

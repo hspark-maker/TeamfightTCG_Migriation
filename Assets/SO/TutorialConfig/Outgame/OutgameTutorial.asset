@@ -12,88 +12,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
-  steps:
-  - kind: 5
-    anchor: 0
-    guideMessage: 
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 11400000, guid: b7e3f1a92c8d4e6f0a1b2c3d4e5f6071, type: 2}
-  - kind: 2
-    anchor: 1
-    guideMessage: "\uC804\uD22C\uB97C \uC2DC\uC791\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
-  - kind: 1
-    anchor: 2
-    guideMessage: "\uC0C1\uC810\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 4
-    anchor: 3
-    guideMessage: "\uCE74\uB4DC\uD329\uC744 \uAD6C\uB9E4\uD558\uC138\uC694"
-    pack: {fileID: 11400000, guid: 8aa5ce5e4eee46b4cbd2762c3c058a9c, type: 2}
-    duplicateRefundGold: 10
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 3
-    anchor: 0
-    guideMessage: "\uCE74\uB4DC\uD329 \uC624\uD508"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 1
-    anchor: 4
-    guideMessage: "\uCE74\uB4DC \uD68D\uB4DD"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 2
-    anchor: 1
-    guideMessage: "\uC804\uD22C\uB97C \uC2DC\uC791\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
-  - kind: 1
-    anchor: 2
-    guideMessage: "\uC0C1\uC810\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 4
-    anchor: 3
-    guideMessage: "\uCE74\uB4DC\uD329\uC744 \uAD6C\uB9E4\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 3
-    anchor: 0
-    guideMessage: "\uCE74\uB4DC\uD329 \uC624\uD508"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 1
-    anchor: 4
-    guideMessage: "\uCE74\uB4DC \uD68D\uB4DD"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 0}
-  - kind: 2
-    anchor: 1
-    guideMessage: "\uC804\uD22C\uB97C \uC2DC\uC791\uD558\uC138\uC694"
-    pack: {fileID: 0}
-    duplicateRefundGold: 0
-    nextScene: 
-    scenario: {fileID: 11400000, guid: 8c3d4e5f6071829300b5c6d7e8f90a1b, type: 2}
+  chapters:
+  - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
+    steps:
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b01, type: 2}
+  - label: "\uB450 \uBC88\uCA30 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    steps:
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b02, type: 2}
+  - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    steps:
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b03, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b04, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b05, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b06, type: 2}
+    - {fileID: 11400000, guid: b394da0da6d453946a7a5350ba155288, type: 2}
+    - {fileID: 11400000, guid: 469c10250a684a24eaaac010879d606c, type: 2}
+    - {fileID: 11400000, guid: 810a6e4ce8ea5da418342a49d61a2b20, type: 2}
+    - {fileID: 11400000, guid: e1e2a03848ced574c9060d6ea4100451, type: 2}
+    - {fileID: 11400000, guid: 3210dcc78cdc1ac48aa722e28214ecff, type: 2}
+    - {fileID: 11400000, guid: b4825c095da6e474bbcf15eb69020a52, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b07, type: 2}
+  - label: "\uB9C8\uC9C0\uB9C9 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    steps:
+    - {fileID: 11400000, guid: c492551bedab8254d9bbf38bb786ef0c, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b08, type: 2}
+    - {fileID: 11400000, guid: 02c9317917027d94c8fa77a7e479d425, type: 2}
+    - {fileID: 11400000, guid: 1460734f01b212542bc52f5f08108e34, type: 2}
+    - {fileID: 11400000, guid: ee5a608ccdd41fd4da0a444eb4482ee5, type: 2}
+    - {fileID: 11400000, guid: f6d2b1f1dc3bade4bb2aba8d090775fb, type: 2}
+    - {fileID: 11400000, guid: 78709a22360399d44a893783a26498bb, type: 2}
+    - {fileID: 11400000, guid: b4825c095da6e474bbcf15eb69020a52, type: 2}
+    - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b09, type: 2}

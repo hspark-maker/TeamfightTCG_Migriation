@@ -12,6 +12,10 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CollectionLayoutConfig collectionLayout;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
+    // 덱 대표 이미지 후보 SO. 미배선(null)이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
+    [SerializeField] DeckImageCatalog deckImageCatalog;
+    // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선(null)이면 지급을 건너뛴다.
+    [SerializeField] CardPackData starterDeck;
 
     static bool s_booted;
 
@@ -40,10 +44,18 @@ public class BootInstaller : MonoBehaviour
         // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
         CollectionProductionManager.Init();
 
-        // 덱 복원은 카드 이름 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
+        // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
         DeckSaveManager.SetCardRegistry(cardRegistry.All);
-        DeckSaveManager.LoadFromFile();
+        DeckSaveManager.LoadFromSave();
+
+        // 덱 대표 이미지 후보 주입 — 신규 덱 저장 시 여기서 키를 뽑는다.
+        DeckImages.SetSource(deckImageCatalog);
+
+        // 덱이 하나도 없는 신규 유저에게 스타터덱 지급(카드 소유권 포함).
+        // 소유권 캐시·덱 로드 이후여야 하고, 대표 이미지 키를 뽑으므로 DeckImages 주입보다도 뒤에 온다.
+        // 튜토리얼 첫실행 판정은 GameManager.Boot(BeforeSceneLoad)에서 이미 끝났으므로 여기 지급이 스킵을 유발하지 않는다.
+        StarterDeck.GrantIfNoDeck(starterDeck);
 
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);

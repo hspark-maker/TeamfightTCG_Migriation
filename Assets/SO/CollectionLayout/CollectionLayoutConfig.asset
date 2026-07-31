@@ -15,22 +15,26 @@ MonoBehaviour:
   defaultRewardType: 0
   defaultProductionCycleSeconds: 15
   defaultCap: 240
+  defaultCardsPerRow: 3
   rows:
-  - card1: {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
-    card2: {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-    card3: {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - cards:
+    - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
+    - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
+    - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
     rewardType: 0
     productionCycleSeconds: 0
     cap: 100
-  - card1: {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-    card2: {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-    card3: {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  - cards:
+    - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
+    - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
+    - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
     rewardType: 0
     productionCycleSeconds: 0
     cap: 120
-  - card1: {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-    card2: {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-    card3: {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
+  - cards:
+    - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+    - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
+    - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
     rewardType: 0
     productionCycleSeconds: 0
     cap: 140

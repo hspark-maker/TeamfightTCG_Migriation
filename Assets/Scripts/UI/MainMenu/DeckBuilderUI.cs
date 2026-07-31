@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -49,7 +50,7 @@ public class DeckBuilderUI : MonoBehaviour
         if (this.isDirty)
         {
             ShowSavePopup(
-                () => { SaveCurrentDeck(); SwitchSlot(_index); },
+                () => { SwitchSlot(TrySaveCurrentDeck() ? ShiftedForInsert(_index) : _index); },
                 () => { DiscardChanges();  SwitchSlot(_index); });
             return;
         }
@@ -70,12 +71,45 @@ public class DeckBuilderUI : MonoBehaviour
         RefreshDeckDependentUI();
     }
 
-    public void SaveCurrentDeck()
+    // 씬 버튼 배선용 진입점(UnityEvent는 void 메서드만 찾는다).
+    public void SaveCurrentDeck() => TrySaveCurrentDeck();
+
+    // 앞 삽입이 실제로 일어났으면 true — 기존 덱이 한 칸씩 뒤로 밀리므로 호출부가 좌표를 보정해야 한다.
+    bool TrySaveCurrentDeck()
     {
-        DeckSaveManager.Save(this.currentSlotIndex, this.deckGroup.Deck);
-        DeckSaveManager.SaveToFile();
+        bool t_inserted = false;
+
+        // 미완성 편성은 저장하지 않는다 — 유효 덱을 6장 미만으로 덮으면 그 자리가 구멍이 돼
+        // DeckCount가 앞에서 접히고(압축 불변식 파손) 덱 목록이 통째로 비어 보인다.
+        if (this.deckGroup.Deck.Count(c => c != null) != DeckSaveManager.DECK_SIZE)
+        {
+            Debug.LogWarning($"[DeckBuilderUI] 카드 {DeckSaveManager.DECK_SIZE}장을 채우지 않아 저장하지 않았다.");
+        }
+        else if (DeckSaveManager.IsSlotValid(this.currentSlotIndex))
+        {
+            DeckSaveManager.SaveSlot(this.currentSlotIndex, this.deckGroup.Deck);   // 기존 덱 편집은 위치 유지
+        }
+        else
+        {
+            // 빈 칸에 그대로 쓰면 구멍이 생겨 압축 불변식이 깨진다 — 신규는 맨 앞 삽입.
+            string t_name = DeckSaveManager.GetName(this.currentSlotIndex);
+            if (string.IsNullOrEmpty(t_name)) t_name = DeckSaveManager.SuggestNewDeckName();
+
+            t_inserted = DeckSaveManager.TryInsertFront(
+                this.deckGroup.Deck, t_name, DeckImages.PickRandomKey(), out int t_index);
+
+            // 실패 시 -1을 필드에 굳히면 이후 모든 슬롯 접근이 범위를 벗어난다.
+            if (t_inserted) this.currentSlotIndex = t_index;
+        }
+
         this.isDirty = false;
+
+        return t_inserted;
     }
+
+    // 앞 삽입 뒤에는 클릭 시점의 좌표가 한 칸 뒤를 가리킨다. 범위를 넘으면 보정하지 않는다.
+    static int ShiftedForInsert(int _index)
+        => _index + 1 < DeckSaveManager.SLOT_COUNT ? _index + 1 : _index;
 
     public void DiscardChanges() => this.isDirty = false;
 
@@ -84,12 +118,12 @@ public class DeckBuilderUI : MonoBehaviour
         if (!DeckSaveManager.IsSlotValid(this.currentSlotIndex)) return;
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
-            titleText = $"'{DeckSaveManager.GetName(this.currentSlotIndex)}' 덱을 삭제하시겠습니까?",
+            titleText = $"'{DeckSaveManager.GetDisplayName(this.currentSlotIndex)}' 덱을 삭제하시겠습니까?",
             yesText   = "삭제",
             noText    = "취소",
             yesAction = () =>
             {
-                DeckSaveManager.Delete(this.currentSlotIndex);
+                DeckSaveManager.TryDeleteAt(this.currentSlotIndex);   // 삭제 + 압축(뒤 덱이 앞으로 당겨져 보이는 게 정상)
                 LoadCurrentDeck();
                 RefreshDeckListButtons();
             },
@@ -100,7 +134,7 @@ public class DeckBuilderUI : MonoBehaviour
     {
         List<CardData> t_loaded = DeckSaveManager.Load(this.currentSlotIndex);
         this.deckGroup.SetDeck(t_loaded.ToArray());
-        this.deckGroup.SetDeckName(DeckSaveManager.GetName(this.currentSlotIndex));
+        this.deckGroup.SetDeckName(DeckSaveManager.GetDisplayName(this.currentSlotIndex));
         this.isDirty = false;
         RefreshDeckDependentUI();
     }
@@ -108,7 +142,8 @@ public class DeckBuilderUI : MonoBehaviour
     void OnDeckNameSubmit(string _name)
     {
         DeckSaveManager.SetName(this.currentSlotIndex, _name);
-        DeckSaveManager.SaveToFile();
+        // 이름만 바뀌었으므로 해당 칸만 flush(Load는 빈 슬롯에서도 null이 아닌 리스트를 준다).
+        DeckSaveManager.SaveSlot(this.currentSlotIndex, DeckSaveManager.Load(this.currentSlotIndex));
         RefreshDeckListButtons();
     }
 
@@ -118,7 +153,7 @@ public class DeckBuilderUI : MonoBehaviour
         for (int i = 0; i < this.deckListButtonLabels.Length; i++)
         {
             if (this.deckListButtonLabels[i] == null) continue;
-            this.deckListButtonLabels[i].text = DeckSaveManager.GetName(i);
+            this.deckListButtonLabels[i].text = DeckSaveManager.GetDisplayName(i);
         }
     }
 
