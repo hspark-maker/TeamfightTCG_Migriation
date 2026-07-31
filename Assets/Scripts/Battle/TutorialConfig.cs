@@ -16,6 +16,11 @@ public static class TutorialConfig
 {
     public static bool IsActive { get; private set; }
 
+    /// <summary>튜토리얼 고정 시드(임의 상수). 이 값으로 <see cref="MatchRandom"/>을 시드하면
+    /// 스플래시 대상·랜덤 패시브까지 실행마다 동일하게 재현된다(덱 순서는 <see cref="ShufflePolicy.None"/> 몫).
+    /// 시드 지점이 둘(GameInitializer 정상 경로 / TurnRunner 단독 실행 폴백)이라 상수는 여기 하나로 둔다.</summary>
+    public const ulong FixedSeed = 0x7507_0521_1A11_0A15UL;
+
     /// <summary>이 튜토리얼에서 시너지 배지 표시 + 덱 시너지 적용 여부. 기본 false(초반 튜토리얼).</summary>
     public static bool SynergyEnabled { get; private set; }
 

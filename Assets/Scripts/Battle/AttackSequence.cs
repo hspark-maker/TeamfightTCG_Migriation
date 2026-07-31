@@ -195,8 +195,11 @@ public static class AttackSequence
         CardView.RestoreAllFades();
     }
 
-    /// <summary>제자리 발사 반동. 이동하지 않고 슬롯에서 살짝 밀렸다 돌아온다(각도 변화 없음).</summary>
-    static async UniTask RecoilInPlace(CardView _attacker, CardView _defender)
+    /// <summary>제자리 발사 반동. 이동하지 않고 슬롯에서 살짝 밀렸다 돌아온다(각도 변화 없음).
+    ///
+    /// 원거리 공격 외에 <b>무리 선피해 일제사격</b>(SwarmVfx)도 이걸 쓴다 — "쏘는 동작"은 한 가지여야
+    /// 같은 카드가 경로에 따라 다르게 움직이지 않는다. 거리·시간은 박치기와 같은 SO 값(NormalTuning)이다.</summary>
+    public static async UniTask RecoilInPlace(CardView _attacker, CardView _defender)
     {
         if (_attacker == null) return;
 

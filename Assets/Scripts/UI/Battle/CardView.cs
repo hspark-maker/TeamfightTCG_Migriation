@@ -12,6 +12,24 @@ public class CardView : MonoBehaviour
     #region Static / Events
     public static event System.Action<CardView, CardView> OnAttack;
 
+    /// <summary>탭 무장 상태가 **실제로 바뀌었을 때만** 통지(무장=그 카드, 해제=null).
+    /// 튜토리얼 가이드가 "아군 골랐다 → 이제 적 고를 차례"로 넘어가는 유일한 신호다.
+    /// 다른 카드로 갈아타는 경우엔 null을 거치지 않는다 — 안내 배너가 한 프레임 깜빡이지 않게.</summary>
+    public static event System.Action<CardView> OnAttackerArmed;
+
+    static CardView s_notifiedArmed;   // 마지막으로 통지한 무장 상태(중복 통지 억제)
+
+    /// <summary>지금 탭으로 무장된 공격자(없으면 null). 튜토리얼이 "이미 무장돼 있는가"를 먼저 확인해
+    /// <see cref="OnAttackerArmed"/> 구독만 걸고 영영 기다리는 상황을 피한다.</summary>
+    public static CardView SelectedAttacker => s_selectedAttacker;
+
+    static void NotifyArmed(CardView _armed)
+    {
+        if (s_notifiedArmed == _armed) return;
+        s_notifiedArmed = _armed;
+        OnAttackerArmed?.Invoke(_armed);
+    }
+
     static readonly List<CardView> allViews = new List<CardView>();
     static bool s_anyDragging;
     static CardView s_selectedAttacker;   // 탭 공격(제스처3)으로 무장된 공격자. null=미무장.
@@ -395,7 +413,7 @@ public class CardView : MonoBehaviour
             BeginTargeting();
             var t_validTargets = GetValidEnemyViews();
             foreach (var t_cv in t_validTargets)
-                if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
+                if (BattleRules.IsTaunt(t_cv.boundCard))
                     t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
             ApplyDragTargetFade(t_validTargets);
             this.cardAnim.MoveTo(this.centerPos).Forget();
@@ -696,7 +714,7 @@ public class CardView : MonoBehaviour
     void ToggleSelectAttacker()
     {
         if (s_selectedAttacker == this) { ClearAttackerSelection(); return; }
-        ClearAttackerSelection();
+        ClearAttackerSelection(_notify: false);   // 갈아타기 — 해제 통지를 생략해 안내가 깜빡이지 않게
 
         s_selectedAttacker = this;
         BeginTargeting();   // 무장 1회 = 안내 1회.
@@ -710,7 +728,7 @@ public class CardView : MonoBehaviour
         FadeCards(1f, this);
         FadeCards(1f, t_targets.ToArray());
         foreach (var t_cv in t_targets)
-            if (t_cv.boundCard.HasKeyword(CardKeyword.Taunt))
+            if (BattleRules.IsTaunt(t_cv.boundCard))
                 t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
 
         // 유효 타겟 각각에 공격 HP 프리뷰 표시(맞으면 남는 체력/치사 점멸).
@@ -721,10 +739,13 @@ public class CardView : MonoBehaviour
             AttackPreview t_p = AttackPreview.Compute(this.boundCard, t_cv.boundCard);
             t_cv.ShowAttackPreview(t_p.attackDamage, t_p.defenderWouldDie);
         }
+
+        NotifyArmed(this);
     }
 
     // 무장 해제: 강조/확대/무기/페이드 원복. _instant=공격 발동 직전(뒤이어 AttackSequence가 transform 장악).
-    static void ClearAttackerSelection(bool _instant = false)
+    // _notify=false는 곧바로 다른 카드를 무장하는 경로 전용(중간 null 통지 생략).
+    static void ClearAttackerSelection(bool _instant = false, bool _notify = true)
     {
         if (s_selectedAttacker == null) return;
         CardView t_prev = s_selectedAttacker;
@@ -742,6 +763,8 @@ public class CardView : MonoBehaviour
         t_prev.FocusWeapon(false);
         t_prev.SetArmedVfx(false);   // 무장 해제 = 이펙트도 끝(공격으로 이어지는 경우는 HandleEnemyTap이 다시 켠다)
         RestoreAllFades();
+
+        if (_notify) NotifyArmed(null);
     }
 
     // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(유효 필터는 공격자 기준).
@@ -780,7 +803,7 @@ public class CardView : MonoBehaviour
         if (s_tauntNoticeShown || _validTargets == null || _validTargets.Count == 0) return;
 
         // 지정 타깃(튜토리얼)로 걸러진 경우는 스크립트가 따로 안내한다 → 도발로 막힌 경우만 문구.
-        CardView t_taunt = _validTargets.Find(cv => cv?.boundCard != null && cv.boundCard.HasKeyword(CardKeyword.Taunt));
+        CardView t_taunt = _validTargets.Find(cv => BattleRules.IsTaunt(cv?.boundCard));
         if (t_taunt == null) return;
 
         s_tauntNoticeShown = true;
@@ -811,7 +834,7 @@ public class CardView : MonoBehaviour
         transform.DOPunchScale(Vector3.one * (this.targetFocusScale - 1f), this.targetFocusDur * 2f, vibrato: 4, elasticity: 0.4f)
                  .SetLink(gameObject)
                  .OnComplete(() => transform.localScale = Vector3.one);
-        if (this.boundCard != null && this.boundCard.HasKeyword(CardKeyword.Taunt))
+        if (BattleRules.IsTaunt(this.boundCard))
             PlayKeywordGlow(CardKeyword.Taunt).Forget();
     }
 
@@ -869,7 +892,7 @@ public class CardView : MonoBehaviour
         }
 
         // ② 도발이 있으면 도발 카드만.
-        var t_taunt = t_enemies.FindAll(cv => cv.boundCard.HasKeyword(CardKeyword.Taunt));
+        var t_taunt = t_enemies.FindAll(cv => BattleRules.IsTaunt(cv.boundCard));
         return t_taunt.Count > 0 ? t_taunt : t_enemies;
     }
 
@@ -1270,6 +1293,12 @@ public class CardView : MonoBehaviour
         this.cardAnim.HideDeathPreview();
     }
 
+    /// <summary>표시용 HP를 임의 값으로 덮어쓴다. 규칙상 hp는 이미 확정됐는데(결정론: 상태변이 선행)
+    /// 연출이 여러 번에 나눠 그 피해를 보여줄 때, 숫자만 단계적으로 따라오게 하는 용도다.
+    /// **표시 전용** — CardInstance는 건드리지 않는다. 다음 Render/PlayHitAnim이 실제 값으로 되돌린다.</summary>
+    public void OverrideHpDisplay(int _hp, int _bonusHp)
+        => SetHpDisplay(Mathf.Max(0, _hp).ToString(), _bonusHp > 0 ? $"+{_bonusHp}" : "");
+
     void SetHpDisplay(string _hp, string _bonus)
     {
         if (this.hpText != null) this.hpText.text = _hp;
@@ -1428,22 +1457,45 @@ public class CardView : MonoBehaviour
         }
     }
 
+    /// <summary>키워드 글로우 재생. 색·유지시간·프리팹은 전부 KeywordIconConfig(SO)가 소유하고,
+    /// 미지정(hold 0 / prefab null)일 때만 전역 기본값(BattleTimingConfig.keywordGlowHold, 이 뷰의 keywordGlowPrefab)으로 폴백한다.
+    ///
+    /// 키워드마다 유지시간이 다를 수 있으므로 <b>짧은 것부터 순서대로</b> 제거하고, await은 가장 긴 것 기준이다 —
+    /// 전부 최댓값까지 살려두면 SO에서 짧게 잡은 글로우가 그 값대로 안 사라진다.</summary>
     public async UniTask PlayKeywordGlow(CardKeyword _kw)
     {
-        if (this.keywordGlowPrefab == null || _kw == CardKeyword.None) return;
+        if (_kw == CardKeyword.None) return;
 
-        var t_spawned = new List<GameObject>();
+        var t_spawned = new List<(GameObject Go, float Hold)>();
         foreach (CardKeyword t_flag in System.Enum.GetValues(typeof(CardKeyword)))
         {
             if (t_flag == CardKeyword.None) continue;
             if (!_kw.HasFlag(t_flag)) continue;
             if (!this.iconMap.TryGetValue(t_flag, out GameObject t_icon)) continue;
 
-            Color t_startCol = Color.white;
-            Color t_endCol   = Color.clear;
-            this.keywordIconConfig?.TryGetGlowColors(t_flag, out t_startCol, out t_endCol);
+            KeywordIconConfig.GlowSpec t_spec = this.keywordIconConfig != null
+                ? this.keywordIconConfig.GetGlow(t_flag)
+                : KeywordIconConfig.GlowSpec.Default;
 
-            GameObject t_glow = Instantiate(this.keywordGlowPrefab, t_icon.transform.position, Quaternion.identity);
+            GameObject t_prefab = t_spec.PrefabOverride != null ? t_spec.PrefabOverride : this.keywordGlowPrefab;
+            if (t_prefab == null) continue;   // 전용도 기본도 없으면 이 키워드는 글로우 없음
+
+            // SO 값은 raw 초 → 배속은 여기서 한 번만 먹인다(BattleTimingConfig.Scaled가 유일 출구).
+            float t_hold = t_spec.HoldOverride > 0f
+                ? GameTiming.Battle.Scaled(t_spec.HoldOverride)
+                : GameTiming.Battle.KeywordGlowHold;
+
+            GameObject t_glow = Instantiate(t_prefab, t_icon.transform.position, Quaternion.identity);
+
+            // 크기는 프리팹을 건드리지 않고 SO 배율로 키운다 — 프리팹을 키우면 이걸 재사용하는
+            // 다른 연출(시너지/힐 등)까지 같이 커진다.
+            float t_scale = t_spec.ScaleOverride > 0f
+                ? t_spec.ScaleOverride
+                : (this.keywordIconConfig != null ? this.keywordIconConfig.DefaultGlowScale : 1f);
+            if (!Mathf.Approximately(t_scale, 1f)) t_glow.transform.localScale *= t_scale;
+
+            PopKeywordIcon(t_icon);   // 글로우 스폰과 같은 프레임 — 둘이 한 타격으로 읽히게
+
             var t_ps = t_glow.GetComponent<ParticleSystem>();
             if (t_ps != null)
             {
@@ -1451,25 +1503,61 @@ public class CardView : MonoBehaviour
                 t_col.enabled = true;
                 var t_grad = new Gradient();
                 t_grad.SetKeys(
-                    new GradientColorKey[] { new GradientColorKey(t_startCol, 0f), new GradientColorKey(t_endCol, 1f) },
+                    new GradientColorKey[] { new GradientColorKey(t_spec.Start, 0f), new GradientColorKey(t_spec.End, 1f) },
                     new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
                 );
                 t_col.color = new ParticleSystem.MinMaxGradient(t_grad);
                 t_ps.Play();
             }
-            t_spawned.Add(t_glow);
+            t_spawned.Add((t_glow, t_hold));
         }
 
         if (t_spawned.Count == 0) return;
 
+        t_spawned.Sort((_a, _b) => _a.Hold.CompareTo(_b.Hold));
+
         try
         {
-            await UniTask.Delay((int)(GameTiming.Battle.KeywordGlowHold * 1000), cancellationToken: this.GetCancellationTokenOnDestroy());
+            CancellationToken t_ct = this.GetCancellationTokenOnDestroy();
+            float t_elapsed = 0f;
+            foreach ((GameObject t_go, float t_hold) in t_spawned)
+            {
+                int t_wait = (int)((t_hold - t_elapsed) * 1000);
+                if (t_wait > 0)
+                {
+                    await UniTask.Delay(t_wait, cancellationToken: t_ct);
+                    t_elapsed = t_hold;
+                }
+                if (t_go != null) Destroy(t_go);
+            }
+            return;   // 정상 종료 — 아래 일괄 정리는 취소된 경우만.
         }
         catch (OperationCanceledException) { }
 
-        foreach (GameObject t_g in t_spawned)
-            if (t_g != null) Destroy(t_g);
+        // 취소(씬/오브젝트 파괴)로 중간에 끊긴 경우 남은 글로우를 흘리지 않는다.
+        foreach ((GameObject t_go, float _) in t_spawned)
+            if (t_go != null) Destroy(t_go);
+    }
+
+    /// <summary>키워드 아이콘 튀기기. 글로우 스폰과 같은 프레임에 불러서 둘이 한 타격으로 읽히게 한다.
+    /// 기다리지 않는다 — 글로우 유지시간(hold)이 연출 길이의 단일 기준이라, Pop을 await 하면
+    /// SO의 hold 값과 무관하게 대기가 늘어난다.
+    ///
+    /// 펀치는 <b>현재</b> localScale 기준이라 이전 펀치가 살아 있으면 배율이 곱해져 계속 커진다 →
+    /// DOKill(complete: true)로 기준 스케일까지 되돌린 뒤 새로 건다.</summary>
+    void PopKeywordIcon(GameObject _icon)
+    {
+        if (_icon == null || this.keywordIconConfig == null) return;
+
+        float t_pop = this.keywordIconConfig.IconPopScale;
+        if (t_pop <= 1f) return;
+
+        Transform t_tr = _icon.transform;
+        t_tr.DOKill(complete: true);
+        t_tr.DOPunchScale(t_tr.localScale * (t_pop - 1f),
+                          GameTiming.Battle.Scaled(this.keywordIconConfig.IconPopDuration),
+                          vibrato: 1, elasticity: 0.6f)
+            .SetLink(_icon);
     }
     #endregion
 
@@ -1527,22 +1615,36 @@ public class CardView : MonoBehaviour
     /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardData.cinemaAttackStyle 하나로,
     /// **공격 시네마와 같은 축을 쓴다**(같은 에너지 구체를 공유하는 한 몸 연출이라 배선을 갈라두지 않는다).
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
-    public UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => UsesOrbAppear
-            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
-            : this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+    public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+    {
+        if (!UsesOrbAppear)
+        {
+            await this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+            return;
+        }
+
+        // 구체 등장도 앞 토막(덱에서 나와 중앙 확대·정지)을 그대로 탄다 — 카드 정보를 보여주는 구간이
+        // 이 연출에만 없으면 고등급 카드가 오히려 뭔지 모른 채 지나간다. 중간 정지는 일반 배치와 같은 값.
+        await PlayDealToMid(_from, _mid, _dest, _duration);
+        bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
+                cancellationToken: this.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (t_cancelled) return;
+
+        await PlayDealToSlot(_mid, _dest, _duration);
+    }
 
     /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
     /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
-    ///
-    /// 구체 등장(EnergyOrbCurve)은 쪼갤 지점이 없다 — 카드가 중앙에 서는 구간 자체가 없고 구체가 날아온다.
-    /// 그래서 앞 토막은 무동작이고 뒤 토막이 통째로 구체 연출을 돌린다(컷씬 뒤에 등장하는 순서는 같다).</summary>
+    /// 구체 등장도 같은 앞 토막을 쓴다 — 중앙에 선 카드가 뒤 토막에서 구체로 변신한다.</summary>
     public UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => UsesOrbAppear ? UniTask.CompletedTask : this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+        => this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
 
+    /// <summary>뒤 토막: 중앙 → 슬롯. 구체 등장 카드는 중앙에 선 카드가 구체로 변신한 뒤 날아간다
+    /// (_morphFromCard) — 카드가 이미 중앙에 있으므로 구체를 새로 "생성"하면 카드가 순간 사라져 보인다.</summary>
     public UniTask PlayDealToSlot(Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
         => UsesOrbAppear
-            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration)
+            ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration, _morphFromCard: true)
             : this.cardAnim.PlayDealToSlot(_dest, _duration);
 
     bool UsesOrbAppear => this.boundCard?.data != null
@@ -1603,11 +1705,34 @@ public class CardView : MonoBehaviour
         }
     }
 
+    /// <summary>이 슬롯 자리를 감싸는 월드 AABB. 카드가 연출로 움직이거나 확대돼 있어도
+    /// **슬롯 좌표 + 기본 카드 크기** 기준이라, 이걸로 뚫은 튜토리얼 포커스 구멍이 흔들리지 않는다.
+    /// 크기는 강조 스프라이트(sliced size)에서 얻고 미배선이면 상수로 폴백한다.</summary>
+    public Bounds SlotWorldBounds
+    {
+        get
+        {
+            Vector2 t_size = this.selectedHighlight != null
+                          && this.selectedHighlight.drawMode != SpriteDrawMode.Simple
+                ? this.selectedHighlight.size
+                : DefaultCardSize;
+            return new Bounds(this.SlotPosition, new Vector3(t_size.x, t_size.y, 0.01f));
+        }
+    }
+
+    static readonly Vector2 DefaultCardSize = new Vector2(2f, 3f);
+
+    /// <summary>이 카드 한 장을 감싸는 화면 px 사각. 튜토리얼 카드 포커스가 뚫을 구멍.</summary>
+    public Rect ScreenBounds(float _paddingPx = 0f)
+        => CameraUtil.WorldBoundsToScreenRect(this.SlotWorldBounds, _paddingPx);
+
     public static void Cleanup()
     {
-        OnAttack      = null;
+        OnAttack        = null;
+        OnAttackerArmed = null;
         s_anyDragging = false;
         s_selectedAttacker = null;
+        s_notifiedArmed    = null;
         s_tauntNoticeShown = false;
         ForcedDimAlpha = 0.3f;
         TurnState.Reset();

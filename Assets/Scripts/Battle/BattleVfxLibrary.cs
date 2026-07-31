@@ -18,6 +18,8 @@ public enum BattleVfxId
     ExecutionSpark   = 9,   // 처형 발동: 처형자 무기(도끼) **양 끝**에 하나씩
     ExecutionCircle  = 10,  // 처형 발동: 처형자 카드 자리에 한 번
     CunningFog       = 11,  // 교활 퇴장: 카드가 덱으로 돌아가기 직전 자리에 깔리는 안개
+    SwarmProjectile  = 12,  // 무리 선피해: 무리 아군 한 장이 대상에게 쏘는 작은 투사체(수명은 호출부가 관리)
+    FlowWind         = 13,  // 흐름 발동: 그 진영 필드 위로 지나가는 바람(수명은 항목 lifetime)
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

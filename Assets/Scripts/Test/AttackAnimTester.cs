@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -47,6 +48,12 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] BattleTimingConfig timingConfig;
     [Tooltip("SO 값이 바뀌면 자동으로 다시 불러온다(인스펙터에서 SO를 직접 고칠 때). 끄면 [T]로 수동.")]
     [SerializeField] bool autoReloadConfig = true;
+
+    [Header("시너지 연출 테스트  [S] 무리 볼리 / [F] 흐름 바람 / [H] 돌보미 회복")]
+    [Tooltip("무리 발수. 실제로는 필드의 무리 카드 수 — 여기선 아군 라이브 슬롯 수로 대체한다")]
+    [SerializeField] int swarmDamagePerShot = 1;
+    [Tooltip("돌보미 1인당 회복량(HealVfx 재사용 — 힐러와 같은 연출)")]
+    [SerializeField] int caretakerHeal = 1;
 
     [Header("박치기 타이밍(초) / 거리 / 각도  — Play 중 조정 가능")]
     [SerializeField] float windDur    = 0.07f;
@@ -129,6 +136,9 @@ public class AttackAnimTester : MonoBehaviour
         // 처치 없이 처형 연출만 보기. 무기가 꺼져 있어도 좌표는 유효하므로 그대로 뜬다.
         if (Input.GetKeyDown(KeyCode.Z)) ExecutionVfx.Play(this.playerFieldView?.GetSlotView(0));
         if (Input.GetKeyDown(KeyCode.C)) PreviewCunningExit().Forget();
+        if (Input.GetKeyDown(KeyCode.S)) PreviewSwarmVolley().Forget();
+        if (Input.GetKeyDown(KeyCode.F)) SynergyVfx.PlayFlowWind(this.playerFieldView);
+        if (Input.GetKeyDown(KeyCode.H)) PreviewCaretakerHeal();
         if (Input.GetKeyDown(KeyCode.R)) { this.attackVfx.Rescan(); this.hitVfx.Rescan(); t_armedChanged = true; }
         if (Input.GetKeyDown(KeyCode.T)) PullTuningFromConfig();
         if (Input.GetKeyDown(KeyCode.K)) ApplyTuningToConfig();
@@ -259,6 +269,48 @@ public class AttackAnimTester : MonoBehaviour
 
     /// <summary>토글 상태를 공격자 카드에 반영. **끌 때 반드시 지운다** — 런타임 키워드는 카드 인스턴스에
     /// 남으므로, 켜고 한 번 때린 카드가 토글을 꺼도 계속 무쌍으로 남으면 무엇을 보고 있는지 알 수 없게 된다.</summary>
+    // ── 시너지 연출 미리보기 ─────────────────────────────────────────────
+    // 전부 **실제 게임이 쓰는 진입점 그대로** 부른다. 테스터 전용 사본을 만들면 그쪽만 고쳐지고
+    // 본 경로가 뒤처진다(테스트 경로 미스매치). 다른 건 상태 변경이 없다는 것뿐 — 순수 연출이라 그래도 된다.
+
+    /// <summary>무리 선피해 볼리: 아군 라이브 슬롯 전원이 적 슬롯0에게 한 발씩.
+    /// 게임에선 피해가 먼저 적용되고 표기만 착탄에 맞춰 내려오지만, 여기선 피해를 넣지 않으므로
+    /// 표기만 잠시 어긋난다(다음 Render/공격에서 실제 값으로 되돌아온다).</summary>
+    async UniTaskVoid PreviewSwarmVolley()
+    {
+        CardView t_target = this.enemyFieldView?.GetSlotView(0);
+        if (t_target == null || t_target.BoundCard == null) return;
+
+        var t_sources = new List<CardView>();
+        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+        {
+            CardView t_v = this.playerFieldView?.GetSlotView(i);
+            if (t_v != null && t_v.BoundCard != null) t_sources.Add(t_v);
+        }
+        if (t_sources.Count == 0) return;
+
+        var t_damages = new int[t_sources.Count];
+        for (int i = 0; i < t_damages.Length; i++) t_damages[i] = Mathf.Max(0, this.swarmDamagePerShot);
+
+        await SwarmVfx.PlayVolley(t_sources, t_target, t_damages,
+                                  t_target.BoundCard.hp, t_target.BoundCard.bonusHp);
+    }
+
+    /// <summary>돌보미: 힐러와 같은 연출(HealVfx)을 아군 전원에게. 발사 주체는 슬롯0.</summary>
+    void PreviewCaretakerHeal()
+    {
+        CardView t_src = this.playerFieldView?.GetSlotView(0);
+        if (t_src == null) return;
+
+        var t_targets = new List<(CardView view, int amount)>();
+        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+        {
+            CardView t_v = this.playerFieldView?.GetSlotView(i);
+            if (t_v != null && t_v.BoundCard != null) t_targets.Add((t_v, Mathf.Max(0, this.caretakerHeal)));
+        }
+        if (t_targets.Count > 0) HealVfx.PlayHealBurst(t_src, t_targets);
+    }
+
     void ApplyPeerlessKeyword(CardView _attacker)
     {
         CardInstance t_c = _attacker?.BoundCard;
@@ -438,5 +490,8 @@ public class AttackAnimTester : MonoBehaviour
             $"피격VFX [↑/↓] {this.hitVfx.Index + 1}/{this.hitVfx.Count}  {this.hitVfx.CurrentName}");
         GUI.Label(new Rect(12, 106, 1100, 24),
             $"[1] 무장VFX on/off  [2] 피격VFX on/off  [V] 무장VFX 미리보기({(this.armedPreview ? "ON" : "off")})  [B] 피격VFX 미리보기  [R] 폴더 재스캔  [L] 선택 경로 로그");
+        GUI.Label(new Rect(12, 130, 1100, 24),
+            "시너지: [S] 무리 볼리(아군 전원 → 적0)   [F] 흐름 바람(아군 필드)   [H] 돌보미 회복(HealVfx 재사용)"
+            + "   ※ 무리/흐름은 BattleVfxLibrary에 SwarmProjectile·FlowWind 배선 필요");
     }
 }

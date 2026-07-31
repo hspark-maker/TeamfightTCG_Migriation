@@ -81,14 +81,12 @@ public class EnemyTurn : TurnBase
             }
             else
             {
-                // 일반 AI 랜덤 공격. 튜토리얼 폴백은 재현성 위해 고정 시드(MatchRandom) 사용.
-                if (t_forcedAttacker != null)          t_atk = t_forcedAttacker;
-                else if (TutorialConfig.IsActive)      t_atk = t_attackers[MatchRandom.Range(t_attackers.Count)];
-                else                                   t_atk = t_attackers[UnityEngine.Random.Range(0, t_attackers.Count)];
-
-                t_def = TutorialConfig.IsActive
-                    ? t_targets[MatchRandom.Range(t_targets.Count)]
-                    : t_targets[UnityEngine.Random.Range(0, t_targets.Count)];
+                // 일반 AI 랜덤 공격. 튜토리얼/일반 구분 없이 MatchRandom 하나로 뽑는다 —
+                // 게임 로직 랜덤의 진실원은 MatchRandom이고, 시드는 GameInitializer가 전투 시작 전에 건다.
+                t_atk = t_forcedAttacker != null
+                    ? t_forcedAttacker
+                    : t_attackers[MatchRandom.Range(t_attackers.Count)];
+                t_def = t_targets[MatchRandom.Range(t_targets.Count)];
             }
 
             if (!t_atk.IsAlive) return;

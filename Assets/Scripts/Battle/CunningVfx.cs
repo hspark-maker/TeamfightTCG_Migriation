@@ -63,9 +63,10 @@ public static class CunningVfx
         t_tr.localScale    = t_scale;
     }
 
-    /// <summary>교대해 들어온 카드의 등장. **덱에서 나오는 배치 연출**을 그대로 쓴다(죽어서 새 카드가 채워질 때와 동형) —
-    /// 스왑만 제자리 스케일 팝이면 같은 "덱에서 온 카드"인데 등장 방식이 둘로 갈린다.
-    /// 슬롯 뷰에 들어온 카드가 이미 그려져 있어야 한다(호출 전 Refresh).</summary>
+    /// <summary>교대해 들어온 카드의 등장. **보충 등장과 완전히 같은 시퀀스**(CardAppearSequence)를 쓴다 —
+    /// 중앙 정지·등장 컷씬까지 포함이다. 여기서 배치 연출만 직접 부르면 같은 "덱에서 온 카드"인데
+    /// 교활로 들어온 쪽만 컷씬이 빠진다(실제로 그랬다).
+    /// 슬롯 뷰에 들어온 카드가 이미 그려져 있어야 한다(호출 전 Refresh) — 컷씬 자격 판정이 BoundCard 기준.</summary>
     public static UniTask PlayEnter(CardView _view)
     {
         if (_view == null) return UniTask.CompletedTask;
@@ -74,7 +75,8 @@ public static class CunningVfx
         Vector3 t_from = DeckPoint(_view, t_dest.z);
         Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
 
-        return _view.PlayDealAnim(t_from, t_mid, t_dest, GameTiming.Battle.CardDealDuration);
+        return CardAppearSequence.Play(_view, _view.BoundCard, t_from, t_mid, t_dest,
+                                       GameTiming.Battle.CardDealDuration);
     }
 
     /// <summary>카드가 빨려 들어가는 지점. **화면 기준 고정** — 아군은 오른쪽 아래, 적은 왼쪽 위 바깥.

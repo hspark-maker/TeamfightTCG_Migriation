@@ -43,6 +43,11 @@ public static class MatchRandom
     // splitmix64
     static ulong NextU64()
     {
+        // 시드 전 소비 = 0-state 회피값으로 시작하는 고정 시퀀스가 나가고, 뒤늦은 Seed가 스트림을 리셋해
+        // 소비 순서가 어긋난다(멀티면 그 순간부터 영구 divergence). 컴파일러가 못 잡으니 런타임 카나리아.
+        if (!s_seeded)
+            UnityEngine.Debug.LogError("[MatchRandom] 시드 전 소비 — 시드 지점(GameInitializer/SyncInitialDecks)보다 앞선 호출이 있다.");
+
         DrawCount++;
         s_state += 0x9E3779B97F4A7C15UL;
         ulong z = s_state;

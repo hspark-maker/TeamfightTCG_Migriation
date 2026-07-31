@@ -78,25 +78,32 @@ public class GameInitializer : MonoBehaviour
 
         int t_myIndex = MultiplayerTurnRunner.Instance.MyOwnerIndex;
         TurnState.LocalOwnerIndex = t_myIndex;
-        this.playerField.Initialize(DeckConfig.PlayerDeck, t_myIndex);
+        // 멀티 셔플은 Local 고정: 시드 합의(SyncInitialDecks의 commit-reveal)가 이 호출보다 뒤라
+        // MatchRandom을 쓸 수 없고, 쓸 필요도 없다 — 셔플 결과는 GetShuffledIds로 상대에게 그대로 전송된다.
+        this.playerField.Initialize(DeckConfig.PlayerDeck, t_myIndex, ShufflePolicy.Local);
     }
 
     void InitializeSinglePlayerFields()
     {
+        // 시드는 필드 초기화보다 **먼저** — 셔플이 MatchRandom을 소비한다.
+        // (구: TurnRunner.PlayIntroAndStart에서 시드 → 셔플이 시드 밖 UnityEngine.Random으로 새어나갔다.)
+        if (TutorialConfig.IsActive) MatchRandom.Seed(TutorialConfig.FixedSeed);
+        else                         MatchRandom.SeedRandomLocal();
+
         if (TutorialConfig.IsActive)
         {
-            // 튜토리얼: 양 덱 고정 주입(무셔플·6장 이하 허용). 적덱 GetRandomDeck 우회.
-            this.playerField.Initialize(TutorialConfig.PlayerDeck, 0);
-            this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1);
+            // 튜토리얼: 양 덱 고정 주입(무셔플=저작 순서가 곧 등장 순서·6장 이하 허용). 적덱 GetRandomDeck 우회.
+            this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None);
+            this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None);
         }
         else
         {
-            this.playerField.Initialize(DeckConfig.PlayerDeck, 0);
+            this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match);
             // 로비 매칭에서 상대 덱을 미리 확정해 넘겼으면 그 값을 쓰고, 아니면 기존대로 랜덤 폴백(기존 MainMenu 경로 유지).
             var t_enemyDeck = DeckConfig.HasEnemyDeck
                 ? DeckConfig.EnemyDeck
                 : (this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>());
-            this.enemyField.Initialize(t_enemyDeck, 1);
+            this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match);
         }
 
 

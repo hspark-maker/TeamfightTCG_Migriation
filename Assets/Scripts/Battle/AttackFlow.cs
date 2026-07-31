@@ -8,6 +8,13 @@ using UnityEngine;
 /// </summary>
 public static class AttackFlow
 {
+    /// <summary>히트 시점(at)에 글로우를 이미 재생하는 키워드. <see cref="Keywords"/>와
+    /// <see cref="PlayResultFlourish"/>의 단일 진실원이다.
+    ///
+    /// 양쪽이 각자 나열하면 같은 글로우를 두 번 await 해 공격 뒤 대기가 KeywordGlowHold만큼 더 붙는다
+    /// (원거리·무쌍 후딜이 일반 공격의 두 배가 되던 원인). 여기 넣은 키워드는 PlayResultFlourish에서 빠진다.</summary>
+    public const CardKeyword AtHitGlowKeywords = CardKeyword.Ranged | CardKeyword.Peerless;
+
     /// <summary>공격자 키워드로 연출용 pre/at 키워드 산출.
     /// 무쌍/원거리 모두 히트 후(at) 글로우 — 다른 공격과 동일하게 히트 앞에 대기(딜레이) 없음.</summary>
     public static (CardKeyword pre, CardKeyword at) Keywords(CardInstance _attacker)
@@ -16,7 +23,7 @@ public static class AttackFlow
         CardKeyword t_at  = CardKeyword.None;
         if (_attacker.HasKeyword(CardKeyword.Ranged))   t_at |= CardKeyword.Ranged;
         if (_attacker.HasKeyword(CardKeyword.Peerless)) t_at |= CardKeyword.Peerless;
-        return (t_pre, t_at);
+        return (t_pre & AtHitGlowKeywords, t_at & AtHitGlowKeywords);
     }
 
     /// <summary>무쌍(Peerless) 광역 대상 사전 선정. 비무쌍이면 (null, null).</summary>
@@ -93,8 +100,12 @@ public static class AttackFlow
         if (_result.attackerKeywords.HasFlag(CardKeyword.Execution))
             ExecutionVfx.Play(CardView.GetView(_attacker));
 
+        // 히트 시점에 이미 재생한 키워드(원거리/무쌍)는 제외 — 안 빼면 같은 글로우를 두 번 기다린다.
+        // attackerKeywords 자체는 그대로 둔다(결과 소비처가 "무슨 키워드가 발동했나"를 읽는 값이라).
+        CardKeyword t_attackerGlow = _result.attackerKeywords & ~AtHitGlowKeywords;
+
         await UniTask.WhenAll(
-            CardView.GetView(_attacker)?.PlayKeywordGlow(_result.attackerKeywords) ?? UniTask.CompletedTask,
+            CardView.GetView(_attacker)?.PlayKeywordGlow(t_attackerGlow) ?? UniTask.CompletedTask,
             CardView.GetView(_defender)?.PlayKeywordGlow(_result.defenderKeywords) ?? UniTask.CompletedTask);
     }
 }

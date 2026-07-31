@@ -78,6 +78,11 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float healTravelDuration = 0.45f;   // 투사체 비행 시간
     [SerializeField] float healTrailLinger    = 0.25f;   // 도착 후 트레일 잔상 유지
 
+    [Header("Swarm Vfx (무리 선피해 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
+    [SerializeField] float swarmLaunchStagger  = 0.07f;   // 무리 카드별 발사 간격(한 프레임에 겹치면 한 덩어리로 보인다)
+    [SerializeField] float swarmTravelDuration = 0.26f;   // 투사체 비행 시간. 본 공격 앞에 붙는 시간이라 짧게
+    [SerializeField] float swarmImpactHold     = 0.10f;   // 마지막 착탄 후 본 공격까지의 여운
+
     [Header("Mulligan")]
     [SerializeField] float mulliganNoticeHold = 1.2f;   // "상대가 교환 중" 안내를 띄워두는 시간
 
@@ -110,10 +115,18 @@ public class BattleTimingConfig : ScriptableObject
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;
+
+    /// <summary>다른 SO가 들고 있는 raw 초 값에 배속을 먹인다(키워드별 글로우 hold 등).
+    /// SpeedFactor 자체는 계속 비공개 — 곱하는 지점이 코드 여기저기로 흩어지면
+    /// "배속이 안 먹는 연출"이 조용히 생긴다. 외부 시간값은 반드시 이 출구를 통과할 것.</summary>
+    public float Scaled(float _seconds) => _seconds * SpeedFactor;
     public float HealLaunchLead      => healLaunchLead      * SpeedFactor;
     public float HealLaunchStagger   => healLaunchStagger   * SpeedFactor;
     public float HealTravelDuration  => healTravelDuration  * SpeedFactor;
     public float HealTrailLinger     => healTrailLinger     * SpeedFactor;
+    public float SwarmLaunchStagger  => swarmLaunchStagger  * SpeedFactor;
+    public float SwarmTravelDuration => swarmTravelDuration * SpeedFactor;
+    public float SwarmImpactHold     => swarmImpactHold     * SpeedFactor;
     public float CunningFogLead      => cunFogLead          * SpeedFactor;
     public float CunningSpinDuration => cunSpinDur          * SpeedFactor;
     public float CunningExitDuration => cunExitDur          * SpeedFactor;
