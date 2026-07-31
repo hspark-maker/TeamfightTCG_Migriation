@@ -10,6 +10,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     [Tooltip("튜토리얼 스텝 시퀀스 SO. 모든 씬의 브리지에 같은 에셋을 배선한다(주입은 멱등).")]
     [SerializeField] OutgameTutorialData data;
 
+    [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
+    [SerializeField] OutgameTutorialGateUI gatePrefab;
+
     [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 씬 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다.")]
     [SerializeField] bool suppressGuideUI;
 
@@ -58,14 +61,14 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_step.Completion == EOutgameTutorialCompletion.PackOpen)
         {
-            if (!suppressGuideUI) OutgameTutorialGateUI.Ensure().ShowBanner(m_step.GuideMessage);
+            if (!suppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(m_step.GuideMessage);
             return;
         }
 
         if (m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             // 클릭 대기 스텝인데 타깃이 없으면 진행이 불가능하다(저작 실수).
-            Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {OutgameTutorialProgress.StepIndex}('{m_step.name}')에 앵커가 없어 게이트를 걸 수 없습니다.");
+            Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}('{m_step.name}')에 앵커가 없어 게이트를 걸 수 없습니다.");
             CloseGate();
             return;
         }
@@ -92,7 +95,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        OutgameTutorialGateUI.Ensure().ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied);
     }
 
     // 딤 없이 클릭만 듣는다. onSatisfied가 null인 스텝(구매 대기)은 딤이 유일한 표시였으므로 걸 것이 없다

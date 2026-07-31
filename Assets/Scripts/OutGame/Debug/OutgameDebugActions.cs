@@ -37,7 +37,21 @@ public static class OutgameDebugActions
     public static void ResetTutorial()
     {
         OutgameTutorialProgress.ResetForDebug();
-        Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — step {OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
+        Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
+    }
+
+    // N편 처음으로 되감기(소유·재화는 유지 — 앞 편에서 받은 카드는 그대로 남는다).
+    // 러너는 씬 진입 시점에 좌표를 읽으므로 적용을 보려면 씬을 다시 로드해야 한다.
+    public static void RestartTutorialFromChapter(int _chapterIndex)
+    {
+        // 저작된 편 밖으로 보내면 다음 씬 진입이 곧장 완료로 닫아버린다 — 되감기 의도와 정반대라 클램프한다.
+        int t_last    = OutgameTutorialRunner.ChapterCount - 1;
+        int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
+
+        OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+
+        Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
     // 첫실행 재현 원샷: 소유까지 비워 스텝 0의 자동 진행을 원상태로 돌린다.

@@ -8,6 +8,7 @@
 
 | 날짜 | 변경 | 승인 |
 |---|---|---|
+| 2026-07-31 | **튜토리얼 안내 UI 프리팹화 + 사각 구멍 → 타깃 승격 방식 전환 (✅ 코드+프리팹, Unity 컴파일·씬 배선·Play 검증 대기)** — 문제 둘: ① 색·스프라이트·여백이 전부 C# 상수(`HolePadding 12f`·`BannerWidth 900f`·`Color(0,0,0,0.72f)`)라 **리소스를 바꿀 수 없었다**(Layer Lab SimpleCasual에 튜토리얼 전용 에셋이 이미 있는데도 플레인 `Image` 검은 사각형만 사용) ② 타깃 바운딩 박스를 그대로 뚫는 **각진 구멍**이 버튼 모양과 무관하게 남고 유도가 약했다. **① 표시 방식 전환**: 딤 4패널(Top/Bottom/Left/Right) + 매 프레임 구멍 재계산을 폐기하고, **전면 딤 1장**(`raycastTarget=true`)이 전부 흡수 + 타깃 GameObject에 런타임 `Canvas(overrideSorting=true, 351)` + `GraphicRaycaster`를 얹어 딤(350) 위로 **승격**. 클릭 차단은 유지된다(사용자 지정). 앵커 4종 전부 조상 체인에 `Mask`/`RectMask2D`/`ScrollRect`/중첩 `Canvas`가 없음을 실측 확인해 성립 전제를 세웠다. **② sortingOrder 300 → 350/351**(500 아님): `UIPoolManager` 팝업 캔버스가 **400**이라 그 위로 올리면 플레이 스텝의 "유효한 덱이 없습니다"(`MatchFlowController.ShowNoDeckPopup`)·구매 실패 팝업(`PackShowcaseController.ShowFailPopup`)이 딤에 묻히는데, 그때 타깃은 `interactable=true` 그대로라 소프트락 탈출로도 발동하지 않아 **완전 잠김**이 된다. 프리팹의 `Canvas.sortingOrder`는 런타임 상수로 덮어써 저작 사고를 봉쇄. **③ 신규 프리팹** `Assets/Assets/Prefabs/UI/Tutorial/OutgameTutorialGate.prefab`(Blocker/FocusRing/Hand/Message+TMP) — 포커스 링은 `Tutorial_Focus00_Line_White`(92×92 **border 46** 9슬라이스 = 키트 내 유일하게 임의 크기로 늘어나는 링, `fillCenter=false`), 손가락은 `Tutorial_Focus_Icon_Hand`, 문구 프레임은 `ChatFrmae03_Demo_Frame_Light`. 브리지에 `[SerializeField] gatePrefab` 추가 + `Ensure(prefab)`(선례 `TutorialOverlayUI.Ensure`). **④ 해제 단일 창구 `Release()`** — 리스너 해제 + 승격 해제를 묶어 모든 진입점 최상단에서 1회. 갈라 두면 `ShowBanner`·두 번째 `ShowGate`가 이전 타깃 참조를 잃어 **버튼이 모든 UI 위에 영구 잔존**한다. 해제는 `GraphicRaycaster` → `Canvas` 순(`RequireComponent` 역순이면 조용히 실패). 타깃이 이미 `Canvas`를 갖고 있으면 파괴 대신 정렬값 백업·복원, 승격 시 루트에서 `additionalShaderChannels`·`sortingLayerID` 복사(미복사 시 승격 중에만 TMP·그라디언트 깨짐). **⑤ `SetDim(bool)` 명시 API** — `ShowBanner`는 딤 off가 **계약**이다(구 코드는 "4패널 0사이즈"라는 우연한 구현이 지키고 있었다). 전면 딤이 있으면 `PackTearHandle`의 `!IsPointerOverGameObject()` 판정이 화면 어디서나 막혀 **개봉 스와이프가 영영 시작되지 않고**, 그 모드는 `m_armed=false`라 탈출로도 없다. **⑥ 폴백 축소**: 링·손가락 스프라이트가 `Layer Lab/.../ResourcesData/`(= `Resources` 폴더 **아님**)라 코드 경로에서 얻을 수 없다 → 폴백은 딤+문구까지만, 프리팹 미배선 시 `LogWarning` 1회. 포인터 연출은 `localScale`만 트윈(`sizeDelta`/`anchoredPosition`은 `Layout`이 매 프레임 덮어씀), `DOPunchScale` 금지(Kill 시 스케일 미복구) → `DOScale(...).SetLoops(-1, Yoyo)`. **`Runner`·`Progress`·스텝 SO·`TutorialAnchor(Registry)`·`LobbyTabController`·시퀀스 에셋 전부 무수정** | ✅ |
 | 2026-07-30 | **덱 세이브를 아웃게임 세이브로 흡수 (이중 진실원 제거) — ✅ 코드, Unity 컴파일·Play 검증 대기** — `decks.json` 독립 파일과 데드 필드 `UserSaveData.deck`이 공존하던 상태를 정리해 **덱 영속화 진실원을 `DataSaveManager.Data.deck` 하나로** 통합. **① `DeckSaveManager`에서 File IO 전면 제거** — 내부 직렬화 타입(`SlotData`/`SaveData`)·`SavePath`·`ReadFileOrEmpty` 삭제, 메모리 3배열(`s_slots`/`s_names`/`s_imageKeys`) + 레지스트리 재수화 구조는 유지(소비자 API가 `CardData` 리스트를 기대). 공개 API 개명 3건: `LoadFromFile`→**`LoadFromSave`**, `SaveSlotToFile`→**`SaveSlot`**, `SaveToFile`→**`SaveAll`**(파일 개념 소멸). 비파괴 계약(단일 슬롯만 반영)과 전량 flush 위험 경고는 새 문맥으로 보존. `Delete`는 전량 flush → `SaveSlot(index, 빈 목록)` 비파괴 경로로 교체. `ReadFileOrEmpty`가 하던 길이·null 정규화는 `NormalizedSlots()`가 승계해 읽기/쓰기 양쪽이 통과(세이브 인스턴스를 제자리 수정 → 같은 배열 공유). **② `DeckSlotSaveData.imageKey` 필드 1개 가산** — `UserSaveData.VERSION`은 **1 유지**(필드 추가만 = 하위호환, 구 세이브는 빈 값 → 표시가 첫 카드 아트로 폴백). 카드 키는 기존대로 `CardCatalog.KeyOf`(=`CardData.name`) 안정 문자열, 인덱스 저장 없음. **③ 레거시 `decks.json` 1회 이관** — `LoadFromSave` 첫머리에서 "세이브에 덱 0개 + 파일 존재"일 때만 구 포맷(`slotName`/`cards`/`imageKey`)을 옮기고 `DataSaveManager.Save()` 후 원본을 **`decks_migrated.json`으로 rename**(삭제 금지 — corrupt 백업 선례와 같은 결). **재실행 가드는 이관 결과 자체**(덱이 생기면 조건이 거짓) — 완료 플래그 필드를 추가하지 않았다. 파일 IO 예외는 경고 로그만 남기고 진행(부트 사망 금지, 기존 세이브 무보존 손상 없음). **④ 파일 이동** `Assets/Scripts/Battle/DeckSaveManager.cs` → **`Assets/Scripts/OutGame/Deck/DeckSaveManager.cs`**(.meta 동반 이동으로 guid 보존 — static 클래스라 씬 참조 0이지만 규약 준수). 이제 아웃게임 세이브 소비자이므로 `Battle/` 밖. 호출처 5곳 갱신(`BootInstaller`·`StarterDeck`·`DeckEditController`·`DeckBuilderUI`×2) | ✅ |
 | 2026-07-30 | **디버그 전체 해금 런타임 입구 추가 (덱 연동 테스트용)** — 덱 편성은 소유 카드만 허용하므로(`DeckEditCollectionGrid.Build`의 `OwnershipManager.IsOwned` 필터) 인게임 덱 테스트에 전체 해금이 선행돼야 한다. 기존 `OwnershipDebugTool`은 **인스펙터 ContextMenu**뿐이라 플레이 중 손이 닿지 않았다 → 신규 서브트리 `OutGame/Debug/` 2파일. **① `OutgameDebugActions`(static)** = 디버그 조작 단일 창구(전체 해금/회수/현황 로그/튜토리얼 완료·리셋). `OwnershipDebugTool`은 이 창구로 **위임만** 하도록 축소(두 입구가 각자 구현하면 이중 진실원). **② `OutgameDebugOverlay`** = `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]`로 **자기 자신을 띄우는** IMGUI 패널(우상단 [DEBUG] 또는 **F8**) — 씬·프리팹 배선 0건이 설계 목적(테스트 씬 단독 Play 포함 어디서나 동일). 파일 전체를 `#if UNITY_EDITOR \|\| DEVELOPMENT_BUILD`로 감싸 릴리스 빌드엔 클래스 자체가 없다. 라벨은 **ASCII 고정**(IMGUI 기본 폰트에 한글 글리프 없음 — `BootLoadingScreen`의 Quicksand 사례와 같은 함정). 열려 있는 동안 `EventSystem.enabled=false`로 uGUI 입력을 잠근다(IMGUI는 EventSystem 레이캐스트를 막지 못해 패널 클릭이 밑의 뒤로가기·편성 칸까지 때린다). **③ `OwnershipManager.GrantAll(IEnumerable<string>)`/`RevokeAll()`** 추가 — 낱장 `Grant` 반복은 장수만큼 파일 쓰기 + `OnOwnershipChanged` 발화(= 도감 그리드 전량 재빌드)를 유발하므로 대량 경로는 **Save·이벤트 1회**로 접는다. **④ 튜토리얼 스킵 포함 이유**: 튜토리얼 진행 중엔 게이트 딤이 덱 탭을 막아 해금만으론 덱을 못 만든다. `Complete()`만으론 이미 떠 있는 게이트가 남으므로 브리지 `CloseGate`와 같은 `GateUI.Clear()`를 함께 호출. **⑤ `DeckEditController`**: `OnOwnershipChanged` 구독 추가 — 편집 중 해금이 즉시 그리드에 반영되게(재빌드는 컨트롤러가 건다 — "장착중 딤"에 필요한 편성 상태를 아는 쪽이 여기뿐이라는 기존 불변식 유지) | ✅ |
 | 2026-07-29 | **부트 로딩을 `LoadingScene`으로 분리 — 2026-07-28 `LoadingCover` 항목의 설계를 대체** — 로딩 화면을 로비에 얹힌 커버가 아니라 **빌드 0번 독립 씬**으로 승격. 이전 설계의 "씬을 떠나면 커버가 파괴돼 켜진 채 전환된다(분기 0줄)" 트릭은 폐기 — 로딩 씬이 로드 완료를 보장한 뒤에만 다음 씬을 로드하므로 트릭이 필요 없다. (전제 정정: 그 커버는 `3c2781d7` 이후 `m_IsActive:0`으로 꺼져 있어 실제로는 동작하지 않고 있었다.) **① 전역 부트를 `Assets/Assets/Prefabs/Boot.prefab`으로 통합** — 루트 `[Boot]`에 신규 `Core/BootInstaller`(`[DefaultExecutionOrder(-200)]`, `static s_booted` 멱등 가드), 자식으로 `DataLibrary`/`SoundManager`/`UIPoolManager`/`SceneTransition`. `MainMenuInitializer` 삭제하고 그 static 사슬(CardCatalog→CatalogRows→Ownership→Production→DeckSave)을 흡수 + `OutgameTutorialRunner.EnsureData`까지 담당. 프리팹을 **LoadingScene·LobbyScene 양쪽에 배치** — 정상 경로는 로딩 씬이 선점하고 로비 사본은 루트째 자멸, 로비 단독 Play는 로비 사본이 부트를 맡는다(개발 편의 보존). 매니저 4종의 `DontDestroyOnLoad(gameObject)`는 자식이 됐으므로 `transform.root.gameObject` 기준으로 교정(DDOL은 루트에만 유효). 단일 GO 집약은 불가 — `SceneTransitionVideo.Awake`의 `SetActive(false)`가 로딩 중인 DataLibrary까지 끄고, 중복 감지 `Destroy(gameObject)`가 서로를 날린다. **② `LoadingCoverView` → `BootLoadingScreen`**(파일+meta 리네임으로 GUID 보존 → 프리팹 재배선 0건). 진행바 공식(`min(LoadProgress, elapsed/minDuration)` + `MoveTowards`)·타임아웃 탈출로는 유지, `IsCovering`·페이드아웃·`canvasGroup` 제거(알파를 내리면 빈 로딩 씬이 한 프레임 드러난다 — 불투명한 채 씬 교체가 정답). break 조건에 `DataLibrary.IsLoaded` 추가(`PercentComplete`가 등록 콜백보다 먼저 1이 될 수 있다). **③ 목적지 판정은 로딩 씬이** — 현재 스텝이 `AutoBattle`이면 `EnterCurrentStep()`으로 전투 직행, 그 외는 `LobbyScene`. `AutoPurchase`까지 여기서 실행하지 않는 이유는 구매 실패 시 씬 전환 없이 돌아와 탈출로 없는 로딩 씬에 갇히기 때문(로비 브리지가 맡는다). 따라서 `OutgameTutorialBridge`의 `IsCovering` 대기(`CoApplyStepAfterCover`) 삭제. **④ 경유 범위는 앱 최초 기동만** — 전투·개봉에서 로비 복귀는 직행(이전 설계가 겸하던 복귀 히칭 은폐는 포기). 빌드 세팅 `0 Loading / 1 Lobby / 2 Battle / 3 CardPack`, Fusion은 경로 기반 조회라 무수정 | ✅ |
@@ -661,7 +662,7 @@ flowchart TD
 
 ---
 
-### G-TUT — 아웃게임 첫시작 튜토리얼 (P1~P4) — ✅ 코드+검수+컴파일 에러 0 (씬 배선·SO 저작 대기)
+### G-TUT — 아웃게임 첫시작 튜토리얼 (P1~P4) — ✅ 코드+검수+컴파일 에러 0 (씬 배선·SO 저작 대기) / 2026-07-31 **챕터(N편) 2계층 재편**
 
 > 첫실행 온보딩을 "한 번 리다이렉트하고 끝"에서 **영속 진행도 + 스텝 해석 + 강제 안내 게이트** 3축으로 재편한 것.
 > `LobbyFirstRunRedirect`를 흡수·삭제하고, 로비↔CardPack↔Battle 왕복과 앱 강제종료를 견디는 진행도를 세이브에 둔다.
@@ -676,23 +677,26 @@ flowchart TD
     end
 
     subgraph persist["영속 — 세이브만 안다"]
-        PRG["OutgameTutorialProgress (static)<br/>IsCompleted · StepIndex · Init<br/>CommitStep · Complete · ResetForDebug"]:::new
-        SD["TutorialSaveData (슬롯)<br/>outgameStepIndex · outgameCompleted · migrationChecked"]:::new
+        PRG["OutgameTutorialProgress (static)<br/>IsCompleted · ChapterIndex · StepIndex · Init<br/>CommitStep(챕터,스텝) · Complete · ResetForDebug · JumpForDebug"]:::chg
+        SD["TutorialSaveData (슬롯)<br/>outgameChapterIndex · outgameChapterStepIndex<br/>outgameCompleted · migrationChecked<br/>(outgameStepIndex = 플랫 시절 잔재, 동결)"]:::chg
     end
 
     subgraph run["해석 — 스텝 실행 (씬 오브젝트를 모름)"]
-        RUN["OutgameTutorialRunner (static)<br/>IsRunning · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied"]:::new
-        DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialStep&gt; (인덱스 = 세이브 진행도)<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::new
+        RUN["OutgameTutorialRunner (static)<br/>IsRunning · ChapterCount · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied<br/>TryGetNext = 자리 올림(빈 챕터 스킵) 단일 진실원"]:::chg
+        DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialChapter&gt;<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::chg
+        CHAP["OutgameTutorialChapter ([Serializable], SO 아님)<br/>label(기획 'N편'과 1:1) · steps · TryGetStep<br/>챕터 하나 = 준비 스텝들 → 전투 스텝"]:::new
         STEP["OutgameTutorialStep (abstract SO) + 6종<br/>WaitClick · BattleEntry · WaitPurchase<br/>WaitPackOpen · AutoPurchase · AutoBattle<br/>Anchor · Completion · LeavesScene · Enter(ctx)"]:::chg
-        CTX["OutgameTutorialStepContext (readonly struct)<br/>CommitAdvance · Rollback · CompleteIfLast<br/>스텝이 진행도를 건드리는 유일한 창구"]:::chg
-        DATA --> STEP
+        CTX["OutgameTutorialStepContext (readonly struct)<br/>ChapterIndex · StepIndex + 다음 좌표(러너가 미리 계산)<br/>CommitAdvance · Rollback · CompleteIfLast<br/>스텝이 진행도를 건드리는 유일한 창구"]:::chg
+        DATA --> CHAP
+        CHAP --> STEP
         RUN -->|"Enter(ctx)"| STEP
         STEP --> CTX
     end
 
     subgraph scene["씬 레이어 (UI/Tutorial/)"]
         BRG["OutgameTutorialBridge<br/>씬당 1개 (LobbyScene · CardPack)<br/>Awake:EnsureData · Start:EnterCurrentStep"]:::new
-        GATE["OutgameTutorialGateUI<br/>4패널 딤 + 구멍 · 배너 · sortingOrder 300<br/>onClick 구독으로 완료 감지"]:::new
+        GATE["OutgameTutorialGateUI<br/>전면 딤(350) + 타깃 Canvas 승격(351)<br/>포커스링 · 손가락 · 메시지 = 프리팹 저작<br/>onClick 구독으로 완료 감지"]:::chg
+        GPF["OutgameTutorialGate.prefab<br/>브리지가 [SerializeField]로 보유<br/>미배선 시 딤+문구 코드 폴백"]:::new
     end
 
     subgraph anchor["타깃 식별 (씬 경로 문자열 금지)"]
@@ -720,6 +724,8 @@ flowchart TD
     RUN -->|"Set(opened, nextScene, false)"| HAND
     RUN -->|"BattleEntry · AutoBattle 진입 시"| TUT
     RUN -->|"AutoBattle → LoadScene(BattleScene)"| BATTLE
+    BRG -->|"Ensure(gatePrefab) → Instantiate"| GPF
+    GPF --- GATE
     BRG -->|"ShowGate(rect, button, msg)"| GATE
     GATE -->|"onClick → onSatisfied"| BRG
     BRG -->|"NotifyStepSatisfied"| RUN
@@ -733,7 +739,7 @@ flowchart TD
     classDef dead fill:#5a1f1f,stroke:#e57373,color:#fff;
 ```
 
-#### 흐름 시퀀스 — 스텝 0~2 (부트 → 첫 전투 직행 → 로비 복귀 → 상점 [구매])
+#### 흐름 시퀀스 — 1편~3편 머리 (부트 → 첫 전투 직행 → 로비 복귀 → 상점 [구매])
 
 ```mermaid
 sequenceDiagram
@@ -748,60 +754,70 @@ sequenceDiagram
     GM->>PRG: Init() [Load 직후 · 레거시 판정 1회]
     Note over BRG: LobbyScene 진입 · Awake: EnsureData(SO)
     BRG->>RUN: Start → EnterCurrentStep()
-    RUN->>PRG: StepIndex=0 → 스텝0(AutoBattle)
-    RUN->>PRG: CommitStep(1) + Save  ← 실행보다 커밋이 먼저
+    RUN->>PRG: 좌표 (0,0) → 1편 첫 스텝(AutoBattle)
+    RUN->>PRG: CommitStep(1, 0) + Save  ← 실행보다 커밋이 먼저(챕터 자리 올림)
     RUN->>TUT: Begin(scenario) [양 덱 고정 주입 = 저장 덱 불필요]
     RUN->>RUN: LoadScene("BattleScene")
     Note over BRG: 로비는 한 프레임만 스쳐간다(딤·배너 없음)
     Note over TUT: 전투 종료 → GameResultPopup가 LobbyScene 복귀<br/>BattleCleanup이 TutorialConfig.End()
 
-    Note over BRG: 로비 브리지 Start → StepIndex=1(WaitClick)
+    Note over BRG: 로비 브리지 Start → 좌표 (1,0) = 2편 BattleEntry(PlayBtn 딤)<br/>그 전투가 끝나면 자리 올림으로 (2,0) = 3편 첫 스텝
     BRG->>REG: TryGet(LobbyPackTab) → 미등록이면 OnRegistered 대기
     REG-->>BRG: 등록됨(LobbyTabController.Awake 대리 등록)
     BRG->>GATE: ShowGate(rect, button, "상점으로 이동하세요")
-    Note over GATE: 4패널 딤이 타깃만 비움 · 원래 onClick은 그대로 실행
+    Note over GATE: 전면 딤이 전부 막고 타깃만 351로 승격 · 원래 onClick은 그대로 실행
     GATE-->>BRG: onSatisfied (1회 가드)
-    BRG->>RUN: NotifyStepSatisfied() → CommitStep(2)
+    BRG->>RUN: NotifyStepSatisfied() → CommitStep(2, 1)
     BRG->>RUN: EnterCurrentStep() → WaitPurchase(구매 성공이 완료)
-    Note over BRG: 이후 개봉 → [획득] → BattleEntry(PlayBtn) 사이클 2회
+    Note over BRG: 이후 개봉 → [획득] → BattleEntry(PlayBtn)로 3편이 닫히고<br/>4편이 같은 모양으로 한 번 더 반복된다
 ```
 
 #### 원리 카드 — 왜 이렇게 생겼나
 
-- **완료는 파생이 아니라 스칼라**: `outgameCompleted`가 `outgameStepIndex`보다 **항상 우선**한다. 완료를 `stepIndex >= steps.Count`로 파생시키면 나중에 스텝을 추가한 순간 **이미 끝낸 유저의 튜토리얼이 되살아난다**. 러너는 `NotifyStepSatisfied`에서 한 번만 `Complete()`를 확정하고, 자동 스텝은 컨텍스트의 `CompleteIfLast()`로 같은 판정을 빌려 쓴다. — `TutorialSaveData.cs` / `OutgameTutorialRunner.cs`
+- **완료는 파생이 아니라 스칼라**: `outgameCompleted`가 **진행 좌표보다 항상 우선**한다. 완료를 좌표 비교로 파생시키면 나중에 챕터·스텝을 추가한 순간 **이미 끝낸 유저의 튜토리얼이 되살아난다**. 러너는 `NotifyStepSatisfied`에서 한 번만 `Complete()`를 확정하고, 자동 스텝은 컨텍스트의 `CompleteIfLast()`로 같은 판정을 빌려 쓴다. 2계층이 된 뒤에도 이 축은 그대로다 — `IsRunning`이 좌표를 보기 전에 완료 스칼라부터 걸러내므로, **챕터 재편으로 좌표가 (0,0)으로 되감겨도 완료 유저는 영향받지 않는다**. — `TutorialSaveData.cs` / `OutgameTutorialRunner.cs`
+- **챕터 넘김은 자리 올림일 뿐(2026-07-31)**: 저작 축을 기획 언어("튜토리얼 N편")와 1:1로 맞추려 `챕터 → 스텝` 2계층으로 갈랐다. 플랫 12칸은 이미 `전투1 / 전투2 / 상점루프+전투3 / 상점루프+전투4`였는데 **그 경계가 어디에도 적혀 있지 않아** 재사용 에셋(`GoShop`·`OpenPack`·`ClaimCards`)이 어느 편 소속인지 인덱스를 세야만 알 수 있었다. 그런데 이 재편으로 **`OutgameTutorialBridge`·`PackShowcaseController`·`BootLoadingScreen`·스텝 6종의 로직이 한 줄도 바뀌지 않았다** — 챕터 넘김을 별도 단계로 두지 않고 `TryGetNext`의 **자리 올림 한 번**으로 흡수했기 때문이다. 러너가 다음 좌표를 미리 계산해 컨텍스트에 실어주므로 스텝은 자기가 **챕터 끝인지조차 모른 채** `CommitAdvance()`한다(무상태 불변식의 2계층 확장). ⚠️ `TryGetNext`는 완료 판정과 진입 시 `isLast` 판정이 **반드시 공유**해야 한다 — 갈라 놓고 `chapter + 1 >= ChapterCount`로 순진하게 비교하면 뒤에 빈 챕터가 저작된 순간 `isLast`가 영영 false가 되어 완료가 안 찍힌다. 빈 챕터 스킵 루프는 `< ChapterCount` 상한(`!=` 금지)이라 종료가 보장된다. — `OutgameTutorialRunner.TryGetNext`
+- **챕터는 SO가 아니다(2026-07-31)**: 스텝을 SO로 가른 근거는 ①종류별 필드만 노출(다형성) ②같은 에셋 재사용, 둘뿐이었다. 챕터는 **종류가 하나고 재사용도 없어** 두 근거가 모두 사라진다 → `[Serializable]` 인라인 클래스(선례: `TutorialScenarioData.ScriptedAttack`). 덕분에 신규 에셋 0개, 챕터 간 스텝 이동이 한 인스펙터 안의 드래그 한 번이다. **전투 시나리오도 챕터로 올리지 않았다** — 올리면 `BattleEntry`/`AutoBattle`이 `scenario`를 잃고 컨텍스트에서 받아야 하는데, 그러면 "진행도를 건드리는 유일한 창구"인 컨텍스트가 저작 데이터 배달부를 겸하고 아웃게임이 Battle 타입을 알게 된다(G-TUT 경계 선언 위반). "N편의 진실원"은 대신 챕터 `label` + **"마지막 스텝이 `LeavesScene`인가" 주입 시 검증**으로 확보한다(챕터 경계 = 씬 전환 경계). 나중에 챕터로 올리는 확장은 언제든 가능하고 반대 방향은 비싸다. — `OutgameTutorialChapter.cs` / `Runner.WarnOnMisauthoredChapters`
 - **스텝은 데이터가 아니라 에셋(2026-07-31)**: 한 몸 struct + `EStepKind` switch를 **스텝 SO 6종 + `Completion` 축**으로 갈랐다. ① 저작 화면에 그 종류의 필드만 뜬다(구 struct는 무관한 필드 5개가 항상 노출), ② 반복되는 칸(상점 이동·팩 오픈·카드 획득)을 **같은 에셋 재사용**으로 해결 — 12칸이 에셋 9개, ③ 종류 추가가 파일 1개(구조상 러너·브리지·로딩화면 4곳 동시 수정이 필요했다). 브리지는 이제 스텝 **타입을 모른다** — 기다릴 신호는 `Completion{Auto,Click,PackOpen,Purchase}` 하나로 갈리고, "같은 씬에서 이어갈지"는 `LeavesScene`이 답한다. 스텝이 진행도를 건드리는 창구는 `OutgameTutorialStepContext`뿐이라 **자기가 몇 번째 칸인지 모른 채로도** 커밋·롤백한다(재사용의 전제). 예외로 `BootLoadingScreen`만 `is AutoBattleStep` 타입 검사를 남긴다 — "부트에서 로비를 건너뛴다"는 AutoBattle 한정이라 `Completion == Auto`로 넓히면 `AutoPurchase`까지 걸린다. — `Tutorial/Steps/`
 - **커밋이 실행보다 앞선다**: 자동 스텝(`AutoPurchase`·`AutoBattle`)은 `CommitStep(idx+1)`+`Save` **후에** 실행한다. `AutoPurchase`가 반대 순서면 "구매 직후 앱 종료 → 소유는 생겼는데 진행도는 0"이 되어 온보딩이 영구 스킵되고, `AutoBattle`이 반대 순서면 전투 중 강제종료가 그 스텝을 **영원히 되풀이**한다(씬을 떠난 뒤엔 커밋할 지점이 없다). 롤백 분기는 `AutoPurchase`에만 있다 — 구매는 실패할 수 있고(차감 없이 반환되므로 `CommitStep(idx)`로 원상복구) 씬 로드는 실패하지 않는다. — `OutgameTutorialRunner.EnterAutoPurchase` / `EnterAutoBattle`
 - **첫 전투는 저장 덱을 요구하지 않는다(2026-07-28)**: 온보딩 앞머리의 팩 구매·개봉을 걷어내 신규 유저는 첫 전투 시점에 소유 카드도 덱도 0이다. 그래도 성립하는 이유는 `GameInitializer.InitializeSinglePlayerFields`가 `TutorialConfig.IsActive`일 때 **양 덱을 시나리오에서 고정 주입**하기 때문 — `DeckConfig`를 아예 읽지 않는다. 그래서 `LobbyMatchLauncher`의 "유효한 덱이 없습니다" 가드는 **손대지 않았다**: `AutoBattle`은 `PlayBtn`을 거치지 않으므로 그 가드를 통과할 일이 없고, 그 가드를 만나는 2·3회차 `BattleEntry`는 이미 첫 팩을 획득한 뒤다.
 - **레거시 판정은 계정당 1회(`migrationChecked` 낙인)**: "소유 있음 + 진행도 0 = 구버전 유저" 판정을 매 부트 반복하면, 러너가 아직 한 번도 돌지 못한 상태(SO 미배선·구매 실패 롤백 — **P5·P6 보류 중인 지금의 실제 상태**)에서 수동 구매한 신규 유저까지 완료 처리된다. `stepIndex == 0` 항은 함께 남긴다 — 없으면 **현재 빌드로 진행 중인 세이브**가 업데이트 첫 부팅에 완료 낙인을 맞는다. `ResetForDebug()`는 낙인을 **true로 유지**(되돌리면 남은 소유 탓에 다음 부트가 곧장 완료 처리해 리셋이 무의미). — `OutgameTutorialProgress.Init`
 - **타깃은 씬 경로가 아니라 enum 앵커**: 탭 버튼이 Layer Lab 프리팹 내부라 경로 문자열은 취약하고 오타가 검출되지 않는다. `TutorialAnchor`의 `OnEnable/OnDisable`이 그대로 등록/해제가 되므로 **"타깃이 나타나는 시점"을 감지하는 코드가 0줄** — `AcquireButton`의 `SetActive(true)`가 곧 개봉 완료 시점이고, 탭 콘텐츠 토글이 곧 등록 시점이다. enum은 SO에 int로 직렬화되므로 **새 값은 끝에만 추가**(재배치·삭제 금지).
-- **구멍은 4패널(셰이더 아님)**: 타깃 rect 기준 상/하/좌/우 `Image` 4장으로 덮어 타깃만 비운다. 구멍이 물리적 공백이라 클릭 통과가 `ICanvasRaycastFilter` 0줄로 성립한다. 완료는 `onClick` **구독**으로만 감지 → 원래 리스너(`StartAiBattle`·`Select`·`OnBuyPressed`·`OnAcquirePressed`)가 그대로 실행되고, 게이트는 `HideGate`/`Clear`/`OnDestroy`에서 반드시 `RemoveListener`.
-- **소프트락 방지 불변식**: 딤이 걸린 채 누를 수 있는 것이 0인 상태를 만들지 않는다. 타깃이 `activeInHierarchy == false`거나 `IsInteractable() == false`면 **딤만 숨기고 게이트는 armed 유지** → 다시 누를 수 있게 되면 자동 복귀(`LateUpdate` 매 프레임 판정이라 게이트가 걸린 *뒤* 잠기는 경로도 커버). 타깃에 `Button`이 없으면 아예 게이트를 걸지 않는다.
-- **씬 이름을 보지 않는 재개**: 브리지는 씬 로드마다 `StepIndex`를 읽어 그대로 재개한다. 앵커가 이 씬에 없으면 조용히 대기하고 나중에 등장하면 켜진다. `AutoPurchase`는 커밋이 실행보다 앞서므로 개봉 씬 브리지가 재실행할 수 없다. 클릭 직후 다음 스텝이 `AutoPurchase`면 진입을 넘긴다 — 방금 누른 버튼의 `LoadScene`과 자동 전환이 경합해 목적지가 뒤집히기 때문.
+- **~~구멍은 4패널~~ → 타깃을 딤 위로 승격(2026-07-31)**: 구 방식은 타깃 rect 기준 상/하/좌/우 `Image` 4장으로 덮어 타깃만 비웠다(구멍이 물리적 공백이라 클릭 통과가 `ICanvasRaycastFilter` 0줄로 성립). 폐기 이유는 **각진 바운딩 박스 구멍이 버튼 모양과 무관하게 남고 유도가 약해서**다. 현재는 **전면 딤 1장**(`raycastTarget=true`)이 전부 흡수하고, 타깃 GameObject에 런타임으로 `Canvas(overrideSorting=true, sortingOrder=351)` + `GraphicRaycaster`를 얹어 딤(350) 위로 올린다 — 렌더도 레이캐스트도 함께 올라간다(`GraphicRaycaster.sortOrderPriority`가 Overlay에서 `canvas.sortingOrder`를 반환). 성립 전제는 **앵커 조상 체인에 `Mask`/`RectMask2D`/`ScrollRect`/중첩 `Canvas`가 없을 것**(앵커 4종 실측 확인). 완료 감지는 그대로 `onClick` **구독**이라 원래 리스너(`StartAiBattle`·`Select`·`OnBuyPressed`·`OnAcquirePressed`)가 그대로 실행된다.
+- **승격 해제는 단일 창구 `Release()`**: 리스너 해제와 승격 해제를 한 메서드로 묶어 `ShowGate`/`ShowBanner`/`HideGate`/`OnDestroy` **모든 진입점 최상단에서 1회** 부른다. 갈라 두면 ① `ShowBanner`가 `m_target`을 직접 비우고 ② 두 번째 `ShowGate`가 이전 타깃 참조를 잃어 **버튼이 모든 UI 위에 영구히 떠 있는** 상태가 남는다. 해제 시 **`GraphicRaycaster`를 먼저 파괴하고 `Canvas`를 나중에** — 반대로 하면 `RequireComponent` 때문에 조용히 실패해 둘 다 남는다. 타깃이 이미 `Canvas`를 저작으로 갖고 있으면 파괴하지 않고 `overrideSorting`/`sortingOrder`/`sortingLayerID`만 백업·복원한다. 승격 시 **루트 캔버스의 `additionalShaderChannels`·`sortingLayerID`를 복사**한다 — 중첩 Canvas는 기본값으로 리셋되므로 복사하지 않으면 승격 중에만 TMP·그라디언트가 깨진다.
+- **소프트락 방지 불변식**: 딤이 걸린 채 누를 수 있는 것이 0인 상태를 만들지 않는다. 타깃이 `activeInHierarchy == false`거나 `IsInteractable() == false`면 **딤·승격·포인터를 함께 내리고 게이트는 armed 유지** → 다시 누를 수 있게 되면 자동 복귀(`LateUpdate` 매 프레임 판정이라 게이트가 걸린 *뒤* 잠기는 경로도 커버). 셋을 뒤집는 곳은 `RefreshVisibility` **하나뿐**이다. 승격을 함께 내리는 이유가 하나 더 있다: `overrideSorting=true`는 조상 `CanvasGroup`의 raycast 필터를 끊으므로, 남겨 두면 게임이 막으려던 입력이 튜토리얼 때문에 뚫린다. 타깃에 `Button`이 없으면 아예 게이트를 걸지 않는다.
+- **게이트 정렬은 저작 대상이 아니다(하드락 축)**: `TutorialOverlay(200) < 딤(350) < 타깃(351) < UIPoolManager 팝업(400) < Mulligan(999) < LoadingCover(1000)`. **400을 넘기면 안 된다** — 플레이 스텝에서 뜨는 "유효한 덱이 없습니다"(`MatchFlowController.ShowNoDeckPopup`)와 구매 실패 팝업(`PackShowcaseController.ShowFailPopup`)이 딤에 묻히는데, 그때 타깃 버튼은 `interactable=true` 그대로라 위 탈출로도 발동하지 않아 **완전 잠김**이 된다. 그래서 프리팹의 `Canvas.sortingOrder`는 런타임에 상수로 덮어쓴다(`CacheRoots`).
+- **문구 전용 모드에는 딤을 켜지 않는다**: `ShowBanner`(개봉 대기)는 `SetDim(false)`가 계약이다. `PackTearHandle`이 `Input.GetMouseButtonDown(0) && !EventSystem.IsPointerOverGameObject()`로 스와이프 시작을 판정하므로, 전면 딤이 있으면 화면 어디를 눌러도 `true`가 되어 **제스처가 영영 시작되지 않는다**. 게다가 이 모드는 `m_armed=false`라 `LateUpdate`가 돌지 않아 탈출로도 없다. 구 코드에서는 "4패널을 0사이즈로" 두는 **우연한 구현**이 이걸 지켰지만, 지금은 `SetDim(bool)` 명시 API로 못박았다. ⚠️ 딤이 막는 것은 EventSystem 입력뿐이고 raw `Input` 폴러는 오히려 **과차단**된다(`TutorialOverlayUI`가 Physics2D로 남긴 것과 같은 교훈).
+- **룩은 프리팹, 폴백은 딤+문구까지만**: 색·스프라이트·여백·펄스 세기가 전부 `OutgameTutorialGate.prefab`의 인스펙터 값이다(구 코드는 `HolePadding 12f` 같은 C# 상수라 디자이너가 손댈 수 없었다). 선례는 `TutorialOverlayUI.Ensure(prefab)` — 프리팹 우선 + 코드 폴백, 폴백 판정은 `[SerializeField] blocker`의 null 여부. ⚠️ 폴백은 **딤+문구까지만** 성립한다: 포커스 링·손가락 스프라이트가 `Layer Lab/.../ResourcesData/`에 있는데 그건 `Resources` 폴더가 **아니라서**(프로젝트 `Resources`는 `Fonts`/`DOTweenSettings`뿐) 코드 경로에서 얻을 방법이 없다 → 프리팹 미배선 시 `LogWarning` 1회로 드러낸다. 포인터 연출은 `localScale`만 트윈한다(`sizeDelta`·`anchoredPosition`은 `Layout`이 매 프레임 덮어써 트윈이 조용히 사라진다). `DOPunchScale`은 Kill 시 스케일을 복구하지 않아 금지 — 선례대로 `DOScale(...).SetLoops(-1, Yoyo)`.
+- **좌표는 반드시 스크린 경유**: 타깃의 `rect.size`·`anchoredPosition`을 직접 읽으면 안 된다. 캔버스 `referenceResolution`이 씬마다 달라(`LobbyCanvas` 1080×1920, `CardPack UICanvas` 1440×3120) 그대로 옮기면 배율만큼 어긋난다. `GetWorldCorners → WorldToScreenPoint → ScreenPointToLocalPointInRectangle(게이트 캔버스, camera:null)`이 유일한 경로다(두 씬 모두 `Match=0` 폭 기준이라 스크린 경유만 하면 정확히 일치). 문구는 타깃이 화면 위쪽이면 아래, 아래쪽이면 위로 **뒤집어** 배치한다 — 고정 위치로 두면 하단바 탭 스텝에서 타깃(351)이 문구를 뚫고 나와 깨진 것처럼 보인다.
+- **씬 이름을 보지 않는 재개**: 브리지는 씬 로드마다 진행 좌표를 읽어 그대로 재개한다. 앵커가 이 씬에 없으면 조용히 대기하고 나중에 등장하면 켜진다. `AutoPurchase`는 커밋이 실행보다 앞서므로 개봉 씬 브리지가 재실행할 수 없다. 클릭 직후 다음 스텝이 `AutoPurchase`면 진입을 넘긴다 — 방금 누른 버튼의 `LoadScene`과 자동 전환이 경합해 목적지가 뒤집히기 때문.
 - **SO 주입은 브리지가(부트가 아니라)**: `CardPack.unity`에는 `MainMenuInitializer`가 없다. static은 씬 전환에 살아남지만 **CardPack 단독 Play**(`PackStandaloneBoot` 워크플로)에서 깨진다 → 브리지가 `Awake`에서 멱등 주입(다른 에셋 주입 시도는 경고 후 기존 유지).
 - **전투 시작은 클릭 리스너가 아니라 스텝 진입 시**: `TutorialConfig.Begin`을 `BattleEntry` 진입 순간에 호출한다. 클릭 리스너로 하면 `PlayBtn`의 씬 PersistentCall이 런타임 리스너보다 먼저 `LoadScene`을 돌려 순서 의존이 생긴다. `Begin`은 덱/스크립트 큐 세팅뿐이고 `TutorialConfig`는 휘발이라 재진입도 멱등. → **`LobbyMatchLauncher`·`PackShowcaseController`·`PackAcquireController` 무수정.**
 
 - **개봉 씬은 가이드를 끄고 씬 안내로 대체(2026-07-27)**: `CardPack`은 화면에 3D 팩 하나, 요약엔 [획득] 하나뿐이라 강제 게이트가 길잡이가 아니라 **연출을 가리는 잡음**이다. 브리지에 `suppressGuideUI`(씬 스위치)를 두어 그 씬에서만 딤·배너를 끈다 — **스텝 진행은 불변**. 단 완료 감지 경로가 갈린다: `WaitPackOpen`은 원래부터 `OnAnyPackOpened`가 완료를 확정하므로 배너만 빼면 끝이지만, `WaitClick`의 완료는 **게이트가 대신 걸어주던 `onClick` 구독**이라 게이트를 끄면 브리지가 직접 물어야 한다(`HookSilently`/`DetachSilent`, `m_silentDone` 1회 가드 = `GateUI.m_satisfied`와 같은 역할). `GateUI`는 무수정 — "아무것도 안 그리는 모드"를 넣는 대신 소비처에서 끊었다. ⚠️ 그래서 **`AcquireButton`의 `TutorialAnchor`는 억제 모드에서도 필수**다(떼면 스텝 4·9가 영구 정지).
 - **뜯기 안내는 튜토리얼이 아니다**: "스와이프하여 오픈"은 `PackRevealView.tearHint`(씬 저작 TMP + `CanvasGroup`)로, **튜토리얼 진행 여부와 무관하게 항상** 뜯기 대기 중 표시되고 뜯김 확정(`EnterBursting`)에 사라진다. 튜토리얼 배너였다면 2회차 이후 구매에서는 안내가 사라진다 — 조작법은 온보딩이 끝나도 필요하므로 씬의 상시 안내로 둔다. ⚠️ 배치는 **`RevealPanel` 바깥**이어야 한다(그 `CanvasGroup`은 분출 전까지 `alpha 0`이라 그 아래 두면 정작 뜯기 단계에 안 보인다).
 
-**수정 가능성 높은 지점**: 스텝 순서·문구·팩·시나리오 = `OutgameTutorial.asset`(코드 미수정) / 새 타깃 = `EOutgameTutorialAnchor` 끝에 값 추가 + 씬에 `TutorialAnchor` 부착 / 게이트 외형 = `OutgameTutorialGateUI.BuildUI`(현재 코드 빌드, 아트 스킨 교체는 이 메서드 내부만) / 개봉 씬·전투 씬 경로 = `OutgameTutorialRunner.PackOpenScene` / `BattleScene` 상수 / 개봉 씬 가이드 on·off = 씬 브리지의 `suppressGuideUI` 체크박스 / 첫 전투를 다시 "로비에서 눌러서 시작"으로 되돌리려면 스텝 0의 kind를 `AutoBattle`→`BattleEntry`(anchor=`LobbyPlayButton`)로 바꾸면 된다(코드 무수정).
+**수정 가능성 높은 지점**: 편(챕터) 구성·스텝 순서·문구·팩·시나리오 = `OutgameTutorial.asset`(코드 미수정 — 편 추가·삭제·재배치도 여기서만) / 새 타깃 = `EOutgameTutorialAnchor` 끝에 값 추가 + 씬에 `TutorialAnchor` 부착 / 게이트 외형 = `OutgameTutorialGate.prefab`(딤 색·알파, 포커스 링/손가락 스프라이트, 메시지 프레임, `ringPadding`·`handOffset`·`messageMargin`·펄스 세기 전부 인스펙터 — 코드 무수정. 링/손가락 노드를 꺼 두면 그 요소만 빠진다) / 개봉 씬·전투 씬 경로 = `OutgameTutorialRunner.PackOpenScene` / `BattleScene` 상수 / 개봉 씬 가이드 on·off = 씬 브리지의 `suppressGuideUI` 체크박스 / 첫 전투를 다시 "로비에서 눌러서 시작"으로 되돌리려면 1편의 스텝을 `Step_AutoBattle_First`→`BattleEntry` 계열 에셋으로 갈아 끼우면 된다(코드 무수정) / 특정 편부터 재확인 = `OutgameDebugActions.RestartTutorialFromChapter(n)`.
 
 #### 파일 지도 — 다이어그램에서 코드로
 
 | 클래스/에셋 | 파일 | 패키지 |
 |---|---|---|
-| `TutorialSaveData` (세이브 값 객체) | 신규 `Assets/Scripts/OutGame/Save/2.Domain/TutorialSaveData.cs` | P1 ✅ |
+| `TutorialSaveData` (세이브 값 객체) | 신규 `Assets/Scripts/OutGame/Save/2.Domain/TutorialSaveData.cs` | P1 ✅ / 2026-07-31 좌표 2필드 추가(구 `outgameStepIndex` 동결) |
 | `UserSaveData.tutorial` 슬롯 (VERSION 1 유지) | `Assets/Scripts/OutGame/Save/2.Domain/UserSaveData.cs` — 1줄 추가 | P1 ✅ |
-| `OutgameTutorialProgress` (static, 진행도 단일 창구) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialProgress.cs` | P1 ✅ |
+| `OutgameTutorialProgress` (static, 진행도 단일 창구) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialProgress.cs` | P1 ✅ / 2026-07-31 좌표화 + `JumpForDebug` |
 | `GameManager.Boot()` 진행도 Init | `Assets/Scripts/Core/GameManager.cs` — 1줄(Load 직후·CurrencyInit 앞) | P1 ✅ |
 | 튜토리얼 리셋 2종(진행도만 / 소유까지) | `Assets/Scripts/OutGame/Collection/Debug/OwnershipDebugTool.cs` — ContextMenu (동작은 `OutgameDebugActions`에 위임) | P1 ✅ |
-| 디버그 조작 단일 창구(해금·회수·튜토리얼 완료/리셋) | 신규 `Assets/Scripts/OutGame/Debug/OutgameDebugActions.cs` | 2026-07-30 ✅ |
+| 디버그 조작 단일 창구(해금·회수·튜토리얼 완료/리셋/N편 점프) | 신규 `Assets/Scripts/OutGame/Debug/OutgameDebugActions.cs` | 2026-07-30 ✅ / 2026-07-31 `RestartTutorialFromChapter` |
 | 런타임 디버그 패널(자기 부트스트랩 IMGUI, F8, dev 전용) | 신규 `Assets/Scripts/OutGame/Debug/OutgameDebugOverlay.cs` | 2026-07-30 ✅ |
 | `EOutgameTutorialAnchor` (enum 키) | 신규 `Assets/Scripts/OutGame/Tutorial/EOutgameTutorialAnchor.cs` | P2 ✅ |
 | `TutorialAnchorRegistry` (static 등록소 + `OnRegistered`) | 신규 `Assets/Scripts/OutGame/Tutorial/TutorialAnchorRegistry.cs` | P2 ✅ |
 | `TutorialAnchor` (MonoBehaviour, 수명주기 등록) | 신규 `Assets/Scripts/OutGame/Tutorial/TutorialAnchor.cs` | P2 ✅ |
-| `OutgameTutorialData` (SO, `List<OutgameTutorialStep>` 조립 목록) | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` — `Create → Card Battle/Outgame Tutorial` | P2 ✅ / 2026-07-31 스텝 SO화 |
-| `OutgameTutorialGateUI` (4패널 딤 게이트, `Ensure()` 파사드) | 신규 `Assets/Scripts/UI/Tutorial/OutgameTutorialGateUI.cs` | P3 ✅ |
-| `OutgameTutorialRunner` (static, 스텝 해석·실행) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialRunner.cs` | P4 ✅ |
+| `OutgameTutorialData` (SO, `List<OutgameTutorialChapter>` 조립 목록) | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` — `Create → Card Battle/Outgame Tutorial` | P2 ✅ / 2026-07-31 스텝 SO화 → 챕터 2계층 |
+| `OutgameTutorialChapter` (`[Serializable]`, 기획 "N편" 1:1) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialChapter.cs` | 2026-07-31 ✅ |
+| `OutgameTutorialGateUI` (전면 딤 + 타깃 승격 + 포인터, `Ensure(prefab)` 파사드) | `Assets/Scripts/UI/Tutorial/OutgameTutorialGateUI.cs` | P3 ✅ / 2026-07-31 4패널 구멍 → 승격 방식 재작성 |
+| `OutgameTutorialGate.prefab` (딤·포커스링·손가락·메시지 저작본, Canvas order 350) | 신규 `Assets/Assets/Prefabs/UI/Tutorial/OutgameTutorialGate.prefab` — 스프라이트는 Layer Lab SimpleCasual `Tutorial_Focus00_Line_White`(9슬라이스 border 46) · `Tutorial_Focus_Icon_Hand` · `ChatFrmae03_Demo_Frame_Light` | 2026-07-31 ✅ |
+| `OutgameTutorialBridge.gatePrefab` (게이트 프리팹 보유) | `Assets/Scripts/UI/Tutorial/OutgameTutorialBridge.cs` — 필드 1 + `Ensure()` 호출 2곳 | 2026-07-31 ✅ |
+| `OutgameTutorialRunner` (static, 좌표 해석·스텝 실행) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialRunner.cs` | P4 ✅ / 2026-07-31 `TryGetNext` 자리 올림 + 저작 검증 |
 | `OutgameTutorialBridge` (씬당 1개, 수명 연결) | 신규 `Assets/Scripts/UI/Tutorial/OutgameTutorialBridge.cs` | P4 ✅ |
 | `OutgameTutorialBridge.suppressGuideUI` (개봉 씬 가이드 off + 클릭 직접 구독) | `Assets/Scripts/UI/Tutorial/OutgameTutorialBridge.cs` — 필드 1 + `HookSilently`/`OnSilentClicked`/`DetachSilent` | G-HINT ✅ |
 | `PackRevealView.tearHint` (뜯기 상시 안내, 튜토리얼 무관) | `Assets/Scripts/UI/Shop/PackRevealView.cs` — 필드 2 + `SetTearHint` | G-HINT ✅ |
@@ -812,7 +828,7 @@ sequenceDiagram
 | 스텝 SO 계층 (`OutgameTutorialStep` 베이스 + 6종 + `EOutgameTutorialCompletion` + `OutgameTutorialStepContext`) | 신규 `Assets/Scripts/OutGame/Tutorial/Steps/` 9파일 — `Create → Card Battle/Outgame Tutorial/Step/…` | 2026-07-31 ✅ |
 | 스텝 에셋 9개 (`Step_AutoBattle_First`·`Step_BattleEntry_2/3/4`·`Step_GoShop`·`Step_BuyPack_Starter/Default`·`Step_OpenPack`·`Step_ClaimCards`) | 신규 `Assets/SO/TutorialConfig/Outgame/Steps/` | 2026-07-31 ✅ |
 | `LoadingCoverView` (첫 프레임 은폐 커버, 자동 해제) + 씬 노드 `LobbyScene/LoadingCover`(order **1000**) | 신규 `Assets/Scripts/UI/Common/LoadingCoverView.cs` · `Assets/Scenes/LobbyScene.unity` | 2026-07-28 ✅ |
-| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~11) | 저작 완료 — 전투 3회 · 구매 사이클 2회. 2026-07-31 **스텝 SO 12칸 참조로 이관**(중복 3종은 같은 에셋 재사용) | P6 ✅ |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (4챕터 12칸) | 저작 완료 — 1편 첫 전투 / 2편 두 번째 전투 / 3편 상점과 첫 팩 / 4편 두 번째 팩. 2026-07-31 **챕터 2계층으로 재저작**(스텝 에셋 9개 그대로 재사용, 신규 에셋 0) | P6 ✅ |
 
 #### 씬/에셋 인계 (코드 밖 — 사용자)
 
@@ -821,12 +837,13 @@ sequenceDiagram
 | `Assets/Scenes/New/LobbyScene.unity` | 구 `LobbyFirstRunRedirect` GameObject의 **Missing Script 제거** 후 `OutgameTutorialBridge` 부착(`data` ← `OutgameTutorial.asset`) / `MatchContent/PlayBtn`에 `TutorialAnchor`(`key = LobbyPlayButton`) |
 | `Assets/Scenes/CardPack.unity` | `AcquireButton`에 `TutorialAnchor`(`key = PackAcquireButton`) / `PackOpenDirector`에 `OutgameTutorialBridge`(같은 에셋) |
 | `Assets/Scenes/CardPack.unity` (2026-07-27 추가) | ① `PackOpenDirector`의 브리지 → **`Suppress Guide UI` 체크** ② **`UICanvas` 직속**(`RevealPanel`의 **형제**)에 안내 TMP 신규(예: `TearHint`, "스와이프하여 오픈") — `CanvasGroup` 추가 후 **alpha 0으로 저장**, TMP `Raycast Target` 해제 → `PackRevealView.tearHint`에 배선 ③ `AcquireButton`의 `TutorialAnchor`는 **유지**(억제 모드에서도 브리지가 이 앵커로 클릭을 감지) |
-| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` | **11스텝**(2026-07-28 개정). 0=`AutoBattle`(scenario←TutorialScenario, anchor·pack·nextScene 전부 비움) · 1~5·6~10=구매 사이클(`WaitClick`(LobbyPackTab) → `WaitPurchase`(PackBuyButton, pack←NormalPack, refund 10) → `WaitPackOpen` → `WaitClick`(PackAcquireButton) → `BattleEntry`(TutorialScenario2/3, anchor←LobbyPlayButton)) |
-| `UIPoolManager` 캔버스 | `sortingOrder` **1 → 400** (`LobbyScene.unity` / `MainMenu.unity`). 게이트 300 > 팝업 상속값 1이라 **실패 팝업이 딤 아래로 묻혀 [확인]을 못 누른다** |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` | **4챕터 12칸**(2026-07-31 재저작 완료 — 배선 불필요). 1편=`AutoBattle_First` · 2편=`BattleEntry_2` · 3편=`GoShop`→`BuyPack_Starter`→`OpenPack`→`ClaimCards`→`BattleEntry_3` · 4편=`GoShop`→`BuyPack_Default`→`OpenPack`→`ClaimCards`→`BattleEntry_4`. 편을 늘릴 때는 **마지막 스텝을 전투 스텝으로** 둘 것(아니면 주입 시 경고) |
+| `UIPoolManager` 캔버스 | `sortingOrder` **1 → 400** (`LobbyScene.unity` / `MainMenu.unity`). 게이트 300 > 팝업 상속값 1이라 **실패 팝업이 딤 아래로 묻혀 [확인]을 못 누른다**. ⚠️ 2026-07-31 이후 게이트가 350/351이므로 이 400은 **낮추면 안 된다**(같은 하드락이 되돌아온다) |
+| `LobbyScene.unity` · `CardPack.unity` (2026-07-31 추가) | 각 씬 `OutgameTutorialBridge`의 **`Gate Prefab` 필드에 `OutgameTutorialGate.prefab` 드래그**. 미배선이면 조용히 코드 폴백(딤+문구만, 링·손가락 없음)으로 떨어지고 콘솔에 `LogWarning` 1회. `CardPack`은 `suppressGuideUI=1`이라 당장 무해하지만 토글 대비해 함께 배선 |
 
 > `nextScene`은 **개봉 후 목적지**이며 `AutoPurchase` 전용이다(개봉 씬 `"CardPack"`·전투 씬 `"BattleScene"`은 러너 상수). `AutoBattle`은 이 필드를 읽지 않는다.
-> 개봉 씬 스텝(3·8 `WaitPackOpen`, 4·9 `WaitClick`)의 `guideMessage`는 `suppressGuideUI` 이후 **표시되지 않는다**. 비워도 되고 두어도 무해하다(로비 브리지는 이 스텝들을 만나지 않는다).
-> ⚠️ 스텝 인덱스가 곧 세이브 진행도라, 앞머리 3스텝 제거로 **진행 중이던 세이브는 3칸 밀린다** — `OwnershipDebugTool`의 진행도 리셋으로 처음부터 확인할 것.
+> 개봉 씬 스텝(3·4편의 `WaitPackOpen`·`WaitClick`)의 `guideMessage`는 `suppressGuideUI` 이후 **표시되지 않는다**. 비워도 되고 두어도 무해하다(로비 브리지는 이 스텝들을 만나지 않는다).
+> ⚠️ 진행 좌표가 곧 세이브라, 챕터 재편(2026-07-31)으로 **진행 중이던 세이브는 (0,0)으로 되감긴다**(구 `outgameStepIndex`를 환산하지 않는다 — 죽은 12칸 구조를 코드에 하드코딩하지 않으려고). 완료 낙인이 찍힌 세이브는 그대로 완료다. 되감긴 세이브는 부팅이 곧장 1편 전투로 직행하니 버그로 오인하지 말 것 — `ResetTutorialFromScratch`로 소유까지 비우고 확인하는 편이 깔끔하다.
 > 게이트 UI는 코드 빌드라 **신규 프리팹·Addressable 등록이 없다**(`UIPrefab` 라벨 체크 대상 아님).
 
 #### P5·P6 해결 내역

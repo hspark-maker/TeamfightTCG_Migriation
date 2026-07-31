@@ -34,7 +34,7 @@ public class AutoPurchaseStep : OutgameTutorialStep
 
             string t_result = t_opened != null ? t_opened.Result.ToString() : "null";
             string t_pack   = pack != null ? pack.PackId : "null";
-            Debug.LogWarning($"[AutoPurchaseStep] 스텝 {_context.Index} 자동 구매 실패(pack={t_pack}, result={t_result}) — 씬 전환 없이 유지.");
+            Debug.LogWarning($"[AutoPurchaseStep] 스텝 {_context.ChapterIndex}-{_context.StepIndex} 자동 구매 실패(pack={t_pack}, result={t_result}) — 씬 전환 없이 유지.");
             return false;
         }
 

@@ -19,7 +19,7 @@ public class BattleEntryStep : OutgameTutorialStep
         // 클릭 리스너가 아니라 진입 시 미리 시작한다 — PlayBtn의 씬 PersistentCall(StartAiBattle)이
         // 런타임 리스너보다 먼저 LoadScene을 돌려 순서 의존이 생기기 때문. Begin은 멱등이라 재진입도 안전.
         if (scenario == null)
-            Debug.LogWarning($"[BattleEntryStep] 스텝 {_context.Index}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
+            Debug.LogWarning($"[BattleEntryStep] 스텝 {_context.ChapterIndex}-{_context.StepIndex}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
 
         TutorialConfig.Begin(scenario);
         return true;

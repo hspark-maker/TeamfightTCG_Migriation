@@ -22,7 +22,7 @@ public class AutoBattleStep : OutgameTutorialStep
         _context.CompleteIfLast();
 
         if (scenario == null)
-            Debug.LogWarning($"[AutoBattleStep] 스텝 {_context.Index}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
+            Debug.LogWarning($"[AutoBattleStep] 스텝 {_context.ChapterIndex}-{_context.StepIndex}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
 
         // 양 덱은 TutorialConfig가 고정 주입한다(GameInitializer) → 저장 덱이 없는 첫 실행도 그대로 진입 가능.
         TutorialConfig.Begin(scenario);
