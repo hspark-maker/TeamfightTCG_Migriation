@@ -22,6 +22,7 @@ public static class FontCleanupTool
         "Assets/Fonts/Jalnan2 SDF.asset",
         "Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset",
         "Assets/Resources/Fonts/MalgunGothic_TMP.asset",
+        "Assets/Fonts/ONE Mobile POP OTF SDF.asset",
     };
 
     // 통합으로 참조가 0이 된 폰트(삭제 대상).
