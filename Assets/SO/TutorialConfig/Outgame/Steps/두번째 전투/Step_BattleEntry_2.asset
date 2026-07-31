@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1c0f0d0e1f24b3a8c5d6e7f80910a07, type: 3}
   m_Name: Step_BattleEntry_2
   m_EditorClassIdentifier: Assembly-CSharp::BattleEntryStep
-  guideMessage: "전투를 시작하세요"
+  guideMessage: 
   anchor: 1
   scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}

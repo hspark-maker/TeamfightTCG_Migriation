@@ -47,6 +47,8 @@ public class DeckListController : MonoBehaviour
         //    결과적으로 +칸 바로 다음이 가장 최근에 만든 덱이다.
         var t_create = Instantiate(slotPrefab, content);
         t_create.BindCreate(!DeckSaveManager.IsFull, OnCreateClicked);
+        // 재빌드마다 새 인스턴스가 같은 키를 덮어쓰고, 파괴된 옛 항목은 TutorialAnchorRegistry.TryGet의 fake-null 정리가 걷어낸다 → Unregister 불필요.
+        t_create.RegisterTutorialAnchor(EOutgameTutorialAnchor.DeckCreateSlot);
         m_slots.Add(t_create);
 
         // 2) 유효 덱 칸 — 압축 불변식상 [0..DeckCount-1]이 연속 점유지만, 상한은 SLOT_COUNT로 둔다.

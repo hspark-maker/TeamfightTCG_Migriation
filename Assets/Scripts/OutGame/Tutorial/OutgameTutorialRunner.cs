@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼의 시퀀스 해석 static 코어(씬 오브젝트·UI를 모른다).
@@ -81,6 +82,15 @@ public static class OutgameTutorialRunner
         _refundGold = 0;
 
         return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _pack, out _refundGold);
+    }
+
+    /// <summary>튜토리얼이 이번 스텝에서 편성할 덱을 지정했으면 true. 덱 자동 편성은 이걸로 채워
+    /// 튜토리얼 중 편성 결과가 저작대로 고정되게 한다. 미지정이면 false → 일반 편성 규칙.</summary>
+    public static bool TryGetForcedDeck(out IReadOnlyList<CardData> _cards)
+    {
+        _cards = null;
+
+        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedDeck(out _cards);
     }
 
     /// <summary>스텝 완료를 감지한 브리지가 호출. 다음 좌표를 커밋하고 시퀀스를 넘어서면 완료 처리한다.</summary>

@@ -24,7 +24,7 @@ public class DeckEditController : MonoBehaviour
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
-    [SerializeField] Button autoEquipButton;   // 이번 범위 미구현 → 항상 비활성
+    [SerializeField] Button autoEquipButton;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -63,15 +63,18 @@ public class DeckEditController : MonoBehaviour
             unequipAllButton.onClick.AddListener(ClearAll);
         }
 
+        if (autoEquipButton != null)
+        {
+            autoEquipButton.onClick.RemoveAllListeners();
+            autoEquipButton.onClick.AddListener(AutoEquip);
+        }
+
         if (nameInput != null)
         {
             nameInput.characterLimit = NAME_MAX_LENGTH;
             nameInput.onEndEdit.RemoveAllListeners();
             nameInput.onEndEdit.AddListener(OnNameEndEdit);
         }
-
-        // 자동 편성은 이번 범위 밖 — 버튼을 지우면 씬 배선이 깨지므로 자리는 두고 비활성으로 고정한다.
-        if (autoEquipButton != null) autoEquipButton.interactable = false;
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
@@ -241,6 +244,51 @@ public class DeckEditController : MonoBehaviour
         RefreshAll();
     }
 
+    // 자동 편성. 빈 칸만 앞에서부터 메운다(이미 편성한 카드는 건드리지 않는다).
+    // AssignSlot을 반복 호출하지 않고 m_working을 직접 채운다 — 덱 내 중복 금지는 아래 중복 스킵이 대신 보장한다.
+    public void AutoEquip()
+    {
+        bool t_changed = false;
+
+        // 튜토리얼이 지정한 덱이 최우선. 저작 의도가 소유 판정보다 앞서므로 미소유여도 경고만 남기고 채운다.
+        if (OutgameTutorialRunner.TryGetForcedDeck(out var t_forced) && t_forced != null)
+        {
+            for (int t_i = 0; t_i < t_forced.Count; t_i++)
+            {
+                var t_card = t_forced[t_i];
+                if (t_card == null) continue;
+                if (ContainsInWorking(t_card)) continue;
+
+                if (!OwnershipManager.IsOwned(t_card))
+                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{CardCatalog.KeyOf(t_card)}'가 미소유 상태다 — 그대로 편성한다.");
+
+                if (!TryFillFirstEmpty(t_card)) break;   // 6칸이 다 찼다
+                t_changed = true;
+            }
+        }
+
+        // 나머지는 마스터 순서대로 소유 카드로 메운다. 카탈로그가 없으면 채울 원본이 없으므로 조용히 넘어간다.
+        if (CardCatalog.IsReady)
+        {
+            var t_cards = CardCatalog.All;
+            for (int t_i = 0; t_i < t_cards.Count; t_i++)
+            {
+                var t_card = t_cards[t_i];
+                if (t_card == null) continue;                     // CardRegistry의 ID 보존용 빈 칸
+                if (!OwnershipManager.IsOwned(t_card)) continue;
+                if (ContainsInWorking(t_card)) continue;
+
+                if (!TryFillFirstEmpty(t_card)) break;
+                t_changed = true;
+            }
+        }
+
+        if (!t_changed) return;   // 실제 변화가 없으면 dirty를 세우지 않는다(빈 칸 클릭 가드와 같은 이유)
+
+        m_dirty = true;
+        RefreshAll();
+    }
+
     // 편성 칸·컬렉션 착용표시·카운터를 m_working 하나로부터 전량 재생성한다(부분 갱신은 불일치의 근원).
     void RefreshAll()
     {
@@ -257,6 +305,7 @@ public class DeckEditController : MonoBehaviour
         int t_filled = CountFilled();
         if (countText        != null) countText.text = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
+        if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE;   // 가득 차면 채울 칸이 없다
     }
 
     int CountFilled()
@@ -266,6 +315,28 @@ public class DeckEditController : MonoBehaviour
             if (m_working[t_i] != null) t_n++;
 
         return t_n;
+    }
+
+    // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
+    bool TryFillFirstEmpty(CardData _card)
+    {
+        for (int t_i = 0; t_i < m_working.Length; t_i++)
+        {
+            if (m_working[t_i] != null) continue;
+
+            m_working[t_i] = _card;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool ContainsInWorking(CardData _card)
+    {
+        for (int t_i = 0; t_i < m_working.Length; t_i++)
+            if (m_working[t_i] == _card) return true;
+
+        return false;
     }
 
     void OnBackClicked()
@@ -285,7 +356,7 @@ public class DeckEditController : MonoBehaviour
                 SaveEditedDeck();
             }
 
-            ExitToList();
+            ExitEditor();
             return;
         }
 
@@ -295,7 +366,7 @@ public class DeckEditController : MonoBehaviour
         {
             titleText = "덱이 완성되지 않았습니다.\n변경사항을 버리고 나갈까요?",
             yesText   = "나가기",
-            yesAction = ExitToList,
+            yesAction = ExitEditor,
             noText    = "계속 편집",
             noAction  = null,
         });
@@ -303,8 +374,8 @@ public class DeckEditController : MonoBehaviour
         // 팝업이 못 뜨면(UIPoolManager 미배치·프리팹 미등록) 확인을 못 받은 채 화면에 갇힐 수 있다 → 그냥 내보낸다.
         if (t_popup == null)
         {
-            Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 목록으로 복귀한다.");
-            ExitToList();
+            Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 편집을 닫는다.");
+            ExitEditor();
         }
     }
 
@@ -350,7 +421,8 @@ public class DeckEditController : MonoBehaviour
         DeckSaveManager.SaveSlot(m_slotIndex, m_working);
     }
 
-    void ExitToList()
+    // 편집 종료. 실제 복귀 지점(로비 기본 탭)은 탭 셸이 정한다 — 여기서는 "나간다"만 알면 된다.
+    void ExitEditor()
     {
         if (tabController != null) tabController.CloseEditor();
     }

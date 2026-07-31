@@ -9,6 +9,9 @@ public class DeckTabController : MonoBehaviour
     [SerializeField] GameObject         editPanel;
     [SerializeField] DeckEditController editController;   // 옵션 — 미배선이면 패널 토글만 한다
 
+    // 탭 셸(LobbyRoot)은 이 오브젝트의 상위 계층에 있다 — 인스펙터 배선 없이 첫 사용 시 찾아 캐시한다.
+    LobbyTabController m_lobbyTabs;
+
     void OnEnable()
     {
         // 편집 중 탭이 꺼졌다 켜지면 여기서 무저장 폐기된다.
@@ -35,10 +38,16 @@ public class DeckTabController : MonoBehaviour
         if (editController != null) editController.OpenNew();
     }
 
-    // 목록 복귀. listPanel.SetActive(true) → DeckListController.OnEnable → 자동 재빌드가 갱신 경로다.
+    // 편집 종료. 화면은 로비 기본 탭으로 나가되, 내부 상태는 목록으로 되돌려 둔다
+    // (다음에 덱 탭을 다시 켤 때 편집 화면이 아니라 목록부터 보이게 — OnEnable 보장과 같은 이유).
     public void CloseEditor()
     {
         ShowList();
+
+        if (m_lobbyTabs == null) m_lobbyTabs = GetComponentInParent<LobbyTabController>(true);
+
+        // 셸을 못 찾으면(덱 탭을 단독 배치한 테스트 씬 등) 최소한 목록에는 남는다.
+        if (m_lobbyTabs != null) m_lobbyTabs.SelectDefault();
     }
 
     void ShowEditor()

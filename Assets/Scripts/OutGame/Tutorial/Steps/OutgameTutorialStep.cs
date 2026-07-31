@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>아웃게임 튜토리얼 시퀀스의 한 칸(SO). 스텝 하나를 에셋으로 저작해 여러 시퀀스·여러 자리에 재사용한다.
@@ -26,6 +27,13 @@ public abstract class OutgameTutorialStep : ScriptableObject
     {
         _pack       = null;
         _refundGold = 0;
+        return false;
+    }
+
+    /// <summary>이 스텝이 덱 자동 편성으로 채울 카드를 지정하면 true — 튜토리얼 중 편성 결과를 저작대로 고정한다.</summary>
+    public virtual bool TryGetForcedDeck(out IReadOnlyList<CardData> _cards)
+    {
+        _cards = null;
         return false;
     }
 }

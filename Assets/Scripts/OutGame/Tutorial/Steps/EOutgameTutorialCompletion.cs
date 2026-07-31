@@ -5,4 +5,5 @@ public enum EOutgameTutorialCompletion
     Click,      // 앵커 클릭이 곧 완료
     PackOpen,   // 3D 팩 개봉 신호로 완료(딤을 못 뚫어 앵커 없이 배너만)
     Purchase,   // 구매 "성공" 신호로 완료(클릭은 골드 부족으로 실패할 수 있어 완료가 아니다)
+    Confirm,    // 화면 탭으로 넘기는 설명 스텝(누를 대상이 아니라 읽을 영역이라 앵커는 옵션)
 }

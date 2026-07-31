@@ -79,6 +79,12 @@ public class DeckSlotView : MonoBehaviour
         if (clickButton != null) clickButton.interactable = _on;
     }
 
+    // 목록 칸은 런타임 생성이라 TutorialAnchor 컴포넌트를 프리팹에 붙일 수 없다 → 호출측이 대신 등록한다(LobbyTabController와 같은 처리).
+    public void RegisterTutorialAnchor(EOutgameTutorialAnchor _key)
+    {
+        TutorialAnchorRegistry.Register(_key, transform as RectTransform, clickButton);
+    }
+
     void Wire()
     {
         if (clickButton == null) return;

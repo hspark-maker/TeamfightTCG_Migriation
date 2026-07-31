@@ -65,6 +65,14 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
+        // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
+        // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
+        if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
+        {
+            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowMessageGate(null, m_step.GuideMessage, OnGateSatisfied);
+            return;
+        }
+
         if (m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             // 클릭 대기 스텝인데 타깃이 없으면 진행이 불가능하다(저작 실수).
@@ -81,6 +89,14 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)) return;
+
+        // 설명 스텝은 앵커를 "강조할 영역"으로만 쓴다 — 누를 대상이 아니라 Button이 없어도 되고 완료는 딤 탭이다.
+        // 억제 씬에서도 예외적으로 띄운다(딤이 없으면 완료 신호가 없어 진행이 멈춘다).
+        if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
+        {
+            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowMessageGate(t_rect, m_step.GuideMessage, OnGateSatisfied);
+            return;
+        }
 
         // 구매는 눌러도 실패할 수 있다(골드 부족) → 클릭을 완료로 넘기지 않는다. 딤만 유지하고
         // 완료는 구매 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로).

@@ -12,6 +12,9 @@ using UnityEngine.UI;
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
+// 메시지 모드(ShowMessageGate)만 (1)의 예외다 — 누를 대상이 아니라 읽을 영역이라 승격·손가락 없이 딤+링만 켠다.
+// 완료가 딤 탭 자체라 (2)는 오히려 항상 만족한다.
+//
 // 룩은 프리팹(OutgameTutorialGate.prefab)에서 저작한다. 미배선이면 딤+문구만 코드로 그리는 폴백으로 떨어진다
 // — 링·손가락 스프라이트가 Resources 밖에 있어 코드 경로에서는 얻을 방법이 없다.
 public class OutgameTutorialGateUI : MonoBehaviour
@@ -57,6 +60,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_armed;             // 게이트 진행 중(타깃 파괴 감지에 사용)
     bool          m_satisfied;         // 중복 클릭 가드 — 콜백은 1회만
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
+    bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
+    Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
 
     // 승격 상태. 원래 컴포넌트를 지우지 않도록 "내가 붙였는지"와 원래 정렬값을 함께 들고 있는다.
     Canvas m_promotedCanvas;
@@ -161,6 +166,43 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_gateRoot.SetActive(true);
     }
 
+    /// <summary>딤 + 문구를 띄우고 화면(딤) 탭으로 넘기는 설명 게이트. <paramref name="_highlight"/>가 있으면 링으로 그 영역을 강조한다.
+    /// 승격·손가락이 없는 것이 이 모드의 계약이다 — 읽을 영역이지 누를 대상이 아니라서, 승격하면 아직 눌러선 안 되는
+    /// 위젯이 튜토리얼 때문에 뚫린다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
+    public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied)
+    {
+        Release();
+
+        m_target       = _highlight;
+        m_targetButton = null;
+        m_targetCanvas = _highlight != null ? _highlight.GetComponentInParent<Canvas>() : null;
+        m_onSatisfied  = _onSatisfied;
+        m_satisfied    = false;
+        m_blockWarned  = false;
+        m_confirmMode  = true;
+        m_armed        = _highlight != null;   // 추종할 영역이 있을 때만 LateUpdate가 링을 따라간다
+
+        ArmBlockerClick();
+
+        SetDim(true);
+        SetMessage(_message);
+
+        if (m_armed)
+        {
+            RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
+            return;
+        }
+
+        // 하이라이트가 없으면 링도 없다 → 문구만 하단에 고정(ShowBanner와 같은 배치).
+        SetPointerActive(false);
+
+        if (this.messageRect != null)
+            this.messageRect.anchoredPosition =
+                new Vector2(0f, m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottom);
+
+        m_gateRoot.SetActive(true);
+    }
+
     /// <summary>딤을 숨기고 승격·리스너를 해제한다(앵커 미등장 시 대기 상태). 콜백은 유지되지 않는다.</summary>
     public void HideGate()
     {
@@ -191,6 +233,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (this.blocker == null) BuildFallbackUI();   // 프리팹 참조 미배선 = 코드 빌드 폴백
 
         CacheRoots();
+        CacheBlockerButton();  // blocker가 확정된 뒤여야 한다(폴백 경로도 여기서 함께 처리된다)
         NormalizeGraphics();   // 안내 요소의 raycastTarget을 런타임에서 한 번 바로잡는다
         EnsureEventSystem();
 
@@ -219,12 +262,15 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 승격을 남겨 두면 게임이 막으려던 입력이 튜토리얼 때문에 뚫린다.
     void RefreshVisibility()
     {
-        bool t_active    = m_target.gameObject.activeInHierarchy;
-        bool t_clickable = m_targetButton != null && m_targetButton.IsInteractable();
+        bool t_active = m_target.gameObject.activeInHierarchy;
+
+        // 메시지 모드엔 누를 타깃이 없다(버튼 없는 순수 영역도 하이라이트한다) → 표시 여부는 활성 여부만으로 판정한다.
+        // 화면 탭 자체가 탈출로라 딤이 유지돼도 불변식 (2)를 어기지 않는다.
+        bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        if (t_visible) Promote();
-        else           Demote();
+        if (t_visible && !m_confirmMode) Promote();
+        else                             Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -280,12 +326,26 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (this.focusRing != null)
         {
-            this.focusRing.sizeDelta        = t_size + Vector2.one * (this.ringPadding * 2f);
+            // 화면 전체폭 영역(덱 편집의 소유 카드·편성 칸)은 링을 그대로 키우면 좌우 테두리가 화면 밖으로 나가 사라진다
+            // — 9슬라이스라 보이는 건 테두리뿐이다. 펄스로 pulseScale까지 커지는 것까지 감안해 캔버스 안으로 제한한다.
+            Vector2 t_limit = t_full.size / Mathf.Max(1f, this.pulseScale);
+
+            this.focusRing.sizeDelta        = Vector2.Min(t_size + Vector2.one * (this.ringPadding * 2f), t_limit);
             this.focusRing.anchoredPosition = t_center;
         }
 
-        if (this.hand != null)
-            this.hand.anchoredPosition = new Vector2(t_max.x, t_min.y) + this.handOffset;
+        // 손가락은 타깃 우하단 바깥에 두되, 화면 아래위로 잘리지 않게 세로만 캔버스 안으로 민다
+        // (하단바 탭처럼 타깃이 화면 끝에 붙으면 오프셋 그대로는 손가락 대부분이 화면 밖으로 나간다).
+        // 가로는 클램프하지 않는다 — 옆으로 밀면 딤 위로 승격된 타깃 뒤에 들어가 오히려 사라진다.
+        // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
+        if (this.hand != null && !m_confirmMode)
+        {
+            Vector2 t_handPos  = new Vector2(t_max.x, t_min.y) + this.handOffset;
+            float   t_handHalf = this.hand.rect.height * 0.5f;
+
+            t_handPos.y = Mathf.Clamp(t_handPos.y, t_full.yMin + t_handHalf, t_full.yMax - t_handHalf);
+            this.hand.anchoredPosition = t_handPos;
+        }
 
         PlaceMessage(t_full, t_min.y, t_max.y);
     }
@@ -392,8 +452,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     void SetPointerActive(bool _on)
     {
-        if (this.focusRing != null && this.focusRing.gameObject.activeSelf != _on) this.focusRing.gameObject.SetActive(_on);
-        if (this.hand      != null && this.hand.gameObject.activeSelf      != _on) this.hand.gameObject.SetActive(_on);
+        bool t_hand = _on && !m_confirmMode;   // 메시지 모드는 읽을 영역이라 손가락을 띄우지 않는다(링만)
+
+        if (this.focusRing != null && this.focusRing.gameObject.activeSelf != _on)     this.focusRing.gameObject.SetActive(_on);
+        if (this.hand      != null && this.hand.gameObject.activeSelf      != t_hand) this.hand.gameObject.SetActive(t_hand);
 
         if (_on) StartPulse();
         else     StopPulse();
@@ -416,7 +478,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
             m_ringTween = this.focusRing.DOScale(this.pulseScale, this.pulseDuration)
                 .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo).SetLink(this.focusRing.gameObject);
 
-        if (this.hand != null && m_handTween == null)
+        // 숨겨 둔 손가락(메시지 모드)까지 돌릴 이유가 없다 — SetPointerActive가 먼저 활성 여부를 확정한다.
+        if (this.hand != null && this.hand.gameObject.activeSelf && m_handTween == null)
             m_handTween = this.hand.DOScale(this.pulseScale, this.pulseDuration)
                 .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo).SetLink(this.hand.gameObject);
     }
@@ -451,6 +514,18 @@ public class OutgameTutorialGateUI : MonoBehaviour
         t_callback?.Invoke();
     }
 
+    // 메시지 모드의 완료 = 딤 탭. 다른 모드에서 딤을 눌러도 아무 일이 없어야 하므로 모드 플래그로 한 번 더 막는다.
+    void OnBlockerClicked()
+    {
+        if (!m_confirmMode || m_satisfied) return;
+        m_satisfied = true;
+
+        Action t_callback = m_onSatisfied;
+        HideGate();          // 콜백이 다음 게이트를 걸 수 있도록 먼저 정리
+        m_onSatisfied = null;
+        t_callback?.Invoke();
+    }
+
     // 타깃을 놓는 모든 경로가 반드시 지나는 단일 창구. 승격과 리스너를 함께 푼다 —
     // 한쪽만 풀면 버튼이 모든 UI 위에 영구히 떠 있거나 다음 스텝이 오발화한다.
     void Release()
@@ -459,6 +534,19 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (m_targetButton != null) m_targetButton.onClick.RemoveListener(OnTargetClicked);
         m_targetButton = null;
+
+        // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
+        if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
+        m_confirmMode = false;
+    }
+
+    // 딤 탭 수신을 켠다. Release()가 항상 먼저 떼므로 중복 부착은 없지만, 단일 창구를 지키려 여기서도 한 번 뗀다.
+    void ArmBlockerClick()
+    {
+        if (m_blockerButton == null) return;
+
+        m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
+        m_blockerButton.onClick.AddListener(OnBlockerClicked);
     }
 
     // ── 초기화 ──────────────────────────────────────────────────────────────
@@ -475,6 +563,18 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         // 표시 요소들의 부모가 곧 게이트 루트다(별도 필드를 두면 오배선 축만 늘어난다).
         m_gateRoot = this.blocker != null ? this.blocker.transform.parent.gameObject : gameObject;
+    }
+
+    // 메시지 모드의 완료 신호는 딤 탭이다 → blocker에 Button을 1회 확보해 둔다(프리팹·폴백 공통).
+    // 룩은 딤 이미지가 전부라 transition은 끈다.
+    void CacheBlockerButton()
+    {
+        if (this.blocker == null) return;
+
+        m_blockerButton = this.blocker.GetComponent<Button>();
+        if (m_blockerButton == null) m_blockerButton = this.blocker.gameObject.AddComponent<Button>();
+
+        m_blockerButton.transition = Selectable.Transition.None;
     }
 
     // 안내 요소는 입력을 먹으면 안 된다 — 문구 전용 모드엔 딤이 없어 메시지가 터치를 가로챈다.

@@ -78,6 +78,12 @@ public class LobbyTabController : MonoBehaviour
         if (useFocus) this.ApplyFocus(_index);
     }
 
+    /// 로비 기본 탭으로 되돌린다. 하위 화면이 "로비로 나가기"를 부를 때 쓴다(탭 인덱스를 밖에 복제하지 않기 위한 창구).
+    public void SelectDefault()
+    {
+        this.Select(this.defaultIndex);
+    }
+
     /// Focus를 선택 탭 자리로 옮기고 아이콘·이름을 그 탭에 맞춘다.
     void ApplyFocus(int _index)
     {
