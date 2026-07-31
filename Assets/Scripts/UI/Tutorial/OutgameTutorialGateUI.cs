@@ -191,7 +191,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (this.blocker == null) BuildFallbackUI();   // 프리팹 참조 미배선 = 코드 빌드 폴백
 
         CacheRoots();
-        NormalizeGraphics();   // 저작 실수(raycastTarget·폰트)를 런타임에서 한 번 바로잡는다
+        NormalizeGraphics();   // 안내 요소의 raycastTarget을 런타임에서 한 번 바로잡는다
         EnsureEventSystem();
 
         m_gateRoot.SetActive(false);
@@ -477,8 +477,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_gateRoot = this.blocker != null ? this.blocker.transform.parent.gameObject : gameObject;
     }
 
-    // 안내 요소는 입력을 먹으면 안 되고(문구 전용 모드엔 딤이 없다), 한글 폰트가 아니면 두부가 된다.
-    // 프리팹 저작 실수를 여기서 한 번 흡수한다.
+    // 안내 요소는 입력을 먹으면 안 된다 — 문구 전용 모드엔 딤이 없어 메시지가 터치를 가로챈다.
     void NormalizeGraphics()
     {
         if (this.blocker != null) this.blocker.raycastTarget = true;
@@ -486,8 +485,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         ClearRaycast(this.focusRing);
         ClearRaycast(this.hand);
         ClearRaycast(this.messageRect);
-
-        TutorialUIStyle.ApplyFont(this.messageText);
     }
 
     static void ClearRaycast(Component _root)

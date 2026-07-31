@@ -2400,6 +2400,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialBridge
   data: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
+  gatePrefab: {fileID: 6510000000000000006, guid: a7c3f21d94b8e4f4a9d05c6b1e73f802, type: 3}
   suppressGuideUI: 1
 --- !u!1 &1803048085
 GameObject:

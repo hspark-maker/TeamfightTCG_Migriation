@@ -52,7 +52,7 @@ MonoBehaviour:
   collectionLayout: {fileID: 11400000, guid: e7990a7c604be694486685834716e120, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
-  starterDeck: {fileID: 11400000, guid: 8f37683e21484b14baba7c0a0eea43a2, type: 2}
+  starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0
