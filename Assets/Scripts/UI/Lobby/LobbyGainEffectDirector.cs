@@ -110,19 +110,17 @@ public class LobbyGainEffectDirector : MonoBehaviour
             return false;
         }
 
-        // 잔액은 이미 최종값이다 — 획득분만큼 되돌려 놓고 코인 도착에 맞춰 다시 올린다.
-        long t_start = CurrencyManager.Gold - _gold;
-        int  t_count = (int)Mathf.Clamp(_gold, this.coinCountMin, this.coinCountMax);
+        int t_count = (int)Mathf.Clamp(_gold, this.coinCountMin, this.coinCountMax);
 
         var t_burst = EnsureCoinBurst();
         // 수치 근처에서 생겨나 수치로 되돌아온다 — 원점과 목적지가 같고 흩어짐만 부채꼴로 준다.
         t_burst.Configure(this.coinSprite, t_textRect, t_textRect, t_count, this.coinAngleStart, this.coinAngleSpan);
 
         // 되돌리기는 지금 바로 — 시퀀스는 이 프레임에 재생을 시작하므로 콜백으로 미룰 이유가 없다.
-        this.goldHud.HoldDisplay(t_start);
+        var t_onArrived = this.goldHud.BeginGainRollUp(_gold, this.goldPunch);
 
         // 카드 단계와 같은 0초에 꽂아 동시에 돌린다.
-        _master.Insert(0f, t_burst.BuildBurst((_arrived, _total) => OnCoinArrived(t_start, _gold, _arrived, _total)));
+        _master.Insert(0f, t_burst.BuildBurst(t_onArrived));
         return true;
     }
 
@@ -140,17 +138,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
         _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
         return true;
-    }
-
-    // 코인 한 장이 닿을 때마다 숫자를 그만큼 올리고 텍스트를 튀긴다. 마지막 장에서 실제 잔액으로 확정.
-    void OnCoinArrived(long _start, long _gold, int _arrived, int _total)
-    {
-        if (this.goldHud == null) return;
-
-        if (_arrived >= _total) this.goldHud.ReleaseDisplay();
-        else this.goldHud.HoldDisplay(_start + (long)(_gold * (_arrived / (float)_total)));
-
-        UiPunch.Play(this.goldHud.TextRect, this.goldPunch);
     }
 
     void OnCardArrived()

@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 
@@ -10,6 +11,25 @@ public class GoldHud : MonoBehaviour
 
     /// <summary>골드 수치 텍스트의 RectTransform. 연출이 도착 지점·강조 대상으로 쓴다.</summary>
     public RectTransform TextRect => this.goldText != null ? (RectTransform)this.goldText.transform : null;
+
+    /// <summary>
+    /// 획득 연출용 숫자 롤업을 시작하고, 코인 도착 콜백(도착 장수, 전체 장수)에 물릴 진행 핸들러를 돌려준다.
+    /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다(획득분만큼 되돌렸다가 도착에 맞춰 다시 올린다).
+    /// 연출이 끊겨도 고정이 풀리도록 호출부는 시퀀스 OnKill에 ReleaseDisplay를 걸어둘 것.
+    /// </summary>
+    public Action<int, int> BeginGainRollUp(long _gain, float _punch = UiPunch.DEFAULT_SCALE)
+    {
+        long t_start = CurrencyManager.Gold - _gain;
+        this.HoldDisplay(t_start);
+
+        return (_arrived, _total) =>
+        {
+            if (_total <= 0 || _arrived >= _total) this.ReleaseDisplay();
+            else this.HoldDisplay(t_start + (long)(_gain * (_arrived / (float)_total)));
+
+            UiPunch.Play(this.TextRect, _punch);
+        };
+    }
 
     /// <summary>표시값을 연출용으로 고정한다. 실제 잔액 변경은 ReleaseDisplay까지 화면에 반영되지 않는다.</summary>
     public void HoldDisplay(long _value)
