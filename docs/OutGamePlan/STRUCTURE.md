@@ -258,6 +258,7 @@ sequenceDiagram
 - **재진입 = coalesce**: `Play`가 이전 시퀀스를 `Kill`한 뒤 새로 만든다. **`Kill` → `BeginGainRollUp` 순서가 정확성의 전부** — 뒤집으면 옛 `OnKill`의 `ReleaseDisplay`가 새 고정을 풀어 숫자가 뒤로 점프한다(`GoldHud.m_held`가 단일 bool). 끝값은 항상 `CurrencyManager.Gold` 직독이라 드리프트 불가.
 - **`CoinBurstEffect` 인스턴스는 하나만** — 코인 잔해 정리를 다음 `BuildBurst`의 `ClearCoins()`에 맡기는 구조라 인스턴스가 갈리면 옛 코인이 허공에 굳는다.
 - 재생기를 도감 계층에 두지 않은 이유: 화면은 탭 전환에 꺼지고 행 뷰는 `OnEnable`마다 재생성돼 `CoinBurstEffect.OnDisable`이 비행 중 코인을 걷어간다(`RankRewardClaimPopup`이 이미 경고하는 함정).
+- **미수렴 잔여**: `RankRewardClaimPopup.cs:84-92`가 같은 조립을 세 번째로 들고 있다(닫기가 `OnComplete(Hide)`에 물려 있어 재생기에 완료 콜백이 먼저 필요). 이 경로와 `BuildGoldGain`(로비 진입)은 `m_current` coalesce 밖이라 서로·수확과 겹치면 숫자가 튄다 — 로비 진입 연출 1.3초 안에 도감 탭 전환+수확이 필요해 도달 불가로 보고 남겨둔 스코프 밖 엣지. 마스터 시퀀스를 대신 죽이는 해법은 금지: `CardGainFlightEffect`는 `ClearCards` 경로가 다음 `BuildFlight`뿐이라(1회성 연출) 카드가 허공에 굳는다.
 
 > **푸터 일괄수령**: 전용 뷰를 두지 않고 `CollectionGalleryController`가 겸한다 — 필요한 게 폴링 틱과 `OnChanged` 구독뿐인데 둘 다 컨트롤러에 이미 있어, 별도 컴포넌트는 같은 배선의 중복이었다. 버튼은 항상 노출하고 `GetTotalHarvestable() >= 1`일 때만 `interactable`(오브젝트 토글 없음 → 자기비활성 버그 소지 자체가 사라졌다). 라벨은 프리팹 저작값 고정(수량 표기 없음). 클릭 시 `HarvestAll()` 1회로 여러 행·여러 재화를 지급하고 영속·통지는 1회로 묶인다.
 
