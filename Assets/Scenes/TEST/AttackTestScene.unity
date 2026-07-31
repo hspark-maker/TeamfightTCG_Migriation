@@ -3983,6 +3983,16 @@ MonoBehaviour:
   resultText: {fileID: 0}
   frontText: "\uC120\uACF5"
   backText: "\uD6C4\uACF5"
+  backgroundImage: {fileID: 0}
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.78}
+  backgroundFade: 0.25
+  glowImage: {fileID: 0}
+  frontGlowColor: {r: 0.3, g: 0.65, b: 1, a: 0.85}
+  backGlowColor: {r: 1, g: 0.28, b: 0.22, a: 0.85}
+  glowSize: 900
+  glowFade: 0.28
+  glowPulseScale: 1.1
+  glowPulseTime: 0.9
 --- !u!114 &1755558531
 MonoBehaviour:
   m_ObjectHideFlags: 0

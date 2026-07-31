@@ -25,9 +25,26 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
 
     [SerializeField] Sprite emptySlot;
 
+    // 프레임 키워드 장식. 인게임 CardView.KeywordFrame과 같은 구조·같은 판정(CardVisualRules.TraitKeywords) —
+    // 규칙을 복제하지 않고 같은 함수를 부른다. 안 쓸 장식은 배열에서 빼면 그냥 안 켜진다.
+    // 이름 매칭이 아니라 참조 배선인 이유: 오브젝트 이름을 바꿔도 조용히 꺼지지 않게.
+    [System.Serializable]
+    public struct KeywordFrame
+    {
+        public CardKeyword keyword;
+        public GameObject  overlay;
+    }
+
+    [Header("Frame Decorations")]
+    [SerializeField] KeywordFrame[] keywordFrames;
+
     [Header("Keyword Icons")]
     [SerializeField] Transform keywordIconContainer;
     [SerializeField] GameObject keywordIconPrefab;
+    // true면 키워드 아이콘 줄만 그리고 시너지 아이콘은 표시하지 않는다(CardView.keywordIconsUseSynergySlot과 같은 규칙).
+    // 인게임 CardView는 좌하단 세로열 한 자리를 둘이 공유하므로, "그 자리의 주인"을 이 스위치 하나가 정한다.
+    // false면 종전대로 키워드 줄 + 시너지 줄 둘 다.
+    [SerializeField] bool keywordIconsUseSynergySlot;
 
     [Header("Synergy Icons")]
     // 미배선이면 keywordIconContainer에 이어붙인다(전용 자리를 만들기 전에도 바로 보이게).
@@ -52,7 +69,9 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         this.nameText.text = _card.name;
         if (_mod == CardElementMod.Full)
         {
-            this.cardPortrait.sprite = _card.fullImage;
+            // 아트 소스는 CardVisualRules 단독(battleImage → fullImage → portrait). fullImage 직접 참조 금지 —
+            // 프레임이 인게임 CardView와 같은 세로형이라 비율이 다른 fullImage를 쓰면 카드마다 잘림이 갈라진다.
+            this.cardPortrait.sprite = CardVisualRules.PickCardArt(_card);
             //this.explainText.text = _card.cardExplain;
             this.hpText.text = (_displayHp >= 0 ? _displayHp : _card.maxHp).ToString();
         }
@@ -62,6 +81,7 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         }
 
         RefreshKeywordIcons(_card);
+        RefreshKeywordFrames(_card);
         RefreshSynergyIcons(_card);
     }
 
@@ -104,10 +124,30 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         }
     }
 
+    // 프레임 키워드 장식 on/off. 판정 기준은 CardView.RefreshKeywordFrames와 동일한 TraitKeywords —
+    // 즉 표식(Mark)은 아이콘 줄엔 없어도 프레임엔 뜬다(그 차이의 단일 선언 지점은 CardVisualRules.IconRowExcluded).
+    void RefreshKeywordFrames(CardData _card)
+    {
+        if (this.keywordFrames == null) return;
+
+        CardKeyword t_keywords = CardVisualRules.TraitKeywords(_card);
+
+        foreach (KeywordFrame t_frame in this.keywordFrames)
+        {
+            if (t_frame.overlay == null) continue;
+            // None 배선은 항상 꺼짐 — HasFlag(None)은 늘 true라 그대로 두면 모든 카드에서 켜진다.
+            bool t_on = t_frame.keyword != CardKeyword.None && (t_keywords & t_frame.keyword) != 0;
+            t_frame.overlay.SetActive(t_on);
+        }
+    }
+
     /// <summary>시너지 아이콘 줄. 전용 컨테이너가 없으면 키워드 아이콘 뒤에 이어붙인다
     /// (그 경우 클리어는 RefreshKeywordIcons가 이미 했으므로 여기서 또 비우면 안 된다).</summary>
     void RefreshSynergyIcons(CardData _card)
     {
+        // 그 자리를 키워드 아이콘이 쓰는 모드면 시너지 아이콘을 아예 만들지 않는다(겹침 방지). CardView와 동일.
+        if (this.keywordIconsUseSynergySlot) { ClearIcons(this.synergyIconContainer); return; }
+
         bool       t_dedicated = this.synergyIconContainer != null;
         Transform  t_parent    = t_dedicated ? this.synergyIconContainer : this.keywordIconContainer;
         GameObject t_prefab    = this.synergyIconPrefab != null ? this.synergyIconPrefab : this.keywordIconPrefab;
@@ -135,6 +175,7 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
         // 슬롯을 비울 때 이전 카드의 아이콘이 남지 않게 정리(덱 편성에서 슬롯 교체 시 발생).
         ClearIcons(this.keywordIconContainer);
         ClearIcons(this.synergyIconContainer);
+        RefreshKeywordFrames(null);   // 빈 슬롯: 프레임 장식도 전부 끈다(아이콘 줄과 동일한 정보 은닉).
     }
 
     static void ClearIcons(Transform _container)

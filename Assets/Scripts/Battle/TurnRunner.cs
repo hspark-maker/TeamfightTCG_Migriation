@@ -21,16 +21,49 @@ public class TurnRunner : MonoBehaviour
     [SerializeField] GameResultPopup winPopup;
     [SerializeField] GameResultPopup losePopup;
 
+    /// <summary>전투 씬에 하나. 설정 창(항복/디버그 승리)처럼 씬 배선이 없는 UI가 찾아오는 진입점.
+    /// null이면 지금 전투 중이 아니다 — UI는 이걸로 전투 전용 버튼 노출을 판정한다.</summary>
+    public static TurnRunner Instance { get; private set; }
+
     TurnContext ctx;
     bool disconnectWin;
+    bool forcedEnd;      // 항복/디버그로 결과를 강제 확정했는가. 턴 루프를 다음 경계에서 끊는다.
     bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
     long lastRewardGold; // CaptureResult에서 확정한 지급 골드. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
 
+    void Awake() => Instance = this;
+
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom -= HandlePlayerLeft;
+    }
+
+    /// <summary>항복 = 즉시 패배 확정. 보상·랭크는 정상 패배와 같은 경로(CaptureResult)를 탄다.
+    /// 멀티는 러너를 내려 상대에게 <b>기존 이탈-부전승 경로</b>(OnPlayerLeftRoom)로 승리를 준다 —
+    /// 항복 전용 와이어 메시지를 새로 만들지 않는다(프로토콜 추가 0, 결과 동일).</summary>
+    public void Surrender() => ForceEnd(false);
+
+#if UNITY_EDITOR
+    /// <summary>디버그 강제 승리. 에디터 전용 — 빌드에는 이 심볼 자체가 없다.
+    /// 멀티에서는 이쪽 화면만 끝나고 상대는 계속 진행한다(디버그 용도라 동기화하지 않는다).</summary>
+    public void DebugForceWin() => ForceEnd(true);
+#endif
+
+    void ForceEnd(bool _won)
+    {
+        if (this.resultCaptured) return;   // 이미 승패 확정 — 보상 재지급·팝업 덮어쓰기 방지
+
+        this.forcedEnd = true;
+        TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
+        CaptureResult(_won);
+        GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
+        t_popup?.Show(this.lastRewardGold, this.lastRankDelta, _won);
+
+        if (!_won && DeckConfig.IsMultiplayer)
+            NetworkSession.Instance?.Disconnect().Forget();
     }
 
 #if UNITY_EDITOR
@@ -185,7 +218,7 @@ public class TurnRunner : MonoBehaviour
                 SynergyTriggers.TurnEnded(t_endedCtx);
             }
 
-            if (this.disconnectWin || CheckGameOver()) break;
+            if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
 
             if (t_current == 1)
             {

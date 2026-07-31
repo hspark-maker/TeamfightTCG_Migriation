@@ -27,15 +27,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
   playerScript:
-  - kind: 2
-    attackerSlot: 0
-    targetSlot: 1
-    guideMessage: "\uC801 \uCE74\uB4DC\uB97C \uC190\uAC00\uB77D\uC73C\uB85C \uAE38\uAC8C
-      \uB204\uB974\uBA74 \uADF8 \uCE74\uB4DC\uC758 \uC815\uBCF4(\uCCB4\uB825\xB7\uD0A4\uC6CC\uB4DC)\uB97C
-      \uBCFC \uC218 \uC788\uB2E4. \uC801 '\uCCA0\uAC11\uBABD\uCE58'\uB97C \uAE38\uAC8C
-      \uB20C\uB7EC \uD655\uC778\uD574\uBCF4\uC790!"
-    waitForTap: 0
-    dimBackground: 0
   - kind: 1
     attackerSlot: 0
     targetSlot: 1
