@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1c0f0d0e1f24b3a8c5d6e7f80910a05, type: 3}
   m_Name: Step_OpenPack
   m_EditorClassIdentifier: Assembly-CSharp::WaitPackOpenStep
-  guideMessage: "카드팩 오픈"
+  guideMessage: 
