@@ -26,6 +26,7 @@ public static class SynergyTriggers
         // (icon 미배정이면 null 전달 = 기존대로 카드 초상화 폴백)
         CardPassive.Notify(self, synergy.effectDescription, synergy.activeIcon);
         CardView.GetView(self)?.PopSynergyBadge(synergy);       // 발동 주체 카드의 해당 배지 pop
+        SynergyEmblemVfx.Play(self, synergy);                   // 카드 뒤 상징 등장(그림 미배정이면 무동작)
     }
 
 
@@ -226,6 +227,11 @@ public static class SynergyTriggers
                 if (t_effect == null) continue;
                 t_effect.OnEntered(ctx.WithSynergy(t_active.Synergy)).Forget();
             }
+
+            // 그 시너지 소속 카드가 등장한 경우에만 상징을 띄운다 — 디스패처는 비소속 카드에도 돌기 때문에
+            // 게이트가 없으면 아무 카드나 나올 때마다 모든 활성 시너지 엠블럼이 겹쳐 뜬다.
+            if (SynergyApplier.BelongsTo(ctx.self, t_active.Synergy))
+                SynergyEmblemVfx.Play(ctx.self, t_active.Synergy);
         }
     }
 
