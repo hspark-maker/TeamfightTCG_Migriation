@@ -5759,7 +5759,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 379855187250368168, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 98
+      value: 95
+      objectReference: {fileID: 0}
+    - target: {fileID: 379855187250368168, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 95
       objectReference: {fileID: 0}
     - target: {fileID: 379855187250368170, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
       propertyPath: m_Sprite
@@ -5773,6 +5777,10 @@ PrefabInstance:
       propertyPath: m_sharedMaterial
       value: 
       objectReference: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+    - target: {fileID: 379855187413560722, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 126
+      objectReference: {fileID: 0}
     - target: {fileID: 379855187535017865, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
       propertyPath: m_Name
       value: Button_Battle
