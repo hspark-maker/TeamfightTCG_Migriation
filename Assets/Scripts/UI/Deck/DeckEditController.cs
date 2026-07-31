@@ -29,18 +29,22 @@ public class DeckEditController : MonoBehaviour
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
 
+    // 신규 생성은 저장 좌표가 없다(큐 삽입 위치는 저장이 확정되는 순간에 생긴다) → sentinel이 아니라 모드로 구분한다.
+    enum EDeckEditMode { None, Edit, Create }
+
     // 편집 중인 덱 사본. 길이는 항상 DECK_SIZE 고정이고 빈 칸은 null이다(리스트로 두면 "3번 칸이 비었다"를 표현할 수 없다).
     readonly CardData[] m_working = new CardData[DeckSaveManager.DECK_SIZE];
 
-    // 현재 편집 중인 저장 슬롯 인덱스(닫힌 상태는 -1).
+    EDeckEditMode m_mode = EDeckEditMode.None;
+
+    // 현재 편집 중인 저장 슬롯 인덱스(Edit 모드에서만 유효).
     int  m_slotIndex = -1;
     bool m_dirty;
 
     // 편집 진입 시점의 이름. 이름 변경 여부 판정 기준이자 빈 입력의 복구값이다.
     string m_savedName;
 
-    public int  SlotIndex => m_slotIndex;
-    public bool IsOpen    => m_slotIndex >= 0;
+    public bool IsOpen => m_mode != EDeckEditMode.None;
 
     // 드래그 컨트롤러가 드롭 대상 판정에 쓰는 칸 목록. 미배선(null)이어도 호출측이 터지지 않게 빈 목록을 준다.
     public IReadOnlyList<DeckEditSlotView> Slots => slots ?? Array.Empty<DeckEditSlotView>();
@@ -70,16 +74,17 @@ public class DeckEditController : MonoBehaviour
         if (autoEquipButton != null) autoEquipButton.interactable = false;
     }
 
-    // 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표(신규 생성도 빈 슬롯 인덱스를 받는다).
+    // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
     public void Open(int _slotIndex)
     {
-        // DeckSaveManager는 슬롯 배열을 직접 인덱싱한다 — 만석일 때 FindFirstEmptySlot이 주는 -1이 새면 예외가 난다.
+        // DeckSaveManager는 슬롯 배열을 직접 인덱싱한다 — 범위 밖 좌표가 새면 예외가 난다.
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT)
         {
             Debug.LogError($"[DeckEditController] 잘못된 슬롯 인덱스 {_slotIndex} — 편집을 열지 않는다.");
             return;
         }
 
+        m_mode      = EDeckEditMode.Edit;
         m_slotIndex = _slotIndex;
 
         // 세이브의 List<CardData>는 유효 슬롯이면 6개지만 불완전 슬롯이면 더 짧을 수 있다 → 앞에서부터 채운다.
@@ -94,18 +99,25 @@ public class DeckEditController : MonoBehaviour
 
         m_dirty = false;   // 로드 직후 = 디스크와 동일 → 그냥 나가면 파일 쓰기 없음
 
-        // GetName은 이름이 비어 있으면 "덱 N" 폴백을 준다 → 신규 덱도 그대로 기본 이름이 된다.
-        m_savedName = DeckSaveManager.GetName(_slotIndex);
-        if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
+        // 표시용 폴백("덱 N")까지 포함한 값이라야, 입력을 안 건드렸을 때 rename 판정이 false로 유지된다.
+        BeginEdit(DeckSaveManager.GetDisplayName(_slotIndex));
+    }
 
-        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest);
-        if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
+    // 신규 덱 편집 진입. 저장 좌표는 6/6 완성 저장 시점에 TryInsertFront가 정한다.
+    public void OpenNew()
+    {
+        m_mode      = EDeckEditMode.Create;
+        m_slotIndex = -1;
 
-        RefreshAll();
+        Array.Clear(m_working, 0, m_working.Length);
+        m_dirty = false;
+
+        BeginEdit(DeckSaveManager.SuggestNewDeckName());
     }
 
     public void Close()
     {
+        m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
         m_dirty     = false;
         m_savedName = null;
@@ -134,12 +146,13 @@ public class DeckEditController : MonoBehaviour
 
     // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
     // Close()는 DeckTabController를 거치는 경로에서만 불린다.
-    // 편집 상태(m_slotIndex)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
-    // DeckTabController.IsEditing이 거짓을 보고한다.
+    // 편집 상태(m_mode)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
+    // 다음 진입 전까지 편집 중인 것처럼 보고된다.
     void OnDisable()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
 
+        m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
         m_dirty     = false;
         m_savedName = null;
@@ -147,6 +160,18 @@ public class DeckEditController : MonoBehaviour
 
         if (dragController != null) dragController.Cancel();
         if (nameInput      != null) nameInput.DeactivateInputField();
+    }
+
+    // 두 진입점의 공통 후반부. m_mode·m_slotIndex·m_working은 호출 전에 확정돼 있어야 한다.
+    void BeginEdit(string _initialName)
+    {
+        m_savedName = _initialName;
+        if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
+
+        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest);
+        if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
+
+        RefreshAll();
     }
 
     // 이름 입력 확정. 여기서는 표시만 정리하고 dirty를 세우지 않는다 —
@@ -250,30 +275,16 @@ public class DeckEditController : MonoBehaviour
 
         if (CountFilled() == DeckSaveManager.DECK_SIZE)
         {
-            // SaveAll()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
-            // (DeckSaveManager.SaveSlot 주석). 그래서 이 슬롯만 반영하는 SaveSlot을 쓴다.
-            // m_working에는 null이 섞일 수 있지만 내부 Save()가 Where(d => d != null)로 거르고,
-            // 애초에 6/6일 때만 이 분기에 들어오므로 안전하다.
-            //
-            // 이름은 SetName으로 메모리에 올려두면 SaveSlot이 이름까지 같이 직렬화한다.
-            // SetName을 저장 경로 안에서만 부르는 게 중요하다 — 밖에서 부르면 미완성 폐기 경로에서도
-            // 메모리 이름이 바뀐 채로 남는다.
-            // 이름이 그대로면 SetName을 부르지 않는다 — m_savedName은 GetName의 표시용 폴백("덱 1")일 수 있고,
-            // 그걸 되쓰면 "이름 미지정(빈 문자열)" 상태가 실데이터로 굳어버린다.
-            string t_name    = ResolveName();
-            bool   t_renamed = t_name != m_savedName;
-
-            if (t_renamed) DeckSaveManager.SetName(m_slotIndex, t_name);
-            if (m_dirty || t_renamed)
+            // 삽입에 실패한 채 나가면 유저가 편성한 6장이 조용히 증발한다 → 화면을 유지해 재시도 여지를 남긴다.
+            if (m_mode == EDeckEditMode.Create)
             {
-                // 덱 대표 이미지는 첫 저장 때 한 번만 발급하고 이후 카드 구성이 바뀌어도 유지한다.
-                // 발급을 저장 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
-                // 메모리에만 키가 남아 세이브와 어긋난다.
-                if (string.IsNullOrEmpty(DeckSaveManager.GetImageKey(m_slotIndex)))
-                    DeckSaveManager.SetImageKey(m_slotIndex, DeckImages.PickRandomKey());
-
-                DeckSaveManager.SaveSlot(m_slotIndex, m_working);
+                if (!SaveNewDeck()) return;
             }
+            else
+            {
+                SaveEditedDeck();
+            }
+
             ExitToList();
             return;
         }
@@ -295,6 +306,48 @@ public class DeckEditController : MonoBehaviour
             Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 목록으로 복귀한다.");
             ExitToList();
         }
+    }
+
+    // 신규 덱은 rename·dirty 판정이 없다 — 6/6이 채워졌으면 항상 저장 대상이다.
+    // 이름도 항상 실문자열로 굳힌다. 빈 이름으로 두면 이후 덱이 앞뒤로 밀릴 때 표시 폴백("덱 N")이 따라 변한다.
+    bool SaveNewDeck()
+    {
+        // 이미지 키는 삽입 "전에" 뽑는다 — IsKeyInUse가 삽입 전 상태를 봐야 중복 회피가 정확하고,
+        // 삽입 후 SetImageKey는 SaveAll이 끝난 뒤라 메모리에만 남는다.
+        if (DeckSaveManager.TryInsertFront(m_working, ResolveName(), DeckImages.PickRandomKey(), out _)) return true;
+
+        // 만석·미로드 등 실패 사유는 DeckSaveManager가 로그로 남긴다. 여기서는 나가지 않는다는 사실만 알린다.
+        Debug.LogError("[DeckEditController] 신규 덱 저장 실패 — 편집 화면을 유지한다.");
+
+        return false;
+    }
+
+    // 기존 덱 저장. 위치(m_slotIndex)는 그대로 유지한다(편집으로는 목록 맨 앞으로 승격하지 않는다).
+    void SaveEditedDeck()
+    {
+        // SaveAll()은 메모리 6슬롯을 통째로 flush해 로드 안 된 다른 덱을 빈 값으로 덮어쓴다
+        // (DeckSaveManager.SaveSlot 주석). 그래서 이 슬롯만 반영하는 SaveSlot을 쓴다.
+        // m_working에는 null이 섞일 수 있지만 내부 Save()가 Where(d => d != null)로 거르고,
+        // 애초에 6/6일 때만 이 분기에 들어오므로 안전하다.
+        //
+        // 이름은 SetName으로 메모리에 올려두면 SaveSlot이 이름까지 같이 직렬화한다.
+        // SetName을 저장 경로 안에서만 부르는 게 중요하다 — 밖에서 부르면 미완성 폐기 경로에서도
+        // 메모리 이름이 바뀐 채로 남는다.
+        // 이름이 그대로면 SetName을 부르지 않는다 — m_savedName은 GetDisplayName의 표시용 폴백("덱 1")일 수 있고,
+        // 그걸 되쓰면 "이름 미지정(빈 문자열)" 상태가 실데이터로 굳어버린다.
+        string t_name    = ResolveName();
+        bool   t_renamed = t_name != m_savedName;
+
+        if (t_renamed) DeckSaveManager.SetName(m_slotIndex, t_name);
+        if (!m_dirty && !t_renamed) return;
+
+        // 덱 대표 이미지는 첫 저장 때 한 번만 발급하고 이후 카드 구성이 바뀌어도 유지한다.
+        // 발급을 저장 분기 안에 두는 게 중요하다 — 밖에서 세우면 저장하지 않는 경로에서
+        // 메모리에만 키가 남아 세이브와 어긋난다.
+        if (string.IsNullOrEmpty(DeckSaveManager.GetImageKey(m_slotIndex)))
+            DeckSaveManager.SetImageKey(m_slotIndex, DeckImages.PickRandomKey());
+
+        DeckSaveManager.SaveSlot(m_slotIndex, m_working);
     }
 
     void ExitToList()

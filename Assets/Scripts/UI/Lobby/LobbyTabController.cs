@@ -3,9 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// 로비 하단 탭 컨트롤러 (레이아웃 템플릿용)
-/// 하단바 버튼을 누르면 대응하는 중앙 콘텐츠 패널만 켜지고 나머지는 꺼진다.
-/// 선택 표시는 Button_Focus(강조 버튼) 하나를 선택된 탭 자리로 옮기는 방식이다.
+/// 로비 탭 컨트롤러 (하단 5탭 / 도감 서브탭 등 탭바 공용)
+/// 탭 버튼을 누르면 대응하는 콘텐츠 패널만 켜지고 나머지는 꺼진다.
+/// 선택 표시는 두 가지 — focus가 배선돼 있으면 Button_Focus(강조 버튼)를 선택된 탭 자리로 옮기고,
+/// 비어 있으면 각 버튼의 TabButtonView가 자기 겉모습(높이·색·선택표시)을 바꾼다.
 /// 아이콘/상세 배치는 각 콘텐츠 패널과 버튼 안에서 자유롭게 채우면 된다.
 public class LobbyTabController : MonoBehaviour
 {
@@ -28,13 +29,22 @@ public class LobbyTabController : MonoBehaviour
     [SerializeField] Image focusIcon;       // Focus 안의 아이콘
     [SerializeField] TMP_Text focusLabel;   // Focus 안의 이름 텍스트
 
+    // 탭 버튼의 겉모습 컴포넌트 캐시(없으면 null). 버튼에서 직접 찾으므로 인스펙터 재배선이 필요 없다.
+    TabButtonView[] m_views;
+
     void Awake()
     {
+        this.m_views = new TabButtonView[this.tabs.Count];
+
         for (int i = 0; i < this.tabs.Count; i++)
         {
             int idx = i; // 클로저 캡처 방지
             Button btn = this.tabs[i].button;
-            if (btn != null) btn.onClick.AddListener(() => this.Select(idx));
+            if (btn != null)
+            {
+                btn.onClick.AddListener(() => this.Select(idx));
+                this.m_views[i] = btn.GetComponent<TabButtonView>();
+            }
 
             // 탭 버튼은 Layer Lab 프리팹 인스턴스 내부의 stripped Button이라 TutorialAnchor를 직접 못 붙인다 → 여기서 대신 등록.
             // 선택된 탭 버튼은 Focus에 가려져 잠시 꺼지지만, 오브젝트 자체는 살아 있으므로 Unregister는 불필요하다.
@@ -60,6 +70,9 @@ public class LobbyTabController : MonoBehaviour
 
             // Focus가 선택 탭 자리를 대신 차지하므로 그 탭의 일반 버튼은 숨긴다.
             if (useFocus && this.tabs[i].button != null) this.tabs[i].button.gameObject.SetActive(!on);
+
+            // Focus를 안 쓰는 탭바(도감 서브탭 등)는 버튼이 스스로 선택 겉모습을 바꾼다.
+            if (!useFocus && this.m_views != null && this.m_views[i] != null) this.m_views[i].SetSelected(on);
         }
 
         if (useFocus) this.ApplyFocus(_index);

@@ -530,14 +530,17 @@ sequenceDiagram
 | `PackCardStack` / `PackCardView` (더미 스와이프 · 개봉 카드 표시) | 신규 `Assets/Scripts/UI/Shop/PackCardStack.cs` · `PackCardView.cs` | G-29 ✅ |
 | `PackAcquireController` (캐리어 소비·획득버튼·목적지 이동) | 신규 `Assets/Scripts/UI/Shop/PackAcquireController.cs` — **(2026-07-30) 덱 저장(`SaveOpenedDeck`)·`DeckConfig.Set` 제거.** 팩을 열 때마다 덱 슬롯이 자동 생성돼 6칸을 잠식하던 동작을 걷어냈다. 첫 덱은 부트의 `StarterDeck`이 보장하고, 편성은 덱 화면의 몫. 전투 덱 폴백은 `LobbyMatchLauncher.TryApplyFirstValidDeck`이 담당 | G-27 ✅ / G-28 덱저장 → **폐기** |
 | ~~`RevealCardView`~~ | ~~**폐기**(G-28) — 결과 표시는 `CollectionCardView` 재사용~~ → **(2026-07-27) 개봉 전용 `PackCardView`로 재분리**(G-29). 도감 타일은 잠금 표현이 필요하고 개봉 카드는 신규/중복 강조가 필요해 요구가 갈렸다 | G-28 → G-29 |
-| `DeckSaveManager.SaveSlotToFile` (공유 계약 **추가**) → **(2026-07-30) `SaveSlot`으로 개명** | `Assets/Scripts/OutGame/Deck/DeckSaveManager.cs`(구 `Battle/`) — 단일 슬롯만 비파괴 저장(전슬롯 flush 금지). 저장 대상은 `decks.json`이 아니라 `DataSaveManager.Data.deck` | G-28 ✅ |
+| `DeckSaveManager.SaveSlotToFile` (공유 계약 **추가**) → **(2026-07-30) `SaveSlot`으로 개명** | `Assets/Scripts/OutGame/Deck/DeckSaveManager.cs`(구 `Battle/`) — 단일 슬롯만 비파괴 저장(전슬롯 flush 금지). 저장 대상은 `decks.json`이 아니라 `DataSaveManager.Data.deck`. **(2026-07-31) 단서**: 여러 칸이 함께 움직이는 순서 변경(삽입·삭제·압축)은 `SaveSlot`으로 반영할 수 없다 — 반드시 `SaveAll` | G-28 ✅ |
 | `OwnershipManager` (GrantDefaults 삭제 + HasAnyOwnedSaved) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` | G-23/24 ✅ |
 | ~~3D 팩 모델 = `Assets/Assets/Prefabs/CardPack.prefab` (BoxCollider)~~ | **폐기**(2026-07-28 2D 전환) — 팩은 씬 UI 노드(`UICanvas > PackRoot > Pack`(Image + `PackTearHandle`) `> Seal`)로 대체. 프리팹·메시 2종·머티리얼 3종은 색 A/B 대조용으로 Play 검증 전까지만 보존(참조는 `CardPack.unity` 하나뿐, guid 전수 검증 완료). `BoxCollider`는 원래부터 참조 0인 vestigial이었다 | G-28 → G-29 → **폐기** |
 | 개봉 전용 카드 = `Assets/Assets/Prefabs/UI/PackUI/PackCard.prefab` | 860×1204 · `Glow`/`NewBadge`/`RefundBadge` | G-29 ✅ |
 | 공용 팩 오픈 씬 = `Assets/Scenes/CardPack.unity` | `PackOpenDirector`(`PackRevealView`+`PackAcquireController`+브리지) · `UICanvas`(Overlay) > **`BG`**(Image, `shakeTarget`) · **`PackRoot`**(빈 컨테이너) > **`Pack`**(Image + `PackTearHandle`) > **`Seal`**(Image) · `RevealPanel`(CanvasGroup) > `SkipButton`·`AcquireButton`·`SummaryGroup`·`ResultGrid` · `StackInput`(+`PackCardStack`) > `CardLayer` > `StackAnchor` · `RemainingText` · `TearHint`. **(2026-07-28 2D 전환)** `CardPack` 프리팹 인스턴스·`Directional Light`·BG SpriteRenderer 제거, `Main Camera`는 AudioListener 숙주 겸 백버퍼 클리어용으로만 유지(ClearFlags=Solid Color, Culling Mask=Nothing) — **`MainCamera` 태그 의존 없음**. `DiscardArea`는 실재한 적 없다(문서 오기, 2026-07-28 정정) | G-28 → G-29 → **2D 전환 🔵** |
 | `StarterPack.asset` (CardPackData) | 신규 에셋 (사용자) — price0·drawCount6·pool=기본6장 | G-25 |
-| `StarterDeck` (신규 유저 기본 덱 지급) | 신규 `Assets/Scripts/OutGame/Deck/StarterDeck.cs` — `GrantIfNoDeck(CardPackData)`. 유효 덱 0개일 때만 pool 앞 6장을 **드로우 없이 고정 순서로** 슬롯 0에 저장 + `OwnershipManager.GrantAll`로 소유권 동시 지급. 정본 SO는 `BootInstaller.starterDeck` 배선으로 고정(packId 조회 안 함 — 중복 에셋 존재) | 스타터덱 ✅ (2026-07-30) |
-| `DeckSaveManager.FindFirstEmptySlot` (공유 계약 **추가**) | `Assets/Scripts/OutGame/Deck/DeckSaveManager.cs`(구 `Battle/`) — `IsSlotValid` false인 첫 슬롯(없으면 -1). `DeckListController`의 private 사본을 승격 — "신규 덱이 쓸 슬롯"은 UI가 아니라 덱 세이브의 규칙이다. 현 소비자는 `DeckListController` 하나 | 스타터덱 ✅ (2026-07-30) |
+| `StarterDeck` (신규 유저 기본 덱 지급) | 신규 `Assets/Scripts/OutGame/Deck/StarterDeck.cs` — `GrantIfNoDeck(CardPackData)`. 유효 덱 0개일 때만 pool 앞 6장을 **드로우 없이 고정 순서로** 목록 맨 앞에 삽입(`TryInsertFront`, 좌표 지식 없음) + `OwnershipManager.GrantAll`로 소유권 동시 지급. 정본 SO는 `BootInstaller.starterDeck` 배선으로 고정(packId 조회 안 함 — 중복 에셋 존재) | 스타터덱 ✅ (2026-07-30) |
+| ~~`DeckSaveManager.FindFirstEmptySlot`~~ | **폐기**(2026-07-31 큐 전환) — 압축 불변식하에서 `DeckCount`와 같은 값을 반환하면서 "첫 구멍"이라는 다른 개념을 주장했다. `DeckCount`로 흡수 | 스타터덱 → **폐기** |
+| **덱 목록 = 큐 (압축 불변식, 공유 계약 **추가**)** | `Assets/Scripts/OutGame/Deck/DeckSaveManager.cs` — **유효 덱은 항상 `[0 .. DeckCount-1]`을 연속 점유하고 `[DeckCount .. SLOT_COUNT-1]`은 전부 빈 칸. 인덱스가 작을수록 최근 덱.** 신규는 맨 앞 삽입, 삭제는 뒤를 앞으로 당김. 세이브 포맷 무변경(`order`/`createdAt` 필드 없음 — 배열 물리 위치가 곧 순서). 구멍 뚫린 구 세이브는 `LoadFromSave` 말미에 1회 압축 후 flush(기존 오름차순 보존, 6장 미만 슬롯은 버림 + 경고). 순서를 바꾸는 API는 메모리를 건드리기 **전에** `s_loaded`를 확인한다 — `SaveAll`이 거부되면 메모리만 재배열된 반쪽 상태로 남기 때문 | 덱 큐 전환 ✅ (2026-07-31) |
+| `DeckSaveManager.DeckCount` / `IsFull` / `TryInsertFront` / `TryDeleteAt` (공유 계약 **추가**) | `Assets/Scripts/OutGame/Deck/DeckSaveManager.cs` — `DeckCount`=첫 무효 슬롯 앞까지(=삽입 위치, 전체를 세지 않는다). `TryInsertFront(deck, name, imageKey, out index)`가 name·imageKey를 인자로 받는 건 **삽입이 끝나야 인덱스가 생기기** 때문(삽입 후 `SetName`/`SetImageKey`는 `SaveAll`을 지나쳐 메모리에만 남는다). 소비자: `DeckListController`·`DeckEditController`·`DeckTabController`·`StarterDeck`·`DeckBuilderUI` | 덱 큐 전환 ✅ (2026-07-31) |
+| `DeckSaveManager.GetName` vs `GetDisplayName` (공유 계약 **추가**) | `GetName`=저장값 그대로(**빈 문자열 가능**, rename 판정 등 비교 전용) / `GetDisplayName`=표시 전용, 비면 `"덱 N"` 폴백. 폴백을 `GetName`에 두면 덱이 이동할 때 이름이 따라 변하고 rename 판정이 오염된다. **화면에 이름을 찍는 코드는 전부 `GetDisplayName`** | 덱 큐 전환 ✅ (2026-07-31) |
 | ~~`PackOpeningView`·`PackOpenSceneController`·`FirstStartBattleRedirect`~~ | **폐기**(구매 분리·캐리어 도입으로 대체) | — |
 | (선택) 튜토리얼 보상 가드 | `Assets/Scripts/Battle/TurnRunner.cs` 또는 `Reward/RewardService.cs` | G-보상분기 |
 
@@ -679,7 +682,12 @@ flowchart TD
 
     subgraph run["해석 — 스텝 실행 (씬 오브젝트를 모름)"]
         RUN["OutgameTutorialRunner (static)<br/>IsRunning · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied"]:::new
-        DATA["OutgameTutorialData (SO)<br/>EStepKind{AutoPurchase,WaitClick,BattleEntry,<br/>WaitPackOpen,WaitPurchase,AutoBattle}<br/>List&lt;Step&gt; (인덱스 = 세이브 진행도)"]:::new
+        DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialStep&gt; (인덱스 = 세이브 진행도)<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::new
+        STEP["OutgameTutorialStep (abstract SO) + 6종<br/>WaitClick · BattleEntry · WaitPurchase<br/>WaitPackOpen · AutoPurchase · AutoBattle<br/>Anchor · Completion · LeavesScene · Enter(ctx)"]:::chg
+        CTX["OutgameTutorialStepContext (readonly struct)<br/>CommitAdvance · Rollback · CompleteIfLast<br/>스텝이 진행도를 건드리는 유일한 창구"]:::chg
+        DATA --> STEP
+        RUN -->|"Enter(ctx)"| STEP
+        STEP --> CTX
     end
 
     subgraph scene["씬 레이어 (UI/Tutorial/)"]
@@ -760,7 +768,8 @@ sequenceDiagram
 
 #### 원리 카드 — 왜 이렇게 생겼나
 
-- **완료는 파생이 아니라 스칼라**: `outgameCompleted`가 `outgameStepIndex`보다 **항상 우선**한다. 완료를 `stepIndex >= steps.Count`로 파생시키면 나중에 스텝을 추가한 순간 **이미 끝낸 유저의 튜토리얼이 되살아난다**. 러너는 `CommitAdvance`에서 한 번만 `Complete()`를 확정한다. — `TutorialSaveData.cs` / `OutgameTutorialRunner.cs`
+- **완료는 파생이 아니라 스칼라**: `outgameCompleted`가 `outgameStepIndex`보다 **항상 우선**한다. 완료를 `stepIndex >= steps.Count`로 파생시키면 나중에 스텝을 추가한 순간 **이미 끝낸 유저의 튜토리얼이 되살아난다**. 러너는 `NotifyStepSatisfied`에서 한 번만 `Complete()`를 확정하고, 자동 스텝은 컨텍스트의 `CompleteIfLast()`로 같은 판정을 빌려 쓴다. — `TutorialSaveData.cs` / `OutgameTutorialRunner.cs`
+- **스텝은 데이터가 아니라 에셋(2026-07-31)**: 한 몸 struct + `EStepKind` switch를 **스텝 SO 6종 + `Completion` 축**으로 갈랐다. ① 저작 화면에 그 종류의 필드만 뜬다(구 struct는 무관한 필드 5개가 항상 노출), ② 반복되는 칸(상점 이동·팩 오픈·카드 획득)을 **같은 에셋 재사용**으로 해결 — 12칸이 에셋 9개, ③ 종류 추가가 파일 1개(구조상 러너·브리지·로딩화면 4곳 동시 수정이 필요했다). 브리지는 이제 스텝 **타입을 모른다** — 기다릴 신호는 `Completion{Auto,Click,PackOpen,Purchase}` 하나로 갈리고, "같은 씬에서 이어갈지"는 `LeavesScene`이 답한다. 스텝이 진행도를 건드리는 창구는 `OutgameTutorialStepContext`뿐이라 **자기가 몇 번째 칸인지 모른 채로도** 커밋·롤백한다(재사용의 전제). 예외로 `BootLoadingScreen`만 `is AutoBattleStep` 타입 검사를 남긴다 — "부트에서 로비를 건너뛴다"는 AutoBattle 한정이라 `Completion == Auto`로 넓히면 `AutoPurchase`까지 걸린다. — `Tutorial/Steps/`
 - **커밋이 실행보다 앞선다**: 자동 스텝(`AutoPurchase`·`AutoBattle`)은 `CommitStep(idx+1)`+`Save` **후에** 실행한다. `AutoPurchase`가 반대 순서면 "구매 직후 앱 종료 → 소유는 생겼는데 진행도는 0"이 되어 온보딩이 영구 스킵되고, `AutoBattle`이 반대 순서면 전투 중 강제종료가 그 스텝을 **영원히 되풀이**한다(씬을 떠난 뒤엔 커밋할 지점이 없다). 롤백 분기는 `AutoPurchase`에만 있다 — 구매는 실패할 수 있고(차감 없이 반환되므로 `CommitStep(idx)`로 원상복구) 씬 로드는 실패하지 않는다. — `OutgameTutorialRunner.EnterAutoPurchase` / `EnterAutoBattle`
 - **첫 전투는 저장 덱을 요구하지 않는다(2026-07-28)**: 온보딩 앞머리의 팩 구매·개봉을 걷어내 신규 유저는 첫 전투 시점에 소유 카드도 덱도 0이다. 그래도 성립하는 이유는 `GameInitializer.InitializeSinglePlayerFields`가 `TutorialConfig.IsActive`일 때 **양 덱을 시나리오에서 고정 주입**하기 때문 — `DeckConfig`를 아예 읽지 않는다. 그래서 `LobbyMatchLauncher`의 "유효한 덱이 없습니다" 가드는 **손대지 않았다**: `AutoBattle`은 `PlayBtn`을 거치지 않으므로 그 가드를 통과할 일이 없고, 그 가드를 만나는 2·3회차 `BattleEntry`는 이미 첫 팩을 획득한 뒤다.
 - **레거시 판정은 계정당 1회(`migrationChecked` 낙인)**: "소유 있음 + 진행도 0 = 구버전 유저" 판정을 매 부트 반복하면, 러너가 아직 한 번도 돌지 못한 상태(SO 미배선·구매 실패 롤백 — **P5·P6 보류 중인 지금의 실제 상태**)에서 수동 구매한 신규 유저까지 완료 처리된다. `stepIndex == 0` 항은 함께 남긴다 — 없으면 **현재 빌드로 진행 중인 세이브**가 업데이트 첫 부팅에 완료 낙인을 맞는다. `ResetForDebug()`는 낙인을 **true로 유지**(되돌리면 남은 소유 탓에 다음 부트가 곧장 완료 처리해 리셋이 무의미). — `OutgameTutorialProgress.Init`
@@ -790,7 +799,7 @@ sequenceDiagram
 | `EOutgameTutorialAnchor` (enum 키) | 신규 `Assets/Scripts/OutGame/Tutorial/EOutgameTutorialAnchor.cs` | P2 ✅ |
 | `TutorialAnchorRegistry` (static 등록소 + `OnRegistered`) | 신규 `Assets/Scripts/OutGame/Tutorial/TutorialAnchorRegistry.cs` | P2 ✅ |
 | `TutorialAnchor` (MonoBehaviour, 수명주기 등록) | 신규 `Assets/Scripts/OutGame/Tutorial/TutorialAnchor.cs` | P2 ✅ |
-| `OutgameTutorialData` (SO, `EStepKind`+`Step`+`steps`) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` — `Create → Card Battle/Outgame Tutorial` | P2 ✅ |
+| `OutgameTutorialData` (SO, `List<OutgameTutorialStep>` 조립 목록) | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` — `Create → Card Battle/Outgame Tutorial` | P2 ✅ / 2026-07-31 스텝 SO화 |
 | `OutgameTutorialGateUI` (4패널 딤 게이트, `Ensure()` 파사드) | 신규 `Assets/Scripts/UI/Tutorial/OutgameTutorialGateUI.cs` | P3 ✅ |
 | `OutgameTutorialRunner` (static, 스텝 해석·실행) | 신규 `Assets/Scripts/OutGame/Tutorial/OutgameTutorialRunner.cs` | P4 ✅ |
 | `OutgameTutorialBridge` (씬당 1개, 수명 연결) | 신규 `Assets/Scripts/UI/Tutorial/OutgameTutorialBridge.cs` | P4 ✅ |
@@ -799,9 +808,11 @@ sequenceDiagram
 | `LobbyTabController.Tab.tutorialAnchor` (탭 버튼 대리 등록) | `Assets/Scripts/UI/Lobby/LobbyTabController.cs` — 필드 1 + `Awake` 3줄 | P4 ✅ |
 | `OwnershipManager.HasAnyOwnedSaved` 용도 축소(주석) | `Assets/Scripts/OutGame/Collection/OwnershipManager.cs` — 레거시 마이그레이션 판정 전용 | P4 ✅ |
 | ~~`LobbyFirstRunRedirect`~~ | **삭제** — 스텝 0 `AutoPurchase`가 흡수 | P4 ✅ |
-| `OutgameTutorialData.EStepKind.AutoBattle` + `Runner.EnterAutoBattle`/`BattleScene` 상수 | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialData.cs` · `OutgameTutorialRunner.cs` | 2026-07-28 ✅ |
+| `AutoBattleStep`(구 `EStepKind.AutoBattle` + `Runner.EnterAutoBattle`/`BattleScene` 상수) | `Assets/Scripts/OutGame/Tutorial/Steps/AutoBattleStep.cs` | 2026-07-28 ✅ / 2026-07-31 SO 이관 |
+| 스텝 SO 계층 (`OutgameTutorialStep` 베이스 + 6종 + `EOutgameTutorialCompletion` + `OutgameTutorialStepContext`) | 신규 `Assets/Scripts/OutGame/Tutorial/Steps/` 9파일 — `Create → Card Battle/Outgame Tutorial/Step/…` | 2026-07-31 ✅ |
+| 스텝 에셋 9개 (`Step_AutoBattle_First`·`Step_BattleEntry_2/3/4`·`Step_GoShop`·`Step_BuyPack_Starter/Default`·`Step_OpenPack`·`Step_ClaimCards`) | 신규 `Assets/SO/TutorialConfig/Outgame/Steps/` | 2026-07-31 ✅ |
 | `LoadingCoverView` (첫 프레임 은폐 커버, 자동 해제) + 씬 노드 `LobbyScene/LoadingCover`(order **1000**) | 신규 `Assets/Scripts/UI/Common/LoadingCoverView.cs` · `Assets/Scenes/LobbyScene.unity` | 2026-07-28 ✅ |
-| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~10) | 저작 완료 — 전투 3회 · 구매 사이클 2회 (2026-07-28 앞머리 3스텝 제거) | P6 ✅ |
+| `Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset` (스텝 0~11) | 저작 완료 — 전투 3회 · 구매 사이클 2회. 2026-07-31 **스텝 SO 12칸 참조로 이관**(중복 3종은 같은 에셋 재사용) | P6 ✅ |
 
 #### 씬/에셋 인계 (코드 밖 — 사용자)
 

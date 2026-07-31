@@ -23,11 +23,16 @@ public class DeckSlotView : MonoBehaviour
     int m_slotIndex = -1;
     Action<int> m_onClick;
 
+    // 생성 칸은 저장 좌표를 들지 않는다 — 큐 삽입 위치는 저장이 확정되는 순간에만 생긴다.
+    Action m_onCreate;
+
     // 덱 칸 모드. _displayNumber는 화면 표시용 순번(1-base), _slotIndex는 DeckSaveManager 좌표.
     public void BindDeck(int _slotIndex, int _displayNumber, string _deckName, Sprite _preview, Action<int> _onClick)
     {
         m_slotIndex = _slotIndex;
-        Wire(_onClick);
+        m_onClick   = _onClick;
+        m_onCreate  = null;
+        Wire();
 
         if (plusObject   != null) plusObject.SetActive(false);
         if (bannerObject != null) bannerObject.SetActive(true);
@@ -51,19 +56,22 @@ public class DeckSlotView : MonoBehaviour
         SetInteractable(true);
     }
 
-    // 신규 생성 칸 모드. _emptySlotIndex가 -1이면 6슬롯 만석 → 자리는 지키되 비활성.
-    public void BindCreate(int _emptySlotIndex, Action<int> _onClick)
+    // 신규 생성 칸 모드. _enabled가 false면 6슬롯 만석 → 자리는 지키되 비활성.
+    public void BindCreate(bool _enabled, Action _onClick)
     {
-        m_slotIndex = _emptySlotIndex;
-        Wire(_onClick);
+        m_slotIndex = -1;
+        m_onClick   = null;
+        // 만석이면 콜백 자체를 붙이지 않는다 — interactable=false와 별개의 이중 가드.
+        m_onCreate  = _enabled ? _onClick : null;
+        Wire();
 
         if (plusObject   != null) plusObject.SetActive(true);
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);
-        if (nameText     != null) nameText.text = _emptySlotIndex >= 0 ? createLabel : fullLabel;
+        if (nameText     != null) nameText.text = _enabled ? createLabel : fullLabel;
 
-        SetInteractable(_emptySlotIndex >= 0);
+        SetInteractable(_enabled);
     }
 
     public void SetInteractable(bool _on)
@@ -71,9 +79,8 @@ public class DeckSlotView : MonoBehaviour
         if (clickButton != null) clickButton.interactable = _on;
     }
 
-    void Wire(Action<int> _onClick)
+    void Wire()
     {
-        m_onClick = _onClick;
         if (clickButton == null) return;
 
         clickButton.onClick.RemoveAllListeners();   // 재빌드 시 중복 등록 방지
@@ -82,7 +89,14 @@ public class DeckSlotView : MonoBehaviour
 
     void OnClicked()
     {
-        if (m_slotIndex < 0) return;   // 만석 신규 칸 이중 가드(interactable=false와 별개)
+        // 콜백 유무가 곧 모드다(Bind 진입점에서 한쪽만 채운다).
+        if (m_onCreate != null)
+        {
+            m_onCreate();
+            return;
+        }
+
+        if (m_slotIndex < 0) return;
         m_onClick?.Invoke(m_slotIndex);
     }
 }

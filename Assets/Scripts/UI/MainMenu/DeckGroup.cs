@@ -61,7 +61,7 @@ public class DeckGroup : MonoBehaviour
     {
         List<CardData> t_loaded = DeckSaveManager.Load(_index);
         SetDeck(t_loaded.ToArray());
-        SetDeckName(DeckSaveManager.GetName(_index));
+        SetDeckName(DeckSaveManager.GetDisplayName(_index));
     }
 
     // ── Deck Name Input ───────────────────────────────────────────────────

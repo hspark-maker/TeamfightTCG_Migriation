@@ -9,9 +9,6 @@ public class DeckTabController : MonoBehaviour
     [SerializeField] GameObject         editPanel;
     [SerializeField] DeckEditController editController;   // 옵션 — 미배선이면 패널 토글만 한다
 
-    // 편집 중 여부. 탭 셸이나 뒤로가기 처리가 이탈을 막아야 할 때 물어보는 창구.
-    public bool IsEditing => editController != null && editController.IsOpen;
-
     void OnEnable()
     {
         // 편집 중 탭이 꺼졌다 켜지면 여기서 무저장 폐기된다.
@@ -20,20 +17,34 @@ public class DeckTabController : MonoBehaviour
         ShowList();
     }
 
-    // 덱 구성 화면 진입. _slotIndex는 DeckSaveManager 슬롯 좌표(신규 생성도 빈 슬롯 인덱스를 받는다).
+    // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
     public void OpenEditor(int _slotIndex)
     {
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return;
 
-        if (listPanel != null) listPanel.SetActive(false);
-        if (editPanel != null) editPanel.SetActive(true);
+        ShowEditor();
         if (editController != null) editController.Open(_slotIndex);
+    }
+
+    // 신규 덱 진입. 좌표는 저장이 확정되는 순간(TryInsertFront)에 생기므로 여기서는 만석만 막는다.
+    public void OpenNewDeckEditor()
+    {
+        if (DeckSaveManager.IsFull) return;
+
+        ShowEditor();
+        if (editController != null) editController.OpenNew();
     }
 
     // 목록 복귀. listPanel.SetActive(true) → DeckListController.OnEnable → 자동 재빌드가 갱신 경로다.
     public void CloseEditor()
     {
         ShowList();
+    }
+
+    void ShowEditor()
+    {
+        if (listPanel != null) listPanel.SetActive(false);
+        if (editPanel != null) editPanel.SetActive(true);
     }
 
     void ShowList()
