@@ -9,7 +9,7 @@
 | 날짜 | 변경 | 승인 |
 |---|---|---|
 | 2026-08-03 | **매치 덱 선택·편집 도입 (✅ 코드+검수, 프리팹·씬 저작 및 Unity 컴파일·Play 검증 대기)** — 전투 진입 직전 화면에서 상대를 본 뒤 덱을 갈아끼우는 동선이 없었다(편성은 로비 덱 탭에서만 가능). `MatchDeckPanel.prefab`은 스크립트 0개·onClick 0건인 레이아웃 목업, `MatchDeckEditPanel.prefab`은 `DeckEditPanel`의 껍데기 배리언트, `MatchFlowController`는 어느 씬에도 없는 고아 — 셋 다 실행 경로 밖이었다. **① 편집기 재사용은 상속·복제가 아니라 훅 주입** — `DeckEditController`의 로비 의존은 `ExitEditor()`의 `tabController.CloseEditor()` **한 줄**로 수렴해 있었다. `Action m_onExit` + `SetExitHandler`를 얹고 `ExitEditor`를 "주입 훅 우선, 없으면 탭 셸" 2분기로 바꾼 게 전부(로비 배선 무영향 — `dragController`/`totalHpText` 오버라이드는 propertyPath 이름 기반이라 필드 추가로 안 깨진다). 상속은 `m_working`/`m_mode`/`m_slotIndex`가 private이라 실익이 0이고, 배리언트에서 컴포넌트 타입을 바꾸면 원본 관계가 끊긴다. **② 저장 규칙을 복제하지 않는 것이 이 설계의 전부** — 매치의 덱 전환 정책("6/6이면 조용히 저장, 미만이면 폐기, 팝업 없음")을 셸이 조립하려면 `CountFilled()==6` 판정과 `Create`/`Edit` 모드 분기를 셸이 알아야 하는데 그게 곧 복제다 → `SaveIfComplete()`를 컨트롤러에 두고 `SaveNewDeck`/`SaveEditedDeck`을 **그대로 호출**, `SwitchTo(int)`가 그 위에 얹힌다. 덤으로 `OnBackClicked`의 저장 분기도 `SaveIfComplete()`에 위임해 **저장 진입점이 1개로 더 수렴**했다. **③ 선택 덱의 진실원은 슬롯 인덱스** — `DeckConfig`는 직렬화 없는 씬 전환 캐리어라 "어느 슬롯인지"를 표현하지 못한다. `MatchDeckShell.SelectedSlot`(int)이면 편집 저장 직후 `DeckSaveManager.GetSlot(idx)` 재조회만으로 MySection이 정합되고, `DeckConfig.Set`은 전투 진입 순간(`TryConfirmSelection`, 이번 범위 호출처 0)에만 부른다. **④ 가로 리스트는 `DeckListController` 재사용을 포기하고 신규** — 재사용 불가 사유 3개가 전부 구조적이다: `RegisterTutorialAnchor(DeckCreateSlot)`가 **static 레지스트리를 덮어써** 매치 화면이 켜지는 순간 로비 튜토리얼 하이라이트가 매치 카드를 가리키고, `+`칸 무조건 삽입과 `tabController` 하드 의존이 `Build` 본문에 박혀 있으며, 미커밋 working copy에서 173줄로 커지며 **덱 삭제 UI까지 딸려온다**(매치 화면에 파괴적 경로를 두지 않는다). `DeckSlotView`는 그대로 재사용하고 `selectedFrame` + `SetSelected(bool)` 6줄만 추가(로비는 미배선 → 무영향). **⑤ 함정 1건**: `DeckSaveManager.IsSlotValid`는 **범위 가드 없이 `s_slots[_index]`를 직접 인덱싱**한다 — 셸이 "선택 없음"을 -1로 표현하므로 `IsValidSlot` 래퍼로 범위를 앞에서 막아야 한다(`GetSlot`/`GetDisplayName`도 같은 성질). **⑥ 배리언트 개조 방침**: `NameInput`/`BackButton`을 **삭제**(런타임 fake-null → 기존 null 가드가 전부 성립, `ResolveName()`이 텍스트를 읽지 않고 `m_savedName`을 반환해 rename 판정이 항상 false)하고 상단에 `TopBar`를 **추가**. 삭제로 원본 BackButton이 사라지므로 좌하단 `Btn_MatchBack`이 **유일한 종료 경로**가 된다(미배선 시 화면에 갇힘 → 셸 `Awake`가 LogError). **⑦ 범위 밖(명시적 후속)**: 로비 PlayBtn→매치 진입 배선, 드래그 편집(매치 캔버스 DragLayer 배선만 하면 코드 0줄), EnemySection 렌더(AI 덱 확정이 범위 밖이라 지금 배선하면 항상 빈 상태를 그리는 죽은 코드) | ✅ |
-| 2026-08-03 | **카드팩 개봉을 별도 씬 → 로비 오버레이로 이관 (✅ 코드, 씬·프리팹 작업 및 Unity 컴파일·Play 검증 대기)** — 동기는 "구매 버튼에서 팩이 날아오는" 연결 연출이다. `SceneManager.LoadScene("CardPack")`은 로비를 **파괴**하므로 출발지(버튼)와 도착지(팩)가 다른 씬에 있어 그 연출이 **원리적으로 불가능**했다. 전제 확인: 개봉 화면은 100% Screen Space-Overlay uGUI + DOTween이고 파티클·Animator·Timeline·3D가 0개, Main Camera는 `CullingMask=0`(아무것도 안 그림) → **"씬이어야 할 기술적 이유가 없다"**. 게다가 이미 로비 종속(자체 `[Boot]` 없이 DDOL에 얹힘)이고, 덱(`DeckTabController` "씬 로드 없음")·도감·상점·랭크보상이 전부 오버레이라 **카드팩만 규약 예외**였다. **① 계약 신설 `UI/Shop/PackOpenOverlay.cs`** — 씬 로드/언로드가 암묵적으로 해주던 4가지(튜토리얼 스텝 재적용·획득 연출 재생·구매 잠금 해제·뷰 상태 초기화)를 `OnOpened`/`OnClosed`/`IsOpen` **세 신호로 명시**. 루트 GO는 항상 활성(Awake로 `Instance` 선점해야 `TryOpen`이 성립) + 자식 `content`만 토글. **② 루트 Canvas 유지가 협상 불가** — 개봉 `UICanvas`는 참조해상도 **1440×3120**, `LobbyCanvas`는 **1080×1920**이고 nested Canvas는 부모 scaleFactor를 상속하며 자식 `CanvasScaler`가 무효화된다 → LobbyCanvas 밑에 넣으면 연출이 1.333배로 깨지고 `PackRevealView`의 1440 기준 직렬화 px(`packEnterDrop 811`·카드 700×930 등)을 전량 재저작해야 한다. `sortingOrder=100`(로비 0 / 게이트 350·351 / 팝업 400 사이 — 안내·실패팝업은 개봉 위에 남아야 한다). **③ 파손 7개 처리**: 재개봉 불가(`OnDisable`이 Summary를 일부러 남겨 `BeginOpen`의 `m_stage!=Idle` 가드에 막힘) → `PackRevealView.ResetSession()` 신설 · 2번째 구매 영구 잠금(`s_transitioning`이 `OnEnable`에서만 해제되는데 탭이 계속 활성) → `OnClosed` 구독 · 획득 연출 소실(로비 `Start`에서만 `CardPackRewardHandoff.TryConsume`) → `OnClosed`에서도 재생 + 겹침 시 직전 시퀀스 `Complete(true)`(Kill이면 `ClearCards`·골드 고정해제 콜백이 유실) · 튜토리얼 영구 정지("다음 씬 브리지가 재개" 전제) → 브리지가 `OnOpened`/`OnClosed` 구독 + **예약형 재진입 가드**(`Enter`가 `TryOpen`으로 자기 자신을 부르는데, 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 재진입을 버리면 개봉 대기 스텝이 영영 적용되지 않는다) · `suppressGuideUI`가 씬 단위 스위치였던 문제 → `SuppressGuideUI => suppressGuideUI \|\| PackOpenOverlay.IsOpen` · 목적지 분기 → `PackAcquireController`에 **한 곳만**("비었거나 현재 씬이면 Close, 아니면 LoadScene" — 첫실행은 `nextScene=BattleScene`이라 진짜 씬 로드가 남아야 한다) · EventSystem·AudioListener·Main Camera 중복 → 프리팹 추출 시 제외. **④ 검수 반영 4건**: 획득 클릭 시 `Close()`가 **동기**라 같은 버튼에 걸린 튜토리얼 게이트의 완료 커밋보다 먼저 돌아 커밋이 유실 → `CloseNextFrame()` 코루틴으로 프레임 끝까지 미룸(씬 로드 시절 저절로 지켜지던 순서를 명시로 복원) · `OnGateSatisfied`의 "다음 스텝이 Auto면 씬이 바뀐다" 전제가 `AutoPurchaseStep.LeavesScene=false`로 깨짐 → 판정을 `Completion==Auto`에서 **`LeavesScene`**으로 교정(`AutoBattleStep`은 true라 기존 동작 보존) · 오버레이 미배치 시 구매하면 골드만 빠지고 개봉 신호가 영영 안 와 튜토리얼 하드락(구매는 원자 영속이라 롤백 불가) → **결제 앞에서 차단**(`PackShowcaseController.OnBuyPressed`/`RefreshBuyLock` + `AutoPurchaseStep`은 `CommitAdvance` 전에 차단) · `IsOpen`을 `BeginSession`보다 앞서 세움(연출이 그 안에서 곧장 개봉 신호를 쏘는 배선이면 구독자가 "안 열린 개봉"을 본다). **⑤ 부수 수정**: 지금은 복귀 시 로비가 재구축되며 탭이 기본값 "경기"로 리셋되는데(`LobbyTabController`) 오버레이는 탭을 유지 → 팩 산 뒤 엉뚱한 탭으로 튕기는 UX 문제가 함께 소멸. **⑥ 배치**: `LobbyScene.unity` 루트에 독립 오브젝트(`LobbyCanvas.prefab` 6,610줄·탭 4종 nested는 **손대지 않는다** — 팩·덱·도감·상점 담당의 공동 편집 파일이 되면 병렬 작업이 불가). `CardPack.unity`는 삭제 대신 **테스트 씬으로 강등**(빌드세팅에서만 제거 — 인덱스 마지막이라 다른 씬 인덱스 안 밀림). 씬·프리팹 작업은 손 드래그 시 `[SerializeField]` 배선 40여 개가 끊길 위험이 있어 **재부모화 방식 에디터 스크립트**(`Assets/Editor/PackOverlayMigration.cs`, 메뉴 1→4)로 수행 | ✅ |
+| 2026-08-03 | **카드팩 개봉을 별도 씬 → 로비 오버레이로 이관 (✅ 코드, 씬·프리팹 작업 및 Unity 컴파일·Play 검증 대기)** — 동기는 "구매 버튼에서 팩이 날아오는" 연결 연출이다. `SceneManager.LoadScene("CardPack")`은 로비를 **파괴**하므로 출발지(버튼)와 도착지(팩)가 다른 씬에 있어 그 연출이 **원리적으로 불가능**했다. 전제 확인: 개봉 화면은 100% Screen Space-Overlay uGUI + DOTween이고 파티클·Animator·Timeline·3D가 0개, Main Camera는 `CullingMask=0`(아무것도 안 그림) → **"씬이어야 할 기술적 이유가 없다"**. 게다가 이미 로비 종속(자체 `[Boot]` 없이 DDOL에 얹힘)이고, 덱(`DeckTabController` "씬 로드 없음")·도감·상점·랭크보상이 전부 오버레이라 **카드팩만 규약 예외**였다. **① 계약 신설 `UI/Shop/PackOpenOverlay.cs`** — 씬 로드/언로드가 암묵적으로 해주던 4가지(튜토리얼 스텝 재적용·획득 연출 재생·구매 잠금 해제·뷰 상태 초기화)를 `OnOpened`/`OnClosed`/`IsOpen` **세 신호로 명시**. 루트 GO는 항상 활성(Awake로 `Instance` 선점해야 `TryOpen`이 성립) + 자식 `content`만 토글. **② 루트 Canvas 유지가 협상 불가** — 개봉 `UICanvas`는 참조해상도 **1440×3120**, `LobbyCanvas`는 **1080×1920**이고 nested Canvas는 부모 scaleFactor를 상속하며 자식 `CanvasScaler`가 무효화된다 → LobbyCanvas 밑에 넣으면 연출이 1.333배로 깨지고 `PackRevealView`의 1440 기준 직렬화 px(`packEnterDrop 811`·카드 700×930 등)을 전량 재저작해야 한다. `sortingOrder=100`(로비 0 / 게이트 350·351 / 팝업 400 사이 — 안내·실패팝업은 개봉 위에 남아야 한다). **③ 파손 7개 처리**: 재개봉 불가(`OnDisable`이 Summary를 일부러 남겨 `BeginOpen`의 `m_stage!=Idle` 가드에 막힘) → `PackRevealView.ResetSession()` 신설 · 2번째 구매 영구 잠금(`s_transitioning`이 `OnEnable`에서만 해제되는데 탭이 계속 활성) → `OnClosed` 구독 · 획득 연출 소실(로비 `Start`에서만 `CardPackRewardHandoff.TryConsume`) → `OnClosed`에서도 재생 + 겹침 시 직전 시퀀스 `Complete(true)`(Kill이면 `ClearCards`·골드 고정해제 콜백이 유실) · 튜토리얼 영구 정지("다음 씬 브리지가 재개" 전제) → 브리지가 `OnOpened`/`OnClosed` 구독 + **예약형 재진입 가드**(`Enter`가 `TryOpen`으로 자기 자신을 부르는데, 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 재진입을 버리면 개봉 대기 스텝이 영영 적용되지 않는다) · `suppressGuideUI`가 씬 단위 스위치였던 문제 → `SuppressGuideUI => suppressGuideUI \|\| PackOpenOverlay.IsOpen` · 목적지 분기 → `PackAcquireController`에 **한 곳만**("비었거나 현재 씬이면 Close, 아니면 LoadScene" — 첫실행은 `nextScene=BattleScene`이라 진짜 씬 로드가 남아야 한다) · EventSystem·AudioListener·Main Camera 중복 → 프리팹 추출 시 제외. **④ 검수 반영 4건**: 획득 클릭 시 `Close()`가 **동기**라 같은 버튼에 걸린 튜토리얼 게이트의 완료 커밋보다 먼저 돌아 커밋이 유실 → `CloseNextFrame()` 코루틴으로 프레임 끝까지 미룸(씬 로드 시절 저절로 지켜지던 순서를 명시로 복원) · `OnGateSatisfied`의 "다음 스텝이 Auto면 씬이 바뀐다" 전제가 `AutoPurchaseStep.LeavesScene=false`로 깨짐 → 판정을 `Completion==Auto`에서 **`LeavesScene`**으로 교정(`AutoBattleStep`은 true라 기존 동작 보존) · 오버레이 미배치 시 구매하면 골드만 빠지고 개봉 신호가 영영 안 와 튜토리얼 하드락(구매는 원자 영속이라 롤백 불가) → **결제 앞에서 차단**(`PackShowcaseController.OnBuyPressed`/`RefreshBuyLock` + `AutoPurchaseStep`은 `CommitAdvance` 전에 차단) · `IsOpen`을 `BeginSession`보다 앞서 세움(연출이 그 안에서 곧장 개봉 신호를 쏘는 배선이면 구독자가 "안 열린 개봉"을 본다). **⑤ 부수 수정**: 지금은 복귀 시 로비가 재구축되며 탭이 기본값 "경기"로 리셋되는데(`LobbyTabController`) 오버레이는 탭을 유지 → 팩 산 뒤 엉뚱한 탭으로 튕기는 UX 문제가 함께 소멸. **⑥ 배치**: `LobbyScene.unity` 루트에 독립 오브젝트(`LobbyCanvas.prefab` 6,610줄·탭 4종 nested는 **손대지 않는다** — 팩·덱·도감·상점 담당의 공동 편집 파일이 되면 병렬 작업이 불가). `CardPack.unity`는 삭제 대신 **테스트 씬으로 강등**(빌드세팅에서만 제거 — 인덱스 마지막이라 다른 씬 인덱스 안 밀림). 씬·프리팹 작업은 손 드래그 시 `[SerializeField]` 배선 40여 개가 끊길 위험이 있어 **재부모화 방식 에디터 스크립트**(`Assets/Editor/PackOverlayMigration.cs`, 메뉴 1→4)로 수행. **⑦ 이관 후 발견·수정 — 개봉 스와이프 불가**: `PackTearHandle.IsPointerOverUI`가 `EventSystem.IsPointerOverGameObject()`(= "아무 레이캐스트 UI 위인가")로 제스처를 막고 있었다. 단독 씬 시절엔 팩·배경 Image가 전부 `raycastTarget=false`라 통과했지만(그 파일의 ⚠ 주석이 그 전제였다), 로비 위에 겹치자 아래 `LobbyCanvas`의 **레이캐스트 타깃 197개**가 늘 포인터 밑에 깔려 화면 어디서도 `BeginDrag`가 시작되지 않았다(카드 넘기기는 `StackInput`의 EventSystem 드래그라 무사). 스와이프 단계엔 `RevealPanel.blocksRaycasts=false`라 오버레이가 레이캐스트를 하나도 막지 않는다는 것이 같은 뿌리의 **두 번째 결함**(팩 뒤 로비 버튼이 그대로 눌림)이기도 했다. 둘을 함께 고쳤다 — 판정을 주석이 원래 뜻하던 **"눌러야 할 버튼(interactable Selectable) 위인가"**로 바꾸고 맨 위 히트 하나만 보게 했으며(`RaycastAll`, 클릭당 1회), `BG`(SafeArea[0]·전체화면·개봉 내내 활성)를 `raycastTarget=true`로 켜 오버레이의 입력 바닥으로 삼았다. 검증: 6개 지점 전부 최상위 히트가 오버레이이고 차단=false, `SkipButton` 위에서만 차단=true. **⑧ 이관 후 발견·수정 — 개봉 직후 배경 흔들림**: `EnterPulling`이 카드가 솟기 직전 `shakeTarget`에 `DOShakePosition(0.3s, 48 디바이스px)`을 거는데(`PackRevealView.cs:400`), 그 대상이 화면과 **정확히 같은 크기의 불투명 배경 아트 `BG`**(`Background_01`, 오프셋 0)다. 개봉이 별도 씬일 땐 그 뒤를 카메라의 검정 클리어(`m_BackGroundColor 0,0,0,1`)가 채워 밀려도 티가 안 났지만, 오버레이가 되자 밀린 만큼 **가장자리로 로비가 새어 보였다**. 카메라가 하던 일을 오버레이 안으로 되돌린다 — `UICanvas` 직속 첫 자식으로 정적 불투명 `Backdrop`(검정, 전체화면) 신설. **`SafeArea` 바깥에 두는 것이 요점**이다: 안쪽에 두면 노치 기기에서 안전영역 밖으로 로비가 비친다(⑦ 당시엔 못 본 잠복 결함). 입력 바닥도 `BG`에서 이 `Backdrop`으로 옮기고 `BG.raycastTarget`은 원래대로 false로 되돌렸다 — 셰이크로 움직이는 것을 블로커로 쓰면 그 0.3초 동안 가장자리 차단이 풀린다. 검증: BG를 최대 변위 48px 강제로 민 최악 상태에서도 4개 가장자리 전부 최상위 히트가 `Backdrop`(로비 노출 0), 스와이프·`SkipButton` 판정 불변. 불변식은 `PackRevealView.cs`의 `shakeTarget` 주석에 명시 | ✅ |
 | 2026-07-31 | **튜토리얼 안내 UI 프리팹화 + 사각 구멍 → 타깃 승격 방식 전환 (✅ 코드+프리팹, Unity 컴파일·씬 배선·Play 검증 대기)** — 문제 둘: ① 색·스프라이트·여백이 전부 C# 상수(`HolePadding 12f`·`BannerWidth 900f`·`Color(0,0,0,0.72f)`)라 **리소스를 바꿀 수 없었다**(Layer Lab SimpleCasual에 튜토리얼 전용 에셋이 이미 있는데도 플레인 `Image` 검은 사각형만 사용) ② 타깃 바운딩 박스를 그대로 뚫는 **각진 구멍**이 버튼 모양과 무관하게 남고 유도가 약했다. **① 표시 방식 전환**: 딤 4패널(Top/Bottom/Left/Right) + 매 프레임 구멍 재계산을 폐기하고, **전면 딤 1장**(`raycastTarget=true`)이 전부 흡수 + 타깃 GameObject에 런타임 `Canvas(overrideSorting=true, 351)` + `GraphicRaycaster`를 얹어 딤(350) 위로 **승격**. 클릭 차단은 유지된다(사용자 지정). 앵커 4종 전부 조상 체인에 `Mask`/`RectMask2D`/`ScrollRect`/중첩 `Canvas`가 없음을 실측 확인해 성립 전제를 세웠다. **② sortingOrder 300 → 350/351**(500 아님): `UIPoolManager` 팝업 캔버스가 **400**이라 그 위로 올리면 플레이 스텝의 "유효한 덱이 없습니다"(`MatchFlowController.ShowNoDeckPopup`)·구매 실패 팝업(`PackShowcaseController.ShowFailPopup`)이 딤에 묻히는데, 그때 타깃은 `interactable=true` 그대로라 소프트락 탈출로도 발동하지 않아 **완전 잠김**이 된다. 프리팹의 `Canvas.sortingOrder`는 런타임 상수로 덮어써 저작 사고를 봉쇄. **③ 신규 프리팹** `Assets/Assets/Prefabs/UI/Tutorial/OutgameTutorialGate.prefab`(Blocker/FocusRing/Hand/Message+TMP) — 포커스 링은 `Tutorial_Focus00_Line_White`(92×92 **border 46** 9슬라이스 = 키트 내 유일하게 임의 크기로 늘어나는 링, `fillCenter=false`), 손가락은 `Tutorial_Focus_Icon_Hand`, 문구 프레임은 `ChatFrmae03_Demo_Frame_Light`. 브리지에 `[SerializeField] gatePrefab` 추가 + `Ensure(prefab)`(선례 `TutorialOverlayUI.Ensure`). **④ 해제 단일 창구 `Release()`** — 리스너 해제 + 승격 해제를 묶어 모든 진입점 최상단에서 1회. 갈라 두면 `ShowBanner`·두 번째 `ShowGate`가 이전 타깃 참조를 잃어 **버튼이 모든 UI 위에 영구 잔존**한다. 해제는 `GraphicRaycaster` → `Canvas` 순(`RequireComponent` 역순이면 조용히 실패). 타깃이 이미 `Canvas`를 갖고 있으면 파괴 대신 정렬값 백업·복원, 승격 시 루트에서 `additionalShaderChannels`·`sortingLayerID` 복사(미복사 시 승격 중에만 TMP·그라디언트 깨짐). **⑤ `SetDim(bool)` 명시 API** — `ShowBanner`는 딤 off가 **계약**이다(구 코드는 "4패널 0사이즈"라는 우연한 구현이 지키고 있었다). 전면 딤이 있으면 `PackTearHandle`의 `!IsPointerOverGameObject()` 판정이 화면 어디서나 막혀 **개봉 스와이프가 영영 시작되지 않고**, 그 모드는 `m_armed=false`라 탈출로도 없다. **⑥ 폴백 축소**: 링·손가락 스프라이트가 `Layer Lab/.../ResourcesData/`(= `Resources` 폴더 **아님**)라 코드 경로에서 얻을 수 없다 → 폴백은 딤+문구까지만, 프리팹 미배선 시 `LogWarning` 1회. 포인터 연출은 `localScale`만 트윈(`sizeDelta`/`anchoredPosition`은 `Layout`이 매 프레임 덮어씀), `DOPunchScale` 금지(Kill 시 스케일 미복구) → `DOScale(...).SetLoops(-1, Yoyo)`. **`Runner`·`Progress`·스텝 SO·`TutorialAnchor(Registry)`·`LobbyTabController`·시퀀스 에셋 전부 무수정** | ✅ |
 | 2026-07-30 | **덱 세이브를 아웃게임 세이브로 흡수 (이중 진실원 제거) — ✅ 코드, Unity 컴파일·Play 검증 대기** — `decks.json` 독립 파일과 데드 필드 `UserSaveData.deck`이 공존하던 상태를 정리해 **덱 영속화 진실원을 `DataSaveManager.Data.deck` 하나로** 통합. **① `DeckSaveManager`에서 File IO 전면 제거** — 내부 직렬화 타입(`SlotData`/`SaveData`)·`SavePath`·`ReadFileOrEmpty` 삭제, 메모리 3배열(`s_slots`/`s_names`/`s_imageKeys`) + 레지스트리 재수화 구조는 유지(소비자 API가 `CardData` 리스트를 기대). 공개 API 개명 3건: `LoadFromFile`→**`LoadFromSave`**, `SaveSlotToFile`→**`SaveSlot`**, `SaveToFile`→**`SaveAll`**(파일 개념 소멸). 비파괴 계약(단일 슬롯만 반영)과 전량 flush 위험 경고는 새 문맥으로 보존. `Delete`는 전량 flush → `SaveSlot(index, 빈 목록)` 비파괴 경로로 교체. `ReadFileOrEmpty`가 하던 길이·null 정규화는 `NormalizedSlots()`가 승계해 읽기/쓰기 양쪽이 통과(세이브 인스턴스를 제자리 수정 → 같은 배열 공유). **② `DeckSlotSaveData.imageKey` 필드 1개 가산** — `UserSaveData.VERSION`은 **1 유지**(필드 추가만 = 하위호환, 구 세이브는 빈 값 → 표시가 첫 카드 아트로 폴백). 카드 키는 기존대로 `CardCatalog.KeyOf`(=`CardData.name`) 안정 문자열, 인덱스 저장 없음. **③ 레거시 `decks.json` 1회 이관** — `LoadFromSave` 첫머리에서 "세이브에 덱 0개 + 파일 존재"일 때만 구 포맷(`slotName`/`cards`/`imageKey`)을 옮기고 `DataSaveManager.Save()` 후 원본을 **`decks_migrated.json`으로 rename**(삭제 금지 — corrupt 백업 선례와 같은 결). **재실행 가드는 이관 결과 자체**(덱이 생기면 조건이 거짓) — 완료 플래그 필드를 추가하지 않았다. 파일 IO 예외는 경고 로그만 남기고 진행(부트 사망 금지, 기존 세이브 무보존 손상 없음). **④ 파일 이동** `Assets/Scripts/Battle/DeckSaveManager.cs` → **`Assets/Scripts/OutGame/Deck/DeckSaveManager.cs`**(.meta 동반 이동으로 guid 보존 — static 클래스라 씬 참조 0이지만 규약 준수). 이제 아웃게임 세이브 소비자이므로 `Battle/` 밖. 호출처 5곳 갱신(`BootInstaller`·`StarterDeck`·`DeckEditController`·`DeckBuilderUI`×2) | ✅ |
 | 2026-07-30 | **디버그 전체 해금 런타임 입구 추가 (덱 연동 테스트용)** — 덱 편성은 소유 카드만 허용하므로(`DeckEditCollectionGrid.Build`의 `OwnershipManager.IsOwned` 필터) 인게임 덱 테스트에 전체 해금이 선행돼야 한다. 기존 `OwnershipDebugTool`은 **인스펙터 ContextMenu**뿐이라 플레이 중 손이 닿지 않았다 → 신규 서브트리 `OutGame/Debug/` 2파일. **① `OutgameDebugActions`(static)** = 디버그 조작 단일 창구(전체 해금/회수/현황 로그/튜토리얼 완료·리셋). `OwnershipDebugTool`은 이 창구로 **위임만** 하도록 축소(두 입구가 각자 구현하면 이중 진실원). **② `OutgameDebugOverlay`** = `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]`로 **자기 자신을 띄우는** IMGUI 패널(우상단 [DEBUG] 또는 **F8**) — 씬·프리팹 배선 0건이 설계 목적(테스트 씬 단독 Play 포함 어디서나 동일). 파일 전체를 `#if UNITY_EDITOR \|\| DEVELOPMENT_BUILD`로 감싸 릴리스 빌드엔 클래스 자체가 없다. 라벨은 **ASCII 고정**(IMGUI 기본 폰트에 한글 글리프 없음 — `BootLoadingScreen`의 Quicksand 사례와 같은 함정). 열려 있는 동안 `EventSystem.enabled=false`로 uGUI 입력을 잠근다(IMGUI는 EventSystem 레이캐스트를 막지 못해 패널 클릭이 밑의 뒤로가기·편성 칸까지 때린다). **③ `OwnershipManager.GrantAll(IEnumerable<string>)`/`RevokeAll()`** 추가 — 낱장 `Grant` 반복은 장수만큼 파일 쓰기 + `OnOwnershipChanged` 발화(= 도감 그리드 전량 재빌드)를 유발하므로 대량 경로는 **Save·이벤트 1회**로 접는다. **④ 튜토리얼 스킵 포함 이유**: 튜토리얼 진행 중엔 게이트 딤이 덱 탭을 막아 해금만으론 덱을 못 만든다. `Complete()`만으론 이미 떠 있는 게이트가 남으므로 브리지 `CloseGate`와 같은 `GateUI.Clear()`를 함께 호출. **⑤ `DeckEditController`**: `OnOwnershipChanged` 구독 추가 — 편집 중 해금이 즉시 그리드에 반영되게(재빌드는 컨트롤러가 건다 — "장착중 딤"에 필요한 편성 상태를 아는 쪽이 여기뿐이라는 기존 불변식 유지) | ✅ |
@@ -1183,16 +1183,22 @@ graph TD
     style SLOTV fill:#fcf8e3,stroke:#8a6d3b
 ```
 
-#### 흐름 — "덱을 고르다 다른 덱으로 갈아타고 나간다"
+#### 흐름 — 전투 씬 진입 → 덱 확정 → 전투 시작
 
 ```mermaid
 sequenceDiagram
     actor U as 유저
+    participant GI as GameInitializer
     participant PV as MatchDeckPanelView
     participant SH as MatchDeckShell
     participant ST as MatchDeckStripController
     participant ED as DeckEditController
     participant SV as DeckSaveManager
+
+    Note over GI: BattleScene 진입 · battleIntro.Await()로 보드는 화면 밖
+    GI->>SH: await RunSelectionAsync(ct)
+    SH->>SH: EnsureBoot() · Open()
+    SH->>PV: Render(SelectedSlot)
 
     U->>PV: EditButton
     PV->>SH: OpenEditor()
@@ -1225,7 +1231,15 @@ sequenceDiagram
     SH->>PV: Render(SelectedSlot)
     PV->>SV: GetSlot(SelectedSlot)
     Note over PV: CardVisualView.Bind(card, true) ×6<br/>(null이면 스스로 SetActive(false))
+
+    U->>PV: BattleButton
+    PV->>SH: Confirm()
+    SH->>SH: TryConfirmSelection() → DeckConfig.Set(GetSlot)
+    SH-->>GI: true (게이트 통과)
+    GI->>GI: InitializeSinglePlayerFields() → PlayIntroAndStart()
 ```
+
+> BackButton은 `Cancel()` → 게이트가 false를 돌려주고, **어디로 돌아갈지는 호스트가 정한다**(셸은 씬을 모른다).
 
 #### 원리 한 장
 
@@ -1245,8 +1259,55 @@ sequenceDiagram
 | 매치 편집 패널 배리언트 (`Title`/`BackButton` 삭제 + `TopBar > DeckStrip`/`Btn_MatchBack` 추가, 하위 3영역 재배치) | `Prefabs/UI/MatchUI/MatchDeckEditPanel.prefab` | ✅ 저작 완료 (MCP) |
 | 스트립 카드 (DeckCard 배리언트, 200×283 실수치 축소 + `SelectedFrame` 링) | `Prefabs/UI/MatchUI/MatchDeckStripCard.prefab` | ✅ 신규 (MCP) |
 | 매치 패널 스크립트 부착·배선 | `Prefabs/UI/MatchUI/MatchDeckPanel.prefab` | ✅ 저작 완료 (MCP) |
-| 호스팅 (`MatchDeckRoot`, `DragLayer` 바로 앞 형제) | `Prefabs/UI/LobbyUI/LobbyCanvas.prefab` | ✅ 저작 완료 (MCP) |
+| 호스팅 (`MatchDeckRoot` + 두 패널 인스턴스 + 셸 배선) | **`Scenes/BattleScene.unity`** | ⬜ 대기 — 아래 "BattleScene 연결" 참조 |
+| ~~호스팅~~ `LobbyCanvas.prefab` | — | ❌ 철회(2026-08-03) — 이 화면은 로비가 아니라 **전투 씬 진입 직후** 열린다 |
 
-- 범위 밖(후속): 로비 PlayBtn → `MatchDeckShell.Open()` 배선 · 드래그 편집(배선만, 코드 0줄) · EnemySection 렌더.
+- 범위 밖(후속): 드래그 편집(배선만, 코드 0줄) · EnemySection 렌더(상대 AI 덱을 게이트 전에 확정하면 가능).
+#### BattleScene 연결 — 남은 작업 (⬜ 이 문단이 착수 스펙이다)
+
+> 이 화면은 **전투 씬 진입 직후** 열려 전투 시작을 붙잡는다. 로비에는 붙지 않는다(2026-08-03 설계 정정 — 초기에 `LobbyCanvas`에 호스팅했다가 철회).
+> 셸 쪽 계약(`RunSelectionAsync`/`Confirm`/`Cancel`/`EnsureBoot`)은 **이미 구현돼 있다**. 남은 건 호스팅과 호출 5줄이다.
+
+**① 씬 호스팅** — `Scenes/BattleScene.unity`
+- 캔버스 선택: 메인 `Canvas`(sortingOrder **0**, 참조해상도 1080×1920) 아래 `SafeArea` 형제로 두거나, 전용 Canvas(1080×1920 · match=0 · **sortingOrder 200**)를 새로 만든다. `CoinFlipCanvas`(250)·`CinematicCanvas`(300)보다 **아래**여야 코인 토스·컷씬이 덱 화면에 묻히지 않는다. ⚠️ `CinematicCanvas`는 참조해상도가 3120×1440(가로 기준)이라 **그 밑에 넣으면 안 된다**.
+- `MatchDeckRoot`(full-stretch, **비활성 시작** — 게이트가 켠다) → 자식으로 `MatchDeckPanel` / `MatchDeckEditPanel` 인스턴스(둘 다 비활성) + `MatchDeckShell` 부착.
+- 셸 배선 8건: `matchPanel` · `editPanel` · `panelView` · `editController` · `strip`(=`MatchDeckEditPanel/TopBar/DeckStrip`) · `editBackButton`(=`Btn_MatchBack`) · `fallbackCardRegistry` · `fallbackDeckImages`. `MatchDeckPanelView.shell`도 인스턴스 오버라이드로 채운다.
+- EventSystem은 BattleScene에 이미 있다(추가 불필요).
+
+**② 게이트 호출** — `Assets/Scripts/Battle/GameInitializer.cs`
+- 삽입 위치: `StartBattleAsync()`의 `SceneTransitionVideo` 대기(`:35~36`) **직후**, `DeckConfig.IsMultiplayer` 분기(`:38`) **직전**. 필드 초기화가 `DeckConfig.PlayerDeck`을 소비(`:101`)하므로 게이트가 반드시 그보다 앞이어야 한다.
+- `battleIntro.Await()`(`:33`)는 그대로 둔다 — 카메라를 빼고 카드를 화면 밖으로 숨기는 게 여기라, 덱 화면이 보드를 가릴 필요가 없다. 건너뛰면 딜 애니가 깨진다.
+- 스킵 조건 2개: `DeckConfig.IsMultiplayer`(덱 동기화 RPC가 게이트를 기다려주지 않는다) · `TutorialConfig.IsActive`(고정 덱).
+
+```csharp
+[SerializeField] MatchDeckShell matchDeckShell;   // 미배선이면 게이트 없이 바로 시작
+[SerializeField] string         lobbyScene = "LobbyScene";
+
+// … SceneTransitionVideo 대기 직후 …
+var t_ct = this.GetCancellationTokenOnDestroy();
+if (this.matchDeckShell != null && !DeckConfig.IsMultiplayer && !TutorialConfig.IsActive)
+{
+    bool t_ready = await this.matchDeckShell.RunSelectionAsync(t_ct);
+    if (t_ct.IsCancellationRequested) return;
+
+    if (!t_ready)
+    {
+        // Await가 걸어둔 카메라 잠금을 풀지 않으면 화면비 대응(BattleCameraFit)이 영영 멈춘다
+        // — 멀티 이탈 경로(:56)가 같은 이유로 같은 처리를 한다.
+        BattleCameraFit.ClearExternalControl();
+        BattleCleanup.LoadScene(this.lobbyScene);
+
+        return;
+    }
+}
+```
+
+**③ 진입점 정리(선택)** — 로비 `LobbyMatchLauncher.cs:32~41`·`MatchFlowController.cs:208`이 진입 전에 `DeckConfig.Set`을 한다. 이제 최종 선택은 전투 씬에서 하므로 이 사전 세팅은 **초기 선택 힌트**로만 남는다(셸의 `TryConfirmSelection`이 덮어쓴다) — 그대로 둬도 상충하지 않는다. `HasAnyValidSlot` 게이트는 유지하는 편이 낫다(덱 0개로 전투 씬에 들어가면 시작 버튼이 영영 비활성).
+
+**④ 알려진 함정**
+- BattleScene에는 부트 프리팹이 **없다**. 로비를 거치면 `DontDestroyOnLoad`로 따라오지만, 전투 씬 단독 Play는 `MatchDeckShell.EnsureBoot`가 커버한다 → 폴백 2필드 배선이 사실상 필수.
+- `DeckConfig`는 전투 종료 후 **정리되지 않는다**(`BattleCleanup`이 안 건드림). 게이트가 매번 덮어쓰므로 덱 자체는 안전하지만, `IsMultiplayer` 잔존은 기존 함정 그대로다.
+- 매치 패널 BackButton = **전투 포기**(호스트가 로비 로드), 편집 패널 좌하단 `Btn_MatchBack` = **편집 종료**(매치 패널 복귀). 둘은 다른 버튼이다.
+
 - 함정 1: `DeckSaveManager.IsSlotValid`/`GetSlot`/`GetDisplayName`은 **범위 가드가 없다** — 선택 없음(-1)을 넘기면 예외. 셸의 `IsValidSlot` 래퍼를 우회하지 말 것.
 - 함정 2: 스트립 카드를 `localScale`로 줄이면 `HorizontalLayoutGroup`이 원본 rect(495px)를 예약해 간격이 벌어진다 — `sizeDelta`/`anchoredPosition`/TMP `fontSize`를 실수치로 축소해야 한다(9슬라이스는 `pixelsPerUnitMultiplier`도 함께).

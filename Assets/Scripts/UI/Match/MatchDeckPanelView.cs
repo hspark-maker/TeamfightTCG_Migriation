@@ -29,8 +29,11 @@ public class MatchDeckPanelView : MonoBehaviour
             backButton.onClick.AddListener(OnBackClicked);
         }
 
-        // battleButton.onClick은 일부러 배선하지 않는다 — 전투 진입 경로가 아직 이 화면 밖에서 정해진다.
-        // 여기서 임시 리스너를 달면 진짜 진입점이 붙을 때 두 경로가 동시에 발화한다. interactable만 관리한다.
+        if (battleButton != null)
+        {
+            battleButton.onClick.RemoveAllListeners();
+            battleButton.onClick.AddListener(OnBattleClicked);
+        }
     }
 
     // 지정 저장 슬롯의 덱을 6칸에 그린다.
@@ -58,7 +61,7 @@ public class MatchDeckPanelView : MonoBehaviour
             mySlots[t_i].Bind(t_i < t_count ? t_deck[t_i] : null, true);
         }
 
-        // 유효한 덱이 없으면 전투를 걸 수 없다. 클릭 자체를 막는 게 유일한 방어선이다(onClick 미배선).
+        // 유효한 덱이 없으면 전투를 시작할 수 없다. 표시용 차단이고, 실제 방어는 Confirm 안의 재검사다.
         if (battleButton != null) battleButton.interactable = t_valid;
     }
 
@@ -67,8 +70,14 @@ public class MatchDeckPanelView : MonoBehaviour
         if (shell != null) shell.OpenEditor();
     }
 
+    // 전투 포기. 어디로 돌아갈지는 셸을 await 하는 호스트가 정한다 — 이 뷰는 씬을 모른다.
     void OnBackClicked()
     {
-        if (shell != null) shell.Close();
+        if (shell != null) shell.Cancel();
+    }
+
+    void OnBattleClicked()
+    {
+        if (shell != null) shell.Confirm();
     }
 }

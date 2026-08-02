@@ -1,7 +1,13 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 매치 덱 화면의 셸(MatchDeckRoot에 부착). 로비 DeckTabController의 매치판.
+// 전투 씬 진입 직후 덱을 고르고 편집하는 화면의 셸(MatchDeckRoot에 부착). 로비 DeckTabController의 전투판.
+//
+// 전투 시작은 이 화면이 결정한다 — 호스트(GameInitializer)가 필드를 초기화하기 전에 RunSelectionAsync를
+// await하고, "시작"이 눌려야 통과한다. 필드 초기화가 DeckConfig.PlayerDeck을 소비하므로 게이트가 그보다 앞이어야 한다.
+//
 // 아는 것은 "어느 저장 슬롯이 선택됐는가"와 "두 패널 중 무엇을 보이는가"뿐 — 편성·저장은 전부 DeckEditController에 위임한다.
 // 선택을 DeckConfig가 아니라 슬롯 인덱스로 드는 이유: DeckConfig는 직렬화 없는 씬 캐리어라 "어느 슬롯"을 표현하지 못한다.
 public class MatchDeckShell : MonoBehaviour
@@ -17,8 +23,19 @@ public class MatchDeckShell : MonoBehaviour
     // 편집 패널 좌하단 뒤로가기. 배리언트에서 원본 BackButton을 삭제했으므로 편집 화면의 유일한 종료 경로다.
     [SerializeField] Button editBackButton;
 
+    [Header("단독 실행 폴백")]
+    // 전투 씬에는 부트 프리팹이 없다 — 로비를 거치면 DontDestroyOnLoad로 따라오지만
+    // 전투 씬 단독 Play에서는 카탈로그·소유·덱 세이브가 전부 비어 목록이 0개가 된다.
+    [SerializeField] CardRegistry      fallbackCardRegistry;
+    [SerializeField] DeckImageCatalog  fallbackDeckImages;
+
     // 현재 선택된 저장 슬롯. 유효한 덱이 하나도 없으면 -1.
     public int SelectedSlot { get; private set; } = -1;
+
+    // 게이트 결과. Pending인 동안 호스트가 전투 시작을 붙잡고 있다.
+    enum EGate { Pending, Confirmed, Cancelled }
+
+    EGate m_gate = EGate.Pending;
 
     // 루트가 비활성인 채로 Open이 불릴 수 있다(SetActive가 Awake를 동기 실행하지만 순서에 기대지 않는다).
     bool m_wired;
@@ -50,7 +67,71 @@ public class MatchDeckShell : MonoBehaviour
         }
     }
 
-    // 매치 덱 화면 진입. 로비 PlayBtn·매치 플로우가 나중에 붙을 외부 창구다.
+    // 전투 시작 게이트. 호스트(GameInitializer)가 필드 초기화 "전에" 이걸 await 하고,
+    // true를 받으면 DeckConfig.PlayerDeck이 확정된 상태로 전투를 이어간다.
+    // false = 유저가 전투를 포기했다(또는 씬이 내려갔다) → 호스트가 복귀를 처리한다.
+    public async UniTask<bool> RunSelectionAsync(CancellationToken _ct)
+    {
+        EnsureBoot();
+
+        m_gate = EGate.Pending;
+        Open();
+
+        // 씬 파괴로 취소되면 Confirm/Cancel 어느 쪽도 오지 않는다 — 예외 대신 취소 여부를 값으로 받는다.
+        bool t_canceled = await UniTask.WaitUntil(() => m_gate != EGate.Pending, cancellationToken: _ct)
+                                       .SuppressCancellationThrow();
+
+        if (t_canceled) return false;
+
+        Close();
+
+        return m_gate == EGate.Confirmed;
+    }
+
+    // 전투 시작 버튼. 선택된 덱을 씬 전환 캐리어에 실은 뒤에만 게이트를 연다 —
+    // 실패(유효 덱 없음)하면 화면을 유지한다. 버튼 interactable로도 막히지만 그건 표시일 뿐이다.
+    public void Confirm()
+    {
+        if (!TryConfirmSelection())
+        {
+            Debug.LogWarning("[MatchDeckShell] 유효한 덱이 선택되지 않았다 — 전투를 시작하지 않는다.");
+
+            return;
+        }
+
+        m_gate = EGate.Confirmed;
+    }
+
+    // 전투 포기. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
+    public void Cancel()
+    {
+        m_gate = EGate.Cancelled;
+    }
+
+    // 전투 씬 단독 Play 보강. 로비를 거쳐 들어오면 부트가 이미 살아 있으므로 아무것도 하지 않는다.
+    // 도감 화면의 EnsureBoot와 같은 결이되, 덱 목록이 필요하므로 덱 세이브 로드까지 포함한다.
+    void EnsureBoot()
+    {
+        if (CardCatalog.IsReady) return;
+        if (fallbackCardRegistry == null)
+        {
+            Debug.LogWarning("[MatchDeckShell] 카탈로그 미초기화 + 폴백 레지스트리 미배선 — 덱 목록이 비어 보인다.");
+
+            return;
+        }
+
+        DataSaveManager.Load();
+        CardCatalog.SetSource(fallbackCardRegistry.All);
+        OwnershipManager.Init();
+
+        // 세이브의 카드 키를 CardData로 재수화하려면 마스터 목록을 먼저 넘겨야 한다(BootInstaller와 같은 순서).
+        DeckSaveManager.SetCardRegistry(fallbackCardRegistry.All);
+        DeckSaveManager.LoadFromSave();
+
+        DeckImages.SetSource(fallbackDeckImages);
+    }
+
+    // 덱 화면 진입. 게이트를 쓰지 않고 직접 열 때(디버그·후속 진입점)의 창구다.
     // _slotIndex가 음수면 이전 선택 → 첫 유효 슬롯 순으로 알아서 고른다.
     public void Open(int _slotIndex = -1)
     {
@@ -92,8 +173,7 @@ public class MatchDeckShell : MonoBehaviour
         if (editController != null) editController.Open(SelectedSlot);
     }
 
-    // 전투 진입 시 선택된 덱을 씬 전환 캐리어에 싣는다. 이번 범위에서는 호출처가 없다(BattleButton 미배선) —
-    // 매치 플로우가 붙을 때 여기 하나만 부르면 되도록 창구만 열어둔다.
+    // 선택된 덱을 씬 전환 캐리어에 싣는다. Confirm이 게이트를 열기 직전에 부르는 유일한 지점이다.
     public bool TryConfirmSelection()
     {
         if (!IsValidSlot(SelectedSlot)) return false;

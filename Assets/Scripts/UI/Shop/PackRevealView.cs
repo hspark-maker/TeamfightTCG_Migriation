@@ -82,11 +82,6 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] float cardPullDuration = 0.55f;
     // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
     [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
-    // 팩은 빠져나가는 중이라 제 위치를 리그에 내주고 있다 — 팩을 걸면 두 축이 다투므로 배경처럼 가만히 있는 것을 건다.
-    [SerializeField] Transform shakeTarget;        // 배경 RectTransform(옵션)
-    [SerializeField] float shakeDuration = 0.3f;
-    [Tooltip("DOShakePosition은 월드 좌표를 흔든다 — Overlay 캔버스의 월드는 디바이스 스크린px다(참조px 아님).")]
-    [SerializeField] float shakeStrength = 48f;
     [Tooltip("뽑기가 끝난 뒤 카드 조작을 열기까지의 여유.")]
     [SerializeField] float pullHold = 0.35f;
 
@@ -216,7 +211,6 @@ public class PackRevealView : MonoBehaviour
 
         if (tearHandle != null) tearHandle.Disarm();
         if (shellRig != null) shellRig.ResetPose();
-        if (shakeTarget != null) shakeTarget.DOKill();
 
         SetTearHint(false, true);
         GateInput(false);
@@ -264,8 +258,6 @@ public class PackRevealView : MonoBehaviour
         // 연출 중 비활성 시 좀비 트윈 정리 + 상태 리셋(재활성 후 "중간 단계에 갇힘" 방지).
         KillStageSeq();
         if (shellRig != null) shellRig.ResetPose();
-        // 셰이크도 같이 끊는다 — 대상은 팩과 달리 계속 보이는 배경이라, 중간에 멈추면 어긋난 자리에 그대로 굳는다.
-        if (shakeTarget != null) shakeTarget.DOKill();
         SetTearHint(false, true);
 
         // 이미 끝난 세션은 끝난 채로 둔다. Idle로 되돌리면 BeginOpen 재진입 가드가 풀려
@@ -397,11 +389,6 @@ public class PackRevealView : MonoBehaviour
         m_stage = EStage.Pulling;
 
         if (burstEffect != null) burstEffect.Play();
-        if (shakeTarget != null)
-        {
-            shakeTarget.DOKill();
-            shakeTarget.DOShakePosition(shakeDuration, shakeStrength).SetLink(shakeTarget.gameObject);
-        }
 
         KillStageSeq();
         m_stageSeq = DOTween.Sequence().SetLink(gameObject);
