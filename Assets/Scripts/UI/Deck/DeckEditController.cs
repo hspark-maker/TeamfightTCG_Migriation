@@ -144,7 +144,7 @@ public class DeckEditController : MonoBehaviour
         if (!IsOpen || collectionGrid == null) return;
 
         // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
-        collectionGrid.Build(OnTileDragRequest);
+        collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         RefreshAll();
     }
 
@@ -172,7 +172,7 @@ public class DeckEditController : MonoBehaviour
         m_savedName = _initialName;
         if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
 
-        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest);
+        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
 
         RefreshAll();
@@ -205,6 +205,25 @@ public class DeckEditController : MonoBehaviour
         if (_tile == null || dragController == null) return;
 
         dragController.Begin(_tile.Card, _data, collectionGrid != null ? collectionGrid.Scroll : null);
+    }
+
+    // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.
+    // 배치는 AssignSlot에 위임한다 — 덱 내 중복 제거·dirty·재갱신을 드래그 드롭과 같은 경로로 태우기 위함이다.
+    void OnTileClicked(DeckEditCardTile _tile)
+    {
+        // 편집이 닫힌 뒤 같은 프레임에 늦게 디스패치될 수 있다(그리드 Clear의 Destroy는 프레임 끝에 반영).
+        // 가드가 없으면 닫힌 편집기의 0번 칸에 카드가 꽂히고 m_dirty까지 선다.
+        if (!IsOpen) return;
+        if (_tile == null || _tile.Card == null) return;
+
+        // 드래그 도중 들어온 클릭은 무시한다. 입력 모듈 쪽 차단(eligibleForClick)이 뚫려도 고스트가 붙은 채
+        // 카드가 칸에 꽂히는 상태는 만들지 않는다.
+        if (dragController != null && dragController.IsDragging) return;
+
+        int t_empty = FindFirstEmpty();
+        if (t_empty < 0) return;   // 6칸이 다 찼다 — 카운터와 자동편성 버튼 비활성으로 이미 드러나 있으므로 조용히 무시
+
+        AssignSlot(t_empty, _tile.Card);
     }
 
     // 편성 칸에 카드를 놓는다. 같은 카드가 이미 다른 칸에 있으면 복사가 아니라 이동이다(덱 내 중복 금지).
@@ -353,18 +372,24 @@ public class DeckEditController : MonoBehaviour
     // 자동 편성 정렬 기준과 합계 표시가 같은 식을 쓰게 하는 단일 지점이다.
     static int HpOf(CardData _card) => _card != null ? _card.maxHp + _card.bonusHp : 0;
 
-    // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
-    bool TryFillFirstEmpty(CardData _card)
+    // 앞쪽 빈 칸의 인덱스. 없으면 -1.
+    int FindFirstEmpty()
     {
         for (int t_i = 0; t_i < m_working.Length; t_i++)
-        {
-            if (m_working[t_i] != null) continue;
+            if (m_working[t_i] == null) return t_i;
 
-            m_working[t_i] = _card;
-            return true;
-        }
+        return -1;
+    }
 
-        return false;
+    // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
+    // 자동 편성 전용 — dirty·재갱신은 호출측(AutoEquip)이 순회를 끝낸 뒤 한 번에 처리한다.
+    bool TryFillFirstEmpty(CardData _card)
+    {
+        int t_empty = FindFirstEmpty();
+        if (t_empty < 0) return false;
+
+        m_working[t_empty] = _card;
+        return true;
     }
 
     bool ContainsInWorking(CardData _card)

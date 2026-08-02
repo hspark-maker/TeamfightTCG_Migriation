@@ -3,13 +3,18 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 // 덱 편집 화면 하단 컬렉션 그리드의 카드 타일 1장.
-// 표시는 CardVisualView에 전부 위임하고, 여기서는 "롱프레스 → 드래그 요청 중계"와 "장착중 딤"만 한다.
+// 표시는 CardVisualView에 전부 위임하고, 여기서는 "롱프레스 → 드래그 요청 중계", "클릭 → 자동 배치 요청 중계",
+// "장착중 딤"만 한다.
 //
 // IDragHandler 계열(IBeginDragHandler/IDragHandler/IEndDragHandler)은 절대 구현하지 않는다 —
 // 구현하면 uGUI가 드래그 타깃을 이 타일로 잡아버려 부모 ScrollRect가 드래그를 못 받는다
 // (Assets/Scripts/UI/MainMenu/SynergyCountIcon.cs:89와 동일한 이유).
 // 그래서 드래그 개시는 롱프레스로만 하고, 실제 이동은 DeckEditDragController가 Update 폴링으로 처리한다.
-public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler
+// 반면 IPointerClickHandler는 드래그 라우팅과 무관해 그대로 구현해도 ScrollRect가 죽지 않는다.
+// 다만 LongPressDetector와 이 컴포넌트는 반드시 같은 GameObject(타일 루트)에 있어야 한다 —
+// 자식에 IPointerDownHandler가 붙으면 pointerPress가 그 자식이 되고, 릴리즈 때 클릭 대상 비교가 어긋나
+// 정상 탭에서도 OnPointerClick이 아예 오지 않는다.
+public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClickHandler
 {
     [SerializeField] CardVisualView     view;
     [SerializeField] LongPressDetector  longPress;
@@ -20,14 +25,16 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler
     bool                                           m_inDeck;
     PointerEventData                               m_pointerData;
     Action<DeckEditCardTile, PointerEventData>     m_onDragRequest;
+    Action<DeckEditCardTile>                       m_onClick;
 
     public CardData Card   => m_card;
     public bool     InDeck => m_inDeck;
 
-    public void Bind(CardData _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest)
+    public void Bind(CardData _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
         m_card          = _card;
         m_onDragRequest = _onDragRequest;
+        m_onClick       = _onClick;
 
         // 그리드에는 소유 카드만 올라오므로 owned는 true 고정(잠김 실루엣 경로가 아니다).
         if (view != null) view.Bind(_card, true);
@@ -58,6 +65,19 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler
     public void OnPointerDown(PointerEventData _data)
     {
         m_pointerData = _data;
+    }
+
+    // 클릭 = 빈 칸 자동 배치 요청. 어느 칸에 넣을지는 편성 상태를 아는 컨트롤러가 정한다.
+    //
+    // 스크롤·드래그와 충돌하지 않는다: ScrollRect 스크롤로 임계값을 넘기면 입력 모듈이 eligibleForClick을 내리고,
+    // 롱프레스 드래그는 DeckEditDragController가 Begin/Finish 양쪽에서 같은 플래그를 눌러둔다.
+    public void OnPointerClick(PointerEventData _data)
+    {
+        // 입력 모듈은 우클릭·휠클릭에도 클릭 핸들러를 태운다 — 에디터/PC에서 오배치가 나지 않게 좌클릭만 받는다.
+        if (_data != null && _data.button != PointerEventData.InputButton.Left) return;
+        if (m_inDeck || m_card == null) return;   // 이미 편성된 카드(딤 상태)는 클릭 대상이 아니다
+
+        m_onClick?.Invoke(this);
     }
 
     void OnDestroy()
