@@ -15,7 +15,7 @@ public class CardPackData : ScriptableObject
 
     [Header("표시")]
     [Tooltip("진열·개봉에 쓰는 팩 아트. 미지정이면 진열 뷰가 자기 기본 이미지를 유지한다.")]
-    [SerializeField] Sprite packArt;             // 축소 아이콘이 아니라 진열 본체 아트(개봉 씬도 같은 필드를 소비할 여지).
+    [SerializeField] Sprite packArt;             // 축소 아이콘이 아니라 진열 본체 아트(개봉 화면도 같은 필드를 쓴다).
 
     [Header("가격·드로우")]
     [Min(0)] [SerializeField] long price = 100;   // Gold 가격. 음수 오설정 방지.

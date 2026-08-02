@@ -80,8 +80,6 @@ public class PackRevealView : MonoBehaviour
     [Tooltip("뽑는 데 걸리는 시간. 더미가 솟아오르는 시간이자 팩이 빠져나가는 시간이다 — " +
              "둘은 같은 한 동작이라 값을 나누지 않는다.")]
     [SerializeField] float cardPullDuration = 0.55f;
-    // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
-    [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
     [Tooltip("뽑기가 끝난 뒤 카드 조작을 열기까지의 여유.")]
     [SerializeField] float pullHold = 0.35f;
 
@@ -102,7 +100,7 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] CanvasGroup revealPanel;
 
     [Header("신규 카드 반응")]
-    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. 씬의 Dim에 붙인 PackScreenFlash를 물린다. " +
+    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. Dim에 붙인 PackScreenFlash를 물린다. " +
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
     [SerializeField] PackScreenFlash newCardFlash;
 
@@ -149,7 +147,7 @@ public class PackRevealView : MonoBehaviour
     bool m_announced;
 
     /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
-    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 씬 기본 그림).</summary>
+    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
     public void BeginOpen(OpenedPack _opened, CardPackData _pack)
     {
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
@@ -387,8 +385,6 @@ public class PackRevealView : MonoBehaviour
         // 씰 찢기 완료와 "찢기 단계 스킵"이 겹쳐도 뽑기가 두 번 재생되지 않게(조각 비산·카드 솟기 중복 방지).
         if (m_stage != EStage.Tearing) return;
         m_stage = EStage.Pulling;
-
-        if (burstEffect != null) burstEffect.Play();
 
         KillStageSeq();
         m_stageSeq = DOTween.Sequence().SetLink(gameObject);

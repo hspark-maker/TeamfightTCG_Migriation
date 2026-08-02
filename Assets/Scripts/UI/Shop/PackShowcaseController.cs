@@ -22,7 +22,7 @@ public class PackShowcaseController : MonoBehaviour
     // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
 
-    [SerializeField] Button buyButton;              // 구매 → 개봉 씬 전환 트리거.
+    [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]

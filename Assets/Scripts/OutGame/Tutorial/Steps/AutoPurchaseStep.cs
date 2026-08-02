@@ -10,10 +10,6 @@ public class AutoPurchaseStep : OutgameTutorialStep
     [Tooltip("중복 카드 1장당 환급 골드")]
     [SerializeField] long duplicateRefundGold;
 
-    [Tooltip("획득 후 이동할 씬. 비우거나 지금 씬과 같으면 오버레이만 닫고 제자리에 남는다(일반값). " +
-             "다른 씬을 넣으면 실제로 그 씬을 로드한다 — 전투 진입은 BattleEntry 스텝의 몫이니 보통 비워 둔다.")]
-    [SerializeField] string nextScene;
-
     public override EOutgameTutorialCompletion Completion => EOutgameTutorialCompletion.Auto;
     public override bool LeavesScene => false;
 
@@ -46,8 +42,9 @@ public class AutoPurchaseStep : OutgameTutorialStep
         // 마지막 스텝이 자동 구매인 저작도 완료로 닫는다(진행도가 시퀀스 끝에 멈춰 재개 불가가 되지 않게).
         _context.CompleteIfLast();
 
-        // 전투 진입은 BattleEntry 스텝(로비 PlayBtn)이 담당 → 캐리어의 튜토리얼 시작은 항상 false.
-        PackHandoff.Set(t_opened, pack, nextScene, false);
+        // 목적지는 비운다 — 개봉은 제자리(오버레이)에서 끝난다. 전투 진입은 BattleEntry 스텝(로비 PlayBtn)이 담당하므로
+        // 캐리어의 튜토리얼 시작도 항상 false다.
+        PackHandoff.Set(t_opened, pack, null, false);
 
         // 오버레이가 안 열려도 Rollback하지 않는다 — 구매는 이미 원자 영속돼 되돌릴 수 없고,
         // 진행도만 되돌리면 다음 부트에 같은 팩을 또 사서 골드가 이중으로 나간다.

@@ -189,7 +189,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6266784726239689142, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 200
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6266784726239689142, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
       propertyPath: m_SizeDelta.y
@@ -297,8 +297,30 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7683943215510907221, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6555885649040983411}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5161141881003963513, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7584594123180644460}
   m_SourcePrefab: {fileID: 100100000, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
+--- !u!1 &1475231515442910347 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5161141881003963513, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
+  m_PrefabInstance: {fileID: 6041891218928853234}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7584594123180644460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1475231515442910347}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
+  m_AspectMode: 2
+  m_AspectRatio: 0.7067138
 --- !u!224 &4142121615309834663 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7683943215510907221, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
