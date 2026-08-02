@@ -207,6 +207,29 @@ public class PackRevealView : MonoBehaviour
         else SkipToSummary();
     }
 
+    /// <summary>세션을 완전히 되돌려 다음 BeginOpen을 받을 수 있게 한다.
+    /// OnDisable은 요약 도달분을 일부러 남기므로(중복 발화 방지), 오버레이가 닫힐 때는 이쪽이 필요하다.</summary>
+    public void ResetSession()
+    {
+        KillStageSeq();
+        KillTotalRefundTween();
+
+        if (tearHandle != null) tearHandle.Disarm();
+        if (shellRig != null) shellRig.ResetPose();
+        if (shakeTarget != null) shakeTarget.DOKill();
+
+        SetTearHint(false, true);
+        GateInput(false);
+
+        if (resultGrid != null) resultGrid.Hide();
+        if (summaryGroup != null) summaryGroup.SetActive(false);
+
+        m_stage = EStage.Idle;
+        m_pending = null;
+        m_announced = false;
+        m_skips = 0;
+    }
+
     void OnEnable()
     {
         if (tearHandle != null) tearHandle.OnTorn += HandleTorn;

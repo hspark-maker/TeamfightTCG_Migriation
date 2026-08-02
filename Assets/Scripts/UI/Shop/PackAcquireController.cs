@@ -1,10 +1,12 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-// 개봉 씬 상주 브레인. 캐리어(PackHandoff)로 넘어온 개봉 세션을 뷰에 태우고, 개봉 완료 →
-// 획득 버튼 노출 → 획득 클릭 → 보상 캐리어 적재 → (튜토리얼이면 시작 후) 목적지 씬으로 이동한다.
+// 개봉 오버레이 상주 브레인. 캐리어(PackHandoff)로 넘어온 개봉 세션을 뷰에 태우고, 개봉 완료 →
+// 획득 버튼 노출 → 획득 클릭 → 보상 캐리어 적재 → (튜토리얼이면 시작 후) 목적지로 나간다.
+// 목적지가 지금 있는 씬이면 오버레이를 닫고, 다른 씬이면 씬을 로드한다.
 // 덱은 만들지 않는다 — 카드 소유는 구매 시점에 이미 영속됐고, 편성은 덱 화면의 몫이다.
 //
 // 경계: 목적지 분기는 캐리어 값(NextScene/StartTutorial)으로만 한다 — 첫시작 판정을 여기서 재계산하지 않는다.
@@ -33,16 +35,24 @@ public class PackAcquireController : MonoBehaviour
     // 획득이 2회 이상 눌려도 씬 전이는 1회만.
     bool m_left;
 
-    void Start()
+    /// <summary>캐리어에 실린 개봉 세션을 뷰에 태운다. 오버레이가 열릴 때마다 호출된다
+    /// — Start에 두면 오버레이는 한 번만 열리는 화면이 된다(재개봉 불가).</summary>
+    public bool BeginSession()
     {
         // 카드 배치 전까지 획득 버튼 숨김 — OnRevealComplete에서 노출.
         if (acquireButton != null) acquireButton.gameObject.SetActive(false);
+        m_left = false;
 
         if (!PackHandoff.HasPending)
         {
-            // 정상 진입은 상점/부트가 캐리어를 채우고 이 씬을 로드한 경우뿐. 직접 진입 등은 열 팩이 없음.
+            // 정상 진입은 상점/부트가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
             Debug.LogWarning("[PackAcquireController] PackHandoff 없음 — 정상 진입이 아님(열 팩 없음).");
-            return;
+            return false;
+        }
+        if (view == null)
+        {
+            Debug.LogWarning("[PackAcquireController] view 미배선 → 개봉 진행 불가.");
+            return false;
         }
 
         // 목적지·팩 컨텍스트를 먼저 캡처한 뒤 Consume(캐리어를 통째로 비움 → 다음 개봉 세션 격리).
@@ -52,8 +62,8 @@ public class PackAcquireController : MonoBehaviour
         var t_opened = PackHandoff.Consume();
         CacheCards(t_opened);
 
-        if (view != null) view.BeginOpen(t_opened, t_pack);
-        else Debug.LogWarning("[PackAcquireController] view 미배선 → 개봉 진행 불가.");
+        view.BeginOpen(t_opened, t_pack);
+        return true;
     }
 
     void OnEnable()
@@ -66,6 +76,13 @@ public class PackAcquireController : MonoBehaviour
     {
         if (view != null) view.OnRevealComplete -= OnRevealComplete;
         if (acquireButton != null) acquireButton.onClick.RemoveListener(OnAcquirePressed);
+    }
+
+    IEnumerator CloseNextFrame()
+    {
+        yield return null;
+
+        if (PackOpenOverlay.Instance != null) PackOpenOverlay.Instance.Close();
     }
 
     // 신규 획득 카드 + 환급 총액 캐시(null 카드 제외).
@@ -106,13 +123,26 @@ public class PackAcquireController : MonoBehaviour
         // 튜토리얼 세팅은 목적지(전투) 진입 직전 1회. scenario null이면 Begin이 End로 안전 처리.
         if (m_startTutorial) TutorialConfig.Begin(scenario);
 
-        if (string.IsNullOrEmpty(m_nextScene))
+        // 목적지가 지금 있는 씬이면 떠날 것이 없다 — 오버레이만 닫아 로비로 돌아간다(일반 구매 경로).
+        // 목적지가 비었을 때도 같다: 단독 테스트 씬은 그 자리에 머무는 것이 기대 동작이다.
+        // 다른 씬이면 진짜 씬 로드(첫실행의 전투 진입). 분기는 여기 한 곳뿐 — 목적지 판정을 늘리지 않는다.
+        if (string.IsNullOrEmpty(m_nextScene) || m_nextScene == SceneManager.GetActiveScene().name)
         {
-            // 배선 오류로 버튼이 죽어 씬에 갇히는 것을 막는다(재실행돼도 캐리어 재설정뿐이라 부작용 없음).
-            m_left = false;
-            Debug.LogWarning("[PackAcquireController] NextScene 미지정 — 씬 전이 불가(캐리어 설정 확인).");
+            if (PackOpenOverlay.Instance == null)
+            {
+                // 배선 오류로 버튼이 죽어 화면에 갇히는 것을 막는다(재실행돼도 캐리어 재적재뿐이라 부작용 없음).
+                m_left = false;
+                Debug.LogWarning("[PackAcquireController] PackOpenOverlay 없음 — 닫기 불가(오버레이 배선 확인).");
+                return;
+            }
+
+            // 같은 버튼에 튜토리얼 게이트가 함께 걸려 있다 — 여기서 바로 닫으면 오버레이 닫힘이
+            // 게이트의 완료 커밋보다 먼저 돌아 그 커밋이 유실된다(진행 불가).
+            // 씬 로드 시절엔 로드가 프레임 끝이라 저절로 지켜지던 순서라, 그 타이밍을 명시로 되살린다.
+            StartCoroutine(CloseNextFrame());
             return;
         }
+
         SceneManager.LoadScene(m_nextScene);
     }
 
