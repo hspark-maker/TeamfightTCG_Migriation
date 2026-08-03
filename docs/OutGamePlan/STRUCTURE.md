@@ -8,6 +8,7 @@
 
 | 날짜 | 변경 | 승인 |
 |---|---|---|
+| 2026-08-04 | **스텝 SO 33개 → 시퀀스 인라인 행 전환 (✅ 이관 완료 27행 + 구 계층 삭제, 컴파일 검증 ✅ / Play 검증 대기)** — 저작 부담 진단에서 출발. 스텝을 SO로 가른 두 근거를 실측 재검증했더니 **재사용은 33개 중 2건**(`Step_MatchEdit`·`Step_DeckBack`)뿐이고, "종류별 필드만 노출"은 드로어로 대체 가능했다. 대가는 파일 66개와 GUID 나열이라 **순서·내용이 보이지 않는 시퀀스**. → 챕터를 인라인한 것과 같은 판단을 스텝에 적용해 `TutorialStepDef`(행) + `TutorialStepExecutor`(액션 switch) + `TutorialStepDefDrawer`(접힘=한 줄 요약, 펼침=액션별 필드)로 접었다. `Completion`·`LeavesScene`·앵커 사용 여부를 **액션에서 파생**시켜 저작 어긋남을 표현 불가능하게 만든 것이 부수 이득. **세이브 스키마·씬 배선 무변경.** 상세 → `G-TUT3` | 사용자 승인(대화) |
 | 2026-08-03 | **3·4편 튜토리얼 덱 동선을 "만들기"에서 "고르기"로 전환 (✅ 코드+에셋+프리팹, Unity 컴파일·시퀀스 로드·앵커 배선 검증 완료 / Play 검증 대기)** — 기존 3·4편은 매치 편집 화면에서 `Btn_UnequipAll` → `Btn_AutoEquip`으로 덱을 **만들게** 했는데, 그렇게 만든 덱은 세이브에만 남고 **전투는 시나리오 덱으로 돌았다**(`GameInitializer.InitializeSinglePlayerFields`가 튜토리얼일 때 `TutorialConfig.PlayerDeck`을 무조건 주입) — 화면과 실전이 갈린 상태였다. 게다가 `ConfirmEnemyDeck`이 튜토리얼에서 조기 반환해 `DeckConfig.EnemyDeck`이 비어 **상대 6칸이 통째로 접혀 있었다**. **① 덱 정본을 시나리오로 확정** — 팩 pool이 아니라 `TutorialScenarioData.playerDeck`. 전투 필드가 실제로 소비하는 값이라 이것만이 화면=실전을 보장한다(실측: `TutorialScenario3.playerDeck` ≡ `SynergyPack.pool` 6/6 일치, `TutorialScenario2`는 5번째만 불일치 — 저작 드리프트로 남김). **② 신규 `DeckGrantStep`(Auto)** 이 시나리오 덱을 `OwnershipManager.GrantAll` + `DeckSaveManager.TryInsertFront`로 세이브에 지급 → 덱 목록에 "키워드 덱"/"시너지 덱"이 생기고 유저가 **리스트에서 골라** 전투에 나간다. 커밋 선행 불변식 준수(`CommitAdvance` → 실행), `CompleteIfLast`는 성공 뒤에만, 저작 오류는 진행(재시도해도 같음)·일시 실패(레거시 이관 대기·슬롯 포화)는 `Rollback`으로 구분. **③ 지급과 조회의 정규화를 한 곳에** — `DeckSaveManager.TryBuildDeck`(null·중복 제거 후 정확히 `DECK_SIZE`) + `TryFindSlot`(원본을 받아 내부에서 정규화). 갈라 두면 지급한 덱과 셸이 되찾는 좌표가 어긋나 앵커가 사라진다. `TryFindSlot`은 순서 무관 비교다 — 편성 순서만 바꾼 덱을 "다른 덱"으로 보면 중복 지급이 된다. **④ 튜토 덱을 초기 선택에서 제외**(`MatchDeckShell.ResolveSlot`) — `TryInsertFront`가 **항상 슬롯 0**에 넣으므로(압축 불변식) 방치하면 이미 선택된 채로 떠서 "고르기"를 가르칠 수 없다. 대안이 없으면(튜토 덱이 유일한 덱) 그거라도 골라 `-1` 잠김을 피한다. **⑤ 앵커 3종 신규**(15 `MatchDeckMySection` / 16 `MatchDeckEnemySection` / 17 `MatchDeckTutorialDeck`, **enum 끝에만**). 15·16은 `MatchDeckPanel.prefab`에 `TutorialAnchor` 부착(Button 없는 순수 영역 → `MessageStep` 전용, 게이트가 딤+링만 걸고 승격은 안 한다). 17은 런타임 생성 칸이라 `MatchDeckStripController`가 **튜토 덱 칸 하나만** 코드 등록 — 기존 "등록하지 않는다" 주석의 전제(로비와 키 공유)를 신규 전용 키로 해소했고, `Clear()`에서 명시 해제한다(Destroy가 프레임 끝이라 자가치유에 맡기면 그사이 죽을 칸을 가리킨다). **⑥ 상대 덱 진실원은 캐리어 한 곳 유지** — 뷰에 튜토리얼 분기를 넣는 대신 `ConfirmEnemyDeck`이 튜토리얼일 때 `DeckConfig.SetEnemyDeck(TutorialConfig.EnemyDeck)`을 실어준다(뷰 무수정, 이중 진실원 방지). **⑦ 브리지가 Auto 스텝 뒤를 잇게** — `ApplyStepOnce`가 `EnterCurrentStep()` false에서 그냥 끊어, 씬에 남는 자동 스텝의 다음 칸이 무관한 외부 신호(개봉 오버레이 닫힘)에 얹혀 진행되고 있었다. 좌표가 실제로 움직였고 그 스텝이 `LeavesScene=false`일 때만 `m_pendingApply`로 이어 진입(롤백한 스텝을 되풀이하지 않게, 상한 8회 유지). **⑧ 시퀀스**: 3편 12→14칸(`GrantDeck` · `Msg_MyPanel`(15) · `Msg_EnemyPanel`(16) · `SelectDeck`(17) 추가, `DeckUnequipAll`·`DeckAutoEquip_Keyword` 제거), 4편 10칸 유지(`GrantDeck`·`SelectDeck` 추가, `DeckUnequipAll`·`DeckAutoEquip_Synergy` 제거). 편집 화면 설명(`Msg_Collection`·`Msg_DeckSlot`)은 3편에 존치. **⑨ 범위 밖(명시적 후속)**: 선택이 전투 덱을 실제로 바꾸지는 않는다(필드는 여전히 시나리오 고정 — 튜토리얼 게이트가 다른 칸을 막아 실질 노출 없음) · `DeckAutoEquipStep`/`TryGetForcedDeck` 축은 소비자 0으로 남김(되살릴 땐 정본을 시나리오로 통일할 것) · `OutgameTutorialBridge`가 `MatchDeckRoot` 자식인 배치 위험(`showDeckGate=1`이라 이번 흐름은 성립) | ✅ |
 | 2026-08-03 | **로딩 커버를 로비 진입 공통 전환으로 승격 (✅ 코드+프리팹, Unity 컴파일·Resources 로드 검증 완료 / Play 검증 대기)** — 로딩 화면이 **StartScene 부트에서만** 동작하고, 같은 로비로 돌아오는 다른 두 경로(`GameResultPopup.HandleTouch`·`GameInitializer.RunDeckGate` 포기)는 전환 없이 즉시 컷됐다. **① `BootLoadingScreen` → `LoadingCoverView` 개명 + 2모드화**(파일·클래스 동시 개명, `.meta` 동반 이동으로 guid 보존 → 프리팹 배선 무손실. 프리팹의 `m_EditorClassIdentifier`가 이미 `LoadingCoverView`라 오히려 일치가 회복됐다) — 부트 모드는 씬에 저작된 인스턴스(진행도 = `DataLibrary.LoadProgress`, 목적지는 튜토리얼 첫 스텝으로 자판정), 전환 모드는 `LoadScene(scene)`이 Resources에서 띄운 인스턴스(진행도 = `LoadSceneAsync`). **모드 분기는 `m_targetScene`의 null 여부 하나**이고, `Instantiate`가 `Awake`를 그 자리에서 돌리는 반면 `Start`는 프레임 끝에 오므로 정적 진입점의 대입이 항상 분기보다 먼저다. 바 추종 루프는 진행도 공급자만 다른 `CoFillBar(Func<float>)`로 뽑아 공유(최소 노출·추종 속도·타임아웃·홀드·페이드·`finally` 규약 전부 재사용). **② 전환 모드의 요점은 `allowSceneActivation=false`** — 여기서 걸리는 씬은 부트가 이미 데워둔 상태라 로드가 한두 프레임에 끝난다. 활성화를 붙잡지 않으면 바가 차기도 전에 씬이 갈려 **커버가 한 프레임만 번쩍이고 사라진다**(노출 길이를 정하는 건 로드 시간이 아니라 `minDuration`). 그 대가로 `progress`가 0.9에서 멈추므로 `/0.9` 정규화가 짝을 이룬다. **③ 배선점은 `BattleCleanup.LoadScene` 한 곳** — 전투 밖으로 나가는 유일한 통로라 여기 한 줄만 갈면 결과 팝업·덱 게이트 포기가 **호출부 무수정**으로 같은 전환을 탄다. `Run()`(=`DOTween.KillAll`)이 커버 생성보다 **먼저**여야 한다 — 뒤로 가면 커버의 페이드인 트윈까지 걷어간다. **④ 프리팹을 `Assets/Assets/Prefabs/UI/` → `Assets/Resources/UI/LoadingCover.prefab`로 이동** — Addressables가 불가한 이유 둘: `"UIPrefab"` 라벨은 `PooledUIBase`만 등록하고(`DataLibrary.LoadUIPrefab`), 부트 모드는 **그 로드가 끝나기 전에** 화면에 떠 있어야 한다(Resources 선례: `TutorialUIStyle`의 폰트). guid 보존으로 StartScene 인스턴스 무손실. 더불어 StartScene 인스턴스에만 있던 룩 오버라이드(배경 스프라이트·"로딩 중입니다"·폰트/머티리얼)를 **프리팹 원본에 반영** — 안 하면 전투→로비만 프리팹 기본 룩으로 떠 두 화면이 갈린다. **⑤ 등장 페이드인 `fadeInDuration`(0.15초) 추가** — 덮을 이전 화면이 있는 전환 모드 전용(부트는 검은 배경뿐이라 무시). 노출 총합 ≈ 페이드인 0.15 + `minDuration` 1 + 홀드 0.15 + 페이드아웃 0.4. **⑥ 잔존 금지 규약 유지** — 어느 경로로 빠지든 `finally { Reveal() }`. 커버가 남으면 DDOL + `sortingOrder 1000` + `blocksRaycasts`가 이후 **모든 씬을 영구 입력 불가**로 잠근다. 커버를 못 얻는 경우(Resources 누락)엔 경고 후 `SceneManager.LoadScene` 즉시 전환으로 폴백 — 연출 때문에 전환이 막히는 일은 없다. **⑦ 범위 밖(의도)**: 로비→전투 진입은 지금의 `SceneTransitionVideo` 영상 오버레이(`MatchFlowController`) 유지, `BattleCleanup.ReloadScene`(전투 재시작) 무수정 | ✅ |
 | 2026-08-03 | **매치 덱 선택·편집 도입 (✅ 코드+검수, 프리팹·씬 저작 및 Unity 컴파일·Play 검증 대기)** — 전투 진입 직전 화면에서 상대를 본 뒤 덱을 갈아끼우는 동선이 없었다(편성은 로비 덱 탭에서만 가능). `MatchDeckPanel.prefab`은 스크립트 0개·onClick 0건인 레이아웃 목업, `MatchDeckEditPanel.prefab`은 `DeckEditPanel`의 껍데기 배리언트, `MatchFlowController`는 어느 씬에도 없는 고아 — 셋 다 실행 경로 밖이었다. **① 편집기 재사용은 상속·복제가 아니라 훅 주입** — `DeckEditController`의 로비 의존은 `ExitEditor()`의 `tabController.CloseEditor()` **한 줄**로 수렴해 있었다. `Action m_onExit` + `SetExitHandler`를 얹고 `ExitEditor`를 "주입 훅 우선, 없으면 탭 셸" 2분기로 바꾼 게 전부(로비 배선 무영향 — `dragController`/`totalHpText` 오버라이드는 propertyPath 이름 기반이라 필드 추가로 안 깨진다). 상속은 `m_working`/`m_mode`/`m_slotIndex`가 private이라 실익이 0이고, 배리언트에서 컴포넌트 타입을 바꾸면 원본 관계가 끊긴다. **② 저장 규칙을 복제하지 않는 것이 이 설계의 전부** — 매치의 덱 전환 정책("6/6이면 조용히 저장, 미만이면 폐기, 팝업 없음")을 셸이 조립하려면 `CountFilled()==6` 판정과 `Create`/`Edit` 모드 분기를 셸이 알아야 하는데 그게 곧 복제다 → `SaveIfComplete()`를 컨트롤러에 두고 `SaveNewDeck`/`SaveEditedDeck`을 **그대로 호출**, `SwitchTo(int)`가 그 위에 얹힌다. 덤으로 `OnBackClicked`의 저장 분기도 `SaveIfComplete()`에 위임해 **저장 진입점이 1개로 더 수렴**했다. **③ 선택 덱의 진실원은 슬롯 인덱스** — `DeckConfig`는 직렬화 없는 씬 전환 캐리어라 "어느 슬롯인지"를 표현하지 못한다. `MatchDeckShell.SelectedSlot`(int)이면 편집 저장 직후 `DeckSaveManager.GetSlot(idx)` 재조회만으로 MySection이 정합되고, `DeckConfig.Set`은 전투 진입 순간(`TryConfirmSelection`, 이번 범위 호출처 0)에만 부른다. **④ 가로 리스트는 `DeckListController` 재사용을 포기하고 신규** — 재사용 불가 사유 3개가 전부 구조적이다: `RegisterTutorialAnchor(DeckCreateSlot)`가 **static 레지스트리를 덮어써** 매치 화면이 켜지는 순간 로비 튜토리얼 하이라이트가 매치 카드를 가리키고, `+`칸 무조건 삽입과 `tabController` 하드 의존이 `Build` 본문에 박혀 있으며, 미커밋 working copy에서 173줄로 커지며 **덱 삭제 UI까지 딸려온다**(매치 화면에 파괴적 경로를 두지 않는다). `DeckSlotView`는 그대로 재사용하고 `selectedFrame` + `SetSelected(bool)` 6줄만 추가(로비는 미배선 → 무영향). **⑤ 함정 1건**: `DeckSaveManager.IsSlotValid`는 **범위 가드 없이 `s_slots[_index]`를 직접 인덱싱**한다 — 셸이 "선택 없음"을 -1로 표현하므로 `IsValidSlot` 래퍼로 범위를 앞에서 막아야 한다(`GetSlot`/`GetDisplayName`도 같은 성질). **⑥ 배리언트 개조 방침**: `NameInput`/`BackButton`을 **삭제**(런타임 fake-null → 기존 null 가드가 전부 성립, `ResolveName()`이 텍스트를 읽지 않고 `m_savedName`을 반환해 rename 판정이 항상 false)하고 상단에 `TopBar`를 **추가**. 삭제로 원본 BackButton이 사라지므로 좌하단 `Btn_MatchBack`이 **유일한 종료 경로**가 된다(미배선 시 화면에 갇힘 → 셸 `Awake`가 LogError). **⑦ 범위 밖(명시적 후속)**: 로비 PlayBtn→매치 진입 배선, 드래그 편집(매치 캔버스 DragLayer 배선만 하면 코드 0줄), EnemySection 렌더(AI 덱 확정이 범위 밖이라 지금 배선하면 항상 빈 상태를 그리는 죽은 코드) | ✅ |
@@ -1026,6 +1027,133 @@ flowchart TD
 | `BootInstaller` 사본 2개 (LoadingScene · LobbyScene) | `Triggered Tutorial Data` 필드에 같은 에셋 배선 |
 | `Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab` | 하단바 `LobbyTabController`: `tabs[3](Deck).tutorialTrigger = DeckTabFirstEnter` · `tabs[4](Collection).tutorialTrigger = CollectionTabFirstEnter`. **도감 서브탭(`Tab_Collection.prefab`)의 탭바는 전부 `None`으로 둘 것** |
 | (별건) `Assets/Scenes/LobbyScene.unity` | `Tab_Deck`이 씬 오버라이드로 `m_IsActive: 1`이다(프리팹 원본은 0). 부팅 시 `DeckTabController.OnEnable`이 1회 헛발화하므로 오버라이드를 원복해 두면 좋다 — 이번 설계는 `Select()` 훅이라 영향은 없다 |
+
+---
+
+### G-TUT3 — 스텝 SO 33개 → 시퀀스 인라인 행 (저작 부담 해소) — ✅ 이관 완료 + 구 계층 삭제 (컴파일 검증 ✅ / Play 검증 대기) / 2026-08-04
+
+> 저작이 감당 안 된다는 진단에서 출발한 것. 스텝을 SO로 가른 두 근거를 실측으로 다시 검증했더니 둘 다 무너졌다:
+> **① "종류별 필드만 노출"** → 드로어가 대신할 수 있다. **② "에셋 재사용"** → 33개 중 **2건**뿐이었다(`Step_MatchEdit`·`Step_DeckBack`, 각 2회).
+> 대가는 파일 66개(자산+meta)와 **순서가 안 보이는 시퀀스**(`OutgameTutorial.asset`이 GUID 나열이라 행마다 무슨 액션인지·앵커가 뭔지 알 수 없다).
+> → 챕터를 인라인한 것과 **같은 판단을 스텝에 적용**한다. `:::new` = 이번 신규.
+
+#### 구조 위치 — 갈리는 지점만 (실행 축은 무변경)
+
+```mermaid
+flowchart TD
+    subgraph before["이전 — 자산 33개 + 클래스 10종"]
+        D0["OutgameTutorial.asset<br/>chapters[].steps: GUID 나열"]
+        S0["Step_*.asset × 33<br/>(+ .meta 33)"]
+        C0["OutgameTutorialStep 베이스<br/>+ 서브클래스 10종<br/>각자 Enter() 오버라이드"]
+        D0 --> S0 --> C0
+    end
+
+    subgraph after["이후 — 자산 1개 + 실행기 1개"]
+        D1["OutgameTutorial.asset<br/>chapters[].stepDefs: 행 인라인"]:::new
+        R1["TutorialStepDef<br/>액션 + 필드 10개<br/>Completion·LeavesScene·Anchor 파생"]:::new
+        X1["TutorialStepExecutor<br/>액션 switch 1개"]:::new
+        W1["TutorialStepDefDrawer (에디터)<br/>접힘=한 줄 요약<br/>펼침=그 액션이 쓰는 필드만"]:::new
+        D1 --> R1 --> X1
+        R1 -.표시.-> W1
+    end
+
+    subgraph same["무변경 — 이 축은 손대지 않았다"]
+        RUN["OutgameTutorialRunner / TriggeredTutorialRunner<br/>좌표 해석"]
+        PRG["OutgameTutorialProgress<br/>세이브 스키마 그대로"]
+        LCK["OutgameFeatureLock<br/>좌표에서 해금 파생"]
+        GTE["OutgameTutorialGateUI · TutorialAnchorRegistry"]
+    end
+
+    after --> same
+    classDef new fill:#e8f5e9,stroke:#43a047,stroke-width:2px
+```
+
+#### 흐름 시퀀스 — 이관 1회 (사용자가 Unity에서 실행)
+
+```mermaid
+sequenceDiagram
+    actor U as 사용자
+    participant M as TutorialStepMigrator (에디터)
+    participant A as OutgameTutorial.asset
+    participant S as Step_*.asset × 33
+
+    U->>M: ① 스텝 SO → 인라인 행 이관
+    M->>A: chapters[].steps 읽기 (GUID)
+    loop 행마다
+        M->>S: SerializedObject로 필드 읽기
+        S-->>M: anchor·guideMessage·unlocks·useDim·pack·scenario…
+        M->>M: 클래스 이름 → 액션 매핑
+        M->>A: stepDefs[i] 초기화 후 기록
+    end
+    M-->>U: "행 33개 이관 완료"
+
+    U->>M: ② 시퀀스를 표로 출력
+    M-->>U: 콘솔에 표 (행 ← 구 자산 이름 대조)
+    Note over U: 여기서 눈으로 검수
+
+    U->>M: ③ 레거시 스텝 목록 비우기
+    M->>A: chapters[].steps 비움
+    Note over U,S: ④ 구 자산 33개·클래스 10종 삭제는 이후 별도 정리
+```
+
+#### 원리 카드 — 왜 이렇게 생겼나
+
+- **자산 분할의 기준은 "재사용되는가"이지 "종류가 다른가"가 아니다.** 종류별 필드 노출은 표시 문제라 드로어로 풀린다. 실측 재사용률이 2/33이면 분할 비용(파일 66개·순서 은폐)이 이득을 압도한다 — 챕터가 이미 같은 이유로 인라인이었다.
+- **파생 가능한 값은 저작하지 않는다.** `Completion`·`LeavesScene`·`Anchor` 사용 여부를 액션에서 파생시켜, 저작에서 "액션은 Message인데 Completion은 Click" 같은 어긋남이 **표현 불가능**해졌다. 구 SO 계층에서는 서브클래스마다 따로 선언해 어긋날 수 있었다.
+- **트레이드오프**: 다형성을 잃어 `TutorialStepExecutor`에 switch가 생겼다. 액션이 10~15개에서 멈출 영역이라 switch 하나가 파일 10개보다 읽기 쉽다고 판단했다. 액션이 30개를 넘기면 이 판단을 다시 볼 것.
+- **이후 수정 가능성이 높은 지점**
+  - 액션 추가 시 손댈 곳 2군데: `EOutgameTutorialAction.cs`(끝에만 추가) + `TutorialStepExecutor.cs:18` switch. 필드가 늘면 `TutorialStepDef`의 `Uses*` 헬퍼(`TutorialStepDef.cs:130~`)에 노출 규칙 1줄.
+  - 요약 줄 열 폭 조정: `TutorialStepDefDrawer.cs:14-17` 상수 4개.
+
+#### 파일 지도
+
+| 클래스/에셋 | 파일 | 상태 |
+|---|---|---|
+| `EOutgameTutorialAction` (액션 enum, int 직렬화 — 끝에만 추가) | 신규 `Assets/Scripts/OutGame/Tutorial/Steps/EOutgameTutorialAction.cs` | 2026-08-04 ✅ |
+| `TutorialStepDef` (`[Serializable]` 행 — 필드 10 + 파생 프로퍼티 3 + 노출 헬퍼 7) | 신규 `Assets/Scripts/OutGame/Tutorial/Steps/TutorialStepDef.cs` | 2026-08-04 ✅ |
+| `TutorialStepExecutor` (액션 switch — 구 `Enter()` 10종 흡수) | 신규 `Assets/Scripts/OutGame/Tutorial/Steps/TutorialStepExecutor.cs` | 2026-08-04 ✅ |
+| `TutorialStepDefDrawer` (접힘=한 줄 요약 / 펼침=액션별 필드) | 신규 `Assets/Scripts/Editor/TutorialStepDefDrawer.cs` | 2026-08-04 ✅ |
+| ~~`TutorialStepMigrator`~~ (①이관 ②표 출력 ③레거시 비우기) | **삭제** — 1회용, 이관 완료 후 데드코드 | 2026-08-04 ✅ |
+| `OutgameTutorialChapter.stepDefs` | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialChapter.cs` | 2026-08-04 ✅ |
+| `TriggeredTutorialEntry.stepDefs` | `Assets/Scripts/OutGame/Tutorial/TriggeredTutorialData.cs` | 2026-08-04 ✅ |
+| `LoadingCoverView` 첫 스텝 판정 `is AutoBattleStep` → `Action == AutoBattle` | `Assets/Scripts/UI/Common/LoadingCoverView.cs:114` | 2026-08-04 ✅ |
+| 러너 2종 `TryGetCurrentStep`/`EnumerateUpTo` 반환형 → `TutorialStepDef`, 실행은 `TutorialStepExecutor.Enter` 위임 | `OutgameTutorialRunner.cs` · `TriggeredTutorialRunner.cs` | 2026-08-04 ✅ |
+| 브리지 2종 `m_step` 타입 교체 + 경고 식별자를 자산명 → 좌표·액션으로 | `UI/Tutorial/OutgameTutorialBridge.cs` · `TriggeredTutorialBridge.cs` | 2026-08-04 ✅ |
+| `OutgameFeatureLock.Collect(TutorialStepDef)` | `Assets/Scripts/OutGame/Tutorial/OutgameFeatureLock.cs` | 2026-08-04 ✅ |
+| ~~스텝 SO 계층 10종 + 베이스~~ (`Steps/*Step.cs` 11파일) | **삭제** | 2026-08-04 ✅ |
+| ~~스텝 자산 33개~~ (`Assets/SO/TutorialConfig/Outgame/Steps/`) | **삭제** — 폴더째 | 2026-08-04 ✅ |
+| ~~레거시 필드 `steps`~~ (챕터·엔트리) | **삭제** | 2026-08-04 ✅ |
+
+> **세이브 스키마 무변경**: 진행 좌표(챕터·스텝 인덱스)·트리거 낙인이 그대로라 **진행 중이던 세이브도 안전하다**. 챕터 재편(2026-07-31) 때와 달리 되감김이 없다.
+> `EOutgameTutorialCompletion`·`EOutgameTutorialAnchor`·`EOutgameFeature`·`OutgameTutorialStepContext`는 **무변경**이다(브리지·게이트·해금이 그대로 물린다).
+>
+> **필드명이 `steps`가 아니라 `stepDefs`인 이유**: 이관 직후 자산 YAML에는 비워진 레거시 `steps:` 키가 아직 남아 있다. 이 상태에서 `stepDefs` → `steps` 개명을 하면 `[FormerlySerializedAs]`보다 **정확한 이름 일치가 우선**이라 빈 `steps:`를 읽어 이관한 27행이 통째로 날아간다. 개명하려면 ① 레거시 필드만 지우고 Unity가 재직렬화하게 둔 뒤 ② 다음 커밋에서 개명하는 2단계가 필요하다 — 순수 미관 이득에 데이터 유실 실패 모드가 붙어 있어 `stepDefs`로 확정했다.
+
+#### 이관 실측 (2026-08-04)
+
+| 시퀀스 | 챕터/엔트리 | 이관 행 |
+|---|---|---|
+| `OutgameTutorial.asset` | 1편 1 · 2편 1 · 3편 12 · 4편 10 | **24행** (레거시 참조 수와 1:1 일치) |
+| `TriggeredTutorial.asset` | 엔트리 2 | **3행** |
+
+- 디스크 자산 33개 중 **시퀀스가 참조하던 것은 25개**(24슬롯 중 2개가 2회 재사용). 나머지 **8개는 이미 고아**였다 — 전부 2026-08-03에 폐기한 "덱 **만들기**" 동선의 잔재(`Step_CreateDeck` · `Step_DeckAutoEquip_Keyword/Synergy` · `Step_DeckBack` · `Step_GoDeckTab`×2 · `Step_DeckUnequipAll` · `Step_GoMatchTap`). 클래스 삭제로 어차피 깨질 자산이라 함께 정리했고, 필요하면 아래 표로 30초에 재저작된다.
+
+| 폐기된 고아 | 액션 | 앵커 | 문구 |
+|---|---|---|---|
+| `Step_GoDeckTab` (3·4편) | WaitClick | 5 `LobbyDeckTab` | (4편만) "시너지 덱 만들기" |
+| `Step_DeckUnequipAll` | WaitClick | 14 `DeckUnequipAllButton` | "먼저 편성된 카드를 모두…" |
+| `Step_DeckAutoEquip_Keyword` / `_Synergy` | DeckAutoEquip | 10 `DeckAutoEquipButton` | pack = `KeywordPack` / `SynergyPack` |
+| `Step_DeckBack` | WaitClick | 11 `DeckEditBackButton` | |
+| `Step_CreateDeck` | WaitClick | 7 `DeckCreateSlot` | |
+| `Step_GoMatchTap` | WaitClick | 6 `LobbyMatchTab` | |
+
+#### 씬/에셋 인계 (코드 밖 — 사용자)
+
+| 씬/에셋 | 작업 |
+|---|---|
+| `OutgameTutorial.asset` · `TriggeredTutorial.asset` | ✅ 이관 완료. 인스펙터에서 접힌 줄에 `순번 / 액션 / 앵커 / 문구`가 뜨고 드래그로 순서 변경 가능 |
+| 씬·프리팹 배선 | **변경 없음** — 브리지 필드(`data`·`gatePrefab`), 앵커, 게이트 프리팹 모두 그대로다 |
+| Play 검증 | ⬜ 1편~4편 통과 확인(특히 3·4편의 구매→개봉→획득→덱 선택→전투 연쇄) |
 
 ---
 

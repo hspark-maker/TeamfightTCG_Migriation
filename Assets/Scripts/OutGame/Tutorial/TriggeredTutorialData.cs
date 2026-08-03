@@ -14,27 +14,27 @@ public class TriggeredTutorialEntry
     [SerializeField] string label;
 
     [Tooltip("이 트리거의 스텝 순서. 진행 좌표는 메모리에만 남는다(앱 종료 시 처음부터)")]
-    [SerializeField] List<OutgameTutorialStep> steps = new List<OutgameTutorialStep>();
+    [SerializeField] List<TutorialStepDef> stepDefs = new List<TutorialStepDef>();
 
     public EOutgameTutorialTrigger Trigger => trigger;
 
     public string Label => label;
 
-    public int StepCount => steps != null ? steps.Count : 0;
+    public int StepCount => stepDefs != null ? stepDefs.Count : 0;
 
     /// <summary>범위 밖·빈 칸이면 false. 미배선 칸은 실행할 스텝이 없는 것과 같다.</summary>
-    public bool TryGetStep(int _index, out OutgameTutorialStep _step)
+    public bool TryGetStep(int _index, out TutorialStepDef _step)
     {
         _step = null;
-        if (steps == null || _index < 0 || _index >= steps.Count) return false;
+        if (stepDefs == null || _index < 0 || _index >= stepDefs.Count) return false;
 
-        _step = steps[_index];
+        _step = stepDefs[_index];
         return _step != null;
     }
 }
 
 /// <summary>트리거 발화 튜토리얼 목록(에디터 저작, SO). 온보딩 시퀀스와 병렬 축이다 —
-/// 스텝 SO 계층은 그대로 재사용하고, 무엇이 언제 발화하는지만 여기서 저작한다.</summary>
+/// 스텝 행 정의(TutorialStepDef)는 그대로 재사용하고, 무엇이 언제 발화하는지만 여기서 저작한다.</summary>
 [CreateAssetMenu(fileName = "TriggeredTutorial", menuName = "Card Battle/Triggered Tutorial")]
 public class TriggeredTutorialData : ScriptableObject
 {

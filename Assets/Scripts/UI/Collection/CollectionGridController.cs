@@ -17,6 +17,10 @@ public class CollectionGridController : MonoBehaviour
 
     readonly List<CardVisualView> m_tiles = new List<CardVisualView>();
 
+    // 상세 오버레이가 좌우로 넘겨볼 순서. m_tiles와 인덱스 1:1(같은 루프에서 같이 채운다).
+    // 오버레이가 참조로 들고 있으므로 재빌드 때도 이 List 인스턴스를 갈아치우지 않고 내용만 비우고 다시 채운다.
+    readonly List<CardData> m_order = new List<CardData>();
+
     void OnEnable()
     {
         EnsureBoot();
@@ -56,9 +60,12 @@ public class CollectionGridController : MonoBehaviour
 
             var t_tile = Instantiate(cardPrefab, content);
             t_tile.Bind(t_card, OwnershipManager.IsOwned(t_card));
+
             // 길게 누르면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
             // (소유 변경 시 도는 OnOwnershipChanged는 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
-            CardDetailOverlayView.BindTile(t_tile, t_card);
+            // 넘겨볼 순서는 화면에 깔리는 순서와 같아야 하므로 타일을 만든 그 자리에서 목록에 넣는다.
+            m_order.Add(t_card);
+            CardDetailOverlayView.BindTile(t_tile, m_order, m_order.Count - 1);
             m_tiles.Add(t_tile);
         }
     }
@@ -89,5 +96,6 @@ public class CollectionGridController : MonoBehaviour
         for (int t_i = 0; t_i < m_tiles.Count; t_i++)
             if (m_tiles[t_i] != null) Destroy(m_tiles[t_i].gameObject);
         m_tiles.Clear();
+        m_order.Clear();
     }
 }

@@ -1,7 +1,8 @@
 using System;
 using UnityEngine;
 
-// 트리거 발화 튜토리얼의 해석 static 코어(씬 오브젝트·UI를 모른다). 온보딩 러너와 병렬 축이다.
+// 트리거 발화 튜토리얼의 해석 static 코어(씬 오브젝트·UI를 모른다). 온보딩 러너와 병렬 축이며
+// 스텝 행 정의·실행기(TutorialStepDef/TutorialStepExecutor)는 온보딩과 같은 것을 그대로 쓴다.
 // 진행 좌표는 메모리에만 둔다 — 앱을 끄면 처음부터고, 세이브에는 완주 시점에 트리거 키 1개만 남는다.
 public static class TriggeredTutorialRunner
 {
@@ -50,7 +51,7 @@ public static class TriggeredTutorialRunner
     }
 
     /// <summary>현재 좌표가 가리키는 스텝. 미실행·범위 밖·빈 칸이면 false.</summary>
-    public static bool TryGetCurrentStep(out OutgameTutorialStep _step)
+    public static bool TryGetCurrentStep(out TutorialStepDef _step)
     {
         _step = null;
         if (!IsRunning) return false;
@@ -73,8 +74,9 @@ public static class TriggeredTutorialRunner
 
         bool t_isLast = s_index + 1 >= s_active.StepCount;
 
-        // 챕터 축은 트리거엔 없으므로 항상 0. 싱크는 메모리 — 스텝이 커밋해도 온보딩의 영속 좌표를 건드리지 않는다.
-        return t_step.Enter(new OutgameTutorialStepContext(0, s_index, 0, s_index + 1, t_isLast, MemoryProgressSink.Instance));
+        // 챕터 축은 트리거엔 없으므로 항상 0. 싱크는 메모리 — 실행기가 커밋해도 온보딩의 영속 좌표를 건드리지 않는다.
+        return TutorialStepExecutor.Enter(t_step,
+            new OutgameTutorialStepContext(0, s_index, 0, s_index + 1, t_isLast, MemoryProgressSink.Instance));
     }
 
     /// <summary>스텝 완료를 감지한 브리지가 호출. 마지막이었으면 완주 낙인까지 찍는다.</summary>

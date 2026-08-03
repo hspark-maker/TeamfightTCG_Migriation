@@ -81,8 +81,8 @@ public static class OutgameFeatureLock
         s_all = s_forceUnlockAll || !t_running;
         if (s_all) return true;
 
-        foreach (var t_stepAsset in OutgameTutorialRunner.EnumerateUpTo(t_chapter, t_step))
-            Collect(t_stepAsset);
+        foreach (var t_row in OutgameTutorialRunner.EnumerateUpTo(t_chapter, t_step))
+            Collect(t_row);
 
         // 저작 미완(시퀀스 전체에 unlocks가 하나도 없음)은 "잠금을 아직 안 쓴다"로 본다.
         // 없으면 저작을 시작하기 전에 화면이 통째로 잠겨 튜토리얼 자체가 막힌다
@@ -95,9 +95,9 @@ public static class OutgameFeatureLock
 
     static bool HasAnyAuthoredUnlock()
     {
-        foreach (var t_stepAsset in OutgameTutorialRunner.EnumerateUpTo(int.MaxValue, int.MaxValue))
+        foreach (var t_row in OutgameTutorialRunner.EnumerateUpTo(int.MaxValue, int.MaxValue))
         {
-            var t_unlocks = t_stepAsset != null ? t_stepAsset.Unlocks : null;
+            var t_unlocks = t_row != null ? t_row.Unlocks : null;
             if (t_unlocks == null) continue;
 
             for (int t_i = 0; t_i < t_unlocks.Count; t_i++)
@@ -107,7 +107,7 @@ public static class OutgameFeatureLock
         return false;
     }
 
-    static void Collect(OutgameTutorialStep _step)
+    static void Collect(TutorialStepDef _step)
     {
         var t_unlocks = _step != null ? _step.Unlocks : null;
         if (t_unlocks == null) return;

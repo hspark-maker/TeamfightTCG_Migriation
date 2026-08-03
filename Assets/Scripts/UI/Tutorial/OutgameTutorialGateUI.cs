@@ -10,7 +10,7 @@ using UnityEngine.UI;
 //
 // 불변식 2개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
-//      단 스텝이 딤을 끄면(OutgameTutorialStep.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
+//      단 스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
 //      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //

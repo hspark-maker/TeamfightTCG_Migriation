@@ -12,7 +12,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다.
-    OutgameTutorialStep m_step;
+    TutorialStepDef m_step;
 
     // 스텝 진입이 다시 ApplyCurrentStep을 부르는 경로를 막는다(예약 후 재실행).
     bool m_applying;
@@ -115,7 +115,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         }
 
         // 이 브리지는 팩 개봉·구매 신호를 구독하지 않는다 → 그 스텝을 꽂으면 완료 신호가 없어 영구 정지다(저작 실수).
-        Debug.LogWarning($"[TriggeredTutorialBridge] 스텝 '{m_step.name}'의 완료 조건({m_step.Completion})은 트리거 튜토리얼에서 지원하지 않습니다 — 중단합니다.");
+        Debug.LogWarning($"[TriggeredTutorialBridge] 스텝 {TriggeredTutorialRunner.StepIndex}({m_step.Action})의 완료 조건({m_step.Completion})은 트리거 튜토리얼에서 지원하지 않습니다 — 중단합니다.");
         CloseGate();
     }
 
