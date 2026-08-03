@@ -21,7 +21,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     public ScrollRect Scroll => scrollRect;
 
-    public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest)
+    public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
         Clear();
         if (content == null || tilePrefab == null) return;
@@ -40,7 +40,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
             if (!OwnershipManager.IsOwned(t_card)) continue;  // 소유 카드만 편성 가능
 
             var t_tile = Instantiate(tilePrefab, content);
-            t_tile.Bind(t_card, _onDragRequest);
+            t_tile.Bind(t_card, _onDragRequest, _onClick);
             m_tiles.Add(t_tile);
         }
 

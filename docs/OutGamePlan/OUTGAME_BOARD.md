@@ -168,6 +168,43 @@
 
 ---
 
+## 매치 덱 선택·편집 (2026-08-03 편입) — 🟠 LobbyCanvas 그룹
+
+> 전투 진입 직전 화면에서 덱을 고르고 그 자리에서 수정하는 흐름. **계약 변경 0건** — 기존 동결 계약(세이브 스키마·부트·재화·소유)을 하나도 건드리지 않고, `DeckSaveManager`를 소비만 한다. 다만 `DeckEditController`(로비 덱 편집의 저장 경로)를 수정하므로 그 패키지만 🔴.
+
+| ID | 등급 | 패키지 | 산출 | 선행 | 담당 | 상태 |
+|---|---|---|---|---|---|---|
+| **PKG-MATCHDECK-API** | 🔴 | 덱편집 재사용 계약 | `DeckEditController` +`m_onExit`/`SetExitHandler`/`RequestExit`/`SwitchTo`/`SaveIfComplete`, `OnBackClicked` 저장 분기 위임, `ExitEditor` 2분기. `DeckSlotView` +`selectedFrame`/`SetSelected` | — | 메인 | ✅ 완료(검수 통과) |
+| **PKG-MATCHDECK-PANEL** | 🟢 | 매치 패널 뷰 | `UI/Match/MatchDeckPanelView.cs` | — | outgame-engineer | ✅ 완료 |
+| **PKG-MATCHDECK-STRIP** | 🟢 | 가로 덱 리스트 | `UI/Match/MatchDeckStripController.cs` | API | outgame-engineer | ✅ 완료 |
+| **PKG-MATCHDECK-SHELL** | 🟠 | 셸 · 진입 API | `UI/Match/MatchDeckShell.cs` | API+PANEL+STRIP | 메인 | ✅ 완료 |
+| **PKG-MATCHDECK-WIRE** | 🟢 | 프리팹 저작 | 배리언트 개조 · 스트립 카드 프리팹 · 매치 패널 배선 | 전부 | 메인(Unity MCP) | ✅ 완료 |
+| **PKG-MATCHDECK-BATTLE** | 🟠 | **BattleScene 호스팅 + 시작 게이트** | `BattleScene.unity`에 `MatchDeckRoot`·두 패널·셸 배선 + `GameInitializer`에 `RunSelectionAsync` 게이트 5줄 | WIRE | — | ⬜ 대기 |
+| *(후속)* PKG-MATCHDECK-DRAG | 🟢 | 매치 드래그 편집 | 전투 씬 캔버스 직하 `DragLayer` 신설 + `DeckEditDragController` 부착·`dragController` 배선. **코드 0줄** (로비 DragLayer는 캔버스가 달라 재사용 불가 — 좌표계가 어긋난다) | BATTLE | — | ⬜ 후속 |
+| *(후속)* PKG-MATCHDECK-ENEMY | 🟢 | EnemySection 렌더 | 상대 AI 덱을 게이트 전에 확정해 VS 화면에 표시 | BATTLE | — | ⬜ 후속 |
+
+> **격리**: `PKG-MATCHDECK-WIRE`는 `Prefabs/UI/MatchUI/` 하위만 만져 로비 자산과 겹치지 않는다(🟢). 후속 `PKG-MATCHDECK-BATTLE`은 `BattleScene.unity` + `GameInitializer.cs`를 만지므로 전투 씬 작업과 그룹 내 순차(🟠).
+>
+> **저작 결과(2026-08-03, Unity MCP `Unity_RunCommand`로 수행 — 손 드래그 0)**
+> ① `MatchDeckEditPanel.prefab` — `Title`(TMP_InputField)·`BackButton` **노드 삭제**, 상단 `TopBar > Frame / DeckStrip[ScrollRect(H) + MatchDeckStripController] > Viewport(RectMask2D) > Content[HorizontalLayoutGroup + ContentSizeFitter(H=PreferredSize)]` 추가, 좌하단 `Btn_MatchBack` 추가(구 BackButton 복제 → `TutorialAnchor` 제거, **onClick 미배선**), `nameInput`/`backButton` 참조를 명시적 null로.
+> ② `MatchDeckStripCard.prefab` 신규(`DeckCard.prefab` 배리언트). `Tile/SelectedFrame`(9슬라이스 링, `fillCenter=false`, `ppu=5`) 추가 + `DeckSlotView.selectedFrame` 배선.
+> ③ `MatchDeckPanel.prefab` 루트에 `MatchDeckPanelView` 부착, `mySlots[0..5]` ← `MySlot_N/CardUIView`, 하단 3버튼 배선(`battleButton`은 참조만).
+> ④ ~~`LobbyCanvas.prefab` 호스팅~~ **철회(2026-08-03)** — 이 화면은 로비가 아니라 **전투 씬 진입 직후**에 열려 전투 시작을 붙잡는 게이트다. `LobbyCanvas.prefab`은 `d7864026` 시점(호스팅 직전)으로 복원했다. 호스팅은 `PKG-MATCHDECK-BATTLE`로 이관 — 착수 스펙은 `STRUCTURE.md`의 "BattleScene 연결 — 남은 작업" 문단이 진실원.
+>
+> **셸 쪽 계약은 이미 구현 완료**: `RunSelectionAsync(CancellationToken) → UniTask<bool>`(게이트) · `Confirm()`(= `TryConfirmSelection` 성공 시에만 통과) · `Cancel()`(전투 포기, 복귀 씬은 호스트가 결정) · `EnsureBoot()`(전투 씬 단독 Play 폴백). `MatchDeckPanelView`의 BattleButton→`Confirm`, BackButton→`Cancel` 배선도 코드에 들어가 있다.
+>
+> **레이아웃 예산(1080×1920 기준, 앵커 비율)**: `TopBar` 0.822~1.000(342px, 뷰포트 298 ≥ 카드 283) · `DeckArea` 0.455~0.818(697px ≥ 그리드 696) · `ButtonBar` 0.405~0.445 · `CollectionArea` 0.085~0.395 · `Btn_MatchBack` 좌하단 220×96. `SlotGrid` 셀은 270×360 → **230×300**(spacing 20×16)으로 축소해 TopBar가 먹은 높이를 흡수했다.
+>
+> ⚠️ **`localScale`로 카드를 줄이면 안 된다** — `HorizontalLayoutGroup`은 `childControlWidth=false`에서 **rect 크기로 칸을 예약**하고 `localScale`도 `LayoutElement.preferredWidth`도 보지 않는다. 스케일 0.404를 준 첫 시도는 495px 폭을 예약해 카드 사이가 통째로 벌어졌다 → `sizeDelta`/`anchoredPosition`/TMP `fontSize`를 전부 0.404배한 **실수치 축소**가 정답. 9슬라이스는 보더가 절대 픽셀이라 `pixelsPerUnitMultiplier`를 함께 올려야 테두리가 판이 되지 않는다.
+>
+> ⚠️ **프리팹 에셋을 고치기 전에 그 프리팹의 씬 인스턴스를 먼저 지울 것** — 남아 있으면 `DeleteAsset`/저장이 확인 대화상자를 띄워 MCP 호출이 `User interactions are not supported`로 실패한다.
+>
+> ⚠️ **`DeckSaveManager.IsSlotValid`/`GetSlot`/`GetDisplayName`은 범위 가드가 없다**(`s_slots[_index]` 직접 인덱싱). 매치 셸은 "선택 없음"을 `-1`로 표현하므로 `MatchDeckShell.IsValidSlot` 래퍼를 반드시 거칠 것.
+>
+> ⚠️ **`MatchDeckEditPanel`은 `DeckEditPanel.prefab`의 배리언트**다. 로비 편집 패널 구조를 바꾸면(노드 개명·이동) 배리언트의 `m_RemovedGameObjects`가 되살아날 수 있다 → 로비 덱 편집 프리팹을 만질 때 매치 배리언트를 반드시 함께 확인.
+
+---
+
 ## 실전 예시 — 어떻게 켜나
 
 - **혼자 순차**: PKG-BOOT 하나만 진행 → 끝나면 다음.

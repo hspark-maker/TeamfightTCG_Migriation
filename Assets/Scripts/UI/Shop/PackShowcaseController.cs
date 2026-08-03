@@ -6,7 +6,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 // Tab_Pack의 카드팩 쇼케이스 컨트롤러. 진열할 팩들을 인스펙터에서 직접 받아 캐러셀에 그림을 공급하고,
-// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → CardPack 씬 전환을 수행한다.
+// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 목록(packs)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
@@ -22,7 +22,7 @@ public class PackShowcaseController : MonoBehaviour
     // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
 
-    [SerializeField] Button buyButton;              // 구매 → 개봉 씬 전환 트리거.
+    [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
@@ -32,8 +32,8 @@ public class PackShowcaseController : MonoBehaviour
     [Tooltip("이 팩에서 이미 소유한 카드를 뽑았을 때(중복) 되돌려주는 Gold.")]
     [Min(0)] [SerializeField] long duplicateRefundGold = 10;
 
-    // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 씬을 떠나므로 리셋 불필요하나,
-    // 탭 재진입·로비 복귀 시 다시 살 수 있게 OnEnable에서 해제한다.
+    // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 개봉 오버레이가 닫힐 때 해제된다 —
+    // 씬을 떠나지 않으므로 OnEnable만으로는 영영 잠긴 채로 남는다(탭이 계속 활성이라 다시 돌지 않는다).
     static bool s_transitioning;
 
     readonly List<CardPackData> m_display = new List<CardPackData>();   // 실제 진열 목록(해석 결과).
@@ -61,6 +61,7 @@ public class PackShowcaseController : MonoBehaviour
 
         CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  += Refresh;
+        PackOpenOverlay.OnClosed             += OnOverlayClosed;
         Refresh();
     }
 
@@ -71,6 +72,14 @@ public class PackShowcaseController : MonoBehaviour
 
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  -= Refresh;
+        PackOpenOverlay.OnClosed             -= OnOverlayClosed;
+    }
+
+    // 개봉이 끝나면 다시 살 수 있다. 씬을 떠나던 시절엔 OnEnable이 해주던 일 — 이제 아무도 해주지 않는다.
+    void OnOverlayClosed()
+    {
+        s_transitioning = false;
+        RefreshBuyLock();   // 개봉으로 잔액이 줄었다 — 다음 구매 가능 여부를 다시 판정한다.
     }
 
     void OnCurrencyChanged(ECurrencyType _type, long _balance)
@@ -164,7 +173,9 @@ public class PackShowcaseController : MonoBehaviour
         if (buyButton == null) return;
 
         ResolvePack(out var t_pack, out _);
-        buyButton.interactable = t_pack != null && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
+        buyButton.interactable = t_pack != null
+                              && PackOpenOverlay.Instance != null
+                              && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
     }
 
     // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
@@ -176,7 +187,7 @@ public class PackShowcaseController : MonoBehaviour
         if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
     }
 
-    // 구매 클릭: 성공이면 캐리어에 실어 CardPack 씬으로, 실패면 사유별 팝업(전역 1회 가드).
+    // 구매 클릭: 성공이면 캐리어에 실어 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
     void OnBuyPressed()
     {
         if (s_transitioning) return;
@@ -184,15 +195,29 @@ public class PackShowcaseController : MonoBehaviour
         ResolvePack(out var t_pack, out long t_refundGold);
         if (t_pack == null) return;
 
+        // 열 화면이 없으면 사지 않는다 — 구매는 원자 영속이라 되돌릴 수 없고, 튜토리얼 구매 스텝이면
+        // 커밋만 남고 개봉 신호가 영영 오지 않아 진행이 막힌다. 결제 앞에서 끊는 것이 유일한 안전판이다.
+        if (PackOpenOverlay.Instance == null)
+        {
+            Debug.LogError("[PackShowcaseController] 개봉 오버레이 미배치 — 구매를 막는다(로비 씬 배선 확인).");
+            return;
+        }
+
         var t_opened = CardPackOpener.TryPurchase(t_pack, t_refundGold);
         if (t_opened != null && t_opened.Success)
         {
             s_transitioning = true;
-            // 구독자가 씬 전환 전에 결과를 처리할 수 있도록 LoadScene보다 먼저 알린다.
+            // 구독자가 개봉 화면이 뜨기 전에 결과를 처리할 수 있도록 먼저 알린다(튜토리얼이 이 순서를 센다).
             OnAnyPurchased?.Invoke();
-            // 일반 구매 목적지는 로비 복귀, 튜토리얼 없음(첫실행 경로와 구분).
-            PackHandoff.Set(t_opened, t_pack, "LobbyScene", false);
-            SceneManager.LoadScene("CardPack");
+            // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
+            PackHandoff.Set(t_opened, t_pack, SceneManager.GetActiveScene().name, false);
+
+            if (!PackOpenOverlay.TryOpen())
+            {
+                // 구매·소유는 이미 원자 영속됐다 — 잃는 것은 개봉 연출뿐이므로 되돌리지 않고 잠금만 푼다.
+                s_transitioning = false;
+                Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
+            }
             return;
         }
 

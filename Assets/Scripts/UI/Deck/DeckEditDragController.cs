@@ -52,9 +52,8 @@ public class DeckEditDragController : MonoBehaviour
 
         // 2) 입력 모듈이 더는 이 포인터의 드래그를 라우팅하지 않게 한다.
         //    StandaloneInputModule.ProcessDrag는 pointerDrag == null이면 첫 줄에서 return한다.
-        _data.dragging         = false;
-        _data.pointerDrag      = null;
-        _data.eligibleForClick = false;   // 손 뗄 때 타일 클릭이 뒤늦게 발화하는 것 차단
+        _data.dragging    = false;
+        _data.pointerDrag = null;
 
         // 3) 관성 제거 — OnEndDrag를 줘도 velocity는 남는다.
         if (_ownerScroll != null)
@@ -71,6 +70,11 @@ public class DeckEditDragController : MonoBehaviour
             Debug.LogError("[DeckEditDragController] ghostPrefab/dragLayer 미배선 — 드래그를 시작할 수 없다.");
             return;
         }
+
+        // 손 뗄 때 타일 클릭(빈 칸 자동 배치)이 뒤늦게 발화하는 것 차단.
+        // 고스트 확보에 성공한 뒤에 내리는 게 중요하다 — 위 early return 경로에서 미리 내려버리면
+        // 드래그도 못 하고 클릭 지름길까지 죽어 조작이 통째로 먹통이 된다.
+        _data.eligibleForClick = false;
 
         m_card     = _card;
         m_data     = _data;

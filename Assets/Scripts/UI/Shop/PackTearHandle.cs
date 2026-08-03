@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 // 카드팩 개봉의 방아쇠가 되는 "가로로 긋기" 제스처. 긋는 동안은 아무것도 찢기지 않는다 —
 // 충분히 그었다고 판정되는 순간 OnTorn 한 번을 쏘고, 그 뒤의 자리잡기·씰 찢기·뽑기는
@@ -38,6 +40,9 @@ public class PackTearHandle : MonoBehaviour
     [Tooltip("이만큼(스크린px) 움직여야 제스처가 시작된다. 방향을 잠그는 기준이기도 하다.")]
     [SerializeField] float deadZone = 12f;
     [SerializeField] float rewindDuration = 0.28f;
+
+    // 레이캐스트 결과 버퍼. 클릭당 1회만 쓰므로 인스턴스마다 들 이유가 없다.
+    static readonly List<RaycastResult> s_hits = new List<RaycastResult>();
 
     bool m_armed;
     bool m_committed;   // 확정 후 재입력 차단
@@ -165,10 +170,26 @@ public class PackTearHandle : MonoBehaviour
     // 터치·마우스 공통 포인터 위치. Unity가 터치를 mousePosition으로도 흘려주므로 한 경로로 충분하다.
     static Vector2 CurrentPointer() => Input.mousePosition;
 
-    // 레이캐스트를 받는 UI 위인지. 개봉 단계의 RevealPanel은 blocksRaycasts=false라 여기 걸리지 않는다.
-    // ⚠ 팩·배경 Image는 raycastTarget을 꺼야 한다 — 켜져 있으면 팩 위에서 시작한 드래그가 여기서 막혀 개봉 자체가 안 된다.
+    // "아무 UI 위인가"가 아니라 "눌러야 할 버튼 위인가"를 묻는다.
+    // 개봉 화면이 로비 위에 겹치면서 아래 로비 UI(레이캐스트 타깃 200여 개)가 늘 포인터 밑에 깔린다 —
+    // IsPointerOverGameObject로 판정하면 화면 어디서도 제스처가 시작되지 않는다(단독 씬 시절엔 밑이 비어 통과했다).
+    // 맨 위 히트 하나만 본다: 그 아래는 어차피 클릭이 닿지 않으므로 양보할 이유가 없다.
     static bool IsPointerOverUI()
-        => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    {
+        var t_es = EventSystem.current;
+        if (t_es == null) return false;
+
+        s_hits.Clear();
+        t_es.RaycastAll(new PointerEventData(t_es) { position = CurrentPointer() }, s_hits);
+        if (s_hits.Count == 0) return false;
+
+        var t_top = s_hits[0].gameObject;
+        if (t_top == null) return false;
+
+        // 라벨을 눌러도 버튼을 누른 것이다 — 부모까지 훑는다.
+        var t_selectable = t_top.GetComponentInParent<Selectable>();
+        return t_selectable != null && t_selectable.IsInteractable();
+    }
 
     void OnDisable()
     {

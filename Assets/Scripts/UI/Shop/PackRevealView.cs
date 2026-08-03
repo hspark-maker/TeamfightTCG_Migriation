@@ -80,13 +80,6 @@ public class PackRevealView : MonoBehaviour
     [Tooltip("뽑는 데 걸리는 시간. 더미가 솟아오르는 시간이자 팩이 빠져나가는 시간이다 — " +
              "둘은 같은 한 동작이라 값을 나누지 않는다.")]
     [SerializeField] float cardPullDuration = 0.55f;
-    // ⚠ Overlay 캔버스 위에는 ParticleSystem이 렌더되지 않는다 — 실제로 붙이려면 Screen Space-Camera 캔버스가 필요하다.
-    [SerializeField] ParticleSystem burstEffect;   // 개봉 순간 파티클(옵션)
-    // 팩은 빠져나가는 중이라 제 위치를 리그에 내주고 있다 — 팩을 걸면 두 축이 다투므로 배경처럼 가만히 있는 것을 건다.
-    [SerializeField] Transform shakeTarget;        // 배경 RectTransform(옵션)
-    [SerializeField] float shakeDuration = 0.3f;
-    [Tooltip("DOShakePosition은 월드 좌표를 흔든다 — Overlay 캔버스의 월드는 디바이스 스크린px다(참조px 아님).")]
-    [SerializeField] float shakeStrength = 48f;
     [Tooltip("뽑기가 끝난 뒤 카드 조작을 열기까지의 여유.")]
     [SerializeField] float pullHold = 0.35f;
 
@@ -107,7 +100,7 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] CanvasGroup revealPanel;
 
     [Header("신규 카드 반응")]
-    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. 씬의 Dim에 붙인 PackScreenFlash를 물린다. " +
+    [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. Dim에 붙인 PackScreenFlash를 물린다. " +
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
     [SerializeField] PackScreenFlash newCardFlash;
 
@@ -154,7 +147,7 @@ public class PackRevealView : MonoBehaviour
     bool m_announced;
 
     /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
-    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 씬 기본 그림).</summary>
+    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
     public void BeginOpen(OpenedPack _opened, CardPackData _pack)
     {
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
@@ -207,6 +200,28 @@ public class PackRevealView : MonoBehaviour
         else SkipToSummary();
     }
 
+    /// <summary>세션을 완전히 되돌려 다음 BeginOpen을 받을 수 있게 한다.
+    /// OnDisable은 요약 도달분을 일부러 남기므로(중복 발화 방지), 오버레이가 닫힐 때는 이쪽이 필요하다.</summary>
+    public void ResetSession()
+    {
+        KillStageSeq();
+        KillTotalRefundTween();
+
+        if (tearHandle != null) tearHandle.Disarm();
+        if (shellRig != null) shellRig.ResetPose();
+
+        SetTearHint(false, true);
+        GateInput(false);
+
+        if (resultGrid != null) resultGrid.Hide();
+        if (summaryGroup != null) summaryGroup.SetActive(false);
+
+        m_stage = EStage.Idle;
+        m_pending = null;
+        m_announced = false;
+        m_skips = 0;
+    }
+
     void OnEnable()
     {
         if (tearHandle != null) tearHandle.OnTorn += HandleTorn;
@@ -241,8 +256,6 @@ public class PackRevealView : MonoBehaviour
         // 연출 중 비활성 시 좀비 트윈 정리 + 상태 리셋(재활성 후 "중간 단계에 갇힘" 방지).
         KillStageSeq();
         if (shellRig != null) shellRig.ResetPose();
-        // 셰이크도 같이 끊는다 — 대상은 팩과 달리 계속 보이는 배경이라, 중간에 멈추면 어긋난 자리에 그대로 굳는다.
-        if (shakeTarget != null) shakeTarget.DOKill();
         SetTearHint(false, true);
 
         // 이미 끝난 세션은 끝난 채로 둔다. Idle로 되돌리면 BeginOpen 재진입 가드가 풀려
@@ -372,13 +385,6 @@ public class PackRevealView : MonoBehaviour
         // 씰 찢기 완료와 "찢기 단계 스킵"이 겹쳐도 뽑기가 두 번 재생되지 않게(조각 비산·카드 솟기 중복 방지).
         if (m_stage != EStage.Tearing) return;
         m_stage = EStage.Pulling;
-
-        if (burstEffect != null) burstEffect.Play();
-        if (shakeTarget != null)
-        {
-            shakeTarget.DOKill();
-            shakeTarget.DOShakePosition(shakeDuration, shakeStrength).SetLink(shakeTarget.gameObject);
-        }
 
         KillStageSeq();
         m_stageSeq = DOTween.Sequence().SetLink(gameObject);

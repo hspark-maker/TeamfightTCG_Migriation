@@ -2,11 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.UI;
 
-// 로비 진입 시 "직전 씬에서 무엇을 얻었는지"를 한 번 보여주는 연출 브레인.
+// 로비에서 "방금 무엇을 얻었는지"를 한 번 보여주는 연출 브레인.
+// 진입점은 둘이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed.
 // 전투(BattleRewardHandoff)와 카드팩(CardPackRewardHandoff) 캐리어를 소비해
-//   골드 → 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다
+//   골드 → 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(GoldGainEffectPlayer에 위임 — 도감 수확과 같은 손맛)
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
 // 두 단계를 동시에 재생한다(획득 하나를 두 번에 걸쳐 알리지 않는다).
 // 카드는 신규만 온다 — 중복분은 환급 골드로 코인 쪽에 이미 섞여 있다(PackAcquireController가 걸러 싣는다).
@@ -16,10 +16,6 @@ using UnityEngine.UI;
 public class LobbyGainEffectDirector : MonoBehaviour
 {
     [Header("배선 (비우면 자동 탐색)")]
-    [Tooltip("골드 수치 HUD. 코인의 도착지이자 숫자가 오르는 대상.")]
-    [SerializeField] GoldHud goldHud;
-    [Tooltip("코인 스프라이트. 비우면 골드 수치 옆 아이콘 Image의 스프라이트를 그대로 쓴다.")]
-    [SerializeField] Sprite coinSprite;
     [Tooltip("카드가 빨려들 도감 탭 버튼. 비우면 collectionTabName으로 찾는다.")]
     [SerializeField] RectTransform collectionTabTarget;
     [Tooltip("도감 탭 버튼 오브젝트 이름(자동 탐색용).")]
@@ -28,20 +24,32 @@ public class LobbyGainEffectDirector : MonoBehaviour
     [SerializeField] string tabFocusName = "Button_Focus";
 
     [Header("연출 값")]
-    [Tooltip("코인 장수 범위. 획득 골드량을 이 사이로 클램프해 장수를 정한다.")]
-    [SerializeField] int coinCountMin = 4;
-    [SerializeField] int coinCountMax = 12;
-    [Tooltip("코인이 흩어지는 부채꼴(도). 기본값은 수치 아래쪽으로 퍼뜨려 화면 밖으로 나가지 않게.")]
-    [SerializeField] float coinAngleStart = 195f;
-    [SerializeField] float coinAngleSpan = 150f;
-    [SerializeField] float goldPunch = 0.35f;
     [SerializeField] float tabPunch = 0.3f;
 
     // 런타임에 만든 하위 연출기(직렬화 배선이 있으면 그것을 쓴다).
-    CoinBurstEffect m_coinBurst;
     CardGainFlightEffect m_cardFlight;
 
+    // 재생 중인 획득 연출. 팩을 연달아 열면 앞 연출이 끝나기 전에 또 불린다.
+    Sequence m_master;
+
+    void OnEnable()
+    {
+        PackOpenOverlay.OnClosed += OnPackOpenClosed;
+    }
+
+    void OnDisable()
+    {
+        // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
+        PackOpenOverlay.OnClosed -= OnPackOpenClosed;
+    }
+
     void Start()
+    {
+        StartCoroutine(PlayWhenReady());
+    }
+
+    // 오버레이 개봉은 로비를 재로드하지 않는다 — 닫힘 신호가 Start를 대신하는 두 번째 진입점이다.
+    void OnPackOpenClosed()
     {
         StartCoroutine(PlayWhenReady());
     }
@@ -76,53 +84,34 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 하단 탭 바·상단 바보다 위에 그려져야 카드가 가려지지 않는다.
         transform.SetAsLastSibling();
 
-        var t_master = DOTween.Sequence().SetLink(gameObject);
+        // 조립 전에 직전 연출을 즉시 마무리한다 — 코인·카드 잔해와 수치 고정이 겹치면 서로를 밟는다.
+        // 새 고정(BeginGainRollUp)보다 먼저여야 옛 시퀀스의 해제가 새 값을 풀어버리지 않는다(GoldGainEffectPlayer.Play와 같은 이유).
+        if (m_master != null && m_master.IsActive()) m_master.Complete(true);
 
-        bool t_goldStaged = t_gold > 0L && TryStageGold(t_master, t_gold);
-        bool t_cardStaged = t_cardCount > 0 && TryStageCards(t_master, t_cards);
+        m_master = DOTween.Sequence().SetLink(gameObject);
+
+        bool t_goldStaged = t_gold > 0L && TryStageGold(m_master, t_gold);
+        bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards);
 
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
         if (!t_goldStaged && !t_cardStaged)
         {
-            t_master.Kill();
-            yield break;
+            m_master.Kill();
+            m_master = null;
         }
-
-        // 연출이 어떤 이유로 끊겨도 수치 고정은 반드시 풀린다(중간 도착 통지가 빠지는 경우의 안전망).
-        if (t_goldStaged) t_master.OnKill(() => { if (this.goldHud != null) this.goldHud.ReleaseDisplay(); });
     }
 
+    // 골드는 공용 재생기가 조립한다(수치 고정 해제 안전망까지 그 시퀀스에 붙어 온다).
+    // 수치 자리에서 튀어 제자리로 돌아오는 모드라 출발점을 주지 않는다.
     bool TryStageGold(Sequence _master, long _gold)
     {
-        if (this.goldHud == null) this.goldHud = FindFirstObjectByType<GoldHud>(FindObjectsInactive.Include);
+        if (!GoldGainEffectPlayer.TryGet(this, out var t_player)) return false;
 
-        var t_textRect = this.goldHud != null ? this.goldHud.TextRect : null;
-        if (t_textRect == null)
-        {
-            Debug.LogWarning("[LobbyGainEffectDirector] GoldHud를 찾지 못해 골드 연출을 건너뛴다.");
-            return false;
-        }
-
-        if (this.coinSprite == null) this.coinSprite = FindIconSpriteNear(t_textRect);
-        if (this.coinSprite == null)
-        {
-            Debug.LogWarning("[LobbyGainEffectDirector] 코인 스프라이트를 찾지 못해 골드 연출을 건너뛴다.");
-            return false;
-        }
-
-        // 잔액은 이미 최종값이다 — 획득분만큼 되돌려 놓고 코인 도착에 맞춰 다시 올린다.
-        long t_start = CurrencyManager.Gold - _gold;
-        int  t_count = (int)Mathf.Clamp(_gold, this.coinCountMin, this.coinCountMax);
-
-        var t_burst = EnsureCoinBurst();
-        // 수치 근처에서 생겨나 수치로 되돌아온다 — 원점과 목적지가 같고 흩어짐만 부채꼴로 준다.
-        t_burst.Configure(this.coinSprite, t_textRect, t_textRect, t_count, this.coinAngleStart, this.coinAngleSpan);
-
-        // 되돌리기는 지금 바로 — 시퀀스는 이 프레임에 재생을 시작하므로 콜백으로 미룰 이유가 없다.
-        this.goldHud.HoldDisplay(t_start);
+        var t_seq = t_player.BuildGoldGain(null, _gold);
+        if (t_seq == null) return false;
 
         // 카드 단계와 같은 0초에 꽂아 동시에 돌린다.
-        _master.Insert(0f, t_burst.BuildBurst((_arrived, _total) => OnCoinArrived(t_start, _gold, _arrived, _total)));
+        _master.Insert(0f, t_seq);
         return true;
     }
 
@@ -142,27 +131,9 @@ public class LobbyGainEffectDirector : MonoBehaviour
         return true;
     }
 
-    // 코인 한 장이 닿을 때마다 숫자를 그만큼 올리고 텍스트를 튀긴다. 마지막 장에서 실제 잔액으로 확정.
-    void OnCoinArrived(long _start, long _gold, int _arrived, int _total)
-    {
-        if (this.goldHud == null) return;
-
-        if (_arrived >= _total) this.goldHud.ReleaseDisplay();
-        else this.goldHud.HoldDisplay(_start + (long)(_gold * (_arrived / (float)_total)));
-
-        UiPunch.Play(this.goldHud.TextRect, this.goldPunch);
-    }
-
     void OnCardArrived()
     {
         UiPunch.Play(PunchTargetOf(this.collectionTabTarget), this.tabPunch);
-    }
-
-    CoinBurstEffect EnsureCoinBurst()
-    {
-        if (m_coinBurst == null) m_coinBurst = GetComponent<CoinBurstEffect>();
-        if (m_coinBurst == null) m_coinBurst = gameObject.AddComponent<CoinBurstEffect>();
-        return m_coinBurst;
     }
 
     CardGainFlightEffect EnsureCardFlight()
@@ -177,25 +148,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
     {
         if (_tab == null) return null;
         return _tab.childCount > 0 ? _tab.GetChild(0) : _tab;
-    }
-
-    // 골드 수치와 같은 묶음에 놓인 아이콘 Image에서 코인 스프라이트를 빌린다(별도 에셋 배선 없이).
-    static Sprite FindIconSpriteNear(RectTransform _textRect)
-    {
-        var t_group = _textRect.parent;
-        if (t_group == null) return null;
-
-        var t_images = t_group.GetComponentsInChildren<Image>(true);
-        Sprite t_any = null;
-        for (int t_i = 0; t_i < t_images.Length; t_i++)
-        {
-            var t_sprite = t_images[t_i].sprite;
-            if (t_sprite == null) continue;
-            if (t_images[t_i].name.Contains("Icon")) return t_sprite;
-            t_any ??= t_sprite;
-        }
-
-        return t_any;
     }
 
     // 도감 탭 RectTransform 탐색. 선택된 탭은 버튼이 꺼지고 Focus가 그 자리를 대신하므로 그때는 Focus를 쓴다.
