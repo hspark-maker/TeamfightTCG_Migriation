@@ -3735,6 +3735,13 @@ MonoBehaviour:
   - {fileID: 1907720550162663288}
   - {fileID: 8623105078942706187}
   - {fileID: 4642156284688465996}
+  enemySlots:
+  - {fileID: 671374974804382460}
+  - {fileID: 8030622436035282989}
+  - {fileID: 372048386308845815}
+  - {fileID: 3927920344760086061}
+  - {fileID: 2903166991755586172}
+  - {fileID: 2890221419403269162}
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
   battleButton: {fileID: 6854664472983553879}
@@ -4368,6 +4375,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
+--- !u!114 &3927920344760086061 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 413829602255273520}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 895698677287965503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!224 &7827589987634418451 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
@@ -4627,6 +4645,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
+--- !u!114 &2890221419403269162 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 1954791468489163831}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1364817860718553400}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!224 &8232518754000382228 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
@@ -4751,6 +4780,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
+--- !u!114 &2903166991755586172 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 1979032513325578849}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1344027014130440046}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!224 &8244393127076812610 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
@@ -5126,6 +5166,17 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 2537002660513953562}
   m_SourcePrefab: {fileID: 100100000, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+--- !u!114 &372048386308845815 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 3897084153978495210}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4595122446378405349}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!1 &4595122446378405349 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
@@ -5385,6 +5436,17 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 645011711494551456}
   m_SourcePrefab: {fileID: 100100000, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+--- !u!114 &671374974804382460 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 4210235155573261025}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3728378466411769838}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!1 &3728378466411769838 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
@@ -5668,6 +5730,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
+--- !u!114 &8030622436035282989 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  m_PrefabInstance: {fileID: 6651378923901376560}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6169490598821066047}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
 --- !u!1001 &8309336892495040593
 PrefabInstance:
   m_ObjectHideFlags: 0

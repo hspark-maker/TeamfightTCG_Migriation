@@ -89,6 +89,16 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     public int Index => PageOf(m_index);
     public int PageCount => m_pages.Count;
 
+    /// <summary>중앙에 놓인 페이지의 노드. 구매 임팩트가 연출 대상으로 쓴다(페이지가 없으면 null).</summary>
+    public RectTransform CurrentPage
+    {
+        get
+        {
+            int t_page = PageOf(m_index);
+            return t_page >= 0 && t_page < m_pages.Count ? m_pages[t_page] : null;
+        }
+    }
+
     // 한 페이지가 좌우에 동시에 놓여야 하는 2장 이하에서는 순환이 성립하지 않는다.
     bool CanLoop => loop && m_pages.Count >= 3;
 

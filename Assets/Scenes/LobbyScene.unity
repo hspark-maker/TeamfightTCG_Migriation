@@ -132,6 +132,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 376655640714115639, guid: 1d1367fb4b947b84e92369f7fc324787, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3597434991347890582, guid: 1d1367fb4b947b84e92369f7fc324787, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -518,7 +522,7 @@ GameObject:
   - component: {fileID: 1204875450}
   - component: {fileID: 1204875451}
   m_Layer: 0
-  m_Name: TutorialManager
+  m_Name: TutorialSystem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -798,7 +802,7 @@ Transform:
   m_GameObject: {fileID: 1336156944}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -170.9505, y: -595.99475, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1566,6 +1570,10 @@ PrefabInstance:
       propertyPath: m_SizeDelta.x
       value: -12.447479
       objectReference: {fileID: 0}
+    - target: {fileID: 4801925019309097986, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4897214392505374714, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1
@@ -2008,7 +2016,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7828321869619423882, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 8007912968602242820, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.y
@@ -2053,6 +2061,10 @@ PrefabInstance:
     - target: {fileID: 8323386062731503882, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: -248.78467
+      objectReference: {fileID: 0}
+    - target: {fileID: 8456251860656613734, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8511228286296085799, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.y
@@ -2257,8 +2269,8 @@ SceneRoots:
   - {fileID: 1242550801}
   - {fileID: 1281513640}
   - {fileID: 4153199893929001440}
-  - {fileID: 1336156946}
   - {fileID: 947312767}
   - {fileID: 1204875450}
   - {fileID: 3864070791857446870}
   - {fileID: 847179117}
+  - {fileID: 1336156946}

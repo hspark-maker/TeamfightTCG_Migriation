@@ -139,6 +139,10 @@ public class MatchDeckShell : MonoBehaviour
         EnsureWired();
 
         SelectedSlot = ResolveSlot(_slotIndex);
+
+        // 상대 덱은 여기서 뽑지 않는다 — 호스트(GameInitializer.ConfirmEnemyDeck)가 이 화면을 열기 전에
+        // 확정해 DeckConfig에 실어둔다. 이 화면이 다시 뽑으면 확정 지점이 두 곳이 되고,
+        // 전투가 소비하는 값과 화면에 그린 값이 갈린다. 뷰는 캐리어를 읽기만 한다.
         ShowMatchPanel();
     }
 
