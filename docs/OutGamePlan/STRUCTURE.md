@@ -8,6 +8,7 @@
 
 | 날짜 | 변경 | 승인 |
 |---|---|---|
+| 2026-08-04 | **도감 상세 패널 높이 고정 — 카드가 카드마다 커졌다 작아지던 문제 (✅ 코드+프리팹, 격리 프리뷰 씬 실측 검증 / Play 검증 대기)** — 루트 `VerticalLayoutGroup`에서 남는 높이를 통째로 받는 것이 `CardArea`(`flexibleHeight=1`)라, `DetailPanel`이 콘텐츠만큼 줄면 그만큼 **카드 그림이 커지고 위치가 밀렸다**. 넘길 때마다 카드가 튀는 원인. **① 빈 섹션을 끄지 않는다** — `ApplySection`의 `SetActive(_chipCount > 0)` 제거(칩 카운트 인자 자체가 불필요해져 시그니처에서 삭제), 대신 보유 카드는 `"없음"`·미소유는 `"???"`(`LockedName` 재사용)를 설명에 적는다. **② 높이의 진실원을 프리팹 한 곳에** — `DetailFrame`에 `LayoutElement.preferredHeight=590`(+`flexibleHeight=0`). `LayoutElement`의 `layoutPriority=1`이 `VerticalLayoutGroup`의 0보다 높아 **자식 내용과 무관하게** 이 값이 채택된다. 590은 카드 35장 전수 실측 최댓값 569.7(깜밤이 3: 키워드 설명 2줄 67 + 시너지 1줄 33)을 10단위로 올리고 여유 20을 더한 값. 결과: `DetailPanel` 638 고정 → `CardArea` **1292 고정**(이전 목업 1501, 카드 슬롯 1000×1333 → 924×1232). **③ 함께 드러난 기존 결함 — 두 `Desc`만 폰트가 `LiberationSans SDF`**(Static + 한글 글리프 없음 + 폴백도 LiberationSans)라 키워드·시너지 설명이 실제로 □□□로 렌더되고 있었다. 프리팹의 나머지 TMP 13개가 모두 쓰는 `Jalnan2TTF SDF_outline`(Dynamic → 한글 온디맨드)로 통일. 이걸 고치지 않으면 ①의 `"없음"`도 □□로 나와 변경 자체가 성립하지 않는다. 검증은 `NewPreviewScene`에 1080×2280 월드스페이스 캔버스를 세워 빈 섹션·최대 길이·미소유 3케이스 전부 `CardArea h=1292 y=-796` 동일 확인 | ✅ |
 | 2026-08-04 | **도감 카드 상세 넘기기를 순환(loop)으로 전환 (✅ 코드+컴파일 0에러 / Play 검증 대기)** — 끝단에서 막히던 방식을 폐기하고 마지막 ↔ 첫 카드를 잇는다(상점 캐러셀 `PackCarouselView`와 같은 규약이라 두 화면의 감각이 갈리지 않는다). `FindValidIn`이 인덱스를 `Wrap`으로 접고 **자기 자신 포함 `Count`칸만** 순회한다 — 끝에서 감으므로 "범위를 벗어남"을 종료 조건으로 쓰면 전부 null인 목록에서 무한루프가 된다. 유효 카드가 한 장뿐이면 한 바퀴 돌아 제자리를 돌려주므로 `Step`이 `t_next == m_index`를 걸러 헛슬라이드를 막는다. `RefreshArrows`는 끝단 판정이 사라져 **양쪽 항상 활성**(1장짜리만 `SetActive(false)`), `Show`의 null 폴백도 순환 덕에 한 방향 탐색 1회로 축약. **프리팹 재배선 불필요**(필드 무변경) | ✅ |
 | 2026-08-04 | **도감 카드 상세 좌우 넘기기 프리팹 배선 (✅ 코드+검수+컴파일은 선행 세션, 이번에 Unity 프리팹 배선 완료 / Play 검증 대기)** — `CardDetailOverlay.prefab`에 ① 루트에 `HorizontalSwipeDetector` 부착(신규 노드 0 — 딤 `Image(raycastTarget)`가 이미 전면을 덮고, 자식들이 `IDragHandler`를 구현하지 않아 드래그가 루트로 버블링) ② `CardArea/CardPad` 하위에 `Btn_Prev`/`Btn_Next` 신설(90×90, 좌우 끝 세로 중앙, 스프라이트는 `LobbyCanvas`가 이미 쓰는 `Icon_Arrow_Prev1`/`Next1` 재사용, `disabledColor` alpha 0.25) ③ `slideTarget = CardUIView` + `CanvasGroup` 저작. **`slideTarget` 후보가 하나뿐인 이유**: 루트 `VerticalLayoutGroup`이 직계 자식 전부를, `CardSlot`의 `AspectRatioFitter(FitInParent)`가 자기 `anchoredPosition`까지 드라이브해 기준 좌표를 1회 캡처하는 슬라이드와 충돌한다 → 카드 그림만 슬라이드, 딤·닫기·버튼바는 고정(사용자 승인). 상세 → `도감 카드 상세 오버레이` 섹션 | ✅ |
 | 2026-08-04 | **스텝 SO 33개 → 시퀀스 인라인 행 전환 (✅ 이관 완료 27행 + 구 계층 삭제, 컴파일 검증 ✅ / Play 검증 대기)** — 저작 부담 진단에서 출발. 스텝을 SO로 가른 두 근거를 실측 재검증했더니 **재사용은 33개 중 2건**(`Step_MatchEdit`·`Step_DeckBack`)뿐이고, "종류별 필드만 노출"은 드로어로 대체 가능했다. 대가는 파일 66개와 GUID 나열이라 **순서·내용이 보이지 않는 시퀀스**. → 챕터를 인라인한 것과 같은 판단을 스텝에 적용해 `TutorialStepDef`(행) + `TutorialStepExecutor`(액션 switch) + `TutorialStepDefDrawer`(접힘=한 줄 요약, 펼침=액션별 필드)로 접었다. `Completion`·`LeavesScene`·앵커 사용 여부를 **액션에서 파생**시켜 저작 어긋남을 표현 불가능하게 만든 것이 부수 이득. **세이브 스키마·씬 배선 무변경.** 상세 → `G-TUT3` | 사용자 승인(대화) |
@@ -395,7 +396,25 @@ sequenceDiagram
     V->>V: RefreshArrows() — 순환이라 양쪽 항상 활성(1장짜리만 숨김)
 ```
 
+**높이 고정 — 카드가 카드마다 커졌다 작아지지 않게**
+
+```mermaid
+flowchart LR
+    subgraph root["루트 VerticalLayoutGroup (childControlHeight, expand=False)"]
+        TB["TopBar<br/>preferredHeight 150 고정"]
+        CA["CardArea<br/><b>flexibleHeight=1</b> → 남는 높이를 전부 받음"]
+        DP["DetailPanel<br/>preferred = DetailFrame + 패딩 48"]
+        BB["BottomBar<br/>preferredHeight 200 고정"]
+    end
+    DF["DetailFrame<br/><b>LayoutElement.preferredHeight = 590</b><br/>layoutPriority 1 > VLG 0 → 내용과 무관하게 채택"]:::new
+    DP --- DF
+    DF -->|"638로 고정되므로"| CA
+    CA -->|"2280-150-638-200 = <b>1292 고정</b>"| OUT["카드 슬롯 924×1232<br/>어느 카드에서도 같은 크기·자리"]:::new
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+```
+
 **원리 3줄**
+- **높이가 흔들리던 진짜 이유는 `CardArea.flexibleHeight=1`이다.** 상세 패널이 콘텐츠만큼 줄면 그 차이를 카드가 통째로 흡수해 커진다 → 빈 섹션을 끄지 않는 것(코드)만으로는 부족하고, **`DetailFrame`의 `LayoutElement.preferredHeight`가 높이의 단일 진실원**이다(`layoutPriority` 1이 `VerticalLayoutGroup`의 0을 이긴다). 카드가 늘어나 설명이 590을 넘기면 그때 이 값을 올린다.
 - **순환 탐색의 종료 조건은 "범위를 벗어남"이 될 수 없다** — 끝에서 감기 때문에 전부 null인 목록에서 영원히 돈다. 그래서 `FindValidIn`은 **자기 자신을 포함해 `Count`칸만** 보고 끊고, 유효 카드가 한 장뿐이면 한 바퀴 돌아 제자리를 돌려주므로 `Step`이 `t_next == m_index`를 걸러 헛슬라이드를 막는다.
 - **`slideTarget`은 레이아웃에 드리븐되지 않는 노드여야 한다.** 기준 좌표를 1회만 캡처하므로 LayoutGroup이 매 프레임 되돌리면 떨린다. 루트가 `VerticalLayoutGroup`, `CardSlot`이 `AspectRatioFitter(FitInParent)`(= anchoredPosition까지 드라이브)라 **자격 있는 기존 노드는 `CardUIView` 하나**뿐이라 이것을 골랐다 → 카드 그림만 슬라이드하고 딤·닫기·버튼바는 고정.
 - **트윈은 `DOKill()`이 아니라 `SetId(this)` + `DOTween.Kill(this)`로 자기 것만 자른다.** 같은 노드에 `PopupTransition`의 등장·퇴장 `DOScale/DOFade`가 걸려 있어 통째로 자르면 스케일이 0.9에 굳는다.

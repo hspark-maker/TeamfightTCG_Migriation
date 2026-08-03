@@ -19,6 +19,8 @@ public class CardDetailOverlayView : MonoBehaviour
     const string LockedName  = "???";
     /// <summary>미소유 카드의 수치 자리(체력).</summary>
     const string LockedValue = "?";
+    /// <summary>보유 카드인데 해당 섹션에 내용이 없을 때. 섹션을 숨기지 않는 이유는 ApplySection 주석 참고.</summary>
+    const string NoneValue   = "없음";
 
     [Header("배선")]
     [SerializeField] TMP_Text       titleText;       // 상단 카드 이름
@@ -435,7 +437,6 @@ public class CardDetailOverlayView : MonoBehaviour
         ClearChildren(this.keywordChipRoot);
 
         var t_lines = new List<string>();
-        int t_chips = 0;
 
         if (_owned && this.keywordIconConfig != null && this.chipPrefab != null && this.keywordChipRoot != null)
         {
@@ -451,13 +452,12 @@ public class CardDetailOverlayView : MonoBehaviour
                 if (!this.keywordIconConfig.TryGetEntry(t_kw, out KeywordIconConfig.Entry t_entry)) continue;
 
                 Instantiate(this.chipPrefab, this.keywordChipRoot).Init(t_entry.icon, t_entry.displayName, null);
-                t_chips++;
 
                 if (!string.IsNullOrEmpty(t_entry.explain)) t_lines.Add(t_entry.explain);
             }
         }
 
-        ApplySection(this.keywordSection, this.keywordDescText, t_chips, t_lines);
+        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned);
     }
 
     void BuildSynergySection(CardData _card, bool _owned)
@@ -465,7 +465,6 @@ public class CardDetailOverlayView : MonoBehaviour
         ClearChildren(this.synergyChipRoot);
 
         var t_lines = new List<string>();
-        int t_chips = 0;
 
         if (_owned && _card.synergies != null && this.chipPrefab != null && this.synergyChipRoot != null)
         {
@@ -477,21 +476,26 @@ public class CardDetailOverlayView : MonoBehaviour
                 // 마지막 인자는 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
                 Instantiate(this.chipPrefab, this.synergyChipRoot)
                     .Init(t_syn.activeIcon, SynergyText.Name(t_syn), null, SynergyIconStrip.IconPadCompensation);
-                t_chips++;
 
                 if (!string.IsNullOrEmpty(t_syn.effectDescription)) t_lines.Add(t_syn.effectDescription);
             }
         }
 
-        ApplySection(this.synergySection, this.synergyDescText, t_chips, t_lines);
+        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
     }
 
-    // 칩이 하나도 없는 섹션은 통째로 숨긴다(미소유 카드는 두 섹션 모두 꺼진다).
-    // 판정에 chipRoot.childCount를 쓰면 안 된다 — 방금 Destroy한 이전 칩이 이 프레임엔 아직 자식으로 남아 있다.
-    static void ApplySection(GameObject _section, TMP_Text _desc, int _chipCount, List<string> _lines)
+    // 비어 있어도 섹션을 끄지 않는다 — 끄면 DetailPanel의 높이가 줄고, 루트 VerticalLayoutGroup에서
+    // 남는 높이를 통째로 받는 것이 CardArea(flexibleHeight=1)라 **카드 그림의 크기와 위치가 카드마다 달라진다**.
+    // 넘길 때마다 카드가 튀어 보이므로, 빈 섹션은 자리를 지킨 채 "없음"(미소유는 ???)만 적는다.
+    // 그래도 설명 줄 수만큼은 흔들리므로 높이 고정의 정본은 프리팹의 DetailFrame LayoutElement.preferredHeight다.
+    static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned)
     {
-        if (_desc    != null) _desc.text = string.Join("\n", _lines);
-        if (_section != null) _section.SetActive(_chipCount > 0);
+        if (_desc != null)
+            _desc.text = _lines.Count > 0 ? string.Join("\n", _lines)
+                       : _owned           ? NoneValue
+                                          : LockedName;
+
+        if (_section != null) _section.SetActive(true);
     }
 
     static void ClearChildren(Transform _root)
