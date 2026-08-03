@@ -20,6 +20,7 @@ public class LobbyTabController : MonoBehaviour
         public string label;              // Focus에 표시할 이름(옵션) — 비우면 name을 쓴다
         public EOutgameTutorialAnchor tutorialAnchor;   // 튜토리얼 안내 타깃 키(옵션) — None이면 등록 안 함
         public EOutgameTutorialTrigger tutorialTrigger; // 첫 진입 1회 튜토리얼 발화 키(옵션) — None이면 발화 안 함
+        public EOutgameFeature unlockFeature;           // 이 탭을 여는 기능 키(옵션) — None이면 항상 열림
     }
 
     [SerializeField] List<Tab> tabs = new List<Tab>();
@@ -51,6 +52,14 @@ public class LobbyTabController : MonoBehaviour
             // 선택된 탭 버튼은 Focus에 가려져 잠시 꺼지지만, 오브젝트 자체는 살아 있으므로 Unregister는 불필요하다.
             if (btn != null && this.tabs[i].tutorialAnchor != EOutgameTutorialAnchor.None)
                 TutorialAnchorRegistry.Register(this.tabs[i].tutorialAnchor, btn.transform as RectTransform, btn);
+
+            // 잠금 표시도 같은 이유로 여기서 얹는다(프리팹에 못 붙이는 버튼이라).
+            if (btn != null && this.tabs[i].unlockFeature != EOutgameFeature.None)
+            {
+                var lockView = btn.GetComponent<FeatureLockView>();
+                if (lockView == null) lockView = btn.gameObject.AddComponent<FeatureLockView>();
+                lockView.Bind(this.tabs[i].unlockFeature);
+            }
         }
     }
 
@@ -64,6 +73,10 @@ public class LobbyTabController : MonoBehaviour
     /// 지정 인덱스 탭만 활성화한다. _fireTrigger=false는 유저 이동이 아닌 초기 선택용.
     public void Select(int _index, bool _fireTrigger = true)
     {
+        // 아직 안 열린 탭은 유저 이동으로 들어갈 수 없다(잠김 오버레이·interactable과 이중 안전).
+        // 초기 선택은 통과시킨다 — 기본 탭이 잠기면 아무 콘텐츠도 안 열린 로비가 되어 더 나쁘다.
+        if (_fireTrigger && this.IsTabLocked(_index)) return;
+
         bool useFocus = (this.focus != null);
 
         for (int i = 0; i < this.tabs.Count; i++)
@@ -89,6 +102,13 @@ public class LobbyTabController : MonoBehaviour
     public void SelectDefault()
     {
         this.Select(this.defaultIndex);
+    }
+
+    bool IsTabLocked(int _index)
+    {
+        if (_index < 0 || _index >= this.tabs.Count) return false;
+
+        return !OutgameFeatureLock.IsUnlocked(this.tabs[_index].unlockFeature);
     }
 
     /// Focus를 선택 탭 자리로 옮기고 아이콘·이름을 그 탭에 맞춘다.

@@ -13,5 +13,7 @@ MonoBehaviour:
   m_Name: Step_GrantDeck_Keyword
   m_EditorClassIdentifier: Assembly-CSharp::DeckGrantStep
   guideMessage: 
+  unlocks: 
+  useDim: 0
   scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
-  deckName: 키워드 덱
+  deckName: "\uD0A4\uC6CC\uB4DC \uB371"

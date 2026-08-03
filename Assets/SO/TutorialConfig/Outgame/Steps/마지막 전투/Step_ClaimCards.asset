@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: Step_ClaimCards
   m_EditorClassIdentifier: Assembly-CSharp::WaitClickStep
   guideMessage: 
+  unlocks: 
+  useDim: 0
   anchor: 4

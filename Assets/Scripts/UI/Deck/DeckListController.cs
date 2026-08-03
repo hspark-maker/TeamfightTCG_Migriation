@@ -40,6 +40,14 @@ public class DeckListController : MonoBehaviour
         // 탭을 나갔다 오면 편집 모드는 항상 해제한다(DeckTabController가 "항상 목록부터"를 보장하는 것과 같은 이유).
         m_editMode = false;
         Build();
+
+        // 목록이 켜진 채 튜토리얼이 진행되면 "신규 생성" 칸의 잠금이 그때 풀린다 — 재빌드가 유일한 반영 경로다.
+        OutgameFeatureLock.OnChanged += Build;
+    }
+
+    void OnDisable()
+    {
+        OutgameFeatureLock.OnChanged -= Build;
     }
 
     // 외부에서 강제 갱신할 때의 공개 창구(목록이 켜진 채 덱이 바뀌는 경로가 생기면 사용).
@@ -75,7 +83,7 @@ public class DeckListController : MonoBehaviour
         //    큐 구조라 삽입 좌표는 저장이 확정될 때 생긴다 → 여기서는 만석 여부만 넘긴다.
         //    결과적으로 +칸 바로 다음이 가장 최근에 만든 덱이다.
         var t_create = Instantiate(slotPrefab, content);
-        t_create.BindCreate(!DeckSaveManager.IsFull, OnCreateClicked);
+        t_create.BindCreate(!DeckSaveManager.IsFull && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate), OnCreateClicked);
         // 재빌드마다 새 인스턴스가 같은 키를 덮어쓰고, 파괴된 옛 항목은 TutorialAnchorRegistry.TryGet의 fake-null 정리가 걷어낸다 → Unregister 불필요.
         t_create.RegisterTutorialAnchor(EOutgameTutorialAnchor.DeckCreateSlot);
         m_slots.Add(t_create);
@@ -128,7 +136,8 @@ public class DeckListController : MonoBehaviour
             if (m_slots[t_i] != null) m_slots[t_i].SetEditMode(m_editMode);
 
         if (editToggleLabel  != null) editToggleLabel.text        = m_editMode ? doneLabel : editLabel;
-        if (editToggleButton != null) editToggleButton.interactable = m_deckSlotCount > 0;
+        if (editToggleButton != null) editToggleButton.interactable = m_deckSlotCount > 0
+                                                                   && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckEditToggle);
     }
 
     // - 버튼. 삭제는 되돌릴 수 없으므로 확인 팝업을 거치지 않는 경로를 만들지 않는다.

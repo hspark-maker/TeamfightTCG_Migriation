@@ -541,30 +541,40 @@ MonoBehaviour:
     icon: {fileID: 7125465344233393141}
     label: "\uC0C1\uC810"
     tutorialAnchor: 0
+    tutorialTrigger: 0
+    unlockFeature: 1
   - name: Pack
     button: {fileID: 7125465342877762487}
     content: {fileID: 5362208430687055620}
     icon: {fileID: 7125465342614020888}
     label: "\uBF51\uAE30"
     tutorialAnchor: 2
+    tutorialTrigger: 0
+    unlockFeature: 2
   - name: Match
     button: {fileID: 7125465342607790153}
     content: {fileID: 8456251860656613734}
     icon: {fileID: 7125465343983690871}
     label: "\uBC30\uD2C0"
     tutorialAnchor: 6
+    tutorialTrigger: 0
+    unlockFeature: 0
   - name: Deck
     button: {fileID: 7125465343882121632}
     content: {fileID: 4801925019309097986}
     icon: {fileID: 7125465342880498328}
     label: "\uB371"
     tutorialAnchor: 5
+    tutorialTrigger: 0
+    unlockFeature: 4
   - name: Collection
     button: {fileID: 7125465343566875747}
     content: {fileID: 2972321608579249813}
     icon: {fileID: 7125465344466381160}
     label: "\uB3C4\uAC10"
     tutorialAnchor: 0
+    tutorialTrigger: 0
+    unlockFeature: 5
   defaultIndex: 2
   focus: {fileID: 7125465343015337625}
   focusIcon: {fileID: 7125465342477617750}
@@ -1113,6 +1123,7 @@ GameObject:
   - component: {fileID: 1158220769595410918}
   - component: {fileID: 3732290268072607226}
   - component: {fileID: 7859930155208968552}
+  - component: {fileID: 3211783697360392402}
   m_Layer: 0
   m_Name: PlayBtn
   m_TagString: Untagged
@@ -1262,6 +1273,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
   key: 1
+--- !u!114 &3211783697360392402
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2489333612989050856}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4ea305af1ffe014e9c512005fc978ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FeatureLockView
+  feature: 6
+  target: {fileID: 0}
+  controlInteractable: 1
+  overlayParent: {fileID: 0}
 --- !u!1 &2518123313376068981
 GameObject:
   m_ObjectHideFlags: 0

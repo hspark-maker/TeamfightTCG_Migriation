@@ -47,6 +47,9 @@ public class CollectionRowView : MonoBehaviour
                 var t_view = Instantiate(cardPrefab, cardsContainer);
                 var t_card = t_cards[t_i];
                 t_view.Bind(t_card, IsOwned(t_card));
+                // 길게 누르면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
+                // (RefreshOwnership은 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
+                CardDetailOverlayView.BindTile(t_view, t_card);
                 m_cards.Add(t_view);
             }
         }
@@ -86,8 +89,10 @@ public class CollectionRowView : MonoBehaviour
         // 생산 사이클 진행바는 전용 뷰에 위임(행마다 1개). 시간 누적 반영을 위해 매 폴링 틱 갱신.
         if (progressView != null) progressView.Refresh();
 
-        // 수확 버튼: 굳은 누적이 1 이상일 때만 활성(잠김이어도 굳은 누적은 청구 가능).
-        if (harvestButton != null) harvestButton.interactable = t_info.CanHarvest;
+        // 수확 버튼: 굳은 누적이 1 이상일 때만 활성(생산이 잠긴 행이어도 굳은 누적은 청구 가능).
+        // 튜토리얼 기능 잠금은 그와 별개 축이다 — 아직 수확을 안 배웠으면 청구 자체를 막는다(일괄수령과 같은 기준).
+        if (harvestButton != null) harvestButton.interactable = t_info.CanHarvest
+                                                             && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CollectionHarvest);
     }
 
     // 수확 클릭 → 매니저에 위임. 지급·영속·통지는 매니저가 처리하고 OnChanged로 컨트롤러가 전체 갱신한다.

@@ -13,3 +13,5 @@ MonoBehaviour:
   m_Name: Step_OpenPack
   m_EditorClassIdentifier: Assembly-CSharp::WaitPackOpenStep
   guideMessage: 
+  unlocks: 
+  useDim: 0

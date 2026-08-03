@@ -111,6 +111,22 @@ public static class OutgameTutorialRunner
         OnStepChanged?.Invoke();
     }
 
+    /// <summary>시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다. 범위 밖이면 있는 데까지만.
+    /// 진행 좌표에서 파생되는 상태(기능 해금)를 재계산하는 쪽이 쓴다 — 러너는 그 상태가 무엇인지 알지 않는다.</summary>
+    public static IEnumerable<OutgameTutorialStep> EnumerateUpTo(int _chapter, int _step)
+    {
+        for (int t_c = 0; t_c <= _chapter && t_c < ChapterCount; t_c++)
+        {
+            if (!TryGetChapter(t_c, out var t_chapter)) continue;
+
+            // 지나온 챕터는 끝까지, 현재 챕터는 좌표까지. 저작에서 챕터가 짧아져도 실물 길이로 잘린다.
+            int t_last = t_c < _chapter ? t_chapter.StepCount - 1 : Mathf.Min(_step, t_chapter.StepCount - 1);
+
+            for (int t_s = 0; t_s <= t_last; t_s++)
+                if (t_chapter.TryGetStep(t_s, out var t_asset)) yield return t_asset;
+        }
+    }
+
     // 범위 밖·빈 칸이면 false. 미배선 챕터는 스텝이 없는 것과 같다.
     static bool TryGetChapter(int _index, out OutgameTutorialChapter _chapter)
     {

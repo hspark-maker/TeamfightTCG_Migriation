@@ -412,7 +412,8 @@ public class DeckEditController : MonoBehaviour
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
         if (totalHpText      != null) totalHpText.text = DeckPower.Of(m_working).ToString();
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
-        if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE;   // 가득 차면 채울 칸이 없다
+        if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
+                                                                   && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);
     }
 
     int CountFilled()

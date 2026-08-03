@@ -8,7 +8,19 @@ public abstract class OutgameTutorialStep : ScriptableObject
     [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
     [TextArea][SerializeField] string guideMessage;
 
+    [Tooltip("이 스텝에 도달하면 열리는 기능(누적). 이 스텝이 지목하는 앵커의 기능은 반드시 여기까지 포함되어야 한다")]
+    [SerializeField] List<EOutgameFeature> unlocks = new List<EOutgameFeature>();
+
+    [Tooltip("타깃 외 입력을 딤으로 막을지. 잠금만으로 흐름이 잡히는 스텝은 꺼서 화면을 어둡게 하지 않는다")]
+    [SerializeField] bool useDim = true;
+
     public string GuideMessage => guideMessage;
+
+    /// <summary>이 스텝까지 진행하면 열리는 기능. 해금은 누적이라 한 번 열린 것은 다시 잠기지 않는다.</summary>
+    public IReadOnlyList<EOutgameFeature> Unlocks => unlocks;
+
+    /// <summary>딤으로 타깃 외 입력을 막는가. false면 링·손가락·문구만 띄우고 차단은 잠금에 맡긴다.</summary>
+    public bool UseDim => useDim;
 
     /// <summary>안내 타깃 위젯. None이면 딤을 걸 타깃이 없다(자동 스텝·배너 전용 스텝).</summary>
     public virtual EOutgameTutorialAnchor Anchor => EOutgameTutorialAnchor.None;
