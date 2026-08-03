@@ -62,12 +62,21 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("[F] 흐름 바람 테스트에 쓸 흐름 연출 SO(비면 무동작)")]
     [SerializeField] FlowSynergyVfxConfig flowVfx;
 
-    [Tooltip("[G] 엠블럼 테스트에 쓸 시너지 SO. vfx 에셋에 상징 그림이 배선된 것을 넣는다(비면 무동작)")]
-    [SerializeField] SynergyData emblemSynergy;
+    [Tooltip("[G] 엠블럼 테스트 대상. **비워두면 프로젝트의 SynergyData를 전부 자동으로 채운다** — " +
+             "시너지가 늘어도 씬을 다시 배선할 필요가 없다. [,]/[.]로 넘긴다.")]
+    [SerializeField] SynergyData[] emblemSynergies;
+    [Tooltip("지금 고른 시너지 번호([,]/[.]로 이동)")]
+    [SerializeField] int emblemIndex = 0;
     [Tooltip("엠블럼을 띄울 아군 슬롯")]
     [Range(0, 2)] [SerializeField] int emblemSlot = 0;
-    [Tooltip("[G]로 볼 타이밍. 시너지마다 타이밍별 몸짓이 다르므로 어느 줄을 볼지 골라야 한다")]
+    [Tooltip("[G]로 볼 타이밍([Y] 토글). 시너지마다 타이밍별 몸짓이 다르므로 어느 줄을 볼지 골라야 한다")]
     [SerializeField] SynergyEmblemTiming emblemTiming = SynergyEmblemTiming.Placed;
+
+    [Tooltip("[U] 자동 반복. 켜두면 엠블럼이 끝나는 대로 다시 재생하고, **Play 중 연출 SO를 고치면 즉시 다시 튼다** " +
+             "— 겹침·간격처럼 눈으로 맞추는 값을 인스펙터에서 바로 확인하려고.")]
+    [SerializeField] bool emblemAutoReplay = false;
+    [Tooltip("반복 사이 쉬는 시간(초)")]
+    [Range(0f, 2f)] [SerializeField] float emblemReplayGap = 0.35f;
 
     [Header("박치기 타이밍(초) / 거리 / 각도  — Play 중 조정 가능")]
     [SerializeField] float windDur    = 0.07f;
@@ -91,6 +100,7 @@ public class AttackAnimTester : MonoBehaviour
         // GameTiming.Battle이 **코드 기본값짜리 임시 인스턴스**를 만들어 쓰고, 그걸 읽는 연출
         // (무쌍 등 슬라이더가 없는 것들)은 인스펙터에서 SO를 고쳐도 아무 반응이 없다.
         ResolveConfig();
+        ResolveSynergyAssets();
 
         // 부트스트랩(GameInitializer) off라 애니메이터 캐시 초기화가 안 됨 → 첫 연출/가이드 누락 방지 위해 직접 호출.
         this.playerFieldView.InitializeAnimators();
@@ -153,9 +163,14 @@ public class AttackAnimTester : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.S)) PreviewSwarmVolley().Forget();
         if (Input.GetKeyDown(KeyCode.F)) SynergyVfx.PlayFlowWind(this.playerFieldView, this.flowVfx);
         if (Input.GetKeyDown(KeyCode.H)) PreviewCaretakerHeal();
-        if (Input.GetKeyDown(KeyCode.G))
-            SynergyEmblemVfx.Play(this.playerFieldView?.GetSlotView(this.emblemSlot),
-                                  this.emblemSynergy, this.emblemTiming);
+        if (Input.GetKeyDown(KeyCode.Comma))  CycleEmblemSynergy(-1);
+        if (Input.GetKeyDown(KeyCode.Period)) CycleEmblemSynergy(+1);
+        if (Input.GetKeyDown(KeyCode.Y))
+            this.emblemTiming = this.emblemTiming == SynergyEmblemTiming.Placed
+                ? SynergyEmblemTiming.Triggered : SynergyEmblemTiming.Placed;
+        if (Input.GetKeyDown(KeyCode.U)) { this.emblemAutoReplay = !this.emblemAutoReplay; this.emblemReplayTimer = 0f; }
+        if (Input.GetKeyDown(KeyCode.G)) PreviewEmblem();
+        PollEmblemAutoReplay();
         if (Input.GetKeyDown(KeyCode.R)) { this.attackVfx.Rescan(); this.hitVfx.Rescan(); t_armedChanged = true; }
         if (Input.GetKeyDown(KeyCode.T)) PullTuningFromConfig();
         if (Input.GetKeyDown(KeyCode.K)) ApplyTuningToConfig();
@@ -326,6 +341,108 @@ public class AttackAnimTester : MonoBehaviour
             if (t_v != null && t_v.BoundCard != null) t_targets.Add((t_v, Mathf.Max(0, this.caretakerHeal)));
         }
         if (t_targets.Count > 0) HealVfx.PlayHealBurst(t_src, t_targets);
+    }
+
+    /// <summary>연출 SO 자동 배선(에디터 전용). 씬에 꽂힌 값이 있으면 그걸 존중하고, **비어 있을 때만** 채운다.
+    ///
+    /// 시너지 연출은 시너지가 늘 때마다 에셋이 하나씩 는다 — 씬에 하나씩 손으로 꽂는 방식이면
+    /// 새 연출을 만든 사람이 씬 배선을 잊는 순간 "테스터에선 안 보인다"가 된다(그러면 아무도 그 연출을
+    /// 테스터에서 확인하지 않는다). 그래서 **프로젝트에 있는 SynergyData 전부**를 목록으로 잡는다.
+    ///
+    /// 무리/흐름 고유 연출도 그 시너지의 <c>SynergyData.vfx</c>에서 꺼낸다 — 인게임이 타는 것과
+    /// 같은 에셋이어야 테스트 결과가 인게임과 일치한다(FindAssets로 아무 에셋이나 집으면 사본을 볼 수 있다).</summary>
+    void ResolveSynergyAssets()
+    {
+#if UNITY_EDITOR
+        if (this.emblemSynergies == null || this.emblemSynergies.Length == 0)
+        {
+            string[] t_guids = UnityEditor.AssetDatabase.FindAssets("t:SynergyData");
+            var t_list = new List<SynergyData>();
+            foreach (string t_guid in t_guids)
+            {
+                var t_so = UnityEditor.AssetDatabase.LoadAssetAtPath<SynergyData>(
+                    UnityEditor.AssetDatabase.GUIDToAssetPath(t_guid));
+                if (t_so != null) t_list.Add(t_so);
+            }
+            t_list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));   // 실행마다 순서가 흔들리지 않게
+            this.emblemSynergies = t_list.ToArray();
+        }
+
+        foreach (SynergyData t_syn in this.emblemSynergies)
+        {
+            if (this.swarmVfx == null) this.swarmVfx = t_syn?.vfx as SwarmSynergyVfxConfig;
+            if (this.flowVfx  == null) this.flowVfx  = t_syn?.vfx as FlowSynergyVfxConfig;
+        }
+#endif
+        this.emblemIndex = WrapIndex(this.emblemIndex);
+    }
+
+    SynergyData CurrentEmblemSynergy
+        => (this.emblemSynergies != null && this.emblemSynergies.Length > 0)
+            ? this.emblemSynergies[WrapIndex(this.emblemIndex)] : null;
+
+    int WrapIndex(int _i)
+    {
+        int t_n = this.emblemSynergies != null ? this.emblemSynergies.Length : 0;
+        return t_n > 0 ? ((_i % t_n) + t_n) % t_n : 0;
+    }
+
+    float emblemReplayTimer;
+    int   emblemDirtyStamp = -1;
+
+    /// <summary>연출 SO **핫 리로드**. 값 자체는 원래 살아 있다(SynergyEmblemVfx가 매 재생마다 SO를 다시 읽는다)
+    /// — 문제는 재생이 1회성이라 "고친 값을 보려면 다시 눌러야 한다"는 것. 그래서 두 가지를 한다:
+    /// ① 끝나는 대로 다시 재생, ② **인스펙터에서 SO를 고치는 순간 즉시 다시 재생**(dirty 카운터 감시).
+    /// 겹침·간격처럼 눈으로 맞추는 값은 이게 없으면 한 번 고칠 때마다 키를 다시 눌러야 한다.</summary>
+    void PollEmblemAutoReplay()
+    {
+        if (!this.emblemAutoReplay) return;
+
+        SynergyData t_syn = CurrentEmblemSynergy;
+        // 배선 없는 시너지에 걸려 있으면 조용히 쉰다 — 반복 재생이라 경고를 그대로 두면 콘솔이 초당 몇 줄로 찬다.
+        if (t_syn == null || t_syn.vfx == null || !t_syn.vfx.PlaysEmblemAt(this.emblemTiming)) return;
+
+#if UNITY_EDITOR
+        // dirty 카운터는 인스펙터 편집마다 오른다(에디터 전용). 값이 바뀌자마자 새 값으로 다시 튼다.
+        int t_stamp = UnityEditor.EditorUtility.GetDirtyCount(t_syn.vfx);
+        if (t_stamp != this.emblemDirtyStamp)
+        {
+            this.emblemDirtyStamp = t_stamp;
+            this.emblemReplayTimer = 0f;
+        }
+#endif
+        this.emblemReplayTimer -= Time.deltaTime;
+        if (this.emblemReplayTimer > 0f) return;
+
+        PreviewEmblem();
+        this.emblemReplayTimer = SynergyEmblemVfx.DurationOf(t_syn, this.emblemTiming) + this.emblemReplayGap;
+    }
+
+    void CycleEmblemSynergy(int _step)
+    {
+        this.emblemReplayTimer = 0f;
+        this.emblemIndex = WrapIndex(this.emblemIndex + _step);
+        SynergyData t_syn = CurrentEmblemSynergy;
+        Debug.Log($"[AttackTest] 엠블럼 시너지 = {(t_syn != null ? t_syn.name : "없음")}"
+                + $" / vfx = {(t_syn?.vfx != null ? t_syn.vfx.name : "미배선")}");
+    }
+
+    /// <summary>[G] 지금 고른 시너지의 그 타이밍 엠블럼 1회. 게임과 같은 진입점(SynergyEmblemVfx.Play)을 탄다.
+    /// 그 타이밍 줄이 없으면 조용히 아무것도 안 뜨므로, 왜 안 뜨는지 로그로 알려준다
+    /// (아무 반응이 없으면 "연출이 깨졌다"와 "배선이 없다"를 구분할 수 없다).</summary>
+    void PreviewEmblem()
+    {
+        SynergyData t_syn = CurrentEmblemSynergy;
+        CardView t_view = this.playerFieldView?.GetSlotView(this.emblemSlot);
+        if (t_syn == null || t_view == null) return;
+
+        if (t_syn.vfx == null || !t_syn.vfx.PlaysEmblemAt(this.emblemTiming))
+        {
+            Debug.LogWarning($"[AttackTest] {t_syn.name}: {this.emblemTiming} 타이밍 엠블럼 배선 없음"
+                           + $"{(t_syn.vfx == null ? " (vfx SO 자체가 비어 있다)" : "")}");
+            return;
+        }
+        SynergyEmblemVfx.Play(t_view, t_syn, this.emblemTiming);
     }
 
     void ApplyPeerlessKeyword(CardView _attacker)
@@ -507,9 +624,15 @@ public class AttackAnimTester : MonoBehaviour
             $"피격VFX [↑/↓] {this.hitVfx.Index + 1}/{this.hitVfx.Count}  {this.hitVfx.CurrentName}");
         GUI.Label(new Rect(12, 106, 1100, 24),
             $"[1] 무장VFX on/off  [2] 피격VFX on/off  [V] 무장VFX 미리보기({(this.armedPreview ? "ON" : "off")})  [B] 피격VFX 미리보기  [R] 폴더 재스캔  [L] 선택 경로 로그");
+        SynergyData t_emblem = CurrentEmblemSynergy;
+        int t_emblemCount = this.emblemSynergies != null ? this.emblemSynergies.Length : 0;
         GUI.Label(new Rect(12, 130, 1100, 24),
             "시너지: [S] 무리 볼리(아군 전원 → 적0)   [F] 흐름 바람(아군 필드)   [H] 돌보미 회복(HealVfx 재사용)"
-            + $"   [G] 엠블럼({(this.emblemSynergy != null ? this.emblemSynergy.name : "SO 미배선")} → 슬롯{this.emblemSlot})"
-            + "   ※ 무리/흐름은 각 시너지 연출 SO(Swarm/Flow SynergyVfx)를 이 컴포넌트에 꽂아야 함");
+            + $"   ※ 무리/흐름 SO = {(this.swarmVfx != null ? this.swarmVfx.name : "없음")} / {(this.flowVfx != null ? this.flowVfx.name : "없음")}");
+        GUI.Label(new Rect(12, 154, 1100, 24),
+            $"[G] 엠블럼 재생 → 슬롯{this.emblemSlot}   [,]/[.] 시너지 넘기기 "
+            + $"({(t_emblemCount > 0 ? this.emblemIndex + 1 : 0)}/{t_emblemCount} {(t_emblem != null ? t_emblem.name : "없음")}"
+            + $" · vfx {(t_emblem?.vfx != null ? t_emblem.vfx.name : "미배선")})"
+            + $"   [Y] 타이밍 {this.emblemTiming}   [U] 자동반복 {(this.emblemAutoReplay ? "ON(SO 고치면 즉시 반영)" : "off")}");
     }
 }

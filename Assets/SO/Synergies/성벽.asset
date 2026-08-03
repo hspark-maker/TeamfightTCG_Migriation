@@ -18,6 +18,7 @@ MonoBehaviour:
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: f76294d05aaa974498faf69479d58af0, type: 3}
   inactiveIcon: {fileID: 21300000, guid: f0e4ef862b2634f4395a9869e961c306, type: 3}
+  vfx: {fileID: 11400000, guid: 7c1a4b9e2f3d40a4b8e5c60d71f2a3b9, type: 2}
   tiers:
   - requiredCount: 2
     label: "\uC131\uBCBD"

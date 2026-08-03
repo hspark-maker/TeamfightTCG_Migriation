@@ -39,6 +39,11 @@ public abstract class SynergyEmblemSpec
     // 2면 모든 카드보다 앞. 피격/투사체 파티클(order 20~30)보다는 낮게 둬서 전투 연출이 계속 위에 뜬다.
     public int sortingOrder = 2;
 
+    /// <summary>띄울 그림이 있는가. 배선 판정(<see cref="SynergyEmblemEntry.Covers"/>)이 이걸 본다.
+    /// 그림을 여러 장 쓰는 몸짓(성벽 StackUpEmblem)은 자기 목록으로 다시 답한다 —
+    /// 여기서 <c>sprite</c> 하나만 보면 그런 몸짓이 배선돼도 줄 전체가 꺼진다.</summary>
+    public virtual bool HasArt => this.sprite != null;
+
     /// <summary>배속이 적용된 실제 재생 길이(초). 자식 구현과, 연출이 끝나길 기다리는 호출부
     /// (무리 선피해 → 볼리)가 같은 이 값을 본다 — 대기 시간과 실제 길이가 갈라지지 않게.</summary>
     public float Duration => GameTiming.Battle.Scaled(Mathf.Max(0.05f, this.duration));
