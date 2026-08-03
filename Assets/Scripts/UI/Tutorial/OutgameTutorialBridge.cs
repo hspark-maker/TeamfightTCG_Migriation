@@ -233,10 +233,16 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
         // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(자동 스텝), 곧 사라질 게이트가 한 프레임 깜빡인다(전투 진입).
-        // 판정 기준은 Completion이 아니라 LeavesScene이다 — 씬을 떠나는 스텝만 다음 브리지가 재개할 수 있고,
-        // 자동 스텝이라도 제자리에 남는 것(개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
+        // 방금 완료된 스텝이 씬을 떠났으면 다음 브리지가 재개한다. 자동 스텝이라도 제자리에 남는 것
+        // (개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
+        //
+        // 다음 스텝을 미리 끊는 것은 "진입만으로" 씬을 떠나는 자동 스텝뿐이다 — 클릭을 기다리는 스텝은
+        // LeavesScene이어도 게이트를 걸어 줘야 한다(전투 시작 버튼). 안 걸면 씬이 그대로라 재개해 줄
+        // 브리지가 없고, CloseGate가 m_step을 비워 앵커 등록 통지로도 깨어나지 못한다 = 영구 정지.
         if (t_leftScene
-            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next) && t_next.LeavesScene))
+            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
+                && t_next.LeavesScene
+                && t_next.Completion == EOutgameTutorialCompletion.Auto))
         {
             CloseGate();
             return;

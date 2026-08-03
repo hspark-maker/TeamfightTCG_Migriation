@@ -12,7 +12,8 @@ using UnityEngine.UI;
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
-// 메시지 모드(ShowMessageGate)만 (1)의 예외다 — 누를 대상이 아니라 읽을 영역이라 승격·손가락 없이 딤+링만 켠다.
+// 메시지 모드(ShowMessageGate)는 손가락만 빼고 딤+링+승격을 켠다 — 읽을 영역이라도 딤 아래 깔리면
+// 링 안쪽이 어두워져 "여길 보라"가 성립하지 않는다. 대신 승격에 레이캐스터를 달지 않는다(Promote 참조).
 // 완료가 딤 탭 자체라 (2)는 오히려 항상 만족한다.
 //
 // 룩은 프리팹(OutgameTutorialGate.prefab)에서 저작한다. 미배선이면 딤+문구만 코드로 그리는 폴백으로 떨어진다
@@ -172,8 +173,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     /// <summary>딤 + 문구를 띄우고 화면(딤) 탭으로 넘기는 설명 게이트. <paramref name="_highlight"/>가 있으면 링으로 그 영역을 강조한다.
-    /// 승격·손가락이 없는 것이 이 모드의 계약이다 — 읽을 영역이지 누를 대상이 아니라서, 승격하면 아직 눌러선 안 되는
-    /// 위젯이 튜토리얼 때문에 뚫린다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
+    /// 승격은 하되 레이캐스터 없이 한다 — 링 안쪽이 딤에 묻히면 안 되지만, 읽을 영역이라 눌려서도 안 된다.
+    /// 손가락이 없는 것도 이 모드의 계약이다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
     public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied)
     {
         Release();
@@ -275,8 +276,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        if (t_visible && !m_confirmMode) Promote();
-        else                             Demote();
+        if (t_visible) Promote();
+        else           Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -340,18 +341,13 @@ public class OutgameTutorialGateUI : MonoBehaviour
             this.focusRing.anchoredPosition = t_center;
         }
 
-        // 손끝(스프라이트 좌상단)이 타깃 중앙을 가리키도록, 손 이미지를 자기 크기의 절반만큼 우하단으로 민다
-        // — 그래야 이미지 좌상단 모서리가 정확히 타깃 중앙에 온다. handOffset은 스프라이트 여백 보정용.
-        // 화면 끝에 붙은 타깃(하단바 탭·우측 상단 아이콘)에서 손가락이 잘리지 않게 가로·세로 모두 캔버스 안으로 민다.
+        // 손 이미지를 타깃 중앙에서 자기 높이의 절반만큼 위로 민다 — 손 아래 모서리가 타깃 중앙에 걸린다.
+        // handOffset은 스프라이트 여백 보정용.
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
         {
             Vector2 t_handHalf = this.hand.rect.size * 0.5f;
-            Vector2 t_handPos  = t_center + new Vector2(t_handHalf.x, -t_handHalf.y) + this.handOffset;
-
-            t_handPos.x = Mathf.Clamp(t_handPos.x, t_full.xMin + t_handHalf.x, t_full.xMax - t_handHalf.x);
-            t_handPos.y = Mathf.Clamp(t_handPos.y, t_full.yMin + t_handHalf.y, t_full.yMax - t_handHalf.y);
-            this.hand.anchoredPosition = t_handPos;
+            this.hand.anchoredPosition = t_center + new Vector2(0f, t_handHalf.y) + this.handOffset;
         }
 
         PlaceMessage(t_full, t_min.y, t_max.y);
@@ -409,7 +405,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
             m_promotedCanvas.additionalShaderChannels = t_root.additionalShaderChannels;
         }
 
-        m_addedRaycaster = t_go.GetComponent<GraphicRaycaster>() == null;
+        // 메시지 모드는 딤 탭이 유일한 완료 경로다 — 레이캐스터를 붙이면 승격된 영역이 탭을 삼켜 진행이 막힌다.
+        // 중첩 Canvas에 레이캐스터가 없으면 그 아래 그래픽은 레이캐스트에서 빠져 탭이 딤까지 내려간다(보이기만 한다).
+        m_addedRaycaster = !m_confirmMode && t_go.GetComponent<GraphicRaycaster>() == null;
         if (m_addedRaycaster) t_go.AddComponent<GraphicRaycaster>();
 
         m_promoted = true;
