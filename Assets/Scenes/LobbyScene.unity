@@ -630,6 +630,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2321662189057112647, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: purchaseFlash.burstSprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 36ac48352a1534c0a8ea272586c70954, type: 3}
     - target: {fileID: 3535906181901233073, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

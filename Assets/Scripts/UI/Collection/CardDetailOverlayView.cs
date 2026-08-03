@@ -84,7 +84,7 @@ public class CardDetailOverlayView : MonoBehaviour
         Open(new[] { _card }, 0);
     }
 
-    /// <summary>_cards[_index]의 상세를 띄우고, 좌우로 같은 목록 안을 넘겨볼 수 있게 한다.
+    /// <summary>_cards[_index]의 상세를 띄우고, 좌우로 같은 목록 안을 순환하며 넘겨볼 수 있게 한다.
     /// _cards는 "화면에 보이는 순서" 그대로여야 한다 — 넘기는 방향과 도감 배열이 어긋나면 길을 잃는다.
     /// null 슬롯(미authoring 카드)은 그대로 넘겨도 된다. 넘기기가 알아서 건너뛴다.</summary>
     public static void Open(IReadOnlyList<CardData> _cards, int _index)
@@ -201,14 +201,12 @@ public class CardDetailOverlayView : MonoBehaviour
         // m_cards만 새 목록이 되고 m_index는 이전 목록 기준으로 남아 화살표·넘기기가 엉뚱한 자리를 가리킨다.
         //
         // 요청 위치가 비었으면(드리프트로 null 슬롯) 가장 가까운 유효 카드로 물러선다 — 빈 상세를 띄우느니 낫다.
+        // 탐색이 순환하므로 한 방향만 봐도 목록 전체를 훑는다(전부 null일 때만 -1).
         int t_index = Mathf.Clamp(_index, 0, _cards.Count - 1);
         if (_cards[t_index] == null)
         {
-            int t_fallback = FindValidIn(_cards, t_index, 1);
-            if (t_fallback < 0) t_fallback = FindValidIn(_cards, t_index, -1);
-            if (t_fallback < 0) return;
-
-            t_index = t_fallback;
+            t_index = FindValidIn(_cards, t_index, 1);
+            if (t_index < 0) return;
         }
 
         this.m_cards = _cards;
@@ -235,14 +233,17 @@ public class CardDetailOverlayView : MonoBehaviour
     void OnPrevPressed() => Step(-1);
     void OnNextPressed() => Step(1);
 
-    // 그 방향의 다음 "유효" 카드로 한 칸. 순환하지 않으므로 끝에서는 아무 일도 일어나지 않는다
-    // (끝에서 반대편으로 튀면 어디까지 봤는지 감각이 끊긴다).
+    // 그 방향의 다음 "유효" 카드로 한 칸. 목록 끝에서는 반대편 끝으로 이어진다(순환) —
+    // 상점 캐러셀(PackCarouselView)과 같은 규약이라 두 화면의 손맛이 갈리지 않는다.
     void Step(int _dir)
     {
         if (_dir == 0) return;
 
         int t_next = FindValid(this.m_index + _dir, _dir);
-        if (t_next < 0) return;
+
+        // 한 바퀴 돌아 제자리면(유효 카드가 지금 이 한 장뿐) 아무 일도 하지 않는다 —
+        // 같은 카드에 슬라이드만 걸면 화면이 이유 없이 흔들린다.
+        if (t_next < 0 || t_next == this.m_index) return;
 
         this.m_index = t_next;
         PlaySlide(CardAt(t_next), _dir);
@@ -332,22 +333,21 @@ public class CardDetailOverlayView : MonoBehaviour
         if (this.m_slideGroup == null) this.m_slideGroup = this.slideTarget.gameObject.AddComponent<CanvasGroup>();
     }
 
-    // 유효한 이웃이 없는 쪽 화살표는 죽이고, 넘길 카드가 아예 없으면(1장짜리) 양쪽을 통째로 숨긴다.
+    // 순환이라 끝이 없으므로 양쪽 화살표는 항상 살아 있다 — 넘길 카드가 아예 없을 때(1장짜리)만 통째로 숨긴다.
+    // interactable을 매번 다시 세우는 이유는 Hide()가 퇴장 중 입력을 죽여두기 때문이다(다시 열 때 여기서 되살아난다).
     void RefreshArrows()
     {
         bool t_multi = HasMultipleCards();
-        bool t_prev  = t_multi && FindValid(this.m_index - 1, -1) >= 0;
-        bool t_next  = t_multi && FindValid(this.m_index + 1,  1) >= 0;
 
         if (this.prevButton != null)
         {
             this.prevButton.gameObject.SetActive(t_multi);
-            this.prevButton.interactable = t_prev;
+            this.prevButton.interactable = t_multi;
         }
         if (this.nextButton != null)
         {
             this.nextButton.gameObject.SetActive(t_multi);
-            this.nextButton.interactable = t_next;
+            this.nextButton.interactable = t_multi;
         }
 
         if (this.swipeDetector != null) this.swipeDetector.Interactable = t_multi;
@@ -361,14 +361,33 @@ public class CardDetailOverlayView : MonoBehaviour
     }
 
     // 아직 m_cards에 대입하기 전의 후보 목록에도 같은 판정을 쓰기 위해 목록을 인자로 받는다(Show 참고).
+    //
+    // 끝에 닿으면 반대편으로 감는다(순환). 그래서 종료 조건을 "범위를 벗어남"에 맡길 수 없다 —
+    // 전부 null인 목록에서 영원히 돈다. 대신 **자기 자신을 포함해 Count칸만** 보고 끊는다.
+    // _from은 음수·Count 이상이어도 되게 미리 접는다(Step이 m_index±1을 그대로 넘긴다).
     static int FindValidIn(IReadOnlyList<CardData> _cards, int _from, int _dir)
     {
         if (_cards == null || _dir == 0) return -1;
 
-        for (int t_i = _from; t_i >= 0 && t_i < _cards.Count; t_i += _dir)
+        int t_count = _cards.Count;
+        if (t_count == 0) return -1;
+
+        int t_i = Wrap(_from, t_count);
+
+        for (int t_n = 0; t_n < t_count; t_n++)
+        {
             if (_cards[t_i] != null) return t_i;
 
+            t_i = Wrap(t_i + _dir, t_count);
+        }
+
         return -1;
+    }
+
+    // 0.._count-1로 접는다. C#의 %는 음수를 음수로 남기므로 한 번 더 더해야 한다.
+    static int Wrap(int _value, int _count)
+    {
+        return ((_value % _count) + _count) % _count;
     }
 
     // 유효 카드가 2장 이상인지. 전체를 세지 않고 2장째에서 끊는다.

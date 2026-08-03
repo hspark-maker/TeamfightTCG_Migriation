@@ -8,6 +8,8 @@
 
 | 날짜 | 변경 | 승인 |
 |---|---|---|
+| 2026-08-04 | **도감 카드 상세 넘기기를 순환(loop)으로 전환 (✅ 코드+컴파일 0에러 / Play 검증 대기)** — 끝단에서 막히던 방식을 폐기하고 마지막 ↔ 첫 카드를 잇는다(상점 캐러셀 `PackCarouselView`와 같은 규약이라 두 화면의 감각이 갈리지 않는다). `FindValidIn`이 인덱스를 `Wrap`으로 접고 **자기 자신 포함 `Count`칸만** 순회한다 — 끝에서 감으므로 "범위를 벗어남"을 종료 조건으로 쓰면 전부 null인 목록에서 무한루프가 된다. 유효 카드가 한 장뿐이면 한 바퀴 돌아 제자리를 돌려주므로 `Step`이 `t_next == m_index`를 걸러 헛슬라이드를 막는다. `RefreshArrows`는 끝단 판정이 사라져 **양쪽 항상 활성**(1장짜리만 `SetActive(false)`), `Show`의 null 폴백도 순환 덕에 한 방향 탐색 1회로 축약. **프리팹 재배선 불필요**(필드 무변경) | ✅ |
+| 2026-08-04 | **도감 카드 상세 좌우 넘기기 프리팹 배선 (✅ 코드+검수+컴파일은 선행 세션, 이번에 Unity 프리팹 배선 완료 / Play 검증 대기)** — `CardDetailOverlay.prefab`에 ① 루트에 `HorizontalSwipeDetector` 부착(신규 노드 0 — 딤 `Image(raycastTarget)`가 이미 전면을 덮고, 자식들이 `IDragHandler`를 구현하지 않아 드래그가 루트로 버블링) ② `CardArea/CardPad` 하위에 `Btn_Prev`/`Btn_Next` 신설(90×90, 좌우 끝 세로 중앙, 스프라이트는 `LobbyCanvas`가 이미 쓰는 `Icon_Arrow_Prev1`/`Next1` 재사용, `disabledColor` alpha 0.25) ③ `slideTarget = CardUIView` + `CanvasGroup` 저작. **`slideTarget` 후보가 하나뿐인 이유**: 루트 `VerticalLayoutGroup`이 직계 자식 전부를, `CardSlot`의 `AspectRatioFitter(FitInParent)`가 자기 `anchoredPosition`까지 드라이브해 기준 좌표를 1회 캡처하는 슬라이드와 충돌한다 → 카드 그림만 슬라이드, 딤·닫기·버튼바는 고정(사용자 승인). 상세 → `도감 카드 상세 오버레이` 섹션 | ✅ |
 | 2026-08-04 | **스텝 SO 33개 → 시퀀스 인라인 행 전환 (✅ 이관 완료 27행 + 구 계층 삭제, 컴파일 검증 ✅ / Play 검증 대기)** — 저작 부담 진단에서 출발. 스텝을 SO로 가른 두 근거를 실측 재검증했더니 **재사용은 33개 중 2건**(`Step_MatchEdit`·`Step_DeckBack`)뿐이고, "종류별 필드만 노출"은 드로어로 대체 가능했다. 대가는 파일 66개와 GUID 나열이라 **순서·내용이 보이지 않는 시퀀스**. → 챕터를 인라인한 것과 같은 판단을 스텝에 적용해 `TutorialStepDef`(행) + `TutorialStepExecutor`(액션 switch) + `TutorialStepDefDrawer`(접힘=한 줄 요약, 펼침=액션별 필드)로 접었다. `Completion`·`LeavesScene`·앵커 사용 여부를 **액션에서 파생**시켜 저작 어긋남을 표현 불가능하게 만든 것이 부수 이득. **세이브 스키마·씬 배선 무변경.** 상세 → `G-TUT3` | 사용자 승인(대화) |
 | 2026-08-03 | **3·4편 튜토리얼 덱 동선을 "만들기"에서 "고르기"로 전환 (✅ 코드+에셋+프리팹, Unity 컴파일·시퀀스 로드·앵커 배선 검증 완료 / Play 검증 대기)** — 기존 3·4편은 매치 편집 화면에서 `Btn_UnequipAll` → `Btn_AutoEquip`으로 덱을 **만들게** 했는데, 그렇게 만든 덱은 세이브에만 남고 **전투는 시나리오 덱으로 돌았다**(`GameInitializer.InitializeSinglePlayerFields`가 튜토리얼일 때 `TutorialConfig.PlayerDeck`을 무조건 주입) — 화면과 실전이 갈린 상태였다. 게다가 `ConfirmEnemyDeck`이 튜토리얼에서 조기 반환해 `DeckConfig.EnemyDeck`이 비어 **상대 6칸이 통째로 접혀 있었다**. **① 덱 정본을 시나리오로 확정** — 팩 pool이 아니라 `TutorialScenarioData.playerDeck`. 전투 필드가 실제로 소비하는 값이라 이것만이 화면=실전을 보장한다(실측: `TutorialScenario3.playerDeck` ≡ `SynergyPack.pool` 6/6 일치, `TutorialScenario2`는 5번째만 불일치 — 저작 드리프트로 남김). **② 신규 `DeckGrantStep`(Auto)** 이 시나리오 덱을 `OwnershipManager.GrantAll` + `DeckSaveManager.TryInsertFront`로 세이브에 지급 → 덱 목록에 "키워드 덱"/"시너지 덱"이 생기고 유저가 **리스트에서 골라** 전투에 나간다. 커밋 선행 불변식 준수(`CommitAdvance` → 실행), `CompleteIfLast`는 성공 뒤에만, 저작 오류는 진행(재시도해도 같음)·일시 실패(레거시 이관 대기·슬롯 포화)는 `Rollback`으로 구분. **③ 지급과 조회의 정규화를 한 곳에** — `DeckSaveManager.TryBuildDeck`(null·중복 제거 후 정확히 `DECK_SIZE`) + `TryFindSlot`(원본을 받아 내부에서 정규화). 갈라 두면 지급한 덱과 셸이 되찾는 좌표가 어긋나 앵커가 사라진다. `TryFindSlot`은 순서 무관 비교다 — 편성 순서만 바꾼 덱을 "다른 덱"으로 보면 중복 지급이 된다. **④ 튜토 덱을 초기 선택에서 제외**(`MatchDeckShell.ResolveSlot`) — `TryInsertFront`가 **항상 슬롯 0**에 넣으므로(압축 불변식) 방치하면 이미 선택된 채로 떠서 "고르기"를 가르칠 수 없다. 대안이 없으면(튜토 덱이 유일한 덱) 그거라도 골라 `-1` 잠김을 피한다. **⑤ 앵커 3종 신규**(15 `MatchDeckMySection` / 16 `MatchDeckEnemySection` / 17 `MatchDeckTutorialDeck`, **enum 끝에만**). 15·16은 `MatchDeckPanel.prefab`에 `TutorialAnchor` 부착(Button 없는 순수 영역 → `MessageStep` 전용, 게이트가 딤+링만 걸고 승격은 안 한다). 17은 런타임 생성 칸이라 `MatchDeckStripController`가 **튜토 덱 칸 하나만** 코드 등록 — 기존 "등록하지 않는다" 주석의 전제(로비와 키 공유)를 신규 전용 키로 해소했고, `Clear()`에서 명시 해제한다(Destroy가 프레임 끝이라 자가치유에 맡기면 그사이 죽을 칸을 가리킨다). **⑥ 상대 덱 진실원은 캐리어 한 곳 유지** — 뷰에 튜토리얼 분기를 넣는 대신 `ConfirmEnemyDeck`이 튜토리얼일 때 `DeckConfig.SetEnemyDeck(TutorialConfig.EnemyDeck)`을 실어준다(뷰 무수정, 이중 진실원 방지). **⑦ 브리지가 Auto 스텝 뒤를 잇게** — `ApplyStepOnce`가 `EnterCurrentStep()` false에서 그냥 끊어, 씬에 남는 자동 스텝의 다음 칸이 무관한 외부 신호(개봉 오버레이 닫힘)에 얹혀 진행되고 있었다. 좌표가 실제로 움직였고 그 스텝이 `LeavesScene=false`일 때만 `m_pendingApply`로 이어 진입(롤백한 스텝을 되풀이하지 않게, 상한 8회 유지). **⑧ 시퀀스**: 3편 12→14칸(`GrantDeck` · `Msg_MyPanel`(15) · `Msg_EnemyPanel`(16) · `SelectDeck`(17) 추가, `DeckUnequipAll`·`DeckAutoEquip_Keyword` 제거), 4편 10칸 유지(`GrantDeck`·`SelectDeck` 추가, `DeckUnequipAll`·`DeckAutoEquip_Synergy` 제거). 편집 화면 설명(`Msg_Collection`·`Msg_DeckSlot`)은 3편에 존치. **⑨ 범위 밖(명시적 후속)**: 선택이 전투 덱을 실제로 바꾸지는 않는다(필드는 여전히 시나리오 고정 — 튜토리얼 게이트가 다른 칸을 막아 실질 노출 없음) · `DeckAutoEquipStep`/`TryGetForcedDeck` 축은 소비자 0으로 남김(되살릴 땐 정본을 시나리오로 통일할 것) · `OutgameTutorialBridge`가 `MatchDeckRoot` 자식인 배치 위험(`showDeckGate=1`이라 이번 흐름은 성립) | ✅ |
 | 2026-08-03 | **로딩 커버를 로비 진입 공통 전환으로 승격 (✅ 코드+프리팹, Unity 컴파일·Resources 로드 검증 완료 / Play 검증 대기)** — 로딩 화면이 **StartScene 부트에서만** 동작하고, 같은 로비로 돌아오는 다른 두 경로(`GameResultPopup.HandleTouch`·`GameInitializer.RunDeckGate` 포기)는 전환 없이 즉시 컷됐다. **① `BootLoadingScreen` → `LoadingCoverView` 개명 + 2모드화**(파일·클래스 동시 개명, `.meta` 동반 이동으로 guid 보존 → 프리팹 배선 무손실. 프리팹의 `m_EditorClassIdentifier`가 이미 `LoadingCoverView`라 오히려 일치가 회복됐다) — 부트 모드는 씬에 저작된 인스턴스(진행도 = `DataLibrary.LoadProgress`, 목적지는 튜토리얼 첫 스텝으로 자판정), 전환 모드는 `LoadScene(scene)`이 Resources에서 띄운 인스턴스(진행도 = `LoadSceneAsync`). **모드 분기는 `m_targetScene`의 null 여부 하나**이고, `Instantiate`가 `Awake`를 그 자리에서 돌리는 반면 `Start`는 프레임 끝에 오므로 정적 진입점의 대입이 항상 분기보다 먼저다. 바 추종 루프는 진행도 공급자만 다른 `CoFillBar(Func<float>)`로 뽑아 공유(최소 노출·추종 속도·타임아웃·홀드·페이드·`finally` 규약 전부 재사용). **② 전환 모드의 요점은 `allowSceneActivation=false`** — 여기서 걸리는 씬은 부트가 이미 데워둔 상태라 로드가 한두 프레임에 끝난다. 활성화를 붙잡지 않으면 바가 차기도 전에 씬이 갈려 **커버가 한 프레임만 번쩍이고 사라진다**(노출 길이를 정하는 건 로드 시간이 아니라 `minDuration`). 그 대가로 `progress`가 0.9에서 멈추므로 `/0.9` 정규화가 짝을 이룬다. **③ 배선점은 `BattleCleanup.LoadScene` 한 곳** — 전투 밖으로 나가는 유일한 통로라 여기 한 줄만 갈면 결과 팝업·덱 게이트 포기가 **호출부 무수정**으로 같은 전환을 탄다. `Run()`(=`DOTween.KillAll`)이 커버 생성보다 **먼저**여야 한다 — 뒤로 가면 커버의 페이드인 트윈까지 걷어간다. **④ 프리팹을 `Assets/Assets/Prefabs/UI/` → `Assets/Resources/UI/LoadingCover.prefab`로 이동** — Addressables가 불가한 이유 둘: `"UIPrefab"` 라벨은 `PooledUIBase`만 등록하고(`DataLibrary.LoadUIPrefab`), 부트 모드는 **그 로드가 끝나기 전에** 화면에 떠 있어야 한다(Resources 선례: `TutorialUIStyle`의 폰트). guid 보존으로 StartScene 인스턴스 무손실. 더불어 StartScene 인스턴스에만 있던 룩 오버라이드(배경 스프라이트·"로딩 중입니다"·폰트/머티리얼)를 **프리팹 원본에 반영** — 안 하면 전투→로비만 프리팹 기본 룩으로 떠 두 화면이 갈린다. **⑤ 등장 페이드인 `fadeInDuration`(0.15초) 추가** — 덮을 이전 화면이 있는 전환 모드 전용(부트는 검은 배경뿐이라 무시). 노출 총합 ≈ 페이드인 0.15 + `minDuration` 1 + 홀드 0.15 + 페이드아웃 0.4. **⑥ 잔존 금지 규약 유지** — 어느 경로로 빠지든 `finally { Reveal() }`. 커버가 남으면 DDOL + `sortingOrder 1000` + `blocksRaycasts`가 이후 **모든 씬을 영구 입력 불가**로 잠근다. 커버를 못 얻는 경우(Resources 누락)엔 경고 후 `SceneManager.LoadScene` 즉시 전환으로 폴백 — 연출 때문에 전환이 막히는 일은 없다. **⑦ 범위 밖(의도)**: 로비→전투 진입은 지금의 `SceneTransitionVideo` 영상 오버레이(`MatchFlowController`) 유지, `BattleCleanup.ReloadScene`(전투 재시작) 무수정 | ✅ |
@@ -340,6 +342,66 @@ sequenceDiagram
 | IRepository · JsonFileRepository · PlayerPrefsRepository | `OutGame/Save/1.Repository/` |
 | UserSaveData 외 값 객체 4종 | `OutGame/Save/2.Domain/` |
 | CurrencyManager · ECurrencyType | `OutGame/Currency/` |
+
+---
+
+### 도감 카드 상세 오버레이 — 좌우 화살표·스와이프 넘기기 (F. UI) — ✅ 코드+검수+프리팹 배선 완료 (2026-08-04, Play 검증 대기)
+
+> 목표: 상세를 닫았다 다시 열지 않고 **도감 배열 순서 그대로** 옆 카드로 넘어간다.
+> **순환**(마지막 ↔ 첫 카드가 이어짐, 상점 캐러셀 `PackCarouselView`와 같은 규약), null 슬롯(authoring 누락)은 넘기기가 건너뛴다. `:::new` = 이번 신규.
+
+```mermaid
+flowchart TD
+    subgraph src["목록 공급자 (화면에 보이는 순서 = 넘기는 순서)"]
+        GRID["CollectionGridController<br/>m_order"]:::new
+        GAL["CollectionGalleryController<br/>m_flat (전 행 이어붙임) + 행별 오프셋"]:::new
+        ROW["CollectionRowView"]
+    end
+
+    subgraph ov["CardDetailOverlay.prefab"]
+        VIEW["CardDetailOverlayView<br/>Open(list, index) · Step(±1)"]
+        SW["HorizontalSwipeDetector<br/>루트에 부착(딤 Image가 raycastTarget)"]:::new
+        PREV["Btn_Prev / Btn_Next<br/>CardPad 하위, 카드 좌우 끝"]:::new
+        SLIDE["CardUIView (slideTarget)<br/>+ CanvasGroup"]:::new
+    end
+
+    GRID -->|"BindTile(tile, m_order, i)"| VIEW
+    GAL -->|"BindTile(tile, m_flat, offset+i)"| ROW --> VIEW
+    SW -->|"OnSwipe(±1)"| VIEW
+    PREV -->|"onClick"| VIEW
+    VIEW -->|"PlaySlide: DOAnchorPosX + DOFade<br/>SetId(this)"| SLIDE
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+```
+
+**흐름 시퀀스 — 갤러리에서 행 끝 카드를 "다음"으로 넘기기**
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant SW as SwipeDetector(루트)
+    participant V as CardDetailOverlayView
+    participant T as DOTween(id=this)
+    participant C as CardUIView(slideTarget)
+
+    U->>SW: 왼쪽으로 드래그 후 뗌
+    SW->>SW: snapRatio 0.22 / flick 700 이중 판정
+    SW->>V: OnSwipe(+1)
+    V->>V: FindValid(m_index+1, +1) — null 슬롯 건너뜀<br/>행 경계는 m_flat이 이미 이어져 있어 그대로 통과<br/>마지막 카드면 Wrap으로 0번 카드에 이어짐
+    V->>T: CancelSlide → DOTween.Kill(this) (연타 인계)
+    T->>C: DOAnchorPosX(base-120, 0.09) + DOFade(0)
+    T->>V: 중간 콜백 → ApplyPending() (카드 교체)
+    T->>C: DOAnchorPosX(base, 0.09) + DOFade(1)
+    V->>V: RefreshArrows() — 순환이라 양쪽 항상 활성(1장짜리만 숨김)
+```
+
+**원리 3줄**
+- **순환 탐색의 종료 조건은 "범위를 벗어남"이 될 수 없다** — 끝에서 감기 때문에 전부 null인 목록에서 영원히 돈다. 그래서 `FindValidIn`은 **자기 자신을 포함해 `Count`칸만** 보고 끊고, 유효 카드가 한 장뿐이면 한 바퀴 돌아 제자리를 돌려주므로 `Step`이 `t_next == m_index`를 걸러 헛슬라이드를 막는다.
+- **`slideTarget`은 레이아웃에 드리븐되지 않는 노드여야 한다.** 기준 좌표를 1회만 캡처하므로 LayoutGroup이 매 프레임 되돌리면 떨린다. 루트가 `VerticalLayoutGroup`, `CardSlot`이 `AspectRatioFitter(FitInParent)`(= anchoredPosition까지 드라이브)라 **자격 있는 기존 노드는 `CardUIView` 하나**뿐이라 이것을 골랐다 → 카드 그림만 슬라이드하고 딤·닫기·버튼바는 고정.
+- **트윈은 `DOKill()`이 아니라 `SetId(this)` + `DOTween.Kill(this)`로 자기 것만 자른다.** 같은 노드에 `PopupTransition`의 등장·퇴장 `DOScale/DOFade`가 걸려 있어 통째로 자르면 스케일이 0.9에 굳는다.
+- **스와이프 감지는 신규 노드 없이 루트에 얹었다.** 자식 그래픽들이 `IDragHandler`를 구현하지 않아(`LongPressDetector`는 PointerDown/Up만) 드래그가 루트로 버블링된다 → 카드·화살표 위에서 끌어도 잡히고, 클릭은 버튼이 먼저 먹는다.
+
+**수정 가능성 높은 지점**: 손맛 임계는 `UI/Input/HorizontalSwipeDetector.cs:24-28`(원본은 상점 캐러셀 `PackCarouselView` — 한쪽만 만지면 두 화면의 감각이 갈라진다) / 슬라이드 거리·시간은 프리팹 `CardDetailOverlayView.slideDistance 120`·`slideDuration 0.18`.
 
 ---
 
