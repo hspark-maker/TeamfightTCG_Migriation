@@ -54,6 +54,16 @@ public class MultiplayerPlayerTurn : TurnBase
         if (t_defCard == null || t_defCard.ownerIndex == t_myIndex) return;
         if (this.forcedAttacker != null && t_attCard != this.forcedAttacker) return;
 
+        // 규칙 백스톱: 도발 필터의 집행을 뷰(CardView.HandleEnemyTap)에만 맡기면 뷰를 우회한 입력이
+        // 규칙을 깬다(멀티는 그 공격이 그대로 상대에게 브로드캐스트되므로 더 위험). 판정은 BattleRules 단독.
+        if (!BattleRules.CanAttack(t_attCard, t_defCard, this.ctx.enemyField.GetActiveCards()))
+        {
+            // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
+            // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
+            CardView.GetView(t_attCard)?.SetArmedVfx(false);
+            return;
+        }
+
         ExecuteAttackAsync(t_attCard, t_defCard).Forget();
     }
 
@@ -78,7 +88,7 @@ public class MultiplayerPlayerTurn : TurnBase
             if (t_attackers.Count > 0) t_attacker = t_attackers[0];
         }
 
-        var t_targets = this.ctx.enemyField.GetValidTargets();          // 도발 우선 + slot 오름차순
+        var t_targets = this.ctx.enemyField.GetValidTargets(t_attacker);   // 도발 우선 + slot 오름차순
         CardInstance t_target = t_targets.Count > 0 ? t_targets[0] : null;
 
         // 방어적: 유효 공격자/타깃 없으면 입력 유지한 채 반환(hang 방지, 다음 tick 재시도).
