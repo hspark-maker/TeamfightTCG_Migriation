@@ -258,6 +258,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1204875450}
   - component: {fileID: 1204875451}
+  - component: {fileID: 1204875452}
   m_Layer: 0
   m_Name: TutorialSystem
   m_TagString: Untagged
@@ -295,6 +296,20 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
   gatePrefab: {fileID: 6510000000000000006, guid: a7c3f21d94b8e4f4a9d05c6b1e73f802, type: 3}
   suppressGuideUI: 0
+--- !u!114 &1204875452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1204875448}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a2b623a73eaabd49b386f62b410532b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TriggeredTutorialBridge
+  data: {fileID: 11400000, guid: af7d8b417cb64f543acba89e6e31e427, type: 2}
+  gatePrefab: {fileID: 6510000000000000006, guid: a7c3f21d94b8e4f4a9d05c6b1e73f802, type: 3}
 --- !u!1 &1242550798
 GameObject:
   m_ObjectHideFlags: 0
@@ -854,6 +869,14 @@ PrefabInstance:
     - target: {fileID: 3749271791714287680, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: -565.6186
+      objectReference: {fileID: 0}
+    - target: {fileID: 3797395670514148879, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: tabs.Array.data[3].tutorialTrigger
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3797395670514148879, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: tabs.Array.data[4].tutorialTrigger
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 3835329262366884807, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.y
