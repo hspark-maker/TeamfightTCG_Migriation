@@ -17,6 +17,10 @@ MonoBehaviour:
     scope: 0
     spec:
       rid: 5071191787478451300
+  - timing: 2
+    scope: 1
+    spec:
+      rid: 5071191787478451301
   references:
     version: 2
     RefIds:
@@ -43,3 +47,16 @@ MonoBehaviour:
         riseHeightRatio: 0.9
         pieceOverlapRatio: 0.25
         landPunch: 0.09
+    - rid: 5071191787478451301
+      type: {class: PopEmblem, ns: , asm: Assembly-CSharp}
+      data:
+        sprite: {fileID: 21300000, guid: 5bc4bc6fcae22c04bbed03b31eb66438, type: 3}
+        duration: 0.7
+        heightRatio: 0.5
+        alpha: 0.85
+        sortingOrder: 2
+        popRatio: 0.3
+        exitRatio: 0.45
+        popScale: 1.25
+        exitScale: 0.85
+        startScale: 1

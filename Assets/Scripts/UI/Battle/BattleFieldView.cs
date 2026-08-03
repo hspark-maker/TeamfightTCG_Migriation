@@ -25,7 +25,7 @@ public class BattleFieldView : MonoBehaviour
 
         // 시너지 표시도 같은 갱신 지점에 붙인다 — 스냅샷(field.Synergy)이 바뀌는 시점이 곧 여기다.
         // 패널은 캔버스에 있고 스스로 등록한다(참조 배선 없음) — 없는 씬에선 조용히 무동작.
-        FieldSynergyPanel.Show(IsLocalSide, this.field.Synergy);
+        FieldSynergyPanel.Show(IsLocalSide, this.field.Synergy, this.field);
     }
 
     /// <summary>이 필드가 로컬 플레이어(화면 아래쪽) 것인가. 표시 위치가 좌우/상하로 갈리는 기준.</summary>
