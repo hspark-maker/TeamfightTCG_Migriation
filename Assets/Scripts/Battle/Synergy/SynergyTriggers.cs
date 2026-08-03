@@ -19,14 +19,23 @@ public static class SynergyTriggers
 {
     // 시너지 효과가 실제 발동한 순간, 발동 주체 self에게 효과 배너 + 카드 배지 pop을 함께 낸다.
     // 순수 UI 피드백(게임상태/RNG 무관, 결정론 무관). 각 효과의 발동 게이트에서 Notify 대신 호출.
-    public static void Fire(CardInstance self, SynergyData synergy)
+    //
+    // 엠블럼은 여기서 무조건 뜨지 않는다 — 시너지마다 "보여줄 순간"이 달라서 SynergyData가 고른다
+    // ([Triggered] 플래그). 배너/배지는 발동 주체 1장 고정이고(스팸 방지), 엠블럼만 범위를 갖는다.
+    // field는 AllMembers 범위 해석에만 쓴다. null이면 그 범위를 못 푸니 self 1장으로 떨어진다.
+    //
+    // 반환값 = 엠블럼을 띄웠는가. 연출이 끝나길 기다렸다가 다음 연출을 잇는 호출부(무리 선피해 → 볼리)가
+    // 이걸 보고 대기 여부를 정한다. 대부분의 호출부는 무시한다(기다릴 게 없는 표시성 발동).
+    public static bool Fire(CardInstance self, SynergyData synergy, BattleField field = null)
     {
-        if (self == null || synergy == null) return;
+        if (self == null || synergy == null) return false;
         // 배너 그림은 카드 초상화가 아니라 시너지 아이콘 — 어느 시너지가 터졌는지가 핵심 정보다.
         // (icon 미배정이면 null 전달 = 기존대로 카드 초상화 폴백)
         CardPassive.Notify(self, synergy.effectDescription, synergy.activeIcon);
         CardView.GetView(self)?.PopSynergyBadge(synergy);       // 발동 주체 카드의 해당 배지 pop
-        SynergyEmblemVfx.Play(self, synergy);                   // 카드 뒤 상징 등장(그림 미배정이면 무동작)
+
+        // 엠블럼 배선(타이밍·범위·몸짓)은 그 시너지의 연출 에셋이 쥔다 — 여기선 "터졌다"만 알린다.
+        return SynergyEmblemVfx.PlayTriggered(self, synergy, field);
     }
 
 
@@ -48,6 +57,9 @@ public static class SynergyTriggers
                 t_effect.OnPlaced(ctx.WithSynergy(t_active.Synergy)).Forget();
             }
         }
+        // [Placed] 배치 엠블럼은 여기서 띄우지 않는다 — 이 디스패처는 ApplyDeckSynergy에서 도는데
+        // 그건 InitializeViews보다 앞이라 CardView가 아직 없다. 발화점은 배치 연출이 끝나는 뷰 쪽
+        // (CardView.PlayDealAnim/PlayDealToSlot → SynergyEmblemVfx.PlayPlaced) 하나뿐이다.
     }
 
     // [TurnBegan] 카드 단위 턴 시작 시 self 소속 활성 시너지 효과 발화.
@@ -227,12 +239,9 @@ public static class SynergyTriggers
                 if (t_effect == null) continue;
                 t_effect.OnEntered(ctx.WithSynergy(t_active.Synergy)).Forget();
             }
-
-            // 그 시너지 소속 카드가 등장한 경우에만 상징을 띄운다 — 디스패처는 비소속 카드에도 돌기 때문에
-            // 게이트가 없으면 아무 카드나 나올 때마다 모든 활성 시너지 엠블럼이 겹쳐 뜬다.
-            if (SynergyApplier.BelongsTo(ctx.self, t_active.Synergy))
-                SynergyEmblemVfx.Play(ctx.self, t_active.Synergy);
         }
+        // 런타임 등장도 "놓이는 순간"이라 [Placed]와 같은 플래그를 쓰고, 발화점도 같은 뷰 쪽 하나다
+        // (등장 카드도 CardAppearSequence로 배치 연출을 탄다). 여기서 또 띄우면 이중이 된다.
     }
 
     // [AfterAttack] 공격 직후 self(공격자) 소속 활성 시너지 효과 발화.

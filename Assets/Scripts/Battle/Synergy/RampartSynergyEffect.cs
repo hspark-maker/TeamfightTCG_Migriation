@@ -20,7 +20,7 @@ public class RampartSynergyEffect : SynergyEffect
     public override void OnAttacked(AttackedCtx _ctx)
     {
         if (_ctx.self == null || _ctx.self.rampartReduction <= 0) return;
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);
     }
 
     public override void OnBoardChanged(BoardCtx _ctx)

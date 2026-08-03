@@ -11,6 +11,6 @@ public class UndeadSynergyEffect : SynergyEffect
     {
         if (_ctx.self == null) return;
         if (_ctx.self.ReviveAtHalf())   // 게임당 1회, 성공 시 제자리 hp 복구
-            SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 부활 성공 시에만 배너+배지 pop(라벨=시너지 설명 통일)
+            SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 부활 성공 시에만 배너+배지 pop(라벨=시너지 설명 통일)
     }
 }

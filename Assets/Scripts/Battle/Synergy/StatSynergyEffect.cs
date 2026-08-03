@@ -26,7 +26,7 @@ public class StatSynergyEffect : SynergyEffect
     // [Placed] 오프닝 배치. 디스패처가 self 소속만 발화하므로 소속 재판정 불필요.
     public override UniTask OnPlaced(SpawnCtx _ctx)
     {
-        FireIfBonusHp(_ctx.self, _ctx.synergy);
+        FireIfBonusHp(_ctx.self, _ctx.synergy, _ctx.field);
         return UniTask.CompletedTask;
     }
 
@@ -34,20 +34,20 @@ public class StatSynergyEffect : SynergyEffect
     public override UniTask OnEntered(SpawnCtx _ctx)
     {
         if (_ctx.self == null || !SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return UniTask.CompletedTask;
-        FireIfBonusHp(_ctx.self, _ctx.synergy);
+        FireIfBonusHp(_ctx.self, _ctx.synergy, _ctx.field);
         return UniTask.CompletedTask;
     }
 
-    void FireIfBonusHp(CardInstance _self, SynergyData _synergy)
+    void FireIfBonusHp(CardInstance _self, SynergyData _synergy, BattleField _field)
     {
         if (_self == null || this.bonusHp <= 0) return;
-        SynergyTriggers.Fire(_self, _synergy);
+        SynergyTriggers.Fire(_self, _synergy, _field);
     }
 
     // [Attacked] 피격. 디스패처가 self 소속만 발화하므로 소속 재판정 불필요.
     public override void OnAttacked(AttackedCtx _ctx)
     {
         if (_ctx.self == null || this.dmgReduction <= 0) return;   // 피해 감소가 없으면 피격과 무관한 스탯
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);
     }
 }

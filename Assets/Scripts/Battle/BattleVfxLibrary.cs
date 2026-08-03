@@ -18,8 +18,11 @@ public enum BattleVfxId
     ExecutionSpark   = 9,   // 처형 발동: 처형자 무기(도끼) **양 끝**에 하나씩
     ExecutionCircle  = 10,  // 처형 발동: 처형자 카드 자리에 한 번
     CunningFog       = 11,  // 교활 퇴장: 카드가 덱으로 돌아가기 직전 자리에 깔리는 안개
-    SwarmProjectile  = 12,  // 무리 선피해: 무리 아군 한 장이 대상에게 쏘는 작은 투사체(수명은 호출부가 관리)
-    FlowWind         = 13,  // 흐름 발동: 그 진영 필드 위로 지나가는 바람(수명은 항목 lifetime)
+    // 12·13은 (사용 안 함) 시너지 고유 연출이라 그 시너지의 SynergyVfxConfig로 옮겼다 —
+    // 여기 남기면 시너지가 늘 때마다 이 enum이 같이 늘고, 값은 직렬화라 되돌릴 수도 없다.
+    // 값 자체는 재사용 금지(기존 에셋에 남아 있을 수 있다).
+    SwarmProjectile  = 12,  // (사용 안 함) → SwarmSynergyVfxConfig.projectile
+    FlowWind         = 13,  // (사용 안 함) → FlowSynergyVfxConfig.wind
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

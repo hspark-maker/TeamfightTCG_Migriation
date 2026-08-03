@@ -97,20 +97,6 @@ MonoBehaviour:
     lifetime: 1.5
     sortingOrder: 20
     alignToDirection: 0
-  - id: 12
-    prefab: {fileID: 2514253928702531489, guid: 408782a724d09aa469c4b861e2918996, type: 3}
-    localOffset: {x: 0, y: 0, z: 0}
-    initialRotation: {x: 0, y: 0, z: 0}
-    lifetime: 1.5
-    sortingOrder: 20
-    alignToDirection: 0
-  - id: 13
-    prefab: {fileID: 1140404083555214, guid: a3f61c94d27b4e0f8b5d9270e4c81fa6, type: 3}
-    localOffset: {x: 0, y: 0, z: 0}
-    initialRotation: {x: 0, y: 0, z: 0}
-    lifetime: 2
-    sortingOrder: 20
-    alignToDirection: 0
   healCurveHeight: 0.8
   healAlternateCurve: 1
   executionSparkOffset: {x: 0.45, y: 0.6}

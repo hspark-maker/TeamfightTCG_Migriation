@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fdcc931ef23aec44a1f01c437d67cb0, type: 3}
+  m_Name: ScaleSynergyVfx
+  m_EditorClassIdentifier: Assembly-CSharp::EmblemOnlySynergyVfxConfig
+  emblems:
+  - timing: 1
+    scope: 0
+    spec:
+      rid: 5071191787478451177
+  - timing: 2
+    scope: 0
+    spec:
+      rid: 5071191787478451178
+  references:
+    version: 2
+    RefIds:
+    - rid: 5071191787478451177
+      type: {class: DropAndShineEmblem, ns: , asm: Assembly-CSharp}
+      data:
+        sprite: {fileID: 21300000, guid: a82fceefc8597974c8f89eb9e152755c, type: 3}
+        duration: 1.1
+        heightRatio: 0.778
+        alpha: 0.806
+        sortingOrder: 2
+        dropRatio: 0.28
+        settleRatio: 0.1
+        shineRatio: 0.37
+        dropHeightRatio: 0.9
+        shineTiltDeg: 25
+        shineWidthRatio: 0.22
+        shineTravelRatio: 0.95
+        shineAlpha: 0.85
+    - rid: 5071191787478451178
+      type: {class: PopEmblem, ns: , asm: Assembly-CSharp}
+      data:
+        sprite: {fileID: 21300000, guid: a82fceefc8597974c8f89eb9e152755c, type: 3}
+        duration: 0.3
+        heightRatio: 0.6
+        alpha: 0.907
+        sortingOrder: 2
+        popRatio: 1
+        exitRatio: 0.74
+        popScale: 1.5
+        exitScale: 0.85
+        startScale: 1.154

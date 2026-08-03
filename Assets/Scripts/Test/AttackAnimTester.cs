@@ -55,10 +55,19 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("돌보미 1인당 회복량(HealVfx 재사용 — 힐러와 같은 연출)")]
     [SerializeField] int caretakerHeal = 1;
 
-    [Tooltip("[G] 엠블럼 테스트에 쓸 시너지 SO. emblem 그림이 배선된 것을 넣는다(비면 무동작)")]
+    // 인게임에선 SynergyData.vfx를 타고 들어가지만, 테스터는 규칙 계층을 안 돌리므로 연출 에셋을 직접 받는다.
+    // (게임 경로와 같은 에셋을 꽂아야 테스트 결과가 인게임과 일치한다 — VfxSlot과 같은 parity 규약.)
+    [Tooltip("[S] 무리 볼리 테스트에 쓸 무리 연출 SO(비면 무동작)")]
+    [SerializeField] SwarmSynergyVfxConfig swarmVfx;
+    [Tooltip("[F] 흐름 바람 테스트에 쓸 흐름 연출 SO(비면 무동작)")]
+    [SerializeField] FlowSynergyVfxConfig flowVfx;
+
+    [Tooltip("[G] 엠블럼 테스트에 쓸 시너지 SO. vfx 에셋에 상징 그림이 배선된 것을 넣는다(비면 무동작)")]
     [SerializeField] SynergyData emblemSynergy;
     [Tooltip("엠블럼을 띄울 아군 슬롯")]
     [Range(0, 2)] [SerializeField] int emblemSlot = 0;
+    [Tooltip("[G]로 볼 타이밍. 시너지마다 타이밍별 몸짓이 다르므로 어느 줄을 볼지 골라야 한다")]
+    [SerializeField] SynergyEmblemTiming emblemTiming = SynergyEmblemTiming.Placed;
 
     [Header("박치기 타이밍(초) / 거리 / 각도  — Play 중 조정 가능")]
     [SerializeField] float windDur    = 0.07f;
@@ -142,10 +151,11 @@ public class AttackAnimTester : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Z)) ExecutionVfx.Play(this.playerFieldView?.GetSlotView(0));
         if (Input.GetKeyDown(KeyCode.C)) PreviewCunningExit().Forget();
         if (Input.GetKeyDown(KeyCode.S)) PreviewSwarmVolley().Forget();
-        if (Input.GetKeyDown(KeyCode.F)) SynergyVfx.PlayFlowWind(this.playerFieldView);
+        if (Input.GetKeyDown(KeyCode.F)) SynergyVfx.PlayFlowWind(this.playerFieldView, this.flowVfx);
         if (Input.GetKeyDown(KeyCode.H)) PreviewCaretakerHeal();
         if (Input.GetKeyDown(KeyCode.G))
-            SynergyEmblemVfx.Play(this.playerFieldView?.GetSlotView(this.emblemSlot), this.emblemSynergy);
+            SynergyEmblemVfx.Play(this.playerFieldView?.GetSlotView(this.emblemSlot),
+                                  this.emblemSynergy, this.emblemTiming);
         if (Input.GetKeyDown(KeyCode.R)) { this.attackVfx.Rescan(); this.hitVfx.Rescan(); t_armedChanged = true; }
         if (Input.GetKeyDown(KeyCode.T)) PullTuningFromConfig();
         if (Input.GetKeyDown(KeyCode.K)) ApplyTuningToConfig();
@@ -300,7 +310,7 @@ public class AttackAnimTester : MonoBehaviour
         for (int i = 0; i < t_damages.Length; i++) t_damages[i] = Mathf.Max(0, this.swarmDamagePerShot);
 
         await SwarmVfx.PlayVolley(t_sources, t_target, t_damages,
-                                  t_target.BoundCard.hp, t_target.BoundCard.bonusHp);
+                                  t_target.BoundCard.hp, t_target.BoundCard.bonusHp, this.swarmVfx);
     }
 
     /// <summary>돌보미: 힐러와 같은 연출(HealVfx)을 아군 전원에게. 발사 주체는 슬롯0.</summary>
@@ -500,6 +510,6 @@ public class AttackAnimTester : MonoBehaviour
         GUI.Label(new Rect(12, 130, 1100, 24),
             "시너지: [S] 무리 볼리(아군 전원 → 적0)   [F] 흐름 바람(아군 필드)   [H] 돌보미 회복(HealVfx 재사용)"
             + $"   [G] 엠블럼({(this.emblemSynergy != null ? this.emblemSynergy.name : "SO 미배선")} → 슬롯{this.emblemSlot})"
-            + "   ※ 무리/흐름은 BattleVfxLibrary에 SwarmProjectile·FlowWind 배선 필요");
+            + "   ※ 무리/흐름은 각 시너지 연출 SO(Swarm/Flow SynergyVfx)를 이 컴포넌트에 꽂아야 함");
     }
 }

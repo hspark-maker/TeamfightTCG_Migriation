@@ -56,11 +56,22 @@ public class CardInstance
     /// <summary>무쌍 광역 피해량. AttackDamage()와 별개 규칙 — 도발/시너지 보정 없는 순수 hp 기준(v1 시맨틱 보존).</summary>
     public int SplashDamage() => UnityEngine.Mathf.FloorToInt(this.hp * 0.5f);
 
-    /// <summary>받는 피해 단일 폴딩 지점. 공격 직격(_isAttackHit=true)일 때만 비늘 감소(-synergyDmgReduction) 적용, 하한 0.
+    /// <summary>피해 감소(비늘/성벽)가 깎아낼 수 있는 하한. 감소가 걸려도 **최소 1은 들어간다** —
+    /// 0까지 떨어지면 그 카드는 그 공격에 대해 완전 무효가 되어 전투가 멈춘다(무적과 구분이 사라진다).
+    /// 원래 0인 피해에는 적용하지 않는다(없던 피해를 만들지 않는다).</summary>
+    const int MinReducedDamage = 1;
+
+    /// <summary>받는 피해 단일 폴딩 지점. 공격 직격(_isAttackHit=true)일 때만 비늘·성벽 감소 적용,
+    /// 하한은 <see cref="MinReducedDamage"/>.
     /// 반격/가시/기타 패시브 피해는 감소 없음(소스를 호출부가 정적 결정 → 양클라 대칭).
     /// Clamp/사망판정/프리뷰/실적용이 모두 이 식을 통과해야 프리뷰↔실제·양클라 일치.</summary>
-    int EffectiveDamage(int _raw, bool _isAttackHit) =>
-        UnityEngine.Mathf.Max(0, _raw - (_isAttackHit ? this.synergyDmgReduction + this.rampartReduction : 0));
+    int EffectiveDamage(int _raw, bool _isAttackHit)
+    {
+        if (_raw <= 0) return 0;   // 없던 피해를 만들지 않는다(0 데미지로 무적을 태우는 경로도 그대로 유지)
+
+        int t_cut = _isAttackHit ? this.synergyDmgReduction + this.rampartReduction : 0;
+        return t_cut > 0 ? UnityEngine.Mathf.Max(MinReducedDamage, _raw - t_cut) : _raw;
+    }
 
     /// <summary>실제 적용 데미지(현재 체력+보너스로 상한). _isAttackHit=공격 직격 소스(비늘 감소 대상, 기본 true).
     /// 반격 맥락 호출부는 false 전달 → 실제 TakeDamage(false)와 프리뷰/계산 일치.</summary>
@@ -72,9 +83,16 @@ public class CardInstance
     public bool WouldDieFrom(int _raw, bool _isAttackHit = true) =>
         !HasKeyword(CardKeyword.Invincible) && EffectiveDamage(_raw, _isAttackHit) >= this.hp + this.bonusHp;
 
-    /// <summary>이 카드가 _defender를 공격할 때 반격을 받는가. 원거리면 무반격, 대상이 표식이면 무반격.</summary>
+    /// <summary>이 카드가 _defender를 공격할 때 반격을 받는가. 원거리면 무반격, 대상이 표식이면 무반격.
+    ///
+    /// **이미 죽어 있는 방어자는 반격하지 않는다.** 공격 개시 전에 죽는 경로가 실재한다 —
+    /// 무리 선피해([BeforeAttack])가 hp를 0으로 만들어도 시체 정리(RemoveDead)는 Execute 안에서야 돌아서,
+    /// 그 사이 방어자는 hp 0인 채 슬롯에 남아 있다. 그 상태로 AttackDamage()를 읽으면 도발 하한(최소 1) 때문에
+    /// **hp 0짜리가 1을 반격**한다. 직격으로 죽는 정상 경로는 이 판정이 피해 적용 **전** 스냅샷이라 영향 없다
+    /// (동시 해결 = 공격 전 수치로 반격).</summary>
     public bool TakesCounterFrom(CardInstance _defender) =>
-        !HasKeyword(CardKeyword.Ranged) && !_defender.HasKeyword(CardKeyword.Mark);
+        _defender != null && _defender.IsAlive
+        && !HasKeyword(CardKeyword.Ranged) && !_defender.HasKeyword(CardKeyword.Mark);
 
     public CardInstance(CardData _data, int _ownerIndex)
     {

@@ -44,8 +44,16 @@ public class CoinFlipUI : MonoBehaviour
     [SerializeField] float glowPulseScale   = 1.10f;   // 안착 후 숨쉬기 배율
     [SerializeField] float glowPulseTime    = 0.9f;
 
+    [Header("반짝임 (안착 직후 1회)")]
+    [SerializeField] float shineTilt     = 25f;     // 띠 기울기(도). 0이면 수직 띠
+    [SerializeField] float shineWidth    = 0.22f;   // 코인 폭 대비 띠 두께
+    [SerializeField] float shineDuration = 0.5f;    // 위→아래로 훑는 시간
+    [SerializeField] float shineAlpha    = 0.9f;    // 띠 밝기(반사광이라 코인보다 진하다)
+
     Vector3 baseScale;
     bool    cached;
+
+    Image shineImage;   // 런타임 생성 — 코인 실루엣 안에서만 보이는 사선 흰 띠
 
     static Sprite s_radialSprite;   // 런타임 생성 방사형 글로우 스프라이트(전 인스턴스 공용)
 
@@ -71,6 +79,7 @@ public class CoinFlipUI : MonoBehaviour
         this.target.localScale       = this.baseScale;
         this.target.localEulerAngles = Vector3.zero;
         HideResult();
+        HideShine();        // 이전 판 반짝임이 남아 회전 중에 번쩍이지 않게
         ShowBackground();   // 딤 배경 페이드인(글로우는 결과 확정 후)
 
         // 항상 짝수 반바퀴 → 정면(upright, 0°)에서 종료. 뒷면이 180°(뒤집힌 채)로 끝나 튀는 문제 방지.
@@ -105,6 +114,9 @@ public class CoinFlipUI : MonoBehaviour
             .SetLink(this.target.gameObject).ToUniTask();
         await this.target.DOScale(this.baseScale, this.popDuration).SetEase(Ease.OutQuad)
             .SetLink(this.target.gameObject).ToUniTask();
+
+        // 금속 반사 1회. 팝이 **끝난 뒤** — 커지는 중에 겹치면 둘 다 묻힌다.
+        await PlayShine();
     }
 
     void SetFace(bool _front)
@@ -112,6 +124,92 @@ public class CoinFlipUI : MonoBehaviour
         if (this.coinImage == null) return;
         Sprite t_s = _front ? this.frontSprite : this.backSprite;
         if (t_s != null && this.coinImage.sprite != t_s) this.coinImage.sprite = t_s;
+    }
+
+    // ── 반짝임 ────────────────────────────────────────────────────
+    // 사선 흰 띠가 코인 위를 위→아래로 한 번 지나간다(시너지 엠블럼 DropAndShine과 같은 그림).
+    // 띠는 코인 실루엣 **안에서만** 보여야 금속 반사로 읽힌다 — UI는 SpriteMask가 안 먹으므로 Mask(스텐실)를 쓴다.
+    //
+    // **Mask를 코인 Image에 직접 걸면 안 된다** — 그러면 코인의 다른 자식(결과 텍스트 등)까지 실루엣 밖이
+    // 통째로 잘려 사라진다. 그래서 코인 스프라이트를 한 장 더 깐 전용 마스크 GO를 만들고 띠만 그 자식에 둔다
+    // (showMaskGraphic=false — 스텐실만 쓰고 그림은 안 그린다. 코인 본체는 원래 Image가 계속 그린다).
+    Image shineMaskImage;
+
+    void EnsureShine()
+    {
+        if (this.shineImage != null || this.coinImage == null) return;
+
+        var t_maskGo = new GameObject("CoinShineMask", typeof(RectTransform));
+        t_maskGo.transform.SetParent(this.coinImage.transform, false);
+        t_maskGo.transform.SetAsFirstSibling();   // 결과 텍스트 등 뒤 형제보다 먼저 그려지게(텍스트가 위)
+
+        var t_maskRt = (RectTransform)t_maskGo.transform;
+        t_maskRt.anchorMin = Vector2.zero;        // 코인 rect에 그대로 맞춘다
+        t_maskRt.anchorMax = Vector2.one;
+        t_maskRt.offsetMin = t_maskRt.offsetMax = Vector2.zero;
+
+        this.shineMaskImage = t_maskGo.AddComponent<Image>();
+        this.shineMaskImage.raycastTarget = false;
+        t_maskGo.AddComponent<Mask>().showMaskGraphic = false;
+
+        var t_go = new GameObject("CoinShine", typeof(RectTransform));
+        t_go.transform.SetParent(t_maskGo.transform, false);
+
+        this.shineImage = t_go.AddComponent<Image>();
+        this.shineImage.sprite        = ShineBandSprite.Get();
+        this.shineImage.raycastTarget = false;
+        this.shineImage.color         = new Color(1f, 1f, 1f, 0f);
+        t_maskGo.SetActive(false);
+    }
+
+    /// <summary>반짝임 1회. 팝(안착)이 **끝난 뒤** 불린다 — 커지는 중에 겹치면 둘 다 묻힌다.
+    /// 호출부가 await 해야 연출이 잘리지 않는다(끝나면 코인을 내리는 흐름이라).</summary>
+    async UniTask PlayShine()
+    {
+        EnsureShine();
+        if (this.shineImage == null) return;
+
+        // 마스크 실루엣 = 지금 보이는 코인 면. SetFace가 스프라이트를 갈아끼우므로 재생 시점에 맞춘다.
+        this.shineMaskImage.sprite = this.coinImage.sprite;
+
+        // 크기는 재생할 때마다 코인 rect에서 다시 잡는다 — 해상도/레이아웃으로 코인이 커져도 띠가 어긋나지 않게.
+        Rect t_coin = ((RectTransform)this.coinImage.transform).rect;
+        var  t_rt   = (RectTransform)this.shineImage.transform;
+
+        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
+        // 기울여도 코인을 완전히 가로지르도록 대각선 길이보다 길게.
+        t_rt.sizeDelta = new Vector2(t_coin.width * this.shineWidth,
+                                     Mathf.Sqrt(t_coin.width * t_coin.width + t_coin.height * t_coin.height) * 1.4f);
+        t_rt.localRotation = Quaternion.Euler(0f, 0f, this.shineTilt);
+
+        float t_travel = t_coin.height * 0.95f;   // 코인 위에서 시작해 아래로 빠져나갈 만큼
+        t_rt.anchoredPosition = new Vector2(0f, t_travel);
+
+        var t_go = this.shineMaskImage.gameObject;
+        t_go.SetActive(true);
+        t_rt.DOKill();
+        this.shineImage.DOKill();
+        this.shineImage.color = new Color(1f, 1f, 1f, 0f);
+
+        float t_dur = Mathf.Max(0.05f, this.shineDuration);
+
+        // 밝기는 양 끝에서 죽는다 — 들어올 때/나갈 때 띠가 잘려 보이지 않게.
+        DOTween.Sequence().SetLink(t_go)
+            .Append(this.shineImage.DOFade(this.shineAlpha, t_dur * 0.3f))
+            .AppendInterval(t_dur * 0.3f)
+            .Append(this.shineImage.DOFade(0f, t_dur * 0.4f));
+
+        await t_rt.DOAnchorPosY(-t_travel, t_dur).SetEase(Ease.InOutSine).SetLink(t_go).ToUniTask();
+        if (t_go != null) t_go.SetActive(false);
+    }
+
+    void HideShine()
+    {
+        if (this.shineImage == null) return;
+        this.shineImage.DOKill();
+        this.shineImage.transform.DOKill();
+        this.shineImage.color = new Color(1f, 1f, 1f, 0f);
+        if (this.shineMaskImage != null) this.shineMaskImage.gameObject.SetActive(false);
     }
 
 
@@ -221,6 +319,7 @@ public class CoinFlipUI : MonoBehaviour
 
     void HideBackdrop()
     {
+        HideShine();
         if (this.backgroundImage != null)
         {
             this.backgroundImage.DOKill();

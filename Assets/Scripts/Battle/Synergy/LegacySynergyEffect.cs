@@ -13,7 +13,7 @@ public class LegacySynergyEffect : SynergyEffect
     {
         if (_ctx.self == null || !_ctx.self.IsAlive) return;
         _ctx.self.legacyStack++;
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 스택 적립 표시
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스택 적립 표시
     }
 
     // 사망: 축적한 스택만큼 아군(자신 제외 라이브) 전원 회복. 스택 0이면 no-op.
@@ -29,6 +29,6 @@ public class LegacySynergyEffect : SynergyEffect
             t_healed = true;
         }
         if (t_healed)
-            SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 실제 회복 발생 시에만 배너+배지 pop
+            SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 실제 회복 발생 시에만 배너+배지 pop
     }
 }

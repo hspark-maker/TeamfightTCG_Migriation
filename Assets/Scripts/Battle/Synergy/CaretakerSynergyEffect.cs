@@ -33,7 +33,7 @@ public class CaretakerSynergyEffect : SynergyEffect
             if (t_view != null) t_healed.Add((t_view, t_amount));
         }
 
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 스폰 주체(self) 기준 1회 배너+배지 pop(동료 전원 반복 금지)
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스폰 주체(self) 기준 1회 배너+배지 pop(동료 전원 반복 금지)
 
         // 힐러와 같은 연출을 재사용 — 회복이면 경로 불문 같은 그림이어야 한다.
         // 발사 주체는 스폰한 돌보미(self). 자기 자신도 대상이라 짧은 호를 그리며 되돌아온다.

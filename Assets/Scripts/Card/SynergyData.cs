@@ -1,5 +1,27 @@
 using UnityEngine;
 
+/// <summary>엠블럼 연출을 띄울 타이밍(복수 선택). **시너지마다 "그 시너지의 순간"이 다르다** —
+/// 무리는 공격 전 선피해가, 성벽은 피격이, 덩치는 배치가 그 순간이라 코드가 한 지점을 못 고른다.
+/// 그래서 발동 지점 자체는 각 효과가 <see cref="SynergyTriggers.Fire"/>로 이미 알리고,
+/// **그중 어느 것을 엠블럼으로 보여줄지만** 이 플래그가 고른다(효과 로직과 연출 선택의 분리).</summary>
+[System.Flags]
+public enum SynergyEmblemTiming
+{
+    None      = 0,
+    Placed    = 1 << 0,   // 필드에 놓이는 순간 — 오프닝 배치(Placed) + 런타임 등장(Entered). 그 카드 1장.
+    Triggered = 1 << 1,   // 효과가 실제로 일한 순간(각 효과의 Fire 지점). 범위는 emblemTriggerScope.
+}
+
+/// <summary>Triggered 타이밍의 대상 범위. Placed는 "그 카드가 놓인 사건"이라 항상 1장이다.</summary>
+public enum SynergyEmblemScope
+{
+    Self       = 0,   // 발동 주체 1장
+    AllMembers = 1,   // 그 필드의 라이브 소속 아군 전원(무리 선피해처럼 전원이 함께 일하는 효과)
+}
+
+// 엠블럼의 움직임 스타일은 enum이 아니라 **타입**이다 — SynergyEmblemSpec의 자식 하나가 몸짓 하나다.
+// (enum이면 몸짓을 늘릴 때 값 추가 + 재생부 switch + 안 쓰는 형태값 칸이 같이 늘어난다.)
+
 [System.Serializable]
 public class SynergyTier
 {
@@ -17,10 +39,14 @@ public class SynergyData : ScriptableObject
     public Sprite activeIcon;   // 배지에 표시할 시너지 아이콘 스프라이트(SynergyBadgeView가 사용)
     public Sprite inactiveIcon;
 
-    // 시너지 발동/등장 시 카드 **뒤쪽**에 크게 떠오르는 상징 그림. 배지 아이콘(activeIcon)과 축이 다르다 —
-    // 저건 상시 표시용 작은 UI 아이콘이고 이건 1회성 대형 연출이라, 같은 그림을 쓰면 둘 중 하나가 반드시 어색해진다.
-    // 비워 두면 그 시너지는 엠블럼 연출 자체를 건너뛴다(무동작 안전).
-    public Sprite emblem;
+    // 이 시너지의 연출 전부(엠블럼 + 고유 연출). **시너지당 에셋 하나**, 타입은 시너지 성격에 따라
+    // SynergyVfxConfig의 자식 중 하나. 비워 두면 이 시너지는 연출 없이 규칙만 돈다(무동작 안전).
+    // 값이 계속 늘어나는 축이라 여기 인라인으로 두면 SynergyData가 연출 값으로 부푼다.
+    public SynergyVfxConfig vfx;
+
+    /// <summary>이 타이밍에 엠블럼을 띄우는가. 연출 에셋/그림 미배정이면 어느 타이밍이든 false(무동작 안전).</summary>
+    public bool PlaysEmblemAt(SynergyEmblemTiming _timing)
+        => this.vfx != null && this.vfx.PlaysEmblemAt(_timing);
 
     /// <summary>UI 틴트용 색. **color 미배정이면 기본값이 (0,0,0,0) = 완전 투명**이라
     /// 그대로 곱하면 아이콘이 사라진다. 알파가 0이면 틴트 없음(흰색)으로 폴백한다.
