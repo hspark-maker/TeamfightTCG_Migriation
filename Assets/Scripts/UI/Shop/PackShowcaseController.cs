@@ -44,6 +44,9 @@ public class PackShowcaseController : MonoBehaviour
     bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
     long m_forcedRefund;
 
+    // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
+    bool m_openPending;
+
     void OnEnable()
     {
         s_transitioning = false;
@@ -73,6 +76,10 @@ public class PackShowcaseController : MonoBehaviour
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  -= Refresh;
         PackOpenOverlay.OnClosed             -= OnOverlayClosed;
+
+        // 임팩트가 화면을 덮기 전에 탭이 꺼지면 시퀀스가 끊겨 개봉 화면을 여는 콜백이 오지 않는다.
+        // 카드는 이미 지급됐으므로 연출은 잃더라도 화면은 반드시 띄운다.
+        OpenOverlay();
     }
 
     // 개봉이 끝나면 다시 살 수 있다. 씬을 떠나던 시절엔 OnEnable이 해주던 일 — 이제 아무도 해주지 않는다.
@@ -212,17 +219,38 @@ public class PackShowcaseController : MonoBehaviour
             // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
             PackHandoff.Set(t_opened, t_pack, SceneManager.GetActiveScene().name, false);
 
-            if (!PackOpenOverlay.TryOpen())
-            {
-                // 구매·소유는 이미 원자 영속됐다 — 잃는 것은 개봉 연출뿐이므로 되돌리지 않고 잠금만 푼다.
-                s_transitioning = false;
-                Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
-            }
+            // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
+            // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
+            m_openPending = true;
+            if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), OpenOverlay);
+            else OpenOverlay();
             return;
         }
 
         // 실패는 차감 없이 반환됨(TryPurchase 보장) — 사유만 안내하고 진열은 그대로 둔다.
         ShowFailPopup(t_opened != null ? t_opened.Result : (EPackOpenResult?)null);
+    }
+
+    // 개봉 화면을 연다. 임팩트가 화면을 덮은 순간 불리고, 그 전에 탭이 꺼지면 OnDisable이 대신 부른다 — 어느 쪽이든 1회.
+    void OpenOverlay()
+    {
+        if (!m_openPending) return;
+        m_openPending = false;
+
+        if (PackOpenOverlay.TryOpen()) return;
+
+        // 구매·소유는 이미 원자 영속됐다 — 잃는 것은 개봉 연출뿐이므로 되돌리지 않고 잠금만 푼다.
+        s_transitioning = false;
+        Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
+    }
+
+    // 임팩트가 반응시킬 팩 노드. 캐러셀이 가리키는 페이지가 곧 방금 산 팩이다(미배선이면 구매 버튼으로 폴백).
+    RectTransform ResolvePackRect()
+    {
+        var t_page = carousel != null ? carousel.CurrentPage : null;
+        if (t_page != null) return t_page;
+
+        return buyButton != null ? (RectTransform)buyButton.transform : null;
     }
 
     // 실패 사유를 사용자 메시지로 갈라 SimpleYNPopup 표시(LobbyMatchLauncher 팝업 관용구).

@@ -10,6 +10,10 @@ public class BattleEntryStep : OutgameTutorialStep
     [Tooltip("전투에 넘길 튜토리얼 시나리오")]
     [SerializeField] TutorialScenarioData scenario;
 
+    [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
+           + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다.")]
+    [SerializeField] bool showDeckGate;
+
     public override EOutgameTutorialAnchor Anchor => anchor;
     public override EOutgameTutorialCompletion Completion => EOutgameTutorialCompletion.Click;
     public override bool LeavesScene => true;
@@ -21,7 +25,7 @@ public class BattleEntryStep : OutgameTutorialStep
         if (scenario == null)
             Debug.LogWarning($"[BattleEntryStep] 스텝 {_context.ChapterIndex}-{_context.StepIndex}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
 
-        TutorialConfig.Begin(scenario);
+        TutorialConfig.Begin(scenario, showDeckGate);
         return true;
     }
 }

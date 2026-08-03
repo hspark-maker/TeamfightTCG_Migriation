@@ -36,6 +36,11 @@ public class GameInitializer : MonoBehaviour
         await UniTask.WaitUntil(() => SceneTransitionVideo.Instance == null
                                    || !SceneTransitionVideo.Instance.IsPlaying);
 
+        // 상대 덱을 게이트보다 **먼저** 확정한다 — 게이트 화면의 상대 섹션이 이 값을 읽어 그린다.
+        // 필드 초기화(InitializeSinglePlayerFields)에서 뽑으면 게이트가 그릴 시점엔 아직 값이 없어
+        // 상대 칸이 빈 채로 뜨고, 화면과 전투가 서로 다른 추첨 결과를 보게 된다.
+        ConfirmEnemyDeck();
+
         // 덱 확인/편집 게이트 — 통과해야 DeckConfig.PlayerDeck이 확정된다.
         // 아래 필드 초기화가 그 값을 소비하므로 반드시 이보다 앞이어야 한다.
         if (!await RunDeckGate()) return;
@@ -75,6 +80,31 @@ public class GameInitializer : MonoBehaviour
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
     }
 
+    /// <summary>상대(AI) 덱 확정. 이 씬에서 상대 덱을 뽑는 유일한 지점이며,
+    /// 결과를 DeckConfig에 실어 게이트 화면과 필드 초기화가 같은 값을 보게 한다.</summary>
+    void ConfirmEnemyDeck()
+    {
+        // 멀티는 상대 덱이 SyncInitialDecks로 훨씬 뒤에 도착한다 — 지금 확정할 수 있는 값이 없다.
+        if (DeckConfig.IsMultiplayer) return;
+
+        // 튜토리얼은 양 덱이 시나리오 고정이다(아래 필드 초기화가 TutorialConfig에서 직접 주입).
+        if (TutorialConfig.IsActive) return;
+
+        // 로비 매칭이 이미 확정해 넘겼으면 그대로 쓴다 — 여기서 다시 뽑으면 로비에서 공개한 패와 어긋난다.
+        if (DeckConfig.HasEnemyDeck) return;
+
+        if (this.aiDeckConfig == null)
+        {
+            Debug.LogWarning("[GameInitializer] aiDeckConfig 미배선 — 상대 덱 없이 전투가 시작된다.");
+
+            return;
+        }
+
+        // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom(셔플 시드)을 소비하지 않으므로
+        // 시드 설정(InitializeSinglePlayerFields)보다 앞에서 뽑아도 결정론에 영향이 없다.
+        DeckConfig.SetEnemyDeck(this.aiDeckConfig.GetRandomDeck());
+    }
+
     /// <summary>전투 시작 전 덱 확인/편집 화면. 반환 false = 유저가 전투를 포기했다 →
     /// 로비로 되돌리고 이 씬의 초기화를 더 진행하지 않는다.</summary>
     async UniTask<bool> RunDeckGate()
@@ -84,7 +114,10 @@ public class GameInitializer : MonoBehaviour
         // 멀티는 한쪽이 덱 화면에 머무는 동안 상대가 타임아웃 없이 대기한다(이탈로도 잡히지 않는다).
         // 매칭 전에 덱이 이미 확정되는 경로라 게이트를 태울 이유도 없다.
         if (DeckConfig.IsMultiplayer) return true;
-        if (TutorialConfig.IsActive)  return true;      // 튜토리얼은 양 덱이 스크립트 고정
+
+        // 튜토리얼은 전투에 넣은 스텝이 정한다(BattleEntryStep/AutoBattleStep의 showDeckGate).
+        // 기본은 끔 — 스크립트 고정 덱 전투는 고를 것이 없어 화면이 의미 없다.
+        if (TutorialConfig.IsActive && !TutorialConfig.ShowDeckGate) return true;
 
         if (await this.matchDeckShell.RunSelectionAsync(this.GetCancellationTokenOnDestroy())) return true;
 
@@ -119,16 +152,16 @@ public class GameInitializer : MonoBehaviour
         if (TutorialConfig.IsActive)
         {
             // 튜토리얼: 양 덱 고정 주입(무셔플=저작 순서가 곧 등장 순서·6장 이하 허용). 적덱 GetRandomDeck 우회.
+            // 덱 게이트(ShowDeckGate)를 켜도 여기는 갈리지 않는다 — 튜토리얼 전투 덱은 언제나 시나리오가 정한다.
             this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None);
             this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None);
         }
         else
         {
             this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match);
-            // 로비 매칭에서 상대 덱을 미리 확정해 넘겼으면 그 값을 쓰고, 아니면 기존대로 랜덤 폴백(기존 MainMenu 경로 유지).
-            var t_enemyDeck = DeckConfig.HasEnemyDeck
-                ? DeckConfig.EnemyDeck
-                : (this.aiDeckConfig?.GetRandomDeck() ?? new System.Collections.Generic.List<CardData>());
+            // 상대 덱은 게이트보다 앞선 ConfirmEnemyDeck이 확정해 뒀다(로비가 넘긴 값이면 그대로 유지된다).
+            // 여기서 다시 뽑지 않는 게 핵심 — 뽑으면 게이트 화면에서 본 상대와 실제 상대가 갈린다.
+            var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<CardData>();
             this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match);
         }
 
