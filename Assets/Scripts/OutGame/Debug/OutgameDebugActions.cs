@@ -28,6 +28,7 @@ public static class OutgameDebugActions
     public static void SkipTutorial()
     {
         OutgameTutorialProgress.Complete();
+        TriggeredTutorialRunner.Abort();   // 트리거 런의 메모리 좌표가 남으면 게이트를 곧바로 다시 세운다
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 
         Debug.Log("[OutgameDebug] 튜토리얼 완료 처리 — 게이트 해제");
@@ -37,7 +38,18 @@ public static class OutgameDebugActions
     public static void ResetTutorial()
     {
         OutgameTutorialProgress.ResetForDebug();
+        TriggeredTutorialRunner.Abort();
         Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
+    }
+
+    // 트리거 튜토리얼(탭 첫 진입 등)만 되돌린다 — 온보딩 진행도·소유·재화는 그대로.
+    public static void ResetTriggeredTutorials()
+    {
+        TriggeredTutorialRunner.Abort();
+        OutgameTutorialProgress.ClearTriggersForDebug();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+
+        Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");
     }
 
     // N편 처음으로 되감기(소유·재화는 유지 — 앞 편에서 받은 카드는 그대로 남는다).
@@ -49,6 +61,7 @@ public static class OutgameDebugActions
         int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
 
         OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
+        TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");

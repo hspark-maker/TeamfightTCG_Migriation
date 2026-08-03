@@ -12,6 +12,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CollectionLayoutConfig collectionLayout;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
+    // 트리거 발화 튜토리얼 목록 SO(탭 첫 진입 등). 미배선(null)이면 트리거는 조용히 발화하지 않는다.
+    [SerializeField] TriggeredTutorialData triggeredTutorialData;
     // 덱 대표 이미지 후보 SO. 미배선(null)이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
     [SerializeField] DeckImageCatalog deckImageCatalog;
     // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선(null)이면 지급을 건너뛴다.
@@ -59,5 +61,6 @@ public class BootInstaller : MonoBehaviour
 
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
+        TriggeredTutorialRunner.EnsureData(triggeredTutorialData);
     }
 }

@@ -2,7 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개, 로비·개봉 씬).
+// 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개).
+// 개봉은 씬이 아니라 로비 오버레이라 재개해 줄 다른 브리지가 없다 — 오버레이 열림/닫힘도 이 브리지가 직접 이어받는다.
 // 씬 이름을 보지 않는다 — 현재 스텝의 앵커가 이 씬에 등록되는 순간에만 게이트가 켜지고, 없으면 조용히 대기한다.
 // 스텝 타입도 보지 않는다 — 어떤 신호를 기다릴지는 스텝의 Completion 하나로 갈린다.
 public class OutgameTutorialBridge : MonoBehaviour
@@ -13,7 +14,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
-    [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 씬 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다.")]
+    [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 화면 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다. 개봉 오버레이가 떠 있는 동안은 이 값과 무관하게 자동 억제된다.")]
     [SerializeField] bool suppressGuideUI;
 
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
@@ -23,6 +24,13 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 억제 모드에서 클릭을 직접 듣는 타깃. 게이트가 없으니 리스너 부착·해제를 브리지가 진다.
     Button m_silentButton;
     bool m_silentDone;
+
+    // 스텝 진입이 오버레이를 열어 ApplyCurrentStep이 자기 자신을 다시 부르는 경로를 막는다(예약 후 재실행).
+    bool m_applying;
+    bool m_pendingApply;
+
+    // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
+    bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
 
     void Awake() => OutgameTutorialRunner.EnsureData(data);
 
@@ -43,25 +51,69 @@ public class OutgameTutorialBridge : MonoBehaviour
         CloseGate();
     }
 
-    // 현재 스텝을 진입시키고, 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
+    // 현재 스텝을 진입시킨다. 재진입(스텝 Enter → 오버레이 열림 → OnOpened)은 버리지 않고 예약한다 —
+    // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
+    {
+        if (!OutgameTutorialRunner.IsRunning) return;   // 온보딩이 끝난 뒤엔 게이트를 건드리지 않는다 — 트리거 튜토리얼이 쓰고 있을 수 있다.
+        if (m_applying) { m_pendingApply = true; return; }
+
+        m_applying = true;
+        try
+        {
+            // 상한: 스텝이 서로를 무한히 재진입시키는 저작 실수로 에디터가 멎지 않게.
+            for (int t_i = 0; t_i < 8; t_i++)
+            {
+                m_pendingApply = false;
+                ApplyStepOnce();
+                if (!m_pendingApply) return;
+            }
+
+            Debug.LogWarning("[OutgameTutorialBridge] 스텝 진입이 반복 재진입해 중단합니다 — 스텝 저작을 확인하세요.");
+        }
+        finally
+        {
+            m_applying     = false;
+            m_pendingApply = false;
+        }
+    }
+
+    // 현재 스텝 1회 진입. 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
+    void ApplyStepOnce()
     {
         // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면(개봉 연출 중의 획득 버튼 등)
         // 옛 안내가 화면에 남는다.
         CloseGate();
 
+        // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
+        OutgameTutorialRunner.TryGetCurrentStep(out var t_entering);
+        int t_beforeChapter = OutgameTutorialProgress.ChapterIndex;
+        int t_beforeStep    = OutgameTutorialProgress.StepIndex;
+
         // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!OutgameTutorialRunner.EnterCurrentStep()) return;
+        if (!OutgameTutorialRunner.EnterCurrentStep())
+        {
+            // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
+            // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
+            // 좌표가 안 움직였으면(= Enter가 롤백했거나 애초에 커밋을 못 했다) 잇지 않는다 — 같은 실패를 되풀이한다.
+            bool t_moved = t_beforeChapter != OutgameTutorialProgress.ChapterIndex
+                        || t_beforeStep    != OutgameTutorialProgress.StepIndex;
+
+            if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+
+            return;
+        }
+
         if (!OutgameTutorialRunner.TryGetCurrentStep(out var t_step)) return;
 
         m_step = t_step;
 
-        // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(CardPack 씬의 팩엔 TutorialAnchor가 없다).
+        // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(개봉 화면의 팩엔 TutorialAnchor가 없다).
         // 그래서 게이트를 건너뛰고 배너만 띄운다. 아래 앵커 조회에 도달하지 않는 유일한 스텝이다.
         // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_step.Completion == EOutgameTutorialCompletion.PackOpen)
         {
-            if (!suppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(m_step.GuideMessage);
+            if (!SuppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(m_step.GuideMessage);
             return;
         }
 
@@ -104,8 +156,8 @@ public class OutgameTutorialBridge : MonoBehaviour
             ? null
             : (Action)OnGateSatisfied;
 
-        // 억제 씬에는 게이트가 없다 → 게이트가 대신 걸어주던 클릭 구독을 브리지가 직접 진다.
-        if (suppressGuideUI)
+        // 억제 중에는 게이트가 없다 → 게이트가 대신 걸어주던 클릭 구독을 브리지가 직접 진다.
+        if (SuppressGuideUI)
         {
             HookSilently(t_button, t_onSatisfied);
             return;
@@ -149,7 +201,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         TryOpenGate();
     }
 
-    // 팩 개봉 신호. 다음 스텝(획득 버튼)이 같은 씬이라 그대로 이어간다.
+    // 팩 개봉 신호. 다음 스텝(획득 버튼)이 같은 씬(오버레이 위)이라 그대로 이어간다.
     void OnPackOpened()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.PackOpen) return;
@@ -157,7 +209,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         OnGateSatisfied();
     }
 
-    // 구매 성공 신호. 곧바로 개봉 씬 로드가 뒤따르므로 커밋만 하고 다음 스텝은 그 씬의 브리지가 재개한다.
+    // 구매 성공 신호. 곧바로 개봉 오버레이가 열리므로 커밋만 하고, 다음 스텝은 OnPackOverlayOpened가 재개한다.
     void OnPurchased()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Purchase) return;
@@ -165,6 +217,11 @@ public class OutgameTutorialBridge : MonoBehaviour
         OutgameTutorialRunner.NotifyStepSatisfied();
         CloseGate();
     }
+
+    // 개봉 오버레이 열림/닫힘. 씬이 바뀌지 않으므로 재개해 줄 새 브리지가 없다 — 이 브리지가 직접 이어간다.
+    void OnPackOverlayOpened() => ApplyCurrentStep();
+
+    void OnPackOverlayClosed() => ApplyCurrentStep();
 
     // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
     void OnGateSatisfied()
@@ -177,9 +234,15 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
         // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(자동 스텝), 곧 사라질 게이트가 한 프레임 깜빡인다(전투 진입).
-        // 두 경우 모두 다음 씬의 브리지가 재개한다.
+        // 방금 완료된 스텝이 씬을 떠났으면 다음 브리지가 재개한다. 자동 스텝이라도 제자리에 남는 것
+        // (개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
+        //
+        // 다음 스텝을 미리 끊는 것은 "진입만으로" 씬을 떠나는 자동 스텝뿐이다 — 클릭을 기다리는 스텝은
+        // LeavesScene이어도 게이트를 걸어 줘야 한다(전투 시작 버튼). 안 걸면 씬이 그대로라 재개해 줄
+        // 브리지가 없고, CloseGate가 m_step을 비워 앵커 등록 통지로도 깨어나지 못한다 = 영구 정지.
         if (t_leftScene
             || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
+                && t_next.LeavesScene
                 && t_next.Completion == EOutgameTutorialCompletion.Auto))
         {
             CloseGate();
@@ -204,6 +267,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
+        PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
+        PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         m_subscribed = true;
     }
 
@@ -214,6 +279,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
+        PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
+        PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         m_subscribed = false;
     }
 }

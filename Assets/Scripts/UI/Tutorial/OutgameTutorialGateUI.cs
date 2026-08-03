@@ -12,7 +12,8 @@ using UnityEngine.UI;
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
-// 메시지 모드(ShowMessageGate)만 (1)의 예외다 — 누를 대상이 아니라 읽을 영역이라 승격·손가락 없이 딤+링만 켠다.
+// 메시지 모드(ShowMessageGate)는 손가락만 빼고 딤+링+승격을 켠다 — 읽을 영역이라도 딤 아래 깔리면
+// 링 안쪽이 어두워져 "여길 보라"가 성립하지 않는다. 대신 승격에 레이캐스터를 달지 않는다(Promote 참조).
 // 완료가 딤 탭 자체라 (2)는 오히려 항상 만족한다.
 //
 // 룩은 프리팹(OutgameTutorialGate.prefab)에서 저작한다. 미배선이면 딤+문구만 코드로 그리는 폴백으로 떨어진다
@@ -21,11 +22,15 @@ public class OutgameTutorialGateUI : MonoBehaviour
 {
     public static OutgameTutorialGateUI Instance { get; private set; }
 
-    // 정렬 불변식: TutorialOverlay(200) < 딤(350) < 타깃(351) < UIPoolManager 팝업(400) < Mulligan(999) < LoadingCover(1000).
-    // 400을 넘기면 안 된다 — 플레이 스텝의 "유효한 덱이 없습니다"(MatchFlowController)와 구매 실패 팝업
+    // 정렬 불변식: TutorialOverlay(200) < 딤(350) < 타깃(351) < 안내 요소(352) < UIPoolManager 팝업(400) < Mulligan(999) < LoadingCover(1000).
+    // 400을 넘기면 안 된다 — 플레이 스텝의 "유효한 덱이 없습니다"(LobbyMatchLauncher)와 구매 실패 팝업
     // (PackShowcaseController)이 딤에 묻히는데, 그때 타깃 버튼은 interactable=true 그대로라 아래 탈출로도 발동하지 않는다.
-    const int GateOrder   = 350;
-    const int TargetOrder = GateOrder + 1;
+    //
+    // 링·손가락·문구가 타깃보다 위인 이유: 딤 위로 승격된 타깃이 자기 위에 겹친 안내를 그대로 덮어버린다.
+    // 딤만 타깃 아래에 남는다 — 딤까지 올리면 타깃이 다시 묻혀 누를 수 없게 된다.
+    const int GateOrder     = 350;
+    const int TargetOrder   = GateOrder + 1;
+    const int OrnamentOrder = TargetOrder + 1;
 
     [Header("표시 요소 (blocker 미배선 = 코드 폴백)")]
     [SerializeField] Image           blocker;       // 전체화면 딤 겸 입력 흡수막
@@ -37,8 +42,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [Header("배치")]
     [Tooltip("링이 타깃보다 얼마나 큰가")]
     [SerializeField] float   ringPadding   = 24f;
-    [Tooltip("타깃 우하단 모서리 기준 손가락 오프셋. 타깃이 딤 위로 올라와 손가락을 덮으므로 바깥쪽으로 뺀다")]
-    [SerializeField] Vector2 handOffset    = new Vector2(70f, -80f);
+    [Tooltip("손끝 미세 보정. 기본 위치는 '타깃 중앙 + 손 높이의 절반'이라 스프라이트 여백만큼만 더 보정하면 된다")]
+    [SerializeField] Vector2 handOffset    = Vector2.zero;
     [Tooltip("타깃과 문구 사이 간격")]
     [SerializeField] float   messageMargin = 36f;
     [Tooltip("문구 전용 모드(타깃 없음)의 하단 여백")]
@@ -49,6 +54,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [SerializeField] float pulseDuration = 0.6f;
 
     RectTransform m_canvasRect;
+    Canvas        m_gateCanvas;   // 중첩 Canvas가 리셋하는 정렬 레이어·셰이더 채널을 복사해 올 원본
     GameObject    m_gateRoot;
 
     readonly Vector3[] m_corners = new Vector3[4];   // GetWorldCorners 재사용 버퍼
@@ -167,8 +173,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     /// <summary>딤 + 문구를 띄우고 화면(딤) 탭으로 넘기는 설명 게이트. <paramref name="_highlight"/>가 있으면 링으로 그 영역을 강조한다.
-    /// 승격·손가락이 없는 것이 이 모드의 계약이다 — 읽을 영역이지 누를 대상이 아니라서, 승격하면 아직 눌러선 안 되는
-    /// 위젯이 튜토리얼 때문에 뚫린다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
+    /// 승격은 하되 레이캐스터 없이 한다 — 링 안쪽이 딤에 묻히면 안 되지만, 읽을 영역이라 눌려서도 안 된다.
+    /// 손가락이 없는 것도 이 모드의 계약이다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
     public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied)
     {
         Release();
@@ -234,6 +240,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         CacheRoots();
         CacheBlockerButton();  // blocker가 확정된 뒤여야 한다(폴백 경로도 여기서 함께 처리된다)
+        LiftOrnaments();       // 승격된 타깃(351)에 안내가 덮이지 않도록 352로 올린다
         NormalizeGraphics();   // 안내 요소의 raycastTarget을 런타임에서 한 번 바로잡는다
         EnsureEventSystem();
 
@@ -269,8 +276,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        if (t_visible && !m_confirmMode) Promote();
-        else                             Demote();
+        if (t_visible) Promote();
+        else           Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -334,17 +341,13 @@ public class OutgameTutorialGateUI : MonoBehaviour
             this.focusRing.anchoredPosition = t_center;
         }
 
-        // 손가락은 타깃 우하단 바깥에 두되, 화면 아래위로 잘리지 않게 세로만 캔버스 안으로 민다
-        // (하단바 탭처럼 타깃이 화면 끝에 붙으면 오프셋 그대로는 손가락 대부분이 화면 밖으로 나간다).
-        // 가로는 클램프하지 않는다 — 옆으로 밀면 딤 위로 승격된 타깃 뒤에 들어가 오히려 사라진다.
+        // 손 이미지를 타깃 중앙에서 자기 높이의 절반만큼 위로 민다 — 손 아래 모서리가 타깃 중앙에 걸린다.
+        // 거기서 handOffset으로 스프라이트 여백을 보정한다(y를 키우면 그만큼 더 뜬다).
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
         {
-            Vector2 t_handPos  = new Vector2(t_max.x, t_min.y) + this.handOffset;
-            float   t_handHalf = this.hand.rect.height * 0.5f;
-
-            t_handPos.y = Mathf.Clamp(t_handPos.y, t_full.yMin + t_handHalf, t_full.yMax - t_handHalf);
-            this.hand.anchoredPosition = t_handPos;
+            Vector2 t_handHalf = this.hand.rect.size * 0.5f;
+            this.hand.anchoredPosition = t_center + new Vector2(0f, t_handHalf.y) + this.handOffset;
         }
 
         PlaceMessage(t_full, t_min.y, t_max.y);
@@ -402,7 +405,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
             m_promotedCanvas.additionalShaderChannels = t_root.additionalShaderChannels;
         }
 
-        m_addedRaycaster = t_go.GetComponent<GraphicRaycaster>() == null;
+        // 메시지 모드는 딤 탭이 유일한 완료 경로다 — 레이캐스터를 붙이면 승격된 영역이 탭을 삼켜 진행이 막힌다.
+        // 중첩 Canvas에 레이캐스터가 없으면 그 아래 그래픽은 레이캐스트에서 빠져 탭이 딤까지 내려간다(보이기만 한다).
+        m_addedRaycaster = !m_confirmMode && t_go.GetComponent<GraphicRaycaster>() == null;
         if (m_addedRaycaster) t_go.AddComponent<GraphicRaycaster>();
 
         m_promoted = true;
@@ -558,6 +563,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         {
             // 정렬값은 저작 대상이 아니다 — 400(팝업) 위로 올라가면 팝업이 딤에 묻혀 하드락이 된다.
             t_canvas.sortingOrder = GateOrder;
+            m_gateCanvas = t_canvas;
             m_canvasRect = t_canvas.GetComponent<RectTransform>();
         }
 
@@ -575,6 +581,36 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (m_blockerButton == null) m_blockerButton = this.blocker.gameObject.AddComponent<Button>();
 
         m_blockerButton.transition = Selectable.Transition.None;
+    }
+
+    // 링·손가락·문구를 승격된 타깃(351)보다 위(352)로 올린다. 게이트 캔버스 그대로 두면 타깃이 딤 위로 올라오면서
+    // 자기 위에 겹친 손가락·링을 덮어버린다(타깃 중앙을 가리키는 손가락이 특히 통째로 사라진다).
+    // blocker는 제외 — 딤까지 올리면 타깃이 다시 딤에 묻혀 누를 수 없게 된다.
+    // GraphicRaycaster는 일부러 붙이지 않는다: 레이캐스터 없는 중첩 Canvas의 그래픽은 레이캐스트 대상에서 아예 빠져
+    // 안내가 타깃 클릭을 가로챌 수 없다(raycastTarget=false와 이중 안전장치).
+    void LiftOrnaments()
+    {
+        LiftAbove(this.focusRing,   m_gateCanvas);
+        LiftAbove(this.hand,        m_gateCanvas);
+        LiftAbove(this.messageRect, m_gateCanvas);
+    }
+
+    static void LiftAbove(Component _ornament, Canvas _root)
+    {
+        if (_ornament == null) return;
+
+        var t_canvas = _ornament.GetComponent<Canvas>();
+        if (t_canvas == null) t_canvas = _ornament.gameObject.AddComponent<Canvas>();
+
+        t_canvas.overrideSorting = true;
+        t_canvas.sortingOrder    = OrnamentOrder;
+
+        // Promote()와 같은 이유 — 중첩 Canvas는 정렬 레이어·셰이더 채널을 기본값으로 리셋해
+        // 복사하지 않으면 문구(TMP)와 그라디언트가 깨진다.
+        if (_root == null) return;
+
+        t_canvas.sortingLayerID           = _root.sortingLayerID;
+        t_canvas.additionalShaderChannels = _root.additionalShaderChannels;
     }
 
     // 안내 요소는 입력을 먹으면 안 된다 — 문구 전용 모드엔 딤이 없어 메시지가 터치를 가로챈다.

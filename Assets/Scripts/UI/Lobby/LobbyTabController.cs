@@ -19,6 +19,7 @@ public class LobbyTabController : MonoBehaviour
         public Image icon;                // 탭 버튼의 아이콘(옵션) — 선택 시 Focus 아이콘으로 스프라이트를 복사한다
         public string label;              // Focus에 표시할 이름(옵션) — 비우면 name을 쓴다
         public EOutgameTutorialAnchor tutorialAnchor;   // 튜토리얼 안내 타깃 키(옵션) — None이면 등록 안 함
+        public EOutgameTutorialTrigger tutorialTrigger; // 첫 진입 1회 튜토리얼 발화 키(옵션) — None이면 발화 안 함
     }
 
     [SerializeField] List<Tab> tabs = new List<Tab>();
@@ -55,11 +56,13 @@ public class LobbyTabController : MonoBehaviour
 
     void Start()
     {
-        this.Select(this.defaultIndex);
+        // 부팅 시 기본 탭 선택은 유저의 "첫 진입"이 아니다 — 발화시키면 아무도 누르지 않은 탭의 튜토리얼이 낭비된다
+        // (도감 서브탭 인스턴스의 초기 선택도 같은 이유로 막힌다).
+        this.Select(this.defaultIndex, false);
     }
 
-    /// 지정 인덱스 탭만 활성화한다.
-    public void Select(int _index)
+    /// 지정 인덱스 탭만 활성화한다. _fireTrigger=false는 유저 이동이 아닌 초기 선택용.
+    public void Select(int _index, bool _fireTrigger = true)
     {
         bool useFocus = (this.focus != null);
 
@@ -76,6 +79,10 @@ public class LobbyTabController : MonoBehaviour
         }
 
         if (useFocus) this.ApplyFocus(_index);
+
+        // 콘텐츠를 켠 뒤에 발화한다 — 안내 타깃(앵커)이 그제서야 등록된다.
+        if (_fireTrigger && _index >= 0 && _index < this.tabs.Count)
+            TriggeredTutorialRunner.Fire(this.tabs[_index].tutorialTrigger);
     }
 
     /// 로비 기본 탭으로 되돌린다. 하위 화면이 "로비로 나가기"를 부를 때 쓴다(탭 인덱스를 밖에 복제하지 않기 위한 창구).

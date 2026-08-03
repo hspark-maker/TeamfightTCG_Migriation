@@ -21,6 +21,7 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] DeckEditCollectionGrid collectionGrid;
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
+    [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
@@ -48,6 +49,15 @@ public class DeckEditController : MonoBehaviour
 
     // 드래그 컨트롤러가 드롭 대상 판정에 쓰는 칸 목록. 미배선(null)이어도 호출측이 터지지 않게 빈 목록을 준다.
     public IReadOnlyList<DeckEditSlotView> Slots => slots ?? Array.Empty<DeckEditSlotView>();
+
+    // 편집 종료 시 어디로 나갈지. 미주입이면 로비 탭 셸(tabController) 경로를 그대로 탄다 —
+    // 로비 배선(LobbyCanvas → Tab_Deck 오버라이드)은 이 필드를 모르는 채 동작이 그대로 유지된다.
+    Action m_onExit;
+
+    // 종료 처리 주입. DeckTabController가 없는 호스트(매치 셸)가 Awake에서 한 번 건다.
+    // OnDisable에서 지우지 않는다 — 이건 편집 상태가 아니라 배선이고, 패널을 껐다 켤 때마다
+    // 다시 주입해야 하면 호스트가 이 패널의 라이프사이클을 추적해야 한다.
+    public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
 
     void Awake()
     {
@@ -106,6 +116,65 @@ public class DeckEditController : MonoBehaviour
         BeginEdit(DeckSaveManager.GetDisplayName(_slotIndex));
     }
 
+    // backButton이 없는 화면(매치 편집 패널)의 종료 창구.
+    // 저장 판정·미완성 팝업·종료 순서를 OnBackClicked 한 곳에만 두기 위해 그쪽으로 넘긴다.
+    public void RequestExit()
+    {
+        // 편집이 열려 있지 않으면 저장할 것도 확인받을 것도 없다 —
+        // 가드가 없으면 빈 m_working이 "미완성"으로 읽혀 엉뚱한 확인 팝업이 뜬다.
+        if (!IsOpen)
+        {
+            ExitEditor();
+
+            return;
+        }
+
+        OnBackClicked();
+    }
+
+    // 편집 화면에 머문 채 다른 저장 슬롯으로 갈아탄다(매치 화면의 가로 덱 리스트).
+    // 6/6이면 조용히 저장하고 미완성이면 이번 편집분을 버린다 — 확인 팝업 없음(매치 화면 정책).
+    // 반환 false = 전환하지 않았다. 호출측이 자기 선택 상태를 되돌릴 수 있어야 한다.
+    public bool SwitchTo(int _slotIndex)
+    {
+        if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return false;
+
+        // 같은 덱 재클릭까지 재로드하면 아직 6/6이 아닌 편집분이 조용히 증발한다.
+        if (m_mode == EDeckEditMode.Edit && _slotIndex == m_slotIndex) return false;
+
+        // 드래그 도중 리스트가 눌릴 수 있다(고스트가 상단을 덮지 않는 배치) — OnBackClicked과 같은 선처리.
+        if (dragController != null && dragController.IsDragging) dragController.Cancel();
+
+        // 신규 저장은 TryInsertFront가 맨 앞에 꽂아 기존 슬롯을 전부 한 칸 뒤로 민다 →
+        // 저장 전 좌표로 열면 유저가 고른 덱이 아니라 이웃 덱이 열린다. 저장 여부를 미리 확정해 좌표를 보정한다.
+        bool t_inserting = m_mode == EDeckEditMode.Create && CountFilled() == DeckSaveManager.DECK_SIZE;
+
+        // 저장에 실패했는데 전환하면 편성한 6장이 조용히 증발한다(OnBackClicked이 화면을 유지하는 것과 같은 이유).
+        if (!SaveIfComplete()) return false;
+
+        int t_target = t_inserting ? _slotIndex + 1 : _slotIndex;
+        if (t_target >= DeckSaveManager.SLOT_COUNT) return false;   // 밀려서 범위를 벗어난 칸은 열 수 없다
+
+        Open(t_target);
+
+        return true;
+    }
+
+    // 6/6일 때만 저장한다. 미완성이면 아무것도 하지 않는다(= 폐기).
+    // 저장 규칙은 SaveNewDeck/SaveEditedDeck을 그대로 쓴다 — 규칙이 두 벌이 되는 순간 매치와 로비가 갈라진다.
+    // 반환 false는 "저장을 시도했는데 실패"(신규 삽입 실패)만을 뜻한다. 저장할 게 없었으면 true다.
+    public bool SaveIfComplete()
+    {
+        if (!IsOpen) return true;
+        if (CountFilled() != DeckSaveManager.DECK_SIZE) return true;
+
+        if (m_mode == EDeckEditMode.Create) return SaveNewDeck();
+
+        SaveEditedDeck();
+
+        return true;
+    }
+
     // 신규 덱 편집 진입. 저장 좌표는 6/6 완성 저장 시점에 TryInsertFront가 정한다.
     public void OpenNew()
     {
@@ -143,7 +212,7 @@ public class DeckEditController : MonoBehaviour
         if (!IsOpen || collectionGrid == null) return;
 
         // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
-        collectionGrid.Build(OnTileDragRequest);
+        collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         RefreshAll();
     }
 
@@ -171,7 +240,7 @@ public class DeckEditController : MonoBehaviour
         m_savedName = _initialName;
         if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
 
-        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest);
+        if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
 
         RefreshAll();
@@ -204,6 +273,25 @@ public class DeckEditController : MonoBehaviour
         if (_tile == null || dragController == null) return;
 
         dragController.Begin(_tile.Card, _data, collectionGrid != null ? collectionGrid.Scroll : null);
+    }
+
+    // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.
+    // 배치는 AssignSlot에 위임한다 — 덱 내 중복 제거·dirty·재갱신을 드래그 드롭과 같은 경로로 태우기 위함이다.
+    void OnTileClicked(DeckEditCardTile _tile)
+    {
+        // 편집이 닫힌 뒤 같은 프레임에 늦게 디스패치될 수 있다(그리드 Clear의 Destroy는 프레임 끝에 반영).
+        // 가드가 없으면 닫힌 편집기의 0번 칸에 카드가 꽂히고 m_dirty까지 선다.
+        if (!IsOpen) return;
+        if (_tile == null || _tile.Card == null) return;
+
+        // 드래그 도중 들어온 클릭은 무시한다. 입력 모듈 쪽 차단(eligibleForClick)이 뚫려도 고스트가 붙은 채
+        // 카드가 칸에 꽂히는 상태는 만들지 않는다.
+        if (dragController != null && dragController.IsDragging) return;
+
+        int t_empty = FindFirstEmpty();
+        if (t_empty < 0) return;   // 6칸이 다 찼다 — 카운터와 자동편성 버튼 비활성으로 이미 드러나 있으므로 조용히 무시
+
+        AssignSlot(t_empty, _tile.Card);
     }
 
     // 편성 칸에 카드를 놓는다. 같은 카드가 이미 다른 칸에 있으면 복사가 아니라 이동이다(덱 내 중복 금지).
@@ -246,6 +334,7 @@ public class DeckEditController : MonoBehaviour
 
     // 자동 편성. 빈 칸만 앞에서부터 메운다(이미 편성한 카드는 건드리지 않는다).
     // AssignSlot을 반복 호출하지 않고 m_working을 직접 채운다 — 덱 내 중복 금지는 아래 중복 스킵이 대신 보장한다.
+    // 채우는 순서는 체력 내림차순이다(마스터 등록 순서가 아니다) — "자동 편성"이 곧 "맨 앞 6장"이 되지 않게.
     public void AutoEquip()
     {
         bool t_changed = false;
@@ -267,10 +356,13 @@ public class DeckEditController : MonoBehaviour
             }
         }
 
-        // 나머지는 마스터 순서대로 소유 카드로 메운다. 카탈로그가 없으면 채울 원본이 없으므로 조용히 넘어간다.
-        if (CardCatalog.IsReady)
+        // 나머지는 소유 카드 중 체력 높은 순으로 메운다. 카탈로그가 없으면 채울 원본이 없으므로 조용히 넘어간다.
+        // 이미 6칸이 찼으면 후보 수집·정렬 자체가 낭비다(버튼은 비활성이지만 이 메서드는 public).
+        if (CardCatalog.IsReady && CountFilled() < DeckSaveManager.DECK_SIZE)
         {
-            var t_cards = CardCatalog.All;
+            var t_cards      = CardCatalog.All;
+            var t_candidates = new List<(CardData card, int order)>(t_cards.Count);
+
             for (int t_i = 0; t_i < t_cards.Count; t_i++)
             {
                 var t_card = t_cards[t_i];
@@ -278,7 +370,21 @@ public class DeckEditController : MonoBehaviour
                 if (!OwnershipManager.IsOwned(t_card)) continue;
                 if (ContainsInWorking(t_card)) continue;
 
-                if (!TryFillFirstEmpty(t_card)) break;
+                t_candidates.Add((t_card, t_i));
+            }
+
+            // 동점을 카탈로그 인덱스로 깬다. List.Sort는 불안정 정렬이라 tiebreak가 없으면
+            // 같은 체력 카드들의 편성 결과가 호출마다 달라진다(유저 눈에는 버튼이 랜덤으로 보인다).
+            t_candidates.Sort((_a, _b) =>
+            {
+                int t_cmp = DeckPower.Of(_b.card).CompareTo(DeckPower.Of(_a.card));
+
+                return t_cmp != 0 ? t_cmp : _a.order.CompareTo(_b.order);
+            });
+
+            for (int t_i = 0; t_i < t_candidates.Count; t_i++)
+            {
+                if (!TryFillFirstEmpty(t_candidates[t_i].card)) break;
                 t_changed = true;
             }
         }
@@ -303,7 +409,8 @@ public class DeckEditController : MonoBehaviour
         if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
 
         int t_filled = CountFilled();
-        if (countText        != null) countText.text = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
+        if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
+        if (totalHpText      != null) totalHpText.text = DeckPower.Of(m_working).ToString();
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE;   // 가득 차면 채울 칸이 없다
     }
@@ -317,18 +424,24 @@ public class DeckEditController : MonoBehaviour
         return t_n;
     }
 
-    // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
-    bool TryFillFirstEmpty(CardData _card)
+    // 앞쪽 빈 칸의 인덱스. 없으면 -1.
+    int FindFirstEmpty()
     {
         for (int t_i = 0; t_i < m_working.Length; t_i++)
-        {
-            if (m_working[t_i] != null) continue;
+            if (m_working[t_i] == null) return t_i;
 
-            m_working[t_i] = _card;
-            return true;
-        }
+        return -1;
+    }
 
-        return false;
+    // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
+    // 자동 편성 전용 — dirty·재갱신은 호출측(AutoEquip)이 순회를 끝낸 뒤 한 번에 처리한다.
+    bool TryFillFirstEmpty(CardData _card)
+    {
+        int t_empty = FindFirstEmpty();
+        if (t_empty < 0) return false;
+
+        m_working[t_empty] = _card;
+        return true;
     }
 
     bool ContainsInWorking(CardData _card)
@@ -347,14 +460,7 @@ public class DeckEditController : MonoBehaviour
         if (CountFilled() == DeckSaveManager.DECK_SIZE)
         {
             // 삽입에 실패한 채 나가면 유저가 편성한 6장이 조용히 증발한다 → 화면을 유지해 재시도 여지를 남긴다.
-            if (m_mode == EDeckEditMode.Create)
-            {
-                if (!SaveNewDeck()) return;
-            }
-            else
-            {
-                SaveEditedDeck();
-            }
+            if (!SaveIfComplete()) return;
 
             ExitEditor();
             return;
@@ -421,9 +527,17 @@ public class DeckEditController : MonoBehaviour
         DeckSaveManager.SaveSlot(m_slotIndex, m_working);
     }
 
-    // 편집 종료. 실제 복귀 지점(로비 기본 탭)은 탭 셸이 정한다 — 여기서는 "나간다"만 알면 된다.
+    // 편집 종료. 실제 복귀 지점은 셸이 정한다 — 여기서는 "나간다"만 알면 된다.
+    // 주입 훅이 우선이고 없으면 로비 탭 셸(기본 탭 복귀)이다. 호스트 의존이 수렴하는 유일한 지점이다.
     void ExitEditor()
     {
+        if (m_onExit != null)
+        {
+            m_onExit();
+
+            return;
+        }
+
         if (tabController != null) tabController.CloseEditor();
     }
 }

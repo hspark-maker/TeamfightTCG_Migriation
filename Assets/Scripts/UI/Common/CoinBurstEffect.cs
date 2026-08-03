@@ -43,7 +43,8 @@ public class CoinBurstEffect : MonoBehaviour
     /// 넘기지 않은 값(_coinCount 음수, 각도 null)은 직렬화된 값을 유지한다.
     /// </summary>
     public void Configure(Sprite _coinSprite, RectTransform _spawnCenter, RectTransform _target,
-                          int _coinCount = -1, float? _angleStart = null, float? _angleSpan = null)
+                          int _coinCount = -1, float? _angleStart = null, float? _angleSpan = null,
+                          float? _scatterRadius = null, float? _gatherDuration = null)
     {
         this.coinSprite  = _coinSprite;
         this.spawnCenter = _spawnCenter;
@@ -51,6 +52,9 @@ public class CoinBurstEffect : MonoBehaviour
         if (_coinCount >= 0) this.coinCount = _coinCount;
         if (_angleStart.HasValue) this.angleStart = _angleStart.Value;
         if (_angleSpan.HasValue) this.angleSpan = _angleSpan.Value;
+        // 출발과 목적지가 멀면 흩어짐은 좁게·수렴은 길게 가야 한다 — 한 인스턴스로 가까운/먼 연출을 오가려면 이 둘도 주입돼야 한다.
+        if (_scatterRadius.HasValue) this.scatterRadius = _scatterRadius.Value;
+        if (_gatherDuration.HasValue) this.gatherDuration = _gatherDuration.Value;
     }
 
     /// <summary>

@@ -16,7 +16,8 @@ public abstract class OutgameTutorialStep : ScriptableObject
     /// <summary>무엇이 이 스텝을 완료시키는가.</summary>
     public abstract EOutgameTutorialCompletion Completion { get; }
 
-    /// <summary>완료가 씬 전환을 부른다 → 같은 씬에서 다음 스텝을 이어 걸지 않는다(다음 씬의 브리지가 재개).</summary>
+    /// <summary>완료 뒤 이 씬에서 이어 걸 스텝이 없다 → 같은 씬에서 다음 스텝을 진입시키지 않는다.
+    /// 씬 전환(BattleEntryStep/AutoBattleStep)뿐 아니라 전투가 화면을 넘겨받는 경우(BattleStartStep)도 포함한다.</summary>
     public virtual bool LeavesScene => false;
 
     /// <summary>스텝 진입. 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함(false면 자동 처리·씬 전환으로 이 씬의 할 일은 끝).</summary>

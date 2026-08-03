@@ -11,6 +11,10 @@ public class AutoBattleStep : OutgameTutorialStep
     [Tooltip("전투에 넘길 튜토리얼 시나리오")]
     [SerializeField] TutorialScenarioData scenario;
 
+    [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
+           + "첫 전투는 저장된 덱이 없어 화면에서 전투를 시작할 수 없으므로 반드시 꺼 둔다.")]
+    [SerializeField] bool showDeckGate;
+
     public override EOutgameTutorialCompletion Completion => EOutgameTutorialCompletion.Auto;
     public override bool LeavesScene => true;
 
@@ -25,7 +29,7 @@ public class AutoBattleStep : OutgameTutorialStep
             Debug.LogWarning($"[AutoBattleStep] 스텝 {_context.ChapterIndex}-{_context.StepIndex}('{name}')에 시나리오가 미배선 — 일반 전투로 진입합니다.");
 
         // 양 덱은 TutorialConfig가 고정 주입한다(GameInitializer) → 저장 덱이 없는 첫 실행도 그대로 진입 가능.
-        TutorialConfig.Begin(scenario);
+        TutorialConfig.Begin(scenario, showDeckGate);
         SceneManager.LoadScene(BattleScene);
         return false;
     }

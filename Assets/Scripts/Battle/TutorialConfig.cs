@@ -30,6 +30,11 @@ public static class TutorialConfig
     /// <summary>확정승용 적 체력 오버라이드(>0이면 적 카드 체력을 이 값 이하로). 0=off.</summary>
     public static int EnemyMaxHpOverride { get; private set; }
 
+    /// <summary>이 전투 전에 덱 확인/편집 화면(MatchDeckRoot)을 띄울지. 전투에 넣은 스텝이 정한다.
+    /// 화면을 띄우는 것과 무관하게 전투 덱은 언제나 시나리오 고정이다 — 이 값은 "무엇으로 싸우는가"가 아니라
+    /// "덱 화면을 거쳐 가는가"만 정한다(덱 설정 안내를 이 화면에서 하는 챕터용).</summary>
+    public static bool ShowDeckGate { get; private set; }
+
     /// <summary>플레이어 스텝을 무효로 폐기한 적이 있는가(= 스크립트가 실제 보드와 어긋났다).
     /// 폐기로 큐가 조기에 비면 안내도 없이 턴이 잠기므로, 이 경우 자유 플레이로 빠진다(PlayerTurn).</summary>
     public static bool ScriptDerailed { get; private set; }
@@ -48,12 +53,15 @@ public static class TutorialConfig
     static CardData[] playerBaseline;
     static CardData[] enemyBaseline;
 
-    public static void Begin(TutorialScenarioData _scenario)
+    /// <summary>시나리오로 시작. <paramref name="_showDeckGate"/>는 시나리오가 아니라 <b>스텝</b>의 저작값이다 —
+    /// 같은 시나리오를 게이트 있는 자리와 없는 자리에 다시 쓸 수 있어야 하므로 SO에 두지 않는다.</summary>
+    public static void Begin(TutorialScenarioData _scenario, bool _showDeckGate = false)
     {
         if (_scenario == null) { End(); return; }
         Begin(_scenario.playerDeck, _scenario.enemyDeck, _scenario.playerScript, _scenario.enemyScript,
               _scenario.enableSynergy, _scenario.freePlayAfterScript);
         EnemyMaxHpOverride = _scenario.enemyMaxHpOverride;   // 리스트 Begin이 0으로 리셋한 뒤 시나리오 값 반영.
+        ShowDeckGate       = _showDeckGate;                  // 같은 이유로 리스트 Begin 뒤에 반영.
     }
 
     /// <summary>SO 없이 리스트로 직접 시작(셋업 씬 인스펙터 저작용).</summary>
@@ -65,6 +73,7 @@ public static class TutorialConfig
         SynergyEnabled = _enableSynergy;
         FreePlayAfterScript = _freePlayAfterScript;
         EnemyMaxHpOverride = 0;   // 리스트 직접 시작 기본값(시나리오 Begin이 이후 덮어씀).
+        ShowDeckGate = false;     // 동상. 셋업 씬 저작은 덱을 직접 넣으므로 게이트를 띄울 이유가 없다.
         ScriptDerailed = false;
         playerBaseline = null;
         enemyBaseline  = null;
@@ -81,6 +90,7 @@ public static class TutorialConfig
         SynergyEnabled = false;
         FreePlayAfterScript = false;
         EnemyMaxHpOverride = 0;
+        ShowDeckGate   = false;
         ScriptDerailed = false;
         PlayerDeck   = null;
         EnemyDeck    = null;
