@@ -353,15 +353,11 @@ public class BattleField : MonoBehaviour
         return t_result;
     }
 
-    // Taunt 카드가 있으면 그것만 반환, 없으면 전체 반환.
-    // 판정은 BattleRules.IsTaunt 단독 — CardView의 도발 강조/차단 안내와 같은 함수다.
-    // (구: c.data.HasKeyword → 시너지·패시브가 부여한 도발을 규칙만 못 보고 UI만 보는 이중 진실원)
-    public List<CardInstance> GetValidTargets()
-    {
-        var t_all   = GetActiveCards();
-        var t_taunt = t_all.FindAll(BattleRules.IsTaunt);
-        return t_taunt.Count > 0 ? t_taunt : t_all;
-    }
+    // 이 필드를 공격할 때 유효한 타깃. 필터 규칙(지정 타깃 > 도발 > 전체)은 BattleRules.ValidTargets 단독 —
+    // CardView의 강조/거절 안내와 **같은 함수**다(도발만 보고 지정 타깃을 모르는 이중 진실원 제거).
+    // _attacker는 규칙에 넘겨줄 뿐 여기서 해석하지 않는다(공격자별 규칙이 생기면 BattleRules가 처리).
+    public List<CardInstance> GetValidTargets(CardInstance _attacker = null)
+        => BattleRules.ValidTargets(_attacker, GetActiveCards());
 
     bool HasAnyCard()
     {

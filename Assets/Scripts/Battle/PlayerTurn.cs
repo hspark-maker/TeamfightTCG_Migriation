@@ -424,6 +424,17 @@ public class PlayerTurn : TurnBase
         if (t_defCard == null || t_defCard.ownerIndex == TurnState.LocalOwnerIndex) return;
         if (this.forcedAttacker != null && t_attCard != this.forcedAttacker) return;
 
+        // 규칙 백스톱: 도발/지정 타깃 필터의 집행을 뷰(CardView.HandleEnemyTap)에만 맡기면
+        // 뷰를 우회한 입력이 규칙을 깬다. 판정은 BattleRules 단독 — 위반이면 조용히 무시
+        // (거절 연출·안내는 뷰가 이미 담당). 스텝 소비 전에 검사해야 스크립트가 어긋나지 않는다.
+        if (!BattleRules.CanAttack(t_attCard, t_defCard, this.ctx.enemyField.GetActiveCards()))
+        {
+            // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
+            // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
+            CardView.GetView(t_attCard)?.SetArmedVfx(false);
+            return;
+        }
+
         // 튜토리얼: 스크립트 스텝(공격자 슬롯·타깃 슬롯)과 일치하는 공격만 허용. 불일치 = 입력 무시.
         this.scriptedStepAttack = false;
         if (TutorialConfig.IsActive)
@@ -471,7 +482,9 @@ public class PlayerTurn : TurnBase
             if (t_attackers.Count > 0) t_attacker = t_attackers[0];
         }
 
-        var t_targets = this.ctx.enemyField.GetValidTargets();          // 도발 우선 + slot 오름차순
+        // 지정 타깃(튜토리얼) > 도발 > 전체 + slot 오름차순. 수동 공격(CardView 필터)과 같은 규칙 함수다 —
+        // 자동공격만 ForcedTarget을 모르면 스크립트가 지정한 적이 아닌 카드를 친다.
+        var t_targets = this.ctx.enemyField.GetValidTargets(t_attacker);
         CardInstance t_target = t_targets.Count > 0 ? t_targets[0] : null;
 
         // 방어적: 유효 공격자/타깃 없으면 입력 유지한 채 반환(hang 방지, 다음 tick 재시도).

@@ -11,6 +11,7 @@ public static class BattleCleanup
         ObjectPooler.Flush<UnityEngine.GameObject>();
 
         CardView.Cleanup();
+        TurnState.Reset();
         TurnRunner.Cleanup();
     }
 

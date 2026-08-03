@@ -15,7 +15,7 @@ public enum InputGesture
 /// 턴 진행 중 입력 게이팅 상태 (게임 규칙).
 /// 이전엔 CardView(뷰)의 static 필드에 흩어져 있던 것을 분리한 단일 권위체.
 /// 쓰기: 턴 로직(PlayerTurn / MultiplayerPlayerTurn 등). 조회: CardView 입력 판정, 뷰 표시.
-/// 씬 종료 시 Reset() (CardView.Cleanup에서 호출).
+/// 씬 종료 시 Reset() (BattleCleanup.Run에서 호출).
 /// </summary>
 public static class TurnState
 {
