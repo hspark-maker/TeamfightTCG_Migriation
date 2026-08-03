@@ -30,4 +30,9 @@ public static class DeckConfig
     public static bool IsMultiplayer { get; private set; }
 
     public static void SetMultiplayer(bool _value) => IsMultiplayer = _value;
+
+    /// <summary>씬 종료 시 모드 플래그 해제. 진입점마다 SetMultiplayer(false)를 부르는 규율은
+    /// 진입점 하나를 빠뜨리면 이전 판의 멀티 플래그가 다음 판으로 새어든다 —
+    /// TutorialConfig.End()와 같은 자리(TurnRunner.Cleanup)에서 함께 끄는 것이 단일 규율.</summary>
+    public static void ResetMode() => IsMultiplayer = false;
 }

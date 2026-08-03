@@ -37,6 +37,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
     // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
     bool opponentLeftDuringInit;
 
+    /// <summary>초기화를 계속할 수 없는 상태(이탈이든 상한 초과든). 결과 처리는 둘을 구분한다 —
+    /// <see cref="InitTimedOut"/> 참조.</summary>
+    bool InitAborted => this.opponentLeftDuringInit || this.InitTimedOut;
+
     // 상대 카드 스폰 버퍼 — RPC 순서 보장으로 WaitForOpponentReady 이후 전부 수신됨
     readonly Queue<(int attackerSlot, int defenderSlot, bool cunningSwap)> attackBuffer = new Queue<(int, int, bool)>();
     readonly Queue<CardInstance> enemySpawnBuffer = new Queue<CardInstance>();
@@ -148,8 +152,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
             NetworkGameController.Instance?.SendInitialDeck(t_myIds ?? System.Array.Empty<int>(), this.MyOwnerIndex);
 
             if (!this.enemyDeckReceived)
-                await this.initSyncTcs.Task;
-            if (this.opponentLeftDuringInit) return false;
+                await AwaitInitStep(this.initSyncTcs.Task, "상대 덱 수신");
+            if (InitAborted) return false;
 
             ResetDeckSyncState();
 
@@ -190,13 +194,13 @@ public class MultiplayerTurnRunner : MonoBehaviour
         byte[] t_myCommit = MatchRandom.Hash(t_myNonce);
 
         NetworkGameController.Instance?.SendSeedCommit(t_myCommit);
-        await WaitOpponentCommit();
-        if (this.opponentLeftDuringInit) return false;
+        await AwaitInitStep(WaitOpponentCommit(), "시드 commit");
+        if (InitAborted) return false;
 
         // 상대 commit 확보 후에야 내 nonce 공개
         NetworkGameController.Instance?.SendSeedReveal(t_myNonce);
-        await WaitOpponentReveal();
-        if (this.opponentLeftDuringInit) return false;
+        await AwaitInitStep(WaitOpponentReveal(), "시드 reveal");
+        if (InitAborted) return false;
 
         if (!MatchRandom.VerifyCommit(this.opponentNonce, this.opponentCommit))
             Debug.LogError("[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심");
@@ -237,6 +241,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void SubscribeInitAbort()
     {
         this.opponentLeftDuringInit = false;
+        this.InitTimedOut  = false;
+        this.initDeadline  = Time.realtimeSinceStartup + InitSyncTimeoutSec;
         if (NetworkSession.Instance == null) return;
         NetworkSession.Instance.OnPlayerLeftRoom   += OnInitPlayerLeft;
         NetworkSession.Instance.OnConnectionFailed += OnInitConnectionFailed;
@@ -252,13 +258,58 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void OnInitPlayerLeft(PlayerRef _p)        => HandleInitAbort();
     void OnInitConnectionFailed(string _reason) => HandleInitAbort();
 
-    /// <summary>초기화 중 상대 이탈: 3 TCS를 멱등 해제해 각 await를 즉시 깨움.</summary>
+    /// <summary>초기화 대기 상한. 이탈·연결실패 콜백은 <see cref="HandleInitAbort"/>가 잡지만,
+    /// 콜백이 아예 오지 않는 경우(스테일 러너로 멀티 오진입, 상대가 조용히 멈춤, 패킷 유실)는
+    /// 아무도 TCS를 풀어주지 않아 전투가 영원히 시작되지 않는다. 그 마지막 구멍을 막는 벽시계 상한이다.</summary>
+    public const float InitSyncTimeoutSec = 20f;
+
+    /// <summary>초기화 전체(덱 교환 + 시드 commit-reveal)에 걸리는 **하나의** 데드라인.
+    /// 단계마다 상한을 따로 걸면 최악 대기가 단계 수만큼 곱해져 사용자가 잠긴 화면에 몇 분씩 갇힌다.</summary>
+    float initDeadline;
+
+    /// <summary>초기화가 상한 초과로 끝났는가. **상대 이탈과 구분해야 한다** —
+    /// 이탈은 부전승(보상 지급)이지만 타임아웃은 내 쪽 문제일 수 있어 보상을 주면 안 된다.
+    /// 양쪽이 동시에 타임아웃 나면 둘 다 승리+보상이 되어 랭크·골드가 부풀어 오른다.</summary>
+    public bool InitTimedOut { get; private set; }
+
+    /// <summary>초기화 단계 대기 + 공용 데드라인. 초과하면 대기를 깨우고 타임아웃으로 표시한다.</summary>
+    async UniTask AwaitInitStep(UniTask _wait, string _what)
+    {
+        float t_left = this.initDeadline - Time.realtimeSinceStartup;
+        if (t_left > 0f)
+        {
+            int t_timedOut = await UniTask.WhenAny(
+                _wait,
+                UniTask.Delay(System.TimeSpan.FromSeconds(t_left), ignoreTimeScale: true));
+            if (t_timedOut != 1) return;
+        }
+
+        Debug.LogError($"[MultiInit] {_what} 대기가 초기화 상한({InitSyncTimeoutSec}초)을 넘겼다. 초기화 중단.");
+        this.InitTimedOut = true;
+        ReleaseInitWaits();
+    }
+
+    /// <summary>초기화 중 상대 이탈: 대기를 깨우고 **이탈**로 표시.</summary>
     void HandleInitAbort()
     {
         this.opponentLeftDuringInit = true;
+        ReleaseInitWaits();
+    }
+
+    /// <summary>3 TCS를 멱등 해제해 각 await를 즉시 깨운다.
+    /// 해제한 TCS는 비운다 — 안 비우면 뒤늦게 도착한 RPC가 이미 완료된 TCS를 풀며
+    /// "TCS냐 플래그냐" 분기(OnSeedCommitReceived)와 상태가 어긋난다.</summary>
+    void ReleaseInitWaits()
+    {
         this.initSyncTcs?.TrySetResult();
-        this.seedCommitTcs?.TrySetResult();
-        this.seedRevealTcs?.TrySetResult();
+
+        UniTaskCompletionSource t_commit = this.seedCommitTcs;
+        this.seedCommitTcs = null;
+        t_commit?.TrySetResult();
+
+        UniTaskCompletionSource t_reveal = this.seedRevealTcs;
+        this.seedRevealTcs = null;
+        t_reveal?.TrySetResult();
     }
 
     // ── 대기 API ───────────────────────────────────────────────────────────

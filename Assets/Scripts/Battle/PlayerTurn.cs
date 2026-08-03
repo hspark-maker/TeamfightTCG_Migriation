@@ -159,45 +159,11 @@ public class PlayerTurn : TurnBase
         return true;
     }
 
-    /// <summary>
-    /// 큐 앞의 "선행 안내 + 공격 스텝 1개"를 한 묶음으로 보고, 실행 불가한 묶음을 통째로 조용히 폐기한다.
-    /// 안내까지 함께 버리는 이유: 죽은 카드를 설명하는 문구가 뜨는 것 자체가 버그다.
-    /// 공격 스텝이 더 없는 꼬리(안내만 남음)는 손대지 않는다 — 마무리 문구는 그대로 보여준다.
-    /// </summary>
+    /// <summary>실행 불가한 "선행 안내 + 공격 스텝" 묶음을 통째로 폐기(플레이어 큐).
+    /// 판정·폐기 규칙은 <see cref="TutorialStepGate"/> 단독 — 적 턴과 기준이 갈리지 않게.</summary>
     void DiscardUnplayableSteps()
-    {
-        while (true)
-        {
-            int t_ahead = 0;
-            while (TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_lead)
-                   && t_lead.kind != TutorialScenarioData.StepKind.Attack)
-                t_ahead++;
-
-            if (!TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_attack)) return;   // 남은 공격 스텝 없음
-            if (IsAttackStepPlayable(t_attack)) return;                                 // 유효 묶음 도달
-
-            Debug.LogWarning($"[Tutorial] 플레이어 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
-                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
-            for (int i = 0; i <= t_ahead; i++) TutorialConfig.DiscardPlayerStep();
-        }
-    }
-
-    /// <summary>튜토리얼 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). 도발 필터는 의도적 미적용.</summary>
-    bool IsAttackStepPlayable(TutorialScenarioData.ScriptedAttack _step)
-    {
-        // 자유공격: 생존 아군·적이 각각 1장 이상이면 실행 가능(슬롯 무관).
-        if (IsFreeStep(_step))
-            return this.ctx.playerField.GetActiveCards().Count > 0
-                && this.ctx.enemyField.GetActiveCards().Count > 0;
-        if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
-        CardInstance t_atk = this.ctx.playerField.GetSlot(_step.attackerSlot);
-        CardInstance t_def = this.ctx.enemyField.GetSlot(_step.targetSlot);
-        if (t_atk == null || !t_atk.IsAlive || t_def == null || !t_def.IsAlive) return false;
-        // 생존만으론 부족하다 — 죽은 카드 자리를 대기 카드가 채우면 슬롯 지정이 엉뚱한 카드에 붙는다.
-        // 스크립트가 그 슬롯에서 기대한 카드와 실제 점유 카드가 다르면 실행 불가로 본다.
-        return TutorialConfig.MatchesPlayerBaseline(_step.attackerSlot, t_atk)
-            && TutorialConfig.MatchesEnemyBaseline(_step.targetSlot, t_def);
-    }
+        => TutorialStepGate.DiscardUnplayable(TutorialStepGate.Side.Player,
+                                              this.ctx.playerField, this.ctx.enemyField);
 
     /// <summary>튜토리얼: 공격 스텝을 오버레이에 안내(문구+공격자/타깃 하이라이트+드래그 포인터).
     /// 추가로 스크립트 공격자를 <see cref="TurnState.ForcedAttacker"/>로 지정 → (1)다른 카드 입력 차단
@@ -409,11 +375,10 @@ public class PlayerTurn : TurnBase
         TurnState.InputAllowed   = true;
     }
 
-    static bool InSlotRange(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
+    static bool InSlotRange(int _slot) => TutorialStepGate.InSlotRange(_slot);
 
     /// <summary>자유공격 스텝: 공격자·타깃 슬롯 둘 다 -1 → 강제 지정 없이 아무 카드로 아무 적을 공격 가능.</summary>
-    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step)
-        => _step.attackerSlot < 0 && _step.targetSlot < 0;
+    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step) => TutorialStepGate.IsFreeStep(_step);
 
     void HandleCardViewAttack(CardView _attacker, CardView _target)
     {
@@ -423,6 +388,17 @@ public class PlayerTurn : TurnBase
         if (t_attCard == null || t_attCard.ownerIndex != TurnState.LocalOwnerIndex) return;
         if (t_defCard == null || t_defCard.ownerIndex == TurnState.LocalOwnerIndex) return;
         if (this.forcedAttacker != null && t_attCard != this.forcedAttacker) return;
+
+        // 규칙 백스톱: 도발/지정 타깃 필터의 집행을 뷰(CardView.HandleEnemyTap)에만 맡기면
+        // 뷰를 우회한 입력이 규칙을 깬다. 판정은 BattleRules 단독 — 위반이면 조용히 무시
+        // (거절 연출·안내는 뷰가 이미 담당). 스텝 소비 전에 검사해야 스크립트가 어긋나지 않는다.
+        if (!this.ctx.enemyField.CanAttack(t_attCard, t_defCard))
+        {
+            // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
+            // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
+            CardView.GetView(t_attCard)?.SetArmedVfx(false);
+            return;
+        }
 
         // 튜토리얼: 스크립트 스텝(공격자 슬롯·타깃 슬롯)과 일치하는 공격만 허용. 불일치 = 입력 무시.
         this.scriptedStepAttack = false;
@@ -471,7 +447,9 @@ public class PlayerTurn : TurnBase
             if (t_attackers.Count > 0) t_attacker = t_attackers[0];
         }
 
-        var t_targets = this.ctx.enemyField.GetValidTargets();          // 도발 우선 + slot 오름차순
+        // 지정 타깃(튜토리얼) > 도발 > 전체 + slot 오름차순. 수동 공격(CardView 필터)과 같은 규칙 함수다 —
+        // 자동공격만 ForcedTarget을 모르면 스크립트가 지정한 적이 아닌 카드를 친다.
+        var t_targets = this.ctx.enemyField.GetValidTargets(t_attacker);
         CardInstance t_target = t_targets.Count > 0 ? t_targets[0] : null;
 
         // 방어적: 유효 공격자/타깃 없으면 입력 유지한 채 반환(hang 방지, 다음 tick 재시도).

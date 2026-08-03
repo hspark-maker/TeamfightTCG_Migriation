@@ -12,7 +12,7 @@ public class CleanerSynergyEffect : SynergyEffect
         int t_heal = _ctx.damageDealt / 2;   // 준 피해의 절반(정수 내림)
         if (t_heal <= 0) return UniTask.CompletedTask;
         _ctx.self.Heal(t_heal);
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)
         return UniTask.CompletedTask;
     }
 }

@@ -9,11 +9,8 @@ public class EnemyTurn : TurnBase
 {
     public EnemyTurn(TurnContext _ctx) : base(_ctx) { }
 
-    static bool InSlotRange(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
-
     /// <summary>자유공격 스텝: 공격자·타깃 슬롯 둘 다 -1 → AI가 대상 선택.</summary>
-    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step)
-        => _step.attackerSlot < 0 && _step.targetSlot < 0;
+    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step) => TutorialStepGate.IsFreeStep(_step);
 
     public override void OnEnter()
     {
@@ -150,43 +147,16 @@ public class EnemyTurn : TurnBase
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
     }
 
-    /// <summary>
-    /// 큐 앞의 "선행 안내 + 공격 스텝 1개"를 한 묶음으로 보고, 실행 불가한 묶음을 통째로 조용히 폐기한다.
-    /// 공격 스텝이 더 없는 꼬리(안내만 남음)는 손대지 않는다. PlayerTurn.DiscardUnplayableSteps와 대칭.
-    /// </summary>
+    /// <summary>실행 불가한 "선행 안내 + 공격 스텝" 묶음을 통째로 폐기(적 큐).
+    /// 판정·폐기 규칙은 <see cref="TutorialStepGate"/> 단독 — 플레이어 턴과 기준이 갈리지 않게.</summary>
     void DiscardUnplayableEnemySteps()
-    {
-        while (true)
-        {
-            int t_ahead = 0;
-            while (TutorialConfig.TryPeekEnemyStep(t_ahead, out var t_lead)
-                   && t_lead.kind != TutorialScenarioData.StepKind.Attack)
-                t_ahead++;
+        => TutorialStepGate.DiscardUnplayable(TutorialStepGate.Side.Enemy,
+                                              this.ctx.enemyField, this.ctx.playerField);
 
-            if (!TutorialConfig.TryPeekEnemyStep(t_ahead, out var t_attack)) return;   // 남은 공격 스텝 없음
-            if (IsEnemyStepPlayable(t_attack)) return;                                 // 유효 묶음 도달
-
-            Debug.LogWarning($"[Tutorial] 적 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
-                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
-            for (int i = 0; i <= t_ahead; i++) TutorialConfig.DiscardEnemyStep();
-        }
-    }
-
-    /// <summary>적 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). PlayerTurn과 대칭.
-    /// 기준선 대조 = 죽은 카드 자리를 채운 다른 카드가 스크립트 공격자/타깃이 되는 것을 막는다.</summary>
+    /// <summary>적 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). 규칙은 <see cref="TutorialStepGate"/>.</summary>
     bool IsEnemyStepPlayable(TutorialScenarioData.ScriptedAttack _step)
-    {
-        // 자유공격: 생존 적·아군이 각각 1장 이상이면 실행 가능(슬롯 무관, 대상은 AI가 선택).
-        if (IsFreeStep(_step))
-            return this.ctx.enemyField.GetActiveCards().Count > 0
-                && this.ctx.playerField.GetActiveCards().Count > 0;
-        if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
-        CardInstance t_atk = this.ctx.enemyField.GetSlot(_step.attackerSlot);
-        CardInstance t_def = this.ctx.playerField.GetSlot(_step.targetSlot);
-        if (t_atk == null || !t_atk.IsAlive || t_def == null || !t_def.IsAlive) return false;
-        return TutorialConfig.MatchesEnemyBaseline(_step.attackerSlot, t_atk)
-            && TutorialConfig.MatchesPlayerBaseline(_step.targetSlot, t_def);
-    }
+        => TutorialStepGate.IsPlayable(TutorialStepGate.Side.Enemy, _step,
+                                       this.ctx.enemyField, this.ctx.playerField);
 
     /// <summary>
     /// 튜토리얼: 큐 앞의 적 Message 스텝을 탭 게이트로 소진. 반환 true = 남은 공격 스텝 존재.

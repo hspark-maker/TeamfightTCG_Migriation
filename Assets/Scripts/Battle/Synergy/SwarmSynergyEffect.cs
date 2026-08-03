@@ -34,7 +34,16 @@ public class SwarmSynergyEffect : SynergyEffect
         // ── 상태 변경은 여기까지. 아래는 전부 표시(await 가능) ──
         // 훅 계약: 첫 await 전에 상태변이 완결 + MatchRandom 미소비.
         _ctx.defender.TakeDamage(t_count, true);   // 선피해도 공격 직격 취급: 비늘 감소 대상. 규칙 전량 TakeDamage 위임.
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 선피해 발동 시에만 배너+배지 pop(스팸 방지)
+        // 선피해 발동 시에만 배너+배지 pop(스팸 방지). ownField를 넘기는 이유: 무리 엠블럼은
+        // AllMembers 범위라 "쏘는 무리 전원"에게 떠야 한다 — 범위 해석에 필드가 필요하다.
+        bool t_emblem = SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);
+
+        // 엠블럼이 다 뜨고 나서 볼리 → 본 공격. 겹쳐 돌리면 "무리가 모였다"는 신호와 발사가 뭉쳐
+        // 둘 다 안 읽힌다. 여기 대기는 표시 전용이다 — 상태는 위에서 이미 확정됐고 RNG도 안 쓴다.
+        float t_wait = t_emblem
+            ? SynergyEmblemVfx.DurationOf(_ctx.synergy, SynergyEmblemTiming.Triggered) : 0f;
+        if (t_wait > 0f)
+            await UniTask.Delay((int)(t_wait * 1000)).SuppressCancellationThrow();
 
         // 무리 카드들이 하나씩 투사체를 쏘고, 다 맞은 뒤에 본 공격 연출이 이어진다.
         // 이 await가 곧 "선피해 먼저, 공격 나중"의 표시 순서다 — 호출부(AttackFlow.RunBeforeAttack)가
@@ -45,8 +54,11 @@ public class SwarmSynergyEffect : SynergyEffect
             CardView t_view = CardView.GetView(t_swarm[i]);
             if (t_view != null) t_views.Add(t_view);
         }
+        // 연출 스펙은 그 시너지의 연출 에셋이 소유한다. 타입이 안 맞게 꽂혔으면 null → 볼리만 생략된다
+        // (피해는 이미 적용된 뒤라 안전하다). 이 캐스트가 "무리 데이터 ↔ 무리 연출"의 유일한 접점이다.
         await SwarmVfx.PlayVolley(t_views, CardView.GetView(_ctx.defender),
-                                  SplitDamage(t_applied, t_views.Count), t_hpBefore, t_bonusBefore);
+                                  SplitDamage(t_applied, t_views.Count), t_hpBefore, t_bonusBefore,
+                                  _ctx.synergy?.vfx as SwarmSynergyVfxConfig);
     }
 
     /// <summary>실제 적용된 총 피해를 발수만큼 정수로 쪼갠다. 나머지는 <b>앞쪽 발</b>에 얹는다 —

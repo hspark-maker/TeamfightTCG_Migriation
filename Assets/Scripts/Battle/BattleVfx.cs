@@ -56,6 +56,32 @@ public static class BattleVfx
         return new VfxHandle(t_poolId, t_go, t_entry.lifetime);
     }
 
+    /// <summary>라이브러리(id)를 거치지 않고 **항목을 직접 받아** 스폰. 배선 지점이 라이브러리가 아니라
+    /// 다른 에셋인 연출용 — 시너지 고유 연출은 그 시너지의 SynergyVfxConfig가 VfxEntry를 들고 있다.
+    /// 스폰/반납/정렬 규약은 여전히 여기 하나뿐이다(id 경로와 같은 코드를 탄다).
+    /// 프리팹이 비어 있으면 무효 핸들 — 호출부는 Valid로 보고 연출을 생략한다.</summary>
+    public static VfxHandle Spawn(VfxEntry _entry, Vector3 _pos, int _sortingLayerId)
+    {
+        if (_entry.prefab == null) return default;
+
+        string t_poolId = _entry.prefab.GetInstanceID().ToString();
+        ParticlePooler.Register(t_poolId, _entry.prefab);
+        GameObject t_go = ParticlePooler.Spawn(t_poolId, _pos + _entry.localOffset,
+                                               Quaternion.Euler(_entry.initialRotation));
+        if (t_go == null) return default;
+
+        ApplySorting(t_go, _sortingLayerId, _entry.sortingOrder);
+        return new VfxHandle(t_poolId, t_go, _entry.lifetime);
+    }
+
+    /// <summary>항목을 직접 받아 1회 스폰하고 수명까지 맡긴다(터지고 사라지는 연출).</summary>
+    public static VfxHandle Play(VfxEntry _entry, Vector3 _pos, int _sortingLayerId)
+    {
+        VfxHandle t_handle = Spawn(_entry, _pos, _sortingLayerId);
+        t_handle.ReleaseAfterLifetime();
+        return t_handle;
+    }
+
     /// <summary>라이브러리를 거치지 않고 **프리팹을 직접** 빌려 쓰는 스폰. 카드마다 다른 연출처럼
     /// 배선 지점이 CardData 쪽인 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
     /// 풀·정렬 규약은 Spawn과 동일하고, 수명은 호출부가 쥔다.</summary>

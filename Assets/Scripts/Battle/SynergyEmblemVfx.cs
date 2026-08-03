@@ -1,97 +1,84 @@
-using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
-/// 시너지 상징(엠블럼)이 카드 <b>뒤쪽</b>에서 떠올라 들썩이다 사라지는 연출.
-/// 발동 지점은 두 곳 — 그 시너지 카드가 배치될 때, 그리고 효과가 실제로 터질 때(SynergyTriggers).
+/// 시너지 상징(엠블럼) 재생의 **진입점**. 발동 지점은 두 곳 —
+/// 그 시너지 카드가 배치될 때([Placed]), 그리고 효과가 실제로 터질 때([Triggered], SynergyTriggers).
 ///
-/// 그림은 SynergyData.emblem 소유(비어 있으면 그 시너지는 이 연출을 건너뛴다).
-/// 시간은 BattleTimingConfig.synergyEmblemDuration 하나 — 아래 비율 상수가 그걸 나눠 쓴다.
-/// 값을 여기 두지 않는 이유: 개별 상수로 흩으면 전역 배속(SpeedFactor)을 우회한다.
+/// 여기엔 "언제 · 누구에게"만 있다. **"어떻게 움직이나"는 SynergyEmblemSpec 자식들이 소유한다**
+/// (RiseAndShakeEmblem / DropAndShineEmblem / PopEmblem). 몸짓이 늘어도 이 파일은 그대로다.
+/// 배선은 SynergyData.vfx.emblems — 그 타이밍을 맡은 줄이 없으면 조용히 건너뛴다.
 ///
-/// **순수 연출** — 게임상태/RNG 무접촉. 카드 계층 밖에 만들어 카드 페이드·DOKill에 얽히지 않게 한다.
+/// 재생 길이도 몸짓(spec)이 쥔다 — 저장은 raw 초, 배속은 spec.Duration에서 곱한다.
 /// </summary>
 public static class SynergyEmblemVfx
 {
-    // 전체 길이를 1로 봤을 때의 구간 비율.
-    const float RiseRatio  = 0.22f;   // 솟아오르며 커지는 구간
-    const float ShakeRatio = 0.48f;   // 들썩이는 구간(웃는 것처럼)
-    // 나머지(0.30)는 사라지는 구간.
+    /// <summary>그 타이밍을 맡은 줄. 배선이 없으면 null.</summary>
+    static SynergyEmblemEntry EntryOf(SynergyData _synergy, SynergyEmblemTiming _timing)
+        => _synergy != null && _synergy.vfx != null ? _synergy.vfx.EntryFor(_timing) : null;
 
-    const int   ShakeCount   = 3;      // 들썩임 횟수
-    const float RiseScale    = 1.12f;  // 솟았을 때 배율(기준 크기 대비)
-    const float ShakeLow     = 0.90f;  // 들썩임 아래쪽 배율
-    const float ExitScale    = 0.72f;  // 사라질 때 줄어드는 배율
-    const float HeightRatio  = 1.45f;  // 카드 높이 대비 엠블럼 높이
-    const float Alpha        = 0.85f;  // 최대 불투명도(카드가 주인공이라 완전 불투명은 피한다)
-
-    // 카드 루트에 SortingGroup(order 1)이 걸려 있어, 그룹 밖 오브젝트는 씬 레벨에서 그 order와 비교된다.
-    // 0이면 모든 카드보다 뒤 → "카드 뒤쪽"이 성립한다.
-    const int SortingOrder = 0;
-
-    /// <summary>이 카드 뒤에 해당 시너지 엠블럼을 1회 재생. 뷰/그림이 없으면 무동작.</summary>
-    public static void Play(CardInstance _card, SynergyData _synergy)
+    /// <summary>이 타이밍 엠블럼 1회 재생 길이(초, 배속 적용). 연출이 끝나길 기다렸다가
+    /// 다음 연출을 잇는 호출부(무리 선피해 → 볼리)가 쓴다. 배선이 없으면 0 — 기다릴 것도 없다.</summary>
+    public static float DurationOf(SynergyData _synergy, SynergyEmblemTiming _timing)
     {
-        if (_card == null || _synergy == null || _synergy.emblem == null) return;
-        Play(CardView.GetView(_card), _synergy);
+        SynergyEmblemEntry t_entry = EntryOf(_synergy, _timing);
+        return t_entry != null ? t_entry.spec.Duration : 0f;
     }
 
-    public static void Play(CardView _view, SynergyData _synergy)
+    /// <summary>[Placed] 배치 상징: 이 카드가 속한 활성 시너지 중 그 타이밍을 맡은 줄만 재생
+    /// (여럿이면 겹쳐 뜬다 — 서로 다른 시너지의 상징이라 겹쳐도 읽힌다).
+    ///
+    /// **발화점이 규칙(SynergyTriggers.Placed)이 아니라 뷰인 이유**: 시너지 Placed는 ApplyDeckSynergy에서
+    /// 도는데 그건 InitializeViews보다 앞이라 그 시점엔 CardView가 아직 없다 — 거기서 띄우면 아무도 못 본다.
+    /// "놓이는 순간"은 규칙상의 사건이 아니라 화면상의 사건이므로 배치 연출이 끝나는 지점이 유일한 발화점이다.
+    ///
+    /// 뒷면 카드는 건너뛴다 — 배지와 같은 규약(뒷면 적의 종족/직업 노출 방지).</summary>
+    public static void PlayPlaced(CardView _view, CardInstance _card, SynergyState _state)
     {
-        if (_view == null || _synergy == null || _synergy.emblem == null) return;
+        if (_view == null || _card == null || _state == null || !_card.isRevealed) return;
 
-        float t_total = Mathf.Max(0.1f, GameTiming.Battle.SynergyEmblemDuration);
-
-        var t_go = new GameObject("SynergyEmblem");
-        // 카드 자식으로 붙이지 않는다 — 카드 쪽 DOKill/FadeView가 이 연출을 조용히 잘라먹는다.
-        // 자리는 SlotPosition 기준이라 카드가 공격 연출로 나가 있어도 엠블럼은 그 자리에 남는다.
-        t_go.transform.position = _view.SlotPosition;
-
-        var t_sr = t_go.AddComponent<SpriteRenderer>();
-        t_sr.sprite         = _synergy.emblem;
-        t_sr.sortingLayerID = _view.VfxSortingLayerId;
-        t_sr.sortingOrder   = SortingOrder;
-        t_sr.color          = Tint(_synergy, 0f);
-
-        // 기준 크기: 스프라이트 원본 크기와 무관하게 카드 높이에 맞춘다(에셋 교체에 안 흔들리게).
-        float t_srcH = t_sr.sprite.bounds.size.y;
-        float t_base = t_srcH > 0.001f ? (_view.SlotWorldBounds.size.y * HeightRatio) / t_srcH : 1f;
-
-        t_go.transform.localScale = Vector3.zero;
-
-        float t_rise  = t_total * RiseRatio;
-        float t_shake = t_total * ShakeRatio;
-        float t_exit  = Mathf.Max(0.05f, t_total - t_rise - t_shake);
-        float t_beat  = t_shake / (ShakeCount * 2f);   // 위·아래 한 번씩이 1회
-
-        Color t_on = Tint(_synergy, Alpha);
-
-        var t_seq = DOTween.Sequence().SetLink(t_go);
-
-        // 1) 솟아오름 — OutBack 오버슈트로 "툭" 튀어나온다.
-        t_seq.Append(t_go.transform.DOScale(t_base * RiseScale, t_rise).SetEase(Ease.OutBack));
-        t_seq.Join(t_sr.DOColor(t_on, t_rise));
-
-        // 2) 들썩임 — 커졌다 작아졌다 반복. InOutSine이라 양 끝에서 꺾이지 않는다.
-        for (int i = 0; i < ShakeCount; i++)
+        foreach (ActiveSynergy t_active in _state.Active)
         {
-            t_seq.Append(t_go.transform.DOScale(t_base * ShakeLow,  t_beat).SetEase(Ease.InOutSine));
-            t_seq.Append(t_go.transform.DOScale(t_base * RiseScale, t_beat).SetEase(Ease.InOutSine));
+            SynergyData t_synergy = t_active?.Synergy;
+            if (t_synergy == null) continue;
+            if (!SynergyApplier.BelongsTo(_card, t_synergy)) continue;
+            Play(_view, t_synergy, SynergyEmblemTiming.Placed);
+        }
+    }
+
+    /// <summary>[Triggered] 효과가 실제로 일한 순간. 범위(자기 1장 / 소속 아군 전원)는 그 줄이 정한다 —
+    /// 무리 선피해처럼 전원이 함께 일하는 효과는 발동 주체 한 장만 빛나면 그림과 어긋난다.
+    /// 반환값 = 실제로 띄웠는가(연출이 끝나길 기다릴지 호출부가 판단하는 근거).
+    /// 순수 연출이라 결정론과 무관하다(상태·RNG 무접촉).</summary>
+    public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleField _field)
+    {
+        SynergyEmblemEntry t_entry = EntryOf(_synergy, SynergyEmblemTiming.Triggered);
+        if (t_entry == null) return false;
+
+        // 필드를 못 받으면 전원 범위를 풀 수 없으므로 발동 주체 1장으로 떨어진다.
+        if (t_entry.scope == SynergyEmblemScope.AllMembers && _field != null)
+        {
+            foreach (CardInstance t_card in _field.GetActiveCards())
+            {
+                if (t_card == null || !t_card.IsAlive) continue;
+                if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
+                t_entry.spec.Play(CardView.GetView(t_card), _synergy);
+            }
+            return true;
         }
 
-        // 3) 소멸 — 줄어들며 투명해진다.
-        t_seq.Append(t_go.transform.DOScale(t_base * ExitScale, t_exit).SetEase(Ease.InQuad));
-        t_seq.Join(t_sr.DOFade(0f, t_exit));
-
-        t_seq.OnComplete(() => { if (t_go != null) Object.Destroy(t_go); });
-        // 중간에 씬이 내려가면 SetLink가 트윈을 죽이는데, 그때 오브젝트도 같이 사라지므로 별도 정리 불필요.
+        CardView t_view = CardView.GetView(_self);
+        if (t_view == null) return false;
+        t_entry.spec.Play(t_view, _synergy);
+        return true;
     }
 
-    /// <summary>시너지 고유색을 옅게 섞은 틴트. 색이 없으면 흰색(원화 그대로).</summary>
-    static Color Tint(SynergyData _synergy, float _alpha)
+    /// <summary>이 카드 앞에 그 타이밍의 엠블럼을 1회 재생. 뷰/배선이 없으면 무동작.
+    /// 몸짓 선택은 타입 자체가 한다 — 여기에 스타일 분기를 두지 마라
+    /// (몸짓을 추가할 때 이 파일을 고쳐야 하는 순간 상속으로 나눈 의미가 사라진다).</summary>
+    public static void Play(CardView _view, SynergyData _synergy, SynergyEmblemTiming _timing)
     {
-        Color t_c = _synergy.TintOrWhite;
-        t_c.a = _alpha;
-        return t_c;
+        SynergyEmblemEntry t_entry = EntryOf(_synergy, _timing);
+        if (_view == null || t_entry == null) return;
+        t_entry.spec.Play(_view, _synergy);
     }
 }

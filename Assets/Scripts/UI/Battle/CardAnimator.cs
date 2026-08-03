@@ -37,6 +37,12 @@ public class CardAnimator : MonoBehaviour
 
     public void ExcludeFromFade(SpriteRenderer _sr) { if (_sr != null) this.fadeExcludes.Add(_sr); }
 
+    /// <summary>이 카드가 **최종적으로 도달할** 알파. 페이드는 트윈이라 진행 중엔 렌더러의 현재 알파가
+    /// 목표와 다르다 — 그 사이에 태어난 자식(키워드 아이콘/시너지 배지)을 현재 알파로 맞추면
+    /// 진행 중인 트윈에는 못 끼고 중간값에 그대로 굳는다(공격 후 아이콘만 흐린 채 남던 원인).
+    /// 새로 만든 자식은 이 목표값으로 맞춘다. 알파를 바꾸는 경로는 전부 이 값을 같이 갱신할 것.</summary>
+    public float FadeTarget { get; private set; } = 1f;
+
     /// <summary>피격/회복 연출(HitEffect·HealEffect) 하위인가. 자체 페이드 시퀀스를 가지므로 카드 페이드 대상에서 제외 —
     /// 안 그러면 fade의 DOKill이 붐/숫자 트윈을 죽이고 dim alpha로 덮어써 연출이 튄다.</summary>
     bool IsHitEffectPart(Component _c)
@@ -155,6 +161,7 @@ public class CardAnimator : MonoBehaviour
 
     public void FadeView(float _alpha, float _duration)
     {
+        this.FadeTarget = _alpha;
         RefreshVisualCache();
 
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
@@ -176,6 +183,7 @@ public class CardAnimator : MonoBehaviour
 
     void FadeSpriteRenderers(float _alpha)
     {
+        this.FadeTarget = _alpha;
         RefreshVisualCache();
 
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
@@ -263,6 +271,7 @@ public class CardAnimator : MonoBehaviour
     public async UniTask PlayDeathAnim(float _duration = -1f)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DeathDuration;
+        this.FadeTarget = 0f;   // 사망은 알파 0으로 끝난다(아래 주석 참조) — 그 사이 태어난 자식도 0으로
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDeath();
@@ -307,6 +316,7 @@ public class CardAnimator : MonoBehaviour
     public async UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
+        this.FadeTarget = 1f;   // 배치는 알파 1로 리셋하고 시작(아래 색 리셋과 짝)
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDealCard();

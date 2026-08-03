@@ -8,7 +8,7 @@ using UnityEngine;
 /// 무리(Swarm) 선피해 연출의 **순서**만 소유한다: 필드의 무리 아군이 슬롯 순서대로 작은 투사체를
 /// 하나씩 쏘고 → 대상에 착탄 → 마지막 착탄 여운 뒤 호출부(본 공격 연출)로 제어가 돌아간다.
 ///
-/// 프리팹/형태 = BattleVfxLibrary(BattleVfxId.SwarmProjectile), 시간 = BattleTimingConfig,
+/// 프리팹/형태 = SwarmSynergyVfxConfig(무리 시너지 연출 에셋), 시간 = BattleTimingConfig,
 /// 스폰·반납·정렬 = BattleVfx. 여기엔 어느 것도 두지 않는다(HealVfx와 같은 규약).
 ///
 /// **선피해 수치는 호출부가 이미 적용한 뒤다 — 여기선 표시만 늦춘다.**
@@ -19,8 +19,6 @@ using UnityEngine;
 /// </summary>
 public static class SwarmVfx
 {
-    const float DEFAULT_CURVE_HEIGHT = 0.55f;   // 라이브러리 미배선 시 형태값 폴백
-
     /// <summary>무리 아군 <paramref name="_sources"/>가 <paramref name="_target"/>에게 일제 사격.
     /// 마지막 착탄 + 여운까지 기다린 뒤 완료된다 — 호출부는 이걸 await 해서 본 공격을 뒤로 미룬다.
     ///
@@ -28,10 +26,10 @@ public static class SwarmVfx
     /// <paramref name="_hpBefore"/>/<paramref name="_bonusBefore"/> = 선피해 **적용 전** 대상 체력 —
     /// hp는 이미 다 깎인 상태라, 표시만 착탄마다 단계적으로 따라오게 하려면 시작값이 필요하다.</summary>
     public static async UniTask PlayVolley(List<CardView> _sources, CardView _target,
-        IReadOnlyList<int> _damages, int _hpBefore, int _bonusBefore)
+        IReadOnlyList<int> _damages, int _hpBefore, int _bonusBefore, SwarmSynergyVfxConfig _vfx)
     {
         if (_target == null || _sources == null || _sources.Count == 0) return;
-        if (!BattleVfx.TryGetEntry(BattleVfxId.SwarmProjectile, out _)) return;   // 미배선 = 연출 생략
+        if (_vfx == null || _vfx.projectile.prefab == null) return;   // 미배선 = 연출 생략
 
         // 착탄 순서대로 누적 차감할 잔여 체력. 발사는 병렬이지만 도착 순서는 stagger로 정해지므로
         // 인덱스별 누적을 미리 계산해 둔다(도착 시점에 공유 변수를 갱신하면 순서가 뒤집힐 때 값이 튄다).
@@ -51,7 +49,7 @@ public static class SwarmVfx
         {
             if (_sources[i] == null) continue;
             int t_dmg = _damages != null && i < _damages.Count ? _damages[i] : 0;
-            t_flights.Add(FlyOne(_sources[i], _target, i, t_dmg, t_remain[i]));
+            t_flights.Add(FlyOne(_sources[i], _target, i, t_dmg, t_remain[i], _vfx));
         }
         if (t_flights.Count == 0) return;
 
@@ -64,7 +62,8 @@ public static class SwarmVfx
     }
 
     /// <summary>한 발. 대상/발사자가 파괴되면 조용히 접고 투사체는 반납한다.</summary>
-    static async UniTask FlyOne(CardView _source, CardView _target, int _index, int _damage, int _hpAfter)
+    static async UniTask FlyOne(CardView _source, CardView _target, int _index, int _damage, int _hpAfter,
+        SwarmSynergyVfxConfig _vfx)
     {
         VfxHandle t_proj = default;
         try
@@ -83,12 +82,12 @@ public static class SwarmVfx
             // await 하지 않는 이유: 비행 시간이 반동보다 길어 어차피 볼리가 더 늦게 끝난다(연출 길이 기준은 비행).
             AttackSequence.RecoilInPlace(_source, _target).Forget();
 
-            t_proj = BattleVfx.Spawn(BattleVfxId.SwarmProjectile, _source.transform.position,
-                                     _source.VfxSortingLayerId);
+            t_proj = BattleVfx.Spawn(_vfx.projectile, _source.transform.position, _source.VfxSortingLayerId);
             if (!t_proj.Valid) return;
 
             // 실제 시작점은 항목 오프셋이 반영된 스폰 위치 — 커브도 그 점 기준이어야 궤적이 안 튄다.
-            await Travel(t_proj.Go, t_proj.Go.transform.position, _target.transform.position, _index, t_ct);
+            await Travel(t_proj.Go, t_proj.Go.transform.position, _target.transform.position, _index,
+                         _vfx.curveHeight, t_ct);
         }
         catch (OperationCanceledException) { }
         finally
@@ -121,9 +120,9 @@ public static class SwarmVfx
     /// <summary>베지어 경로 비행. 트윈(DOPath) 대신 프레임 보간 — 진행 방향으로 매 프레임 눕혀야 하고,
     /// 카드 쪽 DOKill에 조용히 잘리지 않게 하려면 트윈 밖에 있는 편이 안전하다(HealVfx와 같은 이유).</summary>
     static async UniTask Travel(GameObject _go, Vector3 _start, Vector3 _end, int _index,
-        System.Threading.CancellationToken _ct)
+        float _curveHeight, System.Threading.CancellationToken _ct)
     {
-        Vector3 t_ctrl = ControlPoint(_start, _end, _index);
+        Vector3 t_ctrl = ControlPoint(_start, _end, _index, _curveHeight);
         float   t_dur  = Mathf.Max(0.05f, GameTiming.Battle.SwarmTravelDuration);
         float   t_time = 0f;
         Vector3 t_prev = _start;
@@ -151,16 +150,13 @@ public static class SwarmVfx
 
     /// <summary>직선 중점을 화면 수직 방향으로 밀어낸 제어점. 인덱스 패리티로 부호를 번갈아 주면
     /// 여러 발이 같은 궤적으로 겹치지 않고 부채꼴로 갈라진다. **RNG 미사용**(결정론).</summary>
-    static Vector3 ControlPoint(Vector3 _start, Vector3 _end, int _index)
+    static Vector3 ControlPoint(Vector3 _start, Vector3 _end, int _index, float _height)
     {
-        BattleVfxLibrary t_lib = BattleVfx.Library;
-        float t_height = t_lib != null ? t_lib.healCurveHeight : DEFAULT_CURVE_HEIGHT;
-
         Vector3 t_line = _end - _start;
         Vector3 t_perp = new Vector3(-t_line.y, t_line.x, 0f);
         t_perp = t_perp.sqrMagnitude > 1e-6f ? t_perp.normalized : Vector3.up;
 
         float t_sign = (_index & 1) == 1 ? -1f : 1f;
-        return ((_start + _end) * 0.5f) + (t_perp * (t_height * t_sign));
+        return ((_start + _end) * 0.5f) + (t_perp * (_height * t_sign));
     }
 }

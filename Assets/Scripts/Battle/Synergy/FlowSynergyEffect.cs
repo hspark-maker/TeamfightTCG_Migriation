@@ -24,8 +24,9 @@ public class FlowSynergyEffect : SynergyEffect
         foreach (var t_card in _ctx.field.GetActiveCards())
             if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);   // 흐름 카드 등장 시 배너+배지 pop
-        SynergyVfx.PlayFlowWind(_ctx.field);             // 필드 위로 바람 1회(순수 연출, await 없음)
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 흐름 카드 등장 시 배너+배지 pop
+        // 바람 스펙은 흐름 시너지의 연출 에셋이 소유. 타입 불일치면 null → 바람만 생략된다.
+        SynergyVfx.PlayFlowWind(_ctx.field, _ctx.synergy?.vfx as FlowSynergyVfxConfig);
         return UniTask.CompletedTask;
     }
 
@@ -35,9 +36,9 @@ public class FlowSynergyEffect : SynergyEffect
     public override UniTask OnBeforeAttack(BeforeAttackCtx _ctx)
     {
         if (_ctx.self == null || _ctx.self.flowBonus <= 0) return UniTask.CompletedTask;
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy);
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);
         // 가산이 실제로 붙는 순간에도 바람. await 하지 않는다 — 여기서 기다리면 공격 개시가 밀린다.
-        SynergyVfx.PlayFlowWind(_ctx.ownField);
+        SynergyVfx.PlayFlowWind(_ctx.ownField, _ctx.synergy?.vfx as FlowSynergyVfxConfig);
         return UniTask.CompletedTask;
     }
 }
