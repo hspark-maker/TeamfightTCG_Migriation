@@ -55,6 +55,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
+        if (!OutgameTutorialRunner.IsRunning) return;   // 온보딩이 끝난 뒤엔 게이트를 건드리지 않는다 — 트리거 튜토리얼이 쓰고 있을 수 있다.
         if (m_applying) { m_pendingApply = true; return; }
 
         m_applying = true;
@@ -84,8 +85,25 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 옛 안내가 화면에 남는다.
         CloseGate();
 
+        // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
+        OutgameTutorialRunner.TryGetCurrentStep(out var t_entering);
+        int t_beforeChapter = OutgameTutorialProgress.ChapterIndex;
+        int t_beforeStep    = OutgameTutorialProgress.StepIndex;
+
         // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!OutgameTutorialRunner.EnterCurrentStep()) return;
+        if (!OutgameTutorialRunner.EnterCurrentStep())
+        {
+            // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
+            // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
+            // 좌표가 안 움직였으면(= Enter가 롤백했거나 애초에 커밋을 못 했다) 잇지 않는다 — 같은 실패를 되풀이한다.
+            bool t_moved = t_beforeChapter != OutgameTutorialProgress.ChapterIndex
+                        || t_beforeStep    != OutgameTutorialProgress.StepIndex;
+
+            if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+
+            return;
+        }
+
         if (!OutgameTutorialRunner.TryGetCurrentStep(out var t_step)) return;
 
         m_step = t_step;
@@ -216,10 +234,16 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
         // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(자동 스텝), 곧 사라질 게이트가 한 프레임 깜빡인다(전투 진입).
-        // 판정 기준은 Completion이 아니라 LeavesScene이다 — 씬을 떠나는 스텝만 다음 브리지가 재개할 수 있고,
-        // 자동 스텝이라도 제자리에 남는 것(개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
+        // 방금 완료된 스텝이 씬을 떠났으면 다음 브리지가 재개한다. 자동 스텝이라도 제자리에 남는 것
+        // (개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
+        //
+        // 다음 스텝을 미리 끊는 것은 "진입만으로" 씬을 떠나는 자동 스텝뿐이다 — 클릭을 기다리는 스텝은
+        // LeavesScene이어도 게이트를 걸어 줘야 한다(전투 시작 버튼). 안 걸면 씬이 그대로라 재개해 줄
+        // 브리지가 없고, CloseGate가 m_step을 비워 앵커 등록 통지로도 깨어나지 못한다 = 영구 정지.
         if (t_leftScene
-            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next) && t_next.LeavesScene))
+            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_next)
+                && t_next.LeavesScene
+                && t_next.Completion == EOutgameTutorialCompletion.Auto))
         {
             CloseGate();
             return;

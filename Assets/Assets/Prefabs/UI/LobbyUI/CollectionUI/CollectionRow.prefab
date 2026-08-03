@@ -743,8 +743,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uC218\uD655  +120"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
-  m_sharedMaterial: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
+  m_sharedMaterial: {fileID: -4999335185947324146, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

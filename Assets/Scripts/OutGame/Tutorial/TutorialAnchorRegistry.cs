@@ -36,6 +36,18 @@ public static class TutorialAnchorRegistry
         s_entries.Remove(_key);
     }
 
+    /// <summary>지금 등록된 주인이 <paramref name="_rect"/>일 때만 해제한다.
+    /// 같은 키를 공유하는 화면이 한 씬에 둘 있을 때(로비 덱 편집 / 매치 덱 편집) 나중에 켜진 쪽이
+    /// 등록을 가져간 뒤 먼저 켜졌던 쪽이 꺼지면, 키만 보고 지우는 해제가 살아 있는 등록을 날린다.</summary>
+    public static void Unregister(EOutgameTutorialAnchor _key, RectTransform _rect)
+    {
+        if (_key == EOutgameTutorialAnchor.None) return;
+        if (!s_entries.TryGetValue(_key, out var t_entry)) return;
+        if (t_entry.rect != _rect) return;
+
+        s_entries.Remove(_key);
+    }
+
     // 미등록·파괴된 타깃이면 false. 게이트는 false일 때 대기 상태로 남는다.
     public static bool TryGet(EOutgameTutorialAnchor _key, out RectTransform _rect, out Button _button)
     {

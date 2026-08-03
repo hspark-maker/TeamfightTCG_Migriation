@@ -191,7 +191,7 @@
 > ③ `MatchDeckPanel.prefab` 루트에 `MatchDeckPanelView` 부착, `mySlots[0..5]` ← `MySlot_N/CardUIView`, 하단 3버튼 배선(`battleButton`은 참조만).
 > ④ ~~`LobbyCanvas.prefab` 호스팅~~ **철회(2026-08-03)** — 이 화면은 로비가 아니라 **전투 씬 진입 직후**에 열려 전투 시작을 붙잡는 게이트다. `LobbyCanvas.prefab`은 `d7864026` 시점(호스팅 직전)으로 복원했다. 호스팅은 `PKG-MATCHDECK-BATTLE`로 이관 — 착수 스펙은 `STRUCTURE.md`의 "BattleScene 연결 — 남은 작업" 문단이 진실원.
 >
-> **셸 쪽 계약은 이미 구현 완료**: `RunSelectionAsync(CancellationToken) → UniTask<bool>`(게이트) · `Confirm()`(= `TryConfirmSelection` 성공 시에만 통과) · `Cancel()`(전투 포기, 복귀 씬은 호스트가 결정) · `EnsureBoot()`(전투 씬 단독 Play 폴백). `MatchDeckPanelView`의 BattleButton→`Confirm`, BackButton→`Cancel` 배선도 코드에 들어가 있다.
+> **셸 쪽 계약은 이미 구현 완료**: `RunSelectionAsync(CancellationToken) → UniTask<bool>`(게이트) · `Confirm()`(= `TryConfirmSelection` 성공 시에만 통과) · `Cancel()`(오버레이 닫기, 복귀는 호스트가 결정). `MatchDeckPanelView`의 BattleButton→`Confirm`, BackButton→`Cancel` 배선도 코드에 들어가 있다. 호스트는 **로비의 `LobbyMatchLauncher`**다(2026-08-03 배틀 씬 호스팅에서 재역전 — `STRUCTURE.md` "로비 연결" 참조). 전투 씬 단독 Play 폴백 `EnsureBoot`는 삭제됐다.
 >
 > **레이아웃 예산(1080×1920 기준, 앵커 비율)**: `TopBar` 0.822~1.000(342px, 뷰포트 298 ≥ 카드 283) · `DeckArea` 0.455~0.818(697px ≥ 그리드 696) · `ButtonBar` 0.405~0.445 · `CollectionArea` 0.085~0.395 · `Btn_MatchBack` 좌하단 220×96. `SlotGrid` 셀은 270×360 → **230×300**(spacing 20×16)으로 축소해 TopBar가 먹은 높이를 흡수했다.
 >

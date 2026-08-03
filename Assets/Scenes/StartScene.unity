@@ -424,6 +424,10 @@ PrefabInstance:
       propertyPath: starterDeck
       value: 
       objectReference: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
+    - target: {fileID: 5390474672447089678, guid: 305070bab040f1f4fb22ac7a6cf04f80, type: 3}
+      propertyPath: triggeredTutorialData
+      value: 
+      objectReference: {fileID: 11400000, guid: af7d8b417cb64f543acba89e6e31e427, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 3392005005194032163, guid: 305070bab040f1f4fb22ac7a6cf04f80, type: 3}

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 // 아웃게임 첫시작 튜토리얼 진행도의 static 단일 창구.
 // 세이브 슬롯(TutorialSaveData) 매핑을 여기서만 안다 — 러너·브리지·UI는 이 API로만 진행도를 읽고 쓴다.
 // 메모리 캐시를 두지 않고 슬롯을 직접 읽는다(DataSaveManager.Load가 Data를 교체하므로 캐시는 stale 위험).
@@ -64,6 +66,41 @@ public static class OutgameTutorialProgress
         if (t_slot.outgameCompleted) return;
 
         t_slot.outgameCompleted = true;
+        Save();
+    }
+
+    /// <summary>이 트리거의 튜토리얼을 이미 완주했는가. None은 발화할 것이 없으므로 완료로 본다.</summary>
+    public static bool IsTriggerDone(EOutgameTutorialTrigger _trigger)
+    {
+        if (_trigger == EOutgameTutorialTrigger.None) return true;
+
+        var t_done = Slot.completedTriggers;
+        return t_done != null && t_done.Contains(_trigger.ToString());
+    }
+
+    /// <summary>완주 낙인. 트리거당 1회만 남는다(인덱스가 아니라 enum 이름 문자열이라 값 재배치에 안전하다).</summary>
+    public static void MarkTriggerDone(EOutgameTutorialTrigger _trigger)
+    {
+        if (_trigger == EOutgameTutorialTrigger.None) return;
+
+        var t_slot = Slot;
+        if (t_slot.completedTriggers == null) t_slot.completedTriggers = new List<string>();
+
+        string t_key = _trigger.ToString();
+        if (t_slot.completedTriggers.Contains(t_key)) return;
+
+        t_slot.completedTriggers.Add(t_key);
+        Save();
+    }
+
+    // 디버그 전용: 트리거 튜토리얼 낙인만 전부 걷는다(온보딩 좌표·완료는 건드리지 않음).
+    // 모르는 문자열까지 함께 지워진다 — 디버그 의도가 "전부 다시 보기"라 그게 맞다.
+    public static void ClearTriggersForDebug()
+    {
+        var t_slot = Slot;
+        if (t_slot.completedTriggers == null) t_slot.completedTriggers = new List<string>();
+        else                                  t_slot.completedTriggers.Clear();
+
         Save();
     }
 

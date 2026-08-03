@@ -377,7 +377,7 @@ public class DeckEditController : MonoBehaviour
             // 같은 체력 카드들의 편성 결과가 호출마다 달라진다(유저 눈에는 버튼이 랜덤으로 보인다).
             t_candidates.Sort((_a, _b) =>
             {
-                int t_cmp = HpOf(_b.card).CompareTo(HpOf(_a.card));
+                int t_cmp = DeckPower.Of(_b.card).CompareTo(DeckPower.Of(_a.card));
 
                 return t_cmp != 0 ? t_cmp : _a.order.CompareTo(_b.order);
             });
@@ -410,7 +410,7 @@ public class DeckEditController : MonoBehaviour
 
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
-        if (totalHpText      != null) totalHpText.text = SumHp().ToString();
+        if (totalHpText      != null) totalHpText.text = DeckPower.Of(m_working).ToString();
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE;   // 가득 차면 채울 칸이 없다
     }
@@ -423,22 +423,6 @@ public class DeckEditController : MonoBehaviour
 
         return t_n;
     }
-
-    // 편성 중인 6칸의 체력 합. 빈 칸은 HpOf가 0을 돌려주므로 따로 거르지 않는다.
-    int SumHp()
-    {
-        int t_sum = 0;
-        for (int t_i = 0; t_i < m_working.Length; t_i++)
-            t_sum += HpOf(m_working[t_i]);
-
-        return t_sum;
-    }
-
-    // 편성 화면이 쓰는 카드 체력 = 저작값 maxHp + 저작값 bonusHp.
-    // 런타임 부여분(시너지 덩치·돌보미)은 전투에 들어가야 생기므로 여기서 알 수 없다 — 빠진 게 아니라 못 넣는다.
-    // 저작 bonusHp는 CardVisualView가 카드마다 "+N"으로 따로 그리므로(CardVisualView.SetHpDisplay) 합계에도 넣는다.
-    // 자동 편성 정렬 기준과 합계 표시가 같은 식을 쓰게 하는 단일 지점이다.
-    static int HpOf(CardData _card) => _card != null ? _card.maxHp + _card.bonusHp : 0;
 
     // 앞쪽 빈 칸의 인덱스. 없으면 -1.
     int FindFirstEmpty()

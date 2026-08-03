@@ -268,8 +268,9 @@ public class TurnRunner : MonoBehaviour
     {
         TurnEvents.Reset();
         MatchRandom.Reset();
-        TutorialConfig.End();   // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
-        DeckConfig.ResetMode(); // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
+        TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
+        DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
+        DeckConfig.ClearEnemyDeck(); // 상대 덱을 확정하지 않는 진입점이 직전 판의 상대를 물려받지 않게(같은 규율).
         TurnCount = 1;
     }
 

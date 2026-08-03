@@ -323,6 +323,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: Card
       objectReference: {fileID: 0}
+    - target: {fileID: 1835009869300166723, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+    - target: {fileID: 1835009869300166723, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+    - target: {fileID: 1835009869300166723, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5

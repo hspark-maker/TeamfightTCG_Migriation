@@ -20,5 +20,6 @@ public class TutorialAnchor : MonoBehaviour
 
     void OnEnable() => TutorialAnchorRegistry.Register(key, m_rect, m_button);
 
-    void OnDisable() => TutorialAnchorRegistry.Unregister(key);
+    // 키가 아니라 자기 자신을 넘긴다 — 같은 키를 공유하는 다른 화면이 이미 등록을 가져갔다면 건드리면 안 된다.
+    void OnDisable() => TutorialAnchorRegistry.Unregister(key, m_rect);
 }

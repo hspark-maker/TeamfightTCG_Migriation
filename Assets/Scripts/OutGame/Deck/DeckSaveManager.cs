@@ -98,6 +98,54 @@ public static class DeckSaveManager
         return false;
     }
 
+    // 임의의 카드 목록을 슬롯에 넣을 수 있는 덱으로 정규화한다(null·중복 제거 후 정확히 DECK_SIZE장).
+    // 저작 원본(시나리오·팩 pool)을 슬롯에 넣는 쪽과 되찾는 쪽이 같은 규칙을 써야 좌표가 어긋나지 않는다.
+    public static bool TryBuildDeck(IEnumerable<CardData> _source, out List<CardData> _deck)
+    {
+        _deck = new List<CardData>(DECK_SIZE);
+
+        if (_source == null) return false;
+
+        foreach (CardData t_card in _source)
+        {
+            if (_deck.Count >= DECK_SIZE) break;
+            if (t_card == null || _deck.Contains(t_card)) continue;
+
+            _deck.Add(t_card);
+        }
+
+        return _deck.Count == DECK_SIZE;
+    }
+
+    // 같은 카드 구성의 저장 슬롯을 찾는다(순서 무관 — 편성 순서만 바꾼 덱을 "다른 덱"으로 보면 중복 지급이 된다).
+    // 원본을 그대로 받아 정규화까지 여기서 한다 — 호출측마다 정규화를 다시 짜면 지급과 조회가 갈린다.
+    public static bool TryFindSlot(IEnumerable<CardData> _source, out int _index)
+    {
+        _index = -1;
+
+        if (!TryBuildDeck(_source, out List<CardData> t_deck)) return false;
+
+        for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
+        {
+            // IsSlotValid가 "non-null 정확히 DECK_SIZE장"을 보장하고 t_deck도 중복이 없으므로,
+            // 한 방향 포함 검사만으로 두 집합이 같다(장수가 같은데 부분집합이면 곧 동일 집합).
+            if (!IsSlotValid(t_i)) continue;
+
+            var t_slot = s_slots[t_i];
+
+            bool t_same = true;
+            for (int t_j = 0; t_j < t_deck.Count && t_same; t_j++)
+                t_same = t_slot.Contains(t_deck[t_j]);
+
+            if (!t_same) continue;
+
+            _index = t_i;
+            return true;
+        }
+
+        return false;
+    }
+
     // 신규 덱을 목록 맨 앞에 넣는다. name·imageKey를 인자로 받는 건 삽입이 끝나야 인덱스가 생기기 때문 —
     // 삽입 후 SetName/SetImageKey를 부르면 SaveAll이 이미 지나가 메모리에만 남는다.
     public static bool TryInsertFront(IEnumerable<CardData> _deck, string _name, string _imageKey, out int _index)
