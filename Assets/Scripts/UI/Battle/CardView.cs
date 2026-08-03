@@ -187,7 +187,7 @@ public class CardView : MonoBehaviour
 
     CardDecorView CreateDecorView() => new CardDecorView(
         this,
-        this.illustration,
+        this.cardAnim,
         this.keywordIconRoot,
         this.keywordIconPrefab,
         this.keywordIconConfig,
@@ -339,9 +339,16 @@ public class CardView : MonoBehaviour
 
         SetFaceDownLook(t_isFaceDown);
 
+        // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
+        // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
+        this.activeSynergyState = _synergy;
+
         SetupWeapon(_card.data);
         Decor.Refresh(_card, _synergy);   // 뒷면 은닉·표시 대상 판정은 CardDecorView 안에서.
     }
+
+    // 이 카드가 속한 필드의 확정 시너지 스냅샷(BattleFieldView가 Render로 주입). 배치 엠블럼 판정용.
+    SynergyState activeSynergyState;
 
     Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
     bool    illustrationScaleCached;
@@ -611,6 +618,7 @@ public class CardView : MonoBehaviour
         if (!UsesOrbAppear)
         {
             await this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
+            PlayPlacedEmblems();
             return;
         }
 
@@ -633,10 +641,20 @@ public class CardView : MonoBehaviour
 
     /// <summary>뒤 토막: 중앙 → 슬롯. 구체 등장 카드는 중앙에 선 카드가 구체로 변신한 뒤 날아간다
     /// (_morphFromCard) — 카드가 이미 중앙에 있으므로 구체를 새로 "생성"하면 카드가 순간 사라져 보인다.</summary>
-    public UniTask PlayDealToSlot(Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => UsesOrbAppear
+    public async UniTask PlayDealToSlot(Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+    {
+        await (UsesOrbAppear
             ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration, _morphFromCard: true)
-            : this.cardAnim.PlayDealToSlot(_dest, _duration);
+            : this.cardAnim.PlayDealToSlot(_dest, _duration));
+        PlayPlacedEmblems();
+    }
+
+    /// <summary>[Placed] 배치 상징 발화점. 카드가 슬롯에 <b>실제로 내려앉은 뒤</b> 한 번 —
+    /// 규칙 쪽(SynergyTriggers.Placed)은 뷰가 생기기 전에 돌아 못 쓴다(SynergyEmblemVfx.PlayPlaced 주석 참조).
+    /// 구체 등장 경로는 PlayDealAnim이 PlayDealToSlot을 거쳐 가므로 여기 한 번만 걸린다(이중 재생 없음).
+    /// 어느 시너지가 뜰지는 SynergyData.emblemTiming이 정한다 — 여기선 타이밍만 알린다.</summary>
+    void PlayPlacedEmblems()
+        => SynergyEmblemVfx.PlayPlaced(this, this.boundCard, this.activeSynergyState);
 
     bool UsesOrbAppear => this.boundCard?.data != null
                        && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;

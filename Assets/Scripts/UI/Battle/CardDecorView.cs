@@ -28,7 +28,7 @@ public class CardDecorView
     readonly CardView owner;
 
     // ── 주입값(단일 진실원은 CardView의 SerializeField) ──
-    readonly SpriteRenderer   bodyAlphaSource;   // 지금 카드 몸통이 그려지는 알파의 기준(= illustration)
+    readonly CardAnimator     bodyAlphaSource;   // 카드 몸통이 도달할 알파의 기준(= cardAnim.FadeTarget)
     readonly Transform        keywordIconRoot;
     readonly GameObject       keywordIconPrefab;
     readonly KeywordIconConfig keywordIconConfig;
@@ -54,7 +54,7 @@ public class CardDecorView
 
     public CardDecorView(
         CardView                _owner,
-        SpriteRenderer          _bodyAlphaSource,
+        CardAnimator            _bodyAlphaSource,
         Transform               _keywordIconRoot,
         GameObject              _keywordIconPrefab,
         KeywordIconConfig       _keywordIconConfig,
@@ -168,10 +168,12 @@ public class CardDecorView
         }
     }
 
-    /// <summary>지금 카드 몸통이 그려지는 알파. 연출 중 페이드 상태를 그대로 읽는다 —
-    /// 새로 만든 자식(아이콘/배지)을 여기에 맞춰야 카드와 따로 놀지 않는다.
-    /// 기준은 illustration: 페이드 제외 대상(hitOverlay/dieOverlay/fadeExcludes)이 아니라 항상 몸통을 따라간다.</summary>
-    float CurrentBodyAlpha => this.bodyAlphaSource != null ? this.bodyAlphaSource.color.a : 1f;
+    /// <summary>카드 몸통이 **도달할** 알파. 새로 만든 자식(아이콘/배지)을 여기에 맞춰야 카드와 따로 놀지 않는다.
+    ///
+    /// 렌더러의 현재 알파가 아니라 목표값을 쓴다: 페이드는 트윈이라 진행 중엔 둘이 다르고,
+    /// 그 순간 태어난 자식은 이미 돌고 있는 트윈에 못 낀다 — 현재값으로 맞추면 중간 알파에 굳어버린다
+    /// (공격 후 RestoreAllFades와 보드 재렌더가 같은 프레임에 겹쳐 키워드 아이콘만 흐리게 남던 원인).</summary>
+    float CurrentBodyAlpha => this.bodyAlphaSource != null ? this.bodyAlphaSource.FadeTarget : 1f;
 
     static void ApplyAlpha(GameObject _go, float _alpha)
     {
