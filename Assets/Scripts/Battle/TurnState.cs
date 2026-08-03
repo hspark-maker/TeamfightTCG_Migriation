@@ -34,6 +34,11 @@ public static class TurnState
     /// <summary>튜토리얼: 이번 스텝에 허용된 제스처. Any면 무제한(일반 전투). 조회는 CardView 입력 판정.</summary>
     public static InputGesture AllowedGesture { get; set; }
 
+    /// <summary>지금 진행 중인 턴(_current = ownerIndex)이 로컬 플레이어 턴인가.
+    /// 싱글/멀티 분기가 필요 없다 — 싱글은 LocalOwnerIndex가 0이고 플레이어 필드 ownerIndex도 0이다.
+    /// (이전엔 TurnRunner가 DeckConfig.IsMultiplayer로 갈라 같은 규칙을 두 벌로 들고 있었다.)</summary>
+    public static bool IsLocalTurn(int _current) => _current == LocalOwnerIndex;
+
     public static void Reset()
     {
         InputAllowed    = false;

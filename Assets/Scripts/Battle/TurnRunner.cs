@@ -99,11 +99,7 @@ public class TurnRunner : MonoBehaviour
         // 여기 남은 건 StartBattle() 단독 호출 같은 우회 진입용 폴백 — 이미 시드됐으면 손대지 않는다.
         // (덮어쓰면 셔플로 이미 전진한 스트림이 리셋돼 시드 하나가 두 시퀀스를 내게 된다.)
         // 멀티는 SyncInitialDecks의 commit-reveal이 시드하므로 여기서 제외.
-        if (!DeckConfig.IsMultiplayer && !MatchRandom.IsSeeded)
-        {
-            if (TutorialConfig.IsActive) MatchRandom.Seed(TutorialConfig.FixedSeed);
-            else                         MatchRandom.SeedRandomLocal();
-        }
+        MatchSeeding.EnsureSeeded();
         if (DeckConfig.IsMultiplayer && NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom += HandlePlayerLeft;
         this.ctx = new TurnContext
@@ -157,9 +153,8 @@ public class TurnRunner : MonoBehaviour
     }
 
     // 해당 t_current가 로컬(내) 턴인가. 멀티에서 P2는 t_current=1이 내 턴.
-    bool IsMyTurn(int _current) => DeckConfig.IsMultiplayer
-        ? _current == (MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? 0)
-        : _current == 0;
+    // 판정은 TurnState.LocalOwnerIndex 하나 — 멀티는 GameInitializer가 MyOwnerIndex로 채우고 싱글은 0이다.
+    static bool IsMyTurn(int _current) => TurnState.IsLocalTurn(_current);
 
     async UniTask RunTurns(int _startCurrent, bool _skipFirstBanner)
     {
@@ -168,10 +163,9 @@ public class TurnRunner : MonoBehaviour
 
         while (true)
         {
-            // 멀티: playerField/enemyField는 기기마다 ownerIndex가 다름 → ownerIndex로 조회
-            BattleField t_field = DeckConfig.IsMultiplayer
-                ? (this.playerField.OwnerIndex == t_current ? this.playerField : this.enemyField)
-                : (t_current == 0 ? this.playerField : this.enemyField);
+            // playerField/enemyField는 멀티에서 기기마다 ownerIndex가 다르므로 ownerIndex로 조회한다.
+            // 싱글도 playerField.OwnerIndex가 0이라 같은 식이 그대로 맞는다 — 모드 분기 불필요.
+            BattleField t_field = this.playerField.OwnerIndex == t_current ? this.playerField : this.enemyField;
 
             TurnEvents.RaiseTurnStarted(t_field);
             foreach (var t_c in t_field.GetActiveCards())
@@ -275,6 +269,7 @@ public class TurnRunner : MonoBehaviour
         TurnEvents.Reset();
         MatchRandom.Reset();
         TutorialConfig.End();   // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
+        DeckConfig.ResetMode(); // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
         TurnCount = 1;
     }
 

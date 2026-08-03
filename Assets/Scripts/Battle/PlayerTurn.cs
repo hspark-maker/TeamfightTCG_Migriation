@@ -159,45 +159,11 @@ public class PlayerTurn : TurnBase
         return true;
     }
 
-    /// <summary>
-    /// 큐 앞의 "선행 안내 + 공격 스텝 1개"를 한 묶음으로 보고, 실행 불가한 묶음을 통째로 조용히 폐기한다.
-    /// 안내까지 함께 버리는 이유: 죽은 카드를 설명하는 문구가 뜨는 것 자체가 버그다.
-    /// 공격 스텝이 더 없는 꼬리(안내만 남음)는 손대지 않는다 — 마무리 문구는 그대로 보여준다.
-    /// </summary>
+    /// <summary>실행 불가한 "선행 안내 + 공격 스텝" 묶음을 통째로 폐기(플레이어 큐).
+    /// 판정·폐기 규칙은 <see cref="TutorialStepGate"/> 단독 — 적 턴과 기준이 갈리지 않게.</summary>
     void DiscardUnplayableSteps()
-    {
-        while (true)
-        {
-            int t_ahead = 0;
-            while (TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_lead)
-                   && t_lead.kind != TutorialScenarioData.StepKind.Attack)
-                t_ahead++;
-
-            if (!TutorialConfig.TryPeekPlayerStep(t_ahead, out var t_attack)) return;   // 남은 공격 스텝 없음
-            if (IsAttackStepPlayable(t_attack)) return;                                 // 유효 묶음 도달
-
-            Debug.LogWarning($"[Tutorial] 플레이어 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
-                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
-            for (int i = 0; i <= t_ahead; i++) TutorialConfig.DiscardPlayerStep();
-        }
-    }
-
-    /// <summary>튜토리얼 공격 스텝이 지금 실행 가능한가(범위·생존·기준선 일치). 도발 필터는 의도적 미적용.</summary>
-    bool IsAttackStepPlayable(TutorialScenarioData.ScriptedAttack _step)
-    {
-        // 자유공격: 생존 아군·적이 각각 1장 이상이면 실행 가능(슬롯 무관).
-        if (IsFreeStep(_step))
-            return this.ctx.playerField.GetActiveCards().Count > 0
-                && this.ctx.enemyField.GetActiveCards().Count > 0;
-        if (!InSlotRange(_step.attackerSlot) || !InSlotRange(_step.targetSlot)) return false;
-        CardInstance t_atk = this.ctx.playerField.GetSlot(_step.attackerSlot);
-        CardInstance t_def = this.ctx.enemyField.GetSlot(_step.targetSlot);
-        if (t_atk == null || !t_atk.IsAlive || t_def == null || !t_def.IsAlive) return false;
-        // 생존만으론 부족하다 — 죽은 카드 자리를 대기 카드가 채우면 슬롯 지정이 엉뚱한 카드에 붙는다.
-        // 스크립트가 그 슬롯에서 기대한 카드와 실제 점유 카드가 다르면 실행 불가로 본다.
-        return TutorialConfig.MatchesPlayerBaseline(_step.attackerSlot, t_atk)
-            && TutorialConfig.MatchesEnemyBaseline(_step.targetSlot, t_def);
-    }
+        => TutorialStepGate.DiscardUnplayable(TutorialStepGate.Side.Player,
+                                              this.ctx.playerField, this.ctx.enemyField);
 
     /// <summary>튜토리얼: 공격 스텝을 오버레이에 안내(문구+공격자/타깃 하이라이트+드래그 포인터).
     /// 추가로 스크립트 공격자를 <see cref="TurnState.ForcedAttacker"/>로 지정 → (1)다른 카드 입력 차단
@@ -409,11 +375,10 @@ public class PlayerTurn : TurnBase
         TurnState.InputAllowed   = true;
     }
 
-    static bool InSlotRange(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
+    static bool InSlotRange(int _slot) => TutorialStepGate.InSlotRange(_slot);
 
     /// <summary>자유공격 스텝: 공격자·타깃 슬롯 둘 다 -1 → 강제 지정 없이 아무 카드로 아무 적을 공격 가능.</summary>
-    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step)
-        => _step.attackerSlot < 0 && _step.targetSlot < 0;
+    static bool IsFreeStep(TutorialScenarioData.ScriptedAttack _step) => TutorialStepGate.IsFreeStep(_step);
 
     void HandleCardViewAttack(CardView _attacker, CardView _target)
     {

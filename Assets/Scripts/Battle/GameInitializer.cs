@@ -35,6 +35,8 @@ public class GameInitializer : MonoBehaviour
         await UniTask.WaitUntil(() => SceneTransitionVideo.Instance == null
                                    || !SceneTransitionVideo.Instance.IsPlaying);
 
+        ReconcileMultiplayerFlag();
+
         if (DeckConfig.IsMultiplayer)
             await InitializeMultiplayerFields();
         else
@@ -70,6 +72,39 @@ public class GameInitializer : MonoBehaviour
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
     }
 
+    /// <summary>모드 플래그를 **런타임 사실**과 대조한다.
+    ///
+    /// DeckConfig.IsMultiplayer는 로비 패널의 OnPlayerJoined 콜백에서 켜지는데, 전투 씬으로 끌고 가는
+    /// 주체는 마스터의 Runner.LoadScene이다 — 즉 플래그의 authority와 씬 로드의 authority가 다르다.
+    /// 콜백을 놓친(패널이 비활성화돼 구독이 끊긴) 클라이언트는 IsMultiplayer=false인 채 전투에 들어와
+    /// 싱글 턴 객체 + 로컬 시드로 진행한다 = commit-reveal 우회, 양쪽이 아예 다른 게임을 한다.
+    ///
+    /// 여기서는 러너가 살아 있으면 멀티로 승격하고 에러 로그를 남긴다. 로그가 실제로 찍히는지부터
+    /// 계측한 뒤, 확인되면 플래그 세팅 자체를 네트워크 계층으로 옮긴다(그때 UI 세팅 제거).</summary>
+    static void ReconcileMultiplayerFlag()
+    {
+        if (DeckConfig.IsMultiplayer) return;
+        if (TutorialConfig.IsActive) return;   // 튜토리얼은 정의상 싱글(TutorialConfig.Begin이 명시적으로 끈다).
+
+        var t_runner = NetworkSession.Instance?.Runner;
+        if (t_runner == null || !t_runner.IsRunning) return;
+
+        // 러너가 살아 있는 것만으로는 부족하다 — Disconnect()가 await 없이(Forget) 호출되는 경로가
+        // 여럿이라(BattleCleanup.LoadScene, 로비 취소) 이전 판의 러너가 싱글 전투에 남아 있을 수 있다.
+        // 상대가 실제로 접속해 있을 때만 승격한다. 잘못 승격하면 SyncInitialDecks가 타임아웃 없이 영원히 기다린다.
+        int t_players = 0;
+        foreach (Fusion.PlayerRef _ in t_runner.ActivePlayers) t_players++;
+        if (t_players < 2)
+        {
+            Debug.LogWarning($"[Mode] 스테일 러너 감지(접속 {t_players}명). 싱글로 진행한다.");
+            return;
+        }
+
+        Debug.LogError("[Mode] 러너에 상대가 있는데 IsMultiplayer=false로 전투 씬 진입. "
+                     + "멀티로 승격한다 — 로비 콜백(SetMultiplayer)을 놓친 경로가 있다.");
+        DeckConfig.SetMultiplayer(true);
+    }
+
     async UniTask InitializeMultiplayerFields()
     {
         await UniTask.WaitUntil(() => MultiplayerTurnRunner.Instance != null
@@ -85,10 +120,13 @@ public class GameInitializer : MonoBehaviour
 
     void InitializeSinglePlayerFields()
     {
+        // 싱글은 로컬이 항상 0번. 기본값에 기대지 않고 명시한다 — MultiplayerTurnRunner가 씬 오브젝트라
+        // 싱글 전투에서도 Awake가 돌고, 스테일 러너가 있으면 LocalOwnerIndex를 1로 써 버린다.
+        TurnState.LocalOwnerIndex = 0;
+
         // 시드는 필드 초기화보다 **먼저** — 셔플이 MatchRandom을 소비한다.
         // (구: TurnRunner.PlayIntroAndStart에서 시드 → 셔플이 시드 밖 UnityEngine.Random으로 새어나갔다.)
-        if (TutorialConfig.IsActive) MatchRandom.Seed(TutorialConfig.FixedSeed);
-        else                         MatchRandom.SeedRandomLocal();
+        MatchSeeding.SeedForNewMatch();
 
         if (TutorialConfig.IsActive)
         {
