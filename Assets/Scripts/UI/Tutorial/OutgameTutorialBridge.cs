@@ -85,6 +85,11 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 옛 안내가 화면에 남는다.
         CloseGate();
 
+        // 해금은 좌표에서 파생되므로 좌표가 움직인 뒤 한 번 반영해야 잠금 UI가 따라온다.
+        // 스텝 적용의 단일 창구라 자동 스텝이 스스로 커밋하는 경로까지 여기서 함께 잡힌다
+        // (Runner.OnStepChanged는 NotifyStepSatisfied에서만 발화해 그 경로를 놓친다).
+        OutgameFeatureLock.Refresh();
+
         // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
         OutgameTutorialRunner.TryGetCurrentStep(out var t_entering);
         int t_beforeChapter = OutgameTutorialProgress.ChapterIndex;
@@ -163,7 +168,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
     }
 
     // 딤 없이 클릭만 듣는다. onSatisfied가 null인 스텝(구매 대기)은 딤이 유일한 표시였으므로 걸 것이 없다
@@ -229,6 +234,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         bool t_leftScene = m_step != null && m_step.LeavesScene;
 
         OutgameTutorialRunner.NotifyStepSatisfied();
+
+        // 완료로 닫히는 경로는 ApplyCurrentStep까지 가지 않는다(IsRunning=false에서 조기 반환) —
+        // 완주 순간 전 기능이 열리는 것을 반영할 곳이 여기뿐이다.
+        OutgameFeatureLock.Refresh();
 
         if (!OutgameTutorialRunner.IsRunning) { CloseGate(); return; }
 

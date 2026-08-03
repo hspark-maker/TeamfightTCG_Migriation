@@ -72,8 +72,10 @@ public class CollectionGalleryController : MonoBehaviour
         for (int t_i = 0; t_i < m_rows.Count; t_i++)
             if (m_rows[t_i] != null) m_rows[t_i].RefreshProduction();
 
+        // 잠금 변화는 이 폴링이 따라잡는다(0.5초) — 별도 구독 없이도 어긋난 채로 남지 않는다.
         if (harvestAllButton != null)
-            harvestAllButton.interactable = CollectionProductionManager.GetTotalHarvestable() >= 1;
+            harvestAllButton.interactable = CollectionProductionManager.GetTotalHarvestable() >= 1
+                                         && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CollectionHarvest);
     }
 
     // 일괄 수령 클릭 → 매니저에 위임. 지급·영속·통지는 매니저가 처리하고 OnChanged가 갱신을 유발한다.

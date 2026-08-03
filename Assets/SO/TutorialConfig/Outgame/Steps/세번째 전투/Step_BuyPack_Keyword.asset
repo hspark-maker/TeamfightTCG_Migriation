@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: Step_BuyPack_Keyword
   m_EditorClassIdentifier: Assembly-CSharp::WaitPurchaseStep
   guideMessage: 
+  unlocks: 07000000
+  useDim: 1
   anchor: 3
   pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
   duplicateRefundGold: 10

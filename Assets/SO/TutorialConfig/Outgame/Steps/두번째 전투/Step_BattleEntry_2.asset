@@ -13,5 +13,8 @@ MonoBehaviour:
   m_Name: Step_BattleEntry_2
   m_EditorClassIdentifier: Assembly-CSharp::BattleEntryStep
   guideMessage: 
+  unlocks: 06000000
+  useDim: 0
   anchor: 1
   scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
+  showDeckGate: 0
