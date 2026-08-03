@@ -42,7 +42,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [Header("배치")]
     [Tooltip("링이 타깃보다 얼마나 큰가")]
     [SerializeField] float   ringPadding   = 24f;
-    [Tooltip("손끝 미세 보정. 기본 위치는 '타깃 중앙 + 손 크기의 절반'이라 스프라이트 여백만큼만 더 보정하면 된다")]
+    [Tooltip("손끝 미세 보정. 기본 위치는 '타깃 중앙 + 손 높이의 절반'이라 스프라이트 여백만큼만 더 보정하면 된다")]
     [SerializeField] Vector2 handOffset    = Vector2.zero;
     [Tooltip("타깃과 문구 사이 간격")]
     [SerializeField] float   messageMargin = 36f;
@@ -342,7 +342,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         }
 
         // 손 이미지를 타깃 중앙에서 자기 높이의 절반만큼 위로 민다 — 손 아래 모서리가 타깃 중앙에 걸린다.
-        // handOffset은 스프라이트 여백 보정용.
+        // 거기서 handOffset으로 스프라이트 여백을 보정한다(y를 키우면 그만큼 더 뜬다).
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
         {

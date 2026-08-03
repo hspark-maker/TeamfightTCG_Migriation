@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 // 아웃게임 첫시작 튜토리얼 진행도의 세이브 값 객체.
 // 필드는 추가만(하위호환) — 의미 변경·삭제·리네임 금지. 구 세이브엔 노드가 없어 기본값(0/false)으로 읽힌다.
@@ -21,4 +22,8 @@ public class TutorialSaveData
     // 실행 후 커밋이면 자동구매 직후 강제종료 시 소유만 남고 좌표가 0이라 온보딩이 영구 스킵된다.
     public int outgameChapterIndex;
     public int outgameChapterStepIndex;
+
+    // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름). 트리거마다 bool 필드를 늘리지 않으려고 리스트다
+    // — 트리거를 추가해도 세이브 스키마는 그대로다. 모르는 문자열은 지우지 않고 그대로 둔다(구/신 빌드 왕복).
+    public List<string> completedTriggers = new List<string>();
 }

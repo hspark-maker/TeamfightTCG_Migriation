@@ -704,7 +704,7 @@ flowchart TD
         DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialChapter&gt;<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::chg
         CHAP["OutgameTutorialChapter ([Serializable], SO 아님)<br/>label(기획 'N편'과 1:1) · steps · TryGetStep<br/>챕터 하나 = 준비 스텝들 → 전투 스텝"]:::new
         STEP["OutgameTutorialStep (abstract SO) + 6종<br/>WaitClick · BattleEntry · WaitPurchase<br/>WaitPackOpen · AutoPurchase · AutoBattle<br/>Anchor · Completion · LeavesScene · Enter(ctx)"]:::chg
-        CTX["OutgameTutorialStepContext (readonly struct)<br/>ChapterIndex · StepIndex + 다음 좌표(러너가 미리 계산)<br/>CommitAdvance · Rollback · CompleteIfLast<br/>스텝이 진행도를 건드리는 유일한 창구"]:::chg
+        CTX["OutgameTutorialStepContext (readonly struct)<br/>ChapterIndex · StepIndex + 다음 좌표(러너가 미리 계산)<br/>CommitAdvance · Rollback · CompleteIfLast<br/>스텝이 진행도를 건드리는 유일한 창구<br/>커밋 대상은 주입된 싱크 → G-TUT2"]:::chg
         DATA --> CHAP
         CHAP --> STEP
         RUN -->|"Enter(ctx)"| STEP
@@ -712,7 +712,7 @@ flowchart TD
     end
 
     subgraph scene["씬 레이어 (UI/Tutorial/)"]
-        BRG["OutgameTutorialBridge<br/>씬당 1개 (LobbyScene · CardPack)<br/>Awake:EnsureData · Start:EnterCurrentStep"]:::new
+        BRG["OutgameTutorialBridge (온보딩 전용)<br/>씬당 1개 — 현재 LobbyScene뿐<br/>(개봉이 씬→로비 오버레이로 이관돼 CardPack 브리지 소멸)<br/>Awake:EnsureData · Start:EnterCurrentStep<br/>온보딩이 끝나면 게이트를 건드리지 않는다 → G-TUT2"]:::new
         GATE["OutgameTutorialGateUI<br/>전면 딤(350) + 타깃 Canvas 승격(351)<br/>포커스링 · 손가락 · 메시지 = 프리팹 저작<br/>onClick 구독으로 완료 감지"]:::chg
         GPF["OutgameTutorialGate.prefab<br/>브리지가 [SerializeField]로 보유<br/>미배선 시 딤+문구 코드 폴백"]:::new
     end
@@ -877,6 +877,126 @@ sequenceDiagram
   - 갱신 시점이 둘인 이유: 탭 활성화(`OnEnable`)가 스텝 커밋보다 **먼저** 일어난다(탭 버튼의 `Select` 리스너가 게이트 리스너보다 앞에 등록됨). 그래서 `OutgameTutorialRunner.OnStepChanged`로도 재해석한다.
 - **경제 데드락 대응(값 무수정)**: `PackShowcaseController`가 잔액으로 구매 버튼을 잠그고(`CurrencyManager.CanAfford` + `OnCurrencyChanged` 구독), `GateUI.RefreshVisibility`의 기존 소프트락 방어가 딤을 자동으로 걷는다 → 유저가 전투로 골드를 벌고 돌아오면 그 스텝이 그대로 재개된다. Play 실측 후 부족하면 `RewardConfig.minGold` / `NormalPack.price` 조정(코드 무수정).
 - **전투 사이 진입 깜빡임 제거**: `BattleEntry` 완료 직후에는 다음 스텝을 이 씬에서 진입시키지 않는다(`PlayBtn`이 이미 `LoadScene`을 걸어 곧 사라질 게이트가 한 프레임 뜬다) — 로비 복귀 시 그 씬의 브리지가 재개한다.
+
+---
+
+### G-TUT2 — 트리거 기반 튜토리얼 (탭 첫 진입 1회) — 🔄 코드 진행 중 (씬 배선·SO 저작 대기) / 2026-08-03 신설
+
+> G-TUT의 온보딩은 **단조 증가 좌표 하나**뿐이라 "덱 탭에 처음 들어갔을 때 1회" 같은 **선형 시퀀스 밖에서 발화하는 축**을 담을 자리가 없다.
+> 온보딩을 손대지 않고 **트리거 축을 병렬로 추가**한다. 표시(`OutgameTutorialGateUI`)·타깃(`TutorialAnchorRegistry`)·스텝 SO(`MessageStep`/`WaitClickStep`)는 **전부 재사용** — 신규는 "언제 발화하고 어디에 1회 낙인을 찍는가"뿐이다.
+> 첫 대상은 **덱 탭 / 도감 탭 첫 진입**. 발화 API는 범용이라 이후 "덱 편집 첫 진입" 등이 코드 변경 없이 붙는다.
+
+#### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
+
+| 축 | 온보딩(G-TUT) | 트리거(G-TUT2) |
+|---|---|---|
+| 발화 | 부트 시 좌표 재개 (pull) | `TriggeredTutorialRunner.Fire(trigger)` (push) |
+| 진행 좌표 | 세이브 영속 `(챕터, 스텝)` | **메모리만** — 앱 종료 시 처음부터 |
+| 1회 낙인 | `outgameCompleted` 스칼라 | `completedTriggers`에 **완주 시점** 키 1개 |
+| 스텝 SO | 공유 | 공유 (단 커밋 대상이 메모리 싱크) |
+| 게이트 UI | 공유 (`OutgameTutorialGateUI` 싱글턴) | 공유 |
+| 우선순위 | 항상 우선 | 온보딩 `IsRunning` 중엔 발화 억제 |
+
+#### 구조 지도 — 온보딩과 갈리는 지점만
+
+```mermaid
+flowchart TD
+    subgraph persist["영속 — 세이브만 안다 (창구는 그대로 하나)"]
+        PRG["OutgameTutorialProgress (static)<br/>+ IsTriggerDone · MarkTriggerDone · ClearTriggersForDebug"]:::chg
+        SD["TutorialSaveData 슬롯<br/>+ List&lt;string&gt; completedTriggers<br/>(enum 이름 문자열 — 추가만)"]:::chg
+    end
+
+    subgraph sink["진행도 싱크 — 커밋이 어디로 가는가"]
+        ISINK["ITutorialProgressSink<br/>Commit(챕터,스텝) · Complete"]:::new
+        PSINK["PersistentTutorialProgressSink<br/>온보딩 전용 · Progress에 위임"]:::new
+        MSINK["MemoryProgressSink (러너 내부)<br/>트리거 전용 · 세이브에 닿지 않는다"]:::new
+        ISINK --- PSINK
+        ISINK --- MSINK
+    end
+
+    subgraph run["해석 — 러너 2개 (static 분리)"]
+        RUN["OutgameTutorialRunner<br/>온보딩 — IsRunning이 곧 '온보딩 중'"]:::chg
+        TRUN["TriggeredTutorialRunner (static)<br/>Fire · EnsureData · IsRunning<br/>EnterCurrentStep · NotifyStepSatisfied · Abort<br/>event OnActivated"]:::new
+        TDATA["TriggeredTutorialData (SO)<br/>List&lt;TriggeredTutorialEntry&gt;"]:::new
+        TENT["TriggeredTutorialEntry ([Serializable])<br/>trigger · label · steps<br/>씬을 떠나는 마지막 스텝 불변식 없음"]:::new
+        STEP["OutgameTutorialStep + 파생 (공유, 무수정)"]
+        CTX["OutgameTutorialStepContext<br/>+ 싱크 주입 — 커밋 대상이 생성자 인자"]:::chg
+        TDATA --> TENT
+        TENT --> STEP
+        TRUN -->|"Enter(ctx: 메모리 싱크)"| STEP
+        RUN -->|"Enter(ctx: 영속 싱크)"| STEP
+        STEP --> CTX
+    end
+
+    subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
+        BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음"]:::new
+        GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
+    end
+
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false"]:::chg
+    BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
+
+    TAB -->|"유저 탭 전환 시 Fire"| TRUN
+    KEY --- TRUN
+    BOOT -->|"EnsureData(멱등)"| TRUN
+    TBRG -->|"EnsureData · OnActivated 구독"| TRUN
+    TBRG -->|"NotifyStepSatisfied"| TRUN
+    TRUN -->|"완주 시 MarkTriggerDone"| PRG
+    PRG <--> SD
+    CTX -->|"주입된 싱크로 위임"| ISINK
+    PSINK --> PRG
+    MSINK --> TRUN
+    TBRG -->|"ShowGate · ShowMessageGate"| GATE
+    BRG -->|"온보딩 중일 때만"| GATE
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+#### 원리 카드 — 왜 이렇게 생겼나
+
+- **러너를 분리한 이유는 `IsRunning`이 이미 전역 의미를 갖고 있어서다**: `OutgameTutorialRunner.IsRunning`에는 상점 강제 진열(`PackShowcaseController.ResolveDisplay`), 덱 강제 편성(`DeckEditController`), 부트 로비 스킵(`LoadingCoverView`)이 매달려 있다. 기존 러너를 "시퀀스 소스 추상화"로 일반화하면 **이 소비처 6곳이 조용히 트리거 시퀀스를 가리킨다** — 탭 안내 하나 띄우려다 상점 진열이 강제 팩으로 덮인다. 그래서 러너는 갈랐고, 대신 **컨텍스트·스텝·게이트는 공유**한다(갈라야 할 것만 갈랐다). — `TriggeredTutorialRunner.cs`
+- **진행도 경계는 Step이 아니라 Context에 긋는다**: `OutgameTutorialStepContext`가 static `OutgameTutorialProgress`에 하드와이어돼 있으면, 트리거 러너가 넘긴 컨텍스트의 `CommitAdvance()` **한 줄**이 온보딩 영속 좌표를 덮어쓴다. 대안이었던 "스텝에 `IsGuideOnly` 플래그를 달고 안전한 종류만 허용"은 ① `Enter`의 반환값("게이트를 걸어야 하는가")이라는 단일 진실원을 호출측에 복제하고 ② 새 스텝 저작자가 깨뜨릴 수 있는 **약속**이며 ③ 스텝 SO 계층 3파일을 건드린다. 싱크 주입은 셋 다 해결한다 — `Enter`를 정상 호출하고, 세이브에 **물리적으로 도달 불가**하며, **스텝 SO 계층은 한 줄도 수정하지 않는다**. — `ITutorialProgressSink.cs` / `OutgameTutorialStepContext.cs`
+- **게이트 싱글턴은 소유자를 모른다 → 온보딩 쪽에 가드를 건다**: `OutgameTutorialGateUI`는 "스텝·세이브·앵커를 모르는 순수 표시 컴포넌트"라 곧 **소유자도 모른다 = last-writer-wins**다. 실제 재현 경로가 있었다: 온보딩 완료 후 트리거 게이트가 떠 있는데 팩을 개봉하면 → `PackOpenOverlay.OnOpened` → 온보딩 브리지가 `ApplyCurrentStep()` → 첫 줄 `CloseGate()` → `GateUI.Instance.Clear()` → **트리거 게이트가 소리 없이 사라진다**(온보딩 브리지의 구독 해제는 `OnDestroy`뿐이라 완료 후에도 살아 있다). 해법은 `ApplyCurrentStep` 최상단의 `if (!OutgameTutorialRunner.IsRunning) return;` **한 줄** — "온보딩이 끝난 뒤엔 게이트를 건드리지 않는다". 게이트에 소유자 토큰을 넣는 방식은 공개 API 4개를 바꿔야 해서 **소유자가 3개 이상으로 늘 때**로 미룬다. — `OutgameTutorialBridge.ApplyCurrentStep`
+- **진행 좌표는 영속하지 않고 낙인만 영속한다**: 트리거 튜토는 로비 안에서 시작해 로비 안에서 끝나므로 씬 왕복을 견딜 필요가 없다. 딤이 전면을 덮는 동안 유저는 탭을 바꿀 수 없어 **중간 이탈 = 앱 종료뿐**이고, 그때는 다음 진입에 **처음부터 다시** 보여주는 편이 맞다(반쯤 본 안내를 이어 붙이는 것보다 낫다). 그래서 세이브에 늘어나는 것은 완주 키 하나뿐이고, 커밋이 실행보다 앞서야 할 이유(G-TUT의 `AutoPurchase` 축)도 여기엔 없다.
+- **낙인은 bool 필드가 아니라 `List<string>`**: 세이브 규약("필드는 추가만")으로는 둘 다 합법이지만, bool이면 **트리거를 하나 추가할 때마다 `TutorialSaveData` + `OutgameTutorialProgress` 두 공유 파일을 매번 수정**한다. 리스트면 트리거 추가 시 세이브 스키마 churn이 0이고, 저작자는 enum 끝추가 + SO 저작만 하면 된다. 문자열 오타 위험은 없다 — 손으로 쓰지 않고 `enum.ToString()`이다. 대신 실패 모드가 **enum 멤버 리네임**으로 옮겨 가므로(리네임하면 낙인이 풀려 안내가 다시 뜬다) `EOutgameTutorialAnchor`와 같은 금지 주석을 파일 상단에 둔다. 모르는 문자열은 무시한다(전방호환).
+- **훅은 `OnEnable`이 아니라 `Select()`**: 덱 탭 콘텐츠는 `LobbyScene.unity`에 **활성 상태로 저장돼 있어**(프리팹 원본은 비활성) 부팅 시 `DeckTabController.OnEnable`이 1회 헛발화한 뒤 `LobbyTabController.Start()`의 `Select(defaultIndex=2)`가 끈다. `OnEnable`을 "첫 진입"으로 쓰면 유저가 누르지도 않았는데 트리거가 터진다. `Select()`에는 이 GameObject 활성 아티팩트가 보이지 않는다. 단 `Select`는 호출자가 셋(버튼 리스너 · `Start` · `SelectDefault`)이라 **`Start`만 발화 없는 경로로 분리**했다(`Select(idx, _fireTrigger: false)`) — 안 그러면 기본 탭에 트리거를 저작하는 순간 부팅마다 안내가 뜬다. 같은 분리가 **도감 서브탭 인스턴스**의 초기 `Select(0)`도 막는다(하단바와 서브탭이 같은 클래스의 두 인스턴스다).
+- **발화는 이벤트 역전이 아니라 직접 호출**: `LobbyTabController`는 이미 `TutorialAnchorRegistry.Register`를 `Awake`에서 직접 부른다(탭 버튼이 프리팹 내부 stripped Button이라 `TutorialAnchor`를 못 붙이는 대리 등록). 여기서만 이벤트로 뒤집으면 "탭 컨트롤러는 튜토리얼을 반쯤 안다"는 더 나쁜 경계가 된다. 트리거 키를 `Tab` 항목에 두는 것도 같은 이유 — 탭 **인덱스**로 붙이면 `LobbyMatchLauncher.cs`가 이미 복제해 둔 탭 순서 지식이 3번째 사본이 된다.
+- **브리지는 `Start`가 아니라 `Awake`에서 구독한다**: 온보딩 브리지는 `Start`에서 pull 1회면 충분했지만(부트 시점에 좌표가 이미 있다), 트리거는 **세션 중간에 발화**하므로 push가 필요하다. `LobbyTabController`와 `TriggeredTutorialBridge` 둘 다 `DefaultExecutionOrder`가 없어 탭 컨트롤러의 `Start`가 먼저 돌 수 있다 → `Awake` 구독 + `Start` 재개 pull 1회.
+- **트리거 튜토는 안내 스텝만 성립한다**: 브리지가 팩 개봉·구매 신호를 구독하지 않으므로 `Completion`이 `PackOpen`/`Purchase`인 스텝은 완료 신호가 영영 오지 않는다. 저작되면 경고 후 스킵한다. 씬을 떠나는 스텝도 재개해 줄 브리지가 없다 — 트리거 축은 `Confirm`(딤 탭)과 `Click`(타깃 클릭) 두 갈래뿐이다.
+- **앵커 enum은 이번에 늘리지 않았다**: 트리거는 **유저가 이미 그 탭을 누른 뒤** 발화하므로 탭 버튼을 강조하는 스텝이 성립하지 않는다. 도감 내부에서 실제로 가리킬 위젯이 저작 단계에서 확정되면 그때 끝에 추가한다 — 지금 넣으면 `LobbyDeckTab`·`LobbyMatchTab`·`DeckCreateSlot`처럼 사용처 0인 값이 하나 더 는다.
+
+**수정 가능성 높은 지점**: 트리거별 스텝·문구 = `TriggeredTutorial.asset`(코드 무수정) / 새 트리거 = `EOutgameTutorialTrigger` **끝에 값 추가**(리네임 금지) + 발화 지점 1줄 + SO 엔트리 저작 / 어느 탭이 어느 트리거인가 = `LobbyCanvas.prefab`의 `tabs[i].tutorialTrigger` 인스펙터 / 다시 보기 = `OutgameDebugActions.ResetTriggeredTutorials()`(F8 패널).
+
+#### 파일 지도
+
+| 클래스/에셋 | 파일 | 상태 |
+|---|---|---|
+| `EOutgameTutorialTrigger` (발화 키 enum) | 신규 `Assets/Scripts/OutGame/Tutorial/EOutgameTutorialTrigger.cs` | 2026-08-03 |
+| `ITutorialProgressSink` + `PersistentTutorialProgressSink` | 신규 `Assets/Scripts/OutGame/Tutorial/ITutorialProgressSink.cs` | 2026-08-03 |
+| `TriggeredTutorialData` (SO) + `TriggeredTutorialEntry` (`[Serializable]`) | 신규 `Assets/Scripts/OutGame/Tutorial/TriggeredTutorialData.cs` — `Create → Card Battle/Triggered Tutorial` | 2026-08-03 |
+| `TriggeredTutorialRunner` (static, 발화·좌표·낙인) | 신규 `Assets/Scripts/OutGame/Tutorial/TriggeredTutorialRunner.cs` | 2026-08-03 |
+| `TriggeredTutorialBridge` (LobbyScene 1개, 수명 연결) | 신규 `Assets/Scripts/UI/Tutorial/TriggeredTutorialBridge.cs` | 2026-08-03 |
+| `TutorialSaveData.completedTriggers` (완주 키 목록) | `Assets/Scripts/OutGame/Save/2.Domain/TutorialSaveData.cs` — 필드 1 추가 | 2026-08-03 |
+| `OutgameTutorialProgress` 트리거 낙인 API | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialProgress.cs` — `IsTriggerDone`/`MarkTriggerDone`/`ClearTriggersForDebug` | 2026-08-03 |
+| `OutgameTutorialStepContext` 싱크 주입 | `Assets/Scripts/OutGame/Tutorial/Steps/OutgameTutorialStepContext.cs` — 생성자 인자 1 + 위임 3곳 | 2026-08-03 |
+| `OutgameTutorialRunner` 영속 싱크 전달 | `Assets/Scripts/OutGame/Tutorial/OutgameTutorialRunner.cs` — `EnterCurrentStep` 1줄 | 2026-08-03 |
+| `OutgameTutorialBridge` 게이트 소유 가드 | `Assets/Scripts/UI/Tutorial/OutgameTutorialBridge.cs` — `ApplyCurrentStep` 1줄 | 2026-08-03 |
+| `LobbyTabController.Tab.tutorialTrigger` + `Select(idx, fireTrigger)` | `Assets/Scripts/UI/Lobby/LobbyTabController.cs` — 필드 1 + 시그니처 1 + `Start` 1줄 | 2026-08-03 |
+| `BootInstaller` 트리거 SO 주입 | `Assets/Scripts/Core/BootInstaller.cs` — 필드 1 + 1줄 | 2026-08-03 |
+| 트리거 리셋 디버그 | `Assets/Scripts/OutGame/Debug/OutgameDebugActions.cs` · `OutgameDebugOverlay.cs` | 2026-08-03 |
+
+#### 씬/에셋 인계 (코드 밖 — 사용자)
+
+| 씬/에셋 | 작업 |
+|---|---|
+| `Assets/SO/TutorialConfig/Outgame/TriggeredTutorial.asset` | `Create → Card Battle/Triggered Tutorial`로 신규 생성. 엔트리 2개(`DeckTabFirstEnter` / `CollectionTabFirstEnter`) + 각 `Step_Message` 에셋 저작. **`Completion`이 `Confirm`/`Click`인 스텝만** 꽂을 것 |
+| `Assets/Scenes/LobbyScene.unity` | `TutorialSystem` 오브젝트에 `TriggeredTutorialBridge` 부착 → `data` ← `TriggeredTutorial.asset`, `gatePrefab` ← `OutgameTutorialGate.prefab`(온보딩 브리지와 같은 프리팹) |
+| `BootInstaller` 사본 2개 (LoadingScene · LobbyScene) | `Triggered Tutorial Data` 필드에 같은 에셋 배선 |
+| `Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab` | 하단바 `LobbyTabController`: `tabs[3](Deck).tutorialTrigger = DeckTabFirstEnter` · `tabs[4](Collection).tutorialTrigger = CollectionTabFirstEnter`. **도감 서브탭(`Tab_Collection.prefab`)의 탭바는 전부 `None`으로 둘 것** |
+| (별건) `Assets/Scenes/LobbyScene.unity` | `Tab_Deck`이 씬 오버라이드로 `m_IsActive: 1`이다(프리팹 원본은 0). 부팅 시 `DeckTabController.OnEnable`이 1회 헛발화하므로 오버라이드를 원복해 두면 좋다 — 이번 설계는 `Select()` 훅이라 영향은 없다 |
 
 ---
 

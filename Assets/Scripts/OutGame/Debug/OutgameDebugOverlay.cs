@@ -17,7 +17,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     const float PANEL_WIDTH   = 190f;
     const float ROW_HEIGHT    = 26f;
     const float CLOSED_HEIGHT = 30f;
-    const float OPENED_HEIGHT = 248f;   // 편 점프 한 줄 포함
+    const float OPENED_HEIGHT = 274f;   // 편 점프 한 줄 포함
 
     static OutgameDebugOverlay s_instance;
 
@@ -76,6 +76,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("REVOKE ALL CARDS", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RevokeAllCards();
         if (GUILayout.Button("SKIP TUTORIAL",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.SkipTutorial();
         if (GUILayout.Button("RESET TUTORIAL",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTutorial();
+        if (GUILayout.Button("RESET TRIGGERS",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTriggeredTutorials();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
 
         DrawChapterJumps();

@@ -84,11 +84,14 @@ public class MatchDeckShell : MonoBehaviour
         // 씬이 내려가는 중이다 — 파괴될 오브젝트를 건드리지 않는다.
         if (t_canceled) return false;
 
-        // 시작이든 포기든 화면은 내린다. 이 화면은 로비 위 오버레이라 뒤에 로비가 그대로 있고,
-        // 포기 시 덮어줄 씬 전환도 없다.
-        Close();
+        bool t_confirmed = m_gate == EGate.Confirmed;
 
-        return m_gate == EGate.Confirmed;
+        // 내리는 것은 포기일 때뿐이다. 이 화면은 로비 위 오버레이라 내리는 즉시 로비가 드러나는데,
+        // 전투 시작은 호스트가 곧바로 씬을 로드한다 — LoadScene은 프레임 끝에 전환되므로 여기서 내리면
+        // 그 사이 한 프레임이 로비로 번쩍인다. 씬 전환이 화면을 덮어 갈 때까지 그대로 둔다.
+        if (!t_confirmed) Close();
+
+        return t_confirmed;
     }
 
     // 전투 시작 버튼. 선택된 덱을 씬 전환 캐리어에 실은 뒤에만 게이트를 연다 —

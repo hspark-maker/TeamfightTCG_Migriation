@@ -55,6 +55,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
+        if (!OutgameTutorialRunner.IsRunning) return;   // 온보딩이 끝난 뒤엔 게이트를 건드리지 않는다 — 트리거 튜토리얼이 쓰고 있을 수 있다.
         if (m_applying) { m_pendingApply = true; return; }
 
         m_applying = true;

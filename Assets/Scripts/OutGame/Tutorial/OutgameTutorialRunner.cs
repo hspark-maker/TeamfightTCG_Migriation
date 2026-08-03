@@ -71,7 +71,8 @@ public static class OutgameTutorialRunner
         // 다음 좌표를 러너가 미리 계산해 실어준다 — 스텝은 자기가 챕터 끝인지도 모른 채 커밋한다.
         bool t_hasNext = TryGetNext(t_chapter, t_index, out int t_nextChapter, out int t_nextStep);
 
-        return t_step.Enter(new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext));
+        return t_step.Enter(new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext,
+                                                          PersistentTutorialProgressSink.Instance));
     }
 
     /// <summary>튜토리얼이 이번 스텝에서 팔 팩을 지정했으면 true. 상점은 진열·가격·구매 대상을 이걸로 덮어써
