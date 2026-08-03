@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,12 +9,14 @@ using UnityEngine.UI;
 // 덱 데이터의 진실원은 내 쪽이 DeckSaveManager, 상대 쪽이 DeckConfig.EnemyDeck이고
 // 이 뷰는 매 Render마다 거기서 다시 읽는다(사본을 캐시하지 않는다).
 // 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다 — 게이트를 열기 전에
-// GameInitializer.ConfirmEnemyDeck이 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
+// LobbyMatchLauncher.ConfirmEnemyDeck이 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
 public class MatchDeckPanelView : MonoBehaviour
 {
     [SerializeField] MatchDeckShell   shell;
     [SerializeField] CardVisualView[] mySlots;      // 6칸. MySlot_N 자신이 아니라 자식 MySlot_N/CardUIView를 물린다
     [SerializeField] CardVisualView[] enemySlots;   // 6칸. 같은 규약 — EnemySlot_N/CardUIView를 물린다
+    [SerializeField] TMP_Text         myPowerText;      // MyInfoBar/PowerBadge/PowerText
+    [SerializeField] TMP_Text         enemyPowerText;   // EnemyInfoBar/PowerBadge/PowerText
     [SerializeField] Button           editButton;
     [SerializeField] Button           backButton;
     [SerializeField] Button           battleButton;
@@ -64,15 +67,26 @@ public class MatchDeckPanelView : MonoBehaviour
 
         // _owned는 항상 true다. 매치 화면에 올라오는 건 이미 편성된 소유 카드뿐이라 잠금 표시가 뜨면 안 된다.
         BindSlots(mySlots, t_deck);
+        SetPower(myPowerText, t_deck);
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
     // 캐리어가 비어 있으면(=호스트가 확정하지 못한 경우) 전 칸이 빈 칸으로 접힌다.
-    // 멀티는 상대 덱이 게이트보다 늦게(SyncInitialDecks) 도착하므로 애초에 이 화면을 열지 않는다(RunDeckGate).
+    // 멀티는 상대 덱이 이 화면보다 늦게(배틀 씬의 SyncInitialDecks) 도착하므로 애초에 이 화면을 열지 않는다.
     void RenderEnemySlots()
     {
         // 표시용 공개이므로 _owned는 내 쪽과 같은 true — 상대 카드를 잠금 실루엣으로 가리지 않는다.
         BindSlots(enemySlots, DeckConfig.EnemyDeck);
+        SetPower(enemyPowerText, DeckConfig.EnemyDeck);
+    }
+
+    // 덱 파워 표기. 환산식은 DeckPower가 단일 진실원이다(편성 화면의 자동 편성 정렬과 같은 식).
+    // 덱이 null이면 0이 찍힌다 — 미선택·불완전 덱을 빈칸이 아니라 0으로 보이게 하는 게 의도다.
+    static void SetPower(TMP_Text _text, List<CardData> _deck)
+    {
+        if (_text == null) return;   // 미배선 필드는 조용히 건너뛴다
+
+        _text.text = DeckPower.Of(_deck).ToString();
     }
 
     // 칸 배열 하나를 덱으로 채운다. 덱이 짧거나 null이면 남는 칸은 빈 칸이 된다.
@@ -99,7 +113,8 @@ public class MatchDeckPanelView : MonoBehaviour
         if (shell != null) shell.OpenEditor();
     }
 
-    // 전투 포기. 어디로 돌아갈지는 셸을 await 하는 호스트가 정한다 — 이 뷰는 씬을 모른다.
+    // 화면 닫기. 이 오버레이는 로비 위에 떠 있어 닫으면 로비로 돌아갈 뿐이라 확인을 받지 않는다
+    // (덱 편집과 달리 잃을 편집분도 없다). 실제로 어디에 남을지는 셸을 await 하는 호스트가 정한다.
     void OnBackClicked()
     {
         if (shell != null) shell.Cancel();

@@ -150,6 +150,7 @@ GameObject:
   - component: {fileID: 3592011220215043498}
   - component: {fileID: 8160941316250117599}
   - component: {fileID: 7795871077781965683}
+  - component: {fileID: 6416944339491517239}
   m_Layer: 0
   m_Name: EnemySection
   m_TagString: Untagged
@@ -262,6 +263,19 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &6416944339491517239
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 109873837837334765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 16
 --- !u!1 &134942568141960152
 GameObject:
   m_ObjectHideFlags: 0
@@ -453,7 +467,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.08627451, g: 0.13725491, b: 0.24705882, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2722,6 +2736,7 @@ GameObject:
   - component: {fileID: 6195740187845894146}
   - component: {fileID: 4009283567042495858}
   - component: {fileID: 4857769833606807074}
+  - component: {fileID: 7609972416411567334}
   m_Layer: 0
   m_Name: MySection
   m_TagString: Untagged
@@ -2834,6 +2849,19 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &7609972416411567334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6560567247882977205}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 15
 --- !u!1 &6771870178557793575
 GameObject:
   m_ObjectHideFlags: 0
@@ -3742,6 +3770,8 @@ MonoBehaviour:
   - {fileID: 3927920344760086061}
   - {fileID: 2903166991755586172}
   - {fileID: 2890221419403269162}
+  myPowerText: {fileID: 2343818114332843482}
+  enemyPowerText: {fileID: 1251643176279656888}
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
   battleButton: {fileID: 6854664472983553879}

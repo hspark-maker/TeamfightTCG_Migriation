@@ -84,8 +84,25 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 옛 안내가 화면에 남는다.
         CloseGate();
 
+        // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
+        OutgameTutorialRunner.TryGetCurrentStep(out var t_entering);
+        int t_beforeChapter = OutgameTutorialProgress.ChapterIndex;
+        int t_beforeStep    = OutgameTutorialProgress.StepIndex;
+
         // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!OutgameTutorialRunner.EnterCurrentStep()) return;
+        if (!OutgameTutorialRunner.EnterCurrentStep())
+        {
+            // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
+            // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
+            // 좌표가 안 움직였으면(= Enter가 롤백했거나 애초에 커밋을 못 했다) 잇지 않는다 — 같은 실패를 되풀이한다.
+            bool t_moved = t_beforeChapter != OutgameTutorialProgress.ChapterIndex
+                        || t_beforeStep    != OutgameTutorialProgress.StepIndex;
+
+            if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+
+            return;
+        }
+
         if (!OutgameTutorialRunner.TryGetCurrentStep(out var t_step)) return;
 
         m_step = t_step;

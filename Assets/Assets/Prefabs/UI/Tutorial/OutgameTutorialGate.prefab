@@ -121,7 +121,7 @@ MonoBehaviour:
   messageRect: {fileID: 6510000000000000051}
   messageText: {fileID: 6510000000000000063}
   ringPadding: 24
-  handOffset: {x: 70, y: -80}
+  handOffset: {x: 0, y: 0}
   messageMargin: 36
   messageBottom: 220
   pulseScale: 1.08
@@ -533,8 +533,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uC548\uB155\uD558\uC138\uC694."
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
-  m_sharedMaterial: {fileID: -4999335185947324146, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+  m_sharedMaterial: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

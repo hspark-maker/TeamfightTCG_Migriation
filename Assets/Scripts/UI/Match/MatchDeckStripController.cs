@@ -24,7 +24,8 @@ public class MatchDeckStripController : MonoBehaviour
     // 여기서 임의로 그리면 선택 없는 목록이 한 프레임 떴다가 셸의 Build로 덮이면서 깜빡인다.
 
     // 셸이 부르는 유일한 진입점. _selectedSlot은 DeckSaveManager 좌표(없으면 -1), _onClick은 편집 대상 전환 콜백.
-    public void Build(int _selectedSlot, Action<int> _onClick)
+    // _tutorialSlot은 튜토리얼 안내가 가리킬 덱 좌표(없으면 -1) — 그 칸 하나만 앵커로 등록한다.
+    public void Build(int _selectedSlot, Action<int> _onClick, int _tutorialSlot = -1)
     {
         Clear();
 
@@ -56,8 +57,9 @@ public class MatchDeckStripController : MonoBehaviour
                 _onClick,
                 null);                                  // 삭제 콜백 없음 — null이면 SetEditMode가 항상 무시해서 삭제 버튼이 절대 뜨지 않는다(매치 화면에 파괴적 경로를 두지 않는다)
 
-            // RegisterTutorialAnchor는 호출하지 않는다 — TutorialAnchorRegistry가 static이라
-            // 매치 리스트가 등록하면 로비 튜토리얼 하이라이트가 매치 카드를 가리키게 된다.
+            // 튜토리얼 덱 칸에만 등록한다. 로비 목록(DeckListController)이 쓰는 DeckCreateSlot(7)과 키가 달라
+            // TutorialAnchorRegistry가 static이어도 로비 하이라이트를 빼앗지 않는다 — 나머지 칸은 그대로 등록하지 않는다.
+            if (t_i == _tutorialSlot) t_view.RegisterTutorialAnchor(EOutgameTutorialAnchor.MatchDeckTutorialDeck);
 
             m_slots.Add(t_view);
             m_slotIndices.Add(t_i);
@@ -84,6 +86,10 @@ public class MatchDeckStripController : MonoBehaviour
 
     public void Clear()
     {
+        // 앵커는 명시 해제한다 — Destroy가 프레임 끝에 반영되므로 그사이 죽을 칸이 등록된 채 남는다
+        // (레지스트리의 fake-null 자가치유에 기대면 그 구간에 게이트가 사라질 칸을 가리킬 수 있다).
+        TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.MatchDeckTutorialDeck);
+
         // Destroy는 프레임 끝에 반영된다 — 먼저 끄지 않으면 셸이 Clear만 부르고 나가는 경로에서 한 프레임 잔상이 남는다.
         for (int t_i = 0; t_i < m_slots.Count; t_i++)
         {
