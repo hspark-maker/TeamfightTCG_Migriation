@@ -12,7 +12,8 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] AudioClip battleBGM;
     [SerializeField] TutorialOverlayUI tutorialOverlayPrefab;   // 튜토리얼 오버레이 프리팹(비우면 코드 빌드 폴백)
     [SerializeField] BattleVfxLibrary battleVfxLibrary;         // 규칙 기반 연출 배선 단일 지점(비우면 해당 연출만 생략)
-    [SerializeField] MatchDeckShell matchDeckShell;             // 전투 전 덱 확인/편집 게이트(비우면 게이트 없이 기존 동작)
+    // 덱 확인/편집 게이트(MatchDeckShell)는 여기 없다 — 로비(LobbyMatchLauncher)가 씬 로드 전에 돌린다.
+    // 이 씬에 다시 두면 확정 지점이 씬을 넘어 둘로 갈린다. 배틀 씬은 확정된 DeckConfig를 읽기만 한다.
 
     void Awake()
     {
@@ -39,14 +40,8 @@ public class GameInitializer : MonoBehaviour
         // 모드 판정이 먼저다 — 아래 두 단계(상대 덱 확정·덱 게이트)가 IsMultiplayer로 갈린다.
         ReconcileMultiplayerFlag();
 
-        // 상대 덱을 게이트보다 **먼저** 확정한다 — 게이트 화면의 상대 섹션이 이 값을 읽어 그린다.
-        // 필드 초기화(InitializeSinglePlayerFields)에서 뽑으면 게이트가 그릴 시점엔 아직 값이 없어
-        // 상대 칸이 빈 채로 뜨고, 화면과 전투가 서로 다른 추첨 결과를 보게 된다.
+        // 상대 덱 폴백. 로비를 거쳐 왔으면 이미 확정돼 있어 무동작이다(아래 HasEnemyDeck 가드).
         ConfirmEnemyDeck();
-
-        // 덱 확인/편집 게이트 — 통과해야 DeckConfig.PlayerDeck이 확정된다.
-        // 아래 필드 초기화가 그 값을 소비하므로 반드시 이보다 앞이어야 한다.
-        if (!await RunDeckGate()) return;
 
         if (DeckConfig.IsMultiplayer)
         {
@@ -89,8 +84,9 @@ public class GameInitializer : MonoBehaviour
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
     }
 
-    /// <summary>상대(AI) 덱 확정. 이 씬에서 상대 덱을 뽑는 유일한 지점이며,
-    /// 결과를 DeckConfig에 실어 게이트 화면과 필드 초기화가 같은 값을 보게 한다.</summary>
+    /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmEnemyDeck)다 —
+    /// 덱 화면이 그린 6장과 실제 상대가 같아야 하므로 확정은 화면을 띄우기 전에 끝나야 한다.
+    /// 여기는 로비를 거치지 않는 진입점(MainMenu·TutorialSetupUI·AutoBattleStep·씬 단독 실행)만 태운다.</summary>
     void ConfirmEnemyDeck()
     {
         // 멀티는 상대 덱이 SyncInitialDecks로 훨씬 뒤에 도착한다 — 지금 확정할 수 있는 값이 없다.
@@ -99,7 +95,7 @@ public class GameInitializer : MonoBehaviour
         // 튜토리얼은 양 덱이 시나리오 고정이다(아래 필드 초기화가 TutorialConfig에서 직접 주입).
         if (TutorialConfig.IsActive) return;
 
-        // 로비 매칭이 이미 확정해 넘겼으면 그대로 쓴다 — 여기서 다시 뽑으면 로비에서 공개한 패와 어긋난다.
+        // 로비가 이미 확정해 넘겼으면 그대로 쓴다 — 여기서 다시 뽑으면 덱 화면에서 공개한 패와 어긋난다.
         if (DeckConfig.HasEnemyDeck) return;
 
         if (this.aiDeckConfig == null)
@@ -111,31 +107,6 @@ public class GameInitializer : MonoBehaviour
         // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom(셔플 시드)을 소비하지 않으므로
         // 시드 설정(InitializeSinglePlayerFields)보다 앞에서 뽑아도 결정론에 영향이 없다.
         DeckConfig.SetEnemyDeck(this.aiDeckConfig.GetRandomDeck());
-    }
-
-    /// <summary>전투 시작 전 덱 확인/편집 화면. 반환 false = 유저가 전투를 포기했다 →
-    /// 로비로 되돌리고 이 씬의 초기화를 더 진행하지 않는다.</summary>
-    async UniTask<bool> RunDeckGate()
-    {
-        if (this.matchDeckShell == null) return true;   // 미배선 = 게이트 없음(기존 경로 그대로)
-
-        // 멀티는 한쪽이 덱 화면에 머무는 동안 상대가 타임아웃 없이 대기한다(이탈로도 잡히지 않는다).
-        // 매칭 전에 덱이 이미 확정되는 경로라 게이트를 태울 이유도 없다.
-        if (DeckConfig.IsMultiplayer) return true;
-
-        // 튜토리얼은 전투에 넣은 스텝이 정한다(BattleEntryStep/AutoBattleStep의 showDeckGate).
-        // 기본은 끔 — 스크립트 고정 덱 전투는 고를 것이 없어 화면이 의미 없다.
-        if (TutorialConfig.IsActive && !TutorialConfig.ShowDeckGate) return true;
-
-        if (await this.matchDeckShell.RunSelectionAsync(this.GetCancellationTokenOnDestroy())) return true;
-
-        // 유저가 스스로 나가는 길이라 AbortInit(상대 이탈/타임아웃 처리)을 타지 않는다.
-        // 다만 카메라 잠금 해제는 같은 이유로 필요하다 — battleIntro.Await()가 걸어둔 잠금을 풀지 않으면
-        // 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다.
-        BattleCameraFit.ClearExternalControl();
-        BattleCleanup.LoadScene("LobbyScene");
-
-        return false;
     }
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.

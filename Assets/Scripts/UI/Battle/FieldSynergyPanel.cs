@@ -38,6 +38,7 @@ public class FieldSynergyPanel : MonoBehaviour
 
     readonly List<SynergyIconView> icons = new List<SynergyIconView>();   // 재사용 풀(파괴하지 않는다)
     SynergyState lastState;
+    bool         drawnOnce;        // lastState가 null인 것과 "아직 한 번도 안 그렸다"를 가르는 값
     BattleField  field;            // 확대할 카드를 찾는 출처(그 진영 필드)
     SynergyData  selected;         // 지금 설명이 열려 있는 시너지. null = 닫힘
 
@@ -83,10 +84,14 @@ public class FieldSynergyPanel : MonoBehaviour
         }
     }
 
-    /// <summary>같은 스냅샷이면 아무것도 하지 않는다 — 시너지는 덱 확정 1회 산출이라 대부분의 호출이 같은 값이다.</summary>
+    /// <summary>같은 스냅샷이면 아무것도 하지 않는다 — 시너지는 덱 확정 1회 산출이라 대부분의 호출이 같은 값이다.
+    ///
+    /// 단 **첫 호출은 값이 같아도 반드시 그린다**(drawnOnce). 시너지가 없는 판은 _state가 null인데
+    /// lastState 초기값도 null이라 여기서 걸러버리면, 씬에서 켜둔 배경판을 끌 기회가 영영 오지 않는다.</summary>
     public void Refresh(SynergyState _state)
     {
-        if (ReferenceEquals(this.lastState, _state)) return;
+        if (this.drawnOnce && ReferenceEquals(this.lastState, _state)) return;
+        this.drawnOnce = true;
         this.lastState = _state;
         Deselect();   // 칸이 다른 시너지로 바뀌면 열려 있던 설명·확대가 거짓이 된다
 
