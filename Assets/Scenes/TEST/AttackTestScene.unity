@@ -603,8 +603,13 @@ MonoBehaviour:
   autoReloadConfig: 1
   swarmDamagePerShot: 1
   caretakerHeal: 1
-  emblemSynergy: {fileID: 0}
+  swarmVfx: {fileID: 0}
+  flowVfx: {fileID: 0}
+  emblemSynergies:
+  - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
+  emblemIndex: 0
   emblemSlot: 0
+  emblemTiming: 1
   windDur: 0.2
   windDist: 0.4
   inDur: 0.1
@@ -4057,6 +4062,10 @@ MonoBehaviour:
   glowFade: 0.28
   glowPulseScale: 1.1
   glowPulseTime: 0.9
+  shineTilt: 25
+  shineWidth: 0.22
+  shineDuration: 0.5
+  shineAlpha: 0.9
 --- !u!114 &1755558531
 MonoBehaviour:
   m_ObjectHideFlags: 0

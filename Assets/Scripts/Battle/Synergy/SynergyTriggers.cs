@@ -34,6 +34,10 @@ public static class SynergyTriggers
         CardPassive.Notify(self, synergy.effectDescription, synergy.activeIcon);
         CardView.GetView(self)?.PopSynergyBadge(synergy);       // 발동 주체 카드의 해당 배지 pop
 
+        // 화면 가장자리 시너지 줄에서도 그 아이콘만 튄다 — 카드 배지는 카드를 보고 있을 때만 눈에 들어오고,
+        // 어느 진영의 시너지가 일했는지는 그 줄이 답한다. 발동 주체의 소유자로 진영을 가른다.
+        FieldSynergyPanel.Pop(self.ownerIndex == TurnState.LocalOwnerIndex, synergy);
+
         // 엠블럼 배선(타이밍·범위·몸짓)은 그 시너지의 연출 에셋이 쥔다 — 여기선 "터졌다"만 알린다.
         return SynergyEmblemVfx.PlayTriggered(self, synergy, field);
     }

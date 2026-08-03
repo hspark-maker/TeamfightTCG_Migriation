@@ -20,7 +20,7 @@ public class SynergyEmblemEntry
 
     /// <summary>이 줄이 그 타이밍에 실제로 뜨는가. 몸짓/그림 미배정이면 false(무동작 안전).</summary>
     public bool Covers(SynergyEmblemTiming _timing)
-        => (this.timing & _timing) != 0 && this.spec != null && this.spec.sprite != null;
+        => (this.timing & _timing) != 0 && this.spec != null && this.spec.HasArt;
 }
 
 /// <summary>
