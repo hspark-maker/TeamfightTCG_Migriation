@@ -52,14 +52,19 @@ public static class AttackProcessor
 
         // ---- seam 2: ExtraTargets — 추가 대상 피해 ----
         CardInstance t_splash = null;
+        bool t_splashHit = false;
         if (t_peerless)
         {
             t_splash = _preSelectedSplash ?? PickSplash(_defender.slotIndex, _defenderField);
-            if (t_splash != null && t_splashDmg > 0) // 0 데미지로 무적 태우지 않기
+            t_splashHit = t_splash != null && t_splashDmg > 0; // 0 데미지로 무적 태우지 않기
+            if (t_splashHit)
                 t_splash.TakeDamage(t_splashDmg, true); // 스플래시도 공격 직격: 비늘 감소 대상
         }
 
         AttackFlow.RunAttacked(_defender, _attacker, _defenderField, _attackerField); // 패시브 Attacked + 성벽 반격(동기)
+        // 광역 피격자도 같은 직격이므로 시너지 [Attacked]를 발화한다(패시브는 제외 — RunSplashAttacked 주석 참조).
+        if (t_splashHit)
+            AttackFlow.RunSplashAttacked(t_splash, _attacker, _defenderField, _attackerField);
         // [DamageDealt] 패시브 → 시너지 순. ctx가 소속 필드를 들고 있다(디스패처 BelongsTo 판정용).
         if (t_takesCounter)
         {

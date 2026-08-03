@@ -130,8 +130,8 @@ TextureImporter:
         y: 402
         width: 444
         height: 508
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      alignment: 9
+      pivot: {x: 0.75, y: 0.25}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -152,8 +152,8 @@ TextureImporter:
         y: 402
         width: 443
         height: 508
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      alignment: 9
+      pivot: {x: 0.25, y: 0.25}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -184,6 +184,7 @@ TextureImporter:
     nameFileIdTable:
       "\uB369\uCE58_arm_0": 616197046
       "\uB369\uCE58_arm_1": -602720040
+      "\uB369\uCE58_arm_2": 736089835
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

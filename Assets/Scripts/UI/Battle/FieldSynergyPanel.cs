@@ -1,15 +1,15 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
-/// <summary>필드 한쪽의 **활성 시너지 목록**을 화면 모서리에 세로로 세우는 UI 패널.
+/// <summary>필드 한쪽의 **활성 시너지 아이콘 줄**. 내 쪽은 화면 아래 가운데, 상대 쪽은 위 가운데에 둔다
+/// — 위/아래로 갈라져 있어야 "누구 시너지인가"를 색·글자 없이 위치만으로 읽는다.
 ///
-/// 자리는 진영으로 갈린다 — 내 쪽은 **아래 가운데**, 상대 쪽은 **위 가운데**(각자 자기 필드 바깥쪽).
-/// 위/아래로 갈라져 있어야 "누구 시너지인가"를 색·글자 없이 위치만으로 읽는다. 앵커·피벗·정렬은
-/// <see cref="localSide"/> 하나로 코드가 정한다 — 씬에서 손으로 맞추면 두 패널이 서로 다르게 어긋난다.
+/// **고정 UI는 씬에 있고, 개수가 변하는 것만 만든다.** 배경판·앵커·간격은 씬 저작이고(런타임 생성 금지),
+/// 아이콘은 시너지 수만큼 늘었다 줄었다 하므로 프리팹에서 찍어낸다. 한 번 만든 아이콘은 버리지 않고
+/// 껐다 켜 재사용한다 — 갱신마다 파괴/생성하면 그때마다 레이아웃이 다시 돈다.
 ///
-/// **월드가 아니라 캔버스**에 있다: 필드 옆(월드)에 두면 카드·연출과 겹치고 화면 비율마다 자리가 흔들린다.
-/// 화면 고정 정보는 화면 좌표에 둔다.
+/// **배경판 크기는 코드가 계산하지 않는다.** 아이콘 줄에 HorizontalLayoutGroup + ContentSizeFitter가
+/// 붙어 있어 켜진 아이콘 수만큼 저절로 늘고 준다. 폭을 코드로 재면 여백·간격 값이 씬과 코드 두 곳에 생긴다.
 ///
 /// **상대 시너지도 그대로 보여준다**(2026-08-03 사용자 확정). 카드 배지가 뒷면 적의 소속을 가리는 것과
 /// 다른 판단이다 — 필드 시너지는 판을 읽는 정보라 양쪽 다 보이는 쪽이 낫다. 정보 누출로 보고 가리지 마라.
@@ -19,153 +19,167 @@ using UnityEngine.UI;
 /// (씬마다 참조를 다시 꽂지 않게. 같은 진영 패널이 둘이면 먼저 켜진 쪽이 쓰인다).
 ///
 /// 순수 표시 — 규칙/상태 무접촉. 시너지 스냅샷(SynergyState)은 덱 확정 1회 산출이라 재계산도 없다.</summary>
-[RequireComponent(typeof(RectTransform))]
 public class FieldSynergyPanel : MonoBehaviour
 {
-    [Tooltip("체크=내 필드(아래 가운데), 해제=상대 필드(위 가운데)")]
+    [Tooltip("체크=내 필드(아래 가운데), 해제=상대 필드(위 가운데). 어느 진영 것인지만 정한다")]
     [SerializeField] bool localSide = true;
 
-    [Header("겉모습 (px)")]
-    [SerializeField] Vector2 iconSize = new Vector2(72f, 72f);
-    [Tooltip("아이콘 사이 가로 간격")]
-    [SerializeField] float   spacing  = 10f;
-    [Tooltip("x=가운데에서 좌우 미세 조정(보통 0), y=화면 위/아래 변에서 띄우는 거리")]
-    [SerializeField] Vector2 margin = new Vector2(0f, 24f);
-    [Tooltip("이 수를 넘는 시너지는 표시하지 않는다(줄이 화면을 넘지 않게)")]
-    [SerializeField] int maxBadges = 5;
+    [Tooltip("배경판 겸 아이콘 줄. HorizontalLayoutGroup + ContentSizeFitter가 붙어 있어야 " +
+             "아이콘 수에 맞춰 스스로 늘고 준다. 시너지가 없으면 통째로 꺼진다")]
+    [SerializeField] GameObject iconRow;
 
-    [Header("배경판")]
-    [Tooltip("둥근 사각 스프라이트(9-slice 권장). 비우면 배경 없이 아이콘만 뜬다")]
-    [SerializeField] Sprite backgroundSprite;
-    [Tooltip("아이콘 줄 바깥으로 두는 여백(가로, 세로)")]
-    [SerializeField] Vector2 backgroundPadding = new Vector2(24f, 12f);
-    [SerializeField] Color backgroundColor = new Color(0f, 0f, 0f, 0.45f);
-    [Tooltip("9-slice 테두리 축소 배율. 원본 border가 판 높이보다 두꺼우면 모서리가 뭉개진다 — 그때 키운다")]
-    [Min(0.01f)] [SerializeField] float backgroundBorderShrink = 2f;
+    [Tooltip("아이콘 한 칸 프리팹(그림+pop+글로우를 스스로 소유한다). 수가 변하는 부분이라 여기만 런타임 생성한다")]
+    [SerializeField] SynergyIconView iconPrefab;
+
+    [Tooltip("한 줄에 최대 몇 개까지. 0이면 제한 없음")]
+    [SerializeField] int maxIcons = 6;
 
     static readonly List<FieldSynergyPanel> panels = new List<FieldSynergyPanel>();
 
-    readonly List<Image> spawned = new List<Image>();
-    Image background;
+    readonly List<SynergyIconView> icons = new List<SynergyIconView>();   // 재사용 풀(파괴하지 않는다)
     SynergyState lastState;
+    BattleField  field;            // 확대할 카드를 찾는 출처(그 진영 필드)
+    SynergyData  selected;         // 지금 설명이 열려 있는 시너지. null = 닫힘
 
-    void OnEnable()  { panels.Add(this);    ApplyCorner(); }
-    void OnDisable() => panels.Remove(this);
+    void OnEnable()  => panels.Add(this);
+    void OnDisable() { panels.Remove(this); Deselect(); }
 
-    /// <summary>그 진영 패널에 시너지를 그린다. 패널이 없는 씬(테스트 씬 등)에선 조용히 무동작.</summary>
-    public static void Show(bool _localSide, SynergyState _state)
+    /// <summary>그 진영 패널에 시너지를 그린다. 패널이 없는 씬(테스트 씬 등)에선 조용히 무동작.
+    /// 필드를 같이 받는 이유는 아이콘을 눌렀을 때 **그 시너지를 가진 카드**를 찾아야 하기 때문이다.</summary>
+    public static void Show(bool _localSide, SynergyState _state, BattleField _field = null)
     {
         foreach (FieldSynergyPanel t_panel in panels)
         {
             if (t_panel == null || t_panel.localSide != _localSide) continue;
+            t_panel.field = _field;
             t_panel.Refresh(_state);
             return;
         }
     }
 
-    /// <summary>같은 스냅샷이면 아무것도 하지 않는다 — 매번 지웠다 만들면 그때마다 아이콘이 새로 뜬다.</summary>
+    /// <summary>[Triggered] 그 시너지가 실제로 일한 순간, 해당 아이콘 하나만 튄다. 배선이 없거나
+    /// 그 시너지가 줄에 없으면 무동작 — 상대 진영 발동이 내 줄을 흔들지 않게 진영으로 먼저 가른다.
+    /// 순수 표시(상태·RNG 무접촉).</summary>
+    public static void Pop(bool _localSide, SynergyData _synergy)
+    {
+        if (_synergy == null) return;
+        foreach (FieldSynergyPanel t_panel in panels)
+        {
+            if (t_panel == null || t_panel.localSide != _localSide) continue;
+            t_panel.PopIcon(_synergy);
+            return;
+        }
+    }
+
+    /// <summary>그 시너지를 맡은 칸을 찾아 터뜨린다. 켜져 있는 칸만(꺼진 칸은 이번 판에 없는 시너지다).</summary>
+    void PopIcon(SynergyData _synergy)
+    {
+        foreach (SynergyIconView t_icon in this.icons)
+        {
+            if (t_icon == null || !t_icon.gameObject.activeInHierarchy) continue;
+            if (t_icon.Synergy != _synergy) continue;
+            t_icon.Pop();
+            return;
+        }
+    }
+
+    /// <summary>같은 스냅샷이면 아무것도 하지 않는다 — 시너지는 덱 확정 1회 산출이라 대부분의 호출이 같은 값이다.</summary>
     public void Refresh(SynergyState _state)
     {
         if (ReferenceEquals(this.lastState, _state)) return;
         this.lastState = _state;
-        Rebuild(_state);
-    }
+        Deselect();   // 칸이 다른 시너지로 바뀌면 열려 있던 설명·확대가 거짓이 된다
 
-    /// <summary>앵커·피벗을 진영에 맞춘다. 내 쪽은 **아래 가운데**, 상대 쪽은 **위 가운데**.
-    /// 가로 중앙 정렬이라 시너지 수가 늘어도 줄이 좌우로 균등하게 자란다(모서리 기준이면 한쪽으로만 자란다).</summary>
-    void ApplyCorner()
-    {
-        var t_rt = (RectTransform)transform;
-        Vector2 t_anchor = this.localSide ? new Vector2(0.5f, 0f) : new Vector2(0.5f, 1f);
-
-        t_rt.anchorMin = t_anchor;
-        t_rt.anchorMax = t_anchor;
-        t_rt.pivot     = t_anchor;
-        // 세로 여백만 진영으로 부호가 갈린다. 가로는 중앙 기준의 미세 조정값이다(보통 0).
-        t_rt.anchoredPosition = new Vector2(
-            this.margin.x,
-            this.localSide ? this.margin.y : -this.margin.y);
-    }
-
-    /// <summary>아이콘 줄을 덮는 배경판. 아이콘 수에 맞춰 폭이 정해지므로 줄을 만들기 직전에 잡는다
-    /// (고정 크기로 두면 시너지가 하나일 때 텅 빈 판이, 넷일 때 모자란 판이 된다).
-    /// 그림은 인스펙터에서 받는다 — 스프라이트를 안 꽂으면 배경 없이 아이콘만 뜬다.</summary>
-    void BuildBackground(int _count, float _step)
-    {
-        if (this.backgroundSprite == null) return;
-
-        if (this.background == null)
+        int t_used = 0;
+        if (_state != null && this.iconPrefab != null && this.iconRow != null)
         {
-            var t_go = new GameObject("Background", typeof(RectTransform));
-            t_go.transform.SetParent(transform, false);
-            t_go.transform.SetAsFirstSibling();   // 아이콘보다 뒤에(아래에) 그려지게
+            foreach (ActiveSynergy t_active in _state.Active)
+            {
+                if (t_active?.Synergy == null) continue;
+                if (this.maxIcons > 0 && t_used >= this.maxIcons) break;
 
-            this.background = t_go.AddComponent<Image>();
-            this.background.type          = Image.Type.Sliced;   // 9-slice — 늘려도 모서리 반경이 안 늘어난다
-            this.background.raycastTarget = false;
+                SynergyIconView t_slot = SlotAt(t_used);
+                if (t_slot == null) continue;
+
+                t_slot.Bind(t_active.Synergy, t_active.Count);   // 그림 대입 + 이전 판 트윈 정리는 칸이 스스로 한다
+                t_slot.gameObject.SetActive(true);
+                t_used++;
+            }
         }
 
-        this.background.gameObject.SetActive(true);
-        this.background.sprite                 = this.backgroundSprite;
-        this.background.color                  = this.backgroundColor;
-        this.background.pixelsPerUnitMultiplier = this.backgroundBorderShrink;
+        // 남는 아이콘은 끈다(지우지 않는다). 레이아웃 그룹이 켜진 것만 세어 가운데로 모으고,
+        // 배경판 크기도 그 결과를 따라간다 — 여기서 폭을 계산할 일이 없다.
+        for (int i = t_used; i < this.icons.Count; i++)
+            if (this.icons[i] != null) this.icons[i].gameObject.SetActive(false);
 
-        var t_rt = (RectTransform)this.background.transform;
-        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot =
-            this.localSide ? new Vector2(0.5f, 0f) : new Vector2(0.5f, 1f);
-        t_rt.sizeDelta = new Vector2(
-            _step * (_count - 1) + this.iconSize.x + this.backgroundPadding.x * 2f,
-            this.iconSize.y + this.backgroundPadding.y * 2f);
-        // 아이콘은 자기 변(아래/위)에 붙어 있으므로 배경판도 같은 변 기준으로 여백만큼 밀어낸다.
-        t_rt.anchoredPosition = new Vector2(
-            0f, this.localSide ? -this.backgroundPadding.y : this.backgroundPadding.y);
+        if (this.iconRow != null) this.iconRow.SetActive(t_used > 0);
     }
 
-    void Rebuild(SynergyState _state)
+
+    #region 누르는 동안 = 설명 + 소속 카드 확대
+    /// <summary>아이콘을 **누르고 있는 동안만** 그 시너지의 설명 팝업이 뜨고,
+    /// **그 시너지를 가진 이 필드 카드들이 확대**된다. 손을 떼면 둘 다 원복 —
+    /// 토글이면 닫는 걸 잊은 채 판이 진행돼 확대된 카드가 계속 남는다.
+    ///
+    /// 팝업·확대 둘 다 기존 기능을 그대로 부른다: 카드 배지 롱프레스가 쓰는 <see cref="SynergyExplainPopupUI"/>와
+    /// 드래그 조준이 쓰는 <see cref="CardView.SetTargetFocus"/>. 여기서 새 연출을 만들지 마라 —
+    /// 같은 정보가 경로마다 다르게 보이면 어느 쪽이 맞는지 알 수 없다.</summary>
+    void OnIconPressed(SynergyIconView _icon)
     {
-        foreach (Image t_old in this.spawned)
-            if (t_old != null) Destroy(t_old.gameObject);
-        this.spawned.Clear();
+        if (_icon == null || _icon.Synergy == null) return;
 
-        // 시너지가 없으면 배경판도 숨긴다 — 빈 판만 떠 있으면 "무언가 로딩 중"으로 읽힌다.
-        if (this.background != null) this.background.gameObject.SetActive(false);
+        Deselect();
+        this.selected = _icon.Synergy;
 
-        if (_state == null) return;
-
-        // 몇 개가 뜨는지 먼저 세야 가로 중앙 정렬을 할 수 있다(줄 전체 폭이 정해져야 시작점이 나온다).
-        var t_list = new List<SynergyData>();
-        foreach (ActiveSynergy t_active in _state.Active)
+        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
         {
-            if (t_active?.Synergy == null) continue;
-            if (t_list.Count >= this.maxBadges) break;
-            t_list.Add(t_active.Synergy);
-        }
-        if (t_list.Count == 0) return;
+            synergy    = _icon.Synergy,
+            iconRect   = (RectTransform)_icon.transform,   // uGUI 아이콘이라 월드 앵커가 아니라 이쪽
+            ownedCount = _icon.OwnedCount,
+        });
 
-        float t_step  = this.iconSize.x + this.spacing;
-        float t_start = -t_step * (t_list.Count - 1) * 0.5f;   // 줄의 가운데가 패널 원점에 오게
+        SetFocus(this.selected, true);
+    }
 
-        // 배경판이 먼저다 — 나중에 만든 아이콘이 자식 순서상 뒤에 와서 위에 그려진다(UI는 형제 순서가 곧 깊이).
-        BuildBackground(t_list.Count, t_step);
+    /// <summary>손을 뗐다. 누르는 중이던 칸이 아니어도 닫는다 — 열려 있는 설명은 하나뿐이다.</summary>
+    void OnIconReleased(SynergyIconView _icon) => Deselect();
 
-        for (int i = 0; i < t_list.Count; i++)
+    /// <summary>설명을 닫고 확대를 되돌린다. 열려 있지 않으면 무동작.</summary>
+    void Deselect()
+    {
+        if (this.selected == null) return;
+
+        SetFocus(this.selected, false);
+        this.selected = null;
+        UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+    }
+
+    /// <summary>이 필드에서 그 시너지 소속인 라이브 카드의 뷰를 켜고 끈다.
+    /// 소속 판정은 <see cref="SynergyApplier.BelongsTo"/> 단독 — 여기서 카드 데이터를 다시 훑지 마라.</summary>
+    void SetFocus(SynergyData _synergy, bool _on)
+    {
+        if (this.field == null || _synergy == null) return;
+
+        foreach (CardInstance t_card in this.field.GetActiveCards())
         {
-            var t_go = new GameObject("SynergyIcon_" + t_list[i].name, typeof(RectTransform));
-            var t_rt = (RectTransform)t_go.transform;
-            t_rt.SetParent(transform, false);
-            // 부모가 이미 가운데(아래/위)에 붙어 있으므로 아이콘은 부모 원점 기준으로만 늘어선다.
-            // 피벗은 가로 가운데 · 세로는 부모와 같은 변(아래쪽이면 아래, 위쪽이면 위)에 맞춘다.
-            t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot =
-                this.localSide ? new Vector2(0.5f, 0f) : new Vector2(0.5f, 1f);
-            t_rt.sizeDelta        = this.iconSize;
-            t_rt.anchoredPosition = new Vector2(t_start + t_step * i, 0f);
-
-            var t_img = t_go.AddComponent<Image>();
-            t_img.sprite         = t_list[i].activeIcon;   // 필드에 열린 시너지라 항상 활성 아이콘
-            t_img.preserveAspect = true;
-            t_img.raycastTarget  = false;   // 카드 입력(드래그/탭)을 가로채지 않게
-
-            this.spawned.Add(t_img);
+            if (t_card == null || !t_card.IsAlive) continue;
+            if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
+            CardView.GetView(t_card)?.SetTargetFocus(_on);
         }
+    }
+    #endregion
+
+    /// <summary>i번째 아이콘. 모자라면 그때 하나 더 찍어낸다(시너지 수는 판마다 달라 미리 정해둘 수 없다).</summary>
+    SynergyIconView SlotAt(int _index)
+    {
+        while (this.icons.Count <= _index)
+        {
+            SynergyIconView t_new = Instantiate(this.iconPrefab, this.iconRow.transform);
+            t_new.name = "SynergyIcon_" + this.icons.Count;
+            t_new.Pressed  += OnIconPressed;    // 칸은 "눌렸다/뗐다"만 알리고, 무엇을 할지는 줄이 정한다
+            t_new.Released += OnIconReleased;
+            this.icons.Add(t_new);
+        }
+        return this.icons[_index];
     }
 }
