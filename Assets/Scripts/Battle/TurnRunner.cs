@@ -288,6 +288,18 @@ public class TurnRunner : MonoBehaviour
     /// RunTurns가 아직 시작 전이므로 기존 이탈 시맨틱(부전승)과 일관되게 승리 팝업만 노출.
     /// StartBattle을 호출하지 않으므로 OnPlayerLeftRoom(HandlePlayerLeft) 구독도 발생하지 않아 이중 처리 없음.
     /// </summary>
+    /// <summary>초기화가 **상한 초과**로 실패했을 때. 이탈 부전승과 반드시 구분한다 —
+    /// 타임아웃은 내 쪽 문제(스테일 러너·러너 미기동)일 수 있고 상대는 멀쩡히 대기 중일 수 있다.
+    /// 여기서 CaptureResult를 부르면 골드·랭크가 실제로 지급되고, 양쪽이 동시에 타임아웃 나면
+    /// 둘 다 승리 보상을 받아 랭크가 부풀어 오른다. 결과 없이 로비로 돌려보낸다.</summary>
+    public void HandleInitFailed()
+    {
+        Debug.LogError("[MultiInit] 초기화 상한 초과 — 결과·보상 없이 로비로 복귀한다.");
+        BattleCleanup.LoadScene(LobbySceneName);
+    }
+
+    const string LobbySceneName = "LobbyScene";
+
     public void HandleOpponentLeftDuringInit()
     {
         if (!DeckConfig.IsMultiplayer) return;

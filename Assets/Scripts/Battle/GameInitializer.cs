@@ -38,9 +38,18 @@ public class GameInitializer : MonoBehaviour
         ReconcileMultiplayerFlag();
 
         if (DeckConfig.IsMultiplayer)
-            await InitializeMultiplayerFields();
+        {
+            // false = 러너에서 내 ownerIndex를 상한 안에 못 얻음 → 전투를 시작할 수 없다.
+            if (!await InitializeMultiplayerFields())
+            {
+                AbortInit(_timedOut: true);   // ownerIndex 확보 실패는 항상 내 쪽 문제다
+                return;
+            }
+        }
         else
+        {
             InitializeSinglePlayerFields();
+        }
 
         InitializeViews();
 
@@ -53,10 +62,7 @@ public class GameInitializer : MonoBehaviour
             bool t_synced = await MultiplayerTurnRunner.Instance.SyncInitialDecks();
             if (!t_synced)
             {
-                // 인트로 줌을 못 타고 빠지는 경로 — Await가 걸어둔 카메라 잠금을 여기서 풀지 않으면
-                // 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다.
-                BattleCameraFit.ClearExternalControl();
-                GetComponent<TurnRunner>()?.HandleOpponentLeftDuringInit();
+                AbortInit(MultiplayerTurnRunner.Instance.InitTimedOut);
                 return;
             }
         }
@@ -105,17 +111,54 @@ public class GameInitializer : MonoBehaviour
         DeckConfig.SetMultiplayer(true);
     }
 
-    async UniTask InitializeMultiplayerFields()
+    /// <summary>초기화를 시작도 못 하고 빠지는 공통 출구.
+    /// 인트로 줌을 못 타고 나가므로 Await가 걸어둔 카메라 잠금을 여기서 풀지 않으면
+    /// 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다.</summary>
+    void AbortInit(bool _timedOut)
     {
-        await UniTask.WaitUntil(() => MultiplayerTurnRunner.Instance != null
-                                     && (MultiplayerTurnRunner.Instance.MyOwnerIndex >= 0
-                                         || MultiplayerTurnRunner.Instance.TrySetOwnerIndexFromRunner()));
+        BattleCameraFit.ClearExternalControl();
+
+        var t_runner = GetComponent<TurnRunner>();
+        if (_timedOut) t_runner?.HandleInitFailed();              // 무보상 종료 — 내 쪽 문제일 수 있다
+        else           t_runner?.HandleOpponentLeftDuringInit();  // 상대 이탈 = 부전승
+    }
+
+    /// <summary>반환 false = 상한 안에 내 ownerIndex를 못 얻음.
+    /// 상한이 없으면 러너가 죽었거나 스테일인 경우 여기서 영원히 멈춘다(전투가 시작조차 안 됨).</summary>
+    async UniTask<bool> InitializeMultiplayerFields()
+    {
+        // WhenAny로 진 쪽 WaitUntil은 저절로 멈추지 않는다. 이 predicate는 부작용이 있어서
+        // (TrySetOwnerIndexFromRunner가 TurnState.LocalOwnerIndex를 쓴다) 살려두면 다음 싱글 전투에서
+        // 0으로 세팅한 값을 유령이 1로 덮어쓴다 — 반드시 취소한다.
+        using var t_cts = new System.Threading.CancellationTokenSource();
+
+        async UniTask WaitOwnerIndex()
+        {
+            await UniTask.WaitUntil(() => MultiplayerTurnRunner.Instance != null
+                                       && (MultiplayerTurnRunner.Instance.MyOwnerIndex >= 0
+                                           || MultiplayerTurnRunner.Instance.TrySetOwnerIndexFromRunner()),
+                                    cancellationToken: t_cts.Token)
+                .SuppressCancellationThrow();
+        }
+
+        int t_timedOut = await UniTask.WhenAny(
+            WaitOwnerIndex(),
+            UniTask.Delay(System.TimeSpan.FromSeconds(MultiplayerTurnRunner.InitSyncTimeoutSec),
+                          ignoreTimeScale: true));
+        t_cts.Cancel();
+
+        if (t_timedOut == 1)
+        {
+            Debug.LogError($"[MultiInit] ownerIndex 확보가 {MultiplayerTurnRunner.InitSyncTimeoutSec}초를 넘겼다. 초기화 중단.");
+            return false;
+        }
 
         int t_myIndex = MultiplayerTurnRunner.Instance.MyOwnerIndex;
         TurnState.LocalOwnerIndex = t_myIndex;
         // 멀티 셔플은 Local 고정: 시드 합의(SyncInitialDecks의 commit-reveal)가 이 호출보다 뒤라
         // MatchRandom을 쓸 수 없고, 쓸 필요도 없다 — 셔플 결과는 GetShuffledIds로 상대에게 그대로 전송된다.
         this.playerField.Initialize(DeckConfig.PlayerDeck, t_myIndex, ShufflePolicy.Local);
+        return true;
     }
 
     void InitializeSinglePlayerFields()

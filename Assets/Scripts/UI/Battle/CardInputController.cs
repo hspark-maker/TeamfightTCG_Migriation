@@ -715,7 +715,8 @@ public class CardInputController
         var t_cards = new List<CardInstance>(t_enemies.Count);
         foreach (CardView t_cv in t_enemies) t_cards.Add(t_cv.BoundCard);
 
-        var t_valid  = BattleRules.ValidTargets(_attacker.BoundCard, t_cards, out _filter);
+        var t_valid  = BattleRules.ValidTargets(_attacker.BoundCard, t_cards,
+                                                TurnState.ForcedTargetFor(_attacker.BoundCard), out _filter);
         var t_result = new List<CardView>(t_valid.Count);
         // 역변환은 반드시 **이 적 목록 안에서** 찾는다. BattleBoardView.GetView는 전역 첫 매치라
         // 같은 카드를 그리는 뷰가 둘이면 다른 뷰를 돌려주고, 그러면 유효 타깃이 조용히 사라진다.

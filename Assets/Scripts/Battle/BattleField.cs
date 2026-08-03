@@ -355,9 +355,14 @@ public class BattleField : MonoBehaviour
 
     // 이 필드를 공격할 때 유효한 타깃. 필터 규칙(지정 타깃 > 도발 > 전체)은 BattleRules.ValidTargets 단독 —
     // CardView의 강조/거절 안내와 **같은 함수**다(도발만 보고 지정 타깃을 모르는 이중 진실원 제거).
-    // _attacker는 규칙에 넘겨줄 뿐 여기서 해석하지 않는다(공격자별 규칙이 생기면 BattleRules가 처리).
+    // 지정 타깃은 TurnState가 해석해서(공격자가 로컬일 때만) 규칙에 인자로 넘긴다 —
+    // BattleRules는 전역을 읽지 않는다.
     public List<CardInstance> GetValidTargets(CardInstance _attacker = null)
-        => BattleRules.ValidTargets(_attacker, GetActiveCards());
+        => BattleRules.ValidTargets(_attacker, GetActiveCards(), TurnState.ForcedTargetFor(_attacker));
+
+    /// <summary>이 필드를 향한 공격이 규칙상 허용되는가. 턴 로직의 백스톱 진입점.</summary>
+    public bool CanAttack(CardInstance _attacker, CardInstance _target)
+        => BattleRules.CanAttack(_attacker, _target, GetActiveCards(), TurnState.ForcedTargetFor(_attacker));
 
     bool HasAnyCard()
     {

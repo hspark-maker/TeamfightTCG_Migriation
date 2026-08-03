@@ -34,6 +34,13 @@ public static class TurnState
     /// <summary>튜토리얼: 이번 스텝에 허용된 제스처. Any면 무제한(일반 전투). 조회는 CardView 입력 판정.</summary>
     public static InputGesture AllowedGesture { get; set; }
 
+    /// <summary>이 공격자에게 적용되는 지정 타깃. **전역 ForcedTarget을 규칙에 넘기는 유일한 통로**다.
+    /// 로컬 플레이어의 공격에만 적용한다 — ForcedTarget은 튜토리얼 스크립트가 사람에게 거는
+    /// 가이드라서 AI(EnemyTurn) 타깃 선정까지 끌려가면 안 된다.
+    /// BattleRules는 이 값을 인자로만 받는다(전역 직접 조회 금지 — 호출부에 안 보이는 입력이 된다).</summary>
+    public static CardInstance ForcedTargetFor(CardInstance _attacker)
+        => _attacker != null && _attacker.ownerIndex == LocalOwnerIndex ? ForcedTarget : null;
+
     /// <summary>지금 진행 중인 턴(_current = ownerIndex)이 로컬 플레이어 턴인가.
     /// 싱글/멀티 분기가 필요 없다 — 싱글은 LocalOwnerIndex가 0이고 플레이어 필드 ownerIndex도 0이다.
     /// (이전엔 TurnRunner가 DeckConfig.IsMultiplayer로 갈라 같은 규칙을 두 벌로 들고 있었다.)</summary>

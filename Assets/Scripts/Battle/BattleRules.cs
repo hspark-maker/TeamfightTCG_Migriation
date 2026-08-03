@@ -24,17 +24,23 @@ public static class BattleRules
     /// <summary>"공격 가능한 적" 목록의 단일 진실원. 규칙(BattleField.GetValidTargets)·
     /// 표현(CardView.GetValidEnemyViews)·자동공격(생각시간 초과)이 전부 이 함수만 부른다.
     ///
-    /// 우선순위 ① 지정 타깃(<see cref="TurnState.ForcedTarget"/>) ② 도발 ③ 전체.
-    /// ①이 우선 — 튜토리얼 스크립트가 규칙이다. ForcedTarget 존재 자체가 조건(IsActive 등 별도 조건 금지).
-    /// ForcedTarget이 _enemies에 없으면(다른 진영/이미 사망) 무시하고 ②로 내려간다.
+    /// 우선순위 ① 지정 타깃(_forcedTarget) ② 도발 ③ 전체.
+    /// ①이 우선 — 튜토리얼 스크립트가 규칙이다. _forcedTarget이 _enemies에 없으면
+    /// (다른 진영/이미 사망) 무시하고 ②로 내려간다.
+    ///
+    /// **전역을 읽지 않는다.** 지정 타깃은 반드시 인자로 받는다 — 이전엔 여기서 직접
+    /// <see cref="TurnState.ForcedTarget"/>를 읽어 호출부에 안 보이는 입력이 있었고,
+    /// 그래서 AI 타깃 선정이 튜토리얼 스크립트에 끌려가는 버그가 났다.
+    /// 전역을 해석하는 자리는 <see cref="TurnState.ForcedTargetFor"/> 한 곳뿐이다.
     ///
     /// 결정론: 정렬·난수 없음. 반환 순서는 항상 _enemies의 입력 순서 그대로다.</summary>
-    public static List<CardInstance> ValidTargets(CardInstance _attacker, IReadOnlyList<CardInstance> _enemies)
-        => ValidTargets(_attacker, _enemies, out _);
-
-    /// <summary><see cref="ValidTargets(CardInstance, IReadOnlyList{CardInstance})"/> + 좁혀진 이유.</summary>
     public static List<CardInstance> ValidTargets(CardInstance _attacker, IReadOnlyList<CardInstance> _enemies,
-                                                  out TargetFilter _filter)
+                                                  CardInstance _forcedTarget)
+        => ValidTargets(_attacker, _enemies, _forcedTarget, out _);
+
+    /// <summary><see cref="ValidTargets(CardInstance, IReadOnlyList{CardInstance}, CardInstance)"/> + 좁혀진 이유.</summary>
+    public static List<CardInstance> ValidTargets(CardInstance _attacker, IReadOnlyList<CardInstance> _enemies,
+                                                  CardInstance _forcedTarget, out TargetFilter _filter)
     {
         _filter = TargetFilter.None;
 
@@ -44,14 +50,10 @@ public static class BattleRules
             if (_enemies[i] != null) t_all.Add(_enemies[i]);
 
         // ① 지정 타깃이 이 공격자의 적 목록에 있으면 그 하나만 유효(도발보다 우선).
-        //    로컬 플레이어의 공격에만 적용한다 — ForcedTarget은 튜토리얼 스크립트가 사람에게 거는
-        //    가이드라서, AI(EnemyTurn) 타깃 선정까지 끌려가면 안 된다.
-        CardInstance t_forced = _attacker != null && _attacker.ownerIndex == TurnState.LocalOwnerIndex
-            ? TurnState.ForcedTarget : null;
-        if (t_forced != null && t_all.Contains(t_forced))
+        if (_forcedTarget != null && t_all.Contains(_forcedTarget))
         {
             _filter = TargetFilter.ForcedTarget;
-            return new List<CardInstance> { t_forced };
+            return new List<CardInstance> { _forcedTarget };
         }
 
         // ② 도발이 있으면 도발 카드만. 전원 도발이면 좁혀진 게 없으므로 필터 이유는 None 유지
@@ -62,7 +64,9 @@ public static class BattleRules
         return t_taunt;
     }
 
-    /// <summary>이 공격이 규칙상 허용되는가(타깃 선정 백스톱). 뷰 필터를 우회한 입력을 규칙 쪽에서 거른다.</summary>
-    public static bool CanAttack(CardInstance _attacker, CardInstance _target, IReadOnlyList<CardInstance> _enemies)
-        => _target != null && ValidTargets(_attacker, _enemies).Contains(_target);
+    /// <summary>이 공격이 규칙상 허용되는가(타깃 선정 백스톱). 뷰 필터를 우회한 입력을 규칙 쪽에서 거른다.
+    /// 지정 타깃은 호출부가 명시한다 — 편한 진입점은 <see cref="BattleField.CanAttack"/>.</summary>
+    public static bool CanAttack(CardInstance _attacker, CardInstance _target,
+                                 IReadOnlyList<CardInstance> _enemies, CardInstance _forcedTarget)
+        => _target != null && ValidTargets(_attacker, _enemies, _forcedTarget).Contains(_target);
 }

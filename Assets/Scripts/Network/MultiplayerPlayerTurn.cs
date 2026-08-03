@@ -56,7 +56,7 @@ public class MultiplayerPlayerTurn : TurnBase
 
         // 규칙 백스톱: 도발 필터의 집행을 뷰(CardView.HandleEnemyTap)에만 맡기면 뷰를 우회한 입력이
         // 규칙을 깬다(멀티는 그 공격이 그대로 상대에게 브로드캐스트되므로 더 위험). 판정은 BattleRules 단독.
-        if (!BattleRules.CanAttack(t_attCard, t_defCard, this.ctx.enemyField.GetActiveCards()))
+        if (!this.ctx.enemyField.CanAttack(t_attCard, t_defCard))
         {
             // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
             // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
