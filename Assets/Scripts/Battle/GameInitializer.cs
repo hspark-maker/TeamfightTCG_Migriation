@@ -12,6 +12,7 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] AudioClip battleBGM;
     [SerializeField] TutorialOverlayUI tutorialOverlayPrefab;   // 튜토리얼 오버레이 프리팹(비우면 코드 빌드 폴백)
     [SerializeField] BattleVfxLibrary battleVfxLibrary;         // 규칙 기반 연출 배선 단일 지점(비우면 해당 연출만 생략)
+    [SerializeField] MatchDeckShell matchDeckShell;             // 전투 전 덱 확인/편집 게이트(비우면 게이트 없이 기존 동작)
 
     void Awake()
     {
@@ -34,6 +35,10 @@ public class GameInitializer : MonoBehaviour
         // 씬 전환 영상이 재생 중이면 끝날 때까지 대기 (오프닝 배치(Placed) 소리 차단)
         await UniTask.WaitUntil(() => SceneTransitionVideo.Instance == null
                                    || !SceneTransitionVideo.Instance.IsPlaying);
+
+        // 덱 확인/편집 게이트 — 통과해야 DeckConfig.PlayerDeck이 확정된다.
+        // 아래 필드 초기화가 그 값을 소비하므로 반드시 이보다 앞이어야 한다.
+        if (!await RunDeckGate()) return;
 
         if (DeckConfig.IsMultiplayer)
             await InitializeMultiplayerFields();
@@ -68,6 +73,27 @@ public class GameInitializer : MonoBehaviour
         if (this.battleIntro != null) await this.battleIntro.PlayCameraIntro();
         System.Func<UniTask> t_deal = this.battleIntro != null ? () => this.battleIntro.Play() : null;
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
+    }
+
+    /// <summary>전투 시작 전 덱 확인/편집 화면. 반환 false = 유저가 전투를 포기했다 →
+    /// 로비로 되돌리고 이 씬의 초기화를 더 진행하지 않는다.</summary>
+    async UniTask<bool> RunDeckGate()
+    {
+        if (this.matchDeckShell == null) return true;   // 미배선 = 게이트 없음(기존 경로 그대로)
+
+        // 멀티는 한쪽이 덱 화면에 머무는 동안 상대가 타임아웃 없이 대기한다(이탈로도 잡히지 않는다).
+        // 매칭 전에 덱이 이미 확정되는 경로라 게이트를 태울 이유도 없다.
+        if (DeckConfig.IsMultiplayer) return true;
+        if (TutorialConfig.IsActive)  return true;      // 튜토리얼은 양 덱이 스크립트 고정
+
+        if (await this.matchDeckShell.RunSelectionAsync(this.GetCancellationTokenOnDestroy())) return true;
+
+        // 인트로 줌을 못 타고 빠지는 경로 — battleIntro.Await()가 걸어둔 카메라 잠금을 여기서 풀지 않으면
+        // 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다(초기화 중 상대 이탈 경로와 같은 이유).
+        BattleCameraFit.ClearExternalControl();
+        BattleCleanup.LoadScene("LobbyScene");
+
+        return false;
     }
 
     async UniTask InitializeMultiplayerFields()

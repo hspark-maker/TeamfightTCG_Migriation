@@ -23,6 +23,12 @@ public class MatchDeckShell : MonoBehaviour
     // 편집 패널 좌하단 뒤로가기. 배리언트에서 원본 BackButton을 삭제했으므로 편집 화면의 유일한 종료 경로다.
     [SerializeField] Button editBackButton;
 
+    [Header("상대 덱")]
+    // 상대(AI) 덱 풀. 로비 매칭(MatchFlowController)·전투 씬(GameInitializer)이 참조하는 것과
+    // 동일한 AIDeckConfig.asset을 배선한다 — 다른 에셋을 물리면 화면과 전투의 상대가 갈린다.
+    // 미배선이면 상대 섹션만 빈 칸으로 남고 전투는 GameInitializer의 기존 폴백으로 굴러간다.
+    [SerializeField] AIDeckConfig aiDeckConfig;
+
     [Header("단독 실행 폴백")]
     // 전투 씬에는 부트 프리팹이 없다 — 로비를 거치면 DontDestroyOnLoad로 따라오지만
     // 전투 씬 단독 Play에서는 카탈로그·소유·덱 세이브가 전부 비어 목록이 0개가 된다.
@@ -139,7 +145,50 @@ public class MatchDeckShell : MonoBehaviour
         EnsureWired();
 
         SelectedSlot = ResolveSlot(_slotIndex);
+
+        // 상대 덱은 화면을 그리기 전에 확정돼 있어야 한다 — 뷰는 캐리어를 읽기만 한다.
+        EnsureEnemyDeck();
+
         ShowMatchPanel();
+    }
+
+    // 상대 섹션에 그릴 덱을 확정한다. 여기가 이 화면의 유일한 상대 덱 확정 지점이다.
+    // 확정 결과를 DeckConfig에 실어두면 GameInitializer가 폴백 대신 같은 값을 집으므로,
+    // "화면에서 본 상대"와 "실제로 붙는 상대"가 같아진다(GameInitializer.InitializeSinglePlayerFields).
+    void EnsureEnemyDeck()
+    {
+        // 멀티는 상대 덱이 이 게이트보다 뒤(SyncInitialDecks)에 도착한다 → 지금 확정할 수 있는 값이 없다.
+        // 그냥 두면 직전 싱글 전투가 남긴 AI 덱이 상대인 척 남는다(멀티 진입 경로는 캐리어를 비우지 않는다) → 비운다.
+        if (DeckConfig.IsMultiplayer)
+        {
+            DeckConfig.ClearEnemyDeck();
+
+            return;
+        }
+
+        // 튜토리얼은 상대가 시나리오에 고정돼 있다(GameInitializer가 TutorialConfig.EnemyDeck을 직접 주입).
+        // AI 풀에서 뽑으면 화면에 없는 상대가 나오므로 그 고정 덱을 그대로 표시원으로 삼는다.
+        // 전투는 어차피 이 캐리어를 보지 않으니 표시 전용 대입이고, 6장 미만이어도 남는 칸은 빈 칸이 된다.
+        if (TutorialConfig.IsActive)
+        {
+            if (TutorialConfig.EnemyDeck != null) DeckConfig.SetEnemyDeck(TutorialConfig.EnemyDeck);
+            else                                  DeckConfig.ClearEnemyDeck();
+
+            return;
+        }
+
+        // 로비 매칭이 이미 확정했으면 그대로 쓴다 — 여기서 다시 뽑으면 로비에서 공개한 패와 어긋난다.
+        if (DeckConfig.HasEnemyDeck) return;
+
+        if (aiDeckConfig == null)
+        {
+            Debug.LogWarning("[MatchDeckShell] aiDeckConfig 미배선 — 상대 섹션이 비어 보인다(전투는 기존 폴백으로 진행).");
+
+            return;
+        }
+
+        // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom을 소비하지 않으므로 매치 시드와 무관하다.
+        DeckConfig.SetEnemyDeck(aiDeckConfig.GetRandomDeck());
     }
 
     public void Close()
