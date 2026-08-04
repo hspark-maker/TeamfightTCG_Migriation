@@ -17,7 +17,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     const float PANEL_WIDTH   = 190f;
     const float ROW_HEIGHT    = 26f;
     const float CLOSED_HEIGHT = 30f;
-    const float OPENED_HEIGHT = 300f;   // 재화 지급·편 점프 각 한 줄 포함
+    const float OPENED_HEIGHT = 326f;   // 재화 지급·편 점프 각 한 줄 포함. 버튼을 늘리면 ROW_HEIGHT만큼 같이 늘릴 것
 
     static OutgameDebugOverlay s_instance;
 
@@ -79,6 +79,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET TRIGGERS",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTriggeredTutorials();
         if (GUILayout.Button(OutgameFeatureLock.ForceUnlockAllForDebug ? "FEATURE LOCK: OFF" : "FEATURE LOCK: ON",
                                                  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ToggleFeatureLock();
+        if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
 
         DrawCurrencyGrants();

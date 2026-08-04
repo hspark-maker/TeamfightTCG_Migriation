@@ -26,11 +26,7 @@ public class DeckEditSlotView : MonoBehaviour
     public RectTransform Rect  => (RectTransform)transform;
 
     // _card가 null이면 빈 칸 모드. 편집 중 매 변경마다 전량 재바인딩되는 전제라 상태를 남기지 않는다.
-    //
-    // _synergyState: 편성 중인 덱 6장의 시너지 스냅샷. 카드의 시너지 배지가 이걸로 활성/비활성 그림을 가른다
-    // — 한 장 넣고 뺄 때마다 어떤 시너지가 열리고 닫히는지가 카드 위에서 바로 보이는 게 편성의 핵심 피드백이다.
-    // 기본 null은 "판정할 덱이 없다"는 뜻이고, 그때는 배지가 전부 활성 그림으로 뜬다(CardVisualView 규약).
-    public void Bind(int _index, CardData _card, Action<int> _onClick, SynergyState _synergyState = null)
+    public void Bind(int _index, CardData _card, Action<int> _onClick)
     {
         m_index   = _index;
         m_card    = _card;
@@ -47,7 +43,7 @@ public class DeckEditSlotView : MonoBehaviour
         // 편성 칸에는 소유한 카드만 올라간다(컬렉션 목록 자체가 소유분만 노출) → _owned는 true 고정.
         // 여기서 소유여부를 다시 계산하면 편성 배열과 소유 세이브라는 두 진실원이 생긴다.
         // _card가 null이면 cardVisual이 자기 오브젝트를 꺼서 빈 칸이 된다.
-        if (cardVisual != null) cardVisual.Bind(_card, true, _applyGrowth: true, _synergyState: _synergyState);
+        if (cardVisual != null) cardVisual.Bind(_card, true);
 
         if (emptyMark != null) emptyMark.SetActive(!t_has);
 

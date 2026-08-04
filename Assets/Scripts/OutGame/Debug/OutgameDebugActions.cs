@@ -22,6 +22,15 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }
 
+    // 강화 레벨·진화 단계를 전부 되돌린다(소유·재화는 그대로). 강화 반복 테스트의 출발점.
+    // 실제 초기화·영속·통지는 CardGrowthManager가 소유 — 여기서 세이브를 직접 건드리지 않는다.
+    public static void ResetCardGrowth()
+    {
+        CardGrowthManager.DebugResetAll();
+
+        Debug.Log("[OutgameDebug] 카드 성장 초기화 — 전 카드 Lv0 · 미진화");
+    }
+
     // 카탈로그 전량 지급. 덱 편성은 소유 카드만 허용하므로 인게임 덱 연동 테스트의 출발점이다.
     // 실제 지급은 OwnershipManager가 소유 — 인게임 해금 버튼(UnlockAllCardsButton)과 같은 창구를 쓴다.
     public static void UnlockAllCards()

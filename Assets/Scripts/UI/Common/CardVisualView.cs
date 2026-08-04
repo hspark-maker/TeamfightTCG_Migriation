@@ -54,24 +54,15 @@ public class CardVisualView : MonoBehaviour
 
     // ── 인게임 좌표를 uGUI로 옮기는 환산값 ──────────────────────────────────
     //
-    // 정적인 요소(아트·프레임·프레임 장식·HP)는 프리팹에 정규화 앵커로 박아뒀다. 코드가 필요한 건
-    // 런타임 생성물(키워드 아이콘)의 자리와, 카드 rect 크기에 따라 달라지는 폰트 크기 둘뿐이다.
-    //
-    // 카드 셀 크기가 화면마다 다르다(도감 290x386, 덱편집 270x360, 팩개봉 700x930…). 픽셀 상수를 박으면
-    // 한 곳에서만 맞고 나머지는 어긋나므로, 전부 "인게임 카드 크기 대비 비율"로 계산한다.
+    // 카드 내부(Background)는 인게임 카드와 같은 비율의 **고정 크기** rect다(420x558). 칸 크기가
+    // 화면마다 달라도(도감 300x380, 덱편집 270x360, 팩개봉 1000x1230) 그 차이는 UniformFitContent가
+    // 배율 하나로 흡수한다 → 정적인 요소(아트·프레임·프레임 장식·이름·HP)는 프리팹에 픽셀 앵커로 박아두고
+    // 폰트 크기도 프리팹 값을 그대로 쓴다. 코드가 계산할 게 남은 건 런타임 생성물(키워드 아이콘)의 자리뿐이다.
 
     /// <summary>인게임 카드 한 장의 월드 크기 = Frame.png(1024x1361 @PPU100) × CardView Frame localScale 0.233245.
     /// 인게임 프레임 스케일이 바뀌면 여기도 같이 바꿔야 로비 카드가 따라간다.</summary>
     const float IngameCardWidth  = 2.388429f;
     const float IngameCardHeight = 3.174464f;
-
-    // TextMeshPro(월드)는 렌더 시 fontSize에 0.1을 곱하고 TextMeshProUGUI는 그대로 쓴다(m_isOrthographic 차이).
-    // 그래서 인게임 fontSize를 uGUI로 옮기려면 0.1 × (카드 rect 높이 / 인게임 카드 높이)를 곱한다.
-    const float WorldFontToUnit  = 0.1f;
-    const float IngameHpFontSize      = 4f;     // CardView HPText
-    const float IngameBonusHpFontSize = 2.4f;   // CardView AdditionalHPText
-    const float IngameNameFontSize    = 2.3f;   // CardView NameText 오토사이징 최대
-    const float IngameNameFontSizeMin = 1f;     // CardView NameText 오토사이징 최소(긴 이름 축소)
 
     // 키워드 아이콘 가로줄. 인게임은 keywordIconsUseSynergySlot=true 경로를 타므로 기준은
     // synergyBadge* 가 아니라 CardView의 keywordIconStart(-0.65,-1.14) / keywordIconStep(0.42,0)이다
@@ -91,12 +82,7 @@ public class CardVisualView : MonoBehaviour
     // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
     // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
-    //
-    // _synergyState: 이 카드가 속한 **덱**의 시너지 스냅샷. 넘기면 배지가 활성/비활성 아이콘으로 갈린다.
-    // 기본 null인 이유는 호출부 대부분이 덱 문맥이 없기 때문이다(도감 그리드·상세, 팩 개봉, 컬렉션 타일) —
-    // 카드 한 장을 소개하는 자리에서 "몇 장 모였나"는 물을 수 있는 질문이 아니다.
-    // 덱 전체를 한 화면에 늘어놓는 곳(매치 화면 6칸)만 스냅샷을 만들어 넘긴다.
-    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true, SynergyState _synergyState = null)
+    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
     {
         if (_card == null)
         {
@@ -129,10 +115,7 @@ public class CardVisualView : MonoBehaviour
         SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
-        RefreshSynergyBadges(_card, _owned && this.showSynergies, _synergyState);
-
-        // 폰트 크기는 카드 rect에 비례한다 → 바인드 시점에 한 번 맞춘다(셀 크기가 화면마다 다르다).
-        ApplyIngameFontScale();
+        RefreshSynergyBadges(_card, _owned && this.showSynergies);
 
         // 미소유 = 잠김 오버레이 on(아트를 어둡게 덮어 실루엣화).
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
@@ -217,56 +200,25 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    // 카드 rect 높이에 비례해 폰트 크기를 인게임 값으로 환산한다. 프리팹에 픽셀 크기를 박아두면
-    // 그 프리팹을 쓰는 셀 하나에서만 맞고 나머지(도감/덱편집/팩개봉이 서로 다른 셀 크기)는 어긋난다.
-    void ApplyIngameFontScale()
-    {
-        if (!(this.transform is RectTransform t_rect)) return;
-
-        float t_scale = t_rect.rect.height * WorldFontToUnit / IngameCardHeight;
-        if (t_scale <= 0f) return;   // 레이아웃 전(높이 0)이면 건너뛴다 — 확정 후 아래 콜백이 다시 부른다.
-
-        if (this.hpText      != null) this.hpText.fontSize      = IngameHpFontSize      * t_scale;
-        if (this.bonusHpText != null) this.bonusHpText.fontSize = IngameBonusHpFontSize * t_scale;
-
-        // 이름만 인게임이 오토사이징(1.0~2.3)이라 긴 이름이 줄어든다. 오토사이징이 켜져 있으면
-        // fontSize는 무시되고 min/max가 실제 크기를 정하므로 셋 다 환산해야 카드 크기를 따라간다.
-        if (this.nameText != null)
-        {
-            this.nameText.fontSizeMin = IngameNameFontSizeMin * t_scale;
-            this.nameText.fontSizeMax = IngameNameFontSize    * t_scale;
-            this.nameText.fontSize    = IngameNameFontSize    * t_scale;
-        }
-    }
-
-    // 그리드 셀 크기가 Bind 이후에 확정되는 경우(GridLayoutGroup 첫 프레임)를 위해 rect가 바뀔 때마다 재적용.
-    void OnRectTransformDimensionsChange() => ApplyIngameFontScale();
-
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    // _state = 이 카드가 속한 덱의 시너지 스냅샷(없으면 null). 정렬과 활성 판정 둘 다 여기서 갈린다.
-    void RefreshSynergyBadges(CardData _card, bool _show, SynergyState _state)
+    void RefreshSynergyBadges(CardData _card, bool _show)
     {
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // **표시 대상·순서 결정에는 스냅샷을 넘기지 않는다(null 고정).** 넘기면 활성 배지가 위로 올라가면서
-        // 덱을 한 장 갈아끼울 때마다 같은 카드의 배지 순서가 뒤바뀌고, 3개 상한에 걸릴 땐 비활성 배지가
-        // 목록에서 아예 잘려 나간다. 이 카드가 가진 시너지는 덱이 어떻든 같은 자리에 그대로 있어야 한다 —
-        // 덱에 따라 바뀌는 건 **아이콘 하나뿐**이다.
-        // (스냅샷이 없을 때의 정렬 = requiredCount 내림차순 고정. 덱과 무관하므로 자리가 흔들리지 않는다.)
+        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
+        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
+        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
         List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
 
         foreach (SynergyData t_syn in t_tags)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
-
-            // 여기가 스냅샷을 쓰는 유일한 지점 — 그 시너지가 이 덱에서 열렸으면 활성 그림, 아니면 비활성 그림.
-            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다: 거기선 "이 카드가 가진
-            // 시너지" 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
-            bool t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_syn);
-            t_badge.Set(t_syn, t_active);
+            // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
+            // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
+            t_badge.Set(t_syn, true);
         }
     }
 

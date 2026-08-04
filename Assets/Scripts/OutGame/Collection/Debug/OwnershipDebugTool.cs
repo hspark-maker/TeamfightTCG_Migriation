@@ -10,6 +10,9 @@ public class OwnershipDebugTool : MonoBehaviour
     [ContextMenu("전체 회수")]
     void RevokeAll() => OutgameDebugActions.RevokeAllCards();
 
+    [ContextMenu("카드 성장 초기화")]
+    void ResetCardGrowth() => OutgameDebugActions.ResetCardGrowth();
+
     [ContextMenu("소유 현황 로그")]
     void LogOwnership() => OutgameDebugActions.LogOwnership();
 
