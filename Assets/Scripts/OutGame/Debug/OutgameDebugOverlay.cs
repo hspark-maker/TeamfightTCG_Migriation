@@ -17,7 +17,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     const float PANEL_WIDTH   = 190f;
     const float ROW_HEIGHT    = 26f;
     const float CLOSED_HEIGHT = 30f;
-    const float OPENED_HEIGHT = 274f;   // 편 점프 한 줄 포함
+    const float OPENED_HEIGHT = 300f;   // 재화 지급·편 점프 각 한 줄 포함
 
     static OutgameDebugOverlay s_instance;
 
@@ -81,7 +81,17 @@ public class OutgameDebugOverlay : MonoBehaviour
                                                  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ToggleFeatureLock();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
 
+        DrawCurrencyGrants();
         DrawChapterJumps();
+    }
+
+    // 강화·진화 비용 테스트용 재화 지급. 잔액은 CurrencyManager가 보여준다(지급 즉시 영속).
+    void DrawCurrencyGrants()
+    {
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button($"+G {CurrencyManager.Gold}",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantGold();
+        if (GUILayout.Button($"+D {CurrencyManager.Diamond}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantDiamond();
+        GUILayout.EndHorizontal();
     }
 
     // 튜토리얼 N편 되감기. 저작된 편 수만큼 버튼을 자동 생성한다(에셋을 고쳐도 여기는 따라올 필요가 없다).

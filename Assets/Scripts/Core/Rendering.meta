@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/SO/CardGrowth.meta
+guid: 57a130a6cacefb54f87ae1b6632abf1f
+========
 guid: d10ad91d0f9cd924b8a0bc6e4a90ffa0
+>>>>>>>> main:Assets/Scripts/Core/Rendering.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

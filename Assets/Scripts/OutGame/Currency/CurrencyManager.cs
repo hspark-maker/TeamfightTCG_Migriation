@@ -10,7 +10,8 @@ public static class CurrencyManager
     // 잔액 변경 통지 (종류, 변경 후 금액) — UI 갱신용.
     public static event Action<ECurrencyType, long> OnCurrencyChanged;
 
-    public static long Gold => s_currencies[(int)ECurrencyType.Gold];
+    public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
+    public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
 
     public static long GetBalance(ECurrencyType _type) => s_currencies[(int)_type];
 
@@ -20,14 +21,16 @@ public static class CurrencyManager
     public static void Init()
     {
         var t_data = DataSaveManager.Data.currency;
-        s_currencies[(int)ECurrencyType.Gold] = t_data.gold;
+        s_currencies[(int)ECurrencyType.Gold]    = t_data.gold;
+        s_currencies[(int)ECurrencyType.Diamond] = t_data.diamond;
     }
 
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화.
     public static void Save()
     {
         var t_data = DataSaveManager.Data.currency;
-        t_data.gold = s_currencies[(int)ECurrencyType.Gold];
+        t_data.gold    = s_currencies[(int)ECurrencyType.Gold];
+        t_data.diamond = s_currencies[(int)ECurrencyType.Diamond];
         DataSaveManager.Save();
     }
 

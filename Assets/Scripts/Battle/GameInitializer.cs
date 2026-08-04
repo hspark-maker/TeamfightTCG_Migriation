@@ -15,6 +15,16 @@ public class GameInitializer : MonoBehaviour
     // 덱 확인/편집 게이트(MatchDeckShell)는 여기 없다 — 로비(LobbyMatchLauncher)가 씬 로드 전에 돌린다.
     // 이 씬에 다시 두면 확정 지점이 씬을 넘어 둘로 갈린다. 배틀 씬은 확정된 DeckConfig를 읽기만 한다.
 
+    static System.Func<CardData, CardGrowth> s_growthProvider;
+
+    /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
+    /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
+    /// 순수 주입점이라 set만 둔다(읽는 쪽은 이 클래스 내부뿐 — 밖으로 새면 성장값 조회 창구가 둘로 갈린다).</summary>
+    public static System.Func<CardData, CardGrowth> GrowthProvider
+    {
+        set => s_growthProvider = value;
+    }
+
     void Awake()
     {
         // 전투 씬 단독 실행에서도 배선되게 여기서 주입(DataLibrary 비의존).
@@ -86,7 +96,7 @@ public class GameInitializer : MonoBehaviour
 
     /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmEnemyDeck)다 —
     /// 덱 화면이 그린 6장과 실제 상대가 같아야 하므로 확정은 화면을 띄우기 전에 끝나야 한다.
-    /// 여기는 로비를 거치지 않는 진입점(MainMenu·TutorialSetupUI·AutoBattleStep·씬 단독 실행)만 태운다.</summary>
+    /// 여기는 로비를 거치지 않는 진입점(MainMenu·TutorialSetupUI·AutoBattle 스텝·씬 단독 실행)만 태운다.</summary>
     void ConfirmEnemyDeck()
     {
         // 멀티는 상대 덱이 SyncInitialDecks로 훨씬 뒤에 도착한다 — 지금 확정할 수 있는 값이 없다.
@@ -188,6 +198,7 @@ public class GameInitializer : MonoBehaviour
         TurnState.LocalOwnerIndex = t_myIndex;
         // 멀티 셔플은 Local 고정: 시드 합의(SyncInitialDecks의 commit-reveal)가 이 호출보다 뒤라
         // MatchRandom을 쓸 수 없고, 쓸 필요도 없다 — 셔플 결과는 GetShuffledIds로 상대에게 그대로 전송된다.
+        // 성장값은 넘기지 않는다 — 스탯을 와이어로 보내지 않는 lockstep이라 한쪽만 강화되면 즉시 divergence다.
         this.playerField.Initialize(DeckConfig.PlayerDeck, t_myIndex, ShufflePolicy.Local);
         return true;
     }
@@ -202,16 +213,19 @@ public class GameInitializer : MonoBehaviour
         // (구: TurnRunner.PlayIntroAndStart에서 시드 → 셔플이 시드 밖 UnityEngine.Random으로 새어나갔다.)
         MatchSeeding.SeedForNewMatch();
 
+        // 성장값(s_growthProvider)은 아래 **싱글 전투의 플레이어 필드에만** 넘긴다 — AI 적은 마스터 데이터 스탯 그대로가 밸런스 기준선이다.
+
         if (TutorialConfig.IsActive)
         {
             // 튜토리얼: 양 덱 고정 주입(무셔플=저작 순서가 곧 등장 순서·6장 이하 허용). 적덱 GetRandomDeck 우회.
             // 덱 게이트(ShowDeckGate)를 켜도 여기는 갈리지 않는다 — 튜토리얼 전투 덱은 언제나 시나리오가 정한다.
+            // 성장값도 넘기지 않는다 — 저작된 킬 수·턴 수와 확정승(OverrideAllHp)에 기대는 시나리오라 강화된 체력이 전제를 깬다.
             this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None);
             this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None);
         }
         else
         {
-            this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match);
+            this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match, s_growthProvider);
             // 상대 덱은 게이트보다 앞선 ConfirmEnemyDeck이 확정해 뒀다(로비가 넘긴 값이면 그대로 유지된다).
             // 여기서 다시 뽑지 않는 게 핵심 — 뽑으면 게이트 화면에서 본 상대와 실제 상대가 갈린다.
             var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<CardData>();

@@ -24,17 +24,20 @@
 
 | 계약 | 소유 창구 | 상태 | 비고 |
 |---|---|---|---|
-| 재화 API | `CurrencyManager` (Earn/Spend/CanAfford/OnCurrencyChanged/Save) | 🧊 동결 | Spend는 0 허용·음수 거부 |
+| 재화 API | `CurrencyManager` (Earn/Spend/CanAfford/GetBalance/OnCurrencyChanged/Save) | 🧊 재동결(PKG-GROWTH-SAVE, 2026-08-04) | Spend는 0 허용·음수 거부. **시그니처 불변 — 종류만 추가**: `ECurrencyType.Diamond`(**`Gold=0` 불변**, `Count` 앞 삽입 = 배열 인덱스 규약) + `CurrencySaveData.diamond` + `Init/Save` 매핑. 소비처는 종류 인자를 받는 API만 쓰므로 회귀 없음(`Gold`/`Diamond` 편의 프로퍼티는 조회 전용) |
 | 소유 API | `OwnershipManager` (Grant/Revoke/IsOwned/OwnedCount/OnOwnershipChanged) | 🧊 재동결(G-23) | 시그니처 불변. `GrantDefaults` 삭제(신규=소유0). 검수 통과, 전체지급은 `OwnershipDebugTool`로 일원화. **`HasAnyOwnedSaved()`는 레거시 세이브 마이그레이션 1회 판정 전용**(2026-07-27) — 첫실행 판정 대리로 쓰지 말 것 |
 | 카드 창구 | `CardCatalog` (SetSource/KeyOf/Count/IsReady) | 🧊 동결 | KeyOf = SO 파일명 |
 | 시각 창구 | `GameClock` (Since/디버그 점프) | 🧊 동결 | |
-| 세이브 스키마 | `UserSaveData` (version=1, 값 객체 조립) | 🧊 동결 | 필드 추가만. `tutorial` 슬롯 추가(2026-07-27)도 **VERSION 1 유지** — 구 세이브는 노드 없이 기본값(0/false)으로 읽힘 |
+| 세이브 스키마 | `UserSaveData` (version=1, 값 객체 조립) | 🧊 동결 | 필드 추가만. `tutorial` 슬롯 추가(2026-07-27)도 **VERSION 1 유지** — 구 세이브는 노드 없이 기본값(0/false)으로 읽힘. `rank`(2026-07-27)·**`cardGrowth`(2026-08-04)** 슬롯도 같은 규칙으로 **VERSION 1 유지** |
 | 생산 API | `CollectionProductionManager` (GetInfo/Harvest/OnChanged) | 🧊 동결 | |
 | 팩 API | `CardPackOpener` (SetShop/TryPurchase→OpenedPack) | 🧊 동결 | |
 | 보상 API | `RewardService.GrantBattleReward → BattleReward` | 🧊 동결 | 반환값이 팝업 입력 |
 | 랭크 API | `RankManager` (Points/GetInfo/ApplyBattleResult/SetConfig/ResetForDebug) | 🧊 신규 동결(PKG-RANKTIER-CORE, 2026-07-27) | 캐시 없음 = **`Init` 없음 → 부트 순서 무접촉**. 불변식: 티어=`points` 순수 파생(도달티어 별도 저장 금지) · 강등없음=가감 시 하한 클램프 · 예외 미발생(`try/catch` 0). `Config`·`Save()`는 private. `GetInfo→RankInfo`(TierIndex/DisplayName/Badge/Points/NextRequired/IsMaxTier) — **최대 티어면 `NextRequired == Points`**(0 아님). `RankConfig.tiers`는 코드 필드 초기화자로 20티어(5랭크×4단계) 기본 테이블 보증 |
 | **통합 부트 순서** | `GameManager.Boot()` + `MainMenuInitializer` + `OutgameTutorialBridge` | 🧊 재동결(G-TUT, 2026-07-27) | BootScene 없음. GameManager(BeforeSceneLoad: `Load` → **`OutgameTutorialProgress.Init`** → `CurrencyInit`) → LobbyScene `MainMenuInitializer.Awake`[-100](SetSource·Init) → 씬 브리지 `Awake`(EnsureData 멱등)/`Start`(현재 스텝 진입). ~~`LobbyFirstRunRedirect`~~ **삭제** — 첫실행 자동 구매는 스텝 0 `AutoPurchase`. 검수 통과 |
 | **튜토리얼 진행도 API** | `OutgameTutorialProgress` (IsCompleted/StepIndex/Init/Save/CommitStep/Complete/ResetForDebug) | 🧊 신규 동결(2026-07-27) | 진행도 슬롯 매핑을 아는 **유일 창구**(러너·브리지·UI는 이 API로만). 불변식: `outgameCompleted` 우선(인덱스 파생 금지) · 커밋은 스텝 실행 **전** · `migrationChecked` 낙인으로 레거시 판정 계정당 1회 |
+| **성장 API** | `CardGrowthManager` (Init/Save/IsReady/SetConfig/MaxLevel/GrowthOf/HpBonusOf/TryGetNextStep/TryGetPendingGate/TryEnhance/TryEvolve/OnGrowthChanged) | 🧊 신규 동결(PKG-GROWTH-CORE, 2026-08-04) | 성장 슬롯(`CardGrowthSaveData`) 매핑을 아는 **유일 창구**. 불변식: 카드 키 = `CardCatalog.KeyOf`(SO 파일명, 인덱스 금지) · `HpBonus`는 **저장 안 함**(레벨에서 `CardGrowthConfig.HpBonusAt` 파생) · `evolutionStage`는 레벨 파생 금지(**"도달했지만 미진화"가 유효 상태**) · **결제 전 `IsReady` 검사**(미초기화 시 `Save()`가 no-op이라 재화만 소실) · 강화 실패도 `OnGrowthChanged` 발화(잔액이 변했다) · 랜덤은 서비스 내부 `System.Random`(`MatchRandom` 금지). 반환: `TryEnhance → EnhanceResult`(`EEnhanceOutcome` 6종) · `TryEvolve → bool`. `DebugResetAll`은 **소비처 0 = 예약** |
+| **성장 표시 환산** | `DeckPower.MaxHpOf(CardData, bool _applyGrowth = true)` | 🧊 신규 동결(2026-08-04) | 아웃게임에서 카드 체력을 그리는 **모든 화면의 단일 진실원**. 화면이 `maxHp + HpBonusOf`를 직접 더하면 강화 반영 화면과 미반영 화면이 갈린다. 기본 `true`(호출부 전수가 내 카드) · **현재 유일한 `false` opt-out = `MatchDeckPanelView`의 상대 덱 슬롯·상대 파워** |
+| **전투 성장 주입** | `GameInitializer.GrowthProvider` (set-only) | 🧊 신규 동결(2026-08-04) | Battle이 OutGame을 참조하지 않게 **값 생산자를 부트가 밀어넣는** 경계. 꽂는 곳은 `BootInstaller` 한 곳(`CardGrowthManager.Init` **뒤**). 읽는 쪽은 `GameInitializer` 내부뿐(**getter 금지** — 밖으로 새면 조회 창구가 둘로 갈린다). 적용 범위 불변식: **싱글 전투의 플레이어 필드만**(멀티 = 와이어에 스탯 없는 lockstep이라 divergence · AI 적 = 마스터 스탯이 밸런스 기준선 · 튜토리얼 = 저작 킬 수·확정승 전제 파손) |
 
 ---
 
@@ -205,6 +208,47 @@
 
 ---
 
+## 카드 성장 — 강화 + 진화 (2026-08-04 편입) — 🔴 게이트 2개 후 나머지 🟢/🟠
+
+> 카드 한 장에 붙는 **영구 성장**. 강화(골드·확률·Lv1~10)와 진화(다이아·확정·게이트 2개)가 한 축에서 맞물린다.
+> **계약 변경 2건 + 신규 계약 3건**이라 앞의 두 패키지가 🔴다 — 재화 종류 추가와 세이브 슬롯 추가가 모두의 전제이기 때문.
+> 전략·경제(왜 두 재화인가, 왜 실패가 있는가)는 [`ENHANCE_ECONOMY.md`](./ENHANCE_ECONOMY.md), 구조·배선표는 [`STRUCTURE.md`의 "카드 성장" 절](./STRUCTURE.md).
+
+| ID | 등급 | 패키지 | 산출(무엇을 동결하나) | 선행 | 담당 | 상태 |
+|---|---|---|---|---|---|---|
+| **PKG-GROWTH-SAVE** | 🔴 | 성장 세이브 슬롯 + 재화 종류 추가 | 신규 `Save/2.Domain/CardGrowthSaveData.cs`(`version` · `entries[] { cardKey, level, evolutionStage }`) + `UserSaveData.cardGrowth` 슬롯 1줄. **`UserSaveData.VERSION` 1 유지**(슬롯 추가만). 재화: `ECurrencyType.Diamond`(`Count` 앞, `Gold=0` 불변) + `CurrencySaveData.diamond` + `CurrencyManager` Init/Save 매핑 | — | outgame-engineer | ✅ 완료(코드) |
+| **PKG-GROWTH-CORE** | 🔴 | 성장 창구 + 튜닝 SO | **`CardGrowthManager` 창구 동결** + `CardGrowthConfig` 스키마(전역 기본식 + `stepOverrides` + `evolutionGates`) + 값 타입 `EnhanceResult`/`GrowthStep`/`Card/CardGrowth.cs`(**Battle·OutGame 공용 중립**) | SAVE | outgame-engineer | ✅ 완료(코드) |
+| **PKG-GROWTH-BOOT** | 🔴 | 부트 배선 | `BootInstaller`에 `[SerializeField] CardGrowthConfig growthConfig` + `SetConfig` → `Init` → `GameInitializer.GrowthProvider = CardGrowthManager.GrowthOf` 3줄. **통합 부트 순서 재동결**(`CollectionProductionManager.Init` 뒤, `DeckSaveManager` 앞) | CORE | outgame-engineer | ✅ 완료(코드) — `.asset` 미생성 |
+| **PKG-GROWTH-BATTLE** | 🟠 | 전투 반영(경계 교차) | `GameInitializer.GrowthProvider`(set-only 주입점) · `BattleField.Initialize(..., _growthOf)` · **`CardInstance.maxHp` 인스턴스 필드 신설**(회복 상한·언데드 부활·교활 스왑 `savedHp` 전부 이 기준). 적용은 **싱글 플레이어 필드만** | CORE | **battle-engineer** | ✅ 완료(코드) |
+| **PKG-GROWTH-POWER** | 🟢 | 표시 환산 단일화 | `DeckPower.MaxHpOf(card, _applyGrowth = true)` 동결 + 소비처 전환(`CardVisualView.Bind` 3번째 인자 · `CardDetailOverlayView` · `DeckBuilderUI` · `DeckEditController` · `MatchDeckPanelView`는 **상대 덱만 `false`**) | CORE | outgame-engineer | ✅ 완료(코드) |
+| **PKG-GROWTH-SCREEN** | 🟢 | 강화·진화 화면 | 신규 `UI/Growth/CardGrowthScreen.cs`(좌 소유 그리드 / 우 선택 패널 · 진화는 `SimpleYNPopup` 확인 · 공개 API `Select(CardData)`) | CORE | outgame-engineer | ✅ 완료(코드) — **참조 씬·프리팹 0건 = 진입 불가** |
+| **PKG-GROWTH-WIRE** | 🟠 | SO 저작 + 씬 배선 | `Assets/SO/.../CardGrowthConfig.asset` 생성·`BootInstaller.growthConfig` 배선 · `CardGrowthScreen` 호스팅(진입점 미정) · `CardDetailOverlayView`의 `levelValueText`/`evolutionValueText` 배선 · 다이아 HUD(`GoldHud.type = Diamond`) | BOOT ✅, SCREEN ✅ | **사용자(에디터)** | ⬜ 대기 — 배선표는 `STRUCTURE.md` "씬/프리팹 배선" |
+| **PKG-GROWTH-DIA-SUPPLY** | 🟢 | 다이아 공급 배선 | 현재 공급은 **디버그 치트뿐**(`OutgameDebugActions.GrantDiamond`). `ENHANCE_ECONOMY.md`가 주 공급원으로 설계한 **도감 생산 → 다이아**는 `CollectionRowDef.rewardType` 축이 이미 있어 **코드 0줄 · `CollectionLayoutConfig` 저작** 문제다(어느 행을 다이아 행으로 돌릴지가 결정 대상) | WIRE | outgame-engineer + 사용자(에셋) | ⬜ 후속 |
+| **PKG-GROWTH-ART** | 🟠 | 진화 아트 파이프 | `CardData.GetEvolvedArt()` 호출부 신설 + `evolvedArts` 저작. ⚠️ **와이어 계약 접촉** — 3단계 아트가 `Assets/SO/Cards/temp/` **별도 카드 4장**에 있고 그 4장이 `CardRegistry`(= 멀티 와이어 ID 순서)에 등록돼 있다 | ART 결정 | **net-engineer 판정 선행** | ⬜ 보류(별도 단계로 분리) |
+
+**격리 판정 — 착수 전 반드시 확인**
+
+| 대상 | 경합 | 판정 |
+|---|---|---|
+| `Save/2.Domain/UserSaveData.cs` | 없음 | ✅ 단독(슬롯 1줄 추가) |
+| `OutGame/Currency/*` | 없음 | ✅ 단독. 단 **`ECurrencyType` 순서는 배열 인덱스**라 중간 삽입 금지 — 신규는 항상 `Count` 앞 |
+| `Core/BootInstaller.cs` | 부트 순서를 만지는 모든 패키지 | ⚠️ **통합 부트 순서(동결 계약) 접촉** → 🔴. 이번 추가는 `Init` 3줄이고 기존 호출 순서는 무변경 |
+| `Battle/GameInitializer.cs` · `BattleField.cs` · `Card/CardInstance.cs` | 전투 작업 전반 | ⚠️ **battle-engineer 전용**. 아웃게임 세션이 직접 만지지 말 것 — 주입점(`GrowthProvider`)만 소비 |
+| `UI/Match/MatchDeckPanelView.cs` | 매치 덱 그룹 | ✅ `_applyGrowth` 인자 전달만(로직 무변경) |
+
+> **반납 결과(2026-08-04)** — 이 도메인의 핵심 결정 5개.
+> ① **`HpBonus`를 저장하지 않는다** — 세이브에는 `level`·`evolutionStage`만 있고 체력 가산분은 `CardGrowthConfig.HpBonusAt(level)`이 파생한다(랭크가 티어를 저장하지 않는 것과 같은 판단). 곡선 튜닝이 기존 유저에게 소급 반영되고 두 값이 어긋날 여지가 없다.
+> ② **`evolutionStage`는 레벨 파생 금지** — "게이트 레벨에 도달했지만 아직 진화하지 않은" 상태가 이 시스템의 **핵심 상태**(그 구간이 곧 강화 차단)라 파생시키면 표현 자체가 불가능하다.
+> ③ **결제 전 `IsReady` 검사** — `CardGrowthManager.Save()`는 미초기화 시 **빈 캐시로 세이브를 덮지 않도록 no-op**이다. 그래서 `Init` 없이 강화를 허용하면 골드만 나가고 레벨은 재시작 시 소실된다 → `TryEnhance`/`TryEvolve`가 결제 **앞**에서 `NotReady`로 닫는다.
+> ④ **진화는 스탯을 안 바꾼다** — 아트·연출 자격 축(`stage 3` ↔ `CardCinematicRules.CINEMA_ATTACK_STAGE = 3`). 스탯을 얹으면 "강화 2호"가 되어 밸런스 검증 대상이 둘로 늘어난다.
+> ⑤ **성장이 붙는 곳은 싱글 플레이어 필드 하나뿐** — 멀티는 스탯을 와이어로 보내지 않는 lockstep이라 한쪽만 강화되면 즉시 divergence(원격 미러는 `growthOf = null` 고정), AI 적은 마스터 스탯이 밸런스 기준선, 튜토리얼은 저작된 킬 수·확정승 전제가 강화된 체력에 깨진다.
+>
+> ⚠️ **`CardGrowthConfig.asset`이 없어도 동작한다** — `CreateInstance` fallback + **C# 필드 초기화자**가 기본식(Lv10 · HP +2/레벨 · 100+50×(N-1) 골드 · 성공률 1.0−0.08×(N-1))과 **기본 게이트 2개**(Lv5→stage1/다이아 50, Lv10→stage3/다이아 200)를 보증한다. `List<>`가 fallback에서 빈 리스트가 되는 함정(`RankConfig.tiers` 선례)을 같은 처방으로 막았다. 에셋을 만들 때 **게이트 값이 코드 기본과 어긋나면 안 된다**(양쪽 드리프트).
+>
+> ⚠️ **미완 3건은 문서에 정직하게 남아 있다** — `CardGrowthConfig.asset` 미생성 / `CardGrowthScreen` 진입 경로 0건 / 진화 아트 파이프 미구현(`GetEvolvedArt` 호출부 0건 · `evolvedArts` 채워진 카드 0장). 다이아 공급도 디버그 치트뿐이라 **현 상태로는 진화가 정상 플레이로 도달 불가**다.
+
+---
+
 ## 실전 예시 — 어떻게 켜나
 
 - **혼자 순차**: PKG-BOOT 하나만 진행 → 끝나면 다음.
@@ -250,6 +294,7 @@
 
 | 날짜 | 변경 | 영향 패키지 | 재작업? |
 |---|---|---|---|
+| 2026-08-04 | **카드 성장(강화 + 진화) 편입 — 계약 변경 2건 + 신규 계약 3건. 확정 스코프 "단일 골드" 폐기.** ① **재화 종류 추가(계약 변경)**: `ECurrencyType.Diamond` — 진화 비용 전용. `OUTGAME_ROADMAP.md` "확정 스코프"의 **단일 골드**가 이 시점부터 **골드 + 다이아 2종**으로 바뀐다(골드=흐름/플레이 행위 비례, 다이아=저량/시간 비례 — 근거는 `ENHANCE_ECONOMY.md`). 절차상 🔴이지만 **재화 API 시그니처는 불변**이라 재작업이 없다: 소비처가 전부 종류를 인자로 받는 API(`Earn`/`Spend`/`CanAfford`/`GetBalance`)만 쓰고, `Gold=0`을 지킨 채 `Count` 앞에 삽입해 배열 인덱스 매핑이 안 밀렸으며, `CurrencySaveData.diamond`는 **필드 추가**라 구 세이브가 0으로 읽힌다. ② **세이브 스키마 추가**: `UserSaveData.cardGrowth`(`CardGrowthSaveData`) 슬롯 1개 — **VERSION 1 유지**(`tutorial`·`rank` 선례). ③ **부트 순서 추가(재동결)**: `BootInstaller`에 `CardGrowthManager.SetConfig` → `Init` → `GameInitializer.GrowthProvider` 3줄(기존 호출 순서는 무변경). ④ **신규 계약 3종 동결**: `CardGrowthManager`(성장 창구) · `DeckPower.MaxHpOf`(아웃게임 표시 환산 단일 진실원) · `GameInitializer.GrowthProvider`(전투 주입, set-only). ⑤ **범위 제한 명문화**: 성장은 **싱글 전투 플레이어 필드에만** 적용(멀티 lockstep divergence · AI 밸런스 기준선 · 튜토리얼 저작 전제 보호) | 없음(전부 순수 추가 또는 무재작업 확장). 재화 소비처(`CardPackOpener`·`RewardService`·`CollectionProductionManager`·`GoldHud`)는 **회귀 확인만** — 타입 인자를 이미 받고 있어 코드 무수정 | 코드+문서 |
 | 2026-07-27 | **도메인 H(랭크 — 표시용 티어 진행도) 편입 — 계약 변경 1건 + 신규 계약 1건.** ① **세이브 스키마 추가**: `UserSaveData.rank`(`RankSaveData { long points }`) 슬롯 1개 — 필드 추가라 **VERSION 1 유지**(구 세이브는 노드 없이 `points=0`으로 읽힘, 하위호환·재작업 없음). `tutorial` 슬롯과 동일한 선례. ② **신규 계약 `RankManager` 동결 예정**(구현 시). 스코프를 **표시용**(보상·난이도·매칭 무영향)으로 좁혀 재화·소유·생산·팩 계약을 하나도 안 건드린다. 또 **캐시를 두지 않고 세이브 슬롯을 직접 읽어** `Init`이 없으므로 **`GameManager.Boot()` 무수정** = 통합 부트 순서 **무접촉**(재동결 불필요) → 게이트 하나(SAVE)만 🔴이고 나머지는 전부 🟢/🟠. ③ 보드 명칭 충돌 해소: 기존 Wave 2+ `PKG-RANK` → **`PKG-RANK-SERVER`** 개명(PvP 실력 랭크는 여전히 범위 밖) | 없음(순수 추가). `PKG-TUT-REWARD`는 `TurnRunner.CaptureResult` 파일 경합만 — 보류 상태라 실질 영향 없음 | 문서 + 코드(SAVE만 선행 적용) |
 | 2026-07-26 | 워크플로우를 Phase 순차 → 동시성 등급(🔴/🟠/🟢) 분류로 전환. 사람이 다중 세션으로 병렬 실행하는 모델. 보드 신설 | (전체 운영 방식) | 문서만 |
 | 2026-07-27 | **F-20/PKG-POPUP 스코프 확정 — 로비 팝업 폐기, 전투씬 처리.** 신규 `UI/Reward/*` 로비 진입 팝업·`BattleRewardHandoff` 대신 기존 전투씬 `GameResultPopup`에서 보상 골드 연출(스케일-인+`+N0 골드` 순차 팝, 심플)로 마무리. 전투 로직·`RewardService` 무수정(순수 표시). `RewardService` 계약 불변 | PKG-POPUP만(순수 추가) | 문서+단일 파일 |

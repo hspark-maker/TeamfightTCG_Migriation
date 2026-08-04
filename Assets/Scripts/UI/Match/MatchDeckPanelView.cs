@@ -66,8 +66,8 @@ public class MatchDeckPanelView : MonoBehaviour
         List<CardData> t_deck = t_valid ? DeckSaveManager.GetSlot(_slotIndex) : null;
 
         // _owned는 항상 true다. 매치 화면에 올라오는 건 이미 편성된 소유 카드뿐이라 잠금 표시가 뜨면 안 된다.
-        BindSlots(mySlots, t_deck);
-        SetPower(myPowerText, t_deck);
+        BindSlots(mySlots, t_deck, _applyGrowth: true);   // 내 덱이라 강화 반영 체력으로 그린다
+        SetPower(myPowerText, t_deck, _applyGrowth: true);
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
@@ -76,24 +76,37 @@ public class MatchDeckPanelView : MonoBehaviour
     void RenderEnemySlots()
     {
         // 표시용 공개이므로 _owned는 내 쪽과 같은 true — 상대 카드를 잠금 실루엣으로 가리지 않는다.
-        BindSlots(enemySlots, DeckConfig.EnemyDeck);
-        SetPower(enemyPowerText, DeckConfig.EnemyDeck);
+        // 강화는 끈다 — 내 성장은 상대 카드에 붙지 않고, 전투도 AI 적은 마스터 스탯 그대로 쓴다(GameInitializer).
+        BindSlots(enemySlots, DeckConfig.EnemyDeck, _applyGrowth: false);
+        // 파워 합도 같이 꺼야 한다 — 칸은 마스터 값, 배지만 강화 합이면 6칸 합계와 배지가 어긋난다.
+        SetPower(enemyPowerText, DeckConfig.EnemyDeck, _applyGrowth: false);
     }
 
     // 덱 파워 표기. 환산식은 DeckPower가 단일 진실원이다(편성 화면의 자동 편성 정렬과 같은 식).
     // 덱이 null이면 0이 찍힌다 — 미선택·불완전 덱을 빈칸이 아니라 0으로 보이게 하는 게 의도다.
-    static void SetPower(TMP_Text _text, List<CardData> _deck)
+    static void SetPower(TMP_Text _text, List<CardData> _deck, bool _applyGrowth)
     {
         if (_text == null) return;   // 미배선 필드는 조용히 건너뛴다
 
-        _text.text = DeckPower.Of(_deck).ToString();
+        _text.text = DeckPower.Of(_deck, _applyGrowth).ToString();
     }
 
     // 칸 배열 하나를 덱으로 채운다. 덱이 짧거나 null이면 남는 칸은 빈 칸이 된다.
-    static void BindSlots(CardVisualView[] _slots, List<CardData> _deck)
+    //
+    // 시너지 활성 판정은 여기서 붙인다 — 카드 배지가 이미 활성/비활성 아이콘을 갈라 그릴 줄 알고
+    // (CardSynergyBadgeView.Set) 이 화면은 덱 6장을 통째로 들고 있으니, 판정에 필요한 게 전부 여기 있다.
+    // 별도 시너지 패널을 세우지 않는 이유이기도 하다: 어느 카드가 그 시너지를 채우고 있는지는
+    // 배지가 카드 위에서 직접 답하는 편이 짧다.
+    static void BindSlots(CardVisualView[] _slots, List<CardData> _deck, bool _applyGrowth)
     {
         // 미배선 배열은 조용히 건너뛴다 — 부분 배선으로 축소 화면을 만드는 게 이 프로젝트 UI의 관례다.
         if (_slots == null) return;
+
+        // 덱 전체로 1회 산출해 6칸이 공유한다. 칸마다 다시 풀면 같은 답을 여섯 번 구하는 셈이고,
+        // 한 칸이라도 다른 입력으로 풀리면 같은 시너지가 카드마다 다르게 보인다.
+        // 전투가 쓰는 SynergyResolver 그대로다 — 여기서 "덱 화면용 활성 규칙"을 따로 만들면
+        // 전투 시작 직후 배지가 바뀌는 화면이 된다.
+        SynergyState t_synergy = SynergyResolver.Resolve(_deck);
 
         int t_count = _deck != null ? Mathf.Min(_slots.Length, _deck.Count) : 0;
 
@@ -104,7 +117,7 @@ public class MatchDeckPanelView : MonoBehaviour
             // Bind(null, ...)이면 CardVisualView가 스스로 gameObject.SetActive(false)로 빈 칸을 숨긴다
             // (CardVisualView.Bind 진입부) → 여기서 빈 칸 숨김/복구를 따로 처리하지 않는다.
             // 카드를 다시 넘기면 같은 자리에서 SetActive(true)로 되살아난다.
-            _slots[t_i].Bind(t_i < t_count ? _deck[t_i] : null, true);
+            _slots[t_i].Bind(t_i < t_count ? _deck[t_i] : null, true, _applyGrowth, t_synergy);
         }
     }
 

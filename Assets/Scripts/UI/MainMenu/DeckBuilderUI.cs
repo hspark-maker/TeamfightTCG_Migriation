@@ -175,7 +175,8 @@ public class DeckBuilderUI : MonoBehaviour
         {
             if (t_card == null) continue;   // 레지스트리 빈 칸(ID 보존용)은 건너뜀
             CardElement t_element = Instantiate(this.cardElementPrefab, this.collectionGrid);
-            t_element.Init(t_card);
+            // 아웃게임 편성 화면이라 내 카드다 → 강화 반영 체력을 넘긴다(CardElement 폴백은 전투용 마스터 값).
+            t_element.Init(t_card, CardElementMod.Full, DeckPower.MaxHpOf(t_card));
             t_element.onBeginDrag = OnCardBeginDrag;
             t_element.onDrag      = OnCardDrag;
             t_element.onEndDrag   = OnCardEndDrag;

@@ -22,7 +22,9 @@ public class CollectionRowView : MonoBehaviour
     string m_rowKey;
 
     // 행 데이터로 카드 타일을 (재)생성한다. 기존 컨테이너 자식(목업 하드코딩 포함)을 먼저 비운다.
-    public void Build(CatalogRow _row)
+    // _nav = 도감 전체를 행 순서로 이어붙인 평면 목록, _navOffset = 그 안에서 이 행의 첫 슬롯 위치.
+    // 상세 오버레이가 행 경계를 넘어 계속 넘어가려면 행이 자기 카드만 알아서는 안 되므로 컨트롤러가 내려준다.
+    public void Build(CatalogRow _row, IReadOnlyList<CardData> _nav, int _navOffset)
     {
         ClearContainer();
         m_cards.Clear();
@@ -47,9 +49,10 @@ public class CollectionRowView : MonoBehaviour
                 var t_view = Instantiate(cardPrefab, cardsContainer);
                 var t_card = t_cards[t_i];
                 t_view.Bind(t_card, IsOwned(t_card));
-                // 길게 누르면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
+                // 탭하면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
                 // (RefreshOwnership은 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
-                CardDetailOverlayView.BindTile(t_view, t_card);
+                // 빈 슬롯(authoring 누락)에는 배선하지 않는다 — 배선하면 빈 칸을 눌러 이웃 카드가 열린다.
+                if (_nav != null && t_card != null) CardDetailOverlayView.BindTile(t_view, _nav, _navOffset + t_i);
                 m_cards.Add(t_view);
             }
         }
