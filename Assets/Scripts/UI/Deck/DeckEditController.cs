@@ -23,10 +23,6 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
 
-    // 편성 중인 덱의 시너지 줄(미배선이면 표시 생략). 편집 화면이므로 미달 진행도까지 보여야 한다
-    // → 스트립의 showInactive는 켠 채로 쓴다(활성만 보여주는 매치 화면과 같은 컴포넌트, 다른 값).
-    [SerializeField] DeckSynergyStrip       synergyStrip;
-
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
     [SerializeField] Button autoEquipButton;
@@ -411,10 +407,6 @@ public class DeckEditController : MonoBehaviour
         }
 
         if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
-
-        // 빈 칸(null)을 걸러내지 않고 그대로 넘긴다 — SynergyPreview가 null 카드를 무시하므로
-        // 여기서 사본을 뜨면 편성 한 번마다 배열이 하나씩 생길 뿐이다.
-        if (synergyStrip != null) synergyStrip.Refresh(m_working);
 
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
