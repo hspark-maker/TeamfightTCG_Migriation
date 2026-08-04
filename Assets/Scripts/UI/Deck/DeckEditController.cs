@@ -22,6 +22,7 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
+    [SerializeField] DeckEditSynergyView    synergyView;    // 편성 중 시너지 활성 표시(미배선이면 표시 생략)
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
@@ -407,6 +408,9 @@ public class DeckEditController : MonoBehaviour
         }
 
         if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
+        // 시너지도 편성 상태의 파생값이라 같은 자리에서 다시 그린다 — 별도 갱신 경로를 만들면
+        // 칸은 바뀌었는데 시너지는 직전 덱인 순간이 생긴다.
+        if (synergyView    != null) synergyView.Refresh(m_working);
 
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";

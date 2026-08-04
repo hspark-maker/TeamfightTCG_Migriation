@@ -68,17 +68,21 @@ public class CardVisualView : MonoBehaviour
     // TextMeshPro(월드)는 렌더 시 fontSize에 0.1을 곱하고 TextMeshProUGUI는 그대로 쓴다(m_isOrthographic 차이).
     // 그래서 인게임 fontSize를 uGUI로 옮기려면 0.1 × (카드 rect 높이 / 인게임 카드 높이)를 곱한다.
     const float WorldFontToUnit  = 0.1f;
-    const float IngameHpFontSize      = 5f;   // CardView HPText
-    const float IngameBonusHpFontSize = 3f;   // CardView AdditionalHPText
-    const float IngameNameFontSize    = 2f;   // CardView NameText
+    const float IngameHpFontSize      = 4f;     // CardView HPText
+    const float IngameBonusHpFontSize = 2.4f;   // CardView AdditionalHPText
+    const float IngameNameFontSize    = 2.3f;   // CardView NameText 오토사이징 최대
+    const float IngameNameFontSizeMin = 1f;     // CardView NameText 오토사이징 최소(긴 이름 축소)
 
-    // 키워드 아이콘 세로열. 인게임 CardView의 synergyBadgeXPos(-0.6) / YStart(-1) / YStep(-0.5)와
-    // kewordIcon 크기(0.6x0.6)를 위 카드 크기로 나눈 값 = 카드 좌하단 기준 정규화 좌표.
-    const float KeywordIconCenterX = 0.5f - 0.6f / IngameCardWidth;
-    const float KeywordIconStartY  = 0.5f - 1.0f / IngameCardHeight;
-    const float KeywordIconStepY   =      -0.5f / IngameCardHeight;
-    const float KeywordIconWidth   =       0.6f / IngameCardWidth;
-    const float KeywordIconHeight  =       0.6f / IngameCardHeight;
+    // 키워드 아이콘 가로줄. 인게임은 keywordIconsUseSynergySlot=true 경로를 타므로 기준은
+    // synergyBadge* 가 아니라 CardView의 keywordIconStart(-0.65,-1.14) / keywordIconStep(0.42,0)이다
+    // (CardDecorView.RefreshKeywordIcons). kewordIcon 크기(0.65x0.65)와 함께 위 카드 크기로 나눈 값이
+    // 카드 중심 기준 정규화 좌표가 된다. 이 모드에선 인게임이 시너지 배지를 아예 그리지 않는다.
+    const float KeywordIconStartX = 0.5f + -0.65f / IngameCardWidth;
+    const float KeywordIconStartY = 0.5f + -1.14f / IngameCardHeight;
+    const float KeywordIconStepX  =        0.42f / IngameCardWidth;
+    const float KeywordIconStepY  =        0f    / IngameCardHeight;
+    const float KeywordIconWidth  =        0.65f / IngameCardWidth;
+    const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
@@ -173,14 +177,15 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    // 인게임은 세로열 좌표(synergyBadgeXPos/YStart/YStep)로 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
+    // 인게임은 keywordIconStart에서 keywordIconStep만큼 밀며 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
     // 맡기지 않고 같은 좌표를 정규화 앵커로 옮긴다 — LayoutGroup은 간격·크기를 픽셀로 잡아서 카드 셀 크기가
     // 바뀌면(도감 386px vs 팩개봉 930px) 인게임과 비율이 어긋난다. 앵커는 부모 rect 비율이라 어긋나지 않는다.
     static void PlaceKeywordIcon(RectTransform _rect, int _index)
     {
         if (_rect == null) return;
 
-        var t_center = new Vector2(KeywordIconCenterX, KeywordIconStartY + KeywordIconStepY * _index);
+        var t_center = new Vector2(KeywordIconStartX + KeywordIconStepX * _index,
+                                   KeywordIconStartY + KeywordIconStepY * _index);
         var t_half   = new Vector2(KeywordIconWidth, KeywordIconHeight) * 0.5f;
 
         _rect.anchorMin        = t_center - t_half;
@@ -218,7 +223,15 @@ public class CardVisualView : MonoBehaviour
 
         if (this.hpText      != null) this.hpText.fontSize      = IngameHpFontSize      * t_scale;
         if (this.bonusHpText != null) this.bonusHpText.fontSize = IngameBonusHpFontSize * t_scale;
-        if (this.nameText    != null) this.nameText.fontSize    = IngameNameFontSize    * t_scale;
+
+        // 이름만 인게임이 오토사이징(1.0~2.3)이라 긴 이름이 줄어든다. 오토사이징이 켜져 있으면
+        // fontSize는 무시되고 min/max가 실제 크기를 정하므로 셋 다 환산해야 카드 크기를 따라간다.
+        if (this.nameText != null)
+        {
+            this.nameText.fontSizeMin = IngameNameFontSizeMin * t_scale;
+            this.nameText.fontSizeMax = IngameNameFontSize    * t_scale;
+            this.nameText.fontSize    = IngameNameFontSize    * t_scale;
+        }
     }
 
     // 그리드 셀 크기가 Bind 이후에 확정되는 경우(GridLayoutGroup 첫 프레임)를 위해 rect가 바뀔 때마다 재적용.
