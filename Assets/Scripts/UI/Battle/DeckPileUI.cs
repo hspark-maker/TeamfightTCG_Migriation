@@ -79,7 +79,7 @@ public class DeckPileUI : MonoBehaviour
     }
 
 
-    /// <summary>목록에서 카드를 눌렀을 때의 상세. 전투 중 롱프레스와 **같은 창**(PooledCardElement)을 쓴다 —
+    /// <summary>목록 카드를 <b>누르고 있는 동안</b>의 상세. 전투 중 롱프레스와 **같은 창**(PooledCardElement)을 쓴다 —
     /// 여기서 별도 상세 UI를 만들면 카드 정보를 보는 방법이 두 벌이 된다.
     /// 시너지 활성 여부는 이 필드의 확정 스냅샷을 그대로 넘긴다(재계산 금지).</summary>
     void ShowCardDetail(CardData _card)
@@ -91,6 +91,8 @@ public class DeckPileUI : MonoBehaviour
             synergy = this.field != null ? this.field.Synergy : null,
         });
     }
+
+    void HideCardDetail() => UIPoolManager.Instance?.HideUI<PooledCardElement>();
 
     void PopulateList()
     {
@@ -119,11 +121,11 @@ public class DeckPileUI : MonoBehaviour
                 }
                 t_entry.Init(t_card, CardElementMod.Full);
 
-                // 공개된 카드는 눌러서 상세를 볼 수 있다. 목록 항목은 풀에서 재사용되므로
-                // 리스너를 매번 새로 걸지 않고 갈아끼운다(중복 구독이면 한 번 눌러 여러 번 열린다).
-                CardData t_data = t_card.data;
+                // 공개된 카드는 **누르고 있는 동안** 상세가 뜬다(떼면 사라진다).
+                // 콜백은 대입이라 풀에서 재사용돼도 중복되지 않는다.
                 t_entry.SetInteractable(true, false);
-                t_entry.SetButtonAction(() => ShowCardDetail(t_data), _replace: true);
+                t_entry.onPressStart = ShowCardDetail;
+                t_entry.onPressEnd   = HideCardDetail;
                 t_ceIdx++;
             }
             else

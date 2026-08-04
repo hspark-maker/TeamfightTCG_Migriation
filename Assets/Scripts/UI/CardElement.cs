@@ -9,7 +9,9 @@ public enum CardElementMod
     Full,
     Simple,
 }
-public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class CardElement : MonoBehaviour,
+    IBeginDragHandler, IDragHandler, IEndDragHandler,
+    IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
 {
     CardData Data;
     public CardData CardData => Data;
@@ -56,6 +58,13 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
     public Action<CardData, PointerEventData> onBeginDrag;
     public Action<PointerEventData> onDrag;
     public Action<PointerEventData> onEndDrag;
+
+    /// <summary>누르는 동안만 보여줄 것(카드 상세 등)의 켜기/끄기. 손을 떼거나 카드 밖으로 벗어나면 끈다.
+    /// 클릭(onClick)이 아니라 누름 단위인 이유: "누르면 뜨고 떼면 사라진다"가 목록에서 훑어보기 좋다.</summary>
+    public Action<CardData> onPressStart;
+    public Action           onPressEnd;
+
+    bool pressing;   // 떼기/벗어남에서 중복으로 끄지 않게(콜백이 두 번 불리면 다른 카드의 창까지 닫는다)
 
     public void Init(CardData _card, CardElementMod _mod = CardElementMod.Full, int _displayHp = -1)
     {
@@ -215,4 +224,26 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
     }
     public void OnDrag(PointerEventData _eventData) => this.onDrag?.Invoke(_eventData);
     public void OnEndDrag(PointerEventData _eventData) => this.onEndDrag?.Invoke(_eventData);
+
+    // ── 누름(보는 동안만 표시) ──────────────────────────────────────────
+    // 배선이 없으면(onPressStart null) 아무 일도 하지 않는다 — 덱 편성처럼 드래그로 쓰는 화면은 그대로다.
+
+    public void OnPointerDown(PointerEventData _eventData)
+    {
+        if (!this.isInteractable || this.onPressStart == null) return;
+        this.pressing = true;
+        this.onPressStart.Invoke(this.Data);
+    }
+
+    public void OnPointerUp(PointerEventData _eventData)   => EndPress();
+    public void OnPointerExit(PointerEventData _eventData) => EndPress();
+
+    void OnDisable() => EndPress();   // 목록이 닫히거나 항목이 꺼져도 창이 남지 않게
+
+    void EndPress()
+    {
+        if (!this.pressing) return;
+        this.pressing = false;
+        this.onPressEnd?.Invoke();
+    }
 }

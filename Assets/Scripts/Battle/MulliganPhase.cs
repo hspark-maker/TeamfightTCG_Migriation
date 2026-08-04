@@ -91,6 +91,12 @@ public static class MulliganPhase
 
         var t_ui = new MulliganOverlay(_ctx?.turnLabel != null ? _ctx.turnLabel.font : null);
 
+        // 고를 필드만 남기고 나머지를 덮는다(튜토리얼 필드 포커스와 같은 그림).
+        // 구멍은 슬롯 격자 기준이라 카드가 비어 있어도 자리가 흔들리지 않는다.
+        BattleFieldView t_focusView = _ctx != null && _ctx.playerField == _field
+            ? _ctx.playerFieldView : _ctx?.enemyFieldView;
+        if (t_focusView != null) t_ui.SetFocusHole(t_focusView.ScreenBounds());
+
         int t_chosen = -1;
         try
         {
@@ -205,6 +211,50 @@ public static class MulliganPhase
 
             // 스킵 버튼(하단).
             if (_showSkip) CreateSkipButton(t_f);
+        }
+
+        /// <summary>고를 필드만 남기고 화면 나머지를 덮는다(튜토리얼 필드 포커스와 같은 그림).
+        ///
+        /// 구멍은 딤 네 장(위·아래·좌·우)으로 만든다 — 뚫린 영역에는 아무것도 없으므로 그쪽 클릭은
+        /// 그대로 카드까지 내려간다. 카드는 월드 오브젝트고 이 캔버스가 그 위(sortingOrder 999)라
+        /// 카드 스프라이트를 따로 어둡게 하지 않아도 바깥은 전부 덮인다.</summary>
+        public void SetFocusHole(Rect _screenRect)
+        {
+            if (_screenRect.width <= 0f || _screenRect.height <= 0f) return;   // 잡히지 않은 영역이면 덮지 않는다
+
+            const float k_pad = 24f;   // 카드 프레임 장식이 딤에 물리지 않을 여유(px)
+
+            // **정규화(0~1) 앵커로 배치한다.** 이 캔버스엔 CanvasScaler가 걸려 있어 anchoredPosition/sizeDelta는
+            // 스크린 픽셀이 아니라 레퍼런스 해상도 단위다 — 픽셀을 그대로 넣으면 배율만큼 어긋난다.
+            float t_left   = Mathf.Clamp01((_screenRect.xMin - k_pad) / Screen.width);
+            float t_right  = Mathf.Clamp01((_screenRect.xMax + k_pad) / Screen.width);
+            float t_bottom = Mathf.Clamp01((_screenRect.yMin - k_pad) / Screen.height);
+            float t_top    = Mathf.Clamp01((_screenRect.yMax + k_pad) / Screen.height);
+
+            CreateDim("Dim_Top",    new Vector2(0f, t_top),      new Vector2(1f, 1f));
+            CreateDim("Dim_Bottom", new Vector2(0f, 0f),         new Vector2(1f, t_bottom));
+            CreateDim("Dim_Left",   new Vector2(0f, t_bottom),   new Vector2(t_left, t_top));
+            CreateDim("Dim_Right",  new Vector2(t_right, t_bottom), new Vector2(1f, t_top));
+        }
+
+        /// <summary>_min/_max는 화면 비율(0~1). 오프셋을 0으로 두면 해상도·스케일러와 무관하게 그 영역을 덮는다.</summary>
+        void CreateDim(string _name, Vector2 _min, Vector2 _max)
+        {
+            if (_max.x - _min.x <= 0.0001f || _max.y - _min.y <= 0.0001f) return;   // 두께 0이면 만들 이유가 없다
+
+            var t_go = new GameObject(_name);
+            t_go.transform.SetParent(this.root.transform, false);
+            t_go.transform.SetAsFirstSibling();   // 안내 문구·스킵 버튼보다 뒤에
+
+            var t_img = t_go.AddComponent<Image>();
+            t_img.color = new Color(0f, 0f, 0f, 0.62f);
+            t_img.raycastTarget = true;           // 딤 위 클릭이 카드로 새지 않게
+
+            var t_rt = t_img.rectTransform;
+            t_rt.anchorMin = _min;
+            t_rt.anchorMax = _max;
+            t_rt.offsetMin = Vector2.zero;
+            t_rt.offsetMax = Vector2.zero;
         }
 
         void CreateText(string _name, string _msg, TMP_FontAsset _font, float _size,
