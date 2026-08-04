@@ -17,6 +17,13 @@ public class MatchDeckPanelView : MonoBehaviour
     [SerializeField] CardVisualView[] enemySlots;   // 6칸. 같은 규약 — EnemySlot_N/CardUIView를 물린다
     [SerializeField] TMP_Text         myPowerText;      // MyInfoBar/PowerBadge/PowerText
     [SerializeField] TMP_Text         enemyPowerText;   // EnemyInfoBar/PowerBadge/PowerText
+
+    // 활성 시너지 줄. 정보 바의 빈 반대쪽 끝에 붙인다(내 쪽은 왼쪽, 상대 쪽은 오른쪽) —
+    // 위/아래로 갈린 진영을 위치로 읽는 전투 화면(FieldSynergyPanel)과 같은 규약이다.
+    // 이 화면은 편성을 못 바꾸므로 미달 진행도는 보여줄 이유가 없다 → 스트립의 showInactive를 꺼서 쓴다
+    // (필터는 프리팹 설정이고 여기서 코드로 강제하지 않는다 — 편집 화면과 같은 컴포넌트를 다른 값으로 쓰는 게 요점).
+    [SerializeField] DeckSynergyStrip mySynergyStrip;      // MyInfoBar/SynergyStrip
+    [SerializeField] DeckSynergyStrip enemySynergyStrip;   // EnemyInfoBar/SynergyStrip
     [SerializeField] Button           editButton;
     [SerializeField] Button           backButton;
     [SerializeField] Button           battleButton;
@@ -68,6 +75,7 @@ public class MatchDeckPanelView : MonoBehaviour
         // _owned는 항상 true다. 매치 화면에 올라오는 건 이미 편성된 소유 카드뿐이라 잠금 표시가 뜨면 안 된다.
         BindSlots(mySlots, t_deck, _applyGrowth: true);   // 내 덱이라 강화 반영 체력으로 그린다
         SetPower(myPowerText, t_deck, _applyGrowth: true);
+        SetSynergy(mySynergyStrip, t_deck);
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
@@ -80,6 +88,9 @@ public class MatchDeckPanelView : MonoBehaviour
         BindSlots(enemySlots, DeckConfig.EnemyDeck, _applyGrowth: false);
         // 파워 합도 같이 꺼야 한다 — 칸은 마스터 값, 배지만 강화 합이면 6칸 합계와 배지가 어긋난다.
         SetPower(enemyPowerText, DeckConfig.EnemyDeck, _applyGrowth: false);
+        // 시너지는 강화와 무관하다(집계 기준이 CardData.synergies라 성장 레벨이 끼어들 자리가 없다) →
+        // 여기만 _applyGrowth 짝이 없다. 상대 시너지를 가리지 않는 건 전투 화면과 같은 판단이다.
+        SetSynergy(enemySynergyStrip, DeckConfig.EnemyDeck);
     }
 
     // 덱 파워 표기. 환산식은 DeckPower가 단일 진실원이다(편성 화면의 자동 편성 정렬과 같은 식).
@@ -89,6 +100,15 @@ public class MatchDeckPanelView : MonoBehaviour
         if (_text == null) return;   // 미배선 필드는 조용히 건너뛴다
 
         _text.text = DeckPower.Of(_deck, _applyGrowth).ToString();
+    }
+
+    // 활성 시너지 줄 갱신. 덱이 null이면 Refresh(null)이 아이콘을 전부 꺼서 줄이 비므로
+    // 미선택·불완전 덱을 따로 분기하지 않는다(파워가 0으로 접히는 것과 같은 처리).
+    static void SetSynergy(DeckSynergyStrip _strip, List<CardData> _deck)
+    {
+        if (_strip == null) return;   // 미배선 필드는 조용히 건너뛴다
+
+        _strip.Refresh(_deck);
     }
 
     // 칸 배열 하나를 덱으로 채운다. 덱이 짧거나 null이면 남는 칸은 빈 칸이 된다.

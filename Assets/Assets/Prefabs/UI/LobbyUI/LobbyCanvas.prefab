@@ -3713,7 +3713,7 @@ RectTransform:
   m_Father: {fileID: 7199074612625639083}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0.9542763}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -5913,7 +5913,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2931285140278360439, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -109.88623
+      value: -109.88574
       objectReference: {fileID: 0}
     - target: {fileID: 2999328345765968624, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchorMax.y
@@ -7344,6 +7344,10 @@ PrefabInstance:
 '
       objectReference: {fileID: 0}
     - target: {fileID: 4886405216838656031, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
+      propertyPath: m_margin.x
+      value: -6.953079
+      objectReference: {fileID: 0}
+    - target: {fileID: 4886405216838656031, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
       propertyPath: m_textAlignment
       value: 65535
       objectReference: {fileID: 0}
@@ -7593,6 +7597,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4886405216536851745, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5185043943080510297}
+    - targetCorrespondingSourceObject: {fileID: 4886405216536851745, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7381529594773991675}
   m_SourcePrefab: {fileID: 100100000, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
 --- !u!224 &8511228286296085799 stripped
 RectTransform:
@@ -7602,6 +7609,17 @@ RectTransform:
 --- !u!114 &8511228286516405496 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4886405216838656031, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
+  m_PrefabInstance: {fileID: 3878173979988034791}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &8511228286612396778 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4886405216524590605, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
   m_PrefabInstance: {fileID: 3878173979988034791}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
@@ -7629,6 +7647,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GoldHud
   goldText: {fileID: 8511228286516405496}
   type: 0
+--- !u!114 &7381529594773991675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8511228286818513350}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09e95a830ee22a3458e89448ad75c311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GoldHud
+  goldText: {fileID: 8511228286612396778}
+  type: 1
 --- !u!224 &8511228286818513351 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 4886405216536851744, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}

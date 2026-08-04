@@ -40,8 +40,9 @@ public class CardDetailOverlayView : MonoBehaviour
     [SerializeField] TMP_Text evolutionValueText;  // 진화 단계 "2단계"(미진화면 NoEvolution)
 
     [Header("강화·진화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
-    [Tooltip("조작 묶음 전체. 미소유 카드에서는 통째로 끈다.")]
-    [SerializeField] GameObject growthActionRoot;
+    // 조작 묶음(BottomBar)을 통째로 끄는 필드는 두지 않는다 — 루트 VerticalLayoutGroup에서 남는 높이를
+    // CardArea(flexibleHeight=1)가 받아 카드 그림 크기가 소유 여부에 따라 달라진다(ApplySection과 같은 함정).
+    // 대신 버튼만 숨긴다: 바는 높이를 지킨 채 비어 있게 된다.
     [SerializeField] Button     enhanceButton;
     [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
@@ -516,6 +517,10 @@ public class CardDetailOverlayView : MonoBehaviour
     // 값이 그대로인 키워드·시너지 칩까지 매번 Destroy + Instantiate 된다.
     void RefreshGrowth(CardData _card, bool _owned)
     {
+        // 카드 그림의 HP도 강화를 따라와야 한다. Bind가 아니라 RefreshHp인 이유는 그쪽 주석 참고
+        // (Bind는 키워드 아이콘·시너지 배지까지 전부 다시 짓는다).
+        if (this.cardView != null) this.cardView.RefreshHp(_card, _owned);
+
         // CardData에 파워 필드가 없어 프리팹 목업의 "파워" 행을 체력으로 쓴다(라벨/아이콘은 프리팹 쪽 값).
         // 수치는 강화 반영값 — 환산의 정본은 DeckPower다(마스터 maxHp를 직접 읽지 않는다).
         int t_maxHp = DeckPower.MaxHpOf(_card);
@@ -546,24 +551,25 @@ public class CardDetailOverlayView : MonoBehaviour
     // 강화·진화 버튼과 비용·성공률·안내 문구. 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
     void RefreshGrowthActions(CardData _card, bool _owned)
     {
-        // 미소유 카드에는 조작 자체를 숨긴다. BottomBar는 오버레이 루트 직속이라 꺼도 DetailPanel 높이에 영향이 없다
-        // (섹션을 못 끄는 ApplySection의 사정과는 다른 자리다).
-        if (this.growthActionRoot != null) this.growthActionRoot.SetActive(_owned);
-
         // 두 조회의 역할이 다르다: TryGetNextStep은 게이트를 모르는 비용 미리보기, TryGetPendingGate가 진짜 차단 판정이다.
         GrowthStep    t_step = default;
         EvolutionGate t_gate = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
         bool t_gated   = _owned && CardGrowthManager.TryGetPendingGate(_card, out t_gate);
 
+        // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost);
-        if (this.enhanceButton   != null) this.enhanceButton.interactable = t_hasStep && !t_gated && t_canPayEnhance;
+        if (this.enhanceButton != null)
+        {
+            this.enhanceButton.gameObject.SetActive(_owned);
+            this.enhanceButton.interactable = t_hasStep && !t_gated && t_canPayEnhance;
+        }
         if (this.enhanceCostText != null) this.enhanceCostText.text = t_hasStep ? t_step.Cost.ToString("N0") : NoValue;
         if (this.successRateText != null)
             this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
 
         bool t_canPayEvolve = t_gated && CurrencyManager.CanAfford(t_gate.costType, t_gate.cost);
-        if (this.evolveRoot     != null) this.evolveRoot.SetActive(t_gated);
+        if (this.evolveRoot     != null) this.evolveRoot.SetActive(_owned && t_gated);
         if (this.evolveButton   != null) this.evolveButton.interactable = t_canPayEvolve;
         if (this.evolveCostText != null) this.evolveCostText.text = t_gated ? t_gate.cost.ToString("N0") : NoValue;
 

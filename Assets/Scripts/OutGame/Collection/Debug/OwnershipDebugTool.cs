@@ -10,6 +10,13 @@ public class OwnershipDebugTool : MonoBehaviour
     [ContextMenu("전체 회수")]
     void RevokeAll() => OutgameDebugActions.RevokeAllCards();
 
+    // 라벨의 수치는 OutgameDebugActions의 지급 단위와 맞춘다(ContextMenu 인자는 const 문자열만 받아 보간이 안 된다).
+    [ContextMenu("골드 +1000")]
+    void GrantGold() => OutgameDebugActions.GrantGold();
+
+    [ContextMenu("다이아 +1000")]
+    void GrantDiamond() => OutgameDebugActions.GrantDiamond();
+
     [ContextMenu("카드 성장 초기화")]
     void ResetCardGrowth() => OutgameDebugActions.ResetCardGrowth();
 

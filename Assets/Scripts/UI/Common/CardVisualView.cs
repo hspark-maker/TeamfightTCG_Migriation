@@ -121,6 +121,20 @@ public class CardVisualView : MonoBehaviour
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
     }
 
+    /// <summary>강화로 바뀌는 값(최대 체력)만 다시 그린다. 인자 의미는 <see cref="Bind"/>와 같다.
+    ///
+    /// 성장 통지처럼 잦은 갱신에서 Bind를 통째로 부르면 바뀌지도 않은 키워드 아이콘·시너지 배지가
+    /// 매번 Destroy + Instantiate 된다. 반대로 이걸 안 부르면 체력이 옛 값에 굳는다 —
+    /// hpText를 쓰는 곳은 SetHpDisplay 하나뿐이라 호출부가 텍스트를 직접 만지면 진실원이 갈린다.
+    ///
+    /// 카드·소유여부를 캐싱하지 않고 인자로 받는 이유: 바인딩 상태의 진실원을 호출부와 여기 둘로 만들지 않기 위함.</summary>
+    public void RefreshHp(CardData _card, bool _owned, bool _applyGrowth = true)
+    {
+        if (_card == null) return;
+
+        SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
+    }
+
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
     // 아웃게임엔 전투 인스턴스(CardInstance.hp)가 없으므로 내 카드는 강화 반영 최대 체력(DeckPower.MaxHpOf)을 그린다 —
     // 마스터 데이터의 maxHp를 직접 읽으면 강화한 카드가 로비에서만 안 오른 것처럼 보인다.

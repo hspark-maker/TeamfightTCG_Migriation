@@ -5,8 +5,8 @@ using UnityEngine;
 public static class OutgameDebugActions
 {
     // 디버그 지급 단위. 오버레이·ContextMenu가 같은 값을 쓰도록 여기 고정한다.
-    const long DEBUG_GOLD_AMOUNT    = 10000;
-    const long DEBUG_DIAMOND_AMOUNT = 1000;
+    public const long DEBUG_GOLD_AMOUNT    = 1000;
+    public const long DEBUG_DIAMOND_AMOUNT = 1000;
 
     // 강화·진화 비용 테스트용 즉시 지급. 잔액 변경 창구는 CurrencyManager 하나뿐이라 디버그도 Earn을 거친다.
     public static void GrantGold() => GrantCurrency(ECurrencyType.Gold, DEBUG_GOLD_AMOUNT);
