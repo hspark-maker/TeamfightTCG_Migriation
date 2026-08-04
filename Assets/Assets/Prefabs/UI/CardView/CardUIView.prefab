@@ -1013,12 +1013,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 40.57331
+  m_fontSize: 40.57378
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 17.64057
-  m_fontSizeMax: 40.57331
+  m_fontSizeMin: 17.640774
+  m_fontSizeMax: 40.57378
   m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -1150,8 +1150,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 42.337368
-  m_fontSizeBase: 42.337368
+  m_fontSize: 42.33786
+  m_fontSizeBase: 42.33786
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1369,8 +1369,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 70.56228
-  m_fontSizeBase: 70.56228
+  m_fontSize: 70.563095
+  m_fontSizeBase: 70.563095
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1564,7 +1564,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 3872181452
   m_fontColor: {r: 0.8, g: 0.8, b: 0.8, a: 0.9}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -1577,7 +1577,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2

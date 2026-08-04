@@ -91,7 +91,12 @@ public class CardVisualView : MonoBehaviour
     // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
     // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
-    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
+    //
+    // _synergyState: 이 카드가 속한 **덱**의 시너지 스냅샷. 넘기면 배지가 활성/비활성 아이콘으로 갈린다.
+    // 기본 null인 이유는 호출부 대부분이 덱 문맥이 없기 때문이다(도감 그리드·상세, 팩 개봉, 컬렉션 타일) —
+    // 카드 한 장을 소개하는 자리에서 "몇 장 모였나"는 물을 수 있는 질문이 아니다.
+    // 덱 전체를 한 화면에 늘어놓는 곳(매치 화면 6칸)만 스냅샷을 만들어 넘긴다.
+    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true, SynergyState _synergyState = null)
     {
         if (_card == null)
         {
@@ -124,7 +129,7 @@ public class CardVisualView : MonoBehaviour
         SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
-        RefreshSynergyBadges(_card, _owned && this.showSynergies);
+        RefreshSynergyBadges(_card, _owned && this.showSynergies, _synergyState);
 
         // 폰트 크기는 카드 rect에 비례한다 → 바인드 시점에 한 번 맞춘다(셀 크기가 화면마다 다르다).
         ApplyIngameFontScale();
@@ -238,24 +243,27 @@ public class CardVisualView : MonoBehaviour
     void OnRectTransformDimensionsChange() => ApplyIngameFontScale();
 
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    void RefreshSynergyBadges(CardData _card, bool _show)
+    // _state = 이 카드가 속한 덱의 시너지 스냅샷(없으면 null). 정렬과 활성 판정 둘 다 여기서 갈린다.
+    void RefreshSynergyBadges(CardData _card, bool _show, SynergyState _state)
     {
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
-        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
+        // 스냅샷이 없으면 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
         // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, _state, this.synergyMaxBadges);
 
         foreach (SynergyData t_syn in t_tags)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
-            // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
-            // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
-            t_badge.Set(t_syn, true);
+
+            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다 — 거기선 "이 카드가 가진 시너지"
+            // 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
+            // 덱을 들고 온 화면만 실제로 갈린다: 요구 장수를 채운 배지는 활성 그림, 못 채운 배지는 비활성 그림.
+            bool t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_syn);
+            t_badge.Set(t_syn, t_active);
         }
     }
 

@@ -1094,3 +1094,68 @@ sequenceDiagram
     BF->>BF: CardInstance(maxHp = data.maxHp + HpBonus,<br/>evolutionStage = 세이브 우선)
 ```
 
+---
+
+### 도감 테마 뷰 — 토글 전환 + 아코디언 (`OutGame/Collection/` + `UI/Collection/`) — ✅ 코드+검수 완료 (2026-08-04) / SO 에셋·프리팹 저작 대기
+
+> 도감 탭 상단 토글로 **기존 4열 그리드 ↔ 테마별 아코디언 목록**을 교대시킨다. 테마 행을 탭하면 그 자리에서 펼쳐지고,
+> 미소유 카드는 그림 없이 **번호만 뜬 빈 슬롯**으로 보인다.
+> **테마 축은 방치생산 행 축(`CatalogRows`)과 별개 층이다** — 코드 접점은 `BootInstaller` 주입 한 줄뿐.
+> 프리팹·SO 저작 절차의 진실원은 [`COLLECTION_THEME_PREFAB_SPEC.md`](./COLLECTION_THEME_PREFAB_SPEC.md).
+> `:::new` = 이번 신규, `:::chg` = 기존 파일 소규모 수정.
+
+```mermaid
+flowchart TD
+    subgraph theme["OutGame/Collection/ — 테마 축 (신규, 영속 상태 없음)"]
+        TCFG["CollectionThemeConfig (SO)<br/>[#1 authoring] themes[]<br/>themeId · displayName · icon · cards"]:::new
+        TFAC["CollectionThemes<br/>[#1 static창구] 시그니처 캐시<br/>Themes · TryGetTheme<br/>OwnedCountOf · IsComplete · ValidateThemes"]:::new
+        TH["CollectionTheme<br/>[#9 get-only] 테마 1개 불변 뷰<br/>Key · DisplayName · Cards · CardKeys"]:::new
+    end
+
+    subgraph exist["기존 창구 (변경 없음 — 소비만)"]
+        CAT["CardCatalog<br/>KeyOf = SO 파일명"]
+        OWN["OwnershipManager<br/>IsOwned · OnOwnershipChanged"]
+        GRW["CardGrowthManager<br/>OnGrowthChanged"]
+    end
+
+    BOOT["BootInstaller [-200]<br/>SetLayout 다음 줄에 SetSource"]:::chg
+
+    subgraph ui["UI/Collection/ — 테마 뷰 (신규)"]
+        TAB["CollectionTabController<br/>Tab_Collection 루트<br/>Toggle → 두 패널 배타 SetActive"]:::new
+        LIST["CollectionThemeListController<br/>Panel_Themes · m_built 1회 빌드<br/>m_expandedIndex 단일 진실원<br/>ScrollToRow(중첩 CSF 역순 리빌드)"]:::new
+        ROW["CollectionThemeRowView<br/>행 프리팹 · body.SetActive → EnsureSlots<br/>슬롯 최초 펼침 1회 생성"]:::new
+        SLOT["CollectionThemeSlotView<br/>소유=CardUIView / 미소유=번호 슬롯"]:::new
+    end
+
+    subgraph keep["기존 도감 (무수정)"]
+        GRID["CollectionGridController<br/>Panel_Grid · 4열 평면 그리드"]
+        CVV["CardVisualView<br/>카드 비주얼 단일 진실원"]
+        DET["CardDetailOverlayView<br/>BindTile(롱프레스 nav)"]
+    end
+
+    TCFG -->|SetSource| TFAC
+    BOOT --> TFAC
+    CAT -->|"KeyOf(빌드 시)"| TFAC
+    TFAC --> TH
+    OWN -->|"IsOwned 실시간"| TFAC
+    TFAC --> LIST
+    TAB -->|SetActive| GRID
+    TAB -->|SetActive| LIST
+    LIST --> ROW --> SLOT --> CVV
+    SLOT -->|CardView| DET
+    OWN -->|OnOwnershipChanged| LIST
+    GRW -->|OnGrowthChanged| LIST
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+**설계 요지**
+
+- **테마 ≠ 도감 행.** `CatalogRows`의 행은 3장짜리 익명 묶음(방치생산 단위)이고, 테마는 이름 있는 저작물이다. 그래서 행 키(첫 카드 키 파생)와 달리 테마는 명시 `themeId`를 쓰고, `BuildFallback`도 두지 않았다 — 자동 청크는 의미 없는 가짜 테마를 만든다. SO 미배선 = 테마 0개 + 경고 1회.
+- **`CardVisualView`는 읽기 전용.** 슬롯 번호는 `CardData` 바깥의 화면 문맥이라 `Bind`에 인자를 늘리면 8개 소비자가 공유하는 단일 진실원에 이 화면 전용 개념이 새겨진다. 대신 `CollectionThemeSlotView`가 `CardUIView` 인스턴스와 빈 슬롯 노드를 품고 하나만 켠다 → 소유 카드 겉모습이 그리드/덱편집/팩개봉과 갈라질 수 없다.
+- **아코디언 = `body.SetActive()` 뿐.** uGUI LayoutGroup이 비활성 자식을 `rectChildren`에서 빼므로 높이 계산 코드가 없다. 단 `GridLayoutGroup.Constraint = FixedColumnCount`가 전제 — Flexible이면 행 수가 자기 너비에 의존해 높이가 한 프레임 밀린다.
+- **펼침 진실원은 목록의 `m_expandedIndex` 하나.** 행은 사본을 들지 않고 `SetExpanded`를 받기만 한다("한 번에 하나" 규칙이 한 곳에서만 강제된다).
+- **뷰 모드는 저장하지 않는다.** `Tab_Collection`이 LobbyCanvas 안 중첩 인스턴스라 파괴되지 않아 `Toggle.isOn`이 남고, 그것만으로 탭 왕복 유지가 성립한다(세이브 스키마 무변경).
+- 미소유 슬롯은 롱프레스로 상세가 열리지 않는다 — 그리드 뷰(잠김 타일도 열림)와 의도적으로 다르다. 빈 슬롯은 "카드가 아닌 것"이라서.
+
