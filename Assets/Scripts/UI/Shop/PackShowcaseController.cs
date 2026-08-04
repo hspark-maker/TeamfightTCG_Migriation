@@ -64,6 +64,7 @@ public class PackShowcaseController : MonoBehaviour
 
         CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  += Refresh;
+        OutgameFeatureLock.OnChanged         += Refresh;
         PackOpenOverlay.OnClosed             += OnOverlayClosed;
         Refresh();
     }
@@ -75,6 +76,7 @@ public class PackShowcaseController : MonoBehaviour
 
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
         OutgameTutorialRunner.OnStepChanged  -= Refresh;
+        OutgameFeatureLock.OnChanged         -= Refresh;
         PackOpenOverlay.OnClosed             -= OnOverlayClosed;
 
         // 임팩트가 화면을 덮기 전에 탭이 꺼지면 시퀀스가 끊겨 개봉 화면을 여는 콜백이 오지 않는다.
@@ -150,7 +152,7 @@ public class PackShowcaseController : MonoBehaviour
         }
 
         // 튜토리얼 중엔 페이지가 하나뿐이라 넘길 것도 없지만, 잠금을 명시해 화살표·드래그를 함께 죽인다.
-        carousel.SetInteractable(!m_forced);
+        carousel.SetInteractable(!m_forced && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackCarousel));
         m_index = carousel.Index;
     }
 
@@ -182,6 +184,7 @@ public class PackShowcaseController : MonoBehaviour
         ResolvePack(out var t_pack, out _);
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
+                              && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
                               && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
     }
 

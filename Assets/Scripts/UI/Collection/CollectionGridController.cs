@@ -56,6 +56,9 @@ public class CollectionGridController : MonoBehaviour
 
             var t_tile = Instantiate(cardPrefab, content);
             t_tile.Bind(t_card, OwnershipManager.IsOwned(t_card));
+            // 길게 누르면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
+            // (소유 변경 시 도는 OnOwnershipChanged는 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
+            CardDetailOverlayView.BindTile(t_tile, t_card);
             m_tiles.Add(t_tile);
         }
     }

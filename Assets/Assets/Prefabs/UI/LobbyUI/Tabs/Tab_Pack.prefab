@@ -1509,6 +1509,7 @@ GameObject:
   - component: {fileID: 1916907820493293576}
   - component: {fileID: 8859507605474475060}
   - component: {fileID: 8130429894813677610}
+  - component: {fileID: 2863938396556579626}
   m_Layer: 0
   m_Name: BuyBtn_0
   m_TagString: Untagged
@@ -1633,6 +1634,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
   key: 3
+--- !u!114 &2863938396556579626
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8874862289494966950}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4ea305af1ffe014e9c512005fc978ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FeatureLockView
+  feature: 7
+  target: {fileID: 0}
+  controlInteractable: 0
+  overlayParent: {fileID: 0}
 --- !u!1 &9102774269911873022
 GameObject:
   m_ObjectHideFlags: 0

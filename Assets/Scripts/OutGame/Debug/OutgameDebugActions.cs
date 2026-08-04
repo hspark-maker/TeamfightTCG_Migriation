@@ -67,6 +67,15 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
+    // 튜토리얼 진행과 무관하게 잠긴 기능을 전부 연다(진행도는 그대로). 잠금 때문에 QA가 막히지 않게 하는 우회로.
+    // 튜토리얼 딤은 별개 축이라 이걸 켜도 걷히지 않는다 — 딤까지 없애려면 SkipTutorial.
+    public static void ToggleFeatureLock()
+    {
+        OutgameFeatureLock.ForceUnlockAllForDebug = !OutgameFeatureLock.ForceUnlockAllForDebug;
+
+        Debug.Log($"[OutgameDebug] 기능 잠금 {(OutgameFeatureLock.ForceUnlockAllForDebug ? "무시(전체 해금)" : "정상 적용")}");
+    }
+
     // 첫실행 재현 원샷: 소유까지 비워 스텝 0의 자동 진행을 원상태로 돌린다.
     public static void ResetTutorialFromScratch()
     {

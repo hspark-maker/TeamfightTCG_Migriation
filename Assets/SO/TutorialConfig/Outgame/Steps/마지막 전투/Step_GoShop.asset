@@ -13,4 +13,6 @@ MonoBehaviour:
   m_Name: Step_GoShop
   m_EditorClassIdentifier: Assembly-CSharp::WaitClickStep
   guideMessage: 
+  unlocks: 02000000
+  useDim: 1
   anchor: 2

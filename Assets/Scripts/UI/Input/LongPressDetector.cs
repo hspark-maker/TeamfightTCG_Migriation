@@ -11,6 +11,14 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
 
     public Action OnLongPress;
 
+    /// <summary>짧게 눌렀다 뗀 탭. 드리프트가 cancelDistance를 넘었거나(= ScrollRect 스크롤 제스처)
+    /// 롱프레스가 이미 발동했으면 오지 않는다.
+    ///
+    /// IPointerClickHandler를 쓰지 않는 이유: uGUI의 클릭은 스크롤 드래그 뒤에도 손가락이 같은 타일 위에서
+    /// 떨어지면 그대로 발생한다 — 스크롤할 때마다 카드가 열린다. 여기선 이미 누름 시작 좌표를 들고 있으므로
+    /// 같은 cancelDistance 하나로 롱프레스와 탭이 같은 기준을 공유한다.</summary>
+    public Action OnTap;
+
     bool    pressing, fired;
     float   timer;
     Vector2 startPos;
@@ -24,10 +32,13 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
             return;
         }
         this.timer += Time.deltaTime;
-        if (this.timer >= this.threshold)
+
+        // 구독자가 없으면 발동 표식(fired)을 세우지 않는다 — 세워버리면 롱프레스를 쓰지 않는 화면에서
+        // 오래 눌렀다 뗀 손가락이 탭으로도 인정되지 않아 아무 반응이 없다.
+        if (this.timer >= this.threshold && OnLongPress != null)
         {
             this.fired = true;
-            OnLongPress?.Invoke();
+            OnLongPress.Invoke();
         }
     }
 
@@ -39,5 +50,16 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
         this.startPos = _data.position;
     }
 
-    public void OnPointerUp(PointerEventData _) { this.pressing = false; }
+    public void OnPointerUp(PointerEventData _data)
+    {
+        // Update가 이미 취소(pressing=false)했으면 탭이 아니다. 뗀 프레임에 한 번 더 재는 것은
+        // 눌렀다 곧바로 멀리서 뗀 경우(Update가 중간값을 못 본 경우)를 막기 위해서다.
+        bool t_tap = this.pressing
+                  && !this.fired
+                  && Vector2.Distance(_data.position, this.startPos) <= this.cancelDistance;
+
+        this.pressing = false;
+
+        if (t_tap) OnTap?.Invoke();
+    }
 }

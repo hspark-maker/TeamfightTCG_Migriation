@@ -10,6 +10,8 @@ using UnityEngine.UI;
 //
 // 불변식 2개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
+//      단 스텝이 딤을 끄면(OutgameTutorialStep.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
+//      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
 // 메시지 모드(ShowMessageGate)는 손가락만 빼고 딤+링+승격을 켠다 — 읽을 영역이라도 딤 아래 깔리면
@@ -67,6 +69,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_satisfied;         // 중복 클릭 가드 — 콜백은 1회만
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
+    bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
 
     // 승격 상태. 원래 컴포넌트를 지우지 않도록 "내가 붙였는지"와 원래 정렬값을 함께 들고 있는다.
@@ -110,8 +113,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// <summary>타깃만 딤 위로 올리는 게이트를 건다(_onSatisfied는 1회만 호출).
     /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.
     /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
-    /// (구매처럼 눌러도 실패할 수 있는 스텝).</summary>
-    public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied)
+    /// (구매처럼 눌러도 실패할 수 있는 스텝).
+    /// <paramref name="_dim"/>=false면 링·손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
+    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.</summary>
+    public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
     {
         if (_target == null)
         {
@@ -135,10 +140,11 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied    = false;
         m_blockWarned  = false;
         m_armed        = true;
+        m_dim          = _dim;
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetDim(true);
+        SetDim(_dim);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
@@ -276,8 +282,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        if (t_visible) Promote();
-        else           Demote();
+        // 딤이 꺼진 스텝은 승격도 하지 않는다 — 승격은 딤 위로 끌어올리려는 장치인데 가릴 딤이 없다.
+        if (t_visible && m_dim) Promote();
+        else                    Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -289,13 +296,23 @@ public class OutgameTutorialGateUI : MonoBehaviour
             if (t_active && !m_blockWarned)
             {
                 m_blockWarned = true;
-                Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{m_target.name}'의 버튼이 비활성(interactable=false)이라 안내를 숨기고 대기합니다(소프트락 방지).");
+                Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{m_target.name}'의 버튼이 비활성(interactable=false)이라 안내를 숨기고 대기합니다(소프트락 방지).{DescribeLockCause()}");
             }
             return;
         }
 
         m_blockWarned = false;
         Layout();
+    }
+
+    // 기능 잠금이 원인이면 대기가 영영 안 풀린다(잠금은 진행으로만 열리는데 진행이 이 스텝에서 멈춰 있다).
+    // 다른 원인(골드 부족 등)은 유저가 스스로 풀 수 있어 정상 대기다 — 둘을 로그에서 구분해 준다.
+    string DescribeLockCause()
+    {
+        var t_lock = m_target != null ? m_target.GetComponentInParent<FeatureLockView>() : null;
+        if (t_lock == null || !t_lock.IsLocked) return string.Empty;
+
+        return $" 원인은 기능 잠금({t_lock.Feature})입니다 — 이 스텝까지의 unlocks에 해당 기능을 넣으세요.";
     }
 
     // 타깃 월드 코너 → 스크린 → 게이트 캔버스 로컬로 변환해 링·손가락·문구를 배치.
@@ -543,6 +560,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
         m_confirmMode = false;
+        m_dim         = true;   // 딤 없는 스텝(ShowGate)이 그 다음 모드로 새지 않게. ShowGate만 이 값을 덮는다.
     }
 
     // 딤 탭 수신을 켠다. Release()가 항상 먼저 떼므로 중복 부착은 없지만, 단일 창구를 지키려 여기서도 한 번 뗀다.
