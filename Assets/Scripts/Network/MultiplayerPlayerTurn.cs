@@ -172,6 +172,27 @@ public class MultiplayerPlayerTurn : TurnBase
             TurnState.ForcedAttacker = _attacker;
             CardView.FadeTeam(0.3f, TurnState.LocalOwnerIndex);
             CardView.FadeCards(1f, t_attackerView);
+
+            // 처형 재공격 = 무작위 대상 자동 발사(대상 선택 입력을 열지 않는다).
+            // MatchRandom 소비 지점 — 상대 클라도 MultiplayerOpponentTurn에서 같은 자리에서 같은 횟수를 뽑는다.
+            if (BattleUxFlags.ExecutionRandomTarget)
+            {
+                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
+                if (t_nextTarget != null)
+                {
+                    await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
+                    ExecuteAttackAsync(_attacker, t_nextTarget).Forget();
+                    return;
+                }
+
+                // 칠 대상이 없으면 턴을 닫는다(입력을 열면 양측이 서로를 기다리며 잠긴다).
+                this.forcedAttacker      = null;
+                TurnState.ForcedAttacker = null;
+                CardView.RestoreAllFades();
+                this.turnDone = true;
+                return;
+            }
+
             TurnState.InputAllowed = true;
             return;
         }

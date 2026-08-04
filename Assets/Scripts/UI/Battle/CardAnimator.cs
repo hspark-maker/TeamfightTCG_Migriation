@@ -25,6 +25,16 @@ public class CardAnimator : MonoBehaviour
 
     Vector3    twitchHome;      // 떨림 기준 자세 — 연타/중단 시 여기로 되돌린다
     Quaternion twitchHomeRot;
+    Vector3    twitchHomeScale;   // 리프트가 곱해질 기준 크기(프리팹에서 1이 아닐 수 있다)
+    Vector3    twitchBaseHome;    // 리프트를 얹기 전의 원래 자세. twitchHome을 오르내리며 누적시키지 않으려고 따로 둔다
+
+    [Header("롱프레스 리프트 (정보창 볼 때 살짝 떠오름)")]
+    // 등장 컷씬(PlayDealToMid)은 화면 중앙에서 1.5배까지 키운다 — 이건 그보다 훨씬 얕은 '살짝'이다.
+    [SerializeField] float longPressLiftY     = 0.2f;    // 위로 뜨는 거리(월드)
+    [SerializeField] float longPressLiftScale = 1.06f;   // 뜬 동안의 크기 배율
+    [SerializeField] float longPressLiftTime  = 0.12f;   // 뜨고/내려오는 시간(초)
+
+    bool liftActive;
 
     CardInstance boundCard;
     BattleFieldView fieldView;   // 이 카드가 속한 필드(시네마 집결 좌표의 기준). 없으면 폴백.
@@ -34,6 +44,11 @@ public class CardAnimator : MonoBehaviour
 
     SpriteRenderer[] cachedRenderers;
     TMP_Text[]       cachedTexts;
+
+    // 각 렌더러가 "완전히 보일 때" 가질 알파(CardFadeAlpha). 페이드는 절대값이 아니라 이 값과의 곱으로 건다 —
+    // 안 그러면 반투명이어야 할 배경판(이름·키워드 뒤)까지 알파 1로 올라간다. 없는 렌더러는 1.
+    float[] rendererBaseAlpha;
+    float[] textBaseAlpha;
 
     public void ExcludeFromFade(SpriteRenderer _sr) { if (_sr != null) this.fadeExcludes.Add(_sr); }
 
@@ -64,8 +79,10 @@ public class CardAnimator : MonoBehaviour
         if (this.twitchTarget == null && transform.childCount > 0) this.twitchTarget = transform.GetChild(0);
         if (this.twitchTarget != null)
         {
-            this.twitchHome    = this.twitchTarget.localPosition;
-            this.twitchHomeRot = this.twitchTarget.localRotation;
+            this.twitchHome      = this.twitchTarget.localPosition;
+            this.twitchBaseHome  = this.twitchHome;
+            this.twitchHomeRot   = this.twitchTarget.localRotation;
+            this.twitchHomeScale = this.twitchTarget.localScale;
         }
     }
 
@@ -103,6 +120,16 @@ public class CardAnimator : MonoBehaviour
     {
         this.cachedRenderers = GetComponentsInChildren<SpriteRenderer>(true);
         this.cachedTexts     = GetComponentsInChildren<TMP_Text>(true);
+
+        // 기준 알파는 **현재 색이 아니라** 태그(CardFadeAlpha)에서 읽는다 — 페이드 도중 캐시를 다시 만들어도
+        // 중간값이 기준으로 굳지 않는다.
+        this.rendererBaseAlpha = new float[this.cachedRenderers.Length];
+        for (int t_i = 0; t_i < this.cachedRenderers.Length; t_i++)
+            this.rendererBaseAlpha[t_i] = CardFadeAlpha.Of(this.cachedRenderers[t_i]);
+
+        this.textBaseAlpha = new float[this.cachedTexts.Length];
+        for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
+            this.textBaseAlpha[t_i] = CardFadeAlpha.Of(this.cachedTexts[t_i]);
     }
 
     public void SetBoundCard(CardInstance _card) => this.boundCard = _card;
@@ -164,20 +191,22 @@ public class CardAnimator : MonoBehaviour
         this.FadeTarget = _alpha;
         RefreshVisualCache();
 
-        foreach (SpriteRenderer t_sr in this.cachedRenderers)
+        for (int t_i = 0; t_i < this.cachedRenderers.Length; t_i++)
         {
+            SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
             if (t_sr == this.dieOverlay) continue;
             if (IsHitEffectPart(t_sr)) continue;
             if (this.fadeExcludes.Contains(t_sr)) continue;
             t_sr.DOKill();
-            t_sr.DOFade(_alpha, _duration).SetLink(gameObject);
+            t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], _duration).SetLink(gameObject);
         }
-        foreach (TMP_Text t_tmp in this.cachedTexts)
+        for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
+            TMP_Text t_tmp = this.cachedTexts[t_i];
             if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
-            t_tmp.DOFade(_alpha, _duration).SetLink(gameObject);
+            t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], _duration).SetLink(gameObject);
         }
     }
 
@@ -186,19 +215,21 @@ public class CardAnimator : MonoBehaviour
         this.FadeTarget = _alpha;
         RefreshVisualCache();
 
-        foreach (SpriteRenderer t_sr in this.cachedRenderers)
+        for (int t_i = 0; t_i < this.cachedRenderers.Length; t_i++)
         {
+            SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
             if (t_sr == this.dieOverlay) continue;
             if (IsHitEffectPart(t_sr)) continue;
             t_sr.DOKill();
-            t_sr.DOFade(_alpha, this.moveDuration).SetLink(gameObject);
+            t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
-        foreach (TMP_Text t_tmp in this.cachedTexts)
+        for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
+            TMP_Text t_tmp = this.cachedTexts[t_i];
             if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
-            t_tmp.DOFade(_alpha, this.moveDuration).SetLink(gameObject);
+            t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
     }
 
@@ -251,6 +282,49 @@ public class CardAnimator : MonoBehaviour
             t_t.DOPunchRotation(new Vector3(0f, 0f, this.twitchAngle), t_dur, vibrato: 8, elasticity: 0.6f)
                .SetLink(gameObject)
                .OnComplete(() => { t_t.localRotation = this.twitchHomeRot; });
+    }
+
+    /// <summary>롱프레스로 카드 정보를 보는 동안 카드가 살짝 떠오른다. 손을 떼면 원래 자세로.
+    ///
+    /// 떨림과 같은 **비주얼 자식**을 쓰되, 떨림의 기준 자세(twitchHome)까지 함께 올린다 —
+    /// 그래야 뜬 상태에서 맞아도 떨림이 끝난 뒤 슬롯이 아니라 '뜬 위치'로 되돌아간다.
+    /// 루트가 아닌 이유는 PlayHitTwitch 주석과 같다(이동·박치기 트윈과 충돌).</summary>
+    public void SetLongPressLift(bool _on)
+    {
+        Transform t_t = this.twitchTarget;
+        if (t_t == null || this.liftActive == _on) return;
+        this.liftActive = _on;
+
+        this.twitchHome = this.twitchBaseHome + (_on ? new Vector3(0f, this.longPressLiftY, 0f) : Vector3.zero);
+
+        float t_dur = Mathf.Max(0.01f, this.longPressLiftTime) * GameTiming.Factor;
+
+        // 진행 중인 떨림은 끊고 회전만 기준으로 되돌린다 — 위치/크기는 아래 트윈이 바로 이어받는다.
+        t_t.DOKill();
+        t_t.localRotation = this.twitchHomeRot;
+
+        t_t.DOLocalMove(this.twitchHome, t_dur)
+           .SetEase(_on ? Ease.OutCubic : Ease.InCubic)
+           .SetLink(gameObject);
+
+        t_t.DOScale(_on ? this.twitchHomeScale * this.longPressLiftScale : this.twitchHomeScale, t_dur)
+           .SetEase(_on ? Ease.OutCubic : Ease.InCubic)
+           .SetLink(gameObject);
+    }
+
+    /// <summary>리프트를 트윈 없이 즉시 없앤다. 슬롯이 재사용될 때(배치 연출 시작) 부르는 안전망 —
+    /// 손을 떼기 전에 카드가 죽거나 갈려나가면 뜬 자세가 다음 카드에 그대로 남는다.</summary>
+    void ResetLongPressLift()
+    {
+        if (!this.liftActive) return;
+        this.liftActive = false;
+        this.twitchHome = this.twitchBaseHome;
+        if (this.twitchTarget == null) return;
+
+        this.twitchTarget.DOKill();
+        this.twitchTarget.localPosition = this.twitchBaseHome;
+        this.twitchTarget.localScale    = this.twitchHomeScale;
+        this.twitchTarget.localRotation = this.twitchHomeRot;
     }
 
     public async UniTask PlayHitAnim(float _duration = -1f, int _damage = 0)
@@ -317,6 +391,7 @@ public class CardAnimator : MonoBehaviour
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
         this.FadeTarget = 1f;   // 배치는 알파 1로 리셋하고 시작(아래 색 리셋과 짝)
+        ResetLongPressLift();   // 이전 카드가 뜬 채로 사라졌을 수 있다
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDealCard();
@@ -331,16 +406,18 @@ public class CardAnimator : MonoBehaviour
         transform.position      = _from;
         transform.localRotation = Quaternion.identity;
         transform.localScale    = Vector3.one;
-        foreach (SpriteRenderer t_sr in this.cachedRenderers)
+        for (int t_i = 0; t_i < this.cachedRenderers.Length; t_i++)
         {
+            SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay || this.fadeExcludes.Contains(t_sr)) continue;
             t_sr.DOKill();
-            Color t_c = t_sr.color; t_c.a = 1f; t_sr.color = t_c;
+            Color t_c = t_sr.color; t_c.a = this.rendererBaseAlpha[t_i]; t_sr.color = t_c;
         }
-        foreach (TMP_Text t_tmp in this.cachedTexts)
+        for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
+            TMP_Text t_tmp = this.cachedTexts[t_i];
             t_tmp.DOKill();
-            Color t_c = t_tmp.color; t_c.a = 1f; t_tmp.color = t_c;
+            Color t_c = t_tmp.color; t_c.a = this.textBaseAlpha[t_i]; t_tmp.color = t_c;
         }
 
         var t_seq = DOTween.Sequence()

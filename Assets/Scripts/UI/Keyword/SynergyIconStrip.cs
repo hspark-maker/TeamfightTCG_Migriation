@@ -21,9 +21,7 @@ public static class SynergyIconStrip
     {
         if (_parent == null || _iconPrefab == null) return;
 
-        if (_clearFirst)
-            foreach (Transform t_child in _parent)
-                Object.Destroy(t_child.gameObject);
+        if (_clearFirst) Clear(_parent);
 
         if (_card?.synergies == null) return;
 
@@ -60,6 +58,15 @@ public static class SynergyIconStrip
             t_btn.onPointerDown = () => Show(t_captured, t_rt);
             t_btn.onPointerUp   = Hide;
         }
+    }
+
+    /// <summary>아이콘 줄 비우기. 시너지를 아예 감춰야 하는 구간(튜토리얼 미도입)에서 쓴다 —
+    /// 풀에서 재사용된 창에 직전 카드의 아이콘이 남지 않게 <b>지우는 것까지</b>가 표시 규칙의 일부다.</summary>
+    public static void Clear(Transform _parent)
+    {
+        if (_parent == null) return;
+        foreach (Transform t_child in _parent)
+            Object.Destroy(t_child.gameObject);
     }
 
     static void Show(SynergyData _synergy, RectTransform _iconRect)

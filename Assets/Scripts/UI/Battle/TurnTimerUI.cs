@@ -23,6 +23,8 @@ public class TurnTimerUI : MonoBehaviour
     [SerializeField] Image ring;        // Filled + Radial360. 남은 비율이 곧 fillAmount
     [SerializeField] Image ringTrack;   // 뒤에 깔리는 고정 링(옵션)
     [SerializeField] Image ringGlow;    // 위험 구간 발광(옵션)
+    // 링 뒤 배경판(옵션). 색은 TurnSideTint가 턴 주인에 따라 칠하고, 여기선 링과 같이 켜고 끄기만 한다.
+    [SerializeField] Image ringBg;
 
     [Header("Color")]
     // 여유 → 경고 → 위험. 구간 사이는 보간해서 색이 뚝 끊기지 않게 한다.
@@ -149,6 +151,7 @@ public class TurnTimerUI : MonoBehaviour
         if (this.ring      != null) this.ring.enabled      = _show;
         if (this.ringTrack != null) this.ringTrack.enabled = _show;
         if (this.ringGlow  != null) this.ringGlow.enabled  = _show;
+        if (this.ringBg    != null) this.ringBg.enabled    = _show;
 
         // 숨길 때 스케일을 원복 — 위험 구간에서 턴이 끝나면 커진 상태로 굳는다.
         if (!_show && this.punchTarget != null) this.punchTarget.localScale = Vector3.one;

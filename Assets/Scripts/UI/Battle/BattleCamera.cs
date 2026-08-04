@@ -12,12 +12,19 @@ public class BattleCamera : MonoBehaviour
     // (구 cinemaZoom = DOOrthoSize 트윈은 제거 — 이 카메라는 퍼스펙티브라 아무 효과가 없었다.)
     [SerializeField, Range(0f, 0.6f)] float cinemaZMoveRatio = 0.18f;   // 기준 거리 11 기준 약 2
 
+    [Header("롱프레스(카드 정보) 카메라 뒤로 빼기")]
+    // 정보를 보는 동안 화면이 뒤로 물러난다(카드에서 멀어짐). 어둡기/흐림보다 **먼저** 출발해
+    // 천천히 빠지는 게 자연스럽다 — 시작 시점은 CardInputController가 정한다.
+    [SerializeField] float longPressPullBackZ    = 0.35f;   // 뒤로 물러나는 거리(양수 = 멀어짐)
+    [SerializeField] float longPressLiftDuration = 0.32f;
+
     // 시네마 지속시간은 BattleTimingConfig 단일 진실원 (AttackSequence와 공유, 배율 적용)
     float CinemaDuration => GameTiming.Battle.CinemaDuration;
 
     Camera cam;
     BattleCameraFit fit;
     float fallbackBaseZ;
+    bool  liftActive;
 
     /// <summary>시네마 연출 중인가. BattleCameraFit이 이 동안 카메라 z를 덮지 않게 하는 기준.</summary>
     public bool InCinema { get; private set; }
@@ -41,6 +48,34 @@ public class BattleCamera : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+    }
+
+    /// <summary>롱프레스로 카드 정보를 보는 동안 카메라를 카드 쪽으로 살짝 당긴다(손 떼면 false로 복귀).
+    /// 같은 값으로 두 번 불러도 무시하므로 호출부가 매 프레임 불러도 된다(멱등).
+    /// 카메라가 없는 씬(테스터 등)에서도 호출부가 분기하지 않게 정적 진입점을 둔다.</summary>
+    public static void SetLongPressLift(bool _on) => Instance?.ApplyLongPressLift(_on);
+
+    void ApplyLongPressLift(bool _on)
+    {
+        if (this.cam == null || this.liftActive == _on) return;
+        this.liftActive = _on;
+
+        // BaseZ는 음수(카드 평면 앞쪽)다 — 더 빼야 뒤로 물러난다.
+        float t_targetZ = BaseZ - (_on ? this.longPressPullBackZ : 0f);
+
+        // 시네마가 z를 몰고 있는 중엔 아무것도 하지 않는다 — 트윈을 걸면 DOKill이 서로를 죽여 카메라가 튄다.
+        // (롱프레스와 시네마가 겹치는 건 예외 상황이고, 시네마가 끝나면 기준 z로 복귀한다.)
+        if (InCinema) return;
+
+        // fit이 매 프레임 기준 z로 되돌리지 않게 잠근다. 해제는 곧바로 — 복귀 트윈이 도는 동안 fit이
+        // z를 덮어도 목적지가 같은 값이라 어긋나지 않는다.
+        if (_on) BattleCameraFit.BeginExternalControl();
+        else     BattleCameraFit.EndExternalControl();
+
+        transform.DOKill();
+        transform.DOMoveZ(t_targetZ, Mathf.Max(0.01f, this.longPressLiftDuration))
+            .SetEase(Ease.InOutSine)   // 들어올 때·돌아갈 때 모두 부드럽게(가감속 대칭)
+            .SetLink(gameObject);
     }
 
     public UniTask EnterCinema()

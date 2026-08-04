@@ -73,10 +73,15 @@ public class CardView : MonoBehaviour
     [SerializeField] GameObject keywordIconPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
     [SerializeField] float iconSpacing = 0.3f;
-    // true면 키워드 아이콘을 시너지 배지 자리(좌측 세로열)에 그리고, 시너지 배지는 표시하지 않는다.
+    // true면 키워드 아이콘이 시너지 배지 자리를 차지하고, 시너지 배지는 표시하지 않는다.
     // 한 자리에 둘 다 그리면 겹치므로 "그 자리의 주인"은 이 스위치 하나가 정한다(양쪽 분기의 단일 진실원).
     // false로 되돌리면 종전대로 키워드=우하단 가로줄 + 시너지 배지 복귀.
     [SerializeField] bool keywordIconsUseSynergySlot = true;
+
+    // 위 스위치가 true일 때 아이콘이 놓이는 자리. 이름 왼쪽(카드 하단 줄)에서 오른쪽으로 나열한다 —
+    // 예전엔 시너지 배지와 같은 세로열 값을 그대로 썼는데, 그러면 배지 좌표를 손댈 때마다 아이콘이 따라 움직였다.
+    [SerializeField] Vector2 keywordIconStart = new Vector2(-0.54f, -1.14f);
+    [SerializeField] Vector2 keywordIconStep  = new Vector2(0.42f, 0f);
 
     // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
     // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.
@@ -193,6 +198,8 @@ public class CardView : MonoBehaviour
         this.keywordIconConfig,
         this.iconSpacing,
         this.keywordIconsUseSynergySlot,
+        this.keywordIconStart,
+        this.keywordIconStep,
         this.keywordFrames,
         this.synergyBadgeRoot,
         this.synergyBadgePrefab,
@@ -501,7 +508,8 @@ public class CardView : MonoBehaviour
         {
             this.hpText.DOKill();
             Color t_c = this.hpTextOriginalColor;
-            t_c.a = 1f;
+            // 알파는 카드 몸통 상태 × 이 라벨의 기준 알파 — 1로 못박으면 흐려진 카드에서 숫자만 선명해진다.
+            t_c.a = (this.cardAnim != null ? this.cardAnim.FadeTarget : 1f) * CardFadeAlpha.Of(this.hpText);
             this.hpText.color = t_c;
             SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
             this.hpFallbackPreview = false;
@@ -632,6 +640,10 @@ public class CardView : MonoBehaviour
 
         await PlayDealToSlot(_mid, _dest, _duration);
     }
+
+    /// <summary>롱프레스로 이 카드의 정보를 보는 동안 살짝 떠오르게 한다(손 떼면 false로 복귀).
+    /// 뜨는 폭·크기·시간은 CardAnimator의 인스펙터 값이 정한다.</summary>
+    public void SetLongPressLift(bool _on) => this.cardAnim?.SetLongPressLift(_on);
 
     /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
     /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
