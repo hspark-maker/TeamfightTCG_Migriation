@@ -185,8 +185,11 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
             Destroy(t_child.gameObject);
     }
 
-    public void SetButtonAction(Action _buttonAction)
+    /// <summary>_replace=true면 기존 리스너를 지우고 건다. 목록 항목처럼 <b>풀에서 재사용되는</b> 요소는
+    /// 이걸 써야 한다 — 계속 더하기만 하면 한 번 눌러 예전 카드의 동작까지 같이 터진다.</summary>
+    public void SetButtonAction(Action _buttonAction, bool _replace = false)
     {
+        if (_replace) this.button.onClick.RemoveAllListeners();
         this.button.onClick.AddListener(() => _buttonAction?.Invoke());
     }
 

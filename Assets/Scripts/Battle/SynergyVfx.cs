@@ -33,17 +33,28 @@ public static class SynergyVfx
         }
 
         if (t_count == 0) return;   // 띄울 자리가 없다(빈 필드)
-        BattleVfx.Play(_vfx.wind, t_sum / t_count, t_layer);
+
+        // 스택이 쌓일수록 바람이 커진다 — 스택은 이 필드가 세는 값 그대로 쓴다(연출이 따로 세지 않는다).
+        ApplyScale(BattleVfx.Play(_vfx.wind, t_sum / t_count, t_layer), _vfx.WindScaleFor(_field.FlowStack));
+    }
+
+    /// <summary>스폰된 연출 인스턴스의 크기 배율. 풀에서 빌려온 오브젝트라 **스폰할 때마다 반드시 세팅**한다 —
+    /// 안 그러면 직전 스택의 크기가 그대로 남아 다음 재생에 딸려온다.</summary>
+    static void ApplyScale(VfxHandle _handle, float _scale)
+    {
+        if (!_handle.Valid) return;
+        _handle.Go.transform.localScale = Vector3.one * _scale;
     }
 
     /// <summary>뷰를 직접 아는 호출부(연출 테스터)용. 중앙 판정은 BattleFieldView.FieldCenter —
     /// 슬롯 격자 기준이라 카드가 죽어 비어 있어도 자리가 흔들리지 않는다(게임 경로보다 정확하다).
     /// 게임 경로가 이걸 못 쓰는 이유는 시너지 효과 SO가 뷰 계층을 모르기 때문이다.</summary>
-    public static void PlayFlowWind(BattleFieldView _view, FlowSynergyVfxConfig _vfx)
+    public static void PlayFlowWind(BattleFieldView _view, FlowSynergyVfxConfig _vfx, int _stack = 1)
     {
         if (_view == null || _vfx == null || _vfx.wind.prefab == null) return;
 
         CardView t_any = _view.GetSlotView(BattleField.SLOT_COUNT / 2);
-        BattleVfx.Play(_vfx.wind, _view.FieldCenter, t_any != null ? t_any.VfxSortingLayerId : 0);
+        ApplyScale(BattleVfx.Play(_vfx.wind, _view.FieldCenter, t_any != null ? t_any.VfxSortingLayerId : 0),
+                   _vfx.WindScaleFor(_stack));
     }
 }

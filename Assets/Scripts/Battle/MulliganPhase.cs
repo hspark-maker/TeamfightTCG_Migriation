@@ -48,10 +48,21 @@ public static class MulliganPhase
         }
         if (t_slot < 0) return;   // 스킵/취소/무효 — 교환 없음(draw 미소비).
 
+        // 나가는 카드의 뷰는 **스왑 전에** 잡아 둔다 — 스왑이 끝나면 그 슬롯의 카드가 바뀌어
+        // CardView.GetView(t_out)로는 더 이상 찾을 수 없다.
+        CardInstance t_out     = t_field.GetSlot(t_slot);
+        CardView     t_outView = t_out != null ? CardView.GetView(t_out) : null;
+
         // 무작위 덱 카드 인덱스(결정론). 슬롯 선택 확정 뒤 1회 소비.
         int t_deckIndex = MatchRandom.Range(t_field.WaitingCount);
         CardInstance t_in = t_field.MulliganSwap(t_slot, t_deckIndex);
         if (t_in == null) return;
+
+        // 교체된 카드가 덱으로 물러난다(교활 교대와 같은 그림, 안개만 뺀다).
+        // **Refresh 전에** 불러야 한다 — 스왑은 끝났지만 슬롯 뷰는 아직 나가는 카드를 그리고 있고,
+        // 이 창을 놓치면 새로 들어온 카드가 대신 돌아 나가는 그림이 된다(교활 호출 규약과 동일).
+        // isRevealed는 MulliganSwap이 이미 false로 만들어 뒀다 — 연출이 상태를 만들지 않는다.
+        if (t_outView != null) await CunningVfx.PlayExit(t_outView, _withFog: false);
 
         // 연출: 교체 표시(Refresh) 후 새 카드만 딜 애니(FillAndAnimate와 동형).
         t_view.Refresh();

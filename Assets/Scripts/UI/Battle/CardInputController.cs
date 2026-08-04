@@ -91,12 +91,12 @@ public class CardInputController
     public void Tick()
     {
         // 입력이 닫히면(턴 종료/타임아웃 등) 무장된 탭 공격자 강조가 고착되지 않게 해제.
-        if (BattleSelection.SelectedAttacker != null && !TurnState.InputAllowed)
+        if (BattleSelection.SelectedAttacker != null && !TurnState.CardInputAllowed)
             BattleSelection.Clear();
 
         // 들고(드래그) 있다가 입력이 닫히면(생각시간 초과/턴 종료) 슬롯으로 복귀 — 센터에 고착 방지.
         // 이 카드가 그대로 공격자가 되면 AttackSequence의 DOKill이 이 이동을 덮으므로 충돌 안 남.
-        if (this.dragState != DragState.Idle && !TurnState.InputAllowed)
+        if (this.dragState != DragState.Idle && !TurnState.CardInputAllowed)
         {
             this.dragState = DragState.Idle;
             this.swipeGuide?.SetVisible(false);
@@ -117,7 +117,7 @@ public class CardInputController
     #region Pointer
     public void OnMouseDown()
     {
-        if (!TurnState.InputAllowed || this.owner.BoundCard == null) return;
+        if (!TurnState.CardInputAllowed || this.owner.BoundCard == null) return;
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
             && this.owner.BoundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
@@ -157,7 +157,7 @@ public class CardInputController
 
     public void OnMouseDrag()
     {
-        if (!TurnState.InputAllowed || this.owner.BoundCard == null) return;
+        if (!TurnState.CardInputAllowed || this.owner.BoundCard == null) return;
 
         // 처형/튜토리얼 지정 공격자 외 카드는 조작 불가(완전 무반응).
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
@@ -239,7 +239,7 @@ public class CardInputController
 
         // 드래그 중 턴 종료·카드 사망으로 early-return해도 드래그 상태가
         // 고착되지 않도록 가드 통과 전에 반드시 해제한다.
-        if (!TurnState.InputAllowed || this.owner.BoundCard == null)
+        if (!TurnState.CardInputAllowed || this.owner.BoundCard == null)
         {
             this.dragState = DragState.Idle;
             this.swipeGuide?.SetVisible(false);
@@ -515,8 +515,14 @@ public class CardInputController
             }
             else
             {
+                // 시너지 스냅샷을 같이 넘긴다 — 정보창이 활성/비활성을 갈라 그리는 근거다.
+                // 재계산하지 않고 이 카드에 마지막으로 그려진 확정 상태를 그대로 쓴다(단일 진실원).
                 UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
-                    new PooledCardElementData { card = this.owner.BoundCard.data });
+                    new PooledCardElementData
+                    {
+                        card    = this.owner.BoundCard.data,
+                        synergy = this.owner.LastBadgeState,
+                    });
 
                 // 정보를 보는 그 카드만 살짝 떠오른다. 시너지 배지 툴팁 쪽은 카드 정보가 아니므로 제외.
                 // 카메라는 이미 대기 중(CameraLiftStartRatio)에 출발했다 — 여기서 다시 걸지 않는다.

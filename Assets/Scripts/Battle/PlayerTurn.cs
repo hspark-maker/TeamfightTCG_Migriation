@@ -456,6 +456,7 @@ public class PlayerTurn : TurnBase
         if (t_attacker == null || !t_attacker.IsAlive || t_target == null) return;
 
         TurnState.InputAllowed = false;        // 유효 공격 확정 후에만 입력 차단
+        DeckPileUI.CloseAny();                 // 덱을 열어둔 채 시간이 다 됐으면 닫는다(연출이 패널에 가리지 않게)
         CardView.RestoreAllFades();            // 드래그 잔상 정리
         ExecuteAttack(t_attacker, t_target);   // 수동 공격과 100% 동일 경로
     }

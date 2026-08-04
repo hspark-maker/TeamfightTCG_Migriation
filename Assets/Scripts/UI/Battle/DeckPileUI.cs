@@ -11,6 +11,9 @@ public class DeckPileUI : MonoBehaviour
     [SerializeField] GameObject panel;
     [SerializeField] Transform cardListRoot;
 
+    [Tooltip("패널 배경 버튼. 누르면 닫힌다. 목록은 이 버튼의 자식이라 목록 위 클릭은 닫히지 않는다")]
+    [SerializeField] Button backgroundCloseButton;
+
     [Header("Player")]
     [SerializeField] CardElement cardElementPrefab;
 
@@ -27,6 +30,8 @@ public class DeckPileUI : MonoBehaviour
     void Start()
     {
         this.deckButton.onClick.AddListener(Toggle);
+        // 배경(패널 루트) 클릭 = 닫기. 목록·카드는 이 버튼의 자식이라 그쪽 클릭은 여기까지 내려오지 않는다.
+        if (this.backgroundCloseButton != null) this.backgroundCloseButton.onClick.AddListener(Close);
     }
 
     public void Refresh()
@@ -34,6 +39,10 @@ public class DeckPileUI : MonoBehaviour
         if (this.countText != null)
             this.countText.text = this.field.WaitingCount.ToString();
     }
+
+    /// <summary>열려 있는 덱 패널을 닫는다. 생각시간 초과 자동공격처럼 <b>플레이어 조작 없이</b> 판이 진행될 때
+    /// 불러 준다 — 안 닫으면 공격 연출이 패널 뒤에서 돌아 무슨 일이 일어났는지 안 보인다.</summary>
+    public static void CloseAny() => currentOpen?.Close();
 
     void Toggle()
     {
@@ -53,7 +62,9 @@ public class DeckPileUI : MonoBehaviour
     {
         this.panelOpen = true;
         this.panel.SetActive(true);
-        TurnState.InputAllowed = false;
+        // 카드 조작만 막는다. InputAllowed를 끄면 닫을 때 false→true 엣지가 생겨
+        // 생각시간 타이머가 예산을 리셋한다(덱을 열었다 닫으면 시간이 만땅으로 돌아가던 버그).
+        TurnState.UiBlocking = true;
         currentOpen = this;
         PopulateList();
     }
@@ -62,8 +73,23 @@ public class DeckPileUI : MonoBehaviour
     {
         this.panelOpen = false;
         this.panel.SetActive(false);
-        TurnState.InputAllowed = true;
+        TurnState.UiBlocking = false;
+        UIPoolManager.Instance?.HideUI<PooledCardElement>();   // 카드 정보창이 떠 있으면 같이 정리
         if (currentOpen == this) currentOpen = null;
+    }
+
+
+    /// <summary>목록에서 카드를 눌렀을 때의 상세. 전투 중 롱프레스와 **같은 창**(PooledCardElement)을 쓴다 —
+    /// 여기서 별도 상세 UI를 만들면 카드 정보를 보는 방법이 두 벌이 된다.
+    /// 시너지 활성 여부는 이 필드의 확정 스냅샷을 그대로 넘긴다(재계산 금지).</summary>
+    void ShowCardDetail(CardData _card)
+    {
+        if (_card == null) return;
+        UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
+        {
+            card    = _card,
+            synergy = this.field != null ? this.field.Synergy : null,
+        });
     }
 
     void PopulateList()
@@ -92,7 +118,12 @@ public class DeckPileUI : MonoBehaviour
                     this.cardElementPool.Add(t_entry);
                 }
                 t_entry.Init(t_card, CardElementMod.Full);
-                t_entry.SetInteractable(false, false);
+
+                // 공개된 카드는 눌러서 상세를 볼 수 있다. 목록 항목은 풀에서 재사용되므로
+                // 리스너를 매번 새로 걸지 않고 갈아끼운다(중복 구독이면 한 번 눌러 여러 번 열린다).
+                CardData t_data = t_card.data;
+                t_entry.SetInteractable(true, false);
+                t_entry.SetButtonAction(() => ShowCardDetail(t_data), _replace: true);
                 t_ceIdx++;
             }
             else

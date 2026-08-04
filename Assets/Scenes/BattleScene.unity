@@ -1042,6 +1042,7 @@ GameObject:
   - component: {fileID: 245661002}
   - component: {fileID: 245661004}
   - component: {fileID: 245661003}
+  - component: {fileID: 245661005}
   m_Layer: 0
   m_Name: PlayerDeckViewPanel
   m_TagString: Untagged
@@ -1108,6 +1109,50 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 245661001}
   m_CullTransparentMesh: 1
+--- !u!114 &245661005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 245661001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 0
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 245661003}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &282922646
 GameObject:
   m_ObjectHideFlags: 0
@@ -1637,7 +1682,7 @@ RectTransform:
   m_Father: {fileID: 1944050833}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0.97117877}
+  m_AnchorMax: {x: 3.2876713, y: 3.0539715}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3182,6 +3227,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cinemaZMoveRatio: 0.18
+  longPressPullBackZ: 0.35
+  longPressLiftDuration: 0.32
 --- !u!114 &963194230
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5392,6 +5439,7 @@ GameObject:
   - component: {fileID: 2043034706}
   - component: {fileID: 2043034708}
   - component: {fileID: 2043034707}
+  - component: {fileID: 2043034709}
   m_Layer: 0
   m_Name: EnemyDeckViewPanel
   m_TagString: Untagged
@@ -5458,6 +5506,50 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2043034705}
   m_CullTransparentMesh: 1
+--- !u!114 &2043034709
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2043034705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 0
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 2043034707}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &2097959068
 GameObject:
   m_ObjectHideFlags: 0
@@ -5890,6 +5982,7 @@ MonoBehaviour:
   deckButton: {fileID: 2956389357525752916}
   panel: {fileID: 2043034705}
   cardListRoot: {fileID: 1611700762}
+  backgroundCloseButton: {fileID: 2043034709}
   cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
 --- !u!224 &8381650083207030414
@@ -5975,6 +6068,7 @@ MonoBehaviour:
   deckButton: {fileID: 2956389358467859446}
   panel: {fileID: 245661001}
   cardListRoot: {fileID: 1864844264}
+  backgroundCloseButton: {fileID: 245661005}
   cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
 --- !u!1 &8381650084143839539

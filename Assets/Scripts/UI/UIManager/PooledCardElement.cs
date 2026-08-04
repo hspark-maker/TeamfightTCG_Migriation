@@ -217,13 +217,16 @@ public class PooledCardElement : PooledUIBase
         RefreshKeywordList(this.cardData);
         // 시너지 아이콘 줄: 튜토리얼 미도입 구간에선 아예 만들지 않는다(적용도 안 된 효과라 설명할 게 없다).
         if (TutorialConfig.SynergyVisible)
-            SynergyIconStrip.Build(this.cardData, this.synergyIconRoot, this.synergyIconPrefab);
+            SynergyIconStrip.Build(this.cardData, this.synergyIconRoot, this.synergyIconPrefab,
+                                   this.cardElementData.synergy);
         else
             SynergyIconStrip.Clear(this.synergyIconRoot);
     }
 
-    /// <summary>설명 목록. **시너지를 먼저, 키워드를 나중에** 깐다 — 시너지가 카드의 정체성에
-    /// 더 가까워서 위에 오는 게 읽기 좋다. 같은 행 프리팹(KeywordExplainItem)을 공용으로 쓴다.</summary>
+    /// <summary>설명 목록. 순서는 <b>활성 시너지 → 키워드 → 비활성 시너지</b>다.
+    ///
+    /// 지금 켜져 있는 것(활성 시너지·보유 키워드)이 위에 모이고, <b>아직 못 켠 시너지는 목록 맨 아래</b>로 내린다 —
+    /// 회색으로만 구분하면 켜진 것 사이에 섞여 있어 "지금 이 카드가 무엇을 하는가"를 한눈에 못 읽는다.</summary>
     void RefreshKeywordList(CardData _card)
     {
         if (this.keywordListRoot == null || this.keywordExplainItemPrefab == null) return;
@@ -233,31 +236,54 @@ public class PooledCardElement : PooledUIBase
 
         if (_card == null) return;
 
-        // 1) 시너지 (키워드보다 먼저). 튜토리얼 미도입 구간은 통째로 건너뛴다 — 적용되지도 않은 효과다.
+        // 시너지를 활성/비활성으로 가른다. 순서·중복 제거는 아이콘 줄과 같은 규칙(CardVisualRules) —
+        // 두 곳이 갈리면 같은 카드인데 아이콘 순서와 설명 순서가 달라진다.
+        var t_active   = new List<SynergyData>();
+        var t_inactive = new List<SynergyData>();
+
         if (_card.synergies != null && TutorialConfig.SynergyVisible)
         {
-            var t_seen = new HashSet<SynergyData>();
-            foreach (SynergyData t_syn in _card.synergies)
+            SynergyState t_state = this.cardElementData?.synergy;
+            foreach (SynergyData t_syn in CardVisualRules.CollectSynergyBadges(
+                         _card.synergies, t_state, _card.synergies.Length))
             {
-                if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
-                var t_row = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
-                t_row.GetComponent<KeywordExplainItem>()?.Init(
-                    t_syn.activeIcon, SynergyText.Name(t_syn), t_syn.effectDescription,
-                    SynergyIconStrip.IconPadCompensation);   // 시너지 PNG 투명 여백 보정(키워드 행과 크기 맞춤)
+                if (t_syn == null) continue;
+                bool t_on = t_state == null || CardVisualRules.IsSynergyActive(t_state, t_syn);
+                (t_on ? t_active : t_inactive).Add(t_syn);
             }
         }
 
-        // 2) 키워드
-        if (this.keywordIconConfig == null) return;
-        foreach (CardKeyword t_kw in System.Enum.GetValues(typeof(CardKeyword)))
-        {
-            if (t_kw == CardKeyword.None) continue;
-            if (!_card.HasKeyword(t_kw)) continue;
-            if (!this.keywordIconConfig.TryGetEntry(t_kw, out var t_entry)) continue;
+        // 1) 활성 시너지
+        foreach (SynergyData t_syn in t_active) AddSynergyRow(t_syn, _active: true);
 
-            var t_obj = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
-            t_obj.GetComponent<KeywordExplainItem>()?.Init(t_entry.icon, t_entry.displayName, t_entry.explain);
+        // 2) 키워드 — 카드가 실제로 가진 것이라 항상 원래 색이다(활성 개념이 없다).
+        if (this.keywordIconConfig != null)
+        {
+            foreach (CardKeyword t_kw in System.Enum.GetValues(typeof(CardKeyword)))
+            {
+                if (t_kw == CardKeyword.None) continue;
+                if (!_card.HasKeyword(t_kw)) continue;
+                if (!this.keywordIconConfig.TryGetEntry(t_kw, out var t_entry)) continue;
+
+                var t_obj = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
+                t_obj.GetComponent<KeywordExplainItem>()?.Init(t_entry.icon, t_entry.displayName, t_entry.explain);
+            }
         }
+
+        // 3) 아직 못 켠 시너지 — 맨 아래.
+        foreach (SynergyData t_syn in t_inactive) AddSynergyRow(t_syn, _active: false);
+    }
+
+    void AddSynergyRow(SynergyData _synergy, bool _active)
+    {
+        Sprite t_icon = _active ? _synergy.activeIcon
+                                : (_synergy.inactiveIcon != null ? _synergy.inactiveIcon : _synergy.activeIcon);
+
+        var t_row = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
+        t_row.GetComponent<KeywordExplainItem>()?.Init(
+            t_icon, SynergyText.Name(_synergy), _synergy.effectDescription,
+            SynergyIconStrip.IconPadCompensation,   // 시너지 PNG 투명 여백 보정(키워드 행과 크기 맞춤)
+            _active);
     }
 
     public override void Show()
@@ -300,4 +326,8 @@ public class PooledCardElementData : UIData
     public bool  dimOnly;
     /// <summary>배경 어둡기 진행도(0~1). 팝업이 실제로 뜰 때는 1(완전히 어두움).</summary>
     public float dimProgress = 1f;
+
+    /// <summary>지금 필드의 확정 시너지 스냅샷. 있으면 활성 시너지가 앞, 비활성이 회색으로 뒤에 온다.
+    /// 없으면(도감 등 필드 밖 호출) 전부 활성으로 그린다.</summary>
+    public SynergyState synergy;
 }
