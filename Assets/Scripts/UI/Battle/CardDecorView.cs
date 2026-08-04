@@ -34,6 +34,8 @@ public class CardDecorView
     readonly KeywordIconConfig keywordIconConfig;
     readonly float            iconSpacing;
     readonly bool             keywordIconsUseSynergySlot;
+    readonly Vector2          keywordIconStart;   // 시너지 자리를 쓸 때 첫 아이콘 좌표
+    readonly Vector2          keywordIconStep;    // 그 다음 아이콘마다 더할 간격
     readonly CardView.KeywordFrame[] keywordFrames;
     readonly Transform        synergyBadgeRoot;
     readonly SynergyBadgeView synergyBadgePrefab;
@@ -60,6 +62,8 @@ public class CardDecorView
         KeywordIconConfig       _keywordIconConfig,
         float                   _iconSpacing,
         bool                    _keywordIconsUseSynergySlot,
+        Vector2                 _keywordIconStart,
+        Vector2                 _keywordIconStep,
         CardView.KeywordFrame[] _keywordFrames,
         Transform               _synergyBadgeRoot,
         SynergyBadgeView        _synergyBadgePrefab,
@@ -77,6 +81,8 @@ public class CardDecorView
         this.keywordIconConfig          = _keywordIconConfig;
         this.iconSpacing                = _iconSpacing;
         this.keywordIconsUseSynergySlot = _keywordIconsUseSynergySlot;
+        this.keywordIconStart           = _keywordIconStart;
+        this.keywordIconStep            = _keywordIconStep;
         this.keywordFrames              = _keywordFrames;
         this.synergyBadgeRoot           = _synergyBadgeRoot;
         this.synergyBadgePrefab         = _synergyBadgePrefab;
@@ -143,14 +149,15 @@ public class CardDecorView
         List<CardVisualRules.KeywordIcon> t_icons =
             CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
 
-        // 배치 두 가지. 시너지 자리: 배지와 동일한 세로열 좌표(같은 필드를 써야 "그 자리 그대로"가 성립).
+        // 배치 두 가지. 시너지 자리: 카드 하단 줄(이름 왼쪽)에서 keywordIconStep만큼 밀며 나열.
         // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
         float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
             GameObject t_obj = UnityEngine.Object.Instantiate(this.keywordIconPrefab, t_root);
             t_obj.transform.localPosition = this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
-                ? new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f)
+                ? new Vector3(this.keywordIconStart.x + this.keywordIconStep.x * t_i,
+                              this.keywordIconStart.y + this.keywordIconStep.y * t_i, 0f)
                 : new Vector3(-t_i * this.iconSpacing, 0f, 0f);
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
@@ -178,13 +185,16 @@ public class CardDecorView
     static void ApplyAlpha(GameObject _go, float _alpha)
     {
         if (_go == null || _alpha >= 1f) return;   // 1이면 프리팹 기본값 그대로가 맞다(불필요한 순회 생략)
+
+        // 카드 몸통 알파는 각 렌더러의 기준 알파(CardFadeAlpha)와 곱해서 건다 —
+        // 반투명이 기본인 배경판을 여기서 불투명하게 덮어쓰지 않도록(CardAnimator의 페이드와 같은 규칙).
         foreach (SpriteRenderer t_sr in _go.GetComponentsInChildren<SpriteRenderer>(true))
         {
-            Color t_c = t_sr.color; t_c.a = _alpha; t_sr.color = t_c;
+            Color t_c = t_sr.color; t_c.a = _alpha * CardFadeAlpha.Of(t_sr); t_sr.color = t_c;
         }
         foreach (TMP_Text t_tmp in _go.GetComponentsInChildren<TMP_Text>(true))
         {
-            Color t_c = t_tmp.color; t_c.a = _alpha; t_tmp.color = t_c;
+            Color t_c = t_tmp.color; t_c.a = _alpha * CardFadeAlpha.Of(t_tmp); t_tmp.color = t_c;
         }
     }
 
@@ -257,8 +267,9 @@ public class CardDecorView
             UnityEngine.Object.Destroy(t_child.gameObject);
         }
 
-        // 튜토리얼: 시너지 개념 미도입 구간은 배지 숨김. SynergyEnabled(3편~)이면 정상 표시.
-        if (TutorialConfig.IsActive && !TutorialConfig.SynergyEnabled) return;
+        // 튜토리얼: 시너지 개념 미도입 구간은 배지 숨김. 판정은 TutorialConfig.SynergyVisible 단독
+        // (롱프레스 정보창의 아이콘 줄·설명 목록도 같은 게이트를 쓴다).
+        if (!TutorialConfig.SynergyVisible) return;
 
         // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
         if (_card == null || _card.data == null || !_card.isRevealed) return;

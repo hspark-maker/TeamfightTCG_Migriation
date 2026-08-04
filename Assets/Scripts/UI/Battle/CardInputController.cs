@@ -57,6 +57,7 @@ public class CardInputController
 
     bool longPressFired;
     bool longPressSynergyShown;   // true면 카드 정보가 아니라 시너지 설명 팝업을 띄운 상태
+    bool longPressDimShown;       // 누르는 동안 배경 어둡기를 띄웠나(팝업이 뜨기 전에도 켜지므로 따로 센다)
     CancellationTokenSource longPressCts;
     #endregion
 
@@ -456,11 +457,46 @@ public class CardInputController
     #endregion
 
     #region Long press
+    /// <summary>롱프레스 대기 중 배경 어둡기가 시작되는 지점(0~1). 이 앞 구간은 어둡기 0.</summary>
+    const float DimStartRatio = 0.7f;
+
+    /// <summary>카메라가 뒤로 빠지기 시작하는 지점(0~1). 어둡기(<see cref="DimStartRatio"/>)보다 살짝 **앞**이다 —
+    /// 화면이 먼저 천천히 물러나고 그 위에 어둡기가 얹혀야 "정보창이 차오른다"가 한 동작으로 읽힌다.
+    ///
+    /// 너무 앞당기면(0.35 등) 그냥 톡 누르는 탭에도 카메라가 출발해 화면이 왔다갔다한다 —
+    /// 탭으로 끝날 리 없는 구간까지 미뤄 둔다.</summary>
+    const float CameraLiftStartRatio = 0.6f;
+
     async UniTask WaitLongPress(CancellationToken _ct)
     {
         try
         {
-            await UniTask.Delay((int)(GameTiming.Battle.LongPress * 1000), cancellationToken: _ct);
+            // 누르는 동안 배경이 서서히 어두워진다 — "지금 정보창이 차오르는 중"이라는 유일한 피드백이라
+            // 대기 시간을 통째로 재우지 않고 프레임마다 진행도를 넘긴다.
+            // 시너지 배지를 누른 경우는 제외: 그쪽은 카드 정보가 아니라 작은 툴팁이라 화면을 어둡게 하지 않는다.
+            bool  t_dim     = this.owner.BoundCard != null && this.owner.BoundCard.isRevealed
+                           && FindBadgeAt(this.touchStartScreenPos) == null;
+            float t_wait    = Mathf.Max(0.01f, GameTiming.Battle.LongPress);
+            float t_elapsed = 0f;
+            while (t_elapsed < t_wait)
+            {
+                await UniTask.Yield(PlayerLoopTiming.Update, _ct);
+                t_elapsed += Time.deltaTime;
+                // 어둡기/흐림은 대기 초반엔 켜지 않는다 — 스크롤/탭처럼 짧게 스치는 터치마다 화면이 깜빡이므로,
+                // DimStartRatio 지점을 넘긴 뒤부터 남은 구간에 0→1을 몰아서 채운다.
+                if (!t_dim) continue;
+
+                float t_ratio = t_elapsed / t_wait;
+
+                // 카메라는 어둡기보다 먼저 출발한다(멱등 호출이라 매 프레임 불러도 한 번만 걸린다).
+                if (t_ratio >= CameraLiftStartRatio) BattleCamera.SetLongPressLift(true);
+
+                float t_dimProgress = Mathf.InverseLerp(DimStartRatio, 1f, t_ratio);
+                if (t_dimProgress <= 0f) continue;
+                ShowPressDim(t_dimProgress);
+                ScreenBlurFeature.Strength = t_dimProgress;   // 배경 블러도 같은 진행도로 차오른다
+            }
+
             if (this.owner.BoundCard == null || !this.owner.BoundCard.isRevealed) return;
 
             // 누른 지점이 시너지 배지 위면 카드 정보 대신 시너지 설명을 띄운다.
@@ -481,11 +517,35 @@ public class CardInputController
             {
                 UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
                     new PooledCardElementData { card = this.owner.BoundCard.data });
+
+                // 정보를 보는 그 카드만 살짝 떠오른다. 시너지 배지 툴팁 쪽은 카드 정보가 아니므로 제외.
+                // 카메라는 이미 대기 중(CameraLiftStartRatio)에 출발했다 — 여기서 다시 걸지 않는다.
+                this.owner.SetLongPressLift(true);
             }
             this.longPressFired = true;
             // Inspect 통지는 손을 뗀 순간(OnMouseUp)으로 이동 — 팝업이 뜨자마자 스텝이 넘어가지 않도록.
         }
         catch (OperationCanceledException) { }
+    }
+
+    /// <summary>누르는 진행도(0~1)를 카드 정보창의 배경 어둡기에 넘긴다.
+    /// 첫 호출에서만 UI를 띄우고(배경만 켜진 상태), 이후엔 이미 떠 있는 판에 값만 준다 —
+    /// 매 프레임 AddOrUpdateUI를 부르면 설명 줄을 그 횟수만큼 다시 만든다.</summary>
+    void ShowPressDim(float _progress)
+    {
+        if (this.longPressDimShown)
+        {
+            UIPoolManager.Instance?.GetUI<PooledCardElement>()?.SetDim(_progress);
+            return;
+        }
+
+        UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
+        {
+            card        = this.owner.BoundCard?.data,
+            dimOnly     = true,
+            dimProgress = _progress,
+        });
+        this.longPressDimShown = true;
     }
 
     /// <summary>화면 좌표 아래에 있는 시너지 배지. 없으면 null.
@@ -536,13 +596,20 @@ public class CardInputController
     /// 팝업을 닫는 분기를 건너뛰고 화면에 그대로 남았다(잔류 버그).</summary>
     void CancelLongPress()
     {
-        if (this.longPressFired)
-        {
-            // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
-            if (this.longPressSynergyShown) UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
-            else                            UIPoolManager.Instance?.HideUI<PooledCardElement>();
-        }
+        // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
+        if (this.longPressFired && this.longPressSynergyShown)
+            UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
 
+        // 팝업이 뜨기 전에 취소돼도(= 다 누르지 못하고 뗌·드래그) 차오르던 배경은 반드시 지운다.
+        if (this.longPressDimShown || (this.longPressFired && !this.longPressSynergyShown))
+            UIPoolManager.Instance?.HideUI<PooledCardElement>();
+
+        // 배경 블러는 렌더러 전역 상태라 팝업보다 먼저·무조건 끈다 — 여기서 빠뜨리면 화면이 흐린 채로 남는다.
+        ScreenBlurFeature.Strength = 0f;
+        this.owner.SetLongPressLift(false);   // 뜬 카드도 같이 내린다(안 띄웠으면 무시된다)
+        BattleCamera.SetLongPressLift(false); // 카메라 높이도 원복(전역 상태라 무조건 부른다)
+
+        this.longPressDimShown     = false;
         this.longPressSynergyShown = false;
         this.longPressFired = false;
         this.longPressCts?.Cancel();

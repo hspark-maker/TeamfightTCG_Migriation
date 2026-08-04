@@ -24,6 +24,11 @@ public static class TutorialConfig
     /// <summary>이 튜토리얼에서 시너지 배지 표시 + 덱 시너지 적용 여부. 기본 false(초반 튜토리얼).</summary>
     public static bool SynergyEnabled { get; private set; }
 
+    /// <summary>지금 시너지를 <b>화면에 보여도 되는가</b> — 배지·아이콘 줄·설명 목록의 공통 게이트.
+    /// 튜토리얼 시너지 미도입 구간에서는 카드에 시너지가 붙어 있어도 적용되지 않으므로(GameInitializer가 스킵),
+    /// 어디서든 보여주면 "없는 효과"를 설명하는 셈이 된다. 표시 판정은 이 프로퍼티 하나로만 한다.</summary>
+    public static bool SynergyVisible => !IsActive || SynergyEnabled;
+
     /// <summary>스크립트 큐 소진 후 플레이어 자유 공격 전환 여부. 기본 false(디자이너가 턴 종료 스텝 저작).</summary>
     public static bool FreePlayAfterScript { get; private set; }
 

@@ -521,6 +521,27 @@ public class PlayerTurn : TurnBase
             CardView.FadeTeam(0.3f, TurnState.LocalOwnerIndex);
             CardView.FadeCards(1f, t_attackerView);
 
+            // 처형 재공격 = 무작위 대상 자동 발사. 입력을 열지 않고 같은 공격 경로로 다시 들어간다.
+            // 튜토리얼은 제외 — 스크립트가 다음 공격의 대상 슬롯을 지정하므로 무작위가 흐름을 깨뜨린다.
+            if (BattleUxFlags.ExecutionRandomTarget && !TutorialConfig.IsActive)
+            {
+                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
+                if (t_nextTarget != null)
+                {
+                    // 연속 공격이 한 동작으로 뭉쳐 보이지 않게 상대 연속 공격과 같은 간격을 둔다.
+                    await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
+                    ExecuteAttack(_attacker, t_nextTarget);
+                    return;
+                }
+
+                // 칠 대상이 없으면 턴을 닫는다 — 여기서 입력을 열면 아무것도 못 고르고 잠긴다.
+                this.forcedAttacker      = null;
+                TurnState.ForcedAttacker = null;
+                CardView.RestoreAllFades();
+                this.turnDone            = true;
+                return;
+            }
+
             // 튜토리얼: 같은 턴 다음 스텝(처형 연속 공격) 준비 — 선행 Message 소진 후 공격 안내.
             // 처형 공격자 슬롯 일치 검증(_attacker 전달). 남은/유효 스텝 없으면 hang 방지로 턴 종료.
             if (TutorialConfig.IsActive)

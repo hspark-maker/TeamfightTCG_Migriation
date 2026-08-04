@@ -84,6 +84,13 @@ public class MultiplayerOpponentTurn : TurnBase
             if (t_result.canAttackAgain && t_atk.IsAlive)
             {
                 CardPassive.Notify(t_atk, CardKeyword.Execution);
+
+                // **결정론 정렬**: 공격한 쪽(MultiplayerPlayerTurn)은 여기서 처형 대상을 MatchRandom으로 뽑는다.
+                // 실제 대상은 곧 도착할 공격 RPC로 받으므로 이 값은 버리지만, 뽑는 행위 자체를 빼면
+                // 스트림 소비 횟수가 한 번 어긋나 그 순간부터 양측 랜덤이 영구히 갈린다.
+                if (BattleUxFlags.ExecutionRandomTarget)
+                    _ = ExecutionRule.PickRandomTarget(t_atk, this.ctx.playerField);
+
                 await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
                 // 루프 → 다음 공격 RPC 대기
             }
