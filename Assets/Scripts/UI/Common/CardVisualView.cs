@@ -251,17 +251,20 @@ public class CardVisualView : MonoBehaviour
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // 스냅샷이 없으면 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
-        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, _state, this.synergyMaxBadges);
+        // **표시 대상·순서 결정에는 스냅샷을 넘기지 않는다(null 고정).** 넘기면 활성 배지가 위로 올라가면서
+        // 덱을 한 장 갈아끼울 때마다 같은 카드의 배지 순서가 뒤바뀌고, 3개 상한에 걸릴 땐 비활성 배지가
+        // 목록에서 아예 잘려 나간다. 이 카드가 가진 시너지는 덱이 어떻든 같은 자리에 그대로 있어야 한다 —
+        // 덱에 따라 바뀌는 건 **아이콘 하나뿐**이다.
+        // (스냅샷이 없을 때의 정렬 = requiredCount 내림차순 고정. 덱과 무관하므로 자리가 흔들리지 않는다.)
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
 
         foreach (SynergyData t_syn in t_tags)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
 
-            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다 — 거기선 "이 카드가 가진 시너지"
-            // 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
-            // 덱을 들고 온 화면만 실제로 갈린다: 요구 장수를 채운 배지는 활성 그림, 못 채운 배지는 비활성 그림.
+            // 여기가 스냅샷을 쓰는 유일한 지점 — 그 시너지가 이 덱에서 열렸으면 활성 그림, 아니면 비활성 그림.
+            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다: 거기선 "이 카드가 가진
+            // 시너지" 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
             bool t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_syn);
             t_badge.Set(t_syn, t_active);
         }
