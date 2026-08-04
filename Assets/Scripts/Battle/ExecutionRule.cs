@@ -12,17 +12,26 @@ using System.Collections.Generic;
 /// 뽑은 값을 쓰지 않지만, 소비 자체는 반드시 같이 한다(그쪽 호출부 주석 참조).</para></summary>
 public static class ExecutionRule
 {
-    /// <summary>재공격 대상 하나를 무작위로. 유효 대상이 없으면 null(= 재공격 불가, 턴 종료).
+    /// <summary>재공격 대상 하나를 무작위로. 칠 카드가 없으면 null(= 재공격 불가, 턴 종료).
     ///
-    /// 후보는 <see cref="BattleField.GetValidTargets"/> 그대로다 — 도발 같은 지정 규칙을 여기서 다시 풀지 않는다
-    /// (수동 선택과 후보 집합이 갈리면 "고를 수 없던 카드를 처형이 친다"가 된다).</summary>
+    /// <b>도발을 무시한다.</b> 후보는 살아 있는 적 전부(<see cref="BattleField.GetActiveCards"/>)이지
+    /// <see cref="BattleField.GetValidTargets"/>가 아니다 — 처형 재공격은 플레이어가 고르는 공격이 아니라
+    /// "죽인 기세로 한 번 더" 나가는 것이라, 도발이 걸어 놓은 지정을 따르지 않는다.
+    ///
+    /// 후보 순서는 슬롯 오름차순으로 고정이라 양 클라가 같은 목록에서 같은 인덱스를 뽑는다(결정론).</summary>
     public static CardInstance PickRandomTarget(CardInstance _attacker, BattleField _targetField)
     {
         if (_attacker == null || !_attacker.IsAlive || _targetField == null) return null;
 
-        List<CardInstance> t_targets = _targetField.GetValidTargets(_attacker);
-        if (t_targets == null || t_targets.Count == 0) return null;
+        List<CardInstance> t_all = _targetField.GetActiveCards();
+        if (t_all == null || t_all.Count == 0) return null;
 
+        // 슬롯에 남아 있어도 이미 죽은 카드는 후보에서 뺀다(제거 정리 전 타이밍 방어).
+        var t_targets = new List<CardInstance>();
+        foreach (CardInstance t_card in t_all)
+            if (t_card != null && t_card.IsAlive) t_targets.Add(t_card);
+
+        if (t_targets.Count == 0) return null;
         return t_targets[MatchRandom.Range(t_targets.Count)];
     }
 }
