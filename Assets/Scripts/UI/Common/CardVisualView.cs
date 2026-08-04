@@ -68,17 +68,21 @@ public class CardVisualView : MonoBehaviour
     // TextMeshPro(월드)는 렌더 시 fontSize에 0.1을 곱하고 TextMeshProUGUI는 그대로 쓴다(m_isOrthographic 차이).
     // 그래서 인게임 fontSize를 uGUI로 옮기려면 0.1 × (카드 rect 높이 / 인게임 카드 높이)를 곱한다.
     const float WorldFontToUnit  = 0.1f;
-    const float IngameHpFontSize      = 5f;   // CardView HPText
-    const float IngameBonusHpFontSize = 3f;   // CardView AdditionalHPText
-    const float IngameNameFontSize    = 2f;   // CardView NameText
+    const float IngameHpFontSize      = 4f;     // CardView HPText
+    const float IngameBonusHpFontSize = 2.4f;   // CardView AdditionalHPText
+    const float IngameNameFontSize    = 2.3f;   // CardView NameText 오토사이징 최대
+    const float IngameNameFontSizeMin = 1f;     // CardView NameText 오토사이징 최소(긴 이름 축소)
 
-    // 키워드 아이콘 세로열. 인게임 CardView의 synergyBadgeXPos(-0.6) / YStart(-1) / YStep(-0.5)와
-    // kewordIcon 크기(0.6x0.6)를 위 카드 크기로 나눈 값 = 카드 좌하단 기준 정규화 좌표.
-    const float KeywordIconCenterX = 0.5f - 0.6f / IngameCardWidth;
-    const float KeywordIconStartY  = 0.5f - 1.0f / IngameCardHeight;
-    const float KeywordIconStepY   =      -0.5f / IngameCardHeight;
-    const float KeywordIconWidth   =       0.6f / IngameCardWidth;
-    const float KeywordIconHeight  =       0.6f / IngameCardHeight;
+    // 키워드 아이콘 가로줄. 인게임은 keywordIconsUseSynergySlot=true 경로를 타므로 기준은
+    // synergyBadge* 가 아니라 CardView의 keywordIconStart(-0.65,-1.14) / keywordIconStep(0.42,0)이다
+    // (CardDecorView.RefreshKeywordIcons). kewordIcon 크기(0.65x0.65)와 함께 위 카드 크기로 나눈 값이
+    // 카드 중심 기준 정규화 좌표가 된다. 이 모드에선 인게임이 시너지 배지를 아예 그리지 않는다.
+    const float KeywordIconStartX = 0.5f + -0.65f / IngameCardWidth;
+    const float KeywordIconStartY = 0.5f + -1.14f / IngameCardHeight;
+    const float KeywordIconStepX  =        0.42f / IngameCardWidth;
+    const float KeywordIconStepY  =        0f    / IngameCardHeight;
+    const float KeywordIconWidth  =        0.65f / IngameCardWidth;
+    const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
@@ -87,7 +91,12 @@ public class CardVisualView : MonoBehaviour
     // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
     // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
-    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
+    //
+    // _synergyState: 이 카드가 속한 **덱**의 시너지 스냅샷. 넘기면 배지가 활성/비활성 아이콘으로 갈린다.
+    // 기본 null인 이유는 호출부 대부분이 덱 문맥이 없기 때문이다(도감 그리드·상세, 팩 개봉, 컬렉션 타일) —
+    // 카드 한 장을 소개하는 자리에서 "몇 장 모였나"는 물을 수 있는 질문이 아니다.
+    // 덱 전체를 한 화면에 늘어놓는 곳(매치 화면 6칸)만 스냅샷을 만들어 넘긴다.
+    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true, SynergyState _synergyState = null)
     {
         if (_card == null)
         {
@@ -120,7 +129,7 @@ public class CardVisualView : MonoBehaviour
         SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
-        RefreshSynergyBadges(_card, _owned && this.showSynergies);
+        RefreshSynergyBadges(_card, _owned && this.showSynergies, _synergyState);
 
         // 폰트 크기는 카드 rect에 비례한다 → 바인드 시점에 한 번 맞춘다(셀 크기가 화면마다 다르다).
         ApplyIngameFontScale();
@@ -173,14 +182,15 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    // 인게임은 세로열 좌표(synergyBadgeXPos/YStart/YStep)로 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
+    // 인게임은 keywordIconStart에서 keywordIconStep만큼 밀며 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
     // 맡기지 않고 같은 좌표를 정규화 앵커로 옮긴다 — LayoutGroup은 간격·크기를 픽셀로 잡아서 카드 셀 크기가
     // 바뀌면(도감 386px vs 팩개봉 930px) 인게임과 비율이 어긋난다. 앵커는 부모 rect 비율이라 어긋나지 않는다.
     static void PlaceKeywordIcon(RectTransform _rect, int _index)
     {
         if (_rect == null) return;
 
-        var t_center = new Vector2(KeywordIconCenterX, KeywordIconStartY + KeywordIconStepY * _index);
+        var t_center = new Vector2(KeywordIconStartX + KeywordIconStepX * _index,
+                                   KeywordIconStartY + KeywordIconStepY * _index);
         var t_half   = new Vector2(KeywordIconWidth, KeywordIconHeight) * 0.5f;
 
         _rect.anchorMin        = t_center - t_half;
@@ -218,31 +228,45 @@ public class CardVisualView : MonoBehaviour
 
         if (this.hpText      != null) this.hpText.fontSize      = IngameHpFontSize      * t_scale;
         if (this.bonusHpText != null) this.bonusHpText.fontSize = IngameBonusHpFontSize * t_scale;
-        if (this.nameText    != null) this.nameText.fontSize    = IngameNameFontSize    * t_scale;
+
+        // 이름만 인게임이 오토사이징(1.0~2.3)이라 긴 이름이 줄어든다. 오토사이징이 켜져 있으면
+        // fontSize는 무시되고 min/max가 실제 크기를 정하므로 셋 다 환산해야 카드 크기를 따라간다.
+        if (this.nameText != null)
+        {
+            this.nameText.fontSizeMin = IngameNameFontSizeMin * t_scale;
+            this.nameText.fontSizeMax = IngameNameFontSize    * t_scale;
+            this.nameText.fontSize    = IngameNameFontSize    * t_scale;
+        }
     }
 
     // 그리드 셀 크기가 Bind 이후에 확정되는 경우(GridLayoutGroup 첫 프레임)를 위해 rect가 바뀔 때마다 재적용.
     void OnRectTransformDimensionsChange() => ApplyIngameFontScale();
 
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    void RefreshSynergyBadges(CardData _card, bool _show)
+    // _state = 이 카드가 속한 덱의 시너지 스냅샷(없으면 null). 정렬과 활성 판정 둘 다 여기서 갈린다.
+    void RefreshSynergyBadges(CardData _card, bool _show, SynergyState _state)
     {
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
-        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
-        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
+        // **표시 대상·순서 결정에는 스냅샷을 넘기지 않는다(null 고정).** 넘기면 활성 배지가 위로 올라가면서
+        // 덱을 한 장 갈아끼울 때마다 같은 카드의 배지 순서가 뒤바뀌고, 3개 상한에 걸릴 땐 비활성 배지가
+        // 목록에서 아예 잘려 나간다. 이 카드가 가진 시너지는 덱이 어떻든 같은 자리에 그대로 있어야 한다 —
+        // 덱에 따라 바뀌는 건 **아이콘 하나뿐**이다.
+        // (스냅샷이 없을 때의 정렬 = requiredCount 내림차순 고정. 덱과 무관하므로 자리가 흔들리지 않는다.)
         List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
 
         foreach (SynergyData t_syn in t_tags)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
-            // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
-            // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
-            t_badge.Set(t_syn, true);
+
+            // 여기가 스냅샷을 쓰는 유일한 지점 — 그 시너지가 이 덱에서 열렸으면 활성 그림, 아니면 비활성 그림.
+            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다: 거기선 "이 카드가 가진
+            // 시너지" 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
+            bool t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_syn);
+            t_badge.Set(t_syn, t_active);
         }
     }
 

@@ -10,6 +10,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardRegistry cardRegistry;
     // 도감 레이아웃/생산 튜닝 SO. 미배선(null)이면 CatalogRows가 CardCatalog 3장씩 청크 fallback.
     [SerializeField] CollectionLayoutConfig collectionLayout;
+    // 도감 테마 SO. 미배선(null)이면 CollectionThemes가 빈 목록(테마는 저작물이라 자동 생성 fallback이 없다).
+    [SerializeField] CollectionThemeConfig collectionThemes;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
     // 트리거 발화 튜토리얼 목록 SO(탭 첫 진입 등). 미배선(null)이면 트리거는 조용히 발화하지 않는다.
@@ -40,6 +42,9 @@ public class BootInstaller : MonoBehaviour
 
         // 도감 행 레이아웃/생산 튜닝 주입 — 카탈로그 카드를 참조하므로 SetSource 이후. null이면 청크 fallback.
         CatalogRows.SetLayout(collectionLayout);
+
+        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.KeyOf를 읽는다).
+        CollectionThemes.SetSource(collectionThemes);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();

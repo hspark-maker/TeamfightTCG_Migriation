@@ -384,6 +384,8 @@ MonoBehaviour:
   titleText: {fileID: 8621918954321583570}
   cardView: {fileID: 8558623865625129148}
   powerValueText: {fileID: 913301404527908756}
+  levelValueText: {fileID: 0}
+  evolutionValueText: {fileID: 0}
   keywordSection: {fileID: 4508983888050170949}
   keywordChipRoot: {fileID: 4835623982393558091}
   keywordDescText: {fileID: 8033358497726782632}
@@ -3623,7 +3625,7 @@ PrefabInstance:
     - target: {fileID: 5131162808735541596, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_fontAsset
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5

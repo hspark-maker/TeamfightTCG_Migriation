@@ -398,12 +398,18 @@ public class DeckEditController : MonoBehaviour
     // 편성 칸·컬렉션 착용표시·카운터를 m_working 하나로부터 전량 재생성한다(부분 갱신은 불일치의 근원).
     void RefreshAll()
     {
+        // 시너지는 편성 상태의 파생값이라 여기서 1회 산출해 6칸이 공유한다. 칸마다 다시 풀면 같은 답을
+        // 여섯 번 구하는 셈이고, 한 칸이라도 다른 입력으로 풀리면 같은 시너지가 카드마다 다르게 보인다.
+        // 전투가 쓰는 SynergyResolver 그대로다 — 여기서 "편집 화면용 활성 규칙"을 따로 만들면
+        // 편성할 때 열려 보이던 시너지가 전투에선 안 열리는 화면이 된다.
+        SynergyState t_synergy = SynergyResolver.Resolve(m_working);
+
         if (slots != null)
         {
             // 씬에서 칸을 덜 배선했거나 더 붙였을 수 있다 — 짧은 쪽 기준으로 돈다.
             int t_count = Mathf.Min(slots.Length, m_working.Length);
             for (int t_i = 0; t_i < t_count; t_i++)
-                if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], ClearSlot);
+                if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], ClearSlot, t_synergy);
         }
 
         if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
