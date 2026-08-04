@@ -32,6 +32,13 @@ public class PackShowcaseController : MonoBehaviour
     [Tooltip("이 팩에서 이미 소유한 카드를 뽑았을 때(중복) 되돌려주는 Gold.")]
     [Min(0)] [SerializeField] long duplicateRefundGold = 10;
 
+    // ScreenFlash·PackPurchaseImpact는 둘 다 런타임 자가설치라 프리팹에 배선할 자리가 없다 —
+    // 개봉 화면으로 갈아치울 때 쓰는 플래시의 값·에셋은 여기가 유일한 노출 창구다.
+    [Header("구매 → 개봉 전환 플래시")]
+    [Tooltip("전환을 덮는 플래시의 생김새. 손대지 않으면 코드 기본값으로 돈다. " +
+             "빛 스프라이트를 비우면 예전처럼 단색 판만 남는다(전환 은폐 기능은 그대로).")]
+    [SerializeField] ScreenFlashCover purchaseFlash = new ScreenFlashCover();
+
     // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 개봉 오버레이가 닫힐 때 해제된다 —
     // 씬을 떠나지 않으므로 OnEnable만으로는 영영 잠긴 채로 남는다(탭이 계속 활성이라 다시 돌지 않는다).
     static bool s_transitioning;
@@ -225,7 +232,7 @@ public class PackShowcaseController : MonoBehaviour
             // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
             // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
             m_openPending = true;
-            if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), OpenOverlay);
+            if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), purchaseFlash, OpenOverlay);
             else OpenOverlay();
             return;
         }

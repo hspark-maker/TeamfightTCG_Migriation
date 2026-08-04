@@ -18,7 +18,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     [SerializeField] bool suppressGuideUI;
 
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
-    OutgameTutorialStep m_step;
+    TutorialStepDef m_step;
     bool m_subscribed;
 
     // 억제 모드에서 클릭을 직접 듣는 타깃. 게이트가 없으니 리스너 부착·해제를 브리지가 진다.
@@ -133,7 +133,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             // 클릭 대기 스텝인데 타깃이 없으면 진행이 불가능하다(저작 실수).
-            Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}('{m_step.name}')에 앵커가 없어 게이트를 걸 수 없습니다.");
+            Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}({m_step.Action})에 앵커가 없어 게이트를 걸 수 없습니다.");
             CloseGate();
             return;
         }

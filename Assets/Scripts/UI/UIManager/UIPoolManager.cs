@@ -133,6 +133,8 @@ public class UIPoolManager : MonoBehaviour
             return null;
         }
 
+        DumpPrefabSource(uiPrefab);   // TODO 임시 진단용 — 폰트 이슈 확인 끝나면 제거할 것.
+
         T uiInstance = Instantiate(uiPrefab, uiRoot).GetComponent<T>();
         if (uiInstance == null)
         {
@@ -152,8 +154,32 @@ public class UIPoolManager : MonoBehaviour
         return uiInstance;
     }
 
+    /// <summary>TODO 임시 진단용 — Addressables가 넘겨준 "프리팹 원본"이 실제로 어떤 에셋이고,
+    /// 그 안의 TMP 폰트가 무엇인지 인스턴스화 전에 찍는다. 폰트 이슈 확인 끝나면 제거할 것.</summary>
+    static void DumpPrefabSource(GameObject _prefab)
+    {
+        string t_path = "(에디터 아님)";
+#if UNITY_EDITOR
+        t_path = UnityEditor.AssetDatabase.GetAssetPath(_prefab);
+        if (string.IsNullOrEmpty(t_path)) t_path = "(빈 경로 = 번들에서 로드됨)";
+#endif
+        Debug.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
+
+        foreach (var t_text in _prefab.GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            string t_font = t_text.font != null ? t_text.font.name : "null";
+            Debug.Log($"[프리팹원본] {t_text.name} font={t_font}");
+        }
+    }
+
     public void RegisterUI(PooledUIBase _ui)
     {
+        // TODO 임시 진단용 — 누가/어디서 등록되는지. 폰트 이슈 확인 끝나면 제거할 것.
+        var t_path = new System.Text.StringBuilder(_ui.name);
+        for (Transform t_p = _ui.transform.parent; t_p != null; t_p = t_p.parent)
+            t_path.Insert(0, t_p.name + "/");
+        Debug.Log($"[등록] {_ui.GetType().Name} scene='{_ui.gameObject.scene.name}' path={t_path}", _ui);
+
         this.activeUIs[_ui.GetType()] = _ui;
     }
 

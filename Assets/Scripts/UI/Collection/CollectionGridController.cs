@@ -4,7 +4,7 @@ using UnityEngine;
 // 도감 그리드 컨트롤러(Panel_Grid의 Content에 부착).
 // 전체 카드(CardCatalog.All)를 4열 그리드로 평면 나열하고 소유상태(잠김)를 반영한다.
 // 생산/보상은 다루지 않는다(그 흐름은 CollectionGalleryController 담당). 오직 나열 + 소유표시.
-// 소유 변경은 OnOwnershipChanged로 즉시 갱신한다(그리드는 시간 함수가 아니라 폴링 불필요).
+// 소유·강화 변경은 OnOwnershipChanged/OnGrowthChanged로 즉시 갱신한다(그리드는 시간 함수가 아니라 폴링 불필요).
 public class CollectionGridController : MonoBehaviour
 {
     [Header("배선")]
@@ -17,16 +17,23 @@ public class CollectionGridController : MonoBehaviour
 
     readonly List<CardVisualView> m_tiles = new List<CardVisualView>();
 
+    // 상세 오버레이가 좌우로 넘겨볼 순서. m_tiles와 인덱스 1:1(같은 루프에서 같이 채운다).
+    // 오버레이가 참조로 들고 있으므로 재빌드 때도 이 List 인스턴스를 갈아치우지 않고 내용만 비우고 다시 채운다.
+    readonly List<CardData> m_order = new List<CardData>();
+
     void OnEnable()
     {
         EnsureBoot();
         Build();
-        OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+        OwnershipManager.OnOwnershipChanged += Rebind;
+        // 강화도 타일의 체력 표시를 바꾼다 → 소유 변경과 같은 재바인딩 경로를 탄다.
+        CardGrowthManager.OnGrowthChanged += Rebind;
     }
 
     void OnDisable()
     {
-        OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        OwnershipManager.OnOwnershipChanged -= Rebind;
+        CardGrowthManager.OnGrowthChanged -= Rebind;
     }
 
     // 독립 실행 시 카탈로그/소유 부트를 보장. 이미 준비됐으면(실제 통합) 아무것도 하지 않는다.
@@ -56,15 +63,18 @@ public class CollectionGridController : MonoBehaviour
 
             var t_tile = Instantiate(cardPrefab, content);
             t_tile.Bind(t_card, OwnershipManager.IsOwned(t_card));
+
             // 길게 누르면 상세 오버레이. 타일과 카드의 짝은 재빌드 전까지 고정이라 여기서만 배선하면 된다
-            // (소유 변경 시 도는 OnOwnershipChanged는 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
-            CardDetailOverlayView.BindTile(t_tile, t_card);
+            // (소유·강화 변경 시 도는 Rebind는 같은 타일에 같은 카드를 다시 Bind할 뿐이다).
+            // 넘겨볼 순서는 화면에 깔리는 순서와 같아야 하므로 타일을 만든 그 자리에서 목록에 넣는다.
+            m_order.Add(t_card);
+            CardDetailOverlayView.BindTile(t_tile, m_order, m_order.Count - 1);
             m_tiles.Add(t_tile);
         }
     }
 
-    // 소유 변경 시 갱신. 카드 수 그대로면 재바인딩만, 바뀌었으면 전체 재빌드.
-    void OnOwnershipChanged()
+    // 소유·강화 변경 시 갱신. 카드 수 그대로면 재바인딩만, 바뀌었으면 전체 재빌드.
+    void Rebind()
     {
         var t_cards = CardCatalog.All;
         int t_nonNull = 0;
@@ -89,5 +99,6 @@ public class CollectionGridController : MonoBehaviour
         for (int t_i = 0; t_i < m_tiles.Count; t_i++)
             if (m_tiles[t_i] != null) Destroy(m_tiles[t_i].gameObject);
         m_tiles.Clear();
+        m_order.Clear();
     }
 }

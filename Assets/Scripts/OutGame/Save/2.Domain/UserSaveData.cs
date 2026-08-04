@@ -21,4 +21,7 @@ public class UserSaveData
 
     // H 랭크(표시용 티어 진행도). 슬롯 추가만 — VERSION 유지.
     public RankSaveData rank = new RankSaveData();
+
+    // 카드 성장(강화 레벨·진화 단계). 슬롯 추가만 — VERSION 유지(구 세이브는 빈 인스턴스 = 전 카드 Lv0).
+    public CardGrowthSaveData cardGrowth = new CardGrowthSaveData();
 }

@@ -18,6 +18,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] DeckImageCatalog deckImageCatalog;
     // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선(null)이면 지급을 건너뛴다.
     [SerializeField] CardPackData starterDeck;
+    // 카드 강화·진화 튜닝 SO. 미배선(null)이면 CardGrowthManager가 코드 기본식·기본 게이트로 동작한다.
+    [SerializeField] CardGrowthConfig growthConfig;
 
     static bool s_booted;
 
@@ -45,6 +47,14 @@ public class BootInstaller : MonoBehaviour
         // 도감 방치 생산 캐싱 — 세이브(DataSaveManager.Load)만 읽으므로 순서 무관하나
         // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
         CollectionProductionManager.Init();
+
+        // 카드 성장 캐싱 — 세이브(DataSaveManager.Load)만 읽어 순서 무관하나, 곡선 조회가 Config를 쓰므로 주입이 먼저다.
+        CardGrowthManager.SetConfig(growthConfig);
+        CardGrowthManager.Init();
+
+        // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
+        // (GameInitializer.GrowthProvider 주석이 지정한 자리). 캐시가 준비된 Init 뒤여야 첫 전투부터 반영된다.
+        GameInitializer.GrowthProvider = CardGrowthManager.GrowthOf;
 
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.

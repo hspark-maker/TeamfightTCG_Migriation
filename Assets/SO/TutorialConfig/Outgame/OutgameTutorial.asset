@@ -14,12 +14,158 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
   chapters:
   - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
+    stepDefs:
+    - action: 7
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: b7e3f1a92c8d4e6f0a1b2c3d4e5f6071, type: 2}
+      showDeckGate: 0
+      deckName: 
     steps:
     - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b01, type: 2}
   - label: "\uB450 \uBC88\uCA30 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    stepDefs:
+    - action: 5
+      anchor: 1
+      guideMessage: 
+      unlocks: 06000000
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
+      showDeckGate: 0
+      deckName: 
     steps:
     - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b02, type: 2}
   - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    stepDefs:
+    - action: 0
+      anchor: 2
+      guideMessage: 
+      unlocks: 02000000
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 2
+      anchor: 3
+      guideMessage: 
+      unlocks: 07000000
+      useDim: 1
+      pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
+      duplicateRefundGold: 10
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 3
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 4
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 9
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
+      showDeckGate: 0
+      deckName: "\uD0A4\uC6CC\uB4DC \uB371"
+    - action: 5
+      anchor: 1
+      guideMessage: 
+      unlocks: 03000000
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
+      showDeckGate: 1
+      deckName: 
+    - action: 1
+      anchor: 15
+      guideMessage: "\uC544\uB798\uCABD\uC740 \uB0B4 \uB371\uC785\uB2C8\uB2E4. \uC804\uD22C\uC5D0
+        \uB0B4\uBCF4\uB0BC \uCE74\uB4DC 6\uC7A5\uC744 \uC5EC\uAE30\uC11C \uD655\uC778\uD569\uB2C8\uB2E4."
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 1
+      anchor: 16
+      guideMessage: "\uC704\uCABD\uC740 \uC0C1\uB300\uC758 \uB371\uC785\uB2C8\uB2E4.
+        \uC804\uD22C \uC804\uC5D0 \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 12
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 17
+      guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uD0A4\uC6CC\uB4DC \uB371'\uC744
+        \uC120\uD0DD\uD574\uBCF4\uC138\uC694."
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 11
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 6
+      anchor: 13
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
     steps:
     - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b03, type: 2}
     - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b04, type: 2}
@@ -34,6 +180,108 @@ MonoBehaviour:
     - {fileID: 11400000, guid: b4825c095da6e474bbcf15eb69020a52, type: 2}
     - {fileID: 11400000, guid: ca895f46e312639409b6d476f794143d, type: 2}
   - label: "\uB9C8\uC9C0\uB9C9 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    stepDefs:
+    - action: 0
+      anchor: 2
+      guideMessage: 
+      unlocks: 02000000
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 2
+      anchor: 3
+      guideMessage: 
+      unlocks: 07000000
+      useDim: 1
+      pack: {fileID: 11400000, guid: b8076093ef3ae52498a63f0307110d06, type: 2}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 3
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 4
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 9
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: 8c3d4e5f6071829300b5c6d7e8f90a1b, type: 2}
+      showDeckGate: 0
+      deckName: "\uC2DC\uB108\uC9C0 \uB371"
+    - action: 5
+      anchor: 1
+      guideMessage: 
+      unlocks: 03000000
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 11400000, guid: 8c3d4e5f6071829300b5c6d7e8f90a1b, type: 2}
+      showDeckGate: 1
+      deckName: 
+    - action: 0
+      anchor: 12
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 17
+      guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uC2DC\uB108\uC9C0 \uB371'\uC744
+        \uC120\uD0DD\uD574\uBCF4\uC138\uC694."
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 11
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 6
+      anchor: 13
+      guideMessage: 
+      unlocks: 
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
     steps:
     - {fileID: 11400000, guid: c492551bedab8254d9bbf38bb786ef0c, type: 2}
     - {fileID: 11400000, guid: b2d1e1c1f2a34c4b9d6e7f8091a20b08, type: 2}

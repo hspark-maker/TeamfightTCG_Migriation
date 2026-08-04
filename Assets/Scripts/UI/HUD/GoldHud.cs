@@ -6,6 +6,10 @@ public class GoldHud : MonoBehaviour
 {
     [SerializeField] TMP_Text goldText;
 
+    // 표시할 재화 종류. 기본값이 Gold라 기존 골드 HUD 배선은 그대로 동작하고,
+    // 다이아 등 다른 재화는 이 값만 바꿔 같은 컴포넌트를 재사용한다(연출 API도 종류를 따라간다).
+    [SerializeField] ECurrencyType type = ECurrencyType.Gold;
+
     // 획득 연출 중에는 실제 잔액 대신 연출이 지정한 표시값을 보여준다(코인이 도착하며 숫자가 오르는 구간).
     bool m_held;
 
@@ -19,7 +23,7 @@ public class GoldHud : MonoBehaviour
     /// </summary>
     public Action<int, int> BeginGainRollUp(long _gain, float _punch = UiPunch.DEFAULT_SCALE)
     {
-        long t_start = CurrencyManager.Gold - _gain;
+        long t_start = CurrencyManager.GetBalance(this.type) - _gain;
         this.HoldDisplay(t_start);
 
         return (_arrived, _total) =>
@@ -42,7 +46,7 @@ public class GoldHud : MonoBehaviour
     public void ReleaseDisplay()
     {
         m_held = false;
-        this.Render(CurrencyManager.Gold);
+        this.Render(CurrencyManager.GetBalance(this.type));
     }
 
     void Awake()
@@ -54,7 +58,7 @@ public class GoldHud : MonoBehaviour
     {
         // 활성화 시점의 실제 잔액으로 먼저 맞춘 뒤 이후 변경을 구독.
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
-        this.Render(CurrencyManager.Gold);
+        this.Render(CurrencyManager.GetBalance(this.type));
     }
 
     void OnDisable()
@@ -64,18 +68,18 @@ public class GoldHud : MonoBehaviour
         m_held = false;
     }
 
-    // 골드 변경만 반영. 다른 재화 종류는 무시.
+    // 이 HUD가 맡은 재화의 변경만 반영. 다른 종류는 무시.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
         if (m_held) return;
-        if (_type != ECurrencyType.Gold) return;
+        if (_type != this.type) return;
         this.Render(_balance);
     }
 
     // 천단위 콤마 포맷
-    void Render(long _gold)
+    void Render(long _amount)
     {
         if (this.goldText == null) return;
-        this.goldText.text = _gold.ToString("N0");
+        this.goldText.text = _amount.ToString("N0");
     }
 }

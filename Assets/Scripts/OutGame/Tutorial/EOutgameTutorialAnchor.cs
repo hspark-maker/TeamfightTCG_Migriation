@@ -22,7 +22,7 @@ public enum EOutgameTutorialAnchor
     MatchDeckEditButton   = 12,   // 매치 덱 오버레이: MatchDeckPanel/BottomBar/EditButton
     MatchDeckBattleButton = 13,   // 매치 덱 오버레이: MatchDeckPanel/BottomBar/BattleButton
     DeckUnequipAllButton  = 14,   // 덱 편집 Btn_UnequipAll (공용). 자동편성은 덱이 6/6이면 잠기므로 그 앞에 비우는 스텝을 둔다
-    MatchDeckMySection    = 15,   // 매치 덱 오버레이: MatchDeckPanel/Content/MySection (Button 없음 → MessageStep 전용)
+    MatchDeckMySection    = 15,   // 매치 덱 오버레이: MatchDeckPanel/Content/MySection (Button 없음 → Message 액션 전용)
     MatchDeckEnemySection = 16,   // 매치 덱 오버레이: MatchDeckPanel/Content/EnemySection (동상)
     MatchDeckTutorialDeck = 17,   // 매치 덱 리스트에서 이번 튜토리얼 덱 칸(런타임 등록). 로비 목록은 이 키를 쓰지 않아 8~11과 달리 공유 충돌이 없다
 }

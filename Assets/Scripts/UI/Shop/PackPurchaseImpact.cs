@@ -47,16 +47,11 @@ public class PackPurchaseImpact : MonoBehaviour
     [SerializeField] float packFlashFall = 0.18f;
 
     [Header("화면 플래시")]
+    // 플래시의 '생김새'(차오르는 시간·머무는 시간·색·빛)는 여기 두지 않는다 — ScreenFlashCover가 그 단일 진실원이고
+    // 호출부(PackShowcaseController)가 인스펙터로 쥔다. 여기 남는 것은 '이 임팩트 안에서 언제 터지는가' 하나뿐이다.
     [Tooltip("플래시가 차오르기 시작하는 시각(초). 팩이 부풀기를 마치는 시각(눌림+부풀기)과 맞춰야 " +
              "정점에서 터지는 것으로 읽힌다 — 이르면 팩 반응이 잘리고, 늦으면 빈 박자가 생긴다.")]
     [SerializeField] float flashAt = 0.26f;
-    [Tooltip("차오르는 시간. 이 시각에 화면이 완전히 덮이고, 곧바로 개봉 화면으로 갈아치운다.")]
-    [SerializeField] float flashRise = 0.12f;
-    [Tooltip("덮인 채로 머무는 시간. 화면 교체가 이 사이에 일어난다 — 0이면 교체 프레임이 드러날 수 있다.")]
-    [SerializeField] float flashHold = 0.03f;
-    [Tooltip("걷히는 시간. 이 동안 개봉 화면의 팩이 이미 올라오고 있다.")]
-    [SerializeField] float flashFall = 0.35f;
-    [Range(0f, 1f)] [SerializeField] float flashPeak = 0.9f;
 
     static PackPurchaseImpact s_instance;
 
@@ -81,9 +76,12 @@ public class PackPurchaseImpact : MonoBehaviour
     /// — 개봉 화면은 반드시 그때 열어야 전환 프레임이 드러나지 않는다.
     /// 연출이 어떤 이유로 끊겨도 _onCover는 반드시 불린다(카드는 이미 지급됐고, 화면을 못 보는 상태가 최악이다).
     /// </summary>
-    public void Play(RectTransform _packRect, Action _onCover)
+    public void Play(RectTransform _packRect, ScreenFlashCover _cover, Action _onCover)
     {
         if (m_current != null && m_current.IsActive()) m_current.Kill();
+
+        // 덮개를 안 넘겼으면 기본 생김새로 만든다 — 이 축이 통째로 빠지면 전환이 하드컷으로 드러난다.
+        var t_style = _cover ?? new ScreenFlashCover();
 
         // 덮임 통지는 정확히 1회. 시간축과 중단 안전망 양쪽에서 부르므로 여기서 잠근다.
         bool t_fired = false;
@@ -98,9 +96,10 @@ public class PackPurchaseImpact : MonoBehaviour
 
         // OnKill은 덮어쓰기라 단계마다 걸 수 없다 — 정리는 여기 하나로 모아 마지막에 한 번만 건다.
         Action t_cleanup = StagePack(t_seq, _packRect);
-        StageScreenFlash(t_seq);
+        StageScreenFlash(t_seq, t_style);
 
-        t_seq.InsertCallback(this.flashAt + this.flashRise, Fire);
+        // 덮임 시각은 덮개가 정한다 — 이 값이 어긋나면 아직 비치는 화면 위에서 교체가 일어난다.
+        t_seq.InsertCallback(this.flashAt + t_style.rise, Fire);
 
         // 정상 종료든 중단이든 여기로 온다 — 덮임 통지가 빠지면 개봉 화면이 영영 열리지 않는다.
         t_seq.OnKill(() => { Fire(); t_cleanup?.Invoke(); });
@@ -202,11 +201,11 @@ public class PackPurchaseImpact : MonoBehaviour
     }
 
     // 화면을 덮는 플래시. 설치할 자리가 없으면 이 축만 건너뛴다(전환이 하드컷으로 돌아갈 뿐이다).
-    void StageScreenFlash(Sequence _seq)
+    void StageScreenFlash(Sequence _seq, ScreenFlashCover _style)
     {
         if (!ScreenFlash.TryGet(out var t_flash)) return;
 
-        var t_cover = t_flash.BuildCover(this.flashRise, this.flashHold, this.flashFall, this.flashPeak);
+        var t_cover = t_flash.BuildCover(_style);
         if (t_cover == null) return;
 
         _seq.Insert(this.flashAt, t_cover);

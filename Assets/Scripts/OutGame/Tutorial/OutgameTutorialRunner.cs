@@ -4,7 +4,8 @@ using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼의 시퀀스 해석 static 코어(씬 오브젝트·UI를 모른다).
 // 진행 좌표는 (챕터, 챕터 안 스텝) 2차원이지만 챕터 넘김은 좌표의 자리 올림일 뿐이라
-// 스텝·브리지·상점은 챕터 경계를 눈치채지 못한다 — 스텝이 "무엇을 하는지"는 스텝 SO가 안다.
+// 스텝·브리지·상점은 챕터 경계를 눈치채지 못한다 — 스텝이 "무엇을 하는지"는 행의 액션이 정하고
+// 실제 실행은 TutorialStepExecutor가 진다.
 public static class OutgameTutorialRunner
 {
     static OutgameTutorialData s_data;
@@ -47,7 +48,7 @@ public static class OutgameTutorialRunner
     }
 
     /// <summary>현재 좌표가 가리키는 스텝. 미주입·완료·범위 밖·빈 칸이면 false.</summary>
-    public static bool TryGetCurrentStep(out OutgameTutorialStep _step)
+    public static bool TryGetCurrentStep(out TutorialStepDef _step)
     {
         _step = null;
         if (!IsRunning) return false;
@@ -68,11 +69,12 @@ public static class OutgameTutorialRunner
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
         int t_index   = OutgameTutorialProgress.StepIndex;
 
-        // 다음 좌표를 러너가 미리 계산해 실어준다 — 스텝은 자기가 챕터 끝인지도 모른 채 커밋한다.
+        // 다음 좌표를 러너가 미리 계산해 실어준다 — 실행기는 자기가 챕터 끝인지도 모른 채 커밋한다.
         bool t_hasNext = TryGetNext(t_chapter, t_index, out int t_nextChapter, out int t_nextStep);
 
-        return t_step.Enter(new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext,
-                                                          PersistentTutorialProgressSink.Instance));
+        return TutorialStepExecutor.Enter(t_step,
+            new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext,
+                                           PersistentTutorialProgressSink.Instance));
     }
 
     /// <summary>튜토리얼이 이번 스텝에서 팔 팩을 지정했으면 true. 상점은 진열·가격·구매 대상을 이걸로 덮어써
@@ -113,7 +115,7 @@ public static class OutgameTutorialRunner
 
     /// <summary>시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다. 범위 밖이면 있는 데까지만.
     /// 진행 좌표에서 파생되는 상태(기능 해금)를 재계산하는 쪽이 쓴다 — 러너는 그 상태가 무엇인지 알지 않는다.</summary>
-    public static IEnumerable<OutgameTutorialStep> EnumerateUpTo(int _chapter, int _step)
+    public static IEnumerable<TutorialStepDef> EnumerateUpTo(int _chapter, int _step)
     {
         for (int t_c = 0; t_c <= _chapter && t_c < ChapterCount; t_c++)
         {

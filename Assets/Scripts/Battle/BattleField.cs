@@ -18,6 +18,9 @@ public class BattleField : MonoBehaviour
     Queue<CardInstance> waitingQueue = new Queue<CardInstance>();
     int ownerIndex;
     HealerEffect healerEffect;
+    // 카드 영구 성장값 조회원. 인덱스 배열이 아니라 델리게이트인 이유는 셔플이 이 클래스 안에서 일어나기 때문 —
+    // 카드로 조회하면 셔플 순서와 무관하게 맞는다. null이면 성장 미적용(= 기존 동작).
+    System.Func<CardData, CardGrowth> growthOf;
 
     public int OwnerIndex => this.ownerIndex;
     public int WaitingCount => this.waitingQueue.Count;
@@ -32,9 +35,14 @@ public class BattleField : MonoBehaviour
 
     void OnDestroy() => this.healerEffect?.Unsubscribe();
 
-    public void Initialize(List<CardData> _deckData, int _ownerIndex, ShufflePolicy _shuffle)
+    /// <summary>_growthOf = 카드 영구 성장값 공급자(생략/ null이면 성장 미적용).
+    /// 태우는 곳은 싱글·튜토리얼의 **플레이어 필드뿐** — 멀티는 스탯을 와이어로 보내지 않는 결정론 lockstep이라
+    /// 한쪽만 강화되면 즉시 divergence다.</summary>
+    public void Initialize(List<CardData> _deckData, int _ownerIndex, ShufflePolicy _shuffle,
+                           System.Func<CardData, CardGrowth> _growthOf = null)
     {
         this.ownerIndex = _ownerIndex;
+        this.growthOf   = _growthOf;
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
         this.FlowStack = 0;
@@ -47,7 +55,7 @@ public class BattleField : MonoBehaviour
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {
-            var t_card = new CardInstance(t_shuffled[i], this.ownerIndex);
+            var t_card = new CardInstance(t_shuffled[i], this.ownerIndex, GrowthOf(t_shuffled[i]));
             if (i < SLOT_COUNT)
             {
                 t_card.isRevealed = true;
@@ -63,6 +71,9 @@ public class BattleField : MonoBehaviour
             }
         }
     }
+
+    // 성장값 조회 단일 지점(미주입이면 default = 미적용). 카드 생성 경로가 늘어도 여기만 통과시킨다.
+    CardGrowth GrowthOf(CardData _data) => this.growthOf != null ? this.growthOf(_data) : default;
 
     // 빈 슬롯에 대기 카드 순서대로 배치. 채운 카드 목록 반환.
     public List<CardInstance> FillEmptySlots()
@@ -108,7 +119,9 @@ public class BattleField : MonoBehaviour
         NotifyEntered(t_next);   // [Entered] 런타임 등장(패시브+시너지).
         t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible);
 
-        _card.savedHp      = _card.data.maxHp;
+        // 인스턴스 maxHp 기준(= 강화 포함). data.maxHp로 저장하면 재등장 때 강화분이 통째로 사라진다.
+        // bonusHp는 그대로 base — 시너지 덩치는 복귀 시 되돌리지 않는 기존 규칙 유지.
+        _card.savedHp      = _card.maxHp;
         _card.savedBonusHp = _card.data.bonusHp;
         _card.slotIndex   = -1;
         _card.isRevealed  = false;
@@ -188,6 +201,7 @@ public class BattleField : MonoBehaviour
     public void InitializeFromRemote(int[] _ids, int _ownerIndex, CardRegistry _registry)
     {
         this.ownerIndex = _ownerIndex;
+        this.growthOf   = null;   // 원격 미러는 성장 미적용 고정(스탯을 와이어로 보내지 않으므로 로컬 가공 금지)
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
         this.FlowStack = 0;
@@ -239,7 +253,7 @@ public class BattleField : MonoBehaviour
             // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
             Debug.LogWarning($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
                              $"(slot={_slot}, card={_data.name}, waiting={this.waitingQueue.Count})");
-            t_card = new CardInstance(_data, this.ownerIndex);
+            t_card = new CardInstance(_data, this.ownerIndex, GrowthOf(_data));   // 성장원도 Initialize와 같은 소스로
             if (this.Synergy != null)
                 SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
         }

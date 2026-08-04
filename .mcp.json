@@ -1,10 +1,12 @@
 {
   "mcpServers": {
     "unity-mcp": {
-      "command": "C:\\Users\\cookapps\\.unity/relay\\relay_win.exe",
+      "type": "stdio",
+      "command": "${USERPROFILE}/.unity/relay/relay_win.exe",
       "args": [
         "--mcp"
-      ]
+      ],
+      "env": {}
     }
   }
 }

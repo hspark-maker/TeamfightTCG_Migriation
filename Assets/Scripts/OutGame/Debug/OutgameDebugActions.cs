@@ -4,6 +4,24 @@ using UnityEngine;
 // 같은 동작을 공유하도록 여기에 모은다 — 두 입구가 각자 구현하면 한쪽만 고쳐지는 이중 진실원이 된다.
 public static class OutgameDebugActions
 {
+    // 디버그 지급 단위. 오버레이·ContextMenu가 같은 값을 쓰도록 여기 고정한다.
+    const long DEBUG_GOLD_AMOUNT    = 10000;
+    const long DEBUG_DIAMOND_AMOUNT = 1000;
+
+    // 강화·진화 비용 테스트용 즉시 지급. 잔액 변경 창구는 CurrencyManager 하나뿐이라 디버그도 Earn을 거친다.
+    public static void GrantGold() => GrantCurrency(ECurrencyType.Gold, DEBUG_GOLD_AMOUNT);
+
+    public static void GrantDiamond() => GrantCurrency(ECurrencyType.Diamond, DEBUG_DIAMOND_AMOUNT);
+
+    // Earn은 지연 flush라 여기서 즉시 영속한다(앱을 껐다 켜도 지급이 남게).
+    public static void GrantCurrency(ECurrencyType _type, long _amount)
+    {
+        CurrencyManager.Earn(_type, _amount);
+        CurrencyManager.Save();
+
+        Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
+    }
+
     // 카탈로그 전량 지급. 덱 편성은 소유 카드만 허용하므로 인게임 덱 연동 테스트의 출발점이다.
     // 실제 지급은 OwnershipManager가 소유 — 인게임 해금 버튼(UnlockAllCardsButton)과 같은 창구를 쓴다.
     public static void UnlockAllCards()

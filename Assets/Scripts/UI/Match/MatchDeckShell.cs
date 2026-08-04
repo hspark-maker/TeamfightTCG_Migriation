@@ -232,7 +232,7 @@ public class MatchDeckShell : MonoBehaviour
     }
 
     // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 목록에 없으면 -1.
-    // 전투 덱 정본은 TutorialConfig(시나리오)이고 DeckGrantStep이 같은 구성을 세이브에 넣어둔다 —
+    // 전투 덱 정본은 TutorialConfig(시나리오)이고 DeckGrant 스텝이 같은 구성을 세이브에 넣어둔다 —
     // 좌표를 여기서 되찾는 이유는 세이브 삽입이 항상 맨 앞이라 스텝이 좌표를 알려줄 수 없기 때문.
     static int TutorialDeckSlot()
     {
