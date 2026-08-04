@@ -122,7 +122,12 @@ public class LobbyTabController : MonoBehaviour
         // 비활성 오브젝트도 형제 인덱스는 유지되므로 선택 상태와 무관하게 안전하다.
         this.focus.SetSiblingIndex(tab.button.transform.GetSiblingIndex());
 
-        if (this.focusIcon != null && tab.icon != null) this.focusIcon.sprite = tab.icon.sprite;
+        // 아이콘은 스프라이트마다 크기가 달라서 Focus 쪽 고정 크기를 쓰면 찌그러진다 → 대상 버튼 아이콘의 크기를 그대로 가져온다.
+        if (this.focusIcon != null && tab.icon != null)
+        {
+            this.focusIcon.sprite = tab.icon.sprite;
+            this.focusIcon.rectTransform.sizeDelta = tab.icon.rectTransform.sizeDelta;
+        }
         if (this.focusLabel != null) this.focusLabel.text = string.IsNullOrEmpty(tab.label) ? tab.name : tab.label;
     }
 }

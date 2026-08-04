@@ -73,6 +73,8 @@ public class CardElement : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndD
             // 프레임이 인게임 CardView와 같은 세로형이라 비율이 다른 fullImage를 쓰면 카드마다 잘림이 갈라진다.
             this.cardPortrait.sprite = CardVisualRules.PickCardArt(_card);
             //this.explainText.text = _card.cardExplain;
+            // 폴백은 마스터 데이터 그대로 — 이 컴포넌트는 전투 카드정보 팝업(적 카드 포함)도 그린다.
+            // 강화 반영 체력이 필요한 아웃게임 호출부는 _displayHp에 DeckPower.MaxHpOf를 직접 넘긴다.
             this.hpText.text = (_displayHp >= 0 ? _displayHp : _card.maxHp).ToString();
         }
         else

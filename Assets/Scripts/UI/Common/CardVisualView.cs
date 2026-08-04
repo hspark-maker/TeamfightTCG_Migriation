@@ -23,7 +23,7 @@ public class CardVisualView : MonoBehaviour
     [Header("인게임 미러 요소")]
     [SerializeField] Image      frame;            // 카드 프레임(인게임과 동일 스프라이트). 카드별 데이터가 아니라 프리팹 고정값.
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
-    [SerializeField] TMP_Text   hpText;           // maxHp
+    [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
@@ -82,7 +82,12 @@ public class CardVisualView : MonoBehaviour
 
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
-    public void Bind(CardData _card, bool _owned)
+    //
+    // _applyGrowth: 강화 반영 체력을 그릴지. 기본 true인 이유는 호출부 전수가 "내 카드"이기 때문이다
+    // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
+    // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
+    // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
+    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
     {
         if (_card == null)
         {
@@ -112,7 +117,7 @@ public class CardVisualView : MonoBehaviour
         }
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
-        SetHpDisplay(_card, _owned && this.showHp);
+        SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
         RefreshSynergyBadges(_card, _owned && this.showSynergies);
@@ -125,15 +130,17 @@ public class CardVisualView : MonoBehaviour
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
-    // 아웃게임엔 전투 인스턴스(CardInstance.hp)가 없으므로 마스터 데이터의 maxHp를 그린다.
-    void SetHpDisplay(CardData _card, bool _show)
+    // 아웃게임엔 전투 인스턴스(CardInstance.hp)가 없으므로 내 카드는 강화 반영 최대 체력(DeckPower.MaxHpOf)을 그린다 —
+    // 마스터 데이터의 maxHp를 직접 읽으면 강화한 카드가 로비에서만 안 오른 것처럼 보인다.
+    // 반대로 상대 카드(_applyGrowth=false)는 내 성장과 무관하므로 마스터 값 그대로다.
+    void SetHpDisplay(CardData _card, bool _show, bool _applyGrowth)
     {
         if (this.hpPanel != null) this.hpPanel.SetActive(_show);
 
         if (this.hpText != null)
         {
             this.hpText.gameObject.SetActive(_show);
-            if (_show) this.hpText.text = _card.maxHp.ToString();
+            if (_show) this.hpText.text = DeckPower.MaxHpOf(_card, _applyGrowth).ToString();
         }
 
         if (this.bonusHpText != null)

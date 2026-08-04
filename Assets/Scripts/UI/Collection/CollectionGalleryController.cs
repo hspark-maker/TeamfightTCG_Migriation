@@ -5,7 +5,7 @@ using UnityEngine.UI;
 // 도감 갤러리 컨트롤러(CollectionScreen에 부착).
 // CatalogRows로부터 행/카드 타일을 생성하고 소유상태(잠김)·생산상태를 반영한다.
 // 생산 누적은 시간 함수라 매니저가 통지하지 않으므로, 열린 동안 폴링 틱으로 각 행 + 푸터 일괄수령 버튼을 주기 갱신한다.
-// 수확/리셋은 OnChanged로, 소유변경은 OnOwnershipChanged로 즉시 갱신한다.
+// 수확/리셋은 OnChanged로, 소유·강화 변경은 OnOwnershipChanged/OnGrowthChanged로 즉시 갱신한다.
 public class CollectionGalleryController : MonoBehaviour
 {
     [Header("배선")]
@@ -50,7 +50,9 @@ public class CollectionGalleryController : MonoBehaviour
             harvestAllButton.onClick.AddListener(OnHarvestAllClicked);
         }
 
-        OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+        OwnershipManager.OnOwnershipChanged += RebindRows;
+        // 강화도 행 타일의 체력 표시를 바꾼다 → 소유 변경과 같은 재바인딩 경로를 탄다.
+        CardGrowthManager.OnGrowthChanged += RebindRows;
         CollectionProductionManager.OnChanged += OnProductionChanged;
         m_refreshTimer = 0f;
         RefreshProduction();
@@ -58,7 +60,8 @@ public class CollectionGalleryController : MonoBehaviour
 
     void OnDisable()
     {
-        OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        OwnershipManager.OnOwnershipChanged -= RebindRows;
+        CardGrowthManager.OnGrowthChanged -= RebindRows;
         CollectionProductionManager.OnChanged -= OnProductionChanged;
     }
 
@@ -159,9 +162,9 @@ public class CollectionGalleryController : MonoBehaviour
         return _row != null ? _row.Cards : null;
     }
 
-    // 소유 변경 시 갱신. 원본 행 수가 그대로면 재바인딩만, 바뀌었으면 전체 재빌드.
+    // 소유·강화 변경 시 갱신. 원본 행 수가 그대로면 재바인딩만, 바뀌었으면 전체 재빌드.
     // 비교 기준은 m_rows.Count가 아니라 빌드 당시의 원본 행 수다 — 건너뛴 행이 있으면 둘이 애초에 다르다.
-    void OnOwnershipChanged()
+    void RebindRows()
     {
         if (CatalogRows.Rows.Count != m_sourceRowCount) { Build(); return; }
 

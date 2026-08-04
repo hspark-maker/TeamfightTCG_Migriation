@@ -21,11 +21,17 @@ public class CardDetailOverlayView : MonoBehaviour
     const string LockedValue = "?";
     /// <summary>보유 카드인데 해당 섹션에 내용이 없을 때. 섹션을 숨기지 않는 이유는 ApplySection 주석 참고.</summary>
     const string NoneValue   = "없음";
+    /// <summary>진화 단계 0(아직 진화하지 않음)의 표시.</summary>
+    const string NoEvolution = "미진화";
 
     [Header("배선")]
     [SerializeField] TMP_Text       titleText;       // 상단 카드 이름
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
     [SerializeField] TMP_Text       powerValueText;  // 체력 수치(프리팹 목업의 "파워" 행을 체력으로 쓴다)
+
+    [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
+    [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
+    [SerializeField] TMP_Text evolutionValueText;  // 진화 단계 "2단계"(미진화면 NoEvolution)
 
     [Header("키워드 섹션")]
     [SerializeField] GameObject keywordSection;      // 칩이 0개면 통째로 숨긴다
@@ -173,6 +179,9 @@ public class CardDetailOverlayView : MonoBehaviour
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
 
+        // 강화·진화는 이 오버레이가 떠 있는 동안 바뀔 수 있다(강화 UI가 위에 겹친다) → 체력·레벨 행이 즉시 따라오게.
+        CardGrowthManager.OnGrowthChanged += OnGrowthChanged;
+
         RefreshArrows();
     }
 
@@ -181,6 +190,8 @@ public class CardDetailOverlayView : MonoBehaviour
         if (this.prevButton != null) this.prevButton.onClick.RemoveListener(OnPrevPressed);
         if (this.nextButton != null) this.nextButton.onClick.RemoveListener(OnNextPressed);
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
+
+        CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
 
         // 전환 도중에 닫히면 slideTarget이 옆으로 밀린 채·반투명인 채 굳는다 → 다음 열기에 그대로 보인다.
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
@@ -412,6 +423,13 @@ public class CardDetailOverlayView : MonoBehaviour
         return this.m_cards != null && _index >= 0 && _index < this.m_cards.Count ? this.m_cards[_index] : null;
     }
 
+    // 강화/진화 통지. m_index는 전환 중에도 이미 목표 카드를 가리키므로 지금 카드만 다시 그리면 된다.
+    void OnGrowthChanged()
+    {
+        CardData t_card = CardAt(this.m_index);
+        if (t_card != null) Apply(t_card);
+    }
+
     void Apply(CardData _card)
     {
         bool t_owned = OwnershipManager.IsOwned(_card);
@@ -423,13 +441,31 @@ public class CardDetailOverlayView : MonoBehaviour
             this.titleText.text = t_owned ? _card.displayName : LockedName;
 
         // CardData에 파워 필드가 없어 프리팹 목업의 "파워" 행을 체력으로 쓴다(라벨/아이콘은 프리팹 쪽 값).
+        // 수치는 강화 반영값 — 환산의 정본은 DeckPower다(마스터 maxHp를 직접 읽지 않는다).
+        int t_maxHp = DeckPower.MaxHpOf(_card);
         if (this.powerValueText != null)
             this.powerValueText.text = !t_owned          ? LockedValue
-                                     : _card.bonusHp > 0 ? $"{_card.maxHp} (+{_card.bonusHp})"
-                                                         : _card.maxHp.ToString();
+                                     : _card.bonusHp > 0 ? $"{t_maxHp} (+{_card.bonusHp})"
+                                                         : t_maxHp.ToString();
 
+        ApplyGrowth(_card, t_owned);
         BuildKeywordSection(_card, t_owned);
         BuildSynergySection(_card, t_owned);
+    }
+
+    // 강화 레벨·진화 단계. 미배선 필드는 조용히 건너뛴다(이전/다음 화살표와 같은 옵션 배선 규약).
+    // 값이 없어도 행을 끄지 않는 이유는 ApplySection 주석과 같다 — 카드마다 패널 높이가 흔들린다.
+    void ApplyGrowth(CardData _card, bool _owned)
+    {
+        CardGrowth t_growth = CardGrowthManager.GrowthOf(_card);
+
+        if (this.levelValueText != null)
+            this.levelValueText.text = _owned ? $"Lv {t_growth.Level} / {CardGrowthManager.MaxLevel}" : LockedValue;
+
+        if (this.evolutionValueText != null)
+            this.evolutionValueText.text = !_owned                     ? LockedValue
+                                         : t_growth.EvolutionStage > 0 ? $"{t_growth.EvolutionStage}단계"
+                                                                       : NoEvolution;
     }
 
     void BuildKeywordSection(CardData _card, bool _owned)

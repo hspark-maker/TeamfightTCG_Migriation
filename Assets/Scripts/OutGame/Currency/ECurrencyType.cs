@@ -3,6 +3,7 @@
 public enum ECurrencyType
 {
     Gold,
+    Diamond,    // 카드 진화 전용 재화(5·10레벨 문). 랭크 티어명 "다이아몬드"와는 무관.
 
     Count,  // 종류 개수(항상 마지막) — 배열 크기.
 }

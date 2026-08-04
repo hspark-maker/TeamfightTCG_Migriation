@@ -2,6 +2,9 @@ public class CardInstance
 {
     public CardData data;
     public int hp;
+    // 이 인스턴스의 최대 체력(= data.maxHp + 영구 강화분). 회복 상한·부활 기준은 전부 이 값이다 —
+    // data.maxHp는 공유 에셋이라 강화값을 담을 수 없다. 강화분은 bonusHp(시너지 임시 채널)에 섞지 않는다.
+    public int maxHp;
     public int bonusHp;
     public int slotIndex;   // -1 = waiting queue
     public bool isRevealed;
@@ -33,8 +36,7 @@ public class CardInstance
     public bool justSpawned;
 
     // 런타임 진화 단계. 0=미진화, 1~CardData.MaxEvolutionStage.
-    // 등급/진화 획득 시스템 미구현 — 지금은 CardData의 임시 기본값(defaultEvolutionStage)에서 주입,
-    // 세이브 연동 시 이 필드에 주입하는 지점만 바뀐다(필드 위치·소비측은 그대로).
+    // 주입원은 세이브(CardGrowth.EvolutionStage) 우선, 없으면 CardData의 임시 기본값(defaultEvolutionStage) 폴백.
     public int evolutionStage;
     // 등장 컷씬 1회성 래치. 스왑으로 대기열에 갔다가 다시 필드로 돌아오는 등 같은 인스턴스가
     // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
@@ -94,16 +96,21 @@ public class CardInstance
         _defender != null && _defender.IsAlive
         && !HasKeyword(CardKeyword.Ranged) && !_defender.HasKeyword(CardKeyword.Mark);
 
-    public CardInstance(CardData _data, int _ownerIndex)
+    /// <summary>_growth = 카드 영구 성장값(강화 체력·진화 단계). 기본값(default)이면 성장 미적용 —
+    /// 성장을 태우지 않는 경로(AI 적 필드·멀티 원격 미러)는 인자를 생략한다.</summary>
+    public CardInstance(CardData _data, int _ownerIndex, CardGrowth _growth = default)
     {
         this.data    = _data;
-        this.hp      = _data.maxHp;
+        // 강화분은 최대 체력에 흡수(bonusHp는 데미지로 소진되는 시너지 채널이라 영구값을 담으면 안 된다).
+        this.maxHp   = _data.maxHp + _growth.HpBonus;
+        this.hp      = this.maxHp;
         this.bonusHp = _data.bonusHp;
         this.slotIndex   = -1;
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
-        // 진화 단계 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과) — 세이브가 들어와도 여기만 교체한다.
-        this.evolutionStage = _data.defaultEvolutionStage;
+        // 성장값 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과).
+        // 진화는 세이브 값 우선, 없으면 마스터 데이터 폴백 — temp 3단계 카드가 아직 defaultEvolutionStage로 동작 중.
+        this.evolutionStage = _growth.EvolutionStage > 0 ? _growth.EvolutionStage : _data.defaultEvolutionStage;
     }
 
     // ── 시너지 적용 (SynergyApplier가 호출하는 계약: 덱 확정 시 1회, 가산/합집합) ──
@@ -136,7 +143,7 @@ public class CardInstance
     {
         if (_amount <= 0) return 0;
         int t_before = this.hp;
-        this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.data.maxHp);
+        this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.maxHp);
         int t_healed = this.hp - t_before;
         // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
         if (_showEffect && t_healed > 0) CardView.GetView(this)?.PlayHealEffect(t_healed);
@@ -155,7 +162,7 @@ public class CardInstance
     {
         if (this.reviveUsed || IsAlive) return false;
         this.reviveUsed = true;
-        this.hp = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.data.maxHp * 0.5f));
+        this.hp = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.maxHp * 0.5f));
         CardView.GetView(this)?.PlayHealEffect(this.hp);   // 언데드 부활도 회복 연출(복구된 hp만큼). 순수 연출.
         return true;
     }
