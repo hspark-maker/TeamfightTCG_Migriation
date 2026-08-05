@@ -96,8 +96,12 @@ public class EnhanceResultPanelView : MonoBehaviour
     /// <summary>결과를 무대에 올리고 탭을 기다린다.
     /// _onClose는 탭으로 걷힌 시점 — 호출부가 여기서 무대 복귀를 시작한다.
     /// _onRetry는 "한 번 더"로 걷힌 시점 — 호출부가 복귀를 마친 뒤 다음 강화로 잇는다.
-    /// 둘 중 정확히 하나만, 정확히 한 번 온다(중단 경로에선 어느 것도 오지 않는다 — <see cref="HideImmediate"/> 참고).</summary>
-    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry)
+    /// 둘 중 정확히 하나만, 정확히 한 번 온다(중단 경로에선 어느 것도 오지 않는다 — <see cref="HideImmediate"/> 참고).
+    ///
+    /// _onHpRoll은 체력 숫자가 굴러 오르기 시작하는 시점 — 인자는 굴리는 데 걸리는 시간이다.
+    /// 무대에 선 카드의 체력도 이 박자로 함께 굴리라고 알린다. 두 숫자가 한 박에 움직여야
+    /// "이 행이 저 카드의 저 자리"가 읽힌다. 굴릴 것이 없으면(실패·상승폭 0) 오지 않는다.</summary>
+    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null)
     {
         gameObject.SetActive(true);
         EnsureBase();
@@ -132,7 +136,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.titleText != null)
             t_seq.InsertCallback(0f, () => UiPunch.Play(this.titleText.transform));
 
-        BuildRows(t_seq, t_success, _line);
+        BuildRows(t_seq, t_success, _line, _onHpRoll);
 
         this.m_seq = t_seq;
         t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
@@ -185,7 +189,7 @@ public class EnhanceResultPanelView : MonoBehaviour
 
     // 성공이면 행이 아래에서 차례로 떠오르고 오른 체력이 굴러 오른다.
     // 실패는 같은 행을 쓰되 박자를 뺀다 — 성공의 리듬이 있어야 실패의 정적이 아프다.
-    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line)
+    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line, Action<float> _onHpRoll)
     {
         if (this.effectValueText != null)
             this.effectValueText.text = _success && _line.ToHp > _line.FromHp
@@ -221,17 +225,23 @@ public class EnhanceResultPanelView : MonoBehaviour
 
         if (!_success || this.effectValueText == null || _line.ToHp <= _line.FromHp) return;
 
+        float t_rollAt  = this.fadeInDuration + this.rowRiseDuration;
+        float t_rollDur = Mathf.Max(0.05f, this.rollDuration);
+
         // 굴리기는 그 행이 다 떠오른 뒤에 — 떠오르는 중에 숫자까지 움직이면 둘 다 안 읽힌다.
-        _seq.Insert(this.fadeInDuration + this.rowRiseDuration, BuildRoll(_line.FromHp, _line.ToHp));
+        _seq.Insert(t_rollAt, BuildRoll(_line.FromHp, _line.ToHp, t_rollDur));
+
+        // 카드 위의 숫자도 같은 시각·같은 길이로 출발한다. 길이를 넘기는 이유는 저작값이 이쪽에만 있기 때문이다.
+        if (_onHpRoll != null) _seq.InsertCallback(t_rollAt, () => _onHpRoll(t_rollDur));
     }
 
-    Tween BuildRoll(int _from, int _to)
+    Tween BuildRoll(int _from, int _to, float _duration)
     {
         float t_shown = _from;
 
         return DOTween.To(() => t_shown,
                           _v => { t_shown = _v; this.effectValueText.text = EffectLine(_from, Mathf.RoundToInt(_v)); },
-                          (float)_to, Mathf.Max(0.05f, this.rollDuration))
+                          (float)_to, _duration)
                       .SetEase(Ease.OutQuad)
                       // 굴리다 끊기면 중간값이 남는다 — 마지막 한 번을 못 박는다.
                       .OnKill(() => { if (this.effectValueText != null) this.effectValueText.text = EffectLine(_from, _to); })

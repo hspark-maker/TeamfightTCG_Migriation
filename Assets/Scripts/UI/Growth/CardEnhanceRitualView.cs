@@ -167,6 +167,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     Sequence m_seq;
     Action   m_onReveal;
+    Action   m_onSettled;
     Action   m_onFinished;
 
     // 결과를 무대에 남긴 채 복귀 신호(PlayReturn)를 기다리는 중. 이 동안에도 재진입은 막혀야 하므로 IsPlaying에 포함된다.
@@ -190,25 +191,30 @@ public class CardEnhanceRitualView : MonoBehaviour
     public bool IsPlaying => this.m_awaitingReturn || (this.m_seq != null && this.m_seq.IsActive());
 
     /// <summary>강화 결과를 한 번 보여준다. _outcome은 Success/Failed만 온다(나머지는 결제 전 차단이라 보여줄 것이 없다).
-    /// _onReveal은 카드가 빛에 완전히 덮인 시점 — 호출부가 여기서 값을 화면에 반영한다.
+    ///
+    /// _onReveal은 카드가 빛에 완전히 덮인 시점 — 호출부가 여기서 값을 화면에 반영한다(보이지 않는 갱신).
+    /// _onSettled는 카드 위 연출이 다 끝난 시점 — 호출부가 여기서 결과판을 띄운다. 둘을 나누는 이유는
+    /// 값 반영은 빛 아래에서 끝나야 하고, 읽을 것은 카드가 조용해진 뒤에 와야 서로를 잡아먹지 않기 때문이다.
     ///
     /// _awaitReturn이면 결과를 무대에 남긴 채 멈추고 <see cref="PlayReturn"/>을 기다린다(결과판이 걷힐 때까지).
     /// 아니면 지금까지처럼 스스로 걷고 _onFinished까지 이어간다 — 결과판 미배선이 소프트락이 되면 안 된다.
     /// _onFinished는 그 복귀가 끝난 시점 — 호출부가 여기서 조작을 되살린다.
     ///
-    /// 두 콜백은 스킵·중단·재진입 어느 경로로든 각각 정확히 한 번 온다.</summary>
-    public void Play(EEnhanceOutcome _outcome, bool _awaitReturn, Action _onReveal, Action _onFinished)
+    /// 세 콜백은 스킵·중단·재진입 어느 경로로든 각각 정확히 한 번, 이 순서로 온다.</summary>
+    public void Play(EEnhanceOutcome _outcome, bool _awaitReturn, Action _onReveal, Action _onSettled, Action _onFinished)
     {
         // 재진입은 호출부가 막지만 여기서도 닫는다 — 두 연출이 같은 노드를 두고 싸우면 카드가 굳는다.
         // 다만 콜백은 삼키지 않는다. 삼키면 호출부의 갱신 유예가 영영 풀리지 않아 버튼이 죽는다.
         if (IsPlaying)
         {
             _onReveal?.Invoke();
+            _onSettled?.Invoke();
             _onFinished?.Invoke();
             return;
         }
 
         this.m_onReveal   = _onReveal;
+        this.m_onSettled  = _onSettled;
         this.m_onFinished = _onFinished;
 
         if (this.cardStage == null)
@@ -217,6 +223,7 @@ public class CardEnhanceRitualView : MonoBehaviour
             // 결과판을 기다리는 경우엔 그 닫힘(PlayReturn)이 마무리를 이어받는다.
             this.m_awaitingReturn = _awaitReturn;
             FireReveal();
+            FireSettled();
             if (!_awaitReturn) FireFinished();
             return;
         }
@@ -250,17 +257,18 @@ public class CardEnhanceRitualView : MonoBehaviour
         if (t_success) BuildSuccess(t_seq, t_result, t_resultDur);
         else           BuildFail(t_seq, t_result);
 
-        if (_awaitReturn)
-            // 길이를 못 박는다 — 위 트윈이 전부 미배선이면 시퀀스가 결과에 닿기도 전에 끝나 버린다.
-            t_seq.InsertCallback(t_return, () => { });
-        else
-            BuildReturn(t_seq, t_return, t_backDur, t_end);
+        // 카드 위 연출이 다 끝난 자리. 결과판은 여기서부터다 — 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
+        // (이 콜백이 시퀀스 길이도 함께 못 박는다. 위 트윈이 전부 미배선이면 여기 닿기 전에 끝나 버린다.)
+        t_seq.InsertCallback(t_return, FireSettled);
+
+        if (!_awaitReturn) BuildReturn(t_seq, t_return, t_backDur, t_end);
 
         // 정상 종료든 스킵이든 중단이든 여기로 온다 — 콜백 유실과 굳은 화면을 동시에 막는 안전망이다.
         t_seq.OnKill(() =>
         {
             this.m_seq = null;
             FireReveal();
+            FireSettled();
 
             // 결과를 남기고 멈추는 경우엔 여기서 걷지 않는다. 중단이었다면 CancelImmediate가 곧바로 이 플래그를 지운다.
             if (_awaitReturn)
@@ -335,6 +343,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         // 결과를 남긴 채 기다리다 잘린 경우엔 아직 안 나간 콜백이 있다. 이미 나간 것은 null이라 무해하다.
         FireReveal();
+        FireSettled();
         FireFinished();
     }
 
@@ -644,6 +653,13 @@ public class CardEnhanceRitualView : MonoBehaviour
     {
         Action t_cb = this.m_onReveal;
         this.m_onReveal = null;
+        t_cb?.Invoke();
+    }
+
+    void FireSettled()
+    {
+        Action t_cb = this.m_onSettled;
+        this.m_onSettled = null;
         t_cb?.Invoke();
     }
 

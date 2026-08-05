@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -25,6 +26,8 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
     [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
+    [Tooltip("체력이 굴러 오르는 동안 물드는 색(RollHp). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
+    [SerializeField] Color      hpRollFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
@@ -75,6 +78,13 @@ public class CardVisualView : MonoBehaviour
     const float KeywordIconWidth  =        0.65f / IngameCardWidth;
     const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
+    // 굴러 오르는 중인 체력. 도는 동안에는 이쪽이 숫자의 주인이다 — RefreshHp가 최종값을 먼저 찍으면 굴릴 것이 사라진다.
+    Tween m_hpRoll;
+
+    // hpText의 authoring 색. 물든 중간값을 기준으로 잡으면 굴릴 때마다 색이 밀린다 → 1회만 캡처한다.
+    Color m_hpBaseColor;
+    bool  m_hpBaseCaptured;
+
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
     //
@@ -90,6 +100,9 @@ public class CardVisualView : MonoBehaviour
             return;
         }
         gameObject.SetActive(true);
+
+        // 다른 카드를 그리는 참이다 — 남은 굴리기가 이 카드 위에 옛 카드의 숫자를 마저 찍게 두지 않는다.
+        KillHpRoll();
 
         if (this.portrait != null)
         {
@@ -132,7 +145,87 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card == null) return;
 
+        // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
+        if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
+
         SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
+    }
+
+    /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
+    /// 표시 문장·최종값의 정본은 여전히 <see cref="SetHpDisplay"/>다 — 굴리는 동안의 중간 숫자만 여기서 만들고,
+    /// 끝나든 잘리든 그쪽으로 되돌려 못 박는다(반올림 중간값이 남지 않는다).
+    ///
+    /// 굴릴 것이 없으면(미소유·표시 꺼짐·오르지 않음) 즉시 반영하고 null을 돌려준다 — 강화 실패가 이 길로 온다.
+    /// _duration은 호출부가 정한다: 결과판의 체력 행과 같은 길이여야 두 숫자가 한 박에 움직인다.</summary>
+    public Tween RollHp(CardData _card, bool _owned, int _from, float _duration)
+    {
+        if (_card == null) return null;
+
+        KillHpRoll();
+
+        int t_to = DeckPower.MaxHpOf(_card);
+
+        if (this.hpText == null || !(_owned && this.showHp) || _duration <= 0f || t_to <= _from)
+        {
+            RefreshHp(_card, _owned);
+            return null;
+        }
+
+        // 패널·보너스는 먼저 최종 상태로 세운다 — 굴러야 하는 것은 숫자 하나뿐이다.
+        SetHpDisplay(_card, true, true);
+        CaptureHpColor();
+        this.hpText.text = _from.ToString();
+
+        float t_shown = _from;
+        float t_span  = t_to - _from;
+
+        this.m_hpRoll = DOTween.To(() => t_shown, _v =>
+                                   {
+                                       t_shown = _v;
+                                       if (this.hpText == null) return;
+
+                                       this.hpText.text = Mathf.RoundToInt(_v).ToString();
+
+                                       // 색은 굴리는 도중에 가장 짙고 끝에서 원래 색으로 돌아온다.
+                                       // 별도 트윈으로 두면 잘렸을 때 물든 채 굳으므로 같은 축에 얹는다.
+                                       float t_p = Mathf.Clamp01((_v - _from) / t_span);
+                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor,
+                                                                      Mathf.Sin(t_p * Mathf.PI));
+                                   },
+                                   (float)t_to, _duration)
+                               .SetEase(Ease.OutQuad)   // 결과판의 체력 행과 같은 곡선 — 두 숫자가 따로 놀지 않는다.
+                               .SetLink(this.hpText.gameObject)
+                               .OnComplete(() => UiPunch.Play(this.hpText.transform))
+                               .OnKill(() =>
+                               {
+                                   this.m_hpRoll = null;
+                                   RestoreHpColor();
+                                   RefreshHp(_card, _owned);
+                               });
+
+        return this.m_hpRoll;
+    }
+
+    void KillHpRoll()
+    {
+        Tween t_roll  = this.m_hpRoll;
+        this.m_hpRoll = null;
+        t_roll?.Kill();   // OnKill이 색과 숫자를 되돌린다.
+    }
+
+    void CaptureHpColor()
+    {
+        if (this.m_hpBaseCaptured || this.hpText == null) return;
+
+        this.m_hpBaseCaptured = true;
+        this.m_hpBaseColor    = this.hpText.color;
+    }
+
+    void RestoreHpColor()
+    {
+        if (!this.m_hpBaseCaptured || this.hpText == null) return;
+
+        this.hpText.color = this.m_hpBaseColor;
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.

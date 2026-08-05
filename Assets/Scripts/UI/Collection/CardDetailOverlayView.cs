@@ -508,11 +508,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 성장에 따라 움직이는 것만 다시 그린다. 강화는 연타하는 조작이라, 통지마다 Apply를 통째로 돌리면
     // 값이 그대로인 키워드·시너지 칩까지 매번 Destroy + Instantiate 된다.
-    void RefreshGrowth(CardData _card, bool _owned)
+    //
+    // _deferCardHp: 카드 그림의 체력만 손대지 않는다. 결과판이 그 숫자를 굴려 보여줄 참이라
+    // 여기서 최종값을 먼저 찍으면, 빛이 걷힌 카드에 새 숫자가 잠깐 비쳤다가 굴리기가 시작되며 옛 값으로 되돌아간다.
+    void RefreshGrowth(CardData _card, bool _owned, bool _deferCardHp = false)
     {
         // 카드 그림의 HP도 강화를 따라와야 한다. Bind가 아니라 RefreshHp인 이유는 그쪽 주석 참고
         // (Bind는 키워드 아이콘·시너지 배지까지 전부 다시 짓는다).
-        if (this.cardView != null) this.cardView.RefreshHp(_card, _owned);
+        if (this.cardView != null && !_deferCardHp) this.cardView.RefreshHp(_card, _owned);
 
         // CardData에 파워 필드가 없어 프리팹 목업의 "파워" 행을 체력으로 쓴다(라벨/아이콘은 프리팹 쪽 값).
         // 수치는 강화 반영값 — 환산의 정본은 DeckPower다(마스터 maxHp를 직접 읽지 않는다).
@@ -607,7 +610,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
                 // 카드가 빛에 완전히 덮인 프레임이다. 걷혀 있는 상세 패널의 값을 여기서 조용히 갈아두면
                 // 결과판을 닫고 돌아왔을 때 숫자가 튀지 않는다 — 보여주는 일은 결과판이 맡는다.
-                RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+                //
+                // 카드 위의 체력만 옛 값에 붙들어 둔다. 그 숫자는 결과판의 체력 행과 같은 박자로 굴러 오를 참이다.
+                RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card), _deferCardHp: this.resultPanel != null);
+            },
+            _onSettled: () =>
+            {
+                // 카드 위 연출이 다 끝난 뒤다. 여기서부터가 읽는 시간 — 결과판이 제 박자로 글자를 쌓는다.
+                if (CardAt(this.m_index) != t_card) return;
+
                 ShowResultPanel(t_card, t_result, t_fromLevel, t_fromHp);
             },
             _onFinished: () =>
@@ -656,6 +667,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               {
                                   this.m_retryQueued = true;
                                   this.ritual.PlayReturn();
+                              },
+                              // 결과판의 "체력 71 → 73"이 굴러 오르는 그 박자에 무대에 선 카드의 숫자도 함께 오른다 —
+                              // 따로 놀면 오른 것이 저 카드의 저 값이라는 연결이 끊긴다.
+                              _onHpRoll: _dur =>
+                              {
+                                  if (this.cardView == null) return;
+                                  this.cardView.RollHp(_card, OwnershipManager.IsOwned(_card), _fromHp, _dur);
                               });
     }
 
