@@ -22,6 +22,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const string NoneValue   = "없음";
     const string NoValue     = "-";
 
+    // 오른 레벨이 굴러가는 시간. 한 칸짜리라도 숫자가 바뀌는 순간이 눈에 걸려야 한다.
+    const float LevelRollDuration = 0.35f;
+
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
     [SerializeField] TMP_Text       powerValueText;  // 체력 수치(프리팹 목업의 "파워" 행을 체력으로 쓴다)
@@ -35,6 +38,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
+
+    [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
+    [SerializeField] CardEnhanceRitualView ritual;
 
     [Header("키워드 섹션")]
     [SerializeField] GameObject keywordSection;      // 칩이 0개면 통째로 숨긴다
@@ -85,6 +91,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     CanvasGroup m_slideGroup;
     float       m_slideBaseX;
     bool        m_slideBaseCaptured;
+
+    // 강화 연출 중에는 값 갱신을 미룬다 — TryEnhance가 판정·세이브·통지를 동기로 끝내므로,
+    // 그대로 두면 연출이 시작하기도 전에 Lv·HP가 새 값으로 튀어 공개할 것이 남지 않는다.
+    bool  m_ritualPlaying;
+    Tween m_levelRoll;
 
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
@@ -162,7 +173,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.cardView != null)
         {
             LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
-            if (t_tap != null) t_tap.OnTap = Hide;
+            if (t_tap != null) t_tap.OnTap = TapClose;
         }
     }
 
@@ -202,6 +213,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
         CancelSlide();
 
+        // 연출 중에 닫히면 카드가 확대·회색인 채 굳는다. 잘라내되 콜백은 흘러나오므로 유예도 함께 풀린다.
+        this.ritual?.CancelImmediate();
+        KillLevelRoll();
+
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
     }
@@ -232,6 +247,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 곧바로 Apply가 이어지므로 pending은 버린다(중간 카드에 칩을 한 번 더 짓지 않게).
         CancelSlide();
+        this.ritual?.CancelImmediate();
+        KillLevelRoll();
         this.transition.SetVisible(gameObject, true);
         Apply(CardAt(this.m_index));
         RefreshArrows();
@@ -259,6 +276,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_hit != null && this.tapCloseExclude != null
          && t_hit.transform.IsChildOf(this.tapCloseExclude)) return;
 
+        TapClose();
+    }
+
+    // 강화 연출 중의 탭은 닫기가 아니라 스킵이다 — 연타하는 조작이라 결과를 기다리게만 두면 지겹고,
+    // 그렇다고 닫아버리면 방금 쓴 골드의 결과를 못 보고 화면이 사라진다.
+    void TapClose()
+    {
+        // "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
+        // 그리고 OnKill 콜백 구간에서 어긋난다.
+        if (this.m_ritualPlaying)
+        {
+            this.ritual?.RequestSkip();
+            return;
+        }
+
         Hide();
     }
 
@@ -270,6 +302,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void Step(int _dir)
     {
         if (_dir == 0) return;
+
+        // 연출 중에 카드가 바뀌면 무대에 선 카드와 결과가 어긋난다.
+        if (this.m_ritualPlaying) return;
 
         int t_next = FindValid(this.m_index + _dir, _dir);
 
@@ -363,8 +398,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // interactable을 매번 다시 세우는 이유는 Hide()가 퇴장 중 입력을 죽여두기 때문이다(다시 열 때 여기서 되살아난다).
     void RefreshArrows()
     {
-        bool t_multi = HasMultipleCards();
-        
+        bool t_multi = HasMultipleCards() && !this.m_ritualPlaying;
 
         if (this.swipeDetector != null) this.swipeDetector.Interactable = t_multi;
     }
@@ -430,6 +464,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 칩 섹션까지 다시 짓지 않는 이유는 RefreshGrowth 주석 참고.
     void OnGrowthChanged()
     {
+        // 연출 중이면 흘려보낸다 — 결과는 공개 순간에 한 번에 반영된다(m_ritualPlaying 주석 참고).
+        if (this.m_ritualPlaying) return;
+
         CardData t_card = CardAt(this.m_index);
         if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
@@ -437,6 +474,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 재화 종류에 따라 버튼 활성만 바뀐다 — 어느 종류든 다시 판정하면 되므로 걸러내지 않는다.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
+        if (this.m_ritualPlaying) return;
+
         CardData t_card = CardAt(this.m_index);
         if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
@@ -480,10 +519,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 값이 없어도 행을 끄지 않는 이유는 ApplySection 주석과 같다 — 카드마다 패널 높이가 흔들린다.
     void ApplyGrowth(CardData _card, bool _owned)
     {
-        CardGrowth t_growth = CardGrowthManager.GrowthOf(_card);
+        if (this.levelValueText == null) return;
 
-        if (this.levelValueText != null)
-            this.levelValueText.text = _owned ? $"Lv {t_growth.Level} / {CardGrowthManager.MaxLevel}" : LockedValue;
+        // 굴리는 중이면 손대지 않는다 — 공개 직후의 갱신이 최종값을 먼저 찍어 카운트업을 지운다.
+        if (this.m_levelRoll != null && this.m_levelRoll.IsActive()) return;
+
+        if (_owned) SetLevelText(CardGrowthManager.GrowthOf(_card).Level);
+        else        this.levelValueText.text = LockedValue;
     }
 
     // 강화 버튼과 비용·성공률·안내 문구. 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
@@ -497,7 +539,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.enhanceButton != null)
         {
             this.enhanceButton.gameObject.SetActive(_owned);
-            this.enhanceButton.interactable = t_hasStep && t_canPayEnhance;
+            // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
+            this.enhanceButton.interactable = t_canPayEnhance && !this.m_ritualPlaying;
         }
         if (this.enhanceCostText != null) this.enhanceCostText.text = t_hasStep ? t_step.Cost.ToString("N0") : NoValue;
         if (this.successRateText != null)
@@ -512,8 +555,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnEnhancePressed()
     {
+        if (this.m_ritualPlaying) return;
+
         CardData t_card = CardAt(this.m_index);
         if (t_card == null) return;
+
+        // 시도 **전에** 잡아둔다 — 결과에는 오른 폭(HpGain)도 이전 레벨도 없다.
+        int  t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
+        bool t_hasStep   = CardGrowthManager.TryGetNextStep(t_card, out GrowthStep t_step);
+
+        // 유예를 먼저 세운다 — TryEnhance가 그 안에서 OnGrowthChanged를 동기로 발화한다.
+        this.m_ritualPlaying = true;
 
         EnhanceResult t_result = CardGrowthManager.TryEnhance(t_card);
 
@@ -521,8 +573,75 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_result.Outcome == EEnhanceOutcome.NotReady)
             Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
 
-        // 성공·실패는 OnGrowthChanged가 이미 갱신했지만 잔액부족은 통지가 없다 → 여기서 한 번 더(멱등).
+        bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
+
+        // 결제 전에 막힌 경우(잔액 부족·최고 레벨·미초기화)엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
+        if (!t_played || this.ritual == null)
+        {
+            this.m_ritualPlaying = false;
+            RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));   // 잔액부족은 통지가 없다 → 여기서 한 번(멱등)
+            return;
+        }
+
+        bool t_success = t_result.Outcome == EEnhanceOutcome.Success;
+        int  t_hpGain  = t_success && t_hasStep ? t_step.HpGain : 0;
+
+        // 연출 동안 스와이프를 죽이고 버튼을 눌린 모양에서 풀어둔다 — 값은 그대로 유예된 채다(RefreshGrowth는 표시만 다시 그린다).
         RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+        RefreshArrows();
+
+        this.ritual.Play(
+            t_result.Outcome, t_hpGain,
+            _onReveal: () =>
+            {
+                // 카드가 이미 바뀐 뒤 잘려 들어온 콜백이면 옛 값을 찍지 않는다(Show/Step의 CancelImmediate 경로).
+                if (CardAt(this.m_index) != t_card) return;
+
+                // 굴리기가 먼저다 — 뒤이은 RefreshGrowth가 최종값을 먼저 찍으면 카운트업이 사라진다(ApplyGrowth 주석 참고).
+                AnimateLevel(t_fromLevel, t_result.Level);
+                RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+                if (t_success && this.powerValueText != null) UiPunch.Play(this.powerValueText.transform);
+            },
+            _onFinished: () =>
+            {
+                this.m_ritualPlaying = false;
+
+                // 지금 보이는 카드로 다시 그린다 — 중간에 카드가 바뀌었어도 화면과 값이 어긋나지 않게.
+                CardData t_now = CardAt(this.m_index);
+                if (t_now != null) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
+                RefreshArrows();
+            });
+    }
+
+    // 오른 레벨을 굴려 보여준다. 최종 문장은 ApplyGrowth와 같으므로 표시 규칙의 진실원이 갈리지 않는다.
+    void AnimateLevel(int _from, int _to)
+    {
+        KillLevelRoll();
+        if (this.levelValueText == null || _to <= _from) return;
+
+        SetLevelText(_from);   // 트윈의 첫 갱신을 기다리지 않는다 — 한 프레임이라도 최종값이 비치면 굴릴 것이 없다.
+
+        float t_shown = _from;
+        this.m_levelRoll = DOTween.To(() => t_shown,
+                                      _v => { t_shown = _v; SetLevelText(Mathf.RoundToInt(_v)); },
+                                      (float)_to, LevelRollDuration)
+                                  .SetEase(Ease.OutQuad)
+                                  .SetLink(this.levelValueText.gameObject)
+                                  // 굴리다 끊기면 중간값이 남는다 — 마지막 한 번을 못 박는다.
+                                  .OnKill(() => SetLevelText(_to));
+
+        this.m_levelRoll.OnComplete(() => UiPunch.Play(this.levelValueText.transform));
+    }
+
+    void KillLevelRoll()
+    {
+        this.m_levelRoll?.Kill();
+        this.m_levelRoll = null;
+    }
+
+    void SetLevelText(int _level)
+    {
+        if (this.levelValueText != null) this.levelValueText.text = $"Lv {_level} / {CardGrowthManager.MaxLevel}";
     }
 
     void BuildKeywordSection(CardData _card, bool _owned)

@@ -117,20 +117,7 @@ public class DeckEditController : MonoBehaviour
     }
 
     // backButton이 없는 화면(매치 편집 패널)의 종료 창구.
-    // 저장 판정·미완성 팝업·종료 순서를 OnBackClicked 한 곳에만 두기 위해 그쪽으로 넘긴다.
-    public void RequestExit()
-    {
-        // 편집이 열려 있지 않으면 저장할 것도 확인받을 것도 없다 —
-        // 가드가 없으면 빈 m_working이 "미완성"으로 읽혀 엉뚱한 확인 팝업이 뜬다.
-        if (!IsOpen)
-        {
-            ExitEditor();
-
-            return;
-        }
-
-        OnBackClicked();
-    }
+    public void RequestExit() => RequestLeave(ExitEditor);
 
     // 편집 화면에 머문 채 다른 저장 슬롯으로 갈아탄다(매치 화면의 가로 덱 리스트).
     // 6/6이면 조용히 저장하고 미완성이면 이번 편집분을 버린다 — 확인 팝업 없음(매치 화면 정책).
@@ -142,14 +129,14 @@ public class DeckEditController : MonoBehaviour
         // 같은 덱 재클릭까지 재로드하면 아직 6/6이 아닌 편집분이 조용히 증발한다.
         if (m_mode == EDeckEditMode.Edit && _slotIndex == m_slotIndex) return false;
 
-        // 드래그 도중 리스트가 눌릴 수 있다(고스트가 상단을 덮지 않는 배치) — OnBackClicked과 같은 선처리.
+        // 드래그 도중 리스트가 눌릴 수 있다(고스트가 상단을 덮지 않는 배치) — RequestLeave와 같은 선처리.
         if (dragController != null && dragController.IsDragging) dragController.Cancel();
 
         // 신규 저장은 TryInsertFront가 맨 앞에 꽂아 기존 슬롯을 전부 한 칸 뒤로 민다 →
         // 저장 전 좌표로 열면 유저가 고른 덱이 아니라 이웃 덱이 열린다. 저장 여부를 미리 확정해 좌표를 보정한다.
         bool t_inserting = m_mode == EDeckEditMode.Create && CountFilled() == DeckSaveManager.DECK_SIZE;
 
-        // 저장에 실패했는데 전환하면 편성한 6장이 조용히 증발한다(OnBackClicked이 화면을 유지하는 것과 같은 이유).
+        // 저장에 실패했는데 전환하면 편성한 6장이 조용히 증발한다(RequestLeave가 화면을 유지하는 것과 같은 이유).
         if (!SaveIfComplete()) return false;
 
         int t_target = t_inserting ? _slotIndex + 1 : _slotIndex;
@@ -453,9 +440,25 @@ public class DeckEditController : MonoBehaviour
         return false;
     }
 
-    void OnBackClicked()
+    void OnBackClicked() => RequestLeave(ExitEditor);
+
+    // 편집 화면을 떠나도 되는지 판정하는 단일 창구. 뒤로가기든 탭 버튼이든 전부 여기로 모은다 —
+    // 경로마다 판정이 갈리면 "어떤 버튼으로 나갔는지"에 따라 편성분이 사라지고 말고가 달라진다.
+    //
+    // 나가도 되는 순간에 _onGranted를 부른다(즉시 또는 확인 팝업의 "나가기" 이후).
+    // 나가면 안 되면 아무것도 부르지 않는다 — 호출측은 자기 전환을 그대로 포기하면 된다.
+    public void RequestLeave(Action _onGranted)
     {
-        // 드래그 도중 뒤로가기가 눌릴 수 있다(고스트가 버튼을 덮지 않는 배치). 고스트를 먼저 정리한다.
+        // 편집이 열려 있지 않으면 저장할 것도 확인받을 것도 없다 —
+        // 가드가 없으면 빈 m_working이 "미완성"으로 읽혀 엉뚱한 확인 팝업이 뜬다.
+        if (!IsOpen)
+        {
+            _onGranted?.Invoke();
+
+            return;
+        }
+
+        // 드래그 도중 눌릴 수 있다(고스트가 버튼·탭바를 덮지 않는 배치). 고스트를 먼저 정리한다.
         if (dragController != null && dragController.IsDragging) dragController.Cancel();
 
         if (CountFilled() == DeckSaveManager.DECK_SIZE)
@@ -463,7 +466,8 @@ public class DeckEditController : MonoBehaviour
             // 삽입에 실패한 채 나가면 유저가 편성한 6장이 조용히 증발한다 → 화면을 유지해 재시도 여지를 남긴다.
             if (!SaveIfComplete()) return;
 
-            ExitEditor();
+            _onGranted?.Invoke();
+
             return;
         }
 
@@ -473,7 +477,7 @@ public class DeckEditController : MonoBehaviour
         {
             titleText = "덱이 완성되지 않았습니다.\n변경사항을 버리고 나갈까요?",
             yesText   = "나가기",
-            yesAction = ExitEditor,
+            yesAction = () => _onGranted?.Invoke(),
             noText    = "계속 편집",
             noAction  = null,
         });
@@ -482,7 +486,7 @@ public class DeckEditController : MonoBehaviour
         if (t_popup == null)
         {
             Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 편집을 닫는다.");
-            ExitEditor();
+            _onGranted?.Invoke();
         }
     }
 
