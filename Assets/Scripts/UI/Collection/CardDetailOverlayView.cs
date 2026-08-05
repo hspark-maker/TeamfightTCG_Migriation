@@ -22,8 +22,6 @@ public class CardDetailOverlayView : MonoBehaviour
     const string LockedValue = "?";
     /// <summary>보유 카드인데 해당 섹션에 내용이 없을 때. 섹션을 숨기지 않는 이유는 ApplySection 주석 참고.</summary>
     const string NoneValue   = "없음";
-    /// <summary>진화 단계 0(아직 진화하지 않음)의 표시.</summary>
-    const string NoEvolution = "미진화";
     /// <summary>보여줄 수치가 없을 때(만렙 등)의 자리. 빈 문자열을 넣으면 라벨만 떠 있어 배선 실수처럼 보인다.</summary>
     const string NoValue     = "-";
 
@@ -37,20 +35,15 @@ public class CardDetailOverlayView : MonoBehaviour
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
     [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
-    [SerializeField] TMP_Text evolutionValueText;  // 진화 단계 "2단계"(미진화면 NoEvolution)
 
-    [Header("강화·진화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
+    [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     // 조작 묶음(BottomBar)을 통째로 끄는 필드는 두지 않는다 — 루트 VerticalLayoutGroup에서 남는 높이를
     // CardArea(flexibleHeight=1)가 받아 카드 그림 크기가 소유 여부에 따라 달라진다(ApplySection과 같은 함정).
     // 대신 버튼만 숨긴다: 바는 높이를 지킨 채 비어 있게 된다.
     [SerializeField] Button     enhanceButton;
     [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
-    [Tooltip("진화 UI 묶음. 게이트에 걸렸을 때만 켠다.")]
-    [SerializeField] GameObject evolveRoot;
-    [SerializeField] Button     evolveButton;
-    [SerializeField] TMP_Text   evolveCostText;     // 진화 비용(다이아)
-    [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(진화 필요·최고 레벨·잔액 부족).")]
+    [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
 
     [Header("강화 결과 피드백")]
@@ -215,11 +208,6 @@ public class CardDetailOverlayView : MonoBehaviour
             this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
             this.enhanceButton.onClick.AddListener(OnEnhancePressed);
         }
-        if (this.evolveButton != null)
-        {
-            this.evolveButton.onClick.RemoveListener(OnEvolvePressed);
-            this.evolveButton.onClick.AddListener(OnEvolvePressed);
-        }
 
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
@@ -240,7 +228,6 @@ public class CardDetailOverlayView : MonoBehaviour
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
-        if (this.evolveButton  != null) this.evolveButton.onClick.RemoveListener(OnEvolvePressed);
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
@@ -533,7 +520,7 @@ public class CardDetailOverlayView : MonoBehaviour
         RefreshGrowthActions(_card, _owned);
     }
 
-    // 강화 레벨·진화 단계. 미배선 필드는 조용히 건너뛴다(이전/다음 화살표와 같은 옵션 배선 규약).
+    // 강화 레벨. 미배선 필드는 조용히 건너뛴다(이전/다음 화살표와 같은 옵션 배선 규약).
     // 값이 없어도 행을 끄지 않는 이유는 ApplySection 주석과 같다 — 카드마다 패널 높이가 흔들린다.
     void ApplyGrowth(CardData _card, bool _owned)
     {
@@ -541,46 +528,30 @@ public class CardDetailOverlayView : MonoBehaviour
 
         if (this.levelValueText != null)
             this.levelValueText.text = _owned ? $"Lv {t_growth.Level} / {CardGrowthManager.MaxLevel}" : LockedValue;
-
-        if (this.evolutionValueText != null)
-            this.evolutionValueText.text = !_owned                     ? LockedValue
-                                         : t_growth.EvolutionStage > 0 ? $"{t_growth.EvolutionStage}단계"
-                                                                       : NoEvolution;
     }
 
-    // 강화·진화 버튼과 비용·성공률·안내 문구. 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
+    // 강화 버튼과 비용·성공률·안내 문구. 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
     void RefreshGrowthActions(CardData _card, bool _owned)
     {
-        // 두 조회의 역할이 다르다: TryGetNextStep은 게이트를 모르는 비용 미리보기, TryGetPendingGate가 진짜 차단 판정이다.
-        GrowthStep    t_step = default;
-        EvolutionGate t_gate = default;
+        GrowthStep t_step = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
-        bool t_gated   = _owned && CardGrowthManager.TryGetPendingGate(_card, out t_gate);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost);
         if (this.enhanceButton != null)
         {
             this.enhanceButton.gameObject.SetActive(_owned);
-            this.enhanceButton.interactable = t_hasStep && !t_gated && t_canPayEnhance;
+            this.enhanceButton.interactable = t_hasStep && t_canPayEnhance;
         }
         if (this.enhanceCostText != null) this.enhanceCostText.text = t_hasStep ? t_step.Cost.ToString("N0") : NoValue;
         if (this.successRateText != null)
             this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
 
-        bool t_canPayEvolve = t_gated && CurrencyManager.CanAfford(t_gate.costType, t_gate.cost);
-        if (this.evolveRoot     != null) this.evolveRoot.SetActive(_owned && t_gated);
-        if (this.evolveButton   != null) this.evolveButton.interactable = t_canPayEvolve;
-        if (this.evolveCostText != null) this.evolveCostText.text = t_gated ? t_gate.cost.ToString("N0") : NoValue;
-
-        // 만렙 게이트는 "다음 강화"가 없다 — 열어줄 강화가 없으니 최종 진화로 안내한다.
         if (this.growthNoticeText != null)
-            this.growthNoticeText.text = !_owned                ? string.Empty
-                                       : t_gated && !t_hasStep  ? $"최고 레벨 — {CurrencyName(t_gate.costType)}로 최종 진화할 수 있다"
-                                       : t_gated                ? $"{t_gate.atLevel}레벨 — {CurrencyName(t_gate.costType)}로 진화해야 다음 강화가 열린다"
-                                       : !t_hasStep             ? "최고 레벨에 도달했다"
-                                       : !t_canPayEnhance       ? "골드가 부족하다"
-                                                                : string.Empty;
+            this.growthNoticeText.text = !_owned          ? string.Empty
+                                       : !t_hasStep       ? "최고 레벨에 도달했다"
+                                       : !t_canPayEnhance ? "골드가 부족하다"
+                                                          : string.Empty;
     }
 
     void OnEnhancePressed()
@@ -592,53 +563,8 @@ public class CardDetailOverlayView : MonoBehaviour
 
         ShowEnhanceResult(t_result);
 
-        // 성공·실패는 OnGrowthChanged가 이미 갱신했지만 차단·잔액부족은 통지가 없다 → 여기서 한 번 더(멱등).
+        // 성공·실패는 OnGrowthChanged가 이미 갱신했지만 잔액부족은 통지가 없다 → 여기서 한 번 더(멱등).
         RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
-    }
-
-    void OnEvolvePressed()
-    {
-        CardData t_card = CardAt(this.m_index);
-        if (t_card == null) return;
-        if (!CardGrowthManager.TryGetPendingGate(t_card, out EvolutionGate t_gate)) return;
-
-        // 확인 팝업이 없는 환경(테스트 씬)에서도 루프가 닫히도록 즉시 진화로 폴백한다.
-        // 팝업이 떠 있는 동안 카드를 넘길 수 있으므로 지금 카드를 잡아 클로저에 넘긴다.
-        if (UIPoolManager.instance == null)
-        {
-            Evolve(t_card);
-            return;
-        }
-
-        UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
-        {
-            titleText = $"{CurrencyName(t_gate.costType)} {t_gate.cost:N0}을(를) 사용해 진화하시겠습니까?",
-            yesText   = "진화",
-            yesAction = () => Evolve(t_card),
-            noText    = "취소",
-        });
-    }
-
-    // 진화는 실패 확률이 없다 — false는 잔액 부족이거나 그사이 게이트가 사라진 경우뿐이다.
-    void Evolve(CardData _card)
-    {
-        // 미초기화도 false로 오지만 원인이 잔액이 아니다 → 잔액 문구로 뭉뚱그리지 않고 갈라낸다(재화는 소모되지 않았다).
-        if (!CardGrowthManager.IsReady)
-        {
-            ShowResult("잠시 후 다시 시도하세요", false);
-            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
-            return;
-        }
-
-        if (!CardGrowthManager.TryEvolve(_card))
-        {
-            ShowResult("다이아가 부족하다", false);
-            RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
-            return;
-        }
-
-        ShowResult($"진화 성공!  {CardGrowthManager.GrowthOf(_card).EvolutionStage}단계", true);
-        RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
     }
 
     // 실패가 이 시스템의 엔진이라 결과가 한눈에 갈려야 한다 — 문구·색·펀치 세기·효과음을 함께 바꾼다.
@@ -657,10 +583,6 @@ public class CardDetailOverlayView : MonoBehaviour
 
             case EEnhanceOutcome.NotAffordable:
                 ShowResult("골드가 부족하다", false);
-                break;
-
-            case EEnhanceOutcome.BlockedByEvolution:
-                ShowResult("먼저 진화해야 한다", false);
                 break;
 
             case EEnhanceOutcome.MaxLevel:
@@ -718,11 +640,6 @@ public class CardDetailOverlayView : MonoBehaviour
         return this.cardView != null ? this.cardView.transform : null;
     }
 
-    // 안내 문구용 재화 이름. 표시 문자열이라 ECurrencyType에 얹지 않고 화면 쪽에 둔다(다른 진실원 없음).
-    static string CurrencyName(ECurrencyType _type)
-    {
-        return _type == ECurrencyType.Diamond ? "다이아" : "골드";
-    }
 
     void BuildKeywordSection(CardData _card, bool _owned)
     {

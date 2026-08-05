@@ -1,4 +1,4 @@
-/// <summary>카드 한 장의 영구 성장 상태(강화 레벨 · 진화 단계). 세이브가 진실원이고 전투는 읽기만 한다.
+/// <summary>카드 한 장의 영구 성장 상태(강화 레벨). 세이브가 진실원이고 전투는 읽기만 한다.
 ///
 /// 값 하나로 묶은 이유는 확장 축이다 — 성장 축이 늘어도(등급·각성 등) 이 struct에 필드만 더하면
 /// <see cref="CardInstance"/> 생성자와 <see cref="BattleField"/> 공급 경로의 시그니처는 그대로다.
@@ -14,13 +14,9 @@ public readonly struct CardGrowth
     /// 곡선(CardGrowthConfig)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
     public readonly int HpBonus;
 
-    /// <summary>진화 단계. 0 = 미진화. 연출 자격(CardCinematicRules)과 진화 아트 선택의 입력.</summary>
-    public readonly int EvolutionStage;
-
-    public CardGrowth(int _level, int _hpBonus, int _evolutionStage)
+    public CardGrowth(int _level, int _hpBonus)
     {
-        this.Level          = _level;
-        this.HpBonus        = _hpBonus;
-        this.EvolutionStage = _evolutionStage;
+        this.Level   = _level;
+        this.HpBonus = _hpBonus;
     }
 }

@@ -1,8 +1,11 @@
 using UnityEngine;
 using TMPro;
 
-// 도감 테마 슬롯 한 칸(슬롯 프리팹 루트에 부착). 카드 그림은 CardVisualView에 위임하고 "빈 자리 + 번호"만 얹는다.
+// 도감 슬롯 한 칸(슬롯 프리팹 루트에 부착). 카드 그림은 CardVisualView에 위임하고 "빈 자리 + 번호"만 얹는다.
 // 감싸는 이유: 슬롯 번호는 이 화면 전용 문맥이라 CardVisualView.Bind에 넣으면 8개 소비자의 공용 API가 오염된다.
+//
+// 테마 행(CollectionThemeRowView)과 평면 그리드(CollectionGridController)가 같은 슬롯 프리팹을 공유한다 —
+// 빈 칸의 생김새와 "미소유면 번호만" 규칙이 도감 안에서 갈라지지 않게 하려는 것이다.
 public class CollectionThemeSlotView : MonoBehaviour
 {
     [SerializeField] CardVisualView cardView;    // 중첩 CardUIView 인스턴스
