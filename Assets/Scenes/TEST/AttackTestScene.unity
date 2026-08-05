@@ -574,8 +574,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
   - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
   useSpecialCinema: 0
-  usePeerless: 1
-  useExecution: 1
+  usePeerless: 0
+  useExecution: 0
+  killWeakerSide: 1
+  hitVfxOnCounter: 0
   attackVfx:
     folder: Assets/PurchasedAssets
     filter: 
@@ -597,27 +599,28 @@ MonoBehaviour:
     lifetime: 1.5
     sortingOrder: 100
     spawnDelay: 0
-  hitVfxOnCounter: 1
-  killWeakerSide: 1
   timingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
-  autoReloadConfig: 1
-  swarmDamagePerShot: 1
-  caretakerHeal: 1
-  swarmVfx: {fileID: 0}
-  flowVfx: {fileID: 0}
-  emblemSynergies:
-  - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
-  emblemIndex: 0
+  synergyIndex: 0
+  synergyPreview: 0
   emblemSlot: 0
   emblemTiming: 1
-  windDur: 0.2
-  windDist: 0.4
-  inDur: 0.1
-  recoilDur: 0.2
-  recoilDist: 1
-  outDur: 0.3
-  lungeT: 0.62
-  maxLean: 40
+  emblemAutoReplay: 0
+  emblemReplayGap: 0.35
+  flowStack: 3
+  swarmDamagePerShot: 1
+  caretakerHeal: 1
+  emblemSynergies:
+  - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
+  - {fileID: 11400000, guid: dee4791a461125448898b01d9b781ae5, type: 2}
+  - {fileID: 11400000, guid: fcb84e498c66194468fe9a236338aa3e, type: 2}
+  - {fileID: 11400000, guid: f7ab12f62bfb6934581309d59e27d0aa, type: 2}
+  - {fileID: 11400000, guid: eb2ed99578dee8343bcb851b4578ddae, type: 2}
+  - {fileID: 11400000, guid: a59a9ebdd6705f84fac97090c1cc310e, type: 2}
+  - {fileID: 11400000, guid: 9bff0080901fae44eb15d5dfea14a160, type: 2}
+  - {fileID: 11400000, guid: 7e6c20c2bb8b5ad4c8b36ec6373665fa, type: 2}
+  - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
+  swarmVfx: {fileID: 0}
+  flowVfx: {fileID: 0}
 --- !u!4 &182972993
 Transform:
   m_ObjectHideFlags: 0
@@ -1623,6 +1626,7 @@ MonoBehaviour:
   ring: {fileID: 0}
   ringTrack: {fileID: 0}
   ringGlow: {fileID: 0}
+  ringBg: {fileID: 0}
   normalColor: {r: 0.45, g: 0.85, b: 1, a: 1}
   warnColor: {r: 1, g: 0.78, b: 0.25, a: 1}
   dangerColor: {r: 1, g: 0.28, b: 0.28, a: 1}
@@ -2584,7 +2588,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -12.384163}
+  m_LocalPosition: {x: 0, y: 0, z: -11.749078}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2603,6 +2607,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cinemaZMoveRatio: 0.18
+  longPressPullBackZ: 0.35
+  longPressLiftDuration: 0.32
 --- !u!114 &963194230
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2664,8 +2670,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.462  \uAC70\uB9AC 12.38  \uBC30\uC728 1.13\n\uAC00\uC2DC \xB13.30
-    x \xB17.15  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.486  \uAC70\uB9AC 11.75  \uBC30\uC728 1.07\n\uAC00\uC2DC \xB13.30
+    x \xB16.78  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!1 &982015555
 GameObject:

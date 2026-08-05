@@ -18,7 +18,12 @@ public static class CunningVfx
 {
     const float EXIT_SCALE = 0.4f;   // 빨려 들어가며 줄어드는 배율
 
-    public static async UniTask PlayExit(CardView _view)
+    /// <summary>필드의 카드가 덱으로 물러나는 그림. 교활 교대 말고 <b>멀리건 교체</b>도 같은 연출을 쓴다 —
+    /// "필드 카드가 덱으로 돌아간다"는 사건은 하나뿐이라 그림도 하나여야 한다.
+    ///
+    /// <paramref name="_withFog"/>는 교활 표식인 안개를 띄울지다. 멀리건은 끄고 부른다 —
+    /// 안개가 같이 뜨면 교활이 발동한 것으로 읽힌다.</summary>
+    public static async UniTask PlayExit(CardView _view, bool _withFog = true)
     {
         if (_view == null) return;
 
@@ -27,9 +32,9 @@ public static class CunningVfx
         Quaternion t_rot0  = t_tr.localRotation;
         Vector3    t_scale = t_tr.localScale;
 
-        BattleVfx.Play(BattleVfxId.CunningFog, t_tr.position, _view.VfxSortingLayerId);
+        if (_withFog) BattleVfx.Play(BattleVfxId.CunningFog, t_tr.position, _view.VfxSortingLayerId);
 
-        float t_lead = GameTiming.Battle.CunningFogLead;
+        float t_lead = _withFog ? GameTiming.Battle.CunningFogLead : 0f;   // 안개가 없으면 기다릴 이유도 없다
         if (t_lead > 0f) await UniTask.Delay((int)(t_lead * 1000));
         if (_view == null) return;
 

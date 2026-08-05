@@ -35,7 +35,9 @@ public class HealerEffect
             var t_healed = new List<(CardView view, int amount)>();
             foreach (var t_c in this.field.GetActiveCards())
             {
-                if (t_c.data.HasKeyword(CardKeyword.Healer)) continue;   // 힐러는 회복 대상 아님(종전 규칙 유지)
+                // 제외는 **자기 자신뿐**이다. 예전엔 힐러 전체를 대상에서 뺐는데, 그러면 힐러를 둘 깔았을 때
+                // 서로를 못 치유해 힐러만 회복 없이 말라 죽었다("아군 1 회복"이라는 키워드 설명과도 어긋난다).
+                if (t_c == t_healer) continue;
                 int t_amount = t_c.Heal(1, _showEffect: false);   // 표기는 HealVfx가 도착 시점에 재생
                 if (t_amount <= 0) continue;                      // 이미 만피 = 연출 대상 아님
                 t_healed.Add((CardView.GetView(t_c), t_amount));
