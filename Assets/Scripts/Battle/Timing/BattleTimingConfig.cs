@@ -114,7 +114,8 @@ public class BattleTimingConfig : ScriptableObject
     public float DealAnimDuration   => dealAnimDuration   * SpeedFactor;
     public float DealMidPause       => dealMidPause       * SpeedFactor;
     public float DeathPreviewFlash  => deathPreviewFlash  * SpeedFactor;
-    public float LongPress          => longPress          * SpeedFactor;
+    // 사용자 입력 임계시간은 전투 연출 배속과 무관해야 한다.
+    public float LongPress          => longPress;
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;

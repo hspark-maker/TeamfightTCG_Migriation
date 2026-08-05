@@ -33,7 +33,7 @@ public class CoinFlipUI : MonoBehaviour
     [SerializeField] string   backText  = "후공";   // 뒷면
 
     [Header("배경 / 글로우")]
-    [SerializeField] Image backgroundImage;                                   // 비우면 런타임 생성(전체화면 딤)
+    [SerializeField] Image backgroundImage;                                   // ScreenDim이 없는 테스트 씬 fallback
     [SerializeField] Color backgroundColor  = new Color(0f, 0f, 0f, 0.78f);
     [SerializeField] float backgroundFade   = 0.25f;
     [SerializeField] Image glowImage;                                         // 비우면 런타임 생성(방사형 글로우)
@@ -62,7 +62,6 @@ public class CoinFlipUI : MonoBehaviour
         if (this.target == null) this.target = this.transform;
         this.baseScale = this.target.localScale;
         this.cached = true;
-        if (this.backgroundImage == null) this.backgroundImage = BuildBackdrop("CoinFlipBackground", 4000f, null);
         if (this.glowImage       == null) this.glowImage       = BuildBackdrop("CoinFlipGlow", this.glowSize, RadialSprite());
         HideBackdrop();
     }
@@ -284,13 +283,21 @@ public class CoinFlipUI : MonoBehaviour
 
     void ShowBackground()
     {
-        if (this.backgroundImage != null)
+        if (ScreenDim.IsAvailable) ScreenDim.Show(this, this.backgroundColor.a, true, this.backgroundFade);
+        else
         {
-            var t_go = this.backgroundImage.gameObject;
-            t_go.SetActive(true);
+            if (this.backgroundImage == null)
+            {
+                this.backgroundImage = BuildBackdrop("CoinFlipBackground", 4000f, null);
+                if (this.glowImage != null)
+                    this.backgroundImage.transform.SetSiblingIndex(this.glowImage.transform.GetSiblingIndex());
+            }
+            var t_backgroundGo = this.backgroundImage.gameObject;
+            t_backgroundGo.SetActive(true);
+            this.backgroundImage.raycastTarget = true;
             this.backgroundImage.DOKill();
             this.backgroundImage.color = new Color(this.backgroundColor.r, this.backgroundColor.g, this.backgroundColor.b, 0f);
-            this.backgroundImage.DOFade(this.backgroundColor.a, this.backgroundFade).SetLink(t_go);
+            this.backgroundImage.DOFade(this.backgroundColor.a, this.backgroundFade).SetLink(t_backgroundGo);
         }
         if (this.glowImage != null)
         {
@@ -320,6 +327,7 @@ public class CoinFlipUI : MonoBehaviour
     void HideBackdrop()
     {
         HideShine();
+        ScreenDim.Hide(this);
         if (this.backgroundImage != null)
         {
             this.backgroundImage.DOKill();

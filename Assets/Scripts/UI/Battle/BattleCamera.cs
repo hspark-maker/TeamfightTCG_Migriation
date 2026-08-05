@@ -25,6 +25,8 @@ public class BattleCamera : MonoBehaviour
     BattleCameraFit fit;
     float fallbackBaseZ;
     bool  liftActive;
+    bool  liftOwnsExternalControl;
+    Tween liftTween;
 
     /// <summary>시네마 연출 중인가. BattleCameraFit이 이 동안 카메라 z를 덮지 않게 하는 기준.</summary>
     public bool InCinema { get; private set; }
@@ -47,6 +49,7 @@ public class BattleCamera : MonoBehaviour
 
     void OnDestroy()
     {
+        ReleaseLiftExternalControl();
         if (Instance == this) Instance = null;
     }
 
@@ -58,24 +61,69 @@ public class BattleCamera : MonoBehaviour
     void ApplyLongPressLift(bool _on)
     {
         if (this.cam == null || this.liftActive == _on) return;
-        this.liftActive = _on;
 
-        // BaseZ는 음수(카드 평면 앞쪽)다 — 더 빼야 뒤로 물러난다.
-        float t_targetZ = BaseZ - (_on ? this.longPressPullBackZ : 0f);
+        if (_on)
+        {
+            // 시네마가 z를 몰고 있을 때는 상태와 외부 제어권도 잡지 않는다.
+            if (InCinema) return;
 
-        // 시네마가 z를 몰고 있는 중엔 아무것도 하지 않는다 — 트윈을 걸면 DOKill이 서로를 죽여 카메라가 튄다.
-        // (롱프레스와 시네마가 겹치는 건 예외 상황이고, 시네마가 끝나면 기준 z로 복귀한다.)
-        if (InCinema) return;
+            // 진행 중인 복귀가 있다면 그쪽 OnKill이 제어권을 먼저 반환한 뒤 새로 획득한다.
+            transform.DOKill();
+            this.liftTween = null;
+            this.liftActive = true;
+            AcquireLiftExternalControl();
 
-        // fit이 매 프레임 기준 z로 되돌리지 않게 잠근다. 해제는 곧바로 — 복귀 트윈이 도는 동안 fit이
-        // z를 덮어도 목적지가 같은 값이라 어긋나지 않는다.
-        if (_on) BattleCameraFit.BeginExternalControl();
-        else     BattleCameraFit.EndExternalControl();
+            this.liftTween = transform.DOMoveZ(BaseZ - this.longPressPullBackZ,
+                                                Mathf.Max(0.01f, this.longPressLiftDuration))
+                .SetEase(Ease.InOutSine)
+                .SetLink(gameObject);
+            return;
+        }
+
+        bool t_snapBack = this.liftTween != null
+                       && this.liftTween.IsActive()
+                       && !this.liftTween.IsComplete();
+        this.liftActive = false;
+
+        // 시네마 트윈은 건드리지 않고, 실제로 획득했던 제어권만 정확히 반환한다.
+        if (InCinema)
+        {
+            this.liftTween = null;
+            ReleaseLiftExternalControl();
+            return;
+        }
 
         transform.DOKill();
-        transform.DOMoveZ(t_targetZ, Mathf.Max(0.01f, this.longPressLiftDuration))
-            .SetEase(Ease.InOutSine)   // 들어올 때·돌아갈 때 모두 부드럽게(가감속 대칭)
-            .SetLink(gameObject);
+        this.liftTween = null;
+
+        // 확정 전 잠깐 출발했다 취소된 카메라는 복귀 트윈 없이 기준 위치로 스냅한다.
+        if (t_snapBack)
+        {
+            Vector3 t_pos = transform.position;
+            t_pos.z = BaseZ;
+            transform.position = t_pos;
+            ReleaseLiftExternalControl();
+            return;
+        }
+
+        this.liftTween = transform.DOMoveZ(BaseZ, Mathf.Max(0.01f, this.longPressLiftDuration))
+            .SetEase(Ease.InOutSine)
+            .SetLink(gameObject)
+            .OnKill(ReleaseLiftExternalControl);
+    }
+
+    void AcquireLiftExternalControl()
+    {
+        if (this.liftOwnsExternalControl) return;
+        this.liftOwnsExternalControl = true;
+        BattleCameraFit.BeginExternalControl();
+    }
+
+    void ReleaseLiftExternalControl()
+    {
+        if (!this.liftOwnsExternalControl) return;
+        this.liftOwnsExternalControl = false;
+        BattleCameraFit.EndExternalControl();
     }
 
     public UniTask EnterCinema()

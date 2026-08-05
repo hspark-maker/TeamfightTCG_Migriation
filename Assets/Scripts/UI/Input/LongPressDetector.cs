@@ -26,6 +26,16 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
     void Update()
     {
         if (!this.pressing || this.fired) return;
+
+        // PointerUp 이벤트가 프레임 사이에서 유실돼도 실제 포인터가 풀렸으면 즉시 취소한다.
+        if (!IsPointerHeld())
+        {
+            bool t_tap = Vector2.Distance(Input.mousePosition, this.startPos) <= this.cancelDistance;
+            this.pressing = false;
+            if (t_tap) OnTap?.Invoke();
+            return;
+        }
+
         if (Vector2.Distance(Input.mousePosition, this.startPos) > this.cancelDistance)
         {
             this.pressing = false;
@@ -48,6 +58,19 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
         this.timer    = 0f;
         this.fired    = false;
         this.startPos = _data.position;
+    }
+
+    static bool IsPointerHeld()
+    {
+        if (Input.touchCount == 0) return Input.GetMouseButton(0);
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            TouchPhase t_phase = Input.GetTouch(i).phase;
+            if (t_phase == TouchPhase.Began || t_phase == TouchPhase.Moved || t_phase == TouchPhase.Stationary)
+                return true;
+        }
+        return false;
     }
 
     public void OnPointerUp(PointerEventData _data)

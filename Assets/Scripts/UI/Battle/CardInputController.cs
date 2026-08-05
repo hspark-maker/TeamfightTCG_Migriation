@@ -92,7 +92,10 @@ public class CardInputController
     {
         // 입력이 닫히면(턴 종료/타임아웃 등) 무장된 탭 공격자 강조가 고착되지 않게 해제.
         if (BattleSelection.SelectedAttacker != null && !TurnState.CardInputAllowed)
-            BattleSelection.Clear();
+            BattleSelection.Clear(_instant: true);   // 아래 MoveTo의 루트 DOKill에 축소 트윈이 잘리지 않게 즉시 확정.
+
+        if (this.longPressCts != null && (!TurnState.CardInputAllowed || this.owner.BoundCard == null))
+            CancelLongPress();
 
         // 들고(드래그) 있다가 입력이 닫히면(생각시간 초과/턴 종료) 슬롯으로 복귀 — 센터에 고착 방지.
         // 이 카드가 그대로 공격자가 되면 AttackSequence의 DOKill이 이 이동을 덮으므로 충돌 안 남.
@@ -122,14 +125,14 @@ public class CardInputController
             && this.owner.BoundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
         CancelLongPress();
-        this.longPressCts = CancellationTokenSource.CreateLinkedTokenSource(
-            this.owner.GetCancellationTokenOnDestroy());
-        WaitLongPress(this.longPressCts.Token).Forget();
-
         this.touchStartScreenPos  = (Vector2)Input.mousePosition;
         this.dragStartScreenPos   = this.touchStartScreenPos;
         this.currentDragScreenPos = this.touchStartScreenPos;
         this.activeGesture        = Gesture.None;   // 새 터치 — 제스처 미확정(탭/드래그 판정 대기).
+
+        this.longPressCts = CancellationTokenSource.CreateLinkedTokenSource(
+            this.owner.GetCancellationTokenOnDestroy());
+        WaitLongPress(this.longPressCts.Token).Forget();
 
         if (this.owner.BoundCard.ownerIndex != TurnState.LocalOwnerIndex) return;
 
@@ -235,7 +238,10 @@ public class CardInputController
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard != null
             && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
             && this.owner.BoundCard != TurnState.ForcedAttacker)
+        {
+            CancelLongPress();
             return;   // 적 카드는 통과(무장된 공격자 → 적 탭 발사 위해)
+        }
 
         // 드래그 중 턴 종료·카드 사망으로 early-return해도 드래그 상태가
         // 고착되지 않도록 가드 통과 전에 반드시 해제한다.
@@ -244,6 +250,7 @@ public class CardInputController
             this.dragState = DragState.Idle;
             this.swipeGuide?.SetVisible(false);
             HideDragLine();
+            CancelLongPress();
             return;
         }
         this.swipeGuide?.SetVisible(false);
@@ -275,11 +282,14 @@ public class CardInputController
                     return;
                 }
                 ClearTargetPreview();
-                this.owner.FocusWeapon(false);
-                this.owner.SetArmedVfx(false);   // 공격 없이 손 뗌
                 ResetAimTilt();
-                BattleBoardView.RestoreAllFades();
-                this.owner.MoveToSlot().Forget();
+                if (BattleSelection.SelectedAttacker != this.owner)
+                {
+                    this.owner.FocusWeapon(false);
+                    this.owner.SetArmedVfx(false);   // 공격 없이 손 뗌
+                    BattleBoardView.RestoreAllFades();
+                    this.owner.MoveToSlot().Forget();
+                }
             }
             this.dragState = DragState.Idle;
             return;
@@ -457,47 +467,62 @@ public class CardInputController
     #endregion
 
     #region Long press
-    /// <summary>롱프레스 대기 중 배경 어둡기가 시작되는 지점(0~1). 이 앞 구간은 어둡기 0.</summary>
-    const float DimStartRatio = 0.7f;
-
-    /// <summary>카메라가 뒤로 빠지기 시작하는 지점(0~1). 어둡기(<see cref="DimStartRatio"/>)보다 살짝 **앞**이다 —
-    /// 화면이 먼저 천천히 물러나고 그 위에 어둡기가 얹혀야 "정보창이 차오른다"가 한 동작으로 읽힌다.
-    ///
-    /// 너무 앞당기면(0.35 등) 그냥 톡 누르는 탭에도 카메라가 출발해 화면이 왔다갔다한다 —
-    /// 탭으로 끝날 리 없는 구간까지 미뤄 둔다.</summary>
-    const float CameraLiftStartRatio = 0.6f;
+    /// <summary>롱프레스 확정 직전 카메라가 출발할 수 있는 남은 시간.
+    /// 비율보다 실제 시간으로 두어 프레임레이트가 달라도 같은 구간에서 확인한다.</summary>
+    const float CameraLiftLead = 0.08f;
 
     async UniTask WaitLongPress(CancellationToken _ct)
     {
         try
         {
-            // 누르는 동안 배경이 서서히 어두워진다 — "지금 정보창이 차오르는 중"이라는 유일한 피드백이라
-            // 대기 시간을 통째로 재우지 않고 프레임마다 진행도를 넘긴다.
-            // 시너지 배지를 누른 경우는 제외: 그쪽은 카드 정보가 아니라 작은 툴팁이라 화면을 어둡게 하지 않는다.
+            // dim/blur는 확정 뒤에만 켠다. 시너지 배지는 작은 툴팁이라 화면을 어둡게 하지 않는다.
             bool  t_dim     = this.owner.BoundCard != null && this.owner.BoundCard.isRevealed
                            && FindBadgeAt(this.touchStartScreenPos) == null;
             float t_wait    = Mathf.Max(0.01f, GameTiming.Battle.LongPress);
             float t_elapsed = 0f;
+            bool  t_cameraLiftPending = false;
             while (t_elapsed < t_wait)
             {
                 await UniTask.Yield(PlayerLoopTiming.Update, _ct);
+
+                // 짧은 탭의 Up 이벤트가 저프레임에서 유실돼도 실제 포인터 상태로 즉시 복구한다.
+                if (!TurnState.CardInputAllowed || this.owner.BoundCard == null || !IsPointerHeld())
+                {
+                    CancelLongPress();
+                    return;
+                }
+
+                // 드래그 이벤트 빈도에 기대지 않고 대기 루프가 직접 이동 취소를 판정한다.
+                if (Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) > this.deadZoneRadius)
+                {
+                    CancelLongPress();
+                    return;
+                }
+
                 t_elapsed += Time.deltaTime;
-                // 어둡기/흐림은 대기 초반엔 켜지 않는다 — 스크롤/탭처럼 짧게 스치는 터치마다 화면이 깜빡이므로,
-                // DimStartRatio 지점을 넘긴 뒤부터 남은 구간에 0→1을 몰아서 채운다.
                 if (!t_dim) continue;
 
-                float t_ratio = t_elapsed / t_wait;
+                // 임계 직전 구간에 들어온 뒤 다음 프레임에도 눌려 있어야 카메라를 움직인다.
+                if (t_wait - t_elapsed <= CameraLiftLead)
+                {
+                    if (t_cameraLiftPending) BattleCamera.SetLongPressLift(true);
+                    else t_cameraLiftPending = true;
+                }
 
-                // 카메라는 어둡기보다 먼저 출발한다(멱등 호출이라 매 프레임 불러도 한 번만 걸린다).
-                if (t_ratio >= CameraLiftStartRatio) BattleCamera.SetLongPressLift(true);
-
-                float t_dimProgress = Mathf.InverseLerp(DimStartRatio, 1f, t_ratio);
-                if (t_dimProgress <= 0f) continue;
-                ShowPressDim(t_dimProgress);
-                ScreenBlurFeature.Strength = t_dimProgress;   // 배경 블러도 같은 진행도로 차오른다
             }
 
-            if (this.owner.BoundCard == null || !this.owner.BoundCard.isRevealed) return;
+            if (this.owner.BoundCard == null || !this.owner.BoundCard.isRevealed)
+            {
+                CancelLongPress();
+                return;
+            }
+
+            // dim/blur는 롱프레스 확정 뒤에만 켠다. 저프레임 경계에서 짧은 탭에 반응하면 안 된다.
+            if (t_dim)
+            {
+                ShowPressDim();
+                ScreenBlurFeature.Strength = 1f;
+            }
 
             // 누른 지점이 시너지 배지 위면 카드 정보 대신 시너지 설명을 띄운다.
             SynergyBadgeView t_badge = FindBadgeAt(this.touchStartScreenPos);
@@ -525,7 +550,7 @@ public class CardInputController
                     });
 
                 // 정보를 보는 그 카드만 살짝 떠오른다. 시너지 배지 툴팁 쪽은 카드 정보가 아니므로 제외.
-                // 카메라는 이미 대기 중(CameraLiftStartRatio)에 출발했다 — 여기서 다시 걸지 않는다.
+                // 카메라는 이미 임계 직전 확인 구간에서 출발했다 — 여기서 다시 걸지 않는다.
                 this.owner.SetLongPressLift(true);
             }
             this.longPressFired = true;
@@ -534,22 +559,27 @@ public class CardInputController
         catch (OperationCanceledException) { }
     }
 
-    /// <summary>누르는 진행도(0~1)를 카드 정보창의 배경 어둡기에 넘긴다.
-    /// 첫 호출에서만 UI를 띄우고(배경만 켜진 상태), 이후엔 이미 떠 있는 판에 값만 준다 —
-    /// 매 프레임 AddOrUpdateUI를 부르면 설명 줄을 그 횟수만큼 다시 만든다.</summary>
-    void ShowPressDim(float _progress)
+    static bool IsPointerHeld()
     {
-        if (this.longPressDimShown)
-        {
-            UIPoolManager.Instance?.GetUI<PooledCardElement>()?.SetDim(_progress);
-            return;
-        }
+        if (Input.touchCount == 0) return Input.GetMouseButton(0);
 
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            TouchPhase t_phase = Input.GetTouch(i).phase;
+            if (t_phase == TouchPhase.Began || t_phase == TouchPhase.Moved || t_phase == TouchPhase.Stationary)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>롱프레스 확정 뒤 카드 정보창의 배경 어둡기를 켠다.</summary>
+    void ShowPressDim()
+    {
         UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
         {
             card        = this.owner.BoundCard?.data,
             dimOnly     = true,
-            dimProgress = _progress,
+            dimProgress = 1f,
         });
         this.longPressDimShown = true;
     }

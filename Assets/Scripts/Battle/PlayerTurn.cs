@@ -159,6 +159,27 @@ public class PlayerTurn : TurnBase
         return true;
     }
 
+    /// <summary>튜토리얼 처형 재공격의 대상. 큐 맨 앞이 <b>이 공격자를 지정한 공격 스텝</b>이고
+    /// 그 타깃 슬롯에 카드가 살아 있을 때만 그 카드를 돌려주고 스텝을 소비한다 — 자동 발사가
+    /// 스크립트 기준선과 어긋나지 않게. 조건이 하나라도 안 맞으면 null(무작위 대상으로 폴백).
+    ///
+    /// 안내 배너는 띄우지 않는다. 처형 재공격은 플레이어가 조작하는 스텝이 아니다.</summary>
+    CardInstance TutorialScriptedExecutionTarget(CardInstance _attacker)
+    {
+        if (!TutorialConfig.IsActive || _attacker == null) return null;
+        if (!TutorialConfig.TryPeekPlayerStep(out var t_step)) return null;
+        if (t_step.kind != TutorialScenarioData.StepKind.Attack) return null;
+        if (IsFreeStep(t_step)) return null;
+        if (t_step.attackerSlot != _attacker.slotIndex) return null;
+        if (!InSlotRange(t_step.targetSlot)) return null;
+
+        CardInstance t_target = this.ctx.enemyField.GetSlot(t_step.targetSlot);
+        if (t_target == null) return null;
+
+        TutorialConfig.ConsumePlayerStep();
+        return t_target;
+    }
+
     /// <summary>실행 불가한 "선행 안내 + 공격 스텝" 묶음을 통째로 폐기(플레이어 큐).
     /// 판정·폐기 규칙은 <see cref="TutorialStepGate"/> 단독 — 적 턴과 기준이 갈리지 않게.</summary>
     void DiscardUnplayableSteps()
@@ -522,11 +543,13 @@ public class PlayerTurn : TurnBase
             CardView.FadeTeam(0.3f, TurnState.LocalOwnerIndex);
             CardView.FadeCards(1f, t_attackerView);
 
-            // 처형 재공격 = 무작위 대상 자동 발사. 입력을 열지 않고 같은 공격 경로로 다시 들어간다.
-            // 튜토리얼은 제외 — 스크립트가 다음 공격의 대상 슬롯을 지정하므로 무작위가 흐름을 깨뜨린다.
-            if (BattleUxFlags.ExecutionRandomTarget && !TutorialConfig.IsActive)
+            // 처형 재공격 = 대상 자동 발사. 입력을 열지 않고 같은 공격 경로로 다시 들어간다.
+            // 튜토리얼도 같은 경로다 — 예전엔 여기서 빠져나가 "처형인데 대상을 또 고르는" 흐름이 남아 있었다.
+            // 대상만 갈린다: 스크립트가 이 공격자의 다음 타깃을 지정해 뒀으면 그걸, 아니면 무작위.
+            if (BattleUxFlags.ExecutionRandomTarget)
             {
-                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
+                CardInstance t_nextTarget = TutorialScriptedExecutionTarget(_attacker)
+                                         ?? ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
                 if (t_nextTarget != null)
                 {
                     // 연속 공격이 한 동작으로 뭉쳐 보이지 않게 상대 연속 공격과 같은 간격을 둔다.
