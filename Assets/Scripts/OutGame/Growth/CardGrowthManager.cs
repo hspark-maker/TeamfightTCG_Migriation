@@ -2,42 +2,36 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 카드 성장(강화 레벨·진화 단계)의 static 단일 창구. 세이브 슬롯(CardGrowthSaveData) 매핑을 여기서만 안다.
-// 카드 키는 CardCatalog.KeyOf — 소유·덱 세이브와 정합. OwnershipManager와 동일한 부트/flush 결.
-// 성장 상태의 진실원은 이 창구이고 전투는 CardGrowth 값을 받아 읽기만 한다.
+// 카드 성장(강화 레벨)의 static 단일 창구
 public static class CardGrowthManager
 {
-    // 카드 키 → 성장 진행도(메모리 캐시). 값은 세이브 슬롯에 넣을 값 객체와 동일 참조.
     static readonly Dictionary<string, CardGrowthEntry> s_growth = new Dictionary<string, CardGrowthEntry>();
 
-    // 강화 성공 판정용 로컬 랜덤. Battle/MatchRandom 재사용 금지(경계 위반) — 서비스 내부 System.Random.
-    // 비결정론 무방(오프라인 단일 유저 강화).
     static readonly System.Random s_rng = new System.Random();
 
     static CardGrowthConfig s_config;
 
     static bool s_initialized;
 
-    // 성장 변경 통지 — UI 갱신용. 강화 실패도 통지한다(재화가 줄었고 표시가 따라와야 한다).
+    // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 미배선이면 기본 인스턴스로 동작한다(씬 배선 없이도 곡선·게이트가 살아 있게 — RewardService 선례).
+    // 강화 곡선 설정(미배선이면 기본 인스턴스)
     public static CardGrowthConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<CardGrowthConfig>());
 
     public static int MaxLevel => Config.MaxLevel;
 
-    /// <summary>Init()으로 세이브를 캐싱했는지. false면 Save()가 no-op이라 성장 결과를 영속할 수 없다 —
-    /// 그래서 결제 경로(TryEnhance/TryEvolve)가 이 값을 결제 **전에** 본다.</summary>
+    // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
 
-    /// <summary>부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
+    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(CardGrowthConfig _config)
     {
         if (_config != null) s_config = _config;
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출. 세이브만 읽으므로 CardCatalog와 순서 무관.
+    // 부트에서 DataSaveManager.Load() 이후 1회 호출
     public static void Init()
     {
         s_growth.Clear();
@@ -47,8 +41,8 @@ public static class CardGrowthManager
         {
             foreach (var t_entry in t_data.entries)
             {
-                if (t_entry == null || string.IsNullOrEmpty(t_entry.cardKey)) continue; // 손상/빈 키는 무시(예외 없음).
-                if (s_growth.ContainsKey(t_entry.cardKey)) continue;                     // 중복 키는 첫 항목 유지.
+                if (t_entry == null || string.IsNullOrEmpty(t_entry.cardKey)) continue;
+                if (s_growth.ContainsKey(t_entry.cardKey)) continue;
                 s_growth[t_entry.cardKey] = t_entry;
             }
         }
@@ -56,8 +50,7 @@ public static class CardGrowthManager
         s_initialized = true;
     }
 
-    // 메모리 캐시를 세이브 슬롯에 flush 후 영속화. 현재 카탈로그에 없는 키도 그대로 보존(진행도 0 덮어쓰기 금지).
-    // 미초기화(Init 전) 상태에서는 빈 캐시로 세이브를 덮지 않도록 no-op.
+    // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
     public static void Save()
     {
         if (!s_initialized) return;
@@ -68,22 +61,23 @@ public static class CardGrowthManager
         DataSaveManager.Save();
     }
 
-    // ── 조회 ────────────────────────────────────────────────
-
     public static CardGrowth GrowthOf(CardData _card) => GrowthOf(CardCatalog.KeyOf(_card));
 
-    // 미성장 카드는 default(Lv0·미진화). HP 보너스는 저장하지 않고 레벨에서 파생한다(곡선을 고쳐도 소급 반영).
+    // 카드 키의 성장 스냅샷(기록이 없으면 미강화). HP 보너스는 저장값이 아니라 레벨에서 파생
     public static CardGrowth GrowthOf(string _key)
     {
-        if (string.IsNullOrEmpty(_key)) return default;
-        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return default;
+        if (string.IsNullOrEmpty(_key)) return CardGrowth.Fresh;
+        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return CardGrowth.Fresh;
 
-        return new CardGrowth(t_entry.level, Config.HpBonusAt(t_entry.level), t_entry.evolutionStage);
+        // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
+        int t_level = t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
+
+        return new CardGrowth(t_level, Config.HpBonusAt(t_level));
     }
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
 
-    // 다음 레벨의 비용·성공률·HP 증가분. 만렙이면 false.
+    // 다음 레벨의 비용·성공률·HP 증가분(만렙이면 false)
     public static bool TryGetNextStep(CardData _card, out GrowthStep _step)
     {
         _step = default;
@@ -92,27 +86,13 @@ public static class CardGrowthManager
         return Config.TryGetStep(GrowthOf(_card).Level + 1, out _step);
     }
 
-    // 지금 강화를 막고 있는 진화 게이트. 없으면 false(= 진화할 것이 없다).
-    public static bool TryGetPendingGate(CardData _card, out EvolutionGate _gate)
-    {
-        _gate = default;
-        if (_card == null) return false;
-
-        CardGrowth t_growth = GrowthOf(_card);
-        return Config.TryGetPendingGate(t_growth.Level, t_growth.EvolutionStage, out _gate);
-    }
-
-    // ── 성장 ────────────────────────────────────────────────
-
-    // 강화 1회 시도. 결제(골드)까지 갔으면 확률로 성공/실패가 갈리고, 실패해도 골드는 소모된다(레벨 하락 없음).
-    // 카드가 무효(null·빈 키)면 결제 없이 MaxLevel로 닫는다 — 열려 있는 시도 경로를 남기지 않기 위함.
+    // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
     public static EnhanceResult TryEnhance(CardData _card)
     {
-        // 미초기화면 Save()가 no-op이라 골드만 사라지고 레벨은 재시작 시 소실된다 → 결제 전에 닫는다.
-        if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, 0);
+        if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
 
         string t_key = CardCatalog.KeyOf(_card);
-        if (string.IsNullOrEmpty(t_key)) return new EnhanceResult(EEnhanceOutcome.MaxLevel, 0);
+        if (string.IsNullOrEmpty(t_key)) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
         CardGrowthConfig t_config = Config;
         CardGrowth       t_growth = GrowthOf(t_key);
@@ -120,17 +100,12 @@ public static class CardGrowthManager
 
         if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        // 게이트 도달 후에는 진화가 다음 레벨을 여는 유일한 열쇠다.
-        if (t_config.TryGetPendingGate(t_level, t_growth.EvolutionStage, out _))
-            return new EnhanceResult(EEnhanceOutcome.BlockedByEvolution, t_level);
-
         if (!t_config.TryGetStep(t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         if (!CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
-        // CanAfford 통과 후에도 false면 방어 실패(차감 없음).
         if (!CurrencyManager.Spend(ECurrencyType.Gold, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
@@ -142,39 +117,13 @@ public static class CardGrowthManager
             Save();
         }
 
-        // 실패해도 잔액이 변했으므로 영속·통지는 두 경우 모두 한다.
         CurrencyManager.Save();
         OnGrowthChanged?.Invoke();
 
         return new EnhanceResult(t_success ? EEnhanceOutcome.Success : EEnhanceOutcome.Failed, t_level);
     }
 
-    // 진화 1회. 막고 있는 게이트가 없거나 비용을 못 내면 false. 실패 확률은 없다 — 결제되면 반드시 단계가 오른다.
-    public static bool TryEvolve(CardData _card)
-    {
-        // TryEnhance와 같은 이유 — 미초기화면 다이아만 잃고 단계는 영속되지 않는다(결제 전 거부).
-        if (!s_initialized) return false;
-
-        string t_key = CardCatalog.KeyOf(_card);
-        if (string.IsNullOrEmpty(t_key)) return false;
-
-        CardGrowth t_growth = GrowthOf(t_key);
-        if (!Config.TryGetPendingGate(t_growth.Level, t_growth.EvolutionStage, out var t_gate)) return false;
-
-        if (!CurrencyManager.Spend(t_gate.costType, t_gate.cost)) return false;
-
-        // 진화는 스탯을 바꾸지 않는다(아트·연출 자격 축).
-        Entry(t_key).evolutionStage = t_gate.toStage;
-
-        Save();
-        CurrencyManager.Save();
-        OnGrowthChanged?.Invoke();
-        return true;
-    }
-
-    // ── 디버그/유지보수 ─────────────────────────────────────
-
-    // 성장 전체 초기화(디버그). 세이브에서도 제거. 진행도 손실 주의 — 정상 흐름에서 호출 금지.
+    // 성장 전체 초기화(디버그 전용, 진행도 손실)
     public static void DebugResetAll()
     {
         s_growth.Clear();
@@ -182,14 +131,11 @@ public static class CardGrowthManager
         OnGrowthChanged?.Invoke();
     }
 
-    // ── 내부 ────────────────────────────────────────────────
-
-    // 캐시 엔트리 확보(없으면 생성). Lv0·미진화는 세이브에 남기지 않으므로 실제로 값이 오르는 직전에만 부른다.
     static CardGrowthEntry Entry(string _key)
     {
         if (s_growth.TryGetValue(_key, out var t_entry) && t_entry != null) return t_entry;
 
-        t_entry = new CardGrowthEntry { cardKey = _key, level = 0, evolutionStage = 0 };
+        t_entry = new CardGrowthEntry { cardKey = _key, level = CardGrowth.BaseLevel };
         s_growth[_key] = t_entry;
         return t_entry;
     }

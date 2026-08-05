@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -33,6 +34,15 @@ public class LobbyTabController : MonoBehaviour
 
     // 탭 버튼의 겉모습 컴포넌트 캐시(없으면 null). 버튼에서 직접 찾으므로 인스펙터 재배선이 필요 없다.
     TabButtonView[] m_views;
+
+    // 현재 탭이 건 이탈 가드(없으면 null). 셸은 무엇을 확인하는지 모르고 Action<Action> 하나만 안다.
+    Action<Action> m_leaveGuard;
+
+    /// 탭 전환을 가로챌 이탈 가드를 건다. 가드는 이탈이 허가된 시점에 넘겨받은 _proceed를 부른다 —
+    /// 그때는 스스로 해제돼 있어야 한다(안 그러면 _proceed가 다시 가드로 들어와 무한히 맴돈다).
+    public void SetLeaveGuard(Action<Action> _guard) => this.m_leaveGuard = _guard;
+
+    public void ClearLeaveGuard() => this.m_leaveGuard = null;
 
     void Awake()
     {
@@ -77,6 +87,15 @@ public class LobbyTabController : MonoBehaviour
         // 초기 선택은 통과시킨다 — 기본 탭이 잠기면 아무 콘텐츠도 안 열린 로비가 되어 더 나쁘다.
         if (_fireTrigger && this.IsTabLocked(_index)) return;
 
+        // 잠금 검사 뒤에 둔다 — 어차피 못 들어가는 탭 때문에 "나갈까요?"를 묻게 할 이유가 없다.
+        // 전환 권한을 통째로 넘기고 여기서는 끝낸다. 허가되면 가드가 이 호출을 그대로 다시 부른다.
+        if (this.m_leaveGuard != null)
+        {
+            this.m_leaveGuard(() => this.Select(_index, _fireTrigger));
+
+            return;
+        }
+
         bool useFocus = (this.focus != null);
 
         for (int i = 0; i < this.tabs.Count; i++)
@@ -96,12 +115,6 @@ public class LobbyTabController : MonoBehaviour
         // 콘텐츠를 켠 뒤에 발화한다 — 안내 타깃(앵커)이 그제서야 등록된다.
         if (_fireTrigger && _index >= 0 && _index < this.tabs.Count)
             TriggeredTutorialRunner.Fire(this.tabs[_index].tutorialTrigger);
-    }
-
-    /// 로비 기본 탭으로 되돌린다. 하위 화면이 "로비로 나가기"를 부를 때 쓴다(탭 인덱스를 밖에 복제하지 않기 위한 창구).
-    public void SelectDefault()
-    {
-        this.Select(this.defaultIndex);
     }
 
     bool IsTabLocked(int _index)

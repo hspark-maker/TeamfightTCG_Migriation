@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -25,6 +26,8 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
     [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
+    [Tooltip("체력이 굴러 오르는 동안 물드는 색(RollHp). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
+    [SerializeField] Color      hpRollFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
@@ -54,24 +57,15 @@ public class CardVisualView : MonoBehaviour
 
     // ── 인게임 좌표를 uGUI로 옮기는 환산값 ──────────────────────────────────
     //
-    // 정적인 요소(아트·프레임·프레임 장식·HP)는 프리팹에 정규화 앵커로 박아뒀다. 코드가 필요한 건
-    // 런타임 생성물(키워드 아이콘)의 자리와, 카드 rect 크기에 따라 달라지는 폰트 크기 둘뿐이다.
-    //
-    // 카드 셀 크기가 화면마다 다르다(도감 290x386, 덱편집 270x360, 팩개봉 700x930…). 픽셀 상수를 박으면
-    // 한 곳에서만 맞고 나머지는 어긋나므로, 전부 "인게임 카드 크기 대비 비율"로 계산한다.
+    // 카드 내부(Background)는 인게임 카드와 같은 비율의 **고정 크기** rect다(420x558). 칸 크기가
+    // 화면마다 달라도(도감 255x323, 덱편집 270x360, 팩개봉 1000x1230) 그 차이는 UniformFitContent가
+    // 배율 하나로 흡수한다 → 정적인 요소(아트·프레임·프레임 장식·이름·HP)는 프리팹에 픽셀 앵커로 박아두고
+    // 폰트 크기도 프리팹 값을 그대로 쓴다. 코드가 계산할 게 남은 건 런타임 생성물(키워드 아이콘)의 자리뿐이다.
 
     /// <summary>인게임 카드 한 장의 월드 크기 = Frame.png(1024x1361 @PPU100) × CardView Frame localScale 0.233245.
     /// 인게임 프레임 스케일이 바뀌면 여기도 같이 바꿔야 로비 카드가 따라간다.</summary>
     const float IngameCardWidth  = 2.388429f;
     const float IngameCardHeight = 3.174464f;
-
-    // TextMeshPro(월드)는 렌더 시 fontSize에 0.1을 곱하고 TextMeshProUGUI는 그대로 쓴다(m_isOrthographic 차이).
-    // 그래서 인게임 fontSize를 uGUI로 옮기려면 0.1 × (카드 rect 높이 / 인게임 카드 높이)를 곱한다.
-    const float WorldFontToUnit  = 0.1f;
-    const float IngameHpFontSize      = 4f;     // CardView HPText
-    const float IngameBonusHpFontSize = 2.4f;   // CardView AdditionalHPText
-    const float IngameNameFontSize    = 2.3f;   // CardView NameText 오토사이징 최대
-    const float IngameNameFontSizeMin = 1f;     // CardView NameText 오토사이징 최소(긴 이름 축소)
 
     // 키워드 아이콘 가로줄. 인게임은 keywordIconsUseSynergySlot=true 경로를 타므로 기준은
     // synergyBadge* 가 아니라 CardView의 keywordIconStart(-0.65,-1.14) / keywordIconStep(0.42,0)이다
@@ -84,6 +78,13 @@ public class CardVisualView : MonoBehaviour
     const float KeywordIconWidth  =        0.65f / IngameCardWidth;
     const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
+    // 굴러 오르는 중인 체력. 도는 동안에는 이쪽이 숫자의 주인이다 — RefreshHp가 최종값을 먼저 찍으면 굴릴 것이 사라진다.
+    Tween m_hpRoll;
+
+    // hpText의 authoring 색. 물든 중간값을 기준으로 잡으면 굴릴 때마다 색이 밀린다 → 1회만 캡처한다.
+    Color m_hpBaseColor;
+    bool  m_hpBaseCaptured;
+
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
     //
@@ -91,12 +92,7 @@ public class CardVisualView : MonoBehaviour
     // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
     // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
-    //
-    // _synergyState: 이 카드가 속한 **덱**의 시너지 스냅샷. 넘기면 배지가 활성/비활성 아이콘으로 갈린다.
-    // 기본 null인 이유는 호출부 대부분이 덱 문맥이 없기 때문이다(도감 그리드·상세, 팩 개봉, 컬렉션 타일) —
-    // 카드 한 장을 소개하는 자리에서 "몇 장 모였나"는 물을 수 있는 질문이 아니다.
-    // 덱 전체를 한 화면에 늘어놓는 곳(매치 화면 6칸)만 스냅샷을 만들어 넘긴다.
-    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true, SynergyState _synergyState = null)
+    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
     {
         if (_card == null)
         {
@@ -104,6 +100,9 @@ public class CardVisualView : MonoBehaviour
             return;
         }
         gameObject.SetActive(true);
+
+        // 다른 카드를 그리는 참이다 — 남은 굴리기가 이 카드 위에 옛 카드의 숫자를 마저 찍게 두지 않는다.
+        KillHpRoll();
 
         if (this.portrait != null)
         {
@@ -129,13 +128,104 @@ public class CardVisualView : MonoBehaviour
         SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
-        RefreshSynergyBadges(_card, _owned && this.showSynergies, _synergyState);
-
-        // 폰트 크기는 카드 rect에 비례한다 → 바인드 시점에 한 번 맞춘다(셀 크기가 화면마다 다르다).
-        ApplyIngameFontScale();
+        RefreshSynergyBadges(_card, _owned && this.showSynergies);
 
         // 미소유 = 잠김 오버레이 on(아트를 어둡게 덮어 실루엣화).
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
+    }
+
+    /// <summary>강화로 바뀌는 값(최대 체력)만 다시 그린다. 인자 의미는 <see cref="Bind"/>와 같다.
+    ///
+    /// 성장 통지처럼 잦은 갱신에서 Bind를 통째로 부르면 바뀌지도 않은 키워드 아이콘·시너지 배지가
+    /// 매번 Destroy + Instantiate 된다. 반대로 이걸 안 부르면 체력이 옛 값에 굳는다 —
+    /// hpText를 쓰는 곳은 SetHpDisplay 하나뿐이라 호출부가 텍스트를 직접 만지면 진실원이 갈린다.
+    ///
+    /// 카드·소유여부를 캐싱하지 않고 인자로 받는 이유: 바인딩 상태의 진실원을 호출부와 여기 둘로 만들지 않기 위함.</summary>
+    public void RefreshHp(CardData _card, bool _owned, bool _applyGrowth = true)
+    {
+        if (_card == null) return;
+
+        // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
+        if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
+
+        SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
+    }
+
+    /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
+    /// 표시 문장·최종값의 정본은 여전히 <see cref="SetHpDisplay"/>다 — 굴리는 동안의 중간 숫자만 여기서 만들고,
+    /// 끝나든 잘리든 그쪽으로 되돌려 못 박는다(반올림 중간값이 남지 않는다).
+    ///
+    /// 굴릴 것이 없으면(미소유·표시 꺼짐·오르지 않음) 즉시 반영하고 null을 돌려준다 — 강화 실패가 이 길로 온다.
+    /// _duration은 호출부가 정한다: 결과판의 체력 행과 같은 길이여야 두 숫자가 한 박에 움직인다.</summary>
+    public Tween RollHp(CardData _card, bool _owned, int _from, float _duration)
+    {
+        if (_card == null) return null;
+
+        KillHpRoll();
+
+        int t_to = DeckPower.MaxHpOf(_card);
+
+        if (this.hpText == null || !(_owned && this.showHp) || _duration <= 0f || t_to <= _from)
+        {
+            RefreshHp(_card, _owned);
+            return null;
+        }
+
+        // 패널·보너스는 먼저 최종 상태로 세운다 — 굴러야 하는 것은 숫자 하나뿐이다.
+        SetHpDisplay(_card, true, true);
+        CaptureHpColor();
+        this.hpText.text = _from.ToString();
+
+        float t_shown = _from;
+        float t_span  = t_to - _from;
+
+        this.m_hpRoll = DOTween.To(() => t_shown, _v =>
+                                   {
+                                       t_shown = _v;
+                                       if (this.hpText == null) return;
+
+                                       this.hpText.text = Mathf.RoundToInt(_v).ToString();
+
+                                       // 색은 굴리는 도중에 가장 짙고 끝에서 원래 색으로 돌아온다.
+                                       // 별도 트윈으로 두면 잘렸을 때 물든 채 굳으므로 같은 축에 얹는다.
+                                       float t_p = Mathf.Clamp01((_v - _from) / t_span);
+                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor,
+                                                                      Mathf.Sin(t_p * Mathf.PI));
+                                   },
+                                   (float)t_to, _duration)
+                               .SetEase(Ease.OutQuad)   // 결과판의 체력 행과 같은 곡선 — 두 숫자가 따로 놀지 않는다.
+                               .SetLink(this.hpText.gameObject)
+                               .OnComplete(() => UiPunch.Play(this.hpText.transform))
+                               .OnKill(() =>
+                               {
+                                   this.m_hpRoll = null;
+                                   RestoreHpColor();
+                                   RefreshHp(_card, _owned);
+                               });
+
+        return this.m_hpRoll;
+    }
+
+    void KillHpRoll()
+    {
+        Tween t_roll  = this.m_hpRoll;
+        this.m_hpRoll = null;
+        t_roll?.Kill();   // OnKill이 색과 숫자를 되돌린다.
+    }
+
+    void CaptureHpColor()
+    {
+        if (this.m_hpBaseCaptured || this.hpText == null) return;
+
+        this.m_hpBaseCaptured = true;
+        this.m_hpBaseColor    = this.hpText.color;
+    }
+
+    void RestoreHpColor()
+    {
+        if (!this.m_hpBaseCaptured || this.hpText == null) return;
+
+        this.hpText.color = this.m_hpBaseColor;
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
@@ -217,56 +307,25 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    // 카드 rect 높이에 비례해 폰트 크기를 인게임 값으로 환산한다. 프리팹에 픽셀 크기를 박아두면
-    // 그 프리팹을 쓰는 셀 하나에서만 맞고 나머지(도감/덱편집/팩개봉이 서로 다른 셀 크기)는 어긋난다.
-    void ApplyIngameFontScale()
-    {
-        if (!(this.transform is RectTransform t_rect)) return;
-
-        float t_scale = t_rect.rect.height * WorldFontToUnit / IngameCardHeight;
-        if (t_scale <= 0f) return;   // 레이아웃 전(높이 0)이면 건너뛴다 — 확정 후 아래 콜백이 다시 부른다.
-
-        if (this.hpText      != null) this.hpText.fontSize      = IngameHpFontSize      * t_scale;
-        if (this.bonusHpText != null) this.bonusHpText.fontSize = IngameBonusHpFontSize * t_scale;
-
-        // 이름만 인게임이 오토사이징(1.0~2.3)이라 긴 이름이 줄어든다. 오토사이징이 켜져 있으면
-        // fontSize는 무시되고 min/max가 실제 크기를 정하므로 셋 다 환산해야 카드 크기를 따라간다.
-        if (this.nameText != null)
-        {
-            this.nameText.fontSizeMin = IngameNameFontSizeMin * t_scale;
-            this.nameText.fontSizeMax = IngameNameFontSize    * t_scale;
-            this.nameText.fontSize    = IngameNameFontSize    * t_scale;
-        }
-    }
-
-    // 그리드 셀 크기가 Bind 이후에 확정되는 경우(GridLayoutGroup 첫 프레임)를 위해 rect가 바뀔 때마다 재적용.
-    void OnRectTransformDimensionsChange() => ApplyIngameFontScale();
-
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    // _state = 이 카드가 속한 덱의 시너지 스냅샷(없으면 null). 정렬과 활성 판정 둘 다 여기서 갈린다.
-    void RefreshSynergyBadges(CardData _card, bool _show, SynergyState _state)
+    void RefreshSynergyBadges(CardData _card, bool _show)
     {
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // **표시 대상·순서 결정에는 스냅샷을 넘기지 않는다(null 고정).** 넘기면 활성 배지가 위로 올라가면서
-        // 덱을 한 장 갈아끼울 때마다 같은 카드의 배지 순서가 뒤바뀌고, 3개 상한에 걸릴 땐 비활성 배지가
-        // 목록에서 아예 잘려 나간다. 이 카드가 가진 시너지는 덱이 어떻든 같은 자리에 그대로 있어야 한다 —
-        // 덱에 따라 바뀌는 건 **아이콘 하나뿐**이다.
-        // (스냅샷이 없을 때의 정렬 = requiredCount 내림차순 고정. 덱과 무관하므로 자리가 흔들리지 않는다.)
+        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
+        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
+        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
         List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
 
         foreach (SynergyData t_syn in t_tags)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
-
-            // 여기가 스냅샷을 쓰는 유일한 지점 — 그 시너지가 이 덱에서 열렸으면 활성 그림, 아니면 비활성 그림.
-            // 덱 문맥이 없는 화면(도감·팩 개봉·컬렉션)은 전부 활성 그림으로 그린다: 거기선 "이 카드가 가진
-            // 시너지" 소개가 목적이라, 판정할 덱이 없다는 이유로 전부 흐리게 두면 카드가 병들어 보인다.
-            bool t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_syn);
-            t_badge.Set(t_syn, t_active);
+            // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
+            // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
+            t_badge.Set(t_syn, true);
         }
     }
 

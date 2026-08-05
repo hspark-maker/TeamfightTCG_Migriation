@@ -51,7 +51,7 @@ public class MatchDeckShell : MonoBehaviour
         if (editBackButton != null)
         {
             editBackButton.onClick.RemoveAllListeners();
-            // 셸이 아니라 컨트롤러로 직행한다 — 저장 판정·미완성 확인 팝업은 OnBackClicked 한 곳에만 있다.
+            // 셸이 아니라 컨트롤러로 직행한다 — 저장 판정·미완성 확인 팝업은 RequestLeave 한 곳에만 있다.
             editBackButton.onClick.AddListener(OnEditBackClicked);
         }
         else

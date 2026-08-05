@@ -19,12 +19,3 @@ MonoBehaviour:
   baseSuccessRate: 1
   rateDropPerLevel: 0.08
   stepOverrides: []
-  evolutionGates:
-  - atLevel: 5
-    toStage: 1
-    costType: 1
-    cost: 50
-  - atLevel: 10
-    toStage: 3
-    costType: 1
-    cost: 200

@@ -1,56 +1,34 @@
 using System.Collections.Generic;
 
-/// <summary>
-/// 카드팩 구매·개봉의 static 파사드(오케스트레이터). 자체 영속 상태가 없다 —
-/// 골드 차감은 CurrencyManager가, 카드 소유는 OwnershipManager가 이미 영속하므로 E는 둘을 잇기만 한다.
-/// 상점 목록·중복 환급값은 이 파사드가 쥐지 않는다 — 구매처(버튼/첫실행)가 대상 팩 SO와 환급액을
-/// 직접 넘긴다(진열은 각 뷰의 책임, 팩은 CardPackData 참조로 지정).
-///
-/// 전제: TryPurchase는 CardCatalog·OwnershipManager가 Init된 상태를 가정한다(부트 후 호출).
-/// Grant는 KeyOf(=CardData.name) 기준이라 카탈로그 준비와 무관히 소유 집합에 키를 넣지만,
-/// 소유 UI가 카탈로그로 카드를 되찾으므로 정상 흐름에선 부트 완료 후 사용한다.
-/// </summary>
+// 카드팩 구매·즉시 개봉의 static 파사드
 public static class CardPackOpener
 {
-    // 아웃게임 최초 랜덤. Battle/MatchRandom 재사용 금지(경계 위반) — 서비스 내부 System.Random.
-    // 비결정론 무방(오프라인 단일 유저 개봉).
     static readonly System.Random s_rng = new System.Random();
 
-    /// <summary>
-    /// 팩 구매·즉시 개봉. 성공 시 Gold 차감 → 지정 풀 균등 드로우 → 소유 부여 → 중복 환급 → 1회 Save 후
-    /// OpenedPack 반환. 실패(팩 없음/잔액 부족/빈 풀/방어)는 차감 없이 실패 결과 반환(예외 없음).
-    /// 대상 팩과 중복 환급액(refundGold)은 호출부가 직접 넘긴다(상점 SO 미개입).
-    /// </summary>
+    // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 환급, 실패 시 차감 없이 사유 반환
     public static OpenedPack TryPurchase(CardPackData _pack, long _refundGold)
     {
-        // 1. 팩 미지정 — 차감 없이 실패.
         if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound, null);
 
         string t_packId = _pack.PackId;
 
-        // 빈 풀은 드로우 불가 — 차감 전에 방어(잘못된 결제 방지).
         if (_pack.PoolCount == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool, t_packId);
 
         long t_price = _pack.Price;
 
-        // 2. 잔액 확인 — 부족하면 차감 없이 실패.
         if (!CurrencyManager.CanAfford(ECurrencyType.Gold, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold, t_packId);
 
-        // 3. 차감. CanAfford 통과 후에도 false면 방어 실패(차감 없음).
         if (!CurrencyManager.Spend(ECurrencyType.Gold, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed, t_packId);
 
-        // 4. drawCount회 균등 드로우 → Grant → 중복 시 환급.
         var t_pool = _pack.Pool;
-        long t_refundEach = _refundGold < 0 ? 0 : _refundGold;   // 음수 방어(환급은 0 이상).
+        long t_refundEach = _refundGold < 0 ? 0 : _refundGold;
         int t_drawCount = _pack.DrawCount;
 
-        // 중복 없음 옵션: 비복원 추출이라 풀보다 많이 뽑을 수 없다(풀 크기로 캡).
         bool t_unique = _pack.UniqueDraw;
         if (t_unique && t_drawCount > t_pool.Count) t_drawCount = t_pool.Count;
 
-        // 비복원용 인덱스 셔플 버퍼(중복 허용이면 미사용).
         List<int> t_remain = null;
         if (t_unique)
         {
@@ -64,18 +42,16 @@ public static class CardPackOpener
             CardData t_card;
             if (t_unique)
             {
-                // 뽑은 인덱스는 제거해 같은 카드가 두 번 나오지 않게 한다.
                 int t_pick = s_rng.Next(t_remain.Count);
                 t_card = t_pool[t_remain[t_pick]];
                 t_remain.RemoveAt(t_pick);
             }
             else
             {
-                t_card = t_pool[s_rng.Next(t_pool.Count)]; // 로컬 랜덤 균등(복원 추출).
+                t_card = t_pool[s_rng.Next(t_pool.Count)];
             }
 
-            // 오설정 방어: null 풀 항목은 뽑지 않고 건너뛴다.
-            // (Grant(null)==false가 '중복'으로 오판돼 받지도 않은 카드에 환급이 나가는 것을 차단.)
+            // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 환급이 새어나간다
             if (t_card == null) continue;
 
             bool t_isNew = OwnershipManager.Grant(CardCatalog.KeyOf(t_card));
@@ -83,7 +59,6 @@ public static class CardPackOpener
             long t_refund = 0;
             if (!t_isNew)
             {
-                // 중복 = 소액 골드 환급. Spend와 같은 트랜잭션(루프 후 1회 Save로 영속).
                 CurrencyManager.Earn(ECurrencyType.Gold, t_refundEach);
                 t_refund = t_refundEach;
             }
@@ -91,10 +66,8 @@ public static class CardPackOpener
             t_drawn.Add(new DrawnCard(t_card, t_isNew, t_refund));
         }
 
-        // 5. Spend+Earn 트랜잭션 즉시 영속(1회). 소유는 Grant가 이미 자체 Save했다.
         CurrencyManager.Save();
 
-        // 6. 결과 조립(총 환급액은 카드 Refund 합으로 파생).
         return OpenedPack.CreateSuccess(t_packId, t_drawn);
     }
 }

@@ -1,7 +1,6 @@
 using UnityEngine;
 
-// 소유권 디버그 툴. 씬의 아무 GameObject에 붙이고 인스펙터 컴포넌트 우클릭 ContextMenu로 실행.
-// 실제 동작은 OutgameDebugActions에 있다 — 런타임 오버레이(OutgameDebugOverlay)와 같은 경로를 쓴다.
+// 소유권 디버그 툴(인스펙터 우클릭 ContextMenu로 실행)
 public class OwnershipDebugTool : MonoBehaviour
 {
     [ContextMenu("전체 해금")]
@@ -9,6 +8,15 @@ public class OwnershipDebugTool : MonoBehaviour
 
     [ContextMenu("전체 회수")]
     void RevokeAll() => OutgameDebugActions.RevokeAllCards();
+
+    [ContextMenu("골드 +1000")]
+    void GrantGold() => OutgameDebugActions.GrantGold();
+
+    [ContextMenu("다이아 +1000")]
+    void GrantDiamond() => OutgameDebugActions.GrantDiamond();
+
+    [ContextMenu("카드 성장 초기화")]
+    void ResetCardGrowth() => OutgameDebugActions.ResetCardGrowth();
 
     [ContextMenu("소유 현황 로그")]
     void LogOwnership() => OutgameDebugActions.LogOwnership();

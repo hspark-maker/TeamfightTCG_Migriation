@@ -60,8 +60,8 @@ public class CollectionThemeRowView : MonoBehaviour
     {
         if (body != null) body.SetActive(_expanded);
 
-        // 슬롯 생성은 body를 켠 **다음**이어야 한다 — CardVisualView.ApplyIngameFontScale이
-        // 꺼진 부모(rect 높이 0)에서는 건너뛰어 글자 크기가 어긋난 채로 남는다.
+        // 슬롯 생성은 body를 켠 **다음**이어야 한다 — 꺼진 부모는 rect가 0이라
+        // 카드 배율(UniformFitContent)이 정해지지 않는다.
         if (_expanded) EnsureSlots();
 
         if (arrow != null)

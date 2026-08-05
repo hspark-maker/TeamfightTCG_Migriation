@@ -2,36 +2,49 @@ using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
 // 로비 컬렉션 탭의 카드 상세 오버레이(CardDetailOverlay.prefab 루트에 부착).
 // 카드 타일을 길게 누르면 열리고, 누른 카드의 이름·체력·키워드·시너지를 채운다.
+// 닫기 버튼은 두지 않는다 — 오버레이 아무 곳이나 탭하면 닫힌다(조작 바 tapCloseExclude만 제외).
 //
 // 인게임 카드 정보창(PooledCardElement)과 달리 풀드 UI가 아니라 로비 씬에 직접 배치한다 —
 // 로비 전용 풀스크린 한 장이라 Addressables("UIPrefab" 라벨) 등록까지 갈 이유가 없다(PackOpenOverlay와 같은 결).
 //
 // 표시 규칙은 복제하지 않는다: 카드 그림 한 장은 CardVisualView.Bind, 시너지 이름은 SynergyText,
 // 키워드 아이콘·표시명·설명은 KeywordIconConfig가 정본이다.
-public class CardDetailOverlayView : MonoBehaviour
+public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 {
-    /// <summary>미소유 카드의 이름 자리. 카드 그림 자체는 CardVisualView가 실루엣으로 가린다.</summary>
     const string LockedName  = "???";
-    /// <summary>미소유 카드의 수치 자리(체력).</summary>
     const string LockedValue = "?";
-    /// <summary>보유 카드인데 해당 섹션에 내용이 없을 때. 섹션을 숨기지 않는 이유는 ApplySection 주석 참고.</summary>
     const string NoneValue   = "없음";
-    /// <summary>진화 단계 0(아직 진화하지 않음)의 표시.</summary>
-    const string NoEvolution = "미진화";
+    const string NoValue     = "-";
+
+    // 강화가 왜 막혔는지. 상세 패널의 상시 문구와 결과판의 "한 번 더" 아래 문구가 같은 문장을 쓴다.
+    const string MaxLevelNotice     = "최고 레벨에 도달했다";
+    const string NotAffordableNotice = "골드가 부족하다";
 
     [Header("배선")]
-    [SerializeField] TMP_Text       titleText;       // 상단 카드 이름
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
     [SerializeField] TMP_Text       powerValueText;  // 체력 수치(프리팹 목업의 "파워" 행을 체력으로 쓴다)
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
     [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
-    [SerializeField] TMP_Text evolutionValueText;  // 진화 단계 "2단계"(미진화면 NoEvolution)
+
+    [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
+    [SerializeField] Button     enhanceButton;
+    [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
+    [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
+    [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
+    [SerializeField] TMP_Text   growthNoticeText;
+
+    [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
+    [SerializeField] CardEnhanceRitualView ritual;
+
+    [Tooltip("연출이 끝난 자리에 뜨는 결과판. 미배선이면 연출이 스스로 걷고 곧바로 상세로 돌아온다.")]
+    [SerializeField] EnhanceResultPanelView resultPanel;
 
     [Header("키워드 섹션")]
     [SerializeField] GameObject keywordSection;      // 칩이 0개면 통째로 숨긴다
@@ -48,12 +61,12 @@ public class CardDetailOverlayView : MonoBehaviour
     // 칩에는 설명 줄이 없으므로 프리팹의 explainText를 미배선으로 비워둔다(Init이 null 가드).
     [SerializeField] KeywordExplainItem chipPrefab;
     [SerializeField] KeywordIconConfig  keywordIconConfig;
-    [SerializeField] Button             closeButton;
     [SerializeField] PopupTransition    transition = new PopupTransition();
 
-    [Header("이전/다음 (선택 — 미배선이면 넘기기 없이 지금까지와 동일하게 동작)")]
-    [SerializeField] Button prevButton;
-    [SerializeField] Button nextButton;
+    [Header("탭해서 닫기")]
+    [Tooltip("탭해도 닫히지 않을 영역(BottomBar). 미배선이면 바의 빈 곳 탭도 닫기로 샌다.")]
+    [SerializeField] RectTransform tapCloseExclude;
+    
     [Tooltip("좌우 스와이프 감지. 오버레이 전면을 덮는 raycastTarget Graphic 위에 올려야 한다.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
@@ -82,6 +95,15 @@ public class CardDetailOverlayView : MonoBehaviour
     CanvasGroup m_slideGroup;
     float       m_slideBaseX;
     bool        m_slideBaseCaptured;
+
+    // 강화 연출 중에는 값 갱신을 미룬다 — TryEnhance가 판정·세이브·통지를 동기로 끝내므로,
+    // 그대로 두면 연출이 시작하기도 전에 Lv·HP가 새 값으로 튀어 공개할 것이 남지 않는다.
+    // 결과판이 떠 있는 동안까지 켜져 있다(연출 → 결과판 → 복귀 전체가 한 덩이의 "연출 중"이다).
+    bool m_ritualPlaying;
+
+    // 결과판의 "한 번 더". 무대가 돌아오기 전에 다음 연출을 시작하면 두 연출이 같은 노드를 두고 싸운다 →
+    // 복귀가 끝나는 시점까지 눌린 사실만 들고 있는다.
+    bool m_retryQueued;
 
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
@@ -154,10 +176,12 @@ public class CardDetailOverlayView : MonoBehaviour
     {
         s_instance = this;
 
-        if (this.closeButton != null)
+        // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
+        // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
+        if (this.cardView != null)
         {
-            this.closeButton.onClick.RemoveAllListeners();
-            this.closeButton.onClick.AddListener(Hide);
+            LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
+            if (t_tap != null) t_tap.OnTap = TapClose;
         }
     }
 
@@ -165,37 +189,43 @@ public class CardDetailOverlayView : MonoBehaviour
     // Awake 한 번으로는 부족하고, Remove 후 Add라 중복 등록도 남지 않는다.
     void OnEnable()
     {
-        if (this.prevButton != null)
+
+        if (this.enhanceButton != null)
         {
-            this.prevButton.onClick.RemoveListener(OnPrevPressed);
-            this.prevButton.onClick.AddListener(OnPrevPressed);
-        }
-        if (this.nextButton != null)
-        {
-            this.nextButton.onClick.RemoveListener(OnNextPressed);
-            this.nextButton.onClick.AddListener(OnNextPressed);
+            this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
+            this.enhanceButton.onClick.AddListener(OnEnhancePressed);
         }
 
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
 
-        // 강화·진화는 이 오버레이가 떠 있는 동안 바뀔 수 있다(강화 UI가 위에 겹친다) → 체력·레벨 행이 즉시 따라오게.
+        // 강화 실패에도 통지가 온다 — 핸들러는 "레벨이 올랐다"고 가정하지 않고 값을 다시 읽는다.
         CardGrowthManager.OnGrowthChanged += OnGrowthChanged;
+
+        // 잔액이 바뀌면 버튼 활성이 따라와야 한다(다른 화면·디버그 지급으로도 바뀐다).
+        CurrencyManager.OnCurrencyChanged += HandleCurrencyChanged;
 
         RefreshArrows();
     }
 
     void OnDisable()
     {
-        if (this.prevButton != null) this.prevButton.onClick.RemoveListener(OnPrevPressed);
-        if (this.nextButton != null) this.nextButton.onClick.RemoveListener(OnNextPressed);
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
+        if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
+
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
+        CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
 
         // 전환 도중에 닫히면 slideTarget이 옆으로 밀린 채·반투명인 채 굳는다 → 다음 열기에 그대로 보인다.
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
         CancelSlide();
+
+        // 연출 중에 닫히면 카드가 확대·회색인 채 굳는다. 잘라내되 콜백은 흘러나오므로 유예도 함께 풀린다.
+        // 무대를 먼저 자른다 — 잘리며 흘러나오는 공개 콜백이 결과판을 한 번 더 띄우므로, 결과판 정리가 뒤여야 한다.
+        this.ritual?.CancelImmediate();
+        this.resultPanel?.HideImmediate();
+        this.m_retryQueued = false;
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
@@ -227,6 +257,9 @@ public class CardDetailOverlayView : MonoBehaviour
 
         // 곧바로 Apply가 이어지므로 pending은 버린다(중간 카드에 칩을 한 번 더 짓지 않게).
         CancelSlide();
+        this.ritual?.CancelImmediate();       // 순서는 OnDisable 주석 참고 — 무대가 먼저다.
+        this.resultPanel?.HideImmediate();
+        this.m_retryQueued = false;
         this.transition.SetVisible(gameObject, true);
         Apply(CardAt(this.m_index));
         RefreshArrows();
@@ -237,10 +270,39 @@ public class CardDetailOverlayView : MonoBehaviour
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 화살표·스와이프가 전환을 시작하면 close 시퀀스와 같은 노드를 두고 싸운다.
         // 다시 열 때는 SetVisible(true) → OnEnable → RefreshArrows()가 되살린다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;
-        if (this.prevButton    != null) this.prevButton.interactable    = false;
-        if (this.nextButton    != null) this.nextButton.interactable    = false;
 
         this.transition.SetVisible(gameObject, false);
+    }
+
+    /// <summary>딤·상세 패널 어디를 탭해도 닫는다. 조작 바(tapCloseExclude)와 카드 그림(Awake 참고)은 제외.</summary>
+    public void OnPointerClick(PointerEventData _e)
+    {
+        if (_e == null || _e.button != PointerEventData.InputButton.Left) return;
+
+        // 스와이프로 소비된 포인터는 탭이 아니다 — 없으면 카드를 넘긴 뒤 손 떼는 순간 닫힌다.
+        if (_e.dragging) return;
+
+        // 누른 노드로 판정 — 이 경로의 pointerPress는 루트 자신이라 영역을 알려주지 못한다.
+        GameObject t_hit = _e.pointerPressRaycast.gameObject;
+        if (t_hit != null && this.tapCloseExclude != null
+         && t_hit.transform.IsChildOf(this.tapCloseExclude)) return;
+
+        TapClose();
+    }
+
+    // 강화 연출 중의 탭은 닫기가 아니라 스킵이다 — 연타하는 조작이라 결과를 기다리게만 두면 지겹고,
+    // 그렇다고 닫아버리면 방금 쓴 골드의 결과를 못 보고 화면이 사라진다.
+    void TapClose()
+    {
+        // "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
+        // 그리고 OnKill 콜백 구간에서 어긋난다.
+        if (this.m_ritualPlaying)
+        {
+            this.ritual?.RequestSkip();
+            return;
+        }
+
+        Hide();
     }
 
     void OnPrevPressed() => Step(-1);
@@ -251,6 +313,9 @@ public class CardDetailOverlayView : MonoBehaviour
     void Step(int _dir)
     {
         if (_dir == 0) return;
+
+        // 연출 중에 카드가 바뀌면 무대에 선 카드와 결과가 어긋난다.
+        if (this.m_ritualPlaying) return;
 
         int t_next = FindValid(this.m_index + _dir, _dir);
 
@@ -303,13 +368,7 @@ public class CardDetailOverlayView : MonoBehaviour
 
         t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
     }
-
-    // 진행 중 전환을 취소한다: 자리·투명도를 authoring 값으로 되돌리고 아직 반영 못 한 카드는 버린다.
-    // 버려도 되는 이유는 호출처가 셋뿐이기 때문이다 — 닫힘(안 보임), Show(직후 Apply), 연타 인계(새 카드가 덮어씀).
-    // 한 프레임도 안 보일 중간 카드에 칩 전량을 재생성하지 않는다.
-    //
-    // ⚠ slideTarget.DOKill()을 쓰면 안 된다 — 같은 노드에 PopupTransition의 등장·퇴장 DOScale/DOFade가 걸려 있어
-    //   통째로 자르면 localScale이 0.9 같은 중간값에 굳는다. 그래서 슬라이드 시퀀스에만 id(this)를 달고 그것만 자른다.
+    
     void CancelSlide()
     {
         DOTween.Kill(this);
@@ -350,18 +409,7 @@ public class CardDetailOverlayView : MonoBehaviour
     // interactable을 매번 다시 세우는 이유는 Hide()가 퇴장 중 입력을 죽여두기 때문이다(다시 열 때 여기서 되살아난다).
     void RefreshArrows()
     {
-        bool t_multi = HasMultipleCards();
-
-        if (this.prevButton != null)
-        {
-            this.prevButton.gameObject.SetActive(t_multi);
-            this.prevButton.interactable = t_multi;
-        }
-        if (this.nextButton != null)
-        {
-            this.nextButton.gameObject.SetActive(t_multi);
-            this.nextButton.interactable = t_multi;
-        }
+        bool t_multi = HasMultipleCards() && !this.m_ritualPlaying;
 
         if (this.swipeDetector != null) this.swipeDetector.Interactable = t_multi;
     }
@@ -424,48 +472,243 @@ public class CardDetailOverlayView : MonoBehaviour
     }
 
     // 강화/진화 통지. m_index는 전환 중에도 이미 목표 카드를 가리키므로 지금 카드만 다시 그리면 된다.
+    // 칩 섹션까지 다시 짓지 않는 이유는 RefreshGrowth 주석 참고.
     void OnGrowthChanged()
     {
+        // 연출 중이면 흘려보낸다 — 결과는 공개 순간에 한 번에 반영된다(m_ritualPlaying 주석 참고).
+        if (this.m_ritualPlaying) return;
+
         CardData t_card = CardAt(this.m_index);
-        if (t_card != null) Apply(t_card);
+        if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
 
+    // 재화 종류에 따라 버튼 활성만 바뀐다 — 어느 종류든 다시 판정하면 되므로 걸러내지 않는다.
+    void HandleCurrencyChanged(ECurrencyType _type, long _balance)
+    {
+        if (this.m_ritualPlaying) return;
+
+        CardData t_card = CardAt(this.m_index);
+        if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+    }
+
+    // 카드가 바뀔 때의 전량 갱신. 칩 재생성이 여기에만 있다.
     void Apply(CardData _card)
     {
         bool t_owned = OwnershipManager.IsOwned(_card);
 
         // 그림·이름·체력·키워드 아이콘·잠김 오버레이는 도감 타일과 같은 컴포넌트에 그대로 위임한다.
         if (this.cardView != null) this.cardView.Bind(_card, t_owned);
+        
 
-        if (this.titleText != null)
-            this.titleText.text = t_owned ? _card.displayName : LockedName;
+        BuildKeywordSection(_card, t_owned);
+        BuildSynergySection(_card, t_owned);
+
+        RefreshGrowth(_card, t_owned);
+    }
+
+    // 성장에 따라 움직이는 것만 다시 그린다. 강화는 연타하는 조작이라, 통지마다 Apply를 통째로 돌리면
+    // 값이 그대로인 키워드·시너지 칩까지 매번 Destroy + Instantiate 된다.
+    //
+    // _deferCardHp: 카드 그림의 체력만 손대지 않는다. 결과판이 그 숫자를 굴려 보여줄 참이라
+    // 여기서 최종값을 먼저 찍으면, 빛이 걷힌 카드에 새 숫자가 잠깐 비쳤다가 굴리기가 시작되며 옛 값으로 되돌아간다.
+    void RefreshGrowth(CardData _card, bool _owned, bool _deferCardHp = false)
+    {
+        // 카드 그림의 HP도 강화를 따라와야 한다. Bind가 아니라 RefreshHp인 이유는 그쪽 주석 참고
+        // (Bind는 키워드 아이콘·시너지 배지까지 전부 다시 짓는다).
+        if (this.cardView != null && !_deferCardHp) this.cardView.RefreshHp(_card, _owned);
 
         // CardData에 파워 필드가 없어 프리팹 목업의 "파워" 행을 체력으로 쓴다(라벨/아이콘은 프리팹 쪽 값).
         // 수치는 강화 반영값 — 환산의 정본은 DeckPower다(마스터 maxHp를 직접 읽지 않는다).
         int t_maxHp = DeckPower.MaxHpOf(_card);
         if (this.powerValueText != null)
-            this.powerValueText.text = !t_owned          ? LockedValue
+            this.powerValueText.text = !_owned           ? LockedValue
                                      : _card.bonusHp > 0 ? $"{t_maxHp} (+{_card.bonusHp})"
                                                          : t_maxHp.ToString();
 
-        ApplyGrowth(_card, t_owned);
-        BuildKeywordSection(_card, t_owned);
-        BuildSynergySection(_card, t_owned);
+        ApplyGrowth(_card, _owned);
+        RefreshGrowthActions(_card, _owned);
     }
 
-    // 강화 레벨·진화 단계. 미배선 필드는 조용히 건너뛴다(이전/다음 화살표와 같은 옵션 배선 규약).
+    // 강화 레벨. 미배선 필드는 조용히 건너뛴다(이전/다음 화살표와 같은 옵션 배선 규약).
     // 값이 없어도 행을 끄지 않는 이유는 ApplySection 주석과 같다 — 카드마다 패널 높이가 흔들린다.
     void ApplyGrowth(CardData _card, bool _owned)
     {
-        CardGrowth t_growth = CardGrowthManager.GrowthOf(_card);
+        if (this.levelValueText == null) return;
 
-        if (this.levelValueText != null)
-            this.levelValueText.text = _owned ? $"Lv {t_growth.Level} / {CardGrowthManager.MaxLevel}" : LockedValue;
+        if (_owned) SetLevelText(CardGrowthManager.GrowthOf(_card).Level);
+        else        this.levelValueText.text = LockedValue;
+    }
 
-        if (this.evolutionValueText != null)
-            this.evolutionValueText.text = !_owned                     ? LockedValue
-                                         : t_growth.EvolutionStage > 0 ? $"{t_growth.EvolutionStage}단계"
-                                                                       : NoEvolution;
+    // 강화 버튼과 비용·성공률·안내 문구. 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
+    void RefreshGrowthActions(CardData _card, bool _owned)
+    {
+        GrowthStep t_step = default;
+        bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
+
+        // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
+        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost);
+        if (this.enhanceButton != null)
+        {
+            this.enhanceButton.gameObject.SetActive(_owned);
+            // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
+            this.enhanceButton.interactable = t_canPayEnhance && !this.m_ritualPlaying;
+        }
+        if (this.enhanceCostText != null) this.enhanceCostText.text = t_hasStep ? t_step.Cost.ToString("N0") : NoValue;
+        if (this.successRateText != null)
+            this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
+
+        if (this.growthNoticeText != null)
+            this.growthNoticeText.text = _owned ? GrowthNotice(t_hasStep, t_canPayEnhance) : string.Empty;
+    }
+
+    // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
+    static string GrowthNotice(bool _hasStep, bool _canPay)
+    {
+        return !_hasStep ? MaxLevelNotice : !_canPay ? NotAffordableNotice : string.Empty;
+    }
+
+    void OnEnhancePressed()
+    {
+        if (this.m_ritualPlaying) return;
+
+        CardData t_card = CardAt(this.m_index);
+        if (t_card == null)
+        {
+            AbortEnhance(null);
+            return;
+        }
+
+        // 시도 **전에** 잡아둔다 — 결과에는 오른 폭도 이전 값도 없다.
+        int t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
+        int t_fromHp    = DeckPower.MaxHpOf(t_card);
+
+        // 유예를 먼저 세운다 — TryEnhance가 그 안에서 OnGrowthChanged를 동기로 발화한다.
+        this.m_ritualPlaying = true;
+
+        EnhanceResult t_result = CardGrowthManager.TryEnhance(t_card);
+
+        // 저작 실수(부트 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
+        if (t_result.Outcome == EEnhanceOutcome.NotReady)
+            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
+
+        bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
+
+        // 결제 전에 막힌 경우(잔액 부족·최고 레벨·미초기화)엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
+        if (!t_played || this.ritual == null)
+        {
+            AbortEnhance(t_card);
+            return;
+        }
+
+        // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhance는 이미 끝난 거래라
+        // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
+        LockControls();
+
+        this.ritual.Play(
+            t_result.Outcome, _awaitReturn: this.resultPanel != null,
+            _onReveal: () =>
+            {
+                // 카드가 이미 바뀐 뒤 잘려 들어온 콜백이면 옛 값을 찍지 않는다(Show/Step의 CancelImmediate 경로).
+                if (CardAt(this.m_index) != t_card) return;
+
+                // 카드가 빛에 완전히 덮인 프레임이다. 걷혀 있는 상세 패널의 값을 여기서 조용히 갈아두면
+                // 결과판을 닫고 돌아왔을 때 숫자가 튀지 않는다 — 보여주는 일은 결과판이 맡는다.
+                //
+                // 카드 위의 체력만 옛 값에 붙들어 둔다. 그 숫자는 결과판의 체력 행과 같은 박자로 굴러 오를 참이다.
+                RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card), _deferCardHp: this.resultPanel != null);
+            },
+            _onSettled: () =>
+            {
+                // 카드 위 연출이 다 끝난 뒤다. 여기서부터가 읽는 시간 — 결과판이 제 박자로 글자를 쌓는다.
+                //
+                // 무대에 선 카드가 바뀌었으면 옛 결과를 띄우지 않는다. 다만 무대는 **반드시** 돌려보낸다 —
+                // 결과판이 안 뜨면 복귀를 시작할 주체가 없어 오버레이가 통째로 굳는다(도감이 목록을 제자리에서
+                // 다시 채우면 연출 도중에도 CardAt이 다른 카드를 가리킬 수 있다).
+                if (CardAt(this.m_index) != t_card)
+                {
+                    this.ritual.PlayReturn();
+                    return;
+                }
+
+                ShowResultPanel(t_card, t_result, t_fromLevel, t_fromHp);
+            },
+            _onFinished: () =>
+            {
+                this.m_ritualPlaying = false;
+
+                // 지금 보이는 카드로 다시 그린다 — 중간에 카드가 바뀌었어도 화면과 값이 어긋나지 않게.
+                CardData t_now = CardAt(this.m_index);
+                if (t_now != null) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
+                RefreshArrows();
+
+                // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
+                // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
+                // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
+                if (!this.m_retryQueued) return;
+
+                this.m_retryQueued = false;
+                OnEnhancePressed();
+            });
+    }
+
+    // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.
+    //
+    // 무대까지 되돌리는 이유는 "한 번 더"로 이어온 길 때문이다 — 그 경로에선 패널이 걷힌 채로 넘어오므로
+    // 여기서 되돌리지 않으면 상세 패널이 사라진 채 굳는다(첫 시도에서 막힌 경우엔 되돌릴 것이 없어 무해하다).
+    void AbortEnhance(CardData _card)
+    {
+        this.m_ritualPlaying = false;
+
+        this.ritual?.CancelImmediate();
+
+        // 잔액부족은 통지가 없다 → 여기서 한 번(멱등)
+        if (_card != null) RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
+        RefreshArrows();
+    }
+
+    // 강화를 누른 직후의 잠금. 값은 손대지 않는다 — 여기서 RefreshGrowth를 부르면 공개할 것이 사라진다.
+    void LockControls()
+    {
+        if (this.enhanceButton != null) this.enhanceButton.interactable = false;
+
+        RefreshArrows();   // 연출 중에 카드가 넘어가면 무대에 선 카드와 결과가 어긋난다.
+    }
+
+    // 결과판을 띄운다. 판정은 이미 끝났고 여기서는 "무엇이 얼마나 바뀌었나"만 모아 넘긴다.
+    void ShowResultPanel(CardData _card, EnhanceResult _result, int _fromLevel, int _fromHp)
+    {
+        if (this.resultPanel == null) return;   // 미배선이면 연출이 스스로 걷는다(Play의 _awaitReturn 참고).
+
+        // "한 번 더"의 가부는 오른 뒤의 다음 단계로 판정한다 — 방금 쓴 비용이 아니라 지금 낼 비용이 기준이다.
+        bool t_hasNext  = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
+        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(ECurrencyType.Gold, t_next.Cost);
+
+        var t_line = new EnhanceResultLine(_result.Outcome,
+                                           _fromHp, DeckPower.MaxHpOf(_card),
+                                           _fromLevel, _result.Level,
+                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry));
+
+        this.resultPanel.Show(t_line,
+                              _onClose: () => this.ritual.PlayReturn(),
+                              // 무대는 돌려보내지 않는다 — 상세 패널이 0.35초 돌아왔다 곧바로 다시 걷히면
+                              // 연타의 리듬이 그 왕복에서 끊긴다. 걷힌 채로 다음 담금질이 이어진다.
+                              _onRetry: () =>
+                              {
+                                  this.m_retryQueued = true;
+                                  this.ritual.EndAwaitForChain();
+                              },
+                              // 결과판의 "체력 71 → 73"이 굴러 오르는 그 박자에 무대에 선 카드의 숫자도 함께 오른다 —
+                              // 따로 놀면 오른 것이 저 카드의 저 값이라는 연결이 끊긴다.
+                              _onHpRoll: _dur =>
+                              {
+                                  if (this.cardView == null) return;
+                                  this.cardView.RollHp(_card, OwnershipManager.IsOwned(_card), _fromHp, _dur);
+                              });
+    }
+
+    void SetLevelText(int _level)
+    {
+        if (this.levelValueText != null) this.levelValueText.text = $"Lv {_level} / {CardGrowthManager.MaxLevel}";
     }
 
     void BuildKeywordSection(CardData _card, bool _owned)
