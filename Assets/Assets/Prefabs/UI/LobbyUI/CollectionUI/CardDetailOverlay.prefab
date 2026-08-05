@@ -644,8 +644,11 @@ MonoBehaviour:
   blindPeak: 1
   overheatStart: 0.4
   overheatRise: 0.55
-  blindFailPeak: 0.45
-  blindFailColor: {r: 0.62, g: 0.66, b: 0.78, a: 1}
+  coverMaterial: {fileID: 2100000, guid: f744962ef568df34ea0c619144cf67de, type: 2}
+  snuffDuration: 0.1
+  emberHeat: 0.22
+  emberFade: 0.35
+  blackoutDepth: 0.3
   afterglowHeat: 0.35
   afterglowAlpha: 0.3
   afterglowScale: 1.12

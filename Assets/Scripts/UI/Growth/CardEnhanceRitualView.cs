@@ -64,8 +64,6 @@ public class CardEnhanceRitualView : MonoBehaviour
     [SerializeField] Graphic backGlow;
 
     [Header("담금질 — 온도")]
-    [Tooltip("진입에서 식는 색. 흰색에서 이쪽으로 밀린다 — 어두워지는 것이 아니라 차가워져야 '불이 꺼진 대장간'이 된다.")]
-    [SerializeField] Color chillColor    = new Color(0.62f, 0.66f, 0.82f, 1f);
     [Tooltip("달아오르기 시작할 때의 빛색(잉걸).")]
     [SerializeField] Color emberColor    = new Color(1f, 0.50f, 0.15f, 1f);
     [Tooltip("정점의 빛색(백열). 여기까지 색이 올라와야 다음이 '터진다'로 읽힌다.")]
@@ -169,7 +167,6 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 카드 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
 
-    static readonly int P_Color             = Shader.PropertyToID("_Color");
     static readonly int P_Glow              = Shader.PropertyToID("_Glow");
     static readonly int P_GlowColor         = Shader.PropertyToID("_GlowColor");
     static readonly int P_InnerOutlineAlpha = Shader.PropertyToID("_InnerOutlineAlpha");
@@ -206,7 +203,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     // 트윈이 이어 붙을 때의 출발점들. getter가 시작 시점에 한 번 읽히므로 앞 구간이 남긴 값에서 이어진다.
     float m_dimLevel;   // -1 어둠 ~ +1 빛
-    float m_heat;       // -1 식음 ~ +1 백열
+    float m_heat;       // 0 평상 ~ +1 백열
     float m_shake;      // 픽셀 진동 0~1
     float m_snuff;      // 덮개가 꺼진 정도 0~1
 
@@ -458,14 +455,17 @@ public class CardEnhanceRitualView : MonoBehaviour
             }
 
         _seq.Insert(0f, this.cardStage.DOScale(this.enterScale, _dur).SetEase(Ease.OutCubic));
+
+        // 어두워지는 것은 무대뿐이다 — 카드는 프리팹 그대로의 밝기로 서 있어야
+        // 뒤이어 붙는 빛이 "이 카드가 달아올랐다"로 읽힌다('불이 꺼진 대장간'은 딤이 진다).
         _seq.Insert(0f, DimTween(-1f, _dur));
-        _seq.Insert(0f, HeatTween(-1f, _dur).SetEase(Ease.OutQuad));
 
         if (!_chained) return;
 
         // 앞 결과가 남긴 자세를 이 구간이 데려온다 — 실패의 잿빛·떨궈진 자리가 "다시 식는다"로 읽히게.
         // (RestoreVisual로 즉시 원복하면 같은 되돌림이 한 프레임에 튄다.)
         _seq.Insert(0f, this.cardStage.DOAnchorPos(this.m_baseAnchored, _dur).SetEase(Ease.OutQuad));
+        _seq.Insert(0f, HeatTween(0f, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(0f, GreyTween(0f, _dur));
         _seq.Insert(0f, BlindTween(0f, _dur));
         _seq.Insert(0f, CoverTween(0f, _dur));
@@ -493,7 +493,8 @@ public class CardEnhanceRitualView : MonoBehaviour
                         this.cardStage.DOShakeAnchorPos(t_seg, t_strength, t_vibrato, 90f, false, false));
         }
 
-        // 식은 상태에서 백열 직전까지. 뒤로 갈수록 가팔라야 "버티다 못해 달아오른다"가 된다.
+        // 평상에서 백열 직전까지. 뒤로 갈수록 가팔라야 "버티다 못해 달아오른다"가 된다 —
+        // 앞 구간이 거의 0에 머무는 덕에 카드는 한동안 원래 모습 그대로 조여들기만 한다.
         _seq.Insert(_at, HeatTween(1f, _dur).SetEase(Ease.InQuad));
         _seq.Insert(_at, ShakeTween(1f, _dur).SetEase(Ease.InQuad));
 
@@ -628,8 +629,8 @@ public class CardEnhanceRitualView : MonoBehaviour
         // 다 꺼진 덮개를 중립으로 되돌린다. 알파와 잠식을 같은 프레임에 놓아야 되돌리는 과정이 보이지 않는다.
         _seq.InsertCallback(t_out, () => { SetCover(0f); SetSnuff(0f); });
 
-        // 잔열. 면의 빛은 이미 없고 테두리선만 남아 사그라든다.
-        _seq.Insert(t_out, HeatTween(-1f, Mathf.Max(0.05f, this.emberFade)).SetEase(Ease.InQuad));
+        // 잔열. 면의 빛은 이미 없고 테두리선만 남아 사그라든다 — 카드 자체는 회색화만 뒤집어쓴 채 원래 밝기로 돌아온다.
+        _seq.Insert(t_out, HeatTween(0f, Mathf.Max(0.05f, this.emberFade)).SetEase(Ease.InQuad));
 
         // 낙하는 꺼진 다음이다 — 같이 떨어지면 꺼짐이 낙하에 묻힌다.
         _seq.Insert(t_out, this.cardStage.DOScale(1f, 0.3f).SetEase(Ease.OutQuad));
@@ -696,17 +697,17 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
     }
 
-    // -1이면 식어 푸르고, 0이 평상, +1이 백열. 흩어진 프로퍼티를 한 축으로 묶어 구간마다 하나만 밀면 되게 한다.
+    // 0이 평상(카드 원래 밝기), +1이 백열. 흩어진 프로퍼티를 한 축으로 묶어 구간마다 하나만 밀면 되게 한다.
+    //
+    // ⚠ 카드 색(_Color)은 어느 구간에서도 건드리지 않는다 — 달아오르기 전에 톤이 먼저 밀리면
+    //   "이 카드가 달아오른다"가 아니라 "다른 카드로 바뀌었다"가 된다. 올리는 것은 없던 빛(글로·테두리)뿐이다.
     void SetHeat(float _level)
     {
         this.m_heat = _level;
 
         if (this.m_body == null) return;
 
-        float t_chill = Mathf.Clamp01(-_level);
-        float t_hot   = Mathf.Clamp01(_level);
-
-        this.m_body.SetColor(P_Color, Color.Lerp(Color.white, this.chillColor, t_chill));
+        float t_hot = Mathf.Clamp01(_level);
 
         Color t_light = Color.Lerp(this.emberColor, this.whiteHotColor, t_hot);
         this.m_body.SetColor(P_GlowColor, t_light);
