@@ -9,7 +9,7 @@ public class CardGrowthSaveData
 
     public int version = VERSION;
 
-    // 성장한 카드만 담는다(Lv0은 항목 없음)
+    // 강화한 카드만 담는다(미강화 Lv1은 항목 없음)
     public List<CardGrowthEntry> entries = new List<CardGrowthEntry>();
 }
 

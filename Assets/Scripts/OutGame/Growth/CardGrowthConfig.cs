@@ -6,13 +6,14 @@ using UnityEngine;
 public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
-    [Min(0)] [SerializeField] int maxLevel = 10;
+    [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
     [Min(0)] [SerializeField] int hpPerLevel = 2;
 
-    [Tooltip("레벨 1로 올릴 때의 골드 비용.")]
+    [Tooltip("첫 강화(Lv2로 올릴 때)의 골드 비용.")]
     [SerializeField] long baseGoldCost = 100;
-    
-    [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseGoldCost + (N-1) * 이 값.")]
+
+    [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseGoldCost + (N-2) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
     [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
     [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
@@ -20,14 +21,14 @@ public class CardGrowthConfig : ScriptableObject
     [Header("레벨별 오버라이드 (override 체크한 필드만 기본식을 대체)")]
     [SerializeField] List<GrowthStepOverride> stepOverrides = new List<GrowthStepOverride>();
 
-    // 강화 상한 레벨(음수 오설정은 0으로 보정)
-    public int MaxLevel => maxLevel < 0 ? 0 : maxLevel;
+    // 강화 상한 레벨(바닥 아래 오설정은 바닥으로 보정 = 강화 없음)
+    public int MaxLevel => maxLevel < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : maxLevel;
 
-    // 레벨 _level로 올리는 한 스텝(범위 밖이면 false)
+    // 레벨 _level로 올리는 한 스텝(범위 밖이면 false). 바닥 레벨은 강화로 도달하는 레벨이 아니다.
     public bool TryGetStep(int _level, out GrowthStep _step)
     {
         _step = default;
-        if (_level < 1 || _level > MaxLevel) return false;
+        if (_level <= CardGrowth.BaseLevel || _level > MaxLevel) return false;
 
         _step = StepAt(_level);
         return true;
@@ -36,11 +37,11 @@ public class CardGrowthConfig : ScriptableObject
     // 레벨 _level까지의 누적 HP 보너스
     public int HpBonusAt(int _level)
     {
-        if (_level <= 0) return 0;
+        if (_level <= CardGrowth.BaseLevel) return 0;
 
         int t_top = _level > MaxLevel ? MaxLevel : _level;
         int t_sum = 0;
-        for (int t_i = 1; t_i <= t_top; t_i++)
+        for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
         {
             t_sum += StepAt(t_i).HpGain;
         }
@@ -49,9 +50,12 @@ public class CardGrowthConfig : ScriptableObject
 
     GrowthStep StepAt(int _level)
     {
+        // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseGoldCost·baseSuccessRate가 첫 강화의 값이 된다.
+        int t_step = _level - CardGrowth.BaseLevel - 1;
+
         int   t_hp   = hpPerLevel;
-        long  t_cost = baseGoldCost + costGrowthPerLevel * (_level - 1);
-        float t_rate = baseSuccessRate - rateDropPerLevel * (_level - 1);
+        long  t_cost = baseGoldCost + costGrowthPerLevel * t_step;
+        float t_rate = baseSuccessRate - rateDropPerLevel * t_step;
 
         if (TryGetOverride(_level, out var t_over))
         {
@@ -86,7 +90,7 @@ public class CardGrowthConfig : ScriptableObject
 [System.Serializable]
 public struct GrowthStepOverride
 {
-    [Tooltip("대상 레벨(1 = 첫 강화). 0은 유효 레벨이 아니라 어떤 스텝에도 적용되지 않는다.")]
+    [Tooltip("대상 레벨(2 = 첫 강화). 바닥 레벨(1) 이하는 어떤 스텝에도 적용되지 않는다.")]
     public int level;
 
     public bool overrideHpGain;

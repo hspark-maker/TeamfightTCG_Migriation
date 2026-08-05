@@ -63,13 +63,16 @@ public static class CardGrowthManager
 
     public static CardGrowth GrowthOf(CardData _card) => GrowthOf(CardCatalog.KeyOf(_card));
 
-    // 카드 키의 성장 스냅샷(미성장은 Lv0). HP 보너스는 저장값이 아니라 레벨에서 파생
+    // 카드 키의 성장 스냅샷(기록이 없으면 미강화). HP 보너스는 저장값이 아니라 레벨에서 파생
     public static CardGrowth GrowthOf(string _key)
     {
-        if (string.IsNullOrEmpty(_key)) return default;
-        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return default;
+        if (string.IsNullOrEmpty(_key)) return CardGrowth.Fresh;
+        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return CardGrowth.Fresh;
 
-        return new CardGrowth(t_entry.level, Config.HpBonusAt(t_entry.level));
+        // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
+        int t_level = t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
+
+        return new CardGrowth(t_level, Config.HpBonusAt(t_level));
     }
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
@@ -86,10 +89,10 @@ public static class CardGrowthManager
     // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
     public static EnhanceResult TryEnhance(CardData _card)
     {
-        if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, 0);
+        if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
 
         string t_key = CardCatalog.KeyOf(_card);
-        if (string.IsNullOrEmpty(t_key)) return new EnhanceResult(EEnhanceOutcome.MaxLevel, 0);
+        if (string.IsNullOrEmpty(t_key)) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
         CardGrowthConfig t_config = Config;
         CardGrowth       t_growth = GrowthOf(t_key);
@@ -132,7 +135,7 @@ public static class CardGrowthManager
     {
         if (s_growth.TryGetValue(_key, out var t_entry) && t_entry != null) return t_entry;
 
-        t_entry = new CardGrowthEntry { cardKey = _key, level = 0 };
+        t_entry = new CardGrowthEntry { cardKey = _key, level = CardGrowth.BaseLevel };
         s_growth[_key] = t_entry;
         return t_entry;
     }

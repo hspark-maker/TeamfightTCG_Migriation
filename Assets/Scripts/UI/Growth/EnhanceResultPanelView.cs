@@ -103,6 +103,14 @@ public class EnhanceResultPanelView : MonoBehaviour
     /// "이 행이 저 카드의 저 자리"가 읽힌다. 굴릴 것이 없으면(실패·상승폭 0) 오지 않는다.</summary>
     public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null)
     {
+        // 닫을 수단이 하나도 없으면 띄우는 순간이 곧 소프트락이다 — 무대만 돌려보내고 뜨지 않는다.
+        if (this.tapCatcher == null && this.retryButton == null)
+        {
+            Debug.LogError("[EnhanceResultPanelView] 탭 받이·'한 번 더'가 둘 다 미배선 — 결과판을 띄우면 닫을 수단이 없다.");
+            _onClose?.Invoke();
+            return;
+        }
+
         gameObject.SetActive(true);
         EnsureBase();
         KillSeq();
@@ -185,6 +193,14 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.retryButton != null) this.retryButton.onClick.RemoveListener(OnRetryPressed);
 
         KillSeq();
+
+        // 걷히는 도중에 꺼졌다면 OnComplete가 안 돌아 복귀 신호가 삼켜진다. 상태만은 반드시 풀어둔다 —
+        // 다음에 켜졌을 때 "닫히는 중"으로 남아 있으면 탭이 통째로 먹힌다.
+        // (무대 복귀는 이 경로에서 호출부가 CancelImmediate로 직접 한다.)
+        this.m_open    = false;
+        this.m_closing = false;
+        this.m_onClose = null;
+        this.m_onRetry = null;
     }
 
     // 성공이면 행이 아래에서 차례로 떠오르고 오른 체력이 굴러 오른다.

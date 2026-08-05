@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 // 카드 강화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 담금질이다 — 카드가 움츠러들며 달아오르고(고조), 그 빛이 카드를 통째로 삼킨 뒤(정적), 백열이 걷히며 터진다(공개).
-// 실패는 그 열이 터지지 못하고 꺼져 회색이 번지는 모습으로 갈린다.
+// 실패는 그 열이 터지지 못하고 훅 꺼져 식는 모습으로 갈린다 — 성공은 빛이 밖으로 걷히고, 실패는 안에서 죽는다.
 //
 // ⚠ 결과는 백열이 카드를 완전히 덮은 뒤에 갈린다 — 성공·실패가 같은 백지에서 출발해야 결과가 미리 새지 않는다.
 //
@@ -26,6 +26,9 @@ using UnityEngine.UI;
 //
 // 다만 재질은 자기가 얹힌 이미지만 덮는다. 글자·아이콘까지 삼키는 마지막 한 겹은 셰이더가 아니라
 // 카드 실루엣 모양의 판(floodCover) 하나가 진다 — 카드가 몇 조각으로 쪼개져 있든 덮개는 한 장이면 된다.
+//
+// 그 덮개는 이미지가 한 장이므로 UV 의존 축을 써도 된다(rect가 하나뿐이라 어긋날 경계가 없다).
+// 실패의 꺼짐이 이걸 쓴다 — FADE로 덮개만 얼룩덜룩 갉아 없앤다. 지워지는 것은 빛이지 카드가 아니다.
 //
 // ⚠ 셰이더 키워드는 런타임에 켜지 않는다 — shader_feature라 빌드에서 미사용 변형이 스트립되고,
 //   첫 EnableKeyword는 변형 컴파일 렉을 만든다. 필요한 키워드는 .mat 자산에 켜둔 채 값만 민다.
@@ -87,11 +90,20 @@ public class CardEnhanceRitualView : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] float overheatRise  = 0.55f;
 
-    [Header("실패 — 꺼지는 빛")]
-    [Tooltip("백열이 꺼지며 잠깐 머무는 잿빛의 세기. 흰빛에서 여기까지 떨어졌다가 사라진다.")]
-    [Range(0f, 1f)]
-    [SerializeField] float blindFailPeak = 0.45f;
-    [SerializeField] Color blindFailColor = new Color(0.62f, 0.66f, 0.78f, 1f);
+    [Header("실패 — 훅 꺼진다")]
+    [Tooltip("Materials/Growth/CardRitualEmber. FADE가 켜져 있어야 한다. floodCover에만 얹는다(이미지 한 장이라 UV 축이 안전하다).\n" +
+             "미배선이면 덮개가 얼룩 없이 균일하게 걷힌다 — 꺼지는 것이 아니라 페이드아웃으로 읽힌다.")]
+    [SerializeField] Material coverMaterial;
+    [Tooltip("백열이 죽는 시간. 짧아야 '꺼졌다'가 된다 — 길어지면 불이 카드를 먹는 것으로 읽힌다.")]
+    [SerializeField] float snuffDuration  = 0.1f;
+    [Tooltip("꺼진 직후 남는 잔열. 면의 빛(_Glow)은 제곱이라 이 값에서 이미 없고 테두리선만 남는다 — 불이 있었다는 유일한 증거.")]
+    [Range(0f, 0.5f)]
+    [SerializeField] float emberHeat      = 0.22f;
+    [Tooltip("잔열이 사그라들어 카드가 차갑게 식기까지의 시간.")]
+    [SerializeField] float emberFade      = 0.35f;
+    [Tooltip("빛이 사라진 순간 딤이 결과 밝기보다 더 내려가는 깊이. 눈이 정점의 빛에 적응해 있어서 이 과암이 있어야 낙차가 몸으로 온다.")]
+    [Range(0f, 0.6f)]
+    [SerializeField] float blackoutDepth  = 0.3f;
 
     [Header("성공 잔광 — 카드 가장자리")]
     [Tooltip("공개 뒤 카드에 남는 열. 테두리 불(_InnerOutlineAlpha)이 여기에 비례해 남는다 — 방금 벼려낸 쇠붙이의 결.")]
@@ -148,8 +160,11 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 카드가 완전히 덮인 채 머무는 한 박. 값 반영은 이 백지 위에서 일어난다 — 눈이 숫자가 바뀌는 과정을 보지 못한다.
     const float BlindRise = 0.05f;
 
-    // 실패의 낙하(0.25) + 착지 흔들림(0.28)이 끝나기 전에 복귀가 시작되면 두 트윈이 같은 좌표를 다툰다.
-    const float FailSettle = 0.55f;
+    // 셰이더가 '아직 멀쩡함'으로 보는 _FadeAmount. 0이 아니라 음수라, 꺼짐 축은 이 구간을 감춘 0~1로 민다.
+    const float FadeIdle = -0.1f;
+
+    // 꺼짐 뒤의 낙하(0.25) + 착지 흔들림(0.28)이 끝나기 전에 복귀가 시작되면 두 트윈이 같은 좌표를 다툰다.
+    float FailSettle => Mathf.Max(0.02f, this.snuffDuration) + 0.53f;
 
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 카드 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
@@ -164,6 +179,7 @@ public class CardEnhanceRitualView : MonoBehaviour
     static readonly int P_GreyscaleBlend    = Shader.PropertyToID("_GreyscaleBlend");
     static readonly int P_HitEffectBlend    = Shader.PropertyToID("_HitEffectBlend");
     static readonly int P_HitEffectColor    = Shader.PropertyToID("_HitEffectColor");
+    static readonly int P_FadeAmount        = Shader.PropertyToID("_FadeAmount");
 
     Sequence m_seq;
     Action   m_onReveal;
@@ -173,8 +189,15 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 결과를 무대에 남긴 채 복귀 신호(PlayReturn)를 기다리는 중. 이 동안에도 재진입은 막혀야 하므로 IsPlaying에 포함된다.
     bool m_awaitingReturn;
 
+    // 잘라내는 중. 이때 흘리는 콜백이 호출부를 타고 PlayReturn으로 되돌아오면 걷어내는 도중에 새 시퀀스가 선다.
+    bool m_cancelling;
+
+    // 무대를 걷은 채로 남겨 두고 다음 연출을 기다리는 중("한 번 더" 경로). 다음 Play가 이 자세를 이어받는다.
+    bool m_stageRetracted;
+
     // 카드에 얹은 재질 사본. 자산을 직접 밀면 같은 셰이더를 쓰는 다른 화면까지 함께 달아오른다.
     Material m_body;
+    Material m_cover;
 
     // cardStage·딤의 authoring 상태. 연출 중간값을 기준으로 잡으면 반복할수록 자리가 밀린다 → 1회만 캡처한다.
     Vector2 m_baseAnchored;
@@ -185,6 +208,7 @@ public class CardEnhanceRitualView : MonoBehaviour
     float m_dimLevel;   // -1 어둠 ~ +1 빛
     float m_heat;       // -1 식음 ~ +1 백열
     float m_shake;      // 픽셀 진동 0~1
+    float m_snuff;      // 덮개가 꺼진 정도 0~1
 
     /// <summary>연출이 진행 중인가(결과를 남긴 채 기다리는 동안도 포함).
     /// 호출부는 이 동안 강화 재입력·카드 넘기기·닫기를 막는다.</summary>
@@ -213,6 +237,10 @@ public class CardEnhanceRitualView : MonoBehaviour
             return;
         }
 
+        // 걷힌 무대를 그대로 물려받는가("한 번 더"). 플래그는 여기서 소비한다 — 이어받는 것은 이 한 번뿐이다.
+        bool t_chained        = this.m_stageRetracted;
+        this.m_stageRetracted = false;
+
         this.m_onReveal   = _onReveal;
         this.m_onSettled  = _onSettled;
         this.m_onFinished = _onFinished;
@@ -229,7 +257,9 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
 
         CaptureBase();
-        RestoreVisual();
+
+        // 이어받는 경우엔 즉시 원복하지 않는다 — 결과 자세(실패의 잿빛·떨궈진 카드)를 진입 구간이 식히며 되돌린다.
+        if (!t_chained) RestoreVisual();
 
         bool t_success = _outcome == EEnhanceOutcome.Success;
 
@@ -249,7 +279,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
 
-        BuildEnter(t_seq, t_enterDur);
+        BuildEnter(t_seq, t_enterDur, t_chained);
         BuildRise(t_seq, t_rise, t_riseDur);
         BuildStill(t_seq, t_still, t_stillDur);
         BuildReveal(t_seq, t_reveal);
@@ -257,25 +287,33 @@ public class CardEnhanceRitualView : MonoBehaviour
         if (t_success) BuildSuccess(t_seq, t_result, t_resultDur);
         else           BuildFail(t_seq, t_result);
 
-        // 카드 위 연출이 다 끝난 자리. 결과판은 여기서부터다 — 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
-        // (이 콜백이 시퀀스 길이도 함께 못 박는다. 위 트윈이 전부 미배선이면 여기 닿기 전에 끝나 버린다.)
-        t_seq.InsertCallback(t_return, FireSettled);
-
-        if (!_awaitReturn) BuildReturn(t_seq, t_return, t_backDur, t_end);
+        // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리. 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
+        //
+        // 결과를 남기고 멈추는 경우엔 이 시각이 곧 시퀀스의 끝이므로 신호를 OnKill로 미룬다 —
+        // 시퀀스가 죽은 **뒤**에 흘려야 호출부가 곧바로 PlayReturn을 되받아 불러도 재진입이 없다.
+        // (여기 콜백은 시퀀스 길이를 못 박는 역할만 한다. 위 트윈이 전부 미배선이면 여기 닿기 전에 끝나 버린다.)
+        if (_awaitReturn)
+        {
+            t_seq.InsertCallback(t_return, () => { });
+        }
+        else
+        {
+            t_seq.InsertCallback(t_return, FireSettled);
+            BuildReturn(t_seq, t_return, t_backDur, t_end);
+        }
 
         // 정상 종료든 스킵이든 중단이든 여기로 온다 — 콜백 유실과 굳은 화면을 동시에 막는 안전망이다.
         t_seq.OnKill(() =>
         {
-            this.m_seq = null;
+            // 콜백보다 상태가 먼저다 — 호출부가 FireSettled 안에서 PlayReturn을 부를 수 있고,
+            // 그때 이미 "기다리는 중"이어야 복귀가 정상 경로를 탄다. 중단이었다면 CancelImmediate가 곧바로 지운다.
+            this.m_seq            = null;
+            this.m_awaitingReturn = _awaitReturn;
+
             FireReveal();
             FireSettled();
 
-            // 결과를 남기고 멈추는 경우엔 여기서 걷지 않는다. 중단이었다면 CancelImmediate가 곧바로 이 플래그를 지운다.
-            if (_awaitReturn)
-            {
-                this.m_awaitingReturn = true;
-                return;
-            }
+            if (_awaitReturn) return;
 
             RestoreVisual();
             FireFinished();
@@ -296,12 +334,18 @@ public class CardEnhanceRitualView : MonoBehaviour
     /// 기다리는 중이 아니면 남은 콜백만 흘린다 — 어느 경로로 와도 조작이 죽은 채 굳지 않게.</summary>
     public void PlayReturn()
     {
-        // 결과판은 공개 순간(무대가 아직 터지는 중)에 뜨므로 그보다 먼저 닫힐 수 있다.
-        // 남은 구간을 끌어당겨야 복귀가 결과 자세에서 출발한다 — 안 그러면 무대가 결과 포즈에 굳는다.
+        // 잘라내는 중에 콜백을 타고 되돌아온 것이다 — 남은 콜백은 CancelImmediate가 마저 흘린다.
+        if (this.m_cancelling) return;
+
+        // 결과판이 무대보다 먼저 닫힐 수 있다(스킵 경로). 남은 구간을 끌어당겨야 복귀가 결과 자세에서 출발한다.
         if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
 
         if (!this.m_awaitingReturn)
         {
+            // 기다린 적이 없는데 불렸다 = 어딘가에서 순서가 어긋났다. 남은 콜백을 계약 순서대로 전부 흘린다 —
+            // 여기서 _onFinished만 흘리면 값 반영을 못 받은 채 잠금만 풀려 화면과 세이브가 갈린다.
+            FireReveal();
+            FireSettled();
             FireFinished();
             return;
         }
@@ -331,11 +375,42 @@ public class CardEnhanceRitualView : MonoBehaviour
         t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
     }
 
+    /// <summary>결과판이 "한 번 더"로 걷혔다 — 무대를 되돌리지 않고 대기만 푼다.
+    /// 걷힌 패널·가라앉은 딤·결과 자세가 그대로 남으므로 **곧바로 <see cref="Play"/>로 이어야 한다**
+    /// (다음 Play가 그 자세에서 이어 출발한다). 이을 수 없게 됐다면 <see cref="CancelImmediate"/>로 무대를 되돌릴 것 —
+    /// 그냥 두면 상세 패널이 사라진 채 굳는다.
+    ///
+    /// 복귀를 건너뛸 뿐 콜백 계약은 그대로다 — _onFinished까지 여기서 흘린다.</summary>
+    public void EndAwaitForChain()
+    {
+        if (this.m_cancelling) return;
+
+        // 결과판이 무대보다 먼저 닫힐 수 있다(스킵 경로). 남은 구간을 끌어당겨 결과 자세에서 이어지게 한다.
+        if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
+
+        if (!this.m_awaitingReturn)
+        {
+            // 기다린 적이 없다 = 이어받을 무대도 없다. 남은 콜백만 계약 순서대로 흘린다(PlayReturn과 같은 결).
+            FireReveal();
+            FireSettled();
+            FireFinished();
+            return;
+        }
+
+        this.m_awaitingReturn = false;
+        this.m_stageRetracted = true;   // 콜백보다 먼저 — 호출부가 FireFinished 안에서 곧바로 Play를 되받아 부른다.
+
+        FireFinished();
+    }
+
     /// <summary>연출을 잘라내고 화면만 원복한다(카드 전환·닫힘 경로).
     /// 어느 단계에서 잘렸든 남은 콜백을 전부 흘린다 — 안 그러면 호출부의 값 갱신 유예가 영영 풀리지 않는다.</summary>
     public void CancelImmediate()
     {
-        this.m_seq?.Kill();   // OnKill이 공개·복귀 콜백을 흘린다.
+        if (this.m_cancelling) return;
+        this.m_cancelling = true;
+
+        this.m_seq?.Kill();   // OnKill이 공개·정착 콜백을 흘린다.
         this.m_seq            = null;
         this.m_awaitingReturn = false;
 
@@ -345,6 +420,8 @@ public class CardEnhanceRitualView : MonoBehaviour
         FireReveal();
         FireSettled();
         FireFinished();
+
+        this.m_cancelling = false;
     }
 
     // 첫 강화가 아니라 오버레이가 켜지는 순간 재질을 꽂는다 — 평상값이 전부 중립이라
@@ -362,13 +439,14 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     void OnDestroy()
     {
-        if (this.m_body != null) Destroy(this.m_body);
+        if (this.m_body  != null) Destroy(this.m_body);
+        if (this.m_cover != null) Destroy(this.m_cover);
     }
 
     // ── 구간 ─────────────────────────────────────────────
 
     // 패널이 걷히고 카드가 한 번 움츠러들며 식는다.
-    void BuildEnter(Sequence _seq, float _dur)
+    void BuildEnter(Sequence _seq, float _dur, bool _chained)
     {
         _seq.InsertCallback(0f, () => SetRetractBlocking(false));
 
@@ -376,12 +454,27 @@ public class CardEnhanceRitualView : MonoBehaviour
             foreach (CanvasGroup t_g in this.retractGroups)
             {
                 if (t_g == null) continue;
-                _seq.Insert(0f, t_g.DOFade(0f, _dur));
+                _seq.Insert(0f, t_g.DOFade(0f, _dur));   // 이어받는 경우엔 이미 걷혀 있어 제자리 트윈이다.
             }
 
         _seq.Insert(0f, this.cardStage.DOScale(this.enterScale, _dur).SetEase(Ease.OutCubic));
         _seq.Insert(0f, DimTween(-1f, _dur));
         _seq.Insert(0f, HeatTween(-1f, _dur).SetEase(Ease.OutQuad));
+
+        if (!_chained) return;
+
+        // 앞 결과가 남긴 자세를 이 구간이 데려온다 — 실패의 잿빛·떨궈진 자리가 "다시 식는다"로 읽히게.
+        // (RestoreVisual로 즉시 원복하면 같은 되돌림이 한 프레임에 튄다.)
+        _seq.Insert(0f, this.cardStage.DOAnchorPos(this.m_baseAnchored, _dur).SetEase(Ease.OutQuad));
+        _seq.Insert(0f, GreyTween(0f, _dur));
+        _seq.Insert(0f, BlindTween(0f, _dur));
+        _seq.Insert(0f, CoverTween(0f, _dur));
+
+        if (this.backGlow != null)
+        {
+            _seq.Insert(0f, this.backGlow.DOFade(0f, _dur));
+            _seq.Insert(0f, this.backGlow.rectTransform.DOScale(this.glowStartScale, _dur));
+        }
     }
 
     // 고조. 카드는 쉬지 않고 조여들며 달아오르고, 몸통 진동은 세 마디로 폭과 잔떨림을 함께 키운다 —
@@ -509,29 +602,41 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
     }
 
-    // 열이 터지지 못하고 꺼진다. 빛이 먼저 죽어야 "놓쳤다"가 되고, 그 다음에 회색이 번지며 카드가 떨어진다.
+    // 열이 터지지 못하고 꺼진다. 타는 것은 전선이 이동하며 시간이 걸리고, 꺼지는 것은 제자리에서 순간이다 —
+    // 그래서 방향 없이 전면에서 동시에, 짧게 죽인다. 지워지는 것은 덮개(빛)뿐이고 카드는 그 밑에 그대로 남는다.
     void BuildFail(Sequence _seq, float _at)
     {
+        float t_snuff = Mathf.Max(0.02f, this.snuffDuration);
+        float t_out   = _at + t_snuff;
+
         if (this.backGlow != null) _seq.Insert(_at, this.backGlow.DOFade(0f, 0.03f));
 
-        // 백열이 잿빛으로 돌았다가 사그라든다 — 흰빛에서 곧장 0으로 가면 "빛이 걷혔다"(성공)와 구분되지 않는다.
-        _seq.Insert(_at, BlindColorTween(this.blindFailColor, 0.1f));
-        _seq.Insert(_at, BlindTween(this.blindFailPeak, 0.1f).SetEase(Ease.OutQuad));
-        _seq.Insert(_at + 0.1f, BlindTween(0f, 0.22f).SetEase(Ease.InQuad));
-        _seq.Insert(_at, CoverTween(this.blindFailPeak, 0.1f).SetEase(Ease.OutQuad));
-        _seq.Insert(_at + 0.1f, CoverTween(0f, 0.22f).SetEase(Ease.InQuad));
+        // 덮개가 얼룩덜룩 갉혀 사라진다. 본체의 백열은 그보다 먼저 죽어야 뚫린 구멍으로 흰빛이 아니라 식은 카드가 보인다.
+        _seq.Insert(_at, BlindTween(0f, t_snuff * 0.6f).SetEase(Ease.OutQuad));
 
-        _seq.Insert(_at, HeatTween(-1f, 0.08f).SetEase(Ease.OutQuad));
-        _seq.Insert(_at + 0.06f, GreyTween(this.failDesaturation, 0.28f).SetEase(Ease.OutQuad));
+        if (this.m_cover != null) _seq.Insert(_at, SnuffTween(1f, t_snuff).SetEase(Ease.OutQuad));
+        else                      _seq.Insert(_at, CoverTween(0f, t_snuff).SetEase(Ease.InQuad));
 
-        // 성공보다 빨리·더 깊게 가라앉는다 — 빛이 걷힌 자리가 어두울수록 "놓쳤다"가 된다.
-        _seq.Insert(_at, DimTween(this.resultDimLevel, 0.18f).SetEase(Ease.OutQuad));
+        // 걷히고 나서 식는 것이 아니라, 걷었더니 이미 차갑다 — 그래서 냉각은 빛 아래에서 끝난다.
+        _seq.Insert(_at, HeatTween(this.emberHeat, t_snuff * 0.8f).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, GreyTween(this.failDesaturation, t_snuff * 0.8f).SetEase(Ease.OutQuad));
 
-        _seq.Insert(_at, this.cardStage.DOScale(1f, 0.3f).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.cardStage.DOAnchorPosY(this.m_baseAnchored.y - this.failDrop, 0.25f).SetEase(Ease.OutQuad));
+        // 눈이 정점의 빛에 적응해 있다. 결과 밝기보다 한 번 더 내려갔다 올라와야 "빛이 사라졌다"가 몸으로 온다.
+        _seq.Insert(_at,   DimTween(Mathf.Max(-1f, this.resultDimLevel - this.blackoutDepth), t_snuff).SetEase(Ease.OutQuad));
+        _seq.Insert(t_out, DimTween(this.resultDimLevel, 0.35f).SetEase(Ease.InOutSine));
+
+        // 다 꺼진 덮개를 중립으로 되돌린다. 알파와 잠식을 같은 프레임에 놓아야 되돌리는 과정이 보이지 않는다.
+        _seq.InsertCallback(t_out, () => { SetCover(0f); SetSnuff(0f); });
+
+        // 잔열. 면의 빛은 이미 없고 테두리선만 남아 사그라든다.
+        _seq.Insert(t_out, HeatTween(-1f, Mathf.Max(0.05f, this.emberFade)).SetEase(Ease.InQuad));
+
+        // 낙하는 꺼진 다음이다 — 같이 떨어지면 꺼짐이 낙하에 묻힌다.
+        _seq.Insert(t_out, this.cardStage.DOScale(1f, 0.3f).SetEase(Ease.OutQuad));
+        _seq.Insert(t_out, this.cardStage.DOAnchorPosY(this.m_baseAnchored.y - this.failDrop, 0.25f).SetEase(Ease.OutQuad));
 
         // 흔들림은 낙하가 끝난 뒤 — 같은 시간에 겹치면 두 트윈이 같은 좌표를 두고 싸운다.
-        _seq.Insert(_at + 0.25f, this.cardStage.DOShakeAnchorPos(0.28f, this.failShake, 12, 90f, false, true));
+        _seq.Insert(t_out + 0.25f, this.cardStage.DOShakeAnchorPos(0.28f, this.failShake, 12, 90f, false, true));
     }
 
     void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
@@ -540,6 +645,9 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, GreyTween(0f, Mathf.Min(0.2f, _dur)));
         _seq.Insert(_at, BlindTween(0f, Mathf.Min(0.1f, _dur)));
         _seq.Insert(_at, CoverTween(0f, Mathf.Min(0.1f, _dur)));
+
+        // 잠식은 덮개가 다 투명해진 뒤에 되돌린다 — 먼저 되돌리면 지워졌던 덮개가 한 프레임 되살아난다.
+        _seq.InsertCallback(_at + Mathf.Min(0.1f, _dur), () => SetSnuff(0f));
 
         _seq.Insert(_at, this.cardStage.DOAnchorPos(this.m_baseAnchored, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(_at, this.cardStage.DOScale(1f, _dur).SetEase(Ease.OutQuad));
@@ -569,13 +677,22 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 연출 밖에서는 기본 UI 재질과 구분되지 않는다 — 열 때마다 재질을 갈아끼울 이유가 없다.
     void EnsureMaterial()
     {
-        if (this.m_body != null || this.bodyMaterial == null || this.cardSurfaces == null) return;
-
-        this.m_body = new Material(this.bodyMaterial) { name = this.bodyMaterial.name + " (ritual)" };
-
-        foreach (Graphic t_g in this.cardSurfaces)
+        if (this.m_body == null && this.bodyMaterial != null && this.cardSurfaces != null)
         {
-            if (t_g != null) t_g.material = this.m_body;
+            this.m_body = new Material(this.bodyMaterial) { name = this.bodyMaterial.name + " (ritual)" };
+
+            foreach (Graphic t_g in this.cardSurfaces)
+            {
+                if (t_g != null) t_g.material = this.m_body;
+            }
+        }
+
+        // 덮개는 본체와 다른 재질을 쓴다 — 본체가 못 쓰는 UV 의존 축(FADE)이 여기서만 성립한다.
+        if (this.m_cover == null && this.coverMaterial != null && this.floodCover != null)
+        {
+            this.m_cover = new Material(this.coverMaterial) { name = this.coverMaterial.name + " (ritual)" };
+
+            this.floodCover.material = this.m_cover;
         }
     }
 
@@ -636,6 +753,14 @@ public class CardEnhanceRitualView : MonoBehaviour
         SetGraphicAlpha(this.floodCover, _alpha);
     }
 
+    // 0이면 덮개가 멀쩡하고 1이면 다 꺼졌다. 셰이더의 유휴값이 음수라 그 구간을 여기서 감춘다.
+    void SetSnuff(float _amount)
+    {
+        this.m_snuff = _amount;
+
+        if (this.m_cover != null) this.m_cover.SetFloat(P_FadeAmount, Mathf.Lerp(FadeIdle, 1f, _amount));
+    }
+
     Tween HeatTween(float _to, float _dur)  => DOTween.To(() => this.m_heat, SetHeat, _to, _dur);
     Tween ShakeTween(float _to, float _dur) => DOTween.To(() => this.m_shake, SetShake, _to, _dur);
     Tween GreyTween(float _to, float _dur)  => DOTween.To(() => this.m_body != null ? this.m_body.GetFloat(P_GreyscaleBlend) : 0f, SetGrey, _to, _dur);
@@ -646,6 +771,8 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     Tween CoverTween(float _to, float _dur)
         => DOTween.To(() => this.floodCover != null ? this.floodCover.color.a : 0f, SetCover, _to, _dur);
+
+    Tween SnuffTween(float _to, float _dur) => DOTween.To(() => this.m_snuff, SetSnuff, _to, _dur);
 
     // ── 상태 ─────────────────────────────────────────────
 
@@ -694,6 +821,9 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 다음 연출이 중간값(압축·열·회색)에서 출발하지 않게 원복. 캡처 전이면 건드릴 것도 없다.
     void RestoreVisual()
     {
+        // 무대가 제자리로 돌아오는 모든 길이 여기를 지난다 — 이어받을 자세도 여기서 무효가 된다.
+        this.m_stageRetracted = false;
+
         if (!this.m_baseCaptured) return;
 
         if (this.cardStage != null)
@@ -713,6 +843,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         SetGrey(0f);
         SetBlind(0f);
         SetCover(0f);
+        SetSnuff(0f);
         SetBlindColor(Color.white);
 
         if (this.retractGroups != null)

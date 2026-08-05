@@ -572,7 +572,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.m_ritualPlaying) return;
 
         CardData t_card = CardAt(this.m_index);
-        if (t_card == null) return;
+        if (t_card == null)
+        {
+            AbortEnhance(null);
+            return;
+        }
 
         // 시도 **전에** 잡아둔다 — 결과에는 오른 폭도 이전 값도 없다.
         int t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
@@ -592,8 +596,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 결제 전에 막힌 경우(잔액 부족·최고 레벨·미초기화)엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
         if (!t_played || this.ritual == null)
         {
-            this.m_ritualPlaying = false;
-            RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));   // 잔액부족은 통지가 없다 → 여기서 한 번(멱등)
+            AbortEnhance(t_card);
             return;
         }
 
@@ -617,7 +620,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             _onSettled: () =>
             {
                 // 카드 위 연출이 다 끝난 뒤다. 여기서부터가 읽는 시간 — 결과판이 제 박자로 글자를 쌓는다.
-                if (CardAt(this.m_index) != t_card) return;
+                //
+                // 무대에 선 카드가 바뀌었으면 옛 결과를 띄우지 않는다. 다만 무대는 **반드시** 돌려보낸다 —
+                // 결과판이 안 뜨면 복귀를 시작할 주체가 없어 오버레이가 통째로 굳는다(도감이 목록을 제자리에서
+                // 다시 채우면 연출 도중에도 CardAt이 다른 카드를 가리킬 수 있다).
+                if (CardAt(this.m_index) != t_card)
+                {
+                    this.ritual.PlayReturn();
+                    return;
+                }
 
                 ShowResultPanel(t_card, t_result, t_fromLevel, t_fromHp);
             },
@@ -630,13 +641,29 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 if (t_now != null) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
                 RefreshArrows();
 
-                // "한 번 더"는 무대가 완전히 돌아온 지금 이어간다. 재입력 가드(m_ritualPlaying)가 이미 풀렸으므로
-                // 그냥 다시 누른 것과 같고, 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다.
+                // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
+                // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
+                // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
                 if (!this.m_retryQueued) return;
 
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+    }
+
+    // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.
+    //
+    // 무대까지 되돌리는 이유는 "한 번 더"로 이어온 길 때문이다 — 그 경로에선 패널이 걷힌 채로 넘어오므로
+    // 여기서 되돌리지 않으면 상세 패널이 사라진 채 굳는다(첫 시도에서 막힌 경우엔 되돌릴 것이 없어 무해하다).
+    void AbortEnhance(CardData _card)
+    {
+        this.m_ritualPlaying = false;
+
+        this.ritual?.CancelImmediate();
+
+        // 잔액부족은 통지가 없다 → 여기서 한 번(멱등)
+        if (_card != null) RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
+        RefreshArrows();
     }
 
     // 강화를 누른 직후의 잠금. 값은 손대지 않는다 — 여기서 RefreshGrowth를 부르면 공개할 것이 사라진다.
@@ -663,10 +690,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         this.resultPanel.Show(t_line,
                               _onClose: () => this.ritual.PlayReturn(),
+                              // 무대는 돌려보내지 않는다 — 상세 패널이 0.35초 돌아왔다 곧바로 다시 걷히면
+                              // 연타의 리듬이 그 왕복에서 끊긴다. 걷힌 채로 다음 담금질이 이어진다.
                               _onRetry: () =>
                               {
                                   this.m_retryQueued = true;
-                                  this.ritual.PlayReturn();
+                                  this.ritual.EndAwaitForChain();
                               },
                               // 결과판의 "체력 71 → 73"이 굴러 오르는 그 박자에 무대에 선 카드의 숫자도 함께 오른다 —
                               // 따로 놀면 오른 것이 저 카드의 저 값이라는 연결이 끊긴다.
