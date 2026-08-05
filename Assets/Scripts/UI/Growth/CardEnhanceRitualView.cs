@@ -5,9 +5,12 @@ using UnityEngine.UI;
 
 // 카드 강화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 담금질이다 — 카드가 움츠러들며 달아오르고(고조), 그 빛이 카드를 통째로 삼킨 뒤(정적), 백열이 걷히며 터진다(공개).
-// 실패는 그 열이 터지지 못하고 훅 꺼져 식는 모습으로 갈린다 — 성공은 빛이 밖으로 걷히고, 실패는 안에서 죽는다.
 //
 // ⚠ 결과는 백열이 카드를 완전히 덮은 뒤에 갈린다 — 성공·실패가 같은 백지에서 출발해야 결과가 미리 새지 않는다.
+//
+// ⚠ 몸짓은 결과를 모른다 — 성공도 실패도 같은 박자에 같은 폭발을 한다(BuildBurst). 갈리는 것은
+//   그 폭발이 무엇을 드러내느냐뿐이다: 성공은 빛이 밖으로 걷히며 벼려진 카드가, 실패는 빛이 안에서 죽어 잿빛 잔막이 드러난다.
+//   결과별로 카드를 다르게 움직이면 표면이 답을 내놓기 전에 몸짓이 먼저 발설한다.
 //
 // 판정은 하지 않는다 — 강화는 CardGrowthManager.TryEnhance가 이미 원자적으로 끝낸 거래이고,
 // 여기서는 그 결과를 보여줄 뿐이다(PackRevealView와 같은 결).
@@ -92,8 +95,16 @@ public class CardEnhanceRitualView : MonoBehaviour
     [Tooltip("Materials/Growth/CardRitualEmber. FADE가 켜져 있어야 한다. floodCover에만 얹는다(이미지 한 장이라 UV 축이 안전하다).\n" +
              "미배선이면 덮개가 얼룩 없이 균일하게 걷힌다 — 꺼지는 것이 아니라 페이드아웃으로 읽힌다.")]
     [SerializeField] Material coverMaterial;
-    [Tooltip("백열이 죽는 시간. 짧아야 '꺼졌다'가 된다 — 길어지면 불이 카드를 먹는 것으로 읽힌다.")]
-    [SerializeField] float snuffDuration  = 0.1f;
+    [Tooltip("빛이 죽는 시간(밝기만). 짧아야 '꺼졌다'가 된다.")]
+    [SerializeField] float snuffDuration  = 0.07f;
+    [Tooltip("빛이 죽고 덮개에 남는 잉걸 잔막의 색. 어두워야 한다 — 밝으면 아직 타는 중으로 보인다.")]
+    [SerializeField] Color ashColor       = new Color(0.42f, 0.16f, 0.05f, 1f);
+    [Tooltip("잔막의 두께. 카드가 비쳐야 '덮인 채 식는 중'으로 읽힌다.")]
+    [Range(0f, 1f)]
+    [SerializeField] float ashAlpha       = 0.5f;
+    [Tooltip("잔막이 얼룩덜룩 걷히는 시간. 밝기와 달리 여기는 짧으면 안 된다 —\n" +
+             "0.1초면 얼룩이 6프레임 만에 지나가 눈이 무늬를 못 읽고 그냥 사라진 것으로 보인다.")]
+    [SerializeField] float ashSweep       = 0.3f;
     [Tooltip("꺼진 직후 남는 잔열. 면의 빛(_Glow)은 제곱이라 이 값에서 이미 없고 테두리선만 남는다 — 불이 있었다는 유일한 증거.")]
     [Range(0f, 0.5f)]
     [SerializeField] float emberHeat      = 0.22f;
@@ -140,8 +151,6 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     [Tooltip("고조 마지막 구간의 몸통 진동 폭(px). 앞 구간은 이 값의 1/4, 1/2로 커진다.")]
     [SerializeField] float shakeStrength    = 9f;
-    [SerializeField] float failDrop         = 20f;
-    [SerializeField] float failShake        = 6f;
     [Range(0f, 1f)]
     [SerializeField] float failDesaturation = 0.85f;
     [Range(0f, 1f)]
@@ -158,11 +167,16 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 카드가 완전히 덮인 채 머무는 한 박. 값 반영은 이 백지 위에서 일어난다 — 눈이 숫자가 바뀌는 과정을 보지 못한다.
     const float BlindRise = 0.05f;
 
-    // 셰이더가 '아직 멀쩡함'으로 보는 _FadeAmount. 0이 아니라 음수라, 꺼짐 축은 이 구간을 감춘 0~1로 민다.
-    const float FadeIdle = -0.1f;
+    // 셰이더가 '아직 멀쩡함'으로 보는 _FadeAmount. 꺼짐 축은 이 구간을 감춘 0~1로 민다.
+    //
+    // ⚠ 재질의 _FadeBurnTransition(0.28)보다 더 내려가 있어야 한다 — 셰이더가 [_FadeAmount, +transition]
+    //   구간을 걸쳐 지우므로, -0.1이면 노이즈가 0.18보다 어두운 픽셀이 평상시에도 반투명해 덮개가 새 버린다.
+    //   (인스펙터 Range는 -0.1까지지만 런타임 SetFloat은 잘리지 않는다.)
+    const float FadeIdle = -0.3f;
 
-    // 꺼짐 뒤의 낙하(0.25) + 착지 흔들림(0.28)이 끝나기 전에 복귀가 시작되면 두 트윈이 같은 좌표를 다툰다.
-    float FailSettle => Mathf.Max(0.02f, this.snuffDuration) + 0.53f;
+    // 실패 표면이 다 걷히기 전에 복귀가 시작되면, 잔막이 지워지는 도중에 카드가 되돌아온다.
+    // (0.35는 과암에서 결과 밝기로 되돌아오는 딤 트윈 — 잔막 쓸림보다 짧아도 이만큼은 담겨야 한다.)
+    float FailSettle => Mathf.Max(0.02f, this.snuffDuration) + Mathf.Max(this.ashSweep, 0.35f);
 
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 카드 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
@@ -255,7 +269,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         CaptureBase();
 
-        // 이어받는 경우엔 즉시 원복하지 않는다 — 결과 자세(실패의 잿빛·떨궈진 카드)를 진입 구간이 식히며 되돌린다.
+        // 이어받는 경우엔 즉시 원복하지 않는다 — 결과가 남긴 표면(실패의 잿빛·성공의 잔열)을 진입 구간이 식히며 되돌린다.
         if (!t_chained) RestoreVisual();
 
         bool t_success = _outcome == EEnhanceOutcome.Success;
@@ -264,8 +278,11 @@ public class CardEnhanceRitualView : MonoBehaviour
         float t_enterDur  = Mathf.Max(0.01f, this.enterDuration);
         float t_riseDur   = Mathf.Max(0.06f, this.buildUpDuration);
         float t_stillDur  = Mathf.Max(0.02f, this.holdDuration);
-        float t_resultDur = Mathf.Max(t_success ? 0.1f : FailSettle, this.resultHold);
         float t_backDur   = Mathf.Max(0.05f, this.returnDuration);
+
+        // 결과 구간은 공통 몸짓(폭발 회수)과 결과별 표면 중 긴 쪽을 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
+        float t_burst     = Mathf.Max(0.05f, this.burstSettle);
+        float t_resultDur = Mathf.Max(this.resultHold, t_success ? t_burst : Mathf.Max(t_burst, FailSettle));
 
         float t_rise   = t_enterDur;
         float t_still  = t_rise + t_riseDur;
@@ -281,8 +298,11 @@ public class CardEnhanceRitualView : MonoBehaviour
         BuildStill(t_seq, t_still, t_stillDur);
         BuildReveal(t_seq, t_reveal);
 
-        if (t_success) BuildSuccess(t_seq, t_result, t_resultDur);
-        else           BuildFail(t_seq, t_result);
+        // 몸짓 먼저, 그 위에 표면. 폭발은 결과를 모르고, 결과는 그 폭발이 드러내는 얼굴로만 갈린다.
+        BuildBurst(t_seq, t_result);
+
+        if (t_success) BuildSuccessSurface(t_seq, t_result, t_resultDur);
+        else           BuildFailSurface(t_seq, t_result);
 
         // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리. 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
         //
@@ -462,8 +482,9 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         if (!_chained) return;
 
-        // 앞 결과가 남긴 자세를 이 구간이 데려온다 — 실패의 잿빛·떨궈진 자리가 "다시 식는다"로 읽히게.
+        // 앞 결과가 남긴 표면을 이 구간이 데려온다 — 실패의 잿빛·성공의 잔열이 "다시 식는다"로 읽히게.
         // (RestoreVisual로 즉시 원복하면 같은 되돌림이 한 프레임에 튄다.)
+        // 좌표는 이제 어느 결과도 옮기지 않지만, 진동 중에 잘린 자리를 데려오는 길은 여기뿐이라 남긴다.
         _seq.Insert(0f, this.cardStage.DOAnchorPos(this.m_baseAnchored, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(0f, HeatTween(0f, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(0f, GreyTween(0f, _dur));
@@ -565,7 +586,11 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     // 폭발. 눌려 있던 것이 한 프레임에 터져 나왔다가 제자리로 회수된다 —
     // 부풀어 오르는 과정을 트윈에 맡기면 타격이 뭉개진다(PackCardView.PlayPunch와 같은 규칙).
-    void BuildSuccess(Sequence _seq, float _at, float _hold)
+    //
+    // ⚠ 결과와 무관하다. 실패도 같은 크기로 같은 시간에 터진다 — 압축은 결과를 기다린 것이 아니라
+    //   고조가 쌓아 둔 반동이고, 그 반동은 무엇이 나오든 똑같이 풀린다. 여기에 결과를 섞으면
+    //   표면이 답을 내놓기 전에 몸짓이 먼저 답한다.
+    void BuildBurst(Sequence _seq, float _at)
     {
         float t_settle = Mathf.Max(0.05f, this.burstSettle);
 
@@ -574,6 +599,12 @@ public class CardEnhanceRitualView : MonoBehaviour
             if (this.cardStage != null) this.cardStage.localScale = Vector3.one * this.burstScale;
         });
         _seq.Insert(_at, this.cardStage.DOScale(1f, t_settle).SetEase(Ease.OutQuint));
+    }
+
+    // 성공의 얼굴. 터진 자리에서 백열이 밖으로 걷히고 벼려진 카드가 드러난다.
+    void BuildSuccessSurface(Sequence _seq, float _at, float _hold)
+    {
+        float t_settle = Mathf.Max(0.05f, this.burstSettle);
 
         // 백열이 걷히며 카드가 드러난다. 열은 잔열만 남기고 천천히 식는다 — 방금 벼려낸 쇠붙이의 결.
         _seq.Insert(_at, BlindTween(0f, t_settle).SetEase(Ease.InQuad));
@@ -603,41 +634,42 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
     }
 
-    // 열이 터지지 못하고 꺼진다. 타는 것은 전선이 이동하며 시간이 걸리고, 꺼지는 것은 제자리에서 순간이다 —
-    // 그래서 방향 없이 전면에서 동시에, 짧게 죽인다. 지워지는 것은 덮개(빛)뿐이고 카드는 그 밑에 그대로 남는다.
-    void BuildFail(Sequence _seq, float _at)
+    // 실패의 얼굴. 카드는 성공과 똑같이 터지지만, 터진 자리에서 빛이 밖으로 나가지 못하고 안에서 죽는다.
+    //
+    // 밝기와 면적을 갈라 민다 — 빛이 죽는 것은 순간이어야 "꺼졌다"가 되고,
+    // 남은 잔막이 걷히는 것은 눈이 얼룩을 읽을 만큼 이어져야 한다.
+    // 한 덩어리로 뭉치면 둘 다 안 보인다(얼룩이 몇 프레임 만에 지나가 그냥 사라진 것이 된다).
+    void BuildFailSurface(Sequence _seq, float _at)
     {
         float t_snuff = Mathf.Max(0.02f, this.snuffDuration);
+        float t_sweep = Mathf.Max(0.05f, this.ashSweep);
         float t_out   = _at + t_snuff;
 
         if (this.backGlow != null) _seq.Insert(_at, this.backGlow.DOFade(0f, 0.03f));
 
-        // 덮개가 얼룩덜룩 갉혀 사라진다. 본체의 백열은 그보다 먼저 죽어야 뚫린 구멍으로 흰빛이 아니라 식은 카드가 보인다.
-        _seq.Insert(_at, BlindTween(0f, t_snuff * 0.6f).SetEase(Ease.OutQuad));
+        // 훅. 백열이 잉걸로 주저앉고 덮개는 카드가 비칠 두께만 남는다 — 여기서 사라지는 것은 빛이지 덮개가 아니다.
+        _seq.Insert(_at, BlindTween(0f, t_snuff).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, BlindColorTween(this.ashColor, t_snuff));
+        _seq.Insert(_at, CoverTween(this.ashAlpha, t_snuff).SetEase(Ease.OutQuad));
 
-        if (this.m_cover != null) _seq.Insert(_at, SnuffTween(1f, t_snuff).SetEase(Ease.OutQuad));
-        else                      _seq.Insert(_at, CoverTween(0f, t_snuff).SetEase(Ease.InQuad));
-
-        // 걷히고 나서 식는 것이 아니라, 걷었더니 이미 차갑다 — 그래서 냉각은 빛 아래에서 끝난다.
-        _seq.Insert(_at, HeatTween(this.emberHeat, t_snuff * 0.8f).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, GreyTween(this.failDesaturation, t_snuff * 0.8f).SetEase(Ease.OutQuad));
+        // 걷히고 나서 식는 것이 아니라, 걷었더니 이미 차갑다 — 그래서 냉각은 잔막 아래에서 끝난다.
+        _seq.Insert(_at, HeatTween(this.emberHeat, t_snuff).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, GreyTween(this.failDesaturation, t_snuff).SetEase(Ease.OutQuad));
 
         // 눈이 정점의 빛에 적응해 있다. 결과 밝기보다 한 번 더 내려갔다 올라와야 "빛이 사라졌다"가 몸으로 온다.
         _seq.Insert(_at,   DimTween(Mathf.Max(-1f, this.resultDimLevel - this.blackoutDepth), t_snuff).SetEase(Ease.OutQuad));
         _seq.Insert(t_out, DimTween(this.resultDimLevel, 0.35f).SetEase(Ease.InOutSine));
 
-        // 다 꺼진 덮개를 중립으로 되돌린다. 알파와 잠식을 같은 프레임에 놓아야 되돌리는 과정이 보이지 않는다.
-        _seq.InsertCallback(t_out, () => { SetCover(0f); SetSnuff(0f); });
+        // 잔막이 얼룩덜룩 걷힌다. 이미 어두워진 뒤라 면적이 줄어드는 것으로만 읽힌다 —
+        // 밝을 때 줄이면 같은 트윈이 "불이 카드를 먹는다"가 된다.
+        if (this.m_cover != null) _seq.Insert(t_out, SnuffTween(1f, t_sweep).SetEase(Ease.InOutQuad));
+        else                      _seq.Insert(t_out, CoverTween(0f, t_sweep).SetEase(Ease.InQuad));
+
+        // 다 걷힌 덮개를 중립으로 되돌린다. 알파와 잠식을 같은 프레임에 놓아야 되돌리는 과정이 보이지 않는다.
+        _seq.InsertCallback(t_out + t_sweep, () => { SetCover(0f); SetSnuff(0f); });
 
         // 잔열. 면의 빛은 이미 없고 테두리선만 남아 사그라든다 — 카드 자체는 회색화만 뒤집어쓴 채 원래 밝기로 돌아온다.
         _seq.Insert(t_out, HeatTween(0f, Mathf.Max(0.05f, this.emberFade)).SetEase(Ease.InQuad));
-
-        // 낙하는 꺼진 다음이다 — 같이 떨어지면 꺼짐이 낙하에 묻힌다.
-        _seq.Insert(t_out, this.cardStage.DOScale(1f, 0.3f).SetEase(Ease.OutQuad));
-        _seq.Insert(t_out, this.cardStage.DOAnchorPosY(this.m_baseAnchored.y - this.failDrop, 0.25f).SetEase(Ease.OutQuad));
-
-        // 흔들림은 낙하가 끝난 뒤 — 같은 시간에 겹치면 두 트윈이 같은 좌표를 두고 싸운다.
-        _seq.Insert(t_out + 0.25f, this.cardStage.DOShakeAnchorPos(0.28f, this.failShake, 12, 90f, false, true));
     }
 
     void BuildReturn(Sequence _seq, float _at, float _dur, float _end)

@@ -17,8 +17,8 @@ public class MatchDeckPanelView : MonoBehaviour
     [SerializeField] CardVisualView[] enemySlots;   // 6칸. 같은 규약 — EnemySlot_N/CardUIView를 물린다
     [SerializeField] TMP_Text         myPowerText;      // MyInfoBar/PowerBadge/PowerText
     [SerializeField] TMP_Text         enemyPowerText;   // EnemyInfoBar/PowerBadge/PowerText
-    [SerializeField] DeckSynergyStrip mySynergyStrip;      // MyInfoBar 쪽 시너지 줄
-    [SerializeField] DeckSynergyStrip enemySynergyStrip;   // EnemyInfoBar 쪽 시너지 줄
+    [SerializeField] MatchSynergyStrip mySynergyStrip;      // MyInfoBar 쪽 활성 시너지 줄
+    [SerializeField] MatchSynergyStrip enemySynergyStrip;   // EnemyInfoBar 쪽 활성 시너지 줄
     [SerializeField] Button           editButton;
     [SerializeField] Button           backButton;
     [SerializeField] Button           battleButton;

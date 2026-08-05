@@ -570,6 +570,7 @@ RectTransform:
   m_Children:
   - {fileID: 6923290234853127671}
   - {fileID: 785118270883938787}
+  - {fileID: 3950802737356805882}
   m_Father: {fileID: 6284538003045798158}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1324,6 +1325,99 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &3118880827585086078
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3950802737356805882}
+  - component: {fileID: 2380001324698316660}
+  - component: {fileID: 5028605972808237304}
+  - component: {fileID: 5624309026716051576}
+  m_Layer: 0
+  m_Name: SynergyBar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &3950802737356805882
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3118880827585086078}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3209139471161949486}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2380001324698316660
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3118880827585086078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_Spacing: 0
+  m_ChildForceExpandWidth: 1
+  m_ChildForceExpandHeight: 1
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
+  m_ReverseArrangement: 0
+--- !u!114 &5028605972808237304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3118880827585086078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
+  m_HorizontalFit: 2
+  m_VerticalFit: 0
+--- !u!114 &5624309026716051576
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3118880827585086078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca3046ba9fabf654aa0fcaa6c3afbf3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MatchSynergyStrip
+  iconParent: {fileID: 3950802737356805882}
+  iconPrefab: {fileID: 2223970490519747476, guid: d018f658be3f5ed459e967ad07e1f4b9, type: 3}
+  maxIcons: 6
 --- !u!1 &3172104365737703777
 GameObject:
   m_ObjectHideFlags: 0
@@ -3772,6 +3866,8 @@ MonoBehaviour:
   - {fileID: 2890221419403269162}
   myPowerText: {fileID: 2343818114332843482}
   enemyPowerText: {fileID: 1251643176279656888}
+  mySynergyStrip: {fileID: 5624309026716051576}
+  enemySynergyStrip: {fileID: 0}
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
   battleButton: {fileID: 6854664472983553879}
@@ -4298,6 +4394,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -4432,6 +4536,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
@@ -4568,6 +4680,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -4702,6 +4822,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
@@ -4838,6 +4966,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -4972,6 +5108,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
@@ -5108,6 +5252,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -5242,6 +5394,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
@@ -5378,6 +5538,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -5512,6 +5680,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
@@ -5648,6 +5824,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: CardUIView
       objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
+      objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -5782,6 +5966,14 @@ PrefabInstance:
     - target: {fileID: 707099119696358671, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Name
       value: CardUIView
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.594183
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.594183
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x

@@ -6168,6 +6168,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3811782918038723621, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
+      propertyPath: tilePrefab
+      value: 
+      objectReference: {fileID: 8367064574799359268, guid: f8440a7444c641d4eadb1787f5e66e9d, type: 3}
     - target: {fileID: 4258929779402746263, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -6838,7 +6842,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7820027171039150106, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -773.5
+      value: -773.501
       objectReference: {fileID: 0}
     - target: {fileID: 7874714462834887964, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchorMax.x
@@ -8159,6 +8163,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3535906181901233073}
     m_Modifications:
+    - target: {fileID: 22208597230921135, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
+      propertyPath: tilePrefab
+      value: 
+      objectReference: {fileID: 8367064574799359268, guid: f8440a7444c641d4eadb1787f5e66e9d, type: 3}
     - target: {fileID: 369396932376221998, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
       propertyPath: m_text
       value: "\uB371 \uAD00\uB9AC"
@@ -9378,6 +9386,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: -55
       objectReference: {fileID: 0}
+    - target: {fileID: 5090917865885044892, guid: 7748ba667e6fae944a9626011c81f80d, type: 3}
+      propertyPath: slotPrefab
+      value: 
+      objectReference: {fileID: 7233918457220144371, guid: 8d1a5bfd3e2893b49a3ffe0d4816b9fe, type: 3}
     - target: {fileID: 5651570900846061486, guid: 7748ba667e6fae944a9626011c81f80d, type: 3}
       propertyPath: m_FlexibleHeight
       value: 8

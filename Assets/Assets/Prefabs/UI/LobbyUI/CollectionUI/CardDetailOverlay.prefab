@@ -635,7 +635,6 @@ MonoBehaviour:
   bodyMaterial: {fileID: 2100000, guid: 7a1c9e4b2f30d4a4b9c8e5d61f2a3b40, type: 2}
   floodCover: {fileID: 5887355907855028410}
   backGlow: {fileID: 651702345096800075}
-  chillColor: {r: 0.62, g: 0.66, b: 0.82, a: 1}
   emberColor: {r: 1, g: 0.5, b: 0.15, a: 1}
   whiteHotColor: {r: 1, g: 0.93, b: 0.78, a: 1}
   heatGlow: 1.6
@@ -645,7 +644,10 @@ MonoBehaviour:
   overheatStart: 0.4
   overheatRise: 0.55
   coverMaterial: {fileID: 2100000, guid: f744962ef568df34ea0c619144cf67de, type: 2}
-  snuffDuration: 0.1
+  snuffDuration: 0.07
+  ashColor: {r: 0.42, g: 0.16, b: 0.05, a: 1}
+  ashAlpha: 0.5
+  ashSweep: 0.3
   emberHeat: 0.22
   emberFade: 0.35
   blackoutDepth: 0.3
