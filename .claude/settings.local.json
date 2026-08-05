@@ -119,7 +119,9 @@
       "Bash(cp DeckUI/DeckEditSlot.prefab C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/4f2bf985-1506-4cf9-8833-5b890211b989/scratchpad/backup/DeckEditSlot.prefab.FINAL)",
       "Bash(tee /tmp/targets.txt)",
       "Bash(awk ' *)",
-      "Bash(awk '/^--- !u!1001 &7469000894678542274/,/^--- !u!/{print NR\": \"$0}' Assets/Assets/Prefabs/UI/LobbyCanvas.prefab)"
+      "Bash(awk '/^--- !u!1001 &7469000894678542274/,/^--- !u!/{print NR\": \"$0}' Assets/Assets/Prefabs/UI/LobbyCanvas.prefab)",
+      "Bash(awk '/^--- !u!224 &604385528$/,/m_Pivot/' Assets/Scenes/BattleScene.unity)",
+      "Bash(awk '/^--- !u!224 &145518277$/,/m_Pivot/' Assets/Scenes/BattleScene.unity)"
     ]
   },
   "enabledMcpjsonServers": [

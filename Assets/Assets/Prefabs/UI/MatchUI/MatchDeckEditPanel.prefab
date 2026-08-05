@@ -746,7 +746,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 946f1c01b6ce14631a249b555b9d5a84, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 4afdbc8ba755f45c69639d7d40484c83, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -872,6 +872,14 @@ PrefabInstance:
       propertyPath: m_VerticalAlignment
       value: 4096
       objectReference: {fileID: 0}
+    - target: {fileID: 2393208248198090925, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 2393208248198090925, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
+      objectReference: {fileID: 0}
     - target: {fileID: 2850095037927338035, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
@@ -927,6 +935,14 @@ PrefabInstance:
     - target: {fileID: 3024505103512581317, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3141974002322698183, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 3141974002322698183, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
       objectReference: {fileID: 0}
     - target: {fileID: 3195626572415997836, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchorMax.y
@@ -1156,13 +1172,21 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5377109419095892785, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 5377109419095892785, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
+      objectReference: {fileID: 0}
     - target: {fileID: 5762010084877965581, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.x
-      value: 89.333336
+      value: 285.0616
       objectReference: {fileID: 0}
     - target: {fileID: 5762010084877965581, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.y
-      value: 118.905754
+      value: 379.42685
       objectReference: {fileID: 0}
     - target: {fileID: 5762010084877965581, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_Padding.m_Top
@@ -1227,6 +1251,22 @@ PrefabInstance:
     - target: {fileID: 6156563706212830073, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6328191322338092007, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 6328191322338092007, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 6669347918927574342, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 6669347918927574342, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
       objectReference: {fileID: 0}
     - target: {fileID: 6826724644928931716, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchorMax.x
@@ -1288,6 +1328,18 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7054107738787253895, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 4afdbc8ba755f45c69639d7d40484c83, type: 3}
+    - target: {fileID: 7485357710021231645, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5938974
+      objectReference: {fileID: 0}
+    - target: {fileID: 7485357710021231645, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5938974
+      objectReference: {fileID: 0}
     - target: {fileID: 7822360014526533886, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_Name
       value: MatchDeckEditPanel
@@ -1302,11 +1354,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.x
-      value: 44.64197
+      value: 249.43692
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.y
-      value: 59.420006
+      value: 332.00916
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_Padding.m_Top
@@ -1324,6 +1376,10 @@ PrefabInstance:
       propertyPath: m_Padding.m_Bottom
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8457024000686175874, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 4afdbc8ba755f45c69639d7d40484c83, type: 3}
     - target: {fileID: 8650996764699192405, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -1511,6 +1567,9 @@ MonoBehaviour:
   columns: 3
   cellAspect: 0.7512953
   rowsToFit: 0
+  artUsableRatio: {x: 1, y: 1}
+  sideMargin: 0
+  visibleGap: {x: 0, y: 0}
 --- !u!1 &1743822870218303019 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3527900677952351212, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
@@ -1626,6 +1685,9 @@ MonoBehaviour:
   columns: 3
   cellAspect: 0.7512953
   rowsToFit: 2
+  artUsableRatio: {x: 1, y: 1}
+  sideMargin: 0
+  visibleGap: {x: 0, y: 0}
 --- !u!1 &3745276763486826332 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1963347402011042459, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
