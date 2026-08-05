@@ -1,10 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>아웃게임 첫시작 튜토리얼의 챕터 시퀀스(에디터 저작, SO). 기획의 "N편"을 순서대로 꽂는 조립 목록일 뿐이다.
-/// 스텝은 행(TutorialStepDef)으로 이 안에 인라인되고, 실행은 TutorialStepExecutor가,
-/// 진행도 영속은 OutgameTutorialProgress가, 순서 해석은 러너가 맡는다.
-/// </summary>
+// 아웃게임 첫시작 튜토리얼의 챕터 시퀀스(에디터 저작, SO)
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
 public class OutgameTutorialData : ScriptableObject
 {

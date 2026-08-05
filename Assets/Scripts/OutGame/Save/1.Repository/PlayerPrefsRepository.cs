@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// IRepository의 PlayerPrefs 구현.
+// IRepository의 PlayerPrefs 구현
 public class PlayerPrefsRepository : IRepository
 {
     public bool Has(string _key) => PlayerPrefs.HasKey(_key);

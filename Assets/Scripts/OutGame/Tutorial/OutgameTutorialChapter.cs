@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>튜토리얼 한 편(챕터) — 준비 스텝 0개 이상 → 전투 스텝으로 끝나는 묶음. 기획 문서의 "N편"과 1:1.
-/// SO로 가르지 않는다 — 스텝을 SO로 가른 두 근거(종류별 필드만 노출·에셋 재사용)가 챕터엔 둘 다 없다.
-/// 그 두 근거는 스텝에서도 성립하지 않는 것으로 드러나 스텝 역시 행으로 접었다(TutorialStepDef).</summary>
+// 튜토리얼 한 편(챕터) — 기획의 "N편"과 1:1인 스텝 묶음
 [Serializable]
 public class OutgameTutorialChapter
 {
@@ -18,7 +16,7 @@ public class OutgameTutorialChapter
 
     public int StepCount => stepDefs != null ? stepDefs.Count : 0;
 
-    /// <summary>범위 밖·빈 칸이면 false. 미배선 칸은 실행할 스텝이 없는 것과 같다.</summary>
+    // 순번의 스텝 조회 — 범위 밖·빈 칸이면 false
     public bool TryGetStep(int _index, out TutorialStepDef _step)
     {
         _step = null;

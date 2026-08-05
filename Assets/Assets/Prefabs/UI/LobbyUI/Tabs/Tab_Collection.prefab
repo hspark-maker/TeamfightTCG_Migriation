@@ -3611,6 +3611,7 @@ GameObject:
   - component: {fileID: 2731368118931943373}
   - component: {fileID: 6469205581728674685}
   - component: {fileID: 1695152502235054079}
+  - component: {fileID: 3311000000000001}
   - component: {fileID: 5090917865885044892}
   m_Layer: 0
   m_Name: Content
@@ -3665,8 +3666,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GridLayoutGroup
   m_Padding:
-    m_Left: 0
-    m_Right: 0
+    m_Left: -22
+    m_Right: -22
     m_Top: 20
     m_Bottom: 20
   m_ChildAlignment: 1
@@ -3676,6 +3677,24 @@ MonoBehaviour:
   m_Spacing: {x: -27, y: -10}
   m_Constraint: 1
   m_ConstraintCount: 4
+--- !u!114 &3311000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1413455685671764872}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45434bf23b4d47947b4c8ba457769b08, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::GridRatioFitter
+  columns: 4
+  cellAspect: 0.7526882
+  rowsToFit: 0
+  artUsableRatio: {x: 0.8544922, y: 0.96914035}
+  sideMargin: 0
+  visibleGap: {x: 17, y: 2}
 --- !u!114 &5090917865885044892
 MonoBehaviour:
   m_ObjectHideFlags: 0

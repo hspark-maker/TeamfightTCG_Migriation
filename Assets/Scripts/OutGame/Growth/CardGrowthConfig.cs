@@ -1,30 +1,29 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 카드 강화 튜닝 데이터
-/// </summary>
+// 카드 강화 튜닝 데이터
 [CreateAssetMenu(fileName = "CardGrowthConfig", menuName = "Card Battle/Card Growth Config")]
 public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
-    [Min(0)] [SerializeField] int maxLevel = 10;               // 강화 상한 레벨. 도달하면 더 강화할 수 없다.
-    [Min(0)] [SerializeField] int hpPerLevel = 2;              // 레벨업 1회당 최대 체력 가산분.
-    
+    [Min(0)] [SerializeField] int maxLevel = 10;
+    [Min(0)] [SerializeField] int hpPerLevel = 2;
+
     [Tooltip("레벨 1로 올릴 때의 골드 비용.")]
     [SerializeField] long baseGoldCost = 100;
     
     [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseGoldCost + (N-1) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
-    [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;      // 레벨 1의 성공률.
-    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;  // 레벨마다 깎이는 성공률. 레벨 N = base - (N-1) * 이 값(0~1 클램프).
+    [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
+    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
 
     [Header("레벨별 오버라이드 (override 체크한 필드만 기본식을 대체)")]
     [SerializeField] List<GrowthStepOverride> stepOverrides = new List<GrowthStepOverride>();
 
-    public int MaxLevel => maxLevel < 0 ? 0 : maxLevel;   // 음수 오설정이 레벨 판정을 뒤집지 않게 하한 보정.
+    // 강화 상한 레벨(음수 오설정은 0으로 보정)
+    public int MaxLevel => maxLevel < 0 ? 0 : maxLevel;
 
-    /// <summary>레벨 _level로 올리는 한 스텝(hpGain/cost/successRate). 범위(1~MaxLevel) 밖이면 false.</summary>
+    // 레벨 _level로 올리는 한 스텝(범위 밖이면 false)
     public bool TryGetStep(int _level, out GrowthStep _step)
     {
         _step = default;
@@ -34,12 +33,11 @@ public class CardGrowthConfig : ScriptableObject
         return true;
     }
 
-    /// <summary>레벨 _level까지의 누적 HP 보너스. 스텝 오버라이드가 있어 레벨 × hpPerLevel로 단축할 수 없다.</summary>
+    // 레벨 _level까지의 누적 HP 보너스
     public int HpBonusAt(int _level)
     {
         if (_level <= 0) return 0;
 
-        // 상한을 나중에 낮춰도 구 세이브의 초과 레벨이 없는 스텝을 읽지 않도록 클램프.
         int t_top = _level > MaxLevel ? MaxLevel : _level;
         int t_sum = 0;
         for (int t_i = 1; t_i <= t_top; t_i++)
@@ -49,7 +47,6 @@ public class CardGrowthConfig : ScriptableObject
         return t_sum;
     }
 
-    // 기본식 계산 후 오버라이드 적용. 조회·누적 계산이 이 한 곳을 공유해 곡선 정의가 갈리지 않게 한다.
     GrowthStep StepAt(int _level)
     {
         int   t_hp   = hpPerLevel;
@@ -63,7 +60,6 @@ public class CardGrowthConfig : ScriptableObject
             if (t_over.overrideSuccessRate) t_rate = t_over.successRate;
         }
 
-        // 음수 비용(=적립)·음수 HP는 저작 실수로만 나온다. 소비처가 재방어하지 않도록 여기서 정규화.
         if (t_cost < 0) t_cost = 0;
         if (t_hp < 0)   t_hp   = 0;
 
@@ -80,17 +76,13 @@ public class CardGrowthConfig : ScriptableObject
             if (stepOverrides[t_i].level != _level) continue;
 
             _override = stepOverrides[t_i];
-            return true;   // 같은 레벨이 여러 번 저작되면 첫 항목만 쓴다
+            return true;
         }
         return false;
     }
 }
 
-/// <summary>
-/// 레벨 하나의 저작 오버라이드. override 플래그로 "미지정"을 표현한다 —
-/// 센티널(0/음수)을 쓰면 "HP 0 증가"·"무료"·"성공률 0%" 같은 정상 저작값과 구분되지 않는다.
-/// 새 항목의 기본값(전부 false)은 곧 전역 기본식이라 인스펙터에서 추가만 해도 안전하다.
-/// </summary>
+// 레벨 하나의 저작 오버라이드(override 플래그로 "미지정"을 표현)
 [System.Serializable]
 public struct GrowthStepOverride
 {
@@ -110,15 +102,14 @@ public struct GrowthStepOverride
     public float successRate;
 }
 
-/// <summary>
-/// 레벨 하나의 파생 스냅샷(저작 데이터가 아니라 CardGrowthConfig가 기본식+오버라이드로 계산해 내주는 값).
-/// </summary>
+// 레벨 하나의 파생 스냅샷(CardGrowthConfig가 기본식+오버라이드로 계산해 내주는 값)
 public readonly struct GrowthStep
 {
-    public readonly int Level;          // 이 스텝을 밟으면 도달하는 레벨
-    public readonly int HpGain;         // 성공 시 늘어나는 최대 체력
-    public readonly long Cost;          // 소모 골드(성공·실패 무관하게 소모)
-    public readonly float SuccessRate;  // 성공률(0~1)
+    public readonly int Level;
+    public readonly int HpGain;
+    // 성공·실패 무관하게 소모되는 골드
+    public readonly long Cost;
+    public readonly float SuccessRate;
 
     public GrowthStep(int _level, int _hpGain, long _cost, float _successRate)
     {

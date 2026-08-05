@@ -1,35 +1,28 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
 // 로비 컬렉션 탭의 카드 상세 오버레이(CardDetailOverlay.prefab 루트에 부착).
 // 카드 타일을 길게 누르면 열리고, 누른 카드의 이름·체력·키워드·시너지를 채운다.
+// 닫기 버튼은 두지 않는다 — 오버레이 아무 곳이나 탭하면 닫힌다(조작 바 tapCloseExclude만 제외).
 //
 // 인게임 카드 정보창(PooledCardElement)과 달리 풀드 UI가 아니라 로비 씬에 직접 배치한다 —
 // 로비 전용 풀스크린 한 장이라 Addressables("UIPrefab" 라벨) 등록까지 갈 이유가 없다(PackOpenOverlay와 같은 결).
 //
 // 표시 규칙은 복제하지 않는다: 카드 그림 한 장은 CardVisualView.Bind, 시너지 이름은 SynergyText,
 // 키워드 아이콘·표시명·설명은 KeywordIconConfig가 정본이다.
-public class CardDetailOverlayView : MonoBehaviour
+public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 {
-    /// <summary>미소유 카드의 이름 자리. 카드 그림 자체는 CardVisualView가 실루엣으로 가린다.</summary>
     const string LockedName  = "???";
-    /// <summary>미소유 카드의 수치 자리(체력).</summary>
     const string LockedValue = "?";
-    /// <summary>보유 카드인데 해당 섹션에 내용이 없을 때. 섹션을 숨기지 않는 이유는 ApplySection 주석 참고.</summary>
     const string NoneValue   = "없음";
-    /// <summary>보여줄 수치가 없을 때(만렙 등)의 자리. 빈 문자열을 넣으면 라벨만 떠 있어 배선 실수처럼 보인다.</summary>
     const string NoValue     = "-";
 
-    /// <summary>강화 실패 펀치는 성공보다 작게 준다 — 같은 크기로 튀면 결과를 색·문구로만 구분하게 된다.</summary>
-    const float FailPunch = 0.12f;
-
     [Header("배선")]
-    [SerializeField] TMP_Text       titleText;       // 상단 카드 이름
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
     [SerializeField] TMP_Text       powerValueText;  // 체력 수치(프리팹 목업의 "파워" 행을 체력으로 쓴다)
 
@@ -37,25 +30,11 @@ public class CardDetailOverlayView : MonoBehaviour
     [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
-    // 조작 묶음(BottomBar)을 통째로 끄는 필드는 두지 않는다 — 루트 VerticalLayoutGroup에서 남는 높이를
-    // CardArea(flexibleHeight=1)가 받아 카드 그림 크기가 소유 여부에 따라 달라진다(ApplySection과 같은 함정).
-    // 대신 버튼만 숨긴다: 바는 높이를 지킨 채 비어 있게 된다.
     [SerializeField] Button     enhanceButton;
     [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
-
-    [Header("강화 결과 피드백")]
-    [Tooltip("강화 성공/실패 결과 한 줄. 잠시 뒤 저절로 사라진다.")]
-    [SerializeField] TMP_Text resultText;
-    [Tooltip("결과에 반응해 튈 대상. 미배선이면 카드 뷰를 쓴다.")]
-    [SerializeField] RectTransform punchTarget;
-    [SerializeField] Color successColor = new Color(0.45f, 1f, 0.55f);
-    [SerializeField] Color failColor    = new Color(1f, 0.45f, 0.4f);
-    [Min(0f)] [SerializeField] float resultHoldSeconds = 1.6f;
-    [SerializeField] AudioClip successSfx;
-    [SerializeField] AudioClip failSfx;
 
     [Header("키워드 섹션")]
     [SerializeField] GameObject keywordSection;      // 칩이 0개면 통째로 숨긴다
@@ -72,12 +51,12 @@ public class CardDetailOverlayView : MonoBehaviour
     // 칩에는 설명 줄이 없으므로 프리팹의 explainText를 미배선으로 비워둔다(Init이 null 가드).
     [SerializeField] KeywordExplainItem chipPrefab;
     [SerializeField] KeywordIconConfig  keywordIconConfig;
-    [SerializeField] Button             closeButton;
     [SerializeField] PopupTransition    transition = new PopupTransition();
 
-    [Header("이전/다음 (선택 — 미배선이면 넘기기 없이 지금까지와 동일하게 동작)")]
-    [SerializeField] Button prevButton;
-    [SerializeField] Button nextButton;
+    [Header("탭해서 닫기")]
+    [Tooltip("탭해도 닫히지 않을 영역(BottomBar). 미배선이면 바의 빈 곳 탭도 닫기로 샌다.")]
+    [SerializeField] RectTransform tapCloseExclude;
+    
     [Tooltip("좌우 스와이프 감지. 오버레이 전면을 덮는 raycastTarget Graphic 위에 올려야 한다.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
@@ -106,9 +85,6 @@ public class CardDetailOverlayView : MonoBehaviour
     CanvasGroup m_slideGroup;
     float       m_slideBaseX;
     bool        m_slideBaseCaptured;
-
-    // 결과 문구를 잠시 뒤 지우는 코루틴. 카드가 바뀌거나 오버레이가 닫히면 잘라낸다.
-    Coroutine m_resultRoutine;
 
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
@@ -181,10 +157,12 @@ public class CardDetailOverlayView : MonoBehaviour
     {
         s_instance = this;
 
-        if (this.closeButton != null)
+        // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
+        // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
+        if (this.cardView != null)
         {
-            this.closeButton.onClick.RemoveAllListeners();
-            this.closeButton.onClick.AddListener(Hide);
+            LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
+            if (t_tap != null) t_tap.OnTap = Hide;
         }
     }
 
@@ -192,16 +170,6 @@ public class CardDetailOverlayView : MonoBehaviour
     // Awake 한 번으로는 부족하고, Remove 후 Add라 중복 등록도 남지 않는다.
     void OnEnable()
     {
-        if (this.prevButton != null)
-        {
-            this.prevButton.onClick.RemoveListener(OnPrevPressed);
-            this.prevButton.onClick.AddListener(OnPrevPressed);
-        }
-        if (this.nextButton != null)
-        {
-            this.nextButton.onClick.RemoveListener(OnNextPressed);
-            this.nextButton.onClick.AddListener(OnNextPressed);
-        }
 
         if (this.enhanceButton != null)
         {
@@ -223,17 +191,12 @@ public class CardDetailOverlayView : MonoBehaviour
 
     void OnDisable()
     {
-        if (this.prevButton != null) this.prevButton.onClick.RemoveListener(OnPrevPressed);
-        if (this.nextButton != null) this.nextButton.onClick.RemoveListener(OnNextPressed);
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
-
-        // 꺼지는 동안 코루틴이 죽어 결과 문구가 켜진 채 굳는다 → 다음 진입에 남은 결과가 보이지 않게 여기서 지운다.
-        ClearResult();
 
         // 전환 도중에 닫히면 slideTarget이 옆으로 밀린 채·반투명인 채 굳는다 → 다음 열기에 그대로 보인다.
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
@@ -279,10 +242,24 @@ public class CardDetailOverlayView : MonoBehaviour
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 화살표·스와이프가 전환을 시작하면 close 시퀀스와 같은 노드를 두고 싸운다.
         // 다시 열 때는 SetVisible(true) → OnEnable → RefreshArrows()가 되살린다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;
-        if (this.prevButton    != null) this.prevButton.interactable    = false;
-        if (this.nextButton    != null) this.nextButton.interactable    = false;
 
         this.transition.SetVisible(gameObject, false);
+    }
+
+    /// <summary>딤·상세 패널 어디를 탭해도 닫는다. 조작 바(tapCloseExclude)와 카드 그림(Awake 참고)은 제외.</summary>
+    public void OnPointerClick(PointerEventData _e)
+    {
+        if (_e == null || _e.button != PointerEventData.InputButton.Left) return;
+
+        // 스와이프로 소비된 포인터는 탭이 아니다 — 없으면 카드를 넘긴 뒤 손 떼는 순간 닫힌다.
+        if (_e.dragging) return;
+
+        // 누른 노드로 판정 — 이 경로의 pointerPress는 루트 자신이라 영역을 알려주지 못한다.
+        GameObject t_hit = _e.pointerPressRaycast.gameObject;
+        if (t_hit != null && this.tapCloseExclude != null
+         && t_hit.transform.IsChildOf(this.tapCloseExclude)) return;
+
+        Hide();
     }
 
     void OnPrevPressed() => Step(-1);
@@ -345,13 +322,7 @@ public class CardDetailOverlayView : MonoBehaviour
 
         t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
     }
-
-    // 진행 중 전환을 취소한다: 자리·투명도를 authoring 값으로 되돌리고 아직 반영 못 한 카드는 버린다.
-    // 버려도 되는 이유는 호출처가 셋뿐이기 때문이다 — 닫힘(안 보임), Show(직후 Apply), 연타 인계(새 카드가 덮어씀).
-    // 한 프레임도 안 보일 중간 카드에 칩 전량을 재생성하지 않는다.
-    //
-    // ⚠ slideTarget.DOKill()을 쓰면 안 된다 — 같은 노드에 PopupTransition의 등장·퇴장 DOScale/DOFade가 걸려 있어
-    //   통째로 자르면 localScale이 0.9 같은 중간값에 굳는다. 그래서 슬라이드 시퀀스에만 id(this)를 달고 그것만 자른다.
+    
     void CancelSlide()
     {
         DOTween.Kill(this);
@@ -393,17 +364,7 @@ public class CardDetailOverlayView : MonoBehaviour
     void RefreshArrows()
     {
         bool t_multi = HasMultipleCards();
-
-        if (this.prevButton != null)
-        {
-            this.prevButton.gameObject.SetActive(t_multi);
-            this.prevButton.interactable = t_multi;
-        }
-        if (this.nextButton != null)
-        {
-            this.nextButton.gameObject.SetActive(t_multi);
-            this.nextButton.interactable = t_multi;
-        }
+        
 
         if (this.swipeDetector != null) this.swipeDetector.Interactable = t_multi;
     }
@@ -485,14 +446,9 @@ public class CardDetailOverlayView : MonoBehaviour
     {
         bool t_owned = OwnershipManager.IsOwned(_card);
 
-        // 이전 카드의 강화 결과 문구가 따라오지 않게 지운다.
-        ClearResult();
-
         // 그림·이름·체력·키워드 아이콘·잠김 오버레이는 도감 타일과 같은 컴포넌트에 그대로 위임한다.
         if (this.cardView != null) this.cardView.Bind(_card, t_owned);
-
-        if (this.titleText != null)
-            this.titleText.text = t_owned ? _card.displayName : LockedName;
+        
 
         BuildKeywordSection(_card, t_owned);
         BuildSynergySection(_card, t_owned);
@@ -561,85 +517,13 @@ public class CardDetailOverlayView : MonoBehaviour
 
         EnhanceResult t_result = CardGrowthManager.TryEnhance(t_card);
 
-        ShowEnhanceResult(t_result);
+        // 저작 실수(부트 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
+        if (t_result.Outcome == EEnhanceOutcome.NotReady)
+            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
 
         // 성공·실패는 OnGrowthChanged가 이미 갱신했지만 잔액부족은 통지가 없다 → 여기서 한 번 더(멱등).
         RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
-
-    // 실패가 이 시스템의 엔진이라 결과가 한눈에 갈려야 한다 — 문구·색·펀치 세기·효과음을 함께 바꾼다.
-    void ShowEnhanceResult(EnhanceResult _result)
-    {
-        switch (_result.Outcome)
-        {
-            case EEnhanceOutcome.Success:
-                ShowResult($"강화 성공!  Lv {_result.Level}", true);
-                UiPunch.Play(this.levelValueText != null ? this.levelValueText.transform : null);
-                break;
-
-            case EEnhanceOutcome.Failed:
-                ShowResult($"강화 실패…  Lv {_result.Level} 유지", false);
-                break;
-
-            case EEnhanceOutcome.NotAffordable:
-                ShowResult("골드가 부족하다", false);
-                break;
-
-            case EEnhanceOutcome.MaxLevel:
-                ShowResult("이미 최고 레벨이다", false);
-                break;
-
-            // 결제 전에 거부된 경우 — 재화는 그대로다. 저작 실수(부트 누락)라 유저 문구보다 로그가 본체다.
-            case EEnhanceOutcome.NotReady:
-                ShowResult("잠시 후 다시 시도하세요", false);
-                Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
-                break;
-        }
-    }
-
-    void ShowResult(string _text, bool _positive)
-    {
-        if (this.resultText != null)
-        {
-            this.resultText.text  = _text;
-            this.resultText.color = _positive ? this.successColor : this.failColor;
-            this.resultText.gameObject.SetActive(true);
-        }
-
-        UiPunch.Play(ResolvePunchTarget(), _positive ? UiPunch.DEFAULT_SCALE : FailPunch);
-
-        SoundManager.Instance?.PlaySFX(_positive ? this.successSfx : this.failSfx);
-
-        if (this.m_resultRoutine != null) StopCoroutine(this.m_resultRoutine);
-        if (isActiveAndEnabled) this.m_resultRoutine = StartCoroutine(HideResultAfterHold());
-    }
-
-    IEnumerator HideResultAfterHold()
-    {
-        yield return new WaitForSeconds(this.resultHoldSeconds);
-
-        this.m_resultRoutine = null;
-        if (this.resultText != null) this.resultText.gameObject.SetActive(false);
-    }
-
-    void ClearResult()
-    {
-        if (this.m_resultRoutine != null)
-        {
-            StopCoroutine(this.m_resultRoutine);
-            this.m_resultRoutine = null;
-        }
-
-        if (this.resultText != null) this.resultText.gameObject.SetActive(false);
-    }
-
-    Transform ResolvePunchTarget()
-    {
-        if (this.punchTarget != null) return this.punchTarget;
-
-        return this.cardView != null ? this.cardView.transform : null;
-    }
-
 
     void BuildKeywordSection(CardData _card, bool _owned)
     {

@@ -1,8 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 전투 결과 → 골드 환산 튜닝 파라미터
-/// </summary>
+// 전투 결과 → 골드 환산 튜닝 파라미터 SO
 [CreateAssetMenu(fileName = "RewardConfig", menuName = "TCG/Reward Config")]
 public class BattleReward : ScriptableObject
 {

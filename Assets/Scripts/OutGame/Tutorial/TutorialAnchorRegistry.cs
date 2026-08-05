@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 튜토리얼 타깃 위젯의 static 등록소. 씬의 TutorialAnchor가 자기 수명주기로 등록/해제한다.
-// 타깃은 전부 씬 고정 단일 인스턴스라 키 하나당 1개만 보관한다(id 구분자 불필요).
-// Button을 함께 보관하는 이유: 게이트가 스텝 완료를 onClick 리스너로 감지한다.
+// 튜토리얼 타깃 위젯의 static 등록소(키 하나당 1건, Button은 없을 수 있다)
 public static class TutorialAnchorRegistry
 {
-    // 등록된 타깃 1건. Button은 없을 수 있다(클릭 대상이 아닌 순수 하이라이트 타깃).
+    // 등록된 타깃 1건
     struct Entry
     {
         public RectTransform rect;
@@ -17,9 +15,10 @@ public static class TutorialAnchorRegistry
 
     static readonly Dictionary<EOutgameTutorialAnchor, Entry> s_entries = new Dictionary<EOutgameTutorialAnchor, Entry>();
 
-    // 등록 통지 — 앵커가 나중에 등장하는 경우(탭 전환·개봉 완료 노출)를 게이트가 기다렸다 켜지게 한다.
+    // 앵커가 나중에 등장하는 경우(탭 전환·개봉 완료 노출)를 게이트가 기다렸다 켜지게 하는 등록 통지
     public static event Action<EOutgameTutorialAnchor> OnRegistered;
 
+    // 타깃 등록(같은 키는 나중 등록이 가져간다)
     public static void Register(EOutgameTutorialAnchor _key, RectTransform _rect, Button _button)
     {
         if (_key == EOutgameTutorialAnchor.None) return;
@@ -29,6 +28,7 @@ public static class TutorialAnchorRegistry
         OnRegistered?.Invoke(_key);
     }
 
+    // 키만 보고 해제
     public static void Unregister(EOutgameTutorialAnchor _key)
     {
         if (_key == EOutgameTutorialAnchor.None) return;
@@ -36,9 +36,7 @@ public static class TutorialAnchorRegistry
         s_entries.Remove(_key);
     }
 
-    /// <summary>지금 등록된 주인이 <paramref name="_rect"/>일 때만 해제한다.
-    /// 같은 키를 공유하는 화면이 한 씬에 둘 있을 때(로비 덱 편집 / 매치 덱 편집) 나중에 켜진 쪽이
-    /// 등록을 가져간 뒤 먼저 켜졌던 쪽이 꺼지면, 키만 보고 지우는 해제가 살아 있는 등록을 날린다.</summary>
+    // 지금 등록된 주인이 _rect일 때만 해제(같은 키를 공유하는 다른 화면의 등록을 날리지 않게)
     public static void Unregister(EOutgameTutorialAnchor _key, RectTransform _rect)
     {
         if (_key == EOutgameTutorialAnchor.None) return;
@@ -48,7 +46,7 @@ public static class TutorialAnchorRegistry
         s_entries.Remove(_key);
     }
 
-    // 미등록·파괴된 타깃이면 false. 게이트는 false일 때 대기 상태로 남는다.
+    // 등록된 타깃 조회 — 미등록·파괴됐으면 false
     public static bool TryGet(EOutgameTutorialAnchor _key, out RectTransform _rect, out Button _button)
     {
         _rect = null;
@@ -56,7 +54,6 @@ public static class TutorialAnchorRegistry
 
         if (!s_entries.TryGetValue(_key, out var t_entry)) return false;
 
-        // 씬 언로드로 OnDisable 없이 파괴된 stale 항목 정리(Unity의 fake-null 판정).
         if (t_entry.rect == null)
         {
             s_entries.Remove(_key);
