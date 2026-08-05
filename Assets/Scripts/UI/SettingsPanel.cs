@@ -25,11 +25,15 @@ public class SettingsPanel : PooledUIBase
     // 페이지 전환(메뉴 ↔ 환경설정) 피드백.
     const float PageSlideX    = 70f;
     const float PageSlideTime = 0.18f;
+    // 나가는 페이지는 들어오는 것보다 빨리 걷힌다 — 같은 시간을 쓰면 두 페이지가 겹쳐 보이는 구간이 길어진다.
+    const float PageFadeOutTime = 0.12f;
     const float TitlePopScale = 0.88f;
 
     [Header("Float")]
     // dim(DimCloseButton)을 제외한 창 본체. BG·타이틀·두 페이지가 전부 이 밑에 있다.
     [SerializeField] RectTransform panelRoot;
+    [Tooltip("contents에 붙은 CanvasGroup. 창 등장/퇴장 페이드용 — 프리팹에 저작돼 있어야 한다")]
+    [SerializeField] CanvasGroup contentsGroup;
     Vector2 panelHomePos;
     bool    hiding;   // 퇴장 연출 진행 중. 중복 Hide로 시퀀스가 겹치지 않게 잠근다.
 
@@ -37,6 +41,9 @@ public class SettingsPanel : PooledUIBase
     // 창 하나에 두 페이지. 켜고 끄기만 하고 생성하지 않는다 — 둘 다 프리팹에 저작돼 있다.
     [SerializeField] GameObject menuPage;
     [SerializeField] GameObject optionsPage;
+    [Tooltip("각 페이지에 붙은 CanvasGroup. 페이지 교차 페이드용 — 프리팹에 저작돼 있어야 한다")]
+    [SerializeField] CanvasGroup menuGroup;
+    [SerializeField] CanvasGroup optionsGroup;
     Vector2 menuHomePos;
     Vector2 optionsHomePos;
     [SerializeField] TMP_Text   titleText;
@@ -97,8 +104,14 @@ public class SettingsPanel : PooledUIBase
         this.hiding = false;   // 퇴장 연출 도중 다시 열렸으면 잠금 해제 — 안 풀면 다음 Hide가 통째로 무시된다.
 
         // 퇴장이 껐던 입력을 되돌린다(퇴장 중 재오픈 경로).
-        CanvasGroup t_cg = this.contents.GetComponent<CanvasGroup>();
-        if (t_cg != null) t_cg.blocksRaycasts = true;
+        CanvasGroup t_cg = this.contentsGroup;
+        if (t_cg != null)
+        {
+            t_cg.blocksRaycasts = true;
+            // 투명에서 시작해야 아래 animator.Fade(…, 1f)가 실제로 올라간다 — 1인 채로 두면 페이드가 무동작이다.
+            // 페이드를 태워 줄 animator가 없으면 건드리지 않는다(창이 안 보이는 채로 남는다).
+            if (this.animator != null) t_cg.alpha = 0f;
+        }
 
         // 창이 떠 있는 동안 필드 카드 조작을 막는다(덱 보기 창과 같은 규약).
         // InputAllowed가 아니라 UiBlocking인 이유: 창을 닫을 때 생각시간 예산이 리셋되면 안 된다.
@@ -120,20 +133,24 @@ public class SettingsPanel : PooledUIBase
         RefreshBattleButtons();
         RefreshFrameRateButtons();
 
-        this.animator?.Fade(this.contents.GetComponent<CanvasGroup>(), 1f);
+        this.animator?.Fade(this.contentsGroup, 1f);
     }
 
     /// <summary>메뉴 ↔ 환경설정 페이지 전환. 배경·타이틀은 두 페이지가 공유하므로 여기서 갈아끼운다.
     /// _animate면 새 페이지가 진행 방향에서 밀려 들어오고 타이틀이 살짝 튄다 — 눌렀다는 피드백.</summary>
     void ShowPage(bool _options, bool _animate = false)
     {
-        if (this.menuPage    != null) this.menuPage.SetActive(!_options);
-        if (this.optionsPage != null) this.optionsPage.SetActive(_options);
-        if (this.titleText   != null) this.titleText.text = _options ? "환경설정" : "메뉴";
+        GameObject t_next = _options ? this.optionsPage : this.menuPage;
+        GameObject t_prev = _options ? this.menuPage    : this.optionsPage;
+
+        if (t_next != null) t_next.SetActive(true);
+        if (this.titleText != null) this.titleText.text = _options ? "환경설정" : "메뉴";
 
         if (!_animate)
         {
-            // 전환 트윈이 돌던 중에 창이 닫혔다면 페이지가 중간 위치에 굳어 있다 — 저작 자리로 즉시 되돌린다.
+            if (t_prev != null) t_prev.SetActive(false);
+
+            // 전환 트윈이 돌던 중에 창이 닫혔다면 페이지가 중간 위치·중간 알파로 굳어 있다 — 저작 상태로 즉시 되돌린다.
             ResetPage(this.menuPage,    this.menuHomePos);
             ResetPage(this.optionsPage, this.optionsHomePos);
             if (this.titleText != null)
@@ -145,7 +162,9 @@ public class SettingsPanel : PooledUIBase
         }
 
         // 앞으로(환경설정) 갈 땐 오른쪽에서, 뒤로(메뉴) 갈 땐 왼쪽에서 들어온다.
-        PlayPageIn(_options ? this.optionsPage : this.menuPage,
+        // 나가는 페이지는 **끄지 않고 페이드로 걷는다** — 즉시 끄면 새 페이지만 덩그러니 나타나 전환이 툭 끊긴다.
+        PlayPageOut(t_prev);
+        PlayPageIn(t_next,
                    _options ? this.optionsHomePos : this.menuHomePos,
                    _options ? 1f : -1f);
         PlayTitlePop();
@@ -157,9 +176,52 @@ public class SettingsPanel : PooledUIBase
     {
         if (_page == null || _page.transform is not RectTransform t_rt) return;
 
+        CanvasGroup t_cg = PageGroup(_page);
+        if (t_cg != null)
+        {
+            // 나가던 중에 다시 눌린 페이지일 수 있다. 완료 콜백을 태우지 않고 끊는다 —
+            // 태우면 PlayPageOut의 OnComplete가 방금 켠 페이지를 도로 꺼버린다.
+            t_cg.DOKill();
+            t_cg.alpha          = 0f;
+            t_cg.blocksRaycasts = true;
+            t_cg.DOFade(1f, PageSlideTime).SetEase(Ease.OutCubic).SetLink(_page);
+        }
+
         t_rt.DOKill();
         t_rt.anchoredPosition = _home + new Vector2(PageSlideX * _dir, 0f);
         t_rt.DOAnchorPos(_home, PageSlideTime).SetEase(Ease.OutCubic).SetLink(_page);
+    }
+
+    /// <summary>나가는 페이지를 알파로 걷고 끝난 뒤에 끈다. 걷히는 동안 클릭을 먹지 않게 레이캐스트를 먼저 닫는다 —
+    /// 두 페이지가 겹치는 짧은 구간에 뒤 페이지 버튼이 눌리면 방금 떠난 화면이 동작한다.</summary>
+    void PlayPageOut(GameObject _page)
+    {
+        if (_page == null || !_page.activeSelf) return;
+
+        CanvasGroup t_cg = PageGroup(_page);
+        if (t_cg == null) { _page.SetActive(false); return; }
+
+        if (_page.transform is RectTransform t_rt) t_rt.DOKill();
+
+        t_cg.DOKill();
+        t_cg.blocksRaycasts = false;
+        t_cg.DOFade(0f, PageFadeOutTime).SetEase(Ease.InCubic).SetLink(_page)
+            .OnComplete(() =>
+            {
+                _page.SetActive(false);
+                t_cg.alpha          = 1f;   // 다음 등장이 알파를 다시 잡지만, 꺼진 채로 0을 남겨두지 않는다
+                t_cg.blocksRaycasts = true;
+            });
+    }
+
+    /// <summary>그 페이지의 CanvasGroup. **런타임에 붙이지 않는다** — 프리팹 저작이 진실원이고
+    /// 미배선이면 페이드만 빠진다(전환 자체는 슬라이드로 계속 동작).</summary>
+    CanvasGroup PageGroup(GameObject _page)
+    {
+        if (_page == null) return null;
+        if (this.menuPage    == _page) return this.menuGroup;
+        if (this.optionsPage == _page) return this.optionsGroup;
+        return null;
     }
 
     /// <summary>타이틀은 자리를 지키고 크기만 튄다 — 두 페이지가 공유하는 요소라 같이 밀리면 전환이 어색해진다.</summary>
@@ -173,11 +235,18 @@ public class SettingsPanel : PooledUIBase
         t_tr.DOScale(1f, PageSlideTime).SetEase(Ease.OutBack, 2f).SetLink(this.titleText.gameObject);
     }
 
-    static void ResetPage(GameObject _page, Vector2 _home)
+    void ResetPage(GameObject _page, Vector2 _home)
     {
         if (_page == null || _page.transform is not RectTransform t_rt) return;
         t_rt.DOKill();
         t_rt.anchoredPosition = _home;
+
+        CanvasGroup t_cg = PageGroup(_page);
+        if (t_cg == null) return;
+
+        t_cg.DOKill();
+        t_cg.alpha          = 1f;
+        t_cg.blocksRaycasts = true;
     }
 
     static void CachePageHome(GameObject _page, ref Vector2 _home)
@@ -221,7 +290,7 @@ public class SettingsPanel : PooledUIBase
 
         // 연출이 도는 동안 창 자체 입력을 끊는다 — 사라지는 중인 버튼이 눌리면 안 된다.
         // 레이캐스트는 여전히 막으므로 뒤쪽 필드로 터치가 새지도 않는다.
-        CanvasGroup t_cg = this.contents.GetComponent<CanvasGroup>();
+        CanvasGroup t_cg = this.contentsGroup;
         if (t_cg != null) t_cg.blocksRaycasts = false;
 
         bool t_canceled = await PlayFloatOut(t_cg);

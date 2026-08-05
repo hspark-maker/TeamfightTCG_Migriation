@@ -41,21 +41,14 @@ public class DeckPileUI : MonoBehaviour
 
     bool panelOpen;
 
-    // 닫힘 연출 동안 페이드 + 클릭 차단을 한 곳에서 맡는다. 씬 저작을 강제하지 않으려고
-    // 없으면 여기서 붙인다 — 자식을 만드는 게 아니라 패널 자신에 다는 부품이라 배선 대상이 아니다.
-    CanvasGroup panelGroup;
+    [Tooltip("패널(panel)에 붙은 CanvasGroup. 닫힘 연출의 페이드 + 클릭 차단을 맡는다")]
+    [SerializeField] CanvasGroup panelGroup;
 
     void Start()
     {
         this.deckButton.onClick.AddListener(Toggle);
         // 배경(패널 루트) 클릭 = 닫기. 목록·카드는 이 버튼의 자식이라 그쪽 클릭은 여기까지 내려오지 않는다.
         if (this.backgroundCloseButton != null) this.backgroundCloseButton.onClick.AddListener(Close);
-
-        if (this.panel != null)
-        {
-            this.panelGroup = this.panel.GetComponent<CanvasGroup>();
-            if (this.panelGroup == null) this.panelGroup = this.panel.AddComponent<CanvasGroup>();
-        }
     }
 
     public void Refresh()
