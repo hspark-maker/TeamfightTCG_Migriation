@@ -17,8 +17,6 @@ public class MatchDeckPanelView : MonoBehaviour
     [SerializeField] CardVisualView[] enemySlots;   // 6칸. 같은 규약 — EnemySlot_N/CardUIView를 물린다
     [SerializeField] TMP_Text         myPowerText;      // MyInfoBar/PowerBadge/PowerText
     [SerializeField] TMP_Text         enemyPowerText;   // EnemyInfoBar/PowerBadge/PowerText
-    [SerializeField] MatchSynergyStrip mySynergyStrip;      // MyInfoBar 쪽 활성 시너지 줄
-    [SerializeField] MatchSynergyStrip enemySynergyStrip;   // EnemyInfoBar 쪽 활성 시너지 줄
     [SerializeField] Button           editButton;
     [SerializeField] Button           backButton;
     [SerializeField] Button           battleButton;
@@ -70,8 +68,6 @@ public class MatchDeckPanelView : MonoBehaviour
         // _owned는 항상 true다. 매치 화면에 올라오는 건 이미 편성된 소유 카드뿐이라 잠금 표시가 뜨면 안 된다.
         BindSlots(mySlots, t_deck, _applyGrowth: true);   // 내 덱이라 강화 반영 체력으로 그린다
         SetPower(myPowerText, t_deck, _applyGrowth: true);
-        // 강화·진화는 시너지 소속을 바꾸지 않으므로 칸/파워와 달리 성장 플래그가 필요 없다.
-        mySynergyStrip?.Refresh(t_deck);
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
@@ -84,8 +80,6 @@ public class MatchDeckPanelView : MonoBehaviour
         BindSlots(enemySlots, DeckConfig.EnemyDeck, _applyGrowth: false);
         // 파워 합도 같이 꺼야 한다 — 칸은 마스터 값, 배지만 강화 합이면 6칸 합계와 배지가 어긋난다.
         SetPower(enemyPowerText, DeckConfig.EnemyDeck, _applyGrowth: false);
-        // 캐리어가 비어 있으면(=상대 덱 미확정) Refresh(null)이 전 아이콘을 접는다.
-        enemySynergyStrip?.Refresh(DeckConfig.EnemyDeck);
     }
 
     // 덱 파워 표기. 환산식은 DeckPower가 단일 진실원이다(편성 화면의 자동 편성 정렬과 같은 식).

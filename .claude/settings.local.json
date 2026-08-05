@@ -121,7 +121,10 @@
       "Bash(awk ' *)",
       "Bash(awk '/^--- !u!1001 &7469000894678542274/,/^--- !u!/{print NR\": \"$0}' Assets/Assets/Prefabs/UI/LobbyCanvas.prefab)",
       "Bash(awk '/^--- !u!224 &604385528$/,/m_Pivot/' Assets/Scenes/BattleScene.unity)",
-      "Bash(awk '/^--- !u!224 &145518277$/,/m_Pivot/' Assets/Scenes/BattleScene.unity)"
+      "Bash(awk '/^--- !u!224 &145518277$/,/m_Pivot/' Assets/Scenes/BattleScene.unity)",
+      "Bash(rm -f Materials/Growth/CardRitualSmoke.mat Materials/Growth/CardRitualSmoke.mat.meta Sprites/Growth/Smoke.png Sprites/Growth/Smoke.png.meta)",
+      "Bash(rmdir Sprites/Growth)",
+      "Bash(rm -f Sprites/Growth.meta)"
     ]
   },
   "enabledMcpjsonServers": [
