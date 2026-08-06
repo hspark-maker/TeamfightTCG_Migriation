@@ -19,8 +19,8 @@ public sealed class CollectionTheme
     // 테마에 속한 카드들(순서 = 슬롯 번호)
     public IReadOnlyList<CardData> Cards { get; }
 
-    // 테마 카드들의 안정 키(Cards와 인덱스 정합)
-    public IReadOnlyList<string> CardKeys { get; }
+    // 테마 카드들의 고유 번호(Cards와 인덱스 정합)
+    public IReadOnlyList<int> CardIds { get; }
 
     internal CollectionTheme(
         string _key,
@@ -28,13 +28,13 @@ public sealed class CollectionTheme
         Sprite _icon,
         int _index,
         IReadOnlyList<CardData> _cards,
-        IReadOnlyList<string> _cardKeys)
+        IReadOnlyList<int> _cardIds)
     {
         Key = _key;
         DisplayName = _displayName;
         Icon = _icon;
         Index = _index;
         Cards = _cards;
-        CardKeys = _cardKeys;
+        CardIds = _cardIds;
     }
 }

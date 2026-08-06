@@ -53,13 +53,13 @@ public static class CollectionThemes
     {
         if (_theme == null) return 0;
 
-        var t_keys = _theme.CardKeys;
-        if (t_keys == null) return 0;
+        var t_ids = _theme.CardIds;
+        if (t_ids == null) return 0;
 
         int t_owned = 0;
-        for (int t_i = 0; t_i < t_keys.Count; t_i++)
+        for (int t_i = 0; t_i < t_ids.Count; t_i++)
         {
-            if (OwnershipManager.IsOwned(t_keys[t_i])) t_owned++;
+            if (OwnershipManager.IsOwned(t_ids[t_i])) t_owned++;
         }
         return t_owned;
     }
@@ -69,10 +69,10 @@ public static class CollectionThemes
     {
         if (_theme == null) return false;
 
-        var t_keys = _theme.CardKeys;
-        if (t_keys == null || t_keys.Count == 0) return false;
+        var t_ids = _theme.CardIds;
+        if (t_ids == null || t_ids.Count == 0) return false;
 
-        return OwnedCountOf(_theme) == t_keys.Count;
+        return OwnedCountOf(_theme) == t_ids.Count;
     }
 
     // 테마 authoring ↔ 카탈로그 드리프트 로그 진단(디버그 전용)
@@ -86,32 +86,32 @@ public static class CollectionThemes
 
         EnsureBuilt();
 
-        var t_placed = new HashSet<string>();
+        var t_placed = new HashSet<int>();
         foreach (var t_theme in s_themes)
         {
-            foreach (var t_key in t_theme.CardKeys)
+            foreach (var t_id in t_theme.CardIds)
             {
-                if (!string.IsNullOrEmpty(t_key)) t_placed.Add(t_key);
+                if (t_id > 0) t_placed.Add(t_id);
             }
         }
 
-        var t_catalog = new HashSet<string>();
+        var t_catalog = new HashSet<int>();
         foreach (var t_card in CardCatalog.All)
         {
-            var t_key = CardCatalog.KeyOf(t_card);
-            if (!string.IsNullOrEmpty(t_key)) t_catalog.Add(t_key);
+            int t_id = CardCatalog.IdOf(t_card);
+            if (t_id > 0) t_catalog.Add(t_id);
         }
 
-        var t_missingFromThemes = new List<string>();
-        foreach (var t_key in t_catalog)
+        var t_missingFromThemes = new List<int>();
+        foreach (var t_id in t_catalog)
         {
-            if (!t_placed.Contains(t_key)) t_missingFromThemes.Add(t_key);
+            if (!t_placed.Contains(t_id)) t_missingFromThemes.Add(t_id);
         }
 
-        var t_notInCatalog = new List<string>();
-        foreach (var t_key in t_placed)
+        var t_notInCatalog = new List<int>();
+        foreach (var t_id in t_placed)
         {
-            if (!t_catalog.Contains(t_key)) t_notInCatalog.Add(t_key);
+            if (!t_catalog.Contains(t_id)) t_notInCatalog.Add(t_id);
         }
 
         if (t_missingFromThemes.Count == 0 && t_notInCatalog.Count == 0)
@@ -156,14 +156,14 @@ public static class CollectionThemes
             int t_slots = t_source != null ? t_source.Count : 0;
 
             var t_cards = new List<CardData>(t_slots);
-            var t_keys = new List<string>(t_slots);
+            var t_ids = new List<int>(t_slots);
             for (int t_c = 0; t_c < t_slots; t_c++)
             {
                 t_cards.Add(t_source[t_c]);
-                t_keys.Add(CardCatalog.KeyOf(t_source[t_c]));
+                t_ids.Add(CardCatalog.IdOf(t_source[t_c]));
             }
 
-            AddTheme(t_i, t_def, t_cards, t_keys);
+            AddTheme(t_i, t_def, t_cards, t_ids);
         }
 
         EndBuild();
@@ -183,10 +183,10 @@ public static class CollectionThemes
         s_themeByKey = new Dictionary<string, CollectionTheme>();
     }
 
-    static void AddTheme(int _index, CollectionThemeDef _def, List<CardData> _cards, List<string> _keys)
+    static void AddTheme(int _index, CollectionThemeDef _def, List<CardData> _cards, List<int> _ids)
     {
         var t_theme = new CollectionTheme(
-            ResolveKey(_index, _def), _def.displayName, _def.icon, _index, _cards.AsReadOnly(), _keys.AsReadOnly());
+            ResolveKey(_index, _def), _def.displayName, _def.icon, _index, _cards.AsReadOnly(), _ids.AsReadOnly());
         s_themes.Add(t_theme);
 
         if (!string.IsNullOrEmpty(t_theme.Key) && !s_themeByKey.ContainsKey(t_theme.Key))

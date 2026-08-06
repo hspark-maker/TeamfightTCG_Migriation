@@ -46,8 +46,10 @@ MonoBehaviour:
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
-    sortingOrder: 30
+    sortingOrder: 40
     alignToDirection: 1
+    countByStrength: {x: 0.6, y: 2.2}
+    speedByStrength: {x: 0.8, y: 1.6}
   - id: 4
     prefab: {fileID: 1753279311565200, guid: 29776907ecb017543b3032870386ccb3, type: 3}
     localOffset: {x: 0, y: 0, z: 0}

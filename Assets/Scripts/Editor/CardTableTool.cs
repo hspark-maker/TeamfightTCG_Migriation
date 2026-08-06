@@ -16,11 +16,13 @@ using UnityEngine;
 /// **이 도구가 소유하는 열만 덮어쓴다.** 아트·패시브·보이스·attackEffect는 표에 없고 건드리지도 않는다 —
 /// 표를 다시 밀어넣어도 인스펙터에서 채운 배선이 날아가지 않는다.
 ///
-/// **삭제·재정렬은 하지 않는다.** CardRegistry는 배열 인덱스가 곧 멀티 와이어 ID다(CardAuthoringWindow와 같은 규약).
-/// 표에서 행을 지워도 카드 에셋과 등록은 그대로 남는다.
+/// **행을 지워도 카드 에셋과 등록은 남는다.** 표는 값을 밀어 넣는 창구일 뿐 삭제 창구가 아니다.
+/// 멀티 와이어 ID는 id 열의 카드 번호이므로 행 순서·목록 순서는 의미가 없다 — 바꾸면 안 되는 건 번호 자체다.
 /// </summary>
 public class CardTableTool : EditorWindow
 {
+    const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
+    const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;
     const string DEFAULT_TABLE_PATH = "Assets/SO/CardTable.csv";
     const string DEFAULT_CARD_ROOT  = "Assets/SO/Cards";
     const string REGISTRY_PATH      = "Assets/SO/CardRegistry.asset";
@@ -33,9 +35,12 @@ public class CardTableTool : EditorWindow
     // 강화 키워드(기본 키워드가 강화되는 개념이라 별도 열이 없다).
     static readonly string[] Columns =
     {
+        "id",
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
-        "synergies", "defaultEvolutionStage", "cardExplain",
+        "synergies", "defaultEvolutionStage",
+        "hp0", "hp1", "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
+        "cardExplain",
     };
 
     string tablePath = DEFAULT_TABLE_PATH;
@@ -94,12 +99,18 @@ public class CardTableTool : EditorWindow
         EditorGUILayout.Space(10);
         EditorGUILayout.HelpBox(
             "열: " + string.Join(", ", Columns) + "\n\n" +
+            "· id : 카드 고유 번호. 한 번 부여하면 바꾸지 않는다. 빈칸이면 남은 번호를 자동 부여한다.\n" +
             "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
             "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림(기본 키워드 카드).\n" +
             "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
-            "· 진화 레벨(1차/2차)과 레벨별 체력 증가량은 표에 없다 — CardGrowthConfig가 소유한다.\n" +
+            "• 진화 레벨과 비용/성공률은 CardGrowthConfig, 카드별 HP 증가폭은 hp0~hp10 열이 소유합니다.\n" +
             "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
-            "· 행을 지워도 카드는 지워지지 않는다(CardRegistry ID 보존).", MessageType.None);
+            "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).", MessageType.None);
+
+        EditorGUILayout.HelpBox(
+            "hp0~hp10: 해당 레벨 진입 시 증가하는 HP입니다. Lv0/Lv1은 0으로 고정됩니다. " +
+            "11칸이 모두 비어 있으면 CardGrowthConfig 전역식을 사용하고, 하나라도 입력하면 나머지 빈칸은 0으로 저장됩니다.",
+            MessageType.Info);
 
         EditorGUILayout.EndScrollView();
     }
@@ -134,6 +145,7 @@ public class CardTableTool : EditorWindow
     {
         switch (_column)
         {
+            case "id":                    return _card.id > 0 ? _card.id.ToString(CultureInfo.InvariantCulture) : "";
             case "name":                  return _card.name;
             case "displayName":           return _card.displayName;
             case "channel":               return _card.channel.ToString();
@@ -143,7 +155,15 @@ public class CardTableTool : EditorWindow
             case "synergies":             return SynergiesToText(_card.synergies);
             case "defaultEvolutionStage": return _card.defaultEvolutionStage.ToString(CultureInfo.InvariantCulture);
             case "cardExplain":           return _card.cardExplain;
-            default:                      return "";
+            default:
+                if (TryParseHpColumn(_column, out int t_level))
+                {
+                    if (_card.hpGainByLevel == null || _card.hpGainByLevel.Length == 0) return "";
+                    return t_level < _card.hpGainByLevel.Length
+                        ? _card.hpGainByLevel[t_level].ToString(CultureInfo.InvariantCulture)
+                        : "";
+                }
+                return "";
         }
     }
 
@@ -199,6 +219,10 @@ public class CardTableTool : EditorWindow
         int t_created = 0, t_updated = 0;
         var t_warnings = new List<string>();
 
+        // 번호 예약대장(id → 소유 카드 이름). 표에 적힌 번호가 먼저 자리를 잡아야
+        // 빈 칸 자동 부여가 그 번호를 가로채지 않는다 — 그래서 행 처리 전에 한 번 훑는다.
+        Dictionary<int, string> t_idOwner = ClaimIds(t_rows, t_header, t_existing, t_warnings);
+
         for (int r = 1; r < t_rows.Count; r++)
         {
             List<string> t_row = t_rows[r];
@@ -217,6 +241,7 @@ public class CardTableTool : EditorWindow
                 t_updated++;
             }
 
+            ApplyId(t_card, t_row, t_header, t_name, t_idOwner, t_warnings);
             ApplyRow(t_card, t_row, t_header, t_synergies, t_name, t_warnings);
             // 이미 존재하지만 Registry에서 빠진 카드도 가져오기 한 번으로 복구한다.
             // AppendToRegistry는 기존 참조면 no-op이며 항상 맨 뒤에만 추가해 와이어 ID를 보존한다.
@@ -237,6 +262,84 @@ public class CardTableTool : EditorWindow
         string t_report = t_sb.ToString();
         Debug.Log($"[카드 표] {t_report}");
         return t_report;
+    }
+
+    /// <summary>이미 쓰이는 번호를 모아 예약대장을 만든다. 에셋에 박힌 번호가 먼저 들어가고,
+    /// 표가 다른 번호를 적었으면 표가 이긴다(기획이 표에서 번호를 옮길 수 있어야 하므로).
+    /// 두 카드가 같은 번호를 노리면 먼저 잡은 쪽이 유지되고 뒤쪽은 경고 후 기존 번호를 지킨다.</summary>
+    static Dictionary<int, string> ClaimIds(List<List<string>> _rows, Dictionary<string, int> _header,
+                                            Dictionary<string, CardData> _existing, List<string> _warnings)
+    {
+        var t_owner = new Dictionary<int, string>();
+
+        foreach (var t_pair in _existing)
+        {
+            CardData t_card = t_pair.Value;
+            if (t_card == null || t_card.id <= 0) continue;
+
+            if (t_owner.TryGetValue(t_card.id, out string t_prev) && t_prev != t_pair.Key)
+            {
+                _warnings.Add($"{t_pair.Key}.id: 번호 {t_card.id}가 '{t_prev}'와 중복 — 표에서 한쪽을 고칠 것");
+                continue;
+            }
+            t_owner[t_card.id] = t_pair.Key;
+        }
+
+        if (!_header.ContainsKey("id")) return t_owner;
+
+        for (int r = 1; r < _rows.Count; r++)
+        {
+            string t_name = Cell(_rows[r], _header, "name").Trim();
+            if (string.IsNullOrEmpty(t_name)) continue;
+
+            int t_id = ParseInt(Cell(_rows[r], _header, "id"), 0);
+            if (t_id <= 0) continue;
+
+            if (t_owner.TryGetValue(t_id, out string t_holder) && t_holder != t_name)
+            {
+                _warnings.Add($"{t_name}.id: 번호 {t_id}는 이미 '{t_holder}'의 것 — 기존 번호를 유지한다");
+                continue;
+            }
+            // 이 카드가 다른 번호를 갖고 있었다면 옛 번호는 대장에 남겨 둔다. 번호는 재사용하지 않는다.
+            t_owner[t_id] = t_name;
+        }
+        return t_owner;
+    }
+
+    /// <summary>표의 번호를 카드에 반영한다. 빈 칸이면 기존 번호를 지키고, 그마저 없으면 남은 번호를 새로 부여한다.
+    /// 번호는 세이브·표 참조가 매달리는 안정 키라 자동 부여는 "빈 카드 채우기"에만 쓴다.</summary>
+    static void ApplyId(CardData _card, List<string> _row, Dictionary<string, int> _header,
+                        string _name, Dictionary<int, string> _idOwner, List<string> _warnings)
+    {
+        int t_id = _header.ContainsKey("id") ? ParseInt(Cell(_row, _header, "id"), 0) : 0;
+
+        if (t_id > 0)
+        {
+            // 예약대장이 이 이름에 내줬을 때만 반영한다(충돌은 ClaimIds가 이미 경고했다).
+            if (_idOwner.TryGetValue(t_id, out string t_holder) && t_holder == _name)
+            {
+                _card.id = t_id;
+                return;
+            }
+        }
+        else if (t_id < 0)
+        {
+            _warnings.Add($"{_name}.id: 음수 번호는 무시한다");
+        }
+
+        if (_card.id > 0) return;
+
+        int t_next = NextFreeId(_idOwner);
+        _card.id          = t_next;
+        _idOwner[t_next]  = _name;
+    }
+
+    // 대장에 없는 가장 작은 양수. 번호를 촘촘하게 유지해 표에서 눈으로 훑기 쉽게 한다.
+    static int NextFreeId(Dictionary<int, string> _idOwner)
+    {
+        int t_id = 1;
+        while (_idOwner.ContainsKey(t_id)) t_id++;
+        return t_id;
     }
 
     static void ApplyRow(CardData _card, List<string> _row, Dictionary<string, int> _header,
@@ -269,6 +372,8 @@ public class CardTableTool : EditorWindow
             int t_stage = ParseInt(Cell(_row, _header, "defaultEvolutionStage"), _card.defaultEvolutionStage);
             _card.defaultEvolutionStage = Mathf.Clamp(t_stage, 0, CardData.MaxEvolutionStage);
         }
+
+        ApplyHpCurve(_card, _row, _header, _name, _warnings);
 
         if (_header.ContainsKey("cardExplain")) _card.cardExplain = Cell(_row, _header, "cardExplain");
 
@@ -358,6 +463,59 @@ public class CardTableTool : EditorWindow
     static int ParseInt(string _text, int _fallback)
         => int.TryParse(_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_v) ? t_v : _fallback;
 
+    static void ApplyHpCurve(CardData _card, List<string> _row, Dictionary<string, int> _header,
+                             string _name, List<string> _warnings)
+    {
+        int t_curveColumnCount = 0;
+        bool t_hasValue = false;
+        var t_values = new int[HP_CURVE_MAX_LEVEL + 1];
+
+        for (int t_level = HP_CURVE_MIN_LEVEL; t_level <= HP_CURVE_MAX_LEVEL; t_level++)
+        {
+            string t_column = "hp" + t_level;
+            if (!_header.ContainsKey(t_column)) continue;
+
+            t_curveColumnCount++;
+            string t_text = Cell(_row, _header, t_column).Trim();
+            if (t_text.Length == 0) continue;
+
+            t_hasValue = true;
+            if (!int.TryParse(t_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_hp))
+            {
+                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 0으로 처리");
+                continue;
+            }
+
+            if (t_hp < 0)
+            {
+                _warnings.Add($"{_name}.{t_column}: 음수 '{t_hp}' — 0으로 처리");
+                t_hp = 0;
+            }
+            if (t_level <= CardGrowth.BaseLevel && t_hp != 0)
+            {
+                _warnings.Add($"{_name}.{t_column}: Lv0/Lv1은 성장 전 기준값 — 0으로 처리");
+                t_hp = 0;
+            }
+            t_values[t_level] = t_hp;
+        }
+
+        if (t_curveColumnCount == 0) return;
+        if (t_curveColumnCount != HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1)
+        {
+            _warnings.Add($"{_name}: hp0~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
+            return;
+        }
+        _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();
+    }
+
+    static bool TryParseHpColumn(string _column, out int _level)
+    {
+        _level = -1;
+        if (string.IsNullOrEmpty(_column) || !_column.StartsWith("hp", StringComparison.Ordinal)) return false;
+        if (!int.TryParse(_column.Substring(2), NumberStyles.None, CultureInfo.InvariantCulture, out _level)) return false;
+        return _level >= HP_CURVE_MIN_LEVEL && _level <= HP_CURVE_MAX_LEVEL;
+    }
+
     // ── CSV ────────────────────────────────────────────────────────────────
 
     static string Escape(string _value)
@@ -434,7 +592,7 @@ public class CardTableTool : EditorWindow
 
     static CardRegistry LoadRegistry() => AssetDatabase.LoadAssetAtPath<CardRegistry>(REGISTRY_PATH);
 
-    /// <summary>CardRegistry 맨 뒤에 append. 이미 있으면 기존 ID 반환(중복 등록 방지).</summary>
+    /// <summary>목록에 없으면 뒤에 넣는다(중복 등록 방지). 순서는 의미가 없다 — 와이어 ID는 카드 번호다.</summary>
     static int AppendToRegistry(CardData _card)
     {
         CardRegistry t_reg = LoadRegistry();
@@ -471,30 +629,32 @@ public class CardTableTool : EditorWindow
         return AssetDatabase.IsValidFolder(t_path);
     }
 
-    /// <summary>표의 행 순서는 CardRegistry ID 순 — 표를 봤을 때 와이어 ID를 그대로 읽을 수 있게.
-    /// 미등록 카드는 뒤에 이어 붙인다.</summary>
+    /// <summary>표의 행 순서는 카드 번호 순 — 표를 봤을 때 와이어 ID를 그대로 읽을 수 있게.
+    /// 번호가 없는 카드(신규)는 이름 순으로 뒤에 붙어 눈에 띈다.</summary>
     static List<CardData> AllCards()
     {
-        var t_list = new List<CardData>();
+        var t_numbered = new List<CardData>();
+        var t_unnumbered = new List<CardData>();
         var t_seen = new HashSet<CardData>();
 
         CardRegistry t_reg = LoadRegistry();
         if (t_reg != null)
         {
             foreach (CardData c in t_reg.All)
-                if (c != null && t_seen.Add(c)) t_list.Add(c);
+                if (c != null && t_seen.Add(c)) (c.id > 0 ? t_numbered : t_unnumbered).Add(c);
         }
 
-        var t_rest = new List<CardData>();
         foreach (string g in AssetDatabase.FindAssets("t:CardData"))
         {
             var c = AssetDatabase.LoadAssetAtPath<CardData>(AssetDatabase.GUIDToAssetPath(g));
-            if (c != null && t_seen.Add(c)) t_rest.Add(c);
+            if (c != null && t_seen.Add(c)) (c.id > 0 ? t_numbered : t_unnumbered).Add(c);
         }
-        t_rest.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
-        t_list.AddRange(t_rest);
 
-        return t_list;
+        t_numbered.Sort((a, b) => a.id.CompareTo(b.id));
+        t_unnumbered.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        t_numbered.AddRange(t_unnumbered);
+
+        return t_numbered;
     }
 
     static Dictionary<string, ScriptableObject> AllSynergies()

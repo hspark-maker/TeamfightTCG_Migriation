@@ -30,7 +30,7 @@ public static class StarterDeck
             return;
         }
 
-        OwnershipManager.GrantAll(ToKeys(t_cards));
+        OwnershipManager.GrantAll(ToIds(t_cards));
 
         if (!DeckSaveManager.TryInsertFront(t_cards, DECK_NAME, DeckImages.PickRandomKey(), out _))
             Debug.LogWarning("[StarterDeck] 덱 삽입 실패 — 지급 생략(DeckSaveManager 로그 확인).");
@@ -50,13 +50,13 @@ public static class StarterDeck
         return t_cards;
     }
 
-    static List<string> ToKeys(List<CardData> _cards)
+    static List<int> ToIds(List<CardData> _cards)
     {
-        var t_keys = new List<string>(_cards.Count);
+        var t_ids = new List<int>(_cards.Count);
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
-            t_keys.Add(CardCatalog.KeyOf(_cards[t_i]));
+            t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
         }
-        return t_keys;
+        return t_ids;
     }
 }

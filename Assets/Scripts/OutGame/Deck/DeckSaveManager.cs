@@ -187,12 +187,13 @@ public static class DeckSaveManager
     public static void SetCardRegistry(IEnumerable<CardData> _cards)
         => s_registry = _cards.ToList();
 
-    // 세이브에 덱이 하나라도 들어 있는지(메모리 아님)
+    // 세이브에 덱이 하나라도 들어 있는지(메모리 아님).
+    // 이관 전 구 세이브도 "덱 있음"으로 읽어야 한다 — 아니면 기존 유저에게 스타터덱이 다시 지급된다.
     public static bool HasAnySavedDeck()
     {
         var t_slots = NormalizedSlots();
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
-            if (t_slots[t_i].cardKeys.Length > 0) return true;
+            if (t_slots[t_i].cardIds.Length > 0 || t_slots[t_i].cardKeys.Length > 0) return true;
 
         return false;
     }
@@ -204,6 +205,8 @@ public static class DeckSaveManager
         s_loaded = true;
 
         var t_slots = NormalizedSlots();
+        bool t_migrated = MigrateLegacyCardKeys(t_slots);
+
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
         {
             var t_slot = t_slots[t_i];
@@ -213,13 +216,36 @@ public static class DeckSaveManager
 
             if (s_registry == null) continue;
 
-            s_slots[t_i] = t_slot.cardKeys
-                .Select(k => s_registry.FirstOrDefault(c => c != null && CardCatalog.KeyOf(c) == k))
+            s_slots[t_i] = t_slot.cardIds
+                .Select(id => s_registry.FirstOrDefault(c => c != null && CardCatalog.IdOf(c) == id))
                 .Where(c => c != null)
                 .ToList();
         }
 
-        if (s_registry != null && Compact()) SaveAll();
+        if (s_registry == null) return;
+
+        // 압축이 없어도 이관분은 반드시 내려써야 한다 — 안 그러면 다음 부트에 같은 이관을 또 한다.
+        if (Compact() || t_migrated) SaveAll();
+    }
+
+    /// <summary>구 세이브의 카드 이름 배열을 번호 배열로 옮긴다(슬롯당 1회). 카탈로그 미준비면 미룬다 —
+    /// 여기서 잘못 비우면 덱이 통째로 사라지므로 이관에 성공한 슬롯만 이름을 지운다.</summary>
+    static bool MigrateLegacyCardKeys(DeckSlotSaveData[] _slots)
+    {
+        if (!CardCatalog.IsReady) return false;
+
+        bool t_changed = false;
+        for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
+        {
+            var t_slot = _slots[t_i];
+            if (t_slot.cardKeys.Length == 0) continue;
+            if (t_slot.cardIds.Length > 0) { t_slot.cardKeys = new string[0]; t_changed = true; continue; }
+
+            t_slot.cardIds  = t_slot.cardKeys.Select(CardCatalog.LegacyIdOfName).Where(id => id > 0).ToArray();
+            t_slot.cardKeys = new string[0];
+            t_changed       = true;
+        }
+        return t_changed;
     }
 
     // 대상 슬롯만 세이브에 반영(나머지 슬롯은 저장된 값 보존)
@@ -279,9 +305,9 @@ public static class DeckSaveManager
 
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
         {
-            if (t_saved[t_i].cardKeys.Length != DECK_SIZE || IsSlotValid(t_i)) continue;
+            if (t_saved[t_i].cardIds.Length != DECK_SIZE || IsSlotValid(t_i)) continue;
 
-            Debug.LogWarning($"[DeckSaveManager] 슬롯 {t_i}의 카드 키를 레지스트리에서 해석하지 못했다 — 압축·저장 보류(세이브 원본 보존). 카드 SO 이름 변경·삭제를 확인할 것.");
+            Debug.LogWarning($"[DeckSaveManager] 슬롯 {t_i}의 카드 번호를 레지스트리에서 해석하지 못했다 — 압축·저장 보류(세이브 원본 보존). 카드 번호 변경·삭제를 확인할 것.");
             return false;
         }
 
@@ -293,7 +319,7 @@ public static class DeckSaveManager
         {
             if (!IsSlotValid(t_read))
             {
-                if (t_saved[t_read].cardKeys.Length > 0) t_dropped++;
+                if (t_saved[t_read].cardIds.Length > 0) t_dropped++;
                 continue;
             }
 
@@ -307,7 +333,7 @@ public static class DeckSaveManager
 
         for (int t_i = t_write; t_i < SLOT_COUNT; t_i++)
         {
-            if (t_saved[t_i].cardKeys.Length > 0 || !string.IsNullOrEmpty(s_names[t_i]) || !string.IsNullOrEmpty(s_imageKeys[t_i]))
+            if (t_saved[t_i].cardIds.Length > 0 || !string.IsNullOrEmpty(s_names[t_i]) || !string.IsNullOrEmpty(s_imageKeys[t_i]))
                 t_changed = true;
 
             ClearSlot(t_i);
@@ -344,6 +370,7 @@ public static class DeckSaveManager
             if (t_slot == null) t_deck.slots[t_i] = t_slot = new DeckSlotSaveData();
 
             if (t_slot.name == null)     t_slot.name     = "";
+            if (t_slot.cardIds == null)  t_slot.cardIds  = new int[0];
             if (t_slot.cardKeys == null) t_slot.cardKeys = new string[0];
             if (t_slot.imageKey == null) t_slot.imageKey = "";
         }
@@ -356,8 +383,9 @@ public static class DeckSaveManager
         var t_dst = _slots[_index];
 
         t_dst.name     = s_names[_index] ?? "";
-        t_dst.cardKeys = s_slots[_index]?.Where(c => c != null).Select(c => CardCatalog.KeyOf(c)).ToArray()
-                         ?? new string[0];
+        t_dst.cardIds  = s_slots[_index]?.Where(c => c != null).Select(c => CardCatalog.IdOf(c)).ToArray()
+                         ?? new int[0];
+        t_dst.cardKeys = new string[0];   // 이관 완료 슬롯은 구 필드를 비운 채로 유지한다
         t_dst.imageKey = s_imageKeys[_index] ?? "";
     }
 

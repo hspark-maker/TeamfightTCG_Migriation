@@ -43,7 +43,7 @@ public static class OutgameDebugActions
 
     public static void LogOwnership()
     {
-        Debug.Log($"[OutgameDebug] 소유 {OwnershipManager.OwnedCount}장: {string.Join(", ", OwnershipManager.OwnedKeys)}");
+        Debug.Log($"[OutgameDebug] 소유 {OwnershipManager.OwnedCount}장: {string.Join(", ", OwnershipManager.OwnedIds)}");
     }
 
     // 튜토리얼 완료 낙인 + 떠 있는 게이트 해제

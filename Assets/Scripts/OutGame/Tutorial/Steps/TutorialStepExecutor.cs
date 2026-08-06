@@ -113,7 +113,7 @@ public static class TutorialStepExecutor
             return false;
         }
 
-        OwnershipManager.GrantAll(ToKeys(t_cards));
+        OwnershipManager.GrantAll(ToIds(t_cards));
 
         if (!DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out _))
         {
@@ -126,13 +126,13 @@ public static class TutorialStepExecutor
         return false;
     }
 
-    static List<string> ToKeys(List<CardData> _cards)
+    static List<int> ToIds(List<CardData> _cards)
     {
-        var t_keys = new List<string>(_cards.Count);
+        var t_ids = new List<int>(_cards.Count);
         for (int t_i = 0; t_i < _cards.Count; t_i++)
-            t_keys.Add(CardCatalog.KeyOf(_cards[t_i]));
+            t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
 
-        return t_keys;
+        return t_ids;
     }
 
     static string Where(OutgameTutorialStepContext _context) => $"스텝 {_context.ChapterIndex}-{_context.StepIndex}";

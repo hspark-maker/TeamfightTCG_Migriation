@@ -59,17 +59,17 @@ public class CardGrowthConfig : ScriptableObject
     public bool SynergyUnlockedAt(int _level) => _level >= firstEvolutionLevel;
 
     // 레벨 _level로 올리는 한 스텝(범위 밖이면 false). 바닥 레벨은 강화로 도달하는 레벨이 아니다.
-    public bool TryGetStep(int _level, out GrowthStep _step)
+    public bool TryGetStep(CardData _card, int _level, out GrowthStep _step)
     {
         _step = default;
         if (_level <= CardGrowth.BaseLevel || _level > MaxLevel) return false;
 
-        _step = StepAt(_level);
+        _step = StepAt(_card, _level);
         return true;
     }
 
     // 레벨 _level까지의 누적 HP 보너스
-    public int HpBonusAt(int _level)
+    public int HpBonusAt(CardData _card, int _level)
     {
         if (_level <= CardGrowth.BaseLevel) return 0;
 
@@ -77,12 +77,12 @@ public class CardGrowthConfig : ScriptableObject
         int t_sum = 0;
         for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
         {
-            t_sum += StepAt(t_i).HpGain;
+            t_sum += StepAt(_card, t_i).HpGain;
         }
         return t_sum;
     }
 
-    GrowthStep StepAt(int _level)
+    GrowthStep StepAt(CardData _card, int _level)
     {
         // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseGoldCost·baseSuccessRate가 첫 강화의 값이 된다.
         int t_step = _level - CardGrowth.BaseLevel - 1;
@@ -97,6 +97,9 @@ public class CardGrowthConfig : ScriptableObject
             if (t_row.cost        > 0)    t_cost = t_row.cost;   // 0 이하 = 미지정 → 기본식
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;   // 음수 = 미지정 → 기본식
         }
+
+        if (_card != null && _card.TryGetHpGain(_level, out int t_cardHp))
+            t_hp = t_cardHp;
 
         if (t_cost < 0) t_cost = 0;
         if (t_hp < 0)   t_hp   = 0;

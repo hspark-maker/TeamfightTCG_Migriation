@@ -13,8 +13,8 @@ using UnityEngine;
 /// (예전엔 DeckBuilderUI/MainMenuInitializer가 카드 목록 사본을 따로 들고 있어서 3~4군데를
 ///  갱신해야 했다. 지금은 둘 다 CardRegistry를 참조하므로 여기만 등록하면 끝.)
 ///
-/// **CardRegistry는 배열 인덱스가 곧 와이어 ID다.** 그래서 이 도구는 끝에 append만 한다.
-/// 중간 삽입/재정렬/삭제는 양 클라의 ID 해석이 어긋나 즉시 divergence가 되므로 도구로 막아뒀다.
+/// **와이어 ID는 CardData.id다** — 배열 순서가 아니다. 그래서 목록 재정렬·빈 칸 제거는 안전하고,
+/// 이 도구는 새 카드에 남는 번호를 부여한 뒤 목록에 넣는다. 바꾸면 안 되는 건 부여된 번호 쪽이다.
 /// </summary>
 public class CardAuthoringWindow : EditorWindow
 {
@@ -124,8 +124,8 @@ public class CardAuthoringWindow : EditorWindow
 
         EditorGUILayout.Space(6);
         EditorGUILayout.HelpBox(
-            "CardRegistry는 배열 인덱스가 곧 멀티 와이어 ID다. 이 도구는 항상 맨 뒤에 붙인다.\n" +
-            "기존 항목을 지우거나 순서를 바꾸면 양 클라 해석이 어긋나 매치가 깨진다.",
+            "멀티 와이어 ID는 카드 번호(CardData.id)다. 이 도구가 남는 번호를 자동 부여한다.\n" +
+            "목록 순서는 의미가 없다 — 부여된 번호를 바꾸면 양 클라 해석이 어긋나 매치가 깨진다.",
             MessageType.Info);
     }
 
@@ -171,15 +171,15 @@ public class CardAuthoringWindow : EditorWindow
         AssetDatabase.CreateAsset(t_card, t_path);
         AssetDatabase.SaveAssets();
 
-        int t_id = AppendToRegistry(t_card);
+        int t_id = RegisterCard(t_card);
 
         AssetDatabase.Refresh();
         Selection.activeObject = t_card;
         EditorGUIUtility.PingObject(t_card);
 
-        Debug.Log($"[카드 추가] {t_path}\n  CardRegistry id={t_id}");
+        Debug.Log($"[카드 추가] {t_path}\n  카드 번호={t_id}");
         EditorUtility.DisplayDialog("카드 추가 완료",
-            $"{this.newName}\n\nCardRegistry ID: {t_id}\n" +
+            $"{this.newName}\n\n카드 번호(와이어 ID): {t_id}\n" +
             "덱 편성 컬렉션에도 자동으로 뜬다(CardRegistry 참조).\n\n" +
             "남은 것: 이미지 / passive / attackEffect / 보이스 — 인스펙터에서 채울 것.", "확인");
 
@@ -211,8 +211,8 @@ public class CardAuthoringWindow : EditorWindow
         EditorGUILayout.LabelField($"카드 에셋 {t_all.Count}개 / CardRegistry {t_arr.arraySize}칸", EditorStyles.boldLabel);
 
         if (t_nullSlots > 0)
-            EditorGUILayout.HelpBox($"CardRegistry에 빈 칸 {t_nullSlots}개. 지우지 말고 그대로 둘 것 — " +
-                                    "칸을 없애면 뒤쪽 카드 ID가 전부 밀려 멀티가 깨진다.", MessageType.Warning);
+            EditorGUILayout.HelpBox($"CardRegistry에 빈 칸 {t_nullSlots}개. 지워도 된다 — " +
+                                    "와이어 ID는 카드 번호라 목록 순서에 매달리지 않는다.", MessageType.Info);
 
         var t_missing = new List<CardData>();
         foreach (var c in t_all) if (!t_registered.Contains(c)) t_missing.Add(c);
@@ -229,12 +229,12 @@ public class CardAuthoringWindow : EditorWindow
             {
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.ObjectField(c, typeof(CardData), false);
-                if (GUILayout.Button("등록", GUILayout.Width(60))) { AppendToRegistry(c); GUIUtility.ExitGUI(); }
+                if (GUILayout.Button("등록", GUILayout.Width(60))) { RegisterCard(c); GUIUtility.ExitGUI(); }
                 EditorGUILayout.EndHorizontal();
             }
             if (GUILayout.Button($"미등록 {t_missing.Count}개 전부 등록"))
             {
-                foreach (var c in t_missing) AppendToRegistry(c);
+                foreach (var c in t_missing) RegisterCard(c);
                 GUIUtility.ExitGUI();
             }
         }
@@ -252,25 +252,54 @@ public class CardAuthoringWindow : EditorWindow
 
     static CardRegistry LoadRegistry() => AssetDatabase.LoadAssetAtPath<CardRegistry>(REGISTRY_PATH);
 
-    /// <summary>CardRegistry 맨 뒤에 append. 이미 있으면 기존 ID를 반환한다(중복 등록 방지).</summary>
-    static int AppendToRegistry(CardData _card)
+    /// <summary>번호를 부여하고(없을 때만) 목록에 넣는다. 반환값은 카드 번호 = 와이어 ID.</summary>
+    static int RegisterCard(CardData _card)
+    {
+        if (_card == null) return -1;
+
+        EnsureId(_card);
+        AppendToRegistry(_card);
+        AssetDatabase.SaveAssets();
+        return _card.id;
+    }
+
+    /// <summary>비어 있는 카드에만 남는 최소 번호를 부여한다. 이미 번호가 있으면 손대지 않는다 —
+    /// 번호 변경은 세이브와 와이어를 동시에 깨는 유일한 조작이다.</summary>
+    static void EnsureId(CardData _card)
+    {
+        if (_card.id > 0) return;
+
+        var t_used = new HashSet<int>();
+        foreach (string g in AssetDatabase.FindAssets("t:CardData"))
+        {
+            var c = AssetDatabase.LoadAssetAtPath<CardData>(AssetDatabase.GUIDToAssetPath(g));
+            if (c != null && c != _card && c.id > 0) t_used.Add(c.id);
+        }
+
+        int t_id = 1;
+        while (t_used.Contains(t_id)) t_id++;
+
+        _card.id = t_id;
+        EditorUtility.SetDirty(_card);
+    }
+
+    /// <summary>목록에 없으면 뒤에 넣는다. 순서는 의미가 없으므로 위치는 아무래도 좋다.</summary>
+    static void AppendToRegistry(CardData _card)
     {
         CardRegistry t_reg = LoadRegistry();
-        if (t_reg == null || _card == null) return -1;
+        if (t_reg == null || _card == null) return;
 
         var t_so  = new SerializedObject(t_reg);
         var t_arr = t_so.FindProperty("allCards");
 
         for (int i = 0; i < t_arr.arraySize; i++)
-            if (t_arr.GetArrayElementAtIndex(i).objectReferenceValue == _card) return i;   // 이미 등록됨
+            if (t_arr.GetArrayElementAtIndex(i).objectReferenceValue == _card) return;   // 이미 등록됨
 
-        int t_id = t_arr.arraySize;
-        t_arr.InsertArrayElementAtIndex(t_id);
-        t_arr.GetArrayElementAtIndex(t_id).objectReferenceValue = _card;
+        int t_slot = t_arr.arraySize;
+        t_arr.InsertArrayElementAtIndex(t_slot);
+        t_arr.GetArrayElementAtIndex(t_slot).objectReferenceValue = _card;
         t_so.ApplyModifiedProperties();
         EditorUtility.SetDirty(t_reg);
-        AssetDatabase.SaveAssets();
-        return t_id;
     }
 
     /// <summary>절대 경로를 프로젝트 상대(Assets/...)로. 프로젝트 밖이면 null.</summary>

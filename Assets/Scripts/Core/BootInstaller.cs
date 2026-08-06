@@ -46,7 +46,7 @@ public class BootInstaller : MonoBehaviour
         // 도감 행 레이아웃/생산 튜닝 주입 — 카탈로그 카드를 참조하므로 SetSource 이후. null이면 청크 fallback.
         CatalogRows.SetLayout(collectionLayout);
 
-        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.KeyOf를 읽는다).
+        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CollectionThemes.SetSource(collectionThemes);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).

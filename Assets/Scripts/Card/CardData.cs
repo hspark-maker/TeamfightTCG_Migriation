@@ -21,6 +21,15 @@ public class CardArtSet
 [CreateAssetMenu(fileName = "NewCard", menuName = "Card Battle/Card Data")]
 public class CardData : ScriptableObject
 {
+    public const int MinHpCurveLevel = 0;
+    public const int MaxHpCurveLevel = 10;
+
+    /// <summary>카드 고유 번호. 에셋 이름·표 행 순서와 무관하게 카드를 가리키는 안정 키다 —
+    /// 리네임·행 이동에도 이 값은 따라가지 않는다. **한 번 부여하면 바꾸지 않는다.**
+    /// 0 = 미부여(표 가져오기가 빈 번호를 찾아 채운다). 중복은 표 도구가 경고로 잡는다.</summary>
+    [Min(0)] [Tooltip("카드 고유 번호. 부여 후 변경 금지. 0 = 미부여(표 가져오기가 자동 부여).")]
+    public int id;
+
     public string displayName;
     [Tooltip("Live는 실제 실행에도 노출되고, TestOnly는 테스트 실행에서만 노출됩니다.")]
     public ECardChannel channel;
@@ -36,6 +45,10 @@ public class CardData : ScriptableObject
     public Sprite portrait;
     public Sprite battleImage;
     public Sprite deckPreview;
+
+    [Header("Growth HP Curve")]
+    [Tooltip("index = 레벨(0~10), 값 = 해당 레벨 진입 시 증가 HP. 비어 있으면 CardGrowthConfig 전역식을 사용합니다.")]
+    public int[] hpGainByLevel;
 
     [Header("Growth Unlock")]
     /// <summary><see cref="keywords"/>가 열리는 강화 레벨. **0(미지정) = 처음부터 열려 있음** —
@@ -89,6 +102,17 @@ public class CardData : ScriptableObject
     public CardKeyword explainKeywords;
 
     public bool HasKeyword(CardKeyword _kw) => (this.keywords & _kw) != 0;
+
+    public bool TryGetHpGain(int _level, out int _hpGain)
+    {
+        _hpGain = 0;
+        if (this.hpGainByLevel == null || this.hpGainByLevel.Length == 0) return false;
+        if (_level < MinHpCurveLevel || _level > MaxHpCurveLevel) return false;
+        if (_level >= this.hpGainByLevel.Length) return true;
+
+        _hpGain = Mathf.Max(0, this.hpGainByLevel[_level]);
+        return true;
+    }
 
     /// <summary>진화 _stage단계(1~MaxEvolutionStage)의 아트 세트. 범위를 벗어나거나 미배정이면 null.
     /// 여기서는 인덱싱만 한다 — "비었으면 무엇으로 폴백하나"는 표시 규칙이라 CardVisualRules 몫이다.

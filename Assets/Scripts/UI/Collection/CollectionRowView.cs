@@ -19,7 +19,7 @@ public class CollectionRowView : MonoBehaviour
     readonly List<CardVisualView> m_cards = new List<CardVisualView>();
 
     // 행 안정 키(생산 조회·수확의 식별자). Build에서 저장, RefreshProduction/OnHarvestClicked가 사용.
-    string m_rowKey;
+    int m_rowId;
 
     // 행 데이터로 카드 타일을 (재)생성한다. 기존 컨테이너 자식(목업 하드코딩 포함)을 먼저 비운다.
     // _nav = 도감 전체를 행 순서로 이어붙인 평면 목록, _navOffset = 그 안에서 이 행의 첫 슬롯 위치.
@@ -29,10 +29,10 @@ public class CollectionRowView : MonoBehaviour
         ClearContainer();
         m_cards.Clear();
 
-        m_rowKey = _row != null ? _row.Key : null;
+        m_rowId = _row != null ? _row.Id : 0;
 
         // 진행바에 이 행 키 위임(이후 갱신은 RefreshProduction이 progressView.Refresh로 구동).
-        if (progressView != null) progressView.Bind(m_rowKey);
+        if (progressView != null) progressView.Bind(m_rowId);
 
         // 수확 버튼 리스너 1회 배선(재빌드마다 중복 등록 방지).
         if (harvestButton != null)
@@ -77,12 +77,12 @@ public class CollectionRowView : MonoBehaviour
     }
 
     // 생산 상태 표시 갱신. 시간 누적을 폴링하므로 컨트롤러 틱에서 주기 호출된다.
-    // rowKey가 없으면(드리프트 미해결 행) 아무것도 하지 않는다.
+    // 행 번호가 없으면(드리프트 미해결 행) 아무것도 하지 않는다.
     public void RefreshProduction()
     {
-        if (string.IsNullOrEmpty(m_rowKey)) return;
+        if (m_rowId <= 0) return;
 
-        var t_info = CollectionProductionManager.GetInfo(m_rowKey);
+        var t_info = CollectionProductionManager.GetInfo(m_rowId);
 
         // 누적/상한을 Get 버튼 텍스트에 통합 표시(상태 칩 제거 — 잠김/만땅 구분은 진행바·버튼 활성으로 전달).
         // 상태 무관하게 "현재누적 / 상한"으로 통일: Capped는 누적==상한이라 "cap / cap", 잠김은 굳은 누적(0일 수 있음).
@@ -102,12 +102,12 @@ public class CollectionRowView : MonoBehaviour
     // 즉시성을 위해 자기 행은 여기서 한 번 더 갱신.
     void OnHarvestClicked()
     {
-        if (string.IsNullOrEmpty(m_rowKey)) return;
+        if (m_rowId <= 0) return;
 
         // 재화 종류는 행의 정적 속성이라 배치에서 직접 읽는다(GetInfo는 정산까지 도는 무거운 조회).
-        var t_reward = CatalogRows.TryGetRow(m_rowKey, out var t_row) ? t_row.RewardType : ECurrencyType.Gold;
+        var t_reward = CatalogRows.TryGetRow(m_rowId, out var t_row) ? t_row.RewardType : ECurrencyType.Gold;
 
-        long t_earned = CollectionProductionManager.Harvest(m_rowKey);
+        long t_earned = CollectionProductionManager.Harvest(m_rowId);
 
         // 연출은 표시 갱신보다 먼저 — Harvest의 OnChanged로 레이아웃이 이미 dirty라 버튼 월드좌표를 지금 읽어둔다.
         PlayGainEffect(t_reward, t_earned);
@@ -126,7 +126,7 @@ public class CollectionRowView : MonoBehaviour
 
     static bool IsOwned(CardData _card)
     {
-        return _card != null && OwnershipManager.IsOwned(CardCatalog.KeyOf(_card));
+        return _card != null && OwnershipManager.IsOwned(CardCatalog.IdOf(_card));
     }
 
     void ClearContainer()

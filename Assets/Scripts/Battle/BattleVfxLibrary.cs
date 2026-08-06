@@ -40,6 +40,13 @@ public struct VfxEntry
     // true면 호출부가 준 방향으로 회전시켜 스폰(예: 피격 반대 방향으로 튀는 먼지).
     // 방향이 없으면(환경 피해 등) 평소대로 항목 회전값만 쓴다.
     public bool alignToDirection;
+
+    // ── 피해 세기 반응 (x = 세기 0일 때 배율, y = 세기 1일 때 배율) ──────────────
+    // 세기는 호출부가 준 0~1 값(피격이면 HitImpact.Strength01 = 피해/최대체력).
+    // **y가 0 이하면 반응 없음** = 기본값 (0,0)이라 기존 항목은 손대지 않아도 그대로다.
+    // 프리팹 원본 값에 곱해지는 배율이라, 원본을 손보면 세기 반응도 같이 따라온다(두 값을 따로 관리하지 않게).
+    public Vector2 countByStrength;   // 방출량(버스트 개수 + rateOverTime) 배율. 예: (0.5, 2) = 약한 타격 절반, 강타 2배
+    public Vector2 speedByStrength;   // 시작 속도 배율. 세게 맞을수록 먼지가 멀리 튄다
 }
 
 /// <summary>

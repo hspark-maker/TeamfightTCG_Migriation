@@ -747,7 +747,10 @@ public class CardView : MonoBehaviour
         // 그쪽은 카드에 상주하며 상태(시퀀스/숫자)를 가지므로 1회성 파티클과 축이 다르다.
         Vector3 t_awayDir = _hitFrom != null ? transform.position - _hitFrom.transform.position : default;
         t_awayDir.z = 0f;   // 화면 평면 방향만 — 시네마 중 z가 벌어져 있으면 먼지가 카메라 쪽으로 튄다
-        BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir);
+        // 먼지의 양·속도도 화면 흔들림·카드 반동과 같은 세기(피해/최대체력)를 따른다 — 세 연출이 갈리면
+        // "센 공격"이 한쪽에서만 세게 읽힌다. 세기 반응이 배선된 항목만 이 값을 쓴다.
+        BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir,
+                               HitImpact.Strength01(_damage, this.boundCard));
         // 먼지가 튀는 방향과 카드가 밀리는 방향은 같아야 한다 — 같은 t_awayDir를 그대로 넘긴다.
         await this.cardAnim.PlayHitAnim(_d, _damage, t_awayDir);
     }

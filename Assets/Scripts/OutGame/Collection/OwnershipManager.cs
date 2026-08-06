@@ -4,7 +4,7 @@ using System.Collections.Generic;
 // 카드 소유권의 static 단일 창구
 public static class OwnershipManager
 {
-    static readonly HashSet<string> s_owned = new HashSet<string>();
+    static readonly HashSet<int> s_owned = new HashSet<int>();
 
     // 소유 변경 통지 — UI 갱신용
     public static event Action OnOwnershipChanged;
@@ -12,17 +12,27 @@ public static class OwnershipManager
     public static int OwnedCount => s_owned.Count;
 
     // 외부 변조 차단용 스냅샷(라이브 뷰 아님)
-    public static IReadOnlyCollection<string> OwnedKeys => new List<string>(s_owned);
+    public static IReadOnlyCollection<int> OwnedIds => new List<int>(s_owned);
 
-    // 메모리 캐시(Init) 없이 세이브의 소유 여부만 조회 — 첫실행 판정용
+    // 메모리 캐시(Init) 없이 세이브의 소유 여부만 조회 — 첫실행 판정용.
+    // 이관 전 구 세이브도 "소유 있음"으로 읽어야 한다 — 아니면 기존 유저가 신규로 오인돼 스타터덱을 다시 받는다.
     public static bool HasAnyOwnedSaved()
     {
         var t_data = DataSaveManager.Data.ownership;
-        if (t_data.ownedCardKeys == null) return false;
 
-        foreach (var t_key in t_data.ownedCardKeys)
+        if (t_data.ownedCardIds != null)
         {
-            if (!string.IsNullOrEmpty(t_key)) return true;
+            foreach (var t_id in t_data.ownedCardIds)
+            {
+                if (t_id > 0) return true;
+            }
+        }
+        if (t_data.ownedCardKeys != null)
+        {
+            foreach (var t_key in t_data.ownedCardKeys)
+            {
+                if (!string.IsNullOrEmpty(t_key)) return true;
+            }
         }
         return false;
     }
@@ -31,44 +41,56 @@ public static class OwnershipManager
     public static void Init()
     {
         s_owned.Clear();
-        bool t_removedUnavailable = false;
+        bool t_dirty = false;
 
         var t_data = DataSaveManager.Data.ownership;
-        if (t_data.ownedCardKeys != null)
+        if (t_data.ownedCardIds != null)
         {
-            foreach (var t_key in t_data.ownedCardKeys)
+            foreach (var t_id in t_data.ownedCardIds)
             {
-                if (string.IsNullOrEmpty(t_key)) continue;
-                if (!CardCatalog.IsReady || CardCatalog.Get(t_key) != null) s_owned.Add(t_key);
-                else t_removedUnavailable = true;
+                if (t_id <= 0) continue;
+                if (!CardCatalog.IsReady || CardCatalog.Contains(t_id)) s_owned.Add(t_id);
+                else t_dirty = true;
             }
         }
 
-        if (t_removedUnavailable) Save();
+        // 구 세이브(이름 키) 이관 — 카탈로그가 준비된 뒤에만 가능하다. 미준비면 다음 부트로 미룬다.
+        if (CardCatalog.IsReady && t_data.ownedCardKeys != null && t_data.ownedCardKeys.Count > 0)
+        {
+            foreach (var t_key in t_data.ownedCardKeys)
+            {
+                int t_id = CardCatalog.LegacyIdOfName(t_key);
+                if (t_id > 0) s_owned.Add(t_id);
+            }
+            t_data.ownedCardKeys.Clear();   // 한 번만 옮긴다 — 남겨두면 회수한 카드가 부트마다 되살아난다
+            t_dirty = true;
+        }
+
+        if (t_dirty) Save();
     }
 
     // 메모리 소유 집합을 세이브 슬롯에 flush 후 영속화
     public static void Save()
     {
         var t_data = DataSaveManager.Data.ownership;
-        t_data.ownedCardKeys = new List<string>(s_owned);
+        t_data.ownedCardIds = new List<int>(s_owned);
         DataSaveManager.Save();
     }
 
-    public static bool IsOwned(string _key)
+    public static bool IsOwned(int _id)
     {
-        if (string.IsNullOrEmpty(_key)) return false;
+        if (_id <= 0) return false;
 
-        return s_owned.Contains(_key);
+        return s_owned.Contains(_id);
     }
 
-    public static bool IsOwned(CardData _card) => IsOwned(CardCatalog.KeyOf(_card));
+    public static bool IsOwned(CardData _card) => IsOwned(CardCatalog.IdOf(_card));
 
     // 카드 1장 지급 — 신규 지급이면 true
-    public static bool Grant(string _key)
+    public static bool Grant(int _id)
     {
-        if (string.IsNullOrEmpty(_key)) return false;
-        if (!s_owned.Add(_key)) return false;
+        if (_id <= 0) return false;
+        if (!s_owned.Add(_id)) return false;
 
         Save();
         OnOwnershipChanged?.Invoke();
@@ -76,26 +98,26 @@ public static class OwnershipManager
     }
 
     // 카드 1장 회수(디버그용) — 실제 제거 시 true
-    public static bool Revoke(string _key)
+    public static bool Revoke(int _id)
     {
-        if (string.IsNullOrEmpty(_key)) return false;
-        if (!s_owned.Remove(_key)) return false;
+        if (_id <= 0) return false;
+        if (!s_owned.Remove(_id)) return false;
 
         Save();
         OnOwnershipChanged?.Invoke();
         return true;
     }
 
-    // 여러 키 일괄 지급(Save·이벤트 1회) — 신규 지급 장수 반환
-    public static int GrantAll(IEnumerable<string> _keys)
+    // 여러 번호 일괄 지급(Save·이벤트 1회) — 신규 지급 장수 반환
+    public static int GrantAll(IEnumerable<int> _ids)
     {
-        if (_keys == null) return 0;
+        if (_ids == null) return 0;
 
         int t_added = 0;
-        foreach (var t_key in _keys)
+        foreach (var t_id in _ids)
         {
-            if (string.IsNullOrEmpty(t_key)) continue;
-            if (s_owned.Add(t_key)) t_added++;
+            if (t_id <= 0) continue;
+            if (s_owned.Add(t_id)) t_added++;
         }
         if (t_added == 0) return 0;
 
@@ -113,13 +135,13 @@ public static class OwnershipManager
             return 0;
         }
 
-        var t_keys = new List<string>(CardCatalog.Count);
+        var t_ids = new List<int>(CardCatalog.Count);
         foreach (var t_card in CardCatalog.All)
         {
-            t_keys.Add(CardCatalog.KeyOf(t_card));
+            t_ids.Add(CardCatalog.IdOf(t_card));
         }
 
-        return GrantAll(t_keys);
+        return GrantAll(t_ids);
     }
 
     // 전체 회수(디버그용) — 제거된 장수 반환
