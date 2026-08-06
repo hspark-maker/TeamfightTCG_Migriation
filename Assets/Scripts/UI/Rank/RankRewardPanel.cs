@@ -28,7 +28,9 @@ public class RankRewardPanel : MonoBehaviour
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩돼 있다 — 매개변수를 붙이면 배선이 끊긴다(진입점을 따로 추가할 것).
     public void Open()
     {
-        this.OpenAt(RankRewardManager.ClaimedCount);
+        // 받을 게 있으면 강조되는 최상위 행, 없으면 현재 도달 티어를 보여준다.
+        int t_top = RankRewardManager.TopClaimableIndex;
+        this.OpenAt(t_top >= 0 ? t_top : RankManager.GetInfo().TierIndex);
     }
 
     /// <summary>전투에서 티어가 올라 자동으로 열릴 때. 새로 도달한 행으로 스크롤하고 그 행만 연출한다.</summary>

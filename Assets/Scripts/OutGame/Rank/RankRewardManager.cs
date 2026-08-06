@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-// 랭크 티어 달성 보상의 static 단일 창구(순차 수령)
+// 랭크 티어 달성 보상의 static 단일 창구(도달한 보상은 순서 무관하게 수령)
 public static class RankRewardManager
 {
     static RankConfig s_config;
@@ -12,11 +12,21 @@ public static class RankRewardManager
     // 전체 티어 수
     public static int TierCount => Config.TierCount;
 
-    // 지금까지 수령한 티어 개수(= 다음 수령 대상 인덱스)
-    public static int ClaimedCount => Slot.claimedCount;
+    // 수령 가능한 티어 중 가장 높은 인덱스(없으면 -1). 강조 표식과 열기 스크롤의 공통 기준.
+    public static int TopClaimableIndex
+    {
+        get
+        {
+            int t_from = Mathf.Min(RankManager.GetInfo().TierIndex, TierCount - 1);
+            for (int t_i = t_from; t_i >= 0; t_i--)
+                if (StateOf(t_i) == ERankRewardState.Claimable) return t_i;
+
+            return -1;
+        }
+    }
 
     // 수령 가능한 보상이 있는지(알림 점용)
-    public static bool HasAnyClaimable => StateOf(Slot.claimedCount) == ERankRewardState.Claimable;
+    public static bool HasAnyClaimable => TopClaimableIndex >= 0;
 
     static RankConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
@@ -27,6 +37,8 @@ public static class RankRewardManager
         {
             var t_data = DataSaveManager.Data;
             if (t_data.rank == null) t_data.rank = new RankSaveData();
+
+            MigrateClaimedCount(t_data.rank);
             return t_data.rank;
         }
     }
@@ -42,25 +54,28 @@ public static class RankRewardManager
     {
         Config.TryGetTier(_tierIndex, out RankTier t_tier);
 
+        var t_state = StateOf(_tierIndex);
+
         return new RankRewardInfo(
             _tierIndex,
             t_tier.DisplayName,
             t_tier.Badge,
-            t_tier.RewardGold,
-            StateOf(_tierIndex));
+            t_tier.Reward,
+            t_state,
+            t_state == ERankRewardState.Claimable && _tierIndex == TopClaimableIndex);
     }
 
     public static bool CanClaim(int _tierIndex) => StateOf(_tierIndex) == ERankRewardState.Claimable;
 
-    // 보상 수령 — 지급 → 커서 갱신 → 즉시 영속 → 통지
+    // 보상 수령 — 지급 → 낙인 → 즉시 영속 → 통지
     public static bool Claim(int _tierIndex)
     {
         if (!CanClaim(_tierIndex)) return false;
 
         if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return false;
 
-        CurrencyManager.Earn(ECurrencyType.Gold, t_tier.RewardGold);
-        Slot.claimedCount = _tierIndex + 1;
+        CurrencyManager.Earn(t_tier.Reward.Type, t_tier.Reward.Amount);
+        Slot.claimedTiers.Add(_tierIndex);
 
         // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
         CurrencyManager.Save();
@@ -68,26 +83,40 @@ public static class RankRewardManager
         return true;
     }
 
-    // 수령 커서만 되돌린다(디버그 전용, 지급된 골드는 회수하지 않는다)
+    // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)
     public static void ResetForDebug()
     {
+        Slot.claimedTiers.Clear();
         Slot.claimedCount = 0;
         DataSaveManager.Save();
         OnChanged?.Invoke();
     }
 
-    // Claimed 검사가 먼저여야 한다 — claimedCount > 도달티어인 구간에서 재수령이 뚫린다
+    // 구 커서 세이브를 낙인 리스트로 1회 흡수한다. 비운 뒤로는 no-op이라 Slot 접근마다 불려도 무해하다.
+    static void MigrateClaimedCount(RankSaveData _slot)
+    {
+        if (_slot.claimedCount <= 0) return;
+
+        for (int t_i = 0; t_i < _slot.claimedCount; t_i++)
+            if (!_slot.claimedTiers.Contains(t_i)) _slot.claimedTiers.Add(t_i);
+
+        _slot.claimedCount = 0;
+        DataSaveManager.Save();
+    }
+
+    // Claimed 검사가 먼저여야 한다 — 강등 등으로 도달 티어가 내려간 구간에서 수령 표시가 풀린다
     static ERankRewardState StateOf(int _tierIndex)
     {
         if (_tierIndex < 0 || _tierIndex >= TierCount) return ERankRewardState.Locked;
-        if (_tierIndex < Slot.claimedCount) return ERankRewardState.Claimed;
+        if (Slot.claimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
 
-        bool t_reached = _tierIndex <= RankManager.GetInfo().TierIndex;
-        return t_reached && _tierIndex == Slot.claimedCount ? ERankRewardState.Claimable : ERankRewardState.Locked;
+        return _tierIndex <= RankManager.GetInfo().TierIndex
+            ? ERankRewardState.Claimable
+            : ERankRewardState.Locked;
     }
 }
 
-// 티어 보상 행 상태(3종 배타, "달성했지만 차례 아님"은 Locked)
+// 티어 보상 행 상태(3종 배타, 미도달만 Locked)
 public enum ERankRewardState
 {
     Locked,
@@ -101,15 +130,20 @@ public readonly struct RankRewardInfo
     public readonly int TierIndex;
     public readonly string DisplayName;
     public readonly Sprite Badge;
-    public readonly long RewardGold;
+    public readonly CurrencyGain Reward;
     public readonly ERankRewardState State;
 
-    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, long _rewardGold, ERankRewardState _state)
+    // 수령 가능한 행 중 최상위 — 강조 표식 대상. 상태 enum에 섞지 않는다(State == Claimable 검사가 조용히 깨진다).
+    public readonly bool IsTopClaimable;
+
+    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, CurrencyGain _reward,
+                          ERankRewardState _state, bool _isTopClaimable)
     {
         TierIndex = _tierIndex;
         DisplayName = _displayName;
         Badge = _badge;
-        RewardGold = _rewardGold;
+        Reward = _reward;
         State = _state;
+        IsTopClaimable = _isTopClaimable;
     }
 }

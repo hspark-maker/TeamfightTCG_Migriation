@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58383e8ec353d4d42b9a10ac5f39c7fe, type: 3}
   m_Name: CardGrowthConfig
   m_EditorClassIdentifier: Assembly-CSharp::CardGrowthConfig
-  maxLevel: 10
+  maxLevel: 11
   hpPerLevel: 2
   baseGoldCost: 100
   costGrowthPerLevel: 50

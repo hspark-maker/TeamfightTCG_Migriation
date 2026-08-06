@@ -6,10 +6,10 @@ using UnityEngine;
 // 로비에서 "방금 무엇을 얻었는지"를 한 번 보여주는 연출 브레인.
 // 진입점은 둘이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed.
 // 전투(BattleRewardHandoff)와 카드팩(CardPackRewardHandoff) 캐리어를 소비해
-//   골드 → 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(GoldGainEffectPlayer에 위임 — 도감 수확과 같은 손맛)
+//   재화 → 각 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(CurrencyGainEffectPlayer에 위임 — 도감 수확과 같은 손맛)
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
 // 두 단계를 동시에 재생한다(획득 하나를 두 번에 걸쳐 알리지 않는다).
-// 카드는 신규만 온다 — 중복분은 환급 골드로 코인 쪽에 이미 섞여 있다(PackAcquireController가 걸러 싣는다).
+// 카드는 신규만 온다 — 중복분은 환급 재화로 코인 쪽에 이미 섞여 있다(PackAcquireController가 걸러 싣는다).
 //
 // 경계: 지급·저장은 각 씬이 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
 // 배선을 비워두면 이름으로 자동 탐색한다 — 로비 프리팹 수정 없이도 동작하게(자동 탐색 실패 시 그 단계만 건너뛴다).
@@ -61,18 +61,15 @@ public class LobbyGainEffectDirector : MonoBehaviour
         yield return null;
         Canvas.ForceUpdateCanvases();
 
-        long t_gold = 0L;
-        if (BattleRewardHandoff.TryConsume(out long t_battleGold)) t_gold += t_battleGold;
+        // 중복 카드 환급도 획득이다 — 전투 보상과 한 버킷에 합쳐 한 번에 보여준다(종류가 갈리면 그 안에서 나뉜다).
+        var t_gains = new CurrencyGainBucket();
+        BattleRewardHandoff.TryConsume(t_gains);
 
         IReadOnlyList<CardData> t_cards = null;
-        if (CardPackRewardHandoff.TryConsume(out long t_refundGold, out var t_packCards))
-        {
-            t_gold += t_refundGold;      // 중복 카드 환급도 골드 획득이다 — 전투 보상과 합쳐 한 번에 보여준다.
-            t_cards = t_packCards;
-        }
+        if (CardPackRewardHandoff.TryConsume(t_gains, out var t_packCards)) t_cards = t_packCards;
 
         int t_cardCount = t_cards != null ? t_cards.Count : 0;
-        if (t_gold <= 0L && t_cardCount <= 0) yield break;
+        if (t_gains.IsEmpty && t_cardCount <= 0) yield break;
 
         // 연출 레이어는 캔버스 좌표계 위여야 한다(anchoredPosition으로 날린다).
         if (transform is not RectTransform)
@@ -85,29 +82,29 @@ public class LobbyGainEffectDirector : MonoBehaviour
         transform.SetAsLastSibling();
 
         // 조립 전에 직전 연출을 즉시 마무리한다 — 코인·카드 잔해와 수치 고정이 겹치면 서로를 밟는다.
-        // 새 고정(BeginGainRollUp)보다 먼저여야 옛 시퀀스의 해제가 새 값을 풀어버리지 않는다(GoldGainEffectPlayer.Play와 같은 이유).
+        // 새 고정(BeginGainRollUp)보다 먼저여야 옛 시퀀스의 해제가 새 값을 풀어버리지 않는다(CurrencyGainEffectPlayer.Play와 같은 이유).
         if (m_master != null && m_master.IsActive()) m_master.Complete(true);
 
         m_master = DOTween.Sequence().SetLink(gameObject);
 
-        bool t_goldStaged = t_gold > 0L && TryStageGold(m_master, t_gold);
+        bool t_gainStaged = !t_gains.IsEmpty && TryStageGains(m_master, t_gains);
         bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards);
 
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
-        if (!t_goldStaged && !t_cardStaged)
+        if (!t_gainStaged && !t_cardStaged)
         {
             m_master.Kill();
             m_master = null;
         }
     }
 
-    // 골드는 공용 재생기가 조립한다(수치 고정 해제 안전망까지 그 시퀀스에 붙어 온다).
+    // 재화는 공용 재생기가 조립한다(수치 고정 해제 안전망까지 그 시퀀스에 붙어 온다).
     // 수치 자리에서 튀어 제자리로 돌아오는 모드라 출발점을 주지 않는다.
-    bool TryStageGold(Sequence _master, long _gold)
+    bool TryStageGains(Sequence _master, CurrencyGainBucket _gains)
     {
-        if (!GoldGainEffectPlayer.TryGet(this, out var t_player)) return false;
+        if (!CurrencyGainEffectPlayer.TryGet(this, out var t_player)) return false;
 
-        var t_seq = t_player.BuildGoldGain(null, _gold);
+        var t_seq = t_player.BuildGain(null, _gains);
         if (t_seq == null) return false;
 
         // 카드 단계와 같은 0초에 꽂아 동시에 돌린다.

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ef172436211a3934fb172f7d6ab7ebab, type: 3}
-  m_Name: Keyword_pack
+  m_Name: UltraPack
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: UltraPack
   displayName: "\uC6B8\uD2B8\uB77C \uD329"

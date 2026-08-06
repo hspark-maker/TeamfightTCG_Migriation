@@ -93,7 +93,7 @@ public class RankConfig : ScriptableObject
             $"{t_grade.displayName} {t_division}",
             t_grade.badge,
             t_grade.entryPoints + t_step * t_grade.pointsPerDivision,
-            t_grade.rewardGold + t_step * t_grade.rewardGoldPerDivision);
+            new CurrencyGain(t_grade.rewardType, t_grade.rewardGold + t_step * t_grade.rewardGoldPerDivision));
         return true;
     }
 }
@@ -132,6 +132,10 @@ public class RankGradeConfig
     [Tooltip("단계 간 포인트 간격. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. 저작 규칙: entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다.")]
     public long pointsPerDivision;
 
+    // 이 등급 보상으로 지급할 재화 종류(4단계 공용)
+    [Tooltip("이 등급 보상으로 지급할 재화 종류(4단계 공용).")]
+    public ECurrencyType rewardType = ECurrencyType.Gold;
+
     // 이 등급 1단계 달성 시 1회 수령하는 골드
     [Tooltip("이 등급 1단계 달성 시 1회 수령하는 골드. 0이면 수령해도 지급이 없다(진행만 넘어간다).")]
     public long rewardGold;
@@ -145,7 +149,7 @@ public class RankGradeConfig
 public readonly struct RankTier
 {
     // 조회 실패용 빈 스냅샷 — 실패 판정은 반드시 TryGetTier 반환값으로(None은 브론즈 1과 값으로 구분되지 않는다)
-    public static readonly RankTier None = new RankTier(0, ERankGrade.Bronze, 0, null, null, 0, 0);
+    public static readonly RankTier None = new RankTier(0, ERankGrade.Bronze, 0, null, null, 0, CurrencyGain.None);
 
     public readonly int Index;
     public readonly ERankGrade Grade;
@@ -153,9 +157,9 @@ public readonly struct RankTier
     public readonly string DisplayName;
     public readonly Sprite Badge;
     public readonly long RequiredPoints;
-    public readonly long RewardGold;
+    public readonly CurrencyGain Reward;
 
-    public RankTier(int _index, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _requiredPoints, long _rewardGold)
+    public RankTier(int _index, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _requiredPoints, CurrencyGain _reward)
     {
         Index = _index;
         Grade = _grade;
@@ -163,6 +167,6 @@ public readonly struct RankTier
         DisplayName = _displayName != null ? _displayName : string.Empty;
         Badge = _badge;
         RequiredPoints = _requiredPoints;
-        RewardGold = _rewardGold;
+        Reward = _reward;
     }
 }

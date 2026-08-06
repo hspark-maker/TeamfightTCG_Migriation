@@ -100,7 +100,8 @@ public class PackShowcaseController : MonoBehaviour
 
     void OnCurrencyChanged(ECurrencyType _type, long _balance)
     {
-        if (_type == ECurrencyType.Gold) RefreshBuyLock();
+        // 진열 팩마다 결제 재화가 다를 수 있어 종류를 가리지 않는다(판정은 RefreshBuyLock이 팩 기준으로 한다).
+        RefreshBuyLock();
     }
 
     // 페이지가 바뀌면 표시와 잠금이 함께 따라간다 — 둘 중 하나만 갱신하면 "보이는 팩과 살 팩"이 갈린다.
@@ -192,7 +193,7 @@ public class PackShowcaseController : MonoBehaviour
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
-                              && CurrencyManager.CanAfford(ECurrencyType.Gold, t_pack.Price);
+                              && CurrencyManager.CanAfford(t_pack.PriceType, t_pack.Price);
     }
 
     // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
@@ -266,8 +267,12 @@ public class PackShowcaseController : MonoBehaviour
     // 실패 사유를 사용자 메시지로 갈라 SimpleYNPopup 표시(LobbyMatchLauncher 팝업 관용구).
     void ShowFailPopup(EPackOpenResult? _result)
     {
+        // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
+        ResolvePack(out var t_pack, out _);
+        string t_currency = t_pack != null && t_pack.PriceType == ECurrencyType.Diamond ? "다이아" : "골드";
+
         string t_message = _result == EPackOpenResult.InsufficientGold
-            ? "골드가 부족합니다."
+            ? $"{t_currency}가 부족합니다."
             : "구매할 수 없습니다.";
 
         UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData

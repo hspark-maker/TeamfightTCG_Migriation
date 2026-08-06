@@ -50,7 +50,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BootInstaller
   cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
   collectionLayout: {fileID: 11400000, guid: e7990a7c604be694486685834716e120, type: 2}
+  collectionThemes: {fileID: 0}
+  albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
+  triggeredTutorialData: {fileID: 0}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
   starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
   growthConfig: {fileID: 11400000, guid: 29d2bc1886de275478143db4a63e16e1, type: 2}
