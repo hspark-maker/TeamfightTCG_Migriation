@@ -66,7 +66,11 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     static void ValidateLiveConsumers(List<string> _errors)
     {
         foreach (CardPackData t_pack in LoadBuildDependencies<CardPackData>())
+        {
             CheckCards(t_pack.Pool, t_pack.name, _errors);
+            foreach (RankPackPool t_rankPool in t_pack.RankPools)
+                CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _errors);
+        }
 
         foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
             if (t_ai.decks != null)
@@ -109,6 +113,12 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             T t_asset = AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(t_guid));
             if (t_asset != null) yield return t_asset;
         }
+    }
+
+    static IEnumerable<CardData> RankPoolCards(RankPackPool _pool)
+    {
+        if (_pool?.cards == null) yield break;
+        foreach (WeightedCard t_weighted in _pool.cards) yield return t_weighted.card;
     }
 
     static void CheckCards(IEnumerable<CardData> _cards, string _owner, List<string> _errors)

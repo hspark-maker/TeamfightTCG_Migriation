@@ -479,7 +479,7 @@ public class PackRevealView : MonoBehaviour
         // 격자는 더미와 별개로 결과 사본을 새로 세운다 — 밀려나 사라진 카드를 여기서 다시 만난다.
         if (resultGrid != null) resultGrid.Show(m_pending != null ? m_pending.Cards : null, _instant);
 
-        PlayTotalRefund(m_pending != null ? m_pending.TotalRefund : 0, _instant);
+        PlayTotalRefund(m_pending != null ? m_pending.TotalRefund.Amount : 0, _instant);
 
         OnRevealComplete?.Invoke();
     }

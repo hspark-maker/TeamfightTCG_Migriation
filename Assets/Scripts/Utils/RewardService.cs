@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 전투 결과를 골드로 환산
+/// 전투 결과를 보상 재화로 환산
 /// </summary>
 public static class RewardService
 {
@@ -18,30 +18,30 @@ public static class RewardService
     }
 
     /// <summary>
-    /// 전투 결과를 골드로 환산(순수 함수). 남은 카드 수 × 장당 골드,
+    /// 전투 결과를 보상으로 환산(순수 함수). 남은 카드 수 × 장당 골드,
     /// minGold를 하한으로 적용(승패 무관 동일 공식).
     /// </summary>
-    public static long CalculateGold(int remainingCards)
+    public static CurrencyGain CalculateReward(int remainingCards)
     {
         var t_config = Config;
 
-        long t_gold = Math.Max((long)remainingCards * t_config.goldPerCard, t_config.minGold);
+        long t_amount = Math.Max((long)remainingCards * t_config.goldPerCard, t_config.minGold);
 
-        return t_gold;
+        return new CurrencyGain(t_config.rewardType, t_amount);
     }
 
     /// <summary>
     /// 전투 종료 시점에 보상을 직접 지급한다. 환산 → Earn → 즉시 Save(영속화) 순으로 처리하고
-    /// 지급액을 반환한다. 반환값은 F-20 보상 팝업이 그대로 소비할 수 있다.
+    /// 지급분을 반환한다. 반환값은 F-20 보상 팝업이 그대로 소비할 수 있다.
     /// </summary>
-    public static long GrantBattleReward(int remainingCards)
+    public static CurrencyGain GrantBattleReward(int remainingCards)
     {
-        long gold = CalculateGold(remainingCards);
+        CurrencyGain t_reward = CalculateReward(remainingCards);
 
-        CurrencyManager.Earn(ECurrencyType.Gold, gold);
+        CurrencyManager.Earn(t_reward.Type, t_reward.Amount);
         // Earn은 flush하지 않으므로 지급 직후 즉시 영속화(앱 강제 종료에도 보상 유실 방지).
         CurrencyManager.Save();
 
-        return gold;
+        return t_reward;
     }
 }

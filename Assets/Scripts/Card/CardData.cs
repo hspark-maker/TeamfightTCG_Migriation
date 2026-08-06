@@ -46,9 +46,13 @@ public class CardData : ScriptableObject
     public Sprite battleImage;
     public Sprite deckPreview;
 
+    /// <summary>체력 곡선의 "미지정" 칸. 0을 빈칸으로 쓸 수 없어서 둔다 —
+    /// 표의 빈칸은 레벨 하나만 전역식으로 넘기는 뜻이고, 0은 "그 레벨 체력이 0"이라는 저작 값이다.</summary>
+    public const int NoMaxHpOverride = -1;
+
     [Header("Growth HP Curve")]
-    [Tooltip("index = 레벨(0~10), 값 = 해당 레벨 진입 시 증가 HP. 비어 있으면 CardGrowthConfig 전역식을 사용합니다.")]
-    public int[] hpGainByLevel;
+    [Tooltip("index = 레벨(0~10), 값 = 그 레벨의 최대 HP(절대값). -1 = 미지정(그 레벨만 CardGrowthConfig 전역식). 비어 있으면 전 레벨 전역식.")]
+    public int[] maxHpByLevel;
 
     [Header("Growth Unlock")]
     /// <summary><see cref="keywords"/>가 열리는 강화 레벨. **0(미지정) = 처음부터 열려 있음** —
@@ -103,14 +107,23 @@ public class CardData : ScriptableObject
 
     public bool HasKeyword(CardKeyword _kw) => (this.keywords & _kw) != 0;
 
-    public bool TryGetHpGain(int _level, out int _hpGain)
+    /// <summary>레벨 _level의 최대 HP를 표가 직접 정해뒀는가. false면 미지정 — 부르는 쪽이 전역식으로 채운다.
+    ///
+    /// **칸 번호는 레벨이 아니라 강화 횟수다.** hp0 = 미강화 = <see cref="maxHp"/>이므로 곡선이 읽는 첫 칸은 hp1이고,
+    /// 레벨 L은 index L-1을 본다(Lv2 = 1강화 = hp1). 레벨은 1부터 세는데 강화는 0회부터 세기 때문.</summary>
+    public bool TryGetMaxHp(int _level, out int _maxHp)
     {
-        _hpGain = 0;
-        if (this.hpGainByLevel == null || this.hpGainByLevel.Length == 0) return false;
-        if (_level < MinHpCurveLevel || _level > MaxHpCurveLevel) return false;
-        if (_level >= this.hpGainByLevel.Length) return true;
+        _maxHp = 0;
+        if (this.maxHpByLevel == null) return false;
 
-        _hpGain = Mathf.Max(0, this.hpGainByLevel[_level]);
+        int t_index = _level - 1;
+        if (t_index < MinHpCurveLevel || t_index > MaxHpCurveLevel) return false;
+        if (t_index >= this.maxHpByLevel.Length) return false;
+
+        int t_value = this.maxHpByLevel[t_index];
+        if (t_value < 0) return false;
+
+        _maxHp = t_value;
         return true;
     }
 

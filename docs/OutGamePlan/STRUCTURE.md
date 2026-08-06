@@ -77,210 +77,7 @@ flowchart TD
 <!-- 각 도메인 설계 승인 시 이 아래에 클래스도·데이터 흐름 mermaid를 추가한다.
      기존 승인분과 신규분을 구분 표시할 것. -->
 
-### Collection 도메인 (B. 마스터·소유 + C. 도감 생산) — 구현 완료
 
-각 노드 옆 `[관용구 #n]`은 `docs/IDIOMS.md` 항목 번호.
-
-```mermaid
-flowchart TD
-    subgraph boot["부트 배선 (MainMenuInitializer.Awake, 순서 중요)"]
-        INIT["MainMenuInitializer<br/>allCards 주입"]
-    end
-
-    subgraph master["B. 마스터·소유"]
-        CAT["CardCatalog<br/>[#1 static창구][#3 안정키]<br/>KeyOf = SO 파일명"]
-        OWN["OwnershipManager<br/>[#2 Init/Save][#9 스냅샷]<br/>s_owned 집합"]
-    end
-
-    subgraph derive["C-행 파생 (읽기전용)"]
-        CFG["CollectionLayoutConfig (SO)<br/>[#1 fallback]<br/>행 def + 전역 튜닝"]
-        ROWS["CatalogRows<br/>[#1 static+fallback]<br/>행 파생·완성 판정 캐시"]
-        ROW["CatalogRow<br/>[#9 get-only]<br/>행 1개 불변 뷰"]
-    end
-
-    subgraph prod["C-생산 (순수 시간)"]
-        CLOCK["GameClock<br/>[#4 시각 창구]"]
-        PROD["CollectionProductionManager<br/>[#2 Init/Save][#5 Resolve][#7 0덮금지]<br/>s_progress 진행도"]
-        INFO["RowProductionInfo<br/>[#6 UI 스냅샷]"]
-    end
-
-    subgraph save["세이브 슬롯"]
-        SD["CollectionSaveData<br/>OwnershipSaveData<br/>[#3 rowKey]"]
-    end
-
-    CUR["CurrencyManager<br/>[#2 단일 골드]"]
-    OPENER["CardPackOpener (E)<br/>TryPurchase(pack, refund) · 무상태"]:::new
-
-    subgraph ui["F. UI (도감 갤러리)"]
-        GAL["CollectionGalleryController"]
-        RV["CollectionRowView"]
-        CV["CardVisualView"]
-    end
-
-    INIT -->|SetSource| CAT
-    INIT -->|Init| OWN
-    INIT -->|Init| PROD
-    CAT --> OWN
-    CFG -->|SetLayout| ROWS
-    CAT --> ROWS
-    ROWS --> ROW
-    OWN -->|IsOwned 실시간| ROWS
-    ROW --> PROD
-    CLOCK --> PROD
-    PROD -->|"Harvest 후 Earn"| CUR
-    OWN <--> SD
-    PROD <--> SD
-    PROD --> INFO
-    ROWS --> GAL
-    GAL --> RV --> CV
-    OWN -->|OnOwnershipChanged| GAL
-    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
-```
-
-> **부트 2계층(PKG-BOOT 확정)**: 씬무관 전역(`DataSaveManager.Load`·`CurrencyManager.Init`)은 `GameManager.Boot()`(BeforeSceneLoad)가, 씬 카드목록 의존(`SetSource`·`OwnershipManager.Init`·`ProductionManager.Init`)은 `MainMenuInitializer.Awake()`(ExecutionOrder -100)가 담당. `CardPackOpener`는 무상태 파사드가 돼 부트 주입이 없다 — 대상 팩 SO·환급액은 구매처(버튼/첫실행)가 직접 소유해 `TryPurchase`에 넘긴다. `EnsureBoot`(테스트 씬)는 `CardCatalog.IsReady` 가드로 통합 시 no-op.
-
-**핵심 흐름 2줄**
-- 소유: 부트가 `CardCatalog.SetSource → OwnershipManager.Init` → 갤러리가 `CatalogRows.Rows`를 그리고 `IsOwned`로 잠금 표시 → `Grant/Revoke` 시 `OnOwnershipChanged`로 재바인딩.
-- 생산: 완성 행을 조회하면 `Resolve`가 `GameClock.Since(lastSettle)`로 경과분 누적(cap 클램프) → `Harvest`가 정수분을 `CurrencyManager.Earn`, 소수 보존 후 즉시 영속.
-
----
-
-### F-17/F-18 도감 생산 UI 배선 (F. UI) — ✅ 씬/프리팹 배선 완료 (CollectionTest.unity)
-
-> 목표: 이미 완비된 `CollectionProductionManager` API(GetInfo/Harvest/HarvestAll/GetTotalHarvestable/OnChanged)를
-> 도감 갤러리 UI에 연결. 매니저·세이브·재화 계약은 **변경 없음**(소비만 추가). `:::new` = 이번 신규/확장.
-
-```mermaid
-flowchart TD
-    subgraph mgr["생산/재화 매니저 (기존, 변경 없음)"]
-        PROD["CollectionProductionManager<br/>GetInfo · Harvest · OnChanged"]
-        CUR["CurrencyManager<br/>Earn · OnCurrencyChanged"]
-        OWN["OwnershipManager<br/>OwnedCount · OnOwnershipChanged"]
-        CAT["CardCatalog.Count"]
-    end
-
-    subgraph ui["F. 도감 갤러리 UI"]
-        GAL["CollectionGalleryController<br/>+ 폴링 틱 · OnChanged 구독<br/>+ 푸터 일괄수령 버튼"]:::new
-        RV["CollectionRowView<br/>+ 상태칩·수확버튼 · 진행바 위임"]:::new
-        CV["CardVisualView (구 CollectionCardView)"]
-        PV["CollectionProgressView<br/>행별 생산 사이클 진행바"]:::new
-        HUD["GoldHud (기존 코드,<br/>씬 부착만)"]:::new
-    end
-
-    GAL -->|"틱마다 RefreshProduction"| RV
-    RV -->|"GetInfo(rowKey) 폴링"| PROD
-    RV -->|"수확버튼 → Harvest(rowKey)"| PROD
-    PROD -->|"OnChanged"| GAL
-    GAL --> CV
-    RV -->|"Bind(rowKey)·틱마다 Refresh"| PV
-    PV -->|"GetInfo(rowKey).CycleProgress01"| PROD
-    GAL -->|"GetTotalHarvestable 폴링 / HarvestAll"| PROD
-    CUR -->|"OnCurrencyChanged"| HUD
-
-    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
-```
-
-**설계 요지**
-- 생산 누적은 시간 함수라 `OnChanged`가 안 뜬다 → 컨트롤러가 **0.5s 폴링 틱**으로 열린 동안 각 행 `RefreshProduction()` 갱신. 푸터 일괄수령 뷰는 소유자(컨트롤러)가 없어 **자체 0.5s 폴링**. 수확/소유변경은 `OnChanged`/`OnOwnershipChanged`로 즉시 갱신.
-- 행 상태 4종 표시: 잠김(수확버튼 off) / 생산중(누적 표시) / 수확가능(버튼 on) / 상한(만땅). 상태는 `GetInfo`의 `State`+`CanHarvest` 조합.
-- 매니저/세이브/재화 계약 **불변** — UI는 순수 소비자(경계 준수).
-
-**흐름 시퀀스 — 생산 폴링 + 수확 (Phase 2 구현)**
-
-```mermaid
-sequenceDiagram
-    participant U as 유저
-    participant GAL as GalleryController
-    participant RV as RowView
-    participant PROD as ProductionManager
-    participant CUR as CurrencyManager
-    participant HUD as GoldHud
-
-    loop 0.5s 폴링(열린 동안)
-        GAL->>RV: RefreshProduction()
-        RV->>PROD: GetInfo(rowKey)
-        PROD-->>RV: RowProductionInfo(State/Accumulated/CanHarvest)
-        Note over RV: 상태칩·누적텍스트·버튼 interactable 갱신
-    end
-    U->>RV: 수확 버튼 클릭
-    RV->>PROD: Harvest(rowKey)
-    PROD->>CUR: Earn(RewardType, 정수분)
-    PROD->>PROD: Save + CurrencyManager.Save
-    PROD-->>GAL: OnChanged
-    GAL->>RV: 전 행 RefreshProduction()
-    CUR-->>HUD: OnCurrencyChanged → 골드 갱신
-```
-
-
-
-#### 구조 지도 — 이게 전체 어디에 붙어 있나
-
-```mermaid
-flowchart TB
-    subgraph L3["3.Manager — 유일한 진입점"]
-        DSM["DataSaveManager<br/>static · Load / Save / Data<br/>손상 시 corrupt 키에 백업"]
-    end
-    subgraph L2["2.Domain — 세이브 값 객체(순수 데이터)"]
-        USD["UserSaveData<br/>version=1 · 도메인 조립 지점"]
-        CUR["CurrencySaveData"]
-        COLS["CollectionSaveData<br/>rows: rowKey / ticks / accumulated"]
-        ETC["OwnershipSaveData · DeckSaveData"]
-    end
-    subgraph L1["1.Repository — 저장 매체(교체 가능)"]
-        IR["IRepository"]
-        JFR["JsonFileRepository<br/>persistentDataPath/Save/*.json"]
-        PPR["PlayerPrefsRepository"]
-    end
-    CM["CurrencyManager<br/>static · 장부 메모리 캐시<br/>Earn / Spend / OnCurrencyChanged"]
-
-    DSM -->|"JsonUtility 직렬화"| USD
-    USD --- CUR
-    USD --- COLS
-    USD --- ETC
-    DSM -->|"키 outgame_save"| IR
-    IR -. 구현 .- JFR
-    IR -. 구현 .- PPR
-    CM -->|"Init: 읽기 / Save: flush"| CUR
-```
-
-#### 흐름 시퀀스 — 부트 로드와 재화 캐싱
-
-```mermaid
-sequenceDiagram
-    participant Boot as 부트 ExecutionOrder -100
-    participant DSM as DataSaveManager
-    participant Repo as IRepository
-    participant CM as CurrencyManager
-    Boot->>DSM: Load()
-    DSM->>Repo: Load("outgame_save")
-    Repo-->>DSM: json
-    alt 파싱 실패(손상된 세이브)
-        DSM->>Repo: Save("outgame_save_corrupt", 원본)
-        Note over DSM: 기본값으로 시작 — 진행도 0 덮어쓰기 금지 규약
-    end
-    Boot->>CM: Init()
-    CM->>DSM: Data.currency.gold 읽어 메모리 캐시
-    Note over CM: 이후 Earn/Spend는 메모리에서만 변경.<br/>CM.Save() 호출 시점에 세이브 슬롯 flush → DSM.Save()
-```
-
-#### 원리 카드 — 왜 이렇게 생겼나
-
-- **3층 분리(Repository/Domain/Manager)**: 저장 매체 교체가 한 줄(`SetRepository`), 스키마는 값 객체로 고립, 진입점은 하나. — `Save/3.Manager/DataSaveManager.cs`
-- **재화 캐싱+flush**: Earn/Spend마다 파일 IO를 안 하려고 메모리 장부로 운영, `CurrencyManager.Save()` 시점에만 영속. **트레이드오프: Save() 누락 시 앱 종료로 장부 유실** → 지급/차감 직후 Save() 호출이 규약. — `Currency/CurrencyManager.cs`
-- **CollectionRowProgress 필드 3개의 이유**: `rowKey`는 문자열(인덱스 금지 — 카드 추가돼도 진행도 안 밀림) / `lastSettleUtcTicks`는 long(JsonUtility가 DateTime 직렬화 불가) / `accumulated`는 double(수확 시 정수분만 지급, 소수 잔여 보존). — `Save/2.Domain/CollectionSaveData.cs`
-
-**수정 가능성 높은 지점**: 새 재화 추가 = `ECurrencyType` + `CurrencySaveData` 필드 + `CurrencyManager.Init/Save` 매핑 3곳 동시 수정 / 새 세이브 항목 = `UserSaveData`에 값 객체 필드 추가만(리네임·삭제 금지).
-
-#### 파일 지도 — 다이어그램에서 코드로
-
-| 클래스 | 파일 |
-|---|---|
-| DataSaveManager | `OutGame/Save/3.Manager/DataSaveManager.cs` |
-| IRepository · JsonFileRepository · PlayerPrefsRepository | `OutGame/Save/1.Repository/` |
-| UserSaveData 외 값 객체 4종 | `OutGame/Save/2.Domain/` |
-| CurrencyManager · ECurrencyType | `OutGame/Currency/` |
-
----
 
 ### 도감 카드 상세 오버레이 — 좌우 화살표·스와이프 넘기기 (F. UI) — ✅ 코드+검수+프리팹 배선 완료 (2026-08-04, Play 검증 대기)
 
@@ -346,7 +143,7 @@ flowchart TD
         SHOP["상점 UI"]
     end
     subgraph def["E-14 정의 (SO, 에디터 데이터)"]
-        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)"]:::new
+        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
     end
     subgraph svc["E-15 구매·드로우"]
         SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack, refund) · 로컬 랜덤"]:::new
@@ -356,11 +153,13 @@ flowchart TD
     CUR["CurrencyManager<br/>Spend · Earn · Save (기존)"]
     OWN["OwnershipManager<br/>Grant (기존)"]
     KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
+    RANK["RankManager.GetInfo().Grade (기존)"]
 
     SHOP -->|"TryPurchase(pack, refund)"| SVC
     SHOP -.->|"대상 팩 SO 참조"| DEF
+    SVC -->|"현재 등급 조회"| RANK
     SVC -->|"Spend(Gold, price)"| CUR
-    SVC -->|"DEF.pool 지정셋 균등 드로우"| DEF
+    SVC -->|"ResolvePool(등급) 가중 드로우"| DEF
     SVC -->|"KeyOf(card)"| KEY
     SVC -->|"Grant(key) 루프 → isNew"| OWN
     SVC -->|"중복이면 Earn(Gold, refund)"| CUR
@@ -387,7 +186,7 @@ sequenceDiagram
         SVC-->>SHOP: 실패(구매 불가, 차감 없음)
     else 충분
         SVC->>CUR: Spend(Gold, price)
-        loop drawCount 회 (DEF.pool에서 균등 드로우)
+        loop drawCount 회 (ResolvePool(현재 등급)에서 가중 드로우)
             SVC->>OWN: Grant(KeyOf(card)) → isNew
             alt 중복(isNew=false)
                 SVC->>CUR: Earn(Gold, duplicateRefundGold)
@@ -403,14 +202,16 @@ sequenceDiagram
 - **오케스트레이터라 세이브 섹션 없음**: E는 `Spend`·`Earn`(재화)·`Grant`(소유)만 호출하고 모두 이미 영속. E 자체 세이브를 만들면 이중 진실원. 트레이드오프: 구매 이력·pity 카운터가 필요해지면 그때 세이브 섹션 추가.
 - **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
 - **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
-- **중복 = 소액 골드 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(Gold, refundGold)`. 환급액은 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘긴다(상점 SO 전역값 폐기). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
+- **랭크별 풀 오버라이드 (2026-08-06)**: `rankPools`(`RankPackPool` = minGrade + `WeightedCard` 목록)가 있으면 `ResolvePool(현재 등급)`이 "minGrade ≤ 현재 등급 중 최고 등급" 항목을 적용(등급별 통풀 재저작, 하위 등급과 합산 없음). 매치 없거나 비면 기존 `pool`을 weight 1 취급으로 폴백 → `rankPools` 빈 팩(튜토리얼 3종)은 기존 동작 그대로. weight 0 이하 = 1(균등) 취급, 카드 제외는 리스트 삭제로. 풀 해석은 데이터(`CardPackData`)가 소유 — 상점 미리보기가 생기면 같은 메서드를 쓴다(현재 미리보기 소비자 없음).
+- **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(팩 결제 재화, refundAmount)`. 환급 **액수**는 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘기고(상점 SO 전역값 폐기), 환급 **재화 종류**는 `CardPackData.priceType` 하나가 정한다(→ 재화 분리 섹션). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
 - **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
 - **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, 대상 팩 SO·환급액은 각 구매처 뷰가 인스펙터로 소유해 `TryPurchase(pack, refund)`에 직접 넘긴다(진열=뷰 책임).
-- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드 / 등급 가중치가 필요해지면 `DEF.pool`을 가중 목록으로 확장.
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드. ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
 
 | 클래스 | 파일 | 태스크 |
 |---|---|---|
-| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)` | E-14 |
+| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
+| `WeightedCard` · `RankPackPool` (값, co-locate) | `OutGame/CardPack/CardPackData.cs` — `card·weight(0 이하=1)` / `minGrade·cards` | E-14 |
 | `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData, long refund)` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
 
@@ -825,10 +626,10 @@ flowchart TD
     end
 
     subgraph rank["랭크 (기존 + 신규)"]
-        CFG["RankConfig / RankGradeConfig<br/>rewardGold · rewardGoldPerDivision"]:::chg
+        CFG["RankConfig / RankGradeConfig<br/>rewardType · rewardGold · rewardGoldPerDivision"]:::chg
         MGR["RankManager<br/>[H-33 시점 무수정 → 등급 재설계에서 동결 해제]<br/>GetInfo → 도달 티어"]
         RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
-        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>RewardGold · State"]:::new
+        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Reward(CurrencyGain) · State"]:::new
         HAND["RankUpHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)"]:::new
     end
 
@@ -1019,7 +820,7 @@ flowchart TD
         CVV["CardVisualView.Bind(card, owned, _applyGrowth)"]:::chg
         DET["CardDetailOverlayView<br/>레벨·진화 행"]:::chg
         MPV["MatchDeckPanelView<br/>상대 덱만 _applyGrowth:false"]:::chg
-        GHUD["GoldHud(type = Diamond)<br/>같은 컴포넌트 재사용"]:::chg
+        GHUD["CurrencyHud(type = Diamond)<br/>같은 컴포넌트 재사용"]:::chg
     end
 
     DSM --> USD
@@ -1094,4 +895,190 @@ sequenceDiagram
     BF->>BF: CardInstance(maxHp = data.maxHp + HpBonus,<br/>evolutionStage = 세이브 우선)
 ```
 
--
+---
+
+### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **데이터 축 + UI 축 구현·배선 완료 (2026-08-06, PKG-ALBUM-DATA/UI) — Play 검증·앨범 저작(ASSET) 대기**
+
+> **네이밍 은유 = 스티커 앨범.** 도감(圖鑑)은 **앨범**이고, 앨범에는 **페이지**가 있고, 페이지에는 카드를 꽂는 **칸(슬롯)** 이 있다. 이 은유가 요구된 3계층에 1:1로 맞아떨어져서, 클래스 이름만 읽어도 그게 무엇인지 알 수 있다.
+> **"챕터"는 의도적으로 피했다** — 튜토리얼이 이미 `TutorialSaveData.outgameChapterIndex`로 챕터를 쓰고 있어 같은 단어가 두 도메인을 가리키게 된다.
+> **"Collection" 접두어도 쓸 수 없다** — 구 도감이 `CollectionTheme`·`CollectionThemeConfig`·`CollectionProgressView` 등으로 이미 점유했고, 병존 기간에 이름이 겹치면 어느 쪽 파일인지 구분이 안 된다.
+
+> 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체할** 새 축. **이번 플랜에 기존 삭제는 포함하지 않는다 — 병존**하고, 삭제는 후속 정리 패키지로 넘긴다.
+> 그래서 신규는 폴더·접두어를 **`Album`으로 물리 분리**한다(`OutGame/Album/` · `UI/Album/`). 구/신 파일이 `OutGame/Collection/`·`UI/Collection/`에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
+
+**실측 전제 (설계의 근거)**
+
+- 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있고 **역참조 0건 = 로비에서 도달 불가**.
+- 테마 축(`CollectionThemes`/`CollectionThemeConfig`/`CollectionThemeListController`/`CollectionThemeRowView`/`CollectionTabController`)은 코드만 있고 **에셋 0건 + 어떤 프리팹·씬에도 미부착 = 완전 휴면**. `Tab_Collection`의 `ThemeTab_All/01~06`은 컨트롤러 없는 **정적 목업**이다.
+- ⚠️ **`Boot.prefab:51-55`에 직렬화된 필드는 `cardRegistry`/`collectionLayout`/`tutorialData`/`deckImageCatalog`/`starterDeck` 5개뿐** — `BootInstaller.cs`의 `collectionThemes`·`triggeredTutorialData`·`growthConfig`는 프리팹에 없다(= null). 즉 매 부팅마다 `CollectionThemes`의 "테마 SO 미배선" 경고가 뜨고 있다. 신규 SO 배선도 **반드시 `Boot.prefab` 레벨**에 해야 한다 — `StartScene.unity:423-435`가 일부 SO를 **씬 오버라이드**로 꽂는 바람에 `LobbyScene` 단독 Play에서 null이 되는 기존 함정을 반복하지 않기 위해서다.
+- **도감에 "완성 보상 수령" 개념이 코드에 전혀 없다.** 수령 선례는 랭크(`RankRewardManager`)뿐이고, **페이지 개념도 데이터 모델에 없다**(`Tab_Collection`의 `ChapterLabel "01"`은 미배선 장식).
+- 카드 총량 = **현재 31장**(`Assets/SO/Cards/*.asset`) / **계획 90장**(사용자 확정 2026-08-06).
+
+**저작 스케일 (사용자 확정 2026-08-06)**
+
+| 항목 | 값 | 성격 |
+|---|---|---|
+| 페이지 1장 | **3×3 = 9칸** | 프리팹 `GridLayoutGroup` 3열 저작값. 칸 수는 `page.Cards.Count` 파생 — **코드에 `9`도 `3`도 박지 않는다** |
+| 테마 1개 | **5페이지 = 45장** | `AlbumThemeDef.pages` 리스트 길이. 향후 페이지 추가 가능이 요구사항 |
+| 도감 전체 | **90장 = 테마 2개 × 5페이지** | `CardAlbumConfig.themes` 리스트 길이 |
+
+> 세 값 **전부 SO 저작값**이라 코드 변경 없이 바뀐다. 테마마다 페이지 수가 달라도 된다(리스트 길이가 곧 페이지 수).
+> 현재 31장이므로 **첫 저작은 페이지가 부분적으로 빈다** — 빈 칸은 `null` 슬롯이 되고, `CardAlbum`이 완성 판정 모수에서 제외하므로 "9칸 중 4장만 저작된 페이지"는 `4/4`로 완성 가능하다(아래 함정 절 참조). 카드가 채워지는 대로 저작을 늘리면 그 페이지가 다시 미완성으로 내려가는데, 수령 낙인은 `Claimed` 최우선 판정이라 재지급되지 않는다.
+
+#### 클래스도
+
+```mermaid
+flowchart TD
+    subgraph AUTH["저작 (에디터)"]
+        CFG["CardAlbumConfig (SO)<br/>앨범 저작 1장<br/>themes[] · albumReward"]:::new
+        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName · icon<br/>rewards[] · pages[]"]:::new
+        PDEF["AlbumPageDef<br/>페이지 저작 항목<br/>pageId · rewards[] · cards[]"]:::new
+        RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
+    end
+    subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
+        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
+        THEME["AlbumTheme<br/>테마 1개 런타임 뷰<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
+        PAGE["AlbumPage<br/>페이지 1장 런타임 뷰<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+    end
+    subgraph CLAIM["보상 수령 (유일한 저장 축)"]
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
+        SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
+    end
+    subgraph UI["UI (UI/Album/ · 실측 6파일 — 그리드·스테퍼는 오버레이에 흡수)"]
+        TAB["AlbumTabController<br/>Tab_Collection_New 루트<br/>앨범 게이지·보상 + 갤러리 빌드"]:::new
+        TBTN["AlbumThemeCellView<br/>테마 셀 1개(Cell_00 템플릿)<br/>아이콘·이름·n/N·상자·✓"]:::new
+        PANEL["AlbumPageOverlayView<br/>페이지 오버레이 + ◀ n/N ▶ 스테퍼<br/>(Tab_Collection_New 내부)"]:::new
+        SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>미소유 회색 + 이름 유지"]:::new
+        BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new
+        PROG["AlbumGaugeView (Serializable 소품)<br/>n/N 게이지 · 3계층 공용"]:::new
+    end
+    OWN["OwnershipManager<br/>IsOwned (동결 계약)"]
+    CAT["CardCatalog.KeyOf<br/>= SO 파일명 (동결 계약)"]
+    CUR["CurrencyManager<br/>Earn / Save (동결 계약)"]
+    BOOTI["BootInstaller<br/>+2줄 SetSource"]:::chg
+    DET["CardDetailOverlayView<br/>(기존 재사용 · 무수정)"]
+
+    CFG --> TDEF --> PDEF
+    TDEF -.-> RDEF
+    PDEF -.-> RDEF
+    BOOTI -->|SetSource| BOOK
+    CFG --> BOOK
+    BOOK --> THEME --> PAGE
+    CAT -->|카드 키| BOOK
+    OWN -->|"소유 집합 = 진행도의 유일한 원천"| BOOK
+    BOOK -->|완성 판정| RMGR
+    RMGR --> RINFO
+    RMGR <-->|"슬롯 직독"| SAVE
+    RMGR -->|Earn → Save 1회| CUR
+    TAB --> TBTN
+    TAB -->|테마 클릭| PANEL
+    PANEL --> SLOT
+    RINFO --> BOX
+    BOOK --> PROG
+    RMGR -->|OnChanged| TAB
+    RMGR -->|OnChanged| PANEL
+    OWN -->|OnOwnershipChanged| TAB
+    SLOT -->|"Open(페이지 칸 순서, null 제외)"| DET
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+#### 확정 설계 결정 5개 (각각 "안 그러면 무엇이 깨지나")
+
+| # | 결정 | 안 그러면 |
+|---|---|---|
+| 1 | **페이지는 명시 저작**(`List<AlbumPageDef>` + `pageId`). 자동 9청크 금지 | 자동 청크 + 인덱스 키면 카드 1장 삽입에 페이지 내용이 밀려 **이미 준 보상이 다시 Claimable**이 된다(재화 복제). 첫-카드-키로 만들면 삽입 지점 이후 **모든 페이지 키가 새 키**가 되어 낙인이 전멸한다. `CollectionThemes.BuildEmpty()`가 세운 "저작물성 데이터는 자동 생성 금지"의 연장 — 보상이 붙은 페이지는 테마보다 더 강한 저작물이다 |
+| 2 | **진행도는 저장하지 않는다** — `OwnershipManager.IsOwned`의 순수 파생. 저장하는 건 **수령 낙인**뿐 | 진행도를 저장하면 기존 생산 축이 겪은 "완성/미완성 전이마다 정산 시각을 당기는" 보정 로직과 세이브 마이그레이션 부채를 그대로 물려받는다 |
+| 3 | **수령 낙인 = 접두 네임스페이스 문자열 리스트**(`p:테마/페이지` · `t:테마` · `b`). 랭크의 `claimedCount` 단조 커서 **사용 불가** | 도감 완성은 소유 집합의 함수라 **부분순서**다(3테마를 먼저 완성하고 1테마를 나중에 완성 가능, 카드 추가로 완성이 **취소**되기도 한다). 커서로 표현하면 "3테마 수령"이 "1·2테마 수령"으로 해석된다. 비트마스크는 비트 위치=인덱스라 세이브 규약(인덱스 금지) 정면 위반 |
+| 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **부트에 줄이 0개 추가** | 캐시를 두면 "부트를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
+| 5 | **`StateOf`는 `Claimed`를 최우선 검사**, 3종 배타(`Locked`/`Claimable`/`Claimed`) | 완성 후 카드가 추가돼 미완성으로 되돌아간 뒤 다시 완성되면 **재수령이 뚫린다**. 랭크가 같은 이유로 같은 순서를 쓴다 |
+
+#### 병존 경계 — 기존 도감 코드 수정 0
+
+신규가 **읽기만** 하는 것: `OwnershipManager.IsOwned` · `CardCatalog.KeyOf` · `CurrencyManager.Earn`/`Save` · `CardDetailOverlayView.BindTile`(무수정 재사용).
+신규가 **참조하지 않는** 것(리뷰 체크리스트): `CollectionThemes` · `CollectionTheme` · `CollectionThemeConfig` · `CatalogRows` · `CatalogRow` · `CollectionProductionManager` · `CollectionThemeListController` · `CollectionThemeRowView` · `CollectionGalleryController` · `CollectionRowView` · `CollectionProgressView` · `CollectionGridController`.
+
+기존 코드 수정은 **3파일 4줄**(BootInstaller·UserSaveData·CollectionThemeConfig), 프리팹은 신규 `Tab_Collection_New` + `LobbyCanvas` 재배선:
+
+| 파일 | 변경 |
+|---|---|
+| `Core/BootInstaller.cs` | `[SerializeField] CardAlbumConfig albumConfig` + `CardAlbum.SetSource(albumConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
+| `OutGame/Save/2.Domain/UserSaveData.cs` | `albumReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
+| `OutGame/Collection/CollectionThemeConfig.cs` | `[CreateAssetMenu]` **봉인**(1줄) — 누군가 구 테마 SO를 새로 만들어 꽂으면 "카드→테마" 매핑이 2벌이 된다. 이게 이중 진실원의 유일한 실질 방어선 |
+| `Tab_Collection.prefab` | **무수정으로 변경(2026-08-06 실측)** — 사용자 목업 `Tab_Collection_New.prefab`이 탭을 통째로 대체하고, `LobbyCanvas.prefab`의 `LobbyTabController.tabs[4].content`를 신규 탭 인스턴스로 재배선했다(구 탭 인스턴스는 비활성 병존). 구 `CollectionGridController`는 탭 선택으로 활성화될 경로가 없어져 **가동 중단 목적(BindTile 가로채기 차단)은 동일하게 달성** |
+| `Tab_Collection_New.prefab` + `LobbyCanvas.prefab` | UI 컴포넌트 4건 부착 + 배선(MCP 일괄 수술): 목업 퍼시스턴트 onClick 11건 제거, 상자 Button 3곳 추가, 게이지 Fill 3곳 Filled(Horizontal) 전환, `tabs[4].content` 교체 |
+
+#### 배치 규약 (충돌 회피)
+
+- **오버레이는 `Tab_Collection_New.prefab` 안 패널(`Panel_PageOverlay`)로 둔다.** `CardDetailOverlay`처럼 `LobbyCanvas.prefab` 직속에 두면 대기 중인 `PKG-ENTRY`·`PKG-HUD`와 **3항목 클리크**가 되고, `.prefab` YAML은 머지가 불가해 도감이 대기줄에 선다.
+- `Tab_Collection_New.prefab`은 `LobbyCanvas` 안 **중첩 인스턴스**다 → **프리팹 에셋 레벨에서만 편집**, 인스턴스 오버라이드 금지(오버라이드를 걸면 `LobbyCanvas.prefab`이 변해 클리크로 승격된다).
+- 프리팹 참조는 **프리팹 레벨에 저작**. 씬 오버라이드로 하면 `LobbyScene.unity`가 4번째 경합 파일이 되고, 나중에 누가 Apply All 하면 조용히 어긋난다.
+- `sortingOrder`는 **400 미만** 유지(`UIPoolManager` 팝업 400 / 튜토리얼 게이트 350·351·352).
+
+#### 알려진 함정
+
+- **완성 보상은 계층마다 `rewards` 리스트(복수 저작 가능, 2026-08-06).** 빈 리스트 = 보상 미저작 → **상자 숨김 + `Claimable` 불성립**(`CanClaim*`·알림 뱃지 미점등). 단 낙인 검사가 최우선이라 **기수령 낙인은 보상을 비워도 `Claimed` 유지**(재수령 안 뚫림). 수령은 리스트 순회 `Earn`(amount≤0 스킵) 후 `CurrencyManager.Save()` **1회** — 건별 Save 금지. 표시: 상자 아이콘 = 첫 보상, 앨범 `RewardSlot` 3칸 초과 저작은 앞칸만 + 경고.
+- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`CardAlbum` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
+- **키 폴백에 `displayName`을 넣지 말 것.** `CollectionThemes.ResolveKey`는 `themeId → displayName → theme_{index}` 폴백을 허용하지만 거기는 표시 축이라 리네임 손해가 없었다. 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
+- **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).
+- **카드 배치가 두 곳에 저작된다** — 신규 `CardAlbumConfig`(앨범 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.
+
+---
+
+### 재화 획득·연출의 재화별 분리 (`OutGame/Currency/`, `UI/HUD/`, `UI/Common/`) — ✅ 코드 완료 (2026-08-06, Play 검증 대기)
+
+**한 줄**: 재화 종류(`ECurrencyType`)가 지급원부터 HUD 숫자 롤업까지 끊기지 않고 흐른다. 이전에는 획득량이 `long` 하나로만 흘러 연출이 골드 전용으로 굳어 있었다.
+
+#### 고친 실제 결함
+
+`LobbyCanvas.prefab`의 `StatusBar_Group_Dark` 루트에는 **HUD가 2장**(`type:0` Gold, `type:1` Diamond) 붙어 있는데, 연출기와 랭크 팝업이 `FindFirstObjectByType<GoldHud>()`로 **아무거나 하나**를 집었다. 어느 쪽이 잡힐지는 컴포넌트 등록 순서에 달렸고, `RankRewardClaimPopup.goldHud`는 미배선(fileID 0)이라 **항상** 그 폴백을 탔다 → 골드 연출이 다이아 텍스트 위에서 노는 경로가 이미 열려 있었다.
+
+#### 세 축
+
+| 축 | 무엇을 | 어떻게 |
+|---|---|---|
+| **값** | 획득량 `long` → **쌍** | `readonly struct CurrencyGain(Type, Amount)`. 여러 재화가 섞이는 2곳(로비 합산·`HarvestAll`)만 `CurrencyGainBucket`(종류당 1칸 고정 배열, 가변 싱크라 class) |
+| **HUD 조회** | 타입 탐색 → **종류 조회** | `CurrencyHud`의 `static Dictionary<ECurrencyType, CurrencyHud>` + `TryGet`. `OnEnable` 등록 / `OnDisable`은 **본인일 때만** Remove(씬 전환 시 새 HUD의 OnEnable이 먼저 돌 수 있다) / `TryGet`이 파괴된 잔재 정리 |
+| **연출 상태** | 싱글턴 1벌 → **재화별 슬롯** | `CurrencyGainEffectPlayer`가 `m_bursts`·`m_current`·`m_coinSprites`를 `ECurrencyType.Count` 크기 배열로. 재화별 `CoinBurstEffect`는 **자식 `Burst_{type}` 노드**로 분리 |
+
+#### 단일 진실원
+
+- **팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘기고 종류는 팩이 정한다 → `PackShowcaseController`·`TutorialStepDef`·`OutgameTutorialRunner` 시그니처 무변경(따라서 `TutorialStepDefDrawer`의 `"duplicateRefundGold"` 문자열 참조도 그대로 산다).
+- **전투 보상 재화** = `BattleReward.rewardType`. **랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용). **생산 행 재화** = 기존 `CatalogRow.RewardType`.
+- 세 SO 필드 모두 기본값 `Gold` → **기존 에셋 재저작 불필요**.
+
+#### 흐름
+
+```
+지급원                        캐리어                       연출
+RewardService.GrantBattleReward → BattleRewardHandoff ─┐
+CardPackOpener(→OpenedPack.TotalRefund) → CardPackRewardHandoff ─┤→ CurrencyGainBucket
+                                                       └→ LobbyGainEffectDirector
+                                                            → CurrencyGainEffectPlayer.BuildGain(bucket)
+                                                                → 종류별 CurrencyHud.BeginGainRollUp
+
+CollectionProductionManager.Harvest(→CurrencyGain) / HarvestAll(→Bucket) → CurrencyGainEffectPlayer.Play
+RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
+```
+
+캐리어 소비는 **드레인 방식** — `TryConsume(CurrencyGainBucket _into)`가 호출자 버킷에 합친다(`out`으로 새 버킷을 내보내면 로비가 둘을 다시 합칠 API가 하나 더 필요해진다).
+
+#### 개명 (`.cs` + `.cs.meta` 동반 `git mv` → guid 유지, 배선 무손실 실증)
+
+| 전 | 후 | 비고 |
+|---|---|---|
+| `UI/HUD/GoldHud.cs` | `CurrencyHud.cs` | 프리팹 3곳 배선 유지, Missing Script 0 |
+| 위 클래스 `goldText` | `valueText` | **`[FormerlySerializedAs("goldText")]` 필수** |
+| `UI/Common/GoldGainEffectPlayer.cs` | `CurrencyGainEffectPlayer.cs` | 씬 인스턴스 0장(전량 런타임 자가설치)이라 개명 리스크 0 |
+| `RankTier.RewardGold` · `RankRewardInfo.RewardGold` | `Reward`(`CurrencyGain`) | 직렬화 아님 |
+
+**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`rewardGold`·`duplicateRefundGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. 개명하면 저작 자산 위험만 늘고 얻는 게 없다.
+
+#### 알려진 잔여 이슈 (스코프 밖)
+
+- **표시 아이콘·코인 스프라이트는 여전히 프리팹에 골드로 굳어 있다** — `GameResultPopup`의 코인, `RankRewardClaimPopup.claimBurst`(스프라이트 + **코인이 날아갈 목적지**), `PackRevealView`의 환급 칩. 숫자·잔액은 종류를 따라가지만 **다이아 랭크 티어를 저작하는 순간 코인은 골드 텍스트로 날아가고 숫자는 다이아에서 오른다**. 재화 아이콘을 `ECurrencyType`으로 조회하는 창구가 다음 수순이다(HUD 이웃 아이콘 차용 `FindIconSpriteNear`는 HUD 경로에서만 동작한다).
+- **같은 재화를 두 소스가 동시에 올릴 때의 Hold 경합**은 기존 동작 유지(마지막 Hold가 이김). `Play`(m_current 추적)와 `BuildGain`(호출자 시퀀스에 위임, 미추적)이 같은 종류에서 겹치면 앞 코인이 `ClearCoins`로 걷힌다 — 리팩터링 이전과 동일하며 회귀 아님.
+- **같은 종류 HUD 2장 공존 시** 나중에 켜진 쪽이 꺼지면 레지스트리가 비고 살아 있는 쪽이 재등록되지 않는다. 현재 배치(종류당 1장)에선 미발현.
+- 비활성 HUD는 등록되지 않으므로 **그 재화 연출이 스킵**된다(이전엔 비활성 HUD를 찾아 숫자만 올렸다). 지급·저장과 무관해 무해.

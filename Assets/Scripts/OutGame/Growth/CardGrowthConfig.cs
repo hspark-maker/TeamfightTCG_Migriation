@@ -6,8 +6,8 @@ using UnityEngine;
 public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
-    [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
+    [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다(11 = 10강화 = 표의 hp10까지).")]
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 11;
     [Min(0)] [SerializeField] int hpPerLevel = 2;
 
     [Tooltip("첫 강화(Lv2로 올릴 때)의 골드 비용.")]
@@ -68,18 +68,45 @@ public class CardGrowthConfig : ScriptableObject
         return true;
     }
 
+    /// <summary>레벨 _level에서의 최대 체력(절대값). 카드 표(CardData.maxHpByLevel)가 값을 적어둔 레벨은 그 값이 곧
+    /// 총 체력이고, 비워둔 레벨만 직전 총 체력에 전역 증가분을 더해 잇는다 — 표의 빈칸이 레벨 하나만 건너뛰게 하려면
+    /// 증가분이 아니라 이렇게 레벨을 아래에서부터 훑어야 한다.</summary>
+    public int MaxHpAt(CardData _card, int _level)
+    {
+        if (_card == null) return 0;
+
+        int t_top = Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
+        int t_hp  = _card.maxHp;                             // Lv1 기준 체력은 표의 maxHp 열이 소유한다
+        for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
+        {
+            t_hp = _card.TryGetMaxHp(t_i, out int t_authored) ? t_authored : t_hp + BaseHpGainAt(t_i);
+        }
+        return t_hp;
+    }
+
     // 레벨 _level까지의 누적 HP 보너스
     public int HpBonusAt(CardData _card, int _level)
     {
         if (_level <= CardGrowth.BaseLevel) return 0;
 
         int t_top = _level > MaxLevel ? MaxLevel : _level;
-        int t_sum = 0;
-        for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
+
+        // 카드를 못 찾은 경로(카탈로그 미준비)는 절대값 표를 읽을 수 없다 — 전역 증가분만 누적한다.
+        if (_card == null)
         {
-            t_sum += StepAt(_card, t_i).HpGain;
+            int t_sum = 0;
+            for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++) t_sum += BaseHpGainAt(t_i);
+            return t_sum;
         }
-        return t_sum;
+
+        return MaxHpAt(_card, t_top) - _card.maxHp;
+    }
+
+    // 표가 비어 있을 때 쓰는 레벨당 증가분. levelSteps에 행이 있으면 그 값이 전역 기본선이 된다.
+    int BaseHpGainAt(int _level)
+    {
+        int t_hp = TryGetLevelStep(_level, out var t_row) ? t_row.hpGain : hpPerLevel;
+        return t_hp < 0 ? 0 : t_hp;
     }
 
     GrowthStep StepAt(CardData _card, int _level)
@@ -87,19 +114,17 @@ public class CardGrowthConfig : ScriptableObject
         // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseGoldCost·baseSuccessRate가 첫 강화의 값이 된다.
         int t_step = _level - CardGrowth.BaseLevel - 1;
 
-        int   t_hp   = hpPerLevel;
         long  t_cost = baseGoldCost + costGrowthPerLevel * t_step;
         float t_rate = baseSuccessRate - rateDropPerLevel * t_step;
 
         if (TryGetLevelStep(_level, out var t_row))
         {
-            t_hp = t_row.hpGain;                             // 행이 있으면 체력은 항상 그 값(레벨별 상세 저작이 목적)
-            if (t_row.cost        > 0)    t_cost = t_row.cost;   // 0 이하 = 미지정 → 기본식
+            if (t_row.cost        > 0)    t_cost = t_row.cost;          // 0 이하 = 미지정 → 기본식
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;   // 음수 = 미지정 → 기본식
         }
 
-        if (_card != null && _card.TryGetHpGain(_level, out int t_cardHp))
-            t_hp = t_cardHp;
+        // 체력은 절대값 곡선의 차분이다. 여기서 따로 정하면 표와 두 갈래가 된다.
+        int t_hp = HpBonusAt(_card, _level) - HpBonusAt(_card, _level - 1);
 
         if (t_cost < 0) t_cost = 0;
         if (t_hp < 0)   t_hp   = 0;
@@ -123,16 +148,16 @@ public class CardGrowthConfig : ScriptableObject
     }
 }
 
-/// <summary>레벨 하나의 저작 값. 목록에 행이 있으면 그 레벨의 <see cref="hpGain"/>은 무조건 이 값이다 —
-/// "레벨당 오르는 체력"을 한 칸씩 손으로 정하는 게 이 목록의 존재 이유라 별도 override 체크를 두지 않는다.
-/// 비용·성공률만 미지정을 허용한다(각각 0 이하 / 음수 = 기본식 사용).</summary>
+/// <summary>레벨 하나의 저작 값. <see cref="hpGain"/>은 **카드 표가 그 레벨을 비워뒀을 때의 기본선**이다 —
+/// 카드별 체력은 표의 hp0~hp10(총 체력)이 소유하고 여기서는 못 이긴다.
+/// 비용·성공률은 미지정을 허용한다(각각 0 이하 / 음수 = 기본식 사용).</summary>
 [System.Serializable]
 public struct GrowthLevelStep
 {
     [Tooltip("대상 레벨(2 = 첫 강화). 바닥 레벨(1) 이하는 어떤 스텝에도 적용되지 않는다.")]
     public int level;
 
-    [Min(0)] [Tooltip("이 레벨업으로 얻는 최대 체력 가산분.")]
+    [Min(0)] [Tooltip("카드 표에 그 레벨의 체력이 없을 때 얻는 최대 체력 가산분.")]
     public int hpGain;
 
     [Tooltip("이 레벨업의 골드 비용. 0 이하면 기본식을 쓴다.")]

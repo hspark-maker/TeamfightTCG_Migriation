@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 도감 테마 데이터
-[CreateAssetMenu(fileName = "CollectionThemeConfig", menuName = "Card Battle/Collection Theme Config")]
+// 신규 카드 앨범(CardAlbumConfig)과 "카드→테마" 매핑 이중 진실원 방지 — 구 테마 SO 신규 생성 봉인
+// [CreateAssetMenu(fileName = "CollectionThemeConfig", menuName = "Card Battle/Collection Theme Config")]
 public class CollectionThemeConfig : ScriptableObject
 {
     [Header("도감 테마 목록 (순서 = 표시 순서). 테마마다 카드 수는 자유.")]

@@ -38,6 +38,8 @@
 | **성장 API** | `CardGrowthManager` (Init/Save/IsReady/SetConfig/MaxLevel/GrowthOf/HpBonusOf/TryGetNextStep/TryGetPendingGate/TryEnhance/TryEvolve/OnGrowthChanged) | 🧊 신규 동결(PKG-GROWTH-CORE, 2026-08-04) | 성장 슬롯(`CardGrowthSaveData`) 매핑을 아는 **유일 창구**. 불변식: 카드 키 = `CardCatalog.KeyOf`(SO 파일명, 인덱스 금지) · `HpBonus`는 **저장 안 함**(레벨에서 `CardGrowthConfig.HpBonusAt` 파생) · `evolutionStage`는 레벨 파생 금지(**"도달했지만 미진화"가 유효 상태**) · **결제 전 `IsReady` 검사**(미초기화 시 `Save()`가 no-op이라 재화만 소실) · 강화 실패도 `OnGrowthChanged` 발화(잔액이 변했다) · 랜덤은 서비스 내부 `System.Random`(`MatchRandom` 금지). 반환: `TryEnhance → EnhanceResult`(`EEnhanceOutcome` 6종) · `TryEvolve → bool`. `DebugResetAll`은 **소비처 0 = 예약** |
 | **성장 표시 환산** | `DeckPower.MaxHpOf(CardData, bool _applyGrowth = true)` | 🧊 신규 동결(2026-08-04) | 아웃게임에서 카드 체력을 그리는 **모든 화면의 단일 진실원**. 화면이 `maxHp + HpBonusOf`를 직접 더하면 강화 반영 화면과 미반영 화면이 갈린다. 기본 `true`(호출부 전수가 내 카드) · **현재 유일한 `false` opt-out = `MatchDeckPanelView`의 상대 덱 슬롯·상대 파워** |
 | **전투 성장 주입** | `GameInitializer.GrowthProvider` (set-only) | 🧊 신규 동결(2026-08-04) | Battle이 OutGame을 참조하지 않게 **값 생산자를 부트가 밀어넣는** 경계. 꽂는 곳은 `BootInstaller` 한 곳(`CardGrowthManager.Init` **뒤**). 읽는 쪽은 `GameInitializer` 내부뿐(**getter 금지** — 밖으로 새면 조회 창구가 둘로 갈린다). 적용 범위 불변식: **싱글 전투의 플레이어 필드만**(멀티 = 와이어에 스탯 없는 lockstep이라 divergence · AI 적 = 마스터 스탯이 밸런스 기준선 · 튜토리얼 = 저작 킬 수·확정승 전제 파손) |
+| **앨범 구조 창구** | `CardAlbum` (SetSource/Invalidate/Themes/ThemeCount/AlbumReward/TryGetTheme/TryGetPage/OwnedCountOf/**TotalCountOf**/IsComplete/CompletedThemeCount/IsAlbumComplete/ValidateAlbum) | 🧊 **신규 동결(PKG-ALBUM-DATA, 2026-08-06)** | 신규 도감(카드 앨범)의 **테마 → 페이지 → 칸** 구조를 아는 유일 창구. 불변식: 카드 키 = `CardCatalog.KeyOf`(SO 파일명) · **진행도를 저장하지 않는다**(소유 집합의 순수 파생) · **null 슬롯은 완성 판정 모수에서 제외** — 분모는 `TotalCountOf` **한 곳**(UI·매니저가 `Cards.Count` 재산출 금지) · lazy 빌드라 `Init` 없음. 저작 SO 미배선 시 **빈 앨범 + 경고**(자동 청크 fallback 금지 — `CollectionThemes.BuildEmpty` 선례). 진단 전용 `ValidateAlbum`은 `CardCatalog.IsReady/All/Contains`도 읽음(허용) |
+| **앨범 보상 창구** | `AlbumRewardManager` (GetPage/Theme/AlbumInfo · CanClaim* · Claim* · HasAnyClaimable · ClaimableCountOf · ResetForDebug · OnChanged) | 🧊 **신규 동결(PKG-ALBUM-DATA, 2026-08-06)** | 페이지/테마/전체 **3단 보상 수령**의 유일 창구. 불변식: **캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 선례) → **부트 순서 무접촉** · 낙인 키는 `AlbumTheme`/`AlbumPage`의 `RewardKey`가 **유일 생성처**(UI·매니저가 문자열 조립 금지) · `StateOf`는 **`Claimed` 최우선 검사**(안 하면 완성 취소→재완성 구간에서 재수령이 뚫린다) · `Claim` 순서 = `CanClaim 재검증 → 저작 조회 → Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged` |
 
 ---
 
@@ -249,6 +251,47 @@
 
 ---
 
+## 신규 도감 = 카드 앨범 (2026-08-06 편입) — ✅ **설계 승인(2026-08-06, 플랜 모드 게이트)**
+
+> 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체할** 새 축. 테마 → 페이지(3×3 = 9칸) → 칸 **3계층**, **보상 3단**(페이지 완성 / 테마 완성 / 전체 테마 완성).
+> 설계 승인 완료 — DATA부터 착수. `Tab_Collection.prefab`·`Boot.prefab` 선점 여부는 아래 격리 판정 표 참조.
+> 설계·구조도·함정의 진실원은 [`STRUCTURE.md`의 "신규 도감 = 카드 앨범" 절](./STRUCTURE.md). 도메인 문자는 **아직 미부여**(로드맵 편입은 별도).
+
+**저작 스케일(사용자 확정)**: 카드 **계획 90장**(현재 31장) = **테마 2개 × 5페이지 × 9칸**. 세 값 전부 SO 저작값이라 코드 변경 없이 늘어난다(향후 페이지 추가가 요구사항).
+
+**네이밍**: `Album` 접두어로 폴더째 물리 분리(`OutGame/Album/` · `UI/Album/`). `Collection`은 구 도감이 점유했고, `Chapter`는 튜토리얼이 점유(`outgameChapterIndex`)해서 둘 다 피했다. 구/신이 같은 폴더에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
+
+| ID | 등급 | 패키지 | 산출(무엇을 동결하나) | 만지는 파일 | 선행 | 담당 | 상태 |
+|---|---|---|---|---|---|---|---|
+| **PKG-ALBUM-DATA** | 🔴 | 앨범 데이터 축 + 두 창구 | **`CardAlbum` 창구 동결** + **`AlbumRewardManager` 창구 동결** + `CardAlbumConfig` 스키마(`AlbumThemeDef`/`AlbumPageDef`/`AlbumRewardDef`) + 값 타입(`AlbumTheme`/`AlbumPage`/`AlbumRewardInfo`/`EAlbumRewardTier`/`EAlbumRewardState`) + 세이브 슬롯 `UserSaveData.albumReward`(`AlbumRewardSaveData { VERSION, version, List<string> claimedKeys }`, **VERSION 1 유지**) | 신규 `OutGame/Album/`(6) + `OutGame/Save/2.Domain/AlbumRewardSaveData.cs` / 수정 `Save/2.Domain/UserSaveData.cs`(1줄) · `Core/BootInstaller.cs`(2줄) · `OutGame/Collection/CollectionThemeConfig.cs`(`CreateAssetMenu` 봉인 1줄) + `Boot.prefab` 배선 | — | outgame-engineer | ✅ 완료(2026-08-06, 검수 통과·컴파일 0에러). `Boot.prefab` 배선은 ASSET 때 사용자 인계 |
+| **PKG-ALBUM-UI** | 🟠 | 테마 목록 화면 + 페이지 오버레이 | 없음(순수 소비) | 신규 `UI/Album/`(**6**: `AlbumTabController`/`AlbumThemeCellView`/`AlbumPageOverlayView`/`AlbumCardSlotView` + Serializable `AlbumGaugeView`/`AlbumChestView`) + `Tab_Collection_New.prefab` 부착·배선(**MCP 수술** — onClick 11건 제거·상자 Button 3곳·Fill 3곳 Filled) + `LobbyCanvas.prefab` `tabs[4].content` 재배선(구 탭 인스턴스 비활성 병존) | DATA 인터페이스 | outgame-engineer + 메인(MCP 배선) | ✅ **코드+배선 완료(2026-08-06, 검수 통과·컴파일 0에러)** — Play 검증·ASSET 대기 |
+| **PKG-ALBUM-ASSET** | — | 앨범 저작 | `Assets/SO/Album/CardAlbumConfig.asset` 생성 + `BootInstaller.albumConfig` 배선 + 테마 2개 × 5페이지 카드 배치 | `.asset`(**에디터**) | DATA | **사용자(에디터)** | 🟩 준비(DATA 동결됨) |
+| *(후속)* **PKG-ALBUM-CLEANUP** | 🟢 | 구 도감 삭제 | 없음 | 구 `OutGame/Collection/` 테마·행 축 + `UI/Collection/` 6파일 + `CollectionScreen.prefab` + `CollectionTest.unity` + **구 `Tab_Collection.prefab`(LobbyCanvas 내 비활성 인스턴스 포함, 2026-08-06 스코프 추가)** | UI 완료 | — | ⬜ **이번 스코프 밖** |
+
+**실측: 신규 파일 13(DATA 7 + UI 6) · 기존 코드 수정 3파일 4줄.** 기존 도감 코드는 **한 줄도 수정하지 않았다** — 구 `Tab_Collection.prefab`도 무수정(탭 재배선으로 도달 불가화, `CollectionGridController`의 BindTile 가로채기 차단 목적 동일 달성).
+
+**격리 판정 — 착수 전 반드시 확인**
+
+| 대상 | 경합 | 판정 |
+|---|---|---|
+| `Tab_Collection.prefab` | 없음(현재 이 프리팹을 잡은 패키지 0건) | ✅ `PKG-ALBUM-UI` **단독 점유**. ⚠️ 이 프리팹은 `LobbyCanvas` 안 **중첩 인스턴스**다 → **프리팹 모드에서만 편집**, 인스턴스 오버라이드 금지(오버라이드를 걸면 `LobbyCanvas.prefab`이 변해 아래 클리크로 승격된다) |
+| `LobbyCanvas.prefab` | `PKG-ENTRY`(⬜) · `PKG-HUD`(⬜) | ✅ **회피 완료.** 페이지 오버레이를 `CardDetailOverlay`처럼 `LobbyCanvas` 직속에 두면 3항목 클리크(`.prefab` YAML은 머지 불가)가 되므로, **`Tab_Collection` 안 패널**로 확정했다 |
+| `Core/BootInstaller.cs` + `Boot.prefab` | 부트를 만지는 모든 패키지 | ⚠️ **접촉.** C#은 2줄(기존 호출 순서 무변경)이지만 `Boot.prefab`은 **YAML 머지 불가** → 🔴 근거의 절반. 현재 다른 대기 패키지 중 `Boot.prefab`을 잡은 건 없다 |
+| `Save/2.Domain/UserSaveData.cs` | 없음 | ✅ 단독(슬롯 1줄 추가, VERSION 1 유지) |
+| `LobbyScene.unity` | — | ✅ **무접촉.** 프리팹 참조는 **프리팹 레벨에 저작**한다 — 씬 오버라이드로 하면 씬이 4번째 경합 파일이 되고, 나중에 누가 Apply All 하면 조용히 어긋난다 |
+
+**착수 순서**: `DATA`(🔴 단독) → `UI`(🟠) ∥ `ASSET`(사용자). DATA의 **창구 시그니처만 먼저 커밋**하면 그 시점부터 UI 병렬 가능(구현은 뒤따라도 된다).
+
+> **⚠️ 조사 중 드러난 별건 2개 (이 패키지 밖, 그러나 착수 전 알아야 함)**
+> ① **`Boot.prefab:51-55`에 직렬화된 필드는 `cardRegistry`/`collectionLayout`/`tutorialData`/`deckImageCatalog`/`starterDeck` 5개뿐이다** — `BootInstaller`의 `collectionThemes`·`triggeredTutorialData`·`growthConfig`는 프리팹에 **없다(= null)**. 매 부팅마다 `CollectionThemes`의 "테마 SO 미배선" 경고가 뜨고 있고, `growthConfig`는 `StartScene.unity:423-435`가 **씬 오버라이드**로만 꽂아 **`LobbyScene` 단독 Play에서는 null**이다(기존 버그). → `CardAlbumConfig` 배선은 **반드시 `Boot.prefab` 레벨**에 한다.
+> ② **`CollectionGridController`는 가동을 즉시 멈춰야 한다.** `OnEnable`이 `OwnershipManager`/`CardGrowthManager` 이벤트를 구독하고 `CardDetailOverlayView.BindTile`로 **오버레이의 좌우 넘김 목록을 가로챈다**(마지막에 Bind한 쪽이 이긴다). 구 패널이 살아 있으면 탭을 오간 뒤 앨범에서 좌우로 넘길 때 **남의 목록을 탄다**. 코드 삭제는 후속이어도 `Panel_Grid` **`SetActive(false)`는 `PKG-ALBUM-UI`에 포함**한다.
+>
+> **병존 부채(승인 시 감수하는 것)**: 카드 배치가 **두 SO에 저작된다** — 신규 `CardAlbumConfig`(앨범)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖.
+>
+> **이중 진실원 방어 1건은 `PKG-ALBUM-DATA`에 포함한다**: 구 `CollectionThemeConfig`의 `[CreateAssetMenu]` **봉인**. 지금은 그 에셋이 0건이라 실해가 없지만, 누군가 메뉴로 만들어 Boot에 꽂는 순간 "카드 → 테마" 매핑이 2벌이 된다. 이게 유일한 실질 방어선이다.
+
+---
+
 ## 실전 예시 — 어떻게 켜나
 
 - **혼자 순차**: PKG-BOOT 하나만 진행 → 끝나면 다음.
@@ -294,6 +337,9 @@
 
 | 날짜 | 변경 | 영향 패키지 | 재작업? |
 |---|---|---|---|
+| 2026-08-06 | **앨범 완성 보상 복수화(계약 변경).** `AlbumThemeDef.reward`/`AlbumPageDef.reward`/`albumReward`(단수 struct) → **`rewards`/`albumRewards` 리스트**. 런타임 `AlbumTheme.Reward`/`AlbumPage.Reward`/`CardAlbum.AlbumReward` → `Rewards`/`AlbumRewards`(IReadOnlyList), `AlbumRewardInfo`는 `Currency/Amount/Icon` → `Rewards[]`. 빈 리스트 = 상자 숨김 + Claimable 불성립(낙인 존재 시 Claimed 우선 불변). 수령은 리스트 순회 Earn 후 Save 1회. 소비자가 앨범 8파일 내부뿐이라 파급 국소, **세이브(`claimedKeys`) 무영향**. `CardAlbumConfig.asset`은 YAML 수동 마이그레이션으로 저작값 보존(다이아 5000·골드 1000×2·앨범 골드 100000), `Tab_Collection_New.prefab`에 `rewardSlots` 3칸(MCP) 배선 — 목업 RewardSlot_00..02가 비로소 전부 가동 | PKG-ALBUM-UI(내부 갱신)·PKG-ALBUM-ASSET(이후 저작은 리스트 형태로) | 코드+에셋+문서 |
+| 2026-08-06 | **PKG-ALBUM-UI 산출 방식 변경 + 완료.** 원안(`Tab_Collection.prefab` 재구성·노드 비활성화) 대신 **사용자 목업 `Tab_Collection_New.prefab` 병존 + `LobbyCanvas.prefab` `tabs[4].content` 재배선**으로 확정 — 구 탭 프리팹 무수정, `CollectionGridController`는 도달 불가로 가동 중단(BindTile 가로채기 차단 동일 달성). UI 파일 8→**6**(그리드·스테퍼를 오버레이에 흡수, 게이지·상자는 Serializable 소품). 슬롯 배지 확정: 별=진화 단계(`Max(default, growth)` — `CardInstance`와 동일 규칙), 역할=첫 키워드 아이콘, 수령=상자 탭 즉시(팝업 없음). 프리팹 부착·배선은 **사용자 명시 지시로 MCP(RunCommand) 수술** 수행(onClick 11건 제거·Button 3곳·Fill 3곳·컴포넌트 4건+배선) | **PKG-ALBUM-CLEANUP 스코프 확대**: 구 `Tab_Collection.prefab` 삭제(LobbyCanvas 내 비활성 인스턴스 포함) 추가 | 문서만 |
+| 2026-08-06 | **신규 도감(카드 앨범) 편입 — ⬜ 설계 승인 대기(착수 금지).** 계약 변경 1건 + 신규 계약 2건 예정. ① **세이브 스키마 추가**: `UserSaveData.albumReward`(`AlbumRewardSaveData { List<string> claimedKeys }`) 슬롯 1개 — **VERSION 1 유지**(`tutorial`·`rank`·`cardGrowth` 선례, 구 세이브는 노드 없이 빈 리스트로 읽힘). ② **부트 순서 추가(재동결)**: `BootInstaller`에 `CardAlbum.SetSource(albumConfig)` 1줄(기존 `CollectionThemes.SetSource` 바로 뒤, **호출 순서 무변경**) + `Boot.prefab` 배선. ③ **신규 계약 2종 동결 예정**: `CardAlbum`(구조 창구) · `AlbumRewardManager`(3단 보상 수령 창구). 후자는 **캐시·`Init` 없이 슬롯 직독**이라 부트에 줄이 0개 늘어난다(`RankRewardManager` 선례). ④ **구 `CollectionThemeConfig`의 `CreateAssetMenu` 봉인** — 이중 진실원("카드 → 테마" 매핑 2벌)의 유일한 실질 방어선. ⑤ **기존 도감 삭제는 스코프 밖** — 병존시키고 `PKG-ALBUM-CLEANUP`(후속)으로 넘긴다. ⑥ **로드맵 도메인 문자는 미부여** — 이 편입은 보드에만 반영했고 `OUTGAME_ROADMAP.md`는 미갱신 | 없음(전부 순수 추가). 기존 도감 코드는 **수정 0줄**(프리팹 노드 비활성화만). `PKG-ENTRY`/`PKG-HUD`와의 `LobbyCanvas.prefab` 클리크는 오버레이를 `Tab_Collection` 안에 두는 것으로 **사전 회피** | 문서만(코드 미착수) |
 | 2026-08-04 | **카드 성장(강화 + 진화) 편입 — 계약 변경 2건 + 신규 계약 3건. 확정 스코프 "단일 골드" 폐기.** ① **재화 종류 추가(계약 변경)**: `ECurrencyType.Diamond` — 진화 비용 전용. `OUTGAME_ROADMAP.md` "확정 스코프"의 **단일 골드**가 이 시점부터 **골드 + 다이아 2종**으로 바뀐다(골드=흐름/플레이 행위 비례, 다이아=저량/시간 비례 — 근거는 `ENHANCE_ECONOMY.md`). 절차상 🔴이지만 **재화 API 시그니처는 불변**이라 재작업이 없다: 소비처가 전부 종류를 인자로 받는 API(`Earn`/`Spend`/`CanAfford`/`GetBalance`)만 쓰고, `Gold=0`을 지킨 채 `Count` 앞에 삽입해 배열 인덱스 매핑이 안 밀렸으며, `CurrencySaveData.diamond`는 **필드 추가**라 구 세이브가 0으로 읽힌다. ② **세이브 스키마 추가**: `UserSaveData.cardGrowth`(`CardGrowthSaveData`) 슬롯 1개 — **VERSION 1 유지**(`tutorial`·`rank` 선례). ③ **부트 순서 추가(재동결)**: `BootInstaller`에 `CardGrowthManager.SetConfig` → `Init` → `GameInitializer.GrowthProvider` 3줄(기존 호출 순서는 무변경). ④ **신규 계약 3종 동결**: `CardGrowthManager`(성장 창구) · `DeckPower.MaxHpOf`(아웃게임 표시 환산 단일 진실원) · `GameInitializer.GrowthProvider`(전투 주입, set-only). ⑤ **범위 제한 명문화**: 성장은 **싱글 전투 플레이어 필드에만** 적용(멀티 lockstep divergence · AI 밸런스 기준선 · 튜토리얼 저작 전제 보호) | 없음(전부 순수 추가 또는 무재작업 확장). 재화 소비처(`CardPackOpener`·`RewardService`·`CollectionProductionManager`·`GoldHud`)는 **회귀 확인만** — 타입 인자를 이미 받고 있어 코드 무수정 | 코드+문서 |
 | 2026-07-27 | **도메인 H(랭크 — 표시용 티어 진행도) 편입 — 계약 변경 1건 + 신규 계약 1건.** ① **세이브 스키마 추가**: `UserSaveData.rank`(`RankSaveData { long points }`) 슬롯 1개 — 필드 추가라 **VERSION 1 유지**(구 세이브는 노드 없이 `points=0`으로 읽힘, 하위호환·재작업 없음). `tutorial` 슬롯과 동일한 선례. ② **신규 계약 `RankManager` 동결 예정**(구현 시). 스코프를 **표시용**(보상·난이도·매칭 무영향)으로 좁혀 재화·소유·생산·팩 계약을 하나도 안 건드린다. 또 **캐시를 두지 않고 세이브 슬롯을 직접 읽어** `Init`이 없으므로 **`GameManager.Boot()` 무수정** = 통합 부트 순서 **무접촉**(재동결 불필요) → 게이트 하나(SAVE)만 🔴이고 나머지는 전부 🟢/🟠. ③ 보드 명칭 충돌 해소: 기존 Wave 2+ `PKG-RANK` → **`PKG-RANK-SERVER`** 개명(PvP 실력 랭크는 여전히 범위 밖) | 없음(순수 추가). `PKG-TUT-REWARD`는 `TurnRunner.CaptureResult` 파일 경합만 — 보류 상태라 실질 영향 없음 | 문서 + 코드(SAVE만 선행 적용) |
 | 2026-07-26 | 워크플로우를 Phase 순차 → 동시성 등급(🔴/🟠/🟢) 분류로 전환. 사람이 다중 세션으로 병렬 실행하는 모델. 보드 신설 | (전체 운영 방식) | 문서만 |

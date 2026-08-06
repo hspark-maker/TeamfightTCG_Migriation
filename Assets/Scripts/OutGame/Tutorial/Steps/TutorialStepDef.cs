@@ -95,6 +95,7 @@ public class TutorialStepDef
     }
 
     // 이 스텝이 덱 자동 편성으로 채울 카드를 지정하면 true(풀 전체를 넘긴다 — 덱 크기는 편성 쪽이 정의)
+    // 기본 pool 직독: 튜토리얼 팩은 rankPools 미저작 전제(저작 시 실제 드로우 ResolvePool과 어긋남)
     public bool TryGetForcedDeck(out IReadOnlyList<CardData> _cards)
     {
         _cards = action == EOutgameTutorialAction.DeckAutoEquip && pack != null && pack.PoolCount > 0
