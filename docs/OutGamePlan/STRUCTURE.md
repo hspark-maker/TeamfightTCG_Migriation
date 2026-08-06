@@ -143,7 +143,7 @@ flowchart TD
         SHOP["상점 UI"]
     end
     subgraph def["E-14 정의 (SO, 에디터 데이터)"]
-        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)"]:::new
+        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
     end
     subgraph svc["E-15 구매·드로우"]
         SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack, refund) · 로컬 랜덤"]:::new
@@ -153,11 +153,13 @@ flowchart TD
     CUR["CurrencyManager<br/>Spend · Earn · Save (기존)"]
     OWN["OwnershipManager<br/>Grant (기존)"]
     KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
+    RANK["RankManager.GetInfo().Grade (기존)"]
 
     SHOP -->|"TryPurchase(pack, refund)"| SVC
     SHOP -.->|"대상 팩 SO 참조"| DEF
+    SVC -->|"현재 등급 조회"| RANK
     SVC -->|"Spend(Gold, price)"| CUR
-    SVC -->|"DEF.pool 지정셋 균등 드로우"| DEF
+    SVC -->|"ResolvePool(등급) 가중 드로우"| DEF
     SVC -->|"KeyOf(card)"| KEY
     SVC -->|"Grant(key) 루프 → isNew"| OWN
     SVC -->|"중복이면 Earn(Gold, refund)"| CUR
@@ -184,7 +186,7 @@ sequenceDiagram
         SVC-->>SHOP: 실패(구매 불가, 차감 없음)
     else 충분
         SVC->>CUR: Spend(Gold, price)
-        loop drawCount 회 (DEF.pool에서 균등 드로우)
+        loop drawCount 회 (ResolvePool(현재 등급)에서 가중 드로우)
             SVC->>OWN: Grant(KeyOf(card)) → isNew
             alt 중복(isNew=false)
                 SVC->>CUR: Earn(Gold, duplicateRefundGold)
@@ -200,14 +202,16 @@ sequenceDiagram
 - **오케스트레이터라 세이브 섹션 없음**: E는 `Spend`·`Earn`(재화)·`Grant`(소유)만 호출하고 모두 이미 영속. E 자체 세이브를 만들면 이중 진실원. 트레이드오프: 구매 이력·pity 카운터가 필요해지면 그때 세이브 섹션 추가.
 - **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
 - **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
+- **랭크별 풀 오버라이드 (2026-08-06)**: `rankPools`(`RankPackPool` = minGrade + `WeightedCard` 목록)가 있으면 `ResolvePool(현재 등급)`이 "minGrade ≤ 현재 등급 중 최고 등급" 항목을 적용(등급별 통풀 재저작, 하위 등급과 합산 없음). 매치 없거나 비면 기존 `pool`을 weight 1 취급으로 폴백 → `rankPools` 빈 팩(튜토리얼 3종)은 기존 동작 그대로. weight 0 이하 = 1(균등) 취급, 카드 제외는 리스트 삭제로. 풀 해석은 데이터(`CardPackData`)가 소유 — 상점 미리보기가 생기면 같은 메서드를 쓴다(현재 미리보기 소비자 없음).
 - **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(팩 결제 재화, refundAmount)`. 환급 **액수**는 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘기고(상점 SO 전역값 폐기), 환급 **재화 종류**는 `CardPackData.priceType` 하나가 정한다(→ 재화 분리 섹션). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
 - **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
 - **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, 대상 팩 SO·환급액은 각 구매처 뷰가 인스펙터로 소유해 `TryPurchase(pack, refund)`에 직접 넘긴다(진열=뷰 책임).
-- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드 / 등급 가중치가 필요해지면 `DEF.pool`을 가중 목록으로 확장.
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드. ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
 
 | 클래스 | 파일 | 태스크 |
 |---|---|---|
-| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)` | E-14 |
+| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
+| `WeightedCard` · `RankPackPool` (값, co-locate) | `OutGame/CardPack/CardPackData.cs` — `card·weight(0 이하=1)` / `minGrade·cards` | E-14 |
 | `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData, long refund)` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
 
@@ -893,7 +897,7 @@ sequenceDiagram
 
 ---
 
-### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **설계 승인 · 데이터 축 구현 완료 (2026-08-06, PKG-ALBUM-DATA)**
+### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **데이터 축 + UI 축 구현·배선 완료 (2026-08-06, PKG-ALBUM-DATA/UI) — Play 검증·앨범 저작(ASSET) 대기**
 
 > **네이밍 은유 = 스티커 앨범.** 도감(圖鑑)은 **앨범**이고, 앨범에는 **페이지**가 있고, 페이지에는 카드를 꽂는 **칸(슬롯)** 이 있다. 이 은유가 요구된 3계층에 1:1로 맞아떨어져서, 클래스 이름만 읽어도 그게 무엇인지 알 수 있다.
 > **"챕터"는 의도적으로 피했다** — 튜토리얼이 이미 `TutorialSaveData.outgameChapterIndex`로 챕터를 쓰고 있어 같은 단어가 두 도메인을 가리키게 된다.
@@ -927,9 +931,9 @@ sequenceDiagram
 flowchart TD
     subgraph AUTH["저작 (에디터)"]
         CFG["CardAlbumConfig (SO)<br/>앨범 저작 1장<br/>themes[] · albumReward"]:::new
-        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName · icon<br/>reward · pages[]"]:::new
-        PDEF["AlbumPageDef<br/>페이지 저작 항목<br/>pageId · reward · cards[]"]:::new
-        RDEF["AlbumRewardDef (struct)<br/>보상 1건<br/>currency · amount · icon"]:::new
+        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName · icon<br/>rewards[] · pages[]"]:::new
+        PDEF["AlbumPageDef<br/>페이지 저작 항목<br/>pageId · rewards[] · cards[]"]:::new
+        RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
     end
     subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
         BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
@@ -938,18 +942,16 @@ flowchart TD
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
         RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
-        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 1건 UI 스냅샷<br/>Tier · Currency · Amount<br/>Owned/Total · State"]:::new
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
-    subgraph UI["UI (UI/Album/)"]
-        TAB["AlbumThemeListController<br/>도감 탭 루트 = 테마 목록 화면"]:::new
-        TBTN["AlbumThemeButtonView<br/>테마 버튼 1개<br/>아이콘·이름·n/N·보상·✓"]:::new
-        PANEL["AlbumPageOverlayView<br/>테마 클릭 시 뜨는 페이지 오버레이<br/>(Tab_Collection 내부)"]:::new
-        PVIEW["AlbumPageGridView<br/>3열 칸 격자 (칸 재사용)"]:::new
-        SLOT["AlbumCardSlotView<br/>칸 1개 · 미소유 실루엣 + 이름"]:::new
-        STEP["AlbumPageStepperView<br/>◀ 1/5 ▶"]:::new
-        BOX["AlbumRewardChestView<br/>보상 상자 · 3계층 공용"]:::new
-        PROG["AlbumProgressBarView<br/>n/N 진행 바 · 3계층 공용"]:::new
+    subgraph UI["UI (UI/Album/ · 실측 6파일 — 그리드·스테퍼는 오버레이에 흡수)"]
+        TAB["AlbumTabController<br/>Tab_Collection_New 루트<br/>앨범 게이지·보상 + 갤러리 빌드"]:::new
+        TBTN["AlbumThemeCellView<br/>테마 셀 1개(Cell_00 템플릿)<br/>아이콘·이름·n/N·상자·✓"]:::new
+        PANEL["AlbumPageOverlayView<br/>페이지 오버레이 + ◀ n/N ▶ 스테퍼<br/>(Tab_Collection_New 내부)"]:::new
+        SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>미소유 회색 + 이름 유지"]:::new
+        BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new
+        PROG["AlbumGaugeView (Serializable 소품)<br/>n/N 게이지 · 3계층 공용"]:::new
     end
     OWN["OwnershipManager<br/>IsOwned (동결 계약)"]
     CAT["CardCatalog.KeyOf<br/>= SO 파일명 (동결 계약)"]
@@ -971,14 +973,13 @@ flowchart TD
     RMGR -->|Earn → Save 1회| CUR
     TAB --> TBTN
     TAB -->|테마 클릭| PANEL
-    PANEL --> PVIEW --> SLOT
-    PANEL --> STEP
+    PANEL --> SLOT
     RINFO --> BOX
     BOOK --> PROG
     RMGR -->|OnChanged| TAB
     RMGR -->|OnChanged| PANEL
     OWN -->|OnOwnershipChanged| TAB
-    SLOT -->|"BindTile(테마 평탄화 목록)"| DET
+    SLOT -->|"Open(페이지 칸 순서, null 제외)"| DET
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
@@ -999,24 +1000,26 @@ flowchart TD
 신규가 **읽기만** 하는 것: `OwnershipManager.IsOwned` · `CardCatalog.KeyOf` · `CurrencyManager.Earn`/`Save` · `CardDetailOverlayView.BindTile`(무수정 재사용).
 신규가 **참조하지 않는** 것(리뷰 체크리스트): `CollectionThemes` · `CollectionTheme` · `CollectionThemeConfig` · `CatalogRows` · `CatalogRow` · `CollectionProductionManager` · `CollectionThemeListController` · `CollectionThemeRowView` · `CollectionGalleryController` · `CollectionRowView` · `CollectionProgressView` · `CollectionGridController`.
 
-수정 파일은 **4개 · 5줄**뿐:
+기존 코드 수정은 **3파일 4줄**(BootInstaller·UserSaveData·CollectionThemeConfig), 프리팹은 신규 `Tab_Collection_New` + `LobbyCanvas` 재배선:
 
 | 파일 | 변경 |
 |---|---|
 | `Core/BootInstaller.cs` | `[SerializeField] CardAlbumConfig albumConfig` + `CardAlbum.SetSource(albumConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
 | `OutGame/Save/2.Domain/UserSaveData.cs` | `albumReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
 | `OutGame/Collection/CollectionThemeConfig.cs` | `[CreateAssetMenu]` **봉인**(1줄) — 누군가 구 테마 SO를 새로 만들어 꽂으면 "카드→테마" 매핑이 2벌이 된다. 이게 이중 진실원의 유일한 실질 방어선 |
-| `Tab_Collection.prefab` | `Panel_Grid`·`Panel_ThemeBar` **비활성화**(스크립트 무수정). ⚠️ 코드 삭제는 후속이어도 **가동은 즉시 중단해야 한다** — `CollectionGridController.OnEnable`이 `OwnershipManager`/`CardGrowthManager` 이벤트를 구독하고 `CardDetailOverlayView.BindTile`로 **오버레이의 넘김 목록을 가로채기** 때문이다(마지막에 Bind한 쪽이 이긴다 → 탭을 오간 뒤 좌우 넘김이 남의 목록을 탄다) |
+| `Tab_Collection.prefab` | **무수정으로 변경(2026-08-06 실측)** — 사용자 목업 `Tab_Collection_New.prefab`이 탭을 통째로 대체하고, `LobbyCanvas.prefab`의 `LobbyTabController.tabs[4].content`를 신규 탭 인스턴스로 재배선했다(구 탭 인스턴스는 비활성 병존). 구 `CollectionGridController`는 탭 선택으로 활성화될 경로가 없어져 **가동 중단 목적(BindTile 가로채기 차단)은 동일하게 달성** |
+| `Tab_Collection_New.prefab` + `LobbyCanvas.prefab` | UI 컴포넌트 4건 부착 + 배선(MCP 일괄 수술): 목업 퍼시스턴트 onClick 11건 제거, 상자 Button 3곳 추가, 게이지 Fill 3곳 Filled(Horizontal) 전환, `tabs[4].content` 교체 |
 
 #### 배치 규약 (충돌 회피)
 
-- **오버레이는 `Tab_Collection.prefab` 안 패널로 둔다.** `CardDetailOverlay`처럼 `LobbyCanvas.prefab` 직속에 두면 대기 중인 `PKG-ENTRY`·`PKG-HUD`와 **3항목 클리크**가 되고, `.prefab` YAML은 머지가 불가해 도감이 대기줄에 선다.
-- `Tab_Collection.prefab`은 `LobbyCanvas` 안 **중첩 인스턴스**다 → **프리팹 모드에서만 편집**, 인스턴스 오버라이드 금지(오버라이드를 걸면 `LobbyCanvas.prefab`이 변해 클리크로 승격된다).
+- **오버레이는 `Tab_Collection_New.prefab` 안 패널(`Panel_PageOverlay`)로 둔다.** `CardDetailOverlay`처럼 `LobbyCanvas.prefab` 직속에 두면 대기 중인 `PKG-ENTRY`·`PKG-HUD`와 **3항목 클리크**가 되고, `.prefab` YAML은 머지가 불가해 도감이 대기줄에 선다.
+- `Tab_Collection_New.prefab`은 `LobbyCanvas` 안 **중첩 인스턴스**다 → **프리팹 에셋 레벨에서만 편집**, 인스턴스 오버라이드 금지(오버라이드를 걸면 `LobbyCanvas.prefab`이 변해 클리크로 승격된다).
 - 프리팹 참조는 **프리팹 레벨에 저작**. 씬 오버라이드로 하면 `LobbyScene.unity`가 4번째 경합 파일이 되고, 나중에 누가 Apply All 하면 조용히 어긋난다.
 - `sortingOrder`는 **400 미만** 유지(`UIPoolManager` 팝업 400 / 튜토리얼 게이트 350·351·352).
 
 #### 알려진 함정
 
+- **완성 보상은 계층마다 `rewards` 리스트(복수 저작 가능, 2026-08-06).** 빈 리스트 = 보상 미저작 → **상자 숨김 + `Claimable` 불성립**(`CanClaim*`·알림 뱃지 미점등). 단 낙인 검사가 최우선이라 **기수령 낙인은 보상을 비워도 `Claimed` 유지**(재수령 안 뚫림). 수령은 리스트 순회 `Earn`(amount≤0 스킵) 후 `CurrencyManager.Save()` **1회** — 건별 Save 금지. 표시: 상자 아이콘 = 첫 보상, 앨범 `RewardSlot` 3칸 초과 저작은 앞칸만 + 경고.
 - **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`CardAlbum` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
 - **키 폴백에 `displayName`을 넣지 말 것.** `CollectionThemes.ResolveKey`는 `themeId → displayName → theme_{index}` 폴백을 허용하지만 거기는 표시 축이라 리네임 손해가 없었다. 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
 - **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).

@@ -6,8 +6,8 @@ using UnityEngine;
 public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
-    [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
+    [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다(11 = 10강화 = 표의 hp10까지).")]
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 11;
     [Min(0)] [SerializeField] int hpPerLevel = 2;
 
     [Tooltip("첫 강화(Lv2로 올릴 때)의 골드 비용.")]

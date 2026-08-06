@@ -8,7 +8,7 @@ public sealed class AlbumPage
     // 테마 내 페이지 인덱스(표시용, 식별 키 아님)
     public int Index { get; }
 
-    public AlbumRewardDef Reward { get; }
+    public IReadOnlyList<AlbumRewardDef> Rewards { get; }
 
     public string ThemeKey { get; }
 
@@ -27,7 +27,7 @@ public sealed class AlbumPage
     internal AlbumPage(
         string _key,
         int _index,
-        AlbumRewardDef _reward,
+        IReadOnlyList<AlbumRewardDef> _rewards,
         string _themeKey,
         bool _hasStableKey,
         IReadOnlyList<CardData> _cards,
@@ -35,7 +35,7 @@ public sealed class AlbumPage
     {
         Key = _key;
         Index = _index;
-        Reward = _reward;
+        Rewards = _rewards;
         ThemeKey = _themeKey;
         Cards = _cards;
         CardIds = _cardIds;

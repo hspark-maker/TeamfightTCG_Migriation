@@ -25,10 +25,16 @@ public static class CardAlbum
         get { EnsureBuilt(); return s_themes.Count; }
     }
 
-    // 앨범 전체 완성 보상 저작값(미배선이면 default)
-    public static AlbumRewardDef AlbumReward
+    // 앨범 전체 완성 보상 저작값(미배선이면 빈 목록)
+    public static IReadOnlyList<AlbumRewardDef> AlbumRewards
     {
-        get { EnsureBuilt(); return s_source != null ? s_source.AlbumReward : default; }
+        get
+        {
+            EnsureBuilt();
+            return s_source != null
+                ? s_source.AlbumRewards
+                : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
+        }
     }
 
     public static int CompletedThemeCount
@@ -269,7 +275,7 @@ public static class CardAlbum
         }
 
         var t_theme = new AlbumTheme(
-            _def.themeId, _def.displayName, _def.icon, _index, _def.reward,
+            _def.themeId, _def.displayName, _def.icon, _index, NormalizeRewards(_def.rewards),
             t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
         s_themes.Add(t_theme);
 
@@ -295,9 +301,13 @@ public static class CardAlbum
         }
 
         return new AlbumPage(
-            _def.pageId, _index, _def.reward, _themeKey, t_stable,
+            _def.pageId, _index, NormalizeRewards(_def.rewards), _themeKey, t_stable,
             t_cards.AsReadOnly(), t_ids.AsReadOnly());
     }
+
+    // def의 List는 null일 수 있다 — 소비자가 매번 null 가드하지 않게 빈 목록으로 정규화
+    static IReadOnlyList<AlbumRewardDef> NormalizeRewards(List<AlbumRewardDef> _rewards)
+        => _rewards != null ? _rewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
 
     static void EndBuild()
     {

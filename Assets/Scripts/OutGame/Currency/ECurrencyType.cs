@@ -3,6 +3,7 @@ public enum ECurrencyType
 {
     Gold,
     Diamond,
-
+    Energy,
+    
     Count,
 }

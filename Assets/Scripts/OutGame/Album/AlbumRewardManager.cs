@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 // 앨범 3단(페이지·테마·앨범) 완성 보상의 static 수령 창구 — 캐시·Init 없이 세이브 슬롯 직독(부트 무접촉)
 public static class AlbumRewardManager
@@ -38,9 +39,9 @@ public static class AlbumRewardManager
         if (_page == null) return default;
         return new AlbumRewardInfo(
             EAlbumRewardTier.Page,
-            _page.Reward.currency, _page.Reward.amount, _page.Reward.icon,
+            _page.Rewards,
             CardAlbum.OwnedCountOf(_page), CardAlbum.TotalCountOf(_page),
-            StateOf(_page.RewardKey, CardAlbum.IsComplete(_page)));
+            StateOf(_page.RewardKey, CardAlbum.IsComplete(_page), _page.Rewards.Count > 0));
     }
 
     public static AlbumRewardInfo GetThemeInfo(AlbumTheme _theme)
@@ -48,47 +49,47 @@ public static class AlbumRewardManager
         if (_theme == null) return default;
         return new AlbumRewardInfo(
             EAlbumRewardTier.Theme,
-            _theme.Reward.currency, _theme.Reward.amount, _theme.Reward.icon,
+            _theme.Rewards,
             CardAlbum.OwnedCountOf(_theme), CardAlbum.TotalCountOf(_theme),
-            StateOf(_theme.RewardKey, CardAlbum.IsComplete(_theme)));
+            StateOf(_theme.RewardKey, CardAlbum.IsComplete(_theme), _theme.Rewards.Count > 0));
     }
 
     // 앨범 진행도는 완성 테마 수 기준(n/N = 완성 테마/전체 테마)
     public static AlbumRewardInfo GetAlbumInfo()
     {
-        var t_reward = CardAlbum.AlbumReward;
+        var t_rewards = CardAlbum.AlbumRewards;
         return new AlbumRewardInfo(
             EAlbumRewardTier.Album,
-            t_reward.currency, t_reward.amount, t_reward.icon,
+            t_rewards,
             CardAlbum.CompletedThemeCount, CardAlbum.ThemeCount,
-            StateOf(AlbumRewardKey, CardAlbum.IsAlbumComplete));
+            StateOf(AlbumRewardKey, CardAlbum.IsAlbumComplete, t_rewards.Count > 0));
     }
 
     public static bool CanClaimPage(AlbumPage _page)
-        => _page != null && StateOf(_page.RewardKey, CardAlbum.IsComplete(_page)) == EAlbumRewardState.Claimable;
+        => _page != null && StateOf(_page.RewardKey, CardAlbum.IsComplete(_page), _page.Rewards.Count > 0) == EAlbumRewardState.Claimable;
 
     public static bool CanClaimTheme(AlbumTheme _theme)
-        => _theme != null && StateOf(_theme.RewardKey, CardAlbum.IsComplete(_theme)) == EAlbumRewardState.Claimable;
+        => _theme != null && StateOf(_theme.RewardKey, CardAlbum.IsComplete(_theme), _theme.Rewards.Count > 0) == EAlbumRewardState.Claimable;
 
     public static bool CanClaimAlbum()
-        => StateOf(AlbumRewardKey, CardAlbum.IsAlbumComplete) == EAlbumRewardState.Claimable;
+        => StateOf(AlbumRewardKey, CardAlbum.IsAlbumComplete, CardAlbum.AlbumRewards.Count > 0) == EAlbumRewardState.Claimable;
 
     public static bool ClaimPage(AlbumPage _page)
     {
         if (!CanClaimPage(_page)) return false;
-        return Claim(_page.RewardKey, _page.Reward);
+        return Claim(_page.RewardKey, _page.Rewards);
     }
 
     public static bool ClaimTheme(AlbumTheme _theme)
     {
         if (!CanClaimTheme(_theme)) return false;
-        return Claim(_theme.RewardKey, _theme.Reward);
+        return Claim(_theme.RewardKey, _theme.Rewards);
     }
 
     public static bool ClaimAlbum()
     {
         if (!CanClaimAlbum()) return false;
-        return Claim(AlbumRewardKey, CardAlbum.AlbumReward);
+        return Claim(AlbumRewardKey, CardAlbum.AlbumRewards);
     }
 
     // 테마 내 수령 가능 건수(페이지들 + 테마 자신) — 테마 버튼 알림 뱃지용
@@ -114,10 +115,14 @@ public static class AlbumRewardManager
         OnChanged?.Invoke();
     }
 
-    // 보상 지급 → 낙인 → 즉시 영속 → 통지
-    static bool Claim(string _rewardKey, AlbumRewardDef _reward)
+    // 보상 지급(리스트 전량) → 낙인 → 즉시 영속 → 통지
+    static bool Claim(string _rewardKey, IReadOnlyList<AlbumRewardDef> _rewards)
     {
-        CurrencyManager.Earn(_reward.currency, _reward.amount);
+        for (int t_i = 0; t_i < _rewards.Count; t_i++)
+        {
+            if (_rewards[t_i].amount <= 0) continue;
+            CurrencyManager.Earn(_rewards[t_i].currency, _rewards[t_i].amount);
+        }
         Slot.claimedKeys.Add(_rewardKey);
 
         // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
@@ -126,12 +131,13 @@ public static class AlbumRewardManager
         return true;
     }
 
-    // Claimed 검사가 먼저여야 한다 — 완성 취소 후 재완성 구간에서 재수령이 뚫린다
-    static EAlbumRewardState StateOf(string _rewardKey, bool _complete)
+    // Claimed 검사가 먼저여야 한다 — 완성 취소 후 재완성 구간에서 재수령이 뚫린다.
+    // 빈 보상 리스트는 Claimable 불성립(줄 게 없는 낙인 소모 방지) — 기수령 낙인은 보상이 비어도 Claimed
+    static EAlbumRewardState StateOf(string _rewardKey, bool _complete, bool _hasReward)
     {
         if (string.IsNullOrEmpty(_rewardKey)) return EAlbumRewardState.Locked;
         if (Slot.claimedKeys.Contains(_rewardKey)) return EAlbumRewardState.Claimed;
-        return _complete ? EAlbumRewardState.Claimable : EAlbumRewardState.Locked;
+        return _complete && _hasReward ? EAlbumRewardState.Claimable : EAlbumRewardState.Locked;
     }
 }
 

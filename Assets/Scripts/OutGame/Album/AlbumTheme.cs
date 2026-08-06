@@ -13,7 +13,7 @@ public sealed class AlbumTheme
     // 테마 목록상 인덱스(표시용, 식별 키 아님)
     public int Index { get; }
 
-    public AlbumRewardDef Reward { get; }
+    public IReadOnlyList<AlbumRewardDef> Rewards { get; }
 
     public IReadOnlyList<AlbumPage> Pages { get; }
 
@@ -33,7 +33,7 @@ public sealed class AlbumTheme
         string _displayName,
         Sprite _icon,
         int _index,
-        AlbumRewardDef _reward,
+        IReadOnlyList<AlbumRewardDef> _rewards,
         IReadOnlyList<AlbumPage> _pages,
         IReadOnlyList<CardData> _cards,
         IReadOnlyList<int> _cardIds,
@@ -43,7 +43,7 @@ public sealed class AlbumTheme
         DisplayName = _displayName;
         Icon = _icon;
         Index = _index;
-        Reward = _reward;
+        Rewards = _rewards;
         Pages = _pages;
         Cards = _cards;
         CardIds = _cardIds;

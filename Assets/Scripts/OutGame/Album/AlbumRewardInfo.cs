@@ -1,29 +1,23 @@
-using UnityEngine;
+using System.Collections.Generic;
 
-// 앨범 보상 1건 UI 스냅샷
+// 앨범 보상 1건 UI 스냅샷 (보상은 복수 — 재화 종류별 리스트)
 public readonly struct AlbumRewardInfo
 {
     public readonly EAlbumRewardTier Tier;
-    public readonly ECurrencyType Currency;
-    public readonly long Amount;
-    public readonly Sprite Icon;
+    public readonly IReadOnlyList<AlbumRewardDef> Rewards;
     public readonly int Owned;
     public readonly int Total;
     public readonly EAlbumRewardState State;
 
     public AlbumRewardInfo(
         EAlbumRewardTier _tier,
-        ECurrencyType _currency,
-        long _amount,
-        Sprite _icon,
+        IReadOnlyList<AlbumRewardDef> _rewards,
         int _owned,
         int _total,
         EAlbumRewardState _state)
     {
         Tier = _tier;
-        Currency = _currency;
-        Amount = _amount;
-        Icon = _icon;
+        Rewards = _rewards ?? System.Array.Empty<AlbumRewardDef>();
         Owned = _owned;
         Total = _total;
         State = _state;
