@@ -738,7 +738,10 @@ public class CardView : MonoBehaviour
     public UniTask MoveToSlot()                    => this.cardAnim.MoveToSlot();
     /// <summary>_hitFrom = 때린 쪽의 뷰(없으면 환경 피해). 먼지처럼 방향을 따르는 항목이
     /// "맞은 방향의 반대"로 튀도록 진행 방향을 넘긴다.</summary>
-    public async UniTask PlayHitAnim(float _d = 0.15f, int _damage = 0, CardView _hitFrom = null)
+    /// <param name="_isCounter">반격으로 되받는 피격인가. 먼지·파편(skipOnCounter 항목)을 생략한다 —
+    /// 공격자 발밑에도 같은 먼지가 일면 주 타격이 어느 쪽인지 읽히지 않는다.</param>
+    public async UniTask PlayHitAnim(float _d = 0.15f, int _damage = 0, CardView _hitFrom = null,
+        bool _isCounter = false)
     {
         // 숫자는 즉시 최종값으로 튀지 않고 굴러 내려간다(아이콘 팝 → 6·5·4·3 → 복귀).
         if (this.boundCard != null)
@@ -750,7 +753,7 @@ public class CardView : MonoBehaviour
         // 먼지의 양·속도도 화면 흔들림·카드 반동과 같은 세기(피해/최대체력)를 따른다 — 세 연출이 갈리면
         // "센 공격"이 한쪽에서만 세게 읽힌다. 세기 반응이 배선된 항목만 이 값을 쓴다.
         BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir,
-                               HitImpact.Strength01(_damage, this.boundCard));
+                               HitImpact.Strength01(_damage, this.boundCard), _isCounter);
         // 먼지가 튀는 방향과 카드가 밀리는 방향은 같아야 한다 — 같은 t_awayDir를 그대로 넘긴다.
         await this.cardAnim.PlayHitAnim(_d, _damage, t_awayDir);
     }

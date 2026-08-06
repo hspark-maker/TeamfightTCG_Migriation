@@ -794,7 +794,8 @@ public static class AttackSequence
                     HitImpact.Strength01(t_defDmg, _defender?.BoundCard),
                     HitImpact.Strength01(t_atkDmg, _attacker?.BoundCard))));
             _defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker).Forget();
-            if (t_attackerHit) _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender).Forget();
+            // 공격자가 맞는 건 **반격**이다 — 먼지는 주 타격 쪽에서만 인다(_isCounter).
+            if (t_attackerHit) _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender, _isCounter: true).Forget();
             await HitStop(_hitStop);
 
             await _beforeSplashHit();
@@ -824,7 +825,8 @@ public static class AttackSequence
                 : _defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker);
             if (t_attackerHit)
                 await UniTask.WhenAll(t_defHit,
-                    _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender) ?? UniTask.CompletedTask);
+                    _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender, _isCounter: true)
+                    ?? UniTask.CompletedTask);
             else
                 await t_defHit;
         }

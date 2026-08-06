@@ -111,23 +111,34 @@ public static class BattleVfx
     ///
     /// _strength01(0~1)은 항목의 countByStrength/speedByStrength가 켜져 있을 때만 쓰인다 —
     /// 피격이면 HitImpact.Strength01(피해/최대체력). 세게 맞을수록 먼지가 많아지고 빨라진다.
-    /// 반응 배선이 없는 항목은 이 값을 무시하므로, 호출부는 세기를 항상 넘겨도 된다.</summary>
+    /// 반응 배선이 없는 항목은 이 값을 무시하므로, 호출부는 세기를 항상 넘겨도 된다.
+    ///
+    /// _isCounter=반격으로 되받는 피격이면 skipOnCounter 항목(먼지·파편)을 건너뛴다 —
+    /// 주 타격과 반격이 같은 먼지를 양쪽에서 일으키면 누가 맞은 건지 안 읽힌다.</summary>
     public static void PlayAttached(BattleVfxId _id, Transform _anchor, bool _flip, int _sortingLayerId,
-        Vector3 _direction = default, float _strength01 = 0f)
+        Vector3 _direction = default, float _strength01 = 0f, bool _isCounter = false)
     {
         if (s_library == null || s_library.Collect(_id, s_collectBuffer) == 0) return;
 
         bool  t_hasDir = _direction.sqrMagnitude > 1e-6f;
         float t_s01    = Mathf.Clamp01(_strength01);
 
+        // 방향을 못 받은 호출(공격자 뷰 없는 피해·디버그 재생)도 **화면 평면 안에서** 튀어야 한다.
+        // 예전엔 이때 항목 회전값을 그대로 뒀는데, 그러면 콘이 월드 +Z(화면 안쪽)로 뿜어 아군 쪽은
+        // 아무것도 안 보였다 — 적 쪽만 보였던 건 flip의 180도 X회전이 우연히 콘을 카메라 쪽으로
+        // 돌려놨기 때문이다(연출이 아니라 사고였다). 아군은 위에서 맞으니 아래로, 적은 그 반대.
+        Vector3 t_alignDir = t_hasDir ? _direction.normalized : (_flip ? Vector3.up : Vector3.down);
+
         foreach (VfxEntry t_entry in s_collectBuffer)
         {
+            if (_isCounter && t_entry.skipOnCounter) continue;   // 반격 맞은 쪽엔 먼지를 안 일으킨다
+
             GameObject t_go = SpawnAttached(t_entry.prefab, _anchor, t_entry.localOffset,
                                             t_entry.initialRotation, _flip, out string t_poolId);
             if (t_go == null) continue;
 
-            if (t_entry.alignToDirection && t_hasDir)
-                t_go.transform.rotation = Quaternion.LookRotation(_direction.normalized, Vector3.back)
+            if (t_entry.alignToDirection)
+                t_go.transform.rotation = Quaternion.LookRotation(t_alignDir, Vector3.back)
                                         * Quaternion.Euler(t_entry.initialRotation);
 
             ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
