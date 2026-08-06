@@ -103,13 +103,15 @@ public class CardTableTool : EditorWindow
             "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
             "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림(기본 키워드 카드).\n" +
             "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
-            "• 진화 레벨과 비용/성공률은 CardGrowthConfig, 카드별 HP 증가폭은 hp0~hp10 열이 소유합니다.\n" +
+            "• 진화 레벨과 비용/성공률은 CardGrowthConfig, 카드별 레벨 체력은 hp0~hp10 열이 소유합니다.\n" +
             "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
             "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).", MessageType.None);
 
         EditorGUILayout.HelpBox(
-            "hp0~hp10: 해당 레벨 진입 시 증가하는 HP입니다. Lv0/Lv1은 0으로 고정됩니다. " +
-            "11칸이 모두 비어 있으면 CardGrowthConfig 전역식을 사용하고, 하나라도 입력하면 나머지 빈칸은 0으로 저장됩니다.",
+            "hp0~hp10: 그 레벨의 **총 HP(절대값)** 입니다. 증가분이 아닙니다.\n" +
+            "빈칸은 그 레벨만 CardGrowthConfig 전역식으로 계산합니다(직전 레벨 체력 + 레벨당 증가분).\n" +
+            "Lv1 기준 체력은 maxHp 열이 소유하므로 hp0/hp1은 비워 두세요.\n" +
+            "예) maxHp=4, hp2=6, hp3=9, hp4=(빈칸), hp5=14 → 4 / 6 / 9 / 11 / 14",
             MessageType.Info);
 
         EditorGUILayout.EndScrollView();
@@ -156,11 +158,11 @@ public class CardTableTool : EditorWindow
             case "defaultEvolutionStage": return _card.defaultEvolutionStage.ToString(CultureInfo.InvariantCulture);
             case "cardExplain":           return _card.cardExplain;
             default:
+                // 미지정 칸은 빈칸으로 나가야 한다 — 센티널(-1)이 표에 새어 나가면 다음 가져오기에서 음수 경고가 된다.
                 if (TryParseHpColumn(_column, out int t_level))
                 {
-                    if (_card.hpGainByLevel == null || _card.hpGainByLevel.Length == 0) return "";
-                    return t_level < _card.hpGainByLevel.Length
-                        ? _card.hpGainByLevel[t_level].ToString(CultureInfo.InvariantCulture)
+                    return _card.TryGetMaxHp(t_level, out int t_maxHp)
+                        ? t_maxHp.ToString(CultureInfo.InvariantCulture)
                         : "";
                 }
                 return "";
@@ -373,7 +375,7 @@ public class CardTableTool : EditorWindow
             _card.defaultEvolutionStage = Mathf.Clamp(t_stage, 0, CardData.MaxEvolutionStage);
         }
 
-        ApplyHpCurve(_card, _row, _header, _name, _warnings);
+        ApplyMaxHpCurve(_card, _row, _header, _name, _warnings);
 
         if (_header.ContainsKey("cardExplain")) _card.cardExplain = Cell(_row, _header, "cardExplain");
 
@@ -463,12 +465,19 @@ public class CardTableTool : EditorWindow
     static int ParseInt(string _text, int _fallback)
         => int.TryParse(_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_v) ? t_v : _fallback;
 
-    static void ApplyHpCurve(CardData _card, List<string> _row, Dictionary<string, int> _header,
-                             string _name, List<string> _warnings)
+    /// <summary>hp0~hp10을 **그 레벨의 총 체력**으로 읽는다. 빈칸은 0이 아니라 미지정(-1)으로 남겨야
+    /// 그 레벨만 CardGrowthConfig 전역식으로 넘어간다 — 칸 단위 폴백의 전부가 이 구분이다.</summary>
+    static void ApplyMaxHpCurve(CardData _card, List<string> _row, Dictionary<string, int> _header,
+                                string _name, List<string> _warnings)
     {
-        int t_curveColumnCount = 0;
-        bool t_hasValue = false;
+        int  t_curveColumnCount = 0;
+        bool t_hasValue         = false;
+
         var t_values = new int[HP_CURVE_MAX_LEVEL + 1];
+        for (int t_i = 0; t_i < t_values.Length; t_i++) t_values[t_i] = CardData.NoMaxHpOverride;
+
+        // 역행 검사의 기준. 채워진 칸끼리만 잇는다 — 빈칸 구간의 전역식 증가분은 표 도구가 모른다.
+        int t_prevHp = _card.maxHp;
 
         for (int t_level = HP_CURVE_MIN_LEVEL; t_level <= HP_CURVE_MAX_LEVEL; t_level++)
         {
@@ -479,23 +488,29 @@ public class CardTableTool : EditorWindow
             string t_text = Cell(_row, _header, t_column).Trim();
             if (t_text.Length == 0) continue;
 
-            t_hasValue = true;
             if (!int.TryParse(t_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_hp))
             {
-                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 0으로 처리");
+                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 빈칸으로 처리");
                 continue;
             }
-
             if (t_hp < 0)
             {
-                _warnings.Add($"{_name}.{t_column}: 음수 '{t_hp}' — 0으로 처리");
-                t_hp = 0;
+                _warnings.Add($"{_name}.{t_column}: 음수 '{t_hp}' — 빈칸으로 처리");
+                continue;
             }
-            if (t_level <= CardGrowth.BaseLevel && t_hp != 0)
+            if (t_level <= CardGrowth.BaseLevel)
             {
-                _warnings.Add($"{_name}.{t_column}: Lv0/Lv1은 성장 전 기준값 — 0으로 처리");
-                t_hp = 0;
+                _warnings.Add($"{_name}.{t_column}: Lv0/Lv1 체력은 maxHp 열이 소유한다 — 무시");
+                continue;
             }
+            if (t_hp <= t_prevHp)
+            {
+                _warnings.Add($"{_name}.{t_column}: '{t_hp}'가 직전 체력 {t_prevHp} 이하 — " +
+                              "증가분이 아니라 그 레벨의 총 체력을 적을 것");
+            }
+
+            t_hasValue        = true;
+            t_prevHp          = t_hp;
             t_values[t_level] = t_hp;
         }
 
@@ -505,7 +520,7 @@ public class CardTableTool : EditorWindow
             _warnings.Add($"{_name}: hp0~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
             return;
         }
-        _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();
+        _card.maxHpByLevel = t_hasValue ? t_values : Array.Empty<int>();
     }
 
     static bool TryParseHpColumn(string _column, out int _level)

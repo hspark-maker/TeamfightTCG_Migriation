@@ -14,7 +14,7 @@ public class RankRewardRowView : MonoBehaviour
     [SerializeField] Button rewardBox;       // 보상 박스 = 수령 요청 버튼
 
     [Header("상태 노드(선택 — 미배선 시 null 가드)")]
-    [SerializeField] GameObject highlight;   // 수령 가능
+    [SerializeField] GameObject highlight;   // 수령 가능한 행 중 최상위 1개만(밀려 쌓인 행은 버튼만 활성)
     [SerializeField] GameObject claimedMark; // 수령 완료(체크)
     [SerializeField] GameObject lockDim;     // 미달성(자물쇠)
     [SerializeField] GameObject chevron;     // 행 사이 장식(마지막 행만 비활성)
@@ -30,6 +30,11 @@ public class RankRewardRowView : MonoBehaviour
     [Tooltip("깜빡임이 내려가는 최저 알파.")]
     [SerializeField] float tierUpMinAlpha = 0.2f;
 
+    [Header("최상위 수령 가능 연출")]
+    [Tooltip("최상위 행의 링이 상시 깜빡이는 최저 알파.")]
+    [SerializeField] float readyPulseMinAlpha = 0.45f;
+    [SerializeField] float readyPulseDuration = 0.8f;
+
     // 표시 대상 티어. -1 = 미바인딩(Refresh 무시).
     int m_tierIndex = -1;
 
@@ -37,6 +42,9 @@ public class RankRewardRowView : MonoBehaviour
 
     // 진행 중 티어 상승 연출. 살아있는 동안 Refresh가 highlight 토글을 건너뛴다.
     Sequence m_tierUpSeq;
+
+    // 최상위 행의 상시 펄스. 티어 상승 연출과 같은 알파를 쓰므로 둘이 동시에 돌지 않게 한다.
+    Tween m_pulseTween;
 
     // 깜빡임 대상. highlight 노드에서 1회만 찾아 캐싱한다.
     Image m_highlightImage;
@@ -79,7 +87,9 @@ public class RankRewardRowView : MonoBehaviour
         if (this.canvasGroup != null) this.canvasGroup.alpha = t_claimed ? this.claimedAlpha : 1f;
 
         // 연출 중에는 링을 끄지 않는다 — 도중에 OnChanged가 오면(수령 등) 깜빡이던 링이 사라진다.
-        if (this.highlight != null && !this.IsTierUpPlaying) this.highlight.SetActive(t_claimable);
+        if (this.highlight != null && !this.IsTierUpPlaying) this.highlight.SetActive(t_info.IsTopClaimable);
+
+        this.UpdateReadyPulse(t_info.IsTopClaimable);
     }
 
     /// <summary>이번 전투로 새로 도달한 행임을 알리는 연출. 끝나면 Refresh로 원래 표시 규칙에 되돌린다.</summary>
@@ -88,8 +98,9 @@ public class RankRewardRowView : MonoBehaviour
         if (this.highlight == null) return;
 
         this.KillTierUpEffect();
+        this.KillReadyPulse();   // 같은 링 알파를 쓴다 — 겹쳐 돌면 깜빡임이 서로를 덮는다.
 
-        // 아직 수령 차례가 아니어도 이 행만은 보이게 켠다 — "도달했다"를 알리는 게 목적이다.
+        // 최상위 수령 대상이 아니어도 이 행만은 보이게 켠다 — "도달했다"를 알리는 게 목적이다.
         this.highlight.SetActive(true);
 
         this.m_tierUpSeq = DOTween.Sequence().SetLink(this.gameObject);
@@ -105,17 +116,18 @@ public class RankRewardRowView : MonoBehaviour
         this.m_tierUpSeq.OnComplete(() =>
         {
             this.m_tierUpSeq = null;   // Refresh의 연출 가드를 먼저 풀어야 링이 정상 규칙으로 돌아간다.
-            this.RestoreTierUpVisual();
-            this.Refresh();
+            this.RestoreRowVisual();
+            this.Refresh();            // 최상위 행이면 여기서 상시 펄스로 이어진다.
         });
     }
 
     // 패널을 닫거나 행이 꺼질 때 잔여 트윈이 스케일·알파를 중간값에 남기지 않게 정리한다.
-    // Kill로 연출 가드를 먼저 푼 뒤 Refresh해야, 연출이 강제로 켰던 링이 원래 규칙(수령 가능 여부)으로 되돌아간다.
+    // Kill로 연출 가드를 먼저 푼 뒤 Refresh해야, 연출이 강제로 켰던 링이 원래 규칙(최상위 여부)으로 되돌아간다.
     void OnDisable()
     {
         this.KillTierUpEffect();
-        this.RestoreTierUpVisual();
+        this.KillReadyPulse();
+        this.RestoreRowVisual();
         this.Refresh();
     }
 
@@ -126,7 +138,31 @@ public class RankRewardRowView : MonoBehaviour
         this.m_onClick?.Invoke(this.m_tierIndex);
     }
 
+    // 최상위 수령 가능 행만 상시로 깜빡인다. 티어 상승 연출이 같은 알파를 쓰는 동안엔 손대지 않는다(끝나면 Refresh가 다시 부른다).
+    void UpdateReadyPulse(bool _isTopClaimable)
+    {
+        if (this.IsTierUpPlaying) return;
+
+        // 꺼지는 중(OnDisable→Refresh)에는 켜지 않는다 — 보이지도 않는 트윈이 남는다.
+        if (!_isTopClaimable || !this.isActiveAndEnabled)
+        {
+            this.KillReadyPulse();
+            return;
+        }
+
+        if (this.IsReadyPulsePlaying) return;   // 재시작하면 OnChanged마다 알파가 처음으로 튄다.
+
+        var t_image = this.HighlightImage;
+        if (t_image == null) return;
+
+        this.m_pulseTween = t_image.DOFade(this.readyPulseMinAlpha, this.readyPulseDuration)
+                                   .SetLoops(-1, LoopType.Yoyo)
+                                   .SetLink(this.gameObject);
+    }
+
     bool IsTierUpPlaying => this.m_tierUpSeq != null && this.m_tierUpSeq.IsActive();
+
+    bool IsReadyPulsePlaying => this.m_pulseTween != null && this.m_pulseTween.IsActive();
 
     Image HighlightImage
     {
@@ -145,7 +181,15 @@ public class RankRewardRowView : MonoBehaviour
         this.m_tierUpSeq = null;
     }
 
-    void RestoreTierUpVisual()
+    void KillReadyPulse()
+    {
+        if (this.m_pulseTween == null) return;
+        this.m_pulseTween.Kill();
+        this.m_pulseTween = null;
+        this.RestoreRowVisual();   // 중간 알파에 굳은 링이 다음 상태로 넘어가지 않게.
+    }
+
+    void RestoreRowVisual()
     {
         this.transform.localScale = Vector3.one;
 
