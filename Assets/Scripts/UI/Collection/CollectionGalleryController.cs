@@ -94,13 +94,12 @@ public class CollectionGalleryController : MonoBehaviour
     }
 
     // 일괄 수령 클릭 → 매니저에 위임. 지급·영속·통지는 매니저가 처리하고 OnChanged가 갱신을 유발한다.
-    // 총합을 골드로 취급한다 — 현재 배치는 전 행이 골드고, 섞이더라도 롤업 시작점만 낮아질 뿐 끝값은 실잔액을 다시 읽는다.
     void OnHarvestAllClicked()
     {
-        long t_earned = CollectionProductionManager.HarvestAll();
-        if (t_earned <= 0 || harvestAllButton == null) return;
+        var t_earned = CollectionProductionManager.HarvestAll();
+        if (t_earned.IsEmpty || harvestAllButton == null) return;
 
-        if (GoldGainEffectPlayer.TryGet(this, out var t_player))
+        if (CurrencyGainEffectPlayer.TryGet(this, out var t_player))
             t_player.Play((RectTransform)harvestAllButton.transform, t_earned);
     }
 

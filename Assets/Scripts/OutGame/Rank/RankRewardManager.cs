@@ -46,7 +46,7 @@ public static class RankRewardManager
             _tierIndex,
             t_tier.DisplayName,
             t_tier.Badge,
-            t_tier.RewardGold,
+            t_tier.Reward,
             StateOf(_tierIndex));
     }
 
@@ -59,7 +59,7 @@ public static class RankRewardManager
 
         if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return false;
 
-        CurrencyManager.Earn(ECurrencyType.Gold, t_tier.RewardGold);
+        CurrencyManager.Earn(t_tier.Reward.Type, t_tier.Reward.Amount);
         Slot.claimedCount = _tierIndex + 1;
 
         // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
@@ -101,15 +101,15 @@ public readonly struct RankRewardInfo
     public readonly int TierIndex;
     public readonly string DisplayName;
     public readonly Sprite Badge;
-    public readonly long RewardGold;
+    public readonly CurrencyGain Reward;
     public readonly ERankRewardState State;
 
-    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, long _rewardGold, ERankRewardState _state)
+    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, CurrencyGain _reward, ERankRewardState _state)
     {
         TierIndex = _tierIndex;
         DisplayName = _displayName;
         Badge = _badge;
-        RewardGold = _rewardGold;
+        Reward = _reward;
         State = _state;
     }
 }

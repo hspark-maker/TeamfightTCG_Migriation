@@ -27,10 +27,10 @@ public class PackAcquireController : MonoBehaviour
     bool m_startTutorial;
 
     // 이번 개봉에서 처음 얻은 카드만(로비 도감 연출 대상). Consume은 1회뿐이라 여기 캐시한다.
-    // 중복은 골드로 환급돼 코인 연출로 나가므로 도감 연출거리가 없다.
+    // 중복은 팩 결제 재화로 환급돼 코인 연출로 나가므로 도감 연출거리가 없다.
     readonly List<CardData> m_newCards = new List<CardData>();
     // 이번 개봉의 중복 환급 합계(연출 표시용). 카드와 같은 시점에 캐시해야 짝이 갈라지지 않는다.
-    long m_refundGold;
+    CurrencyGain m_refund;
 
     // 획득이 2회 이상 눌려도 씬 전이는 1회만.
     bool m_left;
@@ -89,7 +89,7 @@ public class PackAcquireController : MonoBehaviour
     void CacheCards(OpenedPack _opened)
     {
         m_newCards.Clear();
-        m_refundGold = _opened != null ? _opened.TotalRefund : 0;
+        m_refund = _opened != null ? _opened.TotalRefund : CurrencyGain.None;
 
         var t_drawn = _opened != null ? _opened.Cards : null;
         if (t_drawn == null) return;
@@ -118,7 +118,7 @@ public class PackAcquireController : MonoBehaviour
 
         // 골드·카드가 같은 개봉 세션 결과라 로비 복귀 직전 한 지점에서 함께 싣는다(지급·저장은 이미 끝났다 — 표시량뿐).
         // 카드는 신규만 — 중복분은 환급 골드로 이미 표현된다. 튜토리얼 경로로 전투에 먼저 가면 이후 로비 진입 시 재생된다.
-        CardPackRewardHandoff.Set(m_refundGold, m_newCards);
+        CardPackRewardHandoff.Set(m_refund, m_newCards);
 
         // 튜토리얼 세팅은 목적지(전투) 진입 직전 1회. scenario null이면 Begin이 End로 안전 처리.
         if (m_startTutorial) TutorialConfig.Begin(scenario);

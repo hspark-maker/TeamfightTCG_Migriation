@@ -68,7 +68,7 @@ public class RankRewardRowView : MonoBehaviour
         // 배지 미저작(null)이면 프리팹에 배선된 기존 스프라이트를 그대로 둔다.
         if (this.badgeImage != null && t_info.Badge != null) this.badgeImage.sprite = t_info.Badge;
         if (this.tierNameText != null) this.tierNameText.text = t_info.DisplayName;
-        if (this.amountText != null) this.amountText.text = $"x{t_info.RewardGold:N0}";
+        if (this.amountText != null) this.amountText.text = $"x{t_info.Reward.Amount:N0}";
 
         bool t_claimable = t_info.State == ERankRewardState.Claimable;
         bool t_claimed = t_info.State == ERankRewardState.Claimed;

@@ -14,6 +14,8 @@ public class CardPackData : ScriptableObject
     [SerializeField] Sprite packArt;
 
     [Header("가격·드로우")]
+    [Tooltip("결제 재화. 중복 카드 환급도 같은 재화로 돌려준다.")]
+    [SerializeField] ECurrencyType priceType = ECurrencyType.Gold;
     [Min(0)] [SerializeField] long price = 100;
     [Min(1)] [SerializeField] int drawCount = 3;
 
@@ -27,6 +29,7 @@ public class CardPackData : ScriptableObject
     public string PackId => packId;
     public string DisplayName => displayName;
     public Sprite PackArt => packArt;
+    public ECurrencyType PriceType => priceType;
     public long Price => price;
     public int DrawCount => drawCount;
     public bool UniqueDraw => uniqueDraw;

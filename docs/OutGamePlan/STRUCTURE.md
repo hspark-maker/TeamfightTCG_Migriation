@@ -893,10 +893,14 @@ sequenceDiagram
 
 ---
 
-### 신규 도감 (`OutGame/Dex/`) — 테마 → 페이지 → 칸, 보상 3단 — ⬜ **설계 승인 대기 (2026-08-06)**
+### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **설계 승인 · 데이터 축 구현 완료 (2026-08-06, PKG-ALBUM-DATA)**
+
+> **네이밍 은유 = 스티커 앨범.** 도감(圖鑑)은 **앨범**이고, 앨범에는 **페이지**가 있고, 페이지에는 카드를 꽂는 **칸(슬롯)** 이 있다. 이 은유가 요구된 3계층에 1:1로 맞아떨어져서, 클래스 이름만 읽어도 그게 무엇인지 알 수 있다.
+> **"챕터"는 의도적으로 피했다** — 튜토리얼이 이미 `TutorialSaveData.outgameChapterIndex`로 챕터를 쓰고 있어 같은 단어가 두 도메인을 가리키게 된다.
+> **"Collection" 접두어도 쓸 수 없다** — 구 도감이 `CollectionTheme`·`CollectionThemeConfig`·`CollectionProgressView` 등으로 이미 점유했고, 병존 기간에 이름이 겹치면 어느 쪽 파일인지 구분이 안 된다.
 
 > 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체할** 새 축. **이번 플랜에 기존 삭제는 포함하지 않는다 — 병존**하고, 삭제는 후속 정리 패키지로 넘긴다.
-> 그래서 신규는 폴더·접두어를 **`Dex`로 물리 분리**한다. 구/신 파일이 `UI/Collection/`에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
+> 그래서 신규는 폴더·접두어를 **`Album`으로 물리 분리**한다(`OutGame/Album/` · `UI/Album/`). 구/신 파일이 `OutGame/Collection/`·`UI/Collection/`에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
 
 **실측 전제 (설계의 근거)**
 
@@ -911,41 +915,41 @@ sequenceDiagram
 | 항목 | 값 | 성격 |
 |---|---|---|
 | 페이지 1장 | **3×3 = 9칸** | 프리팹 `GridLayoutGroup` 3열 저작값. 칸 수는 `page.Cards.Count` 파생 — **코드에 `9`도 `3`도 박지 않는다** |
-| 테마 1개 | **5페이지 = 45장** | `DexThemeDef.pages` 리스트 길이. 향후 페이지 추가 가능이 요구사항 |
-| 도감 전체 | **90장 = 테마 2개 × 5페이지** | `DexConfig.themes` 리스트 길이 |
+| 테마 1개 | **5페이지 = 45장** | `AlbumThemeDef.pages` 리스트 길이. 향후 페이지 추가 가능이 요구사항 |
+| 도감 전체 | **90장 = 테마 2개 × 5페이지** | `CardAlbumConfig.themes` 리스트 길이 |
 
 > 세 값 **전부 SO 저작값**이라 코드 변경 없이 바뀐다. 테마마다 페이지 수가 달라도 된다(리스트 길이가 곧 페이지 수).
-> 현재 31장이므로 **첫 저작은 페이지가 부분적으로 빈다** — 빈 칸은 `null` 슬롯이 되고, `DexBook`이 완성 판정 모수에서 제외하므로 "9칸 중 4장만 저작된 페이지"는 `4/4`로 완성 가능하다(아래 함정 절 참조). 카드가 채워지는 대로 저작을 늘리면 그 페이지가 다시 미완성으로 내려가는데, 수령 낙인은 `Claimed` 최우선 판정이라 재지급되지 않는다.
+> 현재 31장이므로 **첫 저작은 페이지가 부분적으로 빈다** — 빈 칸은 `null` 슬롯이 되고, `CardAlbum`이 완성 판정 모수에서 제외하므로 "9칸 중 4장만 저작된 페이지"는 `4/4`로 완성 가능하다(아래 함정 절 참조). 카드가 채워지는 대로 저작을 늘리면 그 페이지가 다시 미완성으로 내려가는데, 수령 낙인은 `Claimed` 최우선 판정이라 재지급되지 않는다.
 
 #### 클래스도
 
 ```mermaid
 flowchart TD
     subgraph AUTH["저작 (에디터)"]
-        CFG["DexConfig (SO)<br/>themes[] · bookReward"]:::new
-        TDEF["DexThemeDef<br/>themeId · displayName · icon<br/>reward · pages[]"]:::new
-        PDEF["DexPageDef<br/>pageId · reward · cards[]"]:::new
-        RDEF["DexRewardDef (struct)<br/>currency · amount · icon"]:::new
+        CFG["CardAlbumConfig (SO)<br/>앨범 저작 1장<br/>themes[] · albumReward"]:::new
+        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName · icon<br/>reward · pages[]"]:::new
+        PDEF["AlbumPageDef<br/>페이지 저작 항목<br/>pageId · reward · cards[]"]:::new
+        RDEF["AlbumRewardDef (struct)<br/>보상 1건<br/>currency · amount · icon"]:::new
     end
     subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
-        BOOK["DexBook (static)<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateBook"]:::new
-        THEME["DexTheme<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
-        PAGE["DexPage<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
+        THEME["AlbumTheme<br/>테마 1개 런타임 뷰<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
+        PAGE["AlbumPage<br/>페이지 1장 런타임 뷰<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
-        RMGR["DexRewardManager (static)<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/BookInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
-        RINFO["DexRewardInfo (readonly struct)<br/>Tier · Currency · Amount<br/>Owned/Total · State"]:::new
-        SAVE["DexRewardSaveData<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.dexReward · VERSION 1 유지)"]:::new
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 1건 UI 스냅샷<br/>Tier · Currency · Amount<br/>Owned/Total · State"]:::new
+        SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
-    subgraph UI["UI (UI/Dex/)"]
-        TAB["DexTabView<br/>테마 버튼 그리드"]:::new
-        TBTN["DexThemeButtonView<br/>아이콘·이름·n/N·보상·✓"]:::new
-        PANEL["DexPanelView<br/>오버레이 셸 (Tab_Collection 내부)"]:::new
-        PVIEW["DexPageView<br/>3열 칸 그리드 (칸 재사용)"]:::new
-        SLOT["DexSlotView<br/>미소유 실루엣 + 이름"]:::new
-        STEP["DexPageStepperView<br/>◀ 1/4 ▶"]:::new
-        BOX["DexRewardBoxView<br/>3계층 공용"]:::new
-        PROG["DexProgressView<br/>3계층 공용"]:::new
+    subgraph UI["UI (UI/Album/)"]
+        TAB["AlbumThemeListController<br/>도감 탭 루트 = 테마 목록 화면"]:::new
+        TBTN["AlbumThemeButtonView<br/>테마 버튼 1개<br/>아이콘·이름·n/N·보상·✓"]:::new
+        PANEL["AlbumPageOverlayView<br/>테마 클릭 시 뜨는 페이지 오버레이<br/>(Tab_Collection 내부)"]:::new
+        PVIEW["AlbumPageGridView<br/>3열 칸 격자 (칸 재사용)"]:::new
+        SLOT["AlbumCardSlotView<br/>칸 1개 · 미소유 실루엣 + 이름"]:::new
+        STEP["AlbumPageStepperView<br/>◀ 1/5 ▶"]:::new
+        BOX["AlbumRewardChestView<br/>보상 상자 · 3계층 공용"]:::new
+        PROG["AlbumProgressBarView<br/>n/N 진행 바 · 3계층 공용"]:::new
     end
     OWN["OwnershipManager<br/>IsOwned (동결 계약)"]
     CAT["CardCatalog.KeyOf<br/>= SO 파일명 (동결 계약)"]
@@ -984,7 +988,7 @@ flowchart TD
 
 | # | 결정 | 안 그러면 |
 |---|---|---|
-| 1 | **페이지는 명시 저작**(`List<DexPageDef>` + `pageId`). 자동 9청크 금지 | 자동 청크 + 인덱스 키면 카드 1장 삽입에 페이지 내용이 밀려 **이미 준 보상이 다시 Claimable**이 된다(재화 복제). 첫-카드-키로 만들면 삽입 지점 이후 **모든 페이지 키가 새 키**가 되어 낙인이 전멸한다. `CollectionThemes.BuildEmpty()`가 세운 "저작물성 데이터는 자동 생성 금지"의 연장 — 보상이 붙은 페이지는 테마보다 더 강한 저작물이다 |
+| 1 | **페이지는 명시 저작**(`List<AlbumPageDef>` + `pageId`). 자동 9청크 금지 | 자동 청크 + 인덱스 키면 카드 1장 삽입에 페이지 내용이 밀려 **이미 준 보상이 다시 Claimable**이 된다(재화 복제). 첫-카드-키로 만들면 삽입 지점 이후 **모든 페이지 키가 새 키**가 되어 낙인이 전멸한다. `CollectionThemes.BuildEmpty()`가 세운 "저작물성 데이터는 자동 생성 금지"의 연장 — 보상이 붙은 페이지는 테마보다 더 강한 저작물이다 |
 | 2 | **진행도는 저장하지 않는다** — `OwnershipManager.IsOwned`의 순수 파생. 저장하는 건 **수령 낙인**뿐 | 진행도를 저장하면 기존 생산 축이 겪은 "완성/미완성 전이마다 정산 시각을 당기는" 보정 로직과 세이브 마이그레이션 부채를 그대로 물려받는다 |
 | 3 | **수령 낙인 = 접두 네임스페이스 문자열 리스트**(`p:테마/페이지` · `t:테마` · `b`). 랭크의 `claimedCount` 단조 커서 **사용 불가** | 도감 완성은 소유 집합의 함수라 **부분순서**다(3테마를 먼저 완성하고 1테마를 나중에 완성 가능, 카드 추가로 완성이 **취소**되기도 한다). 커서로 표현하면 "3테마 수령"이 "1·2테마 수령"으로 해석된다. 비트마스크는 비트 위치=인덱스라 세이브 규약(인덱스 금지) 정면 위반 |
 | 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **부트에 줄이 0개 추가** | 캐시를 두면 "부트를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
@@ -999,8 +1003,8 @@ flowchart TD
 
 | 파일 | 변경 |
 |---|---|
-| `Core/BootInstaller.cs` | `[SerializeField] DexConfig dexConfig` + `DexBook.SetSource(dexConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
-| `OutGame/Save/2.Domain/UserSaveData.cs` | `dexReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
+| `Core/BootInstaller.cs` | `[SerializeField] CardAlbumConfig albumConfig` + `CardAlbum.SetSource(albumConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
+| `OutGame/Save/2.Domain/UserSaveData.cs` | `albumReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
 | `OutGame/Collection/CollectionThemeConfig.cs` | `[CreateAssetMenu]` **봉인**(1줄) — 누군가 구 테마 SO를 새로 만들어 꽂으면 "카드→테마" 매핑이 2벌이 된다. 이게 이중 진실원의 유일한 실질 방어선 |
 | `Tab_Collection.prefab` | `Panel_Grid`·`Panel_ThemeBar` **비활성화**(스크립트 무수정). ⚠️ 코드 삭제는 후속이어도 **가동은 즉시 중단해야 한다** — `CollectionGridController.OnEnable`이 `OwnershipManager`/`CardGrowthManager` 이벤트를 구독하고 `CardDetailOverlayView.BindTile`로 **오버레이의 넘김 목록을 가로채기** 때문이다(마지막에 Bind한 쪽이 이긴다 → 탭을 오간 뒤 좌우 넘김이 남의 목록을 탄다) |
 
@@ -1013,7 +1017,7 @@ flowchart TD
 
 #### 알려진 함정
 
-- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`DexBook` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
+- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`CardAlbum` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
 - **키 폴백에 `displayName`을 넣지 말 것.** `CollectionThemes.ResolveKey`는 `themeId → displayName → theme_{index}` 폴백을 허용하지만 거기는 표시 축이라 리네임 손해가 없었다. 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
 - **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).
-- **카드 배치가 두 곳에 저작된다** — 신규 `DexConfig`(테마 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.
+- **카드 배치가 두 곳에 저작된다** — 신규 `CardAlbumConfig`(앨범 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.

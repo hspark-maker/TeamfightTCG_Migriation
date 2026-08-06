@@ -21,7 +21,7 @@ using UnityEngine.UI;
 // — 플래시 정점과 화면 교체가 각자 다른 타이머로 돌면 언젠가 반드시 갈린다.
 public class PackPurchaseImpact : MonoBehaviour
 {
-    // 자가 설치 대상 노드 이름. 못 찾으면 캔버스 루트에 붙는다(GoldGainEffectPlayer와 같은 관용구).
+    // 자가 설치 대상 노드 이름. 못 찾으면 캔버스 루트에 붙는다(CurrencyGainEffectPlayer와 같은 관용구).
     const string LAYER_NAME = "GainEffectLayer";
 
     // 팩 위에 얹는 흰빛 노드의 이름. 팩 아트를 찾을 때 이 이름을 걸러야 한다 —

@@ -104,23 +104,19 @@ public class CollectionRowView : MonoBehaviour
     {
         if (string.IsNullOrEmpty(m_rowKey)) return;
 
-        // 재화 종류는 행의 정적 속성이라 배치에서 직접 읽는다(GetInfo는 정산까지 도는 무거운 조회).
-        var t_reward = CatalogRows.TryGetRow(m_rowKey, out var t_row) ? t_row.RewardType : ECurrencyType.Gold;
-
-        long t_earned = CollectionProductionManager.Harvest(m_rowKey);
+        CurrencyGain t_earned = CollectionProductionManager.Harvest(m_rowKey);
 
         // 연출은 표시 갱신보다 먼저 — Harvest의 OnChanged로 레이아웃이 이미 dirty라 버튼 월드좌표를 지금 읽어둔다.
-        PlayGainEffect(t_reward, t_earned);
+        PlayGainEffect(t_earned);
 
         RefreshProduction();
     }
 
-    // 골드만 연출한다(HUD가 골드만 표시). 다른 재화 행은 지급만 되고 조용히 지나간다.
-    void PlayGainEffect(ECurrencyType _reward, long _earned)
+    void PlayGainEffect(CurrencyGain _earned)
     {
-        if (_earned <= 0 || _reward != ECurrencyType.Gold || harvestButton == null) return;
+        if (!_earned.HasAmount || harvestButton == null) return;
 
-        if (GoldGainEffectPlayer.TryGet(this, out var t_player))
+        if (CurrencyGainEffectPlayer.TryGet(this, out var t_player))
             t_player.Play((RectTransform)harvestButton.transform, _earned);
     }
 

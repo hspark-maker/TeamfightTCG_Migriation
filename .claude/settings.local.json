@@ -125,7 +125,8 @@
       "Bash(rm -f Materials/Growth/CardRitualSmoke.mat Materials/Growth/CardRitualSmoke.mat.meta Sprites/Growth/Smoke.png Sprites/Growth/Smoke.png.meta)",
       "Bash(rmdir Sprites/Growth)",
       "Bash(rm -f Sprites/Growth.meta)",
-      "Bash(awk 'NR>=627 && NR<=700' \"Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab\")"
+      "Bash(awk 'NR>=627 && NR<=700' \"Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab\")",
+      "mcp__unity-mcp__Unity_AssetGeneration_GetModels"
     ]
   },
   "enabledMcpjsonServers": [

@@ -15,11 +15,12 @@ public static class CardPackOpener
         if (_pack.PoolCount == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool, t_packId);
 
         long t_price = _pack.Price;
+        ECurrencyType t_currency = _pack.PriceType;
 
-        if (!CurrencyManager.CanAfford(ECurrencyType.Gold, t_price))
+        if (!CurrencyManager.CanAfford(t_currency, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold, t_packId);
 
-        if (!CurrencyManager.Spend(ECurrencyType.Gold, t_price))
+        if (!CurrencyManager.Spend(t_currency, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed, t_packId);
 
         var t_pool = _pack.Pool;
@@ -59,7 +60,7 @@ public static class CardPackOpener
             long t_refund = 0;
             if (!t_isNew)
             {
-                CurrencyManager.Earn(ECurrencyType.Gold, t_refundEach);
+                CurrencyManager.Earn(t_currency, t_refundEach);
                 t_refund = t_refundEach;
             }
 
@@ -68,6 +69,6 @@ public static class CardPackOpener
 
         CurrencyManager.Save();
 
-        return OpenedPack.CreateSuccess(t_packId, t_drawn);
+        return OpenedPack.CreateSuccess(t_packId, t_drawn, t_currency);
     }
 }

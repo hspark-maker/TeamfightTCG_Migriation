@@ -61,7 +61,7 @@ public class GameResultPopup : MonoBehaviour
     /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
     /// </summary>
-    public void Show(long _rewardGold, long _rankDelta = 0, bool _won = true)
+    public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true)
     {
         gameObject.SetActive(true);
 
@@ -69,7 +69,7 @@ public class GameResultPopup : MonoBehaviour
 
         this.m_revealDone = false;
 
-        ResetVisual(_rewardGold > 0 ? _rewardGold : 0, _rankDelta, _won);
+        ResetVisual(_reward.HasAmount ? _reward.Amount : 0, _rankDelta, _won);
 
         this.revealSeq = DOTween.Sequence().SetLink(gameObject);
 

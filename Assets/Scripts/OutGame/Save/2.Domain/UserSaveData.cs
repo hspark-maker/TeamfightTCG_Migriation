@@ -19,4 +19,6 @@ public class UserSaveData
     public RankSaveData rank = new RankSaveData();
 
     public CardGrowthSaveData cardGrowth = new CardGrowthSaveData();
+
+    public AlbumRewardSaveData albumReward = new AlbumRewardSaveData();
 }
