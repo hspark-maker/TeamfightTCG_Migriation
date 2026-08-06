@@ -38,6 +38,13 @@ public class CardEnhanceShading
     [SerializeField] float rimStrength   = 0.75f;                               // 정점의 테두리 불(_InnerOutlineAlpha)
     [Range(0f, 2f)]
     [SerializeField] float pixelShake    = 0.35f;                               // 정점의 픽셀 진동(_ShakeUv). 크면 이웃 그림이 새어든다
+    [SerializeField] Color coolColor     = new Color(0.35f, 0.42f, 0.55f, 1f);  // 다 식은 잔열의 색. 잉걸 그대로 사라지면 꺼진 뒤에도 타는 중으로 보인다
+
+    [Header("균열 — 실패의 순간")]
+    [Tooltip("⚠ CardRitualBody에 CHROMABERR_ON이 켜져 있고 _ChromAberrAmount 유휴값이 0이어야 한다 —\n" +
+             "  셰이더 기본값은 1이라 재질에 0을 저작해 두지 않으면 평상시에도 색이 벌어진 채 뜬다.")]
+    [Range(0f, 1f)]
+    [SerializeField] float aberration    = 0.6f;                                // 균열 정점의 색수차 폭(_ChromAberrAmount). 0이면 이 축을 건너뛴다
 
     // 셰이더가 '아직 멀쩡함'으로 보는 _FadeAmount. 재질의 _FadeBurnTransition(0.28)보다 낮아야
     // 평상시 덮개가 새지 않는다(셰이더가 [_FadeAmount, +transition] 구간을 걸쳐 지운다).
@@ -56,6 +63,7 @@ public class CardEnhanceShading
     static readonly int P_ShineLocation     = Shader.PropertyToID("_ShineLocation");
     static readonly int P_ShineWidth        = Shader.PropertyToID("_ShineWidth");
     static readonly int P_ShineGlow         = Shader.PropertyToID("_ShineGlow");
+    static readonly int P_ChromAberrAmount  = Shader.PropertyToID("_ChromAberrAmount");
 
     Material m_bodyMat;                     // 재질 사본. 자산을 직접 밀면 같은 셰이더를 쓰는 다른 화면까지 달아오른다
     Material m_coverMat;
@@ -69,6 +77,8 @@ public class CardEnhanceShading
     float m_coverAlpha;
     float m_snuff;
     float m_gleamAt;
+    float m_fracture;
+    float m_cool;
     Color m_blindColor = Color.white;
 
     /// <summary>달아오를 면이 하나라도 배선돼 있는가.</summary>
@@ -100,7 +110,7 @@ public class CardEnhanceShading
             if (this.m_bodyMat == null) return;
 
             float t_hot   = Mathf.Clamp01(value);
-            Color t_light = LightAt(t_hot);
+            Color t_light = Color.Lerp(LightAt(t_hot), this.coolColor, this.m_cool);
 
             this.m_bodyMat.SetColor(P_GlowColor, t_light);
             this.m_bodyMat.SetColor(P_InnerOutlineColor, t_light);
@@ -206,6 +216,30 @@ public class CardEnhanceShading
         }
     }
 
+    /// <summary>0 멀쩡 ~ +1 금이 간 순간. 색이 좌우로 벌어졌다 돌아온다.
+    /// ⚠ 조각마다 rect가 달라 좁은 조각일수록 픽셀상 크게 벌어진다 — 한순간이라 눈에 안 걸리지만 길게 끌면 어긋남이 보인다.</summary>
+    public float Fracture
+    {
+        get => this.m_fracture;
+        set
+        {
+            this.m_fracture = value;
+            if (this.m_bodyMat != null) this.m_bodyMat.SetFloat(P_ChromAberrAmount, value * this.aberration);
+        }
+    }
+
+    /// <summary>0 잉걸 ~ +1 다 식음. 열의 <b>색</b>만 민다 — 세기까지 함께 내리면 잔열이 사라지는 속도가 두 번 곱해진다.
+    /// 값을 직접 밀지 않고 <see cref="Heat"/>를 다시 태우는 이유는 색의 진실원이 거기 하나이기 때문이다.</summary>
+    public float Cool
+    {
+        get => this.m_cool;
+        set
+        {
+            this.m_cool = value;
+            this.Heat   = this.m_heat;
+        }
+    }
+
     // getter는 트윈이 시작할 때 한 번 읽힌다 — 그래서 앞 구간이 남긴 값에서 이어 출발한다.
     public Tween TweenHeat(float _to, float _dur)  => DOTween.To(() => this.Heat,  _v => this.Heat  = _v, _to, _dur);
     public Tween TweenShake(float _to, float _dur) => DOTween.To(() => this.Shake, _v => this.Shake = _v, _to, _dur);
@@ -214,6 +248,9 @@ public class CardEnhanceShading
     public Tween TweenCover(float _to, float _dur) => DOTween.To(() => this.Cover, _v => this.Cover = _v, _to, _dur);
     public Tween TweenSnuff(float _to, float _dur) => DOTween.To(() => this.Snuff, _v => this.Snuff = _v, _to, _dur);
     public Tween TweenGleam(float _to, float _dur) => DOTween.To(() => this.Gleam, _v => this.Gleam = _v, _to, _dur);
+
+    public Tween TweenFracture(float _to, float _dur) => DOTween.To(() => this.Fracture, _v => this.Fracture = _v, _to, _dur);
+    public Tween TweenCool(float _to, float _dur)     => DOTween.To(() => this.Cool,     _v => this.Cool     = _v, _to, _dur);
 
     public Tween TweenBlindColor(Color _to, float _dur)
         => DOTween.To(() => this.BlindColor, _v => this.BlindColor = _v, _to, _dur);
@@ -282,10 +319,12 @@ public class CardEnhanceShading
         EndGleam();
         this.Gleam = 0f;
 
-        this.Heat  = 0f;
-        this.Shake = 0f;
-        this.Grey  = 0f;
-        this.Blind = 0f;
+        this.Cool     = 0f;   // 열보다 먼저 — 색을 되돌린 뒤에 세기를 내려야 마지막 한 번이 잉걸색으로 찍히지 않는다
+        this.Heat     = 0f;
+        this.Shake    = 0f;
+        this.Grey     = 0f;
+        this.Blind    = 0f;
+        this.Fracture = 0f;
 
         // 알파를 먼저 내리고 잠식을 되돌린다 — 순서가 뒤집히면 지워졌던 덮개가 한 프레임 되살아난다.
         this.Cover = 0f;

@@ -30,6 +30,12 @@ public class CardEnhanceRitualView : MonoBehaviour
     [Range(0f, 0.5f)] [SerializeField] float emberHeat     = 0.22f;                               // 꺼진 직후의 잔열. 면의 빛은 이미 없고 테두리선만 남는다
     [SerializeField] float emberFade     = 0.35f;                               // 잔열이 사그라들기까지
     [Range(0f, 0.6f)] [SerializeField] float blackoutDepth = 0.3f;              // 딤이 결과 밝기보다 더 내려가는 깊이. 이 과암이 낙차를 만든다
+    [SerializeField] float coolFade      = 0.2f;                                // 잉걸이 회청으로 식는 시간
+
+    [Header("실패 — 균열")]
+    [SerializeField] float fractureShake = 11f;                                 // 균열의 몸통 흔들림 폭(px). 고조의 진동과 달리 한 번뿐이다
+    [SerializeField] float fractureFade  = 0.12f;                               // 색수차가 가라앉는 시간. 길면 '부서졌다'가 '흐려졌다'로 뭉개진다
+    [Range(0f, 1f)] [SerializeField] float ashGreyResidue = 0.2f;               // 펄스 뒤 남는 회색화. 낮아야 '담금질이 실패했다'이지 '카드가 상했다'가 아니다
 
     [Header("성공 잔광 — 카드 가장자리")]
     [Range(0f, 1f)] [SerializeField] float afterglowHeat  = 0.35f;                              // 공개 뒤 카드에 남는 열 — 방금 벼려낸 쇠붙이의 결
@@ -71,9 +77,25 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
 
+    // 균열이 폭발보다 늦게 붙는 만큼. 첫 두 프레임이 성공과 같아야 BuildBurst의 계약("몸짓은 결과를 모른다")이 산다 —
+    // 그 사이 백열이 이미 죽기 시작해 표면이 먼저 답을 낸다.
+    const float FractureDelay = 0.03f;
+
+    // 균열의 몸통 흔들림 길이. 이 뒤에 좌표를 못 박는다.
+    const float FractureShake = 0.18f;
+
+    // 벌어진 채 머무는 한 박. 즉시 되돌리면 눈이 어긋남을 읽기 전에 지나간다.
+    const float FractureHold = 0.02f;
+
+    // 잿빛이 정점에 머무는 한 박과 물러나는 시간. 머무름이 없으면 찍힌 것이 안 보이고, 길면 카드가 상한 것으로 읽힌다.
+    const float AshGreyHold    = 0.1f;
+    const float AshGreyRelease = 0.25f;
+
     // 실패 표면이 다 걷히기 전에 복귀가 시작되면, 잔막이 지워지는 도중에 카드가 되돌아온다.
     // (0.35는 과암에서 결과 밝기로 되돌아오는 딤 트윈 — 잔막 쓸림보다 짧아도 이만큼은 담겨야 한다.)
-    float FailSettle => Mathf.Max(0.02f, this.snuffDuration) + Mathf.Max(this.ashSweep, 0.35f);
+    // 잔막 쓸림·냉각은 둘 다 훅 꺼진 자리에서 함께 출발하므로 긴 쪽이 구간을 정한다.
+    float FailSettle => Mathf.Max(0.02f, this.snuffDuration)
+                      + Mathf.Max(Mathf.Max(this.ashSweep, 0.35f), Mathf.Max(0.05f, this.coolFade));
 
     // 성공도 마찬가지다 — 불티가 다 꺼지고 빛줄기가 다 지나갈 자리를 결과 구간이 담아야 한다.
     float SuccessSettle => Mathf.Max(this.embers.Span,
@@ -340,9 +362,11 @@ public class CardEnhanceRitualView : MonoBehaviour
         // 좌표는 이제 어느 결과도 옮기지 않지만, 진동 중에 잘린 자리를 데려오는 길은 여기뿐이라 남긴다.
         _seq.Insert(0f, this.cardStage.DOAnchorPos(this.m_baseAnchored, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(0f, this.shading.TweenHeat(0f, _dur).SetEase(Ease.OutQuad));
+        _seq.Insert(0f, this.shading.TweenCool(0f, _dur));
         _seq.Insert(0f, this.shading.TweenGrey(0f, _dur));
         _seq.Insert(0f, this.shading.TweenBlind(0f, _dur));
         _seq.Insert(0f, this.shading.TweenCover(0f, _dur));
+        _seq.Insert(0f, this.shading.TweenFracture(0f, _dur));
 
         _seq.Insert(0f, this.halo.TweenAlpha(0f, _dur));
         _seq.Insert(0f, this.halo.TweenScale(this.halo.IdleScale, _dur));
@@ -511,6 +535,12 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, this.shading.TweenHeat(this.emberHeat, t_snuff).SetEase(Ease.OutQuad));
         _seq.Insert(_at, this.shading.TweenGrey(this.failDesaturation, t_snuff).SetEase(Ease.OutQuad));
 
+        // 잿빛은 훅 찍고 곧 물러난다 — 실패가 앗아간 것은 골드뿐인데 잿빛이 남으면 카드가 상한 것으로 읽힌다
+        // (PackCardView가 중복 카드에 내린 것과 같은 판단).
+        _seq.Insert(_at + AshGreyHold, this.shading.TweenGrey(this.ashGreyResidue, AshGreyRelease).SetEase(Ease.OutQuad));
+
+        BuildFracture(_seq, _at);
+
         // 눈이 정점의 빛에 적응해 있다. 결과 밝기보다 한 번 더 내려갔다 올라와야 "빛이 사라졌다"가 몸으로 온다.
         _seq.Insert(_at,   this.dimTint.TweenLevel(Mathf.Max(-1f, this.resultDimLevel - this.blackoutDepth), t_snuff).SetEase(Ease.OutQuad));
         _seq.Insert(t_out, this.dimTint.TweenLevel(this.resultDimLevel, 0.35f).SetEase(Ease.InOutSine));
@@ -525,14 +555,36 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         // 잔열. 면의 빛은 이미 없고 테두리선만 남아 사그라든다 — 카드 자체는 회색화만 뒤집어쓴 채 원래 밝기로 돌아온다.
         _seq.Insert(t_out, this.shading.TweenHeat(0f, Mathf.Max(0.05f, this.emberFade)).SetEase(Ease.InQuad));
+
+        // 그 잔열의 색이 잉걸에서 회청으로 넘어간다. 밝기만 내리면 꺼진 뒤에도 주황이 남아 "아직 타는 중"으로 보인다.
+        _seq.Insert(t_out, this.shading.TweenCool(1f, Mathf.Max(0.05f, this.coolFade)).SetEase(Ease.OutQuad));
+    }
+
+    // 균열. 빛이 죽는 순간 카드가 한 번 어긋났다 돌아온다 — 실패에 없던 타격 프레임이다.
+    // 벌어짐은 즉시 세우고 감쇠만 트윈에 맡긴다(폭발과 같은 규칙 — 차오르는 과정을 보여주면 타격이 뭉개진다).
+    void BuildFracture(Sequence _seq, float _at)
+    {
+        float t_crack = _at + FractureDelay;
+
+        // 감쇠를 한 박 늦춰 시작한다 — 같은 시각에 놓으면 트윈의 getter가 콜백보다 먼저 읽혀 0에서 0으로 흐를 수 있다.
+        _seq.InsertCallback(t_crack, () => this.shading.Fracture = 1f);
+        _seq.Insert(t_crack + FractureHold,
+                    this.shading.TweenFracture(0f, Mathf.Max(0.02f, this.fractureFade)).SetEase(Ease.OutQuad));
+
+        _seq.Insert(t_crack, this.cardStage.DOShakeAnchorPos(FractureShake, this.fractureShake, 24, 90f, false, false));
+
+        // 잘린 흔들림이 좌표에 굳으면 결과판이 뜨는 동안 카드가 비뚤어진 채 선다(BuildStill과 같은 못 박기).
+        _seq.Insert(t_crack + FractureShake, this.cardStage.DOAnchorPos(this.m_baseAnchored, 0.08f).SetEase(Ease.OutQuad));
     }
 
     void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
     {
         _seq.Insert(_at, this.shading.TweenHeat(0f, _dur).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.shading.TweenCool(0f, Mathf.Min(0.2f, _dur)));
         _seq.Insert(_at, this.shading.TweenGrey(0f, Mathf.Min(0.2f, _dur)));
         _seq.Insert(_at, this.shading.TweenBlind(0f, Mathf.Min(0.1f, _dur)));
         _seq.Insert(_at, this.shading.TweenCover(0f, Mathf.Min(0.1f, _dur)));
+        _seq.Insert(_at, this.shading.TweenFracture(0f, Mathf.Min(0.1f, _dur)));
 
         // 잠식은 덮개가 다 투명해진 뒤에 되돌린다 — 먼저 되돌리면 지워졌던 덮개가 한 프레임 되살아난다.
         _seq.InsertCallback(_at + Mathf.Min(0.1f, _dur), () => this.shading.Snuff = 0f);
