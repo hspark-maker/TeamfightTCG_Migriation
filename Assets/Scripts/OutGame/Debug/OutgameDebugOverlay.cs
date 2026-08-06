@@ -12,11 +12,16 @@ public class OutgameDebugOverlay : MonoBehaviour
     const float PANEL_WIDTH   = 190f;
     const float ROW_HEIGHT    = 26f;
     const float CLOSED_HEIGHT = 30f;
-    const float OPENED_HEIGHT = 326f;
+    // 열었을 때 쓸 최대 높이. 화면이 더 짧으면 그만큼만 쓴다.
+    // 내용이 넘치면 잘리지 않고 스크롤된다 — 고정 높이만 두면 줄을 추가할 때 아래가 조용히 사라진다(실제로 그랬음).
+    const float OPENED_HEIGHT = 460f;
 
     static OutgameDebugOverlay s_instance;
 
     bool m_open;
+
+    // 패널이 화면보다 길어졌을 때의 스크롤 위치.
+    Vector2 m_scroll;
 
     EventSystem m_lockedEvents;
 
@@ -47,7 +52,10 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(t_scale, t_scale, 1f));
 
         float t_right = Screen.width / t_scale;
-        var   t_area  = new Rect(t_right - PANEL_WIDTH - 8f, 8f, PANEL_WIDTH, m_open ? OPENED_HEIGHT : CLOSED_HEIGHT);
+        // 화면 밖으로 나가지 않게 상하 여백을 뺀 값으로 제한한다(세로가 짧은 기기 대응).
+        float t_maxHeight = Mathf.Max(CLOSED_HEIGHT, Screen.height / t_scale - 16f);
+        float t_height    = m_open ? Mathf.Min(OPENED_HEIGHT, t_maxHeight) : CLOSED_HEIGHT;
+        var   t_area      = new Rect(t_right - PANEL_WIDTH - 8f, 8f, PANEL_WIDTH, t_height);
 
         GUILayout.BeginArea(t_area, GUI.skin.box);
 
@@ -62,6 +70,9 @@ public class OutgameDebugOverlay : MonoBehaviour
 
     void DrawBody()
     {
+        // 스크롤로 감싼다 — 버튼을 하나 더 붙였을 때 아래가 잘려 "버튼이 없다"가 되지 않게.
+        m_scroll = GUILayout.BeginScrollView(m_scroll);
+
         GUILayout.Label($"OWNED {OwnershipManager.OwnedCount} / {CardCatalog.Count}");
 
         if (GUILayout.Button("UNLOCK ALL CARDS", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.UnlockAllCards();
@@ -77,6 +88,8 @@ public class OutgameDebugOverlay : MonoBehaviour
         DrawCurrencyGrants();
         DrawTierControls();
         DrawChapterJumps();
+
+        GUILayout.EndScrollView();
     }
 
     // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
