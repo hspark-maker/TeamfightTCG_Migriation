@@ -75,7 +75,22 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
 
         DrawCurrencyGrants();
+        DrawTierControls();
         DrawChapterJumps();
+    }
+
+    // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
+    void DrawTierControls()
+    {
+        RankInfo t_info = RankManager.GetInfo();
+
+        GUILayout.Label($"TIER {t_info.DisplayName}  (AI Lv{RankManager.AiCardLevel})");
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
+        if (GUILayout.Button("TIER +", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RaiseTier();
+        if (GUILayout.Button("RESET", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.ResetTier();
+        GUILayout.EndHorizontal();
     }
 
     void DrawCurrencyGrants()

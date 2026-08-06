@@ -34,6 +34,8 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] float      hpIconPulse = 0.12f;
     [Tooltip("굴리기가 끝나는 프레임 아이콘을 튀기는 세기. 숫자 펀치(UiPunch 기본값)보다 작아야 시선이 숫자에 남는다.")]
     [SerializeField] float      hpIconPunch = 0.15f;
+    [Tooltip("강화 레벨 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
+    [SerializeField] TMP_Text   levelText;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
@@ -56,6 +58,7 @@ public class CardVisualView : MonoBehaviour
     // "무엇을 보일지"는 프리팹이 결정한다(호출부에 표시 분기를 만들지 않기 위함).
     [SerializeField] bool showName      = true;
     [SerializeField] bool showHp        = true;
+    [SerializeField] bool showLevel     = true;
     [SerializeField] bool showKeywords  = true;
     [SerializeField] bool showSynergies = true;
     // 표시 최대 배지 수. 기본값은 인게임과 같은 코드 상수 하나에서 온다(각자 3을 적어두면 한쪽만 바뀌어도 조용히 갈라진다).
@@ -96,11 +99,12 @@ public class CardVisualView : MonoBehaviour
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
     //
-    // _applyGrowth: 강화 반영 체력을 그릴지. 기본 true인 이유는 호출부 전수가 "내 카드"이기 때문이다
+    // _mine: 이 칸이 내 카드인가. 기본 true인 이유는 호출부 전수가 "내 카드"이기 때문이다
     // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
-    // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots) — 거기만 false로 끈다.
-    // 내 강화분이 상대 카드에 얹히면 트레이드 판단이 틀어진다.
-    public void Bind(CardData _card, bool _owned, bool _applyGrowth = true)
+    // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots).
+    // **false는 "성장 없음"이 아니라 "상대 기준"이다** — 내 강화분을 얹지 않되, 상대가 서 있는
+    // 레벨(랭크 티어가 정한 AI 레벨)로 체력·레벨을 그린다. 둘을 같게 두면 상대가 실제보다 약해 보인다.
+    public void Bind(CardData _card, bool _owned, bool _mine = true)
     {
         if (_card == null)
         {
@@ -133,7 +137,8 @@ public class CardVisualView : MonoBehaviour
         }
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
-        SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
+        SetHpDisplay(_card, _owned && this.showHp, _mine);
+        SetLevelDisplay(_card, _owned && this.showLevel, _mine);
         RefreshKeywordIcons(_card, _owned && this.showKeywords);
         RefreshKeywordFrames(_card, _owned && this.showKeywords);
         RefreshSynergyBadges(_card, _owned && this.showSynergies);
@@ -149,14 +154,15 @@ public class CardVisualView : MonoBehaviour
     /// hpText를 쓰는 곳은 SetHpDisplay 하나뿐이라 호출부가 텍스트를 직접 만지면 진실원이 갈린다.
     ///
     /// 카드·소유여부를 캐싱하지 않고 인자로 받는 이유: 바인딩 상태의 진실원을 호출부와 여기 둘로 만들지 않기 위함.</summary>
-    public void RefreshHp(CardData _card, bool _owned, bool _applyGrowth = true)
+    public void RefreshHp(CardData _card, bool _owned, bool _mine = true)
     {
         if (_card == null) return;
 
         // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
         if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
 
-        SetHpDisplay(_card, _owned && this.showHp, _applyGrowth);
+        SetHpDisplay(_card, _owned && this.showHp, _mine);
+        SetLevelDisplay(_card, _owned && this.showLevel, _mine);
     }
 
     /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
@@ -270,15 +276,25 @@ public class CardVisualView : MonoBehaviour
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
     // 아웃게임엔 전투 인스턴스(CardInstance.hp)가 없으므로 내 카드는 강화 반영 최대 체력(DeckPower.MaxHpOf)을 그린다 —
     // 마스터 데이터의 maxHp를 직접 읽으면 강화한 카드가 로비에서만 안 오른 것처럼 보인다.
-    // 반대로 상대 카드(_applyGrowth=false)는 내 성장과 무관하므로 마스터 값 그대로다.
-    void SetHpDisplay(CardData _card, bool _show, bool _applyGrowth)
+    // 반대로 상대 카드(_mine=false)는 내 진행도가 아니라 상대 레벨 기준이다.
+    /// <summary>강화 레벨 표시. 상대 덱도 띄운다 — 상대가 몇 레벨 카드로 나오는지가 트레이드 판단의 핵심이다.
+    /// 값의 기준만 갈린다(내 카드=내 진행도, 상대=랭크 티어 AI 레벨). 판정은 DeckPower가 소유.</summary>
+    void SetLevelDisplay(CardData _card, bool _show, bool _mine)
+    {
+        if (this.levelText == null) return;
+
+        this.levelText.gameObject.SetActive(_show);
+        if (_show) this.levelText.text = $"Lv{DeckPower.LevelOf(_card, _mine)}";
+    }
+
+    void SetHpDisplay(CardData _card, bool _show, bool _mine)
     {
         if (this.hpPanel != null) this.hpPanel.SetActive(_show);
 
         if (this.hpText != null)
         {
             this.hpText.gameObject.SetActive(_show);
-            if (_show) this.hpText.text = DeckPower.MaxHpOf(_card, _applyGrowth).ToString();
+            if (_show) this.hpText.text = DeckPower.MaxHpOf(_card, _mine).ToString();
         }
 
         if (this.bonusHpText != null)

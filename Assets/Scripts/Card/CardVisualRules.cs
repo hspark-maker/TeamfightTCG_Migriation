@@ -70,10 +70,39 @@ public static class CardVisualRules
         => _card == null ? CardKeyword.None
          : (_card.unlockedKeywords | _card.synergyKeywords) & ~AlwaysStatus;
 
+    static System.Func<CardData, CardKeyword> s_unlockedKeywords;
+
+    /// <summary>강화로 **지금 실제 열려 있는** 카드 키워드 공급자. 부트가 OutGame의 성장값을 꽂는다 —
+    /// 표시 규칙(여기)이 OutGame을 직접 참조하지 않게 값 생산자를 상위에서 밀어넣는 기존 규약과 같다.
+    ///
+    /// 미주입(null)이면 마스터 데이터 그대로 = 성장 없는 경로(전투 씬 단독 실행)의 종전 동작.</summary>
+    public static System.Func<CardData, CardKeyword> UnlockedKeywordProvider
+    {
+        set => s_unlockedKeywords = value;
+    }
+
+    /// <summary>이 카드가 지금 가진 키워드. 해금 전이면 비어 있다 —
+    /// `data.keywords`를 직접 읽으면 아직 못 쓰는 키워드가 화면에 뜨고 규칙과 갈라진다.</summary>
+    static CardKeyword OwnedKeywords(CardData _card)
+        => s_unlockedKeywords != null ? s_unlockedKeywords(_card) : _card.keywords;
+
     /// <summary>전투 인스턴스가 없는 아웃게임(도감/로비)용 같은 판정. 판정식을 여기 한 곳에만 둔다 —
     /// 호출부가 각자 `& ~AlwaysStatus`를 복제하면 로비와 전투 표시가 조용히 갈라진다.</summary>
     public static CardKeyword TraitKeywords(CardData _card)
-        => _card == null ? CardKeyword.None : _card.keywords & ~AlwaysStatus;
+        => _card == null ? CardKeyword.None : OwnedKeywords(_card) & ~AlwaysStatus;
+
+    /// <summary>**카드 정보창**이 띄울 키워드 = 지금 가진 키워드 + 설명 전용(explainKeywords).
+    /// 타일의 아이콘 줄과 목적이 다르다(설명까지 보여주는 창이라 AlwaysStatus를 빼지 않는다).
+    /// 이 규칙을 호출부가 각자 `keywords | explainKeywords`로 복제하면 해금 반영이 한쪽에서만 빠진다.</summary>
+    public static CardKeyword InfoKeywords(CardData _card)
+        => _card == null ? CardKeyword.None : OwnedKeywords(_card) | _card.explainKeywords;
+
+    /// <summary>전투 인스턴스용 정보창 키워드. **인스턴스가 있으면 이쪽이 정답이다** —
+    /// 적 카드에 내 성장을 얹지 않으려면 공급자(내 강화값)가 아니라 그 인스턴스의 값을 봐야 한다.</summary>
+    public static CardKeyword InfoKeywords(CardInstance _card)
+        => _card == null ? CardKeyword.None
+         : _card.unlockedKeywords | _card.synergyKeywords
+           | (_card.data != null ? _card.data.explainKeywords : CardKeyword.None);
 
     /// <summary>아이콘 줄에서만 빼는 키워드. 프레임 장식으로는 그대로 보여준다.
     /// Mark(표식)=반격을 못 주는 대가라 프레임 테두리로 알리는 편이 맞고, 아이콘 줄에 넣으면

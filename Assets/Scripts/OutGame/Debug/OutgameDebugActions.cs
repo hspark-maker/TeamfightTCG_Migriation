@@ -87,6 +87,29 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
+    // 티어 1단계 올리기/내리기. AI 카드 레벨이 티어에서 나오므로 난이도 곡선을 이걸로 확인한다.
+    public static void RaiseTier() => StepTier(+1);
+
+    public static void LowerTier() => StepTier(-1);
+
+    static void StepTier(int _step)
+    {
+        int t_before = RankManager.GetInfo().TierIndex;
+        int t_after  = RankManager.StepTierForDebug(_step);
+
+        RankInfo t_info = RankManager.GetInfo();
+        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel}");
+    }
+
+    // 랭크 포인트 초기화(브론즈 1로)
+    public static void ResetTier()
+    {
+        RankManager.ResetForDebug();
+
+        RankInfo t_info = RankManager.GetInfo();
+        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName} / AI 카드 레벨 {RankManager.AiCardLevel}");
+    }
+
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)
     public static void ToggleFeatureLock()
     {

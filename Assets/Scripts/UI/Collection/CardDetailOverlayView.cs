@@ -719,9 +719,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (_owned && this.keywordIconConfig != null && this.chipPrefab != null && this.keywordChipRoot != null)
         {
-            // 판정 기준은 인게임 카드 정보창(CardElement)과 같은 keywords | explainKeywords —
-            // 설명 전용 키워드까지 보여주는 것이 정보창의 규약이다(카드 타일의 아이콘 줄과는 목적이 다르다).
-            CardKeyword t_all = _card.keywords | _card.explainKeywords;
+            // 판정 기준은 인게임 카드 정보창(CardElement)과 같다 — 규칙 자체는 CardVisualRules가 소유한다.
+            // 해금 전 키워드는 여기서도 뜨지 않는다(공급자 미주입이면 마스터 데이터 그대로).
+            CardKeyword t_all = CardVisualRules.InfoKeywords(_card);
 
             // 순회 순서 = CardKeyword 선언 순. 카드 타일 아이콘 줄(CardVisualRules.CollectKeywordIcons)과 같은 순서다.
             foreach (CardKeyword t_kw in (CardKeyword[])Enum.GetValues(typeof(CardKeyword)))

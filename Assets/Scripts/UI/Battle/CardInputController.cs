@@ -545,8 +545,9 @@ public class CardInputController
                 UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
                     new PooledCardElementData
                     {
-                        card    = this.owner.BoundCard.data,
-                        synergy = this.owner.LastBadgeState,
+                        card     = this.owner.BoundCard.data,
+                        instance = this.owner.BoundCard,
+                        synergy  = this.owner.LastBadgeState,
                     });
 
                 // 정보를 보는 그 카드만 살짝 떠오른다. 시너지 배지 툴팁 쪽은 카드 정보가 아니므로 제외.

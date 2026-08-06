@@ -210,7 +210,10 @@ public class PooledCardElement : PooledUIBase
         if (this.cardElementData.dimOnly) return;
 
         // 이 창은 전체 카드 한 가지만 띄운다(작은 모드 폐지) — mod 값이 뭐로 오든 Full로 그린다.
-        this.fullCardElement.Init(this.cardData, CardElementMod.Full);
+        if (this.cardElementData.instance != null)
+            this.fullCardElement.Init(this.cardElementData.instance, CardElementMod.Full);
+        else
+            this.fullCardElement.Init(this.cardData, CardElementMod.Full);
         this.fullCardContents.SetActive(true);
 
 
@@ -320,6 +323,11 @@ public class PooledCardElement : PooledUIBase
 public class PooledCardElementData : UIData
 {
     public CardData card;
+
+    /// <summary>전투 카드면 그 인스턴스. 있으면 키워드·체력의 진실원이 이쪽이다 —
+    /// 적 카드 정보창에 내 강화 해금이 얹히는 것을 막는 유일한 구분이다.</summary>
+    public CardInstance instance;
+
     public CardElementMod mod = CardElementMod.Full;
 
     /// <summary>true면 배경 어둡기만 — 롱프레스가 차오르는 중이라 카드는 아직 띄우지 않는다.</summary>

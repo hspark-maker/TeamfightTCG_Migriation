@@ -66,8 +66,14 @@ public class CardElement : MonoBehaviour,
 
     bool pressing;   // 떼기/벗어남에서 중복으로 끄지 않게(콜백이 두 번 불리면 다른 카드의 창까지 닫는다)
 
+    // 전투 인스턴스로 바인딩됐다면 그쪽이 키워드의 진실원이다 — 적 카드에 내 강화 해금을 얹지 않기 위함.
+    // CardData로 바인딩되면 null이 되어 아웃게임(내 카드) 해금 규칙을 탄다.
+    CardInstance boundInstance;
+
     public void Init(CardData _card, CardElementMod _mod = CardElementMod.Full, int _displayHp = -1)
     {
+        this.boundInstance = null;   // CardData 바인딩 = 아웃게임(내 카드) 기준으로 되돌린다
+
         if (_card == null)
         {
             EmptySlotInit();
@@ -82,9 +88,10 @@ public class CardElement : MonoBehaviour,
             // 프레임이 인게임 CardView와 같은 세로형이라 비율이 다른 fullImage를 쓰면 카드마다 잘림이 갈라진다.
             this.cardPortrait.sprite = CardVisualRules.PickCardArt(_card);
             //this.explainText.text = _card.cardExplain;
-            // 폴백은 마스터 데이터 그대로 — 이 컴포넌트는 전투 카드정보 팝업(적 카드 포함)도 그린다.
-            // 강화 반영 체력이 필요한 아웃게임 호출부는 _displayHp에 DeckPower.MaxHpOf를 직접 넘긴다.
-            this.hpText.text = (_displayHp >= 0 ? _displayHp : _card.maxHp).ToString();
+            // 호출부가 값을 정했으면 그대로(전투는 인스턴스 현재 체력을 넘긴다).
+            // 안 정했으면 = CardData만 아는 아웃게임 경로라 강화 반영 최대 체력이 맞다.
+            // 적 카드는 이 길로 오지 않는다 — 전투 팝업은 인스턴스를 넘기므로 _displayHp가 항상 채워진다.
+            this.hpText.text = (_displayHp >= 0 ? _displayHp : DeckPower.MaxHpOf(_card)).ToString();
         }
         else
         {
@@ -99,6 +106,9 @@ public class CardElement : MonoBehaviour,
     public void Init(CardInstance _instance, CardElementMod _mod = CardElementMod.Full)
     {
         Init(_instance?.data, _mod, _instance?.hp ?? -1);
+        // Init(CardData)가 null로 지운 뒤에 다시 세운다 — 순서가 뒤집히면 인스턴스 기준이 날아간다.
+        this.boundInstance = _instance;
+        RefreshKeywordIcons(_instance?.data);
     }
 
     void RefreshKeywordIcons(CardData _card)
@@ -111,7 +121,11 @@ public class CardElement : MonoBehaviour,
         KeywordIconConfig t_config = DataLibrary.instance?.keywordIconConfig;
         if (t_config == null) return;
 
-        CardKeyword t_allKeywords = _card.keywords | _card.explainKeywords;
+        // 정보창 키워드 규칙은 CardVisualRules 단독. 인스턴스가 있으면(전투 카드) 그 인스턴스의 값이 정답이다 —
+        // CardData 경로는 내 강화 해금을 태우므로 적 카드에 쓰면 안 된다.
+        CardKeyword t_allKeywords = this.boundInstance != null
+            ? CardVisualRules.InfoKeywords(this.boundInstance)
+            : CardVisualRules.InfoKeywords(_card);
         foreach (CardKeyword t_kw in (CardKeyword[])Enum.GetValues(typeof(CardKeyword)))
         {
             if (t_kw == CardKeyword.None) continue;

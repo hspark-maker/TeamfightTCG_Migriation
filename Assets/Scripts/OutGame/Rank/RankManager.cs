@@ -68,6 +68,28 @@ public static class RankManager
             t_config.ResolveTierIndex(t_slot.points));
     }
 
+    /// <summary>티어를 _index로 바로 옮긴다(디버그 전용). 포인트를 그 티어의 진입 임계치에 맞춘다 —
+    /// 티어는 points의 순수 파생이라 티어를 직접 쓸 곳이 없고, 임계치에 세워야 표시·보상이 다 맞는다.
+    /// 범위 밖은 양끝으로 클램프. 반환값 = 실제로 도달한 티어 인덱스.</summary>
+    public static int SetTierForDebug(int _index)
+    {
+        var t_config = Config;
+        int t_last   = t_config.TierCount - 1;
+        if (t_last < 0) return 0;
+
+        int t_target = _index < 0 ? 0 : (_index > t_last ? t_last : _index);
+        if (!t_config.TryGetTier(t_target, out RankTier t_tier)) return t_config.ResolveTierIndex(Points);
+
+        Slot.points = t_tier.RequiredPoints;
+        Save();
+
+        return t_config.ResolveTierIndex(Slot.points);
+    }
+
+    /// <summary>티어를 _step만큼 올린다(음수면 내린다). 디버그 전용.</summary>
+    public static int StepTierForDebug(int _step)
+        => SetTierForDebug(Config.ResolveTierIndex(Points) + _step);
+
     // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
