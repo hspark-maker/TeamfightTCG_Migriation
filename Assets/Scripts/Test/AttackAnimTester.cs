@@ -27,6 +27,14 @@ public enum SynergyPreviewKind
     CaretakerHeal,   // 돌보미: 아군 전원 회복(힐러와 같은 연출)
 }
 
+/// <summary>키워드에서 따로 확인할 수 있는 연출 종류.</summary>
+public enum KeywordPreviewKind
+{
+    Glow,
+    Attack,
+    Vfx,
+}
+
 /// <summary>이어 붙여 재생할 수 있는 한 마디. 인게임 <c>AttackFlow</c>가 실제로 도는 순서
 /// (선피해 → 공격 시퀀스 → 공격 후 효과 → 교대 → 결과 연출)를 그대로 재현하려고 나눠 둔 단위다.</summary>
 public enum AttackStep
@@ -54,9 +62,6 @@ public class AttackAnimTester : MonoBehaviour
     [Header("공격 연출 옵션")]
     [Tooltip("체크=특별 연출(시네마). 해제=일반 박치기")]
     [SerializeField] bool useSpecialCinema = false;
-    [Tooltip("체크=무쌍. 공격자에게 무쌍 키워드를 임시로 주고 대상 옆칸을 광역 대상으로 넘긴다.\n" +
-             "옆칸이 비어 있으면 광역 대상이 없어 일반(박치기)으로 떨어진다 — 인게임 규칙과 같다.")]
-    [SerializeField] bool usePeerless = false;
     [Tooltip("체크=처치에 성공하면 처형 연출(무기 양 끝 스파크 + 마법진) 재생")]
     [SerializeField] bool useExecution = true;
     [Tooltip("체크=총 체력이 낮은 쪽이 접촉 순간 즉사. 사망/생존 연출 분기를 반복해서 보려는 스위치다\n" +
@@ -82,6 +87,12 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] int synergyIndex = 0;
     [Tooltip("무엇을 재생할지. 종류가 늘면 이 enum에 값을 더하고 PlaySelectedSynergy의 분기만 늘린다")]
     [SerializeField] SynergyPreviewKind synergyPreview = SynergyPreviewKind.Emblem;
+
+    [Header("키워드 연출")]
+    [Tooltip("연출을 확인할 키워드(실제 연출이 있는 키워드만 표시)")]
+    [SerializeField] int keywordIndex = 0;
+    [Tooltip("고른 키워드에서 확인할 연출")]
+    [SerializeField] KeywordPreviewKind keywordPreview = KeywordPreviewKind.Glow;
 
     [Header("연출별 값")]
     [Tooltip("엠블럼을 띄울 아군 슬롯")]
@@ -224,10 +235,10 @@ public class AttackAnimTester : MonoBehaviour
         // 적(비로컬) 공격이면 오프셋/회전 반전 — AttackSequence의 t_flip 규칙과 동일.
         bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
 
-        // 무쌍: 키워드를 런타임으로 주고 광역 대상을 직접 골라 넘긴다. 인게임에선 AttackFlow가 하는 일인데
-        // 테스터는 규칙 계층을 안 돌리므로(데미지 없음) 여기서 같은 입력만 만들어 준다.
-        ApplyPeerlessKeyword(_attacker);
-        CardView t_splash = this.usePeerless ? FindSplashTarget(_defender) : null;
+        // 테스터는 규칙 계층을 안 돌리므로 무쌍 광역 대상만 같은 규칙으로 직접 골라 넘긴다.
+        CardView t_splash = _attacker.BoundCard.HasKeyword(CardKeyword.Peerless)
+            ? FindSplashTarget(_defender) : null;
+        var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker.BoundCard);
 
         // 무장 VFX는 무장 시점에 켜진다. 버튼 공격은 무장 단계를 안 거치므로 여기서 대신 켜준다
         // (탭/드래그 공격은 FocusWeapon에서 이미 켜져 있고, SetArmedVfx는 중복 호출에 안전).
@@ -250,7 +261,9 @@ public class AttackAnimTester : MonoBehaviour
 
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
         await AttackSequence.PlaySplash(_attacker, _defender, t_effect,
-            _onEffect: OnEffect, _splashView: t_splash, _forceSpecial: this.useSpecialCinema);
+            _onEffect: OnEffect, _splashView: t_splash,
+            _preEffectKw: t_preKw, _atEffectKw: t_atKw,
+            _forceSpecial: this.useSpecialCinema);
 
         // 처형 연출. 인게임 조건과 같게 **처치 + 공격자 생존**일 때만 — 공격자가 반격에 같이 죽었으면 뜨면 안 된다.
         // 리스폰 전에 불러야 죽은 상태 기준으로 판정된다.
@@ -386,6 +399,111 @@ public class AttackAnimTester : MonoBehaviour
         t_card.isRevealed = true;
         if (t_cv != null) t_cv.Render(t_card);
         await CunningVfx.PlayEnter(t_cv);
+    }
+
+    // ── 키워드 연출 ──────────────────────────────────────────────────────
+
+    static readonly CardKeyword[] k_previewableKeywords =
+    {
+        CardKeyword.Ranged,
+        CardKeyword.Peerless,
+        CardKeyword.Execution,
+        CardKeyword.Taunt,
+        CardKeyword.Cunning,
+        CardKeyword.Healer,
+    };
+
+    static readonly KeywordPreviewKind[] k_glowOnly = { KeywordPreviewKind.Glow };
+    static readonly KeywordPreviewKind[] k_glowAttack =
+        { KeywordPreviewKind.Glow, KeywordPreviewKind.Attack };
+    static readonly KeywordPreviewKind[] k_glowVfx =
+        { KeywordPreviewKind.Glow, KeywordPreviewKind.Vfx };
+
+    public CardKeyword[] PreviewableKeywords() => k_previewableKeywords;
+
+    public CardKeyword SelectedKeyword
+        => k_previewableKeywords[Mathf.Clamp(this.keywordIndex, 0, k_previewableKeywords.Length - 1)];
+
+    public KeywordPreviewKind SelectedKeywordPreview => this.keywordPreview;
+
+    public KeywordPreviewKind[] AvailableKeywordPreviews(CardKeyword _keyword)
+    {
+        switch (_keyword)
+        {
+            case CardKeyword.Ranged:
+            case CardKeyword.Peerless:
+                return k_glowAttack;
+            case CardKeyword.Execution:
+            case CardKeyword.Cunning:
+            case CardKeyword.Healer:
+                return k_glowVfx;
+            default:
+                return k_glowOnly;
+        }
+    }
+
+    public void ClampKeywordPreviewToAvailable()
+    {
+        this.keywordIndex = Mathf.Clamp(this.keywordIndex, 0, k_previewableKeywords.Length - 1);
+        KeywordPreviewKind[] t_available = AvailableKeywordPreviews(SelectedKeyword);
+        foreach (KeywordPreviewKind t_kind in t_available)
+            if (t_kind == this.keywordPreview) return;
+        this.keywordPreview = t_available[0];
+    }
+
+    public void PlaySelectedKeyword() => PreviewSelectedKeyword().Forget();
+
+    async UniTaskVoid PreviewSelectedKeyword()
+    {
+        if (this.busy) return;
+
+        CardView t_view = this.playerFieldView?.GetSlotView(0);
+        CardInstance t_card = t_view?.BoundCard;
+        if (t_card == null) return;
+
+        CardKeyword t_keyword = SelectedKeyword;
+        CardKeyword t_originalKeywords = t_card.unlockedKeywords;
+
+        this.busy = true;
+        TurnState.InputAllowed = false;
+        try
+        {
+            // 아이콘과 글로우가 같은 키워드를 보도록 해금 키워드로 임시 부여하고 다시 그린다.
+            t_card.unlockedKeywords = (t_card.unlockedKeywords
+                                     & ~(CardKeyword.Ranged | CardKeyword.Peerless | CardKeyword.Execution
+                                       | CardKeyword.Taunt | CardKeyword.Cunning | CardKeyword.Healer))
+                                     | t_keyword;
+            t_view.Render(t_card);
+
+            switch (this.keywordPreview)
+            {
+                case KeywordPreviewKind.Glow:
+                    await t_view.PlayKeywordGlow(t_keyword);
+                    break;
+                case KeywordPreviewKind.Attack:
+                {
+                    CardView t_defender = this.enemyFieldView?.GetSlotView(0);
+                    if (t_defender?.BoundCard != null) await AttackCore(t_view, t_defender);
+                    break;
+                }
+                case KeywordPreviewKind.Vfx:
+                    if (t_keyword == CardKeyword.Execution) ExecutionVfx.Play(t_view);
+                    else if (t_keyword == CardKeyword.Cunning) await CunningCore();
+                    else if (t_keyword == CardKeyword.Healer) PlayCaretakerHeal();
+                    break;
+            }
+        }
+        finally
+        {
+            // 공격 중 리스폰했으면 새 카드 인스턴스를 죽은 원본으로 덮어쓰지 않는다.
+            if (ReferenceEquals(t_view.BoundCard, t_card))
+            {
+                t_card.unlockedKeywords = t_originalKeywords;
+                t_view.Render(t_card);
+            }
+            TurnState.InputAllowed = true;
+            this.busy = false;
+        }
     }
 
     // ── 시너지 연출 ──────────────────────────────────────────────────────
@@ -689,17 +807,6 @@ public class AttackAnimTester : MonoBehaviour
 
         PlayEmblem();
         this.emblemReplayTimer = SynergyEmblemVfx.DurationOf(t_syn, this.emblemTiming) + this.emblemReplayGap;
-    }
-
-    /// <summary>토글 상태를 공격자 카드에 반영. **끌 때 반드시 지운다** — 런타임 키워드는 카드 인스턴스에
-    /// 남으므로, 켜고 한 번 때린 카드가 토글을 꺼도 계속 무쌍으로 남으면 무엇을 보고 있는지 알 수 없게 된다.</summary>
-    void ApplyPeerlessKeyword(CardView _attacker)
-    {
-        CardInstance t_c = _attacker?.BoundCard;
-        if (t_c == null) return;
-
-        if (this.usePeerless) t_c.runtimeKeywords |=  CardKeyword.Peerless;
-        else                  t_c.runtimeKeywords &= ~CardKeyword.Peerless;
     }
 
     /// <summary>대상 옆칸(오른쪽 우선)에서 카드가 있는 슬롯 하나. 인게임은 인접 중 무작위(MatchRandom)지만

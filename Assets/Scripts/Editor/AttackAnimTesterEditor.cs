@@ -16,7 +16,7 @@ public class AttackAnimTesterEditor : Editor
     // 상단 조작 패널이 직접 그리는 값들. 아래 "그 밖의 설정"에서 중복으로 그리지 않으려고 제외 목록으로 쓴다.
     static readonly string[] k_handled =
     {
-        "m_Script", "synergyIndex", "synergyPreview",
+        "m_Script", "synergyIndex", "synergyPreview", "keywordIndex", "keywordPreview",
         "emblemSlot", "emblemTiming", "emblemAutoReplay", "emblemReplayGap",
         "flowStack", "swarmDamagePerShot", "caretakerHeal",
         "sequence", "stepGap", "untimedStepHold",
@@ -42,6 +42,7 @@ public class AttackAnimTesterEditor : Editor
         {
             DrawSequenceSection(t_tester);
             DrawAttackSection(t_tester);
+            DrawKeywordSection(t_tester);
             DrawSynergySection(t_tester);
             DrawVfxSection(t_tester);
 
@@ -86,6 +87,48 @@ public class AttackAnimTesterEditor : Editor
         }
         EditorGUILayout.LabelField("카드를 탭·드래그해도 공격이 나간다(인게임과 같은 입력).",
                                    EditorStyles.miniLabel);
+    }
+
+    void DrawKeywordSection(AttackAnimTester _tester)
+    {
+        Section("키워드 연출");
+
+        CardKeyword[] t_keywords = _tester.PreviewableKeywords();
+        SerializedProperty t_index = serializedObject.FindProperty("keywordIndex");
+        var t_keywordLabels = new string[t_keywords.Length];
+        for (int i = 0; i < t_keywords.Length; i++) t_keywordLabels[i] = t_keywords[i].ToString();
+
+        using (var t_check = new EditorGUI.ChangeCheckScope())
+        {
+            int t_current = Mathf.Clamp(t_index.intValue, 0, t_keywords.Length - 1);
+            int t_picked = EditorGUILayout.Popup("키워드", t_current, t_keywordLabels);
+            if (t_check.changed)
+            {
+                t_index.intValue = t_picked;
+                serializedObject.ApplyModifiedProperties();
+                _tester.ClampKeywordPreviewToAvailable();
+                serializedObject.Update();
+            }
+        }
+
+        KeywordPreviewKind[] t_available = _tester.AvailableKeywordPreviews(_tester.SelectedKeyword);
+        SerializedProperty t_kind = serializedObject.FindProperty("keywordPreview");
+        var t_labels = new string[t_available.Length];
+        int t_kindIndex = 0;
+        for (int i = 0; i < t_available.Length; i++)
+        {
+            t_labels[i] = t_available[i].ToString();
+            if ((int)t_available[i] == t_kind.enumValueIndex) t_kindIndex = i;
+        }
+
+        using (var t_check = new EditorGUI.ChangeCheckScope())
+        {
+            int t_picked = EditorGUILayout.Popup("연출", t_kindIndex, t_labels);
+            if (t_check.changed) t_kind.enumValueIndex = (int)t_available[t_picked];
+        }
+
+        serializedObject.ApplyModifiedProperties();
+        if (Button("키워드 재생")) _tester.PlaySelectedKeyword();
     }
 
     void DrawSynergySection(AttackAnimTester _tester)
