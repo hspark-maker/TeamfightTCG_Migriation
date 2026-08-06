@@ -1094,4 +1094,118 @@ sequenceDiagram
     BF->>BF: CardInstance(maxHp = data.maxHp + HpBonus,<br/>evolutionStage = 세이브 우선)
 ```
 
--
+---
+
+### 신규 도감 (`OutGame/Dex/`) — 테마 → 페이지 → 칸, 보상 3단 — ⬜ **설계 승인 대기 (2026-08-06)**
+
+> 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체할** 새 축. **이번 플랜에 기존 삭제는 포함하지 않는다 — 병존**하고, 삭제는 후속 정리 패키지로 넘긴다.
+> 그래서 신규는 폴더·접두어를 **`Dex`로 물리 분리**한다. 구/신 파일이 `UI/Collection/`에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
+
+**실측 전제 (설계의 근거)**
+
+- 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있고 **역참조 0건 = 로비에서 도달 불가**.
+- 테마 축(`CollectionThemes`/`CollectionThemeConfig`/`CollectionThemeListController`/`CollectionThemeRowView`/`CollectionTabController`)은 코드만 있고 **에셋 0건 + 어떤 프리팹·씬에도 미부착 = 완전 휴면**. `Tab_Collection`의 `ThemeTab_All/01~06`은 컨트롤러 없는 **정적 목업**이다.
+- ⚠️ **`Boot.prefab:51-55`에 직렬화된 필드는 `cardRegistry`/`collectionLayout`/`tutorialData`/`deckImageCatalog`/`starterDeck` 5개뿐** — `BootInstaller.cs`의 `collectionThemes`·`triggeredTutorialData`·`growthConfig`는 프리팹에 없다(= null). 즉 매 부팅마다 `CollectionThemes`의 "테마 SO 미배선" 경고가 뜨고 있다. 신규 SO 배선도 **반드시 `Boot.prefab` 레벨**에 해야 한다 — `StartScene.unity:423-435`가 일부 SO를 **씬 오버라이드**로 꽂는 바람에 `LobbyScene` 단독 Play에서 null이 되는 기존 함정을 반복하지 않기 위해서다.
+- **도감에 "완성 보상 수령" 개념이 코드에 전혀 없다.** 수령 선례는 랭크(`RankRewardManager`)뿐이고, **페이지 개념도 데이터 모델에 없다**(`Tab_Collection`의 `ChapterLabel "01"`은 미배선 장식).
+- 카드 총량 = **31장**(`Assets/SO/Cards/*.asset`). 목업의 "4페이지 × 9칸 = 36칸"은 현재 카드로 채울 수 없다 → 테마·페이지 분할은 승인 항목.
+
+#### 클래스도
+
+```mermaid
+flowchart TD
+    subgraph AUTH["저작 (에디터)"]
+        CFG["DexConfig (SO)<br/>themes[] · bookReward"]:::new
+        TDEF["DexThemeDef<br/>themeId · displayName · icon<br/>reward · pages[]"]:::new
+        PDEF["DexPageDef<br/>pageId · reward · cards[]"]:::new
+        RDEF["DexRewardDef (struct)<br/>currency · amount · icon"]:::new
+    end
+    subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
+        BOOK["DexBook (static)<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateBook"]:::new
+        THEME["DexTheme<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
+        PAGE["DexPage<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+    end
+    subgraph CLAIM["보상 수령 (유일한 저장 축)"]
+        RMGR["DexRewardManager (static)<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/BookInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
+        RINFO["DexRewardInfo (readonly struct)<br/>Tier · Currency · Amount<br/>Owned/Total · State"]:::new
+        SAVE["DexRewardSaveData<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.dexReward · VERSION 1 유지)"]:::new
+    end
+    subgraph UI["UI (UI/Dex/)"]
+        TAB["DexTabView<br/>테마 버튼 그리드"]:::new
+        TBTN["DexThemeButtonView<br/>아이콘·이름·n/N·보상·✓"]:::new
+        PANEL["DexPanelView<br/>오버레이 셸 (Tab_Collection 내부)"]:::new
+        PVIEW["DexPageView<br/>3열 칸 그리드 (칸 재사용)"]:::new
+        SLOT["DexSlotView<br/>미소유 실루엣 + 이름"]:::new
+        STEP["DexPageStepperView<br/>◀ 1/4 ▶"]:::new
+        BOX["DexRewardBoxView<br/>3계층 공용"]:::new
+        PROG["DexProgressView<br/>3계층 공용"]:::new
+    end
+    OWN["OwnershipManager<br/>IsOwned (동결 계약)"]
+    CAT["CardCatalog.KeyOf<br/>= SO 파일명 (동결 계약)"]
+    CUR["CurrencyManager<br/>Earn / Save (동결 계약)"]
+    BOOTI["BootInstaller<br/>+2줄 SetSource"]:::chg
+    DET["CardDetailOverlayView<br/>(기존 재사용 · 무수정)"]
+
+    CFG --> TDEF --> PDEF
+    TDEF -.-> RDEF
+    PDEF -.-> RDEF
+    BOOTI -->|SetSource| BOOK
+    CFG --> BOOK
+    BOOK --> THEME --> PAGE
+    CAT -->|카드 키| BOOK
+    OWN -->|"소유 집합 = 진행도의 유일한 원천"| BOOK
+    BOOK -->|완성 판정| RMGR
+    RMGR --> RINFO
+    RMGR <-->|"슬롯 직독"| SAVE
+    RMGR -->|Earn → Save 1회| CUR
+    TAB --> TBTN
+    TAB -->|테마 클릭| PANEL
+    PANEL --> PVIEW --> SLOT
+    PANEL --> STEP
+    RINFO --> BOX
+    BOOK --> PROG
+    RMGR -->|OnChanged| TAB
+    RMGR -->|OnChanged| PANEL
+    OWN -->|OnOwnershipChanged| TAB
+    SLOT -->|"BindTile(테마 평탄화 목록)"| DET
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+#### 확정 설계 결정 5개 (각각 "안 그러면 무엇이 깨지나")
+
+| # | 결정 | 안 그러면 |
+|---|---|---|
+| 1 | **페이지는 명시 저작**(`List<DexPageDef>` + `pageId`). 자동 9청크 금지 | 자동 청크 + 인덱스 키면 카드 1장 삽입에 페이지 내용이 밀려 **이미 준 보상이 다시 Claimable**이 된다(재화 복제). 첫-카드-키로 만들면 삽입 지점 이후 **모든 페이지 키가 새 키**가 되어 낙인이 전멸한다. `CollectionThemes.BuildEmpty()`가 세운 "저작물성 데이터는 자동 생성 금지"의 연장 — 보상이 붙은 페이지는 테마보다 더 강한 저작물이다 |
+| 2 | **진행도는 저장하지 않는다** — `OwnershipManager.IsOwned`의 순수 파생. 저장하는 건 **수령 낙인**뿐 | 진행도를 저장하면 기존 생산 축이 겪은 "완성/미완성 전이마다 정산 시각을 당기는" 보정 로직과 세이브 마이그레이션 부채를 그대로 물려받는다 |
+| 3 | **수령 낙인 = 접두 네임스페이스 문자열 리스트**(`p:테마/페이지` · `t:테마` · `b`). 랭크의 `claimedCount` 단조 커서 **사용 불가** | 도감 완성은 소유 집합의 함수라 **부분순서**다(3테마를 먼저 완성하고 1테마를 나중에 완성 가능, 카드 추가로 완성이 **취소**되기도 한다). 커서로 표현하면 "3테마 수령"이 "1·2테마 수령"으로 해석된다. 비트마스크는 비트 위치=인덱스라 세이브 규약(인덱스 금지) 정면 위반 |
+| 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **부트에 줄이 0개 추가** | 캐시를 두면 "부트를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
+| 5 | **`StateOf`는 `Claimed`를 최우선 검사**, 3종 배타(`Locked`/`Claimable`/`Claimed`) | 완성 후 카드가 추가돼 미완성으로 되돌아간 뒤 다시 완성되면 **재수령이 뚫린다**. 랭크가 같은 이유로 같은 순서를 쓴다 |
+
+#### 병존 경계 — 기존 도감 코드 수정 0
+
+신규가 **읽기만** 하는 것: `OwnershipManager.IsOwned` · `CardCatalog.KeyOf` · `CurrencyManager.Earn`/`Save` · `CardDetailOverlayView.BindTile`(무수정 재사용).
+신규가 **참조하지 않는** 것(리뷰 체크리스트): `CollectionThemes` · `CollectionTheme` · `CollectionThemeConfig` · `CatalogRows` · `CatalogRow` · `CollectionProductionManager` · `CollectionThemeListController` · `CollectionThemeRowView` · `CollectionGalleryController` · `CollectionRowView` · `CollectionProgressView` · `CollectionGridController`.
+
+수정 파일은 **4개 · 5줄**뿐:
+
+| 파일 | 변경 |
+|---|---|
+| `Core/BootInstaller.cs` | `[SerializeField] DexConfig dexConfig` + `DexBook.SetSource(dexConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
+| `OutGame/Save/2.Domain/UserSaveData.cs` | `dexReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
+| `OutGame/Collection/CollectionThemeConfig.cs` | `[CreateAssetMenu]` **봉인**(1줄) — 누군가 구 테마 SO를 새로 만들어 꽂으면 "카드→테마" 매핑이 2벌이 된다. 이게 이중 진실원의 유일한 실질 방어선 |
+| `Tab_Collection.prefab` | `Panel_Grid`·`Panel_ThemeBar` **비활성화**(스크립트 무수정). ⚠️ 코드 삭제는 후속이어도 **가동은 즉시 중단해야 한다** — `CollectionGridController.OnEnable`이 `OwnershipManager`/`CardGrowthManager` 이벤트를 구독하고 `CardDetailOverlayView.BindTile`로 **오버레이의 넘김 목록을 가로채기** 때문이다(마지막에 Bind한 쪽이 이긴다 → 탭을 오간 뒤 좌우 넘김이 남의 목록을 탄다) |
+
+#### 배치 규약 (충돌 회피)
+
+- **오버레이는 `Tab_Collection.prefab` 안 패널로 둔다.** `CardDetailOverlay`처럼 `LobbyCanvas.prefab` 직속에 두면 대기 중인 `PKG-ENTRY`·`PKG-HUD`와 **3항목 클리크**가 되고, `.prefab` YAML은 머지가 불가해 도감이 대기줄에 선다.
+- `Tab_Collection.prefab`은 `LobbyCanvas` 안 **중첩 인스턴스**다 → **프리팹 모드에서만 편집**, 인스턴스 오버라이드 금지(오버라이드를 걸면 `LobbyCanvas.prefab`이 변해 클리크로 승격된다).
+- 프리팹 참조는 **프리팹 레벨에 저작**. 씬 오버라이드로 하면 `LobbyScene.unity`가 4번째 경합 파일이 되고, 나중에 누가 Apply All 하면 조용히 어긋난다.
+- `sortingOrder`는 **400 미만** 유지(`UIPoolManager` 팝업 400 / 튜토리얼 게이트 350·351·352).
+
+#### 알려진 함정
+
+- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`DexBook` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
+- **키 폴백에 `displayName`을 넣지 말 것.** `CollectionThemes.ResolveKey`는 `themeId → displayName → theme_{index}` 폴백을 허용하지만 거기는 표시 축이라 리네임 손해가 없었다. 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
+- **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).
+- **카드 배치가 두 곳에 저작된다** — 신규 `DexConfig`(테마 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.

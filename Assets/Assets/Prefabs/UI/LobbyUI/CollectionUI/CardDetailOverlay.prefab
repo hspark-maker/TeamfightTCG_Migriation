@@ -626,25 +626,48 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardEnhanceRitualView
   cardStage: {fileID: 3915342703562077861}
-  dim: {fileID: 4389903715525950018}
   retractGroups:
   - {fileID: 2309724952634657886}
   - {fileID: 6303195616330956602}
-  cardSurfaces:
-  - {fileID: 7031325186801552220}
-  - {fileID: 2077304351476186024}
-  bodyMaterial: {fileID: 2100000, guid: 7a1c9e4b2f30d4a4b9c8e5d61f2a3b40, type: 2}
-  floodCover: {fileID: 5887355907855028410}
+  shading:
+    cardSurfaces:
+    - {fileID: 7031325186801552220}
+    - {fileID: 2077304351476186024}
+    bodyMaterial: {fileID: 2100000, guid: 7a1c9e4b2f30d4a4b9c8e5d61f2a3b40, type: 2}
+    floodCover: {fileID: 5887355907855028410}
+    coverMaterial: {fileID: 2100000, guid: f744962ef568df34ea0c619144cf67de, type: 2}
+    gleamCover: {fileID: 1504589440636840914}
+    gleamMaterial: {fileID: 2100000, guid: 5d3f8c1a604e7b442a9d0c3e18b6f259, type: 2}
+    gleamGlow: 3
+    emberColor: {r: 1, g: 0.5, b: 0.15, a: 1}
+    whiteHotColor: {r: 1, g: 0.93, b: 0.78, a: 1}
+    heatGlow: 1.6
+    rimStrength: 0.75
+    pixelShake: 0.35
+  embers:
+    motes:
+    - {fileID: 3943808625683221302}
+    - {fileID: 1155668704974666292}
+    - {fileID: 2460989219909188239}
+    - {fileID: 128410566125723898}
+    - {fileID: 920037921950789690}
+    - {fileID: 7013542906041397956}
+    material: {fileID: 2100000, guid: 3c8a5f27b1e04d94b8f6a2c709d5e13a, type: 2}
+    rise: 0.7
+    stagger: 0.06
+    travel: 190
+    spread: 70
+    shrink: 0.4
+    spin: 70
+    alpha: 0.9
+  dimTint:
+    dim: {fileID: 4389903715525950018}
+    darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
+    brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   backGlow: {fileID: 651702345096800075}
-  emberColor: {r: 1, g: 0.5, b: 0.15, a: 1}
-  whiteHotColor: {r: 1, g: 0.93, b: 0.78, a: 1}
-  heatGlow: 1.6
-  rimStrength: 0.75
-  pixelShake: 0.35
   blindPeak: 1
   overheatStart: 0.4
   overheatRise: 0.55
-  coverMaterial: {fileID: 2100000, guid: f744962ef568df34ea0c619144cf67de, type: 2}
   snuffDuration: 0.07
   ashColor: {r: 0.42, g: 0.16, b: 0.05, a: 1}
   ashAlpha: 0.5
@@ -655,26 +678,8 @@ MonoBehaviour:
   afterglowHeat: 0.35
   afterglowAlpha: 0.3
   afterglowScale: 1.12
-  moteMaterial: {fileID: 2100000, guid: 3c8a5f27b1e04d94b8f6a2c709d5e13a, type: 2}
-  emberMotes:
-  - {fileID: 3943808625683221302}
-  - {fileID: 1155668704974666292}
-  - {fileID: 2460989219909188239}
-  - {fileID: 128410566125723898}
-  - {fileID: 920037921950789690}
-  - {fileID: 7013542906041397956}
-  moteRise: 0.7
-  moteStagger: 0.06
-  moteTravel: 190
-  moteSpread: 70
-  moteShrink: 0.4
-  moteSpin: 70
-  moteAlpha: 0.9
-  gleamMaterial: {fileID: 2100000, guid: 5d3f8c1a604e7b442a9d0c3e18b6f259, type: 2}
-  gleamCover: {fileID: 1504589440636840914}
   gleamDelay: 0.14
   gleamSweep: 0.4
-  gleamGlow: 3
   useScreenFlash: 1
   successFlash:
     rise: 0.05
@@ -704,8 +709,6 @@ MonoBehaviour:
   failDesaturation: 0.8
   glowPeakAlpha: 0.9
   glowStartScale: 1.6
-  dimDarkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
-  dimBrightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   resultDimLevel: -0.45
 --- !u!1 &1120484064910990786
 GameObject:
