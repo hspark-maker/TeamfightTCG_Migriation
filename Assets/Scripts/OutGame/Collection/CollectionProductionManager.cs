@@ -118,37 +118,37 @@ public static class CollectionProductionManager
             t_row.Id, t_state, t_whole, t_raw, t_row.Cap, t_whole >= 1, t_row.RewardType, t_row.ProductionCycleSeconds);
     }
 
-    // 행 하나 수확 — 정수 누적분 지급, 지급량 반환
-    public static long Harvest(int _rowId)
+    // 행 하나 수확 — 정수 누적분 지급, 지급 재화·지급량 반환
+    public static CurrencyGain Harvest(int _rowId)
     {
-        if (!CatalogRows.TryGetRow(_rowId, out var t_row)) return 0;
+        if (!CatalogRows.TryGetRow(_rowId, out var t_row)) return CurrencyGain.None;
 
         long t_earned = HarvestCore(t_row);
-        if (t_earned <= 0) return 0;
+        if (t_earned <= 0) return CurrencyGain.None;
 
         Save();
         CurrencyManager.Save();
         OnChanged?.Invoke();
-        return t_earned;
+        return new CurrencyGain(t_row.RewardType, t_earned);
     }
 
-    // 모든 행 일괄 수확 — 영속·통지는 1회로 묶음
-    public static long HarvestAll()
+    // 모든 행 일괄 수확 — 영속·통지는 1회로 묶음. 행마다 재화가 달라도 종류별로 나뉘어 담긴다
+    public static CurrencyGainBucket HarvestAll()
     {
-        long t_total = 0;
+        var t_gains = new CurrencyGainBucket();
 
         var t_rows = CatalogRows.Rows;
         for (int t_i = 0; t_i < t_rows.Count; t_i++)
         {
-            t_total += HarvestCore(t_rows[t_i]);
+            t_gains.Add(t_rows[t_i].RewardType, HarvestCore(t_rows[t_i]));
         }
 
-        if (t_total <= 0) return 0;
+        if (t_gains.IsEmpty) return t_gains;
 
         Save();
         CurrencyManager.Save();
         OnChanged?.Invoke();
-        return t_total;
+        return t_gains;
     }
 
     static long HarvestCore(CatalogRow _row)

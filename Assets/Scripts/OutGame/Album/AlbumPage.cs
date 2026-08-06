@@ -16,7 +16,7 @@ public sealed class AlbumPage
     public IReadOnlyList<CardData> Cards { get; }
 
     // 완성 판정 모수(null 슬롯 제외)
-    public IReadOnlyList<string> CardKeys { get; }
+    public IReadOnlyList<int> CardIds { get; }
 
     // 테마 키까지 안정해야 참 — 페이지 낙인 키에 테마 키가 들어간다
     public bool HasStableKey { get; }
@@ -31,14 +31,14 @@ public sealed class AlbumPage
         string _themeKey,
         bool _hasStableKey,
         IReadOnlyList<CardData> _cards,
-        IReadOnlyList<string> _cardKeys)
+        IReadOnlyList<int> _cardIds)
     {
         Key = _key;
         Index = _index;
         Reward = _reward;
         ThemeKey = _themeKey;
         Cards = _cards;
-        CardKeys = _cardKeys;
+        CardIds = _cardIds;
         HasStableKey = _hasStableKey;
         RewardKey = _hasStableKey ? "p:" + _themeKey + "/" + _key : null;
     }

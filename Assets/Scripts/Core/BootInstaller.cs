@@ -51,7 +51,7 @@ public class BootInstaller : MonoBehaviour
         // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CollectionThemes.SetSource(collectionThemes);
 
-        // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.KeyOf를 읽는다).
+        // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CardAlbum.SetSource(albumConfig);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).

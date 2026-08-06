@@ -81,17 +81,17 @@ public static class CardAlbum
     }
 
     public static int OwnedCountOf(AlbumTheme _theme)
-        => _theme != null ? OwnedIn(_theme.CardKeys) : 0;
+        => _theme != null ? OwnedIn(_theme.CardIds) : 0;
 
     public static int OwnedCountOf(AlbumPage _page)
-        => _page != null ? OwnedIn(_page.CardKeys) : 0;
+        => _page != null ? OwnedIn(_page.CardIds) : 0;
 
     // 완성 판정 분모(null 슬롯 제외) — 다른 곳에서 Cards.Count로 재산출 금지
     public static int TotalCountOf(AlbumTheme _theme)
-        => _theme != null && _theme.CardKeys != null ? _theme.CardKeys.Count : 0;
+        => _theme != null && _theme.CardIds != null ? _theme.CardIds.Count : 0;
 
     public static int TotalCountOf(AlbumPage _page)
-        => _page != null && _page.CardKeys != null ? _page.CardKeys.Count : 0;
+        => _page != null && _page.CardIds != null ? _page.CardIds.Count : 0;
 
     // 카드 0장 테마는 미완성(저작 누락이 완성으로 새지 않게)
     public static bool IsComplete(AlbumTheme _theme)
@@ -118,9 +118,10 @@ public static class CardAlbum
         EnsureBuilt();
 
         int t_unstable = 0;
+        int t_unassigned = 0;
         var t_rewardKeys = new HashSet<string>();
-        var t_placed = new HashSet<string>();
-        var t_dupCards = new List<string>();
+        var t_placed = new HashSet<int>();
+        var t_dupCards = new List<int>();
 
         foreach (var t_theme in s_themes)
         {
@@ -137,9 +138,19 @@ public static class CardAlbum
                 if (TotalCountOf(t_page) == 0)
                     Debug.LogWarning($"[CardAlbum] 카드 0장 페이지 '{t_theme.Key}/{t_page.Key}' — 영구 미완성이다.");
 
-                foreach (var t_key in t_page.CardKeys)
+                foreach (var t_card in t_page.Cards)
                 {
-                    if (!t_placed.Add(t_key)) t_dupCards.Add(t_key);
+                    if (t_card == null) continue;
+
+                    int t_id = CardCatalog.IdOf(t_card);
+                    // 미부여 id는 전부 0이라 중복·미존재 진단이 오염된다 — 카드명으로 따로 보고
+                    if (t_id <= 0)
+                    {
+                        t_unassigned++;
+                        Debug.LogError($"[CardAlbum] id 미부여 카드 '{t_card.name}' (페이지 '{t_theme.Key}/{t_page.Key}') — 소유 불가라 페이지가 영구 미완성이다.");
+                        continue;
+                    }
+                    if (!t_placed.Add(t_id)) t_dupCards.Add(t_id);
                 }
             }
         }
@@ -149,16 +160,16 @@ public static class CardAlbum
         if (t_dupCards.Count > 0)
             Debug.LogWarning($"[CardAlbum] 카드 중복 배치 {t_dupCards.Count}건: {string.Join(", ", t_dupCards)}");
 
-        var t_missing = new List<string>();
+        var t_missing = new List<int>();
         foreach (var t_card in CardCatalog.All)
         {
-            var t_key = CardCatalog.KeyOf(t_card);
-            if (!string.IsNullOrEmpty(t_key) && !t_placed.Contains(t_key)) t_missing.Add(t_key);
+            var t_id = CardCatalog.IdOf(t_card);
+            if (t_id > 0 && !t_placed.Contains(t_id)) t_missing.Add(t_id);
         }
-        var t_notInCatalog = new List<string>();
-        foreach (var t_key in t_placed)
+        var t_notInCatalog = new List<int>();
+        foreach (var t_id in t_placed)
         {
-            if (!CardCatalog.Contains(t_key)) t_notInCatalog.Add(t_key);
+            if (!CardCatalog.Contains(t_id)) t_notInCatalog.Add(t_id);
         }
 
         if (t_missing.Count > 0)
@@ -166,18 +177,18 @@ public static class CardAlbum
         if (t_notInCatalog.Count > 0)
             Debug.LogWarning($"[CardAlbum] 앨범엔 있으나 카탈로그 미존재 {t_notInCatalog.Count}장: {string.Join(", ", t_notInCatalog)}");
 
-        if (t_unstable == 0 && t_dupCards.Count == 0 && t_missing.Count == 0 && t_notInCatalog.Count == 0)
+        if (t_unstable == 0 && t_unassigned == 0 && t_dupCards.Count == 0 && t_missing.Count == 0 && t_notInCatalog.Count == 0)
             Debug.Log($"[CardAlbum] 앨범 검증 통과 — 테마 {s_themes.Count}개 / 배치 {t_placed.Count}장, 드리프트 없음.");
     }
 
-    static int OwnedIn(IReadOnlyList<string> _keys)
+    static int OwnedIn(IReadOnlyList<int> _ids)
     {
-        if (_keys == null) return 0;
+        if (_ids == null) return 0;
 
         int t_owned = 0;
-        for (int t_i = 0; t_i < _keys.Count; t_i++)
+        for (int t_i = 0; t_i < _ids.Count; t_i++)
         {
-            if (OwnershipManager.IsOwned(_keys[t_i])) t_owned++;
+            if (OwnershipManager.IsOwned(_ids[t_i])) t_owned++;
         }
         return t_owned;
     }
@@ -235,7 +246,7 @@ public static class CardAlbum
 
         var t_pages = new List<AlbumPage>();
         var t_cards = new List<CardData>();
-        var t_keys = new List<string>();
+        var t_ids = new List<int>();
 
         var t_pageDefs = _def.pages;
         int t_pageCount = t_pageDefs != null ? t_pageDefs.Count : 0;
@@ -248,9 +259,9 @@ public static class CardAlbum
             {
                 if (t_page.Cards[t_c] != null) t_cards.Add(t_page.Cards[t_c]);
             }
-            for (int t_c = 0; t_c < t_page.CardKeys.Count; t_c++)
+            for (int t_c = 0; t_c < t_page.CardIds.Count; t_c++)
             {
-                t_keys.Add(t_page.CardKeys[t_c]);
+                t_ids.Add(t_page.CardIds[t_c]);
             }
 
             if (t_page.RewardKey != null && !s_pageByRewardKey.ContainsKey(t_page.RewardKey))
@@ -259,7 +270,7 @@ public static class CardAlbum
 
         var t_theme = new AlbumTheme(
             _def.themeId, _def.displayName, _def.icon, _index, _def.reward,
-            t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_keys.AsReadOnly(), t_stable);
+            t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
         s_themes.Add(t_theme);
 
         if (t_stable && !s_themeByKey.ContainsKey(t_theme.Key))
@@ -276,16 +287,16 @@ public static class CardAlbum
         int t_slots = t_source != null ? t_source.Count : 0;
 
         var t_cards = new List<CardData>(t_slots);
-        var t_keys = new List<string>(t_slots);
+        var t_ids = new List<int>(t_slots);
         for (int t_c = 0; t_c < t_slots; t_c++)
         {
             t_cards.Add(t_source[t_c]);
-            if (t_source[t_c] != null) t_keys.Add(CardCatalog.KeyOf(t_source[t_c]));
+            if (t_source[t_c] != null) t_ids.Add(CardCatalog.IdOf(t_source[t_c]));
         }
 
         return new AlbumPage(
             _def.pageId, _index, _def.reward, _themeKey, t_stable,
-            t_cards.AsReadOnly(), t_keys.AsReadOnly());
+            t_cards.AsReadOnly(), t_ids.AsReadOnly());
     }
 
     static void EndBuild()

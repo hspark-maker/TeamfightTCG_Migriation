@@ -21,7 +21,7 @@ public sealed class AlbumTheme
     public IReadOnlyList<CardData> Cards { get; }
 
     // Cards와 인덱스 정합(null 슬롯 제외)
-    public IReadOnlyList<string> CardKeys { get; }
+    public IReadOnlyList<int> CardIds { get; }
 
     public bool HasStableKey { get; }
 
@@ -36,7 +36,7 @@ public sealed class AlbumTheme
         AlbumRewardDef _reward,
         IReadOnlyList<AlbumPage> _pages,
         IReadOnlyList<CardData> _cards,
-        IReadOnlyList<string> _cardKeys,
+        IReadOnlyList<int> _cardIds,
         bool _hasStableKey)
     {
         Key = _key;
@@ -46,7 +46,7 @@ public sealed class AlbumTheme
         Reward = _reward;
         Pages = _pages;
         Cards = _cards;
-        CardKeys = _cardKeys;
+        CardIds = _cardIds;
         HasStableKey = _hasStableKey;
         RewardKey = _hasStableKey ? "t:" + _key : null;
     }
