@@ -626,9 +626,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardEnhanceRitualView
   cardStage: {fileID: 3915342703562077861}
-  retractGroups:
-  - {fileID: 2309724952634657886}
-  - {fileID: 6303195616330956602}
+  retractPanels:
+    groups:
+    - {fileID: 2309724952634657886}
+    - {fileID: 6303195616330956602}
   shading:
     cardSurfaces:
     - {fileID: 7031325186801552220}
@@ -660,11 +661,13 @@ MonoBehaviour:
     shrink: 0.4
     spin: 70
     alpha: 0.9
+  halo:
+    glow: {fileID: 651702345096800075}
+    idleScale: 1.6
   dimTint:
     dim: {fileID: 4389903715525950018}
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
-  backGlow: {fileID: 651702345096800075}
   blindPeak: 1
   overheatStart: 0.4
   overheatRise: 0.55
@@ -708,7 +711,6 @@ MonoBehaviour:
   shakeStrength: 9
   failDesaturation: 0.8
   glowPeakAlpha: 0.9
-  glowStartScale: 1.6
   resultDimLevel: -0.45
 --- !u!1 &1120484064910990786
 GameObject:

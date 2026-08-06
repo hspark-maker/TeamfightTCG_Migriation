@@ -1,7 +1,6 @@
 using System;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.UI;
 
 // 카드 강화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 담금질이다 — 카드가 움츠러들며 달아오르고(고조), 그 빛이 카드를 통째로 삼킨 뒤(정적), 백열이 걷히며 터진다(공개).
@@ -10,16 +9,13 @@ public class CardEnhanceRitualView : MonoBehaviour
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 진동이 보이지 않는다.")]
     [SerializeField] RectTransform cardStage;                                   // 압축·진동·낙하를 받는 노드(CardSlot). 카드 그림의 부모
-    [Tooltip("⚠ SetActive로 끄지 않는다 — 루트 VerticalLayoutGroup에서 CardArea가 남는 높이를 먹어 카드 크기가 튄다.")]
-    [SerializeField] CanvasGroup[] retractGroups;                               // 연출 동안 사라졌다 돌아올 패널들(DetailPanel·BottomBar)
+    [SerializeField] RetractingPanels retractPanels = new RetractingPanels();   // 연출 동안 사라졌다 돌아올 패널들(DetailPanel·BottomBar)
 
     [Header("연출 레이어")]
     [SerializeField] CardEnhanceShading shading = new CardEnhanceShading();     // 카드 표면이 내는 빛
     [SerializeField] CardEnhanceEmbers  embers  = new CardEnhanceEmbers();      // 성공에 흩날리는 불티
+    [SerializeField] CardEnhanceHalo    halo    = new CardEnhanceHalo();        // 카드 뒤 후광
     [SerializeField] ScreenDimTint      dimTint = new ScreenDimTint();          // 화면 딤의 밝기
-
-    [Header("카드 뒤 후광 (선택)")]
-    [SerializeField] Graphic backGlow;                                          // 카드 뒤에서 조여드는 빛. 에셋 후보: Sprites/CardPack/Glow_Radial
 
     [Header("과열 — 빛이 카드를 삼킨다")]
     [Range(0f, 1f)] [SerializeField] float blindPeak     = 1f;                                  // 백열의 최대 세기. 1이면 흰 실루엣만 남는다
@@ -32,8 +28,8 @@ public class CardEnhanceRitualView : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] float ashAlpha      = 0.5f;                                // 잔막의 두께. 카드가 비쳐야 '덮인 채 식는 중'으로 읽힌다
     [SerializeField] float ashSweep      = 0.3f;                                // 잔막이 얼룩덜룩 걷히는 시간. 짧으면 눈이 무늬를 못 읽는다
     [Range(0f, 0.5f)] [SerializeField] float emberHeat     = 0.22f;                               // 꺼진 직후의 잔열. 면의 빛은 이미 없고 테두리선만 남는다
-    [SerializeField] float emberFade     = 0.35f;                               // 잔열이 사그라들기까지[Range(0f, 0.6f)]
-    [SerializeField] float blackoutDepth = 0.3f;                                // 딤이 결과 밝기보다 더 내려가는 깊이. 이 과암이 낙차를 만든다
+    [SerializeField] float emberFade     = 0.35f;                               // 잔열이 사그라들기까지
+    [Range(0f, 0.6f)] [SerializeField] float blackoutDepth = 0.3f;              // 딤이 결과 밝기보다 더 내려가는 깊이. 이 과암이 낙차를 만든다
 
     [Header("성공 잔광 — 카드 가장자리")]
     [Range(0f, 1f)] [SerializeField] float afterglowHeat  = 0.35f;                              // 공개 뒤 카드에 남는 열 — 방금 벼려낸 쇠붙이의 결
@@ -64,8 +60,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     [SerializeField] float shakeStrength    = 9f;                               // 고조 마지막 마디의 몸통 진동(px). 앞 마디는 1/4, 1/2
     [Range(0f, 1f)] [SerializeField] float failDesaturation = 0.85f;
-    [Range(0f, 1f)] [SerializeField] float glowPeakAlpha    = 0.9f;
-    [SerializeField] float glowStartScale   = 1.6f;
+    [Range(0f, 1f)] [SerializeField] float glowPeakAlpha    = 0.9f;             // 고조 정점의 후광 짙기
 
     [Range(-1f, 1f)]
     [SerializeField] float resultDimLevel = -0.45f;                             // 결과를 읽는 동안의 밝기. 여기까지 가라앉아야 결과판 글자가 읽힌다
@@ -85,9 +80,8 @@ public class CardEnhanceRitualView : MonoBehaviour
                                      this.shading.HasGleam ? Mathf.Max(0f, this.gleamDelay) + Mathf.Max(0.05f, this.gleamSweep) : 0f);
 
     Sequence m_seq;
-    Action   m_onReveal;
-    Action   m_onSettled;
-    Action   m_onFinished;
+
+    readonly EnhanceRitualHandoff m_handoff = new EnhanceRitualHandoff();   // 호출부에 돌려주는 세 신호. 순서·1회 보장은 여기가 진다
 
     bool m_awaitingReturn;                  // 결과를 남긴 채 복귀 신호를 기다리는 중. 이 동안에도 재진입은 막혀야 한다
     bool m_cancelling;                      // 잘라내는 중. 콜백이 호출부를 타고 PlayReturn으로 되돌아오는 것을 막는다
@@ -126,17 +120,16 @@ public class CardEnhanceRitualView : MonoBehaviour
         bool t_chained        = this.m_stageRetracted;
         this.m_stageRetracted = false;
 
-        this.m_onReveal   = _onReveal;
-        this.m_onSettled  = _onSettled;
-        this.m_onFinished = _onFinished;
+        this.m_handoff.Arm(_onReveal, _onSettled, _onFinished);
 
         if (this.cardStage == null)
         {
             // 무대가 없으면 보여줄 것이 없다. 값 반영까지 막지는 않는다(배선 실패가 소프트락이 되지 않게).
+            // 결과판을 기다리는 경우엔 그 닫힘(PlayReturn)이 마무리를 이어받는다.
             this.m_awaitingReturn = _awaitReturn;
-            FireReveal();
-            FireSettled();
-            if (!_awaitReturn) FireFinished();
+            this.m_handoff.Reveal();
+            this.m_handoff.Settled();
+            if (!_awaitReturn) this.m_handoff.Finished();
             return;
         }
 
@@ -188,25 +181,25 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
         else
         {
-            t_seq.InsertCallback(t_return, FireSettled);
+            t_seq.InsertCallback(t_return, this.m_handoff.Settled);
             BuildReturn(t_seq, t_return, t_backDur, t_end);
         }
 
         // 정상 종료든 스킵이든 중단이든 여기로 온다 — 콜백 유실과 굳은 화면을 동시에 막는 안전망이다.
         t_seq.OnKill(() =>
         {
-            // 콜백보다 상태가 먼저다 — 호출부가 FireSettled 안에서 PlayReturn을 부를 수 있고,
+            // 신호보다 상태가 먼저다 — 호출부가 Settled 안에서 PlayReturn을 부를 수 있고,
             // 그때 이미 "기다리는 중"이어야 복귀가 정상 경로를 탄다.
             this.m_seq            = null;
             this.m_awaitingReturn = _awaitReturn;
 
-            FireReveal();
-            FireSettled();
+            this.m_handoff.Reveal();
+            this.m_handoff.Settled();
 
             if (_awaitReturn) return;
 
             RestoreVisual();
-            FireFinished();
+            this.m_handoff.Finished();
         });
 
         this.m_seq = t_seq;
@@ -232,11 +225,8 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         if (!this.m_awaitingReturn)
         {
-            // 기다린 적이 없는데 불렸다 = 어딘가에서 순서가 어긋났다. 남은 콜백을 계약 순서대로 전부 흘린다 —
-            // 여기서 _onFinished만 흘리면 값 반영을 못 받은 채 잠금만 풀려 화면과 세이브가 갈린다.
-            FireReveal();
-            FireSettled();
-            FireFinished();
+            // 기다린 적이 없는데 불렸다 = 어딘가에서 순서가 어긋났다.
+            this.m_handoff.FlushAll();
             return;
         }
 
@@ -245,7 +235,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         if (this.cardStage == null)
         {
             RestoreVisual();
-            FireFinished();
+            this.m_handoff.Finished();
             return;
         }
 
@@ -258,7 +248,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         {
             this.m_seq = null;
             RestoreVisual();
-            FireFinished();
+            this.m_handoff.Finished();
         });
 
         this.m_seq = t_seq;
@@ -279,17 +269,15 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         if (!this.m_awaitingReturn)
         {
-            // 기다린 적이 없다 = 이어받을 무대도 없다. 남은 콜백만 계약 순서대로 흘린다(PlayReturn과 같은 결).
-            FireReveal();
-            FireSettled();
-            FireFinished();
+            // 기다린 적이 없다 = 이어받을 무대도 없다(PlayReturn과 같은 결).
+            this.m_handoff.FlushAll();
             return;
         }
 
         this.m_awaitingReturn = false;
-        this.m_stageRetracted = true;   // 콜백보다 먼저 — 호출부가 FireFinished 안에서 곧바로 Play를 되받아 부른다.
+        this.m_stageRetracted = true;   // 신호보다 먼저 — 호출부가 Finished 안에서 곧바로 Play를 되받아 부른다.
 
-        FireFinished();
+        this.m_handoff.Finished();
     }
 
     /// <summary>연출을 잘라내고 화면만 원복한다(카드 전환·닫힘 경로).
@@ -305,10 +293,8 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         RestoreVisual();
 
-        // 결과를 남긴 채 기다리다 잘린 경우엔 아직 안 나간 콜백이 있다. 이미 나간 것은 null이라 무해하다.
-        FireReveal();
-        FireSettled();
-        FireFinished();
+        // 결과를 남긴 채 기다리다 잘린 경우엔 아직 안 나간 신호가 있다. 이미 나간 것은 무해하게 지나간다.
+        this.m_handoff.FlushAll();
 
         this.m_cancelling = false;
     }
@@ -338,14 +324,9 @@ public class CardEnhanceRitualView : MonoBehaviour
     // 패널이 걷히고 카드가 한 번 움츠러들며 식는다.
     void BuildEnter(Sequence _seq, float _dur, bool _chained)
     {
-        _seq.InsertCallback(0f, () => SetRetractBlocking(false));
+        _seq.InsertCallback(0f, () => this.retractPanels.SetBlocking(false));
 
-        if (this.retractGroups != null)
-            foreach (CanvasGroup t_g in this.retractGroups)
-            {
-                if (t_g == null) continue;
-                _seq.Insert(0f, t_g.DOFade(0f, _dur));   // 이어받는 경우엔 이미 걷혀 있어 제자리 트윈이다.
-            }
+        this.retractPanels.Insert(_seq, 0f, 0f, _dur);   // 이어받는 경우엔 이미 걷혀 있어 제자리 트윈이다.
 
         _seq.Insert(0f, this.cardStage.DOScale(this.enterScale, _dur).SetEase(Ease.OutCubic));
 
@@ -363,11 +344,8 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(0f, this.shading.TweenBlind(0f, _dur));
         _seq.Insert(0f, this.shading.TweenCover(0f, _dur));
 
-        if (this.backGlow != null)
-        {
-            _seq.Insert(0f, this.backGlow.DOFade(0f, _dur));
-            _seq.Insert(0f, this.backGlow.rectTransform.DOScale(this.glowStartScale, _dur));
-        }
+        _seq.Insert(0f, this.halo.TweenAlpha(0f, _dur));
+        _seq.Insert(0f, this.halo.TweenScale(this.halo.IdleScale, _dur));
     }
 
     // 고조. 카드는 쉬지 않고 조여들며 달아오르고, 몸통 진동은 세 마디로 폭과 잔떨림을 함께 키운다 —
@@ -391,11 +369,8 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, this.shading.TweenHeat(1f, _dur).SetEase(Ease.InQuad));
         _seq.Insert(_at, this.shading.TweenShake(1f, _dur).SetEase(Ease.InQuad));
 
-        if (this.backGlow != null)
-        {
-            _seq.Insert(_at, this.backGlow.DOFade(this.glowPeakAlpha, _dur).SetEase(Ease.InQuad));
-            _seq.Insert(_at, this.backGlow.rectTransform.DOScale(1f, _dur).SetEase(Ease.OutQuad));
-        }
+        _seq.Insert(_at, this.halo.TweenAlpha(this.glowPeakAlpha, _dur).SetEase(Ease.InQuad));
+        _seq.Insert(_at, this.halo.TweenScale(1f, _dur).SetEase(Ease.OutQuad));
 
         // 어둠에서 출발해 빛으로 차오른다.
         _seq.Insert(_at, this.dimTint.TweenLevel(0.6f, _dur).SetEase(Ease.InQuad));
@@ -439,11 +414,8 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, this.dimTint.TweenLevel(1f, _dur).SetEase(Ease.InQuad));
 
         // 빛이 카드 밖으로 새어 나가야 실루엣이 잘린 판때기로 보이지 않는다.
-        if (this.backGlow != null)
-        {
-            _seq.Insert(_at, this.backGlow.DOFade(1f, _dur).SetEase(Ease.InQuad));
-            _seq.Insert(_at, this.backGlow.rectTransform.DOScale(GlowFloodScale, _dur).SetEase(Ease.InQuad));
-        }
+        _seq.Insert(_at, this.halo.TweenAlpha(1f, _dur).SetEase(Ease.InQuad));
+        _seq.Insert(_at, this.halo.TweenScale(GlowFloodScale, _dur).SetEase(Ease.InQuad));
     }
 
     // 공개. 카드가 완전히 덮인 채로 한 박 머물고, 그 백지 위에서 값이 바뀐다.
@@ -453,7 +425,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, this.shading.TweenBlind(this.blindPeak, BlindRise));
         _seq.Insert(_at, this.shading.TweenCover(1f, BlindRise));
 
-        _seq.InsertCallback(_at + BlindRise, FireReveal);
+        _seq.InsertCallback(_at + BlindRise, this.m_handoff.Reveal);
     }
 
     // 폭발. 눌려 있던 것이 한 프레임에 터져 나왔다가 제자리로 회수된다 —
@@ -485,18 +457,15 @@ public class CardEnhanceRitualView : MonoBehaviour
         // 정점의 빛이 배경까지 밝혀 둔 채다. 여기서 가라앉혀야 위에 뜨는 결과판 글자가 읽힌다.
         _seq.Insert(_at, this.dimTint.TweenLevel(this.resultDimLevel, t_settle).SetEase(Ease.OutQuad));
 
-        if (this.backGlow != null)
-        {
-            // 후광은 꺼지지 않고 카드 가장자리에 눌러앉는다 — 복귀 구간이 걷어간다.
-            _seq.Insert(_at, this.backGlow.rectTransform.DOScale(this.afterglowScale, t_settle).SetEase(Ease.OutQuad));
-            _seq.Insert(_at, this.backGlow.DOFade(this.afterglowAlpha, t_settle).SetEase(Ease.OutQuad));
+        // 후광은 꺼지지 않고 카드 가장자리에 눌러앉는다 — 복귀 구간이 걷어간다.
+        _seq.Insert(_at, this.halo.TweenScale(this.afterglowScale, t_settle).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenAlpha(this.afterglowAlpha, t_settle).SetEase(Ease.OutQuad));
 
-            // 한 번 숨을 쉰다. 고정된 잔광은 배경 이미지로 보이고, 이 한 번의 들숨이 카드를 살아 있게 만든다.
-            float t_breath = Mathf.Max(0.1f, _hold - t_settle);
-            _seq.Insert(_at + t_settle,
-                        this.backGlow.DOFade(this.afterglowAlpha * 0.5f, t_breath * 0.5f)
-                            .SetEase(Ease.InOutSine).SetLoops(2, LoopType.Yoyo));
-        }
+        // 한 번 숨을 쉰다. 고정된 잔광은 배경 이미지로 보이고, 이 한 번의 들숨이 카드를 살아 있게 만든다.
+        float t_breath = Mathf.Max(0.1f, _hold - t_settle);
+        _seq.Insert(_at + t_settle,
+                    this.halo.TweenAlpha(this.afterglowAlpha * 0.5f, t_breath * 0.5f)
+                        .SetEase(Ease.InOutSine).SetLoops(2, LoopType.Yoyo));
 
         if (this.useScreenFlash && ScreenFlash.TryGet(out ScreenFlash t_flash))
         {
@@ -531,7 +500,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         float t_sweep = Mathf.Max(0.05f, this.ashSweep);
         float t_out   = _at + t_snuff;
 
-        if (this.backGlow != null) _seq.Insert(_at, this.backGlow.DOFade(0f, 0.03f));
+        _seq.Insert(_at, this.halo.TweenAlpha(0f, 0.03f));
 
         // 훅. 백열이 잉걸로 주저앉고 덮개는 카드가 비칠 두께만 남는다 — 여기서 사라지는 것은 빛이지 덮개가 아니다.
         _seq.Insert(_at, this.shading.TweenBlind(0f, t_snuff).SetEase(Ease.OutQuad));
@@ -573,45 +542,16 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(_at, this.dimTint.TweenLevel(0f, _dur));
 
         // 성공 잔광을 여기서 걷는다 — RestoreVisual에만 맡기면 마지막 프레임에 후광이 툭 끊긴다.
-        if (this.backGlow != null)
-        {
-            _seq.Insert(_at, this.backGlow.DOFade(0f, _dur).SetEase(Ease.InQuad));
-            _seq.Insert(_at, this.backGlow.rectTransform.DOScale(this.glowStartScale, _dur).SetEase(Ease.InQuad));
-        }
+        _seq.Insert(_at, this.halo.TweenAlpha(0f, _dur).SetEase(Ease.InQuad));
+        _seq.Insert(_at, this.halo.TweenScale(this.halo.IdleScale, _dur).SetEase(Ease.InQuad));
 
-        if (this.retractGroups != null)
-            foreach (CanvasGroup t_g in this.retractGroups)
-            {
-                if (t_g == null) continue;
-                _seq.Insert(_at, t_g.DOFade(1f, _dur));
-            }
+        this.retractPanels.Insert(_seq, _at, 1f, _dur);
 
         // 길이를 못 박는다 — 위 트윈이 전부 미배선이면 시퀀스가 여기 닿기 전에 끝나 버린다.
-        _seq.InsertCallback(_end, () => SetRetractBlocking(true));
+        _seq.InsertCallback(_end, () => this.retractPanels.SetBlocking(true));
     }
 
     // ── 상태 ─────────────────────────────────────────────
-
-    void FireReveal()
-    {
-        Action t_cb = this.m_onReveal;
-        this.m_onReveal = null;
-        t_cb?.Invoke();
-    }
-
-    void FireSettled()
-    {
-        Action t_cb = this.m_onSettled;
-        this.m_onSettled = null;
-        t_cb?.Invoke();
-    }
-
-    void FireFinished()
-    {
-        Action t_cb = this.m_onFinished;
-        this.m_onFinished = null;
-        t_cb?.Invoke();
-    }
 
     void CaptureBase()
     {
@@ -622,18 +562,6 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         this.dimTint.Capture();
         this.embers.CapturePoses();
-    }
-
-    // 걷힌 패널은 투명해도 여전히 입력을 먹는다 — 그대로 두면 그 위를 탭해도 스킵이 안 되는 죽은 영역이 생긴다.
-    void SetRetractBlocking(bool _on)
-    {
-        if (this.retractGroups == null) return;
-
-        foreach (CanvasGroup t_g in this.retractGroups)
-        {
-            if (t_g == null) continue;
-            t_g.blocksRaycasts = _on;
-        }
     }
 
     // 다음 연출이 중간값(압축·열·회색)에서 출발하지 않게 원복. 캡처 전이면 건드릴 것도 없다.
@@ -651,29 +579,9 @@ public class CardEnhanceRitualView : MonoBehaviour
         }
 
         this.dimTint.Reset();
-
-        SetAlpha(this.backGlow, 0f);
-        if (this.backGlow != null) this.backGlow.rectTransform.localScale = Vector3.one * this.glowStartScale;
-
+        this.halo.Reset();
         this.embers.Reset();
         this.shading.Neutralize();
-
-        if (this.retractGroups != null)
-            foreach (CanvasGroup t_g in this.retractGroups)
-            {
-                if (t_g == null) continue;
-                t_g.alpha = 1f;
-            }
-
-        SetRetractBlocking(true);
-    }
-
-    static void SetAlpha(Graphic _g, float _a)
-    {
-        if (_g == null) return;
-
-        Color t_c = _g.color;
-        t_c.a = _a;
-        _g.color = t_c;
+        this.retractPanels.Reset();
     }
 }
