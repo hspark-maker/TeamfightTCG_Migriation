@@ -4,7 +4,7 @@ using System.Collections.Generic;
 // 도감 방치 생산 매니저
 public static class CollectionProductionManager
 {
-    static readonly Dictionary<string, CollectionRowProgress> s_progress = new Dictionary<string, CollectionRowProgress>();
+    static readonly Dictionary<int, CollectionRowProgress> s_progress = new Dictionary<int, CollectionRowProgress>();
 
     static bool s_initialized;
 
@@ -17,17 +17,35 @@ public static class CollectionProductionManager
         s_progress.Clear();
 
         var t_data = DataSaveManager.Data.collection;
+        bool t_migrated = false;
         if (t_data != null && t_data.rows != null)
         {
             foreach (var t_entry in t_data.rows)
             {
-                if (t_entry == null || string.IsNullOrEmpty(t_entry.rowKey)) continue;
-                if (s_progress.ContainsKey(t_entry.rowKey)) continue;
-                s_progress[t_entry.rowKey] = t_entry;
+                if (t_entry == null) continue;
+
+                int t_id = t_entry.rowId;
+                if (t_id <= 0)
+                {
+                    // 구 세이브(행 첫 카드 이름) 이관 — 카탈로그 미준비면 이번 부트는 건너뛰고 값을 보존한다.
+                    if (!CardCatalog.IsReady) continue;
+
+                    t_id = CardCatalog.LegacyIdOfName(t_entry.rowKey);
+                    if (t_id <= 0) continue;                 // 사라진 행의 누적은 버린다
+
+                    t_entry.rowId  = t_id;
+                    t_entry.rowKey = null;
+                    t_migrated     = true;
+                }
+
+                if (s_progress.ContainsKey(t_id)) continue;
+                s_progress[t_id] = t_entry;
             }
         }
 
         s_initialized = true;
+
+        if (t_migrated) Save();
     }
 
     // 메모리 진행도를 세이브 슬롯에 flush 후 영속화(Init 전이면 no-op — 빈 캐시로 덮어쓰기 방지)
@@ -42,9 +60,9 @@ public static class CollectionProductionManager
     }
 
     // 현재 수확 가능한 정수 누적량(소수 버림)
-    public static long GetAccumulated(string _rowKey)
+    public static long GetAccumulated(int _rowId)
     {
-        return CatalogRows.TryGetRow(_rowKey, out var t_row) ? HarvestableOf(t_row) : 0;
+        return CatalogRows.TryGetRow(_rowId, out var t_row) ? HarvestableOf(t_row) : 0;
     }
 
     // 전 행의 수확 가능한 정수 누적 합계(일괄 수령 버튼용)
@@ -61,21 +79,21 @@ public static class CollectionProductionManager
     }
 
     // 행 누적 상한
-    public static long GetCap(string _rowKey)
+    public static long GetCap(int _rowId)
     {
-        return CatalogRows.TryGetRow(_rowKey, out var t_row) ? t_row.Cap : 0;
+        return CatalogRows.TryGetRow(_rowId, out var t_row) ? t_row.Cap : 0;
     }
 
     // 최소 1 이상 수확 가능한지 — 잠긴 행이라도 이미 굳은 누적은 청구 가능
-    public static bool CanHarvest(string _rowKey)
+    public static bool CanHarvest(int _rowId)
     {
-        return GetAccumulated(_rowKey) >= 1;
+        return GetAccumulated(_rowId) >= 1;
     }
 
     // 행 생산 상태(수확 가능 여부는 별도 축 — CanHarvest로 조회)
-    public static EProductionState GetState(string _rowKey)
+    public static EProductionState GetState(int _rowId)
     {
-        if (!CatalogRows.TryGetRow(_rowKey, out var t_row)) return EProductionState.Locked;
+        if (!CatalogRows.TryGetRow(_rowId, out var t_row)) return EProductionState.Locked;
         return Classify(t_row, Resolve(t_row));
     }
 
@@ -86,10 +104,10 @@ public static class CollectionProductionManager
     }
 
     // UI 1회 스냅샷(상태·누적·상한·수확가능·튜닝)
-    public static RowProductionInfo GetInfo(string _rowKey)
+    public static RowProductionInfo GetInfo(int _rowId)
     {
-        if (!CatalogRows.TryGetRow(_rowKey, out var t_row))
-            return new RowProductionInfo(_rowKey, EProductionState.Locked, 0, 0.0, 0, false, ECurrencyType.Gold, 0f);
+        if (!CatalogRows.TryGetRow(_rowId, out var t_row))
+            return new RowProductionInfo(_rowId, EProductionState.Locked, 0, 0.0, 0, false, ECurrencyType.Gold, 0f);
 
         double t_raw = Resolve(t_row);
         long t_whole = (long)Math.Floor(t_raw);
@@ -97,40 +115,40 @@ public static class CollectionProductionManager
         EProductionState t_state = Classify(t_row, t_raw);
 
         return new RowProductionInfo(
-            t_row.Key, t_state, t_whole, t_raw, t_row.Cap, t_whole >= 1, t_row.RewardType, t_row.ProductionCycleSeconds);
+            t_row.Id, t_state, t_whole, t_raw, t_row.Cap, t_whole >= 1, t_row.RewardType, t_row.ProductionCycleSeconds);
     }
 
-    // 행 하나 수확 — 정수 누적분 지급, 지급 재화·지급량 반환
-    public static CurrencyGain Harvest(string _rowKey)
+    // 행 하나 수확 — 정수 누적분 지급, 지급량 반환
+    public static long Harvest(int _rowId)
     {
-        if (!CatalogRows.TryGetRow(_rowKey, out var t_row)) return CurrencyGain.None;
+        if (!CatalogRows.TryGetRow(_rowId, out var t_row)) return 0;
 
         long t_earned = HarvestCore(t_row);
-        if (t_earned <= 0) return CurrencyGain.None;
+        if (t_earned <= 0) return 0;
 
         Save();
         CurrencyManager.Save();
         OnChanged?.Invoke();
-        return new CurrencyGain(t_row.RewardType, t_earned);
+        return t_earned;
     }
 
-    // 모든 행 일괄 수확 — 영속·통지는 1회로 묶음. 행마다 재화가 달라도 종류별로 나뉘어 담긴다
-    public static CurrencyGainBucket HarvestAll()
+    // 모든 행 일괄 수확 — 영속·통지는 1회로 묶음
+    public static long HarvestAll()
     {
-        var t_gains = new CurrencyGainBucket();
+        long t_total = 0;
 
         var t_rows = CatalogRows.Rows;
         for (int t_i = 0; t_i < t_rows.Count; t_i++)
         {
-            t_gains.Add(t_rows[t_i].RewardType, HarvestCore(t_rows[t_i]));
+            t_total += HarvestCore(t_rows[t_i]);
         }
 
-        if (t_gains.IsEmpty) return t_gains;
+        if (t_total <= 0) return 0;
 
         Save();
         CurrencyManager.Save();
         OnChanged?.Invoke();
-        return t_gains;
+        return t_total;
     }
 
     static long HarvestCore(CatalogRow _row)
@@ -138,7 +156,7 @@ public static class CollectionProductionManager
         long t_earned = HarvestableOf(_row);
         if (t_earned <= 0) return 0;
 
-        if (!s_progress.TryGetValue(_row.Key, out var t_entry)) return 0;
+        if (!s_progress.TryGetValue(_row.Id, out var t_entry)) return 0;
 
         t_entry.accumulated -= t_earned;
         t_entry.lastSettleUtcTicks = GameClock.UtcNow.Ticks;
@@ -149,7 +167,7 @@ public static class CollectionProductionManager
 
     static long HarvestableOf(CatalogRow _row)
     {
-        if (_row == null || string.IsNullOrEmpty(_row.Key)) return 0;
+        if (_row == null || _row.Id <= 0) return 0;
         return (long)Math.Floor(Resolve(_row));
     }
 
@@ -163,11 +181,11 @@ public static class CollectionProductionManager
 
     static double Resolve(CatalogRow _row)
     {
-        if (_row == null || string.IsNullOrEmpty(_row.Key)) return 0.0;
+        if (_row == null || _row.Id <= 0) return 0.0;
 
-        string t_key = _row.Key;
+        int t_id = _row.Id;
         bool t_complete = CatalogRows.IsRowComplete(_row);
-        bool t_has = s_progress.TryGetValue(t_key, out var t_entry);
+        bool t_has = s_progress.TryGetValue(t_id, out var t_entry);
 
         if (!t_complete)
         {
@@ -184,11 +202,11 @@ public static class CollectionProductionManager
         {
             t_entry = new CollectionRowProgress
             {
-                rowKey = t_key,
+                rowId = t_id,
                 lastSettleUtcTicks = GameClock.UtcNow.Ticks,
                 accumulated = 0.0,
             };
-            s_progress[t_key] = t_entry;
+            s_progress[t_id] = t_entry;
             Save();
             return 0.0;
         }
@@ -221,7 +239,7 @@ public enum EProductionState
 // 행 생산 상태 1회 스냅샷(UI용)
 public readonly struct RowProductionInfo
 {
-    public readonly string RowKey;
+    public readonly int RowId;
     public readonly EProductionState State;
     // 수확 가능한 정수 누적량(소수 버림)
     public readonly long Accumulated;
@@ -236,10 +254,10 @@ public readonly struct RowProductionInfo
     public float CycleProgress01 => (float)(AccumulatedRaw - Accumulated);
 
     public RowProductionInfo(
-        string _rowKey, EProductionState _state, long _accumulated, double _accumulatedRaw,
+        int _rowId, EProductionState _state, long _accumulated, double _accumulatedRaw,
         long _cap, bool _canHarvest, ECurrencyType _rewardType, float _productionCycleSeconds)
     {
-        RowKey = _rowKey;
+        RowId = _rowId;
         State = _state;
         Accumulated = _accumulated;
         AccumulatedRaw = _accumulatedRaw;

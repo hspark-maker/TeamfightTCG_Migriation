@@ -15,9 +15,15 @@ public static class SynergyIconStrip
     /// 아이콘 PNG의 여백 비율을 바꾸면 이 값도 같이 바꿀 것(시너지 아이콘 크기의 단일 진실원).</summary>
     public const float IconPadCompensation = 1.55f;
 
+    /// <summary>비활성인데 전용 회색 아이콘(inactiveIcon)이 없을 때 씌우는 색. 채도를 죽여 "아직 아니다"로 읽히게.</summary>
+    static readonly Color InactiveTint = new Color(0.45f, 0.45f, 0.5f, 0.75f);
+
     /// <summary>_parent를 비우고 _card의 시너지 아이콘을 깐다.
     /// 아이콘이 없는(icon 미배정) 시너지는 건너뛴다 — 빈 사각형이 뜨는 것보다 낫다.</summary>
-    public static void Build(CardData _card, Transform _parent, GameObject _iconPrefab, bool _clearFirst = true)
+    /// <param name="_state">지금 필드의 확정 시너지 스냅샷. 넘기면 <b>활성이 앞, 비활성이 뒤</b>로 정렬되고
+    /// 비활성은 회색(inactiveIcon)으로 그려진다. null이면 전부 활성으로 본다(덱 편성처럼 필드가 없는 화면).</param>
+    public static void Build(CardData _card, Transform _parent, GameObject _iconPrefab,
+                             SynergyState _state = null, bool _clearFirst = true)
     {
         if (_parent == null || _iconPrefab == null) return;
 
@@ -25,20 +31,29 @@ public static class SynergyIconStrip
 
         if (_card?.synergies == null) return;
 
-        var t_shown = new HashSet<SynergyData>();
-        foreach (SynergyData t_synergy in _card.synergies)
+        // 정렬·중복 제거 규칙은 카드 배지와 같은 곳(CardVisualRules) — 두 곳이 갈리면 같은 카드인데
+        // 배지 순서와 정보창 순서가 달라진다. 여기선 상한만 풀어(전부 표시) 쓴다.
+        List<SynergyData> t_ordered = CardVisualRules.CollectSynergyBadges(
+            _card.synergies, _state, _card.synergies.Length);
+
+        foreach (SynergyData t_synergy in t_ordered)
         {
             if (t_synergy == null) continue;
-            if (!t_shown.Add(t_synergy)) continue;   // 카드가 같은 시너지를 중복 나열해도 1개만
-            if (t_synergy.activeIcon == null) continue;
+
+            bool   t_active = _state == null || CardVisualRules.IsSynergyActive(_state, t_synergy);
+            Sprite t_sprite = t_active ? t_synergy.activeIcon
+                                       : (t_synergy.inactiveIcon != null ? t_synergy.inactiveIcon : t_synergy.activeIcon);
+            if (t_sprite == null) continue;
 
             GameObject t_obj = Object.Instantiate(_iconPrefab, _parent);
 
             Image t_img = t_obj.GetComponent<Image>();
             if (t_img != null)
             {
-                t_img.sprite  = t_synergy.activeIcon;
+                t_img.sprite  = t_sprite;
                 t_img.enabled = true;
+                // 전용 회색 아이콘이 없는 시너지도 비활성으로 읽히게 — 아트가 채워지면 자연히 원래 색이 산다.
+                t_img.color = t_active || t_synergy.inactiveIcon != null ? Color.white : InactiveTint;
             }
 
             // 키워드 아이콘 프리팹을 재사용하는 경우 롱프레스 배선이 딸려오므로 끊는다.

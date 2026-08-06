@@ -11,6 +11,14 @@ public class CardInstance
     public bool wasEverRevealed;
     public int ownerIndex;   // 싱글: 0=player, 1=enemy / 멀티: TurnState.LocalOwnerIndex가 아군, 나머지 적
     public CardKeyword runtimeKeywords;
+    // 이 카드가 **지금 실제로 가진** 고유 키워드. 강화 해금 전이면 비어 있다.
+    // data.keywords를 직접 읽지 않는 이유가 여기다 — 마스터 데이터는 "해금되면 무엇이 열리는가"이고
+    // 켜졌는지는 성장 레벨이 정한다. runtimeKeywords와 분리한 것은 그웬·피즈의 `&= ~Invincible` 같은
+    // 해제가 영구 해금분까지 걷어가면 안 되기 때문(시너지 키워드를 따로 둔 것과 같은 이유).
+    public CardKeyword unlockedKeywords;
+    // 성장값이 주입된 카드는 1차 진화(Lv5)부터 시너지에 참여한다.
+    // 성장 미주입(default) 경로는 기존 AI/멀티 규칙을 보존하기 위해 항상 활성으로 본다.
+    public bool synergyEnabled;
     public int attackCount;
 
     // 시너지: 덱 확정 시 1회 적용, 전투 중 재계산 없음.
@@ -28,9 +36,8 @@ public class CardInstance
     public int  rampartReduction;
     public bool reviveUsed;    // 언데드: 게임당 1회 부활 소진 플래그.
 
-    // 덱 복귀 시 체력 보존용 (-1 = 미저장)
-    public int savedHp      = -1;
-    public int savedBonusHp = -1;
+    // 교활 효과로 필드에서 물러난 뒤 재등장하는 카드인지 표시.
+    public bool returnedFromField;
 
     // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
@@ -46,7 +53,8 @@ public class CardInstance
     public bool cinemaAttackUsed;
 
     public bool IsAlive => this.hp > 0;
-    public bool HasKeyword(CardKeyword _kw) => (this.data.keywords | this.runtimeKeywords | this.synergyKeywords).HasFlag(_kw);
+    public bool HasKeyword(CardKeyword _kw) =>
+        (this.unlockedKeywords | this.runtimeKeywords | this.synergyKeywords).HasFlag(_kw);
 
     // ── 전투 규칙 (단일 진실원: 공격 해결부·프리뷰 공용) ──
     /// <summary>이 카드가 가하는 기본 공격력. 도발이면 현재 체력의 절반(최소 1).</summary>
@@ -108,7 +116,12 @@ public class CardInstance
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
         // 성장값 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과).
-        this.evolutionStage = _data.defaultEvolutionStage;
+        // 진화 단계는 마스터 데이터(임시 입력)와 강화 해금 중 높은 쪽 — 성장 미주입이면 후자가 0이라 기존 동작 그대로.
+        this.evolutionStage = UnityEngine.Mathf.Max(_data.defaultEvolutionStage, _growth.EvolutionStage);
+        // 성장을 태우는 경로만 해금 게이트를 받는다. 미주입(AI 적 필드·멀티 원격 미러)은 마스터 데이터 그대로 —
+        // 한쪽만 키워드가 사라지면 밸런스 기준선이 무너지고 멀티는 즉시 divergence다.
+        this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : _data.keywords;
+        this.synergyEnabled   = !_growth.Applied || _growth.SynergyUnlocked;
     }
 
     // ── 시너지 적용 (SynergyApplier가 호출하는 계약: 덱 확정 시 1회, 가산/합집합) ──
@@ -134,17 +147,27 @@ public class CardInstance
         return (t_hpAfter, t_bonusAfter);
     }
 
-    /// <summary>체력 회복(단일 진실원). hp만 회복하며 maxHp 상한(보너스HP는 회복 대상 아님).
-    /// 반환값 = **실제 회복량**(상한에 걸리면 0). _showEffect=false면 연출을 생략한다 —
+    /// <summary>체력 회복(단일 진실원). hp만 회복하며 기본적으로 maxHp 상한(보너스HP는 회복 대상 아님).
+    /// _allowOverheal=true면 maxHp를 초과해 회복한다. 반환값 = **실제 회복량**(상한에 걸리면 0).
+    /// _showEffect=false면 연출을 생략한다 —
     /// 힐러 투사체처럼 회복 표기를 **도착 시점으로 미루는** 호출부 전용(상태 변경 시점은 그대로).</summary>
-    public int Heal(int _amount, bool _showEffect = true)
+    public int Heal(int _amount, bool _showEffect = true, bool _allowOverheal = false)
     {
         if (_amount <= 0) return 0;
+        if (!_allowOverheal && this.hp >= this.maxHp) return 0;
         int t_before = this.hp;
-        this.hp = UnityEngine.Mathf.Min(this.hp + _amount, this.maxHp);
+        this.hp = _allowOverheal
+            ? this.hp + _amount
+            : UnityEngine.Mathf.Min(this.hp + _amount, this.maxHp);
         int t_healed = this.hp - t_before;
         // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
-        if (_showEffect && t_healed > 0) CardView.GetView(this)?.PlayHealEffect(t_healed);
+        // 표기를 미루는 호출부(_showEffect:false)는 **미룬다는 사실 자체를 뷰에 알린다** — 그러지 않으면
+        // 그 사이 화면 갱신(Render)이 최신 hp를 먼저 찍어, 투사체는 나중에 오는데 숫자는 이미 올라가 있다.
+        if (t_healed > 0)
+        {
+            if (_showEffect) CardView.GetView(this)?.PlayHealEffect(t_healed);
+            else             CardView.GetView(this)?.DeferHpDisplay(t_healed);
+        }
         return t_healed;
     }
 

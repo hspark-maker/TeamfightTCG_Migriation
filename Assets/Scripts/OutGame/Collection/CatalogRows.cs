@@ -10,7 +10,7 @@ public static class CatalogRows
 
     static List<CatalogRow> s_rows;
     static IReadOnlyList<CatalogRow> s_rowsReadonly;
-    static Dictionary<string, CatalogRow> s_rowByKey;
+    static Dictionary<int, CatalogRow> s_rowById;
     static LayoutSignature s_signature;
     static bool s_hasCache;
 
@@ -32,7 +32,7 @@ public static class CatalogRows
         s_hasCache = false;
         s_rows = null;
         s_rowsReadonly = null;
-        s_rowByKey = null;
+        s_rowById = null;
     }
 
     // 행 목록(읽기 전용, 순서 = authoring 순서)
@@ -46,12 +46,12 @@ public static class CatalogRows
         get { EnsureBuilt(); return s_rows.Count; }
     }
 
-    // 행 안정 키로 행 조회
-    public static bool TryGetRow(string _rowKey, out CatalogRow _row)
+    // 행 안정 키(대표 카드 번호)로 행 조회
+    public static bool TryGetRow(int _rowId, out CatalogRow _row)
     {
         EnsureBuilt();
-        if (string.IsNullOrEmpty(_rowKey)) { _row = null; return false; }
-        return s_rowByKey.TryGetValue(_rowKey, out _row);
+        if (_rowId <= 0) { _row = null; return false; }
+        return s_rowById.TryGetValue(_rowId, out _row);
     }
 
     // 행 완성 = 행의 모든 카드 소유(빈 행은 미완성)
@@ -59,20 +59,20 @@ public static class CatalogRows
     {
         if (_row == null) return false;
 
-        var t_keys = _row.CardKeys;
-        if (t_keys == null || t_keys.Count == 0) return false;
+        var t_ids = _row.CardIds;
+        if (t_ids == null || t_ids.Count == 0) return false;
 
-        for (int t_i = 0; t_i < t_keys.Count; t_i++)
+        for (int t_i = 0; t_i < t_ids.Count; t_i++)
         {
-            if (!OwnershipManager.IsOwned(t_keys[t_i])) return false;
+            if (!OwnershipManager.IsOwned(t_ids[t_i])) return false;
         }
         return true;
     }
 
     // 행 키로 완성 조회
-    public static bool IsRowComplete(string _rowKey)
+    public static bool IsRowComplete(int _rowId)
     {
-        return TryGetRow(_rowKey, out var t_row) && IsRowComplete(t_row);
+        return TryGetRow(_rowId, out var t_row) && IsRowComplete(t_row);
     }
 
     // 행 authoring ↔ 카탈로그 드리프트 로그 진단(디버그 전용)
@@ -86,32 +86,32 @@ public static class CatalogRows
 
         EnsureBuilt();
 
-        var t_placed = new HashSet<string>();
+        var t_placed = new HashSet<int>();
         foreach (var t_row in s_rows)
         {
-            foreach (var t_key in t_row.CardKeys)
+            foreach (var t_id in t_row.CardIds)
             {
-                if (!string.IsNullOrEmpty(t_key)) t_placed.Add(t_key);
+                if (t_id > 0) t_placed.Add(t_id);
             }
         }
 
-        var t_catalog = new HashSet<string>();
+        var t_catalog = new HashSet<int>();
         foreach (var t_card in CardCatalog.All)
         {
-            var t_key = CardCatalog.KeyOf(t_card);
-            if (!string.IsNullOrEmpty(t_key)) t_catalog.Add(t_key);
+            int t_id = CardCatalog.IdOf(t_card);
+            if (t_id > 0) t_catalog.Add(t_id);
         }
 
-        var t_missingFromLayout = new List<string>();
-        foreach (var t_key in t_catalog)
+        var t_missingFromLayout = new List<int>();
+        foreach (var t_id in t_catalog)
         {
-            if (!t_placed.Contains(t_key)) t_missingFromLayout.Add(t_key);
+            if (!t_placed.Contains(t_id)) t_missingFromLayout.Add(t_id);
         }
 
-        var t_notInCatalog = new List<string>();
-        foreach (var t_key in t_placed)
+        var t_notInCatalog = new List<int>();
+        foreach (var t_id in t_placed)
         {
-            if (!t_catalog.Contains(t_key)) t_notInCatalog.Add(t_key);
+            if (!t_catalog.Contains(t_id)) t_notInCatalog.Add(t_id);
         }
 
         if (t_missingFromLayout.Count == 0 && t_notInCatalog.Count == 0)
@@ -157,15 +157,15 @@ public static class CatalogRows
             int t_slots = t_source != null ? t_source.Count : 0;
 
             var t_cards = new List<CardData>(t_slots);
-            var t_keys = new List<string>(t_slots);
+            var t_ids = new List<int>(t_slots);
             for (int t_c = 0; t_c < t_slots; t_c++)
             {
                 t_cards.Add(t_source[t_c]);
-                t_keys.Add(CardCatalog.KeyOf(t_source[t_c]));
+                t_ids.Add(CardCatalog.IdOf(t_source[t_c]));
             }
 
             ResolveTuning(t_def, out float t_cycleSeconds, out ECurrencyType t_rewardType, out long t_cap);
-            AddRow(t_rowIndex++, t_cards, t_keys, t_cycleSeconds, t_rewardType, t_cap);
+            AddRow(t_rowIndex++, t_cards, t_ids, t_cycleSeconds, t_rewardType, t_cap);
         }
 
         EndBuild();
@@ -189,16 +189,16 @@ public static class CatalogRows
         {
             int t_slots = System.Math.Min(t_perRow, t_count - t_i);
             var t_cards = new List<CardData>(t_slots);
-            var t_keys = new List<string>(t_slots);
+            var t_ids = new List<int>(t_slots);
 
             for (int t_c = 0; t_c < t_slots; t_c++)
             {
                 var t_card = t_source[t_i + t_c];
                 t_cards.Add(t_card);
-                t_keys.Add(CardCatalog.KeyOf(t_card));
+                t_ids.Add(CardCatalog.IdOf(t_card));
             }
 
-            AddRow(t_rowIndex++, t_cards, t_keys, t_cycleSeconds, t_rewardType, t_cap);
+            AddRow(t_rowIndex++, t_cards, t_ids, t_cycleSeconds, t_rewardType, t_cap);
         }
 
         EndBuild();
@@ -217,22 +217,22 @@ public static class CatalogRows
     static void BeginBuild()
     {
         s_rows = new List<CatalogRow>();
-        s_rowByKey = new Dictionary<string, CatalogRow>();
+        s_rowById = new Dictionary<int, CatalogRow>();
     }
 
-    static void AddRow(int _index, List<CardData> _cards, List<string> _keys, float _cycleSeconds, ECurrencyType _rewardType, long _cap)
+    static void AddRow(int _index, List<CardData> _cards, List<int> _ids, float _cycleSeconds, ECurrencyType _rewardType, long _cap)
     {
-        string t_rowKey = null;
-        for (int t_i = 0; t_i < _keys.Count; t_i++)
+        int t_rowId = 0;
+        for (int t_i = 0; t_i < _ids.Count; t_i++)
         {
-            if (!string.IsNullOrEmpty(_keys[t_i])) { t_rowKey = _keys[t_i]; break; }
+            if (_ids[t_i] > 0) { t_rowId = _ids[t_i]; break; }
         }
 
-        var t_row = new CatalogRow(t_rowKey, _index, _cards.AsReadOnly(), _keys.AsReadOnly(), _cycleSeconds, _rewardType, _cap);
+        var t_row = new CatalogRow(t_rowId, _index, _cards.AsReadOnly(), _ids.AsReadOnly(), _cycleSeconds, _rewardType, _cap);
         s_rows.Add(t_row);
 
-        if (!string.IsNullOrEmpty(t_rowKey) && !s_rowByKey.ContainsKey(t_rowKey))
-            s_rowByKey.Add(t_rowKey, t_row);
+        if (t_rowId > 0 && !s_rowById.ContainsKey(t_rowId))
+            s_rowById.Add(t_rowId, t_row);
     }
 
     static void EndBuild()

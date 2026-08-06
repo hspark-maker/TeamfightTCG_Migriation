@@ -55,7 +55,7 @@ public static class CardPackOpener
             // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 환급이 새어나간다
             if (t_card == null) continue;
 
-            bool t_isNew = OwnershipManager.Grant(CardCatalog.KeyOf(t_card));
+            bool t_isNew = OwnershipManager.Grant(CardCatalog.IdOf(t_card));
 
             long t_refund = 0;
             if (!t_isNew)

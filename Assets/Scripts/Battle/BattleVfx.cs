@@ -107,13 +107,18 @@ public static class BattleVfx
     /// 오프셋·회전 flip 규약은 SpawnAttached와 동일(적 카드는 배치가 위아래로 뒤집혀 있다).
     ///
     /// _direction을 주고 항목의 alignToDirection이 켜져 있으면 그 방향으로 눕혀 스폰한다
-    /// (피격 반대 방향으로 튀는 먼지 등). 이때 flip은 적용하지 않는다 — 방향이 이미 명시됐다.</summary>
+    /// (피격 반대 방향으로 튀는 먼지 등). 이때 flip은 적용하지 않는다 — 방향이 이미 명시됐다.
+    ///
+    /// _strength01(0~1)은 항목의 countByStrength/speedByStrength가 켜져 있을 때만 쓰인다 —
+    /// 피격이면 HitImpact.Strength01(피해/최대체력). 세게 맞을수록 먼지가 많아지고 빨라진다.
+    /// 반응 배선이 없는 항목은 이 값을 무시하므로, 호출부는 세기를 항상 넘겨도 된다.</summary>
     public static void PlayAttached(BattleVfxId _id, Transform _anchor, bool _flip, int _sortingLayerId,
-        Vector3 _direction = default)
+        Vector3 _direction = default, float _strength01 = 0f)
     {
         if (s_library == null || s_library.Collect(_id, s_collectBuffer) == 0) return;
 
-        bool t_hasDir = _direction.sqrMagnitude > 1e-6f;
+        bool  t_hasDir = _direction.sqrMagnitude > 1e-6f;
+        float t_s01    = Mathf.Clamp01(_strength01);
 
         foreach (VfxEntry t_entry in s_collectBuffer)
         {
@@ -126,8 +131,22 @@ public static class BattleVfx
                                         * Quaternion.Euler(t_entry.initialRotation);
 
             ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+            ApplyStrength(t_go, t_entry, t_s01);
             new VfxHandle(t_poolId, t_go, t_entry.lifetime).ReleaseAfterLifetime();
         }
+    }
+
+    /// <summary>항목에 세기 반응이 배선돼 있으면 파티클 방출량/속도를 그 배율로 덮어쓴다.
+    /// y가 0 이하 = 반응 없음이라, 미배선 항목은 컴포넌트조차 붙지 않는다(기존 연출 무변경).</summary>
+    static void ApplyStrength(GameObject _go, VfxEntry _entry, float _strength01)
+    {
+        float t_count = _entry.countByStrength.y > 0f
+            ? Mathf.Lerp(_entry.countByStrength.x, _entry.countByStrength.y, _strength01) : 1f;
+        float t_speed = _entry.speedByStrength.y > 0f
+            ? Mathf.Lerp(_entry.speedByStrength.x, _entry.speedByStrength.y, _strength01) : 1f;
+
+        if (Mathf.Approximately(t_count, 1f) && Mathf.Approximately(t_speed, 1f)) return;
+        VfxStrengthScaler.Apply(_go, t_count, t_speed);
     }
 
     /// <summary>_anchor 자식으로 붙여 스폰. 붙어 있으므로 카드가 움직이면 이펙트도 따라간다.

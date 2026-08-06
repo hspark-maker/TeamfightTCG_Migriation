@@ -18,7 +18,12 @@ public static class CunningVfx
 {
     const float EXIT_SCALE = 0.4f;   // 빨려 들어가며 줄어드는 배율
 
-    public static async UniTask PlayExit(CardView _view)
+    /// <summary>필드의 카드가 덱으로 물러나는 그림. 교활 교대 말고 <b>멀리건 교체</b>도 같은 연출을 쓴다 —
+    /// "필드 카드가 덱으로 돌아간다"는 사건은 하나뿐이라 그림도 하나여야 한다.
+    ///
+    /// <paramref name="_withFog"/>는 교활 표식인 안개를 띄울지다. 멀리건은 끄고 부른다 —
+    /// 안개가 같이 뜨면 교활이 발동한 것으로 읽힌다.</summary>
+    public static async UniTask PlayExit(CardView _view, bool _withFog = true)
     {
         if (_view == null) return;
 
@@ -27,9 +32,9 @@ public static class CunningVfx
         Quaternion t_rot0  = t_tr.localRotation;
         Vector3    t_scale = t_tr.localScale;
 
-        BattleVfx.Play(BattleVfxId.CunningFog, t_tr.position, _view.VfxSortingLayerId);
+        if (_withFog) BattleVfx.Play(BattleVfxId.CunningFog, t_tr.position, _view.VfxSortingLayerId);
 
-        float t_lead = GameTiming.Battle.CunningFogLead;
+        float t_lead = _withFog ? GameTiming.Battle.CunningFogLead : 0f;   // 안개가 없으면 기다릴 이유도 없다
         if (t_lead > 0f) await UniTask.Delay((int)(t_lead * 1000));
         if (_view == null) return;
 
@@ -46,21 +51,32 @@ public static class CunningVfx
         if (_view == null) return;
 
         float t_exit = Mathf.Max(0.05f, GameTiming.Battle.CunningExitDuration);
-        Vector3 t_to = DeckPoint(_view, t_home.z);
+        Vector3 t_to = DeckExitPoint(_view, t_home.z);
 
-        // 축소는 이동보다 먼저 끝난다 — 작아진 뒤 남은 거리를 미끄러져야 덱에 빨려 들어간 것으로 보인다.
+        // 축소는 이동보다 먼저 끝나고, 덱 도착 직전에는 사라진다. 목표가 화면 안의 덱 버튼이므로
+        // 페이드가 없으면 버튼 위에 멈췄다가 툭 사라져 보인다.
         float t_shrink = Mathf.Max(0.05f, t_exit * GameTiming.Battle.CunningShrinkRatio);
-        t_tr.DOScale(t_scale * EXIT_SCALE, t_shrink).SetEase(Ease.InQuad).SetLink(_view.gameObject);
-
-        await t_tr.DOMove(t_to, t_exit).SetEase(Ease.InQuad).SetLink(_view.gameObject).ToUniTask();
-
-        // 슬롯 뷰는 **재사용된다** — 자세를 원복하지 않으면 다음에 이 슬롯을 쓰는 카드가
-        // 화면 밖에서 뒤집힌 채 시작한다(보충이 없어 PlayDealAnim이 안 도는 경우엔 영영 그대로).
-        if (_view == null) return;
-        t_tr.DOKill();
-        t_tr.position      = t_home;
-        t_tr.localRotation = t_rot0;
-        t_tr.localScale    = t_scale;
+        float t_fade   = Mathf.Min(t_exit, Mathf.Max(0.05f, t_exit * 0.25f));
+        try
+        {
+            await DOTween.Sequence().SetLink(_view.gameObject)
+                .Join(t_tr.DOMove(t_to, t_exit).SetEase(Ease.InQuad))
+                .Join(t_tr.DOScale(t_scale * EXIT_SCALE, t_shrink).SetEase(Ease.InQuad))
+                .InsertCallback(t_exit - t_fade, () => { if (_view != null) _view.FadeView(0f, t_fade); })
+                .ToUniTask();
+        }
+        finally
+        {
+            // 슬롯 뷰는 재사용된다. 중단/취소돼도 자세와 알파를 함께 원복해야 다음 카드가 정상 표시된다.
+            if (_view != null)
+            {
+                t_tr.DOKill();
+                t_tr.position      = t_home;
+                t_tr.localRotation = t_rot0;
+                t_tr.localScale    = t_scale;
+                _view.FadeView(1f, 0f);
+            }
+        }
     }
 
     /// <summary>교대해 들어온 카드의 등장. **보충 등장과 완전히 같은 시퀀스**(CardAppearSequence)를 쓴다 —
@@ -72,17 +88,30 @@ public static class CunningVfx
         if (_view == null) return UniTask.CompletedTask;
 
         Vector3 t_dest = _view.SlotPosition;
-        Vector3 t_from = DeckPoint(_view, t_dest.z);
+        Vector3 t_from = DeckSpawnPoint(_view, t_dest.z);
         Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
 
         return CardAppearSequence.Play(_view, _view.BoundCard, t_from, t_mid, t_dest,
                                        GameTiming.Battle.CardDealDuration);
     }
 
-    /// <summary>카드가 빨려 들어가는 지점. **화면 기준 고정** — 아군은 오른쪽 아래, 적은 왼쪽 위 바깥.
-    /// 덱 UI 좌표를 따라가 봤지만 캔버스 스케일·앵커 조합에 따라 엉뚱한 자리로 튀어서, 화면 모서리로 고정한다
-    /// (덱 더미가 각 진영 그 방향에 있으므로 결과는 같고, 씬 배선에 의존하지 않는다).</summary>
-    static Vector3 DeckPoint(CardView _view, float _z)
+    /// <summary>퇴장 목표는 해당 소유자의 실제 덱 버튼. 버튼은 safe-area 하위이므로 화면 형태를 그대로 따른다.
+    /// 덱 UI가 없는 테스트 씬/비정상 배선에서는 safe-area 안쪽 모서리로 폴백한다.</summary>
+    static Vector3 DeckExitPoint(CardView _view, float _z)
+    {
+        DeckPileUI t_deck = _view.BoundCard != null ? DeckPileUI.For(_view.BoundCard.ownerIndex) : null;
+        if (t_deck != null) return CameraUtil.ScreenPointToWorld(t_deck.AnchorScreenPoint, _z);
+
+        Rect t_safe = Screen.safeArea;
+        float t_margin = Mathf.Min(t_safe.width, t_safe.height) * 0.05f;
+        Vector2 t_point = _view.IsEnemySide
+            ? new Vector2(t_safe.xMin + t_margin, t_safe.yMax - t_margin)
+            : new Vector2(t_safe.xMax - t_margin, t_safe.yMin + t_margin);
+        return CameraUtil.ScreenPointToWorld(t_point, _z);
+    }
+
+    /// <summary>등장 시작점은 기존처럼 화면 밖. 퇴장 목표와 합치면 덱 위에서 카드가 팝업된다.</summary>
+    static Vector3 DeckSpawnPoint(CardView _view, float _z)
         => _view.IsEnemySide
             ? CameraUtil.ScreenFractionToWorld(-0.15f, 1.15f, _z)
             : CameraUtil.ScreenFractionToWorld( 1.15f, -0.15f, _z);

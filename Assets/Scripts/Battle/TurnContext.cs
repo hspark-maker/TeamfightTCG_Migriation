@@ -13,6 +13,9 @@ public class TurnContext
     public DeckPileUI enemyDeckUI;
     public TurnBannerUI turnBanner;
 
+    /// <summary>멀리건 안내 오버레이(씬 저작 프리팹 인스턴스). 비어 있으면 안내 없이 진행한다.</summary>
+    public MulliganOverlayUI mulliganOverlay;
+
     public void RefreshViews()
     {
         this.playerFieldView.Refresh();

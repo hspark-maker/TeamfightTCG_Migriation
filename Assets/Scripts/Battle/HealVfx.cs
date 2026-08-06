@@ -19,16 +19,18 @@ public static class HealVfx
 {
     const float DEFAULT_CURVE_HEIGHT = 0.8f;   // 라이브러리 미배선 시 형태값 폴백
 
-    /// <summary>_targets = (대상 뷰, 이번에 실제 회복된 양). 투사체가 배선돼 있지 않으면
+    /// <summary>_targets = (대상 뷰, 예약 시점 카드, 이번에 실제 회복된 양). 투사체가 배선돼 있지 않으면
     /// 즉시 회복 연출만 재생한다 — 연출은 선택, "+N"과 HP 표기는 필수.</summary>
-    public static void PlayHealBurst(CardView _source, List<(CardView view, int amount)> _targets)
+    public static void PlayHealBurst(
+        CardView _source, List<(CardView view, CardInstance card, int amount)> _targets)
     {
         if (_targets == null || _targets.Count == 0) return;
 
         if (_source == null || !BattleVfx.TryGetEntry(BattleVfxId.HealerProjectile, out _))
         {
-            foreach ((CardView t_view, int t_amount) in _targets)
-                t_view?.PlayHealEffect(t_amount);
+            foreach ((CardView t_view, CardInstance t_card, int t_amount) in _targets)
+                if (t_view != null && t_view.BoundCard == t_card)
+                    t_view.PlayHealEffect(t_amount, _consumeDeferred: true);
             return;
         }
 
@@ -36,7 +38,7 @@ public static class HealVfx
         BattleVfx.Play(BattleVfxId.HealerLaunch, _source.BottomCenter, _source.VfxSortingLayerId);
 
         for (int i = 0; i < _targets.Count; i++)
-            FlyOne(_source, _targets[i].view, _targets[i].amount, i).Forget();
+            FlyOne(_source, _targets[i].view, _targets[i].card, _targets[i].amount, i).Forget();
     }
 
     /// <summary>PlayHealBurst 한 번이 끝나기까지 걸리는 시간(초). 힐러가 여럿일 때 **순차로 세우는 간격**의 기준이다
@@ -52,9 +54,11 @@ public static class HealVfx
     }
 
     /// <summary>대상 1명분 비행. 대상이 파괴되면(사망/씬 전환) 취소되고 투사체는 반납된다.</summary>
-    static async UniTaskVoid FlyOne(CardView _source, CardView _target, int _amount, int _index)
+    static async UniTaskVoid FlyOne(
+        CardView _source, CardView _target, CardInstance _expectedCard, int _amount, int _index)
     {
         if (_target == null) return;
+        CardInstance t_expectedSource = _source != null ? _source.BoundCard : null;
 
         VfxHandle t_proj = default;
         try
@@ -67,7 +71,8 @@ public static class HealVfx
             if (t_delay > 0f)
                 await UniTask.Delay((int)(t_delay * 1000), cancellationToken: t_ct);
 
-            if (_source == null || _target == null) return;
+            if (_source == null || _source.BoundCard != t_expectedSource
+                || _target == null || _target.BoundCard != _expectedCard) return;
 
             Vector3 t_start = _source.BottomCenter;
             Vector3 t_end   = _target.transform.position;
@@ -84,7 +89,7 @@ public static class HealVfx
         catch (OperationCanceledException) { }
         finally
         {
-            FinishAndRelease(t_proj, _target, _amount).Forget();
+            FinishAndRelease(t_proj, _target, _expectedCard, _amount).Forget();
         }
     }
 
@@ -94,12 +99,14 @@ public static class HealVfx
     /// 순서: 방출 정지(살아 있는 파티클은 각자 수명대로 페이드아웃) → 카드에 흡수되듯 축소 →
     /// **완전히 사라진 뒤** 카드 회복 연출("+N"). 투사체와 숫자가 겹쳐 두 번 터지는 것처럼 보이지 않게.
     /// 순수 연출 — 회복 수치는 이미 적용된 뒤다.</summary>
-    static async UniTaskVoid FinishAndRelease(VfxHandle _proj, CardView _target, int _amount)
+    static async UniTaskVoid FinishAndRelease(
+        VfxHandle _proj, CardView _target, CardInstance _expectedCard, int _amount)
     {
         // 투사체가 없거나 이미 죽었으면 표기만이라도 즉시 — "+N"과 HP 갱신은 필수다.
         if (!_proj.Valid)
         {
-            if (_target != null) _target.PlayHealEffect(_amount);
+            if (_target != null && _target.BoundCard == _expectedCard)
+                _target.PlayHealEffect(_amount, _consumeDeferred: true);
             _proj.Release();
             return;
         }
@@ -127,7 +134,8 @@ public static class HealVfx
         }
         _proj.Release();
 
-        if (_target != null) _target.PlayHealEffect(_amount);
+        if (_target != null && _target.BoundCard == _expectedCard)
+            _target.PlayHealEffect(_amount, _consumeDeferred: true);
     }
 
     /// <summary>베지어 경로 비행. 트윈(DOPath) 대신 프레임 보간 — 진행 방향으로 매 프레임 눕혀야 하고,

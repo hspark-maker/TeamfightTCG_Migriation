@@ -12,7 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
   m_Name: "\uB2E8\uD48D\uAF2C\uB9AC"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
+  id: 28
   displayName: "\uB2E8\uD48D\uAF2C\uB9AC"
+  channel: 1
   keywords: 0
   maxHp: 5
   bonusHp: 0
@@ -21,6 +23,22 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
   battleImage: {fileID: 21300000, guid: be8ca3718794a704083e1a32f2855238, type: 3}
   deckPreview: {fileID: 21300000, guid: 1834b24023ce27c43ad1ad50497b3934, type: 3}
+  hpGainByLevel: 
+  keywordUnlockLevel: 0
+  evolvedArts:
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  defaultEvolutionStage: 0
+  appearCinematic: {fileID: 0}
+  cinemaAttackStyle: 0
+  cinemaOrbPrefab: {fileID: 0}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}

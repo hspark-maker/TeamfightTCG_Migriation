@@ -40,12 +40,15 @@ public class BootInstaller : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
-        CardCatalog.SetSource(cardRegistry.All);
+        ContentProfileConfig t_profile = ContentProfileConfig.Active;
+        var t_availableCards = new System.Collections.Generic.List<CardData>(
+            cardRegistry.Available(t_profile.IncludeTestCards));
+        CardCatalog.SetSource(t_availableCards);
 
         // 도감 행 레이아웃/생산 튜닝 주입 — 카탈로그 카드를 참조하므로 SetSource 이후. null이면 청크 fallback.
         CatalogRows.SetLayout(collectionLayout);
 
-        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.KeyOf를 읽는다).
+        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CollectionThemes.SetSource(collectionThemes);
 
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.KeyOf를 읽는다).
@@ -53,6 +56,8 @@ public class BootInstaller : MonoBehaviour
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();
+        // Live 카탈로그 밖의 레거시 소유 키가 정리된 뒤 튜토리얼 완료 여부를 판정한다.
+        OutgameTutorialProgress.Init();
 
         // 도감 방치 생산 캐싱 — 세이브(DataSaveManager.Load)만 읽으므로 순서 무관하나
         // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
@@ -68,8 +73,8 @@ public class BootInstaller : MonoBehaviour
 
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
-        DeckSaveManager.SetCardRegistry(cardRegistry.All);
-        DeckSaveManager.LoadFromSave();
+        DeckSaveManager.SetCardRegistry(t_availableCards);
+        DeckSaveManager.LoadFromSave(t_profile.RunMode == EContentRunMode.Live);
 
         // 덱 대표 이미지 후보 주입 — 신규 덱 저장 시 여기서 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);

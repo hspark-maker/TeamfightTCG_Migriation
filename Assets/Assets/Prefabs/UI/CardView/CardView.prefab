@@ -5631,7 +5631,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8075097872003109342
 Transform:
   m_ObjectHideFlags: 0
@@ -5722,7 +5722,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7532553100725007632
 Transform:
   m_ObjectHideFlags: 0
@@ -5813,7 +5813,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8865967053809472510
 Transform:
   m_ObjectHideFlags: 0
@@ -6376,7 +6376,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1132653297864322211
 Transform:
   m_ObjectHideFlags: 0
@@ -7099,7 +7099,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2492616262356393841
 Transform:
   m_ObjectHideFlags: 0
@@ -7243,7 +7243,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5522359118724990920
 Transform:
   m_ObjectHideFlags: 0
@@ -8311,6 +8311,9 @@ MonoBehaviour:
   cardAnim: {fileID: 7580946599242575258}
   hpText: {fileID: 8681528261154911474}
   bonusHpText: {fileID: 2023722739662934295}
+  hpIcon: {fileID: 203920337666098622}
+  hpIconPopScale: 1.4
+  hpTextPopScale: 1.25
   damagePreviewText: {fileID: 2379275210755578131}
   nameText: {fileID: 8681528259622043953}
   illustration: {fileID: 8681528260152137749}
@@ -8382,6 +8385,9 @@ MonoBehaviour:
   twitchDistance: 0.12
   twitchDuration: 0.16
   twitchAngle: 5
+  knockbackMax: 0.6
+  knockbackOutTime: 0.06
+  knockbackBackTime: 0.14
   longPressLiftY: 0.2
   longPressLiftScale: 1.06
   longPressLiftTime: 0.12
@@ -8610,7 +8616,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &5052139404988092427
 Transform:
   m_ObjectHideFlags: 0

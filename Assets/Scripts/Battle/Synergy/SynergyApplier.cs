@@ -41,7 +41,7 @@ public static class SynergyApplier
     // 배열에 중복 나열돼도 존재 여부만 보므로 카드당 1회 판정 → effect 이중적용 없음.
     public static bool BelongsTo(CardInstance _card, SynergyData _synergy)
     {
-        if (_card?.data?.synergies == null || _synergy == null) return false;
+        if (_card == null || !_card.synergyEnabled || _card.data?.synergies == null || _synergy == null) return false;
         return System.Array.IndexOf(_card.data.synergies, _synergy) >= 0;
     }
 }

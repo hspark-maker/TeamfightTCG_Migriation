@@ -242,6 +242,13 @@ public class CardDecorView
     // _synergy는 이 카드가 속한 BattleField.Synergy(BattleFieldView가 Render로 주입). null이면 전부 비활성 취급.
     void RefreshSynergyBadges(CardInstance _card, SynergyState _synergy)
     {
+        // 스냅샷은 **배지를 그리든 안 그리든 항상** 기록한다. 롱프레스 정보창이 활성/비활성을 가르는 근거라
+        // 여기서 빠지면 정보창이 상태를 못 받아 전부 활성으로 그린다(배지 자리를 키워드가 쓰는 지금 모드에서
+        // 아래 early return에 걸려 실제로 그랬다).
+        bool t_sameAsBefore = _card == this.lastBadgeCard && _synergy == this.lastBadgeState;
+        this.lastBadgeCard  = _card;
+        this.lastBadgeState = _synergy;
+
         // 그 자리를 키워드 아이콘이 쓰는 모드면 배지를 아예 만들지 않는다(겹침 방지).
         // 배지가 존재하지 않으므로 FindBadgeAt은 null → 롱프레스는 카드 정보 팝업으로, PopSynergyBadge는 no-op.
         if (this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null) return;
@@ -250,11 +257,7 @@ public class CardDecorView
         // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →
         // 매 Render(턴 시작 Refresh)마다 배지가 재-Set되어 pop이 반복되는 문제 방지.
         // 배지가 이미 존재할 때만 스킵(없으면 재생성 필요). 첫 등장/리바인드 시에만 rebuild+pop.
-        if (_card == this.lastBadgeCard && _synergy == this.lastBadgeState
-            && this.synergyBadgeRoot.childCount > 0)
-            return;
-        this.lastBadgeCard  = _card;
-        this.lastBadgeState = _synergy;
+        if (t_sameAsBefore && this.synergyBadgeRoot.childCount > 0) return;
 
         // 기존 배지 정리. 배경 SpriteRenderer/라벨 TMP_Text가 CardAnimator FadeView tween 대상일 수 있어
         // 파괴 전 직접 DOKill(SetLink는 CardView GO 기준이라 자식 단독 파괴 시 안 걸림). 키워드 아이콘과 동일 규약.

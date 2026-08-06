@@ -5,9 +5,13 @@ public static class CameraUtil
     // ScreenToWorldPoint with z=0 gives camera position for perspective cameras.
     // Pass worldZ to project at the correct depth plane.
     public static Vector3 ScreenFractionToWorld(float _xFraction, float _yFraction, float _worldZ)
+        => ScreenPointToWorld(new Vector2(Screen.width * _xFraction, Screen.height * _yFraction), _worldZ);
+
+    /// <summary>화면 픽셀 좌표를 지정한 월드 z 평면으로 투영한다.</summary>
+    public static Vector3 ScreenPointToWorld(Vector2 _screenPoint, float _worldZ)
     {
         float t_depth = Mathf.Abs(Camera.main.transform.position.z - _worldZ);
-        Vector3 t_sc  = new Vector3(Screen.width * _xFraction, Screen.height * _yFraction, t_depth);
+        Vector3 t_sc  = new Vector3(_screenPoint.x, _screenPoint.y, t_depth);
         Vector3 t_wc  = Camera.main.ScreenToWorldPoint(t_sc);
         t_wc.z = _worldZ;
         return t_wc;

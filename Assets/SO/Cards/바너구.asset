@@ -10,9 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
-  m_Name: 바너구
+  m_Name: "\uBC14\uB108\uAD6C"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
-  displayName: 바너구
+  id: 31
+  displayName: "\uBC14\uB108\uAD6C"
+  channel: 1
   keywords: 0
   maxHp: 5
   bonusHp: 0
@@ -21,6 +23,22 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
   battleImage: {fileID: 21300000, guid: 6071e50933644ea68afb033f55f8a02b, type: 3}
   deckPreview: {fileID: 21300000, guid: abca9c8dbf5764a409c7afb61f3e754f, type: 3}
+  hpGainByLevel: 
+  keywordUnlockLevel: 0
+  evolvedArts:
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  defaultEvolutionStage: 0
+  appearCinematic: {fileID: 0}
+  cinemaAttackStyle: 0
+  cinemaOrbPrefab: {fileID: 0}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}
@@ -31,5 +49,6 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: '이끼 갑옷을 두른 웜뱃. 튼튼한 앞줄 몸빵.'
+  cardExplain: "\uC774\uB07C \uAC11\uC637\uC744 \uB450\uB978 \uC6DC\uBC43. \uD2BC\uD2BC\uD55C
+    \uC55E\uC904 \uBAB8\uBE75."
   explainKeywords: 0

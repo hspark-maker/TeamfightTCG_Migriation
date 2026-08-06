@@ -63,11 +63,12 @@ public static class CardVisualRules
     /// Invincible=피해 1회 면역(TakeDamage에서 소모), BonusHp=수치가 붙어 있는 임시 체력(HP 옆 "+N"으로 이미 보인다).</summary>
     public const CardKeyword AlwaysStatus = CardKeyword.Invincible | CardKeyword.BonusHp;
 
-    /// <summary>아이콘으로 띄울 키워드 = 마스터 데이터 + 시너지 부여(둘 다 전투 내내 불변) − 항상상태.
-    /// runtimeKeywords(패시브가 전투 중 부여/해제하는 것)는 통째로 빠진다.</summary>
+    /// <summary>아이콘으로 띄울 키워드 = 해금된 카드 키워드 + 시너지 부여(전투 내내 불변) − 항상상태.
+    /// data.keywords가 아니라 인스턴스의 unlockedKeywords를 보는 이유: 아직 해금 안 된 키워드를 띄우면
+    /// 표시와 규칙이 갈라진다. runtimeKeywords(패시브가 전투 중 부여/해제)는 통째로 빠진다.</summary>
     public static CardKeyword TraitKeywords(CardInstance _card)
         => _card == null ? CardKeyword.None
-         : ((_card.data != null ? _card.data.keywords : CardKeyword.None) | _card.synergyKeywords) & ~AlwaysStatus;
+         : (_card.unlockedKeywords | _card.synergyKeywords) & ~AlwaysStatus;
 
     /// <summary>전투 인스턴스가 없는 아웃게임(도감/로비)용 같은 판정. 판정식을 여기 한 곳에만 둔다 —
     /// 호출부가 각자 `& ~AlwaysStatus`를 복제하면 로비와 전투 표시가 조용히 갈라진다.</summary>

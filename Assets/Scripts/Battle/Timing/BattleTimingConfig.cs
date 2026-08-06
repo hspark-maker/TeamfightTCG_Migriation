@@ -72,6 +72,11 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float attackPreviewFlash = 0.55f;
     [SerializeField] float keywordGlowHold    = 1.5f;
 
+    [Header("HP 표기 변동 (아이콘 팝 → 숫자 굴림 → 복귀). 피격·회복 공용")]
+    [SerializeField] float hpPopDuration = 0.1f;    // 아이콘이 커지는/작아지는 각 1회 시간
+    [SerializeField] float hpRollPerStep = 0.05f;   // 체력 1칸당 굴림 시간(6→3이면 3칸 = 0.15초)
+    [SerializeField] float hpRollMax     = 0.45f;   // 큰 피해에도 굴림이 늘어지지 않게 하는 상한
+
     [Header("Heal Vfx (힐러 회복 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
     [SerializeField] float healLaunchLead     = 0.15f;   // 발동 이펙트 → 첫 투사체 사이 간격
     [SerializeField] float healLaunchStagger  = 0.06f;   // 대상별 발사 간격
@@ -114,10 +119,14 @@ public class BattleTimingConfig : ScriptableObject
     public float DealAnimDuration   => dealAnimDuration   * SpeedFactor;
     public float DealMidPause       => dealMidPause       * SpeedFactor;
     public float DeathPreviewFlash  => deathPreviewFlash  * SpeedFactor;
-    public float LongPress          => longPress          * SpeedFactor;
+    // 사용자 입력 임계시간은 전투 연출 배속과 무관해야 한다.
+    public float LongPress          => longPress;
     public float FadeViewDuration   => fadeViewDuration   * SpeedFactor;
     public float AttackPreviewFlash => attackPreviewFlash * SpeedFactor;
     public float KeywordGlowHold    => keywordGlowHold    * SpeedFactor;
+    public float HpPopDuration      => hpPopDuration      * SpeedFactor;
+    public float HpRollPerStep      => hpRollPerStep      * SpeedFactor;
+    public float HpRollMax          => hpRollMax          * SpeedFactor;
 
     /// <summary>다른 SO가 들고 있는 raw 초 값에 배속을 먹인다(키워드별 글로우 hold 등).
     /// SpeedFactor 자체는 계속 비공개 — 곱하는 지점이 코드 여기저기로 흩어지면

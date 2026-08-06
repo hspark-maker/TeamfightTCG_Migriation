@@ -12,7 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27ee77400871c2d4cb40a194e27507fd, type: 3}
   m_Name: "\uBB3C\uBC29\uC6B8\uB8FD 3"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
+  id: 33
   displayName: "\uBB3C\uBC29\uC6B8\uB8FD 3"
+  channel: 0
   keywords: 16
   maxHp: 7
   bonusHp: 0
@@ -22,6 +24,8 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 8c38891d13a84860b056ec84d3b7bddc, type: 3}
   battleImage: {fileID: 21300000, guid: 0aed83bef23e4d398142508bcb4b16ae, type: 3}
   deckPreview: {fileID: 21300000, guid: ab1b5ba0423f4dfbae684a76e4c34b64, type: 3}
+  hpGainByLevel: 
+  keywordUnlockLevel: 0
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}

@@ -248,14 +248,15 @@ public class VfxDebugWindow : MonoBehaviour
         CardView t_src = Source();
         if (t_src == null) return;
 
-        var t_targets = new List<(CardView view, int amount)>();
+        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             if (_single && i != this.targetSlot) continue;
             if (i == this.sourceSlot && !_single) continue;   // 힐러 자신은 대상 아님(인게임 규칙과 동일)
 
             CardView t_view = Slot(this.playerFieldView, i);
-            if (t_view != null) t_targets.Add((t_view, this.healAmount));
+            if (t_view != null && t_view.BoundCard != null)
+                t_targets.Add((t_view, t_view.BoundCard, this.healAmount));
         }
 
         HealVfx.PlayHealBurst(t_src, t_targets);

@@ -23,6 +23,17 @@ public class CardAnimator : MonoBehaviour
     [SerializeField] float twitchDuration = 0.16f;   // 길이(초, 전역 배속 적용)
     [SerializeField] float twitchAngle    = 5f;      // 함께 흔들리는 각도(0이면 회전 없음)
 
+    [Header("Hit Knockback (피해에 비례해 뒤로 밀림)")]
+    // 세기는 HitImpact.Strength01 하나가 정한다 — 흔들림과 같은 곡선을 써야 "센 공격"이 화면·카드에서 같이 읽힌다.
+    [SerializeField] float knockbackMax      = 0.3f;    // 최대 세기일 때 밀리는 거리(월드). 0이면 반동 없음
+    [SerializeField] float knockbackOutTime  = 0.06f;   // 밀려나는 시간(초, 전역 배속 적용)
+    [SerializeField] float knockbackBackTime = 0.14f;   // 제자리로 돌아오는 시간(밀림보다 길어야 '되밀린다'로 읽힌다)
+
+    // 밀림+떨림+복귀를 한 줄로 묶은 시퀀스. 필드로 들고 있는 이유 — 시퀀스 **안**의 트윈은
+    // 대상 DOKill로 끊으면 안 된다(DOTween에서 시퀀스 내부 트윈 개별 Kill은 정의되지 않은 동작).
+    // 끊을 땐 항상 KillHitTwitch()로 시퀀스부터 죽인다.
+    Sequence hitTwitchSeq;
+
     Vector3    twitchHome;      // 떨림 기준 자세 — 연타/중단 시 여기로 되돌린다
     Quaternion twitchHomeRot;
     Vector3    twitchHomeScale;   // 리프트가 곱해질 기준 크기(프리팹에서 1이 아닐 수 있다)
@@ -262,26 +273,70 @@ public class CardAnimator : MonoBehaviour
     /// 루트 position/rotation은 이동·박치기·시네마 트윈이 쓰고 있어서 거기에 흔들기를 얹으면
     /// 서로 덮어쓰거나 DOKill에 잘려 카드가 엉뚱한 자리에 굳는다.
     /// 미배선이면(twitchTarget=null) Awake에서 첫 자식을 잡고, 그것도 없으면 조용히 생략한다.</summary>
-    void PlayHitTwitch()
+    /// <param name="_damage">이번에 받은 피해. 반동 거리·회전 폭이 여기에 비례한다(0이면 반동 없이 예전 떨림 그대로).</param>
+    /// <param name="_awayDir">"때린 쪽의 반대" 월드 방향. 없으면(환경 피해 등) 밀리지 않고 떨기만 한다.</param>
+    void PlayHitTwitch(int _damage, Vector3 _awayDir)
     {
         Transform t_t = this.twitchTarget;
-        if (t_t == null || this.twitchDistance <= 0f || this.twitchDuration <= 0f) return;
+        if (t_t == null || this.twitchDuration <= 0f) return;
 
-        float t_dur = this.twitchDuration * GameTiming.Factor;   // 전역 배속 반영(다른 연출과 같은 기준)
+        float t_dur  = this.twitchDuration * GameTiming.Factor;   // 전역 배속 반영(다른 연출과 같은 기준)
+        // 세기 판정은 HitImpact 단독(화면 흔들림과 공용). 기준은 이 카드의 최대 체력 —
+        // 데미지는 이미 적용된 뒤지만 maxHp는 피해로 변하지 않아 그대로 써도 된다.
+        float t_s01  = HitImpact.Strength01(_damage, this.boundCard);
 
         // 직전 떨림이 남아 있으면 끊고 기준 자세로 되돌린 뒤 다시 — 연타 피격에서 누적되어 밀리지 않게.
-        t_t.DOKill();
+        KillHitTwitch();
         t_t.localPosition = this.twitchHome;
         t_t.localRotation = this.twitchHomeRot;
 
-        t_t.DOShakePosition(t_dur, this.twitchDistance, vibrato: 18, randomness: 40f, fadeOut: true)
-           .SetLink(gameObject)
-           .OnComplete(() => { t_t.localPosition = this.twitchHome; });
+        // 밀림 방향은 부모 기준으로 변환한다 — twitchTarget은 localPosition으로 움직이는데
+        // 카드 루트는 조준/돌진 중 기울어 있어서 월드 방향을 그대로 넣으면 엉뚱한 쪽으로 밀린다.
+        Vector3 t_back = Vector3.zero;
+        if (this.knockbackMax > 0f && t_s01 > 0f && _awayDir.sqrMagnitude > 1e-6f)
+        {
+            Vector3 t_dir = _awayDir.normalized;
+            if (t_t.parent != null) t_dir = t_t.parent.InverseTransformDirection(t_dir);
+            t_dir.z = 0f;   // 화면 평면 안에서만 밀린다(시네마 중 z가 벌어져 있어도 카메라 쪽으로 안 튄다)
+            if (t_dir.sqrMagnitude > 1e-6f)
+                t_back = t_dir.normalized * (this.knockbackMax * t_s01);
+        }
 
+        // 순서: 밀려나고 → **밀린 자리에서** 부들부들 → 제자리. 밀림과 떨림을 겹치면 같은 localPosition을
+        // 두 트윈이 한 프레임에 서로 덮어써서 카드가 지직거린다 — 그래서 겹치지 않고 잇는다.
+        this.hitTwitchSeq = DOTween.Sequence().SetLink(gameObject);
+
+        if (t_back != Vector3.zero)
+            this.hitTwitchSeq.Append(t_t.DOLocalMove(this.twitchHome + t_back,
+                                                     this.knockbackOutTime * GameTiming.Factor)
+                                        .SetEase(Ease.OutQuad));
+
+        if (this.twitchDistance > 0f)
+            this.hitTwitchSeq.Append(t_t.DOShakePosition(t_dur, this.twitchDistance,
+                                                         vibrato: 18, randomness: 40f, fadeOut: true));
+
+        if (t_back != Vector3.zero)
+            this.hitTwitchSeq.Append(t_t.DOLocalMove(this.twitchHome,
+                                                     this.knockbackBackTime * GameTiming.Factor)
+                                        .SetEase(Ease.OutBack));
+
+        this.hitTwitchSeq.OnComplete(() => { if (t_t != null) t_t.localPosition = this.twitchHome; });
+
+        // 회전 펀치는 위치와 다른 축이라 겹쳐도 안전 — 세기만 피해에 따라 얕게/깊게.
         if (this.twitchAngle > 0f)
-            t_t.DOPunchRotation(new Vector3(0f, 0f, this.twitchAngle), t_dur, vibrato: 8, elasticity: 0.6f)
+            t_t.DOPunchRotation(new Vector3(0f, 0f, this.twitchAngle * Mathf.Lerp(0.7f, 1.5f, t_s01)),
+                                t_dur, vibrato: 8, elasticity: 0.6f)
                .SetLink(gameObject)
                .OnComplete(() => { t_t.localRotation = this.twitchHomeRot; });
+    }
+
+    /// <summary>진행 중인 밀림/떨림을 끊는다. 시퀀스를 **먼저** 죽인 뒤 대상 트윈을 정리해야 한다 —
+    /// 순서를 뒤집으면 살아 있는 시퀀스가 이미 죽은 내부 트윈을 계속 돌린다.</summary>
+    void KillHitTwitch()
+    {
+        this.hitTwitchSeq?.Kill();
+        this.hitTwitchSeq = null;
+        if (this.twitchTarget != null) this.twitchTarget.DOKill();
     }
 
     /// <summary>롱프레스로 카드 정보를 보는 동안 카드가 살짝 떠오른다. 손을 떼면 원래 자세로.
@@ -299,8 +354,8 @@ public class CardAnimator : MonoBehaviour
 
         float t_dur = Mathf.Max(0.01f, this.longPressLiftTime) * GameTiming.Factor;
 
-        // 진행 중인 떨림은 끊고 회전만 기준으로 되돌린다 — 위치/크기는 아래 트윈이 바로 이어받는다.
-        t_t.DOKill();
+        // 진행 중인 떨림/밀림은 끊고 회전만 기준으로 되돌린다 — 위치/크기는 아래 트윈이 바로 이어받는다.
+        KillHitTwitch();
         t_t.localRotation = this.twitchHomeRot;
 
         t_t.DOLocalMove(this.twitchHome, t_dur)
@@ -321,18 +376,18 @@ public class CardAnimator : MonoBehaviour
         this.twitchHome = this.twitchBaseHome;
         if (this.twitchTarget == null) return;
 
-        this.twitchTarget.DOKill();
+        KillHitTwitch();
         this.twitchTarget.localPosition = this.twitchBaseHome;
         this.twitchTarget.localScale    = this.twitchHomeScale;
         this.twitchTarget.localRotation = this.twitchHomeRot;
     }
 
-    public async UniTask PlayHitAnim(float _duration = -1f, int _damage = 0)
+    public async UniTask PlayHitAnim(float _duration = -1f, int _damage = 0, Vector3 _awayDir = default)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
-        this.hitEffect?.Play(_damage);   // 피격 붐 + 데미지 숫자(있으면). 위치=이 카드.
-        PlayHitTwitch();                 // 맞은 순간 잠깐 떨림(붐과 같은 프레임에 시작)
+        this.hitEffect?.Play(_damage);          // 피격 붐 + 데미지 숫자(있으면). 위치=이 카드.
+        PlayHitTwitch(_damage, _awayDir);       // 맞은 순간 밀림+떨림(붐과 같은 프레임에 시작)
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();
         Color t_c = this.hitOverlay.color;

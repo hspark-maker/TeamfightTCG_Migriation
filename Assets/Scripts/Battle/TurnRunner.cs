@@ -17,6 +17,7 @@ public class TurnRunner : MonoBehaviour
     [SerializeField] DeckPileUI playerDeckUI;
     [SerializeField] DeckPileUI enemyDeckUI;
     [SerializeField] TurnBannerUI    turnBanner;
+    [SerializeField] MulliganOverlayUI mulliganOverlay;   // 멀리건 안내 화면(씬에 꺼진 채로 놓인 프리팹 인스턴스)
     [SerializeField] CoinFlipUI      coinFlip;       // 선/후공 결정 연출(싱글 AI전 전용, 비우면 스킵)
     [SerializeField] GameResultPopup winPopup;
     [SerializeField] GameResultPopup losePopup;
@@ -112,6 +113,7 @@ public class TurnRunner : MonoBehaviour
             playerDeckUI    = this.playerDeckUI,
             enemyDeckUI     = this.enemyDeckUI,
             turnBanner       = this.turnBanner,
+            mulliganOverlay  = this.mulliganOverlay,
         };
 
         // (선/후공 판정 — 시드 확정 후) 멀티는 기존 고정(발산 방지), 싱글은 코인 랜덤.

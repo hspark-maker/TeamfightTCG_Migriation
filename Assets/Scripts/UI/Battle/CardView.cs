@@ -41,6 +41,12 @@ public class CardView : MonoBehaviour
     [Header("UI")]
     [SerializeField] TMP_Text hpText;
     [SerializeField] TMP_Text bonusHpText;
+    // 체력 변동 연출에서 커졌다 작아지는 아이콘. 미배선이면 HP 숫자 자체를 대신 부풀린다
+    // (연출이 아예 없는 것보단 숫자라도 들썩이는 편이 변동을 읽게 해준다).
+    [SerializeField] Transform hpIcon;
+    [SerializeField] float hpIconPopScale = 1.4f;   // 변동 중 배율(원래 스케일 대비 — 아이콘 기본이 1이 아니다)
+    // HP 숫자도 같이 부푼다. 아이콘보다 작게 두는 게 기본 — 숫자가 아이콘만큼 커지면 옆 칸(이름·보너스HP)을 침범한다.
+    [SerializeField] float hpTextPopScale = 1.25f;
     // 공격 선택 시 이 카드가 받을 예상 데미지("-N"). HP 라벨을 덮어써 "맞은 뒤 남을 체력"을 보여주면
     // 현재 체력과 헷갈리므로 수치는 별도 라벨에 띄운다. 미배선이면 HP 라벨 폴백(아래 ShowAttackPreview).
     [SerializeField] TMP_Text damagePreviewText;
@@ -212,6 +218,19 @@ public class CardView : MonoBehaviour
 
     Color hpTextOriginalColor;
 
+    // ── HP 표기 상태 ─────────────────────────────────────────────────────
+    // 지금 화면에 찍혀 있는 값. 규칙상 hp는 이미 확정돼 있어도(결정론: 상태변이 선행) 표기는 연출을 따라
+    // 굴러가므로, 굴림의 **시작점은 모델이 아니라 이 값**이다. 모델을 시작점으로 쓰면 굴릴 것이 남지 않는다.
+    int shownHp;
+    int shownBonusHp;
+    // 진행 중 굴림까지 모두 끝났을 때 도달할 논리 목표값. shownHp는 현재 프레임 값이라 연속 회복이
+    // 첫 굴림을 끊으면 일부 회복량을 잃을 수 있다 — 다음 목표는 이 값에 누적한다.
+    int hpDisplayTarget;
+    // 아직 화면에 안 올린 회복량. 0보다 크면 "표기 유예 중" — 이 사이 Render가 최신 hp로 덮으면
+    // 숫자만 먼저 올라간다. 힐러가 둘이면 몫이 둘 쌓이고, 투사체가 도착할 때마다 자기 몫씩 빠진다.
+    int hpPendingHeal;
+    Sequence hpRollSeq;
+
     public CardInstance BoundCard => this.boundCard;
     #endregion
 
@@ -250,6 +269,7 @@ public class CardView : MonoBehaviour
         this.armedVfxView?.Hide();   // 풀 대여분을 물고 죽으면 풀이 파괴된 오브젝트를 들고 있게 된다
         this.weaponView?.Cleanup();  // 무기 인스턴스는 자식이라 Unity가 함께 파괴 — 참조만 끊는다
         this.decorView?.Cleanup();   // 아이콘/배지 트윈 끊기(파괴 전 DOKill 규약) + 스냅샷 참조 해제
+        KillHpRoll();
         if (this.hpText != null) this.hpText.DOKill();
     }
 
@@ -317,6 +337,9 @@ public class CardView : MonoBehaviour
         {
             this.cardAnim.ResetHitEffect();
             this.armedVfxView?.Hide();   // 이전 카드의 무장 이펙트가 새 카드에 남지 않게
+            // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
+            KillHpRoll();
+            this.hpPendingHeal = 0;
         }
 
         this.boundCard = _card;
@@ -336,8 +359,16 @@ public class CardView : MonoBehaviour
 
         bool t_isFaceDown = !_card.isRevealed;
 
-        if (t_isFaceDown) SetHpDisplay("?", "");
-        else SetHpDisplay(_card.hp.ToString(), _card.bonusHp > 0 ? $"+{_card.bonusHp}" : "");
+        // 뒷면은 수치 자체가 비밀, 유예 중이면 **일부러 옛 값**(연출이 아직 안 왔다), 그 외엔 최신값 스냅.
+        if (t_isFaceDown)
+        {
+            KillHpRoll();
+            this.hpPendingHeal = 0;
+            SetHpDisplay("?", "");
+        }
+        else if (this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
+            WriteHpDisplay(this.shownHp, this.shownBonusHp);
+        else SnapHpDisplay(_card);
         this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
@@ -511,7 +542,7 @@ public class CardView : MonoBehaviour
             // 알파는 카드 몸통 상태 × 이 라벨의 기준 알파 — 1로 못박으면 흐려진 카드에서 숫자만 선명해진다.
             t_c.a = (this.cardAnim != null ? this.cardAnim.FadeTarget : 1f) * CardFadeAlpha.Of(this.hpText);
             this.hpText.color = t_c;
-            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+            RestoreHpDisplay();
             this.hpFallbackPreview = false;
         }
 
@@ -522,8 +553,127 @@ public class CardView : MonoBehaviour
     /// <summary>표시용 HP를 임의 값으로 덮어쓴다. 규칙상 hp는 이미 확정됐는데(결정론: 상태변이 선행)
     /// 연출이 여러 번에 나눠 그 피해를 보여줄 때, 숫자만 단계적으로 따라오게 하는 용도다.
     /// **표시 전용** — CardInstance는 건드리지 않는다. 다음 Render/PlayHitAnim이 실제 값으로 되돌린다.</summary>
-    public void OverrideHpDisplay(int _hp, int _bonusHp)
-        => SetHpDisplay(Mathf.Max(0, _hp).ToString(), _bonusHp > 0 ? $"+{_bonusHp}" : "");
+    public void OverrideHpDisplay(int _hp, int _bonusHp) => AnimateHpDisplay(Mathf.Max(0, _hp), _bonusHp);
+
+    /// <summary>회복 표기를 **연출이 도착할 때까지** 미룬다. <see cref="CardInstance.Heal"/>(_showEffect:false) 전용 —
+    /// 그 경로는 수치를 지금 적용하고(결정론: 상태는 동기) 표기는 투사체가 닿을 때 한다. 이 사이에 Render가 돌면
+    /// 숫자만 먼저 올라가 "결과가 반영된 뒤에 이펙트가 오는" 그림이 된다 — 그걸 막는 래치다.
+    /// 해제는 셋 중 먼저 오는 것: 도착(PlayHealEffect) / 다른 HP 변동 연출 / 슬롯 카드 교체·뒷면화.
+    /// _amount는 **이 호출분의 회복량**이다 — 힐러가 둘이면 몫이 쌓이고 투사체마다 자기 몫만 올라간다
+    /// (합계로 두면 첫 투사체가 남의 몫까지 올려버려 두 번째 투사체는 숫자가 안 움직인다).</summary>
+    public void DeferHpDisplay(int _amount) => this.hpPendingHeal += Mathf.Max(0, _amount);
+
+    /// <summary>HP 표기를 _hp까지 **굴린다**: 아이콘이 커지고 → 숫자가 빠르게 오르내리고 → 다시 작아진다.
+    /// 시작점은 모델이 아니라 현재 표기값(shownHp) — 규칙은 이미 끝나 있고 여기선 그 차이를 보여줄 뿐이다.
+    /// 순수 연출: RNG/게임상태 무관, 활성 클라 표시만.</summary>
+    void AnimateHpDisplay(int _hp, int _bonusHp, bool _clearPending = true)
+    {
+        if (_clearPending) this.hpPendingHeal = 0;
+        this.hpDisplayTarget = _hp;
+
+        // 시작점은 **지금 눈에 보이는 숫자**다. 목표값을 먼저 shownHp에 넣어두면, 굴리는 도중 다음 갱신이
+        // 들어왔을 때(무리 다단 착탄) 아직 화면에 뜨지도 않은 값에서 굴러 내려간다.
+        KillHpRoll();
+        int t_from = this.shownHp;
+
+        // 변화가 없으면 팝도 굴림도 생략 — 0 피해(무적 소멸)·만피 회복에 아이콘만 들썩이지 않게.
+        if (t_from == _hp && this.shownBonusHp == _bonusHp)
+        {
+            WriteHpDisplay(_hp, _bonusHp);
+            return;
+        }
+
+        float t_popDur  = Mathf.Max(0.01f, GameTiming.Battle.HpPopDuration);
+        float t_rollDur = Mathf.Clamp(Mathf.Abs(_hp - t_from) * GameTiming.Battle.HpRollPerStep,
+                                      0.03f, Mathf.Max(0.03f, GameTiming.Battle.HpRollMax));
+
+        // 보너스HP는 즉시 확정하고 숫자만 굴린다(둘 다 굴리면 어느 쪽이 움직이는지 안 읽힌다).
+        WriteHpDisplay(t_from, _bonusHp);
+
+        this.hpRollSeq = DOTween.Sequence().SetLink(gameObject);
+
+        // 아이콘과 숫자가 **함께** 부푼다(Insert(0f) — Append로 이어 붙이면 대상마다 순서대로 늦게 커진다).
+        foreach (HpPop t_pop in EnsureHpPops())
+        {
+            this.hpRollSeq.Insert(0f, t_pop.target.DOScale(t_pop.home * t_pop.scale, t_popDur).SetEase(Ease.OutBack));
+            this.hpRollSeq.Insert(t_popDur + t_rollDur, t_pop.target.DOScale(t_pop.home, t_popDur).SetEase(Ease.InQuad));
+        }
+
+        // 숫자는 아이콘이 커진 **뒤부터** 굴러야 "아이콘이 커지고 → 체력이 달고 → 작아진다"로 읽힌다.
+        this.hpRollSeq.Insert(t_popDur,
+            DOVirtual.Int(t_from, _hp, t_rollDur, _v => WriteHpDisplay(_v, _bonusHp)).SetEase(Ease.Linear));
+        this.hpRollSeq.OnComplete(() => WriteHpDisplay(_hp, _bonusHp));
+    }
+
+    /// <summary>표기를 즉시 _card 값으로 맞춘다(굴림 없음). 슬롯 재구성·바인딩 교체처럼 **연출이 아닌** 갱신 전용.</summary>
+    void SnapHpDisplay(CardInstance _card)
+    {
+        KillHpRoll();
+        this.hpDisplayTarget = _card.hp;
+        WriteHpDisplay(_card.hp, _card.bonusHp);
+    }
+
+    /// <summary>프리뷰 등으로 덮어썼던 HP 라벨을 **현재 표기값**으로 되돌린다(모델값이 아니다 —
+    /// 굴림/유예 중이면 모델은 이미 앞서 있어서 숫자가 튄다). 뒷면 카드는 다시 감춘다.</summary>
+    void RestoreHpDisplay()
+    {
+        if (this.boundCard != null && !this.boundCard.isRevealed) SetHpDisplay("?", "");
+        else WriteHpDisplay(this.shownHp, this.shownBonusHp);
+    }
+
+    /// <summary>팝 대상 한 건. home은 **원래 스케일**이다 — 1이라는 보장이 없어(아이콘은 프리팹에서 2배)
+    /// 복귀값을 대상별로 들고 있어야 한다. 부푼 중간값을 기준으로 잡으면 굴릴 때마다 커진 채 남는다.</summary>
+    struct HpPop
+    {
+        public Transform target;
+        public Vector3   home;
+        public float     scale;
+    }
+    HpPop[] hpPops;
+
+    /// <summary>팝 대상 = 하트 아이콘 + HP 숫자. **둘 다** 커졌다 작아진다 —
+    /// 아이콘만 부풀면 옆의 숫자가 그 자리에 못 박힌 것처럼 보인다.
+    /// 배선은 프리팹마다 고정이라 1회만 만들고, 그때의 스케일을 복귀 기준으로 캡처한다.</summary>
+    HpPop[] EnsureHpPops()
+    {
+        if (this.hpPops != null) return this.hpPops;
+
+        int t_count = (this.hpIcon != null ? 1 : 0) + (this.hpText != null ? 1 : 0);
+        var t_pops  = new HpPop[t_count];
+        int t_i     = 0;
+        if (this.hpIcon != null)
+            t_pops[t_i++] = new HpPop { target = this.hpIcon, home = this.hpIcon.localScale, scale = this.hpIconPopScale };
+        if (this.hpText != null)
+            t_pops[t_i] = new HpPop { target = this.hpText.transform, home = this.hpText.transform.localScale, scale = this.hpTextPopScale };
+
+        this.hpPops = t_pops;
+        return this.hpPops;
+    }
+
+    /// <summary>진행 중인 굴림을 끊고 팝 대상을 전부 원래 크기로 되돌린다. 끊긴 트윈은 OnComplete를 안 타므로
+    /// 스케일 복원을 여기서 직접 한다 — 안 하면 커진 아이콘·숫자가 그대로 굳는다.</summary>
+    void KillHpRoll()
+    {
+        this.hpRollSeq?.Kill();
+        this.hpRollSeq = null;
+
+        if (this.hpPops == null) return;   // 한 번도 굴린 적 없으면 되돌릴 것도 없다(파괴 경로 포함)
+        foreach (HpPop t_pop in this.hpPops)
+        {
+            if (t_pop.target == null) continue;
+            t_pop.target.DOKill();
+            t_pop.target.localScale = t_pop.home;
+        }
+    }
+
+    /// <summary>숫자를 실제로 찍는 유일한 지점. 찍은 값이 곧 shownHp다 — 굴림 중간값도 포함해서
+    /// **화면과 shownHp가 갈라지지 않는다**(다음 굴림의 시작점이 여기서 나온다).</summary>
+    void WriteHpDisplay(int _hp, int _bonus)
+    {
+        this.shownHp      = _hp;
+        this.shownBonusHp = _bonus;
+        SetHpDisplay(_hp.ToString(), _bonus > 0 ? $"+{_bonus}" : "");
+    }
 
     void SetHpDisplay(string _hp, string _bonus)
     {
@@ -590,23 +740,59 @@ public class CardView : MonoBehaviour
     /// "맞은 방향의 반대"로 튀도록 진행 방향을 넘긴다.</summary>
     public async UniTask PlayHitAnim(float _d = 0.15f, int _damage = 0, CardView _hitFrom = null)
     {
+        // 숫자는 즉시 최종값으로 튀지 않고 굴러 내려간다(아이콘 팝 → 6·5·4·3 → 복귀).
         if (this.boundCard != null)
-            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+            AnimateHpDisplay(this.boundCard.hp, this.boundCard.bonusHp);
         // 피격 파티클은 라이브러리 소유(미배선이면 무동작). 붐/숫자는 프리팹의 HitEffectView가 계속 담당 —
         // 그쪽은 카드에 상주하며 상태(시퀀스/숫자)를 가지므로 1회성 파티클과 축이 다르다.
         Vector3 t_awayDir = _hitFrom != null ? transform.position - _hitFrom.transform.position : default;
         t_awayDir.z = 0f;   // 화면 평면 방향만 — 시네마 중 z가 벌어져 있으면 먼지가 카메라 쪽으로 튄다
-        BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir);
-        await this.cardAnim.PlayHitAnim(_d, _damage);
+        // 먼지의 양·속도도 화면 흔들림·카드 반동과 같은 세기(피해/최대체력)를 따른다 — 세 연출이 갈리면
+        // "센 공격"이 한쪽에서만 세게 읽힌다. 세기 반응이 배선된 항목만 이 값을 쓴다.
+        BattleVfx.PlayAttached(BattleVfxId.Hit, transform, IsEnemySide, VfxSortingLayerId, t_awayDir,
+                               HitImpact.Strength01(_damage, this.boundCard));
+        // 먼지가 튀는 방향과 카드가 밀리는 방향은 같아야 한다 — 같은 t_awayDir를 그대로 넘긴다.
+        await this.cardAnim.PlayHitAnim(_d, _damage, t_awayDir);
     }
-    public UniTask PlayDeathAnim(float _d = 0.4f)  => this.cardAnim.PlayDeathAnim(_d);
+    /// <summary>사망 연출. **HP 굴림이 끝난 뒤에** 시작한다 — 카드가 줄어들며 사라지는 도중에 숫자가
+    /// 0까지 굴러가면 얼마를 맞고 죽었는지가 안 읽히고, 페이드로 흐려진 숫자 위에서 굴림만 헛돈다.
+    /// 순수 연출 대기다 — 규칙(hp·사망 판정)은 이미 확정된 뒤라 이 대기가 게임 판정을 미루지 않는다.</summary>
+    public async UniTask PlayDeathAnim(float _d = 0.4f)
+    {
+        await WaitHpRollSettled();
+        await this.cardAnim.PlayDeathAnim(_d);
+    }
+
+    /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).
+    /// 굴림이 중간에 끊기면(카드 교체·파괴·다음 변동) 취소로 빠져나오며 기다림도 거기서 끝난다 —
+    /// 대기가 연출 하나에 매달려 턴 흐름을 붙잡지 않게.</summary>
+    public async UniTask WaitHpRollSettled()
+    {
+        Sequence t_seq = this.hpRollSeq;
+        if (t_seq == null || !t_seq.IsActive()) return;
+        await t_seq.ToUniTask().SuppressCancellationThrow();
+    }
 
     /// <summary>회복 연출(회복 파티클 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
     /// 회복이면 경로(힐러/돌보미/청소부/유산/부활) 불문 여기 하나로 수렴한다.</summary>
-    public void PlayHealEffect(int _amount)
+    public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
     {
+        // 힐러 경로는 여기가 **표기의 발화점**이다 — 수치는 턴 시작에 이미 들어갔고(결정론),
+        // 숫자는 투사체가 닿는 지금부터 굴러 오른다(그때까지는 DeferHpDisplay가 붙잡고 있었다).
+        // 유예분이 남아 있으면 이번 도착 몫(_amount)만 올린다. 모델 hp를 넘지 않게 잘라 두면
+        // 도중에 맞아서 hp가 내려간 경우에도 숫자가 실제보다 높이 뜨지 않는다.
         if (this.boundCard != null)
-            SetHpDisplay(this.boundCard.hp.ToString(), this.boundCard.bonusHp > 0 ? $"+{this.boundCard.bonusHp}" : "");
+        {
+            int t_consumed = _consumeDeferred ? Mathf.Min(this.hpPendingHeal, _amount) : 0;
+            this.hpPendingHeal -= t_consumed;
+
+            // 즉시 회복은 자기 몫을 바로 목표에 더하고, 지연 회복은 실제로 소비한 pending 몫만 더한다.
+            // 모델 hp에서 아직 남은 pending을 뺀 값을 상한으로 삼아, 다음 투사체 몫을 먼저 노출하지 않는다.
+            int t_step      = _consumeDeferred ? t_consumed : _amount;
+            int t_revealed  = this.boundCard.hp - this.hpPendingHeal;
+            int t_target    = Mathf.Min(this.hpDisplayTarget + t_step, t_revealed);
+            AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
+        }
         BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
         this.cardAnim.PlayHealEffect(_amount);   // 숫자("+N") — 붐 스프라이트는 프리팹에서 비우면 파티클만 남는다
     }

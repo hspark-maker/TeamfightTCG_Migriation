@@ -336,7 +336,7 @@ public class DeckEditController : MonoBehaviour
                 if (ContainsInWorking(t_card)) continue;
 
                 if (!OwnershipManager.IsOwned(t_card))
-                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{CardCatalog.KeyOf(t_card)}'가 미소유 상태다 — 그대로 편성한다.");
+                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{t_card.name}'가 미소유 상태다 — 그대로 편성한다.");
 
                 if (!TryFillFirstEmpty(t_card)) break;   // 6칸이 다 찼다
                 t_changed = true;

@@ -123,6 +123,7 @@ public class CardCinematicPlayer : MonoBehaviour
         this.skipRequested = false;
         gameObject.SetActive(true);
         EnsureRenderTexture();
+        ClearRenderTexture();   // 페이드 인 전에 반드시 — 안 지우면 직전 컷씬 마지막 프레임이 비친다.
 
         if (this.background != null) this.background.gameObject.SetActive(true);
 
@@ -255,6 +256,23 @@ public class CardCinematicPlayer : MonoBehaviour
         this.renderTexture             = new RenderTexture(Screen.width, Screen.height, 0);
         this.videoPlayer.targetTexture = this.renderTexture;
         this.rawImage.texture          = this.renderTexture;
+    }
+
+    /// <summary>
+    /// RenderTexture 픽셀을 검정으로 지운다. **재생 시작마다** 호출해야 한다 — 새로 만들 때만이 아니다.
+    /// 같은 해상도면 EnsureRenderTexture가 텍스처를 그대로 재사용하는데, 거기엔 직전 컷씬의 마지막
+    /// 프레임이 남아 있다. 재생 순서가 (오버레이 켜기 → 페이드 인 → Play)라 새 클립의 첫 프레임이
+    /// 디코딩되기 전 1~2프레임 동안 그 잔상이 그대로 보인다.
+    /// RenderTexture.active는 전역 상태라 남의 렌더 타깃을 뺏은 채 끝내지 않도록 원래 값으로 되돌린다.
+    /// </summary>
+    void ClearRenderTexture()
+    {
+        if (this.renderTexture == null) return;
+
+        RenderTexture t_prev = RenderTexture.active;
+        RenderTexture.active = this.renderTexture;
+        GL.Clear(true, true, Color.black);
+        RenderTexture.active = t_prev;
     }
 
     void ReleaseRenderTexture()

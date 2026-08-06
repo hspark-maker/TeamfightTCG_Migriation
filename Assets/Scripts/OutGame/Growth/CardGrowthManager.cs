@@ -5,7 +5,7 @@ using UnityEngine;
 // 카드 성장(강화 레벨)의 static 단일 창구
 public static class CardGrowthManager
 {
-    static readonly Dictionary<string, CardGrowthEntry> s_growth = new Dictionary<string, CardGrowthEntry>();
+    static readonly Dictionary<int, CardGrowthEntry> s_growth = new Dictionary<int, CardGrowthEntry>();
 
     static readonly System.Random s_rng = new System.Random();
 
@@ -37,17 +37,35 @@ public static class CardGrowthManager
         s_growth.Clear();
 
         var t_data = DataSaveManager.Data.cardGrowth;
+        bool t_migrated = false;
         if (t_data != null && t_data.entries != null)
         {
             foreach (var t_entry in t_data.entries)
             {
-                if (t_entry == null || string.IsNullOrEmpty(t_entry.cardKey)) continue;
-                if (s_growth.ContainsKey(t_entry.cardKey)) continue;
-                s_growth[t_entry.cardKey] = t_entry;
+                if (t_entry == null) continue;
+
+                int t_id = t_entry.cardId;
+                if (t_id <= 0)
+                {
+                    // 구 세이브(이름 키) 이관 — 카탈로그 미준비면 이번 부트는 건너뛰고 값을 보존한다.
+                    if (!CardCatalog.IsReady) continue;
+
+                    t_id = CardCatalog.LegacyIdOfName(t_entry.cardKey);
+                    if (t_id <= 0) continue;                 // 사라진 카드의 진행도는 버린다
+
+                    t_entry.cardId  = t_id;
+                    t_entry.cardKey = null;
+                    t_migrated      = true;
+                }
+
+                if (s_growth.ContainsKey(t_id)) continue;
+                s_growth[t_id] = t_entry;
             }
         }
 
         s_initialized = true;
+
+        if (t_migrated) Save();
     }
 
     // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
@@ -61,18 +79,19 @@ public static class CardGrowthManager
         DataSaveManager.Save();
     }
 
-    public static CardGrowth GrowthOf(CardData _card) => GrowthOf(CardCatalog.KeyOf(_card));
+    public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)));
 
-    // 카드 키의 성장 스냅샷(기록이 없으면 미강화). HP 보너스는 저장값이 아니라 레벨에서 파생
-    public static CardGrowth GrowthOf(string _key)
+    // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
+    public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id));
+
+    // 카드의 현재 강화 레벨(기록 없음 = 미강화)
+    public static int LevelOf(int _id)
     {
-        if (string.IsNullOrEmpty(_key)) return CardGrowth.Fresh;
-        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return CardGrowth.Fresh;
+        if (_id <= 0) return CardGrowth.BaseLevel;
+        if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return CardGrowth.BaseLevel;
 
         // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
-        int t_level = t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
-
-        return new CardGrowth(t_level, Config.HpBonusAt(t_level));
+        return t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
     }
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
@@ -83,7 +102,7 @@ public static class CardGrowthManager
         _step = default;
         if (_card == null) return false;
 
-        return Config.TryGetStep(GrowthOf(_card).Level + 1, out _step);
+        return Config.TryGetStep(_card, GrowthOf(_card).Level + 1, out _step);
     }
 
     // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
@@ -91,16 +110,16 @@ public static class CardGrowthManager
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
 
-        string t_key = CardCatalog.KeyOf(_card);
-        if (string.IsNullOrEmpty(t_key)) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
+        int t_id = CardCatalog.IdOf(_card);
+        if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
         CardGrowthConfig t_config = Config;
-        CardGrowth       t_growth = GrowthOf(t_key);
+        CardGrowth       t_growth = GrowthOf(t_id);
         int              t_level  = t_growth.Level;
 
         if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!t_config.TryGetStep(t_level + 1, out var t_step))
+        if (!t_config.TryGetStep(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         if (!CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost))
@@ -113,7 +132,7 @@ public static class CardGrowthManager
         if (t_success)
         {
             t_level = t_growth.Level + 1;
-            Entry(t_key).level = t_level;
+            Entry(t_id).level = t_level;
             Save();
         }
 
@@ -131,12 +150,25 @@ public static class CardGrowthManager
         OnGrowthChanged?.Invoke();
     }
 
-    static CardGrowthEntry Entry(string _key)
+    // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
+    // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.
+    static CardGrowth Snapshot(CardData _card, int _level)
     {
-        if (s_growth.TryGetValue(_key, out var t_entry) && t_entry != null) return t_entry;
+        CardGrowthConfig t_config = Config;
+        return new CardGrowth(
+            _level,
+            t_config.HpBonusAt(_card, _level),
+            t_config.EvolutionStageAt(_level),
+            t_config.UnlockedKeywordsAt(_card, _level),
+            t_config.SynergyUnlockedAt(_level));
+    }
 
-        t_entry = new CardGrowthEntry { cardKey = _key, level = CardGrowth.BaseLevel };
-        s_growth[_key] = t_entry;
+    static CardGrowthEntry Entry(int _id)
+    {
+        if (s_growth.TryGetValue(_id, out var t_entry) && t_entry != null) return t_entry;
+
+        t_entry = new CardGrowthEntry { cardId = _id, level = CardGrowth.BaseLevel };
+        s_growth[_id] = t_entry;
         return t_entry;
     }
 }
