@@ -15,6 +15,7 @@ public class DeckPileUI : MonoBehaviour
     const float CloseTime     = 0.16f;
     static readonly Vector2 PivotMine    = new Vector2(1f, 0f);   // 우하단
     static readonly Vector2 PivotOpponent = new Vector2(0f, 1f);  // 좌상단
+    static readonly List<DeckPileUI> live = new List<DeckPileUI>();
 
     [SerializeField] BattleField field;
     [SerializeField] TMP_Text countText;
@@ -44,6 +45,16 @@ public class DeckPileUI : MonoBehaviour
     [Tooltip("패널(panel)에 붙은 CanvasGroup. 닫힘 연출의 페이드 + 클릭 차단을 맡는다")]
     [SerializeField] CanvasGroup panelGroup;
 
+    void OnEnable()
+    {
+        if (!live.Contains(this)) live.Add(this);
+    }
+
+    void OnDisable()
+    {
+        live.Remove(this);
+    }
+
     void Start()
     {
         this.deckButton.onClick.AddListener(Toggle);
@@ -60,6 +71,37 @@ public class DeckPileUI : MonoBehaviour
     /// <summary>열려 있는 덱 패널을 닫는다. 생각시간 초과 자동공격처럼 <b>플레이어 조작 없이</b> 판이 진행될 때
     /// 불러 준다 — 안 닫으면 공격 연출이 패널 뒤에서 돌아 무슨 일이 일어났는지 안 보인다.</summary>
     public static void CloseAny() => currentOpen?.Close();
+
+    /// <summary>현재 씬에서 지정 소유자의 덱 UI를 찾는다. 비활성/미배선 상태면 null.</summary>
+    public static DeckPileUI For(int _ownerIndex)
+    {
+        DeckPileUI t_match = null;
+        for (int i = live.Count - 1; i >= 0; i--)
+        {
+            DeckPileUI t_ui = live[i];
+            if (t_ui == null) { live.RemoveAt(i); continue; }
+            if (t_ui.field != null && t_ui.deckButton != null && t_ui.field.OwnerIndex == _ownerIndex)
+            {
+                if (t_match != null) return null;   // 초기화 전 owner 중복: 임의 덱 대신 safe-area 폴백
+                t_match = t_ui;
+            }
+        }
+        return t_match;
+    }
+
+    /// <summary>safe-area 안에 배치된 덱 버튼 중심의 화면 픽셀 좌표.</summary>
+    public Vector2 AnchorScreenPoint
+    {
+        get
+        {
+            RectTransform t_rect = (RectTransform)this.deckButton.transform;
+            Canvas t_canvas = this.deckButton.GetComponentInParent<Canvas>();
+            Camera t_camera = t_canvas != null && t_canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? t_canvas.worldCamera
+                : null;
+            return RectTransformUtility.WorldToScreenPoint(t_camera, t_rect.position);
+        }
+    }
 
     void Toggle()
     {

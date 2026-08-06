@@ -84,14 +84,8 @@ public class BattleField : MonoBehaviour
             if (this.slots[i] == null && this.waitingQueue.Count > 0)
             {
                 var t_card = this.waitingQueue.Dequeue();
-                bool t_cunningReturn = t_card.savedHp >= 0 && t_card.HasKeyword(CardKeyword.Cunning);
-                if (t_card.savedHp >= 0)
-                {
-                    t_card.hp         = t_card.savedHp;
-                    t_card.bonusHp    = t_card.savedBonusHp;
-                    t_card.savedHp    = -1;
-                    t_card.savedBonusHp = -1;
-                }
+                bool t_cunningReturn = t_card.returnedFromField && t_card.HasKeyword(CardKeyword.Cunning);
+                t_card.returnedFromField = false;
                 t_card.isRevealed = true;
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
@@ -112,17 +106,17 @@ public class BattleField : MonoBehaviour
         if (t_slot < 0 || t_slot >= SLOT_COUNT) return null;
 
         CardInstance t_next = this.waitingQueue.Dequeue();
+        bool t_cunningReturn = t_next.returnedFromField && t_next.HasKeyword(CardKeyword.Cunning);
+        t_next.returnedFromField = false;
         t_next.isRevealed      = true;
         t_next.wasEverRevealed = true;
         t_next.slotIndex       = t_slot;
         this.slots[t_slot]     = t_next;
         NotifyEntered(t_next);   // [Entered] 런타임 등장(패시브+시너지).
-        t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible);
+        t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
 
-        // 인스턴스 maxHp 기준(= 강화 포함). data.maxHp로 저장하면 재등장 때 강화분이 통째로 사라진다.
-        // bonusHp는 그대로 base — 시너지 덩치는 복귀 시 되돌리지 않는 기존 규칙 유지.
-        _card.savedHp      = _card.maxHp;
-        _card.savedBonusHp = _card.data.bonusHp;
+        // 재등장 턴의 TurnBegan 스킵 판정용. 현재 hp/bonusHp는 인스턴스에 그대로 유지한다.
+        _card.returnedFromField = true;
         _card.slotIndex   = -1;
         _card.isRevealed  = false;
         this.waitingQueue.Enqueue(_card);
@@ -153,9 +147,7 @@ public class BattleField : MonoBehaviour
         t_in.slotIndex       = _slotIndex;
         this.slots[_slotIndex] = t_in;
 
-        // 스왑-아웃 카드 → 대기열 뒤로. savedHp는 건드리지 않는다(-1 유지) — 전투 시작 무피해라 현재 hp/bonusHp가
-        // 곧 정확값이고, ApplyDeckSynergy가 준 시너지 덩치(bonusHp)를 담고 있다. base로 저장하면 재등장 시
-        // FillEmptySlots가 그 덩치를 소실시켜 스왑 안 된 대기 카드(-1 유지)와 비대칭이 생긴다.
+        // 스왑-아웃 카드 → 대기열 뒤로. 전투 시작 전 멀리건이므로 교활 복귀 플래그는 설정하지 않는다.
         t_out.slotIndex    = -1;
         t_out.isRevealed   = false;
         t_list.Add(t_out);
@@ -233,9 +225,8 @@ public class BattleField : MonoBehaviour
     /// <summary>
     /// RPC로 받은 상대 스폰을 원격 미러 대기 큐에서 꺼내 슬롯에 배치.
     /// 소유 클라 FillEmptySlots와 100% 동형 — fresh 재파생/시너지 재적용을 하지 않고 미러 인스턴스를
-    /// 그대로 배치한다. bonusHp(덩치) 같은 stateful 값을 원격에서 재부여하면 divergence가 나므로,
-    /// 이미 ApplyDeckSynergy로 시너지를 받고(초기 대기) / SwapWithWaiting으로 savedBonusHp=base가 저장된
-    /// (Cunning 복귀) 미러 인스턴스를 재사용해 소유 클라와 값이 정확히 일치하게 한다.
+    /// 그대로 배치한다. hp/bonusHp 같은 stateful 값을 원격에서 재부여하면 divergence가 나므로,
+    /// 초기 대기 및 교활 복귀 모두 미러 인스턴스를 재사용해 소유 클라와 값이 정확히 일치하게 한다.
     /// </summary>
     public CardInstance PlaceCardDirectly(int _slot, CardData _data)
     {
@@ -258,15 +249,9 @@ public class BattleField : MonoBehaviour
                 SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
         }
 
-        // FillEmptySlots와 동형: savedHp/savedBonusHp 복원 + 슬롯 세팅 + justSpawned 판정.
-        bool t_cunningReturn = t_card.savedHp >= 0 && t_card.HasKeyword(CardKeyword.Cunning);
-        if (t_card.savedHp >= 0)
-        {
-            t_card.hp          = t_card.savedHp;
-            t_card.bonusHp     = t_card.savedBonusHp;
-            t_card.savedHp     = -1;
-            t_card.savedBonusHp = -1;
-        }
+        // FillEmptySlots와 동형: 교활 복귀 플래그 소비 + 슬롯 세팅 + justSpawned 판정.
+        bool t_cunningReturn = t_card.returnedFromField && t_card.HasKeyword(CardKeyword.Cunning);
+        t_card.returnedFromField = false;
         t_card.slotIndex       = _slot;
         t_card.isRevealed      = true;
         t_card.wasEverRevealed = true;
@@ -286,7 +271,10 @@ public class BattleField : MonoBehaviour
         var t_cards = new List<CardInstance>(GetActiveCards());
         t_cards.AddRange(this.waitingQueue);
 
-        this.Synergy = SynergyResolver.Resolve(t_cards.ConvertAll(c => c.data));
+        // 성장 카드의 시너지는 1차 진화부터 카운트한다. CardData만 넘기기 전에 인스턴스에서
+        // 필터해야 Resolver가 성장 계층을 알지 않아도 되고 기존 순수 집계 계약도 유지된다.
+        this.Synergy = SynergyResolver.Resolve(
+            t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.data));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
         // [DeckResolved] 패시브 몫. **DeckResolved만 synergy→passive 역순인데 구조적 제약이다** —
         // ApplyAll 안에 ClearSynergy가 있어서 패시브를 먼저 돌리면 패시브가 넣은 정적 스탯이 지워진다.

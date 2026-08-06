@@ -1,6 +1,12 @@
 using UnityEngine;
 using UnityEngine.Video;
 
+public enum ECardChannel
+{
+    TestOnly = 0,
+    Live = 1,
+}
+
 /// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 세 장이 세트로 바뀐다.
 /// 단계별로 Sprite 필드를 평평하게 늘어놓으면(evolved2BattleImage…) 단계 추가 때마다 필드가 3개씩 늘고
 /// 호출부가 단계→필드 매핑을 손으로 분기하게 된다 → 세트를 배열 원소로 만들어 단계는 인덱스로만 다룬다.</summary>
@@ -16,6 +22,10 @@ public class CardArtSet
 public class CardData : ScriptableObject
 {
     public string displayName;
+    [Tooltip("Live는 실제 실행에도 노출되고, TestOnly는 테스트 실행에서만 노출됩니다.")]
+    public ECardChannel channel;
+    /// <summary>이 카드의 키워드. <see cref="keywordUnlockLevel"/>에 도달해야 열린다(미지정이면 처음부터).
+    /// "강화 키워드"(2차 진화)는 별도 필드가 아니라 **이 키워드가 강화되는 것**이라 여기 한 축만 둔다.</summary>
     public CardKeyword keywords;
     public int maxHp;
     public int bonusHp;
@@ -26,6 +36,13 @@ public class CardData : ScriptableObject
     public Sprite portrait;
     public Sprite battleImage;
     public Sprite deckPreview;
+
+    [Header("Growth Unlock")]
+    /// <summary><see cref="keywords"/>가 열리는 강화 레벨. **0(미지정) = 처음부터 열려 있음** —
+    /// 해금 레벨을 아직 정하지 않은 카드를 기본 키워드 카드로 취급하기 위한 값이라 0이 기본이어야 한다.
+    /// 카드마다 다르므로 여기 둔다(진화 레벨은 전역이라 CardGrowthConfig 소유).</summary>
+    [Min(0)] [Tooltip("이 레벨에 도달하면 keywords가 열린다. 0 = 처음부터 열려 있음(기본 키워드 카드).")]
+    public int keywordUnlockLevel;
 
     /// <summary>진화 최대 단계. 1단계=최초 진화 … 3단계=최종. 0단계(미진화) 아트는 위 기본 필드다.
     /// 단계 수의 단일 진실원 — 진화 규칙·UI·에디터가 전부 이걸 보고, 숫자 3을 각자 적지 않는다.</summary>

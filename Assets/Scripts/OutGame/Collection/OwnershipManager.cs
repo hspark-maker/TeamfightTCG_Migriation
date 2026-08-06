@@ -31,15 +31,20 @@ public static class OwnershipManager
     public static void Init()
     {
         s_owned.Clear();
+        bool t_removedUnavailable = false;
 
         var t_data = DataSaveManager.Data.ownership;
         if (t_data.ownedCardKeys != null)
         {
             foreach (var t_key in t_data.ownedCardKeys)
             {
-                if (!string.IsNullOrEmpty(t_key)) s_owned.Add(t_key);
+                if (string.IsNullOrEmpty(t_key)) continue;
+                if (!CardCatalog.IsReady || CardCatalog.Get(t_key) != null) s_owned.Add(t_key);
+                else t_removedUnavailable = true;
             }
         }
+
+        if (t_removedUnavailable) Save();
     }
 
     // 메모리 소유 집합을 세이브 슬롯에 flush 후 영속화

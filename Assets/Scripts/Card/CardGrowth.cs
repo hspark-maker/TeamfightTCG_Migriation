@@ -17,13 +17,37 @@ public readonly struct CardGrowth
     /// 곡선(CardGrowthConfig)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
     public readonly int HpBonus;
 
+    /// <summary>강화로 도달한 진화 단계(0 = 미진화). 관문 레벨은 CardGrowthConfig가 소유하고 여기엔 결과만 담긴다 —
+    /// 전투가 곡선을 알 필요가 없다는 <see cref="HpBonus"/>와 같은 규약.</summary>
+    public readonly int EvolutionStage;
+
+    /// <summary>이 레벨에서 **실제로 켜져 있는** 카드 키워드. 기본 키워드에 더하는 값이 아니라 **대체하는** 값이다 —
+    /// 키워드는 해금 레벨 전까지 아예 없는 것으로 친다. 소비측은 <see cref="Applied"/>가 true일 때만 이 값을 쓰고,
+    /// 미주입(default)이면 CardData.keywords를 그대로 써야 한다(AI·원격 미러의 기존 동작 보존).</summary>
+    public readonly CardKeyword UnlockedKeywords;
+
+    /// <summary>성장원이 실제로 주입됐는가. default(Level 0)는 "성장 미적용"이고 <see cref="Fresh"/>(Level 1)는
+    /// "성장을 아는데 아직 미강화"다 — 이 둘을 가르는 유일한 기준이라 해금 게이트가 전부 여기에 매달린다.</summary>
+    public bool Applied => this.Level >= BaseLevel;
+
+    /// <summary>1차 진화로 시너지 기능이 열렸는가. **성장원 미주입(default)일 때도 false라는 점에 주의** —
+    /// 소비측은 "false = 시너지 차단"이 아니라 성장이 주입된 경로에서만 게이트로 써야 한다.</summary>
+    public readonly bool SynergyUnlocked;
+
     /// <summary>아직 한 번도 강화하지 않은 카드. 세이브에 기록이 없는 카드가 이 값이다
     /// (default는 성장원 미주입 — 레벨을 읽는 쪽이 없어 보너스 0으로만 쓰인다).</summary>
     public static CardGrowth Fresh => new CardGrowth(BaseLevel, 0);
 
     public CardGrowth(int _level, int _hpBonus)
+        : this(_level, _hpBonus, 0, CardKeyword.None, false) { }
+
+    public CardGrowth(int _level, int _hpBonus, int _evolutionStage,
+                      CardKeyword _unlockedKeywords, bool _synergyUnlocked)
     {
-        this.Level   = _level;
-        this.HpBonus = _hpBonus;
+        this.Level            = _level;
+        this.HpBonus          = _hpBonus;
+        this.EvolutionStage   = _evolutionStage;
+        this.UnlockedKeywords = _unlockedKeywords;
+        this.SynergyUnlocked  = _synergyUnlocked;
     }
 }

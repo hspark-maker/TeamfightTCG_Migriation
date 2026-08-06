@@ -43,7 +43,7 @@ MonoBehaviour:
   deckDealDelay: 0.12
   deckDealDuration: 0.35
   cardMoveDuration: 0.3
-  hitDuration: 0.15
+  hitDuration: 0.2
   deathDuration: 0.4
   dealAnimDuration: 1
   dealMidPause: 0.5
@@ -52,10 +52,16 @@ MonoBehaviour:
   fadeViewDuration: 0.3
   attackPreviewFlash: 0.55
   keywordGlowHold: 0.8
+  hpPopDuration: 0.2
+  hpRollPerStep: 0.1
+  hpRollMax: 0.45
   healLaunchLead: 0.15
   healLaunchStagger: 0.06
   healTravelDuration: 0.45
   healTrailLinger: 0.25
+  swarmLaunchStagger: 0.07
+  swarmTravelDuration: 0.26
+  swarmImpactHold: 0.1
   mulliganNoticeHold: 1.2
   effectNotifyDisplay: 1
   effectNotifySlide: 0.2

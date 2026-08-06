@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: "\uD3EC\uC2AC\uB7A8"
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   displayName: "\uD3EC\uC2AC\uB7A8"
+  channel: 1
   keywords: 64
   maxHp: 2
   bonusHp: 0
@@ -22,6 +23,21 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 3c0cd24ca73665443bf8d17c008d1920, type: 3}
   battleImage: {fileID: 21300000, guid: 731ba818476823b44ba85eceacd406e8, type: 3}
   deckPreview: {fileID: 21300000, guid: 7e6713d70796abc45af96dc00c1f79a5, type: 3}
+  keywordUnlockLevel: 0
+  evolvedArts:
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  - fullImage: {fileID: 0}
+    portrait: {fileID: 0}
+    battleImage: {fileID: 0}
+  defaultEvolutionStage: 0
+  appearCinematic: {fileID: 0}
+  cinemaAttackStyle: 0
+  cinemaOrbPrefab: {fileID: 0}
   weaponPrefab: {fileID: 0}
   enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}

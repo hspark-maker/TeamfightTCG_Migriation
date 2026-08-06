@@ -19,6 +19,17 @@ public class CardRegistry : ScriptableObject
     /// <summary>등록된 카드 전체(등록 순서 = ID 순서). null 칸이 섞여 있을 수 있으니 소비측에서 걸러라.</summary>
     public IReadOnlyList<CardData> All => this.allCards ?? System.Array.Empty<CardData>();
 
+    /// <summary>와이어 ID 원본은 유지한 채 현재 실행 프로필에 노출할 카드만 반환한다.</summary>
+    public IEnumerable<CardData> Available(bool _includeTestCards)
+    {
+        foreach (CardData t_card in All)
+        {
+            if (t_card == null) continue;
+            if (_includeTestCards || t_card.channel == ECardChannel.Live)
+                yield return t_card;
+        }
+    }
+
     readonly Dictionary<CardData, int> dataToId = new Dictionary<CardData, int>();
     readonly Dictionary<int, CardData> idToData  = new Dictionary<int, CardData>();
 

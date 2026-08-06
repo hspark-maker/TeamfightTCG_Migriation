@@ -198,9 +198,9 @@ public static class DeckSaveManager
     }
 
     // 세이브의 덱 노드를 메모리로 복원(DataSaveManager.Load 이후 호출)
-    public static void LoadFromSave()
+    public static void LoadFromSave(bool _allowLegacyMigration = true)
     {
-        TryMigrateLegacyFile();
+        if (_allowLegacyMigration) TryMigrateLegacyFile();
         s_loaded = true;
 
         var t_slots = NormalizedSlots();

@@ -18,4 +18,42 @@ MonoBehaviour:
   costGrowthPerLevel: 50
   baseSuccessRate: 1
   rateDropPerLevel: 0.08
-  stepOverrides: []
+  firstEvolutionLevel: 5
+  secondEvolutionLevel: 10
+  levelSteps:
+  - level: 2
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 3
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 4
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 5
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 6
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 7
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 8
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 9
+    hpGain: 2
+    cost: 0
+    successRate: -1
+  - level: 10
+    hpGain: 2
+    cost: 0
+    successRate: -1

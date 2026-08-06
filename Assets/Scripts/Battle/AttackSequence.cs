@@ -748,6 +748,10 @@ public static class AttackSequence
     // 카드 총 체력(hp+bonusHp). 뷰/카드 없으면 0.
     static int HpTotal(CardView _v) => _v?.BoundCard != null ? _v.BoundCard.hp + _v.BoundCard.bonusHp : 0;
 
+    // 무쌍 광역 타격의 화면 흔들림 세기(주 대상 대비). 광역은 피해도 절반이라 같은 세기로 흔들면
+    // 두 번째 타격이 더 세게 읽힌다(감쇠가 덜 끝난 상태에서 최대값으로 재시작되므로).
+    const float SPLASH_SHAKE_SCALE = 0.7f;
+
     /// <summary>_beforeSplashHit를 주면 주 대상 → (그 콜백) → 광역 대상 순으로 **표시가 갈라진다**(무쌍 연출).
     /// _hitStop은 각 대상의 피격 표시 직전에 끼우는 멈칫이다. **얼마나 멈추는지가 아니라 무엇을 멈추는지까지
     /// 호출부가 정한다** — 카드만 멈추고 자기가 띄운 이펙트는 계속 흐르면 "멈춘 순간"으로 안 읽힌다.
@@ -781,6 +785,14 @@ public static class AttackSequence
             // 피격은 기다리지 않는다(.Forget). PlayHitAnim은 오버레이가 들어왔다 빠질 때까지
             // (hitDuration × 2) 잡고 있어서, 기다리면 다음 대상으로 넘어가는 간격이 그만큼 고정돼
             // 호출부가 준 대기값이 무의미해진다.
+            // 화면 흔들림은 피격 표시와 같은 프레임. 순차 타격이라 벨 때마다 한 번씩 흔든다.
+            // 반격은 주 대상 타격과 한 묶음이므로 여기서 같이 처리된다(따로 흔들지 않는다).
+            // 세기 = 피해/최대체력 비율(HitImpact 단일 진실원). 주 대상과 반격 중 **비율이 큰 쪽** 기준 —
+            // 한 순간에 겹치는 타격이라 둘을 더하면 연타에서 화면이 폭주한다.
+            if (t_defDmg > 0 || t_attackerHit)
+                BattleCamera.Shake(HitImpact.ShakeScale01(Mathf.Max(
+                    HitImpact.Strength01(t_defDmg, _defender?.BoundCard),
+                    HitImpact.Strength01(t_atkDmg, _attacker?.BoundCard))));
             _defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker).Forget();
             if (t_attackerHit) _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender).Forget();
             await HitStop(_hitStop);
@@ -788,11 +800,24 @@ public static class AttackSequence
             await _beforeSplashHit();
 
             if (_splashView != null)
+            {
+                // 광역은 주 대상보다 약하게(고정 감쇠) × 그 대상이 받은 비율 세기.
+                if (t_splDmg > 0)
+                    BattleCamera.Shake(HitImpact.ShakeScale(t_splDmg, _splashView?.BoundCard) * SPLASH_SHAKE_SCALE);
                 _splashView.PlayHitAnim(_damage: t_splDmg, _hitFrom: _attacker).Forget();
+            }
             await HitStop(_hitStop);
         }
         else
         {
+            // 동시 타격(일반·원거리·시네마·일반 스플래시): 한 순간에 다 맞으므로 흔들림도 한 번,
+            // 세기는 그 순간 맞은 대상들의 **비율 중 가장 큰 것** 기준(합산하면 다대상 공격만 과하게 흔들린다).
+            if (t_defDmg > 0 || t_splDmg > 0 || t_attackerHit)
+                BattleCamera.Shake(HitImpact.ShakeScale01(Mathf.Max(
+                    HitImpact.Strength01(t_defDmg, _defender?.BoundCard),
+                    Mathf.Max(HitImpact.Strength01(t_splDmg, _splashView?.BoundCard),
+                              HitImpact.Strength01(t_atkDmg, _attacker?.BoundCard)))));
+
             UniTask t_defHit = _splashView != null
                 ? UniTask.WhenAll(_defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker),
                                   _splashView.PlayHitAnim(_damage: t_splDmg, _hitFrom: _attacker))

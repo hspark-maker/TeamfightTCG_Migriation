@@ -20,7 +20,7 @@ public class CaretakerSynergyEffect : SynergyEffect
         // 회복/보너스는 **여기서 전부 즉시**(상태 = 동기), 표시는 투사체가 닿을 때(연출 = 비동기).
         // 상태 변경을 연출에 묶으면 프레임레이트 차이가 그대로 멀티 divergence가 된다(HealerEffect와 같은 규약).
         // _showEffect: false — "+N"은 HealVfx가 도착 시점에 재생한다(즉시 재생하면 두 번 뜬다).
-        var t_healed = new List<(CardView view, int amount)>();
+        var t_healed = new List<(CardView view, CardInstance card, int amount)>();
         foreach (var t_card in _ctx.field.GetActiveCards())   // 자신 포함 라이브 슬롯 카드
         {
             if (t_card == null || !SynergyApplier.BelongsTo(t_card, _ctx.synergy)) continue;
@@ -30,7 +30,7 @@ public class CaretakerSynergyEffect : SynergyEffect
 
             // 만피라 회복량이 0이어도 bonusHp는 붙었다 → 연출 대상에 남긴다(숫자는 0이면 자동으로 숨는다).
             CardView t_view = CardView.GetView(t_card);
-            if (t_view != null) t_healed.Add((t_view, t_amount));
+            if (t_view != null) t_healed.Add((t_view, t_card, t_amount));
         }
 
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스폰 주체(self) 기준 1회 배너+배지 pop(동료 전원 반복 금지)

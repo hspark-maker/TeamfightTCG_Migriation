@@ -61,18 +61,19 @@ public static class CardGrowthManager
         DataSaveManager.Save();
     }
 
-    public static CardGrowth GrowthOf(CardData _card) => GrowthOf(CardCatalog.KeyOf(_card));
+    public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.KeyOf(_card)));
 
-    // 카드 키의 성장 스냅샷(기록이 없으면 미강화). HP 보너스는 저장값이 아니라 레벨에서 파생
-    public static CardGrowth GrowthOf(string _key)
+    // 카드 키의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
+    public static CardGrowth GrowthOf(string _key) => Snapshot(CardCatalog.Get(_key), LevelOf(_key));
+
+    // 카드의 현재 강화 레벨(기록 없음 = 미강화)
+    public static int LevelOf(string _key)
     {
-        if (string.IsNullOrEmpty(_key)) return CardGrowth.Fresh;
-        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return CardGrowth.Fresh;
+        if (string.IsNullOrEmpty(_key)) return CardGrowth.BaseLevel;
+        if (!s_growth.TryGetValue(_key, out var t_entry) || t_entry == null) return CardGrowth.BaseLevel;
 
         // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
-        int t_level = t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
-
-        return new CardGrowth(t_level, Config.HpBonusAt(t_level));
+        return t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
     }
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
@@ -129,6 +130,19 @@ public static class CardGrowthManager
         s_growth.Clear();
         Save();
         OnGrowthChanged?.Invoke();
+    }
+
+    // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
+    // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.
+    static CardGrowth Snapshot(CardData _card, int _level)
+    {
+        CardGrowthConfig t_config = Config;
+        return new CardGrowth(
+            _level,
+            t_config.HpBonusAt(_level),
+            t_config.EvolutionStageAt(_level),
+            t_config.UnlockedKeywordsAt(_card, _level),
+            t_config.SynergyUnlockedAt(_level));
     }
 
     static CardGrowthEntry Entry(string _key)

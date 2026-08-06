@@ -59,6 +59,11 @@ public class SettingsPanel : PooledUIBase
     // 프리팹의 FrameRateRow 버튼들. 순서는 GameManager.FrameRateOptions와 1:1로 맞춘다.
     [SerializeField] Button[] frameRateButtons;
 
+    [Header("Screen Shake")]
+    // 타격 화면 흔들림 켜기/끄기. FPS 행과 같은 규약(선택된 쪽만 밝게) — 미배선이면 옵션 줄만 빠진다.
+    [SerializeField] Button screenShakeOnButton;
+    [SerializeField] Button screenShakeOffButton;
+
     [Header("Battle")]
     // 전투 전용. 로비 등 TurnRunner가 없는 씬에서는 Show가 통째로 숨긴다.
     [SerializeField] Button surrenderButton;
@@ -86,6 +91,8 @@ public class SettingsPanel : PooledUIBase
         // 버튼으로 넘길 때만 전환 연출을 켠다(창이 처음 열릴 때는 등장 연출과 겹쳐 산만해진다).
         this.optionsButton?.onClick.AddListener(() => ShowPage(_options: true,  _animate: true));
         this.optionsBackButton?.onClick.AddListener(() => ShowPage(_options: false, _animate: true));
+        this.screenShakeOnButton?.onClick.AddListener(() => OnScreenShakeChanged(true));
+        this.screenShakeOffButton?.onClick.AddListener(() => OnScreenShakeChanged(false));
         this.bgmSlider?.onValueChanged.AddListener(OnBGMChanged);
         this.sfxSlider?.onValueChanged.AddListener(OnSFXChanged);
         this.surrenderButton?.onClick.AddListener(OnSurrender);
@@ -132,6 +139,7 @@ public class SettingsPanel : PooledUIBase
 
         RefreshBattleButtons();
         RefreshFrameRateButtons();
+        RefreshScreenShakeButtons();
 
         this.animator?.Fade(this.contentsGroup, 1f);
     }
@@ -398,21 +406,36 @@ public class SettingsPanel : PooledUIBase
         if (this.frameRateButtons.Length != GameManager.FrameRateOptions.Length) return;
 
         for (int i = 0; i < this.frameRateButtons.Length; i++)
-        {
-            Button t_button = this.frameRateButtons[i];
-            if (t_button == null) continue;
+            ApplySelectedTint(this.frameRateButtons[i],
+                              GameManager.FrameRateOptions[i] == GameManager.CurrentFrameRate);
+    }
 
-            bool t_selected = GameManager.FrameRateOptions[i] == GameManager.CurrentFrameRate;
-            Color t_tint = t_selected ? FrameRateSelected : FrameRateUnselected;
+    void OnScreenShakeChanged(bool _on)
+    {
+        GameManager.SetScreenShake(_on);
+        RefreshScreenShakeButtons();
+    }
 
-            // ColorTint 버튼이라 targetGraphic.color를 직접 쓰면 상태 전이가 바로 덮어쓴다 — ColorBlock을 갈아끼운다.
-            ColorBlock t_colors = t_button.colors;
-            t_colors.normalColor      = t_tint;
-            t_colors.highlightedColor = t_tint;
-            t_colors.selectedColor    = t_tint;
-            t_colors.pressedColor     = new Color(t_tint.r * 0.75f, t_tint.g * 0.75f, t_tint.b * 0.75f, t_tint.a);
-            t_button.colors = t_colors;
-        }
+    void RefreshScreenShakeButtons()
+    {
+        ApplySelectedTint(this.screenShakeOnButton,   GameManager.ScreenShakeEnabled);
+        ApplySelectedTint(this.screenShakeOffButton, !GameManager.ScreenShakeEnabled);
+    }
+
+    /// <summary>선택된 항목만 밝게. 여러 줄(FPS·화면 흔들림)이 같은 규약을 쓰도록 여기 한 곳에 둔다.</summary>
+    static void ApplySelectedTint(Button _button, bool _selected)
+    {
+        if (_button == null) return;
+
+        Color t_tint = _selected ? FrameRateSelected : FrameRateUnselected;
+
+        // ColorTint 버튼이라 targetGraphic.color를 직접 쓰면 상태 전이가 바로 덮어쓴다 — ColorBlock을 갈아끼운다.
+        ColorBlock t_colors = _button.colors;
+        t_colors.normalColor      = t_tint;
+        t_colors.highlightedColor = t_tint;
+        t_colors.selectedColor    = t_tint;
+        t_colors.pressedColor     = new Color(t_tint.r * 0.75f, t_tint.g * 0.75f, t_tint.b * 0.75f, t_tint.a);
+        _button.colors = t_colors;
     }
 
     void RefreshText(TMP_Text _text, float _val)

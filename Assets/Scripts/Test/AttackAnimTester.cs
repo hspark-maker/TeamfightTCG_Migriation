@@ -504,11 +504,12 @@ public class AttackAnimTester : MonoBehaviour
         CardView t_src = this.playerFieldView?.GetSlotView(0);
         if (t_src == null) return;
 
-        var t_targets = new List<(CardView view, int amount)>();
+        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardView t_v = this.playerFieldView?.GetSlotView(i);
-            if (t_v != null && t_v.BoundCard != null) t_targets.Add((t_v, Mathf.Max(0, this.caretakerHeal)));
+            if (t_v != null && t_v.BoundCard != null)
+                t_targets.Add((t_v, t_v.BoundCard, Mathf.Max(0, this.caretakerHeal)));
         }
         if (t_targets.Count > 0) HealVfx.PlayHealBurst(t_src, t_targets);
     }

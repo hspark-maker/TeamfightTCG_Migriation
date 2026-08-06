@@ -10,7 +10,6 @@ public class DeckBuilderUI : MonoBehaviour
 {
     // 카드 목록은 CardRegistry(SO)가 단일 진실원. 예전엔 여기에 사본을 들고 있어서
     // 카드를 추가해도 이 리스트를 안 고치면 컬렉션에 안 뜨는 버그가 있었다.
-    [SerializeField] CardRegistry cardRegistry;
     [SerializeField] Transform collectionGrid;
     [SerializeField] CardElement cardElementPrefab;
     [SerializeField] Canvas canvas;
@@ -165,13 +164,13 @@ public class DeckBuilderUI : MonoBehaviour
             Destroy(t_child.gameObject);
         this.spawnedCards.Clear();
 
-        if (this.cardRegistry == null)
+        if (!CardCatalog.IsReady)
         {
-            Debug.LogError("[DeckBuilderUI] cardRegistry 미배선 — 컬렉션이 비어 보인다.");
+            Debug.LogError("[DeckBuilderUI] CardCatalog 미초기화 — 부트 순서를 확인할 것.");
             return;
         }
 
-        foreach (CardData t_card in this.cardRegistry.All)
+        foreach (CardData t_card in CardCatalog.All)
         {
             if (t_card == null) continue;   // 레지스트리 빈 칸(ID 보존용)은 건너뜀
             CardElement t_element = Instantiate(this.cardElementPrefab, this.collectionGrid);
