@@ -679,6 +679,7 @@ MonoBehaviour:
   hpPanel: {fileID: 2381697628577008813}
   hpText: {fileID: 2135457978220358100}
   bonusHpText: {fileID: 8039110176308865399}
+  hpIcon: {fileID: 2095231904163912780}
   keywordIconRoot: {fileID: 4508722447716442137}
   synergyBadgeRoot: {fileID: 0}
   keywordIconPrefab: {fileID: 2263209049379785608, guid: 91c94acce9143cb41bd0f5b522849acc, type: 3}

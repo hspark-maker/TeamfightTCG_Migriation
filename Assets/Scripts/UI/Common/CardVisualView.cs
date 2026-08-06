@@ -26,8 +26,14 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
     [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
+    [Tooltip("HP 아이콘. 체력이 굴러 오르는 동안 숫자와 같은 축으로 맥박친다(RollHp). 미배선이면 맥박만 조용히 빠진다.")]
+    [SerializeField] Image      hpIcon;
     [Tooltip("체력이 굴러 오르는 동안 물드는 색(RollHp). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
     [SerializeField] Color      hpRollFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
+    [Tooltip("굴리는 동안 HP 아이콘이 부푸는 최대 비율. 아이콘(167.1)이 HpPanel(192.4) 안에 있어야 하므로 0.15를 넘기면 삐져나온다.")]
+    [SerializeField] float      hpIconPulse = 0.12f;
+    [Tooltip("굴리기가 끝나는 프레임 아이콘을 튀기는 세기. 숫자 펀치(UiPunch 기본값)보다 작아야 시선이 숫자에 남는다.")]
+    [SerializeField] float      hpIconPunch = 0.15f;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
@@ -81,9 +87,11 @@ public class CardVisualView : MonoBehaviour
     // 굴러 오르는 중인 체력. 도는 동안에는 이쪽이 숫자의 주인이다 — RefreshHp가 최종값을 먼저 찍으면 굴릴 것이 사라진다.
     Tween m_hpRoll;
 
-    // hpText의 authoring 색. 물든 중간값을 기준으로 잡으면 굴릴 때마다 색이 밀린다 → 1회만 캡처한다.
-    Color m_hpBaseColor;
-    bool  m_hpBaseCaptured;
+    // hpText의 authoring 색과 hpIcon의 authoring 배율. 물든 중간값이나 부푼 중간 배율을 기준으로 잡으면
+    // 굴릴 때마다 색과 크기가 밀린다 → 둘 다 1회만, 같은 시점에 캡처한다.
+    Color   m_hpBaseColor;
+    Vector3 m_hpIconBaseScale;
+    bool    m_hpBaseCaptured;
 
     // 카드 데이터·소유여부로 타일을 바인딩. _card가 null이면 빈칸으로 숨긴다.
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
@@ -173,11 +181,12 @@ public class CardVisualView : MonoBehaviour
 
         // 패널·보너스는 먼저 최종 상태로 세운다 — 굴러야 하는 것은 숫자 하나뿐이다.
         SetHpDisplay(_card, true, true);
-        CaptureHpColor();
+        CaptureHpVisual();
         this.hpText.text = _from.ToString();
 
         float t_shown = _from;
         float t_span  = t_to - _from;
+        bool  t_done  = false;   // 정상 종료 여부. 잘렸으면 마무리 박자도 없다.
 
         this.m_hpRoll = DOTween.To(() => t_shown, _v =>
                                    {
@@ -188,18 +197,34 @@ public class CardVisualView : MonoBehaviour
 
                                        // 색은 굴리는 도중에 가장 짙고 끝에서 원래 색으로 돌아온다.
                                        // 별도 트윈으로 두면 잘렸을 때 물든 채 굳으므로 같은 축에 얹는다.
-                                       float t_p = Mathf.Clamp01((_v - _from) / t_span);
-                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor,
-                                                                      Mathf.Sin(t_p * Mathf.PI));
+                                       float t_p    = Mathf.Clamp01((_v - _from) / t_span);
+                                       float t_wave = Mathf.Sin(t_p * Mathf.PI);
+
+                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor, t_wave);
+
+                                       // 아이콘도 같은 파형 위에서 부풀었다 돌아온다 — 축을 나누면 숫자와 따로 논다.
+                                       if (this.hpIcon != null)
+                                           this.hpIcon.transform.localScale =
+                                               this.m_hpIconBaseScale * (1f + this.hpIconPulse * t_wave);
                                    },
                                    (float)t_to, _duration)
                                .SetEase(Ease.OutQuad)   // 결과판의 체력 행과 같은 곡선 — 두 숫자가 따로 놀지 않는다.
                                .SetLink(this.hpText.gameObject)
-                               .OnComplete(() => UiPunch.Play(this.hpText.transform))
+                               .OnComplete(() => t_done = true)
                                .OnKill(() =>
                                {
                                    this.m_hpRoll = null;
-                                   RestoreHpColor();
+
+                                   // 복원이 먼저다 — autoKill이라 OnComplete와 같은 프레임에 여기 오므로,
+                                   // 펀치를 앞에 두면 배율 복원이 방금 시작한 펀치를 도로 걷어낸다.
+                                   RestoreHpVisual();
+
+                                   if (t_done)
+                                   {
+                                       UiPunch.Play(this.hpText.transform);
+                                       if (this.hpIcon != null) UiPunch.Play(this.hpIcon.transform, this.hpIconPunch);
+                                   }
+
                                    RefreshHp(_card, _owned);
                                });
 
@@ -210,22 +235,36 @@ public class CardVisualView : MonoBehaviour
     {
         Tween t_roll  = this.m_hpRoll;
         this.m_hpRoll = null;
-        t_roll?.Kill();   // OnKill이 색과 숫자를 되돌린다.
+        t_roll?.Kill();   // OnKill이 숫자·색·배율을 되돌린다.
+
+        // 굴리기가 이미 끝났어도 마무리 펀치는 남아 있을 수 있다(그땐 m_hpRoll이 null이라 위 Kill이 못 잡는다).
+        // 카드 교체·연속 강화가 모두 여기를 지나므로 그 잔상도 여기서 걷는다.
+        RestoreHpVisual();
     }
 
-    void CaptureHpColor()
+    void CaptureHpVisual()
     {
         if (this.m_hpBaseCaptured || this.hpText == null) return;
 
         this.m_hpBaseCaptured = true;
         this.m_hpBaseColor    = this.hpText.color;
+
+        if (this.hpIcon != null) this.m_hpIconBaseScale = this.hpIcon.transform.localScale;
     }
 
-    void RestoreHpColor()
+    // 굴리기가 끝나든 잘리든 여기 한 곳에서 기준 상태로 못 박는다(멱등).
+    void RestoreHpVisual()
     {
-        if (!this.m_hpBaseCaptured || this.hpText == null) return;
+        if (!this.m_hpBaseCaptured) return;
 
-        this.hpText.color = this.m_hpBaseColor;
+        if (this.hpText != null) this.hpText.color = this.m_hpBaseColor;
+
+        if (this.hpIcon != null)
+        {
+            // 대입만 하면 아직 도는 펀치가 다음 프레임에 제 배율을 다시 쓴다 → 먼저 완료시켜 소유권을 회수한다.
+            this.hpIcon.transform.DOComplete();
+            this.hpIcon.transform.localScale = this.m_hpIconBaseScale;
+        }
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
