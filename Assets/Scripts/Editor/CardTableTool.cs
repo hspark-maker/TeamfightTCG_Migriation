@@ -108,10 +108,10 @@ public class CardTableTool : EditorWindow
             "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).", MessageType.None);
 
         EditorGUILayout.HelpBox(
-            "hp0~hp10: 그 레벨의 **총 HP(절대값)** 입니다. 증가분이 아닙니다.\n" +
-            "빈칸은 그 레벨만 CardGrowthConfig 전역식으로 계산합니다(직전 레벨 체력 + 레벨당 증가분).\n" +
-            "Lv1 기준 체력은 maxHp 열이 소유하므로 hp0/hp1은 비워 두세요.\n" +
-            "예) maxHp=4, hp2=6, hp3=9, hp4=(빈칸), hp5=14 → 4 / 6 / 9 / 11 / 14",
+            "hpN: **N번 강화한 뒤의 총 HP(절대값)** 입니다. 증가분이 아닙니다.\n" +
+            "hp0(미강화)은 maxHp 열이 소유하므로 비워 두고, hp1(1강화)부터 적으세요.\n" +
+            "빈칸은 그 단계만 CardGrowthConfig 전역식으로 계산합니다(직전 체력 + 레벨당 증가분).\n" +
+            "예) maxHp=4, hp1=6, hp2=9, hp3=(빈칸), hp4=14 → 4 / 6 / 9 / 11 / 14",
             MessageType.Info);
 
         EditorGUILayout.EndScrollView();
@@ -159,9 +159,10 @@ public class CardTableTool : EditorWindow
             case "cardExplain":           return _card.cardExplain;
             default:
                 // 미지정 칸은 빈칸으로 나가야 한다 — 센티널(-1)이 표에 새어 나가면 다음 가져오기에서 음수 경고가 된다.
-                if (TryParseHpColumn(_column, out int t_level))
+                // 열 번호는 강화 횟수라 레벨로는 +1이다(hp1 = 1강화 = Lv2).
+                if (TryParseHpColumn(_column, out int t_enhanceCount))
                 {
-                    return _card.TryGetMaxHp(t_level, out int t_maxHp)
+                    return _card.TryGetMaxHp(t_enhanceCount + 1, out int t_maxHp)
                         ? t_maxHp.ToString(CultureInfo.InvariantCulture)
                         : "";
                 }
@@ -465,8 +466,9 @@ public class CardTableTool : EditorWindow
     static int ParseInt(string _text, int _fallback)
         => int.TryParse(_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_v) ? t_v : _fallback;
 
-    /// <summary>hp0~hp10을 **그 레벨의 총 체력**으로 읽는다. 빈칸은 0이 아니라 미지정(-1)으로 남겨야
-    /// 그 레벨만 CardGrowthConfig 전역식으로 넘어간다 — 칸 단위 폴백의 전부가 이 구분이다.</summary>
+    /// <summary>hp0~hp10을 **강화 N회 뒤의 총 체력**으로 읽는다(hp0 = 미강화 = maxHp 열 소유).
+    /// 빈칸은 0이 아니라 미지정(-1)으로 남겨야 그 레벨만 CardGrowthConfig 전역식으로 넘어간다 —
+    /// 칸 단위 폴백의 전부가 이 구분이다.</summary>
     static void ApplyMaxHpCurve(CardData _card, List<string> _row, Dictionary<string, int> _header,
                                 string _name, List<string> _warnings)
     {
@@ -498,9 +500,10 @@ public class CardTableTool : EditorWindow
                 _warnings.Add($"{_name}.{t_column}: 음수 '{t_hp}' — 빈칸으로 처리");
                 continue;
             }
-            if (t_level <= CardGrowth.BaseLevel)
+            // hp0 = 미강화 자리. 그 체력은 maxHp 열이 소유하므로 곡선은 hp1(1강화)부터 읽는다.
+            if (t_level < 1)
             {
-                _warnings.Add($"{_name}.{t_column}: Lv0/Lv1 체력은 maxHp 열이 소유한다 — 무시");
+                _warnings.Add($"{_name}.{t_column}: 미강화 체력은 maxHp 열이 소유한다 — 무시");
                 continue;
             }
             if (t_hp <= t_prevHp)

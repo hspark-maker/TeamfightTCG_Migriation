@@ -1,5 +1,5 @@
 ﻿id,name,displayName,channel,maxHp,keywords,keywordUnlockLevel,synergies,defaultEvolutionStage,hp0,hp1,hp2,hp3,hp4,hp5,hp6,hp7,hp8,hp9,hp10,cardExplain
-1,포슬램,포슬램,Live,2,Healer,0,돌보미,0,,10,20,,,,,,,,,
+1,포슬램,포슬램,Live,2,Healer,0,돌보미,0,,,,,,,,,,,,
 2,파도리,파도리,Live,3,Ranged,0,돌보미,0,,,,,,,,,,,,
 3,별토리,별토리,Live,4,Healer,0,돌보미,0,,,,,,,,,,,,
 4,솜구름몽,솜구름몽,Live,3,,0,돌보미,0,,,,,,,,,,,,

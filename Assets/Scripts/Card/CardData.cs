@@ -107,15 +107,20 @@ public class CardData : ScriptableObject
 
     public bool HasKeyword(CardKeyword _kw) => (this.keywords & _kw) != 0;
 
-    /// <summary>레벨 _level의 최대 HP를 표가 직접 정해뒀는가. false면 미지정 — 부르는 쪽이 전역식으로 채운다.</summary>
+    /// <summary>레벨 _level의 최대 HP를 표가 직접 정해뒀는가. false면 미지정 — 부르는 쪽이 전역식으로 채운다.
+    ///
+    /// **칸 번호는 레벨이 아니라 강화 횟수다.** hp0 = 미강화 = <see cref="maxHp"/>이므로 곡선이 읽는 첫 칸은 hp1이고,
+    /// 레벨 L은 index L-1을 본다(Lv2 = 1강화 = hp1). 레벨은 1부터 세는데 강화는 0회부터 세기 때문.</summary>
     public bool TryGetMaxHp(int _level, out int _maxHp)
     {
         _maxHp = 0;
         if (this.maxHpByLevel == null) return false;
-        if (_level < MinHpCurveLevel || _level > MaxHpCurveLevel) return false;
-        if (_level >= this.maxHpByLevel.Length) return false;
 
-        int t_value = this.maxHpByLevel[_level];
+        int t_index = _level - 1;
+        if (t_index < MinHpCurveLevel || t_index > MaxHpCurveLevel) return false;
+        if (t_index >= this.maxHpByLevel.Length) return false;
+
+        int t_value = this.maxHpByLevel[t_index];
         if (t_value < 0) return false;
 
         _maxHp = t_value;
