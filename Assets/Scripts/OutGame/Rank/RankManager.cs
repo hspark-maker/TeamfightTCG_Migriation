@@ -22,6 +22,10 @@ public static class RankManager
         }
     }
 
+    /// <summary>현재 티어에서 AI가 쓸 카드 레벨. 난이도 축의 유일한 조회 지점 —
+    /// 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
+    public static int AiCardLevel => Config.AiCardLevelAt(Config.ResolveTierIndex(Points));
+
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo()
     {

@@ -21,7 +21,9 @@ public class CardArtSet
 [CreateAssetMenu(fileName = "NewCard", menuName = "Card Battle/Card Data")]
 public class CardData : ScriptableObject
 {
-    public const int MinHpCurveLevel = 0;
+    /// <summary>성장 곡선이 값을 갖는 첫 레벨 = 첫 강화 레벨. 바닥(<see cref="CardGrowth.BaseLevel"/>)은
+    /// 강화로 도달하는 레벨이 아니라 곡선에 칸이 없다 — 표에도 hp2부터만 열이 있다.</summary>
+    public const int MinHpCurveLevel = CardGrowth.BaseLevel + 1;
     public const int MaxHpCurveLevel = 10;
 
     /// <summary>카드 고유 번호. 에셋 이름·표 행 순서와 무관하게 카드를 가리키는 안정 키다 —
@@ -47,7 +49,9 @@ public class CardData : ScriptableObject
     public Sprite deckPreview;
 
     [Header("Growth HP Curve")]
-    [Tooltip("index = 레벨(0~10), 값 = 해당 레벨 진입 시 증가 HP. 비어 있으면 CardGrowthConfig 전역식을 사용합니다.")]
+    // index = 레벨을 유지한다(호출부가 레벨→인덱스를 손으로 옮기지 않게). 그래서 [0]/[1]은 쓰지 않는 빈칸이다 —
+    // 강화는 Lv2부터라 그 아래 레벨에는 증가분이라는 개념 자체가 없다.
+    [Tooltip("index = 레벨. 값 = 그 레벨 진입 시 증가 HP. 강화는 Lv2부터라 [0]/[1]은 미사용. 비면 CardGrowthConfig 전역식.")]
     public int[] hpGainByLevel;
 
     [Header("Growth Unlock")]

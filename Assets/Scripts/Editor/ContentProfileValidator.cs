@@ -13,16 +13,11 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 
     public int callbackOrder => 0;
 
-    [MenuItem("Tools/Card Battle/Content Profile/Validate")]
-    static void ValidateMenu()
-    {
-        ValidateOrThrow();
-        Debug.Log("[ContentProfile] 검증 통과");
-    }
-
     public void OnPreprocessBuild(BuildReport _report) => ValidateOrThrow();
 
-    static void ValidateOrThrow()
+    /// <summary>문제 목록을 던지지 않고 돌려준다(빈 목록 = 통과). 릴리즈 관리 창이 목록으로 띄우는 진입점 —
+    /// 빌드 전처리와 **같은 규칙**을 써야 창에서 통과한 것이 빌드에서 막히지 않는다.</summary>
+    public static List<string> Collect()
     {
         var t_errors = new List<string>();
         CardRegistry t_registry = AssetDatabase.LoadAssetAtPath<CardRegistry>(REGISTRY_PATH);
@@ -59,6 +54,12 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             ValidateLiveConsumers(t_errors);
         }
 
+        return t_errors;
+    }
+
+    static void ValidateOrThrow()
+    {
+        List<string> t_errors = Collect();
         if (t_errors.Count > 0)
             throw new BuildFailedException("[ContentProfile] 검증 실패\n- " + string.Join("\n- ", t_errors));
     }

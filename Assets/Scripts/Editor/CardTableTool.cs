@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 카드 표(Excel/CSV) ↔ CardData SO 왕복 도구. Tools > Card Battle > 카드 표(Excel).
+/// 카드 표(Excel/CSV) ↔ CardData SO 왕복 엔진. **UI는 없다** — 창은 ReleaseManagerWindow 하나뿐이다.
 ///
 /// **왜 CSV인가**: .xlsx를 직접 읽으려면 외부 라이브러리(EPPlus/NPOI)를 프로젝트에 들여야 한다.
 /// Excel은 "CSV UTF-8"로 저장/열기를 기본 지원하므로, 표는 Excel에서 편집하고 프로젝트는 CSV만 읽는다.
@@ -19,16 +19,11 @@ using UnityEngine;
 /// **행을 지워도 카드 에셋과 등록은 남는다.** 표는 값을 밀어 넣는 창구일 뿐 삭제 창구가 아니다.
 /// 멀티 와이어 ID는 id 열의 카드 번호이므로 행 순서·목록 순서는 의미가 없다 — 바꾸면 안 되는 건 번호 자체다.
 /// </summary>
-public class CardTableTool : EditorWindow
+public static class CardTableTool
 {
     const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
     const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;
-    const string DEFAULT_TABLE_PATH = "Assets/SO/CardTable.csv";
-    const string DEFAULT_CARD_ROOT  = "Assets/SO/Cards";
-    const string REGISTRY_PATH      = "Assets/SO/CardRegistry.asset";
-
-    const string PREF_TABLE = "CardTable.TablePath";
-    const string PREF_ROOT  = "CardTable.CardRoot";
+    const string REGISTRY_PATH   = "Assets/SO/CardRegistry.asset";
 
     // 열 순서 = 내보내기 순서. 읽을 때는 헤더 이름으로 찾으므로 Excel에서 열을 옮겨도 된다.
     // 표에 없는 축은 인스펙터 전용이다: bonusHp(시너지 덩치 채널), explainKeywords(설명 전용 표시),
@@ -39,85 +34,23 @@ public class CardTableTool : EditorWindow
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
-        "hp0", "hp1", "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
+        "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
         "cardExplain",
     };
 
-    string tablePath = DEFAULT_TABLE_PATH;
-    string cardRoot  = DEFAULT_CARD_ROOT;
-
-    Vector2 scroll;
-    string  lastReport;
-
-    [MenuItem("Tools/Card Battle/카드 표(Excel)")]
-    static void Open() => GetWindow<CardTableTool>("카드 표").minSize = new Vector2(460, 420);
-
-    void OnEnable()
-    {
-        this.tablePath = EditorPrefs.GetString(PREF_TABLE, DEFAULT_TABLE_PATH);
-        this.cardRoot  = EditorPrefs.GetString(PREF_ROOT,  DEFAULT_CARD_ROOT);
-    }
-
-    void OnDisable()
-    {
-        EditorPrefs.SetString(PREF_TABLE, this.tablePath);
-        EditorPrefs.SetString(PREF_ROOT,  this.cardRoot);
-    }
-
-    void OnGUI()
-    {
-        if (EditorApplication.isPlayingOrWillChangePlaymode)
-        {
-            EditorGUILayout.HelpBox("플레이 모드에서는 에셋을 만들 수 없다. 플레이를 멈추고 다시 열 것.", MessageType.Warning);
-            return;
-        }
-
-        this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
-
-        EditorGUILayout.LabelField("표 파일 (CSV UTF-8)", EditorStyles.boldLabel);
-        this.tablePath = EditorGUILayout.TextField(this.tablePath);
-        EditorGUILayout.LabelField("카드 에셋 생성 위치", EditorStyles.boldLabel);
-        this.cardRoot = EditorGUILayout.TextField(this.cardRoot);
-
-        EditorGUILayout.Space(10);
-        if (GUILayout.Button("① 카드 → 표 내보내기", GUILayout.Height(30))) Export();
-
-        EditorGUILayout.Space(4);
-        GUI.enabled = File.Exists(this.tablePath);
-        if (GUILayout.Button("② 표 → 카드 SO 생성/갱신", GUILayout.Height(38))) Import();
-        GUI.enabled = true;
-        if (!File.Exists(this.tablePath))
-            EditorGUILayout.HelpBox("표 파일이 아직 없다. ①로 현재 카드를 뽑아 Excel에서 편집할 것.", MessageType.Info);
-
-        if (!string.IsNullOrEmpty(this.lastReport))
-        {
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("결과", EditorStyles.boldLabel);
-            EditorGUILayout.TextArea(this.lastReport, GUILayout.MinHeight(120));
-        }
-
-        EditorGUILayout.Space(10);
-        EditorGUILayout.HelpBox(
-            "열: " + string.Join(", ", Columns) + "\n\n" +
-            "· id : 카드 고유 번호. 한 번 부여하면 바꾸지 않는다. 빈칸이면 남은 번호를 자동 부여한다.\n" +
-            "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
-            "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림(기본 키워드 카드).\n" +
-            "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
-            "• 진화 레벨과 비용/성공률은 CardGrowthConfig, 카드별 HP 증가폭은 hp0~hp10 열이 소유합니다.\n" +
-            "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
-            "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).", MessageType.None);
-
-        EditorGUILayout.HelpBox(
-            "hp0~hp10: 해당 레벨 진입 시 증가하는 HP입니다. Lv0/Lv1은 0으로 고정됩니다. " +
-            "11칸이 모두 비어 있으면 CardGrowthConfig 전역식을 사용하고, 하나라도 입력하면 나머지 빈칸은 0으로 저장됩니다.",
-            MessageType.Info);
-
-        EditorGUILayout.EndScrollView();
-    }
-
-    // ── 내보내기 ───────────────────────────────────────────────────────────
-
-    void Export() => this.lastReport = ExportTo(this.tablePath);
+    /// <summary>창이 띄우는 열 설명. 규칙 문구의 진실원을 표 도구 쪽에 둔다(UI가 규칙을 다시 적지 않게).</summary>
+    public static string ColumnHelp =>
+        "열: " + string.Join(", ", Columns) + "\n\n" +
+        "· id : 카드 고유 번호. 한 번 부여하면 바꾸지 않는다. 빈칸이면 남은 번호를 자동 부여한다.\n" +
+        "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
+        "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림.\n" +
+        "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
+        "· hp2~hp10 : 그 레벨 진입 시 증가 HP. 강화는 Lv2부터라 그 아래 열은 없다. 9칸 전부 비면\n" +
+        "  CardGrowthConfig 전역식, 하나라도 채우면 나머지 빈칸은 0으로 저장된다.\n" +
+        "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
+        "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
+        "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).\n" +
+        "· 라이브/테스트 표는 같은 CardData를 공유한다 — 모드 전환은 곧 덮어쓰기다.";
 
     /// <summary>표를 파일로 뽑는 실동작. 창 없이도(자동화·검증) 부를 수 있게 static으로 분리한다.</summary>
     public static string ExportTo(string _tablePath)
@@ -168,12 +101,6 @@ public class CardTableTool : EditorWindow
     }
 
     // ── 가져오기 ───────────────────────────────────────────────────────────
-
-    void Import()
-    {
-        this.lastReport = ImportFrom(this.tablePath, this.cardRoot, out string t_error);
-        if (t_error != null) EditorUtility.DisplayDialog("실패", t_error, "확인");
-    }
 
     /// <summary>표를 읽어 카드 SO를 생성/갱신하는 실동작. 창 없이도(자동화·검증) 부를 수 있게 static으로 분리한다.
     /// 막힌 경우 _error에 사유가 담기고 반환값은 빈 문자열이다.</summary>
@@ -389,7 +316,7 @@ public class CardTableTool : EditorWindow
         string t_dir = $"{_cardRoot}/{_name}";
         if (!AssetDatabase.IsValidFolder(t_dir)) AssetDatabase.CreateFolder(_cardRoot, _name);
 
-        var t_card = CreateInstance<CardData>();
+        var t_card = ScriptableObject.CreateInstance<CardData>();
         t_card.displayName = _name;
         AssetDatabase.CreateAsset(t_card, $"{t_dir}/{_name}.asset");
         AppendToRegistry(t_card);
@@ -491,18 +418,13 @@ public class CardTableTool : EditorWindow
                 _warnings.Add($"{_name}.{t_column}: 음수 '{t_hp}' — 0으로 처리");
                 t_hp = 0;
             }
-            if (t_level <= CardGrowth.BaseLevel && t_hp != 0)
-            {
-                _warnings.Add($"{_name}.{t_column}: Lv0/Lv1은 성장 전 기준값 — 0으로 처리");
-                t_hp = 0;
-            }
             t_values[t_level] = t_hp;
         }
 
         if (t_curveColumnCount == 0) return;
         if (t_curveColumnCount != HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1)
         {
-            _warnings.Add($"{_name}: hp0~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
+            _warnings.Add($"{_name}: hp2~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
             return;
         }
         _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();

@@ -16,6 +16,7 @@ public class GameInitializer : MonoBehaviour
     // 이 씬에 다시 두면 확정 지점이 씬을 넘어 둘로 갈린다. 배틀 씬은 확정된 DeckConfig를 읽기만 한다.
 
     static System.Func<CardData, CardGrowth> s_growthProvider;
+    static System.Func<CardData, CardGrowth> s_enemyGrowthProvider;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
@@ -23,6 +24,16 @@ public class GameInitializer : MonoBehaviour
     public static System.Func<CardData, CardGrowth> GrowthProvider
     {
         set => s_growthProvider = value;
+    }
+
+    /// <summary>**싱글 AI 적**의 성장값 주입점. 랭크 티어가 정하는 난이도라 값 생산자를 상위(부트)가 꽂는다.
+    /// 미세팅(null)이면 마스터 데이터 스탯 그대로 = 종전 동작.
+    ///
+    /// **멀티·튜토리얼에는 절대 넘기지 않는다.** 멀티 원격 미러는 스탯을 와이어로 보내지 않는 lockstep이라
+    /// 한쪽만 가공하면 즉시 divergence고, 튜토리얼은 저작된 킬 수·턴 수에 기대는 시나리오라 체력이 바뀌면 전제가 깨진다.</summary>
+    public static System.Func<CardData, CardGrowth> EnemyGrowthProvider
+    {
+        set => s_enemyGrowthProvider = value;
     }
 
     void Awake()
@@ -213,7 +224,8 @@ public class GameInitializer : MonoBehaviour
         // (구: TurnRunner.PlayIntroAndStart에서 시드 → 셔플이 시드 밖 UnityEngine.Random으로 새어나갔다.)
         MatchSeeding.SeedForNewMatch();
 
-        // 성장값(s_growthProvider)은 아래 **싱글 전투의 플레이어 필드에만** 넘긴다 — AI 적은 마스터 데이터 스탯 그대로가 밸런스 기준선이다.
+        // 성장값은 **싱글 전투에만** 넘긴다. 플레이어는 자기 강화 진행도(s_growthProvider),
+        // AI 적은 랭크 티어가 정한 고정 레벨(s_enemyGrowthProvider)을 쓴다.
 
         if (TutorialConfig.IsActive)
         {
@@ -229,7 +241,8 @@ public class GameInitializer : MonoBehaviour
             // 상대 덱은 게이트보다 앞선 ConfirmEnemyDeck이 확정해 뒀다(로비가 넘긴 값이면 그대로 유지된다).
             // 여기서 다시 뽑지 않는 게 핵심 — 뽑으면 게이트 화면에서 본 상대와 실제 상대가 갈린다.
             var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<CardData>();
-            this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match);
+            // AI도 티어 레벨을 받는다 — 체력뿐 아니라 키워드·시너지 해금까지 같은 곡선으로 정해진다.
+            this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match, s_enemyGrowthProvider);
         }
 
 

@@ -81,6 +81,11 @@ public static class CardGrowthManager
 
     public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)));
 
+    /// <summary>세이브와 무관하게 **지정 레벨**의 성장 스냅샷. AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다 —
+    /// 곡선 해석(체력·진화·키워드·시너지 해금)을 한 곳에 두려고 여기서 내준다.</summary>
+    public static CardGrowth GrowthAtLevel(CardData _card, int _level)
+        => Snapshot(_card, _level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _level);
+
     // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
     public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id));
 

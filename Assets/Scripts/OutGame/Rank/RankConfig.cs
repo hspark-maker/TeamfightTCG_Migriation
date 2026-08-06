@@ -28,8 +28,32 @@ public class RankConfig : ScriptableObject
         new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewardGold = 1400, rewardGoldPerDivision = 200 },
     };
 
+    /// <summary>티어별 AI 카드 레벨(index = 티어 인덱스). 난이도 곡선의 단일 진실원.
+    /// **브론즈~실버 중반은 플레이어보다 낮게, 실버 끝에서 동급, 골드부터 높게** 저작한다 —
+    /// 그래야 강화가 체감되면서도 후반에 도전이 남는다.
+    /// 목록이 티어 수보다 짧으면 마지막 값이 이어진다(비면 전부 바닥 레벨 = 성장 없음).</summary>
+    [Tooltip("티어별 AI 카드 레벨. index = 티어 인덱스(등급×4 + 단계-1). 짧으면 마지막 값이 이어진다.")]
+    public List<int> aiCardLevels = new List<int>
+    {
+        1, 1, 2, 2,      // 브론즈 1~4 — 플레이어보다 확실히 약하다
+        3, 3, 4, 5,      // 실버   1~4 — 따라붙어 실버 끝에서 동급
+        6, 6, 7, 7,      // 골드   1~4 — 여기서부터 플레이어보다 강하다
+        8, 8, 9, 9,      // 루비   1~4
+        10, 10, 10, 10,  // 다이아  1~4 — 만렙
+    };
+
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
+
+    /// <summary>티어 _index에서 AI가 쓸 카드 레벨. 미저작이면 바닥 레벨(성장 없음 = 종전 동작).</summary>
+    public int AiCardLevelAt(int _index)
+    {
+        if (aiCardLevels == null || aiCardLevels.Count == 0) return CardGrowth.BaseLevel;
+
+        int t_i = _index < 0 ? 0 : (_index >= aiCardLevels.Count ? aiCardLevels.Count - 1 : _index);
+        int t_level = aiCardLevels[t_i];
+        return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
+    }
 
     // 임계치 <= _points를 만족하는 최대 티어 인덱스(없으면 0)
     public int ResolveTierIndex(long _points)
