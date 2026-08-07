@@ -93,7 +93,7 @@ public class BattleTimingConfig : ScriptableObject
 
     [Header("Approach (매치포인트 공격 과정)")]
     // 결과 미확정 구간이므로 전역 timeScale 대신 이 공격의 이동 시간에만 배율을 적용한다.
-    [SerializeField, Range(0.2f, 1f)] float approachSlow = 0.55f;
+    [SerializeField, Range(0.2f, 1f)] float approachSlow = 0.65f;
     [SerializeField] float approachFocusIn  = 0.22f;
     [SerializeField] float approachFocusOut = 0.20f;
 

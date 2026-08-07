@@ -593,14 +593,18 @@ public class CardView : MonoBehaviour
         this.hpRollSeq = DOTween.Sequence().SetLink(gameObject);
 
         // 아이콘과 숫자가 **함께** 부푼다(Insert(0f) — Append로 이어 붙이면 대상마다 순서대로 늦게 커진다).
+        // 작아지는 건 부풀기와 굴림이 **둘 다 끝난 뒤**다. 둘을 더해서 잡으면(popDur+rollDur) 굴림이 끝나고도
+        // 아이콘이 커진 채로 popDur만큼 더 서 있는다.
+        float t_settled = Mathf.Max(t_popDur, t_rollDur);
         foreach (HpPop t_pop in EnsureHpPops())
         {
             this.hpRollSeq.Insert(0f, t_pop.target.DOScale(t_pop.home * t_pop.scale, t_popDur).SetEase(Ease.OutBack));
-            this.hpRollSeq.Insert(t_popDur + t_rollDur, t_pop.target.DOScale(t_pop.home, t_popDur).SetEase(Ease.InQuad));
+            this.hpRollSeq.Insert(t_settled, t_pop.target.DOScale(t_pop.home, t_popDur).SetEase(Ease.InQuad));
         }
 
-        // 숫자는 아이콘이 커진 **뒤부터** 굴러야 "아이콘이 커지고 → 체력이 달고 → 작아진다"로 읽힌다.
-        this.hpRollSeq.Insert(t_popDur,
+        // 숫자는 **팝과 같은 프레임에** 굴기 시작한다. 팝이 끝난 뒤로 미루면 타격은 이미 터졌는데 체력만
+        // popDur(현재 0.17초)만큼 늦게 움직여 "때렸는데 안 깎인다"로 읽힌다.
+        this.hpRollSeq.Insert(0f,
             DOVirtual.Int(t_from, _hp, t_rollDur, _v => WriteHpDisplay(_v, _bonusHp)).SetEase(Ease.Linear));
         this.hpRollSeq.OnComplete(() => WriteHpDisplay(_hp, _bonusHp));
     }

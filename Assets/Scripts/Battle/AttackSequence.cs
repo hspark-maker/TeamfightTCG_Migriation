@@ -51,6 +51,14 @@ public static class AttackSequence
 
     public static void ClearNormalOverride() => s_normalOverride = null;
 
+    /// <summary>매치포인트 접근 연출의 시간 배율 적용 지점.
+    /// 후퇴·복귀는 원속을 유지하고 타격으로 이어지는 전진 구간에만 무게를 싣는다.</summary>
+    static void ApplyApproach(ref NormalTuning _cfg)
+        => _cfg.inDur *= BattleFinisher.ApproachDurationFactor;
+
+    static void ApplyApproach(ref PeerlessTuning _cfg)
+        => _cfg.approachDur *= BattleFinisher.ApproachDurationFactor;
+
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect = null,
         CardKeyword _preEffectKw = CardKeyword.None,
@@ -225,9 +233,6 @@ public static class AttackSequence
         if (_attacker == null) return;
 
         NormalTuning t_cfg = Normal;
-        float t_approachFactor = BattleFinisher.ApproachDurationFactor;
-        t_cfg.windDur *= t_approachFactor;
-        t_cfg.outDur  *= t_approachFactor;
         Transform t_atk  = _attacker.transform;
         Vector3   t_home = t_atk.position;
 
@@ -278,7 +283,7 @@ public static class AttackSequence
 
         // 이 공격 동안 쓸 튜닝 스냅샷(박치기와 같은 규약). 시간 항목은 이미 배속이 적용돼 들어온다.
         PeerlessTuning t_cfg = GameTiming.Battle.PeerlessAttack;
-        t_cfg.approachDur *= BattleFinisher.ApproachDurationFactor;
+        ApplyApproach(ref t_cfg);
 
         // 이번 연출이 띄운 이펙트들. 멈칫(hit stop) 때 **같이 얼어야** 해서 들고 있는다 —
         // 카드만 멈추고 베기가 계속 흐르면 "멈춘 순간"이 아니라 "카드가 굳은 것"으로 보인다.
@@ -323,21 +328,20 @@ public static class AttackSequence
             ResumeVfx(t_frozen, t_speeds);
         }
 
-        // 1) 주 대상 앞으로 이동. 회전은 아직 하지 않는다(다음 단계에서 윈드업까지 한 번에 튼다).
+        // 1) 주 대상 앞으로 파고들며 동시에 윈드업한다. 도착 프레임이 곧 첫 베기 프레임이다.
         Vector3 t_front = Vector3.Lerp(t_atk.position, _defender.transform.position, t_cfg.approachT);
         t_front.z = t_atk.position.z;   // 평면 유지(뒤로 파고들지 않게) — 박치기와 같은 규약
 
-        t_atk.DOKill();
-        await t_atk.DOMove(t_front, t_cfg.approachDur).SetEase(Ease.OutQuad)
-                   .SetLink(_attacker.gameObject).ToUniTask();
-
-        // 2) 윈드업: 주 대상을 보는 각에서 **광역 대상 반대쪽으로 더** 튼다.
-        // 여기서 반대로 젖혀놔야 이어지는 회전(주 대상 → 광역 대상)이 한 번에 쓸어내리는 궤적이 된다.
-        // FaceRot의 Z는 왼쪽이 +라 부호가 그대로 "광역 반대쪽"이 된다.
+        // 주 대상을 보는 각에서 **광역 대상 반대쪽으로 더** 튼다.
+        // 접근과 함께 젖혀놔야 이어지는 회전(주 대상 → 광역 대상)이 한 번에 쓸어내리는 궤적이 된다.
         Quaternion t_aimDef = FaceRot(t_baseRot, _defender.transform.position - t_front, t_cfg.maxTurn);
-        await t_atk.DOLocalRotateQuaternion(t_aimDef * Quaternion.Euler(0f, 0f, t_sideSign * t_cfg.windupAngle),
-                                            t_cfg.turnDur)
-                   .SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask();
+        t_atk.DOKill();
+        await DOTween.Sequence().SetLink(_attacker.gameObject)
+            .Append(t_atk.DOMove(t_front, t_cfg.approachDur).SetEase(Ease.InQuad))
+            .Join(t_atk.DOLocalRotateQuaternion(
+                t_aimDef * Quaternion.Euler(0f, 0f, t_sideSign * t_cfg.windupAngle), t_cfg.turnDur)
+                .SetEase(Ease.OutQuad))
+            .ToUniTask();
 
         // 3) 공격 시작. 파고드는 동안 미리 띄우면 닿기도 전에 휘두른 것으로 보인다.
         //
@@ -557,9 +561,7 @@ public static class AttackSequence
         AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit, Vector3 _home)
     {
         NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
-        float t_approachFactor = BattleFinisher.ApproachDurationFactor;
-        t_cfg.windDur *= t_approachFactor;
-        t_cfg.inDur   *= t_approachFactor;
+        ApplyApproach(ref t_cfg);
 
         Transform  t_atk     = _attacker.transform;
         Vector3    t_origin  = t_atk.position;            // 공격 시작점 = 현재 위치(드래그-백이면 띄운 자리).
@@ -580,10 +582,11 @@ public static class AttackSequence
 
         // 윈드업(뒤로 살짝) → 박치기 돌진(각도 틀며 접촉). 끊김 없이 연속.
         t_atk.DOKill();
+        float t_lungeStart = t_cfg.windDur * 0.85f;
         await DOTween.Sequence().SetLink(_attacker.gameObject)
-            .Append(t_atk.DOMove(t_windback, t_cfg.windDur).SetEase(Ease.OutQuad))
-            .Append(t_atk.DOMove(t_impact, t_cfg.inDur).SetEase(Ease.InQuad))
-            .Join(t_atk.DOLocalRotateQuaternion(t_leanRot, t_cfg.inDur).SetEase(Ease.OutQuad))
+            .Append(t_atk.DOMove(t_windback, t_cfg.windDur).SetEase(Ease.OutSine))
+            .Insert(t_lungeStart, t_atk.DOMove(t_impact, t_cfg.inDur).SetEase(Ease.InQuad))
+            .Insert(t_lungeStart, t_atk.DOLocalRotateQuaternion(t_leanRot, t_cfg.inDur).SetEase(Ease.OutQuad))
             .ToUniTask();
 
         // 접촉: 히트/사망 해결과 공격자 반동/복귀를 동시 진행 → 중간 대기 없이 시퀀스 계속.
