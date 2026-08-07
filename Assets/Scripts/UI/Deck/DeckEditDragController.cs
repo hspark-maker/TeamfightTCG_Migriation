@@ -42,7 +42,7 @@ public class DeckEditDragController : MonoBehaviour
     }
 
     // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
-    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize = default)
+    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
     {
         if (m_dragging || _card == null || _data == null) return;
 
@@ -83,8 +83,8 @@ public class DeckEditDragController : MonoBehaviour
         m_dragging = true;
 
         // 고스트는 1회 Instantiate 후 재사용되므로 크기는 드래그마다 다시 준다 —
-        // 해상도나 패널이 바뀌면 cellSize도 바뀐다.
-        if (_cellSize.x > 0f && _cellSize.y > 0f) m_ghostRect.sizeDelta = _cellSize;
+        // 해상도나 패널이 바뀌면 cellSize도 바뀐다. else가 필요하다: 안 그러면 직전 드래그의 크기가 그대로 남는다.
+        m_ghostRect.sizeDelta = _cellSize.x > 0f && _cellSize.y > 0f ? _cellSize : ghostSize;
 
         if (m_ghostView != null) m_ghostView.Bind(_card, true);
         m_ghostRect.gameObject.SetActive(true);

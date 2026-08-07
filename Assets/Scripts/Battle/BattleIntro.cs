@@ -176,6 +176,9 @@ public class BattleIntro : MonoBehaviour
             if (!t_first) await UniTask.Delay((int)(this.cardDealDelay * 1000));
             t_first = false;
 
+            // 대기 중에 씬 전환 정리가 보드를 걷어갔을 수 있다 — 남은 카드까지 배치하려 들면 파괴된 뷰를 만진다.
+            if (t_view == null) return;
+
             // 고등급 등장 컷씬: 이 카드가 필드에 나오기 직전. 오프닝 배치도 "필드에 나오는" 순간이라 포함한다
             // (런타임 등장은 BattleFieldView.PlayFillAnim). 자격 판정은 CardCinematicRules 단독 —
             // 일반 카드는 Resolve가 null이라 즉시 통과하고, 같은 인스턴스는 래치로 두 번 재생되지 않는다.

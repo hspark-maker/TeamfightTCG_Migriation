@@ -444,6 +444,10 @@ public class CardAnimator : MonoBehaviour
     /// 컷씬이 없으면 PlayDealAnim이 중간 정지만 두고 곧바로 이어 붙인다(예전과 같은 흐름).</summary>
     public async UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
     {
+        // 호출부가 await 사이에 멈춘 동안 카드가 풀에 반납·파괴됐을 수 있다(씬 전환 정리).
+        // RefreshVisualCache의 GetComponentsInChildren는 파괴된 컴포넌트에서 예외를 던지므로 여기서 끊는다.
+        if (this == null) return;
+
         if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
         this.FadeTarget = 1f;   // 배치는 알파 1로 리셋하고 시작(아래 색 리셋과 짝)
         ResetLongPressLift();   // 이전 카드가 뜬 채로 사라졌을 수 있다

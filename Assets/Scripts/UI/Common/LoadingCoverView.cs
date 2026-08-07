@@ -53,9 +53,15 @@ public class LoadingCoverView : MonoBehaviour
     // 전환 모드의 목적지. null이면 부트 모드 — 목적지를 스스로 판정한다.
     string m_targetScene;
 
+    // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
+    Action m_beforeLoad;
+
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
     /// 부트가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
-    public static void LoadScene(string _scene)
+    /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
+    /// 반드시 여기로 넘긴다 — 커버는 1초 넘게 도는데, 그 전에 정리하면 이전 씬이 파괴된 오브젝트를 붙잡은 채
+    /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
+    public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
         var t_prefab = Resources.Load<GameObject>(ResourcePath);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
@@ -64,12 +70,19 @@ public class LoadingCoverView : MonoBehaviour
         if (t_view == null)
         {
             Debug.LogWarning($"[LoadingCoverView] Resources/{ResourcePath} 를 찾지 못해 커버 없이 전환합니다.");
+            _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;
         }
 
+        t_view.m_beforeLoad = _onBeforeLoad;
+
         // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 모드 분기보다 먼저다.
         t_view.m_targetScene = _scene;
+
+        // 페이드인 시작값도 같은 이유로 여기서 준다. Start를 기다리면 프리팹의 alpha 1이 한 프레임 그려져
+        // 하드컷으로 덮은 뒤 페이드인이 도는 꼴이 된다. alpha 0이어도 blocksRaycasts는 그대로라 입력은 이미 막힌다.
+        if (t_view.m_group != null && t_view.fadeInDuration > 0f) t_view.m_group.alpha = 0f;
     }
 
     void Awake()
@@ -157,6 +170,12 @@ public class LoadingCoverView : MonoBehaviour
             yield return CoFillBar(() => t_op.progress / 0.9f);
 
             if (holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
+
+            // 정리는 여기 — 씬 교체와 붙어 있어야 파괴된 오브젝트를 붙잡은 연출 체인이 깨어날 틈이 없다.
+            // 커버 자신은 이 시점에 도는 트윈이 없어(페이드인은 끝났고 Reveal은 뒤에 만들어진다)
+            // 훅이 DOTween.KillAll류를 돌려도 커버가 같이 죽지 않는다.
+            m_beforeLoad?.Invoke();
+            m_beforeLoad = null;
 
             t_op.allowSceneActivation = true;
             yield return t_op;
