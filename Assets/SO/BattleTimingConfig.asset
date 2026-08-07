@@ -65,6 +65,7 @@ MonoBehaviour:
   approachSlow: 0.65
   approachFocusIn: 0.22
   approachFocusOut: 0.2
+  approachLungeT: 0.88
   finishHitStop: 0.11
   finishIn: 0.06
   finishHold: 0.1

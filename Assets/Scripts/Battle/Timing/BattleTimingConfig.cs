@@ -96,6 +96,10 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField, Range(0.2f, 1f)] float approachSlow = 0.65f;
     [SerializeField] float approachFocusIn  = 0.22f;
     [SerializeField] float approachFocusOut = 0.20f;
+    // 결정타에서만 쓰는 돌진 도달 비율. 평소(atkLungeT 0.62)는 방어자 앞에서 멈추는데, 접근 연출은
+    // 느리고 카메라까지 붙어서 그 빈틈이 그대로 보인다 — "안 닿았는데 맞았다"가 된다.
+    // 시간이 아니라 거리라 접근 배율(SpeedFactor·ApproachDurationFactor)과 무관한 raw 값이다.
+    [SerializeField, Range(0f, 1f)] float approachLungeT = 0.88f;
 
     [Header("Finisher (승부를 가른 타격 강조 — 결과 확정보다 앞선다)")]
     // 여기 시간은 **승패에 관계없이 동일**하다. 멀티는 한쪽이 승리·다른 쪽이 패배인데 길이가 갈리면
@@ -198,6 +202,7 @@ public class BattleTimingConfig : ScriptableObject
     public float ApproachDurationFactor => 1f / Mathf.Clamp(approachSlow, 0.2f, 1f);
     public float ApproachFocusIn        => Mathf.Max(0f, approachFocusIn);
     public float ApproachFocusOut       => Mathf.Max(0f, approachFocusOut);
+    public float ApproachLungeT         => Mathf.Clamp01(approachLungeT);
     public float FinishHitStop      => Mathf.Max(0f, finishHitStop);
     public float FinishIn           => Mathf.Max(0f, finishIn);
     public float FinishHold         => Mathf.Max(0f, finishHold);

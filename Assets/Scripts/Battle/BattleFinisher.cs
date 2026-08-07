@@ -76,6 +76,10 @@ public static class BattleFinisher
     public static float ApproachDurationFactor
         => s_approachActive ? GameTiming.Battle.ApproachDurationFactor : 1f;
 
+    /// <summary>지금 매치포인트 접근 연출이 도는 중인가. <b>시간이 아니라 거리·자세</b>를 바꿔야 하는
+    /// 항목이 이걸 본다(접근 배율은 시간에만 곱하므로 그쪽으로는 표현할 수 없다).</summary>
+    public static bool ApproachActive => s_approachActive;
+
     /// <summary>비종전 공격은 카메라를 복구하고, 결정타가 열렸으면 현재 위치를 피니시에 넘긴다.</summary>
     public static void EndApproach()
     {
@@ -115,6 +119,13 @@ public static class BattleFinisher
 
         s_loserOwner = t_atkEmpty ? _attackerField.OwnerIndex : _defenderField.OwnerIndex;
     }
+
+    /// <summary>이 공격이 판을 끝냈는가를 <b>소비하지 않고</b> 미리 본다. <see cref="Arm"/> 이후,
+    /// 즉 피해 적용(_onEffect) 이후에만 유효하다.
+    ///
+    /// <para>호출부가 "타격 표시를 기다릴지"를 정하는 데 쓴다 — 결정타면 표시를 기다리면 안 된다.
+    /// 기다린 뒤에 얼리면 얼어붙는 프레임이 부딪힌 순간이 아니라 피격 연출이 다 끝난 뒤가 된다.</para></summary>
+    public static bool WillFinish => s_loserOwner != NoOwner;
 
     public static void Disarm()
     {
