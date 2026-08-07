@@ -52,9 +52,16 @@ public static class AttackSequence
     public static void ClearNormalOverride() => s_normalOverride = null;
 
     /// <summary>매치포인트 접근 연출의 시간 배율 적용 지점.
-    /// 후퇴·복귀는 원속을 유지하고 타격으로 이어지는 전진 구간에만 무게를 싣는다.</summary>
+    /// 후퇴·복귀는 원속을 유지하고 타격으로 이어지는 전진 구간에만 무게를 싣는다.
+    ///
+    /// <para>결정타는 <b>도달 거리도</b> 바꾼다 — 평소 lungeT는 방어자 앞에서 멈추는 값이라
+    /// 느려진 접근에서는 닿지도 않은 채 피격 연출이 터진다. 접근 중일 때만 실제로 부딪히는 지점까지
+    /// 파고들게 해서 "피격 연출 프레임 = 부딪히는 프레임"이 되게 한다.</para></summary>
     static void ApplyApproach(ref NormalTuning _cfg)
-        => _cfg.inDur *= BattleFinisher.ApproachDurationFactor;
+    {
+        _cfg.inDur *= BattleFinisher.ApproachDurationFactor;
+        if (BattleFinisher.ApproachActive) _cfg.lungeT = GameTiming.Battle.ApproachLungeT;
+    }
 
     static void ApplyApproach(ref PeerlessTuning _cfg)
         => _cfg.approachDur *= BattleFinisher.ApproachDurationFactor;
@@ -810,6 +817,11 @@ public static class AttackSequence
         int t_atkDmg = t_atkBefore - HpTotal(_attacker);
         bool t_attackerHit = t_atkDmg > 0;
 
+        // 이 한 방이 판을 끝내는가 — **소비하지 않는 조회**다(_onEffect 안의 Arm 이후라 유효).
+        // 아래 표시들을 기다릴지 말지가 여기서 갈린다: 결정타는 부딪힌 프레임을 그대로 얼려야 하므로
+        // 표시를 흘려보내고 곧장 TryBegin으로 간다.
+        bool t_finishing = BattleFinisher.WillFinish;
+
         // 피격 방향: 맞은 쪽은 "때린 쪽"을 넘긴다(먼지 등이 반대로 튀게). 반격은 방향이 뒤집힌다.
         if (_beforeSplashHit != null && _splashView != null)
         {
@@ -859,16 +871,25 @@ public static class AttackSequence
                 ? UniTask.WhenAll(_defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker),
                                   _splashView.PlayHitAnim(_damage: t_splDmg, _hitFrom: _attacker))
                 : _defender.PlayHitAnim(_damage: t_defDmg, _hitFrom: _attacker);
-            if (t_attackerHit)
-                await UniTask.WhenAll(t_defHit,
-                    _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender, _isCounter: true)
-                    ?? UniTask.CompletedTask);
-            else
-                await t_defHit;
+            UniTask t_atkHit = t_attackerHit
+                ? _attacker?.PlayHitAnim(_damage: t_atkDmg, _hitFrom: _defender, _isCounter: true)
+                  ?? UniTask.CompletedTask
+                : UniTask.CompletedTask;
+
+            // 결정타면 **기다리지 않는다**. 무쌍 경로와 같은 규약이다(위 주석) — 타격을 먼저 터뜨리고
+            // 그 프레임을 얼려야 한다. 기다리면 피격 연출(hitDuration×2)이 다 끝난 뒤에 얼어붙어,
+            // 부딪힌 순간이 아니라 체력이 다 깎인 뒤에 슬로우가 걸린다.
+            if (t_finishing) { t_defHit.Forget(); t_atkHit.Forget(); }
+            else             await UniTask.WhenAll(t_defHit, t_atkHit);
         }
 
+        // 결정타에서는 글로우도 기다리지 않는다 — KeywordGlowHold(현재 1.25초)만큼 얼어붙기가 밀린다.
         if (_atEffectKw != CardKeyword.None)
-            await (_attacker?.PlayKeywordGlow(_atEffectKw) ?? UniTask.CompletedTask);
+        {
+            UniTask t_glow = _attacker?.PlayKeywordGlow(_atEffectKw) ?? UniTask.CompletedTask;
+            if (t_finishing) t_glow.Forget();
+            else             await t_glow;
+        }
 
         bool t_defenderKilled = _defender.BoundCard != null && _defender.BoundCard.hp <= 0;
         bool t_attackerKilled = _attacker?.BoundCard != null && _attacker.BoundCard.hp <= 0;
