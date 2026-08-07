@@ -1,4 +1,4 @@
-﻿id,name,displayName,channel,maxHp,keywords,keywordUnlockLevel,synergies,defaultEvolutionStage,hp2,hp3,hp4,hp5,hp6,hp7,hp8,hp9,hp10,cardExplain
+id,name,displayName,channel,maxHp,keywords,keywordUnlockLevel,synergies,defaultEvolutionStage,hp2,hp3,hp4,hp5,hp6,hp7,hp8,hp9,hp10,cardExplain
 1,포슬램,포슬램,Live,3,Healer,3,돌보미,0,1,2,1,2,1,2,1,2,1,
 2,파도리,파도리,Live,4,Ranged,2,돌보미,0,2,1,1,2,1,1,2,1,1,
 3,별토리,별토리,Live,4,Healer,3,돌보미,0,1,1,2,1,2,1,2,1,2,
@@ -29,7 +29,6 @@
 28,단풍꼬리,단풍꼬리,Live,5,,0,,0,1,1,2,2,1,1,1,2,1,
 29,수정뿔루,수정뿔루,Live,2,,0,,0,1,1,1,1,2,2,2,2,1,
 30,폭탄밤,폭탄밤,Live,4,,0,,0,2,2,1,1,1,2,1,1,1,
-31,바너구,바너구,Live,5,,0,,0,1,2,1,1,1,2,2,1,1,
 32,찌릿핀 3,찌릿핀 3,TestOnly,8,Execution,4,흐름,3,1,1,2,1,1,1,2,1,2,
 33,물방울룽 3,물방울룽 3,TestOnly,8,Cunning,2,흐름,3,2,2,1,1,1,1,1,1,1,
 34,깜밤이 3,깜밤이 3,TestOnly,8,Taunt,2,언데드,3,1,1,1,1,1,1,2,2,2,

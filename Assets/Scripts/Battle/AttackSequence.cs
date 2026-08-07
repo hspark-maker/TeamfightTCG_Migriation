@@ -241,7 +241,14 @@ public static class AttackSequence
 
         NormalTuning t_cfg = Normal;
         Transform t_atk  = _attacker.transform;
-        Vector3   t_home = t_atk.position;
+
+        // 복귀 목표는 **슬롯**이다(현재 위치가 아니라). 현재 위치를 목표로 잡으면 어떤 이유로든 어긋난
+        // 좌표가 그대로 새 기준이 되어 발사할 때마다 누적된다 — 박치기(PlayNormal)는 _home(슬롯)으로
+        // 복귀해 매 공격 리셋되지만 이 경로엔 리셋 지점이 없어, 한 번 뜨면 카드가 뜬 채로 영구히 남는다
+        // (원거리 카드만 공격 후 위에 떠 있던 원인).
+        // z는 현재 평면을 따른다 — 발사하는 동안 방어자보다 앞에 그려져야 한다.
+        Vector3 t_home = _attacker.SlotPosition;
+        t_home.z = t_atk.position.z;
 
         Vector3 t_dir  = _defender.transform.position - t_home;
         Vector3 t_dirN = t_dir.sqrMagnitude > 0.0001f ? t_dir.normalized : Vector3.up;

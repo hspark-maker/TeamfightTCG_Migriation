@@ -75,7 +75,10 @@ public class BattleFieldView : MonoBehaviour
         for (int i = 0; i < _placed.Count; i++)
         {
             CardView t_view = this.slotViews[_placed[i].slotIndex];
-            t_dests[i] = t_view.transform.position;
+            // 목적지는 **슬롯**이다(현재 위치가 아니라). 현재 위치를 목적지로 잡으면, 직전 카드가
+            // 어긋난 자리에서 사라졌을 때 그 어긋남이 새 카드의 자리로 굳고 보충할 때마다 누적된다 —
+            // 이 슬롯 뷰는 방금 카드가 죽어 비워진 자리라 연출 잔여가 남아 있을 확률이 가장 높은 지점이다.
+            t_dests[i] = t_view.SlotPosition;
             Vector3 t_hide = t_from;
             t_hide.z = t_dests[i].z;
             t_view.transform.position = t_hide;

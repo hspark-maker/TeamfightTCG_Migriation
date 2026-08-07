@@ -764,10 +764,30 @@ public class CardView : MonoBehaviour
     /// <summary>사망 연출. **HP 굴림이 끝난 뒤에** 시작한다 — 카드가 줄어들며 사라지는 도중에 숫자가
     /// 0까지 굴러가면 얼마를 맞고 죽었는지가 안 읽히고, 페이드로 흐려진 숫자 위에서 굴림만 헛돈다.
     /// 순수 연출 대기다 — 규칙(hp·사망 판정)은 이미 확정된 뒤라 이 대기가 게임 판정을 미루지 않는다.</summary>
-    public async UniTask PlayDeathAnim(float _d = 0.4f)
+    public async UniTask PlayDeathAnim(float _d = -1f)
     {
         await WaitHpRollSettled();
-        await this.cardAnim.PlayDeathAnim(_d);
+        float t_duration = _d < 0f ? GameTiming.Battle.DeathDuration : _d;
+
+        // 파티클은 **카드에 붙이지 않는다**. 붙이면 사망 직후 HideSlot이 카드를 끄면서 별가루도 같이
+        // 꺼져 뚝 끊긴다(FinishImpact가 월드 스폰인 것과 같은 이유). 좌표는 죽는 그 자리로 고정 —
+        // 카드는 떠오르지만 바닥 파동은 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
+        Vector3 t_deathPosition = transform.position;
+
+        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
+        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
+
+        // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
+        // 결정타 구간에서 그 초과분에 슬로우 배율이 곱해진다.
+        float t_novaDelay = Mathf.Min(GameTiming.Battle.DeathNovaAt, t_duration);
+        bool t_cancelled = await UniTask.Delay(
+                (int)(t_novaDelay * 1000f),
+                cancellationToken: this.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (!t_cancelled)
+            BattleVfx.Play(BattleVfxId.DeathNova, t_deathPosition, VfxSortingLayerId);
+
+        await t_cardAnim;
     }
 
     /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).

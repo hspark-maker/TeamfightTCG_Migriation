@@ -397,31 +397,89 @@ public class CardAnimator : MonoBehaviour
         await this.hitOverlay.DOFade(0f, _duration).SetLink(gameObject).ToUniTask();
     }
 
+    // 사망 연출 형태값(거리·배율이라 시간이 아니다 → BattleTimingConfig가 아니라 여기).
+    const float DEATH_LIFT_DISTANCE = 0.18f;   // 사라지며 떠오르는 거리(월드)
+    const float DEATH_SHRINK        = 0.92f;   // 끝 크기 배율(0까지 찌그러뜨리지 않는다)
+
+    /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 축소 → 페이드아웃.
+    /// 별가루·바닥 파동 파티클은 여기 없다 — 스폰 좌표와 정렬 레이어를 아는 <see cref="CardView"/>가 쏜다.
+    /// 여기는 트윈만 소유한다.</summary>
     public async UniTask PlayDeathAnim(float _duration = -1f)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DeathDuration;
+        // 부유의 출발점은 지금 있는 자리지만, **되돌릴 자리는 슬롯**이다(아래 finally).
+        // 진입 시점 좌표를 복원 기준으로 삼으면 어긋난 좌표가 새 기준이 되고, 슬롯은 재사용되므로
+        // 그 어긋남이 다음 카드에 그대로 이월된다(카드가 조금씩 밀리던 원인).
+        Vector3 t_liftFrom = transform.localPosition;
         this.FadeTarget = 0f;   // 사망은 알파 0으로 끝난다(아래 주석 참조) — 그 사이 태어난 자식도 0으로
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDeath();
         SoundManager.Instance?.PlayDeathVoice(this.boundCard?.data?.deathVoices);
+
+        // 플래시는 DieOverlay(치사 예고용 판)를 빌려 쓴다 — 카드 모양 그대로라 실루엣이 정확히 번쩍인다.
+        // 색은 여기서 흰색으로 덮고 끝나면 되돌린다. 자식 해골 아이콘은 플래시에 같이 비치면 안 되므로 잠깐 끈다.
+        Color      t_overlayColor     = default;
+        GameObject t_dieIcon          = null;
+        bool       t_dieIconWasActive = false;
+        if (this.dieOverlay != null)
+        {
+            this.dieOverlay.gameObject.SetActive(true);
+            this.dieOverlay.DOKill();
+            t_overlayColor = this.dieOverlay.color;
+            this.dieOverlay.color = new Color(1f, 1f, 1f, 0f);
+
+            Transform t_dieIconTransform = this.dieOverlay.transform.Find("DieIcon");
+            if (t_dieIconTransform != null)
+            {
+                t_dieIcon          = t_dieIconTransform.gameObject;
+                t_dieIconWasActive = t_dieIcon.activeSelf;
+                t_dieIcon.SetActive(false);
+            }
+        }
+
         var t_seq = DOTween.Sequence()
             .SetLink(gameObject)
-            .Join(transform.DOScale(0f, _duration).SetEase(Ease.InBack));
+            .Join(transform.DOLocalMoveY(t_liftFrom.y + DEATH_LIFT_DISTANCE,
+                                         Mathf.Min(GameTiming.Battle.DeathLift, _duration))
+                           .SetEase(Ease.OutCubic))
+            .Join(transform.DOScale(Vector3.one * DEATH_SHRINK, _duration).SetEase(Ease.OutQuad));
+        if (this.dieOverlay != null)
+        {
+            float t_flashHalf = Mathf.Min(GameTiming.Battle.DeathFlash, _duration) * 0.5f;
+            _ = t_seq.Insert(0f,           this.dieOverlay.DOFade(0.85f, t_flashHalf));
+            _ = t_seq.Insert(t_flashHalf,  this.dieOverlay.DOFade(0f,    t_flashHalf));
+        }
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay) continue;
-            _ = t_seq.Join(t_sr.DOFade(0f, _duration));
+            _ = t_seq.Join(t_sr.DOFade(0f, _duration).SetEase(Ease.InQuad));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            _ = t_seq.Join(t_tmp.DOFade(0f, _duration));
-        await t_seq.ToUniTask();
+            _ = t_seq.Join(t_tmp.DOFade(0f, _duration).SetEase(Ease.InQuad));
 
-        if (this == null) return;
-        // 스케일만 재사용 대비 복원. 알파는 페이드아웃(0) 상태로 남긴다 —
-        // 여기서 알파를 1로 되돌리면 죽은 카드가 잠깐 되살아나 보인 뒤 HideSlot이 다시 숨김(플래시).
-        // 슬롯 재사용 시 알파=1 복원은 PlayDealAnim(시작 시 리셋)이 담당하므로 중복 불필요.
-        transform.localScale = Vector3.one;
+        try
+        {
+            await t_seq.ToUniTask();
+        }
+        finally
+        {
+            if (this != null)
+            {
+                // 슬롯(=Awake에서 잡은 원래 자리)과 크기 1로 되돌린다. 진입 시점 값이 아니라 **알려진 정상값**이라
+                // 어떤 이유로 어긋난 채 죽어도 그 어긋남이 슬롯에 남지 않는다.
+                // 알파는 0으로 남긴다 — 1로 되돌리면 죽은 카드가 잠깐 되살아나 보인 뒤 HideSlot이 다시 숨긴다(플래시).
+                // 슬롯 재사용 시 알파=1 복원은 PlayDealAnim(시작 시 리셋)이 담당한다.
+                transform.position   = this.slotPosition;
+                transform.localScale = Vector3.one;
+                if (this.dieOverlay != null)
+                {
+                    this.dieOverlay.color = t_overlayColor;
+                    if (t_dieIcon != null) t_dieIcon.SetActive(t_dieIconWasActive);
+                    this.dieOverlay.gameObject.SetActive(false);
+                }
+            }
+        }
     }
 
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)

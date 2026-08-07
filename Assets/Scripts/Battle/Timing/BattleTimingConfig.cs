@@ -62,6 +62,11 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float cardMoveDuration  = 0.3f;
     [SerializeField] float hitDuration       = 0.15f;
     [SerializeField] float deathDuration     = 0.4f;
+    // 사망 연출 내부 박자. 전부 deathDuration 안에서 끝난다 — 이 값들을 늘려 사망을 길게 만들지 말 것
+    // (결정타에서 deathDuration에 finishSlow 배율이 곱해져 체감이 4배로 늘어난다).
+    [SerializeField] float deathFlash        = 0.05f;  // 사망 순간 흰 플래시(올렸다 내리는 총 시간)
+    [SerializeField] float deathLift         = 0.12f;  // 카드가 떠오르는 데 걸리는 시간
+    [SerializeField] float deathNovaAt       = 0.28f;  // 바닥 빛 파동이 터지는 시점(사망 시작 기준)
     [SerializeField] float dealAnimDuration  = 0.6f;
     [SerializeField] float dealMidPause      = 0.5f;   // 거래 애니 중간 정지
     [SerializeField] float deathPreviewFlash = 0.55f;  // 죽음 미리보기 점멸
@@ -161,6 +166,9 @@ public class BattleTimingConfig : ScriptableObject
     public float CardMoveDuration   => cardMoveDuration   * SpeedFactor;
     public float HitDuration        => hitDuration        * SpeedFactor;
     public float DeathDuration      => deathDuration      * SpeedFactor;
+    public float DeathFlash         => deathFlash         * SpeedFactor;
+    public float DeathLift          => deathLift          * SpeedFactor;
+    public float DeathNovaAt        => deathNovaAt        * SpeedFactor;
     public float DealAnimDuration   => dealAnimDuration   * SpeedFactor;
     public float DealMidPause       => dealMidPause       * SpeedFactor;
     public float DeathPreviewFlash  => deathPreviewFlash  * SpeedFactor;
