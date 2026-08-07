@@ -507,7 +507,8 @@ public class PlayerTurn : TurnBase
 
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
-        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField);   // 무리 선피해(Execute 전 원자)
+        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+                                         t_preSelectedSplash);   // 무리 선피해(Execute 전 원자)
 
         await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
             _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw,

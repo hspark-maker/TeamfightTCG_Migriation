@@ -30,6 +30,7 @@ public class TurnRunner : MonoBehaviour
     bool disconnectWin;
     bool forcedEnd;      // 항복/디버그로 결과를 강제 확정했는가. 턴 루프를 다음 경계에서 끊는다.
     bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
+    bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
 
@@ -55,16 +56,38 @@ public class TurnRunner : MonoBehaviour
 
     void ForceEnd(bool _won)
     {
-        if (this.resultCaptured) return;   // 이미 승패 확정 — 보상 재지급·팝업 덮어쓰기 방지
+        if (this.resultFinalized) return;   // 이미 승패 확정 — 보상 재지급·팝업 덮어쓰기 방지
 
         this.forcedEnd = true;
-        TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
-        CaptureResult(_won);
-        GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, _won);
+        // 강제 종료에는 여운을 붙이지 않는다 — 항복·디버그 승리는 화면에 강조할 "결정타"가 없다.
+        FinalizeResult(_won, _withBeat: false);
 
         if (!_won && DeckConfig.IsMultiplayer)
             NetworkSession.Instance?.Disconnect().Forget();
+    }
+
+    /// <summary>이번 전투 결과를 확정하고 표시한다 — <b>결과가 화면에 나가는 유일한 출구</b>.
+    /// 정상 승패·항복·전투 중 이탈·초기화 중 이탈이 전부 여기로 모인다. 두 경로가 경합해도 먼저 온 쪽만 이긴다
+    /// (보상은 CaptureResult가, 팝업·여운은 이 게이트가 각각 한 번만 돌게 막는다).
+    /// <paramref name="_withBeat"/>면 팝업 앞에 승패 여운(<see cref="BattleResultBeat"/>)을 한 박자 넣는다.</summary>
+    void FinalizeResult(bool _won, bool _withBeat)
+    {
+        if (this.resultFinalized) return;
+        this.resultFinalized = true;
+
+        TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
+        CaptureResult(_won);
+        ShowResult(_won, _withBeat).Forget();
+    }
+
+    // 여운은 표시 전용이라 결과·보상 확정 뒤에 돈다 — 도중에 씬이 내려가면 취소되고 팝업도 뜨지 않는다.
+    async UniTaskVoid ShowResult(bool _won, bool _withBeat)
+    {
+        if (_withBeat)
+            await BattleResultBeat.Play(_won, this.GetCancellationTokenOnDestroy());
+
+        GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won);
     }
 
 #if UNITY_EDITOR
@@ -72,8 +95,17 @@ public class TurnRunner : MonoBehaviour
     {
         // 연출 확인용 샘플 보상 — 0이면 코인·수치 롤링이 통째로 생략돼 볼 게 없다.
         // 패배(F2)는 설계상 분출·롤링이 없다 — 값만 박힌 채 뜨는 게 정상이다.
-        if (Input.GetKeyDown(KeyCode.F1)) this.winPopup?.Show(new CurrencyGain(ECurrencyType.Gold, 1234), 10, _won: true);
-        if (Input.GetKeyDown(KeyCode.F2)) this.losePopup?.Show(new CurrencyGain(ECurrencyType.Gold, 1234), -5, _won: false);
+        if (Input.GetKeyDown(KeyCode.F1)) PreviewResult(true).Forget();
+        if (Input.GetKeyDown(KeyCode.F2)) PreviewResult(false).Forget();
+    }
+
+    // 여운까지 포함한 미리보기. 결과를 확정하지 않으므로(CaptureResult 미호출) 보상·랭크는 건드리지 않는다 —
+    // 전투를 끝까지 돌리지 않고도 여운 타이밍을 튜닝하려면 이 경로가 정상 경로와 같은 연출을 타야 한다.
+    async UniTaskVoid PreviewResult(bool _won)
+    {
+        await BattleResultBeat.Play(_won, this.GetCancellationTokenOnDestroy());
+        GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
+        t_popup?.Show(new CurrencyGain(ECurrencyType.Gold, 1234), _won ? 10 : -5, _won);
     }
 #endif
 
@@ -219,6 +251,10 @@ public class TurnRunner : MonoBehaviour
 
             if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
 
+            // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다
+            // (흐림·클로즈업이 남은 채로 다음 턴이 시작되면 먹통으로 보인다). 안 돌았으면 무동작.
+            BattleResultBeat.AbortFinish();
+
             if (t_current == 1)
             {
                 TurnCount++;
@@ -282,8 +318,8 @@ public class TurnRunner : MonoBehaviour
         this.disconnectWin = true;
         NetworkGameController.Instance?.ForceOpponentReady();
         MultiplayerTurnRunner.Instance?.ForceOpponentAttackResolve();
-        CaptureResult(true);
-        this.winPopup?.Show(this.lastReward, this.lastRankDelta, _won: true);
+        // 부전승에는 여운이 없다 — 강조할 결정타가 없고, 이탈은 전투가 진행 중일 때도 들어온다.
+        FinalizeResult(true, _withBeat: false);
     }
 
     /// <summary>
@@ -307,22 +343,21 @@ public class TurnRunner : MonoBehaviour
     {
         if (!DeckConfig.IsMultiplayer) return;
         this.disconnectWin = true;
-        CaptureResult(true);
-        this.winPopup?.Show(this.lastReward, this.lastRankDelta, _won: true);
+        FinalizeResult(true, _withBeat: false);
     }
 
     bool CheckGameOver()
     {
+        // 정상 종료만 여운을 탄다. 여기까지 왔다는 건 이번 턴의 공격·사망 연출과 충원이 모두 끝났다는 뜻이라,
+        // 여운은 "정리된 보드를 한 박자 붙잡았다가" 팝업을 여는 연출이 된다.
         if (this.enemyField.IsEmpty)
         {
-            CaptureResult(true);
-            this.winPopup?.Show(this.lastReward, this.lastRankDelta, _won: true);
+            FinalizeResult(true, _withBeat: true);
             return true;
         }
         if (this.playerField.IsEmpty)
         {
-            CaptureResult(false);
-            this.losePopup?.Show(this.lastReward, this.lastRankDelta, _won: false);
+            FinalizeResult(false, _withBeat: true);
             return true;
         }
         return false;

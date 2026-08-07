@@ -86,7 +86,9 @@ public class LobbyMatchLauncher : MonoBehaviour
             return;
         }
 
-        DeckConfig.SetEnemyDeck(aiDeckConfig != null ? aiDeckConfig.GetRandomDeck() : new List<CardData>());
+        DeckConfig.SetEnemyDeck(aiDeckConfig != null
+            ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex)
+            : new List<CardData>());
     }
 
     void ShowNoDeckPopup()

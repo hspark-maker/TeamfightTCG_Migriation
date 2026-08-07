@@ -89,27 +89,44 @@ public static class AttackSequence
     /// <summary>연출 디스패치. 두 프레젠테이션 공유 히트해결(ResolveHits)로 데미지/사망 타이밍 일치.
     /// - 일반(PlayNormal): 자기 위치에서 적 방향으로 각도 틀고 박치기.
     /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1. 3단계 진화 카드의 첫 공격 1회.</summary>
-    static UniTask PlayCore(CardView _attacker, CardView _defender,
+    static async UniTask PlayCore(CardView _attacker, CardView _defender,
         AttackEffect _effect, Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit,
         bool? _forceSpecial = null)
     {
         // 테스트/특수 호출이 강제하면 그 값, 아니면 공격력 기준 판정.
         bool t_special = _forceSpecial ?? IsCinemaAttack(_attacker);
-        if (t_special)
-            return PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
+        if (t_special) BattleFinisher.CancelApproachArm();
+        bool t_approach = !t_special && BattleFinisher.TryBeginApproach(_attacker, _defender);
 
-        // 원거리(Ranged)는 붙지 않는다 — 제자리에서 투사체를 쏘고, 투사체가 닿는 시점에 히트.
-        // 판정은 런타임 키워드 포함(HasKeyword) — 시너지/패시브가 준 원거리도 같은 연출이어야 한다.
-        if (IsRangedAttack(_attacker))
-            return PlayRanged(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+        try
+        {
+            if (t_special)
+            {
+                await PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
+                return;
+            }
 
-        // 무쌍은 **광역 대상이 실제로 있을 때만** 전용 연출로 간다. 인접이 비어 스플래시가 없으면
-        // 벨 대상이 하나뿐이라 박치기와 다를 게 없다(빈 회전만 늘어난다).
-        if (IsPeerlessAttack(_attacker) && _splashView != null)
-            return PlayPeerless(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+            // 원거리(Ranged)는 붙지 않는다 — 제자리에서 투사체를 쏘고, 투사체가 닿는 시점에 히트.
+            if (IsRangedAttack(_attacker))
+            {
+                await PlayRanged(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+                return;
+            }
 
-        return PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+            // 무쌍은 광역 대상이 실제로 있을 때만 전용 연출로 간다.
+            if (IsPeerlessAttack(_attacker) && _splashView != null)
+            {
+                await PlayPeerless(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+                return;
+            }
+
+            await PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+        }
+        finally
+        {
+            if (t_approach) BattleFinisher.EndApproach();
+        }
     }
 
     /// <summary>이 공격이 원거리 발사 연출인가. 공격자 없음(환경 피해)이면 false → 기존 경로.</summary>
@@ -135,7 +152,8 @@ public static class AttackSequence
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
         SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip);
+        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
+                                BattleFinisher.ApproachDurationFactor);
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -164,7 +182,8 @@ public static class AttackSequence
     static async UniTask PlayRanged(CardView _attacker, CardView _defender, CardView _splashView,
         AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
-        float t_hitDelay = _effect?.hitDelay ?? 0f;
+        float t_approachFactor = BattleFinisher.ApproachDurationFactor;
+        float t_hitDelay = (_effect?.hitDelay ?? 0f) * t_approachFactor;
 
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
@@ -174,8 +193,10 @@ public static class AttackSequence
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
         SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip);
-        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay, t_flip).Forget();
+        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
+                                BattleFinisher.ApproachDurationFactor);
+        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform,
+                         t_hitDelay, t_flip, t_approachFactor).Forget();
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -204,6 +225,9 @@ public static class AttackSequence
         if (_attacker == null) return;
 
         NormalTuning t_cfg = Normal;
+        float t_approachFactor = BattleFinisher.ApproachDurationFactor;
+        t_cfg.windDur *= t_approachFactor;
+        t_cfg.outDur  *= t_approachFactor;
         Transform t_atk  = _attacker.transform;
         Vector3   t_home = t_atk.position;
 
@@ -241,7 +265,8 @@ public static class AttackSequence
         _attacker.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
         SoundManager.Instance?.PlayAttackVoice(_attacker.BoundCard?.data?.attackVoices);
-        _effect?.SpawnParticles(_attacker.transform, _defender.transform, t_flip);
+        _effect?.SpawnParticles(_attacker.transform, _defender.transform, t_flip,
+                                BattleFinisher.ApproachDurationFactor);
 
         if (_preEffectKw != CardKeyword.None)
             await _attacker.PlayKeywordGlow(_preEffectKw);
@@ -253,6 +278,7 @@ public static class AttackSequence
 
         // 이 공격 동안 쓸 튜닝 스냅샷(박치기와 같은 규약). 시간 항목은 이미 배속이 적용돼 들어온다.
         PeerlessTuning t_cfg = GameTiming.Battle.PeerlessAttack;
+        t_cfg.approachDur *= BattleFinisher.ApproachDurationFactor;
 
         // 이번 연출이 띄운 이펙트들. 멈칫(hit stop) 때 **같이 얼어야** 해서 들고 있는다 —
         // 카드만 멈추고 베기가 계속 흐르면 "멈춘 순간"이 아니라 "카드가 굳은 것"으로 보인다.
@@ -531,6 +557,9 @@ public static class AttackSequence
         AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit, Vector3 _home)
     {
         NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
+        float t_approachFactor = BattleFinisher.ApproachDurationFactor;
+        t_cfg.windDur *= t_approachFactor;
+        t_cfg.inDur   *= t_approachFactor;
 
         Transform  t_atk     = _attacker.transform;
         Vector3    t_origin  = t_atk.position;            // 공격 시작점 = 현재 위치(드래그-백이면 띄운 자리).
@@ -628,7 +657,8 @@ public static class AttackSequence
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
         SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip);
+        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
+                                BattleFinisher.ApproachDurationFactor);
         LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay, t_flip).Forget();
 
         if (_preEffectKw != CardKeyword.None)
@@ -650,7 +680,10 @@ public static class AttackSequence
         else
             await ResolveHits(null, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
 
-        BattleCamera.Instance?.ExitCinema();
+        // 결정타가 열렸으면 시네마가 카메라 소유권을 돌려놓지 않는다.
+        // FinishFocus가 현재 위치에서 이어받았는데 여기서 ExitCinema를 호출하면 강한 줌이 즉시 풀린다.
+        if (!BattleResultBeat.FinishPlayed)
+            BattleCamera.Instance?.ExitCinema();
 
         await UniTask.WhenAll(
             _attacker?.RestoreAfterAttack() ?? UniTask.CompletedTask,
@@ -838,28 +871,45 @@ public static class AttackSequence
         bool t_attackerKilled = _attacker?.BoundCard != null && _attacker.BoundCard.hp <= 0;
         bool t_splashKilled   = _splashView?.BoundCard != null && _splashView.BoundCard.hp <= 0;
 
-        float t_remain = t_duration - t_hitDelay;
-        if (!_skipRemain && t_remain > 0f)
-            await UniTask.Delay((int)(t_remain * 1000));
-
-        _attacker?.FocusWeapon(false);
-
-        if (_splashView != null)
+        // 이 한 방이 판을 끝냈다면 여기서 강조를 연다 — **죽는 카드의 View와 좌표가 살아 있는 마지막 지점**이다.
+        // 아래 사망 연출부터는 카드가 페이드되고, 그 뒤엔 슬롯이 충원 카드에 재바인딩된다.
+        // true면 화면이 느려진 채로 돌아오므로 **사망 연출이 그 슬로우 안에서 재생된다**(스케일드 트윈).
+        // 끝낸 게 아니면 즉시 false로 빠져 기존 흐름과 완전히 같다.
+        try
         {
-            // 무쌍 등 다중 파괴: 동시 재생하면 "따닥"으로 뭉쳐 보인다 → 대상→스플래시 순차 재생.
-            if (t_defenderKilled) await _defender.PlayDeathAnim();
-            if (t_splashKilled)   await (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask);
-            if (t_defenderKilled || t_splashKilled)
+            bool t_finished = await BattleFinisher.TryBegin(_attacker, _defender, _splashView,
+                                                            t_attackerKilled, t_defenderKilled, t_splashKilled);
+
+            // 피니시가 이미 한 박자를 썼으므로 잔여 대기는 건너뛴다(끝난 판에서 빈 시간이 겹치지 않게).
+            float t_remain = t_duration - t_hitDelay;
+            if (!_skipRemain && !t_finished && t_remain > 0f)
+                await UniTask.Delay((int)(t_remain * 1000));
+
+            _attacker?.FocusWeapon(false);
+
+            if (_splashView != null)
+            {
+                // 무쌍 등 다중 파괴: 동시 재생하면 "따닥"으로 뭉쳐 보인다 → 대상→스플래시 순차 재생.
+                if (t_defenderKilled) await _defender.PlayDeathAnim();
+                if (t_splashKilled)   await (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask);
+                if (t_defenderKilled || t_splashKilled)
+                    SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
+            }
+            else if (t_defenderKilled)
+            {
+                await _defender.PlayDeathAnim();
                 SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
-        }
-        else if (t_defenderKilled)
-        {
-            await _defender.PlayDeathAnim();
-            SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
-        }
+            }
 
-        if (t_attackerKilled)
-            await (_attacker?.PlayDeathAnim() ?? UniTask.CompletedTask);
+            if (t_attackerKilled)
+                await (_attacker?.PlayDeathAnim() ?? UniTask.CompletedTask);
+        }
+        finally
+        {
+            // 어떤 경로로 빠져나가도 배속은 반드시 정상으로 돌아온다 — 여기를 건너뛰면
+            // 전투가 느린 채로 계속된다. 피니시가 안 열렸으면 무동작.
+            await BattleFinisher.End();
+        }
 
         // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(청소부 heal/OnAfterAttack 등) 실행
         if (_afterHit != null)
@@ -872,12 +922,14 @@ public static class AttackSequence
     static UniTask HitStop(Func<UniTask> _beat)
         => _beat?.Invoke() ?? UniTask.CompletedTask;
 
-    static async UniTask LaunchProjectile(ProjectileData _proj, Transform _attacker, Transform _defender, float _duration, bool _flipOffset = false)
+    static async UniTask LaunchProjectile(ProjectileData _proj, Transform _attacker, Transform _defender,
+                                          float _duration, bool _flipOffset = false, float _timingFactor = 1f)
     {
         if (_proj.prefab == null || _attacker == null || _defender == null) return;
 
-        if (_proj.spawnDelay > 0f)
-            await UniTask.Delay((int)(_proj.spawnDelay * 1000));
+        float t_spawnDelay = _proj.spawnDelay * Mathf.Max(0f, _timingFactor);
+        if (t_spawnDelay > 0f)
+            await UniTask.Delay((int)(t_spawnDelay * 1000));
 
         Vector3 t_offset = _flipOffset ? -_proj.localOffset : _proj.localOffset;
         Vector3 t_start  = _attacker.TransformPoint(t_offset);
@@ -888,7 +940,7 @@ public static class AttackSequence
         if (t_dir != Vector3.zero)
             t_proj.transform.right = t_dir.normalized;
 
-        float t_travel = Mathf.Max(0f, _duration - _proj.spawnDelay);
+        float t_travel = Mathf.Max(0f, _duration - t_spawnDelay);
         if (t_travel > 0f)
             await t_proj.transform.DOMove(t_end, t_travel).SetEase(Ease.Linear).ToUniTask();
 

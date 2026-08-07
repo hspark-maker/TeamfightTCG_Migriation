@@ -7,6 +7,10 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "LegacySynergyEffect", menuName = "Card Battle/Synergy Effect/Legacy")]
 public class LegacySynergyEffect : SynergyEffect
 {
+    // 한 카드가 죽으며 아군을 회복시키면, RemoveDead의 같은 루프에서 hp 0으로 대기 중이던 다른 아군이
+    // 되살아나 제거를 면할 수 있다 — 즉 전멸 예측이 틀릴 수 있다.
+    public override bool CanAlterLethalOutcome => true;
+
     // 턴 종료: 소속 카드 스택 적립. TurnRunner가 OnExit 직후 인라인 발화.
     // 스택이 쌓이는 순간에도 배너를 띄운다 — 사망 회복 때만 띄우면 한 판 내내 안 보일 수 있다.
     public override void OnTurnEnded(TurnCtx _ctx)

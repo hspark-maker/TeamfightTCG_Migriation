@@ -344,6 +344,20 @@ public class BattleField : MonoBehaviour
     public CardInstance GetSlot(int _index) => this.slots[_index];
     public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;
 
+    /// <summary>슬롯을 점유한 카드 수(hp 0으로 아직 정리 전인 카드 포함 — <see cref="GetActiveCards"/>와 같은 집합).
+    /// GetActiveCards()는 부를 때마다 리스트를 새로 만든다. 개수만 필요한 판정
+    /// (전투 종료 예측의 사전 게이트 등)은 이쪽을 써서 매 공격 할당을 만들지 않는다.</summary>
+    public int ActiveCount
+    {
+        get
+        {
+            int t_count = 0;
+            for (int i = 0; i < SLOT_COUNT; i++)
+                if (this.slots[i] != null) t_count++;
+            return t_count;
+        }
+    }
+
     public List<CardInstance> GetActiveCards()
     {
         var t_result = new List<CardInstance>();

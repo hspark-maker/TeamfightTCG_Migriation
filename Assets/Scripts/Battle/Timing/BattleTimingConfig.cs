@@ -91,6 +91,47 @@ public class BattleTimingConfig : ScriptableObject
     // 시너지 엠블럼 길이는 여기 없다 — 몸짓/시너지마다 달라서 그 시너지의 연출 에셋
     // (SynergyEmblemSpec.duration, raw 초)이 쥔다. 배속은 Scaled()를 통과해 적용된다.
 
+    [Header("Approach (매치포인트 공격 과정)")]
+    // 결과 미확정 구간이므로 전역 timeScale 대신 이 공격의 이동 시간에만 배율을 적용한다.
+    [SerializeField, Range(0.2f, 1f)] float approachSlow = 0.55f;
+    [SerializeField] float approachFocusIn  = 0.22f;
+    [SerializeField] float approachFocusOut = 0.20f;
+
+    [Header("Finisher (승부를 가른 타격 강조 — 결과 확정보다 앞선다)")]
+    // 여기 시간은 **승패에 관계없이 동일**하다. 멀티는 한쪽이 승리·다른 쪽이 패배인데 길이가 갈리면
+    // 다음 Ready 동기 시점이 어긋난다 — 다르게 가져갈 것은 길이가 아니라 색감·깊이다.
+    // Result Beat과 같은 이유로 전역 배속(SpeedFactor) 미적용 raw다.
+    [SerializeField] float finishHitStop = 0.11f;   // 타격이 터진 직후 완전히 얼어붙는 시간
+    [SerializeField] float finishIn      = 0.06f;   // 슬로우·줌으로 빨려 들어가는 시간
+    // 유지 구간의 **본편은 사망 연출**이다(느려진 채로 재생된다). 이 값은 그 뒤에 남기는 여운이라
+    // 카드가 사라진 빈 클로즈업을 붙잡는 시간이기도 하다 — 길이를 늘릴 땐 여기보다 finishSlow를 먼저 본다.
+    [SerializeField] float finishHold    = 0.22f;
+    [SerializeField] float finishOut     = 0.22f;   // 배속 복귀 + 카메라 XY 복귀 시간
+    // 첫 박(얼어붙기+진입)에 확 붙은 뒤, 사망 연출이 도는 내내 **천천히 더 다가가는** 시간.
+    // 여기가 0이면 카메라가 한 번 튀고 멈춰 서서, 정작 죽는 그림 위에서는 움직이지 않는다.
+    [SerializeField] float finishCreep   = 1.4f;
+    // 사망 연출(약 0.4초)이 이 배속으로 늘어난다 — 0.25면 약 1.6초. 피니시 길이를 조절하는 **주 레버**다.
+    // 더 내리면 죽는 그림이 늘어져 "느리다"가 아니라 "멈췄다"로 읽히기 시작한다.
+    [SerializeField, Range(0.05f, 1f)] float finishSlow     = 0.25f;
+    [SerializeField, Range(0.5f, 1f)]  float finishBgmPitch = 0.82f;
+    // 배경 블러는 여기 없다 — 결정타 구간은 **선명해야** 무슨 일이 벌어졌는지 읽힌다.
+    // 흐림은 "보드에서 팝업으로 넘어가는" 장치라 Result Beat 쪽이 소유한다.
+
+    [Header("Result Beat (승패 확정 → 결과 팝업 사이의 여운)")]
+    // 이 구간의 시간값만은 **배속을 먹지 않는다**(raw 노출). 여기는 전투 연출이 아니라 결과 표시의 리듬이고,
+    // 배속을 5로 올려 빠르게 돌리는 사람에게도 승패 확정은 똑같이 한 박자 쉬어야 읽힌다.
+    [SerializeField] float resultBeatIn   = 0.08f;   // 슬로우로 빨려 들어가는 시간
+    [SerializeField] float resultBeatHold = 0.20f;   // 가장 느린 상태로 머무는 시간
+    [SerializeField] float resultBeatOut  = 0.12f;   // 정상 속도로 돌아오는 시간
+    [SerializeField, Range(0.05f, 1f)] float resultBeatSlow     = 0.25f;  // 가장 느릴 때의 Time.timeScale(1 = 슬로우 없음)
+    [SerializeField, Range(0f, 1f)]    float resultBeatBlur     = 0.45f;  // 여운 동안 차오르는 배경 블러 강도
+    [SerializeField, Range(0.5f, 1f)]  float resultBeatBgmPitch = 0.88f;  // 여운 동안 BGM이 끌리는 정도(1 = 그대로)
+    // 패배는 승리보다 약하게 — 깊이(슬로우·블러·줌)와 머무는 시간에 함께 곱한다.
+    [SerializeField, Range(0f, 1f)]    float resultBeatLoseRatio = 0.7f;
+    // 피니시가 이미 돌았으면 여운은 통째로 접고 이만큼만 쉬었다 팝업을 연다 —
+    // 슬로우를 두 번 먹이면 "결정타"가 흐려지고 결과까지 늘어진다(블러·클로즈업은 이미 올라와 있다).
+    [SerializeField] float resultBeatAfterFinish = 0.22f;
+
     [Header("Mulligan")]
     [SerializeField] float mulliganNoticeHold = 1.2f;   // "상대가 교환 중" 안내를 띄워두는 시간
 
@@ -145,6 +186,25 @@ public class BattleTimingConfig : ScriptableObject
     // 배속은 CunningExitDuration에서 이미 걸리므로 비율은 raw로 노출한다(두 번 곱하면 축소가 사라진다).
     public float CunningShrinkRatio  => cunShrinkRatio;
     public float MulliganNoticeHold  => mulliganNoticeHold  * SpeedFactor;
+    // 여운은 배속 미적용 raw 노출 — 이유는 위 Header 주석 참조.
+    public float ResultBeatIn        => Mathf.Max(0f, resultBeatIn);
+    public float ResultBeatHold      => Mathf.Max(0f, resultBeatHold);
+    public float ResultBeatOut       => Mathf.Max(0f, resultBeatOut);
+    public float ResultBeatSlow      => resultBeatSlow;
+    public float ResultBeatBlur      => resultBeatBlur;
+    public float ResultBeatBgmPitch  => resultBeatBgmPitch;
+    public float ResultBeatLoseRatio => resultBeatLoseRatio;
+    public float ResultBeatAfterFinish => Mathf.Max(0f, resultBeatAfterFinish);
+    public float ApproachDurationFactor => 1f / Mathf.Clamp(approachSlow, 0.2f, 1f);
+    public float ApproachFocusIn        => Mathf.Max(0f, approachFocusIn);
+    public float ApproachFocusOut       => Mathf.Max(0f, approachFocusOut);
+    public float FinishHitStop      => Mathf.Max(0f, finishHitStop);
+    public float FinishIn           => Mathf.Max(0f, finishIn);
+    public float FinishHold         => Mathf.Max(0f, finishHold);
+    public float FinishOut          => Mathf.Max(0f, finishOut);
+    public float FinishCreep        => Mathf.Max(0f, finishCreep);
+    public float FinishSlow         => finishSlow;
+    public float FinishBgmPitch     => finishBgmPitch;
     public float EffectNotifyDisplay => effectNotifyDisplay * SpeedFactor;
     public float EffectNotifySlide   => effectNotifySlide   * SpeedFactor;
     public float EnemyTurnStartDelay      => enemyTurnStartDelay      * SpeedFactor;

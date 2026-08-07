@@ -79,6 +79,7 @@ public class BootInstaller : MonoBehaviour
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
         // 레벨은 전투 시작 시점에 읽어야 한다(부트 때 굳히면 랭크가 올라도 난이도가 안 따라온다).
         GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, RankManager.AiCardLevel);
+        GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.

@@ -54,6 +54,8 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             ValidateLiveConsumers(t_errors);
         }
 
+        AIDeckBandValidator.CollectErrors(t_errors);
+
         return t_errors;
     }
 

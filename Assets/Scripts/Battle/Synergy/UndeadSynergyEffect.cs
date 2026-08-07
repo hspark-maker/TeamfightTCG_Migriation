@@ -7,6 +7,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "UndeadSynergyEffect", menuName = "Card Battle/Synergy Effect/Undead")]
 public class UndeadSynergyEffect : SynergyEffect
 {
+    // 부활은 사망을 취소한다 — 이 시너지가 걸린 필드는 "이 공격으로 전멸한다"를 예측할 수 없다.
+    public override bool CanAlterLethalOutcome => true;
+
     public override void OnLethal(DeathCtx _ctx)
     {
         if (_ctx.self == null) return;

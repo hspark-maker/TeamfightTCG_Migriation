@@ -259,6 +259,9 @@ public class AttackAnimTester : MonoBehaviour
                 this.hitVfx.Spawn(_attacker.transform, !t_flip);
         }
 
+        // 필드 모델이 없는 테스터에서도 매치포인트 접근 줌·국소 감속을 함께 확인한다.
+        BattleFinisher.ArmApproachPreview();
+
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
         await AttackSequence.PlaySplash(_attacker, _defender, t_effect,
             _onEffect: OnEffect, _splashView: t_splash,

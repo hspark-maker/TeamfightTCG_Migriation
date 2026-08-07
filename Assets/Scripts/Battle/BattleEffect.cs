@@ -50,4 +50,20 @@ public abstract class BattleEffect : ScriptableObject
     /// 그 호출은 AttackProcessor.RemoveDead의 슬롯 루프 안이다 — 여기서 스폰/제거를 하면
     /// 그 루프가 방금 들어온 카드를 이어서 지운다.</summary>
     public virtual void    OnBoardChanged(BoardCtx _ctx) { }
+
+    // ── 조회 (훅 아님) ────────────────────────────────────────────────────
+    // 아래 둘은 발화가 아니라 **질문**이다. <see cref="BattleOverForecast"/>가 공격 전에
+    // "이 한 방으로 판이 끝나는가"를 계산하려면 각 효과가 뭘 할지 알아야 하는데,
+    // 예측기가 그걸 직접 알아내려면 규칙을 복제해야 하고 그 순간 진실원이 둘이 된다.
+    // 값의 주인은 여전히 각 효과다 — 예측기는 물어보기만 한다.
+
+    /// <summary>이 효과가 이번 공격의 <b>치사 결과를 뒤집을 수 있는가</b>(부활, 사망 시 아군 회복 등).
+    /// true면 예측기는 계산을 포기하고 "안 끝난다"로 답한다 — 헛나오는 연출보다 안 나오는 게 낫다.
+    /// 사망을 취소하거나 죽을 카드를 살릴 수 있는 효과만 덮어쓴다.</summary>
+    public virtual bool CanAlterLethalOutcome => false;
+
+    /// <summary>이 카드가 <b>피격될 때</b> 공격자에게 되돌리는 추가 피해(가시). 0 = 없음.
+    /// 실제 적용은 <see cref="OnAttacked"/>가 한다 — 여기는 같은 값을 예측이 읽어가는 창구일 뿐이라
+    /// 두 곳이 같은 필드를 봐야 한다(숫자를 여기 새로 적지 마라).</summary>
+    public virtual int ThornDamage => 0;
 }

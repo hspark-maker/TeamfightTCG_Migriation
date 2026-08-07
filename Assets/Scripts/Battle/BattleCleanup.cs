@@ -6,6 +6,11 @@ public static class BattleCleanup
 {
     public static void Run()
     {
+        // 승패 여운이 남긴 전역 상태(배속·배경 블러·BGM 피치)부터 되돌린다. 트윈을 죽이는 것으로는 안 풀리고,
+        // 블러와 피치는 씬·매니저 수명 밖에 있어 여기서 빠뜨리면 로비가 흐리거나 끌린 채로 뜬다.
+        BattleResultBeat.Reset();
+        BattleFinisher.Disarm();
+
         DOTween.KillAll();
         ParticlePooler.Flush();
         ObjectPooler.Flush<UnityEngine.GameObject>();

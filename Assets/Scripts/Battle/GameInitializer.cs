@@ -17,6 +17,7 @@ public class GameInitializer : MonoBehaviour
 
     static System.Func<CardData, CardGrowth> s_growthProvider;
     static System.Func<CardData, CardGrowth> s_enemyGrowthProvider;
+    static System.Func<int> s_enemyTierProvider;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
@@ -34,6 +35,11 @@ public class GameInitializer : MonoBehaviour
     public static System.Func<CardData, CardGrowth> EnemyGrowthProvider
     {
         set => s_enemyGrowthProvider = value;
+    }
+
+    public static System.Func<int> EnemyTierProvider
+    {
+        set => s_enemyTierProvider = value;
     }
 
     void Awake()
@@ -127,7 +133,8 @@ public class GameInitializer : MonoBehaviour
 
         // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom(셔플 시드)을 소비하지 않으므로
         // 시드 설정(InitializeSinglePlayerFields)보다 앞에서 뽑아도 결정론에 영향이 없다.
-        DeckConfig.SetEnemyDeck(this.aiDeckConfig.GetRandomDeck());
+        int t_tier = s_enemyTierProvider != null ? s_enemyTierProvider() : 0;
+        DeckConfig.SetEnemyDeck(this.aiDeckConfig.GetDeckForTier(t_tier));
     }
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.

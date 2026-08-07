@@ -98,6 +98,11 @@ public static class AttackProcessor
         RemoveDead(_attackerField);
         RemoveDead(_defenderField);
 
+        // 이 공격이 판을 끝냈는가 — **표시 전용** 기록. 규칙도 결과도 바꾸지 않는다(진짜 승패는 TurnRunner).
+        // 여기가 유일하게 맞는 시점이다: 부활·사망 정리가 끝났고, 연출(AttackSequence)은 아직 죽는 카드를
+        // 화면에 들고 있다. 공격마다 무조건 불러 지난 판정이 다음 타격으로 새지 않게 한다.
+        BattleFinisher.Arm(_attackerField, _defenderField);
+
         // ---- 결과 조립 ----
         var t_result = MakeResult(_attacker, t_defKilled);
         t_result.damageDealt = t_actualAtkDmg; // 주 대상만(splash 합산 안 함 = v1). 트리거용

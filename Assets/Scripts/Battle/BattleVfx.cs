@@ -41,6 +41,22 @@ public static class BattleVfx
         return t_handle;
     }
 
+    /// <summary>월드 좌표에 1회 스폰하되 **방향으로 눕힌다**(항목의 alignToDirection이 켜져 있을 때만 —
+    /// PlayAttached와 같은 규약). 카드에 붙이지 않는 이유: 이 연출을 쓰는 쪽(피니시 임팩트)은
+    /// 대상이 곧 사망 연출로 사라지므로, 붙이면 이펙트가 같이 페이드된다.</summary>
+    public static VfxHandle PlayDirected(BattleVfxId _id, Vector3 _pos, int _sortingLayerId, Vector3 _direction)
+    {
+        if (!TryGetEntry(_id, out VfxEntry t_entry)) return default;
+
+        VfxHandle t_handle = Spawn(t_entry, _pos, _sortingLayerId);
+        if (t_handle.Valid && t_entry.alignToDirection && _direction.sqrMagnitude > 1e-6f)
+            t_handle.Go.transform.rotation = Quaternion.LookRotation(_direction.normalized, Vector3.back)
+                                           * Quaternion.Euler(t_entry.initialRotation);
+
+        t_handle.ReleaseAfterLifetime();
+        return t_handle;
+    }
+
     /// <summary>수명을 **호출부가 쥐는** 스폰(투사체처럼 살아 움직이는 것). 다 쓰면 Release를 불러야 한다.</summary>
     public static VfxHandle Spawn(BattleVfxId _id, Vector3 _pos, int _sortingLayerId)
     {
