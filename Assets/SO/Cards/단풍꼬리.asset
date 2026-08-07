@@ -21,7 +21,7 @@ MonoBehaviour:
   synergies: []
   fullImage: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
   portrait: {fileID: 21300000, guid: 5eba549fbbaebc04e98ab08fd21f0304, type: 3}
-  battleImage: {fileID: 21300000, guid: be8ca3718794a704083e1a32f2855238, type: 3}
+  battleImage: {fileID: 21300000, guid: 5f9e92e1dd4b27feb87b2161652ce671, type: 3}
   deckPreview: {fileID: 21300000, guid: 1834b24023ce27c43ad1ad50497b3934, type: 3}
   hpGainByLevel: 
   keywordUnlockLevel: 0

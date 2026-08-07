@@ -22,7 +22,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
   fullImage: {fileID: 21300000, guid: db4f4283e3b2fad41963570924634cf6, type: 3}
   portrait: {fileID: 21300000, guid: db4f4283e3b2fad41963570924634cf6, type: 3}
-  battleImage: {fileID: 21300000, guid: 7616501705ec9674ca031e0169b6b426, type: 3}
+  battleImage: {fileID: 21300000, guid: 7201d2979297065d1c515af04cc3beec, type: 3}
   deckPreview: {fileID: 21300000, guid: cedf9e7d3e78fc44398070d639405036, type: 3}
   hpGainByLevel: 
   keywordUnlockLevel: 0
