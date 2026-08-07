@@ -19,7 +19,22 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     readonly List<DeckEditCardTile> m_tiles = new List<DeckEditCardTile>();
 
+    GridLayoutGroup m_grid;
+
     public ScrollRect Scroll => scrollRect;
+
+    // 드래그 고스트를 타일과 같은 크기로 띄우기 위한 값. 저작 시점 값을 쓸 수 없다 —
+    // 매치 편집 패널은 GridRatioFitter가 cellSize를 컨테이너 폭에서 런타임에 다시 정한다.
+    // 그리드를 못 찾으면 zero를 주고, 호출측이 자기 폴백을 쓰게 한다.
+    public Vector2 CellSize
+    {
+        get
+        {
+            if (m_grid == null && content != null) m_grid = content.GetComponent<GridLayoutGroup>();
+
+            return m_grid != null ? m_grid.cellSize : Vector2.zero;
+        }
+    }
 
     public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {

@@ -14,10 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardAlbumConfig
   themes:
   - themeId: Theme_Nature
-    displayName: "\uC790\uC5F0"
+    displayName: "\uB369\uAD74\uC232"
     icon: {fileID: 21300000, guid: 99a3558df7b2d4451bc229734228238b, type: 3}
-    frame: {fileID: 21300000, guid: 9f5976efc00a04bbf9d3a01ac0219c63, type: 3}
+    frame: {fileID: 21300000, guid: d6bfed5702eb944e1969b6af820883e1, type: 3}
     namePlate: {fileID: 21300000, guid: 2d734a17e89824d30b1f014a9c1f5f60, type: 3}
+    cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
       amount: 1000
@@ -83,206 +84,34 @@ MonoBehaviour:
       - {fileID: 0}
       - {fileID: 0}
       - {fileID: 0}
-  - themeId: Theme_Fairytale
-    displayName: "\uB3D9\uD654"
-    icon: {fileID: 21300000, guid: 2bda18db3ac5243de9739fd8bf59c554, type: 3}
-    frame: {fileID: 21300000, guid: 7878a4afed4e6465c9785efcd828aaec, type: 3}
-    namePlate: {fileID: 21300000, guid: 6ccda849190f74a499129a46716088b3, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Movie
-    displayName: "\uC601\uD654"
-    icon: {fileID: 21300000, guid: bb3c5fa5b8da242b3ae9afc4328bfaa9, type: 3}
-    frame: {fileID: 21300000, guid: 63128e5af0cdc46bfbd4a90aac012629, type: 3}
-    namePlate: {fileID: 21300000, guid: 769ff630d5d724abbafe6154aa0ef82f, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Cooking
-    displayName: "\uC694\uB9AC"
-    icon: {fileID: 21300000, guid: b4ec795895f854ed68373255da55b91f, type: 3}
-    frame: {fileID: 21300000, guid: e628dc11848744b1c8b2cf768e50aaeb, type: 3}
-    namePlate: {fileID: 21300000, guid: 9ebb6a7a6b3654bd78584cb6dd9d12b5, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Wonder
-    displayName: "\uBD88\uAC00\uC0AC\uC758"
-    icon: {fileID: 21300000, guid: 420a044c889dd40ecad9cd456e83d5cf, type: 3}
-    frame: {fileID: 21300000, guid: bf3e36f58b7084484bf9b2cf2fb6f142, type: 3}
-    namePlate: {fileID: 21300000, guid: f696c5de5bea644b3ba78434e4939f8d, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Sculpture
-    displayName: "\uC870\uAC01\uD488"
-    icon: {fileID: 21300000, guid: 8090e6595854a4d25ab1b736861025c8, type: 3}
-    frame: {fileID: 21300000, guid: e4d4397b068a146afb97820c51a021cd, type: 3}
-    namePlate: {fileID: 21300000, guid: 9f1de124832454aaa89e2816cf5bd1e9, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Space
-    displayName: "\uC6B0\uC8FC"
-    icon: {fileID: 21300000, guid: 13acaf5eee12347d6a9f5d843dbcfe9d, type: 3}
-    frame: {fileID: 21300000, guid: 6d9eab39063214eeba16deb4498687d9, type: 3}
+  - themeId: Theme_Sea
+    displayName: "\uC18C\uC6A9\uB3CC\uC774\uD574\uC548"
+    icon: {fileID: 21300000, guid: bed32852f918045e797c7b36358b373b, type: 3}
+    frame: {fileID: 21300000, guid: 5b2f70c200f624e07a6131de2c4f0d6e, type: 3}
     namePlate: {fileID: 21300000, guid: 1b53139c9116d475ba23bccd98bd2714, type: 3}
+    cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
       amount: 1000
       icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
     pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Ocean
-    displayName: "\uBC14\uB2E4"
-    icon: {fileID: 21300000, guid: 7eb65f1958e9c4395ae9e3cebb8934ea, type: 3}
-    frame: {fileID: 21300000, guid: 63128e5af0cdc46bfbd4a90aac012629, type: 3}
-    namePlate: {fileID: 21300000, guid: 9f1de124832454aaa89e2816cf5bd1e9, type: 3}
+    - pageId: p1
+      rewards: []
+      cards: []
+  - themeId: Theme_Fire
+    displayName: "\uC544\uC9C0\uB791\uC774"
+    icon: {fileID: 21300000, guid: 55ae8aff12a604233b1adcff0634b373, type: 3}
+    frame: {fileID: 21300000, guid: 3cee3faceebf04b08946d7ad4202f081, type: 3}
+    namePlate: {fileID: 21300000, guid: 24a37202cf8a143a0bf8ca494ff3b6ec, type: 3}
+    cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
       amount: 1000
       icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
     pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-  - themeId: Theme_Festival
-    displayName: "\uCD95\uC81C"
-    icon: {fileID: 21300000, guid: 027cbee02deda4dc5a434de3acf7fc4a, type: 3}
-    frame: {fileID: 21300000, guid: 7878a4afed4e6465c9785efcd828aaec, type: 3}
-    namePlate: {fileID: 21300000, guid: 6ccda849190f74a499129a46716088b3, type: 3}
-    rewards:
-    - currency: 1
-      amount: 1000
-      icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
-    pages:
-    - pageId: P1
-      rewards:
-      - currency: 0
-        amount: 1000
-        icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-      cards:
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
-      - {fileID: 0}
+    - pageId: p1
+      rewards: []
+      cards: []
   albumRewards:
   - currency: 0
     amount: 15000

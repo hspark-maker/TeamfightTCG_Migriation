@@ -10,7 +10,6 @@ public class AlbumChestView
     [SerializeField] Button button;
     [SerializeField] Image icon;
     [SerializeField] GameObject claimedMark;
-    [SerializeField] Color lockedTint = new Color(0.55f, 0.55f, 0.55f, 1f);
     [SerializeField] float pulseScale = 1.08f;
     [SerializeField] float pulseDuration = 0.5f;
 
@@ -42,7 +41,6 @@ public class AlbumChestView
         {
             var t_sprite = _info.Rewards[0].icon;
             if (t_sprite != null) icon.sprite = t_sprite;   // null이면 목업 스프라이트 보존
-            icon.color = t_claimable ? Color.white : lockedTint;
         }
 
         if (claimedMark != null) claimedMark.SetActive(_info.State == EAlbumRewardState.Claimed);

@@ -259,7 +259,11 @@ public class DeckEditController : MonoBehaviour
     {
         if (_tile == null || dragController == null) return;
 
-        dragController.Begin(_tile.Card, _data, collectionGrid != null ? collectionGrid.Scroll : null);
+        // 고스트 크기는 그리드가 정한다 — 매치 패널은 GridRatioFitter가 cellSize를 런타임에 계산한다.
+        dragController.Begin(_tile.Card,
+                             _data,
+                             collectionGrid != null ? collectionGrid.Scroll    : null,
+                             collectionGrid != null ? collectionGrid.CellSize  : default);
     }
 
     // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.

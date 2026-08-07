@@ -6930,6 +6930,10 @@ PrefabInstance:
       propertyPath: totalHpText
       value: 
       objectReference: {fileID: 9160209663099077423}
+    - target: {fileID: 3019038460908467554, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
+      propertyPath: dragController
+      value: 
+      objectReference: {fileID: 3668802067711513282}
     - target: {fileID: 3239004785793194497, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1

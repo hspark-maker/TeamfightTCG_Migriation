@@ -31,7 +31,7 @@ MonoBehaviour:
       anchor: 1
       guideMessage: 
       unlocks: 06000000
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       duplicateRefundGold: 0
       scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
@@ -53,7 +53,7 @@ MonoBehaviour:
       anchor: 3
       guideMessage: 
       unlocks: 07000000
-      useDim: 1
+      useDim: 0
       pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
       duplicateRefundGold: 10
       scenario: {fileID: 0}
