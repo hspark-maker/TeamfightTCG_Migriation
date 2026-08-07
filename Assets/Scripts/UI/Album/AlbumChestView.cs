@@ -8,7 +8,6 @@ using UnityEngine.UI;
 public class AlbumChestView
 {
     [SerializeField] Button button;
-    [SerializeField] Image icon;
     [SerializeField] GameObject claimedMark;
     [SerializeField] float pulseScale = 1.08f;
     [SerializeField] float pulseDuration = 0.5f;
@@ -37,11 +36,7 @@ public class AlbumChestView
 
         bool t_claimable = _info.State == EAlbumRewardState.Claimable;
 
-        if (icon != null)
-        {
-            var t_sprite = _info.Rewards[0].icon;
-            if (t_sprite != null) icon.sprite = t_sprite;   // null이면 목업 스프라이트 보존
-        }
+        // 상자 그림은 프리팹 저작 그대로 둔다 — 보상 아이콘을 꽂으면 상자가 코인/보석으로 바뀐다
 
         if (claimedMark != null) claimedMark.SetActive(_info.State == EAlbumRewardState.Claimed);
 
