@@ -33,7 +33,8 @@ public class AlbumPageOverlayView : MonoBehaviour
     bool m_built;
     readonly List<AlbumCardSlotView> m_slots = new List<AlbumCardSlotView>();
 
-    // CardDetailOverlayView가 참조로 쥔다 — 인스턴스를 유지하고 Clear+재충전만 한다
+    // 상세에서 넘겨볼 목록 = 이 테마의 **소유** 카드 전체(페이지 순). 미소유를 담지 않으므로 잠김 상세로 새지 않고,
+    // 페이지 경계에서도 끊기지 않는다. CardDetailOverlayView가 참조로 쥔다 — 인스턴스를 유지하고 Clear+재충전만 한다
     readonly List<CardData> m_order = new List<CardData>();
 
     public void Open(AlbumTheme _theme)
@@ -132,7 +133,15 @@ public class AlbumPageOverlayView : MonoBehaviour
         while (m_slots.Count < t_cards.Count)
             m_slots.Add(Instantiate(slotTemplate, slotRoot));
 
-        m_order.Clear();
+        // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 페이지마다 1로 되돌아가면 번호가 자리를 못 가리킨다
+        int t_baseNumber = 0;
+        for (int t_p = 0; t_p < m_pageIndex; t_p++)
+            t_baseNumber += m_theme.Pages[t_p].Cards.Count;
+
+        // 목록은 테마 전체라 이 페이지의 첫 소유 카드가 놓인 자리부터 세어 나간다
+        int t_orderOffset = BuildOwnedOrder();
+        int t_ownedInPage = 0;
+
         for (int t_i = 0; t_i < m_slots.Count; t_i++)
         {
             var t_slot = m_slots[t_i];
@@ -143,16 +152,18 @@ public class AlbumPageOverlayView : MonoBehaviour
             }
 
             var t_card = t_cards[t_i];
+            bool t_owned = t_card != null && OwnershipManager.IsOwned(t_card);
             t_slot.gameObject.SetActive(true);
-            t_slot.Bind(t_card, t_card != null && OwnershipManager.IsOwned(t_card));
+            t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
+
+            // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
+            int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;
 
             var t_button = t_slot.Button;
             if (t_button == null) continue;
             t_button.onClick.RemoveAllListeners();
-            if (t_card == null) continue;
+            if (t_orderIndex < 0) continue;
 
-            int t_orderIndex = m_order.Count;
-            m_order.Add(t_card);
             t_button.onClick.AddListener(() => CardDetailOverlayView.Open(m_order, t_orderIndex));
         }
 
@@ -165,6 +176,30 @@ public class AlbumPageOverlayView : MonoBehaviour
         bool t_steppable = m_theme.Pages.Count > 1;
         if (prevButton != null) prevButton.interactable = t_steppable;
         if (nextButton != null) nextButton.interactable = t_steppable;
+    }
+
+    // m_order를 테마의 소유 카드로 다시 채우고, 지금 페이지의 카드들이 시작되는 자리를 돌려준다.
+    // 소유가 바뀌면 RefreshPage가 다시 돌아 목록과 배선이 같은 프레임에 함께 갱신된다.
+    int BuildOwnedOrder()
+    {
+        m_order.Clear();
+
+        int t_offset = 0;
+        for (int t_p = 0; t_p < m_theme.Pages.Count; t_p++)
+        {
+            if (t_p == m_pageIndex) t_offset = m_order.Count;
+
+            var t_cards = m_theme.Pages[t_p].Cards;
+            for (int t_i = 0; t_i < t_cards.Count; t_i++)
+            {
+                var t_card = t_cards[t_i];
+                if (t_card == null || !OwnershipManager.IsOwned(t_card)) continue;
+
+                m_order.Add(t_card);
+            }
+        }
+
+        return t_offset;
     }
 
     void Step(int _dir)

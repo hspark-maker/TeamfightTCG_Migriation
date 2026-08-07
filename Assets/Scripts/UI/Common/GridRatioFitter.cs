@@ -5,7 +5,8 @@ using UnityEngine.UI;
 // GridLayoutGroup의 cellSize를 컨테이너 크기에서 매번 다시 계산한다(GridLayoutGroup과 같은 오브젝트에 부착).
 //
 // cellSize를 픽셀로 박아두면 캔버스 해상도·부모 비율이 바뀔 때 칸이 잘리거나 여백이 벌어진다.
-// 그래서 이 컴포넌트가 고정하는 건 "열 수"와 "칸 종횡비" 둘뿐이고, 실제 픽셀은 컨테이너가 정한다.
+// 그래서 이 컴포넌트가 고정하는 건 "열 수"와 "칸 높이 정책" 둘뿐이고, 칸 폭은 언제나 컨테이너가 정한다.
+// 높이 정책은 둘 중 하나다 — 종횡비(칸이 그림일 때) 또는 고정 px(칸 내용이 텍스트라 폭 따라 커지면 안 될 때).
 // 단일진실원: 칸 크기는 여기서만 쓴다 — 인스펙터의 Cell Size 값은 이 컴포넌트가 덮어쓴다.
 //
 // artUsableRatio를 1보다 작게 주면 "그림 기준" 모드가 켜져 spacing과 좌우 padding까지 이 컴포넌트가 쓴다(아래 참고).
@@ -17,10 +18,14 @@ public class GridRatioFitter : UIBehaviour
     [Tooltip("가로 칸 수. GridLayoutGroup의 Constraint도 이 값으로 강제된다.")]
     [SerializeField] int columns = 3;
 
-    [Tooltip("칸의 가로/세로 비. 카드 원본 290x386 → 0.751")]
+    [Tooltip("칸의 가로/세로 비. 카드 원본 290x386 → 0.751\n\nCell Height가 0보다 크면 이 값은 무시된다.")]
     [SerializeField] float cellAspect = 0.751f;
 
-    [Tooltip("0보다 크면 세로도 이 행 수에 맞춰 채운다(스크롤 없는 고정 그리드). 0이면 폭만 기준으로 계산한다(스크롤 그리드).")]
+    [Tooltip("0보다 크면 칸 높이를 이 픽셀로 고정하고 Cell Aspect·Rows To Fit을 무시한다(폭은 그래도 컨테이너가 정한다).\n\n" +
+             "칸 안이 그림이 아니라 텍스트·게이지라 폭 따라 커지면 안 되는 1열 목록용. 0이면 종횡비 모드.")]
+    [SerializeField] float cellHeight;
+
+    [Tooltip("0보다 크면 세로도 이 행 수에 맞춰 채운다(스크롤 없는 고정 그리드). 0이면 폭만 기준으로 계산한다(스크롤 그리드).\n\nCell Height가 0보다 크면 이 값은 무시된다.")]
     [SerializeField] int rowsToFit;
 
     // ── 그림 기준 모드 ──────────────────────────────────────────────────
@@ -49,6 +54,8 @@ public class GridRatioFitter : UIBehaviour
     GridLayoutGroup Grid => m_grid != null ? m_grid : (m_grid = GetComponent<GridLayoutGroup>());
     RectTransform   Rect => m_rect != null ? m_rect : (m_rect = (RectTransform)transform);
 
+    bool UseFixedHeight => cellHeight > 0f;
+
     // 비율이 (1,1)이면 기존 계약(칸 크기만 쓰고 spacing·padding은 읽기만)을 그대로 지킨다.
     bool UseArtMetrics => artUsableRatio.x > 0f && artUsableRatio.y > 0f
                        && (artUsableRatio.x < 1f || artUsableRatio.y < 1f);
@@ -76,7 +83,8 @@ public class GridRatioFitter : UIBehaviour
     void Apply(bool _force)
     {
         if (Grid == null || Rect == null) return;
-        if (columns < 1 || cellAspect <= 0f) return;
+        if (columns < 1) return;
+        if (!UseFixedHeight && cellAspect <= 0f) return;
 
         var t_size = Rect.rect.size;
         if (!_force && Mathf.Approximately(t_size.x, m_lastSize.x) && Mathf.Approximately(t_size.y, m_lastSize.y))
@@ -105,10 +113,11 @@ public class GridRatioFitter : UIBehaviour
             t_w = t_availW / columns;
         }
 
-        float t_h = t_w / cellAspect;
+        float t_h = UseFixedHeight ? cellHeight : t_w / cellAspect;
 
         // 행 수가 지정된 고정 그리드는 세로도 넘치면 안 된다 — 비를 유지한 채 세로 기준으로 다시 계산한다.
-        if (rowsToFit > 0)
+        // 높이를 못 박은 모드에선 이 보정이 곧 높이를 흔드는 일이라 아예 건너뛴다.
+        if (rowsToFit > 0 && !UseFixedHeight)
         {
             float t_gapY   = UseArtMetrics ? visibleGap.y : Grid.spacing.y;
             float t_availH = t_size.y - Grid.padding.vertical - t_gapY * (rowsToFit - 1);

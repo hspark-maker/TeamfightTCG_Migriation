@@ -275,7 +275,7 @@ public static class CardAlbum
         }
 
         var t_theme = new AlbumTheme(
-            _def.themeId, _def.displayName, _def.icon, _index, NormalizeRewards(_def.rewards),
+            _def.themeId, _def.displayName, _def.icon, _def.frame, _def.namePlate, _def.cellPrefab, _index, NormalizeRewards(_def.rewards),
             t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
         s_themes.Add(t_theme);
 

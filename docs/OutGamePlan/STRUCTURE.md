@@ -897,7 +897,7 @@ sequenceDiagram
 
 ---
 
-### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **데이터 축 + UI 축 구현·배선 완료 (2026-08-06, PKG-ALBUM-DATA/UI) — Play 검증·앨범 저작(ASSET) 대기**
+### 신규 도감 = 카드 앨범 (`OutGame/Album/`) — 테마 → 페이지 → 칸, 보상 3단 — ✅ **데이터 축 + UI 축 + 앨범 저작 완료 (2026-08-06 DATA/UI, 2026-08-07 ASSET) — Play 검증 대기**
 
 > **네이밍 은유 = 스티커 앨범.** 도감(圖鑑)은 **앨범**이고, 앨범에는 **페이지**가 있고, 페이지에는 카드를 꽂는 **칸(슬롯)** 이 있다. 이 은유가 요구된 3계층에 1:1로 맞아떨어져서, 클래스 이름만 읽어도 그게 무엇인지 알 수 있다.
 > **"챕터"는 의도적으로 피했다** — 튜토리얼이 이미 `TutorialSaveData.outgameChapterIndex`로 챕터를 쓰고 있어 같은 단어가 두 도메인을 가리키게 된다.
@@ -919,8 +919,49 @@ sequenceDiagram
 | 항목 | 값 | 성격 |
 |---|---|---|
 | 페이지 1장 | **3×3 = 9칸** | 프리팹 `GridLayoutGroup` 3열 저작값. 칸 수는 `page.Cards.Count` 파생 — **코드에 `9`도 `3`도 박지 않는다** |
-| 테마 1개 | **5페이지 = 45장** | `AlbumThemeDef.pages` 리스트 길이. 향후 페이지 추가 가능이 요구사항 |
-| 도감 전체 | **90장 = 테마 2개 × 5페이지** | `CardAlbumConfig.themes` 리스트 길이 |
+| 테마 1개 | **페이지 수 자유** | `AlbumThemeDef.pages` 리스트 길이. 향후 페이지 추가 가능이 요구사항 |
+| 도감 전체 | **90장 계획**(현재 31장) | `CardAlbumConfig.themes` 리스트 길이 |
+
+**실제 저작 (2026-08-07, PKG-ALBUM-ASSET)** — 테마 **9개**. 갤러리 `Content`가 `GridLayoutGroup` 3열이고 목업 셀이 `Cell_00`~`Cell_08` 9개라, **9개가 빈 줄 없이 3×3을 채우는 수**다. 테마 이름·아이콘·순서는 그 목업 셀에서 그대로 옮겼다(자연·동화·영화·요리·불가사의·조각품·우주·바다·축제).
+
+| 테마 | 페이지 | 실카드 | 비고 |
+|---|---|---|---|
+| `Theme_Nature`(자연) | P1~P4 | **31장** 전부 | 시너지 묶음 배치. P4는 4장 + **null 5칸**(3×3 유지, 완성 모수 제외 → 4/4로 완성 가능) |
+| 나머지 8개 | P1 | 0장 | **목업** — 페이지 1장 × null 9칸. 카드가 늘면 여기로 옮겨 담는다 |
+
+**셀 비주얼은 2단이다 (2026-08-07)** — 색만 다르면 **스킨 저작**, 구조가 다르면 **프리팹 교체**.
+
+| 축 | 저작 | 쓰는 때 |
+|---|---|---|
+| 스킨 3종 | `AlbumThemeDef.icon` / `frame` / `namePlate` | 셀 구조는 같고 **색·아이콘만** 다를 때(현재 테마 9개 전부) |
+| 셀 교체 | `AlbumThemeDef.cellPrefab` (`GameObject`) | 테마마다 **셀 구조 자체**가 다를 때. 비우면 갤러리 기본 셀 |
+
+기본 셀은 `Tabs/Album/AlbumThemeCell.prefab`으로 **독립 에셋**이고 `AlbumTabController.cellTemplate`이 이걸 가리킨다. 테마 디자인을 바꾸려면 이 프리팹을 복제·수정해 그 테마의 `cellPrefab`에 꽂으면 된다 — 나머지 테마는 영향받지 않는다.
+셀마다 갈리는 비주얼은 실측 **3종뿐**(`Button_Thumb` 프레임 · `Button_Thumb/Icon/Image` 아이콘 · `Button_Thumb/Plate_Name` 이름판)이고 나머지(체크·게이지 배경·Fill·보상 아이콘)는 전부 동일해서, 지금 9테마는 프리팹 1개 + 스킨 저작으로 충분하다.
+
+> **`cellPrefab`이 `AlbumThemeCellView`가 아니라 `GameObject`인 이유** — 저작 축(`OutGame/Album/`)이 UI 축(`UI/Album/`)을 참조하면 병존 경계가 지키려는 의존 방향이 뒤집힌다. 대신 `AlbumTabController.ResolveCellPrefab`이 컴포넌트 유무를 확인하고, 없으면 **기본 셀로 떨어뜨리고 `LogError`** 한다.
+> **목업 프리팹에 색을 칠해두는 건 대안이 아니다** — `Build()`가 `galleryContent`의 자식을 전부 `Destroy`한다(템플릿이 프리팹 에셋이 된 뒤로는 `Cell_00`도 예외가 아니다). 런타임 셀은 전부 프리팹 클론이라, 저작하지 않으면 9칸이 **전부 Green 프레임**이 된다. 목업이 알록달록해 보이는 건 에디터에서뿐이다.
+> 테마 수가 이미 SO 저작값이므로, 셀 비주얼만 프리팹에 남기면 **이중 진실원**이 된다(테마 추가 시 양쪽을 손대야 하고 순서가 어긋나면 "자연 테마에 동화 프레임"이 조용히 뜬다).
+> **템플릿을 프리팹 에셋으로 바꿀 때 같이 고친 함정**: `Build()`의 `cellTemplate.gameObject.SetActive(false)`는 씬 오브젝트 전제였다 — 에셋에 그대로 걸면 **프리팹 파일이 비활성으로 저장**된다. `scene.IsValid()`로 가드한다.
+> **셀 교체는 그리드 순서를 잃는다** — `Instantiate`는 항상 맨 뒤에 붙으므로 `Refresh`가 `SetSiblingIndex(i)`로 자리를 되돌린다. 안 하면 저작을 바꾼 테마만 갤러리 끝으로 밀린다.
+
+**게이지는 전부 마스크 방식이다 (2026-08-07)** — `AlbumGaugeView`가 `fill`(Type=Filled)과 `fillRect`(마스크형) 중 **`fillRect`가 배선돼 있으면 그쪽을 쓴다**. 앨범의 게이지 **12곳 전부** `fillRect` 경로다.
+
+| 게이지 | 위치 | 스프라이트 |
+|---|---|---|
+| 앨범 전체 | `Row_TotalGauge/Gauge_Total` | `Slider_Basic01_Fill_Green` (border 2/4/6/31) |
+| 페이지 | `Panel_PageOverlay/.../Gauge_Page` | 〃 |
+| 테마 셀(실사용) | `AlbumThemeCell.prefab` | `Slider_Icon01_Fill_Orange` (border 2/5/6/42) |
+| 목업 셀 9개 | `Content/Cell_00`~`08` | `Slider_Basic01_Fill_Green` |
+
+> **고친 결함 2종**: 셀 `Fill`은 **`Sliced`인데 `fillAmount`로 채우려 해서 전혀 차오르지 않았고**(Sliced에서 `fillAmount`는 무효), 나머지 게이지는 **9-slice 스프라이트를 `Filled`로 써서 끝단이 늘어나고 있었다**. Layer Lab의 Fill 스프라이트는 사실상 전부 9-slice라 `Filled`가 애초에 맞지 않는다.
+> 해법은 키트 원본(`Slider_Icon01_Orange.prefab`)과 같은 **`FillMask`(`Mask`, `showMaskGraphic=false`) → `FillArea` → `Fill`** 계층이고, `AlbumGaugeView`가 `Fill`의 `anchorMax.x`를 비율로 조절한다. 마스크 스프라이트는 계열마다 짝이 있다(`{계열}_Fill_{색}` → `{계열}_FillMask`).
+> **`FillMask`는 `SetSiblingIndex(0)`** — `Label_Value`·`Icon_Reward`보다 뒤에 그려져야 숫자가 안 가린다. `Mask`는 자기 자식만 자르므로 형제인 라벨·아이콘은 영향받지 않는다.
+> **비율 0에서 `Fill`을 끈다** — 9-slice는 좌우 border 합(2+6px)이 최소 너비라, 폭을 0으로 줘도 조각이 남는다.
+
+> **목업 테마도 페이지를 1장은 줘야 한다** — `AlbumPageOverlayView.Open`이 `Pages.Count == 0`이면 "빈 테마"로 판정해 오버레이를 아예 열지 않는다. 셀을 눌렀는데 아무 반응이 없는 것으로 보인다.
+> **목업 테마에도 `rewards`를 저작했다** — 빈 리스트면 `AlbumChestView`가 상자를 통째로 숨겨(`SetActive(false)`) 그 셀만 레이아웃이 달라 보인다. 영구 미완성이라 지급은 열리지 않는다.
+> **감수한 로그**: 목업 테마는 실카드 0장이라 `ValidateAlbum`이 "카드 0장 페이지" 경고 8건을 낸다. 저작이 채워지면 자연 소멸한다.
 
 > 세 값 **전부 SO 저작값**이라 코드 변경 없이 바뀐다. 테마마다 페이지 수가 달라도 된다(리스트 길이가 곧 페이지 수).
 > 현재 31장이므로 **첫 저작은 페이지가 부분적으로 빈다** — 빈 칸은 `null` 슬롯이 되고, `CardAlbum`이 완성 판정 모수에서 제외하므로 "9칸 중 4장만 저작된 페이지"는 `4/4`로 완성 가능하다(아래 함정 절 참조). 카드가 채워지는 대로 저작을 늘리면 그 페이지가 다시 미완성으로 내려가는데, 수령 낙인은 `Claimed` 최우선 판정이라 재지급되지 않는다.
@@ -931,7 +972,7 @@ sequenceDiagram
 flowchart TD
     subgraph AUTH["저작 (에디터)"]
         CFG["CardAlbumConfig (SO)<br/>앨범 저작 1장<br/>themes[] · albumReward"]:::new
-        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName · icon<br/>rewards[] · pages[]"]:::new
+        TDEF["AlbumThemeDef<br/>테마 저작 항목<br/>themeId · displayName<br/>스킨: icon · frame · namePlate<br/>cellPrefab(선택 · 셀 통째 교체)<br/>rewards[] · pages[]"]:::new
         PDEF["AlbumPageDef<br/>페이지 저작 항목<br/>pageId · rewards[] · cards[]"]:::new
         RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
     end
@@ -947,7 +988,7 @@ flowchart TD
     end
     subgraph UI["UI (UI/Album/ · 실측 6파일 — 그리드·스테퍼는 오버레이에 흡수)"]
         TAB["AlbumTabController<br/>Tab_Collection_New 루트<br/>앨범 게이지·보상 + 갤러리 빌드"]:::new
-        TBTN["AlbumThemeCellView<br/>테마 셀 1개(Cell_00 템플릿)<br/>아이콘·이름·n/N·상자·✓"]:::new
+        TBTN["AlbumThemeCellView<br/>테마 셀 1개(AlbumThemeCell.prefab)<br/>아이콘·프레임·이름판·n/N·상자·✓"]:::new
         PANEL["AlbumPageOverlayView<br/>페이지 오버레이 + ◀ n/N ▶ 스테퍼<br/>(Tab_Collection_New 내부)"]:::new
         SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>미소유 회색 + 이름 유지"]:::new
         BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new

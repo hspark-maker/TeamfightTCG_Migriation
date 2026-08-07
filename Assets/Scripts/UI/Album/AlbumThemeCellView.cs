@@ -8,6 +8,8 @@ public class AlbumThemeCellView : MonoBehaviour
 {
     [SerializeField] Button thumbButton;
     [SerializeField] Image thumbIcon;
+    [SerializeField] Image thumbFrame;
+    [SerializeField] Image namePlate;
     [SerializeField] TMP_Text nameLabel;
     [SerializeField] GameObject progressRow;
     [SerializeField] AlbumGaugeView gauge = new AlbumGaugeView();
@@ -20,7 +22,10 @@ public class AlbumThemeCellView : MonoBehaviour
     {
         m_theme = _theme;
 
+        // 셀은 Cell_00 클론이라 저작이 없으면 9칸이 전부 같은 스킨이 된다 — null은 목업 보존이 아니라 "템플릿 색 그대로"
         if (thumbIcon != null && _theme.Icon != null) thumbIcon.sprite = _theme.Icon;
+        if (thumbFrame != null && _theme.Frame != null) thumbFrame.sprite = _theme.Frame;
+        if (namePlate != null && _theme.NamePlate != null) namePlate.sprite = _theme.NamePlate;
         if (nameLabel != null) nameLabel.text = _theme.DisplayName;
 
         var t_info = AlbumRewardManager.GetThemeInfo(_theme);
