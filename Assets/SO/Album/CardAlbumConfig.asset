@@ -15,9 +15,9 @@ MonoBehaviour:
   themes:
   - themeId: Theme_Nature
     displayName: "\uB369\uAD74\uC232"
-    icon: {fileID: 21300000, guid: 99a3558df7b2d4451bc229734228238b, type: 3}
-    frame: {fileID: 21300000, guid: d6bfed5702eb944e1969b6af820883e1, type: 3}
-    namePlate: {fileID: 21300000, guid: 2d734a17e89824d30b1f014a9c1f5f60, type: 3}
+    icon: {fileID: 0}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
@@ -87,8 +87,8 @@ MonoBehaviour:
   - themeId: Theme_Sea
     displayName: "\uC18C\uC6A9\uB3CC\uC774\uD574\uC548"
     icon: {fileID: 21300000, guid: bed32852f918045e797c7b36358b373b, type: 3}
-    frame: {fileID: 21300000, guid: 5b2f70c200f624e07a6131de2c4f0d6e, type: 3}
-    namePlate: {fileID: 21300000, guid: 1b53139c9116d475ba23bccd98bd2714, type: 3}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
@@ -101,8 +101,8 @@ MonoBehaviour:
   - themeId: Theme_Fire
     displayName: "\uC544\uC9C0\uB791\uC774"
     icon: {fileID: 21300000, guid: 55ae8aff12a604233b1adcff0634b373, type: 3}
-    frame: {fileID: 21300000, guid: 3cee3faceebf04b08946d7ad4202f081, type: 3}
-    namePlate: {fileID: 21300000, guid: 24a37202cf8a143a0bf8ca494ff3b6ec, type: 3}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
