@@ -228,7 +228,11 @@ public class DeckEditController : MonoBehaviour
         if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
 
         if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
+
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
+        // 배선이 프리팹 인스턴스 오버라이드로만 존재한다(DragLayer가 이 프리팹 밖에 있다) — Revert 한 번에 조용히 사라진다.
+        // 여기서 알리지 않으면 "롱프레스해도 아무 일 없음"으로만 드러난다. 패널을 열 때 한 번만 찍힌다.
+        else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
 
         RefreshAll();
     }
@@ -259,7 +263,11 @@ public class DeckEditController : MonoBehaviour
     {
         if (_tile == null || dragController == null) return;
 
-        dragController.Begin(_tile.Card, _data, collectionGrid != null ? collectionGrid.Scroll : null);
+        // 고스트 크기는 그리드가 정한다 — 매치 패널은 GridRatioFitter가 cellSize를 런타임에 계산한다.
+        dragController.Begin(_tile.Card,
+                             _data,
+                             collectionGrid != null ? collectionGrid.Scroll    : null,
+                             collectionGrid != null ? collectionGrid.CellSize  : default);
     }
 
     // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.

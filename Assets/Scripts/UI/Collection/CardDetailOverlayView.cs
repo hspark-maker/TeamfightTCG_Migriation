@@ -29,6 +29,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
     [SerializeField] TMP_Text       powerValueText;  // 체력 수치(프리팹 목업의 "파워" 행을 체력으로 쓴다)
+    [Tooltip("상세 목록 스크롤. 카드를 넘길 때 맨 위로 되감는다. 미배선이면 되감기만 없다.")]
+    [SerializeField] ScrollRect     detailScroll;
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
     [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
@@ -55,6 +57,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] GameObject synergySection;
     [SerializeField] Transform  synergyChipRoot;
     [SerializeField] TMP_Text   synergyDescText;
+
+    [Header("설명 섹션")]
+    [Tooltip("카드 설명(CardData.cardExplain) 한 문단. 미배선이면 설명 없이 지금까지와 동일하게 동작한다.")]
+    [SerializeField] TMP_Text descriptionText;
 
     [Header("공용")]
     // 키워드/시너지 칩 공용 프리팹. 인게임 정보창의 설명 행과 같은 컴포넌트를 쓰되,
@@ -502,6 +508,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         BuildKeywordSection(_card, t_owned);
         BuildSynergySection(_card, t_owned);
+        ApplyDescription(_card, t_owned);
+        RewindScroll();
 
         RefreshGrowth(_card, t_owned);
     }
@@ -763,10 +771,36 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
     }
 
-    // 비어 있어도 섹션을 끄지 않는다 — 끄면 DetailPanel의 높이가 줄고, 루트 VerticalLayoutGroup에서
-    // 남는 높이를 통째로 받는 것이 CardArea(flexibleHeight=1)라 **카드 그림의 크기와 위치가 카드마다 달라진다**.
-    // 넘길 때마다 카드가 튀어 보이므로, 빈 섹션은 자리를 지킨 채 "없음"(미소유는 ???)만 적는다.
-    // 그래도 설명 줄 수만큼은 흔들리므로 높이 고정의 정본은 프리팹의 DetailFrame LayoutElement.preferredHeight다.
+    // 카드가 바뀌면 읽던 자리도 같이 바뀐다 — 되감지 않으면 새 카드가 설명 중간부터 펼쳐진 채 들어온다.
+    // verticalNormalizedPosition이 아니라 좌표를 직접 0으로 두는 이유: 내용이 뷰포트보다 짧을 때
+    // 그쪽 계산은 음수 길이로 한 번 어긋난 자리를 잡았다가 탄성으로 되돌아와, 넘길 때마다 패널이 튄다.
+    void RewindScroll()
+    {
+        if (this.detailScroll == null || this.detailScroll.content == null) return;
+
+        this.detailScroll.StopMovement();
+
+        // Content는 위에 매달려 있다(pivot y=1, 상단 앵커) → y=0이 곧 맨 위다.
+        Vector2 t_pos = this.detailScroll.content.anchoredPosition;
+        this.detailScroll.content.anchoredPosition = new Vector2(t_pos.x, 0f);
+    }
+
+    // 카드 설명 한 문단. 마스터 데이터 한 줄이라 칩도 재생성도 없고, 빈값 규약(없음/???)만 다른 섹션과 맞춘다.
+    void ApplyDescription(CardData _card, bool _owned)
+    {
+        if (this.descriptionText == null) return;
+
+        string t_text = _owned && _card != null ? _card.cardExplain : null;
+
+        this.descriptionText.text = !string.IsNullOrEmpty(t_text) ? t_text
+                                  : _owned                        ? NoneValue
+                                                                  : LockedName;
+    }
+
+    // 비어 있어도 섹션을 끄지 않는다 — 스크롤 안에서 섹션이 통째로 사라지면 카드를 넘길 때마다 목록이
+    // 들쭉날쭉해 어디를 읽던 중이었는지 잃는다. 빈 섹션은 자리를 지킨 채 "없음"(미소유는 ???)만 적는다.
+    // 패널 자체의 높이는 프리팹 DetailFrame의 LayoutElement.preferredHeight가 고정하므로,
+    // 안쪽 줄 수가 얼마든 카드 그림의 크기·위치는 카드마다 흔들리지 않는다.
     static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned)
     {
         if (_desc != null)
