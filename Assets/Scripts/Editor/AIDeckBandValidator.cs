@@ -112,6 +112,8 @@ public static class AIDeckBandValidator
             if (t_count != DeckSaveManager.DECK_SIZE)
                 _errors.Add($"AI 덱 '{t_name}' 카드 수 {t_count} ≠ {DeckSaveManager.DECK_SIZE}");
             if (t_entry == null) continue;
+            if (t_entry.cards != null && t_entry.cards.Exists(_card => _card == null))
+                _errors.Add($"AI 덱 '{t_name}'에 null 카드가 있습니다.");
             if (t_entry.fromTier < 0 || t_entry.fromTier >= _rank.TierCount)
             {
                 _errors.Add($"AI 덱 '{t_name}' 시작 티어 {t_entry.fromTier}가 유효 범위를 벗어났습니다.");
@@ -141,14 +143,17 @@ public static class AIDeckBandValidator
             t_firstSynergyTier = t_tier;
             break;
         }
-        if (t_firstSynergyTier < 0 || _config.decks == null) return;
+        if (t_firstSynergyTier < 0) return;
 
-        foreach (AIDeckConfig.DeckEntry t_entry in _config.decks)
+        var t_warned = new HashSet<AIDeckConfig.DeckEntry>();
+        for (int t_tier = t_firstSynergyTier; t_tier <= t_firstSynergyTier + 1 && t_tier < _rank.TierCount; t_tier++)
         {
-            if (t_entry == null || t_entry.fromTier < t_firstSynergyTier || t_entry.fromTier > t_firstSynergyTier + 1) continue;
-            int t_synergyCount = SynergyResolver.Resolve(t_entry.cards).Active.Count;
-            if (t_synergyCount != 1)
+            foreach (AIDeckConfig.DeckEntry t_entry in CandidatesAt(_config, t_tier))
+            {
+                int t_synergyCount = SynergyResolver.Resolve(t_entry.cards).Active.Count;
+                if (t_synergyCount == 1 || !t_warned.Add(t_entry)) continue;
                 _warnings.Add($"시너지 입문 구간 덱 '{t_entry.deckName}'의 성립 시너지가 {t_synergyCount}개입니다(권장 1개).");
+            }
         }
     }
 
@@ -170,6 +175,7 @@ public static class AIDeckBandValidator
         if (_config.decks == null) return t_candidates;
         foreach (AIDeckConfig.DeckEntry t_entry in _config.decks)
             if (t_entry != null && t_entry.cards != null && t_entry.cards.Count == DeckSaveManager.DECK_SIZE
+                && !t_entry.cards.Exists(_card => _card == null)
                 && t_entry.fromTier <= _tier && _tier <= t_entry.ToTierOrMax)
                 t_candidates.Add(t_entry);
         return t_candidates;

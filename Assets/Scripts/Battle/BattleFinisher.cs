@@ -67,8 +67,8 @@ public static class BattleFinisher
         if (!t_armed || _attacker == null || _defender == null) return false;
 
         s_approachActive = true;
-        Vector3 t_focus = Vector3.Lerp(_attacker.transform.position, _defender.transform.position, 0.5f);
-        BattleCamera.ApproachFocus(t_focus, GameTiming.Battle.ApproachFocusIn);
+        // 좌표가 아니라 카드를 넘긴다 — 접근 중 공격자는 윈드업·돌진으로 계속 움직인다.
+        BattleCamera.ApproachFocus(_attacker.transform, _defender.transform, GameTiming.Battle.ApproachFocusIn);
         return true;
     }
 
@@ -146,17 +146,24 @@ public static class BattleFinisher
         bool t_defVictim = IsVictim(_defender, _defenderKilled, t_loser);
         bool t_splVictim = IsVictim(_splash,   _splashKilled,   t_loser);
 
-        Vector3 t_focus = Vector3.zero;
-        int     t_count = 0;
-        if (t_atkVictim) { t_focus += _attacker.transform.position; t_count++; }
-        if (t_defVictim) { t_focus += _defender.transform.position; t_count++; }
-        if (t_splVictim) { t_focus += _splash.transform.position;   t_count++; }
+        // 카메라가 **따라갈** 카드. 좌표를 찍어두지 않는 이유 — 죽는 카드는 그 자리에 서 있지 않다.
+        // 특히 반격사에서 죽는 쪽은 공격자이고, 그 카드는 돌진 지점에서 제 슬롯으로 밀려 돌아가는 중이라
+        // 좌표로 잡으면 카메라가 충돌 지점에 굳어 "맞은 카드를 비추는" 그림이 된다.
+        // 공격자와 방어자는 서로 다른 필드라 한 편에서 죽는 카드는 최대 둘(주 대상 + 광역)이다.
+        Transform t_victimA = t_atkVictim ? _attacker.transform
+                            : t_defVictim ? _defender.transform
+                            : t_splVictim ? _splash.transform : null;
+        Transform t_victimB = t_atkVictim ? null
+                            : (t_defVictim && t_splVictim) ? _splash.transform : null;
 
         // 이번 타격으로 쓰러진 카드가 패자 편에 없다 = 전멸을 만든 게 이 타격이 아니다(교활 퇴장 등).
         // 강조할 그림이 없으므로 조용히 접고 기존 결과 여운에 맡긴다.
-        if (t_count == 0) return false;
+        if (t_victimA == null) return false;
 
-        t_focus /= t_count;   // 여럿이면 평균 = 두 카드를 함께 담는 와이드 초점
+        // 임팩트 VFX·방향은 그 순간의 좌표로 한 번만 찍는다(터지고 사라지는 연출이라 추적이 필요 없다).
+        Vector3 t_focus = t_victimB != null
+            ? Vector3.Lerp(t_victimA.position, t_victimB.position, 0.5f)
+            : t_victimA.position;
 
         // 때린 쪽 = 죽는 게 공격자면 방어자(반격), 아니면 공격자. 방향이 여기서 갈린다.
         CardView t_source = t_atkVictim ? _defender : _attacker;
@@ -169,7 +176,7 @@ public static class BattleFinisher
         try
         {
             // 카메라는 얼어붙는 순간에 확 붙고(얼어붙기+진입), 그 뒤 사망 연출이 도는 내내 천천히 더 다가간다.
-            BattleCamera.FinishFocus(t_focus, t_cfg.FinishHitStop + t_cfg.FinishIn, t_cfg.FinishCreep);
+            BattleCamera.FinishFocus(t_victimA, t_victimB, t_cfg.FinishHitStop + t_cfg.FinishIn, t_cfg.FinishCreep);
             PlayImpactVfx(_attacker, _defender, _splash, t_atkVictim, t_defVictim, t_splVictim, t_focus, t_dir);
             BattleCamera.Shake(1f);
 

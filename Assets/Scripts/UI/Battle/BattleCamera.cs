@@ -54,9 +54,18 @@ public class BattleCamera : MonoBehaviour
     // 화면에 찍히는 XY = home + focus + shake. 매 프레임 이 합을 **절대 좌표로 다시 쓴다** —
     // 오프셋을 더했다 빼는 방식이면 두 연출이 겹칠 때 서로의 복귀점을 오염시킨다.
     Vector2 homeXY;        // 씬 배치 기준 XY. 연출이 끝나면 언제나 여기로 수렴한다
-    Vector2 focusOffset;   // 피니시 클로즈업이 미는 XY. 트윈이 이 값을 몰고, 화면 반영은 LateUpdate가 한다
+    Vector2 focusOffset;   // 지금 화면에 적용 중인 XY 밀기. LateUpdate가 매 프레임 다시 계산한다
     bool    focusActive;   // 오프셋이 0이 아니거나 복귀 중 — LateUpdate가 XY를 계속 쓸지 판단하는 기준
-    Tween   focusTween;
+    Tween   focusTween;    // focusWeight를 모는 트윈(오프셋을 직접 몰지 않는다)
+
+    // 줌 대상은 **좌표가 아니라 카드**다. 결정타를 맞고 죽는 카드는 그 자리에 서 있지 않다 —
+    // 반격사면 공격자가 돌진 지점에서 제 슬롯으로 밀려 돌아가는 중이고, 좌표를 한 번만 찍어두면
+    // 카메라는 카드가 떠난 자리(=상대 카드 근처)를 비춘다. 그래서 매 프레임 다시 읽는다.
+    Transform focusA;      // 따라갈 카드. 둘 다 null이면 focusAnchor 고정 좌표를 쓴다
+    Transform focusB;      // 둘이면 중점(공격자·방어자 와이드 / 주 대상·광역 동시 처치)
+    Vector2   focusAnchor; // 따라갈 대상이 없을 때의 목표. 복귀 시작 시점의 좌표를 여기 굳힌다
+    float     focusRatio;  // 이번 연출의 추적 비율(접근은 얕게, 피니시는 깊게)
+    float     focusWeight; // 0 = 기준 위치, 1 = 목표까지 완전히 이동
 
     float shakeLeft;      // 남은 시간(0 = 흔들림 없음)
     float shakeTotal;     // 이번 흔들림의 전체 시간(감쇠 계산 기준)
@@ -102,6 +111,9 @@ public class BattleCamera : MonoBehaviour
         transform.DOKill();
         this.focusTween?.Kill();
         this.focusTween  = null;
+        this.focusA      = null;
+        this.focusB      = null;
+        this.focusWeight = 0f;
         this.focusOffset = Vector2.zero;
         this.focusActive = false;
         WriteXY(Vector2.zero);
@@ -150,6 +162,8 @@ public class BattleCamera : MonoBehaviour
         bool t_shaking = this.shakeLeft > 0f;
         if (!t_shaking && !this.focusActive) return;
 
+        if (this.focusActive) this.focusOffset = ComputeFocusOffset();
+
         Vector2 t_shake = Vector2.zero;
         if (t_shaking)
         {
@@ -172,6 +186,19 @@ public class BattleCamera : MonoBehaviour
 
         WriteXY(t_shake);
     }
+
+    // 지금 따라갈 목표(카드 위치 / 없으면 굳혀둔 좌표)에서 이번 프레임의 XY 밀기를 낸다.
+    Vector2 CurrentFocusTarget()
+    {
+        Vector2 t_sum = Vector2.zero;
+        int     t_n   = 0;
+        if (this.focusA != null) { t_sum += (Vector2)this.focusA.position; t_n++; }
+        if (this.focusB != null) { t_sum += (Vector2)this.focusB.position; t_n++; }
+        return t_n > 0 ? t_sum / t_n : this.focusAnchor;
+    }
+
+    Vector2 ComputeFocusOffset()
+        => (CurrentFocusTarget() - this.homeXY) * this.focusRatio * this.focusWeight;
 
     // 화면에 찍히는 XY = home + focus + shake. z는 건드리지 않는다(fit·시네마 소유).
     void WriteXY(Vector2 _shake)
@@ -289,63 +316,84 @@ public class BattleCamera : MonoBehaviour
     // 한 번에 다 붙이면 카메라가 튀고 멈춰 서서, 정작 죽는 그림 위에서는 아무것도 움직이지 않는다.
     const float FinishPunchRatio = 0.8f;
 
-    /// <summary>공격자·방어자 중점으로 들어가는 얕은 와이드 줌.
-    /// 실제 결정타가 나면 FinishFocus가 현재 오프셋과 z에서 이어받는다.</summary>
-    public static void ApproachFocus(Vector3 _worldPos, float _duration)
-        => Instance?.ApplyApproachFocus(_worldPos, _duration);
+    /// <summary>공격자·방어자 <b>중점을 따라가는</b> 얕은 와이드 줌. 둘 다 연출 중에 움직이므로
+    /// 좌표가 아니라 트랜스폼을 받는다. 실제 결정타가 나면 FinishFocus가 현재 상태에서 이어받는다.</summary>
+    public static void ApproachFocus(Transform _attacker, Transform _defender, float _duration)
+        => Instance?.ApplyApproachFocus(_attacker, _defender, _duration);
 
-    void ApplyApproachFocus(Vector3 _worldPos, float _duration)
+    void ApplyApproachFocus(Transform _attacker, Transform _defender, float _duration)
     {
         if (this.cam == null) return;
 
         InCinema = true;
-        Vector2 t_target = (new Vector2(_worldPos.x, _worldPos.y) - this.homeXY) * this.approachFollowXY;
-        float t_z = ZoomInZ(this.approachZMoveRatio);
+        BeginFocus(_attacker, _defender, this.approachFollowXY);
+
         float t_duration = Mathf.Max(0.01f, _duration);
 
-        this.focusActive = true;
         this.focusTween?.Kill();
-        this.focusTween = DOTween.To(() => this.focusOffset, _v => this.focusOffset = _v,
-                                     t_target, t_duration)
-            .SetEase(Ease.InOutSine)
-            .SetUpdate(true)
-            .SetLink(gameObject);
+        this.focusTween = TweenFocusWeight(1f, t_duration, Ease.InOutSine);
 
         transform.DOKill();
-        transform.DOMoveZ(t_z, t_duration)
+        transform.DOMoveZ(ZoomInZ(this.approachZMoveRatio), t_duration)
             .SetEase(Ease.InOutSine)
             .SetUpdate(true)
             .SetLink(gameObject);
     }
 
-    /// <summary>승부를 가른 타격 지점으로 밀고 들어가는 클로즈업. XY(타격 지점 추적)와 z(당기기)를 함께 쓴다.
-    /// <paramref name="_worldPos"/>는 죽는 카드(들)의 월드 좌표.
+    // 추적 대상 교체. 진행 중인 밀기(focusWeight)는 그대로 두고 목표만 바꾼다 —
+    // 접근 줌에서 피니시 줌으로 넘어갈 때 카메라가 튀지 않게.
+    void BeginFocus(Transform _a, Transform _b, float _ratio)
+    {
+        this.focusActive = true;
+        this.focusA      = _a;
+        this.focusB      = _b;
+        this.focusRatio  = _ratio;
+        if (_a == null && _b == null) this.focusAnchor = this.homeXY;   // 대상이 없으면 밀지 않는다
+    }
+
+    Tween TweenFocusWeight(float _to, float _duration, Ease _ease)
+        => DOTween.To(() => this.focusWeight, _v => this.focusWeight = _v, _to, Mathf.Max(0.01f, _duration))
+            .SetEase(_ease)
+            .SetUpdate(true)
+            .SetLink(gameObject);
+
+    /// <summary>승부를 가른 <b>죽는 카드를 따라가는</b> 클로즈업. XY 추적과 z 당기기를 함께 쓴다.
+    /// <paramref name="_victimA"/>/<paramref name="_victimB"/>는 이번 타격에 쓰러지는 카드(둘이면 중점).
     /// <paramref name="_punch"/>에 80%까지 확 붙고, <paramref name="_creep"/>에 걸쳐 나머지가 천천히 붙는다.
+    ///
+    /// <para>좌표가 아니라 트랜스폼인 이유 — 반격사에서 죽는 쪽은 <b>공격자</b>이고, 그 카드는
+    /// 돌진 지점에서 제 슬롯으로 밀려 돌아가는 중이다. 좌표를 한 번만 찍으면 카메라가 충돌 지점에
+    /// 굳어 "맞은 카드를 비추는" 그림이 된다.</para>
     ///
     /// **기다리지 않는다(void).** 연출 길이는 BattleFinisher가 소유한다. 트윈은 unscaled —
     /// 이 연출은 Time.timeScale을 깊게 낮춘 상태에서 돌므로, scaled로 두면 줌이 기어간다.
     /// 되돌리는 건 <see cref="RestoreFromFinish"/> 하나. 안 부르면 카메라가 클로즈업 상태로 굳는다.</summary>
-    public static void FinishFocus(Vector3 _worldPos, float _punch, float _creep)
-        => Instance?.ApplyFinishFocus(_worldPos, _punch, _creep);
+    public static void FinishFocus(Transform _victimA, Transform _victimB, float _punch, float _creep)
+        => Instance?.ApplyFinishFocus(_victimA, _victimB, _punch, _creep);
 
-    void ApplyFinishFocus(Vector3 _worldPos, float _punch, float _creep)
+    void ApplyFinishFocus(Transform _victimA, Transform _victimB, float _punch, float _creep)
     {
         if (this.cam == null) return;
 
         InCinema = true;   // fit이 z를 덮지 않게(시네마와 같은 축을 쓴다)
 
-        Vector2 t_target = (new Vector2(_worldPos.x, _worldPos.y) - this.homeXY) * this.finishFollowXY;
-        float   t_z      = ZoomInZ(this.finishZMoveRatio);
-        float   t_punch  = Mathf.Max(0.01f, _punch);
-        float   t_creep  = Mathf.Max(0.01f, _creep);
+        // 접근 줌에서 넘어온 경우 focusWeight는 이미 1 근처다 — 대상만 죽는 카드로 갈아타고
+        // 비율(얕게 → 깊게)이 올라가면서 자연스럽게 더 파고든다.
+        BeginFocus(_victimA, _victimB, this.finishFollowXY);
 
-        this.focusActive = true;
+        float t_z     = ZoomInZ(this.finishZMoveRatio);
+        float t_punch = Mathf.Max(0.01f, _punch);
+        float t_creep = Mathf.Max(0.01f, _creep);
+
+        // focusWeight는 **리셋하지 않는다** — 0으로 되돌리면 접근 줌이 붙어 있던 화면이 기준 위치로
+        // 한 번 튕겼다 다시 들어온다. 접근에서 이어받으면 실효 밀기는 0.5 → 0.74 → 0.92로 계속 안쪽이다
+        // (비율이 0.5에서 0.92로 올라가므로 weight가 1 → 0.8로 내려가도 화면은 파고든다).
         this.focusTween?.Kill();
         this.focusTween = DOTween.Sequence()
-            .Append(DOTween.To(() => this.focusOffset, _v => this.focusOffset = _v,
-                               t_target * FinishPunchRatio, t_punch).SetEase(Ease.OutCubic))
-            .Append(DOTween.To(() => this.focusOffset, _v => this.focusOffset = _v,
-                               t_target, t_creep).SetEase(Ease.InOutSine))
+            .Append(DOTween.To(() => this.focusWeight, _v => this.focusWeight = _v,
+                               FinishPunchRatio, t_punch).SetEase(Ease.OutCubic))
+            .Append(DOTween.To(() => this.focusWeight, _v => this.focusWeight = _v,
+                               1f, t_creep).SetEase(Ease.InOutSine))
             .SetUpdate(true)
             .SetLink(gameObject);
 
@@ -382,12 +430,14 @@ public class BattleCamera : MonoBehaviour
     {
         if (this.cam == null || !this.focusActive) return;
 
+        // 추적을 먼저 끊고 마지막 목표를 좌표로 굳힌다 — 물러나는 동안에도 카드를 계속 따라가면
+        // 죽어서 사라지거나(파괴) 다음 카드에 재바인딩된 View를 쫓아 카메라가 엉뚱한 데로 끌려간다.
+        this.focusAnchor = CurrentFocusTarget();
+        this.focusA      = null;
+        this.focusB      = null;
+
         this.focusTween?.Kill();
-        this.focusTween = DOTween.To(() => this.focusOffset, _v => this.focusOffset = _v, Vector2.zero,
-                                     Mathf.Max(0.01f, _duration))
-            .SetEase(Ease.InOutSine)
-            .SetUpdate(true)
-            .SetLink(gameObject)
+        this.focusTween = TweenFocusWeight(0f, _duration, Ease.InOutSine)
             .OnComplete(() => this.focusActive = false);
     }
 

@@ -198,7 +198,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
     - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
     fromTier: 6
-    toTier: 8
+    toTier: 6
     weight: 1
   - deckName: "예리"
     cards:
@@ -209,7 +209,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
     - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
     fromTier: 6
-    toTier: 8
+    toTier: 6
     weight: 1
   - deckName: "비늘 입문"
     cards:
