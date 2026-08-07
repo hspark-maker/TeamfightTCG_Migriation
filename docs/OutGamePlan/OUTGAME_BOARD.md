@@ -257,7 +257,8 @@
 > 설계 승인 완료 — DATA부터 착수. `Tab_Collection.prefab`·`Boot.prefab` 선점 여부는 아래 격리 판정 표 참조.
 > 설계·구조도·함정의 진실원은 [`STRUCTURE.md`의 "신규 도감 = 카드 앨범" 절](./STRUCTURE.md). 도메인 문자는 **아직 미부여**(로드맵 편입은 별도).
 
-**저작 스케일(사용자 확정)**: 카드 **계획 90장**(현재 31장) = **테마 2개 × 5페이지 × 9칸**. 세 값 전부 SO 저작값이라 코드 변경 없이 늘어난다(향후 페이지 추가가 요구사항).
+**저작 스케일**: 카드 **계획 90장**(현재 31장), 페이지 = **9칸(3×3)**. 세 값 전부 SO 저작값이라 코드 변경 없이 늘어난다(향후 페이지 추가가 요구사항).
+**실제 저작(2026-08-07, ASSET)**: **테마 9개** — 갤러리 그리드가 3열 × 3행이라 셀 9칸을 채우는 수. 이름·아이콘·순서는 `Tab_Collection_New` 목업 셀(`Cell_00`~`Cell_08`)에서 그대로 가져왔다. 실카드 31장은 **첫 테마 `Theme_Nature`(자연)에 전부** 몰고(4페이지 = 9/9/9/4+null 5), 나머지 8테마는 **카드 없는 목업**(페이지 1장 × null 9칸)이다.
 
 **네이밍**: `Album` 접두어로 폴더째 물리 분리(`OutGame/Album/` · `UI/Album/`). `Collection`은 구 도감이 점유했고, `Chapter`는 튜토리얼이 점유(`outgameChapterIndex`)해서 둘 다 피했다. 구/신이 같은 폴더에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
 
@@ -265,7 +266,7 @@
 |---|---|---|---|---|---|---|---|
 | **PKG-ALBUM-DATA** | 🔴 | 앨범 데이터 축 + 두 창구 | **`CardAlbum` 창구 동결** + **`AlbumRewardManager` 창구 동결** + `CardAlbumConfig` 스키마(`AlbumThemeDef`/`AlbumPageDef`/`AlbumRewardDef`) + 값 타입(`AlbumTheme`/`AlbumPage`/`AlbumRewardInfo`/`EAlbumRewardTier`/`EAlbumRewardState`) + 세이브 슬롯 `UserSaveData.albumReward`(`AlbumRewardSaveData { VERSION, version, List<string> claimedKeys }`, **VERSION 1 유지**) | 신규 `OutGame/Album/`(6) + `OutGame/Save/2.Domain/AlbumRewardSaveData.cs` / 수정 `Save/2.Domain/UserSaveData.cs`(1줄) · `Core/BootInstaller.cs`(2줄) · `OutGame/Collection/CollectionThemeConfig.cs`(`CreateAssetMenu` 봉인 1줄) + `Boot.prefab` 배선 | — | outgame-engineer | ✅ 완료(2026-08-06, 검수 통과·컴파일 0에러). `Boot.prefab` 배선은 ASSET 때 사용자 인계 |
 | **PKG-ALBUM-UI** | 🟠 | 테마 목록 화면 + 페이지 오버레이 | 없음(순수 소비) | 신규 `UI/Album/`(**6**: `AlbumTabController`/`AlbumThemeCellView`/`AlbumPageOverlayView`/`AlbumCardSlotView` + Serializable `AlbumGaugeView`/`AlbumChestView`) + `Tab_Collection_New.prefab` 부착·배선(**MCP 수술** — onClick 11건 제거·상자 Button 3곳·Fill 3곳 Filled) + `LobbyCanvas.prefab` `tabs[4].content` 재배선(구 탭 인스턴스 비활성 병존) | DATA 인터페이스 | outgame-engineer + 메인(MCP 배선) | ✅ **코드+배선 완료(2026-08-06, 검수 통과·컴파일 0에러)** — Play 검증·ASSET 대기 |
-| **PKG-ALBUM-ASSET** | — | 앨범 저작 | `Assets/SO/Album/CardAlbumConfig.asset` 생성 + `BootInstaller.albumConfig` 배선 + 테마 2개 × 5페이지 카드 배치 | `.asset`(**에디터**) | DATA | **사용자(에디터)** | 🟩 준비(DATA 동결됨) |
+| **PKG-ALBUM-ASSET** | — | 앨범 저작 | `Assets/SO/Album/CardAlbumConfig.asset` 저작 + `Boot.prefab` `albumConfig` 배선 + **테마 9개 × 9칸 페이지** 카드 배치 | `.asset`(**에디터**) | DATA | 메인(MCP) | ✅ **완료(2026-08-07)** — 테마 9(목업 셀 그대로) · 자연 테마에 실카드 31장 4페이지 · 나머지 8테마는 빈 목업 · 중복 0 · 낙인키 충돌 0 |
 | *(후속)* **PKG-ALBUM-CLEANUP** | 🟢 | 구 도감 삭제 | 없음 | 구 `OutGame/Collection/` 테마·행 축 + `UI/Collection/` 6파일 + `CollectionScreen.prefab` + `CollectionTest.unity` + **구 `Tab_Collection.prefab`(LobbyCanvas 내 비활성 인스턴스 포함, 2026-08-06 스코프 추가)** | UI 완료 | — | ⬜ **이번 스코프 밖** |
 
 **실측: 신규 파일 13(DATA 7 + UI 6) · 기존 코드 수정 3파일 4줄.** 기존 도감 코드는 **한 줄도 수정하지 않았다** — 구 `Tab_Collection.prefab`도 무수정(탭 재배선으로 도달 불가화, `CollectionGridController`의 BindTile 가로채기 차단 목적 동일 달성).

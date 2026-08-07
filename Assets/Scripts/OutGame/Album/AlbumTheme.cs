@@ -10,6 +10,14 @@ public sealed class AlbumTheme
 
     public Sprite Icon { get; }
 
+    // 셀 스킨 — null이면 셀 프리팹에 저작된 스프라이트를 그대로 둔다
+    public Sprite Frame { get; }
+
+    public Sprite NamePlate { get; }
+
+    // 테마 전용 셀 프리팹 — null이면 갤러리 기본 셀. 타입이 GameObject인 건 저작 축이 UI 축을 참조하지 않기 위해서다
+    public GameObject CellPrefab { get; }
+
     // 테마 목록상 인덱스(표시용, 식별 키 아님)
     public int Index { get; }
 
@@ -32,6 +40,9 @@ public sealed class AlbumTheme
         string _key,
         string _displayName,
         Sprite _icon,
+        Sprite _frame,
+        Sprite _namePlate,
+        GameObject _cellPrefab,
         int _index,
         IReadOnlyList<AlbumRewardDef> _rewards,
         IReadOnlyList<AlbumPage> _pages,
@@ -42,6 +53,9 @@ public sealed class AlbumTheme
         Key = _key;
         DisplayName = _displayName;
         Icon = _icon;
+        Frame = _frame;
+        NamePlate = _namePlate;
+        CellPrefab = _cellPrefab;
         Index = _index;
         Rewards = _rewards;
         Pages = _pages;

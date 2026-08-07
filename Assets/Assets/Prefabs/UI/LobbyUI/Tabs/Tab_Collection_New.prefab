@@ -2206,7 +2206,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -3778,7 +3778,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -4904,7 +4904,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 0}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -6692,7 +6692,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -9380,6 +9380,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AlbumThemeCellView
   thumbButton: {fileID: 1284312078214478308}
   thumbIcon: {fileID: 7229712283944530555}
+  thumbFrame: {fileID: 2050149104402166058}
+  namePlate: {fileID: 7565333521414396834}
   nameLabel: {fileID: 1866988109210076818}
   progressRow: {fileID: 3473346320874829287}
   gauge:
@@ -15289,7 +15291,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -18054,7 +18056,7 @@ MonoBehaviour:
     pulseScale: 1.08
     pulseDuration: 0.5
   galleryContent: {fileID: 5011781350917975736}
-  cellTemplate: {fileID: 6946420568498162348}
+  cellTemplate: {fileID: 2119395285970280779, guid: 0493854958e1af947b4565f34a5f3e40, type: 3}
   pageOverlay: {fileID: 867367259897312106}
 --- !u!1 &5480081462231874875
 GameObject:

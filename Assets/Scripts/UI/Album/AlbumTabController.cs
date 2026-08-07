@@ -11,12 +11,15 @@ public class AlbumTabController : MonoBehaviour
 
     [Header("갤러리")]
     [SerializeField] Transform galleryContent;
+    [Tooltip("갤러리 기본 셀 프리팹. 테마가 cellPrefab을 저작하면 그 테마만 교체된다.")]
     [SerializeField] AlbumThemeCellView cellTemplate;
 
     [Header("오버레이")]
     [SerializeField] AlbumPageOverlayView pageOverlay;
 
     readonly List<AlbumThemeCellView> m_cells = new List<AlbumThemeCellView>();
+    // m_cells와 인덱스 정합 — 저작이 바뀌어 다른 프리팹이 되면 그 칸만 다시 만든다
+    readonly List<AlbumThemeCellView> m_cellSources = new List<AlbumThemeCellView>();
     bool m_built;
     bool m_overflowWarned;
 
@@ -55,7 +58,9 @@ public class AlbumTabController : MonoBehaviour
             t_child.SetActive(false);
             Destroy(t_child);
         }
-        cellTemplate.gameObject.SetActive(false);
+
+        // 템플릿이 프리팹 에셋이면 끄지 않는다 — 에셋을 SetActive하면 프리팹 파일 자체가 변한다
+        if (cellTemplate.gameObject.scene.IsValid()) cellTemplate.gameObject.SetActive(false);
     }
 
     void Refresh()
@@ -64,15 +69,30 @@ public class AlbumTabController : MonoBehaviour
 
         if (galleryContent != null && cellTemplate != null)
         {
-            while (m_cells.Count < t_themes.Count)
-                m_cells.Add(Instantiate(cellTemplate, galleryContent));
-
-            for (int t_i = 0; t_i < m_cells.Count; t_i++)
+            for (int t_i = 0; t_i < t_themes.Count; t_i++)
             {
-                bool t_use = t_i < t_themes.Count;
-                m_cells[t_i].gameObject.SetActive(t_use);
-                if (t_use) m_cells[t_i].Bind(t_themes[t_i], OpenTheme);
+                var t_source = ResolveCellPrefab(t_themes[t_i]);
+
+                if (t_i >= m_cells.Count)
+                {
+                    m_cells.Add(Instantiate(t_source, galleryContent));
+                    m_cellSources.Add(t_source);
+                }
+                else if (m_cellSources[t_i] != t_source)
+                {
+                    Destroy(m_cells[t_i].gameObject);
+                    m_cells[t_i] = Instantiate(t_source, galleryContent);
+                    m_cellSources[t_i] = t_source;
+                }
+
+                // Instantiate는 항상 맨 뒤에 붙는다 — 교체된 셀이 그리드 순서를 잃지 않게 고정
+                m_cells[t_i].transform.SetSiblingIndex(t_i);
+                m_cells[t_i].gameObject.SetActive(true);
+                m_cells[t_i].Bind(t_themes[t_i], OpenTheme);
             }
+
+            for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)
+                m_cells[t_i].gameObject.SetActive(false);
         }
 
         // GetAlbumInfo의 Owned/Total은 테마 수 기준이라 카드 진행 게이지엔 못 쓴다
@@ -94,6 +114,18 @@ public class AlbumTabController : MonoBehaviour
     void OpenTheme(AlbumTheme _theme)
     {
         if (pageOverlay != null) pageOverlay.Open(_theme);
+    }
+
+    // 저작이 GameObject라 잘못된 프리팹도 꽂힐 수 있다 — 기본 셀로 떨어뜨리고 저작자에게 알린다
+    AlbumThemeCellView ResolveCellPrefab(AlbumTheme _theme)
+    {
+        if (_theme.CellPrefab == null) return cellTemplate;
+
+        var t_view = _theme.CellPrefab.GetComponent<AlbumThemeCellView>();
+        if (t_view != null) return t_view;
+
+        Debug.LogError($"[AlbumTabController] 테마 '{_theme.Key}'의 cellPrefab '{_theme.CellPrefab.name}'에 AlbumThemeCellView가 없다 — 기본 셀로 대체한다.", this);
+        return cellTemplate;
     }
 
     void BindRewardSlots(IReadOnlyList<AlbumRewardDef> _rewards)

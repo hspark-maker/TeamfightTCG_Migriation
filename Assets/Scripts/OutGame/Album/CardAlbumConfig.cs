@@ -31,6 +31,12 @@ public struct AlbumThemeDef
     public string themeId;
     public string displayName;
     public Sprite icon;
+    [Tooltip("셀 썸네일 프레임. 비우면 셀 프리팹에 저작된 스프라이트를 그대로 쓴다(테마마다 색을 달리하려면 저작할 것).")]
+    public Sprite frame;
+    [Tooltip("셀 이름판 배경. 비우면 셀 프리팹 기본값 유지.")]
+    public Sprite namePlate;
+    [Tooltip("이 테마 전용 셀 프리팹(AlbumThemeCellView가 붙어 있어야 한다). 비우면 갤러리 기본 셀을 쓴다 — 색만 다르면 위 스킨 3종으로 충분하고, 셀 구조 자체가 다를 때만 저작할 것.")]
+    public GameObject cellPrefab;
     public List<AlbumRewardDef> rewards;
     public List<AlbumPageDef> pages;
 }
