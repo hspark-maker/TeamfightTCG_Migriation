@@ -29,14 +29,23 @@ public class AlbumThemeCellView : MonoBehaviour
         if (nameLabel != null) nameLabel.text = _theme.DisplayName;
 
         var t_info = AlbumRewardManager.GetThemeInfo(_theme);
-        gauge.Set(t_info.Owned, t_info.Total);
+
+        // 삽입 연출 중 아직 안 꽂은 카드는 표시에서만 뺀다 — 총 게이지·페이지 게이지와 숫자가 갈리지 않게
+        int t_hidden = AlbumInsertMask.HiddenCountIn(_theme);
+        gauge.Set(t_info.Owned - t_hidden, t_info.Total);
 
         // Claimable은 progressRow 유지 — 상자 펄스가 수령을 유도한다
-        bool t_done = t_info.State == EAlbumRewardState.Claimed;
+        bool t_done = t_hidden == 0 && t_info.State == EAlbumRewardState.Claimed;
         if (progressRow != null) progressRow.SetActive(!t_done);
         if (doneRow != null) doneRow.SetActive(t_done);
 
-        chest.Bind(t_info, ClaimReward);
+        // 마지막 칸을 꽂는 순간 상자가 나타나는 게 보상 신호다 — 그 전엔 감춘다
+        if (t_hidden > 0)
+        {
+            var t_empty = default(AlbumRewardInfo);
+            chest.Bind(t_empty, null);
+        }
+        else chest.Bind(t_info, ClaimReward);
 
         if (thumbButton != null)
         {

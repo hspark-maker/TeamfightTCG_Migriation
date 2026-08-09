@@ -986,19 +986,32 @@ flowchart TD
         RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
-    subgraph UI["UI (UI/Album/ · 실측 6파일 — 그리드·스테퍼는 오버레이에 흡수)"]
-        TAB["AlbumTabController<br/>Tab_Collection_New 루트<br/>앨범 게이지·보상 + 갤러리 빌드"]:::new
+    subgraph UI["UI (UI/Album/ · 실측 7파일 — 그리드·스테퍼는 오버레이에 흡수)"]
+        TAB["AlbumTabController<br/>Tab_Collection_New 루트<br/>앨범 게이지·보상 + 갤러리 빌드<br/>OpenThemePage(테마, 페이지) · PageOverlay"]:::new
         TBTN["AlbumThemeCellView<br/>테마 셀 1개(AlbumThemeCell.prefab)<br/>아이콘·프레임·이름판·n/N·상자·✓"]:::new
-        PANEL["AlbumPageOverlayView<br/>페이지 오버레이 + ◀ n/N ▶ 스테퍼<br/>(Tab_Collection_New 내부)"]:::new
-        SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>미소유 회색 + 이름 유지"]:::new
+        PANEL["AlbumPageOverlayView<br/>페이지 오버레이 + ◀ n/N ▶ 스테퍼<br/>(Tab_Collection_New 내부)<br/>ShownAsOwned = 표시의 단일 진실원<br/>+ TryGetSlotRect · SetInteractionLocked"]:::new
+        SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>칸의 그래픽 = 슬리브 하나(루트엔 Image 없음)<br/>Sleeve → NumberLabel → CardHolder/Card<br/>번호는 카드가 덮어 저절로 가려진다"]:::new
         BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new
         PROG["AlbumGaugeView (Serializable 소품)<br/>n/N 게이지 · 3계층 공용"]:::new
+        RSLOT["AlbumRewardSlotView (Serializable 소품)<br/>앨범 보상 칸 1개 · 아이콘+수량"]:::new
+    end
+    subgraph INS["삽입(수록) 연출 (UI/Album/Insert/ · 실측 7파일 · 전량 휘발성 · 저장 0)"]
+        IQ["AlbumInsertQueue (static)<br/>획득 카드 → 세션 캐리어<br/>Enqueue · TryConsume(1회 소비)<br/>저장 안 함 (CardPackRewardHandoff와 같은 모양)"]:::new
+        IM["AlbumInsertMask (static)<br/>'소유 확정 · 화면 미수록' 단일 진실원<br/>HideAll/Reveal/Clear · IsHidden<br/>HiddenCountIn(Page/Theme) · HiddenTotal · OnChanged"]:::new
+        IP["AlbumInsertPlan (static)<br/>카드 목록 → AlbumInsertStep[]<br/>(테마→페이지→칸) 앨범 순회로 정렬<br/>미배치 카드는 _unplaced로 반환 + LogWarning"]:::new
+        ISS["AlbumInsertSession (MonoBehaviour)<br/>상태 머신 브레인<br/>PageTurn → Spawn → AwaitDrag → Seat<br/>IsRunning · SkipAll · 3중 위장 해제"]:::new
+        IDR["AlbumInsertCardDragger<br/>세로 1축 연속 드래그 → 진행도(0~1)<br/>OnProgress/OnSeat/OnReturn/OnGrab<br/>임계 원본 = PackCardStack"]:::new
+        ISV["AlbumSleeveView (좌표 계산 전담)<br/>드래그 카드 홀더를 슬롯 rect에 정렬<br/>진행도 → 카드 y (YAt) · CardHeight<br/>씰·안착 표현 없음(복제 씰 삭제)"]:::new
+        IHV["AlbumInsertHintView<br/>손가락 힌트 · 하단 안내문구 · 건너뛰기<br/>값 원본 = OutgameTutorialGateUI"]:::new
+        IPF["Panel_AlbumInsert (Tab_Collection_New 내)<br/>Blocker_Drag · CardHolder/CardUIView<br/>Hint_Finger · Label_Guide · Button_Skip<br/>씰 없음 — 진짜 칸에 직접 꽂는다"]:::new
     end
     OWN["OwnershipManager<br/>IsOwned (동결 계약)"]
     CAT["CardCatalog.KeyOf<br/>= SO 파일명 (동결 계약)"]
     CUR["CurrencyManager<br/>Earn / Save (동결 계약)"]
     BOOTI["BootInstaller<br/>+2줄 SetSource"]:::chg
     DET["CardDetailOverlayView<br/>(기존 재사용 · 무수정)"]
+    GAIN["LobbyGainEffectDirector<br/>팩 획득 연출 → 삽입 세션 진입점"]:::chg
+    DBG["OutgameDebugActions.ForceAlbumInsertSession<br/>F8 → 'ALBUM INSERT x3'"]:::chg
 
     CFG --> TDEF --> PDEF
     TDEF -.-> RDEF
@@ -1022,8 +1035,27 @@ flowchart TD
     OWN -->|OnOwnershipChanged| TAB
     SLOT -->|"Open(페이지 칸 순서, null 제외)"| DET
 
+    GAIN -->|"Enqueue + HideAll (탭 열리기 전)"| IQ
+    GAIN -->|"Select(4, false) → 다음 프레임 Begin()"| ISS
+    DBG -.->|강제 실행| IQ
+    IQ -->|TryConsume| ISS
+    BOOK -->|"앨범 순회로 (테마→페이지→칸) 해석"| IP
+    IP -->|스텝 배열| ISS
+    ISS -->|"Reveal / Clear (그림만)"| IM
+    ISS -->|"Open(theme,page) · TryGetSlotRect · 잠금"| PANEL
+    ISS -->|OpenThemePage| TAB
+    IDR -->|진행도 0~1| ISS
+    ISS -->|SetProgress · YAt| ISV
+    ISS <-->|안내 표시 / 건너뛰기| IHV
+    IM -->|"OnChanged → RefreshPage 전량 재계산"| PANEL
+    IM -->|OnChanged → 총 게이지 차감| TAB
+    IM -->|HiddenCountIn 차감| TBTN
+    IPF -.->|부착 대상| ISS
+    SLOT -.->|"정렬 대상 rect 제공(TryGetSlotRect)"| ISV
+
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+    classDef todo fill:#6b2222,stroke:#ff9a9a,color:#fff;
 ```
 
 #### 확정 설계 결정 5개 (각각 "안 그러면 무엇이 깨지나")
@@ -1066,6 +1098,77 @@ flowchart TD
 - **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).
 - **카드 배치가 두 곳에 저작된다** — 신규 `CardAlbumConfig`(앨범 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.
 
+#### 카드 삽입(수록) 연출 (`UI/Album/Insert/`, 실측 7파일) — 🔄 코드 완료 (2026-08-09) / **프리팹 배선·씰 아트 대기**
+
+**한 줄**: 팩 개봉으로 이미 소유가 확정된 신규 카드를, 도감에서 **유저가 직접 슬리브에 밀어 넣는** 연출. 소유·저장은 한 줄도 건드리지 않고 **그림만** 잠시 되돌린다.
+
+진입은 `LobbyGainEffectDirector`가 하고(카드 착지 연출 `OnComplete`), 세션은 `Panel_PageOverlay` 자식으로 살면서 `(테마→페이지→칸)` 순서로 카드를 한 장씩 소비한다. 상태 머신: `PageTurn → Spawn → AwaitDrag ⇄ Return → Seat` 반복 → `Finish`.
+
+| 지금 있는 것 | 아직 없는 것 (미완) |
+|---|---|
+| 코드 7파일(`Insert/`) + 기존 6파일 수정 + 디버그 버튼(F8 → `ALBUM INSERT x3`) | **`Panel_AlbumInsert.prefab` 미생성** — 배선 전엔 `ResolveInsertSession`이 null을 물고 `CancelInsertSession()`으로 조용히 물러난다(카드는 그냥 꽂힌다) |
+| `AlbumCardSlot.prefab` 슬리브 일원화 완료(2026-08-10) — 루트에 `Image` 없음 / `Sleeve`(유일 그래픽·버튼 타깃) → `NumberLabel` → `CardHolder`(CanvasGroup)→`Card` | **씰 전용 아트 미교체** — 지금은 `ItemFrame02_Single_Navy`를 빌려 쓰는 중이다 |
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 유저
+    participant GD as LobbyGainEffectDirector
+    participant Q as AlbumInsertQueue
+    participant M as AlbumInsertMask
+    participant S as AlbumInsertSession
+    participant PV as AlbumPageOverlayView
+    participant DR as AlbumInsertCardDragger
+
+    U->>GD: 팩 개봉 종료 (신규 카드 N장)
+    GD->>Q: Enqueue(cards)
+    GD->>M: HideAll(cards)  ※탭 열리기 전
+    M-->>PV: OnChanged → RefreshPage (해당 칸이 빈 칸으로)
+    GD->>GD: 카드 착지 연출 재생 → OnComplete
+    GD->>GD: Select(도감 탭, fireTrigger:false) + 1프레임 양보
+    GD->>S: Begin()
+    S->>Q: TryConsume() (1회 소비)
+    S->>S: AlbumInsertPlan.Build → (테마→페이지→칸) 스텝
+    loop 스텝마다
+        S->>PV: Open(theme, page) + SetInteractionLocked(true)
+        S->>PV: TryGetSlotRect(slot)  ※ForceUpdateCanvases 이후
+        S->>DR: Interactable = true
+        U->>DR: 아래로 드래그
+        DR-->>S: OnProgress(p) → 칸의 번호를 점점 덮는다
+        alt 임계 이상
+            DR-->>S: OnSeat
+            S->>M: Reveal(card)
+            M-->>PV: OnChanged → RefreshPage (슬롯 카드 ON · 게이지 +1)
+            S->>S: 같은 프레임에 드래그 카드 OFF (이음매 0프레임)
+        else 임계 미만
+            DR-->>S: OnReturn → 원위치 복귀
+        end
+    end
+    S->>M: Clear() (Finish / SkipAll / OnDisable 공통)
+    S->>PV: SetInteractionLocked(false) + 이탈 가드 해제
+```
+
+> **왜 세이브에 "미수록" 상태를 두지 않았나** — 이 연출은 **전적으로 휘발성**이다. 소유는 팩 개봉 시점에 `OwnershipManager`가 이미 확정했고, 삽입은 그 사실을 화면에서 **잠깐 미루는 것**뿐이다. 세션 중 앱을 끄면 카드는 그냥 꽂힌 상태가 된다(설계상 허용). 그 대가로 **세이브 스키마 · `CardAlbum` · `AlbumRewardManager` 계약이 전부 무변경**이고 `UserSaveData.VERSION`도 그대로다. 반대로 "미수록"을 저장했다면 도감 진행도가 소유 집합의 순수 파생이라는 [확정 설계 결정 2]가 즉시 깨지고, 미수록 플래그와 소유 집합이 어긋난 세이브를 복구할 마이그레이션이 필요해진다. `AlbumInsertMask`가 카드 **id(int)** 집합을 쓰는 것도 같은 이유로 안전하다 — 디스크에 닿지 않으므로 세이브 규약(문자열 키·인덱스 금지)의 적용 대상이 아니다.
+> **위장은 슬롯 조작이 아니라 "소유 판정의 합성"이다** — `AlbumPageOverlayView.RefreshPage()`는 `OwnershipManager.IsOwned`로 페이지 전체를 **매번 전량 재계산**한다. 세션이 슬롯을 직접 꺼두면 성장 통지·보상 수령·탭 재진입 **어떤 통지 하나**만 튀어도 위장이 통째로 벗겨진다. 그래서 개입점은 판정 함수 한 곳뿐이다: `ShownAsOwned(_card) = IsOwned && !AlbumInsertMask.IsHidden` (`AlbumPageOverlayView.cs:240`). **표시의 단일 진실원은 여전히 `RefreshPage()` 하나**이고, 세션은 `Reveal()`만 호출해 재계산을 유발한다. 위장이 꺼져 있으면 `IsHidden`은 항상 false → **평상시 동작은 변경 전과 완전 동치**다.
+> **`BuildOwnedOrder`(`:258`)도 같은 함수를 써야 한다** — 여기를 빼먹으면 아직 안 꽂은 카드가 상세 넘겨보기 목록으로 샌다. 게이지·상자도 마찬가지로 **표시값에서만** 차감한다(`AlbumPageOverlayView.cs:219` 페이지 게이지, `AlbumTabController.cs:115` 총 게이지, `AlbumThemeCellView.cs:34` 테마 n/N). 실제 보상 판정(`AlbumRewardManager`)은 손대지 않으므로 **마지막 칸을 꽂는 순간 상자가 등장**하는 것이 보상 신호가 된다.
+> **마스킹·잘라내기를 쓰지 않는다(`RectMask2D`·스텐실·셰이더 컷 전부)** — 가림은 **그리기 순서**가 한다. 칸은 **실제 슬리브와 같은 두 겹**이다(2026-08-10 확정): `Sleeve_Back(불투명, 포켓 바닥) → NumberLabel → InsertDock → Card → Sleeve_Front(반투명 비닐)`. 슬롯 루트에는 `Image`가 **없다**(버튼 타깃·레이캐스트는 `Sleeve_Back`이 받는다). 드래그 카드는 `InsertDock`으로 **부모가 옮겨져** 번호를 덮으며 비닐 뒤로 잠긴다. 얻는 것: TMP·런타임 아이콘 머티리얼 문제 없음, 레이캐스트 컬링 문제 없음.
+> **앞면 알파는 "칸이 비었는가" 하나로만 정해진다** — 빈 칸 `emptyFrontAlpha(0.4)`, 꽂힌 칸 `0`. `Bind`가 매번 이 값을 다시 세우므로 **연출용 별도 상태가 없고**, 어느 경로로 `RefreshPage`가 와도 칸의 톤이 스스로 옳은 값으로 돌아온다. 삽입 연출은 그 사이를 잇는 트윈 하나(`SettleFront(revealDuration)`)일 뿐이다.
+> **폐기한 두 가지(되돌리지 말 것)** — ① 씰을 카드 **위** 한 겹으로만 두고 소유 시 알파를 낮추는 방식: 패널에 복제 씰(`Sleeve_Slot`)이 필요해져 화면에 씰이 두 벌 생긴다. ② 평소 알파 0인 덮개를 삽입 중에만 불투명하게 씌우는 방식: **그 칸만 어두워져 다른 칸과 눈에 띄게 달라진다**(실기 확인). 두 겹 구조는 이 둘을 동시에 피한다.
+> **`Sleeve`·`NumberLabel`은 칸이 아니라 "보이는 그림" 앵커(0.0728~0.9272 / 0.0154~0.9846)를 쓴다** — `GridRatioFitter`가 `artUsableRatio`로 **셀을 일부러 겹쳐** 배치하기 때문이다(`Frame.png`의 좌우 7.2%·상하 1.5% 투명 여백만큼 `spacing`이 음수). 씰을 셀 전체에 그리면 그 투명분만큼 **옆 칸 씰과 겹쳐 보인다**(2026-08-10 실기 확인). 반대로 `CardHolder`는 셀 전체(stretch 0~1)여야 한다 — 카드 스프라이트가 그 투명분을 품고 있어야 보이는 크기가 개편 전과 같다. **두 앵커가 다른 것이 버그가 아니라 이 그리드의 전제**다.
+> **도감 번호는 포켓 바닥에 인쇄된 것처럼 둔다** — `NumberLabel`은 `Sleeve_Back` 바로 뒤 형제이자 `InsertDock`·`Card`보다 **앞 형제**다. 그래서 카드가 꽂히면 **번호가 저절로 가려지고**, 삽입 중에도 카드가 내려온 만큼 번호가 덮이는 그림이 공짜로 나온다 — `Bind`에 "소유면 번호 끄기" 분기가 없다.
+> **패널의 복제 씰(`Sleeve_Slot`)은 삭제했다**(2026-08-10) — 예전에는 드래그 카드가 패널에 있어 진짜 칸보다 위에 그려지므로, 카드를 가릴 씰이 패널에도 하나 더 필요했다(`AlbumCardSlot` 인스턴스를 그대로 띄웠다). **씰이 카드 뒤로 내려간 지금은 가릴 것이 없으므로 그 복제본은 화면에 씰이 두 개 존재하는 비용만 남는다.** 실측으로도 씬에 `AlbumCardSlotView`가 10개(진짜 칸 9 + 복제 1)였다. 지금은 9개다.
+> **`AlbumSleeveView`는 부모를 옮긴다** — `AlignTo(slotRect, dock)`가 `cardHolder`를 대상 칸의 `InsertDock`으로 `SetParent`한다. 칸 안으로 들어가면 좌표계가 곧 칸이라 중앙이 (0,0)이고 레이어 변환이 사라진다(폴백: dock이 null이면 예전처럼 패널 좌표계, 가림 없음). **홈 부모는 Awake가 아니라 첫 이동 직전에 기억**하고 `Release()`가 되돌린다 — 안 되돌리면 다음 세션이 남의 칸 안에서 시작한다. `Finish`가 이 호출의 유일한 자리다.
+> **안착의 이음매는 0프레임** — 진행도 1에서 드래그 카드는 진짜 칸의 카드와 같은 자리·같은 크기로 비닐 뒤에 잠겨 있다. `AlbumInsertMask.Reveal(card)` → 칸이 같은 그림을 그리고, **같은 프레임에** 드래그 카드를 끈다. 남은 것은 비닐을 걷는 일뿐이다.
+> **조상에 마스크가 없다는 것이 전제다** — `Slot_00 → Grid_Slots → Panel_Page → Frame → Panel_PageOverlay → … → LobbyCanvas` 전 구간에 `RectMask2D`·`Mask`·`ScrollRect`가 없음을 실측 확인했다(2026-08-10). 그래서 칸 안으로 들어간 카드가 진행도 0(칸 한 칸 위)에서도 잘리지 않는다. **여기에 마스크를 추가하면 첫 행 카드가 사라진다.**
+> **씰은 켜고 끄거나 흔들지 않는다** — 칸의 그래픽이 씰 하나뿐이므로 알파를 소유 여부로 바꾸면 칸의 재질감이 갈린다. 빈 칸/꽂힌 칸의 차이는 **씰이 아니라 그 위에 카드가 있느냐**로만 표현한다(`ownedSleeveAlpha`·`CardGroup`은 이 개편으로 삭제).
+> **불변식: 위장 영구 잔존 = 카드 영구 실종.** 위장이 켜진 채 세션이 죽으면 유저는 "뽑았는데 도감에 없는 카드"를 보게 되고, 소유는 살아 있으므로 **재획득으로도 복구되지 않는다**. 그래서 해제는 3중이다 — ① `AlbumInsertSession.OnDisable`/`OnDestroy`의 `ReleaseGuards()`(멱등, `Finish`와 겹쳐도 안전) ② `AlbumPageOverlayView.OnDisable`에서 `if (!AlbumInsertSession.IsRunning) AlbumInsertMask.Clear();` ③ `AlbumInsertMask`의 `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`(도메인 리로드를 꺼두면 static 집합이 이전 플레이를 물고 넘어온다). 여기에 더해 세션에 **도달하지 못한** 모든 경로(RectTransform 아님·카드 연출 미조립·세션 미발견)가 `LobbyGainEffectDirector.CancelInsertSession()`으로 수렴한다. **이 네 갈래 중 어느 하나도 "중복이니까" 지우지 말 것.**
+> **탈출로는 건너뛰기 하나** — 세션 중 `pageOverlay.SetInteractionLocked(true)` + `LobbyTabController.SetLeaveGuard(_p => { SkipAll(); _p(); })`. 다른 탭으로 나가려 하면 남은 전부를 안착시킨 뒤 보낸다. `LobbyGainEffectDirector`가 도감 탭을 열 때 **`Select(4, false)` 고정** — `true`면 도감 첫 진입 튜토리얼이 발화해 딤이 세션을 덮는다.
+> **`GridRatioFitter`가 cellSize를 런타임에 정한다** — 슬롯 rect는 `yield return null; Canvas.ForceUpdateCanvases();` **이후에만** 진짜 값이다(`AlbumInsertSession.cs:194`). 그 전에 읽으면 카드가 엉뚱한 자리에 뜬다. 같은 이유로 진입부(`LobbyGainEffectDirector.BeginInsertSession`)도 탭을 켠 뒤 한 프레임을 양보한다.
+> **`DOKill`은 타깃 단위** — 안착 트윈은 `CardHolder`, 카드 비주얼 펀치는 `CardVisualView`로 노드를 나눈다(`PackCardStack`이 이미 밟은 함정).
+> **값 원본이 바깥에 있는 두 곳** — 드래그 임계(`seatThreshold 0.6` / `flickSpeed 700` / `flickMinProgress 0.15`)는 `PackCardStack`, 힌트 펄스(`1.08f / 0.6s`)와 하단 문구 여백(`220f`)은 `OutgameTutorialGateUI`가 원본이다. 한쪽만 만지면 개봉 넘기기·튜토리얼 안내와 손맛이 갈라진다(각 파일 상단 주석에 명시).
+
+**프리팹 배선 대기 목록(에디터 작업)**: `AlbumCardSlot.prefab` 씰 아트 교체(구조는 완료 — 루트 `Image`가 씰) / `Panel_AlbumInsert.prefab` 신규(`Blocker_Drag`는 alpha 0 · **`raycastTarget=true`**, 끄면 드래그가 조용히 안 들어온다 / `Button_Skip` 퍼시스턴트 onClick 비울 것) / `Panel_PageOverlay.prefab` 루트 **직계 마지막 자식**으로 추가(`Grid_Slots` 안에 넣으면 그리드 마스크에 카드가 잘린다) / `LobbyCanvas.prefab`의 `LobbyGainEffectDirector`에 `lobbyTabController`·`collectionTabIndex=4`·`albumTabController` 배선.
+
 ---
 
 ### 재화 획득·연출의 재화별 분리 (`OutGame/Currency/`, `UI/HUD/`, `UI/Common/`) — ✅ 코드 완료 (2026-08-06, Play 검증 대기)
@@ -1099,6 +1202,14 @@ CardPackOpener(→OpenedPack.TotalRefund) → CardPackRewardHandoff ─┤→ Cu
                                                        └→ LobbyGainEffectDirector
                                                             → CurrencyGainEffectPlayer.BuildGain(bucket)
                                                                 → 종류별 CurrencyHud.BeginGainRollUp
+                                                            → (신규 카드가 있으면)
+                                                              AlbumInsertQueue.Enqueue + AlbumInsertMask.HideAll   ← 탭 열리기 전에 위장
+                                                                → 카드 착지 연출 OnComplete
+                                                                  → Select(도감 탭, fireTrigger:false) → 1프레임 양보
+                                                                    → AlbumInsertSession.Begin()
+                                                                      → AlbumInsertPlan (테마→페이지→칸)
+                                                                        → 드래그 안착마다 AlbumInsertMask.Reveal
+                                                                          → OnChanged → AlbumPageOverlayView.RefreshPage
 
 CollectionProductionManager.Harvest(→CurrencyGain) / HarvestAll(→Bucket) → CurrencyGainEffectPlayer.Play
 RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup

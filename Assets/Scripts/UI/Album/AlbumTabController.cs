@@ -23,12 +23,22 @@ public class AlbumTabController : MonoBehaviour
     bool m_built;
     bool m_overflowWarned;
 
+    // 삽입 세션이 페이지 오버레이를 직접 몰아야 한다
+    public AlbumPageOverlayView PageOverlay => pageOverlay;
+
+    // 세션이 지정 페이지로 바로 여는 경로. 셀 콜백은 여전히 0페이지 진입이다
+    public void OpenThemePage(AlbumTheme _theme, int _pageIndex)
+    {
+        if (pageOverlay != null) pageOverlay.Open(_theme, _pageIndex);
+    }
+
     void OnEnable()
     {
         if (!m_built) Build();
 
         OwnershipManager.OnOwnershipChanged += Refresh;
         AlbumRewardManager.OnChanged += Refresh;
+        AlbumInsertMask.OnChanged += Refresh;
 
         Refresh();
     }
@@ -37,6 +47,7 @@ public class AlbumTabController : MonoBehaviour
     {
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
+        AlbumInsertMask.OnChanged -= Refresh;
     }
 
     // 더미 정리 1회 기준 — 빈 앨범 0셀도 정상이라 셀 빌드 성공과는 무관
@@ -101,6 +112,7 @@ public class AlbumTabController : MonoBehaviour
         for (int t_i = 0; t_i < t_themes.Count; t_i++)
         {
             t_owned += CardAlbum.OwnedCountOf(t_themes[t_i]);
+            t_owned -= AlbumInsertMask.HiddenCountIn(t_themes[t_i]);   // 아직 안 꽂은 몫은 화면에서 뺀다
             t_total += CardAlbum.TotalCountOf(t_themes[t_i]);
         }
         totalGauge.Set(t_owned, t_total);
@@ -113,7 +125,7 @@ public class AlbumTabController : MonoBehaviour
 
     void OpenTheme(AlbumTheme _theme)
     {
-        if (pageOverlay != null) pageOverlay.Open(_theme);
+        OpenThemePage(_theme, 0);
     }
 
     // 저작이 GameObject라 잘못된 프리팹도 꽂힐 수 있다 — 기본 셀로 떨어뜨리고 저작자에게 알린다

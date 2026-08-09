@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // 아웃게임 디버그 조작의 단일 창구 (인스펙터 ContextMenu·런타임 오버레이 공용)
@@ -123,5 +124,57 @@ public static class OutgameDebugActions
     {
         RevokeAllCards();
         ResetTutorial();
+    }
+
+    // 팩 없이 앨범 삽입 연출만 반복 검증. 소유 카드를 그대로 다시 꽂는 연출이라 소유·세이브는 건드리지 않는다.
+    public static void ForceAlbumInsertSession(int _count = 3)
+    {
+        List<CardData> t_cards = CollectOwnedAlbumCards(_count);
+        if (t_cards.Count == 0)
+        {
+            Debug.LogWarning("[OutgameDebug] 앨범에 소유 카드가 없어 삽입 세션을 건너뛴다 — 팩을 열거나 전체 해금 후 다시 시도.");
+            return;
+        }
+
+        AlbumInsertQueue.Enqueue(t_cards);
+        AlbumInsertMask.HideAll(t_cards);
+
+        // 삽입 패널은 평소 꺼져 있다 — 비활성 포함 탐색이어야 잡힌다.
+        var t_session = Object.FindFirstObjectByType<AlbumInsertSession>(FindObjectsInactive.Include);
+        if (t_session == null)
+        {
+            // 위장이 남으면 카드가 영영 빈 칸이다.
+            AlbumInsertQueue.Clear();
+            AlbumInsertMask.Clear();
+
+            Debug.LogWarning("[OutgameDebug] 씬에 AlbumInsertSession이 없어 삽입 세션을 건너뛴다 — 로비 씬에서 실행할 것.");
+            return;
+        }
+
+        t_session.Begin();
+        Debug.Log($"[OutgameDebug] 앨범 삽입 세션 강제 시작 — {t_cards.Count}장");
+    }
+
+    // 앨범 저작 순서(테마→페이지→슬롯) 기준 소유 카드 앞 _count장. 해금은 하지 않는다.
+    static List<CardData> CollectOwnedAlbumCards(int _count)
+    {
+        var t_result = new List<CardData>();
+        if (_count <= 0) return t_result;
+
+        var t_themes = CardAlbum.Themes;
+        for (int t_i = 0; t_i < t_themes.Count; t_i++)
+        {
+            var t_cards = t_themes[t_i].Cards;
+            for (int t_j = 0; t_j < t_cards.Count; t_j++)
+            {
+                var t_card = t_cards[t_j];
+                if (t_card == null || !OwnershipManager.IsOwned(t_card)) continue;
+
+                t_result.Add(t_card);
+                if (t_result.Count >= _count) return t_result;
+            }
+        }
+
+        return t_result;
     }
 }
