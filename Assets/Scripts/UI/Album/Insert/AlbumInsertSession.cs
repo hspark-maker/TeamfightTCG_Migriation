@@ -297,10 +297,7 @@ public class AlbumInsertSession : MonoBehaviour
         if (t_holder != null)
         {
             t_holder.DOKill();
-            yield return t_holder.DOAnchorPosY(sleeve.YAt(1f), this.seatDuration)
-                                 .SetEase(Ease.OutCubic)
-                                 .SetLink(gameObject)
-                                 .WaitForCompletion();
+            yield return this.TweenProgress(t_holder, 1f, this.seatDuration, Ease.OutCubic).WaitForCompletion();
         }
 
         // 다 밀어 넣은 카드는 비닐(씰 앞면) 뒤에 잠겨 있고 번호도 그 카드에 덮여 있다.
@@ -330,16 +327,25 @@ public class AlbumInsertSession : MonoBehaviour
              .SetLink(_rect.gameObject);
     }
 
+    // 카드가 스스로 움직이는 유일한 통로. 진행도를 몰면 위치·기울기·좌우 어긋남이 함께 따라온다 —
+    // ⚠ y만 트윈하면(예전 DOAnchorPosY) 각도가 그 자리에 얼어붙는다.
+    // SetTarget(holder)가 필수다: HandleGrab의 CardHolder.DOKill()이 이 트윈도 걷어야
+    // 되감기 중 다시 잡았을 때 트윈과 손가락이 카드를 동시에 끌지 않는다.
+    Tween TweenProgress(RectTransform _holder, float _to, float _duration, Ease _ease)
+    {
+        return DOTween.To(() => sleeve.Progress, _v => sleeve.SetProgress(_v), _to, _duration)
+                      .SetEase(_ease)
+                      .SetTarget(_holder)
+                      .SetLink(gameObject);
+    }
+
     IEnumerator ReturnToStart()
     {
         var t_holder = sleeve.CardHolder;
         if (t_holder == null) yield break;
 
         t_holder.DOKill();
-        yield return t_holder.DOAnchorPosY(sleeve.YAt(0f), this.returnDuration)
-                             .SetEase(Ease.OutBack)
-                             .SetLink(gameObject)
-                             .WaitForCompletion();
+        yield return this.TweenProgress(t_holder, 0f, this.returnDuration, Ease.OutBack).WaitForCompletion();
 
         // 카드가 시작 자리로 돌아온 뒤에야 누적을 지운다 — 트윈 도중 다시 잡으면 그 자리에서 이어져야 한다.
         if (dragger != null) dragger.ResetProgress();
