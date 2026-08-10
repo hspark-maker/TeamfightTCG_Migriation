@@ -104,7 +104,7 @@ public class PackRevealView : MonoBehaviour
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
     [SerializeField] PackScreenFlash newCardFlash;
 
-    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 골드가 얼마 돌아왔나"를 말한다 —
+    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 얼마가 돌아왔나"를 말한다 —
     // 결과 격자에는 칩이 없으므로(PackCardView.PlayRefundAccent) 이 줄이 그 축의 유일한 답이다.
     //
     // ⚠ 칩과 획득 버튼은 **같은 앵커 기준(화면 하단)**이어야 한다. 한쪽만 중앙 앵커면 화면비가 바뀔 때

@@ -143,10 +143,10 @@ flowchart TD
         SHOP["상점 UI"]
     end
     subgraph def["E-14 정의 (SO, 에디터 데이터)"]
-        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
+        DEF["CardPackData (SO)<br/>packId·packArt·priceType·price·drawCount·pool(지정 카드셋)<br/>refundType·refundAmount(중복 환급)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
     end
     subgraph svc["E-15 구매·드로우"]
-        SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack, refund) · 로컬 랜덤"]:::new
+        SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack) · 로컬 랜덤"]:::new
     end
     RES["OpenedPack / DrawnCard<br/>[#6 UI 스냅샷] card · isNew · refund"]:::new
 
@@ -155,14 +155,14 @@ flowchart TD
     KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
     RANK["RankManager.GetInfo().Grade (기존)"]
 
-    SHOP -->|"TryPurchase(pack, refund)"| SVC
+    SHOP -->|"TryPurchase(pack)"| SVC
     SHOP -.->|"대상 팩 SO 참조"| DEF
     SVC -->|"현재 등급 조회"| RANK
-    SVC -->|"Spend(Gold, price)"| CUR
+    SVC -->|"Spend(priceType, price)"| CUR
     SVC -->|"ResolvePool(등급) 가중 드로우"| DEF
     SVC -->|"KeyOf(card)"| KEY
     SVC -->|"Grant(key) 루프 → isNew"| OWN
-    SVC -->|"중복이면 Earn(Gold, refund)"| CUR
+    SVC -->|"중복이면 Earn(refundType, refundAmount)"| CUR
     SVC -->|"결과 조립"| RES
     RES -->|"신규/중복·환급 연출"| SHOP
 
@@ -180,16 +180,16 @@ sequenceDiagram
     participant OWN as OwnershipManager
 
     U->>SHOP: 팩 구매 클릭
-    SHOP->>SVC: TryPurchase(pack, refund)
-    SVC->>CUR: CanAfford(Gold, price)?
+    SHOP->>SVC: TryPurchase(pack)
+    SVC->>CUR: CanAfford(priceType, price)?
     alt 잔액 부족
         SVC-->>SHOP: 실패(구매 불가, 차감 없음)
     else 충분
-        SVC->>CUR: Spend(Gold, price)
+        SVC->>CUR: Spend(priceType, price)
         loop drawCount 회 (ResolvePool(현재 등급)에서 가중 드로우)
             SVC->>OWN: Grant(KeyOf(card)) → isNew
             alt 중복(isNew=false)
-                SVC->>CUR: Earn(Gold, duplicateRefundGold)
+                SVC->>CUR: Earn(refundType, refundAmount)
             end
         end
         SVC->>CUR: Save() (즉시 영속)
@@ -203,16 +203,16 @@ sequenceDiagram
 - **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
 - **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
 - **랭크별 풀 오버라이드 (2026-08-06)**: `rankPools`(`RankPackPool` = minGrade + `WeightedCard` 목록)가 있으면 `ResolvePool(현재 등급)`이 "minGrade ≤ 현재 등급 중 최고 등급" 항목을 적용(등급별 통풀 재저작, 하위 등급과 합산 없음). 매치 없거나 비면 기존 `pool`을 weight 1 취급으로 폴백 → `rankPools` 빈 팩(튜토리얼 3종)은 기존 동작 그대로. weight 0 이하 = 1(균등) 취급, 카드 제외는 리스트 삭제로. 풀 해석은 데이터(`CardPackData`)가 소유 — 상점 미리보기가 생기면 같은 메서드를 쓴다(현재 미리보기 소비자 없음).
-- **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(팩 결제 재화, refundAmount)`. 환급 **액수**는 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘기고(상점 SO 전역값 폐기), 환급 **재화 종류**는 `CardPackData.priceType` 하나가 정한다(→ 재화 분리 섹션). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
+- **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(refundType, refundAmount)`. 종류·액수 **둘 다 `CardPackData`가 쥔다**(2026-08-10 이관 — 구매처는 아무것도 넘기지 않는다). 결제 재화(`priceType`)와 무관하게 저작할 수 있다: UltraPack은 Diamond로 사고 Gold로 환급한다. Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
 - **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
-- **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, 대상 팩 SO·환급액은 각 구매처 뷰가 인스펙터로 소유해 `TryPurchase(pack, refund)`에 직접 넘긴다(진열=뷰 책임).
-- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드. ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
+- **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, **진열할 팩 목록**만 각 구매처 뷰가 인스펙터로 소유한다(진열=뷰 책임). 환급은 2026-08-10에 팩 SO로 다시 모였다 — 뷰는 `TryPurchase(pack)`에 팩만 넘긴다.
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률·**중복 환급 종류/액수** 전부 `CardPackData` SO(코드 미수정). ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
 
 | 클래스 | 파일 | 태스크 |
 |---|---|---|
-| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
+| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·priceType·price·drawCount·uniqueDraw·refundType·refundAmount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
 | `WeightedCard` · `RankPackPool` (값, co-locate) | `OutGame/CardPack/CardPackData.cs` — `card·weight(0 이하=1)` / `minGrade·cards` | E-14 |
-| `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData, long refund)` | E-15 |
+| `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData)` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
 
 ---
@@ -564,7 +564,7 @@ flowchart TD
     end
 
     DL["DataLibrary<br/>전역 SO 주입 창구<br/>(RewardService.SetConfig 선례)"]:::chg
-    HUD["RankHud (UI/HUD)<br/>RankBadge(Image) · RankPower(TMP)<br/>최초 렌더 = Start()"]:::new
+    HUD["RankHud (UI/HUD)<br/>RankBadge(Image) · RankText(TMP) · RankPips×4<br/>최초 렌더 = Start()<br/>※ 포인트 수치 표시는 없다(아래 랭크 연출 개편)"]:::new
 
     DSM --> USD
     USD --- RSD
@@ -630,7 +630,7 @@ flowchart TD
         MGR["RankManager<br/>[H-33 시점 무수정 → 등급 재설계에서 동결 해제]<br/>GetInfo → 도달 티어"]
         RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
         INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Reward(CurrencyGain) · State"]:::new
-        HAND["RankUpHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)"]:::new
+        HAND["RankResultHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)<br/>※ 개명 전 이름 RankUpHandoff"]:::new
     end
 
     subgraph ui["UI (씬 직접 저작 — PooledUIBase 아님)"]
@@ -653,13 +653,39 @@ flowchart TD
     PANEL -->|Claim| RMGR
     RMGR -->|"지급 + 영속 1회"| CUR
     RMGR -.->|OnChanged| PANEL
-    MGR -.->|"전투 씬: 승급이면 Set"| HAND
-    HAND -.->|"로비 Start: TryConsume 1회<br/>→ 패널 자동 오픈 + 도달 행 연출"| PANEL
+    MGR -.->|"전투 씬: 정산마다 Set(승패 무관)"| HAND
+    HAND -.->|"로비: LobbyRankEffectDirector가 TryConsume<br/>(패널 자동 오픈은 폐지 — 아래 랭크 연출 개편)"| PANEL
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
 ```
 
+### 랭크 연출 개편 — 자동 팝업 폐지 · 배지 반응 (2026-08-10)
+
+보상 패널이 로비 복귀 즉시 자동으로 열리던 흐름을 걷어내고, **받을 것이 있다는 알림 점**과 **배지 반응**으로 나눴다.
+포인트 수치 표시(`RankBadge/PointText`)는 화면에서 삭제했다 — 증감량은 조각 개수로만 비친다.
+
+| 바뀐 것 | 전 | 후 |
+|---|---|---|
+| 캐리어 | `RankUpHandoff` · **티어 상승일 때만** 실림 | `RankResultHandoff` · 정산마다 실림(`Delta==0 && !IsTierUp`이면 스스로 거름). 연속 전투는 `Delta` 누적 + 도달 최고 티어 |
+| 소비처 | `RankRewardPanel.Start` 코루틴 | `LobbyRankEffectDirector`(`GainEffectLayer`에 부착 — 탭과 무관하게 항상 활성) |
+| 복귀 화면 | 승급 연출 후 **패널 자동 오픈** | 조각이 배지로 수렴 → 승급 연출 → 끝. 패널은 유저가 `RankReward` 버튼으로 연다 |
+| 보상 안내 | 없음(패널이 직접 떴다) | `RankRewardAlertDot` 배선(`RankReward/Dot`) — `HasAnyClaimable` 단일 근거 |
+
+**연출 순서의 근거**: 조각이 다 꽂힌 **뒤에** 핍이 켜진다. 그래서 `RankHud.BuildTierUp`의 "과거 상태 되돌리기"를 시퀀스 첫 콜백에서 **조립 시점 즉시 실행**으로 옮겼다 — 앞 단계가 도는 동안 새 핍이 이미 켜져 있으면 인과가 뒤집힌다.
+디렉터가 승급 시퀀스만 **커버 아래에서 조립해 `Pause`**로 들고 있다가 조각이 끝난 뒤 `Play`하는 이유도 같다(유저가 처음 보는 화면이 "오르기 전"이어야 한다).
+
+**단계를 한 시퀀스에 중첩하지 않는다.** `RankHud`는 탭 전환 등에서 자기 연출을 스스로 `Kill`하는데, 중첩된 하위를 밖에서 죽이면 부모 시퀀스가 어긋난다(DOTween은 네스티드 트윈의 개별 제어를 지원하지 않는다). 그래서 디렉터는 코루틴으로 `Play` → `WaitForKill` → 다음 단계 순으로 잇는다 — 개편 전 `RankRewardPanel.Start`가 쓰던 관용구와 같다.
+같은 이유로 디렉터 `OnDisable`은 **재생에 닿지 못한 승급 시퀀스를 걷는다** — 정지한 채 남으면 `RankHud.Render`의 연출 가드를 영영 막아 표시가 과거에 고착된다.
+
+| 신규/변경 파일 | 역할 |
+|---|---|
+| `UI/Lobby/LobbyRankEffectDirector.cs` 🆕 | 캐리어 소비 · 커버 대기 · 승리/패배/승급 조립. 재화 디렉터와 분리(타임라인이 다르고 마스터 공유 이득이 없다) |
+| `UI/HUD/RankHud.cs` | `pointText` 제거 · `BadgeRect` / `PlayGainImpact(bool)` / `BuildLossReaction()` 추가 |
+| `OutGame/Rank/RankResultHandoff.cs` | 개명 + 병합 규칙 재작성 |
+| `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` | 자동 오픈 경로와 `PlayTierUpEffect` 제거(최상위 행은 `readyPulse`가 이미 상시 강조) |
+
+**알려진 한계**: 튜토리얼 졸업(`OutgameTutorialRunner.CompleteSequence`)은 로비 세션 **중간**에 `Set`을 부르므로 디렉터의 `Start`가 지난 뒤다 → 그 결과는 다음 로비 진입에서 소비된다(개편 전과 동일).
 
 
 ### 매치 덱 선택·편집 (`UI/Match/`) — ✅ 코드+검수 완료 (2026-08-03), 프리팹·씬 저작 대기
@@ -1198,7 +1224,7 @@ sequenceDiagram
 
 #### 단일 진실원
 
-- **팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘기고 종류는 팩이 정한다 → `PackShowcaseController`·`TutorialStepDef`·`OutgameTutorialRunner` 시그니처 무변경(따라서 `TutorialStepDefDrawer`의 `"duplicateRefundGold"` 문자열 참조도 그대로 산다).
+- ~~**팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘긴다.~~ → **2026-08-10 개정**: 환급이 결제에서 떨어져 나갔다. 아래 "중복 환급 저작의 팩 SO 이관" 참조.
 - **전투 보상 재화** = `BattleReward.rewardType`. **랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용). **생산 행 재화** = 기존 `CatalogRow.RewardType`.
 - 세 SO 필드 모두 기본값 `Gold` → **기존 에셋 재저작 불필요**.
 
@@ -1235,7 +1261,7 @@ RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
 | `UI/Common/GoldGainEffectPlayer.cs` | `CurrencyGainEffectPlayer.cs` | 씬 인스턴스 0장(전량 런타임 자가설치)이라 개명 리스크 0 |
 | `RankTier.RewardGold` · `RankRewardInfo.RewardGold` | `Reward`(`CurrencyGain`) | 직렬화 아님 |
 
-**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`rewardGold`·`duplicateRefundGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. 개명하면 저작 자산 위험만 늘고 얻는 게 없다.
+**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`rewardGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. 개명하면 저작 자산 위험만 늘고 얻는 게 없다. (`duplicateRefundGold`는 2026-08-10 이관에서 삭제됐다 — 아래 절 참조.)
 
 #### 알려진 잔여 이슈 (스코프 밖)
 
@@ -1243,3 +1269,44 @@ RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
 - **같은 재화를 두 소스가 동시에 올릴 때의 Hold 경합**은 기존 동작 유지(마지막 Hold가 이김). `Play`(m_current 추적)와 `BuildGain`(호출자 시퀀스에 위임, 미추적)이 같은 종류에서 겹치면 앞 코인이 `ClearCoins`로 걷힌다 — 리팩터링 이전과 동일하며 회귀 아님.
 - **같은 종류 HUD 2장 공존 시** 나중에 켜진 쪽이 꺼지면 레지스트리가 비고 살아 있는 쪽이 재등록되지 않는다. 현재 배치(종류당 1장)에선 미발현.
 - 비활성 HUD는 등록되지 않으므로 **그 재화 연출이 스킵**된다(이전엔 비활성 HUD를 찾아 숫자만 올렸다). 지급·저장과 무관해 무해.
+
+---
+
+### 중복 환급 저작의 팩 SO 이관 (`OutGame/CardPack/`) — ✅ 코드+에셋 완료 (2026-08-10, Play 검증 대기)
+
+**한 줄**: "중복 카드에 무엇을 얼마나 돌려주는가"가 구매처 뷰·튜토리얼 스텝에서 **`CardPackData` 하나**로 모였다.
+
+#### 왜
+
+환급은 팩의 규칙인데 저작 위치가 팩 밖에 있었다. 그 결과 두 가지가 굳어 있었다.
+
+- **액수**가 `PackShowcaseController.duplicateRefundGold`(뷰 인스펙터) 1개 → `ResolvePack`이 캐러셀 인덱스와 무관하게 같은 값을 반환 → **팩별 차등 불가**. 튜토리얼은 같은 값을 스텝에 또 저작(이중 저작).
+- **종류**가 `priceType`에 묶여 → 다이아로 결제하는 `UltraPack`이 **다이아를 환급**(팩 가격 80에 중복 1장당 10).
+
+#### 무엇이 바뀌었나
+
+| | 전 | 후 |
+|---|---|---|
+| 종류 | `CardPackData.priceType` (결제와 공유) | `CardPackData.refundType` (독립) |
+| 액수 | 호출자가 인자로 전달 | `CardPackData.refundAmount` (`[Min(0)]`) |
+| 진입점 | `TryPurchase(pack, _refundGold)` | `TryPurchase(pack)` |
+
+**삭제된 심볼**: `PackShowcaseController.duplicateRefundGold`·`m_forcedRefund` / `TutorialStepDef.duplicateRefundGold`·`DuplicateRefundGold`·`UsesRefundGold` / `TutorialStepDefDrawer`의 `"duplicateRefundGold"` 노출 분기.
+**축소된 시그니처**: `ResolvePack(out CardPackData)` / `TutorialStepDef.TryGetForcedPack(out CardPackData)` / `OutgameTutorialRunner.TryGetForcedPack(out CardPackData)`.
+
+#### 저작값 (전 팩 명시 — 필드 초기값에 기대지 않는다)
+
+| 에셋 | priceType / price | refundType / refundAmount |
+|---|---|---|
+| `NormalPack` | Gold 200 | Gold 10 |
+| `SpecialPack` | Gold 500 | Gold 10 |
+| `UltraPack` | **Diamond 80** | **Gold 10** ← 종류만 전환(액수는 추후 밸런싱) |
+| `StarterPack` · `SynergyPack` | Gold 0 | Gold **0** |
+| `KeywordPack` | Gold 0 | Gold 10 |
+
+`Tab_Pack.prefab` · `OutgameTutorial.asset` · `TriggeredTutorial.asset`에서 `duplicateRefundGold` 키 전량 제거.
+
+#### 남은 것 (스코프 밖)
+
+- 환급 칩·총합 배지의 **코인 아이콘은 여전히 프리팹에 골드로 굳어 있다**. 지금 저작값은 전 팩 Gold라 표시가 맞지만, `refundType`을 Diamond로 저작하는 순간 아이콘만 골드로 남는다 — 위 "알려진 잔여 이슈"의 재화 아이콘 조회 창구와 같은 문제다.
+- `PackStandaloneBoot.dummyRefund`는 유지(테스트 씬이 임의 값으로 연출을 검증하는 더미 — 지갑을 건드리지 않는다). 종류만 `dummyPack.RefundType`을 따른다.

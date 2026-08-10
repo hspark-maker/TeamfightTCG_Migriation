@@ -170,6 +170,7 @@
 > **HUD 반납 결과(2026-07-27)**: 신규 `UI/HUD/RankHud.cs` 1개(수정 파일 0, 산출 계약 0). `Start()` 최초 렌더 + `OnEnable`의 `m_started` 가드로 위 함정 회피, 이벤트 구독 0(`OnDisable` 없음), `Badge`/`Points` 2필드만 소비(`IsMaxTier` 미참조 → 검수 유보 ① 회피), 배지 폴백 배열 없음(진실원 = `RankConfig.tiers[].badge` 단일). tcg-reviewer 검수 **발견 0**, Unity 콘솔 컴파일 에러 0.
 > **씬 배선도 이 세션에서 완료**(`RankInfo`에 `RankHud` 부착 + `badgeImage`→`RankBadge`, `pointText`→`RankPower/Text`, `RankReward` 비활성). 배선은 `LobbyScene`이 에디터에 **dirty 상태로 열려 있어** YAML 직접 편집 대신 에디터 API(Undo 등록)로 수행했고, **씬 저장은 사용자 몫으로 남겨 뒀다**(사용자의 다른 미저장 변경과 함께 저장 여부를 판단하도록). ⚠️ 저장 전에 씬을 discard하면 배선이 날아간다.
 > **도메인 H 코드 종결** — 남은 건 `RankConfig.asset` 저작·배선 + 티어 배지 아트(에셋/아트 인계분).
+> **연출 개편(2026-08-10)으로 위 기록 중 2건이 갱신됨**: ① `HasAnyClaimable` 소비처 0 → `RankReward/Dot`에 `RankRewardAlertDot` 배선 완료(보상 패널 자동 오픈은 폐지) ② `pointText`→`RankPower/Text` 배선 → **포인트 수치 표시 자체를 삭제**(`RankBadge/PointText` 노드 제거, `RankHud.pointText` 필드 제거). 상세는 `STRUCTURE.md`의 "랭크 연출 개편".
 
 ---
 

@@ -14,39 +14,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RankConfig
   winPoints: 10
   losePoints: 5
+  unrankedDisplayName: Unranked
+  unrankedBadge: {fileID: 21300000, guid: 3fab8619b568843a1a5766e0df6d5300, type: 3}
   grades:
   - grade: 0
     displayName: Bronze
-    badge: {fileID: 21300000, guid: 8baff83bfa190470482abd0dae5c881d, type: 3}
+    badge: {fileID: 21300000, guid: 8cf65c3ef86684908a00c57c340b3b8f, type: 3}
     entryPoints: 100
     pointsPerDivision: 25
+    rewardType: 0
     rewardGold: 100
     rewardGoldPerDivision: 50
   - grade: 1
     displayName: Silver
-    badge: {fileID: 21300000, guid: a41ce061db2614bfa8fe61cd0d085c38, type: 3}
+    badge: {fileID: 21300000, guid: b436adf7ef9c24c86a0085a4088ca7a0, type: 3}
     entryPoints: 200
     pointsPerDivision: 25
+    rewardType: 0
     rewardGold: 300
     rewardGoldPerDivision: 50
   - grade: 2
     displayName: Gold
-    badge: {fileID: 21300000, guid: 5e0c4d6941cc74f0da0fdae5cb820f39, type: 3}
+    badge: {fileID: 21300000, guid: 8b4adf7a4e9404fc0ba3f5ebde482e6c, type: 3}
     entryPoints: 300
     pointsPerDivision: 25
+    rewardType: 0
     rewardGold: 500
     rewardGoldPerDivision: 100
   - grade: 3
-    displayName: Ruby
-    badge: {fileID: 21300000, guid: 3c8c79709eb3c47d99282852a7ca0958, type: 3}
+    displayName: Platinum
+    badge: {fileID: 21300000, guid: 98740b435ec5846ae98c8f153321003d, type: 3}
     entryPoints: 400
     pointsPerDivision: 25
+    rewardType: 0
     rewardGold: 900
     rewardGoldPerDivision: 100
   - grade: 4
     displayName: Diamond
-    badge: {fileID: 21300000, guid: fba201cf2cb14452bae43a674add4f43, type: 3}
+    badge: {fileID: 21300000, guid: 0f78de46475ea43c1a07d24efa7761f5, type: 3}
     entryPoints: 500
     pointsPerDivision: 25
+    rewardType: 0
     rewardGold: 1400
     rewardGoldPerDivision: 200
+  aiCardLevels: 010000000100000002000000020000000300000003000000040000000500000006000000060000000700000007000000080000000800000009000000090000000a0000000a0000000a0000000a000000

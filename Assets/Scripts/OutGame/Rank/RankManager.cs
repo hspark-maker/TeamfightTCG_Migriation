@@ -41,15 +41,18 @@ public static class RankManager
         t_config.TryGetTier(t_index, out RankTier t_tier);
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
-        // 미도달이면 표시명과 다음 목표를 첫 티어 기준으로 바꿔 준다 — 배지·등급은 첫 티어 것을 그대로 쓴다.
+        // 미도달이면 표시명·배지·다음 목표를 언랭크 기준으로 바꿔 준다 — 등급은 첫 티어 것을 그대로 쓴다.
         bool t_unranked = t_points < t_config.FirstTierPoints;
+
+        // 언랭크 배지가 미저작이면 첫 등급 배지로 폴백한다(빈 배지보다 낫다).
+        Sprite t_badge = t_unranked && t_config.unrankedBadge != null ? t_config.unrankedBadge : t_tier.Badge;
 
         return new RankInfo(
             t_index,
             t_tier.Grade,
             t_tier.Division,
             t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
-            t_tier.Badge,
+            t_badge,
             t_points,
             t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
             !t_unranked && !t_hasNext,

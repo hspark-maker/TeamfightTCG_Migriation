@@ -28,14 +28,14 @@ public static class OutgameTutorialRunner
 
     /// <summary>온보딩 졸업 처리의 유일한 창구(멱등). 완료 낙인과 함께 첫 랭크 티어에 진입시킨다 —
     /// 튜토리얼 전투로 쌓은 포인트는 첫 티어 임계치에 못 미치므로(승점 × 3전), 진입은 전투가 아니라 졸업이 결정한다.
-    /// 진입 결과는 캐리어에 실어 둔다(로비 도달 시 보상 패널이 소비해 자동으로 열린다).</summary>
+    /// 진입 결과는 캐리어에 실어 둔다(로비 도달 시 랭크 연출 디렉터가 소비한다).</summary>
     public static void CompleteSequence()
     {
         if (OutgameTutorialProgress.IsCompleted) return;
 
         OutgameTutorialProgress.Complete();
 
-        if (RankManager.TryEnterFirstTier(out var t_entry)) RankUpHandoff.Set(t_entry);
+        if (RankManager.TryEnterFirstTier(out var t_entry)) RankResultHandoff.Set(t_entry);
     }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
@@ -84,12 +84,11 @@ public static class OutgameTutorialRunner
     }
 
     // 이번 스텝이 상점 진열·판매 대상을 지정했으면 true(미지정이면 상점 기본 진열)
-    public static bool TryGetForcedPack(out CardPackData _pack, out long _refundGold)
+    public static bool TryGetForcedPack(out CardPackData _pack)
     {
-        _pack       = null;
-        _refundGold = 0;
+        _pack = null;
 
-        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _pack, out _refundGold);
+        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _pack);
     }
 
     // 이번 스텝이 자동 편성으로 채울 카드를 지정했으면 true(미지정이면 일반 편성 규칙)

@@ -17,7 +17,7 @@ public class PackStandaloneBoot : MonoBehaviour
     [Header("신규/중복 섞기")]
     [Tooltip("켜면 홀수 번째 카드를 중복으로 만든다. 신규 연출만 반복되면 중복 표현을 검증할 수 없다.")]
     [SerializeField] bool alternateDuplicates;
-    [Tooltip("중복으로 만든 카드에 붙일 환급 Gold(표시용 — 실제 지갑은 건드리지 않는다).")]
+    [Tooltip("중복으로 만든 카드에 붙일 환급량(표시용 — 실제 지갑은 건드리지 않는다).")]
     [Min(0)] [SerializeField] long dummyRefund = 10;
 
     [Header("획득 후 목적지")]
@@ -47,7 +47,7 @@ public class PackStandaloneBoot : MonoBehaviour
         }
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
-        var t_refundType = dummyPack != null ? dummyPack.PriceType : ECurrencyType.Gold;
+        var t_refundType = dummyPack != null ? dummyPack.RefundType : ECurrencyType.Gold;
         PackHandoff.Set(OpenedPack.CreateSuccess(t_packId, t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneBoot] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");

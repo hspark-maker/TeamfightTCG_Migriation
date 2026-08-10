@@ -950,7 +950,7 @@ GameObject:
   - component: {fileID: 5806360662642137157}
   - component: {fileID: 4963108934289220070}
   m_Layer: 0
-  m_Name: GoldImg
+  m_Name: PriceIcon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1105,12 +1105,14 @@ MonoBehaviour:
   buyButton: {fileID: 8859507605474475060}
   packNameText: {fileID: 2409881490114025726}
   priceText: {fileID: 4346100424576629787}
+  priceIcon: {fileID: 4963108934289220070}
+  goldIcon: {fileID: 21300000, guid: a779b38098fc44264b31817b3dca64ba, type: 3}
+  diamondIcon: {fileID: 21300000, guid: 229efd4609d7d463c9d7c812c98cf229, type: 3}
   packs:
   - {fileID: 11400000, guid: dc5d796287646fe44937453728a1cf97, type: 2}
   - {fileID: 11400000, guid: 022c53aec58d27948af9fff21e9d76fe, type: 2}
   - {fileID: 11400000, guid: 14ae3da35afdd404894e0b4b8eafd1cd, type: 2}
   carousel: {fileID: 7471955986726886911}
-  duplicateRefundGold: 10
 --- !u!1 &6487736475670867845
 GameObject:
   m_ObjectHideFlags: 0

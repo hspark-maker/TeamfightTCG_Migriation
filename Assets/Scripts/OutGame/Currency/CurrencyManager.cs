@@ -21,6 +21,7 @@ public static class CurrencyManager
         var t_data = DataSaveManager.Data.currency;
         s_currencies[(int)ECurrencyType.Gold]    = t_data.gold;
         s_currencies[(int)ECurrencyType.Diamond] = t_data.diamond;
+        s_currencies[(int)ECurrencyType.Energy]  = t_data.energy;
     }
 
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화
@@ -29,6 +30,7 @@ public static class CurrencyManager
         var t_data = DataSaveManager.Data.currency;
         t_data.gold    = s_currencies[(int)ECurrencyType.Gold];
         t_data.diamond = s_currencies[(int)ECurrencyType.Diamond];
+        t_data.energy  = s_currencies[(int)ECurrencyType.Energy];
         DataSaveManager.Save();
     }
 
