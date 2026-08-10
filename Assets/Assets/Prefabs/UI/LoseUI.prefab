@@ -622,6 +622,8 @@ MonoBehaviour:
   gatherDuration: 0.32
   coinInterval: 0.06
   popDuration: 0.12
+  angleStart: 18
+  angleSpan: 360
 --- !u!1 &3287729154821830570
 GameObject:
   m_ObjectHideFlags: 0
@@ -759,6 +761,7 @@ MonoBehaviour:
   coinBurst: {fileID: 4467058774673947208}
   rankPointText: {fileID: 3940828187706244952}
   rankBurst: {fileID: 8760854948223052529}
+  rankLine: {fileID: 5900842752905199912}
   hintGroup: {fileID: 7084887883192255366}
   dimDuration: 0.2
   enterDuration: 0.45
@@ -901,6 +904,8 @@ MonoBehaviour:
   gatherDuration: 0.32
   coinInterval: 0.06
   popDuration: 0.12
+  angleStart: 18
+  angleSpan: 360
 --- !u!1 &5879143412218995848
 GameObject:
   m_ObjectHideFlags: 0

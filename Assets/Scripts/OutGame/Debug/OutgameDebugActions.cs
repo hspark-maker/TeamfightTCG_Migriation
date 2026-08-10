@@ -50,7 +50,7 @@ public static class OutgameDebugActions
     // 튜토리얼 완료 낙인 + 떠 있는 게이트 해제
     public static void SkipTutorial()
     {
-        OutgameTutorialProgress.Complete();
+        OutgameTutorialRunner.CompleteSequence();   // 스킵도 졸업 — 첫 랭크 진입을 동일하게 받는다
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 

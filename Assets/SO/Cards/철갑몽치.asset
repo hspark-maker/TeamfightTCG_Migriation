@@ -24,8 +24,8 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 1806183720295a04c948b4d7af36c3a6, type: 3}
   battleImage: {fileID: 21300000, guid: b7741208eda4c99fd01c8037e2dcfd7e, type: 3}
   deckPreview: {fileID: 21300000, guid: c47c14e8b65f636448babc987cbc47dc, type: 3}
-  hpGainByLevel: 
-  keywordUnlockLevel: 0
+  hpGainByLevel: 0000000000000000020000000100000002000000010000000100000002000000020000000200000002000000
+  keywordUnlockLevel: 2
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
