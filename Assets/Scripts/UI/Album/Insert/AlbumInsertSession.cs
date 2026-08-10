@@ -15,6 +15,12 @@ public class AlbumInsertSession : MonoBehaviour
 {
     public static bool IsRunning { get; private set; }
 
+    /// <summary>세션이 큐를 인계받아 처리를 끝냈다(성공·중단 무관). 안내가 다음 스텝을 이어 걸 신호다.</summary>
+    public static event Action OnAnyFinished;
+
+    /// <summary>안내가 이 세션을 몰고 있다 — 탭 이탈을 삼키고, 끝나면 페이지 오버레이까지 걷는다.</summary>
+    public static bool TutorialMode;
+
     [Header("바깥 연결")]
     [SerializeField] AlbumTabController   albumTabController;
     [SerializeField] AlbumPageOverlayView pageOverlay;
@@ -36,6 +42,11 @@ public class AlbumInsertSession : MonoBehaviour
     [Range(0f, 0.3f)] [SerializeField] float reboundAmount = 0.05f;
     [Tooltip("손을 댄 뒤 이만큼 아무 입력이 없으면 손가락 안내를 되살린다.")]
     [SerializeField] float  hintIdleDelay    = 3f;
+    [Header("건너뛰기 자동 진행")]
+    [Tooltip("건너뛴 뒤 카드 한 장이 저절로 다 밀려 들어가는 데 걸리는 시간.")]
+    [SerializeField] float  autoSeatDuration = 0.5f;
+    [Tooltip("자동 진행에서 카드가 뜬 뒤 밀리기 시작할 때까지의 텀. 0이면 뜨자마자 빨려 들어가 장수가 안 읽힌다.")]
+    [SerializeField] float  autoStepGap      = 0.15f;
     [Header("안착 마무리 펄스")]
     [Tooltip("안착 직후 칸이 잠깐 줄어들었다 돌아오는 배율(1보다 작게).")]
     [SerializeField] float  settlePulseScale    = 0.9f;
@@ -48,6 +59,8 @@ public class AlbumInsertSession : MonoBehaviour
     AlbumTheme        m_openTheme;   // 지금 오버레이가 열고 있는 테마(오버레이는 페이지만 노출한다)
     RectTransform     m_slotRect;    // 이번 스텝 칸의 rect — 안착 마무리 펀치 대상
     Coroutine     m_routine;
+    bool          m_notifyOnFinish;// Begin을 시도한 세션만 완료를 알린다 — 배선 누락으로 시작조차 못 해도 한 번은 알려야 안내가 안 멎는다
+    bool          m_autoPlay;      // 건너뛰기 이후 — 스텝은 그대로 두고 드래그 대기만 자동 트윈으로 대체한다
     bool          m_seatRequested;
     bool          m_releaseRequested;
     bool          m_fingerPaused;
@@ -57,6 +70,8 @@ public class AlbumInsertSession : MonoBehaviour
     public void Begin()
     {
         if (IsRunning) return;
+
+        m_notifyOnFinish = true;
 
         // ⚠ 순서가 중요하다: 이 컴포넌트는 Panel_PageOverlay 자식이라 오버레이가 닫혀 있으면 GameObject가 비활성이고,
         //   비활성 상태에서 StartCoroutine을 부르면 예외다.
@@ -82,7 +97,8 @@ public class AlbumInsertSession : MonoBehaviour
             return;
         }
 
-        IsRunning = true;
+        IsRunning  = true;
+        m_autoPlay = false;
 
         var t_first = m_steps[0];
         m_openTheme = t_first.Theme;
@@ -102,8 +118,11 @@ public class AlbumInsertSession : MonoBehaviour
             return;
         }
 
-        // 탈출로는 건너뛰기 하나 — 다른 탭으로 나가려 하면 남은 전부를 안착시키고 보낸다.
-        if (lobbyTabController != null) lobbyTabController.SetLeaveGuard(_p => { SkipAll(); _p(); });
+        // 다른 탭으로 나가려 하면 자동 진행이 아니라 즉시 끝낸다 — 안 보이는 화면에서 연출을 계속 돌릴 이유가 없다.
+        // 안내 중에는 이탈 자체를 삼킨다 — 선택된 탭은 버튼이 꺼지고 Focus가 대신하므로(LobbyTabController.Select),
+        // 유저가 먼저 그 탭으로 가 버리면 뒤이어 그 버튼을 가리키는 안내가 영영 뜨지 못한다. 탈출로는 건너뛰기다.
+        if (lobbyTabController != null)
+            lobbyTabController.SetLeaveGuard(_p => { if (TutorialMode) return; AbortAll(); _p(); });
         if (pageOverlay != null) pageOverlay.SetInteractionLocked(true);
 
         if (group != null) group.blocksRaycasts = true;
@@ -122,7 +141,7 @@ public class AlbumInsertSession : MonoBehaviour
             dragger.OnGrab     += this.HandleGrab;
         }
 
-        if (hint != null) hint.OnSkip += this.SkipAll;
+        if (hint != null) hint.OnSkip += this.SkipToAuto;
     }
 
     void OnDisable()
@@ -136,7 +155,7 @@ public class AlbumInsertSession : MonoBehaviour
             dragger.Interactable = false;
         }
 
-        if (hint != null) hint.OnSkip -= this.SkipAll;
+        if (hint != null) hint.OnSkip -= this.SkipToAuto;
 
         this.KillTweens();
         m_routine = null;
@@ -163,7 +182,7 @@ public class AlbumInsertSession : MonoBehaviour
         // 여기서 이어받지 않으면 큐에 영구 잔류하고, 다음 세션이 위장 없는 카드를 스텝으로 만들어
         // 이미 꽂힌 슬롯 위에 카드가 뜬다.
         // finally — 중간에 예외가 나도 위장·잠금·가드가 살아남으면 카드가 영영 빈 칸이 된다.
-        // (SkipAll의 StopCoroutine 경로는 finally가 돌지 않으므로 그쪽에서 직접 Finish를 부른다)
+        // (AbortAll의 StopCoroutine 경로는 finally가 돌지 않으므로 그쪽에서 직접 Finish를 부른다)
         try
         {
             while (m_steps.Count > 0)
@@ -178,7 +197,10 @@ public class AlbumInsertSession : MonoBehaviour
                     yield return this.Spawn(t_step, _ok => t_spawned = _ok);
                     if (!t_spawned) continue;   // 슬롯을 못 얻은 카드는 Spawn이 이미 위장을 풀었다
 
-                    yield return this.AwaitDrag();
+                    // 건너뛴 뒤에는 손을 기다리지 않는다 — 뜬 카드를 잠깐 보여 주고 그대로 안착 트윈에 넘긴다.
+                    if (m_autoPlay) yield return new WaitForSecondsRealtime(this.autoStepGap);
+                    else            yield return this.AwaitDrag();
+
                     yield return this.Seat(t_step);
                 }
 
@@ -248,7 +270,12 @@ public class AlbumInsertSession : MonoBehaviour
         cardVisual.gameObject.SetActive(true);
         UiPunch.Play(cardVisual.transform);
 
-        if (hint != null) hint.Show(this.guideMessage, sleeve.CardHolder);
+        // 자동 진행 중엔 안내가 거짓말이 된다 — 밀라고 해 놓고 저절로 들어가면 입력이 씹힌 것으로 읽힌다.
+        if (hint != null)
+        {
+            if (m_autoPlay) hint.Hide();
+            else            hint.Show(this.guideMessage, sleeve.CardHolder);
+        }
 
         m_seatRequested    = false;
         m_releaseRequested = false;
@@ -256,7 +283,7 @@ public class AlbumInsertSession : MonoBehaviour
         m_idleTime         = 0f;
 
         this.SetGroupAlpha(1f);
-        dragger.Interactable = true;
+        dragger.Interactable = !m_autoPlay;
 
         _result?.Invoke(true);
     }
@@ -265,7 +292,8 @@ public class AlbumInsertSession : MonoBehaviour
     // 손을 떼면 살짝 되밀릴 뿐 **민 만큼은 남는다**. 유휴가 길어지면 손가락 안내를 되살린다.
     IEnumerator AwaitDrag()
     {
-        while (!m_seatRequested)
+        // 미는 도중 건너뛰기를 누르면 민 자리에서 이어 받는다 — 되돌렸다 다시 밀면 진행이 되감기는 것으로 보인다.
+        while (!m_seatRequested && !m_autoPlay)
         {
             if (m_releaseRequested)
             {
@@ -292,12 +320,19 @@ public class AlbumInsertSession : MonoBehaviour
         dragger.Interactable = false;
         if (hint != null) hint.PauseFinger();
 
+        // 자동 진행은 HandleSeat를 안 거친다 — 잔떨림을 여기서 끄지 않으면 안착한 카드가 계속 떤다.
+        if (m_autoPlay && sleeve != null) sleeve.SetPushing(false);
+
+        // 자동 진행은 진행도 0부터 밀어야 하므로, 거의 다 민 뒤의 마무리와 같은 시간·감속이면 카드가 빨려 들어간다.
+        float t_duration = m_autoPlay ? this.autoSeatDuration : this.seatDuration;
+        Ease  t_ease     = m_autoPlay ? Ease.InOutCubic       : Ease.OutCubic;
+
         // ⚠ DOKill은 타깃 단위다 — 안착 트윈은 CardHolder, 카드 비주얼 펀치는 CardVisualView로 노드를 나눈다.
         var t_holder = sleeve.CardHolder;
         if (t_holder != null)
         {
             t_holder.DOKill();
-            yield return this.TweenProgress(t_holder, 1f, this.seatDuration, Ease.OutCubic).WaitForCompletion();
+            yield return this.TweenProgress(t_holder, 1f, t_duration, t_ease).WaitForCompletion();
         }
 
         // 트윈은 목표만 끝까지 민다 — 그림은 slipGlide만큼 늦게 따라온다. 다 따라붙기 전에 바꿔치기하면
@@ -356,8 +391,26 @@ public class AlbumInsertSession : MonoBehaviour
         if (dragger != null) dragger.SyncProgress(t_to);
     }
 
+    // 건너뛰기 — 남은 스텝을 버리지 않는다. 손만 떼고, 나머지가 한 장씩 저절로 꽂히는 것을 끝까지 보여준다.
+    // (연출을 통째로 날리면 "무엇을 몇 장 받았는지"가 화면에서 사라진다 — 그 정보가 이 연출의 값이다.)
+    void SkipToAuto()
+    {
+        if (!IsRunning || m_autoPlay) return;
+
+        m_autoPlay = true;
+
+        if (dragger != null) dragger.Interactable = false;
+        if (hint != null) hint.Hide();
+
+        // 손이 닿은 채 눌렀으면 OnEndDrag가 무시돼 잔떨림이 켜진 채 남는다 — 아무도 안 미는 카드가 떨면 안 된다.
+        if (sleeve != null) sleeve.SetPushing(false);
+
+        // 되밀림 트윈이 돌고 있으면 그 대기부터 끊어야 자동 진행이 이 자리에서 바로 이어진다.
+        if (sleeve != null && sleeve.CardHolder != null) sleeve.CardHolder.DOKill();
+    }
+
     // 남은 스텝을 전부 버리고 끝낸다. AlbumInsertMask.Clear()가 나머지를 한 번에 드러낸다.
-    void SkipAll()
+    void AbortAll()
     {
         if (!IsRunning) return;
 
@@ -380,6 +433,7 @@ public class AlbumInsertSession : MonoBehaviour
         m_openTheme = null;
         m_slotRect  = null;
         m_routine   = null;
+        m_autoPlay  = false;
 
         if (dragger != null) dragger.Interactable = false;
         if (hint != null) hint.Hide();
@@ -398,6 +452,15 @@ public class AlbumInsertSession : MonoBehaviour
         // 전면 Blocker가 남아 있으면 세션이 끝난 뒤에도 도감 입력을 계속 먹는다.
         if (group != null) group.blocksRaycasts = false;
         if (gameObject.activeSelf) gameObject.SetActive(false);
+
+        // 안내가 몰던 세션이면 오버레이까지 걷는다 — 다음 안내가 하단 탭바를 쓰는데 오버레이 딤이 덮는다.
+        // ⚠ IsRunning을 내린 뒤여야 한다. 앞에 두면 오버레이 비활성이 OnDisable → ReleaseGuards → Finish 재진입을 부른다.
+        if (TutorialMode && pageOverlay != null) pageOverlay.Close();
+
+        // 화면이 정리된 뒤에 알린다 — 듣는 쪽이 곧바로 다음 안내를 그 화면 위에 건다.
+        if (!m_notifyOnFinish) return;
+        m_notifyOnFinish = false;
+        OnAnyFinished?.Invoke();
     }
 
     void HandleProgress(float _p)

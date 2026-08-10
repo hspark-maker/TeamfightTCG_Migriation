@@ -139,20 +139,21 @@ public static class OutgameDebugActions
         AlbumInsertQueue.Enqueue(t_cards);
         AlbumInsertMask.HideAll(t_cards);
 
-        // 삽입 패널은 평소 꺼져 있다 — 비활성 포함 탐색이어야 잡힌다.
-        var t_session = Object.FindFirstObjectByType<AlbumInsertSession>(FindObjectsInactive.Include);
-        if (t_session == null)
+        // 도감 탭은 평소 꺼져 있다 — 비활성 포함 탐색이어야 잡힌다.
+        var t_album = Object.FindFirstObjectByType<AlbumTabController>(FindObjectsInactive.Include);
+        if (t_album == null)
         {
             // 위장이 남으면 카드가 영영 빈 칸이다.
             AlbumInsertQueue.Clear();
             AlbumInsertMask.Clear();
 
-            Debug.LogWarning("[OutgameDebug] 씬에 AlbumInsertSession이 없어 삽입 세션을 건너뛴다 — 로비 씬에서 실행할 것.");
+            Debug.LogWarning("[OutgameDebug] 씬에 AlbumTabController가 없어 삽입 세션을 건너뛴다 — 로비 씬에서 실행할 것.");
             return;
         }
 
-        t_session.Begin();
-        Debug.Log($"[OutgameDebug] 앨범 삽입 세션 강제 시작 — {t_cards.Count}장");
+        // 도감 탭이 꺼져 있으면 조용히 대기했다가 탭에 들어가는 순간 재생된다.
+        t_album.TryBeginInsert();
+        Debug.Log($"[OutgameDebug] 앨범 삽입 세션 예약 — {t_cards.Count}장(도감 탭 진입 시 재생)");
     }
 
     // 앨범 저작 순서(테마→페이지→슬롯) 기준 소유 카드 앞 _count장. 해금은 하지 않는다.

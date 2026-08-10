@@ -63,9 +63,10 @@ public class TutorialStepDef
     // 무엇이 이 스텝을 완료시키는가(액션에서 파생)
     public EOutgameTutorialCompletion Completion => action switch
     {
-        EOutgameTutorialAction.Message      => EOutgameTutorialCompletion.Confirm,
-        EOutgameTutorialAction.WaitPurchase => EOutgameTutorialCompletion.Purchase,
-        EOutgameTutorialAction.WaitPackOpen => EOutgameTutorialCompletion.PackOpen,
+        EOutgameTutorialAction.Message         => EOutgameTutorialCompletion.Confirm,
+        EOutgameTutorialAction.WaitPurchase    => EOutgameTutorialCompletion.Purchase,
+        EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
+        EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -108,20 +109,23 @@ public class TutorialStepDef
     // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
     public static bool UsesAnchor(EOutgameTutorialAction _action) => _action switch
     {
-        EOutgameTutorialAction.WaitPackOpen or
-        EOutgameTutorialAction.AutoBattle   or
-        EOutgameTutorialAction.AutoPurchase or
-        EOutgameTutorialAction.DeckGrant    => false,
+        EOutgameTutorialAction.WaitPackOpen    or
+        EOutgameTutorialAction.WaitAlbumInsert or
+        EOutgameTutorialAction.AutoBattle      or
+        EOutgameTutorialAction.AutoPurchase    or
+        EOutgameTutorialAction.DeckGrant       => false,
 
         _ => true,
     };
 
     // 이 액션이 안내 문구를 띄우는가(자동 스텝은 화면에 아무것도 그리지 않는다)
+    // 삽입 대기는 자동 스텝이 아니지만 연출 자체가 손가락·문구를 띄운다 — 겹쳐 그리지 않는다
     public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => _action switch
     {
-        EOutgameTutorialAction.AutoBattle   or
-        EOutgameTutorialAction.AutoPurchase or
-        EOutgameTutorialAction.DeckGrant    => false,
+        EOutgameTutorialAction.WaitAlbumInsert or
+        EOutgameTutorialAction.AutoBattle      or
+        EOutgameTutorialAction.AutoPurchase    or
+        EOutgameTutorialAction.DeckGrant       => false,
 
         _ => true,
     };

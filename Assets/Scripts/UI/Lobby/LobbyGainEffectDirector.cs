@@ -28,8 +28,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
     [Tooltip("도감 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
     [SerializeField] int collectionTabIndex = 4;
     [SerializeField] AlbumTabController albumTabController;
-    [Tooltip("비우면 albumTabController.PageOverlay 아래에서 찾는다.")]
-    [SerializeField] AlbumInsertSession insertSession;
 
     [Header("연출 값")]
     [SerializeField] float tabPunch = 0.3f;
@@ -123,7 +121,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
         }
     }
 
-    // 도감 탭 착지에 이어붙는 삽입 세션. 큐·위장은 이미 걸려 있고 세션이 스스로 소비한다.
+    // 도감 탭 착지에 이어붙는 삽입 세션. 큐·위장은 이미 걸려 있고, 연출을 세우는 일은 도감 탭이 진다 —
+    // 여기서 정하는 것은 "도감 탭을 대신 켜 줄 것인가" 하나뿐이다.
     void StartInsertSession()
     {
         if (!AlbumInsertQueue.HasPending) return;
@@ -131,27 +130,34 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 연속 개봉 — 이미 돌고 있는 세션이 남은 큐까지 가져간다(위장 해제도 그 세션이 한다).
         if (AlbumInsertSession.IsRunning) return;
 
-        var t_session = ResolveInsertSession();
-        if (t_session == null)
+        var t_album = ResolveAlbumTab();
+        if (t_album == null)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] AlbumInsertSession을 찾지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] AlbumTabController를 찾지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
             CancelInsertSession();
             return;
         }
 
-        StartCoroutine(BeginInsertSession(t_session));
-    }
+        // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
+        // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
+        if (OutgameTutorialRunner.IsRunning)
+        {
+            t_album.TryBeginInsert();
+            return;
+        }
 
-    IEnumerator BeginInsertSession(AlbumInsertSession _session)
-    {
         // _fireTrigger는 반드시 false — true면 도감 탭 첫 진입 튜토리얼이 발화해 딤이 삽입 세션을 덮는다.
         if (this.lobbyTabController != null) this.lobbyTabController.Select(this.collectionTabIndex, false);
 
-        // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다.
-        yield return null;
-        Canvas.ForceUpdateCanvases();
+        // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.
+        if (!t_album.isActiveAndEnabled)
+        {
+            Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭을 켜지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            CancelInsertSession();
+            return;
+        }
 
-        _session.Begin();
+        t_album.TryBeginInsert();
     }
 
     // 세션이 시작되지 못한 모든 경로의 정리. 위장이 남으면 카드가 영영 빈 칸이다.
@@ -161,20 +167,13 @@ public class LobbyGainEffectDirector : MonoBehaviour
         AlbumInsertMask.Clear();
     }
 
-    AlbumInsertSession ResolveInsertSession()
+    // 도감 탭은 평소 꺼져 있다 — 비활성 포함으로 찾는다.
+    AlbumTabController ResolveAlbumTab()
     {
-        if (this.insertSession != null) return this.insertSession;
-
         if (this.albumTabController == null)
             this.albumTabController = FindFirstObjectByType<AlbumTabController>(FindObjectsInactive.Include);
-        if (this.albumTabController == null) return null;
 
-        var t_overlay = this.albumTabController.PageOverlay;
-        if (t_overlay == null) return null;
-
-        // 삽입 패널은 페이지 오버레이의 자식이고 평소엔 꺼져 있다.
-        this.insertSession = t_overlay.GetComponentInChildren<AlbumInsertSession>(true);
-        return this.insertSession;
+        return this.albumTabController;
     }
 
     // 재화는 공용 재생기가 조립한다(수치 고정 해제 안전망까지 그 시퀀스에 붙어 온다).

@@ -20,6 +20,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitPackOpen:
             case EOutgameTutorialAction.DeckAutoEquip:
             case EOutgameTutorialAction.BattleStart:
+            case EOutgameTutorialAction.WaitAlbumInsert:
                 return true;
 
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);

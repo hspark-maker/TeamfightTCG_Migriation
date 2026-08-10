@@ -33,11 +33,14 @@ public static class OutgameFeatureLock
     static bool s_running;
 
     // 해당 기능이 열려 있는가(None은 항상 열림)
+    // ⚠ 조회도 반드시 Refresh를 거친다 — 조회가 캐시만 조용히 갱신하면 뒤이은 Refresh가 "변화 없음"으로 보고
+    //   알림을 삼켜, 잠김 룩이 옛 상태에 고착된다(진행으로만 열리는 잠금이라 영영 안 풀린다).
+    //   구독자가 이 안에서 다시 조회해도 그때는 캐시가 최신이라 재귀는 한 단계에서 멎는다.
     public static bool IsUnlocked(EOutgameFeature _feature)
     {
         if (_feature == EOutgameFeature.None) return true;
 
-        Recalculate();
+        Refresh();
         return s_all || s_unlocked.Contains(_feature);
     }
 

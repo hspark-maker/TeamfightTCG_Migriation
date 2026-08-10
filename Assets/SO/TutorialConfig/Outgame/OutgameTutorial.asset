@@ -79,6 +79,46 @@ MonoBehaviour:
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
+    - action: 0
+      anchor: 18
+      guideMessage:
+      unlocks: 05000000
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName:
+    - action: 0
+      anchor: 19
+      guideMessage:
+      unlocks:
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName:
+    - action: 10
+      anchor: 0
+      guideMessage:
+      unlocks:
+      useDim: 0
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName:
+    - action: 0
+      anchor: 6
+      guideMessage: "새로운 카드를 시험해봅시다."
+      unlocks:
+      useDim: 1
+      pack: {fileID: 0}
+      duplicateRefundGold: 0
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName:
     - action: 9
       anchor: 0
       guideMessage: 

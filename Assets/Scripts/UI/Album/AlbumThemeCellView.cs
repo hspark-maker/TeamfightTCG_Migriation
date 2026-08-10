@@ -17,8 +17,9 @@ public class AlbumThemeCellView : MonoBehaviour
     [SerializeField] GameObject doneRow;
 
     AlbumTheme m_theme;
+    bool       m_anchored;   // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다
 
-    public void Bind(AlbumTheme _theme, Action<AlbumTheme> _onOpen)
+    public void Bind(AlbumTheme _theme, Action<AlbumTheme> _onOpen, bool _tutorialTarget = false)
     {
         m_theme = _theme;
 
@@ -52,6 +53,8 @@ public class AlbumThemeCellView : MonoBehaviour
             thumbButton.onClick.RemoveAllListeners();
             thumbButton.onClick.AddListener(() => _onOpen?.Invoke(m_theme));
         }
+
+        ApplyTutorialAnchor(_tutorialTarget);
     }
 
     void Awake()
@@ -59,6 +62,24 @@ public class AlbumThemeCellView : MonoBehaviour
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (thumbButton != null && thumbButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumThemeCellView] 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
+    }
+
+    // 셀은 갤러리가 다시 그릴 때 꺼지거나 교체된다 — 죽은 칸을 가리키는 등록이 남지 않게 여기서 놓는다
+    void OnDisable()
+    {
+        ApplyTutorialAnchor(false);
+    }
+
+    void ApplyTutorialAnchor(bool _on)
+    {
+        if (_on == m_anchored) return;
+        m_anchored = _on;
+
+        var t_rect = thumbButton != null ? thumbButton.transform as RectTransform : null;
+        if (t_rect == null) return;
+
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.AlbumThemeCell, t_rect, thumbButton);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.AlbumThemeCell, t_rect);
     }
 
     void ClaimReward()

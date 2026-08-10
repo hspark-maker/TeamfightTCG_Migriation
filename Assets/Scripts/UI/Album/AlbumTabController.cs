@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -23,6 +24,9 @@ public class AlbumTabController : MonoBehaviour
     bool m_built;
     bool m_overflowWarned;
 
+    AlbumInsertSession m_insertSession;
+    bool m_insertPending;   // 시작 코루틴이 떠 있는 동안의 중복 진입 방지(탭 활성화와 큐 충전이 같은 프레임에 겹친다)
+
     // 삽입 세션이 페이지 오버레이를 직접 몰아야 한다
     public AlbumPageOverlayView PageOverlay => pageOverlay;
 
@@ -30,6 +34,32 @@ public class AlbumTabController : MonoBehaviour
     public void OpenThemePage(AlbumTheme _theme, int _pageIndex)
     {
         if (pageOverlay != null) pageOverlay.Open(_theme, _pageIndex);
+    }
+
+    // 대기 중인 신규 카드가 있으면 삽입 연출을 시작한다. 탭이 꺼져 있으면 무연산 —
+    // 세션이 설 수 있는 조건("탭이 켜져 있고 · 큐에 카드가 있고 · 돌고 있는 세션이 없다")의 단일 판정처라
+    // 큐가 채워지는 순간(획득 연출 끝)과 탭이 켜지는 순간(유저 진입) 양쪽에서 이 하나를 부르면 된다
+    public void TryBeginInsert()
+    {
+        if (!isActiveAndEnabled || m_insertPending) return;
+        if (!AlbumInsertQueue.HasPending || AlbumInsertSession.IsRunning) return;
+
+        // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
+        // 여기서 막지 않으면 테마를 누르라는 스텝을 세션이 대신 해 버린다.
+        if (OutgameTutorialRunner.IsRunning && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
+
+        var t_session = ResolveInsertSession();
+        if (t_session == null)
+        {
+            // 위장이 남으면 그 카드가 도감에서 영영 빈 칸이다 — 연출을 못 하면 그냥 꽂는다
+            Debug.LogError("[AlbumTabController] AlbumInsertSession을 찾지 못해 삽입 연출을 건너뛴다.", this);
+            AlbumInsertQueue.Clear();
+            AlbumInsertMask.Clear();
+            return;
+        }
+
+        m_insertPending = true;
+        StartCoroutine(BeginInsertNextFrame(t_session));
     }
 
     void OnEnable()
@@ -41,6 +71,9 @@ public class AlbumTabController : MonoBehaviour
         AlbumInsertMask.OnChanged += Refresh;
 
         Refresh();
+
+        // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
+        TryBeginInsert();
     }
 
     void OnDisable()
@@ -48,6 +81,29 @@ public class AlbumTabController : MonoBehaviour
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
+
+        // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
+        m_insertPending = false;
+    }
+
+    // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다
+    IEnumerator BeginInsertNextFrame(AlbumInsertSession _session)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        m_insertPending = false;
+        _session.Begin();
+    }
+
+    // 삽입 패널은 페이지 오버레이의 자식이고 평소엔 꺼져 있다
+    AlbumInsertSession ResolveInsertSession()
+    {
+        if (m_insertSession != null) return m_insertSession;
+        if (pageOverlay == null) return null;
+
+        m_insertSession = pageOverlay.GetComponentInChildren<AlbumInsertSession>(true);
+        return m_insertSession;
     }
 
     // 더미 정리 1회 기준 — 빈 앨범 0셀도 정상이라 셀 빌드 성공과는 무관
@@ -78,6 +134,9 @@ public class AlbumTabController : MonoBehaviour
     {
         var t_themes = CardAlbum.Themes;
 
+        // 안내는 아직 안 꽂은 카드가 있는 첫 테마 한 칸만 지목한다(앵커는 키당 1건)
+        bool t_anchorTaken = false;
+
         if (galleryContent != null && cellTemplate != null)
         {
             for (int t_i = 0; t_i < t_themes.Count; t_i++)
@@ -99,7 +158,11 @@ public class AlbumTabController : MonoBehaviour
                 // Instantiate는 항상 맨 뒤에 붙는다 — 교체된 셀이 그리드 순서를 잃지 않게 고정
                 m_cells[t_i].transform.SetSiblingIndex(t_i);
                 m_cells[t_i].gameObject.SetActive(true);
-                m_cells[t_i].Bind(t_themes[t_i], OpenTheme);
+
+                bool t_target = !t_anchorTaken && AlbumInsertMask.HiddenCountIn(t_themes[t_i]) > 0;
+                t_anchorTaken |= t_target;
+
+                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_target);
             }
 
             for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)
@@ -126,6 +189,9 @@ public class AlbumTabController : MonoBehaviour
     void OpenTheme(AlbumTheme _theme)
     {
         OpenThemePage(_theme, 0);
+
+        // 안내 중이면 이 클릭이 세션의 출발 신호다 — 그전까지는 오버레이가 닫혀 있어 대기했다
+        TryBeginInsert();
     }
 
     // 저작이 GameObject라 잘못된 프리팹도 꽂힐 수 있다 — 기본 셀로 떨어뜨리고 저작자에게 알린다
