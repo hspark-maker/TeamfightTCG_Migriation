@@ -32,9 +32,6 @@ public class TutorialStepDef
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
     [SerializeField] CardPackData pack;
 
-    [Tooltip("중복 카드 1장당 환급 골드")]
-    [SerializeField] long duplicateRefundGold;
-
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
 
@@ -59,8 +56,6 @@ public class TutorialStepDef
     public bool UseDim => useDim;
 
     public CardPackData Pack => pack;
-
-    public long DuplicateRefundGold => duplicateRefundGold;
 
     public TutorialScenarioData Scenario => scenario;
 
@@ -98,10 +93,9 @@ public class TutorialStepDef
     };
 
     // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true
-    public bool TryGetForcedPack(out CardPackData _pack, out long _refundGold)
+    public bool TryGetForcedPack(out CardPackData _pack)
     {
-        _pack       = action == EOutgameTutorialAction.WaitPurchase ? pack : null;
-        _refundGold = _pack != null ? duplicateRefundGold : 0;
+        _pack = action == EOutgameTutorialAction.WaitPurchase ? pack : null;
 
         return _pack != null;
     }
@@ -154,10 +148,6 @@ public class TutorialStepDef
 
         _ => false,
     };
-
-    // 이 액션이 중복 환급 골드를 쓰는가(실제로 구매하는 액션만)
-    public static bool UsesRefundGold(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.WaitPurchase || _action == EOutgameTutorialAction.AutoPurchase;
 
     // 이 액션이 시나리오를 쓰는가(전투 주입 또는 덱 정본)
     public static bool UsesScenario(EOutgameTutorialAction _action) => _action switch

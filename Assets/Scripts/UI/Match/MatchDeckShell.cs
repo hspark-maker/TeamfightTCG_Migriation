@@ -87,8 +87,9 @@ public class MatchDeckShell : MonoBehaviour
         bool t_confirmed = m_gate == EGate.Confirmed;
 
         // 내리는 것은 포기일 때뿐이다. 이 화면은 로비 위 오버레이라 내리는 즉시 로비가 드러나는데,
-        // 전투 시작은 호스트가 곧바로 씬을 로드한다 — LoadScene은 프레임 끝에 전환되므로 여기서 내리면
-        // 그 사이 한 프레임이 로비로 번쩍인다. 씬 전환이 화면을 덮어 갈 때까지 그대로 둔다.
+        // 전투 시작은 호스트가 곧바로 씬을 로드한다 — 여기서 내리면 그 사이가 로비로 번쩍인다.
+        // 화면을 덮어 가는 것은 SceneCurtainView이고, 커튼이 닫히는 동안(하드컷의 한 프레임이 아니다)
+        // 이 화면이 깔려 있어야 한다 — 커튼은 이 화면의 색으로 만들어져 있어 그래야 접히는 것처럼 보인다.
         if (!t_confirmed) Close();
 
         return t_confirmed;

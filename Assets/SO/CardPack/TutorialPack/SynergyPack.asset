@@ -17,6 +17,8 @@ MonoBehaviour:
   packArt: {fileID: 21300000, guid: 3056f3fc00667944ba8bb3a369d731b1, type: 3}
   price: 0
   drawCount: 6
+  refundType: 0
+  refundAmount: 0
   uniqueDraw: 1
   pool:
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}

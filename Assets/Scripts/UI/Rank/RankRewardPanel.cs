@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;   // 승급 연출이 끝날 때까지 기다리는 WaitForKill
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -79,7 +80,20 @@ public class RankRewardPanel : MonoBehaviour
         yield return null;
 
         // 소비는 반드시 양보 뒤에. 양보 전에 소비하면 그 사이 씬이 바뀔 때 결과가 증발한다.
-        if (RankUpHandoff.TryConsume(out var t_rankUp)) this.OpenForTierUp(t_rankUp);
+        if (!RankUpHandoff.TryConsume(out var t_rankUp)) yield break;
+
+        // 승급은 먼저 몸으로 보여주고 보상은 그 뒤에 연다 — 순서가 뒤집히면 "받아라"가 "올랐다"를 가린다.
+        // HUD가 꺼진 탭으로 돌아왔으면(경기 탭 밖) 연출할 자리가 없으니 곧장 연다.
+        if (RankHud.TryGet(out var t_hud))
+        {
+            var t_seq = t_hud.BuildTierUp(t_rankUp.PrevTierIndex);   // 재생은 호출자 몫
+            t_seq.Play();
+
+            // 완료가 아니라 Kill을 기다린다 — 연출이 도중에 끊겨도(탭 전환 등) 보상 패널은 반드시 열린다.
+            yield return t_seq.WaitForKill();
+        }
+
+        this.OpenForTierUp(t_rankUp);
     }
 
     // Open 경로 공통부. 스크롤 타겟만 호출자가 정한다.

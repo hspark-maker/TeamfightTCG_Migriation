@@ -9,8 +9,8 @@ using UnityEngine.SceneManagement;
 // 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
-// 진열 목록(packs)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
-//   — 상점 SO 미개입(목록이 비면 구매 잠금).
+// 진열 목록(packs)은 이 뷰가 직접 소유한다 — 상점 SO 미개입(목록이 비면 구매 잠금).
+//   가격·중복 환급은 팩 SO가 쥐므로 이 뷰는 아무것도 넘기지 않는다.
 // 제스처·스냅은 PackCarouselView가 쥔다. 그쪽은 팩을 모르고 "그림 N장 중 몇 번째"만 안다 —
 //   돈을 쥔 이 클래스가 포인터 물리까지 소유하지 않게 한 분리다.
 //
@@ -29,8 +29,6 @@ public class PackShowcaseController : MonoBehaviour
     [SerializeField] List<CardPackData> packs = new List<CardPackData>();
     [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
     [SerializeField] PackCarouselView carousel;
-    [Tooltip("이 팩에서 이미 소유한 카드를 뽑았을 때(중복) 되돌려주는 Gold.")]
-    [Min(0)] [SerializeField] long duplicateRefundGold = 10;
 
     // ScreenFlash·PackPurchaseImpact는 둘 다 런타임 자가설치라 프리팹에 배선할 자리가 없다 —
     // 개봉 화면으로 갈아치울 때 쓰는 플래시의 값·에셋은 여기가 유일한 노출 창구다.
@@ -49,7 +47,6 @@ public class PackShowcaseController : MonoBehaviour
 
     int m_index;
     bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
-    long m_forcedRefund;
 
     // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
     bool m_openPending;
@@ -127,7 +124,7 @@ public class PackShowcaseController : MonoBehaviour
     void ResolveDisplay()
     {
         m_display.Clear();
-        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced, out m_forcedRefund);
+        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced);
 
         if (m_forced)
         {
@@ -177,10 +174,9 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 구매 대상 해석. 캐러셀이 가리키는 페이지가 곧 결제 대상이다.
-    void ResolvePack(out CardPackData _pack, out long _refundGold)
+    void ResolvePack(out CardPackData _pack)
     {
         _pack = m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
-        _refundGold = m_forced ? m_forcedRefund : duplicateRefundGold;
     }
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
@@ -189,7 +185,7 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (buyButton == null) return;
 
-        ResolvePack(out var t_pack, out _);
+        ResolvePack(out var t_pack);
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
@@ -199,7 +195,7 @@ public class PackShowcaseController : MonoBehaviour
     // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
     void Bind()
     {
-        ResolvePack(out var t_pack, out _);
+        ResolvePack(out var t_pack);
 
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
         if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
@@ -210,7 +206,7 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (s_transitioning) return;
 
-        ResolvePack(out var t_pack, out long t_refundGold);
+        ResolvePack(out var t_pack);
         if (t_pack == null) return;
 
         // 열 화면이 없으면 사지 않는다 — 구매는 원자 영속이라 되돌릴 수 없고, 튜토리얼 구매 스텝이면
@@ -221,7 +217,7 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        var t_opened = CardPackOpener.TryPurchase(t_pack, t_refundGold);
+        var t_opened = CardPackOpener.TryPurchase(t_pack);
         if (t_opened != null && t_opened.Success)
         {
             s_transitioning = true;
@@ -268,7 +264,7 @@ public class PackShowcaseController : MonoBehaviour
     void ShowFailPopup(EPackOpenResult? _result)
     {
         // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
-        ResolvePack(out var t_pack, out _);
+        ResolvePack(out var t_pack);
         string t_currency = t_pack != null && t_pack.PriceType == ECurrencyType.Diamond ? "다이아" : "골드";
 
         string t_message = _result == EPackOpenResult.InsufficientGold

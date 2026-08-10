@@ -1110,7 +1110,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 022c53aec58d27948af9fff21e9d76fe, type: 2}
   - {fileID: 11400000, guid: 14ae3da35afdd404894e0b4b8eafd1cd, type: 2}
   carousel: {fileID: 7471955986726886911}
-  duplicateRefundGold: 10
 --- !u!1 &6487736475670867845
 GameObject:
   m_ObjectHideFlags: 0

@@ -22,7 +22,6 @@ MonoBehaviour:
       unlocks: 
       useDim: 1
       pack: {fileID: 0}
-      duplicateRefundGold: 0
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
@@ -32,7 +31,6 @@ MonoBehaviour:
       unlocks: 
       useDim: 1
       pack: {fileID: 0}
-      duplicateRefundGold: 0
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
@@ -43,7 +41,6 @@ MonoBehaviour:
       unlocks: 
       useDim: 1
       pack: {fileID: 0}
-      duplicateRefundGold: 0
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 

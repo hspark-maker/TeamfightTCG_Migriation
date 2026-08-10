@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 /// 로비 PlayBtn → 출전 덱 확정 → AI 대전 진입.
 /// 전투가 소비하는 DeckConfig.PlayerDeck을 채우는 지점은 이 진입점이 여는 덱 화면(MatchDeckShell) 하나뿐이다.
@@ -30,7 +29,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 덱 화면을 거치지 않는 튜토리얼 챕터. 저장된 덱이 아직 없으므로 유효 덱 검사보다 반드시 앞이다.
         if (TutorialConfig.IsActive && !TutorialConfig.ShowDeckGate)
         {
-            SceneManager.LoadScene(BATTLE_SCENE);
+            EnterBattle();
             return;
         }
 
@@ -46,11 +45,22 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (shell == null)
         {
             Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
-            if (TryApplyFirstValidDeck()) SceneManager.LoadScene(BATTLE_SCENE);
+            if (TryApplyFirstValidDeck()) EnterBattle();
             return;
         }
 
         RunGateAsync().Forget();
+    }
+
+    // 로비에서 전투로 넘어가는 유일한 문. 세 진입 경로가 여기로 모인다 — 전환 연출을 갈아끼울 때 손댈 자리가 하나여야 한다.
+    //
+    // m_running을 되돌리지 않는 이유: 커튼이 도는 동안 로비는 그대로 살아 있다. 하드컷 시절엔 그 창이 한 프레임이라
+    // 무시할 만했지만, 이제는 그 사이 PlayBtn 재클릭이 덱 화면을 커튼 밑에서 다시 연다(RunGateAsync의 finally가
+    // 이 지점보다 먼저 m_running을 내린다). 로비는 곧 파괴되므로 다시 세운 채 두면 된다.
+    void EnterBattle()
+    {
+        m_running = true;
+        SceneCurtainView.LoadScene(BATTLE_SCENE);
     }
 
     // 덱 화면이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 셸이 스스로 닫고 로비가 그대로 남는다.
@@ -72,7 +82,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 씬이 내려가며 취소된 경우 — 파괴 중인 오브젝트를 건드리지 않는다.
         if (t_ct.IsCancellationRequested) return;
 
-        if (t_confirmed) SceneManager.LoadScene(BATTLE_SCENE);
+        if (t_confirmed) EnterBattle();
     }
 
     // 상대 덱을 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.
