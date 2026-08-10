@@ -9,8 +9,10 @@ Shader "VFX/FX_Dissovle"
 		_Main_Ins( "Main_Ins", Float ) = 1
 		[HDR] _Main_Color( "Main_Color", Color ) = ( 1, 1, 1, 0 )
 		_Dissovle_Tex( "Dissovle_Tex", 2D ) = "white" {}
+		_Dissovle( "Dissovle", Range( -1, 1 ) ) = 1
 		_Dissovle_Upanner( "Dissovle_Upanner", Float ) = 0
 		_Dissovle_Vpanner( "Dissovle_Vpanner", Float ) = 0
+		[Toggle( _USE_DISSOVLE_ON )] _USE_Dissovle( "USE_Dissovle", Float ) = 0
 
 
 		//_TessPhongStrength( "Tess Phong Strength", Range( 0, 1 ) ) = 0.5
@@ -252,6 +254,7 @@ Shader "VFX/FX_Dissovle"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_COLOR
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -290,6 +293,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -493,7 +497,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord3.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord3.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord3.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				float4 temp_cast_0 = (_Main_Power).xxxx;
 				
 				float3 BakedAlbedo = 0;
@@ -611,6 +620,7 @@ Shader "VFX/FX_Dissovle"
 
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -646,6 +656,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -799,7 +810,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				
 
 				float Alpha = ( tex2DNode35.a * input.ase_color.a * temp_output_45_0 ).r;
@@ -869,6 +885,7 @@ Shader "VFX/FX_Dissovle"
 
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			struct Attributes
@@ -896,6 +913,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -1048,7 +1066,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				
 
 				surfaceDescription.Alpha = ( tex2DNode35.a * input.ase_color.a * temp_output_45_0 ).r;
@@ -1111,6 +1134,7 @@ Shader "VFX/FX_Dissovle"
 
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			struct Attributes
@@ -1138,6 +1162,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -1289,7 +1314,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				
 
 				surfaceDescription.Alpha = ( tex2DNode35.a * input.ase_color.a * temp_output_45_0 ).r;
@@ -1359,6 +1389,7 @@ Shader "VFX/FX_Dissovle"
 
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -1396,6 +1427,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -1576,7 +1608,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord2.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord2.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord2.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				
 
 				float3 Normal = float3(0, 0, 1);
@@ -1701,6 +1738,7 @@ Shader "VFX/FX_Dissovle"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_COLOR
+			#pragma shader_feature_local _USE_DISSOVLE_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -1739,6 +1777,7 @@ Shader "VFX/FX_Dissovle"
 			float4 _Main_Color;
 			float _Dissovle_Upanner;
 			float _Dissovle_Vpanner;
+			float _Dissovle;
 			float _Main_Power;
 			float _Main_Ins;
 			float _AlphaClip;
@@ -1930,7 +1969,12 @@ Shader "VFX/FX_Dissovle"
 				float2 appendResult49 = (float2(_Dissovle_Upanner , _Dissovle_Vpanner));
 				float2 uv_Dissovle_Tex = input.ase_texcoord3.xy * _Dissovle_Tex_ST.xy + _Dissovle_Tex_ST.zw;
 				float2 panner48 = ( 1.0 * _Time.y * appendResult49 + uv_Dissovle_Tex);
-				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + input.ase_texcoord3.z ) ) );
+				#ifdef _USE_DISSOVLE_ON
+				float staticSwitch60 = input.ase_texcoord3.z;
+				#else
+				float staticSwitch60 = _Dissovle;
+				#endif
+				float4 temp_output_45_0 = saturate( ( tex2DNode35 * ( tex2D( _Dissovle_Tex, panner48 ).r + staticSwitch60 ) ) );
 				float4 temp_cast_0 = (_Main_Power).xxxx;
 				
 
@@ -2022,9 +2066,11 @@ Version=19912
 {"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":49,"pos":[-2133.187,379.2758],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":47,"pos":[-2352,152],"params":["Inherit","False","0","36","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.PannerNode, AmplifyShaderEditor","id":48,"pos":[-1952,288],"params":["Inherit","False","3","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","1","FLOAT","1","False","1","FLOAT2","0"]}
+{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":59,"pos":[-1533.733,569.7925],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
+{"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":42,"pos":[-1624,480],"params":["Inherit","False","Property","_Dissovle","Dissovle","5","0","Create","True","0","0","0","False","0","False","Object","-1","","1","0","-1","1","0","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SamplerNode, AmplifyShaderEditor","id":36,"pos":[-1616,208],"params":["Inherit","True","Property","_Dissovle_Tex","Dissovle_Tex","4","0","Create","True","0","0","0","False","0","False","","-1","None","None","True","0","False","white","Auto","False","Object","-1","Auto","Texture2D","False","8","0","SAMPLER2D","","False","1","FLOAT2","0,0","False","2","FLOAT","0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT","1","False","6","FLOAT","0","False","7","SAMPLERSTATE","","False","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":46,"pos":[-1840,-128],"params":["Inherit","False","0","35","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
-{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":59,"pos":[-1533.733,569.7925],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
+{"type":"AmplifyShaderEditor.StaticSwitch, AmplifyShaderEditor","id":60,"pos":[-1229.3,597.6287],"params":["Inherit","False","Property","_USE_Dissovle","USE_Dissovle","8","0","Create","True","0","0","0","False","0","False","","0","0","0","True","","Toggle","2","Key0","Key1","Create","True","True","All","9","1","FLOAT","0","False","0","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","4","FLOAT","0","False","5","FLOAT","0","False","6","FLOAT","0","False","7","FLOAT","0","False","8","FLOAT","0","False","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SamplerNode, AmplifyShaderEditor","id":35,"pos":[-1480,-128],"params":["Inherit","True","Property","_Main_Tex","Main_Tex","0","0","Create","True","0","0","0","False","0","False","","-1","None","None","True","0","False","white","Auto","False","Object","-1","Auto","Texture2D","False","8","0","SAMPLER2D","","False","1","FLOAT2","0,0","False","2","FLOAT","0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT","1","False","6","FLOAT","0","False","7","SAMPLERSTATE","","False","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":43,"pos":[-1304,288],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":44,"pos":[-1160,72],"params":["Inherit","True","2","2","0","COLOR","0,0,0,0","False","1","FLOAT","0","False","1","COLOR","0"]}
@@ -2035,7 +2081,6 @@ Version=19912
 {"type":"AmplifyShaderEditor.VertexColorNode, AmplifyShaderEditor","id":55,"pos":[-776,336],"params":["Inherit","False","0","5","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.ColorNode, AmplifyShaderEditor","id":54,"pos":[-472,-296],"params":["Inherit","False","Property","_Main_Color","Main_Color","3","1","[HDR]","Create","True","0","0","0","False","0","False","Object","-1","","1,1,1,0","1,1,1,0","True","True","0","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":57,"pos":[-496,-80],"params":["Inherit","False","2","2","0","COLOR","0,0,0,0","False","1","FLOAT","0","False","1","COLOR","0"]}
-{"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":42,"pos":[-1624,480],"params":["Inherit","False","Property","_Dissovle","Dissovle","5","0","Create","True","0","0","0","False","0","False","Object","-1","","1","0","-1","1","0","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":52,"pos":[-240,-72],"params":["Inherit","False","3","3","0","COLOR","0,0,0,0","False","1","COLOR","0,0,0,0","False","2","COLOR","0,0,0,0","False","1","COLOR","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":56,"pos":[-344,240],"params":["Inherit","False","3","3","0","FLOAT","0","False","1","FLOAT","0","False","2","COLOR","0,0,0,0","False","1","COLOR","0"]}
 {"type":"AmplifyShaderEditor.TemplateMultiPassMasterNode, AmplifyShaderEditor","id":22,"pos":[0,0],"params":["Float","False","False","-1","3","UnityEditor.ShaderGraphUnlitGUI","0","19","New Amplify Shader","2992e84f91cbeb14eab234972e07ea9d","True","ExtraPrePass","0","0","ExtraPrePass","6","False","True","1","1","False","","0","False","","1","1","False","","0","False","","True","1","False","","1","False","","False","False","False","False","False","False","False","False","False","True","0","False","","False","True","0","False","","False","True","True","True","True","True","0","False","","False","False","True","False","False","False","False","True","False","0","False","","255","False","","255","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","False","True","1","False","","False","False","False","True","4","RenderPipeline=UniversalPipeline","RenderType=Opaque=RenderType","Queue=Geometry=Queue=0","UniversalMaterialType=Unlit","True","5","True","14","all","0","False","False","False","False","False","False","False","False","False","False","False","False","False","True","True","0","False","","True","True","True","True","True","True","0","False","","False","False","False","False","False","False","False","True","False","0","False","","255","False","","255","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","0","False","","False","True","1","False","","True","3","False","","True","True","0","False","","0","False","","False","True","0","False","False","0","","145","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","RenderPipeline=UniversalPipeline","RenderType=Opaque","Queue=Geometry","UniversalMaterialType=Unlit","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","=","0","Standard","0","False","0"]}
@@ -2056,9 +2101,11 @@ Version=19912
 {"wire":[48,0,47,0]}
 {"wire":[48,2,49,0]}
 {"wire":[36,1,48,0]}
+{"wire":[60,1,42,0]}
+{"wire":[60,0,59,3]}
 {"wire":[35,1,46,0]}
 {"wire":[43,0,36,1]}
-{"wire":[43,1,59,3]}
+{"wire":[43,1,60,0]}
 {"wire":[44,0,35,0]}
 {"wire":[44,1,43,0]}
 {"wire":[45,0,44,0]}
@@ -2075,4 +2122,4 @@ Version=19912
 {"wire":[23,2,52,0]}
 {"wire":[23,3,56,0]}
 ASEEND*/
-//CHKSM=F178684E5949B2FDAC24F81A20C791B2E4C7354E
+//CHKSM=AB1AA52E89FEBDDFCA2E20C2FD7C96767A7CD870
