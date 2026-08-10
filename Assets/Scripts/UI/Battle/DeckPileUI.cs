@@ -45,6 +45,19 @@ public class DeckPileUI : MonoBehaviour
     [Tooltip("패널(panel)에 붙은 CanvasGroup. 닫힘 연출의 페이드 + 클릭 차단을 맡는다")]
     [SerializeField] CanvasGroup panelGroup;
 
+    [Tooltip("마지막 한 장이 더미에서 튀어나갈 때 더미가 오므라들며 사라지는 시간")]
+    [SerializeField] float drawOutTime = 0.18f;
+
+    // 0장을 봤지만 아직 안 숨겼다. 숨기는 주체는 마지막 장의 등장 연출(PlayDrawOut)이다 —
+    // 카드가 더미에서 출발하는 그림이 먼저 보여야 하므로 Refresh가 먼저 지워버리면 안 된다.
+    // 그 경로를 못 타고 비는 이상 케이스는 다음 Refresh가 정리한다(자가 복구).
+    bool pendingHide;
+
+    // 인트로가 더미를 붙잡고 있다("덱이 없는 상태"로 시작해 나눠주는 연출이 끝나야 생긴다).
+    // 이 동안은 Refresh가 장수를 보고도 켜지 않는다 — 켜는 시점은 RevealFromIntro 하나뿐.
+    bool introHold;
+    int introDealRemaining;
+
     void OnEnable()
     {
         if (!live.Contains(this)) live.Add(this);
@@ -64,8 +77,120 @@ public class DeckPileUI : MonoBehaviour
 
     public void Refresh()
     {
+        int t_visibleCount = (this.field != null ? this.field.WaitingCount : 0) + this.introDealRemaining;
         if (this.countText != null)
-            this.countText.text = this.field.WaitingCount.ToString();
+            this.countText.text = t_visibleCount.ToString();
+
+        if (t_visibleCount > 0)
+        {
+            this.pendingHide = false;
+            if (!this.introHold) ShowPile();
+            return;
+        }
+
+        // 첫 0장은 유예(마지막 장이 아직 더미에서 나오는 중), 그 다음 갱신까지 남아 있으면 조용히 정리한다.
+        if (this.pendingHide) HidePile(0f);
+        else                  this.pendingHide = true;
+    }
+
+    /// <summary>마지막 한 장이 더미에서 튀어나가는 순간 호출 — 더미가 그 카드가 된 것처럼 오므라들며 사라진다.
+    /// 아직 남은 카드가 있으면 무동작이다(<see cref="Refresh"/>가 0을 본 적이 있어야 발동).</summary>
+    public void PlayDrawOut()
+    {
+        if (!this.pendingHide) return;
+
+        this.pendingHide = false;
+        HidePile(this.drawOutTime);
+    }
+
+    /// <summary>인트로 시작 — 더미를 감춘다. 전투는 "덱이 없는" 상태에서 열리고,
+    /// 나눠주는 연출이 끝나야(<see cref="RevealFromIntro"/>) 더미가 생긴다.</summary>
+    public static void HideAllForIntro()
+    {
+        for (int i = live.Count - 1; i >= 0; i--)
+        {
+            DeckPileUI t_ui = live[i];
+            if (t_ui == null) { live.RemoveAt(i); continue; }
+            t_ui.HideForIntro();
+        }
+    }
+
+    public void HideForIntro()
+    {
+        this.introHold  = true;
+        this.introDealRemaining = 0;
+        this.pendingHide = false;
+        HidePile(0f);
+    }
+
+    /// <summary>나눠주는 연출이 끝난 자리에 더미가 솟는다. 날아온 뒷면 카드가 멈춘 지점과 같은 자리라
+    /// 둘이 이어져 보인다. 장수가 0이면(있을 수 없는 배선) 붙잡기만 풀고 켜지 않는다.</summary>
+    public void RevealFromIntro(int _openingCardCount)
+    {
+        if (!this.introHold) return;
+        this.introHold = false;
+        this.introDealRemaining = Mathf.Max(0, _openingCardCount);
+
+        if (this.field == null || this.field.WaitingCount + this.introDealRemaining <= 0) return;
+
+        Refresh();
+        if (this.deckButton == null) return;
+
+        Transform t_pile = this.deckButton.transform;
+        t_pile.DOKill();
+        t_pile.localScale = Vector3.zero;
+        t_pile.DOScale(1f, this.drawOutTime).SetEase(Ease.OutBack, 1.4f)
+              .SetLink(this.deckButton.gameObject);
+    }
+
+    /// <summary>오프닝 카드 한 장이 더미에서 출발한다. 인트로 동안만 실제 대기열에 아직 포함되지 않은
+    /// 슬롯 카드까지 장수로 보여주며, 마지막 카드라면 출발과 동시에 더미를 접는다.</summary>
+    public void PlayIntroDraw()
+    {
+        if (this.introDealRemaining <= 0) return;
+
+        this.introDealRemaining--;
+        int t_visibleCount = this.field != null
+            ? this.field.WaitingCount + this.introDealRemaining
+            : this.introDealRemaining;
+
+        if (this.countText != null)
+            this.countText.text = t_visibleCount.ToString();
+
+        if (t_visibleCount <= 0) HidePile(this.drawOutTime);
+    }
+
+    void ShowPile()
+    {
+        if (this.deckButton == null) return;
+
+        Transform t_pile = this.deckButton.transform;
+        t_pile.DOKill();
+        t_pile.localScale = Vector3.one;
+        this.deckButton.gameObject.SetActive(true);
+    }
+
+    void HidePile(float _duration)
+    {
+        if (this.deckButton == null) return;
+
+        Transform t_pile = this.deckButton.transform;
+        t_pile.DOKill();
+
+        if (_duration <= 0f)
+        {
+            t_pile.localScale = Vector3.one;
+            this.deckButton.gameObject.SetActive(false);
+            return;
+        }
+
+        t_pile.DOScale(0f, _duration).SetEase(Ease.InBack, 1.4f)
+              .SetLink(this.deckButton.gameObject)
+              .OnComplete(() =>
+              {
+                  t_pile.localScale = Vector3.one;   // 다음 판(리매치) 복귀용 기준 상태
+                  this.deckButton.gameObject.SetActive(false);
+              });
     }
 
     /// <summary>열려 있는 덱 패널을 닫는다. 생각시간 초과 자동공격처럼 <b>플레이어 조작 없이</b> 판이 진행될 때

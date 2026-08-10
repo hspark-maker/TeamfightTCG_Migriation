@@ -42,6 +42,12 @@ public class RankConfig : ScriptableObject
         10, 10, 10, 10,  // 다이아  1~4 — 만렙
     };
 
+    [Tooltip("AI 카드 레벨 하향 편차. 티어 레벨보다 최대 이만큼 낮은 카드가 섞인다. 0이면 하향 없음.")]
+    public int aiLevelSpreadDown = 1;
+
+    [Tooltip("AI 카드 레벨 상향 편차. 티어 레벨보다 최대 이만큼 높은 카드가 섞인다. 0이면 상향 없음.")]
+    public int aiLevelSpreadUp = 1;
+
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
 
@@ -52,6 +58,24 @@ public class RankConfig : ScriptableObject
 
         int t_i = _index < 0 ? 0 : (_index >= aiCardLevels.Count ? aiCardLevels.Count - 1 : _index);
         int t_level = aiCardLevels[t_i];
+        return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
+    }
+
+    /// <summary>티어 _tierIndex에서 카드 _cardId 한 장이 쓸 레벨. 기준 레벨(<see cref="AiCardLevelAt(int)"/>) 주변에
+    /// 카드 번호에서 파생한 고정 편차를 얹는다 — 난수가 아니라 파생값이라 덱 미리보기와 전투가 갈리지 않는다.
+    /// 편차는 카드 고유값이라 티어가 올라도 순서가 뒤집히지 않는다(기준이 오르면 그 카드 레벨도 같이 오른다).
+    /// 바닥(BaseLevel)에서 잘리므로 저티어에서는 평균이 기준보다 살짝 위다.</summary>
+    public int AiCardLevelForCard(int _tierIndex, int _cardId)
+    {
+        int t_base = AiCardLevelAt(_tierIndex);
+
+        int t_down = Mathf.Max(0, aiLevelSpreadDown);
+        int t_up   = Mathf.Max(0, aiLevelSpreadUp);
+        int t_span = t_down + t_up + 1;
+        if (t_span <= 1 || _cardId <= 0) return t_base;
+
+        int t_offset = (int)(Mix((uint)_cardId) % (uint)t_span) - t_down;
+        int t_level  = t_base + t_offset;
         return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
     }
 
@@ -95,6 +119,15 @@ public class RankConfig : ScriptableObject
             t_grade.entryPoints + t_step * t_grade.pointsPerDivision,
             new CurrencyGain(t_grade.rewardType, t_grade.rewardGold + t_step * t_grade.rewardGoldPerDivision));
         return true;
+    }
+
+    // 카드 번호를 고정 규칙으로 흩는다(플랫폼·런타임 무관). 난수원이 아니라 파생 해시다.
+    static uint Mix(uint _a)
+    {
+        uint t_h = _a * 2654435761u;
+        t_h ^= t_h >> 15; t_h *= 2246822519u;
+        t_h ^= t_h >> 13; t_h *= 3266489917u;
+        return t_h ^ (t_h >> 16);
     }
 }
 
