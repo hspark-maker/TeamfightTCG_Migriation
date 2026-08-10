@@ -68,7 +68,7 @@ public static class TutorialStepExecutor
 
         _context.CommitAdvance();
 
-        var t_opened = CardPackOpener.TryPurchase(_step.Pack, _step.DuplicateRefundGold);
+        var t_opened = CardPackOpener.TryPurchase(_step.Pack);
         if (t_opened == null || !t_opened.Success)
         {
             _context.Rollback();

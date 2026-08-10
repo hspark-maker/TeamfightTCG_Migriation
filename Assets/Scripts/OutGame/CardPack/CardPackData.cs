@@ -19,14 +19,14 @@ public class CardPackData : ScriptableObject
     [Min(0)] [SerializeField] long price = 100;
     [Min(1)] [SerializeField] int drawCount = 3;
 
+    [Tooltip("켜면 한 팩 안에서 같은 카드를 두 번 뽑지 않는다(비복원 추출). 풀이 뽑을 장수보다 작으면 풀 크기만큼만 나온다.")]
+    [SerializeField] bool uniqueDraw;
+
     [Header("중복 환급")]
     [Tooltip("이미 소유한 카드를 뽑았을 때 되돌려줄 재화. 결제 재화와 달라도 된다 — 다이아로 산 팩이 골드를 환급해도 무방하다.")]
     [SerializeField] ECurrencyType refundType = ECurrencyType.Gold;
     [Tooltip("중복 카드 1장당 환급량. 0이면 환급하지 않는다.")]
     [Min(0)] [SerializeField] long refundAmount = 10;
-
-    [Tooltip("켜면 한 팩 안에서 같은 카드를 두 번 뽑지 않는다(비복원 추출). 풀이 뽑을 장수보다 작으면 풀 크기만큼만 나온다.")]
-    [SerializeField] bool uniqueDraw;
 
     [Header("드로우 풀 (이 팩 전용 지정 카드셋)")]
     [Tooltip("이 팩에서 뽑을 수 있는 카드셋. 마스터 전체가 아닌 큐레이션된 부분집합. 균등 확률로 drawCount회 뽑는다.")]

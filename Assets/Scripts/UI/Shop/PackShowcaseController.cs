@@ -24,7 +24,13 @@ public class PackShowcaseController : MonoBehaviour
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
-    [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
+    [SerializeField] TextMeshProUGUI priceText;     // 가격 숫자(재화 종류는 팩마다 다르다 — 옵션, 미배선 무시).
+    [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 스프라이트가 바뀐다(옵션 — 미배선 무시).")]
+    [SerializeField] Image priceIcon;
+    [Tooltip("골드 결제 팩에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
+    [SerializeField] Sprite goldIcon;
+    [Tooltip("다이아 결제 팩에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
+    [SerializeField] Sprite diamondIcon;
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
     [SerializeField] List<CardPackData> packs = new List<CardPackData>();
     [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
@@ -174,10 +180,8 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 구매 대상 해석. 캐러셀이 가리키는 페이지가 곧 결제 대상이다.
-    void ResolvePack(out CardPackData _pack)
-    {
-        _pack = m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
-    }
+    CardPackData ResolvePack()
+        => m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
     // 튜토리얼 게이트도 이 상태를 보고 딤을 자동으로 걷어 유저가 골드를 벌러 나갈 수 있다(소프트락 방지).
@@ -185,20 +189,37 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (buyButton == null) return;
 
-        ResolvePack(out var t_pack);
+        var t_pack = ResolvePack();
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
                               && CurrencyManager.CanAfford(t_pack.PriceType, t_pack.Price);
     }
 
-    // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
+    // 중앙 팩의 표시명·가격·재화 아이콘을 UI에 반영(참조는 전부 옵션).
     void Bind()
     {
-        ResolvePack(out var t_pack);
+        var t_pack = ResolvePack();
 
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
         if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
+
+        if (priceIcon != null)
+        {
+            // 가격 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
+            priceIcon.enabled = t_pack != null;
+
+            var t_icon = ResolveCurrencyIcon(t_pack);
+            if (t_icon != null) priceIcon.sprite = t_icon;
+        }
+    }
+
+    // 결제 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 — 둘 다 있을 때만 바꾼다.
+    Sprite ResolveCurrencyIcon(CardPackData _pack)
+    {
+        if (_pack == null || goldIcon == null || diamondIcon == null) return null;
+
+        return _pack.PriceType == ECurrencyType.Diamond ? diamondIcon : goldIcon;
     }
 
     // 구매 클릭: 성공이면 캐리어에 실어 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
@@ -206,7 +227,7 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (s_transitioning) return;
 
-        ResolvePack(out var t_pack);
+        var t_pack = ResolvePack();
         if (t_pack == null) return;
 
         // 열 화면이 없으면 사지 않는다 — 구매는 원자 영속이라 되돌릴 수 없고, 튜토리얼 구매 스텝이면
@@ -264,7 +285,7 @@ public class PackShowcaseController : MonoBehaviour
     void ShowFailPopup(EPackOpenResult? _result)
     {
         // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
-        ResolvePack(out var t_pack);
+        var t_pack = ResolvePack();
         string t_currency = t_pack != null && t_pack.PriceType == ECurrencyType.Diamond ? "다이아" : "골드";
 
         string t_message = _result == EPackOpenResult.InsufficientGold

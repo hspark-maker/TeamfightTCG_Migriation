@@ -22,16 +22,20 @@ public class SceneCurtainView : MonoBehaviour
     const string ResourcePath = "UI/SceneCurtain";
 
     [Tooltip("위 판(상대색). 아랫변이 이음매다.\n"
+           + "저작해서 쓰는 값: 색·스프라이트 / 기울기(회전 Z) / 이음매 세로 위치(앵커 Y).\n"
+           + "⚠ 크기와 위치는 런타임이 화면에 맞춰 다시 잡는다 — 프리팹의 Width·Height·Pos는 편집 중 미리보기일 뿐 무시된다.\n"
            + "⚠ pivot은 반드시 (0.5, 0) — 회전이 pivot을 중심으로 돌기 때문에, 이음매가 될 변 위에 pivot이 있어야 "
            + "해상도와 무관하게 아래 판의 변과 정확히 겹친다. 이 규약이 깨지면 대각선에 틈이 생긴다.")]
     [SerializeField] RectTransform top;
 
-    [Tooltip("아래 판(내색). 윗변이 이음매다.\n⚠ pivot은 반드시 (0.5, 1). 앵커·회전은 위 판과 같은 값이어야 한다.")]
+    [Tooltip("아래 판(내색). 윗변이 이음매다. 크기·위치는 위 판과 같이 런타임이 잡는다.\n"
+           + "⚠ pivot은 반드시 (0.5, 1). 앵커·회전은 위 판과 같은 값이어야 한다(다르면 진입 시 경고가 뜬다).")]
     [SerializeField] RectTransform bottom;
 
     [Tooltip("맞물리는 순간 번쩍이는 이음매 선. 미배선이면 이 축을 통째로 건너뛴다.\n"
            + "커튼은 매치 덱 화면과 같은 색이라 닫힘이 '색의 변화'로는 읽히지 않는다 — 이 선이 맞물림을 알리는 신호다.\n"
-           + "색과 두께(높이)는 프리팹에 저작한 값을 그대로 쓰고, 코드는 알파만 굴린다.")]
+           + "색과 두께(Height)는 저작한 값을 그대로 쓴다. 저작 알파가 번쩍임의 최대 밝기이고, 코드는 그 사이를 오갈 뿐이다.\n"
+           + "⚠ 가로 길이(Width)만은 런타임이 판과 같은 값으로 덮어쓴다.")]
     [SerializeField] Image seam;
 
     [Header("타이밍")]

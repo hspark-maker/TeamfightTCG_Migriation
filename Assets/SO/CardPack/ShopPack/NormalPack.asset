@@ -18,9 +18,9 @@ MonoBehaviour:
   priceType: 0
   price: 200
   drawCount: 6
+  uniqueDraw: 0
   refundType: 0
   refundAmount: 10
-  uniqueDraw: 0
   pool:
   - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
@@ -32,7 +32,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
   - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-  - {fileID: 0}
   - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
   - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
   - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
