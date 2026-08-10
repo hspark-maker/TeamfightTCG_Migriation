@@ -300,6 +300,11 @@ public class AlbumInsertSession : MonoBehaviour
             yield return this.TweenProgress(t_holder, 1f, this.seatDuration, Ease.OutCubic).WaitForCompletion();
         }
 
+        // 트윈은 목표만 끝까지 민다 — 그림은 slipGlide만큼 늦게 따라온다. 다 따라붙기 전에 바꿔치기하면
+        // 덜 들어간 카드가 꽂힌 카드로 둔갑한다. (상한은 방어 — 끝내 못 따라붙어도 연출만 건너뛴다)
+        for (float t_wait = 0f; !sleeve.Settled && t_wait < 0.6f; t_wait += Time.unscaledDeltaTime)
+            yield return null;
+
         // 다 밀어 넣은 카드는 비닐(씰 앞면) 뒤에 잠겨 있고 번호도 그 카드에 덮여 있다.
         // 위장을 풀면 같은 칸이 같은 카드를 같은 자리·같은 크기로 그리므로, 같은 프레임에 드래그 카드를
         // 걷어도 교체가 보이지 않는다(이음매 0프레임). 비닐은 걷지 않는다 — 꽂힌 칸도 같은 톤으로 덮여 있다.

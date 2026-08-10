@@ -21,6 +21,11 @@ using UnityEngine;
 //   진동한다("덜덜"이 아니라 "지직"으로 읽히던 원인). 계단·각도킥·가로 어긋남 셋 다 진행도의 **연속 단조 함수**로 두고,
 //   툭툭거림은 "대부분 평평하다가 구간 뒤쪽에서만 급히 미끄러지는" 모양으로 낸다.
 //
+// ■ 목표와 그림은 층이 다르다 — SetProgress는 눈금 **목표**만 적는 순수층(되감기 정확성 담보)이고,
+//   그림은 LateUpdate가 slipGlide 동안 SmoothDamp로 미끄러지며 따라간다. 계단이 몸에 닿기 전에 시간으로 뭉개진다.
+//   ⚠ 층을 섞지 말 것: 목표 쪽을 늦추면 드래그 임계·트윈 시작값까지 그림 지연에 오염된다.
+//   바꿔치기(Seat)는 그림이 목표에 다 따라붙은 뒤에만 유효하다 — 세션이 Settled를 기다린다.
+//
 //   ③이 공짜로 나오는 이유가 이 구조의 전부다 — 각도를 직접 줄이는 코드는 없고,
 //   "깊이 d까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 각도"(`AllowedTilt`)라는 **봉투**가 있을 뿐이다.
 //   실제 각도 = 봉투 × seed(-1~1). 봉투가 d에 대해 단조 감소하므로 seed를 아무리 흔들어도 수렴한다.
@@ -65,6 +70,9 @@ public class AlbumSleeveView : MonoBehaviour
              "0이면 대칭(부드럽게 시작해 부드럽게 정지), 1이면 거의 즉발 후 긴 감속.\n" +
              "slip감이 부족할 때 진폭·빈도를 올리기 전에 먼저 만질 값이다 — 거칠어지지 않고 대비만 커진다.")]
     [Range(0f, 1f)] [SerializeField] float slipRelease = 0.65f;
+    [Tooltip("그림이 눈금 목표를 따라붙는 시간(초). 목표가 툭 움직여도 카드는 이 시간 동안 미끄러지며 들어간다.\n" +
+             "0이면 즉시 반응(계단이 그대로 몸에 닿는다). 너무 크면 손보다 카드가 늦어 헐렁하게 느껴진다.")]
+    [Range(0f, 0.3f)] [SerializeField] float slipGlide = 0.1f;
     [Tooltip("미끄러질 때마다 각도가 튀는 몫(0~1). 0이면 계단만 지고 각도는 얌전하다.")]
     [Range(0f, 1f)] [SerializeField] float slipTiltKick = 0.2f;
     [Tooltip("손가락이 닿아 있는 동안의 잔떨림 각도(도). 밀리지 않고 버티는 순간에도 카드가 떤다.")]
@@ -98,7 +106,12 @@ public class AlbumSleeveView : MonoBehaviour
     float     m_progress;
     Vector2   m_basePos;      // 각도 0·가로이동 0일 때의 자리. 회전 보정과 떨림은 이 위에 얹었다 걷는다
     float     m_baseAngle;
-    float     m_depth;        // 지금 삽입 깊이. 봉투·여유를 다시 묻는 창구다
+    float     m_depth;        // 그림의 삽입 깊이(시간 보간 후). 봉투·여유를 다시 묻는 창구다
+    float     m_targetDepth;  // 눈금 목표 깊이 — SetProgress(순수층)가 적고 LateUpdate가 따라간다
+    float     m_targetSeed;   // 목표 기울기 계수(킥 포함, -1~1)
+    float     m_visSeed;      // 그림의 기울기 계수
+    float     m_depthVel;     // SmoothDamp 속도 버퍼
+    float     m_seedVel;
     float     m_arm;          // 카드 중심 → 입구선 거리. 회전축을 입구로 옮기는 팔 길이(ApplyPose)
     float     m_shift;        // 입구선의 가로 이동. m_slack 안으로 클램프된다
     float     m_slack;        // 각도가 쓰고 남은 가로 여유. 이 밖으로는 어떤 성분도 못 나간다
@@ -111,6 +124,10 @@ public class AlbumSleeveView : MonoBehaviour
 
     /// <summary>마지막으로 반영된 진행도. 안착·되밀림 트윈의 시작값이다.</summary>
     public float Progress => this.m_progress;
+
+    /// <summary>그림이 목표 깊이에 다 따라붙었는가. 트윈은 목표만 끝까지 밀 뿐 그림은 slipGlide만큼 늦다 —
+    /// Seat는 이것이 참이 된 뒤에 바꿔치기해야 덜 들어간 카드가 꽂힌 카드로 둔갑하지 않는다.</summary>
+    public bool Settled => this.slipGlide <= 0f || Mathf.Abs(this.m_targetDepth - this.m_depth) < 0.25f;
 
     public RectTransform CardHolder => this.cardHolder;
 
@@ -170,6 +187,11 @@ public class AlbumSleeveView : MonoBehaviour
         this.cardHolder.localRotation = Quaternion.identity;
         this.m_progress               = 0f;
 
+        // 보간 상태도 지운다 — 남으면 홈으로 돌아간 홀더를 LateUpdate가 옛 좌표계 자세로 끌고 간다.
+        this.m_targetDepth = this.m_depth   = 0f;
+        this.m_targetSeed  = this.m_visSeed = 0f;
+        this.m_depthVel    = this.m_seedVel = 0f;
+
         if (this.m_dockHome == null) return;
         if (this.cardHolder.parent == this.m_dockHome) return;
 
@@ -215,28 +237,60 @@ public class AlbumSleeveView : MonoBehaviour
         float t_kick   = Mathf.Lerp(Hash11(t_i), Hash11(t_i + 1), t_slip);
         float t_seed   = Mathf.Clamp(Mathf.Lerp(t_smooth, t_kick, this.slipTiltKick), -1f, 1f);
 
-        float t_env = this.AllowedTilt(t_depth);
+        this.m_targetDepth = t_depth;
+        this.m_targetSeed  = t_seed;
+        this.m_progress    = t_p;
+
+        // 여기서는 목표만 적는다 — 그림은 LateUpdate가 slipGlide 동안 미끄러지며 따라간다.
+        if (this.slipGlide <= 0f) this.Snap();
+    }
+
+    // 깊이·계수 한 쌍을 실제 자세로 편다 — 그림이 되는 길은 이 하나뿐이다.
+    // 클램프는 SmoothDamp 오버슈트 방어: 봉투·여유 계산이 정의역을 벗어나면 격리 증명이 깨진다.
+    void PoseFromDepth(float _depth, float _seed)
+    {
+        float t_depth = Mathf.Clamp(_depth, 0f, this.m_cardHeight);
+        float t_env   = this.AllowedTilt(t_depth);
 
         this.m_depth     = t_depth;
-        this.m_baseAngle = t_env * t_seed;
+        this.m_visSeed   = Mathf.Clamp(_seed, -1f, 1f);
+        this.m_baseAngle = t_env * this.m_visSeed;
 
         // 각도가 쓰고 남은 여유(m_slack) 안에서만 옆으로 민다 — 저주파 seed만 태워 각도 잡음이 가로로 증폭되지 않게.
         // ⚠ 봉투 페이드를 한 번 더 곱하는 이유: 여유는 각도가 0이 되면 오히려 **넓어지므로**,
         //   그것만 보고 밀면 다 꽂힌 카드가 중앙에서 비껴 선 채 끝나 바꿔치기가 어긋나 보인다.
-        this.m_arm      = this.m_cardHeight * 0.5f - t_depth;
-        this.m_slack    = this.LateralSlack(t_depth, this.m_baseAngle);
-        this.m_shift    = this.m_slack * this.shiftRatio * t_smooth * this.TiltFade(t_env);
-        this.m_basePos  = new Vector2(this.m_homeX, this.m_homeY - t_depth);
-        this.m_progress = t_p;
+        this.m_arm     = this.m_cardHeight * 0.5f - t_depth;
+        this.m_slack   = this.LateralSlack(t_depth, this.m_baseAngle);
+        this.m_shift   = this.m_slack * this.shiftRatio * this.SeedAt(t_depth) * this.TiltFade(t_env);
+        this.m_basePos = new Vector2(this.m_homeX, this.m_homeY - t_depth);
 
         this.ApplyPose(0f, 0f);
     }
 
-    // 잔떨림은 진행도와 무관한 덧칠이라 SetProgress의 순수성을 건드리지 않는다 —
-    // 계산된 자세(m_base*)는 그대로 두고 그 위에 얹었다 걷는다.
+    // 그림을 목표에 즉시 붙인다 — 새 카드 스폰과 slipGlide 0(보간 끔) 전용.
+    void Snap()
+    {
+        this.m_depthVel = 0f;
+        this.m_seedVel  = 0f;
+        this.PoseFromDepth(this.m_targetDepth, this.m_targetSeed);
+    }
+
+    // 그림층 — 목표를 미끄러지며 따라가는 시간 보간과, 그 위에 얹었다 걷는 잔떨림.
+    // 둘 다 SetProgress(목표층)의 순수성을 건드리지 않는다.
     void LateUpdate()
     {
-        if (!this.m_pushing || this.cardHolder == null) return;
+        if (this.cardHolder == null) return;
+
+        // 목표는 눈금대로 즉발로 움직여도 그림은 여기서 슬슬 따라간다 — 계단이 시간으로 뭉개진다.
+        if (this.slipGlide > 0f && (this.m_depth != this.m_targetDepth || this.m_visSeed != this.m_targetSeed))
+        {
+            float t_dt = Time.unscaledDeltaTime;
+            this.PoseFromDepth(
+                Mathf.SmoothDamp(this.m_depth,   this.m_targetDepth, ref this.m_depthVel, this.slipGlide, Mathf.Infinity, t_dt),
+                Mathf.SmoothDamp(this.m_visSeed, this.m_targetSeed,  ref this.m_seedVel,  this.slipGlide, Mathf.Infinity, t_dt));
+        }
+
+        if (!this.m_pushing) return;
 
         // 봉투가 좁아진 만큼 떨림도 잦아든다 — 다 들어간 카드가 부르르 떨면 안착이 안 끝난 것처럼 보인다.
         float t_env = this.TiltFade(this.AllowedTilt(this.m_depth));
@@ -332,6 +386,7 @@ public class AlbumSleeveView : MonoBehaviour
 
         Fit(this.cardHolder, _size, new Vector2(this.m_homeX, this.m_homeY));
         this.SetProgress(0f);
+        this.Snap();   // 새 카드가 이전 카드의 깊이에서 미끄러져 오면 안 된다 — 시작 자리에 즉시 선다
     }
 
     // ■ 봉투 — 깊이 _depth까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 기울기.
