@@ -1,6 +1,6 @@
-using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 // 앨범 페이지의 카드 칸 하나(AlbumCardSlot 부착) — **실제 슬리브와 같은 두 겹 구조**다.
@@ -12,9 +12,8 @@ using UnityEngine.UI;
 //   · `Card` = 안착한 카드.
 //   · `Sleeve_Front`(반투명 비닐) = 카드 위를 덮는 앞면.
 //
-// 앞면 알파는 "칸이 비었는가"로만 정해진다: 빈 칸 = `emptyFrontAlpha`, 꽂힌 칸 = 0(카드가 선명해야 한다).
-// 삽입 연출은 그 사이를 잇는 트윈 하나(`SettleFront`)일 뿐이라 **연출용 별도 상태가 없다** —
-// 어느 경로로 `Bind`가 불려도 칸의 톤이 스스로 옳은 값으로 돌아온다.
+// 앞면 알파는 칸 상태와 무관하게 늘 `frontAlpha`다 — 꽂힌 카드도 비닐 너머로 보이는 것이 슬리브의 그림이다.
+// (2026-08-10 이전에는 꽂힌 칸의 앞면을 0으로 걷었고 삽입 연출이 그 사이를 트윈했다. 되돌리지 말 것.)
 //
 // ⚠ Sleeve_*·NumberLabel은 "보이는 그림" 앵커(0.0728~0.9272)를, Card·InsertDock은 칸 전체(0~1)를 쓴다.
 //   GridRatioFitter가 카드 스프라이트의 투명 여백만큼 셀을 겹쳐 배치하기 때문이다 —
@@ -28,11 +27,12 @@ public class AlbumCardSlotView : MonoBehaviour
     [SerializeField] CardVisualView cardVisual;
     [Tooltip("씰 뒷면(포켓 바닥). 불투명이라 뒤로는 아무것도 비치지 않는다. 버튼 타깃·레이캐스트도 이 이미지가 받는다.")]
     [SerializeField] Image sleeveImage;
-    [Tooltip("씰 앞면(비닐). 카드 위를 덮는다 — 빈 칸에서만 보이고 카드가 꽂히면 0이 된다.")]
+    [Tooltip("씰 앞면(비닐). 빈 칸이든 꽂힌 칸이든 늘 같은 톤으로 카드 위를 덮는다.")]
     [SerializeField] Image sleeveFrontImage;
     [Range(0f, 1f)]
-    [Tooltip("빈 칸일 때 앞면 알파. 올릴수록 '비닐 너머'가 또렷하지만 번호와 삽입 중인 카드가 그만큼 흐려진다.")]
-    [SerializeField] float emptyFrontAlpha = 0.4f;
+    [Tooltip("앞면 알파. 올릴수록 '비닐 너머'가 또렷하지만 번호와 카드가 그만큼 흐려진다.")]
+    [FormerlySerializedAs("emptyFrontAlpha")]
+    [SerializeField] float frontAlpha = 0.4f;
     [Tooltip("삽입 중 드래그 카드가 들어앉는 자리. 번호 위·앞면 아래 형제라 번호를 덮으며 비닐 뒤로 잠긴다.")]
     [SerializeField] RectTransform insertDock;
     [Tooltip("포켓 바닥에 찍히는 도감 번호. 카드보다 뒤라 카드가 꽂히면 가려진다. 번호는 오버레이가 테마 내 통번호로 넘긴다.")]
@@ -46,19 +46,6 @@ public class AlbumCardSlotView : MonoBehaviour
     /// <summary>삽입 중 드래그 카드를 넣을 부모. 여기 들어간 것만 번호를 덮고 앞면 뒤로 잠긴다.</summary>
     public RectTransform InsertDock => insertDock;
 
-    /// <summary>앞면을 빈 칸 톤에서 0까지 걷는 트윈 — 카드가 비닐 너머에서 선명해지는 것이 "안착했다"의 신호다.
-    /// 직전 `Bind`가 이미 0으로 놓았으므로 시작값을 다시 세우고 출발한다.</summary>
-    public Tween SettleFront(float _duration)
-    {
-        if (sleeveFrontImage == null) return null;
-
-        this.SetFrontAlpha(emptyFrontAlpha);
-
-        return sleeveFrontImage.DOFade(0f, _duration)
-                               .SetEase(Ease.OutQuad)
-                               .SetLink(sleeveFrontImage.gameObject);
-    }
-
     // 미소유는 잠김 실루엣이 아니라 빈 칸으로 둔다 — 획득한 카드가 자리를 채우는 게 도감의 그림이다.
     // (CardVisualView의 잠김 오버레이 경로는 여기서 아예 타지 않는다)
     //
@@ -69,8 +56,7 @@ public class AlbumCardSlotView : MonoBehaviour
 
         if (cardVisual != null) cardVisual.Bind(t_show ? _card : null, true);
 
-        // 꽂힌 카드 위에 비닐을 남기지 않는다 — 칸의 톤은 "비었는가" 하나로만 정해진다.
-        this.SetFrontAlpha(t_show ? 0f : emptyFrontAlpha);
+        this.ApplyFrontAlpha();
 
         if (button != null) button.interactable = t_show;
 
@@ -82,14 +68,13 @@ public class AlbumCardSlotView : MonoBehaviour
         }
     }
 
-    void SetFrontAlpha(float _a)
+    // 프리팹 저작 알파가 무엇이든 인스펙터 값으로 덮는다 — 칸마다 비닐 톤이 갈리지 않게.
+    void ApplyFrontAlpha()
     {
         if (sleeveFrontImage == null) return;
 
-        sleeveFrontImage.DOKill();
-
         var t_c = sleeveFrontImage.color;
-        t_c.a = _a;
+        t_c.a = frontAlpha;
         sleeveFrontImage.color = t_c;
     }
 }

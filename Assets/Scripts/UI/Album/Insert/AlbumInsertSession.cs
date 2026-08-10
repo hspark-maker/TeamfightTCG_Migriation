@@ -34,8 +34,6 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] float  reboundDuration  = 0.16f;
     [Tooltip("손을 뗄 때 되밀리는 양(진행도). 0이면 민 자리에 딱 멈춰 기계적으로 보인다.")]
     [Range(0f, 0.3f)] [SerializeField] float reboundAmount = 0.05f;
-    [Tooltip("안착 후 씰 앞면(비닐)이 걷히며 카드가 선명해지는 시간.")]
-    [SerializeField] float  revealDuration   = 0.25f;
     [Tooltip("손을 댄 뒤 이만큼 아무 입력이 없으면 손가락 안내를 되살린다.")]
     [SerializeField] float  hintIdleDelay    = 3f;
     [Header("안착 마무리 펄스")]
@@ -48,8 +46,7 @@ public class AlbumInsertSession : MonoBehaviour
     readonly List<AlbumInsertStep> m_steps = new List<AlbumInsertStep>();
 
     AlbumTheme        m_openTheme;   // 지금 오버레이가 열고 있는 테마(오버레이는 페이지만 노출한다)
-    AlbumCardSlotView m_slot;        // 이번 스텝의 칸 — 안착 시 비닐을 걷는 주체
-    RectTransform     m_slotRect;    // 그 칸의 rect — 안착 마무리 펀치 대상
+    RectTransform     m_slotRect;    // 이번 스텝 칸의 rect — 안착 마무리 펀치 대상
     Coroutine     m_routine;
     bool          m_seatRequested;
     bool          m_releaseRequested;
@@ -239,7 +236,6 @@ public class AlbumInsertSession : MonoBehaviour
             yield break;
         }
 
-        m_slot     = t_slot;
         m_slotRect = t_slot.transform as RectTransform;
 
         // 카드를 번호 위·비닐 아래(InsertDock)로 들여보낸다 — 밀어 넣을수록 번호를 덮고 비닐 뒤로 잠긴다.
@@ -306,13 +302,9 @@ public class AlbumInsertSession : MonoBehaviour
 
         // 다 밀어 넣은 카드는 비닐(씰 앞면) 뒤에 잠겨 있고 번호도 그 카드에 덮여 있다.
         // 위장을 풀면 같은 칸이 같은 카드를 같은 자리·같은 크기로 그리므로, 같은 프레임에 드래그 카드를
-        // 걷어도 교체가 보이지 않는다(이음매 0프레임). 남은 것은 비닐을 걷는 일뿐이다.
+        // 걷어도 교체가 보이지 않는다(이음매 0프레임). 비닐은 걷지 않는다 — 꽂힌 칸도 같은 톤으로 덮여 있다.
         AlbumInsertMask.Reveal(_step.Card);
-        var t_settle = m_slot != null ? m_slot.SettleFront(this.revealDuration) : null;
         this.HideCard();
-
-        // 비닐이 걷히며 카드가 선명해지는 것이 "안착했다"의 신호다.
-        if (t_settle != null) yield return t_settle.WaitForCompletion();
 
         this.SettlePulse(m_slotRect);
     }
@@ -381,7 +373,6 @@ public class AlbumInsertSession : MonoBehaviour
 
         m_steps.Clear();
         m_openTheme = null;
-        m_slot      = null;
         m_slotRect  = null;
         m_routine   = null;
 

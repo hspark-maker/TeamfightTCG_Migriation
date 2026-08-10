@@ -14,10 +14,22 @@ using UnityEngine;
 //   ① 한 번의 스와이프로 다 안 들어간다 — 손을 떼도 **제자리에 남고**(세션이 되돌리지 않는다) 다음 스와이프가 이어 민다.
 //   ② 스와이프마다 카드가 **까딱 다른 각도**로 걸린다(매번 새 seed).
 //   ③ 그 까딱거림의 진폭은 **깊이 들어갈수록 저절로 줄어** 마지막엔 0으로 수렴한다.
+//   ④ 카드는 연속이 아니라 slipStep 단위로 **툭툭** 미끄러져 들어간다.
+//
+// ⚠ ④의 계단은 **불연속이면 안 된다**(2026-08-10 개편). Floor로 잡으면 눈금 경계에서
+//   터치 입력의 미세 떨림이 index를 n↔n-1로 왕복시키고, 무상관 해시가 걸린 각도가 매 프레임 최대 진폭으로
+//   진동한다("덜덜"이 아니라 "지직"으로 읽히던 원인). 계단·각도킥·가로 어긋남 셋 다 진행도의 **연속 단조 함수**로 두고,
+//   툭툭거림은 "대부분 평평하다가 구간 뒤쪽에서만 급히 미끄러지는" 모양으로 낸다.
 //
 //   ③이 공짜로 나오는 이유가 이 구조의 전부다 — 각도를 직접 줄이는 코드는 없고,
 //   "깊이 d까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 각도"(`AllowedTilt`)라는 **봉투**가 있을 뿐이다.
 //   실제 각도 = 봉투 × seed(-1~1). 봉투가 d에 대해 단조 감소하므로 seed를 아무리 흔들어도 수렴한다.
+//
+// ■ 카드가 씰 밖으로 안 나가는 근거는 두 가지뿐이다(둘 중 하나만 빠져도 새어 나간다):
+//   ⓐ 회전축이 카드 중앙이 아니라 **입구선**이다(`ApplyPose`). 중앙을 축으로 돌리면 이미 꽂힌 아랫부분이
+//      카드 높이 절반 × sinθ 만큼 쓸려 나가 봉투가 아무리 정확해도 소용이 없다.
+//   ⓑ 가로 이동(shift·잔떨림)은 **각도가 쓰고 남은 여유**(`LateralSlack`) 안에서만 논다.
+//      봉투는 각도만 막을 뿐이라, 그 위에 덧대는 이동은 예산을 따로 받아야 한다.
 //
 //   콜라이더를 쓰지 않는다 — 이 식은 진행도의 순수 함수라 트윈으로 되감아도 각도가 정확히 되돌아온다.
 //   진행도가 그림의 단일 진실원이므로, **y만 따로 트윈하면 각도가 그 자리에 얼어붙는다.**
@@ -27,36 +39,50 @@ public class AlbumSleeveView : MonoBehaviour
     [SerializeField] RectTransform cardHolder;  // 드래그 카드 부모
 
     [Header("기울기")]
-    [Tooltip("입구 밖(진행도 0 근처)에서 허용하는 최대 기울기(도). 봉투의 천장이다.")]
-    [SerializeField] float maxTilt = 14f;
+    [Tooltip("입구 밖(진행도 0 근처)에서 허용하는 최대 기울기(도). 봉투의 천장이다.\n" +
+             "회전축이 입구선이라 같은 각도라도 카드 윗부분이 크게 돈다 — 눈에 보이는 흔들림은 이 값보다 커 보인다.")]
+    [SerializeField] float maxTilt = 11f;
     [Tooltip("스와이프마다 뽑는 기울기 진폭의 하한(봉투 대비). 0이면 가끔 똑바로 들어가 까딱거림이 끊긴다.")]
-    [Range(0f, 1f)] [SerializeField] float minTiltAmount = 0.4f;
+    [Range(0f, 1f)] [SerializeField] float minTiltAmount = 0.3f;
     [Tooltip("직전과 반대쪽으로 기울 확률. 1이면 좌우가 규칙적으로 번갈아 보인다.")]
     [Range(0f, 1f)] [SerializeField] float flipChance = 0.7f;
     [Tooltip("새 각도로 갈아타는 데 걸리는 삽입 깊이(카드 높이 대비). 0이면 손을 대는 순간 각도가 튄다.")]
-    [Range(0.01f, 0.4f)] [SerializeField] float tiltBlendDepth = 0.07f;
-    [Tooltip("기울어진 만큼 옆으로도 밀린다(카드 폭 대비). 0이면 항상 칸 정중앙.")]
-    [Range(0f, 0.3f)] [SerializeField] float shiftRatio = 0.07f;
+    [Range(0.01f, 0.4f)] [SerializeField] float tiltBlendDepth = 0.12f;
+    [Tooltip("기울어진 만큼 옆으로도 밀린다 — 단위는 카드 폭이 아니라 **남은 입구 여유(slack)의 비율**이다.\n" +
+             "1이어도 씰을 넘지 않는다(각도가 이미 쓴 폭을 뺀 나머지만 쓰므로). 0이면 입구가 항상 칸 정중앙.")]
+    [Range(0f, 1f)] [SerializeField] float shiftRatio = 0.5f;
 
     [Header("덜덜거림 (stick-slip)")]
-    [Tooltip("한 번에 미끄러져 들어가는 단위(카드 높이 대비). 손가락은 연속으로 움직여도 카드는 이 단위로 툭툭 들어간다.")]
-    [Range(0.005f, 0.12f)] [SerializeField] float slipStep = 0.035f;
+    [Tooltip("한 번에 미끄러져 들어가는 단위(카드 높이 대비). 손가락은 연속으로 움직여도 카드는 이 단위로 툭툭 들어간다.\n" +
+             "작을수록 눈금이 잦아 잔진동처럼 읽히고, 클수록 한 번에 크게 미끄러진다.")]
+    [Range(0.02f, 0.2f)] [SerializeField] float slipStep = 0.12f;
+    [Tooltip("한 눈금 중 실제로 미끄러지는 구간의 비율. 나머지는 버티는(평평한) 구간이다.\n" +
+             "0.05면 거의 계단(급격), 1이면 계단이 없어져 그냥 매끄럽게 들어간다.\n" +
+             "⚠ 0으로는 못 내린다 — 계단이 불연속이 되는 순간 눈금 경계에서 각도가 지직거린다.\n" +
+             "거칠다고 느껴지면 여기부터 올린다(진폭보다 이쪽이 체감을 크게 바꾼다).")]
+    [Range(0.05f, 1f)] [SerializeField] float slipSharpness = 0.6f;
+    [Tooltip("미끄러짐이 앞으로 쏠리는 정도 — 정지마찰을 이기는 순간 확 나갔다가 감속하며 멈추는 몫.\n" +
+             "0이면 대칭(부드럽게 시작해 부드럽게 정지), 1이면 거의 즉발 후 긴 감속.\n" +
+             "slip감이 부족할 때 진폭·빈도를 올리기 전에 먼저 만질 값이다 — 거칠어지지 않고 대비만 커진다.")]
+    [Range(0f, 1f)] [SerializeField] float slipRelease = 0.65f;
     [Tooltip("미끄러질 때마다 각도가 튀는 몫(0~1). 0이면 계단만 지고 각도는 얌전하다.")]
-    [Range(0f, 1f)] [SerializeField] float slipTiltKick = 0.45f;
+    [Range(0f, 1f)] [SerializeField] float slipTiltKick = 0.2f;
     [Tooltip("손가락이 닿아 있는 동안의 잔떨림 각도(도). 밀리지 않고 버티는 순간에도 카드가 떤다.")]
-    [SerializeField] float shakeAngle = 0.7f;
-    [Tooltip("잔떨림 가로 진폭(카드 폭 대비).")]
-    [Range(0f, 0.05f)] [SerializeField] float shakeShift = 0.012f;
-    [Tooltip("잔떨림 속도. 높을수록 거칠다.")]
-    [SerializeField] float shakeSpeed = 26f;
+    [SerializeField] float shakeAngle = 0.2f;
+    [Tooltip("잔떨림 가로 진폭 — shiftRatio와 같이 **남은 입구 여유(slack) 비율**이다. 둘을 합쳐도 씰을 넘지 않는다.")]
+    [Range(0f, 1f)] [SerializeField] float shakeShift = 0.12f;
+    [Tooltip("잔떨림 속도. 높을수록 거칠다.\n" +
+             "⚠ 15를 넘기면 60fps에서 노이즈 격자보다 프레임 간격이 성겨져(에일리어싱) 떨림이 아니라 튐으로 보인다.")]
+    [SerializeField] float shakeSpeed = 5f;
 
     [Header("씰 입구")]
     [Tooltip("입구가 카드보다 이만큼 넓다고 본다(카드 폭 대비). 클수록 헐겁게, 작을수록 빡빡하게 끼워진다.")]
     [Range(0.02f, 0.4f)] [SerializeField] float mouthClearance = 0.12f;
     [Tooltip("이 진행도부터 남은 기울기를 마저 편다 — 안착 순간 각도가 정확히 0이어야 바꿔치기가 안 보인다.")]
     [Range(0.4f, 0.95f)] [SerializeField] float uprightFrom = 0.75f;
-    [Tooltip("최대로 기울 수 있는 구간에서 깎이는 진행 속도. 0.55면 손가락 이동의 45%만 들어간다(모서리가 걸린 느낌).")]
-    [Range(0f, 0.85f)] [SerializeField] float resistanceMax = 0.55f;
+    [Tooltip("최대로 기울 수 있는 구간에서 깎이는 진행 속도. 0.4면 손가락 이동의 60%만 들어간다(모서리가 걸린 느낌).\n" +
+             "⚠ stick-slip과 이중으로 걸리는 값이다 — 여기를 올리면 계단이 그대로여도 더 거칠게 느껴진다.")]
+    [Range(0f, 0.85f)] [SerializeField] float resistanceMax = 0.4f;
 
     const int RESIST_SAMPLES = 33;   // 저항 적분 해상도. 32구간이면 카드 높이의 3% 단위 — 눈으로는 연속이다
 
@@ -70,8 +96,12 @@ public class AlbumSleeveView : MonoBehaviour
     float     m_seedTo;       // 이번 스와이프의 기울기 계수
     float     m_seedDepth;    // 갈아타기가 시작된 깊이 — 여기부터 tiltBlendDepth만큼 밀면 새 각도가 된다
     float     m_progress;
-    Vector2   m_basePos;      // 잔떨림을 얹기 전의 계산된 자세. 떨림은 이 위에 덧칠했다 걷는다
+    Vector2   m_basePos;      // 각도 0·가로이동 0일 때의 자리. 회전 보정과 떨림은 이 위에 얹었다 걷는다
     float     m_baseAngle;
+    float     m_depth;        // 지금 삽입 깊이. 봉투·여유를 다시 묻는 창구다
+    float     m_arm;          // 카드 중심 → 입구선 거리. 회전축을 입구로 옮기는 팔 길이(ApplyPose)
+    float     m_shift;        // 입구선의 가로 이동. m_slack 안으로 클램프된다
+    float     m_slack;        // 각도가 쓰고 남은 가로 여유. 이 밖으로는 어떤 성분도 못 나간다
     bool      m_pushing;      // 손가락이 닿아 있는가(잔떨림 스위치)
     bool      m_layerWarned;  // 배선 누락 경고는 카드마다 쏟지 않고 한 번만
     Transform m_dockHome;     // cardHolder의 원래 부모(= 패널). 옮기기 전에 한 번만 기억한다
@@ -163,24 +193,40 @@ public class AlbumSleeveView : MonoBehaviour
     {
         if (this.cardHolder == null) return;
 
-        float t_p = Mathf.Clamp01(_p);
+        float t_p   = Mathf.Clamp01(_p);
+        float t_raw = this.DepthAt(t_p);
 
         // ■ stick-slip — 손가락은 연속으로 움직이지만 카드는 slipStep 단위로 **툭툭** 들어간다.
-        //   계단을 내림(Floor)으로 잡는 것이 곧 정지마찰이다: 다음 눈금에 닿기 전까지 카드는 버틴다.
-        float t_raw   = this.DepthAt(t_p);
-        float t_unit  = Mathf.Max(0.001f, this.m_cardHeight * this.slipStep);
-        int   t_index = Mathf.FloorToInt(t_raw / t_unit);
-        float t_depth = t_p >= 1f ? this.m_cardHeight : Mathf.Min(t_raw, t_index * t_unit);
+        //   한 눈금 안에서 앞쪽은 버티고(평평) 뒤쪽 slipSharpness 구간에서만 미끄러진다 — 계단이되 연속이다.
+        //   ⚠ Floor로 끊으면 눈금 경계에서 손가락 미세 떨림이 그대로 각도 진동이 된다(개편 전 지직거림).
+        float t_unit = Mathf.Max(0.001f, this.m_cardHeight * this.slipStep);
+        float t_u    = t_raw / t_unit;
+        int   t_i    = Mathf.FloorToInt(t_u);
+        float t_slip = this.SlipCurve(Mathf.InverseLerp(1f - this.slipSharpness, 1f, t_u - t_i));
 
-        // 눈금마다 각도가 튄다 — 미끄러진 순간의 충격이다. 눈금 번호로 결정하므로 되감아도 같은 값이다.
-        float t_seed = Mathf.Clamp(Mathf.Lerp(this.SeedAt(t_depth), Hash11(t_index), this.slipTiltKick), -1f, 1f);
+        // 마지막 구간에선 계단을 편다 — 각도를 마저 펴는 그 구간이다. 계단이 남으면 진행도 1에서
+        // 깊이가 한 눈금 모자라 "완전 삽입"이 안 되고, 바꿔치기가 그만큼 어긋나 보인다.
+        float t_flat  = SmootherStep(Mathf.InverseLerp(this.uprightFrom, 1f, this.DepthRatio(t_raw)));
+        float t_depth = Mathf.Lerp((t_i + t_slip) * t_unit, t_raw, t_flat);
 
-        this.m_baseAngle = this.AllowedTilt(t_depth) * t_seed;
+        // 각도 킥을 같은 미끄러짐에 실어 보낸다 — 이웃 눈금끼리 보간하므로 카드가 미끄러지는 그 순간에만 튄다.
+        // (눈금 번호로만 뽑으면 인접값이 무상관이라 경계에서 최대 진폭으로 튄다.)
+        float t_smooth = this.SeedAt(t_depth);
+        float t_kick   = Mathf.Lerp(Hash11(t_i), Hash11(t_i + 1), t_slip);
+        float t_seed   = Mathf.Clamp(Mathf.Lerp(t_smooth, t_kick, this.slipTiltKick), -1f, 1f);
 
-        // 좌우 어긋남은 기울기에 매달아 둔다 — 각도가 0으로 수렴하면 x도 같이 칸 중앙으로 회수된다.
-        float t_shift = this.m_cardWidth * this.shiftRatio * (this.maxTilt > 0f ? this.m_baseAngle / this.maxTilt : 0f);
+        float t_env = this.AllowedTilt(t_depth);
 
-        this.m_basePos  = new Vector2(this.m_homeX + t_shift, this.m_homeY - t_depth);
+        this.m_depth     = t_depth;
+        this.m_baseAngle = t_env * t_seed;
+
+        // 각도가 쓰고 남은 여유(m_slack) 안에서만 옆으로 민다 — 저주파 seed만 태워 각도 잡음이 가로로 증폭되지 않게.
+        // ⚠ 봉투 페이드를 한 번 더 곱하는 이유: 여유는 각도가 0이 되면 오히려 **넓어지므로**,
+        //   그것만 보고 밀면 다 꽂힌 카드가 중앙에서 비껴 선 채 끝나 바꿔치기가 어긋나 보인다.
+        this.m_arm      = this.m_cardHeight * 0.5f - t_depth;
+        this.m_slack    = this.LateralSlack(t_depth, this.m_baseAngle);
+        this.m_shift    = this.m_slack * this.shiftRatio * t_smooth * this.TiltFade(t_env);
+        this.m_basePos  = new Vector2(this.m_homeX, this.m_homeY - t_depth);
         this.m_progress = t_p;
 
         this.ApplyPose(0f, 0f);
@@ -193,24 +239,74 @@ public class AlbumSleeveView : MonoBehaviour
         if (!this.m_pushing || this.cardHolder == null) return;
 
         // 봉투가 좁아진 만큼 떨림도 잦아든다 — 다 들어간 카드가 부르르 떨면 안착이 안 끝난 것처럼 보인다.
-        float t_env = this.maxTilt > 0f ? this.AllowedTilt(this.m_homeY - this.m_basePos.y) / this.maxTilt : 0f;
+        float t_env = this.TiltFade(this.AllowedTilt(this.m_depth));
         if (t_env <= 0f) return;
 
         float t_t = Time.unscaledTime * this.shakeSpeed;
 
-        this.ApplyPose((Mathf.PerlinNoise(t_t, 0.37f) * 2f - 1f) * this.shakeAngle * t_env,
-                       (Mathf.PerlinNoise(0.71f, t_t) * 2f - 1f) * this.m_cardWidth * this.shakeShift * t_env);
+        // ⚠ 두 축을 (t, c)와 (c, t)로 뽑으면 안 된다 — Perlin은 대각 대칭이라 각도와 가로가 같이 움직여
+        //   "떨림"이 아니라 한 방향으로 쓸리는 흔들림이 된다. 같은 축에서 좌표만 멀리 벌려 뽑는다.
+        this.ApplyPose((Mathf.PerlinNoise(t_t, 3.7f) * 2f - 1f) * this.shakeAngle * t_env,
+                       (Mathf.PerlinNoise(t_t + 41.3f, 17.9f) * 2f - 1f) * this.m_slack * this.shakeShift * t_env);
     }
 
+    // ■ 회전축을 카드 중앙이 아니라 **입구선**(지금 씰에 걸린 지점)으로 옮긴다.
+    //
+    //   RectTransform은 pivot(0.5,0.5) 기준으로 도는데, 그러면 기울일 때마다 이미 꽂힌 아랫부분이
+    //   팔 길이(카드 높이의 절반)×sinθ 만큼 옆으로 쓸려 씰 밖으로 나간다 — 카드가 세로로 길수록 심하다.
+    //   입구를 축으로 돌면 흔들리는 건 씰 밖에 남은 윗부분뿐이고, AllowedTilt의 유도(회전 중심 = 입구)와도
+    //   비로소 일치한다. pivot을 런타임에 옮기는 대신 회전이 밀어낸 만큼을 되빼는 쪽이 싸고 되돌리기 쉽다.
     void ApplyPose(float _angleAdd, float _shiftAdd)
     {
         if (this.cardHolder == null) return;
 
-        this.cardHolder.anchoredPosition = this.m_basePos + new Vector2(_shiftAdd, 0f);
-        this.cardHolder.localRotation    = Quaternion.Euler(0f, 0f, this.m_baseAngle + _angleAdd);
+        float t_angle = this.m_baseAngle + _angleAdd;
+        float t_rad   = t_angle * Mathf.Deg2Rad;
+
+        // 입구선이 제자리에 남도록 되빼는 양(= 회전이 그 점을 밀어낸 만큼).
+        var t_fix = new Vector2(-this.m_arm * Mathf.Sin(t_rad),
+                                 this.m_arm * (Mathf.Cos(t_rad) - 1f));
+
+        // 보정 뒤의 가로 성분이 곧 입구선의 위치다 — 여유 밖으로는 어떤 성분도 못 나간다.
+        float t_x = Mathf.Clamp(this.m_shift + _shiftAdd, -this.m_slack, this.m_slack);
+
+        this.cardHolder.anchoredPosition = this.m_basePos + t_fix + new Vector2(t_x, 0f);
+        this.cardHolder.localRotation    = Quaternion.Euler(0f, 0f, t_angle);
+    }
+
+    // 각도가 이미 쓴 폭을 뺀 남은 가로 여유. 봉투(AllowedTilt)는 각도만 막을 뿐이라,
+    // 그 위에 얹는 가로 이동은 따로 예산을 받아야 씰을 넘지 않는다(개편 전엔 shift·잔떨림이 예산 밖이었다).
+    float LateralSlack(float _depth, float _angle)
+    {
+        float t_a   = this.m_cardWidth * 0.5f;
+        float t_rad = Mathf.Abs(_angle) * Mathf.Deg2Rad;
+
+        return Mathf.Max(0f, t_a * (1f + this.mouthClearance)
+                           - (t_a * Mathf.Cos(t_rad) + _depth * Mathf.Sin(t_rad)));
+    }
+
+    // ■ 한 눈금을 미끄러지는 모양. 대칭 S커브를 앞으로 쏠리게 비틀어 stick-slip의 물리를 흉내낸다 —
+    //   정지마찰을 이기는 순간 확 나갔다가(앞) 운동마찰에 감속하며 멈춘다(뒤).
+    //
+    //   ⚠ 비틀기는 S커브 **뒤에** 건다. 먼저 걸면 양끝 미분이 0이 아니게 돼 미끄러짐이 시작·끝에서 툭 끊긴다.
+    //   (1−(1−s)^n의 미분은 s'에 비례하므로, s'가 양끝에서 0이면 비튼 뒤에도 0으로 남는다.)
+    float SlipCurve(float _t)
+    {
+        float t_s = SmootherStep(_t);
+        if (this.slipRelease <= 0f) return t_s;
+
+        return 1f - Mathf.Pow(1f - t_s, 1f + this.slipRelease * 2f);
+    }
+
+    // SmoothStep(3t²−2t³)은 양끝에서 가속도가 불연속이라 미끄러짐이 시작·끝에서 "탁" 하고 걸린다.
+    static float SmootherStep(float _t)
+    {
+        float t_t = Mathf.Clamp01(_t);
+        return t_t * t_t * t_t * (t_t * (t_t * 6f - 15f) + 10f);
     }
 
     // 눈금 번호 → -1~1. 난수를 쓰면 같은 눈금을 되감을 때 값이 달라져 카드가 지직거린다.
+    // 이웃 눈금끼리는 무상관이라 **반드시 보간해서** 쓴다(SetProgress) — 날것으로 쓰면 그 무상관이 곧 진동이다.
     static float Hash11(int _i)
     {
         float t_v = Mathf.Sin(_i * 127.1f) * 43758.5453f;
@@ -240,7 +336,8 @@ public class AlbumSleeveView : MonoBehaviour
 
     // ■ 봉투 — 깊이 _depth까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 기울기.
     //
-    //   들어간 부분의 가로 반경 ≈ a·cosθ + d·sinθ = R·cos(θ−φ)   (a=카드 반폭, R=√(a²+d²), φ=atan2(d,a))
+    //   들어간 부분의 가로 반경 = a·cosθ + d·sinθ = R·cos(θ−φ)   (a=카드 반폭, R=√(a²+d²), φ=atan2(d,a))
+    //   ⚠ 이 유도는 **회전축이 입구선일 때만** 성립한다 — ApplyPose의 피벗 보정이 그 전제를 지킨다.
     //   이것이 입구 반폭 C 이하여야 하므로 θmax = φ − acos(C/R).
     //   d가 커질수록 단조 감소 → **스와이프마다 각도를 새로 뽑아도 진폭이 저절로 수렴한다.**
     float AllowedTilt(float _depth)
@@ -263,9 +360,13 @@ public class AlbumSleeveView : MonoBehaviour
         }
 
         // 기하 제약만으로는 끝에서 2~3°가 남는다 — 안착 순간의 각도 0은 바꿔치기 계약이라 여기서 마저 편다.
-        float t_p = this.m_cardHeight > 0f ? _depth / this.m_cardHeight : 0f;
-        return t_abs * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(this.uprightFrom, 1f, t_p)));
+        return t_abs * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(this.uprightFrom, 1f, this.DepthRatio(_depth))));
     }
+
+    float DepthRatio(float _depth) => this.m_cardHeight > 0f ? _depth / this.m_cardHeight : 0f;
+
+    // 봉투를 천장 대비 0~1로. 깊을수록 0에 수렴하므로 "각도를 따라 사라져야 하는 것"의 공통 스위치다.
+    float TiltFade(float _env) => this.maxTilt > 0f ? Mathf.Clamp01(_env / this.maxTilt) : 0f;
 
     // 이번 스와이프의 기울기 계수(-1~1). 깊이로 갈아타므로 **되감아도 같은 값이 나온다**(시간을 쓰지 않는다).
     float SeedAt(float _depth)
