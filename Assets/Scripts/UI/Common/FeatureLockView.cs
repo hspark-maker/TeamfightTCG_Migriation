@@ -13,6 +13,7 @@ using UnityEngine.UI;
 public class FeatureLockView : MonoBehaviour
 {
     const string OverlayPath = "UI/LockOverlay";
+    const string DimName     = "Dim";   // 오버레이 프리팹에서 실루엣을 갈아끼울 자식
 
     [Tooltip("이 UI를 여는 기능 키. None이면 항상 열려 있다")]
     [SerializeField] EOutgameFeature feature;
@@ -121,5 +122,42 @@ public class FeatureLockView : MonoBehaviour
         }
 
         m_overlay.transform.SetAsLastSibling();   // 내용물 위에 그린다
+
+        ShapeDim(t_parent);
+    }
+
+    // 딤이 대상 실루엣을 따르게 스프라이트를 복사한다 — 원형·라운드 버튼에 사각 딤이 얹히면 모양이 어긋난다.
+    // 색은 프리팹의 검정 반투명 그대로라 스프라이트 알파가 곧 딤 모양이 된다.
+    void ShapeDim(RectTransform _parent)
+    {
+        var t_dim = m_overlay.transform.Find(DimName);
+        var t_dimImage = t_dim != null ? t_dim.GetComponent<Image>() : null;
+        if (t_dimImage == null) return;
+
+        var t_shape = FindShape(_parent);
+        if (t_shape == null || t_shape.sprite == null) return;   // 못 찾으면 프리팹의 사각 딤 그대로
+
+        t_dimImage.sprite                  = t_shape.sprite;
+        t_dimImage.type                    = t_shape.type;
+        t_dimImage.fillCenter              = t_shape.fillCenter;
+        t_dimImage.preserveAspect          = t_shape.preserveAspect;
+        t_dimImage.pixelsPerUnitMultiplier = t_shape.pixelsPerUnitMultiplier;
+
+        if (t_shape.type != Image.Type.Filled) return;
+
+        t_dimImage.fillMethod    = t_shape.fillMethod;
+        t_dimImage.fillAmount    = t_shape.fillAmount;
+        t_dimImage.fillClockwise = t_shape.fillClockwise;
+        t_dimImage.fillOrigin    = t_shape.fillOrigin;
+    }
+
+    // 오버레이가 덮는 면적의 주인이 곧 모양의 주인이다 — 오버레이 부모 → 잠금 대상 순으로 찾는다.
+    Image FindShape(RectTransform _parent)
+    {
+        var t_image = _parent.GetComponent<Image>();
+        if (t_image != null && t_image.sprite != null) return t_image;
+
+        var t_target = ResolveTarget();
+        return t_target != null ? t_target.image : null;
     }
 }

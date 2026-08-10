@@ -15,6 +15,10 @@ public class PopupTransition
 
     [SerializeField] float openDuration = 0.25f;
     [SerializeField] float closeDuration = 0.15f;
+
+    /// <summary>등장이 끝나는 데 걸리는 시간 — 열림을 기다렸다 이어 붙이는 쪽이 값을 또 들고 있지 않게.</summary>
+    public float OpenDuration => this.openDuration;
+
     [SerializeField] float openFromScale = 0.9f;
     [SerializeField] float closeToScale = 0.9f;
 

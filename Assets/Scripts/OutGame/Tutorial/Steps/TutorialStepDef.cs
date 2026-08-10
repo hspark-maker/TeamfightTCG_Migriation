@@ -18,6 +18,14 @@ public class TutorialStepDef
     [Tooltip("이 스텝에 도달하면 열리는 기능(누적). 이 스텝이 지목하는 앵커의 기능은 반드시 여기까지 포함되어야 한다")]
     [SerializeField] List<EOutgameFeature> unlocks = new List<EOutgameFeature>();
 
+    [Tooltip("이 스텝 동안만 다시 잠그는 기능(일시).\n"
+           + "unlocks와 달리 누적되지 않는다 — 다음 스텝으로 넘어가면 저절로 원래 해금 상태로 돌아간다.\n"
+           + "이미 열린 기능에도 걸리고 해금보다 우선한다. 딤을 켜지 않고 옆길만 막고 싶을 때 쓴다.\n"
+           + "⚠ 이 스텝이 지목하는 앵커의 기능을 여기 넣으면 눌러야 할 버튼을 스스로 막아 진행이 멎는다.\n"
+           + "⚠ 잠그려는 위젯에 잠금 키가 배선돼 있어야 한다(탭이면 LobbyTabController의 unlockFeature) — "
+           + "None인 위젯은 잠글 대상이 없어 아무 일도 일어나지 않는다")]
+    [SerializeField] List<EOutgameFeature> locks = new List<EOutgameFeature>();
+
     [Tooltip("타깃 외 입력을 딤으로 막을지. 잠금만으로 흐름이 잡히는 스텝은 꺼서 화면을 어둡게 하지 않는다")]
     [SerializeField] bool useDim = true;
 
@@ -44,6 +52,9 @@ public class TutorialStepDef
     // 이 스텝까지 진행하면 열리는 기능(해금은 누적)
     public IReadOnlyList<EOutgameFeature> Unlocks => unlocks;
 
+    // 이 스텝 동안만 닫히는 기능(누적되지 않는다 — 다음 스텝에서 저절로 풀린다)
+    public IReadOnlyList<EOutgameFeature> Locks => locks;
+
     // 딤으로 타깃 외 입력을 막는가(false면 차단은 잠금에 맡긴다)
     public bool UseDim => useDim;
 
@@ -63,9 +74,10 @@ public class TutorialStepDef
     // 무엇이 이 스텝을 완료시키는가(액션에서 파생)
     public EOutgameTutorialCompletion Completion => action switch
     {
-        EOutgameTutorialAction.Message      => EOutgameTutorialCompletion.Confirm,
-        EOutgameTutorialAction.WaitPurchase => EOutgameTutorialCompletion.Purchase,
-        EOutgameTutorialAction.WaitPackOpen => EOutgameTutorialCompletion.PackOpen,
+        EOutgameTutorialAction.Message         => EOutgameTutorialCompletion.Confirm,
+        EOutgameTutorialAction.WaitPurchase    => EOutgameTutorialCompletion.Purchase,
+        EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
+        EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -108,20 +120,23 @@ public class TutorialStepDef
     // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
     public static bool UsesAnchor(EOutgameTutorialAction _action) => _action switch
     {
-        EOutgameTutorialAction.WaitPackOpen or
-        EOutgameTutorialAction.AutoBattle   or
-        EOutgameTutorialAction.AutoPurchase or
-        EOutgameTutorialAction.DeckGrant    => false,
+        EOutgameTutorialAction.WaitPackOpen    or
+        EOutgameTutorialAction.WaitAlbumInsert or
+        EOutgameTutorialAction.AutoBattle      or
+        EOutgameTutorialAction.AutoPurchase    or
+        EOutgameTutorialAction.DeckGrant       => false,
 
         _ => true,
     };
 
     // 이 액션이 안내 문구를 띄우는가(자동 스텝은 화면에 아무것도 그리지 않는다)
+    // 삽입 대기는 자동 스텝이 아니지만 연출 자체가 손가락·문구를 띄운다 — 겹쳐 그리지 않는다
     public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => _action switch
     {
-        EOutgameTutorialAction.AutoBattle   or
-        EOutgameTutorialAction.AutoPurchase or
-        EOutgameTutorialAction.DeckGrant    => false,
+        EOutgameTutorialAction.WaitAlbumInsert or
+        EOutgameTutorialAction.AutoBattle      or
+        EOutgameTutorialAction.AutoPurchase    or
+        EOutgameTutorialAction.DeckGrant       => false,
 
         _ => true,
     };

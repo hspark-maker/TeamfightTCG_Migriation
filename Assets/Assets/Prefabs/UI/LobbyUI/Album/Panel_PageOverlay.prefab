@@ -1177,6 +1177,11 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
+  pageFlip:
+    duration: 0.32
+    crossfade: 0.12
+    shadeMax: 0.55
+  sideFadeRoot: {fileID: 7544840550643421913}
 --- !u!1 &3639251394067991597
 GameObject:
   m_ObjectHideFlags: 0

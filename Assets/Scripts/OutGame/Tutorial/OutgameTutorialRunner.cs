@@ -26,6 +26,18 @@ public static class OutgameTutorialRunner
         }
     }
 
+    /// <summary>온보딩 졸업 처리의 유일한 창구(멱등). 완료 낙인과 함께 첫 랭크 티어에 진입시킨다 —
+    /// 튜토리얼 전투로 쌓은 포인트는 첫 티어 임계치에 못 미치므로(승점 × 3전), 진입은 전투가 아니라 졸업이 결정한다.
+    /// 진입 결과는 캐리어에 실어 둔다(로비 도달 시 보상 패널이 소비해 자동으로 열린다).</summary>
+    public static void CompleteSequence()
+    {
+        if (OutgameTutorialProgress.IsCompleted) return;
+
+        OutgameTutorialProgress.Complete();
+
+        if (RankManager.TryEnterFirstTier(out var t_entry)) RankUpHandoff.Set(t_entry);
+    }
+
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
     public static void EnsureData(OutgameTutorialData _data)
     {
@@ -98,7 +110,7 @@ public static class OutgameTutorialRunner
 
         OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
 
-        if (!t_hasNext) OutgameTutorialProgress.Complete();
+        if (!t_hasNext) CompleteSequence();
 
         OnStepChanged?.Invoke();
     }
@@ -159,7 +171,7 @@ public static class OutgameTutorialRunner
         if (t_chapter >= ChapterCount)
         {
             Debug.LogWarning($"[OutgameTutorialRunner] 좌표 {t_chapter}-{t_index}이(가) '{s_data.name}'의 챕터 {ChapterCount}개 밖입니다 — 완료로 닫습니다.");
-            OutgameTutorialProgress.Complete();
+            CompleteSequence();
             return;
         }
 
@@ -177,7 +189,7 @@ public static class OutgameTutorialRunner
         }
 
         Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 마지막 챕터 {t_chapter} 뒤에 남은 스텝이 없습니다 — 완료로 닫습니다.");
-        OutgameTutorialProgress.Complete();
+        CompleteSequence();
     }
 
     static void WarnOnMisauthoredChapters()

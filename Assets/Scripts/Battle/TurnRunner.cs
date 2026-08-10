@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using TMPro;
@@ -34,7 +35,14 @@ public class TurnRunner : MonoBehaviour
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
 
-    void Awake() => Instance = this;
+    // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
+    CancellationToken destroyCt;
+
+    void Awake()
+    {
+        Instance = this;
+        this.destroyCt = this.GetCancellationTokenOnDestroy();
+    }
 
     void OnDestroy()
     {
@@ -84,7 +92,7 @@ public class TurnRunner : MonoBehaviour
     async UniTaskVoid ShowResult(bool _won, bool _withBeat)
     {
         if (_withBeat)
-            await BattleResultBeat.Play(_won, this.GetCancellationTokenOnDestroy());
+            await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
         t_popup?.Show(this.lastReward, this.lastRankDelta, _won);
@@ -103,7 +111,7 @@ public class TurnRunner : MonoBehaviour
     // 전투를 끝까지 돌리지 않고도 여운 타이밍을 튜닝하려면 이 경로가 정상 경로와 같은 연출을 타야 한다.
     async UniTaskVoid PreviewResult(bool _won)
     {
-        await BattleResultBeat.Play(_won, this.GetCancellationTokenOnDestroy());
+        await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
         t_popup?.Show(new CurrencyGain(ECurrencyType.Gold, 1234), _won ? 10 : -5, _won);
     }
@@ -163,6 +171,8 @@ public class TurnRunner : MonoBehaviour
             this.coinFlip.gameObject.SetActive(true);
             await this.coinFlip.Play(t_playerFirst);   // 앞면=선공(플레이어 먼저)
             await UniTask.Delay(500);                   // 결과 잠깐 유지
+            // 연출 대기 중 씬이 내려갔으면 아래는 전부 파괴된 오브젝트를 만진다.
+            if (this.destroyCt.IsCancellationRequested) return;
             this.coinFlip.gameObject.SetActive(false);
         }
 
@@ -180,7 +190,8 @@ public class TurnRunner : MonoBehaviour
         if (_dealCards != null) await _dealCards();
 
         // (3.5) 후공 어드밴티지 멀리건 — 첫 턴 시작 전, 보드가 채워진 뒤. 싱글 전용(멀티는 내부에서 no-op).
-        await MulliganPhase.Run(this.ctx, t_first, this.GetCancellationTokenOnDestroy());
+        if (this.destroyCt.IsCancellationRequested) return;   // 딜 도중 씬 전환 — 멀리건·턴 루프를 시작하지 않는다
+        await MulliganPhase.Run(this.ctx, t_first, this.destroyCt);
 
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
         RunTurns(t_first, _skipFirstBanner: true).Forget();
@@ -295,6 +306,8 @@ public class TurnRunner : MonoBehaviour
         BattleRewardHandoff.Set(this.lastReward);
 
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
+        // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
+        // 다만 튜토 3전으로는 첫 티어 임계치에 못 미치고, 졸업 시점에 CompleteSequence가 첫 티어로 끌어올린다.
         var t_rank = RankManager.ApplyBattleResult(_won);
         this.lastRankDelta = t_rank.Delta;
 

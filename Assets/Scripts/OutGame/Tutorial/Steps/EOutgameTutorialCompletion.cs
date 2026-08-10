@@ -5,5 +5,6 @@ public enum EOutgameTutorialCompletion
     Click,
     PackOpen,
     Purchase,   // 클릭이 아니라 구매 "성공"이 완료
-    Confirm,    // 화면 탭으로 넘기는 설명 스텝
+    Confirm,     // 화면 탭으로 넘기는 설명 스텝
+    AlbumInsert, // 도감 삽입 세션의 종료가 완료
 }

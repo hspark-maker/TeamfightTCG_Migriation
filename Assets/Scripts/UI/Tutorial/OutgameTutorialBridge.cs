@@ -122,6 +122,18 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
+        // 삽입 연출은 스스로 손가락·문구를 띄운다 — 게이트를 겹쳐 걸지 않고 세션이 끝나기만 기다린다.
+        // 연출 중 다른 탭으로 새면 그 탭 버튼이 꺼져(Focus가 대신한다) 뒤이어 그 탭을 가리키는 안내가 뜨지 못하므로,
+        // 세션에게 이탈을 삼키라고 알린다.
+        if (m_step.Completion == EOutgameTutorialCompletion.AlbumInsert)
+        {
+            AlbumInsertSession.TutorialMode = true;
+
+            // 설 세션이 아예 없으면(연출 배선 실패·좌표가 밀린 옛 세이브) 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
+            if (!AlbumInsertQueue.HasPending && !AlbumInsertSession.IsRunning) OnGateSatisfied();
+            return;
+        }
+
         // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
         // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
@@ -214,6 +226,14 @@ public class OutgameTutorialBridge : MonoBehaviour
         OnGateSatisfied();
     }
 
+    // 삽입 세션 종료 신호. 세션이 오버레이까지 걷고 알려 오므로 다음 안내를 그대로 이어 건다.
+    void OnAlbumInsertFinished()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.AlbumInsert) return;
+
+        OnGateSatisfied();
+    }
+
     // 구매 성공 신호. 곧바로 개봉 오버레이가 열리므로 커밋만 하고, 다음 스텝은 OnPackOverlayOpened가 재개한다.
     void OnPurchased()
     {
@@ -265,6 +285,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         m_step = null;
 
+        // 안내가 삽입 세션을 몰던 상태를 여기서 되돌린다 — 스위치가 남으면 이후 일반 개봉의 탭 이탈까지 막는다.
+        AlbumInsertSession.TutorialMode = false;
+
         DetachSilent();   // 리스너가 남으면 다음 스텝·다음 씬에서 오발화한다
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }
@@ -278,6 +301,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackShowcaseController.OnAnyPurchased += OnPurchased;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
+        AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
         m_subscribed = true;
     }
 
@@ -290,6 +314,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
+        AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
         m_subscribed = false;
     }
 }

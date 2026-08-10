@@ -17,6 +17,11 @@ public class RankConfig : ScriptableObject
     [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다).")]
     public long losePoints = 5;
 
+    // 첫 티어 미도달(언랭크) 상태의 표시명
+    [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
+             "그 전까지 표시되는 문구다. 티어 표시명과 달리 단계 숫자가 붙지 않는다.")]
+    public string unrankedDisplayName = "언랭크";
+
     // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
@@ -50,6 +55,10 @@ public class RankConfig : ScriptableObject
 
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
+
+    /// <summary>첫 티어(1등급 1단계) 진입 임계치 = 랭크 도달 여부의 단일 기준.
+    /// ResolveTierIndex는 미도달도 0으로 폴백하므로 "인덱스 0"만으로는 도달을 판정할 수 없다.</summary>
+    public long FirstTierPoints => grades != null && grades.Count > 0 && grades[0] != null ? grades[0].entryPoints : 0;
 
     /// <summary>티어 _index에서 AI가 쓸 카드 레벨. 미저작이면 바닥 레벨(성장 없음 = 종전 동작).</summary>
     public int AiCardLevelAt(int _index)
