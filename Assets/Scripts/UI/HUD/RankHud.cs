@@ -50,14 +50,29 @@ public class RankHud : MonoBehaviour
     [Tooltip("배지가 잠깐 식는 색. 붉은 경고가 아니라 채도가 빠지는 쪽 — 패배를 두 번 때리지 않는다.")]
     [SerializeField] Color lossColor = new Color(0.6f, 0.6f, 0.7f);
 
+    [Header("강등 연출")]
+    [Tooltip("별 하나가 꺼지고 다음으로 넘어가는 간격. 승급(pipStep)보다 짧게 둔다 — 잃는 장면을 길게 끌지 않는다.")]
+    [SerializeField] float demotePipStep = 0.22f;
+
+    [Tooltip("꺼지는 별이 움츠러드는 세기. 켜질 때의 펀치와 반대 방향으로 들어간다.")]
+    [SerializeField] float demotePipShrink = 0.18f;
+
+    [Tooltip("등급이 갈릴 때만 쓰는 배지 흔들림 세기(px). 별 하나 제거에는 쓰지 않는다 — 강도는 빈도를 따른다.")]
+    [SerializeField] float badgeShakeStrength = 18f;
+    [SerializeField] float badgeShakeDuration = 0.45f;
+
+    [Tooltip("등급이 갈리는 순간 배지가 잠깐 잠기는 색.")]
+    [SerializeField] Color demoteBadgeColor = new Color(0.45f, 0.42f, 0.5f);
+
     // 활성 인스턴스(연출 호출자가 찾는 창구). 로비에 하나뿐이지만 탭 토글로 꺼지므로 활성분만 든다.
     static RankHud s_instance;
 
     // 최초 렌더를 Start로 미루기 위한 표식 — RankConfig 주입(DataLibrary.Awake)보다 OnEnable이 먼저 돌 수 있다.
     bool m_started;
 
-    // 진행 중 승급 연출. 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).
-    Sequence m_tierUpSeq;
+    // 진행 중 티어 변화 연출(승급·강등 공용 — 둘이 함께 돌 일이 없고 Render의 연출 가드는 하나여야 한다).
+    // 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).
+    Sequence m_tierSeq;
 
     // 포인트 손실 반응. 배지 색·스케일을 함께 잡으므로 획득 플래시와 겹쳐 돌지 않게 따로 든다.
     Sequence m_lossSeq;
@@ -67,6 +82,9 @@ public class RankHud : MonoBehaviour
 
     // 배지의 저작 색. 연출이 어디서 끊겨도 여기로 되돌린다(티어업이 스프라이트를 갈아도 색은 그대로다).
     Color m_badgeBaseColor = Color.white;
+
+    // 강등 흔들림이 되돌릴 배지 자리. 흔들림이 중간에 끊기면 배지가 어긋난 채 굳는다.
+    Vector2 m_badgeBasePos;
 
     /// <summary>조각이 튀어나올 원점이자 도착지. 연출 디렉터가 쓴다.</summary>
     public RectTransform BadgeRect => this.badgeImage != null ? (RectTransform)this.badgeImage.transform : null;
@@ -139,7 +157,7 @@ public class RankHud : MonoBehaviour
     /// </summary>
     public Sequence BuildTierUp(int _prevTierIndex)
     {
-        this.KillTierUp();
+        this.KillTierChange();
 
         int t_divisions = RankConfig.DivisionsPerGrade;
         var t_info = RankManager.GetInfo();
@@ -148,41 +166,88 @@ public class RankHud : MonoBehaviour
         int t_prevGrade    = _prevTierIndex < 0 ? -1 : _prevTierIndex / t_divisions;
         bool t_gradeUp     = t_info.TierIndex / t_divisions != t_prevGrade;
 
-        this.m_tierUpSeq = DOTween.Sequence().SetLink(this.gameObject);
+        this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
 
         // 출발점 = 오르기 직전 화면. 되돌리기는 시퀀스가 아니라 조립 시점에 즉시 건다 —
         // 앞 단계(포인트 조각)가 도는 동안 새 핍이 이미 켜져 있으면 "포인트가 차서 별이 켜졌다"는 인과가 깨진다.
-        // m_tierUpSeq 대입 뒤여야 Render의 연출 가드가 이 상태를 최종값으로 덮지 않는다.
+        // m_tierSeq 대입 뒤여야 Render의 연출 가드가 이 상태를 최종값으로 덮지 않는다.
         // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 핍 줄이 꺼진 채 시작해 첫 칸이 켜질 때 함께 나타난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
         this.RenderPips(t_prevDivision);
         if (t_gradeUp && _prevTierIndex >= 0) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
 
         // 옛 상태를 한 박자 보여준 뒤에 바꾼다 — 곧장 켜면 무엇이 달라졌는지 못 본다.
-        this.m_tierUpSeq.AppendInterval(this.enterDelay);
+        this.m_tierSeq.AppendInterval(this.enterDelay);
 
         // 같은 등급 안 상승(브론즈 1 → 2)도 같은 길을 탄다 — 새로 도달한 칸을 순서대로 켠다(두 칸 이상 뛰어도 다 켜진다).
-        if (t_gradeUp) this.StageGradeUp(this.m_tierUpSeq, t_info, t_prevDivision, t_divisions);
+        if (t_gradeUp) this.StageGradeUp(this.m_tierSeq, t_info, t_prevDivision, t_divisions);
         else
             for (int t_i = t_prevDivision; t_i < t_info.Division && t_i < t_divisions; t_i++)
-                this.StagePipOn(this.m_tierUpSeq, t_i);
+                this.StagePipOn(this.m_tierSeq, t_i);
 
         // 여운 없이 끝내면 마지막 별이 튀는 도중에 연출이 잘린 것처럼 보인다.
-        this.m_tierUpSeq.AppendInterval(this.finishDelay);
+        this.m_tierSeq.AppendInterval(this.finishDelay);
 
         // 어떤 이유로 끊겨도 표시가 중간 상태로 굳지 않게 한다(연출 가드를 먼저 풀고 정상 규칙으로 되돌린다).
-        this.m_tierUpSeq.OnKill(() =>
+        this.m_tierSeq.OnKill(() =>
         {
-            this.m_tierUpSeq = null;
+            this.m_tierSeq = null;
             this.Render();
         });
 
-        return this.m_tierUpSeq;
+        return this.m_tierSeq;
+    }
+
+    /// <summary>
+    /// 티어가 내려간 순간을 그린다. 표시는 이미 최종 티어이므로 _prevTierIndex 상태에서 출발해 지금으로 내려온다.
+    /// 재생은 호출자 몫(BuildTierUp과 같은 규약).
+    /// 강도는 빈도를 따른다 — 별 하나 제거는 조용히, 등급이 갈릴 때만 배지를 흔들어 크게 알린다.
+    /// </summary>
+    public Sequence BuildTierDown(int _prevTierIndex)
+    {
+        this.KillTierChange();
+
+        int t_divisions = RankConfig.DivisionsPerGrade;
+        var t_info = RankManager.GetInfo();
+
+        int t_prevDivision = _prevTierIndex % t_divisions + 1;
+        bool t_gradeDown   = t_info.TierIndex / t_divisions != _prevTierIndex / t_divisions;
+
+        this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
+
+        // 흔들림이 되돌아올 자리는 여기서 잡는다 — Awake는 레이아웃 전이라 배지가 아직 제자리가 아닐 수 있다.
+        var t_badgeRect = this.BadgeRect;
+        if (t_badgeRect != null) this.m_badgeBasePos = t_badgeRect.anchoredPosition;
+
+        // 출발점 = 떨어지기 직전 화면(BuildTierUp과 같은 규율 — 조립 시점에 즉시 되돌린다).
+        this.RenderPips(t_prevDivision);
+        if (t_gradeDown) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
+
+        this.m_tierSeq.AppendInterval(this.enterDelay);
+
+        // 등급이 그대로면 잃은 칸만, 갈릴 거면 켜져 있던 칸을 전부 — 뒤에서부터 하나씩 꺼진다.
+        int t_stop = t_gradeDown ? 0 : t_info.Division;
+        for (int t_i = t_prevDivision - 1; t_i >= t_stop; t_i--)
+            this.StagePipOff(this.m_tierSeq, t_i);
+
+        if (t_gradeDown) this.StageGradeDown(this.m_tierSeq, t_info);
+
+        this.m_tierSeq.AppendInterval(this.finishDelay);
+
+        this.m_tierSeq.OnKill(() =>
+        {
+            this.m_tierSeq = null;
+            this.RestoreBadgeColor();
+            this.RestoreBadgePosition();
+            this.Render();
+        });
+
+        return this.m_tierSeq;
     }
 
     void Awake()
     {
-        // 연출이 되돌릴 기준색. 배지 스프라이트는 티어업으로 갈리지만 색은 저작값 그대로다.
+        // 연출이 되돌릴 기준색. 배지 스프라이트는 티어 변화로 갈리지만 색은 저작값 그대로다.
         if (this.badgeImage != null) this.m_badgeBaseColor = this.badgeImage.color;
     }
 
@@ -206,14 +271,14 @@ public class RankHud : MonoBehaviour
         if (s_instance == this) s_instance = null;
 
         // 꺼지는 동안 트윈만 남으면 다음 활성화가 중간 상태를 물려받는다.
-        this.KillTierUp();
+        this.KillTierChange();
         this.KillReactions();
     }
 
     void Render()
     {
         // 연출 중에는 손대지 않는다 — 과거 상태에서 출발하는 연출을 최종값으로 덮어버린다.
-        if (this.m_tierUpSeq != null && this.m_tierUpSeq.IsActive()) return;
+        if (this.m_tierSeq != null && this.m_tierSeq.IsActive()) return;
 
         var t_info = RankManager.GetInfo();
 
@@ -265,6 +330,45 @@ public class RankHud : MonoBehaviour
         _seq.AppendInterval(this.pipStep);
     }
 
+    // 등급 강등: 배지가 흔들리며 아래 등급으로 갈리고, 새 등급의 별 4칸은 한 번에 켜진다.
+    // 칸을 하나씩 켜는 건 승급의 문법이라 여기서 재사용하면 "별이 늘었다 = 올랐다"로 읽힌다.
+    void StageGradeDown(Sequence _seq, in RankInfo _info)
+    {
+        // in 파라미터는 람다가 잡을 수 없다 — 콜백이 쓸 값만 먼저 떠 둔다(StageGradeUp과 같은 사정).
+        string t_name = _info.DisplayName;
+        Sprite t_badge = _info.Badge;
+        int t_division = _info.Division;
+
+        _seq.AppendInterval(this.badgeSwapDelay);
+        _seq.AppendCallback(() =>
+        {
+            this.RenderTier(t_name, t_badge);
+            this.RenderPips(t_division);
+        });
+
+        // 흔들림·어두워짐은 시퀀스 멤버로 단다 — 콜백 안에서 따로 띄우면 시퀀스가 죽어도 살아남아 배지가 어긋난 채 굳는다.
+        // 배지가 미배선이면 둘 다 없다(핍만 갈린다). BadgeRect가 non-null이면 badgeImage도 non-null이다.
+        var t_rect = this.BadgeRect;
+        if (t_rect == null) return;
+
+        // 콜백 뒤에는 Join이 아니라 Append로 붙인다 — 길이 0인 콜백은 시퀀스 길이를 늘리지 않아
+        // Append가 곧 "콜백과 같은 시각"이고, Join의 기준점보다 이쪽이 분명하다.
+        _seq.Append(t_rect.DOShakeAnchorPos(this.badgeShakeDuration, this.badgeShakeStrength, vibrato: 14));
+        _seq.Join(this.badgeImage.DOColor(this.demoteBadgeColor, this.badgeShakeDuration * 0.5f)
+                                 .SetLoops(2, LoopType.Yoyo));
+    }
+
+    // 핍 하나가 조용히 꺼지는 단위 동작. 켜질 때의 탁 튀는 손맛과 반대로 움츠러들었다 돌아온다.
+    void StagePipOff(Sequence _seq, int _index)
+    {
+        _seq.AppendCallback(() =>
+        {
+            this.SetPip(_index, false);
+            UiPunch.Play(this.PipTransform(_index), -this.demotePipShrink);
+        });
+        _seq.AppendInterval(this.demotePipStep);
+    }
+
     void RenderTier(in RankRewardInfo _info) => this.RenderTier(_info.DisplayName, _info.Badge);
 
     // 배지 미저작(null)이면 씬에 배선된 기존 스프라이트를 그대로 둔다.
@@ -310,13 +414,13 @@ public class RankHud : MonoBehaviour
         return t_pip != null ? t_pip.transform : null;
     }
 
-    void KillTierUp()
+    void KillTierChange()
     {
-        if (this.m_tierUpSeq == null) return;
+        if (this.m_tierSeq == null) return;
 
         // Kill이 OnKill을 부르고 그쪽에서 참조를 비운다 — 여기서 먼저 비우면 Render의 연출 가드가 어긋난다.
-        this.m_tierUpSeq.Kill();
-        this.m_tierUpSeq = null;
+        this.m_tierSeq.Kill();
+        this.m_tierSeq = null;
     }
 
     // 배지 색·스케일을 잡는 연출을 모두 걷는다(각 OnKill이 저작 상태로 되돌린다).
@@ -339,5 +443,11 @@ public class RankHud : MonoBehaviour
     void RestoreBadgeColor()
     {
         if (this.badgeImage != null) this.badgeImage.color = this.m_badgeBaseColor;
+    }
+
+    void RestoreBadgePosition()
+    {
+        var t_rect = this.BadgeRect;
+        if (t_rect != null) t_rect.anchoredPosition = this.m_badgeBasePos;
     }
 }

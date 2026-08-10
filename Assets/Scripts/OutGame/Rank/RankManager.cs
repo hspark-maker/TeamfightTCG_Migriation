@@ -76,7 +76,7 @@ public static class RankManager
         return true;
     }
 
-    // 전투 1회 정산(가감 전 티어 임계치를 하한으로 클램프해 강등을 막는다) + 즉시 저장
+    // 전투 1회 정산(강등은 열되 브론즈 1 아래·첫 티어 위로는 못 넘게 클램프) + 즉시 저장
     public static RankApplyResult ApplyBattleResult(bool _won)
     {
         var t_config = Config;
@@ -86,12 +86,17 @@ public static class RankManager
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
+        bool t_ranked = IsRanked;
 
-        // 하한은 "도달한" 티어의 임계치일 때만 의미가 있다 — 미도달(언랭크) 구간에 임계치를 하한으로 쓰면
-        // 승패와 무관하게 점수가 첫 티어로 올라가 버린다(= 전투 1판이 곧 진입).
-        long t_floor = IsRanked && t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
+        // 티어 임계치는 하한이 아니다 — 티어 사이 강등은 열어 두고, 진입 뒤의 바닥만 첫 티어로 막는다.
+        // 언랭크로 되돌아가지 않게 하려는 것: 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
+        long t_floor = t_ranked ? t_config.FirstTierPoints : 0;
 
-        t_slot.points = Math.Max(t_points + t_delta, t_floor);
+        // 튜토리얼 중엔 첫 티어 직전에서 막는다 — 졸업(TryEnterFirstTier)이 랭크 진입의 유일한 문이다.
+        // 판정을 튜토 진행도가 아니라 IsRanked로 하는 건 "졸업 ⟺ 첫 티어 도달"이 불변식이기 때문(DataLibrary가 세운다).
+        long t_ceiling = t_ranked ? long.MaxValue : Math.Max(t_config.FirstTierPoints - 1, 0);
+
+        t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
 
         return new RankApplyResult(
@@ -148,6 +153,9 @@ public readonly struct RankApplyResult
 
     // 이번 정산으로 티어가 올랐는지
     public bool IsTierUp => this.TierIndex > this.PrevTierIndex;
+
+    // 내렸는지. 첫 진입 센티널(PrevTierIndex = -1)은 여기 걸리지 않는다.
+    public bool IsTierDown => this.TierIndex < this.PrevTierIndex;
 
     public RankApplyResult(long _delta, int _prevTierIndex, int _tierIndex)
     {

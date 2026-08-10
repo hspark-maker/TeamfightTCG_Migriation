@@ -30,8 +30,8 @@ public class LobbyRankEffectDirector : MonoBehaviour
     [Tooltip("커버가 걷힌 뒤 시작까지의 뜸. 상단바 코인이 먼저 착지하도록 비켜 준다.")]
     [SerializeField] float startDelay = 0.15f;
 
-    // 커버 아래에서 미리 세워 둔 승급 연출(재생 대기 중). 조립하는 순간 표시가 과거로 되돌아간다.
-    Sequence m_tierUp;
+    // 커버 아래에서 미리 세워 둔 티어 변화 연출(승급·강등, 재생 대기 중). 조립하는 순간 표시가 과거로 되돌아간다.
+    Sequence m_tierChange;
 
     void Start()
     {
@@ -41,10 +41,10 @@ public class LobbyRankEffectDirector : MonoBehaviour
     void OnDisable()
     {
         // 재생에 닿지 못한 채 꺼지면 정지한 시퀀스가 RankHud.Render의 연출 가드를 영영 막아 표시가 과거에 고착된다.
-        if (this.m_tierUp == null) return;
+        if (this.m_tierChange == null) return;
 
-        this.m_tierUp.Kill();
-        this.m_tierUp = null;
+        this.m_tierChange.Kill();
+        this.m_tierChange = null;
     }
 
     IEnumerator PlayWhenReady()
@@ -57,12 +57,13 @@ public class LobbyRankEffectDirector : MonoBehaviour
         if (!RankResultHandoff.TryConsume(out var t_result)) yield break;
         if (!RankHud.TryGet(out var t_hud)) yield break;
 
-        // 승급은 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
-        // 커버가 걷히는 순간 유저가 처음 보는 화면이 "오르기 전"이 된다.
-        if (t_result.IsTierUp)
+        // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
+        // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다(승급·강등 같은 이유).
+        if (t_result.IsTierUp || t_result.IsTierDown)
         {
-            this.m_tierUp = t_hud.BuildTierUp(t_result.PrevTierIndex);
-            this.m_tierUp.Pause();
+            this.m_tierChange = t_result.IsTierUp ? t_hud.BuildTierUp(t_result.PrevTierIndex)
+                                                  : t_hud.BuildTierDown(t_result.PrevTierIndex);
+            this.m_tierChange.Pause();
         }
 
         yield return new WaitWhile(() => LoadingCoverView.IsCovering);
@@ -72,16 +73,21 @@ public class LobbyRankEffectDirector : MonoBehaviour
         yield return this.PlayPointChange(t_hud, t_result);
 
         // 포인트가 다 찬 뒤에 별이 켜진다 — 순서가 뒤집히면 "왜 올랐는지"가 사라진다.
-        var t_seq = this.m_tierUp;
-        this.m_tierUp = null;
+        var t_seq = this.m_tierChange;
+        this.m_tierChange = null;
         if (t_seq != null) t_seq.Play();
     }
 
-    // 증감 반응 1개를 재생하고 끝날 때까지 기다린다. 완료가 아니라 Kill을 기다린다 — 도중에 끊겨도 승급으로 넘어간다.
+    // 증감 반응 1개를 재생하고 끝날 때까지 기다린다. 완료가 아니라 Kill을 기다린다 — 도중에 끊겨도 티어 연출로 넘어간다.
     IEnumerator PlayPointChange(RankHud _hud, RankApplyResult _result)
     {
-        // 승급이 함께 왔으면 손실은 알리지 않는다 — 여러 판이 합쳐진 결과라 "올랐다"가 지배적인 소식이다.
-        if (_result.Delta == 0 || (_result.Delta < 0 && _result.IsTierUp)) yield break;
+        if (_result.Delta == 0) yield break;
+
+        // 증감 부호와 티어 변화 방향이 어긋나면(여러 판이 합쳐진 결과) 티어 쪽이 지배적인 소식이라 조각은 생략한다.
+        if (_result.Delta > 0 && _result.IsTierDown) yield break;
+
+        // 강등이 뒤따르면 손실 반응도 생략한다 — 배지가 두 번 식는다.
+        if (_result.Delta < 0 && (_result.IsTierUp || _result.IsTierDown)) yield break;
 
         var t_seq = _result.Delta > 0 ? this.BuildGain(_hud, _result.Delta) : _hud.BuildLossReaction();
         if (t_seq == null) yield break;

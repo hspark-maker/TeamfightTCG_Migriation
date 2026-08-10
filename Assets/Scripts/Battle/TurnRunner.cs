@@ -307,7 +307,7 @@ public class TurnRunner : MonoBehaviour
 
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
         // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
-        // 다만 튜토 3전으로는 첫 티어 임계치에 못 미치고, 졸업 시점에 CompleteSequence가 첫 티어로 끌어올린다.
+        // 몇 판을 이기든 ApplyBattleResult가 첫 티어 직전에서 막고, 졸업 시점에 CompleteSequence가 첫 티어로 끌어올린다.
         var t_rank = RankManager.ApplyBattleResult(_won);
         this.lastRankDelta = t_rank.Delta;
 
