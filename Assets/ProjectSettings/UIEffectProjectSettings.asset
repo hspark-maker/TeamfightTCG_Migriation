@@ -64,6 +64,8 @@ ShaderVariantCollection:
         passType: 0
       - keywords: EDGE_SHINY TRANSITION_SHINY
         passType: 0
+      - keywords: TONE_GRAYSCALE
+        passType: 0
       - keywords: TONE_GRAYSCALE TRANSITION_SHINY
         passType: 0
       - keywords: TRANSITION_SHINY

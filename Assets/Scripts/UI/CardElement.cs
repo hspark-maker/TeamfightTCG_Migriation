@@ -95,7 +95,7 @@ public class CardElement : MonoBehaviour,
         }
         else
         {
-            this.cardPortrait.sprite = _card.portrait;
+            this.cardPortrait.sprite = CardVisualRules.PickCardArt(_card);
         }
 
         RefreshKeywordIcons(_card);
@@ -108,6 +108,8 @@ public class CardElement : MonoBehaviour,
         Init(_instance?.data, _mod, _instance?.hp ?? -1);
         // Init(CardData)가 null로 지운 뒤에 다시 세운다 — 순서가 뒤집히면 인스턴스 기준이 날아간다.
         this.boundInstance = _instance;
+        if (this.cardPortrait != null)
+            this.cardPortrait.sprite = CardVisualRules.PickBattleArt(_instance);
         RefreshKeywordIcons(_instance?.data);
     }
 

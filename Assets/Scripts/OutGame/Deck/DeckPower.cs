@@ -18,6 +18,9 @@ public static class DeckPower
         return _mine ? CardGrowthManager.GrowthOf(_card).Level : OpponentLevelOf(_card);
     }
 
+    public static int EvolutionStageOf(CardData _card, bool _mine = true)
+        => CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, _mine)).EvolutionStage;
+
     // 표시용 최대 체력. 내 카드는 내 강화 진행도, 상대 카드는 상대 레벨 기준이다.
     public static int MaxHpOf(CardData _card, bool _mine = true)
     {

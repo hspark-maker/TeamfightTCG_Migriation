@@ -74,6 +74,7 @@ public class BootInstaller : MonoBehaviour
         // 표시용 해금 키워드도 같은 성장값에서 나온다. 이걸 안 꽂으면 아직 못 쓰는 키워드가
         // 도감·덱편집·정보창에 그대로 떠서 표시와 규칙이 갈라진다.
         CardVisualRules.UnlockedKeywordProvider = _card => CardGrowthManager.GrowthOf(_card).UnlockedKeywords;
+        CardVisualRules.EvolutionStageProvider = _card => CardGrowthManager.GrowthOf(_card).EvolutionStage;
 
         // 싱글 AI 난이도. 랭크 티어가 정한 레벨을 같은 성장 곡선에 태운다 —
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
