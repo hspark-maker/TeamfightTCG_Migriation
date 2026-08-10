@@ -103,8 +103,9 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesDeckName(_action))      yield return "deckName";
         if (TutorialStepDef.UsesDim(_action))           yield return "useDim";
 
-        // 해금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
+        // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
         yield return "unlocks";
+        yield return "locks";
     }
 
     static EOutgameTutorialAction ActionOf(SerializedProperty _property)

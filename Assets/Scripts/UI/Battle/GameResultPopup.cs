@@ -21,6 +21,10 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] CoinBurstEffect coinBurst;   // 코인 분출·수렴(옵션)
     [SerializeField] TMP_Text rankPointText;      // 가감된 랭크 포인트 표시용(표시 전용)
     [SerializeField] CoinBurstEffect rankBurst;   // 랭크 포인트 아이콘 분출·수렴(옵션)
+
+    [Tooltip("랭크 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 가감이 0인 전투(튜토리얼)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.")]
+    [SerializeField] GameObject rankLine;         // 랭크 줄 전체(옵션)
+
     [SerializeField] CanvasGroup hintGroup;       // "터치하면 메인 화면으로" 안내
 
     [Header("타이밍")]
@@ -139,6 +143,9 @@ public class GameResultPopup : MonoBehaviour
 
         if (this.dimGroup != null) this.dimGroup.alpha = 0f;
         if (this.hintGroup != null) this.hintGroup.alpha = 0f;
+
+        // 랭크를 정산하지 않는 전투(튜토리얼)에서는 "0"이 아니라 줄 자체가 없어야 한다.
+        if (this.rankLine != null) this.rankLine.SetActive(_rankDelta != 0);
 
         // 라벨('골드'·'랭크 포인트')과 아이콘은 프리팹의 정적 요소, 여기선 가감 수치만 채운다.
         // 굴릴 값이 있으면 0에서 출발, 없으면 곧장 확정값을 보여준다.

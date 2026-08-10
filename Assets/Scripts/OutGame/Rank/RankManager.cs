@@ -9,6 +9,10 @@ public static class RankManager
     // 현재 랭크 포인트
     public static long Points => Slot.points;
 
+    /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
+    /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
+    public static bool IsRanked => Points >= Config.FirstTierPoints;
+
     static RankConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
 
@@ -37,15 +41,36 @@ public static class RankManager
         t_config.TryGetTier(t_index, out RankTier t_tier);
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
+        // 미도달이면 표시명과 다음 목표를 첫 티어 기준으로 바꿔 준다 — 배지·등급은 첫 티어 것을 그대로 쓴다.
+        bool t_unranked = t_points < t_config.FirstTierPoints;
+
         return new RankInfo(
             t_index,
             t_tier.Grade,
             t_tier.Division,
-            t_tier.DisplayName,
+            t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
             t_tier.Badge,
             t_points,
-            t_hasNext ? t_next.RequiredPoints : t_points,
-            !t_hasNext);
+            t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
+            !t_unranked && !t_hasNext,
+            t_unranked);
+    }
+
+    /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
+    /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
+    public static bool TryEnterFirstTier(out RankApplyResult _result)
+    {
+        _result = default;
+        if (IsRanked) return false;
+
+        var t_slot = Slot;
+        long t_points = t_slot.points;
+
+        t_slot.points = Config.FirstTierPoints;
+        Save();
+
+        _result = new RankApplyResult(t_slot.points - t_points, -1, Config.ResolveTierIndex(t_slot.points));
+        return true;
     }
 
     // 전투 1회 정산(가감 전 티어 임계치를 하한으로 클램프해 강등을 막는다) + 즉시 저장
@@ -58,7 +83,10 @@ public static class RankManager
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
-        long t_floor = t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
+
+        // 하한은 "도달한" 티어의 임계치일 때만 의미가 있다 — 미도달(언랭크) 구간에 임계치를 하한으로 쓰면
+        // 승패와 무관하게 점수가 첫 티어로 올라가 버린다(= 전투 1판이 곧 진입).
+        long t_floor = IsRanked && t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
 
         t_slot.points = Math.Max(t_points + t_delta, t_floor);
         Save();
@@ -139,7 +167,10 @@ public readonly struct RankInfo
     public readonly long NextRequired;
     public readonly bool IsMaxTier;
 
-    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _nextRequired, bool _isMaxTier)
+    // 첫 티어 미도달(언랭크). TierIndex는 이때도 0이라 인덱스로는 구분되지 않는다.
+    public readonly bool IsUnranked;
+
+    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
     {
         TierIndex = _tierIndex;
         Grade = _grade;
@@ -149,5 +180,6 @@ public readonly struct RankInfo
         Points = _points;
         NextRequired = _nextRequired;
         IsMaxTier = _isMaxTier;
+        IsUnranked = _isUnranked;
     }
 }

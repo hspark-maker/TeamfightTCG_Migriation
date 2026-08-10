@@ -127,7 +127,9 @@
       "Bash(rm -f Sprites/Growth.meta)",
       "Bash(awk 'NR>=627 && NR<=700' \"Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab\")",
       "mcp__unity-mcp__Unity_AssetGeneration_GetModels",
-      "Bash(sort -u -k2)"
+      "Bash(sort -u -k2)",
+      "Bash(awk '/^--- !u!114 &3692091235067170845/,/^--- !u!.*&\\(?!3692091235067170845\\)/' \"Assets/Assets/Prefabs/UI/CardView/CardUIView.prefab\")",
+      "Bash(awk 'NR>=2768 && NR<=3200' \"Assets/Assets/Prefabs/UI/LobbyUI/Album/Panel_PageOverlay.prefab\")"
     ]
   },
   "enabledMcpjsonServers": [

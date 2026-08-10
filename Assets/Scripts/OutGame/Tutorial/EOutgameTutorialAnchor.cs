@@ -20,4 +20,6 @@ public enum EOutgameTutorialAnchor
     MatchDeckMySection    = 15,
     MatchDeckEnemySection = 16,
     MatchDeckTutorialDeck = 17,
+    LobbyCollectionTab    = 18,
+    AlbumThemeCell        = 19,   // 갤러리 셀은 런타임 생성이라 아직 안 꽂은 카드가 있는 테마의 칸이 스스로 등록한다
 }

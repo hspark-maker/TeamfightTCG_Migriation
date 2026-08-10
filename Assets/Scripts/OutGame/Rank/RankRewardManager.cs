@@ -105,12 +105,16 @@ public static class RankRewardManager
     }
 
     // Claimed 검사가 먼저여야 한다 — 강등 등으로 도달 티어가 내려간 구간에서 수령 표시가 풀린다
+    // 도달 판정은 티어 인덱스가 아니라 포인트로 한다 — 인덱스는 미도달(언랭크)도 0으로 폴백해서
+    // 첫 티어 보상이 튜토리얼 시작부터 수령 가능으로 보인다.
     static ERankRewardState StateOf(int _tierIndex)
     {
         if (_tierIndex < 0 || _tierIndex >= TierCount) return ERankRewardState.Locked;
         if (Slot.claimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
 
-        return _tierIndex <= RankManager.GetInfo().TierIndex
+        if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return ERankRewardState.Locked;
+
+        return RankManager.Points >= t_tier.RequiredPoints
             ? ERankRewardState.Claimable
             : ERankRewardState.Locked;
     }

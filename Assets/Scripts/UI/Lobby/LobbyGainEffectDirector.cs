@@ -23,6 +23,12 @@ public class LobbyGainEffectDirector : MonoBehaviour
     [Tooltip("도감 탭이 선택돼 원 버튼이 꺼져 있을 때 대신 쓸 오브젝트 이름.")]
     [SerializeField] string tabFocusName = "Button_Focus";
 
+    [Header("삽입 세션 (비우면 자동 탐색)")]
+    [SerializeField] LobbyTabController lobbyTabController;
+    [Tooltip("도감 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
+    [SerializeField] int collectionTabIndex = 4;
+    [SerializeField] AlbumTabController albumTabController;
+
     [Header("연출 값")]
     [SerializeField] float tabPunch = 0.3f;
 
@@ -41,6 +47,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
     {
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         PackOpenOverlay.OnClosed -= OnPackOpenClosed;
+
+        // 카드 비행 도중 씬이 바뀌면 m_master가 Kill되고 OnComplete는 영영 안 온다 —
+        // 세션에 아직 인계 못 한 위장은 여기서 되돌린다(안 그러면 그 카드가 도감에서 영영 빈 칸이다).
+        if (!AlbumInsertSession.IsRunning && AlbumInsertQueue.HasPending) CancelInsertSession();
     }
 
     void Start()
@@ -71,10 +81,18 @@ public class LobbyGainEffectDirector : MonoBehaviour
         int t_cardCount = t_cards != null ? t_cards.Count : 0;
         if (t_gains.IsEmpty && t_cardCount <= 0) yield break;
 
+        // 도감 탭이 켜지는 순간 이미 빈 칸이어야 한다 — 위장은 탭이 열리기 전에 걸어둔다.
+        if (t_cardCount > 0)
+        {
+            AlbumInsertQueue.Enqueue(t_cards);
+            AlbumInsertMask.HideAll(t_cards);
+        }
+
         // 연출 레이어는 캔버스 좌표계 위여야 한다(anchoredPosition으로 날린다).
         if (transform is not RectTransform)
         {
             Debug.LogWarning("[LobbyGainEffectDirector] RectTransform이 아닌 오브젝트에 붙어 있어 연출을 건너뛴다.");
+            if (t_cardCount > 0) CancelInsertSession();
             yield break;
         }
 
@@ -90,12 +108,72 @@ public class LobbyGainEffectDirector : MonoBehaviour
         bool t_gainStaged = !t_gains.IsEmpty && TryStageGains(m_master, t_gains);
         bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards);
 
+        // 카드 연출이 안 붙었으면 착지 콜백도 없다 — 위장을 여기서 되돌리지 않으면 카드가 영영 빈 칸이다.
+        // 재화만 온 경우까지 Clear하면 돌고 있는 세션의 위장을 벗긴다 — 이번에 건 위장이 있을 때만 되돌린다.
+        if (t_cardStaged) m_master.OnComplete(StartInsertSession);
+        else if (t_cardCount > 0) CancelInsertSession();
+
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
         if (!t_gainStaged && !t_cardStaged)
         {
             m_master.Kill();
             m_master = null;
         }
+    }
+
+    // 도감 탭 착지에 이어붙는 삽입 세션. 큐·위장은 이미 걸려 있고, 연출을 세우는 일은 도감 탭이 진다 —
+    // 여기서 정하는 것은 "도감 탭을 대신 켜 줄 것인가" 하나뿐이다.
+    void StartInsertSession()
+    {
+        if (!AlbumInsertQueue.HasPending) return;
+
+        // 연속 개봉 — 이미 돌고 있는 세션이 남은 큐까지 가져간다(위장 해제도 그 세션이 한다).
+        if (AlbumInsertSession.IsRunning) return;
+
+        var t_album = ResolveAlbumTab();
+        if (t_album == null)
+        {
+            Debug.LogWarning("[LobbyGainEffectDirector] AlbumTabController를 찾지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            CancelInsertSession();
+            return;
+        }
+
+        // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
+        // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
+        if (OutgameTutorialRunner.IsRunning)
+        {
+            t_album.TryBeginInsert();
+            return;
+        }
+
+        // _fireTrigger는 반드시 false — true면 도감 탭 첫 진입 튜토리얼이 발화해 딤이 삽입 세션을 덮는다.
+        if (this.lobbyTabController != null) this.lobbyTabController.Select(this.collectionTabIndex, false);
+
+        // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.
+        if (!t_album.isActiveAndEnabled)
+        {
+            Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭을 켜지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            CancelInsertSession();
+            return;
+        }
+
+        t_album.TryBeginInsert();
+    }
+
+    // 세션이 시작되지 못한 모든 경로의 정리. 위장이 남으면 카드가 영영 빈 칸이다.
+    static void CancelInsertSession()
+    {
+        AlbumInsertQueue.Clear();
+        AlbumInsertMask.Clear();
+    }
+
+    // 도감 탭은 평소 꺼져 있다 — 비활성 포함으로 찾는다.
+    AlbumTabController ResolveAlbumTab()
+    {
+        if (this.albumTabController == null)
+            this.albumTabController = FindFirstObjectByType<AlbumTabController>(FindObjectsInactive.Include);
+
+        return this.albumTabController;
     }
 
     // 재화는 공용 재생기가 조립한다(수치 고정 해제 안전망까지 그 시퀀스에 붙어 온다).
