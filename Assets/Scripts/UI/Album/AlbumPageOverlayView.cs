@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,6 +29,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+    [SerializeField] AlbumPageFlipView pageFlip = new AlbumPageFlipView();
+    [Tooltip("선택 — 종이와 따로 크로스페이드할 주변 UI 묶음(Row_PageGauge). 미배선이면 페이드를 건너뛴다.")]
+    [SerializeField] RectTransform sideFadeRoot;
 
     AlbumTheme m_theme;
     int m_pageIndex;
@@ -38,9 +43,21 @@ public class AlbumPageOverlayView : MonoBehaviour
     readonly List<CardData> m_order = new List<CardData>();
 
     // 삽입 세션이 켜는 잠금 — 탈출로를 세션의 건너뛰기 하나로 좁힌다
-    bool m_interactionLocked;
+    bool m_sessionLocked;
+    // 넘김 한 번 동안만. 세션과 bool을 공유하면 넘김이 끝날 때 세션 잠금까지 같이 풀린다
+    bool m_flipLocked;
+    bool m_flipping;
+    // 진행 중이던 넘김이 Open/OnDisable로 잘렸는지 판정. 잘린 넘김이 뒤늦게 인덱스를 덮어쓰면 안 된다
+    int m_flipGen;
+
+    bool IsLocked => m_sessionLocked || m_flipLocked;
 
     public int PageIndex => m_pageIndex;
+
+    /// <summary>넘김 한 번에 걸리는 시간의 단일 진실원 — 삽입 세션이 따로 값을 들고 있지 않게 한다.</summary>
+    public float FlipDuration => pageFlip.Duration;
+
+    public bool IsFlipping => m_flipping;
 
     public void Open(AlbumTheme _theme)
     {
@@ -54,6 +71,8 @@ public class AlbumPageOverlayView : MonoBehaviour
             Debug.LogWarning("[AlbumPageOverlayView] 빈 테마 — 오버레이를 열지 않는다.", this);
             return;
         }
+
+        CancelFlip();   // 잘린 넘김 자세를 안고 열리지 않게
 
         bool t_wasActive = gameObject.activeSelf;
         m_theme = _theme;
@@ -85,14 +104,26 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     public void SetInteractionLocked(bool _locked)
     {
-        m_interactionLocked = _locked;
+        m_sessionLocked = _locked;
+        ApplyInteractable();
+    }
 
-        if (dimButton != null) dimButton.interactable = !_locked;
-        if (closeButton != null) closeButton.interactable = !_locked;
-        if (swipeDetector != null) swipeDetector.Interactable = !_locked;
+    void SetFlipLocked(bool _locked)
+    {
+        m_flipLocked = _locked;
+        ApplyInteractable();
+    }
+
+    void ApplyInteractable()
+    {
+        bool t_locked = IsLocked;
+
+        if (dimButton != null) dimButton.interactable = !t_locked;
+        if (closeButton != null) closeButton.interactable = !t_locked;
+        if (swipeDetector != null) swipeDetector.Interactable = !t_locked;
 
         // 잠금 해제는 페이지 수가 정하던 원래 값으로 되돌린다
-        bool t_steppable = !_locked && m_theme != null && m_theme.Pages.Count > 1;
+        bool t_steppable = !t_locked && m_theme != null && m_theme.Pages.Count > 1;
         if (prevButton != null) prevButton.interactable = t_steppable;
         if (nextButton != null) nextButton.interactable = t_steppable;
     }
@@ -109,6 +140,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (closeButton != null) closeButton.onClick.AddListener(Close);
         if (prevButton != null) prevButton.onClick.AddListener(() => Step(-1));
         if (nextButton != null) nextButton.onClick.AddListener(() => Step(1));
+
+        // 회전 대상은 Panel_Page가 아니라 slotRoot(Grid_Slots)다 — 같은 사각형이면서 부모 레이아웃이
+        // anchoredPosition을 안 덮어쓰는 유일한 노드라 축 보정이 되돌려지지 않는다
+        pageFlip.Bind(slotRoot as RectTransform, sideFadeRoot, pageLabel);
     }
 
     void OnEnable()
@@ -134,6 +169,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 안전망 — 세션 없이 위장만 남으면 카드가 영영 빈 칸으로 보인다
         if (!AlbumInsertSession.IsRunning) AlbumInsertMask.Clear();
+
+        // 탭 전환 등으로 넘김 도중에 꺼지면 종이가 세워진 채 굳는다
+        CancelFlip();
 
         transition.HandleDisabled(gameObject);
     }
@@ -209,7 +247,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
             t_button.onClick.AddListener(() =>
             {
-                if (m_interactionLocked) return;   // 삽입 중엔 상세로 새지 않는다
+                if (IsLocked) return;   // 삽입 중이거나 넘기는 중엔 상세로 새지 않는다
                 CardDetailOverlayView.Open(m_order, t_orderIndex);
             });
         }
@@ -231,9 +269,8 @@ public class AlbumPageOverlayView : MonoBehaviour
             pageChest.Bind(t_info, ClaimPageReward);
         }
 
-        bool t_steppable = !m_interactionLocked && m_theme.Pages.Count > 1;
-        if (prevButton != null) prevButton.interactable = t_steppable;
-        if (nextButton != null) nextButton.interactable = t_steppable;
+        // 잠금은 리프레시로 풀리지 않는다 — 넘김 중에도 이벤트가 이 함수를 부른다
+        ApplyInteractable();
     }
 
     // 삽입 연출 중에는 아직 안 꽂은 카드를 빈 칸으로 위장한다. 소유는 이미 확정됐지만 화면상 꽂기 전이다.
@@ -267,11 +304,92 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void Step(int _dir)
     {
+        FlipStepAsync(_dir).Forget();
+    }
+
+    /// <summary>테마·페이지를 지정해 옮긴다. 열려 있으면 넘김 연출을 태우고, 닫혀 있으면 팝업 열기에 맡긴다.</summary>
+    public async UniTask GoToPageAsync(AlbumTheme _theme, int _pageIndex)
+    {
+        if (_theme == null || _theme.Pages == null || _theme.Pages.Count == 0) return;
+
+        // 닫혀 있으면 넘길 옛 페이지가 없다 — 팝업 등장에 맡기고 그게 끝날 때까지 기다린다
+        if (!gameObject.activeSelf || m_theme == null || m_flipping || pageFlip.Duration <= 0f)
+        {
+            Open(_theme, _pageIndex);
+            await UniTask.Delay((int)(transition.OpenDuration * 1000f), ignoreTimeScale: true);
+            return;
+        }
+
+        int t_target = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
+        if (m_theme == _theme && t_target == m_pageIndex) return;
+
+        // 테마가 통째로 바뀌면 인덱스 비교가 뜻이 없다 — "다음 장"으로 읽히게 한다
+        int t_dir = (m_theme != _theme || t_target > m_pageIndex) ? 1 : -1;
+        await FlipAsync(t_target, t_dir, _theme);
+    }
+
+    async UniTask FlipStepAsync(int _dir)
+    {
+        if (m_flipping) return;   // 넘기는 중 재입력은 무시 — 인덱스만 앞서가는 분기를 원천 차단한다
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
-        int t_count = m_theme.Pages.Count;
-        m_pageIndex = (m_pageIndex + _dir + t_count) % t_count;
-        RefreshPage();
+        int t_count  = m_theme.Pages.Count;
+        int t_target = (m_pageIndex + _dir + t_count) % t_count;
+
+        if (t_count <= 1 || pageFlip.Duration <= 0f)
+        {
+            m_pageIndex = t_target;
+            RefreshPage();
+            return;
+        }
+
+        await FlipAsync(t_target, _dir, null);
+    }
+
+    async UniTask FlipAsync(int _target, int _dir, AlbumTheme _theme)
+    {
+        int t_gen = ++m_flipGen;
+
+        m_flipping = true;
+        SetFlipLocked(true);
+        pageFlip.Begin(_dir);
+
+        try
+        {
+            float t_p = 0f;
+            await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 0.5f, pageFlip.Duration * 0.5f)
+                .SetEase(Ease.InQuad).SetLink(gameObject).SetId(this).ToUniTask();
+
+            if (t_gen != m_flipGen) return;   // 도중에 잘렸다 — 새 페이지를 덮어쓰면 안 된다
+
+            // edge-on(종이가 안 보이는 순간)에 교체한다. RefreshPage는 m_pageIndex의 순수 함수라
+            // 연출을 전혀 몰라도 되고, 도중에 이벤트가 난입해도 화면이 어긋나지 않는다
+            if (_theme != null) m_theme = _theme;
+            m_pageIndex = _target;
+            RefreshPage();
+            pageFlip.EnsureShadeOnTop();   // 슬롯이 새로 생겼으면 그늘이 카드 뒤로 묻힌다
+
+            await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 1f, pageFlip.Duration * 0.5f)
+                .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this).ToUniTask();
+        }
+        finally
+        {
+            if (t_gen == m_flipGen)
+            {
+                pageFlip.Cancel();
+                m_flipping = false;
+                SetFlipLocked(false);
+            }
+        }
+    }
+
+    void CancelFlip()
+    {
+        m_flipGen++;                 // 진행 중이던 넘김의 커밋·정리를 무효화한다
+        DOTween.Kill(this, true);    // SetId(this)를 단 넘김 트윈만. complete=true라야 대기가 취소가 아닌 완료로 풀린다
+        pageFlip.Cancel();
+        m_flipping = false;
+        SetFlipLocked(false);
     }
 
     void ClaimPageReward()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 
@@ -34,7 +35,7 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] CanvasGroup              group;
 
     [Header("타이밍")]
-    [SerializeField] float  pageTurnDuration = 0.25f;
+    // 페이지 넘김 시간은 여기 두지 않는다 — AlbumPageOverlayView.FlipDuration이 단일 진실원이다
     [SerializeField] float  seatDuration     = 0.28f;
     [Tooltip("손을 뗐을 때 카드가 살짝 되밀리는 시간.")]
     [SerializeField] float  reboundDuration  = 0.16f;
@@ -238,9 +239,9 @@ public class AlbumInsertSession : MonoBehaviour
         if (m_openTheme == _step.Theme && pageOverlay.PageIndex == _step.PageIndex) yield break;
 
         m_openTheme = _step.Theme;
-        pageOverlay.Open(_step.Theme, _step.PageIndex);
 
-        yield return new WaitForSecondsRealtime(this.pageTurnDuration);
+        // 열려 있으면 책 넘김을, 닫혀 있으면 팝업 열기를 태운다 — 어느 쪽인지는 오버레이가 판단한다
+        yield return pageOverlay.GoToPageAsync(_step.Theme, _step.PageIndex).ToCoroutine();
     }
 
     // ⚠ GridRatioFitter가 cellSize를 런타임에 정한다 — 한 프레임 넘기고 ForceUpdateCanvases 한 뒤에만
