@@ -15,11 +15,12 @@ public static class RankResultHandoff
             // 티어가 그대로인 판(포인트만 변한 판)도 버리지 않는다 — 증감은 늘 누적된다.
             // 출발은 처음 실린 것, 도착은 마지막 것 — 최소/최대로 접으면 승패가 섞였을 때 거짓말이 된다
             // (실버1 →승 실버2 →패 실버1이 "실버1 → 실버2 승급"으로 보고된다).
-            // 첫 티어 진입의 센티널 -1도 이 방식이면 처음 실린 값이라 그대로 남는다.
             var t_prev = s_pending.Value;
-            s_pending = new RankApplyResult(t_prev.Delta + _result.Delta,
-                                            t_prev.PrevTierIndex,
-                                            _result.TierIndex);
+
+            // 예외는 첫 티어 진입의 센티널 -1 하나뿐 — 언제 실리든 이긴다. 삼켜지면 진입 연출이 사라진다.
+            int t_from = _result.PrevTierIndex < 0 ? _result.PrevTierIndex : t_prev.PrevTierIndex;
+
+            s_pending = new RankApplyResult(t_prev.Delta + _result.Delta, t_from, _result.TierIndex);
             return;
         }
 

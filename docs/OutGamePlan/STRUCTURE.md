@@ -600,7 +600,7 @@ sequenceDiagram
     TR->>MGR: ApplyBattleResult(_won)
     MGR->>MGR: delta = 승? +winPoints : -losePoints
     MGR->>MGR: 바닥 = 랭크 진입했으면 FirstTierPoints, 아니면 0
-    MGR->>MGR: 천장 = 랭크 진입 전이면 FirstTierPoints-1, 아니면 없음
+    MGR->>MGR: 천장 = 튜토 전투면 max(FirstTierPoints-1, 현재), 아니면 없음
     MGR->>MGR: points = clamp(points + delta, 바닥, 천장)
     MGR->>DSM: Save() — 씬 왕복을 견디게 즉시 영속
     Note over TR,HUD: BattleCleanup.LoadScene("LobbyScene")
@@ -698,12 +698,24 @@ flowchart TD
 | 축 | 전 | 후 |
 |---|---|---|
 | 정산 하한 | 가감 **전** 티어의 `RequiredPoints` → 강등 구조적으로 불가 | 랭크 진입 뒤엔 `FirstTierPoints`(브론즈 1) 하나뿐 → 티어 사이 강등은 열림 |
-| 정산 상한 | 없음 | 랭크 진입 **전**에만 `FirstTierPoints - 1` — 튜토 중 몇 승을 해도 언랭크가 유지된다 |
+| 정산 상한 | 없음 | **튜토리얼 전투**에만 `max(FirstTierPoints - 1, 현재 포인트)` — 몇 승을 해도 랭크에 진입하지 못한다 |
 | 언랭크 복귀 | (해당 없음) | **없다.** 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있어 의미가 두 갈래로 갈린다 |
-| 캐리어 병합 | `Min(prev)/Max(tier)` — 상승만 가정 | **처음 실린 출발 → 마지막 도달**. 승·패가 섞이면 최소/최대는 거짓말을 한다(승1패1이 "승급"으로 보고됐다) |
+| 캐리어 병합 | `Min(prev)/Max(tier)` — 상승만 가정 | **처음 실린 출발 → 마지막 도달**(센티널 `-1`만 예외로 언제 실리든 이긴다). 승·패가 섞이면 최소/최대는 거짓말을 한다(승1패1이 "승급"으로 보고됐다) |
 
-**천장 판정을 튜토 진행도가 아니라 `IsRanked`로 거는 이유**: Rank 도메인이 Tutorial을 참조하지 않게 하려는 것이고, `DataLibrary`가 "튜토 졸업 ⟺ 첫 티어 도달"을 부팅 시 불변식으로 세우므로 등가다.
+#### ⚠️ 졸업 낙인은 마지막 튜토 전투보다 **먼저** 찍힌다
+
+이것이 이 설계에서 가장 반직관적인 지점이고, 천장 규칙이 지금 모양인 유일한 이유다.
+
+마지막 챕터의 마지막 스텝은 `BattleStart`(덱 확인 화면의 "전투 시작" 버튼)다. 게이트 만족 = 씬 이탈이므로 `NotifyStepSatisfied` → `CompleteSequence` → `TryEnterFirstTier`가 **전투가 열리기 전에** 끝난다. 즉 마지막 튜토 전투는 이미 브론즈 1(=100점)에 선 채로 정산된다.
+
+- 천장 판정을 `IsRanked`로 하면 → 그 전투가 랭크 전투로 새어 100+25 = **브론즈 2**로 졸업한다.
+- 천장을 `FirstTierPoints - 1`로 **고정**하면 → 그 전투가 100을 99로 끌어내려 **강등 + 언랭크 복귀**가 된다.
+- 그래서 천장은 `max(FirstTierPoints - 1, 현재 포인트)` — "튜토 전투는 랭크를 **올리기만** 하고 첫 티어는 넘지 않는다". 마지막 전투에선 천장과 바닥이 둘 다 100이라 승패 무관 브론즈 1을 지킨다.
+
+판정 입력은 `TurnRunner`가 `TutorialConfig.IsActive`를 넘긴다(랭크가 튜토리얼 도메인을 직접 보지 않게). `TutorialConfig.Begin`은 한 단계 앞 `BattleEntry` 스텝에서 걸리므로 마지막 전투에서도 참이다.
 **부작용 1건(승인됨)**: 튜토 4승째는 75→99라 결과 팝업에 `+24`가 뜬다.
+
+> 승점이 10이던 때는 100+10 = 110으로 브론즈 2 문턱(125)에 못 미쳐 이 누수가 드러나지 않았다. 한 판이 정확히 한 단계가 되면서 노출됐다.
 
 #### 강등 연출 — 강도는 빈도를 따른다
 
@@ -718,7 +730,8 @@ flowchart TD
 
 | 변경 파일 | 내용 |
 |---|---|
-| `OutGame/Rank/RankManager.cs` | `ApplyBattleResult` 바닥/천장 재작성 · `RankApplyResult.IsTierDown` 추가 |
+| `OutGame/Rank/RankManager.cs` | `ApplyBattleResult(_won, _tutorial)` 바닥/천장 재작성 · `RankApplyResult.IsTierDown` 추가 |
+| `Battle/TurnRunner.cs` | `TutorialConfig.IsActive`를 정산에 넘긴다 |
 | `OutGame/Rank/RankResultHandoff.cs` | 병합을 "처음 출발 → 마지막 도달"로 교체 |
 | `OutGame/Rank/RankConfig.cs` | 코드 기본값 25/25로 애셋과 동기화(이중 진실원 제거) |
 | `UI/HUD/RankHud.cs` | `m_tierUpSeq` → `m_tierSeq`(승급·강등 공용 가드) · `BuildTierDown` · `StageGradeDown` · `StagePipOff` 추가 |

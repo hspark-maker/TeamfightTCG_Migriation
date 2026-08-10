@@ -76,8 +76,9 @@ public static class RankManager
         return true;
     }
 
-    // 전투 1회 정산(강등은 열되 브론즈 1 아래·첫 티어 위로는 못 넘게 클램프) + 즉시 저장
-    public static RankApplyResult ApplyBattleResult(bool _won)
+    /// <summary>전투 1회 정산 + 즉시 저장. _tutorial = 이 전투가 튜토리얼 시나리오 전투인가
+    /// (호출자가 TutorialConfig.IsActive를 넘긴다 — 랭크가 튜토리얼 도메인을 직접 보지 않게).</summary>
+    public static RankApplyResult ApplyBattleResult(bool _won, bool _tutorial)
     {
         var t_config = Config;
         var t_slot = Slot;
@@ -86,15 +87,16 @@ public static class RankManager
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
-        bool t_ranked = IsRanked;
 
         // 티어 임계치는 하한이 아니다 — 티어 사이 강등은 열어 두고, 진입 뒤의 바닥만 첫 티어로 막는다.
         // 언랭크로 되돌아가지 않게 하려는 것: 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
-        long t_floor = t_ranked ? t_config.FirstTierPoints : 0;
+        long t_floor = IsRanked ? t_config.FirstTierPoints : 0;
 
-        // 튜토리얼 중엔 첫 티어 직전에서 막는다 — 졸업(TryEnterFirstTier)이 랭크 진입의 유일한 문이다.
-        // 판정을 튜토 진행도가 아니라 IsRanked로 하는 건 "졸업 ⟺ 첫 티어 도달"이 불변식이기 때문(DataLibrary가 세운다).
-        long t_ceiling = t_ranked ? long.MaxValue : Math.Max(t_config.FirstTierPoints - 1, 0);
+        // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
+        // 천장을 현재 포인트 아래로는 내리지 않는다: 졸업 낙인이 마지막 튜토 전투보다 "먼저" 찍히므로
+        // (마지막 스텝이 전투 시작 버튼 클릭이다) 그 판은 이미 첫 티어에 선 채로 정산된다 —
+        // 고정 천장을 쓰면 그 한 판이 곧 강등이 된다.
+        long t_ceiling = _tutorial ? Math.Max(t_config.FirstTierPoints - 1, t_points) : long.MaxValue;
 
         t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
