@@ -1000,8 +1000,8 @@ flowchart TD
         IM["AlbumInsertMask (static)<br/>'소유 확정 · 화면 미수록' 단일 진실원<br/>HideAll/Reveal/Clear · IsHidden<br/>HiddenCountIn(Page/Theme) · HiddenTotal · OnChanged"]:::new
         IP["AlbumInsertPlan (static)<br/>카드 목록 → AlbumInsertStep[]<br/>(테마→페이지→칸) 앨범 순회로 정렬<br/>미배치 카드는 _unplaced로 반환 + LogWarning"]:::new
         ISS["AlbumInsertSession (MonoBehaviour)<br/>상태 머신 브레인<br/>PageTurn → Spawn → AwaitDrag → Seat<br/>IsRunning · SkipAll · 3중 위장 해제"]:::new
-        IDR["AlbumInsertCardDragger<br/>세로 1축 연속 드래그 → 진행도(0~1)<br/>OnProgress/OnSeat/OnReturn/OnGrab<br/>임계 원본 = PackCardStack"]:::new
-        ISV["AlbumSleeveView (그림의 단일 진실원)<br/>드래그 카드 홀더를 슬롯 rect에 정렬<br/>진행도 → 위치+기울기+좌우어긋남 (SetProgress)<br/>입구 기하 제약 TiltAt · 저항 LUT BakeResistance<br/>씰·안착 표현 없음(복제 씰 삭제)"]:::chg
+        IDR["AlbumInsertCardDragger<br/>세로 1축 드래그 → 진행도(0~1)<br/>**스와이프에 걸쳐 누적**(리셋은 스폰 때 1회)<br/>OnProgress/OnSeat/OnRelease/OnGrab"]:::chg
+        ISV["AlbumSleeveView (그림의 단일 진실원)<br/>드래그 카드 홀더를 슬롯 rect에 정렬<br/>진행도 → 위치+기울기+좌우어긋남 (SetProgress)<br/>봉투 AllowedTilt × seed(스와이프마다 NudgeTilt)<br/>저항 LUT BakeResistance · 씰 표현 없음"]:::chg
         IHV["AlbumInsertHintView<br/>손가락 힌트 · 하단 안내문구 · 건너뛰기<br/>값 원본 = OutgameTutorialGateUI"]:::new
         IPF["Panel_AlbumInsert (Tab_Collection_New 내)<br/>Blocker_Drag · CardHolder/CardUIView<br/>Hint_Finger · Label_Guide · Button_Skip<br/>씰 없음 — 진짜 칸에 직접 꽂는다"]:::new
     end
@@ -1133,16 +1133,18 @@ sequenceDiagram
         S->>PV: Open(theme, page) + SetInteractionLocked(true)
         S->>PV: TryGetSlotRect(slot)  ※ForceUpdateCanvases 이후
         S->>DR: Interactable = true
-        U->>DR: 아래로 드래그
-        DR-->>S: OnProgress(p) → 칸의 번호를 점점 덮는다
-        alt 임계 이상
-            DR-->>S: OnSeat
-            S->>M: Reveal(card)
-            M-->>PV: OnChanged → RefreshPage (슬롯 카드 ON · 게이지 +1)
-            S->>S: 같은 프레임에 드래그 카드 OFF (이음매 0프레임)
-        else 임계 미만
-            DR-->>S: OnReturn → 원위치 복귀
+        loop 다 들어갈 때까지 스와이프 반복
+            U->>DR: 아래로 밀기 (OnGrab → NudgeTilt: 이번 각도 추첨)
+            DR-->>S: OnProgress(p, 누적) → 봉투×seed로 까딱이며 점점 수렴
+            alt 임계(0.92) 이상 또는 완전 삽입
+                DR-->>S: OnSeat
+            else 임계 미만에서 손 뗌
+                DR-->>S: OnRelease → reboundAmount만큼만 되뱉음 (민 만큼은 남는다)
+            end
         end
+        S->>M: Reveal(card)
+        M-->>PV: OnChanged → RefreshPage (슬롯 카드 ON · 게이지 +1)
+        S->>S: 같은 프레임에 드래그 카드 OFF (이음매 0프레임)
     end
     S->>M: Clear() (Finish / SkipAll / OnDisable 공통)
     S->>PV: SetInteractionLocked(false) + 이탈 가드 해제
@@ -1158,9 +1160,13 @@ sequenceDiagram
 > **도감 번호는 포켓 바닥에 인쇄된 것처럼 둔다** — `NumberLabel`은 `Sleeve_Back` 바로 뒤 형제이자 `InsertDock`·`Card`보다 **앞 형제**다. 그래서 카드가 꽂히면 **번호가 저절로 가려지고**, 삽입 중에도 카드가 내려온 만큼 번호가 덮이는 그림이 공짜로 나온다 — `Bind`에 "소유면 번호 끄기" 분기가 없다.
 > **패널의 복제 씰(`Sleeve_Slot`)은 삭제했다**(2026-08-10) — 예전에는 드래그 카드가 패널에 있어 진짜 칸보다 위에 그려지므로, 카드를 가릴 씰이 패널에도 하나 더 필요했다(`AlbumCardSlot` 인스턴스를 그대로 띄웠다). **씰이 카드 뒤로 내려간 지금은 가릴 것이 없으므로 그 복제본은 화면에 씰이 두 개 존재하는 비용만 남는다.** 실측으로도 씬에 `AlbumCardSlotView`가 10개(진짜 칸 9 + 복제 1)였다. 지금은 9개다.
 > **`AlbumSleeveView`는 부모를 옮긴다** — `AlignTo(slotRect, dock)`가 `cardHolder`를 대상 칸의 `InsertDock`으로 `SetParent`한다. 칸 안으로 들어가면 좌표계가 곧 칸이라 중앙이 (0,0)이고 레이어 변환이 사라진다(폴백: dock이 null이면 예전처럼 패널 좌표계, 가림 없음). **홈 부모는 Awake가 아니라 첫 이동 직전에 기억**하고 `Release()`가 되돌린다 — 안 되돌리면 다음 세션이 남의 칸 안에서 시작한다. `Finish`가 이 호출의 유일한 자리다.
-> **끼워 넣는 체감은 콜라이더가 아니라 기하식이다**(2026-08-10) — 카드는 스텝마다 다른 각도(`±5~15°`)·좌우 어긋남으로 뜨고, 깊이 `d`까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 각도 `θmax(d) = atan2(d,a) − acos(C/R)` (`a`=카드 반폭, `C=a·(1+mouthClearance)`, `R=√(a²+d²)`)로 **강제로 펴진다**(`AlbumSleeveView.TiltAt`). 물리 콜라이더를 쓰지 않는 이유: 이 식은 **진행도의 순수 함수**라 복귀 트윈으로 되감아도 각도가 정확히 되돌아온다(콜라이더는 상태가 어긋난다). "기울면 잘 안 들어간다"는 저항은 `∫dx/(1−r(x))`를 **스폰 때 33칸 표로 한 번 굽고**(`BakeResistance`) 런타임엔 역참조만 한다 — 프레임마다 적분하면 SetProgress가 이력에 의존해 같은 진행도가 다른 위치를 준다. 총 수고는 1로 정규화하므로 **드래그 임계 계약(진행도 1 = 카드 높이만큼 밀기)은 무변경**이다.
-> **위치를 묻는 창구(`YAt`)는 없앴다** — 저항이 들어간 뒤로 진행도와 거리가 비례하지 않아, "목표 y만 받아 `DOAnchorPosY`" 사용법이 곧 **각도가 그 자리에 얼어붙는 버그**가 된다. 그래서 카드가 움직이는 길은 `SetProgress` 하나뿐이고, 안착·복귀도 `AlbumInsertSession.TweenProgress`(`DOTween.To` + `SetTarget(cardHolder)`)로 진행도를 몬다. `SetTarget`이 필수인 이유: `HandleGrab`의 `CardHolder.DOKill()`이 이 트윈도 걷어야 되감기 중 다시 잡았을 때 트윈과 손가락이 카드를 동시에 끌지 않는다.
-> **안착 순간의 각도 0은 계약이다** — 기하 제약만으로는 끝에서 2~3°가 남는다. `uprightFrom(0.7)`부터 SmoothStep으로 마저 펴고 좌우 어긋남도 같은 비율로 회수해, 진행도 1에서 카드가 **정확히 칸 중앙·무회전**이 되게 한다. 아래 "이음매 0프레임"이 성립하는 전제다.
+> **한 번에 안 들어간다 — 여러 번 나눠 꽂는다**(2026-08-10 재설계) — 실제로 카드를 슬리브에 꽂을 때처럼 ① 한 스와이프로 다 안 들어가고 ② 스와이프마다 **까딱 다른 각도**로 걸리며 ③ 그 까딱거림이 **깊어질수록 수렴**한다. 임계 미만에서 손을 떼도 **처음으로 되돌아가지 않는다** — `AlbumInsertCardDragger.m_pushed`가 스와이프 경계에서 리셋되지 않고 누적되고(리셋은 스폰 때 한 번뿐), 세션은 `reboundAmount(0.05)`만큼만 되뱉는다(`AlbumInsertSession.Rebound`). **여기서 진행도를 0으로 되돌리면 이 연출의 전제가 통째로 무너진다**(옛 `ReturnToStart`).
+> **덜덜거림 = stick-slip, 물리 엔진이 아니다** — 카드가 매끄럽게 미끄러지면 "판이 내려간다"로 읽힌다. 실제 마찰은 **붙었다 미끄러졌다**를 반복하므로, 손가락은 연속으로 움직여도 카드 깊이는 `slipStep(카드 높이의 3.5%)` 눈금으로 **내림(Floor)** 한다 — 다음 눈금에 닿기 전까지 카드가 버티는 것이 곧 정지마찰이다(`AlbumSleeveView.SetProgress`). 미끄러지는 눈금마다 각도가 `Hash11(눈금번호)`로 튄다(난수가 아니라 **눈금 번호의 함수**라 되감아도 같은 값 → 지직거리지 않는다). 여기에 손가락이 닿아 있는 동안 `LateUpdate`가 Perlin 잔떨림(각도 0.7°·가로 1.2%)을 덧칠한다 — **밀리지 않고 버티는 순간에도 떨어야** 빡빡하다고 읽힌다. 잔떨림은 계산된 자세(`m_basePos`/`m_baseAngle`) 위에 얹었다 걷는 덧칠이라 `SetProgress`의 순수성을 건드리지 않고, 진폭이 봉투에 비례해 **다 들어갈수록 저절로 잦아든다**.
+> **각도 수렴은 코드가 아니라 봉투가 만든다** — 깊이 `d`까지 들어간 카드가 씰 입구 폭 안에 남을 수 있는 최대 각도 `θmax(d) = atan2(d,a) − acos(C/R)` (`a`=카드 반폭, `C=a·(1+mouthClearance)`, `R=√(a²+d²)`)가 **봉투**다(`AlbumSleeveView.AllowedTilt`). 실제 각도 = **봉투 × seed(-1~1)**이고, seed는 스와이프마다 새로 뽑힌다(`NudgeTilt`, `HandleGrab`에서 호출). 봉투가 `d`에 대해 단조 감소하므로 **seed를 아무리 흔들어도 진폭이 저절로 줄어든다 — 각도를 직접 줄이는 코드는 없다.** 새 seed로는 `tiltBlendDepth(7%)`만큼 밀리는 동안 갈아탄다(시간이 아니라 깊이로 — 되감아도 같은 값이 나오게).
+> **물리 콜라이더를 쓰지 않는 이유** — 위 식은 전부 **진행도의 순수 함수**라 되밀림·안착 트윈으로 되감아도 각도가 정확히 되돌아온다(콜라이더는 상태가 어긋난다). "기울 수 있는 구간일수록 잘 안 들어간다"는 저항은 `∫dx/(1−r(x))`를 **스폰 때 33칸 표로 한 번 굽고**(`BakeResistance`) 런타임엔 역참조만 한다. ⚠ 저항은 실제 각도가 아니라 **봉투**로 잰다 — seed로 재면 진행도→깊이 매핑이 스와이프마다 달라져 손을 대는 순간 카드가 순간이동한다. 총 수고는 1로 정규화하므로 **드래그 임계 계약(진행도 1 = 카드 높이만큼 밀기)은 무변경**이다.
+> **위치를 묻는 창구(`YAt`)는 없앴다** — 저항이 들어간 뒤로 진행도와 거리가 비례하지 않아, "목표 y만 받아 `DOAnchorPosY`" 사용법이 곧 **각도가 그 자리에 얼어붙는 버그**가 된다. 그래서 카드가 움직이는 길은 `SetProgress` 하나뿐이고, 안착·되밀림도 `AlbumInsertSession.TweenProgress`(`DOTween.To` + `SetTarget(cardHolder)`)로 진행도를 몬다. `SetTarget`이 필수인 이유: `HandleGrab`의 `CardHolder.DOKill()`이 이 트윈도 걷어야 되밀림 중 다시 잡았을 때 트윈과 손가락이 카드를 동시에 끌지 않는다. 되밀린 뒤 `dragger.SyncProgress(to)`로 누적을 맞추지 않으면 다음 스와이프 첫 프레임에 카드가 그만큼 순간이동한다.
+> **임계는 PackCardStack에서 의도적으로 갈라졌다** — 개봉 넘기기는 한 스와이프로 끝나는 동작이라 `seatThreshold 0.6` + `flickSpeed 700`이 맞지만, 꽂기는 나눠 미는 동작이라 그대로 두면 **첫 스와이프에 끝나 버린다**. 삽입 쪽은 `seatThreshold 0.92` / `flickSpeed 0`(플릭 지름길 없음)이고, 진행도가 1에 닿으면 손을 떼기 전에도 `OnDrag`에서 안착시킨다. 프리팹(`Tab_Collection_New.prefab`)에도 같은 값으로 반영돼 있다 — **인스펙터 값이 코드 기본값을 덮으므로 둘을 같이 본다.**
+> **안착 순간의 각도 0은 계약이다** — 기하 봉투만으로는 끝에서 2~3°가 남는다. `uprightFrom(0.75)`부터 SmoothStep으로 마저 펴고 좌우 어긋남(`shiftRatio`)도 각도에 매달아 함께 회수해, 진행도 1에서 카드가 **정확히 칸 중앙·무회전**이 되게 한다. 아래 "이음매 0프레임"이 성립하는 전제다.
 > **안착의 이음매는 0프레임** — 진행도 1에서 드래그 카드는 진짜 칸의 카드와 같은 자리·같은 크기로 비닐 뒤에 잠겨 있다. `AlbumInsertMask.Reveal(card)` → 칸이 같은 그림을 그리고, **같은 프레임에** 드래그 카드를 끈다. 남은 것은 비닐을 걷는 일뿐이다.
 > **조상에 마스크가 없다는 것이 전제다** — `Slot_00 → Grid_Slots → Panel_Page → Frame → Panel_PageOverlay → … → LobbyCanvas` 전 구간에 `RectMask2D`·`Mask`·`ScrollRect`가 없음을 실측 확인했다(2026-08-10). 그래서 칸 안으로 들어간 카드가 진행도 0(칸 한 칸 위)에서도 잘리지 않는다. **여기에 마스크를 추가하면 첫 행 카드가 사라진다.**
 > **씰은 켜고 끄거나 흔들지 않는다** — 칸의 그래픽이 씰 하나뿐이므로 알파를 소유 여부로 바꾸면 칸의 재질감이 갈린다. 빈 칸/꽂힌 칸의 차이는 **씰이 아니라 그 위에 카드가 있느냐**로만 표현한다(`ownedSleeveAlpha`·`CardGroup`은 이 개편으로 삭제).

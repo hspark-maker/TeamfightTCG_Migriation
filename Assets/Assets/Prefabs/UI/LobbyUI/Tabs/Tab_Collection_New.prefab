@@ -2967,7 +2967,8 @@ MonoBehaviour:
   group: {fileID: 8712932046923545466}
   pageTurnDuration: 0.25
   seatDuration: 0.28
-  returnDuration: 0.2
+  reboundDuration: 0.16
+  reboundAmount: 0.05
   hintIdleDelay: 3
   guideMessage: "\uC2AC\uB9AC\uBE0C\uC5D0 \uB123\uAE30 \uC704\uD574 \uC2A4\uC640\uC774\uD504\uD558\uC138\uC694"
 --- !u!114 &1274187336003097380
@@ -3657,8 +3658,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62feb604611bdbc4c93e02fbcf00c993, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AlbumInsertCardDragger
-  seatThreshold: 0.6
-  flickSpeed: 700
+  seatThreshold: 0.92
+  flickSpeed: 0
   flickMinProgress: 0.15
 --- !u!1 &7885323460306023443
 GameObject:

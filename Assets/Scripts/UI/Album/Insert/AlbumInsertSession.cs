@@ -30,7 +30,10 @@ public class AlbumInsertSession : MonoBehaviour
     [Header("타이밍")]
     [SerializeField] float  pageTurnDuration = 0.25f;
     [SerializeField] float  seatDuration     = 0.28f;
-    [SerializeField] float  returnDuration   = 0.2f;
+    [Tooltip("손을 뗐을 때 카드가 살짝 되밀리는 시간.")]
+    [SerializeField] float  reboundDuration  = 0.16f;
+    [Tooltip("손을 뗄 때 되밀리는 양(진행도). 0이면 민 자리에 딱 멈춰 기계적으로 보인다.")]
+    [Range(0f, 0.3f)] [SerializeField] float reboundAmount = 0.05f;
     [Tooltip("안착 후 씰 앞면(비닐)이 걷히며 카드가 선명해지는 시간.")]
     [SerializeField] float  revealDuration   = 0.25f;
     [Tooltip("손을 댄 뒤 이만큼 아무 입력이 없으면 손가락 안내를 되살린다.")]
@@ -49,7 +52,7 @@ public class AlbumInsertSession : MonoBehaviour
     RectTransform     m_slotRect;    // 그 칸의 rect — 안착 마무리 펀치 대상
     Coroutine     m_routine;
     bool          m_seatRequested;
-    bool          m_returnRequested;
+    bool          m_releaseRequested;
     bool          m_fingerPaused;
     float         m_idleTime;
 
@@ -118,7 +121,7 @@ public class AlbumInsertSession : MonoBehaviour
         {
             dragger.OnProgress += this.HandleProgress;
             dragger.OnSeat     += this.HandleSeat;
-            dragger.OnReturn   += this.HandleReturn;
+            dragger.OnRelease  += this.HandleRelease;
             dragger.OnGrab     += this.HandleGrab;
         }
 
@@ -131,7 +134,7 @@ public class AlbumInsertSession : MonoBehaviour
         {
             dragger.OnProgress -= this.HandleProgress;
             dragger.OnSeat     -= this.HandleSeat;
-            dragger.OnReturn   -= this.HandleReturn;
+            dragger.OnRelease  -= this.HandleRelease;
             dragger.OnGrab     -= this.HandleGrab;
             dragger.Interactable = false;
         }
@@ -251,10 +254,10 @@ public class AlbumInsertSession : MonoBehaviour
 
         if (hint != null) hint.Show(this.guideMessage, sleeve.CardHolder);
 
-        m_seatRequested   = false;
-        m_returnRequested = false;
-        m_fingerPaused    = false;
-        m_idleTime        = 0f;
+        m_seatRequested    = false;
+        m_releaseRequested = false;
+        m_fingerPaused     = false;
+        m_idleTime         = 0f;
 
         this.SetGroupAlpha(1f);
         dragger.Interactable = true;
@@ -262,15 +265,16 @@ public class AlbumInsertSession : MonoBehaviour
         _result?.Invoke(true);
     }
 
-    // 임계를 넘길 때까지 밀고 당기기를 반복한다. 유휴가 길어지면 손가락 안내를 되살린다.
+    // 임계를 넘길 때까지 스와이프를 반복한다 — 한 번에 다 들어가지 않는 것이 이 연출의 전제다.
+    // 손을 떼면 살짝 되밀릴 뿐 **민 만큼은 남는다**. 유휴가 길어지면 손가락 안내를 되살린다.
     IEnumerator AwaitDrag()
     {
         while (!m_seatRequested)
         {
-            if (m_returnRequested)
+            if (m_releaseRequested)
             {
-                m_returnRequested = false;
-                yield return this.ReturnToStart();
+                m_releaseRequested = false;
+                yield return this.Rebound();
                 continue;
             }
 
@@ -339,16 +343,20 @@ public class AlbumInsertSession : MonoBehaviour
                       .SetLink(gameObject);
     }
 
-    IEnumerator ReturnToStart()
+    // 손을 뗀 순간 — 처음으로 되돌리지 않는다. 밀어 넣다 만 카드가 살짝 뱉어지는 만큼만 물러난다.
+    // ⚠ 여기서 0으로 되돌리면 "여러 번 나눠 꽂는다"는 이 연출의 전제가 통째로 무너진다(예전 동작).
+    IEnumerator Rebound()
     {
         var t_holder = sleeve.CardHolder;
         if (t_holder == null) yield break;
 
-        t_holder.DOKill();
-        yield return this.TweenProgress(t_holder, 0f, this.returnDuration, Ease.OutBack).WaitForCompletion();
+        float t_to = Mathf.Max(0f, sleeve.Progress - this.reboundAmount);
 
-        // 카드가 시작 자리로 돌아온 뒤에야 누적을 지운다 — 트윈 도중 다시 잡으면 그 자리에서 이어져야 한다.
-        if (dragger != null) dragger.ResetProgress();
+        t_holder.DOKill();
+        yield return this.TweenProgress(t_holder, t_to, this.reboundDuration, Ease.OutQuad).WaitForCompletion();
+
+        // 되밀린 만큼 드래그 누적도 깎아 둔다 — 안 맞추면 다음 스와이프 첫 프레임에 카드가 그만큼 순간이동한다.
+        if (dragger != null) dragger.SyncProgress(t_to);
     }
 
     // 남은 스텝을 전부 버리고 끝낸다. AlbumInsertMask.Clear()가 나머지를 한 번에 드러낸다.
@@ -402,16 +410,32 @@ public class AlbumInsertSession : MonoBehaviour
         if (sleeve != null) sleeve.SetProgress(_p);
     }
 
-    void HandleSeat()   => m_seatRequested = true;
+    // 손이 떨어지는 두 경로 모두에서 잔떨림을 끈다 — 아무도 안 미는 카드가 계속 떨면 유령이 민 것처럼 보인다.
+    void HandleSeat()
+    {
+        m_seatRequested = true;
+        if (sleeve != null) sleeve.SetPushing(false);
+    }
 
-    void HandleReturn() => m_returnRequested = true;
+    void HandleRelease()
+    {
+        m_releaseRequested = true;
+        if (sleeve != null) sleeve.SetPushing(false);
+    }
 
-    // 첫 접촉 — 손가락은 걷고, 되감기 트윈이 돌고 있으면 손에 소유권을 넘긴다.
+    // 스와이프 시작 — 손가락은 걷고, 되밀림 트윈이 돌고 있으면 손에 소유권을 넘긴다.
+    // 여기서 각도를 새로 뽑는 것이 "매번 다르게 걸린다"의 전부다 — 봉투가 이미 좁아져 있으므로
+    // 깊이 들어간 카드일수록 아무리 뽑아도 덜 흔들린다(수렴은 공짜다).
     void HandleGrab()
     {
         m_idleTime = 0f;
 
         if (sleeve != null && sleeve.CardHolder != null) sleeve.CardHolder.DOKill();
+        if (sleeve != null)
+        {
+            sleeve.NudgeTilt();
+            sleeve.SetPushing(true);
+        }
 
         if (m_fingerPaused) return;
         m_fingerPaused = true;

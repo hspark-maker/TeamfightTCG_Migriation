@@ -2,10 +2,16 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-// 세로 연속 드래그 한 축 → 진행도(0~1) 스트림 + 뗄 때 안착/복귀 판정 1회. 그림은 전혀 건드리지 않는다.
+// 세로 드래그 한 축 → 진행도(0~1) 스트림 + 뗄 때 안착/손뗌 판정 1회. 그림은 전혀 건드리지 않는다.
 //
-// ⚠ 임계 기본값(seatThreshold·flickSpeed·flickMinProgress)의 원본은 PackCardStack이다 —
-//   손맛을 바꿀 땐 둘을 같이 본다(한쪽만 만지면 개봉 넘기기와 삽입의 감각이 갈라진다).
+// ■ 누적이 이 컴포넌트의 핵심이다 — 한 번의 스와이프로 다 안 들어간다.
+//   m_pushed는 스와이프 경계에서 리셋되지 않고 **여러 번의 스와이프에 걸쳐 쌓인다**(카드를 슬리브에 꽂는 실제 동작).
+//   리셋은 새 카드가 스폰될 때(ResetProgress) 한 번뿐이다.
+//
+// ⚠ 임계 기본값의 원본은 PackCardStack이었으나 **의도적으로 갈라졌다**(2026-08-10) —
+//   개봉 넘기기는 "한 번의 스와이프로 끝나는 동작"이라 낮은 임계·플릭 지름길이 맞지만,
+//   꽂기는 "여러 번 나눠 밀어 넣는 동작"이라 그 둘이 그대로면 첫 스와이프에 끝나 버린다.
+//   → seatThreshold를 끝까지 올리고 flickSpeed는 0(플릭 지름길 없음)이 이 연출의 기본이다.
 //
 // PackCardStack은 카드를 직접 끌지만 여기는 이동량을 진행도로만 환산해 넘긴다 —
 // 무엇을 얼마나 움직여 보일지는 전적으로 구독자(AlbumSleeveView) 몫이다.
@@ -21,17 +27,19 @@ public class AlbumInsertCardDragger : MonoBehaviour, IBeginDragHandler, IDragHan
     /// <summary>임계를 넘겨 손을 뗀 순간 1회.</summary>
     public Action OnSeat;
 
-    /// <summary>임계 미만으로 손을 뗀 순간 1회.</summary>
-    public Action OnReturn;
+    /// <summary>임계 미만으로 손을 뗀 순간 1회.
+    /// ⚠ "처음으로 되돌아가라"가 아니다 — 카드는 민 만큼 남아 있고 다음 스와이프가 이어 민다.
+    /// 진행도를 버리면 "한 번에 쭉 들어가는" 예전 감각으로 되돌아간다.</summary>
+    public Action OnRelease;
 
     /// <summary>첫 접촉 1회(손가락 힌트를 걷는 신호).</summary>
     public Action OnGrab;
 
     [Header("임계")]
-    [Tooltip("이 진행도 이상이면 안착. 진행도 1 = TravelPixels만큼 밀었을 때.")]
-    [Range(0.2f, 0.95f)] [SerializeField] float seatThreshold = 0.6f;
-    [Tooltip("이 속도(캔버스단위/초) 이상이면 거리가 부족해도 안착한다. 0이면 속도 판정 없음.")]
-    [SerializeField] float flickSpeed = 700f;
+    [Tooltip("손을 뗐을 때 이 진행도 이상이면 안착. 진행도 1(= 완전 삽입)에 닿으면 손을 떼기 전에도 안착한다.")]
+    [Range(0.2f, 0.99f)] [SerializeField] float seatThreshold = 0.92f;
+    [Tooltip("이 속도(캔버스단위/초) 이상이면 거리가 부족해도 안착한다. 0이면 속도 판정 없음(= 나눠 꽂기 기본).")]
+    [SerializeField] float flickSpeed = 0f;
     [Tooltip("속도로 안착시킬 때 최소한 이만큼(진행도)은 밀어야 한다.")]
     [Range(0f, 0.5f)] [SerializeField] float flickMinProgress = 0.15f;
 
@@ -62,10 +70,18 @@ public class AlbumInsertCardDragger : MonoBehaviour, IBeginDragHandler, IDragHan
         }
     }
 
-    /// <summary>진행도를 0으로 되돌린다. 카드가 실제로 시작 자리에 놓인 순간에만 부른다(스폰·복귀 완료).</summary>
+    /// <summary>진행도를 0으로 되돌린다. 카드가 실제로 시작 자리에 놓인 순간에만 부른다(= 스폰).</summary>
     public void ResetProgress()
     {
         this.m_pushed = 0f;
+        this.m_speed  = 0f;
+    }
+
+    /// <summary>누적을 화면의 진행도에 맞춘다. 손을 뗀 뒤 카드가 살짝 되밀리는 만큼만 세션이 되돌려 준다 —
+    /// 안 맞추면 다음 스와이프 첫 프레임에 카드가 되밀린 분량만큼 순간이동한다.</summary>
+    public void SyncProgress(float _p)
+    {
+        this.m_pushed = Mathf.Clamp01(_p) * this.m_travel;
         this.m_speed  = 0f;
     }
 
@@ -76,8 +92,8 @@ public class AlbumInsertCardDragger : MonoBehaviour, IBeginDragHandler, IDragHan
         this.m_dragging = true;
         this.m_speed    = 0f;
 
-        // 누적을 0으로 되돌리지 않는다 — 복귀 트윈 도중 다시 잡으면 카드가 위로 튄다.
-        // 시작 자리로의 리셋은 카드가 실제로 거기 있는 시점(ResetProgress)에만 한다.
+        // 누적을 0으로 되돌리지 않는다 — 이전 스와이프까지 밀어 넣은 만큼에서 이어 민다.
+        // 시작 자리로의 리셋은 새 카드가 스폰될 때(ResetProgress) 한 번뿐이다.
         OnGrab?.Invoke();
     }
 
@@ -96,7 +112,14 @@ public class AlbumInsertCardDragger : MonoBehaviour, IBeginDragHandler, IDragHan
         float t_dt = Time.unscaledDeltaTime;
         if (t_dt > 0f) this.m_speed = t_move / t_dt;
 
-        OnProgress?.Invoke(this.Progress());
+        float t_progress = this.Progress();
+        OnProgress?.Invoke(t_progress);
+
+        // 끝까지 밀어 넣었으면 손을 떼기를 기다리지 않는다 — 다 들어간 카드를 붙잡고 있는 그림이 된다.
+        if (t_progress < 1f) return;
+
+        this.m_dragging = false;
+        OnSeat?.Invoke();
     }
 
     public void OnEndDrag(PointerEventData _e)
@@ -113,7 +136,7 @@ public class AlbumInsertCardDragger : MonoBehaviour, IBeginDragHandler, IDragHan
 
         if (t_progress < this.seatThreshold && !t_flicked)
         {
-            OnReturn?.Invoke();
+            OnRelease?.Invoke();
             return;
         }
 
