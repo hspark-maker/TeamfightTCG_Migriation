@@ -16,16 +16,29 @@ public readonly struct EnhanceResultLine
     public readonly bool   CanRetry;
     public readonly string RetryNotice;   // 못 누르는 이유(최고 레벨·잔액 부족). 누를 수 있으면 빈 문자열.
 
+    /// <summary>"한 번 더"에 들 비용. **이미 표기까지 끝난 문자열**로 받는다 — 숫자 포맷을 여기서 또 정하면
+    /// 하단 바의 강화 비용과 같은 값이 화면마다 다른 모양으로 뜬다(포맷의 주인은 호출부 하나).
+    /// 더 올릴 단계가 없으면 호출부가 "없음" 표기를 넣는다.</summary>
+    public readonly string RetryCostText;
+
+    /// <summary>이번 강화로 **새로 열린 것**(키워드·시너지·진화). 없으면 null/빈 문자열이고 그 행은 아예 뜨지 않는다.
+    /// 무엇이 열렸는지 판정하는 것은 성장 규칙을 아는 호출부 몫이고, 여기는 완성된 문장만 받는다
+    /// (<see cref="RetryNotice"/>·<see cref="RetryCostText"/>와 같은 규약).</summary>
+    public readonly string UnlockText;
+
     public EnhanceResultLine(EEnhanceOutcome _outcome, int _fromHp, int _toHp, int _fromLevel, int _toLevel,
-                             bool _canRetry, string _retryNotice)
+                             bool _canRetry, string _retryNotice, string _retryCostText = null,
+                             string _unlockText = null)
     {
-        this.Outcome     = _outcome;
-        this.FromHp      = _fromHp;
-        this.ToHp        = _toHp;
-        this.FromLevel   = _fromLevel;
-        this.ToLevel     = _toLevel;
-        this.CanRetry    = _canRetry;
-        this.RetryNotice = _retryNotice;
+        this.UnlockText = _unlockText;
+        this.Outcome       = _outcome;
+        this.FromHp        = _fromHp;
+        this.ToHp          = _toHp;
+        this.FromLevel     = _fromLevel;
+        this.ToLevel       = _toLevel;
+        this.CanRetry      = _canRetry;
+        this.RetryNotice   = _retryNotice;
+        this.RetryCostText = _retryCostText;
     }
 }
 
@@ -69,6 +82,13 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] Button   retryButton;
     [Tooltip("못 누르는 이유(최고 레벨·잔액 부족). 상세 패널의 상시 문구와 같은 문장을 호출부가 넘긴다.")]
     [SerializeField] TMP_Text retryNoticeText;
+    [Tooltip("다음 강화에 들 비용. 하단 바의 강화 버튼과 같은 값·같은 표기를 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
+    [SerializeField] TMP_Text retryCostText;
+
+    [Header("해금 알림 (선택)")]
+    [Tooltip("이번 강화로 열린 것(키워드·시너지·진화). 열린 게 없는 강화가 대부분이라 행째로 껐다 켠다.")]
+    [SerializeField] GameObject unlockRow;
+    [SerializeField] TMP_Text   unlockValueText;
 
     [Header("박자")]
     [SerializeField] float fadeInDuration  = 0.12f;
@@ -93,6 +113,10 @@ public class EnhanceResultPanelView : MonoBehaviour
     bool m_open;
     bool m_closing;
 
+    // 결과 행이 다 떠오른 시점. 그 전의 탭은 "빨리 보여달라"는 뜻이라 닫지 않고 연출만 끝까지 당긴다.
+    Action m_onRowsDone;
+    bool   m_rowsDone;
+
     /// <summary>결과를 무대에 올리고 탭을 기다린다.
     /// _onClose는 탭으로 걷힌 시점 — 호출부가 여기서 무대 복귀를 시작한다.
     /// _onRetry는 "한 번 더"로 걷힌 시점 — 호출부가 복귀를 마친 뒤 다음 강화로 잇는다.
@@ -101,8 +125,11 @@ public class EnhanceResultPanelView : MonoBehaviour
     /// _onHpRoll은 체력 숫자가 굴러 오르기 시작하는 시점 — 인자는 굴리는 데 걸리는 시간이다.
     /// 무대에 선 카드의 체력도 이 박자로 함께 굴리라고 알린다. 두 숫자가 한 박에 움직여야
     /// "이 행이 저 카드의 저 자리"가 읽힌다. 굴릴 것이 없으면(실패·상승폭 0) 오지 않는다.</summary>
-    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null)
+    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null,
+                     Action _onRowsDone = null)
     {
+        this.m_onRowsDone = _onRowsDone;
+        this.m_rowsDone   = false;
         // 닫을 수단이 하나도 없으면 띄우는 순간이 곧 소프트락이다 — 무대만 돌려보내고 뜨지 않는다.
         if (this.tapCatcher == null && this.retryButton == null)
         {
@@ -134,6 +161,12 @@ public class EnhanceResultPanelView : MonoBehaviour
 
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;
+        if (this.retryCostText   != null) this.retryCostText.text   = _line.RetryCostText;
+
+        // 열린 게 없으면 행 자체를 접는다 — 빈 줄이 남으면 "뭔가 열렸나?" 하고 한 번 더 읽게 된다.
+        bool t_hasUnlock = !string.IsNullOrEmpty(_line.UnlockText);
+        if (this.unlockRow != null) this.unlockRow.SetActive(t_hasUnlock);
+        if (this.unlockValueText != null && t_hasUnlock) this.unlockValueText.text = _line.UnlockText;
 
         this.group.alpha          = 0f;
         this.group.blocksRaycasts = true;
@@ -146,8 +179,23 @@ public class EnhanceResultPanelView : MonoBehaviour
 
         BuildRows(t_seq, t_success, _line, _onHpRoll);
 
+        // 읽을 것이 다 나온 자리. 탭으로 당겨도 여기를 지나므로(Complete는 콜백을 그대로 실행) 신호가 유실되지 않는다.
+        t_seq.OnComplete(MarkRowsDone);
+
         this.m_seq = t_seq;
         t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
+    }
+
+    /// <summary>결과를 읽는 중인가. 이 동안에는 하단 바의 강화 버튼이 "한 번 더"로 동작한다 —
+    /// 같은 자리의 같은 버튼이 계속 그 일을 하게 두는 편이, 결과판이 자기 버튼을 하나 더 띄우는 것보다 읽기 쉽다.</summary>
+    public bool IsOpen => this.m_open && !this.m_closing;
+
+    /// <summary>"한 번 더"를 밖(하단 바 버튼)에서 눌렀을 때. 결과판 자신의 버튼과 **같은 길**로 흘려보낸다 —
+    /// 닫힘 애니·콜백 1회 보장이 그 경로에만 있어서, 여기서 따로 처리하면 두 규약이 갈린다.</summary>
+    public void RequestRetry()
+    {
+        if (!IsOpen) return;
+        OnRetryPressed();
     }
 
     /// <summary>결과판을 잘라내고 감춘다(카드 전환·닫힘 경로). 콜백은 흘리지 않는다 —
@@ -269,7 +317,25 @@ public class EnhanceResultPanelView : MonoBehaviour
 
     void OnTapped()
     {
+        // 아직 행이 쌓이는 중이면 탭은 "건너뛰기"다 — 여기서 닫아버리면 결과를 읽기도 전에 사라진다.
+        // 남은 구간을 최종 상태로 당기면 OnComplete가 곧 읽을 것이 다 나왔다고 알린다.
+        if (!this.m_rowsDone)
+        {
+            if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
+            else MarkRowsDone();   // 시퀀스가 이미 죽었으면 신호만 흘린다
+            return;
+        }
+
         BeginClose(this.m_onClose);
+    }
+
+    // 한 번만 흘린다 — 탭으로 당긴 뒤 OnComplete가 또 오거나, 닫힘이 먼저 와도 두 번 알리지 않는다.
+    void MarkRowsDone()
+    {
+        if (this.m_rowsDone) return;
+
+        this.m_rowsDone = true;
+        this.m_onRowsDone?.Invoke();
     }
 
     void OnRetryPressed()
@@ -281,6 +347,9 @@ public class EnhanceResultPanelView : MonoBehaviour
     void BeginClose(Action _after)
     {
         if (!this.m_open || this.m_closing) return;
+
+        // 다 나오기 전에 닫히는 경로("한 번 더" 연타)에서도 신호는 흘린다 — 안 그러면 하단 바가 숨은 채 굳는다.
+        MarkRowsDone();
 
         this.m_closing = true;
         KillSeq();
