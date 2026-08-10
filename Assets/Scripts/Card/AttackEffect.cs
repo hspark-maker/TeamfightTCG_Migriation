@@ -14,13 +14,14 @@ public class AttackEffect : ScriptableObject
     public ParticleEntry[] particles;
 
     /// <summary>공격 시작 시점에 터뜨릴 파티클들. 무장 지속형(timing=Armed)은 CardView가 따로 관리하므로 건너뛴다.</summary>
-    public void SpawnParticles(Transform _attacker, Transform _defender, bool _flipOffset = false)
+    public void SpawnParticles(Transform _attacker, Transform _defender, bool _flipOffset = false,
+                               float _timingFactor = 1f)
     {
         if (this.particles == null) return;
         foreach (var t_entry in this.particles)
         {
             if (t_entry.timing != ParticleTiming.AttackStart) continue;
-            SpawnDelayed(t_entry, _attacker, _defender, _flipOffset).Forget();
+            SpawnDelayed(t_entry, _attacker, _defender, _flipOffset, Mathf.Max(0f, _timingFactor)).Forget();
         }
     }
 
@@ -34,10 +35,11 @@ public class AttackEffect : ScriptableObject
                 yield return t_entry;
     }
 
-    async UniTask SpawnDelayed(ParticleEntry _entry, Transform _attacker, Transform _defender, bool _flipOffset)
+    async UniTask SpawnDelayed(ParticleEntry _entry, Transform _attacker, Transform _defender, bool _flipOffset,
+                               float _timingFactor)
     {
         if (_entry.spawnDelay > 0f)
-            await UniTask.Delay((int)(_entry.spawnDelay * 1000));
+            await UniTask.Delay((int)(_entry.spawnDelay * _timingFactor * 1000));
         if (_entry.prefab == null) return;
 
         Transform t_anchor = _entry.spawnTarget == ParticleSpawnTarget.Defender ? _defender : _attacker;

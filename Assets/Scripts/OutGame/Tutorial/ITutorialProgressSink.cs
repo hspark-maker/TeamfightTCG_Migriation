@@ -14,5 +14,6 @@ sealed class PersistentTutorialProgressSink : ITutorialProgressSink
 
     public void Commit(int _chapter, int _step) => OutgameTutorialProgress.CommitStep(_chapter, _step);
 
-    public void Complete() => OutgameTutorialProgress.Complete();
+    // 졸업 처리는 러너 창구로 — 완료 낙인만 찍으면 첫 랭크 진입이 빠진다
+    public void Complete() => OutgameTutorialRunner.CompleteSequence();
 }

@@ -23,6 +23,10 @@ public enum BattleVfxId
     // 값 자체는 재사용 금지(기존 에셋에 남아 있을 수 있다).
     SwarmProjectile  = 12,  // (사용 안 함) → SwarmSynergyVfxConfig.projectile
     FlowWind         = 13,  // (사용 안 함) → FlowSynergyVfxConfig.wind
+    FinishImpact     = 14,  // 승부를 가른 타격: 죽는 카드 자리에 1회. alignToDirection을 켜면 "때린 쪽 → 죽는 쪽"
+                            // 방향으로 눕는다 — 반격사면 방향이 저절로 뒤집히므로 항목을 따로 만들 필요가 없다
+    DeathStardust    = 15,  // 사망: 카드가 사라지며 위로 흩어지는 별가루. 죽는 자리에 1회(카드에 붙이지 않는다)
+    DeathNova        = 16,  // 사망: 카드가 사라진 자리에 남는 바닥 빛 파동. 별가루보다 늦게 1회
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

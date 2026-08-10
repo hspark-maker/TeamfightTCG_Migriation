@@ -96,6 +96,13 @@ public class SoundManager : MonoBehaviour
         bgmSource.Stop();
     }
 
+    /// <summary>BGM 재생 속도(1 = 원속). 승패 여운처럼 화면이 느려질 때 소리도 같이 끌리게 하는 표시용 레버.
+    /// 이 매니저는 DontDestroyOnLoad라 <b>바꾼 쪽이 반드시 1로 되돌려야 한다</b> — 안 그러면 로비까지 끌린 채 간다.</summary>
+    public void SetBGMPitch(float _pitch)
+    {
+        if (this.bgmSource != null) this.bgmSource.pitch = Mathf.Clamp(_pitch, 0.1f, 3f);
+    }
+
     public void PlaySFX(AudioClip _clip)
     {
         if (_clip == null) return;

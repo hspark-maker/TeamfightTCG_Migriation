@@ -9,6 +9,10 @@ public static class RankManager
     // 현재 랭크 포인트
     public static long Points => Slot.points;
 
+    /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
+    /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
+    public static bool IsRanked => Points >= Config.FirstTierPoints;
+
     static RankConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
 
@@ -22,9 +26,25 @@ public static class RankManager
         }
     }
 
-    /// <summary>현재 티어에서 AI가 쓸 카드 레벨. 난이도 축의 유일한 조회 지점 —
-    /// 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
-    public static int AiCardLevel => Config.AiCardLevelAt(Config.ResolveTierIndex(Points));
+    // 현재 포인트가 가리키는 티어 인덱스(티어는 points의 순수 파생)
+    public static int TierIndex => Config.ResolveTierIndex(Points);
+
+    /// <summary>현재 티어의 AI 카드 레벨. **티어 기준값이지 실제 카드 레벨이 아니다**(카드별 값은 <see cref="AiCardLevelOf"/>).
+    /// 난이도 축의 유일한 조회 지점 — 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
+    public static int AiCardLevel => Config.AiCardLevelAt(TierIndex);
+
+    /// <summary>현재 티어에서 카드 _card 한 장이 쓸 AI 레벨. 티어 기준 레벨 주변으로 카드마다 흩어지되,
+    /// 강화 곡선 만렙을 넘지 않는다(넘으면 곡선에 없는 레벨이라 보너스가 멈춘 것처럼 보인다).</summary>
+    public static int AiCardLevelOf(CardData _card)
+    {
+        int t_base  = Config.AiCardLevelAt(TierIndex);
+        int t_level = _card == null
+            ? t_base
+            : KeepUnlocks(_card, Config.AiCardLevelForCard(TierIndex, CardCatalog.IdOf(_card)), t_base);
+
+        int t_max = CardGrowthManager.MaxLevel;
+        return t_max > 0 && t_level > t_max ? t_max : t_level;
+    }
 
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo()
@@ -36,15 +56,36 @@ public static class RankManager
         t_config.TryGetTier(t_index, out RankTier t_tier);
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
+        // 미도달이면 표시명과 다음 목표를 첫 티어 기준으로 바꿔 준다 — 배지·등급은 첫 티어 것을 그대로 쓴다.
+        bool t_unranked = t_points < t_config.FirstTierPoints;
+
         return new RankInfo(
             t_index,
             t_tier.Grade,
             t_tier.Division,
-            t_tier.DisplayName,
+            t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
             t_tier.Badge,
             t_points,
-            t_hasNext ? t_next.RequiredPoints : t_points,
-            !t_hasNext);
+            t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
+            !t_unranked && !t_hasNext,
+            t_unranked);
+    }
+
+    /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
+    /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
+    public static bool TryEnterFirstTier(out RankApplyResult _result)
+    {
+        _result = default;
+        if (IsRanked) return false;
+
+        var t_slot = Slot;
+        long t_points = t_slot.points;
+
+        t_slot.points = Config.FirstTierPoints;
+        Save();
+
+        _result = new RankApplyResult(t_slot.points - t_points, -1, Config.ResolveTierIndex(t_slot.points));
+        return true;
     }
 
     // 전투 1회 정산(가감 전 티어 임계치를 하한으로 클램프해 강등을 막는다) + 즉시 저장
@@ -57,7 +98,10 @@ public static class RankManager
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
-        long t_floor = t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
+
+        // 하한은 "도달한" 티어의 임계치일 때만 의미가 있다 — 미도달(언랭크) 구간에 임계치를 하한으로 쓰면
+        // 승패와 무관하게 점수가 첫 티어로 올라가 버린다(= 전투 1판이 곧 진입).
+        long t_floor = IsRanked && t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
 
         t_slot.points = Math.Max(t_points + t_delta, t_floor);
         Save();
@@ -103,6 +147,24 @@ public static class RankManager
         Save();
     }
 
+    /// <summary>하향 편차는 체력만 깎는다 — 기준 레벨이 이미 연 시너지·키워드를 도로 잠그면 카드 정체성이 사라진다
+    /// (시너지가 꺼진 카드는 집계에서 빠져 3장 요구 시너지가 성립조차 못 한다). 해금이 기준과 같아지는 가장 낮은 레벨까지만 내린다.</summary>
+    static int KeepUnlocks(CardData _card, int _level, int _base)
+    {
+        if (_level >= _base) return _level;
+
+        CardGrowthConfig t_growth = CardGrowthManager.Config;
+        bool             t_synergy  = t_growth.SynergyUnlockedAt(_base);
+        CardKeyword      t_keywords = t_growth.UnlockedKeywordsAt(_card, _base);
+
+        for (int t_lv = _level; t_lv < _base; t_lv++)
+        {
+            if (t_growth.SynergyUnlockedAt(t_lv) == t_synergy && t_growth.UnlockedKeywordsAt(_card, t_lv) == t_keywords)
+                return t_lv;
+        }
+        return _base;
+    }
+
     static void Save() => DataSaveManager.Save();
 }
 
@@ -138,7 +200,10 @@ public readonly struct RankInfo
     public readonly long NextRequired;
     public readonly bool IsMaxTier;
 
-    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _nextRequired, bool _isMaxTier)
+    // 첫 티어 미도달(언랭크). TierIndex는 이때도 0이라 인덱스로는 구분되지 않는다.
+    public readonly bool IsUnranked;
+
+    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
     {
         TierIndex = _tierIndex;
         Grade = _grade;
@@ -148,5 +213,6 @@ public readonly struct RankInfo
         Points = _points;
         NextRequired = _nextRequired;
         IsMaxTier = _isMaxTier;
+        IsUnranked = _isUnranked;
     }
 }

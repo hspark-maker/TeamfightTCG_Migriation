@@ -13,7 +13,8 @@ public class DeckEditDragController : MonoBehaviour
     [SerializeField] RectTransform    dragLayer;    // 보통 자기 자신
     [SerializeField] Canvas           rootCanvas;   // LobbyCanvas
     [SerializeField] DeckEditCardTile ghostPrefab;  // 타일과 동일 프리팹 재사용
-    [SerializeField] Vector2          ghostSize  = new Vector2(290f, 386f);   // 컬렉션 GridLayoutGroup.cellSize와 맞출 것
+    [Tooltip("컬렉션 cellSize를 못 읽었을 때만 쓰는 폴백. 평소에는 Begin이 넘겨준 실제 cellSize가 이 값을 덮어쓴다.")]
+    [SerializeField] Vector2          ghostSize  = new Vector2(290f, 386f);
     [SerializeField] float            ghostScale = 1.05f;
     [SerializeField] float            ghostAlpha = 0.85f;
 
@@ -40,7 +41,8 @@ public class DeckEditDragController : MonoBehaviour
         m_onDropped    = _onDropped;
     }
 
-    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll)
+    // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
+    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
     {
         if (m_dragging || _card == null || _data == null) return;
 
@@ -79,6 +81,10 @@ public class DeckEditDragController : MonoBehaviour
         m_card     = _card;
         m_data     = _data;
         m_dragging = true;
+
+        // 고스트는 1회 Instantiate 후 재사용되므로 크기는 드래그마다 다시 준다 —
+        // 해상도나 패널이 바뀌면 cellSize도 바뀐다. else가 필요하다: 안 그러면 직전 드래그의 크기가 그대로 남는다.
+        m_ghostRect.sizeDelta = _cellSize.x > 0f && _cellSize.y > 0f ? _cellSize : ghostSize;
 
         if (m_ghostView != null) m_ghostView.Bind(_card, true);
         m_ghostRect.gameObject.SetActive(true);
@@ -180,6 +186,7 @@ public class DeckEditDragController : MonoBehaviour
 
         // 크기도 반드시 직접 준다. 타일 프리팹 루트는 sizeDelta가 0이고 실제 크기를 GridLayoutGroup이 주입하는데,
         // DragLayer에는 레이아웃 그룹이 없어 그대로 두면 고스트가 0x0으로 렌더링돼 화면에 아무것도 안 보인다.
+        // 실제 cellSize는 Begin이 덮어쓴다 — 여기 값은 그걸 못 받았을 때의 폴백이다.
         m_ghostRect.sizeDelta = ghostSize;
 
         m_ghostView = t_go.GetComponent<CardVisualView>();

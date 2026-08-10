@@ -372,8 +372,9 @@ public class CardView : MonoBehaviour
         this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
-        if (this.illustration != null && !t_isFaceDown && _card.data.battleImage != null)
-            this.illustration.sprite = _card.data.battleImage;
+        Sprite t_art = CardVisualRules.PickBattleArt(_card);
+        if (this.illustration != null && !t_isFaceDown && t_art != null)
+            this.illustration.sprite = t_art;
 
         SetFaceDownLook(t_isFaceDown);
 
@@ -593,14 +594,18 @@ public class CardView : MonoBehaviour
         this.hpRollSeq = DOTween.Sequence().SetLink(gameObject);
 
         // 아이콘과 숫자가 **함께** 부푼다(Insert(0f) — Append로 이어 붙이면 대상마다 순서대로 늦게 커진다).
+        // 작아지는 건 부풀기와 굴림이 **둘 다 끝난 뒤**다. 둘을 더해서 잡으면(popDur+rollDur) 굴림이 끝나고도
+        // 아이콘이 커진 채로 popDur만큼 더 서 있는다.
+        float t_settled = Mathf.Max(t_popDur, t_rollDur);
         foreach (HpPop t_pop in EnsureHpPops())
         {
             this.hpRollSeq.Insert(0f, t_pop.target.DOScale(t_pop.home * t_pop.scale, t_popDur).SetEase(Ease.OutBack));
-            this.hpRollSeq.Insert(t_popDur + t_rollDur, t_pop.target.DOScale(t_pop.home, t_popDur).SetEase(Ease.InQuad));
+            this.hpRollSeq.Insert(t_settled, t_pop.target.DOScale(t_pop.home, t_popDur).SetEase(Ease.InQuad));
         }
 
-        // 숫자는 아이콘이 커진 **뒤부터** 굴러야 "아이콘이 커지고 → 체력이 달고 → 작아진다"로 읽힌다.
-        this.hpRollSeq.Insert(t_popDur,
+        // 숫자는 **팝과 같은 프레임에** 굴기 시작한다. 팝이 끝난 뒤로 미루면 타격은 이미 터졌는데 체력만
+        // popDur(현재 0.17초)만큼 늦게 움직여 "때렸는데 안 깎인다"로 읽힌다.
+        this.hpRollSeq.Insert(0f,
             DOVirtual.Int(t_from, _hp, t_rollDur, _v => WriteHpDisplay(_v, _bonusHp)).SetEase(Ease.Linear));
         this.hpRollSeq.OnComplete(() => WriteHpDisplay(_hp, _bonusHp));
     }
@@ -760,10 +765,30 @@ public class CardView : MonoBehaviour
     /// <summary>사망 연출. **HP 굴림이 끝난 뒤에** 시작한다 — 카드가 줄어들며 사라지는 도중에 숫자가
     /// 0까지 굴러가면 얼마를 맞고 죽었는지가 안 읽히고, 페이드로 흐려진 숫자 위에서 굴림만 헛돈다.
     /// 순수 연출 대기다 — 규칙(hp·사망 판정)은 이미 확정된 뒤라 이 대기가 게임 판정을 미루지 않는다.</summary>
-    public async UniTask PlayDeathAnim(float _d = 0.4f)
+    public async UniTask PlayDeathAnim(float _d = -1f)
     {
         await WaitHpRollSettled();
-        await this.cardAnim.PlayDeathAnim(_d);
+        float t_duration = _d < 0f ? GameTiming.Battle.DeathDuration : _d;
+
+        // 파티클은 **카드에 붙이지 않는다**. 붙이면 사망 직후 HideSlot이 카드를 끄면서 별가루도 같이
+        // 꺼져 뚝 끊긴다(FinishImpact가 월드 스폰인 것과 같은 이유). 좌표는 죽는 그 자리로 고정 —
+        // 카드는 떠오르지만 바닥 파동은 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
+        Vector3 t_deathPosition = transform.position;
+
+        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
+        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
+
+        // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
+        // 결정타 구간에서 그 초과분에 슬로우 배율이 곱해진다.
+        float t_novaDelay = Mathf.Min(GameTiming.Battle.DeathNovaAt, t_duration);
+        bool t_cancelled = await UniTask.Delay(
+                (int)(t_novaDelay * 1000f),
+                cancellationToken: this.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (!t_cancelled)
+            BattleVfx.Play(BattleVfxId.DeathNova, t_deathPosition, VfxSortingLayerId);
+
+        await t_cardAnim;
     }
 
     /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).

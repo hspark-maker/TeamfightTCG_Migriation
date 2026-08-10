@@ -17,6 +17,11 @@ public class RankConfig : ScriptableObject
     [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다).")]
     public long losePoints = 5;
 
+    // 첫 티어 미도달(언랭크) 상태의 표시명
+    [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
+             "그 전까지 표시되는 문구다. 티어 표시명과 달리 단계 숫자가 붙지 않는다.")]
+    public string unrankedDisplayName = "언랭크";
+
     // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
@@ -42,8 +47,18 @@ public class RankConfig : ScriptableObject
         10, 10, 10, 10,  // 다이아  1~4 — 만렙
     };
 
+    [Tooltip("AI 카드 레벨 하향 편차. 티어 레벨보다 최대 이만큼 낮은 카드가 섞인다. 0이면 하향 없음.")]
+    public int aiLevelSpreadDown = 1;
+
+    [Tooltip("AI 카드 레벨 상향 편차. 티어 레벨보다 최대 이만큼 높은 카드가 섞인다. 0이면 상향 없음.")]
+    public int aiLevelSpreadUp = 1;
+
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
+
+    /// <summary>첫 티어(1등급 1단계) 진입 임계치 = 랭크 도달 여부의 단일 기준.
+    /// ResolveTierIndex는 미도달도 0으로 폴백하므로 "인덱스 0"만으로는 도달을 판정할 수 없다.</summary>
+    public long FirstTierPoints => grades != null && grades.Count > 0 && grades[0] != null ? grades[0].entryPoints : 0;
 
     /// <summary>티어 _index에서 AI가 쓸 카드 레벨. 미저작이면 바닥 레벨(성장 없음 = 종전 동작).</summary>
     public int AiCardLevelAt(int _index)
@@ -52,6 +67,24 @@ public class RankConfig : ScriptableObject
 
         int t_i = _index < 0 ? 0 : (_index >= aiCardLevels.Count ? aiCardLevels.Count - 1 : _index);
         int t_level = aiCardLevels[t_i];
+        return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
+    }
+
+    /// <summary>티어 _tierIndex에서 카드 _cardId 한 장이 쓸 레벨. 기준 레벨(<see cref="AiCardLevelAt(int)"/>) 주변에
+    /// 카드 번호에서 파생한 고정 편차를 얹는다 — 난수가 아니라 파생값이라 덱 미리보기와 전투가 갈리지 않는다.
+    /// 편차는 카드 고유값이라 티어가 올라도 순서가 뒤집히지 않는다(기준이 오르면 그 카드 레벨도 같이 오른다).
+    /// 바닥(BaseLevel)에서 잘리므로 저티어에서는 평균이 기준보다 살짝 위다.</summary>
+    public int AiCardLevelForCard(int _tierIndex, int _cardId)
+    {
+        int t_base = AiCardLevelAt(_tierIndex);
+
+        int t_down = Mathf.Max(0, aiLevelSpreadDown);
+        int t_up   = Mathf.Max(0, aiLevelSpreadUp);
+        int t_span = t_down + t_up + 1;
+        if (t_span <= 1 || _cardId <= 0) return t_base;
+
+        int t_offset = (int)(Mix((uint)_cardId) % (uint)t_span) - t_down;
+        int t_level  = t_base + t_offset;
         return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
     }
 
@@ -95,6 +128,15 @@ public class RankConfig : ScriptableObject
             t_grade.entryPoints + t_step * t_grade.pointsPerDivision,
             new CurrencyGain(t_grade.rewardType, t_grade.rewardGold + t_step * t_grade.rewardGoldPerDivision));
         return true;
+    }
+
+    // 카드 번호를 고정 규칙으로 흩는다(플랫폼·런타임 무관). 난수원이 아니라 파생 해시다.
+    static uint Mix(uint _a)
+    {
+        uint t_h = _a * 2654435761u;
+        t_h ^= t_h >> 15; t_h *= 2246822519u;
+        t_h ^= t_h >> 13; t_h *= 3266489917u;
+        return t_h ^ (t_h >> 16);
     }
 }
 

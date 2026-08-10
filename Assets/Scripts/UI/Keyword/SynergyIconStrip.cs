@@ -9,11 +9,14 @@ using UnityEngine.UI;
 /// </summary>
 public static class SynergyIconStrip
 {
-    /// <summary>시너지 아이콘 오브젝트에 곱할 배율. 시너지 PNG는 512 캔버스에 배지가 ~60%만 차지해
-    /// (나머지는 투명 여백) 같은 슬롯 크기의 키워드 아이콘 옆에서 혼자 작아 보인다.
-    /// 이미지를 자르는 대신 오브젝트를 키워 보정한다 — 보이는 배지가 슬롯을 거의 채운다.
-    /// 아이콘 PNG의 여백 비율을 바꾸면 이 값도 같이 바꿀 것(시너지 아이콘 크기의 단일 진실원).</summary>
-    public const float IconPadCompensation = 1.55f;
+    /// <summary>시너지 아이콘 오브젝트에 곱할 배율. 시너지 PNG는 512 캔버스에 배지가 일부만 차지하고
+    /// 나머지가 투명 여백이라, 같은 슬롯 크기의 키워드 아이콘 옆에서 혼자 작아 보인다.
+    /// 이미지를 자르는 대신 오브젝트를 키워 보정한다 — 두 아이콘의 **보이는** 크기가 같아진다.
+    ///
+    /// 값의 근거는 실측이다: 알파 경계 기준으로 캔버스를 채우는 비율이 키워드 0.869, 시너지 0.624 →
+    /// 0.869 / 0.624 ≈ 1.39. (이전 1.55는 시너지가 11% 더 커 보였다.)
+    /// 아이콘 PNG의 여백 비율을 바꾸면 이 값도 같이 잴 것(시너지 아이콘 크기의 단일 진실원).</summary>
+    public const float IconPadCompensation = 1.39f;
 
     /// <summary>비활성인데 전용 회색 아이콘(inactiveIcon)이 없을 때 씌우는 색. 채도를 죽여 "아직 아니다"로 읽히게.</summary>
     static readonly Color InactiveTint = new Color(0.45f, 0.45f, 0.5f, 0.75f);

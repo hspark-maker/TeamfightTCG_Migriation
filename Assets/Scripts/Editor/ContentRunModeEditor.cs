@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -98,6 +99,12 @@ public static class ContentRunModeEditor
         AssetDatabase.SaveAssets();
         return $"[{Label(_mode)} 표 적용]\n{t_report}";
     }
+
+    /// <summary>지정 모드의 표와 카드 에셋을 값 단위로 대조한다(빈 목록 = 일치, null = 표를 못 읽음).
+    /// <see cref="Applied"/>는 "어느 표를 실었는가"라는 도장일 뿐이라 적용 후 인스펙터로 고친 값을 못 잡는다 —
+    /// 실제로 빌드에 실리는 건 SO이므로 그 SO를 직접 견주는 창구가 따로 있어야 한다.</summary>
+    public static List<string> DiffTable(EContentRunMode _mode, out string _error)
+        => CardTableTool.DiffAgainst(TablePathOf(_mode), out _error);
 
     /// <summary>현재 카드 에셋을 지정 모드의 표로 뽑는다. 뽑고 나면 그 표 = 현재 에셋이므로 적용 모드도 갱신.</summary>
     public static string ExportTable(EContentRunMode _mode)

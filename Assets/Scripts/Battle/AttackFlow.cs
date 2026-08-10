@@ -41,12 +41,17 @@ public static class AttackFlow
     /// AttackSequence.Play 직전(PreSelectSplash 이후)에 호출 → Execute 전 원자 완료. RNG 미소비(splash 스트림 미교란).</summary>
     public static async UniTask RunBeforeAttack(
         CardInstance _attacker, CardInstance _defender,
-        BattleField _attackerField, BattleField _defenderField)
+        BattleField _attackerField, BattleField _defenderField,
+        CardInstance _preSelectedSplash = null)
     {
+        BattleFinisher.ArmApproach(null, null, null, null);   // 이전 공격의 미소비 래치 제거
         if (!_attacker.IsAlive) return;
         var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField);
         await (_attacker.data.passive?.OnBeforeAttack(t_ctx) ?? UniTask.CompletedTask);
         await SynergyTriggers.BeforeAttack(t_ctx);
+        // 무리 선피해가 반영된 **최신 보드**에서 전투 종료를 예측한다 — 선피해로 이미 hp 0이 된 카드가
+        // 슬롯에 남아 있는 상태라, 여기보다 앞에서 계산하면 그 피해를 빼먹는다.
+        BattleFinisher.ArmApproach(_attacker, _defender, _attackerField, _defenderField, _preSelectedSplash);
     }
 
     /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 성벽 반격 등).

@@ -116,14 +116,7 @@ public class CardVisualView : MonoBehaviour
         // 다른 카드를 그리는 참이다 — 남은 굴리기가 이 카드 위에 옛 카드의 숫자를 마저 찍게 두지 않는다.
         KillHpRoll();
 
-        if (this.portrait != null)
-        {
-            // 아트 선택(폴백 체인)은 표시 규칙이라 CardVisualRules가 정본이다 — 소비자(덱편집 칸/개봉 카드)가
-            // 늘어난 뒤 각자 폴백을 적어두면 같은 카드가 화면마다 다른 그림으로 뜬다.
-            Sprite t_art = CardVisualRules.PickCardArt(_card);
-            this.portrait.sprite  = t_art;
-            this.portrait.enabled = t_art != null;
-        }
+        RefreshArt(_card, _mine);
 
         // 프레임은 카드별로 바뀌지 않는다. 스프라이트 미배선 시 흰 사각형이 뜨는 것만 막는다.
         if (this.frame != null) this.frame.enabled = this.frame.sprite != null;
@@ -163,6 +156,29 @@ public class CardVisualView : MonoBehaviour
 
         SetHpDisplay(_card, _owned && this.showHp, _mine);
         SetLevelDisplay(_card, _owned && this.showLevel, _mine);
+    }
+
+    /// <summary>현재 표시 주체의 레벨에 맞는 진화 아트만 다시 그린다.</summary>
+    public void RefreshArt(CardData _card, bool _mine = true)
+    {
+        if (_card == null || this.portrait == null) return;
+
+        Sprite t_art = CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
+        this.portrait.sprite  = t_art;
+        this.portrait.enabled = t_art != null;
+    }
+
+    /// <summary>강화로 키워드가 해금된 프레임에 카드 위 아이콘 줄과 프레임 장식을 다시 그린다.
+    /// 판정은 <see cref="Bind"/>와 같은 CardVisualRules 호출이라 표시 기준이 갈리지 않는다.
+    ///
+    /// <see cref="RefreshHp"/>처럼 값만 고칠 수 없는 갱신이다(아이콘은 Destroy + Instantiate) →
+    /// 호출부는 **키워드가 실제로 바뀐 프레임에만** 부른다. 성장 통지마다 부르면 매번 다시 짓는다.</summary>
+    public void RefreshKeywords(CardData _card, bool _owned)
+    {
+        if (_card == null) return;
+
+        RefreshKeywordIcons(_card, _owned && this.showKeywords);
+        RefreshKeywordFrames(_card, _owned && this.showKeywords);
     }
 
     /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).

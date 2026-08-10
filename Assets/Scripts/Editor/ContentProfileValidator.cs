@@ -13,7 +13,39 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 
     public int callbackOrder => 0;
 
-    public void OnPreprocessBuild(BuildReport _report) => ValidateOrThrow();
+    public void OnPreprocessBuild(BuildReport _report)
+    {
+        ValidateOrThrow();
+        WarnTableDrift(_report);
+    }
+
+    /// <summary>빌드에 실릴 카드 SO가 그 빌드가 쓸 표와 다른지 **경고만** 한다(막지 않는다).
+    /// 릴리즈 관리 창을 거치지 않는 경로(File > Build Settings, 배치 빌드)에서도 어긋남이 보이게 하는 게 목적이다.
+    ///
+    /// 모드 판정은 <see cref="ContentProfileConfig"/>의 런타임 규칙과 같아야 한다 — 개발 빌드 = 테스트 프로필.
+    /// 에디터 모드(EditorPrefs)는 빌드와 무관하므로 보지 않는다.</summary>
+    static void WarnTableDrift(BuildReport _report)
+    {
+        bool t_dev = (_report.summary.options & BuildOptions.Development) != 0;
+        EContentRunMode t_mode = t_dev ? EContentRunMode.Test : EContentRunMode.Live;
+        string t_label = ContentRunModeEditor.Label(t_mode);
+
+        List<string> t_drift = ContentRunModeEditor.DiffTable(t_mode, out string t_error);
+        if (t_drift == null)
+        {
+            Debug.LogWarning($"[카드 표 대조] {t_label} 표를 읽지 못해 대조를 건너뛴다 — {t_error}");
+            return;
+        }
+        if (t_drift.Count == 0)
+        {
+            Debug.Log($"[카드 표 대조] {t_label} 표와 카드 에셋 일치.");
+            return;
+        }
+
+        Debug.LogWarning($"[카드 표 대조] {t_label} 빌드인데 카드 에셋이 {t_label} 표와 다르다 " +
+                         "— 이 빌드에 실리는 값은 표가 아니라 에셋이다.\n" +
+                         CardTableTool.DriftSummary(t_drift, 50));
+    }
 
     /// <summary>문제 목록을 던지지 않고 돌려준다(빈 목록 = 통과). 릴리즈 관리 창이 목록으로 띄우는 진입점 —
     /// 빌드 전처리와 **같은 규칙**을 써야 창에서 통과한 것이 빌드에서 막히지 않는다.</summary>
@@ -53,6 +85,8 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
                     t_errors.Add($"CardRegistry 미등록 카드: {t_card.name}");
             ValidateLiveConsumers(t_errors);
         }
+
+        AIDeckBandValidator.CollectErrors(t_errors);
 
         return t_errors;
     }
