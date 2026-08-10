@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 006bf42b5a94c3049b0329cc6c66e333
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures:
+  - _Main_Tex: {fileID: 2800000, guid: 83af70e1fb8d056d4a4597a2a1fedf96, type: 3}
+  - _Step_Line: {fileID: 2800000, guid: fa5d57d9f6bd7e94182aa6773a4c895d, type: 3}
+  - _Mask_Tex: {fileID: 2800000, guid: b8dbfa46774578a42b8269ba577c69f0, type: 3}
+  - _mask_Tex_02: {fileID: 2800000, guid: ccc98dfe1b1da8341adf683b65fc2fa0, type: 3}
+  - _Step_Tex: {fileID: 2800000, guid: bbc69234deed9fb429a9572875f70634, type: 3}
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
