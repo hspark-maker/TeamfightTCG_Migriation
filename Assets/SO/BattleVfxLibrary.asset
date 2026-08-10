@@ -20,6 +20,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 25
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 2
     prefab: {fileID: 5865500980904363483, guid: 24bd12dd4dca10c48840972c3ae92522, type: 3}
     localOffset: {x: 0, y: -0.1, z: 0}
@@ -27,6 +30,9 @@ MonoBehaviour:
     lifetime: 1
     sortingOrder: 25
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 5
     prefab: {fileID: 152564, guid: 38ab0c40c3b705e48b5dab95bb9927f3, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -34,6 +40,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 4
     prefab: {fileID: 194966, guid: dee124e64b251e947b79230a951ccada, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -41,16 +50,19 @@ MonoBehaviour:
     lifetime: 1
     sortingOrder: 30
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 4
-    prefab: {fileID: 3993081043635493482, guid: feb549b44db8f2a47be7b333d8a2d3b1, type: 3}
+    prefab: {fileID: 3993081043635493482, guid: 83b0266618984644d9de5ea2a33f8e0c, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
-    lifetime: 1.2
+    lifetime: 1.6
     sortingOrder: 40
     alignToDirection: 1
+    skipOnCounter: 1
     countByStrength: {x: 0.6, y: 2.2}
     speedByStrength: {x: 0.8, y: 1.6}
-    skipOnCounter: 1
   - id: 4
     prefab: {fileID: 1753279311565200, guid: 29776907ecb017543b3032870386ccb3, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -58,6 +70,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 6
     prefab: {fileID: 8379521604733118929, guid: b0bea5251d594d62974930fcb29b4cdd, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -65,6 +80,9 @@ MonoBehaviour:
     lifetime: 2
     sortingOrder: 30
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 7
     prefab: {fileID: 1691668335544622, guid: 25f0520c9ecef6641af6ea648e95a88d, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -72,6 +90,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 1
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 8
     prefab: {fileID: 153968, guid: d81a1d73a005a62488013e966f8ea4be, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -79,6 +100,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 9
     prefab: {fileID: 1463520409267208, guid: 839d4d9b50d81fd449b946db05c18c99, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -86,6 +110,9 @@ MonoBehaviour:
     lifetime: 1.2
     sortingOrder: 30
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 10
     prefab: {fileID: 1486123758399518, guid: 1344ad10518c5d247a56bae970391c87, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -93,6 +120,9 @@ MonoBehaviour:
     lifetime: 1.5
     sortingOrder: 20
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 11
     prefab: {fileID: 192630, guid: 5818af7a69f6af94eb7a7cbae3027afa, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -100,6 +130,9 @@ MonoBehaviour:
     lifetime: 1.5
     sortingOrder: 20
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 15
     prefab: {fileID: 6310177886152990554, guid: 0b473b7b1b8d58840a7eb09b075b2d60, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
@@ -107,12 +140,29 @@ MonoBehaviour:
     lifetime: 1
     sortingOrder: 32
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   - id: 16
     prefab: {fileID: 194966, guid: dee124e64b251e947b79230a951ccada, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1
     sortingOrder: 31
-    alignToDirection: 0  healCurveHeight: 0.8
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  - id: 4
+    prefab: {fileID: 5117122663855017936, guid: 03710823b1ef7ff4fbb331b2bba03199, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    sortingOrder: 35
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  healCurveHeight: 0.8
   healAlternateCurve: 1
   executionSparkOffset: {x: 0.45, y: 0.6}
