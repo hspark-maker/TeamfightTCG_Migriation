@@ -51,7 +51,17 @@ public class GameInitializer : MonoBehaviour
 
     async UniTaskVoid Start()
     {
-        await StartBattleAsync();
+        // 초기화가 예외로 끊기면 인트로가 숨겨둔 카드가 그대로 화면 밖에 남아 "아무것도 없는 전투"에 갇힌다.
+        // 원인은 로그로 남기되, 화면은 반드시 출구(초기화 실패 처리)로 보낸다.
+        try
+        {
+            await StartBattleAsync();
+        }
+        catch (System.Exception t_e)
+        {
+            Debug.LogError($"[GameInitializer] 전투 초기화 실패 — 전투를 열지 못했다: {t_e}");
+            AbortInit(_timedOut: true);
+        }
     }
 
     async UniTask StartBattleAsync()
