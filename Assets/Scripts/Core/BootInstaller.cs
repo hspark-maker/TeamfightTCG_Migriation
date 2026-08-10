@@ -83,6 +83,11 @@ public class BootInstaller : MonoBehaviour
         GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, RankManager.AiCardLevelOf(_card));
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
+        // 튜토리얼 전투용 미강화 기준값. 레벨은 바닥 고정이라 체력은 안 오르고 해금 게이트만 산다 —
+        // 진행도(GrowthProvider)를 태우면 저작된 킬 수·턴 수가 깨지고, 아예 안 태우면 키워드가 전부 열린다.
+        GameInitializer.BaseGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, CardGrowth.BaseLevel);
+        GameInitializer.GrowthAtLevelProvider = CardGrowthManager.GrowthAtLevel;
+
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
         DeckSaveManager.SetCardRegistry(t_availableCards);
