@@ -22,6 +22,10 @@ public class RankConfig : ScriptableObject
              "그 전까지 표시되는 문구다. 티어 표시명과 달리 단계 숫자가 붙지 않는다.")]
     public string unrankedDisplayName = "언랭크";
 
+    // 언랭크 상태의 배지(첫 등급 배지 대신 쓴다)
+    [Tooltip("첫 티어 미도달(언랭크) 상태에서 쓸 배지 스프라이트. 비워두면 첫 등급 배지가 그대로 보여 도달한 것처럼 읽히므로 저작을 권한다.")]
+    public Sprite unrankedBadge;
+
     // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
@@ -29,7 +33,7 @@ public class RankConfig : ScriptableObject
         new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100,   pointsPerDivision = 25, rewardGold = 100,  rewardGoldPerDivision = 50 },
         new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 200, pointsPerDivision = 25, rewardGold = 300,  rewardGoldPerDivision = 50 },
         new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 25, rewardGold = 500,  rewardGoldPerDivision = 100 },
-        new RankGradeConfig { grade = ERankGrade.Ruby, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewardGold = 900,  rewardGoldPerDivision = 100 },
+        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewardGold = 900,  rewardGoldPerDivision = 100 },
         new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewardGold = 1400, rewardGoldPerDivision = 200 },
     };
 
@@ -146,7 +150,7 @@ public enum ERankGrade
     Bronze,
     Silver,
     Gold,
-    Ruby,
+    Platinum,
     Diamond,
 }
 

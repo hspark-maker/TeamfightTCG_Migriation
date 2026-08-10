@@ -311,8 +311,8 @@ public class TurnRunner : MonoBehaviour
         var t_rank = RankManager.ApplyBattleResult(_won);
         this.lastRankDelta = t_rank.Delta;
 
-        // 티어가 올랐으면 캐리어에 실어 둔다 — 로비 진입 시 보상 패널이 소비해 자동으로 열린다.
-        if (t_rank.IsTierUp) RankUpHandoff.Set(t_rank);
+        // 승패 무관하게 싣는다 — 로비 랭크 배지가 포인트 증감에 반응한다(보여줄 것이 없는 결과는 캐리어가 스스로 거른다).
+        RankResultHandoff.Set(t_rank);
     }
 
     public static void Cleanup()

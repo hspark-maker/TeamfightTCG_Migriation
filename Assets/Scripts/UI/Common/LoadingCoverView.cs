@@ -47,6 +47,13 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("전환 모드에서 커버가 이전 화면을 덮는 시간(초). 부트 모드는 덮을 화면이 없어 무시한다.")]
     [SerializeField] float fadeInDuration = 0.15f;
 
+    // 지금 화면을 덮고 있는 커버(없으면 null). 커버는 DontDestroyOnLoad로 다음 씬 위까지 살아남으므로
+    // 새 씬의 Start는 아직 가려진 화면에서 돈다 — 로비 연출은 이게 걷힌 뒤에 시작해야 눈에 보인다.
+    static LoadingCoverView s_active;
+
+    /// <summary>커버가 화면을 덮고 있는가(페이드아웃이 끝나 파괴되면 false).</summary>
+    public static bool IsCovering => s_active != null;
+
     // 커버 루트의 페이드 대상. Canvas·CanvasGroup·이 스크립트가 모두 같은 오브젝트라 배선 없이 잡는다.
     CanvasGroup m_group;
 
@@ -87,9 +94,16 @@ public class LoadingCoverView : MonoBehaviour
 
     void Awake()
     {
+        s_active = this;
         m_group = GetComponent<CanvasGroup>();
 
         if (progressBar != null) progressBar.normalizedValue = 0f;
+    }
+
+    // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
+    void OnDestroy()
+    {
+        if (s_active == this) s_active = null;
     }
 
     void Start()

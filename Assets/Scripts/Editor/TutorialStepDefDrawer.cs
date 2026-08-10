@@ -97,7 +97,6 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesAnchor(_action))        yield return "anchor";
         if (TutorialStepDef.ShowsGuideMessage(_action)) yield return "guideMessage";
         if (TutorialStepDef.UsesPack(_action))          yield return "pack";
-        if (TutorialStepDef.UsesRefundGold(_action))    yield return "duplicateRefundGold";
         if (TutorialStepDef.UsesScenario(_action))      yield return "scenario";
         if (TutorialStepDef.UsesShowDeckGate(_action))  yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))      yield return "deckName";
