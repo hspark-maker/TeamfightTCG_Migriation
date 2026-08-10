@@ -28,6 +28,13 @@ public class ReleaseManagerWindow : EditorWindow
     List<string> issues;
     bool showColumnHelp;
 
+    // 표 대조 결과 캐시. 매 프레임 CSV를 파싱하고 카드를 복제할 수는 없으므로 모드가 바뀌거나
+    // 검증을 다시 돌릴 때만 계산한다. driftMode = 이 결과가 어느 모드 표를 본 것인지.
+    List<string>    drift;
+    string          driftError;
+    EContentRunMode driftMode;
+    bool            driftValid;
+
     [MenuItem("Tools/Card Battle/릴리즈 관리")]
     static void Open() => GetWindow<ReleaseManagerWindow>("릴리즈 관리").minSize = new Vector2(520, 560);
 
@@ -199,7 +206,52 @@ public class ReleaseManagerWindow : EditorWindow
             MessageType.Error);
     }
 
-    void Revalidate() => this.issues = ContentProfileValidator.Collect();
+    void Revalidate()
+    {
+        this.issues     = ContentProfileValidator.Collect();
+        this.driftValid = false;   // 표를 갈았거나 에셋이 움직였다 — 대조 결과도 같이 낡는다
+    }
+
+    // ── 표 대조 ────────────────────────────────────────────────────────────
+
+    /// <summary>빌드가 쓸 표와 카드 에셋을 값 단위로 견준다. <see cref="ContentRunModeEditor.Applied"/> 도장은
+    /// "어느 표를 실었나"만 알 뿐, 적용 후 인스펙터에서 고친 값은 못 잡는다 — 그 구멍을 여기서 막는다.</summary>
+    void EnsureDrift(EContentRunMode _mode)
+    {
+        if (this.driftValid && this.driftMode == _mode) return;
+
+        this.drift      = ContentRunModeEditor.DiffTable(_mode, out this.driftError);
+        this.driftMode  = _mode;
+        this.driftValid = true;
+    }
+
+    void DrawDriftBox(EContentRunMode _mode)
+    {
+        string t_label = ContentRunModeEditor.Label(_mode);
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("표 대조", $"{t_label} 표 ↔ 카드 에셋");
+            if (GUILayout.Button("다시 대조", GUILayout.Width(80))) this.driftValid = false;
+        }
+
+        if (this.drift == null)
+        {
+            EditorGUILayout.HelpBox($"대조 못 함 — {this.driftError}", MessageType.Warning);
+            return;
+        }
+        if (this.drift.Count == 0)
+        {
+            EditorGUILayout.HelpBox($"{t_label} 표와 카드 에셋의 값이 모두 같다.", MessageType.Info);
+            return;
+        }
+
+        EditorGUILayout.HelpBox(
+            $"이 빌드에 실리는 값은 표가 아니라 카드 에셋이다 — 둘이 다르다.\n" +
+            CardTableTool.DriftSummary(this.drift) + "\n\n" +
+            $"표가 맞다면 ②에서 '{t_label} 표 → 카드 적용', 에셋이 맞다면 '카드 → {t_label} 표 내보내기'.",
+            MessageType.Warning);
+    }
 
     // ── ④ 빌드 ─────────────────────────────────────────────────────────────
 
@@ -219,6 +271,11 @@ public class ReleaseManagerWindow : EditorWindow
 
         int t_scenes = EnabledScenes().Length;
         EditorGUILayout.LabelField("포함 씬", $"{t_scenes}개 (Build Settings 기준)");
+
+        EditorGUILayout.Space(4);
+        EnsureDrift(t_runtimeMode);
+        DrawDriftBox(t_runtimeMode);
+        EditorGUILayout.Space(4);
 
         string t_block = BuildBlocker(t_runtimeMode, t_scenes);
         if (t_block != null) EditorGUILayout.HelpBox(t_block, MessageType.Error);
@@ -250,9 +307,15 @@ public class ReleaseManagerWindow : EditorWindow
     {
         string t_path = Path.Combine(this.buildDir, OutputName(_target));
 
+        // 대조 경고는 빌드를 막지 않는다(의도적으로 에셋만 손댄 상태로 뽑는 일이 있다) —
+        // 대신 되돌리기 어려운 시점에 한 번 더 눈에 띄게 한다.
+        string t_driftNote = this.drift != null && this.drift.Count > 0
+            ? $"\n\n⚠ 표와 다른 값 {this.drift.Count}건 — 표가 아니라 에셋 값으로 나간다."
+            : "";
+
         if (!EditorUtility.DisplayDialog("빌드",
                 $"{ContentRunModeEditor.Label(_runtimeMode)} 빌드를 만든다.\n\n" +
-                $"플랫폼: {_target}\n출력: {t_path}\n\n시간이 걸린다.", "빌드", "취소"))
+                $"플랫폼: {_target}\n출력: {t_path}{t_driftNote}\n\n시간이 걸린다.", "빌드", "취소"))
             return;
 
         Directory.CreateDirectory(this.buildDir);

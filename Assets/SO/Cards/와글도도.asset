@@ -24,8 +24,8 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 9db1c86c959e91d418a1c0adf03ee5dc, type: 3}
   battleImage: {fileID: 21300000, guid: c96ea0adfc4dd55b875a249451f168fe, type: 3}
   deckPreview: {fileID: 21300000, guid: ea9c68458ab445c4d91479887e213809, type: 3}
-  hpGainByLevel: 
-  keywordUnlockLevel: 0
+  hpGainByLevel: 0000000000000000020000000200000002000000020000000200000001000000010000000100000001000000
+  keywordUnlockLevel: 2
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
@@ -50,8 +50,5 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "\uD63C\uC790\uC11C\uB294 \uAC81\uC774 \uB9CE\uC9C0\uB9CC \uBAA8\uC774\uBA74
-    \uC138\uC0C1 \uBB34\uC11C\uC6B8 \uAC8C \uC5C6\uB294 \uB3C4\uB3C4\uC0C8\uB4E4.
-    \uBB38\uC81C\uB294 \uB3C4\uB9DD\uAC08 \uB54C\uB3C4 \uB2E8\uCCB4 \uD589\uB3D9\uC774
-    \uB108\uBB34 \uC644\uBCBD\uD558\uB2E4."
+  cardExplain: 
   explainKeywords: 0

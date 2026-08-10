@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\uBB3C\uBC29\uC6B8\uB8FD 3"
   channel: 0
   keywords: 16
-  maxHp: 7
+  maxHp: 8
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
@@ -24,8 +24,8 @@ MonoBehaviour:
   portrait: {fileID: 21300000, guid: 8c38891d13a84860b056ec84d3b7bddc, type: 3}
   battleImage: {fileID: 21300000, guid: 0aed83bef23e4d398142508bcb4b16ae, type: 3}
   deckPreview: {fileID: 21300000, guid: ab1b5ba0423f4dfbae684a76e4c34b64, type: 3}
-  hpGainByLevel: 
-  keywordUnlockLevel: 0
+  hpGainByLevel: 0000000000000000020000000200000001000000010000000100000001000000010000000100000001000000
+  keywordUnlockLevel: 2
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
@@ -50,7 +50,5 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "\uBD88\uB9CC \uBCF4\uBA74 \uBAB8\uBD80\uD130 \uCD9C\uB3D9\uD558\uB294
-    \uC824\uB9AC \uC218\uB2EC. \uBD88\uC740 \uC798 \uB044\uC9C0\uB9CC \uD604\uC7A5\uC740
-    \uB298 \uBB3C\uBC14\uB2E4\uAC00 \uB41C\uB2E4."
+  cardExplain: 
   explainKeywords: 0
