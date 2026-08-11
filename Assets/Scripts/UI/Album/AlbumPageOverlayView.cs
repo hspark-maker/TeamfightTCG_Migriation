@@ -145,16 +145,32 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void ApplyInteractable()
     {
-        bool t_locked = IsLocked;
+        // 색으로 잠긴 티를 내는 건 **세션 잠금**뿐이다. 넘김 잠금은 0.3초짜리라 Button의 Color Tint가
+        // 켜졌다 꺼지는 것이 "dim이 풀렸다 돌아온다 / 칸이 깜빡인다"로 보인다.
+        // 짧은 잠금은 색을 건드리지 않고 눌렀을 때 걸러낸다(HandleCloseRequest·HandleStepRequest).
+        bool t_dimmed = m_sessionLocked;
 
-        if (dimButton != null) dimButton.interactable = !t_locked;
-        if (closeButton != null) closeButton.interactable = !t_locked;
-        if (swipeDetector != null) swipeDetector.Interactable = !t_locked;
+        if (dimButton != null) dimButton.interactable = !t_dimmed;
+        if (closeButton != null) closeButton.interactable = !t_dimmed;
+        if (swipeDetector != null) swipeDetector.Interactable = !IsLocked;
 
-        // 잠금 해제는 페이지 수가 정하던 원래 값으로 되돌린다
-        bool t_steppable = !t_locked && m_theme != null && m_theme.Pages.Count > 1;
+        bool t_steppable = !t_dimmed && m_theme != null && m_theme.Pages.Count > 1;
         if (prevButton != null) prevButton.interactable = t_steppable;
         if (nextButton != null) nextButton.interactable = t_steppable;
+    }
+
+    /// <summary>닫기 요청. 잠금은 색이 아니라 여기서 막는다 — 넘김 도중 눌러도 아무 일이 없다.</summary>
+    void HandleCloseRequest()
+    {
+        if (IsLocked) return;
+        Close();
+    }
+
+    /// <summary>페이지 스테퍼 요청. 스와이프와 같은 잠금 규칙을 탄다.</summary>
+    void HandleStepRequest(int _dir)
+    {
+        if (IsLocked || m_flipping || m_dragging) return;
+        Step(_dir);
     }
 
     void Awake()
@@ -165,10 +181,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (closeButton != null && closeButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumPageOverlayView] Button_Close에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
 
-        if (dimButton != null) dimButton.onClick.AddListener(Close);
-        if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (prevButton != null) prevButton.onClick.AddListener(() => Step(-1));
-        if (nextButton != null) nextButton.onClick.AddListener(() => Step(1));
+        if (dimButton != null) dimButton.onClick.AddListener(HandleCloseRequest);
+        if (closeButton != null) closeButton.onClick.AddListener(HandleCloseRequest);
+        if (prevButton != null) prevButton.onClick.AddListener(() => HandleStepRequest(-1));
+        if (nextButton != null) nextButton.onClick.AddListener(() => HandleStepRequest(1));
 
         // 회전 대상은 Panel_Page가 아니라 slotRoot(Grid_Slots)다 — 같은 사각형이면서 부모 레이아웃이
         // anchoredPosition을 안 덮어쓰는 유일한 노드라 축 보정이 되돌려지지 않는다
