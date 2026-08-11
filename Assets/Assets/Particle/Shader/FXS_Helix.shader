@@ -194,10 +194,9 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
+			#define _SURFACE_TYPE_TRANSPARENT 1
 			#define _NORMAL_DROPOFF_TS 1
 			#pragma shader_feature_local_fragment _RECEIVE_SHADOWS_OFF
-			#define ASE_OPAQUE_KEEP_ALPHA
-			#define _SURFACE_TYPE_TRANSPARENT 1
 			#define ASE_VERSION 19912
 			#define ASE_SRP_VERSION 170300
 
@@ -503,7 +502,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord3.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord3.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord3.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord3.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -598,9 +597,8 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
-			#define _NORMAL_DROPOFF_TS 1
-			#define ASE_OPAQUE_KEEP_ALPHA
 			#define _SURFACE_TYPE_TRANSPARENT 1
+			#define _NORMAL_DROPOFF_TS 1
 			#define ASE_VERSION 19912
 			#define ASE_SRP_VERSION 170300
 
@@ -820,7 +818,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -867,9 +865,8 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
-			#define _NORMAL_DROPOFF_TS 1
-			#define ASE_OPAQUE_KEEP_ALPHA
 			#define _SURFACE_TYPE_TRANSPARENT 1
+			#define _NORMAL_DROPOFF_TS 1
 			#define ASE_VERSION 19912
 			#define ASE_SRP_VERSION 170300
 
@@ -1081,7 +1078,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -1116,9 +1113,8 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
-			#define _NORMAL_DROPOFF_TS 1
-			#define ASE_OPAQUE_KEEP_ALPHA
 			#define _SURFACE_TYPE_TRANSPARENT 1
+			#define _NORMAL_DROPOFF_TS 1
 			#define ASE_VERSION 19912
 			#define ASE_SRP_VERSION 170300
 
@@ -1334,7 +1330,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -1373,9 +1369,8 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
-        	#define _NORMAL_DROPOFF_TS 1
-        	#define ASE_OPAQUE_KEEP_ALPHA
         	#define _SURFACE_TYPE_TRANSPARENT 1
+        	#define _NORMAL_DROPOFF_TS 1
         	#define ASE_VERSION 19912
         	#define ASE_SRP_VERSION 170300
 
@@ -1633,7 +1628,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord2.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord2.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord2.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord2.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -1712,10 +1707,9 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 
 			HLSLPROGRAM
 
+			#define _SURFACE_TYPE_TRANSPARENT 1
 			#define _NORMAL_DROPOFF_TS 1
 			#pragma shader_feature_local_fragment _RECEIVE_SHADOWS_OFF
-			#define ASE_OPAQUE_KEEP_ALPHA
-			#define _SURFACE_TYPE_TRANSPARENT 1
 			#define ASE_VERSION 19912
 			#define ASE_SRP_VERSION 170300
 
@@ -1999,7 +1993,7 @@ Shader "Amplify Shader/portfolio/FX_Helix"
 				float2 panner34 = ( 1.0 * _Time.y * appendResult37 + uv_normal_Tex);
 				float3 temp_output_31_0 = ( (UnpackNormalScale( tex2D( _normal_Tex, panner34 ), 1.0f )).xyz * _distotion );
 				float2 uv_Main_TEx = input.ase_texcoord3.xy * _Main_TEx_ST.xy + _Main_TEx_ST.zw;
-				float2 appendResult4 = (float2(uv_Main_TEx.x , ( uv_Main_TEx.y + input.ase_texcoord3.z )));
+				float2 appendResult4 = (float2(( uv_Main_TEx.x + input.ase_texcoord3.z ) , uv_Main_TEx.y));
 				float4 tex2DNode1 = tex2D( _Main_TEx, ( temp_output_31_0 + float3( appendResult4 ,  0.0 ) ).xy );
 				float2 appendResult14 = (float2(_NOise_UPanner , _NOise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord3.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
@@ -2149,11 +2143,11 @@ Version=19912
 {"wire":[30,0,29,0]}
 {"wire":[10,0,9,0]}
 {"wire":[10,2,14,0]}
-{"wire":[3,0,2,2]}
+{"wire":[3,0,2,1]}
 {"wire":[3,1,5,3]}
 {"wire":[43,0,41,1]}
-{"wire":[4,0,2,1]}
-{"wire":[4,1,3,0]}
+{"wire":[4,0,3,0]}
+{"wire":[4,1,2,2]}
 {"wire":[31,0,30,0]}
 {"wire":[31,1,32,0]}
 {"wire":[28,0,31,0]}
@@ -2186,4 +2180,4 @@ Version=19912
 {"wire":[48,2,20,0]}
 {"wire":[48,3,26,0]}
 ASEEND*/
-//CHKSM=8005236362537945F8ECC19C499C09AEB82B2CCA
+//CHKSM=0A073FB13C782E050E551E5980CC5C4875FE17EC
