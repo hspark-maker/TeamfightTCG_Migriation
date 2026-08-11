@@ -36,7 +36,8 @@ public class RewardClaimPopup : MonoBehaviour
     [Tooltip("획득 순간 화면이 반응하는 축. dim에 딤 이미지를 물린다(알파는 그대로, 색만 밀린다).")]
     [SerializeField] ScreenDimTint dimTint = new ScreenDimTint();
 
-    [Tooltip("코인이 출발할 자리(선택). 비우면 각 재화 수치 자리에서 튀어 제자리로 돌아온다.")]
+    [Tooltip("빛이 피어날 자리의 폴백(선택). 평소엔 그 재화의 보상 아이콘 자리에서 피므로 쓰이지 않는다 — " +
+             "아이콘을 배선하지 않은 칸에서만 여기로 내려온다.")]
     [SerializeField] RectTransform burstOrigin;
 
     static bool s_overflowWarned;
@@ -47,8 +48,11 @@ public class RewardClaimPopup : MonoBehaviour
     // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
     Func<bool> m_onConfirm;
 
-    // 표시 중인 행의 보상. 재화가 갈리면 각자의 HUD로 각자의 코인이 날아가므로 종류별로 담아 둔다.
+    // 표시 중인 행의 보상. 재화가 갈리면 각자의 HUD로 각자의 빛이 흘러가므로 종류별로 담아 둔다.
     readonly CurrencyGainBucket m_rewards = new CurrencyGainBucket();
+
+    // 재화별로 빛이 피어날 자리(그 재화가 걸린 보상 아이콘). 아이콘 자리에서 피어야 "그것이 빛이 됐다"로 읽힌다.
+    readonly RectTransform[] m_origins = new RectTransform[(int)ECurrencyType.Count];
 
     // 이 팝업이 세운 분출. 딤을 눌러 닫고 다음 행을 바로 수령할 수 있어 두 연출이 겹친다.
     Sequence m_burst;
@@ -147,7 +151,7 @@ public class RewardClaimPopup : MonoBehaviour
             return;
         }
 
-        // 직전 분출을 새 롤업 고정(BuildGain 안의 BeginGainRollUp)보다 먼저 마무리한다 — 순서가 뒤집히면
+        // 직전 연출을 새 롤업 고정(BuildLightGain 안의 BeginGainRollUp)보다 먼저 마무리한다 — 순서가 뒤집히면
         // 옛 도착 콜백이 새 고정을 덮어 숫자가 뒤로 튄다(로비 획득 연출과 같은 이유).
         // 소유권을 먼저 떼야 옛 시퀀스의 종료 콜백이 이번에 다시 연 팝업을 닫지 않는다.
         var t_prev = this.m_burst;
@@ -157,19 +161,20 @@ public class RewardClaimPopup : MonoBehaviour
         // 등장이 아직 돌고 있으면 걷어 저작 상태로 되돌린다 — 중간값에서 퇴장을 이어 받으면 아이콘이 튄다.
         this.RestoreReveal();
 
-        // 재화가 갈리면 분출기도 갈려야 한다 — 공용 재생기가 종류별 시퀀스를 조립하고 수치 고정 해제 안전망까지 붙여 온다.
-        var t_gain = t_player.BuildGain(this.burstOrigin, this.m_rewards);
+        // 재화가 갈리면 줄기도 갈려야 한다 — 공용 재생기가 종류별 시퀀스를 조립하고 수치 고정 해제 안전망까지 붙여 온다.
+        var t_gain = t_player.BuildLightGain(this.m_rewards, this.m_origins, this.reveal.LightSprite);
         if (t_gain == null)
         {
             this.Hide();
             return;
         }
 
-        // 연출 레이어가 랭크 오버레이보다 아래면 코인이 딤에 가린다(로비 획득 연출과 같은 처리).
+        // 연출 레이어가 랭크 오버레이보다 아래면 빛이 딤에 가린다(로비 획득 연출과 같은 처리).
+        // 빛이 아이콘 '위'에 떠야 아이콘이 그 아래서 사라진 것으로 읽히므로, 이 한 줄이 연출의 전제다.
         t_player.transform.SetAsLastSibling();
 
-        // 퇴장 안무와 코인 분출을 한 시간축에 놓는다 — 아이콘이 사라지는 프레임에 코인이 나와야 분해된 것으로 읽힌다.
-        // 마스터에 SetLink를 걸지 않는 이유는 기존과 같다: 팝업이 꺼질 때 죽으면 코인이 허공에 굳는다.
+        // 퇴장 안무와 빛 줄기를 한 시간축에 놓는다 — 아이콘이 사그라드는 구간에 빛이 피어야 그것이 변한 것으로 읽힌다.
+        // 마스터에 SetLink를 걸지 않는 이유는 기존과 같다: 팝업이 꺼질 때 죽으면 빛이 허공에 굳는다.
         var t_burst = DOTween.Sequence();
         this.reveal.BuildOutro(t_burst, this.dimTint);
         t_burst.Insert(this.reveal.LaunchAt, t_gain);
@@ -180,7 +185,7 @@ public class RewardClaimPopup : MonoBehaviour
         // 팝업이 [획득] 비활성 상태로 열린 채 남는다. autoKill은 전역 기본값에 기대지 않고 명시한다.
         t_burst.SetAutoKill(true).OnKill(this.OnBurstEnded);
 
-        // BuildGain은 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
+        // BuildLightGain은 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
         t_burst.Play();
     }
 
@@ -217,14 +222,22 @@ public class RewardClaimPopup : MonoBehaviour
 
     void BindRewardSlots(IReadOnlyList<RewardLine> _rewards)
     {
+        Array.Clear(this.m_origins, 0, this.m_origins.Length);
+
         if (this.rewardSlots == null) return;
 
         for (int t_i = 0; t_i < this.rewardSlots.Length; t_i++)
         {
             if (this.rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) this.rewardSlots[t_i].Bind(_rewards[t_i].Icon, _rewards[t_i].Gain.Amount);
-            else this.rewardSlots[t_i].Hide();
+            if (t_i >= _rewards.Count)
+            {
+                this.rewardSlots[t_i].Hide();
+                continue;
+            }
+
+            this.rewardSlots[t_i].Bind(_rewards[t_i].Icon, _rewards[t_i].Gain.Amount);
+            this.RecordOrigin(_rewards[t_i].Gain.Type, this.rewardSlots[t_i].Icon);
         }
 
         // 저작 문제라 표시할 때마다 찍으면 소음이다 — 세션에 한 번이면 족하다.
@@ -233,6 +246,15 @@ public class RewardClaimPopup : MonoBehaviour
             s_overflowWarned = true;
             Debug.LogWarning($"[RewardClaimPopup] 보상 {_rewards.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
         }
+    }
+
+    // 같은 재화가 두 칸에 나뉘어 있어도 빛은 한 줄기다(수치도 한 번에 오른다) — 먼저 선 칸에서 피운다.
+    void RecordOrigin(ECurrencyType _type, Graphic _icon)
+    {
+        int t_slot = (int)_type;
+        if (this.m_origins[t_slot] != null) return;
+
+        this.m_origins[t_slot] = _icon != null ? (RectTransform)_icon.transform : this.burstOrigin;
     }
 
     void SetVisible(bool _visible)

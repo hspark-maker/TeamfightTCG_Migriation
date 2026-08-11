@@ -92,7 +92,7 @@ public static class UiGainBurst
             // 휘어진 궤적은 그 물림이 필요 없다 — 옆으로 부푼 곡선 자체가 "돌아 들어가는" 시간을 이미 만든다.
             t_seq.Insert(t_delay + _settings.ScatterDuration,
                          _settings.ArcHeight > 0f
-                       ? GatherAlongArc(t_rt, t_mid, _to, _settings.GatherDuration, _settings.ArcHeight, t_i)
+                       ? ArcTo(t_rt, t_mid, _to, _settings.GatherDuration, _settings.ArcHeight, t_i)
                        : t_rt.DOAnchorPos(_to, _settings.GatherDuration).SetEase(Ease.InBack));
 
             if (!Mathf.Approximately(_settings.GatherScale, 1f))
@@ -128,10 +128,14 @@ public static class UiGainBurst
         return _layer.InverseTransformPoint(_target.position);
     }
 
-    // 2차 베지에로 빨려든다. DOAnchorPos는 직선밖에 못 그리므로 진행도만 트윈하고 좌표는 여기서 찍는다.
+    /// <summary>
+    /// 2차 베지에로 휘어 든다. DOAnchorPos는 직선밖에 못 그리므로 진행도만 트윈하고 좌표는 여기서 찍는다.
+    /// 코인이든 빛이든 "빨려드는" 궤적은 이 한 곳만 쓴다 — 규칙이 갈라지면 손맛도 갈라진다.
+    /// _index는 휘는 방향을 가르는 축(짝수는 한쪽, 홀수는 반대쪽).
+    /// </summary>
     // 대상을 트윈에 물려 둔다 — 호출자가 조각별로 거는 DOKill(transform)이 이 트윈도 함께 잡아야 잔해가 안 남는다.
-    static Tween GatherAlongArc(RectTransform _rt, Vector2 _from, Vector2 _to, float _duration,
-                                float _height, int _index)
+    public static Tween ArcTo(RectTransform _rt, Vector2 _from, Vector2 _to, float _duration,
+                              float _height, int _index)
     {
         Vector2 t_delta = _to - _from;
         float   t_dist  = t_delta.magnitude;

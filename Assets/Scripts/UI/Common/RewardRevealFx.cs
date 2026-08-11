@@ -141,8 +141,22 @@ public class RewardRevealFx
     Vector2     m_buttonHome;
     bool        m_homeCaptured;
 
-    /// <summary>아이콘이 빨려들기 시작하는 시각 — 코인 분출을 여기에 맞춰야 "아이콘이 코인으로 분해됐다"로 읽힌다.</summary>
+    /// <summary>아이콘이 빨려들기 시작하는 시각 — 획득 연출을 여기에 맞춰야 "아이콘이 빛이 됐다"로 읽힌다.</summary>
     public float LaunchAt => this.launchRise;
+
+    /// <summary>
+    /// 빛 줄기가 쓸 그림. 이미 저작된 훈김(rayGlow)을 빌려 새 배선 없이 얻는다 —
+    /// 팝업마다 같은 스프라이트를 한 번 더 꽂게 하면 진실원이 둘이 된다.
+    /// </summary>
+    public Sprite LightSprite
+    {
+        get
+        {
+            if (this.rayGlow is Image t_glow && t_glow.sprite != null) return t_glow.sprite;
+
+            return this.confettiSprites != null && this.confettiSprites.Length > 0 ? this.confettiSprites[0] : null;
+        }
+    }
 
     /// <summary>등장이 끝나는 시각 — 입력을 다시 여는 쪽이 값을 또 들고 있지 않게.</summary>
     public float IntroDuration
