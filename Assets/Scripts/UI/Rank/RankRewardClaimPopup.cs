@@ -80,26 +80,26 @@ public class RankRewardClaimPopup : MonoBehaviour
         }
 
         // BuildBurst는 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
-        var t_rollUp = this.BeginRollUp(out var t_hud);
+        var t_rollUp = this.BeginRollUp(out var t_releaseDisplay);
         var t_burst = this.claimBurst.BuildBurst(t_rollUp);
         t_burst.OnComplete(this.Hide);
 
         // 연출이 어떤 이유로 끊겨도 수치 고정은 반드시 풀린다(로비 획득 연출과 같은 안전망).
-        if (t_rollUp != null) t_burst.OnKill(() => { if (t_hud != null) t_hud.ReleaseDisplay(); });
+        if (t_rollUp != null) t_burst.OnKill(() => t_releaseDisplay?.Invoke());
 
         t_burst.Play();
     }
 
     // 지급은 이미 끝났고 잔액도 최종값이다 — 로비 획득 연출과 같은 규칙으로 숫자를 코인 도착에 맞춰 올린다.
     // HUD를 못 찾거나 지급액이 0이면 롤업 없이 코인만 돈다(수령 자체를 막지 않는다).
-    Action<int, int> BeginRollUp(out CurrencyHud _hud)
+    Action<int, int> BeginRollUp(out Action _releaseDisplay)
     {
-        _hud = null;
+        _releaseDisplay = null;
         if (!this.m_reward.HasAmount) return null;
 
-        if (!CurrencyHud.TryGet(this.m_reward.Type, out _hud)) return null;
+        if (!CurrencyHud.TryGet(this.m_reward.Type, out var t_hud)) return null;
 
-        return _hud.BeginGainRollUp(this.m_reward.Amount, this.goldPunch);
+        return t_hud.BeginGainRollUp(this.m_reward.Amount, out _releaseDisplay, this.goldPunch);
     }
 
     void SetVisible(bool _visible)

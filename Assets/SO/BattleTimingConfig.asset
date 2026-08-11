@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25215ec81c6a5e64eafec7630faa005f, type: 3}
   m_Name: BattleTimingConfig
   m_EditorClassIdentifier: Assembly-CSharp::BattleTimingConfig
-  globalSpeed: 1
+  globalSpeed: 1.2
   cinemaDuration: 0.25
   atkWindDur: 0.12
   atkWindDist: 0.4
@@ -44,7 +44,7 @@ MonoBehaviour:
   deckDealDuration: 0.35
   cardMoveDuration: 0.3
   hitDuration: 0.2
-  deathDuration: 0.7666667
+  deathDuration: 0.9
   deathFlash: 0.05
   deathLift: 0.12
   deathNovaAt: 0.28

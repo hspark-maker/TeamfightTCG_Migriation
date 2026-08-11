@@ -20,6 +20,9 @@ public class AlbumPageOverlayView : MonoBehaviour
     [SerializeField] Transform slotRoot;            // Grid_Slots
     [SerializeField] AlbumCardSlotView slotTemplate; // Slot_00
 
+    [Tooltip("선택 — 지금 열어둔 테마 이름(CollectionTitle). 미배선이면 저작된 글자를 그대로 둔다.")]
+    [SerializeField] TMP_Text titleLabel;
+
     [Header("페이지 넘기기")]
     [SerializeField] Button prevButton;
     [SerializeField] Button nextButton;
@@ -253,6 +256,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         }
 
         if (pageLabel != null) pageLabel.text = $"{m_pageIndex + 1} / {m_theme.Pages.Count}";
+
+        // 제목은 페이지를 넘겨도 같은 테마다. 그래도 페이지 갱신과 같은 자리에서 찍는다 —
+        // 테마가 바뀌는 경로(Open·세션의 GoToPage)가 전부 여기를 지나므로 갱신 지점을 늘리지 않는다.
+        if (titleLabel != null) titleLabel.text = m_theme.DisplayName;
 
         var t_info = AlbumRewardManager.GetPageInfo(t_page);
         int t_hidden = AlbumInsertMask.HiddenCountIn(t_page);

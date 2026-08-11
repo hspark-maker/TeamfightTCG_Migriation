@@ -128,8 +128,17 @@ public class CardAnimator : MonoBehaviour
         {
             this.normalMaterials = new Material[this.dissolveRenderers.Length];
             for (int t_i = 0; t_i < this.dissolveRenderers.Length; t_i++)
-                if (this.dissolveRenderers[t_i] != null)
-                    this.normalMaterials[t_i] = this.dissolveRenderers[t_i].sharedMaterial;
+            {
+                if (this.dissolveRenderers[t_i] == null) continue;
+                this.normalMaterials[t_i] = this.dissolveRenderers[t_i].sharedMaterial;
+
+                // 프리팹이 평상시부터 디졸브 머티리얼을 물고 있으면 "되돌릴 자리"가 곧 디졸브다 —
+                // 복구가 조용히 무효가 되고, 한 번 죽은 슬롯은 그 뒤로 계속 녹은 채(안 보이는 채) 재사용된다.
+                // 실제로 브랜치 머지가 Frame을 이 상태로 되돌려 놓은 적이 있어서 시끄럽게 잡아 둔다.
+                if (this.normalMaterials[t_i] == this.dissolveMaterial)
+                    Debug.LogWarning($"[CardAnimator] {this.dissolveRenderers[t_i].name}이 평상시에도 디졸브 머티리얼을 쓰고 있다 — " +
+                                     "프리팹에서 기본 스프라이트 머티리얼로 되돌릴 것", this.dissolveRenderers[t_i]);
+            }
         }
     }
 

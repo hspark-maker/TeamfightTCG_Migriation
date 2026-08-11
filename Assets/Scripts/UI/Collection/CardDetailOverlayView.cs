@@ -8,7 +8,7 @@ using TMPro;
 
 // 로비 컬렉션 탭의 카드 상세 오버레이(CardDetailOverlay.prefab 루트에 부착).
 // 카드 타일을 길게 누르면 열리고, 누른 카드의 이름·체력·키워드·시너지를 채운다.
-// 닫기 버튼은 두지 않는다 — 오버레이 아무 곳이나 탭하면 닫힌다(조작 바 tapCloseExclude만 제외).
+// 닫기 버튼은 두지 않는다 — 배경(딤)을 탭하면 닫힌다. 카드·상세 패널·조작 바 위의 탭은 닫지 않는다.
 //
 // 인게임 카드 정보창(PooledCardElement)과 달리 풀드 UI가 아니라 로비 씬에 직접 배치한다 —
 // 로비 전용 풀스크린 한 장이라 Addressables("UIPrefab" 라벨) 등록까지 갈 이유가 없다(PackOpenOverlay와 같은 결).
@@ -90,10 +90,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] KeywordIconConfig  keywordIconConfig;
     [SerializeField] PopupTransition    transition = new PopupTransition();
 
-    [Header("탭해서 닫기")]
-    [Tooltip("탭해도 닫히지 않을 영역(BottomBar). 미배선이면 바의 빈 곳 탭도 닫기로 샌다.")]
-    [SerializeField] RectTransform tapCloseExclude;
-    
     [Tooltip("좌우 스와이프 감지. 오버레이 전면을 덮는 raycastTarget Graphic 위에 올려야 한다.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
@@ -215,10 +211,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
         // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
+        // 카드는 배경이 아니므로 여기서 닫지 않는다. 연출 중 스킵만 받는다.
         if (this.cardView != null)
         {
             LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
-            if (t_tap != null) t_tap.OnTap = TapClose;
+            if (t_tap != null) t_tap.OnTap = SkipRitual;
         }
     }
 
@@ -312,7 +309,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.transition.SetVisible(gameObject, false);
     }
 
-    /// <summary>딤·상세 패널 어디를 탭해도 닫는다. 조작 바(tapCloseExclude)와 카드 그림(Awake 참고)은 제외.</summary>
+    /// <summary>닫기는 <b>배경(딤)</b> 탭만이다. 배경 = 이 루트 자신의 전면 Image —
+    /// 카드·상세 패널·조작 바 위의 탭은 닫지 않는다(내용을 읽다 손이 스쳐 창이 사라지던 문제).
+    ///
+    /// 판정을 "무엇을 눌렀나"로 하는 이유: 이 경로의 pointerPress는 언제나 루트라 영역을 알려주지 못한다.
+    /// pointerPressRaycast가 곧 루트면 그 위에 아무 UI도 없었다는 뜻이고, 그게 배경이다.</summary>
     public void OnPointerClick(PointerEventData _e)
     {
         if (_e == null || _e.button != PointerEventData.InputButton.Left) return;
@@ -320,27 +321,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 스와이프로 소비된 포인터는 탭이 아니다 — 없으면 카드를 넘긴 뒤 손 떼는 순간 닫힌다.
         if (_e.dragging) return;
 
-        // 누른 노드로 판정 — 이 경로의 pointerPress는 루트 자신이라 영역을 알려주지 못한다.
-        GameObject t_hit = _e.pointerPressRaycast.gameObject;
-        if (t_hit != null && this.tapCloseExclude != null
-         && t_hit.transform.IsChildOf(this.tapCloseExclude)) return;
+        // 연출 중의 탭은 어디를 눌렀든 스킵이다 — 연타하는 조작이라 기다리게만 두면 지겹다.
+        if (this.m_ritualPlaying) { SkipRitual(); return; }
 
-        TapClose();
-    }
-
-    // 강화 연출 중의 탭은 닫기가 아니라 스킵이다 — 연타하는 조작이라 결과를 기다리게만 두면 지겹고,
-    // 그렇다고 닫아버리면 방금 쓴 골드의 결과를 못 보고 화면이 사라진다.
-    void TapClose()
-    {
-        // "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
-        // 그리고 OnKill 콜백 구간에서 어긋난다.
-        if (this.m_ritualPlaying)
-        {
-            this.ritual?.RequestSkip();
-            return;
-        }
+        if (_e.pointerPressRaycast.gameObject != gameObject) return;
 
         Hide();
+    }
+
+    /// <summary>강화 연출 스킵. 닫기와 갈라 둔다 — 방금 쓴 골드의 결과를 못 보고 화면이 사라지면 안 된다.
+    /// "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
+    /// 그리고 OnKill 콜백 구간에서 어긋난다.</summary>
+    void SkipRitual()
+    {
+        if (this.m_ritualPlaying) this.ritual?.RequestSkip();
     }
 
     void OnPrevPressed() => Step(-1);
