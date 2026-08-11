@@ -23,7 +23,18 @@ public class PageRollGraphic : MaskableGraphic
     const int   MaxSegments  = 64;
     const float SpiralGrowth = 0.08f;   // 한 바퀴 감길 때마다 통이 굵어지는 비율(겹침이 정확히 포개지지 않게)
 
-    Texture m_texture;
+    /// <summary>이 판이 그릴 면. UI Graphic 하나는 텍스처 한 장뿐이라, 종이 앞면(페이지 그림)과
+    /// 뒷면(카드 뒤판)을 다른 그림으로 보이려면 판을 둘로 갈라야 한다.
+    /// 뒷면은 통 꼭대기 = 화면에서 가장 앞이므로 앞면 판보다 뒤에(위에) 그린다.</summary>
+    public enum RollFace
+    {
+        Both,    // 뒤판 그림이 없을 때 — 앞면 그림을 어둡게 접어 쓴다(예전 동작)
+        Front,
+        Back,
+    }
+
+    Texture  m_texture;
+    RollFace m_face = RollFace.Both;
     float   m_amount;              // 0 = 평평, 1 = 책등까지 다 말림
     int     m_dir = 1;             // +1이면 왼쪽이 책등
     float   m_radiusRatio = 0.13f;
@@ -41,6 +52,7 @@ public class PageRollGraphic : MaskableGraphic
     float[] m_colDepth;
     float[] m_colShade;
     float[] m_colBulge;
+    float[] m_colFacing;   // 1 정면 → 0 옆 → -1 뒷면. 어느 판이 그릴 조각인지 이걸로 가른다
     int[]   m_order;
 
     public override Texture mainTexture => m_texture != null ? m_texture : Texture2D.whiteTexture;
@@ -51,6 +63,15 @@ public class PageRollGraphic : MaskableGraphic
 
         m_texture = _texture;
         this.SetMaterialDirty();
+        this.SetVerticesDirty();
+    }
+
+    /// <summary>이 판이 맡을 면. 앞뒤를 가르면 두 판이 한 통을 나눠 그린다.</summary>
+    public void SetFace(RollFace _face)
+    {
+        if (m_face == _face) return;
+
+        m_face = _face;
         this.SetVerticesDirty();
     }
 
@@ -98,6 +119,8 @@ public class PageRollGraphic : MaskableGraphic
 
         if (t_rolled <= 0.5f)
         {
+            if (m_face == RollFace.Back) return;   // 평평한 종이에는 뒷면이 없다
+
             // 평평 — 넘김 전과 픽셀 단위로 같은 그림이어야 한다(여기서 흔들리면 넘김 시작이 툭 튄다)
             this.AddStrip(_vh,
                 t_hingeX, t_hingeX + t_u * t_w,
@@ -141,10 +164,20 @@ public class PageRollGraphic : MaskableGraphic
         for (int t_i = 0; t_i < t_quads; t_i++)
         {
             int t_c = m_order[t_i];
+
+            // 조각이 어느 면인지는 두 열의 평균으로 정한다 — 경계에 걸친 한 조각은 한쪽이 통째로 가져간다
+            float t_facing = (m_colFacing[t_c] + m_colFacing[t_c + 1]) * 0.5f;
+            if (m_face == RollFace.Front && t_facing < 0f) continue;
+            if (m_face == RollFace.Back  && t_facing >= 0f) continue;
+
+            // 뒤판은 제 그림을 그대로 쓴다 — 앞면 그림을 어둡게 접던 값(m_backShade)을 물려받으면 뒤판까지 컴컴하다
+            float t_shade0 = m_face == RollFace.Back ? this.BackFaceShade(m_colFacing[t_c])     : m_colShade[t_c];
+            float t_shade1 = m_face == RollFace.Back ? this.BackFaceShade(m_colFacing[t_c + 1]) : m_colShade[t_c + 1];
+
             this.AddStrip(_vh,
                 m_colX[t_c], m_colX[t_c + 1],
                 m_colUv[t_c], m_colUv[t_c + 1],
-                m_colShade[t_c], m_colShade[t_c + 1],
+                t_shade0, t_shade1,
                 m_colBulge[t_c], m_colBulge[t_c + 1],
                 t_centerY, t_h, t_fade);
         }
@@ -183,12 +216,17 @@ public class PageRollGraphic : MaskableGraphic
             t_shade += m_gloss * Mathf.Exp(-(t_off * t_off) / 0.18f);
         }
 
-        m_colX[_index]     = t_x;
-        m_colUv[_index]    = m_dir >= 0 ? _a / _width : 1f - _a / _width;
-        m_colDepth[_index] = t_depth;
-        m_colShade[_index] = t_shade;
-        m_colBulge[_index] = 1f + m_bulge * (t_depth / (2f * Mathf.Max(1f, _radius)));
+        m_colX[_index]      = t_x;
+        m_colUv[_index]     = m_dir >= 0 ? _a / _width : 1f - _a / _width;
+        m_colDepth[_index]  = t_depth;
+        m_colShade[_index]  = t_shade;
+        m_colFacing[_index] = t_facing;
+        m_colBulge[_index]  = 1f + m_bulge * (t_depth / (2f * Mathf.Max(1f, _radius)));
     }
+
+    // 뒤판 판 전용 밝기 — 옆으로 누울수록 어둡고 정면으로 뒤집힌 데서 가장 밝다(앞면과 같은 축의 거울상).
+    float BackFaceShade(float _facing)
+        => Mathf.Lerp(m_edgeShade, 1f, Mathf.Clamp01(-_facing));
 
     void AddStrip(VertexHelper _vh,
                   float _x0, float _x1, float _uv0, float _uv1,
@@ -237,11 +275,12 @@ public class PageRollGraphic : MaskableGraphic
     {
         if (m_colX != null && m_colX.Length >= _count) return;
 
-        m_colX     = new float[_count];
-        m_colUv    = new float[_count];
-        m_colDepth = new float[_count];
-        m_colShade = new float[_count];
-        m_colBulge = new float[_count];
-        m_order    = new int[_count];
+        m_colX      = new float[_count];
+        m_colUv     = new float[_count];
+        m_colDepth  = new float[_count];
+        m_colShade  = new float[_count];
+        m_colFacing = new float[_count];
+        m_colBulge  = new float[_count];
+        m_order     = new int[_count];
     }
 }
