@@ -54,9 +54,13 @@ public class AlbumPageFlipView
              "충분히 어두워야 뒷면으로 읽힌다. 뒤판 그림을 넣으면 이 값 대신 그 그림이 보인다.")]
     [Range(0f, 1f)] [SerializeField] float rollBackShade = 0.32f;
 
-    [Tooltip("선택 — 말린 종이의 뒷면에 보일 그림(Assets/Assets/Images/DeckPile). 비우면 앞면 그림을 어둡게 접어 쓴다.\n" +
+    [Tooltip("선택 — 말린 종이의 뒷면에 보일 카드 뒤판 그림(Assets/Assets/Images/DeckPile). 비우면 앞면 그림을 어둡게 접어 쓴다.\n" +
              "UI Graphic 하나는 텍스처 한 장뿐이라, 넣으면 앞면·뒷면을 두 판이 나눠 그린다.")]
     [SerializeField] Sprite rollBackSprite;
+
+    [Tooltip("뒤판 그림을 장 안에서 가로·세로 몇 번 반복할지. 칸 배치와 같은 3x3이 기본 — 종이 뒷면에\n" +
+             "카드 뒷면 아홉 장이 있는 것이 실제 앨범의 그림이다. 1x1로 두면 한 장이 장 전체로 늘어난다.")]
+    [SerializeField] Vector2 rollBackTiling = new Vector2(3f, 3f);
 
     [Tooltip("페이지를 뜰 때만 쓰는 전용 카메라 레이어. 화면에 보이는 레이어(UI=5)와 겹치면 다른 것까지 찍힌다.")]
     [SerializeField] int captureLayer = 7;
@@ -411,7 +415,15 @@ public class AlbumPageFlipView
 
         if (m_rollBack != null)
         {
-            m_rollBack.SetTexture(this.rollBackSprite.texture);
+            var t_backTex = this.rollBackSprite.texture;
+
+            // 칸마다 한 장씩 반복하려면 Repeat여야 한다. 임포터 설정에 기대지 않고 여기서 못 박는다 —
+            // 다른 데서 쓰는 UV는 0~1 안이라 Repeat로 바뀌어도 그림이 달라지지 않는다.
+            if (t_backTex != null && (this.rollBackTiling.x > 1f || this.rollBackTiling.y > 1f))
+                t_backTex.wrapMode = TextureWrapMode.Repeat;
+
+            m_rollBack.SetTexture(t_backTex);
+            m_rollBack.SetTiling(this.rollBackTiling);
             m_rollBack.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
             m_rollBack.SetFace(PageRollGraphic.RollFace.Back);
             m_rollBack.SetRoll(t_reverse ? 1f : 0f, 1);
