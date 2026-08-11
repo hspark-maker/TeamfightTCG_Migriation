@@ -135,7 +135,7 @@ public class RankConfig : ScriptableObject
 
     /// <summary>티어 _index의 보상을 단계 배율까지 적용해 _sink에 담는다(Clear는 이 메서드가 한다).
     /// 티어 스냅샷과 분리해 둔다 — 행 상태 갱신마다 보상 리스트를 만들 이유가 없다.</summary>
-    public void FillRewards(int _index, List<RankReward> _sink)
+    public void FillRewards(int _index, List<RewardLine> _sink)
     {
         if (_sink == null) return;
         _sink.Clear();
@@ -152,7 +152,7 @@ public class RankConfig : ScriptableObject
             RankRewardDef t_def = t_grade.rewards[t_i];
             if (t_def.amount <= 0) continue;
 
-            _sink.Add(new RankReward(
+            _sink.Add(new RewardLine(
                 new CurrencyGain(t_def.currency, t_def.amount + t_step * t_def.amountPerDivision),
                 t_def.icon));
         }
@@ -234,19 +234,6 @@ public struct RankRewardDef
     // 단계마다 늘어나는 증가분
     [Tooltip("단계마다 늘어나는 증가분. 단계 N의 지급액 = amount + (N-1) * 이 값. 0이면 4단계 모두 같은 액수를 준다.")]
     public long amountPerDivision;
-}
-
-// 단계 배율이 적용된 보상 1건(저작값의 파생 스냅샷)
-public readonly struct RankReward
-{
-    public readonly CurrencyGain Gain;
-    public readonly Sprite Icon;
-
-    public RankReward(CurrencyGain _gain, Sprite _icon)
-    {
-        Gain = _gain;
-        Icon = _icon;
-    }
 }
 
 // 티어 1개의 파생 스냅샷(RankConfig가 등급 행에서 계산해 내주는 값)

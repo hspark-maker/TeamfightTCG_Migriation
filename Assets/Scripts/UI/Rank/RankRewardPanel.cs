@@ -13,7 +13,6 @@ public class RankRewardPanel : MonoBehaviour
     [SerializeField] Transform content;              // 행이 세로로 쌓일 Content(VerticalLayoutGroup)
     [SerializeField] RankRewardRowView rowPrefab;    // 행 프리팹
     [SerializeField] Button closeButton;
-    [SerializeField] RankRewardClaimPopup claimPopup;
 
     [Header("연출")]
     [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
@@ -34,7 +33,7 @@ public class RankRewardPanel : MonoBehaviour
 
     public void Close()
     {
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        HideClaimPopup();
         this.SetVisible(false);
     }
 
@@ -62,7 +61,7 @@ public class RankRewardPanel : MonoBehaviour
     void OpenAt(int _scrollRow)
     {
         // 패널보다 먼저 닫는다 — 아직 화면에 없는 동안이라 팝업이 트윈 없이 즉시 정리된다(퇴장 중 열림 경합 차단).
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        HideClaimPopup();
 
         this.SetVisible(true);
 
@@ -109,18 +108,25 @@ public class RankRewardPanel : MonoBehaviour
             if (this.m_rows[t_i] != null) this.m_rows[t_i].Refresh();
     }
 
-    // 행 클릭 → 수령 팝업. 팝업이 미배선이면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
+    // 행 클릭 → 수령 팝업. 팝업이 씬에 없으면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
     void OnRowClicked(int _tierIndex)
     {
         if (!RankRewardManager.CanClaim(_tierIndex)) return;
 
-        if (this.claimPopup == null)
+        if (!RewardClaimPopup.TryGet(out var t_popup))
         {
             this.Claim(_tierIndex);
             return;
         }
 
-        this.claimPopup.Show(RankRewardManager.GetInfo(_tierIndex), () => this.Claim(_tierIndex));
+        var t_info = RankRewardManager.GetInfo(_tierIndex);
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex));
+    }
+
+    // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
+    static void HideClaimPopup()
+    {
+        if (RewardClaimPopup.TryGet(out var t_popup)) t_popup.Hide();
     }
 
     // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshRows를 유발한다.

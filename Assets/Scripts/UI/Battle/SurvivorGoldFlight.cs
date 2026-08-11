@@ -8,7 +8,7 @@ using UnityEngine.UI;
 // "보상 = 남은 카드 수"라는 인과를 세는 리듬으로 보여주는 것이 목적이라, 등장과 흡수 사이에
 // 반드시 멈추는 구간이 있다(몇 장인지 세어질 시간). UiGainBurst는 그 정지를 넣을 수 없어 궤적을 직접 짓는다.
 //
-// MonoBehaviour가 아니라 뷰가 필드로 소유한다(RankRewardRevealFx·ScreenDimTint와 같은 계열).
+// MonoBehaviour가 아니라 뷰가 필드로 소유한다(RewardRevealFx·ScreenDimTint와 같은 계열).
 [Serializable]
 public class SurvivorGoldFlight
 {

@@ -94,7 +94,7 @@ public class RankRewardRowView : MonoBehaviour
         this.Refresh();
     }
 
-    void BindRewardSlots(IReadOnlyList<RankReward> _rewards)
+    void BindRewardSlots(IReadOnlyList<RewardLine> _rewards)
     {
         if (this.rewardSlots == null) return;
 

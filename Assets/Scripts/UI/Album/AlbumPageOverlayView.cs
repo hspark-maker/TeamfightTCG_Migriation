@@ -638,14 +638,12 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
         var t_page = m_theme.Pages[Mathf.Clamp(m_pageIndex, 0, m_theme.Pages.Count - 1)];
-        var t_rewards = t_page.Rewards;   // Claim 전에 캡처
-        if (!AlbumRewardManager.ClaimPage(t_page)) return;
 
-        if (!CurrencyGainEffectPlayer.TryGet(this, out var t_player)) return;
+        // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어나므로 여기서 걸러야 못 받을 보상이 축하받지 않는다.
+        if (!AlbumRewardManager.CanClaimPage(t_page)) return;
 
-        var t_bucket = new CurrencyGainBucket();
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            t_bucket.Add(t_rewards[t_i].currency, t_rewards[t_i].amount);
-        t_player.Play(pageChest.Rect, t_bucket);
+        AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} {t_page.Index + 1}페이지 완성!",
+                                  t_page.Rewards,
+                                  () => AlbumRewardManager.ClaimPage(t_page));
     }
 }

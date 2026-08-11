@@ -227,14 +227,11 @@ public class AlbumTabController : MonoBehaviour
 
     void ClaimAlbumReward()
     {
-        var t_rewards = CardAlbum.AlbumRewards;   // Claim 전에 캡처
-        if (!AlbumRewardManager.ClaimAlbum()) return;
+        // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
+        if (!AlbumRewardManager.CanClaimAlbum()) return;
 
-        if (!CurrencyGainEffectPlayer.TryGet(this, out var t_player)) return;
-
-        var t_bucket = new CurrencyGainBucket();
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            t_bucket.Add(t_rewards[t_i].currency, t_rewards[t_i].amount);
-        t_player.Play(albumChest.Rect, t_bucket);
+        AlbumRewardClaimFlow.Open("앨범 완성!",
+                                  CardAlbum.AlbumRewards,
+                                  () => AlbumRewardManager.ClaimAlbum());
     }
 }
