@@ -67,6 +67,7 @@ public class AlbumPageFlipView
 
     UiRectCapture   m_capture;
     PageRollGraphic m_roll;
+    CanvasGroup     m_pageGroup;   // 되돌릴 때 밑에서 걷히는 지금 장
 
     Vector2 m_baseAnchored;
     Vector3 m_baseScale = Vector3.one;
@@ -75,6 +76,7 @@ public class AlbumPageFlipView
     int     m_dir = 1;
     bool    m_active;
     bool    m_rolling;
+    bool    m_rollReverse;   // 되돌리기 = 지금 장을 마는 게 아니라 이전 장을 펴서 덮는다
 
     public float Duration => this.duration;
 
@@ -122,8 +124,9 @@ public class AlbumPageFlipView
 
         m_dir = _dir >= 0 ? 1 : -1;
 
-        // 말림은 페이지를 통째로 떠서 다시 그린다 — 그늘·광택 판은 접힘 전용이라 여기서 만들지 않는다
-        if (this.useRoll && this.TryBeginRoll())
+        // 말림은 페이지를 통째로 떠서 다시 그린다 — 그늘·광택 판은 접힘 전용이라 여기서 만들지 않는다.
+        // 되돌리기(이전 장)는 말던 것을 되감는 게 아니라 **이전 장이 펴져 들어오는** 것이라 뜨는 대상이 반대다.
+        if (this.useRoll && this.TryBeginRoll(m_dir < 0))
         {
             this.SetFlipProgress(0f);
             return;
@@ -154,9 +157,18 @@ public class AlbumPageFlipView
 
         float t_p = Mathf.Clamp01(_p);
 
-        // 말림은 진행도 0.5(교체 지점)에서 이미 다 말려 있어야 한다 — 뒤 절반은 새 장의 몫이다
-        if (m_rolling && m_roll != null) m_roll.SetRoll(Mathf.Clamp01(t_p / 0.5f), m_dir);
-        else                             this.ApplyFold(t_p);
+        // 말림은 진행도 0.5(교체 지점)에서 끝나 있어야 한다 — 뒤 절반은 새 장의 몫이다.
+        // 다음 장은 지금 장이 다 말려 사라진 상태(1), 되돌리기는 이전 장이 다 펴진 상태(0)가 끝이다.
+        // 축은 양쪽 다 왼쪽 책등이다 — 되돌리기는 같은 자세를 거꾸로 재생하는 것이라 방향까지 뒤집으면 반대편에서 펴진다.
+        if (m_rolling && m_roll != null)
+        {
+            float t_amount = Mathf.Clamp01(t_p / 0.5f);
+            m_roll.SetRoll(m_rollReverse ? 1f - t_amount : t_amount, 1);
+        }
+        else
+        {
+            this.ApplyFold(t_p);
+        }
 
         this.ApplyChrome(t_p);
     }
@@ -230,6 +242,14 @@ public class AlbumPageFlipView
 
         if (m_sideGroup != null) m_sideGroup.alpha = t_alpha;
         if (m_label != null)     m_label.alpha     = t_alpha;
+
+        // 되돌리기: 뒤에 깔린 장이 곧 **펴져 들어오는 장**이라 촬영대에 올라가 있다.
+        // 여기에 초점 연출(알파·축소)을 태우면 뜨는 그림 자체가 흐려진다 — 대신 지금 장을 걷는다.
+        if (m_rollReverse)
+        {
+            if (m_pageGroup != null) m_pageGroup.alpha = 1f - Mathf.Clamp01(t_p / 0.5f);
+            return;
+        }
 
         // 실제 블러 대신 알파와 미세 축소를 복원해 추가 머티리얼 없이 초점이 맞는 느낌을 낸다.
         float t_underFocus = Mathf.Clamp01(t_p * 2f);
@@ -308,16 +328,29 @@ public class AlbumPageFlipView
 
     // 페이지를 촬영대로 넘기고, 그 자리에 같은 크기의 말림 판을 세운다.
     // 뜨는 데 실패하면(레이아웃 전이라 rect가 0인 프레임 등) false — 호출부는 접힘으로 물러난다.
-    bool TryBeginRoll()
+    bool TryBeginRoll(bool _reverse)
     {
-        if (m_rolling) return true;
+        // 뒤에 깔린 장이 없으면 되돌리기도 지금 장을 마는 것으로 대신한다
+        bool t_reverse = _reverse && m_underRoot != null && m_underRoot.gameObject.activeInHierarchy;
+
+        // 손가락이 도중에 방향을 뒤집으면 뜨는 대상 자체가 바뀐다 — 되감지 말고 다시 뜬다
+        if (m_rolling)
+        {
+            if (m_rollReverse == t_reverse) return true;
+            this.EndRoll();
+        }
+
         if (m_page == null || m_page.parent == null) return false;
         if (m_page.rect.width < 1f || m_page.rect.height < 1f) return false;
+
+        RectTransform t_source = t_reverse ? m_underRoot : m_page;
+        if (t_source == null || t_source.parent == null) return false;
 
         this.EnsureRoll();
         if (m_roll == null) return false;
 
-        // 자세는 페이지가 촬영대로 떠나기 **전에** 베낀다 — 떠난 뒤엔 촬영대 기준 값이라 자리가 어긋난다
+        // 자세는 페이지가 촬영대로 떠나기 **전에** 베낀다 — 떠난 뒤엔 촬영대 기준 값이라 자리가 어긋난다.
+        // 되돌리기라도 자리의 기준은 지금 장이다(들어오는 장이 앉을 자리가 곧 지금 장의 자리다).
         var t_rect = m_roll.rectTransform;
         t_rect.anchorMin        = m_page.anchorMin;
         t_rect.anchorMax        = m_page.anchorMax;
@@ -326,18 +359,31 @@ public class AlbumPageFlipView
         t_rect.anchoredPosition = m_page.anchoredPosition;
         t_rect.localScale       = m_page.localScale;
         t_rect.localRotation    = Quaternion.identity;
-        t_rect.SetSiblingIndex(m_page.GetSiblingIndex());   // 페이지가 있던 층을 그대로 물려받는다
+
+        // 다음 장은 지금 장이 있던 층을 물려받고(어차피 곧 떠난다), 되돌리기는 지금 장 **위**에 얹혀야 한다 —
+        // 펴져 들어오는 장이 아래로 깔리면 걷히는 장에 가려 아무것도 안 보인다.
+        t_rect.SetSiblingIndex(t_reverse ? m_page.GetSiblingIndex() + 1 : m_page.GetSiblingIndex());
+
+        if (t_reverse)
+        {
+            // 촬영 대상이 흐려져 있으면 뜨는 그림도 흐리다 — 초점 연출값을 걷고 뜬다
+            if (m_underGroup != null) m_underGroup.alpha = 1f;
+            this.EnsurePageGroup();
+        }
 
         if (m_capture == null) m_capture = new UiRectCapture();
-        if (!m_capture.Begin(m_page, this.captureLayer))
+        if (!m_capture.Begin(t_source, this.captureLayer))
         {
             m_roll.gameObject.SetActive(false);
+            if (m_underGroup != null) m_underGroup.alpha = m_underBaseAlpha;
             return false;
         }
 
+        m_rollReverse = t_reverse;
+
         m_roll.SetTexture(m_capture.Texture);
         m_roll.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
-        m_roll.SetRoll(0f, m_dir);
+        m_roll.SetRoll(t_reverse ? 1f : 0f, 1);
         m_roll.gameObject.SetActive(true);
 
         m_rolling = true;
@@ -348,6 +394,7 @@ public class AlbumPageFlipView
     {
         if (!m_rolling) return;
         m_rolling = false;
+        m_rollReverse = false;
 
         if (m_roll != null)
         {
@@ -355,6 +402,16 @@ public class AlbumPageFlipView
             m_roll.gameObject.SetActive(false);
         }
         if (m_capture != null) m_capture.End();
+        if (m_pageGroup != null) m_pageGroup.alpha = 1f;
+    }
+
+    // 프리팹에 CanvasGroup을 저작하지 않는다 — 주변 UI(m_sideGroup)와 같은 관용구
+    void EnsurePageGroup()
+    {
+        if (m_pageGroup != null || m_page == null) return;
+
+        m_pageGroup = m_page.GetComponent<CanvasGroup>();
+        if (m_pageGroup == null) m_pageGroup = m_page.gameObject.AddComponent<CanvasGroup>();
     }
 
     void EnsureRoll()

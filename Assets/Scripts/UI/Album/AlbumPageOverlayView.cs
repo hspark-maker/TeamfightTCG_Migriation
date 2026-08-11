@@ -24,6 +24,10 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("선택 — 지금 열어둔 테마 이름(CollectionTitle). 미배선이면 저작된 글자를 그대로 둔다.")]
     [SerializeField] TMP_Text titleLabel;
 
+    [Tooltip("한 페이지가 늘 차지하는 칸 수(Grid_Slots는 3열 = 3x3이라 9). 저작 칸이 이보다 적으면 빈 칸으로 채워\n" +
+             "페이지마다 격자가 들쭉날쭉해지지 않게 한다. 저작 칸이 더 많으면 그만큼 그대로 늘린다.")]
+    [SerializeField] int pageSlotCount = 9;
+
     [Header("페이지 넘기기")]
     [SerializeField] Button prevButton;
     [SerializeField] Button nextButton;
@@ -278,7 +282,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void EnsurePageCapacity(AlbumTheme _theme)
     {
-        int t_max = 0;
+        int t_max = Mathf.Max(0, this.pageSlotCount);   // 빈 칸 채움분까지 미리 확보한다
         for (int t_i = 0; t_i < _theme.Pages.Count; t_i++)
             t_max = Mathf.Max(t_max, _theme.Pages[t_i].Cards.Count);
 
@@ -298,7 +302,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_pageIndex = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
         var t_cards = _theme.Pages[t_pageIndex].Cards;
 
-        EnsureSlotCapacity(_slots, _root, t_cards.Count);
+        // 저작 칸이 모자란 페이지도 격자를 다 채운다 — 채움 칸은 카드도 번호도 없는 순수 빈 포켓이다
+        int t_shown = Mathf.Max(t_cards.Count, Mathf.Max(0, this.pageSlotCount));
+
+        EnsureSlotCapacity(_slots, _root, t_shown);
 
         // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 페이지마다 1로 되돌아가면 번호가 자리를 못 가리킨다
         int t_baseNumber = 0;
@@ -312,9 +319,18 @@ public class AlbumPageOverlayView : MonoBehaviour
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
             var t_slot = _slots[t_i];
-            if (t_i >= t_cards.Count)
+            if (t_i >= t_shown)
             {
                 t_slot.gameObject.SetActive(false);
+                continue;
+            }
+
+            // 격자 채움 칸 — 도감에 없는 자리라 번호를 찍지 않는다(0이면 번호가 숨는다)
+            if (t_i >= t_cards.Count)
+            {
+                t_slot.gameObject.SetActive(true);
+                t_slot.Bind(null, false, 0);
+                if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
                 continue;
             }
 
