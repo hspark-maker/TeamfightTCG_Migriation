@@ -58,7 +58,11 @@ public class AlbumCardSlotView : MonoBehaviour
 
         this.ApplyFrontAlpha();
 
-        if (button != null) button.interactable = t_show;
+        if (button != null)
+        {
+            this.NeutralizeDisabledTint();
+            button.interactable = t_show;
+        }
 
         // 번호는 소유 여부로 끄지 않는다 — 꽂힌 카드가 위에서 덮는 것이 이 구조의 자연스러운 은닉이다.
         if (numberLabel != null)
@@ -66,6 +70,19 @@ public class AlbumCardSlotView : MonoBehaviour
             numberLabel.gameObject.SetActive(_number > 0);
             if (_number > 0) numberLabel.text = _number.ToString("000");
         }
+    }
+
+    // 빈 칸의 밝기는 **씰 그림**이 정한다. 누를 수 있는지(interactable)가 정하게 두면,
+    // 페이지를 넘겨 그 칸의 소유 상태가 뒤집힐 때마다 Button의 Disabled 틴트가 0.1초 페이드로 끼어들어
+    // 칸 몇 개가 제멋대로 어두워졌다 돌아온다 — 화면에는 "칸이 깜빡인다"로 보인다.
+    // 그래서 Disabled 색을 Normal과 같게 못 박는다(누름·강조 피드백은 그대로 산다).
+    void NeutralizeDisabledTint()
+    {
+        var t_colors = button.colors;
+        if (t_colors.disabledColor == t_colors.normalColor) return;
+
+        t_colors.disabledColor = t_colors.normalColor;
+        button.colors = t_colors;
     }
 
     // 프리팹 저작 알파가 무엇이든 인스펙터 값으로 덮는다 — 칸마다 비닐 톤이 갈리지 않게.

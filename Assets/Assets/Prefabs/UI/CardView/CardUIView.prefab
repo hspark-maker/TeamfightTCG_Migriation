@@ -674,6 +674,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
   portrait: {fileID: 6426275104562043657}
   nameText: {fileID: 1835009869300166723}
+  nameBackground: {fileID: 9060805177612912613}
   lockOverlay: {fileID: 8278678757470793809}
   frame: {fileID: 2625298850542742525}
   hpPanel: {fileID: 2381697628577008813}

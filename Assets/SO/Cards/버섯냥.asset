@@ -29,10 +29,10 @@ MonoBehaviour:
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
-    battleImage: {fileID: 21300000, guid: 1b964954f43d4e248f0bad555488aa08, type: 3}
+    battleImage: {fileID: 21300000, guid: 6e003421d556bb44d9fe4e111c0937db, type: 3}
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
-    battleImage: {fileID: 0}
+    battleImage: {fileID: 21300000, guid: 62a68455ed5b4cd4389531f2277cc9cb, type: 3}
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
     battleImage: {fileID: 0}

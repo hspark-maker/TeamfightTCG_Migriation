@@ -19,6 +19,10 @@ public class HorizontalSwipeDetector : MonoBehaviour, IBeginDragHandler, IDragHa
     /// <summary>스와이프가 확정된 순간 1회. -1 = 이전, +1 = 다음(오른쪽으로 끌면 이전이 들어온다).</summary>
     public Action<int> OnSwipe;
 
+    /// <summary>손가락이 새로 내려앉은 순간 1회. "이 손짓은 아직 안 쓴 것"을 표시하려는 구독자용이다 —
+    /// <see cref="OnDragProgress"/>의 0 통지로 대신하면 안 된다. 끌다가 시작점을 되지나가도 0이 오기 때문이다.</summary>
+    public Action OnDragBegin;
+
     /// <summary>끄는 동안 매 프레임. 기준 폭 대비 누적 이동량(-1~1, 오른쪽이 +). 시작할 때 0으로 한 번 온다.
     /// 그림을 손가락에 붙이려는 구독자만 쓴다 — <see cref="OnSwipe"/>만 보는 쪽(상점 캐러셀)은 영향이 없다.</summary>
     public Action<float> OnDragProgress;
@@ -68,6 +72,7 @@ public class HorizontalSwipeDetector : MonoBehaviour, IBeginDragHandler, IDragHa
         this.m_delta    = 0f;
         this.m_speed    = 0f;
 
+        OnDragBegin?.Invoke();
         OnDragProgress?.Invoke(0f);
     }
 
