@@ -540,6 +540,7 @@ flowchart TD
 > 목표 루프의 **엔드포인트 표기**를 실물로 세운다. 단 실력 지표가 아니라 **표시용 진행도**(칭호)다.
 > **왜 로컬로 가능한가**: 로비 Match 탭은 100% AI전이고(`LobbyMatchLauncher.StartAiBattle` 단일 배선), PvP UI는 런타임에 도달 불가한 `MainMenu.unity`에만 있다. 클라 권위 + RPC 무검증이라 위조 가능하지만, **보상·난이도·매칭에 아무 영향이 없으므로 위조돼도 잃는 게 없다** → 서버 권위가 전제되지 않는다.
 > **H는 자체 계약 소비가 거의 없다** — 재화·소유·생산·팩 어느 것도 안 건드리고, 세이브 슬롯 1개와 전투 종료 훅 1줄만 쓴다. `:::new` = 신규, `:::chg` = 기존 파일 소규모 수정.
+> ⚠️ **정산 규칙은 아래 "랭크 강등 개방"에서 재작성됐다** — "티어 임계치를 하한으로 클램프해 강등을 막는다"는 서술은 폐기됐고, `RankApplyResult`에 `IsTierDown`이 추가됐다. 아래 시퀀스는 갱신본이다.
 
 #### 구조 지도 — 4갈래(영속 / 판정 / 주입 / 표시)
 
@@ -598,8 +599,9 @@ sequenceDiagram
     Note over TR: 멀티 배제 게이트는 제거됨(프로토 스코프 밖)<br/>싱글·멀티·튜토리얼·부전승 전부 가감
     TR->>MGR: ApplyBattleResult(_won)
     MGR->>MGR: delta = 승? +winPoints : -losePoints
-    MGR->>MGR: 하한 = max(가감 "전" 티어 requiredPoints, 0)
-    MGR->>MGR: points = max(points + delta, 하한)
+    MGR->>MGR: 바닥 = 랭크 진입했으면 FirstTierPoints, 아니면 0
+    MGR->>MGR: 천장 = 튜토 전투면 max(FirstTierPoints-1, 현재), 아니면 없음
+    MGR->>MGR: points = clamp(points + delta, 바닥, 천장)
     MGR->>DSM: Save() — 씬 왕복을 견디게 즉시 영속
     Note over TR,HUD: BattleCleanup.LoadScene("LobbyScene")
     HUD->>MGR: Start()에서 GetInfo() 1회
@@ -626,10 +628,10 @@ flowchart TD
     end
 
     subgraph rank["랭크 (기존 + 신규)"]
-        CFG["RankConfig / RankGradeConfig<br/>rewardType · rewardGold · rewardGoldPerDivision"]:::chg
+        CFG["RankConfig / RankGradeConfig<br/>rewards = RankRewardDef 목록(재화 · 아이콘 · 액수 · 단계증가분)<br/>FillRewards(티어, sink) → 단계 배율 적용한 RankReward"]:::chg
         MGR["RankManager<br/>[H-33 시점 무수정 → 등급 재설계에서 동결 해제]<br/>GetInfo → 도달 티어"]
         RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
-        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Reward(CurrencyGain) · State"]:::new
+        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Rewards(RankReward 목록) · State"]:::new
         HAND["RankResultHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)<br/>※ 개명 전 이름 RankUpHandoff"]:::new
     end
 
@@ -684,8 +686,59 @@ flowchart TD
 | `UI/HUD/RankHud.cs` | `pointText` 제거 · `BadgeRect` / `PlayGainImpact(bool)` / `BuildLossReaction()` 추가 |
 | `OutGame/Rank/RankResultHandoff.cs` | 개명 + 병합 규칙 재작성 |
 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` | 자동 오픈 경로와 `PlayTierUpEffect` 제거(최상위 행은 `readyPulse`가 이미 상시 강조) |
+| `UI/Rank/RankRewardAlertDot.cs` | **코드 무수정** — 구독·최초 렌더·`m_started` 가드까지 완비돼 있었고 배선만 없었다 |
 
 **알려진 한계**: 튜토리얼 졸업(`OutgameTutorialRunner.CompleteSequence`)은 로비 세션 **중간**에 `Set`을 부르므로 디렉터의 `Start`가 지난 뒤다 → 그 결과는 다음 로비 진입에서 소비된다(개편 전과 동일).
+
+
+### 랭크 강등 개방 — ±25 심플 사다리 · 튜토 언랭크 확정 (2026-08-10)
+
+승패마다 ±25, 단계 간격도 25 → **1승 = 1단계 상승, 1패 = 1단계 강등**. 사다리를 양방향으로 열었다.
+
+| 축 | 전 | 후 |
+|---|---|---|
+| 정산 하한 | 가감 **전** 티어의 `RequiredPoints` → 강등 구조적으로 불가 | 랭크 진입 뒤엔 `FirstTierPoints`(브론즈 1) 하나뿐 → 티어 사이 강등은 열림 |
+| 정산 상한 | 없음 | **튜토리얼 전투**에만 `max(FirstTierPoints - 1, 현재 포인트)` — 몇 승을 해도 랭크에 진입하지 못한다 |
+| 언랭크 복귀 | (해당 없음) | **없다.** 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있어 의미가 두 갈래로 갈린다 |
+| 캐리어 병합 | `Min(prev)/Max(tier)` — 상승만 가정 | **처음 실린 출발 → 마지막 도달**(센티널 `-1`만 예외로 언제 실리든 이긴다). 승·패가 섞이면 최소/최대는 거짓말을 한다(승1패1이 "승급"으로 보고됐다) |
+
+#### ⚠️ 졸업 낙인은 마지막 튜토 전투보다 **먼저** 찍힌다
+
+이것이 이 설계에서 가장 반직관적인 지점이고, 천장 규칙이 지금 모양인 유일한 이유다.
+
+마지막 챕터의 마지막 스텝은 `BattleStart`(덱 확인 화면의 "전투 시작" 버튼)다. 게이트 만족 = 씬 이탈이므로 `NotifyStepSatisfied` → `CompleteSequence` → `TryEnterFirstTier`가 **전투가 열리기 전에** 끝난다. 즉 마지막 튜토 전투는 이미 브론즈 1(=100점)에 선 채로 정산된다.
+
+- 천장 판정을 `IsRanked`로 하면 → 그 전투가 랭크 전투로 새어 100+25 = **브론즈 2**로 졸업한다.
+- 천장을 `FirstTierPoints - 1`로 **고정**하면 → 그 전투가 100을 99로 끌어내려 **강등 + 언랭크 복귀**가 된다.
+- 그래서 천장은 `max(FirstTierPoints - 1, 현재 포인트)` — "튜토 전투는 랭크를 **올리기만** 하고 첫 티어는 넘지 않는다". 마지막 전투에선 천장과 바닥이 둘 다 100이라 승패 무관 브론즈 1을 지킨다.
+
+판정 입력은 `TurnRunner`가 `TutorialConfig.IsActive`를 넘긴다(랭크가 튜토리얼 도메인을 직접 보지 않게). `TutorialConfig.Begin`은 한 단계 앞 `BattleEntry` 스텝에서 걸리므로 마지막 전투에서도 참이다.
+**부작용 1건(승인됨)**: 튜토 4승째는 75→99라 결과 팝업에 `+24`가 뜬다.
+
+> 승점이 10이던 때는 100+10 = 110으로 브론즈 2 문턱(125)에 못 미쳐 이 누수가 드러나지 않았다. 한 판이 정확히 한 단계가 되면서 노출됐다.
+
+#### 강등 연출 — 강도는 빈도를 따른다
+
+별 하나 제거는 패배마다 나오는 흔한 일이고 등급 강등은 드물다. 그래서 **같은 등급 안 하락은 조용히, 등급이 갈릴 때만 크게** 때린다.
+
+- **별 1개 제거**: 꺼질 칸이 뒤에서부터 하나씩, `UiPunch`에 **음수 세기**를 넘겨 켜질 때와 반대로 움츠러들었다 돌아온다.
+- **등급 강등**: 켜진 별을 전부 끄고 → 배지가 아래 등급으로 갈리며 `DOShakeAnchorPos` + 어두워짐 → **새 등급 별 4칸을 한 번에 스냅**한다.
+  칸을 하나씩 켜는 건 승급의 문법이라 여기서 재사용하면 *"별이 늘었다 = 올랐다"*로 읽힌다 — 강등에서 순차 점등 금지.
+- 흔들림·색은 **시퀀스 멤버**로 단다(콜백 안에서 따로 띄우면 시퀀스가 죽어도 살아남아 배지가 어긋난 채 굳는다). 콜백 뒤에는 `Join`이 아니라 `Append` — 길이 0인 콜백은 시퀀스 길이를 늘리지 않아 `Append`가 곧 "콜백과 같은 시각"이고 기준점이 분명하다.
+
+**디렉터 규칙**: 증감 부호와 티어 변화 방향이 어긋나면(여러 판 합산) 티어 쪽이 지배적인 소식이라 조각을 생략하고, 강등이 뒤따르면 손실 반응도 생략한다 — 배지가 두 번 식는다.
+
+| 변경 파일 | 내용 |
+|---|---|
+| `OutGame/Rank/RankManager.cs` | `ApplyBattleResult(_won, _tutorial)` 바닥/천장 재작성 · `RankApplyResult.IsTierDown` 추가 |
+| `Battle/TurnRunner.cs` | `TutorialConfig.IsActive`를 정산에 넘긴다 |
+| `OutGame/Rank/RankResultHandoff.cs` | 병합을 "처음 출발 → 마지막 도달"로 교체 |
+| `OutGame/Rank/RankConfig.cs` | 코드 기본값 25/25로 애셋과 동기화(이중 진실원 제거) |
+| `UI/HUD/RankHud.cs` | `m_tierUpSeq` → `m_tierSeq`(승급·강등 공용 가드) · `BuildTierDown` · `StageGradeDown` · `StagePipOff` 추가 |
+| `UI/Lobby/LobbyRankEffectDirector.cs` | 강등도 커버 아래에서 조립·`Pause` · `PlayPointChange` 가드 3분기 |
+| `OutGame/Debug/OutgameDebugActions.cs` | `TIER ±`가 결과를 캐리어에 실어 **씬 재진입 시 연출을 재생**한다(없으면 강등 연출을 볼 길이 전투뿐) |
+
+**보상은 무수정** — `RankRewardManager.StateOf`가 티어 인덱스가 아니라 **포인트 기준**이고 `Claimed` 낙인을 먼저 보므로, 강등해도 수령분은 유지되고 미수령 상위 행만 `Locked`로 되돌아간다(이미 강등을 전제한 코드였다).
 
 
 ### 매치 덱 선택·편집 (`UI/Match/`) — ✅ 코드+검수 완료 (2026-08-03), 프리팹·씬 저작 대기
@@ -1019,7 +1072,7 @@ flowchart TD
         SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>칸의 그래픽 = 슬리브 하나(루트엔 Image 없음)<br/>Sleeve → NumberLabel → CardHolder/Card<br/>번호는 카드가 덮어 저절로 가려진다"]:::new
         BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new
         PROG["AlbumGaugeView (Serializable 소품)<br/>n/N 게이지 · 3계층 공용"]:::new
-        RSLOT["AlbumRewardSlotView (Serializable 소품)<br/>앨범 보상 칸 1개 · 아이콘+수량"]:::new
+        RSLOT["CurrencyRewardSlotView (UI/Common · Serializable 소품)<br/>재화 보상 칸 1개 · 아이콘+수량<br/>앨범 보상 요약과 랭크 보상 행·팝업이 공용<br/>※ 개명·이관 전 이름 AlbumRewardSlotView"]:::new
     end
     subgraph INS["삽입(수록) 연출 (UI/Album/Insert/ · 실측 7파일 · 전량 휘발성 · 저장 0)"]
         IQ["AlbumInsertQueue (static)<br/>획득 카드 → 세션 캐리어<br/>Enqueue · TryConsume(1회 소비)<br/>저장 안 함 (CardPackRewardHandoff와 같은 모양)"]:::new
@@ -1225,8 +1278,8 @@ sequenceDiagram
 #### 단일 진실원
 
 - ~~**팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘긴다.~~ → **2026-08-10 개정**: 환급이 결제에서 떨어져 나갔다. 아래 "중복 환급 저작의 팩 SO 이관" 참조.
-- **전투 보상 재화** = `BattleReward.rewardType`. **랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용). **생산 행 재화** = 기존 `CatalogRow.RewardType`.
-- 세 SO 필드 모두 기본값 `Gold` → **기존 에셋 재저작 불필요**.
+- **전투 보상 재화** = `BattleReward.rewardType`. **생산 행 재화** = 기존 `CatalogRow.RewardType`. 둘 다 기본값 `Gold` → 기존 에셋 재저작 불필요.
+- ~~**랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용)~~ → **2026-08-10 개정**: 재화 1종 스키마를 폐기하고 `RankGradeConfig.rewards`(`RankRewardDef` 목록 = 재화·아이콘·액수·단계증가분)로 바꿨다. 티어별 지급액의 단일 진실원은 `RankConfig.FillRewards` — 단계 배율(`amount + (단계-1) * amountPerDivision`)이 여기서만 계산된다. `RankConfig.asset`은 재저작했다(골드 값은 종전 그대로, 다이아 추가).
 
 #### 흐름
 
@@ -1247,7 +1300,7 @@ CardPackOpener(→OpenedPack.TotalRefund) → CardPackRewardHandoff ─┤→ Cu
                                                                           → OnChanged → AlbumPageOverlayView.RefreshPage
 
 CollectionProductionManager.Harvest(→CurrencyGain) / HarvestAll(→Bucket) → CurrencyGainEffectPlayer.Play
-RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
+RankRewardManager.Claim(RankConfig.FillRewards → 재화별 Earn) → RankRewardClaimPopup → CurrencyGainEffectPlayer.BuildGain(Bucket)
 ```
 
 캐리어 소비는 **드레인 방식** — `TryConsume(CurrencyGainBucket _into)`가 호출자 버킷에 합친다(`out`으로 새 버킷을 내보내면 로비가 둘을 다시 합칠 API가 하나 더 필요해진다).
@@ -1261,7 +1314,7 @@ RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
 | `UI/Common/GoldGainEffectPlayer.cs` | `CurrencyGainEffectPlayer.cs` | 씬 인스턴스 0장(전량 런타임 자가설치)이라 개명 리스크 0 |
 | `RankTier.RewardGold` · `RankRewardInfo.RewardGold` | `Reward`(`CurrencyGain`) | 직렬화 아님 |
 
-**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`rewardGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. 개명하면 저작 자산 위험만 늘고 얻는 게 없다. (`duplicateRefundGold`는 2026-08-10 이관에서 삭제됐다 — 아래 절 참조.)
+**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. (`rewardGold`는 2026-08-10 랭크 보상 복수 재화화에서 `rewards` 목록으로 대체돼 사라졌다.) 개명하면 저작 자산 위험만 늘고 얻는 게 없다. (`duplicateRefundGold`는 2026-08-10 이관에서 삭제됐다 — 아래 절 참조.)
 
 #### 알려진 잔여 이슈 (스코프 밖)
 

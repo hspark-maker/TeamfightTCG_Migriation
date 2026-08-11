@@ -95,11 +95,17 @@ public static class OutgameDebugActions
 
     static void StepTier(int _step)
     {
-        int t_before = RankManager.GetInfo().TierIndex;
-        int t_after  = RankManager.StepTierForDebug(_step);
+        int t_before  = RankManager.GetInfo().TierIndex;
+        long t_points = RankManager.Points;
+        int t_after   = RankManager.StepTierForDebug(_step);
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel}");
+
+        // 캐리어에 실어 두면 씬 재진입 때 로비 디렉터가 소비해 승급·강등 연출을 그대로 재생한다 —
+        // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
+        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
+
+        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel} — 씬 재진입 시 연출 재생");
     }
 
     // 랭크 포인트 초기화(브론즈 1로)

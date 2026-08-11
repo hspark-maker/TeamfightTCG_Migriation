@@ -50,5 +50,8 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: 
+  cardExplain: "\uCDA9\uC804\uB9CC \uBD80\uD0C1 \uBC1B\uC558\uB294\uB370 \uB9C8\uC744
+    \uC804\uCCB4\uB97C \uC815\uC804\uC2DC\uD0A8 \uC804\uB825\uC774 \uC788\uB2E4.
+    \uBCF8\uC778\uC740 \u2018\uCD9C\uB825\uC774 \uC870\uAE08 \uC14C\uC744 \uBFD0\u2019\uC774\uB77C\uACE0
+    \uC8FC\uC7A5\uD55C\uB2E4."
   explainKeywords: 0

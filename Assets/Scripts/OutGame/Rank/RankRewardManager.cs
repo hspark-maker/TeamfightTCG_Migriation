@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // 랭크 티어 달성 보상의 static 단일 창구(도달한 보상은 순서 무관하게 수령)
@@ -56,11 +57,15 @@ public static class RankRewardManager
 
         var t_state = StateOf(_tierIndex);
 
+        // 매번 새 리스트 — 팝업이 Show 시점 스냅샷을 들고 있다가 나중에 소비하므로 공용 버퍼를 돌려주면 stale이 된다
+        var t_rewards = new List<RankReward>();
+        Config.FillRewards(_tierIndex, t_rewards);
+
         return new RankRewardInfo(
             _tierIndex,
             t_tier.DisplayName,
             t_tier.Badge,
-            t_tier.Reward,
+            t_rewards,
             t_state,
             t_state == ERankRewardState.Claimable && _tierIndex == TopClaimableIndex);
     }
@@ -72,9 +77,12 @@ public static class RankRewardManager
     {
         if (!CanClaim(_tierIndex)) return false;
 
-        if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return false;
+        var t_rewards = new List<RankReward>();
+        Config.FillRewards(_tierIndex, t_rewards);
 
-        CurrencyManager.Earn(t_tier.Reward.Type, t_tier.Reward.Amount);
+        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
+            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
+
         Slot.claimedTiers.Add(_tierIndex);
 
         // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
@@ -134,19 +142,19 @@ public readonly struct RankRewardInfo
     public readonly int TierIndex;
     public readonly string DisplayName;
     public readonly Sprite Badge;
-    public readonly CurrencyGain Reward;
+    public readonly IReadOnlyList<RankReward> Rewards;
     public readonly ERankRewardState State;
 
     // 수령 가능한 행 중 최상위 — 강조 표식 대상. 상태 enum에 섞지 않는다(State == Claimable 검사가 조용히 깨진다).
     public readonly bool IsTopClaimable;
 
-    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, CurrencyGain _reward,
+    public RankRewardInfo(int _tierIndex, string _displayName, Sprite _badge, IReadOnlyList<RankReward> _rewards,
                           ERankRewardState _state, bool _isTopClaimable)
     {
         TierIndex = _tierIndex;
         DisplayName = _displayName;
         Badge = _badge;
-        Reward = _reward;
+        Rewards = _rewards ?? System.Array.Empty<RankReward>();
         State = _state;
         IsTopClaimable = _isTopClaimable;
     }

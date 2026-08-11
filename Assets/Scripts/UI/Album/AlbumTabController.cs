@@ -6,7 +6,7 @@ using UnityEngine;
 public class AlbumTabController : MonoBehaviour
 {
     [Header("전체 보상")]
-    [SerializeField] AlbumRewardSlotView[] rewardSlots;
+    [SerializeField] CurrencyRewardSlotView[] rewardSlots;
     [SerializeField] AlbumGaugeView totalGauge = new AlbumGaugeView();
     [SerializeField] AlbumChestView albumChest = new AlbumChestView();
 
@@ -214,7 +214,7 @@ public class AlbumTabController : MonoBehaviour
         {
             if (rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(_rewards[t_i]);
+            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(_rewards[t_i].icon, _rewards[t_i].amount);
             else rewardSlots[t_i].Hide();
         }
 

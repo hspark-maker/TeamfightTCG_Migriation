@@ -49,5 +49,8 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: 
+  cardExplain: "\uC218\uC815 \uBFD4\uB85C \uBCF4\uC11D\uC744 \uCC3E\uACE0 \uBCF4\uD638\uB9C9\uC744
+    \uD3BC\uCE58\uB294 \uC0B0\uC591. \uBE5B\uB098\uB294 \uB3CC\uB9CC \uBCF4\uBA74
+    \uC784\uBB34\uB97C \uC78A\uACE0 \uC5BC\uB9C8\uC778\uC9C0 \uAC10\uC815\uBD80\uD130
+    \uC2DC\uC791\uD55C\uB2E4."
   explainKeywords: 0

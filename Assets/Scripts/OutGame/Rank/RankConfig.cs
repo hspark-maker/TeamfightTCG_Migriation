@@ -10,12 +10,12 @@ public class RankConfig : ScriptableObject
     public const int DivisionsPerGrade = 4;
 
     // 승리 시 더할 랭크 포인트
-    [Tooltip("승리 시 더할 랭크 포인트.")]
-    public long winPoints = 10;
+    [Tooltip("승리 시 더할 랭크 포인트. pointsPerDivision과 같게 두면 1승 = 1단계 상승이 된다.")]
+    public long winPoints = 25;
 
     // 패배 시 뺄 랭크 포인트(양수로 입력)
-    [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다).")]
-    public long losePoints = 5;
+    [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다). pointsPerDivision과 같게 두면 1패 = 1단계 강등이 된다.")]
+    public long losePoints = 25;
 
     // 첫 티어 미도달(언랭크) 상태의 표시명
     [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
@@ -30,11 +30,11 @@ public class RankConfig : ScriptableObject
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
-        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100,   pointsPerDivision = 25, rewardGold = 100,  rewardGoldPerDivision = 50 },
-        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 200, pointsPerDivision = 25, rewardGold = 300,  rewardGoldPerDivision = 50 },
-        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 25, rewardGold = 500,  rewardGoldPerDivision = 100 },
-        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewardGold = 900,  rewardGoldPerDivision = 100 },
-        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewardGold = 1400, rewardGoldPerDivision = 200 },
+        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 25, rewards = GoldOnly(100,  50) },
+        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 200, pointsPerDivision = 25, rewards = GoldOnly(300,  50) },
+        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 25, rewards = GoldOnly(500,  100) },
+        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewards = GoldOnly(900,  100) },
+        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewards = GoldOnly(1400, 200) },
     };
 
     /// <summary>티어별 AI 카드 레벨(index = 티어 인덱스). 난이도 곡선의 단일 진실원.
@@ -129,10 +129,40 @@ public class RankConfig : ScriptableObject
             t_division,
             $"{t_grade.displayName} {t_division}",
             t_grade.badge,
-            t_grade.entryPoints + t_step * t_grade.pointsPerDivision,
-            new CurrencyGain(t_grade.rewardType, t_grade.rewardGold + t_step * t_grade.rewardGoldPerDivision));
+            t_grade.entryPoints + t_step * t_grade.pointsPerDivision);
         return true;
     }
+
+    /// <summary>티어 _index의 보상을 단계 배율까지 적용해 _sink에 담는다(Clear는 이 메서드가 한다).
+    /// 티어 스냅샷과 분리해 둔다 — 행 상태 갱신마다 보상 리스트를 만들 이유가 없다.</summary>
+    public void FillRewards(int _index, List<RankReward> _sink)
+    {
+        if (_sink == null) return;
+        _sink.Clear();
+
+        if (grades == null || _index < 0 || _index >= TierCount) return;
+
+        RankGradeConfig t_grade = grades[_index / DivisionsPerGrade];
+        if (t_grade == null || t_grade.rewards == null) return;
+
+        long t_step = _index % DivisionsPerGrade;
+
+        for (int t_i = 0; t_i < t_grade.rewards.Count; t_i++)
+        {
+            RankRewardDef t_def = t_grade.rewards[t_i];
+            if (t_def.amount <= 0) continue;
+
+            _sink.Add(new RankReward(
+                new CurrencyGain(t_def.currency, t_def.amount + t_step * t_def.amountPerDivision),
+                t_def.icon));
+        }
+    }
+
+    static List<RankRewardDef> GoldOnly(long _amount, long _amountPerDivision)
+        => new List<RankRewardDef>
+        {
+            new RankRewardDef { currency = ECurrencyType.Gold, amount = _amount, amountPerDivision = _amountPerDivision },
+        };
 
     // 카드 번호를 고정 규칙으로 흩는다(플랫폼·런타임 무관). 난수원이 아니라 파생 해시다.
     static uint Mix(uint _a)
@@ -178,24 +208,52 @@ public class RankGradeConfig
     [Tooltip("단계 간 포인트 간격. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. 저작 규칙: entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다.")]
     public long pointsPerDivision;
 
-    // 이 등급 보상으로 지급할 재화 종류(4단계 공용)
-    [Tooltip("이 등급 보상으로 지급할 재화 종류(4단계 공용).")]
-    public ECurrencyType rewardType = ECurrencyType.Gold;
+    // 이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다)
+    [Tooltip("이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다). 리스트 순서 = 표시 순서. " +
+             "비워두면 수령해도 지급이 없다(진행만 넘어간다).")]
+    public List<RankRewardDef> rewards = new List<RankRewardDef>();
+}
 
-    // 이 등급 1단계 달성 시 1회 수령하는 골드
-    [Tooltip("이 등급 1단계 달성 시 1회 수령하는 골드. 0이면 수령해도 지급이 없다(진행만 넘어간다).")]
-    public long rewardGold;
+// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다)
+[Serializable]
+public struct RankRewardDef
+{
+    // 지급할 재화 종류
+    [Tooltip("지급할 재화 종류.")]
+    public ECurrencyType currency;
 
-    // 단계마다 늘어나는 보상 증가분
-    [Tooltip("단계마다 늘어나는 보상 증가분. 단계 N의 보상 = rewardGold + (N-1) * 이 값.")]
-    public long rewardGoldPerDivision;
+    // 보상 슬롯 아이콘(선택)
+    [Tooltip("보상 슬롯 아이콘. 비워두면 슬롯 프리팹에 저작된 스프라이트를 그대로 쓴다.")]
+    public Sprite icon;
+
+    // 이 등급 1단계 지급액
+    [Tooltip("이 등급 1단계 지급액. 0 이하면 이 항목은 4단계 전부에서 표시도 지급도 되지 않는다(단계 증가분이 있어도 마찬가지) — " +
+             "항목을 지우지 않고 잠시 끄고 싶을 때 쓴다. 1단계만 건너뛰고 2단계부터 주는 저작은 지원하지 않는다.")]
+    public long amount;
+
+    // 단계마다 늘어나는 증가분
+    [Tooltip("단계마다 늘어나는 증가분. 단계 N의 지급액 = amount + (N-1) * 이 값. 0이면 4단계 모두 같은 액수를 준다.")]
+    public long amountPerDivision;
+}
+
+// 단계 배율이 적용된 보상 1건(저작값의 파생 스냅샷)
+public readonly struct RankReward
+{
+    public readonly CurrencyGain Gain;
+    public readonly Sprite Icon;
+
+    public RankReward(CurrencyGain _gain, Sprite _icon)
+    {
+        Gain = _gain;
+        Icon = _icon;
+    }
 }
 
 // 티어 1개의 파생 스냅샷(RankConfig가 등급 행에서 계산해 내주는 값)
 public readonly struct RankTier
 {
     // 조회 실패용 빈 스냅샷 — 실패 판정은 반드시 TryGetTier 반환값으로(None은 브론즈 1과 값으로 구분되지 않는다)
-    public static readonly RankTier None = new RankTier(0, ERankGrade.Bronze, 0, null, null, 0, CurrencyGain.None);
+    public static readonly RankTier None = new RankTier(0, ERankGrade.Bronze, 0, null, null, 0);
 
     public readonly int Index;
     public readonly ERankGrade Grade;
@@ -203,9 +261,8 @@ public readonly struct RankTier
     public readonly string DisplayName;
     public readonly Sprite Badge;
     public readonly long RequiredPoints;
-    public readonly CurrencyGain Reward;
 
-    public RankTier(int _index, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _requiredPoints, CurrencyGain _reward)
+    public RankTier(int _index, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _requiredPoints)
     {
         Index = _index;
         Grade = _grade;
@@ -213,6 +270,5 @@ public readonly struct RankTier
         DisplayName = _displayName != null ? _displayName : string.Empty;
         Badge = _badge;
         RequiredPoints = _requiredPoints;
-        Reward = _reward;
     }
 }
