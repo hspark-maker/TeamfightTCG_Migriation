@@ -40,8 +40,9 @@ public class AlbumPageFlipView
              "끄면 예전 접힘(Y회전 = 가로 압축)으로 돌아간다. 뜨는 데 실패한 프레임도 접힘으로 물러난다.")]
     [SerializeField] bool useRoll = true;
 
-    [Tooltip("말린 통의 굵기(장 폭 대비 반지름). 클수록 굵게 말리고 한 바퀴가 길어진다.")]
-    [Range(0.04f, 0.4f)] [SerializeField] float rollRadiusRatio = 0.13f;
+    [Tooltip("말린 통의 굵기(장 폭 대비 반지름). 작을수록 여러 바퀴 도르르 말리고, 클수록 굵은 통이 한 번 크게 휜다.\n" +
+             "감기는 총 각도 = 1/이 값 라디안 — 0.16이면 약 한 바퀴, 0.32면 반 바퀴, 1이면 57도만 휜다.")]
+    [Range(0.04f, 1f)] [SerializeField] float rollRadiusRatio = 0.13f;
 
     [Tooltip("말린 구간을 몇 조각으로 나눌지. 낮으면 통이 각져 보이고, 높이면 정점만 늘어난다.")]
     [Range(8, 64)] [SerializeField] int rollSegments = 28;
