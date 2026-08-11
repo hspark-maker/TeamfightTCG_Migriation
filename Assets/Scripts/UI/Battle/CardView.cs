@@ -770,6 +770,13 @@ public class CardView : MonoBehaviour
         await WaitHpRollSettled();
         float t_duration = _d < 0f ? GameTiming.Battle.DeathDuration : _d;
 
+        // 카드에 **붙어 있던** 연출(피격 파편·회복 프레임 등)은 사망과 함께 지운다.
+        // 카드는 알파로만 사라지고(HideSlot도 페이드다) 붙은 파티클은 그 페이드에 끼지 않으므로,
+        // 남은 수명 동안 빈 자리에 그대로 떠 있다 — "죽었는데 프레임만 남는다"의 정체.
+        // 풀 반납은 각자의 타이머가 그대로 처리한다(여기선 재생만 끊는다).
+        foreach (ParticleSystem t_ps in GetComponentsInChildren<ParticleSystem>(true))
+            t_ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         // 파티클은 **카드에 붙이지 않는다**. 붙이면 사망 직후 HideSlot이 카드를 끄면서 별가루도 같이
         // 꺼져 뚝 끊긴다(FinishImpact가 월드 스폰인 것과 같은 이유). 좌표는 죽는 그 자리로 고정 —
         // 카드는 떠오르지만 바닥 파동은 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
