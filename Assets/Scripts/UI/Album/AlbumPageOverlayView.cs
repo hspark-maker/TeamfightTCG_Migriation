@@ -24,6 +24,10 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("선택 — 지금 열어둔 테마 이름(CollectionTitle). 미배선이면 저작된 글자를 그대로 둔다.")]
     [SerializeField] TMP_Text titleLabel;
 
+    [Tooltip("한 페이지가 늘 차지하는 칸 수(Grid_Slots는 3열 = 3x3이라 9). 저작 칸이 이보다 적으면 빈 칸으로 채워\n" +
+             "페이지마다 격자가 들쭉날쭉해지지 않게 한다. 저작 칸이 더 많으면 그만큼 그대로 늘린다.")]
+    [SerializeField] int pageSlotCount = 9;
+
     [Header("페이지 넘기기")]
     [SerializeField] Button prevButton;
     [SerializeField] Button nextButton;
@@ -141,16 +145,32 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void ApplyInteractable()
     {
-        bool t_locked = IsLocked;
+        // 색으로 잠긴 티를 내는 건 **세션 잠금**뿐이다. 넘김 잠금은 0.3초짜리라 Button의 Color Tint가
+        // 켜졌다 꺼지는 것이 "dim이 풀렸다 돌아온다 / 칸이 깜빡인다"로 보인다.
+        // 짧은 잠금은 색을 건드리지 않고 눌렀을 때 걸러낸다(HandleCloseRequest·HandleStepRequest).
+        bool t_dimmed = m_sessionLocked;
 
-        if (dimButton != null) dimButton.interactable = !t_locked;
-        if (closeButton != null) closeButton.interactable = !t_locked;
-        if (swipeDetector != null) swipeDetector.Interactable = !t_locked;
+        if (dimButton != null) dimButton.interactable = !t_dimmed;
+        if (closeButton != null) closeButton.interactable = !t_dimmed;
+        if (swipeDetector != null) swipeDetector.Interactable = !IsLocked;
 
-        // 잠금 해제는 페이지 수가 정하던 원래 값으로 되돌린다
-        bool t_steppable = !t_locked && m_theme != null && m_theme.Pages.Count > 1;
+        bool t_steppable = !t_dimmed && m_theme != null && m_theme.Pages.Count > 1;
         if (prevButton != null) prevButton.interactable = t_steppable;
         if (nextButton != null) nextButton.interactable = t_steppable;
+    }
+
+    /// <summary>닫기 요청. 잠금은 색이 아니라 여기서 막는다 — 넘김 도중 눌러도 아무 일이 없다.</summary>
+    void HandleCloseRequest()
+    {
+        if (IsLocked) return;
+        Close();
+    }
+
+    /// <summary>페이지 스테퍼 요청. 스와이프와 같은 잠금 규칙을 탄다.</summary>
+    void HandleStepRequest(int _dir)
+    {
+        if (IsLocked || m_flipping || m_dragging) return;
+        Step(_dir);
     }
 
     void Awake()
@@ -161,10 +181,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (closeButton != null && closeButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumPageOverlayView] Button_Close에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
 
-        if (dimButton != null) dimButton.onClick.AddListener(Close);
-        if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (prevButton != null) prevButton.onClick.AddListener(() => Step(-1));
-        if (nextButton != null) nextButton.onClick.AddListener(() => Step(1));
+        if (dimButton != null) dimButton.onClick.AddListener(HandleCloseRequest);
+        if (closeButton != null) closeButton.onClick.AddListener(HandleCloseRequest);
+        if (prevButton != null) prevButton.onClick.AddListener(() => HandleStepRequest(-1));
+        if (nextButton != null) nextButton.onClick.AddListener(() => HandleStepRequest(1));
 
         // 회전 대상은 Panel_Page가 아니라 slotRoot(Grid_Slots)다 — 같은 사각형이면서 부모 레이아웃이
         // anchoredPosition을 안 덮어쓰는 유일한 노드라 축 보정이 되돌려지지 않는다
@@ -186,7 +206,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         AlbumInsertMask.OnChanged += HandleChanged;
         if (swipeDetector != null)
         {
-            swipeDetector.OnSwipe       += Step;
+            swipeDetector.OnSwipe        += HandleSwipe;
+            swipeDetector.OnDragBegin    += HandleDragBegin;
             swipeDetector.OnDragProgress += HandleDragProgress;
             swipeDetector.OnDragCancel   += HandleDragCancel;
         }
@@ -202,7 +223,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         AlbumInsertMask.OnChanged -= HandleChanged;
         if (swipeDetector != null)
         {
-            swipeDetector.OnSwipe        -= Step;
+            swipeDetector.OnSwipe        -= HandleSwipe;
+            swipeDetector.OnDragBegin    -= HandleDragBegin;
             swipeDetector.OnDragProgress -= HandleDragProgress;
             swipeDetector.OnDragCancel   -= HandleDragCancel;
         }
@@ -214,6 +236,11 @@ public class AlbumPageOverlayView : MonoBehaviour
         CancelFlip();
 
         transition.HandleDisabled(gameObject);
+    }
+
+    void OnDestroy()
+    {
+        pageFlip.Dispose();
     }
 
     void HandleChanged()
@@ -273,7 +300,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void EnsurePageCapacity(AlbumTheme _theme)
     {
-        int t_max = 0;
+        int t_max = Mathf.Max(0, this.pageSlotCount);   // 빈 칸 채움분까지 미리 확보한다
         for (int t_i = 0; t_i < _theme.Pages.Count; t_i++)
             t_max = Mathf.Max(t_max, _theme.Pages[t_i].Cards.Count);
 
@@ -293,7 +320,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_pageIndex = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
         var t_cards = _theme.Pages[t_pageIndex].Cards;
 
-        EnsureSlotCapacity(_slots, _root, t_cards.Count);
+        // 저작 칸이 모자란 페이지도 격자를 다 채운다 — 채움 칸은 카드도 번호도 없는 순수 빈 포켓이다
+        int t_shown = Mathf.Max(t_cards.Count, Mathf.Max(0, this.pageSlotCount));
+
+        EnsureSlotCapacity(_slots, _root, t_shown);
 
         // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 페이지마다 1로 되돌아가면 번호가 자리를 못 가리킨다
         int t_baseNumber = 0;
@@ -307,9 +337,18 @@ public class AlbumPageOverlayView : MonoBehaviour
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
             var t_slot = _slots[t_i];
-            if (t_i >= t_cards.Count)
+            if (t_i >= t_shown)
             {
                 t_slot.gameObject.SetActive(false);
+                continue;
+            }
+
+            // 격자 채움 칸 — 도감에 없는 자리라 번호를 찍지 않는다(0이면 번호가 숨는다)
+            if (t_i >= t_cards.Count)
+            {
+                t_slot.gameObject.SetActive(true);
+                t_slot.Bind(null, false, 0);
+                if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
                 continue;
             }
 
@@ -399,18 +438,32 @@ public class AlbumPageOverlayView : MonoBehaviour
         FlipStepAsync(_dir).Forget();
     }
 
+    /// <summary>손짓 하나는 넘김 하나만 쓴다. 감지기가 어떤 이유로 스와이프를 두 번 통지해도
+    /// (오래 끌다 방향을 되짚는 손짓 등) 두 장이 넘어가지 않는다 — 무장은 새 손가락이 내려앉을 때만 선다.</summary>
+    void HandleSwipe(int _dir)
+    {
+        if (!m_dragArmed) return;
+        m_dragArmed = false;   // 이 손짓은 여기서 소진된다
+
+        if (m_flipping || IsLocked) return;
+
+        Step(_dir);
+    }
+
+    /// <summary>새 손가락이 내려앉았다 — 여기서만 무장한다.</summary>
+    void HandleDragBegin()
+    {
+        m_dragArmed = !m_flipping && !IsLocked;
+    }
+
     /// <summary>손가락이 끄는 만큼 종이를 세운다. 진행도는 <b>0.5(edge-on)에서 멈춘다</b> —
     /// 거기가 페이지를 교체하는 지점이라, 넘길지 말지 확정되기 전에 넘어가면 되돌릴 수 없다.
     /// 넘김 확정 임계는 감지기(snapRatio·flick)가 정한다. 여기는 손가락과 자세를 잇기만 한다.</summary>
     void HandleDragProgress(float _norm)
     {
-        // 시작 통지(0)는 잠금 여부와 무관하게 래치만 세운다 — 여기서 걸러버리면
-        // 잠금이 풀린 뒤 들어오는 이동 통지가 무장 없이 접힘을 시작한다.
-        if (Mathf.Approximately(_norm, 0f))
-        {
-            m_dragArmed = !m_flipping && !IsLocked;
-            return;
-        }
+        // 진행도 0은 무장 신호가 아니다 — 끌다가 시작점을 되지나가도 0이 온다.
+        // 무장은 OnDragBegin 하나만 세운다(HandleDragBegin).
+        if (Mathf.Approximately(_norm, 0f)) return;
 
         if (m_flipping || IsLocked) return;
         if (!m_dragArmed) return;   // 이 손짓은 이미 소비됐다(넘김으로 확정됐거나 취소됐다)
@@ -490,9 +543,8 @@ public class AlbumPageOverlayView : MonoBehaviour
             m_underPageIndex = t_index;
         }
 
-        int t_currentOrder = slotRoot.GetSiblingIndex();
-        underSlotRoot.SetSiblingIndex(t_currentOrder);
-        slotRoot.SetSiblingIndex(t_currentOrder + 1);
+        // 순서의 기준은 넘김 뷰가 정한다 — 말림 중에는 넘기는 표면이 슬롯 뿌리가 아니라 그것을 떠 온 판이다
+        pageFlip.OrderUnderBelowPage(underSlotRoot);
         underSlotRoot.gameObject.SetActive(true);
     }
 

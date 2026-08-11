@@ -19,6 +19,8 @@ public class CardVisualView : MonoBehaviour
 {
     [SerializeField] Image portrait;          // 카드 아트
     [SerializeField] TMP_Text nameText;       // 카드 이름(미소유 시 숨김)
+    [Tooltip("이름 뒤 판(TextBG). 이름과 한 몸이라 늘 같이 켜고 끈다 — 따로 두면 글자만 사라지고 검은 띠가 남는다. 미배선이면 조용히 건너뛴다.")]
+    [SerializeField] GameObject nameBackground;
     [SerializeField] GameObject lockOverlay;  // 미소유 시 활성(어두운 오버레이 + 잠김 표시)
 
     [Header("인게임 미러 요소")]
@@ -63,6 +65,23 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] bool showSynergies = true;
     // 표시 최대 배지 수. 기본값은 인게임과 같은 코드 상수 하나에서 온다(각자 3을 적어두면 한쪽만 바뀌어도 조용히 갈라진다).
     [SerializeField] int  synergyMaxBadges = CardVisualRules.MaxSynergyBadges;
+
+    // 프레임과 아트만 남기는 런타임 마스크(도감 "일러스트만 보기"). 프리팹 스위치(show*)를 끄지 않고 **그 위에 얹는다** —
+    // 직접 끄면 껐다 켤 때 프리팹이 원래 무엇을 보이던 타일이었는지(작은 타일은 이름·HP가 애초에 꺼져 있다)를 잃는다.
+    bool m_artOnly;
+
+    // show* 는 프리팹의 뜻, m_artOnly는 지금 화면의 뜻이다. 소비 지점이 둘을 각자 곱하면 한 군데 빠뜨렸을 때
+    // 그 요소만 살아남으므로, 곱은 여기 한 줄씩에서만 한다.
+    bool ShowName      => this.showName      && !this.m_artOnly;
+    bool ShowHp        => this.showHp        && !this.m_artOnly;
+    bool ShowLevel     => this.showLevel     && !this.m_artOnly;
+    bool ShowKeywords  => this.showKeywords  && !this.m_artOnly;
+    bool ShowSynergies => this.showSynergies && !this.m_artOnly;
+
+    /// <summary>프레임·아트만 남기고 카드 위 정보(이름·HP·레벨·키워드 아이콘·프레임 장식·시너지 배지)를 전부 가린다.
+    /// 값만 세우고 다시 그리지는 않는다 — 아이콘/배지는 Destroy + Instantiate라 갱신 시점을 호출부가 쥐어야 한다
+    /// (호출부는 이걸 세운 뒤 <see cref="Bind"/>를 다시 태운다).</summary>
+    public void SetArtOnly(bool _on) => this.m_artOnly = _on;
 
     // ── 인게임 좌표를 uGUI로 옮기는 환산값 ──────────────────────────────────
     //
@@ -121,20 +140,23 @@ public class CardVisualView : MonoBehaviour
         // 프레임은 카드별로 바뀌지 않는다. 스프라이트 미배선 시 흰 사각형이 뜨는 것만 막는다.
         if (this.frame != null) this.frame.enabled = this.frame.sprite != null;
 
-        if (this.nameText != null)
         {
             // 미소유는 이름을 숨겨 실루엣만 노출.
-            bool t_showName = _owned && this.showName;
-            this.nameText.gameObject.SetActive(t_showName);
-            if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+            bool t_showName = _owned && this.ShowName;
+            if (this.nameBackground != null) this.nameBackground.SetActive(t_showName);
+            if (this.nameText != null)
+            {
+                this.nameText.gameObject.SetActive(t_showName);
+                if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+            }
         }
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
-        SetHpDisplay(_card, _owned && this.showHp, _mine);
-        SetLevelDisplay(_card, _owned && this.showLevel, _mine);
-        RefreshKeywordIcons(_card, _owned && this.showKeywords);
-        RefreshKeywordFrames(_card, _owned && this.showKeywords);
-        RefreshSynergyBadges(_card, _owned && this.showSynergies);
+        SetHpDisplay(_card, _owned && this.ShowHp, _mine);
+        SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
+        RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
+        RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
+        RefreshSynergyBadges(_card, _owned && this.ShowSynergies);
 
         // 미소유 = 잠김 오버레이 on(아트를 어둡게 덮어 실루엣화).
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
@@ -154,8 +176,8 @@ public class CardVisualView : MonoBehaviour
         // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
         if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
 
-        SetHpDisplay(_card, _owned && this.showHp, _mine);
-        SetLevelDisplay(_card, _owned && this.showLevel, _mine);
+        SetHpDisplay(_card, _owned && this.ShowHp, _mine);
+        SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
     }
 
     /// <summary>현재 표시 주체의 레벨에 맞는 진화 아트만 다시 그린다.</summary>
@@ -177,8 +199,8 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card == null) return;
 
-        RefreshKeywordIcons(_card, _owned && this.showKeywords);
-        RefreshKeywordFrames(_card, _owned && this.showKeywords);
+        RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
+        RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
     }
 
     /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
@@ -195,7 +217,7 @@ public class CardVisualView : MonoBehaviour
 
         int t_to = DeckPower.MaxHpOf(_card);
 
-        if (this.hpText == null || !(_owned && this.showHp) || _duration <= 0f || t_to <= _from)
+        if (this.hpText == null || !(_owned && this.ShowHp) || _duration <= 0f || t_to <= _from)
         {
             RefreshHp(_card, _owned);
             return null;

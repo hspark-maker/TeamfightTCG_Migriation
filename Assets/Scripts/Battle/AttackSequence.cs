@@ -198,7 +198,11 @@ public static class AttackSequence
         AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
         float t_approachFactor = BattleFinisher.ApproachDurationFactor;
-        float t_hitDelay = (_effect?.hitDelay ?? 0f) * t_approachFactor;
+        // 비행 시간엔 바닥값이 있다. hitDelay가 0(또는 AttackEffect 없음)이면 투사체가 스폰된 프레임에
+        // 그대로 파괴돼 아무것도 안 보인다 — 원거리는 "날아가서 맞는다"가 규칙이므로 최소 비행은 보장한다.
+        // 히트 시점도 같은 값을 쓴다(투사체 도착 = 피해·피격 연출).
+        float t_hitDelay = Mathf.Max((_effect?.hitDelay ?? 0f) * t_approachFactor,
+                                     GameTiming.Battle.RangedFlightMin * t_approachFactor);
 
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
@@ -211,7 +215,8 @@ public static class AttackSequence
         _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
         LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform,
-                         t_hitDelay, t_flip, t_approachFactor).Forget();
+                         t_hitDelay, _attacker != null ? _attacker.VfxSortingLayerId : _defender.VfxSortingLayerId,
+                         t_flip, t_approachFactor).Forget();
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -676,7 +681,8 @@ public static class AttackSequence
         SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
         _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
-        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay, t_flip).Forget();
+        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay,
+                         _attacker != null ? _attacker.VfxSortingLayerId : _defender.VfxSortingLayerId, t_flip).Forget();
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -953,10 +959,28 @@ public static class AttackSequence
     static UniTask HitStop(Func<UniTask> _beat)
         => _beat?.Invoke() ?? UniTask.CompletedTask;
 
+    // 투사체·착탄 정렬. 카드 아트(최대 31: DieOverlay)보다 위, 피격 파티클(35·40)보다는 아래 —
+    // 날아오는 구체가 카드를 가리되 착탄 순간의 피격 연출이 그 위에 얹힌다.
+    const int PROJECTILE_SORTING_ORDER = 33;
+
+    /// <param name="_sortingLayerId">공격자 카드의 정렬 레이어. 구매 에셋 투사체는 대개 Default 레이어라
+    /// 그대로 두면 Card 레이어인 카드/배경 **뒤로 깔려 아예 안 보인다** — 다른 연출 스폰 경로가 전부
+    /// BattleVfx.ApplySorting을 타는 것과 같은 이유로 여기서도 맞춘다.</param>
     static async UniTask LaunchProjectile(ProjectileData _proj, Transform _attacker, Transform _defender,
-                                          float _duration, bool _flipOffset = false, float _timingFactor = 1f)
+                                          float _duration, int _sortingLayerId, bool _flipOffset = false,
+                                          float _timingFactor = 1f)
     {
-        if (_proj.prefab == null || _attacker == null || _defender == null) return;
+        if (_attacker == null || _defender == null) return;
+
+        // 카드가 자기 투사체를 안 가졌으면 키워드 기본 투사체로 떨어진다 — 원거리는 카드 고유 연출이 아니라
+        // **키워드가 만드는 규칙 연출**이라, 카드별 배선 누락이 "발사체 없는 원거리 공격"으로 새면 안 된다.
+        // (키워드 연출 미리보기처럼 원거리가 아닌 카드에 키워드만 얹는 경로도 여기서 살아난다.)
+        if (_proj.prefab == null && BattleVfx.TryGetEntry(BattleVfxId.RangedProjectile, out VfxEntry t_fallback))
+        {
+            _proj.prefab      = t_fallback.prefab;
+            _proj.localOffset = t_fallback.localOffset;
+        }
+        if (_proj.prefab == null) return;
 
         float t_spawnDelay = _proj.spawnDelay * Mathf.Max(0f, _timingFactor);
         if (t_spawnDelay > 0f)
@@ -967,6 +991,7 @@ public static class AttackSequence
         Vector3 t_end    = _defender.position;
 
         GameObject t_proj = UnityEngine.Object.Instantiate(_proj.prefab, t_start, Quaternion.identity);
+        BattleVfx.ApplySorting(t_proj, _sortingLayerId, PROJECTILE_SORTING_ORDER);
         Vector3 t_dir = t_end - t_start;
         if (t_dir != Vector3.zero)
             t_proj.transform.right = t_dir.normalized;
@@ -981,7 +1006,8 @@ public static class AttackSequence
         {
             string t_id = _proj.impactPrefab.GetInstanceID().ToString();
             ParticlePooler.Register(t_id, _proj.impactPrefab);
-            ParticlePooler.Spawn(t_id, t_end, Quaternion.identity);
+            GameObject t_impact = ParticlePooler.Spawn(t_id, t_end, Quaternion.identity);
+            BattleVfx.ApplySorting(t_impact, _sortingLayerId, PROJECTILE_SORTING_ORDER);
         }
     }
 }
