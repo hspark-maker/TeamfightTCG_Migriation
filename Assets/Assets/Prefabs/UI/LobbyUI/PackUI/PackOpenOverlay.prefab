@@ -888,10 +888,6 @@ MonoBehaviour:
   sealTearDuration: 0.45
   cardPullDelay: 0.12
   cardPullDuration: 0.55
-  burstEffect: {fileID: 0}
-  shakeTarget: {fileID: 5791923598284961103}
-  shakeDuration: 0.3
-  shakeStrength: 48
   pullHold: 0.35
   packSagSquash: {x: 0.97, y: 0.93}
   packExitDrop: 2400
