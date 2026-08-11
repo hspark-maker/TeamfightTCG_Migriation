@@ -34,7 +34,8 @@ public class PageRollGraphic : MaskableGraphic
     }
 
     Texture  m_texture;
-    RollFace m_face = RollFace.Both;
+    RollFace m_face   = RollFace.Both;
+    Vector2  m_tiling = Vector2.one;
     float   m_amount;              // 0 = 평평, 1 = 책등까지 다 말림
     int     m_dir = 1;             // +1이면 왼쪽이 책등
     float   m_radiusRatio = 0.13f;
@@ -63,6 +64,18 @@ public class PageRollGraphic : MaskableGraphic
 
         m_texture = _texture;
         this.SetMaterialDirty();
+        this.SetVerticesDirty();
+    }
+
+    /// <summary>그림을 장 안에서 몇 번 반복할지. 뒤판을 칸마다 한 장씩(3x3) 붙일 때 쓴다 —
+    /// 종이 한 면에 카드 뒷면 아홉 장이 있는 것이 실제 앨범의 그림이다.
+    /// ⚠ 1을 넘기려면 텍스처 wrapMode가 Repeat여야 한다(Clamp면 가장자리 픽셀이 늘어붙는다).</summary>
+    public void SetTiling(Vector2 _tiling)
+    {
+        var t_tiling = new Vector2(Mathf.Max(0.01f, _tiling.x), Mathf.Max(0.01f, _tiling.y));
+        if (t_tiling == m_tiling) return;
+
+        m_tiling = t_tiling;
         this.SetVerticesDirty();
     }
 
@@ -245,20 +258,25 @@ public class PageRollGraphic : MaskableGraphic
         // 법선·탄젠트까지 기본값으로 채운다 — 0 벡터가 섞이면 그 채널을 읽는 셰이더에서 판이 검게 나온다
         for (int t_i = 0; t_i < 4; t_i++) m_quad[t_i] = UIVertex.simpleVert;
 
+        // UV는 종이 위 좌표에 반복 횟수만 곱한다 — 접힌 자리에서도 칸 경계가 종이를 따라 같이 휜다
+        float t_u0 = _uv0 * m_tiling.x;
+        float t_u1 = _uv1 * m_tiling.x;
+        float t_vT = m_tiling.y;
+
         m_quad[0].position = new Vector3(_x0, t_bot0);
-        m_quad[0].uv0      = new Vector2(_uv0, 0f);
+        m_quad[0].uv0      = new Vector2(t_u0, 0f);
         m_quad[0].color    = t_c0;
 
         m_quad[1].position = new Vector3(_x0, t_top0);
-        m_quad[1].uv0      = new Vector2(_uv0, 1f);
+        m_quad[1].uv0      = new Vector2(t_u0, t_vT);
         m_quad[1].color    = t_c0;
 
         m_quad[2].position = new Vector3(_x1, t_top1);
-        m_quad[2].uv0      = new Vector2(_uv1, 1f);
+        m_quad[2].uv0      = new Vector2(t_u1, t_vT);
         m_quad[2].color    = t_c1;
 
         m_quad[3].position = new Vector3(_x1, t_bot1);
-        m_quad[3].uv0      = new Vector2(_uv1, 0f);
+        m_quad[3].uv0      = new Vector2(t_u1, 0f);
         m_quad[3].color    = t_c1;
 
         _vh.AddUIVertexQuad(m_quad);
