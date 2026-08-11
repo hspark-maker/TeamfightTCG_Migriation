@@ -118,6 +118,35 @@ public class PackCardView : MonoBehaviour
     [SerializeField] float newBadgeOvershoot = 0.18f;
     [SerializeField] float newBadgeDuration = 0.2f;
 
+    // 중복 표식 띠. 환급 칩과 반대로 카드 아트 **위**를 지나고, 한 번 그어지면 퇴장하지 않는다 —
+    // 칩이 사라지는 이유(순간의 정산이 카드의 속성처럼 굳으면 안 된다)의 정확한 뒤집힘이다.
+    // 중복은 그 카드의 속성이라 굳어야 맞고, 그래서 결과 격자까지 따라간다.
+    //
+    // 자리·크기·색·문구는 전부 프리팹이 쥔다. 코드가 미는 것은 알파와 배율 둘뿐이라,
+    // 어디에 어떤 모양으로 앉히든 연출은 그대로 성립한다 — 폭을 코드가 정하면 프리팹을 옮긴 순간 어긋난다.
+    [Header("중복 표식 띠")]
+    [Tooltip("띠 노드(중복일 때만). **UIEffectReplica가 붙지 않은 노드**여야 한다 — 붙어 있으면 " +
+             "결과 격자의 탈채도가 그 사슬을 타고 번져 띠까지 회색이 된다. " +
+             "이름판·HP판을 가리지 않는 자리에 둘 것. " +
+             "Image·TMP 모두 Raycast Target을 꺼야 더미 스와이프를 가로채지 않는다.")]
+    [SerializeField] GameObject dupeBand;
+    [Tooltip("띠 바탕. 알파는 프리팹 값이 곧 최종 농도다 — 코드는 그 값을 적어 뒀다가 되돌리기만 한다.")]
+    [SerializeField] Graphic dupeBandFill;
+    [Tooltip("띠 위 문구. 자동 축소(Auto Size)를 켜 두면 문구를 바꿔도 띠를 넘지 않는다.")]
+    [SerializeField] Graphic dupeBandLabel;
+    [Tooltip("카드가 드러난 뒤 중복 표식이 등장하기까지의 뜸. 0이 기본 — NEW 워드마크가 뜸 없이 곧장 꽂히므로 " +
+             "중복도 같은 박자로 온다. 띠와 환급 칩이 **함께** 이 값을 쓴다.")]
+    [FormerlySerializedAs("dupeBandDelay")] [SerializeField] float dupeRevealDelay;
+    [Tooltip("띠가 즉시 이만큼 커진 뒤 제자리로 꽂힌다(배율 증가분). NEW 워드마크와 같은 규약 — " +
+             "서서히 커지면 타격이 아니라 숨쉬기가 된다.")]
+    [SerializeField] float dupeBandOvershoot = 0.18f;
+    [Tooltip("제자리로 회수하는 시간. NEW 워드마크와 같은 값으로 두면 신규·중복이 같은 박자로 읽힌다.")]
+    [FormerlySerializedAs("dupeBandOpenDuration")] [SerializeField] float dupeBandPopDuration = 0.2f;
+    [Tooltip("결과 격자에도 띠를 남길지. 남기면 중복이 탈채도 하나가 아니라 문구로도 갈린다 — " +
+             "전부 중복인 팩에서는 비교 대상이 없어 탈채도만으로는 판단이 서지 않는다. " +
+             "다만 격자 배율이 0.42배라 720폭 기기에서 글자가 20px까지 내려간다: 잡음으로 보이면 끈다.")]
+    [SerializeField] bool dupeBandInResult = true;
+
     // 중복 환급 칩. 카드 위가 아니라 카드 **밖 아래**에 앉는다 — 이 배지가 답하는 질문("이 카드로 무엇을 얻었나")은
     // 아트가 답하는 질문("무엇을 뽑았나")과 다른 축이라, 하나가 다른 하나를 덮으면 둘 다 죽는다.
     // NEW 워드마크가 위쪽 밖, 환급 칩이 아래쪽 밖 — 두 신호를 자리로 갈랐다.
@@ -176,6 +205,16 @@ public class PackCardView : MonoBehaviour
     // 펀치를 걸기 전의 배율. 도중에 끊겼을 때 돌아갈 자리다(SnapPunchToRest).
     Vector3 m_punchRestScale = Vector3.one;
 
+    // 띠의 제자리 알파와 배율. 프리팹이 쥔 값이라 최초 1회만 캡처하고, 재생은 여기서 출발해 여기로 돌아온다.
+    // 배율을 1로 단정하지 않는 이유는 NEW 워드마크와 같다 — 프리팹에서 키워 뒀을 수 있다.
+    float m_bandRestAlpha = 1f;
+    float m_bandRestLabelAlpha = 1f;
+    Vector3 m_bandRestScale = Vector3.one;
+    bool m_bandRestCaptured;
+
+    // 띠의 열림→문구 한 묶음. 트랜스폼과 그래픽 둘에 걸쳐 있어 손잡이 하나로 끊는다.
+    Sequence m_bandSeq;
+
     // NEW 워드마크의 제자리 배율. 프리팹에서 기울이거나 키워 뒀을 수 있어 1로 단정하지 않는다(최초 1회 캡처).
     Vector3 m_newBadgeRestScale = Vector3.one;
     bool m_newBadgeRestCaptured;
@@ -220,8 +259,16 @@ public class PackCardView : MonoBehaviour
         // 결과 격자의 지속 대비는 ApplyResultContrast가 따로 쥔다 — 한 메서드가 두 순간을 겸하지 않게 갈랐다.
         if (IsNew && !_instant) PlayRim();
 
-        if (IsNew) PlayNewBadge(_instant);
-        else PlayRefundAccent(_instant);
+        if (IsNew)
+        {
+            PlayNewBadge(_instant);
+            return;
+        }
+
+        // 둘은 같은 순간에 온다(dupeRevealDelay 공유) — 갈라지는 것은 등장 시점이 아니라 수명이다.
+        // 띠는 남고 칩은 머물다 사라진다.
+        PlayDupeBand(_instant);
+        PlayRefundAccent(_instant);
     }
 
     /// <summary>
@@ -242,6 +289,15 @@ public class PackCardView : MonoBehaviour
         }
 
         SetRim(false);
+
+        // 띠는 반대로 결과판에 남는다(기본). 끄기로 했다면 여기서 못 박는다 —
+        // PlayRevealAccent(_instant: true)가 이미 내려 두지만, 켜고 끄는 판단이 한 곳에만 있으면
+        // 이 스위치를 읽는 사람이 결과판의 최종 상태를 여기서 못 읽는다.
+        if (!dupeBandInResult)
+        {
+            KillBandSeq();
+            HideDupeBand();
+        }
 
         // 환급 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
         // 격자가 아닌 경로로 이 상태에 들어오는 카드(낱장 확인 중 요약으로 넘어간 경우)도 있어 여기서 못 박는다.
@@ -359,6 +415,10 @@ public class PackCardView : MonoBehaviour
             revealFlash.gameObject.SetActive(false);
         }
 
+        // 띠를 걷는다. 재생 중이었다면 배율·알파가 중간값이라 한 번에 되돌린다.
+        KillBandSeq();
+        HideDupeBand();
+
         // 환급 칩을 걷는다. 재생 중이었다면 위치·배율·알파가 모두 중간값이라 한 번에 되돌린다.
         KillRefundSeq();
         HideRefundBadge();
@@ -458,6 +518,91 @@ public class PackCardView : MonoBehaviour
         if (newGleam != null) newGleam.transitionRate = _rate;
     }
 
+    // 중복: 띠가 톡 커진 채 나타나 제자리로 꽂힌다.
+    // NEW 워드마크(PlayNewBadge)와 같은 규약이다 — 신규만 박자가 다르면 중복이 뒤늦게 딸려오는 부록처럼 읽힌다.
+    void PlayDupeBand(bool _instant)
+    {
+        if (dupeBand == null) return;
+
+        CaptureBandRest();
+        KillBandSeq();
+
+        if (_instant && !dupeBandInResult)
+        {
+            HideDupeBand();
+            return;
+        }
+
+        var t_rt = (RectTransform)dupeBand.transform;
+        dupeBand.SetActive(true);
+
+        // 회수 시간이 0이면 꽂히는 과정 자체가 없다 — 최종 상태로 세운다(펀치와 같은 규약: 0이 곧 끄는 손잡이다).
+        if (_instant || dupeBandPopDuration <= 0f)
+        {
+            t_rt.localScale = m_bandRestScale;
+            SetBandAlpha(m_bandRestAlpha, m_bandRestLabelAlpha);
+            return;
+        }
+
+        // 충격은 t=0에 전부 들어간다 — 눈이 봐야 하는 것은 커지는 과정이 아니라 이미 맞은 뒤의 회복이다.
+        t_rt.localScale = m_bandRestScale * (1f + dupeBandOvershoot);
+
+        // 뜸을 두기로 했다면 그동안은 숨어 있어야 한다 — 커진 채로 먼저 보이면 팝이 아니라 부풀기가 된다.
+        bool t_delayed = dupeRevealDelay > 0f;
+        SetBandAlpha(t_delayed ? 0f : m_bandRestAlpha, t_delayed ? 0f : m_bandRestLabelAlpha);
+
+        // 트윈은 띠 노드에 건다. 카드 루트에 걸면 PackCardStack이 스와이프 시작에 부르는 DOKill에 함께 죽는다.
+        m_bandSeq = DOTween.Sequence()
+            .SetLink(dupeBand)
+            .AppendInterval(dupeRevealDelay)
+            .AppendCallback(() => SetBandAlpha(m_bandRestAlpha, m_bandRestLabelAlpha))
+            .Append(t_rt.DOScale(m_bandRestScale, dupeBandPopDuration).SetEase(Ease.OutQuint))
+            .OnComplete(() => m_bandSeq = null);
+    }
+
+    // 띠를 내리고 다음 재생이 쓸 출발 상태로 되돌린다.
+    // ⚠ 시퀀스는 여기서 걷지 않는다 — 호출처가 전부 KillBandSeq를 먼저 부르는 전제이고,
+    //   그 짝을 깨면 재생 중인 트윈이 아래 복구를 곧바로 덮어쓴다.
+    void HideDupeBand()
+    {
+        if (dupeBand == null) return;
+
+        // 캡처가 먼저다 — Bind가 부르는 ResetAccent가 이 경로로 들어오는데,
+        // 그때 프리팹 알파를 아직 안 적어 뒀으면 아래 복구가 1로 덮어써 버린다.
+        CaptureBandRest();
+
+        dupeBand.transform.localScale = m_bandRestScale;
+
+        // 알파는 제자리로 되돌린다 — 0으로 남으면 다음 카드의 띠가 켜져도 보이지 않는다.
+        SetBandAlpha(m_bandRestAlpha, m_bandRestLabelAlpha);
+        dupeBand.SetActive(false);
+    }
+
+    void KillBandSeq()
+    {
+        if (m_bandSeq == null) return;
+
+        m_bandSeq.Kill();
+        m_bandSeq = null;
+    }
+
+    // 프리팹이 쥔 농도와 배율을 적어 둔다. 재생이 여기서 출발하고 정리도 여기로 돌아온다.
+    void CaptureBandRest()
+    {
+        if (m_bandRestCaptured) return;
+
+        m_bandRestScale = dupeBand.transform.localScale;
+        if (dupeBandFill != null) m_bandRestAlpha = dupeBandFill.color.a;
+        if (dupeBandLabel != null) m_bandRestLabelAlpha = dupeBandLabel.color.a;
+        m_bandRestCaptured = true;
+    }
+
+    void SetBandAlpha(float _fill, float _label)
+    {
+        if (dupeBandFill != null) SetAlpha(dupeBandFill, _fill);
+        if (dupeBandLabel != null) SetAlpha(dupeBandLabel, _label);
+    }
+
     // 중복: 코인 칩이 카드 아래에서 올라와 앉고, 읽을 만큼 머문 뒤 사라진다.
     // 환급이 0이면 아무 말도 하지 않는다(조용한 정산).
     //
@@ -501,8 +646,11 @@ public class PackCardView : MonoBehaviour
         // 페이드인은 상승보다 짧게 끊는다 — 올라오는 내내 반투명하면 도착이 아니라 스며듦으로 읽힌다.
         float t_fadeIn = Mathf.Min(0.12f, refundRiseDuration);
 
+        // 띠와 같은 순간에 출발한다 — 중복이라는 사실과 그 정산은 한 박자로 오는 편이 읽기 쉽다.
+        // 딜레이 동안은 알파 0이라 아무것도 보이지 않는다(위에서 출발 상태를 이미 세워 뒀다).
         m_refundSeq = DOTween.Sequence()
             .SetLink(refundBadge)
+            .AppendInterval(dupeRevealDelay)
             .Append(t_tr.DOLocalMoveY(m_refundHome.y, refundRiseDuration).SetEase(Ease.OutCubic))
             .Join(t_tr.DOScale(m_refundRestScale, refundRiseDuration).SetEase(Ease.OutQuint))
             .Join(t_group.DOFade(1f, t_fadeIn))

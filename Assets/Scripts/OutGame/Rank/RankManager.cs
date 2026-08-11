@@ -74,6 +74,18 @@ public static class RankManager
             t_unranked);
     }
 
+    /// <summary>언랭크(첫 티어 미도달) 상태의 표시값. 승급 연출이 '오르기 직전'으로 되돌릴 때 쓴다 —
+    /// 그 시점엔 정산이 끝나 GetInfo가 이미 도달 상태를 돌려주므로 언랭크 표시를 따로 물어야 한다.
+    /// 폴백 규칙(언랭크 배지 미저작 → 첫 등급 배지)은 GetInfo와 같다.</summary>
+    public static void GetUnrankedDisplay(out string _displayName, out Sprite _badge)
+    {
+        var t_config = Config;
+        t_config.TryGetTier(0, out RankTier t_first);
+
+        _displayName = t_config.unrankedDisplayName;
+        _badge       = t_config.unrankedBadge != null ? t_config.unrankedBadge : t_first.Badge;
+    }
+
     /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
     /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
     public static bool TryEnterFirstTier(out RankApplyResult _result)
