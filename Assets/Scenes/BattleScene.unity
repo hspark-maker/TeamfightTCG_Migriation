@@ -3462,7 +3462,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -11.749078}
+  m_LocalPosition: {x: 0, y: 0, z: -12.077841}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3552,8 +3552,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.486  \uAC70\uB9AC 11.75  \uBC30\uC728 1.07\n\uAC00\uC2DC \xB13.30
-    x \xB16.78  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.473  \uAC70\uB9AC 12.08  \uBC30\uC728 1.10\n\uAC00\uC2DC \xB13.30
+    x \xB16.97  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!1 &982015555
 GameObject:
@@ -4696,7 +4696,7 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   battleIntro: {fileID: 1572181725}
-  battleBGM: {fileID: 8300000, guid: 2a13429062d06ae4fbeeec8b5ca1fdc3, type: 3}
+  battleBGM: {fileID: 8300000, guid: 140dd8561d180464e9eb100e24b3d143, type: 3}
   tutorialOverlayPrefab: {fileID: 1373953528122502585, guid: 7e3565f15335afd45905a0d13c508ae8, type: 3}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!4 &1572181723
@@ -4761,6 +4761,7 @@ MonoBehaviour:
   playerDeckTransform: {fileID: 5093726298483216111}
   enemyDeckTransform: {fileID: 5093726298078040397}
   deckCardCount: 3
+  deckStackStep: {x: 0, y: 5}
 --- !u!1001 &1662328434
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6318,6 +6319,7 @@ MonoBehaviour:
   cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   panelGroup: {fileID: 1091019058}
+  drawOutTime: 0.18
 --- !u!224 &8381650083207030414
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6406,6 +6408,7 @@ MonoBehaviour:
   cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   panelGroup: {fileID: 245661006}
+  drawOutTime: 0.18
 --- !u!1 &8381650084143839539
 GameObject:
   m_ObjectHideFlags: 0
