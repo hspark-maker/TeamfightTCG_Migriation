@@ -42,6 +42,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
 
+    [Header("일러스트만 보기 (선택 — 미배선이면 기능만 빠진다)")]
+    [Tooltip("누를 때마다 카드 위 정보(이름·이름판·체력·레벨·키워드 아이콘·프레임 장식·시너지)를 통째로 가렸다 되돌린다. 프레임과 일러스트만 남는다.")]
+    [SerializeField] Button artOnlyButton;
+    [Tooltip("선택 — 켜짐/꺼짐을 색으로 알리는 아이콘. 미배선이면 색 피드백만 빠진다(동작은 그대로).")]
+    [SerializeField] Image  artOnlyIcon;
+    [SerializeField] Color  artOnlyOffColor = Color.white;
+    [SerializeField] Color  artOnlyOnColor  = new Color(1f, 0.82f, 0.25f, 1f);
+
     [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
     [SerializeField] CardEnhanceRitualView ritual;
 
@@ -123,6 +131,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 그대로 두면 연출이 시작하기도 전에 Lv·HP가 새 값으로 튀어 공개할 것이 남지 않는다.
     // 결과판이 떠 있는 동안까지 켜져 있다(연출 → 결과판 → 복귀 전체가 한 덩이의 "연출 중"이다).
     bool m_ritualPlaying;
+
+    // 프레임·아트만 보는 열람 모드. 창이 열려 있는 동안만 유지한다(OnDisable에서 내린다).
+    bool m_artOnly;
 
     // 결과판의 "한 번 더". 무대가 돌아오기 전에 다음 연출을 시작하면 두 연출이 같은 노드를 두고 싸운다 →
     // 복귀가 끝나는 시점까지 눌린 사실만 들고 있는다.
@@ -239,6 +250,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.enhanceButton.onClick.AddListener(OnEnhancePressed);
         }
 
+        if (this.artOnlyButton != null)
+        {
+            this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
+            this.artOnlyButton.onClick.AddListener(ToggleArtOnly);
+        }
+
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
 
@@ -256,6 +273,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
+
+        if (this.artOnlyButton != null) this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
+
+        // 열람 모드는 창을 닫으면 풀린다 — 다음에 열었을 때 체력·레벨이 사라진 이유를 설명해 줄 화면이 없다.
+        // 카드 쪽 플래그까지 같이 내린다(cardView는 이 오버레이 전용 인스턴스라 남겨두면 다음 열기에 그대로 따라온다).
+        this.m_artOnly = false;
+        this.cardView?.SetArtOnly(false);
+        ApplyArtOnlyChrome();
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
@@ -533,6 +558,29 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         CardData t_card = CardAt(this.m_index);
         if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+    }
+
+    // 카드 위 정보를 가렸다 되돌린다. 다시 그리는 것은 cardView.Bind 하나 —
+    // Apply를 통째로 돌리면 값이 그대로인 키워드·시너지 칩까지 Destroy + Instantiate 된다.
+    void ToggleArtOnly()
+    {
+        if (this.m_ritualPlaying) return;   // 연출이 화면을 덮은 동안 카드를 다시 그리면 담금질 자세가 풀린다
+
+        this.m_artOnly = !this.m_artOnly;
+        ApplyArtOnlyChrome();
+
+        // 모드는 Bind보다 먼저 세운다 — 키워드 아이콘은 Bind가 지었다 부수므로 나중이면 이번 판만 옛 모습이 남는다.
+        this.cardView?.SetArtOnly(this.m_artOnly);
+
+        CardData t_card = CardAt(this.m_index);
+        if (t_card != null && this.cardView != null)
+            this.cardView.Bind(t_card, OwnershipManager.IsOwned(t_card));
+    }
+
+    void ApplyArtOnlyChrome()
+    {
+        if (this.artOnlyIcon != null)
+            this.artOnlyIcon.color = this.m_artOnly ? this.artOnlyOnColor : this.artOnlyOffColor;
     }
 
     // 카드가 바뀔 때의 전량 갱신. 조건 없는 칩 재생성은 여기뿐이다

@@ -12,14 +12,6 @@ public class AlbumPageOverlayView : MonoBehaviour
     [SerializeField] Button dimButton;
     [SerializeField] Button closeButton;
 
-    [Header("일러스트만 보기")]
-    [Tooltip("선택 — 누를 때마다 카드 위 정보(이름·체력·레벨·키워드·프레임 장식·시너지)를 통째로 가렸다 되돌린다. 미배선이면 기능만 빠진다.")]
-    [SerializeField] Button artOnlyButton;
-    [Tooltip("선택 — 켜짐/꺼짐을 색으로 알리는 아이콘. 미배선이면 색 피드백만 빠진다(동작은 그대로).")]
-    [SerializeField] Image artOnlyIcon;
-    [SerializeField] Color artOnlyOffColor = Color.white;
-    [SerializeField] Color artOnlyOnColor  = new Color(1f, 0.82f, 0.25f, 1f);
-
     [Header("페이지 보상")]
     [SerializeField] AlbumGaugeView pageGauge = new AlbumGaugeView();
     [SerializeField] AlbumChestView pageChest = new AlbumChestView();
@@ -59,10 +51,6 @@ public class AlbumPageOverlayView : MonoBehaviour
     readonly List<AlbumCardSlotView> m_underSlots = new List<AlbumCardSlotView>();
     AlbumTheme m_underTheme;
     int m_underPageIndex = -1;
-
-    // 프레임·아트만 보는 열람 모드. 오버레이가 켜져 있는 동안만 유지한다(닫았다 열면 정상 표시로 돌아온다) —
-    // 저장까지 하면 "왜 내 도감에 체력이 안 보이지"가 다음 세션으로 넘어간다.
-    bool m_artOnly;
 
     // 상세에서 넘겨볼 목록 = 이 테마의 **소유** 카드 전체(페이지 순). 미소유를 담지 않으므로 잠김 상세로 새지 않고,
     // 페이지 경계에서도 끊기지 않는다. CardDetailOverlayView가 참조로 쥔다 — 인스턴스를 유지하고 Clear+재충전만 한다
@@ -151,29 +139,12 @@ public class AlbumPageOverlayView : MonoBehaviour
         ApplyInteractable();
     }
 
-    // 카드 위 정보를 가렸다 되돌린다. 다시 그리는 길은 RefreshPage 하나 — 여기서 슬롯을 직접 만지면
-    // 페이지를 넘기는 순간 새로 바인딩된 칸이 옛 모드로 돌아간다(모드의 주인은 BindSlots다).
-    void ToggleArtOnly()
-    {
-        if (IsLocked || m_dragging || m_flipping) return;
-
-        m_artOnly = !m_artOnly;
-        ApplyArtOnlyChrome();
-        RefreshPage();
-    }
-
-    void ApplyArtOnlyChrome()
-    {
-        if (artOnlyIcon != null) artOnlyIcon.color = m_artOnly ? artOnlyOnColor : artOnlyOffColor;
-    }
-
     void ApplyInteractable()
     {
         bool t_locked = IsLocked;
 
         if (dimButton != null) dimButton.interactable = !t_locked;
         if (closeButton != null) closeButton.interactable = !t_locked;
-        if (artOnlyButton != null) artOnlyButton.interactable = !t_locked;
         if (swipeDetector != null) swipeDetector.Interactable = !t_locked;
 
         // 잠금 해제는 페이지 수가 정하던 원래 값으로 되돌린다
@@ -190,12 +161,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (closeButton != null && closeButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumPageOverlayView] Button_Close에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
 
-        if (artOnlyButton != null && artOnlyButton.onClick.GetPersistentEventCount() > 0)
-            Debug.LogWarning("[AlbumPageOverlayView] Button_ArtOnly에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
-
         if (dimButton != null) dimButton.onClick.AddListener(Close);
         if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (artOnlyButton != null) artOnlyButton.onClick.AddListener(ToggleArtOnly);
         if (prevButton != null) prevButton.onClick.AddListener(() => Step(-1));
         if (nextButton != null) nextButton.onClick.AddListener(() => Step(1));
 
@@ -239,10 +206,6 @@ public class AlbumPageOverlayView : MonoBehaviour
             swipeDetector.OnDragProgress -= HandleDragProgress;
             swipeDetector.OnDragCancel   -= HandleDragCancel;
         }
-
-        // 열람 모드는 창을 닫으면 풀린다 — 다음에 열었을 때 정보가 사라진 이유를 설명해 줄 화면이 없다
-        m_artOnly = false;
-        ApplyArtOnlyChrome();
 
         // 안전망 — 세션 없이 위장만 남으면 카드가 영영 빈 칸으로 보인다
         if (!AlbumInsertSession.IsRunning) AlbumInsertMask.Clear();
@@ -358,9 +321,6 @@ public class AlbumPageOverlayView : MonoBehaviour
             var t_card = t_cards[t_i];
             bool t_owned = ShownAsOwned(t_card);
             t_slot.gameObject.SetActive(true);
-            // 모드는 Bind보다 먼저 세운다 — 아이콘·배지는 Bind가 지었다 부수므로 나중에 세우면 이번 페이지만 옛 모습이 남는다.
-            // 뒤쪽 버퍼(under)도 같은 길로 오므로 넘기는 도중 다음 장이 다른 모드로 비치지 않는다.
-            t_slot.SetArtOnly(m_artOnly);
             t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
 
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다

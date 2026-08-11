@@ -19,6 +19,8 @@ public class CardVisualView : MonoBehaviour
 {
     [SerializeField] Image portrait;          // 카드 아트
     [SerializeField] TMP_Text nameText;       // 카드 이름(미소유 시 숨김)
+    [Tooltip("이름 뒤 판(TextBG). 이름과 한 몸이라 늘 같이 켜고 끈다 — 따로 두면 글자만 사라지고 검은 띠가 남는다. 미배선이면 조용히 건너뛴다.")]
+    [SerializeField] GameObject nameBackground;
     [SerializeField] GameObject lockOverlay;  // 미소유 시 활성(어두운 오버레이 + 잠김 표시)
 
     [Header("인게임 미러 요소")]
@@ -138,12 +140,15 @@ public class CardVisualView : MonoBehaviour
         // 프레임은 카드별로 바뀌지 않는다. 스프라이트 미배선 시 흰 사각형이 뜨는 것만 막는다.
         if (this.frame != null) this.frame.enabled = this.frame.sprite != null;
 
-        if (this.nameText != null)
         {
             // 미소유는 이름을 숨겨 실루엣만 노출.
             bool t_showName = _owned && this.ShowName;
-            this.nameText.gameObject.SetActive(t_showName);
-            if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+            if (this.nameBackground != null) this.nameBackground.SetActive(t_showName);
+            if (this.nameText != null)
+            {
+                this.nameText.gameObject.SetActive(t_showName);
+                if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+            }
         }
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.

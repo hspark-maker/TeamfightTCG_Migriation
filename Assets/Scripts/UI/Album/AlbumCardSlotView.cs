@@ -46,13 +46,6 @@ public class AlbumCardSlotView : MonoBehaviour
     /// <summary>삽입 중 드래그 카드를 넣을 부모. 여기 들어간 것만 번호를 덮고 앞면 뒤로 잠긴다.</summary>
     public RectTransform InsertDock => insertDock;
 
-    /// <summary>이 칸의 카드를 프레임·아트만 남긴 모습으로 그릴지. 씰·번호는 칸의 그림이라 대상이 아니다.
-    /// 다시 그리는 것은 <see cref="Bind"/>이므로 호출부는 이걸 세운 뒤 Bind를 태운다(BindSlots가 한 자리에서 한다).</summary>
-    public void SetArtOnly(bool _on)
-    {
-        if (cardVisual != null) cardVisual.SetArtOnly(_on);
-    }
-
     // 미소유는 잠김 실루엣이 아니라 빈 칸으로 둔다 — 획득한 카드가 자리를 채우는 게 도감의 그림이다.
     // (CardVisualView의 잠김 오버레이 경로는 여기서 아예 타지 않는다)
     //
