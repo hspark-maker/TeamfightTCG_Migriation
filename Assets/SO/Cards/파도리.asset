@@ -29,7 +29,7 @@ MonoBehaviour:
   evolvedArts:
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
-    battleImage: {fileID: 0}
+    battleImage: {fileID: 21300000, guid: 348ae5d394644c3ca0ebc87c76f85a69, type: 3}
   - fullImage: {fileID: 0}
     portrait: {fileID: 0}
     battleImage: {fileID: 0}
@@ -50,8 +50,5 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "\uD30C\uB3C4 \uC704\uB97C \uB204\uAD6C\uBCF4\uB2E4 \uBE60\uB974\uAC8C
-    \uB2EC\uB9AC\uB294 \uAD6C\uC870\uB300\uC6D0. \uAD6C\uC870\uAC00 \uB05D\uB098\uBA74
-    \uAF2D \uD55C \uBC88\uC740 \uBA4B\uC9C4 \uD134\uC744 \uBCF4\uC5EC\uC918\uC57C
-    \uC9C1\uC131\uC774 \uD480\uB9B0\uB2E4."
+  cardExplain: 
   explainKeywords: 0

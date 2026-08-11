@@ -19,7 +19,7 @@ using UnityEngine;
 /// **행을 지워도 카드 에셋과 등록은 남는다.** 표는 값을 밀어 넣는 창구일 뿐 삭제 창구가 아니다.
 /// 멀티 와이어 ID는 id 열의 카드 번호이므로 행 순서·목록 순서는 의미가 없다 — 바꾸면 안 되는 건 번호 자체다.
 /// </summary>
-public static class CardTableTool
+public static partial class CardTableTool
 {
     const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
     const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;

@@ -91,6 +91,15 @@ public class TutorialScenarioData : ScriptableObject
     [Header("시너지 표시/적용 (기본 off — 초반 튜토리얼은 시너지 개념 미도입, 3편부터 on)")]
     public bool enableSynergy;
 
+    [Header("카드 레벨 (0 = Lv1 호환값)")]
+    [Min(0)] [Tooltip("플레이어 카드에 적용할 성장 레벨. 0은 기존 에셋 호환을 위해 Lv1로 취급")]
+    public int playerCardLevel;
+    [Min(0)] [Tooltip("적 카드에 적용할 성장 레벨. 0은 기존 에셋 호환을 위해 Lv1로 취급")]
+    public int enemyCardLevel;
+
+    public int PlayerCardLevel => Mathf.Max(CardGrowth.BaseLevel, this.playerCardLevel);
+    public int EnemyCardLevel  => Mathf.Max(CardGrowth.BaseLevel, this.enemyCardLevel);
+
     [Header("고정 덱 (순서 = 등장 순서, 셔플 없음, 6장 이하 허용)")]
     public List<CardData> playerDeck;
     public List<CardData> enemyDeck;

@@ -50,7 +50,10 @@ public class BattleField : MonoBehaviour
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
-        List<CardData> t_shuffled = new List<CardData>(_deckData);
+        // 빈 칸(null)은 여기서 걷어낸다. 덱 출처가 여럿이고(세이브·AI 에셋·튜토리얼 시나리오)
+        // 에셋 참조가 끊기면 그 칸이 null로 들어오는데, 그대로 CardInstance를 만들면 NRE로 초기화가
+        // 통째로 죽어 "아무것도 안 나오는 전투"가 된다. 한 장 빠진 채로라도 전투는 열려야 한다.
+        List<CardData> t_shuffled = Compact(_deckData, _ownerIndex);
         Shuffle(t_shuffled, _shuffle);
 
         for (int i = 0; i < t_shuffled.Count; i++)
@@ -70,6 +73,30 @@ public class BattleField : MonoBehaviour
                 this.waitingQueue.Enqueue(t_card);
             }
         }
+    }
+
+    // 덱 리스트에서 끊긴 참조를 제거한 사본. 빠진 칸은 로그로 남긴다 — 조용히 지우면
+    // "덱이 6장인데 5장만 나온다"를 아무도 못 찾는다(에셋 참조가 끊긴 시나리오·AI 덱을 잡는 단서).
+    static List<CardData> Compact(List<CardData> _deckData, int _ownerIndex)
+    {
+        var t_cards = new List<CardData>(_deckData != null ? _deckData.Count : 0);
+        if (_deckData == null)
+        {
+            Debug.LogError($"[BattleField] owner {_ownerIndex} 덱이 null — 빈 필드로 시작한다.");
+            return t_cards;
+        }
+
+        int t_missing = 0;
+        for (int i = 0; i < _deckData.Count; i++)
+        {
+            if (_deckData[i] == null) { t_missing++; continue; }
+            t_cards.Add(_deckData[i]);
+        }
+
+        if (t_missing > 0)
+            Debug.LogError($"[BattleField] owner {_ownerIndex} 덱에 빈 칸 {t_missing}개(카드 에셋 참조 끊김) — 그 칸을 빼고 {t_cards.Count}장으로 시작한다. 덱 에셋을 고칠 것.");
+
+        return t_cards;
     }
 
     // 성장값 조회 단일 지점(미주입이면 default = 미적용). 카드 생성 경로가 늘어도 여기만 통과시킨다.

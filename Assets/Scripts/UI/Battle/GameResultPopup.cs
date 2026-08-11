@@ -16,7 +16,10 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] RectTransform panel;
     [SerializeField] Button mainMenuButton;       // 전체화면 터치 영역(연출 중엔 스킵, 끝난 뒤엔 메인 이동)
     [SerializeField] string mainMenuScene = "LobbyScene";
-    [SerializeField] CanvasGroup dimGroup;        // 암막(옵션)
+    // 암막은 ScreenDim(Canvas 직하 공유 딤)이 그린다 — SafeArea 밖이라 노치까지 덮는다.
+    // 이 그룹은 전체화면 터치 영역(mainMenuButton)을 얹은 판이라 투명하게 유지하고,
+    // ScreenDim이 없는 씬에서만 자기가 암막 노릇을 한다.
+    [SerializeField] CanvasGroup dimGroup;
     [SerializeField] TMP_Text rewardGoldText;     // 지급된 골드 표시용(표시 전용)
     [SerializeField] CoinBurstEffect coinBurst;   // 코인 분출·수렴(옵션)
     [SerializeField] TMP_Text rankPointText;      // 가감된 랭크 포인트 표시용(표시 전용)
@@ -29,6 +32,7 @@ public class GameResultPopup : MonoBehaviour
 
     [Header("타이밍")]
     [SerializeField] float dimDuration = 0.2f;
+    [SerializeField] float dimAlpha = 0.94f;      // 암막 짙기(ScreenDim에 넘기는 값)
     [SerializeField] float enterDuration = 0.45f;
     [SerializeField] float titleDuration = 0.35f;
     [SerializeField] float rewardRevealDuration = 0.3f; // 패널 등장 뒤 보상 라인이 팝하는 시간.
@@ -59,6 +63,8 @@ public class GameResultPopup : MonoBehaviour
     {
         // 연출 중 꺼지면 트윈만 남는다 — 여기서 정리.
         KillTweens();
+        // 공유 딤은 소유자별 스택이라 내 요청을 반드시 걷어야 한다(안 걷으면 다음 판까지 화면이 어둡게 남는다).
+        ScreenDim.Hide(this);
     }
 
     /// <summary>
@@ -77,7 +83,13 @@ public class GameResultPopup : MonoBehaviour
 
         this.revealSeq = DOTween.Sequence().SetLink(gameObject);
 
-        if (this.dimGroup != null)
+        // 암막 먼저, 그다음 패널 팝. ScreenDim은 트윈이 아니라 자기가 페이드하므로 그 시간만큼 시퀀스를 비운다.
+        if (ScreenDim.IsAvailable)
+        {
+            ScreenDim.Show(this, this.dimAlpha, true, this.dimDuration);
+            this.revealSeq.AppendInterval(this.dimDuration);
+        }
+        else if (this.dimGroup != null)
             this.revealSeq.Append(this.dimGroup.DOFade(1f, this.dimDuration));
 
         this.revealSeq.Append(this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));

@@ -64,9 +64,16 @@ public class BattleFieldView : MonoBehaviour
         if (_placed == null || _placed.Count == 0) return;
 
         float t_wz = this.slotViews[0].transform.position.z;
-        Vector3 t_from = this.field.OwnerIndex == TurnState.LocalOwnerIndex
+
+        // 보충 카드는 **덱 더미 버튼 자리**에서 나온다 — 거기가 그 카드가 있던 곳이다.
+        // 덱 UI가 없는 테스트 씬/미배선에서는 종전대로 화면 밖에서 날아온다(CunningVfx.DeckExitPoint와 같은 규약).
+        DeckPileUI t_pile   = DeckPileUI.For(this.field.OwnerIndex);
+        Vector3    t_offscreen = this.field.OwnerIndex == TurnState.LocalOwnerIndex
             ? CameraUtil.ScreenFractionToWorld( 2f, 0f, t_wz)
             : CameraUtil.ScreenFractionToWorld(-1f, 1f, t_wz);
+        Vector3    t_from = t_pile != null
+            ? CameraUtil.ScreenPointToWorld(t_pile.AnchorScreenPoint, t_wz)
+            : t_offscreen;
 
         Vector3 t_mid = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_wz);
 
@@ -79,7 +86,9 @@ public class BattleFieldView : MonoBehaviour
             // 어긋난 자리에서 사라졌을 때 그 어긋남이 새 카드의 자리로 굳고 보충할 때마다 누적된다 —
             // 이 슬롯 뷰는 방금 카드가 죽어 비워진 자리라 연출 잔여가 남아 있을 확률이 가장 높은 지점이다.
             t_dests[i] = t_view.SlotPosition;
-            Vector3 t_hide = t_from;
+            // 대기 중인 카드는 **화면 밖**에 세운다. 출발점(t_from)이 이제 화면 안(덱 더미)이라
+            // 거기 세우면 아직 안 나온 카드가 더미 위에 겹쳐 보인다 — 출발 순간 그 자리로 순간이동한다.
+            Vector3 t_hide = t_offscreen;
             t_hide.z = t_dests[i].z;
             t_view.transform.position = t_hide;
         }
@@ -90,6 +99,10 @@ public class BattleFieldView : MonoBehaviour
             if (i > 0) await UniTask.Delay((int)(this.cardDealDelay * 1000));
 
             CardView t_view = this.slotViews[_placed[i].slotIndex];
+
+            // 마지막 장이 출발하는 순간 더미도 사라진다 — 더미가 그 카드로 변한 것처럼 읽히게.
+            // 덱이 아직 남았으면 무동작이다(판정은 DeckPileUI가 WaitingCount로 한다).
+            if (i == _placed.Count - 1) t_pile?.PlayDrawOut();
 
             // 등장 순서(중앙 정지 → 컷씬 → 슬롯)는 CardAppearSequence 단독 — 교활 교대 등장과 공유한다.
             await CardAppearSequence.Play(t_view, _placed[i], t_from, t_mid, t_dests[i], this.cardDealDuration);

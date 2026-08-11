@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: TutorialScenario1
   m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
   enableSynergy: 0
+  playerCardLevel: 2
+  enemyCardLevel: 2
   playerDeck:
   - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
   - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}

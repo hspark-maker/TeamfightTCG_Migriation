@@ -76,7 +76,7 @@ public class MatchDeckPanelView : MonoBehaviour
     void RenderEnemySlots()
     {
         // 표시용 공개이므로 _owned는 내 쪽과 같은 true — 상대 카드를 잠금 실루엣으로 가리지 않는다.
-        // 강화는 끈다 — 내 성장은 상대 카드에 붙지 않고, 전투도 AI 적은 마스터 스탯 그대로 쓴다(GameInitializer).
+        // 내 강화는 안 붙인다 — _mine:false는 상대(AI) 레벨 기준으로 그린다(DeckPower.OpponentLevelOf).
         BindSlots(enemySlots, DeckConfig.EnemyDeck, _mine: false);
         // 파워 합도 같은 기준이어야 한다 — 칸은 상대 레벨, 배지만 내 강화 합이면 6칸 합계와 배지가 어긋난다.
         SetPower(enemyPowerText, DeckConfig.EnemyDeck, _mine: false);
