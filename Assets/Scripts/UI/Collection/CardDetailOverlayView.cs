@@ -23,8 +23,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const string NoValue     = "-";
 
     // 강화가 왜 막혔는지. 상세 패널의 상시 문구와 결과판의 "한 번 더" 아래 문구가 같은 문장을 쓴다.
-    const string MaxLevelNotice     = "최고 레벨에 도달했다";
-    const string NotAffordableNotice = "골드가 부족하다";
+    // 재화 표시명의 공용 진실원은 아직 없다 — 강화가 쓰는 재화가 둘뿐이라 표를 만들지 않았다.
+    const string MaxLevelNotice          = "최고 레벨에 도달했다";
+    const string NotAffordableNotice     = "골드가 부족하다";
+    const string NotAffordableDiaNotice  = "다이아가 부족하다";
 
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
@@ -37,7 +39,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
-    [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
+    [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 비용(재화는 레벨마다 다르다 — 아래 아이콘이 말한다)
+    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다(옵션 — 미배선 무시).")]
+    [SerializeField] Image      enhanceCostIcon;
+    [Tooltip("골드 비용 레벨에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
+    [SerializeField] Sprite     goldIcon;
+    [Tooltip("다이아 비용 레벨(진화)에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
+    [SerializeField] Sprite     diamondIcon;
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
@@ -689,7 +697,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
-        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost);
+        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
         if (this.enhanceButton != null)
         {
             this.enhanceButton.gameObject.SetActive(_owned);
@@ -697,6 +705,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.enhanceButton.interactable = t_canPayEnhance && !this.m_ritualPlaying;
         }
         if (this.enhanceCostText != null) this.enhanceCostText.text = CostLabel(t_hasStep, t_step.Cost);
+        ApplyCostIcon(t_hasStep, t_step.Currency);
 
         // 결과판이 걷힌 뒤(또는 평상시)엔 다시 "강화"다. 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
         SetEnhanceLabel(this.enhanceLabel);
@@ -704,7 +713,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
 
         if (this.growthNoticeText != null)
-            this.growthNoticeText.text = _owned ? GrowthNotice(t_hasStep, t_canPayEnhance) : string.Empty;
+            this.growthNoticeText.text = _owned ? GrowthNotice(t_hasStep, t_canPayEnhance, t_step.Currency)
+                                               : string.Empty;
     }
 
     /// <summary>이번 강화(_from → _to)로 **새로 열린 것**을 한 문장으로. 아무것도 안 열렸으면 null.
@@ -745,10 +755,33 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 더 올릴 단계가 없으면 숫자 대신 빈값 표기.</summary>
     static string CostLabel(bool _hasStep, long _cost) => _hasStep ? _cost.ToString("N0") : NoValue;
 
-    // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
-    static string GrowthNotice(bool _hasStep, bool _canPay)
+    /// <summary>비용 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 —
+    /// 둘 다 있을 때만 바꾼다(카드팩 진열대의 <c>ResolveCurrencyIcon</c>과 같은 규약).
+    /// 더 올릴 단계가 없으면 숫자가 "-"로 비므로 아이콘도 함께 걷는다(숫자 없이 그림만 남는 칸 방지).</summary>
+    Sprite CostIconOf(ECurrencyType _currency)
     {
-        return !_hasStep ? MaxLevelNotice : !_canPay ? NotAffordableNotice : string.Empty;
+        if (this.goldIcon == null || this.diamondIcon == null) return null;
+
+        return _currency == ECurrencyType.Diamond ? this.diamondIcon : this.goldIcon;
+    }
+
+    void ApplyCostIcon(bool _hasStep, ECurrencyType _currency)
+    {
+        if (this.enhanceCostIcon == null) return;
+
+        this.enhanceCostIcon.enabled = _hasStep;
+
+        Sprite t_icon = CostIconOf(_currency);
+        if (t_icon != null) this.enhanceCostIcon.sprite = t_icon;
+    }
+
+    // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
+    static string GrowthNotice(bool _hasStep, bool _canPay, ECurrencyType _currency)
+    {
+        if (!_hasStep) return MaxLevelNotice;
+        if (_canPay)   return string.Empty;
+
+        return _currency == ECurrencyType.Diamond ? NotAffordableDiaNotice : NotAffordableNotice;
     }
 
     void OnEnhancePressed()
@@ -907,20 +940,23 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // "한 번 더"의 가부는 오른 뒤의 다음 단계로 판정한다 — 방금 쓴 비용이 아니라 지금 낼 비용이 기준이다.
         bool t_hasNext  = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
-        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(ECurrencyType.Gold, t_next.Cost);
+        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
 
         var t_line = new EnhanceResultLine(_result.Outcome,
                                            _fromHp, DeckPower.MaxHpOf(_card),
                                            _fromLevel, _result.Level,
-                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry),
+                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
+                                           // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
+                                           CostIconOf(t_next.Currency),
                                            UnlockLabel(_card, _fromLevel, _result.Level));
 
         // 결과를 읽는 동안 하단 바 버튼이 "한 번 더"를 맡는다 — 연출 시작 때 LockControls가 꺼둔 것을 여기서 되살린다.
         // 값도 지금 낼 비용으로 갈아둔다(방금 쓴 비용이 남아 있으면 다음 한 방의 가격을 잘못 읽는다).
         if (this.enhanceButton   != null) this.enhanceButton.interactable = t_canRetry;
         if (this.enhanceCostText != null) this.enhanceCostText.text       = CostLabel(t_hasNext, t_next.Cost);
+        ApplyCostIcon(t_hasNext, t_next.Currency);
         SetEnhanceLabel(this.retryLabel);
 
         this.resultPanel.Show(t_line,

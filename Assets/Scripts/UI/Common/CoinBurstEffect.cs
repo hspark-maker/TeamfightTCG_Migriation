@@ -32,6 +32,8 @@ public class CoinBurstEffect : MonoBehaviour
     [SerializeField] float angleStart = 18f;
     [Tooltip("흩어지는 부채꼴의 각도 폭. 360이면 전방위.")]
     [SerializeField] float angleSpan = 360f;
+    [Tooltip("목적지로 빨려들 때 직선에서 부풀어 오르는 폭(px). 0이면 직선으로 간다.")]
+    [SerializeField] float arcHeight = 0f;
 
     readonly List<GameObject> m_coins = new List<GameObject>();
 
@@ -45,7 +47,8 @@ public class CoinBurstEffect : MonoBehaviour
     public void Configure(Sprite _coinSprite, RectTransform _spawnCenter, RectTransform _target,
                           int _coinCount = -1, float? _angleStart = null, float? _angleSpan = null,
                           float? _scatterRadius = null, float? _gatherDuration = null,
-                          float? _coinSize = null, float? _coinInterval = null)
+                          float? _coinSize = null, float? _coinInterval = null,
+                          float? _scatterDuration = null, float? _arcHeight = null)
     {
         this.coinSprite  = _coinSprite;
         this.spawnCenter = _spawnCenter;
@@ -59,6 +62,9 @@ public class CoinBurstEffect : MonoBehaviour
         // 출발과 목적지가 멀면 흩어짐은 좁게·수렴은 길게 가야 한다 — 한 인스턴스로 가까운/먼 연출을 오가려면 이 둘도 주입돼야 한다.
         if (_scatterRadius.HasValue) this.scatterRadius = _scatterRadius.Value;
         if (_gatherDuration.HasValue) this.gatherDuration = _gatherDuration.Value;
+        // 터짐은 빠르게·궤적은 휘어서. 이 둘도 모드마다 갈리므로 인스턴스에 남은 직전 값이 새지 않게 함께 주입한다.
+        if (_scatterDuration.HasValue) this.scatterDuration = _scatterDuration.Value;
+        if (_arcHeight.HasValue) this.arcHeight = _arcHeight.Value;
     }
 
     /// <summary>
@@ -100,7 +106,8 @@ public class CoinBurstEffect : MonoBehaviour
 
     UiGainBurst.Settings BuildSettings()
         => new UiGainBurst.Settings(this.coinCount, this.scatterRadius, this.scatterDuration, this.gatherDuration,
-                                    this.coinInterval, this.popDuration, this.angleStart, this.angleSpan);
+                                    this.coinInterval, this.popDuration, this.angleStart, this.angleSpan,
+                                    _arcHeight: this.arcHeight);
 
     GameObject CreateCoin()
     {

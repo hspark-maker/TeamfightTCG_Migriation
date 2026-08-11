@@ -26,16 +26,26 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     [SerializeField] float nearAngleStart = 195f;
     [SerializeField] float nearAngleSpan = 150f;
     [SerializeField] float nearScatterRadius = 240f;
+    [SerializeField] float nearScatterDuration = 0.28f;
     [SerializeField] float nearGatherDuration = 0.32f;
+    [Tooltip("제자리 모드는 출발과 목적지가 같아 곡선이 고리로 보인다 — 기본 0(직선)을 유지할 것.")]
+    [SerializeField] float nearArcHeight = 0f;
 
     [Header("원거리 모드 (출발 != 수치)")]
-    [Tooltip("이동 방향(위)과 같은 쪽으로 퍼뜨린다. 아래로 뿌리면 수렴 InBack이 한 번 더 물어 하단 탭바 뒤로 왕복한다.")]
+    [Tooltip("터짐의 시작 각(도). 폭이 360이면 링 전체를 돌리는 값이라 축에 정렬되지 않게만 두면 된다.")]
     [SerializeField] float farAngleStart = 20f;
-    [SerializeField] float farAngleSpan = 140f;
-    [Tooltip("이동거리가 이미 크므로 흩어짐은 좁게 — 넓으면 행 여러 개를 덮어 노이즈가 된다.")]
-    [SerializeField] float farScatterRadius = 140f;
+    [Tooltip("360 = 사방으로 터진다. 아래로 뿌려도 되는 이유는 수렴이 직선 InBack이 아니라 " +
+             "휘어 도는 곡선(farArcHeight)이기 때문 — 이 값을 0으로 되돌리면 아래 코인이 하단 탭바 뒤로 왕복한다.")]
+    [SerializeField] float farAngleSpan = 360f;
+    [Tooltip("터지는 거리. 이동거리가 이미 크므로 좁게 — 넓으면 행 여러 개를 덮어 노이즈가 된다.")]
+    [SerializeField] float farScatterRadius = 150f;
+    [Tooltip("터지는 시간. 짧을수록 '펑' 하고 열린다 — 0.3에 가까우면 밀려나는 것으로 읽힌다.")]
+    [SerializeField] float farScatterDuration = 0.18f;
     [Tooltip("거리가 몇 배이므로 수렴 시간도 늘린다. 같으면 순간이동으로 보인다.")]
     [SerializeField] float farGatherDuration = 0.42f;
+    [Tooltip("HUD로 빨려들 때 직선에서 부풀어 오르는 폭(px). 코인이 좌우 번갈아 휘어 든다. " +
+             "0이면 예전처럼 직선으로 간다. 이동거리의 45%로 자동 제한되므로 가까운 코인은 덜 휜다.")]
+    [SerializeField] float farArcHeight = 200f;
 
     static CurrencyGainEffectPlayer s_instance;
 
@@ -127,7 +137,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
                           t_near ? this.nearAngleStart : this.farAngleStart,
                           t_near ? this.nearAngleSpan : this.farAngleSpan,
                           t_near ? this.nearScatterRadius : this.farScatterRadius,
-                          t_near ? this.nearGatherDuration : this.farGatherDuration);
+                          t_near ? this.nearGatherDuration : this.farGatherDuration,
+                          _scatterDuration: t_near ? this.nearScatterDuration : this.farScatterDuration,
+                          _arcHeight: t_near ? this.nearArcHeight : this.farArcHeight);
 
         var t_onArrived = t_hud.BeginGainRollUp(_gain.Amount, out var t_releaseDisplay, this.punchScale);
         var t_seq = t_burst.BuildBurst(t_onArrived);

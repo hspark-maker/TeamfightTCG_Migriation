@@ -127,10 +127,11 @@ public static class CardGrowthManager
         if (!t_config.TryGetStep(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost))
+        // 재화는 곡선이 정한다 — 진화 레벨(Lv5·Lv10)만 다이아를 물고 나머지는 골드다.
+        if (!CurrencyManager.CanAfford(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
-        if (!CurrencyManager.Spend(ECurrencyType.Gold, t_step.Cost))
+        if (!CurrencyManager.Spend(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
         bool t_success = s_rng.NextDouble() < t_step.SuccessRate;
