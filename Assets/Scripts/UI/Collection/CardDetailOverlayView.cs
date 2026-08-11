@@ -8,7 +8,7 @@ using TMPro;
 
 // 로비 컬렉션 탭의 카드 상세 오버레이(CardDetailOverlay.prefab 루트에 부착).
 // 카드 타일을 길게 누르면 열리고, 누른 카드의 이름·체력·키워드·시너지를 채운다.
-// 닫기 버튼은 두지 않는다 — 오버레이 아무 곳이나 탭하면 닫힌다(조작 바 tapCloseExclude만 제외).
+// 닫기 버튼은 두지 않는다 — 배경(딤)을 탭하면 닫힌다. 카드·상세 패널·조작 바 위의 탭은 닫지 않는다.
 //
 // 인게임 카드 정보창(PooledCardElement)과 달리 풀드 UI가 아니라 로비 씬에 직접 배치한다 —
 // 로비 전용 풀스크린 한 장이라 Addressables("UIPrefab" 라벨) 등록까지 갈 이유가 없다(PackOpenOverlay와 같은 결).
@@ -84,14 +84,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] GameObject keywordSectionLock;
     [SerializeField] GameObject synergySectionLock;
 
+    // 런타임은 이 프리팹을 만들지 않는다 — 칩은 프리팹에 미리 깔려 있다(TryShowChip 주석).
+    // 남겨 둔 이유는 깔아 주는 에디터 도구(CardDetailChipBaker)가 "무엇을 깔지"를 여기서 읽기 때문이다.
     [SerializeField] KeywordExplainItem chipPrefab;
     [SerializeField] KeywordIconConfig  keywordIconConfig;
     [SerializeField] PopupTransition    transition = new PopupTransition();
 
-    [Header("탭해서 닫기")]
-    [Tooltip("탭해도 닫히지 않을 영역(BottomBar). 미배선이면 바의 빈 곳 탭도 닫기로 샌다.")]
-    [SerializeField] RectTransform tapCloseExclude;
-    
     [Tooltip("좌우 스와이프 감지. 오버레이 전면을 덮는 raycastTarget Graphic 위에 올려야 한다.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
@@ -213,10 +211,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
         // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
+        // 카드는 배경이 아니므로 여기서 닫지 않는다. 연출 중 스킵만 받는다.
         if (this.cardView != null)
         {
             LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
-            if (t_tap != null) t_tap.OnTap = TapClose;
+            if (t_tap != null) t_tap.OnTap = SkipRitual;
         }
     }
 
@@ -310,7 +309,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.transition.SetVisible(gameObject, false);
     }
 
-    /// <summary>딤·상세 패널 어디를 탭해도 닫는다. 조작 바(tapCloseExclude)와 카드 그림(Awake 참고)은 제외.</summary>
+    /// <summary>닫기는 <b>배경(딤)</b> 탭만이다. 배경 = 이 루트 자신의 전면 Image —
+    /// 카드·상세 패널·조작 바 위의 탭은 닫지 않는다(내용을 읽다 손이 스쳐 창이 사라지던 문제).
+    ///
+    /// 판정을 "무엇을 눌렀나"로 하는 이유: 이 경로의 pointerPress는 언제나 루트라 영역을 알려주지 못한다.
+    /// pointerPressRaycast가 곧 루트면 그 위에 아무 UI도 없었다는 뜻이고, 그게 배경이다.</summary>
     public void OnPointerClick(PointerEventData _e)
     {
         if (_e == null || _e.button != PointerEventData.InputButton.Left) return;
@@ -318,27 +321,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 스와이프로 소비된 포인터는 탭이 아니다 — 없으면 카드를 넘긴 뒤 손 떼는 순간 닫힌다.
         if (_e.dragging) return;
 
-        // 누른 노드로 판정 — 이 경로의 pointerPress는 루트 자신이라 영역을 알려주지 못한다.
-        GameObject t_hit = _e.pointerPressRaycast.gameObject;
-        if (t_hit != null && this.tapCloseExclude != null
-         && t_hit.transform.IsChildOf(this.tapCloseExclude)) return;
+        // 연출 중의 탭은 어디를 눌렀든 스킵이다 — 연타하는 조작이라 기다리게만 두면 지겹다.
+        if (this.m_ritualPlaying) { SkipRitual(); return; }
 
-        TapClose();
-    }
-
-    // 강화 연출 중의 탭은 닫기가 아니라 스킵이다 — 연타하는 조작이라 결과를 기다리게만 두면 지겹고,
-    // 그렇다고 닫아버리면 방금 쓴 골드의 결과를 못 보고 화면이 사라진다.
-    void TapClose()
-    {
-        // "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
-        // 그리고 OnKill 콜백 구간에서 어긋난다.
-        if (this.m_ritualPlaying)
-        {
-            this.ritual?.RequestSkip();
-            return;
-        }
+        if (_e.pointerPressRaycast.gameObject != gameObject) return;
 
         Hide();
+    }
+
+    /// <summary>강화 연출 스킵. 닫기와 갈라 둔다 — 방금 쓴 골드의 결과를 못 보고 화면이 사라지면 안 된다.
+    /// "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
+    /// 그리고 OnKill 콜백 구간에서 어긋난다.</summary>
+    void SkipRitual()
+    {
+        if (this.m_ritualPlaying) this.ritual?.RequestSkip();
     }
 
     void OnPrevPressed() => Step(-1);
@@ -882,8 +878,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void BuildKeywordSection(CardData _card, bool _owned)
     {
-        ClearChildren(this.keywordChipRoot);
-
         // 지금 지은 내용의 기준값. RefreshKeywordVisuals의 변경 감지가 이 값을 본다 —
         // 카드 전환(Apply)도 이 길을 지나므로 감지가 곧바로 한 번 더 짓는 일이 없다.
         this.m_keywordCard = _card;
@@ -897,8 +891,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               && CardVisualRules.InfoKeywords(_card) == CardKeyword.None);
 
         var t_lines = new List<string>();
+        int t_used  = 0;
 
-        if (_owned && this.keywordIconConfig != null && this.chipPrefab != null && this.keywordChipRoot != null)
+        if (_owned && this.keywordIconConfig != null && this.keywordChipRoot != null)
         {
             // 판정 기준은 인게임 카드 정보창(CardElement)과 같다 — 규칙 자체는 CardVisualRules가 소유한다.
             // 카드 타일과 달리 **해금 전 키워드도 목록에 넣는다**(잠김 룩으로) — 정보창은 지금 쓸 수 있는 것뿐
@@ -914,21 +909,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 if (!this.keywordIconConfig.TryGetEntry(t_kw, out KeywordIconConfig.Entry t_entry)) continue;
 
                 bool t_open = (t_locked & t_kw) == 0;
-                Instantiate(this.chipPrefab, this.keywordChipRoot)
-                    .Init(t_entry.icon, t_entry.displayName, null, 1f, t_open);
+                if (TryShowChip(this.keywordChipRoot, t_used, "키워드",
+                                t_entry.icon, t_entry.displayName, 1f, t_open))
+                    t_used++;
 
                 // 설명은 잠겨도 그대로 적는다 — 무엇이 열릴지 모르면 강화할 이유가 안 읽힌다.
                 if (!string.IsNullOrEmpty(t_entry.explain)) t_lines.Add(t_entry.explain);
             }
         }
 
+        HideChipsFrom(this.keywordChipRoot, t_used);
         ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned);
     }
 
     void BuildSynergySection(CardData _card, bool _owned)
     {
-        ClearChildren(this.synergyChipRoot);
-
         // 지금 지은 잠김 상태. RefreshUnlockVisuals의 변경 감지가 이 값을 본다(키워드 줄과 같은 규약).
         this.m_shownSynergyOpen = _owned && SynergyUnlocked(_card);
 
@@ -937,8 +932,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         SetSectionLock(this.synergySectionLock, _owned && t_hasSynergy && !this.m_shownSynergyOpen);
 
         var t_lines = new List<string>();
+        int t_used  = 0;
 
-        if (_owned && _card.synergies != null && this.chipPrefab != null && this.synergyChipRoot != null)
+        if (_owned && _card.synergies != null && this.synergyChipRoot != null)
         {
             // 시너지는 카드마다가 아니라 **1차 진화 도달 여부**로 통째로 열린다(관문은 CardGrowthConfig 소유).
             // 그래서 칩마다 판정하지 않고 카드 하나에 한 번만 묻는다.
@@ -949,14 +945,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
 
-                // 세 번째 인자는 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
-                Instantiate(this.chipPrefab, this.synergyChipRoot)
-                    .Init(t_syn.activeIcon, SynergyText.Name(t_syn), null, SynergyIconStrip.IconPadCompensation, t_open);
+                // 아이콘 배율은 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
+                if (TryShowChip(this.synergyChipRoot, t_used, "시너지",
+                                t_syn.activeIcon, SynergyText.Name(t_syn),
+                                SynergyIconStrip.IconPadCompensation, t_open))
+                    t_used++;
 
                 if (!string.IsNullOrEmpty(t_syn.effectDescription)) t_lines.Add(t_syn.effectDescription);
             }
         }
 
+        HideChipsFrom(this.synergyChipRoot, t_used);
         ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
     }
 
@@ -1000,11 +999,37 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_section != null) _section.SetActive(true);
     }
 
-    static void ClearChildren(Transform _root)
+    /// <summary>줄에 <b>미리 깔아 둔</b> _index번째 칩을 채워 켠다. 칩이 모자라면 false —
+    /// 호출부는 거기서 멈춘다(있는 만큼만 보여주고 나머지는 설명 줄로 읽힌다).
+    ///
+    /// 칩은 런타임에 만들지 않는다. 프리팹에 박아 두면 배치·간격을 씬에서 눈으로 잡을 수 있고,
+    /// 카드를 넘길 때마다 Destroy/Instantiate가 돌지 않는다. 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기.</summary>
+    static bool TryShowChip(Transform _root, int _index, string _what,
+                            Sprite _icon, string _name, float _iconScale, bool _open)
+    {
+        if (_root == null) return false;
+        if (_index >= _root.childCount)
+        {
+            Debug.LogWarning($"[CardDetailOverlay] {_what} 칩이 모자라다 — 프리팹에 깔린 {_root.childCount}개까지만 보인다. " +
+                             "Tools/UI/도감 상세창 칩 박기로 개수를 늘릴 것");
+            return false;
+        }
+
+        Transform t_child = _root.GetChild(_index);
+        var       t_chip  = t_child.GetComponent<KeywordExplainItem>();
+        if (t_chip == null) return false;
+
+        t_chip.Init(_icon, _name, null, _iconScale, _open);
+        t_child.gameObject.SetActive(true);
+        return true;
+    }
+
+    /// <summary>_from번째부터 남은 칩을 끈다. 앞 카드가 더 많은 칩을 쓰고 갔을 수 있다.</summary>
+    static void HideChipsFrom(Transform _root, int _from)
     {
         if (_root == null) return;
 
-        for (int t_i = _root.childCount - 1; t_i >= 0; t_i--)
-            Destroy(_root.GetChild(t_i).gameObject);
+        for (int t_i = _from; t_i < _root.childCount; t_i++)
+            _root.GetChild(t_i).gameObject.SetActive(false);
     }
 }

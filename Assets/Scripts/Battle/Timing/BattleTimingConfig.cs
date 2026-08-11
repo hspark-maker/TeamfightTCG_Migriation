@@ -61,10 +61,12 @@ public class BattleTimingConfig : ScriptableObject
     [Header("Card Animator")]
     [SerializeField] float cardMoveDuration  = 0.3f;
     [SerializeField] float hitDuration       = 0.15f;
-    [SerializeField] float deathDuration     = 0.4f;
+    // 사망 길이의 단일 진실원. Card_Dissolve 클립(0.767초)은 이 값에 맞춰 **배속으로 눌린다** —
+    // 이 값이 클립보다 짧으면 디졸브가 그 비율만큼 빨리 감긴다. 클립 길이와 같게 두면 원본 속도.
+    [SerializeField] float deathDuration     = 0.7666667f;
     // 사망 연출 내부 박자. 전부 deathDuration 안에서 끝난다 — 이 값들을 늘려 사망을 길게 만들지 말 것
     // (결정타에서 deathDuration에 finishSlow 배율이 곱해져 체감이 4배로 늘어난다).
-    [SerializeField] float deathFlash        = 0.05f;  // 사망 순간 흰 플래시(올렸다 내리는 총 시간)
+    [SerializeField] float deathFlash        = 0.05f;  // 사망 순간 흰 플래시(디졸브 클립 쓰면 미사용)
     [SerializeField] float deathLift         = 0.12f;  // 카드가 떠오르는 데 걸리는 시간
     [SerializeField] float deathNovaAt       = 0.28f;  // 바닥 빛 파동이 터지는 시점(사망 시작 기준)
     [SerializeField] float dealAnimDuration  = 0.6f;

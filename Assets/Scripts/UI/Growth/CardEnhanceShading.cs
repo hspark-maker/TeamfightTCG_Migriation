@@ -69,6 +69,12 @@ public class CardEnhanceShading
     Material m_coverMat;
     Material m_gleamMat;
 
+    // 사본을 얹기 전의 원래 재질(대개 null = 기본 UI 재질). 연출이 끝나면 여기로 되돌린다.
+    Material[] m_surfaceMats0;
+    Material   m_floodMat0, m_gleamMat0;
+    bool       m_materialsReady;   // 사본을 만들고 원본을 기억했는가
+    bool       m_attached;         // 지금 카드가 사본을 입고 있는가
+
     // 축의 현재값. 재질에서 되읽지 않는다 — 미배선이어도 축은 이어져야 뒤 구간의 출발점이 흔들리지 않는다.
     float m_heat;
     float m_shake;
@@ -257,47 +263,91 @@ public class CardEnhanceShading
 
     // ── 수명 ─────────────────────────────────────────────
 
-    // 사본을 한 번만 만들어 그대로 둔다. 평상값이 전부 중립이라 연출 밖에서는 기본 UI 재질과 구분되지 않는다.
+    /// <summary>사본만 미리 만들어 둔다(카드에 얹지는 않는다). 첫 연출에서 재질 생성·셰이더 준비가
+    /// 한 프레임을 먹는 것을 없애기 위한 예열이다.</summary>
+    public void Warm() => EnsureMaterials();
+
+    /// <summary>사본을 카드에 얹는다. <b>연출 동안에만</b> 얹는다 —
+    /// 평상시까지 물려 두면 카드가 기본 UI 셰이더가 아니라 이 셰이더로 그려지고,
+    /// CanvasGroup 알파가 1이 아닌 구간(상세창 좌우 전환의 페이드)에서 색이 틀어진다(초록빛).</summary>
     public void Attach()
     {
-        if (this.m_bodyMat == null && this.bodyMaterial != null && this.cardSurfaces != null)
-        {
-            this.m_bodyMat = new Material(this.bodyMaterial) { name = this.bodyMaterial.name + " (ritual)" };
+        EnsureMaterials();
+        SetAttached(true);
+    }
 
-            foreach (Graphic t_g in this.cardSurfaces)
-            {
-                if (t_g != null) t_g.material = this.m_bodyMat;
-            }
+    /// <summary>원래 재질로 되돌린다. 사본은 버리지 않는다 — 다음 연출이 다시 얹기만 하면 된다.</summary>
+    public void Detach() => SetAttached(false);
+
+    void EnsureMaterials()
+    {
+        if (this.m_materialsReady) return;
+        this.m_materialsReady = true;
+
+        if (this.bodyMaterial != null && this.cardSurfaces != null)
+        {
+            this.m_bodyMat      = new Material(this.bodyMaterial) { name = this.bodyMaterial.name + " (ritual)" };
+            this.m_surfaceMats0 = new Material[this.cardSurfaces.Length];
+
+            for (int t_i = 0; t_i < this.cardSurfaces.Length; t_i++)
+                if (this.cardSurfaces[t_i] != null)
+                    this.m_surfaceMats0[t_i] = this.cardSurfaces[t_i].material;
         }
 
         // 덮개는 본체와 다른 재질을 쓴다 — 본체가 못 쓰는 UV 의존 축(FADE)이 여기서만 성립한다.
-        if (this.m_coverMat == null && this.coverMaterial != null && this.floodCover != null)
+        if (this.coverMaterial != null && this.floodCover != null)
         {
-            this.m_coverMat = new Material(this.coverMaterial) { name = this.coverMaterial.name + " (ritual)" };
-
-            this.floodCover.material = this.m_coverMat;
+            this.m_coverMat  = new Material(this.coverMaterial) { name = this.coverMaterial.name + " (ritual)" };
+            this.m_floodMat0 = this.floodCover.material;
         }
 
-        // 빛줄기는 유휴 위치가 중립이 아니다(저작값은 카드 한복판) — 얹자마자 범위 밖으로 밀어 둔다.
-        if (this.m_gleamMat == null && this.gleamMaterial != null && this.gleamCover != null)
+        if (this.gleamMaterial != null && this.gleamCover != null)
         {
-            this.m_gleamMat = new Material(this.gleamMaterial) { name = this.gleamMaterial.name + " (ritual)" };
+            this.m_gleamMat  = new Material(this.gleamMaterial) { name = this.gleamMaterial.name + " (ritual)" };
+            this.m_gleamMat0 = this.gleamCover.material;
+        }
+    }
 
-            this.gleamCover.material = this.m_gleamMat;
-            this.Gleam = 0f;
-            SetAlpha(this.gleamCover, 0f);
+    void SetAttached(bool _on)
+    {
+        if (this.m_attached == _on) return;
+        this.m_attached = _on;
+
+        if (this.m_bodyMat != null && this.cardSurfaces != null && this.m_surfaceMats0 != null)
+            for (int t_i = 0; t_i < this.cardSurfaces.Length; t_i++)
+            {
+                if (this.cardSurfaces[t_i] == null) continue;
+                this.cardSurfaces[t_i].material = _on ? this.m_bodyMat : this.m_surfaceMats0[t_i];
+            }
+
+        if (this.m_coverMat != null && this.floodCover != null)
+            this.floodCover.material = _on ? this.m_coverMat : this.m_floodMat0;
+
+        if (this.m_gleamMat != null && this.gleamCover != null)
+        {
+            this.gleamCover.material = _on ? this.m_gleamMat : this.m_gleamMat0;
+
+            // 빛줄기는 유휴 위치가 중립이 아니다(저작값은 카드 한복판) — 얹자마자 범위 밖으로 밀어 둔다.
+            if (_on)
+            {
+                this.Gleam = 0f;
+                SetAlpha(this.gleamCover, 0f);
+            }
         }
     }
 
     public void Release()
     {
+        SetAttached(false);
+
         if (this.m_bodyMat  != null) UnityEngine.Object.Destroy(this.m_bodyMat);
         if (this.m_coverMat != null) UnityEngine.Object.Destroy(this.m_coverMat);
         if (this.m_gleamMat != null) UnityEngine.Object.Destroy(this.m_gleamMat);
 
-        this.m_bodyMat  = null;
-        this.m_coverMat = null;
-        this.m_gleamMat = null;
+        this.m_bodyMat        = null;
+        this.m_coverMat       = null;
+        this.m_gleamMat       = null;
+        this.m_materialsReady = false;
     }
 
     /// <summary>빛줄기를 쏘기 직전. 밑판은 검정·가산이라 켜져도 보이는 것이 없다 — 빛을 실을 알파만 세운다.</summary>

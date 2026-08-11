@@ -7,6 +7,7 @@ public static class CurrencyManager
 
     // 잔액 변경 통지 (종류, 변경 후 금액)
     public static event Action<ECurrencyType, long> OnCurrencyChanged;
+    public static event Action<ECurrencyType, long, long> OnCurrencySpent;
 
     public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
     public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
@@ -51,7 +52,9 @@ public static class CurrencyManager
         if (s_currencies[(int)_type] < _cost) return false;
 
         s_currencies[(int)_type] -= _cost;
-        OnCurrencyChanged?.Invoke(_type, s_currencies[(int)_type]);
+        long t_balance = s_currencies[(int)_type];
+        OnCurrencySpent?.Invoke(_type, _cost, t_balance);
+        OnCurrencyChanged?.Invoke(_type, t_balance);
         return true;
     }
 }

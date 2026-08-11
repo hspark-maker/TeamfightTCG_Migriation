@@ -129,11 +129,11 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
                           t_near ? this.nearScatterRadius : this.farScatterRadius,
                           t_near ? this.nearGatherDuration : this.farGatherDuration);
 
-        var t_onArrived = t_hud.BeginGainRollUp(_gain.Amount, this.punchScale);
+        var t_onArrived = t_hud.BeginGainRollUp(_gain.Amount, out var t_releaseDisplay, this.punchScale);
         var t_seq = t_burst.BuildBurst(t_onArrived);
 
         // 연출이 어떤 이유로 끊겨도 수치 고정은 반드시 풀린다(중간 도착 통지가 빠지는 경우의 안전망).
-        t_seq.OnKill(() => { if (t_hud != null) t_hud.ReleaseDisplay(); });
+        t_seq.OnKill(() => t_releaseDisplay?.Invoke());
         return t_seq;
     }
 
