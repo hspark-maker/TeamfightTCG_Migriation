@@ -207,7 +207,9 @@ public class UiRectCapture
 
         this.ReleaseTexture();
 
-        m_rt = new RenderTexture(_w, _h, 0, RenderTextureFormat.ARGB32)
+        // 깊이 버퍼는 0이면 안 된다 — URP Render Graph는 Depth Stencil Format이 None인 타깃을 거부한다
+        // ("Fake or uninitialized surface is not supported for attachment 0"). UI라 깊이를 쓰진 않지만 붙여 둔다.
+        m_rt = new RenderTexture(_w, _h, 24, RenderTextureFormat.ARGB32)
         {
             name        = "UiRectCapture_RT",
             filterMode  = FilterMode.Bilinear,
