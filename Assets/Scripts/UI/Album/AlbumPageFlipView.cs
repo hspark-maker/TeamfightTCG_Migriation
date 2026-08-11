@@ -35,6 +35,26 @@ public class AlbumPageFlipView
     [Tooltip("넘기기 시작 시 뒤쪽 장의 크기. 진행도에 따라 원래 크기로 돌아온다.")]
     [Range(0.8f, 1f)] [SerializeField] float underStartScale = 0.97f;
 
+    [Header("말림(Roll)")]
+    [Tooltip("켜면 페이지를 RenderTexture로 떠서 실제로 말리는 연출을 쓴다(PageRollGraphic).\n" +
+             "끄면 예전 접힘(Y회전 = 가로 압축)으로 돌아간다. 뜨는 데 실패한 프레임도 접힘으로 물러난다.")]
+    [SerializeField] bool useRoll = true;
+
+    [Tooltip("말린 통의 굵기(장 폭 대비 반지름). 클수록 굵게 말리고 한 바퀴가 길어진다.")]
+    [Range(0.04f, 0.4f)] [SerializeField] float rollRadiusRatio = 0.13f;
+
+    [Tooltip("말린 구간을 몇 조각으로 나눌지. 낮으면 통이 각져 보이고, 높이면 정점만 늘어난다.")]
+    [Range(8, 64)] [SerializeField] int rollSegments = 28;
+
+    [Tooltip("말린 통이 앞으로 나오며 세로로 부푸는 정도. Overlay 캔버스라 원근이 없어 이 값이 유일한 입체 단서다.")]
+    [Range(0f, 0.3f)] [SerializeField] float rollBulge = 0.06f;
+
+    [Tooltip("말린 안쪽(종이 뒷면)의 밝기. 앞면 그림이 그대로 비치므로 충분히 어두워야 뒷면으로 읽힌다.")]
+    [Range(0f, 1f)] [SerializeField] float rollBackShade = 0.32f;
+
+    [Tooltip("페이지를 뜰 때만 쓰는 전용 카메라 레이어. 화면에 보이는 레이어(UI=5)와 겹치면 다른 것까지 찍힌다.")]
+    [SerializeField] int captureLayer = 7;
+
     RectTransform m_page;        // Grid_Slots — Panel_Page와 같은 사각형이면서 레이아웃에 안 물린 유일한 노드
     RectTransform m_sideRoot;
     TMP_Text      m_label;
@@ -44,12 +64,16 @@ public class AlbumPageFlipView
     RectTransform m_underRoot;
     CanvasGroup   m_underGroup;
 
+    UiRectCapture   m_capture;
+    PageRollGraphic m_roll;
+
     Vector2 m_baseAnchored;
     Vector3 m_baseScale = Vector3.one;
     Vector3 m_underBaseScale = Vector3.one;
     float   m_underBaseAlpha = 1f;
     int     m_dir = 1;
     bool    m_active;
+    bool    m_rolling;
 
     public float Duration => this.duration;
 
@@ -97,6 +121,13 @@ public class AlbumPageFlipView
 
         m_dir = _dir >= 0 ? 1 : -1;
 
+        // 말림은 페이지를 통째로 떠서 다시 그린다 — 그늘·광택 판은 접힘 전용이라 여기서 만들지 않는다
+        if (this.useRoll && this.TryBeginRoll())
+        {
+            this.SetFlipProgress(0f);
+            return;
+        }
+
         this.EnsureShade();
         if (m_shade != null)
         {
@@ -120,6 +151,17 @@ public class AlbumPageFlipView
     {
         if (m_page == null) return;
 
+        float t_p = Mathf.Clamp01(_p);
+
+        // 말림은 진행도 0.5(교체 지점)에서 이미 다 말려 있어야 한다 — 뒤 절반은 새 장의 몫이다
+        if (m_rolling && m_roll != null) m_roll.SetRoll(Mathf.Clamp01(t_p / 0.5f), m_dir);
+        else                             this.ApplyFold(t_p);
+
+        this.ApplyChrome(t_p);
+    }
+
+    void ApplyFold(float _p)
+    {
         float t_p    = Mathf.Clamp01(_p);
         float t_fold = 1f - Mathf.Abs(t_p * 2f - 1f);               // 0 → 1 → 0
         float t_deg  = 90f * t_fold * (t_p < 0.5f ? 1f : -1f);      // 0→90 세우고, -90→0 편다
@@ -174,6 +216,12 @@ public class AlbumPageFlipView
             t_color.a     = this.glossMax * (1f - t_cos);
             m_gloss.color = t_color;
         }
+    }
+
+    // 종이 말고 주변(게이지·페이지 번호)과 뒤에 깔린 장. 접힘·말림 어느 쪽이든 같은 규칙이다.
+    void ApplyChrome(float _p)
+    {
+        float t_p = Mathf.Clamp01(_p);
 
         // 알파도 p의 함수로 둔다. 시퀀스로 따로 몰면 넘김이 잘렸을 때 알파만 남는다
         float t_span  = this.duration > 0f ? this.crossfade / this.duration : 0f;
@@ -200,6 +248,21 @@ public class AlbumPageFlipView
         if (m_label != null)     m_label.alpha     = t_a;
     }
 
+    /// <summary>뒤에 깔린 장을 지금 넘기고 있는 표면 바로 아래에 끼운다.
+    /// 말림 중에는 표면이 페이지 자신이 아니라 그것을 떠 온 판(Page_Roll)이므로 순서의 기준이 다르다 —
+    /// 호출부가 그 사정을 알 필요 없게 여기서 하나로 정한다.</summary>
+    public void OrderUnderBelowPage(Transform _under)
+    {
+        if (_under == null) return;
+
+        Transform t_surface = m_rolling && m_roll != null ? m_roll.rectTransform : (Transform)m_page;
+        if (t_surface == null || t_surface.parent != _under.parent) return;
+
+        int t_order = t_surface.GetSiblingIndex();
+        _under.SetSiblingIndex(t_order);
+        t_surface.SetSiblingIndex(t_order + 1);
+    }
+
     /// <summary>RefreshPage가 슬롯을 새로 Instantiate하면 그늘·광택이 카드 뒤로 묻힌다 — 교체 직후 한 번 부른다.</summary>
     public void EnsureShadeOnTop()
     {
@@ -212,6 +275,9 @@ public class AlbumPageFlipView
     {
         if (!m_active) return;
         m_active = false;
+
+        // 촬영대에서 페이지를 먼저 돌려놓는다 — 이게 늦으면 원래 자리로 못 돌아온 판 위에 자세를 다시 계산한다
+        this.EndRoll();
 
         this.SetFlipProgress(0f);
 
@@ -226,6 +292,83 @@ public class AlbumPageFlipView
         if (m_underRoot != null)  m_underRoot.localScale = m_underBaseScale;
         if (m_shade != null) m_shade.gameObject.SetActive(false);
         if (m_gloss != null) m_gloss.gameObject.SetActive(false);
+    }
+
+    /// <summary>소유 뷰가 파괴될 때 캡처용 런타임 오브젝트까지 함께 정리한다.</summary>
+    public void Dispose()
+    {
+        this.EndRoll();
+        if (m_capture != null)
+        {
+            m_capture.Dispose();
+            m_capture = null;
+        }
+    }
+
+    // 페이지를 촬영대로 넘기고, 그 자리에 같은 크기의 말림 판을 세운다.
+    // 뜨는 데 실패하면(레이아웃 전이라 rect가 0인 프레임 등) false — 호출부는 접힘으로 물러난다.
+    bool TryBeginRoll()
+    {
+        if (m_rolling) return true;
+        if (m_page == null || m_page.parent == null) return false;
+        if (m_page.rect.width < 1f || m_page.rect.height < 1f) return false;
+
+        this.EnsureRoll();
+        if (m_roll == null) return false;
+
+        // 자세는 페이지가 촬영대로 떠나기 **전에** 베낀다 — 떠난 뒤엔 촬영대 기준 값이라 자리가 어긋난다
+        var t_rect = m_roll.rectTransform;
+        t_rect.anchorMin        = m_page.anchorMin;
+        t_rect.anchorMax        = m_page.anchorMax;
+        t_rect.pivot            = m_page.pivot;
+        t_rect.sizeDelta        = m_page.sizeDelta;
+        t_rect.anchoredPosition = m_page.anchoredPosition;
+        t_rect.localScale       = m_page.localScale;
+        t_rect.localRotation    = Quaternion.identity;
+        t_rect.SetSiblingIndex(m_page.GetSiblingIndex());   // 페이지가 있던 층을 그대로 물려받는다
+
+        if (m_capture == null) m_capture = new UiRectCapture();
+        if (!m_capture.Begin(m_page, this.captureLayer))
+        {
+            m_roll.gameObject.SetActive(false);
+            return false;
+        }
+
+        m_roll.SetTexture(m_capture.Texture);
+        m_roll.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
+        m_roll.SetRoll(0f, m_dir);
+        m_roll.gameObject.SetActive(true);
+
+        m_rolling = true;
+        return true;
+    }
+
+    void EndRoll()
+    {
+        if (!m_rolling) return;
+        m_rolling = false;
+
+        if (m_roll != null)
+        {
+            m_roll.SetTexture(null);   // 텍스처를 놓고 나서 지워야 이미 없어진 RenderTexture를 그리지 않는다
+            m_roll.gameObject.SetActive(false);
+        }
+        if (m_capture != null) m_capture.End();
+    }
+
+    void EnsureRoll()
+    {
+        if (m_roll != null || m_page == null || m_page.parent == null) return;
+
+        var t_go = new GameObject("Page_Roll", typeof(RectTransform), typeof(LayoutElement), typeof(PageRollGraphic));
+        var t_rect = (RectTransform)t_go.transform;
+        t_rect.SetParent(m_page.parent, false);
+
+        t_go.GetComponent<LayoutElement>().ignoreLayout = true;   // 그늘·광택과 같은 이유(레이아웃 칸으로 세지 않게)
+
+        m_roll = t_go.GetComponent<PageRollGraphic>();
+        m_roll.raycastTarget = false;
+        t_go.SetActive(false);
     }
 
     // 광택 띠. 그늘과 같은 규약으로 만든다(레이아웃 무시·raycast 끔·평상시 비활성).
