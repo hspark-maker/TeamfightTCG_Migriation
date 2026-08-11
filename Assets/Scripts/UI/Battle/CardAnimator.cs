@@ -39,6 +39,24 @@ public class CardAnimator : MonoBehaviour
     Vector3    twitchHomeScale;   // 리프트가 곱해질 기준 크기(프리팹에서 1이 아닐 수 있다)
     Vector3    twitchBaseHome;    // 리프트를 얹기 전의 원래 자세. twitchHome을 오르내리며 누적시키지 않으려고 따로 둔다
 
+    [Header("사망 디졸브 (Card_Dissolve 클립)")]
+    // 프레임/일러스트 셰이더(_Dissolve/_Edge/_Mask_Y_Offset)와 정보 텍스트 알파를 클립 하나가 같이 몬다.
+    // 미배선이면 자식에서 찾는다 — 못 찾으면 예전 페이드 사망으로 폴백한다(연출이 사라지진 않게).
+    [SerializeField] Animator dissolveAnim;
+
+    // 디졸브 머티리얼은 **죽을 때만** 끼운다. 평상시에도 물려 두면 카드가 계속 밝다 —
+    // 셰이더의 기본 색이 `tex*tex.r + tex`(자기 밝기만큼 자기를 더한다)에 엣지 발광(HDR)까지 상시 더하는
+    // 구성이라, _Dissolve를 "안 녹은 값"으로 둬도 평범한 스프라이트로 돌아오지 않는다.
+    // 그래서 값이 아니라 **머티리얼 자체**를 갈아 끼웠다 뺀다.
+    [SerializeField] Material         dissolveMaterial;
+    [SerializeField] SpriteRenderer[] dissolveRenderers;   // 클립이 material._Dissolve를 모는 렌더러(Frame/Illustration)
+
+    Material[] normalMaterials;   // 갈아 끼우기 전 원래 머티리얼(스프라이트 기본). 복구용
+
+    static readonly int DISSOLVE_STATE = Animator.StringToHash("Card_Dissolve");
+    const string DISSOLVE_CLIP = "Card_Dissolve";
+    float dissolveClipLength;   // 클립 원본 길이(초). 사망 길이에 맞춰 배속을 환산하는 데만 쓴다
+
     [Header("롱프레스 리프트 (정보창 볼 때 살짝 떠오름)")]
     // 등장 컷씬(PlayDealToMid)은 화면 중앙에서 1.5배까지 키운다 — 이건 그보다 훨씬 얕은 '살짝'이다.
     [SerializeField] float longPressLiftY     = 0.2f;    // 위로 뜨는 거리(월드)
@@ -95,6 +113,47 @@ public class CardAnimator : MonoBehaviour
             this.twitchHomeRot   = this.twitchTarget.localRotation;
             this.twitchHomeScale = this.twitchTarget.localScale;
         }
+
+        if (this.dissolveAnim == null) this.dissolveAnim = GetComponentInChildren<Animator>(true);
+        if (this.dissolveAnim != null)
+        {
+            // 컨트롤러의 기본 상태가 사망 클립이다 — 켜 둔 채로 두면 카드가 생기자마자 스스로 녹는다.
+            // 첫 평가(Update) 전에 여기서 끄고, 실제 값 복구는 Start의 ResetDissolve가 한다
+            // (Animator 네이티브 초기화가 끝난 뒤라야 Play/Update가 먹는다).
+            this.dissolveAnim.enabled = false;
+            this.dissolveClipLength   = FindDissolveClipLength();
+        }
+
+        if (this.dissolveRenderers != null)
+        {
+            this.normalMaterials = new Material[this.dissolveRenderers.Length];
+            for (int t_i = 0; t_i < this.dissolveRenderers.Length; t_i++)
+                if (this.dissolveRenderers[t_i] != null)
+                    this.normalMaterials[t_i] = this.dissolveRenderers[t_i].sharedMaterial;
+        }
+    }
+
+    void Start() => ResetDissolve();
+
+    float FindDissolveClipLength()
+    {
+        AnimationClip[] t_clips = this.dissolveAnim.runtimeAnimatorController?.animationClips;
+        if (t_clips == null || t_clips.Length == 0) return 0f;
+        foreach (AnimationClip t_clip in t_clips)
+            if (t_clip != null && t_clip.name == DISSOLVE_CLIP) return t_clip.length;
+        return t_clips[0] != null ? t_clips[0].length : 0f;
+    }
+
+    /// <summary>디졸브를 <b>멀쩡한 카드</b> 상태로 되돌린다 — Animator를 끄고 머티리얼을 원래 것으로 뺀다.
+    /// 셰이더 값을 되돌릴 필요는 없다. 평상시엔 디졸브 머티리얼 자체가 안 물려 있고,
+    /// 다음 사망은 클립을 t=0부터 다시 쓰기 때문이다.
+    ///
+    /// 죽은 직후가 아니라 <b>다시 보이기 직전</b>에 부른다. 사망 끝에 되돌리면 녹아 사라진 카드가
+    /// 한 프레임 되살아나 보인다(알파를 0으로 남기는 이유와 같다).</summary>
+    void ResetDissolve()
+    {
+        if (this.dissolveAnim != null) this.dissolveAnim.enabled = false;
+        SetDissolveMaterial(false);
     }
 
     /// <summary>이 카드가 속한 필드의 가운데 자리(월드). 시네마 집결 지점 —
@@ -200,6 +259,9 @@ public class CardAnimator : MonoBehaviour
     public void FadeView(float _alpha, float _duration)
     {
         this.FadeTarget = _alpha;
+        // 다시 보이게 하는 경로(구체 변신 복귀·교활 재등장 등)는 알파만으로는 부족하다 —
+        // 디졸브가 녹은 채로 남아 있으면 알파 1이어도 카드가 안 보인다.
+        if (_alpha > 0f) ResetDissolve();
         RefreshVisualCache();
 
         for (int t_i = 0; t_i < this.cachedRenderers.Length; t_i++)
@@ -400,6 +462,9 @@ public class CardAnimator : MonoBehaviour
     // 사망 연출 형태값(거리·배율이라 시간이 아니다 → BattleTimingConfig가 아니라 여기).
     const float DEATH_LIFT_DISTANCE = 0.18f;   // 사라지며 떠오르는 거리(월드)
     const float DEATH_SHRINK        = 0.92f;   // 끝 크기 배율(0까지 찌그러뜨리지 않는다)
+    // 디졸브 사망에서 장식(아이콘·프레임 등)이 사라지는 시간 = 사망 길이의 이 비율.
+    // 클립이 정보·키워드를 지우는 지점(0.25/0.767)에 맞춘 값 — 카드가 다 녹기 전에 끝나야 한다.
+    const float DEATH_DECOR_FADE_RATIO = 0.33f;
 
     /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 축소 → 페이드아웃.
     /// 별가루·바닥 파동 파티클은 여기 없다 — 스폰 좌표와 정렬 레이어를 아는 <see cref="CardView"/>가 쏜다.
@@ -413,6 +478,10 @@ public class CardAnimator : MonoBehaviour
         Vector3 t_liftFrom = transform.localPosition;
         this.FadeTarget = 0f;   // 사망은 알파 0으로 끝난다(아래 주석 참조) — 그 사이 태어난 자식도 0으로
         RefreshVisualCache();
+
+        // 디졸브 클립이 있으면 **사라지는 방식의 주인은 클립**이다. 아래 렌더러/텍스트 페이드 트윈은
+        // 같은 색을 매 프레임 덮어써 서로 싸우므로(클립이 이긴다) 이때는 아예 걸지 않는다.
+        bool t_dissolving = TryPlayDissolve(_duration);
 
         SoundManager.Instance?.PlayDeath();
         SoundManager.Instance?.PlayDeathVoice(this.boundCard?.data?.deathVoices);
@@ -444,19 +513,30 @@ public class CardAnimator : MonoBehaviour
                                          Mathf.Min(GameTiming.Battle.DeathLift, _duration))
                            .SetEase(Ease.OutCubic))
             .Join(transform.DOScale(Vector3.one * DEATH_SHRINK, _duration).SetEase(Ease.OutQuad));
-        if (this.dieOverlay != null)
+        // 흰 플래시는 **페이드 사망 전용**이다. 디졸브 클립은 자체 엣지 발광(HDR)을 갖고 있어
+        // 그 위에 흰 판을 덧대면 카드가 통째로 하얗게 날아간다(과노출).
+        if (this.dieOverlay != null && !t_dissolving)
         {
             float t_flashHalf = Mathf.Min(GameTiming.Battle.DeathFlash, _duration) * 0.5f;
             _ = t_seq.Insert(0f,           this.dieOverlay.DOFade(0.85f, t_flashHalf));
             _ = t_seq.Insert(t_flashHalf,  this.dieOverlay.DOFade(0f,    t_flashHalf));
         }
+        // 디졸브 중이어도 알파 페이드는 그대로 건다 — 클립이 알파를 모는 대상(정보 텍스트 등)은
+        // 목표가 같아서(0) 부딪히지 않고, 클립이 손대지 않는 장식(타입 아이콘·키워드 프레임 등)은
+        // 이게 없으면 카드가 다 녹은 자리에 아이콘만 떠 있는다.
+        // 예외는 디졸브 렌더러(Frame/Illustration) 둘뿐 — 얘들은 사라지는 방식이 셰이더라,
+        // 알파까지 같이 내리면 엣지 발광이 먼저 흐려져 녹는 게 안 보인다.
+        // 디졸브일 땐 짧게 — 클립이 정보/키워드를 0.25초(전체 0.767초의 1/3)에 이미 지운다.
+        // 나머지 장식도 같은 박자로 지워야 카드가 다 녹은 뒤 아이콘만 떠 있지 않는다.
+        float t_fadeDuration = t_dissolving ? _duration * DEATH_DECOR_FADE_RATIO : _duration;
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay) continue;
-            _ = t_seq.Join(t_sr.DOFade(0f, _duration).SetEase(Ease.InQuad));
+            if (t_dissolving && IsDissolveRenderer(t_sr)) continue;
+            _ = t_seq.Join(t_sr.DOFade(0f, t_fadeDuration).SetEase(Ease.InQuad));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            _ = t_seq.Join(t_tmp.DOFade(0f, _duration).SetEase(Ease.InQuad));
+            _ = t_seq.Join(t_tmp.DOFade(0f, t_fadeDuration).SetEase(Ease.InQuad));
 
         try
         {
@@ -466,6 +546,10 @@ public class CardAnimator : MonoBehaviour
         {
             if (this != null)
             {
+                // 클립은 마지막 프레임(다 녹은 상태)에서 멈춘 채로 둔다 — 되돌리기는 ResetDissolve가
+                // 다시 보이기 직전에 한다. 여기서 Animator를 꺼야 슬롯이 꺼진 뒤 헛돌지 않는다.
+                if (this.dissolveAnim != null) this.dissolveAnim.enabled = false;
+
                 // 슬롯(=Awake에서 잡은 원래 자리)과 크기 1로 되돌린다. 진입 시점 값이 아니라 **알려진 정상값**이라
                 // 어떤 이유로 어긋난 채 죽어도 그 어긋남이 슬롯에 남지 않는다.
                 // 알파는 0으로 남긴다 — 1로 되돌리면 죽은 카드가 잠깐 되살아나 보인 뒤 HideSlot이 다시 숨긴다(플래시).
@@ -480,6 +564,48 @@ public class CardAnimator : MonoBehaviour
                 }
             }
         }
+    }
+
+    bool IsDissolveRenderer(SpriteRenderer _sr)
+    {
+        if (this.dissolveRenderers == null) return false;
+        foreach (SpriteRenderer t_sr in this.dissolveRenderers)
+            if (t_sr == _sr) return true;
+        return false;
+    }
+
+    /// <summary>디졸브 머티리얼을 끼우거나(_on) 원래 것으로 되돌린다. 되돌릴 대상은 Awake에 잡아 둔
+    /// 프리팹 원본이라, 도중에 어떤 이유로 어긋나도 슬롯에 이월되지 않는다.</summary>
+    void SetDissolveMaterial(bool _on)
+    {
+        if (this.dissolveRenderers == null || this.normalMaterials == null) return;
+        if (_on && this.dissolveMaterial == null) return;
+
+        for (int t_i = 0; t_i < this.dissolveRenderers.Length; t_i++)
+        {
+            SpriteRenderer t_sr = this.dissolveRenderers[t_i];
+            if (t_sr == null) continue;
+            t_sr.sharedMaterial = _on ? this.dissolveMaterial : this.normalMaterials[t_i];
+        }
+    }
+
+    /// <summary>사망 디졸브 클립 재생 시작. 재생했으면 true(=페이드 트윈을 걸지 말 것).
+    /// 길이의 단일 진실원은 <c>BattleTimingConfig</c>다 — 클립 길이를 그대로 쓰면 결정타 슬로우·전역 배속이
+    /// 이 연출만 비껴가므로, 클립을 배속으로 눌러 요청받은 _duration에 정확히 맞춘다.</summary>
+    bool TryPlayDissolve(float _duration)
+    {
+        if (this.dissolveAnim == null || !this.dissolveAnim.gameObject.activeInHierarchy) return false;
+
+        // 머티리얼 교체가 먼저 — Animator는 이번 프레임 Update에서야 값을 쓴다.
+        SetDissolveMaterial(true);
+        this.dissolveAnim.enabled = true;
+        this.dissolveAnim.speed   = (_duration > 0f && this.dissolveClipLength > 0f)
+            ? this.dissolveClipLength / _duration
+            : 1f;
+        this.dissolveAnim.Play(DISSOLVE_STATE, 0, 0f);
+        // 첫 프레임을 지금 즉시 반영 — 지난 사망이 남긴 "다 녹은" 값이 한 프레임 비치는 걸 막는다.
+        this.dissolveAnim.Update(0f);
+        return true;
     }
 
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)
@@ -508,6 +634,7 @@ public class CardAnimator : MonoBehaviour
 
         if (_duration < 0f) _duration = GameTiming.Battle.DealAnimDuration;
         this.FadeTarget = 1f;   // 배치는 알파 1로 리셋하고 시작(아래 색 리셋과 짝)
+        ResetDissolve();        // 슬롯 재사용 — 앞 카드가 녹은 채로 끝났으면 셰이더도 같이 되돌린다
         ResetLongPressLift();   // 이전 카드가 뜬 채로 사라졌을 수 있다
         RefreshVisualCache();
 

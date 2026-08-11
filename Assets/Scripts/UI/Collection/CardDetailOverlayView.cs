@@ -84,6 +84,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] GameObject keywordSectionLock;
     [SerializeField] GameObject synergySectionLock;
 
+    // 런타임은 이 프리팹을 만들지 않는다 — 칩은 프리팹에 미리 깔려 있다(TryShowChip 주석).
+    // 남겨 둔 이유는 깔아 주는 에디터 도구(CardDetailChipBaker)가 "무엇을 깔지"를 여기서 읽기 때문이다.
     [SerializeField] KeywordExplainItem chipPrefab;
     [SerializeField] KeywordIconConfig  keywordIconConfig;
     [SerializeField] PopupTransition    transition = new PopupTransition();
@@ -882,8 +884,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void BuildKeywordSection(CardData _card, bool _owned)
     {
-        ClearChildren(this.keywordChipRoot);
-
         // 지금 지은 내용의 기준값. RefreshKeywordVisuals의 변경 감지가 이 값을 본다 —
         // 카드 전환(Apply)도 이 길을 지나므로 감지가 곧바로 한 번 더 짓는 일이 없다.
         this.m_keywordCard = _card;
@@ -897,8 +897,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               && CardVisualRules.InfoKeywords(_card) == CardKeyword.None);
 
         var t_lines = new List<string>();
+        int t_used  = 0;
 
-        if (_owned && this.keywordIconConfig != null && this.chipPrefab != null && this.keywordChipRoot != null)
+        if (_owned && this.keywordIconConfig != null && this.keywordChipRoot != null)
         {
             // 판정 기준은 인게임 카드 정보창(CardElement)과 같다 — 규칙 자체는 CardVisualRules가 소유한다.
             // 카드 타일과 달리 **해금 전 키워드도 목록에 넣는다**(잠김 룩으로) — 정보창은 지금 쓸 수 있는 것뿐
@@ -914,21 +915,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 if (!this.keywordIconConfig.TryGetEntry(t_kw, out KeywordIconConfig.Entry t_entry)) continue;
 
                 bool t_open = (t_locked & t_kw) == 0;
-                Instantiate(this.chipPrefab, this.keywordChipRoot)
-                    .Init(t_entry.icon, t_entry.displayName, null, 1f, t_open);
+                if (TryShowChip(this.keywordChipRoot, t_used, "키워드",
+                                t_entry.icon, t_entry.displayName, 1f, t_open))
+                    t_used++;
 
                 // 설명은 잠겨도 그대로 적는다 — 무엇이 열릴지 모르면 강화할 이유가 안 읽힌다.
                 if (!string.IsNullOrEmpty(t_entry.explain)) t_lines.Add(t_entry.explain);
             }
         }
 
+        HideChipsFrom(this.keywordChipRoot, t_used);
         ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned);
     }
 
     void BuildSynergySection(CardData _card, bool _owned)
     {
-        ClearChildren(this.synergyChipRoot);
-
         // 지금 지은 잠김 상태. RefreshUnlockVisuals의 변경 감지가 이 값을 본다(키워드 줄과 같은 규약).
         this.m_shownSynergyOpen = _owned && SynergyUnlocked(_card);
 
@@ -937,8 +938,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         SetSectionLock(this.synergySectionLock, _owned && t_hasSynergy && !this.m_shownSynergyOpen);
 
         var t_lines = new List<string>();
+        int t_used  = 0;
 
-        if (_owned && _card.synergies != null && this.chipPrefab != null && this.synergyChipRoot != null)
+        if (_owned && _card.synergies != null && this.synergyChipRoot != null)
         {
             // 시너지는 카드마다가 아니라 **1차 진화 도달 여부**로 통째로 열린다(관문은 CardGrowthConfig 소유).
             // 그래서 칩마다 판정하지 않고 카드 하나에 한 번만 묻는다.
@@ -949,14 +951,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
 
-                // 세 번째 인자는 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
-                Instantiate(this.chipPrefab, this.synergyChipRoot)
-                    .Init(t_syn.activeIcon, SynergyText.Name(t_syn), null, SynergyIconStrip.IconPadCompensation, t_open);
+                // 아이콘 배율은 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
+                if (TryShowChip(this.synergyChipRoot, t_used, "시너지",
+                                t_syn.activeIcon, SynergyText.Name(t_syn),
+                                SynergyIconStrip.IconPadCompensation, t_open))
+                    t_used++;
 
                 if (!string.IsNullOrEmpty(t_syn.effectDescription)) t_lines.Add(t_syn.effectDescription);
             }
         }
 
+        HideChipsFrom(this.synergyChipRoot, t_used);
         ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
     }
 
@@ -1000,11 +1005,37 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_section != null) _section.SetActive(true);
     }
 
-    static void ClearChildren(Transform _root)
+    /// <summary>줄에 <b>미리 깔아 둔</b> _index번째 칩을 채워 켠다. 칩이 모자라면 false —
+    /// 호출부는 거기서 멈춘다(있는 만큼만 보여주고 나머지는 설명 줄로 읽힌다).
+    ///
+    /// 칩은 런타임에 만들지 않는다. 프리팹에 박아 두면 배치·간격을 씬에서 눈으로 잡을 수 있고,
+    /// 카드를 넘길 때마다 Destroy/Instantiate가 돌지 않는다. 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기.</summary>
+    static bool TryShowChip(Transform _root, int _index, string _what,
+                            Sprite _icon, string _name, float _iconScale, bool _open)
+    {
+        if (_root == null) return false;
+        if (_index >= _root.childCount)
+        {
+            Debug.LogWarning($"[CardDetailOverlay] {_what} 칩이 모자라다 — 프리팹에 깔린 {_root.childCount}개까지만 보인다. " +
+                             "Tools/UI/도감 상세창 칩 박기로 개수를 늘릴 것");
+            return false;
+        }
+
+        Transform t_child = _root.GetChild(_index);
+        var       t_chip  = t_child.GetComponent<KeywordExplainItem>();
+        if (t_chip == null) return false;
+
+        t_chip.Init(_icon, _name, null, _iconScale, _open);
+        t_child.gameObject.SetActive(true);
+        return true;
+    }
+
+    /// <summary>_from번째부터 남은 칩을 끈다. 앞 카드가 더 많은 칩을 쓰고 갔을 수 있다.</summary>
+    static void HideChipsFrom(Transform _root, int _from)
     {
         if (_root == null) return;
 
-        for (int t_i = _root.childCount - 1; t_i >= 0; t_i--)
-            Destroy(_root.GetChild(t_i).gameObject);
+        for (int t_i = _from; t_i < _root.childCount; t_i++)
+            _root.GetChild(t_i).gameObject.SetActive(false);
     }
 }
