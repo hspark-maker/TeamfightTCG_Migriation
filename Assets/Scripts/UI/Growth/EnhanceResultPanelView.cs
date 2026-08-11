@@ -21,6 +21,11 @@ public readonly struct EnhanceResultLine
     /// 더 올릴 단계가 없으면 호출부가 "없음" 표기를 넣는다.</summary>
     public readonly string RetryCostText;
 
+    /// <summary>"한 번 더"의 비용 재화 아이콘. 스프라이트째 받는 이유는 <see cref="RetryCostText"/>와 같다 —
+    /// 재화에서 그림을 고르는 규칙이 화면마다 따로 있으면 하단 바와 결과판이 같은 비용을 다른 아이콘으로 띄운다.
+    /// null이면 프리팹 그림을 그대로 둔다(강화가 늘 골드였던 시절의 배선도 그대로 산다).</summary>
+    public readonly Sprite RetryCostIcon;
+
     /// <summary>이번 강화로 **새로 열린 것**(키워드·시너지·진화). 없으면 null/빈 문자열이고 그 행은 아예 뜨지 않는다.
     /// 무엇이 열렸는지 판정하는 것은 성장 규칙을 아는 호출부 몫이고, 여기는 완성된 문장만 받는다
     /// (<see cref="RetryNotice"/>·<see cref="RetryCostText"/>와 같은 규약).</summary>
@@ -28,7 +33,7 @@ public readonly struct EnhanceResultLine
 
     public EnhanceResultLine(EEnhanceOutcome _outcome, int _fromHp, int _toHp, int _fromLevel, int _toLevel,
                              bool _canRetry, string _retryNotice, string _retryCostText = null,
-                             string _unlockText = null)
+                             Sprite _retryCostIcon = null, string _unlockText = null)
     {
         this.UnlockText = _unlockText;
         this.Outcome       = _outcome;
@@ -39,6 +44,7 @@ public readonly struct EnhanceResultLine
         this.CanRetry      = _canRetry;
         this.RetryNotice   = _retryNotice;
         this.RetryCostText = _retryCostText;
+        this.RetryCostIcon = _retryCostIcon;
     }
 }
 
@@ -84,6 +90,8 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] TMP_Text retryNoticeText;
     [Tooltip("다음 강화에 들 비용. 하단 바의 강화 버튼과 같은 값·같은 표기를 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
     [SerializeField] TMP_Text retryCostText;
+    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다. 스프라이트도 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
+    [SerializeField] Image    retryCostIcon;
 
     [Header("해금 알림 (선택)")]
     [Tooltip("이번 강화로 열린 것(키워드·시너지·진화). 열린 게 없는 강화가 대부분이라 행째로 껐다 켠다.")]
@@ -162,6 +170,10 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;
         if (this.retryCostText   != null) this.retryCostText.text   = _line.RetryCostText;
+
+        // 스프라이트가 없으면 프리팹 그림을 그대로 둔다 — 빈 칸으로 갈아치우면 아이콘이 사라진다.
+        if (this.retryCostIcon != null && _line.RetryCostIcon != null)
+            this.retryCostIcon.sprite = _line.RetryCostIcon;
 
         // 열린 게 없으면 행 자체를 접는다 — 빈 줄이 남으면 "뭔가 열렸나?" 하고 한 번 더 읽게 된다.
         bool t_hasUnlock = !string.IsNullOrEmpty(_line.UnlockText);

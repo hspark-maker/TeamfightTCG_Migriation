@@ -105,7 +105,7 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] PackScreenFlash newCardFlash;
 
     // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 얼마가 돌아왔나"를 말한다 —
-    // 결과 격자에는 칩이 없으므로(PackCardView.PlayRefundAccent) 이 줄이 그 축의 유일한 답이다.
+    // 결과 격자에는 칩이 없으므로(PackCardView.PlayDupeChip) 이 줄이 그 축의 유일한 답이다.
     //
     // ⚠ 칩과 획득 버튼은 **같은 앵커 기준(화면 하단)**이어야 한다. 한쪽만 중앙 앵커면 화면비가 바뀔 때
     //   서로 파고들고, 화면비가 낮으면(태블릿) 칩이 화면 밖으로 밀려난다.

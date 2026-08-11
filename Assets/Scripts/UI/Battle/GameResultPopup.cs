@@ -1,11 +1,16 @@
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 // 전투 결과 팝업의 등장 연출 진행자.
-// 흐름: 암막 → 패널 팝 → 골드·랭크 라인 동시 진행(코인 분출·수렴, 도착마다 수치 롤링) → 안내문.
+// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 장씩 골드로 빨려들며 계단식 가산) → 랭크 줄 → 안내문.
 // 패배 팝업은 라인 등장까지만 하고 분출·롤링을 접는다 — 같은 스크립트를 승패 플래그로 갈라 쓴다.
+//
+// 카드가 골드로 변하는 축은 승리 전용이다. 패배 보상은 남은 카드를 보지 않는 고정액이라
+// (RewardService.CalculateReward) 카드를 날리면 연출이 규칙을 거짓말하게 된다.
+// 카드 축이 설 때만 랭크를 뒤로 미루는 것도 같은 이유다 — 겹치면 카드=골드 인과가 흐려진다.
 //
 // 보상·랭크는 전투가 끝나는 순간 TurnRunner→RewardService/RankManager가 이미 지급·영속화했다.
 // 여기서는 확정된 값을 보여주기만 한다 — 재계산도, 재지급도 없다.
@@ -21,6 +26,15 @@ public class GameResultPopup : MonoBehaviour
     // ScreenDim이 없는 씬에서만 자기가 암막 노릇을 한다.
     [SerializeField] CanvasGroup dimGroup;
     [SerializeField] TMP_Text rewardGoldText;     // 지급된 골드 표시용(표시 전용)
+
+    [Tooltip("생존 카드가 빨려드는 목적지(보통 골드 아이콘). 미배선이면 골드 수치 텍스트로 간다.")]
+    [SerializeField] RectTransform goldIconRect;
+
+    [Tooltip("생존 카드 수를 적는 줄(옵션). {0}에 장수가 들어간다. 카드 위가 아니라 줄 밖에 두는 표기다.")]
+    [SerializeField] TMP_Text survivorLabel;
+    [SerializeField] string survivorFormat = "생존 {0}장";
+
+    [Tooltip("카드 축이 설 수 없을 때(생존 목록 미전달)만 도는 폴백 분출. 카드가 날아가면 코인은 뜨지 않는다.")]
     [SerializeField] CoinBurstEffect coinBurst;   // 코인 분출·수렴(옵션)
     [SerializeField] TMP_Text rankPointText;      // 가감된 랭크 포인트 표시용(표시 전용)
     [SerializeField] CoinBurstEffect rankBurst;   // 랭크 포인트 아이콘 분출·수렴(옵션)
@@ -30,18 +44,26 @@ public class GameResultPopup : MonoBehaviour
 
     [SerializeField] CanvasGroup hintGroup;       // "터치하면 메인 화면으로" 안내
 
+    [Header("연출")]
+    [SerializeField] SurvivorGoldFlight cardFlight = new SurvivorGoldFlight();
+
     [Header("타이밍")]
     [SerializeField] float dimDuration = 0.2f;
     [SerializeField] float dimAlpha = 0.94f;      // 암막 짙기(ScreenDim에 넘기는 값)
     [SerializeField] float enterDuration = 0.45f;
-    [SerializeField] float titleDuration = 0.35f;
     [SerializeField] float rewardRevealDuration = 0.3f; // 패널 등장 뒤 보상 라인이 팝하는 시간.
     [SerializeField] float goldRollDuration = 0.15f;    // 아이콘 하나가 닿을 때 수치가 굴러가는 시간(골드·랭크 공용).
     [SerializeField] float hintFadeDuration = 0.25f;
 
+    [Tooltip("골드 줄이 패널 팝의 몇 지점에서 끼어드는가(0=동시, 1=끝난 뒤). 매 판 보는 화면이라 겹쳐서 줄인다.")]
+    [SerializeField, Range(0f, 1f)] float panelOverlap = 0.6f;
+
+    [Tooltip("랭크 줄이 골드 줄 끝보다 이만큼 일찍 시작한다.")]
+    [SerializeField] float rankOverlap = 0.3f;
+
     [Header("연출 값")]
-    [SerializeField] float titleDrop = 120f;      // 타이틀이 이만큼 위에서 떨어진다.
     [SerializeField] float goldPunch = 0.3f;      // 아이콘이 닿을 때 수치가 튀는 세기(골드·랭크 공용).
+    [SerializeField] float goldIconPunch = 0.18f; // 카드가 닿을 때 골드 아이콘이 튀는 세기.
 
     Sequence revealSeq;   // 진행 중 등장 연출. 재진입 시 통째로 Kill해 좀비 시퀀스 누적 방지.
 
@@ -70,8 +92,12 @@ public class GameResultPopup : MonoBehaviour
     /// <summary>
     /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
+    /// _survivorArts는 승리 보상을 만든 생존 카드의 아트로, 한 장씩 골드로 빨려들며 계단을 만든다.
+    /// null과 빈 리스트는 다른 뜻이다 — null은 "생존 수를 모른다"(코인 분출로 폴백),
+    /// 빈 리스트는 "0장"(카드도 코인도 없이 하한 보상만). 합치면 카드 없이 코인이 터져 인과가 거꾸로 학습된다.
     /// </summary>
-    public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true)
+    public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true,
+                     IReadOnlyList<Sprite> _survivorArts = null)
     {
         gameObject.SetActive(true);
 
@@ -79,29 +105,46 @@ public class GameResultPopup : MonoBehaviour
 
         this.m_revealDone = false;
 
-        ResetVisual(_reward.HasAmount ? _reward.Amount : 0, _rankDelta, _won);
+        long t_gold = _reward.HasAmount ? _reward.Amount : 0;
+
+        // 패배 보상은 카드와 무관한 고정액이라 카드 축을 세우지 않는다.
+        IReadOnlyList<Sprite> t_arts = _won ? _survivorArts : null;
+
+        // 카드가 0장이면 굴릴 계단이 없다 — 0에서 출발시키면 어디서 왔는지 모를 숫자가 혼자 오른다.
+        bool t_goldWillRoll = _won && t_gold != 0 && (t_arts == null || t_arts.Count > 0);
+
+        ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_arts);
 
         this.revealSeq = DOTween.Sequence().SetLink(gameObject);
+
+        float t_cursor = 0f;
 
         // 암막 먼저, 그다음 패널 팝. ScreenDim은 트윈이 아니라 자기가 페이드하므로 그 시간만큼 시퀀스를 비운다.
         if (ScreenDim.IsAvailable)
         {
             ScreenDim.Show(this, this.dimAlpha, true, this.dimDuration);
-            this.revealSeq.AppendInterval(this.dimDuration);
+            t_cursor += this.dimDuration;
         }
         else if (this.dimGroup != null)
-            this.revealSeq.Append(this.dimGroup.DOFade(1f, this.dimDuration));
+        {
+            this.revealSeq.Insert(0f, this.dimGroup.DOFade(1f, this.dimDuration));
+            t_cursor += this.dimDuration;
+        }
 
-        this.revealSeq.Append(this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
+        this.revealSeq.Insert(t_cursor, this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
 
-        bool t_lineStarted = false;
+        float t_end = t_cursor + this.enterDuration;
 
-        // 골드·랭크는 같은 시점에 함께 굴러간다 — 첫 라인만 Append하고 나머지는 Join으로 겹친다.
-        JoinCounter(BuildCounterLine(this.m_gold, this.coinBurst, _won), ref t_lineStarted);
-        JoinCounter(BuildCounterLine(this.m_rank, this.rankBurst, _won), ref t_lineStarted);
+        // 골드 줄은 패널이 다 커지기 전에 끼어든다 — 순차로 두면 그만큼 결과 화면이 길어진다.
+        float t_goldAt = t_cursor + this.enterDuration * this.panelOverlap;
+        t_end = Mathf.Max(t_end, InsertLine(BuildGoldLine(_won, t_arts, out bool t_cardsFlew), t_goldAt));
+
+        // 카드가 날아갈 때만 랭크를 뒤로 미룬다(꼬리는 물린다). 그 외에는 예전처럼 같은 시점에 겹친다.
+        float t_rankAt = t_cardsFlew ? Mathf.Max(t_goldAt, t_end - this.rankOverlap) : t_goldAt;
+        t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_rank, this.rankBurst, _won), t_rankAt));
 
         if (this.hintGroup != null)
-            this.revealSeq.Append(this.hintGroup.DOFade(1f, this.hintFadeDuration));
+            this.revealSeq.Insert(t_end, this.hintGroup.DOFade(1f, this.hintFadeDuration));
 
         // 스킵(Complete)으로 와도 여기를 지난다 — 수치는 항상 확정값으로 안착한다.
         this.revealSeq.OnComplete(() =>
@@ -112,7 +155,49 @@ public class GameResultPopup : MonoBehaviour
         });
     }
 
-    // 라인 하나(수치 팝 → 아이콘 분출·수렴)를 독립 시퀀스로 만든다. 텍스트 미배선이면 null(라인 자체가 없음).
+    // 골드 줄. 수치가 팝하는 동안 생존 카드가 나란히 서고, 한 장씩 골드로 빨려들며 그만큼 계단이 오른다.
+    // 카드 축이 설 수 없으면(_arts == null) 예전 코인 분출로 폴백한다 — 계단 없이 값만 툭 뜨는 것보다 낫다.
+    // _cardsFlew는 호출자가 랭크 줄을 뒤로 미룰지 판단하는 데 쓴다.
+    Sequence BuildGoldLine(bool _animate, IReadOnlyList<Sprite> _arts, out bool _cardsFlew)
+    {
+        _cardsFlew = false;
+
+        Tween t_reveal = this.m_gold.BuildReveal(this.rewardRevealDuration);
+        if (t_reveal == null) return null;
+
+        Sequence t_line = DOTween.Sequence();
+        t_line.Insert(0f, t_reveal);
+
+        if (!_animate || this.m_gold.Total <= 0) return t_line;
+        if (_arts != null && _arts.Count == 0) return t_line;   // 카드 0장: 하한 보상이 이미 박혀 있다.
+
+        RectTransform t_target = this.goldIconRect != null
+                               ? this.goldIconRect
+                               : (RectTransform)this.rewardGoldText.transform;
+
+        Sequence t_cards = _arts == null ? null
+                         : this.cardFlight.Build(_arts, (RectTransform)transform, t_target,
+                                                 this.m_gold.HandleArrived,
+                                                 () => UiPunch.Play(t_target, this.goldIconPunch, this.goldRollDuration));
+        if (t_cards != null)
+        {
+            t_line.Insert(0f, t_cards);
+            _cardsFlew = true;
+            return t_line;
+        }
+
+        if (this.coinBurst != null)
+        {
+            t_line.Append(this.coinBurst.BuildBurst(this.m_gold.HandleArrived));
+            return t_line;
+        }
+
+        t_line.AppendCallback(() => this.m_gold.HandleArrived(1, 1));
+        t_line.AppendInterval(this.goldRollDuration);
+        return t_line;
+    }
+
+    // 랭크 줄(수치 팝 → 아이콘 분출·수렴). 텍스트 미배선이면 null(라인 자체가 없음).
     // _animate=false면 라인이 등장만 하고 수치는 확정값에 박힌 채로 있는다(패배 팝업).
     Sequence BuildCounterLine(RollingCounter _counter, CoinBurstEffect _burst, bool _animate)
     {
@@ -137,31 +222,40 @@ public class GameResultPopup : MonoBehaviour
         return t_line;
     }
 
-    // 첫 라인은 패널 등장 뒤에 붙이고(Append), 이후 라인은 같은 시점에 겹친다(Join).
-    void JoinCounter(Sequence _line, ref bool _started)
+    // 라인 하나를 지정 시각에 얹고 그 끝 시각을 돌려준다(라인이 없으면 시작 시각 그대로).
+    float InsertLine(Sequence _line, float _at)
     {
-        if (_line == null) return;
+        if (_line == null) return _at;
 
-        if (_started) this.revealSeq.Join(_line);
-        else          this.revealSeq.Append(_line);
-
-        _started = true;
+        this.revealSeq.Insert(_at, _line);
+        return _at + _line.Duration();
     }
 
     // 연출 시작 상태로 되돌린다(재진입 대비).
-    void ResetVisual(long _gold, long _rankDelta, bool _animate)
+    void ResetVisual(long _gold, long _rankDelta, bool _animate, bool _goldWillRoll,
+                     IReadOnlyList<Sprite> _survivorArts)
     {
         this.panel.localScale = Vector3.zero;
 
         if (this.dimGroup != null) this.dimGroup.alpha = 0f;
         if (this.hintGroup != null) this.hintGroup.alpha = 0f;
 
+        this.cardFlight.Reset();
+
         // 랭크를 정산하지 않는 전투(튜토리얼)에서는 "0"이 아니라 줄 자체가 없어야 한다.
         if (this.rankLine != null) this.rankLine.SetActive(_rankDelta != 0);
 
+        // 생존 수를 모르는 경로(폴백)에서는 없는 값을 지어내지 않고 줄째로 감춘다.
+        if (this.survivorLabel != null)
+        {
+            this.survivorLabel.gameObject.SetActive(_survivorArts != null);
+            if (_survivorArts != null)
+                this.survivorLabel.text = string.Format(this.survivorFormat, _survivorArts.Count);
+        }
+
         // 라벨('골드'·'랭크 포인트')과 아이콘은 프리팹의 정적 요소, 여기선 가감 수치만 채운다.
         // 굴릴 값이 있으면 0에서 출발, 없으면 곧장 확정값을 보여준다.
-        this.m_gold.Reset(_gold, _animate && _gold != 0);
+        this.m_gold.Reset(_gold, _goldWillRoll);
         this.m_rank.Reset(_rankDelta, _animate && _rankDelta != 0);
     }
 
@@ -184,6 +278,7 @@ public class GameResultPopup : MonoBehaviour
         this.revealSeq = null;
         this.m_gold?.Kill();
         this.m_rank?.Kill();
+        this.cardFlight?.Reset();   // 시퀀스가 끊기면 마지막 정리 콜백이 오지 않는다.
     }
 
     // 수치 텍스트 한 줄 + 그 롤링·펀치 상태 한 벌.

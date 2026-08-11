@@ -32,9 +32,14 @@ public class RankHud : MonoBehaviour
 
     [Tooltip("마지막 별이 켜진 뒤의 여운.")]
     [SerializeField] float finishDelay = 0.6f;
-    [Tooltip("핍이 다 꺼진 뒤 배지가 갈리기까지의 뜸.")]
+    [Tooltip("핍이 다 꺼진 뒤 배지가 갈리기까지의 뜸(강등 전용 — 승급은 배지 안무가 박자를 갖는다).")]
     [SerializeField] float badgeSwapDelay = 0.15f;
-    [SerializeField] float badgePunch = 0.4f;
+
+    [Tooltip("등급 승급 때 켜져 있던 별이 한꺼번에 꺼지며 움츠러드는 세기.")]
+    [SerializeField] float pipBlowOut = 0.1f;
+
+    [Tooltip("등급이 갈리는 순간의 배지 안무(파열 → 강림). 값은 전부 여기 안에 있다.")]
+    [SerializeField] RankPromoteEffect promote = new RankPromoteEffect();
 
     [Header("포인트 획득 반응")]
     [Tooltip("조각이 닿을 때마다 배지가 튀는 세기. 여러 번 겹치므로 작게 준다.")]
@@ -174,7 +179,18 @@ public class RankHud : MonoBehaviour
         // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 핍 줄이 꺼진 채 시작해 첫 칸이 켜질 때 함께 나타난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
         this.RenderPips(t_prevDivision);
-        if (t_gradeUp && _prevTierIndex >= 0) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
+
+        if (t_gradeUp)
+        {
+            // 첫 진입은 되돌릴 '이전 등급'이 없다 — 언랭크 배지로 되돌려야 그것이 파열하고 첫 등급이 강림한다.
+            // 안 되돌리면 이미 떠 있는 새 배지가 터지고 같은 배지가 다시 내려온다.
+            if (_prevTierIndex >= 0) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
+            else
+            {
+                RankManager.GetUnrankedDisplay(out string t_unrankedName, out Sprite t_unrankedBadge);
+                this.RenderTier(t_unrankedName, t_unrankedBadge);
+            }
+        }
 
         // 옛 상태를 한 박자 보여준 뒤에 바꾼다 — 곧장 켜면 무엇이 달라졌는지 못 본다.
         this.m_tierSeq.AppendInterval(this.enterDelay);
@@ -189,9 +205,12 @@ public class RankHud : MonoBehaviour
         this.m_tierSeq.AppendInterval(this.finishDelay);
 
         // 어떤 이유로 끊겨도 표시가 중간 상태로 굳지 않게 한다(연출 가드를 먼저 풀고 정상 규칙으로 되돌린다).
+        // Restore가 배지의 자리·배율과 런타임 생성물을 함께 걷는다.
         this.m_tierSeq.OnKill(() =>
         {
             this.m_tierSeq = null;
+            this.promote.Restore();
+            this.RestorePipScales();
             this.Render();
         });
 
@@ -239,6 +258,7 @@ public class RankHud : MonoBehaviour
             this.m_tierSeq = null;
             this.RestoreBadgeColor();
             this.RestoreBadgePosition();
+            this.RestorePipScales();
             this.Render();
         });
 
@@ -289,32 +309,32 @@ public class RankHud : MonoBehaviour
         this.RenderPips(t_info.IsUnranked ? 0 : t_info.Division);
     }
 
-    // 등급 승급: 채워졌던 핍이 뒤에서부터 하나씩 꺼지고 → 배지가 갈리고 → 새 등급 1단계가 켜진다.
+    // 등급 승급: 구 배지가 파열하고 → 새 배지가 강림해 착지하고 → 그제서야 새 등급의 별이 채워진다.
+    // 별을 뒤에서부터 하나씩 줄이지 않는다 — 오르는 순간에 '잃는 그림'을 끼우면 감정이 역행한다.
     void StageGradeUp(Sequence _seq, in RankInfo _info, int _prevDivision, int _divisions)
     {
         // in 파라미터는 람다가 잡을 수 없다 — 콜백이 쓸 값만 먼저 떠 둔다.
         string t_name = _info.DisplayName;
         Sprite t_badge = _info.Badge;
         int t_division = _info.Division;
+        int t_prev = _prevDivision;
 
-        for (int t_i = _prevDivision - 1; t_i >= 0; t_i--)
-        {
-            int t_index = t_i;
-            _seq.AppendCallback(() => this.SetPip(t_index, false));
-            _seq.AppendInterval(this.pipStep);
-        }
-
-        _seq.AppendInterval(this.badgeSwapDelay);
-        _seq.AppendCallback(() =>
-        {
-            this.RenderTier(t_name, t_badge);
-            UiPunch.Play(this.badgeImage != null ? this.badgeImage.transform : null, this.badgePunch);
-        });
-        _seq.AppendInterval(this.badgePunch);
+        this.promote.Build(_seq, this.badgeImage, this.descText, t_name, t_badge,
+                           _onBurst: () => this.BlowOutPips(t_prev));
 
         // 새 등급의 1단계부터 다시 쌓기 시작한다(도달 단계가 2 이상인 경우도 순서대로 켠다).
         for (int t_i = 0; t_i < t_division && t_i < _divisions; t_i++)
             this.StagePipOn(_seq, t_i);
+    }
+
+    // 켜져 있던 별이 배지가 터지는 것과 같은 프레임에 한꺼번에 꺼진다(순서대로 지우면 그만큼 잃는 장면이 길어진다).
+    void BlowOutPips(int _prevDivision)
+    {
+        for (int t_i = 0; t_i < _prevDivision; t_i++)
+        {
+            this.SetPip(t_i, false);
+            UiPunch.Play(this.PipTransform(t_i), -this.pipBlowOut);
+        }
     }
 
     // 핍 하나가 탁 켜지는 단위 동작. _index = 켜질 칸(0-based).
@@ -449,5 +469,20 @@ public class RankHud : MonoBehaviour
     {
         var t_rect = this.BadgeRect;
         if (t_rect != null) t_rect.anchoredPosition = this.m_badgeBasePos;
+    }
+
+    // 핍 펀치는 시퀀스 멤버가 아니라 따로 뜬 트윈이라, 연출이 중간에 끊기면 줄어든(혹은 커진) 배율로 굳는다.
+    void RestorePipScales()
+    {
+        if (this.divisionPips == null) return;
+
+        for (int t_i = 0; t_i < this.divisionPips.Length; t_i++)
+        {
+            var t_pip = this.divisionPips[t_i];
+            if (t_pip == null) continue;
+
+            t_pip.transform.DOKill();
+            t_pip.transform.localScale = Vector3.one;
+        }
     }
 }

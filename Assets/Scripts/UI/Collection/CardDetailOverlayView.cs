@@ -23,8 +23,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const string NoValue     = "-";
 
     // 강화가 왜 막혔는지. 상세 패널의 상시 문구와 결과판의 "한 번 더" 아래 문구가 같은 문장을 쓴다.
-    const string MaxLevelNotice     = "최고 레벨에 도달했다";
-    const string NotAffordableNotice = "골드가 부족하다";
+    // 재화 표시명의 공용 진실원은 아직 없다 — 강화가 쓰는 재화가 둘뿐이라 표를 만들지 않았다.
+    const string MaxLevelNotice          = "최고 레벨에 도달했다";
+    const string NotAffordableNotice     = "골드가 부족하다";
+    const string NotAffordableDiaNotice  = "다이아가 부족하다";
 
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
@@ -37,7 +39,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
-    [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 골드 비용
+    [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 비용(재화는 레벨마다 다르다 — 아래 아이콘이 말한다)
+    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다(옵션 — 미배선 무시).")]
+    [SerializeField] Image      enhanceCostIcon;
+    [Tooltip("골드 비용 레벨에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
+    [SerializeField] Sprite     goldIcon;
+    [Tooltip("다이아 비용 레벨(진화)에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
+    [SerializeField] Sprite     diamondIcon;
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
@@ -137,6 +145,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 시너지 줄은 칩마다가 아니라 관문 하나(1차 진화)로 통째로 잠긴다 → 기준값도 불리언 하나면 된다.
     bool m_shownSynergyOpen;
+
+    // 지금 화면에 지어 둔 키워드 줄의 잠김 상태. 해금 순간을 잡으려면 마스크만으로는 부족하다 —
+    // 잠김 판정은 "열린 것이 하나도 없는가"라 마스크가 그대로여도 상태가 바뀔 수 있다.
+    bool m_shownKeywordLocked;
+
+    // 방금 해금됐지만 아직 연출로 걷지 못한 판. 강화 연출이 화면을 덮고 있는 동안 해금이 확정되므로,
+    // 그 사이엔 판을 남겨 두고 무대가 돌아온 뒤에 걷는다(SetSectionLock 주석 참고).
+    bool m_pendingKeywordUnlockFx;
+    bool m_pendingSynergyUnlockFx;
 
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
@@ -260,6 +277,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.ritual?.CancelImmediate();
         this.resultPanel?.HideImmediate();
         this.m_retryQueued = false;
+
+        // 안 보이는 채로 터뜨릴 판은 없다. 대기만 버리고 판은 다음 열기의 Build가 지금 상태로 맞춘다.
+        DropPendingUnlockFx();
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
@@ -529,6 +549,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         bool t_owned = OwnershipManager.IsOwned(_card);
 
+        // 다른 카드를 그리는 참이다 — 앞 카드의 해금 대기는 여기서 버린다(안 그러면 이 카드의 판이 이유 없이 터진다).
+        DropPendingUnlockFx();
+
         // 그림·이름·체력·키워드 아이콘·잠김 오버레이는 도감 타일과 같은 컴포넌트에 그대로 위임한다.
         if (this.cardView != null) this.cardView.Bind(_card, t_owned);
         
@@ -582,6 +605,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         bool t_sameCard = _card == this.m_keywordCard;
 
+        // 같은 카드가 서 있는 채로 잠김이 풀렸다 = 방금 해금됐다. 카드를 넘겨 온 경우는 해금이 아니므로 제외한다.
+        // 판을 걷는 일은 여기서 하지 않는다 — 무대가 돌아온 뒤 PlayPendingUnlockFx가 연출로 걷는다.
+        if (t_sameCard)
+        {
+            if (t_syn && !this.m_shownSynergyOpen) this.m_pendingSynergyUnlockFx = true;
+            if (this.m_shownKeywordLocked && !KeywordSectionLocked(_card, _owned)) this.m_pendingKeywordUnlockFx = true;
+        }
+
         // 시너지 관문(1차 진화)은 키워드 마스크를 안 건드리고 넘어갈 수 있다 — 따로 보지 않으면
         // Lv5를 찍어도 잠긴 시너지 칩이 그대로 남는다.
         if (t_sameCard && t_syn != this.m_shownSynergyOpen) BuildSynergySection(_card, _owned);
@@ -593,10 +624,57 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     // 미배선이면 조용히 건너뛴다(다른 옵션 배선과 같은 규약 — 판 없는 프리팹에서도 칩별 자물쇠는 그대로 뜬다).
-    static void SetSectionLock(GameObject _lock, bool _locked)
+    //
+    // _pendingFx면 **판을 걷지 않는다** — 방금 해금된 줄이라 걷는 일은 연출(SectionUnlockFx)이 맡는다.
+    // 여기서 먼저 꺼버리면 강화 연출에 가려 있는 동안 판이 사라져, 화면이 돌아왔을 때 보여줄 것이 없다.
+    static void SetSectionLock(GameObject _lock, bool _locked, bool _pendingFx = false)
     {
-        if (_lock != null) _lock.SetActive(_locked);
+        if (_lock == null) return;
+        if (!_locked && _pendingFx) return;
+
+        _lock.SetActive(_locked);
     }
+
+    /// <summary>방금 해금된 줄의 잠김 판을 연출로 걷는다. 연출이 미배선이면 예전처럼 즉시 걷는다 —
+    /// 배선 실패가 "판이 안 걷혀 내용이 영영 가려짐"이 되면 안 된다.</summary>
+    void PlayPendingUnlockFx()
+    {
+        if (this.m_pendingKeywordUnlockFx)
+        {
+            this.m_pendingKeywordUnlockFx = false;
+            PlayUnlockFx(this.keywordSectionLock);
+        }
+
+        if (this.m_pendingSynergyUnlockFx)
+        {
+            this.m_pendingSynergyUnlockFx = false;
+            PlayUnlockFx(this.synergySectionLock);
+        }
+    }
+
+    static void PlayUnlockFx(GameObject _lock)
+    {
+        if (_lock == null || !_lock.activeSelf) return;
+
+        var t_fx = _lock.GetComponent<SectionUnlockFx>();
+        if (t_fx == null) { _lock.SetActive(false); return; }
+
+        t_fx.Play();
+    }
+
+    /// <summary>대기 중인 해금 연출을 버리고 판을 지금 상태에 맞춘다.
+    /// 카드를 넘기거나 창을 닫으면 "방금 해금됐다"는 맥락이 사라진다 — 남겨두면 다음 카드의 판이 이유 없이 터진다.</summary>
+    void DropPendingUnlockFx()
+    {
+        this.m_pendingKeywordUnlockFx = false;
+        this.m_pendingSynergyUnlockFx = false;
+    }
+
+    /// <summary>키워드 줄이 통째로 잠겼는가. 판정이 두 곳에 갈리지 않게 여기 하나로 둔다
+    /// (짓는 쪽 <see cref="BuildKeywordSection"/>과 감지하는 쪽 <see cref="RefreshUnlockVisuals"/>가 같은 답을 봐야 한다).</summary>
+    static bool KeywordSectionLocked(CardData _card, bool _owned)
+        => _owned && CardVisualRules.LockedKeywords(_card) != CardKeyword.None
+                  && CardVisualRules.InfoKeywords(_card) == CardKeyword.None;
 
     /// <summary>이 카드의 시너지가 열려 있는가. 관문(1차 진화 레벨)은 CardGrowthConfig가 소유하고
     /// 여기선 그 결과만 읽는다 — 레벨 숫자를 이 화면이 직접 적으면 관문이 두 곳이 된다.</summary>
@@ -619,7 +697,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
-        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(ECurrencyType.Gold, t_step.Cost);
+        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
         if (this.enhanceButton != null)
         {
             this.enhanceButton.gameObject.SetActive(_owned);
@@ -627,6 +705,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.enhanceButton.interactable = t_canPayEnhance && !this.m_ritualPlaying;
         }
         if (this.enhanceCostText != null) this.enhanceCostText.text = CostLabel(t_hasStep, t_step.Cost);
+        ApplyCostIcon(t_hasStep, t_step.Currency);
 
         // 결과판이 걷힌 뒤(또는 평상시)엔 다시 "강화"다. 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
         SetEnhanceLabel(this.enhanceLabel);
@@ -634,7 +713,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
 
         if (this.growthNoticeText != null)
-            this.growthNoticeText.text = _owned ? GrowthNotice(t_hasStep, t_canPayEnhance) : string.Empty;
+            this.growthNoticeText.text = _owned ? GrowthNotice(t_hasStep, t_canPayEnhance, t_step.Currency)
+                                               : string.Empty;
     }
 
     /// <summary>이번 강화(_from → _to)로 **새로 열린 것**을 한 문장으로. 아무것도 안 열렸으면 null.
@@ -675,10 +755,33 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 더 올릴 단계가 없으면 숫자 대신 빈값 표기.</summary>
     static string CostLabel(bool _hasStep, long _cost) => _hasStep ? _cost.ToString("N0") : NoValue;
 
-    // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
-    static string GrowthNotice(bool _hasStep, bool _canPay)
+    /// <summary>비용 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 —
+    /// 둘 다 있을 때만 바꾼다(카드팩 진열대의 <c>ResolveCurrencyIcon</c>과 같은 규약).
+    /// 더 올릴 단계가 없으면 숫자가 "-"로 비므로 아이콘도 함께 걷는다(숫자 없이 그림만 남는 칸 방지).</summary>
+    Sprite CostIconOf(ECurrencyType _currency)
     {
-        return !_hasStep ? MaxLevelNotice : !_canPay ? NotAffordableNotice : string.Empty;
+        if (this.goldIcon == null || this.diamondIcon == null) return null;
+
+        return _currency == ECurrencyType.Diamond ? this.diamondIcon : this.goldIcon;
+    }
+
+    void ApplyCostIcon(bool _hasStep, ECurrencyType _currency)
+    {
+        if (this.enhanceCostIcon == null) return;
+
+        this.enhanceCostIcon.enabled = _hasStep;
+
+        Sprite t_icon = CostIconOf(_currency);
+        if (t_icon != null) this.enhanceCostIcon.sprite = t_icon;
+    }
+
+    // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
+    static string GrowthNotice(bool _hasStep, bool _canPay, ECurrencyType _currency)
+    {
+        if (!_hasStep) return MaxLevelNotice;
+        if (_canPay)   return string.Empty;
+
+        return _currency == ECurrencyType.Diamond ? NotAffordableDiaNotice : NotAffordableNotice;
     }
 
     void OnEnhancePressed()
@@ -766,6 +869,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 if (t_now != null) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
                 RefreshArrows();
 
+                // 무대가 돌아와 줄이 다시 보이는 지금이 해금 연출의 자리다(연출 중엔 가려 있어 보여줄 수 없다).
+                PlayPendingUnlockFx();
+
                 // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
                 // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
                 // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
@@ -834,20 +940,23 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // "한 번 더"의 가부는 오른 뒤의 다음 단계로 판정한다 — 방금 쓴 비용이 아니라 지금 낼 비용이 기준이다.
         bool t_hasNext  = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
-        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(ECurrencyType.Gold, t_next.Cost);
+        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
 
         var t_line = new EnhanceResultLine(_result.Outcome,
                                            _fromHp, DeckPower.MaxHpOf(_card),
                                            _fromLevel, _result.Level,
-                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry),
+                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
+                                           // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
+                                           CostIconOf(t_next.Currency),
                                            UnlockLabel(_card, _fromLevel, _result.Level));
 
         // 결과를 읽는 동안 하단 바 버튼이 "한 번 더"를 맡는다 — 연출 시작 때 LockControls가 꺼둔 것을 여기서 되살린다.
         // 값도 지금 낼 비용으로 갈아둔다(방금 쓴 비용이 남아 있으면 다음 한 방의 가격을 잘못 읽는다).
         if (this.enhanceButton   != null) this.enhanceButton.interactable = t_canRetry;
         if (this.enhanceCostText != null) this.enhanceCostText.text       = CostLabel(t_hasNext, t_next.Cost);
+        ApplyCostIcon(t_hasNext, t_next.Currency);
         SetEnhanceLabel(this.retryLabel);
 
         this.resultPanel.Show(t_line,
@@ -886,9 +995,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 카드 키워드는 keywordUnlockLevel 하나로 통째로 열린다 → 열린 것이 하나도 없으면 섹션 전체가 잠긴 것이다.
         // (explainKeywords는 해금 개념이 없는 안내용이라, 그것만 남았으면 여전히 "통째로 잠김"이 맞다.)
-        SetSectionLock(this.keywordSectionLock,
-                       _owned && CardVisualRules.LockedKeywords(_card) != CardKeyword.None
-                              && CardVisualRules.InfoKeywords(_card) == CardKeyword.None);
+        this.m_shownKeywordLocked = KeywordSectionLocked(_card, _owned);
+        SetSectionLock(this.keywordSectionLock, this.m_shownKeywordLocked, this.m_pendingKeywordUnlockFx);
 
         var t_lines = new List<string>();
         int t_used  = 0;
@@ -929,7 +1037,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 시너지는 1차 진화 관문 하나로 전부 열리고 전부 잠긴다 → 부분 잠김이 없어 항상 섹션째로 덮는다.
         bool t_hasSynergy = _card != null && _card.synergies != null && _card.synergies.Length > 0;
-        SetSectionLock(this.synergySectionLock, _owned && t_hasSynergy && !this.m_shownSynergyOpen);
+        SetSectionLock(this.synergySectionLock, _owned && t_hasSynergy && !this.m_shownSynergyOpen,
+                       this.m_pendingSynergyUnlockFx);
 
         var t_lines = new List<string>();
         int t_used  = 0;

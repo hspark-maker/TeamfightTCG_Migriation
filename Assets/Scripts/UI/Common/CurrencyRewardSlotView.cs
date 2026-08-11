@@ -11,6 +11,11 @@ public class CurrencyRewardSlotView
     [SerializeField] Image icon;
     [SerializeField] TMP_Text amountLabel;
 
+    // 칸 '안'을 안무하는 쪽(랭크 보상 오버레이)을 위한 손잡이. 같은 노드를 저쪽에서 또 배선하면 진실원이 갈린다.
+    public GameObject Root => this.root;
+    public Image Icon => this.icon;
+    public TMP_Text Amount => this.amountLabel;
+
     public void Bind(Sprite _icon, long _amount)
     {
         if (root != null) root.SetActive(true);

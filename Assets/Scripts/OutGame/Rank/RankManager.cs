@@ -74,6 +74,18 @@ public static class RankManager
             t_unranked);
     }
 
+    /// <summary>언랭크(첫 티어 미도달) 상태의 표시값. 승급 연출이 '오르기 직전'으로 되돌릴 때 쓴다 —
+    /// 그 시점엔 정산이 끝나 GetInfo가 이미 도달 상태를 돌려주므로 언랭크 표시를 따로 물어야 한다.
+    /// 폴백 규칙(언랭크 배지 미저작 → 첫 등급 배지)은 GetInfo와 같다.</summary>
+    public static void GetUnrankedDisplay(out string _displayName, out Sprite _badge)
+    {
+        var t_config = Config;
+        t_config.TryGetTier(0, out RankTier t_first);
+
+        _displayName = t_config.unrankedDisplayName;
+        _badge       = t_config.unrankedBadge != null ? t_config.unrankedBadge : t_first.Badge;
+    }
+
     /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
     /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
     public static bool TryEnterFirstTier(out RankApplyResult _result)
@@ -108,9 +120,9 @@ public static class RankManager
         long t_floor = IsRanked ? t_config.FirstTierPoints : 0;
 
         // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
-        // 천장을 현재 포인트 아래로는 내리지 않는다: 졸업 낙인이 마지막 튜토 전투보다 "먼저" 찍히므로
-        // (마지막 스텝이 전투 시작 버튼 클릭이다) 그 판은 이미 첫 티어에 선 채로 정산된다 —
-        // 고정 천장을 쓰면 그 한 판이 곧 강등이 된다.
+        // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
+        // 그래도 천장을 현재 포인트 아래로는 내리지 않는다 — 이미 랭크에 오른 세이브로 튜토 전투를 돌면(디버그 승급 등)
+        // 고정 천장이 곧 강등이 된다.
         long t_ceiling = _tutorial ? Math.Max(t_config.FirstTierPoints - 1, t_points) : long.MaxValue;
 
         t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);

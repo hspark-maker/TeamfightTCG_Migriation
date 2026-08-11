@@ -86,14 +86,11 @@ public class AlbumThemeCellView : MonoBehaviour
     {
         if (m_theme == null) return;
 
-        var t_rewards = m_theme.Rewards;   // Claim 전에 캡처
-        if (!AlbumRewardManager.ClaimTheme(m_theme)) return;
+        // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
+        if (!AlbumRewardManager.CanClaimTheme(m_theme)) return;
 
-        if (!CurrencyGainEffectPlayer.TryGet(this, out var t_player)) return;
-
-        var t_bucket = new CurrencyGainBucket();
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            t_bucket.Add(t_rewards[t_i].currency, t_rewards[t_i].amount);
-        t_player.Play(chest.Rect, t_bucket);
+        AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} 완성!",
+                                  m_theme.Rewards,
+                                  () => AlbumRewardManager.ClaimTheme(m_theme));
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -34,6 +35,9 @@ public class TurnRunner : MonoBehaviour
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
+
+    // 보상을 만든 생존 카드의 아트 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
+    List<Sprite> lastSurvivorArts;
 
     // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
     CancellationToken destroyCt;
@@ -95,25 +99,63 @@ public class TurnRunner : MonoBehaviour
             await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, _won);
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorArts);
     }
 
 #if UNITY_EDITOR
+    // 미리보기 생존 장수. static이라 씬을 다시 켜도 마지막으로 보던 장수가 유지된다.
+    static int s_previewSurvivors = 3;
+
     void Update()
     {
-        // 연출 확인용 샘플 보상 — 0이면 코인·수치 롤링이 통째로 생략돼 볼 게 없다.
+        // F3/F4로 생존 장수를 바꾸고 F1/F2로 그 장수로 재생한다.
         // 패배(F2)는 설계상 분출·롤링이 없다 — 값만 박힌 채 뜨는 게 정상이다.
+        if (Input.GetKeyDown(KeyCode.F3)) SetPreviewSurvivors(s_previewSurvivors + 1);
+        if (Input.GetKeyDown(KeyCode.F4)) SetPreviewSurvivors(s_previewSurvivors - 1);
         if (Input.GetKeyDown(KeyCode.F1)) PreviewResult(true).Forget();
         if (Input.GetKeyDown(KeyCode.F2)) PreviewResult(false).Forget();
     }
 
+    void SetPreviewSurvivors(int _count)
+    {
+        s_previewSurvivors = Mathf.Clamp(_count, 0, BattleField.SLOT_COUNT * 2);
+        Debug.Log($"[결과 미리보기] 생존 {s_previewSurvivors}장 → "
+                + $"{RewardService.CalculateReward(true, s_previewSurvivors).Amount} 골드");
+    }
+
     // 여운까지 포함한 미리보기. 결과를 확정하지 않으므로(CaptureResult 미호출) 보상·랭크는 건드리지 않는다 —
     // 전투를 끝까지 돌리지 않고도 여운 타이밍을 튜닝하려면 이 경로가 정상 경로와 같은 연출을 타야 한다.
+    // 금액도 하드코딩하지 않는다. CalculateReward는 지급하지 않는 순수 함수라, 재화를 건드리지 않으면서
+    // 계단 수(생존 장수)와 총액이 실제 공식대로 맞물리는지까지 함께 검증된다.
     async UniTaskVoid PreviewResult(bool _won)
     {
+        var t_reward = RewardService.CalculateReward(_won, s_previewSurvivors);
+        List<Sprite> t_arts = BuildPreviewArts(s_previewSurvivors);
+
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(new CurrencyGain(ECurrencyType.Gold, 1234), _won ? 10 : -5, _won);
+        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_arts);
+    }
+
+    // 실제 생존 카드 → 플레이어 덱 → 빈 자리 순으로 채운다. 마지막 폴백은 아트 없는 타일 경로까지 함께 검증한다.
+    List<Sprite> BuildPreviewArts(int _count)
+    {
+        var t_arts = new List<Sprite>(_count);
+
+        List<CardInstance> t_active = this.playerField != null ? this.playerField.GetActiveCards() : null;
+        var t_deck = DeckConfig.PlayerDeck;
+
+        for (int t_i = 0; t_i < _count; t_i++)
+        {
+            if (t_active != null && t_i < t_active.Count)
+                t_arts.Add(CardVisualRules.PickBattleArt(t_active[t_i]));
+            else if (t_deck != null && t_i < t_deck.Count)
+                t_arts.Add(CardVisualRules.PickCardArt(t_deck[t_i]));
+            else
+                t_arts.Add(null);
+        }
+
+        return t_arts;
     }
 #endif
 
@@ -299,8 +341,14 @@ public class TurnRunner : MonoBehaviour
         if (this.resultCaptured) return;
         
         this.resultCaptured = true;
-        int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
-        this.lastReward = RewardService.GrantBattleReward(t_remaining);
+
+        var t_active = this.playerField.GetActiveCards();
+        int t_remaining = t_active.Count + this.playerField.WaitingCount;
+
+        // 보상을 만든 그 카드들을 그대로 팝업에 넘긴다 — 목록과 금액이 갈라지면 계단이 어긋난다.
+        this.lastSurvivorArts = CollectSurvivorArts(t_active);
+
+        this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
         BattleRewardHandoff.Set(this.lastReward);
@@ -313,6 +361,20 @@ public class TurnRunner : MonoBehaviour
 
         // 승패 무관하게 싣는다 — 로비 랭크 배지가 포인트 증감에 반응한다(보여줄 것이 없는 결과는 캐리어가 스스로 거른다).
         RankResultHandoff.Set(t_rank);
+    }
+
+    // 슬롯 → 대기 순. 아트를 못 고른 카드도 자리를 지킨다 — 빼면 보상 계단의 분모가 카드 수와 어긋난다.
+    List<Sprite> CollectSurvivorArts(List<CardInstance> _active)
+    {
+        var t_arts = new List<Sprite>(_active.Count + this.playerField.WaitingCount);
+
+        for (int t_i = 0; t_i < _active.Count; t_i++)
+            t_arts.Add(CardVisualRules.PickBattleArt(_active[t_i]));
+
+        foreach (CardInstance t_card in this.playerField.GetWaitingCards())
+            t_arts.Add(CardVisualRules.PickBattleArt(t_card));
+
+        return t_arts;
     }
 
     public static void Cleanup()

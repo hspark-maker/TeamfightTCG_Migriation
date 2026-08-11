@@ -23,37 +23,46 @@ MonoBehaviour:
   levelSteps:
   - level: 2
     hpGain: 0
+    costCurrency: 0
     cost: 50
     successRate: 1
   - level: 3
     hpGain: 0
+    costCurrency: 0
     cost: 80
     successRate: 1
   - level: 4
     hpGain: 0
-    cost: 110
+    costCurrency: 0
+    cost: 120
     successRate: 1
   - level: 5
     hpGain: 0
-    cost: 160
+    costCurrency: 1
+    cost: 15
     successRate: 1
   - level: 6
     hpGain: 0
-    cost: 250
+    costCurrency: 0
+    cost: 200
     successRate: 0.9
   - level: 7
     hpGain: 0
-    cost: 350
+    costCurrency: 0
+    cost: 260
     successRate: 0.8
   - level: 8
     hpGain: 0
-    cost: 450
+    costCurrency: 0
+    cost: 330
     successRate: 0.7
   - level: 9
     hpGain: 0
-    cost: 600
+    costCurrency: 0
+    cost: 400
     successRate: 0.6
   - level: 10
     hpGain: 0
-    cost: 800
-    successRate: 0.5
+    costCurrency: 1
+    cost: 35
+    successRate: 1

@@ -95,10 +95,12 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 개봉이 끝나면 다시 살 수 있다. 씬을 떠나던 시절엔 OnEnable이 해주던 일 — 이제 아무도 해주지 않는다.
+    // 얼려 둔 진열도 여기서 푼다(Refresh 전체 — 잔액뿐 아니라 목록이 바뀌어 있을 수 있다).
+    // 오버레이는 하드컷으로 사라지므로 같은 프레임에 갈아치우면 교체 자체가 보이지 않는다.
     void OnOverlayClosed()
     {
         s_transitioning = false;
-        RefreshBuyLock();   // 개봉으로 잔액이 줄었다 — 다음 구매 가능 여부를 다시 판정한다.
+        Refresh();
     }
 
     void OnCurrencyChanged(ECurrencyType _type, long _balance)
@@ -129,6 +131,12 @@ public class PackShowcaseController : MonoBehaviour
     // 잠그기는 그 다음 문제일 뿐, 표시·결제 일치는 목록이 지킨다.
     void ResolveDisplay()
     {
+        // 구매가 확정된 뒤 개봉이 닫힐 때까지는 진열을 얼린다. 튜토리얼 구매 스텝은 구매 성공 신호로
+        // 곧장 다음 칸을 커밋해 강제 진열이 풀리는데, 그 시점은 플래시가 화면을 덮기 전이라
+        // 원래 상점으로 갈아치워지는 것이 그대로 보인다. 게다가 캐러셀 재구축은 페이지를 파괴하므로
+        // 구매 임팩트가 잡고 있던 팩 노드까지 사라진다.
+        if (s_transitioning) return;
+
         m_display.Clear();
         m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced);
 
@@ -268,7 +276,9 @@ public class PackShowcaseController : MonoBehaviour
         if (PackOpenOverlay.TryOpen()) return;
 
         // 구매·소유는 이미 원자 영속됐다 — 잃는 것은 개봉 연출뿐이므로 되돌리지 않고 잠금만 푼다.
+        // 열지 못하면 닫힘 신호도 오지 않는다 — 얼려 둔 진열을 여기서 함께 풀지 않으면 영영 굳는다.
         s_transitioning = false;
+        Refresh();
         Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
     }
 
