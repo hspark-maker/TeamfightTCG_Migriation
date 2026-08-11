@@ -253,6 +253,11 @@ public class AlbumPageOverlayView : MonoBehaviour
         transition.HandleDisabled(gameObject);
     }
 
+    void OnDestroy()
+    {
+        pageFlip.Dispose();
+    }
+
     void HandleChanged()
     {
         if (m_theme == null) return;
@@ -530,9 +535,8 @@ public class AlbumPageOverlayView : MonoBehaviour
             m_underPageIndex = t_index;
         }
 
-        int t_currentOrder = slotRoot.GetSiblingIndex();
-        underSlotRoot.SetSiblingIndex(t_currentOrder);
-        slotRoot.SetSiblingIndex(t_currentOrder + 1);
+        // 순서의 기준은 넘김 뷰가 정한다 — 말림 중에는 넘기는 표면이 슬롯 뿌리가 아니라 그것을 떠 온 판이다
+        pageFlip.OrderUnderBelowPage(underSlotRoot);
         underSlotRoot.gameObject.SetActive(true);
     }
 
