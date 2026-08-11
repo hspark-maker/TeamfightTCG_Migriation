@@ -27,6 +27,9 @@ public enum BattleVfxId
                             // 방향으로 눕는다 — 반격사면 방향이 저절로 뒤집히므로 항목을 따로 만들 필요가 없다
     DeathStardust    = 15,  // 사망: 카드가 사라지며 위로 흩어지는 별가루. 죽는 자리에 1회(카드에 붙이지 않는다)
     DeathNova        = 16,  // 사망: 카드가 사라진 자리에 남는 바닥 빛 파동. 별가루보다 늦게 1회
+    RangedProjectile = 17,  // 원거리 기본 투사체. **카드가 자기 투사체를 안 가졌을 때만** 쓰인다
+                            // (CardData.attackEffect.projectile이 우선). 원거리는 카드가 아니라 키워드가
+                            // 만드는 연출이라, 카드마다 배선을 빠뜨리면 "발사체가 아예 안 나온다"가 된다
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —
@@ -43,6 +46,11 @@ public struct VfxEntry
     public int sortingOrder;              // 카드와 같은 정렬 레이어에서의 order(구매 에셋이 카드 뒤로 깔리는 것 방지)
     // true면 호출부가 준 방향으로 회전시켜 스폰(예: 피격 반대 방향으로 튀는 먼지).
     // 방향이 없으면(환경 피해 등) 평소대로 항목 회전값만 쓴다.
+    //
+    // 규약: **뿜는 축이 프리팹 로컬 +Z**여야 한다(정렬이 로컬 +Z를 방향에 맞춘다).
+    // 파티클 Shape의 Rotation을 돌려 놓은 프리팹은 그만큼 initialRotation으로 되돌려야 한다 —
+    // 예: Shape Rotation X=90(축이 -Y)이면 initialRotation X=-90. 이걸 빼먹으면 파편이
+    // 화면 안팎으로 뿜어 "방향이 안 맞는" 게 아니라 아예 안 보인다.
     public bool alignToDirection;
 
     // true면 **반격 피격**(공격자가 되받는 경우)에는 생략한다. 먼지·파편처럼 "때린 자리에서 이는" 항목용 —

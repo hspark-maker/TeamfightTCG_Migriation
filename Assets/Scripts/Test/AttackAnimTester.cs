@@ -60,6 +60,12 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] CardData[] enemyCards  = new CardData[3];
 
     [Header("공격 연출 옵션")]
+    // 연출 분기(원거리·무쌍·교활)는 **공격자 카드의 키워드**가 정한다 — 슬롯이 0으로 고정돼 있으면
+    // 그 자리에 세운 카드의 연출만 볼 수 있다(원거리 카드를 1번 칸에 세워두고 "발사체가 안 나온다"가 된다).
+    [Tooltip("공격을 쏠 슬롯(공격자)")]
+    [Range(0, 2)] [SerializeField] int attackerSlot = 0;
+    [Tooltip("맞을 슬롯(대상)")]
+    [Range(0, 2)] [SerializeField] int defenderSlot = 0;
     [Tooltip("체크=특별 연출(시네마). 해제=일반 박치기")]
     [SerializeField] bool useSpecialCinema = false;
     [Tooltip("체크=처치에 성공하면 처형 연출(무기 양 끝 스파크 + 마법진) 재생")]
@@ -197,8 +203,10 @@ public class AttackAnimTester : MonoBehaviour
 
     // ── 공격 연출 ────────────────────────────────────────────────────────
 
-    public void PlayPlayerAttack() => TryAttack(this.playerFieldView, 0, this.enemyFieldView, 0);
-    public void PlayEnemyAttack()  => TryAttack(this.enemyFieldView,  0, this.playerFieldView, 0);
+    public void PlayPlayerAttack()
+        => TryAttack(this.playerFieldView, this.attackerSlot, this.enemyFieldView, this.defenderSlot);
+    public void PlayEnemyAttack()
+        => TryAttack(this.enemyFieldView, this.attackerSlot, this.playerFieldView, this.defenderSlot);
 
     void TryAttack(BattleFieldView _atkFv, int _atkSlot, BattleFieldView _defFv, int _defSlot)
     {
@@ -331,8 +339,8 @@ public class AttackAnimTester : MonoBehaviour
 
             case AttackStep.Attack:
             {
-                CardView t_atk = this.playerFieldView?.GetSlotView(0);
-                CardView t_def = this.enemyFieldView?.GetSlotView(0);
+                CardView t_atk = this.playerFieldView?.GetSlotView(this.attackerSlot);
+                CardView t_def = this.enemyFieldView?.GetSlotView(this.defenderSlot);
                 if (t_atk?.BoundCard != null && t_def?.BoundCard != null)
                     await AttackCore(t_atk, t_def);
                 break;
@@ -460,7 +468,7 @@ public class AttackAnimTester : MonoBehaviour
     {
         if (this.busy) return;
 
-        CardView t_view = this.playerFieldView?.GetSlotView(0);
+        CardView t_view = this.playerFieldView?.GetSlotView(this.attackerSlot);
         CardInstance t_card = t_view?.BoundCard;
         if (t_card == null) return;
 
@@ -485,7 +493,7 @@ public class AttackAnimTester : MonoBehaviour
                     break;
                 case KeywordPreviewKind.Attack:
                 {
-                    CardView t_defender = this.enemyFieldView?.GetSlotView(0);
+                    CardView t_defender = this.enemyFieldView?.GetSlotView(this.defenderSlot);
                     if (t_defender?.BoundCard != null) await AttackCore(t_view, t_defender);
                     break;
                 }
