@@ -50,8 +50,13 @@ public class AlbumPageFlipView
     [Tooltip("말린 통이 앞으로 나오며 세로로 부푸는 정도. Overlay 캔버스라 원근이 없어 이 값이 유일한 입체 단서다.")]
     [Range(0f, 0.3f)] [SerializeField] float rollBulge = 0.06f;
 
-    [Tooltip("말린 안쪽(종이 뒷면)의 밝기. 앞면 그림이 그대로 비치므로 충분히 어두워야 뒷면으로 읽힌다.")]
+    [Tooltip("말린 안쪽(종이 뒷면)의 밝기. 뒤판 그림(아래)이 없을 때만 쓴다 — 앞면 그림이 그대로 비치므로\n" +
+             "충분히 어두워야 뒷면으로 읽힌다. 뒤판 그림을 넣으면 이 값 대신 그 그림이 보인다.")]
     [Range(0f, 1f)] [SerializeField] float rollBackShade = 0.32f;
+
+    [Tooltip("선택 — 말린 종이의 뒷면에 보일 그림(Assets/Assets/Images/DeckPile). 비우면 앞면 그림을 어둡게 접어 쓴다.\n" +
+             "UI Graphic 하나는 텍스처 한 장뿐이라, 넣으면 앞면·뒷면을 두 판이 나눠 그린다.")]
+    [SerializeField] Sprite rollBackSprite;
 
     [Tooltip("페이지를 뜰 때만 쓰는 전용 카메라 레이어. 화면에 보이는 레이어(UI=5)와 겹치면 다른 것까지 찍힌다.")]
     [SerializeField] int captureLayer = 7;
@@ -67,6 +72,7 @@ public class AlbumPageFlipView
 
     UiRectCapture   m_capture;
     PageRollGraphic m_roll;
+    PageRollGraphic m_rollBack;    // 뒤판 그림이 있을 때만. 통 꼭대기(=화면 앞)라 앞면 판 위에 얹는다
     CanvasGroup     m_pageGroup;   // 되돌릴 때 밑에서 걷히는 지금 장
 
     Vector2 m_baseAnchored;
@@ -163,7 +169,10 @@ public class AlbumPageFlipView
         if (m_rolling && m_roll != null)
         {
             float t_amount = Mathf.Clamp01(t_p / 0.5f);
-            m_roll.SetRoll(m_rollReverse ? 1f - t_amount : t_amount, 1);
+            float t_roll   = m_rollReverse ? 1f - t_amount : t_amount;
+
+            m_roll.SetRoll(t_roll, 1);
+            if (m_rollBack != null) m_rollBack.SetRoll(t_roll, 1);   // 두 판은 늘 같은 자세다
         }
         else
         {
@@ -364,6 +373,19 @@ public class AlbumPageFlipView
         // 펴져 들어오는 장이 아래로 깔리면 걷히는 장에 가려 아무것도 안 보인다.
         t_rect.SetSiblingIndex(t_reverse ? m_page.GetSiblingIndex() + 1 : m_page.GetSiblingIndex());
 
+        if (m_rollBack != null)
+        {
+            var t_backRect = m_rollBack.rectTransform;
+            t_backRect.anchorMin        = t_rect.anchorMin;
+            t_backRect.anchorMax        = t_rect.anchorMax;
+            t_backRect.pivot            = t_rect.pivot;
+            t_backRect.sizeDelta        = t_rect.sizeDelta;
+            t_backRect.anchoredPosition = t_rect.anchoredPosition;
+            t_backRect.localScale       = t_rect.localScale;
+            t_backRect.localRotation    = Quaternion.identity;
+            t_backRect.SetSiblingIndex(t_rect.GetSiblingIndex() + 1);   // 뒷면은 통 꼭대기 = 화면에서 가장 앞
+        }
+
         if (t_reverse)
         {
             // 촬영 대상이 흐려져 있으면 뜨는 그림도 흐리다 — 초점 연출값을 걷고 뜬다
@@ -383,8 +405,18 @@ public class AlbumPageFlipView
 
         m_roll.SetTexture(m_capture.Texture);
         m_roll.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
+        m_roll.SetFace(m_rollBack != null ? PageRollGraphic.RollFace.Front : PageRollGraphic.RollFace.Both);
         m_roll.SetRoll(t_reverse ? 1f : 0f, 1);
         m_roll.gameObject.SetActive(true);
+
+        if (m_rollBack != null)
+        {
+            m_rollBack.SetTexture(this.rollBackSprite.texture);
+            m_rollBack.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
+            m_rollBack.SetFace(PageRollGraphic.RollFace.Back);
+            m_rollBack.SetRoll(t_reverse ? 1f : 0f, 1);
+            m_rollBack.gameObject.SetActive(true);
+        }
 
         m_rolling = true;
         return true;
@@ -401,6 +433,7 @@ public class AlbumPageFlipView
             m_roll.SetTexture(null);   // 텍스처를 놓고 나서 지워야 이미 없어진 RenderTexture를 그리지 않는다
             m_roll.gameObject.SetActive(false);
         }
+        if (m_rollBack != null) m_rollBack.gameObject.SetActive(false);   // 뒤판은 제 그림이라 놓을 게 없다
         if (m_capture != null) m_capture.End();
         if (m_pageGroup != null) m_pageGroup.alpha = 1f;
     }
@@ -416,19 +449,29 @@ public class AlbumPageFlipView
 
     void EnsureRoll()
     {
-        if (m_roll != null || m_page == null || m_page.parent == null) return;
+        if (m_page == null || m_page.parent == null) return;
 
+        if (m_roll == null) m_roll = this.CreateRollPlate("Page_Roll");
+
+        // 뒤판 그림이 있을 때만 판을 둘로 가른다 — 없으면 앞면 판 하나가 양면을 다 그린다(예전 동작)
+        if (m_rollBack == null && this.rollBackSprite != null)
+            m_rollBack = this.CreateRollPlate("Page_Roll_Back");
+    }
+
+    PageRollGraphic CreateRollPlate(string _name)
+    {
         // CanvasRenderer를 손으로 적는다 — 이게 없으면 Graphic이 리빌드를 통째로 건너뛰어 판이 안 그려진다
-        var t_go = new GameObject("Page_Roll",
+        var t_go = new GameObject(_name,
             typeof(RectTransform), typeof(CanvasRenderer), typeof(LayoutElement), typeof(PageRollGraphic));
         var t_rect = (RectTransform)t_go.transform;
         t_rect.SetParent(m_page.parent, false);
 
         t_go.GetComponent<LayoutElement>().ignoreLayout = true;   // 그늘·광택과 같은 이유(레이아웃 칸으로 세지 않게)
 
-        m_roll = t_go.GetComponent<PageRollGraphic>();
-        m_roll.raycastTarget = false;
+        var t_plate = t_go.GetComponent<PageRollGraphic>();
+        t_plate.raycastTarget = false;
         t_go.SetActive(false);
+        return t_plate;
     }
 
     // 광택 띠. 그늘과 같은 규약으로 만든다(레이아웃 무시·raycast 끔·평상시 비활성).

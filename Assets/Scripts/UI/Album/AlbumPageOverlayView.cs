@@ -190,7 +190,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         AlbumInsertMask.OnChanged += HandleChanged;
         if (swipeDetector != null)
         {
-            swipeDetector.OnSwipe       += Step;
+            swipeDetector.OnSwipe        += HandleSwipe;
+            swipeDetector.OnDragBegin    += HandleDragBegin;
             swipeDetector.OnDragProgress += HandleDragProgress;
             swipeDetector.OnDragCancel   += HandleDragCancel;
         }
@@ -206,7 +207,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         AlbumInsertMask.OnChanged -= HandleChanged;
         if (swipeDetector != null)
         {
-            swipeDetector.OnSwipe        -= Step;
+            swipeDetector.OnSwipe        -= HandleSwipe;
+            swipeDetector.OnDragBegin    -= HandleDragBegin;
             swipeDetector.OnDragProgress -= HandleDragProgress;
             swipeDetector.OnDragCancel   -= HandleDragCancel;
         }
@@ -420,18 +422,32 @@ public class AlbumPageOverlayView : MonoBehaviour
         FlipStepAsync(_dir).Forget();
     }
 
+    /// <summary>손짓 하나는 넘김 하나만 쓴다. 감지기가 어떤 이유로 스와이프를 두 번 통지해도
+    /// (오래 끌다 방향을 되짚는 손짓 등) 두 장이 넘어가지 않는다 — 무장은 새 손가락이 내려앉을 때만 선다.</summary>
+    void HandleSwipe(int _dir)
+    {
+        if (!m_dragArmed) return;
+        m_dragArmed = false;   // 이 손짓은 여기서 소진된다
+
+        if (m_flipping || IsLocked) return;
+
+        Step(_dir);
+    }
+
+    /// <summary>새 손가락이 내려앉았다 — 여기서만 무장한다.</summary>
+    void HandleDragBegin()
+    {
+        m_dragArmed = !m_flipping && !IsLocked;
+    }
+
     /// <summary>손가락이 끄는 만큼 종이를 세운다. 진행도는 <b>0.5(edge-on)에서 멈춘다</b> —
     /// 거기가 페이지를 교체하는 지점이라, 넘길지 말지 확정되기 전에 넘어가면 되돌릴 수 없다.
     /// 넘김 확정 임계는 감지기(snapRatio·flick)가 정한다. 여기는 손가락과 자세를 잇기만 한다.</summary>
     void HandleDragProgress(float _norm)
     {
-        // 시작 통지(0)는 잠금 여부와 무관하게 래치만 세운다 — 여기서 걸러버리면
-        // 잠금이 풀린 뒤 들어오는 이동 통지가 무장 없이 접힘을 시작한다.
-        if (Mathf.Approximately(_norm, 0f))
-        {
-            m_dragArmed = !m_flipping && !IsLocked;
-            return;
-        }
+        // 진행도 0은 무장 신호가 아니다 — 끌다가 시작점을 되지나가도 0이 온다.
+        // 무장은 OnDragBegin 하나만 세운다(HandleDragBegin).
+        if (Mathf.Approximately(_norm, 0f)) return;
 
         if (m_flipping || IsLocked) return;
         if (!m_dragArmed) return;   // 이 손짓은 이미 소비됐다(넘김으로 확정됐거나 취소됐다)
