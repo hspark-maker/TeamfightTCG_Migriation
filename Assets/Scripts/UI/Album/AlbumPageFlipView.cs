@@ -360,7 +360,9 @@ public class AlbumPageFlipView
     {
         if (m_roll != null || m_page == null || m_page.parent == null) return;
 
-        var t_go = new GameObject("Page_Roll", typeof(RectTransform), typeof(LayoutElement), typeof(PageRollGraphic));
+        // CanvasRenderer를 손으로 적는다 — 이게 없으면 Graphic이 리빌드를 통째로 건너뛰어 판이 안 그려진다
+        var t_go = new GameObject("Page_Roll",
+            typeof(RectTransform), typeof(CanvasRenderer), typeof(LayoutElement), typeof(PageRollGraphic));
         var t_rect = (RectTransform)t_go.transform;
         t_rect.SetParent(m_page.parent, false);
 

@@ -14,6 +14,10 @@ using UnityEngine.UI;
 /// <see cref="AlbumPageFlipView"/>의 전제와 같다.
 /// </summary>
 [AddComponentMenu("")]   // 손으로 붙이는 컴포넌트가 아니다 — 연출 코드가 런타임에 만든다
+// ⚠ RequireComponent는 상속되지 않는다. Graphic이 달아 둔 것에 기대면 AddComponent 때 CanvasRenderer가
+//   안 붙고, 그러면 Graphic.Rebuild가 통째로 건너뛰어(OnPopulateMesh조차 안 불린다) 아무것도 안 그려진다
+//   — 화면엔 "연출이 사라진" 것으로 보인다. UnityEngine.UI.Image도 같은 이유로 자기 클래스에 다시 단다.
+[RequireComponent(typeof(CanvasRenderer))]
 public class PageRollGraphic : MaskableGraphic
 {
     const int   MaxSegments  = 64;
