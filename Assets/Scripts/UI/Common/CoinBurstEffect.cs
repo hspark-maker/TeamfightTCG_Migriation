@@ -44,7 +44,8 @@ public class CoinBurstEffect : MonoBehaviour
     /// </summary>
     public void Configure(Sprite _coinSprite, RectTransform _spawnCenter, RectTransform _target,
                           int _coinCount = -1, float? _angleStart = null, float? _angleSpan = null,
-                          float? _scatterRadius = null, float? _gatherDuration = null)
+                          float? _scatterRadius = null, float? _gatherDuration = null,
+                          float? _coinSize = null, float? _coinInterval = null)
     {
         this.coinSprite  = _coinSprite;
         this.spawnCenter = _spawnCenter;
@@ -52,6 +53,9 @@ public class CoinBurstEffect : MonoBehaviour
         if (_coinCount >= 0) this.coinCount = _coinCount;
         if (_angleStart.HasValue) this.angleStart = _angleStart.Value;
         if (_angleSpan.HasValue) this.angleSpan = _angleSpan.Value;
+        // 코인 말고 다른 알갱이(해금 연출의 빛)를 태울 때 크기·간격까지 주입해야 한 인스턴스가 두 연출을 오갈 수 있다.
+        if (_coinSize.HasValue) this.coinSize = _coinSize.Value;
+        if (_coinInterval.HasValue) this.coinInterval = _coinInterval.Value;
         // 출발과 목적지가 멀면 흩어짐은 좁게·수렴은 길게 가야 한다 — 한 인스턴스로 가까운/먼 연출을 오가려면 이 둘도 주입돼야 한다.
         if (_scatterRadius.HasValue) this.scatterRadius = _scatterRadius.Value;
         if (_gatherDuration.HasValue) this.gatherDuration = _gatherDuration.Value;
