@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: RewardConfig
   m_EditorClassIdentifier: Assembly-CSharp::BattleReward
   goldPerCard: 10
-  minGold: 5
+  winFloor: 10
+  loseGold: 5

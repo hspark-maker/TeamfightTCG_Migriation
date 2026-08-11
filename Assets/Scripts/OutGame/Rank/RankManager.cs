@@ -120,9 +120,9 @@ public static class RankManager
         long t_floor = IsRanked ? t_config.FirstTierPoints : 0;
 
         // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
-        // 천장을 현재 포인트 아래로는 내리지 않는다: 졸업 낙인이 마지막 튜토 전투보다 "먼저" 찍히므로
-        // (마지막 스텝이 전투 시작 버튼 클릭이다) 그 판은 이미 첫 티어에 선 채로 정산된다 —
-        // 고정 천장을 쓰면 그 한 판이 곧 강등이 된다.
+        // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
+        // 그래도 천장을 현재 포인트 아래로는 내리지 않는다 — 이미 랭크에 오른 세이브로 튜토 전투를 돌면(디버그 승급 등)
+        // 고정 천장이 곧 강등이 된다.
         long t_ceiling = _tutorial ? Math.Max(t_config.FirstTierPoints - 1, t_points) : long.MaxValue;
 
         t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);

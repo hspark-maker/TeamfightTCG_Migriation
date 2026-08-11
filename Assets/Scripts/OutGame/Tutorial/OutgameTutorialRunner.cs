@@ -36,6 +36,10 @@ public static class OutgameTutorialRunner
         OutgameTutorialProgress.Complete();
 
         if (RankManager.TryEnterFirstTier(out var t_entry)) RankResultHandoff.Set(t_entry);
+
+        // 졸업으로 전 기능이 열린다. 게이트를 거치지 않고 닫히는 경로(전투에서 돌아와 확정하는 졸업·디버그 스킵)에도
+        // 잠김 룩이 따라오게 여기서 알린다 — FeatureLockView는 OnChanged로만 다시 그린다.
+        OutgameFeatureLock.Refresh();
     }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
@@ -104,12 +108,18 @@ public static class OutgameTutorialRunner
     {
         if (!IsRunning) return;
 
+        // 졸업 보류 판정에 쓸 "방금 끝낸 스텝" — 커밋하면 좌표가 넘어가므로 먼저 떠 둔다.
+        TryGetCurrentStep(out var t_satisfied);
+
         bool t_hasNext = TryGetNext(OutgameTutorialProgress.ChapterIndex, OutgameTutorialProgress.StepIndex,
                                     out int t_nextChapter, out int t_nextStep);
 
         OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
 
-        if (!t_hasNext) CompleteSequence();
+        // 마지막 스텝이 전투로 나가면 졸업은 그 전투가 끝난 뒤로 미룬다 — 여기서 낙인을 찍으면 첫 티어 진입이
+        // 그 판보다 앞서서 승점이 튜토리얼 천장에 걸려 통째로 사라진다(RankManager.ApplyBattleResult).
+        // 미뤄 둔 졸업은 돌아온 씬의 브리지가 끝 좌표를 보고 확정한다(CloseOrWarnOnMissingStep).
+        if (!t_hasNext && (t_satisfied == null || !t_satisfied.LeavesScene)) CompleteSequence();
 
         OnStepChanged?.Invoke();
     }
@@ -169,7 +179,11 @@ public static class OutgameTutorialRunner
 
         if (t_chapter >= ChapterCount)
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] 좌표 {t_chapter}-{t_index}이(가) '{s_data.name}'의 챕터 {ChapterCount}개 밖입니다 — 완료로 닫습니다.");
+            // 끝 좌표(마지막 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
+            // 브리지 Start에서 도는 자리라 로비 랭크 연출 디렉터의 캐리어 소비(다음 프레임)보다 앞선다.
+            if (t_chapter > ChapterCount || t_index != 0)
+                Debug.LogWarning($"[OutgameTutorialRunner] 좌표 {t_chapter}-{t_index}이(가) '{s_data.name}'의 챕터 {ChapterCount}개 밖입니다 — 완료로 닫습니다.");
+
             CompleteSequence();
             return;
         }

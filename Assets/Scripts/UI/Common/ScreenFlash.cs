@@ -159,7 +159,7 @@ public class ScreenFlash : MonoBehaviour
         t_image.raycastTarget = false;   // 덮인 동안 터치를 가로채지 않는다(덮개와 같은 이유).
         t_image.color = new Color(_c.burstColor.r, _c.burstColor.g, _c.burstColor.b, 0f);
 
-        if (_c.burstAdditive) ApplyAdditive(t_go);
+        if (_c.burstAdditive) UiAdditive.Apply(t_go);
 
         float t_life = _c.rise + _c.hold + _c.burstFall;
 
@@ -173,16 +173,6 @@ public class ScreenFlash : MonoBehaviour
 
         // 잔해를 남기지 않는다(CoinBurstEffect.ClearCoins와 같은 정리 규칙).
         return () => { if (t_go != null) Destroy(t_go); };
-    }
-
-    // 가산 합성. 프로젝트에 범용 UI Additive 머티리얼이 없어 UIEffect로 블렌드만 바꾼다(PackCardView와 같은 관용구).
-    // ⚠ blendType 세터는 쓰지 않는다 — 넘긴 값을 필드에 넣지 않고 기존 값으로 되돌리는 패키지 버그가 있다.
-    //   dst를 먼저 지정해야 세터가 Additive로 역산한다.
-    static void ApplyAdditive(GameObject _go)
-    {
-        var t_fx = _go.AddComponent<Coffee.UIEffects.UIEffect>();
-        t_fx.dstBlendMode = UnityEngine.Rendering.BlendMode.One;
-        t_fx.srcBlendMode = UnityEngine.Rendering.BlendMode.One;
     }
 
     // 씬 최상위에 독립 루트 캔버스를 세운다. 어느 캔버스의 자식도 아니어야 sortingOrder가 전역으로 먹는다.

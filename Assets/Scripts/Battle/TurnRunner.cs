@@ -300,7 +300,7 @@ public class TurnRunner : MonoBehaviour
         
         this.resultCaptured = true;
         int t_remaining = this.playerField.GetActiveCards().Count + this.playerField.WaitingCount;
-        this.lastReward = RewardService.GrantBattleReward(t_remaining);
+        this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
         BattleRewardHandoff.Set(this.lastReward);

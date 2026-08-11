@@ -18,13 +18,25 @@ public class RankRewardClaimPopup : MonoBehaviour
     [Tooltip("보상 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
 
+    [Tooltip("딤(팝업 배경). 등장 연출이 도는 동안 이 버튼을 잠가 오조작으로 닫히지 않게 한다.")]
+    [SerializeField] Button dimButton;
+
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+
+    [Tooltip("등장·퇴장 안무. 아무것도 배선하지 않으면 이 축을 통째로 건너뛰고 예전처럼 페이드만 남는다.")]
+    [SerializeField] RankRewardRevealFx reveal = new RankRewardRevealFx();
+
+    [Tooltip("획득 순간 화면이 반응하는 축. dim에 딤 이미지를 물린다(알파는 그대로, 색만 밀린다).")]
+    [SerializeField] ScreenDimTint dimTint = new ScreenDimTint();
 
     [Tooltip("코인이 출발할 자리(선택). 비우면 각 재화 수치 자리에서 튀어 제자리로 돌아온다.")]
     [SerializeField] RectTransform burstOrigin;
 
     static bool s_overflowWarned;
+
+    // 등장 안무. 수령·닫기가 등장 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
+    Sequence m_intro;
 
     // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
     Func<bool> m_onConfirm;
@@ -39,6 +51,12 @@ public class RankRewardClaimPopup : MonoBehaviour
     {
         this.m_onConfirm = _onConfirm;
 
+        // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
+        this.KillIntro();
+
+        // 직전 분출의 소유권도 뗀다. 안 떼면 옛 분출의 종료 콜백이 방금 연 이 팝업을 닫는다(수령 경로와 같은 이유).
+        this.m_burst = null;
+
         this.m_rewards.Clear();
         for (int t_i = 0; t_i < _info.Rewards.Count; t_i++) this.m_rewards.Add(_info.Rewards[t_i].Gain);
 
@@ -49,16 +67,33 @@ public class RankRewardClaimPopup : MonoBehaviour
         {
             this.claimButton.onClick.RemoveAllListeners(); // 재표시마다 중복 등록 방지
             this.claimButton.onClick.AddListener(this.OnClaimClicked);
-            this.claimButton.interactable = true;
         }
 
         this.SetVisible(true);
+
+        this.dimTint.Capture();
+        this.reveal.ApplyCount(_info.Rewards.Count);
+
+        // 등장이 도는 동안은 손을 막는다 — 보상이 다 서기 전에 눌러 닫히면 무엇을 받았는지 못 본다.
+        this.SetInputEnabled(false);
+
+        this.m_intro = this.reveal.BuildIntro(this.rewardSlots, this.dimTint);
+        this.m_intro.InsertCallback(this.reveal.IntroDuration, () => this.SetInputEnabled(true));
+        this.m_intro.SetLink(this.gameObject).Play();
     }
 
     public void Hide()
     {
         this.m_onConfirm = null;
+        this.KillIntro();
         this.SetVisible(false);
+    }
+
+    // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
+    // [획득]도 딤도 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
+    void OnEnable()
+    {
+        this.SetInputEnabled(true);
     }
 
     // 팝업은 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리와 표시 원복을 여기서 위임한다.
@@ -66,6 +101,7 @@ public class RankRewardClaimPopup : MonoBehaviour
     void OnDisable()
     {
         this.transition.HandleDisabled(this.ResolveTarget());
+        this.RestoreReveal();
     }
 
     void OnClaimClicked()
@@ -74,7 +110,7 @@ public class RankRewardClaimPopup : MonoBehaviour
         var t_callback = this.m_onConfirm;
         this.m_onConfirm = null;
 
-        if (this.claimButton != null) this.claimButton.interactable = false;
+        this.SetInputEnabled(false);
 
         // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
         bool t_granted = t_callback != null && t_callback.Invoke();
@@ -93,9 +129,12 @@ public class RankRewardClaimPopup : MonoBehaviour
         this.m_burst = null;
         if (t_prev != null && t_prev.IsActive()) t_prev.Complete(true);
 
+        // 등장이 아직 돌고 있으면 걷어 저작 상태로 되돌린다 — 중간값에서 퇴장을 이어 받으면 아이콘이 튄다.
+        this.RestoreReveal();
+
         // 재화가 갈리면 분출기도 갈려야 한다 — 공용 재생기가 종류별 시퀀스를 조립하고 수치 고정 해제 안전망까지 붙여 온다.
-        var t_burst = t_player.BuildGain(this.burstOrigin, this.m_rewards);
-        if (t_burst == null)
+        var t_gain = t_player.BuildGain(this.burstOrigin, this.m_rewards);
+        if (t_gain == null)
         {
             this.Hide();
             return;
@@ -103,6 +142,12 @@ public class RankRewardClaimPopup : MonoBehaviour
 
         // 연출 레이어가 랭크 오버레이보다 아래면 코인이 딤에 가린다(로비 획득 연출과 같은 처리).
         t_player.transform.SetAsLastSibling();
+
+        // 퇴장 안무와 코인 분출을 한 시간축에 놓는다 — 아이콘이 사라지는 프레임에 코인이 나와야 분해된 것으로 읽힌다.
+        // 마스터에 SetLink를 걸지 않는 이유는 기존과 같다: 팝업이 꺼질 때 죽으면 코인이 허공에 굳는다.
+        var t_burst = DOTween.Sequence();
+        this.reveal.BuildOutro(t_burst, this.dimTint);
+        t_burst.Insert(this.reveal.LaunchAt, t_gain);
 
         this.m_burst = t_burst;
 
@@ -112,6 +157,28 @@ public class RankRewardClaimPopup : MonoBehaviour
 
         // BuildGain은 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
         t_burst.Play();
+    }
+
+    void KillIntro()
+    {
+        if (this.m_intro != null && this.m_intro.IsActive()) this.m_intro.Kill();
+        this.m_intro = null;
+    }
+
+    // 모든 축을 저작 상태로 되돌린다. 화면에 남아 있는 동안 부르면 안 된다 —
+    // 빨려들어 사라진 아이콘이 퇴장 페이드 동안 되살아난다.
+    void RestoreReveal()
+    {
+        this.KillIntro();
+
+        this.reveal.Reset();
+        this.dimTint.Reset();
+    }
+
+    void SetInputEnabled(bool _enabled)
+    {
+        if (this.claimButton != null) this.claimButton.interactable = _enabled;
+        if (this.dimButton != null) this.dimButton.interactable = _enabled;
     }
 
     // 이 팝업이 소유한 분출이 끝났을 때만 닫는다(소유권을 넘긴 뒤 끝난 옛 연출은 무시).
