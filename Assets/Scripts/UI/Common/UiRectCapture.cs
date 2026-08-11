@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 /// <summary>
@@ -106,6 +107,11 @@ public class UiRectCapture
         // 같은 프레임에 찍히도록 강제로 한 번 정렬한다 — 안 하면 첫 프레임이 빈 텍스처다
         LayoutRebuilder.ForceRebuildLayoutImmediate(_source);
         Canvas.ForceUpdateCanvases();
+
+        // 첫 그림을 지금 채운다. 카메라는 프레임 끝에 도는데, 그때까지 이 텍스처를 쓰는 쪽은
+        // **한 번도 안 그려진 메모리**를 그대로 화면에 올린다 — 기기에 따라 빨강·분홍 쓰레기가 한 프레임 번쩍인다.
+        this.ClearTexture();
+        this.RenderNow();
 
         m_capturing = true;
         return true;
@@ -217,6 +223,28 @@ public class UiRectCapture
             antiAliasing = 1,
         };
         m_rt.Create();
+    }
+
+    // 새로 만든 텍스처의 내용은 정의되지 않는다(직전에 그 메모리를 쓰던 것이 그대로 남는다).
+    // 크기가 같아 재사용할 때는 **직전 넘김의 마지막 그림**이 남아 있다 — 어느 쪽이든 한 프레임 번쩍인다.
+    void ClearTexture()
+    {
+        if (m_rt == null) return;
+
+        RenderTexture t_prev = RenderTexture.active;
+        RenderTexture.active = m_rt;
+        GL.Clear(true, true, new Color(0f, 0f, 0f, 0f));
+        RenderTexture.active = t_prev;
+    }
+
+    // 프레임 끝을 기다리지 않고 지금 한 장 찍는다. SRP에서는 Camera.Render를 부르면 안 되므로 렌더 요청을 쓴다.
+    void RenderNow()
+    {
+        if (m_cam == null || m_rt == null) return;
+
+        var t_request = new RenderPipeline.StandardRequest { destination = m_rt };
+        if (RenderPipeline.SupportsRenderRequest(m_cam, t_request))
+            RenderPipeline.SubmitRenderRequest(m_cam, t_request);
     }
 
     void ReleaseTexture()
