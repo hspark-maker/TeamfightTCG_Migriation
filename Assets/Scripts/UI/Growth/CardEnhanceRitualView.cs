@@ -160,6 +160,9 @@ public class CardEnhanceRitualView : MonoBehaviour
         // 이어받는 경우엔 즉시 원복하지 않는다 — 결과가 남긴 표면(실패의 잿빛·성공의 잔열)을 진입 구간이 식히며 되돌린다.
         if (!t_chained) RestoreVisual();
 
+        // 연출 재질은 여기서부터 걸친다(RestoreVisual이 벗기므로 순서가 뒤바뀌면 안 된다).
+        this.shading.Attach();
+
         bool t_success = _outcome == EEnhanceOutcome.Success;
 
         // 저작값이 0이나 음수여도 구간이 서로를 넘지 않게 여기서 한 번 정리한다.
@@ -254,6 +257,9 @@ public class CardEnhanceRitualView : MonoBehaviour
 
         this.m_awaitingReturn = false;
 
+        // 결과판을 기다리는 사이 어떤 경로로든 벗겨졌을 수 있다 — 복귀 구간도 이 재질 위에서 돈다.
+        this.shading.Attach();
+
         if (this.cardStage == null)
         {
             RestoreVisual();
@@ -321,11 +327,12 @@ public class CardEnhanceRitualView : MonoBehaviour
         this.m_cancelling = false;
     }
 
-    // 첫 강화가 아니라 오버레이가 켜지는 순간 재질을 꽂는다 — 평상값이 전부 중립이라
-    // 미리 얹어둬도 보이는 것이 달라지지 않고, 강화 순간의 재질 교체 프레임이 사라진다.
+    // 재질 **사본**은 여기서 미리 만든다(강화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
+    // 평상시까지 얹어두면 카드가 연출 셰이더로 그려져, 상세창 좌우 전환의 알파 페이드에서 색이 틀어졌다.
+    // 불티(embers)는 카드가 아니라 별도 판이고 평상시 알파 0이라 미리 얹어둬도 된다.
     void Awake()
     {
-        this.shading.Attach();
+        this.shading.Warm();
         this.embers.Attach();
     }
 
@@ -634,6 +641,11 @@ public class CardEnhanceRitualView : MonoBehaviour
         this.halo.Reset();
         this.embers.Reset();
         this.shading.Neutralize();
+
+        // 중립값으로 되돌린 **뒤** 재질을 벗는다. 걸친 채로 두면 카드가 기본 UI 셰이더가 아니라
+        // 연출 셰이더로 계속 그려져, 알파가 1이 아닌 구간(상세창 좌우 전환의 페이드)에서 색이 틀어진다.
+        this.shading.Detach();
+
         this.retractPanels.Reset();
     }
 }

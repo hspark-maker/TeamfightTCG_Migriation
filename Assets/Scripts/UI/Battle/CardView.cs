@@ -770,25 +770,9 @@ public class CardView : MonoBehaviour
         await WaitHpRollSettled();
         float t_duration = _d < 0f ? GameTiming.Battle.DeathDuration : _d;
 
-        // 파티클은 **카드에 붙이지 않는다**. 붙이면 사망 직후 HideSlot이 카드를 끄면서 별가루도 같이
-        // 꺼져 뚝 끊긴다(FinishImpact가 월드 스폰인 것과 같은 이유). 좌표는 죽는 그 자리로 고정 —
-        // 카드는 떠오르지만 바닥 파동은 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
-        Vector3 t_deathPosition = transform.position;
-
-        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
-        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
-
-        // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
-        // 결정타 구간에서 그 초과분에 슬로우 배율이 곱해진다.
-        float t_novaDelay = Mathf.Min(GameTiming.Battle.DeathNovaAt, t_duration);
-        bool t_cancelled = await UniTask.Delay(
-                (int)(t_novaDelay * 1000f),
-                cancellationToken: this.GetCancellationTokenOnDestroy())
-            .SuppressCancellationThrow();
-        if (!t_cancelled)
-            BattleVfx.Play(BattleVfxId.DeathNova, t_deathPosition, VfxSortingLayerId);
-
-        await t_cardAnim;
+        // 별가루·바닥 파동 파티클은 뺐다 — 디졸브 클립이 사라지는 연출을 통째로 갖고 있어서
+        // 그 위에 파티클을 얹으면 화면만 지저분해진다. 사망 연출의 주인은 클립 하나다.
+        await this.cardAnim.PlayDeathAnim(t_duration);
     }
 
     /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).

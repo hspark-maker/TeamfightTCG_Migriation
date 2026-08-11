@@ -163,12 +163,12 @@ public class UIPoolManager : MonoBehaviour
         t_path = UnityEditor.AssetDatabase.GetAssetPath(_prefab);
         if (string.IsNullOrEmpty(t_path)) t_path = "(빈 경로 = 번들에서 로드됨)";
 #endif
-        Debug.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
+        LogUtil.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
 
         foreach (var t_text in _prefab.GetComponentsInChildren<TMPro.TMP_Text>(true))
         {
             string t_font = t_text.font != null ? t_text.font.name : "null";
-            Debug.Log($"[프리팹원본] {t_text.name} font={t_font}");
+            LogUtil.Log($"[프리팹원본] {t_text.name} font={t_font}");
         }
     }
 
