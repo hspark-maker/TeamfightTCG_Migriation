@@ -2,18 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="74f371c5-0899-44c7-ab1b-549ac4664e46" name="변경" comment="">
+      <change beforePath="$PROJECT_DIR$/../../Assets/AddressableAssetsData/link.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/PackUI/PackCard.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/PackUI/PackCard.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scenes/LobbyScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scenes/LobbyScene.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/CurrencyRewardSlotView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/CurrencyRewardSlotView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/ScreenFlash.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/ScreenFlash.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Rank/RankRewardClaimPopup.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Rank/RankRewardClaimPopup.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Shop/PackCardView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Shop/PackCardView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Shop/PackRevealView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Shop/PackRevealView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ENHANCE_ECONOMY.md" beforeDir="false" afterPath="$PROJECT_DIR$/ENHANCE_ECONOMY.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Resources/Fonts/MalgunGothic_TMP.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Resources/Fonts/MalgunGothic_TMP.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +37,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feature__enforce",
+    "git-widget-placeholder": "main",
     "nodejs_package_manager_path": "npm",
     "vue.rearranger.settings.migration": "true"
   }
