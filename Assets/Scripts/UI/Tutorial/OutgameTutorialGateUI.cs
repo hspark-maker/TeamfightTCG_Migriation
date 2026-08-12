@@ -45,7 +45,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [SerializeField] TextMeshProUGUI messageText;
 
     [Header("배치")]
-    [Tooltip("손끝 미세 보정. 기본 위치는 '타깃 중앙 + 손 높이의 절반'이라 스프라이트 여백만큼만 더 보정하면 된다")]
+    [Tooltip("Hand 기준점을 놓을 위치 = 타깃 중앙 + 이 값. 손끝 방향·각도는 프리팹의 HandIcon(자식)에서 저작하고, " +
+             "여기서는 그 손끝이 타깃 중앙에 닿도록 기준점만 밀어 준다(코드는 손 크기·각도를 보정하지 않는다)")]
     [SerializeField] Vector2 handOffset    = Vector2.zero;
     [Tooltip("타깃과 문구 사이 간격")]
     [SerializeField] float   messageMargin = 36f;
@@ -356,15 +357,12 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         Vector2 t_center = (t_min + t_max) * 0.5f;
 
-        // 손은 타깃 **아래**에 두고 손끝(위쪽)이 타깃 중앙에 닿게 한다 — 손 이미지가 위를 가리키므로
-        // 위에 두면 손등이 대상을 덮고 손끝은 허공을 가리킨다. 자기 높이의 절반만큼 내리면
-        // 손 위쪽 모서리가 타깃 중앙에 걸린다. handOffset은 스프라이트 여백 보정(y를 키우면 더 파고든다).
+        // 손은 타깃 중앙 + handOffset에 그대로 놓는다. 코드가 방향을 추측하지 않는 이유는
+        // 손끝이 어디인지가 프리팹 저작에 달려 있기 때문이다 — Hand는 빈 기준점이고 그 안의 HandIcon을
+        // 회전·이동시켜 손끝을 맞춘다. 여기서 자기 크기만큼 밀면 저작해 둔 각도와 어긋난다.
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
-        {
-            Vector2 t_handHalf = this.hand.rect.size * 0.5f;
-            this.hand.anchoredPosition = t_center - new Vector2(0f, t_handHalf.y) + this.handOffset;
-        }
+            this.hand.anchoredPosition = t_center + this.handOffset;
 
         PlaceMessage(t_full, t_min.y, t_max.y);
     }
