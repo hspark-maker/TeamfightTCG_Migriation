@@ -50,6 +50,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [Tooltip("지금 왜 막혔는지 알려주는 상시 문구(최고 레벨·잔액 부족).")]
     [SerializeField] TMP_Text   growthNoticeText;
 
+    [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
+    [Tooltip("진화 관문 레벨(CardGrowthConfig의 1·2차 진화 레벨)에서 강화 버튼 대신 서는 버튼. " +
+             "누르는 결과는 강화와 같다 — 진화는 다이아를 무는 레벨업 1회일 뿐이다.")]
+    [SerializeField] Button   evolveButton;
+    [SerializeField] TMP_Text evolveLabelText;
+    [SerializeField] TMP_Text evolveCostText;
+    [SerializeField] Image    evolveCostIcon;
+    [SerializeField] string   evolveLabel = "진화";
+
     [Header("일러스트만 보기 (선택 — 미배선이면 기능만 빠진다)")]
     [Tooltip("누를 때마다 카드 위 정보(이름·이름판·체력·레벨·키워드 아이콘·프레임 장식·시너지)를 통째로 가렸다 되돌린다. 프레임과 일러스트만 남는다.")]
     [SerializeField] Button artOnlyButton;
@@ -258,6 +267,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.enhanceButton.onClick.AddListener(OnEnhancePressed);
         }
 
+        // 진화 버튼도 같은 핸들러다 — 겉모습만 갈릴 뿐 누르는 결과는 같은 레벨업 1회다.
+        if (this.evolveButton != null)
+        {
+            this.evolveButton.onClick.RemoveListener(OnEnhancePressed);
+            this.evolveButton.onClick.AddListener(OnEnhancePressed);
+        }
+
         if (this.artOnlyButton != null)
         {
             this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
@@ -281,6 +297,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
+        if (this.evolveButton  != null) this.evolveButton.onClick.RemoveListener(OnEnhancePressed);
 
         if (this.artOnlyButton != null) this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
 
@@ -744,19 +761,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         GrowthStep t_step = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
+        // 다음 한 방이 진화 관문이면 진화 버튼이 대신 선다. 만렙(다음 단계 없음)이면 강화 버튼이 남는다 —
+        // 어느 쪽이든 바가 비지 않는다.
+        bool t_evolve = this.evolveButton != null && t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
+
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
-        if (this.enhanceButton != null)
-        {
-            this.enhanceButton.gameObject.SetActive(_owned);
-            // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
-            this.enhanceButton.interactable = t_canPayEnhance && !this.m_ritualPlaying;
-        }
-        if (this.enhanceCostText != null) this.enhanceCostText.text = CostLabel(t_hasStep, t_step.Cost);
-        ApplyCostIcon(t_hasStep, t_step.Currency);
+        // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
+        SetActionButton(this.enhanceButton, _owned && !t_evolve, t_canPayEnhance && !this.m_ritualPlaying);
+        SetActionButton(this.evolveButton,  _owned &&  t_evolve, t_canPayEnhance && !this.m_ritualPlaying);
 
-        // 결과판이 걷힌 뒤(또는 평상시)엔 다시 "강화"다. 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
-        SetEnhanceLabel(this.enhanceLabel);
+        ApplyCost(t_hasStep, t_step);
+
+        // 결과판이 걷힌 뒤(또는 평상시)엔 다시 각자의 글자다. 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
+        SetActionLabel(false);
         if (this.successRateText != null)
             this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
 
@@ -813,14 +831,36 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         return _currency == ECurrencyType.Diamond ? this.diamondIcon : this.goldIcon;
     }
 
-    void ApplyCostIcon(bool _hasStep, ECurrencyType _currency)
+    /// <summary>비용 숫자·아이콘을 두 버튼 **모두**에 채운다. 보이는 것은 서 있는 쪽뿐이지만,
+    /// 물러나 있는 쪽에 옛 값을 남겨두면 교체되는 프레임에 그 값이 그대로 비친다.</summary>
+    void ApplyCost(bool _hasStep, GrowthStep _step)
     {
-        if (this.enhanceCostIcon == null) return;
+        string t_cost = CostLabel(_hasStep, _step.Cost);
 
-        this.enhanceCostIcon.enabled = _hasStep;
+        if (this.enhanceCostText != null) this.enhanceCostText.text = t_cost;
+        if (this.evolveCostText  != null) this.evolveCostText.text  = t_cost;
+
+        ApplyCostIcon(this.enhanceCostIcon, _hasStep, _step.Currency);
+        ApplyCostIcon(this.evolveCostIcon,  _hasStep, _step.Currency);
+    }
+
+    void ApplyCostIcon(Image _target, bool _hasStep, ECurrencyType _currency)
+    {
+        if (_target == null) return;
+
+        _target.enabled = _hasStep;
 
         Sprite t_icon = CostIconOf(_currency);
-        if (t_icon != null) this.enhanceCostIcon.sprite = t_icon;
+        if (t_icon != null) _target.sprite = t_icon;
+    }
+
+    /// <summary>강화·진화 버튼 한 쪽의 표시와 조작 가능 여부. 둘 다 같은 규약이라 한 곳에 둔다.</summary>
+    static void SetActionButton(Button _button, bool _shown, bool _interactable)
+    {
+        if (_button == null) return;
+
+        _button.gameObject.SetActive(_shown);
+        _button.interactable = _interactable;
     }
 
     // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
@@ -950,14 +990,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void LockControls()
     {
         if (this.enhanceButton != null) this.enhanceButton.interactable = false;
+        if (this.evolveButton  != null) this.evolveButton.interactable  = false;
 
         HideBottomBar();   // 담금질 구간에는 카드만 남는다
         RefreshArrows();   // 연출 중에 카드가 넘어가면 무대에 선 카드와 결과가 어긋난다.
     }
 
-    void SetEnhanceLabel(string _text)
+    // 결과를 읽는 중엔 강화 버튼만 "한 번 더"가 된다. 진화 버튼은 결과판 위에서도 "진화"다 —
+    // 그 한 방은 방금 한 일의 반복이 아니라 다른 종류의 일이고, 무는 재화도 다르다.
+    void SetActionLabel(bool _retry)
     {
-        if (this.enhanceLabelText != null) this.enhanceLabelText.text = _text;
+        if (this.enhanceLabelText != null) this.enhanceLabelText.text = _retry ? this.retryLabel : this.enhanceLabel;
+        if (this.evolveLabelText  != null) this.evolveLabelText.text  = this.evolveLabel;
     }
 
     // 걷기는 즉시(연출이 이미 시작됐다), 복귀는 페이드. 들어올 때 눈에 띄면 결과를 읽던 시선을 뺏는다.
@@ -1002,10 +1046,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 결과를 읽는 동안 하단 바 버튼이 "한 번 더"를 맡는다 — 연출 시작 때 LockControls가 꺼둔 것을 여기서 되살린다.
         // 값도 지금 낼 비용으로 갈아둔다(방금 쓴 비용이 남아 있으면 다음 한 방의 가격을 잘못 읽는다).
-        if (this.enhanceButton   != null) this.enhanceButton.interactable = t_canRetry;
-        if (this.enhanceCostText != null) this.enhanceCostText.text       = CostLabel(t_hasNext, t_next.Cost);
-        ApplyCostIcon(t_hasNext, t_next.Currency);
-        SetEnhanceLabel(this.retryLabel);
+        // 어느 버튼이 설지는 이미 공개 시점의 RefreshGrowth가 다음 단계 기준으로 정해뒀다 —
+        // 여기선 그 판정을 다시 하지 않고 둘 다 손봐 서 있는 쪽이 알아서 맞게 둔다.
+        if (this.enhanceButton != null) this.enhanceButton.interactable = t_canRetry;
+        if (this.evolveButton  != null) this.evolveButton.interactable  = t_canRetry;
+        ApplyCost(t_hasNext, t_next);
+        SetActionLabel(true);
 
         this.resultPanel.Show(t_line,
                               _onClose: () => this.ritual.PlayReturn(),

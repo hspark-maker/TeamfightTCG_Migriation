@@ -22,6 +22,9 @@ public static class CardGrowthManager
 
     public static int MaxLevel => Config.MaxLevel;
 
+    // 레벨 _level로 올리는 한 방이 진화인가(관문 레벨은 곡선이 소유한다)
+    public static bool IsEvolutionLevel(int _level) => Config.IsEvolutionLevel(_level);
+
     // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
 
