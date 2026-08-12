@@ -101,12 +101,6 @@ public static class TutorialStepExecutor
             return false;
         }
 
-        if (DeckSaveManager.TryFindSlot(t_cards, out _))
-        {
-            _context.CompleteIfLast();
-            return false;
-        }
-
         if (DeckSaveManager.LegacyMigrationPending)
         {
             Debug.LogWarning($"[TutorialStepExecutor] {t_where} 레거시 덱 이관 미완료 — 지급 보류(다음 부트에 재시도).");
@@ -114,7 +108,15 @@ public static class TutorialStepExecutor
             return false;
         }
 
+        // 저장 덱과 소유권은 별도 데이터다. 둘이 어긋난 세이브라도
+        // 가이드 진입 전 실제 카드 소유를 먼저 보장한다.
         OwnershipManager.GrantAll(ToIds(t_cards));
+
+        if (DeckSaveManager.TryFindSlot(t_cards, out _))
+        {
+            _context.CompleteIfLast();
+            return false;
+        }
 
         if (!DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out _))
         {

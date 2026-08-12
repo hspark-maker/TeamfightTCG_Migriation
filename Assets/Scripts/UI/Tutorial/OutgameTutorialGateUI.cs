@@ -356,13 +356,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         Vector2 t_center = (t_min + t_max) * 0.5f;
 
-        // 손 이미지를 타깃 중앙에서 자기 높이의 절반만큼 위로 민다 — 손 아래 모서리가 타깃 중앙에 걸린다.
-        // 거기서 handOffset으로 스프라이트 여백을 보정한다(y를 키우면 그만큼 더 뜬다).
+        // 손은 타깃 **아래**에 두고 손끝(위쪽)이 타깃 중앙에 닿게 한다 — 손 이미지가 위를 가리키므로
+        // 위에 두면 손등이 대상을 덮고 손끝은 허공을 가리킨다. 자기 높이의 절반만큼 내리면
+        // 손 위쪽 모서리가 타깃 중앙에 걸린다. handOffset은 스프라이트 여백 보정(y를 키우면 더 파고든다).
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
         {
             Vector2 t_handHalf = this.hand.rect.size * 0.5f;
-            this.hand.anchoredPosition = t_center + new Vector2(0f, t_handHalf.y) + this.handOffset;
+            this.hand.anchoredPosition = t_center - new Vector2(0f, t_handHalf.y) + this.handOffset;
         }
 
         PlaceMessage(t_full, t_min.y, t_max.y);

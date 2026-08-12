@@ -15,8 +15,13 @@ public class TutorialScenarioData : ScriptableObject
     public enum StepKind { Attack, Message, Inspect }
 
     /// <summary>안내 배너가 붙을 자리. 포커스가 아래(아군)로 내려가면 배너는 위로 비켜야 가려지지 않는다.
-    /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
-    public enum BannerAnchor { Top, Center, Bottom }
+    /// 값 순서 = 화면 위→아래 순서다(인스펙터 드롭다운이 그대로 위아래로 읽힌다).
+    /// 실제 좌표는 <c>TutorialOverlayUI</c>의 자리별 Vector2가 정한다 — 여기선 어느 자리인지만 고른다.
+    ///
+    /// ⚠ SO는 int 직렬화다. <b>2026-08-12에 한 번 재배열했다</b>(구 Center 1→2, 구 Bottom 2→4) —
+    /// 보유처가 TutorialScenario*.asset 다섯 개뿐이라 그 파일들의 값을 같이 옮겼다.
+    /// 앞으로 값을 더 넣을 땐 반드시 끝에 추가할 것(같은 마이그레이션을 다시 하지 않으려면).</summary>
+    public enum BannerAnchor { Top, UpperMiddle, Center, LowerMiddle, Bottom }
 
     /// <summary>카드 낱장 포커스 대상 진영. None(0)이 기본이라 기존 시나리오는 자동으로 꺼진 상태다 —
     /// 슬롯 번호만 두면 기본값 0이 "0번 슬롯 포커스 켜짐"이 돼버려서 진영 자체를 스위치로 쓴다.

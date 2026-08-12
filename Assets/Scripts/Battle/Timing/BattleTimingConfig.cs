@@ -130,7 +130,9 @@ public class BattleTimingConfig : ScriptableObject
     // 사망 연출(약 0.4초)이 이 배속으로 늘어난다 — 0.25면 약 1.6초. 피니시 길이를 조절하는 **주 레버**다.
     // 더 내리면 죽는 그림이 늘어져 "느리다"가 아니라 "멈췄다"로 읽히기 시작한다.
     [SerializeField, Range(0.05f, 1f)] float finishSlow     = 0.25f;
-    [SerializeField, Range(0.5f, 1f)]  float finishBgmPitch = 0.82f;
+    // BGM은 배속을 따라가지 않는다(기본 1). 화면만 느려지고 곡은 제 속도로 흐르는 편이
+    // 결정타가 "멈춘 그림"으로 읽히고, 슬로우 구간마다 곡이 끌려 음정이 무너지지 않는다.
+    [SerializeField, Range(0.5f, 1f)]  float finishBgmPitch = 1f;
     // 배경 블러는 여기 없다 — 결정타 구간은 **선명해야** 무슨 일이 벌어졌는지 읽힌다.
     // 흐림은 "보드에서 팝업으로 넘어가는" 장치라 Result Beat 쪽이 소유한다.
 
@@ -142,7 +144,7 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float resultBeatOut  = 0.12f;   // 정상 속도로 돌아오는 시간
     [SerializeField, Range(0.05f, 1f)] float resultBeatSlow     = 0.25f;  // 가장 느릴 때의 Time.timeScale(1 = 슬로우 없음)
     [SerializeField, Range(0f, 1f)]    float resultBeatBlur     = 0.45f;  // 여운 동안 차오르는 배경 블러 강도
-    [SerializeField, Range(0.5f, 1f)]  float resultBeatBgmPitch = 0.88f;  // 여운 동안 BGM이 끌리는 정도(1 = 그대로)
+    [SerializeField, Range(0.5f, 1f)]  float resultBeatBgmPitch = 1f;     // 여운 동안 BGM이 끌리는 정도(1 = 그대로)
     // 패배는 승리보다 약하게 — 깊이(슬로우·블러·줌)와 머무는 시간에 함께 곱한다.
     [SerializeField, Range(0f, 1f)]    float resultBeatLoseRatio = 0.7f;
     // 피니시가 이미 돌았으면 여운은 통째로 접고 이만큼만 쉬었다 팝업을 연다 —
