@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Coffee.UIEffects;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -166,6 +167,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 시너지 줄은 칩마다가 아니라 관문 하나(1차 진화)로 통째로 잠긴다 → 기준값도 불리언 하나면 된다.
     bool m_shownSynergyOpen;
 
+    // 각 버튼 밑판의 흑백 효과. 자식(라벨·아이콘·숫자)은 UIEffectReplica로 이걸 따라오므로
+    // 코드가 쥐는 것은 버튼당 이 하나뿐이다. 없으면 조작 여부만 바뀐다.
+    UIEffect m_enhanceTone;
+    UIEffect m_evolveTone;
+
     // 지금 화면에 지어 둔 키워드 줄의 잠김 상태. 해금 순간을 잡으려면 마스크만으로는 부족하다 —
     // 잠김 판정은 "열린 것이 하나도 없는가"라 마스크가 그대로여도 상태가 바뀔 수 있다.
     bool m_shownKeywordLocked;
@@ -245,6 +251,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void Awake()
     {
         s_instance = this;
+
+        if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
+        if (this.evolveButton  != null) this.m_evolveTone  = this.evolveButton.GetComponent<UIEffect>();
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
         // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
@@ -766,10 +775,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_evolve = this.evolveButton != null && t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
-        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(_owned && !t_evolve);
+        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(_owned &&  t_evolve);
+
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
-        SetActionButton(this.enhanceButton, _owned && !t_evolve, t_canPayEnhance && !this.m_ritualPlaying);
-        SetActionButton(this.evolveButton,  _owned &&  t_evolve, t_canPayEnhance && !this.m_ritualPlaying);
+        bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
+        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying);
 
         ApplyCost(t_hasStep, t_step);
 
@@ -854,13 +865,23 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_icon != null) _target.sprite = t_icon;
     }
 
-    /// <summary>강화·진화 버튼 한 쪽의 표시와 조작 가능 여부. 둘 다 같은 규약이라 한 곳에 둔다.</summary>
-    static void SetActionButton(Button _button, bool _shown, bool _interactable)
+    /// <summary>두 버튼의 조작 가능 여부. 서 있는 쪽이 어느 것이든 판정은 하나라(같은 레벨업 1회) 함께 건다.</summary>
+    void SetActionsEnabled(bool _interactable)
+    {
+        SetActionEnabled(this.enhanceButton, this.m_enhanceTone, _interactable);
+        SetActionEnabled(this.evolveButton,  this.m_evolveTone,  _interactable);
+    }
+
+    // 못 누르는 동안 버튼이 **통째로** 흑백이 된다. 밑판만 무채색으로 바꾸면 자식(라벨·불 아이콘·동전·숫자)이
+    // 원색 그대로 남아 오히려 어수선해진다 — 색이 빠지는 일은 버튼 전체에 한 번에 걸려야 한다.
+    // 알파를 낮추지 않는 이유: 하단 바 밑판이 어두워(Popup_FullWidth_Dark) 반투명은 곧 사라짐이 된다.
+    static void SetActionEnabled(Button _button, UIEffect _tone, bool _interactable)
     {
         if (_button == null) return;
 
-        _button.gameObject.SetActive(_shown);
         _button.interactable = _interactable;
+
+        if (_tone != null) _tone.toneIntensity = _interactable ? 0f : 1f;
     }
 
     // 지금 강화가 왜 막혔는지 한 문장. 상세 패널과 결과판이 같은 문장을 써야 화면마다 이유가 달라 보이지 않는다.
@@ -989,8 +1010,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 강화를 누른 직후의 잠금. 값은 손대지 않는다 — 여기서 RefreshGrowth를 부르면 공개할 것이 사라진다.
     void LockControls()
     {
-        if (this.enhanceButton != null) this.enhanceButton.interactable = false;
-        if (this.evolveButton  != null) this.evolveButton.interactable  = false;
+        SetActionsEnabled(false);
 
         HideBottomBar();   // 담금질 구간에는 카드만 남는다
         RefreshArrows();   // 연출 중에 카드가 넘어가면 무대에 선 카드와 결과가 어긋난다.
@@ -1048,8 +1068,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 값도 지금 낼 비용으로 갈아둔다(방금 쓴 비용이 남아 있으면 다음 한 방의 가격을 잘못 읽는다).
         // 어느 버튼이 설지는 이미 공개 시점의 RefreshGrowth가 다음 단계 기준으로 정해뒀다 —
         // 여기선 그 판정을 다시 하지 않고 둘 다 손봐 서 있는 쪽이 알아서 맞게 둔다.
-        if (this.enhanceButton != null) this.enhanceButton.interactable = t_canRetry;
-        if (this.evolveButton  != null) this.evolveButton.interactable  = t_canRetry;
+        SetActionsEnabled(t_canRetry);
         ApplyCost(t_hasNext, t_next);
         SetActionLabel(true);
 
