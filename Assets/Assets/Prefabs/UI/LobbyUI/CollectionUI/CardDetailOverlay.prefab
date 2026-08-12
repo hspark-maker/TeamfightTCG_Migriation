@@ -1242,6 +1242,11 @@ MonoBehaviour:
     dim: {fileID: 4389903715525950018}
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+  emblems:
+    engraveDur: 0.28
+    stagger: 0.07
+    seedScale: 1.35
+    flashColor: {r: 1, g: 0.97, b: 0.88, a: 1}
   blindPeak: 1
   overheatStart: 0.45
   overheatRise: 0.5
@@ -1252,7 +1257,7 @@ MonoBehaviour:
     fall: 0.45
     peak: 0.7
     color: {r: 1, g: 0.95, b: 0.82, a: 1}
-    burstSprite: {fileID: 21300000, guid: 4f227f4e384d0a64d8792c7524c0ba43, type: 3}
+    burstSprite: {fileID: 0}
     burstColor: {r: 1, g: 0.95, b: 0.8, a: 1}
     burstAlpha: 1
     burstStartScale: 0.35
@@ -1284,6 +1289,14 @@ MonoBehaviour:
   burstScale: 1.4
   burstSettle: 0.6
   burstTilt: -3
+  settleUndershoot: 0.985
+  beatDelay: 0.08
+  beatScale: 1.05
+  beatRise: 0.12
+  beatFall: 0.24
+  beatHaloAlpha: 0.62
+  beatHaloScale: 1.34
+  beatDim: 0.12
   haloPeakAlpha: 0.9
   haloPeakScale: 1.25
   afterglowHeat: 0.35
@@ -10577,13 +10590,13 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 3915342703562077861}
   - {fileID: 4662742522287700662}
   - {fileID: 5558821698939251705}
   - {fileID: 6510676655916322885}
   - {fileID: 86291993135919425}
   - {fileID: 2223286536478904459}
   - {fileID: 4696724959831755242}
-  - {fileID: 3915342703562077861}
   - {fileID: 5752965148346395327}
   - {fileID: 6130354808394375652}
   - {fileID: 3847412836439741232}

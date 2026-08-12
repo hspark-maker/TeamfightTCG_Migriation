@@ -3,14 +3,14 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 진화 충전에서 카드 뒤에 하나 둘 켜지는 빛줄기.
+// 진화 충전에서 카드 **앞에** 하나 둘 켜지는 빛줄기(가산이라 카드를 가리지 않고 달아오르게 한다).
 // 담금질의 불티(CardEnhanceEmbers)와 반대 벡터다 — 불티는 터진 뒤 흩어지고, 줄기는 공개 프레임에 카드로 빨려든다.
 // 시간축은 모른다: 언제 몇 번째를 켤지는 CardEvolveRitualView가 정한다.
 [Serializable]
 public class CardEvolveRays
 {
     [Tooltip("⚠ 카드(CardSlot)의 자식으로 두지 않는다 — burst 스케일을 함께 받으면 줄기가 아니라 무늬가 된다.\n" +
-             "  CardPad의 자식이면서 CardSlot보다 **앞선 형제**여야 카드 뒤로 간다(uGUI는 나중 형제를 위에 그린다).\n" +
+             "  CardPad의 자식이면서 CardSlot보다 **나중 형제**여야 카드 앞으로 나온다(uGUI는 나중 형제를 위에 그린다).\n" +
              "\n" +
              "저작 규약 세 가지 (어기면 광선으로 안 읽힌다):\n" +
              "  · 피벗은 (0.5, 0) — 뿌리가 카드 중심이고 거기서 바깥으로 뻗는다.\n" +

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,6 +32,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
     [SerializeField] CardEnhanceHalo    halo    = new CardEnhanceHalo();        // 카드 뒤에서 밀려나오는 빛
     [SerializeField] CardEvolveRays     rays    = new CardEvolveRays();         // 충전 동안 하나 둘 켜지는 빛줄기
     [SerializeField] ScreenDimTint      dimTint = new ScreenDimTint();          // 화면 딤의 밝기
+
+    [Tooltip("진화로 새로 열리는 프레임 문양. 대상은 호출부가 Play 직전에 넘긴다(카드마다 다르다) — 여기 배선할 것이 없다.")]
+    [SerializeField] CardEvolveEmblems  emblems = new CardEvolveEmblems();      // 숨 박자에 새겨지는 문양
 
     [Header("과열 — 빛이 카드를 삼킨다")]
     [Range(0f, 1f)] [SerializeField] float blindPeak     = 1f;                  // 백열의 최대 세기. 1이면 흰 실루엣만 남는다
@@ -79,9 +83,24 @@ public class CardEvolveRitualView : CardGrowthRitualView
     [SerializeField] float enterScale   = 1.02f;                                // 진입의 들숨. 1보다 **커야** 담금질의 움츠림과 갈린다
     [SerializeField] float liftDistance = 22f;                                  // 충전 동안 떠오르는 높이(px). 줄기가 켜질 때마다 세 뼘에 나눠 오른다
     [SerializeField] float blazeScale   = 1.06f;                                // 삼켜지는 동안의 완만한 확대
-    [SerializeField] float burstScale   = 1.40f;                                // 빛이 물러나기 시작하는 프레임의 부풂. 즉시 이 크기가 되었다가 회수된다
-    [SerializeField] float burstSettle  = 0.60f;                                // 회수 시간. 빛이 물러나는 속도와 같아야 '빛이 카드가 되었다'로 읽힌다
-    [SerializeField] float burstTilt    = -3f;                                  // 회수가 시작하는 프레임의 기울기(도). 0으로 풀리며 '자리를 잡는다'
+    [Tooltip("정적(hold) 후반에 빛이 부푸는 최대 크기. 공개는 여기서 **이어받아** 내려앉는다 —\n" +
+             "  이 크기를 공개 첫 프레임에 대입하면 카드가 팝하듯 튀어나온다(그것이 '픽 등장'의 정체였다).")]
+    [SerializeField] float burstScale   = 1.40f;
+    [SerializeField] float burstSettle  = 0.60f;                                // 내려앉는 시간. 빛이 물러나는 속도와 같아야 '빛이 카드가 되었다'로 읽힌다
+    [Tooltip("부푸는 동안 함께 기울어지는 각도(도). 공개 구간에서 0으로 풀리며 '자리를 잡는다'.")]
+    [SerializeField] float burstTilt    = -3f;
+    [Tooltip("착지가 제 크기 밑으로 지나치는 깊이. 1이면 언더슛 없이 그냥 멎는다 — 무게는 이 한 뼘에서 나온다.")]
+    [Range(0.9f, 1f)] [SerializeField] float settleUndershoot = 0.985f;
+
+    [Header("숨 — 태어난 것이 한 번 크게 뛴다")]
+    [Tooltip("착지가 끝나고 이만큼 뒤에 뛴다. 0이면 착지에 묻혀 두 사건이 하나로 읽힌다.")]
+    [SerializeField] float beatDelay = 0.08f;
+    [SerializeField] float beatScale = 1.05f;                                   // 부푸는 크기. 착지의 언더슛과 대칭이라 크면 다시 폭발이 된다
+    [SerializeField] float beatRise  = 0.12f;                                   // 차오르는 시간(짧을수록 심박에 가깝다)
+    [SerializeField] float beatFall  = 0.24f;                                   // 가라앉는 시간. 오름보다 길어야 '뛰었다'가 된다
+    [Range(0f, 1f)] [SerializeField] float beatHaloAlpha = 0.62f;               // 박동 정점의 후광 짙기(잔광 alpha에서 여기까지 뛴다)
+    [SerializeField] float beatHaloScale = 1.34f;                               // 박동 정점의 후광 크기. 카드 밖으로 밀려나야 파동으로 읽힌다
+    [Range(0f, 1f)] [SerializeField] float beatDim = 0.12f;                     // 박동이 배경까지 밝히는 폭(결과 밝기 기준 가산)
 
     [Header("빛")]
     [Range(0f, 1f)] [SerializeField] float haloPeakAlpha  = 0.9f;
@@ -105,6 +124,15 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     // 공개 뒤 숨 한 번이 결과 구간 안에 들어가도록 확보하는 여유. 없으면 결과판이 뜬 뒤에도 후광이 뛴다.
     const float BreathRoom = 0.2f;
+
+    // 덮개가 물러나는 데 쓰는 공개 구간의 비율. 숨은 그 뒤에 와야 하므로 BeatAt이 같은 값을 본다.
+    const float VeilRetreatSpan = 0.85f;
+
+    // 박동 정점에서 표면 열이 잔광 대비 부푸는 배율.
+    const float BeatHeatBoost = 1.7f;
+
+    // 숨에 얹히는 축(후광·표면 열·딤)이 그 전에 도착하도록 두는 틈.
+    const float LeadGap = 0.02f;
 
     // 줄기 점화 시각(충전 대비). 간격이 좁아지는 것이 고조의 본체다 — 등간격이면 사건이 아니라 배경이 된다.
     static readonly float[] RayCues = { 0.55f, 0.72f, 0.85f };
@@ -167,9 +195,19 @@ public class CardEvolveRitualView : CardGrowthRitualView
                              + Mathf.Max(0f, this.gleamGap) + Mathf.Max(0.05f, this.gleamSweepSlow)
                            : 0f;
 
-    // 결과 구간은 회수와 빛줄기·줄기 회수가 다 지나갈 자리를 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
-    float RevealSettle => Mathf.Max(Mathf.Max(0.05f, this.burstSettle),
-                                    Mathf.Max(GleamSpan, this.rays.RetractSpan));
+    float SettleSpan => Mathf.Max(0.05f, this.burstSettle);
+
+    // 숨이 시작하는 자리(공개 시작 대비). 착지가 끝나고, 그리고 빛이 다 물러난 뒤여야 한다 —
+    // 아직 덮개가 남은 카드가 뛰면 무엇이 뛰는지가 안 읽힌다. 각인도 이 박에 얹힌다.
+    float BeatAt => Mathf.Max(SettleSpan, Mathf.Max(0.05f, this.revealDuration) * VeilRetreatSpan)
+                  + Mathf.Max(0f, this.beatDelay);
+
+    float BeatSpan => Mathf.Max(0.05f, this.beatRise) + Mathf.Max(0.05f, this.beatFall);
+
+    // 결과 구간은 착지·빛줄기·줄기 회수와 숨·각인이 다 지나갈 자리를 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
+    float RevealSettle => Mathf.Max(Mathf.Max(SettleSpan, GleamSpan),
+                                    Mathf.Max(this.rays.RetractSpan,
+                                              BeatAt + Mathf.Max(BeatSpan, this.emblems.Span)));
 
     Tween TweenLift(float _to, float _dur)      => DOTween.To(() => this.Lift,      _v => this.Lift      = _v, _to, _dur);
     Tween TweenTremorAmp(float _to, float _dur) => DOTween.To(() => this.TremorAmp, _v => this.TremorAmp = _v, _to, _dur);
@@ -208,6 +246,11 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     void OnDestroy() => this.shading.Release();
 
+    /// <summary>이번 진화로 새로 열리는 프레임 문양들. <see cref="CardGrowthRitualView.Play"/> **직전에** 넘긴다 —
+    /// 시퀀스는 Play에서 한 번에 짜이므로 그 뒤에 주면 이번 판에는 반영되지 않는다.
+    /// 넘길 것이 없으면 빈 목록(또는 null)을 줘야 앞 판의 문양이 남지 않는다.</summary>
+    public void SetEmblems(IReadOnlyList<Graphic> _emblems) => this.emblems.SetTargets(_emblems);
+
     protected override void AttachLayers()
     {
         this.shading.Attach();
@@ -243,7 +286,7 @@ public class CardEvolveRitualView : CardGrowthRitualView
         BuildBlaze(_seq, t_blaze, t_blazeDur, t_blazeDur + t_holdDur + t_revealOut * 0.6f);
 
         BuildHold(_seq, t_hold, t_holdDur);
-        BuildReveal(_seq, t_reveal, t_resultDur);
+        BuildReveal(_seq, t_reveal);
 
         // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리.
         return t_reveal + t_resultDur;
@@ -302,6 +345,10 @@ public class CardEvolveRitualView : CardGrowthRitualView
         this.dimTint.Reset();
         this.halo.Reset();
         this.rays.Reset();
+
+        // 문양만은 "꺼짐"이 아니라 authoring(제 색으로 켜짐)으로 돌아간다 — 새기다 잘려도 결과는 열린 문양이다.
+        this.emblems.Restore();
+
         this.shading.Neutralize();
 
         // 중립값으로 되돌린 **뒤** 재질을 벗는다(담금질과 같은 규약 — 걸친 채 두면 페이드 구간에서 색이 틀어진다).
@@ -461,6 +508,8 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     // 정적. 완전히 덮인 채 머문다 — 이 한 박이 진화의 무게다(담금질은 0.05초만 덮이고 곧 터진다).
     // 값이 바뀌는 것은 이 백지 위에서다. 눈은 숫자도 그림도 바뀌는 과정을 보지 못한다.
+    //
+    // 머무는 동안 실루엣이 부푼다 — 공개가 이 크기를 **이어받아** 내려앉아야 카드가 팝하듯 튀지 않는다.
     void BuildHold(Sequence _seq, float _at, float _dur)
     {
         // 앞 구간이 짧게 잘려 덜 덮인 채 도착했더라도 여기서 못 박는다.
@@ -468,45 +517,49 @@ public class CardEvolveRitualView : CardGrowthRitualView
         _seq.Insert(_at, this.shading.TweenCover(1f, BlindRise));
 
         _seq.InsertCallback(_at + BlindRise, this.m_handoff.Reveal);
+
+        // 공개 콜백이 켠 문양을 그 **직후**에 못 박는다(같은 시각이면 삽입 순서대로 처리된다) —
+        // 늦으면 다 자란 문양이 백열 아래에서 한 프레임 비친다.
+        this.emblems.InsertSeed(_seq, _at + BlindRise);
+
+        // 앞 3분의 1은 정적이다 — 곧바로 부풀면 머무는 한 박이 사라진다.
+        float t_swellAt  = _at + _dur * 0.35f;
+        float t_swellDur = Mathf.Max(0.05f, _dur * 0.65f);
+
+        _seq.Insert(t_swellAt, this.cardStage.DOScale(this.burstScale, t_swellDur).SetEase(Ease.InOutSine));
+        _seq.Insert(t_swellAt, this.cardStage.DOLocalRotate(new Vector3(0f, 0f, this.burstTilt), t_swellDur)
+                                   .SetEase(Ease.InOutSine));
     }
 
-    // 공개. 빛이 **물러나며** 새 모습이 드러난다.
-    // 카드는 빛이 물러나기 시작하는 프레임에 한 번 부풀었다가, 빛과 같은 속도로 가라앉는다 —
-    // 둘의 속도가 같아야 "빛이 카드가 되었다"로 읽힌다. 담금질처럼 확 회수하면 그건 폭발이지 재탄생이 아니다.
-    void BuildReveal(Sequence _seq, float _at, float _hold)
+    // 공개. 빛이 **물러나며** 새 모습이 드러나고, 부푼 빛이 그대로 카드가 되어 내려앉는다.
+    // 자세는 hold가 데려온 크기·기울기에서 이어받는다 — 여기서 대입하면 그 프레임에 카드가 튄다(팝).
+    //
+    // 빛이 다 걷힌 뒤에야 한 번 크게 뛴다(BuildBeat). 잔광·표면 열·딤은 그 전에 제 자리에 도착해 있어야 한다 —
+    // 같은 축을 두 트윈이 겹쳐 밀면 뒷마디가 앞마디의 중간값에서 출발한다.
+    void BuildReveal(Sequence _seq, float _at)
     {
-        float t_out    = Mathf.Max(0.05f, this.revealDuration);
-        float t_settle = Mathf.Max(0.05f, this.burstSettle);
+        float t_out  = Mathf.Max(0.05f, this.revealDuration);
+        float t_beat = BeatAt;
+        float t_lead = Mathf.Max(0.05f, t_beat - LeadGap);   // 숨보다 먼저 끝나야 하는 축들의 길이
 
-        _seq.InsertCallback(_at, () =>
-        {
-            if (this.cardStage == null) return;
-
-            this.cardStage.localScale    = Vector3.one * this.burstScale;
-            this.cardStage.localRotation = Quaternion.Euler(0f, 0f, this.burstTilt);
-        });
-
-        _seq.Insert(_at, this.cardStage.DOScale(1f, t_settle).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.cardStage.DOAnchorPos(this.m_baseAnchored, t_settle).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.cardStage.DOLocalRotate(Vector3.zero, t_settle).SetEase(Ease.OutQuad));
+        BuildLanding(_seq, _at, SettleSpan);
 
         // 본체의 백열은 덮개보다 빨리 죽는다 — 그래야 갉혀 뚫린 자리 아래로 **새 모습**이 보인다.
         _seq.Insert(_at, this.shading.TweenBlind(0f, t_out * 0.5f).SetEase(Ease.OutQuad));
         BuildVeilRetreat(_seq, _at, t_out);
-        _seq.Insert(_at + t_out * 0.4f, this.shading.TweenHeat(this.afterglowHeat, t_out).SetEase(Ease.OutQuad));
+
+        float t_heatAt = _at + t_out * 0.4f;
+        _seq.Insert(t_heatAt, this.shading.TweenHeat(this.afterglowHeat,
+                                                     Mathf.Max(0.05f, _at + t_lead - t_heatAt)).SetEase(Ease.OutQuad));
 
         // 정점의 빛이 배경까지 밝혀 둔 채다. 여기서 가라앉혀야 위에 뜨는 결과판 글자가 읽힌다.
-        _seq.Insert(_at, this.dimTint.TweenLevel(this.resultDim, t_out).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.dimTint.TweenLevel(this.resultDim, t_lead).SetEase(Ease.OutQuad));
 
         // 후광은 꺼지지 않고 카드 가장자리에 눌러앉는다 — 복귀 구간이 걷어간다.
-        _seq.Insert(_at, this.halo.TweenScale(this.afterglowScale, t_out).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.halo.TweenAlpha(this.afterglowAlpha, t_out).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenScale(this.afterglowScale, t_lead).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenAlpha(this.afterglowAlpha, t_lead).SetEase(Ease.OutQuad));
 
-        // 한 번 숨을 쉰다. 고정된 잔광은 배경 이미지로 보이고, 이 들숨이 카드를 살아 있게 만든다.
-        float t_breath = Mathf.Max(0.1f, _hold - t_out);
-        _seq.Insert(_at + t_out,
-                    this.halo.TweenAlpha(this.afterglowAlpha * 0.5f, t_breath * 0.5f)
-                        .SetEase(Ease.InOutSine).SetLoops(2, LoopType.Yoyo));
+        BuildBeat(_seq, _at + t_beat);
 
         this.rays.InsertRetract(_seq, _at);   // 빛이 카드 안으로. 담금질의 불티가 밖으로 흩어지는 자리와 정확히 반대다
 
@@ -519,6 +572,45 @@ public class CardEvolveRitualView : CardGrowthRitualView
         BuildGleam(_seq, _at);
     }
 
+    // 착지. 제 크기 밑을 한 뼘 지나쳤다 올라온다 — 곧장 1에서 멎으면 '내려앉았다'가 아니라 '멈췄다'가 된다.
+    // 자리·각도는 한 마디로 푼다(빛이 물러나는 속도와 같아야 "빛이 카드가 되었다"가 유지된다).
+    void BuildLanding(Sequence _seq, float _at, float _settle)
+    {
+        float t_drop = _settle * 0.72f;
+
+        _seq.Insert(_at, this.cardStage.DOScale(this.settleUndershoot, t_drop).SetEase(Ease.OutCubic));
+        _seq.Insert(_at + t_drop, this.cardStage.DOScale(1f, _settle - t_drop).SetEase(Ease.InOutSine));
+
+        _seq.Insert(_at, this.cardStage.DOAnchorPos(this.m_baseAnchored, _settle).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.cardStage.DOLocalRotate(Vector3.zero, _settle).SetEase(Ease.OutQuad));
+    }
+
+    // 숨. 갓 태어난 것이 한 번 크게 뛰고, 그 박동에 새 문양이 새겨진다.
+    // 고정된 잔광은 배경 그림으로 보인다 — 이 한 박이 카드를 살아 있게 만들고, 진화의 마지막 획이 된다.
+    void BuildBeat(Sequence _seq, float _at)
+    {
+        float t_rise = Mathf.Max(0.05f, this.beatRise);
+        float t_fall = Mathf.Max(0.05f, this.beatFall);
+
+        _seq.Insert(_at,           this.cardStage.DOScale(this.beatScale, t_rise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + t_rise,  this.cardStage.DOScale(1f, t_fall).SetEase(Ease.InOutSine));
+
+        // 후광이 카드 밖으로 밀려났다 돌아온다 — 파동이 몸 밖으로 번지는 축이다.
+        _seq.Insert(_at,          this.halo.TweenAlpha(this.beatHaloAlpha, t_rise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at,          this.halo.TweenScale(this.beatHaloScale, t_rise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + t_rise, this.halo.TweenAlpha(this.afterglowAlpha, t_fall).SetEase(Ease.InQuad));
+        _seq.Insert(_at + t_rise, this.halo.TweenScale(this.afterglowScale, t_fall).SetEase(Ease.OutQuad));
+
+        _seq.Insert(_at,          this.shading.TweenHeat(Mathf.Min(1f, this.afterglowHeat * BeatHeatBoost), t_rise)
+                                      .SetEase(Ease.OutQuad));
+        _seq.Insert(_at + t_rise, this.shading.TweenHeat(this.afterglowHeat, t_fall).SetEase(Ease.InOutSine));
+
+        _seq.Insert(_at,          this.dimTint.TweenLevel(this.resultDim + this.beatDim, t_rise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + t_rise, this.dimTint.TweenLevel(this.resultDim, t_fall).SetEase(Ease.InOutSine));
+
+        this.emblems.InsertEngrave(_seq, _at);
+    }
+
     // 덮개가 물러나는 방식. 갉아 없애면 빛이 면을 따라 물러나고, 알파로 내리면 그냥 투명해진다.
     void BuildVeilRetreat(Sequence _seq, float _at, float _out)
     {
@@ -528,7 +620,7 @@ public class CardEvolveRitualView : CardGrowthRitualView
             return;
         }
 
-        float t_sweep = _out * 0.85f;
+        float t_sweep = _out * VeilRetreatSpan;
 
         // 알파(Cover)는 1로 붙들어 둔다 — 셰이더의 번짐 테두리는 Cover에 스케일되지 않아 알파를 내려도 얼룩이 남는다.
         _seq.Insert(_at, this.shading.TweenSnuff(1f, t_sweep).SetEase(Ease.InOutQuad));

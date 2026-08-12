@@ -183,6 +183,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 결과판이 떠 있는 동안까지 켜져 있다(연출 → 결과판 → 복귀 전체가 한 덩이의 "연출 중"이다).
     bool m_ritualPlaying;
 
+    // 진화 연출에 넘길 문양 목록. 매번 새 List를 만들지 않기 위한 재사용 버퍼다(연타하는 조작).
+    readonly List<Graphic> m_emblemBuffer = new List<Graphic>();
+
     // 지금 무대를 쥔 연출(강화 = 담금질, 진화 = 탈각). 누른 순간에 골라 고정한다 —
     // 레벨은 그 직후 올라가므로, 나중에 다시 고르면 방금 시작한 것과 다른 연출을 붙들게 된다.
     CardGrowthRitualView m_activeRitual;
@@ -1110,6 +1113,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         this.m_activeRitual = t_ritual;
+
+        // 이번 진화로 새로 열리는 프레임 문양을 연출에 넘긴다. 이 자리가 유일한 시점이다 —
+        // 레벨은 이미 올랐고(TryEnhance) 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나온다.
+        // 넘길 것이 없어도 부른다(앞 판의 문양이 남으면 이번 판에 이유 없이 다시 새겨진다).
+        if (t_evolve && this.cardView != null)
+        {
+            this.cardView.CollectPendingKeywordFrames(t_card, OwnershipManager.IsOwned(t_card), this.m_emblemBuffer);
+            this.evolveRitual.SetEmblems(this.m_emblemBuffer);
+        }
 
         // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhance는 이미 끝난 거래라
         // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
