@@ -15,7 +15,11 @@ public class DeckEditSlotView : MonoBehaviour
     [SerializeField] Button         clickButton;      // 칸 전체 버튼(클릭 = 해제)
     [SerializeField] CardVisualView cardVisual;       // 카드 비주얼 단일 진실원(빈 칸이면 스스로 숨는다)
     [SerializeField] GameObject     emptyMark;        // 빈 칸 표시(+ 아이콘 등). cardVisual 바깥에 두어야 통째로 꺼져도 남는다.
-    [SerializeField] GameObject     highlightFrame;   // 드래그 오버 하이라이트 테두리
+    [SerializeField] GameObject     highlightFrame;   // 드래그 오버 / 시너지 강조 테두리
+    [SerializeField] CanvasGroup    canvasGroup;      // 시너지 강조 때 대상 아닌 칸을 죽이는 용도
+
+    // 시너지 강조 중 "해당 없음" 칸의 알파. 0으로 두면 빈 칸인지 흐린 칸인지 구분이 안 된다.
+    const float FOCUS_DIM_ALPHA = 0.25f;
 
     int         m_index = -1;
     CardData    m_card;
@@ -47,11 +51,21 @@ public class DeckEditSlotView : MonoBehaviour
 
         if (emptyMark != null) emptyMark.SetActive(!t_has);
 
-        SetHighlight(false);   // 재바인딩은 드래그 종료 직후에도 일어난다 → 하이라이트 잔상 제거
+        SetHighlight(false);          // 재바인딩은 드래그 종료 직후에도 일어난다 → 하이라이트 잔상 제거
+        SetSynergyFocus(false, false);
     }
 
     public void SetHighlight(bool _on)
     {
         if (highlightFrame != null) highlightFrame.SetActive(_on);
+    }
+
+    // 시너지 아이콘 롱프레스 중 호출. _match면 테두리로 띄우고, 아니면 흐리게 눌러 대비를 만든다.
+    // 롱프레스와 드래그는 동시에 성립하지 않으므로 테두리를 드래그 오버와 공유해도 서로 지우지 않는다.
+    public void SetSynergyFocus(bool _focusing, bool _match)
+    {
+        if (canvasGroup != null) canvasGroup.alpha = _focusing && !_match ? FOCUS_DIM_ALPHA : 1f;
+
+        SetHighlight(_focusing && _match);
     }
 }

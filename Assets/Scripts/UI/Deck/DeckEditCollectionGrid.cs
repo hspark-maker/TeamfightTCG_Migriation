@@ -78,6 +78,18 @@ public class DeckEditCollectionGrid : MonoBehaviour
         }
     }
 
+    // 시너지 아이콘 롱프레스 중 해당 시너지를 가진 타일만 남기고 나머지를 죽인다. null이면 전부 해제.
+    public void SetSynergyFocus(SynergyData _synergy)
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        {
+            var t_tile = m_tiles[t_i];
+            if (t_tile == null) continue;
+
+            t_tile.SetSynergyFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+        }
+    }
+
     public void Clear()
     {
         if (content != null)

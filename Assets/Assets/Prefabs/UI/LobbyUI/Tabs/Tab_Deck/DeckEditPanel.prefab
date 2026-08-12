@@ -94,6 +94,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4443662616902879784}
   - component: {fileID: 7902516097386695650}
+  - component: {fileID: 7902516097386695651}
   m_Layer: 0
   m_Name: SlotGrid
   m_TagString: Untagged
@@ -123,8 +124,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -2}
-  m_SizeDelta: {x: 0, y: -96.2901}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7902516097386695650
 MonoBehaviour:
@@ -159,7 +160,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 910000000000000002}
+  - component: {fileID: 910000000000000005}
+  - component: {fileID: 910000000000000006}
   - component: {fileID: 910000000000000004}
+  - component: {fileID: 910000000000000007}
   - component: {fileID: 910000000000000003}
   m_Layer: 0
   m_Name: SynergyBar
@@ -180,22 +184,60 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 722565573194169920}
-  - {fileID: 722565573194169923}
-  - {fileID: 722565573194169922}
-  - {fileID: 722565573194169925}
-  - {fileID: 722565573194169924}
-  - {fileID: 722565573194169927}
-  - {fileID: 722565573194169926}
-  - {fileID: 722565573194169945}
-  - {fileID: 722565573194169944}
+  - {fileID: 722565573216741484}
+  - {fileID: 722565573216741487}
+  - {fileID: 722565573216741486}
+  - {fileID: 722565573216741473}
+  - {fileID: 722565573216741472}
+  - {fileID: 722565573216741475}
+  - {fileID: 722565573216741474}
+  - {fileID: 722565573216741477}
+  - {fileID: 722565573216741476}
   m_Father: {fileID: 6065391164760528791}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 1}
-  m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 0, y: 10}
-  m_SizeDelta: {x: 600, y: 64}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 100, y: -48}
+  m_SizeDelta: {x: 100, y: 0}
+  m_Pivot: {x: 1, y: 1}
+--- !u!222 &910000000000000005
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_CullTransparentMesh: 1
+--- !u!114 &910000000000000006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.4245283, g: 0.4245283, b: 0.4245283, a: 0.654902}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: bc45865c2eb27428684b6da41aa3d8cf, type: 3}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!114 &910000000000000004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -205,16 +247,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 910000000000000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.VerticalLayoutGroup
   m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 4
-  m_Spacing: 50
+    m_Left: 10
+    m_Right: 12
+    m_Top: 10
+    m_Bottom: 20
+  m_ChildAlignment: 1
+  m_Spacing: 8
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 0
@@ -222,6 +264,20 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &910000000000000007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
+  m_HorizontalFit: 0
+  m_VerticalFit: 2
 --- !u!114 &910000000000000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -235,15 +291,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckSynergyStrip
   icons:
-  - {fileID: 310739643151034353}
-  - {fileID: 310739643151034354}
-  - {fileID: 310739643151034355}
-  - {fileID: 310739643151034356}
-  - {fileID: 310739643151034357}
-  - {fileID: 310739643151034358}
-  - {fileID: 310739643151034359}
-  - {fileID: 310739643151034344}
-  - {fileID: 310739643151034345}
+  - {fileID: 310739643090776541}
+  - {fileID: 310739643090776542}
+  - {fileID: 310739643090776543}
+  - {fileID: 310739643090776528}
+  - {fileID: 310739643090776529}
+  - {fileID: 310739643090776530}
+  - {fileID: 310739643090776531}
+  - {fileID: 310739643090776532}
+  - {fileID: 310739643090776533}
   showInactive: 1
   maxIcons: 0
 --- !u!1 &1316838277628216812
@@ -281,7 +337,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.06, y: 0.445}
   m_AnchorMax: {x: 0.94, y: 0.492}
-  m_AnchoredPosition: {x: 0, y: -78}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1194682624816522716
@@ -631,7 +687,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -47}
+  m_AnchoredPosition: {x: 0, y: -14}
   m_SizeDelta: {x: 0, y: 54}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &6493199043175845672
@@ -862,7 +918,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.02}
   m_AnchorMax: {x: 1, y: 0.435}
-  m_AnchoredPosition: {x: 0, y: -29.99997}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &5216895114072076886
@@ -1906,11 +1962,11 @@ MonoBehaviour:
   tabController: {fileID: 0}
   slots:
   - {fileID: 5614813904765663511}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 7224169137899975382}
+  - {fileID: 7213042847266920828}
+  - {fileID: 2877617853632529644}
+  - {fileID: 1043393277063666628}
+  - {fileID: 7297140910123754360}
   collectionGrid: {fileID: 886334161196977064}
   dragController: {fileID: 0}
   countText: {fileID: 1356435498019735195}
@@ -2090,8 +2146,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.495}
   m_AnchorMax: {x: 1, y: 0.935}
-  m_AnchoredPosition: {x: 0, y: -44.49997}
-  m_SizeDelta: {x: 0, y: 89}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7483593799813792460
 MonoBehaviour:
@@ -2196,11 +2252,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -2216,7 +2272,18 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
   m_PrefabInstance: {fileID: 100671702128085718}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000201
+--- !u!114 &1043393277063666628 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1089669665055985938, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
+  m_PrefabInstance: {fileID: 100671702128085718}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
+--- !u!1001 &910000000010000101
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2230,7 +2297,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2238,7 +2305,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2250,25 +2317,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 49
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -49
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_0
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034353 stripped
+--- !u!114 &310739643090776541 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000201}
+  m_PrefabInstance: {fileID: 910000000010000101}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2276,12 +2347,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169920 stripped
+--- !u!224 &722565573216741484 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000201}
+  m_PrefabInstance: {fileID: 910000000010000101}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000202
+--- !u!1001 &910000000010000102
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2295,7 +2366,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2303,7 +2374,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2315,25 +2386,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -137
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_1
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034354 stripped
+--- !u!114 &310739643090776542 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000202}
+  m_PrefabInstance: {fileID: 910000000010000102}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2341,12 +2416,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169923 stripped
+--- !u!224 &722565573216741487 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000202}
+  m_PrefabInstance: {fileID: 910000000010000102}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000203
+--- !u!1001 &910000000010000103
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2360,7 +2435,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2368,7 +2443,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2380,25 +2455,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -223
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_2
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034355 stripped
+--- !u!114 &310739643090776543 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000203}
+  m_PrefabInstance: {fileID: 910000000010000103}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2406,12 +2485,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169922 stripped
+--- !u!224 &722565573216741486 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000203}
+  m_PrefabInstance: {fileID: 910000000010000103}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000204
+--- !u!1001 &910000000010000104
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2425,7 +2504,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2433,7 +2512,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2445,25 +2524,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -309
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_3
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034356 stripped
+--- !u!114 &310739643090776528 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000204}
+  m_PrefabInstance: {fileID: 910000000010000104}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2471,12 +2554,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169925 stripped
+--- !u!224 &722565573216741473 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000204}
+  m_PrefabInstance: {fileID: 910000000010000104}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000205
+--- !u!1001 &910000000010000105
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2490,7 +2573,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2498,7 +2581,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2510,25 +2593,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -395
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_4
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034357 stripped
+--- !u!114 &310739643090776529 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000205}
+  m_PrefabInstance: {fileID: 910000000010000105}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2536,12 +2623,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169924 stripped
+--- !u!224 &722565573216741472 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000205}
+  m_PrefabInstance: {fileID: 910000000010000105}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000206
+--- !u!1001 &910000000010000106
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2555,7 +2642,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2563,7 +2650,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2575,25 +2662,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -481
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_5
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034358 stripped
+--- !u!114 &310739643090776530 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000206}
+  m_PrefabInstance: {fileID: 910000000010000106}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2601,12 +2692,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169927 stripped
+--- !u!224 &722565573216741475 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000206}
+  m_PrefabInstance: {fileID: 910000000010000106}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000207
+--- !u!1001 &910000000010000107
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2620,7 +2711,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2628,7 +2719,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2640,25 +2731,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -567
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_6
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034359 stripped
+--- !u!114 &310739643090776531 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000207}
+  m_PrefabInstance: {fileID: 910000000010000107}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2666,12 +2761,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169926 stripped
+--- !u!224 &722565573216741474 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000207}
+  m_PrefabInstance: {fileID: 910000000010000107}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000208
+--- !u!1001 &910000000010000108
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2685,7 +2780,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2693,7 +2788,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2705,25 +2800,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -653
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_7
       objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034344 stripped
+--- !u!114 &310739643090776532 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000208}
+  m_PrefabInstance: {fileID: 910000000010000108}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2731,12 +2830,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169945 stripped
+--- !u!224 &722565573216741477 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000208}
+  m_PrefabInstance: {fileID: 910000000010000108}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &910000000000000209
+--- !u!1001 &910000000010000109
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -2750,7 +2849,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.x
@@ -2758,7 +2857,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_SizeDelta.x
@@ -2770,25 +2869,29 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -739
       objectReference: {fileID: 0}
     - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
       propertyPath: m_Name
       value: SynergyIcon_8
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
---- !u!114 &310739643151034345 stripped
+--- !u!114 &310739643090776533 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000209}
+  m_PrefabInstance: {fileID: 910000000010000109}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -2796,10 +2899,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
---- !u!224 &722565573194169944 stripped
+--- !u!224 &722565573216741476 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
-  m_PrefabInstance: {fileID: 910000000000000209}
+  m_PrefabInstance: {fileID: 910000000010000109}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &2949878614188398078
 PrefabInstance:
@@ -2891,11 +2994,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -2911,6 +3014,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
   m_PrefabInstance: {fileID: 2949878614188398078}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &2877617853632529644 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1089669665055985938, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
+  m_PrefabInstance: {fileID: 2949878614188398078}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
 --- !u!1001 &4824652307030697989
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3001,11 +3115,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -3122,11 +3236,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -3142,6 +3256,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
   m_PrefabInstance: {fileID: 7663981113371259498}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7297140910123754360 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1089669665055985938, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
+  m_PrefabInstance: {fileID: 7663981113371259498}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
 --- !u!1001 &7712036721120643182
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3232,11 +3357,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -3252,6 +3377,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
   m_PrefabInstance: {fileID: 7712036721120643182}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7213042847266920828 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1089669665055985938, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
+  m_PrefabInstance: {fileID: 7712036721120643182}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
 --- !u!1001 &7736673192964547524
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3342,11 +3478,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 1524147196151106530, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.64285713
+      value: 0.5885126
       objectReference: {fileID: 0}
     - target: {fileID: 2624108122495585723, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
       propertyPath: m_Name
@@ -3362,6 +3498,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
   m_PrefabInstance: {fileID: 7736673192964547524}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7224169137899975382 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1089669665055985938, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
+  m_PrefabInstance: {fileID: 7736673192964547524}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
 --- !u!1001 &8130285976802311651
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3678,3 +3825,22 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 7699889416801685955, guid: 220bfc5f361744a9b85c18cc5d98b944, type: 3}
   m_PrefabInstance: {fileID: 8130285976802311651}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7902516097386695651
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 749322511490546682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 45434bf23b4d47947b4c8ba457769b08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridRatioFitter
+  columns: 3
+  cellAspect: 0.7512953
+  cellHeight: 0
+  rowsToFit: 2
+  artUsableRatio: {x: 1, y: 1}
+  sideMargin: 0
+  visibleGap: {x: 0, y: 0}

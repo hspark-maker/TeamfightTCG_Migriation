@@ -86,6 +86,26 @@ public class DeckEditController : MonoBehaviour
             nameInput.onEndEdit.RemoveAllListeners();
             nameInput.onEndEdit.AddListener(OnNameEndEdit);
         }
+
+        // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
+        if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
+    }
+
+    // _synergy가 null이면 강조 해제. 편성 칸은 테두리 + 나머지 딤, 컬렉션 타일은 딤만 한다.
+    void ApplySynergyFocus(SynergyData _synergy)
+    {
+        bool t_focusing = _synergy != null;
+
+        if (slots != null)
+        {
+            for (int t_i = 0; t_i < slots.Length; t_i++)
+            {
+                if (slots[t_i] == null) continue;
+                slots[t_i].SetSynergyFocus(t_focusing, SynergyPreview.Has(slots[t_i].Card, _synergy));
+            }
+        }
+
+        if (collectionGrid != null) collectionGrid.SetSynergyFocus(_synergy);
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.

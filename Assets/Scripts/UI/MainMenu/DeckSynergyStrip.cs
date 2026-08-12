@@ -1,9 +1,14 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>덱의 전투 참여 가능 시너지를 현재/다음 티어 진행도와 함께 표시한다.</summary>
 public class DeckSynergyStrip : MonoBehaviour
 {
+    /// <summary>롱프레스로 시너지 하나를 들여다보는 중이면 그 시너지, 손을 떼면 null.
+    /// 어떤 카드를 강조할지는 편성 상태를 아는 쪽(DeckEditController)이 정한다.</summary>
+    public Action<SynergyData> onFocusChanged;
+
     [SerializeField] SynergyCountIcon[] icons;
 
     [Header("Filter")]
@@ -80,7 +85,14 @@ public class DeckSynergyStrip : MonoBehaviour
             iconRect   = (RectTransform)_icon.transform,
             ownedCount = _icon.Progress.Count,
         });
+
+        this.onFocusChanged?.Invoke(_icon.Progress.Synergy);
     }
 
-    static void HideExplain() => UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+    // 설명 popup과 강조는 항상 같이 뜨고 같이 진다 — 한쪽만 남으면 화면이 흐린 채로 굳는다.
+    void HideExplain()
+    {
+        UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+        this.onFocusChanged?.Invoke(null);
+    }
 }
