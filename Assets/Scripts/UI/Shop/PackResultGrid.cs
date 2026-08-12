@@ -93,7 +93,11 @@ public class PackResultGrid : MonoBehaviour
 
         float t_scale = CardScale();
         int t_rows = Mathf.CeilToInt(t_count / (float)COLUMN_COUNT);
-        int t_detailOrder = DetailSortingOrder();   // 카드마다 캔버스를 거슬러 올라갈 이유가 없다
+
+        // 카드를 누르면 그 카드의 상세가 이 화면 위에 뜬다. 세 축 모두 이 화면의 사정이다 —
+        // 강화·진화는 걷고(여기는 방금 뽑은 것을 확인하는 자리다), 개봉 캔버스 위로 올라타고,
+        // 상단 재화 바가 없는 화면이라 상세가 로비에서 비켜 앉은 자리까지 덮게 한다.
+        var t_detailOptions = new CardDetailOpenOptions(_readOnly: true, _liftAboveAll: true, _coverFullScreen: true);
 
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
@@ -111,11 +115,7 @@ public class PackResultGrid : MonoBehaviour
             int t_index = m_views.Count;
             m_views.Add(t_view);
             m_order.Add(t_drawn.Card);
-
-            // 카드를 누르면 그 카드의 상세가 이 화면 위에 뜬다. 강화·진화는 걷은 채로 연다 —
-            // 여기는 방금 뽑은 것을 확인하는 자리라, 그 자리에서 재화를 쓰기 시작하면 개봉 흐름이 갈라진다.
-            CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index,
-                                           _readOnly: true, _sortingOrder: t_detailOrder);
+            CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index, t_detailOptions);
 
             var t_rt = (RectTransform)t_view.transform;
             t_rt.anchoredPosition = SlotPosition(t_index, t_count, t_rows);
@@ -196,19 +196,6 @@ public class PackResultGrid : MonoBehaviour
 
         m_views.Clear();
         m_order.Clear();
-    }
-
-    // 상세가 이 화면 위에 뜨기 위한 순서. 상세 오버레이는 로비 캔버스 안에 있고 개봉 화면은 그보다 위에 뜨는
-    // 별도 캔버스라, 그 값을 읽어 한 칸 위로 올린다 — 숫자를 여기 적어 두면 개봉 캔버스를 옮길 때 조용히 어긋난다.
-    int DetailSortingOrder()
-    {
-        Canvas t_canvas = GetComponentInParent<Canvas>();
-        if (t_canvas == null) return 0;   // 0 = 순서를 건드리지 않는다(상세가 제 캔버스의 제자리에 뜬다)
-
-        // 중첩 캔버스는 스스로 순서를 덮어쓰지 않는 한 루트의 순서로 그려진다 — 그 실제 값을 봐야 한다.
-        int t_order = t_canvas.overrideSorting ? t_canvas.sortingOrder : t_canvas.rootCanvas.sortingOrder;
-
-        return t_order + 1;
     }
 
     RectTransform ResolveContent()
