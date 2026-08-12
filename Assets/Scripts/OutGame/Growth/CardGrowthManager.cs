@@ -13,6 +13,10 @@ public static class CardGrowthManager
 
     static bool s_initialized;
 
+    // 안내가 대준 무료 강화를 이미 썼는가. 온보딩이 공짜로 내주는 것은 **한 방뿐**이고,
+    // 그 뒤의 "한 번 더"부터는 유저가 실제 비용을 보고 판단해야 한다(세이브하지 않는다 — 재시작하면 다시 한 방).
+    static bool s_tutorialFreeUsed;
+
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
@@ -110,7 +114,7 @@ public static class CardGrowthManager
         _step = default;
         if (_card == null) return false;
 
-        return Config.TryGetStep(_card, GrowthOf(_card).Level + 1, out _step);
+        return TryGetStepAt(_card, GrowthOf(_card).Level + 1, out _step);
     }
 
     // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
@@ -127,7 +131,7 @@ public static class CardGrowthManager
 
         if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!t_config.TryGetStep(_card, t_level + 1, out var t_step))
+        if (!TryGetStepAt(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         // 재화는 곡선이 정한다 — 진화 레벨(Lv5·Lv10)만 다이아를 물고 나머지는 골드다.
@@ -143,6 +147,10 @@ public static class CardGrowthManager
             t_level = t_growth.Level + 1;
             Entry(t_id).level = t_level;
             Save();
+
+            // 안내가 대준 한 방을 여기서 소진한다. 실패에는 걸지 않는다 —
+            // 실패로 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
+            if (IsTutorialFreeStep()) s_tutorialFreeUsed = true;
         }
 
         CurrencyManager.Save();
@@ -155,9 +163,27 @@ public static class CardGrowthManager
     public static void DebugResetAll()
     {
         s_growth.Clear();
+        s_tutorialFreeUsed = false;   // 강화를 처음부터 다시 보는 상태라 안내가 대주던 한 방도 되살린다
         Save();
         OnGrowthChanged?.Invoke();
     }
+
+    // 레벨 _level로 올리는 한 스텝. 곡선 조회를 여기 하나로 모으는 이유는 튜토리얼 보정 때문이다 —
+    // 안내가 강화를 시키는 동안은 비용을 0으로 눕히는데, 조회가 갈리면 화면엔 100골드가 뜨는데
+    // 실제로는 0이 나가고 잔액이 모자란 유저는 버튼이 비활성으로 굳는다(표시·활성 판정·소모가 같은 값을 봐야 한다).
+    static bool TryGetStepAt(CardData _card, int _level, out GrowthStep _step)
+    {
+        if (!Config.TryGetStep(_card, _level, out _step)) return false;
+
+        if (IsTutorialFreeStep())
+            _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
+
+        return true;
+    }
+
+    // 지금 이 한 방을 안내가 대신 내주는가(온보딩 강화 스텝 + 아직 안 쓴 상태).
+    static bool IsTutorialFreeStep()
+        => !s_tutorialFreeUsed && OutgameTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.

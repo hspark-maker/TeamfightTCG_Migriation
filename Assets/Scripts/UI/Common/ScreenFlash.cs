@@ -26,8 +26,9 @@ public class ScreenFlashCover
     public Color color = Color.white;
 
     [Header("빛(질감)")]
-    [Tooltip("덮개 위에 얹는 빛의 모양. 비우면 이 축을 통째로 건너뛰고 예전처럼 단색 판만 남는다. " +
-             "에셋 후보: Sprites/CardPack/Shine_Radial, Glow_Radial.")]
+    [Tooltip("덮개 위에 얹는 빛의 모양. 비우면 이 축을 통째로 건너뛰고 단색 판만 남는다(그것도 하나의 답이다).\n" +
+             "  에셋 후보: Sprites/CardPack/Glow_Radial.\n" +
+             "  ⚠ Shine_Radial(방사 다발)은 쓰지 말 것 — 덮개가 이미 하얀 정점 위에 겹치므로 살이 안 읽힌다.")]
     public Sprite burstSprite;
     [Tooltip("빛의 색. 덮개가 순백이므로 여기서 살짝 온도를 주면 '흰 판'이 아니라 '빛'으로 읽힌다.")]
     public Color burstColor = new Color(1f, 0.95f, 0.8f, 1f);

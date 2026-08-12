@@ -40,6 +40,10 @@ public class PackResultGrid : MonoBehaviour
 
     readonly List<PackCardView> m_views = new List<PackCardView>();
 
+    // 상세에서 좌우로 넘겨볼 목록 = 격자에 놓인 카드들, 놓인 순서 그대로. 상세 오버레이가 이것을 **참조**로 쥐므로
+    // 인스턴스를 갈아치우지 않고 Clear + 재충전만 한다(CardDetailOverlayView.BindTile 주석과 같은 규약).
+    readonly List<CardData> m_order = new List<CardData>();
+
     CanvasGroup m_panel;
 
     /// <summary>결과 카드를 3열로 세우고 패널을 띄운다. _instant면 페이드도 팝도 없이 곧장 최종 상태(스킵 경로).</summary>
@@ -90,6 +94,11 @@ public class PackResultGrid : MonoBehaviour
         float t_scale = CardScale();
         int t_rows = Mathf.CeilToInt(t_count / (float)COLUMN_COUNT);
 
+        // 카드를 누르면 그 카드의 상세가 이 화면 위에 뜬다. 세 축 모두 이 화면의 사정이다 —
+        // 강화·진화는 걷고(여기는 방금 뽑은 것을 확인하는 자리다), 개봉 캔버스 위로 올라타고,
+        // 상단 재화 바가 없는 화면이라 상세가 로비에서 비켜 앉은 자리까지 덮게 한다.
+        var t_detailOptions = new CardDetailOpenOptions(_readOnly: true, _liftAboveAll: true, _coverFullScreen: true);
+
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
             var t_drawn = _cards[t_i];
@@ -105,6 +114,8 @@ public class PackResultGrid : MonoBehaviour
 
             int t_index = m_views.Count;
             m_views.Add(t_view);
+            m_order.Add(t_drawn.Card);
+            CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index, t_detailOptions);
 
             var t_rt = (RectTransform)t_view.transform;
             t_rt.anchoredPosition = SlotPosition(t_index, t_count, t_rows);
@@ -167,12 +178,24 @@ public class PackResultGrid : MonoBehaviour
         return t_count;
     }
 
+    // 격자를 비우는 곳이자 상세를 닫는 곳. 두 일을 여기 하나로 묶는 이유는 상세가 m_order를 **참조**로 쥐기
+    // 때문이다 — 격자가 걷히는 길(오버레이 닫기·"한 번 더" 재개봉·다음 Show)은 전부 여기를 지난다.
+    //
+    // 상세는 이 화면과 다른 캔버스(로비)에 있어 결과 격자가 사라져도 저 혼자 떠 있는다. 그래서 닫는 일이 필요하다.
+    // 닫아도 퇴장 트윈이 도는 동안(0.15s)은 살아 있어 목록이 빈 창을 잠깐 보게 되는데, 그 구간은 이미
+    // 입력이 닫혀 있고 표시 갱신 경로가 모두 null 카드를 견디므로 그대로 둔다(순서로 막는 것이 아니다).
+    //
+    // ⚠ Close는 전역 싱글턴을 끈다 — "이 화면이 연 상세만" 닫는 것이 아니다.
+    //   지금은 개봉 중에 다른 경로로 상세를 열 길이 없어 문제가 되지 않는다.
     void Clear()
     {
+        CardDetailOverlayView.Close();
+
         for (int t_i = 0; t_i < m_views.Count; t_i++)
             if (m_views[t_i] != null) Destroy(m_views[t_i].gameObject);
 
         m_views.Clear();
+        m_order.Clear();
     }
 
     RectTransform ResolveContent()

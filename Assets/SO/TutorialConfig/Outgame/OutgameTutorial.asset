@@ -19,6 +19,7 @@ MonoBehaviour:
       anchor: 0
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -31,6 +32,7 @@ MonoBehaviour:
       anchor: 1
       guideMessage: 
       unlocks: 06000000
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -43,6 +45,7 @@ MonoBehaviour:
       anchor: 2
       guideMessage: 
       unlocks: 02000000
+      unlocksAll: 0
       locks: 06000000
       useDim: 1
       pack: {fileID: 0}
@@ -53,6 +56,7 @@ MonoBehaviour:
       anchor: 3
       guideMessage: 
       unlocks: 07000000
+      unlocksAll: 0
       locks: 06000000
       useDim: 0
       pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
@@ -63,6 +67,7 @@ MonoBehaviour:
       anchor: 0
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -73,6 +78,7 @@ MonoBehaviour:
       anchor: 4
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -83,6 +89,7 @@ MonoBehaviour:
       anchor: 18
       guideMessage: 
       unlocks: 05000000
+      unlocksAll: 0
       locks: 06000000
       useDim: 0
       pack: {fileID: 0}
@@ -93,6 +100,7 @@ MonoBehaviour:
       anchor: 19
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 06000000
       useDim: 0
       pack: {fileID: 0}
@@ -103,6 +111,7 @@ MonoBehaviour:
       anchor: 0
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 06000000
       useDim: 0
       pack: {fileID: 0}
@@ -113,6 +122,7 @@ MonoBehaviour:
       anchor: 6
       guideMessage: "\uC0C8\uB85C\uC6B4 \uCE74\uB4DC\uB97C \uC2DC\uD5D8\uD574\uBD05\uC2DC\uB2E4."
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -123,6 +133,7 @@ MonoBehaviour:
       anchor: 0
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -133,6 +144,7 @@ MonoBehaviour:
       anchor: 1
       guideMessage: 
       unlocks: 03000000
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -144,6 +156,7 @@ MonoBehaviour:
       guideMessage: "\uC544\uB798\uCABD\uC740 \uB0B4 \uB371\uC785\uB2C8\uB2E4. \uC804\uD22C\uC5D0
         \uB0B4\uBCF4\uB0BC \uCE74\uB4DC 6\uC7A5\uC744 \uC5EC\uAE30\uC11C \uD655\uC778\uD569\uB2C8\uB2E4."
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -155,6 +168,7 @@ MonoBehaviour:
       guideMessage: "\uC704\uCABD\uC740 \uC0C1\uB300\uC758 \uB371\uC785\uB2C8\uB2E4.
         \uC804\uD22C \uC804\uC5D0 \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -165,6 +179,7 @@ MonoBehaviour:
       anchor: 12
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -176,6 +191,7 @@ MonoBehaviour:
       guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uD0A4\uC6CC\uB4DC \uB371'\uC744
         \uC120\uD0DD\uD574\uBCF4\uC138\uC694."
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -186,6 +202,7 @@ MonoBehaviour:
       anchor: 11
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -196,8 +213,101 @@ MonoBehaviour:
       anchor: 13
       guideMessage: 
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+  - label: "\uCE74\uB4DC \uAC15\uD654"
+    stepDefs:
+    - action: 13
+      anchor: 0
+      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
+        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
+      unlocks: 
+      unlocksAll: 1
+      locks: 
+      useDim: 1
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 18
+      guideMessage: 
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 1
+      anchor: 0
+      guideMessage: "\uB2E4\uC74C\uC73C\uB85C, \uAC19\uC774 \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD574\uBD10\uC694!"
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 19
+      guideMessage: 
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 0
+      anchor: 20
+      guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 11
+      anchor: 21
+      guideMessage: "\uAC15\uD654\uB97C \uB20C\uB7EC \uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C\uBCF4\uC138\uC694!"
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 14
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      scenario: {fileID: 0}
+      showDeckGate: 0
+      deckName: 
+    - action: 1
+      anchor: 0
+      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
+        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0

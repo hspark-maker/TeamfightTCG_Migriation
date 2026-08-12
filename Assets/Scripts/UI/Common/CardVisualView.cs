@@ -203,6 +203,30 @@ public class CardVisualView : MonoBehaviour
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
     }
 
+    /// <summary>지금 꺼져 있지만 _card 기준으로는 켜져야 할 프레임 장식들 = 이번 성장으로 새로 열릴 문양.
+    /// 진화 연출이 그것들을 새겨 보이기 위해 **켜지기 전에** 묻는다(켜고 나면 무엇이 새것인지 알 수 없다).
+    ///
+    /// 판정은 <see cref="RefreshKeywordFrames"/>와 같은 CardVisualRules 호출 하나다 — 기준이 갈리면
+    /// 연출이 새기는 문양과 실제로 켜지는 문양이 어긋난다. 일러스트만 보기 모드면 자연히 빈 목록이다.</summary>
+    public void CollectPendingKeywordFrames(CardData _card, bool _owned, List<Graphic> _into)
+    {
+        if (_into == null) return;
+        _into.Clear();
+
+        if (_card == null || this.keywordFrames == null) return;
+
+        CardKeyword t_keywords = _owned && this.ShowKeywords ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
+
+        foreach (KeywordFrame t_frame in this.keywordFrames)
+        {
+            if (t_frame.overlay == null || t_frame.overlay.activeSelf) continue;
+            if (t_frame.keyword == CardKeyword.None || (t_keywords & t_frame.keyword) == 0) continue;
+
+            var t_graphic = t_frame.overlay.GetComponent<Graphic>();
+            if (t_graphic != null) _into.Add(t_graphic);
+        }
+    }
+
     /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
     /// 표시 문장·최종값의 정본은 여전히 <see cref="SetHpDisplay"/>다 — 굴리는 동안의 중간 숫자만 여기서 만들고,
     /// 끝나든 잘리든 그쪽으로 되돌려 못 박는다(반올림 중간값이 남지 않는다).

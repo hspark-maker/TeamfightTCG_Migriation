@@ -81,6 +81,14 @@ public class AlbumPageOverlayView : MonoBehaviour
     int   m_dragDir;
     bool  m_refreshPending;
 
+    static AlbumPageOverlayView s_instance;
+
+    /// <summary>이 오버레이가 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
+    public static event System.Action OnAnyClosed;
+
+    /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
+    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+
     bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
 
     public int PageIndex => m_pageIndex;
@@ -178,6 +186,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void Awake()
     {
+        s_instance = this;
+
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (dimButton != null && dimButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumPageOverlayView] Dim에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
@@ -239,11 +249,16 @@ public class AlbumPageOverlayView : MonoBehaviour
         CancelFlip();
 
         transition.HandleDisabled(gameObject);
+
+        // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 오버레이의 상태를 다시 물어볼 수 있어야 한다.
+        OnAnyClosed?.Invoke();
     }
 
     void OnDestroy()
     {
         pageFlip.Dispose();
+
+        if (s_instance == this) s_instance = null;
     }
 
     void HandleChanged()
@@ -337,11 +352,15 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
         int t_ownedInPage = 0;
 
+        // 안내는 이 페이지의 첫 꽂힌 칸 하나만 지목한다(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
+        bool t_anchorTaken = !_interactive;
+
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
             var t_slot = _slots[t_i];
             if (t_i >= t_shown)
             {
+                t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(false);
                 continue;
             }
@@ -349,6 +368,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 격자 채움 칸 — 도감에 없는 자리라 번호를 찍지 않는다(0이면 번호가 숨는다)
             if (t_i >= t_cards.Count)
             {
+                t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(true);
                 t_slot.Bind(null, false, 0);
                 if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
@@ -359,6 +379,10 @@ public class AlbumPageOverlayView : MonoBehaviour
             bool t_owned = ShownAsOwned(t_card);
             t_slot.gameObject.SetActive(true);
             t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
+
+            bool t_anchor = !t_anchorTaken && t_owned;
+            t_anchorTaken |= t_anchor;
+            t_slot.ApplyTutorialAnchor(t_anchor);
 
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;

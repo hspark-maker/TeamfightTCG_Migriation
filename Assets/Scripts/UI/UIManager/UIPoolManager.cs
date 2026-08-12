@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
+// 팝업 인프라는 이걸 쓰는 UI들이 켜지기 전에 서 있어야 한다 —
+// 기본 순서면 로비 탭 UI의 OnEnable이 Awake보다 먼저 돌아 instance가 아직 없다.
+[DefaultExecutionOrder(-100)]
 public class UIPoolManager : MonoBehaviour
 {
     public static UIPoolManager instance;

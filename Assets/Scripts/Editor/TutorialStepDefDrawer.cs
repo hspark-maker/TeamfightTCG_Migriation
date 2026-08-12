@@ -103,6 +103,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesDim(_action))           yield return "useDim";
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
+        yield return "unlocksAll";
         yield return "unlocks";
         yield return "locks";
     }

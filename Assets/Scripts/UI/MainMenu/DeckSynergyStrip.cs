@@ -19,6 +19,9 @@ public class DeckSynergyStrip : MonoBehaviour
 
     readonly List<CardData> eligibleCards = new List<CardData>();
 
+    // 내가 연 popup이 떠 있는 동안만 true. 안 연 채로 닫으면 남의 popup을 대신 지운다.
+    bool m_explainOpen;
+
     void Awake()
     {
         if (this.icons == null) return;
@@ -86,12 +89,16 @@ public class DeckSynergyStrip : MonoBehaviour
             ownedCount = _icon.Progress.Count,
         });
 
+        this.m_explainOpen = true;
         this.onFocusChanged?.Invoke(_icon.Progress.Synergy);
     }
 
     // 설명 popup과 강조는 항상 같이 뜨고 같이 진다 — 한쪽만 남으면 화면이 흐린 채로 굳는다.
     void HideExplain()
     {
+        if (!this.m_explainOpen) return;
+
+        this.m_explainOpen = false;
         UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
         this.onFocusChanged?.Invoke(null);
     }

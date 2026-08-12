@@ -16,6 +16,34 @@ using TMPro;
 //
 // 표시 규칙은 복제하지 않는다: 카드 그림 한 장은 CardVisualView.Bind, 시너지 이름은 SynergyText,
 // 키워드 아이콘·표시명·설명은 KeywordIconConfig가 정본이다.
+
+/// <summary>상세를 어떤 모습으로 띄울지. <b>기본값(default)이 곧 도감에서 여는 평상시</b>다 —
+/// 축이 하나 더 늘어도 기존 호출처가 그대로 성립하려면 "아무것도 켜지 않은 것"이 현행이어야 한다.
+///
+/// 축을 하나로 뭉치지 않는 이유: 지금은 카드팩 개봉 한 곳이 셋을 함께 켜서 같은 스위치처럼 보이지만,
+/// 서로 다른 질문에 답한다 — 조작을 줄 것인가 / 누구 위에 뜰 것인가 / 상단 바 자리를 쓸 것인가.
+/// 뭉쳐두면 "로비 팝업 위에는 뜨되 상단 바는 남긴다" 같은 조합을 표현할 수 없다.</summary>
+public readonly struct CardDetailOpenOptions
+{
+    /// <summary>강화·진화 조작을 통째로 걷고 표시만 한다(개봉 결과처럼 "확인하는 자리").</summary>
+    public readonly bool ReadOnly;
+
+    /// <summary>지금 떠 있는 모든 캔버스 위로 올라탄다. 순서 값은 상세가 스스로 구한다 —
+    /// 여는 쪽은 "위에 떠라"만 말하면 된다.</summary>
+    public readonly bool LiftAboveAll;
+
+    /// <summary>로비 상단 재화 바를 비켜 앉은 크기를 부모 가득 편다.
+    /// 그 바가 없는 화면 위에 뜰 때 필요하다 — 비운 띠로 아래 화면이 그대로 비친다.</summary>
+    public readonly bool CoverFullScreen;
+
+    public CardDetailOpenOptions(bool _readOnly = false, bool _liftAboveAll = false, bool _coverFullScreen = false)
+    {
+        ReadOnly        = _readOnly;
+        LiftAboveAll    = _liftAboveAll;
+        CoverFullScreen = _coverFullScreen;
+    }
+}
+
 public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 {
     const string LockedName  = "???";
@@ -133,6 +161,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] float slideDistance = 120f;
     [SerializeField] float slideDuration = 0.18f;
 
+    /// <summary>강화가 무대를 쥐었다(연출 시작). 바깥의 안내는 여기서 자기 표시를 접어야 한다 —
+    /// 결과판이 하단 바 버튼을 "한 번 더"로 되살리므로, 접지 않으면 그 버튼 위에 손가락이 다시 떠서
+    /// 유저를 무한 재강화로 이끈다(결과판을 닫아야 오는 완료 신호에는 영영 닿지 못한다).</summary>
+    public static event Action OnAnyEnhanceStarted;
+
+    /// <summary>강화 한 방이 **연출·결과판까지 끝나 상세로 돌아온** 순간(성공·실패 모두). 강화를 기다리는
+    /// 바깥(튜토리얼 안내)이 듣는 신호다 — 성장 통지(CardGrowthManager.OnGrowthChanged)는 판정 그 프레임에 오므로,
+    /// 그걸로 화면을 넘겨받으면 방금 쓴 비용의 결과를 보지 못한 채 연출이 잘린다.</summary>
+    public static event Action<EnhanceResult> OnAnyEnhanceSettled;
+
+    /// <summary>이 창이 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
+    public static event Action OnAnyClosed;
+
+    /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
+    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+
     static CardDetailOverlayView s_instance;
     static bool s_missingWarned;
 
@@ -155,12 +199,34 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 결과판이 떠 있는 동안까지 켜져 있다(연출 → 결과판 → 복귀 전체가 한 덩이의 "연출 중"이다).
     bool m_ritualPlaying;
 
+    // 진화 연출에 넘길 문양 목록. 매번 새 List를 만들지 않기 위한 재사용 버퍼다(연타하는 조작).
+    readonly List<Graphic> m_emblemBuffer = new List<Graphic>();
+
     // 지금 무대를 쥔 연출(강화 = 담금질, 진화 = 탈각). 누른 순간에 골라 고정한다 —
     // 레벨은 그 직후 올라가므로, 나중에 다시 고르면 방금 시작한 것과 다른 연출을 붙들게 된다.
     CardGrowthRitualView m_activeRitual;
 
     // 프레임·아트만 보는 열람 모드. 창이 열려 있는 동안만 유지한다(OnDisable에서 내린다).
     bool m_artOnly;
+
+    // 지금 튜토리얼 안내 타깃으로 등록해 둔 성장 버튼(강화 또는 진화). 자기가 올린 것만 내린다.
+    Button m_anchoredGrowthButton;
+
+    // 강화·진화 조작을 통째로 걷은 채 여는 모드. 카드팩 개봉 결과처럼 "방금 뽑은 것을 확인하는 자리"에서 쓴다 —
+    // 그 자리에서 재화를 쓰게 두면 개봉 흐름이 갈라지고, 담금질·진화 연출이 개봉 화면 위에서 한 번 더 돈다.
+    // 여는 쪽이 매번 정하므로(Open) 내릴 곳은 따로 두지 않는다.
+    bool m_readOnly;
+
+    // 다른 캔버스 위로 올라타기 위해 확보한 Canvas. 창이 열려 있는 동안만 순서를 덮어쓰고 닫히면 되돌린다 —
+    // 상시 최상단으로 두면 로비 쪽 레이어(획득 연출 등)와의 현재 순서까지 뒤집힌다.
+    Canvas m_sortingCanvas;
+
+    // 로비에 배치된 authoring 크기(상단 재화 바를 비켜 앉은 값). 다른 화면 위로 올라탈 때 화면 전체로 폈다가
+    // 여기로 되돌린다. 최초 1회만 잡는다 — 매번 읽으면 이미 편 값을 기준으로 잡아 되돌아갈 자리를 잃는다
+    // (EnsureSlideBase와 같은 관용구).
+    Vector2 m_baseOffsetMin;
+    Vector2 m_baseOffsetMax;
+    bool    m_baseRectCaptured;
 
     // 결과판의 "한 번 더". 무대가 돌아오기 전에 다음 연출을 시작하면 두 연출이 같은 노드를 두고 싸운다 →
     // 복귀가 끝나는 시점까지 눌린 사실만 들고 있는다.
@@ -201,14 +267,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>_cards[_index]의 상세를 띄우고, 좌우로 같은 목록 안을 순환하며 넘겨볼 수 있게 한다.
     /// _cards는 "화면에 보이는 순서" 그대로여야 한다 — 넘기는 방향과 도감 배열이 어긋나면 길을 잃는다.
-    /// null 슬롯(미authoring 카드)은 그대로 넘겨도 된다. 넘기기가 알아서 건너뛴다.</summary>
-    public static void Open(IReadOnlyList<CardData> _cards, int _index)
+    /// null 슬롯(미authoring 카드)은 그대로 넘겨도 된다. 넘기기가 알아서 건너뛴다.
+    ///
+    /// 어떤 모습으로 띄울지는 <see cref="CardDetailOpenOptions"/>가 쥔다(기본값 = 도감에서 여는 평상시).</summary>
+    public static void Open(IReadOnlyList<CardData> _cards, int _index, CardDetailOpenOptions _options = default)
     {
         if (_cards == null || _cards.Count == 0) return;
 
         CardDetailOverlayView t_view = Resolve();
         if (t_view == null) return;
 
+        // 세 축을 각각 세운다. 창을 닫을 때 셋 다 내려가므로(OnDisable) 여기서 매번 다시 세우면 그만이다.
+        t_view.m_readOnly = _options.ReadOnly;
+        t_view.LiftAbove(_options.LiftAboveAll);
+        t_view.SetFullScreen(_options.CoverFullScreen);
         t_view.Show(_cards, _index);
     }
 
@@ -227,8 +299,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 도감/생산 타일은 ScrollRect 안에 있어서 스크롤 드래그가 클릭으로 새면 안 된다.
     ///
     /// 목록을 값이 아니라 **참조**로 잡아둔다 — 컨트롤러가 같은 List 인스턴스를 재사용해 다시 채우면
-    /// 이미 배선된 타일들도 재배선 없이 최신 내용을 넘겨보게 된다(대신 인덱스 정합은 컨트롤러 책임이다).</summary>
-    public static void BindTile(CardVisualView _tile, IReadOnlyList<CardData> _cards, int _index)
+    /// 이미 배선된 타일들도 재배선 없이 최신 내용을 넘겨보게 된다(대신 인덱스 정합은 컨트롤러 책임이다).
+    ///
+    /// _options는 탭이 일어나는 시점의 <see cref="Open(IReadOnlyList{CardData}, int, CardDetailOpenOptions)"/>에 그대로 실려 간다.</summary>
+    public static void BindTile(CardVisualView _tile, IReadOnlyList<CardData> _cards, int _index,
+                                CardDetailOpenOptions _options = default)
     {
         if (_tile == null || _cards == null) return;
 
@@ -236,7 +311,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_press == null) return;
 
         // 대입(+= 아님) — 타일이 재사용·재바인딩돼도 이전 콜백이 겹쳐 남지 않는다(CardElement와 같은 관용구).
-        t_press.OnTap = () => Open(_cards, _index);
+        t_press.OnTap = () => Open(_cards, _index, _options);
     }
 
     // 오버레이는 씬에 **비활성**으로 배치된다. 비활성 오브젝트는 Awake가 돌지 않아
@@ -255,6 +330,89 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         return s_instance;
+    }
+
+    /// <summary>지금 떠 있는 모든 캔버스 위로 올라타거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
+    ///
+    /// 필요한 이유: 이 화면은 로비 캔버스 안에 있어(sortingOrder 0) 그보다 위에 뜨는 별도 캔버스 —
+    /// 카드팩 개봉 화면 같은 것 — 위에서 열면 그 뒤에 가려 보이지 않는다. 두 캔버스 모두 Overlay 루트라
+    /// 계층상의 앞뒤(sibling)로는 순서가 정해지지 않고 sortingOrder만이 답이다.
+    ///
+    /// <b>순서 값을 여는 쪽에서 받지 않는다.</b> 받으면 상세를 여는 화면마다 "누구보다 위인가"를 각자 계산하고,
+    /// 그중 하나만 옛 값으로 남는다. 지금 화면을 보고 여기서 구하는 편이 계산 지점을 하나로 묶는다.
+    ///
+    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
+    /// 떨어져 나온다 — 없으면 눈에는 위에 보이는데 탭은 밑 화면이 먹는다.
+    /// 컴포넌트를 없으면 붙여 쓰는 것은 이 파일의 CanvasGroup 확보(EnsureSlideBase)와 같은 관용구다.
+    ///
+    /// ⚠ 한 번 붙인 두 컴포넌트는 떼지 않는다(다음 열기에 다시 쓴다) → 내릴 때 **값 전부**를 원위치시킨다.
+    ///   sortingOrder까지 0으로 되돌리는 이유: Overlay 캔버스의 레이캐스트 우선순위는 overrideSorting이 아니라
+    ///   sortingOrder 값 그 자체를 읽는다. 숫자를 남겨두면 렌더는 제자리인데 입력만 위에 남아,
+    ///   나중에 상세 위에 뜨는 화면이 생기면 "보이는 건 위 화면인데 탭은 상세가 먹는" 역전이 된다.</summary>
+    void LiftAbove(bool _on)
+    {
+        if (!_on)
+        {
+            if (this.m_sortingCanvas == null) return;
+
+            this.m_sortingCanvas.overrideSorting = false;
+            this.m_sortingCanvas.sortingOrder    = 0;
+            return;
+        }
+
+        if (this.m_sortingCanvas == null)
+        {
+            this.m_sortingCanvas = GetComponent<Canvas>();
+            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
+        }
+
+        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+
+        // 순서를 먼저 끈다 — 켜진 채로 재면 지난번에 올라탄 자기 값이 후보에 끼어 열 때마다 한 칸씩 올라간다.
+        this.m_sortingCanvas.overrideSorting = false;
+
+        this.m_sortingCanvas.sortingOrder    = TopSortingOrder() + 1;
+        this.m_sortingCanvas.overrideSorting = true;
+    }
+
+    /// <summary>지금 화면에서 가장 위에 그려지는 순서. 꺼져 있는 캔버스는 세지 않는다 —
+    /// 안 뜬 화면까지 넘으려 들면 값만 커지고 넘을 이유는 없다.
+    ///
+    /// 순서를 실제로 정하는 것은 루트 캔버스이거나 overrideSorting을 켠 캔버스뿐이다.
+    /// 그 외 중첩 캔버스의 sortingOrder는 그려지는 자리와 무관한 값이라 후보에서 뺀다.</summary>
+    int TopSortingOrder()
+    {
+        int t_top = 0;
+
+        Canvas[] t_canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        for (int t_i = 0; t_i < t_canvases.Length; t_i++)
+        {
+            Canvas t_canvas = t_canvases[t_i];
+            if (t_canvas == null || t_canvas == this.m_sortingCanvas) continue;
+            if (t_canvas != t_canvas.rootCanvas && !t_canvas.overrideSorting) continue;
+
+            t_top = Mathf.Max(t_top, t_canvas.sortingOrder);
+        }
+
+        return t_top;
+    }
+
+    /// <summary>이 오버레이를 부모(SafeArea) 가득 펴거나 authoring 크기로 되돌린다.
+    /// 자식들은 위쪽 앵커라 루트가 위로 펴지면 함께 올라온다 — 상단 바가 없는 화면에서는 그 자리를 회수하는 것이 맞다.
+    /// 되돌릴 값은 최초 1회만 잡는다(위 m_baseOffset* 주석).</summary>
+    void SetFullScreen(bool _on)
+    {
+        RectTransform t_rect = (RectTransform)transform;
+
+        if (!this.m_baseRectCaptured)
+        {
+            this.m_baseRectCaptured = true;
+            this.m_baseOffsetMin    = t_rect.offsetMin;
+            this.m_baseOffsetMax    = t_rect.offsetMax;
+        }
+
+        t_rect.offsetMin = _on ? Vector2.zero : this.m_baseOffsetMin;
+        t_rect.offsetMax = _on ? Vector2.zero : this.m_baseOffsetMax;
     }
 
     void Awake()
@@ -325,6 +483,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.cardView?.SetArtOnly(false);
         ApplyArtOnlyChrome();
 
+        // 창이 닫히면 안내 타깃도 놓는다 — 안 보이는 버튼을 가리키는 등록이 남으면 다음 안내가 허공에 뜬다.
+        ApplyGrowthAnchor(null);
+
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
 
@@ -343,6 +504,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
+
+        // 빌린 순서와 크기를 돌려준다. 세 축 모두 여는 쪽이 매번 정하는 값이라 여기서 함께 내린다 —
+        // 남겨두면 도감에서 연 다음 창이 상단 바를 덮은 채, 조작도 없는 화면이 된다.
+        LiftAbove(false);
+        SetFullScreen(false);
+        this.m_readOnly = false;
+
+        // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 창의 상태를 다시 물어볼 수 있어야 한다.
+        OnAnyClosed?.Invoke();
     }
 
     void OnDestroy()
@@ -385,6 +555,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 화살표·스와이프가 전환을 시작하면 close 시퀀스와 같은 노드를 두고 싸운다.
         // 다시 열 때는 SetVisible(true) → OnEnable → RefreshArrows()가 되살린다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;
+
+        // 연타 예약도 여기서 끊는다. 퇴장은 트윈이라 OnDisable이 곧바로 오지 않는다 —
+        // 그 사이 예약이 살아 있으면 사라지는 창 위에서 다음 담금질이 시작되고, 그 연출이 퇴장을 덮어
+        // 창이 닫히지 않은 것처럼 보인다(바깥이 결과를 듣고 화면을 넘겨받는 경로에서 실제로 그랬다).
+        this.m_retryQueued = false;
 
         this.transition.SetVisible(gameObject, false);
     }
@@ -805,8 +980,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_evolve = this.evolveButton != null && t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
-        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(_owned && !t_evolve);
-        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(_owned &&  t_evolve);
+        // 열람 전용도 같은 길로 내린다: 바 자체는 이미 걷혀 있지만, 그 안에서 살아 있는 버튼을 남겨 두면
+        // 알파만 0인 채로 탭을 먹는다(blocksRaycasts는 창을 여는 순서에 따라 늦게 내려갈 수 있다).
+        bool t_actions = _owned && !this.m_readOnly;
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve);
+        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(t_actions &&  t_evolve);
+
+        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서고 두 버튼이 자리를 번갈아 쓰므로
+        // 프리팹 표식(TutorialAnchor)으로는 잡을 수 없다.
+        ApplyGrowthAnchor(!t_actions ? null : (t_evolve ? this.evolveButton : this.enhanceButton));
 
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
@@ -961,14 +1143,30 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (!t_played || t_ritual == null)
         {
             AbortEnhance(t_card);
+
+            // 강화가 실제로 일어났는데 보여줄 연출만 없는 길이면 여기가 곧 "다 끝난" 시점이다.
+            // 결제 전에 막힌 경우(잔액 부족·만렙)는 아무 일도 없었으므로 알리지 않는다.
+            if (t_played) NotifyEnhanceSettled(t_result);
             return;
         }
 
         this.m_activeRitual = t_ritual;
 
+        // 이번 진화로 새로 열리는 프레임 문양을 연출에 넘긴다. 이 자리가 유일한 시점이다 —
+        // 레벨은 이미 올랐고(TryEnhance) 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나온다.
+        // 넘길 것이 없어도 부른다(앞 판의 문양이 남으면 이번 판에 이유 없이 다시 새겨진다).
+        if (t_evolve && this.cardView != null)
+        {
+            this.cardView.CollectPendingKeywordFrames(t_card, OwnershipManager.IsOwned(t_card), this.m_emblemBuffer);
+            this.evolveRitual.SetEmblems(this.m_emblemBuffer);
+        }
+
         // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhance는 이미 끝난 거래라
         // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
         LockControls();
+
+        // 무대를 쥐기 직전에 알린다 — 바깥의 안내가 결과판 위에 남지 않게(OnAnyEnhanceStarted 주석 참고).
+        OnAnyEnhanceStarted?.Invoke();
 
         t_ritual.Play(
             t_result.Outcome, _awaitReturn: this.resultPanel != null,
@@ -1016,11 +1214,45 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
                 // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
                 // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
+                // 결과를 다 읽고 무대가 돌아온 지금이 "강화가 끝났다"이다 — 바깥은 이 시점에야 화면을 넘겨받아도 된다.
+                // "한 번 더"로 이어가는 중이어도 알린다: 체인의 끝을 기다리면 그 끝이 실패·만렙으로 맺힐 때
+                // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.
+                NotifyEnhanceSettled(t_result);
+
+                // 구독자가 이 결과를 듣고 창을 닫았다면 예약은 Hide가 이미 지웠다 — 체인은 여기서 끝난다.
                 if (!this.m_retryQueued) return;
 
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+    }
+
+    /// <summary>안내 타깃을 지금 서 있는 성장 버튼으로 옮긴다(_button이 null이면 내린다). 창이 닫히면 반드시 내린다 —
+    /// 죽은 버튼을 가리키는 등록이 남으면 다음 안내가 안 보이는 자리에 손가락을 띄운다.
+    ///
+    /// 강화·진화를 같은 키로 다루는 이유: 안내가 시키는 일은 "카드를 한 단계 키워라" 하나이고,
+    /// 그 한 방이 진화 관문이면 버튼의 얼굴만 갈릴 뿐 누르는 결과는 같은 레벨업이다.
+    /// 키를 갈라 두면 관문 레벨의 카드에서 앵커가 영영 등록되지 않아 안내가 말없이 멈춘다.</summary>
+    void ApplyGrowthAnchor(Button _button)
+    {
+        if (_button == this.m_anchoredGrowthButton) return;
+
+        if (this.m_anchoredGrowthButton != null)
+            TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.CardDetailEnhanceButton,
+                                              this.m_anchoredGrowthButton.transform as RectTransform);
+
+        this.m_anchoredGrowthButton = _button;
+
+        if (_button != null)
+            TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.CardDetailEnhanceButton,
+                                            _button.transform as RectTransform, _button);
+    }
+
+    // 성공한 강화가 다 끝났음을 바깥에 알린다. 실패·미결제는 알리지 않는다 —
+    // 기다리는 쪽(튜토리얼)은 "레벨이 올랐다"만 신호로 쓰고, 실패는 같은 자리에서 다시 누르는 일이다.
+    static void NotifyEnhanceSettled(EnhanceResult _result)
+    {
+        OnAnyEnhanceSettled?.Invoke(_result);
     }
 
     // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.
@@ -1070,6 +1302,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void ShowBottomBar()
     {
         if (this.bottomBarGroup == null) return;
+
+        // 열람 전용에는 되돌릴 바가 없다. 바를 되부르는 경로가 여럿이라(창 열기·연출 복귀·결과판 종료)
+        // 각 호출처에 조건을 흩지 않고 여기 한 곳에서 막는다 — 걷은 상태가 곧 이 모드의 평상시다.
+        if (this.m_readOnly) { HideBottomBar(); return; }
 
         this.bottomBarGroup.DOKill();
         this.bottomBarGroup.blocksRaycasts = true;
