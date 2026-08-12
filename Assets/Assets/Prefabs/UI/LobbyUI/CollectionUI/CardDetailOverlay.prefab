@@ -1019,10 +1019,26 @@ MonoBehaviour:
   cardView: {fileID: 8558623865625129148}
   powerValueText: {fileID: 913301404527908756}
   detailScroll: {fileID: 6327562447860816335}
-  artOnlyButton: {fileID: 0}
-  artOnlyIcon: {fileID: 0}
+  levelValueText: {fileID: 7679105488507686104}
+  enhanceButton: {fileID: 3597991617153345238}
+  enhanceCostText: {fileID: 2695298836730381123}
+  enhanceCostIcon: {fileID: 4008388626039349161}
+  goldIcon: {fileID: 21300000, guid: a779b38098fc44264b31817b3dca64ba, type: 3}
+  diamondIcon: {fileID: 21300000, guid: a0c93c8818ff74825a9bcdcb94cf9a57, type: 3}
+  successRateText: {fileID: 8423584013530615387}
+  evolveButton: {fileID: 2654429095011287775}
+  evolveLabelText: {fileID: 3239840589700687580}
+  evolveCostText: {fileID: 6306302649017593835}
+  evolveCostIcon: {fileID: 82294002775688783}
+  evolveLabel: "\uC9C4\uD654"
+  artOnlyButton: {fileID: 5436370305281158304}
+  artOnlyIcon: {fileID: 5297290314732798069}
   artOnlyOffColor: {r: 1, g: 1, b: 1, a: 1}
   artOnlyOnColor: {r: 1, g: 0.82, b: 0.25, a: 1}
+  ritual: {fileID: 6026985106791762235}
+  evolveRitual: {fileID: 5383091894969724125}
+  evolveResultTitle: "\uC9C4\uD654 \uC131\uACF5!"
+  resultPanel: {fileID: 4761716485554405916}
   keywordSection: {fileID: 4508983888050170949}
   keywordChipRoot: {fileID: 4835623982393558091}
   keywordDescText: {fileID: 8033358497726782632}
@@ -1030,6 +1046,11 @@ MonoBehaviour:
   synergyChipRoot: {fileID: 3532517152791900971}
   synergyDescText: {fileID: 8360246240547583556}
   descriptionText: {fileID: 644245320893585545}
+  bottomBarGroup: {fileID: 6303195616330956602}
+  bottomBarFadeDuration: 0.18
+  enhanceLabelText: {fileID: 1828306989454870139}
+  enhanceLabel: "\uAC15\uD654"
+  retryLabel: "\uD55C \uBC88 \uB354"
   keywordSectionLock: {fileID: 2925436257663726187}
   synergySectionLock: {fileID: 6274495548035373296}
   chipPrefab: {fileID: 3423340884098720178, guid: f52d10db32fdc494bac03cd8a0224379, type: 3}
@@ -1044,27 +1065,6 @@ MonoBehaviour:
   slideTarget: {fileID: 3235201013991001474}
   slideDistance: 120
   slideDuration: 0.18
-  levelValueText: {fileID: 7679105488507686104}
-  enhanceButton: {fileID: 3597991617153345238}
-  enhanceCostText: {fileID: 2695298836730381123}
-  enhanceCostIcon: {fileID: 4008388626039349161}
-  goldIcon: {fileID: 21300000, guid: a779b38098fc44264b31817b3dca64ba, type: 3}
-  diamondIcon: {fileID: 21300000, guid: a0c93c8818ff74825a9bcdcb94cf9a57, type: 3}
-  successRateText: {fileID: 8423584013530615387}
-  evolveButton: {fileID: 2654429095011287775}
-  evolveLabelText: {fileID: 3239840589700687580}
-  evolveCostText: {fileID: 6306302649017593835}
-  evolveCostIcon: {fileID: 82294002775688783}
-  evolveLabel: "\uC9C4\uD654"
-  ritual: {fileID: 6026985106791762235}
-  evolveRitual: {fileID: 5383091894969724125}
-  evolveResultTitle: "\uC9C4\uD654 \uC131\uACF5!"
-  resultPanel: {fileID: 4761716485554405916}
-  bottomBarGroup: {fileID: 6303195616330956602}
-  bottomBarFadeDuration: 0.18
-  enhanceLabelText: {fileID: 1828306989454870139}
-  enhanceLabel: "\uAC15\uD654"
-  retryLabel: "\uD55C \uBC88 \uB354"
 --- !u!114 &5835432057288847521
 MonoBehaviour:
   m_ObjectHideFlags: 0
