@@ -492,19 +492,15 @@ public class CardView : MonoBehaviour
 
     /// <summary>공격 선택 시 이 카드가 받을 **예상 데미지**를 표시한다. HP 라벨은 현재 체력을 그대로 유지 —
     /// "맞은 뒤 남을 체력"을 HP 자리에 쓰면 현재 체력과 구분이 안 돼 혼란했다.
-    /// 표시 수치는 실제 적용값(비늘·성벽 감소 + 체력 상한)이며 그 규칙은 CardInstance 단독 소유 —
-    /// 뷰는 ClampDamage 호출만 한다(수식 복제 금지).</summary>
-    public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)
+    /// 표시 수치는 AttackPreview가 산출한 실제 적용값(연속 타격의 무적 소진·피해 감소·체력 상한 포함)이다.</summary>
+    public void ShowAttackPreview(int _damage, bool _wouldDie)
     {
         if (this.boundCard == null) return;
-
-        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → 실제 TakeDamage와 일치.
-        int t_dmg = this.boundCard.ClampDamage(_damage, _isAttackHit);
 
         if (this.damagePreviewText != null)
         {
             this.damagePreviewText.DOKill();
-            this.damagePreviewText.text = $"-{t_dmg}";
+            this.damagePreviewText.text = $"-{_damage}";
             this.damagePreviewText.gameObject.SetActive(true);
         }
         else if (this.hpText != null)
@@ -512,7 +508,7 @@ public class CardView : MonoBehaviour
             // 폴백(프리팹 미배선): HP 라벨 자리에 데미지를 빨갛게. 해제 때 원복한다.
             this.hpTextOriginalColor = this.hpText.color;
             this.hpText.DOKill();
-            this.hpText.text  = $"-{t_dmg}";
+            this.hpText.text  = $"-{_damage}";
             this.hpText.color = Color.red;
             this.hpFallbackPreview = true;
         }

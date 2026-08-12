@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2333098090447985858}
   - component: {fileID: 3478467678668063150}
   - component: {fileID: 3158384836611682994}
+  - component: {fileID: 5859184352856600492}
   m_Layer: 0
   m_Name: Btn_Menu
   m_TagString: Untagged
@@ -137,6 +138,18 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.101960786}
   m_EffectDistance: {x: 0, y: -6}
   m_UseGraphicAlpha: 1
+--- !u!114 &5859184352856600492
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 254936663837882055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 806790908646fe741abbc4e854395b7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbySettingsButton
 --- !u!1 &257855840451499306
 GameObject:
   m_ObjectHideFlags: 0
@@ -1071,6 +1084,12 @@ MonoBehaviour:
   focus: {fileID: 7125465343015337625}
   focusIcon: {fileID: 7125465342477617750}
   focusLabel: {fileID: 7125465344492590325}
+  focusHighlight: {fileID: 0}
+  focusSpinSeconds: 6
+  focusSpinClockwise: 1
+  animateTabWidth: 1
+  selectedWidthWeight: 1.25
+  widthTweenDuration: 0.2
 --- !u!114 &341202313527386194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10235,7 +10254,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 379855186499317652, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 260
+      value: 190
       objectReference: {fileID: 0}
     - target: {fileID: 379855186499317652, guid: 2e4a623b76d7648a6bd59fa2a4975b2d, type: 3}
       propertyPath: m_SizeDelta.y

@@ -20,22 +20,14 @@ MonoBehaviour:
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
-  fullImage: {fileID: 21300000, guid: d8a50cb73d8249e47af6ca7ab8b217f6, type: 3}
-  portrait: {fileID: 21300000, guid: d8a50cb73d8249e47af6ca7ab8b217f6, type: 3}
   battleImage: {fileID: 21300000, guid: 54f8ab70785fdc2cd4b1a435d379976e, type: 3}
   deckPreview: {fileID: 21300000, guid: 118b1de2c1090974288b03d0e6f571d1, type: 3}
   hpGainByLevel: 0000000000000000020000000200000002000000010000000200000001000000010000000100000001000000
   keywordUnlockLevel: 4
   evolvedArts:
-  - fullImage: {fileID: 0}
-    portrait: {fileID: 0}
-    battleImage: {fileID: 21300000, guid: b2d009fdad0607f42b33f368e6693dec, type: 3}
-  - fullImage: {fileID: 0}
-    portrait: {fileID: 0}
-    battleImage: {fileID: 21300000, guid: 81274f70ad15c2946a579d2f221c7b76, type: 3}
-  - fullImage: {fileID: 0}
-    portrait: {fileID: 0}
-    battleImage: {fileID: 0}
+  - battleImage: {fileID: 21300000, guid: b2d009fdad0607f42b33f368e6693dec, type: 3}
+  - battleImage: {fileID: 21300000, guid: 81274f70ad15c2946a579d2f221c7b76, type: 3}
+  - battleImage: {fileID: 0}
   defaultEvolutionStage: 0
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0

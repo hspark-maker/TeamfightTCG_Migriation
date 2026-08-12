@@ -17,9 +17,8 @@ public static class CardVisualRules
     public const int MaxSynergyBadges = 3;
 
     /// <summary>카드 한 장에 그릴 아트 스프라이트를 고른다(없으면 null → 호출부가 렌더러를 끈다).
-    /// 우선순위 battleImage → fullImage → portrait.
-    /// battleImage가 최우선인 이유: 인게임 CardView.Render가 그리는 게 battleImage라, 로비 비주얼을
-    /// 인게임과 통일하려면 같은 소스를 써야 한다. battleImage가 비어 있는 카드만 기존 아웃게임 소스로 폴백한다.
+    /// 소스는 battleImage 하나뿐이다 — 인게임 CardView.Render가 그리는 것과 같은 그림이라 로비/전투가 갈라지지 않는다.
+    /// (예전엔 fullImage → portrait 폴백이 뒤에 붙어 있었지만, battleImage가 늘 채워져 있어 도달한 적이 없다.)
     /// 덱 대표 이미지(deckPreview)처럼 "카드 아트가 아닌 목적 전용" 필드는 여기 넣지 않는다 — 호출부가 앞단에서 고른다.</summary>
     static System.Func<CardData, int> s_evolutionStage;
 
@@ -47,22 +46,14 @@ public static class CardVisualRules
             if (t_sprite != null) return t_sprite;
         }
 
-        if (_card.battleImage != null) return _card.battleImage;
-        if (_card.fullImage   != null) return _card.fullImage;
-        return _card.portrait;
+        return _card.battleImage;
     }
 
     /// <summary>전투 카드 인스턴스의 진화 단계를 반영한 아트.</summary>
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.data, _card.evolutionStage);
 
-    static Sprite PickArt(CardArtSet _art)
-    {
-        if (_art == null) return null;
-        if (_art.battleImage != null) return _art.battleImage;
-        if (_art.fullImage   != null) return _art.fullImage;
-        return _art.portrait;
-    }
+    static Sprite PickArt(CardArtSet _art) => _art != null ? _art.battleImage : null;
 
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
     /// 인게임은 키워드까지 필요하고(iconMap → PlayKeywordGlow 역참조), 아웃게임은 스프라이트만 쓴다.

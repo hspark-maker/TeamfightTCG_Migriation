@@ -33,9 +33,6 @@ public static class AttackProcessor
         int t_ctrDmg = _defender.AttackDamage(); // 동시 해결: 공격 전 수치로 반격 (도발 시 50%)
         bool t_takesCounter = _attacker.TakesCounterFrom(_defender); // 반격 자격(단일 진실원): 원거리/표식 무반격
         bool t_markedCounter = _defender.HasKeyword(CardKeyword.Mark);
-        int t_actualAtkDmg = _defender.ClampDamage(t_atkDmg); // 직격(공격): 비늘 감소 반영(기본 true)
-        int t_actualCtrDmg = _attacker.ClampDamage(t_ctrDmg, false); // 반격: 비늘 감소 없음(TakeDamage(false)와 일치)
-
         bool t_peerless = _attacker.HasKeyword(CardKeyword.Peerless);
         bool t_cunning = _attacker.HasKeyword(CardKeyword.Cunning);
         bool t_ranged = _attacker.HasKeyword(CardKeyword.Ranged);
@@ -46,9 +43,16 @@ public static class AttackProcessor
         bool t_shouldSwap = t_cunning && (_forceCunningSwap ?? _attackerField.CanSwapWithWaiting(_attacker));
 
         // ---- 고정 시퀀스 (순서 변경 금지) ----
+        int t_defenderHpBefore = _defender.hp + _defender.bonusHp;
         _defender.TakeDamage(t_atkDmg, true); // 직격: 비늘 감소 대상
+        int t_actualAtkDmg = t_defenderHpBefore - (_defender.hp + _defender.bonusHp);
+
+        int t_attackerHpBefore = _attacker.hp + _attacker.bonusHp;
         if (t_takesCounter)
             _attacker.TakeDamage(t_ctrDmg); // 반격: 비늘 감소 없음(기본 false)
+        int t_actualCtrDmg = t_takesCounter
+            ? t_attackerHpBefore - (_attacker.hp + _attacker.bonusHp)
+            : 0;
 
         // ---- seam 2: ExtraTargets — 추가 대상 피해 ----
         CardInstance t_splash = null;
@@ -78,6 +82,24 @@ public static class AttackProcessor
         if (t_ranged)
             CardPassive.Notify(_attacker, CardKeyword.Ranged);
 
+        // ---- 강화(일반): "공격한 후, 원래 체력의 50%만큼 추가 피해" ----
+        // 자리가 여기인 이유:
+        //  · 기본타·반격보다 뒤 — "공격한 후"이고, 반격에 공격자가 죽었으면 발동하지 않아야 한다(AfterAttack과 같은 기준).
+        //  · 치사 래치보다 앞 — 이 추가타로 죽으면 그것도 이 공격의 처치다. 뒤로 밀면 처형 재공격·승패 예측이 어긋난다.
+        //  · AfterAttack(RunAfterAttack)이 아닌 이유 — 그건 사망 정리·연출이 끝난 뒤라 거기서 피해를 주면
+        //    처형/부활/막타 슬로우/전멸 판정이 전부 한 박자 늦게 본다.
+        // 기본타로 이미 쓰러진 대상에는 들어가지 않는다(살아 있는 대상에게 한 번 더 치는 효과).
+        // 추가 반격도, [Attacked] 트리거도 없다 — 한 번의 공격이 반격을 두 번 부르면 안 된다.
+        int t_enhanceDmg = 0;
+        if (_attacker.IsAlive && _defender.IsAlive && _attacker.HasVanillaEnhance)
+        {
+            int t_enhanceRaw = _attacker.VanillaEnhanceDamage();
+            // 추가타도 '공격 직격'이라 비늘·성벽 감소를 다시 받는다.
+            int t_before = _defender.hp + _defender.bonusHp;
+            _defender.TakeDamage(t_enhanceRaw, true);
+            t_enhanceDmg = t_before - (_defender.hp + _defender.bonusHp);
+        }
+
         // ★ 치사 래치는 반드시 RemoveDead 전. 언데드 부활이 RemoveDead 안에서 일어나므로
         //   뒤로 미루면 부활한 방어자에 대해 처형 재공격/AfterAttack 처치 판정(defenderKilled)이 사라진다.
         bool t_defKilled = _defender.hp == 0;
@@ -106,6 +128,7 @@ public static class AttackProcessor
         // ---- 결과 조립 ----
         var t_result = MakeResult(_attacker, t_defKilled);
         t_result.damageDealt = t_actualAtkDmg; // 주 대상만(splash 합산 안 함 = v1). 트리거용
+        t_result.enhanceDamage = t_enhanceDmg; // 강화 추가타는 따로 — 합산은 AttackResult.TotalDamage가 준다
         t_result.splashDefender = t_splash;
         t_result.attackerSwapped = t_swapped;
         if (t_swapped) t_result.attackerKeywords |= CardKeyword.Cunning;
