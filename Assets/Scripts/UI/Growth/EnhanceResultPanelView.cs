@@ -31,11 +31,16 @@ public readonly struct EnhanceResultLine
     /// (<see cref="RetryNotice"/>·<see cref="RetryCostText"/>와 같은 규약).</summary>
     public readonly string UnlockText;
 
+    /// <summary>제목 문구를 갈아끼운다(빈값이면 패널의 저작 문구). 진화처럼 같은 판을 다른 이름으로 쓰는 경우의 축 —
+    /// 무엇이라 부를지는 성장 규칙을 아는 호출부 몫이고, 여기는 완성된 문장만 받는다(<see cref="UnlockText"/>와 같은 규약).</summary>
+    public readonly string TitleText;
+
     public EnhanceResultLine(EEnhanceOutcome _outcome, int _fromHp, int _toHp, int _fromLevel, int _toLevel,
                              bool _canRetry, string _retryNotice, string _retryCostText = null,
-                             Sprite _retryCostIcon = null, string _unlockText = null)
+                             Sprite _retryCostIcon = null, string _unlockText = null, string _titleText = null)
     {
         this.UnlockText = _unlockText;
+        this.TitleText  = _titleText;
         this.Outcome       = _outcome;
         this.FromHp        = _fromHp;
         this.ToHp          = _toHp;
@@ -160,7 +165,9 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.titleText != null)
         {
             this.titleText.color = t_success ? this.successColor : this.failColor;
-            this.titleText.text  = t_success ? this.successMessage : this.failMessage;
+            this.titleText.text  = !string.IsNullOrEmpty(_line.TitleText) ? _line.TitleText
+                                 : t_success                             ? this.successMessage
+                                                                         : this.failMessage;
         }
 
         if (this.gradeValueText != null)

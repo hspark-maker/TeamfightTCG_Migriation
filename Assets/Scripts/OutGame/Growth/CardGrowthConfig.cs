@@ -46,6 +46,10 @@ public class CardGrowthConfig : ScriptableObject
         return t_stage > CardData.MaxEvolutionStage ? CardData.MaxEvolutionStage : t_stage;
     }
 
+    /// <summary>레벨 _level로 올리는 것이 곧 진화인가(= 이 레벨에서 진화 단계가 오르는가).
+    /// 관문 레벨 숫자를 화면이 다시 적지 않게 여기서 답한다.</summary>
+    public bool IsEvolutionLevel(int _level) => EvolutionStageAt(_level) > EvolutionStageAt(_level - 1);
+
     /// <summary>레벨 _level에서 **실제로 켜져 있는** 카드 키워드. 카드의 기본 키워드에 더하는 값이 아니라
     /// 그것을 대체하는 값이다 — 키워드는 해금 전까지 아예 없는 것으로 친다.
     /// 해금 레벨 미지정(0)이면 처음부터 열려 있다(해금 레벨을 아직 안 정한 카드 = 기본 키워드 카드).</summary>

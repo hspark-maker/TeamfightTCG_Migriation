@@ -16,6 +16,14 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     // 자가 설치 대상 노드 이름. 못 찾으면 캔버스 루트에 붙는다(연출 레이어가 없는 테스트 씬 대비).
     const string LAYER_NAME = "GainEffectLayer";
 
+    [Tooltip("이 재생기를 공용 창구(TryGet)의 답으로 삼을지.\n\n" +
+             "코인은 이 컴포넌트가 앉은 노드를 좌표계로 삼아 날아간다 — 즉 어느 캔버스에 있느냐가 곧 " +
+             "어디에 그려지느냐다. 그래서 로비 위에 겹쳐 뜨는 화면(개봉 오버레이 등)은 자기 캔버스 안에 " +
+             "재생기를 따로 두어야 코인이 그 화면 위에 보인다.\n\n" +
+             "그런 종속 재생기는 반드시 이 값을 꺼 둘 것 — 켜 두면 공용 창구가 그것을 집을 수 있고, " +
+             "그 화면이 닫힌 뒤 로비 연출이 꺼진 레이어에서 돌아 화면에 아무것도 뜨지 않는다.")]
+    [SerializeField] bool shared = true;
+
     [Header("공통 연출 값")]
     [Tooltip("코인 장수 범위. 획득량을 이 사이로 클램프해 장수를 정한다(장수가 곧 연출 길이).")]
     [SerializeField] int coinCountMin = 4;
@@ -79,20 +87,38 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     public static bool TryGet(Component _context, out CurrencyGainEffectPlayer _player)
     {
         // 비활성 노드에 앉은 재생기는 채택하지 않는다 — CoinBurstEffect.OnDisable이 코인을 즉시 걷어 숫자만 오른다.
-        if (s_instance == null) s_instance = FindFirstObjectByType<CurrencyGainEffectPlayer>();
+        if (s_instance == null) s_instance = FindShared();
         if (s_instance == null) s_instance = Install(_context);
 
         _player = s_instance;
         return _player != null;
     }
 
+    // 공용 창구의 답이 될 자격이 있는 재생기만 고른다(shared 필드 툴팁 참고).
+    static CurrencyGainEffectPlayer FindShared()
+    {
+        var t_all = FindObjectsByType<CurrencyGainEffectPlayer>(FindObjectsSortMode.None);
+        for (int t_i = 0; t_i < t_all.Length; t_i++)
+            if (t_all[t_i].shared) return t_all[t_i];
+
+        return null;
+    }
+
     /// <summary>
     /// 획득 연출을 즉시 재생한다. 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다.
     /// _from을 비우면 수치 자리에서 튀어 제자리로 돌아오고, 주면 그 지점에서 수치까지 날아간다.
     /// </summary>
-    public void Play(RectTransform _from, CurrencyGain _gain)
+    public void Play(RectTransform _from, CurrencyGain _gain) => this.Play(_from, _gain, null);
+
+    /// <summary>
+    /// 도착할 HUD를 지정해 재생한다. 공용 창구(CurrencyHud.TryGet)가 내주는 대표 HUD가 지금 화면에서
+    /// 보이지 않을 때 쓴다 — 겹쳐 뜨는 화면이 자기 잔액 표시로 코인을 받는 경우다.
+    /// _hud가 null이거나 재화가 어긋나면 평소처럼 대표 HUD로 간다.
+    /// 세울 것이 없으면 false(호출부는 그 획득을 다른 화면으로 넘길지 판단할 수 있다).
+    /// </summary>
+    public bool Play(RectTransform _from, CurrencyGain _gain, CurrencyHud _hud)
     {
-        if (!_gain.HasAmount) return;
+        if (!_gain.HasAmount) return false;
 
         int t_slot = (int)_gain.Type;
 
@@ -101,8 +127,10 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         // 같은 재화만 정리한다(다이아 재생이 진행 중인 골드 연출을 죽이지 않게).
         if (this.m_current[t_slot] != null && this.m_current[t_slot].IsActive()) this.m_current[t_slot].Kill();
 
-        this.m_current[t_slot] = this.BuildGain(_from, _gain);
+        this.m_current[t_slot] = this.BuildGain(_from, _gain, _hud);
         this.m_current[t_slot]?.Play();
+
+        return this.m_current[t_slot] != null;
     }
 
     /// <summary>여러 재화가 섞인 획득을 종류별로 나눠 동시에 재생한다.</summary>
@@ -119,7 +147,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
 
     // 종류 하나치 시퀀스. 배선을 못 찾거나 줄 것이 없으면 null.
     // 이 경로는 m_current에 잡히지 않는다 — 호출자 시퀀스를 여기서 죽이면 형제 단계(카드)까지 정리 없이 끊긴다.
-    Sequence BuildGain(RectTransform _from, CurrencyGain _gain)
+    Sequence BuildGain(RectTransform _from, CurrencyGain _gain, CurrencyHud _hud = null)
     {
         if (!_gain.HasAmount) return null;
 
@@ -130,9 +158,16 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             return null;
         }
 
-        if (!CurrencyHud.TryGet(_gain.Type, out var t_hud) || t_hud.TextRect == null)
+        // 지정 HUD가 다른 재화면 쓰지 않는다 — 골드가 다이아 자리로 빨려드는 그림은 어떤 경우에도 틀렸다.
+        var t_hud = _hud != null && _hud.Type == _gain.Type ? _hud : null;
+        if (t_hud == null && !CurrencyHud.TryGet(_gain.Type, out t_hud))
         {
             Debug.LogWarning($"[CurrencyGainEffectPlayer] {_gain.Type} HUD를 찾지 못해 연출을 건너뛴다.");
+            return null;
+        }
+        if (t_hud.TextRect == null)
+        {
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_gain.Type} HUD에 수치 텍스트가 없어 연출을 건너뛴다.");
             return null;
         }
 

@@ -259,22 +259,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: LoadingCover
       objectReference: {fileID: 0}
-    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
-      propertyPath: m_text
-      value: "\uB85C\uB529 \uC911\uC785\uB2C8\uB2E4 "
-      objectReference: {fileID: 0}
-    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
-      propertyPath: m_fontAsset
-      value: 
-      objectReference: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
-    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
-      propertyPath: m_sharedMaterial
-      value: 
-      objectReference: {fileID: -4999335185947324146, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
-    - target: {fileID: 1759463537223822466, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
-      propertyPath: m_hasFontAssetChanged
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4378495238760489521, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0

@@ -1,10 +1,11 @@
-using System;
 using DG.Tweening;
 using UnityEngine;
 
 // 카드 강화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 담금질이다 — 카드가 움츠러들며 달아오르고(고조), 그 빛이 카드를 통째로 삼킨 뒤(정적), 백열이 걷히며 터진다(공개).
-public class CardEnhanceRitualView : MonoBehaviour
+//
+// 호출부와의 콜백 계약은 CardGrowthRitualView가 진다 — 여기는 무대에 무엇을 그릴지만 정한다.
+public class CardEnhanceRitualView : CardGrowthRitualView
 {
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 진동이 보이지 않는다.")]
@@ -101,75 +102,26 @@ public class CardEnhanceRitualView : MonoBehaviour
     float SuccessSettle => Mathf.Max(this.embers.Span,
                                      this.shading.HasGleam ? Mathf.Max(0f, this.gleamDelay) + Mathf.Max(0.05f, this.gleamSweep) : 0f);
 
-    Sequence m_seq;
-
-    readonly EnhanceRitualHandoff m_handoff = new EnhanceRitualHandoff();   // 호출부에 돌려주는 세 신호. 순서·1회 보장은 여기가 진다
-
-    bool m_awaitingReturn;                  // 결과를 남긴 채 복귀 신호를 기다리는 중. 이 동안에도 재진입은 막혀야 한다
-    bool m_cancelling;                      // 잘라내는 중. 콜백이 호출부를 타고 PlayReturn으로 되돌아오는 것을 막는다
-    bool m_stageRetracted;                  // 무대를 걷은 채 다음 연출을 기다리는 중("한 번 더" 경로)
-
     Vector2 m_baseAnchored;                 // cardStage의 authoring 자리. 중간값을 기준으로 잡으면 반복할수록 밀린다
     bool    m_baseCaptured;
 
-    /// <summary>연출이 진행 중인가(결과를 남긴 채 기다리는 동안도 포함).
-    /// 호출부는 이 동안 강화 재입력·카드 넘기기·닫기를 막는다.</summary>
-    public bool IsPlaying => this.m_awaitingReturn || (this.m_seq != null && this.m_seq.IsActive());
+    protected override bool  HasStage       => this.cardStage != null;
+    protected override float ReturnDuration => this.returnDuration;
 
-    /// <summary>강화 결과를 한 번 보여준다. _outcome은 Success/Failed만 온다(나머지는 결제 전 차단이라 보여줄 것이 없다).
+    protected override void AttachLayers() => this.shading.Attach();
+
+    /// <summary>담금질 한 판. 몸짓 먼저, 그 위에 표면 —
+    /// 폭발은 결과를 모르고, 결과는 그 폭발이 드러내는 얼굴로만 갈린다.
     ///
-    /// _onReveal은 카드가 빛에 완전히 덮인 시점 — 호출부가 여기서 값을 화면에 반영한다(보이지 않는 갱신).
-    /// _onSettled는 카드 위 연출이 다 끝난 시점 — 호출부가 여기서 결과판을 띄운다. 둘을 나누는 이유는
-    /// 값 반영은 빛 아래에서 끝나야 하고, 읽을 것은 카드가 조용해진 뒤에 와야 서로를 잡아먹지 않기 때문이다.
-    ///
-    /// _awaitReturn이면 결과를 무대에 남긴 채 멈추고 <see cref="PlayReturn"/>을 기다린다(결과판이 걷힐 때까지).
-    /// 아니면 스스로 걷고 _onFinished까지 이어간다 — 결과판 미배선이 소프트락이 되면 안 된다.
-    ///
-    /// 세 콜백은 스킵·중단·재진입 어느 경로로든 각각 정확히 한 번, 이 순서로 온다.</summary>
-    public void Play(EEnhanceOutcome _outcome, bool _awaitReturn, Action _onReveal, Action _onSettled, Action _onFinished)
+    /// 값 반영(Reveal)은 카드가 빛에 완전히 덮인 프레임이다 — 눈이 숫자가 바뀌는 과정을 보지 못한다.</summary>
+    protected override float BuildStage(Sequence _seq, EEnhanceOutcome _outcome, bool _chained)
     {
-        // 재진입은 호출부가 막지만 여기서도 닫는다 — 두 연출이 같은 노드를 두고 싸우면 카드가 굳는다.
-        // 다만 콜백은 삼키지 않는다. 삼키면 호출부의 갱신 유예가 영영 풀리지 않아 버튼이 죽는다.
-        if (IsPlaying)
-        {
-            _onReveal?.Invoke();
-            _onSettled?.Invoke();
-            _onFinished?.Invoke();
-            return;
-        }
-
-        // 걷힌 무대를 그대로 물려받는가("한 번 더"). 플래그는 여기서 소비한다 — 이어받는 것은 이 한 번뿐이다.
-        bool t_chained        = this.m_stageRetracted;
-        this.m_stageRetracted = false;
-
-        this.m_handoff.Arm(_onReveal, _onSettled, _onFinished);
-
-        if (this.cardStage == null)
-        {
-            // 무대가 없으면 보여줄 것이 없다. 값 반영까지 막지는 않는다(배선 실패가 소프트락이 되지 않게).
-            // 결과판을 기다리는 경우엔 그 닫힘(PlayReturn)이 마무리를 이어받는다.
-            this.m_awaitingReturn = _awaitReturn;
-            this.m_handoff.Reveal();
-            this.m_handoff.Settled();
-            if (!_awaitReturn) this.m_handoff.Finished();
-            return;
-        }
-
-        CaptureBase();
-
-        // 이어받는 경우엔 즉시 원복하지 않는다 — 결과가 남긴 표면(실패의 잿빛·성공의 잔열)을 진입 구간이 식히며 되돌린다.
-        if (!t_chained) RestoreVisual();
-
-        // 연출 재질은 여기서부터 걸친다(RestoreVisual이 벗기므로 순서가 뒤바뀌면 안 된다).
-        this.shading.Attach();
-
         bool t_success = _outcome == EEnhanceOutcome.Success;
 
         // 저작값이 0이나 음수여도 구간이 서로를 넘지 않게 여기서 한 번 정리한다.
         float t_enterDur = Mathf.Max(0.01f, this.enterDuration);
         float t_riseDur  = Mathf.Max(0.06f, this.buildUpDuration);
         float t_stillDur = Mathf.Max(0.02f, this.holdDuration);
-        float t_backDur  = Mathf.Max(0.05f, this.returnDuration);
 
         // 결과 구간은 공통 몸짓(폭발 회수)과 결과별 표면 중 긴 쪽을 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
         float t_burst     = Mathf.Max(0.05f, this.burstSettle);
@@ -179,152 +131,18 @@ public class CardEnhanceRitualView : MonoBehaviour
         float t_still  = t_rise + t_riseDur;
         float t_reveal = t_still + t_stillDur;
         float t_result = t_reveal + BlindRise;
-        float t_return = t_result + t_resultDur;
-        float t_end    = t_return + t_backDur;
 
-        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+        BuildEnter(_seq, t_enterDur, _chained);
+        BuildRise(_seq, t_rise, t_riseDur);
+        BuildStill(_seq, t_still, t_stillDur);
+        BuildReveal(_seq, t_reveal);
+        BuildBurst(_seq, t_result);
 
-        BuildEnter(t_seq, t_enterDur, t_chained);
-        BuildRise(t_seq, t_rise, t_riseDur);
-        BuildStill(t_seq, t_still, t_stillDur);
-        BuildReveal(t_seq, t_reveal);
-
-        // 몸짓 먼저, 그 위에 표면. 폭발은 결과를 모르고, 결과는 그 폭발이 드러내는 얼굴로만 갈린다.
-        BuildBurst(t_seq, t_result);
-
-        if (t_success) BuildSuccessSurface(t_seq, t_result, t_resultDur);
-        else           BuildFailSurface(t_seq, t_result);
+        if (t_success) BuildSuccessSurface(_seq, t_result, t_resultDur);
+        else           BuildFailSurface(_seq, t_result);
 
         // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리. 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
-        //
-        // 결과를 남기고 멈추는 경우엔 이 시각이 곧 시퀀스의 끝이므로 신호를 OnKill로 미룬다 —
-        // 시퀀스가 죽은 **뒤**에 흘려야 호출부가 곧바로 PlayReturn을 되받아 불러도 재진입이 없다.
-        // (여기 콜백은 시퀀스 길이를 못 박는 역할만 한다.)
-        if (_awaitReturn)
-        {
-            t_seq.InsertCallback(t_return, () => { });
-        }
-        else
-        {
-            t_seq.InsertCallback(t_return, this.m_handoff.Settled);
-            BuildReturn(t_seq, t_return, t_backDur, t_end);
-        }
-
-        // 정상 종료든 스킵이든 중단이든 여기로 온다 — 콜백 유실과 굳은 화면을 동시에 막는 안전망이다.
-        t_seq.OnKill(() =>
-        {
-            // 신호보다 상태가 먼저다 — 호출부가 Settled 안에서 PlayReturn을 부를 수 있고,
-            // 그때 이미 "기다리는 중"이어야 복귀가 정상 경로를 탄다.
-            this.m_seq            = null;
-            this.m_awaitingReturn = _awaitReturn;
-
-            this.m_handoff.Reveal();
-            this.m_handoff.Settled();
-
-            if (_awaitReturn) return;
-
-            RestoreVisual();
-            this.m_handoff.Finished();
-        });
-
-        this.m_seq = t_seq;
-        t_seq.Play();   // 재생 책임을 코드에 남긴다(PopupTransition과 같은 결).
-    }
-
-    /// <summary>남은 구간을 최종 상태로 끌어당긴다. 콜백은 순서대로 그대로 실행된다.
-    /// 결과를 남기고 기다리는 동안은 끌어당길 것이 없다 — 그때의 입력은 결과판이 받는다.</summary>
-    public void RequestSkip()
-    {
-        if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
-    }
-
-    /// <summary>결과를 걷고 무대를 원래대로 되돌린다(결과판이 닫힐 때 호출부가 부른다).
-    /// 기다리는 중이 아니면 남은 콜백만 흘린다 — 어느 경로로 와도 조작이 죽은 채 굳지 않게.</summary>
-    public void PlayReturn()
-    {
-        // 잘라내는 중에 콜백을 타고 되돌아온 것이다 — 남은 콜백은 CancelImmediate가 마저 흘린다.
-        if (this.m_cancelling) return;
-
-        // 결과판이 무대보다 먼저 닫힐 수 있다(스킵 경로). 남은 구간을 끌어당겨야 복귀가 결과 자세에서 출발한다.
-        if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
-
-        if (!this.m_awaitingReturn)
-        {
-            // 기다린 적이 없는데 불렸다 = 어딘가에서 순서가 어긋났다.
-            this.m_handoff.FlushAll();
-            return;
-        }
-
-        this.m_awaitingReturn = false;
-
-        // 결과판을 기다리는 사이 어떤 경로로든 벗겨졌을 수 있다 — 복귀 구간도 이 재질 위에서 돈다.
-        this.shading.Attach();
-
-        if (this.cardStage == null)
-        {
-            RestoreVisual();
-            this.m_handoff.Finished();
-            return;
-        }
-
-        float t_dur = Mathf.Max(0.05f, this.returnDuration);
-
-        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
-        BuildReturn(t_seq, 0f, t_dur, t_dur);
-
-        t_seq.OnKill(() =>
-        {
-            this.m_seq = null;
-            RestoreVisual();
-            this.m_handoff.Finished();
-        });
-
-        this.m_seq = t_seq;
-        t_seq.Play();
-    }
-
-    /// <summary>결과판이 "한 번 더"로 걷혔다 — 무대를 되돌리지 않고 대기만 푼다.
-    /// 걷힌 패널·가라앉은 딤·결과 자세가 그대로 남으므로 **곧바로 <see cref="Play"/>로 이어야 한다**.
-    /// 이을 수 없게 됐다면 <see cref="CancelImmediate"/>로 무대를 되돌릴 것 — 그냥 두면 상세 패널이 사라진 채 굳는다.
-    ///
-    /// 복귀를 건너뛸 뿐 콜백 계약은 그대로다 — _onFinished까지 여기서 흘린다.</summary>
-    public void EndAwaitForChain()
-    {
-        if (this.m_cancelling) return;
-
-        // 결과판이 무대보다 먼저 닫힐 수 있다(스킵 경로). 남은 구간을 끌어당겨 결과 자세에서 이어지게 한다.
-        if (this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
-
-        if (!this.m_awaitingReturn)
-        {
-            // 기다린 적이 없다 = 이어받을 무대도 없다(PlayReturn과 같은 결).
-            this.m_handoff.FlushAll();
-            return;
-        }
-
-        this.m_awaitingReturn = false;
-        this.m_stageRetracted = true;   // 신호보다 먼저 — 호출부가 Finished 안에서 곧바로 Play를 되받아 부른다.
-
-        this.m_handoff.Finished();
-    }
-
-    /// <summary>연출을 잘라내고 화면만 원복한다(카드 전환·닫힘 경로).
-    /// 어느 단계에서 잘렸든 남은 콜백을 전부 흘린다 — 안 그러면 호출부의 값 갱신 유예가 영영 풀리지 않는다.</summary>
-    public void CancelImmediate()
-    {
-        if (this.m_cancelling) return;
-        this.m_cancelling = true;
-
-        this.m_seq?.Kill();   // OnKill이 공개·정착 콜백을 흘린다.
-        this.m_seq            = null;
-        this.m_awaitingReturn = false;
-
-        RestoreVisual();
-
-        // 결과를 남긴 채 기다리다 잘린 경우엔 아직 안 나간 신호가 있다. 이미 나간 것은 무해하게 지나간다.
-        this.m_handoff.FlushAll();
-
-        this.m_cancelling = false;
+        return t_result + t_resultDur;
     }
 
     // 재질 **사본**은 여기서 미리 만든다(강화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
@@ -334,12 +152,6 @@ public class CardEnhanceRitualView : MonoBehaviour
     {
         this.shading.Warm();
         this.embers.Attach();
-    }
-
-    void OnDisable()
-    {
-        // 잘린 채 굳은 압축·열·오프셋이 다음 열기로 새지 않게.
-        CancelImmediate();
     }
 
     void OnDestroy()
@@ -584,7 +396,7 @@ public class CardEnhanceRitualView : MonoBehaviour
         _seq.Insert(t_crack + FractureShake, this.cardStage.DOAnchorPos(this.m_baseAnchored, 0.08f).SetEase(Ease.OutQuad));
     }
 
-    void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
+    protected override void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
     {
         _seq.Insert(_at, this.shading.TweenHeat(0f, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(_at, this.shading.TweenCool(0f, Mathf.Min(0.2f, _dur)));
@@ -612,7 +424,7 @@ public class CardEnhanceRitualView : MonoBehaviour
 
     // ── 상태 ─────────────────────────────────────────────
 
-    void CaptureBase()
+    protected override void CaptureBase()
     {
         if (this.m_baseCaptured) return;
 
@@ -624,11 +436,8 @@ public class CardEnhanceRitualView : MonoBehaviour
     }
 
     // 다음 연출이 중간값(압축·열·회색)에서 출발하지 않게 원복. 캡처 전이면 건드릴 것도 없다.
-    void RestoreVisual()
+    protected override void OnRestoreVisual()
     {
-        // 무대가 제자리로 돌아오는 모든 길이 여기를 지난다 — 이어받을 자세도 여기서 무효가 된다.
-        this.m_stageRetracted = false;
-
         if (!this.m_baseCaptured) return;
 
         if (this.cardStage != null)
