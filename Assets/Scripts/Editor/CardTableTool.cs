@@ -7,11 +7,12 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 카드 표(Excel/CSV) ↔ CardData SO 왕복 엔진. **UI는 없다** — 창은 ReleaseManagerWindow 하나뿐이다.
+/// 카드 표 ↔ CardData SO 엔진. **UI는 없다** — 창은 ReleaseManagerWindow 하나뿐이다.
 ///
-/// **왜 CSV인가**: .xlsx를 직접 읽으려면 외부 라이브러리(EPPlus/NPOI)를 프로젝트에 들여야 한다.
-/// Excel은 "CSV UTF-8"로 저장/열기를 기본 지원하므로, 표는 Excel에서 편집하고 프로젝트는 CSV만 읽는다.
-/// 내보낼 때 **UTF-8 BOM**을 붙이는 이유도 이것이다 — BOM이 없으면 Excel이 한글을 깨서 연다.
+/// **값이 들어오는 문은 구글 스펙시트 하나다**(<see cref="CardSpecImporter"/> → <see cref="ImportRows"/>).
+/// CSV는 반대 방향(내보내기)과 대조 전용으로 남았다 — 들어오는 문이 둘이면 어느 쪽으로 마지막에
+/// 덮었는지에 따라 에셋이 달라진다. 내보낸 CSV에 **UTF-8 BOM**을 붙이는 이유는 Excel이
+/// BOM 없는 파일의 한글을 깨서 열기 때문이다.
 ///
 /// **이 도구가 소유하는 열만 덮어쓴다.** 아트·패시브·보이스·attackEffect는 표에 없고 건드리지도 않는다 —
 /// 표를 다시 밀어넣어도 인스펙터에서 채운 배선이 날아가지 않는다.
@@ -50,61 +51,17 @@ public static partial class CardTableTool
         "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
         "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
         "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).\n" +
-        "· 라이브/테스트 표는 같은 CardData를 공유한다 — 모드 전환은 곧 덮어쓰기다.";
-
-    /// <summary>표를 파일로 뽑는 실동작. 창 없이도(자동화·검증) 부를 수 있게 static으로 분리한다.</summary>
-    public static string ExportTo(string _tablePath)
-    {
-        List<CardData> t_cards = AllCards();
-
-        var t_sb = new StringBuilder();
-        t_sb.AppendLine(string.Join(",", Columns));
-        foreach (CardData t_card in t_cards)
-            t_sb.AppendLine(string.Join(",", Array.ConvertAll(Columns, c => Escape(ValueOf(t_card, c)))));
-
-        string t_dir = Path.GetDirectoryName(_tablePath);
-        if (!string.IsNullOrEmpty(t_dir)) Directory.CreateDirectory(t_dir);
-
-        // BOM 필수 — 없으면 Excel이 한글을 깨서 연다.
-        File.WriteAllText(_tablePath, t_sb.ToString(), new UTF8Encoding(true));
-        AssetDatabase.Refresh();
-
-        string t_report = $"내보내기 완료: {t_cards.Count}행\n{_tablePath}";
-        Debug.Log($"[카드 표] {t_report}");
-        return t_report;
-    }
-
-    static string ValueOf(CardData _card, string _column)
-    {
-        switch (_column)
-        {
-            case "id":                    return _card.id > 0 ? _card.id.ToString(CultureInfo.InvariantCulture) : "";
-            case "name":                  return _card.name;
-            case "displayName":           return _card.displayName;
-            case "channel":               return _card.channel.ToString();
-            case "maxHp":                 return _card.maxHp.ToString(CultureInfo.InvariantCulture);
-            case "keywords":              return KeywordsToText(_card.keywords);
-            case "keywordUnlockLevel":    return _card.keywordUnlockLevel.ToString(CultureInfo.InvariantCulture);
-            case "synergies":             return SynergiesToText(_card.synergies);
-            case "defaultEvolutionStage": return _card.defaultEvolutionStage.ToString(CultureInfo.InvariantCulture);
-            case "cardExplain":           return _card.cardExplain;
-            default:
-                if (TryParseHpColumn(_column, out int t_level))
-                {
-                    if (_card.hpGainByLevel == null || _card.hpGainByLevel.Length == 0) return "";
-                    return t_level < _card.hpGainByLevel.Length
-                        ? _card.hpGainByLevel[t_level].ToString(CultureInfo.InvariantCulture)
-                        : "";
-                }
-                return "";
-        }
-    }
+        "· 라이브(Card)/테스트(Card_Test) 시트는 같은 CardData를 공유한다 — 모드 전환은 곧 덮어쓰기다.\n" +
+        "· 두 시트의 같은 카드는 반드시 같은 id여야 한다(매칭 키가 id).";
 
     // ── 가져오기 ───────────────────────────────────────────────────────────
 
-    /// <summary>표를 읽어 카드 SO를 생성/갱신하는 실동작. 창 없이도(자동화·검증) 부를 수 있게 static으로 분리한다.
-    /// 막힌 경우 _error에 사유가 담기고 반환값은 빈 문자열이다.</summary>
-    public static string ImportFrom(string _tablePath, string _cardRoot, out string _error)
+    /// <summary>표 **내용**에서 시작하는 가져오기. 0행 = 헤더(열 이름), 1행부터 데이터.
+    ///
+    /// 파일 경로가 아니라 행 목록을 받는 이유: 표의 출처가 CSV 하나가 아니게 됐다(스펙시트 → <see cref="CardSpecImporter"/>).
+    /// 소스마다 파싱·검증을 복제하면 "CSV로 넣을 때와 시트로 넣을 때가 다른" 상태가 반드시 생긴다 —
+    /// id 예약·키워드/시너지 해석·hp곡선·경고·레지스트리 등록은 전부 여기 한 갈래로만 흐른다.</summary>
+    public static string ImportRows(List<List<string>> _rows, string _cardRoot, out string _error)
     {
         _error = null;
 
@@ -113,14 +70,9 @@ public static partial class CardTableTool
             _error = $"CardRegistry를 못 찾음: {REGISTRY_PATH}";
             return "";
         }
-        if (!File.Exists(_tablePath))
-        {
-            _error = $"표 파일이 없다: {_tablePath}";
-            return "";
-        }
 
-        List<List<string>> t_rows = ParseCsv(File.ReadAllText(_tablePath, Encoding.UTF8));
-        if (t_rows.Count < 2)
+        List<List<string>> t_rows = _rows;
+        if (t_rows == null || t_rows.Count < 2)
         {
             _error = "표에 헤더 말고 데이터 행이 없다.";
             return "";
@@ -141,6 +93,13 @@ public static partial class CardTableTool
         Dictionary<string, CardData> t_existing = new Dictionary<string, CardData>();
         foreach (CardData c in AllCards()) t_existing[c.name] = c;
 
+        // 번호 → 카드. **매칭의 1순위는 이름이 아니라 번호다** — 번호가 카드를 가리키는 안정 키이고
+        // (CardData.id 주석), 이름은 기획이 표에서 바꿀 수 있는 표시값이다. 이름으로만 찾으면
+        // 표에서 이름 한 글자만 고쳐도 같은 카드가 새 에셋으로 복제된다(guid가 갈려 배선이 통째로 끊긴다).
+        var t_byId = new Dictionary<int, CardData>();
+        foreach (CardData c in t_existing.Values)
+            if (c != null && c.id > 0 && !t_byId.ContainsKey(c.id)) t_byId[c.id] = c;
+
         Dictionary<string, ScriptableObject> t_synergies = AllSynergies();
 
         int t_created = 0, t_updated = 0;
@@ -156,7 +115,13 @@ public static partial class CardTableTool
             string t_name = Cell(t_row, t_header, "name").Trim();
             if (string.IsNullOrEmpty(t_name)) continue;   // 빈 행(Excel이 흔히 남긴다)
 
-            if (!t_existing.TryGetValue(t_name, out CardData t_card))
+            // 번호 → 이름 순으로 찾는다. 둘 다 없을 때만 새 카드다.
+            int t_rowId = t_header.ContainsKey("id") ? ParseInt(Cell(t_row, t_header, "id"), 0) : 0;
+            CardData t_card = null;
+            if (t_rowId > 0) t_byId.TryGetValue(t_rowId, out t_card);
+            if (t_card == null) t_existing.TryGetValue(t_name, out t_card);
+
+            if (t_card == null)
             {
                 t_card = CreateCardAsset(_cardRoot, t_name);
                 if (t_card == null) { t_warnings.Add($"{t_name}: 에셋 생성 실패"); continue; }
@@ -166,9 +131,15 @@ public static partial class CardTableTool
             else
             {
                 t_updated++;
+                // 번호로 찾았는데 이름이 다르면 표가 이긴다 — 에셋 파일을 따라 바꾼다.
+                // 리네임은 guid를 보존하므로 이 카드를 참조하는 시나리오·카드팩·AI덱·도감 배선은 그대로 산다.
+                if (t_card.name != t_name) RenameCardAsset(t_card, t_name, t_existing, t_warnings);
             }
 
+            if (t_card.id > 0) t_byId[t_card.id] = t_card;
+
             ApplyId(t_card, t_row, t_header, t_name, t_idOwner, t_warnings);
+            if (t_card.id > 0) t_byId[t_card.id] = t_card;
             ApplyRow(t_card, t_row, t_header, t_synergies, t_name, t_warnings);
             // 이미 존재하지만 Registry에서 빠진 카드도 가져오기 한 번으로 복구한다.
             // AppendToRegistry는 기존 참조면 no-op이며 항상 맨 뒤에만 추가해 와이어 ID를 보존한다.
@@ -214,6 +185,10 @@ public static partial class CardTableTool
 
         if (!_header.ContainsKey("id")) return t_owner;
 
+        // 표가 잡은 번호. 매칭이 번호 우선이므로 **번호를 적은 행은 언제나 그 번호의 주인**이다
+        // (이름이 달라졌어도 같은 카드다 — 리네임은 표가 이긴다). 진짜 충돌은 두 행이 같은 번호를 적은 경우뿐.
+        var t_claimedByRow = new Dictionary<int, string>();
+
         for (int r = 1; r < _rows.Count; r++)
         {
             string t_name = Cell(_rows[r], _header, "name").Trim();
@@ -222,15 +197,43 @@ public static partial class CardTableTool
             int t_id = ParseInt(Cell(_rows[r], _header, "id"), 0);
             if (t_id <= 0) continue;
 
-            if (t_owner.TryGetValue(t_id, out string t_holder) && t_holder != t_name)
+            if (t_claimedByRow.TryGetValue(t_id, out string t_first))
             {
-                _warnings.Add($"{t_name}.id: 번호 {t_id}는 이미 '{t_holder}'의 것 — 기존 번호를 유지한다");
+                _warnings.Add($"{t_name}.id: 번호 {t_id}를 '{t_first}' 행이 이미 썼다 — 표에서 한쪽을 고칠 것");
                 continue;
             }
+
+            t_claimedByRow[t_id] = t_name;
             // 이 카드가 다른 번호를 갖고 있었다면 옛 번호는 대장에 남겨 둔다. 번호는 재사용하지 않는다.
             t_owner[t_id] = t_name;
         }
         return t_owner;
+    }
+
+    /// <summary>번호로 찾은 카드의 에셋 이름을 표에 맞춘다. **리네임은 guid를 보존**하므로
+    /// 이 카드를 참조하는 에셋(시나리오·카드팩·AI덱·도감·튜토리얼)의 배선은 끊기지 않는다.
+    /// 같은 이름이 이미 있으면 건드리지 않는다 — 두 에셋이 한 이름을 갖게 두는 것보다 표를 고치는 게 맞다.</summary>
+    static void RenameCardAsset(CardData _card, string _newName, Dictionary<string, CardData> _existing,
+                                List<string> _warnings)
+    {
+        if (_existing.TryGetValue(_newName, out CardData t_taken) && t_taken != _card)
+        {
+            _warnings.Add($"{_card.name}: 이름을 '{_newName}'으로 바꾸려 했지만 이미 그 이름의 카드가 있다 — 이름 유지");
+            return;
+        }
+
+        string t_old  = _card.name;
+        string t_path = AssetDatabase.GetAssetPath(_card);
+        string t_fail = AssetDatabase.RenameAsset(t_path, _newName);
+        if (!string.IsNullOrEmpty(t_fail))
+        {
+            _warnings.Add($"{t_old}: 이름 변경 실패({_newName}) — {t_fail}");
+            return;
+        }
+
+        _existing.Remove(t_old);
+        _existing[_newName] = _card;
+        _warnings.Add($"{t_old} → {_newName}: 번호 {_card.id}로 찾아 이름을 표에 맞췄다(참조 유지)");
     }
 
     /// <summary>표의 번호를 카드에 반영한다. 빈 칸이면 기존 번호를 지키고, 그마저 없으면 남은 번호를 새로 부여한다.
@@ -439,70 +442,6 @@ public static partial class CardTableTool
     }
 
     // ── CSV ────────────────────────────────────────────────────────────────
-
-    static string Escape(string _value)
-    {
-        string t_v = _value ?? "";
-        if (t_v.IndexOfAny(new[] { ',', '"', '\n', '\r' }) < 0) return t_v;
-        return "\"" + t_v.Replace("\"", "\"\"") + "\"";
-    }
-
-    /// <summary>RFC4180 최소 파서. 따옴표 안의 쉼표·줄바꿈을 지킨다 —
-    /// cardExplain에 쉼표가 들어가는 순간 Split(',')짜리는 조용히 열을 밀어버린다.</summary>
-    static List<List<string>> ParseCsv(string _text)
-    {
-        var t_rows  = new List<List<string>>();
-        var t_row   = new List<string>();
-        var t_field = new StringBuilder();
-        bool t_quoted = false;
-
-        for (int i = 0; i < _text.Length; i++)
-        {
-            char c = _text[i];
-
-            if (t_quoted)
-            {
-                if (c == '"')
-                {
-                    if (i + 1 < _text.Length && _text[i + 1] == '"') { t_field.Append('"'); i++; }
-                    else t_quoted = false;
-                }
-                else t_field.Append(c);
-                continue;
-            }
-
-            switch (c)
-            {
-                case '"':
-                    t_quoted = true;
-                    break;
-                case ',':
-                    t_row.Add(t_field.ToString()); t_field.Clear();
-                    break;
-                case '\r':
-                    break;   // \r\n은 \n에서 한 번만 끊는다
-                case '\n':
-                    t_row.Add(t_field.ToString()); t_field.Clear();
-                    t_rows.Add(t_row); t_row = new List<string>();
-                    break;
-                default:
-                    t_field.Append(c);
-                    break;
-            }
-        }
-
-        if (t_field.Length > 0 || t_row.Count > 0)
-        {
-            t_row.Add(t_field.ToString());
-            t_rows.Add(t_row);
-        }
-
-        // 선두 BOM 제거 — 남기면 첫 헤더가 "﻿name"이 되어 name 열을 못 찾는다.
-        if (t_rows.Count > 0 && t_rows[0].Count > 0)
-            t_rows[0][0] = t_rows[0][0].TrimStart('﻿');
-
-        return t_rows;
-    }
 
     static string Cell(List<string> _row, Dictionary<string, int> _header, string _column)
     {

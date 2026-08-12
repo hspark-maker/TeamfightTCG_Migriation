@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-// 표(CSV) ↔ 카드 SO **대조**. 값을 밀어 넣지 않고 어긋난 곳만 찾아 보고한다.
+// 스펙시트 ↔ 카드 SO **대조**. 값을 밀어 넣지 않고 어긋난 곳만 찾아 보고한다.
 // (클래스 요약은 CardTableTool.cs 쪽에 있다 — partial이라 문서 주석을 한 곳에만 둔다.)
 //
 // **왜 필요한가**: ContentRunModeEditor.Applied는 "마지막에 어느 표를 실었는가"를 적어 둔 도장일 뿐이다.
@@ -20,19 +19,16 @@ using UnityEngine;
 public static partial class CardTableTool
 {
     /// <summary>표와 카드 SO의 차이를 사람이 읽을 줄로 돌려준다(빈 목록 = 일치).
-    /// 표를 못 읽으면 _error에 사유가 담기고 반환값은 null이다.</summary>
-    public static List<string> DiffAgainst(string _tablePath, out string _error)
+    /// 표를 못 읽으면 _error에 사유가 담기고 반환값은 null이다.
+    ///
+    /// 입력이 파일이 아니라 행 목록인 이유는 <see cref="ImportRows"/>와 같다 — 대조가 보는 표와
+    /// 적용이 쓰는 표가 **같은 것**이라야 "대조는 통과했는데 적용하면 값이 달라지는" 상태가 안 생긴다.</summary>
+    public static List<string> DiffRows(List<List<string>> _rows, out string _error)
     {
         _error = null;
 
-        if (string.IsNullOrWhiteSpace(_tablePath) || !File.Exists(_tablePath))
-        {
-            _error = $"표 파일이 없다: {_tablePath}";
-            return null;
-        }
-
-        List<List<string>> t_rows = ParseCsv(File.ReadAllText(_tablePath, System.Text.Encoding.UTF8));
-        if (t_rows.Count < 2)
+        List<List<string>> t_rows = _rows;
+        if (t_rows == null || t_rows.Count < 2)
         {
             _error = "표에 헤더 말고 데이터 행이 없다.";
             return null;

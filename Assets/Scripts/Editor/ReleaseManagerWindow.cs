@@ -93,25 +93,17 @@ public class ReleaseManagerWindow : EditorWindow
 
         EditorGUILayout.LabelField("세이브 폴더", t_profile != null ? t_profile.SaveFolder : "(프로필 에셋 없음)");
         EditorGUILayout.LabelField("테스트 카드", t_mode == EContentRunMode.Test ? "포함" : "제외");
-        EditorGUILayout.LabelField("적용 대상 표", ContentRunModeEditor.ActiveTablePath);
+        EditorGUILayout.LabelField("적용 대상 시트", CardSpecImporter.SheetNameOf(t_mode));
     }
 
     void SwitchMode(EContentRunMode _target)
     {
         string t_label = ContentRunModeEditor.Label(_target);
 
-        if (!File.Exists(ContentRunModeEditor.TablePathOf(_target)))
-        {
-            EditorUtility.DisplayDialog("전환 불가",
-                $"{t_label} 표 파일이 없다:\n{ContentRunModeEditor.TablePathOf(_target)}\n\n" +
-                "②에서 그 경로로 먼저 내보내거나 경로를 고칠 것.", "확인");
-            return;
-        }
-
+        // 시트가 소스라 미리 볼 파일이 없다 — 못 읽는 경우는 SwitchTo가 사유를 담아 돌려준다.
         if (!EditorUtility.DisplayDialog($"{t_label}로 전환",
-                $"실행 모드를 {t_label}로 바꾸고 {t_label} 표를 카드 에셋에 덮어쓴다.\n\n" +
-                "두 표는 같은 CardData를 공유하므로 지금 에셋에 있는 수치는 사라진다.\n" +
-                "보존하려면 취소하고 ②에서 현재 모드 표로 먼저 내보낼 것.", "전환", "취소"))
+                $"실행 모드를 {t_label}로 바꾸고 {CardSpecImporter.SheetNameOf(_target)} 시트를 카드 에셋에 덮어쓴다.\n\n" +
+                "두 시트는 같은 CardData를 공유하므로 지금 에셋에 있는 수치는 사라진다.", "전환", "취소"))
             return;
 
         string t_report = ContentRunModeEditor.SwitchTo(_target, out string t_error);
@@ -125,10 +117,8 @@ public class ReleaseManagerWindow : EditorWindow
         EContentRunMode t_mode = ContentRunModeEditor.Current;
         string t_label = ContentRunModeEditor.Label(t_mode);
 
-        Header("② 카드 표");
+        Header("② 카드 스펙시트");
 
-        ContentRunModeEditor.LiveTablePath = PathField("라이브 표", ContentRunModeEditor.LiveTablePath);
-        ContentRunModeEditor.TestTablePath = PathField("테스트 표", ContentRunModeEditor.TestTablePath);
         ContentRunModeEditor.CardRoot = EditorGUILayout.TextField("카드 에셋 위치", ContentRunModeEditor.CardRoot);
 
         EditorGUILayout.Space(4);
@@ -143,44 +133,24 @@ public class ReleaseManagerWindow : EditorWindow
             EditorGUILayout.LabelField("에셋에 실린 표", ContentRunModeEditor.Label(ContentRunModeEditor.Applied));
         }
 
-        using (new EditorGUILayout.HorizontalScope())
+        // 값이 들어오는 문은 스펙시트 하나뿐이다. 값 변화의 기록은 카드 .asset 자체가 git에 추적되므로
+        // 별도 CSV 스냅샷을 두지 않는다 — 두면 어느 쪽이 진짜인지가 다시 흐려진다.
+        if (GUILayout.Button($"스펙시트({CardSpecImporter.SheetNameOf(t_mode)}) → 카드 적용", GUILayout.Height(26)))
         {
-            if (GUILayout.Button($"카드 → {t_label} 표 내보내기", GUILayout.Height(26)))
-                Finish(ContentRunModeEditor.ExportTable(t_mode), null);
-
-            using (new EditorGUI.DisabledScope(!File.Exists(ContentRunModeEditor.ActiveTablePath)))
-            {
-                if (GUILayout.Button($"{t_label} 표 → 카드 적용", GUILayout.Height(26)))
-                {
-                    string t_report = ContentRunModeEditor.ApplyTable(t_mode, out string t_error);
-                    Finish(t_report, t_error);
-                }
-            }
+            string t_report = CardSpecImporter.ImportToAssets(t_mode, out string t_error);
+            Finish(t_report, t_error);
         }
+
+        EditorGUILayout.HelpBox(
+            "카드 값의 진실원은 구글 스펙시트다. 시트를 고쳤으면 CookApps > SpecData 창에서 " +
+            "'시트 적용 & CS 생성'을 먼저 돌린 뒤 위 버튼을 누른다.\n" +
+            "라이브 = Card 시트 / 테스트 = Card_Test 시트. 같은 카드는 두 시트에서 **같은 id**여야 한다 " +
+            "— 매칭 키가 id라 번호가 갈리면 새 에셋으로 복제된다.\n" +
+            "시트에서 이름을 바꾸면 에셋 이름도 따라 바뀐다(참조는 guid라 유지된다).",
+            MessageType.Info);
 
         this.showColumnHelp = EditorGUILayout.Foldout(this.showColumnHelp, "열 설명", true);
         if (this.showColumnHelp) EditorGUILayout.HelpBox(CardTableTool.ColumnHelp, MessageType.None);
-    }
-
-    static string PathField(string _label, string _value)
-    {
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            string t_next = EditorGUILayout.TextField(_label, _value);
-            if (GUILayout.Button("…", GUILayout.Width(26)))
-            {
-                string t_picked = EditorUtility.OpenFilePanel(_label, "Assets/SO", "csv");
-                if (!string.IsNullOrEmpty(t_picked)) t_next = ToProjectRelative(t_picked) ?? t_picked;
-            }
-            return t_next;
-        }
-    }
-
-    static string ToProjectRelative(string _absolute)
-    {
-        string t_abs  = _absolute.Replace('\\', '/');
-        string t_root = Application.dataPath.Replace('\\', '/');
-        return t_abs.StartsWith(t_root + "/") ? "Assets" + t_abs.Substring(t_root.Length) : null;
     }
 
     // ── ③ 검증 ─────────────────────────────────────────────────────────────
