@@ -161,6 +161,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] float slideDistance = 120f;
     [SerializeField] float slideDuration = 0.18f;
 
+    /// <summary>강화가 **성공하고 그 연출·결과판까지 끝나 상세로 돌아온** 순간. 강화를 기다리는 바깥(튜토리얼 안내)이
+    /// 듣는 신호다 — 성장 통지(CardGrowthManager.OnGrowthChanged)로는 실패와 구분되지 않고, 결과가 나온 그 프레임에
+    /// 화면을 넘겨받으면 방금 쓴 비용의 결과를 보지 못한 채 연출이 잘린다.</summary>
+    public static event Action OnAnyEnhanceSettled;
+
     static CardDetailOverlayView s_instance;
     static bool s_missingWarned;
 
@@ -192,6 +197,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 프레임·아트만 보는 열람 모드. 창이 열려 있는 동안만 유지한다(OnDisable에서 내린다).
     bool m_artOnly;
+
+    // 지금 튜토리얼 안내 타깃으로 등록해 둔 성장 버튼(강화 또는 진화). 자기가 올린 것만 내린다.
+    Button m_anchoredGrowthButton;
 
     // 강화·진화 조작을 통째로 걷은 채 여는 모드. 카드팩 개봉 결과처럼 "방금 뽑은 것을 확인하는 자리"에서 쓴다 —
     // 그 자리에서 재화를 쓰게 두면 개봉 흐름이 갈라지고, 담금질·진화 연출이 개봉 화면 위에서 한 번 더 돈다.
@@ -463,6 +471,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_artOnly = false;
         this.cardView?.SetArtOnly(false);
         ApplyArtOnlyChrome();
+
+        // 창이 닫히면 안내 타깃도 놓는다 — 안 보이는 버튼을 가리키는 등록이 남으면 다음 안내가 허공에 뜬다.
+        ApplyGrowthAnchor(null);
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
@@ -956,6 +967,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve);
         if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(t_actions &&  t_evolve);
 
+        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서고 두 버튼이 자리를 번갈아 쓰므로
+        // 프리팹 표식(TutorialAnchor)으로는 잡을 수 없다.
+        ApplyGrowthAnchor(!t_actions ? null : (t_evolve ? this.evolveButton : this.enhanceButton));
+
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
         SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying);
@@ -1109,6 +1124,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (!t_played || t_ritual == null)
         {
             AbortEnhance(t_card);
+            NotifyEnhanceSettled(t_result);   // 연출 없이 끝난 길이라 여기가 곧 "다 끝난" 시점이다
             return;
         }
 
@@ -1173,11 +1189,47 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
                 // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
                 // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
+                // 결과를 다 읽고 무대가 돌아온 지금이 "강화가 끝났다"이다 — 바깥은 이 시점에야 화면을 넘겨받아도 된다.
+                // "한 번 더"로 이어가는 중이어도 알린다: 체인의 끝을 기다리면 그 끝이 실패·만렙으로 맺힐 때
+                // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.
+                NotifyEnhanceSettled(t_result);
+
+                // 구독자가 창을 닫았으면(OnDisable) 예약도 함께 지워진다 — 그 경우 체인은 여기서 끝난다.
                 if (!this.m_retryQueued) return;
 
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+    }
+
+    /// <summary>안내 타깃을 지금 서 있는 성장 버튼으로 옮긴다(_button이 null이면 내린다). 창이 닫히면 반드시 내린다 —
+    /// 죽은 버튼을 가리키는 등록이 남으면 다음 안내가 안 보이는 자리에 손가락을 띄운다.
+    ///
+    /// 강화·진화를 같은 키로 다루는 이유: 안내가 시키는 일은 "카드를 한 단계 키워라" 하나이고,
+    /// 그 한 방이 진화 관문이면 버튼의 얼굴만 갈릴 뿐 누르는 결과는 같은 레벨업이다.
+    /// 키를 갈라 두면 관문 레벨의 카드에서 앵커가 영영 등록되지 않아 안내가 말없이 멈춘다.</summary>
+    void ApplyGrowthAnchor(Button _button)
+    {
+        if (_button == this.m_anchoredGrowthButton) return;
+
+        if (this.m_anchoredGrowthButton != null)
+            TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.CardDetailEnhanceButton,
+                                              this.m_anchoredGrowthButton.transform as RectTransform);
+
+        this.m_anchoredGrowthButton = _button;
+
+        if (_button != null)
+            TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.CardDetailEnhanceButton,
+                                            _button.transform as RectTransform, _button);
+    }
+
+    // 성공한 강화가 다 끝났음을 바깥에 알린다. 실패·미결제는 알리지 않는다 —
+    // 기다리는 쪽(튜토리얼)은 "레벨이 올랐다"만 신호로 쓰고, 실패는 같은 자리에서 다시 누르는 일이다.
+    static void NotifyEnhanceSettled(EnhanceResult _result)
+    {
+        if (_result.Outcome != EEnhanceOutcome.Success) return;
+
+        OnAnyEnhanceSettled?.Invoke();
     }
 
     // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.

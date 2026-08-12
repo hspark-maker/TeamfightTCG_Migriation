@@ -1339,6 +1339,7 @@ GameObject:
   - component: {fileID: 2760559286507228899}
   - component: {fileID: 8707561417033275778}
   - component: {fileID: 7770487399785170923}
+  - component: {fileID: 6712443273310738661}
   m_Layer: 0
   m_Name: GainEffectLayer
   m_TagString: Untagged
@@ -1406,6 +1407,31 @@ MonoBehaviour:
   scatterRadius: 170
   gatherDuration: 0.32
   startDelay: 0.15
+--- !u!114 &6712443273310738661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1602550880231397688}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5029a1127511d1040885327383cb2d41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardGainFlightEffect
+  cardPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+  spawnCenter: {fileID: 0}
+  target: {fileID: 0}
+  cardSize: {x: 220, y: 300}
+  scatterRadius: 260
+  scatterDuration: 0.34
+  gatherDuration: 0.4
+  cardInterval: 0.09
+  popDuration: 0.16
+  angleStart: 55
+  angleSpan: 70
+  gatherScale: 0.15
+  spinDegrees: 20
 --- !u!1 &1711669502078543248
 GameObject:
   m_ObjectHideFlags: 0

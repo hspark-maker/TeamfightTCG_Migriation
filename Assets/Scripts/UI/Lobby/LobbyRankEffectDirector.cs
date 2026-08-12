@@ -33,6 +33,25 @@ public class LobbyRankEffectDirector : MonoBehaviour
     // 커버 아래에서 미리 세워 둔 티어 변화 연출(승급·강등, 재생 대기 중). 조립하는 순간 표시가 과거로 되돌아간다.
     Sequence m_tierChange;
 
+    static LobbyRankEffectDirector s_instance;
+
+    /// <summary>랭크 연출이 끝났다. <b>보여줄 것이 없어 그냥 지나간 경우도 포함</b>해서 알린다 —
+    /// 이 뒤에 이어 붙는 안내(온보딩 4챕터)가 신호를 놓치면 그 자리에서 영영 멈춘다.</summary>
+    public static event System.Action OnAnyFinished;
+
+    /// <summary>이 씬에 랭크 연출 디렉터가 있는가. 없으면 기다릴 신호도 없다는 뜻이다.</summary>
+    public static bool Exists => s_instance != null;
+
+    void Awake()
+    {
+        s_instance = this;
+    }
+
+    void OnDestroy()
+    {
+        if (s_instance == this) s_instance = null;
+    }
+
     void Start()
     {
         this.StartCoroutine(this.PlayWhenReady());
@@ -49,33 +68,48 @@ public class LobbyRankEffectDirector : MonoBehaviour
 
     IEnumerator PlayWhenReady()
     {
-        // 탭 선택(LobbyTabController.Start)과 레이아웃이 끝나야 배지 좌표가 확정된다(LobbyGainEffectDirector와 같은 이유).
-        yield return null;
-        Canvas.ForceUpdateCanvases();
-
-        // 연출할 자리가 없어도 소비한다 — 남기면 다음 전투 결과에 옛 소식이 병합돼 두 배로 계산된다.
-        if (!RankResultHandoff.TryConsume(out var t_result)) yield break;
-        if (!RankHud.TryGet(out var t_hud)) yield break;
-
-        // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
-        // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다(승급·강등 같은 이유).
-        if (t_result.IsTierUp || t_result.IsTierDown)
+        // 끝을 알리는 자리는 여기 하나다 — 보여줄 것이 없어 중간에 빠져나가는 길이 여럿이라,
+        // 각 return마다 알리면 언젠가 한 곳을 빠뜨린다(그 길로 나가면 기다리던 안내가 영영 멈춘다).
+        try
         {
-            this.m_tierChange = t_result.IsTierUp ? t_hud.BuildTierUp(t_result.PrevTierIndex)
-                                                  : t_hud.BuildTierDown(t_result.PrevTierIndex);
-            this.m_tierChange.Pause();
+            // 탭 선택(LobbyTabController.Start)과 레이아웃이 끝나야 배지 좌표가 확정된다(LobbyGainEffectDirector와 같은 이유).
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            // 연출할 자리가 없어도 소비한다 — 남기면 다음 전투 결과에 옛 소식이 병합돼 두 배로 계산된다.
+            if (!RankResultHandoff.TryConsume(out var t_result)) yield break;
+            if (!RankHud.TryGet(out var t_hud)) yield break;
+
+            // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
+            // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다(승급·강등 같은 이유).
+            if (t_result.IsTierUp || t_result.IsTierDown)
+            {
+                this.m_tierChange = t_result.IsTierUp ? t_hud.BuildTierUp(t_result.PrevTierIndex)
+                                                      : t_hud.BuildTierDown(t_result.PrevTierIndex);
+                this.m_tierChange.Pause();
+            }
+
+            yield return new WaitWhile(() => LoadingCoverView.IsCovering);
+
+            if (this.startDelay > 0f) yield return new WaitForSeconds(this.startDelay);
+
+            yield return this.PlayPointChange(t_hud, t_result);
+
+            // 포인트가 다 찬 뒤에 별이 켜진다 — 순서가 뒤집히면 "왜 올랐는지"가 사라진다.
+            var t_seq = this.m_tierChange;
+            this.m_tierChange = null;
+            if (t_seq == null) yield break;
+
+            t_seq.Play();
+
+            // 별이 다 켜질 때까지 기다린다. 화면에 보이는 것은 전과 같고 코루틴이 끝나는 시점만 정확해진다 —
+            // 뒤에 이어 붙는 안내가 승급 연출 위에 겹쳐 뜨지 않으려면 이 끝이 진짜 끝이어야 한다.
+            yield return t_seq.WaitForKill();
         }
-
-        yield return new WaitWhile(() => LoadingCoverView.IsCovering);
-
-        if (this.startDelay > 0f) yield return new WaitForSeconds(this.startDelay);
-
-        yield return this.PlayPointChange(t_hud, t_result);
-
-        // 포인트가 다 찬 뒤에 별이 켜진다 — 순서가 뒤집히면 "왜 올랐는지"가 사라진다.
-        var t_seq = this.m_tierChange;
-        this.m_tierChange = null;
-        if (t_seq != null) t_seq.Play();
+        finally
+        {
+            OnAnyFinished?.Invoke();
+        }
     }
 
     // 증감 반응 1개를 재생하고 끝날 때까지 기다린다. 완료가 아니라 Kill을 기다린다 — 도중에 끊겨도 티어 연출로 넘어간다.

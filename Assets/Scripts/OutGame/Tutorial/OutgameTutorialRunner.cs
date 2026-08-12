@@ -26,9 +26,11 @@ public static class OutgameTutorialRunner
         }
     }
 
-    /// <summary>온보딩 졸업 처리의 유일한 창구(멱등). 완료 낙인과 함께 첫 랭크 티어에 진입시킨다 —
-    /// 튜토리얼 전투로 쌓은 포인트는 첫 티어 임계치에 못 미치므로(승점 × 3전), 진입은 전투가 아니라 졸업이 결정한다.
-    /// 진입 결과는 캐리어에 실어 둔다(로비 도달 시 랭크 연출 디렉터가 소비한다).</summary>
+    /// <summary>온보딩 졸업 처리의 유일한 창구(멱등).
+    ///
+    /// 첫 랭크 티어 진입은 <b>여기가 아니라 시퀀스가 저작한 자리</b>(EnterFirstRank 스텝)에서 일어난다 —
+    /// 진입 연출은 마지막 전투에서 로비로 돌아온 그 순간에 서야 하고, 졸업은 그보다 뒤로 밀릴 수 있기 때문이다.
+    /// 여기 남은 호출은 그 스텝을 거치지 않고 닫히는 경로(디버그 스킵·좌표 이탈)의 안전망이다(TryEnterFirstTier는 멱등).</summary>
     public static void CompleteSequence()
     {
         if (OutgameTutorialProgress.IsCompleted) return;
@@ -86,6 +88,11 @@ public static class OutgameTutorialRunner
             new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext,
                                            PersistentTutorialProgressSink.Instance));
     }
+
+    // 지금 서 있는 스텝이 _action인가. 화면이 튜토 좌표를 직접 해석하지 않게 하는 조회 창구
+    // (강화 화면이 "지금이 튜토 강화 스텝인가"를 묻는 데 쓴다)
+    public static bool IsCurrentAction(EOutgameTutorialAction _action)
+        => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
 
     // 이번 스텝이 상점 진열·판매 대상을 지정했으면 true(미지정이면 상점 기본 진열)
     public static bool TryGetForcedPack(out CardPackData _pack)
@@ -215,6 +222,9 @@ public static class OutgameTutorialRunner
                 Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}에 스텝이 없습니다 — 저작을 마치기 전엔 진행이 멈춥니다.");
                 continue;
             }
+
+            // 마지막 챕터는 면제한다 — 그 끝은 다음 챕터로의 인계가 아니라 졸업이라 씬을 떠날 이유가 없다.
+            if (i == ChapterCount - 1) continue;
 
             if (!t_chapter.TryGetStep(t_chapter.StepCount - 1, out var t_last) || !t_last.LeavesScene)
                 Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}('{t_chapter.Label}') 마지막 스텝이 씬을 떠나지 않습니다 — 챕터는 전투 스텝으로 끝나야 합니다.");

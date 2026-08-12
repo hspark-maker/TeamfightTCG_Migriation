@@ -337,11 +337,15 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
         int t_ownedInPage = 0;
 
+        // 안내는 이 페이지의 첫 꽂힌 칸 하나만 지목한다(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
+        bool t_anchorTaken = !_interactive;
+
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
             var t_slot = _slots[t_i];
             if (t_i >= t_shown)
             {
+                t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(false);
                 continue;
             }
@@ -349,6 +353,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 격자 채움 칸 — 도감에 없는 자리라 번호를 찍지 않는다(0이면 번호가 숨는다)
             if (t_i >= t_cards.Count)
             {
+                t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(true);
                 t_slot.Bind(null, false, 0);
                 if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
@@ -359,6 +364,10 @@ public class AlbumPageOverlayView : MonoBehaviour
             bool t_owned = ShownAsOwned(t_card);
             t_slot.gameObject.SetActive(true);
             t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
+
+            bool t_anchor = !t_anchorTaken && t_owned;
+            t_anchorTaken |= t_anchor;
+            t_slot.ApplyTutorialAnchor(t_anchor);
 
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;

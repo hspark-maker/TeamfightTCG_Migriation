@@ -38,7 +38,24 @@ public class AlbumCardSlotView : MonoBehaviour
     [Tooltip("포켓 바닥에 찍히는 도감 번호. 카드보다 뒤라 카드가 꽂히면 가려진다. 번호는 오버레이가 테마 내 통번호로 넘긴다.")]
     [SerializeField] TMP_Text numberLabel;
 
+    // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다(AlbumThemeCellView와 같은 관용구)
+    bool m_anchored;
+
     public Button Button => button;
+
+    /// <summary>이 칸을 튜토리얼 안내 타깃으로 세우거나 내린다. 칸은 페이지를 넘길 때마다 다른 카드로 다시
+    /// 묶이므로 프리팹 표식(TutorialAnchor)을 붙일 수 없다 — 지금 무엇이 꽂혀 있는지 아는 오버레이가 정한다.</summary>
+    public void ApplyTutorialAnchor(bool _on)
+    {
+        if (_on == m_anchored) return;
+        m_anchored = _on;
+
+        var t_rect = button != null ? button.transform as RectTransform : null;
+        if (t_rect == null) return;
+
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.AlbumCardSlot, t_rect, button);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.AlbumCardSlot, t_rect);
+    }
 
     /// <summary>씰 뒷면. 칸의 그림이 하나의 프리팹에서 온다는 것을 보장하는 창구다.</summary>
     public Image SleeveImage => sleeveImage;
@@ -70,6 +87,12 @@ public class AlbumCardSlotView : MonoBehaviour
             numberLabel.gameObject.SetActive(_number > 0);
             if (_number > 0) numberLabel.text = _number.ToString("000");
         }
+    }
+
+    // 칸은 꺼지거나 다른 카드로 갈린다 — 죽은 칸을 가리키는 등록이 남지 않게 여기서 놓는다
+    void OnDisable()
+    {
+        ApplyTutorialAnchor(false);
     }
 
     // 빈 칸의 밝기는 **씰 그림**이 정한다. 누를 수 있는지(interactable)가 정하게 두면,

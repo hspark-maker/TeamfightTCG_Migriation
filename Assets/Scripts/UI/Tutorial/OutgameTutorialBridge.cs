@@ -122,6 +122,15 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
+        // 랭크 승급 연출이 무대를 쥐고 있는 구간이다 — 걸 앵커도 없고 그려서도 안 된다(딤이 그 연출을 덮는다).
+        // 연출이 끝나는 신호만 기다린다.
+        if (m_step.Completion == EOutgameTutorialCompletion.RankEffect)
+        {
+            // 놓아줄 디렉터가 이 씬에 없으면 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
+            if (!LobbyRankEffectDirector.Exists) OnGateSatisfied();
+            return;
+        }
+
         // 삽입 연출은 스스로 손가락·문구를 띄운다 — 게이트를 겹쳐 걸지 않고 세션이 끝나기만 기다린다.
         // 연출 중 다른 탭으로 새면 그 탭 버튼이 꺼져(Focus가 대신한다) 뒤이어 그 탭을 가리키는 안내가 뜨지 못하므로,
         // 세션에게 이탈을 삼키라고 알린다.
@@ -167,9 +176,10 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        // 구매는 눌러도 실패할 수 있다(골드 부족) → 클릭을 완료로 넘기지 않는다. 딤만 유지하고
-        // 완료는 구매 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로).
+        // 구매·강화는 눌러도 실패할 수 있다(골드 부족·확률 실패) → 클릭을 완료로 넘기지 않는다. 딤만 유지하고
+        // 완료는 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로 겸 연출 관람로).
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Purchase
+                            || m_step.Completion == EOutgameTutorialCompletion.Enhance
             ? null
             : (Action)OnGateSatisfied;
 
@@ -230,6 +240,23 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnAlbumInsertFinished()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.AlbumInsert) return;
+
+        OnGateSatisfied();
+    }
+
+    // 랭크 연출 종료 신호. 보여줄 것이 없어 지나간 경우도 같은 신호로 온다.
+    void OnRankEffectFinished()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.RankEffect) return;
+
+        OnGateSatisfied();
+    }
+
+    // 강화 완료 신호. 성공한 강화의 연출·결과판이 다 끝나 상세로 돌아온 시점에만 온다 —
+    // 판정 순간에 넘겨받으면 다음 스텝(상세 닫기)이 연출을 통째로 잘라낸다.
+    void OnEnhanceSettled()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         OnGateSatisfied();
     }
@@ -302,6 +329,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
+        CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
+        LobbyRankEffectDirector.OnAnyFinished     += OnRankEffectFinished;
         m_subscribed = true;
     }
 
@@ -315,6 +344,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
+        CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
+        LobbyRankEffectDirector.OnAnyFinished     -= OnRankEffectFinished;
         m_subscribed = false;
     }
 }

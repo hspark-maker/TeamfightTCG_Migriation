@@ -110,7 +110,7 @@ public static class CardGrowthManager
         _step = default;
         if (_card == null) return false;
 
-        return Config.TryGetStep(_card, GrowthOf(_card).Level + 1, out _step);
+        return TryGetStepAt(_card, GrowthOf(_card).Level + 1, out _step);
     }
 
     // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
@@ -127,7 +127,7 @@ public static class CardGrowthManager
 
         if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!t_config.TryGetStep(_card, t_level + 1, out var t_step))
+        if (!TryGetStepAt(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         // 재화는 곡선이 정한다 — 진화 레벨(Lv5·Lv10)만 다이아를 물고 나머지는 골드다.
@@ -157,6 +157,19 @@ public static class CardGrowthManager
         s_growth.Clear();
         Save();
         OnGrowthChanged?.Invoke();
+    }
+
+    // 레벨 _level로 올리는 한 스텝. 곡선 조회를 여기 하나로 모으는 이유는 튜토리얼 보정 때문이다 —
+    // 안내가 강화를 시키는 동안은 비용을 0으로 눕히는데, 조회가 갈리면 화면엔 100골드가 뜨는데
+    // 실제로는 0이 나가고 잔액이 모자란 유저는 버튼이 비활성으로 굳는다(표시·활성 판정·소모가 같은 값을 봐야 한다).
+    static bool TryGetStepAt(CardData _card, int _level, out GrowthStep _step)
+    {
+        if (!Config.TryGetStep(_card, _level, out _step)) return false;
+
+        if (OutgameTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance))
+            _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
+
+        return true;
     }
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).

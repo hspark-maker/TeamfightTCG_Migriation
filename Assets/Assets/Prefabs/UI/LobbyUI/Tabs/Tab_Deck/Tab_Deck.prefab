@@ -243,6 +243,10 @@ MonoBehaviour:
   slotPrefab: {fileID: 2387532502086018912, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
   tabController: {fileID: 1165637426703706450}
   countText: {fileID: 2577396469901318872}
+  editToggleButton: {fileID: 0}
+  editToggleLabel: {fileID: 0}
+  editLabel: "\uD3B8\uC9D1"
+  doneLabel: "\uC644\uB8CC"
 --- !u!1 &3465362569220972208
 GameObject:
   m_ObjectHideFlags: 0
@@ -474,7 +478,7 @@ MonoBehaviour:
   m_ChildAlignment: 0
   m_StartCorner: 0
   m_StartAxis: 0
-  m_CellSize: {x: 480, y: 780}
+  m_CellSize: {x: 480, y: 600}
   m_Spacing: {x: 30, y: 40}
   m_Constraint: 1
   m_ConstraintCount: 2

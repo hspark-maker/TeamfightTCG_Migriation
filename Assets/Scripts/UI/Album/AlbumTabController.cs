@@ -134,8 +134,9 @@ public class AlbumTabController : MonoBehaviour
     {
         var t_themes = CardAlbum.Themes;
 
-        // 안내는 아직 안 꽂은 카드가 있는 첫 테마 한 칸만 지목한다(앵커는 키당 1건)
-        bool t_anchorTaken = false;
+        // 안내는 아직 안 꽂은 카드가 있는 첫 테마 한 칸만 지목한다(앵커는 키당 1건).
+        // 꽂을 것이 하나도 없으면 첫 테마를 대신 지목한다 — 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 간다.
+        int t_anchorIndex = FindAnchorThemeIndex(t_themes);
 
         if (galleryContent != null && cellTemplate != null)
         {
@@ -159,10 +160,7 @@ public class AlbumTabController : MonoBehaviour
                 m_cells[t_i].transform.SetSiblingIndex(t_i);
                 m_cells[t_i].gameObject.SetActive(true);
 
-                bool t_target = !t_anchorTaken && AlbumInsertMask.HiddenCountIn(t_themes[t_i]) > 0;
-                t_anchorTaken |= t_target;
-
-                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_target);
+                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_i == t_anchorIndex);
             }
 
             for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)
@@ -184,6 +182,15 @@ public class AlbumTabController : MonoBehaviour
         albumChest.Bind(t_info, ClaimAlbumReward);
 
         BindRewardSlots(CardAlbum.AlbumRewards);
+    }
+
+    // 안내가 지목할 테마 칸. 꽂을 카드가 남은 첫 테마가 우선이고, 없으면 첫 테마다(빈 갤러리면 -1).
+    static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
+    {
+        for (int t_i = 0; t_i < _themes.Count; t_i++)
+            if (AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
+
+        return _themes.Count > 0 ? 0 : -1;
     }
 
     void OpenTheme(AlbumTheme _theme)

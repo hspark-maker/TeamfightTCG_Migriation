@@ -73,6 +73,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitPurchase    => EOutgameTutorialCompletion.Purchase,
         EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
         EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
+        EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
+        EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -118,7 +120,9 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitAlbumInsert or
         EOutgameTutorialAction.AutoBattle      or
         EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       => false,
+        EOutgameTutorialAction.DeckGrant       or
+        EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.EnterFirstRank  => false,
 
         _ => true,
     };
@@ -130,7 +134,9 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitAlbumInsert or
         EOutgameTutorialAction.AutoBattle      or
         EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       => false,
+        EOutgameTutorialAction.DeckGrant       or
+        EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.EnterFirstRank  => false,
 
         _ => true,
     };
