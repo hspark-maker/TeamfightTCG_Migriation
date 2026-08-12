@@ -40,6 +40,10 @@ public class PackAcquireController : MonoBehaviour
     [Tooltip("모자란 가격 숫자의 색. 무채색 밑판이 '못 누른다'를 말하고 이 색이 '어디가 모자란가'를 말한다.")]
     [SerializeField] Color shortPriceColor  = new Color(0.95f, 0.30f, 0.28f, 1f);
     [SerializeField] Color normalPriceColor = Color.white;
+    [Tooltip("재구매 → 재개봉으로 갈아치울 때 화면을 덮는 플래시의 생김새. " +
+             "첫 구매(PackShowcaseController의 '구매 → 개봉 전환 플래시')와 같은 값으로 둘 것 — " +
+             "두 결제가 다른 사건으로 보이면 '또 샀다'가 읽히지 않는다.")]
+    [SerializeField] ScreenFlashCover retryFlash = new ScreenFlashCover();
 
     // 캐리어에서 받은 목적지 컨텍스트(Start에서 캡처, 이후 재판정 안 함).
     string m_nextScene;
@@ -60,12 +64,17 @@ public class PackAcquireController : MonoBehaviour
     // 저작된 유채색 밑판. 무채색으로 갈아끼우기 전에 한 번만 잡아 둔다 — 안 그러면 되돌아갈 자리를 잃는다.
     Sprite m_retryPlate;
 
+    // 결제는 끝났고 화면만 아직 안 갈아치운 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다
+    // (상점의 m_openPending과 같은 자리 — 그쪽은 오버레이를 열고, 여기는 세션을 갈아끼운다).
+    bool m_retrying;
+
     /// <summary>캐리어에 실린 개봉 세션을 뷰에 태운다. 오버레이가 열릴 때마다 호출된다
     /// — Start에 두면 오버레이는 한 번만 열리는 화면이 된다(재개봉 불가).</summary>
     public bool BeginSession()
     {
         // 카드 배치 전까지 아래 버튼들 숨김 — OnRevealComplete에서 함께 노출.
-        if (acquireButton != null) acquireButton.gameObject.SetActive(false);
+        // 획득의 조작 가능은 여기서 되살린다: 재구매 연출이 중간에 끊기면 잠근 채로 남아 출구가 죽는다.
+        if (acquireButton != null) { acquireButton.gameObject.SetActive(false); acquireButton.interactable = true; }
         if (retryButton != null) retryButton.gameObject.SetActive(false);
         m_left = false;
 
@@ -110,6 +119,10 @@ public class PackAcquireController : MonoBehaviour
         if (view != null) view.OnRevealComplete -= OnRevealComplete;
         if (acquireButton != null) acquireButton.onClick.RemoveListener(OnAcquirePressed);
         if (retryButton != null) retryButton.onClick.RemoveListener(OnRetryPressed);
+
+        // 화면이 꺼진 뒤 도착하는 임팩트 콜백은 세션을 되살릴 자리가 없다 — 여기서 미리 무효화한다.
+        // 남겨 두면 다음에 열렸을 때 이 플래그가 그대로 남아 재구매가 영영 막힌다.
+        m_retrying = false;
     }
 
     IEnumerator CloseNextFrame()
@@ -196,7 +209,7 @@ public class PackAcquireController : MonoBehaviour
     //   튜토리얼 중엔 이 버튼이 잠겨 있다. 신호를 늘리면 "구매 1회 : 스텝 1칸"이 도리어 어긋난다.
     void OnRetryPressed()
     {
-        if (m_left || m_pack == null || view == null) return;
+        if (m_left || m_retrying || m_pack == null || view == null) return;
 
         // 차감·소유·환급은 여기 한 곳에서만 일어난다(첫 구매와 같은 길). 실패면 차감 없이 돌아온다.
         var t_opened = CardPackOpener.TryPurchase(m_pack);
@@ -214,6 +227,34 @@ public class PackAcquireController : MonoBehaviour
 
         // 목적지 컨텍스트는 그대로 물려준다 — 어느 세션에서 획득을 누르든 나가는 곳은 같아야 한다.
         PackHandoff.Set(t_opened, m_pack, m_nextScene, m_startTutorial);
+
+        // 결제는 끝났다 — 화면이 덮이기 전까지 두 버튼 다 죽인다(획득으로 새어 나가면 방금 산 팩이 캐리어에 갇힌다).
+        m_retrying = true;
+        if (retryButton != null) retryButton.interactable = false;
+        if (acquireButton != null) acquireButton.interactable = false;
+
+        // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
+        // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.
+        // 연출을 세우지 못하면 예전처럼 즉시 갈아끼운다(연출은 있으면 좋은 것이지, 재개봉의 조건이 아니다).
+        // 팩이 저작한 모양 있는 전환은 넘기지 않는다(null) — 그것은 상점에서 개봉으로 건너올 때의 것이다.
+        // 여기서 같은 전환을 또 쓰면 방금 보던 카드가 통째로 가려지고, 팩의 서명이 개봉마다 반복돼 값을 잃는다.
+        if (PackPurchaseImpact.TryGet(this, out var t_impact))
+            t_impact.Play(retryButton != null ? (RectTransform)retryButton.transform : null, retryFlash, null, RestartSession);
+        else
+            RestartSession();
+    }
+
+    // 화면이 플래시로 덮인 순간 1회(끊겨도 임팩트가 반드시 부른다). 여기서만 세션을 갈아끼운다 —
+    // 결과 격자가 걷히고 팩이 서는 프레임이 덮개 밑에 숨어야 하드컷으로 드러나지 않는다.
+    void RestartSession()
+    {
+        if (!m_retrying) return;
+        m_retrying = false;
+
+        if (acquireButton != null) acquireButton.interactable = true;
+
+        // 덮이는 사이 화면을 떠났다면(획득·씬 전이) 되살릴 세션이 없다 — 캐리어는 다음 개봉이 소비한다.
+        if (m_left) return;
 
         view.ResetSession();   // 요약 상태를 되돌려야 BeginOpen의 재진입 가드가 풀린다.
         BeginSession();

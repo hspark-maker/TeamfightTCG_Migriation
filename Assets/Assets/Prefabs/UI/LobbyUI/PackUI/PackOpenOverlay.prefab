@@ -193,7 +193,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &703896174192520432
 Transform:
   m_ObjectHideFlags: 0
@@ -1203,6 +1203,20 @@ MonoBehaviour:
   disabledPlate: {fileID: 21300000, guid: fdde60a141a004135a65e1d7c313a5a1, type: 3}
   shortPriceColor: {r: 0.95, g: 0.3, b: 0.28, a: 1}
   normalPriceColor: {r: 1, g: 1, b: 1, a: 1}
+  retryFlash:
+    rise: 0.04
+    hold: 0.03
+    fall: 0.35
+    peak: 1
+    color: {r: 1, g: 1, b: 1, a: 1}
+    burstSprite: {fileID: 21300000, guid: 62d0e972baa374782ab656748c0269ad, type: 3}
+    burstColor: {r: 0.6, g: 0.65882355, b: 0.9764706, a: 1}
+    burstAlpha: 1
+    burstStartScale: 0.35
+    burstEndScale: 1.6
+    burstFall: 0.45
+    burstSpin: 0
+    burstAdditive: 1
 --- !u!114 &1623875942876989043
 MonoBehaviour:
   m_ObjectHideFlags: 0

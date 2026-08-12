@@ -46,11 +46,12 @@ public class PackPurchaseImpact : MonoBehaviour
     [SerializeField] float packFlashRise = 0.08f;
     [SerializeField] float packFlashFall = 0.18f;
 
-    [Header("화면 플래시")]
-    // 플래시의 '생김새'(차오르는 시간·머무는 시간·색·빛)는 여기 두지 않는다 — ScreenFlashCover가 그 단일 진실원이고
-    // 호출부(PackShowcaseController)가 인스펙터로 쥔다. 여기 남는 것은 '이 임팩트 안에서 언제 터지는가' 하나뿐이다.
-    [Tooltip("플래시가 차오르기 시작하는 시각(초). 팩이 부풀기를 마치는 시각(눌림+부풀기)과 맞춰야 " +
-             "정점에서 터지는 것으로 읽힌다 — 이르면 팩 반응이 잘리고, 늦으면 빈 박자가 생긴다.")]
+    [Header("화면 덮개")]
+    // 덮개의 '생김새'는 여기 두지 않는다 — 흰 플래시는 ScreenFlashCover, 모양 있는 전환은 팩 SO의 PackOpenTransition이
+    // 각자의 단일 진실원이다. 여기 남는 것은 '이 임팩트 안에서 언제 터지는가' 하나뿐이다.
+    [Tooltip("덮개가 차오르기 시작하는 시각(초). 흰 플래시든 모양 있는 전환이든 이 시각에 시작한다. " +
+             "팩이 부풀기를 마치는 시각(눌림+부풀기)과 맞춰야 정점에서 터지는 것으로 읽힌다 " +
+             "— 이르면 팩 반응이 잘리고, 늦으면 빈 박자가 생긴다.")]
     [SerializeField] float flashAt = 0.26f;
 
     static PackPurchaseImpact s_instance;
@@ -72,11 +73,12 @@ public class PackPurchaseImpact : MonoBehaviour
     }
 
     /// <summary>
-    /// 구매 임팩트를 즉시 재생한다. _onCover는 화면이 플래시로 완전히 덮인 순간 1회 불린다
+    /// 구매 임팩트를 즉시 재생한다. _onCover는 화면이 완전히 덮인 순간 1회 불린다
     /// — 개봉 화면은 반드시 그때 열어야 전환 프레임이 드러나지 않는다.
+    /// _transition이 저작돼 있으면 모양 있는 전환으로 덮고, 아니면 흰 플래시(_cover)로 덮는다.
     /// 연출이 어떤 이유로 끊겨도 _onCover는 반드시 불린다(카드는 이미 지급됐고, 화면을 못 보는 상태가 최악이다).
     /// </summary>
-    public void Play(RectTransform _packRect, ScreenFlashCover _cover, Action _onCover)
+    public void Play(RectTransform _packRect, ScreenFlashCover _cover, PackOpenTransition _transition, Action _onCover)
     {
         if (m_current != null && m_current.IsActive()) m_current.Kill();
 
@@ -96,10 +98,16 @@ public class PackPurchaseImpact : MonoBehaviour
 
         // OnKill은 덮어쓰기라 단계마다 걸 수 없다 — 정리는 여기 하나로 모아 마지막에 한 번만 건다.
         Action t_cleanup = StagePack(t_seq, _packRect);
-        StageScreenFlash(t_seq, t_style);
 
-        // 덮임 시각은 덮개가 정한다 — 이 값이 어긋나면 아직 비치는 화면 위에서 교체가 일어난다.
-        t_seq.InsertCallback(this.flashAt + t_style.rise, Fire);
+        // 모양 있는 전환과 흰 플래시는 택일이다 — 둘을 같이 켜면 흰 판 위로 와이프가 겹쳐 두 연출로 읽힌다.
+        // 전환은 다 덮인 시각을 스스로 알기에 통지도 자기가 한다.
+        if (!StageTransition(t_seq, _transition, Fire))
+        {
+            StageScreenFlash(t_seq, t_style);
+
+            // 덮임 시각은 덮개가 정한다 — 이 값이 어긋나면 아직 비치는 화면 위에서 교체가 일어난다.
+            t_seq.InsertCallback(this.flashAt + t_style.rise, Fire);
+        }
 
         // 정상 종료든 중단이든 여기로 온다 — 덮임 통지가 빠지면 개봉 화면이 영영 열리지 않는다.
         t_seq.OnKill(() => { Fire(); t_cleanup?.Invoke(); });
@@ -198,6 +206,20 @@ public class PackPurchaseImpact : MonoBehaviour
 
         // 잔해를 남기지 않는다(CoinBurstEffect.ClearCoins와 같은 정리 규칙).
         return () => { if (t_go != null) Destroy(t_go); };
+    }
+
+    // 팩마다 다른 모양·색으로 덮는 전환. 세웠으면 true — 그때는 흰 플래시를 켜지 않는다.
+    // 미저작이거나 프리팹 구성이 예상과 다르면 false로 물러난다(전환은 있으면 좋은 것이지, 개봉의 조건이 아니다).
+    bool StageTransition(Sequence _seq, PackOpenTransition _transition, Action _onCover)
+    {
+        if (_transition == null || !_transition.IsAuthored) return false;
+        if (!PackTransitionScreen.TryGet(out var t_screen)) return false;
+
+        var t_cover = t_screen.BuildCover(_transition, _onCover);
+        if (t_cover == null) return false;
+
+        _seq.Insert(this.flashAt, t_cover);
+        return true;
     }
 
     // 화면을 덮는 플래시. 설치할 자리가 없으면 이 축만 건너뛴다(전환이 하드컷으로 돌아갈 뿐이다).
