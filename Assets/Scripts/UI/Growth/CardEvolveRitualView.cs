@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.UI;
 
 // 카드 진화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 재탄생이다 — 카드가 떠오르며 금빛을 머금고(충전), 백열이 카드를 통째로 삼킨 뒤(정적),
@@ -7,7 +8,9 @@ using UnityEngine;
 //
 // 담금질(CardEnhanceRitualView)과 **같은 빛의 언어**를 쓴다 — 같은 화면에서 연달아 누르는 두 조작이라
 // 서로 다른 문법이면 같은 시스템으로 안 읽힌다. 갈라지는 것은 색과 어투뿐이다:
-//  · 카드가 떨지 않고 떠오른다(담금질은 움츠러들며 떤다) — 진화는 시달리는 것이 아니라 차오르는 것이다.
+//  · 카드가 떠오르며 떤다(담금질은 움츠러들며 떤다) — 진화는 시달리는 것이 아니라 차오르는 것이다.
+//    두 떨림은 결이 다르다: 담금질은 세 마디로 툭툭 끊어 흔들리고(두들겨 맞는 것),
+//    진화는 마디 없이 진폭이 연속으로 커지다 백열이 삼키며 멎는다(안에서 차오르는 압력).
 //  · 잉걸이 아니라 금빛에서 출발한다(색은 shading의 저작값이 정한다).
 //  · 정점에 오래 머물고 빛이 천천히 물러난다. 담금질이 "터진다"면 이쪽은 "드러난다".
 //  · 실패의 얼굴이 없다 — 진화 레벨의 성공률은 1이다.
@@ -15,7 +18,11 @@ public class CardEvolveRitualView : CardGrowthRitualView
 {
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 부양이 보이지 않는다.")]
-    [SerializeField] RectTransform cardStage;                                   // 부양·확대를 받는 노드(CardSlot)
+    [SerializeField] RectTransform cardStage;                                   // 부양·진동·확대를 받는 노드(CardSlot)
+    [Tooltip("cardStage 자신의 AspectRatioFitter(FitInParent). 연출 동안만 재운다 —\n" +
+             "  이 모드는 레이아웃 리빌드마다 anchoredPosition을 0으로 못 박아 부양·진동을 지운다.\n" +
+             "  미배선이면 그냥 그 위험을 안고 돈다(리빌드가 안 끼면 보이지 않는다).")]
+    [SerializeField] AspectRatioFitter stageFitter;
     [SerializeField] RetractingPanels retractPanels = new RetractingPanels();   // 연출 동안 사라졌다 돌아올 패널들
 
     [Header("연출 레이어")]
@@ -45,6 +52,15 @@ public class CardEvolveRitualView : CardGrowthRitualView
     [SerializeField] float gleamSweep     = 0.22f;                              // 빠른 줄기 — 갓 태어난 것을 스친다
     [SerializeField] float gleamGap       = 0.06f;                              // 두 줄기 사이의 빈 자리. 0이면 한 줄로 뭉쳐 읽힌다
     [SerializeField] float gleamSweepSlow = 0.5f;                               // 느린 줄기 — 표면을 닦아 낸다
+
+    [Header("진동 — 차오르는 것을 못 견딘다")]
+    [Tooltip("담금질의 세 마디 진동과 갈리는 지점이다 — 이쪽은 마디가 없다.\n" +
+             "  진폭이 0에서 연속으로 커지다 백열에 삼켜지며 멎는다. 마디를 넣으면 두 연출이 같은 것이 된다.")]
+    [Range(0f, 1f)] [SerializeField] float tremorStart   = 0.85f;               // 충전의 어디서 떨기 시작하나(줄기 셋째가 켜지는 자리)
+    [SerializeField] float tremorAmp     = 7f;                                  // 정점 진폭(px). 담금질(9)보다 작아야 '두들겨 맞는 것'이 안 된다
+    [SerializeField] float tremorHz      = 26f;                                 // 떨림의 잦기. 높을수록 '견디는 중'으로 읽힌다
+    [Range(0f, 1f)] [SerializeField] float tremorPeak    = 0.35f;               // 백열의 어디서 정점을 찍나. 충전이 아니라 여기까지 자라야 blaze로 이어진다
+    [Range(0f, 1f)] [SerializeField] float tremorSurface = 0.6f;                // 함께 도는 표면 픽셀 진동의 세기(shading.Shake)
 
     [Header("빛줄기 박자")]
     [SerializeField] float rayIgniteDur = 0.26f;                                // 줄기 하나가 뻗어 나오는 시간
@@ -112,8 +128,38 @@ public class CardEvolveRitualView : CardGrowthRitualView
     Vector2 m_baseAnchored;   // cardStage의 authoring 자리. 중간값을 기준으로 잡으면 반복할수록 밀린다
     bool    m_baseCaptured;
 
+    // 무대의 자리는 부양과 진동이 함께 정한다. 둘이 각자 anchoredPosition을 밀면 나중 트윈이 앞 트윈을 지운다.
+    float m_lift;
+    float m_tremorAmp;
+    float m_tremorPhase;
+
     protected override bool  HasStage       => this.cardStage != null;
     protected override float ReturnDuration => this.returnDuration;
+
+    /// <summary>충전이 밀어 올린 높이(px).</summary>
+    float Lift
+    {
+        get => this.m_lift;
+        set { this.m_lift = value; ApplyStagePose(); }
+    }
+
+    /// <summary>진동의 위상(라디안). 매 프레임 도는 축이라 자세를 여기서 다시 그린다.</summary>
+    float TremorPhase
+    {
+        get => this.m_tremorPhase;
+        set { this.m_tremorPhase = value; ApplyStagePose(); }
+    }
+
+    /// <summary>0 멎음 ~ 1 정점. 몸통과 표면이 같은 세기로 함께 떤다 — 따로 두면 두 물건이 떠는 것으로 보인다.</summary>
+    float TremorAmp
+    {
+        get => this.m_tremorAmp;
+        set
+        {
+            this.m_tremorAmp   = value;
+            this.shading.Shake = value * this.tremorSurface;
+        }
+    }
 
     // 두 줄기는 순차다(판이 한 장이라 겹칠 수 없다) — 그래서 길이가 더해진다.
     float GleamSpan => this.shading.HasGleam
@@ -125,13 +171,50 @@ public class CardEvolveRitualView : CardGrowthRitualView
     float RevealSettle => Mathf.Max(Mathf.Max(0.05f, this.burstSettle),
                                     Mathf.Max(GleamSpan, this.rays.RetractSpan));
 
+    Tween TweenLift(float _to, float _dur)      => DOTween.To(() => this.Lift,      _v => this.Lift      = _v, _to, _dur);
+    Tween TweenTremorAmp(float _to, float _dur) => DOTween.To(() => this.TremorAmp, _v => this.TremorAmp = _v, _to, _dur);
+
+    // 부양과 진동을 한 자리에서 합성한다. 진동은 난수가 아니라 어긋난 두 주기의 겹침이다 —
+    // 불티(CardEnhanceEmbers)와 같은 이유로 같은 진화는 매번 같아야 한다.
+    void ApplyStagePose()
+    {
+        if (this.cardStage == null) return;
+
+        Vector2 t_off = Vector2.zero;
+
+        if (this.m_tremorAmp > 0f)
+        {
+            float t_p = this.m_tremorPhase;
+            float t_a = this.m_tremorAmp * this.tremorAmp;
+
+            t_off.x = (Mathf.Sin(t_p)                 * 0.7f + Mathf.Sin(t_p * 2.3f + 0.7f) * 0.3f) * t_a;
+            t_off.y = (Mathf.Sin(t_p * 1.37f + 1.1f)  * 0.7f + Mathf.Sin(t_p * 3.1f + 2.2f) * 0.3f) * t_a * 0.75f;
+        }
+
+        this.cardStage.anchoredPosition = this.m_baseAnchored + new Vector2(0f, this.m_lift) + t_off;
+    }
+
+    // 축만 0으로 되돌린다(자세는 건드리지 않는다) — 이어받는 길에서 앞 판이 남긴 높이가 다음 부양의 출발점이 되면 카드가 내려간다.
+    void ClearStageAxes()
+    {
+        this.m_lift        = 0f;
+        this.m_tremorPhase = 0f;
+        this.TremorAmp     = 0f;
+    }
+
     // 재질 사본은 미리 만들어 둔다(진화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
     // 평상시까지 얹어두면 카드가 연출 셰이더로 그려져 상세창 좌우 전환의 페이드에서 색이 틀어진다.
     void Awake() => this.shading.Warm();
 
     void OnDestroy() => this.shading.Release();
 
-    protected override void AttachLayers() => this.shading.Attach();
+    protected override void AttachLayers()
+    {
+        this.shading.Attach();
+
+        // 피터가 깨어 있으면 리빌드 한 번에 카드가 제자리로 튄다(shading.Attach와 같은 수명 — 연출 동안만).
+        if (this.stageFitter != null) this.stageFitter.enabled = false;
+    }
 
     /// <summary>재탄생 한 판. _outcome은 언제나 Success다 — 진화 레벨의 성공률은 1이고,
     /// 실패가 생긴다면 그때는 담금질이 그 얼굴을 맡아야 한다(여기에 실패의 얼굴을 덧대지 말 것).</summary>
@@ -152,6 +235,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
         BuildEnter(_seq, 0f, t_enterDur, _chained);
         BuildCharge(_seq, t_charge, t_chargeDur);
+
+        // 진동은 충전 끝을 넘어 백열까지 이어진다 — 그래서 충전이 아니라 여기서 짠다.
+        BuildTremor(_seq, t_charge, t_chargeDur, t_blaze, t_blazeDur);
 
         // 줄기 회전은 백열(blaze·hold)을 지나 공개까지 물고 이어진다 — hold 안에서 끝나면 백지라 아무도 못 본다.
         BuildBlaze(_seq, t_blaze, t_blazeDur, t_blazeDur + t_holdDur + t_revealOut * 0.6f);
@@ -202,6 +288,8 @@ public class CardEvolveRitualView : CardGrowthRitualView
     {
         if (!this.m_baseCaptured) return;
 
+        ClearStageAxes();   // 자세를 못 박기 전에 축부터 — 남은 높이·진폭이 다음 판의 출발점이 되면 안 된다
+
         if (this.cardStage != null)
         {
             this.cardStage.anchoredPosition = this.m_baseAnchored;
@@ -219,6 +307,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
         // 중립값으로 되돌린 **뒤** 재질을 벗는다(담금질과 같은 규약 — 걸친 채 두면 페이드 구간에서 색이 틀어진다).
         this.shading.Detach();
 
+        // 자리를 되돌린 뒤에 깨운다 — 먼저 깨우면 그 프레임의 리빌드가 원복과 겹친다.
+        if (this.stageFitter != null) this.stageFitter.enabled = true;
+
         this.retractPanels.Reset();
     }
 
@@ -228,6 +319,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
     void BuildEnter(Sequence _seq, float _at, float _dur, bool _chained)
     {
         _seq.InsertCallback(_at, () => this.retractPanels.SetBlocking(false));
+
+        // 이어받는 길엔 RestoreVisual이 지나가지 않는다 — 앞 판이 남긴 높이에서 부양이 출발하면 카드가 내려간다.
+        _seq.InsertCallback(_at, ClearStageAxes);
 
         this.retractPanels.Insert(_seq, _at, 0f, _dur);   // 이어받는 경우엔 이미 걷혀 있어 제자리 트윈이다.
 
@@ -282,10 +376,38 @@ public class CardEvolveRitualView : CardGrowthRitualView
     void BuildChargeLift(Sequence _seq, float _at, float _dur)
     {
         for (int t_i = 0; t_i < RayCues.Length; t_i++)
-        {
-            float t_to = this.m_baseAnchored.y + this.liftDistance * LiftSteps[t_i];
-            _seq.Insert(_at + _dur * RayCues[t_i], this.cardStage.DOAnchorPosY(t_to, 0.18f).SetEase(Ease.OutCubic));
-        }
+            _seq.Insert(_at + _dur * RayCues[t_i],
+                        TweenLift(this.liftDistance * LiftSteps[t_i], 0.18f).SetEase(Ease.OutCubic));
+    }
+
+    // 진동. 마디가 없는 것이 이 구간의 뜻이다 — 줄기가 다 켜진 자리에서 시작해 백열 한복판에서 정점을 찍고,
+    // 빛이 카드를 다 삼킬 때 멎는다. 충전 안에서 끝내면 '차오르다 만 것'이 되어 blaze로 이어지지 않는다.
+    void BuildTremor(Sequence _seq, float _chargeAt, float _chargeDur, float _blazeAt, float _blazeDur)
+    {
+        float t_from = _chargeAt + _chargeDur * Mathf.Clamp01(this.tremorStart);
+        float t_rise = Mathf.Max(0.05f, _blazeAt + _blazeDur * Mathf.Clamp01(this.tremorPeak) - t_from);
+        float t_hold = _blazeDur * 0.15f;
+        float t_fall = _blazeDur * 0.3f;
+        float t_span = t_rise + t_hold + t_fall;
+
+        _seq.InsertCallback(t_from, ClearStageAxesButLift);
+
+        // 위상은 끊기지 않는 한 줄이다 — 나눠 꽂으면 이음매마다 떨림이 한 번 튄다.
+        _seq.Insert(t_from, DOTween.To(() => this.TremorPhase, _v => this.TremorPhase = _v,
+                                       t_span * this.tremorHz * Mathf.PI * 2f, t_span).SetEase(Ease.Linear));
+
+        _seq.Insert(t_from, TweenTremorAmp(1f, t_rise).SetEase(Ease.InQuad));
+        _seq.Insert(t_from + t_rise + t_hold, TweenTremorAmp(0f, t_fall).SetEase(Ease.OutQuad));
+
+        // 멎은 자리를 못 박는다 — 잘린 프레임에서 어긋난 채 굳으면 백열이 비뚤어진 실루엣으로 선다.
+        _seq.InsertCallback(t_from + t_span, () => { this.TremorAmp = 0f; ApplyStagePose(); });
+    }
+
+    // 진동만 0에서 출발시킨다. 부양은 이미 올라와 있으므로 함께 지우면 카드가 툭 떨어진다.
+    void ClearStageAxesButLift()
+    {
+        this.m_tremorPhase = 0f;
+        this.TremorAmp     = 0f;
     }
 
     // 표면. 골은 계속 올라가고 마루만 새로 갱신된다 — "추세는 상승, 최고점만 갱신".
