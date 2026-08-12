@@ -33,8 +33,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: ""
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 1
     cardFocusSlot: 0
   - kind: 1
@@ -46,8 +46,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: ""
-    bannerAnchor: 2
-    targetBannerAnchor: 0
+    bannerAnchor: 4
+    targetBannerAnchor: 1
     cardFocusSide: 2
     cardFocusSlot: 0
   - kind: 0
@@ -59,8 +59,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 1
     targetGuideMessage: "\uC774\uC81C \uACF5\uACA9\uD560 \uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE8\uB77C\uBCF4\uC138\uC694."
-    bannerAnchor: 0
-    targetBannerAnchor: 2
+    bannerAnchor: 1
+    targetBannerAnchor: 4
     cardFocusSide: 0
     cardFocusSlot: 0
   - kind: 0
@@ -72,8 +72,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 1
     targetGuideMessage: "\uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE8\uB77C \uACF5\uACA9\uD558\uC138\uC694."
-    bannerAnchor: 0
-    targetBannerAnchor: 2
+    bannerAnchor: 1
+    targetBannerAnchor: 4
     cardFocusSide: 0
     cardFocusSlot: 0
   - kind: 1
@@ -85,8 +85,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: ""
-    bannerAnchor: 1
-    targetBannerAnchor: 0
+    bannerAnchor: 2
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
   enemyScript:
@@ -99,8 +99,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: ""
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
   freePlayAfterScript: 1

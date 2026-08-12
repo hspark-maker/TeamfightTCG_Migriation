@@ -10576,6 +10576,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
   - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
+  attackerSlot: 0
+  defenderSlot: 0
   useSpecialCinema: 0
   useExecution: 0
   killWeakerSide: 1
@@ -52586,7 +52588,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10.161365}
+  m_LocalPosition: {x: 0, y: 0, z: -11.749078}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -52676,8 +52678,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.563  \uAC70\uB9AC 10.16  \uBC30\uC728 0.92\n\uAC00\uC2DC \xB13.30
-    x \xB15.87  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.486  \uAC70\uB9AC 11.75  \uBC30\uC728 1.07\n\uAC00\uC2DC \xB13.30
+    x \xB16.78  (\uB2F4\uC744 \uC601\uC5ED \xB13.30 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!114 &963194232
 MonoBehaviour:

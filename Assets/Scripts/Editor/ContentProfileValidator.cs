@@ -68,18 +68,18 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         if (t_registry != null)
         {
             int t_liveCount = 0;
-            int t_testCount = 0;
             var t_registered = new HashSet<CardData>();
             foreach (CardData t_card in t_registry.All)
             {
                 if (t_card == null) { t_errors.Add("CardRegistry에 null 슬롯 존재"); continue; }
                 if (!t_registered.Add(t_card)) t_errors.Add($"CardRegistry 중복 카드: {t_card.name}");
                 if (t_card.channel == ECardChannel.Live) t_liveCount++;
-                else t_testCount++;
             }
 
+            // Live 0장은 빈 게임이라 진짜 오류다. TestOnly 0장은 아니다 —
+            // Test 프로필은 IncludeTestCards로 TestOnly 카드를 **덤으로 더** 실을 뿐이라,
+            // 0장이면 테스트 빌드가 Live와 같은 카드 목록을 쓰는 정상 상태다(전 카드 출시 = 이 상태).
             if (t_liveCount == 0) t_errors.Add("Live 카드가 없음");
-            if (t_testCount == 0) t_errors.Add("TestOnly 카드가 없음");
             foreach (CardData t_card in LoadAll<CardData>())
                 if (!t_registered.Contains(t_card))
                     t_errors.Add($"CardRegistry 미등록 카드: {t_card.name}");

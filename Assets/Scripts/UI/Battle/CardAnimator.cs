@@ -470,12 +470,15 @@ public class CardAnimator : MonoBehaviour
 
     // 사망 연출 형태값(거리·배율이라 시간이 아니다 → BattleTimingConfig가 아니라 여기).
     const float DEATH_LIFT_DISTANCE = 0.18f;   // 사라지며 떠오르는 거리(월드)
-    const float DEATH_SHRINK        = 0.92f;   // 끝 크기 배율(0까지 찌그러뜨리지 않는다)
-    // 디졸브 사망에서 장식(아이콘·프레임 등)이 사라지는 시간 = 사망 길이의 이 비율.
-    // 클립이 정보·키워드를 지우는 지점(0.25/0.767)에 맞춘 값 — 카드가 다 녹기 전에 끝나야 한다.
-    const float DEATH_DECOR_FADE_RATIO = 0.33f;
+    const float DEATH_POP_SCALE     = 1.18f;   // 바닥 파동이 터지는 순간의 최대 배율(부풀었다 터지는 그림)
+    const float DEATH_SHRINK        = 0.45f;   // 팝 뒤 급격히 줄어드는 끝 배율
+    // 팝 이후 남은 시간 중 **실제로 줄어드는** 비율. 나머지는 정지 — "빠르게" 줄어야 터진 것으로 읽힌다.
+    const float DEATH_SHRINK_RATIO  = 0.45f;
 
-    /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 축소 → 페이드아웃.
+    /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 <b>한 번 부풀었다가</b> 급격히 축소 + 페이드아웃.
+    /// 부푸는 정점은 바닥 파동(DeathNova)이 터지는 시각(<c>DeathNovaAt</c>)에 맞춘다 — 파동과 카드가
+    /// 같은 순간에 터져야 "여기서 터져 사라졌다"로 읽힌다. 파동을 쏘는 쪽은 <see cref="CardView"/>이고,
+    /// 두 곳이 같은 <c>GameTiming</c> 값을 공유해 박자를 맞춘다.
     /// 별가루·바닥 파동 파티클은 여기 없다 — 스폰 좌표와 정렬 레이어를 아는 <see cref="CardView"/>가 쏜다.
     /// 여기는 트윈만 소유한다.</summary>
     public async UniTask PlayDeathAnim(float _duration = -1f)
@@ -516,12 +519,19 @@ public class CardAnimator : MonoBehaviour
             }
         }
 
+        // 팝의 정점 = 바닥 파동이 터지는 시각. 그 뒤 남은 시간의 일부만 써서 확 줄인다.
+        float t_popDur    = Mathf.Clamp(GameTiming.Battle.DeathNovaAt, 0.01f, _duration);
+        float t_shrinkDur = Mathf.Max(0.01f, (_duration - t_popDur) * DEATH_SHRINK_RATIO);
+
         var t_seq = DOTween.Sequence()
             .SetLink(gameObject)
             .Join(transform.DOLocalMoveY(t_liftFrom.y + DEATH_LIFT_DISTANCE,
                                          Mathf.Min(GameTiming.Battle.DeathLift, _duration))
                            .SetEase(Ease.OutCubic))
-            .Join(transform.DOScale(Vector3.one * DEATH_SHRINK, _duration).SetEase(Ease.OutQuad));
+            // 두 스케일 트윈은 시간이 겹치지 않는다(두 번째가 첫 번째가 끝나는 지점에서 시작).
+            .Insert(0f, transform.DOScale(Vector3.one * DEATH_POP_SCALE, t_popDur).SetEase(Ease.OutQuad))
+            .Insert(t_popDur, transform.DOScale(Vector3.one * DEATH_SHRINK, t_shrinkDur)
+                                       .SetEase(Ease.OutQuint));
         // 흰 플래시는 **페이드 사망 전용**이다. 디졸브 클립은 자체 엣지 발광(HDR)을 갖고 있어
         // 그 위에 흰 판을 덧대면 카드가 통째로 하얗게 날아간다(과노출).
         if (this.dieOverlay != null && !t_dissolving)
@@ -535,17 +545,22 @@ public class CardAnimator : MonoBehaviour
         // 이게 없으면 카드가 다 녹은 자리에 아이콘만 떠 있는다.
         // 예외는 디졸브 렌더러(Frame/Illustration) 둘뿐 — 얘들은 사라지는 방식이 셰이더라,
         // 알파까지 같이 내리면 엣지 발광이 먼저 흐려져 녹는 게 안 보인다.
-        // 디졸브일 땐 짧게 — 클립이 정보/키워드를 0.25초(전체 0.767초의 1/3)에 이미 지운다.
-        // 나머지 장식도 같은 박자로 지워야 카드가 다 녹은 뒤 아이콘만 떠 있지 않는다.
-        float t_fadeDuration = t_dissolving ? _duration * DEATH_DECOR_FADE_RATIO : _duration;
+        // 페이드는 **줄어드는 구간에 붙인다** — 부푸는 동안은 또렷하게 보이고 터지면서 함께 사라져야
+        // "부풀었다 터졌다"로 읽힌다. 부푸는 동안 이미 흐려지면 그냥 흐지부지 사라진 것이 된다.
+        // 디졸브에도 같은 창을 쓴다: 창이 끝나는 시점(팝+축소)이 클립이 다 녹는 _duration보다 앞이라
+        // "카드가 다 녹은 자리에 아이콘만 떠 있는" 문제는 그대로 막힌다.
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay) continue;
             if (t_dissolving && IsDissolveRenderer(t_sr)) continue;
-            _ = t_seq.Join(t_sr.DOFade(0f, t_fadeDuration).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_sr.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            _ = t_seq.Join(t_tmp.DOFade(0f, t_fadeDuration).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_tmp.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
+
+        // 연출 길이의 주인은 여전히 _duration이다. 팝+축소가 그보다 먼저 끝나도 시퀀스를 끝까지 붙잡는다 —
+        // 디졸브 클립은 이 시퀀스 밖에서 _duration 동안 돌고, 호출부는 시퀀스 완료를 사망 완료로 본다.
+        _ = t_seq.InsertCallback(_duration, () => { });
 
         try
         {

@@ -75,13 +75,13 @@ MonoBehaviour:
   finishOut: 0.16
   finishCreep: 0.9
   finishSlow: 0.4
-  finishBgmPitch: 0.82
+  finishBgmPitch: 1
   resultBeatIn: 0.08
   resultBeatHold: 0.2
   resultBeatOut: 0.12
   resultBeatSlow: 0.25
   resultBeatBlur: 0.45
-  resultBeatBgmPitch: 0.88
+  resultBeatBgmPitch: 1
   resultBeatLoseRatio: 0.7
   resultBeatAfterFinish: 0.12
   mulliganNoticeHold: 1.2

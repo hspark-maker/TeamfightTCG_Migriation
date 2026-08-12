@@ -777,10 +777,25 @@ public class CardView : MonoBehaviour
         foreach (ParticleSystem t_ps in GetComponentsInChildren<ParticleSystem>(true))
             t_ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-        // 사망 자리에 쏘던 별가루·바닥 파동(DeathStardust·DeathNova)은 뺐다 —
-        // 디졸브 클립이 사라지는 연출을 통째로 갖고 있어서 그 위에 파티클을 얹으면 화면만 지저분해진다.
-        // 사망 연출의 주인은 클립 하나다.
-        await this.cardAnim.PlayDeathAnim(t_duration);
+        // 사망 파티클은 **카드에 붙이지 않는다**. 붙이면 위 Stop 루프와 사망 직후 HideSlot이 카드를 끄면서
+        // 별가루까지 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
+        // 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
+        Vector3 t_deathPosition = transform.position;
+
+        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
+        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
+
+        // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
+        // 결정타 구간에서 그 초과분에 슬로우 배율이 곱해진다.
+        float t_novaDelay = Mathf.Min(GameTiming.Battle.DeathNovaAt, t_duration);
+        bool t_cancelled = await UniTask.Delay(
+                (int)(t_novaDelay * 1000f),
+                cancellationToken: this.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (!t_cancelled)
+            BattleVfx.Play(BattleVfxId.DeathNova, t_deathPosition, VfxSortingLayerId);
+
+        await t_cardAnim;
     }
 
     /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).
@@ -879,6 +894,34 @@ public class CardView : MonoBehaviour
 
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();
+
+    // ── 공격 중 최상위 정렬 ────────────────────────────────────────────────
+    // 카드 한 장의 정렬 주인은 루트 SortingGroup 하나다(자식 렌더러 order는 그 안에서만 유효).
+    // 원래 order는 첫 상승 때 한 번만 붙잡는다 — 상승 중에 다시 읽으면 상승값이 원래값으로 굳는다.
+    UnityEngine.Rendering.SortingGroup sortingGroup;
+    int  baseSortingOrder;
+    bool sortingCaptured;
+
+    // 이 레이어의 order 계약(PrefabEmblem 주석과 같은 값): 카드 1 · 시너지 몸짓 2 · 전투 VFX 20~40.
+    // 상승값은 그 사이에 둔다 — 카드(1)보다는 확실히 위, **타격/투사체 VFX(20~)보다는 아래**.
+    // 여기서 VFX 대역을 넘기면(예: 500) 돌진해 겹친 공격자 카드가 자기 타격 이펙트를 덮어버린다.
+    const int AttackSortingOrder = 10;
+
+    /// <summary>공격 연출 동안 이 카드를 다른 카드 위로 올린다(끝나면 false로 원복).
+    /// 돌진·시네마에서 공격자가 이웃 카드 뒤로 파고드는 것을 막는 유일한 지점.
+    /// SortingGroup이 없는 프리팹이면 무동작.</summary>
+    public void SetAttackRaised(bool _on)
+    {
+        if (!this.sortingCaptured)
+        {
+            this.sortingGroup     = GetComponent<UnityEngine.Rendering.SortingGroup>();
+            this.baseSortingOrder = this.sortingGroup != null ? this.sortingGroup.sortingOrder : 0;
+            this.sortingCaptured  = true;
+        }
+        if (this.sortingGroup == null) return;
+
+        this.sortingGroup.sortingOrder = _on ? AttackSortingOrder : this.baseSortingOrder;
+    }
 
     // 보드 전체 페이드 셰임. 본체는 BattleBoardView.
     // TODO: 호출부 이관 후 삭제
