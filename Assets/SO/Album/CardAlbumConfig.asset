@@ -21,7 +21,7 @@ MonoBehaviour:
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
-      amount: 1000
+      amount: 50
       icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
     pages:
     - pageId: P1
@@ -80,11 +80,11 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   albumRewards:
   - currency: 0
-    amount: 15000
+    amount: 3000
     icon: {fileID: 21300000, guid: cb9ac5c430df5468c8ecf26434823ecb, type: 3}
   - currency: 1
-    amount: 5000
+    amount: 100
     icon: {fileID: 21300000, guid: e0940f4e599044730b69eb2f0af6617d, type: 3}
   - currency: 2
-    amount: 1000
+    amount: 30
     icon: {fileID: 21300000, guid: 58716c3f53a384ba7992b78410462bfe, type: 3}
