@@ -162,6 +162,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 프레임·아트만 보는 열람 모드. 창이 열려 있는 동안만 유지한다(OnDisable에서 내린다).
     bool m_artOnly;
 
+    // 강화·진화 조작을 통째로 걷은 채 여는 모드. 카드팩 개봉 결과처럼 "방금 뽑은 것을 확인하는 자리"에서 쓴다 —
+    // 그 자리에서 재화를 쓰게 두면 개봉 흐름이 갈라지고, 담금질·진화 연출이 개봉 화면 위에서 한 번 더 돈다.
+    // 여는 쪽이 매번 정하므로(Open) 내릴 곳은 따로 두지 않는다.
+    bool m_readOnly;
+
+    // 다른 캔버스 위로 올라타기 위해 확보한 Canvas. 창이 열려 있는 동안만 순서를 덮어쓰고 닫히면 되돌린다 —
+    // 상시 최상단으로 두면 로비 쪽 레이어(획득 연출 등)와의 현재 순서까지 뒤집힌다.
+    Canvas m_sortingCanvas;
+
+    // 로비에 배치된 authoring 크기(상단 재화 바를 비켜 앉은 값). 다른 화면 위로 올라탈 때 화면 전체로 폈다가
+    // 여기로 되돌린다. 최초 1회만 잡는다 — 매번 읽으면 이미 편 값을 기준으로 잡아 되돌아갈 자리를 잃는다
+    // (EnsureSlideBase와 같은 관용구).
+    Vector2 m_baseOffsetMin;
+    Vector2 m_baseOffsetMax;
+    bool    m_baseRectCaptured;
+
     // 결과판의 "한 번 더". 무대가 돌아오기 전에 다음 연출을 시작하면 두 연출이 같은 노드를 두고 싸운다 →
     // 복귀가 끝나는 시점까지 눌린 사실만 들고 있는다.
     bool m_retryQueued;
@@ -201,14 +217,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>_cards[_index]의 상세를 띄우고, 좌우로 같은 목록 안을 순환하며 넘겨볼 수 있게 한다.
     /// _cards는 "화면에 보이는 순서" 그대로여야 한다 — 넘기는 방향과 도감 배열이 어긋나면 길을 잃는다.
-    /// null 슬롯(미authoring 카드)은 그대로 넘겨도 된다. 넘기기가 알아서 건너뛴다.</summary>
-    public static void Open(IReadOnlyList<CardData> _cards, int _index)
+    /// null 슬롯(미authoring 카드)은 그대로 넘겨도 된다. 넘기기가 알아서 건너뛴다.
+    ///
+    /// _readOnly면 강화·진화 조작을 통째로 걷고 표시만 한다(카드팩 개봉 결과처럼 "확인하는 자리"용).
+    /// _sortingOrder가 0이 아니면 그 순서로 올라타고 화면을 통째로 덮는다 — 아래 <see cref="LiftAbove"/> 참고.</summary>
+    public static void Open(IReadOnlyList<CardData> _cards, int _index, bool _readOnly = false, int _sortingOrder = 0)
     {
         if (_cards == null || _cards.Count == 0) return;
 
         CardDetailOverlayView t_view = Resolve();
         if (t_view == null) return;
 
+        t_view.m_readOnly = _readOnly;
+        t_view.LiftAbove(_sortingOrder);
         t_view.Show(_cards, _index);
     }
 
@@ -227,8 +248,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 도감/생산 타일은 ScrollRect 안에 있어서 스크롤 드래그가 클릭으로 새면 안 된다.
     ///
     /// 목록을 값이 아니라 **참조**로 잡아둔다 — 컨트롤러가 같은 List 인스턴스를 재사용해 다시 채우면
-    /// 이미 배선된 타일들도 재배선 없이 최신 내용을 넘겨보게 된다(대신 인덱스 정합은 컨트롤러 책임이다).</summary>
-    public static void BindTile(CardVisualView _tile, IReadOnlyList<CardData> _cards, int _index)
+    /// 이미 배선된 타일들도 재배선 없이 최신 내용을 넘겨보게 된다(대신 인덱스 정합은 컨트롤러 책임이다).
+    ///
+    /// _readOnly·_sortingOrder는 <see cref="Open(IReadOnlyList{CardData}, int, bool, int)"/>에 그대로 실려 간다.</summary>
+    public static void BindTile(CardVisualView _tile, IReadOnlyList<CardData> _cards, int _index,
+                                bool _readOnly = false, int _sortingOrder = 0)
     {
         if (_tile == null || _cards == null) return;
 
@@ -236,7 +260,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_press == null) return;
 
         // 대입(+= 아님) — 타일이 재사용·재바인딩돼도 이전 콜백이 겹쳐 남지 않는다(CardElement와 같은 관용구).
-        t_press.OnTap = () => Open(_cards, _index);
+        t_press.OnTap = () => Open(_cards, _index, _readOnly, _sortingOrder);
     }
 
     // 오버레이는 씬에 **비활성**으로 배치된다. 비활성 오브젝트는 Awake가 돌지 않아
@@ -255,6 +279,79 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         return s_instance;
+    }
+
+    /// <summary>이 오버레이가 _sortingOrder 자리에 그려지게 한다(0이면 아무것도 하지 않는다 = 부모 캔버스를 그대로 따른다).
+    ///
+    /// 필요한 이유: 이 화면은 로비 캔버스 안에 있어(sortingOrder 0) 그보다 위에 뜨는 별도 캔버스 —
+    /// 카드팩 개봉 화면(100) 같은 것 — 위에서 열면 그 뒤에 가려 보이지 않는다. 두 캔버스 모두 Overlay 루트라
+    /// 계층상의 앞뒤(sibling)로는 순서가 정해지지 않고 sortingOrder만이 답이다.
+    ///
+    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
+    /// 떨어져 나온다 — 없으면 눈에는 위에 보이는데 탭은 밑 화면이 먹는다.
+    /// 컴포넌트를 없으면 붙여 쓰는 것은 이 파일의 CanvasGroup 확보(EnsureSlideBase)와 같은 관용구다.
+    ///
+    /// ⚠ 한 번 붙인 두 컴포넌트는 떼지 않는다(다음 열기에 다시 쓴다) → 되돌리는 일은 DropLift가
+    ///   **값 전부**를 원위치시키는 것으로 한다. 어느 한 값이라도 남으면 그 컴포넌트가 계속 그 값으로 산다.
+    ///
+    /// 크기도 함께 편다: 이 화면은 로비에 <b>상단 재화 바를 비켜</b> 앉아 있다(그 바 높이만큼 위가 잘린 채 배치).
+    /// 그 바가 없는 화면 위로 올라타면 잘린 띠로 아래 화면이 그대로 비친다 — 올라탄 동안에는 화면을 통째로 덮는다.
+    /// 두 일을 한 메서드가 맡는 이유는 조건이 같기 때문이다: "남의 화면 위에 올라탄다"는 하나의 사건이다.</summary>
+    void LiftAbove(int _sortingOrder)
+    {
+        if (_sortingOrder == 0)
+        {
+            DropLift();
+            return;
+        }
+
+        if (this.m_sortingCanvas == null)
+        {
+            this.m_sortingCanvas = GetComponent<Canvas>();
+            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
+        }
+
+        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+
+        this.m_sortingCanvas.overrideSorting = true;
+        this.m_sortingCanvas.sortingOrder    = _sortingOrder;
+
+        SetFullScreen(true);
+    }
+
+    /// <summary>덮어쓴 순서를 되돌린다(컴포넌트는 남기고 값만 내린다 — 다음 열기에 다시 쓴다).
+    /// 도감에서 여는 평상시 경로가 이 상태를 전제로 한다: 순서를 로비 캔버스 안의 제자리로 돌려놔야
+    /// 획득 연출 같은 뒤 레이어와의 앞뒤가 지금까지와 같다.
+    ///
+    /// sortingOrder까지 0으로 되돌리는 이유: Overlay 캔버스의 레이캐스트 우선순위는 overrideSorting이 아니라
+    /// sortingOrder 값 그 자체를 읽는다. 숫자를 남겨두면 렌더는 제자리로 돌아왔는데 입력만 101에 남아,
+    /// 나중에 상세 위에 뜨는 화면이 생기면 "보이는 건 위 화면인데 탭은 상세가 먹는" 역전이 된다.</summary>
+    void DropLift()
+    {
+        SetFullScreen(false);
+
+        if (this.m_sortingCanvas == null) return;
+
+        this.m_sortingCanvas.overrideSorting = false;
+        this.m_sortingCanvas.sortingOrder    = 0;
+    }
+
+    /// <summary>이 오버레이를 부모(SafeArea) 가득 펴거나 authoring 크기로 되돌린다.
+    /// 자식들은 위쪽 앵커라 루트가 위로 펴지면 함께 올라온다 — 상단 바가 없는 화면에서는 그 자리를 회수하는 것이 맞다.
+    /// 되돌릴 값은 최초 1회만 잡는다(위 m_baseOffset* 주석).</summary>
+    void SetFullScreen(bool _on)
+    {
+        RectTransform t_rect = (RectTransform)transform;
+
+        if (!this.m_baseRectCaptured)
+        {
+            this.m_baseRectCaptured = true;
+            this.m_baseOffsetMin    = t_rect.offsetMin;
+            this.m_baseOffsetMax    = t_rect.offsetMax;
+        }
+
+        t_rect.offsetMin = _on ? Vector2.zero : this.m_baseOffsetMin;
+        t_rect.offsetMax = _on ? Vector2.zero : this.m_baseOffsetMax;
     }
 
     void Awake()
@@ -343,6 +440,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
+
+        // 빌린 순서와 크기를 돌려준다. 열람 전용도 여는 쪽이 매번 정하는 값이라 여기서 함께 내린다 —
+        // 남겨두면 도감에서 연 다음 창이 상단 바를 덮은 채, 조작도 없는 화면이 된다.
+        DropLift();
+        this.m_readOnly = false;
     }
 
     void OnDestroy()
@@ -805,8 +907,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_evolve = this.evolveButton != null && t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
-        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(_owned && !t_evolve);
-        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(_owned &&  t_evolve);
+        // 열람 전용도 같은 길로 내린다: 바 자체는 이미 걷혀 있지만, 그 안에서 살아 있는 버튼을 남겨 두면
+        // 알파만 0인 채로 탭을 먹는다(blocksRaycasts는 창을 여는 순서에 따라 늦게 내려갈 수 있다).
+        bool t_actions = _owned && !this.m_readOnly;
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve);
+        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(t_actions &&  t_evolve);
 
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
@@ -1070,6 +1175,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void ShowBottomBar()
     {
         if (this.bottomBarGroup == null) return;
+
+        // 열람 전용에는 되돌릴 바가 없다. 바를 되부르는 경로가 여럿이라(창 열기·연출 복귀·결과판 종료)
+        // 각 호출처에 조건을 흩지 않고 여기 한 곳에서 막는다 — 걷은 상태가 곧 이 모드의 평상시다.
+        if (this.m_readOnly) { HideBottomBar(); return; }
 
         this.bottomBarGroup.DOKill();
         this.bottomBarGroup.blocksRaycasts = true;

@@ -158,6 +158,10 @@ public class PackCardView : MonoBehaviour
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
 
+    /// <summary>카드 비주얼 노드. 탭을 받는 것이 이 노드다(LongPressDetector가 여기 붙어 있다) —
+    /// 결과 격자가 상세 열기를 물릴 때 쓴다. 이 클래스 자신은 여전히 입력을 모른다(헤더 주석 참고).</summary>
+    public CardVisualView Visual => this.cardVisual;
+
     // 카드 한 장 통째로 페이드하는 손잡이(밀어내기가 쓴다). 프리팹에 없으면 인스턴스에 붙여준다 —
     // 이 값이 알파를 쥐는 단일 지점이라, 프리팹에 컴포넌트가 있든 없든 페이드는 항상 성립한다.
     CanvasGroup m_group;

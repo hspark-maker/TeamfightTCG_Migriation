@@ -40,6 +40,10 @@ public class PackResultGrid : MonoBehaviour
 
     readonly List<PackCardView> m_views = new List<PackCardView>();
 
+    // 상세에서 좌우로 넘겨볼 목록 = 격자에 놓인 카드들, 놓인 순서 그대로. 상세 오버레이가 이것을 **참조**로 쥐므로
+    // 인스턴스를 갈아치우지 않고 Clear + 재충전만 한다(CardDetailOverlayView.BindTile 주석과 같은 규약).
+    readonly List<CardData> m_order = new List<CardData>();
+
     CanvasGroup m_panel;
 
     /// <summary>결과 카드를 3열로 세우고 패널을 띄운다. _instant면 페이드도 팝도 없이 곧장 최종 상태(스킵 경로).</summary>
@@ -89,6 +93,7 @@ public class PackResultGrid : MonoBehaviour
 
         float t_scale = CardScale();
         int t_rows = Mathf.CeilToInt(t_count / (float)COLUMN_COUNT);
+        int t_detailOrder = DetailSortingOrder();   // 카드마다 캔버스를 거슬러 올라갈 이유가 없다
 
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
@@ -105,6 +110,12 @@ public class PackResultGrid : MonoBehaviour
 
             int t_index = m_views.Count;
             m_views.Add(t_view);
+            m_order.Add(t_drawn.Card);
+
+            // 카드를 누르면 그 카드의 상세가 이 화면 위에 뜬다. 강화·진화는 걷은 채로 연다 —
+            // 여기는 방금 뽑은 것을 확인하는 자리라, 그 자리에서 재화를 쓰기 시작하면 개봉 흐름이 갈라진다.
+            CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index,
+                                           _readOnly: true, _sortingOrder: t_detailOrder);
 
             var t_rt = (RectTransform)t_view.transform;
             t_rt.anchoredPosition = SlotPosition(t_index, t_count, t_rows);
@@ -167,12 +178,37 @@ public class PackResultGrid : MonoBehaviour
         return t_count;
     }
 
+    // 격자를 비우는 곳이자 상세를 닫는 곳. 두 일을 여기 하나로 묶는 이유는 상세가 m_order를 **참조**로 쥐기
+    // 때문이다 — 격자가 걷히는 길(오버레이 닫기·"한 번 더" 재개봉·다음 Show)은 전부 여기를 지난다.
+    //
+    // 상세는 이 화면과 다른 캔버스(로비)에 있어 결과 격자가 사라져도 저 혼자 떠 있는다. 그래서 닫는 일이 필요하다.
+    // 닫아도 퇴장 트윈이 도는 동안(0.15s)은 살아 있어 목록이 빈 창을 잠깐 보게 되는데, 그 구간은 이미
+    // 입력이 닫혀 있고 표시 갱신 경로가 모두 null 카드를 견디므로 그대로 둔다(순서로 막는 것이 아니다).
+    //
+    // ⚠ Close는 전역 싱글턴을 끈다 — "이 화면이 연 상세만" 닫는 것이 아니다.
+    //   지금은 개봉 중에 다른 경로로 상세를 열 길이 없어 문제가 되지 않는다.
     void Clear()
     {
+        CardDetailOverlayView.Close();
+
         for (int t_i = 0; t_i < m_views.Count; t_i++)
             if (m_views[t_i] != null) Destroy(m_views[t_i].gameObject);
 
         m_views.Clear();
+        m_order.Clear();
+    }
+
+    // 상세가 이 화면 위에 뜨기 위한 순서. 상세 오버레이는 로비 캔버스 안에 있고 개봉 화면은 그보다 위에 뜨는
+    // 별도 캔버스라, 그 값을 읽어 한 칸 위로 올린다 — 숫자를 여기 적어 두면 개봉 캔버스를 옮길 때 조용히 어긋난다.
+    int DetailSortingOrder()
+    {
+        Canvas t_canvas = GetComponentInParent<Canvas>();
+        if (t_canvas == null) return 0;   // 0 = 순서를 건드리지 않는다(상세가 제 캔버스의 제자리에 뜬다)
+
+        // 중첩 캔버스는 스스로 순서를 덮어쓰지 않는 한 루트의 순서로 그려진다 — 그 실제 값을 봐야 한다.
+        int t_order = t_canvas.overrideSorting ? t_canvas.sortingOrder : t_canvas.rootCanvas.sortingOrder;
+
+        return t_order + 1;
     }
 
     RectTransform ResolveContent()
