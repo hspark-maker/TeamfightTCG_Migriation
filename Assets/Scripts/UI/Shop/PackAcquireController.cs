@@ -40,6 +40,12 @@ public class PackAcquireController : MonoBehaviour
     [Tooltip("모자란 가격 숫자의 색. 무채색 밑판이 '못 누른다'를 말하고 이 색이 '어디가 모자란가'를 말한다.")]
     [SerializeField] Color shortPriceColor  = new Color(0.95f, 0.30f, 0.28f, 1f);
     [SerializeField] Color normalPriceColor = Color.white;
+    [Tooltip("개봉 화면 위에 띄우는 잔액 표시들(재화별로 한 장씩). 이번 팩의 결제 재화 하나만 켜진다.\n\n" +
+             "개봉 화면이 로비를 통째로 덮어 로비 재화 바가 보이지 않는다 — 되사기로 재화가 빠지는데 " +
+             "줄어드는 숫자가 화면에 없으면 유저는 얼마가 남았는지 모른 채 반복 구매한다.\n\n" +
+             "여기 넣는 CurrencyHud는 'Register As Primary'를 반드시 꺼 둘 것(그 필드 툴팁 참고). " +
+             "미배선이면 잔액 표시 없이 예전처럼 돈다.")]
+    [SerializeField] CurrencyHud[] balanceHuds;
     [Tooltip("재구매 → 재개봉으로 갈아치울 때 화면을 덮는 플래시의 생김새. " +
              "첫 구매(PackShowcaseController의 '구매 → 개봉 전환 플래시')와 같은 값으로 둘 것 — " +
              "두 결제가 다른 사건으로 보이면 '또 샀다'가 읽히지 않는다.")]
@@ -73,8 +79,7 @@ public class PackAcquireController : MonoBehaviour
     public bool BeginSession()
     {
         // 카드 배치 전까지 아래 버튼들 숨김 — OnRevealComplete에서 함께 노출.
-        // 획득의 조작 가능은 여기서 되살린다: 재구매 연출이 중간에 끊기면 잠근 채로 남아 출구가 죽는다.
-        if (acquireButton != null) { acquireButton.gameObject.SetActive(false); acquireButton.interactable = true; }
+        if (acquireButton != null) acquireButton.gameObject.SetActive(false);
         if (retryButton != null) retryButton.gameObject.SetActive(false);
         m_left = false;
 
@@ -97,6 +102,7 @@ public class PackAcquireController : MonoBehaviour
         var t_opened = PackHandoff.Consume();
         CacheCards(t_opened);
         BindRetryPrice();
+        BindBalanceHud();
 
         view.BeginOpen(t_opened, m_pack);
         return true;
@@ -187,6 +193,21 @@ public class PackAcquireController : MonoBehaviour
             retryPriceText.color = t_allowed && !t_afford ? shortPriceColor : normalPriceColor;
     }
 
+    // 이번 팩의 결제 재화 잔액만 띄운다. 둘 다 띄우면 개봉 화면에서 쓰지도 않는 숫자가 하나 늘고,
+    // 유저가 두 값을 견주기 시작한다 — 여기서 답해야 할 질문은 "한 번 더 살 수 있나" 하나뿐이다.
+    // 차감 연출(롤다운+펄스)은 CurrencyHud가 OnCurrencySpent를 직접 받아 스스로 돈다 — 여기서 지시하지 않는다.
+    void BindBalanceHud()
+    {
+        if (balanceHuds == null) return;
+
+        for (int t_i = 0; t_i < balanceHuds.Length; t_i++)
+        {
+            if (balanceHuds[t_i] == null) continue;
+
+            balanceHuds[t_i].gameObject.SetActive(m_pack != null && balanceHuds[t_i].Type == m_pack.PriceType);
+        }
+    }
+
     // 한 번 더 버튼의 가격 표시. 세션당 한 번만 바뀐다(같은 팩을 되사므로 값이 움직이지 않는다).
     void BindRetryPrice()
     {
@@ -228,10 +249,10 @@ public class PackAcquireController : MonoBehaviour
         // 목적지 컨텍스트는 그대로 물려준다 — 어느 세션에서 획득을 누르든 나가는 곳은 같아야 한다.
         PackHandoff.Set(t_opened, m_pack, m_nextScene, m_startTutorial);
 
-        // 결제는 끝났다 — 화면이 덮이기 전까지 두 버튼 다 죽인다(획득으로 새어 나가면 방금 산 팩이 캐리어에 갇힌다).
+        // 결제는 끝났고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다 —
+        // 버튼을 죽이면 획득이 반투명 회색으로 사라지는 것이 덮이기 전 0.26초 동안 그대로 보인다
+        // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
         m_retrying = true;
-        if (retryButton != null) retryButton.interactable = false;
-        if (acquireButton != null) acquireButton.interactable = false;
 
         // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
         // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.
@@ -251,20 +272,24 @@ public class PackAcquireController : MonoBehaviour
         if (!m_retrying) return;
         m_retrying = false;
 
-        if (acquireButton != null) acquireButton.interactable = true;
-
         // 덮이는 사이 화면을 떠났다면(획득·씬 전이) 되살릴 세션이 없다 — 캐리어는 다음 개봉이 소비한다.
         if (m_left) return;
 
         view.ResetSession();   // 요약 상태를 되돌려야 BeginOpen의 재진입 가드가 풀린다.
-        BeginSession();
+        if (BeginSession()) return;
+
+        // 태우지 못하면 두 버튼이 이미 숨겨진 뒤라 출구 없는 빈 화면이 남는다 — 오버레이째 떨어뜨린다
+        // (PackOpenOverlay.Open이 같은 false를 받고 하는 일과 같은 처분).
+        Debug.LogWarning("[PackAcquireController] 재개봉 세션 시작 실패 — 오버레이를 닫는다.");
+        if (PackOpenOverlay.Instance != null) PackOpenOverlay.Instance.Close();
     }
 
     // 획득 클릭: 튜토리얼이면 시작 → 목적지 씬으로 이동(1회 가드).
     // 개봉 카드로 덱을 만들지 않는다 — 첫 덱은 부트의 StarterDeck이 보장하고, 이후 편성은 유저 몫이다.
     void OnAcquirePressed()
     {
-        if (m_left) return;
+        // 재구매가 화면을 덮는 중이면 나갈 수 없다 — 방금 산 팩이 캐리어에 갇힌 채 로비로 돌아간다.
+        if (m_left || m_retrying) return;
         m_left = true;
         RefreshRetryLock();   // 나가기로 한 뒤엔 되사기를 막는다(닫히는 프레임에 눌리는 것 차단).
 

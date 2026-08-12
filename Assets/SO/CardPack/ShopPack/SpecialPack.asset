@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\uC2A4\uD398\uC15C \uD329"
   packArt: {fileID: 21300000, guid: 3056f3fc00667944ba8bb3a369d731b1, type: 3}
   openTransition:
-    screenPrefab: {fileID: 5913652462422843508, guid: d58b751ee41bb264b9996465d05a5801, type: 3}
+    screenPrefab: {fileID: 5913652462422843508, guid: 660e175edf2e5c446b329e29faa02716, type: 3}
     fillColor: {r: 0.55, g: 0.36, b: 0.08, a: 1}
     fillSprite: {fileID: 0}
     fillMaterial: {fileID: 2100000, guid: a6e6f87444e825c469134295711171d2, type: 2}

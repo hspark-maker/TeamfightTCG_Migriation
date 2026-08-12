@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using TransitionScreenPackage;
 using UnityEngine;
@@ -38,6 +39,10 @@ public class PackTransitionScreen : MonoBehaviour
 
     // 한 번 훑는 데 걸리는 시간(원본 기준). 덮이는 구간(최장 1.33초) 안에 지나가야 걷힌 뒤 잔광이 남지 않는다.
     const float SHINE_SWEEP = 1.4f;
+
+    // 정사각 덮개를 화면보다 조금 크게 잡는 배수. 층마다 저작된 물림·오프셋이 몇 픽셀씩 어긋나므로
+    // 딱 맞게 잡으면 그 오차가 화면 가장자리의 실금으로 드러난다. 2%는 눈에 띄지 않는다.
+    const float COVER_OVERSCALE = 1.02f;
 
     static PackTransitionScreen s_instance;
 
@@ -126,13 +131,10 @@ public class PackTransitionScreen : MonoBehaviour
         var t_all = _instance.GetComponentsInChildren<Image>(true);
         for (int t_i = 0; t_i < t_all.Length; t_i++) t_all[t_i].raycastTarget = false;
 
-        // 모양을 만드는 층은 루트의 직속 자식들이다. Outlined 프리팹은 Mask 밖에 형제로 Outline 층을 하나 더 두는데,
-        // 그쪽도 같이 보정해야 한다 — 한쪽만 정사각으로 잡으면 테두리와 모양이 서로 다른 비율로 늘어나 어긋난다.
-        for (int t_i = 0; t_i < _instance.transform.childCount; t_i++)
-            SquareUp((RectTransform)_instance.transform.GetChild(t_i));
-
         var t_mask = _instance.GetComponentInChildren<Mask>(true);
         if (t_mask == null) return null;
+
+        SquareUpLayers(_instance.transform, t_mask.transform);
 
         var t_maskImage = t_mask.GetComponent<Image>();
 
@@ -142,7 +144,8 @@ public class PackTransitionScreen : MonoBehaviour
 
         // 팩 색을 입히는 대상은 마스크의 자식 그래픽뿐이다. 마스크 자신은 스텐실만 쓰므로(showMaskGraphic 꺼짐)
         // 여기서 색을 칠하면 아무 데도 나타나지 않고 모양 판정만 망친다.
-        // Outline 층도 일부러 건드리지 않는다 — 패키지가 흰 테두리로 저작한 그림이고, 팩 색으로 덮으면 테두리가 사라진다.
+        // Outline 층은 마스크의 부모라 이 순회에 걸리지 않는다 — 그게 맞다. 패키지가 흰 테두리로 저작한 그림이고
+        // 팩 색으로 덮으면 테두리가 사라진다.
         var t_graphics = t_mask.GetComponentsInChildren<Image>(true);
         for (int t_i = 0; t_i < t_graphics.Length; t_i++)
         {
@@ -171,20 +174,43 @@ public class PackTransitionScreen : MonoBehaviour
                                    1f, SHINE_SWEEP / _speed).SetEase(Ease.InOutSine));
     }
 
-    // 화면 긴 변 기준 정사각으로 잡는다. 모양의 비율을 지키면서 어느 화면비에서도 넘치게 덮는다.
-    // ⚠ 자가설치된 바로 그 프레임에는 캔버스 rect가 아직 0이다 — 그때 접어버리면 '첫 구매만 전환이 없다'가 되므로
-    //   화면 크기로 대신한다(이 캔버스는 CanvasScaler가 없어 rect가 곧 화면 픽셀이라 두 값이 같다).
-    void SquareUp(RectTransform _rect)
+    // 루트에서 마스크까지의 층들을 화면 긴 변 기준 정사각으로 못 박는다.
+    // 마스크 모양은 1920x1080 가로로 저작돼 있어 스트레치로 두면 세로 화면에서 2배 넘게 늘어난다.
+    //
+    // ⚠ 층이 하나가 아니다. Outlined 프리팹은 Outline > Mask > Background로 겹쳐 있고, 두 층이 부모 대비
+    //   안팎으로 백여 픽셀씩 물려 있다(테두리 그림과 모양 그림을 맞추려고 저작된 값이다).
+    //   스트레치 앵커에서 크기는 '부모 크기 + sizeDelta'이므로, 위층만 정사각으로 바꾸고 아래층을 그대로 두면
+    //   아래층 크기가 '정사각 − 100'이 되어 화면 위아래로 빈 띠가 드러난다.
+    //   그래서 물림을 누적해 각 층을 '정사각 + 누적치'로 절대 크기로 박는다 — 층 사이 관계는 그대로 남는다.
+    //   anchoredPosition은 손대지 않는다: 스트레치든 중앙 앵커든 그 값의 뜻이 '부모 중심에서의 오프셋'으로 같다.
+    void SquareUpLayers(Transform _root, Transform _mask)
     {
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)_root;
 
+        // ⚠ 자가설치된 바로 그 프레임에는 캔버스 rect가 아직 0이다 — 그때 접어버리면 '첫 구매만 전환이 없다'가 되므로
+        //   화면 크기로 대신한다(이 캔버스는 CanvasScaler가 없어 rect가 곧 화면 픽셀이라 두 값이 같다).
         float t_base = Mathf.Max(t_root.rect.width, t_root.rect.height);
         if (t_base <= 0f) t_base = Mathf.Max(Screen.width, Screen.height);
         if (t_base <= 0f) return;
 
-        _rect.anchorMin = _rect.anchorMax = _rect.pivot = new Vector2(0.5f, 0.5f);
-        _rect.anchoredPosition = Vector2.zero;
-        _rect.sizeDelta = new Vector2(t_base, t_base);
+        t_base *= COVER_OVERSCALE;
+
+        // 루트 → 마스크 경로를 위에서 아래 순서로 세운다(누적은 위에서부터여야 뜻이 맞다).
+        var t_chain = new List<RectTransform>();
+        for (Transform t_node = _mask; t_node != null && t_node != _root; t_node = t_node.parent)
+            if (t_node is RectTransform t_layer) t_chain.Add(t_layer);
+        t_chain.Reverse();
+
+        var t_inset = Vector2.zero;
+        for (int t_i = 0; t_i < t_chain.Count; t_i++)
+        {
+            var t_layer = t_chain[t_i];
+
+            t_inset += t_layer.sizeDelta;   // 아직 손대지 않은 값이라 여기서 읽는 것이 곧 저작된 물림이다.
+
+            t_layer.anchorMin = t_layer.anchorMax = t_layer.pivot = new Vector2(0.5f, 0.5f);
+            t_layer.sizeDelta = new Vector2(t_base + t_inset.x, t_base + t_inset.y);
+        }
     }
 
     // 패키지 프리팹이 들고 오는 자기 캔버스 한 벌을 걷는다. 정렬은 이 레이어가 쥔다(위 주석).

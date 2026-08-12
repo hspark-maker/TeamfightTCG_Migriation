@@ -18,6 +18,14 @@ public class CurrencyHud : MonoBehaviour
     // 다이아 등 다른 재화는 이 값만 바꿔 같은 컴포넌트를 재사용한다(연출 API도 종류를 따라간다).
     [SerializeField] ECurrencyType type = ECurrencyType.Gold;
 
+    [Tooltip("이 HUD를 그 재화의 대표(코인이 날아와 꽂히는 곳)로 등록할지.\n\n" +
+             "화면당 대표는 재화별로 딱 한 장이고, 겹치면 마지막에 켜진 쪽이 이긴다. " +
+             "그래서 로비 위에 잠깐 겹쳐 뜨는 화면(개봉 오버레이 등)에 잔액을 하나 더 두려면 " +
+             "반드시 이 값을 꺼야 한다 — 켜 두면 그 화면이 닫히는 순간 대표 자리가 통째로 비어(본인 등록만 지운다) " +
+             "로비 획득 연출의 코인이 날아갈 곳을 잃는다.\n\n" +
+             "끈다고 잃는 것은 도착 지점 자격뿐이다. 잔액 표시·소모 롤다운·펄스는 그대로 돈다.")]
+    [SerializeField] bool registerAsPrimary = true;
+
     [Tooltip("펄스로 튀길 노드. 미배선이면 이 컴포넌트가 붙은 노드(아이콘+숫자 묶음).\n" +
              "숫자 텍스트를 직접 물리지 말 것 — 그 rect는 LayoutGroup·ContentSizeFitter가 잡는 자식이라 " +
              "피벗이 묶음 한쪽으로 치우쳐 있고, 배율 축이 그 피벗이라 숫자가 옆으로 밀리듯 보인다.")]
@@ -37,6 +45,9 @@ public class CurrencyHud : MonoBehaviour
 
     /// <summary>수치 텍스트의 RectTransform. 코인이 날아와 꽂히는 **도착 지점**이다.</summary>
     public RectTransform TextRect => this.valueText != null ? (RectTransform)this.valueText.transform : null;
+
+    /// <summary>이 HUD가 맡은 재화. 결제 재화에 맞는 잔액만 띄우려는 화면이 본다.</summary>
+    public ECurrencyType Type => this.type;
 
     /// <summary>펄스로 튀길 노드. 도착 지점과 갈라 둔다 — 코인은 숫자에 꽂혀야 하지만,
     /// 튀는 것은 아이콘까지 묶은 덩어리여야 축이 그 한가운데에 선다.</summary>
@@ -112,7 +123,8 @@ public class CurrencyHud : MonoBehaviour
     void OnEnable()
     {
         // 종류별 1장. 같은 종류가 겹치면 마지막이 이긴다(예외 없이).
-        s_huds[this.type] = this;
+        // 종속 표시(registerAsPrimary=false)는 이 자리를 넘보지 않는다 — 자세한 이유는 그 필드 툴팁.
+        if (this.registerAsPrimary) s_huds[this.type] = this;
 
         // 활성화 시점의 실제 잔액으로 먼저 맞춘 뒤 이후 변경을 구독.
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;

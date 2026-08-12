@@ -171,6 +171,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: PackOpenOverlay
       objectReference: {fileID: 0}
+    - target: {fileID: 5895301881091186177, guid: 1d1367fb4b947b84e92369f7fc324787, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5895301881091186177, guid: 1d1367fb4b947b84e92369f7fc324787, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0.9542763
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
