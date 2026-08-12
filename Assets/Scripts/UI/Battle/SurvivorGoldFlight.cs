@@ -21,7 +21,12 @@ public class SurvivorGoldFlight
     [Tooltip("카드 줄이 서는 자리. 미배선이면 골드 아이콘에서 rowRise만큼 위.")]
     [SerializeField] RectTransform rowCenter;
 
-    [Tooltip("카드 테두리 스프라이트(아트 위에 얹힌다). 미배선이면 카드 아트 한 장만 날아간다.")]
+    [Tooltip("날아갈 카드 프리팹(CardVisualView). 카드 생김새의 단일 진실원이라 여기로 그리는 쪽이 정본이다. "
+           + "미배선이면 아래 아트+테두리로 흉내 낸다.")]
+    [SerializeField] CardVisualView cardPrefab;
+
+    [Tooltip("카드 테두리 스프라이트(아트 위에 얹힌다). cardPrefab 미배선일 때만 쓰는 폴백. "
+           + "미배선이면 카드 아트 한 장만 날아간다.")]
     [SerializeField] Sprite tileFrame;
 
     [Header("배치")]
@@ -78,12 +83,12 @@ public class SurvivorGoldFlight
     /// _onEachArrived는 같은 순간의 화면 반응(아이콘 펀치)용.
     /// 날릴 것이 없거나 레이어를 확보하지 못하면 null — 호출자가 이 축을 통째로 건너뛴다.
     /// </summary>
-    public Sequence Build(IReadOnlyList<Sprite> _arts, RectTransform _root, RectTransform _target,
+    public Sequence Build(IReadOnlyList<CardData> _cards, RectTransform _root, RectTransform _target,
                           Action<int, int> _onArrived, Action _onEachArrived = null)
     {
         Reset();
 
-        int t_count = _arts != null ? _arts.Count : 0;
+        int t_count = _cards != null ? _cards.Count : 0;
         if (t_count <= 0 || _root == null || _target == null) return null;
 
         RectTransform t_layer = EnsureLayer(_root);
@@ -95,8 +100,10 @@ public class SurvivorGoldFlight
                       : t_to + Vector2.up * this.rowRise;
 
         // 줄이 화면을 넘지 않게 줄째로 축소한다 — 칸마다 크기를 다르게 하면 "장수"가 아니라 "크기"가 읽힌다.
+        // 배치는 언제나 tileSize 기준이다(프리팹을 써도 화면에 보이는 크기는 같게 맞춘다 → RestScale).
         float t_span  = this.tileSize.x * t_count + this.tileSpacing * Mathf.Max(0, t_count - 1);
         float t_scale = t_span > this.maxRowWidth && t_span > 0f ? this.maxRowWidth / t_span : 1f;
+        float t_rest  = t_scale * RestScale();
         float t_step  = (this.tileSize.x + this.tileSpacing) * t_scale;
         float t_left  = t_row.x - t_step * (t_count - 1) * 0.5f;
 
@@ -108,7 +115,7 @@ public class SurvivorGoldFlight
 
         for (int t_i = 0; t_i < t_count; t_i++)
         {
-            RectTransform t_tile = CreateTile(_arts[t_i], t_layer);
+            RectTransform t_tile = CreateTile(_cards[t_i], t_layer);
             if (t_tile == null) continue;
 
             Vector2 t_home = new Vector2(t_left + t_step * t_i, t_row.y);
@@ -117,11 +124,11 @@ public class SurvivorGoldFlight
 
             float t_enterAt = t_enterStagger * t_i;
             t_seq.Insert(t_enterAt, t_tile.DOAnchorPos(t_home, this.enterDuration).SetEase(Ease.OutCubic));
-            t_seq.Insert(t_enterAt, t_tile.DOScale(t_scale, this.enterDuration).SetEase(Ease.OutBack));
+            t_seq.Insert(t_enterAt, t_tile.DOScale(t_rest, this.enterDuration).SetEase(Ease.OutBack));
 
             float t_flyAt = t_flyStart + t_flyStagger * t_i;
             t_seq.Insert(t_flyAt, t_tile.DOAnchorPos(t_to, this.flyDuration).SetEase(Ease.InBack));
-            t_seq.Insert(t_flyAt, t_tile.DOScale(t_scale * this.flyScale, this.flyDuration).SetEase(Ease.InQuad));
+            t_seq.Insert(t_flyAt, t_tile.DOScale(t_rest * this.flyScale, this.flyDuration).SetEase(Ease.InQuad));
 
             if (!Mathf.Approximately(this.flySpin, 0f))
             {
@@ -173,25 +180,64 @@ public class SurvivorGoldFlight
         return t_rt;
     }
 
-    // 아트가 없어도 자리는 지킨다 — 리스트에서 빼면 계단의 분모가 어긋나 마지막 한 장이 남은 금액을 다 실어 나른다.
-    RectTransform CreateTile(Sprite _art, RectTransform _layer)
+    // 프리팹은 원본 크기(420x558)를 유지한 채 배율만 줄인다 — sizeDelta를 강제하면 내부 비율 배치가 깨진다.
+    // CardGainFlightEffect.RestScale과 같은 관용구. 프리팹을 안 쓰면 타일이 이미 tileSize라 1.
+    float RestScale()
+    {
+        if (this.cardPrefab == null) return 1f;
+
+        float t_height = ((RectTransform)this.cardPrefab.transform).sizeDelta.y;
+        return t_height > 0f ? this.tileSize.y / t_height : 1f;
+    }
+
+    // 카드를 못 그려도 자리는 지킨다 — 리스트에서 빼면 계단의 분모가 어긋나 마지막 한 장이 남은 금액을 다 실어 나른다.
+    RectTransform CreateTile(CardData _card, RectTransform _layer)
+    {
+        RectTransform t_rt = this.cardPrefab != null && _card != null
+                           ? CreateFromPrefab(_card)
+                           : CreateFromArt(_card);
+
+        t_rt.SetParent(_layer, false);
+        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
+
+        this.m_tiles.Add(t_rt.gameObject);
+        return t_rt;
+    }
+
+    // 카드 생김새의 정본 경로. 이 줄은 장수를 세는 물건이라 이름·HP는 잔글씨로 뭉갠다 →
+    // 아트와 프레임만 남긴다(SetArtOnly는 값만 세우므로 Bind가 뒤에 와야 실제로 반영된다).
+    RectTransform CreateFromPrefab(CardData _card)
+    {
+        var t_view = UnityEngine.Object.Instantiate(this.cardPrefab);
+        t_view.SetArtOnly(true);
+        t_view.Bind(_card, true);   // 내가 전투에 들고 나온 카드다 — 소유는 확정.
+
+        // 팝업의 전체화면 터치(스킵·메인 이동)를 날아가는 카드가 가로채지 않게.
+        var t_group = t_view.GetComponent<CanvasGroup>();
+        if (t_group == null) t_group = t_view.gameObject.AddComponent<CanvasGroup>();
+        t_group.blocksRaycasts = false;
+        t_group.interactable   = false;
+
+        return (RectTransform)t_view.transform;
+    }
+
+    // 프리팹 미배선 폴백: 아트 한 장 + 테두리로 카드를 흉내 낸다.
+    RectTransform CreateFromArt(CardData _card)
     {
         var t_go = new GameObject("SurvivorTile", typeof(RectTransform));
         var t_rt = (RectTransform)t_go.transform;
-        t_rt.SetParent(_layer, false);
-        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
         t_rt.sizeDelta = this.tileSize;
 
-        if (_art != null) AddImage(t_go, _art, this.tileSize);
+        Sprite t_art = CardVisualRules.PickCardArt(_card);
+        if (t_art != null) AddImage(t_go, t_art, this.tileSize);
 
         if (this.tileFrame != null)
         {
             // 테두리는 아트 위에 얹힌다(카드 프리팹과 같은 순서) — 뒤에 깔면 아트에 가려 안 보인다.
-            GameObject t_frameHost = _art != null ? NewChild(t_rt) : t_go;
+            GameObject t_frameHost = t_art != null ? NewChild(t_rt) : t_go;
             AddImage(t_frameHost, this.tileFrame, this.tileSize);
         }
 
-        this.m_tiles.Add(t_go);
         return t_rt;
     }
 

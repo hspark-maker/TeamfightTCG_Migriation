@@ -22,6 +22,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.BattleStart:
             case EOutgameTutorialAction.WaitAlbumInsert:
             case EOutgameTutorialAction.WaitEnhance:
+            case EOutgameTutorialAction.WaitLobbyReturn:
                 return true;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);

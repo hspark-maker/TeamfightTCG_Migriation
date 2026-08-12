@@ -161,10 +161,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] float slideDistance = 120f;
     [SerializeField] float slideDuration = 0.18f;
 
-    /// <summary>강화가 **성공하고 그 연출·결과판까지 끝나 상세로 돌아온** 순간. 강화를 기다리는 바깥(튜토리얼 안내)이
-    /// 듣는 신호다 — 성장 통지(CardGrowthManager.OnGrowthChanged)로는 실패와 구분되지 않고, 결과가 나온 그 프레임에
-    /// 화면을 넘겨받으면 방금 쓴 비용의 결과를 보지 못한 채 연출이 잘린다.</summary>
-    public static event Action OnAnyEnhanceSettled;
+    /// <summary>강화가 무대를 쥐었다(연출 시작). 바깥의 안내는 여기서 자기 표시를 접어야 한다 —
+    /// 결과판이 하단 바 버튼을 "한 번 더"로 되살리므로, 접지 않으면 그 버튼 위에 손가락이 다시 떠서
+    /// 유저를 무한 재강화로 이끈다(결과판을 닫아야 오는 완료 신호에는 영영 닿지 못한다).</summary>
+    public static event Action OnAnyEnhanceStarted;
+
+    /// <summary>강화 한 방이 **연출·결과판까지 끝나 상세로 돌아온** 순간(성공·실패 모두). 강화를 기다리는
+    /// 바깥(튜토리얼 안내)이 듣는 신호다 — 성장 통지(CardGrowthManager.OnGrowthChanged)는 판정 그 프레임에 오므로,
+    /// 그걸로 화면을 넘겨받으면 방금 쓴 비용의 결과를 보지 못한 채 연출이 잘린다.</summary>
+    public static event Action<EnhanceResult> OnAnyEnhanceSettled;
+
+    /// <summary>이 창이 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
+    public static event Action OnAnyClosed;
+
+    /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
+    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
     static CardDetailOverlayView s_instance;
     static bool s_missingWarned;
@@ -499,6 +510,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         LiftAbove(false);
         SetFullScreen(false);
         this.m_readOnly = false;
+
+        // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 창의 상태를 다시 물어볼 수 있어야 한다.
+        OnAnyClosed?.Invoke();
     }
 
     void OnDestroy()
@@ -541,6 +555,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 화살표·스와이프가 전환을 시작하면 close 시퀀스와 같은 노드를 두고 싸운다.
         // 다시 열 때는 SetVisible(true) → OnEnable → RefreshArrows()가 되살린다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;
+
+        // 연타 예약도 여기서 끊는다. 퇴장은 트윈이라 OnDisable이 곧바로 오지 않는다 —
+        // 그 사이 예약이 살아 있으면 사라지는 창 위에서 다음 담금질이 시작되고, 그 연출이 퇴장을 덮어
+        // 창이 닫히지 않은 것처럼 보인다(바깥이 결과를 듣고 화면을 넘겨받는 경로에서 실제로 그랬다).
+        this.m_retryQueued = false;
 
         this.transition.SetVisible(gameObject, false);
     }
@@ -1124,7 +1143,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (!t_played || t_ritual == null)
         {
             AbortEnhance(t_card);
-            NotifyEnhanceSettled(t_result);   // 연출 없이 끝난 길이라 여기가 곧 "다 끝난" 시점이다
+
+            // 강화가 실제로 일어났는데 보여줄 연출만 없는 길이면 여기가 곧 "다 끝난" 시점이다.
+            // 결제 전에 막힌 경우(잔액 부족·만렙)는 아무 일도 없었으므로 알리지 않는다.
+            if (t_played) NotifyEnhanceSettled(t_result);
             return;
         }
 
@@ -1142,6 +1164,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhance는 이미 끝난 거래라
         // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
         LockControls();
+
+        // 무대를 쥐기 직전에 알린다 — 바깥의 안내가 결과판 위에 남지 않게(OnAnyEnhanceStarted 주석 참고).
+        OnAnyEnhanceStarted?.Invoke();
 
         t_ritual.Play(
             t_result.Outcome, _awaitReturn: this.resultPanel != null,
@@ -1194,7 +1219,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.
                 NotifyEnhanceSettled(t_result);
 
-                // 구독자가 창을 닫았으면(OnDisable) 예약도 함께 지워진다 — 그 경우 체인은 여기서 끝난다.
+                // 구독자가 이 결과를 듣고 창을 닫았다면 예약은 Hide가 이미 지웠다 — 체인은 여기서 끝난다.
                 if (!this.m_retryQueued) return;
 
                 this.m_retryQueued = false;
@@ -1227,9 +1252,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 기다리는 쪽(튜토리얼)은 "레벨이 올랐다"만 신호로 쓰고, 실패는 같은 자리에서 다시 누르는 일이다.
     static void NotifyEnhanceSettled(EnhanceResult _result)
     {
-        if (_result.Outcome != EEnhanceOutcome.Success) return;
-
-        OnAnyEnhanceSettled?.Invoke();
+        OnAnyEnhanceSettled?.Invoke(_result);
     }
 
     // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.

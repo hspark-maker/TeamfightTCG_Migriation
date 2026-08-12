@@ -81,6 +81,14 @@ public class AlbumPageOverlayView : MonoBehaviour
     int   m_dragDir;
     bool  m_refreshPending;
 
+    static AlbumPageOverlayView s_instance;
+
+    /// <summary>이 오버레이가 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
+    public static event System.Action OnAnyClosed;
+
+    /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
+    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+
     bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
 
     public int PageIndex => m_pageIndex;
@@ -178,6 +186,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void Awake()
     {
+        s_instance = this;
+
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (dimButton != null && dimButton.onClick.GetPersistentEventCount() > 0)
             Debug.LogWarning("[AlbumPageOverlayView] Dim에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
@@ -239,11 +249,16 @@ public class AlbumPageOverlayView : MonoBehaviour
         CancelFlip();
 
         transition.HandleDisabled(gameObject);
+
+        // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 오버레이의 상태를 다시 물어볼 수 있어야 한다.
+        OnAnyClosed?.Invoke();
     }
 
     void OnDestroy()
     {
         pageFlip.Dispose();
+
+        if (s_instance == this) s_instance = null;
     }
 
     void HandleChanged()

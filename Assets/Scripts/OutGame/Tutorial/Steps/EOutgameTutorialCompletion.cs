@@ -9,4 +9,5 @@ public enum EOutgameTutorialCompletion
     AlbumInsert, // 도감 삽입 세션의 종료가 완료
     Enhance,     // 클릭이 아니라 강화 "성공"이 완료(실패는 비용만 쓰고 그 자리에 남는다)
     RankEffect,  // 로비 랭크 연출이 끝나는 것이 완료(입력 없음 — 안내가 그 연출 위에 겹치지 않게 기다린다)
+    LobbyReturn, // 열려 있던 오버레이가 모두 닫혀 로비 표면이 드러나는 것이 완료
 }
