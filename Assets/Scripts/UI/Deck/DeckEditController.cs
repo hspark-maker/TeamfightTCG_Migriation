@@ -22,6 +22,7 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
+    [SerializeField] DeckSynergyStrip       synergyStrip;
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
@@ -85,6 +86,26 @@ public class DeckEditController : MonoBehaviour
             nameInput.onEndEdit.RemoveAllListeners();
             nameInput.onEndEdit.AddListener(OnNameEndEdit);
         }
+
+        // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
+        if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
+    }
+
+    // _synergy가 null이면 강조 해제. 편성 칸은 테두리 + 나머지 딤, 컬렉션 타일은 딤만 한다.
+    void ApplySynergyFocus(SynergyData _synergy)
+    {
+        bool t_focusing = _synergy != null;
+
+        if (slots != null)
+        {
+            for (int t_i = 0; t_i < slots.Length; t_i++)
+            {
+                if (slots[t_i] == null) continue;
+                slots[t_i].SetSynergyFocus(t_focusing, SynergyPreview.Has(slots[t_i].Card, _synergy));
+            }
+        }
+
+        if (collectionGrid != null) collectionGrid.SetSynergyFocus(_synergy);
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
@@ -184,6 +205,7 @@ public class DeckEditController : MonoBehaviour
 
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
+        if (synergyStrip   != null) synergyStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
@@ -218,6 +240,7 @@ public class DeckEditController : MonoBehaviour
         Array.Clear(m_working, 0, m_working.Length);
 
         if (dragController != null) dragController.Cancel();
+        if (synergyStrip   != null) synergyStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
     }
 
@@ -406,6 +429,7 @@ public class DeckEditController : MonoBehaviour
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
         if (totalHpText      != null) totalHpText.text = DeckPower.Of(m_working).ToString();
+        if (synergyStrip     != null) synergyStrip.Refresh(m_working);
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
                                                                    && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);

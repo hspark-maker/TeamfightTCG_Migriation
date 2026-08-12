@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 8536008210875763298}
   - component: {fileID: 4606277552250736698}
   - component: {fileID: 1089669665055985938}
+  - component: {fileID: 1089669665055985940}
   m_Layer: 0
   m_Name: DeckEditSlot
   m_TagString: Untagged
@@ -161,6 +162,7 @@ MonoBehaviour:
   cardVisual: {fileID: 7747075183359689411}
   emptyMark: {fileID: 5191217836908232406}
   highlightFrame: {fileID: 5453281548558494196}
+  canvasGroup: {fileID: 1089669665055985940}
 --- !u!1 &5191217836908232406
 GameObject:
   m_ObjectHideFlags: 0
@@ -440,3 +442,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f92e16a088dfa044946abea01651193, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CollectionCardView
+--- !u!225 &1089669665055985940
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2624108122495585723}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0

@@ -11,10 +11,8 @@ using UnityEngine.UI;
 public class SynergyCountIcon : MonoBehaviour,
     IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
 {
-    [SerializeField] Image     icon;
-    [SerializeField] TMP_Text  countText;
-    [SerializeField] GameObject activeRoot;    // 활성 표시(선택)
-    [SerializeField] GameObject inactiveRoot;  // 비활성 표시(선택)
+    [SerializeField] Image    icon;
+    [SerializeField] TMP_Text countText;
 
     [Header("Format")]
     [Tooltip("해제(기본): '현재/필요' 통상 표기. 체크: '필요/현재'로 뒤집기.")]
@@ -53,22 +51,28 @@ public class SynergyCountIcon : MonoBehaviour,
         SynergyData t_data   = _p.Synergy;
         bool        t_active = _p.IsActive;
 
+        // 비활성은 전용 disabled 스프라이트로 그린다. 어둡게 덮는 오버레이는 쓰지 않는다.
+        bool   t_hasDisabledArt = !t_active && t_data.inactiveIcon != null;
+        Sprite t_sprite         = t_hasDisabledArt ? t_data.inactiveIcon : t_data.activeIcon;
+
         // color 미배정(알파 0)이면 틴트 없이 원본 아이콘 그대로 — 안 그러면 투명해져서 안 보인다.
-        Color t_tint = this.tintBySynergyColor ? t_data.TintOrWhite : Color.white;
-        if (!t_active) t_tint.a *= this.inactiveAlpha;
+        // disabled 아트가 있으면 이미 회색으로 그려져 있으니 틴트도 알파도 건드리지 않는다(이중 감쇠 방지).
+        Color t_tint = Color.white;
+        if (!t_hasDisabledArt)
+        {
+            if (this.tintBySynergyColor) t_tint = t_data.TintOrWhite;
+            if (!t_active)               t_tint.a *= this.inactiveAlpha;
+        }
 
         if (this.icon != null)
         {
-            this.icon.sprite  = t_data.activeIcon;
-            this.icon.enabled = t_data.activeIcon != null;
+            this.icon.sprite  = t_sprite;
+            this.icon.enabled = t_sprite != null;
             this.icon.color   = t_tint;
         }
 
         if (this.countText != null)
             this.countText.text = BuildCount(_p);
-
-        if (this.activeRoot   != null) this.activeRoot.SetActive(t_active);
-        if (this.inactiveRoot != null) this.inactiveRoot.SetActive(!t_active);
     }
 
     /// <summary>필요 수는 '다음 티어'가 있으면 그 요구치, 최고 티어 도달이면 현재 열린 티어 요구치.

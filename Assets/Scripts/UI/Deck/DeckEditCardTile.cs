@@ -21,8 +21,12 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     [SerializeField] GameObject         inDeckOverlay;
     [SerializeField] CanvasGroup        canvasGroup;
 
+    const float IN_DECK_ALPHA = 0.45f;   // 이미 편성된 카드(클릭 대상 아님)
+    const float FOCUS_DIM_ALPHA = 0.2f;  // 시너지 강조 중 해당 없는 카드
+
     CardData                                       m_card;
     bool                                           m_inDeck;
+    bool                                           m_focusDimmed;
     PointerEventData                               m_pointerData;
     Action<DeckEditCardTile, PointerEventData>     m_onDragRequest;
     Action<DeckEditCardTile>                       m_onClick;
@@ -46,6 +50,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
             longPress.OnLongPress += OnLongPressFired;
         }
 
+        m_focusDimmed = false;
         SetInDeck(false);
     }
 
@@ -54,10 +59,28 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         m_inDeck = _on;
 
         if (inDeckOverlay != null) inDeckOverlay.SetActive(_on);
-        if (canvasGroup   != null) canvasGroup.alpha = _on ? 0.45f : 1f;
+        ApplyAlpha();
 
         // 발화 시점 가드(OnLongPressFired)와 별개로 타이머 자체를 꺼두는 2중 가드.
         if (longPress != null) longPress.enabled = !_on;
+    }
+
+    // 시너지 아이콘 롱프레스 중 호출. 해당 시너지가 없는 카드를 눌러 대상 카드만 남긴다.
+    public void SetSynergyFocus(bool _focusing, bool _match)
+    {
+        m_focusDimmed = _focusing && !_match;
+        ApplyAlpha();
+    }
+
+    // 딤 요인이 둘(장착중 / 시너지 강조 제외)이라 곱하지 않고 한 곳에서 우선순위로 정한다 —
+    // 두 곳에서 각자 alpha를 쓰면 해제 순서에 따라 흐린 채로 굳는다.
+    void ApplyAlpha()
+    {
+        if (canvasGroup == null) return;
+
+        canvasGroup.alpha = m_focusDimmed ? FOCUS_DIM_ALPHA
+                          : m_inDeck      ? IN_DECK_ALPHA
+                                          : 1f;
     }
 
     // 참조만 보관한다. StandaloneInputModule은 포인터 id별로 PointerEventData 인스턴스를 재사용·갱신하므로
