@@ -13,10 +13,6 @@ public class CardPackData : ScriptableObject
     [Tooltip("진열·개봉에 쓰는 팩 아트. 미지정이면 진열 뷰가 자기 기본 이미지를 유지한다.")]
     [SerializeField] Sprite packArt;
 
-    [Header("개봉 전환 (구매 → 개봉 화면)")]
-    [Tooltip("이 팩을 살 때 화면을 덮는 전환. 미저작이면 진열 뷰(PackShowcaseController)의 흰 플래시로 돈다.")]
-    [SerializeField] PackOpenTransition openTransition = new PackOpenTransition();
-
     [Header("가격·드로우")]
     [Tooltip("결제 재화.")]
     [SerializeField] ECurrencyType priceType = ECurrencyType.Gold;
@@ -43,7 +39,6 @@ public class CardPackData : ScriptableObject
     public string PackId => packId;
     public string DisplayName => displayName;
     public Sprite PackArt => packArt;
-    public PackOpenTransition OpenTransition => openTransition;
     public ECurrencyType PriceType => priceType;
     public long Price => price;
     public int DrawCount => drawCount;

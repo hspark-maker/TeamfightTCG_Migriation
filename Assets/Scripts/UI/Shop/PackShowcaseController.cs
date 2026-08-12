@@ -38,11 +38,9 @@ public class PackShowcaseController : MonoBehaviour
 
     // ScreenFlash·PackPurchaseImpact는 둘 다 런타임 자가설치라 프리팹에 배선할 자리가 없다 —
     // 개봉 화면으로 갈아치울 때 쓰는 플래시의 값·에셋은 여기가 유일한 노출 창구다.
-    [Header("구매 → 개봉 전환 플래시 (팩 미저작 시 폴백)")]
+    [Header("구매 → 개봉 전환 플래시")]
     [Tooltip("전환을 덮는 플래시의 생김새. 손대지 않으면 코드 기본값으로 돈다. " +
-             "빛 스프라이트를 비우면 예전처럼 단색 판만 남는다(전환 은폐 기능은 그대로).\n\n" +
-             "팩 SO에 '개봉 전환'이 저작돼 있으면 그쪽이 이긴다 — 이 값은 미저작 팩에만 쓰인다. " +
-             "전환은 팩마다 달라야 하는 것이므로 진열 뷰가 한 벌로 쥐는 이 필드는 폴백 자리다.")]
+             "빛 스프라이트를 비우면 예전처럼 단색 판만 남는다(전환 은폐 기능은 그대로).")]
     [SerializeField] ScreenFlashCover purchaseFlash = new ScreenFlashCover();
 
     // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 개봉 오버레이가 닫힐 때 해제된다 —
@@ -260,9 +258,7 @@ public class PackShowcaseController : MonoBehaviour
             // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
             // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
             m_openPending = true;
-            // 팩이 저작한 전환이 있으면 그것으로 덮고, 없으면 위 purchaseFlash(흰 플래시)로 덮는다.
-            if (PackPurchaseImpact.TryGet(this, out var t_impact))
-                t_impact.Play(ResolvePackRect(), purchaseFlash, t_pack.OpenTransition, OpenOverlay);
+            if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), purchaseFlash, OpenOverlay);
             else OpenOverlay();
             return;
         }

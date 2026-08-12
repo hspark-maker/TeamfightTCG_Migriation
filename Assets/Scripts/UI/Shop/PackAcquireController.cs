@@ -257,10 +257,8 @@ public class PackAcquireController : MonoBehaviour
         // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
         // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.
         // 연출을 세우지 못하면 예전처럼 즉시 갈아끼운다(연출은 있으면 좋은 것이지, 재개봉의 조건이 아니다).
-        // 팩이 저작한 모양 있는 전환은 넘기지 않는다(null) — 그것은 상점에서 개봉으로 건너올 때의 것이다.
-        // 여기서 같은 전환을 또 쓰면 방금 보던 카드가 통째로 가려지고, 팩의 서명이 개봉마다 반복돼 값을 잃는다.
         if (PackPurchaseImpact.TryGet(this, out var t_impact))
-            t_impact.Play(retryButton != null ? (RectTransform)retryButton.transform : null, retryFlash, null, RestartSession);
+            t_impact.Play(retryButton != null ? (RectTransform)retryButton.transform : null, retryFlash, RestartSession);
         else
             RestartSession();
     }
