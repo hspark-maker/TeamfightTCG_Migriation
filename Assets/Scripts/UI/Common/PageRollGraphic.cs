@@ -43,6 +43,9 @@ public class PageRollGraphic : MaskableGraphic
     float   m_bulge       = 0.06f;
     float   m_backShade   = 0.32f;
     float   m_gloss       = 0.35f;
+    float   m_glossWidth  = 0.35f;
+    float   m_sheenFloor  = 0.82f;
+    float   m_diagonal;            // 0이면 세로축 말림(종전과 완전히 동일)
     float   m_edgeShade   = 0.45f;
 
     readonly UIVertex[] m_quad = new UIVertex[4];
@@ -54,6 +57,7 @@ public class PageRollGraphic : MaskableGraphic
     float[] m_colShade;
     float[] m_colBulge;
     float[] m_colFacing;   // 1 정면 → 0 옆 → -1 뒷면. 어느 판이 그릴 조각인지 이걸로 가른다
+    float[] m_colSkew;     // 이 열에서 위·아래 정점이 서로 반대로 밀리는 양(px). 말림 경계를 비스듬히 눕힌다
     int[]   m_order;
 
     public override Texture mainTexture => m_texture != null ? m_texture : Texture2D.whiteTexture;
@@ -88,14 +92,27 @@ public class PageRollGraphic : MaskableGraphic
         this.SetVerticesDirty();
     }
 
-    /// <summary>말림의 모양 상수. 진행도(<see cref="SetRoll"/>)와 달리 넘김 한 번 동안 바뀌지 않는다.</summary>
-    public void Configure(float _radiusRatio, int _segments, float _bulge, float _backShade, float _gloss)
+    /// <summary>말림의 모양 상수. 진행도·기울기처럼 드래그 중 변하는 자세 값은 각각 전용 setter가 소유한다.</summary>
+    public void Configure(float _radiusRatio, int _segments, float _bulge, float _backShade,
+                          float _gloss, float _glossWidth, float _sheenFloor)
     {
         m_radiusRatio = Mathf.Clamp(_radiusRatio, 0.02f, 0.5f);
         m_segments    = Mathf.Clamp(_segments, 4, MaxSegments);
         m_bulge       = Mathf.Clamp(_bulge, 0f, 0.3f);
         m_backShade   = Mathf.Clamp01(_backShade);
         m_gloss       = Mathf.Clamp01(_gloss);
+        m_glossWidth  = Mathf.Clamp(_glossWidth, 0.05f, 1f);
+        m_sheenFloor  = Mathf.Clamp01(_sheenFloor);
+        this.SetVerticesDirty();
+    }
+
+    /// <summary>말림 경계의 실시간 기울기(장 높이 대비). 0이면 종전의 곧은 세로축 말림.</summary>
+    public void SetDiagonal(float _diagonal)
+    {
+        float t_diagonal = Mathf.Clamp(_diagonal, -0.5f, 0.5f);
+        if (Mathf.Approximately(t_diagonal, m_diagonal)) return;
+
+        m_diagonal = t_diagonal;
         this.SetVerticesDirty();
     }
 
@@ -134,11 +151,12 @@ public class PageRollGraphic : MaskableGraphic
         {
             if (m_face == RollFace.Back) return;   // 평평한 종이에는 뒷면이 없다
 
-            // 평평 — 넘김 전과 픽셀 단위로 같은 그림이어야 한다(여기서 흔들리면 넘김 시작이 툭 튄다)
+            // 평평 — 넘김 전과 픽셀 단위로 같은 그림이어야 한다(여기서 흔들리면 넘김 시작이 툭 튄다).
+            // 기울기도 0을 넘긴다: 아직 아무것도 안 감겼으니 눕힐 경계 자체가 없다.
             this.AddStrip(_vh,
                 t_hingeX, t_hingeX + t_u * t_w,
                 m_dir >= 0 ? 0f : 1f, m_dir >= 0 ? 1f : 0f,
-                1f, 1f, 1f, 1f, t_centerY, t_h, t_fade);
+                1f, 1f, 1f, 1f, 0f, 0f, t_centerY, t_h, t_fade);
             return;
         }
 
@@ -192,6 +210,7 @@ public class PageRollGraphic : MaskableGraphic
                 m_colUv[t_c], m_colUv[t_c + 1],
                 t_shade0, t_shade1,
                 m_colBulge[t_c], m_colBulge[t_c + 1],
+                m_colSkew[t_c], m_colSkew[t_c + 1],
                 t_centerY, t_h, t_fade);
         }
     }
@@ -222,12 +241,31 @@ public class PageRollGraphic : MaskableGraphic
             ? Mathf.Lerp(m_edgeShade, 1f, t_facing)
             : m_backShade * Mathf.Lerp(1f, 0.55f, Mathf.Clamp01(-t_facing));   // 말린 안쪽(종이 뒷면)
 
-        // 비스듬히 선 부분만 반짝인다. 통이 굴러가면 이 띠도 같이 훑고 지나간다.
-        if (t_facing > 0f)
+        // LDR 정점 컬러는 1을 넘겨도 Color32에서 잘리므로 밝기 가산만으로는 흰 반사가 나오지 않는다.
+        // 말림 중 바탕을 살짝 낮춰 헤드룸을 만들고, 넓은 sheen + 좁은 hot line의 대비로 비닐 코팅을 읽힌다.
+        if (t_facing > 0f && m_gloss > 0f && m_face != RollFace.Back)
         {
-            float t_off = t_theta - 0.75f;
-            t_shade += m_gloss * Mathf.Exp(-(t_off * t_off) / 0.18f);
+            float t_strength = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.12f, m_amount));
+            t_shade *= Mathf.Lerp(1f, m_sheenFloor, t_strength);
+
+            // 종이 위 좌표를 따라 자유단에서 책등 쪽으로 흐른다. 정방향·역방향은 같은 자세를
+            // 역재생하므로 m_amount 하나만 따르면 빛도 자연스럽게 되감긴다.
+            float t_progress  = Mathf.SmoothStep(0f, 1f, m_amount);
+            float t_surface   = _a / _width;
+            float t_center    = 1f - 0.72f * t_progress;
+            float t_off       = t_surface - t_center;
+            float t_softSigma = m_glossWidth * 0.45f;
+            float t_hotSigma  = t_softSigma * 0.22f;
+            float t_soft      = Mathf.Exp(-(t_off * t_off) / (2f * t_softSigma * t_softSigma));
+            float t_hot       = Mathf.Exp(-(t_off * t_off) / (2f * t_hotSigma * t_hotSigma));
+            float t_reflect   = Mathf.Clamp01(m_gloss * t_strength * (0.45f * t_soft + 2.7f * t_hot));
+            t_shade = Mathf.Lerp(t_shade, 1f, t_reflect);
         }
+
+        // 비스듬한 말림: 이 열이 **이미 감아 올린 종이 길이**(장 폭 대비)를 그대로 기울기 세기로 쓴다.
+        // 0(아직 누워 있는 구간) → m_amount(자유단)까지 자연히 커지므로 별도 램프가 필요 없고,
+        // 평평한 부분과 책등(a ≤ contact)은 0이라 움직이지 않는다 — 넘김 시작 프레임이 종전과 같다.
+        m_colSkew[_index]   = Mathf.Clamp01((_a - _contact) / Mathf.Max(1f, _width));
 
         m_colX[_index]      = t_x;
         m_colUv[_index]     = m_dir >= 0 ? _a / _width : 1f - _a / _width;
@@ -244,6 +282,7 @@ public class PageRollGraphic : MaskableGraphic
     void AddStrip(VertexHelper _vh,
                   float _x0, float _x1, float _uv0, float _uv1,
                   float _shade0, float _shade1, float _bulge0, float _bulge1,
+                  float _skew0, float _skew1,
                   float _centerY, float _height, float _fade)
     {
         float t_half = _height * 0.5f;
@@ -251,6 +290,18 @@ public class PageRollGraphic : MaskableGraphic
         float t_bot0 = _centerY - t_half * _bulge0;
         float t_top1 = _centerY + t_half * _bulge1;
         float t_bot1 = _centerY - t_half * _bulge1;
+
+        // 비스듬한 말림. 한 열의 위·아래를 **반대 방향으로** 밀어 말림 경계를 눕힌다 —
+        // 아래는 책등 쪽으로(= 더 감긴 것처럼), 위는 자유단 쪽으로(= 덜 감긴 것처럼).
+        // 열 단위 x를 흔드는 게 아니라 같은 열 안에서만 어긋내므로 이웃 조각과 틈이 생기지 않고,
+        // 깊이 정렬(m_colDepth)·UV·밝기는 그대로다. 앞판·뒤판이 같은 값을 받아 벌어지지 않는다.
+        float t_lean0 = m_diagonal * _height * _skew0 * m_dir;
+        float t_lean1 = m_diagonal * _height * _skew1 * m_dir;
+
+        float t_xTop0 = _x0 + t_lean0;
+        float t_xBot0 = _x0 - t_lean0;
+        float t_xTop1 = _x1 + t_lean1;
+        float t_xBot1 = _x1 - t_lean1;
 
         Color t_c0 = this.Tint(_shade0, _fade);
         Color t_c1 = this.Tint(_shade1, _fade);
@@ -263,19 +314,19 @@ public class PageRollGraphic : MaskableGraphic
         float t_u1 = _uv1 * m_tiling.x;
         float t_vT = m_tiling.y;
 
-        m_quad[0].position = new Vector3(_x0, t_bot0);
+        m_quad[0].position = new Vector3(t_xBot0, t_bot0);
         m_quad[0].uv0      = new Vector2(t_u0, 0f);
         m_quad[0].color    = t_c0;
 
-        m_quad[1].position = new Vector3(_x0, t_top0);
+        m_quad[1].position = new Vector3(t_xTop0, t_top0);
         m_quad[1].uv0      = new Vector2(t_u0, t_vT);
         m_quad[1].color    = t_c0;
 
-        m_quad[2].position = new Vector3(_x1, t_top1);
+        m_quad[2].position = new Vector3(t_xTop1, t_top1);
         m_quad[2].uv0      = new Vector2(t_u1, t_vT);
         m_quad[2].color    = t_c1;
 
-        m_quad[3].position = new Vector3(_x1, t_bot1);
+        m_quad[3].position = new Vector3(t_xBot1, t_bot1);
         m_quad[3].uv0      = new Vector2(t_u1, 0f);
         m_quad[3].color    = t_c1;
 
@@ -285,7 +336,8 @@ public class PageRollGraphic : MaskableGraphic
     Color Tint(float _shade, float _fade)
     {
         var t_base = this.color;
-        float t_s  = Mathf.Clamp(_shade, 0f, 2f);
+        // 기본 UI 셰이더의 Color32 정점색은 1 초과를 보존하지 않는다.
+        float t_s  = Mathf.Clamp01(_shade);
         return new Color(t_base.r * t_s, t_base.g * t_s, t_base.b * t_s, t_base.a * _fade);
     }
 
@@ -299,6 +351,7 @@ public class PageRollGraphic : MaskableGraphic
         m_colShade  = new float[_count];
         m_colFacing = new float[_count];
         m_colBulge  = new float[_count];
+        m_colSkew   = new float[_count];
         m_order     = new int[_count];
     }
 }

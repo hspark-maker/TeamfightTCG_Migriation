@@ -1177,7 +1177,7 @@ MonoBehaviour:
   nextButton: {fileID: 7916168327312615923}
   pageLabel: {fileID: 1821404874538657858}
   swipeDetector: {fileID: 6860633450131112207}
-  dragFullRatio: 0.4
+  dragFullRatio: 0.8
   dragReturnDuration: 0.16
   transition:
     panel: {fileID: 6483501150855271555}
@@ -1199,6 +1199,9 @@ MonoBehaviour:
     rollSegments: 28
     rollBulge: 0.06
     rollBackShade: 0.32
+    rollSheenFloor: 0.82
+    rollDiagonal: 0.139
+    rollDiagonalFollowsTouch: 1
     rollBackSprite: {fileID: 21300000, guid: 907ce29f21f022949991206a7677b268, type: 3}
     rollBackTiling: {x: 3, y: 3}
     captureLayer: 7

@@ -54,6 +54,20 @@ public class AlbumPageFlipView
              "충분히 어두워야 뒷면으로 읽힌다. 뒤판 그림을 넣으면 이 값 대신 그 그림이 보인다.")]
     [Range(0f, 1f)] [SerializeField] float rollBackShade = 0.32f;
 
+    [Tooltip("말림 중 광택 띠 바깥의 앞면 밝기. 낮출수록 하이라이트 대비가 커져 비닐처럼 보인다.")]
+    [Range(0.65f, 1f)] [SerializeField] float rollSheenFloor = 0.82f;
+
+    [Tooltip("말림 경계를 비스듬히 눕히는 정도(장 높이 대비). 0이면 곧은 세로축 말림(종전 동작).\n" +
+             "양수면 오른쪽 아래 모서리가 먼저 감겨 왼쪽 위로 비스듬히 말리고, 음수면 반대로 기운다.\n" +
+             "장 전체를 회전시키는 게 아니라 말린 구간만 어긋내므로 책등·캡처 영역은 그대로다.\n\n" +
+             "체감 크기: 손가락을 세로로 N px 움직이면 말린 끝의 정점이 (2 x 이 값 x N) px 어긋난다.\n" +
+             "0.05면 손가락 100px에 10px뿐이라 눈에 잘 안 띈다 — 추종이 도는지 확인하려면 0.25 이상으로 올려볼 것.")]
+    [Range(-0.5f, 0.5f)] [SerializeField] float rollDiagonal = 0.25f;
+
+    [Tooltip("드래그 중인 손가락의 세로 위치를 따라 말림 방향을 바꾼다. 아래로 움직이면 아래 모서리부터, 위로 움직이면 위 모서리부터 말린다.\n" +
+             "끄면 터치 위치와 무관하게 rollDiagonal의 고정 방향을 쓴다.")]
+    [SerializeField] bool rollDiagonalFollowsTouch = true;
+
     [Tooltip("선택 — 말린 종이의 뒷면에 보일 카드 뒤판 그림(Assets/Assets/Images/DeckPile). 비우면 앞면 그림을 어둡게 접어 쓴다.\n" +
              "UI Graphic 하나는 텍스처 한 장뿐이라, 넣으면 앞면·뒷면을 두 판이 나눠 그린다.")]
     [SerializeField] Sprite rollBackSprite;
@@ -87,11 +101,51 @@ public class AlbumPageFlipView
     bool    m_active;
     bool    m_rolling;
     bool    m_rollReverse;   // 되돌리기 = 지금 장을 마는 게 아니라 이전 장을 펴서 덮는다
+    bool    m_hasTouchDiagonal;
+    float   m_touchDiagonal;
 
     public float Duration => this.duration;
 
     /// <summary>주변 UI가 걷혔다 돌아오는 편도 시간. 교체 뒤 글자를 되돌릴 때 호출부가 같은 값을 쓴다.</summary>
     public float Crossfade => Mathf.Max(0.01f, this.crossfade);
+
+    /// <summary>손가락의 현재 높이를 이번 넘김의 말림 방향으로 갱신한다.
+    ///
+    /// ⚠ 기준 사각형은 <b>화면에 남아 있는 것</b>이라야 한다. 말림이 시작되면 <see cref="UiRectCapture"/>가
+    /// 페이지(m_page)를 촬영대로 옮겨 버리므로, 그걸 기준으로 재면 손가락이 늘 범위 밖으로 나가
+    /// 기울기가 한쪽 끝에 붙박이로 고정된다("아래로 최대로 당겨진 채 안 따라옴"의 정체).
+    /// 말림 중에는 그 자리를 물려받은 판(m_roll)이 곧 페이지가 보이는 자리다 — 부모·앵커·크기가 같아
+    /// 로컬 좌표계도 동일하다.</summary>
+    public void SetTouchAnchor(Vector2 _screenPosition)
+    {
+        if (!this.rollDiagonalFollowsTouch) { this.ClearTouchAnchor(); return; }
+
+        // 아래 두 실패는 **지우지 않고 그냥 나간다**. 여기서 래치를 비우면 고정 rollDiagonal(한쪽 끝)로
+        // 튀어서, 원인은 잠깐의 측정 실패인데 화면은 "최대로 기운 채 멈춤"으로 보인다 — 직전 값을 유지하는 편이 낫다.
+        RectTransform t_ref = m_rolling && m_roll != null ? m_roll.rectTransform : m_page;
+        if (t_ref == null || t_ref.rect.height < 1f) return;
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(t_ref, _screenPosition, null, out Vector2 t_local))
+            return;
+
+        float t_y = Mathf.InverseLerp(t_ref.rect.yMin, t_ref.rect.yMax, t_local.y);
+        m_touchDiagonal    = this.rollDiagonal * (1f - 2f * Mathf.Clamp01(t_y));
+        m_hasTouchDiagonal = true;
+
+        // 이미 말리는 중이면 손가락의 최신 높이를 즉시 반영한다. 앞·뒤판은 같은 자세여야 벌어지지 않는다.
+        if (m_rolling && m_roll != null)
+        {
+            m_roll.SetDiagonal(m_touchDiagonal);
+            if (m_rollBack != null) m_rollBack.SetDiagonal(m_touchDiagonal);
+        }
+    }
+
+    /// <summary>다음 넘김은 프리팹의 고정 기울기를 쓰게 한다(버튼·취소 경로).</summary>
+    public void ClearTouchAnchor()
+    {
+        m_hasTouchDiagonal = false;
+        m_touchDiagonal    = 0f;
+    }
 
     public void Bind(
         RectTransform _page,
@@ -307,6 +361,8 @@ public class AlbumPageFlipView
     /// <summary>자세·그늘·주변 알파를 넘김 전과 픽셀 단위로 같은 상태로 되돌린다.</summary>
     public void Cancel()
     {
+        // 드래그가 말림을 시작하기 전에 취소돼도 다음 버튼 넘김이 이전 터치 높이를 물려받지 않게 한다.
+        this.ClearTouchAnchor();
         if (!m_active) return;
         m_active = false;
 
@@ -408,7 +464,10 @@ public class AlbumPageFlipView
         m_rollReverse = t_reverse;
 
         m_roll.SetTexture(m_capture.Texture);
-        m_roll.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
+        float t_diagonal = m_hasTouchDiagonal ? m_touchDiagonal : this.rollDiagonal;
+        m_roll.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade,
+                         this.glossMax, this.glossWidth, this.rollSheenFloor);
+        m_roll.SetDiagonal(t_diagonal);
         m_roll.SetFace(m_rollBack != null ? PageRollGraphic.RollFace.Front : PageRollGraphic.RollFace.Both);
         m_roll.SetRoll(t_reverse ? 1f : 0f, 1);
         m_roll.gameObject.SetActive(true);
@@ -424,7 +483,10 @@ public class AlbumPageFlipView
 
             m_rollBack.SetTexture(t_backTex);
             m_rollBack.SetTiling(this.rollBackTiling);
-            m_rollBack.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade, this.glossMax);
+            // 기울기까지 앞판과 **같은 값**이어야 한다 — 다르면 통의 앞뒤가 어긋나 사이가 벌어져 보인다.
+            m_rollBack.Configure(this.rollRadiusRatio, this.rollSegments, this.rollBulge, this.rollBackShade,
+                                 this.glossMax, this.glossWidth, this.rollSheenFloor);
+            m_rollBack.SetDiagonal(t_diagonal);
             m_rollBack.SetFace(PageRollGraphic.RollFace.Back);
             m_rollBack.SetRoll(t_reverse ? 1f : 0f, 1);
             m_rollBack.gameObject.SetActive(true);

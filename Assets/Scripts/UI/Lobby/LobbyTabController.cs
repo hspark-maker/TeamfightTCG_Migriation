@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,6 +32,30 @@ public class LobbyTabController : MonoBehaviour
     [SerializeField] RectTransform focus;   // 선택 탭 자리로 옮길 강조 버튼. 비워두면 Focus 연출 없이 콘텐츠만 토글한다
     [SerializeField] Image focusIcon;       // Focus 안의 아이콘
     [SerializeField] TMP_Text focusLabel;   // Focus 안의 이름 텍스트
+
+    [Header("Focus 하이라이트 회전")]
+    [Tooltip("Button_Focus 뒤쪽 하이라이트. 비우면 Focus의 Light 자식을 자동으로 찾는다.")]
+    [SerializeField] RectTransform focusHighlight;
+
+    [Tooltip("하이라이트가 한 바퀴 도는 시간(초). 타임스케일 영향을 받지 않는다.")]
+    [SerializeField] float focusSpinSeconds = 6f;
+
+    [SerializeField] bool focusSpinClockwise = true;
+
+    [Header("선택 확대 (탭바가 HorizontalLayoutGroup일 때만 의미 있음)")]
+    [Tooltip("끄면 폭을 전혀 건드리지 않는다(종전 동작).")]
+    [SerializeField] bool animateTabWidth = true;
+
+    [Tooltip("선택된 칸이 가져가는 폭 가중치. 나머지 칸이 남은 몫을 똑같이 나눠 가지므로 **합은 항상 탭 수**다.\n" +
+             "탭 5개에 1.25면 나머지는 각 0.9375 — 1080 폭 기준 선택 270 / 나머지 202.5.\n" +
+             "1이면 전부 균등(확대 없음). 크게 할수록 선택 칸이 커지고 나머지가 같이 좁아진다.")]
+    [Range(1f, 2f)] [SerializeField] float selectedWidthWeight = 1.25f;
+
+    [Tooltip("폭이 바뀌는 시간(초). 타임스케일 영향을 받지 않는다.")]
+    [SerializeField] float widthTweenDuration = 0.2f;
+
+    // 직전 선택 탭. 전환 때 "큰 폭에서 작은 폭으로 줄어드는" 쪽을 알아야 확대 영역이 순간이동하지 않는다.
+    int m_prevIndex = -1;
 
     // 탭 버튼의 겉모습 컴포넌트 캐시(없으면 null). 버튼에서 직접 찾으므로 인스펙터 재배선이 필요 없다.
     TabButtonView[] m_views;
@@ -73,6 +98,16 @@ public class LobbyTabController : MonoBehaviour
         }
     }
 
+    void OnEnable()
+    {
+        this.StartFocusHighlightSpin();
+    }
+
+    void OnDisable()
+    {
+        if (this.focusHighlight != null) DOTween.Kill(this.focusHighlight);
+    }
+
     void Start()
     {
         // 부팅 시 기본 탭 선택은 유저의 "첫 진입"이 아니다 — 발화시키면 아무도 누르지 않은 탭의 튜토리얼이 낭비된다
@@ -112,9 +147,134 @@ public class LobbyTabController : MonoBehaviour
 
         if (useFocus) this.ApplyFocus(_index);
 
+        // 폭은 Focus를 옮긴 **뒤에** 잡는다 — 자리(형제 순서)가 확정돼야 어느 칸이 커지는지가 맞는다.
+        // 첫 선택(부팅)은 트윈 없이 즉시 — 로비가 열리자마자 탭바가 벌어지는 그림은 연출이 아니라 결함으로 읽힌다.
+        this.ApplyTabWidths(_index, _animate: this.m_prevIndex >= 0 && this.m_prevIndex != _index);
+        this.m_prevIndex = _index;
+
         // 콘텐츠를 켠 뒤에 발화한다 — 안내 타깃(앵커)이 그제서야 등록된다.
         if (_fireTrigger && _index >= 0 && _index < this.tabs.Count)
             TriggeredTutorialRunner.Fire(this.tabs[_index].tutorialTrigger);
+    }
+
+    /// 선택 칸은 넓히고 나머지는 남은 몫을 균등하게 나눠 갖는다. 합이 탭 수로 고정이라 탭바 전체 폭은 그대로다.
+    ///
+    /// <b>scale이 아니라 폭</b>인 이유: HorizontalLayoutGroup은 자식 localScale을 배치에 반영하지 않는다.
+    /// 확대만 하면 이웃과 겹치고, 무엇보다 <b>클릭 판정은 원래 폭 그대로 남아</b> 보이는 것과 눌리는 곳이 어긋난다.
+    /// 폭을 움직이면 배치·클릭·튜토리얼 앵커가 전부 같은 RectTransform 하나를 따라간다.
+    void ApplyTabWidths(int _index, bool _animate)
+    {
+        if (!this.animateTabWidth || this.tabs.Count <= 1) return;
+
+        float t_selected = Mathf.Clamp(this.selectedWidthWeight, 0.01f, this.tabs.Count - 0.01f);
+        float t_normal   = (this.tabs.Count - t_selected) / (this.tabs.Count - 1);
+        bool  t_useFocus = this.focus != null;
+
+        // 전환 중 연타해도 현재 레이아웃 모양을 그대로 이어받는다. Focus의 현재 폭은 다시 켜지는
+        // 직전 버튼으로, 새로 꺼지는 선택 버튼의 현재 폭은 이동한 Focus로 넘겨야 활성 슬롯 합이 튀지 않는다.
+        float t_previousFocusWeight = t_useFocus ? GetWidthWeight(this.focus, t_selected) : t_selected;
+        float t_newSlotWeight = t_normal;
+        if (t_useFocus && _index >= 0 && _index < this.tabs.Count && this.tabs[_index].button != null)
+            t_newSlotWeight = GetWidthWeight(this.tabs[_index].button.transform as RectTransform, t_normal);
+
+        for (int i = 0; i < this.tabs.Count; i++)
+        {
+            RectTransform t_slot = this.tabs[i].button != null
+                ? this.tabs[i].button.transform as RectTransform
+                : null;
+            if (t_slot == null) continue;
+
+            // Focus를 쓰면 선택 탭의 버튼은 꺼져 있어 배치에 끼지 않는다. 대신 **직전 선택 버튼**이
+            // 방금 다시 켜졌으므로, Focus가 비우고 간 큰 폭에서 시작해 보통 폭으로 줄어들게 한다.
+            if (t_useFocus && i == _index) continue;
+
+            bool t_shrinking = t_useFocus && i == this.m_prevIndex && _animate;
+            if (t_shrinking) SetWidthWeight(t_slot, t_previousFocusWeight);
+
+            TweenWidthWeight(t_slot, t_normal, _animate);
+        }
+
+        // 선택 칸: Focus가 있으면 Focus가, 없으면 그 탭 버튼이 커지는 쪽이다.
+        RectTransform t_grow = t_useFocus
+            ? this.focus
+            : (_index >= 0 && _index < this.tabs.Count && this.tabs[_index].button != null
+                ? this.tabs[_index].button.transform as RectTransform
+                : null);
+        if (t_grow == null) return;
+
+        // Focus는 자리를 옮겨 왔을 뿐 폭은 직전 탭의 큰 값을 그대로 들고 있다 —
+        // 보통 폭에서 다시 출발시켜야 "밀려서 커진다"로 읽힌다(안 그러면 확대 영역이 순간이동한다).
+        if (t_useFocus && _animate) SetWidthWeight(t_grow, t_newSlotWeight);
+
+        TweenWidthWeight(t_grow, t_selected, _animate);
+    }
+
+    /// 폭을 **가중치만으로** 정하게 만든다. preferred/min을 0으로 눕히지 않으면 각 버튼 Image의
+    /// 네이티브 크기가 바닥값으로 남아, 가중치를 아무리 바꿔도 비율대로 안 움직인다.
+    static LayoutElement EnsureWidthSlot(RectTransform _slot)
+    {
+        var t_element = _slot.GetComponent<LayoutElement>();
+        if (t_element == null) t_element = _slot.gameObject.AddComponent<LayoutElement>();
+
+        if (t_element.minWidth != 0f)       t_element.minWidth = 0f;
+        if (t_element.preferredWidth != 0f) t_element.preferredWidth = 0f;
+
+        return t_element;
+    }
+
+    static void SetWidthWeight(RectTransform _slot, float _weight)
+    {
+        LayoutElement t_element = EnsureWidthSlot(_slot);
+        DOTween.Kill(t_element);
+        t_element.flexibleWidth = _weight;
+    }
+
+    static float GetWidthWeight(RectTransform _slot, float _fallback)
+    {
+        if (_slot == null) return _fallback;
+
+        LayoutElement t_element = _slot.GetComponent<LayoutElement>();
+        return t_element != null && t_element.flexibleWidth >= 0f
+            ? t_element.flexibleWidth
+            : _fallback;
+    }
+
+    void TweenWidthWeight(RectTransform _slot, float _weight, bool _animate)
+    {
+        LayoutElement t_element = EnsureWidthSlot(_slot);
+        DOTween.Kill(t_element);   // 연타로 트윈이 쌓이면 폭이 중간값에서 덜컥거린다
+
+        if (!_animate || Mathf.Approximately(t_element.flexibleWidth, _weight))
+        {
+            t_element.flexibleWidth = _weight;
+            return;
+        }
+
+        float t_from = t_element.flexibleWidth;
+        DOTween.To(() => t_from, _v => { t_from = _v; t_element.flexibleWidth = _v; }, _weight,
+                   Mathf.Max(0.01f, this.widthTweenDuration))
+               .SetEase(Ease.OutCubic)
+               .SetUpdate(true)            // 로비 연출이 timeScale에 끌려가지 않게
+               .SetTarget(t_element)
+               .SetLink(_slot.gameObject);
+    }
+
+    void StartFocusHighlightSpin()
+    {
+        if (this.focusHighlight == null && this.focus != null)
+            this.focusHighlight = this.focus.Find("Light") as RectTransform;
+        if (this.focusHighlight == null) return;
+
+        DOTween.Kill(this.focusHighlight);
+        this.focusHighlight.localRotation = Quaternion.identity;
+        float t_angle = this.focusSpinClockwise ? -360f : 360f;
+        this.focusHighlight
+            .DOLocalRotate(new Vector3(0f, 0f, t_angle), Mathf.Max(0.01f, this.focusSpinSeconds), RotateMode.FastBeyond360)
+            .SetLoops(-1, LoopType.Restart)
+            .SetEase(Ease.Linear)
+            .SetUpdate(true)
+            .SetTarget(this.focusHighlight)
+            .SetLink(this.focusHighlight.gameObject);
     }
 
     bool IsTabLocked(int _index)

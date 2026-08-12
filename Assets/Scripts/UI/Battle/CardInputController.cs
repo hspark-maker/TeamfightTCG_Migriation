@@ -778,7 +778,7 @@ public class CardInputController
         Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
         UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
         {
-            portrait       = t_icon != null ? t_icon : _tauntCard.data.fullImage,
+            portrait       = t_icon != null ? t_icon : CardVisualRules.PickCardArt(_tauntCard.data),
             preserveAspect = t_icon != null,
             cardName       = _tauntCard.data.displayName,
             effectLabel    = TAUNT_BLOCKED_TEXT,
@@ -925,10 +925,9 @@ public class CardInputController
         // 계산은 AttackPreview가 단독 소유(실제 전투와 갈라지지 않도록). 여기선 표시만.
         AttackPreview t_p = AttackPreview.Compute(t_atk, t_def);
 
-        _target.ShowAttackPreview(t_p.attackDamage, t_p.defenderWouldDie);   // 직격(공격): 비늘 감소 반영(기본 true)
+        _target.ShowAttackPreview(t_p.attackDamage, t_p.defenderWouldDie);
         if (!t_p.hasCounter) return;
-        // 반격 맥락: 비늘 감소 없음(false). 실제 반격 TakeDamage(false)와 사망 프리뷰/HP표시 일치.
-        this.owner.ShowAttackPreview(t_p.counterDamage, t_p.attackerWouldDie, false);
+        this.owner.ShowAttackPreview(t_p.counterDamage, t_p.attackerWouldDie);
     }
     #endregion
 

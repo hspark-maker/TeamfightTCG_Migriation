@@ -45,6 +45,12 @@ public class HorizontalSwipeDetector : MonoBehaviour, IBeginDragHandler, IDragHa
     float  m_speed;
     bool   m_interactable = true;
 
+    /// <summary>현재 손짓이 시작된 화면 좌표. 구독자가 드래그 시작 위치에 연출을 맞출 때 쓴다.</summary>
+    public Vector2 BeginPosition { get; private set; }
+
+    /// <summary>드래그 중인 손가락의 최신 화면 좌표. 세로 위치까지 실시간으로 따르는 연출용이다.</summary>
+    public Vector2 CurrentPosition { get; private set; }
+
     /// <summary>끄면 진행 중이던 드래그까지 즉시 무효화한다 — 잠금이 드래그 도중에 들어와도
     /// 손을 떼는 순간 한 칸 넘어가 버리는 일이 없게.</summary>
     public bool Interactable
@@ -71,6 +77,9 @@ public class HorizontalSwipeDetector : MonoBehaviour, IBeginDragHandler, IDragHa
         this.m_dragging = true;
         this.m_delta    = 0f;
         this.m_speed    = 0f;
+        // OnBeginDrag는 드래그 임계값을 넘긴 뒤 호출되므로 현재 position이 아니라 실제 터치다운 좌표를 보존한다.
+        this.BeginPosition = _e.pressPosition;
+        this.CurrentPosition = this.BeginPosition;
 
         OnDragBegin?.Invoke();
         OnDragProgress?.Invoke(0f);
@@ -79,6 +88,8 @@ public class HorizontalSwipeDetector : MonoBehaviour, IBeginDragHandler, IDragHa
     public void OnDrag(PointerEventData _e)
     {
         if (!this.m_dragging) return;
+
+        this.CurrentPosition = _e.position;
 
         // 캔버스 스케일을 나눠야 임계값이 해상도와 무관해진다(기준 폭도 같은 캔버스 좌표계다).
         float t_scale = this.ResolveCanvasScale();

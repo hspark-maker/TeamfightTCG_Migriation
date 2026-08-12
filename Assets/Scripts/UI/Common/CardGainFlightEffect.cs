@@ -134,12 +134,12 @@ public class CardGainFlightEffect : MonoBehaviour
         return (RectTransform)t_go.transform;
     }
 
+    // 덱 배너(deckPreview)를 먼저 쓰는 건 날아가는 물건이 "카드 한 장"이라 배너 비율이 더 맞기 때문이다.
+    // 없으면 카드 아트로 폴백하되 그 판단은 CardVisualRules 하나에 맡긴다(여기서 필드를 직접 적으면 드리프트).
     static Sprite ArtOf(CardData _card)
     {
         if (_card == null) return null;
-        if (_card.deckPreview != null) return _card.deckPreview;
-        if (_card.fullImage != null) return _card.fullImage;
-        return _card.portrait;
+        return _card.deckPreview != null ? _card.deckPreview : CardVisualRules.PickCardArt(_card);
     }
 
     // 날아가는 카드가 탭 터치를 가로채지 않게.

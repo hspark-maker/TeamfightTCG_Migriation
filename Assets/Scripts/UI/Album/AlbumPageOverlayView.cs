@@ -35,9 +35,11 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("선택 — 오버레이 전면 raycastTarget 위에 올린 스와이프 감지기.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
-    [Tooltip("화면 폭의 이 비율만큼 끌면 종이가 완전히 세워진다(진행도 0.5 = 넘어가기 직전).\n" +
-             "넘김 확정 임계는 감지기(snapRatio)가 정한다 — 이 값은 손가락과 그림의 배율일 뿐이다.")]
-    [Range(0.1f, 1f)] [SerializeField] float dragFullRatio = 0.4f;
+    [Tooltip("좌/우 민감도. 화면 폭의 이 비율만큼 끌면 종이가 완전히 세워진다(진행도 0.5 = 넘어가기 직전).\n" +
+             "작을수록 민감하다 — 0.4면 화면 폭의 40%를 끌어야 다 세워지고, 0.15면 15%만 끌어도 다 세워진다.\n" +
+             "넘김이 실제로 확정되는 임계는 감지기(HorizontalSwipeDetector.snapRatio)가 따로 정한다 —\n" +
+             "이 값은 손가락 이동과 그림이 세워지는 정도의 배율일 뿐이다.")]
+    [Range(0.05f, 1f)] [SerializeField] float dragFullRatio = 0.4f;
 
     [Tooltip("임계 미달로 손을 뗐을 때 제자리로 돌아오는 시간.")]
     [SerializeField] float dragReturnDuration = 0.16f;
@@ -170,6 +172,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     void HandleStepRequest(int _dir)
     {
         if (IsLocked || m_flipping || m_dragging) return;
+        pageFlip.ClearTouchAnchor();
         Step(_dir);
     }
 
@@ -447,13 +450,23 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         if (m_flipping || IsLocked) return;
 
-        Step(_dir);
+        // 손짓 도중 방향을 잠갔는데 감지기가 반대 방향으로 확정했다 = 되짚다가 반대쪽으로 넘겨버린 경우다.
+        // 그대로 넘기면 화면에서 말리던 장과 다른 장이 넘어간다 — 넘기지 않고 제자리로 돌린다.
+        if (m_dragDir != 0 && _dir != m_dragDir)
+        {
+            HandleDragCancel();
+            return;
+        }
+
+        Step(m_dragDir != 0 ? m_dragDir : _dir);
     }
 
     /// <summary>새 손가락이 내려앉았다 — 여기서만 무장한다.</summary>
     void HandleDragBegin()
     {
         m_dragArmed = !m_flipping && !IsLocked;
+        if (m_dragArmed && swipeDetector != null)
+            pageFlip.SetTouchAnchor(swipeDetector.BeginPosition);
     }
 
     /// <summary>손가락이 끄는 만큼 종이를 세운다. 진행도는 <b>0.5(edge-on)에서 멈춘다</b> —
@@ -461,32 +474,40 @@ public class AlbumPageOverlayView : MonoBehaviour
     /// 넘김 확정 임계는 감지기(snapRatio·flick)가 정한다. 여기는 손가락과 자세를 잇기만 한다.</summary>
     void HandleDragProgress(float _norm)
     {
+        if (m_flipping || IsLocked) return;
+        if (!m_dragArmed) return;   // 이 손짓은 이미 소비됐다(넘김으로 확정됐거나 취소됐다)
+
+        // 가로 이동이 0이어도 위아래 손짓은 말림 기울기를 바꾼다. 따라서 _norm 조기 반환보다 먼저 갱신한다.
+        if (swipeDetector != null)
+            pageFlip.SetTouchAnchor(swipeDetector.CurrentPosition);
+
         // 진행도 0은 무장 신호가 아니다 — 끌다가 시작점을 되지나가도 0이 온다.
         // 무장은 OnDragBegin 하나만 세운다(HandleDragBegin).
         if (Mathf.Approximately(_norm, 0f)) return;
 
-        if (m_flipping || IsLocked) return;
-        if (!m_dragArmed) return;   // 이 손짓은 이미 소비됐다(넘김으로 확정됐거나 취소됐다)
         if (m_theme == null || m_theme.Pages.Count <= 1 || pageFlip.Duration <= 0f) return;
 
         // 오른쪽으로 끌면 이전 장이 들어온다(감지기의 OnSwipe 부호 규약과 같다).
-        int t_dir = _norm > 0f ? -1 : 1;
-
-        m_dragging = true;
-
-        if (m_dragDir != t_dir)
+        // **방향은 손짓 하나에 한 번만 정한다.** 끌던 도중에 반대로 되짚어도 진영을 갈아타지 않는다 —
+        // 갈아타면 한 스윕이 앞장·뒷장을 오가며 뜨는 대상(촬영대)까지 계속 바뀌어, 무엇을 넘기는 중인지 안 읽힌다.
+        // 되짚는 손짓은 방향 전환이 아니라 **되감기**로 해석한다(아래 부호 있는 진행도).
+        if (m_dragDir == 0)
         {
-            m_dragDir = t_dir;
-            int t_count = m_theme.Pages.Count;
-            int t_target = (m_pageIndex + t_dir + t_count) % t_count;
+            m_dragDir = _norm > 0f ? -1 : 1;
+            int t_count  = m_theme.Pages.Count;
+            int t_target = (m_pageIndex + m_dragDir + t_count) % t_count;
             PrepareUnderPage(m_theme, t_target);
         }
 
-        // 방향이 도중에 뒤집혀도 기준 자세는 다시 잡지 않는다(Begin이 m_active를 보고 방향만 갱신한다).
-        pageFlip.Begin(t_dir);
+        m_dragging = true;
 
-        float t_full = Mathf.Max(0.01f, this.dragFullRatio);
-        m_dragProgress = Mathf.Clamp01(Mathf.Abs(_norm) / t_full) * 0.5f;
+        pageFlip.Begin(m_dragDir);
+
+        // 잠근 방향으로 얼마나 갔는지. 되짚어서 시작점을 지나면 음수 → 0으로 잘려 종이가 도로 눕는다.
+        // (|_norm|을 쓰면 반대로 끄는데도 계속 세워지는, 손가락과 그림이 반대로 노는 상태가 된다.)
+        float t_toward = -_norm * m_dragDir;
+        float t_full   = Mathf.Max(0.01f, this.dragFullRatio);
+        m_dragProgress = Mathf.Clamp01(t_toward / t_full) * 0.5f;
         pageFlip.SetFlipProgress(m_dragProgress);
     }
 
@@ -523,6 +544,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (!m_flipping)
         {
             pageFlip.Cancel();
+            pageFlip.ClearTouchAnchor();
             HideUnderPage();
             FlushPendingRefresh();
         }
@@ -579,6 +601,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 테마가 통째로 바뀌면 인덱스 비교가 뜻이 없다 — "다음 장"으로 읽히게 한다
         int t_dir = (m_theme != _theme || t_target > m_pageIndex) ? 1 : -1;
+        pageFlip.ClearTouchAnchor();
         await FlipAsync(t_target, t_dir, _theme);
     }
 
@@ -605,6 +628,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             m_pageIndex = t_target;
             RefreshPage();
             pageFlip.Cancel();
+            pageFlip.ClearTouchAnchor();
             HideUnderPage();
             return;
         }
@@ -662,6 +686,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             if (t_gen == m_flipGen)
             {
                 pageFlip.Cancel();
+                pageFlip.ClearTouchAnchor();
                 HideUnderPage();
                 m_flipping = false;
                 SetFlipLocked(false);
@@ -680,6 +705,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         m_dragDir      = 0;
         DOTween.Kill(this, true);    // SetId(this)를 단 넘김 트윈만. complete=true라야 대기가 취소가 아닌 완료로 풀린다
         pageFlip.Cancel();
+        pageFlip.ClearTouchAnchor();
         HideUnderPage();
         m_flipping = false;
         SetFlipLocked(false);
