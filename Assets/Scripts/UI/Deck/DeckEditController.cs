@@ -22,6 +22,7 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
+    [SerializeField] DeckSynergyStrip       synergyStrip;
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
@@ -184,6 +185,7 @@ public class DeckEditController : MonoBehaviour
 
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
+        if (synergyStrip   != null) synergyStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
@@ -218,6 +220,7 @@ public class DeckEditController : MonoBehaviour
         Array.Clear(m_working, 0, m_working.Length);
 
         if (dragController != null) dragController.Cancel();
+        if (synergyStrip   != null) synergyStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
     }
 
@@ -406,6 +409,7 @@ public class DeckEditController : MonoBehaviour
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
         if (totalHpText      != null) totalHpText.text = DeckPower.Of(m_working).ToString();
+        if (synergyStrip     != null) synergyStrip.Refresh(m_working);
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
                                                                    && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);

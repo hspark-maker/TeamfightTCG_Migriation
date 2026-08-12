@@ -1819,6 +1819,7 @@ MonoBehaviour:
   dragController: {fileID: 0}
   countText: {fileID: 1356435498019735195}
   totalHpText: {fileID: 0}
+  synergyStrip: {fileID: 910000000000000003}
   unequipAllButton: {fileID: 8332926192173611373}
   autoEquipButton: {fileID: 9112524983723466820}
 --- !u!1 &7853780263903233111
@@ -1987,6 +1988,7 @@ RectTransform:
   m_Children:
   - {fileID: 4088694591249248317}
   - {fileID: 806464173930779824}
+  - {fileID: 910000000000000002}
   - {fileID: 4443662616902879784}
   m_Father: {fileID: 5176086449309812204}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2200,6 +2202,102 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
+--- !u!1 &910000000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000000000000002}
+  - component: {fileID: 910000000000000004}
+  - component: {fileID: 910000000000000003}
+  m_Layer: 0
+  m_Name: SynergyBar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &910000000000000002
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 910000000000000121}
+  - {fileID: 910000000000000122}
+  - {fileID: 910000000000000123}
+  - {fileID: 910000000000000124}
+  - {fileID: 910000000000000125}
+  - {fileID: 910000000000000126}
+  - {fileID: 910000000000000127}
+  - {fileID: 910000000000000128}
+  - {fileID: 910000000000000129}
+  m_Father: {fileID: 6065391164760528791}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -32}
+  m_SizeDelta: {x: 600, y: 64}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &910000000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.HorizontalLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 4
+  m_Spacing: 26
+  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandHeight: 0
+  m_ChildControlWidth: 1
+  m_ChildControlHeight: 1
+  m_ChildScaleWidth: 1
+  m_ChildScaleHeight: 1
+  m_ReverseArrangement: 0
+--- !u!114 &910000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4483f06cd28fb8d458167596ba5fd113, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::DeckSynergyStrip
+  icons:
+  - {fileID: 910000000000000111}
+  - {fileID: 910000000000000112}
+  - {fileID: 910000000000000113}
+  - {fileID: 910000000000000114}
+  - {fileID: 910000000000000115}
+  - {fileID: 910000000000000116}
+  - {fileID: 910000000000000117}
+  - {fileID: 910000000000000118}
+  - {fileID: 910000000000000119}
+  showInactive: 1
+  maxIcons: 0
 --- !u!224 &4528849558391699685 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 777167090116223914, guid: ebb55fadd3f7d4640add62fb4bb94b7f, type: 3}
@@ -3458,3 +3556,409 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 19504a21cb8575b458d69b99efc63496, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckEditSlotView
+--- !u!1001 &910000000000000201
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000111 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000201}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!224 &910000000000000121 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000201}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000122 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000202}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000123 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000203}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000124 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000204}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000125 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000205}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000126 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000206}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000127 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000207}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000128 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000208}
+  m_PrefabAsset: {fileID: 0}
+--- !u!224 &910000000000000129 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000209}
+  m_PrefabAsset: {fileID: 0}
+
+--- !u!1001 &910000000000000202
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000112 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000202}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000203
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_2
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000113 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000203}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000204
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_3
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000114 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000204}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000205
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_4
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000115 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000205}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000206
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_5
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000116 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000206}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000207
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_6
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000117 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000207}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000208
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_7
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000118 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000208}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon
+--- !u!1001 &910000000000000209
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 910000000000000002}
+    m_Modifications:
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 479608770632171145, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 7994518963679795016, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+      propertyPath: m_Name
+      value: SynergyIcon_8
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+--- !u!114 &910000000000000119 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 643733420555183928, guid: d93f3f8d16f6354499153c0378916723, type: 3}
+  m_PrefabInstance: {fileID: 910000000000000209}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b9864e844fc17458cc116ee7eef1f7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyCountIcon

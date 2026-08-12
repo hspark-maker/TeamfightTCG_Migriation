@@ -1,71 +1,86 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 덱 타이틀 옆의 시너지 아이콘 줄. 덱을 받아 <see cref="SynergyPreview"/>로 집계해 표시한다.
-///
-/// 표시 전용이고 상태를 안 들고 있다 — <see cref="DeckGroup"/>이 덱이 바뀔 때마다 Refresh를 부른다.
-/// 아이콘은 풀링한다(매번 Destroy/Instantiate 하면 레이아웃이 튄다).
-/// 전투용 SynergyResolver가 아니라 SynergyPreview를 쓰는 이유: 편성 중에는 아직 활성이 아닌
-/// 시너지의 진행도도 보여야 하는데 Resolver는 활성만 반환한다.
-/// </summary>
+/// <summary>덱의 전투 참여 가능 시너지를 현재/다음 티어 진행도와 함께 표시한다.</summary>
 public class DeckSynergyStrip : MonoBehaviour
 {
-    [SerializeField] SynergyCountIcon iconPrefab;
-    [SerializeField] Transform        iconParent;   // 보통 HorizontalLayoutGroup이 붙은 오브젝트
-    [SerializeField] SynergyTooltip   tooltip;      // 롱프레스 설명(선택 — 미배선이면 롱프레스 무동작)
+    [SerializeField] SynergyCountIcon[] icons;
 
     [Header("Filter")]
-    [Tooltip("체크 해제하면 아직 활성이 아닌 시너지는 숨긴다.")]
+    [Tooltip("해제하면 아직 활성화되지 않은 시너지는 숨긴다.")]
     [SerializeField] bool showInactive = true;
-    [Tooltip("0보다 크면 이 개수까지만 표시한다(타이틀 옆 공간이 좁을 때).")]
-    [SerializeField] int maxIcons = 0;
+    [Tooltip("0보다 크면 이 개수까지만 표시한다.")]
+    [SerializeField] int maxIcons;
 
-    readonly List<SynergyCountIcon> icons = new List<SynergyCountIcon>();
+    readonly List<CardData> eligibleCards = new List<CardData>();
 
-    /// <summary>덱(빈 슬롯 null 허용)을 받아 아이콘 줄을 다시 그린다.</summary>
+    void Awake()
+    {
+        if (this.icons == null) return;
+
+        foreach (SynergyCountIcon t_icon in this.icons)
+        {
+            if (t_icon == null) continue;
+            t_icon.onLongPress    = ShowExplain;
+            t_icon.onLongPressEnd = _ => HideExplain();
+            t_icon.gameObject.SetActive(false);
+        }
+    }
+
     public void Refresh(IEnumerable<CardData> _deck)
     {
-        List<SynergyProgress> t_all = SynergyPreview.Resolve(_deck);
-
-        var t_shown = new List<SynergyProgress>();
-        foreach (SynergyProgress t_p in t_all)
+        this.eligibleCards.Clear();
+        if (_deck != null)
         {
-            if (!this.showInactive && !t_p.IsActive) continue;
-            t_shown.Add(t_p);
+            foreach (CardData t_card in _deck)
+            {
+                if (t_card == null) continue;
+                if (DeckConfig.IsMultiplayer)
+                {
+                    this.eligibleCards.Add(t_card);
+                    continue;
+                }
+
+                CardGrowth t_growth = CardGrowthManager.GrowthOf(t_card);
+                if (!t_growth.Applied || t_growth.SynergyUnlocked)
+                    this.eligibleCards.Add(t_card);
+            }
+        }
+
+        List<SynergyProgress> t_all = SynergyPreview.Resolve(this.eligibleCards);
+        var t_shown = new List<SynergyProgress>();
+        foreach (SynergyProgress t_progress in t_all)
+        {
+            if (!this.showInactive && !t_progress.IsActive) continue;
+            t_shown.Add(t_progress);
             if (this.maxIcons > 0 && t_shown.Count >= this.maxIcons) break;
         }
 
-        EnsureIconCount(t_shown.Count);
-
-        for (int i = 0; i < this.icons.Count; i++)
+        if (this.icons == null) return;
+        for (int i = 0; i < this.icons.Length; i++)
         {
-            if (this.icons[i] == null) continue;
-            if (i < t_shown.Count) this.icons[i].Set(t_shown[i]);
-            else                   this.icons[i].gameObject.SetActive(false);   // 남는 건 숨김(풀 유지)
+            SynergyCountIcon t_icon = this.icons[i];
+            if (t_icon == null) continue;
+            if (i < t_shown.Count) t_icon.Set(t_shown[i]);
+            else                   t_icon.gameObject.SetActive(false);
         }
     }
 
     public void Clear() => Refresh(null);
 
-    void OnDisable() => this.tooltip?.Hide();
+    void OnDisable() => HideExplain();
 
-    void EnsureIconCount(int _needed)
+    void ShowExplain(SynergyCountIcon _icon)
     {
-        if (this.iconPrefab == null || this.iconParent == null) return;
-        while (this.icons.Count < _needed)
+        if (_icon == null || _icon.Progress?.Synergy == null) return;
+
+        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
         {
-            SynergyCountIcon t_icon = Instantiate(this.iconPrefab, this.iconParent);
-            // 아이콘은 풀링되어 재사용되므로 구독은 생성 시 1회만(Refresh마다 걸면 중복 구독).
-            t_icon.onLongPress    = ShowTooltip;
-            t_icon.onLongPressEnd = _ => this.tooltip?.Hide();
-            this.icons.Add(t_icon);
-        }
+            synergy    = _icon.Progress.Synergy,
+            iconRect   = (RectTransform)_icon.transform,
+            ownedCount = _icon.Progress.Count,
+        });
     }
 
-    void ShowTooltip(SynergyCountIcon _icon)
-    {
-        if (this.tooltip == null || _icon == null) return;
-        this.tooltip.Show(_icon.Progress, (RectTransform)_icon.transform);
-    }
+    static void HideExplain() => UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
 }
