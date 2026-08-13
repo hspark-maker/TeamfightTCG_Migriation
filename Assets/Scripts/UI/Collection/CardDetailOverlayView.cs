@@ -56,6 +56,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const string MaxLevelNotice          = "최고 레벨에 도달했다";
     const string NotAffordableNotice     = "골드가 부족하다";
     const string NotAffordableDiaNotice  = "다이아가 부족하다";
+    const string NotAffordableEnergyNotice = "에너지가 부족하다";
 
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
@@ -75,6 +76,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] Sprite     goldIcon;
     [Tooltip("다이아 비용 레벨(진화)에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
     [SerializeField] Sprite     diamondIcon;
+    [Tooltip("에너지 비용 레벨(일반 강화)에 쓸 아이콘. 비우면 골드 아이콘으로 떨어진다.")]
+    [SerializeField] Sprite     energyIcon;
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
 
     [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
@@ -1047,6 +1050,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         if (this.goldIcon == null || this.diamondIcon == null) return null;
 
+        // 에너지 아이콘은 아직 없을 수 있다(재화 그림이 미제작) → 없으면 골드 그림으로 떨어진다.
+        if (_currency == ECurrencyType.Energy) return this.energyIcon != null ? this.energyIcon : this.goldIcon;
+
         return _currency == ECurrencyType.Diamond ? this.diamondIcon : this.goldIcon;
     }
 
@@ -1098,7 +1104,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (!_hasStep) return MaxLevelNotice;
         if (_canPay)   return string.Empty;
 
-        return _currency == ECurrencyType.Diamond ? NotAffordableDiaNotice : NotAffordableNotice;
+        switch (_currency)
+        {
+            case ECurrencyType.Diamond: return NotAffordableDiaNotice;
+            case ECurrencyType.Energy:  return NotAffordableEnergyNotice;
+            default:                    return NotAffordableNotice;
+        }
     }
 
     void OnEnhancePressed()
