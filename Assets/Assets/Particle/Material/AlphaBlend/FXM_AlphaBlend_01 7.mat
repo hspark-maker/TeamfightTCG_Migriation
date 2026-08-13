@@ -19,7 +19,12 @@ Material:
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
-  disabledShaderPasses: []
+  disabledShaderPasses:
+  - DepthOnly
+  - DepthNormalsOnly
+  - UniversalGBuffer
+  - SceneSelectionPass
+  - Picking
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
