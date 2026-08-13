@@ -136,6 +136,9 @@ public class AlbumInsertSession : MonoBehaviour
 
             // 어차피 가드에 막혀 눌러도 안 먹는 탭바다 — 걷어야 화면 맨 아래가 건너뛰기 자리로 열린다
             lobbyTabController.SetBarRetracted(true);
+
+            // 페이지 오버레이의 딤은 탭 콘텐츠 안이라 상단 재화·메뉴를 못 덮는다 — 그쪽 탈출로는 셸 딤이 막는다
+            lobbyTabController.SetShellDimmed(true);
         }
         if (pageOverlay != null) pageOverlay.SetInteractionLocked(true);
 
@@ -491,6 +494,7 @@ public class AlbumInsertSession : MonoBehaviour
         {
             lobbyTabController.ClearLeaveGuard();
             lobbyTabController.SetBarRetracted(false);
+            lobbyTabController.SetShellDimmed(false);
         }
 
         IsRunning = false;

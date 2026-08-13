@@ -9,7 +9,7 @@ using UnityEngine.UI;
 // 덱 데이터의 진실원은 내 쪽이 DeckSaveManager, 상대 쪽이 DeckConfig.EnemyDeck이고
 // 이 뷰는 매 Render마다 거기서 다시 읽는다(사본을 캐시하지 않는다).
 // 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다 — 게이트를 열기 전에
-// LobbyMatchLauncher.ConfirmEnemyDeck이 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
+// LobbyMatchLauncher.ConfirmOpponent가 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
 public class MatchDeckPanelView : MonoBehaviour
 {
     [SerializeField] MatchDeckShell   shell;

@@ -116,6 +116,7 @@ public class PackResultGrid : MonoBehaviour
             m_views.Add(t_view);
             m_order.Add(t_drawn.Card);
             CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index, t_detailOptions);
+            AllowSloppyTap(t_view.Visual);
 
             var t_rt = (RectTransform)t_view.transform;
             t_rt.anchoredPosition = SlotPosition(t_index, t_count, t_rows);
@@ -123,6 +124,17 @@ public class PackResultGrid : MonoBehaviour
 
             PlayPop(t_rt, t_index, t_scale, _instant);
         }
+    }
+
+    // 손가락이 흔들려도 탭으로 인정한다. 이 화면은 스크롤이 없어(개봉 오버레이에 ScrollRect가 없다)
+    // 기본 12px 드리프트 가드가 지킬 제스처가 없고, 빠르게 툭 치는 탭만 잘라내 상세가 안 열린다 —
+    // 손가락을 고정한 채 눌렀다 떼야 열리니 "꾹 눌러야 열린다"로 읽혔다.
+    static void AllowSloppyTap(CardVisualView _tile)
+    {
+        if (_tile == null) return;
+
+        var t_press = _tile.GetComponent<LongPressDetector>();
+        if (t_press != null) t_press.CancelDistance = float.MaxValue;
     }
 
     // i번째 칸의 자리. 행·열 모두 중앙 정렬이고, 마지막 행이 덜 찼으면 그 행만 따로 가운데로 모은다.
