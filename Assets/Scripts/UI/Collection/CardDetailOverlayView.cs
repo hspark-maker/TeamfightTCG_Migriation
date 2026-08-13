@@ -177,6 +177,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// <summary>이 창이 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
     public static event Action OnAnyClosed;
 
+    /// <summary>강화 결과판에 읽을 것이 다 떠오른 순간. 결과판은 원래 탭해야 걷히는데, 안내가 접혀 있는 구간
+    /// (튜토리얼)에서는 "탭하라"고 말해 줄 자리가 없다 — 그쪽이 이 신호를 듣고 <see cref="CloseEnhanceResult"/>로
+    /// 대신 걷는다.</summary>
+    public static event Action OnAnyEnhanceResultReady;
+
+    /// <summary>떠 있는 강화 결과판을 밖에서 걷는다(튜토리얼 자동 복귀). 탭과 **같은 길**로 흘려보내므로
+    /// 무대 복귀·완료 신호(<see cref="OnAnyEnhanceSettled"/>)가 그대로 이어진다. 떠 있지 않으면 아무 일도 없다.</summary>
+    public static void CloseEnhanceResult()
+    {
+        if (s_instance == null || s_instance.resultPanel == null) return;
+
+        s_instance.resultPanel.RequestClose();
+    }
+
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
@@ -462,6 +476,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
 
+        // 무대에 선 카드를 창이 떠 있는 동안만 안내 타깃으로 내준다. Button을 넘기지 않는 것이 이 앵커의 계약이다 —
+        // 누를 대상이 아니라 "방금 이 카드가 강해졌다"를 딤 위로 띄워 보여 줄 영역이다.
+        if (this.cardView != null)
+            TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.CardDetailCard,
+                                            this.cardView.transform as RectTransform, null);
+
         // 강화 실패에도 통지가 온다 — 핸들러는 "레벨이 올랐다"고 가정하지 않고 값을 다시 읽는다.
         CardGrowthManager.OnGrowthChanged += OnGrowthChanged;
 
@@ -488,6 +508,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 창이 닫히면 안내 타깃도 놓는다 — 안 보이는 버튼을 가리키는 등록이 남으면 다음 안내가 허공에 뜬다.
         ApplyGrowthAnchor(null);
+
+        if (this.cardView != null)
+            TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.CardDetailCard,
+                                              this.cardView.transform as RectTransform);
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
@@ -1331,13 +1355,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.resultPanel == null) return;   // 미배선이면 연출이 스스로 걷는다(Play의 _awaitReturn 참고).
 
         // "한 번 더"의 가부는 오른 뒤의 다음 단계로 판정한다 — 방금 쓴 비용이 아니라 지금 낼 비용이 기준이다.
-        bool t_hasNext  = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
-        bool t_canRetry = t_hasNext && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
+        bool t_hasNext = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
+
+        // 다음 한 방이 진화 관문이면 여기서 잇지 않는다. 진화는 방금 한 일의 반복이 아니라 다른 재화를 무는
+        // 다른 종류의 일이라, 골드를 연타하던 손에 그대로 걸리면 안 된다 — 상세로 돌아가 스스로 고르는 자리다.
+        bool t_nextIsEvolve = t_hasNext && CardGrowthManager.IsEvolutionLevel(t_next.Level);
+        bool t_canRetry     = t_hasNext && !t_nextIsEvolve && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
 
         var t_line = new EnhanceResultLine(_result.Outcome,
                                            _fromHp, DeckPower.MaxHpOf(_card),
                                            _fromLevel, _result.Level,
-                                           t_canRetry, GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
+                                           // 못 잇는 이유가 잔액이 아니라 규칙이면 안내도 없다 —
+                                           // GrowthNotice를 그대로 흘리면 "다이아가 부족"이라는 거짓 문장이 뜬다.
+                                           t_canRetry,
+                                           t_nextIsEvolve ? string.Empty
+                                                          : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
                                            // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
@@ -1349,9 +1381,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 값도 지금 낼 비용으로 갈아둔다(방금 쓴 비용이 남아 있으면 다음 한 방의 가격을 잘못 읽는다).
         // 어느 버튼이 설지는 이미 공개 시점의 RefreshGrowth가 다음 단계 기준으로 정해뒀다 —
         // 여기선 그 판정을 다시 하지 않고 둘 다 손봐 서 있는 쪽이 알아서 맞게 둔다.
+        //
+        // 진화 관문 앞에서는 아무것도 되살리지 않는다. 바가 걷힌 채로 남고(아래 _onRowsDone) 판이 스스로 걷히므로,
+        // 여기서 값·글자를 갈아두면 복귀 도중 한 프레임 비칠 뿐이다.
         SetActionsEnabled(t_canRetry);
-        ApplyCost(t_hasNext, t_next);
-        SetActionLabel(true);
+        if (!t_nextIsEvolve)
+        {
+            ApplyCost(t_hasNext, t_next);
+            SetActionLabel(true);
+        }
 
         this.resultPanel.Show(t_line,
                               _onClose: () => this.m_activeRitual.PlayReturn(),
@@ -1376,7 +1414,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               },
                               // 읽을 것이 다 나왔다 — 이제 하단 바가 돌아와 "한 번 더"를 받는다.
                               // 결과판을 탭해 연출을 당긴 경우에도 같은 시점으로 앞당겨져 온다.
-                              _onRowsDone: ShowBottomBar);
+                              //
+                              // 진화 관문 앞에서는 걷은 채로 둔다. 받을 "한 번 더"가 없어서인데, 못 누르는 버튼을
+                              // 굳이 띄웠다가 상세에서 다시 켜면 그 깜빡임이 못 누르는 사실보다 더 눈에 걸린다.
+                              // 바는 복귀가 끝나는 _onFinished가 되돌린다(멱등).
+                              _onRowsDone: () =>
+                              {
+                                  if (!t_nextIsEvolve) ShowBottomBar();
+                                  OnAnyEnhanceResultReady?.Invoke();
+                              },
+                              // 이을 것이 없는 판이라 탭을 기다리지 않는다 — 읽을 것이 다 나오면 스스로 상세로 돌아간다.
+                              _autoReturn: t_nextIsEvolve);
     }
 
     void SetLevelText(int _level)

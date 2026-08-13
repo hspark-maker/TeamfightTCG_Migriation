@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 
 // 트리거 발화 튜토리얼의 씬 수명 브리지(씬당 1개). OutgameTutorialBridge의 축소판이다 —
@@ -11,6 +12,10 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
+
+    [Tooltip("강화 결과판을 대신 걷기까지 쥐고 있는 시간(초). 결과 행이 다 떠오른 시점부터 센다.\n" +
+             "튜토리얼 동안에만 적용된다 — 평상시의 결과판은 유저가 탭할 때까지 그대로 서 있다.")]
+    [SerializeField] float enhanceResultHold = 1.1f;
 
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다.
     TutorialStepDef m_step;
@@ -28,10 +33,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnActivated  += OnActivated;
         TutorialAnchorRegistry.OnRegistered  += OnAnchorRegistered;
 
-        CardDetailOverlayView.OnAnyEnhanceStarted += OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
-        CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
-        AlbumPageOverlayView.OnAnyClosed          += OnOverlayClosed;
+        CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed             += OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
     }
 
     void Start()
@@ -46,10 +52,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnActivated  -= OnActivated;
         TutorialAnchorRegistry.OnRegistered  -= OnAnchorRegistered;
 
-        CardDetailOverlayView.OnAnyEnhanceStarted -= OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
-        CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
-        AlbumPageOverlayView.OnAnyClosed          -= OnOverlayClosed;
+        CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed             -= OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
 
         CloseGate();
     }
@@ -182,6 +189,17 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         HideGuide();
+    }
+
+    // 결과판에 읽을 것이 다 떠올랐다. 안내를 접어 둔 구간이라 "탭해서 닫아라"를 말해 줄 자리가 없으므로
+    // 잠깐 쥐었다 대신 걷는다 — 걷히면 무대가 스스로 상세로 돌아오고, 그 복귀가 다음 스텝을 부른다.
+    // 그 사이 유저가 먼저 탭했거나 "한 번 더"로 넘어갔으면 걷을 판이 없다(RequestClose가 조용히 지나간다).
+    void OnEnhanceResultReady()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+
+        DOVirtual.DelayedCall(Mathf.Max(0f, this.enhanceResultHold), CardDetailOverlayView.CloseEnhanceResult)
+                 .SetLink(gameObject);
     }
 
     // 강화 한 방이 연출·결과판까지 끝나 상세로 돌아왔다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
