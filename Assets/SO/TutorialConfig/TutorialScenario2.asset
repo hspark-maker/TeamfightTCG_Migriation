@@ -27,7 +27,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
-  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
   playerScript:
   - kind: 1

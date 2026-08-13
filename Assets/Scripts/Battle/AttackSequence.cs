@@ -929,22 +929,16 @@ public static class AttackSequence
 
             _attacker?.FocusWeapon(false);
 
-            if (_splashView != null)
-            {
-                // 무쌍 등 다중 파괴: 동시 재생하면 "따닥"으로 뭉쳐 보인다 → 대상→스플래시 순차 재생.
-                if (t_defenderKilled) await _defender.PlayDeathAnim();
-                if (t_splashKilled)   await (_splashView?.PlayDeathAnim() ?? UniTask.CompletedTask);
-                if (t_defenderKilled || t_splashKilled)
-                    SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
-            }
-            else if (t_defenderKilled)
-            {
-                await _defender.PlayDeathAnim();
-                SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
-            }
+            // 공격자와 대상은 **같이 쓰러진다**. 순차로 세우면 서로의 사망 연출을 끝까지 기다려
+            // 마무리 여운이 두 배로 늘어난다 — 반격으로 양쪽이 같이 죽는 판이 특히 길었다.
+            // 대상 쪽(주 대상 → 스플래시)만 순차를 유지한다: 같은 편 둘이 동시에 터지면 "따닥"으로 뭉친다.
+            UniTask t_victimDeaths = PlayVictimDeaths(_attacker, _defender, _splashView,
+                                                      t_defenderKilled, t_splashKilled);
+            UniTask t_attackerDeath = t_attackerKilled && _attacker != null
+                ? _attacker.PlayDeathAnim()
+                : UniTask.CompletedTask;
 
-            if (t_attackerKilled)
-                await (_attacker?.PlayDeathAnim() ?? UniTask.CompletedTask);
+            await UniTask.WhenAll(t_victimDeaths, t_attackerDeath);
         }
         finally
         {
@@ -956,6 +950,19 @@ public static class AttackSequence
         // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(청소부 heal/OnAfterAttack 등) 실행
         if (_afterHit != null)
             await _afterHit();
+    }
+
+    /// <summary>맞은 쪽 사망 연출. 주 대상 → 스플래시 **순차** — 같은 편 카드가 한 프레임에 같이 터지면
+    /// 두 죽음이 한 덩어리로 뭉쳐 몇 장이 죽었는지 안 읽힌다. 공격자 사망은 이 체인 밖에서 병렬로 돈다.
+    /// 처치 음성은 하나라도 죽었으면 체인 끝에 한 번(죽은 장수만큼 겹쳐 울리지 않게).</summary>
+    static async UniTask PlayVictimDeaths(CardView _attacker, CardView _defender, CardView _splashView,
+        bool _defenderKilled, bool _splashKilled)
+    {
+        if (_defenderKilled && _defender != null)   await _defender.PlayDeathAnim();
+        if (_splashKilled   && _splashView != null) await _splashView.PlayDeathAnim();
+
+        if (_defenderKilled || _splashKilled)
+            SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
     }
 
     /// <summary>타격 순간의 멈칫. 무엇을 멈출지는 호출부가 준 콜백이 정한다(미지정이면 멈칫 없음).

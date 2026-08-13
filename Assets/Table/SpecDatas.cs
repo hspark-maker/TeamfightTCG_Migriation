@@ -52,6 +52,48 @@ public partial class Card
 }
 
 [GeneratorSpecData]
+public partial class CardPack
+{
+    /// 팩 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 안정 키(코드/SO 참조용
+    public string packId;
+    /// 변경 금지)
+    public string displayName;
+    /// 화면 표시 이름
+    public string channel;
+    /// Live=실행 노출 / TestOnly=테스트만
+    public string priceType;
+    /// 결제 재화(Gold/Diamond/Energy)
+    public long price;
+    /// 가격
+    public int drawCount;
+    /// 한 팩에서 뽑는 장수
+    public int uniqueDraw;
+    /// 1=한 팩 안 중복 없음(비복원 추출)
+    public string refundType;
+    /// 중복 환급 재화
+    public long refundAmount;
+}
+
+[GeneratorSpecData]
+public partial class CardPackDrop
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// CardPack.packId 참조
+    public string packId;
+    /// 이 등급 이상에서 이 묶음 사용(가장 높은 만족 등급 하나만 적용)
+    public string minGrade;
+    /// Card.id 참조
+    public int cardId;
+    /// 추첨 가중치(같은 packId+minGrade 안에서 정규화)
+    public int weight;
+}
+
+[GeneratorSpecData]
 public partial class Card_Test
 {
     /// 카드 고유 번호(부여 후 변경 금지)
