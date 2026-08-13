@@ -43,6 +43,9 @@ public static class CardGrowthManager
     {
         s_growth.Clear();
 
+        KeywordGrowthManager.OnChanged -= NotifyGrowthChanged;
+        KeywordGrowthManager.OnChanged += NotifyGrowthChanged;
+
         var t_data = DataSaveManager.Data.cardGrowth;
         bool t_migrated = false;
         if (t_data != null && t_data.entries != null)
@@ -75,6 +78,8 @@ public static class CardGrowthManager
         if (t_migrated) Save();
     }
 
+    static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
+
     // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
     public static void Save()
     {
@@ -86,15 +91,15 @@ public static class CardGrowthManager
         DataSaveManager.Save();
     }
 
-    public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)));
+    public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)), true);
 
     /// <summary>세이브와 무관하게 **지정 레벨**의 성장 스냅샷. AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다 —
     /// 곡선 해석(체력·진화·키워드·시너지 해금)을 한 곳에 두려고 여기서 내준다.</summary>
     public static CardGrowth GrowthAtLevel(CardData _card, int _level)
-        => Snapshot(_card, _level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _level);
+        => Snapshot(_card, _level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _level, false);
 
     // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
-    public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id));
+    public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id), true);
 
     // 카드의 현재 강화 레벨(기록 없음 = 미강화)
     public static int LevelOf(int _id)
@@ -187,14 +192,18 @@ public static class CardGrowthManager
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.
-    static CardGrowth Snapshot(CardData _card, int _level)
+    static CardGrowth Snapshot(CardData _card, int _level, bool _includeKeywordGrowth)
     {
         CardGrowthConfig t_config = Config;
+        CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_card, _level);
+        int t_hpBonus = t_config.HpBonusAt(_card, _level);
+        if (_includeKeywordGrowth) t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
+
         return new CardGrowth(
             _level,
-            t_config.HpBonusAt(_card, _level),
+            t_hpBonus,
             t_config.EvolutionStageAt(_level),
-            t_config.UnlockedKeywordsAt(_card, _level),
+            t_unlockedKeywords,
             t_config.SynergyUnlockedAt(_level));
     }
 
