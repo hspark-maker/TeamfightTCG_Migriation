@@ -84,6 +84,11 @@ public static class TriggeredTutorialRunner
         return s_active.TryGetStep(s_index, out _step);
     }
 
+    // 지금 서 있는 스텝이 _action인가. OutgameTutorialRunner와 같은 조회 창구다 —
+    // 화면·규칙 쪽이 튜토 좌표를 직접 해석하지 않게 한다(강화 비용이 "지금이 안내가 시킨 강화인가"를 묻는다).
+    public static bool IsCurrentAction(EOutgameTutorialAction _action)
+        => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
+
     // 현재 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
     public static bool EnterCurrentStep()
     {

@@ -26,6 +26,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitAlbumInsert:
             case EOutgameTutorialAction.WaitEnhance:
             case EOutgameTutorialAction.WaitLobbyReturn:
+            case EOutgameTutorialAction.WaitCardDetailReturn:
                 return true;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);

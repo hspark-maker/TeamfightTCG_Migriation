@@ -13,7 +13,7 @@ public static class CardGrowthManager
 
     static bool s_initialized;
 
-    // 안내가 대준 무료 강화를 이미 썼는가. 온보딩이 공짜로 내주는 것은 **한 방뿐**이고,
+    // 안내가 대준 무료 강화를 이미 썼는가. 안내가 공짜로 내주는 것은 **한 방뿐**이고,
     // 그 뒤의 "한 번 더"부터는 유저가 실제 비용을 보고 판단해야 한다(세이브하지 않는다 — 재시작하면 다시 한 방).
     static bool s_tutorialFreeUsed;
 
@@ -122,6 +122,12 @@ public static class CardGrowthManager
         return TryGetStepAt(_card, GrowthOf(_card).Level + 1, out _step);
     }
 
+    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다(안내가 강화 스텝에 들어선 순간).
+    /// 레벨도 잔액도 그대로지만 **낼 값**이 달라지므로, 이미 그려 둔 화면이 비용을 다시 읽어야 한다 —
+    /// 안 알리면 상세가 옛 비용을 띄운 채로 굳고, 잔액이 그에 못 미치는 유저는 강화 버튼이 비활성인 채
+    /// 안내가 시킨 일을 하지 못한다(표시·활성 판정·소모가 같은 값을 봐야 한다는 <see cref="TryGetStepAt"/> 규약).</summary>
+    public static void NotifyCostRuleChanged() => OnGrowthChanged?.Invoke();
+
     // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
     public static EnhanceResult TryEnhance(CardData _card)
     {
@@ -220,9 +226,13 @@ public static class CardGrowthManager
         return true;
     }
 
-    // 지금 이 한 방을 안내가 대신 내주는가(온보딩 강화 스텝 + 아직 안 쓴 상태).
+    // 지금 이 한 방을 안내가 대신 내주는가(강화 스텝에 서 있고 + 아직 안 쓴 상태).
+    // 두 러너를 함께 보는 이유: 강화 안내는 온보딩에서 트리거 튜토(도감 첫 진입)로 옮겨 갔고,
+    // 한쪽만 물으면 안내가 시킨 첫 강화에 유저 골드가 나간다. 무료 한 방은 둘을 합쳐 여전히 하나뿐이다.
     static bool IsTutorialFreeStep()
-        => !s_tutorialFreeUsed && OutgameTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);
+        => !s_tutorialFreeUsed
+        && (OutgameTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance)
+         || TriggeredTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance));
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using TMPro;
 
@@ -28,14 +29,18 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
     [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
-    [Tooltip("HP 아이콘. 체력이 굴러 오르는 동안 숫자와 같은 축으로 맥박친다(RollHp). 미배선이면 맥박만 조용히 빠진다.")]
+    [Tooltip("HP 아이콘. 새 값이 드러나는 한 박에 숫자와 같은 축으로 부푼다(FlashGrowth). 미배선이면 맥박만 조용히 빠진다.")]
     [SerializeField] Image      hpIcon;
-    [Tooltip("체력이 굴러 오르는 동안 물드는 색(RollHp). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
-    [SerializeField] Color      hpRollFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
-    [Tooltip("굴리는 동안 HP 아이콘이 부푸는 최대 비율. 아이콘(167.1)이 HpPanel(192.4) 안에 있어야 하므로 0.15를 넘기면 삐져나온다.")]
-    [SerializeField] float      hpIconPulse = 0.12f;
-    [Tooltip("굴리기가 끝나는 프레임 아이콘을 튀기는 세기. 숫자 펀치(UiPunch 기본값)보다 작아야 시선이 숫자에 남는다.")]
-    [SerializeField] float      hpIconPunch = 0.15f;
+    [Tooltip("새 값이 드러나는 한 박에 Lv·HP 글자가 물드는 색(FlashGrowth). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
+    [FormerlySerializedAs("hpRollFlashColor")]
+    [SerializeField] Color      growthFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
+    [Tooltip("그 한 박에 Lv·HP 글자가 부푸는 최대 비율.")]
+    [SerializeField] float      growthTextPulse = 0.18f;
+    [Tooltip("그 한 박에 HP 아이콘이 부푸는 최대 비율. 아이콘(167.1)이 HpPanel(192.4) 안에 있어야 하므로 0.15를 넘기면 삐져나온다.")]
+    [FormerlySerializedAs("hpIconPulse")]
+    [SerializeField] float      growthIconPulse = 0.12f;
+    [Tooltip("부풀었다 돌아오는 데 걸리는 시간. 섬광이 물러나는 동안 안에서 끝나야 '드러나며 강조된다'로 읽힌다.")]
+    [SerializeField] float      growthFlashDuration = 0.45f;
     [Tooltip("강화 레벨 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
     [SerializeField] TMP_Text   levelText;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
@@ -106,12 +111,15 @@ public class CardVisualView : MonoBehaviour
     const float KeywordIconWidth  =        0.65f / IngameCardWidth;
     const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
-    // 굴러 오르는 중인 체력. 도는 동안에는 이쪽이 숫자의 주인이다 — RefreshHp가 최종값을 먼저 찍으면 굴릴 것이 사라진다.
-    Tween m_hpRoll;
+    // 새 값이 드러나는 한 박의 강조(FlashGrowth). 값은 이미 찍혀 있고 여기서 도는 것은 색과 배율뿐이다.
+    Tween m_growthFlash;
 
-    // hpText의 authoring 색과 hpIcon의 authoring 배율. 물든 중간값이나 부푼 중간 배율을 기준으로 잡으면
-    // 굴릴 때마다 색과 크기가 밀린다 → 둘 다 1회만, 같은 시점에 캡처한다.
+    // Lv·HP 글자의 authoring 색과 글자·아이콘의 authoring 배율. 물든 중간값이나 부푼 중간 배율을 기준으로 잡으면
+    // 강조할 때마다 색과 크기가 밀린다 → 전부 1회만, 같은 시점에 캡처한다.
     Color   m_hpBaseColor;
+    Color   m_levelBaseColor;
+    Vector3 m_hpTextBaseScale;
+    Vector3 m_levelBaseScale;
     Vector3 m_hpIconBaseScale;
     bool    m_hpBaseCaptured;
 
@@ -132,8 +140,8 @@ public class CardVisualView : MonoBehaviour
         }
         gameObject.SetActive(true);
 
-        // 다른 카드를 그리는 참이다 — 남은 굴리기가 이 카드 위에 옛 카드의 숫자를 마저 찍게 두지 않는다.
-        KillHpRoll();
+        // 다른 카드를 그리는 참이다 — 앞 카드의 강조(물든 색·부푼 배율)가 이 카드 위에 남게 두지 않는다.
+        RestoreGrowthFlash();
 
         RefreshArt(_card, _mine);
 
@@ -172,9 +180,6 @@ public class CardVisualView : MonoBehaviour
     public void RefreshHp(CardData _card, bool _owned, bool _mine = true)
     {
         if (_card == null) return;
-
-        // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
-        if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
 
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
@@ -227,112 +232,105 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
-    /// 표시 문장·최종값의 정본은 여전히 <see cref="SetHpDisplay"/>다 — 굴리는 동안의 중간 숫자만 여기서 만들고,
-    /// 끝나든 잘리든 그쪽으로 되돌려 못 박는다(반올림 중간값이 남지 않는다).
+    /// <summary>새 Lv·HP가 드러나는 한 박을 강조한다(강화 결과 공개용). **값은 손대지 않는다** —
+    /// 표시의 진실원은 여전히 <see cref="SetHpDisplay"/>·<see cref="SetLevelDisplay"/>이고,
+    /// 호출부가 이 프레임에 이미 새 값을 찍어 둔 상태로 부른다.
     ///
-    /// 굴릴 것이 없으면(미소유·표시 꺼짐·오르지 않음) 즉시 반영하고 null을 돌려준다 — 강화 실패가 이 길로 온다.
-    /// _duration은 호출부가 정한다: 결과판의 체력 행과 같은 길이여야 두 숫자가 한 박에 움직인다.</summary>
-    public Tween RollHp(CardData _card, bool _owned, int _from, float _duration)
+    /// 부르는 자리는 섬광이 물러나기 시작하는 프레임이다 — 그냥 바뀌어 있기만 하면 프레임 장식에 묻히므로
+    /// 글자가 물들고 글자·아이콘이 부풀었다 제자리로 돌아온다. 색과 배율은 **한 파형** 위에 얹는다:
+    /// 축을 나누면 따로 놀고, 잘렸을 때 한쪽만 물든 채 굳는다.</summary>
+    public void FlashGrowth()
     {
-        if (_card == null) return null;
+        if (this.hpText == null && this.levelText == null) return;
 
-        KillHpRoll();
-
-        int t_to = DeckPower.MaxHpOf(_card);
-
-        if (this.hpText == null || !(_owned && this.ShowHp) || _duration <= 0f || t_to <= _from)
-        {
-            RefreshHp(_card, _owned);
-            return null;
-        }
-
-        // 패널·보너스는 먼저 최종 상태로 세운다 — 굴러야 하는 것은 숫자 하나뿐이다.
-        SetHpDisplay(_card, true, true);
+        RestoreGrowthFlash();
         CaptureHpVisual();
-        this.hpText.text = _from.ToString();
 
-        float t_shown = _from;
-        float t_span  = t_to - _from;
-        bool  t_done  = false;   // 정상 종료 여부. 잘렸으면 마무리 박자도 없다.
+        Transform t_link = this.hpText != null ? this.hpText.transform : this.levelText.transform;
 
-        this.m_hpRoll = DOTween.To(() => t_shown, _v =>
-                                   {
-                                       t_shown = _v;
-                                       if (this.hpText == null) return;
+        this.m_growthFlash = DOVirtual.Float(0f, 1f, Mathf.Max(0.05f, this.growthFlashDuration),
+                                             _p =>
+                                             {
+                                                 float t_wave = Mathf.Sin(Mathf.Clamp01(_p) * Mathf.PI);
 
-                                       this.hpText.text = Mathf.RoundToInt(_v).ToString();
+                                                 ApplyFlash(this.hpText,    this.m_hpBaseColor,
+                                                            this.m_hpTextBaseScale, t_wave);
+                                                 ApplyFlash(this.levelText, this.m_levelBaseColor,
+                                                            this.m_levelBaseScale, t_wave);
 
-                                       // 색은 굴리는 도중에 가장 짙고 끝에서 원래 색으로 돌아온다.
-                                       // 별도 트윈으로 두면 잘렸을 때 물든 채 굳으므로 같은 축에 얹는다.
-                                       float t_p    = Mathf.Clamp01((_v - _from) / t_span);
-                                       float t_wave = Mathf.Sin(t_p * Mathf.PI);
-
-                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor, t_wave);
-
-                                       // 아이콘도 같은 파형 위에서 부풀었다 돌아온다 — 축을 나누면 숫자와 따로 논다.
-                                       if (this.hpIcon != null)
-                                           this.hpIcon.transform.localScale =
-                                               this.m_hpIconBaseScale * (1f + this.hpIconPulse * t_wave);
-                                   },
-                                   (float)t_to, _duration)
-                               .SetEase(Ease.OutQuad)   // 결과판의 체력 행과 같은 곡선 — 두 숫자가 따로 놀지 않는다.
-                               .SetLink(this.hpText.gameObject)
-                               .OnComplete(() => t_done = true)
-                               .OnKill(() =>
-                               {
-                                   this.m_hpRoll = null;
-
-                                   // 복원이 먼저다 — autoKill이라 OnComplete와 같은 프레임에 여기 오므로,
-                                   // 펀치를 앞에 두면 배율 복원이 방금 시작한 펀치를 도로 걷어낸다.
-                                   RestoreHpVisual();
-
-                                   if (t_done)
-                                   {
-                                       UiPunch.Play(this.hpText.transform);
-                                       if (this.hpIcon != null) UiPunch.Play(this.hpIcon.transform, this.hpIconPunch);
-                                   }
-
-                                   RefreshHp(_card, _owned);
-                               });
-
-        return this.m_hpRoll;
+                                                 // 아이콘은 색을 건드리지 않는다 — 그림이 물들면 강조가 아니라 고장으로 읽힌다.
+                                                 if (this.hpIcon != null)
+                                                     this.hpIcon.transform.localScale =
+                                                         this.m_hpIconBaseScale * (1f + this.growthIconPulse * t_wave);
+                                             })
+                                       .SetLink(t_link.gameObject)
+                                       .OnKill(() =>
+                                       {
+                                           this.m_growthFlash = null;
+                                           RestoreHpVisual();
+                                       });
     }
 
-    void KillHpRoll()
+    /// <summary>강조를 걷고 authoring 상태로 못 박는다(멱등). 결과판이 읽기를 넘겨받는 자리와
+    /// 다른 카드를 그리는 자리가 이 길을 지난다 — 물든 색·부푼 배율이 다음 화면까지 따라가지 않게.</summary>
+    public void RestoreGrowthFlash()
     {
-        Tween t_roll  = this.m_hpRoll;
-        this.m_hpRoll = null;
-        t_roll?.Kill();   // OnKill이 숫자·색·배율을 되돌린다.
+        Tween t_flash      = this.m_growthFlash;
+        this.m_growthFlash = null;
+        t_flash?.Kill();   // OnKill이 색·배율을 되돌린다.
 
-        // 굴리기가 이미 끝났어도 마무리 펀치는 남아 있을 수 있다(그땐 m_hpRoll이 null이라 위 Kill이 못 잡는다).
-        // 카드 교체·연속 강화가 모두 여기를 지나므로 그 잔상도 여기서 걷는다.
-        RestoreHpVisual();
+        RestoreHpVisual();   // 트윈이 이미 죽어 있던 경우(위 Kill이 못 잡는 잔상)까지 여기서 걷는다.
+    }
+
+    // 물든 색과 부푼 배율을 한 파형에서 함께 얹는다. 미배선 노드는 조용히 건너뛴다.
+    void ApplyFlash(TMP_Text _text, Color _baseColor, Vector3 _baseScale, float _wave)
+    {
+        if (_text == null) return;
+
+        _text.color                = Color.Lerp(_baseColor, this.growthFlashColor, _wave);
+        _text.transform.localScale = _baseScale * (1f + this.growthTextPulse * _wave);
     }
 
     void CaptureHpVisual()
     {
-        if (this.m_hpBaseCaptured || this.hpText == null) return;
+        if (this.m_hpBaseCaptured) return;
+        if (this.hpText == null && this.levelText == null) return;
 
         this.m_hpBaseCaptured = true;
-        this.m_hpBaseColor    = this.hpText.color;
+
+        if (this.hpText != null)
+        {
+            this.m_hpBaseColor      = this.hpText.color;
+            this.m_hpTextBaseScale  = this.hpText.transform.localScale;
+        }
+
+        if (this.levelText != null)
+        {
+            this.m_levelBaseColor = this.levelText.color;
+            this.m_levelBaseScale = this.levelText.transform.localScale;
+        }
 
         if (this.hpIcon != null) this.m_hpIconBaseScale = this.hpIcon.transform.localScale;
     }
 
-    // 굴리기가 끝나든 잘리든 여기 한 곳에서 기준 상태로 못 박는다(멱등).
+    // 강조가 끝나든 잘리든 여기 한 곳에서 기준 상태로 못 박는다(멱등).
     void RestoreHpVisual()
     {
         if (!this.m_hpBaseCaptured) return;
 
-        if (this.hpText != null) this.hpText.color = this.m_hpBaseColor;
-
-        if (this.hpIcon != null)
+        if (this.hpText != null)
         {
-            // 대입만 하면 아직 도는 펀치가 다음 프레임에 제 배율을 다시 쓴다 → 먼저 완료시켜 소유권을 회수한다.
-            this.hpIcon.transform.DOComplete();
-            this.hpIcon.transform.localScale = this.m_hpIconBaseScale;
+            this.hpText.color                = this.m_hpBaseColor;
+            this.hpText.transform.localScale = this.m_hpTextBaseScale;
         }
+
+        if (this.levelText != null)
+        {
+            this.levelText.color                = this.m_levelBaseColor;
+            this.levelText.transform.localScale = this.m_levelBaseScale;
+        }
+
+        if (this.hpIcon != null) this.hpIcon.transform.localScale = this.m_hpIconBaseScale;
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.

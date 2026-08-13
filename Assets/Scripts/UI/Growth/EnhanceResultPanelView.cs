@@ -143,14 +143,10 @@ public class EnhanceResultPanelView : MonoBehaviour
     /// _onRetry는 "한 번 더"로 걷힌 시점 — 호출부가 복귀를 마친 뒤 다음 강화로 잇는다.
     /// 둘 중 정확히 하나만, 정확히 한 번 온다(중단 경로에선 어느 것도 오지 않는다 — <see cref="HideImmediate"/> 참고).
     ///
-    /// _onHpRoll은 체력 숫자가 굴러 오르기 시작하는 시점 — 인자는 굴리는 데 걸리는 시간이다.
-    /// 무대에 선 카드의 체력도 이 박자로 함께 굴리라고 알린다. 두 숫자가 한 박에 움직여야
-    /// "이 행이 저 카드의 저 자리"가 읽힌다. 굴릴 것이 없으면(실패·상승폭 0) 오지 않는다.
-    ///
     /// _autoReturn이면 읽을 것이 다 나온 뒤 <see cref="autoReturnHold"/>만큼 머물다 스스로 걷는다(탭과 같은 길).
     /// **어느 결과가 그 대상인지는 성장 규칙을 아는 호출부 몫**이고 여기는 켬/끔만 받는다
     /// (<see cref="EnhanceResultLine.UnlockText"/>와 같은 규약) — 머무는 박자만 이쪽 저작값이다.</summary>
-    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null,
+    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry,
                      Action _onRowsDone = null, bool _autoReturn = false)
     {
         this.m_onRowsDone = _onRowsDone;
@@ -210,7 +206,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.titleText != null)
             t_seq.InsertCallback(0f, () => UiPunch.Play(this.titleText.transform));
 
-        BuildRows(t_seq, t_success, _line, _onHpRoll);
+        BuildRows(t_seq, t_success, _line);
 
         // 읽을 것이 다 나온 자리. 탭으로 당겨도 여기를 지나므로(Complete는 콜백을 그대로 실행) 신호가 유실되지 않는다.
         t_seq.OnComplete(MarkRowsDone);
@@ -303,7 +299,7 @@ public class EnhanceResultPanelView : MonoBehaviour
 
     // 성공이면 행이 아래에서 차례로 떠오르고 오른 체력이 굴러 오른다.
     // 실패는 같은 행을 쓰되 박자를 뺀다 — 성공의 리듬이 있어야 실패의 정적이 아프다.
-    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line, Action<float> _onHpRoll)
+    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line)
     {
         if (this.effectValueText != null)
             this.effectValueText.text = _success && _line.ToHp > _line.FromHp
@@ -343,10 +339,8 @@ public class EnhanceResultPanelView : MonoBehaviour
         float t_rollDur = Mathf.Max(0.05f, this.rollDuration);
 
         // 굴리기는 그 행이 다 떠오른 뒤에 — 떠오르는 중에 숫자까지 움직이면 둘 다 안 읽힌다.
+        // 카드 위 숫자는 여기 맞춰 굴리지 않는다: 그쪽은 섬광이 물러날 때 이미 새 값으로 드러났다(FlashGrowth).
         _seq.Insert(t_rollAt, BuildRoll(_line.FromHp, _line.ToHp, t_rollDur));
-
-        // 카드 위의 숫자도 같은 시각·같은 길이로 출발한다. 길이를 넘기는 이유는 저작값이 이쪽에만 있기 때문이다.
-        if (_onHpRoll != null) _seq.InsertCallback(t_rollAt, () => _onHpRoll(t_rollDur));
     }
 
     Tween BuildRoll(int _from, int _to, float _duration)

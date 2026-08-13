@@ -113,11 +113,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
         m_step = t_step;
 
-        // 유저가 열어 둔 오버레이(카드 상세·도감 페이지)를 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
-        // 이미 로비 표면이면 기다릴 것이 없다.
-        if (m_step.Completion == EOutgameTutorialCompletion.LobbyReturn)
+        // 유저가 열어 둔 화면을 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
+        // 어디까지 걷혀야 하는지는 완료 조건이 정한다. 이미 걷혀 있으면 기다릴 것이 없다.
+        if (IsSurfaceWait(m_step.Completion))
         {
-            if (IsLobbySurfaceVisible()) OnGateSatisfied();
+            if (IsSurfaceReady(m_step.Completion)) OnGateSatisfied();
             return;
         }
 
@@ -137,6 +137,12 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Click
          || m_step.Completion == EOutgameTutorialCompletion.Enhance)
         {
+            // 이 스텝에 들어선 순간 강화 한 방의 값이 0으로 눕는다(CardGrowthManager의 무료 한 방).
+            // 카드 상세는 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
+            // 다시 읽게 하지 않으면 잔액이 그에 못 미치는 유저의 강화 버튼이 비활성으로 굳는다.
+            if (m_step.Completion == EOutgameTutorialCompletion.Enhance)
+                CardGrowthManager.NotifyCostRuleChanged();
+
             TryOpenGate();
             return;
         }
@@ -168,14 +174,26 @@ public class TriggeredTutorialBridge : MonoBehaviour
         OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
     }
 
-    // 오버레이 하나가 닫혔다. 남은 것이 아직 있으면 계속 기다린다 — 완료는 "로비 표면이 드러났는가" 하나로 판정한다.
+    // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다.
     void OnOverlayClosed()
     {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.LobbyReturn) return;
-        if (!IsLobbySurfaceVisible()) return;
+        if (m_step == null || !IsSurfaceWait(m_step.Completion)) return;
+        if (!IsSurfaceReady(m_step.Completion)) return;
 
         OnGateSatisfied();
     }
+
+    // 이 완료 조건이 "유저가 화면을 닫기를 기다리는" 부류인가.
+    static bool IsSurfaceWait(EOutgameTutorialCompletion _completion)
+        => _completion == EOutgameTutorialCompletion.LobbyReturn
+        || _completion == EOutgameTutorialCompletion.CardDetailReturn;
+
+    // 기다리던 화면이 걷혔는가. 상세 하나만 묻는 스텝은 뒤에 남는 도감 페이지를 세지 않는다 —
+    // 카드에서 손을 뗀 그 순간이 안내를 이어 붙일 자리이고, 도감을 마저 닫을 이유는 안내에 없다.
+    static bool IsSurfaceReady(EOutgameTutorialCompletion _completion)
+        => _completion == EOutgameTutorialCompletion.CardDetailReturn
+            ? !CardDetailOverlayView.IsOpen
+            : IsLobbySurfaceVisible();
 
     // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()

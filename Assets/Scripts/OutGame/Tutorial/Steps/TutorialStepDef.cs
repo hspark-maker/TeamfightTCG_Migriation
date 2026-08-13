@@ -95,6 +95,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
+        EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
         EOutgameTutorialAction.CardGrant       => EOutgameTutorialCompletion.CardGain,
 
         EOutgameTutorialAction.WaitClick     or
@@ -148,6 +149,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.WaitCardDetailReturn or
         EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
@@ -164,6 +166,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.WaitCardDetailReturn or
         EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
