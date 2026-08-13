@@ -27,6 +27,11 @@ public class PackShowcaseController : MonoBehaviour
     [SerializeField] TextMeshProUGUI priceText;     // 가격 숫자(재화 종류는 팩마다 다르다 — 옵션, 미배선 무시).
     [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 스프라이트가 바뀐다(옵션 — 미배선 무시).")]
     [SerializeField] Image priceIcon;
+    [Tooltip("튜토리얼이 가격 자리 문구(예: \"무료\")를 저작했을 때 대신 켜지는 라벨. 그동안 위 아이콘:숫자 "
+           + "쌍은 노드째로 꺼진다 — 쌍은 아이콘 자리를 비워 둔 좌표에 손으로 박혀 있어서, 아이콘만 걷으면 "
+           + "문구가 그 자리를 물려받지 못하고 한쪽으로 치우친다. 가운데 정렬로 저작할 것. "
+           + "미배선이면 예전처럼 숫자 칸이 문구를 대신 쓴다(치우침도 그대로).")]
+    [SerializeField] TextMeshProUGUI forcedPriceText;
     [Tooltip("골드 결제 팩에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
     [SerializeField] Sprite goldIcon;
     [Tooltip("다이아 결제 팩에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
@@ -52,7 +57,8 @@ public class PackShowcaseController : MonoBehaviour
     readonly List<Sprite> m_arts = new List<Sprite>();
 
     int m_index;
-    bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
+    bool m_forced;               // 튜토리얼이 진열을 덮어썼는가.
+    string m_forcedPriceLabel;   // 그 스텝이 가격 자리에 대신 띄우라고 저작한 문구(비면 실제 가격).
 
     // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
     bool m_openPending;
@@ -138,7 +144,7 @@ public class PackShowcaseController : MonoBehaviour
         if (s_transitioning) return;
 
         m_display.Clear();
-        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced);
+        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced, out m_forcedPriceLabel);
 
         if (m_forced)
         {
@@ -210,12 +216,39 @@ public class PackShowcaseController : MonoBehaviour
         var t_pack = ResolvePack();
 
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
-        if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
+
+        // 튜토리얼 스텝이 가격 자리 문구를 저작했으면 숫자 대신 그 말을 띄운다(예: "무료").
+        bool t_labeled = t_pack != null && m_forced && !string.IsNullOrEmpty(m_forcedPriceLabel);
+
+        // 문구가 설 자리. 별도 라벨이 배선돼 있으면 그쪽이 정본이고, 아이콘:숫자 쌍은 통째로 물러난다 —
+        // 쌍은 아이콘 자리를 비워 둔 좌표에 손으로 박혀 있어(레이아웃 그룹 없음) 아이콘만 걷으면
+        // 문구가 그 자리를 물려받지 못한다. 정렬을 손보는 대신 표시 주체를 갈아끼우는 이유다.
+        TMP_Text t_host = !t_labeled              ? null
+                        : forcedPriceText != null ? forcedPriceText
+                                                  : priceText;   // 라벨 미배선 폴백(예전 그림 그대로)
+
+        if (forcedPriceText != null)
+        {
+            forcedPriceText.gameObject.SetActive(t_host == forcedPriceText);
+            if (t_host == forcedPriceText) forcedPriceText.text = m_forcedPriceLabel;
+        }
+
+        // 숫자와 아이콘은 컴포넌트가 아니라 노드째로 끈다 — 문구가 그 자리에 서는 게 아니라 대신 서는 것이라,
+        // 꺼진 쌍이 자리만 차지하고 있으면 라벨을 어디에 두든 화면에는 빈칸이 낀 줄로 남는다.
+        if (priceText != null)
+        {
+            bool t_showNumber = t_pack != null && t_host == null;
+
+            priceText.gameObject.SetActive(t_showNumber || t_host == priceText);
+            if (t_showNumber)             priceText.text = $"{t_pack.Price:N0}";
+            else if (t_host == priceText) priceText.text = m_forcedPriceLabel;
+        }
 
         if (priceIcon != null)
         {
             // 가격 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
-            priceIcon.enabled = t_pack != null;
+            // 문구로 갈아낀 자리도 마찬가지 — 결제 재화를 말하지 않는 표기에 재화 아이콘만 남으면 어긋난다.
+            priceIcon.gameObject.SetActive(t_pack != null && !t_labeled);
 
             var t_icon = ResolveCurrencyIcon(t_pack);
             if (t_icon != null) priceIcon.sprite = t_icon;

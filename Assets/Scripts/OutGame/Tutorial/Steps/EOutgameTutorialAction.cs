@@ -17,4 +17,5 @@ public enum EOutgameTutorialAction
     CloseCardDetail = 12,   // 입력 없이 카드 상세 오버레이를 닫는다(로비 위젯을 가리키는 다음 안내의 길을 튼다)
     EnterFirstRank  = 13,   // 입력 없이 첫 랭크 티어에 올린다(온보딩 전투가 끝난 자리 = 랭크 연출이 서던 그 자리)
     WaitLobbyReturn = 14,   // 유저가 열어 둔 오버레이를 스스로 닫고 로비 표면으로 돌아올 때까지 대기(화면에 아무것도 그리지 않는다)
+    CardGrant       = 15,   // 입력 없이 카드 한 장을 지급하고 로비 획득 연출이 끝날 때까지 대기
 }

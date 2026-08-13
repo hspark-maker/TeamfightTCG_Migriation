@@ -7,6 +7,9 @@ public static class TutorialStepExecutor
 {
     const string BattleScene = "BattleScene";
 
+    // 보상 오버레이 제목. 지금은 첫 승리 보너스 한 자리에만 쓰이지만, 늘어나면 스텝 저작값으로 올린다.
+    const string RewardTitle = "첫 승리 보너스";
+
     // 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
     public static bool Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
@@ -31,6 +34,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
             case EOutgameTutorialAction.AutoPurchase: return EnterAutoPurchase(_step, _context);
             case EOutgameTutorialAction.DeckGrant:    return EnterDeckGrant(_step, _context);
+            case EOutgameTutorialAction.CardGrant:    return EnterCardGrant(_step, _context);
         }
 
         Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 알 수 없는 액션({(int)_step.Action}) — 건너뜁니다.");
@@ -160,6 +164,61 @@ public static class TutorialStepExecutor
             return false;
         }
 
+        _context.CompleteIfLast();
+        return false;
+    }
+
+    // 보상 카드를 오버레이로 보여 주고 유저가 [획득]을 눌러야 지급되는 자리.
+    // 진입에 성공하면 완료를 넘기지 않는다(EnterFirstRank와 같은 이유: 뒤이을 안내의 딤이 카드 비행을 덮는다) —
+    // 완료는 획득 뒤에 이어지는 로비 획득 연출이 끝나는 신호가 확정한다.
+    static bool EnterCardGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
+    {
+        string t_where = Where(_context);
+
+        if (_step.Card == null)
+        {
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} CardGrant에 카드가 미배선 — 지급을 건너뜁니다.");
+            return SkipAfterGrant(_context, null);
+        }
+
+        // 보여 줄 화면도 연출을 틀 디렉터도 없으면 기다릴 신호가 없다 — 화면 없이 지급만 하고 지나간다.
+        // 캐리어를 싣지 않는 것이 중요하다: 소비되지 못한 채 살아남으면 다음 로비 진입의 획득 연출에 섞인다.
+        if (!CardRewardOverlay.TryGet(out var t_overlay) || !LobbyGainEffectDirector.Exists)
+        {
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 보상 오버레이·획득 연출이 없어 지급만 하고 지나갑니다(로비 씬 배선 확인).");
+            return SkipAfterGrant(_context, _step.Card);
+        }
+
+        var t_card = _step.Card;
+        t_overlay.Show(RewardTitle, t_card, () => AcquireCard(t_card));
+        return true;
+    }
+
+    // [획득]이 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
+    // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
+    static bool AcquireCard(CardData _card)
+    {
+        OwnershipManager.Grant(CardCatalog.IdOf(_card));
+
+        CardPackRewardHandoff.Set(CurrencyGain.None, new List<CardData> { _card });
+        if (LobbyGainEffectDirector.PlayNow()) return true;
+
+        // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
+        CardPackRewardHandoff.TryConsume(null, out _);
+
+        // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
+        LobbyGainEffectDirector.NotifySkipped();
+
+        Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급은 완료).");
+        return false;
+    }
+
+    // 화면을 세우지 못한 경로의 마무리. 소유권만 맞춰 두고 스텝을 넘긴다.
+    static bool SkipAfterGrant(OutgameTutorialStepContext _context, CardData _card)
+    {
+        if (_card != null) OwnershipManager.Grant(CardCatalog.IdOf(_card));
+
+        _context.CommitAdvance();
         _context.CompleteIfLast();
         return false;
     }

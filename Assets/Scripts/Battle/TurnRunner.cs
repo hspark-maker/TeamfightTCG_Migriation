@@ -39,6 +39,9 @@ public class TurnRunner : MonoBehaviour
     // 보상을 만든 생존 카드 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
     List<CardData> lastSurvivorCards;
 
+    // 이번 판에 잃은 카드 스냅샷. 보상에는 관여하지 않고 결과 화면의 분모("몇 장 중")만 만든다.
+    List<CardData> lastFallenCards;
+
     // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
     CancellationToken destroyCt;
 
@@ -99,7 +102,7 @@ public class TurnRunner : MonoBehaviour
             await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorCards);
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorCards, this.lastFallenCards);
     }
 
 #if UNITY_EDITOR
@@ -130,11 +133,26 @@ public class TurnRunner : MonoBehaviour
     async UniTaskVoid PreviewResult(bool _won)
     {
         var t_reward = RewardService.CalculateReward(_won, s_previewSurvivors);
-        List<CardData> t_cards = BuildPreviewCards(s_previewSurvivors);
+        List<CardData> t_cards  = BuildPreviewCards(s_previewSurvivors);
+        List<CardData> t_fallen = BuildPreviewFallen(t_cards);
 
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards);
+        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards, t_fallen);
+    }
+
+    // 미리보기 전사 목록: 덱에서 생존 목록에 없는 카드를 담는다. 장수로 자르면 같은 카드가
+    // 산 채로도 죽은 채로도 한 줄에 서서, 실제 전투에서는 나올 수 없는 그림으로 연출을 튜닝하게 된다.
+    List<CardData> BuildPreviewFallen(List<CardData> _survivors)
+    {
+        var t_cards = new List<CardData>();
+        var t_deck  = DeckConfig.PlayerDeck;
+        if (t_deck == null) return t_cards;
+
+        for (int t_i = 0; t_i < t_deck.Count; t_i++)
+            if (!_survivors.Contains(t_deck[t_i])) t_cards.Add(t_deck[t_i]);
+
+        return t_cards;
     }
 
     // 실제 생존 카드 → 플레이어 덱 → 빈 자리 순으로 채운다. 마지막 폴백은 카드 없는 타일 경로까지 함께 검증한다.
@@ -347,6 +365,9 @@ public class TurnRunner : MonoBehaviour
 
         // 보상을 만든 그 카드들을 그대로 팝업에 넘긴다 — 목록과 금액이 갈라지면 계단이 어긋난다.
         this.lastSurvivorCards = CollectSurvivorCards(t_active);
+
+        // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
+        this.lastFallenCards = new List<CardData>(this.playerField.FallenCards);
 
         this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 

@@ -2,11 +2,14 @@ using System;
 using System.Collections;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// 로비 → 배틀 진입을 덮는 커튼. 위/아래 두 판이 대각으로 맞물려 화면을 덮고, 그 밑에서 씬을 갈아치운 뒤 다시 열린다.
+// 씬 전환을 덮는 커튼. 위/아래 두 판이 대각으로 맞물려 화면을 덮고, 그 밑에서 씬을 갈아치운 뒤 다시 열린다.
 // 복귀(배틀 → 로비)는 LoadingCoverView가 맡는다 — 가는 길은 빠르고 단호하게, 오는 길은 여유 있게.
+//
+// 이 컴포넌트는 "덮고 → 갈아치우고 → 연다"만 안다. 무엇이 갈리는지는 주입된 ICurtainSwap이 안다.
+// 지금 구현은 씬 로드(SceneLoadSwap) 하나뿐이지만, 커튼이 씬을 직접 알던 시절엔 씬 로드가 이 코루틴에
+// 섞여 있어 폴백이 두 곳으로 갈리고 씬 없는 전환을 표현할 방법이 없었다.
 //
 // 아트의 진실원은 프리팹이다(Resources/UI/SceneCurtain). 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
 // 코드는 화면 크기에 맞춰 판을 키우고 움직이기만 한다. 판의 색·대각은 매치 덱 확인 화면에서 가져왔다 —
@@ -15,9 +18,9 @@ using UnityEngine.UI;
 // ⚠ 프리팹 루트는 독립 캔버스여야 한다. 중첩 캔버스는 sortingOrder를 올려도 부모 루트가 그려지는 자리 안에서만 정렬된다.
 // ⚠ DontDestroyOnLoad로 씬을 넘어간다 — 씬이 갈린 뒤에 열려야 하므로. 그 대가로 어떻게 빠져나가든 반드시 스스로를
 //   파괴해야 한다. 남기면 커튼의 sortingOrder와 입력 차단판이 이후 모든 씬을 영구 입력 불가로 잠근다.
-public class SceneCurtainView : MonoBehaviour
+public class CurtainView : MonoBehaviour
 {
-    // 커버를 얻는 유일한 경로. Addressables가 아닌 이유는 LoadingCoverView와 같다 —
+    // 커튼을 얻는 유일한 경로. Addressables가 아닌 이유는 LoadingCoverView와 같다 —
     // "UIPrefab" 라벨은 PooledUIBase만 등록한다(DataLibrary.LoadUIPrefab).
     const string ResourcePath = "UI/SceneCurtain";
 
@@ -42,7 +45,7 @@ public class SceneCurtainView : MonoBehaviour
     [Tooltip("두 판이 맞물리는 시간(초).")]
     [Min(0f)] [SerializeField] float close = 0.22f;
 
-    [Tooltip("맞물린 채 머무는 시간(초). 로드가 덜 끝났으면 이 시간을 넘겨 더 기다린다.")]
+    [Tooltip("맞물린 채 머무는 시간(초). 갈아치울 것이 덜 준비됐으면 이 시간을 넘겨 더 기다린다.")]
     [Min(0f)] [SerializeField] float hold = 0.08f;
 
     [Tooltip("두 판이 다시 열리는 시간(초).\n⚠ close보다 길게 유지할 것 — 닫힘이 열림보다 빨라야 "
@@ -62,15 +65,16 @@ public class SceneCurtainView : MonoBehaviour
     [Tooltip("위 판이 이음매보다 더 내려와 아래 판 밑에 깔리는 양(px). 대각선 래스터라이즈에서 생기는 1px 틈을 막는다.")]
     [Min(0f)] [SerializeField] float seamOverlap = 2f;
 
-    [Tooltip("로드가 끝나지 않아도 이 시간(초)이 지나면 씬을 활성화한다 — 무한 대기 방지.")]
+    [Tooltip("갈아치울 것이 준비되지 않아도 이 시간(초)이 지나면 그대로 진행한다 — 무한 대기 방지.")]
     [Min(0f)] [SerializeField] float maxWait = 10f;
 
     // 씬을 넘어 사는 물건이라 가드도 씬 파괴에 묶이지 않아야 한다(BattleCleanup.s_loading과 같은 논리).
     static bool s_busy;
 
-    string         m_targetScene;
-    Action         m_beforeLoad;
-    AsyncOperation m_op;
+    ICurtainSwap m_swap;
+
+    // 프리팹을 못 얻어 판 없이 세워진 커튼. 미배선 오류와 구분하려고 든다 — 그쪽은 이미 경고를 냈다.
+    bool m_panelless;
 
     // 프리팹에 저작된 이음매 값. 코드가 크기를 다시 잡을 때 덮어쓰지 않도록 시작 시 떠 둔다.
     Color m_seamColor;
@@ -82,31 +86,53 @@ public class SceneCurtainView : MonoBehaviour
     /// <summary>커튼이 도는 중인가. 진입 연출이 끝나기를 기다리는 쪽이 묻는 창구다.</summary>
     public static bool IsBusy => s_busy;
 
-    /// <summary>커튼이 닫혀 화면을 덮은 뒤 _scene을 활성화하고, 새 씬 위에서 커튼이 열린다.
-    /// 로비 → 배틀 진입 전용(복귀는 LoadingCoverView.LoadScene).</summary>
-    /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리는 반드시 여기로 넘긴다
-    /// — 씬 교체와 붙어 있어야 파괴된 오브젝트를 붙잡은 연출 체인이 깨어날 틈이 없다(LoadingCoverView와 같은 계약).</param>
+    // 판을 못 얻은 커튼도 교체는 끝까지 책임진다(하드컷) — 연출 때문에 화면이 갇히면 탈출로가 없다.
+    bool HasPanels => top != null && bottom != null;
+
+    /// <summary>커튼이 닫혀 화면을 덮은 뒤 _swap이 갈아치우고, 새 화면 위에서 커튼이 열린다.
+    /// 무엇이 갈리든 커튼은 가리지 않는 원형 창구다.</summary>
+    public static void Play(ICurtainSwap _swap)
+    {
+        if (!TryPlay(_swap)) _swap?.Abort();
+    }
+
+    /// <summary>커튼이 덮은 사이 _scene으로 갈아탄다. 로비 → 배틀 진입 전용(복귀는 LoadingCoverView.LoadScene).</summary>
+    /// <param name="_onBeforeLoad">씬 교체 직전 1회 호출. 계약은 SceneLoadSwap 참고.</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
-        if (s_busy) return;   // 두 번째 클릭이 씬을 두 번 걸지 못하게
+        Play(new SceneLoadSwap(_scene, _onBeforeLoad));
+    }
+
+    // 커튼을 세워 연출을 건다. 걸지 못했으면 false — 호출부가 교체를 직접 책임진다.
+    static bool TryPlay(ICurtainSwap _swap)
+    {
+        if (_swap == null)
+        {
+            Debug.LogError("[CurtainView] 갈아치울 것이 없습니다 — 커튼을 걸지 않습니다.");
+
+            return false;
+        }
+
+        if (s_busy) return false;   // 두 번째 클릭이 전환을 두 번 걸지 못하게
 
         var t_prefab = Resources.Load<GameObject>(ResourcePath);
-        var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<SceneCurtainView>() : null;
+        var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<CurtainView>() : null;
 
-        // 커튼을 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
+        // 판을 못 얻어도 전환 자체는 되게 한다. 빈 오브젝트를 세워 코루틴 호스트로만 쓰면
+        // 폴백이 "판 없는 커튼" 한 갈래로 모인다 — 여기서 교체를 직접 돌리면 경로가 둘로 갈린다.
         if (t_view == null)
         {
-            Debug.LogWarning($"[SceneCurtainView] Resources/{ResourcePath} 를 찾지 못해 커튼 없이 전환합니다.");
-            _onBeforeLoad?.Invoke();
-            SceneManager.LoadScene(_scene);
-            return;
+            Debug.LogWarning($"[CurtainView] Resources/{ResourcePath} 를 찾지 못해 커튼 없이 전환합니다.");
+            t_view = new GameObject("Curtain (판 없음)").AddComponent<CurtainView>();
+            t_view.m_panelless = true;
         }
 
         s_busy = true;
 
-        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입들이 연출 시작보다 먼저다.
-        t_view.m_targetScene = _scene;
-        t_view.m_beforeLoad  = _onBeforeLoad;
+        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 연출 시작보다 먼저다.
+        t_view.m_swap = _swap;
+
+        return true;
     }
 
     /// <summary>화면 크기와 이음매 각도만으로 판의 크기·이동거리를 푼다.
@@ -136,23 +162,22 @@ public class SceneCurtainView : MonoBehaviour
 
     void Start()
     {
-        if (top == null || bottom == null)
+        if (!HasPanels)
         {
-            Debug.LogError("[SceneCurtainView] 판이 미배선이라 커튼을 칠 수 없습니다 — 커튼 없이 전환합니다.");
-            m_beforeLoad?.Invoke();
-            Finish();
-            Destroy(gameObject);
-            SceneManager.LoadScene(m_targetScene);
-            return;
+            // 프리팹은 얻었는데 판이 미배선인 경우. 하드컷으로 진행하되 저작 실수를 알린다.
+            if (!m_panelless)
+                Debug.LogError("[CurtainView] 판이 미배선이라 커튼을 칠 수 없습니다 — 커튼 없이 전환합니다.");
         }
-
-        WarnOnMisauthoredPanels();
-
-        if (seam != null)
+        else
         {
-            m_seamColor     = seam.color;
-            m_seamThickness = seam.rectTransform.sizeDelta.y;
-            SetSeamAlpha(0f);
+            WarnOnMisauthoredPanels();
+
+            if (seam != null)
+            {
+                m_seamColor     = seam.color;
+                m_seamThickness = seam.rectTransform.sizeDelta.y;
+                SetSeamAlpha(0f);
+            }
         }
 
         StartCoroutine(CoRun());
@@ -169,55 +194,39 @@ public class SceneCurtainView : MonoBehaviour
         Finish();
     }
 
+    // 커튼의 전부. 무엇이 갈리는지는 m_swap만 알고, 여기는 그 네 박자에 판의 움직임을 맞출 뿐이다.
     IEnumerator CoRun()
     {
-        m_op = SceneManager.LoadSceneAsync(m_targetScene);
+        // 닫힘 연출로 가릴 수 있는 준비는 여기서 시작된다(씬 비동기 로드 등).
+        m_swap.Prepare();
 
-        if (m_op == null)
-        {
-            Debug.LogError($"[SceneCurtainView] '{m_targetScene}' 를 로드할 수 없어 커튼 없이 전환합니다.");
-            m_beforeLoad?.Invoke();
-            Finish();
-            Destroy(gameObject);
-            SceneManager.LoadScene(m_targetScene);
-            yield break;
-        }
-
-        // 닫히는 동안 뒤에서 로드하고, 활성화는 다 닫힐 때까지 붙잡는다.
-        m_op.allowSceneActivation = false;
-
-        // 씬이 갈려도 커튼이 살아남아 열림을 마쳐야 한다.
+        // 교체가 씬을 갈아탈 수 있다 — 그래도 커튼이 살아남아 열림을 마쳐야 한다.
         DontDestroyOnLoad(gameObject);
 
         try
         {
-            yield return WaitSeq(BuildClose());
-
-            PlaySeamFlash();
+            if (HasPanels)
+            {
+                yield return WaitSeq(BuildClose());
+                PlaySeamFlash();
+            }
 
             float t_held = 0f;
-            while (t_held < hold || m_op.progress < 0.9f)
+            while (t_held < hold || !m_swap.IsReady)
             {
                 if (t_held >= maxWait)
                 {
-                    Debug.LogWarning($"[SceneCurtainView] 로드가 {maxWait}초 안에 끝나지 않아 그대로 진행합니다.");
+                    Debug.LogWarning($"[CurtainView] 교체 준비가 {maxWait}초 안에 끝나지 않아 그대로 진행합니다.");
                     break;
                 }
 
-                t_held += Time.unscaledDeltaTime;   // 씬 전환을 덮는 물건이라 timeScale을 신뢰하지 않는다
+                t_held += Time.unscaledDeltaTime;   // 화면 전환을 덮는 물건이라 timeScale을 신뢰하지 않는다
                 yield return null;
             }
 
-            m_beforeLoad?.Invoke();
-            m_beforeLoad = null;
+            yield return m_swap.Commit();
 
-            m_op.allowSceneActivation = true;
-            yield return m_op;
-            m_op = null;
-
-            yield return null;   // 새 씬이 최소 한 번 그려지도록 한 프레임 양보
-
-            yield return WaitSeq(BuildOpen());
+            if (HasPanels) yield return WaitSeq(BuildOpen());
         }
         finally
         {
@@ -242,7 +251,7 @@ public class SceneCurtainView : MonoBehaviour
         t_seq.Insert(0f, top   .DOAnchorPosY(-seamOverlap, close).SetEase(closeEase));
         t_seq.Insert(0f, bottom.DOAnchorPosY(0f,           close).SetEase(closeEase));
 
-        // 반쯤 닫힌 채 굳으면 그 틈으로 씬 교체 프레임이 샌다.
+        // 반쯤 닫힌 채 굳으면 그 틈으로 교체 순간이 샌다.
         t_seq.OnKill(SnapClosed);
 
         return t_seq.Play();   // 재생 책임을 코드에 남긴다(전역 autoPlay 설정에 기대지 않게)
@@ -250,13 +259,13 @@ public class SceneCurtainView : MonoBehaviour
 
     Sequence BuildOpen()
     {
-        ApplyGeometry(_closed: true);   // 씬이 갈리는 사이 해상도가 달라졌을 수 있어 다시 푼다
+        ApplyGeometry(_closed: true);   // 교체 사이 해상도가 달라졌을 수 있어 다시 푼다
 
         var t_seq = DOTween.Sequence().SetLink(gameObject).SetUpdate(true);
         t_seq.Insert(0f, top   .DOAnchorPosY( m_travelUp,   open).SetEase(openEase));
         t_seq.Insert(0f, bottom.DOAnchorPosY(-m_travelDown, open).SetEase(openEase));
 
-        // 잘리면 활짝 열린 채로 굳힌다 — 반쯤 닫힌 커튼이 보드를 가리지 않게.
+        // 잘리면 활짝 열린 채로 굳힌다 — 반쯤 닫힌 커튼이 다음 화면을 가리지 않게.
         t_seq.OnKill(SnapOpen);
 
         return t_seq.Play();
@@ -318,14 +327,14 @@ public class SceneCurtainView : MonoBehaviour
         seam.color = t_c;
     }
 
-    // 붙잡아 둔 활성화를 반드시 풀고 가드를 되돌린다. AsyncOperation은 이 오브젝트의 수명에 묶이지 않아,
-    // 여기서 놓치면 씬이 영영 활성화되지 않고 이전 화면에 갇힌다.
+    // 어떻게 빠져나가든 여기를 지난다. 교체가 붙잡은 것을 놓고, 가드를 되돌리고, 기다리는 쪽을 깨운다 —
+    // 셋 중 하나라도 놓치면 화면이 영영 갇힌다(붙잡힌 씬 활성화 / 다시 못 도는 커튼 / 안 깨어나는 진입 체인).
     void Finish()
     {
-        if (m_op != null)
+        if (m_swap != null)
         {
-            m_op.allowSceneActivation = true;
-            m_op = null;
+            m_swap.Abort();
+            m_swap = null;
         }
 
         s_busy = false;
@@ -337,13 +346,13 @@ public class SceneCurtainView : MonoBehaviour
     {
 #if UNITY_EDITOR
         if (!Mathf.Approximately(top.anchorMin.y, bottom.anchorMin.y))
-            Debug.LogWarning($"[SceneCurtainView] 두 판의 앵커가 다릅니다(위 {top.anchorMin.y} ≠ 아래 {bottom.anchorMin.y}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] 두 판의 앵커가 다릅니다(위 {top.anchorMin.y} ≠ 아래 {bottom.anchorMin.y}) — 이음매가 어긋납니다.");
 
         if (Mathf.Abs(Mathf.DeltaAngle(top.localEulerAngles.z, bottom.localEulerAngles.z)) > 0.01f)
-            Debug.LogWarning($"[SceneCurtainView] 두 판의 기울기가 다릅니다(위 {top.localEulerAngles.z} ≠ 아래 {bottom.localEulerAngles.z}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] 두 판의 기울기가 다릅니다(위 {top.localEulerAngles.z} ≠ 아래 {bottom.localEulerAngles.z}) — 이음매가 어긋납니다.");
 
         if (!Mathf.Approximately(top.pivot.y, 0f) || !Mathf.Approximately(bottom.pivot.y, 1f))
-            Debug.LogWarning($"[SceneCurtainView] pivot 규약 위반(위 {top.pivot} 은 y=0, 아래 {bottom.pivot} 은 y=1이어야 함) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] pivot 규약 위반(위 {top.pivot} 은 y=0, 아래 {bottom.pivot} 은 y=1이어야 함) — 이음매가 어긋납니다.");
 #endif
     }
 }
