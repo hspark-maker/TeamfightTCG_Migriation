@@ -10,6 +10,8 @@ using UnityEngine.UI;
 //
 // 상대를 실제로 구하는 것은 IMatchmaker이고 이 화면은 그 대기를 연출로 채운다 —
 // 페이크(로컬 AI)든 실제(Photon)든 이 화면은 달라지지 않는다. 대기 시간의 주인이 매치메이커이기 때문이다.
+//
+// 무엇을 어떻게 움직일지는 전부 MatchmakingFx·MatchHandoffFx가 쥔다. 셸은 "언제"만 정한다.
 public class MatchmakingShell : MonoBehaviour
 {
     [SerializeField] MatchProfileView myProfile;
@@ -35,6 +37,12 @@ public class MatchmakingShell : MonoBehaviour
     [Tooltip("대치할 때 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
     [SerializeField] float versusApproach = 60f;
 
+    [Header("연출")]
+    [SerializeField] MatchmakingFx fx = new MatchmakingFx();
+
+    [Tooltip("덱 화면으로 넘어가는 전환. 커튼으로 덮지 않고 두 화면을 잇는다 — 자세한 규약은 MatchHandoffFx 참고.")]
+    [SerializeField] MatchHandoffFx handoffFx = new MatchHandoffFx();
+
     const float DOT_INTERVAL = 0.35f;
     const int   DOT_MAX      = 3;
 
@@ -49,10 +57,15 @@ public class MatchmakingShell : MonoBehaviour
     Vector2 m_myHome;
     Vector2 m_opponentHome;
 
+    // 지금 화면에 떠 있는 안무. 화면이 내려갈 때 함께 걷지 않으면 파괴된 대상 위에서 계속 돈다.
+    Sequence m_stage;
+
     void Awake()
     {
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
+
+        fx.Capture();
 
         EnsureWired();
     }
@@ -62,6 +75,8 @@ public class MatchmakingShell : MonoBehaviour
         // 셸만 먼저 파괴되는 경우(호스트는 살아 있다) 매치메이커가 계속 돌다 파괴된 화면을 그린다.
         m_cts?.Cancel();
         StopDots();
+        KillStage();
+        fx.StopScan();
     }
 
     // 취소 버튼은 여기서 건다 — 프리팹 onClick으로 배선하면 셸이 모르는 취소 경로가 생겨 토큰이 살아남는다.
@@ -103,21 +118,48 @@ public class MatchmakingShell : MonoBehaviour
         m_running = true;
         m_cts     = CancellationTokenSource.CreateLinkedTokenSource(_ct);
 
+        MatchOpponent? t_result = null;
         try
         {
-            return await RunStagesAsync(_matchmaker, _ct);
+            t_result = await RunStagesAsync(_matchmaker, _ct);
+
+            return t_result;
         }
         finally
         {
             StopDots();
 
-            // 성공 경로도 여기로 온다(SetActive는 멱등) — 매치메이커가 계약을 어기고 던져도 화면이 남지 않는다.
-            Close();
+            // 내리는 것은 물러날 때뿐이다. 상대가 확정되면 이 화면의 부품들이 그대로 덱 화면으로 옮겨 앉으므로
+            // (PlayHandoffAsync) 여기서 내리면 옮길 것이 사라진다 — 실제로 내리는 것도 그 전환의 마지막 프레임이다.
+            // 매치메이커가 계약을 어기고 던져도 t_result는 null이라 화면이 남지 않는다.
+            if (t_result == null) Close();
 
             m_running = false;
             m_cts.Dispose();
             m_cts = null;
         }
+    }
+
+    /// <summary>
+    /// 덱 화면으로 넘어가는 전환. 상대가 확정된 뒤 호스트가 덱 화면을 세워 두고 이걸 await 한다.
+    /// 끝나면 이 화면은 내려가고 모든 축이 저작 상태로 돌아간다 — 전환은 도달하는 과정만 바꾼다.
+    /// </summary>
+    public async UniTask PlayHandoffAsync(MatchHandoffTargets _targets, CancellationToken _ct)
+    {
+        KillStage();
+
+        m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target, in _targets);
+        m_stage.SetLink(gameObject);
+
+        // 부품이 다 옮겨 앉은 프레임에 내려간다. 뒤의 덱 등장까지 켜 두면 알파 0짜리 딤이 그동안 터치를 먹는다.
+        m_stage.InsertCallback(handoffFx.moveDuration, Close);
+
+        await m_stage.ToUniTask(cancellationToken: _ct).SuppressCancellationThrow();
+
+        // 씬이 내려가는 중이다 — 파괴될 오브젝트를 건드리지 않는다.
+        if (_ct.IsCancellationRequested) return;
+
+        Close();   // 안무가 중간에 잘렸을 수 있다(SetActive는 멱등).
     }
 
     // 탐색중 → 발견 → 대치 → 진입. 어느 단계에서 끊겨도 null로 빠져나온다.
@@ -152,6 +194,10 @@ public class MatchmakingShell : MonoBehaviour
         gameObject.SetActive(true);
         EnsureWired();
 
+        // 직전 전환이 카드를 옮겨 앉히고 흐려 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
+        KillStage();
+        fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
+
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
 
@@ -161,6 +207,8 @@ public class MatchmakingShell : MonoBehaviour
 
         SetCancelInteractable(true);
         StartDots();
+
+        if (opponentProfile != null) fx.StartScan(opponentProfile.SearchingRect);
     }
 
     // 여기서부터 취소를 받지 않는다 — 이미 뽑은 상대를 버리고 다시 누르면 다른 상대가 나와,
@@ -168,6 +216,7 @@ public class MatchmakingShell : MonoBehaviour
     void ShowFound(in MatchOpponent _opponent)
     {
         StopDots();
+        fx.StopScan();
         SetCancelInteractable(false);
 
         if (titleText != null) titleText.text = foundTitle;
@@ -175,45 +224,22 @@ public class MatchmakingShell : MonoBehaviour
         if (opponentProfile == null) return;
 
         opponentProfile.Render(_opponent.Profile);
-        UiPunch.Play(opponentProfile.transform);
+
+        PlayStage(fx.BuildFound(opponentProfile, (RectTransform)transform));
     }
 
     void PlayVersus()
     {
-        if (versusRoot != null)
-        {
-            versusRoot.SetActive(true);
-            UiPunch.Play(versusRoot.transform, 0.6f, 0.35f);
-        }
+        var t_vs = VersusRect;
+        if (versusRoot != null) versusRoot.SetActive(true);
 
-        if (versusApproach <= 0f || myProfile == null || opponentProfile == null) return;
-
-        // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 왼쪽인지 프리팹을 몰라도 된다.
+        // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
         Vector2 t_gap  = m_opponentHome - m_myHome;
         Vector2 t_step = (t_gap.sqrMagnitude > 0.01f ? t_gap.normalized : Vector2.right) * versusApproach;
 
-        Approach(myProfile.Rect,       m_myHome,        t_step);
-        Approach(opponentProfile.Rect, m_opponentHome, -t_step);
-    }
-
-    // 서로를 향해 부딪혔다가 제자리로 튕겨 나온다.
-    static void Approach(RectTransform _rect, Vector2 _home, Vector2 _step)
-    {
-        _rect.DOKill();
-        _rect.anchoredPosition = _home;
-
-        // SetTarget이 없으면 시퀀스에 중첩된 트윈이 DOKill(대상 필터)에서 빠져나가 재진입 때 위치를 계속 민다.
-        DOTween.Sequence().SetTarget(_rect).SetLink(_rect.gameObject)
-               .Append(_rect.DOAnchorPos(_home + _step, 0.16f).SetEase(Ease.InQuad))
-               .Append(_rect.DOAnchorPos(_home,         0.32f).SetEase(Ease.OutBack));
-    }
-
-    static void RestoreHome(MatchProfileView _view, Vector2 _home)
-    {
-        if (_view == null) return;
-
-        _view.Rect.DOKill();
-        _view.Rect.anchoredPosition = _home;
+        PlayStage(fx.BuildVersus(myProfile != null ? myProfile.Rect : null,       m_myHome,
+                                 opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
+                                 t_step, t_vs));
     }
 
     // 취소 버튼. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
@@ -227,9 +253,41 @@ public class MatchmakingShell : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    RectTransform VersusRect => versusRoot != null ? (RectTransform)versusRoot.transform : null;
+
+    // 한 번에 도는 안무는 하나뿐이다 — 발견이 아직 도는 중에 대치가 겹치면 같은 카드를 두 트윈이 민다.
+    void PlayStage(Sequence _seq)
+    {
+        KillStage();
+
+        if (_seq == null) return;
+
+        m_stage = _seq.SetLink(gameObject);
+        m_stage.Play();
+    }
+
+    void KillStage()
+    {
+        m_stage?.Kill();
+        m_stage = null;
+    }
+
     void SetCancelInteractable(bool _on)
     {
         if (cancelButton != null) cancelButton.interactable = _on;
+    }
+
+    static void RestoreHome(MatchProfileView _view, Vector2 _home)
+    {
+        if (_view == null) return;
+
+        _view.Rect.DOKill();
+        _view.Rect.anchoredPosition = _home;
+        _view.Rect.localScale       = Vector3.one;
+
+        // 전환이 카드를 통째로 흐려 놓고 끝난다 — 되돌리지 않으면 다음 매칭이 투명한 카드로 열린다.
+        _view.Group.DOKill();
+        _view.Group.alpha = 1f;
     }
 
     // 취소되면 true. 예외 대신 값으로 받아 호출부가 한 줄로 갈린다.

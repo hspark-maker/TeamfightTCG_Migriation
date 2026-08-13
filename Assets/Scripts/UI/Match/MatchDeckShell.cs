@@ -34,6 +34,13 @@ public class MatchDeckShell : MonoBehaviour
     // 루트가 비활성인 채로 Open이 불릴 수 있다(SetActive가 Awake를 동기 실행하지만 순서에 기대지 않는다).
     bool m_wired;
 
+    // 게이트가 열려 있는가. 화면이 켜졌는지로 판정하지 않는 이유는 전환이 이 화면을 게이트보다 "먼저" 세우기 때문이다
+    // (PrepareForHandoff) — 켜짐을 진행 중으로 읽으면 정작 진짜 진입이 중복으로 걸려 그대로 포기 처리된다.
+    bool m_selecting;
+
+    // 전환이 이미 세워 둔 화면인가. 다시 열면 등장 안무가 세운 알파·배율이 저작값으로 되돌아간다.
+    bool m_prepared;
+
     void Awake()
     {
         EnsureWired();
@@ -67,19 +74,25 @@ public class MatchDeckShell : MonoBehaviour
     public async UniTask<bool> RunSelectionAsync(CancellationToken _ct)
     {
         // 이미 진행 중인데 다시 부르면 선택 상태를 덮어쓰고, Confirm 한 번에 두 await가 동시에 깨어난다.
-        if (m_gate == EGate.Pending && gameObject.activeSelf)
+        if (m_selecting)
         {
             Debug.LogWarning("[MatchDeckShell] 선택이 이미 진행 중이다 — 중복 진입을 무시한다.");
 
             return false;
         }
 
-        m_gate = EGate.Pending;
-        Open();
+        m_selecting = true;
+        m_gate      = EGate.Pending;
+
+        // 전환이 이미 세워 둔 화면이면 다시 열지 않는다 — 등장 안무가 감춰 둔 칸이 저작값으로 되살아난다.
+        if (!m_prepared) Open();
+        m_prepared = false;
 
         // 씬 파괴로 취소되면 Confirm/Cancel 어느 쪽도 오지 않는다 — 예외 대신 취소 여부를 값으로 받는다.
         bool t_canceled = await UniTask.WaitUntil(() => m_gate != EGate.Pending, cancellationToken: _ct)
                                        .SuppressCancellationThrow();
+
+        m_selecting = false;
 
         // 씬이 내려가는 중이다 — 파괴될 오브젝트를 건드리지 않는다.
         if (t_canceled) return false;
@@ -113,6 +126,18 @@ public class MatchDeckShell : MonoBehaviour
     public void Cancel()
     {
         m_gate = EGate.Cancelled;
+    }
+
+    /// <summary>
+    /// 매칭 화면 밑에 이 화면을 미리 세운다. 게이트(RunSelectionAsync)보다 앞서는 유일한 진입이다 —
+    /// 전환이 옮겨 앉힐 자리를 읽으려면 레이아웃이 이미 계산돼 있어야 한다.
+    /// </summary>
+    public MatchHandoffTargets PrepareForHandoff()
+    {
+        Open();
+        m_prepared = true;
+
+        return panelView != null ? panelView.BuildHandoffTargets() : default;
     }
 
     // 덱 화면 진입. 게이트를 쓰지 않고 직접 열 때(디버그·후속 진입점)의 창구다.
@@ -211,7 +236,13 @@ public class MatchDeckShell : MonoBehaviour
     {
         if (editPanel  != null) editPanel.SetActive(false);
         if (matchPanel != null) matchPanel.SetActive(true);
-        if (panelView  != null) panelView.Render(SelectedSlot);
+
+        if (panelView == null) return;
+
+        panelView.Render(SelectedSlot);
+
+        // 전환을 타고 들어온 직전 표시가 칸을 감춘 채 끝났을 수 있다 — 전환을 타지 않는 경로는 반드시 여기서 되돌린다.
+        panelView.ResetIntro();
     }
 
     // 표시할 슬롯 결정. 요청값 → 직전 선택 유지 → (튜토리얼 덱을 뺀) 첫 유효 슬롯 → 없음(-1).

@@ -3775,6 +3775,21 @@ MonoBehaviour:
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
   battleButton: {fileID: 6854664472983553879}
+  introFx:
+    enemyInfoBar: {fileID: 392638601574185110}
+    myInfoBar: {fileID: 3209139471161949486}
+    vsBadge: {fileID: 969477318005341513}
+    bottomBar: {fileID: 8301175124249707092}
+    cardDuration: 0.2
+    cardStagger: 0.03
+    cardStartScale: 0.6
+    infoAt: 0.02
+    infoDuration: 0.16
+    powerCountDuration: 0.3
+    bottomAt: 0.3
+    bottomDuration: 0.18
+    bottomRise: 120
+    battlePulse: 0.16
 --- !u!1 &8356174053361611620
 GameObject:
   m_ObjectHideFlags: 0

@@ -119,10 +119,32 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (shell == null)
         {
             Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
+
+            // 넘어갈 화면이 없으니 매칭 화면은 여기서 스스로 내려간다(전환이 내려 줄 기회가 없다).
+            m_matchShell?.Close();
+
             return TryApplyFirstValidDeck();
         }
 
-        return await shell.RunSelectionAsync(_ct);
+        // 매칭을 거치지 않은 경로(튜토리얼)는 옮겨 앉힐 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
+        if (t_opponent == null) return await shell.RunSelectionAsync(_ct);
+
+        return await RunSelectionWithHandoffAsync(_ct);
+    }
+
+    // 매칭 화면 → 덱 화면. 덱 화면을 매칭 화면 "밑에" 먼저 세운 뒤, 매칭의 세 부품(내 카드·상대 카드·VS)이
+    // 새 화면의 제자리로 옮겨 앉는다. 커튼으로 덮지 않는 이유는 두 화면의 축이 이미 같기 때문이다 —
+    // 가리면 같은 무대라는 사실이 오히려 지워진다(자세한 규약은 MatchHandoffFx 참고).
+    async UniTask<bool> RunSelectionWithHandoffAsync(CancellationToken _ct)
+    {
+        MatchHandoffTargets t_targets = shell.PrepareForHandoff();
+
+        // 선택 게이트는 전환이 도는 동안 시작해 첫 대기에서 멈춘다 — 전환이 끝난 프레임엔 이미 서 있어야 한다.
+        UniTask<bool> t_selection = shell.RunSelectionAsync(_ct);
+
+        await m_matchShell.PlayHandoffAsync(t_targets, _ct);
+
+        return await t_selection;
     }
 
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.

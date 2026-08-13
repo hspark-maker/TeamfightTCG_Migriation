@@ -24,6 +24,28 @@ public class MatchProfileView : MonoBehaviour
     // 대치 연출에서 셸이 카드를 통째로 민다.
     public RectTransform Rect => (RectTransform)transform;
 
+    // 아래 셋은 안무(MatchmakingFx·MatchHandoffFx)가 집는 부품이다. 뷰는 여전히 상태를 들지 않는다 —
+    // 무엇을 언제 움직일지는 전부 바깥이 정하고 여기는 어디에 있는지만 알려준다.
+    public TMP_Text NicknameText => nicknameText;
+    public TMP_Text RankNameText => rankNameText;
+
+    /// <summary>상대를 찾는 동안 훑을 빈 틀. 없으면(내 쪽) 스캔 축이 통째로 빠진다.</summary>
+    public RectTransform SearchingRect => searchingRoot != null ? (RectTransform)searchingRoot.transform : null;
+
+    // 전환이 카드를 통째로 흐린다. 저작에 없어도 되게 런타임에 붙인다 — 프리팹마다 하나씩 꽂게 하면 배선이 늘기만 한다.
+    CanvasGroup m_group;
+
+    public CanvasGroup Group
+    {
+        get
+        {
+            if (m_group == null) m_group = GetComponent<CanvasGroup>();
+            if (m_group == null) m_group = gameObject.AddComponent<CanvasGroup>();
+
+            return m_group;
+        }
+    }
+
     public void ShowSearching()
     {
         if (searchingRoot != null) searchingRoot.SetActive(true);
