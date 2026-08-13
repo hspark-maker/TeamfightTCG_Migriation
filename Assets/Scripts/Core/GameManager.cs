@@ -65,6 +65,11 @@ public class GameManager : MonoBehaviour
         ContentProfileConfig t_profile = ContentProfileConfig.Active;
         DataSaveManager.SetRepository(new JsonFileRepository(t_profile.SaveFolder));
         DataSaveManager.Load();             // 프로필별 세이브 로드
+
+        // 디버그 되감기 예약 소비(1단) — 매니저 Init들이 슬롯을 캐싱하기 전이어야 갈아끼운 슬롯이 반영된다.
+        // 예약이 없으면 아무 일도 없다. 지급 재생(2단)은 BootInstaller 끝에서 이어진다.
+        OutgameTutorialRewind.ApplyWipeIfScheduled();
+
         CurrencyManager.Init();             // 세이브 → 재화 메모리 캐싱
     }
 

@@ -7,14 +7,14 @@ public enum ECardChannel
     Live = 1,
 }
 
-/// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 세 장이 세트로 바뀐다.
-/// 단계별로 Sprite 필드를 평평하게 늘어놓으면(evolved2BattleImage…) 단계 추가 때마다 필드가 3개씩 늘고
-/// 호출부가 단계→필드 매핑을 손으로 분기하게 된다 → 세트를 배열 원소로 만들어 단계는 인덱스로만 다룬다.</summary>
+/// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 그림이 바뀐다.
+/// 단계별로 Sprite 필드를 평평하게 늘어놓으면(evolved2BattleImage…) 단계 추가 때마다 필드가 늘고
+/// 호출부가 단계→필드 매핑을 손으로 분기하게 된다 → 세트를 배열 원소로 만들어 단계는 인덱스로만 다룬다.
+///
+/// 한 장뿐인데도 클래스로 두는 이유: 단계별 아트에 다른 축(연출용 그림 등)이 붙을 자리를 남겨두기 위함이다.</summary>
 [System.Serializable]
 public class CardArtSet
 {
-    public Sprite fullImage;
-    public Sprite portrait;
     public Sprite battleImage;
 }
 
@@ -43,8 +43,9 @@ public class CardData : ScriptableObject
     // 카드가 가진 시너지들(가변 개수). main/sub 구분은 개념적일 뿐 같은 종류의 synergy.
     // 같은 SynergyData가 중복 나열돼도 카운트/적용/배지에서는 1회로 취급(소비측 Distinct).
     public SynergyData[] synergies;
-    public Sprite fullImage;
-    public Sprite portrait;
+    // 카드 아트는 battleImage 한 장뿐이다. 예전엔 fullImage(로비 전신)·portrait(초상)를 따로 뒀지만
+    // 실제로는 두 필드가 늘 같은 그림이었고, battleImage가 모든 폴백 사슬의 맨 앞이라 한 번도 도달하지 않았다.
+    // deckPreview는 카드 아트가 아니라 **덱 목록 배너 전용** 그림이라 별개 축으로 남는다.
     public Sprite battleImage;
     public Sprite deckPreview;
 
@@ -120,7 +121,7 @@ public class CardData : ScriptableObject
 
     /// <summary>진화 _stage단계(1~MaxEvolutionStage)의 아트 세트. 범위를 벗어나거나 미배정이면 null.
     /// 여기서는 인덱싱만 한다 — "비었으면 무엇으로 폴백하나"는 표시 규칙이라 CardVisualRules 몫이다.
-    /// 0단계(미진화)를 넣으면 null이 나온다. 미진화는 배열이 아니라 fullImage/portrait/battleImage 쪽이다.</summary>
+    /// 0단계(미진화)를 넣으면 null이 나온다. 미진화는 배열이 아니라 battleImage 쪽이다.</summary>
     public CardArtSet GetEvolvedArt(int _stage)
     {
         int t_index = _stage - 1;

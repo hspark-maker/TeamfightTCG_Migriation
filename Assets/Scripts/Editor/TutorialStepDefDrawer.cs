@@ -97,13 +97,13 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesAnchor(_action))        yield return "anchor";
         if (TutorialStepDef.ShowsGuideMessage(_action)) yield return "guideMessage";
         if (TutorialStepDef.UsesPack(_action))          yield return "pack";
-        if (TutorialStepDef.UsesRefundGold(_action))    yield return "duplicateRefundGold";
         if (TutorialStepDef.UsesScenario(_action))      yield return "scenario";
         if (TutorialStepDef.UsesShowDeckGate(_action))  yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))      yield return "deckName";
         if (TutorialStepDef.UsesDim(_action))           yield return "useDim";
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
+        yield return "unlocksAll";
         yield return "unlocks";
         yield return "locks";
     }

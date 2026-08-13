@@ -84,8 +84,8 @@ public class CardElement : MonoBehaviour,
         this.nameText.text = _card.name;
         if (_mod == CardElementMod.Full)
         {
-            // 아트 소스는 CardVisualRules 단독(battleImage → fullImage → portrait). fullImage 직접 참조 금지 —
-            // 프레임이 인게임 CardView와 같은 세로형이라 비율이 다른 fullImage를 쓰면 카드마다 잘림이 갈라진다.
+            // 아트 소스는 CardVisualRules 단독. 카드 아트를 여기서 직접 읽지 말 것 —
+            // 프레임이 인게임 CardView와 같은 세로형이라, 비율이 다른 그림을 끼우면 카드마다 잘림이 갈라진다.
             this.cardPortrait.sprite = CardVisualRules.PickCardArt(_card);
             //this.explainText.text = _card.cardExplain;
             // 호출부가 값을 정했으면 그대로(전투는 인스턴스 현재 체력을 넘긴다).

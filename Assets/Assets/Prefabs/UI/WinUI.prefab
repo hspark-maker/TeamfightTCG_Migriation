@@ -210,6 +210,7 @@ MonoBehaviour:
   popDuration: 0.12
   angleStart: 18
   angleSpan: 360
+  arcHeight: 0
 --- !u!1 &1854962038215382207
 GameObject:
   m_ObjectHideFlags: 0
@@ -479,6 +480,7 @@ RectTransform:
   - {fileID: 433631282471626747}
   - {fileID: 6643905990147842171}
   - {fileID: 2642928797730071673}
+  - {fileID: 6950760237462054635}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -503,19 +505,43 @@ MonoBehaviour:
   mainMenuScene: LobbyScene
   dimGroup: {fileID: 7550376149298931392}
   rewardGoldText: {fileID: 5379306916474164639}
+  goldIconRect: {fileID: 8834019312633937438}
+  survivorLabel: {fileID: 0}
+  survivorFormat: "\uC0DD\uC874 {0}\uC7A5"
   coinBurst: {fileID: 8555565048897266977}
   rankPointText: {fileID: 31623442940432697}
   rankBurst: {fileID: 8169535200608968343}
   rankLine: {fileID: 7719120126808185768}
   hintGroup: {fileID: 4680157987745065650}
+  cardFlight:
+    layerOverride: {fileID: 0}
+    rowCenter: {fileID: 6950760237462054635}
+    tileFrame: {fileID: 21300000, guid: 3ccd76da422b6d64b99e2aeb55123545, type: 3}
+    tileSize: {x: 150, y: 200}
+    tileSpacing: 24
+    rowRise: 260
+    maxRowWidth: 1000
+    enterStagger: 0.06
+    enterDuration: 0.18
+    enterRise: 90
+    maxEnterSpan: 0.45
+    holdBase: 0.3
+    holdPerCard: 0.03
+    flyStagger: 0.18
+    flyDuration: 0.26
+    flyScale: 0.18
+    flySpin: 12
+    maxFlySpan: 1
   dimDuration: 0.2
+  dimAlpha: 0.94
   enterDuration: 0.45
-  titleDuration: 0.35
   rewardRevealDuration: 0.3
   goldRollDuration: 0.15
   hintFadeDuration: 0.25
-  titleDrop: 120
+  panelOverlap: 0.6
+  rankOverlap: 0.3
   goldPunch: 0.3
+  goldIconPunch: 0.18
 --- !u!1 &3669285588003552999
 GameObject:
   m_ObjectHideFlags: 0
@@ -1200,6 +1226,41 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1080, y: 150}
   m_Pivot: {x: 0.5, y: 1}
+--- !u!1 &5699916596648059112
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6950760237462054635}
+  m_Layer: 0
+  m_Name: SurvivorRowPos
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &6950760237462054635
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5699916596648059112}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3669285587999233025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: -430}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &5761338280391621419
 GameObject:
   m_ObjectHideFlags: 0
@@ -1627,6 +1688,7 @@ MonoBehaviour:
   popDuration: 0.12
   angleStart: 18
   angleSpan: 360
+  arcHeight: 0
 --- !u!1 &7719120126808185768
 GameObject:
   m_ObjectHideFlags: 0

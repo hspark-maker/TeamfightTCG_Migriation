@@ -143,10 +143,10 @@ flowchart TD
         SHOP["상점 UI"]
     end
     subgraph def["E-14 정의 (SO, 에디터 데이터)"]
-        DEF["CardPackData (SO)<br/>packId·packArt·price·drawCount·pool(지정 카드셋)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
+        DEF["CardPackData (SO)<br/>packId·packArt·priceType·price·drawCount·pool(지정 카드셋)<br/>refundType·refundAmount(중복 환급)<br/>rankPools(등급별 가중 풀) · ResolvePool(등급)"]:::new
     end
     subgraph svc["E-15 구매·드로우"]
-        SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack, refund) · 로컬 랜덤"]:::new
+        SVC["CardPackOpener<br/>[#1 무상태 static]<br/>TryPurchase(pack) · 로컬 랜덤"]:::new
     end
     RES["OpenedPack / DrawnCard<br/>[#6 UI 스냅샷] card · isNew · refund"]:::new
 
@@ -155,14 +155,14 @@ flowchart TD
     KEY["CardCatalog.KeyOf<br/>안정 키 규약 (기존)"]
     RANK["RankManager.GetInfo().Grade (기존)"]
 
-    SHOP -->|"TryPurchase(pack, refund)"| SVC
+    SHOP -->|"TryPurchase(pack)"| SVC
     SHOP -.->|"대상 팩 SO 참조"| DEF
     SVC -->|"현재 등급 조회"| RANK
-    SVC -->|"Spend(Gold, price)"| CUR
+    SVC -->|"Spend(priceType, price)"| CUR
     SVC -->|"ResolvePool(등급) 가중 드로우"| DEF
     SVC -->|"KeyOf(card)"| KEY
     SVC -->|"Grant(key) 루프 → isNew"| OWN
-    SVC -->|"중복이면 Earn(Gold, refund)"| CUR
+    SVC -->|"중복이면 Earn(refundType, refundAmount)"| CUR
     SVC -->|"결과 조립"| RES
     RES -->|"신규/중복·환급 연출"| SHOP
 
@@ -180,16 +180,16 @@ sequenceDiagram
     participant OWN as OwnershipManager
 
     U->>SHOP: 팩 구매 클릭
-    SHOP->>SVC: TryPurchase(pack, refund)
-    SVC->>CUR: CanAfford(Gold, price)?
+    SHOP->>SVC: TryPurchase(pack)
+    SVC->>CUR: CanAfford(priceType, price)?
     alt 잔액 부족
         SVC-->>SHOP: 실패(구매 불가, 차감 없음)
     else 충분
-        SVC->>CUR: Spend(Gold, price)
+        SVC->>CUR: Spend(priceType, price)
         loop drawCount 회 (ResolvePool(현재 등급)에서 가중 드로우)
             SVC->>OWN: Grant(KeyOf(card)) → isNew
             alt 중복(isNew=false)
-                SVC->>CUR: Earn(Gold, duplicateRefundGold)
+                SVC->>CUR: Earn(refundType, refundAmount)
             end
         end
         SVC->>CUR: Save() (즉시 영속)
@@ -203,16 +203,16 @@ sequenceDiagram
 - **isNew는 Grant 시점에만 안다**: `Grant`는 신규면 true, 이미 소유면 false 반환. 개봉 후엔 전 카드가 `IsOwned=true`라 UI가 사후 판정 불가 → **`OpenedPack`는 생략 불가**(신규 여부·환급의 유일 진실원).
 - **팩별 지정 풀**: 드로우 대상은 `CardData` 전체가 아니라 `CardPackData.pool`(에디터 큐레이션). 이는 마스터 목록 복제가 아닌 **부분집합 참조**라 4번째 목록 드리프트 아님. 키는 여전히 `CardCatalog.KeyOf`(단일 규약)로 산출.
 - **랭크별 풀 오버라이드 (2026-08-06)**: `rankPools`(`RankPackPool` = minGrade + `WeightedCard` 목록)가 있으면 `ResolvePool(현재 등급)`이 "minGrade ≤ 현재 등급 중 최고 등급" 항목을 적용(등급별 통풀 재저작, 하위 등급과 합산 없음). 매치 없거나 비면 기존 `pool`을 weight 1 취급으로 폴백 → `rankPools` 빈 팩(튜토리얼 3종)은 기존 동작 그대로. weight 0 이하 = 1(균등) 취급, 카드 제외는 리스트 삭제로. 풀 해석은 데이터(`CardPackData`)가 소유 — 상점 미리보기가 생기면 같은 메서드를 쓴다(현재 미리보기 소비자 없음).
-- **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(팩 결제 재화, refundAmount)`. 환급 **액수**는 `TryPurchase`의 인자로 구매처(버튼/첫실행)가 직접 넘기고(상점 SO 전역값 폐기), 환급 **재화 종류**는 `CardPackData.priceType` 하나가 정한다(→ 재화 분리 섹션). Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
+- **중복 = 소액 환급**: 장별 `Grant` 반환이 false면 `CurrencyManager.Earn(refundType, refundAmount)`. 종류·액수 **둘 다 `CardPackData`가 쥔다**(2026-08-10 이관 — 구매처는 아무것도 넘기지 않는다). 결제 재화(`priceType`)와 무관하게 저작할 수 있다: UltraPack은 Diamond로 사고 Gold로 환급한다. Spend/Earn을 한 트랜잭션으로 처리 후 `Save()` 1회.
 - **로컬 랜덤(비결정론 무방)**: 아웃게임 최초 랜덤. `Battle/MatchRandom` 재사용 금지(경계), 서비스 내부 `System.Random` 인스턴스.
-- **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, 대상 팩 SO·환급액은 각 구매처 뷰가 인스펙터로 소유해 `TryPurchase(pack, refund)`에 직접 넘긴다(진열=뷰 책임).
-- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률 = `CardPackData` SO(코드 미수정) / 환급액 = 구매처 뷰의 `duplicateRefundGold` 필드. ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
+- **상점 SO(CardShop) 폐기**: 진열 팩 목록·환급 전역값을 쥐던 `CardShop` SO와 `SetShop` 주입을 제거. `CardPackOpener`는 무상태 파사드가 되고, **진열할 팩 목록**만 각 구매처 뷰가 인스펙터로 소유한다(진열=뷰 책임). 환급은 2026-08-10에 팩 SO로 다시 모였다 — 뷰는 `TryPurchase(pack)`에 팩만 넘긴다.
+- **수정 가능성 높은 지점**: 팩 가격·드로우 수·구성·등급별 풀/확률·**중복 환급 종류/액수** 전부 `CardPackData` SO(코드 미수정). ("가중 목록으로 확장" 예고는 `rankPools`로 실현.)
 
 | 클래스 | 파일 | 태스크 |
 |---|---|---|
-| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·price·drawCount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
+| `CardPackData` (SO) | `OutGame/CardPack/CardPackData.cs` — `packId·displayName·packArt(Sprite)·priceType·price·drawCount·uniqueDraw·refundType·refundAmount·pool(List<CardData>)·rankPools(List<RankPackPool>)·ResolvePool(ERankGrade)` | E-14 |
 | `WeightedCard` · `RankPackPool` (값, co-locate) | `OutGame/CardPack/CardPackData.cs` — `card·weight(0 이하=1)` / `minGrade·cards` | E-14 |
-| `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData, long refund)` | E-15 |
+| `CardPackOpener` (static, 무상태) | `OutGame/CardPack/CardPackOpener.cs` — `TryPurchase(CardPackData)` | E-15 |
 | `OpenedPack` · `DrawnCard` (값) | `OutGame/CardPack/OpenedPack.cs` — `card · isNew · refund` | E-16 |
 
 ---
@@ -347,7 +347,7 @@ flowchart TD
     end
 
     subgraph run["해석 — 스텝 실행 (씬 오브젝트를 모름)"]
-        RUN["OutgameTutorialRunner (static)<br/>IsRunning · ChapterCount · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied<br/>TryGetNext = 자리 올림(빈 챕터 스킵) 단일 진실원"]:::chg
+        RUN["OutgameTutorialRunner (static)<br/>IsRunning · ChapterCount · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied<br/>TryGetNext = 자리 올림(빈 챕터 스킵) 단일 진실원<br/>디버그: StepCountOf · ChapterLabelOf · TryGetStepAt<br/>RewindForDebug(좌표) → OnRewound"]:::chg
         DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialChapter&gt;<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::chg
         CHAP["OutgameTutorialChapter ([Serializable], SO 아님)<br/>label(기획 'N편'과 1:1) · steps · TryGetStep<br/>챕터 하나 = 준비 스텝들 → 전투 스텝"]:::new
         STEP["OutgameTutorialStep (abstract SO) + 6종<br/>WaitClick · BattleEntry · WaitPurchase<br/>WaitPackOpen · AutoPurchase · AutoBattle<br/>Anchor · Completion · LeavesScene · Enter(ctx)<br/>unlocks(기능 해금) · UseDim(딤 사용 여부)"]:::chg
@@ -360,7 +360,7 @@ flowchart TD
 
     subgraph scene["씬 레이어 (UI/Tutorial/)"]
         BRG["OutgameTutorialBridge (온보딩 전용)<br/>씬당 1개 — 현재 LobbyScene뿐<br/>(개봉이 씬→로비 오버레이로 이관돼 CardPack 브리지 소멸)<br/>Awake:EnsureData · Start:EnterCurrentStep<br/>온보딩이 끝나면 게이트를 건드리지 않는다 → G-TUT2"]:::new
-        GATE["OutgameTutorialGateUI<br/>전면 딤(350) + 타깃 Canvas 승격(351)<br/>포커스링 · 손가락 · 메시지 = 프리팹 저작<br/>onClick 구독으로 완료 감지<br/>UseDim=false면 딤·승격 생략(잠금이 대신 막는다)"]:::chg
+        GATE["OutgameTutorialGateUI<br/>전면 딤(350) + 타깃 Canvas 승격(351)<br/>포커스링 · 손가락 · 메시지 = 프리팹 저작<br/>onClick 구독으로 완료 감지<br/>UseDim=false면 딤·승격 생략(잠금이 대신 막는다)<br/>안내 문구는 항상 화면 중앙"]:::chg
         GPF["OutgameTutorialGate.prefab<br/>브리지가 [SerializeField]로 보유<br/>미배선 시 딤+문구 코드 폴백"]:::new
     end
 
@@ -412,6 +412,13 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
+    DBGS["OutgameTutorialStepWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>SO 직독으로 편·스텝을 펼치고 칸 하나를 예약한다"]:::new
+    RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
+    BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
+    DBGS -->|"Schedule(좌표)"| RWD
+    RWD --- BOOT2
+    BOOT2 --> PRG
+    RWD -->|"TryGetStepAt · StepCountOf"| RUN
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
@@ -459,6 +466,9 @@ sequenceDiagram
 > G-TUT의 온보딩은 **단조 증가 좌표 하나**뿐이라 "덱 탭에 처음 들어갔을 때 1회" 같은 **선형 시퀀스 밖에서 발화하는 축**을 담을 자리가 없다.
 > 온보딩을 손대지 않고 **트리거 축을 병렬로 추가**한다. 표시(`OutgameTutorialGateUI`)·타깃(`TutorialAnchorRegistry`)·스텝 SO(`MessageStep`/`WaitClickStep`)는 **전부 재사용** — 신규는 "언제 발화하고 어디에 1회 낙인을 찍는가"뿐이다.
 > 첫 대상은 **덱 탭 / 도감 탭 첫 진입**. 발화 API는 범용이라 이후 "덱 편집 첫 진입" 등이 코드 변경 없이 붙는다.
+>
+> 2026-08-13: 온보딩 마지막 챕터였던 **카드 강화 안내가 도감 탭 트리거(`CollectionTabFirstEnter`)로 이관**됐다.
+> 온보딩에는 랭크 승급 연출(`EnterFirstRank` + `unlocksAll`) 한 스텝만 남아 그 자리가 곧 졸업이다.
 
 #### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
 
@@ -490,7 +500,7 @@ flowchart TD
 
     subgraph run["해석 — 러너 2개 (static 분리)"]
         RUN["OutgameTutorialRunner<br/>온보딩 — IsRunning이 곧 '온보딩 중'"]:::chg
-        TRUN["TriggeredTutorialRunner (static)<br/>Fire · EnsureData · IsRunning<br/>EnterCurrentStep · NotifyStepSatisfied · Abort<br/>event OnActivated"]:::new
+        TRUN["TriggeredTutorialRunner (static)<br/>Fire · EnsureData · IsRunning<br/>EnterCurrentStep · NotifyStepSatisfied · Abort<br/>HasPending(trigger) — 표시 판정 창구<br/>event OnActivated · OnChanged"]:::new
         TDATA["TriggeredTutorialData (SO)<br/>List&lt;TriggeredTutorialEntry&gt;"]:::new
         TENT["TriggeredTutorialEntry ([Serializable])<br/>trigger · label · steps<br/>씬을 떠나는 마지막 스텝 불변식 없음"]:::new
         STEP["OutgameTutorialStep + 파생 (공유, 무수정)"]
@@ -504,13 +514,19 @@ flowchart TD
 
     subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
         BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
-        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음"]:::new
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn"]:::chg
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
     KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
-    TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false"]:::chg
+    TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
+
+    ADOT["AlertDotView (abstract, UI/Common)<br/>등장 팝 · 상시 맥동 · 퇴장 — 판정 없음<br/>파생: RankRewardAlertDot · TutorialAlertDot"]:::new
+    TDOT["TutorialAlertDot<br/>HasPending && FeatureLock.IsUnlocked"]:::new
+    ADOT --- TDOT
+    TAB -->|"AddComponent + Bind"| TDOT
+    TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
     KEY --- TRUN
@@ -540,6 +556,7 @@ flowchart TD
 > 목표 루프의 **엔드포인트 표기**를 실물로 세운다. 단 실력 지표가 아니라 **표시용 진행도**(칭호)다.
 > **왜 로컬로 가능한가**: 로비 Match 탭은 100% AI전이고(`LobbyMatchLauncher.StartAiBattle` 단일 배선), PvP UI는 런타임에 도달 불가한 `MainMenu.unity`에만 있다. 클라 권위 + RPC 무검증이라 위조 가능하지만, **보상·난이도·매칭에 아무 영향이 없으므로 위조돼도 잃는 게 없다** → 서버 권위가 전제되지 않는다.
 > **H는 자체 계약 소비가 거의 없다** — 재화·소유·생산·팩 어느 것도 안 건드리고, 세이브 슬롯 1개와 전투 종료 훅 1줄만 쓴다. `:::new` = 신규, `:::chg` = 기존 파일 소규모 수정.
+> ⚠️ **정산 규칙은 아래 "랭크 강등 개방"에서 재작성됐다** — "티어 임계치를 하한으로 클램프해 강등을 막는다"는 서술은 폐기됐고, `RankApplyResult`에 `IsTierDown`이 추가됐다. 아래 시퀀스는 갱신본이다.
 
 #### 구조 지도 — 4갈래(영속 / 판정 / 주입 / 표시)
 
@@ -564,7 +581,7 @@ flowchart TD
     end
 
     DL["DataLibrary<br/>전역 SO 주입 창구<br/>(RewardService.SetConfig 선례)"]:::chg
-    HUD["RankHud (UI/HUD)<br/>RankBadge(Image) · RankPower(TMP)<br/>최초 렌더 = Start()"]:::new
+    HUD["RankHud (UI/HUD)<br/>RankBadge(Image) · RankText(TMP) · RankPips×4<br/>최초 렌더 = Start()<br/>※ 포인트 수치 표시는 없다(아래 랭크 연출 개편)"]:::new
 
     DSM --> USD
     USD --- RSD
@@ -598,8 +615,9 @@ sequenceDiagram
     Note over TR: 멀티 배제 게이트는 제거됨(프로토 스코프 밖)<br/>싱글·멀티·튜토리얼·부전승 전부 가감
     TR->>MGR: ApplyBattleResult(_won)
     MGR->>MGR: delta = 승? +winPoints : -losePoints
-    MGR->>MGR: 하한 = max(가감 "전" 티어 requiredPoints, 0)
-    MGR->>MGR: points = max(points + delta, 하한)
+    MGR->>MGR: 바닥 = 랭크 진입했으면 FirstTierPoints, 아니면 0
+    MGR->>MGR: 천장 = 튜토 전투면 max(FirstTierPoints-1, 현재), 아니면 없음
+    MGR->>MGR: points = clamp(points + delta, 바닥, 천장)
     MGR->>DSM: Save() — 씬 왕복을 견디게 즉시 영속
     Note over TR,HUD: BattleCleanup.LoadScene("LobbyScene")
     HUD->>MGR: Start()에서 GetInfo() 1회
@@ -626,11 +644,11 @@ flowchart TD
     end
 
     subgraph rank["랭크 (기존 + 신규)"]
-        CFG["RankConfig / RankGradeConfig<br/>rewardType · rewardGold · rewardGoldPerDivision"]:::chg
+        CFG["RankConfig / RankGradeConfig<br/>rewards = RankRewardDef 목록(재화 · 아이콘 · 액수 · 단계증가분)<br/>FillRewards(티어, sink) → 단계 배율 적용한 RankReward"]:::chg
         MGR["RankManager<br/>[H-33 시점 무수정 → 등급 재설계에서 동결 해제]<br/>GetInfo → 도달 티어"]
         RMGR["RankRewardManager<br/>[#1 보상 창구] 캐시 없음 · 예외 미발생<br/>GetInfo · CanClaim · Claim · OnChanged"]:::new
-        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Reward(CurrencyGain) · State"]:::new
-        HAND["RankUpHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)"]:::new
+        INFO["RankRewardInfo (readonly struct)<br/>TierIndex · DisplayName · Badge<br/>Rewards(RankReward 목록) · State"]:::new
+        HAND["RankResultHandoff<br/>[씬 캐리어] 세이브 없음 · nullable 홀더 1개<br/>Set(RankApplyResult) · TryConsume(1회 소비)<br/>※ 개명 전 이름 RankUpHandoff"]:::new
     end
 
     subgraph ui["UI (씬 직접 저작 — PooledUIBase 아님)"]
@@ -653,13 +671,90 @@ flowchart TD
     PANEL -->|Claim| RMGR
     RMGR -->|"지급 + 영속 1회"| CUR
     RMGR -.->|OnChanged| PANEL
-    MGR -.->|"전투 씬: 승급이면 Set"| HAND
-    HAND -.->|"로비 Start: TryConsume 1회<br/>→ 패널 자동 오픈 + 도달 행 연출"| PANEL
+    MGR -.->|"전투 씬: 정산마다 Set(승패 무관)"| HAND
+    HAND -.->|"로비: LobbyRankEffectDirector가 TryConsume<br/>(패널 자동 오픈은 폐지 — 아래 랭크 연출 개편)"| PANEL
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
 ```
 
+### 랭크 연출 개편 — 자동 팝업 폐지 · 배지 반응 (2026-08-10)
+
+보상 패널이 로비 복귀 즉시 자동으로 열리던 흐름을 걷어내고, **받을 것이 있다는 알림 점**과 **배지 반응**으로 나눴다.
+포인트 수치 표시(`RankBadge/PointText`)는 화면에서 삭제했다 — 증감량은 조각 개수로만 비친다.
+
+| 바뀐 것 | 전 | 후 |
+|---|---|---|
+| 캐리어 | `RankUpHandoff` · **티어 상승일 때만** 실림 | `RankResultHandoff` · 정산마다 실림(`Delta==0 && !IsTierUp`이면 스스로 거름). 연속 전투는 `Delta` 누적 + 도달 최고 티어 |
+| 소비처 | `RankRewardPanel.Start` 코루틴 | `LobbyRankEffectDirector`(`GainEffectLayer`에 부착 — 탭과 무관하게 항상 활성) |
+| 복귀 화면 | 승급 연출 후 **패널 자동 오픈** | 조각이 배지로 수렴 → 승급 연출 → 끝. 패널은 유저가 `RankReward` 버튼으로 연다 |
+| 보상 안내 | 없음(패널이 직접 떴다) | `RankRewardAlertDot` 배선(`RankReward/Dot`) — `HasAnyClaimable` 단일 근거 |
+
+**연출 순서의 근거**: 조각이 다 꽂힌 **뒤에** 핍이 켜진다. 그래서 `RankHud.BuildTierUp`의 "과거 상태 되돌리기"를 시퀀스 첫 콜백에서 **조립 시점 즉시 실행**으로 옮겼다 — 앞 단계가 도는 동안 새 핍이 이미 켜져 있으면 인과가 뒤집힌다.
+디렉터가 승급 시퀀스만 **커버 아래에서 조립해 `Pause`**로 들고 있다가 조각이 끝난 뒤 `Play`하는 이유도 같다(유저가 처음 보는 화면이 "오르기 전"이어야 한다).
+
+**단계를 한 시퀀스에 중첩하지 않는다.** `RankHud`는 탭 전환 등에서 자기 연출을 스스로 `Kill`하는데, 중첩된 하위를 밖에서 죽이면 부모 시퀀스가 어긋난다(DOTween은 네스티드 트윈의 개별 제어를 지원하지 않는다). 그래서 디렉터는 코루틴으로 `Play` → `WaitForKill` → 다음 단계 순으로 잇는다 — 개편 전 `RankRewardPanel.Start`가 쓰던 관용구와 같다.
+같은 이유로 디렉터 `OnDisable`은 **재생에 닿지 못한 승급 시퀀스를 걷는다** — 정지한 채 남으면 `RankHud.Render`의 연출 가드를 영영 막아 표시가 과거에 고착된다.
+
+| 신규/변경 파일 | 역할 |
+|---|---|
+| `UI/Lobby/LobbyRankEffectDirector.cs` 🆕 | 캐리어 소비 · 커버 대기 · 승리/패배/승급 조립. 재화 디렉터와 분리(타임라인이 다르고 마스터 공유 이득이 없다) |
+| `UI/HUD/RankHud.cs` | `pointText` 제거 · `BadgeRect` / `PlayGainImpact(bool)` / `BuildLossReaction()` 추가 |
+| `OutGame/Rank/RankResultHandoff.cs` | 개명 + 병합 규칙 재작성 |
+| `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` | 자동 오픈 경로와 `PlayTierUpEffect` 제거(최상위 행은 `readyPulse`가 이미 상시 강조) |
+| `UI/Rank/RankRewardAlertDot.cs` | **코드 무수정** — 구독·최초 렌더·`m_started` 가드까지 완비돼 있었고 배선만 없었다 |
+
+**알려진 한계**: 튜토리얼 졸업(`OutgameTutorialRunner.CompleteSequence`)은 로비 세션 **중간**에 `Set`을 부르므로 디렉터의 `Start`가 지난 뒤다 → 그 결과는 다음 로비 진입에서 소비된다(개편 전과 동일).
+
+
+### 랭크 강등 개방 — ±25 심플 사다리 · 튜토 언랭크 확정 (2026-08-10)
+
+승패마다 ±25, 단계 간격도 25 → **1승 = 1단계 상승, 1패 = 1단계 강등**. 사다리를 양방향으로 열었다.
+
+| 축 | 전 | 후 |
+|---|---|---|
+| 정산 하한 | 가감 **전** 티어의 `RequiredPoints` → 강등 구조적으로 불가 | 랭크 진입 뒤엔 `FirstTierPoints`(브론즈 1) 하나뿐 → 티어 사이 강등은 열림 |
+| 정산 상한 | 없음 | **튜토리얼 전투**에만 `max(FirstTierPoints - 1, 현재 포인트)` — 몇 승을 해도 랭크에 진입하지 못한다 |
+| 언랭크 복귀 | (해당 없음) | **없다.** 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있어 의미가 두 갈래로 갈린다 |
+| 캐리어 병합 | `Min(prev)/Max(tier)` — 상승만 가정 | **처음 실린 출발 → 마지막 도달**(센티널 `-1`만 예외로 언제 실리든 이긴다). 승·패가 섞이면 최소/최대는 거짓말을 한다(승1패1이 "승급"으로 보고됐다) |
+
+#### ⚠️ 졸업 낙인은 마지막 튜토 전투보다 **먼저** 찍힌다
+
+이것이 이 설계에서 가장 반직관적인 지점이고, 천장 규칙이 지금 모양인 유일한 이유다.
+
+마지막 챕터의 마지막 스텝은 `BattleStart`(덱 확인 화면의 "전투 시작" 버튼)다. 게이트 만족 = 씬 이탈이므로 `NotifyStepSatisfied` → `CompleteSequence` → `TryEnterFirstTier`가 **전투가 열리기 전에** 끝난다. 즉 마지막 튜토 전투는 이미 브론즈 1(=100점)에 선 채로 정산된다.
+
+- 천장 판정을 `IsRanked`로 하면 → 그 전투가 랭크 전투로 새어 100+25 = **브론즈 2**로 졸업한다.
+- 천장을 `FirstTierPoints - 1`로 **고정**하면 → 그 전투가 100을 99로 끌어내려 **강등 + 언랭크 복귀**가 된다.
+- 그래서 천장은 `max(FirstTierPoints - 1, 현재 포인트)` — "튜토 전투는 랭크를 **올리기만** 하고 첫 티어는 넘지 않는다". 마지막 전투에선 천장과 바닥이 둘 다 100이라 승패 무관 브론즈 1을 지킨다.
+
+판정 입력은 `TurnRunner`가 `TutorialConfig.IsActive`를 넘긴다(랭크가 튜토리얼 도메인을 직접 보지 않게). `TutorialConfig.Begin`은 한 단계 앞 `BattleEntry` 스텝에서 걸리므로 마지막 전투에서도 참이다.
+**부작용 1건(승인됨)**: 튜토 4승째는 75→99라 결과 팝업에 `+24`가 뜬다.
+
+> 승점이 10이던 때는 100+10 = 110으로 브론즈 2 문턱(125)에 못 미쳐 이 누수가 드러나지 않았다. 한 판이 정확히 한 단계가 되면서 노출됐다.
+
+#### 강등 연출 — 강도는 빈도를 따른다
+
+별 하나 제거는 패배마다 나오는 흔한 일이고 등급 강등은 드물다. 그래서 **같은 등급 안 하락은 조용히, 등급이 갈릴 때만 크게** 때린다.
+
+- **별 1개 제거**: 꺼질 칸이 뒤에서부터 하나씩, `UiPunch`에 **음수 세기**를 넘겨 켜질 때와 반대로 움츠러들었다 돌아온다.
+- **등급 강등**: 켜진 별을 전부 끄고 → 배지가 아래 등급으로 갈리며 `DOShakeAnchorPos` + 어두워짐 → **새 등급 별 4칸을 한 번에 스냅**한다.
+  칸을 하나씩 켜는 건 승급의 문법이라 여기서 재사용하면 *"별이 늘었다 = 올랐다"*로 읽힌다 — 강등에서 순차 점등 금지.
+- 흔들림·색은 **시퀀스 멤버**로 단다(콜백 안에서 따로 띄우면 시퀀스가 죽어도 살아남아 배지가 어긋난 채 굳는다). 콜백 뒤에는 `Join`이 아니라 `Append` — 길이 0인 콜백은 시퀀스 길이를 늘리지 않아 `Append`가 곧 "콜백과 같은 시각"이고 기준점이 분명하다.
+
+**디렉터 규칙**: 증감 부호와 티어 변화 방향이 어긋나면(여러 판 합산) 티어 쪽이 지배적인 소식이라 조각을 생략하고, 강등이 뒤따르면 손실 반응도 생략한다 — 배지가 두 번 식는다.
+
+| 변경 파일 | 내용 |
+|---|---|
+| `OutGame/Rank/RankManager.cs` | `ApplyBattleResult(_won, _tutorial)` 바닥/천장 재작성 · `RankApplyResult.IsTierDown` 추가 |
+| `Battle/TurnRunner.cs` | `TutorialConfig.IsActive`를 정산에 넘긴다 |
+| `OutGame/Rank/RankResultHandoff.cs` | 병합을 "처음 출발 → 마지막 도달"로 교체 |
+| `OutGame/Rank/RankConfig.cs` | 코드 기본값 25/25로 애셋과 동기화(이중 진실원 제거) |
+| `UI/HUD/RankHud.cs` | `m_tierUpSeq` → `m_tierSeq`(승급·강등 공용 가드) · `BuildTierDown` · `StageGradeDown` · `StagePipOff` 추가 |
+| `UI/Lobby/LobbyRankEffectDirector.cs` | 강등도 커버 아래에서 조립·`Pause` · `PlayPointChange` 가드 3분기 |
+| `OutGame/Debug/OutgameDebugActions.cs` | `TIER ±`가 결과를 캐리어에 실어 **씬 재진입 시 연출을 재생**한다(없으면 강등 연출을 볼 길이 전투뿐) |
+
+**보상은 무수정** — `RankRewardManager.StateOf`가 티어 인덱스가 아니라 **포인트 기준**이고 `Claimed` 낙인을 먼저 보므로, 강등해도 수령분은 유지되고 미수령 상위 행만 `Locked`로 되돌아간다(이미 강등을 전제한 코드였다).
 
 
 ### 매치 덱 선택·편집 (`UI/Match/`) — ✅ 코드+검수 완료 (2026-08-03), 프리팹·씬 저작 대기
@@ -993,7 +1088,7 @@ flowchart TD
         SLOT["AlbumCardSlotView<br/>칸 1개(Slot_00 템플릿 클론 풀)<br/>칸의 그래픽 = 슬리브 하나(루트엔 Image 없음)<br/>Sleeve → NumberLabel → CardHolder/Card<br/>번호는 카드가 덮어 저절로 가려진다"]:::new
         BOX["AlbumChestView (Serializable 소품)<br/>보상 상자 · 3계층 공용 · 탭 즉시 수령"]:::new
         PROG["AlbumGaugeView (Serializable 소품)<br/>n/N 게이지 · 3계층 공용"]:::new
-        RSLOT["AlbumRewardSlotView (Serializable 소품)<br/>앨범 보상 칸 1개 · 아이콘+수량"]:::new
+        RSLOT["CurrencyRewardSlotView (UI/Common · Serializable 소품)<br/>재화 보상 칸 1개 · 아이콘+수량<br/>앨범 보상 요약과 랭크 보상 행·팝업이 공용<br/>※ 개명·이관 전 이름 AlbumRewardSlotView"]:::new
     end
     subgraph INS["삽입(수록) 연출 (UI/Album/Insert/ · 실측 7파일 · 전량 휘발성 · 저장 0)"]
         IQ["AlbumInsertQueue (static)<br/>획득 카드 → 세션 캐리어<br/>Enqueue · TryConsume(1회 소비)<br/>저장 안 함 (CardPackRewardHandoff와 같은 모양)"]:::new
@@ -1198,9 +1293,9 @@ sequenceDiagram
 
 #### 단일 진실원
 
-- **팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘기고 종류는 팩이 정한다 → `PackShowcaseController`·`TutorialStepDef`·`OutgameTutorialRunner` 시그니처 무변경(따라서 `TutorialStepDefDrawer`의 `"duplicateRefundGold"` 문자열 참조도 그대로 산다).
-- **전투 보상 재화** = `BattleReward.rewardType`. **랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용). **생산 행 재화** = 기존 `CatalogRow.RewardType`.
-- 세 SO 필드 모두 기본값 `Gold` → **기존 에셋 재저작 불필요**.
+- ~~**팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘긴다.~~ → **2026-08-10 개정**: 환급이 결제에서 떨어져 나갔다. 아래 "중복 환급 저작의 팩 SO 이관" 참조.
+- **전투 보상 재화** = `BattleReward.rewardType`. **생산 행 재화** = 기존 `CatalogRow.RewardType`. 둘 다 기본값 `Gold` → 기존 에셋 재저작 불필요.
+- ~~**랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용)~~ → **2026-08-10 개정**: 재화 1종 스키마를 폐기하고 `RankGradeConfig.rewards`(`RankRewardDef` 목록 = 재화·아이콘·액수·단계증가분)로 바꿨다. 티어별 지급액의 단일 진실원은 `RankConfig.FillRewards` — 단계 배율(`amount + (단계-1) * amountPerDivision`)이 여기서만 계산된다. `RankConfig.asset`은 재저작했다(골드 값은 종전 그대로, 다이아 추가).
 
 #### 흐름
 
@@ -1221,7 +1316,7 @@ CardPackOpener(→OpenedPack.TotalRefund) → CardPackRewardHandoff ─┤→ Cu
                                                                           → OnChanged → AlbumPageOverlayView.RefreshPage
 
 CollectionProductionManager.Harvest(→CurrencyGain) / HarvestAll(→Bucket) → CurrencyGainEffectPlayer.Play
-RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
+RankRewardManager.Claim(RankConfig.FillRewards → 재화별 Earn) → RankRewardClaimPopup → CurrencyGainEffectPlayer.BuildGain(Bucket)
 ```
 
 캐리어 소비는 **드레인 방식** — `TryConsume(CurrencyGainBucket _into)`가 호출자 버킷에 합친다(`out`으로 새 버킷을 내보내면 로비가 둘을 다시 합칠 API가 하나 더 필요해진다).
@@ -1235,7 +1330,7 @@ RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
 | `UI/Common/GoldGainEffectPlayer.cs` | `CurrencyGainEffectPlayer.cs` | 씬 인스턴스 0장(전량 런타임 자가설치)이라 개명 리스크 0 |
 | `RankTier.RewardGold` · `RankRewardInfo.RewardGold` | `Reward`(`CurrencyGain`) | 직렬화 아님 |
 
-**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`rewardGold`·`duplicateRefundGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. 개명하면 저작 자산 위험만 늘고 얻는 게 없다.
+**SO 필드명은 전부 유지**(`goldPerCard`·`minGold`·`price`) — 이름만 골드에 고정돼 있고 값은 "액수"로 여전히 유효하다. (`rewardGold`는 2026-08-10 랭크 보상 복수 재화화에서 `rewards` 목록으로 대체돼 사라졌다.) 개명하면 저작 자산 위험만 늘고 얻는 게 없다. (`duplicateRefundGold`는 2026-08-10 이관에서 삭제됐다 — 아래 절 참조.)
 
 #### 알려진 잔여 이슈 (스코프 밖)
 
@@ -1243,3 +1338,44 @@ RankRewardManager.Claim(RankTier.Reward) → RankRewardClaimPopup
 - **같은 재화를 두 소스가 동시에 올릴 때의 Hold 경합**은 기존 동작 유지(마지막 Hold가 이김). `Play`(m_current 추적)와 `BuildGain`(호출자 시퀀스에 위임, 미추적)이 같은 종류에서 겹치면 앞 코인이 `ClearCoins`로 걷힌다 — 리팩터링 이전과 동일하며 회귀 아님.
 - **같은 종류 HUD 2장 공존 시** 나중에 켜진 쪽이 꺼지면 레지스트리가 비고 살아 있는 쪽이 재등록되지 않는다. 현재 배치(종류당 1장)에선 미발현.
 - 비활성 HUD는 등록되지 않으므로 **그 재화 연출이 스킵**된다(이전엔 비활성 HUD를 찾아 숫자만 올렸다). 지급·저장과 무관해 무해.
+
+---
+
+### 중복 환급 저작의 팩 SO 이관 (`OutGame/CardPack/`) — ✅ 코드+에셋 완료 (2026-08-10, Play 검증 대기)
+
+**한 줄**: "중복 카드에 무엇을 얼마나 돌려주는가"가 구매처 뷰·튜토리얼 스텝에서 **`CardPackData` 하나**로 모였다.
+
+#### 왜
+
+환급은 팩의 규칙인데 저작 위치가 팩 밖에 있었다. 그 결과 두 가지가 굳어 있었다.
+
+- **액수**가 `PackShowcaseController.duplicateRefundGold`(뷰 인스펙터) 1개 → `ResolvePack`이 캐러셀 인덱스와 무관하게 같은 값을 반환 → **팩별 차등 불가**. 튜토리얼은 같은 값을 스텝에 또 저작(이중 저작).
+- **종류**가 `priceType`에 묶여 → 다이아로 결제하는 `UltraPack`이 **다이아를 환급**(팩 가격 80에 중복 1장당 10).
+
+#### 무엇이 바뀌었나
+
+| | 전 | 후 |
+|---|---|---|
+| 종류 | `CardPackData.priceType` (결제와 공유) | `CardPackData.refundType` (독립) |
+| 액수 | 호출자가 인자로 전달 | `CardPackData.refundAmount` (`[Min(0)]`) |
+| 진입점 | `TryPurchase(pack, _refundGold)` | `TryPurchase(pack)` |
+
+**삭제된 심볼**: `PackShowcaseController.duplicateRefundGold`·`m_forcedRefund` / `TutorialStepDef.duplicateRefundGold`·`DuplicateRefundGold`·`UsesRefundGold` / `TutorialStepDefDrawer`의 `"duplicateRefundGold"` 노출 분기.
+**축소된 시그니처**: `ResolvePack(out CardPackData)` / `TutorialStepDef.TryGetForcedPack(out CardPackData)` / `OutgameTutorialRunner.TryGetForcedPack(out CardPackData)`.
+
+#### 저작값 (전 팩 명시 — 필드 초기값에 기대지 않는다)
+
+| 에셋 | priceType / price | refundType / refundAmount |
+|---|---|---|
+| `NormalPack` | Gold 200 | Gold 10 |
+| `SpecialPack` | Gold 500 | Gold 10 |
+| `UltraPack` | **Diamond 80** | **Gold 10** ← 종류만 전환(액수는 추후 밸런싱) |
+| `StarterPack` · `SynergyPack` | Gold 0 | Gold **0** |
+| `KeywordPack` | Gold 0 | Gold 10 |
+
+`Tab_Pack.prefab` · `OutgameTutorial.asset` · `TriggeredTutorial.asset`에서 `duplicateRefundGold` 키 전량 제거.
+
+#### 남은 것 (스코프 밖)
+
+- 환급 칩·총합 배지의 **코인 아이콘은 여전히 프리팹에 골드로 굳어 있다**. 지금 저작값은 전 팩 Gold라 표시가 맞지만, `refundType`을 Diamond로 저작하는 순간 아이콘만 골드로 남는다 — 위 "알려진 잔여 이슈"의 재화 아이콘 조회 창구와 같은 문제다.
+- `PackStandaloneBoot.dummyRefund`는 유지(테스트 씬이 임의 값으로 연출을 검증하는 더미 — 지갑을 건드리지 않는다). 종류만 `dummyPack.RefundType`을 따른다.

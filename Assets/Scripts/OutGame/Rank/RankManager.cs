@@ -56,19 +56,34 @@ public static class RankManager
         t_config.TryGetTier(t_index, out RankTier t_tier);
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
-        // 미도달이면 표시명과 다음 목표를 첫 티어 기준으로 바꿔 준다 — 배지·등급은 첫 티어 것을 그대로 쓴다.
+        // 미도달이면 표시명·배지·다음 목표를 언랭크 기준으로 바꿔 준다 — 등급은 첫 티어 것을 그대로 쓴다.
         bool t_unranked = t_points < t_config.FirstTierPoints;
+
+        // 언랭크 배지가 미저작이면 첫 등급 배지로 폴백한다(빈 배지보다 낫다).
+        Sprite t_badge = t_unranked && t_config.unrankedBadge != null ? t_config.unrankedBadge : t_tier.Badge;
 
         return new RankInfo(
             t_index,
             t_tier.Grade,
             t_tier.Division,
             t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
-            t_tier.Badge,
+            t_badge,
             t_points,
             t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
             !t_unranked && !t_hasNext,
             t_unranked);
+    }
+
+    /// <summary>언랭크(첫 티어 미도달) 상태의 표시값. 승급 연출이 '오르기 직전'으로 되돌릴 때 쓴다 —
+    /// 그 시점엔 정산이 끝나 GetInfo가 이미 도달 상태를 돌려주므로 언랭크 표시를 따로 물어야 한다.
+    /// 폴백 규칙(언랭크 배지 미저작 → 첫 등급 배지)은 GetInfo와 같다.</summary>
+    public static void GetUnrankedDisplay(out string _displayName, out Sprite _badge)
+    {
+        var t_config = Config;
+        t_config.TryGetTier(0, out RankTier t_first);
+
+        _displayName = t_config.unrankedDisplayName;
+        _badge       = t_config.unrankedBadge != null ? t_config.unrankedBadge : t_first.Badge;
     }
 
     /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
@@ -88,8 +103,9 @@ public static class RankManager
         return true;
     }
 
-    // 전투 1회 정산(가감 전 티어 임계치를 하한으로 클램프해 강등을 막는다) + 즉시 저장
-    public static RankApplyResult ApplyBattleResult(bool _won)
+    /// <summary>전투 1회 정산 + 즉시 저장. _tutorial = 이 전투가 튜토리얼 시나리오 전투인가
+    /// (호출자가 TutorialConfig.IsActive를 넘긴다 — 랭크가 튜토리얼 도메인을 직접 보지 않게).</summary>
+    public static RankApplyResult ApplyBattleResult(bool _won, bool _tutorial)
     {
         var t_config = Config;
         var t_slot = Slot;
@@ -99,11 +115,17 @@ public static class RankManager
 
         int t_index = t_config.ResolveTierIndex(t_points);
 
-        // 하한은 "도달한" 티어의 임계치일 때만 의미가 있다 — 미도달(언랭크) 구간에 임계치를 하한으로 쓰면
-        // 승패와 무관하게 점수가 첫 티어로 올라가 버린다(= 전투 1판이 곧 진입).
-        long t_floor = IsRanked && t_config.TryGetTier(t_index, out RankTier t_tier) ? Math.Max(t_tier.RequiredPoints, 0) : 0;
+        // 티어 임계치는 하한이 아니다 — 티어 사이 강등은 열어 두고, 진입 뒤의 바닥만 첫 티어로 막는다.
+        // 언랭크로 되돌아가지 않게 하려는 것: 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
+        long t_floor = IsRanked ? t_config.FirstTierPoints : 0;
 
-        t_slot.points = Math.Max(t_points + t_delta, t_floor);
+        // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
+        // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
+        // 그래도 천장을 현재 포인트 아래로는 내리지 않는다 — 이미 랭크에 오른 세이브로 튜토 전투를 돌면(디버그 승급 등)
+        // 고정 천장이 곧 강등이 된다.
+        long t_ceiling = _tutorial ? Math.Max(t_config.FirstTierPoints - 1, t_points) : long.MaxValue;
+
+        t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
 
         return new RankApplyResult(
@@ -178,6 +200,9 @@ public readonly struct RankApplyResult
 
     // 이번 정산으로 티어가 올랐는지
     public bool IsTierUp => this.TierIndex > this.PrevTierIndex;
+
+    // 내렸는지. 첫 진입 센티널(PrevTierIndex = -1)은 여기 걸리지 않는다.
+    public bool IsTierDown => this.TierIndex < this.PrevTierIndex;
 
     public RankApplyResult(long _delta, int _prevTierIndex, int _tierIndex)
     {

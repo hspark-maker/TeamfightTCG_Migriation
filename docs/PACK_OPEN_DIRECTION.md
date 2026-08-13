@@ -40,7 +40,7 @@
 ```
 [LobbyScene] Tab_Pack
    PackShowcaseController.OnBuyPressed()
-      CardPackOpener.TryPurchase(pack, refundGold)   // 차감·드로우·소유부여·환급까지 원자 영속
+      CardPackOpener.TryPurchase(pack)   // 차감·드로우·소유부여·환급까지 원자 영속(환급 종류·액수는 팩 SO)
       PackHandoff.Set(opened, "LobbyScene", false)
       SceneManager.LoadScene("CardPack")
             │

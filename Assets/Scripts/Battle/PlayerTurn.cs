@@ -91,7 +91,7 @@ public class PlayerTurn : TurnBase
                 // Inspect: 배너만 띄우고(마스크 off) 입력 허용 → OnMouseDown/롱프레스 동작.
                 // 롱프레스 통지(WaitForInspectAsync) 대기 후, 다음 스텝 준비 위해 입력 재차단.
                 // "상대 정보 확인" 집중: 확인 대상(적 targetSlot) 1장만 밝게, 나머지 전부 암전. 대기 후 원복.
-                t_overlay?.ShowInspect(t_step0.guideMessage);
+                t_overlay?.ShowInspect(t_step0.guideMessage, t_step0.bannerAnchor);
                 CardView.ForcedDimAlpha = 0.1f;
                 CardView.FadeAll(CardView.ForcedDimAlpha);
                 if (InSlotRange(t_step0.targetSlot))
@@ -127,7 +127,7 @@ public class PlayerTurn : TurnBase
                 }
                 else
                 {
-                    t_overlay.ShowMessage(t_step0.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
+                    t_overlay.ShowMessage(t_step0.guideMessage, true, t_step0.bannerAnchor);   // 탭 게이트 = BG(dim) 항상 켬
                     await t_overlay.WaitForTapAsync(t_ct);
                 }
                 t_overlay.ClearFieldFocus();
@@ -150,7 +150,7 @@ public class PlayerTurn : TurnBase
         // 빈 텍스트 dim 가이드 화면이 떴다 사라지는 문제 방지(적 턴과 대칭).
         if (t_step.waitForTap && !string.IsNullOrWhiteSpace(t_step.guideMessage) && t_overlay != null)
         {
-            t_overlay.ShowMessage(t_step.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
+            t_overlay.ShowMessage(t_step.guideMessage, true, t_step.bannerAnchor);   // 탭 게이트 = BG(dim) 항상 켬
             await t_overlay.WaitForTapAsync(t_ct);
         }
 
@@ -203,7 +203,7 @@ public class PlayerTurn : TurnBase
             CardView.RestoreAllFades();        // forced 없음 → 전부 밝게
 
             if (_step.guidedFreeSelect) BeginGuidedFreeSelect(_step);
-            else TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false);
+            else TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, null, null, false, _step.bannerAnchor);
             return;
         }
 
@@ -219,7 +219,7 @@ public class PlayerTurn : TurnBase
         CardView.ForcedDimAlpha  = 0.1f;   // 튜토리얼: 거의 검게(일반 전투 0.3보다 진하게)
         CardView.RestoreAllFades();        // 공격자/타깃 기준 재적용 → 공격자·타깃만 full, 나머지 암전
 
-        TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, t_atkView, t_defView, true);
+        TutorialOverlayUI.Instance?.ShowAttack(_step.guideMessage, t_atkView, t_defView, true, _step.bannerAnchor);
 
         // 카드 낱장 포커스가 지정됐으면 배경까지 덮는다(ShowAttack은 카드 암전만 한다).
         // 탭 대기는 없다 — 이 스텝은 공격 입력으로 진행한다.

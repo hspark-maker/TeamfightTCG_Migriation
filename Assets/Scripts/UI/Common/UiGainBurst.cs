@@ -25,10 +25,13 @@ public static class UiGainBurst
         public readonly float SpinDegrees;       // 비행 중 z 회전량(0이면 회전 없음)
         // 흩어져 날아가는 동안의 기준 배율. 프리팹을 원본 크기 그대로 쓰면서 화면에는 작게 띄울 때 쓴다.
         public readonly float RestScale;
+        // 수렴 궤적이 직선에서 부풀어 오르는 폭(px). 0이면 직선 + InBack(예전 궤적) 그대로다.
+        public readonly float ArcHeight;
 
         public Settings(int _count, float _scatterRadius, float _scatterDuration, float _gatherDuration,
                         float _interval, float _popDuration, float _angleStart, float _angleSpan,
-                        float _gatherScale = 1f, float _spinDegrees = 0f, float _restScale = 1f)
+                        float _gatherScale = 1f, float _spinDegrees = 0f, float _restScale = 1f,
+                        float _arcHeight = 0f)
         {
             this.Count           = _count;
             this.ScatterRadius   = _scatterRadius;
@@ -41,6 +44,7 @@ public static class UiGainBurst
             this.GatherScale     = _gatherScale;
             this.SpinDegrees     = _spinDegrees;
             this.RestScale       = _restScale;
+            this.ArcHeight       = _arcHeight;
         }
 
         /// <summary>연출 전체 길이(초).</summary>
@@ -83,9 +87,13 @@ public static class UiGainBurst
 
             t_seq.Insert(t_delay, t_rt.DOScale(_settings.RestScale, _settings.PopDuration).SetEase(Ease.OutBack));
             t_seq.Insert(t_delay, t_rt.DOAnchorPos(t_mid, _settings.ScatterDuration).SetEase(Ease.OutQuad));
-            // 수렴은 InBack — 잠깐 뒤로 물렸다 빨려드는 느낌.
+
+            // 수렴은 두 갈래다. 직선은 InBack으로 잠깐 뒤로 물렸다 빨려들고,
+            // 휘어진 궤적은 그 물림이 필요 없다 — 옆으로 부푼 곡선 자체가 "돌아 들어가는" 시간을 이미 만든다.
             t_seq.Insert(t_delay + _settings.ScatterDuration,
-                         t_rt.DOAnchorPos(_to, _settings.GatherDuration).SetEase(Ease.InBack));
+                         _settings.ArcHeight > 0f
+                       ? ArcTo(t_rt, t_mid, _to, _settings.GatherDuration, _settings.ArcHeight, t_i)
+                       : t_rt.DOAnchorPos(_to, _settings.GatherDuration).SetEase(Ease.InBack));
 
             if (!Mathf.Approximately(_settings.GatherScale, 1f))
                 t_seq.Insert(t_delay + _settings.ScatterDuration,
@@ -118,6 +126,36 @@ public static class UiGainBurst
     {
         if (_layer == null || _target == null) return Vector2.zero;
         return _layer.InverseTransformPoint(_target.position);
+    }
+
+    /// <summary>
+    /// 2차 베지에로 휘어 든다. DOAnchorPos는 직선밖에 못 그리므로 진행도만 트윈하고 좌표는 여기서 찍는다.
+    /// 코인이든 빛이든 "빨려드는" 궤적은 이 한 곳만 쓴다 — 규칙이 갈라지면 손맛도 갈라진다.
+    /// _index는 휘는 방향을 가르는 축(짝수는 한쪽, 홀수는 반대쪽).
+    /// </summary>
+    // 대상을 트윈에 물려 둔다 — 호출자가 조각별로 거는 DOKill(transform)이 이 트윈도 함께 잡아야 잔해가 안 남는다.
+    public static Tween ArcTo(RectTransform _rt, Vector2 _from, Vector2 _to, float _duration,
+                              float _height, int _index)
+    {
+        Vector2 t_delta = _to - _from;
+        float   t_dist  = t_delta.magnitude;
+
+        // 좌우 번갈아 휜다(회전과 같은 규칙) — 한쪽으로만 부풀면 코인 전체가 한 덩어리로 돈다.
+        // 이동거리에 비례해 눌러 두지 않으면 가까운 코인이 고리를 그리며 되돌아온다.
+        float t_bow = Mathf.Min(_height, t_dist * 0.45f) * (_index % 2 == 0 ? 1f : -1f);
+
+        Vector2 t_perp = t_dist > 0.001f ? new Vector2(-t_delta.y, t_delta.x) / t_dist : Vector2.up;
+        Vector2 t_ctrl = _from + t_delta * 0.5f + t_perp * t_bow;
+
+        return DOTween.To(() => 0f, _t => _rt.anchoredPosition = Bezier(_from, t_ctrl, _to, _t), 1f, _duration)
+                      .SetEase(Ease.InCubic)     // 목적지에서 가속해야 "빨려든다"로 읽힌다
+                      .SetTarget(_rt.transform);
+    }
+
+    static Vector2 Bezier(Vector2 _a, Vector2 _ctrl, Vector2 _b, float _t)
+    {
+        float t_inv = 1f - _t;
+        return t_inv * t_inv * _a + 2f * t_inv * _t * _ctrl + _t * _t * _b;
     }
 
     // 흩어짐 방향·거리. 각도를 균등 분할해 난수 없이도 고르게 퍼지고 매번 같은 그림이 나온다.

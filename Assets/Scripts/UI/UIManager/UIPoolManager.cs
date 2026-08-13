@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
+// 팝업 인프라는 이걸 쓰는 UI들이 켜지기 전에 서 있어야 한다 —
+// 기본 순서면 로비 탭 UI의 OnEnable이 Awake보다 먼저 돌아 instance가 아직 없다.
+[DefaultExecutionOrder(-100)]
 public class UIPoolManager : MonoBehaviour
 {
     public static UIPoolManager instance;
@@ -163,12 +166,12 @@ public class UIPoolManager : MonoBehaviour
         t_path = UnityEditor.AssetDatabase.GetAssetPath(_prefab);
         if (string.IsNullOrEmpty(t_path)) t_path = "(빈 경로 = 번들에서 로드됨)";
 #endif
-        Debug.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
+        LogUtil.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
 
         foreach (var t_text in _prefab.GetComponentsInChildren<TMPro.TMP_Text>(true))
         {
             string t_font = t_text.font != null ? t_text.font.name : "null";
-            Debug.Log($"[프리팹원본] {t_text.name} font={t_font}");
+            LogUtil.Log($"[프리팹원본] {t_text.name} font={t_font}");
         }
     }
 

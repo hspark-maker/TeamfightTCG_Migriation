@@ -114,6 +114,10 @@ public static class AttackSequence
         if (t_special) BattleFinisher.CancelApproachArm();
         bool t_approach = !t_special && BattleFinisher.TryBeginApproach(_attacker, _defender);
 
+        // 공격자는 연출 내내 다른 카드 위에 그려진다. 여기가 모든 연출 분기의 공통 입구라
+        // 박치기·원거리·무쌍·시네마가 각자 정렬을 챙기지 않아도 된다(빠뜨림 = 카드가 이웃 뒤로 숨음).
+        _attacker?.SetAttackRaised(true);
+
         try
         {
             if (t_special)
@@ -140,6 +144,7 @@ public static class AttackSequence
         }
         finally
         {
+            _attacker?.SetAttackRaised(false);
             if (t_approach) BattleFinisher.EndApproach();
         }
     }

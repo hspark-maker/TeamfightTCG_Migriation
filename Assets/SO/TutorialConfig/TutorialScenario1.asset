@@ -13,13 +13,15 @@ MonoBehaviour:
   m_Name: TutorialScenario1
   m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
   enableSynergy: 0
+  playerCardLevel: 1
+  enemyCardLevel: 1
   playerDeck:
-  - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
+  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
   - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
   - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   enemyDeck:
   - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
@@ -38,23 +40,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
-    cardFocusSide: 0
-    cardFocusSlot: 0
-    handSide: 0
-    handSlot: 0
-  - kind: 0
-    attackerSlot: -1
-    targetSlot: -1
-    guideMessage: 
-    waitForTap: 0
-    dimBackground: 0
-    allowedGesture: 0
-    guidedFreeSelect: 0
-    targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -69,8 +56,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 1
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 1
     cardFocusSlot: 1
     handSide: 0
@@ -87,8 +74,8 @@ MonoBehaviour:
     targetGuideMessage: "\uACF5\uACA9\uD560 \uC0C1\uB300 \uCE74\uB4DC\uB97C \uACE0\uB974\uC138\uC694!
       \uC6D0\uAC70\uB9AC \uCE74\uB4DC\uB294 \uBC18\uACA9 \uD53C\uD574\uB97C \uBC1B\uC9C0
       \uC54A\uC2B5\uB2C8\uB2E4."
-    bannerAnchor: 0
-    targetBannerAnchor: 2
+    bannerAnchor: 1
+    targetBannerAnchor: 4
     cardFocusSide: 1
     cardFocusSlot: 1
     handSide: 0
@@ -103,8 +90,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -118,8 +105,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0

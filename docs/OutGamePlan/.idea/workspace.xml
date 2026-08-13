@@ -2,10 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="74f371c5-0899-44c7-ab1b-549ac4664e46" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/../../.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/../../.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/AddressableAssetsData/link.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scenes/BattleScene.unity" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scenes/BattleScene.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Resources/Fonts/MalgunGothic_TMP.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Resources/Fonts/MalgunGothic_TMP.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,10 +18,10 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 7,
-  "fromUser": false
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7,
+  &quot;fromUser&quot;: false
+}</component>
   <component name="ProjectId" id="3HNpd1EUBv97wZvC2OddOjUDOvK" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -34,7 +37,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feature__Collection",
+    "git-widget-placeholder": "main",
     "nodejs_package_manager_path": "npm",
     "vue.rearranger.settings.migration": "true"
   }
@@ -47,6 +50,7 @@
       <option name="presentableId" value="Default" />
       <updated>1785718465281</updated>
       <workItem from="1785718466882" duration="1195000" />
+      <workItem from="1786427268999" duration="3624000" />
     </task>
     <servers />
   </component>

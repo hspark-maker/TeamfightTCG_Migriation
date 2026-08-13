@@ -18,6 +18,12 @@ public class TutorialStepDef
     [Tooltip("이 스텝에 도달하면 열리는 기능(누적). 이 스텝이 지목하는 앵커의 기능은 반드시 여기까지 포함되어야 한다")]
     [SerializeField] List<EOutgameFeature> unlocks = new List<EOutgameFeature>();
 
+    [Tooltip("이 스텝에 도달하면 남은 기능을 **전부** 연다(누적 — 이후 스텝에서도 유지된다).\n"
+           + "안내는 계속 돌지만 게임의 문은 여기서 열린다는 뜻이다. 졸업까지 기다리지 않고 미리 여는 자리에 켠다.\n"
+           + "위 unlocks를 하나하나 채우는 대신 쓰는 스위치라, 나중에 기능이 늘어도 저작을 고칠 필요가 없다.\n"
+           + "⚠ 아래 locks는 여전히 이긴다 — 그 스텝 동안 막아 둔 옆길은 전체 해금 뒤에도 막힌다.")]
+    [SerializeField] bool unlocksAll;
+
     [Tooltip("이 스텝 동안만 다시 잠그는 기능(일시).\n"
            + "unlocks와 달리 누적되지 않는다 — 다음 스텝으로 넘어가면 저절로 원래 해금 상태로 돌아간다.\n"
            + "이미 열린 기능에도 걸리고 해금보다 우선한다. 딤을 켜지 않고 옆길만 막고 싶을 때 쓴다.\n"
@@ -26,14 +32,11 @@ public class TutorialStepDef
            + "None인 위젯은 잠글 대상이 없어 아무 일도 일어나지 않는다")]
     [SerializeField] List<EOutgameFeature> locks = new List<EOutgameFeature>();
 
-    [Tooltip("타깃 외 입력을 딤으로 막을지. 잠금만으로 흐름이 잡히는 스텝은 꺼서 화면을 어둡게 하지 않는다")]
+    [Tooltip("타깃 외 입력을 딤으로 막을지. 끄면 화면이 어두워지지 않고 입력도 막지 않는다(차단은 아래 locks가 맡는다)")]
     [SerializeField] bool useDim = true;
 
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
     [SerializeField] CardPackData pack;
-
-    [Tooltip("중복 카드 1장당 환급 골드")]
-    [SerializeField] long duplicateRefundGold;
 
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
@@ -52,6 +55,9 @@ public class TutorialStepDef
     // 이 스텝까지 진행하면 열리는 기능(해금은 누적)
     public IReadOnlyList<EOutgameFeature> Unlocks => unlocks;
 
+    // 이 스텝부터 남은 기능을 전부 여는가(졸업을 기다리지 않고 미리 여는 자리)
+    public bool UnlocksAll => unlocksAll;
+
     // 이 스텝 동안만 닫히는 기능(누적되지 않는다 — 다음 스텝에서 저절로 풀린다)
     public IReadOnlyList<EOutgameFeature> Locks => locks;
 
@@ -59,8 +65,6 @@ public class TutorialStepDef
     public bool UseDim => useDim;
 
     public CardPackData Pack => pack;
-
-    public long DuplicateRefundGold => duplicateRefundGold;
 
     public TutorialScenarioData Scenario => scenario;
 
@@ -78,6 +82,9 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitPurchase    => EOutgameTutorialCompletion.Purchase,
         EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
         EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
+        EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
+        EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
+        EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -98,10 +105,9 @@ public class TutorialStepDef
     };
 
     // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true
-    public bool TryGetForcedPack(out CardPackData _pack, out long _refundGold)
+    public bool TryGetForcedPack(out CardPackData _pack)
     {
-        _pack       = action == EOutgameTutorialAction.WaitPurchase ? pack : null;
-        _refundGold = _pack != null ? duplicateRefundGold : 0;
+        _pack = action == EOutgameTutorialAction.WaitPurchase ? pack : null;
 
         return _pack != null;
     }
@@ -124,7 +130,10 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitAlbumInsert or
         EOutgameTutorialAction.AutoBattle      or
         EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       => false,
+        EOutgameTutorialAction.DeckGrant       or
+        EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.EnterFirstRank  or
+        EOutgameTutorialAction.WaitLobbyReturn => false,
 
         _ => true,
     };
@@ -136,7 +145,10 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitAlbumInsert or
         EOutgameTutorialAction.AutoBattle      or
         EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       => false,
+        EOutgameTutorialAction.DeckGrant       or
+        EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.EnterFirstRank  or
+        EOutgameTutorialAction.WaitLobbyReturn => false,
 
         _ => true,
     };
@@ -154,10 +166,6 @@ public class TutorialStepDef
 
         _ => false,
     };
-
-    // 이 액션이 중복 환급 골드를 쓰는가(실제로 구매하는 액션만)
-    public static bool UsesRefundGold(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.WaitPurchase || _action == EOutgameTutorialAction.AutoPurchase;
 
     // 이 액션이 시나리오를 쓰는가(전투 주입 또는 덱 정본)
     public static bool UsesScenario(EOutgameTutorialAction _action) => _action switch

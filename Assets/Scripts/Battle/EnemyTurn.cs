@@ -32,6 +32,8 @@ public class EnemyTurn : TurnBase
             CardInstance t_atk;
             CardInstance t_def;
             string t_tutorialMsg = null;
+            // 배너 자리도 스텝이 정한다. t_step은 아래 블록 스코프라 여기로 꺼내 둔다(기본 = Top).
+            var t_bannerAnchor = TutorialScenarioData.BannerAnchor.Top;
             bool   t_scriptedSlots = false;   // 슬롯 지정 스텝대로 진행했는가(기준선 재동기 대상)
 
             // 실행 불가 스텝(공격자·타깃이 죽었거나 그 자리를 다른 카드가 채움)은 안내 묶음째 먼저 폐기.
@@ -44,7 +46,8 @@ public class EnemyTurn : TurnBase
             if (t_scripted)
             {
                 TutorialConfig.TryPeekEnemyStep(out var t_step);   // Drain 성공 = Attack 스텝 존재 보장
-                t_tutorialMsg = t_step.guideMessage;
+                t_tutorialMsg  = t_step.guideMessage;
+                t_bannerAnchor = t_step.bannerAnchor;
                 if (IsFreeStep(t_step))
                 {
                     // 자유공격: 슬롯 무지정 → AI가 결정론(MatchRandom)으로 공격자·타깃 선택.
@@ -70,7 +73,7 @@ public class EnemyTurn : TurnBase
                 if (t_step.waitForTap && !string.IsNullOrWhiteSpace(t_step.guideMessage)
                     && TutorialOverlayUI.Instance != null)
                 {
-                    TutorialOverlayUI.Instance.ShowMessage(t_step.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
+                    TutorialOverlayUI.Instance.ShowMessage(t_step.guideMessage, true, t_step.bannerAnchor);   // 탭 게이트 = BG(dim) 항상 켬
                     await TutorialOverlayUI.Instance.WaitForTapAsync(GetCt());
                 }
 
@@ -96,7 +99,8 @@ public class EnemyTurn : TurnBase
             if (TutorialConfig.IsActive && TutorialOverlayUI.Instance != null
                 && !string.IsNullOrWhiteSpace(t_tutorialMsg))
             {
-                TutorialOverlayUI.Instance.ShowAttack(t_tutorialMsg, t_attackerView, t_defenderView, false);
+                TutorialOverlayUI.Instance.ShowAttack(t_tutorialMsg, t_attackerView, t_defenderView, false,
+                                                      t_bannerAnchor);
                 await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
 
                 // 안내 읽기 딜레이 후, 실제 공격 연출 동안 힌트(배너·하이라이트) 전부 숨김. 다음 스텝에서 재표시.
@@ -170,7 +174,7 @@ public class EnemyTurn : TurnBase
         {
             if (t_overlay != null && !string.IsNullOrWhiteSpace(t_msg.guideMessage))
             {
-                t_overlay.ShowMessage(t_msg.guideMessage, true);   // 탭 게이트 = BG(dim) 항상 켬
+                t_overlay.ShowMessage(t_msg.guideMessage, true, t_msg.bannerAnchor);   // 탭 게이트 = BG(dim) 항상 켬
                 await t_overlay.WaitForTapAsync(GetCt());
             }
             TutorialConfig.ConsumeEnemyStep();

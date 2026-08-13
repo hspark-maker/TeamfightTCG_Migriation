@@ -445,7 +445,34 @@ public class CardView : MonoBehaviour
     // 무장 이펙트는 여기 얹지 않는다 — ResolveHits가 접촉 직후 FocusWeapon(false)를 부르기 때문에
     // 같이 묶으면 반동이 끝나기도 전에 이펙트가 꺼진다. 무장/해제 시점에서 SetArmedVfx를 직접 부른다.
     // TODO: 호출부 이관 후 삭제
-    public void FocusWeapon(bool _active) => WeaponView.Focus(_active);
+    public void FocusWeapon(bool _active)
+    {
+        // 무기 애니메이션은 프레임에 얹힌 장식(WeaponAnimSpec)이 소유한다 — 무장에서 당기고 해제에서 되돌린다.
+        // CardData.weaponPrefab으로 무기를 따로 띄우던 경로(CardWeaponView)는 더 이상 타지 않는다:
+        // 그 프리팹을 가진 카드가 하나도 없고, 두 경로가 같은 신호를 나눠 가지면 어느 쪽이 그렸는지 흐려진다.
+        if (FrameWeaponAnim == null)
+            Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': WeaponAnimSpec 없음", this);
+        else if (_active) FrameWeaponAnim.Draw();
+        else              FrameWeaponAnim.ResetToIdle();
+    }
+
+    // 프레임 장식의 애니메이션(원거리 활 등). 키워드 프레임이라 꺼져 있을 수 있어 비활성 포함으로 찾는다.
+    // 없는 카드가 정상이므로 못 찾아도 조용하다 — 한 번 찾고 결과를 기억한다(매 무장마다 훑지 않게).
+    WeaponAnimSpec frameWeaponAnim;
+    bool           frameWeaponAnimSearched;
+
+    WeaponAnimSpec FrameWeaponAnim
+    {
+        get
+        {
+            if (!this.frameWeaponAnimSearched)
+            {
+                this.frameWeaponAnimSearched = true;
+                this.frameWeaponAnim = GetComponentInChildren<WeaponAnimSpec>(true);
+            }
+            return this.frameWeaponAnim;
+        }
+    }
 
     /// <summary>무장(포커스) 이펙트 토글. 카드 자식으로 붙어 공격 이동/기울기를 그대로 따라간다.
     /// 켜지는 시점 = 무장(FocusWeapon(true)), 꺼지는 시점 = 적에 닿는 순간(AttackSequence가 false로 호출).
@@ -492,19 +519,15 @@ public class CardView : MonoBehaviour
 
     /// <summary>공격 선택 시 이 카드가 받을 **예상 데미지**를 표시한다. HP 라벨은 현재 체력을 그대로 유지 —
     /// "맞은 뒤 남을 체력"을 HP 자리에 쓰면 현재 체력과 구분이 안 돼 혼란했다.
-    /// 표시 수치는 실제 적용값(비늘·성벽 감소 + 체력 상한)이며 그 규칙은 CardInstance 단독 소유 —
-    /// 뷰는 ClampDamage 호출만 한다(수식 복제 금지).</summary>
-    public void ShowAttackPreview(int _damage, bool _wouldDie, bool _isAttackHit = true)
+    /// 표시 수치는 AttackPreview가 산출한 실제 적용값(연속 타격의 무적 소진·피해 감소·체력 상한 포함)이다.</summary>
+    public void ShowAttackPreview(int _damage, bool _wouldDie)
     {
         if (this.boundCard == null) return;
-
-        // _isAttackHit=직격(공격) 프리뷰면 비늘 감소 반영, 반격 프리뷰면 false → 실제 TakeDamage와 일치.
-        int t_dmg = this.boundCard.ClampDamage(_damage, _isAttackHit);
 
         if (this.damagePreviewText != null)
         {
             this.damagePreviewText.DOKill();
-            this.damagePreviewText.text = $"-{t_dmg}";
+            this.damagePreviewText.text = $"-{_damage}";
             this.damagePreviewText.gameObject.SetActive(true);
         }
         else if (this.hpText != null)
@@ -512,7 +535,7 @@ public class CardView : MonoBehaviour
             // 폴백(프리팹 미배선): HP 라벨 자리에 데미지를 빨갛게. 해제 때 원복한다.
             this.hpTextOriginalColor = this.hpText.color;
             this.hpText.DOKill();
-            this.hpText.text  = $"-{t_dmg}";
+            this.hpText.text  = $"-{_damage}";
             this.hpText.color = Color.red;
             this.hpFallbackPreview = true;
         }
@@ -777,9 +800,9 @@ public class CardView : MonoBehaviour
         foreach (ParticleSystem t_ps in GetComponentsInChildren<ParticleSystem>(true))
             t_ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-        // 파티클은 **카드에 붙이지 않는다**. 붙이면 사망 직후 HideSlot이 카드를 끄면서 별가루도 같이
-        // 꺼져 뚝 끊긴다(FinishImpact가 월드 스폰인 것과 같은 이유). 좌표는 죽는 그 자리로 고정 —
-        // 카드는 떠오르지만 바닥 파동은 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
+        // 사망 파티클은 **카드에 붙이지 않는다**. 붙이면 위 Stop 루프와 사망 직후 HideSlot이 카드를 끄면서
+        // 별가루까지 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
+        // 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
         Vector3 t_deathPosition = transform.position;
 
         BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
@@ -895,6 +918,34 @@ public class CardView : MonoBehaviour
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();
 
+    // ── 공격 중 최상위 정렬 ────────────────────────────────────────────────
+    // 카드 한 장의 정렬 주인은 루트 SortingGroup 하나다(자식 렌더러 order는 그 안에서만 유효).
+    // 원래 order는 첫 상승 때 한 번만 붙잡는다 — 상승 중에 다시 읽으면 상승값이 원래값으로 굳는다.
+    UnityEngine.Rendering.SortingGroup sortingGroup;
+    int  baseSortingOrder;
+    bool sortingCaptured;
+
+    // 이 레이어의 order 계약(PrefabEmblem 주석과 같은 값): 카드 1 · 시너지 몸짓 2 · 전투 VFX 20~40.
+    // 상승값은 그 사이에 둔다 — 카드(1)보다는 확실히 위, **타격/투사체 VFX(20~)보다는 아래**.
+    // 여기서 VFX 대역을 넘기면(예: 500) 돌진해 겹친 공격자 카드가 자기 타격 이펙트를 덮어버린다.
+    const int AttackSortingOrder = 10;
+
+    /// <summary>공격 연출 동안 이 카드를 다른 카드 위로 올린다(끝나면 false로 원복).
+    /// 돌진·시네마에서 공격자가 이웃 카드 뒤로 파고드는 것을 막는 유일한 지점.
+    /// SortingGroup이 없는 프리팹이면 무동작.</summary>
+    public void SetAttackRaised(bool _on)
+    {
+        if (!this.sortingCaptured)
+        {
+            this.sortingGroup     = GetComponent<UnityEngine.Rendering.SortingGroup>();
+            this.baseSortingOrder = this.sortingGroup != null ? this.sortingGroup.sortingOrder : 0;
+            this.sortingCaptured  = true;
+        }
+        if (this.sortingGroup == null) return;
+
+        this.sortingGroup.sortingOrder = _on ? AttackSortingOrder : this.baseSortingOrder;
+    }
+
     // 보드 전체 페이드 셰임. 본체는 BattleBoardView.
     // TODO: 호출부 이관 후 삭제
     public static float ForcedDimAlpha
@@ -943,7 +994,13 @@ public class CardView : MonoBehaviour
     }
 
     // TODO: 호출부 이관 후 삭제
-    public void PlayAttackAnim() => WeaponView.PlayAttackAnim(this.boundCard);
+    public void PlayAttackAnim()
+    {
+        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 weaponPrefab 경로의 배선)에 기대지 않는다 —
+        // 어느 상태를 트는지는 그 장식의 WeaponAnimSpec이 스스로 안다.
+        if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': WeaponAnimSpec 없음", this);
+        else                         FrameWeaponAnim.Fire();
+    }
 
 #endregion
 

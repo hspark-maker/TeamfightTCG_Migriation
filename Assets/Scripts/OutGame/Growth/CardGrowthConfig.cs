@@ -10,10 +10,11 @@ public class CardGrowthConfig : ScriptableObject
     [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
     [Min(0)] [SerializeField] int hpPerLevel = 2;
 
-    [Tooltip("첫 강화(Lv2로 올릴 때)의 골드 비용.")]
-    [SerializeField] long baseGoldCost = 100;
+    [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(골드)다.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
+    [SerializeField] long baseEnhanceCost = 100;
 
-    [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseGoldCost + (N-2) * 이 값.")]
+    [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
     [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
     [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
@@ -45,6 +46,10 @@ public class CardGrowthConfig : ScriptableObject
         if (_level >= secondEvolutionLevel) t_stage = 2;
         return t_stage > CardData.MaxEvolutionStage ? CardData.MaxEvolutionStage : t_stage;
     }
+
+    /// <summary>레벨 _level로 올리는 것이 곧 진화인가(= 이 레벨에서 진화 단계가 오르는가).
+    /// 관문 레벨 숫자를 화면이 다시 적지 않게 여기서 답한다.</summary>
+    public bool IsEvolutionLevel(int _level) => EvolutionStageAt(_level) > EvolutionStageAt(_level - 1);
 
     /// <summary>레벨 _level에서 **실제로 켜져 있는** 카드 키워드. 카드의 기본 키워드에 더하는 값이 아니라
     /// 그것을 대체하는 값이다 — 키워드는 해금 전까지 아예 없는 것으로 친다.
@@ -84,16 +89,19 @@ public class CardGrowthConfig : ScriptableObject
 
     GrowthStep StepAt(CardData _card, int _level)
     {
-        // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseGoldCost·baseSuccessRate가 첫 강화의 값이 된다.
+        // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseEnhanceCost·baseSuccessRate가 첫 강화의 값이 된다.
         int t_step = _level - CardGrowth.BaseLevel - 1;
 
-        int   t_hp   = hpPerLevel;
-        long  t_cost = baseGoldCost + costGrowthPerLevel * t_step;
-        float t_rate = baseSuccessRate - rateDropPerLevel * t_step;
+        int           t_hp       = hpPerLevel;
+        long          t_cost     = baseEnhanceCost + costGrowthPerLevel * t_step;
+        float         t_rate     = baseSuccessRate - rateDropPerLevel * t_step;
+        ECurrencyType t_currency = ECurrencyType.Gold;       // 기본식에는 재화 축이 없다 — 곡선은 골드가 전제다
+                                                             // (에너지는 키워드 강화 쪽 재화다 — KeywordGrowthConfig)
 
         if (TryGetLevelStep(_level, out var t_row))
         {
-            t_hp = t_row.hpGain;                             // 행이 있으면 체력은 항상 그 값(레벨별 상세 저작이 목적)
+            t_hp       = t_row.hpGain;                       // 행이 있으면 체력은 항상 그 값(레벨별 상세 저작이 목적)
+            t_currency = t_row.costCurrency;                 // 재화도 같은 규약 — 행이 있으면 그 칸이 그대로 쓰인다
             if (t_row.cost        > 0)    t_cost = t_row.cost;   // 0 이하 = 미지정 → 기본식
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;   // 음수 = 미지정 → 기본식
         }
@@ -104,7 +112,7 @@ public class CardGrowthConfig : ScriptableObject
         if (t_cost < 0) t_cost = 0;
         if (t_hp < 0)   t_hp   = 0;
 
-        return new GrowthStep(_level, t_hp, t_cost, Mathf.Clamp01(t_rate));
+        return new GrowthStep(_level, t_hp, t_currency, t_cost, Mathf.Clamp01(t_rate));
     }
 
     bool TryGetLevelStep(int _level, out GrowthLevelStep _row)
@@ -135,7 +143,11 @@ public struct GrowthLevelStep
     [Min(0)] [Tooltip("이 레벨업으로 얻는 최대 체력 가산분.")]
     public int hpGain;
 
-    [Tooltip("이 레벨업의 골드 비용. 0 이하면 기본식을 쓴다.")]
+    [Tooltip("이 레벨업에 소모할 재화. 비용과 달리 '미지정'이 없다 — 행이 있으면 이 값이 그대로 쓰인다. " +
+             "일반 강화는 에너지, 진화 레벨에 다이아를 물리는 것이 이 칸의 용도다.")]
+    public ECurrencyType costCurrency;
+
+    [Tooltip("이 레벨업의 비용. 0 이하면 기본식을 쓴다. 단위는 위 재화다(기본식은 항상 골드).")]
     public long cost;
 
     [Range(-1f, 1f)] [Tooltip("이 레벨업의 성공률(0~1). 음수면 기본식을 쓴다. 실패해도 비용만 소모되고 레벨은 유지된다.")]
@@ -147,14 +159,16 @@ public readonly struct GrowthStep
 {
     public readonly int Level;
     public readonly int HpGain;
-    // 성공·실패 무관하게 소모되는 골드
+    // 성공·실패 무관하게 소모되는 재화와 그 양
+    public readonly ECurrencyType Currency;
     public readonly long Cost;
     public readonly float SuccessRate;
 
-    public GrowthStep(int _level, int _hpGain, long _cost, float _successRate)
+    public GrowthStep(int _level, int _hpGain, ECurrencyType _currency, long _cost, float _successRate)
     {
         Level       = _level;
         HpGain      = _hpGain;
+        Currency    = _currency;
         Cost        = _cost;
         SuccessRate = _successRate;
     }

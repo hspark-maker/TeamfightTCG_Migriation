@@ -9,8 +9,8 @@ using UnityEngine.SceneManagement;
 // 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
-// 진열 목록(packs)과 중복 환급액(duplicateRefundGold)은 이 뷰가 직접 소유해 TryPurchase에 넘긴다
-//   — 상점 SO 미개입(목록이 비면 구매 잠금).
+// 진열 목록(packs)은 이 뷰가 직접 소유한다 — 상점 SO 미개입(목록이 비면 구매 잠금).
+//   가격·중복 환급은 팩 SO가 쥐므로 이 뷰는 아무것도 넘기지 않는다.
 // 제스처·스냅은 PackCarouselView가 쥔다. 그쪽은 팩을 모르고 "그림 N장 중 몇 번째"만 안다 —
 //   돈을 쥔 이 클래스가 포인터 물리까지 소유하지 않게 한 분리다.
 //
@@ -24,13 +24,17 @@ public class PackShowcaseController : MonoBehaviour
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
-    [SerializeField] TextMeshProUGUI priceText;     // 가격(Gold, 옵션 — 미배선 무시).
+    [SerializeField] TextMeshProUGUI priceText;     // 가격 숫자(재화 종류는 팩마다 다르다 — 옵션, 미배선 무시).
+    [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 스프라이트가 바뀐다(옵션 — 미배선 무시).")]
+    [SerializeField] Image priceIcon;
+    [Tooltip("골드 결제 팩에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
+    [SerializeField] Sprite goldIcon;
+    [Tooltip("다이아 결제 팩에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
+    [SerializeField] Sprite diamondIcon;
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
     [SerializeField] List<CardPackData> packs = new List<CardPackData>();
     [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
     [SerializeField] PackCarouselView carousel;
-    [Tooltip("이 팩에서 이미 소유한 카드를 뽑았을 때(중복) 되돌려주는 Gold.")]
-    [Min(0)] [SerializeField] long duplicateRefundGold = 10;
 
     // ScreenFlash·PackPurchaseImpact는 둘 다 런타임 자가설치라 프리팹에 배선할 자리가 없다 —
     // 개봉 화면으로 갈아치울 때 쓰는 플래시의 값·에셋은 여기가 유일한 노출 창구다.
@@ -49,7 +53,6 @@ public class PackShowcaseController : MonoBehaviour
 
     int m_index;
     bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
-    long m_forcedRefund;
 
     // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
     bool m_openPending;
@@ -92,10 +95,12 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 개봉이 끝나면 다시 살 수 있다. 씬을 떠나던 시절엔 OnEnable이 해주던 일 — 이제 아무도 해주지 않는다.
+    // 얼려 둔 진열도 여기서 푼다(Refresh 전체 — 잔액뿐 아니라 목록이 바뀌어 있을 수 있다).
+    // 오버레이는 하드컷으로 사라지므로 같은 프레임에 갈아치우면 교체 자체가 보이지 않는다.
     void OnOverlayClosed()
     {
         s_transitioning = false;
-        RefreshBuyLock();   // 개봉으로 잔액이 줄었다 — 다음 구매 가능 여부를 다시 판정한다.
+        Refresh();
     }
 
     void OnCurrencyChanged(ECurrencyType _type, long _balance)
@@ -126,8 +131,14 @@ public class PackShowcaseController : MonoBehaviour
     // 잠그기는 그 다음 문제일 뿐, 표시·결제 일치는 목록이 지킨다.
     void ResolveDisplay()
     {
+        // 구매가 확정된 뒤 개봉이 닫힐 때까지는 진열을 얼린다. 튜토리얼 구매 스텝은 구매 성공 신호로
+        // 곧장 다음 칸을 커밋해 강제 진열이 풀리는데, 그 시점은 플래시가 화면을 덮기 전이라
+        // 원래 상점으로 갈아치워지는 것이 그대로 보인다. 게다가 캐러셀 재구축은 페이지를 파괴하므로
+        // 구매 임팩트가 잡고 있던 팩 노드까지 사라진다.
+        if (s_transitioning) return;
+
         m_display.Clear();
-        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced, out m_forcedRefund);
+        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced);
 
         if (m_forced)
         {
@@ -177,11 +188,8 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 구매 대상 해석. 캐러셀이 가리키는 페이지가 곧 결제 대상이다.
-    void ResolvePack(out CardPackData _pack, out long _refundGold)
-    {
-        _pack = m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
-        _refundGold = m_forced ? m_forcedRefund : duplicateRefundGold;
-    }
+    CardPackData ResolvePack()
+        => m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
     // 튜토리얼 게이트도 이 상태를 보고 딤을 자동으로 걷어 유저가 골드를 벌러 나갈 수 있다(소프트락 방지).
@@ -189,20 +197,37 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (buyButton == null) return;
 
-        ResolvePack(out var t_pack, out _);
+        var t_pack = ResolvePack();
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
                               && CurrencyManager.CanAfford(t_pack.PriceType, t_pack.Price);
     }
 
-    // 중앙 팩의 표시명·가격을 UI에 반영(참조는 전부 옵션).
+    // 중앙 팩의 표시명·가격·재화 아이콘을 UI에 반영(참조는 전부 옵션).
     void Bind()
     {
-        ResolvePack(out var t_pack, out _);
+        var t_pack = ResolvePack();
 
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
         if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
+
+        if (priceIcon != null)
+        {
+            // 가격 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
+            priceIcon.enabled = t_pack != null;
+
+            var t_icon = ResolveCurrencyIcon(t_pack);
+            if (t_icon != null) priceIcon.sprite = t_icon;
+        }
+    }
+
+    // 결제 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 — 둘 다 있을 때만 바꾼다.
+    Sprite ResolveCurrencyIcon(CardPackData _pack)
+    {
+        if (_pack == null || goldIcon == null || diamondIcon == null) return null;
+
+        return _pack.PriceType == ECurrencyType.Diamond ? diamondIcon : goldIcon;
     }
 
     // 구매 클릭: 성공이면 캐리어에 실어 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
@@ -210,7 +235,7 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (s_transitioning) return;
 
-        ResolvePack(out var t_pack, out long t_refundGold);
+        var t_pack = ResolvePack();
         if (t_pack == null) return;
 
         // 열 화면이 없으면 사지 않는다 — 구매는 원자 영속이라 되돌릴 수 없고, 튜토리얼 구매 스텝이면
@@ -221,7 +246,7 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        var t_opened = CardPackOpener.TryPurchase(t_pack, t_refundGold);
+        var t_opened = CardPackOpener.TryPurchase(t_pack);
         if (t_opened != null && t_opened.Success)
         {
             s_transitioning = true;
@@ -251,7 +276,9 @@ public class PackShowcaseController : MonoBehaviour
         if (PackOpenOverlay.TryOpen()) return;
 
         // 구매·소유는 이미 원자 영속됐다 — 잃는 것은 개봉 연출뿐이므로 되돌리지 않고 잠금만 푼다.
+        // 열지 못하면 닫힘 신호도 오지 않는다 — 얼려 둔 진열을 여기서 함께 풀지 않으면 영영 굳는다.
         s_transitioning = false;
+        Refresh();
         Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
     }
 
@@ -268,7 +295,7 @@ public class PackShowcaseController : MonoBehaviour
     void ShowFailPopup(EPackOpenResult? _result)
     {
         // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
-        ResolvePack(out var t_pack, out _);
+        var t_pack = ResolvePack();
         string t_currency = t_pack != null && t_pack.PriceType == ECurrencyType.Diamond ? "다이아" : "골드";
 
         string t_message = _result == EPackOpenResult.InsufficientGold

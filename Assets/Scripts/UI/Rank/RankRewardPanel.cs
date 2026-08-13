@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,7 +13,6 @@ public class RankRewardPanel : MonoBehaviour
     [SerializeField] Transform content;              // 행이 세로로 쌓일 Content(VerticalLayoutGroup)
     [SerializeField] RankRewardRowView rowPrefab;    // 행 프리팹
     [SerializeField] Button closeButton;
-    [SerializeField] RankRewardClaimPopup claimPopup;
 
     [Header("연출")]
     [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
@@ -33,20 +31,9 @@ public class RankRewardPanel : MonoBehaviour
         this.OpenAt(t_top >= 0 ? t_top : RankManager.GetInfo().TierIndex);
     }
 
-    /// <summary>전투에서 티어가 올라 자동으로 열릴 때. 새로 도달한 행으로 스크롤하고 그 행만 연출한다.</summary>
-    public void OpenForTierUp(in RankApplyResult _result)
-    {
-        int t_target = _result.TierIndex;
-
-        this.OpenAt(t_target);
-
-        if (t_target >= 0 && t_target < this.m_rows.Count && this.m_rows[t_target] != null)
-            this.m_rows[t_target].PlayTierUpEffect();
-    }
-
     public void Close()
     {
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        HideClaimPopup();
         this.SetVisible(false);
     }
 
@@ -70,23 +57,11 @@ public class RankRewardPanel : MonoBehaviour
         this.transition.HandleDisabled(this.ResolveTarget());
     }
 
-    // 전투에서 넘어온 티어 상승을 소비해 자동으로 연다.
-    // Awake/OnEnable이 아니라 Start인 이유: RankConfig 주입(DataLibrary.Awake)이 끝난 뒤여야 행 정보가 제대로 나온다.
-    // 오버레이는 항상 활성이고 root만 토글되므로 이 Start는 보장 실행된다.
-    IEnumerator Start()
-    {
-        // 씬 로드 첫 프레임에는 ScrollRect 자신의 초기화가 뒤에 와서 스크롤 위치를 덮는다 — 한 프레임 양보한 뒤에 연다.
-        yield return null;
-
-        // 소비는 반드시 양보 뒤에. 양보 전에 소비하면 그 사이 씬이 바뀔 때 결과가 증발한다.
-        if (RankUpHandoff.TryConsume(out var t_rankUp)) this.OpenForTierUp(t_rankUp);
-    }
-
     // Open 경로 공통부. 스크롤 타겟만 호출자가 정한다.
     void OpenAt(int _scrollRow)
     {
         // 패널보다 먼저 닫는다 — 아직 화면에 없는 동안이라 팝업이 트윈 없이 즉시 정리된다(퇴장 중 열림 경합 차단).
-        if (this.claimPopup != null) this.claimPopup.Hide();
+        HideClaimPopup();
 
         this.SetVisible(true);
 
@@ -133,18 +108,25 @@ public class RankRewardPanel : MonoBehaviour
             if (this.m_rows[t_i] != null) this.m_rows[t_i].Refresh();
     }
 
-    // 행 클릭 → 수령 팝업. 팝업이 미배선이면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
+    // 행 클릭 → 수령 팝업. 팝업이 씬에 없으면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
     void OnRowClicked(int _tierIndex)
     {
         if (!RankRewardManager.CanClaim(_tierIndex)) return;
 
-        if (this.claimPopup == null)
+        if (!RewardClaimPopup.TryGet(out var t_popup))
         {
             this.Claim(_tierIndex);
             return;
         }
 
-        this.claimPopup.Show(RankRewardManager.GetInfo(_tierIndex), () => this.Claim(_tierIndex));
+        var t_info = RankRewardManager.GetInfo(_tierIndex);
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex));
+    }
+
+    // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
+    static void HideClaimPopup()
+    {
+        if (RewardClaimPopup.TryGet(out var t_popup)) t_popup.Hide();
     }
 
     // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshRows를 유발한다.

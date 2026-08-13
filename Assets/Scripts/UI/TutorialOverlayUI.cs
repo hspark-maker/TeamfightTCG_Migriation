@@ -38,6 +38,23 @@ public class TutorialOverlayUI : MonoBehaviour
     // 항상 동일한 어둡기 보장. (프리팹에서 DimMask Image alpha를 0으로 저장해도 dim 정상 작동.)
     const float DimStrength = 0.6f;
 
+    // 배너가 설 세 자리(캔버스 단위, 기준 해상도 1080x1920). 앵커/피벗은 자리마다 정해져 있고
+    // 여기 값은 그 기준점에서의 보정이다 — Top은 화면 위에서 아래로, Bottom은 화면 아래에서 위로.
+    // **좌표를 코드에 박아 두지 않는 이유**: 저작이 눈으로 잡아야 하는 값인데 코드 상수면 빌드를 거쳐야 보인다.
+    // 프리팹에서 이 셋을 옮기면 그대로 반영된다(Banner RectTransform을 직접 옮기는 건 소용없다 —
+    // 표시할 때마다 아래 SetBannerAnchor가 자리를 다시 잡는다).
+    [Header("배너 위치 (자리별 보정 — 프리팹에서 잡는다)")]
+    [Tooltip("맨위: 화면 최상단 기준. y가 음수일수록 아래로 내려온다")]
+    [SerializeField] Vector2 bannerTopPos         = new Vector2(0f, -160f);
+    [Tooltip("중간위: 맨위와 같은 화면 상단 기준. y가 음수일수록 아래로 내려온다(맨위보다 더 내린 자리)")]
+    [SerializeField] Vector2 bannerUpperMiddlePos = Vector2.zero;
+    [Tooltip("중간: 화면 정중앙 기준")]
+    [SerializeField] Vector2 bannerCenterPos      = Vector2.zero;
+    [Tooltip("중간아래: 완전아래와 같은 화면 하단 기준. y가 양수일수록 위로 올라온다(완전아래보다 더 올린 자리)")]
+    [SerializeField] Vector2 bannerLowerMiddlePos = Vector2.zero;
+    [Tooltip("완전아래: 화면 최하단 기준. y가 양수일수록 위로 올라온다")]
+    [SerializeField] Vector2 bannerBottomPos      = new Vector2(0f, 160f);
+
     bool tapped;      // dim 활성 중 탭(release) 발생 플래그(WaitForTapAsync가 소비)
     bool tapArmed;    // 탭 대기 활성 구간(이 구간에서 시작된 press만 인정)
     bool pressActive; // 이번 대기 구간 안에서 pointer down이 발생했는가
@@ -56,12 +73,12 @@ public class TutorialOverlayUI : MonoBehaviour
     [Header("터치 유도 손 아이콘")]
     [Tooltip("눌러야 할 자리에 떠 있는 손. 비우면 손 표시 자체를 생략한다(무동작 안전)")]
     [SerializeField] Sprite handSprite;
-    [SerializeField] float  handSize      = 150f;   // 캔버스 단위
-    [SerializeField] float  handBobHeight = 26f;    // 위아래 떠 있는 폭
+    [SerializeField] float  handSize      = 260f;   // 캔버스 단위(1080x1920 기준). 작으면 전투 화면에서 묻힌다
+    [SerializeField] float  handBobHeight = 34f;    // 위아래 떠 있는 폭
     [SerializeField] float  handTapPeriod = 1.1f;   // 한 번 누르는 주기(초)
 
     [Tooltip("목표 지점 기준 손 위치 보정(캔버스 단위). 오른쪽 아래로 빼면 손이 대상을 덜 가린다")]
-    [SerializeField] Vector2 handOffset = new Vector2(52f, -60f);
+    [SerializeField] Vector2 handOffset = new Vector2(34f, -24f);
 
     // 손은 프리팹 배선 없이 최초 사용 시 만든다(포커스 패널과 같은 규약).
     RectTransform handRect;
@@ -141,12 +158,13 @@ public class TutorialOverlayUI : MonoBehaviour
     /// 설명/게이트 스텝. 배너 + 탭 대기용 마스크 활성(탭 감지). darken이면 배경 어둡게,
     /// 아니면 투명하되 탭은 여전히 받는다. 하이라이트/포인터 없음.
     /// </summary>
-    public void ShowMessage(string _message, bool _darken)
+    public void ShowMessage(string _message, bool _darken, TutorialScenarioData.BannerAnchor _anchor)
     {
         ClearHighlight();
         ClearPointer();
         ActivateMask(_darken);
         HideHand();   // 화면 아무 데나 탭하는 구간 — 특정 지점을 가리키면 안 된다
+        SetBannerAnchor(_anchor);
         SetBanner(_message, _showTapHint: true);   // 이 스텝의 진행 수단이 탭이다
     }
 
@@ -154,7 +172,8 @@ public class TutorialOverlayUI : MonoBehaviour
     /// 공격 스텝 안내. 배너 + 공격자/타깃 슬롯 하이라이트 + (showPointer면) 공격자에 드래그 포인터.
     /// 마스크는 끈다(카드 드래그를 받아야 하므로). attacker/target 슬롯 뷰는 null 허용.
     /// </summary>
-    public void ShowAttack(string _message, CardView _attacker, CardView _target, bool _showPointer)
+    public void ShowAttack(string _message, CardView _attacker, CardView _target, bool _showPointer,
+        TutorialScenarioData.BannerAnchor _anchor)
     {
         ClearHighlight();
         ClearPointer();
@@ -171,6 +190,7 @@ public class TutorialOverlayUI : MonoBehaviour
         }
 
         DeactivateMask();
+        SetBannerAnchor(_anchor);
         SetBanner(_message, _showTapHint: false);   // 진행은 공격 입력 — 탭 안내는 오해를 준다
 
         // 슬롯 지정 스텝: 먼저 눌러야 하는 건 공격자 카드다. 지정이 없으면(자유공격) 손도 없다.
@@ -204,12 +224,13 @@ public class TutorialOverlayUI : MonoBehaviour
     /// Inspect 안내. 배너만 띄우고 마스크는 끈다(적 카드 롱프레스를 받아야 하므로).
     /// 카드 입력은 Physics2D라 마스크와 무관 — 마스크를 켜면 어두워지기만 하므로 여기선 끈다.
     /// </summary>
-    public void ShowInspect(string _message)
+    public void ShowInspect(string _message, TutorialScenarioData.BannerAnchor _anchor)
     {
         ClearHighlight();
         ClearPointer();
         DeactivateMask();
         HideHand();   // 롱프레스 유도라 탭 손은 오해를 준다
+        SetBannerAnchor(_anchor);
         // Inspect는 탭이 아니라 롱프레스로 진행 → "탭하여 계속" 힌트 숨김(오해 방지).
         SetBanner(_message, _showTapHint: false);
     }
@@ -430,30 +451,47 @@ public class TutorialOverlayUI : MonoBehaviour
     }
 
     /// <summary>배너를 화면 위/가운데/아래로 옮긴다. 포커스가 아군 필드(하단)로 내려가면
-    /// 배너가 그 위를 덮지 않도록 저작이 위치를 지정한다. 앵커·피벗을 같이 바꿔 화면 밖으로 새지 않게.</summary>
+    /// 배너가 그 위를 덮지 않도록 저작이 위치를 지정한다. 앵커·피벗을 같이 바꿔 화면 밖으로 새지 않게.
+    ///
+    /// **모든 표시 경로가 이걸 부른다.** 예전엔 포커스 스텝만 불러서, 한 번 자리가 옮겨지면 그 뒤의
+    /// 일반 메시지·공격 안내가 그 자리를 그대로 물려받아 스텝마다 배너가 튀었다(되돌리는 쪽이 없었다).
+    /// 자리는 스텝 데이터(<see cref="TutorialScenarioData.ScriptedAttack.bannerAnchor"/>)가 정한다.</summary>
     void SetBannerAnchor(TutorialScenarioData.BannerAnchor _anchor)
     {
         if (this.bannerGroup == null) return;
-        var t_rect = (RectTransform)this.bannerGroup.transform;
 
+        // **윗동네는 화면 위쪽에서, 아랫동네는 화면 아래쪽에서 잰다.**
+        // 맨위/중간위는 상단(1) 기준으로 "위에서 얼마나 내려왔나", 중간아래/완전아래는 하단(0) 기준으로
+        // "아래에서 얼마나 올라왔나". 화면 비율(0.75/0.25)로 띄우면 세로 비율이 다른 기기에서
+        // 같은 숫자가 다른 여백이 되고, 저작이 "위에서 N만큼"으로 생각하는 방식과도 어긋난다.
+        // 가운데만 정중앙(0.5) 기준이다.
         switch (_anchor)
         {
+            case TutorialScenarioData.BannerAnchor.UpperMiddle:
+                ApplyBannerSlot(1f,   new Vector2(0.5f, 1f),   this.bannerUpperMiddlePos);
+                break;
             case TutorialScenarioData.BannerAnchor.Center:
-                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 0.5f);
-                t_rect.pivot            = new Vector2(0.5f, 0.5f);
-                t_rect.anchoredPosition = Vector2.zero;
+                ApplyBannerSlot(0.5f, new Vector2(0.5f, 0.5f), this.bannerCenterPos);
+                break;
+            case TutorialScenarioData.BannerAnchor.LowerMiddle:
+                ApplyBannerSlot(0f,   new Vector2(0.5f, 0f),   this.bannerLowerMiddlePos);
                 break;
             case TutorialScenarioData.BannerAnchor.Bottom:
-                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 0f);
-                t_rect.pivot            = new Vector2(0.5f, 0f);
-                t_rect.anchoredPosition = new Vector2(0f, 160f);
+                ApplyBannerSlot(0f,   new Vector2(0.5f, 0f),   this.bannerBottomPos);
                 break;
             default:   // Top — BuildUI 기본값과 동일
-                t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, 1f);
-                t_rect.pivot            = new Vector2(0.5f, 1f);
-                t_rect.anchoredPosition = new Vector2(0f, -160f);
+                ApplyBannerSlot(1f,   new Vector2(0.5f, 1f),   this.bannerTopPos);
                 break;
         }
+    }
+
+    /// <summary>배너를 화면 세로 비율 <paramref name="_anchorY"/> 자리에 세운다(0 = 맨 아래, 1 = 맨 위).</summary>
+    void ApplyBannerSlot(float _anchorY, Vector2 _pivot, Vector2 _offset)
+    {
+        var t_rect = (RectTransform)this.bannerGroup.transform;
+        t_rect.anchorMin = t_rect.anchorMax = new Vector2(0.5f, _anchorY);
+        t_rect.pivot            = _pivot;
+        t_rect.anchoredPosition = _offset;
     }
 
     // 4패널을 최초 1회 생성. 배너보다 **먼저** 넣어 배너가 항상 딤 위에 그려지게 한다.

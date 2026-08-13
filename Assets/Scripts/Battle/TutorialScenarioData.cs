@@ -15,8 +15,13 @@ public class TutorialScenarioData : ScriptableObject
     public enum StepKind { Attack, Message, Inspect }
 
     /// <summary>안내 배너가 붙을 자리. 포커스가 아래(아군)로 내려가면 배너는 위로 비켜야 가려지지 않는다.
-    /// (SO는 int 직렬화 → 새 값은 반드시 끝에 추가.)</summary>
-    public enum BannerAnchor { Top, Center, Bottom }
+    /// 값 순서 = 화면 위→아래 순서다(인스펙터 드롭다운이 그대로 위아래로 읽힌다).
+    /// 실제 좌표는 <c>TutorialOverlayUI</c>의 자리별 Vector2가 정한다 — 여기선 어느 자리인지만 고른다.
+    ///
+    /// ⚠ SO는 int 직렬화다. <b>2026-08-12에 한 번 재배열했다</b>(구 Center 1→2, 구 Bottom 2→4) —
+    /// 보유처가 TutorialScenario*.asset 다섯 개뿐이라 그 파일들의 값을 같이 옮겼다.
+    /// 앞으로 값을 더 넣을 땐 반드시 끝에 추가할 것(같은 마이그레이션을 다시 하지 않으려면).</summary>
+    public enum BannerAnchor { Top, UpperMiddle, Center, LowerMiddle, Bottom }
 
     /// <summary>카드 낱장 포커스 대상 진영. None(0)이 기본이라 기존 시나리오는 자동으로 꺼진 상태다 —
     /// 슬롯 번호만 두면 기본값 0이 "0번 슬롯 포커스 켜짐"이 돼버려서 진영 자체를 스위치로 쓴다.
@@ -90,6 +95,15 @@ public class TutorialScenarioData : ScriptableObject
 
     [Header("시너지 표시/적용 (기본 off — 초반 튜토리얼은 시너지 개념 미도입, 3편부터 on)")]
     public bool enableSynergy;
+
+    [Header("카드 레벨 (0 = Lv1 호환값)")]
+    [Min(0)] [Tooltip("플레이어 카드에 적용할 성장 레벨. 0은 기존 에셋 호환을 위해 Lv1로 취급")]
+    public int playerCardLevel;
+    [Min(0)] [Tooltip("적 카드에 적용할 성장 레벨. 0은 기존 에셋 호환을 위해 Lv1로 취급")]
+    public int enemyCardLevel;
+
+    public int PlayerCardLevel => Mathf.Max(CardGrowth.BaseLevel, this.playerCardLevel);
+    public int EnemyCardLevel  => Mathf.Max(CardGrowth.BaseLevel, this.enemyCardLevel);
 
     [Header("고정 덱 (순서 = 등장 순서, 셔플 없음, 6장 이하 허용)")]
     public List<CardData> playerDeck;
