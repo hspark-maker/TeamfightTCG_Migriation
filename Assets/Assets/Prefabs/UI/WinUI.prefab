@@ -516,6 +516,7 @@ MonoBehaviour:
   cardFlight:
     layerOverride: {fileID: 0}
     rowCenter: {fileID: 6950760237462054635}
+    cardPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
     tileFrame: {fileID: 21300000, guid: 3ccd76da422b6d64b99e2aeb55123545, type: 3}
     tileSize: {x: 150, y: 200}
     tileSpacing: 24

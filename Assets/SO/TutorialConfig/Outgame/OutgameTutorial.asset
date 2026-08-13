@@ -34,7 +34,7 @@ MonoBehaviour:
       unlocks: 06000000
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
       showDeckGate: 0
@@ -181,7 +181,7 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
@@ -193,7 +193,7 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
@@ -204,7 +204,7 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
@@ -215,7 +215,7 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0

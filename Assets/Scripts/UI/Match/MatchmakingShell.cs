@@ -103,16 +103,22 @@ public class MatchmakingShell : MonoBehaviour
         m_running = true;
         m_cts     = CancellationTokenSource.CreateLinkedTokenSource(_ct);
 
+        MatchOpponent? t_result = null;
         try
         {
-            return await RunStagesAsync(_matchmaker, _ct);
+            t_result = await RunStagesAsync(_matchmaker, _ct);
+
+            return t_result;
         }
         finally
         {
             StopDots();
 
-            // 성공 경로도 여기로 온다(SetActive는 멱등) — 매치메이커가 계약을 어기고 던져도 화면이 남지 않는다.
-            Close();
+            // 내리는 것은 물러날 때뿐이다. 이 화면은 로비 위 오버레이라 내리는 즉시 로비가 드러나는데,
+            // 상대가 확정되면 호스트가 커튼으로 덮은 뒤 덱 화면으로 갈아치운다 — 여기서 내리면
+            // 커튼이 닫히기 전에 로비가 한 번 번쩍인다(MatchDeckShell.RunSelectionAsync와 같은 규약).
+            // 매치메이커가 계약을 어기고 던져도 t_result는 null이라 화면이 남지 않는다.
+            if (t_result == null) Close();
 
             m_running = false;
             m_cts.Dispose();

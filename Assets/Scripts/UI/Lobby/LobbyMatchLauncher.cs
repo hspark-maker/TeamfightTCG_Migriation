@@ -79,7 +79,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     void EnterBattle()
     {
         m_running = true;
-        SceneCurtainView.LoadScene(BATTLE_SCENE);
+        CurtainView.LoadScene(BATTLE_SCENE);
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.
@@ -122,7 +122,28 @@ public class LobbyMatchLauncher : MonoBehaviour
             return TryApplyFirstValidDeck();
         }
 
-        return await shell.RunSelectionAsync(_ct);
+        // 매칭을 거치지 않은 경로(튜토리얼)는 갈아치울 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
+        if (t_opponent == null) return await shell.RunSelectionAsync(_ct);
+
+        return await RunSelectionBehindCurtainAsync(_ct);
+    }
+
+    // 매칭 화면 → 덱 화면. 전투 진입과 같은 커튼이 덮은 사이에 갈아치운다 —
+    // 두 전환이 같은 판을 쓰면 매칭·덱·배틀이 한 줄기 흐름으로 읽힌다.
+    async UniTask<bool> RunSelectionBehindCurtainAsync(CancellationToken _ct)
+    {
+        // 선택 게이트는 커튼이 덮은 순간 시작하고, 그 await만 커튼이 열린 뒤로 미룬다.
+        // RunSelectionAsync는 부르는 즉시 화면을 열고 첫 대기에서 멈추므로 여기서 시작해야 커튼 밑에서 선다.
+        // 밖에서 미리 Open을 부르지 않는 이유: 그러면 셸의 중복 진입 가드에 걸려 그대로 포기 처리된다.
+        UniTask<bool> t_selection = default;
+
+        await CurtainView.CoverAsync(() =>
+        {
+            m_matchShell.Close();
+            t_selection = shell.RunSelectionAsync(_ct);
+        });
+
+        return await t_selection;
     }
 
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.
