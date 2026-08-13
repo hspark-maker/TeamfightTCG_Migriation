@@ -139,7 +139,7 @@ public class GameInitializer : MonoBehaviour
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
     }
 
-    /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmEnemyDeck)다 —
+    /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmOpponent)다 —
     /// 덱 화면이 그린 6장과 실제 상대가 같아야 하므로 확정은 화면을 띄우기 전에 끝나야 한다.
     /// 여기는 로비를 거치지 않는 진입점(MainMenu·TutorialSetupUI·AutoBattle 스텝·씬 단독 실행)만 태운다.</summary>
     void ConfirmEnemyDeck()

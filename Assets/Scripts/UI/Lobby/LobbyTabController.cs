@@ -45,6 +45,19 @@ public class LobbyTabController : MonoBehaviour
 
     [SerializeField] float barRetractDuration = 0.2f;
 
+    [Header("셸 딤 (옵션 — 로비 하단바 인스턴스에만 배선한다)")]
+    [Tooltip("탭 콘텐츠 **밖**(상단바·하단바 자리)을 덮는 딤 묶음(Panel_ShellDim)의 CanvasGroup.\n" +
+             "탭 콘텐츠 안에서 열리는 오버레이의 딤은 상하단까지 못 덮는다 — 그 자리를 이것이 맡는다.\n\n" +
+             "⚠ 저작 자리는 아무 데나(SafeArea 층)여도 된다 — Awake가 콘텐츠 뿌리의 첫 자식으로 옮긴다.\n" +
+             "  그 자리라야 상단바는 덮으면서(콘텐츠가 상단바보다 나중에 그려진다) 같은 콘텐츠 안 탭들보다는\n" +
+             "  먼저 그려져, 연출 중 위로 튀어나오는 카드가 딤에 깔리지 않는다.\n\n" +
+             "⚠ 저작 규약: 두 판은 **콘텐츠 경계 기준**으로 셸 높이(상단 180 / 하단 220) + 여유 400만큼 바깥으로 뻗는다.\n" +
+             "  Dim_Top은 pos.y +580 / height 580, Dim_Bottom은 pos.y -620 / height 620.\n" +
+             "  (저작 자리가 SafeArea 층이라 에디터에서는 어긋나 보이지만, 옮겨진 뒤가 맞는 자리다.)\n" +
+             "  여유분은 SafeArea 밖 노치까지 덮으려는 것이고, 셸 높이를 바꾸면 이 값도 같이 고쳐야 경계가 안 어긋난다.\n" +
+             "  두 판의 알파는 페이지 오버레이 Dim과 같은 값으로 맞춰 둔다 — 다르면 이음매가 선으로 보인다.")]
+    [SerializeField] CanvasGroup shellDim;
+
     [Header("Focus 하이라이트 회전")]
     [Tooltip("Button_Focus 뒤쪽 하이라이트. 비우면 Focus의 Light 자식을 자동으로 찾는다.")]
     [SerializeField] RectTransform focusHighlight;
@@ -99,8 +112,52 @@ public class LobbyTabController : MonoBehaviour
             .SetLink(this.barGroup.gameObject);
     }
 
+    /// 탭 콘텐츠 밖(상단바·하단바 자리)을 딤으로 덮어 화면 한가운데만 남긴다.
+    /// 연출이 콘텐츠 안에서 도는 동안 상단 재화·메뉴로 빠져나가는 길을 함께 막는다 —
+    /// 이 딤은 어둡게 하는 겉모습이자 그 자체가 입력 블로커다.
+    public void SetShellDimmed(bool _dimmed)
+    {
+        if (this.shellDim == null) return;
+
+        DOTween.Kill(this.shellDim);   // 세션이 연달아 돌면 알파가 중간값에 굳는다
+
+        // 입력은 트윈을 기다리지 않는다(SetBarRetracted와 같은 규율) — 옅은 동안 눌리면 막은 뜻이 없다
+        this.shellDim.blocksRaycasts = _dimmed;
+
+        this.shellDim.DOFade(_dimmed ? 1f : 0f, Mathf.Max(0.01f, this.barRetractDuration))
+            .SetEase(Ease.OutQuad)
+            .SetUpdate(true)
+            .SetTarget(this.shellDim)
+            .SetLink(this.shellDim.gameObject);
+    }
+
+    /// 딤을 탭 콘텐츠 뿌리의 맨 아래 칸으로 내린다 — 상단바는 여전히 덮으면서(콘텐츠가 상단바보다 나중에 그려진다)
+    /// 같은 콘텐츠 안에서 도는 연출(삽입 카드)보다는 먼저 그려지게 하려는 것이다.
+    /// ⚠ 저작으로 못 하고 여기서 하는 이유: 에디트 모드는 프리팹 인스턴스 내부 오브젝트의 부모 변경을 막는다.
+    void MoveShellDimUnderContent()
+    {
+        if (this.shellDim == null) return;
+
+        Transform t_content = this.ContentRoot();
+        if (t_content == null) return;
+
+        this.shellDim.transform.SetParent(t_content, false);
+        this.shellDim.transform.SetAsFirstSibling();
+    }
+
+    // 탭 콘텐츠들이 매달린 뿌리. 배선을 하나 더 받지 않으려고 이미 아는 값(탭 콘텐츠의 부모)에서 얻는다.
+    Transform ContentRoot()
+    {
+        for (int i = 0; i < this.tabs.Count; i++)
+            if (this.tabs[i].content != null) return this.tabs[i].content.transform.parent;
+
+        return null;
+    }
+
     void Awake()
     {
+        this.MoveShellDimUnderContent();
+
         this.m_views = new TabButtonView[this.tabs.Count];
 
         for (int i = 0; i < this.tabs.Count; i++)
