@@ -68,8 +68,9 @@ public static class OutgameDebugActions
     // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 초기화
     public static void ResetTriggeredTutorials()
     {
-        TriggeredTutorialRunner.Abort();
+        // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
         OutgameTutorialProgress.ClearTriggersForDebug();
+        TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 
         Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");

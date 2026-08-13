@@ -60,6 +60,17 @@ public static class OutgameTutorialRunner
         WarnOnMisauthoredChapters();
     }
 
+    // 저작된 챕터의 스텝 수(범위 밖·빈 챕터는 0)
+    public static int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
+
+    // 임의 좌표의 스텝 조회(진행도와 무관 — 되감기 재생이 좌표째 훑는 창구)
+    public static bool TryGetStepAt(int _chapter, int _step, out TutorialStepDef _def)
+    {
+        _def = null;
+
+        return TryGetChapter(_chapter, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
+    }
+
     // 현재 좌표가 가리키는 스텝(미주입·완료·범위 밖·빈 칸이면 false)
     public static bool TryGetCurrentStep(out TutorialStepDef _step)
     {
@@ -154,8 +165,6 @@ public static class OutgameTutorialRunner
         _chapter = s_data.chapters[_index];
         return _chapter != null;
     }
-
-    static int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
 
     // 반환 false = 시퀀스 끝(그때도 out은 끝 좌표를 준다 — 그대로 커밋되어야 하므로)
     static bool TryGetNext(int _chapter, int _step, out int _nextChapter, out int _nextStep)

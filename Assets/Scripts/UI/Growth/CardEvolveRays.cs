@@ -128,13 +128,48 @@ public class CardEvolveRays
         }
     }
 
-    /// <summary>길이가 먼저 무너지고 밝기가 뒤따라 꺼진다 — 순서가 반대면 '꺼졌다'이지 '빨려들었다'가 아니다.</summary>
-    public void InsertRetract(Sequence _seq, float _at)
+    /// <summary>충격파. 씨앗에서 저작 길이를 **넘어** 밖으로 터졌다가 그 자리에서 죽는다 —
+    /// 회수(<see cref="InsertRetract"/>)와 정확히 반대 벡터이므로, 하나가 응축이고 하나가 방출이다.
+    /// 길이·밝기만 못 박고 출발하므로 앞 구간이 줄기를 어떻게 남겼든(꺼졌든 회수됐든) 같은 폭발이 된다.</summary>
+    /// <remarks>⚠ 각도는 건드리지 않는다 — <see cref="InsertSpin"/>이 아직 돌고 있을 수 있고,
+    /// 자세를 통째로 못 박으면 그 프레임에 저작 각도로 튄다.</remarks>
+    public void InsertBurst(Sequence _seq, float _at, float _dur, float _lengthScale)
     {
         if (this.rays == null || this.m_poses == null) return;
 
-        float t_from = _at + Mathf.Max(0f, this.retractDelay);
-        float t_dur  = Mathf.Max(0.05f, this.retractSweep);
+        float t_dur = Mathf.Max(0.05f, _dur);
+
+        for (int t_i = 0; t_i < this.rays.Length; t_i++)
+        {
+            if (!TryGet(t_i, out Graphic t_ray, out RayPose t_pose)) continue;
+
+            RectTransform t_rt   = t_ray.rectTransform;
+            Graphic       t_lit  = t_ray;   // 클로저가 잡을 판. 반복마다 새 변수여야 마지막 줄기만 터지지 않는다
+            Vector3       t_seed = Vector3.Scale(t_pose.Scale, new Vector3(1f, this.igniteSeedLength, 1f));
+            Vector3       t_end  = Vector3.Scale(t_pose.Scale, new Vector3(1f, Mathf.Max(1f, _lengthScale), 1f));
+
+            _seq.InsertCallback(_at, () =>
+            {
+                SetAlpha(t_lit, 0f);
+                t_rt.localScale = t_seed;
+            });
+
+            // 뻗는 것이 밝기보다 오래간다 — 알파가 먼저 죽으면 '터졌다'가 아니라 '깜빡였다'가 된다.
+            _seq.Insert(_at, t_rt.DOScale(t_end, t_dur).SetEase(Ease.OutQuad));
+            _seq.Insert(_at, t_ray.DOFade(this.flareAlpha, t_dur * 0.12f).SetEase(Ease.OutQuad));
+            _seq.Insert(_at + t_dur * 0.12f, t_ray.DOFade(0f, t_dur * 0.88f).SetEase(Ease.InQuad));
+        }
+    }
+
+    /// <summary>길이가 먼저 무너지고 밝기가 뒤따라 꺼진다 — 순서가 반대면 '꺼졌다'이지 '빨려들었다'가 아니다.
+    /// _maxSpan은 회수를 끝내야 하는 마감 시각(_at 대비)이다 — 뒤에 폭발이 오는 길에서 겹치면
+    /// 같은 판을 두 트윈이 밀어 응축이 사라진다.</summary>
+    public void InsertRetract(Sequence _seq, float _at, float _maxSpan = float.MaxValue)
+    {
+        if (this.rays == null || this.m_poses == null) return;
+
+        float t_from = _at + Mathf.Min(Mathf.Max(0f, this.retractDelay), Mathf.Max(0f, _maxSpan - 0.05f));
+        float t_dur  = Mathf.Max(0.05f, Mathf.Min(this.retractSweep, _at + _maxSpan - t_from));
 
         for (int t_i = 0; t_i < this.rays.Length; t_i++)
         {

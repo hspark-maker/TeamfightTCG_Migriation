@@ -108,5 +108,9 @@ public class BootInstaller : MonoBehaviour
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
         TriggeredTutorialRunner.EnsureData(triggeredTutorialData);
+
+        // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
+        // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
+        OutgameTutorialRewind.ApplyReplayIfScheduled();
     }
 }

@@ -55,6 +55,14 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] float  settlePulseDuration = 0.24f;
     [SerializeField] string guideMessage     = "슬리브에 넣기 위해 스와이프하세요";
 
+    [Header("건너뛰기 글자")]
+    [Tooltip("손으로 미는 동안의 글자. {0}에 앞으로 꽂을 장수(지금 뜬 카드 포함)가 들어간다.\n" +
+             "\"건너뛰기\"가 아니라 \"모두 넣기\"인 이유 — 눌러도 카드는 전부 받는다. 손실로 읽히면 못 누른다.")]
+    [SerializeField] string skipLabelFormat  = "{0}장 모두 넣기";
+
+    [Tooltip("한 번 눌러 자동 진행에 들어간 뒤의 글자. 여기서 또 누르면 남은 장을 즉시 다 꽂고 끝낸다.")]
+    [SerializeField] string skipFinishLabel  = "바로 끝내기";
+
     readonly List<AlbumInsertStep> m_steps = new List<AlbumInsertStep>();
 
     AlbumTheme        m_openTheme;   // 지금 오버레이가 열고 있는 테마(오버레이는 페이지만 노출한다)
@@ -123,7 +131,12 @@ public class AlbumInsertSession : MonoBehaviour
         // 안내 중에는 이탈 자체를 삼킨다 — 선택된 탭은 버튼이 꺼지고 Focus가 대신하므로(LobbyTabController.Select),
         // 유저가 먼저 그 탭으로 가 버리면 뒤이어 그 버튼을 가리키는 안내가 영영 뜨지 못한다. 탈출로는 건너뛰기다.
         if (lobbyTabController != null)
+        {
             lobbyTabController.SetLeaveGuard(_p => { if (TutorialMode) return; AbortAll(); _p(); });
+
+            // 어차피 가드에 막혀 눌러도 안 먹는 탭바다 — 걷어야 화면 맨 아래가 건너뛰기 자리로 열린다
+            lobbyTabController.SetBarRetracted(true);
+        }
         if (pageOverlay != null) pageOverlay.SetInteractionLocked(true);
 
         if (group != null) group.blocksRaycasts = true;
@@ -195,7 +208,7 @@ public class AlbumInsertSession : MonoBehaviour
                     yield return this.PageTurn(t_step);
 
                     bool t_spawned = false;
-                    yield return this.Spawn(t_step, _ok => t_spawned = _ok);
+                    yield return this.Spawn(t_step, m_steps.Count - t_i, _ok => t_spawned = _ok);
                     if (!t_spawned) continue;   // 슬롯을 못 얻은 카드는 Spawn이 이미 위장을 풀었다
 
                     // 건너뛴 뒤에는 손을 기다리지 않는다 — 뜬 카드를 잠깐 보여 주고 그대로 안착 트윈에 넘긴다.
@@ -246,7 +259,7 @@ public class AlbumInsertSession : MonoBehaviour
 
     // ⚠ GridRatioFitter가 cellSize를 런타임에 정한다 — 한 프레임 넘기고 ForceUpdateCanvases 한 뒤에만
     //   슬롯 rect가 진짜 값이다. 그 전에 읽으면 카드가 엉뚱한 자리에 뜬다.
-    IEnumerator Spawn(AlbumInsertStep _step, Action<bool> _result)
+    IEnumerator Spawn(AlbumInsertStep _step, int _remaining, Action<bool> _result)
     {
         yield return null;
         Canvas.ForceUpdateCanvases();
@@ -272,10 +285,13 @@ public class AlbumInsertSession : MonoBehaviour
         UiPunch.Play(cardVisual.transform);
 
         // 자동 진행 중엔 안내가 거짓말이 된다 — 밀라고 해 놓고 저절로 들어가면 입력이 씹힌 것으로 읽힌다.
+        // 건너뛰기는 그래도 남는다(자동 진행을 끝낼 유일한 손잡이라).
         if (hint != null)
         {
             if (m_autoPlay) hint.Hide();
             else            hint.Show(this.guideMessage, sleeve.CardHolder);
+
+            hint.SetSkip(true, this.SkipLabel(_remaining));
         }
 
         m_seatRequested    = false;
@@ -392,16 +408,37 @@ public class AlbumInsertSession : MonoBehaviour
         if (dragger != null) dragger.SyncProgress(t_to);
     }
 
+    // 자동 진행 중이면 남은 장수를 셀 이유가 없다 — 이미 손을 뗀 상태고 남은 선택지는 "끝내기" 하나다.
+    string SkipLabel(int _remaining)
+    {
+        if (m_autoPlay) return this.skipFinishLabel;
+
+        return string.Format(this.skipLabelFormat, Mathf.Max(1, _remaining));
+    }
+
     // 건너뛰기 — 남은 스텝을 버리지 않는다. 손만 떼고, 나머지가 한 장씩 저절로 꽂히는 것을 끝까지 보여준다.
     // (연출을 통째로 날리면 "무엇을 몇 장 받았는지"가 화면에서 사라진다 — 그 정보가 이 연출의 값이다.)
+    //
+    // 두 번째 누름은 그 자동 진행마저 끝낸다. 한 번 누르고 끝나기를 기다리는 동안 손잡이가 사라지면
+    // 눌린 건지 씹힌 건지 알 길이 없다 — 버튼은 남고, 대신 무엇을 하는 버튼인지가 바뀐다.
     void SkipToAuto()
     {
-        if (!IsRunning || m_autoPlay) return;
+        if (!IsRunning) return;
+
+        if (m_autoPlay)
+        {
+            AbortAll();   // 남은 위장은 AlbumInsertMask.Clear가 걷는다 — 카드는 전부 꽂힌 채로 끝난다
+            return;
+        }
 
         m_autoPlay = true;
 
         if (dragger != null) dragger.Interactable = false;
-        if (hint != null) hint.Hide();
+        if (hint != null)
+        {
+            hint.Hide();
+            hint.SetSkip(true, this.skipFinishLabel);
+        }
 
         // 손이 닿은 채 눌렀으면 OnEndDrag가 무시돼 잔떨림이 켜진 채 남는다 — 아무도 안 미는 카드가 떨면 안 된다.
         if (sleeve != null) sleeve.SetPushing(false);
@@ -437,7 +474,11 @@ public class AlbumInsertSession : MonoBehaviour
         m_autoPlay  = false;
 
         if (dragger != null) dragger.Interactable = false;
-        if (hint != null) hint.Hide();
+        if (hint != null)
+        {
+            hint.Hide();
+            hint.SetSkip(false, null);   // 안내와 수명이 갈려 있다 — 세션이 끝날 때만 여기서 함께 걷는다
+        }
         this.HideCard();
 
         // 카드 홀더를 남의 칸 안에 두고 끝내면 다음 세션이 그 칸에서 시작한다 — 홈(패널)으로 되돌린다.
@@ -446,7 +487,11 @@ public class AlbumInsertSession : MonoBehaviour
         // 위장 해제가 먼저다 — 잠금을 먼저 풀면 그 프레임에 빈 칸이 눌릴 수 있다.
         AlbumInsertMask.Clear();
         if (pageOverlay != null) pageOverlay.SetInteractionLocked(false);
-        if (lobbyTabController != null) lobbyTabController.ClearLeaveGuard();
+        if (lobbyTabController != null)
+        {
+            lobbyTabController.ClearLeaveGuard();
+            lobbyTabController.SetBarRetracted(false);
+        }
 
         IsRunning = false;
 
