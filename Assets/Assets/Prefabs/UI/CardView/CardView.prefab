@@ -5716,6 +5716,7 @@ GameObject:
   - component: {fileID: 7532553100725007632}
   - component: {fileID: 2981857273068350447}
   - component: {fileID: 9032425798275430677}
+  - component: {fileID: 2967255411902883315}
   m_Layer: 0
   m_Name: "\uC6D0\uAC70\uB9AC"
   m_TagString: Untagged
@@ -5822,6 +5823,25 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &2967255411902883315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1972510696962177717}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f523bd5c3ddb30b4b8a0be0350e3ea40, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponAnimSpec
+  animator: {fileID: 9032425798275430677}
+  stateName: Attack
+  drawSeconds: 0.55
+  fireStart01: 0.4646465
+  clipSeconds: 1.65
+  fireSeconds: 0.1
+  logDiagnostics: 1
 --- !u!1 &2279820978060975018
 GameObject:
   m_ObjectHideFlags: 0
@@ -8690,11 +8710,6 @@ MonoBehaviour:
   longPressLiftY: 0.2
   longPressLiftScale: 1.06
   longPressLiftTime: 0.12
-  dissolveAnim: {fileID: 0}
-  dissolveMaterial: {fileID: 2100000, guid: 4528e1e4fe9e46840b467a042b35524c, type: 2}
-  dissolveRenderers:
-  - {fileID: 8681528260152100003}
-  - {fileID: 8681528260152137749}
 --- !u!210 &1536455536639633097
 SortingGroup:
   m_ObjectHideFlags: 0

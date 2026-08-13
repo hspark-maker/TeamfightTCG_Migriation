@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -24,9 +25,16 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     const float IN_DECK_ALPHA = 0.45f;   // 이미 편성된 카드(클릭 대상 아님)
     const float FOCUS_DIM_ALPHA = 0.2f;  // 시너지 강조 중 해당 없는 카드
 
+    // 시너지 강조 대상 카드를 살짝 띄우는 확대. 여기서만 localScale을 쓴다 —
+    // 표시 크기를 영구히 바꾸는 게 아니라 눌린 동안만 도는 연출이고, 그리드 배치는 rect 기준이라
+    // 스케일을 줘도 칸 위치가 흔들리지 않는다(레이아웃을 건드리면 강조할 때마다 그리드가 재배치된다).
+    const float FOCUS_SCALE      = 1.08f;
+    const float FOCUS_SCALE_TIME = 0.12f;
+
     CardData                                       m_card;
     bool                                           m_inDeck;
     bool                                           m_focusDimmed;
+    Tween                                          m_focusTween;
     PointerEventData                               m_pointerData;
     Action<DeckEditCardTile, PointerEventData>     m_onDragRequest;
     Action<DeckEditCardTile>                       m_onClick;
@@ -51,6 +59,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         }
 
         m_focusDimmed = false;
+        ApplyFocusScale(false, true);   // 재바인딩은 강조 도중에도 일어난다 → 확대 잔상 제거(트윈 없이 즉시)
         SetInDeck(false);
     }
 
@@ -65,11 +74,33 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         if (longPress != null) longPress.enabled = !_on;
     }
 
-    // 시너지 아이콘 롱프레스 중 호출. 해당 시너지가 없는 카드를 눌러 대상 카드만 남긴다.
+    // 시너지 아이콘 롱프레스 중 호출. 해당 시너지가 없는 카드를 눌러 대상 카드만 남기고,
+    // 대상 카드는 살짝 키워 띄운다.
     public void SetSynergyFocus(bool _focusing, bool _match)
     {
         m_focusDimmed = _focusing && !_match;
         ApplyAlpha();
+        ApplyFocusScale(_focusing && _match, false);
+    }
+
+    // _instant면 트윈 없이 즉시 맞춘다(재바인딩·초기화 경로).
+    void ApplyFocusScale(bool _up, bool _instant)
+    {
+        float t_target = _up ? FOCUS_SCALE : 1f;
+
+        // 트윈은 항상 먼저 죽인다 — 반대 방향 트윈이 살아 있으면 마지막에 끝난 쪽이 이겨 크기가 뒤집힌 채 굳는다.
+        m_focusTween?.Kill();
+        m_focusTween = null;
+
+        if (_instant || !Application.isPlaying || Mathf.Approximately(transform.localScale.x, t_target))
+        {
+            transform.localScale = Vector3.one * t_target;
+            return;
+        }
+
+        m_focusTween = transform.DOScale(t_target, FOCUS_SCALE_TIME)
+                                .SetEase(_up ? Ease.OutBack : Ease.OutQuad)
+                                .SetLink(gameObject);
     }
 
     // 딤 요인이 둘(장착중 / 시너지 강조 제외)이라 곱하지 않고 한 곳에서 우선순위로 정한다 —
@@ -106,6 +137,10 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     void OnDestroy()
     {
         if (longPress != null) longPress.OnLongPress -= OnLongPressFired;
+
+        m_focusTween?.Kill();
+        m_focusTween = null;
+        transform.DOKill();
     }
 
     void OnLongPressFired()

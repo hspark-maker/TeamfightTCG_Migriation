@@ -17,7 +17,7 @@ MonoBehaviour:
   duration: 0.7
   attackClips: []
   projectile:
-    prefab: {fileID: 4327367476428695880, guid: b3bc7e8c00b948e448c60006a5f5663b, type: 3}
+    prefab: {fileID: 6566167575339027792, guid: 27858caa88e70bb46af5c5fe002aba3d, type: 3}
     impactPrefab: {fileID: 0}
     localOffset: {x: 0, y: 0.6, z: -0.5}
     spawnDelay: 0.1

@@ -91,7 +91,8 @@ public class DeckEditController : MonoBehaviour
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
     }
 
-    // _synergy가 null이면 강조 해제. 편성 칸은 테두리 + 나머지 딤, 컬렉션 타일은 딤만 한다.
+    // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
+    // 강조 중에는 컬렉션 목록을 세운다 — 설명창을 띄운 채 화면이 스와이프되면 보라고 강조한 카드가 흘러간다.
     void ApplySynergyFocus(SynergyData _synergy)
     {
         bool t_focusing = _synergy != null;
@@ -105,7 +106,11 @@ public class DeckEditController : MonoBehaviour
             }
         }
 
-        if (collectionGrid != null) collectionGrid.SetSynergyFocus(_synergy);
+        if (collectionGrid != null)
+        {
+            collectionGrid.SetSynergyFocus(_synergy);
+            collectionGrid.SetScrollLocked(t_focusing);
+        }
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
