@@ -115,7 +115,6 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.EndHorizontal();
     }
 
-    // 편 단위 되감기만 둔다 — 스텝 단위 검증은 Tools > Card Battle > 튜토리얼 스텝 되감기(에디터 창).
     void DrawChapterJumps()
     {
         int t_count = OutgameTutorialRunner.ChapterCount;
@@ -124,7 +123,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.BeginHorizontal();
         for (int i = 0; i < t_count; i++)
         {
-            if (GUILayout.Button($"CH{i + 1}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RestartTutorialFromStep(i, 0, false);
+            if (GUILayout.Button($"CH{i + 1}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RestartTutorialFromChapter(i);
         }
         GUILayout.EndHorizontal();
     }

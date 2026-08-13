@@ -10,9 +10,6 @@ public static class OutgameTutorialRunner
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
-    // 디버그 되감기로 좌표가 뒤로 움직였을 때 발화(브리지가 현재 씬에서 그 스텝을 다시 세운다)
-    public static event Action OnRewound;
-
     // 데이터가 주입됐고 아직 완료 전인가
     public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted;
 
@@ -66,11 +63,7 @@ public static class OutgameTutorialRunner
     // 저작된 챕터의 스텝 수(범위 밖·빈 챕터는 0)
     public static int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
 
-    // 챕터의 표시 이름(범위 밖이면 빈 문자열) — 저작 목록을 그리는 디버그 UI용
-    public static string ChapterLabelOf(int _chapter)
-        => TryGetChapter(_chapter, out var t_chapter) && !string.IsNullOrEmpty(t_chapter.Label) ? t_chapter.Label : string.Empty;
-
-    // 임의 좌표의 스텝 조회(진행도와 무관 — 저작 내용을 훑는 창구)
+    // 임의 좌표의 스텝 조회(진행도와 무관 — 되감기 재생이 좌표째 훑는 창구)
     public static bool TryGetStepAt(int _chapter, int _step, out TutorialStepDef _def)
     {
         _def = null;
@@ -161,25 +154,6 @@ public static class OutgameTutorialRunner
             for (int t_s = 0; t_s <= t_last; t_s++)
                 if (t_chapter.TryGetStep(t_s, out var t_asset)) yield return t_asset;
         }
-    }
-
-    /// <summary>디버그 전용 — 임의 좌표로 되감고 그 스텝을 다시 세운다.
-    ///
-    /// 좌표만 옮기는 <see cref="OutgameTutorialProgress.JumpForDebug"/>와 달리 화면까지 따라오게 한다:
-    /// 해금은 좌표에서 파생되므로 갱신하고, 브리지는 <see cref="OnRewound"/>로 현재 씬에서 스텝을 다시 세운다
-    /// (없으면 씬을 나갔다 들어와야만 적용된다).</summary>
-    public static void RewindForDebug(int _chapter, int _step)
-    {
-        if (ChapterCount == 0) return;
-
-        int t_chapter = Mathf.Clamp(_chapter, 0, ChapterCount - 1);
-        int t_last    = StepCountOf(t_chapter) - 1;
-        int t_step    = t_last < 0 ? 0 : Mathf.Clamp(_step, 0, t_last);
-
-        OutgameTutorialProgress.JumpForDebug(t_chapter, t_step);
-        OutgameFeatureLock.Refresh();
-
-        OnRewound?.Invoke();
     }
 
     static bool TryGetChapter(int _index, out OutgameTutorialChapter _chapter)

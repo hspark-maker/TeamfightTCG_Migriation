@@ -412,11 +412,13 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
-    DBGS["OutgameTutorialStepWindow (에디터 창)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>편·스텝 목록(정지=SO 직독 / 플레이=러너) → 그 좌표로 되감기<br/>prepare = 앞선 DeckGrant·팩 풀을 같이 지급"]:::new
-    DBGA["OutgameDebugActions.RestartTutorialFromStep(챕터,스텝,prepare)<br/>ResetTutorial = (0,0,false) · F8 CH버튼 = (i,0,false)"]:::chg
-    DBGS --> DBGA
-    DBGA -->|"RewindForDebug"| RUN
-    RUN -->|"OnRewound"| BRG
+    DBGS["OutgameTutorialStepWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>SO 직독으로 편·스텝을 펼치고 칸 하나를 예약한다"]:::new
+    RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
+    BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
+    DBGS -->|"Schedule(좌표)"| RWD
+    RWD --- BOOT2
+    BOOT2 --> PRG
+    RWD -->|"TryGetStepAt · StepCountOf"| RUN
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
@@ -498,7 +500,7 @@ flowchart TD
 
     subgraph run["해석 — 러너 2개 (static 분리)"]
         RUN["OutgameTutorialRunner<br/>온보딩 — IsRunning이 곧 '온보딩 중'"]:::chg
-        TRUN["TriggeredTutorialRunner (static)<br/>Fire · EnsureData · IsRunning<br/>EnterCurrentStep · NotifyStepSatisfied · Abort<br/>event OnActivated"]:::new
+        TRUN["TriggeredTutorialRunner (static)<br/>Fire · EnsureData · IsRunning<br/>EnterCurrentStep · NotifyStepSatisfied · Abort<br/>HasPending(trigger) — 표시 판정 창구<br/>event OnActivated · OnChanged"]:::new
         TDATA["TriggeredTutorialData (SO)<br/>List&lt;TriggeredTutorialEntry&gt;"]:::new
         TENT["TriggeredTutorialEntry ([Serializable])<br/>trigger · label · steps<br/>씬을 떠나는 마지막 스텝 불변식 없음"]:::new
         STEP["OutgameTutorialStep + 파생 (공유, 무수정)"]
@@ -517,8 +519,14 @@ flowchart TD
     end
 
     KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
-    TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false"]:::chg
+    TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
+
+    ADOT["AlertDotView (abstract, UI/Common)<br/>등장 팝 · 상시 맥동 · 퇴장 — 판정 없음<br/>파생: RankRewardAlertDot · TutorialAlertDot"]:::new
+    TDOT["TutorialAlertDot<br/>HasPending && FeatureLock.IsUnlocked"]:::new
+    ADOT --- TDOT
+    TAB -->|"AddComponent + Bind"| TDOT
+    TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
     KEY --- TRUN

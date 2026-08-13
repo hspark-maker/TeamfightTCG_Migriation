@@ -6,21 +6,13 @@ using UnityEngine;
 /// <summary>
 /// 아웃게임 첫시작 튜토리얼 스텝 되감기 도구. Tools > Card Battle > 튜토리얼 스텝 되감기.
 ///
-/// 저작된 시퀀스를 편·스텝째로 펼쳐 놓고 원하는 칸을 눌러 그 스텝부터 다시 검증한다.
-/// 되감기는 플레이 중에만 가능하다 — 진행도가 세이브(런타임 로드)에 있고, 되감은 좌표는
-/// 브리지가 <see cref="OutgameTutorialRunner.OnRewound"/>로 받아 그 씬에서 곧바로 다시 세운다.
-///
-/// 목록의 출처가 모드마다 다르다: 플레이 중에는 <b>실제 주입된</b> 시퀀스(러너)를 읽고,
-/// 정지 상태에서는 창이 잡은 SO 에셋을 읽는다. 씬 브리지에 다른 에셋이 배선돼 있어도 플레이 중 표시는 어긋나지 않는다.
+/// 저작된 시퀀스를 편·스텝째로 펼쳐 놓고 칸 하나를 고르면 <b>다음 플레이</b>에 그 스텝부터 시작한다.
+/// 이 창은 예약만 남긴다(<see cref="OutgameTutorialRewind"/>) — 세이브를 미는 일은 매니저들이 슬롯을
+/// 캐싱하기 전에 일어나야 해서 부트에서만 안전하다. 그래서 플레이를 켜지 않고 쓰는 도구다.
 /// </summary>
 public class OutgameTutorialStepWindow : EditorWindow
 {
-    const string PREF_PREPARE = "OutgameTutorialStep.Prepare";
-
     OutgameTutorialData data;
-
-    // 되감을 때 앞선 스텝이 지급했어야 할 덱·카드를 같이 채울지.
-    bool prepare = true;
 
     readonly HashSet<int> openChapters = new HashSet<int>();
 
@@ -31,11 +23,8 @@ public class OutgameTutorialStepWindow : EditorWindow
 
     void OnEnable()
     {
-        this.prepare = EditorPrefs.GetBool(PREF_PREPARE, true);
         if (this.data == null) this.data = FindSequenceAsset();
     }
-
-    void OnDisable() => EditorPrefs.SetBool(PREF_PREPARE, this.prepare);
 
     // 플레이 중 현재 좌표가 움직이는 것을 따라 그린다(OnGUI만으로는 창이 멈춰 보인다).
     void OnInspectorUpdate()
@@ -50,9 +39,7 @@ public class OutgameTutorialStepWindow : EditorWindow
         int t_chapters = ChapterCount();
         if (t_chapters == 0)
         {
-            EditorGUILayout.HelpBox(Application.isPlaying
-                ? "러너에 시퀀스가 주입되지 않았다 — 브리지가 있는 씬(로비)에서 플레이할 것."
-                : "저작된 챕터가 없다 — 위에 OutgameTutorialData 에셋을 지정할 것.", MessageType.Info);
+            EditorGUILayout.HelpBox("저작된 챕터가 없다 — 위에 OutgameTutorialData 에셋을 지정할 것.", MessageType.Info);
             return;
         }
 
@@ -63,21 +50,36 @@ public class OutgameTutorialStepWindow : EditorWindow
 
     void DrawHeader()
     {
-        using (new EditorGUI.DisabledScope(Application.isPlaying))
-            this.data = (OutgameTutorialData)EditorGUILayout.ObjectField("시퀀스 SO", this.data, typeof(OutgameTutorialData), false);
+        this.data = (OutgameTutorialData)EditorGUILayout.ObjectField("시퀀스 SO", this.data, typeof(OutgameTutorialData), false);
 
         EditorGUILayout.LabelField("현재 좌표", CurrentCoordLabel(), EditorStyles.boldLabel);
 
-        this.prepare = EditorGUILayout.ToggleLeft(
-            new GUIContent("되감을 때 앞선 지급도 채우기",
-                           "목표 칸 직전까지의 덱 지급(DeckGrant)을 재생하고, 팩을 쓰는 스텝의 카드 풀을 소유로 준다.\n"
-                         + "끄면 좌표만 움직인다 — 덱이 없는 세이브로 전투 스텝에 서면 그 자리에서 막힌다."),
-            this.prepare);
+        DrawScheduleBanner();
 
-        if (!Application.isPlaying)
-            EditorGUILayout.HelpBox("되감기는 플레이 중에만 가능하다(진행도가 런타임 세이브에 있다). 지금은 저작 내용만 훑는다.", MessageType.Info);
+        EditorGUILayout.HelpBox(
+            "칸을 누르면 다음 플레이에 적용된다: 아웃게임 세이브를 첫실행으로 밀고(소유·강화/진화·재화·덱·랭크·도감보상·트리거 낙인)"
+          + " 그 칸 직전까지의 지급만 재생한다(덱 지급 + 팩 풀 전량 소유). 되돌릴 수 없다 — 진행 중인 세이브는 사라진다.",
+            MessageType.Warning);
 
         EditorGUILayout.Space(4);
+    }
+
+    void DrawScheduleBanner()
+    {
+        if (!OutgameTutorialRewind.TryGetScheduled(out int t_chapter, out int t_step))
+        {
+            EditorGUILayout.LabelField("예약", "없음", EditorStyles.miniLabel);
+            return;
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("예약", $"{t_chapter}-{t_step}  {ActionNameAt(t_chapter, t_step)}", EditorStyles.boldLabel);
+        if (GUILayout.Button("예약 취소", GUILayout.Width(72))) OutgameTutorialRewind.Cancel();
+        EditorGUILayout.EndHorizontal();
+
+        // 예약은 부트에서만 소비된다 — 지금 도는 플레이는 그대로다.
+        if (Application.isPlaying)
+            EditorGUILayout.HelpBox("이미 플레이 중이다 — 이 예약은 지금 세션이 아니라 다음 플레이에 적용된다.", MessageType.Info);
     }
 
     void DrawChapter(int _chapter)
@@ -112,20 +114,23 @@ public class OutgameTutorialStepWindow : EditorWindow
 
     void DrawStepRow(int _chapter, int _step)
     {
-        bool t_isHere = IsCurrent(_chapter, _step);
+        bool t_isHere      = IsCurrent(_chapter, _step);
+        bool t_isScheduled = IsScheduled(_chapter, _step);
 
-        using (new EditorGUILayout.VerticalScope(t_isHere ? EditorStyles.helpBox : GUIStyle.none))
+        using (new EditorGUILayout.VerticalScope(t_isHere || t_isScheduled ? EditorStyles.helpBox : GUIStyle.none))
         {
             bool t_found  = TryGetStep(_chapter, _step, out var t_def);
             string t_name = t_found ? t_def.Action.ToString() : "(빈 칸)";
 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"{(t_isHere ? "▶" : " ")} {_chapter}-{_step}  {t_name}",
-                                       t_isHere ? EditorStyles.boldLabel : EditorStyles.label);
+            // ▶ = 지금 서 있는 칸(플레이 중), ◆ = 다음 플레이에 시작할 칸
+            string t_mark = t_isScheduled ? "◆" : t_isHere ? "▶" : "  ";
 
-            using (new EditorGUI.DisabledScope(!Application.isPlaying))
-                if (GUILayout.Button("여기부터", GUILayout.Width(64)))
-                    OutgameDebugActions.RestartTutorialFromStep(_chapter, _step, this.prepare);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"{t_mark} {_chapter}-{_step}  {t_name}",
+                                       t_isHere || t_isScheduled ? EditorStyles.boldLabel : EditorStyles.label);
+
+            if (GUILayout.Button(t_isScheduled ? "예약됨" : "여기부터", GUILayout.Width(64)))
+                OutgameTutorialRewind.Schedule(_chapter, _step);
 
             EditorGUILayout.EndHorizontal();
 
@@ -172,52 +177,40 @@ public class OutgameTutorialStepWindow : EditorWindow
         && OutgameTutorialProgress.ChapterIndex == _chapter
         && OutgameTutorialProgress.StepIndex == _step;
 
-    static string CurrentCoordLabel()
+    static bool IsScheduled(int _chapter, int _step)
+        => OutgameTutorialRewind.TryGetScheduled(out int t_c, out int t_s) && t_c == _chapter && t_s == _step;
+
+    string CurrentCoordLabel()
     {
-        if (!Application.isPlaying)             return "— (플레이 중 아님)";
+        if (!Application.isPlaying)              return "— (플레이 중 아님)";
         if (OutgameTutorialProgress.IsCompleted) return "졸업 완료 (되감으면 낙인도 풀린다)";
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
         int t_step    = OutgameTutorialProgress.StepIndex;
-        string t_name = OutgameTutorialRunner.TryGetStepAt(t_chapter, t_step, out var t_def) ? t_def.Action.ToString() : "(빈 칸)";
 
-        return $"{t_chapter}-{t_step}  {t_name}";
+        return $"{t_chapter}-{t_step}  {ActionNameAt(t_chapter, t_step)}";
     }
 
-    // ── 목록 출처: 플레이 중이면 실제 주입된 러너, 아니면 창이 잡은 에셋 ──
+    string ActionNameAt(int _chapter, int _step)
+        => TryGetStep(_chapter, _step, out var t_def) ? t_def.Action.ToString() : "(빈 칸)";
 
-    int ChapterCount()
-    {
-        if (Application.isPlaying) return OutgameTutorialRunner.ChapterCount;
+    // ── 목록 출처는 언제나 창이 잡은 SO 하나다(플레이 여부와 무관 — 예약은 부트가 이 시퀀스로 재생한다) ──
 
-        return this.data != null && this.data.chapters != null ? this.data.chapters.Count : 0;
-    }
+    int ChapterCount() => this.data != null && this.data.chapters != null ? this.data.chapters.Count : 0;
 
-    int StepCountOf(int _chapter)
-    {
-        if (Application.isPlaying) return OutgameTutorialRunner.StepCountOf(_chapter);
-
-        return TryGetAssetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
-    }
+    int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
 
     string LabelOf(int _chapter)
-    {
-        if (Application.isPlaying) return OutgameTutorialRunner.ChapterLabelOf(_chapter);
-
-        return TryGetAssetChapter(_chapter, out var t_chapter) && !string.IsNullOrEmpty(t_chapter.Label)
-            ? t_chapter.Label
-            : string.Empty;
-    }
+        => TryGetChapter(_chapter, out var t_chapter) && !string.IsNullOrEmpty(t_chapter.Label) ? t_chapter.Label : string.Empty;
 
     bool TryGetStep(int _chapter, int _step, out TutorialStepDef _def)
     {
-        if (Application.isPlaying) return OutgameTutorialRunner.TryGetStepAt(_chapter, _step, out _def);
-
         _def = null;
-        return TryGetAssetChapter(_chapter, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
+
+        return TryGetChapter(_chapter, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
     }
 
-    bool TryGetAssetChapter(int _chapter, out OutgameTutorialChapter _result)
+    bool TryGetChapter(int _chapter, out OutgameTutorialChapter _result)
     {
         _result = null;
         if (this.data == null || this.data.chapters == null) return false;
