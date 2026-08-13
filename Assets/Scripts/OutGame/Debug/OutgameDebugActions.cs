@@ -58,12 +58,7 @@ public static class OutgameDebugActions
     }
 
     // 튜토리얼 진행도만 초기화 (소유는 유지)
-    public static void ResetTutorial()
-    {
-        OutgameTutorialProgress.ResetForDebug();
-        TriggeredTutorialRunner.Abort();
-        Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
-    }
+    public static void ResetTutorial() => RestartTutorialFromStep(0, 0, false);
 
     // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 초기화
     public static void ResetTriggeredTutorials()
@@ -75,17 +70,80 @@ public static class OutgameDebugActions
         Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");
     }
 
-    // 튜토리얼 N편 처음으로 되감기 (소유·재화 유지, 씬 재진입 시 적용)
-    public static void RestartTutorialFromChapter(int _chapterIndex)
+    /// <summary>튜토리얼을 임의 좌표(N편 M번째 스텝)로 되감아 그 스텝부터 다시 검증한다.
+    ///
+    /// _prepare = 그 스텝이 성립하려면 앞선 스텝이 지급했어야 할 것(덱·카드 소유)을 같이 채운다.
+    /// 끄면 좌표만 움직이므로, 예를 들어 덱이 없는 세이브로 전투 스텝에 서면 진행이 막힌다.</summary>
+    public static void RestartTutorialFromStep(int _chapterIndex, int _stepIndex, bool _prepare)
     {
-        int t_last    = OutgameTutorialRunner.ChapterCount - 1;
-        int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
+        if (OutgameTutorialRunner.ChapterCount == 0)
+        {
+            Debug.LogWarning("[OutgameDebug] 저작된 튜토리얼 챕터가 없어 되감을 좌표가 없습니다 — 브리지의 시퀀스 배선을 확인하세요.");
+            return;
+        }
 
-        OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 
-        Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
+        // 좌표를 옮기기 "전"에 채운다 — 지급 로그와 되감기 로그가 섞이지 않고, 목표 스텝은 진입 순간 이미 조건이 갖춰져 있다.
+        if (_prepare) PrepareStepPrerequisites(_chapterIndex, _stepIndex);
+
+        OutgameTutorialRunner.RewindForDebug(_chapterIndex, _stepIndex);
+
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_step    = OutgameTutorialProgress.StepIndex;
+        string t_action = OutgameTutorialRunner.TryGetStepAt(t_chapter, t_step, out var t_def) ? t_def.Action.ToString() : "빈 칸";
+
+        Debug.Log($"[OutgameDebug] 튜토리얼 되감기 → {t_chapter}-{t_step} ({t_action}) / 사전지급 {(_prepare ? "ON" : "OFF")}");
+    }
+
+    // 목표 좌표 "직전"까지의 스텝이 지급했어야 할 것을 재생한다(좌표는 건드리지 않는다).
+    // 씬 로드·오버레이를 여는 액션(AutoBattle·AutoPurchase·BattleEntry)은 실행하지 않는다 — 되감기 도중 화면을 뺏는다.
+    static void PrepareStepPrerequisites(int _chapterIndex, int _stepIndex)
+    {
+        int t_decks = 0;
+        int t_cards = 0;
+
+        // EnumerateUpTo는 좌표를 돌려주지 않는다 — 실행 로그가 엉뚱한 칸을 가리키지 않게 여기서는 좌표째 훑는다.
+        for (int t_c = 0; t_c <= _chapterIndex && t_c < OutgameTutorialRunner.ChapterCount; t_c++)
+        {
+            int t_count = OutgameTutorialRunner.StepCountOf(t_c);
+            int t_end   = t_c < _chapterIndex ? t_count : Mathf.Min(_stepIndex, t_count);
+
+            for (int t_s = 0; t_s < t_end; t_s++)
+            {
+                if (!OutgameTutorialRunner.TryGetStepAt(t_c, t_s, out var t_row)) continue;
+
+                // 덱 지급은 순수 세이브 작업이라 그대로 재생할 수 있다. sink를 비워 좌표 커밋·졸업 낙인만 무력화한다.
+                if (t_row.Action == EOutgameTutorialAction.DeckGrant)
+                {
+                    TutorialStepExecutor.Enter(t_row, new OutgameTutorialStepContext(t_c, t_s, t_c, t_s, false, null));
+                    t_decks++;
+                    continue;
+                }
+
+                // 팩에서 나왔어야 할 카드. 실제 드로우는 랜덤이라 재현할 수 없으니 검증용으로 풀 전체를 준다.
+                if (t_row.Pack != null && TutorialStepDef.UsesPack(t_row.Action)) t_cards += GrantPackPool(t_row.Pack);
+            }
+        }
+
+        if (t_decks == 0 && t_cards == 0) return;
+
+        Debug.Log($"[OutgameDebug] 튜토리얼 사전지급 — 덱 스텝 {t_decks}개 재생 / 팩 풀 카드 {t_cards}장 신규 지급");
+    }
+
+    static int GrantPackPool(CardPackData _pack)
+    {
+        var t_pool = _pack.Pool;
+        if (t_pool == null || t_pool.Count == 0) return 0;
+
+        var t_ids = new List<int>(t_pool.Count);
+        for (int t_i = 0; t_i < t_pool.Count; t_i++)
+        {
+            if (t_pool[t_i] != null) t_ids.Add(CardCatalog.IdOf(t_pool[t_i]));
+        }
+
+        return OwnershipManager.GrantAll(t_ids);
     }
 
     // 티어 1단계 올리기/내리기. AI 카드 레벨이 티어에서 나오므로 난이도 곡선을 이걸로 확인한다.

@@ -36,6 +36,10 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void Start()
     {
+        // 되감기 구독만은 IsRunning과 무관하게 건다 — 이미 졸업한 세이브를 디버그로 되감는 경우
+        // 아래에서 조기 반환해 버리면 이 씬에는 그 좌표를 세워 줄 주체가 없다.
+        OutgameTutorialRunner.OnRewound += OnRewoundForDebug;
+
         if (!OutgameTutorialRunner.IsRunning) return;
 
         Subscribe();          // 타깃이 나중에 등장하는 경우를 기다린다(구독은 스텝 진입 전에).
@@ -47,8 +51,18 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnDestroy()
     {
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
+        OutgameTutorialRunner.OnRewound -= OnRewoundForDebug;
         Unsubscribe();
         CloseGate();
+    }
+
+    // 디버그 되감기 — 떠 있던 안내를 걷고 새 좌표의 스텝을 이 씬에서 곧바로 다시 세운다.
+    void OnRewoundForDebug()
+    {
+        Subscribe();          // 졸업 상태로 시작한 씬은 아직 구독 전이다(완료 신호를 받을 주체가 없으면 되감아도 멈춘다).
+
+        CloseGate();
+        ApplyCurrentStep();
     }
 
     // 현재 스텝을 진입시킨다. 재진입(스텝 Enter → 오버레이 열림 → OnOpened)은 버리지 않고 예약한다 —

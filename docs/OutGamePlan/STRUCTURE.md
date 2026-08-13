@@ -347,7 +347,7 @@ flowchart TD
     end
 
     subgraph run["해석 — 스텝 실행 (씬 오브젝트를 모름)"]
-        RUN["OutgameTutorialRunner (static)<br/>IsRunning · ChapterCount · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied<br/>TryGetNext = 자리 올림(빈 챕터 스킵) 단일 진실원"]:::chg
+        RUN["OutgameTutorialRunner (static)<br/>IsRunning · ChapterCount · EnsureData · TryGetCurrentStep<br/>EnterCurrentStep · NotifyStepSatisfied<br/>TryGetNext = 자리 올림(빈 챕터 스킵) 단일 진실원<br/>디버그: StepCountOf · ChapterLabelOf · TryGetStepAt<br/>RewindForDebug(좌표) → OnRewound"]:::chg
         DATA["OutgameTutorialData (SO)<br/>List&lt;OutgameTutorialChapter&gt;<br/>조립 목록일 뿐 — 종류별 필드·실행은 스텝이 가진다"]:::chg
         CHAP["OutgameTutorialChapter ([Serializable], SO 아님)<br/>label(기획 'N편'과 1:1) · steps · TryGetStep<br/>챕터 하나 = 준비 스텝들 → 전투 스텝"]:::new
         STEP["OutgameTutorialStep (abstract SO) + 6종<br/>WaitClick · BattleEntry · WaitPurchase<br/>WaitPackOpen · AutoPurchase · AutoBattle<br/>Anchor · Completion · LeavesScene · Enter(ctx)<br/>unlocks(기능 해금) · UseDim(딤 사용 여부)"]:::chg
@@ -412,6 +412,11 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
+    DBGS["OutgameTutorialStepWindow (에디터 창)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>편·스텝 목록(정지=SO 직독 / 플레이=러너) → 그 좌표로 되감기<br/>prepare = 앞선 DeckGrant·팩 풀을 같이 지급"]:::new
+    DBGA["OutgameDebugActions.RestartTutorialFromStep(챕터,스텝,prepare)<br/>ResetTutorial = (0,0,false) · F8 CH버튼 = (i,0,false)"]:::chg
+    DBGS --> DBGA
+    DBGA -->|"RewindForDebug"| RUN
+    RUN -->|"OnRewound"| BRG
 
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
