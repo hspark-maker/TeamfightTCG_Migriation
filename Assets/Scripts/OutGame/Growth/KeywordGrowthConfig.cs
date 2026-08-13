@@ -15,7 +15,10 @@ public class KeywordGrowthConfig : ScriptableObject
 
     [Min(1)] [SerializeField] int maxLevel = 10;
     [Min(1)] [SerializeField] int hpPerLevel = 1;
-    [Min(0)] [SerializeField] long baseGoldCost = 500;
+    // 키워드 강화의 재화는 에너지다(카드 강화는 골드 — CardGrowthConfig).
+    // 이름을 재화 중립으로 바꾸되 FormerlySerializedAs로 기존 에셋 값을 그대로 물려받는다.
+    [Min(0)] [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
+    [SerializeField] long baseCost = 500;
     [Min(0)] [SerializeField] long costGrowthPerLevel = 500;
 
     public int MaxLevel => maxLevel < 1 ? 1 : maxLevel;
@@ -38,10 +41,10 @@ public class KeywordGrowthConfig : ScriptableObject
         if (!Supports(_keyword) || _level < 0 || _level >= MaxLevel) return false;
 
         int t_nextLevel = _level + 1;
-        long t_cost = baseGoldCost + costGrowthPerLevel * (t_nextLevel - 1);
+        long t_cost = baseCost + costGrowthPerLevel * (t_nextLevel - 1);
         if (t_cost < 0) t_cost = 0;
 
-        _step = new GrowthStep(t_nextLevel, HpPerLevel, ECurrencyType.Gold, t_cost, 1f);
+        _step = new GrowthStep(t_nextLevel, HpPerLevel, ECurrencyType.Energy, t_cost, 1f);
         return true;
     }
 
