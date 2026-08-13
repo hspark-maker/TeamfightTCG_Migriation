@@ -300,8 +300,8 @@ MonoBehaviour:
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
-    - action: 1
-      anchor: 0
+    - action: 0
+      anchor: 1
       guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
         \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
       unlocks: 

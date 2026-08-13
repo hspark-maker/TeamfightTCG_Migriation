@@ -20,6 +20,7 @@ MonoBehaviour:
       anchor: 7
       guideMessage: "\uC774\uACF3\uC5D0\uC11C \uB371\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 0
       pack: {fileID: 0}
@@ -30,6 +31,7 @@ MonoBehaviour:
       anchor: 8
       guideMessage: "\uC774\uACF3\uC740 \uB0B4\uAC00 \uC18C\uC720\uD55C \uCE74\uB4DC\uC785\uB2C8\uB2E4"
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
@@ -41,12 +43,10 @@ MonoBehaviour:
       guideMessage: "\uC774\uACF3\uC5D0 \uCE74\uB4DC\uB97C \uC62C\uB824 \uB371\uC744
         \uAD6C\uC131\uD569\uB2C8\uB2E4"
       unlocks: 
+      unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
-  - trigger: 2
-    label: "\uB3C4\uAC10 \uD0ED \uC548\uB0B4"
-    stepDefs: []

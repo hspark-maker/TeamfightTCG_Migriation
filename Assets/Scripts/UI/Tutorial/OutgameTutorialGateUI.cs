@@ -11,8 +11,8 @@ using UnityEngine.UI;
 //
 // 불변식 2개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
-//      단 스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
-//      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
+//      스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 어둡게만 하지 않을 뿐 판은 그대로 깔린다
+//      — 차단도 승격도 딤 스텝과 동일하다(UseDim은 룩만 정하는 스위치).
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
 // 강조는 "딤 위로 올라온 대상" 그 자체다 — 테두리를 덧그리지 않는다. 봐야 할 것만 밝게 남는 것이 안내다.
@@ -71,8 +71,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_satisfied;         // 중복 클릭 가드 — 콜백은 1회만
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
-    bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
+    Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(투명 모드에서 알파만 0으로 낮춘다)
 
     // 승격 상태. 원래 컴포넌트를 지우지 않도록 "내가 붙였는지"와 원래 정렬값을 함께 들고 있는다.
     // 카드 단위 승격(CollectHighlights) 때문에 여러 개가 동시에 올라간다.
@@ -123,8 +123,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.
     /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
     /// (구매처럼 눌러도 실패할 수 있는 스텝).
-    /// <paramref name="_dim"/>=false면 손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
-    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.</summary>
+    /// <paramref name="_dim"/>=false면 화면을 어둡게만 하지 않는다 — 판은 그대로 깔려 타깃 외 입력을 막고
+    /// 타깃 승격도 유지된다(투명한 판 아래 묻히면 정작 눌러야 할 것이 안 눌린다).</summary>
     public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
     {
         if (_target == null)
@@ -149,19 +149,19 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied    = false;
         m_blockWarned  = false;
         m_armed        = true;
-        m_dim          = _dim;
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetDim(_dim);
+        SetBlocker(true, _dim);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
 
     /// <summary>딤 없이 안내 문구만 띄운다. 걸 타깃이 아예 없거나(개봉 대기처럼 클릭이 아닌 신호로 끝나는 스텝),
     /// 타깃에 Button이 없어 ShowGate가 거부하는 경우용.
-    /// 딤을 켜지 않는 것이 이 모드의 계약이다 — 개봉 스와이프(PackTearHandle)가 EventSystem.IsPointerOverGameObject로
-    /// 시작 여부를 판정하므로, 전체화면 딤이 있으면 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
+    /// 판을 아예 걷는 것이 이 모드의 계약이다(투명한 판도 두지 않는다) — 개봉 스와이프(PackTearHandle)가
+    /// EventSystem.IsPointerOverGameObject로 시작 여부를 판정하므로, 전체화면 판이 있으면 보이든 안 보이든
+    /// 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
     /// 게다가 이 모드는 m_armed=false라 LateUpdate가 돌지 않아 탈출로도 없다.</summary>
     public void ShowBanner(string _message)
     {
@@ -176,7 +176,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (string.IsNullOrEmpty(_message)) { HideGate(); return; }
 
-        SetDim(false);
+        SetBlocker(false);
         SetPointerActive(false);
         SetMessage(_message);
 
@@ -206,7 +206,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         ArmBlockerClick();
 
-        SetDim(true);
+        SetBlocker(true);
         SetMessage(_message);
 
         if (m_armed)
@@ -254,6 +254,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (this.blocker == null) BuildFallbackUI();   // 프리팹 참조 미배선 = 코드 빌드 폴백
 
+        CacheDimColor();
         CacheRoots();
         CacheBlockerButton();  // blocker가 확정된 뒤여야 한다(폴백 경로도 여기서 함께 처리된다)
         LiftOrnaments();       // 승격된 타깃(351)에 안내가 덮이지 않도록 352로 올린다
@@ -292,9 +293,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        // 딤이 꺼진 스텝은 승격도 하지 않는다 — 승격은 딤 위로 끌어올리려는 장치인데 가릴 딤이 없다.
-        if (t_visible && m_dim) Promote();
-        else                    Demote();
+        if (t_visible) Promote();
+        else           Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -501,14 +501,16 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     // ── 표시 토글 ────────────────────────────────────────────────────────────
 
-    // 딤은 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
-    // 주의: 딤이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
-    void SetDim(bool _on)
+    // 판을 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
+    // _visible은 룩만 정한다 — 투명해도 차단은 그대로이므로 승격(RefreshVisibility)도 함께 유지되어야 한다.
+    // 주의: 이 판이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
+    void SetBlocker(bool _on, bool _visible = true)
     {
         if (this.blocker == null) return;
 
         this.blocker.enabled       = _on;
         this.blocker.raycastTarget = _on;
+        this.blocker.color         = _visible ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
     }
 
     void SetPointerActive(bool _on)
@@ -587,7 +589,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
         m_confirmMode = false;
-        m_dim         = true;   // 딤 없는 스텝(ShowGate)이 그 다음 모드로 새지 않게. ShowGate만 이 값을 덮는다.
     }
 
     // 딤 탭 수신을 켠다. Release()가 항상 먼저 떼므로 중복 부착은 없지만, 단일 창구를 지키려 여기서도 한 번 뗀다.
@@ -600,6 +601,17 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     // ── 초기화 ──────────────────────────────────────────────────────────────
+
+    // 딤 색의 정본은 프리팹 저작값이다 — 투명 모드가 알파만 덮으므로 원본을 여기서 한 번 떠 둔다.
+    // 알파 0 메시는 CanvasRenderer가 컬링하고, 컬링된 그래픽은 레이캐스트에서도 빠진다
+    // → 투명 판이 아무것도 막지 못한다. 그래서 컬링을 끈다(비용은 투명 쿼드 1장).
+    void CacheDimColor()
+    {
+        if (this.blocker == null) return;
+
+        m_dimColor = this.blocker.color;
+        this.blocker.canvasRenderer.cullTransparentMesh = false;
+    }
 
     void CacheRoots()
     {
