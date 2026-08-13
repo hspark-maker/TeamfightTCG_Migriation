@@ -11,6 +11,7 @@ public static class CurrencyManager
 
     public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
     public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
+    public static long Energy => s_currencies[(int)ECurrencyType.Energy];
 
     public static long GetBalance(ECurrencyType _type) => s_currencies[(int)_type];
 

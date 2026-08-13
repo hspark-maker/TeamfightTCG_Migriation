@@ -12,6 +12,9 @@ public class DeckSynergyStrip : MonoBehaviour
 
     [SerializeField] SynergyCountIcon[] icons;
 
+    [Tooltip("표시할 시너지가 하나도 없을 때 같이 숨길 배경판. 미배선이면 이 오브젝트의 Graphic을 쓴다.")]
+    [SerializeField] Graphic background;
+
     [Header("Filter")]
     [Tooltip("해제하면 아직 활성화되지 않은 시너지는 숨긴다.")]
     [SerializeField] bool showInactive = true;
@@ -64,6 +67,12 @@ public class DeckSynergyStrip : MonoBehaviour
         }
 
         List<SynergyProgress> t_all = SynergyPreview.Resolve(this.eligibleCards);
+
+        // 배경 판정은 **필터를 걸기 전** 값으로 한다 — 기준은 "시너지를 가진 카드가 한 장이라도 있는가"다.
+        // 아래 t_shown은 showInactive·maxIcons로 걸러진 뒤라, 그걸로 재면
+        // "시너지 카드는 있는데 아직 티어 미달"인 덱에서 판이 사라진다(설정에 따라 의미가 흔들린다).
+        ShowBackground(t_all.Count > 0);
+
         var t_shown = new List<SynergyProgress>();
         foreach (SynergyProgress t_progress in t_all)
         {
@@ -80,6 +89,17 @@ public class DeckSynergyStrip : MonoBehaviour
             if (i < t_shown.Count) t_icon.Set(t_shown[i]);
             else                   t_icon.gameObject.SetActive(false);
         }
+    }
+
+    // 시너지를 가진 카드가 한 장도 없으면 빈 판때기만 남는다(ContentSizeFitter가 줄여도 배경은 그려진다).
+    // GameObject를 끄지 않고 Graphic만 끈다 — 이 스크립트가 그 오브젝트에 붙어 있어서,
+    // 통째로 끄면 다음 Refresh를 받을 주체가 사라지고 OnDisable의 설명창 정리까지 딸려 나간다.
+    void ShowBackground(bool _show)
+    {
+        if (this.background == null) this.background = GetComponent<Graphic>();
+        if (this.background == null) return;
+
+        this.background.enabled = _show;
     }
 
     public void Clear() => Refresh(null);

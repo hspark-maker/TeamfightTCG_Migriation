@@ -1113,6 +1113,20 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 022c53aec58d27948af9fff21e9d76fe, type: 2}
   - {fileID: 11400000, guid: 14ae3da35afdd404894e0b4b8eafd1cd, type: 2}
   carousel: {fileID: 7471955986726886911}
+  purchaseFlash:
+    rise: 0.04
+    hold: 0.03
+    fall: 0.35
+    peak: 1
+    color: {r: 1, g: 1, b: 1, a: 1}
+    burstSprite: {fileID: 0}
+    burstColor: {r: 1, g: 0.95, b: 0.8, a: 1}
+    burstAlpha: 1
+    burstStartScale: 0.35
+    burstEndScale: 1.6
+    burstFall: 0.45
+    burstSpin: 0
+    burstAdditive: 1
 --- !u!1 &6487736475670867845
 GameObject:
   m_ObjectHideFlags: 0
@@ -1166,7 +1180,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &3393199271212118098
 RectTransform:
   m_ObjectHideFlags: 0

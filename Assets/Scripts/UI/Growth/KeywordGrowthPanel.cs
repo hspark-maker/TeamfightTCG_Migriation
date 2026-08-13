@@ -13,7 +13,7 @@ public class KeywordGrowthPanel : MonoBehaviour
     [SerializeField] Transform grid;                    // 칸이 격자로 쌓일 Content(GridLayoutGroup)
     [SerializeField] KeywordGrowthCellView cellPrefab;  // 칸 프리팹
     [SerializeField] Button closeButton;
-    [SerializeField] TMP_Text goldText;
+    [SerializeField] TMP_Text energyText;
 
     [Header("하단 액션")]
     [SerializeField] TMP_Text nextBonusText;            // "다음 보너스: +1"
@@ -148,7 +148,7 @@ public class KeywordGrowthPanel : MonoBehaviour
 
         this.RefreshAction();
 
-        if (this.goldText != null) this.goldText.text = CurrencyManager.Gold.ToString("N0");
+        if (this.energyText != null) this.energyText.text = CurrencyManager.Energy.ToString("N0");
     }
 
     // 하단 액션 줄. 표시 비용과 실제 소모가 갈리지 않게 매니저의 같은 스텝 하나만 본다.
