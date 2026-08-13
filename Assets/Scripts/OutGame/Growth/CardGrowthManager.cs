@@ -164,6 +164,40 @@ public static class CardGrowthManager
         return new EnhanceResult(t_success ? EEnhanceOutcome.Success : EEnhanceOutcome.Failed, t_level);
     }
 
+    /// <summary>전 카드를 만렙으로 올린다(디버그 전용). 반환값은 실제로 레벨이 오른 카드 수.
+    ///
+    /// TryEnhance를 돌리지 않는다 — 재화·성공률을 타면 골드가 마르거나 실패로 레벨이 들쭉날쭉해져
+    /// "전부 만렙"이라는 목적을 못 채운다. 여기서는 곡선이 정한 상한을 레벨에 직접 쓴다.
+    /// 진화 단계·키워드 해금은 레벨에서 파생되므로(GrowthOf) 따로 손대지 않아도 같이 열린다.</summary>
+    public static int DebugMaxAll()
+    {
+        if (!s_initialized) return 0;
+
+        int t_max     = Config.MaxLevel;
+        int t_changed = 0;
+
+        var t_cards = CardCatalog.All;
+        for (int t_i = 0; t_i < t_cards.Count; t_i++)
+        {
+            CardData t_card = t_cards[t_i];
+            if (t_card == null) continue;               // CardRegistry의 ID 보존용 빈 칸
+
+            int t_id = CardCatalog.IdOf(t_card);
+            if (t_id <= 0) continue;
+            if (LevelOf(t_id) >= t_max) continue;
+
+            Entry(t_id).level = t_max;
+            t_changed++;
+        }
+
+        if (t_changed == 0) return 0;
+
+        Save();
+        OnGrowthChanged?.Invoke();
+
+        return t_changed;
+    }
+
     // 성장 전체 초기화(디버그 전용, 진행도 손실)
     public static void DebugResetAll()
     {

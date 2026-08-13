@@ -19,11 +19,10 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses:
-  - DepthOnly
+  - Picking
   - DepthNormalsOnly
   - UniversalGBuffer
   - SceneSelectionPass
-  - Picking
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -35,6 +34,10 @@ Material:
     - _Noise_Tex:
         m_Texture: {fileID: 2800000, guid: 6ee695e0752e86e43a7cada3a23def4c, type: 3}
         m_Scale: {x: 1, y: 0.5}
+        m_Offset: {x: 0, y: 0}
+    - _Normal_Tex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
         m_Texture: {fileID: 0}
@@ -52,14 +55,19 @@ Material:
     m_Floats:
     - _AddPrecomputedVelocity: 1
     - _Dissovle: 0.286
+    - _Distortion: 0
     - _Emi_ins: 3.19
     - _Float0: 0
+    - _Mask_Y_Offset: 0
     - _Noise_Upanner: -0.8
     - _Noise_VPanner: 0.4
+    - _Normal_UPanner: 0
+    - _Normal_VPanner: 0
     - _Opacity: 0.46
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _USE_Mask_Y_Offset: 0
     - _USE_Y_Offset: 0
     - _XRMotionVectorsPass: 1
     - _dissovle: 1

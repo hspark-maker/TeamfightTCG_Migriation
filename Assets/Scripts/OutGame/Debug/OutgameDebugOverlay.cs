@@ -139,6 +139,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET TRIGGERS",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTriggeredTutorials();
         if (GUILayout.Button(OutgameFeatureLock.ForceUnlockAllForDebug ? "FEATURE LOCK: OFF" : "FEATURE LOCK: ON",
                                                  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ToggleFeatureLock();
+        if (GUILayout.Button("MAX GROWTH (ALL)", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.MaxCardGrowth();
         if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);

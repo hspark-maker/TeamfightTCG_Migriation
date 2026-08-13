@@ -21,6 +21,20 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }
 
+    // 전 카드 만렙 (재화·성공률 무시 — 진화 단계·키워드 해금도 레벨에서 파생돼 같이 열린다)
+    public static void MaxCardGrowth()
+    {
+        int t_changed = CardGrowthManager.DebugMaxAll();
+
+        if (t_changed == 0)
+        {
+            Debug.LogWarning("[OutgameDebug] 최대 강화 대상 없음 — 이미 전부 만렙이거나 성장 시스템이 아직 초기화되지 않았다(부트 경유 필요).");
+            return;
+        }
+
+        Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 Lv{CardGrowthManager.MaxLevel}");
+    }
+
     // 강화 레벨·진화 단계 초기화 (소유·재화는 유지)
     public static void ResetCardGrowth()
     {
