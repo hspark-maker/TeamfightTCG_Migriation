@@ -11,8 +11,12 @@ using UnityEngine.UI;
 //
 // 전사한 카드를 같은 줄에 흑백으로 세우는 이유는 분모를 보여주기 위해서다 — 생존만 서면 "4장 받았다"까지만
 // 읽히고 "6장 중 4장"이 안 읽힌다. 그래서 이 줄은 보상 표시가 아니라 그 판의 성적표다.
-// 전사 카드는 흡수에 참여하지 않고(계단의 분모는 생존 장수 그대로), 흡수가 끝나면 페이드로 걷힌다 —
-// 승리 화면의 마지막 그림이 시체로 남지 않게.
+// 전사 카드는 흡수에 참여하지 않지만(계단의 분모는 생존 장수 그대로), 첫 장이 빨려드는 순간 함께
+// 아래부터 삭아 부서진다 — 왼쪽은 골드로 빨려들고 오른쪽은 무너지는 한 번의 움직임으로 줄이 갈린다.
+// 흡수가 끝나기를 기다리면 그만큼 결과 화면이 길어지고, 파괴가 흡수의 꼬리에 붙은 별개의 사건으로 읽힌다.
+// 승리 화면의 마지막 그림이 시체로 남지 않게. 조용히 페이드로 걷히면 "지워졌다"로 읽히므로,
+// 잃은 것은 잃은 것처럼 무너뜨린다(UiCrumble). 전투의 사망 연출(흰 플래시 → 부풀었다 터짐)과 일부러 다른
+// 언어를 쓴다 — 같은 그림을 두 번 보여주면 결과 화면이 전투의 재방송이 된다.
 //
 // MonoBehaviour가 아니라 뷰가 필드로 소유한다(RewardRevealFx·ScreenDimTint와 같은 계열).
 [Serializable]
@@ -73,8 +77,33 @@ public class SurvivorGoldFlight
            + "장수는 줄 밖 라벨이 말한다.")]
     [SerializeField] Color fallenTint = new Color(0.42f, 0.42f, 0.48f, 1f);
 
-    [Tooltip("생존이 다 빨려든 뒤 전사 카드가 사라지는 시간. 0이면 남긴 채로 끝난다.")]
+    [Tooltip("전사 카드가 사라지는 시간. 0이면 남긴 채로 끝난다. 아래 파괴 시간이 0일 때만 쓰는 폴백이며, "
+           + "이쪽은 흡수가 **다 끝난 뒤**에 돈다(파괴는 흡수와 병렬이라 시작 시각이 다르다).")]
     [SerializeField] float fallenFadeDuration = 0.2f;
+
+    [Header("전사 카드 파괴")]
+    [Tooltip("전사 카드가 아래부터 삭아 부서지는 시간. 0이면 파괴 없이 위의 알파 페이드로 걷힌다. "
+           + "흡수와 병렬로 도므로 흡수 구간(flyStagger·flyDuration)보다 짧으면 결과 화면이 길어지지 않는다 — "
+           + "⚠ 그보다 길어지는 순간부터는 이 값이 곧 결과 화면 길이다.")]
+    [SerializeField] float crumbleDuration = 0.35f;
+
+    [Tooltip("장당 엇물림. 첫 생존 카드가 골드로 빨려드는 순간 함께 시작해, 흡수와 같은 방향(왼→오)으로 "
+           + "한 장씩 부서진다 — 줄 전체가 한 번의 움직임으로 갈리게.")]
+    [SerializeField] float crumbleStagger = 0.04f;
+
+    [Tooltip("삭는 경계에 이는 빛. ⚠ 따뜻한 색을 넣으면 '불타 없어진다'로 읽혀 강화 연출(잉걸→백열)과 섞인다 — "
+           + "차가운 색이어야 '삭아 부서진다'로 읽힌다.")]
+    [SerializeField] Color crumbleEdgeColor = new Color(0.62f, 0.72f, 0.95f, 1f);
+
+    [Tooltip("삭는 경계의 폭(0~1). 키우면 빛나는 띠가 두꺼워지고, 0에 가까우면 빛 없이 툭툭 끊겨 사라진다.")]
+    [Range(0f, 1f)]
+    [SerializeField] float crumbleEdgeWidth = 0.2f;
+
+    [Tooltip("부서지며 내려앉는 거리(px). 삭는 그림만으로는 '지워진다'에 가깝다 — 무게가 있어야 무너짐이 된다.")]
+    [SerializeField] float crumbleSink = 8f;
+
+    [Tooltip("부서지며 기우는 각(도). 좌우 번갈아 — 난수를 쓰면 같은 결과가 매번 다르게 보인다.")]
+    [SerializeField] float crumbleTilt = 3f;
 
     readonly List<GameObject> m_tiles = new List<GameObject>();
     RectTransform m_layer;   // 자동 생성한 레이어. 타일만 걷고 레이어는 재사용한다.
@@ -130,6 +159,11 @@ public class SurvivorGoldFlight
         float t_enterStagger = Stagger(this.enterStagger, this.maxEnterSpan, t_count);
         float t_flyStagger   = Stagger(this.flyStagger, this.maxFlySpan, t_live);
         float t_flyStart     = EnterSpan(t_count) + HoldDuration(t_count);
+
+        // 파괴는 첫 장이 빨려드는 순간 함께 시작한다(흡수와 병렬) — 줄이 한 번의 움직임으로 갈린다:
+        // 왼쪽은 골드로 빨려들고 오른쪽은 부서진다. 흡수가 다 끝나기를 기다리면 그만큼 화면이 길어지고,
+        // 파괴가 흡수의 꼬리에 붙은 별개의 사건으로 읽힌다.
+        // 폴백 알파 페이드는 이 자리를 쓰지 않는다 — 아래 t_fadeAt(흡수 종료) 그대로다.
         float t_fadeAt       = t_flyStart + FlySpan(t_live);
 
         var t_seq = DOTween.Sequence();
@@ -152,12 +186,33 @@ public class SurvivorGoldFlight
 
             if (!t_alive)
             {
-                // 전사는 처음부터 흑백으로 뜬다 — 여기서 깨뜨리는 연출은 이미 전투에서 본 장면이고,
-                // 매 판 보는 화면이라 한 박자도 더 늘리지 않는다.
-                ApplyFallen(t_tile);
+                // 전사는 처음부터 흑백으로 뜬다 — 줄이 한눈에 성적표로 읽히려면 생존·전사 구분이
+                // 등장 순간부터 서 있어야 한다. 파괴는 등장이 아니라 퇴장의 몫이다(아래).
+                UIEffect[] t_fx = ApplyFallen(t_tile);
 
-                if (this.fallenFadeDuration > 0f)
+                // 흡수와 같은 시각·같은 방향(왼→오)으로 한 장씩. 전사는 t_live번째부터 서므로 그만큼 뺀 순번이다.
+                float t_crumbleAt = t_flyStart + this.crumbleStagger * (t_i - t_live);
+
+                if (this.crumbleDuration > 0f && t_fx.Length > 0)
+                {
+                    t_seq.Insert(t_crumbleAt, UiCrumble.BuildTween(t_fx, this.crumbleDuration));
+
+                    // 삭는 것과 같은 시간 안에서 내려앉고 기운다 — 무너짐은 한 사건이라 축을 나누지 않는다.
+                    if (!Mathf.Approximately(this.crumbleSink, 0f))
+                        t_seq.Insert(t_crumbleAt, t_tile.DOAnchorPosY(t_home.y - this.crumbleSink, this.crumbleDuration)
+                                                        .SetEase(Ease.InQuad));
+
+                    if (!Mathf.Approximately(this.crumbleTilt, 0f))
+                    {
+                        float t_tilt = this.crumbleTilt * (t_i % 2 == 0 ? 1f : -1f);
+                        t_seq.Insert(t_crumbleAt, t_tile.DOLocalRotate(new Vector3(0f, 0f, t_tilt), this.crumbleDuration)
+                                                        .SetEase(Ease.InOutSine));
+                    }
+                }
+                else if (this.fallenFadeDuration > 0f)
+                {
                     t_seq.Insert(t_fadeAt, EnsureGroup(t_tile.gameObject).DOFade(0f, this.fallenFadeDuration));
+                }
 
                 continue;
             }
@@ -243,10 +298,12 @@ public class SurvivorGoldFlight
     // 전사 카드를 흑백 + 어둡게. UIEffect는 Graphic 하나에 붙는 컴포넌트라 타일 안의 그래픽 전부에 건다 —
     // CardUIView 프리팹에는 UIEffectReplica 저작이 없어서(PackCard와 다르다) 한 곳에만 걸면 그 노드만 빠진다.
     // 타일은 매번 새로 Instantiate하는 일회용이라 런타임 AddComponent가 안전하다(UiAdditive와 같은 관용구).
-    void ApplyFallen(RectTransform _tile)
+    // 돌려주는 묶음은 부르는 쪽이 파괴 축을 한 값으로 밀기 위한 것이다 — 조각마다 따로 밀면 카드가 갈라져 부서진다.
+    UIEffect[] ApplyFallen(RectTransform _tile)
     {
         // 활성 노드만 — SetArtOnly가 이름·HP·잠김 판을 이미 껐고, 꺼진 그래픽에 거는 효과는 화면에 없다.
         Graphic[] t_graphics = _tile.GetComponentsInChildren<Graphic>();
+        var       t_effects  = new UIEffect[t_graphics.Length];
 
         for (int t_i = 0; t_i < t_graphics.Length; t_i++)
         {
@@ -258,7 +315,14 @@ public class SurvivorGoldFlight
             t_fx.colorFilter    = ColorFilter.Multiply;
             t_fx.color          = this.fallenTint;
             t_fx.colorIntensity = 1f;
+
+            // 타일 뿌리를 공유해야 아트·프레임이 카드 한 장으로 부서진다(UiCrumble 머리말 참고).
+            UiCrumble.Arm(t_fx, _tile, this.crumbleEdgeColor, this.crumbleEdgeWidth);
+
+            t_effects[t_i] = t_fx;
         }
+
+        return t_effects;
     }
 
     static CanvasGroup EnsureGroup(GameObject _go)

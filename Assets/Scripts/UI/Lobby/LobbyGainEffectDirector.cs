@@ -39,6 +39,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
     // 재생 중인 획득 연출. 팩을 연달아 열면 앞 연출이 끝나기 전에 또 불린다.
     Sequence m_master;
 
+    // 이번 재생분만 쓰는 카드 출발점(PlayNow가 실어 준다). 보여 주던 화면이 있으면 그 카드가 서 있던
+    // 자리에서 출발해야 "방금 본 그 카드가 도감으로 갔다"가 한 줄로 이어진다.
+    RectTransform m_cardOrigin;
+
     // 이번 재생분 식별자. 앞 연출을 강제 마무리(Complete)하면 그 시퀀스의 완료 콜백도 함께 터지는데,
     // 그것을 이번 재생의 종료로 오인하면 기다리던 안내가 카드가 날기도 전에 다음으로 넘어간다.
     int m_runId;
@@ -55,13 +59,15 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     /// <summary>씬을 다시 열지 않고 지금 실린 캐리어를 재생한다. 로비에 머문 채 지급하는 쪽이 쓴다
     /// (Start·오버레이 닫힘은 이미 지나갔으므로 그 둘로는 닿지 않는다).
+    /// _cardOrigin을 주면 카드가 그 자리에서 출발한다(보상 화면이 카드를 세워 두던 자리).
     /// <b>false면 아무것도 재생되지 않았고 종료 통지도 오지 않는다</b> — 캐리어 정리는 호출자 몫이다.</summary>
-    public static bool PlayNow()
+    public static bool PlayNow(RectTransform _cardOrigin = null)
     {
         // 판정 기준을 Exists와 같이 둔다 — 꺼져 있는 오브젝트에서는 코루틴이 돌지 못해
         // 통지도 캐리어 소비도 없이 조용히 사라진다.
         if (!Exists) return false;
 
+        s_instance.m_cardOrigin = _cardOrigin;
         s_instance.Play();
         return true;
     }
@@ -123,6 +129,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
         yield return null;
         Canvas.ForceUpdateCanvases();
 
+        // 출발점은 이번 재생분의 것이다 — 여기서 비워야 다음 진입(씬 로드·팩 닫힘)이 옛 자리를 물려받지 않는다.
+        var t_origin = m_cardOrigin;
+        m_cardOrigin = null;
+
         // 재화가 둘 이상 들어와도 한 번의 획득이다 — 한 버킷에 합쳐 보여준다(종류가 갈리면 그 안에서 나뉜다).
         // 카드팩 중복 환급은 대개 여기 오지 않는다: 개봉 화면이 자기 잔액 표시로 이미 받아 갔고,
         //   그럴 때 캐리어에는 카드만 실려 온다(PackAcquireController.PendingRefund).
@@ -166,7 +176,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         m_master = DOTween.Sequence().SetLink(gameObject);
 
         bool t_gainStaged = !t_gains.IsEmpty && TryStageGains(m_master, t_gains);
-        bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards);
+        bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards, t_origin);
 
         // 카드 연출이 안 붙었으면 착지 콜백도 없다 — 위장을 여기서 되돌리지 않으면 카드가 영영 빈 칸이다.
         // 재화만 온 경우까지 Clear하면 돌고 있는 세션의 위장을 벗긴다 — 이번에 건 위장이 있을 때만 되돌린다.
@@ -264,7 +274,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         return true;
     }
 
-    bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards)
+    bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards, RectTransform _origin)
     {
         if (this.collectionTabTarget == null) this.collectionTabTarget = FindTabTarget();
         if (this.collectionTabTarget == null)
@@ -273,8 +283,9 @@ public class LobbyGainEffectDirector : MonoBehaviour
             return false;
         }
 
+        // 출발점이 없으면 목적지에서 분출한다(씬 로드·팩 닫힘 경로 — 보여 주던 카드가 없다).
         var t_flight = EnsureCardFlight();
-        t_flight.Configure(this.collectionTabTarget, this.collectionTabTarget);
+        t_flight.Configure(_origin != null ? _origin : this.collectionTabTarget, this.collectionTabTarget);
 
         _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
         return true;

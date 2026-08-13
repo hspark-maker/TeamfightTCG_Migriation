@@ -190,18 +190,21 @@ public static class TutorialStepExecutor
         }
 
         var t_card = _step.Card;
-        t_overlay.Show(RewardTitle, t_card, () => AcquireCard(t_card));
+
+        // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
+        var t_origin = t_overlay.CardAnchor;
+        t_overlay.Show(RewardTitle, t_card, () => AcquireCard(t_card, t_origin));
         return true;
     }
 
     // [획득]이 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(CardData _card)
+    static bool AcquireCard(CardData _card, RectTransform _origin)
     {
         OwnershipManager.Grant(CardCatalog.IdOf(_card));
 
         CardPackRewardHandoff.Set(CurrencyGain.None, new List<CardData> { _card });
-        if (LobbyGainEffectDirector.PlayNow()) return true;
+        if (LobbyGainEffectDirector.PlayNow(_origin)) return true;
 
         // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
         CardPackRewardHandoff.TryConsume(null, out _);
