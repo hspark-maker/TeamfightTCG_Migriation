@@ -111,30 +111,59 @@ MonoBehaviour:
       card: {fileID: 0}
       showDeckGate: 0
       deckName: 
-    - action: 14
+    - action: 16
       anchor: 0
-      guideMessage: 
-      unlocks: 
+      guideMessage:
+      unlocks:
       unlocksAll: 0
-      locks: 
+      locks:
       useDim: 0
       pack: {fileID: 0}
-      packPriceLabel: 
+      packPriceLabel:
       scenario: {fileID: 0}
       card: {fileID: 0}
       showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 1
+      deckName:
+    - action: 1
+      anchor: 0
       guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
         \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
-      unlocks: 
+      unlocks:
       unlocksAll: 0
-      locks: 
-      useDim: 0
+      locks:
+      useDim: 1
       pack: {fileID: 0}
-      packPriceLabel: 
+      packPriceLabel:
       scenario: {fileID: 0}
       card: {fileID: 0}
       showDeckGate: 0
-      deckName: 
+      deckName:
+  - trigger: 3
+    label: "첫 진화 안내"
+    stepDefs:
+    - action: 1
+      anchor: 0
+      guideMessage: "레벨 5가 되면 이 카드가 진화합니다!"
+      unlocks:
+      unlocksAll: 0
+      locks:
+      useDim: 1
+      pack: {fileID: 0}
+      packPriceLabel:
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      showDeckGate: 0
+      deckName:
+    - action: 11
+      anchor: 21
+      guideMessage: "무료로 진화해 보세요!"
+      unlocks:
+      unlocksAll: 0
+      locks:
+      useDim: 1
+      pack: {fileID: 0}
+      packPriceLabel:
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      showDeckGate: 0
+      deckName:

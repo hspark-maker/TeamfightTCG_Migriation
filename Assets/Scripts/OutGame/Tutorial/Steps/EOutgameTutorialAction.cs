@@ -18,4 +18,8 @@ public enum EOutgameTutorialAction
     EnterFirstRank  = 13,   // 입력 없이 첫 랭크 티어에 올린다(온보딩 전투가 끝난 자리 = 랭크 연출이 서던 그 자리)
     WaitLobbyReturn = 14,   // 유저가 열어 둔 오버레이를 스스로 닫고 로비 표면으로 돌아올 때까지 대기(화면에 아무것도 그리지 않는다)
     CardGrant       = 15,   // 입력 없이 카드 한 장을 지급하고 로비 획득 연출이 끝날 때까지 대기
+    WaitCardDetailReturn = 16,  // 유저가 카드 상세를 스스로 닫을 때까지 대기(도감 페이지는 열린 채여도 넘어간다).
+                                // 로비 표면까지 걷히기를 기다리는 것은 WaitLobbyReturn 쪽이다.
+                                // ⚠ 트리거 튜토리얼 전용 — 온보딩 브리지는 이 완료 조건을 듣지 않는다.
+    CardSetGrant    = 17,   // 입력 없이 카드 여러 장을 한 묶음으로 지급(CardGrant의 N장 판)
 }

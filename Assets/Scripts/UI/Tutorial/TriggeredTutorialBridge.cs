@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 
 // 트리거 발화 튜토리얼의 씬 수명 브리지(씬당 1개). OutgameTutorialBridge의 축소판이다 —
@@ -12,12 +13,21 @@ public class TriggeredTutorialBridge : MonoBehaviour
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
+    [Tooltip("강화 결과판을 대신 걷기까지 쥐고 있는 시간(초). 결과 행이 다 떠오른 시점부터 센다.\n" +
+             "튜토리얼 동안에만 적용된다 — 평상시의 결과판은 유저가 탭할 때까지 그대로 서 있다.")]
+    [SerializeField] float enhanceResultHold = 1.1f;
+
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다.
     TutorialStepDef m_step;
 
     // 스텝 진입이 다시 ApplyCurrentStep을 부르는 경로를 막는다(예약 후 재실행).
     bool m_applying;
     bool m_pendingApply;
+
+    // 강화 연출이 무대를 쥔 구간. 이 동안의 앵커 재등록은 무시한다 —
+    // 진화 연출은 공개 시점에 다음 단계(진화 아님)로 버튼을 갈아끼워 같은 키를 다시 등록하는데,
+    // 그때 버튼은 연출 잠금으로 비활성이라 게이트가 뜨지 못하고 경고만 남는다.
+    bool m_enhancing;
 
     // 구독이 Start가 아니라 Awake인 이유: 발화 지점인 LobbyTabController.Start()가 이 브리지 Start보다 먼저 돌 수 있고
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
@@ -28,10 +38,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnActivated  += OnActivated;
         TutorialAnchorRegistry.OnRegistered  += OnAnchorRegistered;
 
-        CardDetailOverlayView.OnAnyEnhanceStarted += OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
-        CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
-        AlbumPageOverlayView.OnAnyClosed          += OnOverlayClosed;
+        CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed             += OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
     }
 
     void Start()
@@ -46,10 +57,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnActivated  -= OnActivated;
         TutorialAnchorRegistry.OnRegistered  -= OnAnchorRegistered;
 
-        CardDetailOverlayView.OnAnyEnhanceStarted -= OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
-        CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
-        AlbumPageOverlayView.OnAnyClosed          -= OnOverlayClosed;
+        CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed             -= OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
 
         CloseGate();
     }
@@ -106,11 +118,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
         m_step = t_step;
 
-        // 유저가 열어 둔 오버레이(카드 상세·도감 페이지)를 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
-        // 이미 로비 표면이면 기다릴 것이 없다.
-        if (m_step.Completion == EOutgameTutorialCompletion.LobbyReturn)
+        // 유저가 열어 둔 화면을 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
+        // 어디까지 걷혀야 하는지는 완료 조건이 정한다. 이미 걷혀 있으면 기다릴 것이 없다.
+        if (IsSurfaceWait(m_step.Completion))
         {
-            if (IsLobbySurfaceVisible()) OnGateSatisfied();
+            if (IsSurfaceReady(m_step.Completion)) OnGateSatisfied();
             return;
         }
 
@@ -130,6 +142,12 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Click
          || m_step.Completion == EOutgameTutorialCompletion.Enhance)
         {
+            // 이 스텝에 들어선 순간 강화 한 방의 값이 0으로 눕는다(CardGrowthManager의 무료 한 방).
+            // 카드 상세는 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
+            // 다시 읽게 하지 않으면 잔액이 그에 못 미치는 유저의 강화 버튼이 비활성으로 굳는다.
+            if (m_step.Completion == EOutgameTutorialCompletion.Enhance)
+                CardGrowthManager.NotifyCostRuleChanged();
+
             TryOpenGate();
             return;
         }
@@ -161,14 +179,26 @@ public class TriggeredTutorialBridge : MonoBehaviour
         OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
     }
 
-    // 오버레이 하나가 닫혔다. 남은 것이 아직 있으면 계속 기다린다 — 완료는 "로비 표면이 드러났는가" 하나로 판정한다.
+    // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다.
     void OnOverlayClosed()
     {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.LobbyReturn) return;
-        if (!IsLobbySurfaceVisible()) return;
+        if (m_step == null || !IsSurfaceWait(m_step.Completion)) return;
+        if (!IsSurfaceReady(m_step.Completion)) return;
 
         OnGateSatisfied();
     }
+
+    // 이 완료 조건이 "유저가 화면을 닫기를 기다리는" 부류인가.
+    static bool IsSurfaceWait(EOutgameTutorialCompletion _completion)
+        => _completion == EOutgameTutorialCompletion.LobbyReturn
+        || _completion == EOutgameTutorialCompletion.CardDetailReturn;
+
+    // 기다리던 화면이 걷혔는가. 상세 하나만 묻는 스텝은 뒤에 남는 도감 페이지를 세지 않는다 —
+    // 카드에서 손을 뗀 그 순간이 안내를 이어 붙일 자리이고, 도감을 마저 닫을 이유는 안내에 없다.
+    static bool IsSurfaceReady(EOutgameTutorialCompletion _completion)
+        => _completion == EOutgameTutorialCompletion.CardDetailReturn
+            ? !CardDetailOverlayView.IsOpen
+            : IsLobbySurfaceVisible();
 
     // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()
@@ -181,12 +211,26 @@ public class TriggeredTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
+        m_enhancing = true;
         HideGuide();
+    }
+
+    // 결과판에 읽을 것이 다 떠올랐다. 안내를 접어 둔 구간이라 "탭해서 닫아라"를 말해 줄 자리가 없으므로
+    // 잠깐 쥐었다 대신 걷는다 — 걷히면 무대가 스스로 상세로 돌아오고, 그 복귀가 다음 스텝을 부른다.
+    // 그 사이 유저가 먼저 탭했거나 "한 번 더"로 넘어갔으면 걷을 판이 없다(RequestClose가 조용히 지나간다).
+    void OnEnhanceResultReady()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+
+        DOVirtual.DelayedCall(Mathf.Max(0f, this.enhanceResultHold), CardDetailOverlayView.CloseEnhanceResult)
+                 .SetLink(gameObject);
     }
 
     // 강화 한 방이 연출·결과판까지 끝나 상세로 돌아왔다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
     void OnEnhanceSettled(EnhanceResult _result)
     {
+        m_enhancing = false;
+
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
@@ -196,6 +240,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
+        if (m_enhancing) return;
         if (m_step == null || _key != m_step.Anchor) return;
 
         TryOpenGate();
@@ -223,7 +268,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void CloseGate()
     {
-        m_step = null;
+        m_step      = null;
+        m_enhancing = false;
 
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }

@@ -20,15 +20,28 @@ public static class TriggeredTutorialRunner
     // 실행 중인 묶음 안에서의 스텝 순번
     public static int StepIndex => s_index;
 
+    // 지금 도는 런이 이 트리거의 것인가(성장 곡선이 "안내가 대주는 구간인가"를 묻는 창구)
+    public static bool IsRunningTrigger(EOutgameTutorialTrigger _trigger)
+        => s_active != null && s_active.Trigger == _trigger;
+
+    // 온보딩 졸업 전에는 트리거 튜토리얼이 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
+    // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
+    static bool IsOpen => OutgameTutorialProgress.IsCompleted;
+
     // 이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
     // UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).
     public static bool HasPending(EOutgameTutorialTrigger _trigger)
     {
         if (_trigger == EOutgameTutorialTrigger.None) return false;
+        if (!IsOpen) return false;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
 
         return TryGetEntry(_trigger, out var t_entry) && t_entry.StepCount > 0;
     }
+
+    // 온보딩 졸업으로 게이트가 열리면 그 전까지 전부 false였던 HasPending의 답이 한꺼번에 뒤집힌다 —
+    // 이미 그린 쪽(알림 점)에 다시 물어보게 한다.
+    public static void NotifyOnboardingCompleted() => OnChanged?.Invoke();
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
     public static void EnsureData(TriggeredTutorialData _data)
@@ -54,7 +67,7 @@ public static class TriggeredTutorialRunner
         if (_trigger == EOutgameTutorialTrigger.None) return;
         if (s_data == null) return;
         if (IsRunning) return;
-        if (OutgameTutorialRunner.IsRunning) return;                    // 온보딩 우선(게이트를 서로 뺏지 않게)
+        if (!IsOpen) return;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return;
 
         if (!TryGetEntry(_trigger, out var t_entry) || t_entry.StepCount == 0) return;
@@ -74,6 +87,11 @@ public static class TriggeredTutorialRunner
 
         return s_active.TryGetStep(s_index, out _step);
     }
+
+    // 지금 서 있는 스텝이 _action인가. OutgameTutorialRunner와 같은 조회 창구다 —
+    // 화면·규칙 쪽이 튜토 좌표를 직접 해석하지 않게 한다(강화 비용이 "지금이 안내가 시킨 강화인가"를 묻는다).
+    public static bool IsCurrentAction(EOutgameTutorialAction _action)
+        => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
 
     // 현재 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
     public static bool EnterCurrentStep()

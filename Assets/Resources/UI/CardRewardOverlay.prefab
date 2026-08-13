@@ -156,7 +156,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &7284149686138063173
 RectTransform:
   m_ObjectHideFlags: 0
@@ -194,17 +194,45 @@ MonoBehaviour:
   titleText: {fileID: 7863546268192744097}
   acquireButton: {fileID: 7856946437835751216}
   cardView: {fileID: 4952606273116010240}
+  stage: {fileID: 7147919034864819992}
+  cardSlot: {fileID: 8162430383493994154}
+  glowRoot: {fileID: 608612026496272735}
   transition:
     panel: {fileID: 7147919034864819992}
-    openDuration: 0.25
+    openDuration: 0.12
     closeDuration: 0.15
-    openFromScale: 0.9
-    closeToScale: 0.9
+    openFromScale: 1
+    closeToScale: 1
   dimTint:
     dim: {fileID: 881394883608625062}
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
-  dimPulseDuration: 0.25
+  dimPulseDuration: 0.28
+  titleDropDistance: 70
+  titleDelay: 0.04
+  titleDuration: 0.16
+  cardDropDelay: 0.2
+  cardDropDistance: 430
+  cardDropScale: 1.5
+  cardDropDuration: 0.1
+  stageKick: 20
+  stageKickDuration: 0.14
+  glowBurstFrom: 0.65
+  glowBurstTo: 1.06
+  glowBurstUpDuration: 0.1
+  glowBurstSettleDuration: 0.28
+  glowBreathAmount: 0.03
+  glowBreathPeriod: 1.6
+  claimDelay: 0.6
+  claimRiseDistance: 90
+  claimRiseDuration: 0.16
+  claimBreathAmount: 0.03
+  claimBreathPeriod: 1.2
+  handoffPop: 1.08
+  handoffPopDuration: 0.06
+  handoffShrink: 0.34
+  handoffShrinkDuration: 0.14
+  handoffPeelDuration: 0.08
 --- !u!223 &1118912883624455154
 Canvas:
   m_ObjectHideFlags: 0
@@ -303,7 +331,7 @@ RectTransform:
   m_Father: {fileID: 7284149686138063173}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0.95}
+  m_AnchorMax: {x: 1, y: 0.9542763}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -1211,7 +1239,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.92}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

@@ -853,8 +853,69 @@ MonoBehaviour:
   searchingTitle: "\uC0C1\uB300\uB97C \uCC3E\uB294 \uC911"
   foundTitle: "\uC0C1\uB300\uB97C \uCC3E\uC558\uB2E4!"
   foundHold: 0.7
-  versusHold: 0.8
+  versusHold: 0.5
   versusApproach: 60
+  fx:
+    scanSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+    scanColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+    scanPeriod: 0.9
+    scanThickness: 110
+    scanAlpha: 0.5
+    slamScale: 1.3
+    slamRise: 64
+    slamDuration: 0.08
+    rootKick: 0.05
+    foundDimPunch: -0.55
+    infoStagger: 0.05
+    infoSlide: 36
+    foundFlash:
+      rise: 0.03
+      hold: 0.01
+      fall: 0.3
+      peak: 0.42
+      color: {r: 0.55, g: 0.78, b: 1, a: 1}
+      burstSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+      burstColor: {r: 0.8, g: 0.92, b: 1, a: 1}
+      burstAlpha: 1
+      burstStartScale: 0.2
+      burstEndScale: 1.4
+      burstFall: 0.4
+      burstSpin: 0
+      burstAdditive: 1
+    windUpDistance: 26
+    windUpDuration: 0.1
+    impactDuration: 0.08
+    settleDuration: 0.26
+    vsSpin: -14
+    vsOvershoot: 0.4
+    vsPopDuration: 0.14
+    versusDimPunch: -0.35
+    versusFlash:
+      rise: 0.02
+      hold: 0
+      fall: 0.22
+      peak: 0.3
+      color: {r: 1, g: 0.92, b: 0.72, a: 1}
+      burstSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+      burstColor: {r: 1, g: 0.9, b: 0.65, a: 1}
+      burstAlpha: 1
+      burstStartScale: 0.3
+      burstEndScale: 1.5
+      burstFall: 0.32
+      burstSpin: 0
+      burstAdditive: 1
+    dim:
+      dim: {fileID: 3258554939496773107}
+      darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
+      brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+  handoffFx:
+    moveDuration: 0.25
+    cardEndScale: 0.45
+    fadeStart: 0.5
+    versusEndScale: 0.7
+    dimAt: 0.06
+    dimFade: 0.24
+    introAt: 0.2
 --- !u!1 &3258554938269669891 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3274920063186257180, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
@@ -887,6 +948,17 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3274920063462459824, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
   m_PrefabInstance: {fileID: 20947902288158495}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &3258554939496773107 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3274920063880162028, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
+  m_PrefabInstance: {fileID: 20947902288158495}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &4411922439922108020 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4427073707777530219, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}

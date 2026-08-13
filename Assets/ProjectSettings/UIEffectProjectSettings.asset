@@ -60,6 +60,8 @@ ShaderVariantCollection:
         passType: 0
       - keywords: COLOR_FILTER TONE_GRAYSCALE
         passType: 0
+      - keywords: COLOR_FILTER TONE_GRAYSCALE TRANSITION_DISSOLVE
+        passType: 0
       - keywords: EDGE_SHINY
         passType: 0
       - keywords: EDGE_SHINY TONE_RETRO

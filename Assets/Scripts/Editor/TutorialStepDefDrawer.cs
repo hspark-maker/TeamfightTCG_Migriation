@@ -100,6 +100,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
         if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
         if (TutorialStepDef.UsesCard(_action))           yield return "card";
+        if (TutorialStepDef.UsesCards(_action))          yield return "cards";
         if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
         if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
@@ -140,8 +141,18 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesScenario(_action)) return NameOf(_property, "scenario");
         if (TutorialStepDef.UsesPack(_action))     return NameOf(_property, "pack");
         if (TutorialStepDef.UsesCard(_action))     return NameOf(_property, "card");
+        if (TutorialStepDef.UsesCards(_action))    return CountOf(_property, "cards");
 
         return string.Empty;
+    }
+
+    // 카드 묶음은 이름 하나로 줄일 수 없다 — 접힌 줄에서는 장수만 보여 준다.
+    static string CountOf(SerializedProperty _property, string _field)
+    {
+        var t_list = _property.FindPropertyRelative(_field);
+        if (t_list == null || !t_list.isArray) return "(미배선)";
+
+        return t_list.arraySize > 0 ? $"{t_list.arraySize}장" : "(미배선)";
     }
 
     static string NameOf(SerializedProperty _property, string _field)

@@ -5,4 +5,5 @@ public enum EOutgameTutorialTrigger
     None = 0,
     DeckTabFirstEnter,
     CollectionTabFirstEnter,
+    FirstEvolutionReady,      // 첫 진화 관문 도달 — 탭이 아니라 강화 결과가 깨운다
 }

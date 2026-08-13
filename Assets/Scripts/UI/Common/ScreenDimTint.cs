@@ -1,5 +1,7 @@
 using System;
 using DG.Tweening;
+using DG.Tweening.Core;
+using DG.Tweening.Plugins.Options;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,6 +17,12 @@ public class ScreenDimTint
     Color m_base;                           // authoring 색. 중간값을 기준으로 잡으면 반복할수록 밀린다
     bool  m_captured;
     float m_level;
+
+    /// <summary>
+    /// 덮개 자신. 이 클래스는 알파를 건드리지 않지만(구도가 흔들린다), 화면을 걷어내는 쪽은 알파가 필요하다 —
+    /// 진실원을 둘로 만들지 않으려 배선된 대상을 그대로 빌려준다.
+    /// </summary>
+    public Graphic Target => this.dim;
 
     /// <summary>-1 가장 어둡게 ~ 0 평상 ~ +1 가장 밝게.</summary>
     public float Level
@@ -34,7 +42,10 @@ public class ScreenDimTint
     }
 
     // getter는 트윈이 시작할 때 한 번 읽힌다 — 그래서 앞 구간이 남긴 밝기에서 이어 출발한다.
-    public Tween TweenLevel(float _to, float _dur) => DOTween.To(() => this.Level, _v => this.Level = _v, _to, _dur);
+    //
+    // Tween이 아니라 구체 타입으로 돌려준다 — Tween으로 좁히면 호출부의 .From(1f)가 From(bool isRelative)에 걸린다.
+    public TweenerCore<float, float, FloatOptions> TweenLevel(float _to, float _dur)
+        => DOTween.To(() => this.Level, _v => this.Level = _v, _to, _dur);
 
     public void Capture()
     {

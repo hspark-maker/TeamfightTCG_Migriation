@@ -42,6 +42,9 @@ public static class OutgameTutorialRunner
         // 졸업으로 전 기능이 열린다. 게이트를 거치지 않고 닫히는 경로(전투에서 돌아와 확정하는 졸업·디버그 스킵)에도
         // 잠김 룩이 따라오게 여기서 알린다 — FeatureLockView는 OnChanged로만 다시 그린다.
         OutgameFeatureLock.Refresh();
+
+        // 트리거 튜토리얼도 졸업과 함께 풀린다 — 그 답이 뒤집힌 것은 여기서만 알 수 있다.
+        TriggeredTutorialRunner.NotifyOnboardingCompleted();
     }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
