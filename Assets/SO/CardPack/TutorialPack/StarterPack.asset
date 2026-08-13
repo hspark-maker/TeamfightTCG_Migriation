@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: StarterPack
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: StarterPack
-  displayName: "\uC2A4\uD0C0\uD130\uD329"
+  displayName: "\uC2A4\uD0C0\uD130\uB371"
   packArt: {fileID: 0}
   priceType: 0
   price: 0

@@ -49,6 +49,12 @@ public class TutorialStepDef
     [Tooltip("CardGrant: 지급할 카드 한 장. 이미 소유한 카드를 꽂아도 안전하지만 획득 연출은 그대로 돈다")]
     [SerializeField] CardData card;
 
+    [Tooltip("CardSetGrant: 한 묶음으로 지급할 카드들. 순서 = 패널 격자에 놓이는 순서.\n"
+           + "· 이미 소유한 카드를 넣어도 안전하다. 다만 획득 연출은 그대로 돈다(중복 표시 없이 새 카드처럼 보인다).\n"
+           + "· 빈 칸(None)은 건너뛴다 — 격자 자리도 차지하지 않는다.\n"
+           + "· 소유권만 준다. 덱에는 편성되지 않는다(덱 저작은 DeckGrant 몫이다).")]
+    [SerializeField] List<CardData> cards = new List<CardData>();
+
     [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
            + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다")]
     [SerializeField] bool showDeckGate;
@@ -78,6 +84,8 @@ public class TutorialStepDef
 
     public CardData Card => card;
 
+    public IReadOnlyList<CardData> Cards => cards;
+
     public bool ShowDeckGate => showDeckGate;
 
     public string DeckName => deckName;
@@ -96,7 +104,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
         EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
-        EOutgameTutorialAction.CardGrant       => EOutgameTutorialCompletion.CardGain,
+        EOutgameTutorialAction.CardGrant       or
+        EOutgameTutorialAction.CardSetGrant    => EOutgameTutorialCompletion.CardGain,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -150,7 +159,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
-        EOutgameTutorialAction.CardGrant       => false,
+        EOutgameTutorialAction.CardGrant       or
+        EOutgameTutorialAction.CardSetGrant    => false,
 
         _ => true,
     };
@@ -167,7 +177,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
-        EOutgameTutorialAction.CardGrant       => false,
+        EOutgameTutorialAction.CardGrant       or
+        EOutgameTutorialAction.CardSetGrant    => false,
 
         _ => true,
     };
@@ -211,4 +222,8 @@ public class TutorialStepDef
     // 이 액션이 카드 한 장을 쓰는가(지급 대상)
     public static bool UsesCard(EOutgameTutorialAction _action) =>
         _action == EOutgameTutorialAction.CardGrant;
+
+    // 이 액션이 카드 묶음을 쓰는가(한 번에 지급하는 세트)
+    public static bool UsesCards(EOutgameTutorialAction _action) =>
+        _action == EOutgameTutorialAction.CardSetGrant;
 }

@@ -21,4 +21,5 @@ public enum EOutgameTutorialAction
     WaitCardDetailReturn = 16,  // 유저가 카드 상세를 스스로 닫을 때까지 대기(도감 페이지는 열린 채여도 넘어간다).
                                 // 로비 표면까지 걷히기를 기다리는 것은 WaitLobbyReturn 쪽이다.
                                 // ⚠ 트리거 튜토리얼 전용 — 온보딩 브리지는 이 완료 조건을 듣지 않는다.
+    CardSetGrant    = 17,   // 입력 없이 카드 여러 장을 한 묶음으로 지급(CardGrant의 N장 판)
 }

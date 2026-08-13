@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef172436211a3934fb172f7d6ab7ebab, type: 3}
+  m_Name: RangePack
+  m_EditorClassIdentifier: Assembly-CSharp::CardPackData
+  packId: RangePack
+  displayName: "\uC6D0\uAC70\uB9AC\uB371"
+  packArt: {fileID: 0}
+  priceType: 0
+  price: 0
+  drawCount: 6
+  uniqueDraw: 1
+  refundType: 0
+  refundAmount: 0
+  pool:
+  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
+  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
+  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  rankPools: []

@@ -272,7 +272,11 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     // 로비 탭 화면이 그대로 보이는가(도감·보상이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()
-        => !CardDetailOverlayView.IsOpen && !AlbumPageOverlayView.IsOpen && !CardRewardOverlay.IsOpen;
+        => !CardDetailOverlayView.IsOpen && !AlbumPageOverlayView.IsOpen && !AnyRewardOverlayOpen;
+
+    // 카드 보상 화면(낱장·세트) 중 하나라도 떠 있는가. 두 오버레이가 같은 자리를 쓰므로 판정도 한 곳에서 한다 —
+    // 한쪽만 보는 코드가 남으면 세트 지급 구간에서 그 판정이 조용히 틀린다.
+    static bool AnyRewardOverlayOpen => CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen;
 
     // 랭크 연출 종료 신호. 보여줄 것이 없어 지나간 경우도 같은 신호로 온다.
     void OnRankEffectFinished()
@@ -290,7 +294,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnCardGainFinished()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.CardGain) return;
-        if (CardRewardOverlay.IsOpen) return;
+        if (AnyRewardOverlayOpen) return;
 
         OnGateSatisfied();
     }
@@ -399,6 +403,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed          += OnOverlayClosed;
         CardRewardOverlay.OnAnyClosed             += OnOverlayClosed;
+        CardSetRewardOverlay.OnAnyClosed          += OnOverlayClosed;
         m_subscribed = true;
     }
 
@@ -419,6 +424,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed          -= OnOverlayClosed;
         CardRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
+        CardSetRewardOverlay.OnAnyClosed          -= OnOverlayClosed;
         m_subscribed = false;
     }
 }

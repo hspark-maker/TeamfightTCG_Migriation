@@ -115,11 +115,31 @@ public static class OutgameTutorialRewind
                     continue;
                 }
 
+                if (t_row.Action == EOutgameTutorialAction.CardSetGrant)
+                {
+                    t_cards += GrantCardSet(t_row.Cards);
+                    continue;
+                }
+
+
                 if (t_row.Pack != null && TutorialStepDef.UsesPack(t_row.Action)) t_cards += GrantPackPool(t_row.Pack);
             }
         }
 
         Debug.Log($"[TutorialRewind] 좌표 {t_chapter}-{t_step}까지 지급 재생 — 덱 스텝 {t_decks}개 / 팩 풀 카드 {t_cards}장 · 소유 {OwnershipManager.OwnedCount}장");
+    }
+
+    static int GrantCardSet(IReadOnlyList<CardData> _cards)
+    {
+        if (_cards == null || _cards.Count == 0) return 0;
+
+        var t_ids = new List<int>(_cards.Count);
+        for (int t_i = 0; t_i < _cards.Count; t_i++)
+        {
+            if (_cards[t_i] != null) t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
+        }
+
+        return OwnershipManager.GrantAll(t_ids);
     }
 
     static int GrantPackPool(CardPackData _pack)

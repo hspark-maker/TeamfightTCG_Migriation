@@ -7,8 +7,9 @@ public static class TutorialStepExecutor
 {
     const string BattleScene = "BattleScene";
 
-    // 보상 오버레이 제목. 지금은 첫 승리 보너스 한 자리에만 쓰이지만, 늘어나면 스텝 저작값으로 올린다.
+    // 보상 오버레이 제목. 지금은 자리마다 하나씩이라 상수로 두지만, 늘어나면 스텝 저작값으로 올린다.
     const string RewardTitle = "첫 승리 보너스";
+    const string CardSetTitle = "기본 카드 세트";
 
     // 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
     public static bool Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -36,6 +37,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.AutoPurchase: return EnterAutoPurchase(_step, _context);
             case EOutgameTutorialAction.DeckGrant:    return EnterDeckGrant(_step, _context);
             case EOutgameTutorialAction.CardGrant:    return EnterCardGrant(_step, _context);
+            case EOutgameTutorialAction.CardSetGrant: return EnterCardSetGrant(_step, _context);
         }
 
         Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 알 수 없는 액션({(int)_step.Action}) — 건너뜁니다.");
@@ -227,11 +229,65 @@ public static class TutorialStepExecutor
         return false;
     }
 
-    static List<int> ToIds(List<CardData> _cards)
+    // 카드 묶음을 한 번에 주는 자리. EnterCardGrant와 같은 규약이라 다른 점만 적는다 —
+    // 세트는 낱장 보상과 다른 오버레이(격자)를 쓰고, 지급도 한 장이 아니라 목록 단위로 한다.
+    static bool EnterCardSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
+    {
+        string t_where = Where(_context);
+        var t_cards = _step.Cards;
+
+        if (t_cards == null || t_cards.Count == 0)
+        {
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} CardSetGrant에 카드가 미배선 — 지급을 건너뜁니다.");
+            return SkipAfterSetGrant(_context, null);
+        }
+
+        // 디렉터를 오버레이보다 먼저 본다 — 순서를 뒤집으면 로비가 아닌 씬에서도 보상 화면이 세워져 그 씬에 남는다.
+        if (!LobbyGainEffectDirector.Exists || !CardSetRewardOverlay.TryGet(out var t_overlay))
+        {
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 보상 오버레이·획득 연출이 없어 지급만 하고 지나갑니다(로비 씬 배선 확인).");
+            return SkipAfterSetGrant(_context, t_cards);
+        }
+
+        var t_origin = t_overlay.CardAnchor;
+        t_overlay.Show(CardSetTitle, t_cards, () => AcquireCards(t_cards, t_origin));
+        return true;
+    }
+
+    // [받기]가 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
+    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin)
+    {
+        OwnershipManager.GrantAll(ToIds(_cards));
+
+        CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
+        if (LobbyGainEffectDirector.PlayNow(_origin)) return;
+
+        // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
+        CardPackRewardHandoff.TryConsume(null, out _);
+        LobbyGainEffectDirector.NotifySkipped();
+
+        Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급은 완료).");
+    }
+
+    static bool SkipAfterSetGrant(OutgameTutorialStepContext _context, IReadOnlyList<CardData> _cards)
+    {
+        if (_cards != null) OwnershipManager.GrantAll(ToIds(_cards));
+
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+        return false;
+    }
+
+    // null 원소는 건너뛴다 — 저작이 빈 칸을 남긴 세트도 그대로 지급되어야 한다.
+    static List<int> ToIds(IReadOnlyList<CardData> _cards)
     {
         var t_ids = new List<int>(_cards.Count);
         for (int t_i = 0; t_i < _cards.Count; t_i++)
+        {
+            if (_cards[t_i] == null) continue;
+
             t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
+        }
 
         return t_ids;
     }
