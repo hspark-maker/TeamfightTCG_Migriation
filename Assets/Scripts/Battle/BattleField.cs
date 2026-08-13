@@ -22,9 +22,19 @@ public class BattleField : MonoBehaviour
     // 카드로 조회하면 셔플 순서와 무관하게 맞는다. null이면 성장 미적용(= 기존 동작).
     System.Func<CardData, CardGrowth> growthOf;
 
+    // 이번 판에 확정 사망한 카드(슬롯에서 빠진 순서). 필드는 시체를 남기지 않으므로 —
+    // RemoveCard가 슬롯을 null로 만들고 나면 그 CardInstance를 아무도 붙잡지 않는다 —
+    // 빠지는 그 자리에서 적어두지 않으면 판이 끝난 뒤에는 "무엇을 잃었는가"를 복원할 방법이 없다.
+    readonly List<CardData> fallenCards = new List<CardData>();
+
     public int OwnerIndex => this.ownerIndex;
     public int WaitingCount => this.waitingQueue.Count;
     public bool IsEmpty => !HasAnyCard();
+
+    /// <summary>이번 판에 잃은 카드(사망 순서). 결과 화면이 "몇 장 중 몇 장을 지켰는가"를 그리는 출처다.
+    /// <b>소비자는 플레이어 필드 하나뿐이다</b> — 상대 필드에도 똑같이 쌓이지만 읽는 곳이 없다
+    /// (원격 미러는 상대 전사 목록의 정본이 아니다. 필요해지면 그때 경로를 확인하고 열 것).</summary>
+    public IReadOnlyList<CardData> FallenCards => this.fallenCards;
 
     /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifyEntered)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
     /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
@@ -45,6 +55,7 @@ public class BattleField : MonoBehaviour
         this.growthOf   = _growthOf;
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
+        this.fallenCards.Clear();   // 리매치로 인스턴스를 재사용하면 직전 판의 전사자가 결과 화면에 얹힌다
         this.FlowStack = 0;
         this.Synergy   = null;   // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
@@ -194,10 +205,19 @@ public class BattleField : MonoBehaviour
         return t_slot >= 0 && t_slot < SLOT_COUNT;
     }
 
+    /// <summary>슬롯 하나를 비운다. <b>사망 정리 전용</b>이라 여기서 전사 기록을 남긴다 —
+    /// 유일한 호출자가 <c>AttackProcessor.RemoveDead</c>의 부활 게이트를 통과한 시체이고,
+    /// 교활 되돌림·스왑·멀리건은 슬롯을 <b>덮어쓰므로</b> 이 경로를 타지 않는다.
+    /// 사망 외 용도로 이걸 부르기 시작하면 결과 화면의 전사 목록이 조용히 오염된다.</summary>
     public void RemoveCard(int _slotIndex)
     {
-        if (this.slots[_slotIndex] != null)
-            this.slots[_slotIndex].slotIndex = -1;
+        CardInstance t_card = this.slots[_slotIndex];
+        if (t_card != null)
+        {
+            t_card.slotIndex = -1;
+            this.fallenCards.Add(t_card.data);
+        }
+
         this.slots[_slotIndex] = null;
         NotifyBoardChanged();   // 보드 구성 변화 → 라이브 카운트 파생 상태 재동기(성벽 등)
     }
@@ -223,6 +243,7 @@ public class BattleField : MonoBehaviour
         this.growthOf   = null;   // 원격 미러는 성장 미적용 고정(스탯을 와이어로 보내지 않으므로 로컬 가공 금지)
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
+        this.fallenCards.Clear();
         this.FlowStack = 0;
         this.Synergy   = null;   // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
