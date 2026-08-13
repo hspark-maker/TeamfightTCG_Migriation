@@ -108,6 +108,13 @@ public static class OutgameTutorialRewind
                     continue;
                 }
 
+                // 보상 카드도 순수 세이브 작업이다 — 부트 중에는 연출을 세울 무대가 없으니 소유권만 준다.
+                if (t_row.Action == EOutgameTutorialAction.CardGrant)
+                {
+                    if (t_row.Card != null && OwnershipManager.Grant(CardCatalog.IdOf(t_row.Card))) t_cards++;
+                    continue;
+                }
+
                 if (t_row.Pack != null && TutorialStepDef.UsesPack(t_row.Action)) t_cards += GrantPackPool(t_row.Pack);
             }
         }

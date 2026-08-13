@@ -99,6 +99,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesPack(_action))           yield return "pack";
         if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
         if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
+        if (TutorialStepDef.UsesCard(_action))           yield return "card";
         if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
         if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
@@ -138,6 +139,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
 
         if (TutorialStepDef.UsesScenario(_action)) return NameOf(_property, "scenario");
         if (TutorialStepDef.UsesPack(_action))     return NameOf(_property, "pack");
+        if (TutorialStepDef.UsesCard(_action))     return NameOf(_property, "card");
 
         return string.Empty;
     }

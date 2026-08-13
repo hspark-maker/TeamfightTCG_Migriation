@@ -25,10 +25,24 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 11400000, guid: b7e3f1a92c8d4e6f0a1b2c3d4e5f6071, type: 2}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
   - label: "\uB450 \uBC88\uCA30 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
     stepDefs:
+    - action: 15
+      anchor: 0
+      guideMessage: 
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      scenario: {fileID: 0}
+      card: {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
+      showDeckGate: 0
+      deckName: 
     - action: 5
       anchor: 1
       guideMessage: 
@@ -39,6 +53,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
   - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
@@ -53,6 +68,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 2
@@ -65,6 +81,7 @@ MonoBehaviour:
       pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
       packPriceLabel: "\uBB34\uB8CC"
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 3
@@ -77,6 +94,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -89,6 +107,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -101,6 +120,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -113,6 +133,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 10
@@ -125,6 +146,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -137,6 +159,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 9
@@ -149,6 +172,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: "\uD0A4\uC6CC\uB4DC \uB371"
     - action: 5
@@ -161,6 +185,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
+      card: {fileID: 0}
       showDeckGate: 1
       deckName: 
     - action: 1
@@ -174,6 +199,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 1
@@ -187,6 +213,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -199,6 +226,7 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -208,10 +236,11 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -220,10 +249,11 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 6
@@ -232,10 +262,11 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
   - label: "\uCCAB \uB7AD\uD06C \uC2B9\uAE09"
@@ -250,5 +281,6 @@ MonoBehaviour:
       pack: {fileID: 0}
       packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 

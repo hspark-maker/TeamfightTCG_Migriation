@@ -46,6 +46,9 @@ public class TutorialStepDef
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
 
+    [Tooltip("CardGrant: 지급할 카드 한 장. 이미 소유한 카드를 꽂아도 안전하지만 획득 연출은 그대로 돈다")]
+    [SerializeField] CardData card;
+
     [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
            + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다")]
     [SerializeField] bool showDeckGate;
@@ -73,6 +76,8 @@ public class TutorialStepDef
 
     public TutorialScenarioData Scenario => scenario;
 
+    public CardData Card => card;
+
     public bool ShowDeckGate => showDeckGate;
 
     public string DeckName => deckName;
@@ -90,6 +95,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
+        EOutgameTutorialAction.CardGrant       => EOutgameTutorialCompletion.CardGain,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -141,7 +147,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn => false,
+        EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
     };
@@ -156,7 +163,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn => false,
+        EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
     };
@@ -196,4 +204,8 @@ public class TutorialStepDef
     // 이 액션이 덱 이름을 쓰는가
     public static bool UsesDeckName(EOutgameTutorialAction _action) =>
         _action == EOutgameTutorialAction.DeckGrant;
+
+    // 이 액션이 카드 한 장을 쓰는가(지급 대상)
+    public static bool UsesCard(EOutgameTutorialAction _action) =>
+        _action == EOutgameTutorialAction.CardGrant;
 }
