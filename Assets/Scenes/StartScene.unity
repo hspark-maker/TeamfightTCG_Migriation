@@ -259,10 +259,34 @@ PrefabInstance:
       propertyPath: m_Name
       value: LoadingCover
       objectReference: {fileID: 0}
+    - target: {fileID: 1774324519891992026, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_Pivot.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1774324519891992026, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1774324519891992026, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1774324519891992026, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 1328
+      objectReference: {fileID: 0}
+    - target: {fileID: 1774324519891992026, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 2358.8413
+      objectReference: {fileID: 0}
     - target: {fileID: 4378495238760489521, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5461712091178586427, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 84898ae92f1d642488c8403bad7d1c87, type: 3}
     - target: {fileID: 6074598872349822445, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_Pivot.x
       value: 0

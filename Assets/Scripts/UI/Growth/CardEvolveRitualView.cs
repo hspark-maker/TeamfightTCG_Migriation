@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 // 카드 진화 한 번의 연출(CardDetailOverlay 루트에 부착).
 // 재탄생이다 — 카드가 떠오르며 금빛을 머금고(충전), 백열이 카드를 통째로 삼킨 뒤(정적),
-// 그 빛이 천천히 물러나며 새 모습이 드러난다(공개).
+// 하얀 정점에서 화면이 훅 꺼져 카드만 빛나는 실루엣으로 남고(암전), 빛이 돌아오며 새 모습이 드러난다(공개).
 //
 // 담금질(CardEnhanceRitualView)과 **같은 빛의 언어**를 쓴다 — 같은 화면에서 연달아 누르는 두 조작이라
 // 서로 다른 문법이면 같은 시스템으로 안 읽힌다. 갈라지는 것은 색과 어투뿐이다:
@@ -14,6 +15,8 @@ using UnityEngine.UI;
 //    진화는 마디 없이 진폭이 연속으로 커지다 백열이 삼키며 멎는다(안에서 차오르는 압력).
 //  · 잉걸이 아니라 금빛에서 출발한다(색은 shading의 저작값이 정한다).
 //  · 정점에 오래 머물고 빛이 천천히 물러난다. 담금질이 "터진다"면 이쪽은 "드러난다".
+//  · 정점 뒤에 **어둠이 한 번 낀다**(담금질에는 없다). 빛이 가장 셀 때 화면을 꺼 버리면
+//    남는 광원이 카드 하나뿐이라, 그 실루엣이 "여기서 무엇이 바뀌는가"를 손가락질한다.
 //  · 실패의 얼굴이 없다 — 진화 레벨의 성공률은 1이다.
 public class CardEvolveRitualView : CardGrowthRitualView
 {
@@ -41,14 +44,28 @@ public class CardEvolveRitualView : CardGrowthRitualView
     [Range(0f, 1f)] [SerializeField] float overheatStart = 0.45f;               // 충전의 어디서부터 면이 덮이나. 맥동 구간(~58%)을 비워 둬야 그 셋이 보인다
     [Range(0f, 1f)] [SerializeField] float overheatRise  = 0.5f;                // 충전이 끝나는 시점의 잠식률. 1이면 삼켜지는 과정이 안 보인다
 
-    [Header("재탄생 섬광 (선택)")]
-    [Tooltip("빛이 물러나기 시작하는 프레임에 쏜다. 담금질보다 세게 — 진화가 더 큰 사건이라는 것을 화면이 말한다.")]
+    [Header("정점 섬광 (선택)")]
+    [Tooltip("하얀 정점에 쏘는 한 획. 곧바로 암전이 오므로 **짧아야** 한다 —\n" +
+             "  fall이 길면 흰 덮개가 어둠 위에 남아 '훅 꺼졌다'가 '하얗게 페이드'로 바뀐다.\n" +
+             "  덮개가 걷히는 동안 배경은 이미 검다(암전이 그 밑에서 진행된다).")]
     [SerializeField] bool             useScreenFlash = true;
-    [SerializeField] ScreenFlashCover rebirthFlash   = new ScreenFlashCover
+    [SerializeField] ScreenFlashCover peakFlash      = new ScreenFlashCover
     {
-        rise = 0.05f, hold = 0.04f, fall = 0.45f, peak = 0.7f,
-        color = new Color(1f, 0.95f, 0.82f, 1f),
+        rise = 0.05f, hold = 0.03f, fall = 0.10f, peak = 0.85f,
+        color = new Color(1f, 0.96f, 0.88f, 1f),
     };
+
+    [Header("암전 역전 — 정점에서 빛이 훅 빠진다")]
+    [Tooltip("흰 정점에서 어둠까지 걸리는 시간. 0.2를 넘기면 '꺼졌다'가 아니라 '어두워졌다'가 된다.\n" +
+             "  섬광(peakFlash)이 덮고 있는 사이에 대부분이 진행돼야 어둠이 한 프레임에 드러난 것처럼 읽힌다.")]
+    [SerializeField] float blackoutSnap = 0.12f;
+    [Tooltip("암전의 깊이. 배경이 완전히 죽어야 카드가 화면의 유일한 광원이 된다.")]
+    [Range(-1f, 0f)] [SerializeField] float blackoutDim = -1f;
+    [Tooltip("암전에서 실루엣이 금빛으로 내려앉는 정도(0이면 순백 그대로).\n" +
+             "  순백은 형태가 안 읽힌다 — 살짝 온도를 줘야 '빛나는 실루엣'이 되고, 뒤이어 돌아오는 빛과도 갈린다.")]
+    [Range(0f, 1f)] [SerializeField] float silhouetteTint = 0.35f;
+    [Tooltip("암전 동안 후광 알파. 1이면 빛이 빠진 것으로 안 읽히고, 0이면 실루엣이 종이처럼 잘려 보인다.")]
+    [Range(0f, 1f)] [SerializeField] float blackoutHalo = 0.6f;
 
     [Header("표면을 훑는 빛 — 두 줄, 순차")]
     [Tooltip("⚠ 두 줄기는 겹칠 수 없다 — 판(GleamCover)이 한 장이고 축도 하나라, 겹치면 뒷줄기가 앞줄기의 중간 위치에서 출발한다.")]
@@ -83,14 +100,48 @@ public class CardEvolveRitualView : CardGrowthRitualView
     [SerializeField] float enterScale   = 1.02f;                                // 진입의 들숨. 1보다 **커야** 담금질의 움츠림과 갈린다
     [SerializeField] float liftDistance = 22f;                                  // 충전 동안 떠오르는 높이(px). 줄기가 켜질 때마다 세 뼘에 나눠 오른다
     [SerializeField] float blazeScale   = 1.06f;                                // 삼켜지는 동안의 완만한 확대
-    [Tooltip("정적(hold) 후반에 빛이 부푸는 최대 크기. 공개는 여기서 **이어받아** 내려앉는다 —\n" +
-             "  이 크기를 공개 첫 프레임에 대입하면 카드가 팝하듯 튀어나온다(그것이 '픽 등장'의 정체였다).")]
-    [SerializeField] float burstScale   = 1.40f;
-    [SerializeField] float burstSettle  = 0.60f;                                // 내려앉는 시간. 빛이 물러나는 속도와 같아야 '빛이 카드가 되었다'로 읽힌다
-    [Tooltip("부푸는 동안 함께 기울어지는 각도(도). 공개 구간에서 0으로 풀리며 '자리를 잡는다'.")]
-    [SerializeField] float burstTilt    = -3f;
-    [Tooltip("착지가 제 크기 밑으로 지나치는 깊이. 1이면 언더슛 없이 그냥 멎는다 — 무게는 이 한 뼘에서 나온다.")]
-    [Range(0.9f, 1f)] [SerializeField] float settleUndershoot = 0.985f;
+
+    [Header("재탄생 몸짓 — 다가왔다 내려꽂힌다 (회전 없음)")]
+    [Tooltip("암전 동안 부풀어 '다가오는' 크기. 커야 꽂히는 거리가 생긴다 — 1.2 아래면 슬램이 그냥 축소로 보인다.\n" +
+             "\n" +
+             "⚠ 이 구간에 회전을 넣지 말 것. 2D 카드가 기울면 '재탄생'이 아니라 '카드가 비뚤어졌다'로 읽힌다 —\n" +
+             "  임팩트는 전부 '한 프레임에 몰린 동시 사건'에서 나온다(슬램·킥·충격파·방사·섬광).")]
+    [SerializeField] float loomScale = 1.5f;
+    [Tooltip("해방~착지 전체 길이.")]
+    [FormerlySerializedAs("burstSettle")]
+    [SerializeField] float landingDuration = 0.60f;
+    [Tooltip("그 중 **꽂히는** 데 쓰는 비율. 짧을수록 세다 — 0.25를 넘기면 '내려앉았다'가 되어 임팩트가 사라진다.")]
+    [Range(0.05f, 0.35f)] [SerializeField] float slamRatio = 0.16f;
+    [Tooltip("꽂힌 프레임의 납작함(x, y). x>1·y<1이어야 바닥에 부딪힌 것으로 읽힌다.")]
+    [SerializeField] Vector2 impactSquash = new Vector2(1.08f, 0.92f);
+    [Tooltip("되튐 크기(감쇠). 납작함과 반대 부호여야 탄력이 되고, 1에 붙으면 착지가 '멈췄다'가 된다.")]
+    [SerializeField] Vector2 reboundScale = new Vector2(0.98f, 1.02f);
+    [Tooltip("착지 길이 중 되튐에 쓰는 비율. 나머지가 1로 정착하는 데 쓰인다.")]
+    [Range(0.1f, 0.6f)] [SerializeField] float reboundRatio = 0.3f;
+
+    [Header("임팩트 — 꽂히는 한 프레임에 전부 터진다")]
+    [Tooltip("공개 길이(revealDuration) 중 빛이 물러나는 데 쓰는 비율. **여기서 슬램 시각이 나온다** —\n" +
+             "  빛이 다 걷힌 프레임에 카드가 꽂히므로, 크면 어둠 속 공개가 길어지고 작으면 덜 걷힌 채 꽂힌다.")]
+    [Range(0.15f, 0.9f)] [SerializeField] float veilRetreatRatio = 0.3f;
+    [Tooltip("꽂힌 순간 카드가 튀는 진폭(px). 충전의 떨림(tremorAmp)보다 **훨씬 커야** 킥으로 읽힌다.")]
+    [SerializeField] float impactShake = 20f;
+    [Tooltip("킥이 잦아드는 시간. 길면 임팩트가 아니라 '흔들리는 카드'가 된다.")]
+    [SerializeField] float impactDecay = 0.26f;
+    [Tooltip("임팩트에 배경이 되찾는 밝기. 어둠(blackoutDim)에서 여기까지 한 프레임에 뛴 뒤 resultDim으로 가라앉는다.")]
+    [Range(-1f, 1f)] [SerializeField] float impactDim = 0.55f;
+    [Tooltip("충격파로 부푸는 후광 크기. 잔광 크기로 다시 가라앉는다.\n" +
+             "  ⚠ 후광(CardBackGlow)은 cardStage의 **자식**이라 카드 배율을 함께 받는다 —\n" +
+             "    직전까지 카드가 loomScale로 커져 있었으므로, 그 곱(≈1.12×loomScale)보다 넉넉히 커야 파동으로 읽힌다.")]
+    [SerializeField] float shockHaloScale = 2.3f;
+    [Tooltip("밖으로 터지는 빛줄기 길이(저작 길이 대비). 1이면 폭발이 없고 제 길이로만 켜진다.")]
+    [SerializeField] float rayBurstScale = 1.9f;
+    [Tooltip("꽂히는 프레임의 짧은 흰 섬광. 정점 섬광(peakFlash)보다 **약하고 짧아야** 한다 —\n" +
+             "  여기서 화면을 하얗게 덮으면 정작 보여줄 새 모습이 지워진다.")]
+    [SerializeField] ScreenFlashCover impactFlash = new ScreenFlashCover
+    {
+        rise = 0.02f, hold = 0f, fall = 0.16f, peak = 0.42f,
+        color = new Color(1f, 0.97f, 0.9f, 1f),
+    };
 
     [Header("숨 — 태어난 것이 한 번 크게 뛴다")]
     [Tooltip("착지가 끝나고 이만큼 뒤에 뛴다. 0이면 착지에 묻혀 두 사건이 하나로 읽힌다.")]
@@ -125,11 +176,20 @@ public class CardEvolveRitualView : CardGrowthRitualView
     // 공개 뒤 숨 한 번이 결과 구간 안에 들어가도록 확보하는 여유. 없으면 결과판이 뜬 뒤에도 후광이 뛴다.
     const float BreathRoom = 0.2f;
 
-    // 덮개가 물러나는 데 쓰는 공개 구간의 비율. 숨은 그 뒤에 와야 하므로 BeatAt이 같은 값을 본다.
-    const float VeilRetreatSpan = 0.85f;
-
     // 박동 정점에서 표면 열이 잔광 대비 부푸는 배율.
     const float BeatHeatBoost = 1.7f;
+
+    // 꽂히기 직전까지 계속 다가오는 폭(loomScale 대비). 멈춰 있으면 슬램이 정지한 그림에서 출발한다.
+    const float LoomDrift = 1.04f;
+
+    // 충격파가 부푸는 시간. 파동은 커지는 것보다 사그라지는 것이 길어야 읽힌다(그 나머지가 잔광까지의 길이다).
+    const float ShockRise = 0.06f;
+
+    // 임팩트 킥의 잦기(Hz). 충전의 떨림보다 잦아야 '부딪혔다'가 되고, 낮으면 '흔들린다'가 된다.
+    const float ImpactShakeHz = 32f;
+
+    // 꽂히는 프레임에 표면 열이 잔광 대비 튀는 배율(1로 잘린다). 숨의 배율보다 커야 임팩트가 더 큰 사건으로 읽힌다.
+    const float ImpactHeatBoost = 2.4f;
 
     // 숨에 얹히는 축(후광·표면 열·딤)이 그 전에 도착하도록 두는 틈.
     const float LeadGap = 0.02f;
@@ -160,6 +220,10 @@ public class CardEvolveRitualView : CardGrowthRitualView
     float m_lift;
     float m_tremorAmp;
     float m_tremorPhase;
+
+    // 지금 도는 진동의 정점 진폭(px). 충전의 떨림과 임팩트의 킥은 **같은 합성점**을 쓰고 세기만 다르다 —
+    // 축을 따로 두면 두 진동이 각자 anchoredPosition을 밀어 나중 것이 앞의 것을 지운다.
+    float m_shakePeakPx;
 
     protected override bool  HasStage       => this.cardStage != null;
     protected override float ReturnDuration => this.returnDuration;
@@ -195,11 +259,24 @@ public class CardEvolveRitualView : CardGrowthRitualView
                              + Mathf.Max(0f, this.gleamGap) + Mathf.Max(0.05f, this.gleamSweepSlow)
                            : 0f;
 
-    float SettleSpan => Mathf.Max(0.05f, this.burstSettle);
+    float SettleSpan => Mathf.Max(0.05f, this.landingDuration);
+
+    // 덮개가 물러나는 데 쓰는 길이(공개 시작 대비). 숨은 그 뒤에 와야 하므로 BeatAt이 같은 값을 본다.
+    float VeilSpan => Mathf.Max(0.05f, this.revealDuration) * Mathf.Clamp01(this.veilRetreatRatio);
+
+    // 꽂히기 시작하는 자리 = 빛이 다 걷힌 자리. 착지 길이의 절반을 넘지 못한다 —
+    // 넘으면 슬램과 반동이 결과 구간을 밀고 나가 숨과 겹친다.
+    float SlamAt => Mathf.Min(SettleSpan * 0.5f, VeilSpan);
+
+    float SlamSpan => SettleSpan * Mathf.Clamp(this.slamRatio, 0.05f, 0.35f);
+
+    /// <summary>모든 임팩트(킥·충격파·방사·섬광·딤)가 동시에 터지는 한 프레임. 공개 시작 대비.</summary>
+    float ImpactAt => SlamAt + SlamSpan;
 
     // 숨이 시작하는 자리(공개 시작 대비). 착지가 끝나고, 그리고 빛이 다 물러난 뒤여야 한다 —
     // 아직 덮개가 남은 카드가 뛰면 무엇이 뛰는지가 안 읽힌다. 각인도 이 박에 얹힌다.
-    float BeatAt => Mathf.Max(SettleSpan, Mathf.Max(0.05f, this.revealDuration) * VeilRetreatSpan)
+    // 임팩트의 킥이 잦아든 뒤이기도 해야 한다 — 떠는 카드가 그 위에서 뛰면 두 사건이 뭉갠다.
+    float BeatAt => Mathf.Max(Mathf.Max(SettleSpan, VeilSpan), ImpactAt + Mathf.Max(0.05f, this.impactDecay))
                   + Mathf.Max(0f, this.beatDelay);
 
     float BeatSpan => Mathf.Max(0.05f, this.beatRise) + Mathf.Max(0.05f, this.beatFall);
@@ -223,7 +300,7 @@ public class CardEvolveRitualView : CardGrowthRitualView
         if (this.m_tremorAmp > 0f)
         {
             float t_p = this.m_tremorPhase;
-            float t_a = this.m_tremorAmp * this.tremorAmp;
+            float t_a = this.m_tremorAmp * this.m_shakePeakPx;
 
             t_off.x = (Mathf.Sin(t_p)                 * 0.7f + Mathf.Sin(t_p * 2.3f + 0.7f) * 0.3f) * t_a;
             t_off.y = (Mathf.Sin(t_p * 1.37f + 1.1f)  * 0.7f + Mathf.Sin(t_p * 3.1f + 2.2f) * 0.3f) * t_a * 0.75f;
@@ -437,7 +514,11 @@ public class CardEvolveRitualView : CardGrowthRitualView
         float t_fall = _blazeDur * 0.3f;
         float t_span = t_rise + t_hold + t_fall;
 
-        _seq.InsertCallback(t_from, ClearStageAxesButLift);
+        _seq.InsertCallback(t_from, () =>
+        {
+            this.m_shakePeakPx = this.tremorAmp;   // 이 구간의 세기. 임팩트 킥이 같은 합성점을 더 큰 값으로 쓴다
+            ClearStageAxesButLift();
+        });
 
         // 위상은 끊기지 않는 한 줄이다 — 나눠 꽂으면 이음매마다 떨림이 한 번 튄다.
         _seq.Insert(t_from, DOTween.To(() => this.TremorPhase, _v => this.TremorPhase = _v,
@@ -509,7 +590,8 @@ public class CardEvolveRitualView : CardGrowthRitualView
     // 정적. 완전히 덮인 채 머문다 — 이 한 박이 진화의 무게다(담금질은 0.05초만 덮이고 곧 터진다).
     // 값이 바뀌는 것은 이 백지 위에서다. 눈은 숫자도 그림도 바뀌는 과정을 보지 못한다.
     //
-    // 머무는 동안 실루엣이 부푼다 — 공개가 이 크기를 **이어받아** 내려앉아야 카드가 팝하듯 튀지 않는다.
+    // 그리고 이 백지가 **꺼진다**. 하얀 정점에서 배경만 어둠으로 떨어지면 카드가 화면의 유일한 광원으로 남고,
+    // 남은 정적 동안 그 실루엣이 부풀어 다가온다 — 공개는 그 크기를 **이어받아** 제자리로 내려꽂힌다.
     void BuildHold(Sequence _seq, float _at, float _dur)
     {
         // 앞 구간이 짧게 잘려 덜 덮인 채 도착했더라도 여기서 못 박는다.
@@ -522,68 +604,156 @@ public class CardEvolveRitualView : CardGrowthRitualView
         // 늦으면 다 자란 문양이 백열 아래에서 한 프레임 비친다.
         this.emblems.InsertSeed(_seq, _at + BlindRise);
 
-        // 앞 3분의 1은 정적이다 — 곧바로 부풀면 머무는 한 박이 사라진다.
-        float t_swellAt  = _at + _dur * 0.35f;
-        float t_swellDur = Mathf.Max(0.05f, _dur * 0.65f);
-
-        _seq.Insert(t_swellAt, this.cardStage.DOScale(this.burstScale, t_swellDur).SetEase(Ease.InOutSine));
-        _seq.Insert(t_swellAt, this.cardStage.DOLocalRotate(new Vector3(0f, 0f, this.burstTilt), t_swellDur)
-                                   .SetEase(Ease.InOutSine));
+        BuildBlackout(_seq, _at);
+        BuildLoom(_seq, _at, _dur);
     }
 
-    // 공개. 빛이 **물러나며** 새 모습이 드러나고, 부푼 빛이 그대로 카드가 되어 내려앉는다.
-    // 자세는 hold가 데려온 크기·기울기에서 이어받는다 — 여기서 대입하면 그 프레임에 카드가 튄다(팝).
+    // 암전. 섬광이 정점을 한 번 더 밀어 올리고, 그 흰 덮개 **밑에서** 배경이 어둠으로 떨어진다 —
+    // 덮개가 걷히는 프레임에 어둠이 이미 완성돼 있어야 '꺼졌다'가 되고, 그러지 않으면 '어두워졌다'가 된다.
+    void BuildBlackout(Sequence _seq, float _at)
+    {
+        if (this.useScreenFlash && ScreenFlash.TryGet(out ScreenFlash t_flash))
+        {
+            Sequence t_cover = t_flash.BuildCover(this.peakFlash);
+            if (t_cover != null) _seq.Insert(_at, t_cover);
+        }
+
+        float t_snap = Mathf.Max(0.02f, this.blackoutSnap);
+
+        // InQuad — 대부분이 섬광에 덮인 앞쪽에서 천천히 진행되고 마지막에 떨어진다.
+        _seq.Insert(_at, this.dimTint.TweenLevel(this.blackoutDim, t_snap).SetEase(Ease.InQuad));
+
+        // 실루엣도 함께 온도를 얻는다. 순백 그대로면 검은 배경 위에서 형태가 뭉개지고,
+        // 뒤이어 돌아오는 빛과 구분이 안 돼 '다시 밝아졌다'가 사라진다.
+        _seq.Insert(_at, this.shading.TweenBlindColor(this.shading.LightAt(1f - Mathf.Clamp01(this.silhouetteTint)),
+                                                     t_snap));
+
+        // 후광은 죽지 않고 물러난다 — 0으로 내리면 실루엣이 종이처럼 잘려 보인다.
+        _seq.Insert(_at, this.halo.TweenAlpha(this.blackoutHalo, t_snap).SetEase(Ease.OutQuad));
+    }
+
+    // 다가옴. 어둠이 완성된 **뒤에** 부풀기 시작한다 — 암전과 겹치면 두 사건이 한 뭉치로 읽혀 어느 쪽도 안 보인다.
+    // 커지는 것은 꽂힐 거리를 만드는 일이다. 여기서 부풀지 않으면 슬램이 '그냥 작아짐'이 된다.
+    void BuildLoom(Sequence _seq, float _at, float _dur)
+    {
+        float t_from = _at + Mathf.Min(_dur * 0.5f, Mathf.Max(this.blackoutSnap, _dur * 0.35f));
+        float t_span = Mathf.Max(0.05f, _at + _dur - t_from);
+
+        _seq.Insert(t_from, this.cardStage.DOScale(this.loomScale, t_span).SetEase(Ease.OutQuad));
+    }
+
+    // 공개. 어둠 속에서 빛이 **빠르게** 걷혀 새 모습이 드러나고(여기까지가 VeilSpan),
+    // 다가와 있던 그 카드가 곧바로 제자리로 내려꽂힌다. 임팩트는 전부 그 한 프레임(ImpactAt)에 몰린다 —
+    // 킥·충격파·방사 폭발·배경 섬광이 흩어지면 각자 약한 사건 넷이 되고, 겹치면 하나의 큰 사건이 된다.
     //
-    // 빛이 다 걷힌 뒤에야 한 번 크게 뛴다(BuildBeat). 잔광·표면 열·딤은 그 전에 제 자리에 도착해 있어야 한다 —
-    // 같은 축을 두 트윈이 겹쳐 밀면 뒷마디가 앞마디의 중간값에서 출발한다.
+    // 배경은 임팩트까지 어둠을 쥐고 있는다. 빛은 카드가 꽂힐 때 돌아온다.
     void BuildReveal(Sequence _seq, float _at)
     {
-        float t_out  = Mathf.Max(0.05f, this.revealDuration);
-        float t_beat = BeatAt;
-        float t_lead = Mathf.Max(0.05f, t_beat - LeadGap);   // 숨보다 먼저 끝나야 하는 축들의 길이
+        float t_beat   = BeatAt;
+        float t_lead   = Mathf.Max(0.05f, t_beat - LeadGap);   // 숨보다 먼저 끝나야 하는 축들의 길이
+        float t_veil   = VeilSpan;
+        float t_impact = ImpactAt;
 
         BuildLanding(_seq, _at, SettleSpan);
 
         // 본체의 백열은 덮개보다 빨리 죽는다 — 그래야 갉혀 뚫린 자리 아래로 **새 모습**이 보인다.
-        _seq.Insert(_at, this.shading.TweenBlind(0f, t_out * 0.5f).SetEase(Ease.OutQuad));
-        BuildVeilRetreat(_seq, _at, t_out);
+        _seq.Insert(_at, this.shading.TweenBlind(0f, t_veil * 0.6f).SetEase(Ease.OutQuad));
+        BuildVeilRetreat(_seq, _at, t_veil);
 
-        float t_heatAt = _at + t_out * 0.4f;
-        _seq.Insert(t_heatAt, this.shading.TweenHeat(this.afterglowHeat,
-                                                     Mathf.Max(0.05f, _at + t_lead - t_heatAt)).SetEase(Ease.OutQuad));
+        // 표면 열·후광은 꽂히기 **전에** 잔광까지 내려와 있어야 한다 — 임팩트가 거기서 다시 튀기 때문이다.
+        _seq.Insert(_at, this.shading.TweenHeat(this.afterglowHeat, Mathf.Max(0.05f, t_impact)).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenAlpha(this.afterglowAlpha, Mathf.Max(0.05f, t_impact)).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenScale(this.afterglowScale, Mathf.Max(0.05f, t_impact)).SetEase(Ease.OutQuad));
 
-        // 정점의 빛이 배경까지 밝혀 둔 채다. 여기서 가라앉혀야 위에 뜨는 결과판 글자가 읽힌다.
-        _seq.Insert(_at, this.dimTint.TweenLevel(this.resultDim, t_lead).SetEase(Ease.OutQuad));
+        // 빛줄기는 꽂히기 전에 카드로 빨려들어 응축된다 — 그 응축이 임팩트에서 밖으로 터진다.
+        this.rays.InsertRetract(_seq, _at, Mathf.Max(0.1f, t_impact));
 
-        // 후광은 꺼지지 않고 카드 가장자리에 눌러앉는다 — 복귀 구간이 걷어간다.
-        _seq.Insert(_at, this.halo.TweenScale(this.afterglowScale, t_lead).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.halo.TweenAlpha(this.afterglowAlpha, t_lead).SetEase(Ease.OutQuad));
+        BuildImpact(_seq, _at + t_impact, t_lead - t_impact);
 
         BuildBeat(_seq, _at + t_beat);
-
-        this.rays.InsertRetract(_seq, _at);   // 빛이 카드 안으로. 담금질의 불티가 밖으로 흩어지는 자리와 정확히 반대다
-
-        if (this.useScreenFlash && ScreenFlash.TryGet(out ScreenFlash t_flash))
-        {
-            Sequence t_cover = t_flash.BuildCover(this.rebirthFlash);
-            if (t_cover != null) _seq.Insert(_at, t_cover);
-        }
-
         BuildGleam(_seq, _at);
     }
 
-    // 착지. 제 크기 밑을 한 뼘 지나쳤다 올라온다 — 곧장 1에서 멎으면 '내려앉았다'가 아니라 '멈췄다'가 된다.
-    // 자리·각도는 한 마디로 푼다(빛이 물러나는 속도와 같아야 "빛이 카드가 되었다"가 유지된다).
+    // 착지. 다가오던 카드가 제자리로 꽂히고(슬램), 한 번 되튀었다가 제 크기에 정착한다.
+    // 마디는 이어 붙는다 — 겹치면 뒷마디가 앞마디의 중간 크기에서 출발해 임팩트가 뭉개진다.
+    //
+    // 회전은 걸지 않는다. 2D 카드가 기울면 재탄생이 아니라 '비뚤어진 카드'로 읽힌다 —
+    // 자세의 각도는 이 연출 전체에서 언제나 0이고(RestoreVisual·BuildEnter가 그것을 보장한다) 여기서 되돌릴 것이 없다.
     void BuildLanding(Sequence _seq, float _at, float _settle)
     {
-        float t_drop = _settle * 0.72f;
+        float t_slamAt = SlamAt;
+        float t_slam   = SlamSpan;
 
-        _seq.Insert(_at, this.cardStage.DOScale(this.settleUndershoot, t_drop).SetEase(Ease.OutCubic));
-        _seq.Insert(_at + t_drop, this.cardStage.DOScale(1f, _settle - t_drop).SetEase(Ease.InOutSine));
+        // 되튐·정착은 슬램이 끝난 뒤 남는 자리에서 나눠 쓴다 — 넘치면 숨(BuildBeat)이 그 위를 덮친다.
+        float t_room    = Mathf.Max(0.1f, _settle - t_slamAt - t_slam);
+        float t_rebound = Mathf.Min(_settle * Mathf.Clamp(this.reboundRatio, 0.1f, 0.6f), t_room * 0.6f);
+        float t_rest    = Mathf.Max(0.05f, t_room - t_rebound);
 
-        _seq.Insert(_at, this.cardStage.DOAnchorPos(this.m_baseAnchored, _settle).SetEase(Ease.OutQuad));
-        _seq.Insert(_at, this.cardStage.DOLocalRotate(Vector3.zero, _settle).SetEase(Ease.OutQuad));
+        // 다가오는 압력은 꽂히기 직전까지 이어진다 — 멈춰 있으면 슬램이 정지한 그림에서 출발한다.
+        if (t_slamAt > 0.02f)
+            _seq.Insert(_at, this.cardStage.DOScale(this.loomScale * LoomDrift, t_slamAt).SetEase(Ease.InOutSine));
+
+        // 슬램. **끝에서 가속**해야 꽂힌 것이 된다 — OutQuad면 미끄러져 앉는다.
+        _seq.Insert(_at + t_slamAt, this.cardStage.DOScale(Flat(this.impactSquash), t_slam).SetEase(Ease.InCubic));
+        _seq.Insert(_at + t_slamAt + t_slam,
+                    this.cardStage.DOScale(Flat(this.reboundScale), t_rebound).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + t_slamAt + t_slam + t_rebound,
+                    this.cardStage.DOScale(1f, t_rest).SetEase(Ease.InOutSine));
+
+        // 자리는 꽂히는 프레임에 정확히 제자리여야 한다 — 그 뒤로는 킥(ApplyStagePose)이 자세를 소유하므로
+        // 이 트윈이 살아 있으면 둘이 같은 anchoredPosition을 두고 싸운다.
+        _seq.Insert(_at, this.cardStage.DOAnchorPos(this.m_baseAnchored, Mathf.Max(0.05f, t_slamAt + t_slam))
+                             .SetEase(Ease.InQuad));
     }
+
+    // 임팩트. 다섯 가지가 같은 프레임에서 터진다 — 킥(카드가 튄다), 충격파(후광이 밖으로 부푼다),
+    // 방사(빛줄기가 응축을 풀고 뻗는다), 표면 열, 배경(어둠에서 빛으로 + 짧은 섬광).
+    // _tail은 숨이 시작하기 전까지 남은 길이다. 사그라지는 것은 전부 이 안에서 끝난다.
+    void BuildImpact(Sequence _seq, float _at, float _tail)
+    {
+        float t_settle = Mathf.Max(0.05f, _tail - ShockRise);
+        float t_decay  = Mathf.Max(0.05f, this.impactDecay);
+
+        // 킥. 부양을 여기서 0으로 내린다 — 자세를 킥이 소유하는 순간부터 남은 높이가 그대로 오프셋이 된다.
+        _seq.InsertCallback(_at, () =>
+        {
+            this.m_lift        = 0f;
+            this.m_shakePeakPx = this.impactShake;
+            this.m_tremorPhase = 0f;
+            this.TremorAmp     = 1f;   // 정점에서 시작해 잦아든다(충전의 떨림과 반대 방향의 봉투다)
+        });
+
+        _seq.Insert(_at, DOTween.To(() => this.TremorPhase, _v => this.TremorPhase = _v,
+                                    t_decay * ImpactShakeHz * Mathf.PI * 2f, t_decay).SetEase(Ease.Linear));
+        _seq.Insert(_at, TweenTremorAmp(0f, t_decay).SetEase(Ease.OutCubic));
+        _seq.InsertCallback(_at + t_decay, () => { this.TremorAmp = 0f; ApplyStagePose(); });
+
+        // 충격파. 부푸는 것은 순간이고 사그라지는 것이 길다 — 반대면 파동이 아니라 후광이 커진 것으로 보인다.
+        _seq.Insert(_at, this.halo.TweenAlpha(1f, ShockRise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.halo.TweenScale(this.shockHaloScale, ShockRise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + ShockRise, this.halo.TweenAlpha(this.afterglowAlpha, t_settle).SetEase(Ease.InQuad));
+        _seq.Insert(_at + ShockRise, this.halo.TweenScale(this.afterglowScale, t_settle).SetEase(Ease.OutQuad));
+
+        this.rays.InsertBurst(_seq, _at, ShockRise + t_settle, this.rayBurstScale);
+
+        _seq.Insert(_at, this.shading.TweenHeat(Mathf.Min(1f, this.afterglowHeat * ImpactHeatBoost), ShockRise)
+                             .SetEase(Ease.OutQuad));
+        _seq.Insert(_at + ShockRise, this.shading.TweenHeat(this.afterglowHeat, t_settle).SetEase(Ease.InOutSine));
+
+        // 빛이 돌아온다. 어둠에서 한 프레임에 뛰어야 '터졌다'가 된다 — 천천히 오르면 그냥 조명이 켜진 것이다.
+        _seq.Insert(_at, this.dimTint.TweenLevel(this.impactDim, ShockRise).SetEase(Ease.OutQuad));
+        _seq.Insert(_at + ShockRise, this.dimTint.TweenLevel(this.resultDim, t_settle).SetEase(Ease.OutQuad));
+
+        if (this.useScreenFlash && ScreenFlash.TryGet(out ScreenFlash t_flash))
+        {
+            Sequence t_cover = t_flash.BuildCover(this.impactFlash);
+            if (t_cover != null) _seq.Insert(_at, t_cover);
+        }
+    }
+
+    // 스쿼시 축을 무대 배율로. z는 언제나 1이다 — uGUI에서 z 배율은 보이는 것이 없고,
+    // 앞 구간이 남긴 z(균일 확대의 잔재)가 그대로 굳는 것만 막는다.
+    static Vector3 Flat(Vector2 _s) => new Vector3(_s.x, _s.y, 1f);
 
     // 숨. 갓 태어난 것이 한 번 크게 뛰고, 그 박동에 새 문양이 새겨진다.
     // 고정된 잔광은 배경 그림으로 보인다 — 이 한 박이 카드를 살아 있게 만들고, 진화의 마지막 획이 된다.
@@ -612,15 +782,16 @@ public class CardEvolveRitualView : CardGrowthRitualView
     }
 
     // 덮개가 물러나는 방식. 갉아 없애면 빛이 면을 따라 물러나고, 알파로 내리면 그냥 투명해진다.
-    void BuildVeilRetreat(Sequence _seq, float _at, float _out)
+    // _span은 다 걷히기까지의 길이다 — 이 끝이 곧 카드가 꽂히는 자리(ImpactAt)라, 늘리면 슬램도 함께 밀린다.
+    void BuildVeilRetreat(Sequence _seq, float _at, float _span)
     {
+        float t_sweep = Mathf.Max(0.05f, _span);
+
         if (!this.shading.CanSnuff)
         {
-            _seq.Insert(_at, this.shading.TweenCover(0f, _out * 0.7f).SetEase(Ease.OutQuad));
+            _seq.Insert(_at, this.shading.TweenCover(0f, t_sweep).SetEase(Ease.OutQuad));
             return;
         }
-
-        float t_sweep = _out * VeilRetreatSpan;
 
         // 알파(Cover)는 1로 붙들어 둔다 — 셰이더의 번짐 테두리는 Cover에 스케일되지 않아 알파를 내려도 얼룩이 남는다.
         _seq.Insert(_at, this.shading.TweenSnuff(1f, t_sweep).SetEase(Ease.InOutQuad));

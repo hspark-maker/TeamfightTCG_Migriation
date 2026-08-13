@@ -47,11 +47,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [Header("배치")]
     [Tooltip("Hand 기준점을 놓을 위치 = 타깃 중앙 + 이 값. 손끝 방향·각도는 프리팹의 HandIcon(자식)에서 저작하고, " +
              "여기서는 그 손끝이 타깃 중앙에 닿도록 기준점만 밀어 준다(코드는 손 크기·각도를 보정하지 않는다)")]
-    [SerializeField] Vector2 handOffset    = Vector2.zero;
-    [Tooltip("타깃과 문구 사이 간격")]
-    [SerializeField] float   messageMargin = 36f;
-    [Tooltip("문구 전용 모드(타깃 없음)의 하단 여백")]
-    [SerializeField] float   messageBottom = 220f;
+    [SerializeField] Vector2 handOffset = Vector2.zero;
 
     [Header("포인터 연출")]
     [SerializeField] float pulseScale    = 1.08f;
@@ -73,6 +69,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
     bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
+    Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(판을 끌 때 알파 0으로 내렸다가 되돌린다)
 
     // 승격 상태. 원래 컴포넌트를 지우지 않도록 "내가 붙였는지"와 원래 정렬값을 함께 들고 있는다.
     // 카드 단위 승격(CollectHighlights) 때문에 여러 개가 동시에 올라간다.
@@ -153,7 +150,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetDim(_dim);
+        SetBlocker(_dim);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
@@ -176,13 +173,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (string.IsNullOrEmpty(_message)) { HideGate(); return; }
 
-        SetDim(false);
+        SetBlocker(false);
         SetPointerActive(false);
         SetMessage(_message);
-
-        if (this.messageRect != null)
-            this.messageRect.anchoredPosition =
-                new Vector2(0f, m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottom);
 
         m_gateRoot.SetActive(true);
     }
@@ -206,7 +199,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         ArmBlockerClick();
 
-        SetDim(true);
+        SetBlocker(true);
         SetMessage(_message);
 
         if (m_armed)
@@ -215,12 +208,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
             return;
         }
 
-        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 하단에 고정(ShowBanner와 같은 배치).
+        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 띄운다(위치는 SetMessage가 화면 중앙으로 고정).
         SetPointerActive(false);
-
-        if (this.messageRect != null)
-            this.messageRect.anchoredPosition =
-                new Vector2(0f, m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottom);
 
         m_gateRoot.SetActive(true);
     }
@@ -254,6 +243,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (this.blocker == null) BuildFallbackUI();   // 프리팹 참조 미배선 = 코드 빌드 폴백
 
+        CacheDimColor();
         CacheRoots();
         CacheBlockerButton();  // blocker가 확정된 뒤여야 한다(폴백 경로도 여기서 함께 처리된다)
         LiftOrnaments();       // 승격된 타깃(351)에 안내가 덮이지 않도록 352로 올린다
@@ -363,24 +353,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
             this.hand.anchoredPosition = t_center + this.handOffset;
-
-        PlaceMessage(t_full, t_min.y, t_max.y);
-    }
-
-    // 타깃을 가리지 않는 쪽에 문구를 둔다 — 타깃이 화면 위쪽이면 아래, 아래쪽이면 위.
-    // 고정 위치로 두면 하단바 탭 스텝에서 문구가 타깃과 겹치고, 타깃이 문구 위로 승격돼 깨진 것처럼 보인다.
-    void PlaceMessage(Rect _full, float _targetYMin, float _targetYMax)
-    {
-        if (this.messageRect == null || !this.messageRect.gameObject.activeSelf) return;
-
-        float t_half   = this.messageRect.sizeDelta.y * 0.5f;
-        float t_center = (_targetYMin + _targetYMax) * 0.5f;
-        float t_y = t_center > 0f
-            ? _targetYMin - this.messageMargin - t_half
-            : _targetYMax + this.messageMargin + t_half;
-
-        t_y = Mathf.Clamp(t_y, _full.yMin + t_half + this.messageMargin, _full.yMax - t_half - this.messageMargin);
-        this.messageRect.anchoredPosition = new Vector2(0f, t_y);
     }
 
     // ── 타깃 승격 ────────────────────────────────────────────────────────────
@@ -502,13 +474,15 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // ── 표시 토글 ────────────────────────────────────────────────────────────
 
     // 딤은 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
+    // 색까지 투명으로 내리는 이유: 컴포넌트만 꺼 두면 무언가 다시 켜는 순간 어두운 판이 그대로 돌아온다.
     // 주의: 딤이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
-    void SetDim(bool _on)
+    void SetBlocker(bool _on)
     {
         if (this.blocker == null) return;
 
         this.blocker.enabled       = _on;
         this.blocker.raycastTarget = _on;
+        this.blocker.color         = _on ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
     }
 
     void SetPointerActive(bool _on)
@@ -521,11 +495,17 @@ public class OutgameTutorialGateUI : MonoBehaviour
         else        StopPulse();
     }
 
+    // 문구는 모드·타깃과 무관하게 화면 중앙 한 자리에 둔다(읽는 자리가 스텝마다 옮겨 다니지 않게).
     void SetMessage(string _message)
     {
         bool t_has = !string.IsNullOrEmpty(_message);
 
-        if (this.messageRect != null) this.messageRect.gameObject.SetActive(t_has);
+        if (this.messageRect != null)
+        {
+            this.messageRect.gameObject.SetActive(t_has);
+            this.messageRect.anchoredPosition = Vector2.zero;
+        }
+
         if (t_has && this.messageText != null) this.messageText.text = _message;
     }
 
@@ -600,6 +580,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     // ── 초기화 ──────────────────────────────────────────────────────────────
+
+    // 딤 색의 정본은 프리팹 저작값이다 — 끌 때 알파를 0으로 덮으므로 원본을 여기서 한 번 떠 둔다.
+    void CacheDimColor()
+    {
+        if (this.blocker == null) return;
+
+        m_dimColor = this.blocker.color;
+    }
 
     void CacheRoots()
     {

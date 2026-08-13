@@ -32,7 +32,7 @@ public class TutorialStepDef
            + "None인 위젯은 잠글 대상이 없어 아무 일도 일어나지 않는다")]
     [SerializeField] List<EOutgameFeature> locks = new List<EOutgameFeature>();
 
-    [Tooltip("타깃 외 입력을 딤으로 막을지. 잠금만으로 흐름이 잡히는 스텝은 꺼서 화면을 어둡게 하지 않는다")]
+    [Tooltip("타깃 외 입력을 딤으로 막을지. 끄면 화면이 어두워지지 않고 입력도 막지 않는다(차단은 아래 locks가 맡는다)")]
     [SerializeField] bool useDim = true;
 
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
