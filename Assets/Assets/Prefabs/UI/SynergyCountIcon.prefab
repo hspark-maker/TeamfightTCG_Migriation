@@ -225,7 +225,6 @@ GameObject:
   - component: {fileID: 4276499517248210391}
   - component: {fileID: 2965770518125349753}
   - component: {fileID: 643733420555183928}
-  - component: {fileID: 2543110982229174920}
   m_Layer: 0
   m_Name: SynergyCountIcon
   m_TagString: Untagged
@@ -293,14 +292,6 @@ MonoBehaviour:
   inactiveAlpha: 0.45
   longPressSeconds: 0.3
   cancelDragPixels: 20
---- !u!222 &2543110982229174920
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7994518963679795016}
-  m_CullTransparentMesh: 1
 --- !u!222 &4276499517248210390
 CanvasRenderer:
   m_ObjectHideFlags: 0

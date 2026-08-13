@@ -34,7 +34,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 5
-    prefab: {fileID: 547462986702723620, guid: b990e46b2c253724bbcfd2805f3b8973, type: 3}
+    prefab: {fileID: 227207458835192764, guid: b990e46b2c253724bbcfd2805f3b8973, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 2
@@ -74,7 +74,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 8
-    prefab: {fileID: 153968, guid: d81a1d73a005a62488013e966f8ea4be, type: 3}
+    prefab: {fileID: 2129740873354057291, guid: 6f0ba736d21c3ce48ba3fd1adbad747a, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
@@ -94,7 +94,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 10
-    prefab: {fileID: 1486123758399518, guid: 1344ad10518c5d247a56bae970391c87, type: 3}
+    prefab: {fileID: 5320869421729719446, guid: 438f5c1f174e5e547833bc0fccc23818, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
@@ -134,7 +134,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 4
-    prefab: {fileID: 7820321437265073688, guid: 03710823b1ef7ff4fbb331b2bba03199, type: 3}
+    prefab: {fileID: 2590653333717155793, guid: 03710823b1ef7ff4fbb331b2bba03199, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
@@ -144,7 +144,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 17
-    prefab: {fileID: 2514253928702531489, guid: 408782a724d09aa469c4b861e2918996, type: 3}
+    prefab: {fileID: 6566167575339027792, guid: 27858caa88e70bb46af5c5fe002aba3d, type: 3}
     localOffset: {x: 0, y: 0.6, z: -0.5}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 0

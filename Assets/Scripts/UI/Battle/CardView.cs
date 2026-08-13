@@ -445,7 +445,34 @@ public class CardView : MonoBehaviour
     // 무장 이펙트는 여기 얹지 않는다 — ResolveHits가 접촉 직후 FocusWeapon(false)를 부르기 때문에
     // 같이 묶으면 반동이 끝나기도 전에 이펙트가 꺼진다. 무장/해제 시점에서 SetArmedVfx를 직접 부른다.
     // TODO: 호출부 이관 후 삭제
-    public void FocusWeapon(bool _active) => WeaponView.Focus(_active);
+    public void FocusWeapon(bool _active)
+    {
+        // 무기 애니메이션은 프레임에 얹힌 장식(WeaponAnimSpec)이 소유한다 — 무장에서 당기고 해제에서 되돌린다.
+        // CardData.weaponPrefab으로 무기를 따로 띄우던 경로(CardWeaponView)는 더 이상 타지 않는다:
+        // 그 프리팹을 가진 카드가 하나도 없고, 두 경로가 같은 신호를 나눠 가지면 어느 쪽이 그렸는지 흐려진다.
+        if (FrameWeaponAnim == null)
+            Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': WeaponAnimSpec 없음", this);
+        else if (_active) FrameWeaponAnim.Draw();
+        else              FrameWeaponAnim.ResetToIdle();
+    }
+
+    // 프레임 장식의 애니메이션(원거리 활 등). 키워드 프레임이라 꺼져 있을 수 있어 비활성 포함으로 찾는다.
+    // 없는 카드가 정상이므로 못 찾아도 조용하다 — 한 번 찾고 결과를 기억한다(매 무장마다 훑지 않게).
+    WeaponAnimSpec frameWeaponAnim;
+    bool           frameWeaponAnimSearched;
+
+    WeaponAnimSpec FrameWeaponAnim
+    {
+        get
+        {
+            if (!this.frameWeaponAnimSearched)
+            {
+                this.frameWeaponAnimSearched = true;
+                this.frameWeaponAnim = GetComponentInChildren<WeaponAnimSpec>(true);
+            }
+            return this.frameWeaponAnim;
+        }
+    }
 
     /// <summary>무장(포커스) 이펙트 토글. 카드 자식으로 붙어 공격 이동/기울기를 그대로 따라간다.
     /// 켜지는 시점 = 무장(FocusWeapon(true)), 꺼지는 시점 = 적에 닿는 순간(AttackSequence가 false로 호출).
@@ -967,7 +994,13 @@ public class CardView : MonoBehaviour
     }
 
     // TODO: 호출부 이관 후 삭제
-    public void PlayAttackAnim() => WeaponView.PlayAttackAnim(this.boundCard);
+    public void PlayAttackAnim()
+    {
+        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 weaponPrefab 경로의 배선)에 기대지 않는다 —
+        // 어느 상태를 트는지는 그 장식의 WeaponAnimSpec이 스스로 안다.
+        if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': WeaponAnimSpec 없음", this);
+        else                         FrameWeaponAnim.Fire();
+    }
 
 #endregion
 

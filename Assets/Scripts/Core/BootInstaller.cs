@@ -24,6 +24,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardPackData starterDeck;
     // 카드 강화·진화 튜닝 SO. 미배선(null)이면 CardGrowthManager가 코드 기본식·기본 게이트로 동작한다.
     [SerializeField] CardGrowthConfig growthConfig;
+    // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
+    [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
 
     static bool s_booted;
 
@@ -64,6 +66,8 @@ public class BootInstaller : MonoBehaviour
         CollectionProductionManager.Init();
 
         // 카드 성장 캐싱 — 세이브(DataSaveManager.Load)만 읽어 순서 무관하나, 곡선 조회가 Config를 쓰므로 주입이 먼저다.
+        KeywordGrowthManager.SetConfig(keywordGrowthConfig);
+        KeywordGrowthManager.Init();
         CardGrowthManager.SetConfig(growthConfig);
         CardGrowthManager.Init();
 

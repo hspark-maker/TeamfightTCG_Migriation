@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>덱의 전투 참여 가능 시너지를 현재/다음 티어 진행도와 함께 표시한다.</summary>
 public class DeckSynergyStrip : MonoBehaviour
@@ -21,6 +22,13 @@ public class DeckSynergyStrip : MonoBehaviour
 
     // 내가 연 popup이 떠 있는 동안만 true. 안 연 채로 닫으면 남의 popup을 대신 지운다.
     bool m_explainOpen;
+
+    // 설명창이 떠 있는 동안 잠근 스크롤과 그 원래 축 설정.
+    // 아이콘은 IDragHandler를 구현하지 않으므로(부모 스크롤을 죽이지 않으려고) 롱프레스가 발화한 뒤에도
+    // 손가락 이동이 그대로 부모 ScrollRect의 드래그로 흘러간다 — 설명창을 띄운 채 화면이 스와이프된다.
+    ScrollRect m_lockedScroll;
+    bool       m_scrollWasVertical;
+    bool       m_scrollWasHorizontal;
 
     void Awake()
     {
@@ -90,6 +98,7 @@ public class DeckSynergyStrip : MonoBehaviour
         });
 
         this.m_explainOpen = true;
+        LockScroll(true);
         this.onFocusChanged?.Invoke(_icon.Progress.Synergy);
     }
 
@@ -99,7 +108,41 @@ public class DeckSynergyStrip : MonoBehaviour
         if (!this.m_explainOpen) return;
 
         this.m_explainOpen = false;
+        LockScroll(false);
         UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
         this.onFocusChanged?.Invoke(null);
+    }
+
+    // 스크롤 자체를 비활성(enabled=false)하지 않는다 — 드래그 도중 꺼지면 ScrollRect가 OnEndDrag를 못 받아
+    // 내부 드래그 상태가 켜진 채 남고, 다음 터치에서 관성이 튄다. 축만 닫으면 이벤트는 정상적으로 끝난다.
+    // 원래 값을 기억했다 되돌린다 — true로 되돌리면 가로 스크롤이 없던 목록에 없던 축이 생긴다.
+    void LockScroll(bool _on)
+    {
+        if (_on)
+        {
+            if (this.m_lockedScroll != null) return;   // 이미 잠갔다(원래 값을 덮어쓰면 복구 불능)
+
+            ScrollRect t_scroll = GetComponentInParent<ScrollRect>(true);
+            if (t_scroll == null) return;
+
+            this.m_lockedScroll        = t_scroll;
+            this.m_scrollWasVertical   = t_scroll.vertical;
+            this.m_scrollWasHorizontal = t_scroll.horizontal;
+
+            t_scroll.StopMovement();          // 이미 굴러가던 관성은 여기서 끊는다
+            t_scroll.velocity   = Vector2.zero;
+            t_scroll.vertical   = false;
+            t_scroll.horizontal = false;
+
+            return;
+        }
+
+        if (this.m_lockedScroll == null) return;
+
+        this.m_lockedScroll.StopMovement();   // 잠긴 동안 쌓인 이동량이 풀리는 순간 튀지 않게
+        this.m_lockedScroll.velocity   = Vector2.zero;
+        this.m_lockedScroll.vertical   = this.m_scrollWasVertical;
+        this.m_lockedScroll.horizontal = this.m_scrollWasHorizontal;
+        this.m_lockedScroll            = null;
     }
 }
