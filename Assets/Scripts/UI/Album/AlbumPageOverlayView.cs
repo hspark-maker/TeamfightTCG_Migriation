@@ -9,6 +9,10 @@ using UnityEngine.UI;
 public class AlbumPageOverlayView : MonoBehaviour
 {
     [Header("닫기")]
+    [Tooltip("바깥을 눌러 닫는 딤판. **이 버튼이 딤판 그 자체**여야 한다 — 닫기 판정만 맡는 투명 버튼이면 안 된다.\n" +
+             "삽입 연출 중 SetFrontmost가 이 rect를 화면 끝까지 늘려 상단바·탭바까지 덮게 하므로,\n" +
+             "판정과 그림이 갈리면 늘어나는 것과 어두워지는 것이 서로 다른 오브젝트가 된다.\n\n" +
+             "⚠ Transition은 None으로 저작한다 — ColorTint면 잠금 시 상태색이 곱해져 딤이 옅어진다(ApplyInteractable 참고).")]
     [SerializeField] Button dimButton;
     [SerializeField] Button closeButton;
 
@@ -44,6 +48,16 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("임계 미달로 손을 뗐을 때 제자리로 돌아오는 시간.")]
     [SerializeField] float dragReturnDuration = 0.16f;
 
+    [Header("삽입 연출 — 로비 셸 위로 올라서기")]
+    [Tooltip("이 오버레이는 탭 콘텐츠 안에 있어 평소엔 상단바·탭바 아래에 그려지고, 딤도 콘텐츠 영역까지만 덮는다.\n" +
+             "삽입 연출 동안만 이 order로 셸 위에 올라서서 딤 한 장이 화면 전체를 덮게 한다(SetFrontmost).\n" +
+             "로비 UI 중 정렬을 덮어쓰는 것은 여기뿐이라 값끼리 다툴 상대가 없다 — 양수면 된다.")]
+    [SerializeField] int frontSortingOrder = 100;
+
+    [Tooltip("올라선 동안 Dim이 콘텐츠 경계 밖으로 뻗는 여유(px). 상단바 180 / 하단바 220을 넘기기만 하면 되고,\n" +
+             "잘라내는 마스크가 없어 넉넉해도 손해가 없다. 기기별 안전영역 차이까지 삼키라고 크게 잡는다.")]
+    [SerializeField] float frontDimOverflow = 1000f;
+
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
     [SerializeField] AlbumPageFlipView pageFlip = new AlbumPageFlipView();
@@ -64,6 +78,11 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     // 삽입 세션이 켜는 잠금 — 탈출로를 세션의 건너뛰기 하나로 좁힌다
     bool m_sessionLocked;
+    // 셸 위로 올라설 때 얻는 캔버스와, 그때 늘렸다 되돌릴 딤의 원래 여백
+    Canvas  m_frontCanvas;
+    bool    m_dimStretched;
+    Vector2 m_dimOffsetMin;
+    Vector2 m_dimOffsetMax;
     // 넘김 한 번 동안만. 세션과 bool을 공유하면 넘김이 끝날 때 세션 잠금까지 같이 풀린다
     bool m_flipLocked;
     bool m_flipping;
@@ -90,6 +109,9 @@ public class AlbumPageOverlayView : MonoBehaviour
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
     bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
+
+    // 딤판의 rect. 닫기 버튼과 같은 오브젝트라는 저작 규약을 여기 한 곳에서만 읽는다(dimButton 툴팁 참고).
+    RectTransform DimRect => dimButton != null ? dimButton.transform as RectTransform : null;
 
     public int PageIndex => m_pageIndex;
 
@@ -147,6 +169,52 @@ public class AlbumPageOverlayView : MonoBehaviour
         ApplyInteractable();
     }
 
+    /// <summary>삽입 연출 동안 이 오버레이를 로비 셸(상단바·탭바) 위로 올리고, 딤을 화면 끝까지 늘린다.
+    /// 딤 한 장이 화면 전체를 덮으므로 셸은 어두워진 채 제자리에 남고(걷지 않는다) 입력도 이 딤이 받는다.
+    /// 카드·프레임은 같은 캔버스 안이라 함께 올라가 딤 위에 그려진다.
+    /// ⚠ 자리(계층)는 건드리지 않는다 — 옮기면 rect가 바뀌어 프레임과 격자가 딸려 움직인다.</summary>
+    public void SetFrontmost(bool _front)
+    {
+        RectTransform t_dim = this.DimRect;
+
+        if (_front)
+        {
+            if (m_frontCanvas == null)
+            {
+                m_frontCanvas = gameObject.GetComponent<Canvas>();
+                if (m_frontCanvas == null) m_frontCanvas = gameObject.AddComponent<Canvas>();
+
+                // 정렬을 덮어쓴 캔버스는 자기 레이캐스터가 있어야 입력도 그 순서를 따른다 —
+                // 없으면 그림만 위로 오고 클릭은 아래 셸이 먼저 먹는다.
+                if (gameObject.GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+            }
+
+            m_frontCanvas.overrideSorting = true;
+            m_frontCanvas.sortingOrder    = frontSortingOrder;
+
+            if (t_dim != null && !m_dimStretched)
+            {
+                m_dimStretched = true;
+                m_dimOffsetMin = t_dim.offsetMin;
+                m_dimOffsetMax = t_dim.offsetMax;
+                t_dim.offsetMin = m_dimOffsetMin - new Vector2(0f, frontDimOverflow);
+                t_dim.offsetMax = m_dimOffsetMax + new Vector2(0f, frontDimOverflow);
+            }
+
+            return;
+        }
+
+        if (m_frontCanvas != null) m_frontCanvas.overrideSorting = false;
+
+        // 늘려둔 딤은 반드시 되돌린다 — 남으면 평소 도감 오버레이가 상단바·탭바까지 덮는다
+        if (t_dim != null && m_dimStretched)
+        {
+            m_dimStretched  = false;
+            t_dim.offsetMin = m_dimOffsetMin;
+            t_dim.offsetMax = m_dimOffsetMax;
+        }
+    }
+
     void SetFlipLocked(bool _locked)
     {
         m_flipLocked = _locked;
@@ -158,6 +226,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 색으로 잠긴 티를 내는 건 **세션 잠금**뿐이다. 넘김 잠금은 0.3초짜리라 Button의 Color Tint가
         // 켜졌다 꺼지는 것이 "dim이 풀렸다 돌아온다 / 칸이 깜빡인다"로 보인다.
         // 짧은 잠금은 색을 건드리지 않고 눌렀을 때 걸러낸다(HandleCloseRequest·HandleStepRequest).
+        //
+        // ⚠ Dim 버튼만은 **Transition을 None으로 저작**해야 한다. 딤판의 실제 색은
+        //   Image.color × 버튼 상태색이라, ColorTint면 여기서 끄는 순간 disabledColor(알파 0.5)가 곱해져
+        //   딤이 반쯤 옅어진다 — Image 알파를 아무리 올려도 그 절반에서 막힌다.
         bool t_dimmed = m_sessionLocked;
 
         if (dimButton != null) dimButton.interactable = !t_dimmed;
@@ -244,6 +316,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 안전망 — 세션 없이 위장만 남으면 카드가 영영 빈 칸으로 보인다
         if (!AlbumInsertSession.IsRunning) AlbumInsertMask.Clear();
+
+        // 셸 위로 올라선 채 꺼지면 다음에 열릴 때 늘어난 딤을 그대로 안고 열린다
+        SetFrontmost(false);
 
         // 탭 전환 등으로 넘김 도중에 꺼지면 종이가 세워진 채 굳는다
         CancelFlip();

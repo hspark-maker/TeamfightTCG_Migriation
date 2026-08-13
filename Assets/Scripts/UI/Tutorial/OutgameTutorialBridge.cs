@@ -131,6 +131,15 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
+        // 카드 획득 연출이 무대를 쥐고 있는 구간이다 — 랭크 승급과 같은 이유로 그리지 않고 기다린다
+        // (딤이 날아가는 카드를 덮는다).
+        if (m_step.Completion == EOutgameTutorialCompletion.CardGain)
+        {
+            // 놓아줄 디렉터가 이 씬에 없으면 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
+            if (!LobbyGainEffectDirector.Exists) OnGateSatisfied();
+            return;
+        }
+
         // 유저가 열어 둔 오버레이를 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
         // 이미 로비 표면이면 기다릴 것이 없다(뒤이을 안내를 한 프레임도 미루지 않는다).
         if (m_step.Completion == EOutgameTutorialCompletion.LobbyReturn)
@@ -261,14 +270,27 @@ public class OutgameTutorialBridge : MonoBehaviour
         OnGateSatisfied();
     }
 
-    // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
+    // 로비 탭 화면이 그대로 보이는가(도감·보상이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()
-        => !CardDetailOverlayView.IsOpen && !AlbumPageOverlayView.IsOpen;
+        => !CardDetailOverlayView.IsOpen && !AlbumPageOverlayView.IsOpen && !CardRewardOverlay.IsOpen;
 
     // 랭크 연출 종료 신호. 보여줄 것이 없어 지나간 경우도 같은 신호로 온다.
     void OnRankEffectFinished()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.RankEffect) return;
+
+        OnGateSatisfied();
+    }
+
+    // 획득 연출 종료 신호. 실을 것이 없어 지나간 경우도 같은 신호로 온다.
+    //
+    // 보상 화면이 떠 있는 동안 오는 신호는 이 스텝의 것이 아니다 — 전투에서 돌아온 로비는 골드 획득 연출을
+    // 스스로 재생하는데, 그 종료를 완료로 받으면 유저가 [획득]을 누르기도 전에 다음 안내가 화면 밑에 깔린다.
+    // 지급이 트는 연출은 화면을 먼저 닫고 시작하므로 이 가드에 걸리지 않는다.
+    void OnCardGainFinished()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.CardGain) return;
+        if (CardRewardOverlay.IsOpen) return;
 
         OnGateSatisfied();
     }
@@ -373,8 +395,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted += OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
         LobbyRankEffectDirector.OnAnyFinished     += OnRankEffectFinished;
+        LobbyGainEffectDirector.OnAnyFinished     += OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed          += OnOverlayClosed;
+        CardRewardOverlay.OnAnyClosed             += OnOverlayClosed;
         m_subscribed = true;
     }
 
@@ -391,8 +415,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted -= OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
         LobbyRankEffectDirector.OnAnyFinished     -= OnRankEffectFinished;
+        LobbyGainEffectDirector.OnAnyFinished     -= OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed          -= OnOverlayClosed;
+        CardRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
         m_subscribed = false;
     }
 }

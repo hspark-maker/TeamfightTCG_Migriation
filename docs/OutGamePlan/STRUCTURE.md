@@ -1379,3 +1379,192 @@ RankRewardManager.Claim(RankConfig.FillRewards → 재화별 Earn) → RankRewar
 
 - 환급 칩·총합 배지의 **코인 아이콘은 여전히 프리팹에 골드로 굳어 있다**. 지금 저작값은 전 팩 Gold라 표시가 맞지만, `refundType`을 Diamond로 저작하는 순간 아이콘만 골드로 남는다 — 위 "알려진 잔여 이슈"의 재화 아이콘 조회 창구와 같은 문제다.
 - `PackStandaloneBoot.dummyRefund`는 유지(테스트 씬이 임의 값으로 연출을 검증하는 더미 — 지갑을 건드리지 않는다). 종류만 `dummyPack.RefundType`을 따른다.
+
+
+
+### 매칭 연출 (`OutGame/Match/`, `UI/Match/`) — ✅ 코드+검수+프리팹 저작·배선 완료 (2026-08-13, Play 검증 대기)
+
+**한 줄**: 로비 "대전 입장"과 출전 덱 화면 **사이**에 상대를 찾는 연출을 끼웠다. 전투 상대는 여전히 로컬 AI다 — 매칭은 체감을 만드는 껍데기이고, 나중에 실제 Photon 매칭으로 갈아끼울 접합점만 남겼다.
+
+#### 왜
+
+PlayBtn을 누르면 곧장 덱 화면이 떠서, 상대가 어디서 왔는지 유저가 느낄 순간이 없었다. "누군가와 붙는다"는 대치감이 붙는 자리가 진입 체인에 없었다.
+
+기존 PvP UI(`UI/MainMenu/RandomMatchPanel`)는 재활용하지 못한다 — 로직 전부가 Photon 콜백(`OnPlayerJoinedRoom`)에 묶여 있고 덱 게이트를 아예 거치지 않으며, 스크립트를 참조하는 씬·프리팹이 0개다(도달 불가 유물). 이번 작업은 그 파일을 건드리지 않는다.
+
+#### 구조 위치 (🆕 = 이번 신규)
+
+```mermaid
+graph TD
+    subgraph MatchData["OutGame/Match/ 🆕"]
+        IMM["IMatchmaker 🆕<br/>UniTask&lt;MatchOpponent?&gt; FindOpponentAsync(ct)<br/>취소·실패는 예외가 아니라 null"]
+        FAKE["FakeMatchmaker 🆕<br/>1.0~1.6s 대기 후 상대 생성<br/>UnityEngine.Random (MatchRandom 무접촉)"]
+        OPP["MatchOpponent 🆕<br/>Profile + Deck + IsValid"]
+        PROF["MatchProfile 🆕<br/>OfLocalPlayer / OfOpponent<br/>닉네임·티어·랭크명·배지·동상"]
+        HOFF["MatchOpponentHandoff 🆕<br/>비소비형 캐리어 (읽는 쪽 아직 없음)"]
+        POOL["OpponentProfilePool 🆕 (SO)<br/>닉네임·동상 후보 풀"]
+    end
+
+    subgraph MatchUI["UI/Match/ 🆕 + 기존"]
+        MSHELL["MatchmakingShell 🆕<br/>RunMatchAsync 게이트<br/>탐색→발견→대치→진입"]
+        MPV["MatchProfileView 🆕<br/>카드 한 장 렌더러<br/>null 스프라이트는 저작값 유지"]
+        DSHELL["MatchDeckShell (기존)<br/>RunSelectionAsync 게이트"]
+    end
+
+    subgraph Host["UI/Lobby/ · Battle/"]
+        LML["LobbyMatchLauncher<br/>🔸RunEntryChainAsync<br/>🔸ConfirmOpponent<br/>🔸MatchShell (런타임 생성)"]
+        RANK["RankManager<br/>TierIndex · GetInfo"]
+        AIDECK["AIDeckConfig<br/>GetDeckForTier"]
+        DCFG["DeckConfig<br/>씬 전환 캐리어"]
+        TRUN["TurnRunner.Cleanup<br/>🔸MatchOpponentHandoff.Clear"]
+    end
+
+    LML -->|await| MSHELL
+    LML -->|await| DSHELL
+    LML -.->|new| FAKE
+    MSHELL -->|FindOpponentAsync| IMM
+    FAKE -.->|구현| IMM
+    FAKE --> OPP
+    FAKE --> POOL
+    FAKE --> AIDECK
+    OPP --> PROF
+    PROF --> RANK
+    MSHELL --> MPV
+    MPV --> PROF
+    LML -->|Set| HOFF
+    LML -->|SetEnemyDeck<br/>확정 단일 지점| DCFG
+    TRUN -->|Clear| HOFF
+
+    style IMM fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style FAKE fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style OPP fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style PROF fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style HOFF fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style POOL fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style MSHELL fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style MPV fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style LML fill:#fcf8e3,stroke:#8a6d3b
+```
+
+#### 흐름 — PlayBtn → 매칭 → 덱 확정 → 전투
+
+```mermaid
+sequenceDiagram
+    actor U as 유저
+    participant LML as LobbyMatchLauncher
+    participant MS as MatchmakingShell
+    participant MM as IMatchmaker
+    participant DS as MatchDeckShell
+    participant DC as DeckConfig
+
+    U->>LML: PlayBtn (대전 입장)
+    LML->>LML: m_running 가드 · SetMultiplayer(false)
+    Note over LML: TutorialConfig.IsActive && !ShowDeckGate → 즉시 EnterBattle (매칭 미경유)
+    LML->>LML: HasAnyValidSlot() 검사 (덱 없으면 매칭 전에 차단)
+
+    alt UseMatchmaking — 튜토 전투가 아니고 프리팹이 배선됨
+        LML->>MS: await RunMatchAsync(Matchmaker, ct)
+        MS->>MS: ① 탐색중 — 내 프로필 Render · 상대 빈 틀 · 점 애니메이션
+        MS->>MM: FindOpponentAsync(m_cts.Token)
+        alt 취소 버튼
+            MM-->>MS: null
+            MS-->>LML: null → 로비 그대로 (false 복귀)
+        else 상대 확정
+            MM-->>MS: MatchOpponent (프로필 + 덱)
+            MS->>MS: ② 발견 — 상대 Render + 펀치 · 취소 잠금 (foundHold)
+            MS->>MS: ③ 대치 — VS 켜고 두 프로필 충돌 (versusHold)
+            MS-->>LML: MatchOpponent
+        end
+    end
+
+    LML->>LML: ConfirmOpponent(t_opponent)
+    LML->>DC: SetEnemyDeck(상대 덱) — 확정 단일 지점
+    Note over LML: 튜토·폴백 갈래는 Handoff.Clear, 매칭 갈래는 Handoff.Set
+
+    LML->>DS: await RunSelectionAsync(ct)
+    DS-->>LML: true (전투 시작) / false (뒤로가기)
+    LML->>LML: EnterBattle() → SceneCurtainView.LoadScene("BattleScene")
+```
+
+> 호스트는 **`LobbyMatchLauncher`**다. 위 「매치 덱 선택·편집」 절의 시퀀스는 게이트를 `GameInitializer`가 여는 구버전 서술이다 — 현행은 로비가 씬 로드 **전에** 두 게이트를 연달아 돌린다.
+
+#### 튜토리얼 게이트 — 술어는 `TutorialConfig.IsActive` 하나
+
+| 좌표 | 경로 | 매칭 |
+|---|---|---|
+| ch0-0 `AutoBattle` | `StartAiBattle` 미경유 (`SceneManager.LoadScene` 직행) | 없음 |
+| ch1-0 `BattleEntry` (showDeckGate=0) | `IsActive && !ShowDeckGate` 조기 반환 | 없음 |
+| ch2-9 `BattleEntry` (showDeckGate=1) | `UseMatchmaking`이 false → 덱 화면 직행 | **없음** ← 최대 회귀 위험 지점 |
+| ch2-15 `BattleStart` | 위와 같음 (마지막 튜토 전투) | 없음 |
+| ch3-7 `WaitClick`@LobbyPlayButton (졸업 클릭) | `TurnRunner.Cleanup`이 이미 `TutorialConfig.End()`를 했다 | **있음** |
+
+`IsActive`를 고른 이유는 그것이 **정확히 "튜토 전투 3판"의 수명**이기 때문이다(`TutorialStepExecutor`가 켜고 `TurnRunner.Cleanup`이 끈다). 기각한 후보:
+
+- **`OutgameTutorialRunner.IsRunning`** — 한 판 늦다. Unity `Button.onClick`은 persistent → runtime 순이라 ch3-7 졸업 클릭에서 `StartAiBattle()`이 먼저 돌고 `CompleteSequence()`가 뒤에 온다(`TutorialStepExecutor.cs:73` 주석이 그 순서를 명시). 즉 졸업 클릭 순간에도 여전히 true다.
+- **`EOutgameFeature`** — 판별력이 없다. ch3-0 `EnterFirstRank`가 `unlocksAll=1`이라 ch3-7 시점엔 전부 해금 상태다.
+
+ch3에 4번째 튜토 전투를 끼워 넣어도 `IsActive`는 자동으로 따라간다.
+
+#### 상대 확정의 단일 진실원 유지
+
+`DeckConfig.SetEnemyDeck` 호출은 여전히 `ConfirmOpponent` 안 **세 갈래**뿐이다(튜토 / 매칭 / 폴백). 매치메이커가 프로필과 덱을 **한 값(`MatchOpponent`)으로 묶어** 반환하고 호스트가 그 값에서 갈라 싣기 때문에, "매칭 화면에 뜬 상대 == 덱 화면 EnemySection == 실제 전투 상대"가 값 동일성으로 보장된다.
+
+**상대 랭크 표시는 `MatchProfile.OfOpponent`가 내 `RankManager.GetInfo()`를 그대로 비춘다.** 상대 덱(`AIDeckConfig.GetDeckForTier`)과 카드 레벨(`RankManager.AiCardLevelOf`)이 실제로 내 `TierIndex`를 쓰므로, 표시만 티어표에서 따로 읽으면 언랭크 유저에게 "나=언랭크 / 상대=브론즈 1"로 짝짝이가 된다.
+
+#### 저작값
+
+| 축 | 값 | 위치 |
+|---|---|---|
+| 탐색 대기 | 1.0 ~ 1.6s (랜덤) | `FakeMatchmaker` 생성자 기본값 |
+| 발견 뜸 (`foundHold`) | 0.7s | `MatchmakingShell` 인스펙터 |
+| 대치 뜸 (`versusHold`) | 0.8s | 〃 |
+| 충돌 거리 (`versusApproach`) | 60px (0이면 이동 없이 VS만) | 〃 |
+| 닉네임 후보 | 25개 + 숫자 꼬리(1~999) | `Assets/SO/OpponentProfilePool.asset` |
+| 동상 후보 | 미저작 (프리팹 저작 이미지 유지) | 〃 |
+
+취소 버튼은 **① 탐색중에만** 살아 있다. ② 발견 이후 잠그는 이유: 이미 뽑은 상대를 버리고 다시 누르면 다른 상대가 나와, 유저가 상대를 고르는 장치로 오해할 수 있다.
+
+#### 프리팹 저작 — 로비에 얹지 않고 런타임에 띄운다
+
+원본은 Layer Lab `GUI Pro-SuperCasual/Prefabs/Prefabs_DemoScene_Panels/Loading_Maching.prefab`의 배리언트(`Assets/Assets/Prefabs/UI/MatchUI/MatchmakingRoot.prefab`). 위 배너 = 상대(`ProfileFrame_Empty` → `ProfileFrame` 교체로 탐색→발견이 성립), 아래 파란 배너 = 나, 중앙 `Title_Line03_Group_VS`.
+
+**`MatchDeckRoot`와 달리 `LobbyCanvas.prefab`에 인스턴스를 얹지 않는다.** `PrefabUtility.LoadPrefabContents(LobbyCanvas)`가 `[ExecuteAlways]` 컴포넌트를 실제로 돌려서, 저장할 때 SafeArea `m_AnchorMax`가 런타임 계산값(`y: 0.954`)으로 굳고 탭 focus의 `m_Father`·형제 순서까지 함께 커밋된다(실측 129줄 오염). 대신 `LobbyMatchLauncher.MatchShell`이 첫 매칭 때 `Instantiate(matchShellPrefab, transform.parent)`로 띄우고 캐시한다 — 부모는 덱 화면과 같은 SafeArea이고, 로비 프리팹에 들어가는 것은 **참조 2줄**(`matchShellPrefab` / `profilePool`)뿐이다.
+
+저작 시 걸린 함정 둘: 원본 루트에 데모용 **missing script**가 있어 그대로는 배리언트 저장이 거부된다(재귀 `RemoveMonoBehavioursWithMissingScript` 필요). `Button_Cancel`에는 **`Button` 컴포넌트가 없고 `Image`만** 있어 `AddComponent<Button>()` + `targetGraphic` 지정이 필요하다.
+
+---
+
+### 향후 확장 — 실제 Photon 매칭으로 교체
+
+Photon Fusion 2.1.1과 결정론 락스텝 대전 코드(`Scripts/Network/`)는 **이미 완성돼 BattleScene에도 배선돼 있다** — 진입 UI가 없어 도달 불가일 뿐이다. `DeckConfig.SetMultiplayer(true)` + 러너에 2명이 붙으면 그대로 돈다.
+
+#### 교체 지점은 한 줄
+
+```csharp
+// LobbyMatchLauncher
+IMatchmaker Matchmaker => m_matchmaker ??= new FakeMatchmaker(aiDeckConfig, profilePool);
+//                                         └─ new PhotonMatchmaker(...) 로 바꾸면 끝
+```
+
+UI에 손댈 것이 없는 이유:
+
+- **취소가 `CancellationToken`으로 표현돼 있다** → 실제 구현은 `_ct.Register(() => NetworkSession.Instance.Disconnect())` 한 줄이면 유저 취소가 룸 퇴장으로 이어진다.
+- **결과가 `MatchOpponent` 값이다** → 화면은 "닉네임·랭크·덱을 그린다"만 알고, 그 값이 원격에서 왔는지 모른다.
+- **대기 시간의 주인이 매치메이커다** → `FakeMatchmaker`의 `UniTask.Delay`가 진짜 대기로 바뀌어도 셸이 가진 연출 박자(발견 이후)는 그대로 산다.
+
+#### 그때 함께 손봐야 할 것
+
+| 자리 | 지금 | 실제 매칭에서 |
+|---|---|---|
+| `LobbyMatchLauncher.StartAiBattle` L41 | `DeckConfig.SetMultiplayer(false)` 못 박음 | `MatchOpponent`에 `IsRemote`를 더해 `ConfirmOpponent`에서 갈라야 한다 |
+| `MatchOpponent.IsValid` | 페이크는 항상 덱이 찬다 | 상대 덱이 배틀 씬(`SyncInitialDecks`)에서 도착 → 이 시점엔 **프로필만** 온다. `IsValid`를 미리 넣어 둔 이유가 이것 |
+| `MatchmakingShell.RunStagesAsync` | 덱이 빈 상대도 통과시킨다(폴백은 호스트 전담) | 그대로 유효 — 셸은 `null`만 거른다 |
+| `MatchDeckShell` 게이트 | 매칭 뒤 덱 화면을 연다 | 상대가 타임아웃 없이 무한 대기하게 되므로 **멀티는 덱 게이트를 건너뛰거나 제한 시간이 필요**하다 |
+| 매칭 실패 | 취소와 같은 `null`로 합류 | "상대를 못 찾았다"는 취소와 구분해 안내하거나 AI 폴백으로 떨어뜨려야 한다 |
+| `MatchProfile.OfOpponent` | 내 랭크를 그대로 비춤 | 원격 상대의 실제 랭크를 와이어로 받아야 한다(현재 프로토콜에 프로필 메시지 없음) |
+
+#### 그 밖에 열려 있는 자리
+
+- **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
+- **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
+- **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.

@@ -49,6 +49,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
              "여기서는 그 손끝이 타깃 중앙에 닿도록 기준점만 밀어 준다(코드는 손 크기·각도를 보정하지 않는다)")]
     [SerializeField] Vector2 handOffset = Vector2.zero;
 
+    [Tooltip("문구를 타깃에서 비켜 놓을 때의 최소 간격. 문구 자리는 화면 중앙이 기본이고, " +
+             "타깃과 세로로 겹치는 스텝에서만 이 간격을 두고 위/아래로 물러난다")]
+    [SerializeField] float messageMargin = 36f;
+
     [Header("포인터 연출")]
     [SerializeField] float pulseScale    = 1.08f;
     [SerializeField] float pulseDuration = 0.6f;
@@ -341,7 +345,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_onScreen = t_max.x > t_min.x && t_max.y > t_min.y
                           && t_max.x > t_full.xMin && t_min.x < t_full.xMax
                           && t_max.y > t_full.yMin && t_min.y < t_full.yMax;
-        if (!t_onScreen) { SetPointerActive(false); return; }
+        if (!t_onScreen) { SetPointerActive(false); CenterMessage(); return; }   // 피할 타깃이 화면에 없다 → 홈으로
 
         SetPointerActive(true);
 
@@ -353,6 +357,33 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
             this.hand.anchoredPosition = t_center + this.handOffset;
+
+        PlaceMessage(t_full, t_min.y, t_max.y);
+    }
+
+    // 문구의 홈은 화면 중앙이다 — 시선이 처음 닿는 자리라, 비켜야 할 이유가 없으면 옮기지 않는다.
+    // 다만 안내는 승격된 타깃보다 위(352)에 그려지므로 겹치면 강조 대상을 문구판이 그대로 덮는다.
+    // 그래서 세로로 겹칠 때만, 여유가 더 넓은 쪽으로 최소한만 물러난다.
+    void PlaceMessage(Rect _full, float _targetYMin, float _targetYMax)
+    {
+        if (this.messageRect == null || !this.messageRect.gameObject.activeSelf) return;
+
+        float t_half = this.messageRect.sizeDelta.y * 0.5f;
+        float t_gap  = t_half + this.messageMargin;
+
+        if (_targetYMin >= t_gap || _targetYMax <= -t_gap) { CenterMessage(); return; }
+
+        float t_y = (_targetYMin - _full.yMin) >= (_full.yMax - _targetYMax)
+            ? _targetYMin - t_gap    // 아래가 더 넓다
+            : _targetYMax + t_gap;
+
+        // 타깃이 화면을 거의 채우면 물러날 자리가 없다 — 겹치더라도 문구는 화면 안에 있어야 읽힌다.
+        this.messageRect.anchoredPosition = new Vector2(0f, Mathf.Clamp(t_y, _full.yMin + t_gap, _full.yMax - t_gap));
+    }
+
+    void CenterMessage()
+    {
+        if (this.messageRect != null) this.messageRect.anchoredPosition = Vector2.zero;
     }
 
     // ── 타깃 승격 ────────────────────────────────────────────────────────────
@@ -495,7 +526,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         else        StopPulse();
     }
 
-    // 문구는 모드·타깃과 무관하게 화면 중앙 한 자리에 둔다(읽는 자리가 스텝마다 옮겨 다니지 않게).
+    // 문구는 항상 화면 중앙에서 출발한다. 타깃을 피해 물러나는 판단은 Layout(PlaceMessage) 하나가 맡는다 —
+    // 따라갈 타깃이 없는 모드(배너·앵커 없는 메시지)는 그래서 중앙에 그대로 남는다.
     void SetMessage(string _message)
     {
         bool t_has = !string.IsNullOrEmpty(_message);
@@ -503,7 +535,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (this.messageRect != null)
         {
             this.messageRect.gameObject.SetActive(t_has);
-            this.messageRect.anchoredPosition = Vector2.zero;
+            CenterMessage();
         }
 
         if (t_has && this.messageText != null) this.messageText.text = _message;

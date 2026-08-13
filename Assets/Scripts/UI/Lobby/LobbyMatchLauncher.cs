@@ -79,7 +79,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     void EnterBattle()
     {
         m_running = true;
-        SceneCurtainView.LoadScene(BATTLE_SCENE);
+        CurtainView.LoadScene(BATTLE_SCENE);
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.

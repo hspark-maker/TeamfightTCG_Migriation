@@ -38,8 +38,16 @@ public class TutorialStepDef
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
     [SerializeField] CardPackData pack;
 
+    [Tooltip("이 스텝 동안 상점 가격 자리에 대신 띄울 문구(예: \"무료\"). 비우면 팩의 실제 가격이 숫자로 나온다.\n"
+           + "문구를 넣으면 재화 아이콘도 함께 숨는다 — 값을 치르는 물건이 아니라고 말하는 자리이기 때문이다.\n"
+           + "⚠ 표기만 바꾼다. 실제 결제는 팩 SO의 price가 그대로 한다 — 무료로 보이게 하려면 그 팩의 가격이 0이어야 한다")]
+    [SerializeField] string packPriceLabel;
+
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
+
+    [Tooltip("CardGrant: 지급할 카드 한 장. 이미 소유한 카드를 꽂아도 안전하지만 획득 연출은 그대로 돈다")]
+    [SerializeField] CardData card;
 
     [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
            + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다")]
@@ -68,6 +76,8 @@ public class TutorialStepDef
 
     public TutorialScenarioData Scenario => scenario;
 
+    public CardData Card => card;
+
     public bool ShowDeckGate => showDeckGate;
 
     public string DeckName => deckName;
@@ -85,6 +95,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
+        EOutgameTutorialAction.CardGrant       => EOutgameTutorialCompletion.CardGain,
 
         EOutgameTutorialAction.WaitClick     or
         EOutgameTutorialAction.DeckAutoEquip or
@@ -104,10 +115,13 @@ public class TutorialStepDef
         _ => false,
     };
 
-    // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true
-    public bool TryGetForcedPack(out CardPackData _pack)
+    // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true(가격 자리 문구도 함께 — 비었으면 실제 가격을 쓰라는 뜻)
+    public bool TryGetForcedPack(out CardPackData _pack, out string _priceLabel)
     {
-        _pack = action == EOutgameTutorialAction.WaitPurchase ? pack : null;
+        bool t_forces = action == EOutgameTutorialAction.WaitPurchase;
+
+        _pack       = t_forces ? pack : null;
+        _priceLabel = t_forces ? packPriceLabel : null;
 
         return _pack != null;
     }
@@ -133,7 +147,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn => false,
+        EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
     };
@@ -148,7 +163,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
         EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn => false,
+        EOutgameTutorialAction.WaitLobbyReturn or
+        EOutgameTutorialAction.CardGrant       => false,
 
         _ => true,
     };
@@ -167,6 +183,10 @@ public class TutorialStepDef
         _ => false,
     };
 
+    // 이 액션이 가격 표기 문구를 쓰는가(상점 진열을 덮어쓰는 액션만 — 화면에 가격 자리가 있는 경우다)
+    public static bool UsesPackPriceLabel(EOutgameTutorialAction _action) =>
+        _action == EOutgameTutorialAction.WaitPurchase;
+
     // 이 액션이 시나리오를 쓰는가(전투 주입 또는 덱 정본)
     public static bool UsesScenario(EOutgameTutorialAction _action) => _action switch
     {
@@ -184,4 +204,8 @@ public class TutorialStepDef
     // 이 액션이 덱 이름을 쓰는가
     public static bool UsesDeckName(EOutgameTutorialAction _action) =>
         _action == EOutgameTutorialAction.DeckGrant;
+
+    // 이 액션이 카드 한 장을 쓰는가(지급 대상)
+    public static bool UsesCard(EOutgameTutorialAction _action) =>
+        _action == EOutgameTutorialAction.CardGrant;
 }

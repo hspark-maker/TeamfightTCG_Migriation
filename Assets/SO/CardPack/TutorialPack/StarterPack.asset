@@ -15,15 +15,17 @@ MonoBehaviour:
   packId: StarterPack
   displayName: "\uC2A4\uD0C0\uD130\uD329"
   packArt: {fileID: 0}
+  priceType: 0
   price: 0
   drawCount: 6
   uniqueDraw: 1
   refundType: 0
   refundAmount: 0
   pool:
-  - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
+  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-  - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
-  - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  rankPools: []

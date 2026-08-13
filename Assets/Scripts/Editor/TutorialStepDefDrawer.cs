@@ -94,13 +94,15 @@ public class TutorialStepDefDrawer : PropertyDrawer
     {
         yield return "action";
 
-        if (TutorialStepDef.UsesAnchor(_action))        yield return "anchor";
-        if (TutorialStepDef.ShowsGuideMessage(_action)) yield return "guideMessage";
-        if (TutorialStepDef.UsesPack(_action))          yield return "pack";
-        if (TutorialStepDef.UsesScenario(_action))      yield return "scenario";
-        if (TutorialStepDef.UsesShowDeckGate(_action))  yield return "showDeckGate";
-        if (TutorialStepDef.UsesDeckName(_action))      yield return "deckName";
-        if (TutorialStepDef.UsesDim(_action))           yield return "useDim";
+        if (TutorialStepDef.UsesAnchor(_action))         yield return "anchor";
+        if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
+        if (TutorialStepDef.UsesPack(_action))           yield return "pack";
+        if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
+        if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
+        if (TutorialStepDef.UsesCard(_action))           yield return "card";
+        if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
+        if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
+        if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
         yield return "unlocksAll";
@@ -137,6 +139,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
 
         if (TutorialStepDef.UsesScenario(_action)) return NameOf(_property, "scenario");
         if (TutorialStepDef.UsesPack(_action))     return NameOf(_property, "pack");
+        if (TutorialStepDef.UsesCard(_action))     return NameOf(_property, "card");
 
         return string.Empty;
     }
