@@ -23,6 +23,8 @@ public class PackShowcaseController : MonoBehaviour
     public static event Action OnAnyPurchased;
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
+    [Tooltip("확률 고지 팝업 열기(옵션 — 미배선 무시). 지금 진열 중인 팩 기준으로 연다.")]
+    [SerializeField] Button oddsButton;
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격 숫자(재화 종류는 팩마다 다르다 — 옵션, 미배선 무시).
     [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 스프라이트가 바뀐다(옵션 — 미배선 무시).")]
@@ -72,6 +74,11 @@ public class PackShowcaseController : MonoBehaviour
             buyButton.onClick.RemoveListener(OnBuyPressed);
             buyButton.onClick.AddListener(OnBuyPressed);
         }
+        if (oddsButton != null)
+        {
+            oddsButton.onClick.RemoveListener(OnOddsPressed);
+            oddsButton.onClick.AddListener(OnOddsPressed);
+        }
         if (carousel != null)
         {
             carousel.OnIndexChanged -= OnPageChanged;
@@ -88,6 +95,7 @@ public class PackShowcaseController : MonoBehaviour
     void OnDisable()
     {
         if (buyButton != null) buyButton.onClick.RemoveListener(OnBuyPressed);
+        if (oddsButton != null) oddsButton.onClick.RemoveListener(OnOddsPressed);
         if (carousel != null) carousel.OnIndexChanged -= OnPageChanged;
 
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
@@ -261,6 +269,16 @@ public class PackShowcaseController : MonoBehaviour
         if (_pack == null || goldIcon == null || diamondIcon == null) return null;
 
         return _pack.PriceType == ECurrencyType.Diamond ? diamondIcon : goldIcon;
+    }
+
+    // 확률 고지 클릭: 지금 진열 중인 팩의 등장 확률을 연다. 구매 잠금(잔액·기능잠금)과 무관하게 항상 열린다 —
+    // 확률은 살 수 있는지와 별개로 사기 전에 봐야 하는 정보다.
+    void OnOddsPressed()
+    {
+        var t_pack = ResolvePack();
+        if (t_pack == null) return;
+
+        UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
     }
 
     // 구매 클릭: 성공이면 캐리어에 실어 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).

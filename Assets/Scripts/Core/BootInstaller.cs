@@ -47,6 +47,10 @@ public class BootInstaller : MonoBehaviour
             cardRegistry.Available(t_profile.IncludeTestCards));
         CardCatalog.SetSource(t_availableCards);
 
+        // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
+        // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
+        PackSpec.Init();
+
         // 도감 행 레이아웃/생산 튜닝 주입 — 카탈로그 카드를 참조하므로 SetSource 이후. null이면 청크 fallback.
         CatalogRows.SetLayout(collectionLayout);
 

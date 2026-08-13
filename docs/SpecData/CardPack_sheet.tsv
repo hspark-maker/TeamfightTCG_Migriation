@@ -1,0 +1,9 @@
+﻿팩 고유 번호(부여 후 변경 금지)	안정 키(코드/SO 참조용, 변경 금지)	화면 표시 이름	Live=실행 노출 / TestOnly=테스트만	결제 재화(Gold/Diamond/Energy)	가격	한 팩에서 뽑는 장수	1=한 팩 안 중복 없음(비복원 추출)	중복 환급 재화	중복 1장당 환급량(0=환급 없음)
+id	packId	displayName	channel	priceType	price	drawCount	uniqueDraw	refundType	refundAmount
+int	string	string	string	string	long	int	int	string	long
+1	NormalPack_TEST	일반 팩	Live	Gold	110	6	0	Gold	5
+2	SpecialPack	스페셜 팩	Live	Gold	140	6	0	Gold	10
+3	UltraPack	울트라 팩	Live	Diamond	30	6	1	Gold	50
+4	KeywordDeck	키워드덱	Live	Gold	0	6	1	Gold	10
+5	StarterPack	스타터팩	Live	Gold	0	6	1	Gold	0
+6	SynergyPack	시너지팩	Live	Gold	0	6	1	Gold	0

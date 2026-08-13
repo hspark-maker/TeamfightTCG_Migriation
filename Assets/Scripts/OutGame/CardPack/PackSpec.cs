@@ -1,0 +1,98 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// 카드팩 스펙시트(CardPack / CardPackDrop) 런타임 조회 창구.
+//
+// 카드(CardData)와 달리 팩은 아트 말고 물려 있는 에셋이 없다 — 값이 전부 숫자·키·카드 id다.
+// 그래서 에셋에 굽지 않고 시트를 그대로 읽는다. CardPackData SO는 packId와 팩 아트만 소유한다.
+//
+// 시트를 못 읽거나 packId가 시트에 없으면 조회가 전부 실패로 떨어지고, CardPackData가 자기
+// 인스펙터 값으로 폴백한다 — 스펙 파이프라인이 끊겨도 팩 상점이 빈 화면이 되지는 않는다.
+public static class PackSpec
+{
+    static bool s_loaded;
+    static readonly Dictionary<string, CardPack> s_packs = new Dictionary<string, CardPack>();
+    static readonly Dictionary<string, List<CardPackDrop>> s_drops = new Dictionary<string, List<CardPackDrop>>();
+
+    public static bool IsReady => s_loaded && s_packs.Count > 0;
+
+    // 부트에서 1회. 첫 조회에서도 지연 로드되므로 필수는 아니지만, 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
+    public static void Init() => EnsureLoaded();
+
+    public static bool TryGetPack(string _packId, out CardPack _row)
+    {
+        EnsureLoaded();
+        _row = null;
+        return !string.IsNullOrEmpty(_packId) && s_packs.TryGetValue(_packId, out _row);
+    }
+
+    // 이 팩에서 뽑을 수 있는 카드와 가중치. 랭크 오버라이드는 **만족하는 등급 중 가장 높은 하나**만 적용된다
+    // (하위 등급과 합산하지 않는다 — CardPackData.ResolvePool과 같은 규약).
+    // 카드 조회는 CardCatalog 단독이라, 카탈로그에 없는 id(테스트 전용 등)는 조용히 빠진다.
+    public static List<WeightedCard> ResolveDrops(string _packId, ERankGrade _grade)
+    {
+        EnsureLoaded();
+
+        var t_result = new List<WeightedCard>();
+        if (string.IsNullOrEmpty(_packId) || !s_drops.TryGetValue(_packId, out List<CardPackDrop> t_rows))
+            return t_result;
+
+        ERankGrade t_best = ERankGrade.Bronze;
+        bool t_found = false;
+        foreach (CardPackDrop t_row in t_rows)
+        {
+            ERankGrade t_grade = ParseGrade(t_row.minGrade);
+            if (t_grade > _grade) continue;
+            if (!t_found || t_grade > t_best) { t_best = t_grade; t_found = true; }
+        }
+        if (!t_found) return t_result;
+
+        foreach (CardPackDrop t_row in t_rows)
+        {
+            if (ParseGrade(t_row.minGrade) != t_best) continue;
+            if (!CardCatalog.TryGet(t_row.cardId, out CardData t_card)) continue;
+
+            t_result.Add(new WeightedCard { card = t_card, weight = Mathf.Max(1, t_row.weight) });
+        }
+        return t_result;
+    }
+
+    static void EnsureLoaded()
+    {
+        if (s_loaded) return;
+        s_loaded = true;   // 실패해도 매 조회마다 재파싱하지 않는다(폴백으로 계속 돈다).
+
+        string t_json = SpecDataResourceLoader.LoadSpecData();
+        if (string.IsNullOrEmpty(t_json))
+        {
+            Debug.LogWarning("[PackSpec] SpecData 리소스를 못 읽었다. 팩은 SO 인스펙터 값으로 돈다.");
+            return;
+        }
+
+        var t_manager = new SpecDataManager();
+        if (!t_manager.Load(t_json))
+        {
+            Debug.LogWarning("[PackSpec] SpecData 파싱 실패. 팩은 SO 인스펙터 값으로 돈다.");
+            return;
+        }
+
+        IReadOnlyList<CardPack> t_packRows = t_manager.CardPack?.All;
+        if (t_packRows != null)
+            foreach (CardPack t_row in t_packRows)
+                if (t_row != null && !string.IsNullOrEmpty(t_row.packId))
+                    s_packs[t_row.packId] = t_row;
+
+        IReadOnlyList<CardPackDrop> t_dropRows = t_manager.CardPackDrop?.All;
+        if (t_dropRows != null)
+            foreach (CardPackDrop t_row in t_dropRows)
+            {
+                if (t_row == null || string.IsNullOrEmpty(t_row.packId)) continue;
+                if (!s_drops.TryGetValue(t_row.packId, out List<CardPackDrop> t_list))
+                    s_drops[t_row.packId] = t_list = new List<CardPackDrop>();
+                t_list.Add(t_row);
+            }
+    }
+
+    static ERankGrade ParseGrade(string _value)
+        => System.Enum.TryParse(_value, out ERankGrade t_grade) ? t_grade : ERankGrade.Bronze;
+}
