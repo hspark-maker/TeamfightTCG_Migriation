@@ -5841,7 +5841,7 @@ MonoBehaviour:
   fireStart01: 0.4646465
   clipSeconds: 1.65
   fireSeconds: 0.1
-  logDiagnostics: 1
+  logDiagnostics: 0
 --- !u!1 &2279820978060975018
 GameObject:
   m_ObjectHideFlags: 0

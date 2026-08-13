@@ -27,6 +27,8 @@ public class DeckEditController : MonoBehaviour
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
     [SerializeField] Button autoEquipButton;
+    [Tooltip("우측 하단 저장 버튼. 바꾼 게 있을 때만 눌린다(미배선이면 나갈 때 확인만으로 저장한다).")]
+    [SerializeField] Button saveButton;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -78,6 +80,12 @@ public class DeckEditController : MonoBehaviour
         {
             autoEquipButton.onClick.RemoveAllListeners();
             autoEquipButton.onClick.AddListener(AutoEquip);
+        }
+
+        if (saveButton != null)
+        {
+            saveButton.onClick.RemoveAllListeners();
+            saveButton.onClick.AddListener(OnSaveClicked);
         }
 
         if (nameInput != null)
@@ -276,6 +284,9 @@ public class DeckEditController : MonoBehaviour
 
         // 빈 이름은 저장하지 않는다 — 편집 진입 시점 이름으로 되돌린다.
         nameInput.SetTextWithoutNotify(string.IsNullOrEmpty(t_name) ? m_savedName : t_name);
+
+        // 이름 변경도 IsDirty의 한 축이다 — 여기서 갱신하지 않으면 이름만 고쳤을 때 저장 버튼이 죽은 채 남는다.
+        RefreshSaveButton();
     }
 
     // 지금 화면에 입력된 이름(트림). 비어 있으면 진입 시점 이름을 그대로 쓴다.
@@ -438,6 +449,16 @@ public class DeckEditController : MonoBehaviour
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
                                                                    && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);
+        RefreshSaveButton();
+    }
+
+    /// <summary>저장 버튼은 <b>바꾼 게 있을 때만</b> 눌린다. 미완성이어도 눌리게 두는 이유는,
+    /// 왜 저장이 안 되는지 알려주는 자리가 필요해서다 — 회색으로 죽여 두면 유저는 이유를 알 수 없다.</summary>
+    void RefreshSaveButton()
+    {
+        if (saveButton == null) return;
+
+        saveButton.interactable = IsOpen && IsDirty;
     }
 
     int CountFilled()
@@ -498,26 +519,39 @@ public class DeckEditController : MonoBehaviour
         // 드래그 도중 눌릴 수 있다(고스트가 버튼·탭바를 덮지 않는 배치). 고스트를 먼저 정리한다.
         if (dragController != null && dragController.IsDragging) dragController.Cancel();
 
-        if (CountFilled() == DeckSaveManager.DECK_SIZE)
+        // 바꾼 게 없으면 저장할 것도 확인받을 것도 없다. 여기서 걸러야 "들어왔다 그냥 나가기"에
+        // 팝업이 뜨지 않는다 — 매번 물으면 확인 창이 소음이 되고, 유저는 내용을 안 읽고 누르게 된다.
+        if (!IsDirty)
         {
-            // 삽입에 실패한 채 나가면 유저가 편성한 6장이 조용히 증발한다 → 화면을 유지해 재시도 여지를 남긴다.
-            if (!SaveIfComplete()) return;
-
             _onGranted?.Invoke();
 
             return;
         }
 
-        // 미완성 상태로는 저장하지 않는다. DeckSaveManager.Save()도 부르면 안 된다 —
-        // 메모리 슬롯이 6장 미만으로 덮여 IsSlotValid가 false가 되고, 목록에서 기존 덱이 통째로 사라진다.
-        SimpleYNPopup t_popup = UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
-        {
-            titleText = "덱이 완성되지 않았습니다.\n변경사항을 버리고 나갈까요?",
-            yesText   = "나가기",
-            yesAction = () => _onGranted?.Invoke(),
-            noText    = "계속 편집",
-            noAction  = null,
-        });
+        SimpleYNPopupData t_data = CountFilled() == DeckSaveManager.DECK_SIZE
+            ? new SimpleYNPopupData
+              {
+                  titleText = "변경사항을 저장할까요?",
+                  yesText   = "저장",
+                  // 삽입에 실패하면 나가지 않는다 — 그냥 내보내면 편성한 6장이 조용히 증발한다.
+                  // 화면을 유지해 재시도 여지를 남긴다(실패 사유는 DeckSaveManager가 로그로 남긴다).
+                  yesAction = () => { if (SaveIfComplete()) _onGranted?.Invoke(); },
+                  noText    = "저장 안 함",
+                  noAction  = () => _onGranted?.Invoke(),
+              }
+            // 미완성 상태로는 저장하지 않는다. DeckSaveManager.Save()도 부르면 안 된다 —
+            // 메모리 슬롯이 6장 미만으로 덮여 IsSlotValid가 false가 되고, 목록에서 기존 덱이 통째로 사라진다.
+            // 그래서 여기서는 "저장" 선택지 자체를 주지 않고, 왜 저장이 안 되는지만 알린다.
+            : new SimpleYNPopupData
+              {
+                  titleText = $"카드 {DeckSaveManager.DECK_SIZE}장을 모두 채워야 저장할 수 있습니다.\n변경사항을 버리고 나갈까요?",
+                  yesText   = "나가기",
+                  yesAction = () => _onGranted?.Invoke(),
+                  noText    = "계속 편집",
+                  noAction  = null,
+              };
+
+        SimpleYNPopup t_popup = UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(t_data);
 
         // 팝업이 못 뜨면(UIPoolManager 미배치·프리팹 미등록) 확인을 못 받은 채 화면에 갇힐 수 있다 → 그냥 내보낸다.
         if (t_popup == null)
@@ -527,13 +561,71 @@ public class DeckEditController : MonoBehaviour
         }
     }
 
+    /// <summary>디스크와 달라진 게 있는가. 카드 편성(m_dirty)뿐 아니라 <b>이름 변경도 변경사항</b>이다 —
+    /// 이름만 고치고 나간 유저에게 아무것도 안 묻고 버리면 그대로 사라진다.
+    ///
+    /// 신규(Create)는 이름을 비교하지 않는다. m_savedName이 실제 저장값이 아니라 제안 이름이라
+    /// 비교가 성립하지 않고, 카드를 한 장이라도 놓으면 어차피 m_dirty가 선다.</summary>
+    bool IsDirty => m_dirty
+                 || (m_mode == EDeckEditMode.Edit && ResolveName() != m_savedName);
+
+    // 저장 버튼. 편집 화면에 머문 채 지금까지의 편성을 확정한다(나가기와 달리 화면을 닫지 않는다).
+    void OnSaveClicked()
+    {
+        if (!IsOpen) return;
+
+        // 미완성은 저장하지 않는다 — 6장 미만으로 세이브를 덮으면 IsSlotValid가 false가 되어
+        // 목록에서 그 덱이 통째로 사라진다(RequestLeave의 미완성 분기와 같은 이유).
+        // 버튼을 죽여두지 않고 여기서 알리는 쪽을 택했다: 왜 저장이 안 되는지 말할 자리가 필요하다.
+        if (CountFilled() != DeckSaveManager.DECK_SIZE)
+        {
+            // SimpleYNPopup은 버튼이 항상 둘이다(단일 확인 모드가 없다) → 남는 한 자리를 빈 채로 두지 않고
+            // 바로 채워 주는 선택지로 쓴다. 자동 편성이 잠겨 있으면 그 자리는 그냥 닫기가 된다.
+            bool t_canAutoEquip = OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);
+
+            UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+            {
+                titleText = $"카드 {DeckSaveManager.DECK_SIZE}장을 모두 채워야 저장할 수 있습니다.",
+                yesText   = t_canAutoEquip ? "자동 편성" : "확인",
+                yesAction = t_canAutoEquip ? AutoEquip : (Action)null,
+                noText    = "닫기",
+                noAction  = null,
+            });
+
+            return;
+        }
+
+        // 실패(신규 삽입 불가)면 아무것도 바꾸지 않는다 — dirty를 내리면 유저는 저장된 줄 알고 나간다.
+        if (!SaveIfComplete()) return;
+
+        MarkSaved();
+    }
+
+    /// <summary>저장이 끝난 뒤의 상태 정리. 여기서 dirty를 내려야 저장 버튼이 다시 죽는다.
+    /// m_savedName도 같이 굳힌다 — 이름 비교가 IsDirty의 한 축이라, 안 굳히면 저장 직후에도 계속 dirty다.</summary>
+    void MarkSaved()
+    {
+        m_dirty     = false;
+        m_savedName = ResolveName();
+
+        RefreshAll();
+    }
+
     // 신규 덱은 rename·dirty 판정이 없다 — 6/6이 채워졌으면 항상 저장 대상이다.
     // 이름도 항상 실문자열로 굳힌다. 빈 이름으로 두면 이후 덱이 앞뒤로 밀릴 때 표시 폴백("덱 N")이 따라 변한다.
     bool SaveNewDeck()
     {
         // 이미지 키는 삽입 "전에" 뽑는다 — IsKeyInUse가 삽입 전 상태를 봐야 중복 회피가 정확하고,
         // 삽입 후 SetImageKey는 SaveAll이 끝난 뒤라 메모리에만 남는다.
-        if (DeckSaveManager.TryInsertFront(m_working, ResolveName(), DeckImages.PickRandomKey(), out _)) return true;
+        if (DeckSaveManager.TryInsertFront(m_working, ResolveName(), DeckImages.PickRandomKey(), out int t_index))
+        {
+            // 저장 버튼으로 신규를 확정하면 화면에 그대로 머문다 — 그 상태로 또 누르면 같은 덱이 한 벌 더 꽂힌다.
+            // 저장된 순간부터는 "그 슬롯을 편집 중"이어야 한다(나가기 경로에서는 곧 닫혀서 드러나지 않던 문제).
+            m_mode      = EDeckEditMode.Edit;
+            m_slotIndex = t_index;
+
+            return true;
+        }
 
         // 만석·미로드 등 실패 사유는 DeckSaveManager가 로그로 남긴다. 여기서는 나가지 않는다는 사실만 알린다.
         Debug.LogError("[DeckEditController] 신규 덱 저장 실패 — 편집 화면을 유지한다.");
