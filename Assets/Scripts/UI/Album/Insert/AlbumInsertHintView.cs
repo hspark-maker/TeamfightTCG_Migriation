@@ -6,8 +6,10 @@ using UnityEngine.UI;
 
 // 삽입 세션 전용 안내 묶음 — 아래로 미는 손가락 + 하단 문구 + 건너뛰기.
 //
-// ⚠ 값(하단 문구 y 계산, 펄스 1.08f / 0.6s)의 원본은 OutgameTutorialGateUI다 —
+// ⚠ 펄스 값(1.08f / 0.6s)의 원본은 OutgameTutorialGateUI다 —
 //   손맛을 바꿀 땐 둘을 같이 본다(한쪽만 만지면 튜토리얼 안내와 삽입 안내가 갈라진다).
+//   문구 자리는 공유하지 않는다: 이쪽은 손가락이 미는 카드를 비켜 하단 고정이고,
+//   게이트는 중앙을 홈으로 두고 타깃과 겹칠 때만 물러난다.
 //
 // 튜토리얼 게이트를 재사용하지 않는 이유: ShowBanner가 진입부에서 진행 중 게이트를 걷어 도감 튜토리얼과
 // 싱글턴을 밟고, 그쪽 계약은 "배너 = 문구만"이라 손가락을 켤 수 없다. 연출도 다르다(제자리 펄스 ↔ 미는 이동).
@@ -34,7 +36,7 @@ public class AlbumInsertHintView : MonoBehaviour
     [SerializeField] float pushDistance = 120f;
     [SerializeField] float pulseScale   = 1.08f;
     [SerializeField] float pulseDuration = 0.6f;
-    [Tooltip("문구 전용 모드(타깃 없음)의 하단 여백 — OutgameTutorialGateUI.messageBottom과 같은 값.")]
+    [Tooltip("문구를 화면 하단에서 띄울 높이. 카드를 미는 손가락과 겹치지 않을 만큼 띄운다.")]
     [SerializeField] float messageBottom = 220f;
 
     RectTransform m_rect;

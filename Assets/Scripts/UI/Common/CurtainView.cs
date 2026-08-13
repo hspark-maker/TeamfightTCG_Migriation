@@ -1,16 +1,15 @@
 using System;
 using System.Collections;
-using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 화면 전환을 덮는 커튼. 위/아래 두 판이 대각으로 맞물려 화면을 덮고, 그 밑에서 무언가를 갈아치운 뒤 다시 열린다.
+// 씬 전환을 덮는 커튼. 위/아래 두 판이 대각으로 맞물려 화면을 덮고, 그 밑에서 씬을 갈아치운 뒤 다시 열린다.
 // 복귀(배틀 → 로비)는 LoadingCoverView가 맡는다 — 가는 길은 빠르고 단호하게, 오는 길은 여유 있게.
 //
-// 이 컴포넌트는 "덮고 → 갈아치우고 → 연다"만 안다. 무엇이 갈리는지는 주입된 ICurtainSwap이 안다 —
-// 씬 로드(SceneLoadSwap)든 오버레이 교체(ScreenSwap)든 커튼은 달라지지 않는다.
-// 커튼이 씬을 직접 알던 시절엔 씬 로드가 이 코루틴에 섞여 있어 씬 없는 전환을 표현할 방법이 없었다.
+// 이 컴포넌트는 "덮고 → 갈아치우고 → 연다"만 안다. 무엇이 갈리는지는 주입된 ICurtainSwap이 안다.
+// 지금 구현은 씬 로드(SceneLoadSwap) 하나뿐이지만, 커튼이 씬을 직접 알던 시절엔 씬 로드가 이 코루틴에
+// 섞여 있어 폴백이 두 곳으로 갈리고 씬 없는 전환을 표현할 방법이 없었다.
 //
 // 아트의 진실원은 프리팹이다(Resources/UI/SceneCurtain). 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
 // 코드는 화면 크기에 맞춰 판을 키우고 움직이기만 한다. 판의 색·대각은 매치 덱 확인 화면에서 가져왔다 —
@@ -73,7 +72,6 @@ public class CurtainView : MonoBehaviour
     static bool s_busy;
 
     ICurtainSwap m_swap;
-    Action       m_onOpened;
 
     // 프리팹을 못 얻어 판 없이 세워진 커튼. 미배선 오류와 구분하려고 든다 — 그쪽은 이미 경고를 냈다.
     bool m_panelless;
@@ -92,10 +90,10 @@ public class CurtainView : MonoBehaviour
     bool HasPanels => top != null && bottom != null;
 
     /// <summary>커튼이 닫혀 화면을 덮은 뒤 _swap이 갈아치우고, 새 화면 위에서 커튼이 열린다.
-    /// 씬 로드·화면 교체를 가리지 않는 원형 창구다.</summary>
+    /// 무엇이 갈리든 커튼은 가리지 않는 원형 창구다.</summary>
     public static void Play(ICurtainSwap _swap)
     {
-        if (!TryPlay(_swap, null)) _swap?.Abort();
+        if (!TryPlay(_swap)) _swap?.Abort();
     }
 
     /// <summary>커튼이 덮은 사이 _scene으로 갈아탄다. 로비 → 배틀 진입 전용(복귀는 LoadingCoverView.LoadScene).</summary>
@@ -105,26 +103,8 @@ public class CurtainView : MonoBehaviour
         Play(new SceneLoadSwap(_scene, _onBeforeLoad));
     }
 
-    /// <summary>커튼이 덮은 사이 _swap으로 화면을 갈아치우고, 커튼이 **다 열린 뒤** 깨어난다.
-    /// 씬을 넘지 않는 오버레이 전환용(매칭 화면 → 덱 화면).</summary>
-    /// <remarks>연출이 어디서 잘리든 반드시 깨어난다 — 여기서 막히면 호출부의 진입 체인이 통째로 멈춘다.</remarks>
-    public static UniTask CoverAsync(Action _swap)
-    {
-        var t_swap = new ScreenSwap(_swap);
-        var t_tcs  = new UniTaskCompletionSource();
-
-        if (!TryPlay(t_swap, () => t_tcs.TrySetResult()))
-        {
-            // 커튼을 못 걸어도 교체는 반드시 일어나야 한다 — 다음 화면이 서지 않으면 아무것도 없는 곳에 갇힌다.
-            t_swap.Abort();
-            t_tcs.TrySetResult();
-        }
-
-        return t_tcs.Task;
-    }
-
     // 커튼을 세워 연출을 건다. 걸지 못했으면 false — 호출부가 교체를 직접 책임진다.
-    static bool TryPlay(ICurtainSwap _swap, Action _onOpened)
+    static bool TryPlay(ICurtainSwap _swap)
     {
         if (_swap == null)
         {
@@ -149,9 +129,8 @@ public class CurtainView : MonoBehaviour
 
         s_busy = true;
 
-        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입들이 연출 시작보다 먼저다.
-        t_view.m_swap     = _swap;
-        t_view.m_onOpened = _onOpened;
+        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 연출 시작보다 먼저다.
+        t_view.m_swap = _swap;
 
         return true;
     }
@@ -359,12 +338,6 @@ public class CurtainView : MonoBehaviour
         }
 
         s_busy = false;
-
-        if (m_onOpened == null) return;
-
-        var t_onOpened = m_onOpened;
-        m_onOpened = null;
-        t_onOpened();
     }
 
     // 이음매는 "두 판의 pivot이 같은 점에 있고 같은 각으로 돈다"는 것만으로 성립한다.

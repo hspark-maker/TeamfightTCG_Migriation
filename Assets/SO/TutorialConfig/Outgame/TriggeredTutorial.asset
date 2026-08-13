@@ -24,7 +24,9 @@ MonoBehaviour:
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 1
@@ -35,7 +37,9 @@ MonoBehaviour:
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 1
@@ -47,7 +51,9 @@ MonoBehaviour:
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
   - trigger: 2
@@ -61,7 +67,9 @@ MonoBehaviour:
       locks: 
       useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -72,7 +80,9 @@ MonoBehaviour:
       locks: 
       useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -83,18 +93,22 @@ MonoBehaviour:
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 11
       anchor: 21
-      guideMessage: "\uAC15\uD654\uB97C \uB20C\uB7EC \uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C\uBCF4\uC138\uC694!"
+      guideMessage: 
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 14
@@ -105,7 +119,9 @@ MonoBehaviour:
       locks: 
       useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 
     - action: 0
@@ -117,6 +133,8 @@ MonoBehaviour:
       locks: 
       useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
       scenario: {fileID: 0}
+      card: {fileID: 0}
       showDeckGate: 0
       deckName: 

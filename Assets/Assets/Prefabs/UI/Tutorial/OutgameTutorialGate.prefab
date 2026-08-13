@@ -196,7 +196,6 @@ MonoBehaviour:
   messageText: {fileID: 6510000000000000063}
   handOffset: {x: 100, y: 100}
   messageMargin: 36
-  messageBottom: 220
   pulseScale: 1.08
   pulseDuration: 0.6
 --- !u!1 &6510000000000000010
@@ -392,7 +391,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -600}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 920, y: 260}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6510000000000000052
