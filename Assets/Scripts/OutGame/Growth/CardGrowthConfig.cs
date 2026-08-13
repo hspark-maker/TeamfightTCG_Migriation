@@ -10,7 +10,7 @@ public class CardGrowthConfig : ScriptableObject
     [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
     [Min(0)] [SerializeField] int hpPerLevel = 2;
 
-    [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(에너지)다.")]
+    [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(골드)다.")]
     [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
     [SerializeField] long baseEnhanceCost = 100;
 
@@ -95,7 +95,8 @@ public class CardGrowthConfig : ScriptableObject
         int           t_hp       = hpPerLevel;
         long          t_cost     = baseEnhanceCost + costGrowthPerLevel * t_step;
         float         t_rate     = baseSuccessRate - rateDropPerLevel * t_step;
-        ECurrencyType t_currency = ECurrencyType.Energy;     // 기본식에는 재화 축이 없다 — 곡선은 에너지가 전제다
+        ECurrencyType t_currency = ECurrencyType.Gold;       // 기본식에는 재화 축이 없다 — 곡선은 골드가 전제다
+                                                             // (에너지는 키워드 강화 쪽 재화다 — KeywordGrowthConfig)
 
         if (TryGetLevelStep(_level, out var t_row))
         {
