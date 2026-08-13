@@ -131,16 +131,15 @@ public class AlbumInsertSession : MonoBehaviour
         // 안내 중에는 이탈 자체를 삼킨다 — 선택된 탭은 버튼이 꺼지고 Focus가 대신하므로(LobbyTabController.Select),
         // 유저가 먼저 그 탭으로 가 버리면 뒤이어 그 버튼을 가리키는 안내가 영영 뜨지 못한다. 탈출로는 건너뛰기다.
         if (lobbyTabController != null)
-        {
             lobbyTabController.SetLeaveGuard(_p => { if (TutorialMode) return; AbortAll(); _p(); });
 
-            // 어차피 가드에 막혀 눌러도 안 먹는 탭바다 — 걷어야 화면 맨 아래가 건너뛰기 자리로 열린다
-            lobbyTabController.SetBarRetracted(true);
-
-            // 페이지 오버레이의 딤은 탭 콘텐츠 안이라 상단 재화·메뉴를 못 덮는다 — 그쪽 탈출로는 셸 딤이 막는다
-            lobbyTabController.SetShellDimmed(true);
+        if (pageOverlay != null)
+        {
+            // 오버레이를 셸 위로 올려 그 딤 한 장이 화면 전체를 덮게 한다 —
+            // 상단 재화·메뉴도 탭바도 어두워진 채 제자리에 남고, 입력은 딤이 받는다.
+            pageOverlay.SetFrontmost(true);
+            pageOverlay.SetInteractionLocked(true);
         }
-        if (pageOverlay != null) pageOverlay.SetInteractionLocked(true);
 
         if (group != null) group.blocksRaycasts = true;
         this.HideCard();
@@ -489,13 +488,12 @@ public class AlbumInsertSession : MonoBehaviour
 
         // 위장 해제가 먼저다 — 잠금을 먼저 풀면 그 프레임에 빈 칸이 눌릴 수 있다.
         AlbumInsertMask.Clear();
-        if (pageOverlay != null) pageOverlay.SetInteractionLocked(false);
-        if (lobbyTabController != null)
+        if (pageOverlay != null)
         {
-            lobbyTabController.ClearLeaveGuard();
-            lobbyTabController.SetBarRetracted(false);
-            lobbyTabController.SetShellDimmed(false);
+            pageOverlay.SetInteractionLocked(false);
+            pageOverlay.SetFrontmost(false);
         }
+        if (lobbyTabController != null) lobbyTabController.ClearLeaveGuard();
 
         IsRunning = false;
 

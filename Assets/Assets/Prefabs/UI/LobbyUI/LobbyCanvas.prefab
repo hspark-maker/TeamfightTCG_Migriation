@@ -1176,9 +1176,8 @@ MonoBehaviour:
   focusIcon: {fileID: 7125465342477617750}
   focusLabel: {fileID: 7125465344492590325}
   alertDotPrefab: {fileID: 4440091932380886368, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
-  barGroup: {fileID: 6505376943950345604}
+  barGroup: {fileID: 8383260424282779458}
   barRetractDuration: 0.2
-  shellDim: {fileID: 8170596514917250366}
   focusHighlight: {fileID: 0}
   focusSpinSeconds: 6
   focusSpinClockwise: 1
@@ -2450,6 +2449,7 @@ GameObject:
   - component: {fileID: 6230837878272533804}
   - component: {fileID: 5652507977459702335}
   - component: {fileID: 2239218047050792931}
+  - component: {fileID: 8383260424282779458}
   m_Layer: 0
   m_Name: BottomBar
   m_TagString: Untagged
@@ -2536,6 +2536,18 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!225 &8383260424282779458
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3864912534804374465}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &3871382350235012647
 GameObject:
   m_ObjectHideFlags: 0
@@ -3194,7 +3206,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4002184598986210688
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4000,7 +4012,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: -620}
+  m_AnchoredPosition: {x: 0, y: -400}
   m_SizeDelta: {x: 0, y: 620}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &4782912489842685902
@@ -5587,11 +5599,6 @@ PrefabInstance:
 --- !u!224 &186469588180088904 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1128353755943318262, guid: d13625a8928721c4d8c58190b4816059, type: 3}
-  m_PrefabInstance: {fileID: 954427604584729278}
-  m_PrefabAsset: {fileID: 0}
---- !u!225 &6505376943950345604 stripped
-CanvasGroup:
-  m_CorrespondingSourceObject: {fileID: 6303195616330956602, guid: d13625a8928721c4d8c58190b4816059, type: 3}
   m_PrefabInstance: {fileID: 954427604584729278}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &2132410345277766320
