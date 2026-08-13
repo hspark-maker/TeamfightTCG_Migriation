@@ -219,6 +219,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 색으로 잠긴 티를 내는 건 **세션 잠금**뿐이다. 넘김 잠금은 0.3초짜리라 Button의 Color Tint가
         // 켜졌다 꺼지는 것이 "dim이 풀렸다 돌아온다 / 칸이 깜빡인다"로 보인다.
         // 짧은 잠금은 색을 건드리지 않고 눌렀을 때 걸러낸다(HandleCloseRequest·HandleStepRequest).
+        //
+        // ⚠ Dim 버튼만은 **Transition을 None으로 저작**해야 한다. 딤판의 실제 색은
+        //   Image.color × 버튼 상태색이라, ColorTint면 여기서 끄는 순간 disabledColor(알파 0.5)가 곱해져
+        //   딤이 반쯤 옅어진다 — Image 알파를 아무리 올려도 그 절반에서 막힌다.
         bool t_dimmed = m_sessionLocked;
 
         if (dimButton != null) dimButton.interactable = !t_dimmed;
