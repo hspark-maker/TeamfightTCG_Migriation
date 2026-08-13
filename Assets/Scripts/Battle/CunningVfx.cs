@@ -92,7 +92,7 @@ public static class CunningVfx
         Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
 
         return CardAppearSequence.Play(_view, _view.BoundCard, t_from, t_mid, t_dest,
-                                       GameTiming.Battle.CardDealDuration);
+                                       GameTiming.Battle.CardDealDuration, _playSwapVfx: true);
     }
 
     /// <summary>퇴장 목표는 해당 소유자의 실제 덱 버튼. 버튼은 safe-area 하위이므로 화면 형태를 그대로 따른다.

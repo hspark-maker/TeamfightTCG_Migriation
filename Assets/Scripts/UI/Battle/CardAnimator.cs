@@ -7,8 +7,6 @@ public class CardAnimator : MonoBehaviour
 {
     [SerializeField] SpriteRenderer hitOverlay;
     [SerializeField] SpriteRenderer dieOverlay;
-    [SerializeField] HitEffectView  hitEffect;   // 피격 붐(카드 자식). 없으면 무시.
-    [SerializeField] HitEffectView  healEffect;  // 회복 붐(카드 자식, isHeal=1). 없으면 무시.
 
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
     float moveDuration => GameTiming.Battle.CardMoveDuration;
@@ -68,16 +66,6 @@ public class CardAnimator : MonoBehaviour
     /// 진행 중인 트윈에는 못 끼고 중간값에 그대로 굳는다(공격 후 아이콘만 흐린 채 남던 원인).
     /// 새로 만든 자식은 이 목표값으로 맞춘다. 알파를 바꾸는 경로는 전부 이 값을 같이 갱신할 것.</summary>
     public float FadeTarget { get; private set; } = 1f;
-
-    /// <summary>피격/회복 연출(HitEffect·HealEffect) 하위인가. 자체 페이드 시퀀스를 가지므로 카드 페이드 대상에서 제외 —
-    /// 안 그러면 fade의 DOKill이 붐/숫자 트윈을 죽이고 dim alpha로 덮어써 연출이 튄다.</summary>
-    bool IsHitEffectPart(Component _c)
-    {
-        if (_c == null) return false;
-        if (this.hitEffect  != null && _c.transform.IsChildOf(this.hitEffect.transform))  return true;
-        if (this.healEffect != null && _c.transform.IsChildOf(this.healEffect.transform)) return true;
-        return false;
-    }
 
     public Vector3 SlotPosition => this.slotPosition;
 
@@ -146,16 +134,6 @@ public class CardAnimator : MonoBehaviour
 
     public void SetBoundCard(CardInstance _card) => this.boundCard = _card;
 
-    /// <summary>진행 중인 피격/회복 연출(붐/숫자) 즉시 제거. 슬롯에 새 카드가 들어오기 전 호출 → 잔여 연출 이월 방지.</summary>
-    public void ResetHitEffect()
-    {
-        this.hitEffect?.Stop();
-        this.healEffect?.Stop();
-    }
-
-    /// <summary>회복 연출(붐 + "+N"). 순수 연출 — 게임상태/RNG 무관, 활성 클라 시각 표시만.</summary>
-    public void PlayHealEffect(int _amount) => this.healEffect?.Play(_amount);
-
     // ── Move ─────────────────────────────────────────────────────────────
 
     /// <summary>내 필드의 가운데로. 공격자·피격자가 각자 자기 필드 중앙에 선다(세로 줄은 그대로 유지).
@@ -208,7 +186,6 @@ public class CardAnimator : MonoBehaviour
             SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
             if (t_sr == this.dieOverlay) continue;
-            if (IsHitEffectPart(t_sr)) continue;
             if (this.fadeExcludes.Contains(t_sr)) continue;
             t_sr.DOKill();
             t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], _duration).SetLink(gameObject);
@@ -216,7 +193,6 @@ public class CardAnimator : MonoBehaviour
         for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
             TMP_Text t_tmp = this.cachedTexts[t_i];
-            if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
             t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], _duration).SetLink(gameObject);
         }
@@ -232,14 +208,12 @@ public class CardAnimator : MonoBehaviour
             SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
             if (t_sr == this.dieOverlay) continue;
-            if (IsHitEffectPart(t_sr)) continue;
             t_sr.DOKill();
             t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
         for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
             TMP_Text t_tmp = this.cachedTexts[t_i];
-            if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
             t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
@@ -387,8 +361,7 @@ public class CardAnimator : MonoBehaviour
     {
         if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
-        this.hitEffect?.Play(_damage);          // 피격 붐 + 데미지 숫자(있으면). 위치=이 카드.
-        PlayHitTwitch(_damage, _awayDir);       // 맞은 순간 밀림+떨림(붐과 같은 프레임에 시작)
+        PlayHitTwitch(_damage, _awayDir);
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();
         Color t_c = this.hitOverlay.color;

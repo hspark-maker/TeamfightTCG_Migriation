@@ -317,9 +317,9 @@ public static class AttackSequence
         // 이 부호 하나를 공유한다 — 따로 계산하면 둘이 어긋나 반대로 휘두르는 그림이 나온다.
         float t_sideSign = Mathf.Sign(_splashView.transform.position.x - _defender.transform.position.x);
 
-        // 베기 프리팹은 왼쪽 → 오른쪽으로 긋는 그림이다. 광역 대상이 왼쪽이면 칼도 오른쪽 → 왼쪽으로
-        // 쓸어내리므로 좌우를 뒤집어야 그림과 궤적이 맞는다.
-        bool t_mirror = t_sideSign < 0f;
+        // 베기 프리팹은 **오른쪽 → 왼쪽**으로 긋는 그림이다. 광역 대상이 왼쪽이면 궤적도 같은 방향이라
+        // 그대로 쓰고, 오른쪽이면 좌우를 뒤집어야 그림과 궤적이 맞는다.
+        bool t_mirror = t_sideSign > 0f;
 
         // 휘두름(칼 궤적)이 지나가는 자리 = 두 대상의 가운데. 한 번 그은 칼이 둘을 함께 쓸고 가는 그림이라
         // 어느 한쪽에 붙이면 나머지 하나는 안 맞은 것처럼 보인다.
@@ -524,7 +524,7 @@ public static class AttackSequence
         return new Vector3(Mathf.Cos(t_rad), Mathf.Sin(t_rad), 0f);
     }
 
-    /// <summary>좌우 뒤집기. 베기 프리팹은 **왼쪽 → 오른쪽으로 긋는 그림 하나뿐**이라, 반대로 벨 때
+    /// <summary>좌우 뒤집기. 베기 프리팹은 **오른쪽 → 왼쪽으로 긋는 그림 하나뿐**이라, 반대로 벨 때
     /// 그냥 쓰면 칼이 가는 방향과 자국이 어긋난다. Y축 180도 = 평면 그림의 좌우 거울(적 진영의 X축 180도와 같은 규약).</summary>
     static readonly Quaternion MirrorRot = Quaternion.Euler(0f, 180f, 0f);
 

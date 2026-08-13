@@ -332,10 +332,9 @@ public class CardView : MonoBehaviour
     #region Visual State
     public void Render(CardInstance _card, SynergyState _synergy = null)
     {
-        // 슬롯 점유 카드가 바뀌면(사망→새 카드 스폰 등) 이전 피격 연출 잔여 제거 → 새 카드에 이월 방지.
+        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 초기화한다.
         if (this.boundCard != _card)
         {
-            this.cardAnim.ResetHitEffect();
             this.armedVfxView?.Hide();   // 이전 카드의 무장 이펙트가 새 카드에 남지 않게
             // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
             KillHpRoll();
@@ -774,8 +773,7 @@ public class CardView : MonoBehaviour
         // 숫자는 즉시 최종값으로 튀지 않고 굴러 내려간다(아이콘 팝 → 6·5·4·3 → 복귀).
         if (this.boundCard != null)
             AnimateHpDisplay(this.boundCard.hp, this.boundCard.bonusHp);
-        // 피격 파티클은 라이브러리 소유(미배선이면 무동작). 붐/숫자는 프리팹의 HitEffectView가 계속 담당 —
-        // 그쪽은 카드에 상주하며 상태(시퀀스/숫자)를 가지므로 1회성 파티클과 축이 다르다.
+        // 피격 파티클은 라이브러리 소유(미배선이면 무동작).
         Vector3 t_awayDir = _hitFrom != null ? transform.position - _hitFrom.transform.position : default;
         t_awayDir.z = 0f;   // 화면 평면 방향만 — 시네마 중 z가 벌어져 있으면 먼지가 카메라 쪽으로 튄다
         // 먼지의 양·속도도 화면 흔들림·카드 반동과 같은 세기(피해/최대체력)를 따른다 — 세 연출이 갈리면
@@ -801,11 +799,10 @@ public class CardView : MonoBehaviour
             t_ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         // 사망 파티클은 **카드에 붙이지 않는다**. 붙이면 위 Stop 루프와 사망 직후 HideSlot이 카드를 끄면서
-        // 별가루까지 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
+        // 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
         // 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
         Vector3 t_deathPosition = transform.position;
 
-        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
         UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
 
         // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
@@ -831,7 +828,7 @@ public class CardView : MonoBehaviour
         await t_seq.ToUniTask().SuppressCancellationThrow();
     }
 
-    /// <summary>회복 연출(회복 파티클 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
+    /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
     /// 회복이면 경로(힐러/돌보미/청소부/유산/부활) 불문 여기 하나로 수렴한다.</summary>
     public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
     {
@@ -852,7 +849,6 @@ public class CardView : MonoBehaviour
             AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
         }
         BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
-        this.cardAnim.PlayHealEffect(_amount);   // 숫자("+N") — 붐 스프라이트는 프리팹에서 비우면 파티클만 남는다
     }
     public void FadeView(float _alpha, float _dur) => this.cardAnim.FadeView(_alpha, _dur);
 
@@ -867,16 +863,11 @@ public class CardView : MonoBehaviour
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
     {
-        if (!UsesOrbAppear)
-        {
-            await this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
-            PlayPlacedEmblems();
-            return;
-        }
-
         // 구체 등장도 앞 토막(덱에서 나와 중앙 확대·정지)을 그대로 탄다 — 카드 정보를 보여주는 구간이
         // 이 연출에만 없으면 고등급 카드가 오히려 뭔지 모른 채 지나간다. 중간 정지는 일반 배치와 같은 값.
+        // 일반 배치와 구체 등장의 차이는 두 토막 **안쪽**(PlayDealToSlot)에서 갈리므로 여기선 나누지 않는다.
         await PlayDealToMid(_from, _mid, _dest, _duration);
+        if (this == null) return;
         bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
                 cancellationToken: this.GetCancellationTokenOnDestroy())
             .SuppressCancellationThrow();
@@ -892,8 +883,11 @@ public class CardView : MonoBehaviour
     /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
     /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
     /// 구체 등장도 같은 앞 토막을 쓴다 — 중앙에 선 카드가 뒤 토막에서 구체로 변신한다.</summary>
-    public UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+    public async UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+    {
+        await this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+        if (this == null) return;
+    }
 
     /// <summary>뒤 토막: 중앙 → 슬롯. 구체 등장 카드는 중앙에 선 카드가 구체로 변신한 뒤 날아간다
     /// (_morphFromCard) — 카드가 이미 중앙에 있으므로 구체를 새로 "생성"하면 카드가 순간 사라져 보인다.</summary>

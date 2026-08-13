@@ -720,6 +720,18 @@ public class CardInputController
 
         // 화면이 무장 상태가 된 뒤 상태 확정 + 통지(프리뷰 타겟은 해제 시 되돌리기용으로 넘긴다).
         BattleSelection.Arm(this.owner, t_targets);
+        if (t_targets.Exists(cv => BattleRules.IsTaunt(cv?.BoundCard)))
+            PlayTauntBlockedVfx(this.owner);
+    }
+
+    /// <summary>도발 차단 안내 이펙트를 **무장한 공격자 카드 위에** 띄운다.
+    /// flip을 끄는 이유: 이건 타격 방향이 있는 파편류가 아니라 카드 위에 서는 표식이라,
+    /// 진영에 따라 뒤집으면 위로 솟는 그림이 아래로 뒤집힌다(무장은 항상 내 카드지만 규약을 명시해 둔다).</summary>
+    static void PlayTauntBlockedVfx(CardView _armed)
+    {
+        if (_armed == null) return;
+        BattleVfx.PlayAttached(BattleVfxId.TauntBlocked, _armed.transform,
+                               _flip: false, _armed.VfxSortingLayerId);
     }
 
     // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(유효 필터는 공격자 기준).
@@ -729,9 +741,11 @@ public class CardInputController
         if (t_armed == null) return;                       // 미무장 — 무동작(정보는 롱프레스).
         if (t_armed.BoundCard == null) { BattleSelection.Clear(); return; }
 
-        var t_valid = GetValidEnemyViews(t_armed);
+        var t_valid = GetValidEnemyViews(t_armed, out BattleRules.TargetFilter t_filter);
         if (!t_valid.Contains(this.owner))
         {
+            if (t_filter == BattleRules.TargetFilter.Taunt)
+                PlayTauntBlockedVfx(t_armed);
             RejectAsTarget(this.owner, t_valid);   // 침묵 무시 금지 — "저기 말고 여기"를 흔들기+펄스+문구로.
             return;
         }

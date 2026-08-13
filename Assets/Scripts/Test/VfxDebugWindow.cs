@@ -269,7 +269,7 @@ public class VfxDebugWindow : MonoBehaviour
         GUILayout.Label("── 카드 연출 ──");
 
         GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Heal +N @T") && Target() != null) Target().PlayHealEffect(this.healAmount);
+        if (GUILayout.Button("Heal VFX @T") && Target() != null) Target().PlayHealEffect(this.healAmount);
         if (GUILayout.Button("Hit @T") && Target() != null)     Target().PlayHitAnim(0.15f, this.healAmount, Source()).Forget();
         GUILayout.EndHorizontal();
 

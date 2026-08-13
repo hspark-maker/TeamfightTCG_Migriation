@@ -19,12 +19,12 @@ public static class CardAppearSequence
     /// <summary><paramref name="_card"/>는 컷씬 자격 판정 대상(= 이 슬롯에 들어온 인스턴스).
     /// 뷰의 BoundCard와 같아야 한다 — 호출 전 Refresh/Render가 끝나 있어야 하는 이유.</summary>
     public static async UniTask Play(CardView _view, CardInstance _card,
-        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration)
+        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration, bool _playSwapVfx = false)
     {
         if (_view == null) return;
 
         VideoClip t_clip = CardCinematicRules.Resolve(_card);
-        if (t_clip == null)
+        if (t_clip == null && !_playSwapVfx)
         {
             await _view.PlayDealAnim(_from, _mid, _dest, _duration);
             return;
@@ -32,7 +32,22 @@ public static class CardAppearSequence
 
         // 컷씬은 **중앙에 멈춘 채** 본다. 끝나거나 스킵된 그 시점에 슬롯으로 들어간다.
         await _view.PlayDealToMid(_from, _mid, _dest, _duration);
-        await CardCinematicPlayer.Play(t_clip);
+        if (_view == null) return;
+
+        if (_playSwapVfx)
+            BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
+
+        if (t_clip != null)
+            await CardCinematicPlayer.Play(t_clip);
+        else
+        {
+            bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
+                    cancellationToken: _view.GetCancellationTokenOnDestroy())
+                .SuppressCancellationThrow();
+            if (t_cancelled) return;
+        }
+
+        if (_view == null) return;
         await _view.PlayDealToSlot(_mid, _dest, _duration);
     }
 }
