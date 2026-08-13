@@ -9,6 +9,10 @@ using UnityEngine.UI;
 public class AlbumPageOverlayView : MonoBehaviour
 {
     [Header("닫기")]
+    [Tooltip("바깥을 눌러 닫는 딤판. **이 버튼이 딤판 그 자체**여야 한다 — 닫기 판정만 맡는 투명 버튼이면 안 된다.\n" +
+             "삽입 연출 중 SetFrontmost가 이 rect를 화면 끝까지 늘려 상단바·탭바까지 덮게 하므로,\n" +
+             "판정과 그림이 갈리면 늘어나는 것과 어두워지는 것이 서로 다른 오브젝트가 된다.\n\n" +
+             "⚠ Transition은 None으로 저작한다 — ColorTint면 잠금 시 상태색이 곱해져 딤이 옅어진다(ApplyInteractable 참고).")]
     [SerializeField] Button dimButton;
     [SerializeField] Button closeButton;
 
@@ -106,6 +110,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
 
+    // 딤판의 rect. 닫기 버튼과 같은 오브젝트라는 저작 규약을 여기 한 곳에서만 읽는다(dimButton 툴팁 참고).
+    RectTransform DimRect => dimButton != null ? dimButton.transform as RectTransform : null;
+
     public int PageIndex => m_pageIndex;
 
     /// <summary>넘김 한 번에 걸리는 시간의 단일 진실원 — 삽입 세션이 따로 값을 들고 있지 않게 한다.</summary>
@@ -168,7 +175,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     /// ⚠ 자리(계층)는 건드리지 않는다 — 옮기면 rect가 바뀌어 프레임과 격자가 딸려 움직인다.</summary>
     public void SetFrontmost(bool _front)
     {
-        var t_dim = dimButton != null ? dimButton.transform as RectTransform : null;
+        RectTransform t_dim = this.DimRect;
 
         if (_front)
         {

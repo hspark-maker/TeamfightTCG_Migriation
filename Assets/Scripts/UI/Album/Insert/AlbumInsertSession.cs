@@ -117,7 +117,9 @@ public class AlbumInsertSession : MonoBehaviour
         else pageOverlay.Open(t_first.Theme, t_first.PageIndex);
 
         gameObject.SetActive(true);
-        transform.SetAsLastSibling();   // 프리팹 저작 순서 방어(중첩 Canvas·overrideSorting은 쓰지 않는다)
+        // 오버레이 안에서의 순서 방어 — 이 패널은 형제 순서로만 딤·프레임 위에 선다.
+        // (오버레이 자신이 로비 셸 위로 올라서는 것은 별개다 — AlbumPageOverlayView.SetFrontmost)
+        transform.SetAsLastSibling();
 
         // 부모(오버레이)가 끝내 안 켜졌으면 StartCoroutine이 예외다 — 위장을 되돌리고 조용히 물러난다.
         if (!gameObject.activeInHierarchy)
