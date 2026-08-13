@@ -20,5 +20,7 @@ public class UserSaveData
 
     public CardGrowthSaveData cardGrowth = new CardGrowthSaveData();
 
+    public KeywordGrowthSaveData keywordGrowth = new KeywordGrowthSaveData();
+
     public AlbumRewardSaveData albumReward = new AlbumRewardSaveData();
 }
