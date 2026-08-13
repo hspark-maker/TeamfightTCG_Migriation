@@ -12,10 +12,23 @@ public static class TriggeredTutorialRunner
     // 트리거가 실제로 발화했을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
     public static event Action OnActivated;
 
+    // 남은 트리거 목록이 달라졌을 때(주입·발화·완주·중단) — 알림 점이 이걸 보고 다시 그린다
+    public static event Action OnChanged;
+
     public static bool IsRunning => s_active != null;
 
     // 실행 중인 묶음 안에서의 스텝 순번
     public static int StepIndex => s_index;
+
+    // 이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
+    // UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).
+    public static bool HasPending(EOutgameTutorialTrigger _trigger)
+    {
+        if (_trigger == EOutgameTutorialTrigger.None) return false;
+        if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
+
+        return TryGetEntry(_trigger, out var t_entry) && t_entry.StepCount > 0;
+    }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
     public static void EnsureData(TriggeredTutorialData _data)
@@ -30,6 +43,9 @@ public static class TriggeredTutorialRunner
         }
 
         s_data = _data;
+
+        // 주입 전의 HasPending은 전부 false다 — 그 답을 이미 그린 쪽에 다시 물어보게 한다.
+        OnChanged?.Invoke();
     }
 
     // 트리거 발화(아래 무시 조건은 전부 정상 경로라 경고하지 않는다)
@@ -47,6 +63,7 @@ public static class TriggeredTutorialRunner
         s_index  = 0;
 
         OnActivated?.Invoke();
+        OnChanged?.Invoke();
     }
 
     // 현재 좌표가 가리키는 스텝(미실행·범위 밖·빈 칸이면 false)
@@ -88,6 +105,9 @@ public static class TriggeredTutorialRunner
     {
         s_active = null;
         s_index  = 0;
+
+        // 디버그 낙인 초기화가 이 경로로 들어온다 — 걷힌 트리거를 알림 점이 다시 집어야 한다.
+        OnChanged?.Invoke();
     }
 
     static bool TryGetEntry(EOutgameTutorialTrigger _trigger, out TriggeredTutorialEntry _entry)
@@ -115,6 +135,8 @@ public static class TriggeredTutorialRunner
 
         s_active = null;
         s_index  = 0;
+
+        OnChanged?.Invoke();
     }
 
     // 트리거 런의 진행 좌표를 메모리에만 두는 싱크(챕터 축이 없어 _chapter는 무시)

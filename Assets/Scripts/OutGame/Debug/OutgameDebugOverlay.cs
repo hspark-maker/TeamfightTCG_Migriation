@@ -1,6 +1,63 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using UnityEngine;
 using UnityEngine.EventSystems;
+using System.Collections.Generic;
+
+static class OutgameDebugInputLock
+{
+    static readonly HashSet<object> s_owners = new HashSet<object>();
+    static EventSystem s_events;
+    // 잠그기 전 상태. 무조건 true로 복원하면 게임이 원래 꺼둔 EventSystem을 켜 버린다.
+    static bool s_wasEnabled;
+
+    public static void Acquire(object _owner)
+    {
+        if (_owner == null || !s_owners.Add(_owner)) return;
+        if (s_owners.Count > 1) return;
+
+        Lock(EventSystem.current);
+    }
+
+    public static void Release(object _owner)
+    {
+        if (_owner == null || !s_owners.Remove(_owner) || s_owners.Count > 0) return;
+
+        Unlock();
+    }
+
+    /// <summary>씬 전환 등으로 EventSystem이 새로 생기면 그쪽도 잠근다.
+    ///
+    /// **null은 "바뀌었다"가 아니라 "이미 잠겼다"로 읽어야 한다** — `enabled = false`로 끈 EventSystem은
+    /// `EventSystem.current`에서 빠지기 때문이다. 여기서 s_events를 null로 덮으면 복원 대상을 잃고,
+    /// 패널을 닫아도 EventSystem이 꺼진 채 남아 화면 입력이 영구히 죽는다.</summary>
+    public static void Refresh()
+    {
+        if (s_owners.Count == 0) return;
+
+        EventSystem t_events = EventSystem.current;
+        if (t_events == null || t_events == s_events) return;
+
+        Unlock();
+        Lock(t_events);
+    }
+
+    static void Lock(EventSystem _events)
+    {
+        s_events = _events;
+        if (s_events == null) return;
+
+        s_wasEnabled     = s_events.enabled;
+        s_events.enabled = false;
+    }
+
+    static void Unlock()
+    {
+        if (s_events != null && s_wasEnabled) s_events.enabled = true;
+
+        s_events     = null;
+        s_wasEnabled = false;
+    }
+}
 
 // 런타임 아웃게임 디버그 패널 (배선 없이 자동 생성, 우상단 [DEBUG] 또는 F8)
 public class OutgameDebugOverlay : MonoBehaviour
@@ -22,8 +79,6 @@ public class OutgameDebugOverlay : MonoBehaviour
 
     // 패널이 화면보다 길어졌을 때의 스크롤 위치.
     Vector2 m_scroll;
-
-    EventSystem m_lockedEvents;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Bootstrap()
@@ -47,6 +102,8 @@ public class OutgameDebugOverlay : MonoBehaviour
 
     void OnGUI()
     {
+        OutgameDebugInputLock.Refresh();
+
         float      t_scale = Mathf.Max(1f, Screen.height / REFERENCE_HEIGHT);
         Matrix4x4  t_prev  = GUI.matrix;
         GUI.matrix = Matrix4x4.Scale(new Vector3(t_scale, t_scale, 1f));
@@ -82,6 +139,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET TRIGGERS",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTriggeredTutorials();
         if (GUILayout.Button(OutgameFeatureLock.ForceUnlockAllForDebug ? "FEATURE LOCK: OFF" : "FEATURE LOCK: ON",
                                                  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ToggleFeatureLock();
+        if (GUILayout.Button("MAX GROWTH (ALL)", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.MaxCardGrowth();
         if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
@@ -98,7 +156,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     {
         RankInfo t_info = RankManager.GetInfo();
 
-        GUILayout.Label($"TIER {t_info.DisplayName}  (AI Lv{RankManager.AiCardLevel})");
+        GUILayout.Label($"TIER {t_info.DisplayName}  (AI Lv{RankManager.AiCardLevel})  ※ ±는 씬 재진입 시 연출");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
@@ -131,16 +189,8 @@ public class OutgameDebugOverlay : MonoBehaviour
     void SetOpen(bool _open)
     {
         m_open = _open;
-
-        if (_open)
-        {
-            m_lockedEvents = EventSystem.current;
-            if (m_lockedEvents != null) m_lockedEvents.enabled = false;
-            return;
-        }
-
-        if (m_lockedEvents != null) m_lockedEvents.enabled = true;
-        m_lockedEvents = null;
+        if (_open) OutgameDebugInputLock.Acquire(this);
+        else OutgameDebugInputLock.Release(this);
     }
 }
 #endif

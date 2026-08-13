@@ -85,7 +85,13 @@ public static class OutgameFeatureLock
         if (s_all) return true;
 
         foreach (var t_row in OutgameTutorialRunner.EnumerateUpTo(t_chapter, t_step))
+        {
+            // 저작이 "여기서부터 전부"라고 못 박은 스텝을 지났으면 남은 목록을 볼 것도 없다 —
+            // 안내는 계속 돌지만 게임의 문은 그 자리에서 열린다(졸업까지 기다리지 않는다).
+            if (t_row != null && t_row.UnlocksAll) s_all = true;
+
             Collect(t_row);
+        }
 
         if (s_unlocked.Count == 0 && !HasAnyAuthoredUnlock()) s_all = true;
 

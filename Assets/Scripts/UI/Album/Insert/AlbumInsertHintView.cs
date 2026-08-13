@@ -20,8 +20,14 @@ public class AlbumInsertHintView : MonoBehaviour
     [SerializeField] RectTransform finger;
     [SerializeField] TMP_Text      guideLabel;
     [SerializeField] Button        skipButton;
+    [Tooltip("건너뛰기 버튼의 글자. 남은 장수와 단계에 따라 세션이 갈아 끼운다.")]
+    [SerializeField] TMP_Text      skipLabel;
     [Tooltip("하단 문구 y 계산 기준. 미배선이면 문구는 프리팹 저작 위치에 그대로 둔다.")]
     [SerializeField] RectTransform canvasRect;
+
+    [Tooltip("건너뛰기가 떠오르는 시간. 탭바가 걷히는 시간과 맞춘다 —\n" +
+             "빈자리에 버튼이 즉시 튀어나오면 탭을 누르려던 손가락이 그대로 눌러 버린다.")]
+    [SerializeField] float skipFadeDuration = 0.2f;
 
     [Header("연출 (값 원본 = OutgameTutorialGateUI)")]
     [Tooltip("손가락이 아래로 미는 거리. 튜토리얼의 제자리 펄스와 달리 방향이 있어야 '민다'로 읽힌다.")]
@@ -35,23 +41,66 @@ public class AlbumInsertHintView : MonoBehaviour
     Vector2       m_fingerHome;   // 손가락 왕복의 기준점. 미는 트윈이 도는 중에 다시 잡으면 자리가 밀린다
     Tween         m_moveTween;
     Tween         m_pulseTween;
+    CanvasGroup   m_skipGroup;
+    bool          m_skipShown;    // 이미 떠 있는 버튼을 다시 페이드인하면 장마다 깜빡인다
 
-    /// <summary>안내를 켠다. <paramref name="_anchor"/>는 지금 밀어야 할 카드(홀더) rect.</summary>
+    /// <summary>안내를 켠다. <paramref name="_anchor"/>는 지금 밀어야 할 카드(홀더) rect.
+    /// <b>건너뛰기는 건드리지 않는다</b> — 자동 진행 중에는 안내만 꺼지고 버튼은 남아야 한다.</summary>
     public void Show(string _message, RectTransform _anchor)
     {
         this.PlaceMessage(_message);
         this.PlaceFinger(_anchor);
         this.ResumeFinger();
-
-        if (this.skipButton != null) this.skipButton.gameObject.SetActive(true);
     }
 
+    /// <summary>건너뛰기의 표시 여부와 글자를 정한다. 안내(손가락·문구)와 수명이 갈리므로 따로 둔다.</summary>
+    public void SetSkip(bool _visible, string _label)
+    {
+        if (this.skipButton == null) return;
+
+        if (this.skipLabel != null && !string.IsNullOrEmpty(_label)) this.skipLabel.text = _label;
+
+        if (!_visible)
+        {
+            this.HideSkip();
+            return;
+        }
+
+        this.skipButton.gameObject.SetActive(true);
+
+        if (this.m_skipShown) return;   // 이미 떠 있다 — 글자만 갈아 끼운다
+        this.m_skipShown = true;
+
+        if (this.m_skipGroup == null) return;
+
+        this.m_skipGroup.DOKill();
+        this.m_skipGroup.alpha = 0f;
+        this.m_skipGroup.DOFade(1f, Mathf.Max(0.01f, this.skipFadeDuration))
+                        .SetEase(Ease.OutQuad)
+                        .SetUpdate(true)
+                        .SetTarget(this.m_skipGroup)
+                        .SetLink(this.skipButton.gameObject);
+    }
+
+    /// <summary>안내(손가락·문구)만 걷는다. <b>건너뛰기는 남는다</b> — 걷으려면 SetSkip(false)를 따로 부른다.</summary>
     public void Hide()
     {
         this.StopFinger();
 
         if (this.finger != null)     this.finger.gameObject.SetActive(false);
         if (this.guideLabel != null) this.guideLabel.gameObject.SetActive(false);
+    }
+
+    void HideSkip()
+    {
+        this.m_skipShown = false;
+
+        if (this.m_skipGroup != null)
+        {
+            this.m_skipGroup.DOKill();
+            this.m_skipGroup.alpha = 1f;   // 다음 등장이 0에서 출발하도록 기준값으로 되돌린다
+        }
+
         if (this.skipButton != null) this.skipButton.gameObject.SetActive(false);
     }
 
@@ -92,9 +141,17 @@ public class AlbumInsertHintView : MonoBehaviour
 
         if (this.skipButton != null) this.skipButton.onClick.AddListener(() => OnSkip?.Invoke());
 
+        // 저작에 없어도 연출은 돌아야 한다 — 없으면 페이드 없이 즉시 뜨는 대신 붙여서 쓴다.
+        if (this.skipButton != null)
+        {
+            this.m_skipGroup = this.skipButton.GetComponent<CanvasGroup>();
+            if (this.m_skipGroup == null) this.m_skipGroup = this.skipButton.gameObject.AddComponent<CanvasGroup>();
+        }
+
         if (this.finger != null) this.m_fingerHome = this.finger.anchoredPosition;
 
         this.Hide();
+        this.HideSkip();
     }
 
     void OnDisable()

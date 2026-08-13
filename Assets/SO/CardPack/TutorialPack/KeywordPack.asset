@@ -12,16 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ef172436211a3934fb172f7d6ab7ebab, type: 3}
   m_Name: KeywordPack
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
-  packId: KeywordPack
-  displayName: "\uD0A4\uC6CC\uB4DC\uD329"
-  packArt: {fileID: 21300000, guid: d7b67b0e4ec24ae4a98f88e09f47e426, type: 3}
+  packId: KeywordDeck
+  displayName: "\uD0A4\uC6CC\uB4DC\uB371"
+  packArt: {fileID: 21300000, guid: d4ce91123c350714abb5804623482f6a, type: 3}
+  priceType: 0
   price: 0
   drawCount: 6
   uniqueDraw: 1
+  refundType: 0
+  refundAmount: 10
   pool:
   - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
   - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
   - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
+  rankPools: []

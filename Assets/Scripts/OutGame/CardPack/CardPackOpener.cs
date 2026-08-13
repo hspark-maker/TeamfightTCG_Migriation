@@ -6,7 +6,7 @@ public static class CardPackOpener
     static readonly System.Random s_rng = new System.Random();
 
     // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 환급, 실패 시 차감 없이 사유 반환
-    public static OpenedPack TryPurchase(CardPackData _pack, long _refundGold)
+    public static OpenedPack TryPurchase(CardPackData _pack)
     {
         if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound, null);
 
@@ -17,15 +17,16 @@ public static class CardPackOpener
         if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool, t_packId);
 
         long t_price = _pack.Price;
-        ECurrencyType t_currency = _pack.PriceType;
+        ECurrencyType t_priceCurrency = _pack.PriceType;
+        ECurrencyType t_refundType = _pack.RefundType;
 
-        if (!CurrencyManager.CanAfford(t_currency, t_price))
+        if (!CurrencyManager.CanAfford(t_priceCurrency, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold, t_packId);
 
-        if (!CurrencyManager.Spend(t_currency, t_price))
+        if (!CurrencyManager.Spend(t_priceCurrency, t_price))
             return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed, t_packId);
 
-        long t_refundEach = _refundGold < 0 ? 0 : _refundGold;
+        long t_refundEach = _pack.RefundAmount;
         int t_drawCount = _pack.DrawCount;
 
         bool t_unique = _pack.UniqueDraw;
@@ -49,7 +50,7 @@ public static class CardPackOpener
             long t_refund = 0;
             if (!t_isNew)
             {
-                CurrencyManager.Earn(t_currency, t_refundEach);
+                CurrencyManager.Earn(t_refundType, t_refundEach);
                 t_refund = t_refundEach;
             }
 
@@ -58,7 +59,7 @@ public static class CardPackOpener
 
         CurrencyManager.Save();
 
-        return OpenedPack.CreateSuccess(t_packId, t_drawn, t_currency);
+        return OpenedPack.CreateSuccess(t_packId, t_drawn, t_refundType);
     }
 
     // 가중치 추첨 — 합에서 굴린 값을 누적 스캔, uniqueDraw 제거 후에도 매회 합을 재계산

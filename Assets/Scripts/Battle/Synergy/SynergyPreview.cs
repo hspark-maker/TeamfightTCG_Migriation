@@ -31,6 +31,17 @@ public static class SynergyPreview
 {
     /// <summary>덱의 모든 시너지를 진행도와 함께 반환. 활성 먼저, 그다음 보유 수 많은 순.
     /// null 카드/빈 슬롯은 무시한다(편성 중 부분 덱 허용).</summary>
+    /// <summary>카드가 그 시너지를 갖는지. 집계(Resolve)와 강조 표시가 같은 판정을 쓰게 하는 창구다.</summary>
+    public static bool Has(CardData _card, SynergyData _synergy)
+    {
+        if (_card == null || _synergy == null || _card.synergies == null) return false;
+
+        for (int i = 0; i < _card.synergies.Length; i++)
+            if (_card.synergies[i] == _synergy) return true;
+
+        return false;
+    }
+
     public static List<SynergyProgress> Resolve(IEnumerable<CardData> _deckCards)
     {
         var t_result = new List<SynergyProgress>();

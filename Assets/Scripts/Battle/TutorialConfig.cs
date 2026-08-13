@@ -24,6 +24,10 @@ public static class TutorialConfig
     /// <summary>이 튜토리얼에서 시너지 배지 표시 + 덱 시너지 적용 여부. 기본 false(초반 튜토리얼).</summary>
     public static bool SynergyEnabled { get; private set; }
 
+    /// <summary>현재 시나리오가 양 진영 카드에 적용할 성장 레벨. Begin에서 복사해 전투 중 고정한다.</summary>
+    public static int PlayerCardLevel { get; private set; } = CardGrowth.BaseLevel;
+    public static int EnemyCardLevel  { get; private set; } = CardGrowth.BaseLevel;
+
     /// <summary>지금 시너지를 <b>화면에 보여도 되는가</b> — 배지·아이콘 줄·설명 목록의 공통 게이트.
     /// 튜토리얼 시너지 미도입 구간에서는 카드에 시너지가 붙어 있어도 적용되지 않으므로(GameInitializer가 스킵),
     /// 어디서든 보여주면 "없는 효과"를 설명하는 셈이 된다. 표시 판정은 이 프로퍼티 하나로만 한다.</summary>
@@ -64,7 +68,8 @@ public static class TutorialConfig
     {
         if (_scenario == null) { End(); return; }
         Begin(_scenario.playerDeck, _scenario.enemyDeck, _scenario.playerScript, _scenario.enemyScript,
-              _scenario.enableSynergy, _scenario.freePlayAfterScript);
+              _scenario.enableSynergy, _scenario.freePlayAfterScript,
+              _scenario.PlayerCardLevel, _scenario.EnemyCardLevel);
         EnemyMaxHpOverride = _scenario.enemyMaxHpOverride;   // 리스트 Begin이 0으로 리셋한 뒤 시나리오 값 반영.
         ShowDeckGate       = _showDeckGate;                  // 같은 이유로 리스트 Begin 뒤에 반영.
     }
@@ -72,10 +77,13 @@ public static class TutorialConfig
     /// <summary>SO 없이 리스트로 직접 시작(셋업 씬 인스펙터 저작용).</summary>
     public static void Begin(List<CardData> _playerDeck, List<CardData> _enemyDeck,
                              List<ScriptedAttack> _playerScript, List<ScriptedAttack> _enemyScript,
-                             bool _enableSynergy = false, bool _freePlayAfterScript = false)
+                             bool _enableSynergy = false, bool _freePlayAfterScript = false,
+                             int _playerCardLevel = CardGrowth.BaseLevel, int _enemyCardLevel = CardGrowth.BaseLevel)
     {
         IsActive = true;
         SynergyEnabled = _enableSynergy;
+        PlayerCardLevel = System.Math.Max(CardGrowth.BaseLevel, _playerCardLevel);
+        EnemyCardLevel  = System.Math.Max(CardGrowth.BaseLevel, _enemyCardLevel);
         FreePlayAfterScript = _freePlayAfterScript;
         EnemyMaxHpOverride = 0;   // 리스트 직접 시작 기본값(시나리오 Begin이 이후 덮어씀).
         ShowDeckGate = false;     // 동상. 셋업 씬 저작은 덱을 직접 넣으므로 게이트를 띄울 이유가 없다.
@@ -93,6 +101,8 @@ public static class TutorialConfig
     {
         IsActive       = false;
         SynergyEnabled = false;
+        PlayerCardLevel = CardGrowth.BaseLevel;
+        EnemyCardLevel  = CardGrowth.BaseLevel;
         FreePlayAfterScript = false;
         EnemyMaxHpOverride = 0;
         ShowDeckGate   = false;

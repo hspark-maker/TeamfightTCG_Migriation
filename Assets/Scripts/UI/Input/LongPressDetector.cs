@@ -19,6 +19,11 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
     /// 같은 cancelDistance 하나로 롱프레스와 탭이 같은 기준을 공유한다.</summary>
     public Action OnTap;
 
+    /// <summary>탭·롱프레스를 취소하는 드리프트 거리. 스크롤 제스처와 갈라야 하는 화면만 좁게 쥐면 되고,
+    /// ScrollRect가 없는 화면은 크게 열어 둔다 — 그런 곳에서 이 가드는 지킬 제스처 없이 빠른 탭만 잡아먹는다
+    /// (손가락을 고정해 눌렀다 떼야만 열려 "꾹 눌러야 열린다"로 읽힌다). <see cref="float.MaxValue"/> = 취소 없음.</summary>
+    public float CancelDistance { set => this.cancelDistance = value; }
+
     bool    pressing, fired;
     float   timer;
     Vector2 startPos;

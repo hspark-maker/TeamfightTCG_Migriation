@@ -21,6 +21,12 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     GridLayoutGroup m_grid;
 
+    // 스크롤 잠금 전 축 설정. 잠금은 겹쳐 걸리지 않는다(m_scrollLocked) — 잠긴 상태에서 또 저장하면
+    // 꺼둔 값(false)을 원래 값으로 기억해 영영 못 푼다.
+    bool m_scrollLocked;
+    bool m_scrollWasVertical;
+    bool m_scrollWasHorizontal;
+
     public ScrollRect Scroll => scrollRect;
 
     // 드래그 고스트를 타일과 같은 크기로 띄우기 위한 값. 저작 시점 값을 쓸 수 없다 —
@@ -76,6 +82,47 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
             t_tile.SetInDeck(_deck != null && Contains(_deck, t_tile.Card));
         }
+    }
+
+    // 시너지 아이콘 롱프레스 중 해당 시너지를 가진 타일만 남기고 나머지를 죽인다. null이면 전부 해제.
+    public void SetSynergyFocus(SynergyData _synergy)
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        {
+            var t_tile = m_tiles[t_i];
+            if (t_tile == null) continue;
+
+            t_tile.SetSynergyFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+        }
+    }
+
+    // 시너지 설명창이 떠 있는 동안 목록을 세운다. 아이콘을 누른 손가락이 위아래로 움직여도
+    // 그 이동이 목록 스크롤로 흘러가면, 강조해서 보라고 띄운 화면이 그대로 흘러가 버린다.
+    //
+    // ScrollRect를 통째로 끄지 않는 이유: 드래그 도중 비활성화되면 OnEndDrag를 못 받아
+    // 내부 드래그 상태가 켜진 채 남고 다음 터치에서 관성이 튄다. 축만 닫으면 이벤트는 정상적으로 끝난다.
+    public void SetScrollLocked(bool _on)
+    {
+        if (scrollRect == null || _on == m_scrollLocked) return;
+
+        m_scrollLocked = _on;
+
+        if (_on)
+        {
+            m_scrollWasVertical   = scrollRect.vertical;
+            m_scrollWasHorizontal = scrollRect.horizontal;
+            scrollRect.vertical   = false;
+            scrollRect.horizontal = false;
+        }
+        else
+        {
+            scrollRect.vertical   = m_scrollWasVertical;
+            scrollRect.horizontal = m_scrollWasHorizontal;
+        }
+
+        // 잠글 때는 굴러가던 관성을 끊고, 풀 때는 잠긴 동안 쌓인 이동량이 튀어나오지 않게 한다.
+        scrollRect.StopMovement();
+        scrollRect.velocity = Vector2.zero;
     }
 
     public void Clear()

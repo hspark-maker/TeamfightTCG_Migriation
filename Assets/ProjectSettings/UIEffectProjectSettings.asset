@@ -73,5 +73,7 @@ ShaderVariantCollection:
   - first: {fileID: 4800000, guid: 935b7be1c88464d2eb87204fdfab5a38, type: 3}
     second:
       variants:
+      - keywords: TONE_GRAYSCALE
+        passType: 0
       - keywords: TRANSITION_SHINY
         passType: 0

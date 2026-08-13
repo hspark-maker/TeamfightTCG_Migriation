@@ -10,6 +10,9 @@ public static class BattleCleanup
         BattleResultBeat.Reset();
         BattleFinisher.Disarm();
 
+        // 전투 BGM은 전투 씬 것이다 — SoundManager가 DontDestroyOnLoad라 여기서 안 끊으면 로비까지 따라간다.
+        SoundManager.Instance?.StopBGM();
+
         DOTween.KillAll();
         ParticlePooler.Flush();
         ObjectPooler.Flush<UnityEngine.GameObject>();

@@ -95,6 +95,7 @@ public class CardAnimator : MonoBehaviour
             this.twitchHomeRot   = this.twitchTarget.localRotation;
             this.twitchHomeScale = this.twitchTarget.localScale;
         }
+
     }
 
     /// <summary>이 카드가 속한 필드의 가운데 자리(월드). 시네마 집결 지점 —
@@ -399,9 +400,15 @@ public class CardAnimator : MonoBehaviour
 
     // 사망 연출 형태값(거리·배율이라 시간이 아니다 → BattleTimingConfig가 아니라 여기).
     const float DEATH_LIFT_DISTANCE = 0.18f;   // 사라지며 떠오르는 거리(월드)
-    const float DEATH_SHRINK        = 0.92f;   // 끝 크기 배율(0까지 찌그러뜨리지 않는다)
+    const float DEATH_POP_SCALE     = 1.18f;   // 바닥 파동이 터지는 순간의 최대 배율(부풀었다 터지는 그림)
+    const float DEATH_SHRINK        = 0.45f;   // 팝 뒤 급격히 줄어드는 끝 배율
+    // 팝 이후 남은 시간 중 **실제로 줄어드는** 비율. 나머지는 정지 — "빠르게" 줄어야 터진 것으로 읽힌다.
+    const float DEATH_SHRINK_RATIO  = 0.45f;
 
-    /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 축소 → 페이드아웃.
+    /// <summary>사망 연출. 흰 플래시 → 살짝 떠오르며 <b>한 번 부풀었다가</b> 급격히 축소 + 페이드아웃.
+    /// 부푸는 정점은 바닥 파동(DeathNova)이 터지는 시각(<c>DeathNovaAt</c>)에 맞춘다 — 파동과 카드가
+    /// 같은 순간에 터져야 "여기서 터져 사라졌다"로 읽힌다. 파동을 쏘는 쪽은 <see cref="CardView"/>이고,
+    /// 두 곳이 같은 <c>GameTiming</c> 값을 공유해 박자를 맞춘다.
     /// 별가루·바닥 파동 파티클은 여기 없다 — 스폰 좌표와 정렬 레이어를 아는 <see cref="CardView"/>가 쏜다.
     /// 여기는 트윈만 소유한다.</summary>
     public async UniTask PlayDeathAnim(float _duration = -1f)
@@ -438,25 +445,38 @@ public class CardAnimator : MonoBehaviour
             }
         }
 
+        // 팝의 정점 = 바닥 파동이 터지는 시각. 그 뒤 남은 시간의 일부만 써서 확 줄인다.
+        float t_popDur    = Mathf.Clamp(GameTiming.Battle.DeathNovaAt, 0.01f, _duration);
+        float t_shrinkDur = Mathf.Max(0.01f, (_duration - t_popDur) * DEATH_SHRINK_RATIO);
+
         var t_seq = DOTween.Sequence()
             .SetLink(gameObject)
             .Join(transform.DOLocalMoveY(t_liftFrom.y + DEATH_LIFT_DISTANCE,
                                          Mathf.Min(GameTiming.Battle.DeathLift, _duration))
                            .SetEase(Ease.OutCubic))
-            .Join(transform.DOScale(Vector3.one * DEATH_SHRINK, _duration).SetEase(Ease.OutQuad));
+            // 두 스케일 트윈은 시간이 겹치지 않는다(두 번째가 첫 번째가 끝나는 지점에서 시작).
+            .Insert(0f, transform.DOScale(Vector3.one * DEATH_POP_SCALE, t_popDur).SetEase(Ease.OutQuad))
+            .Insert(t_popDur, transform.DOScale(Vector3.one * DEATH_SHRINK, t_shrinkDur)
+                                       .SetEase(Ease.OutQuint));
         if (this.dieOverlay != null)
         {
             float t_flashHalf = Mathf.Min(GameTiming.Battle.DeathFlash, _duration) * 0.5f;
             _ = t_seq.Insert(0f,           this.dieOverlay.DOFade(0.85f, t_flashHalf));
             _ = t_seq.Insert(t_flashHalf,  this.dieOverlay.DOFade(0f,    t_flashHalf));
         }
+        // 페이드는 **줄어드는 구간에 붙인다** — 부푸는 동안은 또렷하게 보이고 터지면서 함께 사라져야
+        // "부풀었다 터졌다"로 읽힌다. 부푸는 동안 이미 흐려지면 그냥 흐지부지 사라진 것이 된다.
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay || t_sr == this.dieOverlay) continue;
-            _ = t_seq.Join(t_sr.DOFade(0f, _duration).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_sr.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            _ = t_seq.Join(t_tmp.DOFade(0f, _duration).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_tmp.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
+
+        // 연출 길이의 주인은 여전히 _duration이다. 팝+축소가 그보다 먼저 끝나도 시퀀스를 끝까지 붙잡는다 —
+        // 호출부는 시퀀스 완료를 사망 완료로 본다.
+        _ = t_seq.InsertCallback(_duration, () => { });
 
         try
         {

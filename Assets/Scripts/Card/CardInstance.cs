@@ -65,6 +65,64 @@ public class CardInstance
     /// <summary>무쌍 광역 피해량. AttackDamage()와 별개 규칙 — 도발/시너지 보정 없는 순수 hp 기준(v1 시맨틱 보존).</summary>
     public int SplashDamage() => UnityEngine.Mathf.FloorToInt(this.hp * 0.5f);
 
+    // ── 강화 키워드(2차 진화 = Lv10 해금) ──
+    /// <summary>강화 효과가 열린 단계. 성장 곡선의 <c>secondEvolutionLevel</c>(기본 Lv10)에 도달하면
+    /// <see cref="evolutionStage"/>가 이 값이 된다 — 레벨 숫자를 전투 쪽에 들이지 않기 위해 단계로만 본다.</summary>
+    public const int EnhanceStage = 2;
+
+    /// <summary>이 카드가 <b>일반(키워드 없는) 카드의 강화</b> 자격을 갖는가.
+    ///
+    /// 판정을 <see cref="HasKeyword"/>가 아니라 <c>data.keywords</c>로 하는 이유: 시너지가 얹어 준 키워드나
+    /// 전투 중 걸린 표식·무적 때문에 "일반 카드"라는 정체성이 중간에 바뀌면 안 된다. 강화는 카드 원본의 속성이다.</summary>
+    public bool HasVanillaEnhance =>
+        this.evolutionStage >= EnhanceStage && this.data != null && this.data.keywords == CardKeyword.None;
+
+    /// <summary>일반 강화 추가 피해 = <b>원래 체력</b>의 절반(버림).
+    ///
+    /// 기준이 현재 hp도, 강화로 늘어난 maxHp도 아니라 <c>data.maxHp</c>인 이유: 문구가 "원래 체력"이고,
+    /// 현재 hp 기준이면 맞을수록 약해지는 도발과 같은 축이 되어 "강화"로 읽히지 않는다.
+    /// 성장 HP·덩치(bonusHp)·시너지 공격력도 섞지 않는다 — 카드마다 고정된 값이라야 예측이 선다.</summary>
+    public int VanillaEnhanceDamage() =>
+        this.data != null ? UnityEngine.Mathf.FloorToInt(this.data.maxHp * 0.5f) : 0;
+
+    /// <summary>같은 공격 안에서 연달아 들어오는 두 직격(기본타 → 강화 추가타)의 누적 결과를 <b>부작용 없이</b> 계산.
+    /// 돌려주는 값 = (실제 들어갈 총 피해, 이 공격으로 죽는가).
+    ///
+    /// 폴딩을 여기 한 곳에 두는 이유: 프리뷰(-N 표시)와 전투 종료 예측이 각자 hp를 빼 보면
+    /// 감소·무적·덩치(bonusHp) 소진 순서가 조용히 갈라진다. 실제 적용(<see cref="TakeDamage"/>)과
+    /// 같은 규칙을 한 번만 적는다.
+    ///
+    /// 무적은 <b>첫 타가 소진</b>하고 그 다음 타부터 정상으로 들어간다(TakeDamage와 같은 순서).
+    /// 첫 타로 쓰러지면 둘째 타는 아예 없다 — "살아 있는 대상에게 한 번 더"가 강화의 계약이다.</summary>
+    public (int applied, bool dies) PreviewAttackChain(int _firstRaw, int _secondRaw) =>
+        PreviewDamageChain(_firstRaw, _secondRaw, true);
+
+    /// <summary>같은 해결 순서 안에서 연달아 들어오는 두 피해의 결과를 부작용 없이 계산한다.
+    /// 공격 직격은 <paramref name="_isAttackHit"/>을 true, 반격/가시는 false로 넘긴다.</summary>
+    public (int applied, bool dies) PreviewDamageChain(int _firstRaw, int _secondRaw, bool _isAttackHit)
+    {
+        int  t_hp          = this.hp;
+        int  t_bonus       = this.bonusHp;
+        bool t_invincible  = HasKeyword(CardKeyword.Invincible);
+        int  t_applied     = 0;
+
+        for (int t_i = 0; t_i < 2; t_i++)
+        {
+            int t_raw = t_i == 0 ? _firstRaw : _secondRaw;
+            if (t_raw <= 0) continue;
+            if (t_hp <= 0) break;
+            if (t_invincible) { t_invincible = false; continue; }   // 무적 1회 소멸(피해 0)
+
+            int t_eff   = EffectiveDamage(t_raw, _isAttackHit);
+            int t_drain = UnityEngine.Mathf.Min(t_bonus, t_eff);
+            t_applied  += UnityEngine.Mathf.Min(t_eff, t_hp + t_bonus);
+            t_bonus    -= t_drain;
+            t_hp        = UnityEngine.Mathf.Max(0, t_hp - (t_eff - t_drain));
+        }
+
+        return (t_applied, t_hp <= 0);
+    }
+
     /// <summary>피해 감소(비늘/성벽)가 깎아낼 수 있는 하한. 감소가 걸려도 **최소 1은 들어간다** —
     /// 0까지 떨어지면 그 카드는 그 공격에 대해 완전 무효가 되어 전투가 멈춘다(무적과 구분이 사라진다).
     /// 원래 0인 피해에는 적용하지 않는다(없던 피해를 만들지 않는다).</summary>

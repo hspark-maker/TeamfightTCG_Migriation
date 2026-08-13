@@ -17,6 +17,8 @@ public class GameInitializer : MonoBehaviour
 
     static System.Func<CardData, CardGrowth> s_growthProvider;
     static System.Func<CardData, CardGrowth> s_enemyGrowthProvider;
+    static System.Func<CardData, CardGrowth> s_baseGrowthProvider;
+    static System.Func<CardData, int, CardGrowth> s_growthAtLevelProvider;
     static System.Func<int> s_enemyTierProvider;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
@@ -42,6 +44,22 @@ public class GameInitializer : MonoBehaviour
         set => s_enemyTierProvider = value;
     }
 
+    /// <summary>**미강화(Lv1) 기준** 성장값 주입점. 튜토리얼처럼 진행도를 태우면 안 되는 전투가 쓴다.
+    ///
+    /// 성장값을 아예 안 넘기는 것과 다르다 — 미주입은 <see cref="CardInstance"/>가 마스터 데이터의 키워드를
+    /// **전부 열린 것으로** 취급하는 폴백을 타서, Lv1 표시인 카드가 해금 레벨 4짜리 키워드를 달고 나온다.
+    /// Lv1 성장값을 넘기면 체력 가산분은 0이라 저작된 킬 수·턴 수 전제는 그대로 두고 해금 게이트만 살아난다.</summary>
+    public static System.Func<CardData, CardGrowth> BaseGrowthProvider
+    {
+        set => s_baseGrowthProvider = value;
+    }
+
+    /// <summary>튜토리얼 시나리오가 저작한 레벨의 성장 스냅샷 공급자. 성장 계산은 OutGame이 소유한다.</summary>
+    public static System.Func<CardData, int, CardGrowth> GrowthAtLevelProvider
+    {
+        set => s_growthAtLevelProvider = value;
+    }
+
     void Awake()
     {
         // 전투 씬 단독 실행에서도 배선되게 여기서 주입(DataLibrary 비의존).
@@ -51,7 +69,17 @@ public class GameInitializer : MonoBehaviour
 
     async UniTaskVoid Start()
     {
-        await StartBattleAsync();
+        // 초기화가 예외로 끊기면 인트로가 숨겨둔 카드가 그대로 화면 밖에 남아 "아무것도 없는 전투"에 갇힌다.
+        // 원인은 로그로 남기되, 화면은 반드시 출구(초기화 실패 처리)로 보낸다.
+        try
+        {
+            await StartBattleAsync();
+        }
+        catch (System.Exception t_e)
+        {
+            Debug.LogError($"[GameInitializer] 전투 초기화 실패 — 전투를 열지 못했다: {t_e}");
+            AbortInit(_timedOut: true);
+        }
     }
 
     async UniTask StartBattleAsync()
@@ -111,7 +139,7 @@ public class GameInitializer : MonoBehaviour
         if (t_runner != null) await t_runner.PlayIntroAndStart(t_deal);
     }
 
-    /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmEnemyDeck)다 —
+    /// <summary>상대(AI) 덱 폴백. 정상 경로에서 상대 덱을 뽑는 지점은 로비(LobbyMatchLauncher.ConfirmOpponent)다 —
     /// 덱 화면이 그린 6장과 실제 상대가 같아야 하므로 확정은 화면을 띄우기 전에 끝나야 한다.
     /// 여기는 로비를 거치지 않는 진입점(MainMenu·TutorialSetupUI·AutoBattle 스텝·씬 단독 실행)만 태운다.</summary>
     void ConfirmEnemyDeck()
@@ -238,9 +266,20 @@ public class GameInitializer : MonoBehaviour
         {
             // 튜토리얼: 양 덱 고정 주입(무셔플=저작 순서가 곧 등장 순서·6장 이하 허용). 적덱 GetRandomDeck 우회.
             // 덱 게이트(ShowDeckGate)를 켜도 여기는 갈리지 않는다 — 튜토리얼 전투 덱은 언제나 시나리오가 정한다.
-            // 성장값도 넘기지 않는다 — 저작된 킬 수·턴 수와 확정승(OverrideAllHp)에 기대는 시나리오라 강화된 체력이 전제를 깬다.
-            this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None);
-            this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None);
+            //
+            // 진행도 대신 시나리오 저작 레벨의 성장값을 넘긴다. 레벨을 캡처해 대기 카드가 뒤늦게 나와도
+            // 같은 키워드·시너지·진화·HP 곡선을 탄다. 범용 공급자 미배선 시에는 기존 Lv1 공급자로 폴백한다.
+            System.Func<CardData, CardGrowth> t_playerGrowth = s_baseGrowthProvider;
+            System.Func<CardData, CardGrowth> t_enemyGrowth  = s_baseGrowthProvider;
+            if (s_growthAtLevelProvider != null)
+            {
+                int t_playerLevel = TutorialConfig.PlayerCardLevel;
+                int t_enemyLevel  = TutorialConfig.EnemyCardLevel;
+                t_playerGrowth = _card => s_growthAtLevelProvider(_card, t_playerLevel);
+                t_enemyGrowth  = _card => s_growthAtLevelProvider(_card, t_enemyLevel);
+            }
+            this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None, t_playerGrowth);
+            this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None, t_enemyGrowth);
         }
         else
         {

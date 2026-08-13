@@ -44,7 +44,7 @@ public class @OpenedPack
         TotalRefund = _totalRefund;
     }
 
-    // 성공 결과 조립 — 총 환급액은 카드들의 Refund 합(종류는 팩 단위 속성이라 결제 재화를 그대로 쓴다)
+    // 성공 결과 조립 — 총 환급액은 카드들의 Refund 합(종류는 팩이 저작한 환급 재화, 결제 재화와 별개다)
     public static OpenedPack CreateSuccess(string _packId, List<DrawnCard> _cards, ECurrencyType _refundType)
     {
         long t_totalRefund = 0;

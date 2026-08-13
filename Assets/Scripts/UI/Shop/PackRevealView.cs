@@ -104,8 +104,8 @@ public class PackRevealView : MonoBehaviour
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
     [SerializeField] PackScreenFlash newCardFlash;
 
-    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 골드가 얼마 돌아왔나"를 말한다 —
-    // 결과 격자에는 칩이 없으므로(PackCardView.PlayRefundAccent) 이 줄이 그 축의 유일한 답이다.
+    // 중복 환급 합계. 낱장마다 떴다 사라진 칩들을 한 줄로 합쳐 "이번 개봉으로 얼마가 돌아왔나"를 말한다 —
+    // 결과 격자에는 칩이 없으므로(PackCardView.PlayDupeChip) 이 줄이 그 축의 유일한 답이다.
     //
     // ⚠ 칩과 획득 버튼은 **같은 앵커 기준(화면 하단)**이어야 한다. 한쪽만 중앙 앵커면 화면비가 바뀔 때
     //   서로 파고들고, 화면비가 낮으면(태블릿) 칩이 화면 밖으로 밀려난다.
@@ -118,7 +118,9 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
     [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
     [SerializeField] PackResultGrid resultGrid;
-    [SerializeField] Button skipButton;            // 명시적 건너뛰기(찢기 단계에서도 빠져나갈 수 있게)
+    // 개봉 연출(등장~찢기~뽑기) 동안에는 숨긴다 — 그 구간은 보여주려고 만든 장면이라 빠져나갈 구멍을 두지 않는다.
+    // 카드를 넘기기 시작하는 순간부터 나타나 "남은 걸 한 번에 걷는" 수단이 된다.
+    [SerializeField] Button skipButton;            // 명시적 건너뛰기(넘기기 단계부터 노출)
 
     [Tooltip("스와이프 대기 중에만 보이는 씬 안내(\"옆으로 그어 열기\"). 스와이프 확정 시 사라진다. 미배선이면 안내 없음.")]
     [SerializeField] CanvasGroup tearHint;         // RevealPanel 바깥에 두어야 한다 — 그 패널은 입력을 막고 있다
@@ -174,7 +176,7 @@ public class PackRevealView : MonoBehaviour
 
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
-        if (skipButton != null) skipButton.gameObject.SetActive(true);
+        if (skipButton != null) skipButton.gameObject.SetActive(false);
 
         // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
         KillTotalRefundTween();
@@ -215,6 +217,7 @@ public class PackRevealView : MonoBehaviour
 
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
+        if (skipButton != null) skipButton.gameObject.SetActive(false);
 
         m_stage = EStage.Idle;
         m_pending = null;
@@ -453,6 +456,9 @@ public class PackRevealView : MonoBehaviour
             EnterSummary();
             return;
         }
+
+        // 넘길 것이 실제로 있을 때만 나타난다 — 스킵은 "남은 카드를 걷는" 버튼이라 넘길 게 없으면 뜻이 없다.
+        if (skipButton != null) skipButton.gameObject.SetActive(true);
 
         cardStack.BeginInteraction();
     }

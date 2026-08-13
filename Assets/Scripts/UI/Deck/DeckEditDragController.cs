@@ -27,6 +27,13 @@ public class DeckEditDragController : MonoBehaviour
     bool             m_dragging;
     CardData         m_card;
     PointerEventData m_data;
+    int              m_finger = -1;   // 추적 중인 레거시 Input 터치의 fingerId. -1 = 마우스(터치 없음)
+
+    // 드래그 동안 세워둔 목록과 그 원래 축 설정. 소유권을 뺏는 것(pointerDrag=null)만으로는 부족하다 —
+    // 그건 "이미 잡힌 드래그"를 끊을 뿐이라, 고스트를 든 채 손가락이 움직이는 동안 목록이 새로 잡혀 흐를 수 있다.
+    ScrollRect m_lockedScroll;
+    bool       m_scrollWasVertical;
+    bool       m_scrollWasHorizontal;
 
     public bool IsDragging => m_dragging;
 
@@ -57,12 +64,8 @@ public class DeckEditDragController : MonoBehaviour
         _data.dragging    = false;
         _data.pointerDrag = null;
 
-        // 3) 관성 제거 — OnEndDrag를 줘도 velocity는 남는다.
-        if (_ownerScroll != null)
-        {
-            _ownerScroll.StopMovement();
-            _ownerScroll.velocity = Vector2.zero;
-        }
+        // 3) 고스트 확보(4)에 실패하면 드래그가 성립하지 않으므로, 목록을 세우는 것은 그 뒤에 한다 —
+        //    여기서 잠그면 아래 early return 경로에서 목록이 잠긴 채 영영 풀리지 않는다.
 
         // 4) 고스트 활성화 + 포인터 위치로 이동
         EnsureGhost();
@@ -78,8 +81,12 @@ public class DeckEditDragController : MonoBehaviour
         // 드래그도 못 하고 클릭 지름길까지 죽어 조작이 통째로 먹통이 된다.
         _data.eligibleForClick = false;
 
+        // 관성을 끊고 드래그가 끝날 때까지 목록을 세운다(OnEndDrag를 줘도 velocity는 남는다).
+        LockScroll(_ownerScroll);
+
         m_card     = _card;
         m_data     = _data;
+        m_finger   = ResolveFinger(_data.position);
         m_dragging = true;
 
         // 고스트는 1회 Instantiate 후 재사용되므로 크기는 드래그마다 다시 준다 —
@@ -139,10 +146,12 @@ public class DeckEditDragController : MonoBehaviour
 
         if (m_ghostRect != null) m_ghostRect.gameObject.SetActive(false);
         ClearHighlight();
+        UnlockScroll();
 
         m_dragging = false;
         m_card     = null;
         m_data     = null;
+        m_finger   = -1;
 
         // 손을 뗄 때까지 입력 모듈이 이 포인터를 계속 갱신하므로, 종료 시점에도 클릭 자격을 다시 눌러둔다
         // (Begin 이후 다른 코드가 되살릴 여지 차단 — 드롭 직후 타일 클릭이 뒤늦게 터지는 것을 막는다).
@@ -150,6 +159,38 @@ public class DeckEditDragController : MonoBehaviour
 
         // 콜백은 정리 이후에 부른다 — 콜백이 그리드를 재빌드하며 Cancel을 되부를 수 있어 재진입에 안전해야 한다.
         if (_slotIndex >= 0 && t_card != null) m_onDropped?.Invoke(_slotIndex, t_card);
+    }
+
+    // ScrollRect를 통째로 끄지 않는다(enabled=false) — 드래그 도중 꺼지면 OnEndDrag를 못 받아
+    // 내부 드래그 상태가 켜진 채 남고 다음 터치에서 관성이 튄다. 축만 닫으면 이벤트는 정상적으로 끝난다.
+    // 원래 값을 기억했다 되돌린다 — 둘 다 true로 되돌리면 세로 전용 목록에 없던 가로 축이 생긴다.
+    void LockScroll(ScrollRect _scroll)
+    {
+        if (_scroll == null) return;
+
+        UnlockScroll();   // 앞선 드래그가 남긴 잠금이 있으면 먼저 되돌린다(꺼둔 값을 원래 값으로 기억하지 않게)
+
+        m_lockedScroll        = _scroll;
+        m_scrollWasVertical   = _scroll.vertical;
+        m_scrollWasHorizontal = _scroll.horizontal;
+
+        _scroll.StopMovement();
+        _scroll.velocity   = Vector2.zero;
+        _scroll.vertical   = false;
+        _scroll.horizontal = false;
+    }
+
+    void UnlockScroll()
+    {
+        if (m_lockedScroll == null) return;
+
+        m_lockedScroll.vertical   = m_scrollWasVertical;
+        m_lockedScroll.horizontal = m_scrollWasHorizontal;
+
+        // 잠긴 동안 쌓인 이동량이 풀리는 순간 튀어나오지 않게 한다.
+        m_lockedScroll.StopMovement();
+        m_lockedScroll.velocity = Vector2.zero;
+        m_lockedScroll          = null;
     }
 
     // 고스트는 최초 1회만 Instantiate하고 이후 SetActive로 토글한다(드래그마다 Instantiate하면 GC와 레이아웃 비용이 붙는다).
@@ -243,7 +284,7 @@ public class DeckEditDragController : MonoBehaviour
         return -1;
     }
 
-    // 드래그를 시작한 그 포인터만 추적한다(m_data.pointerId = 터치는 fingerId, 마우스는 음수).
+    // 드래그를 시작한 그 손가락만 추적한다.
     // Input.GetTouch(0)으로 고정해 읽으면, 두 번째 손가락이 닿았다가 첫 손가락을 떼는 순간 touch 배열이 당겨져
     // 고스트가 엉뚱한 손가락으로 순간이동하고 드래그가 끝나지도 않는다.
     void ReadPointer(out Vector2 _pos, out bool _held)
@@ -254,13 +295,12 @@ public class DeckEditDragController : MonoBehaviour
             return;
         }
 
-        int t_id = m_data.pointerId;
-        if (t_id >= 0)
+        if (m_finger >= 0)
         {
             for (int t_i = 0; t_i < Input.touchCount; t_i++)
             {
                 Touch t_touch = Input.GetTouch(t_i);
-                if (t_touch.fingerId != t_id) continue;
+                if (t_touch.fingerId != m_finger) continue;
 
                 _pos  = t_touch.position;
                 _held = t_touch.phase != TouchPhase.Ended && t_touch.phase != TouchPhase.Canceled;
@@ -275,5 +315,30 @@ public class DeckEditDragController : MonoBehaviour
 
         _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Both 라 레거시 Input 사용 가능
         _held = Input.GetMouseButton(0);
+    }
+
+    // 손가락 판별에 PointerEventData.pointerId를 쓰지 않는다 — 그 값의 의미가 입력 모듈마다 다르다.
+    // 레거시 StandaloneInputModule은 마우스에 음수(-1)를 주지만, 이 프로젝트가 쓰는 InputSystemUIInputModule은
+    // 마우스에도 양수를 주고 터치 id도 레거시 fingerId와 체계가 다르다. 그대로 믿으면 마우스가 "터치"로 읽혀
+    // 매칭에 실패하고, 드래그가 시작된 첫 프레임에 "이미 뗐다"로 판정돼 고스트가 뜨자마자 사라진다.
+    // 그래서 추적 대상은 위치·눌림을 실제로 읽는 쪽(레거시 Input)에서 직접 고른다.
+    static int ResolveFinger(Vector2 _startPos)
+    {
+        int   t_finger = -1;
+        float t_best   = float.MaxValue;
+
+        for (int t_i = 0; t_i < Input.touchCount; t_i++)
+        {
+            Touch t_touch = Input.GetTouch(t_i);
+            if (t_touch.phase == TouchPhase.Ended || t_touch.phase == TouchPhase.Canceled) continue;
+
+            float t_dist = Vector2.Distance(t_touch.position, _startPos);
+            if (t_dist >= t_best) continue;
+
+            t_best   = t_dist;
+            t_finger = t_touch.fingerId;
+        }
+
+        return t_finger;   // 터치가 없으면 -1 = 마우스 경로
     }
 }

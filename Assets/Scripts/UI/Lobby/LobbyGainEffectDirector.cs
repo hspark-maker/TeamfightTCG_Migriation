@@ -9,7 +9,7 @@ using UnityEngine;
 //   재화 → 각 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(CurrencyGainEffectPlayer에 위임 — 도감 수확과 같은 손맛)
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
 // 두 단계를 동시에 재생한다(획득 하나를 두 번에 걸쳐 알리지 않는다).
-// 카드는 신규만 온다 — 중복분은 환급 재화로 코인 쪽에 이미 섞여 있다(PackAcquireController가 걸러 싣는다).
+// 카드는 신규만 온다 — 중복분은 환급 재화가 대신하고, 그 환급은 개봉 화면이 자기 잔액 표시로 이미 받아 간다.
 //
 // 경계: 지급·저장은 각 씬이 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
 // 배선을 비워두면 이름으로 자동 탐색한다 — 로비 프리팹 수정 없이도 동작하게(자동 탐색 실패 시 그 단계만 건너뛴다).
@@ -71,7 +71,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
         yield return null;
         Canvas.ForceUpdateCanvases();
 
-        // 중복 카드 환급도 획득이다 — 전투 보상과 한 버킷에 합쳐 한 번에 보여준다(종류가 갈리면 그 안에서 나뉜다).
+        // 재화가 둘 이상 들어와도 한 번의 획득이다 — 한 버킷에 합쳐 보여준다(종류가 갈리면 그 안에서 나뉜다).
+        // 카드팩 중복 환급은 대개 여기 오지 않는다: 개봉 화면이 자기 잔액 표시로 이미 받아 갔고,
+        //   그럴 때 캐리어에는 카드만 실려 온다(PackAcquireController.PendingRefund).
+        //   그 화면에 받을 자리가 없었을 때만 여기로 넘어와 전투 보상과 함께 나간다.
         var t_gains = new CurrencyGainBucket();
         BattleRewardHandoff.TryConsume(t_gains);
 

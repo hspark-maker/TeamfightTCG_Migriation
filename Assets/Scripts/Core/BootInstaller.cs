@@ -24,6 +24,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardPackData starterDeck;
     // 카드 강화·진화 튜닝 SO. 미배선(null)이면 CardGrowthManager가 코드 기본식·기본 게이트로 동작한다.
     [SerializeField] CardGrowthConfig growthConfig;
+    // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
+    [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
 
     static bool s_booted;
 
@@ -64,6 +66,8 @@ public class BootInstaller : MonoBehaviour
         CollectionProductionManager.Init();
 
         // 카드 성장 캐싱 — 세이브(DataSaveManager.Load)만 읽어 순서 무관하나, 곡선 조회가 Config를 쓰므로 주입이 먼저다.
+        KeywordGrowthManager.SetConfig(keywordGrowthConfig);
+        KeywordGrowthManager.Init();
         CardGrowthManager.SetConfig(growthConfig);
         CardGrowthManager.Init();
 
@@ -83,6 +87,11 @@ public class BootInstaller : MonoBehaviour
         GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, RankManager.AiCardLevelOf(_card));
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
+        // 튜토리얼 전투용 미강화 기준값. 레벨은 바닥 고정이라 체력은 안 오르고 해금 게이트만 산다 —
+        // 진행도(GrowthProvider)를 태우면 저작된 킬 수·턴 수가 깨지고, 아예 안 태우면 키워드가 전부 열린다.
+        GameInitializer.BaseGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, CardGrowth.BaseLevel);
+        GameInitializer.GrowthAtLevelProvider = CardGrowthManager.GrowthAtLevel;
+
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
         DeckSaveManager.SetCardRegistry(t_availableCards);
@@ -99,5 +108,9 @@ public class BootInstaller : MonoBehaviour
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
         TriggeredTutorialRunner.EnsureData(triggeredTutorialData);
+
+        // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
+        // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
+        OutgameTutorialRewind.ApplyReplayIfScheduled();
     }
 }

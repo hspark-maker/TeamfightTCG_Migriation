@@ -21,6 +21,20 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }
 
+    // 전 카드 만렙 (재화·성공률 무시 — 진화 단계·키워드 해금도 레벨에서 파생돼 같이 열린다)
+    public static void MaxCardGrowth()
+    {
+        int t_changed = CardGrowthManager.DebugMaxAll();
+
+        if (t_changed == 0)
+        {
+            Debug.LogWarning("[OutgameDebug] 최대 강화 대상 없음 — 이미 전부 만렙이거나 성장 시스템이 아직 초기화되지 않았다(부트 경유 필요).");
+            return;
+        }
+
+        Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 Lv{CardGrowthManager.MaxLevel}");
+    }
+
     // 강화 레벨·진화 단계 초기화 (소유·재화는 유지)
     public static void ResetCardGrowth()
     {
@@ -68,8 +82,9 @@ public static class OutgameDebugActions
     // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 초기화
     public static void ResetTriggeredTutorials()
     {
-        TriggeredTutorialRunner.Abort();
+        // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
         OutgameTutorialProgress.ClearTriggersForDebug();
+        TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
 
         Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");
@@ -95,11 +110,17 @@ public static class OutgameDebugActions
 
     static void StepTier(int _step)
     {
-        int t_before = RankManager.GetInfo().TierIndex;
-        int t_after  = RankManager.StepTierForDebug(_step);
+        int t_before  = RankManager.GetInfo().TierIndex;
+        long t_points = RankManager.Points;
+        int t_after   = RankManager.StepTierForDebug(_step);
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel}");
+
+        // 캐리어에 실어 두면 씬 재진입 때 로비 디렉터가 소비해 승급·강등 연출을 그대로 재생한다 —
+        // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
+        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
+
+        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel} — 씬 재진입 시 연출 재생");
     }
 
     // 랭크 포인트 초기화(브론즈 1로)

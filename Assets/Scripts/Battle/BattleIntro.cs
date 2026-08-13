@@ -283,8 +283,13 @@ public class BattleIntro : MonoBehaviour
             new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 10f));
         t_screenCenter.z = t_fieldCenter.z;
 
-        // 순차 배치: 한 카드 딜 애니가 끝난 뒤 다음 카드 시작(사이에 cardDealDelay 간격).
-        bool t_first = true;
+        // 겹쳐 배치: 앞 카드가 **슬롯으로 출발하는 순간** 다음 카드가 덱에서 나온다.
+        // 통짜 PlayDealAnim을 await하면 앞 카드가 자리에 앉을 때까지 덱이 멈춰 있어 여섯 장이 늘어진다.
+        // 그래서 앞 토막(덱 → 중앙 + 중간 정지)만 기다리고, 뒤 토막(중앙 → 슬롯)은 날려 보낸 뒤 다음 장으로 넘어간다.
+        // 뒤 토막을 모아 두는 이유는 이 함수가 "배치 완료"를 뜻해야 해서다 — 마지막 카드가 앉기 전에 끝나면
+        // 호출부가 다음 연출(턴 시작)을 카드가 날아가는 중에 시작한다.
+        var  t_landings = new List<UniTask>();
+        bool t_first    = true;
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardView t_view = _fieldView.GetSlotView(i);
@@ -293,7 +298,7 @@ public class BattleIntro : MonoBehaviour
             t_first = false;
 
             // 대기 중에 씬 전환 정리가 보드를 걷어갔을 수 있다 — 남은 카드까지 배치하려 들면 파괴된 뷰를 만진다.
-            if (t_view == null) return;
+            if (t_view == null) break;
 
             // 고등급 등장 컷씬: 이 카드가 필드에 나오기 직전. 오프닝 배치도 "필드에 나오는" 순간이라 포함한다
             // (런타임 등장은 BattleFieldView.PlayFillAnim). 자격 판정은 CardCinematicRules 단독 —
@@ -301,7 +306,18 @@ public class BattleIntro : MonoBehaviour
             await CardCinematicPlayer.Play(CardCinematicRules.Resolve(t_view.BoundCard));
 
             t_pile?.PlayIntroDraw();
-            await t_view.PlayDealAnim(_from, t_screenCenter, _dests[i], this.cardDealDuration);
+
+            await t_view.PlayDealToMid(_from, t_screenCenter, _dests[i], this.cardDealDuration);
+            if (t_view == null) break;
+
+            // 중앙 정지는 카드를 읽는 시간이라 그대로 둔다(통짜 경로가 두 토막 사이에 넣던 것과 같은 값).
+            bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000))
+                .SuppressCancellationThrow();
+            if (t_cancelled || t_view == null) break;
+
+            t_landings.Add(t_view.PlayDealToSlot(t_screenCenter, _dests[i], this.cardDealDuration));
         }
+
+        await UniTask.WhenAll(t_landings);
     }
 }

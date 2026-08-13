@@ -13,18 +13,20 @@ MonoBehaviour:
   m_Name: TutorialScenario2
   m_EditorClassIdentifier: Assembly-CSharp::TutorialScenarioData
   enableSynergy: 0
+  playerCardLevel: 1
+  enemyCardLevel: 1
   playerDeck:
   - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
   - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
-  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
+  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
   - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
   enemyDeck:
   - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
   - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
   - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
   playerScript:
@@ -39,8 +41,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 1
-    targetBannerAnchor: 0
+    bannerAnchor: 2
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -57,8 +59,8 @@ MonoBehaviour:
     guidedFreeSelect: 1
     targetGuideMessage: "\uB3C4\uBC1C \uB54C\uBB38\uC5D0 \uC9C0\uAE08\uC740 \uB3C4\uBC1C
       \uCE74\uB4DC\uB9CC \uACE0\uB97C \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uACF5\uACA9\uD574\uBCF4\uC138\uC694!"
-    bannerAnchor: 0
-    targetBannerAnchor: 2
+    bannerAnchor: 1
+    targetBannerAnchor: 4
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -74,8 +76,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 1
-    targetBannerAnchor: 0
+    bannerAnchor: 2
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -90,8 +92,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 1
-    targetBannerAnchor: 0
+    bannerAnchor: 2
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -106,8 +108,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -121,8 +123,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0
@@ -136,8 +138,8 @@ MonoBehaviour:
     allowedGesture: 0
     guidedFreeSelect: 0
     targetGuideMessage: 
-    bannerAnchor: 0
-    targetBannerAnchor: 0
+    bannerAnchor: 1
+    targetBannerAnchor: 1
     cardFocusSide: 0
     cardFocusSlot: 0
     handSide: 0

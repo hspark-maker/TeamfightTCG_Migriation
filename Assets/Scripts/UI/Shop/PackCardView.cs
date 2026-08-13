@@ -9,18 +9,19 @@ using UnityEngine.UI;
 // 카드 비주얼 자체(아트/이름/HP/키워드/시너지)는 도감 타일과 동일하게 CardVisualView에 위임한다 —
 // 뽑은 카드가 도감에서 보던 그 카드와 다르게 생기면 안 된다.
 // 이 클래스가 따로 존재하는 이유는 강조 축이 다르기 때문 — 개봉 카드는 항상 소유라 잠금 표현이 없고,
-// 대신 이 화면에만 있는 축을 얹는다: 한 장이 드러날 때마다 오는 타격(펀치·플래시)과, 신규/중복 구분(NEW 리본·환급 칩).
+// 대신 이 화면에만 있는 축을 얹는다: 한 장이 드러날 때마다 오는 타격(펀치·플래시)과, 신규/중복 구분(NEW 리본·중복 칩).
 // 순수 표시 뷰다. 더미 배치·스와이프 이동은 PackCardStack이 이 오브젝트의 RectTransform을 직접 다룬다.
 //
-// 신규/중복 표식은 둘 다 **카드 밖**에 앉는다 — NEW 워드마크는 윗변 위로, 환급 칩은 아랫변 아래로.
-// 아트를 덮지 않으면서 서로 자리로 갈리므로, 한눈에 어느 쪽인지 읽히고 카드 그림도 온전히 남는다.
+// 신규/중복 표식은 둘 다 **카드 밖**에 앉는다 — NEW 워드마크는 윗변 위로, 중복 칩은 아랫변 아래로.
+// 카드 아트 위에는 아무것도 얹지 않는다: 무엇을 뽑았는지는 그림이 답하고, 그 그림을 가리는 표식은
+// 답을 지우면서 묻는 꼴이 된다. 두 신호가 자리로 갈리므로 어느 쪽인지도 한눈에 읽힌다.
 //
 // 강조는 두 순간으로 갈린다. 섞으면 결과 화면이 개봉 연출의 잔상처럼 보이거나, 반대로 낱장 확인이
 // 결과판처럼 밋밋해진다:
 //   PlayRevealAccent() — 지금 이 한 장이 드러난 순간. 펀치·플래시(전 카드) + 신규 전용 림라이트,
-//                        그리고 중복이면 환급 칩이 올라와 머물다 사라진다.
+//                        그리고 중복이면 칩이 올라와 머물다 사라진다.
 //   ApplyResultContrast() — 결과 격자에 놓인 상태. 신규는 림라이트가 계속 돌고 중복은 탈채도된 채 놓인다.
-//                        환급 칩은 여기 없다 — 격자 배율(0.42배)에서는 읽히지 않아 총합 한 줄이 대신 말한다.
+//                        중복 칩은 여기 없다 — 격자 배율(0.42배)에서는 읽히지 않아 총합 한 줄이 대신 말한다.
 // 화면 전체가 반응하는 축(Dim 번쩍임)은 여기 없다 — 그것은 카드 한 장의 것이 아니라 화면의 것이라
 // 진행자(PackRevealView)가 신규일 때만 쏜다.
 public class PackCardView : MonoBehaviour
@@ -118,17 +119,27 @@ public class PackCardView : MonoBehaviour
     [SerializeField] float newBadgeOvershoot = 0.18f;
     [SerializeField] float newBadgeDuration = 0.2f;
 
-    // 중복 환급 칩. 카드 위가 아니라 카드 **밖 아래**에 앉는다 — 이 배지가 답하는 질문("이 카드로 무엇을 얻었나")은
+    // 중복 칩. 카드 위가 아니라 카드 **밖 아래**에 앉는다 — 중복이라는 사실도, 그 정산도
     // 아트가 답하는 질문("무엇을 뽑았나")과 다른 축이라, 하나가 다른 하나를 덮으면 둘 다 죽는다.
-    // NEW 워드마크가 위쪽 밖, 환급 칩이 아래쪽 밖 — 두 신호를 자리로 갈랐다.
+    // NEW 워드마크가 위쪽 밖, 중복 칩이 아래쪽 밖 — 두 신호를 자리로 갈랐다.
     //
-    // ⚠ 프리팹의 배지 위치는 **최종으로 앉을 자리**다(출발점이 아니다). 코드는 그보다 refundRiseDistance만큼
-    //   아래에서 출발해 올라와 그 자리에 앉힌다. 반대로 잡으면(프리팹=출발점, 위로 떠나가기) 배지가 카드 안으로
+    // "중복"이라는 말은 프리팹이 쥔 고정 문구다(코드가 참조조차 하지 않는다). 칩 자체가 중복일 때만 뜨므로
+    // 따로 토글할 이유가 없고, 자리·크기·색도 프리팹에서 그대로 손본다.
+    //
+    // ⚠ 프리팹의 칩 위치는 **최종으로 앉을 자리**다(출발점이 아니다). 코드는 그보다 refundRiseDistance만큼
+    //   아래에서 출발해 올라와 그 자리에 앉힌다. 반대로 잡으면(프리팹=출발점, 위로 떠나가기) 칩이 카드 안으로
     //   파고들고, 떠난 자리에서 되돌아올 근거가 없어 그대로 굳는다 — 실제로 그게 이전 구현의 버그였다.
-    [Header("중복 환급")]
-    [Tooltip("코인+숫자 칩 묶음(중복이고 환급이 있을 때만). 카드 하단 밖에 앉도록 배선한다.")]
+    [Header("중복 칩")]
+    [Tooltip("\"중복\"+코인+숫자 묶음(중복일 때만). 카드 하단 밖에 앉도록 배선한다. " +
+             "TMP·Image 모두 Raycast Target을 꺼야 더미 스와이프를 가로채지 않는다.")]
     [SerializeField] GameObject refundBadge;
+    [Tooltip("환급 숫자. 환급이 0이면 비워지고 \"중복\"만 남는다.")]
     [SerializeField] TMP_Text refundText;
+    [Tooltip("환급 재화 아이콘. 환급이 0이면 숫자와 함께 내려간다 — 액수 없이 코인만 남으면 뜻이 없다.")]
+    [SerializeField] GameObject refundCoin;
+    [Tooltip("카드가 드러난 뒤 중복 칩이 등장하기까지의 뜸. 0이 기본 — NEW 워드마크가 뜸 없이 곧장 꽂히므로 " +
+             "중복도 같은 박자로 온다.")]
+    [FormerlySerializedAs("dupeBandDelay")] [SerializeField] float dupeRevealDelay;
     [Tooltip("칩 전체를 페이드하는 손잡이. 미배선이면 배지에서 찾고, 없으면 붙여준다 — " +
              "이 값이 알파를 쥐는 단일 지점이라 배선 여부와 무관하게 퇴장이 성립한다.")]
     [SerializeField] CanvasGroup refundGroup;
@@ -146,6 +157,10 @@ public class PackCardView : MonoBehaviour
 
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
+
+    /// <summary>카드 비주얼 노드. 탭을 받는 것이 이 노드다(LongPressDetector가 여기 붙어 있다) —
+    /// 결과 격자가 상세 열기를 물릴 때 쓴다. 이 클래스 자신은 여전히 입력을 모른다(헤더 주석 참고).</summary>
+    public CardVisualView Visual => this.cardVisual;
 
     // 카드 한 장 통째로 페이드하는 손잡이(밀어내기가 쓴다). 프리팹에 없으면 인스턴스에 붙여준다 —
     // 이 값이 알파를 쥐는 단일 지점이라, 프리팹에 컴포넌트가 있든 없든 페이드는 항상 성립한다.
@@ -195,9 +210,9 @@ public class PackCardView : MonoBehaviour
 
     /// <summary>
     /// 카드가 완전히 드러난 순간의 강조. 펀치·플래시는 전 카드 공통이고, 그 위에 신규는 NEW 리본,
-    /// 중복은 환급 칩이 카드 아래에 얹힌다.
+    /// 중복은 칩이 카드 아래에 얹힌다.
     /// _instant면 트윈 없이 최종 상태만 — 결과 격자가 이 경로로 카드를 세운다(유일한 호출처: PackResultGrid).
-    /// 그 상태에 환급 칩은 포함되지 않는다(PlayRefundAccent 주석 참고).
+    /// 그 상태에 중복 칩은 포함되지 않는다(PlayDupeChip 주석 참고).
     /// </summary>
     public void PlayRevealAccent(bool _instant = false)
     {
@@ -220,8 +235,13 @@ public class PackCardView : MonoBehaviour
         // 결과 격자의 지속 대비는 ApplyResultContrast가 따로 쥔다 — 한 메서드가 두 순간을 겸하지 않게 갈랐다.
         if (IsNew && !_instant) PlayRim();
 
-        if (IsNew) PlayNewBadge(_instant);
-        else PlayRefundAccent(_instant);
+        if (IsNew)
+        {
+            PlayNewBadge(_instant);
+            return;
+        }
+
+        PlayDupeChip(_instant);
     }
 
     /// <summary>
@@ -243,7 +263,7 @@ public class PackCardView : MonoBehaviour
 
         SetRim(false);
 
-        // 환급 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
+        // 중복 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
         // 격자가 아닌 경로로 이 상태에 들어오는 카드(낱장 확인 중 요약으로 넘어간 경우)도 있어 여기서 못 박는다.
         KillRefundSeq();
         HideRefundBadge();
@@ -359,7 +379,7 @@ public class PackCardView : MonoBehaviour
             revealFlash.gameObject.SetActive(false);
         }
 
-        // 환급 칩을 걷는다. 재생 중이었다면 위치·배율·알파가 모두 중간값이라 한 번에 되돌린다.
+        // 중복 칩을 걷는다. 재생 중이었다면 위치·배율·알파가 모두 중간값이라 한 번에 되돌린다.
         KillRefundSeq();
         HideRefundBadge();
     }
@@ -458,14 +478,13 @@ public class PackCardView : MonoBehaviour
         if (newGleam != null) newGleam.transitionRate = _rate;
     }
 
-    // 중복: 코인 칩이 카드 아래에서 올라와 앉고, 읽을 만큼 머문 뒤 사라진다.
-    // 환급이 0이면 아무 말도 하지 않는다(조용한 정산).
+    // 중복: 칩이 카드 아래에서 올라와 앉고, 읽을 만큼 머문 뒤 사라진다.
     //
     // 퇴장이 이 연출의 핵심이다. 사라지지 않으면 칩이 그 카드에 영구히 박혀 낱장 확인 구간 내내,
-    // 그리고 결과 격자까지 따라간다 — 순간의 정산이 카드의 속성처럼 굳는다.
-    void PlayRefundAccent(bool _instant)
+    // 그리고 결과 격자까지 따라간다 — 순간의 확인이 카드의 속성처럼 굳는다.
+    void PlayDupeChip(bool _instant)
     {
-        if (refundBadge == null || Refund <= 0) return;
+        if (refundBadge == null) return;
 
         // 결과 격자에서는 칩을 띄우지 않는다. 거기서 카드는 셀에 맞춰 통째로 축소되므로(PackResultGrid.CardScale)
         // 칩도 같은 배율로 줄어 읽히지 않는 얼룩이 된다 — 격자의 환급은 총합 한 줄이 대신 말한다.
@@ -477,7 +496,11 @@ public class PackCardView : MonoBehaviour
             return;
         }
 
-        if (refundText != null) refundText.text = $"+{Refund:N0}";
+        // 환급이 0이어도 칩은 뜬다 — 중복을 말하는 유일한 신호라, 액수 하나로 표식까지 사라지면 안 된다.
+        // 대신 숫자와 코인만 내려가 "중복"만 남는다.
+        bool t_hasRefund = Refund > 0;
+        if (refundText != null) refundText.text = t_hasRefund ? $"+{Refund:N0}" : string.Empty;
+        if (refundCoin != null) refundCoin.SetActive(t_hasRefund);
 
         var t_tr = refundBadge.transform;
         if (!m_refundHomeCaptured)
@@ -501,8 +524,10 @@ public class PackCardView : MonoBehaviour
         // 페이드인은 상승보다 짧게 끊는다 — 올라오는 내내 반투명하면 도착이 아니라 스며듦으로 읽힌다.
         float t_fadeIn = Mathf.Min(0.12f, refundRiseDuration);
 
+        // 딜레이 동안은 알파 0이라 아무것도 보이지 않는다(위에서 출발 상태를 이미 세워 뒀다).
         m_refundSeq = DOTween.Sequence()
             .SetLink(refundBadge)
+            .AppendInterval(dupeRevealDelay)
             .Append(t_tr.DOLocalMoveY(m_refundHome.y, refundRiseDuration).SetEase(Ease.OutCubic))
             .Join(t_tr.DOScale(m_refundRestScale, refundRiseDuration).SetEase(Ease.OutQuint))
             .Join(t_group.DOFade(1f, t_fadeIn))

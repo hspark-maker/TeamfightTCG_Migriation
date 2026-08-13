@@ -18,14 +18,17 @@ public static class RewardService
     }
 
     /// <summary>
-    /// 전투 결과를 보상으로 환산(순수 함수). 남은 카드 수 × 장당 골드,
-    /// minGold를 하한으로 적용(승패 무관 동일 공식).
+    /// 전투 결과를 보상으로 환산(순수 함수). 승리는 남은 카드 수 × 장당 골드에 winFloor 하한,
+    /// 패배는 남은 카드와 무관하게 loseGold 고정.
     /// </summary>
-    public static CurrencyGain CalculateReward(int remainingCards)
+    public static CurrencyGain CalculateReward(bool _won, int _remainingCards)
     {
         var t_config = Config;
 
-        long t_amount = Math.Max((long)remainingCards * t_config.goldPerCard, t_config.minGold);
+        // 패배가 남은 카드를 보지 않는 것이 규칙의 핵심이다 — 보면 첫 턴 항복(6장 생존)이 압승과 같은 액수가 된다.
+        long t_amount = _won
+            ? Math.Max((long)_remainingCards * t_config.goldPerCard, t_config.winFloor)
+            : t_config.loseGold;
 
         return new CurrencyGain(t_config.rewardType, t_amount);
     }
@@ -34,9 +37,9 @@ public static class RewardService
     /// 전투 종료 시점에 보상을 직접 지급한다. 환산 → Earn → 즉시 Save(영속화) 순으로 처리하고
     /// 지급분을 반환한다. 반환값은 F-20 보상 팝업이 그대로 소비할 수 있다.
     /// </summary>
-    public static CurrencyGain GrantBattleReward(int remainingCards)
+    public static CurrencyGain GrantBattleReward(bool _won, int _remainingCards)
     {
-        CurrencyGain t_reward = CalculateReward(remainingCards);
+        CurrencyGain t_reward = CalculateReward(_won, _remainingCards);
 
         CurrencyManager.Earn(t_reward.Type, t_reward.Amount);
         // Earn은 flush하지 않으므로 지급 직후 즉시 영속화(앱 강제 종료에도 보상 유실 방지).

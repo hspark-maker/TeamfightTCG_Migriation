@@ -7,9 +7,11 @@ public static class CurrencyManager
 
     // 잔액 변경 통지 (종류, 변경 후 금액)
     public static event Action<ECurrencyType, long> OnCurrencyChanged;
+    public static event Action<ECurrencyType, long, long> OnCurrencySpent;
 
     public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
     public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
+    public static long Energy => s_currencies[(int)ECurrencyType.Energy];
 
     public static long GetBalance(ECurrencyType _type) => s_currencies[(int)_type];
 
@@ -21,6 +23,7 @@ public static class CurrencyManager
         var t_data = DataSaveManager.Data.currency;
         s_currencies[(int)ECurrencyType.Gold]    = t_data.gold;
         s_currencies[(int)ECurrencyType.Diamond] = t_data.diamond;
+        s_currencies[(int)ECurrencyType.Energy]  = t_data.energy;
     }
 
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화
@@ -29,6 +32,7 @@ public static class CurrencyManager
         var t_data = DataSaveManager.Data.currency;
         t_data.gold    = s_currencies[(int)ECurrencyType.Gold];
         t_data.diamond = s_currencies[(int)ECurrencyType.Diamond];
+        t_data.energy  = s_currencies[(int)ECurrencyType.Energy];
         DataSaveManager.Save();
     }
 
@@ -49,7 +53,9 @@ public static class CurrencyManager
         if (s_currencies[(int)_type] < _cost) return false;
 
         s_currencies[(int)_type] -= _cost;
-        OnCurrencyChanged?.Invoke(_type, s_currencies[(int)_type]);
+        long t_balance = s_currencies[(int)_type];
+        OnCurrencySpent?.Invoke(_type, _cost, t_balance);
+        OnCurrencyChanged?.Invoke(_type, t_balance);
         return true;
     }
 }

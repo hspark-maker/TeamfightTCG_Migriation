@@ -26,7 +26,10 @@ public static class DeckPower
     {
         if (_card == null) return 0;
 
-        return _card.maxHp + CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, _mine)).HpBonus;
+        CardGrowth t_growth = _mine
+            ? CardGrowthManager.GrowthOf(_card)
+            : CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, false));
+        return _card.maxHp + t_growth.HpBonus;
     }
 
     // 카드 1장의 파워(null은 0)
