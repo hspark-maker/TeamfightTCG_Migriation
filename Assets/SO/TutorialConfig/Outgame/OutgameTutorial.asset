@@ -91,7 +91,7 @@ MonoBehaviour:
       unlocks: 05000000
       unlocksAll: 0
       locks: 06000000
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
@@ -220,95 +220,16 @@ MonoBehaviour:
       scenario: {fileID: 0}
       showDeckGate: 0
       deckName: 
-  - label: "\uCE74\uB4DC \uAC15\uD654"
+  - label: "\uCCAB \uB7AD\uD06C \uC2B9\uAE09"
     stepDefs:
     - action: 13
       anchor: 0
-      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
-        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
-      unlocks: 
+      guideMessage:
+      unlocks:
       unlocksAll: 1
-      locks: 
+      locks:
       useDim: 1
       pack: {fileID: 0}
       scenario: {fileID: 0}
       showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 18
-      guideMessage: 
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 1
-      anchor: 0
-      guideMessage: "\uB2E4\uC74C\uC73C\uB85C, \uAC19\uC774 \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD574\uBD10\uC694!"
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 19
-      guideMessage: 
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 20
-      guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 1
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 11
-      anchor: 21
-      guideMessage: "\uAC15\uD654\uB97C \uB20C\uB7EC \uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C\uBCF4\uC138\uC694!"
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 14
-      anchor: 0
-      guideMessage: 
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 1
-      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
-        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
+      deckName:

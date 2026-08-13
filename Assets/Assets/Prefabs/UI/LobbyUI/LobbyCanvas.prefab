@@ -1084,6 +1084,8 @@ MonoBehaviour:
   focus: {fileID: 7125465343015337625}
   focusIcon: {fileID: 7125465342477617750}
   focusLabel: {fileID: 7125465344492590325}
+  barGroup: {fileID: 6505376943950345604}
+  barRetractDuration: 0.2
   focusHighlight: {fileID: 0}
   focusSpinSeconds: 6
   focusSpinClockwise: 1
@@ -4978,6 +4980,11 @@ PrefabInstance:
 --- !u!224 &186469588180088904 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1128353755943318262, guid: d13625a8928721c4d8c58190b4816059, type: 3}
+  m_PrefabInstance: {fileID: 954427604584729278}
+  m_PrefabAsset: {fileID: 0}
+--- !u!225 &6505376943950345604 stripped
+CanvasGroup:
+  m_CorrespondingSourceObject: {fileID: 6303195616330956602, guid: d13625a8928721c4d8c58190b4816059, type: 3}
   m_PrefabInstance: {fileID: 954427604584729278}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &2132410345277766320

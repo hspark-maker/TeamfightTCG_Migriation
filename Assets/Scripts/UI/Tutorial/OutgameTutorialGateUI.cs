@@ -11,8 +11,8 @@ using UnityEngine.UI;
 //
 // 불변식 2개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
-//      스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 어둡게만 하지 않을 뿐 판은 그대로 깔린다
-//      — 차단도 승격도 딤 스텝과 동일하다(UseDim은 룩만 정하는 스위치).
+//      단 스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
+//      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //
 // 강조는 "딤 위로 올라온 대상" 그 자체다 — 테두리를 덧그리지 않는다. 봐야 할 것만 밝게 남는 것이 안내다.
@@ -47,11 +47,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [Header("배치")]
     [Tooltip("Hand 기준점을 놓을 위치 = 타깃 중앙 + 이 값. 손끝 방향·각도는 프리팹의 HandIcon(자식)에서 저작하고, " +
              "여기서는 그 손끝이 타깃 중앙에 닿도록 기준점만 밀어 준다(코드는 손 크기·각도를 보정하지 않는다)")]
-    [SerializeField] Vector2 handOffset    = Vector2.zero;
-    [Tooltip("타깃과 문구 사이 간격")]
-    [SerializeField] float   messageMargin = 36f;
-    [Tooltip("문구 전용 모드(타깃 없음)의 하단 여백")]
-    [SerializeField] float   messageBottom = 220f;
+    [SerializeField] Vector2 handOffset = Vector2.zero;
 
     [Header("포인터 연출")]
     [SerializeField] float pulseScale    = 1.08f;
@@ -71,8 +67,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_satisfied;         // 중복 클릭 가드 — 콜백은 1회만
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
+    bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
-    Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(투명 모드에서 알파만 0으로 낮춘다)
+    Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(판을 끌 때 알파 0으로 내렸다가 되돌린다)
 
     // 승격 상태. 원래 컴포넌트를 지우지 않도록 "내가 붙였는지"와 원래 정렬값을 함께 들고 있는다.
     // 카드 단위 승격(CollectHighlights) 때문에 여러 개가 동시에 올라간다.
@@ -123,8 +120,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.
     /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
     /// (구매처럼 눌러도 실패할 수 있는 스텝).
-    /// <paramref name="_dim"/>=false면 화면을 어둡게만 하지 않는다 — 판은 그대로 깔려 타깃 외 입력을 막고
-    /// 타깃 승격도 유지된다(투명한 판 아래 묻히면 정작 눌러야 할 것이 안 눌린다).</summary>
+    /// <paramref name="_dim"/>=false면 손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
+    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.</summary>
     public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
     {
         if (_target == null)
@@ -149,19 +146,19 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied    = false;
         m_blockWarned  = false;
         m_armed        = true;
+        m_dim          = _dim;
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetBlocker(true, _dim);
+        SetBlocker(_dim);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
 
     /// <summary>딤 없이 안내 문구만 띄운다. 걸 타깃이 아예 없거나(개봉 대기처럼 클릭이 아닌 신호로 끝나는 스텝),
     /// 타깃에 Button이 없어 ShowGate가 거부하는 경우용.
-    /// 판을 아예 걷는 것이 이 모드의 계약이다(투명한 판도 두지 않는다) — 개봉 스와이프(PackTearHandle)가
-    /// EventSystem.IsPointerOverGameObject로 시작 여부를 판정하므로, 전체화면 판이 있으면 보이든 안 보이든
-    /// 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
+    /// 딤을 켜지 않는 것이 이 모드의 계약이다 — 개봉 스와이프(PackTearHandle)가 EventSystem.IsPointerOverGameObject로
+    /// 시작 여부를 판정하므로, 전체화면 딤이 있으면 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
     /// 게다가 이 모드는 m_armed=false라 LateUpdate가 돌지 않아 탈출로도 없다.</summary>
     public void ShowBanner(string _message)
     {
@@ -179,10 +176,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         SetBlocker(false);
         SetPointerActive(false);
         SetMessage(_message);
-
-        if (this.messageRect != null)
-            this.messageRect.anchoredPosition =
-                new Vector2(0f, m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottom);
 
         m_gateRoot.SetActive(true);
     }
@@ -215,12 +208,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
             return;
         }
 
-        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 하단에 고정(ShowBanner와 같은 배치).
+        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 띄운다(위치는 SetMessage가 화면 중앙으로 고정).
         SetPointerActive(false);
-
-        if (this.messageRect != null)
-            this.messageRect.anchoredPosition =
-                new Vector2(0f, m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottom);
 
         m_gateRoot.SetActive(true);
     }
@@ -293,8 +282,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
         bool t_visible   = t_active && t_clickable;
 
-        if (t_visible) Promote();
-        else           Demote();
+        // 딤이 꺼진 스텝은 승격도 하지 않는다 — 승격은 딤 위로 끌어올리려는 장치인데 가릴 딤이 없다.
+        if (t_visible && m_dim) Promote();
+        else                    Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
 
@@ -363,24 +353,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
             this.hand.anchoredPosition = t_center + this.handOffset;
-
-        PlaceMessage(t_full, t_min.y, t_max.y);
-    }
-
-    // 타깃을 가리지 않는 쪽에 문구를 둔다 — 타깃이 화면 위쪽이면 아래, 아래쪽이면 위.
-    // 고정 위치로 두면 하단바 탭 스텝에서 문구가 타깃과 겹치고, 타깃이 문구 위로 승격돼 깨진 것처럼 보인다.
-    void PlaceMessage(Rect _full, float _targetYMin, float _targetYMax)
-    {
-        if (this.messageRect == null || !this.messageRect.gameObject.activeSelf) return;
-
-        float t_half   = this.messageRect.sizeDelta.y * 0.5f;
-        float t_center = (_targetYMin + _targetYMax) * 0.5f;
-        float t_y = t_center > 0f
-            ? _targetYMin - this.messageMargin - t_half
-            : _targetYMax + this.messageMargin + t_half;
-
-        t_y = Mathf.Clamp(t_y, _full.yMin + t_half + this.messageMargin, _full.yMax - t_half - this.messageMargin);
-        this.messageRect.anchoredPosition = new Vector2(0f, t_y);
     }
 
     // ── 타깃 승격 ────────────────────────────────────────────────────────────
@@ -501,16 +473,16 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     // ── 표시 토글 ────────────────────────────────────────────────────────────
 
-    // 판을 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
-    // _visible은 룩만 정한다 — 투명해도 차단은 그대로이므로 승격(RefreshVisibility)도 함께 유지되어야 한다.
-    // 주의: 이 판이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
-    void SetBlocker(bool _on, bool _visible = true)
+    // 딤은 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
+    // 색까지 투명으로 내리는 이유: 컴포넌트만 꺼 두면 무언가 다시 켜는 순간 어두운 판이 그대로 돌아온다.
+    // 주의: 딤이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
+    void SetBlocker(bool _on)
     {
         if (this.blocker == null) return;
 
         this.blocker.enabled       = _on;
         this.blocker.raycastTarget = _on;
-        this.blocker.color         = _visible ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
+        this.blocker.color         = _on ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
     }
 
     void SetPointerActive(bool _on)
@@ -523,11 +495,17 @@ public class OutgameTutorialGateUI : MonoBehaviour
         else        StopPulse();
     }
 
+    // 문구는 모드·타깃과 무관하게 화면 중앙 한 자리에 둔다(읽는 자리가 스텝마다 옮겨 다니지 않게).
     void SetMessage(string _message)
     {
         bool t_has = !string.IsNullOrEmpty(_message);
 
-        if (this.messageRect != null) this.messageRect.gameObject.SetActive(t_has);
+        if (this.messageRect != null)
+        {
+            this.messageRect.gameObject.SetActive(t_has);
+            this.messageRect.anchoredPosition = Vector2.zero;
+        }
+
         if (t_has && this.messageText != null) this.messageText.text = _message;
     }
 
@@ -589,6 +567,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
         m_confirmMode = false;
+        m_dim         = true;   // 딤 없는 스텝(ShowGate)이 그 다음 모드로 새지 않게. ShowGate만 이 값을 덮는다.
     }
 
     // 딤 탭 수신을 켠다. Release()가 항상 먼저 떼므로 중복 부착은 없지만, 단일 창구를 지키려 여기서도 한 번 뗀다.
@@ -602,15 +581,12 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     // ── 초기화 ──────────────────────────────────────────────────────────────
 
-    // 딤 색의 정본은 프리팹 저작값이다 — 투명 모드가 알파만 덮으므로 원본을 여기서 한 번 떠 둔다.
-    // 알파 0 메시는 CanvasRenderer가 컬링하고, 컬링된 그래픽은 레이캐스트에서도 빠진다
-    // → 투명 판이 아무것도 막지 못한다. 그래서 컬링을 끈다(비용은 투명 쿼드 1장).
+    // 딤 색의 정본은 프리팹 저작값이다 — 끌 때 알파를 0으로 덮으므로 원본을 여기서 한 번 떠 둔다.
     void CacheDimColor()
     {
         if (this.blocker == null) return;
 
         m_dimColor = this.blocker.color;
-        this.blocker.canvasRenderer.cullTransparentMesh = false;
     }
 
     void CacheRoots()

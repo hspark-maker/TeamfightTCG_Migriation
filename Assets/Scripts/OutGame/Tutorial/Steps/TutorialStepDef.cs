@@ -26,13 +26,13 @@ public class TutorialStepDef
 
     [Tooltip("이 스텝 동안만 다시 잠그는 기능(일시).\n"
            + "unlocks와 달리 누적되지 않는다 — 다음 스텝으로 넘어가면 저절로 원래 해금 상태로 돌아간다.\n"
-           + "이미 열린 기능에도 걸리고 해금보다 우선한다. 게이트 판이 닿지 않는 자리(팝업·다른 화면)의 옆길을 막을 때 쓴다.\n"
+           + "이미 열린 기능에도 걸리고 해금보다 우선한다. 딤을 켜지 않고 옆길만 막고 싶을 때 쓴다.\n"
            + "⚠ 이 스텝이 지목하는 앵커의 기능을 여기 넣으면 눌러야 할 버튼을 스스로 막아 진행이 멎는다.\n"
            + "⚠ 잠그려는 위젯에 잠금 키가 배선돼 있어야 한다(탭이면 LobbyTabController의 unlockFeature) — "
            + "None인 위젯은 잠글 대상이 없어 아무 일도 일어나지 않는다")]
     [SerializeField] List<EOutgameFeature> locks = new List<EOutgameFeature>();
 
-    [Tooltip("화면을 어둡게 할지. 끄면 딤 판이 투명해질 뿐 그대로 깔린다 — 타깃 외 입력 차단도 타깃 강조(승격)도 켰을 때와 같다")]
+    [Tooltip("타깃 외 입력을 딤으로 막을지. 끄면 화면이 어두워지지 않고 입력도 막지 않는다(차단은 아래 locks가 맡는다)")]
     [SerializeField] bool useDim = true;
 
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
@@ -61,7 +61,7 @@ public class TutorialStepDef
     // 이 스텝 동안만 닫히는 기능(누적되지 않는다 — 다음 스텝에서 저절로 풀린다)
     public IReadOnlyList<EOutgameFeature> Locks => locks;
 
-    // 딤 판을 어둡게 보일지(false여도 판은 깔린다 — 룩만 정하는 값)
+    // 딤으로 타깃 외 입력을 막는가(false면 차단은 잠금에 맡긴다)
     public bool UseDim => useDim;
 
     public CardPackData Pack => pack;

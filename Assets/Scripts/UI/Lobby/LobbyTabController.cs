@@ -33,6 +33,13 @@ public class LobbyTabController : MonoBehaviour
     [SerializeField] Image focusIcon;       // Focus 안의 아이콘
     [SerializeField] TMP_Text focusLabel;   // Focus 안의 이름 텍스트
 
+    [Header("탭바 걷기 (옵션 — 로비 하단바 인스턴스에만 배선한다)")]
+    [Tooltip("연출이 화면 아래를 통째로 써야 할 때 걷어낼 탭바(BottomBar)의 CanvasGroup.\n" +
+             "⚠ SetActive로 끄면 안 된다 — 부모 VerticalLayoutGroup 아래에서 220px가 사라지면 콘텐츠가 늘어나 화면이 튄다.")]
+    [SerializeField] CanvasGroup barGroup;
+
+    [SerializeField] float barRetractDuration = 0.2f;
+
     [Header("Focus 하이라이트 회전")]
     [Tooltip("Button_Focus 뒤쪽 하이라이트. 비우면 Focus의 Light 자식을 자동으로 찾는다.")]
     [SerializeField] RectTransform focusHighlight;
@@ -68,6 +75,24 @@ public class LobbyTabController : MonoBehaviour
     public void SetLeaveGuard(Action<Action> _guard) => this.m_leaveGuard = _guard;
 
     public void ClearLeaveGuard() => this.m_leaveGuard = null;
+
+    /// 탭바를 걷었다 되돌린다. 이탈 가드와 짝으로 쓴다 — 어차피 눌러도 안 먹는 탭바가
+    /// 딤 위에 떠 있으면 화면 아래를 쓰는 연출이 그 자리를 못 쓴다.
+    public void SetBarRetracted(bool _retracted)
+    {
+        if (this.barGroup == null) return;
+
+        DOTween.Kill(this.barGroup);   // 세션이 연달아 돌면 알파가 중간값에 굳는다
+
+        // 입력은 트윈을 기다리지 않는다 — 반투명한 동안 눌리면 걷는 중에 탭이 바뀐다
+        this.barGroup.blocksRaycasts = !_retracted;
+
+        this.barGroup.DOFade(_retracted ? 0f : 1f, Mathf.Max(0.01f, this.barRetractDuration))
+            .SetEase(Ease.OutQuad)
+            .SetUpdate(true)
+            .SetTarget(this.barGroup)
+            .SetLink(this.barGroup.gameObject);
+    }
 
     void Awake()
     {

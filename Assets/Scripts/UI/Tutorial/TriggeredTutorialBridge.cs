@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 // 트리거 발화 튜토리얼의 씬 수명 브리지(씬당 1개). OutgameTutorialBridge의 축소판이다 —
@@ -26,6 +27,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
         TriggeredTutorialRunner.OnActivated  += OnActivated;
         TutorialAnchorRegistry.OnRegistered  += OnAnchorRegistered;
+
+        CardDetailOverlayView.OnAnyEnhanceStarted += OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed          += OnOverlayClosed;
     }
 
     void Start()
@@ -39,6 +45,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         TriggeredTutorialRunner.OnActivated  -= OnActivated;
         TutorialAnchorRegistry.OnRegistered  -= OnAnchorRegistered;
+
+        CardDetailOverlayView.OnAnyEnhanceStarted -= OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
+        AlbumPageOverlayView.OnAnyClosed          -= OnOverlayClosed;
 
         CloseGate();
     }
@@ -95,6 +106,14 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
         m_step = t_step;
 
+        // 유저가 열어 둔 오버레이(카드 상세·도감 페이지)를 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
+        // 이미 로비 표면이면 기다릴 것이 없다.
+        if (m_step.Completion == EOutgameTutorialCompletion.LobbyReturn)
+        {
+            if (IsLobbySurfaceVisible()) OnGateSatisfied();
+            return;
+        }
+
         // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
@@ -108,7 +127,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
             return;
         }
 
-        if (m_step.Completion == EOutgameTutorialCompletion.Click)
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+         || m_step.Completion == EOutgameTutorialCompletion.Enhance)
         {
             TryOpenGate();
             return;
@@ -132,7 +152,46 @@ public class TriggeredTutorialBridge : MonoBehaviour
             return;
         }
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, OnGateSatisfied);
+        // 강화는 눌러도 실패할 수 있다(골드 부족·확률 실패) → 클릭을 완료로 넘기지 않는다.
+        // 완료는 성공 신호(OnEnhanceSettled)가 확정한다.
+        Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Enhance
+            ? null
+            : (Action)OnGateSatisfied;
+
+        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
+    }
+
+    // 오버레이 하나가 닫혔다. 남은 것이 아직 있으면 계속 기다린다 — 완료는 "로비 표면이 드러났는가" 하나로 판정한다.
+    void OnOverlayClosed()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.LobbyReturn) return;
+        if (!IsLobbySurfaceVisible()) return;
+
+        OnGateSatisfied();
+    }
+
+    // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
+    static bool IsLobbySurfaceVisible()
+        => !CardDetailOverlayView.IsOpen && !AlbumPageOverlayView.IsOpen;
+
+    // 강화가 무대를 쥐었다 — 안내만 접는다(스텝은 그대로 대기).
+    // 접지 않으면 결과판이 되살린 "한 번 더" 버튼 위에 손가락이 다시 떠서, 유저가 그걸 따라 누르는 동안
+    // 결과판이 닫히지 않아 완료 신호가 영영 오지 않는다.
+    void OnEnhanceStarted()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+
+        HideGuide();
+    }
+
+    // 강화 한 방이 연출·결과판까지 끝나 상세로 돌아왔다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
+    void OnEnhanceSettled(EnhanceResult _result)
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+
+        if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
+
+        TryOpenGate();
     }
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
@@ -153,6 +212,13 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (!TriggeredTutorialRunner.IsRunning) { CloseGate(); return; }
 
         ApplyCurrentStep();
+    }
+
+    // 안내 표시만 접는다 — 스텝은 그대로 서 있고, TryOpenGate로 언제든 다시 세울 수 있다.
+    // CloseGate와 갈라 둔다: 그쪽은 m_step까지 비워 완료 신호를 받을 주체가 사라진다.
+    void HideGuide()
+    {
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }
 
     void CloseGate()
