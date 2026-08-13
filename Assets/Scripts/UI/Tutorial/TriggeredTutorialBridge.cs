@@ -24,6 +24,11 @@ public class TriggeredTutorialBridge : MonoBehaviour
     bool m_applying;
     bool m_pendingApply;
 
+    // 강화 연출이 무대를 쥔 구간. 이 동안의 앵커 재등록은 무시한다 —
+    // 진화 연출은 공개 시점에 다음 단계(진화 아님)로 버튼을 갈아끼워 같은 키를 다시 등록하는데,
+    // 그때 버튼은 연출 잠금으로 비활성이라 게이트가 뜨지 못하고 경고만 남는다.
+    bool m_enhancing;
+
     // 구독이 Start가 아니라 Awake인 이유: 발화 지점인 LobbyTabController.Start()가 이 브리지 Start보다 먼저 돌 수 있고
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
     void Awake()
@@ -206,6 +211,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
+        m_enhancing = true;
         HideGuide();
     }
 
@@ -223,6 +229,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 강화 한 방이 연출·결과판까지 끝나 상세로 돌아왔다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
     void OnEnhanceSettled(EnhanceResult _result)
     {
+        m_enhancing = false;
+
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
@@ -232,6 +240,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
+        if (m_enhancing) return;
         if (m_step == null || _key != m_step.Anchor) return;
 
         TryOpenGate();
@@ -259,7 +268,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void CloseGate()
     {
-        m_step = null;
+        m_step      = null;
+        m_enhancing = false;
 
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }

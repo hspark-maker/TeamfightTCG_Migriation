@@ -469,6 +469,12 @@ sequenceDiagram
 >
 > 2026-08-13: 온보딩 마지막 챕터였던 **카드 강화 안내가 도감 탭 트리거(`CollectionTabFirstEnter`)로 이관**됐다.
 > 온보딩에는 랭크 승급 연출(`EnterFirstRank` + `unlocksAll`) 한 스텝만 남아 그 자리가 곧 졸업이다.
+>
+> 2026-08-13: **첫 진화 안내(`FirstEvolutionReady`)** 추가 — 발화 축이 탭 밖으로 처음 나갔다.
+> 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
+> 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
+> 안내가 도는 동안 **1차 진화 관문 한 칸만** 무료다(`CardGrowthManager.IsFirstEvolutionFreeStep`) —
+> 런 전체로 넓히면 진화 다음 칸까지 0원으로 새어 결과판의 "한 번 더"가 공짜가 된다.
 
 #### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
 
@@ -514,11 +520,11 @@ flowchart TD
 
     subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
         BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
-        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn"]:::chg
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
@@ -529,6 +535,10 @@ flowchart TD
     TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
+    CDO["CardDetailOverlayView<br/>강화 완료(_onFinished)에서 다음 한 방이 첫 진화면 Fire<br/>+ 발화 직후 RefreshGrowth로 0원 표시 반영"]:::chg
+    GROW["CardGrowthManager.TryGetStepAt<br/>IsFirstEvolutionFreeStep(level) — 관문 한 칸만 0원"]:::chg
+    CDO -->|"Fire(FirstEvolutionReady)"| TRUN
+    GROW -->|"IsRunningTrigger"| TRUN
     KEY --- TRUN
     BOOT -->|"EnsureData(멱등)"| TRUN
     TBRG -->|"EnsureData · OnActivated 구독"| TRUN

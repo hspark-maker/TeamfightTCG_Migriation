@@ -1252,6 +1252,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.
                 NotifyEnhanceSettled(t_result);
 
+                // 결과판이 걷히고 하단 바에 진화 버튼이 선 지금이 첫 진화 안내의 자리다.
+                // "한 번 더"로 이어가는 중이면 아직 무대가 돌지 않았다 — 그 체인이 끝난 뒤 같은 자리에서 다시 묻는다.
+                if (!this.m_retryQueued) TryFireFirstEvolutionTutorial(t_now);
+
                 // 구독자가 이 결과를 듣고 창을 닫았다면 예약은 Hide가 이미 지웠다 — 체인은 여기서 끝난다.
                 if (!this.m_retryQueued) return;
 
@@ -1279,6 +1283,23 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_button != null)
             TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.CardDetailEnhanceButton,
                                             _button.transform as RectTransform, _button);
+    }
+
+    /// <summary>다음 한 방이 첫 진화면 무료 진화 안내를 깨운다. 관문 레벨을 여기서 적지 않는 이유는
+    /// 그것을 곡선(CardGrowthConfig)이 소유하기 때문이다 — 1회성은 트리거 완주 낙인이 보장한다.</summary>
+    void TryFireFirstEvolutionTutorial(CardData _card)
+    {
+        if (_card == null) return;
+        if (CardGrowthManager.GrowthOf(_card).EvolutionStage != 0) return;
+        if (!CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next)) return;
+        if (!CardGrowthManager.IsEvolutionLevel(t_next.Level)) return;
+
+        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.FirstEvolutionReady);
+
+        // 발화로 이 한 칸이 무료가 됐다 — 비용 표시·활성 판정을 다시 읽힌다.
+        // 위(_onFinished)의 RefreshGrowth는 발화보다 앞이라 아직 다이아 값을 그려 뒀다.
+        if (TriggeredTutorialRunner.IsRunningTrigger(EOutgameTutorialTrigger.FirstEvolutionReady))
+            RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
     }
 
     // 성공한 강화가 다 끝났음을 바깥에 알린다. 실패·미결제는 알리지 않는다 —
