@@ -52,7 +52,8 @@ public class PackShowcaseController : MonoBehaviour
     readonly List<Sprite> m_arts = new List<Sprite>();
 
     int m_index;
-    bool m_forced;        // 튜토리얼이 진열을 덮어썼는가.
+    bool m_forced;               // 튜토리얼이 진열을 덮어썼는가.
+    string m_forcedPriceLabel;   // 그 스텝이 가격 자리에 대신 띄우라고 저작한 문구(비면 실제 가격).
 
     // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
     bool m_openPending;
@@ -138,7 +139,7 @@ public class PackShowcaseController : MonoBehaviour
         if (s_transitioning) return;
 
         m_display.Clear();
-        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced);
+        m_forced = OutgameTutorialRunner.TryGetForcedPack(out var t_forced, out m_forcedPriceLabel);
 
         if (m_forced)
         {
@@ -209,13 +210,20 @@ public class PackShowcaseController : MonoBehaviour
     {
         var t_pack = ResolvePack();
 
+        // 튜토리얼 스텝이 가격 자리 문구를 저작했으면 숫자 대신 그 말을 띄운다(예: "무료").
+        bool t_labeled = t_pack != null && m_forced && !string.IsNullOrEmpty(m_forcedPriceLabel);
+
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
-        if (priceText != null) priceText.text = t_pack != null ? $"{t_pack.Price:N0}" : string.Empty;
+        if (priceText != null)
+            priceText.text = t_pack == null ? string.Empty
+                           : t_labeled     ? m_forcedPriceLabel
+                                           : $"{t_pack.Price:N0}";
 
         if (priceIcon != null)
         {
             // 가격 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
-            priceIcon.enabled = t_pack != null;
+            // 문구로 갈아낀 자리도 마찬가지 — 결제 재화를 말하지 않는 표기에 재화 아이콘만 남으면 어긋난다.
+            priceIcon.enabled = t_pack != null && !t_labeled;
 
             var t_icon = ResolveCurrencyIcon(t_pack);
             if (t_icon != null) priceIcon.sprite = t_icon;
