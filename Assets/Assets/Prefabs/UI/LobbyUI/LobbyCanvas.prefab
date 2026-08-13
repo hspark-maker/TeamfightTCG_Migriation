@@ -1199,6 +1199,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LobbyMatchLauncher
   shell: {fileID: 5952838912716686558}
   aiDeckConfig: {fileID: 11400000, guid: 7275411125aa5674a90a9f07342babbc, type: 2}
+  matchShellPrefab: {fileID: 6346514855679779509, guid: 9c3999eeb9743ed4bac70b580dd24467, type: 3}
+  profilePool: {fileID: 11400000, guid: 7f6df2feb8d5076418b96358ee58377d, type: 2}
   lobbyTabController: {fileID: 3797395670514148879}
   deckTabIndex: 3
 --- !u!114 &7651999879105262670

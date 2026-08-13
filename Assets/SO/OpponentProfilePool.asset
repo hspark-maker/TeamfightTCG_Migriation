@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a405047569862b48950c17b1caa35c3, type: 3}
+  m_Name: OpponentProfilePool
+  m_EditorClassIdentifier: Assembly-CSharp::OpponentProfilePool
+  names:
+  - "\uBD88\uAF43\uCE74\uB4DC"
+  - "\uB371\uB9C8\uC2A4\uD130"
+  - "\uCD08\uBCF4\uC0AC\uB0E5\uAFBC"
+  - "\uC804\uC124\uC758\uC2DC\uC791"
+  - "\uCE74\uB4DC\uC655"
+  - "\uBB34\uD328\uC758\uAC80"
+  - "\uD589\uC6B4\uC758\uC190"
+  - "\uACE0\uC591\uC774\uBC1C"
+  - "\uC2EC\uC57C\uC758\uACB0\uD22C"
+  - "\uC655\uCD08\uBCF4"
+  - "\uB77C\uBA74\uBA39\uACE0\uAC10"
+  - "\uCD9C\uADFC\uC911"
+  - "\uD55C\uD310\uB9CC\uB354"
+  - "\uC878\uB9B0\uB208"
+  - "\uC288\uD37C\uB8E8\uD0A4"
+  - "\uC9C0\uB098\uAC00\uB358\uACE0\uC218"
+  - "\uB371\uBE4C\uB354"
+  - "\uC6B4\uBE68\uC804\uBB38\uAC00"
+  - "\uB9C9\uCC28\uD0D1\uC2B9"
+  - "\uCEE4\uD53C\uD55C\uC794"
+  - "\uC7A0\uC218\uD568"
+  - "\uB208\uC0AC\uB78C"
+  - "\uB274\uBE44\uC7A1\uC774"
+  - "\uCE7C\uD1F4\uADFC"
+  - "\uC57C\uADFC\uAC01"
+  appendNumber: 1
+  numberMax: 999
+  avatars: []
