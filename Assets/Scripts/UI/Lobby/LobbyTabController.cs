@@ -45,6 +45,14 @@ public class LobbyTabController : MonoBehaviour
 
     [SerializeField] float barRetractDuration = 0.2f;
 
+    [Header("셸 딤 (옵션 — 로비 하단바 인스턴스에만 배선한다)")]
+    [Tooltip("탭 콘텐츠 **밖**(상단바·하단바 자리)을 덮는 딤 묶음(Panel_ShellDim)의 CanvasGroup.\n" +
+             "탭 콘텐츠 안에서 열리는 오버레이의 딤은 상하단까지 못 덮는다 — 그 자리를 이것이 맡는다.\n\n" +
+             "⚠ 저작 규약: 두 판(Dim_Top·Dim_Bottom)의 높이는 상단바 180 / 하단바 220과 맞춰 둔다.\n" +
+             "  셸 높이를 바꾸면 여기도 같이 고쳐야 딤과 실제 바의 경계가 어긋나지 않는다.\n" +
+             "  두 판 모두 화면 바깥으로 넉넉히 연장해 둔다(SafeArea 밖 노치 영역까지 덮으려고).")]
+    [SerializeField] CanvasGroup shellDim;
+
     [Header("Focus 하이라이트 회전")]
     [Tooltip("Button_Focus 뒤쪽 하이라이트. 비우면 Focus의 Light 자식을 자동으로 찾는다.")]
     [SerializeField] RectTransform focusHighlight;
@@ -97,6 +105,25 @@ public class LobbyTabController : MonoBehaviour
             .SetUpdate(true)
             .SetTarget(this.barGroup)
             .SetLink(this.barGroup.gameObject);
+    }
+
+    /// 탭 콘텐츠 밖(상단바·하단바 자리)을 딤으로 덮어 화면 한가운데만 남긴다.
+    /// 연출이 콘텐츠 안에서 도는 동안 상단 재화·메뉴로 빠져나가는 길을 함께 막는다 —
+    /// 이 딤은 어둡게 하는 겉모습이자 그 자체가 입력 블로커다.
+    public void SetShellDimmed(bool _dimmed)
+    {
+        if (this.shellDim == null) return;
+
+        DOTween.Kill(this.shellDim);   // 세션이 연달아 돌면 알파가 중간값에 굳는다
+
+        // 입력은 트윈을 기다리지 않는다(SetBarRetracted와 같은 규율) — 옅은 동안 눌리면 막은 뜻이 없다
+        this.shellDim.blocksRaycasts = _dimmed;
+
+        this.shellDim.DOFade(_dimmed ? 1f : 0f, Mathf.Max(0.01f, this.barRetractDuration))
+            .SetEase(Ease.OutQuad)
+            .SetUpdate(true)
+            .SetTarget(this.shellDim)
+            .SetLink(this.shellDim.gameObject);
     }
 
     void Awake()
