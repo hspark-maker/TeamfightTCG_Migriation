@@ -28,11 +28,13 @@ public class MatchmakingShell : MonoBehaviour
     [SerializeField] string foundTitle = "상대를 찾았다!";
 
     [Header("연출 박자")]
-    [Tooltip("상대 프로필이 꽂힌 뒤 대치로 넘어가기까지의 뜸(초). 이름과 랭크를 읽을 시간이다 — 0.4 아래로 내리면 못 읽는다.")]
-    [SerializeField] float foundHold = 0.7f;
+    [Tooltip("상대가 꽂히는 안무가 끝난 뒤 충돌까지의 조임 구간(초). 이 구간은 '빈 정지'가 아니라 " +
+             "압력이 차오르는 시간이다(MatchmakingFx의 조임 축들이 여기서 돈다) — 이름과 랭크를 읽는 시간이기도 하다.\n" +
+             "0.4 아래로 내리면 못 읽고, 쌓인 것이 없어 충돌도 같이 약해진다.")]
+    [Min(0f)] [SerializeField] float chargeHold = 0.62f;
 
-    [Tooltip("두 프로필이 부딪히고 VS가 뜬 뒤 덱 화면으로 넘어가기까지의 뜸(초).")]
-    [SerializeField] float versusHold = 0.8f;
+    [Tooltip("충돌·정착이 끝난 뒤 갈라짐까지의 여운(초). 마지막 한 박은 완전 정지여야 다음 사건이 새 사건으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float afterglowHold = 0.34f;
 
     [Tooltip("대치할 때 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
     [SerializeField] float versusApproach = 60f;
@@ -57,6 +59,11 @@ public class MatchmakingShell : MonoBehaviour
     Vector2 m_myHome;
     Vector2 m_opponentHome;
 
+    // 갈라짐에 함께 실려 나가는 것들과 그 기준 위치(제목·취소 버튼). 배너와 같은 이유로 Awake에서만 잡는다 —
+    // 이미 밀려난 값을 홈으로 삼으면 매칭을 열 때마다 제목이 화면 밖으로 조금씩 걸어 나간다.
+    RectTransform[] m_riders;
+    Vector2[]       m_riderHomes;
+
     // 지금 화면에 떠 있는 안무. 화면이 내려갈 때 함께 걷지 않으면 파괴된 대상 위에서 계속 돈다.
     Sequence m_stage;
 
@@ -64,6 +71,8 @@ public class MatchmakingShell : MonoBehaviour
     {
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
+
+        CaptureRiderHomes();
 
         fx.Capture();
 
@@ -77,6 +86,9 @@ public class MatchmakingShell : MonoBehaviour
         StopDots();
         KillStage();
         fx.StopScan();
+
+        // 고여 있던 빛은 시퀀스가 아니라 fx가 소유한다 — 무대만 걷으면 자가설치 노드가 남는다.
+        fx.ClearCharge();
     }
 
     // 취소 버튼은 여기서 건다 — 프리팹 onClick으로 배선하면 셸이 모르는 취소 경로가 생겨 토큰이 살아남는다.
@@ -148,11 +160,14 @@ public class MatchmakingShell : MonoBehaviour
     {
         KillStage();
 
-        m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target, in _targets);
+        m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
+                                  (RectTransform)transform, Riders, fx.RaySprite, in _targets);
         m_stage.SetLink(gameObject);
 
-        // 부품이 다 옮겨 앉은 프레임에 내려간다. 뒤의 덱 등장까지 켜 두면 알파 0짜리 딤이 그동안 터치를 먹는다.
-        m_stage.InsertCallback(handoffFx.moveDuration, Close);
+        // 배너가 다 나가고 어둠까지 다 걷힌 프레임에 내려간다(CloseAt). 한 프레임이라도 일찍 내리면
+        // 남아 있던 어둠이 통째로 사라져 전환 한복판이 번쩍인다 — 걷어내는 도중에 끄는 것이 곧 하드컷이다.
+        // 뒤의 덱 등장까지 켜 두지 않는 이유는 알파 0짜리 딤이 그동안 터치를 먹기 때문이다.
+        m_stage.InsertCallback(handoffFx.CloseAt, Close);
 
         await m_stage.ToUniTask(cancellationToken: _ct).SuppressCancellationThrow();
 
@@ -178,13 +193,17 @@ public class MatchmakingShell : MonoBehaviour
         // 도착해 이 시점엔 프로필만 온다. 덱 폴백은 호스트(ConfirmOpponent)가 전담한다.
         if (t_opponent == null) return null;
 
+        // 꽂힘(①)과 조임(②)은 한 시퀀스로 붙어 돈다 — 사이에 셸이 끼면 그 프레임에 안무가 한 번 끊긴다.
         ShowFound(t_opponent.Value);
 
         // 이 뒤의 대기는 유저 취소(m_cts)가 아니라 씬 파괴(_ct)만 본다 — 발견 이후는 취소를 받지 않기 때문이다.
-        if (await WaitAsync(foundHold, _ct)) return null;
+        if (await WaitAsync(fx.FoundDuration + chargeHold, _ct)) return null;
 
+        // 충돌(③)이 무대를 갈아탄다. 조임이 끌어다 놓은 자리에서 그대로 이어받으므로 되돌리지 않는다.
         PlayVersus();
-        if (await WaitAsync(versusHold, _ct)) return null;
+
+        // 정착 + 여운(④). 여운이 안무보다 짧으면 VS의 호흡이 잘린 채 갈라짐이 시작된다.
+        if (await WaitAsync(fx.VersusDuration + Mathf.Max(fx.AfterglowDuration, afterglowHold), _ct)) return null;
 
         return t_opponent;
     }
@@ -194,12 +213,14 @@ public class MatchmakingShell : MonoBehaviour
         gameObject.SetActive(true);
         EnsureWired();
 
-        // 직전 전환이 카드를 옮겨 앉히고 흐려 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
+        // 직전 전환이 배너를 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
         KillStage();
         fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
+        handoffFx.Reset((RectTransform)transform, VersusRect);
 
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
+        RestoreRiders();
 
         if (myProfile       != null) myProfile.Render(MatchProfile.OfLocalPlayer());
         if (opponentProfile != null) opponentProfile.ShowSearching();
@@ -225,7 +246,17 @@ public class MatchmakingShell : MonoBehaviour
 
         opponentProfile.Render(_opponent.Profile);
 
-        PlayStage(fx.BuildFound(opponentProfile, (RectTransform)transform));
+        var t_root = (RectTransform)transform;
+        var t_seq  = fx.BuildFound(opponentProfile, t_root);
+
+        // 조임은 꽂힘이 끝나는 자리에 이어 붙인다. 별도 무대로 돌리면 그 사이 한 프레임이 완전 정지가 되어,
+        // 채우려던 바로 그 공백이 앞으로 옮겨 갈 뿐이다.
+        t_seq.Insert(fx.FoundDuration,
+                     fx.BuildCharge(myProfile != null ? myProfile.Rect : null, m_myHome,
+                                    opponentProfile.Rect, m_opponentHome,
+                                    VersusStep, t_root, VersusAnchored, chargeHold));
+
+        PlayStage(t_seq);
     }
 
     void PlayVersus()
@@ -233,14 +264,37 @@ public class MatchmakingShell : MonoBehaviour
         var t_vs = VersusRect;
         if (versusRoot != null) versusRoot.SetActive(true);
 
-        // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
-        Vector2 t_gap  = m_opponentHome - m_myHome;
-        Vector2 t_step = (t_gap.sqrMagnitude > 0.01f ? t_gap.normalized : Vector2.right) * versusApproach;
+        // 짓기 전에 먼저 걷는다. PlayStage도 걷지만 그건 인자를 다 만든 뒤라,
+        // 안무를 짓는 동안 조임이 아직 살아 있어 같은 카드를 두 시퀀스가 붙들고 있는 순간이 생긴다.
+        KillStage();
 
         PlayStage(fx.BuildVersus(myProfile != null ? myProfile.Rect : null,       m_myHome,
                                  opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
-                                 t_step, t_vs));
+                                 VersusStep, t_vs, (RectTransform)transform));
     }
+
+    // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
+    // 조임과 충돌이 같은 걸음을 써야 끌린 방향 그대로 부딪힌다.
+    Vector2 VersusStep
+    {
+        get
+        {
+            Vector2 t_gap = m_opponentHome - m_myHome;
+
+            return (t_gap.sqrMagnitude > 0.01f ? t_gap.normalized : Vector2.right) * versusApproach;
+        }
+    }
+
+    // VS가 뜰 자리. 조임의 빛이 여기에 고인다 — VS가 아직 꺼져 있어도 좌표는 읽을 수 있다.
+    Vector2 VersusAnchored => VersusRect != null ? VersusRect.anchoredPosition : Vector2.zero;
+
+    // 배너에 실리지 않은 것들. 갈라짐이 이들도 함께 실어 내보낸다 —
+    // 아니면 전환 한복판에서 제목과 취소 버튼이 한 프레임에 증발한다.
+    RectTransform[] Riders => m_riders ??= new[]
+    {
+        titleText    != null ? (RectTransform)titleText.transform    : null,
+        cancelButton != null ? (RectTransform)cancelButton.transform : null,
+    };
 
     // 취소 버튼. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
     public void Cancel()
@@ -275,6 +329,40 @@ public class MatchmakingShell : MonoBehaviour
     void SetCancelInteractable(bool _on)
     {
         if (cancelButton != null) cancelButton.interactable = _on;
+    }
+
+    // 제목·취소 버튼의 저작 자리를 한 번만 잡는다. Riders 프로퍼티가 배열을 세우고 여기가 그 자세를 기록한다.
+    void CaptureRiderHomes()
+    {
+        var t_riders = Riders;
+
+        m_riderHomes = new Vector2[t_riders.Length];
+
+        for (int t_i = 0; t_i < t_riders.Length; t_i++)
+            if (t_riders[t_i] != null) m_riderHomes[t_i] = t_riders[t_i].anchoredPosition;
+    }
+
+    // 갈라짐이 밀어낸 제목·취소 버튼을 제자리로. 되돌리지 않으면 다음 매칭이 제목 없는 화면으로 열린다.
+    void RestoreRiders()
+    {
+        if (m_riderHomes == null) return;
+
+        var t_riders = Riders;
+
+        for (int t_i = 0; t_i < t_riders.Length && t_i < m_riderHomes.Length; t_i++)
+        {
+            var t_rider = t_riders[t_i];
+            if (t_rider == null) continue;
+
+            t_rider.DOKill();
+            t_rider.anchoredPosition = m_riderHomes[t_i];
+
+            var t_group = t_rider.GetComponent<CanvasGroup>();
+            if (t_group == null) continue;   // 전환을 한 번도 안 탔으면 아직 붙지 않았다
+
+            t_group.DOKill();
+            t_group.alpha = 1f;
+        }
     }
 
     static void RestoreHome(MatchProfileView _view, Vector2 _home)

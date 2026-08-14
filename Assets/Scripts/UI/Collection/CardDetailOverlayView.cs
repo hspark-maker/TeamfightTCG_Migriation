@@ -849,6 +849,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 다른 카드를 그리는 참이다 — 앞 카드의 해금 대기는 여기서 버린다(안 그러면 이 카드의 판이 이유 없이 터진다).
         DropPendingUnlockFx();
 
+        // 해금 연출이 도는 중에 카드가 갈리면 그 연출이 잘려 끝 콜백이 오지 않는다 —
+        // 그때 돌아왔어야 할 하단 바를 여기서 못 박는다(멱등).
+        ShowBottomBar();
+
         // 그림·이름·체력·키워드 아이콘·잠김 오버레이는 도감 타일과 같은 컴포넌트에 그대로 위임한다.
         if (this.cardView != null) this.cardView.Bind(_card, t_owned);
         
@@ -930,30 +934,45 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     /// <summary>방금 해금된 줄의 잠김 판을 연출로 걷는다. 연출이 미배선이면 예전처럼 즉시 걷는다 —
-    /// 배선 실패가 "판이 안 걷혀 내용이 영영 가려짐"이 되면 안 된다.</summary>
+    /// 배선 실패가 "판이 안 걷혀 내용이 영영 가려짐"이 되면 안 된다.
+    ///
+    /// 연출이 도는 동안 하단 바는 걷은 채로 둔다 — 지금 화면이 말하는 것은 "무엇이 열렸는가"이고,
+    /// 그 위에 다음 강화 버튼이 서 있으면 손이 먼저 간다. 바는 연출이 끝나는 그 자리에서 돌아온다.</summary>
     void PlayPendingUnlockFx()
     {
+        Tween t_fx = null;
+
         if (this.m_pendingKeywordUnlockFx)
         {
             this.m_pendingKeywordUnlockFx = false;
-            PlayUnlockFx(this.keywordSectionLock);
+            t_fx = PlayUnlockFx(this.keywordSectionLock) ?? t_fx;
         }
 
         if (this.m_pendingSynergyUnlockFx)
         {
             this.m_pendingSynergyUnlockFx = false;
-            PlayUnlockFx(this.synergySectionLock);
+            t_fx = PlayUnlockFx(this.synergySectionLock) ?? t_fx;
         }
+
+        // 걷을 판도, 돌 연출도 없었다 — 바는 호출부가 이미 되돌렸다.
+        if (t_fx == null) { ShowBottomBar(); return; }
+
+        HideBottomBar();
+
+        // 두 줄이 함께 열려도 길이는 같은 저작값이라 나중에 잡은 것 하나로 끝을 본다.
+        // 도중에 잘리는 경로(카드 전환·창 닫힘)에는 이 콜백이 오지 않는다 → 그쪽은 Apply가 못 박는다.
+        t_fx.OnComplete(ShowBottomBar);
     }
 
-    static void PlayUnlockFx(GameObject _lock)
+    // 걷을 판이 없거나 연출이 미배선이면 null — 부른 쪽은 "기다릴 것이 없다"로 읽는다.
+    static Tween PlayUnlockFx(GameObject _lock)
     {
-        if (_lock == null || !_lock.activeSelf) return;
+        if (_lock == null || !_lock.activeSelf) return null;
 
         var t_fx = _lock.GetComponent<SectionUnlockFx>();
-        if (t_fx == null) { _lock.SetActive(false); return; }
+        if (t_fx == null) { _lock.SetActive(false); return null; }
 
-        t_fx.Play();
+        return t_fx.Play();
     }
 
     /// <summary>대기 중인 해금 연출을 버리고 판을 지금 상태에 맞춘다.
@@ -1032,8 +1051,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         var t_parts = new List<string>();
 
-        // 키워드는 해금 레벨 하나로 통째로 열린다 → 새로 켜진 비트만 뽑으면 그게 이번에 열린 것들이다.
-        CardKeyword t_newKeywords = t_after.UnlockedKeywords & ~t_before.UnlockedKeywords;
+        CardKeyword t_newKeywords = NewKeywords(_card, _from, _to);
         if (t_newKeywords != CardKeyword.None && this.keywordIconConfig != null)
             foreach (CardKeyword t_kw in (CardKeyword[])Enum.GetValues(typeof(CardKeyword)))
             {
@@ -1042,12 +1060,35 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                     t_parts.Add($"{t_entry.displayName} 개방");
             }
 
-        if (!t_before.SynergyUnlocked && t_after.SynergyUnlocked) t_parts.Add("시너지 개방");
+        if (UnlockedSynergy(_card, _from, _to)) t_parts.Add("시너지 개방");
 
         // 진화는 그림이 바뀌는 큰 변화라 같이 알린다 — 결과판을 닫고 나서야 눈치채면 강화의 보람이 반감된다.
         if (t_after.EvolutionStage > t_before.EvolutionStage) t_parts.Add($"{t_after.EvolutionStage}단계 진화");
 
         return t_parts.Count > 0 ? string.Join(" · ", t_parts) : null;
+    }
+
+    /// <summary>이번 강화(_from → _to)로 <b>새로 열린 키워드</b>. 없으면 None.
+    /// 키워드는 해금 레벨 하나로 통째로 열린다 → 새로 켜진 비트가 곧 이번에 열린 것들이다.
+    ///
+    /// 결과판의 문장(<see cref="UnlockLabel"/>)과 그 판의 자동 복귀 판정이 같은 답을 봐야 한다 —
+    /// 갈라 두면 "키워드 개방"이라 적혀 있는데 판은 탭을 기다리는 어긋남이 생긴다.</summary>
+    static CardKeyword NewKeywords(CardData _card, int _from, int _to)
+    {
+        if (_card == null || _to <= _from) return CardKeyword.None;
+
+        return CardGrowthManager.GrowthAtLevel(_card, _to).UnlockedKeywords
+             & ~CardGrowthManager.GrowthAtLevel(_card, _from).UnlockedKeywords;
+    }
+
+    /// <summary>이번 강화(_from → _to)로 <b>시너지가 새로 열렸는가</b>.
+    /// 판정을 <see cref="NewKeywords"/>와 같은 자리에 두는 이유도 같다 — 결과판의 문장과 자동 복귀가 한 답을 본다.</summary>
+    static bool UnlockedSynergy(CardData _card, int _from, int _to)
+    {
+        if (_card == null || _to <= _from) return false;
+
+        return !CardGrowthManager.GrowthAtLevel(_card, _from).SynergyUnlocked
+            &&  CardGrowthManager.GrowthAtLevel(_card, _to).SynergyUnlocked;
     }
 
     /// <summary>강화 비용 표기. 하단 바와 결과판의 "한 번 더"가 같은 값을 같은 모양으로 띄워야 한다 —
@@ -1233,15 +1274,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 this.m_ritualPlaying = false;
 
-                // 결과판을 못 띄운 경로(카드 전환 등)에선 복귀 신호도 못 받았다 — 여기서 못 박는다(멱등).
-                ShowBottomBar();
-
                 // 지금 보이는 카드로 다시 그린다 — 중간에 카드가 바뀌었어도 화면과 값이 어긋나지 않게.
                 CardData t_now = CardAt(this.m_index);
                 if (t_now != null) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
                 RefreshArrows();
 
                 // 무대가 돌아와 줄이 다시 보이는 지금이 해금 연출의 자리다(연출 중엔 가려 있어 보여줄 수 없다).
+                // 하단 바의 복귀도 여기가 쥔다 — 걷을 판이 서면 그 연출이 끝난 뒤에, 아니면 곧바로(멱등).
+                // 결과판을 못 띄운 경로(카드 전환 등)에선 복귀 신호도 못 받았으므로 이 자리가 유일한 못이다.
                 PlayPendingUnlockFx();
 
                 // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
@@ -1382,7 +1422,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 다음 한 방이 진화 관문이면 여기서 잇지 않는다. 진화는 방금 한 일의 반복이 아니라 다른 재화를 무는
         // 다른 종류의 일이라, 골드를 연타하던 손에 그대로 걸리면 안 된다 — 상세로 돌아가 스스로 고르는 자리다.
         bool t_nextIsEvolve = t_hasNext && CardGrowthManager.IsEvolutionLevel(t_next.Level);
-        bool t_canRetry     = t_hasNext && !t_nextIsEvolve && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
+
+        // 이번 한 방으로 키워드·시너지가 열렸으면 같은 이유로 잇지 않는다 — 방금 연 칩 줄은 상세에 있고,
+        // 그 잠김 판은 무대가 돌아온 뒤에야 연출로 걷힌다(PlayPendingUnlockFx).
+        // 결과판에서 연타로 넘어가면 자기가 무엇을 열었는지 못 본 채 지나간다.
+        bool t_unlocked = NewKeywords(_card, _fromLevel, _result.Level) != CardKeyword.None
+                       || UnlockedSynergy(_card, _fromLevel, _result.Level);
+
+        // 탭을 기다리지 않고 스스로 걷혀 상세로 돌아가는 판(= 이을 것이 없는 자리).
+        bool t_selfReturn = t_nextIsEvolve || t_unlocked;
+        bool t_canRetry   = t_hasNext && !t_selfReturn && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
 
         var t_line = new EnhanceResultLine(_result.Outcome,
                                            _fromHp, DeckPower.MaxHpOf(_card),
@@ -1390,8 +1439,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                                            // 못 잇는 이유가 잔액이 아니라 규칙이면 안내도 없다 —
                                            // GrowthNotice를 그대로 흘리면 "다이아가 부족"이라는 거짓 문장이 뜬다.
                                            t_canRetry,
-                                           t_nextIsEvolve ? string.Empty
-                                                          : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
+                                           t_selfReturn ? string.Empty
+                                                        : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
                                            // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
@@ -1404,10 +1453,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 어느 버튼이 설지는 이미 공개 시점의 RefreshGrowth가 다음 단계 기준으로 정해뒀다 —
         // 여기선 그 판정을 다시 하지 않고 둘 다 손봐 서 있는 쪽이 알아서 맞게 둔다.
         //
-        // 진화 관문 앞에서는 아무것도 되살리지 않는다. 바가 걷힌 채로 남고(아래 _onRowsDone) 판이 스스로 걷히므로,
+        // 스스로 걷히는 판에서는 아무것도 되살리지 않는다. 바가 걷힌 채로 남고(아래 _onRowsDone) 판이 곧 물러나므로,
         // 여기서 값·글자를 갈아두면 복귀 도중 한 프레임 비칠 뿐이다.
         SetActionsEnabled(t_canRetry);
-        if (!t_nextIsEvolve)
+        if (!t_selfReturn)
         {
             ApplyCost(t_hasNext, t_next);
             SetActionLabel(true);
@@ -1430,16 +1479,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               // 읽을 것이 다 나왔다 — 이제 하단 바가 돌아와 "한 번 더"를 받는다.
                               // 결과판을 탭해 연출을 당긴 경우에도 같은 시점으로 앞당겨져 온다.
                               //
-                              // 진화 관문 앞에서는 걷은 채로 둔다. 받을 "한 번 더"가 없어서인데, 못 누르는 버튼을
+                              // 스스로 걷히는 판에서는 걷은 채로 둔다. 받을 "한 번 더"가 없어서인데, 못 누르는 버튼을
                               // 굳이 띄웠다가 상세에서 다시 켜면 그 깜빡임이 못 누르는 사실보다 더 눈에 걸린다.
                               // 바는 복귀가 끝나는 _onFinished가 되돌린다(멱등).
                               _onRowsDone: () =>
                               {
-                                  if (!t_nextIsEvolve) ShowBottomBar();
+                                  if (!t_selfReturn) ShowBottomBar();
                                   OnAnyEnhanceResultReady?.Invoke();
                               },
                               // 이을 것이 없는 판이라 탭을 기다리지 않는다 — 읽을 것이 다 나오면 스스로 상세로 돌아간다.
-                              _autoReturn: t_nextIsEvolve);
+                              _autoReturn: t_selfReturn);
     }
 
     void SetLevelText(int _level)
