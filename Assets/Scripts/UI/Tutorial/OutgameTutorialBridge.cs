@@ -391,7 +391,11 @@ public class OutgameTutorialBridge : MonoBehaviour
         AlbumInsertSession.TutorialMode = false;
 
         DetachSilent();   // 리스너가 남으면 다음 스텝·다음 씬에서 오발화한다
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+
+        // 표시는 트리거 튜토리얼과 공용이다 — 승급 연출과 나란히 뜬 알림 점을 유저가 먼저 눌렀다면
+        // 지금 무대를 쥔 것은 그쪽이다. 남의 안내를 걷으면 그 런은 완료 신호를 받을 주체를 잃고 영영 멈춘다.
+        if (!TriggeredTutorialRunner.IsRunning && OutgameTutorialGateUI.Instance != null)
+            OutgameTutorialGateUI.Instance.Clear();
     }
 
     void Subscribe()

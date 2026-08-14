@@ -63,6 +63,10 @@ public static class TutorialStepExecutor
         }
 
         RankResultHandoff.Set(t_entry);
+
+        // 이 뒤로 가르칠 것이 없는 관람 구간이다 — 졸업 낙인(연출이 끝나야 찍힌다)을 기다리지 않고
+        // 트리거 튜토리얼의 알림 점이 승급 연출과 나란히 뜨게 문을 먼저 연다.
+        TriggeredTutorialRunner.NotifyOnboardingFinale();
         return true;
     }
 
