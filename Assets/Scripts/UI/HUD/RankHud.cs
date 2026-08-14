@@ -21,6 +21,14 @@ public class RankHud : MonoBehaviour
     [SerializeField] Sprite pipOn;
     [SerializeField] Sprite pipOff;
 
+    [Header("진행 호")]
+    [Tooltip("배지를 감싸는 진행 게이지. pipsRoot 아래 별들보다 앞선 형제로 둘 것 — 그래야 별 뒤에 깔리고, 언랭크에서 별 줄과 함께 꺼진다.\n" +
+             "미배선이면 호 없이 종전대로 동작한다.")]
+    [SerializeField] RankProgressArc arc;
+
+    [Tooltip("조각 하나가 꽂힐 때 호가 다음 눈금까지 가는 시간. 조각 간격보다 짧게 둔다 — 길면 다음 조각이 앞 트윈을 밟는다.")]
+    [SerializeField] float arcStepDuration = 0.18f;
+
     [Header("승급 연출")]
     [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 켜져야 '변했다'가 보인다.")]
     [SerializeField] float enterDelay = 0.35f;
@@ -85,6 +93,10 @@ public class RankHud : MonoBehaviour
     // 마지막 조각이 꽂힐 때의 밝아짐. 손실 반응과 같은 색을 쓴다.
     Tween m_flashTween;
 
+    // 조각 연출이 출발한 비율과 도착 비율. 조각이 꽂힐 때마다 이 사이를 등분해 전진한다.
+    float m_gainFrom;
+    float m_gainTo;
+
     // 배지의 저작 색. 연출이 어디서 끊겨도 여기로 되돌린다(티어업이 스프라이트를 갈아도 색은 그대로다).
     Color m_badgeBaseColor = Color.white;
 
@@ -107,12 +119,33 @@ public class RankHud : MonoBehaviour
         return true;
     }
 
-    /// <summary>조각 하나가 배지에 꽂혔다. _final이면 마지막 — 크게 튀고 한 번 밝아진다.</summary>
-    public void PlayGainImpact(bool _final)
+    /// <summary>연출을 _points(전투 직전) 시점에서 출발시킨다. 조각이 채워 갈 구간도 여기서 정한다 —
+    /// 등급이 갈리는 판이면 도착지는 새 등급의 자리가 아니라 옛 등급의 승급선(1)이다. 그 뒤는 파열이 이어받는다.</summary>
+    public void PrepareProgress(long _points)
     {
-        UiPunch.Play(this.BadgeRect, _final ? this.gainFinalPunch : this.gainPunch);
+        var t_prev = RankManager.GetInfoAt(_points);
+        var t_now  = RankManager.GetInfo();
 
-        if (!_final || this.badgeImage == null) return;
+        this.m_gainFrom = t_prev.GradeProgress;
+        this.m_gainTo   = t_now.Grade != t_prev.Grade ? 1f : t_now.GradeProgress;
+
+        this.SetArc(this.m_gainFrom);
+    }
+
+    /// <summary>조각 하나가 배지에 꽂혔다(_arrived = 1부터 세는 누적, _total = 전체).
+    /// 마지막 조각이면 크게 튀고 한 번 밝아진다.</summary>
+    public void PlayGainImpact(int _arrived, int _total)
+    {
+        bool t_final = _arrived >= _total;
+
+        UiPunch.Play(this.BadgeRect, t_final ? this.gainFinalPunch : this.gainPunch);
+
+        // 조각이 꽂힌 만큼만 호가 전진한다 — 한 번에 도착시키면 "무엇 때문에 찼는지"가 사라진다.
+        if (this.arc != null && _total > 0)
+            this.arc.TweenTo(Mathf.Lerp(this.m_gainFrom, this.m_gainTo, (float)_arrived / _total),
+                             this.arcStepDuration);
+
+        if (!t_final || this.badgeImage == null) return;
 
         this.KillFlash();
         this.m_flashTween = this.badgeImage.DOColor(this.gainFlashColor, this.gainFlashDuration * 0.5f)
@@ -135,6 +168,13 @@ public class RankHud : MonoBehaviour
         if (this.badgeImage != null)
             this.m_lossSeq.Join(this.badgeImage.DOColor(this.lossColor, this.lossDuration * 0.5f)
                                                .SetLoops(2, LoopType.Yoyo));
+
+        // 호는 요요로 되돌아오지 않는다 — 줄어든 자리가 곧 지금 값이다(배지만 식었다 돌아온다).
+        if (this.arc != null)
+        {
+            Tween t_arc = this.arc.TweenTo(RankManager.GetInfo().GradeProgress, this.lossDuration);
+            if (t_arc != null) this.m_lossSeq.Join(t_arc);
+        }
 
         var t_rect = this.BadgeRect;
         if (t_rect != null)
@@ -293,6 +333,8 @@ public class RankHud : MonoBehaviour
         // 꺼지는 동안 트윈만 남으면 다음 활성화가 중간 상태를 물려받는다.
         this.KillTierChange();
         this.KillReactions();
+
+        if (this.arc != null) this.arc.Stop();
     }
 
     void Render()
@@ -307,6 +349,7 @@ public class RankHud : MonoBehaviour
         // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 핍 줄 자체를 감춘다.
         this.SetPipsVisible(!t_info.IsUnranked);
         this.RenderPips(t_info.IsUnranked ? 0 : t_info.Division);
+        this.SetArc(t_info.IsUnranked ? 0f : t_info.GradeProgress);
     }
 
     // 등급 승급: 구 배지가 파열하고 → 새 배지가 강림해 착지하고 → 그제서야 새 등급의 별이 채워진다.
@@ -318,9 +361,11 @@ public class RankHud : MonoBehaviour
         Sprite t_badge = _info.Badge;
         int t_division = _info.Division;
         int t_prev = _prevDivision;
+        float t_progress = _info.GradeProgress;
 
+        // 호도 별과 같은 프레임에 새 등급의 출발선으로 되감긴다 — 옛 등급의 승급선에 머물면 다 채운 채로 보인다.
         this.promote.Build(_seq, this.badgeImage, this.descText, t_name, t_badge,
-                           _onBurst: () => this.BlowOutPips(t_prev));
+                           _onBurst: () => { this.BlowOutPips(t_prev); this.SetArc(t_progress); });
 
         // 새 등급의 1단계부터 다시 쌓기 시작한다(도달 단계가 2 이상인 경우도 순서대로 켠다).
         for (int t_i = 0; t_i < t_division && t_i < _divisions; t_i++)
@@ -358,12 +403,14 @@ public class RankHud : MonoBehaviour
         string t_name = _info.DisplayName;
         Sprite t_badge = _info.Badge;
         int t_division = _info.Division;
+        float t_progress = _info.GradeProgress;
 
         _seq.AppendInterval(this.badgeSwapDelay);
         _seq.AppendCallback(() =>
         {
             this.RenderTier(t_name, t_badge);
             this.RenderPips(t_division);
+            this.SetArc(t_progress);
         });
 
         // 흔들림·어두워짐은 시퀀스 멤버로 단다 — 콜백 안에서 따로 띄우면 시퀀스가 죽어도 살아남아 배지가 어긋난 채 굳는다.
@@ -405,6 +452,11 @@ public class RankHud : MonoBehaviour
 
         for (int t_i = 0; t_i < this.divisionPips.Length; t_i++)
             this.SetPip(t_i, t_i < _filled);
+    }
+
+    void SetArc(float _ratio)
+    {
+        if (this.arc != null) this.arc.SetRatio(_ratio);
     }
 
     void SetPipsVisible(bool _visible)

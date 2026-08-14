@@ -47,10 +47,14 @@ public static class RankManager
     }
 
     // 랭크 표시용 1회 스냅샷
-    public static RankInfo GetInfo()
+    public static RankInfo GetInfo() => GetInfoAt(Points);
+
+    /// <summary>임의의 포인트 값이 그리는 표시 스냅샷. 연출이 '전투 직전' 화면을 물을 때 쓴다 —
+    /// 정산은 이미 끝나 GetInfo는 최종 상태만 돌려준다.</summary>
+    public static RankInfo GetInfoAt(long _points)
     {
         var t_config = Config;
-        long t_points = Points;
+        long t_points = _points;
 
         int t_index = t_config.ResolveTierIndex(t_points);
         t_config.TryGetTier(t_index, out RankTier t_tier);
@@ -69,6 +73,7 @@ public static class RankManager
             t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
             t_badge,
             t_points,
+            t_unranked ? 0 : t_tier.RequiredPoints,
             t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
             !t_unranked && !t_hasNext,
             t_unranked);
@@ -221,6 +226,8 @@ public readonly struct RankInfo
     public readonly string DisplayName;
     public readonly Sprite Badge;
     public readonly long Points;
+    // 현재 티어 진입 임계치 = 단계 안 진행률의 0% 기준점(언랭크면 0)
+    public readonly long TierRequired;
     // 다음 티어 진입 임계치(최대 티어면 Points와 같다 — 0 나눗셈·음수 잔여 차단)
     public readonly long NextRequired;
     public readonly bool IsMaxTier;
@@ -228,7 +235,22 @@ public readonly struct RankInfo
     // 첫 티어 미도달(언랭크). TierIndex는 이때도 0이라 인덱스로는 구분되지 않는다.
     public readonly bool IsUnranked;
 
-    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
+    /// <summary>현재 단계를 얼마나 채웠는가(0~1). 최대 티어는 1 — 더 갈 곳이 없어 게이지를 비워 두면 오해가 된다.</summary>
+    public float TierProgress
+    {
+        get
+        {
+            if (IsMaxTier) return 1f;
+
+            long t_span = NextRequired - TierRequired;
+            return t_span > 0 ? Mathf.Clamp01((float)(Points - TierRequired) / t_span) : 0f;
+        }
+    }
+
+    /// <summary>등급 안 4단계를 통틀어 얼마나 왔는가(0~1). 1 = 승급선.</summary>
+    public float GradeProgress => (Division - 1 + TierProgress) / RankConfig.DivisionsPerGrade;
+
+    public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _tierRequired, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
     {
         TierIndex = _tierIndex;
         Grade = _grade;
@@ -236,6 +258,7 @@ public readonly struct RankInfo
         DisplayName = _displayName;
         Badge = _badge;
         Points = _points;
+        TierRequired = _tierRequired;
         NextRequired = _nextRequired;
         IsMaxTier = _isMaxTier;
         IsUnranked = _isUnranked;
