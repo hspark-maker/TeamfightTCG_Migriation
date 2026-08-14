@@ -465,8 +465,10 @@ sequenceDiagram
 > 2026-08-13: **첫 진화 안내(`FirstEvolutionReady`)** 추가 — 발화 축이 탭 밖으로 처음 나갔다.
 > 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
 > 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
-> 안내가 도는 동안 **1차 진화 관문 한 칸만** 무료다(`CardGrowthManager.IsFirstEvolutionFreeStep`) —
-> 런 전체로 넓히면 진화 다음 칸까지 0원으로 새어 결과판의 "한 번 더"가 공짜가 된다.
+>
+> 2026-08-14: **키워드 강화 안내(`KeywordGrowthFirstOpen`)** 추가 — 발화 축이 탭·강화 결과에 이어 **화면 열림**까지 왔다.
+> 그리고 "무엇이 공짜인가"의 주인이 코드에서 **저작(`TutorialStepDef.freeOfCharge`)**으로, 소진 원장이
+> `CardGrowthManager`에서 **`OutgameTutorialGuide`로** 옮겨 세 축(카드 강화·진화·키워드 강화)이 같은 원장을 본다.
 
 #### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
 
@@ -512,11 +514,11 @@ flowchart TD
 
     subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
         BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
-        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · KeywordEnhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady · KeywordGrowthFirstOpen<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
@@ -528,9 +530,16 @@ flowchart TD
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
     CDO["CardDetailOverlayView<br/>강화 완료(_onFinished)에서 다음 한 방이 첫 진화면 Fire<br/>+ 발화 직후 RefreshGrowth로 0원 표시 반영"]:::chg
-    GROW["CardGrowthManager.TryGetStepAt<br/>IsFirstEvolutionFreeStep(level) — 관문 한 칸만 0원"]:::chg
+    KGP["KeywordGrowthPanel<br/>Open() 끝에서 Fire — SetVisible·Build 뒤라야 앵커가 서 있다<br/>칸/업그레이드 버튼 앵커를 코드로 등록·해제"]:::new
+    KGM["KeywordGrowthManager<br/>TryGetStepAt 단일 퍼널(표시=활성=소모)<br/>event OnEnhanced(성공만) · NotifyCostRuleChanged"]:::new
+    FREE["OutgameTutorialGuide — 무료 한 방 원장<br/>HasFreeShot · ConsumeFreeShot · ResetFreeShotForDebug<br/>무엇이 공짜인지는 저작(freeOfCharge)이 정한다"]:::new
+    GROW["CardGrowthManager.TryGetStepAt<br/>원장을 직접 쥐지 않고 Guide에 묻는다"]:::chg
     CDO -->|"Fire(FirstEvolutionReady)"| TRUN
-    GROW -->|"IsRunningTrigger"| TRUN
+    KGP -->|"Fire(KeywordGrowthFirstOpen)"| TRUN
+    KGM -->|"OnEnhanced"| TBRG
+    GROW --- FREE
+    KGM --- FREE
+    FREE -->|"현재 스텝 조회"| TRUN
     KEY --- TRUN
     BOOT -->|"EnsureData(멱등)"| TRUN
     TBRG -->|"EnsureData · OnActivated 구독"| TRUN
@@ -546,6 +555,58 @@ flowchart TD
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
 ```
+
+---
+
+### G-TUT3 — 해금 안내 (키워드·시너지를 처음 열었을 때) — 2026-08-14
+
+강화로 키워드가, 1차 진화로 시너지가 열린다. 그 순간 설명은 이미 상세창에 깔려 있으므로
+**없는 것은 지식이 아니라 그것을 읽게 만드는 유도**다. 두 겹으로 답한다.
+
+| 겹 | 언제 | 무엇 |
+|---|---|---|
+| 매번 | 잠김 판이 걷힐 때마다 | 그 줄로 스크롤이 따라가고 칩 → 설명이 순차로 들어온다 (`SectionRevealFx`) |
+| 처음 1회 | 그 개념을 처음 열었을 때 | 전면 오버레이 한 장 (`UnlockIntroOverlay`) |
+
+**트리거 튜토리얼 축(G-TUT2)을 쓰지 않는 이유** — `TriggeredTutorialRunner.IsOpen`이
+"온보딩 졸업 후"로 잠겨 있어 첫 해금이 온보딩 중에 일어나면 영영 발화하지 않는다.
+얼굴도 다르다(손가락+말풍선 vs 축하 오버레이). 그래서 **낙인만 같은 세이브 슬롯을 빌린다.**
+
+```mermaid
+flowchart TD
+    subgraph persist["영속 — 창구는 그대로 하나"]
+        PRG["OutgameTutorialProgress (static)<br/>+ IsUnlockIntroSeen(key) · MarkUnlockIntroSeen(key)<br/>ClearTriggersForDebug가 이 목록도 비운다"]:::chg
+        SD["TutorialSaveData 슬롯<br/>+ List&lt;string&gt; seenUnlockIntros<br/>(키 문자열 — 추가만, VERSION 유지)"]:::chg
+    end
+
+    subgraph value["값 — 키워드와 시너지를 한 모양으로"]
+        UI2["UnlockIntro (readonly struct)<br/>Key · Icon · IconScale · Name · Body<br/>TryForKeyword(config, kw) · TryForSynergy(data)<br/>**낙인 키 조립의 단일 지점** — kw:이름 / syn"]:::new
+    end
+
+    subgraph screen["화면"]
+        CDO["CardDetailOverlayView.PlayPendingUnlockFx<br/>m_pendingUnlockedKeywords(CardKeyword) + m_pendingSynergyUnlockFx<br/>→ 판 걷힘 → RevealUnlockedSections<br/>하단 바 복귀는 이 흐름의 마지막 축 한 곳"]:::chg
+        SRF["SectionRevealFx (섹션 노드마다 1장)<br/>chipRoot → descText 순차 등장<br/>자리가 아니라 알파·배율만 (레이아웃 그룹 회피)"]:::new
+        OVL["UnlockIntroOverlay (Resources/UI, 자가설치)<br/>Show(intros, onClose) · IsOpen · OnAnyClosed<br/>행 = KeywordExplainItem, 프리팹에 미리 깔림<br/>여러 개도 한 화면에 쌓고 [확인]은 한 번"]:::new
+    end
+
+    TXT["SynergyText.Body<br/>효과 + 발동 요구치(2장). 티어 라벨이 시너지 이름과 같으면 생략<br/>상세창 synergyDescText도 같은 포맷을 쓴다"]:::chg
+
+    CDO -->|"CollectUnseenIntros"| UI2
+    UI2 -->|"IsUnlockIntroSeen"| PRG
+    CDO -->|"Play"| SRF
+    CDO -->|"띄우는 순간 MarkUnlockIntroSeen"| PRG
+    CDO -->|"Show(intros, ShowBottomBar)"| OVL
+    UI2 --> TXT
+    PRG <--> SD
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+불변식 몇 개:
+- **낙인은 닫힐 때가 아니라 띄우는 순간** 찍는다 — 읽는 도중 앱이 죽어도 다시 세우지 않는다(내용은 상세창에 남아 있다).
+- 카드를 넘기거나 창을 닫으면 `DropPendingUnlockFx`가 대기를 버린다 → 오버레이도 뜨지 않는다.
+- 하단 바를 되돌리는 곳은 `RevealUnlockedSections`의 끝 **한 곳**뿐이다(오버레이가 서면 그 닫힘이 곧 끝).
 
 
 

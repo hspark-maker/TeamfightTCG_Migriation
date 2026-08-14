@@ -173,7 +173,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
         {
-            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowMessageGate(null, m_step.GuideMessage, OnGateSatisfied);
+            OutgameTutorialGateUI.Ensure(this.gatePrefab)
+                .ShowMessageGate(null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -198,7 +199,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 억제 씬에서도 예외적으로 띄운다(딤이 없으면 완료 신호가 없어 진행이 멈춘다).
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
-            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowMessageGate(t_rect, m_step.GuideMessage, OnGateSatisfied);
+            OutgameTutorialGateUI.Ensure(this.gatePrefab)
+                .ShowMessageGate(t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 

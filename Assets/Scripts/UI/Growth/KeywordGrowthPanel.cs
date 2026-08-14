@@ -45,6 +45,13 @@ public class KeywordGrowthPanel : MonoBehaviour
     Sequence m_upgradeFx;
     bool m_fxPlaying;
 
+    // 업그레이드 버튼이 안내 타깃으로 등록된 상태(자기 것만 해제하려고 들고 있다)
+    bool m_upgradeAnchored;
+
+    // 화면이 서 있는가. 이 컴포넌트는 늘 켜져 있는 루트에 붙어 닫혀도 OnDisable이 안 도는데,
+    // 구독은 살아 있어 RefreshAll이 계속 불린다 — 그때 꺼진 칸을 안내 타깃으로 다시 올리지 않게 한다.
+    bool m_visible;
+
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
@@ -52,6 +59,9 @@ public class KeywordGrowthPanel : MonoBehaviour
 
         if (this.m_built) this.RefreshAll();
         else this.Build();
+
+        // 화면이 다 선 뒤에 깨운다 — 안내가 가리킬 칸·버튼이 그때야 등록돼 있다.
+        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.KeywordGrowthFirstOpen);
     }
 
     public void Close()
@@ -85,8 +95,9 @@ public class KeywordGrowthPanel : MonoBehaviour
         KeywordGrowthManager.OnChanged    -= this.RefreshAll;
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
 
-        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
+        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤도, 죽은 안내 타깃도 남는다.
         ScreenDim.Hide(this);
+        this.ApplyUpgradeAnchor(false);
 
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -181,8 +192,15 @@ public class KeywordGrowthPanel : MonoBehaviour
     void RefreshAll()
     {
         for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
-            if (this.m_cells[t_i] != null)
-                this.m_cells[t_i].Refresh(this.m_cells[t_i].Keyword == this.m_selected);
+        {
+            if (this.m_cells[t_i] == null) continue;
+
+            bool t_selected = this.m_cells[t_i].Keyword == this.m_selected;
+            this.m_cells[t_i].Refresh(t_selected);
+
+            // 안내는 "지금 올릴 칸"을 가리킨다 — 선택이 바뀌면 타깃도 따라간다.
+            this.m_cells[t_i].ApplyTutorialAnchor(t_selected && this.m_visible);
+        }
 
         this.RefreshAction();
 
@@ -270,11 +288,39 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     void SetVisible(bool _visible)
     {
+        this.m_visible = _visible;
+
         // 암막은 공용 ScreenDim(Full)이 그린다 — Root/Dim은 알파 0으로 남아 뒤쪽 입력만 삼킨다.
         if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
         else ScreenDim.Hide(this);
 
         this.transition.SetVisible(this.ResolveTarget(), _visible);
+
+        // 안내 타깃은 이 화면이 서 있는 동안만 유효하다 — 닫히고도 남으면 로비 표면에 죽은 타깃이 남는다.
+        this.ApplyUpgradeAnchor(_visible);
+        if (!_visible) this.ClearCellAnchors();
+    }
+
+    // 하단 업그레이드 버튼을 안내 타깃으로 세우거나 내린다(칸과 달리 하나뿐이라 패널이 직접 쥔다).
+    void ApplyUpgradeAnchor(bool _on)
+    {
+        if (_on == this.m_upgradeAnchored) return;
+
+        var t_rect = this.upgradeButton != null ? this.upgradeButton.transform as RectTransform : null;
+        if (t_rect == null) return;   // 미배선이면 플래그도 그대로 둔다(등록하지 않은 것을 등록했다고 기억하지 않게)
+
+        this.m_upgradeAnchored = _on;
+
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.KeywordGrowthUpgradeButton, t_rect, this.upgradeButton);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.KeywordGrowthUpgradeButton, t_rect);
+    }
+
+    // 칸도 스스로 놓지만(OnDisable) 퇴장 트윈이 끝나야 꺼진다 — 닫는 순간 바로 거둔다.
+    void ClearCellAnchors()
+    {
+        for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
+            if (this.m_cells[t_i] != null)
+                this.m_cells[t_i].ApplyTutorialAnchor(false);
     }
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;

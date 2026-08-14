@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f355f7becae7e6942b0928d26746a712, type: 3}
   m_Name: RankConfig
   m_EditorClassIdentifier: Assembly-CSharp::RankConfig
-  winPoints: 25
-  losePoints: 25
+  winPoints: 10
+  losePoints: 6
   unrankedDisplayName: Unranked
   unrankedBadge: {fileID: 21300000, guid: 3fab8619b568843a1a5766e0df6d5300, type: 3}
   grades:
@@ -21,7 +21,7 @@ MonoBehaviour:
     displayName: Bronze
     badge: {fileID: 21300000, guid: 8cf65c3ef86684908a00c57c340b3b8f, type: 3}
     entryPoints: 100
-    pointsPerDivision: 25
+    pointsPerDivision: 20
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -34,8 +34,8 @@ MonoBehaviour:
   - grade: 1
     displayName: Silver
     badge: {fileID: 21300000, guid: b436adf7ef9c24c86a0085a4088ca7a0, type: 3}
-    entryPoints: 200
-    pointsPerDivision: 25
+    entryPoints: 180
+    pointsPerDivision: 30
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -49,7 +49,7 @@ MonoBehaviour:
     displayName: Gold
     badge: {fileID: 21300000, guid: 8b4adf7a4e9404fc0ba3f5ebde482e6c, type: 3}
     entryPoints: 300
-    pointsPerDivision: 25
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -62,8 +62,8 @@ MonoBehaviour:
   - grade: 3
     displayName: Platinum
     badge: {fileID: 21300000, guid: 98740b435ec5846ae98c8f153321003d, type: 3}
-    entryPoints: 400
-    pointsPerDivision: 25
+    entryPoints: 460
+    pointsPerDivision: 50
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -76,8 +76,8 @@ MonoBehaviour:
   - grade: 4
     displayName: Diamond
     badge: {fileID: 21300000, guid: 0f78de46475ea43c1a07d24efa7761f5, type: 3}
-    entryPoints: 500
-    pointsPerDivision: 25
+    entryPoints: 660
+    pointsPerDivision: 60
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -88,3 +88,5 @@ MonoBehaviour:
       amount: 40
       amountPerDivision: 10
   aiCardLevels: 010000000100000002000000020000000300000003000000040000000500000006000000060000000700000007000000080000000800000009000000090000000a0000000a0000000a0000000a000000
+  aiLevelSpreadDown: 1
+  aiLevelSpreadUp: 1

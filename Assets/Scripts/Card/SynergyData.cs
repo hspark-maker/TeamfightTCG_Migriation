@@ -25,8 +25,14 @@ public enum SynergyEmblemScope
 [System.Serializable]
 public class SynergyTier
 {
-    public int             requiredCount;
-    public string          label;
+    public int requiredCount;
+
+    [Tooltip("이 단계의 별칭. 설명문에 '2장 — <라벨>'로 붙는다.\n\n" +
+             "· 비워 두면 요구 장수만 나온다.\n" +
+             "· 시너지 이름과 똑같이 적으면 표시하지 않는다 — 이름이 바로 위에 있어 같은 말이 두 번 나온다.\n" +
+             "  단계가 하나뿐인 시너지는 비워 두는 편이 맞다.")]
+    public string label;
+
     public SynergyEffect[] effects;
 }
 

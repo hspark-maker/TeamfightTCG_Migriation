@@ -10,12 +10,16 @@ public class RankConfig : ScriptableObject
     public const int DivisionsPerGrade = 4;
 
     // 승리 시 더할 랭크 포인트
-    [Tooltip("승리 시 더할 랭크 포인트. pointsPerDivision과 같게 두면 1승 = 1단계 상승이 된다.")]
-    public long winPoints = 25;
+    [Tooltip("승리 시 더할 랭크 포인트. 전 등급 공용이다. 저작 규칙: 모든 등급의 pointsPerDivision보다 작게 둔다 — " +
+             "그래야 '이겼는데 단계는 아직'인 판이 생겨 한 단계가 여러 판의 결과로 읽힌다. " +
+             "가장 좁은 등급(현재 브론즈 20)에서도 2승은 걸리게 잡는다. 같게 두면 1승 = 1단계라 단계 표시가 승패 로그와 다를 게 없어진다.")]
+    public long winPoints = 10;
 
     // 패배 시 뺄 랭크 포인트(양수로 입력)
-    [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다). pointsPerDivision과 같게 두면 1패 = 1단계 강등이 된다.")]
-    public long losePoints = 25;
+    [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다). 저작 규칙: winPoints보다 작게 둔다(승/패 비대칭) — " +
+             "같게 두면 승률 50%에서 진행이 제자리라 계속 이겨야만 오르는 게임이 된다. " +
+             "단계 강등은 이 값으로 일어나지만 등급은 내려가지 않는다(등급 진입 임계치가 바닥) — 배지는 유지되고 단계만 오르내린다.")]
+    public long losePoints = 6;
 
     // 첫 티어 미도달(언랭크) 상태의 표시명
     [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
@@ -30,11 +34,11 @@ public class RankConfig : ScriptableObject
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
-        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 25, rewards = GoldOnly(100,  50) },
-        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 200, pointsPerDivision = 25, rewards = GoldOnly(300,  50) },
-        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 25, rewards = GoldOnly(500,  100) },
-        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 400, pointsPerDivision = 25, rewards = GoldOnly(900,  100) },
-        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 500, pointsPerDivision = 25, rewards = GoldOnly(1400, 200) },
+        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 20, rewards = GoldOnly(100,  50) },
+        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 180, pointsPerDivision = 30, rewards = GoldOnly(300,  50) },
+        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 40, rewards = GoldOnly(500,  100) },
+        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 460, pointsPerDivision = 50, rewards = GoldOnly(900,  100) },
+        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 660, pointsPerDivision = 60, rewards = GoldOnly(1400, 200) },
     };
 
     /// <summary>티어별 AI 카드 레벨(index = 티어 인덱스). 난이도 곡선의 단일 진실원.
@@ -47,7 +51,7 @@ public class RankConfig : ScriptableObject
         1, 1, 2, 2,      // 브론즈 1~4 — 플레이어보다 확실히 약하다
         3, 3, 4, 5,      // 실버   1~4 — 따라붙어 실버 끝에서 동급
         6, 6, 7, 7,      // 골드   1~4 — 여기서부터 플레이어보다 강하다
-        8, 8, 9, 9,      // 루비   1~4
+        8, 8, 9, 9,      // 플래티넘 1~4
         10, 10, 10, 10,  // 다이아  1~4 — 만렙
     };
 
@@ -109,6 +113,16 @@ public class RankConfig : ScriptableObject
             }
         }
         return 0;
+    }
+
+    /// <summary>_points가 속한 등급의 진입 임계치(첫 등급 미도달이면 0) = 등급 강등을 막는 바닥.
+    /// 등급 선택은 ResolveTierIndex에 맡긴다 — 규칙을 복제하면 한쪽만 고쳐 티어와 바닥이 갈린다.</summary>
+    public long GradeFloorPoints(long _points)
+    {
+        if (grades == null || grades.Count == 0 || _points < FirstTierPoints) return 0;
+
+        RankGradeConfig t_grade = grades[ResolveTierIndex(_points) / DivisionsPerGrade];
+        return t_grade != null ? t_grade.entryPoints : 0;
     }
 
     // 티어 스냅샷 파생(범위 밖·null 등급 행이면 false + RankTier.None)

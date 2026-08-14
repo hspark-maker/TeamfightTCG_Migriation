@@ -21,6 +21,8 @@ using UnityEngine.UI;
 // 무엇을 보라는 것인지 성립하지 않는다. 대신 승격에 레이캐스터를 달지 않는다(PromoteOne 참조).
 // 그리고 영역 안에 카드가 있으면 영역째가 아니라 카드만 올린다(CollectHighlights).
 // 완료가 딤 탭 자체라 (2)는 오히려 항상 만족한다.
+// 이 모드에서 딤을 끄면 판은 투명해지되 **입력은 계속 막는다** — 완료가 그 탭이기 때문이다(SetBlocker 참조).
+// 뒤 화면이 스스로 할 말을 다 하고 있어 문구 한 줄만 얹으면 되는 자리에 쓴다(강화 결과판 등).
 //
 // 룩은 프리팹(OutgameTutorialGate.prefab)에서 저작한다. 미배선이면 딤+문구만 코드로 그리는 폴백으로 떨어진다
 // — 손가락 스프라이트가 Resources 밖에 있어 코드 경로에서는 얻을 방법이 없다.
@@ -53,6 +55,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
              "타깃과 세로로 겹치는 스텝에서만 이 간격을 두고 위/아래로 물러난다")]
     [SerializeField] float messageMargin = 36f;
 
+    [Tooltip("문구를 하단에 두라고 저작된 스텝(messageAtBottom)에서 화면 아래 끝과 벌리는 간격.\n" +
+             "이 캔버스는 안전영역을 따르지 않으므로 홈 인디케이터에 물리지 않을 만큼은 띄운다")]
+    [SerializeField] float messageBottomInset = 120f;
+
     [Header("포인터 연출")]
     [SerializeField] float pulseScale    = 1.08f;
     [SerializeField] float pulseDuration = 0.6f;
@@ -71,6 +77,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_satisfied;         // 중복 클릭 가드 — 콜백은 1회만
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
+    bool          m_atBottom;          // 문구의 홈이 화면 중앙이 아니라 하단인가(무대 가운데를 비워야 하는 스텝)
     bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
     Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(판을 끌 때 알파 0으로 내렸다가 되돌린다)
@@ -154,7 +161,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetBlocker(_dim);
+        SetBlocker(_dim, _dim);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
@@ -177,7 +184,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (string.IsNullOrEmpty(_message)) { HideGate(); return; }
 
-        SetBlocker(false);
+        SetBlocker(false, false);
         SetPointerActive(false);
         SetMessage(_message);
 
@@ -187,8 +194,12 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// <summary>딤 + 문구를 띄우고 화면(딤) 탭으로 넘기는 설명 게이트.
     /// <paramref name="_highlight"/>가 있으면 그 안의 카드만(없으면 영역째) 딤 위로 올려 강조한다.
     /// 승격은 하되 레이캐스터 없이 한다 — 딤에 묻히면 안 되지만, 읽을 영역이라 눌려서도 안 된다.
-    /// 손가락이 없는 것도 이 모드의 계약이다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.</summary>
-    public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied)
+    /// 손가락이 없는 것도 이 모드의 계약이다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.
+    /// <paramref name="_atBottom"/>이면 문구의 홈이 하단이 된다 — 무대 한가운데를 비워야 하는 스텝용이다.
+    /// <paramref name="_dim"/>을 끄면 판이 투명해진다(뒤 화면을 그대로 보여 주는 자리) — 다만 <b>입력은 그대로 막는다</b>.
+    /// 이 모드의 완료가 화면 탭이라 그렇다: 안 막으면 탭이 뒤 화면으로 새어 안내가 넘어가지 않는다.</summary>
+    public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied,
+                                bool _atBottom = false, bool _dim = true)
     {
         Release();
 
@@ -199,11 +210,13 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied    = false;
         m_blockWarned  = false;
         m_confirmMode  = true;
+        m_atBottom     = _atBottom;
+        m_dim          = _dim;                 // 승격도 이 값을 따른다 — 투명한 판 위로 올릴 이유가 없다
         m_armed        = _highlight != null;   // 추종할 영역이 있을 때만 LateUpdate가 문구를 따라 배치한다
 
         ArmBlockerClick();
 
-        SetBlocker(true);
+        SetBlocker(_dim, true);
         SetMessage(_message);
 
         if (m_armed)
@@ -212,7 +225,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
             return;
         }
 
-        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 띄운다(위치는 SetMessage가 화면 중앙으로 고정).
+        // 하이라이트가 없으면 따라갈 영역도 없다 → 문구만 띄운다(자리는 SetMessage가 홈으로 고정).
         SetPointerActive(false);
 
         m_gateRoot.SetActive(true);
@@ -345,7 +358,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_onScreen = t_max.x > t_min.x && t_max.y > t_min.y
                           && t_max.x > t_full.xMin && t_min.x < t_full.xMax
                           && t_max.y > t_full.yMin && t_min.y < t_full.yMax;
-        if (!t_onScreen) { SetPointerActive(false); CenterMessage(); return; }   // 피할 타깃이 화면에 없다 → 홈으로
+        if (!t_onScreen) { SetPointerActive(false); HomeMessage(); return; }   // 피할 타깃이 화면에 없다 → 홈으로
 
         SetPointerActive(true);
 
@@ -368,10 +381,13 @@ public class OutgameTutorialGateUI : MonoBehaviour
     {
         if (this.messageRect == null || !this.messageRect.gameObject.activeSelf) return;
 
+        // 하단이 홈인 스텝은 피할 것을 이미 저작이 정했다 — 자동 회피가 도로 가운데로 끌어올리지 않게 한다.
+        if (m_atBottom) { HomeMessage(); return; }
+
         float t_half = this.messageRect.sizeDelta.y * 0.5f;
         float t_gap  = t_half + this.messageMargin;
 
-        if (_targetYMin >= t_gap || _targetYMax <= -t_gap) { CenterMessage(); return; }
+        if (_targetYMin >= t_gap || _targetYMax <= -t_gap) { HomeMessage(); return; }
 
         float t_y = (_targetYMin - _full.yMin) >= (_full.yMax - _targetYMax)
             ? _targetYMin - t_gap    // 아래가 더 넓다
@@ -381,9 +397,19 @@ public class OutgameTutorialGateUI : MonoBehaviour
         this.messageRect.anchoredPosition = new Vector2(0f, Mathf.Clamp(t_y, _full.yMin + t_gap, _full.yMax - t_gap));
     }
 
-    void CenterMessage()
+    // 문구가 돌아갈 자리. 기본은 화면 중앙이고, 하단 저작이면 화면 아래에 붙인다(가운데는 무대 몫이다).
+    void HomeMessage()
     {
-        if (this.messageRect != null) this.messageRect.anchoredPosition = Vector2.zero;
+        if (this.messageRect == null) return;
+
+        if (!m_atBottom || m_canvasRect == null)
+        {
+            this.messageRect.anchoredPosition = Vector2.zero;
+            return;
+        }
+
+        float t_y = m_canvasRect.rect.yMin + this.messageRect.sizeDelta.y * 0.5f + this.messageBottomInset;
+        this.messageRect.anchoredPosition = new Vector2(0f, t_y);
     }
 
     // ── 타깃 승격 ────────────────────────────────────────────────────────────
@@ -507,13 +533,15 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 딤은 켜고 끄는 것이 곧 입력 차단의 켜고 끔이다. 둘을 따로 두면 "안 보이는데 막힌" 상태가 생긴다.
     // 색까지 투명으로 내리는 이유: 컴포넌트만 꺼 두면 무언가 다시 켜는 순간 어두운 판이 그대로 돌아온다.
     // 주의: 딤이 막는 것은 EventSystem 입력뿐이다 — raw Input을 폴링하는 코드는 오히려 과차단된다.
-    void SetBlocker(bool _on)
+    // 딤은 "보이는가"와 "입력을 막는가"가 갈린다. 메시지 모드는 완료가 화면 탭이라 투명해도 반드시 받아야 하고,
+    // 딤 없는 클릭 스텝은 반대로 아무것도 막지 않아야 타깃이 눌린다(승격도 없으므로 막으면 그대로 잠긴다).
+    void SetBlocker(bool _visible, bool _blockInput)
     {
         if (this.blocker == null) return;
 
-        this.blocker.enabled       = _on;
-        this.blocker.raycastTarget = _on;
-        this.blocker.color         = _on ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
+        this.blocker.enabled       = _visible || _blockInput;
+        this.blocker.raycastTarget = _blockInput;
+        this.blocker.color         = _visible ? m_dimColor : new Color(m_dimColor.r, m_dimColor.g, m_dimColor.b, 0f);
     }
 
     void SetPointerActive(bool _on)
@@ -526,8 +554,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         else        StopPulse();
     }
 
-    // 문구는 항상 화면 중앙에서 출발한다. 타깃을 피해 물러나는 판단은 Layout(PlaceMessage) 하나가 맡는다 —
-    // 따라갈 타깃이 없는 모드(배너·앵커 없는 메시지)는 그래서 중앙에 그대로 남는다.
+    // 문구는 항상 홈(중앙, 저작이 하단이면 하단)에서 출발한다. 타깃을 피해 물러나는 판단은 Layout(PlaceMessage)
+    // 하나가 맡는다 — 따라갈 타깃이 없는 모드(배너·앵커 없는 메시지)는 그래서 홈에 그대로 남는다.
     void SetMessage(string _message)
     {
         bool t_has = !string.IsNullOrEmpty(_message);
@@ -535,7 +563,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (this.messageRect != null)
         {
             this.messageRect.gameObject.SetActive(t_has);
-            CenterMessage();
+            HomeMessage();
         }
 
         if (t_has && this.messageText != null) this.messageText.text = _message;
@@ -599,7 +627,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
         m_confirmMode = false;
-        m_dim         = true;   // 딤 없는 스텝(ShowGate)이 그 다음 모드로 새지 않게. ShowGate만 이 값을 덮는다.
+        m_atBottom    = false;  // 자리 저작도 스텝의 것이다 — 남기면 다음 문구가 이유 없이 아래에 선다.
+        m_dim         = true;   // 딤 없는 스텝이 그 다음 모드로 새지 않게. 이 값은 두 Show*가 저작대로 덮는다.
     }
 
     // 딤 탭 수신을 켠다. Release()가 항상 먼저 떼므로 중복 부착은 없지만, 단일 창구를 지키려 여기서도 한 번 뗀다.
