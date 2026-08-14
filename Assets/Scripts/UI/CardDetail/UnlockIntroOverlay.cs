@@ -36,7 +36,7 @@ public class UnlockIntroOverlay : MonoBehaviour
     [SerializeField] Button confirmButton;
 
     [Tooltip("행이 깔리는 노드. 행은 프리팹에 미리 깔아 둔다 — 런타임 Instantiate 없음(상세창 칩과 같은 규약).\n" +
-             "자식은 KeywordExplainItem을 단 노드여야 한다.")]
+             "자식은 UnlockIntroRow를 단 노드여야 한다.")]
     [SerializeField] Transform rowRoot;
 
     [Header("연출")]
@@ -66,6 +66,10 @@ public class UnlockIntroOverlay : MonoBehaviour
 
     // 이번에 세운 행 수. 등장 안무와 정리가 같은 수를 봐야 한다.
     int m_shownRows;
+
+    // 지금 돌고 있는 데모 무대. 화면이 걷힐 때 반드시 함께 걷어야 한다 —
+    // 남으면 안 보이는 자리에서 카메라가 계속 RenderTexture를 그린다.
+    KeywordDemoStage m_demo;
 
     // 프리팹에 깔린 행이 모자란 것은 저작 문제다 — 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
@@ -103,11 +107,18 @@ public class UnlockIntroOverlay : MonoBehaviour
     }
 
     /// <summary>_intros를 세우고 [확인]을 기다린다. _onClose는 걷힌 뒤 정확히 한 번 온다.
-    /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.</summary>
-    public void Show(IReadOnlyList<UnlockIntro> _intros, Action _onClose)
+    /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.
+    ///
+    /// _card는 데모 무대의 공격자로 선다(<see cref="KeywordDemoStage"/>). null이면 데모 없이 글자만 —
+    /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.
+    ///
+    /// <returns>실제로 세운 줄 수(앞에서부터). 프리팹에 깔린 줄보다 많이 넘기면 뒤쪽은 뜨지 않으므로,
+    /// **본 것으로 낙인찍는 쪽은 이 수만큼만** 찍어야 한다 — 안 뜬 안내가 본 것이 되면 영영 못 본다.</returns></summary>
+    public int Show(IReadOnlyList<UnlockIntro> _intros, CardData _card, Action _onClose)
     {
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
+        EndDemo();
 
         this.m_shownRows = BuildRows(_intros);
 
@@ -116,7 +127,7 @@ public class UnlockIntroOverlay : MonoBehaviour
         {
             this.m_onClose = null;
             _onClose?.Invoke();
-            return;
+            return 0;
         }
 
         this.m_onClose = _onClose;
@@ -133,8 +144,12 @@ public class UnlockIntroOverlay : MonoBehaviour
         // 등장이 도는 동안은 손을 막는다 — 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
         SetInputEnabled(false);
 
+        BeginDemo(_intros, _card);
+
         this.m_intro = BuildIntro();
         this.m_intro.Play();
+
+        return this.m_shownRows;
     }
 
     /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다 —
@@ -143,6 +158,7 @@ public class UnlockIntroOverlay : MonoBehaviour
     {
         this.m_onClose = null;
         KillIntro();
+        EndDemo();
 
         bool t_wasOpen = IsOpen;
         IsOpen = false;
@@ -165,6 +181,7 @@ public class UnlockIntroOverlay : MonoBehaviour
     {
         this.transition.HandleDisabled(ResolveTarget());
         KillIntro();
+        EndDemo();
         ResetChoreography();
 
         // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
@@ -193,6 +210,7 @@ public class UnlockIntroOverlay : MonoBehaviour
         IsOpen = false;
 
         KillIntro();
+        EndDemo();
         SetVisible(false);
         ResetChoreography();
 
@@ -229,11 +247,11 @@ public class UnlockIntroOverlay : MonoBehaviour
             }
 
             Transform t_row  = this.rowRoot.GetChild(t_used);
-            var       t_item = t_row.GetComponent<KeywordExplainItem>();
-            if (t_item == null) continue;   // 행이 아닌 장식 노드가 섞여 있어도 안무가 성립해야 한다
+            var       t_view = t_row.GetComponent<UnlockIntroRow>();
+            if (t_view == null) continue;   // 행이 아닌 장식 노드가 섞여 있어도 안무가 성립해야 한다
 
-            UnlockIntro t_intro = _intros[t_i];
-            t_item.Init(t_intro.Icon, t_intro.Name, t_intro.Body, t_intro.IconScale);
+            t_view.Bind(_intros[t_i]);
+            t_view.SetDemo(null);           // 띠는 BeginDemo가 딱 한 줄에만 켠다
             t_row.gameObject.SetActive(true);
             t_used++;
         }
@@ -242,6 +260,49 @@ public class UnlockIntroOverlay : MonoBehaviour
             this.rowRoot.GetChild(t_i).gameObject.SetActive(false);
 
         return t_used;
+    }
+
+    /// <summary>데모를 딱 한 줄에 세운다.
+    ///
+    /// ⚠ <b>무대·카메라가 하나뿐이라 동시에 두 개를 돌릴 수 없다.</b> 키워드가 둘 이상 열린 판에서는
+    /// 맨 위 키워드 행에만 띠가 뜨고 나머지는 글자로 남는다 — 무대를 행 수만큼 복제하면
+    /// 카메라와 RenderTexture가 그만큼 늘어나는데, 정작 눈은 한 번에 하나만 본다.
+    /// 시너지는 Keyword가 None이라 자연히 건너뛴다(덱 편성 규칙이라 보여줄 대본이 없다).</summary>
+    void BeginDemo(IReadOnlyList<UnlockIntro> _intros, CardData _card)
+    {
+        if (_card == null || this.rowRoot == null) return;
+
+        for (int t_i = 0; t_i < this.m_shownRows && t_i < _intros.Count; t_i++)
+        {
+            if (_intros[t_i].Keyword == CardKeyword.None) continue;
+
+            var t_view = this.rowRoot.GetChild(t_i).GetComponent<UnlockIntroRow>();
+            if (t_view == null) continue;
+
+            if (!KeywordDemoStage.TryGet(out KeywordDemoStage t_stage)) return;
+
+            Texture t_tex = t_stage.Begin(_card, _intros[t_i].Keyword);
+            if (t_tex == null) { t_stage.End(); return; }   // 저작이 덜 됐다 — 띠 없이 글자만 남긴다
+
+            this.m_demo = t_stage;
+            t_view.SetDemo(t_tex);
+            return;
+        }
+    }
+
+    // 무대를 걷는다. 텍스처가 해제되므로 **띠에서 먼저 떼어야** 한다 — 순서가 뒤집히면
+    // 죽은 RenderTexture를 물고 있는 RawImage가 한 프레임 남는다.
+    void EndDemo()
+    {
+        KeywordDemoStage t_demo = this.m_demo;
+        this.m_demo = null;
+        if (t_demo == null) return;
+
+        if (this.rowRoot != null)
+            for (int t_i = 0; t_i < this.rowRoot.childCount; t_i++)
+                this.rowRoot.GetChild(t_i).GetComponent<UnlockIntroRow>()?.SetDemo(null);
+
+        t_demo.End();
     }
 
     // 등장 안무. 딤만 먼저 깔리고 행이 하나씩 앉은 뒤에야 [확인]이 열린다.

@@ -26,13 +26,18 @@ public readonly struct UnlockIntro
     /// <summary>본문. 키워드는 <c>explain</c>, 시너지는 효과 + 발동 요구치(<see cref="SynergyText.Body"/>).</summary>
     public readonly string Body;
 
-    UnlockIntro(string _key, Sprite _icon, float _iconScale, string _name, string _body)
+    /// <summary>어느 키워드인가. <b>시너지면 None</b>이다 — 데모 무대(<see cref="KeywordDemoStage"/>)가
+    /// 이 값으로 대본을 고르므로, 키를 역파싱하지 않게 값으로 들고 다닌다.</summary>
+    public readonly CardKeyword Keyword;
+
+    UnlockIntro(string _key, Sprite _icon, float _iconScale, string _name, string _body, CardKeyword _keyword)
     {
         this.Key       = _key;
         this.Icon      = _icon;
         this.IconScale = _iconScale;
         this.Name      = _name;
         this.Body      = _body;
+        this.Keyword   = _keyword;
     }
 
     /// <summary>키워드 한 개. 표를 못 찾거나 표시명이 비면 false — 이름 없는 칸을 세우느니 안 세우는 편이 낫다.
@@ -46,7 +51,7 @@ public readonly struct UnlockIntro
         if (string.IsNullOrEmpty(t_entry.displayName)) return false;
 
         _intro = new UnlockIntro(KeywordPrefix + _keyword, t_entry.icon, 1f,
-                                 t_entry.displayName, t_entry.explain);
+                                 t_entry.displayName, t_entry.explain, _keyword);
         return true;
     }
 
@@ -56,8 +61,9 @@ public readonly struct UnlockIntro
         _intro = default;
         if (_synergy == null) return false;
 
+        // 키워드 자리는 None — 시너지는 카드 한 장의 능력이 아니라 덱 편성 규칙이라 데모 대본이 없다.
         _intro = new UnlockIntro(SynergyKey, _synergy.activeIcon, SynergyIconStrip.IconPadCompensation,
-                                 SynergyText.Name(_synergy), SynergyText.Body(_synergy));
+                                 SynergyText.Name(_synergy), SynergyText.Body(_synergy), CardKeyword.None);
         return true;
     }
 }
