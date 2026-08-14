@@ -69,6 +69,7 @@ public static class BattleVfx
         if (t_go == null) return default;
 
         ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+        ApplyScale(t_go, t_entry.prefab, t_entry.scale);
         return new VfxHandle(t_poolId, t_go, t_entry.lifetime);
     }
 
@@ -87,6 +88,7 @@ public static class BattleVfx
         if (t_go == null) return default;
 
         ApplySorting(t_go, _sortingLayerId, _entry.sortingOrder);
+        ApplyScale(t_go, _entry.prefab, _entry.scale);
         return new VfxHandle(t_poolId, t_go, _entry.lifetime);
     }
 
@@ -158,9 +160,21 @@ public static class BattleVfx
                                         * Quaternion.Euler(t_entry.initialRotation);
 
             ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+            ApplyScale(t_go, t_entry.prefab, t_entry.scale);
             ApplyStrength(t_go, t_entry, t_s01);
             new VfxHandle(t_poolId, t_go, t_entry.lifetime).ReleaseAfterLifetime();
         }
+    }
+
+    /// <summary>항목 배율을 **프리팹 원본 크기 기준으로** 다시 계산해 적용한다.
+    /// 인스턴스의 현재 크기에 곱하지 않는 이유: 풀에서 재사용되면 지난 배율이 그대로 남아 누적된다.
+    /// 배율이 0 이하(미설정)여도 원본 크기를 다시 써 넣어야 지난 스폰의 배율이 남지 않는다.</summary>
+    static void ApplyScale(GameObject _go, GameObject _prefab, float _scale)
+    {
+        if (_go == null || _prefab == null) return;
+
+        float t_mul = _scale > 0f ? _scale : 1f;
+        _go.transform.localScale = _prefab.transform.localScale * t_mul;
     }
 
     /// <summary>항목에 세기 반응이 배선돼 있으면 파티클 방출량/속도를 그 배율로 덮어쓴다.

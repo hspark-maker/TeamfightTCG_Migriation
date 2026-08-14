@@ -16,7 +16,9 @@ public static class AlbumRewardClaimFlow
             return;
         }
 
-        t_popup.Show(_title, ToLines(_rewards), _onConfirm);
+        // 랭크 보상과 같은 규약 — [획득] 버튼 없이 **배경을 눌러** 받는다.
+        // 세 단(페이지·테마·앨범)이 여기 한 줄을 공유하므로 수령 조작이 갈릴 여지가 없다.
+        t_popup.Show(_title, ToLines(_rewards), _onConfirm, _claimOnDim: true);
     }
 
     // 매번 새 리스트 — 팝업이 Show 시점 스냅샷을 들고 있다가 나중에 소비하므로 공용 버퍼를 돌려주면 stale이 된다.

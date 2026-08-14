@@ -206,8 +206,10 @@ public static class AttackSequence
         // 비행 시간엔 바닥값이 있다. hitDelay가 0(또는 AttackEffect 없음)이면 투사체가 스폰된 프레임에
         // 그대로 파괴돼 아무것도 안 보인다 — 원거리는 "날아가서 맞는다"가 규칙이므로 최소 비행은 보장한다.
         // 히트 시점도 같은 값을 쓴다(투사체 도착 = 피해·피격 연출).
+        // 속도 배율은 바닥값에도 같이 건다 — 바닥값만 남겨두면 배율을 올려도 짧은 비행이 거기서 걸린다.
         float t_hitDelay = Mathf.Max((_effect?.hitDelay ?? 0f) * t_approachFactor,
-                                     GameTiming.Battle.RangedFlightMin * t_approachFactor);
+                                     GameTiming.Battle.RangedFlightMin * t_approachFactor)
+                         / GameTiming.Battle.RangedSpeedMul;
 
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
