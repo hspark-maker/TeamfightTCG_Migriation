@@ -271,6 +271,7 @@ MonoBehaviour:
   rowStagger: 0.07
   rowRise: 18
   rollDuration: 0.35
+  autoReturnHold: 1
 --- !u!1 &201369260162153666
 GameObject:
   m_ObjectHideFlags: 0
@@ -1026,6 +1027,7 @@ MonoBehaviour:
   enhanceCostIcon: {fileID: 4008388626039349161}
   goldIcon: {fileID: 21300000, guid: a779b38098fc44264b31817b3dca64ba, type: 3}
   diamondIcon: {fileID: 21300000, guid: a0c93c8818ff74825a9bcdcb94cf9a57, type: 3}
+  energyIcon: {fileID: 0}
   successRateText: {fileID: 8423584013530615387}
   evolveButton: {fileID: 2654429095011287775}
   evolveLabelText: {fileID: 3239840589700687580}
@@ -1170,12 +1172,12 @@ MonoBehaviour:
     fall: 0.3
     peak: 0.55
     color: {r: 1, g: 1, b: 1, a: 1}
-    burstSprite: {fileID: 0}
-    burstColor: {r: 1, g: 0.95, b: 0.8, a: 1}
-    burstAlpha: 1
-    burstStartScale: 0.35
-    burstEndScale: 1.6
-    burstFall: 0.45
+    burstSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+    burstColor: {r: 1, g: 0.9, b: 0.72, a: 1}
+    burstAlpha: 0.75
+    burstStartScale: 0.3
+    burstEndScale: 1.35
+    burstFall: 0.42
     burstSpin: 0
     burstAdditive: 1
   enterDuration: 0.15
@@ -1272,14 +1274,14 @@ MonoBehaviour:
     fall: 0.1
     peak: 0.85
     color: {r: 1, g: 0.96, b: 0.88, a: 1}
-    burstSprite: {fileID: 0}
-    burstColor: {r: 1, g: 0.95, b: 0.8, a: 1}
-    burstAlpha: 1
+    burstSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+    burstColor: {r: 1, g: 0.82, b: 0.45, a: 1}
+    burstAlpha: 0.55
     burstStartScale: 0.35
-    burstEndScale: 1.6
-    burstFall: 0.45
+    burstEndScale: 0.9
+    burstFall: 0.09
     burstSpin: 0
-    burstAdditive: 1
+    burstAdditive: 0
   blackoutSnap: 0.12
   blackoutDim: -1
   silhouetteTint: 0.35
@@ -1323,12 +1325,12 @@ MonoBehaviour:
     fall: 0.16
     peak: 0.42
     color: {r: 1, g: 0.97, b: 0.9, a: 1}
-    burstSprite: {fileID: 0}
-    burstColor: {r: 1, g: 0.95, b: 0.8, a: 1}
-    burstAlpha: 1
-    burstStartScale: 0.35
-    burstEndScale: 1.6
-    burstFall: 0.45
+    burstSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
+    burstColor: {r: 1, g: 0.93, b: 0.72, a: 1}
+    burstAlpha: 0.85
+    burstStartScale: 0.22
+    burstEndScale: 1.15
+    burstFall: 0.22
     burstSpin: 0
     burstAdditive: 1
   beatDelay: 0.08
