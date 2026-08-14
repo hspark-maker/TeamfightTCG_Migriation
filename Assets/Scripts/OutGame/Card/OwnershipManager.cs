@@ -97,17 +97,6 @@ public static class OwnershipManager
         return true;
     }
 
-    // 카드 1장 회수(디버그용) — 실제 제거 시 true
-    public static bool Revoke(int _id)
-    {
-        if (_id <= 0) return false;
-        if (!s_owned.Remove(_id)) return false;
-
-        Save();
-        OnOwnershipChanged?.Invoke();
-        return true;
-    }
-
     // 여러 번호 일괄 지급(Save·이벤트 1회) — 신규 지급 장수 반환
     public static int GrantAll(IEnumerable<int> _ids)
     {

@@ -27,7 +27,7 @@
 | 재화 API | `CurrencyManager` (Earn/Spend/CanAfford/GetBalance/OnCurrencyChanged/Save) | 🧊 재동결(PKG-GROWTH-SAVE, 2026-08-04) | Spend는 0 허용·음수 거부. **시그니처 불변 — 종류만 추가**: `ECurrencyType.Diamond`(**`Gold=0` 불변**, `Count` 앞 삽입 = 배열 인덱스 규약) + `CurrencySaveData.diamond` + `Init/Save` 매핑. 소비처는 종류 인자를 받는 API만 쓰므로 회귀 없음(`Gold`/`Diamond` 편의 프로퍼티는 조회 전용) |
 | 소유 API | `OwnershipManager` (Grant/Revoke/IsOwned/OwnedCount/OnOwnershipChanged) | 🧊 재동결(G-23) | 시그니처 불변. `GrantDefaults` 삭제(신규=소유0). 검수 통과, 전체지급은 `GrantEntireCatalog` 하나로 일원화(~~`OwnershipDebugTool`~~은 2026-08-14 삭제 — 소비처는 `OutgameDebugActions.UnlockAllCards`·`UI/Debug/UnlockAllCardsButton`). **`HasAnyOwnedSaved()`는 레거시 세이브 마이그레이션 1회 판정 전용**(2026-07-27) — 첫실행 판정 대리로 쓰지 말 것 |
 | 카드 창구 | `CardCatalog` (SetSource/KeyOf/Count/IsReady) | 🧊 동결 | KeyOf = SO 파일명 |
-| 시각 창구 | `GameClock` (Since/디버그 점프) | 🧊 동결 | |
+| ~~시각 창구~~ | ~~`GameClock`~~ | ❌ 삭제(2026-08-14) | 유일 소비처였던 도감 방치 생산과 함께 파일째 제거. 시간 축이 다시 필요해지면 **UTC 고정 + 시계 역행 0 클램프 + 디버그 오프셋**이라는 원래 규약대로 다시 세운다 |
 | 세이브 스키마 | `UserSaveData` (**version=2**, 값 객체 조립) | 🧊 재동결(2026-08-14) | 필드·슬롯 **추가**는 VERSION 유지가 규약 — `tutorial`(2026-07-27)·`rank`(2026-07-27)·`cardGrowth`(2026-08-04)·`albumReward`(2026-08-06) 전부 VERSION 1을 유지했고 구 세이브는 노드 없이 기본값(0/false/빈 리스트)으로 읽혔다. **삭제는 버전을 올린다** — 도감 방치 생산 폐기로 `collection` 슬롯이 사라지며 **VERSION 1 → 2**(구 세이브의 `collection` 노드는 무시되고 나머지 슬롯은 그대로 읽힌다) |
 | 팩 API | `CardPackOpener` (SetShop/TryPurchase→OpenedPack) | 🧊 동결 | |
 | 보상 API | `RewardService.GrantBattleReward → BattleReward` | 🧊 동결 | 반환값이 팝업 입력 |

@@ -143,13 +143,6 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 기능 잠금 {(OutgameFeatureLock.ForceUnlockAllForDebug ? "무시(전체 해금)" : "정상 적용")}");
     }
 
-    // 첫실행 재현 원샷 — 소유까지 비우고 튜토리얼 리셋
-    public static void ResetTutorialFromScratch()
-    {
-        RevokeAllCards();
-        ResetTutorial();
-    }
-
     // 팩 없이 앨범 삽입 연출만 반복 검증. 소유 카드를 그대로 다시 꽂는 연출이라 소유·세이브는 건드리지 않는다.
     public static void ForceAlbumInsertSession(int _count = 3)
     {
