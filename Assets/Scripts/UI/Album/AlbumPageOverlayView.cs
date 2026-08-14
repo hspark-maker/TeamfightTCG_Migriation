@@ -146,6 +146,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     public void Close()
     {
+        // 퇴장 연출과 나란히 돌려준다 — OnDisable을 기다리면 오버레이가 완전히 사라진 뒤에야 바가 돌아온다.
+        LobbyShellBars.Show(this);
         transition.SetVisible(gameObject, false);
     }
 
@@ -283,6 +285,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void OnEnable()
     {
+        // 페이지를 펼치는 동안은 로비 셸을 걷는다 — 이 오버레이가 화면을 통째로 쓴다.
+        LobbyShellBars.Hide(this, transform);
+
         if (!m_built) BuildSlots();
 
         OwnershipManager.OnOwnershipChanged += HandleChanged;
@@ -302,6 +307,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void OnDisable()
     {
+        // 안전망 — 탭 전환·씬 이탈처럼 Close를 거치지 않는 경로로 꺼져도 셸은 돌아와야 한다.
+        LobbyShellBars.Show(this);
+
         OwnershipManager.OnOwnershipChanged -= HandleChanged;
         AlbumRewardManager.OnChanged -= HandleChanged;
         CardGrowthManager.OnGrowthChanged -= HandleChanged;

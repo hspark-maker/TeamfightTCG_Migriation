@@ -18,6 +18,9 @@ public class RankRewardPanel : MonoBehaviour
     [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
+    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기. 예전 Root/Dim 저작값과 같은 0.72다.")]
+    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
+
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
 
     // 행 생성 여부. 티어 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
@@ -52,6 +55,9 @@ public class RankRewardPanel : MonoBehaviour
     void OnDisable()
     {
         RankRewardManager.OnChanged -= this.RefreshRows;
+
+        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
+        ScreenDim.Hide(this);
 
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -160,6 +166,11 @@ public class RankRewardPanel : MonoBehaviour
     // 재진입마다 트윈을 걷고 시작값을 다시 잡는 PopupTransition 쪽 처리가 실질 방어선이다.
     void SetVisible(bool _visible)
     {
+        // 암막은 공용 ScreenDim(Full)이 그린다 — 오버레이마다 딤 한 장씩 들고 있던 것을 걷었다.
+        // Root/Dim 오브젝트는 알파 0으로 남아 "바깥 눌러 닫기" 판정만 맡는다.
+        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
+        else ScreenDim.Hide(this);
+
         this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
 
