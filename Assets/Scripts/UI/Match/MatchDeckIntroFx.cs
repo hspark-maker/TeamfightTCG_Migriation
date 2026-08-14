@@ -20,9 +20,14 @@ using UnityEngine.UI;
 public class MatchDeckIntroFx
 {
     [Header("자리")]
-    [Tooltip("상대 프로필이 수렴할 자리. 매칭 화면이 이 좌표로 카드를 옮겨 앉힌다 — 미배선이면 그쪽 카드는 제자리에서 꺼진다.")]
+    // 이 둘은 **색을 가진 판 자체**를 물린다(EnemySection / MySection). 위·아래에서 가운데로 밀려 들어오는
+    // 분홍·파랑이 곧 이 축이라, 색이 없는 속 껍데기(InfoBar 등)를 물리면 움직이는 것과 보이는 것이 갈라져
+    // 연출이 통째로 사라진 것처럼 보인다. 앵커/좌표는 여기서 안 건드린다 — 저작된 자리를 홈으로 잡고 밀 뿐이다.
+    [Tooltip("위에서 내려오는 상대 쪽 판(EnemySection). 상대 프로필이 수렴할 자리이기도 하다 — " +
+             "미배선이면 그쪽 카드는 제자리에서 꺼진다.")]
     [SerializeField] RectTransform enemyInfoBar;
 
+    [Tooltip("아래에서 올라오는 내 쪽 판(MySection).")]
     [SerializeField] RectTransform myInfoBar;
 
     [Tooltip("VS가 수렴할 자리(VsBadge).")]

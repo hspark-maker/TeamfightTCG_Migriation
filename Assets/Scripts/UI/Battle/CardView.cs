@@ -539,14 +539,11 @@ public class CardView : MonoBehaviour
             this.hpFallbackPreview = true;
         }
 
-        // 치사 예고(카드 흐려짐 + HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
-        // "이 카드는 못 잡는다"가 확정처럼 읽히고 흐려진 카드가 미관을 깬다는 판단. 되살릴 땐 플래그만 true.
-        if (_wouldDie && BattleUxFlags.DeathPreview)
-        {
-            if (this.hpText != null)
-                this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
-            this.cardAnim.ShowDeathPreview();
-        }
+        // 치사 예고(HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
+        // "이 카드는 못 잡는다"가 확정처럼 읽힌다는 판단. 되살릴 땐 플래그만 true.
+        // 함께 있던 카드 흐려짐 오버레이(DieOverlay)는 되살릴 계획이 없어 배선째 삭제했다.
+        if (_wouldDie && BattleUxFlags.DeathPreview && this.hpText != null)
+            this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
     }
 
     public void HideAttackPreview()
@@ -568,9 +565,6 @@ public class CardView : MonoBehaviour
             RestoreHpDisplay();
             this.hpFallbackPreview = false;
         }
-
-        // 플래그로 꺼져 있어도 호출 — 과거 상태/플래그 전환 직후의 잔존 오버레이 정리.
-        this.cardAnim.HideDeathPreview();
     }
 
     /// <summary>표시용 HP를 임의 값으로 덮어쓴다. 규칙상 hp는 이미 확정됐는데(결정론: 상태변이 선행)
