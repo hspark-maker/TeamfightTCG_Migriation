@@ -26,7 +26,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 근거: `docs/ARCHITECTURE.md` §9, `.claude/agents/outgame-engineer.md`
 
 - **의존 방향 단방향**: `UI → 아웃게임 레이어 → Card(읽기 전용)`. 아웃게임 레이어는 **`Battle/`·`Network/`(CardRegistry 포함) 참조 금지**(반대 방향 `Battle → 범용 서비스`는 허용 — `RewardService`/`CurrencyManager` 등, 선례 `DeckConfig`→`DeckSaveManager`). `Battle/`·`Network/`·전투 규칙·와이어 프로토콜 **수정 금지**(전투 종료 시 보상 지급 트리거만 예외적으로 battle-engineer가 담당 — D 참조).
-- **배치**: 로직·데이터 → `Assets/Scripts/Currency/`(및 신규 최상위 폴더), 화면 → `Assets/Scripts/UI/Collection/`. **`.unity`·프리팹 편집은 범위 밖** — "무엇을 어느 프리팹에 붙일지"만 문서화.
+- **배치**: 로직·데이터 → `Assets/Scripts/OutGame/<도메인>/`(착수 당시 표기는 `Assets/Scripts/Currency/`였다), 화면 → `Assets/Scripts/UI/<도메인>/`(도감이면 `UI/Album/`). **`.unity`·프리팹 편집은 범위 밖** — "무엇을 어느 프리팹에 붙일지"만 문서화.
 - **세이브 규약**: 식별자는 **문자열 키(인덱스 금지)**, 하위호환(필드 추가만), **버전 필드 필수**, 부트 순서 `[DefaultExecutionOrder(-100)]`, **로드 실패 시 진행도 0 덮어쓰기 금지**. 선례: `DeckSaveManager.cs`.
 - **마스터 데이터 드리프트**: 카드 전체 목록이 이미 3곳(`CardRegistry.asset`/`MainMenuInitializer.cs:8`/`DeckBuilderUI.cs:10`)에 중복. 아웃게임이 **4번째 목록이 되면 안 됨** — 기존 목록을 주입받는 단일 창구를 세운다(B).
 - **시각·생산**: 생산은 `(마지막 정산 시각, 현재 시각) → 생산량` **경과시간 순수 함수** + 상한 클램프(`Update` 누산 금지). 시각은 **단일 창구**로 감싸 디버그 시간 점프 가능. 저장 UTC, 시계 역행 처리 정의.
@@ -87,7 +87,7 @@ O# 아웃게임 시스템 로드맵 — 도메인 분류 · 태스크 · 순서
 - **E-16 획득 결과 데이터**: 신규/중복 구분해 UI 전달.
 
 ### F. 아웃게임 UI (프리팹은 문서화만)
-`Assets/Scripts/UI/Collection/` 등. 팝업 `PooledUIBase`+`UIPoolManager`, 화면 `MainMenuManager` 패널 토글.
+`Assets/Scripts/UI/Album/`·`UI/Shop/`·`UI/HUD/` 등 도메인별 폴더. 팝업 `PooledUIBase`+`UIPoolManager`, 화면 `MainMenuManager` 패널 토글.
 
 - **F-17 골드 HUD**: 로비·도감·상점 헤더. `CurrencyService.OnChanged` 구독.
 - **F-18 도감 갤러리**: 세로 스크롤 3열(행 자동 확장), 행별 생산·수확, 카드 상세+틸트, 완성 보상 버튼.

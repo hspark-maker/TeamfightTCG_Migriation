@@ -112,14 +112,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
                 foreach (AIDeckConfig.DeckEntry t_deck in t_ai.decks)
                     CheckCards(t_deck?.cards, $"{t_ai.name}/{t_deck?.deckName}", _errors);
 
-        foreach (CollectionLayoutConfig t_layout in LoadBuildDependencies<CollectionLayoutConfig>())
-            foreach (CollectionRowDef t_row in t_layout.Rows)
-                CheckCards(t_row.cards, t_layout.name, _errors);
-
-        foreach (CollectionThemeConfig t_themes in LoadBuildDependencies<CollectionThemeConfig>())
-            foreach (CollectionThemeDef t_theme in t_themes.Themes)
-                CheckCards(t_theme.cards, $"{t_themes.name}/{t_theme.themeId}", _errors);
-
         foreach (TutorialScenarioData t_scenario in LoadBuildDependencies<TutorialScenarioData>())
         {
             CheckCards(t_scenario.playerDeck, $"{t_scenario.name}/player", _errors);

@@ -134,7 +134,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 11
+  key: 0
 --- !u!1 &701667878696700260
 GameObject:
   m_ObjectHideFlags: 0
@@ -454,6 +454,7 @@ MonoBehaviour:
   - {fileID: 310739643090776531}
   - {fileID: 310739643090776532}
   - {fileID: 310739643090776533}
+  background: {fileID: 0}
   showInactive: 1
   maxIcons: 0
 --- !u!1 &1316838277628216812
