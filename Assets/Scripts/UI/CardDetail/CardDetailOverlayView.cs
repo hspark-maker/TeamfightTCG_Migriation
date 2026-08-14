@@ -147,6 +147,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] GameObject keywordSectionLock;
     [SerializeField] GameObject synergySectionLock;
 
+    // 판이 걷힌 **뒤** 그 아래 내용이 들어오는 연출(옵션). 미배선이면 걷히자마자 완성된 글자가 그대로 있다 —
+    // 동작은 같고 "무엇이 드러났는지"만 덜 읽힌다.
+    [SerializeField] SectionRevealFx keywordSectionReveal;
+    [SerializeField] SectionRevealFx synergySectionReveal;
+
+    [Tooltip("해금된 줄로 스크롤이 따라가는 시간. 0이면 즉시 옮긴다(연출 없이 자리만 맞춘다).")]
+    [SerializeField] float unlockScrollDuration = 0.3f;
+
     // 런타임은 이 프리팹을 만들지 않는다 — 칩은 프리팹에 미리 깔려 있다(TryShowChip 주석).
     // 남겨 둔 이유는 깔아 주는 에디터 도구(CardDetailChipBaker)가 "무엇을 깔지"를 여기서 읽기 때문이다.
     [SerializeField] KeywordExplainItem chipPrefab;
@@ -271,8 +279,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 방금 해금됐지만 아직 연출로 걷지 못한 판. 강화 연출이 화면을 덮고 있는 동안 해금이 확정되므로,
     // 그 사이엔 판을 남겨 두고 무대가 돌아온 뒤에 걷는다(SetSectionLock 주석 참고).
-    bool m_pendingKeywordUnlockFx;
-    bool m_pendingSynergyUnlockFx;
+    //
+    // 키워드 쪽은 불리언이 아니라 **열린 키워드 자체**를 든다 — 판을 걷고 나면 "무엇이 열렸나"에 답해야
+    // 처음 보는 것만 골라 전면 안내를 세울 수 있다(None = 걷을 판 없음).
+    // 시너지는 관문 하나로 통째로 열려 답이 하나뿐이라 불리언 그대로다.
+    CardKeyword m_pendingUnlockedKeywords;
+    bool        m_pendingSynergyUnlockFx;
 
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
@@ -914,7 +926,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_sameCard)
         {
             if (t_syn && !this.m_shownSynergyOpen) this.m_pendingSynergyUnlockFx = true;
-            if (this.m_shownKeywordLocked && !KeywordSectionLocked(_card, _owned)) this.m_pendingKeywordUnlockFx = true;
+
+            // 섹션째 잠겨 있다가 풀렸다 = 지금 열려 있는 것 전부가 방금 열린 것이다
+            // (KeywordSectionLocked가 "열린 것이 하나도 없는가"라서 성립한다).
+            if (this.m_shownKeywordLocked && !KeywordSectionLocked(_card, _owned))
+                this.m_pendingUnlockedKeywords = CardVisualRules.InfoKeywords(_card);
         }
 
         // 시너지 관문(1차 진화)은 키워드 마스크를 안 건드리고 넘어갈 수 있다 — 따로 보지 않으면
@@ -939,35 +955,126 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         _lock.SetActive(_locked);
     }
 
-    /// <summary>방금 해금된 줄의 잠김 판을 연출로 걷는다. 연출이 미배선이면 예전처럼 즉시 걷는다 —
-    /// 배선 실패가 "판이 안 걷혀 내용이 영영 가려짐"이 되면 안 된다.
+    /// <summary>방금 해금된 줄의 잠김 판을 연출로 걷고, 그 아래 내용을 읽게 만든다.
+    /// 연출이 미배선이면 예전처럼 즉시 걷는다 — 배선 실패가 "판이 안 걷혀 내용이 영영 가려짐"이 되면 안 된다.
     ///
-    /// 연출이 도는 동안 하단 바는 걷은 채로 둔다 — 지금 화면이 말하는 것은 "무엇이 열렸는가"이고,
-    /// 그 위에 다음 강화 버튼이 서 있으면 손이 먼저 간다. 바는 연출이 끝나는 그 자리에서 돌아온다.</summary>
+    /// 세 박이다: <b>판이 걷힌다 → 그 줄로 스크롤이 따라가며 내용이 들어온다 → (처음 보는 개념이면) 전면 안내</b>.
+    /// 안내를 판보다 먼저 세우지 않는 이유는 순서가 곧 인과이기 때문이다 —
+    /// 무엇이 열렸는지를 카드 화면에서 먼저 보여준 뒤에야 "그게 뭔지"를 말하는 것이 읽힌다.
+    ///
+    /// 그동안 하단 바는 걷은 채로 둔다 — 지금 화면이 말하는 것은 "무엇이 열렸는가"이고,
+    /// 그 위에 다음 강화 버튼이 서 있으면 손이 먼저 간다. 바는 이 흐름의 **마지막 축**이 돌아온 자리에서 되돌린다.</summary>
     void PlayPendingUnlockFx()
     {
+        CardKeyword t_keywords = this.m_pendingUnlockedKeywords;
+        bool        t_synergy  = this.m_pendingSynergyUnlockFx;
+
+        this.m_pendingUnlockedKeywords = CardKeyword.None;
+        this.m_pendingSynergyUnlockFx  = false;
+
         Tween t_fx = null;
-
-        if (this.m_pendingKeywordUnlockFx)
-        {
-            this.m_pendingKeywordUnlockFx = false;
-            t_fx = PlayUnlockFx(this.keywordSectionLock) ?? t_fx;
-        }
-
-        if (this.m_pendingSynergyUnlockFx)
-        {
-            this.m_pendingSynergyUnlockFx = false;
-            t_fx = PlayUnlockFx(this.synergySectionLock) ?? t_fx;
-        }
+        if (t_keywords != CardKeyword.None) t_fx = PlayUnlockFx(this.keywordSectionLock) ?? t_fx;
+        if (t_synergy)                      t_fx = PlayUnlockFx(this.synergySectionLock) ?? t_fx;
 
         // 걷을 판도, 돌 연출도 없었다 — 바는 호출부가 이미 되돌렸다.
-        if (t_fx == null) { ShowBottomBar(); return; }
+        if (t_fx == null && t_keywords == CardKeyword.None && !t_synergy) { ShowBottomBar(); return; }
 
         HideBottomBar();
 
-        // 두 줄이 함께 열려도 길이는 같은 저작값이라 나중에 잡은 것 하나로 끝을 본다.
-        // 도중에 잘리는 경로(카드 전환·창 닫힘)에는 이 콜백이 오지 않는다 → 그쪽은 Apply가 못 박는다.
-        t_fx.OnComplete(ShowBottomBar);
+        // 걷힌 판이 하나뿐이어도 스크롤은 그 줄로 간다. 두 줄이 함께 열렸으면 위쪽(키워드)을 기준으로 삼는다 —
+        // 둘을 차례로 훑으면 화면이 두 번 미끄러져 어느 쪽을 읽어야 하는지가 흐려진다.
+        GameObject t_focus = t_keywords != CardKeyword.None ? this.keywordSection : this.synergySection;
+
+        // 판이 걷힌 뒤가 이 축의 자리다. 도중에 잘리는 경로(카드 전환·창 닫힘)에는 이 콜백이 오지 않는다 →
+        // 그쪽은 Apply가 못 박고, 바는 그 길의 ShowBottomBar가 되돌린다.
+        if (t_fx == null) RevealUnlockedSections(t_focus, t_keywords, t_synergy);
+        else              t_fx.OnComplete(() => RevealUnlockedSections(t_focus, t_keywords, t_synergy));
+    }
+
+    // 걷힌 줄로 스크롤을 옮기고 내용을 들여보낸 뒤, 처음 보는 개념이 있으면 전면 안내로 넘긴다.
+    // 하단 바를 되돌리는 곳은 이 함수의 끝 **한 곳**이다(안내가 서면 그 닫힘이 곧 끝이다).
+    void RevealUnlockedSections(GameObject _focus, CardKeyword _keywords, bool _synergy)
+    {
+        ScrollTo(_focus);
+
+        if (_keywords != CardKeyword.None) this.keywordSectionReveal?.Play();
+        if (_synergy)                      this.synergySectionReveal?.Play();
+
+        List<UnlockIntro> t_intros = CollectUnseenIntros(CardAt(this.m_index), _keywords, _synergy);
+        if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); return; }
+
+        if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) { ShowBottomBar(); return; }
+
+        // 낙인은 닫힐 때가 아니라 **띄우는 순간** 찍는다. 안 그러면 안내를 읽는 도중 앱이 죽었을 때
+        // 다음 부팅에 같은 안내가 다시 선다 — 이미 상세창에 남아 있는 내용이라 다시 세울 값어치가 없다.
+        for (int t_i = 0; t_i < t_intros.Count; t_i++)
+            OutgameTutorialProgress.MarkUnlockIntroSeen(t_intros[t_i].Key);
+
+        t_overlay.Show(t_intros, ShowBottomBar);
+    }
+
+    /// <summary>이번에 열린 것 중 <b>아직 전면으로 안내한 적 없는</b> 개념들. 없으면 null.
+    /// 순서는 화면 순서와 같다(키워드 줄이 위, 시너지 줄이 아래).</summary>
+    List<UnlockIntro> CollectUnseenIntros(CardData _card, CardKeyword _keywords, bool _synergy)
+    {
+        List<UnlockIntro> t_list = null;
+
+        if (_keywords != CardKeyword.None && this.keywordIconConfig != null)
+            foreach (CardKeyword t_kw in (CardKeyword[])Enum.GetValues(typeof(CardKeyword)))
+            {
+                if (t_kw == CardKeyword.None || (_keywords & t_kw) == 0) continue;
+                if (!UnlockIntro.TryForKeyword(this.keywordIconConfig, t_kw, out UnlockIntro t_intro)) continue;
+                if (OutgameTutorialProgress.IsUnlockIntroSeen(t_intro.Key)) continue;
+
+                (t_list ??= new List<UnlockIntro>()).Add(t_intro);
+            }
+
+        // 시너지는 개념 하나라 어느 시너지로 배우든 키가 같다 → 카드가 여럿 물고 있어도 첫 장 하나면 된다.
+        if (_synergy && _card != null && _card.synergies != null)
+            foreach (SynergyData t_syn in _card.synergies)
+            {
+                if (!UnlockIntro.TryForSynergy(t_syn, out UnlockIntro t_intro)) continue;
+                if (OutgameTutorialProgress.IsUnlockIntroSeen(t_intro.Key)) break;
+
+                (t_list ??= new List<UnlockIntro>()).Add(t_intro);
+                break;
+            }
+
+        return t_list;
+    }
+
+    // 그 섹션이 화면에 들어오도록 스크롤을 옮긴다. 내용이 짧아 스크롤이 필요 없으면 아무 일도 하지 않는다.
+    // RewindScroll과 같은 이유로 verticalNormalizedPosition을 쓰지 않는다 — 짧은 내용에서 한 번 어긋난 자리를
+    // 잡았다가 탄성으로 되돌아와 패널이 튄다. 여기서도 content 좌표를 직접 민다.
+    void ScrollTo(GameObject _section)
+    {
+        if (this.detailScroll == null || this.detailScroll.content == null || _section == null) return;
+
+        RectTransform t_content = this.detailScroll.content;
+        RectTransform t_view    = this.detailScroll.viewport != null ? this.detailScroll.viewport
+                                                                     : (RectTransform)this.detailScroll.transform;
+
+        float t_span = t_content.rect.height - t_view.rect.height;
+        if (t_span <= 0f) return;   // 다 보이는 화면이라 옮길 자리가 없다
+
+        // Content는 위에 매달려 있다(pivot y=1) → 목표 자리는 "섹션 상단까지 내린 거리"다.
+        var   t_rect = (RectTransform)_section.transform;
+        float t_top  = -(float)t_content.InverseTransformPoint(t_rect.TransformPoint(new Vector3(0f, t_rect.rect.yMax)))
+                             .y;
+        float t_to   = Mathf.Clamp(t_top, 0f, t_span);
+
+        this.detailScroll.StopMovement();
+        t_content.DOKill();
+
+        if (this.unlockScrollDuration <= 0f)
+        {
+            t_content.anchoredPosition = new Vector2(t_content.anchoredPosition.x, t_to);
+            return;
+        }
+
+        t_content.DOAnchorPosY(t_to, this.unlockScrollDuration)
+                 .SetEase(Ease.OutCubic)
+                 .SetLink(gameObject);
     }
 
     // 걷을 판이 없거나 연출이 미배선이면 null — 부른 쪽은 "기다릴 것이 없다"로 읽는다.
@@ -985,8 +1092,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 카드를 넘기거나 창을 닫으면 "방금 해금됐다"는 맥락이 사라진다 — 남겨두면 다음 카드의 판이 이유 없이 터진다.</summary>
     void DropPendingUnlockFx()
     {
-        this.m_pendingKeywordUnlockFx = false;
-        this.m_pendingSynergyUnlockFx = false;
+        this.m_pendingUnlockedKeywords = CardKeyword.None;
+        this.m_pendingSynergyUnlockFx  = false;
     }
 
     /// <summary>키워드 줄이 통째로 잠겼는가. 판정이 두 곳에 갈리지 않게 여기 하나로 둔다
@@ -1513,7 +1620,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 카드 키워드는 keywordUnlockLevel 하나로 통째로 열린다 → 열린 것이 하나도 없으면 섹션 전체가 잠긴 것이다.
         // (explainKeywords는 해금 개념이 없는 안내용이라, 그것만 남았으면 여전히 "통째로 잠김"이 맞다.)
         this.m_shownKeywordLocked = KeywordSectionLocked(_card, _owned);
-        SetSectionLock(this.keywordSectionLock, this.m_shownKeywordLocked, this.m_pendingKeywordUnlockFx);
+        SetSectionLock(this.keywordSectionLock, this.m_shownKeywordLocked,
+                       this.m_pendingUnlockedKeywords != CardKeyword.None);
 
         var t_lines = new List<string>();
         int t_used  = 0;
@@ -1577,7 +1685,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                                 SynergyIconStrip.IconPadCompensation, t_open))
                     t_used++;
 
-                if (!string.IsNullOrEmpty(t_syn.effectDescription)) t_lines.Add(t_syn.effectDescription);
+                // 효과만이 아니라 발동 요구치까지 적는다 — "몇 장 모으면 켜지는가"가 시너지의 본체이고,
+                // 해금 안내(UnlockIntro)와 같은 포맷이어야 방금 읽은 것을 여기서 다시 찾을 수 있다.
+                t_lines.Add(SynergyText.Body(t_syn));
             }
         }
 
