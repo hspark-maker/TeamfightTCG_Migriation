@@ -59,6 +59,34 @@ public class MatchmakingFx
         burstStartScale = 0.2f, burstEndScale = 1.4f, burstFall = 0.4f,
     };
 
+    [Header("조임(축적) — 발견과 충돌 사이")]
+    [Tooltip("이 구간의 정체는 '빈 정지'가 아니라 '압력이 차오르는 시간'이다. 아래 축들이 동시에 조금씩 올라가고, " +
+             "충돌이 그걸 한 번에 방출한다 — 여기를 0으로 만들면 충돌도 같이 약해진다.")]
+    [Range(-1f, 0f)] [SerializeField] float chargeDim = -0.32f;
+
+    [Tooltip("두 배너가 서로에게 끌리는 거리(px). 처음엔 안 보이다가 끝에 가서 알아채는 정도가 맞는다 — " +
+             "15를 넘기면 '이동'으로 읽혀 충돌의 예비동작이 미리 소진된다.")]
+    [Min(0f)] [SerializeField] float chargeDrift = 8f;
+
+    [Tooltip("구간 끝에 도달하는 떨림 진폭(px). 시작은 0이고 제곱으로 붙는다 — 마지막 0.2초에 거의 다 온다.")]
+    [Min(0f)] [SerializeField] float chargeShake = 2.4f;
+
+    [Tooltip("떨림 주기(Hz). 15 아래로 내리면 흔들림이 아니라 미끄러짐으로 보인다.")]
+    [Min(1f)] [SerializeField] float chargeShakeFreq = 26f;
+
+    [Tooltip("VS가 뜰 자리에 고이는 빛의 크기(px). 충돌 프레임에 이 빛이 터지며 VS로 바뀐다.")]
+    [Min(0f)] [SerializeField] float chargeGlowSize = 260f;
+
+    [Tooltip("고이는 빛의 그림. 비우면 대기 스캔과 같은 그림을 쓴다 — 둘 다 비면 이 축만 빠진다.")]
+    [SerializeField] Sprite chargeGlowSprite;
+
+    [SerializeField] Color chargeGlowColor = new Color(0.62f, 0.82f, 1f, 1f);
+
+    [Range(0f, 1f)] [SerializeField] float chargeGlowAlpha = 0.38f;
+
+    [Min(0f)] [SerializeField] float chargeGlowFrom = 0.55f;
+    [Min(0f)] [SerializeField] float chargeGlowTo   = 1.05f;
+
     [Header("대치(충돌)")]
     [Tooltip("부딪히기 전 뒤로 물러나는 거리(px). 이 예비동작이 없으면 두 카드가 그냥 가까워질 뿐이다.")]
     [Min(0f)] [SerializeField] float windUpDistance = 26f;
@@ -78,6 +106,25 @@ public class MatchmakingFx
 
     [Range(-1f, 0f)] [SerializeField] float versusDimPunch = -0.35f;
 
+    [Tooltip("충돌 프레임에 딤이 밝은 쪽으로 튀는 정도(0~1). 조임이 어둠을 -0.32까지 끌어내렸으므로 " +
+             "여기서 양수로 넘겨야 어둠→빛의 왕복이 생긴다 — 이 반전이 방출감의 대부분이다.")]
+    [Range(0f, 1f)] [SerializeField] float releaseDimPeak = 0.2f;
+
+    [Tooltip("충돌 프레임에 화면 전체가 받는 킥(배율). 조임이 클수록 여기가 커야 균형이 맞는다.")]
+    [Min(0f)] [SerializeField] float releaseKick = 0.09f;
+
+    [Tooltip("고여 있던 빛이 터져 나가는 시간. VS가 튀어나오는 시간과 비슷해야 '빛이 VS가 됐다'로 읽힌다.")]
+    [Min(0.01f)] [SerializeField] float releaseGlowBurst = 0.18f;
+
+    [Tooltip("터질 때 빛이 부푸는 배율(고인 크기 대비).")]
+    [Min(1f)] [SerializeField] float releaseGlowScale = 2.1f;
+
+    [Header("여운")]
+    [Tooltip("VS가 박힌 뒤 한 번 쉬는 호흡의 배율. 이 한 박이 없으면 정지가 '멈춤'으로만 읽힌다.")]
+    [Min(0f)] [SerializeField] float afterglowBreath = 0.035f;
+
+    [Min(0.01f)] [SerializeField] float afterglowBreathDuration = 0.34f;
+
     [Tooltip("충돌 프레임의 섬광. 발견보다 옅어야 한다 — 같은 세기면 두 사건이 한 덩어리로 뭉친다.")]
     [SerializeField] ScreenFlashCover versusFlash = new ScreenFlashCover
     {
@@ -95,14 +142,28 @@ public class MatchmakingFx
     Tween  m_scanTween;
     Image  m_scanBand;
 
+    // 조임이 세운 빛. 조임 시퀀스가 끊기고(대치가 무대를 갈아탄다) 나서도 살아 있어야 충돌이 이걸 터뜨릴 수 있다 —
+    // 그래서 시퀀스가 아니라 여기가 소유한다. 실제로 걷는 것은 ClearCharge / BuildVersus의 마지막 콜백이다.
+    Image m_chargeGlow;
+
+    // 떨림이 밀기 전의 화면 좌표. 이미 밀린 값을 기준으로 잡으면 매칭을 열 때마다 화면이 조금씩 밀려난다.
+    Vector2 m_rootHome;
+    bool    m_rootCaptured;
+
     /// <summary>전환(MatchHandoffFx)이 이어서 걷어낼 딤. 진실원을 둘로 만들지 않으려 여기서 빌려준다.</summary>
     public ScreenDimTint Dim => this.dim;
 
-    /// <summary>발견 안무가 끝나는 시각 — 셸의 뜸(foundHold)이 이보다 짧으면 대치가 안무를 잘라먹는다.</summary>
+    /// <summary>전환의 빛줄기가 쓸 그림. 매칭 화면에 이미 배선된 것을 빌려준다 — 전환에 스프라이트를 또 배선하지 않게.</summary>
+    public Sprite RaySprite => this.chargeGlowSprite != null ? this.chargeGlowSprite : this.scanSprite;
+
+    /// <summary>발견 안무가 끝나는 시각 — 조임은 이 뒤에 이어 붙는다.</summary>
     public float FoundDuration => this.slamDuration + this.infoStagger * 2f + 0.2f;
 
     /// <summary>대치 안무가 끝나는 시각.</summary>
     public float VersusDuration => this.windUpDuration + this.impactDuration + this.settleDuration;
+
+    /// <summary>대치가 끝난 뒤 VS가 한 번 쉬는 데 걸리는 시각. 셸의 여운이 이보다 짧으면 호흡이 잘린다.</summary>
+    public float AfterglowDuration => this.afterglowBreath > 0f ? this.afterglowBreathDuration : 0f;
 
     public void Capture()
     {
@@ -194,12 +255,53 @@ public class MatchmakingFx
     }
 
     /// <summary>
+    /// 발견과 충돌 사이를 채우는 안무. 이 구간은 "빈 정지"가 아니라 "압력이 차오르는 시간"이다 —
+    /// 어둠이 짙어지고, 두 배너가 서로에게 끌리고, 화면이 점점 떨리고, VS 자리에 빛이 고인다.
+    /// 네 축이 동시에 올라가다 충돌 한 프레임에 전부 방출된다.
+    /// </summary>
+    /// <remarks>
+    /// 여기서 세운 빛(<see cref="m_chargeGlow"/>)만은 시퀀스가 아니라 이 클래스가 소유한다 —
+    /// 셸이 대치로 무대를 갈아타며 이 시퀀스를 죽이는데, 빛은 그 뒤 충돌까지 살아 있어야 터질 것이 남는다.
+    /// </remarks>
+    public Sequence BuildCharge(RectTransform _my,  Vector2 _myHome,
+                                RectTransform _opp, Vector2 _oppHome,
+                                Vector2 _step, RectTransform _root, Vector2 _vsAnchored, float _duration)
+    {
+        var t_seq = DOTween.Sequence();
+
+        float t_dur = Mathf.Max(0.05f, _duration);
+
+        this.InsertDrift(t_seq, _my,  _myHome,   _step, t_dur);
+        this.InsertDrift(t_seq, _opp, _oppHome, -_step, t_dur);
+
+        // 어둠은 끝까지 단조 증가한다 — 중간에 되돌아오면 쌓이던 것이 한 번 풀려 다시 시작이 된다.
+        t_seq.Insert(0f, this.dim.TweenLevel(this.chargeDim, t_dur).SetEase(Ease.InQuad));
+
+        this.InsertTremor(t_seq, _root, t_dur);
+        this.InsertChargeGlow(t_seq, _root, _vsAnchored, t_dur);
+
+        return t_seq;
+    }
+
+    /// <summary>고여 있던 빛을 걷는다. 대치까지 가지 못하고 화면이 닫히는 길에서 잔해가 남지 않게.</summary>
+    public void ClearCharge()
+    {
+        if (this.m_chargeGlow != null)
+        {
+            this.m_chargeGlow.DOKill();
+            UnityEngine.Object.Destroy(this.m_chargeGlow.gameObject);
+        }
+
+        this.m_chargeGlow = null;
+    }
+
+    /// <summary>
     /// 두 카드가 물러났다 부딪히고 VS가 튀어나오는 안무. 미는 방향은 호출자가 준 걸음(_step)이 정한다 —
     /// 어느 쪽이 위인지 이 클래스는 몰라도 된다.
     /// </summary>
     public Sequence BuildVersus(RectTransform _my,  Vector2 _myHome,
                                 RectTransform _opp, Vector2 _oppHome,
-                                Vector2 _step, RectTransform _vs)
+                                Vector2 _step, RectTransform _vs, RectTransform _root)
     {
         var t_seq = DOTween.Sequence();
 
@@ -208,8 +310,17 @@ public class MatchmakingFx
 
         float t_hit = this.windUpDuration + this.impactDuration;
 
+        // 조임이 어둠을 끌어내렸으므로 여기는 "더 어둡게"가 아니라 "밝은 쪽으로" 넘겨야 왕복이 생긴다.
+        // 조임 없이 열리는 길(디버그·미배선)에서도 versusDimPunch가 앞을 맡아 왕복 자체는 남는다.
         this.InsertDimPunch(t_seq, t_hit, this.versusDimPunch);
+        t_seq.Insert(t_hit, this.dim.TweenLevel(this.releaseDimPeak, 0.06f).SetEase(Ease.OutQuad));
+        t_seq.Insert(t_hit + 0.06f, this.dim.TweenLevel(0f, 0.34f).SetEase(Ease.OutQuad));
+
         this.InsertFlash(t_seq, t_hit, this.versusFlash);
+        this.InsertGlowBurst(t_seq, t_hit);
+
+        if (this.releaseKick > 0f && _root != null)
+            t_seq.InsertCallback(t_hit, () => UiPunch.Play(_root, this.releaseKick, 0.24f));
 
         if (_vs != null)
         {
@@ -220,6 +331,13 @@ public class MatchmakingFx
             // VS는 충돌의 결과로 튀어나온다 — 켜지는 시각이 부딪히는 프레임과 어긋나면 따로 논다.
             t_seq.Insert(t_hit, _vs.DOScale(1f, this.vsPopDuration).SetEase(Ease.OutBack));
             t_seq.Insert(t_hit, _vs.DOLocalRotate(Vector3.zero, this.vsPopDuration).SetEase(Ease.OutBack));
+
+            // 여운의 한 박. 안무가 끝난 화면이 완전히 굳으면 정지가 '멈춤'으로 읽힌다 —
+            // 숨 한 번이 "다음이 온다"로 바꿔 준다. 배율은 반드시 1로 돌아온다(Yoyo).
+            if (this.afterglowBreath > 0f)
+                t_seq.Insert(this.VersusDuration,
+                             _vs.DOScale(1f + this.afterglowBreath, this.afterglowBreathDuration * 0.5f)
+                                .SetEase(Ease.InOutSine).SetLoops(2, LoopType.Yoyo));
         }
 
         return t_seq;
@@ -229,6 +347,7 @@ public class MatchmakingFx
     public void Reset(MatchProfileView _my, MatchProfileView _opponent, RectTransform _root, RectTransform _vs)
     {
         this.StopScan();
+        this.ClearCharge();
         this.dim.Reset();
 
         RestoreCard(_my);
@@ -238,6 +357,9 @@ public class MatchmakingFx
         {
             _root.DOKill();
             _root.localScale = Vector3.one;
+
+            // 조임의 떨림이 루트를 밀어 놓고 끝났을 수 있다 — 배율만 되돌리면 화면 전체가 몇 px 어긋난 채 열린다.
+            if (this.m_rootCaptured) _root.anchoredPosition = this.m_rootHome;
         }
 
         if (_vs == null) return;
@@ -248,12 +370,15 @@ public class MatchmakingFx
     }
 
     // 물러났다 부딪히고 제자리로. 홈 좌표는 호출자가 Awake에서 잡아 둔 값이라 반복해도 밀리지 않는다.
+    //
+    // ⚠ 시작 좌표를 홈으로 못 박지 않는다 — 조임이 두 배너를 서로에게 끌어다 놓은 채로 넘겨주기 때문이다.
+    //   여기서 홈으로 되돌리면 그 끌림이 한 프레임에 사라지고(눈에 걸리는 스냅), 쌓아 둔 압력도 함께 풀린다.
+    //   물러남은 지금 있는 자리에서 이어지고, 그래서 "당겨졌다 놓는" 반동으로 읽힌다.
     void StageClash(Sequence _seq, RectTransform _rect, Vector2 _home, Vector2 _step)
     {
         if (_rect == null) return;
 
         _rect.DOKill();
-        _rect.anchoredPosition = _home;
 
         Vector2 t_back = _step.sqrMagnitude > 0.0001f ? -_step.normalized * this.windUpDistance : Vector2.zero;
 
@@ -262,6 +387,116 @@ public class MatchmakingFx
                     _rect.DOAnchorPos(_home + _step, this.impactDuration).SetEase(Ease.InQuad));
         _seq.Insert(this.windUpDuration + this.impactDuration,
                     _rect.DOAnchorPos(_home, this.settleDuration).SetEase(Ease.OutBack));
+    }
+
+    // 서로에게 끌린다. 가속 곡선이라 처음엔 안 보이다가 끝에 가서 알아챈다 —
+    // 등속이면 "이동"으로 읽혀 충돌의 예비동작이 미리 소진된다.
+    //
+    // ⚠ 여기서는 DOKill도, 좌표 못 박기도 하지 않는다. 이 안무는 꽂힘(BuildFound) 뒤에 이어 붙는데
+    //   두 시퀀스가 같은 프레임에 지어지기 때문이다 — 그 자리에서 카드를 건드리면 방금 세운 슬램의
+    //   출발 자세(들려 있음)와 트윈이 통째로 지워져 상대가 제자리에서 그냥 나타난다.
+    //   목표만 절대 좌표로 주고, 출발은 트윈이 시작하는 시점(=슬램이 끝나 홈에 꽂힌 뒤)에 알아서 읽힌다.
+    void InsertDrift(Sequence _seq, RectTransform _rect, Vector2 _home, Vector2 _step, float _duration)
+    {
+        if (_rect == null || this.chargeDrift <= 0f) return;
+
+        Vector2 t_dir = _step.sqrMagnitude > 0.0001f ? _step.normalized : Vector2.zero;
+
+        _seq.Insert(0f, _rect.DOAnchorPos(_home + t_dir * this.chargeDrift, _duration).SetEase(Ease.InQuad));
+    }
+
+    // 화면이 점점 떨린다. DOShakePosition을 쓰지 않는 이유는 진폭이 고정이기 때문이다 —
+    // 여기서 필요한 것은 "일정하게 흔들림"이 아니라 "점점 커짐"이라, 진행도를 직접 몰아 진폭을 제곱으로 붙인다.
+    //
+    // 난수가 아니라 사인 두 겹이다. 난수는 프레임 레이트에 따라 세기가 달라 보이고, 무엇보다 되돌릴 기준이 없다.
+    void InsertTremor(Sequence _seq, RectTransform _root, float _duration)
+    {
+        if (_root == null || this.chargeShake <= 0f) return;
+
+        Vector2 t_home = _root.anchoredPosition;
+        this.m_rootHome    = t_home;
+        this.m_rootCaptured = true;
+
+        float t_progress = 0f;
+
+        _seq.Insert(0f, DOTween.To(() => t_progress, _v =>
+                                   {
+                                       t_progress = _v;
+
+                                       float t_time = _v * _duration;
+                                       float t_amp  = this.chargeShake * _v * _v;
+                                       float t_w    = this.chargeShakeFreq * Mathf.PI * 2f;
+
+                                       // 두 축의 주기를 어긋나게 둔다 — 같으면 대각선으로 미끄러지는 것으로 보인다.
+                                       _root.anchoredPosition = t_home + new Vector2(
+                                           Mathf.Sin(t_time * t_w)         * t_amp,
+                                           Mathf.Sin(t_time * t_w * 1.37f) * t_amp * 0.7f);
+                                   },
+                                   1f, _duration).SetEase(Ease.Linear));
+
+        // 충돌이 무대를 갈아타며 이 시퀀스를 죽인다 — 죽는 자리가 어디든 화면은 제자리로 돌려놓아야 한다.
+        _seq.OnKill(() => { if (_root != null) _root.anchoredPosition = t_home; });
+    }
+
+    // VS가 뜰 자리에 빛이 고인다. 아직 VS는 꺼져 있고, 충돌 프레임에 이 빛이 터지며 그 자리를 VS에게 넘긴다.
+    // 스캔 띠와 같은 자가설치 규약이다 — 프리팹에 배선할 자리를 만들지 않는다.
+    void InsertChargeGlow(Sequence _seq, RectTransform _root, Vector2 _vsAnchored, float _duration)
+    {
+        this.ClearCharge();
+
+        Sprite t_sprite = this.RaySprite;
+        if (_root == null || t_sprite == null || this.chargeGlowSize <= 0f) return;
+
+        var t_go = new GameObject("ChargeGlow", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var t_rt = (RectTransform)t_go.transform;
+
+        t_rt.SetParent(_root, false);
+
+        // VS와 같은 앵커(중앙)라 저작 좌표를 그대로 옮겨 쓸 수 있다 — VS가 꺼져 있어도 자리를 알 수 있는 이유다.
+        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
+        t_rt.anchoredPosition = _vsAnchored;
+        t_rt.sizeDelta        = new Vector2(this.chargeGlowSize, this.chargeGlowSize);
+        t_rt.localScale       = Vector3.one * this.chargeGlowFrom;
+
+        // 배너·VS보다 뒤, 딤보다는 앞. 맨 앞 형제로 보내면 딤(검정 89%) 뒤로 들어가 아예 안 보인다 —
+        // 이 화면의 딤은 0번 자식이라 "뒤로 보낸다"가 곧 "지운다"가 된다.
+        PlaceJustAboveDim(t_rt, this.dim.Target);
+
+        var t_image = t_go.GetComponent<Image>();
+        t_image.sprite         = t_sprite;
+        t_image.raycastTarget  = false;
+        t_image.preserveAspect = true;
+        t_image.color          = new Color(this.chargeGlowColor.r, this.chargeGlowColor.g, this.chargeGlowColor.b, 0f);
+
+        UiAdditive.Apply(t_go);
+
+        this.m_chargeGlow = t_image;
+
+        _seq.Insert(0f, t_rt.DOScale(this.chargeGlowTo, _duration).SetEase(Ease.InQuad));
+        _seq.Insert(0f, t_image.DOFade(this.chargeGlowAlpha, _duration).SetEase(Ease.InQuad));
+    }
+
+    // 고인 빛이 터진다. 조임 시퀀스는 이미 죽었으므로 빛의 트윈도 함께 죽어 있다 — 여기서 다시 건다.
+    void InsertGlowBurst(Sequence _seq, float _at)
+    {
+        Image t_glow = this.m_chargeGlow;
+        if (t_glow == null) return;
+
+        var t_rt = (RectTransform)t_glow.transform;
+
+        _seq.InsertCallback(_at, () =>
+        {
+            if (t_glow == null) return;
+
+            t_glow.DOKill();
+            t_rt.DOKill();
+
+            t_rt.DOScale(this.chargeGlowTo * this.releaseGlowScale, this.releaseGlowBurst).SetEase(Ease.OutQuad);
+            t_glow.DOFade(0f, this.releaseGlowBurst).SetEase(Ease.OutQuad);
+        });
+
+        // 다 터진 뒤에 걷는다. 남겨 두면 다음 매칭이 알파 0짜리 판을 물려받아 두 장이 겹친다.
+        _seq.InsertCallback(_at + this.releaseGlowBurst, this.ClearCharge);
     }
 
     void InsertDimPunch(Sequence _seq, float _at, float _level)
@@ -331,5 +566,23 @@ public class MatchmakingFx
         var t_c = _target.color;
         t_c.a = _alpha;
         _target.color = t_c;
+    }
+
+    /// <summary>
+    /// 자가설치한 빛을 딤 바로 앞에 꽂는다(uGUI는 나중 형제를 위에 그린다).
+    /// 딤이 없거나 다른 부모에 있으면 맨 뒤로 보낸다 — 가릴 것이 없으니 그게 안전한 쪽이다.
+    /// </summary>
+    /// <remarks>전환(MatchHandoffFx)의 빛줄기도 같은 규칙을 쓴다 — 두 곳 다 이 화면의 딤 아래로 숨으면 안 된다.
+    /// 이 화면의 자가설치 빛이 지켜야 할 규칙이 하나뿐이도록 여기가 단일 진실원이다.</remarks>
+    public static void PlaceJustAboveDim(RectTransform _node, Graphic _dim)
+    {
+        if (_dim != null && _dim.transform.parent == _node.parent)
+        {
+            _node.SetSiblingIndex(_dim.transform.GetSiblingIndex() + 1);
+
+            return;
+        }
+
+        _node.SetAsFirstSibling();
     }
 }

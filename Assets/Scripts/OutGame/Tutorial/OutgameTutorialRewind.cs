@@ -59,7 +59,6 @@ public static class OutgameTutorialRewind
         t_data.currency    = new CurrencySaveData();
         t_data.ownership   = new OwnershipSaveData();
         t_data.deck        = new DeckSaveData();
-        t_data.collection  = new CollectionSaveData();
         t_data.rank        = new RankSaveData();
         t_data.cardGrowth  = new CardGrowthSaveData();
         t_data.albumReward = new AlbumRewardSaveData();

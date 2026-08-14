@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: KeywordDeck
   displayName: "\uD0A4\uC6CC\uB4DC\uB371"
-  packArt: {fileID: 21300000, guid: d4ce91123c350714abb5804623482f6a, type: 3}
+  packArt: {fileID: 21300000, guid: 68419dc4956c8c64d9a94cd15bf69507, type: 3}
   priceType: 0
   price: 0
   drawCount: 6

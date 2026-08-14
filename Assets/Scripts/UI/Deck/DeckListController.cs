@@ -32,7 +32,13 @@ public class DeckListController : MonoBehaviour
     void Awake()
     {
         // 배선은 프리팹에서 한 번뿐이므로 등록도 한 번뿐 — OnEnable에 두면 탭 재진입마다 중복 등록된다.
-        if (editToggleButton != null) editToggleButton.onClick.AddListener(ToggleEditMode);
+        if (editToggleButton != null)
+        {
+            editToggleButton.onClick.AddListener(ToggleEditMode);
+
+            // 잠김 룩도 한 번만 붙인다 — 이후 해금 반영은 붙은 컴포넌트가 스스로 한다.
+            FeatureLockView.Attach(editToggleButton.gameObject, EOutgameFeature.DeckEditToggle);
+        }
     }
 
     void OnEnable()
@@ -84,6 +90,8 @@ public class DeckListController : MonoBehaviour
         //    결과적으로 +칸 바로 다음이 가장 최근에 만든 덱이다.
         var t_create = Instantiate(slotPrefab, content);
         t_create.BindCreate(!DeckSaveManager.IsFull && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate), OnCreateClicked);
+        // BindCreate 뒤에 붙인다 — 그 안에서 꺼지는 자식들까지 흑백 대상으로 잡을 이유가 없다.
+        FeatureLockView.Attach(t_create.gameObject, EOutgameFeature.DeckCreate);
         // 재빌드마다 새 인스턴스가 같은 키를 덮어쓰고, 파괴된 옛 항목은 TutorialAnchorRegistry.TryGet의 fake-null 정리가 걷어낸다 → Unregister 불필요.
         t_create.RegisterTutorialAnchor(EOutgameTutorialAnchor.DeckCreateSlot);
         m_slots.Add(t_create);

@@ -140,9 +140,9 @@ public class LoadingCoverView : MonoBehaviour
 
             if (OutgameTutorialRunner.TryGetCurrentStep(out var t_step) && t_step.Action == EOutgameTutorialAction.AutoBattle)
             {
-                // 러너가 전투 씬을 걸었으면 false를 준다(커밋·시나리오 주입 포함). AutoBattle 진입은 실제로 항상 씬을 걸므로
+                // 러너가 전투 씬을 걸었으면 Gated가 아니다(커밋·시나리오 주입 포함). AutoBattle 진입은 실제로 항상 씬을 걸므로
                 // 로비가 필요해지는 건 스텝 판정이 어긋난 예외뿐이다. 조기 return은 두지 않는다 — 커버를 걷어야 하니까.
-                t_needLobby = OutgameTutorialRunner.EnterCurrentStep();
+                t_needLobby = OutgameTutorialRunner.EnterCurrentStep() == EOutgameTutorialStepResult.Gated;
             }
 
             if (t_needLobby) yield return SceneManager.LoadSceneAsync(LobbyScene);

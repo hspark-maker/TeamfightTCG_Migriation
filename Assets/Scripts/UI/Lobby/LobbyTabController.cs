@@ -94,12 +94,8 @@ public class LobbyTabController : MonoBehaviour
                 TutorialAnchorRegistry.Register(this.tabs[i].tutorialAnchor, btn.transform as RectTransform, btn);
 
             // 잠금 표시도 같은 이유로 여기서 얹는다(프리팹에 못 붙이는 버튼이라).
-            if (btn != null && this.tabs[i].unlockFeature != EOutgameFeature.None)
-            {
-                var lockView = btn.GetComponent<FeatureLockView>();
-                if (lockView == null) lockView = btn.gameObject.AddComponent<FeatureLockView>();
-                lockView.Bind(this.tabs[i].unlockFeature);
-            }
+            // 진입 차단은 Select의 IsTabLocked가 따로 하므로 여기는 룩만 붙인다.
+            if (btn != null) FeatureLockView.Attach(btn.gameObject, this.tabs[i].unlockFeature);
 
             // 아직 안 본 트리거 튜토리얼이 남은 탭에 알림 점. 잠김 표시와 같은 이유로 여기서 얹는다.
             // 붙는 자리는 버튼이 아니라 아이콘이다 — 버튼 칸은 선택에 따라 폭이 늘었다 줄어서

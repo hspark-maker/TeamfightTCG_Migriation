@@ -7,7 +7,7 @@ using UnityEngine;
 // 진입점은 셋이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed,
 //   로비에 머문 채 지급하는 쪽(튜토리얼 보상)은 PlayNow.
 // 전투(BattleRewardHandoff)와 카드팩(CardPackRewardHandoff) 캐리어를 소비해
-//   재화 → 각 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(CurrencyGainEffectPlayer에 위임 — 도감 수확과 같은 손맛)
+//   재화 → 각 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(CurrencyGainEffectPlayer에 위임)
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
 // 두 단계를 동시에 재생한다(획득 하나를 두 번에 걸쳐 알리지 않는다).
 // 카드는 신규만 온다 — 중복분은 환급 재화가 대신하고, 그 환급은 개봉 화면이 자기 잔액 표시로 이미 받아 간다.

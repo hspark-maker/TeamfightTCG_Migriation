@@ -103,6 +103,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.UsesCards(_action))          yield return "cards";
         if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
+        if (TutorialStepDef.UsesFailurePolicy(_action))  yield return "onFailure";
         if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.

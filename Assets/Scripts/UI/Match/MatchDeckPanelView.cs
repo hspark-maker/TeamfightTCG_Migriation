@@ -117,13 +117,18 @@ public class MatchDeckPanelView : MonoBehaviour
         // OnComplete가 아니라 OnKill이다. 씬이 내려가며 안무가 잘리면 완료 콜백은 오지 않아 화면이 손을 못 받는 채로 남는다.
         t_intro.OnKill(() => SetInteractable(true));
 
-        return new MatchHandoffTargets(introFx.EnemySeat, introFx.MySeat, introFx.VersusSeat, t_intro);
+        // 루트를 통째로 넘긴다 — 전환이 이 화면을 당겨 들이는(확대→1) 축의 대상이 이것이다.
+        return new MatchHandoffTargets(introFx.VersusSeat, (RectTransform)transform, t_intro);
     }
 
     /// <summary>안무가 세운 중간값을 저작 상태로 되돌린다. 전환을 타지 않고 열리는 경로가 반쯤 없는 화면을 물려받지 않게.</summary>
     public void ResetIntro()
     {
         introFx.Reset(enemySlots, mySlots);
+
+        // 전환이 이 루트를 당겨 들이다 잘렸을 수 있다 — 배율을 되돌리지 않으면 다음 진입이 확대된 채로 열린다.
+        transform.DOKill();
+        transform.localScale = Vector3.one;
 
         // 파워는 안무가 0부터 세어 올린다 — 도중에 잘리면 0이 찍힌 채 굳는다.
         if (enemyPowerText != null) enemyPowerText.text = m_enemyPowerValue.ToString();

@@ -14,6 +14,6 @@ public enum EOutgameFeature
     DeckCreate         = 9,
     DeckEditToggle     = 10,
     DeckAutoEquip      = 11,
-    CollectionHarvest  = 12,
+    CollectionHarvest  = 12,   // 폐기(구 도감 수확) — 소비처 0. 값은 뒤 항목이 밀리지 않게 남긴다
     RankReward         = 13,
 }

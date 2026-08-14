@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // 덱 편집 화면 하단의 컬렉션 그리드(ScrollView에 부착). 소유 카드만 3열로 나열한다.
-// 도감(CollectionGridController)과 달리 미소유 카드는 아예 만들지 않는다 — 덱에 넣을 수 없는 카드라 자리만 차지한다.
+// 도감과 달리 미소유 카드는 아예 만들지 않는다 — 덱에 넣을 수 없는 카드라 자리만 차지한다.
 //
 // OnEnable에서 스스로 Build 하지 않는다. 유일한 트리거는 DeckEditController.Open()이다 —
 // 타일의 "장착중 딤"은 현재 편집중인 덱 상태를 알아야 정해지는데, 그 상태를 아는 쪽은 컨트롤러뿐이라

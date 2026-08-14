@@ -5,14 +5,14 @@ using System;
 public class UserSaveData
 {
     // 하위호환 — 슬롯·필드 추가는 VERSION 유지, 의미 변경·삭제·리네임 시에만 올린다
-    public const int VERSION = 1;
+    // 2: 도감 방치 생산 폐기로 collection 슬롯 삭제
+    public const int VERSION = 2;
 
     public int version = VERSION;
 
     public CurrencySaveData currency = new CurrencySaveData();
     public OwnershipSaveData ownership = new OwnershipSaveData();
     public DeckSaveData deck = new DeckSaveData();
-    public CollectionSaveData collection = new CollectionSaveData();
 
     public TutorialSaveData tutorial = new TutorialSaveData();
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// 로비 PlayBtn → 출전 덱 확정 → AI 대전 진입.
 /// 전투가 소비하는 DeckConfig.PlayerDeck을 채우는 지점은 이 진입점이 여는 덱 화면(MatchDeckShell) 하나뿐이다.
@@ -18,6 +19,11 @@ public class LobbyMatchLauncher : MonoBehaviour
     [Header("유효 덱 없음 안내")]
     [SerializeField] LobbyTabController lobbyTabController;
     [SerializeField] int deckTabIndex = 3;   // LobbyTabController.tabs: 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection
+
+    [Header("기능 잠금")]
+    [Tooltip("전투 진입 버튼(PlayBtn). 이 컴포넌트가 LobbyPlay 해금 여부로 interactable을 소유한다.\n" +
+             "미배선이면 잠김이 화면에 안 드러난다 — 진입 차단 자체는 StartAiBattle이 따로 막는다.")]
+    [SerializeField] Button playButton;
 
     const string BATTLE_SCENE = "BattleScene";
 
@@ -48,9 +54,23 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 마지막 튜토 전투가 끝나며 TutorialConfig가 꺼지고, 그 다음 판부터 이 문이 열린다.
     bool UseMatchmaking => !TutorialConfig.IsActive && matchShellPrefab != null;
 
+    void OnEnable()
+    {
+        OutgameFeatureLock.OnChanged += ApplyPlayLock;
+        ApplyPlayLock();
+    }
+
+    void OnDisable()
+    {
+        OutgameFeatureLock.OnChanged -= ApplyPlayLock;
+    }
+
     public void StartAiBattle()
     {
         if (m_running) return;
+
+        // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.LobbyPlay)) return;
 
         DeckConfig.SetMultiplayer(false);
 
@@ -172,6 +192,11 @@ public class LobbyMatchLauncher : MonoBehaviour
         DeckConfig.SetEnemyDeck(aiDeckConfig != null
             ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex)
             : new List<CardData>());
+    }
+
+    void ApplyPlayLock()
+    {
+        if (playButton != null) playButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.LobbyPlay);
     }
 
     void ShowNoDeckPopup()

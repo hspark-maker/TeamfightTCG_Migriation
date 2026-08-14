@@ -430,7 +430,11 @@ public static class DeckSaveManager
         }
         catch (Exception t_e)
         {
-            Debug.LogWarning($"[DeckSaveManager] 레거시 덱 파일 이관 실패: {t_e.Message}");
+            // 파일을 남겨 두면 다음 부트에도 같은 예외가 나 이관 대기가 영영 안 풀린다 — 그동안 스타터 덱과
+            // 튜토리얼 덱 지급이 계속 보류된다. 파싱이 깨진 파일은 어차피 못 살리므로 보관으로 옮기고 대기를 끝낸다.
+            Debug.LogWarning($"[DeckSaveManager] 레거시 덱 파일 이관 실패: {t_e.Message} — 보관 처리하고 대기를 끝낸다.");
+            LegacyMigrationPending = false;
+            ArchiveLegacyFile(t_path);
         }
     }
 

@@ -1,5 +1,8 @@
 # 도감 상단 테마 탭바 (Tab_Collection)
 
+> ⚠️ **이 시스템은 2026-08-14에 삭제됐다 — 신규 앨범(`UI/Album/` · `OutGame/Album/`)이 대체한다.** 이 문서가 지시하는 `Tab_Collection.prefab`과 테마 축(`CollectionThemes`/`CollectionThemeConfig`/`CollectionTabController`)은 코드·에셋째 사라졌으므로 **아래 저작 지시는 실행하지 말 것**. 현재 도감 탭(로비 idx 4)의 진실원은 `Tab_Collection_New.prefab` + [`STRUCTURE.md`의 "신규 도감 = 카드 앨범" 절](./STRUCTURE.md)이다.
+> 다만 *`LayoutElement.flexibleHeight`로 상단바:그리드 비율을 나누는 방식*, *`ChildForceExpandHeight`를 꺼야 배분식이 안 깨지는 이유*, *탭 폭을 좌표로 박지 않고 레이아웃에 맡기는 규약*은 여전히 유효한 uGUI 논거라 보존한다.
+
 수집형 도감처럼 **상단 탭으로 테마를 골라 그리드를 갈아끼우는** 구조. 지금 단계는 **와이어프레임까지**다
 (레퍼런스: Anime TCG Merge Battle 컬렉션 화면 상단바).
 

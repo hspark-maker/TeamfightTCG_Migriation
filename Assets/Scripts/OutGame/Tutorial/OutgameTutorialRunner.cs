@@ -63,6 +63,47 @@ public static class OutgameTutorialRunner
         WarnOnMisauthoredChapters();
     }
 
+    /// <summary>부트가 1회 부르는 재개 정정(EnsureData 이후). 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데
+    /// TutorialConfig가 꺼져 있으면 그 전제를 다시 세울 길이 없다 — 시나리오는 휘발성이라 부트에 사라지고
+    /// 복원 지점이 없다. 그 자리에 남으면 안내 앵커가 등록되지 않아 영구 정지고, 억지로 이어 붙여도 대본 아닌
+    /// 일반 전투가 된다. 그래서 좌표를 전투 진입 스텝으로 되감아 저작된 경로를 처음부터 다시 태운다
+    /// (Begin은 그 스텝의 실행자가 부른다). 스캔은 <b>같은 챕터 안</b>으로 한정한다 — 게이트 구간은 그 진입
+    /// 스텝과 같은 챕터에 저작된다는 전제이고, 전투를 마친 좌표는 이미 다음 챕터라 루프가 돌지 않는다.</summary>
+    public static void RewindToPendingBattleEntry()
+    {
+        // 세션 내 진행은 건드리지 않는다 — 전제가 살아 있으면 되감을 이유가 없다.
+        if (!IsRunning || TutorialConfig.IsActive) return;
+
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_step    = OutgameTutorialProgress.StepIndex;
+
+        for (int t_i = t_step - 1; t_i >= 0; t_i--)
+        {
+            if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
+
+            // 전투를 이미 치른 뒤의 좌표다 — 되감을 대본이 남아 있지 않다.
+            if (t_def.Action == EOutgameTutorialAction.BattleStart ||
+                t_def.Action == EOutgameTutorialAction.AutoBattle) return;
+
+            if (t_def.Action != EOutgameTutorialAction.BattleEntry) continue;
+
+            // 게이트를 거치지 않는 진입은 그 자리에서 씬을 떠나고(LeavesScene), 시나리오가 비면 Begin이 End로
+            // 떨어져 애초에 게이트가 열리지 않는다 — 어느 쪽도 되감아 재생할 화면이 없다.
+            if (!t_def.ShowDeckGate || t_def.Scenario == null) return;
+
+            Debug.LogWarning($"[OutgameTutorialRunner] 대본 전투 전에 앱이 닫혔습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 진입 스텝 {t_chapter}-{t_i}로 되감습니다.");
+
+            // 부트에서 UI 구독보다 먼저 도는 자리라 OnStepChanged는 쏘지 않는다(들을 구독자가 아직 없다).
+            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
+
+            // 매 부트 복구가 도는 좌표는 막힌 좌표가 아니다 — 정지 판정을 새 좌표에서 다시 세지 않으면
+            // 게이트 구간에서 세 번 껐다 켜는 것만으로 fail-open이 오발동한다.
+            OutgameTutorialProgress.ResetStallWatch();
+            OutgameFeatureLock.Refresh();
+            return;
+        }
+    }
+
     // 저작된 챕터의 스텝 수(범위 밖·빈 챕터는 0)
     public static int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
 
@@ -84,14 +125,11 @@ public static class OutgameTutorialRunner
             && t_chapter.TryGetStep(OutgameTutorialProgress.StepIndex, out _step);
     }
 
-    // 현재 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
-    public static bool EnterCurrentStep()
+    // 현재 스텝 진입 — 결말은 반환값이 말한다(Gated=게이트를 걸어야 함 / Advanced=좌표가 넘어감 / Failed=그 자리에 막힘)
+    public static EOutgameTutorialStepResult EnterCurrentStep()
     {
         if (!TryGetCurrentStep(out var t_step))
-        {
-            CloseOrWarnOnMissingStep();
-            return false;
-        }
+            return CloseOrWarnOnMissingStep();
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
         int t_index   = OutgameTutorialProgress.StepIndex;
@@ -185,14 +223,16 @@ public static class OutgameTutorialRunner
         return _nextChapter < ChapterCount;
     }
 
-    static void CloseOrWarnOnMissingStep()
+    // 좌표가 가리키는 스텝이 없는 경우의 수습. 좌표를 정정하거나 졸업으로 닫았으면 Advanced,
+    // 진행할 길이 없으면 Failed — 호출자가 그 둘을 구분해야 fail-open이 필요한 자리에만 선다.
+    static EOutgameTutorialStepResult CloseOrWarnOnMissingStep()
     {
-        if (!IsRunning) return;
+        if (!IsRunning) return EOutgameTutorialStepResult.Advanced;
 
         if (TotalStepCount == 0)
         {
             Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'에 저작된 스텝이 없습니다(챕터 {ChapterCount}개) — 진행할 수 없습니다.");
-            return;
+            return EOutgameTutorialStepResult.Failed;
         }
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
@@ -206,24 +246,25 @@ public static class OutgameTutorialRunner
                 Debug.LogWarning($"[OutgameTutorialRunner] 좌표 {t_chapter}-{t_index}이(가) '{s_data.name}'의 챕터 {ChapterCount}개 밖입니다 — 완료로 닫습니다.");
 
             CompleteSequence();
-            return;
+            return EOutgameTutorialStepResult.Advanced;
         }
 
         if (t_index < StepCountOf(t_chapter))
         {
             Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {t_chapter} 스텝 {t_index}이(가) 비어 있습니다 — 진행할 수 없습니다.");
-            return;
+            return EOutgameTutorialStepResult.Failed;
         }
 
         if (TryGetNext(t_chapter, StepCountOf(t_chapter) - 1, out int t_nextChapter, out int t_nextStep))
         {
             Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {t_chapter}이(가) {t_index}칸보다 짧습니다 — 좌표를 {t_nextChapter}-{t_nextStep}로 정정합니다(다음 씬에서 재개).");
             OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
-            return;
+            return EOutgameTutorialStepResult.Advanced;
         }
 
         Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 마지막 챕터 {t_chapter} 뒤에 남은 스텝이 없습니다 — 완료로 닫습니다.");
         CompleteSequence();
+        return EOutgameTutorialStepResult.Advanced;
     }
 
     static void WarnOnMisauthoredChapters()
@@ -235,6 +276,16 @@ public static class OutgameTutorialRunner
             {
                 Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}에 스텝이 없습니다 — 저작을 마치기 전엔 진행이 멈춥니다.");
                 continue;
+            }
+
+            // Halt는 좌표를 되돌려 재시도를 노리는 정책인데, 앵커도 완료 신호도 없는 스텝은
+            // 되돌려 봐야 이 부트에서 다시 세울 수단이 없다 — 그 자리에서 안내가 끝난다.
+            for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
+            {
+                if (!t_chapter.TryGetStep(t_s, out var t_def) || t_def.OnFailure != EOutgameTutorialFailure.Halt) continue;
+                if (t_def.Anchor != EOutgameTutorialAnchor.None || t_def.Completion != EOutgameTutorialCompletion.Auto) continue;
+
+                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {i}-{t_s}({t_def.Action})가 Halt인데 앵커도 완료 신호도 없습니다 — 되돌려도 이 부트에서 재개할 수단이 없습니다.");
             }
 
             // 마지막 챕터는 면제한다 — 그 끝은 다음 챕터로의 인계가 아니라 졸업이라 씬을 떠날 이유가 없다.

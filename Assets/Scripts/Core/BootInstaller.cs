@@ -8,10 +8,6 @@ public class BootInstaller : MonoBehaviour
 {
     // 카드 목록은 CardRegistry(SO)가 단일 진실원. 씬에 사본을 두면 카드 추가 시 한쪽만 갱신된다.
     [SerializeField] CardRegistry cardRegistry;
-    // 도감 레이아웃/생산 튜닝 SO. 미배선(null)이면 CatalogRows가 CardCatalog 3장씩 청크 fallback.
-    [SerializeField] CollectionLayoutConfig collectionLayout;
-    // 도감 테마 SO. 미배선(null)이면 CollectionThemes가 빈 목록(테마는 저작물이라 자동 생성 fallback이 없다).
-    [SerializeField] CollectionThemeConfig collectionThemes;
     // 카드 앨범(신규 도감) SO. 미배선(null)이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
     [SerializeField] CardAlbumConfig albumConfig;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
@@ -51,12 +47,6 @@ public class BootInstaller : MonoBehaviour
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
         PackSpec.Init();
 
-        // 도감 행 레이아웃/생산 튜닝 주입 — 카탈로그 카드를 참조하므로 SetSource 이후. null이면 청크 fallback.
-        CatalogRows.SetLayout(collectionLayout);
-
-        // 도감 테마 주입 — 테마는 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
-        CollectionThemes.SetSource(collectionThemes);
-
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CardAlbum.SetSource(albumConfig);
 
@@ -64,10 +54,6 @@ public class BootInstaller : MonoBehaviour
         OwnershipManager.Init();
         // Live 카탈로그 밖의 레거시 소유 키가 정리된 뒤 튜토리얼 완료 여부를 판정한다.
         OutgameTutorialProgress.Init();
-
-        // 도감 방치 생산 캐싱 — 세이브(DataSaveManager.Load)만 읽으므로 순서 무관하나
-        // 행 완성 판정(OwnershipManager)·행 해석(CatalogRows)을 lazy로 쓰므로 소유권 Init 뒤에 둔다.
-        CollectionProductionManager.Init();
 
         // 카드 성장 캐싱 — 세이브(DataSaveManager.Load)만 읽어 순서 무관하나, 곡선 조회가 Config를 쓰므로 주입이 먼저다.
         KeywordGrowthManager.SetConfig(keywordGrowthConfig);
@@ -112,6 +98,10 @@ public class BootInstaller : MonoBehaviour
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
         TriggeredTutorialRunner.EnsureData(triggeredTutorialData);
+
+        // 대본 전투가 연 화면 안에서 앱이 닫혔으면 좌표를 그 전투 진입 스텝으로 되감는다(부트당 1회는 여기가 유일).
+        // 디버그 되감기보다 앞이다 — 디버그가 찍은 좌표는 그대로 서야 한다.
+        OutgameTutorialRunner.RewindToPendingBattleEntry();
 
         // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.

@@ -5,7 +5,7 @@
 
 ## 이 파트는
 
-수집형 1vs1 카드배틀의 **아웃게임(메타) 레이어**: 세이브 · 재화 · 도감/소유 · 방치 생산 · 카드팩 · 보상.
+수집형 1vs1 카드배틀의 **아웃게임(메타) 레이어**: 세이브 · 재화 · 카드 소유 · 앨범(도감) · 카드팩 · 성장 · 랭크 · 보상.
 
 - 성장 루프·Phase 로드맵 → `@docs/OutGamePlan/OUTGAME_ROADMAP.md`
 - 승인·구조 기준 문서(진실원) → `@docs/OutGamePlan/STRUCTURE.md` (구조 변경 시 여기부터 갱신)
@@ -13,7 +13,7 @@
 ## 네이밍 (기술보다 개념)
 
 - 클래스/메서드는 **게임 도메인 동사·명사**로. 기술 용어는 인프라 레이어에만.
-  - 예: `CardPackOpener.TryPurchase`, `OwnershipManager.Grant`/`Revoke`, `CollectionProductionManager.Harvest`
+  - 예: `CardPackOpener.TryPurchase`, `OwnershipManager.Grant`/`Revoke`, `AlbumRewardManager.ClaimPage`
   - 인프라 예외: `JsonFileRepository`, `IRepository`
 - enum 접두사 `E` (`ECurrencyType`). 실패 가능 조회는 `Try*` + `out`.
 - 필드 접두사: `s_`(static) · `m_`(인스턴스) · `t_`(지역) · `_`(파라미터).

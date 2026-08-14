@@ -4,10 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 재화 획득 코인 연출의 단일 재생기. "코인이 흩어졌다 수치로 빨려들며 숫자가 오른다"는 조립 순서를 여기 한 곳에만 둔다.
-// 로비 진입(LobbyGainEffectDirector)·도감 수확이 같은 손맛을 쓰고, 각자 복붙하지 않게.
+// 로비 진입(LobbyGainEffectDirector)·보상 수령이 같은 손맛을 쓰고, 각자 복붙하지 않게.
 //
 // 경계: 지급·저장은 호출부가 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
-// 도감 화면·행 뷰는 탭 전환에 꺼지고 재생성되므로 연출기를 거기 두면 OnDisable이 비행 중 코인을 걷어간다 —
+// 탭 전환에 꺼지고 재생성되는 화면에 연출기를 두면 OnDisable이 비행 중 코인을 걷어간다 —
 // 그래서 항상 켜져 있는 연출 레이어에 자리 잡고, 없으면 TryGet이 런타임에 자가 설치한다(프리팹 편집 없이).
 //
 // 재생 상태는 전부 재화별이다. 골드와 다이아가 같이 들어와도 각자의 HUD로 각자의 코인이 날아간다.
@@ -105,12 +105,6 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// 획득 연출을 즉시 재생한다. 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다.
-    /// _from을 비우면 수치 자리에서 튀어 제자리로 돌아오고, 주면 그 지점에서 수치까지 날아간다.
-    /// </summary>
-    public void Play(RectTransform _from, CurrencyGain _gain) => this.Play(_from, _gain, null);
-
-    /// <summary>
     /// 도착할 HUD를 지정해 재생한다. 공용 창구(CurrencyHud.TryGet)가 내주는 대표 HUD가 지금 화면에서
     /// 보이지 않을 때 쓴다 — 겹쳐 뜨는 화면이 자기 잔액 표시로 코인을 받는 경우다.
     /// _hud가 null이거나 재화가 어긋나면 평소처럼 대표 HUD로 간다.
@@ -131,18 +125,6 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         this.m_current[t_slot]?.Play();
 
         return this.m_current[t_slot] != null;
-    }
-
-    /// <summary>여러 재화가 섞인 획득을 종류별로 나눠 동시에 재생한다.</summary>
-    public void Play(RectTransform _from, CurrencyGainBucket _gains)
-    {
-        if (_gains == null) return;
-
-        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-        {
-            var t_type = (ECurrencyType)t_i;
-            this.Play(_from, new CurrencyGain(t_type, _gains[t_type]));
-        }
     }
 
     // 종류 하나치 시퀀스. 배선을 못 찾거나 줄 것이 없으면 null.

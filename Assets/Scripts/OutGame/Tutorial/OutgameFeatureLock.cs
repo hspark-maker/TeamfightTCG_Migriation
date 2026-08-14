@@ -28,6 +28,10 @@ public static class OutgameFeatureLock
     static readonly HashSet<EOutgameFeature> s_locked = new HashSet<EOutgameFeature>();
 
     static bool s_forceUnlockAll;
+
+    // 진행이 막혔다는 판정(세이브하지 않는다 — 같은 좌표면 다음 부팅에 같은 판정이 다시 선다)
+    static bool s_stalled;
+
     static bool s_all;
     static bool s_valid;
 
@@ -59,6 +63,19 @@ public static class OutgameFeatureLock
         OnChanged?.Invoke();
     }
 
+    /// <summary>튜토리얼이 더 나아갈 수 없다고 판정됐다 — 남은 기능을 전부 연다(멱등).
+    ///
+    /// 해금이 진행 좌표에서 파생되는 탓에 진행 정지가 곧 기능 영구 잠금이 된다. 그러면 복구 수단(덱 편성·상점)까지
+    /// 함께 잠겨 유저가 스스로 빠져나올 길이 없다. 안내는 멈추더라도 게임은 계속할 수 있어야 한다.</summary>
+    public static void NotifyStalled()
+    {
+        if (s_stalled) return;
+
+        s_stalled = true;
+        s_valid   = false;
+        Refresh();
+    }
+
     static bool Recalculate()
     {
         int  t_chapter = OutgameTutorialProgress.ChapterIndex;
@@ -75,11 +92,11 @@ public static class OutgameFeatureLock
         s_unlocked.Clear();
         s_locked.Clear();
 
-        s_all = s_forceUnlockAll || !t_running;
+        s_all = s_forceUnlockAll || s_stalled || !t_running;
 
         // 일시 잠금은 해금 계산과 무관하게 지금 스텝 하나만 본다(전체 해금 상태에서도 걸린다).
-        // 디버그 전체 해금은 예외 — 그때는 아무것도 막지 않아야 검증이 된다.
-        if (!s_forceUnlockAll && t_running && OutgameTutorialRunner.TryGetCurrentStep(out var t_current))
+        // 디버그 전체 해금과 정지 판정은 예외 — 막힌 스텝이 닫아 둔 옆길까지 걷어야 탈출로가 실제로 열린다.
+        if (!s_forceUnlockAll && !s_stalled && t_running && OutgameTutorialRunner.TryGetCurrentStep(out var t_current))
             CollectLocks(t_current);
 
         if (s_all) return true;
