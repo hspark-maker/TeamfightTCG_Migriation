@@ -55,6 +55,11 @@ public class KeywordGrowthCellView : MonoBehaviour
         if (this.selectRing != null) this.selectRing.SetActive(_selected);
     }
 
+    public void PlayUpgradePop()
+    {
+        UiPunch.Play(this.selectButton != null ? this.selectButton.transform : transform);
+    }
+
     void HandleClick()
     {
         if (this.m_keyword == CardKeyword.None) return;

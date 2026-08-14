@@ -186,6 +186,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 5520888675207588624}
   - {fileID: 2370097273692674471}
   - {fileID: 2273258506968726868}
   - {fileID: 3695250772657339563}
@@ -1249,6 +1250,7 @@ MonoBehaviour:
   cellPrefab: {fileID: 4034562904161412494}
   closeButton: {fileID: 4872250689061053756}
   energyText: {fileID: 6697412126731881719}
+  energyIcon: {fileID: 8604212548086086245}
   nextBonusText: {fileID: 6480082780468690997}
   costText: {fileID: 5724273868123912611}
   upgradeButton: {fileID: 1043153396112434892}
@@ -1910,16 +1912,16 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6822551485801565164}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2370097273692674471}
+  m_Father: {fileID: 8332151842324728044}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 37}
   m_SizeDelta: {x: 210, y: 210}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3684988307441759101
@@ -1943,14 +1945,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.7075472, g: 0.7075472, b: 0.7075472, a: 1}
+  m_Color: {r: 0.73051584, g: 0.735849, b: 0.36445352, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 2a770cd73c606466cb957b77a70174f0, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 11e93247eb19648ec93fbb9710266af4, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2113,7 +2115,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8089639791160422809}
-  - {fileID: 5520888675207588624}
   m_Father: {fileID: 8332151842324728044}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
