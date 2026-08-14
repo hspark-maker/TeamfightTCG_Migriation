@@ -135,7 +135,12 @@ public static class HealVfx
         _proj.Release();
 
         if (_target != null && _target.BoundCard == _expectedCard)
+        {
+            // 도착 임팩트는 투사체가 실제로 날아온 이 경로에만 있다 — 공통 회복 파티클(Heal)은
+            // PlayHealEffect가 카드에 붙여 내므로, 힐러일 때만 임팩트가 한 겹 더 얹힌다.
+            BattleVfx.Play(BattleVfxId.HealerArrival, _target.transform.position, _target.VfxSortingLayerId);
             _target.PlayHealEffect(_amount, _consumeDeferred: true);
+        }
     }
 
     /// <summary>베지어 경로 비행. 트윈(DOPath) 대신 프레임 보간 — 진행 방향으로 매 프레임 눕혀야 하고,

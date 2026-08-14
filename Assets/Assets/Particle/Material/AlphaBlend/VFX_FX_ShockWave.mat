@@ -21,11 +21,10 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses:
-  - DepthOnly
+  - Picking
   - DepthNormalsOnly
   - UniversalGBuffer
   - SceneSelectionPass
-  - Picking
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3

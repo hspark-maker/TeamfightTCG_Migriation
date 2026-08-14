@@ -23,3 +23,16 @@
 - 설계 확정 후 다건 구현은 `Workflow`로 파이프라인(정찰→설계→시공(worktree 격리)→검수→통합). 단 Workflow는 토큰 많이 쓰므로 큰 구현 단계에서만.
 
 상세: 메모리 [[agent-team-workflow]], [[refactor-backlog]].
+
+## 기능 지도 — 코드 위치를 찾기 전에 먼저 읽어라
+
+자체 코드가 `Assets/Scripts/` 409파일 65,801줄이라 grep 부터 시작하면 헤맨다.
+**위치를 찾는 일이면 `.claude/orch-feature-map.md` 를 먼저 Read 해라.** 묻지 말고 읽어라.
+지도의 타입 이름은 후보다 — `rg` 로 존재를 확인하고 진행한다.
+서브에이전트(특히 `cavecrew-investigator`, 도메인 엔지니어)를 소집할 때도 이 파일을 먼저 읽으라고 지시해라.
+
+측정치(같은 질문 3개, 지도 있음/없음): 탐색 총 입력 토큰 -67%, 턴 -59%, 도구 호출 -67%.
+
+지도를 고쳤으면 `node .claude/check-feature-map.js` 로 타입 실재를 검증한다.
+
+파일 목록만 필요할 때는 `.claude/orch-pathmap.md` (orch 자동 생성, 약 15k 토큰 — 웬만하면 쓰지 말 것).

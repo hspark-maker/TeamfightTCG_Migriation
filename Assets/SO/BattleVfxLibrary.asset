@@ -14,21 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleVfxLibrary
   entries:
   - id: 1
-    prefab: {fileID: 6653574458408915337, guid: 4de4be9a8b431e0408056eb0ded4dd68, type: 3}
+    prefab: {fileID: 2536638742950671837, guid: 14d77752a60d7a24abd24047eaa54d12, type: 3}
     localOffset: {x: 0, y: -0.15, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
     sortingOrder: 25
+    scale: 1
     alignToDirection: 1
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 2
-    prefab: {fileID: 5865500980904363483, guid: 24bd12dd4dca10c48840972c3ae92522, type: 3}
+    prefab: {fileID: 7252720428228848482, guid: ba2edecf69a42b8488f0ac3a9a997daa, type: 3}
     localOffset: {x: 0, y: -0.1, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1
     sortingOrder: 25
+    scale: 1
     alignToDirection: 1
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -39,6 +41,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 2
     sortingOrder: 30
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -49,6 +52,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 2
     sortingOrder: 30
+    scale: 1
     alignToDirection: 1
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -59,6 +63,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
     sortingOrder: 30
+    scale: 1
     alignToDirection: 1
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -69,6 +74,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
     sortingOrder: 30
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -79,6 +85,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
     sortingOrder: 20
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -89,6 +96,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
     sortingOrder: 20
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -99,6 +107,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1
     sortingOrder: 31
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -109,6 +118,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
     sortingOrder: 35
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -119,6 +129,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 0
     sortingOrder: 33
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -129,6 +140,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 3
     sortingOrder: 33
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
@@ -139,6 +151,29 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
     sortingOrder: 33
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  - id: 21
+    prefab: {fileID: 3243629766246550057, guid: 084ba2c917e2be54fbd546c180faa982, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 3
+    sortingOrder: 25
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  - id: 20
+    prefab: {fileID: 7908370566408257381, guid: 4641403b512a9424c9334df038235f7c, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.5
+    sortingOrder: 31
+    scale: 1
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}

@@ -49,6 +49,12 @@ public class BattleTimingConfig : ScriptableObject
     // 투사체가 생성된 프레임에 그대로 파괴된다 — "발사체가 아예 안 나온다"의 정체.
     [SerializeField] float rangedFlightMin = 0.28f;
 
+    // 투사체 **속도** 배율. 비행 시간을 이 값으로 나눈다 — 2면 두 배 빠르고 절반 시간에 닿는다.
+    // 카드마다 저작된 AttackEffect.hitDelay를 전부 고치지 않고 원거리 체감만 조정하는 손잡이다.
+    // 히트 판정 시점도 같은 값에서 나오므로(AttackSequence.PlayRanged) 도착과 피해가 어긋나지 않는다.
+    // **0 이하면 1로 본다** — 새 필드라 기존 에셋은 0으로 역직렬화되고, 그대로 나누면 비행이 무한이 된다.
+    [Range(0f, 4f)] [SerializeField] float rangedSpeedMul = 1.5f;
+
     [Header("Cunning Exit (교활: 안개 → 한 바퀴 돌며 뒷면 → 덱으로)")]
     [SerializeField] float cunFogLead = 0.15f;   // 안개가 먼저 깔리는 시간
     [SerializeField] float cunSpinDur = 0.45f;   // 한 바퀴 도는 시간(중간에 뒷면으로 바뀐다)
@@ -202,6 +208,7 @@ public class BattleTimingConfig : ScriptableObject
     public float SwarmTravelDuration => swarmTravelDuration * SpeedFactor;
     public float SwarmImpactHold     => swarmImpactHold     * SpeedFactor;
     public float RangedFlightMin     => Mathf.Max(0f, rangedFlightMin) * SpeedFactor;
+    public float RangedSpeedMul      => rangedSpeedMul > 0f ? rangedSpeedMul : 1f;
     public float CunningFogLead      => cunFogLead          * SpeedFactor;
     public float CunningSpinDuration => cunSpinDur          * SpeedFactor;
     public float CunningExitDuration => cunExitDur          * SpeedFactor;

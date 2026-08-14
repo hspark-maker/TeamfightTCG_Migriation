@@ -708,7 +708,10 @@ public class CardInputController
         BattleBoardView.FadeCards(1f, t_targets.ToArray());
         foreach (var t_cv in t_targets)
             if (BattleRules.IsTaunt(t_cv.BoundCard))
+            {
                 t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
+                PlayTauntGuardVfx(t_cv);
+            }
 
         // 유효 타겟 각각에 공격 HP 프리뷰 표시(맞으면 남는 체력/치사 점멸).
         foreach (var t_cv in t_targets)
@@ -732,6 +735,16 @@ public class CardInputController
         if (_armed == null) return;
         BattleVfx.PlayAttached(BattleVfxId.TauntBlocked, _armed.transform,
                                _flip: false, _armed.VfxSortingLayerId);
+    }
+
+    /// <summary>도발 보유자 **본인**에게 뜨는 연출. 공격자 쪽 차단 표식(PlayTauntBlockedVfx)과 짝이라
+    /// 무장 순간 둘이 같이 난다 — 한쪽만 있으면 "왜 막혔는지"나 "누가 막는지" 중 하나가 빠진다.
+    /// flip은 같은 이유로 끈다(카드 위에 서는 표식이라 진영에 따라 뒤집으면 그림이 뒤집힌다).</summary>
+    static void PlayTauntGuardVfx(CardView _taunt)
+    {
+        if (_taunt == null) return;
+        BattleVfx.PlayAttached(BattleVfxId.TauntGuard, _taunt.transform,
+                               _flip: false, _taunt.VfxSortingLayerId);
     }
 
     // 적 카드 탭: 무장된 공격자가 있고 이 적이 유효 타깃이면 공격 발동(유효 필터는 공격자 기준).

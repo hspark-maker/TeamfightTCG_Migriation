@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+/**
+ * 기능 지도 검증 — `.claude/orch-feature-map.md` 에 적힌 타입·경로가 실제 소스에 있는지 본다.
+ *
+ * 왜 필요한가: 지도가 틀리면 없느니만 못하다. 잘못된 곳을 읽고 다시 찾게 되므로
+ * 지도 없을 때보다 비싸진다. 타입 이름이 바뀌거나 파일이 사라지면 여기서 즉시 실패해야 한다.
+ *
+ * 실행: node .claude/check-feature-map.js
+ */
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const MAP = path.join(root, ".claude", "orch-feature-map.md");
+const SRC = path.join(root, "Assets", "Scripts");
+
+assert.ok(fs.existsSync(MAP), "기능 지도가 없습니다: .claude/orch-feature-map.md");
+assert.ok(fs.existsSync(SRC), "자체 코드 디렉터리가 없습니다: Assets/Scripts");
+
+const map = fs.readFileSync(MAP, "utf8");
+
+/* 줄번호는 편집 한 번에 밀린다. 지도에 들어가면 안 된다. */
+assert.doesNotMatch(map, /\.cs:\d+/, "지도에 썩기 쉬운 줄번호가 있습니다");
+
+// 소스 전량을 한 번만 읽어 둔다(파일 409개, 매 심볼마다 재탐색하면 느리다).
+const files = [];
+(function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith(".cs")) files.push(full);
+  }
+})(SRC);
+const source = files.map((f) => fs.readFileSync(f, "utf8")).join("\n");
+const relFiles = new Set(files.map((f) => path.relative(SRC, f).split(path.sep).join("/")));
+const dirs = new Set();
+for (const f of relFiles) {
+  const parts = f.split("/");
+  for (let i = 1; i <= parts.length - 1; i++) dirs.add(parts.slice(0, i).join("/") + "/");
+}
+
+/* 백틱 안 토큰을 세 갈래로 나눈다.
+   - `Foo/Bar/` 로 끝나면 디렉터리
+   - `Foo/Bar.cs` 나 `Foo/Bar` 처럼 슬래시 + 대문자 시작이면 경로가 붙은 타입
+   - 그 외 대문자로 시작하는 식별자는 타입 이름 */
+const tokens = [...new Set([...map.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim()))];
+const missing = [];
+let okType = 0, okDir = 0, skipped = 0;
+
+for (const raw of tokens) {
+  if (raw.endsWith("/")) {
+    // 서드파티·범위 밖 디렉터리는 Assets/Scripts 아래가 아니므로 건너뛴다.
+    const key = raw.replace(/^Assets\/Scripts\//, "");
+    if (dirs.has(key)) { okDir++; continue; }
+    if (/^(Assets|Photon|Plugins|PurchasedAssets|AmplifyShaderEditor|GUIPackCartoon)\//.test(raw)) { skipped++; continue; }
+    missing.push(`디렉터리 없음: ${raw}`);
+    continue;
+  }
+  /* 경로가 섞인 표기(`UI/Battle/CardView`)는 마지막 조각이 타입이다.
+     `Type.Method` 표기는 **둘 다** 본다 — 타입만 보고 넘기면 메서드 이름이 바뀌어도 통과하고,
+     통째로 한 이름 취급하면 정규식에 안 맞아 조용히 건너뛴다(실제로 그렇게 새 이름을 놓쳤다). */
+  const last = raw.split("/").pop().replace(/\.cs$/, "");
+  const parts = last.split(".").filter(Boolean);
+  if (!parts.length || !/^[A-Z][A-Za-z0-9_]*$/.test(parts[0])) { skipped++; continue; }
+
+  const typeName = parts[0];
+  const declared = new RegExp(`\\b(?:class|struct|interface|enum)\\s+${typeName}\\b`);
+  if (!declared.test(source)) { missing.push(`타입 선언이 없음: ${raw} (${typeName})`); continue; }
+  okType++;
+
+  // 뒤따르는 멤버는 선언 형태가 제각각이라 등장 여부만 확인한다.
+  for (const member of parts.slice(1)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(member)) { skipped++; continue; }
+    if (new RegExp(`\\b${member}\\b`).test(source)) { okType++; continue; }
+    missing.push(`멤버가 소스에 없음: ${raw} (${member})`);
+  }
+  continue;
+}
+
+if (missing.length) {
+  for (const m of missing) console.error("  " + m);
+  assert.fail(`기능 지도에 실재하지 않는 항목 ${missing.length}건`);
+}
+
+/* 지도가 커지면 한 번에 읽는 이득이 사라진다. 약 26,000 bytes ≈ 7k 토큰이 분할 검토선이다. */
+const bytes = Buffer.byteLength(map);
+if (bytes > 26000) console.warn(`경고: 지도가 ${bytes} bytes 입니다. 기능 축으로 분할을 검토하세요.`);
+
+console.log(`feature map ok: 타입/심볼 ${okType}, 디렉터리 ${okDir}, 건너뜀 ${skipped}, 소스 ${files.length}파일, 지도 ${bytes} bytes`);
