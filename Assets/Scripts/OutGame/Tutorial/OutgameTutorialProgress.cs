@@ -48,6 +48,16 @@ public static class OutgameTutorialProgress
         Save();
     }
 
+    // 정지 판정을 지금 좌표에서 다시 세기 시작한다 — 부트마다 자가 복구가 도는 좌표는 "막힌 좌표"가 아니다.
+    public static void ResetStallWatch()
+    {
+        var t_slot = Slot;
+        t_slot.lastBootChapterIndex = t_slot.outgameChapterIndex;
+        t_slot.lastBootStepIndex    = t_slot.outgameChapterStepIndex;
+        t_slot.sameCoordBootCount   = 0;
+        Save();
+    }
+
     // 온보딩 완료 낙인
     public static void Complete()
     {

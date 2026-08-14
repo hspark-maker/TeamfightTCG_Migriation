@@ -56,7 +56,12 @@ public class TutorialStepDef
     [SerializeField] List<CardData> cards = new List<CardData>();
 
     [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
-           + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다")]
+           + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다.\n"
+           + "⚠ 이걸 켠 BattleEntry는 반드시 같은 챕터 안에서 BattleStart(또는 AutoBattle)로 닫는다.\n"
+           + "· 그 사이 스텝들은 이 화면이 열려 있어야만 성립하는데, 화면을 여는 시나리오는 앱을 끄면 사라진다 —\n"
+           + "  그래서 그 구간에서 재부팅하면 좌표가 이 진입 스텝으로 되감기고 사이 스텝이 다시 재생된다.\n"
+           + "· 따라서 그 사이에는 되풀이돼도 안전한 스텝(안내·클릭 대기)만 둔다. 재화를 쓰거나 보상을 주는\n"
+           + "  스텝(AutoPurchase·CardGrant 등)을 끼우면 재개할 때마다 중복 실행된다")]
     [SerializeField] bool showDeckGate;
 
     [Tooltip("덱 목록에 표시할 이름")]
