@@ -7,9 +7,10 @@ public static class TutorialStepExecutor
 {
     const string BattleScene = "BattleScene";
 
-    // 보상 오버레이 제목. 지금은 자리마다 하나씩이라 상수로 두지만, 늘어나면 스텝 저작값으로 올린다.
-    const string RewardTitle = "첫 승리 보너스";
-    const string CardSetTitle = "기본 카드 세트";
+    // 보상 오버레이 제목의 폴백. 정본은 스텝 저작(rewardTitle)이고, 비어 있을 때만 이 문구가 선다 —
+    // 제목 없는 보상 화면을 띄우느니 덜 맞는 문구라도 서는 편이 낫다.
+    const string DefaultRewardTitle  = "첫 승리 보너스";
+    const string DefaultCardSetTitle = "기본 카드 세트";
 
     // 스텝 진입 — 무엇을 하고 끝났는지는 반환값이 말한다(호출자가 좌표 델타로 되짚지 않게)
     public static EOutgameTutorialStepResult Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -202,7 +203,7 @@ public static class TutorialStepExecutor
 
         // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(RewardTitle, t_card, () => AcquireCard(t_card, t_origin));
+        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin));
         return EOutgameTutorialStepResult.Gated;
     }
 
@@ -248,7 +249,7 @@ public static class TutorialStepExecutor
             return FailAfterSetGrant(_step, _context, t_cards, "보상 오버레이·획득 연출 없음(로비 씬 배선 확인)");
 
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(CardSetTitle, t_cards, () => AcquireCards(t_cards, t_origin));
+        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin));
         return EOutgameTutorialStepResult.Gated;
     }
 
@@ -287,6 +288,13 @@ public static class TutorialStepExecutor
         }
 
         return t_ids;
+    }
+
+    static string TitleOf(TutorialStepDef _step, string _fallback)
+    {
+        string t_title = _step.RewardTitle;
+
+        return string.IsNullOrEmpty(t_title) ? _fallback : t_title;
     }
 
     static string Where(OutgameTutorialStepContext _context) => $"스텝 {_context.ChapterIndex}-{_context.StepIndex}";

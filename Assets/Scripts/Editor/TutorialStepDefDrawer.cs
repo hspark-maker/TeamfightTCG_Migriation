@@ -19,7 +19,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         float t_height = EditorGUIUtility.singleLineHeight + RowGap;
         if (!_property.isExpanded) return t_height;
 
-        foreach (var t_name in VisibleFields(ActionOf(_property)))
+        foreach (var t_name in VisibleFields(ActionOf(_property), AnchorOf(_property)))
         {
             var t_field = _property.FindPropertyRelative(t_name);
             if (t_field == null) continue;
@@ -46,7 +46,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         EditorGUI.indentLevel++;
         float t_y = _rect.y + t_lineHeight + RowGap;
 
-        foreach (var t_name in VisibleFields(t_action))
+        foreach (var t_name in VisibleFields(t_action, AnchorOf(_property)))
         {
             var t_field = _property.FindPropertyRelative(t_name);
             if (t_field == null) continue;
@@ -90,18 +90,22 @@ public class TutorialStepDefDrawer : PropertyDrawer
     }
 
     // 액션이 실제로 쓰는 필드만, 저작 순서대로. 안 쓰는 필드는 값이 남아 있어도 런타임이 무시한다.
-    static IEnumerable<string> VisibleFields(EOutgameTutorialAction _action)
+    // 앵커까지 받는 이유: 대상이 여럿인 앵커(도감 칸)만 "어느 것"을 저작받는다.
+    static IEnumerable<string> VisibleFields(EOutgameTutorialAction _action, EOutgameTutorialAnchor _anchor)
     {
         yield return "action";
 
         if (TutorialStepDef.UsesAnchor(_action))         yield return "anchor";
+        if (TutorialStepDef.UsesAnchor(_action) && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
         if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
         if (TutorialStepDef.UsesMessagePlacement(_action)) yield return "messageAtBottom";
+        if (TutorialStepDef.UsesFreeOfCharge(_action))   yield return "freeOfCharge";
         if (TutorialStepDef.UsesPack(_action))           yield return "pack";
         if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
         if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
         if (TutorialStepDef.UsesCard(_action))           yield return "card";
         if (TutorialStepDef.UsesCards(_action))          yield return "cards";
+        if (TutorialStepDef.UsesRewardTitle(_action))    yield return "rewardTitle";
         if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
         if (TutorialStepDef.UsesFailurePolicy(_action))  yield return "onFailure";
@@ -119,14 +123,18 @@ public class TutorialStepDefDrawer : PropertyDrawer
         return t_field != null ? (EOutgameTutorialAction)t_field.enumValueIndex : EOutgameTutorialAction.WaitClick;
     }
 
+    // 저작된 앵커 그대로(액션이 앵커를 쓰는지는 보지 않는다 — 필드 노출 판정에 쓰이는 값이라 저작값이 곧 답이다)
+    static EOutgameTutorialAnchor AnchorOf(SerializedProperty _property)
+    {
+        var t_field = _property.FindPropertyRelative("anchor");
+        return t_field != null ? (EOutgameTutorialAnchor)t_field.enumValueIndex : EOutgameTutorialAnchor.None;
+    }
+
     static string AnchorLabel(SerializedProperty _property, EOutgameTutorialAction _action)
     {
         if (!TutorialStepDef.UsesAnchor(_action)) return "—";
 
-        var t_field = _property.FindPropertyRelative("anchor");
-        if (t_field == null) return "—";
-
-        var t_anchor = (EOutgameTutorialAnchor)t_field.enumValueIndex;
+        var t_anchor = AnchorOf(_property);
         return t_anchor == EOutgameTutorialAnchor.None ? "—" : t_anchor.ToString();
     }
 

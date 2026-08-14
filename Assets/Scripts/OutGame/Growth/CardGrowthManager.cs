@@ -13,10 +13,11 @@ public static class CardGrowthManager
 
     static bool s_initialized;
 
-    // 안내가 대준 무료 강화를 이미 썼는가(**강화 스텝 축 전용** — 진화 관문은 아래 레벨 판정이 따로 본다).
-    // 안내가 공짜로 내주는 강화는 **한 방뿐**이고,
+    // 안내가 대준 무료 한 방을 이미 쓴 스텝. 무료는 스텝당 **한 방뿐**이고,
     // 그 뒤의 "한 번 더"부터는 유저가 실제 비용을 보고 판단해야 한다(세이브하지 않는다 — 재시작하면 다시 한 방).
-    static bool s_tutorialFreeUsed;
+    // 플래그가 아니라 스텝 참조인 이유: 무료를 저작하는 스텝이 여럿이라(강화 안내·첫 진화 안내)
+    // 하나로 묶으면 앞 스텝이 쓴 한 방 때문에 뒤 스텝의 저작이 조용히 무시된다.
+    static TutorialStepDef s_freeSpentStep;
 
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
@@ -162,8 +163,8 @@ public static class CardGrowthManager
 
             // 안내가 대준 한 방을 여기서 소진한다. 실패에는 걸지 않는다 —
             // 실패로 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
-            // 진화 관문 축은 이 플래그를 쓰지 않는다(관문 한 칸으로 좁혀 둬 소진할 상태가 없다).
-            if (IsGuidedEnhanceFreeStep()) s_tutorialFreeUsed = true;
+            if (IsTutorialFreeStep() && OutgameTutorialGuide.TryGetCurrentStep(out var t_freeStep))
+                s_freeSpentStep = t_freeStep;
         }
 
         CurrencyManager.Save();
@@ -210,7 +211,7 @@ public static class CardGrowthManager
     public static void DebugResetAll()
     {
         s_growth.Clear();
-        s_tutorialFreeUsed = false;   // 강화를 처음부터 다시 보는 상태라 안내가 대주던 한 방도 되살린다
+        s_freeSpentStep = null;   // 강화를 처음부터 다시 보는 상태라 안내가 대주던 한 방도 되살린다
         Save();
         OnGrowthChanged?.Invoke();
     }
@@ -222,28 +223,19 @@ public static class CardGrowthManager
     {
         if (!Config.TryGetStep(_card, _level, out _step)) return false;
 
-        if (IsTutorialFreeStep(_level))
+        if (IsTutorialFreeStep())
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
 
         return true;
     }
 
-    // 안내가 대주는 한 방은 축이 둘이다 — 소진 플래그를 쓰는 강화 스텝 축과, 관문 한 칸만 여는 진화 축.
-    static bool IsTutorialFreeStep(int _level)
-        => IsGuidedEnhanceFreeStep() || IsFirstEvolutionFreeStep(_level);
-
-    // 지금 이 한 방을 안내가 대신 내주는가(강화 스텝에 서 있고 + 아직 안 쓴 상태).
-    // 어느 러너가 도는지는 OutgameTutorialGuide가 답한다 — 강화 안내는 온보딩에서 트리거 튜토(도감 첫 진입)로
-    // 옮겨 갔고, 한쪽만 물으면 안내가 시킨 첫 강화에 유저 골드가 나간다.
-    static bool IsGuidedEnhanceFreeStep()
-        => !s_tutorialFreeUsed
-        && OutgameTutorialGuide.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);
-
-    // 첫 진화 안내가 도는 동안 **1차 진화 관문 한 칸만** 0원.
-    // 런 전체로 넓히면 진화 다음 칸(Lv6)까지 새어 결과판의 "한 번 더"가 공짜가 된다 — 그 조회도 이 퍼널을 지난다.
-    static bool IsFirstEvolutionFreeStep(int _level)
-        => TriggeredTutorialRunner.IsRunningTrigger(EOutgameTutorialTrigger.FirstEvolutionReady)
-        && Config.IsEvolutionLevel(_level) && Config.EvolutionStageAt(_level) == 1;
+    // 지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
+    // 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다 — 강화든 진화든 저작이 같은 축으로 답한다.
+    // 어느 러너가 도는지는 OutgameTutorialGuide가 답한다(강화 안내는 온보딩에서 트리거 튜토로 옮겨 갔다).
+    static bool IsTutorialFreeStep()
+        => OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
+        && t_step.FreeOfCharge
+        && t_step != s_freeSpentStep;
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.

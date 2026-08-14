@@ -48,6 +48,21 @@ public class TutorialStepDef
            + "⚠ 표기만 바꾼다. 실제 결제는 팩 SO의 price가 그대로 한다 — 무료로 보이게 하려면 그 팩의 가격이 0이어야 한다")]
     [SerializeField] string packPriceLabel;
 
+    [Tooltip("도감 앵커(테마 칸·카드 칸)가 **어느 것**을 가리킬지. 앵커 키는 자리 종류만 말하고 도감엔 그 자리가 여럿이라, "
+           + "이 카드가 든 테마·칸을 화면이 찾아 지목한다.\n"
+           + "비우면 화면이 대신 고른다 — 아직 안 꽂은 카드가 있는 첫 테마 / 그 페이지의 첫 소유 칸.\n"
+           + "⚠ 유저가 그 카드를 아직 소유하지 않았으면 가리킬 칸이 없어 폴백으로 떨어진다(안내는 멈추지 않는다)")]
+    [SerializeField] CardData anchorCard;
+
+    [Tooltip("이 스텝이 시키는 성장 한 방을 안내가 대신 내준다(값 0).\n"
+           + "표시·활성 판정·실제 소모가 모두 이 값을 함께 본다 — 화면엔 100골드가 뜨는데 0이 나가는 일은 없다.\n"
+           + "성공하면 그 자리에서 소진된다(실패는 소진하지 않는다 — 안내가 시킨 강화를 유저 돈으로 다시 하게 두지 않는다).\n"
+           + "다음 스텝으로 넘어가면 저절로 풀린다")]
+    [SerializeField] bool freeOfCharge;
+
+    [Tooltip("CardGrant·CardSetGrant: 보상 화면에 띄울 제목. 비우면 기본 문구를 쓴다")]
+    [SerializeField] string rewardTitle;
+
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
 
@@ -106,6 +121,15 @@ public class TutorialStepDef
     public TutorialScenarioData Scenario => scenario;
 
     public CardData Card => card;
+
+    // 안내가 지목한 카드(그 자리를 카드로 고르는 앵커에서만 — 아니면 저작값이 남아 있어도 없는 것으로 본다)
+    public CardData AnchorCard => UsesAnchorCard(Anchor) ? anchorCard : null;
+
+    // 이 스텝이 시키는 성장 한 방이 무료인가(값 저작이 없는 액션은 저작값이 남아 있어도 유료로 본다)
+    public bool FreeOfCharge => UsesFreeOfCharge(action) && freeOfCharge;
+
+    // 보상 화면 제목(비우면 호출자가 기본 문구를 쓴다)
+    public string RewardTitle => UsesRewardTitle(action) ? rewardTitle : null;
 
     public IReadOnlyList<CardData> Cards => cards;
 
@@ -212,6 +236,20 @@ public class TutorialStepDef
     // 이 액션이 문구 자리를 저작하는가(딤 탭으로 넘기는 설명 스텝뿐 — 나머지는 타깃을 피해 자리가 정해진다)
     public static bool UsesMessagePlacement(EOutgameTutorialAction _action)
         => _action == EOutgameTutorialAction.Message;
+
+    // 이 앵커가 "그 자리 중 어느 것"까지 저작받아야 하는가.
+    // 도감은 같은 종류의 자리가 여럿이라 키만으로는 대상이 정해지지 않는다(버튼 하나짜리 앵커는 물을 것이 없다).
+    public static bool UsesAnchorCard(EOutgameTutorialAnchor _anchor)
+        => _anchor == EOutgameTutorialAnchor.AlbumThemeCell
+        || _anchor == EOutgameTutorialAnchor.AlbumCardSlot;
+
+    // 이 액션이 값을 무는가(안내가 대신 내줄 수 있는 자리 = 성장 한 방을 시키는 스텝)
+    public static bool UsesFreeOfCharge(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.WaitEnhance;
+
+    // 이 액션이 보상 화면을 세우는가
+    public static bool UsesRewardTitle(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.CardGrant || _action == EOutgameTutorialAction.CardSetGrant;
 
     // 이 액션이 딤을 걸 수 있는가
     public static bool UsesDim(EOutgameTutorialAction _action) =>
