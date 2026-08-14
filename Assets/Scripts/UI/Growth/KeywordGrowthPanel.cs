@@ -30,6 +30,9 @@ public class KeywordGrowthPanel : MonoBehaviour
     [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
+    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기. 예전 Root/Dim 저작값과 같은 0.75다.")]
+    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.75f;
+
     readonly List<KeywordGrowthCellView> m_cells = new List<KeywordGrowthCellView>();
 
     // 칸 생성 여부. 대상 키워드는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
@@ -81,6 +84,9 @@ public class KeywordGrowthPanel : MonoBehaviour
 
         KeywordGrowthManager.OnChanged    -= this.RefreshAll;
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
+
+        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
+        ScreenDim.Hide(this);
 
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -264,6 +270,10 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     void SetVisible(bool _visible)
     {
+        // 암막은 공용 ScreenDim(Full)이 그린다 — Root/Dim은 알파 0으로 남아 뒤쪽 입력만 삼킨다.
+        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
+        else ScreenDim.Hide(this);
+
         this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
 
