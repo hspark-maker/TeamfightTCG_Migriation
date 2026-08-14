@@ -18,6 +18,12 @@ public class TutorialSaveData
     public int outgameChapterIndex;
     public int outgameChapterStepIndex;
 
+    // 직전 부팅 때의 진행 좌표와 그 좌표가 이어진 부팅 횟수 — 진행이 막혔는지 판정하는 데만 쓴다.
+    // -1은 "아직 한 번도 관측하지 않음". 0으로 두면 시작 좌표(0-0)와 우연히 같아 첫 부팅이 재관측으로 세어진다.
+    public int lastBootChapterIndex = -1;
+    public int lastBootStepIndex    = -1;
+    public int sameCoordBootCount;
+
     // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름)
     public List<string> completedTriggers = new List<string>();
 }

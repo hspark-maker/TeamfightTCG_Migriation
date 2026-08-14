@@ -143,10 +143,12 @@ public static class TutorialStepExecutor
             return false;
         }
 
+        // 되돌리지 않는다 — 이 스텝은 앵커가 없어 되돌리면 이 부트에서 다시 세울 신호가 없다(= 영구 정지).
+        // 덱은 유저가 직접 만들 수 있으니 지급만 건너뛰고 진행한다.
         if (DeckSaveManager.LegacyMigrationPending)
         {
-            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 레거시 덱 이관 미완료 — 지급 보류(다음 부트에 재시도).");
-            _context.Rollback();
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 레거시 덱 이관 미완료 — 지급 생략하고 진행.");
+            _context.CompleteIfLast();
             return false;
         }
 
@@ -160,10 +162,11 @@ public static class TutorialStepExecutor
             return false;
         }
 
+        // 목록이 가득 찼다면 이미 쓸 덱이 여섯 개 있다는 뜻이라 튜토 덱 없이도 전투가 된다 — 위와 같은 이유로 멈추지 않는다.
         if (!DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out _))
         {
-            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 덱 삽입 실패 — 목록이 가득 찼거나 세이브 미로드(DeckSaveManager 로그 확인). 진행도를 되돌린다.");
-            _context.Rollback();
+            Debug.LogWarning($"[TutorialStepExecutor] {t_where} 덱 삽입 실패 — 목록이 가득 찼거나 세이브 미로드(DeckSaveManager 로그 확인). 지급 생략하고 진행.");
+            _context.CompleteIfLast();
             return false;
         }
 

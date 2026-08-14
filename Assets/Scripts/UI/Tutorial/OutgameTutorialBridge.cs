@@ -106,6 +106,14 @@ public class OutgameTutorialBridge : MonoBehaviour
 
             if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
 
+            // 좌표가 그대로면 이 씬에서 이 스텝을 다시 세울 방법이 없다 — 위 CloseGate가 m_step을 비워 앵커 등록 통지도
+            // 못 깨운다. 진행은 여기서 멈추므로 기능 잠금만이라도 걷어 유저가 게임을 이어갈 수 있게 한다.
+            if (!t_moved && OutgameTutorialRunner.IsRunning)
+            {
+                Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {t_beforeChapter}-{t_beforeStep} 진입 실패로 진행이 멈춥니다 — 기능 잠금을 해제합니다.");
+                OutgameFeatureLock.NotifyStalled();
+            }
+
             return;
         }
 
