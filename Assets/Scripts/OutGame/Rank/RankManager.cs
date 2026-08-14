@@ -115,9 +115,9 @@ public static class RankManager
 
         int t_index = t_config.ResolveTierIndex(t_points);
 
-        // 티어 임계치는 하한이 아니다 — 티어 사이 강등은 열어 두고, 진입 뒤의 바닥만 첫 티어로 막는다.
-        // 언랭크로 되돌아가지 않게 하려는 것: 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
-        long t_floor = IsRanked ? t_config.FirstTierPoints : 0;
+        // 단계 강등은 열어 두되 바닥은 현재 등급 진입선 — 등급이 내려가면 카드팩 풀(CardPackData.ResolvePool)이 같이 하향된다.
+        // 언랭크(첫 티어 미도달)만 0 — 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
+        long t_floor = IsRanked ? t_config.GradeFloorPoints(t_points) : 0;
 
         // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
         // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
