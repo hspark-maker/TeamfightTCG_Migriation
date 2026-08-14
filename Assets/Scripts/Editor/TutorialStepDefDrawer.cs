@@ -96,6 +96,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
 
         if (TutorialStepDef.UsesAnchor(_action))         yield return "anchor";
         if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
+        if (TutorialStepDef.UsesMessagePlacement(_action)) yield return "messageAtBottom";
         if (TutorialStepDef.UsesPack(_action))           yield return "pack";
         if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
         if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";

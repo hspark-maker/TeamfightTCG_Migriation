@@ -186,10 +186,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// <summary>이 창이 닫혔다. 유저가 스스로 화면을 정리하기를 기다리는 쪽(온보딩 안내)이 듣는다.</summary>
     public static event Action OnAnyClosed;
 
-    /// <summary>강화 결과판에 읽을 것이 다 떠오른 순간. 결과판은 원래 탭해야 걷히는데, 안내가 접혀 있는 구간
-    /// (튜토리얼)에서는 "탭하라"고 말해 줄 자리가 없다 — 그쪽이 이 신호를 듣고 <see cref="CloseEnhanceResult"/>로
-    /// 대신 걷는다.</summary>
-    public static event Action OnAnyEnhanceResultReady;
+    /// <summary>강화 결과판에 읽을 것이 다 떠오른 순간(성공·실패 모두). 결과판이 아직 떠 있는 이 시점이
+    /// 바깥(튜토리얼)이 결과 화면을 무대로 쓸 수 있는 유일한 자리다 — 그 위에 말을 얹든,
+    /// <see cref="CloseEnhanceResult"/>로 대신 걷든 그쪽이 정한다.
+    /// 판정을 함께 넘기는 이유는 성공과 실패가 다른 길로 가기 때문이다(실패는 같은 자리에서 다시 누르는 일이다).</summary>
+    public static event Action<EnhanceResult> OnAnyEnhanceResultReady;
 
     /// <summary>떠 있는 강화 결과판을 밖에서 걷는다(튜토리얼 자동 복귀). 탭과 **같은 길**로 흘려보내므로
     /// 무대 복귀·완료 신호(<see cref="OnAnyEnhanceSettled"/>)가 그대로 이어진다. 떠 있지 않으면 아무 일도 없다.</summary>
@@ -409,10 +410,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 안 뜬 화면까지 넘으려 들면 값만 커지고 넘을 이유는 없다.
     ///
     /// 순서를 실제로 정하는 것은 루트 캔버스이거나 overrideSorting을 켠 캔버스뿐이다.
-    /// 그 외 중첩 캔버스의 sortingOrder는 그려지는 자리와 무관한 값이라 후보에서 뺀다.</summary>
+    /// 그 외 중첩 캔버스의 sortingOrder는 그려지는 자리와 무관한 값이라 후보에서 뺀다.
+    ///
+    /// 튜토리얼 게이트(350)만은 넘을 대상이 아니라 예외다 — 이 창을 **가리키는** 층이라 항상 위에 있어야 한다.
+    /// 세면 상세가 그 위로 올라타, 상세를 무대로 쓰는 안내(강화·진화)의 딤·문구가 상세 뒤에 깔려 보이지 않는다.</summary>
     int TopSortingOrder()
     {
         int t_top = 0;
+
+        OutgameTutorialGateUI t_gate = OutgameTutorialGateUI.Instance;
 
         Canvas[] t_canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
         for (int t_i = 0; t_i < t_canvases.Length; t_i++)
@@ -420,6 +426,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             Canvas t_canvas = t_canvases[t_i];
             if (t_canvas == null || t_canvas == this.m_sortingCanvas) continue;
             if (t_canvas != t_canvas.rootCanvas && !t_canvas.overrideSorting) continue;
+            if (t_gate != null && t_canvas.transform.IsChildOf(t_gate.transform)) continue;
 
             t_top = Mathf.Max(t_top, t_canvas.sortingOrder);
         }
@@ -1544,7 +1551,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 탭을 기다리지 않고 스스로 걷혀 상세로 돌아가는 판(= 이을 것이 없는 자리).
         bool t_selfReturn = t_nextIsEvolve || t_unlocked;
-        bool t_canRetry   = t_hasNext && !t_selfReturn && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
+
+        // 안내가 시킨 한 방은 이 화면이 종착지다 — 여기에 "한 번 더"를 되살리면 안내가 얹은 말 옆에
+        // 되돌아가는 문이 하나 더 서고, 유저는 그걸 눌러 안내 밖으로 샌다.
+        bool t_guided = OutgameTutorialGuide.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);
+
+        // 하단 바를 되살리지 않는 자리. 스스로 걷히는 것은 t_selfReturn뿐이다 —
+        // 안내가 얹은 말은 유저가 읽고 탭할 때까지 판이 서 있어야 한다.
+        bool t_barStaysDown = t_selfReturn || t_guided;
+        bool t_canRetry     = t_hasNext && !t_barStaysDown && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
 
         var t_line = new EnhanceResultLine(_result.Outcome,
                                            _fromHp, DeckPower.MaxHpOf(_card),
@@ -1552,8 +1567,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                                            // 못 잇는 이유가 잔액이 아니라 규칙이면 안내도 없다 —
                                            // GrowthNotice를 그대로 흘리면 "다이아가 부족"이라는 거짓 문장이 뜬다.
                                            t_canRetry,
-                                           t_selfReturn ? string.Empty
-                                                        : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
+                                           t_barStaysDown ? string.Empty
+                                                          : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
                                            // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
@@ -1566,10 +1581,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 어느 버튼이 설지는 이미 공개 시점의 RefreshGrowth가 다음 단계 기준으로 정해뒀다 —
         // 여기선 그 판정을 다시 하지 않고 둘 다 손봐 서 있는 쪽이 알아서 맞게 둔다.
         //
-        // 스스로 걷히는 판에서는 아무것도 되살리지 않는다. 바가 걷힌 채로 남고(아래 _onRowsDone) 판이 곧 물러나므로,
-        // 여기서 값·글자를 갈아두면 복귀 도중 한 프레임 비칠 뿐이다.
+        // 바가 걷힌 채로 남는 판에서는 아무것도 되살리지 않는다(아래 _onRowsDone) —
+        // 여기서 값·글자를 갈아두면 보이지도 않을 것을 준비하는 셈이고, 스스로 걷히는 판이면 복귀 도중 한 프레임 비친다.
         SetActionsEnabled(t_canRetry);
-        if (!t_selfReturn)
+        if (!t_barStaysDown)
         {
             ApplyCost(t_hasNext, t_next);
             SetActionLabel(true);
@@ -1592,13 +1607,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               // 읽을 것이 다 나왔다 — 이제 하단 바가 돌아와 "한 번 더"를 받는다.
                               // 결과판을 탭해 연출을 당긴 경우에도 같은 시점으로 앞당겨져 온다.
                               //
-                              // 스스로 걷히는 판에서는 걷은 채로 둔다. 받을 "한 번 더"가 없어서인데, 못 누르는 버튼을
-                              // 굳이 띄웠다가 상세에서 다시 켜면 그 깜빡임이 못 누르는 사실보다 더 눈에 걸린다.
+                              // 스스로 걷히는 판·안내가 끝맺는 판에서는 걷은 채로 둔다. 받을 "한 번 더"가 없어서인데,
+                              // 못 누르는 버튼을 굳이 띄웠다가 상세에서 다시 켜면 그 깜빡임이 못 누르는 사실보다 더 눈에 걸린다.
                               // 바는 복귀가 끝나는 _onFinished가 되돌린다(멱등).
                               _onRowsDone: () =>
                               {
-                                  if (!t_selfReturn) ShowBottomBar();
-                                  OnAnyEnhanceResultReady?.Invoke();
+                                  if (!t_barStaysDown) ShowBottomBar();
+                                  OnAnyEnhanceResultReady?.Invoke(_result);
                               },
                               // 이을 것이 없는 판이라 탭을 기다리지 않는다 — 읽을 것이 다 나오면 스스로 상세로 돌아간다.
                               _autoReturn: t_selfReturn);

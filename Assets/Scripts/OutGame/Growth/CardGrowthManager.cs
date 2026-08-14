@@ -233,12 +233,11 @@ public static class CardGrowthManager
         => IsGuidedEnhanceFreeStep() || IsFirstEvolutionFreeStep(_level);
 
     // 지금 이 한 방을 안내가 대신 내주는가(강화 스텝에 서 있고 + 아직 안 쓴 상태).
-    // 두 러너를 함께 보는 이유: 강화 안내는 온보딩에서 트리거 튜토(도감 첫 진입)로 옮겨 갔고,
-    // 한쪽만 물으면 안내가 시킨 첫 강화에 유저 골드가 나간다. 무료 한 방은 둘을 합쳐 여전히 하나뿐이다.
+    // 어느 러너가 도는지는 OutgameTutorialGuide가 답한다 — 강화 안내는 온보딩에서 트리거 튜토(도감 첫 진입)로
+    // 옮겨 갔고, 한쪽만 물으면 안내가 시킨 첫 강화에 유저 골드가 나간다.
     static bool IsGuidedEnhanceFreeStep()
         => !s_tutorialFreeUsed
-        && (OutgameTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance)
-         || TriggeredTutorialRunner.IsCurrentAction(EOutgameTutorialAction.WaitEnhance));
+        && OutgameTutorialGuide.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);
 
     // 첫 진화 안내가 도는 동안 **1차 진화 관문 한 칸만** 0원.
     // 런 전체로 넓히면 진화 다음 칸(Lv6)까지 새어 결과판의 "한 번 더"가 공짜가 된다 — 그 조회도 이 퍼널을 지난다.

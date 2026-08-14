@@ -15,6 +15,11 @@ public class TutorialStepDef
     [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
     [TextArea][SerializeField] string guideMessage;
 
+    [Tooltip("문구를 화면 중앙이 아니라 하단에 놓는다.\n"
+           + "무대 한가운데에 보여 줘야 할 것이 있는 자리에 켠다 — 예: 강화 결과 화면에 얹는 말은 카드를 가리면 안 된다.\n"
+           + "설명(Message) 스텝에만 뜬다. 다른 스텝의 문구 자리는 타깃을 피해 스스로 정해진다")]
+    [SerializeField] bool messageAtBottom;
+
     [Tooltip("이 스텝에 도달하면 열리는 기능(누적). 이 스텝이 지목하는 앵커의 기능은 반드시 여기까지 포함되어야 한다")]
     [SerializeField] List<EOutgameFeature> unlocks = new List<EOutgameFeature>();
 
@@ -80,6 +85,9 @@ public class TutorialStepDef
     public EOutgameTutorialAction Action => action;
 
     public string GuideMessage => guideMessage;
+
+    // 문구를 하단에 두는가(자리 저작이 없는 액션은 저작값이 남아 있어도 중앙으로 본다)
+    public bool MessageAtBottom => UsesMessagePlacement(action) && messageAtBottom;
 
     // 이 스텝까지 진행하면 열리는 기능(해금은 누적)
     public IReadOnlyList<EOutgameFeature> Unlocks => unlocks;
@@ -200,6 +208,10 @@ public class TutorialStepDef
 
         _ => true,
     };
+
+    // 이 액션이 문구 자리를 저작하는가(딤 탭으로 넘기는 설명 스텝뿐 — 나머지는 타깃을 피해 자리가 정해진다)
+    public static bool UsesMessagePlacement(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.Message;
 
     // 이 액션이 딤을 걸 수 있는가
     public static bool UsesDim(EOutgameTutorialAction _action) =>
