@@ -7,6 +7,9 @@ public static class OutgameTutorialRunner
 {
     static OutgameTutorialData s_data;
 
+    // 재개 정정은 프로세스당 1회다 — 씬을 넘나들 때마다 다시 판정하면 진행 중인 좌표를 되감는다.
+    static bool s_resumeChecked;
+
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
@@ -87,6 +90,12 @@ public static class OutgameTutorialRunner
     // 현재 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
     public static bool EnterCurrentStep()
     {
+        if (!s_resumeChecked)
+        {
+            s_resumeChecked = true;
+            RewindToPendingBattleEntry();
+        }
+
         if (!TryGetCurrentStep(out var t_step))
         {
             CloseOrWarnOnMissingStep();
@@ -158,6 +167,39 @@ public static class OutgameTutorialRunner
 
             for (int t_s = 0; t_s <= t_last; t_s++)
                 if (t_chapter.TryGetStep(t_s, out var t_asset)) yield return t_asset;
+        }
+    }
+
+    /// <summary>부트당 1회 도는 재개 정정. 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데 TutorialConfig가
+    /// 꺼져 있으면 그 전제를 다시 세울 길이 없다 — 시나리오는 휘발성이라 부트에 사라지고 복원 지점이 없다.
+    /// 그 자리에 남으면 안내 앵커가 등록되지 않아 영구 정지고, 억지로 이어 붙여도 대본 아닌 일반 전투가 된다.
+    /// 그래서 좌표를 전투 진입 스텝으로 되감아 저작된 경로를 처음부터 다시 태운다(Begin은 그 스텝이 부른다).</summary>
+    static void RewindToPendingBattleEntry()
+    {
+        // 세션 내 진행은 건드리지 않는다 — 전제가 살아 있으면 되감을 이유가 없다.
+        if (!IsRunning || TutorialConfig.IsActive) return;
+
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_step    = OutgameTutorialProgress.StepIndex;
+
+        for (int t_i = t_step - 1; t_i >= 0; t_i--)
+        {
+            if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
+
+            // 전투를 이미 치른 뒤의 좌표다 — 되감을 대본이 남아 있지 않다.
+            if (t_def.Action == EOutgameTutorialAction.BattleStart ||
+                t_def.Action == EOutgameTutorialAction.AutoBattle) return;
+
+            if (t_def.Action != EOutgameTutorialAction.BattleEntry) continue;
+
+            // 게이트를 거치지 않는 진입은 그 자리에서 씬을 떠난다(LeavesScene) — 재개할 화면 자체가 없다.
+            if (!t_def.ShowDeckGate || t_def.Scenario == null) return;
+
+            Debug.LogWarning($"[OutgameTutorialRunner] 대본 전투 전에 앱이 닫혔습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 진입 스텝 {t_chapter}-{t_i}로 되감습니다.");
+
+            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
+            OutgameFeatureLock.Refresh();
+            return;
         }
     }
 
