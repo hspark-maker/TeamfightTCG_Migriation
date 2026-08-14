@@ -107,14 +107,14 @@ public static class TriggeredTutorialRunner
     public static bool IsCurrentAction(EOutgameTutorialAction _action)
         => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
 
-    // 현재 스텝 진입 — 반환 true = 이 씬에서 앵커에 게이트를 걸어야 함
-    public static bool EnterCurrentStep()
+    // 현재 스텝 진입 — 결말은 반환값이 말한다(OutgameTutorialRunner와 같은 규약)
+    public static EOutgameTutorialStepResult EnterCurrentStep()
     {
         if (!TryGetCurrentStep(out var t_step))
         {
             Debug.LogWarning($"[TriggeredTutorialRunner] '{s_active.Label}'({s_active.Trigger})의 스텝 {s_index}이(가) 비어 있습니다 — 완주로 닫습니다.");
             Finish();
-            return false;
+            return EOutgameTutorialStepResult.Advanced;
         }
 
         bool t_isLast = s_index + 1 >= s_active.StepCount;

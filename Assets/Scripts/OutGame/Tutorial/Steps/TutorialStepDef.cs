@@ -67,6 +67,16 @@ public class TutorialStepDef
     [Tooltip("덱 목록에 표시할 이름")]
     [SerializeField] string deckName;
 
+    [Tooltip("이 스텝의 실행이 실패했을 때(참조 미배선·화면 부재·구매 실패 등) 어떻게 끝낼지.\n"
+           + "· Skip = 실패한 일만 생략하고 다음 칸으로 넘어간다. 안내는 계속 흐른다.\n"
+           + "· Halt = 좌표를 이 칸으로 되돌려 그 자리에 세운다. 재시도는 다음 부팅이다.\n"
+           + "  멈춘다고 게임까지 막히지는 않는다 — 정지로 판정되는 즉시 남은 기능이 전부 열린다(안내만 끝난다).\n"
+           + "⚠ 뒤 스텝이 이 스텝의 결과에 기대는 경우에만 Halt를 쓴다(예: 여기서 산 팩을 다음 스텝이 개봉).\n"
+           + "  그렇지 않으면 Skip이 낫다 — 안내가 끝까지 흐르는 편이 유저에게 이롭다.\n"
+           + "⚠ 실패 분기가 있는 액션(AutoPurchase·DeckGrant·CardGrant·CardSetGrant)에서만 뜬다. "
+           + "다른 액션은 실패해도 이 값을 보지 않는다")]
+    [SerializeField] EOutgameTutorialFailure onFailure;
+
     public EOutgameTutorialAction Action => action;
 
     public string GuideMessage => guideMessage;
@@ -94,6 +104,9 @@ public class TutorialStepDef
     public bool ShowDeckGate => showDeckGate;
 
     public string DeckName => deckName;
+
+    // 실패했을 때의 결말(실패 분기가 없는 액션은 저작값이 남아 있어도 Skip으로 본다)
+    public EOutgameTutorialFailure OnFailure => UsesFailurePolicy(action) ? onFailure : EOutgameTutorialFailure.Skip;
 
     // 안내 타깃(앵커를 쓰지 않는 액션은 저작값이 남아 있어도 None으로 본다)
     public EOutgameTutorialAnchor Anchor => UsesAnchor(action) ? anchor : EOutgameTutorialAnchor.None;
@@ -223,6 +236,18 @@ public class TutorialStepDef
     // 이 액션이 덱 이름을 쓰는가
     public static bool UsesDeckName(EOutgameTutorialAction _action) =>
         _action == EOutgameTutorialAction.DeckGrant;
+
+    // 이 액션이 실패 정책을 쓰는가 — 실행기가 실제로 실패 분기를 갖는 액션만.
+    // 대기형은 실패 개념이 없고, 전투 진입 계열은 시나리오가 비어도 일반 전투로 그냥 들어간다(실패로 치지 않는다).
+    public static bool UsesFailurePolicy(EOutgameTutorialAction _action) => _action switch
+    {
+        EOutgameTutorialAction.AutoPurchase or
+        EOutgameTutorialAction.DeckGrant    or
+        EOutgameTutorialAction.CardGrant    or
+        EOutgameTutorialAction.CardSetGrant => true,
+
+        _ => false,
+    };
 
     // 이 액션이 카드 한 장을 쓰는가(지급 대상)
     public static bool UsesCard(EOutgameTutorialAction _action) =>

@@ -159,6 +159,7 @@ public class OutgameTutorialStepWindow : EditorWindow
         if (_def.Locks != null && _def.Locks.Count > 0) Append(t_sb, $"잠금 {string.Join(",", _def.Locks)}");
         if (!_def.UseDim)                               Append(t_sb, "딤 없음");
         if (_def.LeavesScene)                           Append(t_sb, "씬 이탈");
+        if (_def.OnFailure == EOutgameTutorialFailure.Halt) Append(t_sb, "실패 시 정지");
 
         return t_sb.ToString();
     }

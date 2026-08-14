@@ -98,18 +98,18 @@ public class TriggeredTutorialBridge : MonoBehaviour
         // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면 옛 안내가 화면에 남는다.
         CloseGate();
 
-        // 진입 "전" 스텝·좌표. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
+        // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
         TriggeredTutorialRunner.TryGetCurrentStep(out var t_entering);
-        int t_before = TriggeredTutorialRunner.StepIndex;
 
-        // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!TriggeredTutorialRunner.EnterCurrentStep())
+        var t_result = TriggeredTutorialRunner.EnterCurrentStep();
+
+        // Gated가 아니면 이 씬에서 걸 게이트가 없다. 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 영영
+        // 진입하지 못하므로 같은 루프에서 이어 진입시킨다 — 완주로 닫힌 뒤라면 이을 곳이 없다.
+        if (t_result != EOutgameTutorialStepResult.Gated)
         {
-            // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 영영 진입하지 못한다 → 같은 루프에서 이어 진입시킨다.
-            // 좌표가 안 움직였으면 잇지 않는다 — 같은 실패를 되풀이한다.
-            bool t_moved = TriggeredTutorialRunner.IsRunning && t_before != TriggeredTutorialRunner.StepIndex;
-
-            if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+            if (t_result == EOutgameTutorialStepResult.Advanced && TriggeredTutorialRunner.IsRunning
+                && t_entering != null && !t_entering.LeavesScene)
+                m_pendingApply = true;
 
             return;
         }

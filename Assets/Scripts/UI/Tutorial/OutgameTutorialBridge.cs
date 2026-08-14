@@ -90,27 +90,28 @@ public class OutgameTutorialBridge : MonoBehaviour
         // (Runner.OnStepChanged는 NotifyStepSatisfied에서만 발화해 그 경로를 놓친다).
         OutgameFeatureLock.Refresh();
 
-        // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
+        // 진입 "전" 스텝과 좌표. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
         OutgameTutorialRunner.TryGetCurrentStep(out var t_entering);
-        int t_beforeChapter = OutgameTutorialProgress.ChapterIndex;
-        int t_beforeStep    = OutgameTutorialProgress.StepIndex;
+        int t_atChapter = OutgameTutorialProgress.ChapterIndex;
+        int t_atStep    = OutgameTutorialProgress.StepIndex;
 
-        // false = 자동 스텝·씬 전환 등 이 씬에서 걸 게이트가 없음.
-        if (!OutgameTutorialRunner.EnterCurrentStep())
+        var t_result = OutgameTutorialRunner.EnterCurrentStep();
+
+        // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
+        // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
+        if (t_result == EOutgameTutorialStepResult.Advanced)
         {
-            // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
-            // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
-            // 좌표가 안 움직였으면(= Enter가 롤백했거나 애초에 커밋을 못 했다) 잇지 않는다 — 같은 실패를 되풀이한다.
-            bool t_moved = t_beforeChapter != OutgameTutorialProgress.ChapterIndex
-                        || t_beforeStep    != OutgameTutorialProgress.StepIndex;
+            if (t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+            return;
+        }
 
-            if (t_moved && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
-
-            // 좌표가 그대로면 이 씬에서 이 스텝을 다시 세울 방법이 없다 — 위 CloseGate가 m_step을 비워 앵커 등록 통지도
-            // 못 깨운다. 진행은 여기서 멈추므로 기능 잠금만이라도 걷어 유저가 게임을 이어갈 수 있게 한다.
-            if (!t_moved && OutgameTutorialRunner.IsRunning)
+        // 좌표가 그대로라 이 씬에서 이 스텝을 다시 세울 방법이 없다 — 위 CloseGate가 m_step을 비워 앵커 등록 통지도
+        // 못 깨운다. 진행은 여기서 멈추므로 기능 잠금만이라도 걷어 유저가 게임을 이어갈 수 있게 한다.
+        if (t_result == EOutgameTutorialStepResult.Failed)
+        {
+            if (OutgameTutorialRunner.IsRunning)
             {
-                Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {t_beforeChapter}-{t_beforeStep} 진입 실패로 진행이 멈춥니다 — 기능 잠금을 해제합니다.");
+                Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {t_atChapter}-{t_atStep} 진입 실패로 진행이 멈춥니다 — 기능 잠금을 해제합니다.");
                 OutgameFeatureLock.NotifyStalled();
             }
 
