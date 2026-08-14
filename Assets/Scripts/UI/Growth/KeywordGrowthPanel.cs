@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -14,6 +15,7 @@ public class KeywordGrowthPanel : MonoBehaviour
     [SerializeField] KeywordGrowthCellView cellPrefab;  // 칸 프리팹
     [SerializeField] Button closeButton;
     [SerializeField] TMP_Text energyText;
+    [SerializeField] Image energyIcon;
 
     [Header("하단 액션")]
     [SerializeField] TMP_Text nextBonusText;            // "다음 보너스: +1"
@@ -36,6 +38,10 @@ public class KeywordGrowthPanel : MonoBehaviour
     // 하단 버튼이 올릴 대상. None = 미선택(버튼 비활성).
     CardKeyword m_selected = CardKeyword.None;
 
+    CoinBurstEffect m_upgradeBurst;
+    Sequence m_upgradeFx;
+    bool m_fxPlaying;
+
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
@@ -47,6 +53,7 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     public void Close()
     {
+        this.KillUpgradeFx();
         this.SetVisible(false);
     }
 
@@ -70,6 +77,8 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     void OnDisable()
     {
+        this.KillUpgradeFx();
+
         KeywordGrowthManager.OnChanged    -= this.RefreshAll;
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
 
@@ -121,16 +130,39 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     void OnCellSelected(CardKeyword _keyword)
     {
+        if (this.m_fxPlaying) return;
+
         this.m_selected = _keyword;
         this.RefreshAll();
     }
 
     void OnUpgradePressed()
     {
-        if (this.m_selected == CardKeyword.None) return;
+        if (this.m_fxPlaying || this.m_selected == CardKeyword.None) return;
+
+        if (!KeywordGrowthManager.TryGetNextStep(this.m_selected, out GrowthStep t_step)) return;
+
+        KeywordGrowthCellView t_cell = null;
+        for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
+            if (this.m_cells[t_i] != null && this.m_cells[t_i].Keyword == this.m_selected)
+            {
+                t_cell = this.m_cells[t_i];
+                break;
+            }
 
         // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshAll을 유발한다.
-        KeywordGrowthManager.TryEnhance(this.m_selected);
+        this.m_fxPlaying = true;
+        this.RefreshAction();
+
+        EnhanceResult t_result = KeywordGrowthManager.TryEnhance(this.m_selected);
+        if (t_result.Outcome != EEnhanceOutcome.Success)
+        {
+            this.m_fxPlaying = false;
+            this.RefreshAction();
+            return;
+        }
+
+        this.PlayUpgradeFx(t_step.Cost, t_cell);
     }
 
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
@@ -167,9 +199,67 @@ public class KeywordGrowthPanel : MonoBehaviour
             if (t_hasNext) this.costText.text = t_next.Cost.ToString("N0");
         }
 
-        bool t_affordable = t_hasNext && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
-        if (this.upgradeButton != null) this.upgradeButton.interactable = t_affordable;
-        if (this.upgradeGroup != null) this.upgradeGroup.alpha = t_affordable ? 1f : this.disabledAlpha;
+        bool t_affordable  = t_hasNext && CurrencyManager.CanAfford(t_next.Currency, t_next.Cost);
+        bool t_interactive = t_affordable && !this.m_fxPlaying;
+        if (this.upgradeButton != null) this.upgradeButton.interactable = t_interactive;
+        if (this.upgradeGroup != null) this.upgradeGroup.alpha = t_interactive ? 1f : this.disabledAlpha;
+    }
+
+    void PlayUpgradeFx(long _cost, KeywordGrowthCellView _cell)
+    {
+        CoinBurstEffect t_burst = this.EnsureUpgradeBurst();
+        int t_count = (int)System.Math.Min(_cost, 50L);
+        t_burst.Configure(this.energyIcon != null ? this.energyIcon.sprite : null,
+                          this.energyIcon != null ? this.energyIcon.rectTransform : null,
+                          this.upgradeButton != null ? (RectTransform)this.upgradeButton.transform : null,
+                          t_count, _scatterRadius: 0f, _gatherDuration: 0.32f,
+                          _coinSize: 54f, _coinInterval: 0.02f,
+                          _scatterDuration: 0.05f, _arcHeight: 70f);
+
+        Sequence t_sequence = t_burst.BuildBurst((_arrived, _total) =>
+        {
+            if (_arrived == _total) _cell?.PlayUpgradePop();
+        });
+        this.m_upgradeFx = t_sequence;
+        t_sequence.SetLink(this.ResolveTarget(), LinkBehaviour.KillOnDisable);
+        t_sequence.OnKill(() => this.HandleUpgradeFxKilled(t_sequence));
+        t_sequence.Play();
+    }
+
+    CoinBurstEffect EnsureUpgradeBurst()
+    {
+        if (this.m_upgradeBurst != null) return this.m_upgradeBurst;
+
+        var t_go = new GameObject("UpgradeEnergyBurst", typeof(RectTransform), typeof(CoinBurstEffect));
+        var t_rt = (RectTransform)t_go.transform;
+        t_rt.SetParent(this.root != null ? this.root.transform : transform, false);
+        t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
+        t_rt.sizeDelta = Vector2.zero;
+        t_rt.localPosition = Vector3.zero;
+
+        this.m_upgradeBurst = t_go.GetComponent<CoinBurstEffect>();
+        return this.m_upgradeBurst;
+    }
+
+    void KillUpgradeFx()
+    {
+        Sequence t_sequence = this.m_upgradeFx;
+        this.m_upgradeFx = null;
+        if (t_sequence != null && t_sequence.IsActive()) t_sequence.Kill();
+
+        // Kill은 BuildBurst 마지막의 ClearCoins 콜백을 건너뛴다. 연출 노드까지 걷어 취소 중이던 아이콘을 남기지 않는다.
+        if (this.m_upgradeBurst != null) Destroy(this.m_upgradeBurst.gameObject);
+        this.m_upgradeBurst = null;
+        this.m_fxPlaying = false;
+    }
+
+    void HandleUpgradeFxKilled(Sequence _sequence)
+    {
+        if (this.m_upgradeFx != _sequence) return;
+
+        this.m_upgradeFx = null;
+        this.m_fxPlaying = false;
+        if (this.isActiveAndEnabled) this.RefreshAction();
     }
 
     void SetVisible(bool _visible)

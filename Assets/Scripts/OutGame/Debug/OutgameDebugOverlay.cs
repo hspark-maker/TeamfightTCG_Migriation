@@ -170,6 +170,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Button($"+G {CurrencyManager.Gold}",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantGold();
         if (GUILayout.Button($"+D {CurrencyManager.Diamond}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantDiamond();
+        if (GUILayout.Button($"+E {CurrencyManager.Energy}",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantEnergy();
         GUILayout.EndHorizontal();
     }
 

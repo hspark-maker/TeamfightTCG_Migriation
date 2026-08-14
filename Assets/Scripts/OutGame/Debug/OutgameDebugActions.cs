@@ -7,10 +7,13 @@ public static class OutgameDebugActions
     // 디버그 지급 단위
     public const long DEBUG_GOLD_AMOUNT    = 1000;
     public const long DEBUG_DIAMOND_AMOUNT = 1000;
+    public const long DEBUG_ENERGY_AMOUNT  = 1000;
 
     public static void GrantGold() => GrantCurrency(ECurrencyType.Gold, DEBUG_GOLD_AMOUNT);
 
     public static void GrantDiamond() => GrantCurrency(ECurrencyType.Diamond, DEBUG_DIAMOND_AMOUNT);
+
+    public static void GrantEnergy() => GrantCurrency(ECurrencyType.Energy, DEBUG_ENERGY_AMOUNT);
 
     // 재화 즉시 지급 + 즉시 영속
     public static void GrantCurrency(ECurrencyType _type, long _amount)

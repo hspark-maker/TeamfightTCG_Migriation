@@ -74,7 +74,7 @@ public class RewardClaimPopup : MonoBehaviour
     /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
     /// 실패(팝업이 뜬 사이 상태가 바뀜)면 분출 없이 닫는다.
     /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm)
+    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm, bool _claimOnDim = false)
     {
         this.m_onConfirm = _onConfirm;
 
@@ -94,8 +94,16 @@ public class RewardClaimPopup : MonoBehaviour
 
         if (this.claimButton != null)
         {
+            this.claimButton.gameObject.SetActive(!_claimOnDim);
             this.claimButton.onClick.RemoveAllListeners(); // 재표시마다 중복 등록 방지
             this.claimButton.onClick.AddListener(this.OnClaimClicked);
+        }
+
+        if (this.dimButton != null)
+        {
+            this.dimButton.onClick.RemoveAllListeners();
+            if (_claimOnDim) this.dimButton.onClick.AddListener(this.OnClaimClicked);
+            else this.dimButton.onClick.AddListener(this.Hide);
         }
 
         this.SetVisible(true);

@@ -120,7 +120,7 @@ public class RankRewardPanel : MonoBehaviour
         }
 
         var t_info = RankRewardManager.GetInfo(_tierIndex);
-        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex));
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex), true);
     }
 
     // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.

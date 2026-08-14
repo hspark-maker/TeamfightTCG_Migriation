@@ -15,6 +15,9 @@ public class OwnershipDebugTool : MonoBehaviour
     [ContextMenu("다이아 +1000")]
     void GrantDiamond() => OutgameDebugActions.GrantDiamond();
 
+    [ContextMenu("에너지 +1000")]
+    void GrantEnergy() => OutgameDebugActions.GrantEnergy();
+
     [ContextMenu("카드 성장 초기화")]
     void ResetCardGrowth() => OutgameDebugActions.ResetCardGrowth();
 
