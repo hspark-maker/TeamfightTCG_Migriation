@@ -956,6 +956,9 @@ MonoBehaviour:
   retryLabel: "\uD55C \uBC88 \uB354"
   keywordSectionLock: {fileID: 2925436257663726187}
   synergySectionLock: {fileID: 6274495548035373296}
+  keywordSectionReveal: {fileID: 4168879050527402972}
+  synergySectionReveal: {fileID: 6125743804536481199}
+  unlockScrollDuration: 0.3
   chipPrefab: {fileID: 3423340884098720178, guid: f52d10db32fdc494bac03cd8a0224379, type: 3}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   transition:
@@ -2168,6 +2171,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1632400471244049027}
+  - component: {fileID: 6125743804536481199}
   m_Layer: 0
   m_Name: "Section_\uC2DC\uB108\uC9C0"
   m_TagString: Untagged
@@ -2198,6 +2202,25 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -358.78882}
   m_SizeDelta: {x: 950, y: 140}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &6125743804536481199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2656563833050284980}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9491f9cd3bb1d49b226e033189fdf4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SectionRevealFx
+  chipRoot: {fileID: 3532517152791900971}
+  descText: {fileID: 8360246240547583556}
+  chipDelay: 0.06
+  chipDuration: 0.22
+  chipFromScale: 0.9
+  descDelay: 0.1
+  descDuration: 0.28
 --- !u!1 &2807601941540374649
 GameObject:
   m_ObjectHideFlags: 0
@@ -4543,6 +4566,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1469425368152011575}
+  - component: {fileID: 4168879050527402972}
   m_Layer: 0
   m_Name: "Section_\uD0A4\uC6CC\uB4DC"
   m_TagString: Untagged
@@ -4573,6 +4597,25 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -198.99998}
   m_SizeDelta: {x: 950, y: 140}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &4168879050527402972
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4508983888050170949}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d9491f9cd3bb1d49b226e033189fdf4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SectionRevealFx
+  chipRoot: {fileID: 4835623982393558091}
+  descText: {fileID: 8033358497726782632}
+  chipDelay: 0.06
+  chipDuration: 0.22
+  chipFromScale: 0.9
+  descDelay: 0.1
+  descDuration: 0.28
 --- !u!1 &4564851173977774711
 GameObject:
   m_ObjectHideFlags: 0

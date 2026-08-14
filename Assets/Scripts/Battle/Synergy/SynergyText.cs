@@ -20,7 +20,8 @@ public static class SynergyText
     {
         if (_synergy == null) return string.Empty;
 
-        var t_sb = new StringBuilder();
+        string t_name = Name(_synergy);
+        var    t_sb   = new StringBuilder();
         if (!string.IsNullOrEmpty(_synergy.effectDescription))
             t_sb.Append(_synergy.effectDescription);
 
@@ -37,7 +38,9 @@ public static class SynergyText
                 if (_ownedCount >= 0)
                     t_sb.Append(t_tier.requiredCount <= _ownedCount ? "● " : "○ ");
                 t_sb.Append(t_tier.requiredCount).Append('장');
-                if (!string.IsNullOrEmpty(t_tier.label))
+
+                // 라벨이 시너지 이름과 같으면 적지 않는다 — 이름이 이미 위에 있어 "2장 — 덩치"가 같은 말을 두 번 한다.
+                if (!string.IsNullOrEmpty(t_tier.label) && t_tier.label != t_name)
                     t_sb.Append(" — ").Append(t_tier.label);
             }
         }

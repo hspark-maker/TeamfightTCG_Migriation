@@ -12,6 +12,9 @@ public static class KeywordGrowthManager
 
     public static event Action OnChanged;
 
+    // 강화 "성공"만 알린다 — OnChanged는 값이 변했다는 갱신 신호라 완료 판정에 쓰면 의미가 갈린다
+    public static event Action<CardKeyword> OnEnhanced;
+
     public static KeywordGrowthConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<KeywordGrowthConfig>());
 
@@ -77,13 +80,17 @@ public static class KeywordGrowthManager
     }
 
     public static bool TryGetNextStep(CardKeyword _keyword, out GrowthStep _step)
-        => Config.TryGetNextStep(_keyword, LevelOf(_keyword), out _step);
+        => TryGetStepAt(_keyword, LevelOf(_keyword), out _step);
+
+    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다(안내가 강화 스텝에 들어선 순간).
+    /// 레벨도 잔액도 그대로지만 **낼 값**이 달라지므로, 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
+    public static void NotifyCostRuleChanged() => OnChanged?.Invoke();
 
     public static EnhanceResult TryEnhance(CardKeyword _keyword)
     {
         int t_level = LevelOf(_keyword);
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, t_level);
-        if (!Config.TryGetNextStep(_keyword, t_level, out var t_step))
+        if (!TryGetStepAt(_keyword, t_level, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
         if (!CurrencyManager.Spend(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
@@ -91,10 +98,29 @@ public static class KeywordGrowthManager
         t_level++;
         Entry(_keyword).level = t_level;
         SyncSaveData();
+
+        // 안내가 대준 한 방은 성공한 자리에서만 소진한다. OnEnhanced보다 앞이어야 한다 —
+        // 뒤로 밀면 그 신호를 받은 안내가 이미 다음 스텝에 들어선 뒤라 소진 표식이 엉뚱한 스텝에 찍힌다.
+        if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
+            OutgameTutorialGuide.ConsumeFreeShot();
+
         CurrencyManager.Save();
         OnChanged?.Invoke();
+        OnEnhanced?.Invoke(_keyword);
 
         return new EnhanceResult(EEnhanceOutcome.Success, t_level);
+    }
+
+    // 레벨 _level에서 한 단계 올리는 스텝. 곡선 조회를 여기 하나로 모으는 이유는 튜토리얼 보정 때문이다 —
+    // 조회가 갈리면 화면엔 비용이 뜨는데 실제로는 0이 나가고, 잔액이 모자란 유저는 버튼이 비활성으로 굳는다.
+    static bool TryGetStepAt(CardKeyword _keyword, int _level, out GrowthStep _step)
+    {
+        if (!Config.TryGetNextStep(_keyword, _level, out _step)) return false;
+
+        if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
+            _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
+
+        return true;
     }
 
     static void SyncSaveData()

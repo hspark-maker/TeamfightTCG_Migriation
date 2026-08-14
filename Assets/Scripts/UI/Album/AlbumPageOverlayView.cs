@@ -445,8 +445,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
         int t_ownedInPage = 0;
 
-        // 안내는 이 페이지의 첫 꽂힌 칸 하나만 지목한다(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
-        bool t_anchorTaken = !_interactive;
+        // 안내가 이 페이지에서 지목할 칸(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
+        int t_anchorSlot = _interactive ? FindAnchorSlotIndex(t_cards) : -1;
 
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
@@ -473,9 +473,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             t_slot.gameObject.SetActive(true);
             t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
 
-            bool t_anchor = !t_anchorTaken && t_owned;
-            t_anchorTaken |= t_anchor;
-            t_slot.ApplyTutorialAnchor(t_anchor);
+            t_slot.ApplyTutorialAnchor(t_i == t_anchorSlot);
 
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;
@@ -522,6 +520,22 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 잠금은 리프레시로 풀리지 않는다 — 넘김 중에도 이벤트가 이 함수를 부른다
         ApplyInteractable();
+    }
+
+    /// <summary>안내가 가리킬 칸의 순번. 저작(anchorCard)이 지목한 카드의 칸이고, 그 카드가 이 페이지에 없거나
+    /// 아직 빈 칸으로 보이면 폴백으로 첫 꽂힌 칸이다 — 없는 칸을 가리켜 안내가 멎는 것보다 낫다.</summary>
+    static int FindAnchorSlotIndex(IReadOnlyList<CardData> _cards)
+    {
+        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_target))
+        {
+            for (int t_i = 0; t_i < _cards.Count; t_i++)
+                if (_cards[t_i] == t_target && ShownAsOwned(t_target)) return t_i;
+        }
+
+        for (int t_i = 0; t_i < _cards.Count; t_i++)
+            if (ShownAsOwned(_cards[t_i])) return t_i;
+
+        return -1;
     }
 
     // 삽입 연출 중에는 아직 안 꽂은 카드를 빈 칸으로 위장한다. 소유는 이미 확정됐지만 화면상 꽂기 전이다.
