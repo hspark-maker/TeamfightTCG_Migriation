@@ -44,6 +44,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
         CardDetailOverlayView.OnAnyClosed             += OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
+
+        KeywordGrowthManager.OnEnhanced += OnKeywordEnhanced;
     }
 
     void Start()
@@ -63,6 +65,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
         CardDetailOverlayView.OnAnyClosed             -= OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
+
+        KeywordGrowthManager.OnEnhanced -= OnKeywordEnhanced;
 
         CloseGate();
     }
@@ -142,13 +146,16 @@ public class TriggeredTutorialBridge : MonoBehaviour
         }
 
         if (m_step.Completion == EOutgameTutorialCompletion.Click
-         || m_step.Completion == EOutgameTutorialCompletion.Enhance)
+         || m_step.Completion == EOutgameTutorialCompletion.Enhance
+         || m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance)
         {
-            // 이 스텝에 들어선 순간 강화 한 방의 값이 0으로 눕는다(CardGrowthManager의 무료 한 방).
-            // 카드 상세는 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
+            // 이 스텝에 들어선 순간 강화 한 방의 값이 0으로 눕는다(안내가 대주는 무료 한 방).
+            // 화면은 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
             // 다시 읽게 하지 않으면 잔액이 그에 못 미치는 유저의 강화 버튼이 비활성으로 굳는다.
             if (m_step.Completion == EOutgameTutorialCompletion.Enhance)
                 CardGrowthManager.NotifyCostRuleChanged();
+            else if (m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance)
+                KeywordGrowthManager.NotifyCostRuleChanged();
 
             TryOpenGate();
             return;
@@ -174,8 +181,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
         }
 
         // 강화는 눌러도 실패할 수 있다(골드 부족·확률 실패) → 클릭을 완료로 넘기지 않는다.
-        // 완료는 성공 신호(OnEnhanceSettled)가 확정한다.
+        // 완료는 성공 신호(OnEnhanceSettled·OnKeywordEnhanced)가 확정한다.
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Enhance
+                            || m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance
             ? null
             : (Action)OnGateSatisfied;
 
@@ -251,6 +259,14 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
 
         TryOpenGate();
+    }
+
+    // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.
+    void OnKeywordEnhanced(CardKeyword _keyword)
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.KeywordEnhance) return;
+
+        OnGateSatisfied();
     }
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)

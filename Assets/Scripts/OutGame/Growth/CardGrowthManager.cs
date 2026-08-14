@@ -13,12 +13,6 @@ public static class CardGrowthManager
 
     static bool s_initialized;
 
-    // 안내가 대준 무료 한 방을 이미 쓴 스텝. 무료는 스텝당 **한 방뿐**이고,
-    // 그 뒤의 "한 번 더"부터는 유저가 실제 비용을 보고 판단해야 한다(세이브하지 않는다 — 재시작하면 다시 한 방).
-    // 플래그가 아니라 스텝 참조인 이유: 무료를 저작하는 스텝이 여럿이라(강화 안내·첫 진화 안내)
-    // 하나로 묶으면 앞 스텝이 쓴 한 방 때문에 뒤 스텝의 저작이 조용히 무시된다.
-    static TutorialStepDef s_freeSpentStep;
-
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
@@ -163,8 +157,8 @@ public static class CardGrowthManager
 
             // 안내가 대준 한 방을 여기서 소진한다. 실패에는 걸지 않는다 —
             // 실패로 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
-            if (IsTutorialFreeStep() && OutgameTutorialGuide.TryGetCurrentStep(out var t_freeStep))
-                s_freeSpentStep = t_freeStep;
+            if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
+                OutgameTutorialGuide.ConsumeFreeShot();
         }
 
         CurrencyManager.Save();
@@ -211,7 +205,7 @@ public static class CardGrowthManager
     public static void DebugResetAll()
     {
         s_growth.Clear();
-        s_freeSpentStep = null;   // 강화를 처음부터 다시 보는 상태라 안내가 대주던 한 방도 되살린다
+        OutgameTutorialGuide.ResetFreeShotForDebug();   // 강화를 처음부터 다시 보는 상태다
         Save();
         OnGrowthChanged?.Invoke();
     }
@@ -223,19 +217,12 @@ public static class CardGrowthManager
     {
         if (!Config.TryGetStep(_card, _level, out _step)) return false;
 
-        if (IsTutorialFreeStep())
+        // 무료 한 방의 원장은 OutgameTutorialGuide가 쥔다(키워드 강화도 같은 원장을 본다 — 축으로 갈린다).
+        if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
 
         return true;
     }
-
-    // 지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
-    // 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다 — 강화든 진화든 저작이 같은 축으로 답한다.
-    // 어느 러너가 도는지는 OutgameTutorialGuide가 답한다(강화 안내는 온보딩에서 트리거 튜토로 옮겨 갔다).
-    static bool IsTutorialFreeStep()
-        => OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
-        && t_step.FreeOfCharge
-        && t_step != s_freeSpentStep;
 
     // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.

@@ -6,4 +6,5 @@ public enum EOutgameTutorialTrigger
     DeckTabFirstEnter,
     CollectionTabFirstEnter,
     FirstEvolutionReady,      // 첫 진화 관문 도달 — 탭이 아니라 강화 결과가 깨운다
+    KeywordGrowthFirstOpen,   // 키워드 강화 화면 첫 진입 — 탭이 아니라 오버레이가 열리는 것이 깨운다
 }

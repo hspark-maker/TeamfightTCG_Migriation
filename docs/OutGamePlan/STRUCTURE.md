@@ -465,8 +465,10 @@ sequenceDiagram
 > 2026-08-13: **첫 진화 안내(`FirstEvolutionReady`)** 추가 — 발화 축이 탭 밖으로 처음 나갔다.
 > 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
 > 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
-> 안내가 도는 동안 **1차 진화 관문 한 칸만** 무료다(`CardGrowthManager.IsFirstEvolutionFreeStep`) —
-> 런 전체로 넓히면 진화 다음 칸까지 0원으로 새어 결과판의 "한 번 더"가 공짜가 된다.
+>
+> 2026-08-14: **키워드 강화 안내(`KeywordGrowthFirstOpen`)** 추가 — 발화 축이 탭·강화 결과에 이어 **화면 열림**까지 왔다.
+> 그리고 "무엇이 공짜인가"의 주인이 코드에서 **저작(`TutorialStepDef.freeOfCharge`)**으로, 소진 원장이
+> `CardGrowthManager`에서 **`OutgameTutorialGuide`로** 옮겨 세 축(카드 강화·진화·키워드 강화)이 같은 원장을 본다.
 
 #### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
 
@@ -512,11 +514,11 @@ flowchart TD
 
     subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
         BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
-        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · KeywordEnhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady · KeywordGrowthFirstOpen<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
@@ -528,9 +530,16 @@ flowchart TD
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
     CDO["CardDetailOverlayView<br/>강화 완료(_onFinished)에서 다음 한 방이 첫 진화면 Fire<br/>+ 발화 직후 RefreshGrowth로 0원 표시 반영"]:::chg
-    GROW["CardGrowthManager.TryGetStepAt<br/>IsFirstEvolutionFreeStep(level) — 관문 한 칸만 0원"]:::chg
+    KGP["KeywordGrowthPanel<br/>Open() 끝에서 Fire — SetVisible·Build 뒤라야 앵커가 서 있다<br/>칸/업그레이드 버튼 앵커를 코드로 등록·해제"]:::new
+    KGM["KeywordGrowthManager<br/>TryGetStepAt 단일 퍼널(표시=활성=소모)<br/>event OnEnhanced(성공만) · NotifyCostRuleChanged"]:::new
+    FREE["OutgameTutorialGuide — 무료 한 방 원장<br/>HasFreeShot · ConsumeFreeShot · ResetFreeShotForDebug<br/>무엇이 공짜인지는 저작(freeOfCharge)이 정한다"]:::new
+    GROW["CardGrowthManager.TryGetStepAt<br/>원장을 직접 쥐지 않고 Guide에 묻는다"]:::chg
     CDO -->|"Fire(FirstEvolutionReady)"| TRUN
-    GROW -->|"IsRunningTrigger"| TRUN
+    KGP -->|"Fire(KeywordGrowthFirstOpen)"| TRUN
+    KGM -->|"OnEnhanced"| TBRG
+    GROW --- FREE
+    KGM --- FREE
+    FREE -->|"현재 스텝 조회"| TRUN
     KEY --- TRUN
     BOOT -->|"EnsureData(멱등)"| TRUN
     TBRG -->|"EnsureData · OnActivated 구독"| TRUN

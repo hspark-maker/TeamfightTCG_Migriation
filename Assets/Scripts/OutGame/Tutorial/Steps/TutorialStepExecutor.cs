@@ -28,6 +28,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.BattleStart:
             case EOutgameTutorialAction.WaitAlbumInsert:
             case EOutgameTutorialAction.WaitEnhance:
+            case EOutgameTutorialAction.WaitKeywordEnhance:
             case EOutgameTutorialAction.WaitLobbyReturn:
             case EOutgameTutorialAction.WaitCardDetailReturn:
                 return EOutgameTutorialStepResult.Gated;

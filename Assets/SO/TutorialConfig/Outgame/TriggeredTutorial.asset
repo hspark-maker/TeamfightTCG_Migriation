@@ -254,3 +254,84 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  - trigger: 4
+    label: "\uD0A4\uC6CC\uB4DC \uAC15\uD654"
+    stepDefs:
+    - action: 1
+      anchor: 0
+      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uD0A4\uC6CC\uB4DC\uB97C \uC601\uAD6C\uC801\uC73C\uB85C
+        \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
+      messageAtBottom: 1
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      rewardTitle: 
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - action: 0
+      anchor: 22
+      guideMessage: 
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      rewardTitle: 
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - action: 18
+      anchor: 23
+      guideMessage: 
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 1
+      rewardTitle: 
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - action: 1
+      anchor: 0
+      guideMessage: "\uC774 \uD0A4\uC6CC\uB4DC\uB97C \uAC00\uC9C4 \uCE74\uB4DC \uC804\uBD80\uAC00
+        \uAC15\uD654\uB418\uC5C8\uC5B4\uC694! \n\uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
+      messageAtBottom: 1
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 1
+      rewardTitle: 
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0

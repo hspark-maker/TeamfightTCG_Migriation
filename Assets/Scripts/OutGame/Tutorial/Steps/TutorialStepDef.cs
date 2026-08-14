@@ -151,6 +151,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
         EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
         EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
+        EOutgameTutorialAction.WaitKeywordEnhance => EOutgameTutorialCompletion.KeywordEnhance,
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
         EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
@@ -245,7 +246,8 @@ public class TutorialStepDef
 
     // 이 액션이 값을 무는가(안내가 대신 내줄 수 있는 자리 = 성장 한 방을 시키는 스텝)
     public static bool UsesFreeOfCharge(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.WaitEnhance;
+        => _action == EOutgameTutorialAction.WaitEnhance
+        || _action == EOutgameTutorialAction.WaitKeywordEnhance;
 
     // 이 액션이 보상 화면을 세우는가
     public static bool UsesRewardTitle(EOutgameTutorialAction _action)

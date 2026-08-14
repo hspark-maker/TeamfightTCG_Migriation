@@ -24,4 +24,6 @@ public enum EOutgameTutorialAnchor
     AlbumThemeCell        = 19,   // 갤러리 셀은 런타임 생성이라 아직 안 꽂은 카드가 있는 테마의 칸이 스스로 등록한다
     AlbumCardSlot         = 20,   // 페이지 오버레이의 첫 소유 칸. 칸도 런타임 생성이라 슬롯이 스스로 등록한다
     CardDetailEnhanceButton = 21, // 카드 상세의 강화 버튼(진화 버튼과 자리를 번갈아 써서 코드가 등록한다)
+    KeywordGrowthCell       = 22, // 키워드 강화 격자의 칸. 칸도 런타임 생성이라 지금 선택된 칸이 스스로 등록한다
+    KeywordGrowthUpgradeButton = 23, // 키워드 강화 하단의 업그레이드 버튼(패널이 열려 있는 동안만)
 }
