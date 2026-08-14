@@ -454,6 +454,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // Awake 한 번으로는 부족하고, Remove 후 Add라 중복 등록도 남지 않는다.
     void OnEnable()
     {
+        // 상세·강화 화면은 하단 탭바만 걷는다 — 상단 재화 바는 강화 비용을 보는 자리라 되돌려 놓는다.
+        // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
+        LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
         if (this.enhanceButton != null)
         {
@@ -488,6 +491,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnDisable()
     {
+        // 요청을 물리면 아래에 깔린 화면(페이지 오버레이)의 범위가 다시 적용된다.
+        LobbyShellBars.Show(this);
+
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);

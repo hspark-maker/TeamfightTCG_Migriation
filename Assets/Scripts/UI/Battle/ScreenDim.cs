@@ -75,7 +75,20 @@ public class ScreenDim : MonoBehaviour
     public static void ShowWithHole(object _owner, Rect _screenRect, float _alpha = 0.62f, bool _block = true)
         => Get(EDimLayer.Full)?.Push(_owner, _alpha, _block, true, _screenRect, 0f);
 
-    public static void Hide(object _owner, EDimLayer _layer = EDimLayer.Full)
+    /// <summary>레이어를 지정하지 않으면 전 레이어에서 걷는다 —
+    /// Show에만 레이어를 넘기고 Hide에서 빠뜨리면 딤이 켜진 채 남아 입력이 영구히 죽기 때문이다.</summary>
+    public static void Hide(object _owner)
+    {
+        if (_owner == null) return;
+
+        for (int i = 0; i < s_instances.Length; i++)
+        {
+            ScreenDim t_instance = s_instances[i];
+            if (t_instance != null) t_instance.Remove(_owner);
+        }
+    }
+
+    public static void Hide(object _owner, EDimLayer _layer)
     {
         ScreenDim t_instance = Get(_layer);
         if (t_instance == null || _owner == null) return;
