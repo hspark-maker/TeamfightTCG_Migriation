@@ -1200,6 +1200,7 @@ MonoBehaviour:
   profilePool: {fileID: 11400000, guid: 7f6df2feb8d5076418b96358ee58377d, type: 2}
   lobbyTabController: {fileID: 3797395670514148879}
   deckTabIndex: 3
+  playButton: {fileID: 1158220769595410918}
 --- !u!1 &1268768946198566307
 GameObject:
   m_ObjectHideFlags: 0
@@ -1995,9 +1996,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FeatureLockView
   feature: 6
-  target: {fileID: 0}
-  controlInteractable: 1
-  overlayParent: {fileID: 0}
+  badgeParent: {fileID: 0}
 --- !u!1 &2492598757330787519
 GameObject:
   m_ObjectHideFlags: 0

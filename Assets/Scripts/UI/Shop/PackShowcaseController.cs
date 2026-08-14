@@ -73,6 +73,10 @@ public class PackShowcaseController : MonoBehaviour
         {
             buyButton.onClick.RemoveListener(OnBuyPressed);
             buyButton.onClick.AddListener(OnBuyPressed);
+
+            // 잠김 룩은 기능 해금 항만 본다 — RefreshBuyLock의 interactable에는 잔액 부족도 섞여 있고,
+            // 그건 유저가 스스로 푸는 정상 대기라 잠김으로 그리면 안 된다(튜토리얼 게이트가 그 전제로 딤을 걷는다).
+            FeatureLockView.Attach(buyButton.gameObject, EOutgameFeature.PackBuy);
         }
         if (oddsButton != null)
         {

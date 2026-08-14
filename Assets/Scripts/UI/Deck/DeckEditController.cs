@@ -80,6 +80,9 @@ public class DeckEditController : MonoBehaviour
         {
             autoEquipButton.onClick.RemoveAllListeners();
             autoEquipButton.onClick.AddListener(AutoEquip);
+
+            // 잠김 룩은 한 번만 붙인다 — 이후 해금 반영은 붙은 컴포넌트가 스스로 한다.
+            FeatureLockView.Attach(autoEquipButton.gameObject, EOutgameFeature.DeckAutoEquip);
         }
 
         if (saveButton != null)
@@ -225,6 +228,15 @@ public class DeckEditController : MonoBehaviour
     void OnEnable()
     {
         OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+
+        // 편집 화면이 열린 채 자동 편성이 해금될 수 있다 — 유저 조작으로만 도는 RefreshAll로는 그 순간을 못 잡아
+        // 버튼이 잠긴 채 굳는다(잠김 룩은 풀리는데 버튼은 안 풀리는 어긋남까지 생긴다).
+        OutgameFeatureLock.OnChanged += OnFeatureLockChanged;
+    }
+
+    void OnFeatureLockChanged()
+    {
+        if (IsOpen) RefreshAll();
     }
 
     // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
@@ -245,6 +257,7 @@ public class DeckEditController : MonoBehaviour
     void OnDisable()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        OutgameFeatureLock.OnChanged        -= OnFeatureLockChanged;
 
         m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
