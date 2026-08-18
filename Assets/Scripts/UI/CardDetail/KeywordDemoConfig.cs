@@ -4,8 +4,9 @@ using UnityEngine;
 /// <summary>키워드 데모 무대에 **누구를 세울지**. 대본(무엇을 하는지)은 코드가 쥔다 —
 /// 키워드마다 분기가 제각각이라 데이터로 뺄 수 있는 축이 아니다.
 ///
-/// 공격자는 여기 없다. 그 자리는 언제나 **방금 강화한 그 카드**다 —
-/// 데모의 목적이 "이 카드가 이렇게 싸운다"라서, 남의 카드를 세우면 배운 것이 내 카드로 이어지지 않는다.</summary>
+/// 앞자리는 여기 없다. 그 자리는 언제나 **방금 강화한 그 카드**다 —
+/// 데모의 목적이 "이 카드가 이렇게 싸운다"라서, 남의 카드를 세우면 배운 것이 내 카드로 이어지지 않는다.
+/// (도발만 그 카드가 맞는 쪽이 된다 — 남이 나를 치게 만드는 키워드라 배역이 뒤집힌다.)</summary>
 [CreateAssetMenu(fileName = "KeywordDemoConfig", menuName = "Card Battle/Keyword Demo Config")]
 public class KeywordDemoConfig : ScriptableObject
 {
@@ -16,10 +17,11 @@ public class KeywordDemoConfig : ScriptableObject
     {
         public CardKeyword keyword;
 
-        [Tooltip("맞는 쪽. 비우면 defaultOpponent.")]
+        [Tooltip("맞은편. 대개 맞는 쪽이고, 도발에서만 치러 오는 쪽이 된다. 비우면 defaultOpponent.")]
         public CardData opponent;
 
-        [Tooltip("곁에 서는 쪽(무쌍의 광역 대상, 도발이 노리던 카드, 힐러가 살리는 아군). 비우면 defaultNeighbor.")]
+        [Tooltip("곁에 서는 쪽(무쌍의 광역 대상, 도발이 대신 맞아주는 아군, 힐러가 살리는 아군). 비우면 defaultNeighbor. " +
+                 "진영은 코드가 정한다 — 무쌍만 적이고 도발·힐러는 아군이라, 같은 칸에 어떤 카드를 넣어도 편이 뒤집히지 않는다.")]
         public CardData neighbor;
     }
 

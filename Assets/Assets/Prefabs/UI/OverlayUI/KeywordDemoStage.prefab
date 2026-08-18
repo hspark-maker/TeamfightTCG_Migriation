@@ -5635,8 +5635,8 @@ MonoBehaviour:
   slotDefender: {fileID: 6663740429234474390}
   slotNeighbor: {fileID: 8239911163314291873}
   config: {fileID: 11400000, guid: 32050222bc77f8644a6d64fdeb3811f8, type: 2}
-  textureWidth: 512
-  textureHeight: 288
+  textureWidth: 1024
+  textureHeight: 1024
   loopGap: 1.1
   startDelay: 0.35
 --- !u!1 &857658477236989485
@@ -11701,7 +11701,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hitOverlay: {fileID: 1967779348295797063}
-  dieOverlay: {fileID: 2127288559650991251}
   cinemaSpacing: 1.6
   twitchTarget: {fileID: 8907108884476903203}
   twitchDistance: 0.12
@@ -19526,7 +19525,7 @@ Camera:
   far clip plane: 50
   field of view: 60
   orthographic: 1
-  orthographic size: 3.5
+  orthographic size: 3.1
   m_Depth: -100
   m_CullingMask:
     serializedVersion: 2
@@ -19536,7 +19535,7 @@ Camera:
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 0
-  m_AllowMSAA: 0
+  m_AllowMSAA: 1
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
   m_OcclusionCulling: 0
@@ -19709,7 +19708,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hitOverlay: {fileID: 1688920908856444847}
-  dieOverlay: {fileID: 2877854040115981562}
   cinemaSpacing: 1.6
   twitchTarget: {fileID: 555723162163026071}
   twitchDistance: 0.12
@@ -24047,7 +24045,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hitOverlay: {fileID: 3296738696916708776}
-  dieOverlay: {fileID: 8261975745677214267}
   cinemaSpacing: 1.6
   twitchTarget: {fileID: 8953331344321500125}
   twitchDistance: 0.12

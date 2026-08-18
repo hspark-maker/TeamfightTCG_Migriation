@@ -28,23 +28,25 @@ public class KeywordDemoStage : SingletonOverlayBase
     [Tooltip("이 무대만 담는 카메라. tag는 반드시 Untagged — MainCamera를 달면 로비 배경 영상이 이쪽으로 튄다.")]
     [SerializeField] Camera demoCamera;
 
-    [Tooltip("공격자 자리. 방금 강화한 그 카드가 선다.")]
+    [Tooltip("앞자리. 방금 강화한 그 카드가 선다 — 대개 공격자이고, 도발에서만 **맞는 쪽**이 된다.")]
     [SerializeField] CardView slotAttacker;
 
-    [Tooltip("맞는 쪽.")]
+    [Tooltip("맞은편. 대개 맞는 쪽이고, 도발에서만 치러 오는 쪽이 된다.")]
     [SerializeField] CardView slotDefender;
 
-    [Tooltip("곁에 서는 쪽(무쌍 광역 대상·도발이 노리던 카드·힐러가 살리는 아군). 쓰지 않는 대본에서는 꺼둔다.")]
+    [Tooltip("곁에 서는 쪽(무쌍 광역 대상·도발이 지켜주는 아군·힐러가 살리는 아군). 쓰지 않는 대본에서는 꺼둔다.")]
     [SerializeField] CardView slotNeighbor;
 
     [SerializeField] KeywordDemoConfig config;
 
     [Header("텍스처")]
-    [Tooltip("구분선과 설명 사이의 띠에 들어갈 그림이라 클 이유가 없다. 모바일에서 이 값이 곧 비용이다.\n" +
-             "비율은 띠 모양을 따라간다 — 그 자리가 거의 정사각이라 가로세로를 같게 둔다(RawImage 쪽 " +
-             "AspectRatioFitter가 이 비율을 그대로 읽으므로 여기만 고치면 된다).")]
-    [SerializeField] int textureWidth  = 512;
-    [SerializeField] int textureHeight = 512;
+    [Tooltip("비율은 띠 모양을 따라간다 — 그 자리가 거의 정사각이라 가로세로를 같게 둔다(RawImage 쪽 " +
+             "AspectRatioFitter가 이 비율을 그대로 읽으므로 여기만 고치면 된다). 16:9로 두면 띠가 눌려 " +
+             "자리의 절반이 비고, 같은 카메라가 가로로 두 배를 비추느라 카드가 반으로 작아진다.\n" +
+             "해상도는 띠가 화면 폭의 약 78%(1080 기준 840px)를 먹는 데서 온다 — 그보다 작으면 업스케일로 " +
+             "체력·공격력 숫자가 뭉갠다. 모달이 걷힐 때 해제되는 한 장이라 상주 비용은 없다.")]
+    [SerializeField] int textureWidth  = 1024;
+    [SerializeField] int textureHeight = 1024;
 
     [Header("박자")]
     [Tooltip("한 판이 끝나고 다시 돌기까지의 뜸. 반복하지 않으면 한눈판 사이에 지나가 버린다.")]
@@ -141,8 +143,9 @@ public class KeywordDemoStage : SingletonOverlayBase
 
     // ── 배역 ────────────────────────────────────────────────────────────
 
-    // 카드를 세운다. 공격자는 언제나 그 카드, 나머지는 저작(KeywordDemoConfig)이 정한다.
-    // 힐러만 상대가 **아군**이라 owner가 갈린다 — 회복은 적에게 쏘는 것이 아니다.
+    // 카드를 세운다. 앞자리는 언제나 그 카드, 나머지는 저작(KeywordDemoConfig)이 정한다.
+    // 진영은 대본마다 갈린다 — 회복은 적에게 쏘지 않고, 도발은 아군을 대신 맞아주는 것이라
+    // 곁자리가 적이면 "누구를 지켰나"가 성립하지 않는다.
     bool BindRoles(CardData _card, CardKeyword _keyword)
     {
         CardData t_opponent = null;
@@ -155,10 +158,14 @@ public class KeywordDemoStage : SingletonOverlayBase
             return false;
         }
 
-        int t_otherOwner = _keyword == CardKeyword.Healer ? 0 : 1;
+        // 맞은편 진영. 힐러만 아군이다(회복 대상). 도발의 맞은편은 **치러 오는 적**이라 그대로 적 진영.
+        int t_defenderOwner = _keyword == CardKeyword.Healer ? 0 : 1;
+
+        // 곁자리 진영. 무쌍만 적이다(같이 휩쓸리는 대상) — 도발·힐러는 지키고 살리는 아군이다.
+        int t_neighborOwner = _keyword == CardKeyword.Peerless ? 1 : 0;
 
         Render(this.slotAttacker, _card,       0, 0);
-        Render(this.slotDefender, t_opponent,  t_otherOwner, 1);
+        Render(this.slotDefender, t_opponent,  t_defenderOwner, 1);
 
         // 곁자리는 이 셋만 쓴다. 나머지 대본에서 세워두면 화면만 복잡해지고 시선이 갈린다.
         bool t_useNeighbor = _keyword == CardKeyword.Peerless
@@ -168,7 +175,7 @@ public class KeywordDemoStage : SingletonOverlayBase
         if (this.slotNeighbor != null)
         {
             this.slotNeighbor.gameObject.SetActive(t_useNeighbor && t_neighbor != null);
-            if (t_useNeighbor && t_neighbor != null) Render(this.slotNeighbor, t_neighbor, t_otherOwner, 2);
+            if (t_useNeighbor && t_neighbor != null) Render(this.slotNeighbor, t_neighbor, t_neighborOwner, 2);
         }
 
         return true;
@@ -205,8 +212,8 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         switch (_keyword)
         {
-            // 도발은 "못 때린다"가 본체라 공격 자체가 일어나지 않는다 — 유일하게 AttackSequence를 안 탄다.
-            case CardKeyword.Taunt:  await PlayTaunt(t_atk, t_def, _token);  return;
+            // 도발만 **공격 방향이 반대**다(적이 이 카드를 치러 온다) → 배역을 뒤집어 넘긴다.
+            case CardKeyword.Taunt:  await PlayTaunt(_taunter: t_atk, _enemy: t_def, _token: _token);  return;
             case CardKeyword.Healer: await PlayHealer(t_atk, _token);        return;
         }
 
@@ -258,27 +265,44 @@ public class KeywordDemoStage : SingletonOverlayBase
                                          _forceSpecial: false);
     }
 
-    // 도발: 공격자가 곁의 카드를 노리다 도발 카드에 막힌다. 파티클이 아니라 **거절**이 이 키워드의 그림이다.
-    async UniTask PlayTaunt(CardView _atk, CardView _taunter, CancellationToken _token)
+    // 도발: **적이** 곁의 아군을 노리다 이 카드에 끌려와, 결국 이 카드를 친다.
+    // 다른 대본과 달리 앞자리가 맞는 쪽이다 — 도발은 내가 하는 일이 아니라 남이 나를 치게 만드는 일이라,
+    // 앞자리를 공격자로 두면 정작 배운 키워드가 남의 카드에서 빛난다.
+    //
+    // 연출 짝은 인게임(CardInputController)과 같다: 막힌 공격자 위에 TauntBlocked, 도발 보유자에게 TauntGuard.
+    // 한쪽만 있으면 "왜 막혔는지"나 "누가 막는지" 중 하나가 빠진다.
+    async UniTask PlayTaunt(CardView _taunter, CardView _enemy, CancellationToken _token)
     {
+        // 지켜줄 아군. 없으면 노리는 박자를 통째로 건너뛴다 — 대신 맞아줄 상대가 없으면 도발이 성립하지 않는다.
         CardView t_wanted = this.slotNeighbor != null && this.slotNeighbor.gameObject.activeSelf
-                                ? this.slotNeighbor : _taunter;
+                                ? this.slotNeighbor : null;
 
-        t_wanted.SetHighlight(true);
-        await UniTask.Delay(Ms(0.35f), cancellationToken: _token).SuppressCancellationThrow();
-        if (_token.IsCancellationRequested) { t_wanted.SetHighlight(false); return; }
+        if (t_wanted != null)
+        {
+            // 1) 적이 아군을 노린다.
+            t_wanted.SetHighlight(true);
+            await UniTask.Delay(Ms(TAUNT_AIM_HOLD), cancellationToken: _token).SuppressCancellationThrow();
+            if (_token.IsCancellationRequested) { t_wanted.SetHighlight(false); return; }
 
-        // 노리던 쪽은 튕기고, 도발 카드가 "이쪽을 쳐라"로 대답한다.
-        _atk.PlayRejectShake(_focus: true);
-        _taunter.PlayKeywordGlow(CardKeyword.Taunt).Forget();
+            // 2) 못 친다 — 노리던 쪽이 튕기고, 치려던 적 위에 차단 표식이 선다.
+            t_wanted.PlayRejectShake();
+            BattleVfx.PlayAttached(BattleVfxId.TauntBlocked, _enemy.transform,
+                                   _flip: false, _enemy.VfxSortingLayerId);
+        }
+
+        // 3) "이쪽을 쳐라" — 도발 카드가 대답한다.
+        // 키워드 글로우를 따로 부르지 않는다: PlayAttentionPulse가 도발 카드면 스스로 띄운다(인게임 거절 경로와 같다).
+        // 여기서 또 부르면 같은 프레임에 글로우가 두 장 스폰돼 혼자 두 배로 밝아진다.
+        BattleVfx.PlayAttached(BattleVfxId.TauntGuard, _taunter.transform,
+                               _flip: false, _taunter.VfxSortingLayerId);
         _taunter.PlayAttentionPulse();
 
-        await UniTask.Delay(Ms(0.6f), cancellationToken: _token).SuppressCancellationThrow();
-        t_wanted.SetHighlight(false);
+        await UniTask.Delay(Ms(TAUNT_REDIRECT_HOLD), cancellationToken: _token).SuppressCancellationThrow();
+        if (t_wanted != null) t_wanted.SetHighlight(false);
         if (_token.IsCancellationRequested) return;
 
-        // 결국 도발 카드를 친다 — 막히는 것으로 끝내면 "그래서 어디를 치나"가 안 남는다.
-        await Swing(_atk, _taunter, null, _token);
+        // 4) 그래서 이 카드가 맞는다. 끌려온 것으로 끝내면 "대신 맞는다"의 뒷말이 빠진다.
+        await Swing(_enemy, _taunter, null, _token);
     }
 
     // 힐러: 때리는 것이 아니라 아군을 살린다. 대상은 곁자리(있으면)와 맞는 쪽 둘 다.
@@ -317,7 +341,9 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         // 깊이 24는 선택이 아니다 — URP의 Render Graph는 depth stencil이 없는 타깃을 거부한다
         // ("Fake or uninitialized surface is not supported for attachment 0").
-        this.m_texture = new RenderTexture(t_w, t_h, 24, RenderTextureFormat.ARGB32);
+        // MSAA는 카메라가 아니라 **타깃 텍스처**가 정한다(URP는 targetTexture의 샘플 수를 그대로 쓴다).
+        // 끄면 카드 테두리와 숫자가 계단지는데, 이 그림은 화면 폭의 78%로 확대돼 그 계단이 그대로 보인다.
+        this.m_texture = new RenderTexture(t_w, t_h, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
         this.m_texture.Create();
     }
 
@@ -349,6 +375,11 @@ public class KeywordDemoStage : SingletonOverlayBase
         TurnState.LocalOwnerIndex = this.m_ownerIndex0;
         TurnState.InputAllowed    = this.m_inputAllowed0;
     }
+
+    // 도발 대본의 두 박자. 저작 축으로 뺄 값이 아니다 — 이 무대에만 있는 한 대본의 내부 호흡이라,
+    // 인스펙터에 내면 다른 키워드에도 있는 값처럼 읽힌다.
+    const float TAUNT_AIM_HOLD      = 0.35f;   // 적이 아군을 노리는 동안
+    const float TAUNT_REDIRECT_HOLD = 0.6f;    // 끌려오고 나서 치기까지
 
     static int Ms(float _seconds) => Mathf.Max(0, (int)(_seconds * 1000f));
 }
