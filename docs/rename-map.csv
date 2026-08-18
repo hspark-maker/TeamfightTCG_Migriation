@@ -1,0 +1,280 @@
+﻿kind,oldPath,guid,newPath
+Folder,Assets/Assets/Images/Cards/1단계,a563263a88a55bd4cbce7a460099ad1d,Assets/Assets/Images/Cards/Stage1
+Folder,Assets/Assets/Images/Cards/2단계,6943a22c3b021a546ba4b6223be5a9ce,Assets/Assets/Images/Cards/Stage2
+Folder,Assets/Assets/Images/Cards/3단계,d16d9ecb5c5ea1248be6ef9f248adaf2,Assets/Assets/Images/Cards/Stage3
+Folder,Assets/Assets/Particle/Old_VFX/공격,9af0ea791ea0b8c40a93c548605b3114,Assets/Assets/Particle/Old_VFX/Attack
+Folder,Assets/Assets/Particle/Old_VFX/교활,65e8d9aafdd65a3458aa2aa5998a3f6c,Assets/Assets/Particle/Old_VFX/Cunning
+Folder,Assets/Assets/Particle/Old_VFX/시너지,c7d20b183fa94e1cb8e6d4a5f0917b3d,Assets/Assets/Particle/Old_VFX/Synergy
+Folder,Assets/Assets/Particle/Old_VFX/처형,dff8aef5b36f6dd44b55ee04fdb35761,Assets/Assets/Particle/Old_VFX/Execute
+Folder,Assets/Assets/Particle/Old_VFX/히트,31a2ce756c7c5aa4d95e7c6e3d55c33a,Assets/Assets/Particle/Old_VFX/Hit
+Folder,Assets/Assets/Particle/Old_VFX/힐,74af71369646d7845a5592b2029f3e85,Assets/Assets/Particle/Old_VFX/Heal
+Folder,Assets/Assets/Images/Icons/KeyworkIcon,7f8613bc6f7b9964dad0107167991feb,Assets/Assets/Images/Icons/KeywordIcon
+Asset,Assets/Assets/Images/Cards/3단계/17-번개뿔 3.png,00cf8c131e43ab34b857d20ff0adfd86,Assets/Assets/Images/Cards/Stage3/Image_Card_Thunderhorn_Stage3.png
+Asset,Assets/Assets/Images/Cards/2단계/21-자석게 2.png,3086761e6f4bfcf48928c0fca75f0156,Assets/Assets/Images/Cards/Stage2/Image_Card_MagnetCrab_Stage2.png
+Asset,Assets/Assets/Images/Cards/3단계/25-파도리 3.png,309e0c3d5f33dbe499fcadf5c993f1fc,Assets/Assets/Images/Cards/Stage3/Image_Card_Waveri_Stage3.png
+Asset,Assets/Assets/Images/Cards/2단계/8-얼음꼬미 2.png,40c5febf674f97d4397eb4d8e23f866d,Assets/Assets/Images/Cards/Stage2/Image_Card_Icekomi_Stage2.png
+Asset,Assets/SO/Cards/대장부리.asset,50978cecebd80934f8cd32eccff08371,Assets/SO/Cards/Data_Card_CaptainBeak.asset
+Asset,Assets/Assets/Images/Cards/1단계/2-포슬램 1.png,5078820160e3e5d03691eb116af294b1,Assets/Assets/Images/Cards/Stage1/Image_Card_Poslamb_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/흐름_disabled.png,506a57c45d0495e47a3cad2e490f05c8,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Flow_Disabled.png
+Asset,Assets/SO/Cards/풍선펭.asset,60fc3414c9db3504da9512df26e09c1b,Assets/SO/Cards/Data_Card_BalloonPeng.asset
+Asset,Assets/Assets/Images/Cards/2단계/23-폭탄밤 2.png,70f0676187d02464b92642a77e243994,Assets/Assets/Images/Cards/Stage2/Image_Card_Bombbat_Stage2.png
+Asset,Assets/Assets/Images/Cards/2단계/10-톱니두더 2.png,7059d6baab6805c4abc2964f35e80d40,Assets/Assets/Images/Cards/Stage2/Image_Card_Gearmole_Stage2.png
+Asset,Assets/SO/Cards/단풍꼬리.asset,f0e1d2c3b4a5968778695a4b3c2d1e0f,Assets/SO/Cards/Data_Card_Mapletail.asset
+Asset,Assets/Assets/Images/Icons/SynergyIcon/성벽_disabled.png,f0e4ef862b2634f4395a9869e961c306,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Rampart_Disabled.png
+Asset,Assets/Assets/Images/Cards/3단계/3-찌릿핀 3.png,21f10fb5898ac37498fd82852be6b1d3,Assets/Assets/Images/Cards/Stage3/Image_Card_Sparkfin_Stage3.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/청소부_disabled.png,2123fa51233d082408b2f6f50647a349,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Cleaner_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/24-우드혼 2.png,2188568cd265e5a4a9863518a7f904c8,Assets/Assets/Images/Cards/Stage2/Image_Card_Woodhorn_Stage2.png
+Asset,Assets/Assets/Images/Cards/CardFrame/무쌍.png,3122c971c99028b42aacb6a24d74a465,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Peerless.png
+Asset,Assets/Assets/Images/Cards/1단계/26-모래몽 1.png,3184ff0c6a81bc70aa5f311279ad4411,Assets/Assets/Images/Cards/Stage1/Image_Card_Sandmong_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/돌보미.png,41b8d69778c346a438e8234a9d55d548,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Caretaker_Enabled.png
+Asset,Assets/SO/Synergies/Effects/청소부_Cleaner.asset,51c2d4ab814a5524e8e4e57fa142d644,Assets/SO/Synergies/Effects/Data_SynergyEffect_Cleaner_Cleaner.asset
+Asset,Assets/Assets/Images/Cards/2단계/9-꿀꿀비 2.png,617b6cce22f19c84ead56ad3fdf3333e,Assets/Assets/Images/Cards/Stage2/Image_Card_Honeybee_Stage2.png
+Asset,Assets/Assets/Images/References/스크린샷 2026-07-24 163150.png,8183d3c9f50f9da4cb1427d80b2de4e6,Assets/Assets/Images/References/Image_Reference_Screenshot_20260724163150.png
+Asset,Assets/Assets/Images/Cards/3단계/13-풍선펭 3.png,81274f70ad15c2946a579d2f221c7b76,Assets/Assets/Images/Cards/Stage3/Image_Card_BalloonPeng_Stage3.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/도발.png,91d60cf8fd0347543af0444939e31e34,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Taunt_Enabled.png
+Asset,Assets/SO/Cards/눈덩곰.asset,a1b93191a33da8d439f84be802ba1da9,Assets/SO/Cards/Data_Card_SnowballBear.asset
+Asset,Assets/Assets/Images/Cards/2단계/25-파도리 2.png,c150d29e369a2c044b658a51bdb352ba,Assets/Assets/Images/Cards/Stage2/Image_Card_Waveri_Stage2.png
+Asset,Assets/Assets/Images/Cards/2단계/1-모닥콩 2.png,e102d5c699536c747b17b45f99b41986,Assets/Assets/Images/Cards/Stage2/Image_Card_Campbean_Stage2.png
+Asset,Assets/SO/Cards/모닥콩.asset,e1a2b3c4d5e6f7081920314253647586,Assets/SO/Cards/Data_Card_Campbean.asset
+Asset,Assets/Assets/Images/Cards/3단계/12-철갑몽치 3.png,12894fc907e687c448fa4cda99ee4a9b,Assets/Assets/Images/Cards/Stage3/Image_Card_IronMongchi_Stage3.png
+Asset,Assets/SO/Cards/늪꾸리.asset,22e6c2e3f9c659f4f92877741fa7d29d,Assets/SO/Cards/Data_Card_Swampfrog.asset
+Asset,Assets/Assets/Images/Cards/3단계/14-버섯냥 3.png,62a68455ed5b4cd4389531f2277cc9cb,Assets/Assets/Images/Cards/Stage3/Image_Card_MushroomCat_Stage3.png
+Asset,Assets/Assets/Images/Cards/1단계/30-왕밤도치 1.png,7201d2979297065d1c515af04cc3beec,Assets/Assets/Images/Cards/Stage1/Image_Card_KingChestnutHedgehog_Stage1.png
+Asset,Assets/SO/Cards/모래몽.asset,825c6972f2caec54e9301110361dcdaf,Assets/SO/Cards/Data_Card_Sandmong.asset
+Asset,Assets/Assets/Images/UI/ChatGPT Image 2026년 7월 29일 오후 02_39_29.png,92d72755a61855c4bb522273996f2343,Assets/Assets/Images/UI/Image_UI_Generated_2026729023929.png
+Asset,Assets/Assets/Images/UI/제목 없음.png,a2aa3b5c6aca87348a07055363596ef1,Assets/Assets/Images/UI/Image_UI_Untitled.png
+Asset,Assets/Assets/Images/Cards/2단계/13-풍선펭 2.png,b2d009fdad0607f42b33f368e6693dec,Assets/Assets/Images/Cards/Stage2/Image_Card_BalloonPeng_Stage2.png
+Asset,Assets/Assets/Images/Cards/3단계/1-모닥콩 3.png,c2037f48dae22e1458006158fdf33b2f,Assets/Assets/Images/Cards/Stage3/Image_Card_Campbean_Stage3.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/힐러.png,e26739d221404d6419107760944cf4a3,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Healer_Enabled.png
+Asset,Assets/SO/Cards/바위콩.asset,036742cff2ca40e4b97950f6762fb705,Assets/SO/Cards/Data_Card_Rockbean.asset
+Asset,Assets/Assets/Images/Cards/1단계/24-우드혼 1.png,03ffa3efd50149d0b0f3ae200ebf8355,Assets/Assets/Images/Cards/Stage1/Image_Card_Woodhorn_Stage1.png
+Asset,Assets/Assets/Images/Cards/2단계/11-화르륵스 2.png,1301e6fe0e01a9a4e8d54e852ac29398,Assets/Assets/Images/Cards/Stage2/Image_Card_Flarelux_Stage2.png
+Asset,Assets/SO/Cards/찌릿핀.asset,23b19316545684949b7cfbe0b45b710e,Assets/SO/Cards/Data_Card_Sparkfin.asset
+Asset,Assets/Assets/Images/Cards/2단계/12-철갑몽치 2.png,232a4c95d28f23841878ea3b15deb26e,Assets/Assets/Images/Cards/Stage2/Image_Card_IronMongchi_Stage2.png
+Asset,Assets/SO/Synergies/성벽.asset,63b612a11a7b10b48a25d5832d4d3801,Assets/SO/Synergies/Data_Synergy_Rampart.asset
+Asset,Assets/Assets/Images/Cards/3단계/11-화르륵스 3.png,637fa720d8bf0854cad0548218791b95,Assets/Assets/Images/Cards/Stage3/Image_Card_Flarelux_Stage3.png
+Asset,Assets/Assets/Images/Cards/1단계/6-깜밤이 1.png,83af70e1fb8d056d4a4597a2a1fedf96,Assets/Assets/Images/Cards/Stage1/Image_Card_Nightchestnut_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/덩치.png,931801dee12b9f14792db4faae2680cd,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Bulk_Enabled.png
+Asset,Assets/Assets/Images/Cards/2단계/16-늪꾸리 2.png,c3722d4fbeb5a4046aef5f25f9ab7ee1,Assets/Assets/Images/Cards/Stage2/Image_Card_Swampfrog_Stage2.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/무쌍_disabled.png,c3d3cc678fe00b047a9cebe3ace7738e,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Peerless_Disabled.png
+Asset,Assets/Assets/Images/Cards/1단계/17-번개뿔 1.png,c37a48f638d00c9754451ce749e36365,Assets/Assets/Images/Cards/Stage1/Image_Card_Thunderhorn_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/1-모닥콩 1.png,045b17ccb60ea412649b1b67e201d368,Assets/Assets/Images/Cards/Stage1/Image_Card_Campbean_Stage1.png
+Asset,Assets/SO/Synergies/Effects/비늘_DmgReduction.asset,24c0c4332e35fa54ab54b69fe5468c1d,Assets/SO/Synergies/Effects/Data_SynergyEffect_Scale_DmgReduction.asset
+Asset,Assets/Assets/Images/Icons/SynergyIcon/비늘.png,446fe3b6a53368a409492d9e03fce9aa,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Scale_Enabled.png
+Asset,Assets/Assets/Images/Synergy/덩치_body.prefab,5421a9bdcfed0bb46a879c7e2b51e377,Assets/Assets/Images/Synergy/Vfx_Synergy_Bulk_Body.prefab
+Asset,Assets/Assets/Images/Cards/1단계/13-풍선펭 1.png,54f8ab70785fdc2cd4b1a435d379976e,Assets/Assets/Images/Cards/Stage1/Image_Card_BalloonPeng_Stage1.png
+Asset,Assets/Assets/Images/Cards/2단계/30-왕밤도치 2.png,6439cd0c2718d144d8bcf9cc1cd18a31,Assets/Assets/Images/Cards/Stage2/Image_Card_KingChestnutHedgehog_Stage2.png
+Asset,Assets/Assets/Images/Cards/2단계/27-수정뿔루 2.png,7437d2e3730f5a7469ac19fd023054e3,Assets/Assets/Images/Cards/Stage2/Image_Card_Crystalhorn_Stage2.png
+Asset,Assets/Assets/Images/Cards/3단계/26-모래몽 3.png,d46c33f2380009841982907b2d351299,Assets/Assets/Images/Cards/Stage3/Image_Card_Sandmong_Stage3.png
+Asset,Assets/Assets/Images/Cards/3단계/4-물방울릉 3.png,d40f3cbee62b2d54eb131e2370c9a8e5,Assets/Assets/Images/Cards/Stage3/Image_Card_WaterdropLong_Stage3.png
+Asset,Assets/Assets/Images/Cards/1단계/29-꿈먹이 1.png,e484b8aab5d154bd683ca1a1e79e70b8,Assets/Assets/Images/Cards/Stage1/Image_Card_Dreameater_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/5-바위콩 1.png,056de8299a97d16feda45db633f83c89,Assets/Assets/Images/Cards/Stage1/Image_Card_Rockbean_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/9-꿀꿀비 1.png,3598f6dd3630ec476d141ca614cf6bd5,Assets/Assets/Images/Cards/Stage1/Image_Card_Honeybee_Stage1.png
+Asset,Assets/Assets/Images/Cards/CardFrame/표식.png,458539dae2e1fcd489e09f919222ac20,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Mark.png
+Asset,Assets/Assets/Images/Cards/CardArt/물방울룽_cardart.png,45e67ae1f435d2243bd1a0ca50f61c0e,Assets/Assets/Images/Cards/CardArt/Image_Card_WaterdropLong_Art.png
+Asset,Assets/SO/Cards/톱니두더.asset,75b26e88605fc0441946a724f55d19a2,Assets/SO/Cards/Data_Card_Gearmole.asset
+Asset,Assets/Assets/Images/Cards/3단계/7-솜구름몸 3.png,7577244ae929f8f479b6886e2131a547,Assets/Assets/Images/Cards/Stage3/Image_Card_Cloudmong_Stage3.png
+Asset,Assets/SO/Synergies/언데드.asset,a59a9ebdd6705f84fac97090c1cc310e,Assets/SO/Synergies/Data_Synergy_Undead.asset
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/교활.png,d5ea8296ad448fd4d8ec3895855d4547,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Cunning_Enabled.png
+Asset,Assets/Assets/Video/3-찌릿핀 영상.mp4,e548ea1c2cc017e49a1ec1843b00bd89,Assets/Assets/Video/Video_Card_Sparkfin.mp4
+Asset,Assets/Assets/Images/Cards/1단계/7-솜구름몽 1.png,f52364e17f9b803e29e1bcd64b581921,Assets/Assets/Images/Cards/Stage1/Image_Card_Cloudmong_Stage1.png
+Asset,Assets/SO/Cards/자석게.asset,06a290ad1d4489a48b06f3d423941aa4,Assets/SO/Cards/Data_Card_MagnetCrab.asset
+Asset,Assets/Assets/Images/Cards/3단계/10-톱니두더 3.png,165aad73094b2ab40958bcc8175543b2,Assets/Assets/Images/Cards/Stage3/Image_Card_Gearmole_Stage3.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/덩치_disabled.png,26e499ad1ca6e0a4aae82616afb7f8bc,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Bulk_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/26-모래몽 2.png,26fc67884e02e5e459d6fdfc70b990ec,Assets/Assets/Images/Cards/Stage2/Image_Card_Sandmong_Stage2.png
+Asset,Assets/SO/Cards/꿀꿀비.asset,36745bec5e9c1f544b5965c8faf65fb8,Assets/SO/Cards/Data_Card_Honeybee.asset
+Asset,Assets/Assets/Images/Cards/3단계/2-포슬램 3.png,469c42e74b016cb478b1f82fea52fa40,Assets/Assets/Images/Cards/Stage3/Image_Card_Poslamb_Stage3.png
+Asset,Assets/Assets/Video/6-깜밤이 3 영상.mp4,56e33f7a820755e4d810ac84483ead98,Assets/Assets/Video/Video_Card_Nightchestnut_Stage3.mp4
+Asset,Assets/Assets/Images/Cards/3단계/22-헤롱문어 3.png,568787ccb51e7684fa1143da50247fe4,Assets/Assets/Images/Cards/Stage3/Image_Card_DizzyOctopus_Stage3.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/무리.png,66706a239f4726e41b9720c04dc34082,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Swarm_Enabled.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/원거리.png,661b51da39d6eeb4b9a73a415cd374bc,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Ranged_Enabled.png
+Asset,Assets/Assets/Images/Cards/1단계/23-폭탄밤 1.png,76d80665c27d779480ce8fffb3b46c79,Assets/Assets/Images/Cards/Stage1/Image_Card_Bombbat_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/청소부.png,763e9b46d1a622641b325f242f859e28,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Cleaner_Enabled.png
+Asset,Assets/Assets/Images/Synergy/덩치_anim.anim,96311bdfb0ef7bc41bc52fc57e2c1bbb,Assets/Assets/Images/Synergy/Anim_Synergy_Bulk.anim
+Asset,Assets/SO/Cards/AttackEffects/와글도도AttackEffect.asset,969986abe04d9bf48a94145d59603f10,Assets/SO/Cards/AttackEffects/Data_AttackEffect_Waggledodo.asset
+Asset,Assets/Assets/Images/Cards/2단계/15-별토리 2.png,a6ea06b9bace67e4a8d40c2a7a97f20e,Assets/Assets/Images/Cards/Stage2/Image_Card_Startori_Stage2.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/원거리_disabled.png,b69620b46f2e4d8419c291314f96b728,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Ranged_Disabled.png
+Asset,Assets/SO/Cards/우드혼.asset,c62abaa4d045b3c49aaae43a17b6d943,Assets/SO/Cards/Data_Card_Woodhorn.asset
+Asset,Assets/Assets/Images/Synergy/덩치_body.controller,d67552d37a0147d439435ea87c40336f,Assets/Assets/Images/Synergy/Ctrl_Synergy_Bulk_Body.controller
+Asset,Assets/Assets/Images/Cards/2단계/19-눈덩곰 2.png,17dc3d48a61fbb94c9456ee7b16dce4f,Assets/Assets/Images/Cards/Stage2/Image_Card_SnowballBear_Stage2.png
+Asset,Assets/SO/Cards/화르룩스.asset,372e400ce5a3ec1499830a41fa0b64df,Assets/SO/Cards/Data_Card_Flarelux.asset
+Asset,Assets/Assets/Images/Synergy/덩치_body.png,4701a670a56153940a50bdf6443f6294,Assets/Assets/Images/Synergy/Image_Synergy_Bulk_Body.png
+Asset,Assets/Assets/Images/Cards/1단계/19-눈덩곰 1.png,47ec6bf24e01d3a6f8154a2f1a1a5b4a,Assets/Assets/Images/Cards/Stage1/Image_Card_SnowballBear_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/4-물방울룽 1.png,5793bf1bb5fa72800c3560b12a654ee6,Assets/Assets/Images/Cards/Stage1/Image_Card_WaterdropLong_Stage1.png
+Asset,Assets/SO/Synergies/Effects/무리_Swarm.asset,6714f924cc2de3740b8230693b5495a7,Assets/SO/Synergies/Effects/Data_SynergyEffect_Swarm_Swarm.asset
+Asset,Assets/Assets/Images/Cards/2단계/4-물방울룽 2.png,67df5c5cc371cf34da8e32a03041447a,Assets/Assets/Images/Cards/Stage2/Image_Card_WaterdropLong_Stage2.png
+Asset,Assets/SO/Cards/AttackEffects/찌릿핀3AttackEffect.asset,77b6d36e1a62ff546919cdb5f5771344,Assets/SO/Cards/AttackEffects/Data_AttackEffect_Sparkfin_Stage3.asset
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/교활_disabled.png,87d76627647aec9418ea7fb99c51de17,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Cunning_Disabled.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/처형.png,8709db639ab9fe5478a3226a9e3b3662,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Execution_Enabled.png
+Asset,Assets/Assets/Images/Cards/CardFrame/원거리_01.png,a7667528c7e0fc541a7fa20e2da6668e,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged_Variant01.png
+Asset,Assets/Assets/Images/Cards/CardFrame/Bow_0003_레이어-1.png,a7c96e51b0929fe4997ec4b113887089,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged_Bow_Variant0003.png
+Asset,Assets/Assets/Images/Cards/1단계/12-철갑몽치 1.png,b7741208eda4c99fd01c8037e2dcfd7e,Assets/Assets/Images/Cards/Stage1/Image_Card_IronMongchi_Stage1.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/처형_diabled.png,b736e2aaf4d6b8045bb9253d3e9acc93,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Execution_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/28-대장부리 2.png,c74c6adaaa1edfc40b24301e950ab213,Assets/Assets/Images/Cards/Stage2/Image_Card_CaptainBeak_Stage2.png
+Asset,Assets/SO/Cards/AttackEffects/버섯냥AttackEffect.asset,d7803c9bdf127414b9f3e5347928c39a,Assets/SO/Cards/AttackEffects/Data_AttackEffect_MushroomCat.asset
+Asset,Assets/Assets/Images/Cards/3단계/20-와글도도 3.png,d71350b0236e7324ebf8796554081791,Assets/Assets/Images/Cards/Stage3/Image_Card_Waggledodo_Stage3.png
+Asset,Assets/Assets/Images/UI/파편.png,e7c4806631774c54688353283db03c8d,Assets/Assets/Images/UI/Image_UI_Fragment.png
+Asset,Assets/Assets/Images/Cards/CardArt/꿀꿀비_cardart.png,e70c9f848d8fd704497d7026693e3013,Assets/Assets/Images/Cards/CardArt/Image_Card_Honeybee_Art.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/성벽.png,f76294d05aaa974498faf69479d58af0,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Rampart_Enabled.png
+Asset,Assets/Assets/Images/UI/화면 캡처 2026-08-11 193526.png,f71b4321e326df94bb06321cf68aafeb,Assets/Assets/Images/UI/Image_UI_Screenshot_20260811193526.png
+Asset,Assets/SO/Synergies/비늘.asset,f7ab12f62bfb6934581309d59e27d0aa,Assets/SO/Synergies/Data_Synergy_Scale.asset
+Asset,Assets/Assets/Images/Cards/1단계/15-별토리 1.png,0813913c13a638bff5148be2cda1f762,Assets/Assets/Images/Cards/Stage1/Image_Card_Startori_Stage1.png
+Asset,Assets/Assets/Images/Cards/3단계/24-우드혼 3.png,18f0755bd8f13d4459578fe32483c931,Assets/Assets/Images/Cards/Stage3/Image_Card_Woodhorn_Stage3.png
+Asset,Assets/SO/Synergies/Effects/돌보미_Caretaker.asset,180216abb08b44947b486290b8276e51,Assets/SO/Synergies/Effects/Data_SynergyEffect_Caretaker_Caretaker.asset
+Asset,Assets/Assets/Images/Cards/2단계/20-와글도도 2.png,18257f3f2249ed040a81cd5e0bb57db8,Assets/Assets/Images/Cards/Stage2/Image_Card_Waggledodo_Stage2.png
+Asset,Assets/SO/Cards/AttackEffects/파도리AttackEffect.asset,1869af0b0d30c4c45be25d0524cef43d,Assets/SO/Cards/AttackEffects/Data_AttackEffect_Waveri.asset
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/기본.png,78558ad01585c8b43a6729a179712f11,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Default_Enabled.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/힐러_disabled.png,98debdb431379e24d98db423150e221d,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Healer_Disabled.png
+Asset,Assets/Assets/Images/Synergy/비늘_emblem.png,a82fceefc8597974c8f89eb9e152755c,Assets/Assets/Images/Synergy/Image_Synergy_Scale_Emblem.png
+Asset,Assets/Assets/Images/Cards/2단계/18-단풍꼬리 2.png,b863fc091d133d1478f2112a968ea7ab,Assets/Assets/Images/Cards/Stage2/Image_Card_Mapletail_Stage2.png
+Asset,Assets/Assets/Images/Synergy/성벽_emblem_separated.png,b8f4c9a4a8b5dae4e94cb13e43a80c5e,Assets/Assets/Images/Synergy/Image_Synergy_Rampart_Emblem_Separated.png
+Asset,Assets/Assets/Images/UI/파편.mat,09f63846483570e4eb7ec1119516358f,Assets/Assets/Images/UI/Mat_UI_Fragment.mat
+Asset,Assets/SO/Synergies/Effects/언데드_Undead.asset,190848bedbc945d4790873715d2a3005,Assets/SO/Synergies/Effects/Data_SynergyEffect_Undead_Undead.asset
+Asset,Assets/SO/Cards/포슬램.asset,193e18bd3b742be4da0eaa7142ba279d,Assets/SO/Cards/Data_Card_Poslamb.asset
+Asset,Assets/Assets/Images/Icons/SynergyIcon/유산.png,295750674e1f14e40ba97825527be08d,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Legacy_Enabled.png
+Asset,Assets/Assets/Images/Cards/2단계/3-찌릿핀 2.png,8985cfef17bec1a4fb45f9aa80879aba,Assets/Assets/Images/Cards/Stage2/Image_Card_Sparkfin_Stage2.png
+Asset,Assets/Assets/Images/Cards/3단계/18-단풍꼬리 3.png,99d19ef028e86024f8822659d693339a,Assets/Assets/Images/Cards/Stage3/Image_Card_Mapletail_Stage3.png
+Asset,Assets/Assets/Images/Cards/2단계/29-꿈먹이 2.png,992c09225174f6849b2605580b7faff4,Assets/Assets/Images/Cards/Stage2/Image_Card_Dreameater_Stage2.png
+Asset,Assets/Assets/Images/Cards/1단계/21-자석게 1.png,99be48067e068fc16b6057fa65c30b1b,Assets/Assets/Images/Cards/Stage1/Image_Card_MagnetCrab_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/유산_disabled.png,99ce4ddd989c1514488f30738ee7b26b,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Legacy_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/22-헤롱문어 2.png,a991cdd0180cf2e46a23d7023ae1e594,Assets/Assets/Images/Cards/Stage2/Image_Card_DizzyOctopus_Stage2.png
+Asset,Assets/Assets/Images/Cards/1단계/22-헤롱문어 1.png,a98e2542a3dd701deed2256ecef9d40f,Assets/Assets/Images/Cards/Stage1/Image_Card_DizzyOctopus_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/20-와글도도 1.png,c96ea0adfc4dd55b875a249451f168fe,Assets/Assets/Images/Cards/Stage1/Image_Card_Waggledodo_Stage1.png
+Asset,Assets/SO/Cards/철갑몽치.asset,d9168d008093f5744ade5ed55354b2d9,Assets/SO/Cards/Data_Card_IronMongchi.asset
+Asset,Assets/Assets/Images/Cards/1단계/10-톱니두더 1.png,e9f8153ed5ff59f5029cbca2c46e534d,Assets/Assets/Images/Cards/Stage1/Image_Card_Gearmole_Stage1.png
+Asset,Assets/Assets/Images/Cards/3단계/23-폭탄밤 3.png,f9b23a5140815df498d0cd93c39d66ca,Assets/Assets/Images/Cards/Stage3/Image_Card_Bombbat_Stage3.png
+Asset,Assets/SO/Cards/수정뿔루.asset,0a1b2c3d4e5f60718293a4b5c6d7e8f9,Assets/SO/Cards/Data_Card_Crystalhorn.asset
+Asset,Assets/Assets/Particle/Anim/원거리.controller,3abb23589dcef094086f7c1c26c6a283,Assets/Assets/Particle/Anim/Ctrl_Vfx_Ranged.controller
+Asset,Assets/Assets/Images/Icons/SynergyIcon/돌보미_disabled.png,3a4c16d21cdc99a4fbefbf03f3bf3f35,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Caretaker_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/17-번개뿔 2.png,5a1329cc4c475bc4ab765511735db6a3,Assets/Assets/Images/Cards/Stage2/Image_Card_Thunderhorn_Stage2.png
+Asset,Assets/SO/Cards/번개뿔.asset,6ac185a03b471024a929d05d57ff3257,Assets/SO/Cards/Data_Card_Thunderhorn.asset
+Asset,Assets/Assets/Images/Cards/2단계/2-포슬램 2.png,6a8b7c69ff7745943ac945655730372d,Assets/Assets/Images/Cards/Stage2/Image_Card_Poslamb_Stage2.png
+Asset,Assets/Assets/Images/Cards/CardFrame/원거리.png,8aaabaf173753b74cb9fb17e5711e66b,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged.png
+Asset,Assets/Assets/Images/Cards/3단계/30-왕밤도치 3.png,8a5f6e0e2830bb34a82af0a350475902,Assets/Assets/Images/Cards/Stage3/Image_Card_KingChestnutHedgehog_Stage3.png
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/도발_disabled.png,aabe0be006c8692409ee7c0ecaa12d30,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Taunt_Disabled.png
+Asset,Assets/SO/Cards/꿈먹이.asset,caa736112507975438e1965498e8f086,Assets/SO/Cards/Data_Card_Dreameater.asset
+Asset,Assets/Assets/Images/Cards/3단계/16-늪꾸리 3.png,ea4367fe077504a49befd6512ab04011,Assets/Assets/Images/Cards/Stage3/Image_Card_Swampfrog_Stage3.png
+Asset,Assets/SO/Cards/별토리.asset,0b5011e0519ea9d4c8d60963804e0475,Assets/SO/Cards/Data_Card_Startori.asset
+Asset,Assets/Assets/Images/Cards/CardFrame/원거리 Right.png,1b419209eff8ada49b7350a1fe5370e5,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged_Right.png
+Asset,Assets/Assets/Images/Synergy/성벽_emblem.png,5bc4bc6fcae22c04bbed03b31eb66438,Assets/Assets/Images/Synergy/Image_Synergy_Rampart_Emblem.png
+Asset,Assets/Assets/Images/Cards/1단계/28-대장부리 1.png,6b1b8fc006b3e2533c6639ca087b96c5,Assets/Assets/Images/Cards/Stage1/Image_Card_CaptainBeak_Stage1.png
+Asset,Assets/SO/Cards/해롱문어.asset,7be8b0dd314722748b4a4ea9476df64c,Assets/SO/Cards/Data_Card_DizzyOctopus.asset
+Asset,Assets/Assets/Images/Cards/CardFrame/처형.png,8b989cd213e6aab469c4cb3a37ec529b,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Execution.png
+Asset,Assets/SO/Cards/버섯냥.asset,8b6d562eaff71204fa89713403d2acce,Assets/SO/Cards/Data_Card_MushroomCat.asset
+Asset,Assets/SO/Synergies/유산.asset,9bff0080901fae44eb15d5dfea14a160,Assets/SO/Synergies/Data_Synergy_Legacy.asset
+Asset,Assets/SO/Synergies/돌보미.asset,eb2ed99578dee8343bcb851b4578ddae,Assets/SO/Synergies/Data_Synergy_Caretaker.asset
+Asset,Assets/Assets/Images/Cards/3단계/15-별토리 3.png,0cce95d1ac3666249989e950a9c9582f,Assets/Assets/Images/Cards/Stage3/Image_Card_Startori_Stage3.png
+Asset,Assets/Assets/Images/Cards/2단계/7-솜구름몽 2.png,1c7802b905acb03499fd7ce195b873db,Assets/Assets/Images/Cards/Stage2/Image_Card_Cloudmong_Stage2.png
+Asset,Assets/Assets/Images/Cards/CardFrame/원거리 Left.png,2c586c6b20070b347ba48b5deebab779,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged_Left.png
+Asset,Assets/SO/Cards/와글도도.asset,4c49414ab639d5c4e83d5d5d7af945cb,Assets/SO/Cards/Data_Card_Waggledodo.asset
+Asset,Assets/Assets/Images/Icons/KeyworkIcon/무쌍.png,4cceb8fb0dec19742a555fc0464b1115,Assets/Assets/Images/Icons/KeywordIcon/Icon_Keyword_Peerless_Enabled.png
+Asset,Assets/Assets/Images/Cards/1단계/8-얼음꼬미 1.png,7c90cfc89d5464f29a8b81a08dc2d983,Assets/Assets/Images/Cards/Stage1/Image_Card_Icekomi_Stage1.png
+Asset,Assets/SO/Synergies/Effects/흐름_Flow.asset,7c577ba35b9538a4585c1423e80fc3ef,Assets/SO/Synergies/Effects/Data_SynergyEffect_Flow_Flow.asset
+Asset,Assets/SO/Cards/물방울룽.asset,cc526d656ba20e7479b875214496369b,Assets/SO/Cards/Data_Card_WaterdropLong.asset
+Asset,Assets/Assets/Images/Cards/CardFrame/교활.png,dc13f6b1b991dda4494a78f6ca329049,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Cunning.png
+Asset,Assets/SO/Synergies/무리.asset,fcb84e498c66194468fe9a236338aa3e,Assets/SO/Synergies/Data_Synergy_Swarm.asset
+Asset,Assets/Assets/Images/Cards/3단계/29-꿈먹이 3.png,0d08bad4037063146a77b6eebc18808a,Assets/Assets/Images/Cards/Stage3/Image_Card_Dreameater_Stage3.png
+Asset,Assets/Assets/Images/Cards/3단계/8-얼음꼬미 3.png,3de304478fa08e340832f04f7d59066e,Assets/Assets/Images/Cards/Stage3/Image_Card_Icekomi_Stage3.png
+Asset,Assets/Assets/Images/Cards/3단계/6-깜밤이 3.png,4d66529454fb22b43acc6f06ca68b8b3,Assets/Assets/Images/Cards/Stage3/Image_Card_Nightchestnut_Stage3.png
+Asset,Assets/SO/Cards/얼음꼬미.asset,4d1aba428ef74f2469117b1bd542bea4,Assets/SO/Cards/Data_Card_Icekomi.asset
+Asset,Assets/SO/Synergies/흐름.asset,6df69963cdc40944aacf02ccc9ff7fde,Assets/SO/Synergies/Data_Synergy_Flow.asset
+Asset,Assets/SO/Synergies/Effects/성벽_Rampart.asset,7df0d6e04fff90345af21af4aa44fa22,Assets/SO/Synergies/Effects/Data_SynergyEffect_Rampart_Rampart.asset
+Asset,Assets/Assets/Images/Cards/1단계/25-파도리 1.png,7dbd2fd9da78ba8c7187ce996f887e67,Assets/Assets/Images/Cards/Stage1/Image_Card_Waveri_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/11-화르륵스 1.png,9dccf6e719b1bce54521bfa0808f2f03,Assets/Assets/Images/Cards/Stage1/Image_Card_Flarelux_Stage1.png
+Asset,Assets/SO/Cards/왕밤도치.asset,ada0959f8c1a4054c9d5803cbd9d18a7,Assets/SO/Cards/Data_Card_KingChestnutHedgehog.asset
+Asset,Assets/Assets/Images/Cards/3단계/9-꿀꿀비 3.png,bd30f391097addd479f42b52435ad388,Assets/Assets/Images/Cards/Stage3/Image_Card_Honeybee_Stage3.png
+Asset,Assets/SO/Cards/깜밤이.asset,bd45ce87e1bb2064399918c19b8a03bf,Assets/SO/Cards/Data_Card_Nightchestnut.asset
+Asset,Assets/Assets/Images/Cards/CardArt/대장부리_cardart.png,bd4c691efeae73346ac7ccaa78d571b0,Assets/Assets/Images/Cards/CardArt/Image_Card_CaptainBeak_Art.png
+Asset,Assets/Assets/Images/Synergy/덩치_arm.png,0e4f1701c8ae32944b573f21c5bd3382,Assets/Assets/Images/Synergy/Image_Synergy_Bulk_Arm.png
+Asset,Assets/SO/Synergies/Effects/유산_Legacy.asset,1e5efc108928d354c81febdcd1d78e48,Assets/SO/Synergies/Effects/Data_SynergyEffect_Legacy_Legacy.asset
+Asset,Assets/Assets/Images/Icons/SynergyIcon/언데드_disabled.png,2ef74ad92d340f14790185b01580ce8e,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Undead_Disabled.png
+Asset,Assets/Assets/Images/Cards/2단계/5-바위콩 2.png,2e7cf94a11b82834da2efeaf59a42211,Assets/Assets/Images/Cards/Stage2/Image_Card_Rockbean_Stage2.png
+Asset,Assets/Assets/Images/Cards/1단계/16-늪꾸리 1.png,2e5e59c554f8fb14d6f867dccfaab10a,Assets/Assets/Images/Cards/Stage1/Image_Card_Swampfrog_Stage1.png
+Asset,Assets/Assets/Images/Cards/2단계/14-버섯냥 2.png,6e003421d556bb44d9fe4e111c0937db,Assets/Assets/Images/Cards/Stage2/Image_Card_MushroomCat_Stage2.png
+Asset,Assets/Assets/Images/Cards/1단계/27-수정뿔루 1.png,6ed138516e2b9fda82fcf82ea1569014,Assets/Assets/Images/Cards/Stage1/Image_Card_Crystalhorn_Stage1.png
+Asset,Assets/Assets/Images/Cards/CardFrame/원거리 Middle.png,7ee15e2a58eb6b349bdd6861478d090a,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Ranged_Middle.png
+Asset,Assets/SO/Synergies/청소부.asset,7e6c20c2bb8b5ad4c8b36ec6373665fa,Assets/SO/Synergies/Data_Synergy_Cleaner.asset
+Asset,Assets/Assets/Images/Cards/3단계/27-수정뿔루 3.png,ae322aa4e09c3d84097854d63e9a6f70,Assets/Assets/Images/Cards/Stage3/Image_Card_Crystalhorn_Stage3.png
+Asset,Assets/SO/Cards/파도리.asset,aed619ad3c0bf034ba945e5dcb9b346a,Assets/SO/Cards/Data_Card_Waveri.asset
+Asset,Assets/Assets/Images/Cards/1단계/14-버섯냥 1.png,bec705a1deb1be0593477bc19f4bf25f,Assets/Assets/Images/Cards/Stage1/Image_Card_MushroomCat_Stage1.png
+Asset,Assets/Assets/Images/Cards/1단계/3-찌릿핀 1_3x4.png,be8901cbddebcd57bc43fe1daa328b3b,Assets/Assets/Images/Cards/Stage1/Image_Card_Sparkfin_Stage1_Portrait3x4.png
+Asset,Assets/Assets/Video/7-솜구름몸 3 영상.mp4,ce4140d369f5e9c43b6b8d972fa8d707,Assets/Assets/Video/Video_Card_Cloudmong_Stage3.mp4
+Asset,Assets/SO/Cards/솜구름몽.asset,ce0a5e42a8b9f1047b673643e0a2811e,Assets/SO/Cards/Data_Card_Cloudmong.asset
+Asset,Assets/SO/Synergies/덩치.asset,dee4791a461125448898b01d9b781ae5,Assets/SO/Synergies/Data_Synergy_Bulk.asset
+Asset,Assets/Assets/Images/Cards/CardFrame/힐러.png,dead461148008d8459d71c5b4aa5d43c,Assets/Assets/Images/Cards/CardFrame/Image_CardFrame_Healer.png
+Asset,Assets/Assets/Video/4-물방울룽3 영상 A.mp4,eecaef79dc05eac40871dcc77fe710da,Assets/Assets/Video/Video_Card_WaterdropLong_Stage3_A.mp4
+Asset,Assets/Assets/Images/Icons/SynergyIcon/무리_disabled.png,fe00ab13443fd6f4fb921caf9c9fdcbc,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Swarm_Disabled.png
+Asset,Assets/Assets/Images/화면 캡처 2026-08-14 163310.png,fe724d092655d38478fcacc493cd3c65,Assets/Assets/Images/Image_Reference_Screenshot_20260814163310.png
+Asset,Assets/Assets/Images/Cards/3단계/28-대장부리 3.png,feac7d5cdd6426e47bfdd96252c9f630,Assets/Assets/Images/Cards/Stage3/Image_Card_CaptainBeak_Stage3.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/언데드.png,1f39f90d4bca7bb4f8783a0f81c73c2a,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Undead_Enabled.png
+Asset,Assets/Assets/Images/Cards/3단계/5-바위콩 3.png,4fd7ffc34fb24a547a4bf90bfde28db9,Assets/Assets/Images/Cards/Stage3/Image_Card_Rockbean_Stage3.png
+Asset,Assets/Assets/Images/Cards/1단계/18-단풍꼬리 1.png,5f9e92e1dd4b27feb87b2161652ce671,Assets/Assets/Images/Cards/Stage1/Image_Card_Mapletail_Stage1.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/흐름.png,6fd7e39804ddcec43ac9ba8a0aae1ea6,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Flow_Enabled.png
+Asset,Assets/Assets/Images/Cards/2단계/6-깜밤이 2.png,6f089d7b32038494bb7f3aa7514579fd,Assets/Assets/Images/Cards/Stage2/Image_Card_Nightchestnut_Stage2.png
+Asset,Assets/SO/Synergies/Effects/덩치_BonusHp.asset,7fe982b8a25ec3040a6d1069522fc31b,Assets/SO/Synergies/Effects/Data_SynergyEffect_Bulk_BonusHp.asset
+Asset,Assets/SO/Cards/AttackEffects/모래몽AttackEffect.asset,9fe3558b2652cb7479a48f6933852b5a,Assets/SO/Cards/AttackEffects/Data_AttackEffect_Sandmong.asset
+Asset,Assets/SO/Cards/폭탄밤.asset,9f8e7d6c5b4a39281706f5e4d3c2b1a0,Assets/SO/Cards/Data_Card_Bombbat.asset
+Asset,Assets/Assets/Images/Cards/3단계/21-자석게 3.png,af640803ec164bb4b9ccf86e7a9eb077,Assets/Assets/Images/Cards/Stage3/Image_Card_MagnetCrab_Stage3.png
+Asset,Assets/Assets/Images/Icons/SynergyIcon/비늘_disabled.png,df536d235c30e2544a7f3a52e47d851f,Assets/Assets/Images/Icons/SynergyIcon/Icon_Synergy_Scale_Disabled.png
+Asset,Assets/Assets/Images/Cards/3단계/19-눈덩곰 3.png,ef17b3b248162824aaab586988231b00,Assets/Assets/Images/Cards/Stage3/Image_Card_SnowballBear_Stage3.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/circle_ADD.mat,4bf10d94145fd6c4187c18de0af92e43,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_CircleADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/cloud_2x2_soft_AB.mat,719f8d52fe2e6b444b41c2f7a8fe587b,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_Cloud2x2SoftAB.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/glow1_ADD.mat,e653836c30661fe419b8992e230ca189,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_Glow1ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/glow2_ADD.mat,b29e688b444288148ad46d4aae66cffc,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_Glow2ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/gradient_vertical_ADD.mat,9d5f3d715091cd34e97ba2941c6fb73f,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_GradientVerticalADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/ring_nofade_ADD.mat,9eb479f5a4882b2448c5740a38a0cdc0,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_RingNofadeADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Basics/sparkle2_ADD.mat,1fe38ac1a569ae54590f6e2aff679c74,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Basics/Mat_Vfx_EpicToonFX_Sparkle2ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Magic/magic_orb2_ADD.mat,1bafc7aca6a15ce4a92553883cdf5612,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Magic/Mat_Vfx_EpicToonFX_MagicOrb2ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Magic/magic_runecircle_ADD.mat,3fa6ea0a3e6cad146826ea728c857403,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Magic/Mat_Vfx_EpicToonFX_MagicRunecircleADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Sword/slash02_ADD.mat,d37aef7de1fc0aa42810d38ede4bce9f,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Sword/Mat_Vfx_EpicToonFX_Slash02ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Sword/slash03_AB.mat,6e95095aaaabd654b99cc226c305f807,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Sword/Mat_Vfx_EpicToonFX_Slash03AB.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Sword/slash03_ADD.mat,c00f4ebbd07bea24f9aeb168ec407416,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Sword/Mat_Vfx_EpicToonFX_Slash03ADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Sword/slash_ADD.mat,9e2411d65e8b2094eaa91113863f37d4,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Sword/Mat_Vfx_EpicToonFX_SlashADD.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Unsorted/wave_soft_AB.mat,95125be5b97ce6c42bad282b13127fdb,Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Unsorted/Mat_Vfx_EpicToonFX_WaveSoftAB.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Models/aura_straight.FBX,cdd7228b39c07dc48a7a8667d55dcb30,Assets/Assets/Particle/_Vendor/Epic Toon FX/Models/Model_Vfx_EpicToonFX_AuraStraight.fbx
+Asset,Assets/PurchasedAssets/Epic Toon FX/Models/ETFX_CirclePlane2.FBX,a98fc6255fba6aa4f9629b8b2fe76a25,Assets/Assets/Particle/_Vendor/Epic Toon FX/Models/Model_Vfx_EpicToonFX_ETFXCirclePlane2.fbx
+Asset,Assets/PurchasedAssets/Epic Toon FX/Models/ETFX_CirclePlaneHalf.FBX,8e620388dfe970e4882c798a0b3849dd,Assets/Assets/Particle/_Vendor/Epic Toon FX/Models/Model_Vfx_EpicToonFX_ETFXCirclePlaneHalf.fbx
+Asset,Assets/PurchasedAssets/Epic Toon FX/Models/Materials/verticalglow02.mat,4d88f57e14fff234aa6eacafa1ffdf3a,Assets/Assets/Particle/_Vendor/Epic Toon FX/Models/Materials/Mat_Vfx_EpicToonFX_Verticalglow02.mat
+Asset,Assets/PurchasedAssets/Epic Toon FX/Prefabs/Combat/Sword/Slash/SwordSlashThick/SwordSlashThickWhite.prefab,25f0520c9ecef6641af6ea648e95a88d,Assets/Assets/Particle/_Vendor/Epic Toon FX/Prefabs/Combat/Sword/Slash/SwordSlashThick/Vfx_Vfx_EpicToonFX_SwordSlashThickWhite.prefab
+Asset,Assets/PurchasedAssets/Epic Toon FX/Scripts/ETFXRotation.cs,7faa64a828219b44cb0eb5bfbfa83524,Assets/Assets/Particle/_Vendor/Epic Toon FX/Scripts/ETFXRotation.cs
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/circle.png,155f67fd8750f8e4e83c8efb1731f3a0,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Circle.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/cloud_2x2_soft.png,d91a7ceceb48b6d4eb7da66199435d99,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Cloud2x2Soft.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/glow1.png,75c822b01a637d547abc69e6f1f590b4,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Glow1.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/glow2.png,410f2af71183e2c49baecd196e30fdec,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Glow2.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/gradient_vertical.png,93ea19c7d0848ed47806cc339c1b1536,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_GradientVertical.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/magic_orb2.png,d771f7709ddd21f43a8d6ea0573d4f88,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_MagicOrb2.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/magic_runecircle.png,4f390ac040be34146a7ef5ea5ca3a776,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_MagicRunecircle.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/ring.png,a4280d58393322842afb10bcbcfc2a83,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Ring.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/slash02.png,2b5fb67be84c87243835738b6d3828c1,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Slash02.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/slash03.png,0db0d2c7ee689544ab71a3a24818a71c,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Slash03.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/slash_soft.png,ad2eaf8182c154b40a086d794c8d8ed1,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_SlashSoft.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/sparkle2.png,81c2794b522bc6a4fa81c3ad4900b9c6,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_Sparkle2.png
+Asset,Assets/PurchasedAssets/Epic Toon FX/Textures/wave_soft.png,34bce86b60bfc5341a004f5d17aa7349,Assets/Assets/Particle/_Vendor/Epic Toon FX/Textures/Image_Vfx_EpicToonFX_WaveSoft.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Shaders/AB_Unlit.shadergraph,f090c02c15e42bf41ba8388b37b3c21e,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Shaders/Shader_Vfx_GabrielAguiarProductions_ABUnlit.shadergraph
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Shaders/MasterScroll01_Unlit.shadergraph,8dd944eaa6c5f9d40a31d383a07fd824,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Shaders/Shader_Vfx_GabrielAguiarProductions_MasterScroll01Unlit.shadergraph
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Gradients/GradientCenter01_02.png,663540ab948415c4bac0ba0ab5ccc1da,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Gradients/Image_Vfx_GabrielAguiarProductions_GradientCenter0102.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Gradients/Gradient_blue.PNG,d886c0cb73a19514a8be80f38031dd73,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Gradients/Image_Vfx_GabrielAguiarProductions_GradientBlue.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Impact02.png,5e3c4fb784c03af49ad3bb4e3ddb6dcb,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Image_Vfx_GabrielAguiarProductions_Impact02.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Noises/Noise00.png,2f67131bd8bcd5540badff1422fbbf7b,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Noises/Image_Vfx_GabrielAguiarProductions_Noise00.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Noises/Noise000.png,0bc407057fece104db605879b2b919ec,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Noises/Image_Vfx_GabrielAguiarProductions_Noise000.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Noises/Noise01.png,82f4b06147155c54da475b309b9e24fa,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Noises/Image_Vfx_GabrielAguiarProductions_Noise01.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Noises/Noise02.png,28c7aad1372ff114b90d330f8a2dd938,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Noises/Image_Vfx_GabrielAguiarProductions_Noise02.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Noises/Noise03.TGA,7abc4a3e0daadb54db6e7cab23f2d71e,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Noises/Image_Vfx_GabrielAguiarProductions_Noise03.tga
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Spritesheets/UniqueProjectilesVol2_10X10_2K.png,f967218f2af851240a1e43437f13e560,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Spritesheets/Image_Vfx_GabrielAguiarProductions_UniqueProjectilesVol210X102K.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Spritesheets/UniqueProjectilesVol2_10X10_8K.png,dc1504da60856e747a11f936b44954b7,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Spritesheets/Image_Vfx_GabrielAguiarProductions_UniqueProjectilesVol210X108K.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/Textures/Trail01 - 2.png,9d7b5514b0dca6a41b78e3fa59346846,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/Textures/Image_Vfx_GabrielAguiarProductions_Trail012.png
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/ImpactWhite02_SGAddScroll_v4.mat,fd088cbeb45aae745bdf0863e870b924,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/Mat_Vfx_GabrielAguiarProductions_ImpactWhite02SGAddScrollV4.mat
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/UniqueProjectilesVol2_AB_10x10_8K.mat,f5e822387f720fe44b40ca86de4d240c,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/Mat_Vfx_GabrielAguiarProductions_UniqueProjectilesVol2AB10x108K.mat
+Asset,Assets/PurchasedAssets/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/UniqueProjectilesVol2_Add_10x10_8K.mat,278e580a216a1c04e97ca368ab7ca078,Assets/Assets/Particle/_Vendor/GabrielAguiarProductions/UniqueProjectilesVol_2/Materials/Mat_Vfx_GabrielAguiarProductions_UniqueProjectilesVol2Add10x108K.mat
+Asset,Assets/PurchasedAssets/GUIPackCartoon/Demo/Sprites/Buttons/Rectangles/Teal.png,5926ecd2aacfa41b8aebfa36b095df81,Assets/Assets/Images/UI/Image_UI_GUIPackCartoon_Button_Rectangle_Teal.png
+Asset,Assets/PurchasedAssets/GUIPackCartoon/Demo/Sprites/Icons/Icons Colored/Lock - Key/Lock - Sliver.png,9f5d8d64af1e1426aa3a2eba15472c75,Assets/Assets/Images/UI/Image_UI_GUIPackCartoon_Icon_Lock_Silver.png
+Asset,Assets/PurchasedAssets/GUIPackCartoon/Demo/Sprites/Icons/Icons Colored/Tools/Hammer.png,2a0a9073170504932a0b644a49c2e329,Assets/Assets/Images/UI/Image_UI_GUIPackCartoon_Icon_Tool_Hammer.png
+Asset,Assets/PurchasedAssets/GUIPackCartoon/Demo/Sprites/Shapes/Effects/Gradient.png,129a504731d774d51bc0e9e74c4cc2eb,Assets/Assets/Images/UI/Image_UI_GUIPackCartoon_Shape_Gradient.png
+Asset,Assets/PurchasedAssets/Hovl Studio/HSFiles/Textures/Flare6.png,fb60f4826d03c644c80d10aace44bfcb,Assets/Assets/Particle/_Vendor/Hovl Studio/HSFiles/Textures/Image_Vfx_HovlStudio_Flare6.png
+Asset,Assets/PurchasedAssets/MasterMagicFX/Commons/Models/Splash.fbx,fd05e2d6fedbb3848a84e0ab7998f960,Assets/Assets/Particle/_Vendor/MasterMagicFX/Commons/Models/Model_Vfx_MasterMagicFX_Splash.fbx
+Asset,Assets/PurchasedAssets/MasterMagicFX/Commons/Textures/GradientMaskHorizontal.png,8cc658b6018e2034386528e65b607b64,Assets/Assets/Particle/_Vendor/MasterMagicFX/Commons/Textures/Image_Vfx_MasterMagicFX_GradientMaskHorizontal.png
+Asset,Assets/PurchasedAssets/MasterMagicFX/Commons/Textures/GradientMaskVertical.png,5a20d78a06391a74195b3a898673fb63,Assets/Assets/Particle/_Vendor/MasterMagicFX/Commons/Textures/Image_Vfx_MasterMagicFX_GradientMaskVertical.png
+Asset,Assets/PurchasedAssets/MasterMagicFX/Commons/Textures/GradientMaskVertical3.png,699ca367ddad8cf4a9226f6a4e459dbc,Assets/Assets/Particle/_Vendor/MasterMagicFX/Commons/Textures/Image_Vfx_MasterMagicFX_GradientMaskVertical3.png
+Asset,Assets/PurchasedAssets/MasterStylizedProjectiles/Projectiles/Common/Textures/CommonGlow.png,697d2f01b8f1b1d49af66609860b2d94,Assets/Assets/Particle/_Vendor/MasterStylizedProjectiles/Projectiles/Common/Textures/Image_Vfx_MasterStylizedProjectiles_CommonGlow.png
+Asset,Assets/PurchasedAssets/MasterStylizedProjectiles/Projectiles/Common/Textures/Noise.png,3584f2bf4afb5284d91edb6a29126e62,Assets/Assets/Particle/_Vendor/MasterStylizedProjectiles/Projectiles/Common/Textures/Image_Vfx_MasterStylizedProjectiles_Noise.png
+Asset,Assets/PurchasedAssets/MasterStylizedProjectiles/Projectiles/Common/Textures/WhitePortSolid.png,8113366f9f7cec647878e3af2fb98922,Assets/Assets/Particle/_Vendor/MasterStylizedProjectiles/Projectiles/Common/Textures/Image_Vfx_MasterStylizedProjectiles_WhitePortSolid.png

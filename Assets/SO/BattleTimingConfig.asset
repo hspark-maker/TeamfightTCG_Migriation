@@ -34,6 +34,7 @@ MonoBehaviour:
   prlWindupAngle: 30.7
   prlSlashMaxTurn: 30
   rangedFlightMin: 0.23
+  rangedSpeedMul: 1.5
   cunFogLead: 0.13
   cunSpinDur: 0.38
   cunExitDur: 0.29
@@ -46,12 +47,10 @@ MonoBehaviour:
   cardMoveDuration: 0.25
   hitDuration: 0.17
   deathDuration: 0.75
-  deathFlash: 0.04
   deathLift: 0.1
   deathNovaAt: 0.23
   dealAnimDuration: 0.83
   dealMidPause: 0.42
-  deathPreviewFlash: 0.46
   longPress: 0.45
   fadeViewDuration: 0.25
   attackPreviewFlash: 0.46

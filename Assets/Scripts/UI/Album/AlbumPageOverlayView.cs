@@ -48,6 +48,10 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("임계 미달로 손을 뗐을 때 제자리로 돌아오는 시간.")]
     [SerializeField] float dragReturnDuration = 0.16f;
 
+    [Tooltip("끝↔처음으로 감길 때 사이 페이지를 훑는 한 장당 속도 배율. 0.3이면 평소 넘김의 30% 시간에 한 장.\n" +
+             "낮출수록 촤라락 빨라진다. 총 길이는 (페이지 수 - 1)장이 이 배율로 이어 붙은 만큼이다.")]
+    [Range(0.1f, 1f)] [SerializeField] float rewindStepScale = 0.3f;
+
     [Header("삽입 연출 — 로비 셸 위로 올라서기")]
     [Tooltip("이 오버레이는 탭 콘텐츠 안에 있어 평소엔 상단바·탭바 아래에 그려지고, 딤도 콘텐츠 영역까지만 덮는다.\n" +
              "삽입 연출 동안만 이 order로 셸 위에 올라서서 딤 한 장이 화면 전체를 덮게 한다(SetFrontmost).\n" +
@@ -89,6 +93,12 @@ public class AlbumPageOverlayView : MonoBehaviour
     // 진행 중이던 넘김이 Open/OnDisable로 잘렸는지 판정. 잘린 넘김이 뒤늦게 인덱스를 덮어쓰면 안 된다
     int m_flipGen;
 
+    // 끝↔처음 되감기(여러 장 연속 넘김)가 도는 중. 한 장짜리 m_flipping과 갈라 둔다 —
+    // 되감기는 장과 장 사이에서 m_flipping이 잠깐 내려가므로, 그 틈에 새 입력이 끼어들지 못하게 막는 건 이쪽이다.
+    bool m_rewinding;
+    // 되감기 도중 Open/닫기로 잘렸는지 판정. m_flipGen은 한 장마다 새로 발급되어 여러 장에 걸친 판정에 못 쓴다
+    int m_rewindGen;
+
     // 손가락이 직접 종이를 밀고 있는 구간. 트윈(m_flipping)과 갈라 둔다 —
     // 드래그 중에는 아직 넘길지 말지 정해지지 않아 페이지를 교체하면 안 되고, 잠금도 걸지 않는다.
     bool  m_dragging;
@@ -108,7 +118,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
-    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
+    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding;
 
     // 딤판의 rect. 닫기 버튼과 같은 오브젝트라는 저작 규약을 여기 한 곳에서만 읽는다(dimButton 툴팁 참고).
     RectTransform DimRect => dimButton != null ? dimButton.transform as RectTransform : null;
@@ -728,7 +738,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     async UniTask FlipStepAsync(int _dir)
     {
-        if (m_flipping) return;   // 넘기는 중 재입력은 무시 — 인덱스만 앞서가는 분기를 원천 차단한다
+        if (m_flipping || m_rewinding) return;   // 넘기는 중 재입력은 무시 — 인덱스만 앞서가는 분기를 원천 차단한다
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
         // 손가락이 세워둔 자세를 이어받는다. 여기서 0부터 다시 시작하면 뗀 순간 종이가 도로 눕는다.
@@ -754,10 +764,76 @@ public class AlbumPageOverlayView : MonoBehaviour
             return;
         }
 
+        // 끝에서 처음으로(또는 처음에서 끝으로) 감기는 순간은 "다음 한 장"이 아니라 **되감기**다.
+        // 한 장만 넘기면 마지막 페이지와 1페이지가 이웃처럼 보여 한 바퀴 돌았다는 게 안 읽힌다 —
+        // 사이 페이지를 전부, 넘기던 것과 **반대 방향**으로 촤라락 훑어 처음으로 돌아온 길을 보여준다.
+        // (4→1은 왼쪽에서 오른쪽으로 덮이는 장이 연속, 1→4는 오른쪽에서 왼쪽으로 넘어가는 장이 연속.)
+        bool t_wrapped = _dir > 0 ? m_pageIndex == t_count - 1 : m_pageIndex == 0;
+        if (t_wrapped && t_count > 2)
+        {
+            await RewindAsync(-_dir, t_from);
+            return;
+        }
+
         await FlipAsync(t_target, _dir, null, t_from);
     }
 
-    async UniTask FlipAsync(int _target, int _dir, AlbumTheme _theme, float _from = 0f)
+    /// <summary>끝↔처음 순환을 사이 페이지까지 전부 훑으며 되감는다. 한 장씩 같은 넘김 연출을 쓰되
+    /// 배율(<c>rewindStepScale</c>)로 짧게 줄여 이어 붙인다 — 중간 장은 게이지·번호를 되돌리지 않아
+    /// 마지막 장에 닿을 때까지 종이만 계속 넘어가는 그림이 된다.</summary>
+    /// <param name="_dir">되감는 방향. 넘기려던 방향의 반대다.</param>
+    /// <param name="_from">손가락이 이미 세워둔 진행도. 방향이 반대라 이어받을 수 없어 눕히고 시작한다.</param>
+    async UniTask RewindAsync(int _dir, float _from)
+    {
+        int t_gen   = ++m_rewindGen;
+        int t_count = m_theme.Pages.Count;
+
+        m_rewinding = true;
+        SetFlipLocked(true);
+
+        try
+        {
+            if (_from > 0f) await LayPaperDownAsync(_from);
+
+            for (int t_i = 0; t_i < t_count - 1; t_i++)
+            {
+                // 매 장마다 다시 확인한다 — 되감는 도중 닫히거나 다른 테마로 열릴 수 있다.
+                if (t_gen != m_rewindGen || m_theme == null) return;
+
+                int  t_next = (m_pageIndex + _dir + t_count) % t_count;
+                bool t_last = t_i == t_count - 2;
+                await FlipAsync(t_next, _dir, null, 0f, this.rewindStepScale, t_last);
+            }
+        }
+        finally
+        {
+            if (t_gen == m_rewindGen)
+            {
+                m_rewinding = false;
+                SetFlipLocked(false);
+            }
+        }
+    }
+
+    /// <summary>손가락이 세워둔 종이를 짧게 눕힌다. 되감기는 반대 방향으로 도므로 그 자세를 이어받으면
+    /// 세우던 장과 다른 장이 접힌다 — 이어받지 않고 눕혀서 출발점을 맞춘다.</summary>
+    async UniTask LayPaperDownAsync(float _from)
+    {
+        float t_p   = Mathf.Clamp(_from, 0f, 0.5f);
+        float t_dur = Mathf.Min(0.12f, Mathf.Max(0.02f, this.dragReturnDuration) * (t_p / 0.5f));
+
+        await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 0f, t_dur)
+            .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this).ToUniTask();
+
+        pageFlip.Cancel();
+        HideUnderPage();
+    }
+
+    /// <param name="_durationScale">넘김 한 장의 길이 배율. 되감기의 중간 장을 짧게 줄일 때만 1이 아니다.</param>
+    /// <param name="_restoreSides">끝에서 게이지·페이지 번호를 되돌릴지. 되감기의 중간 장은 되돌리지 않는다 —
+    /// 되돌려봐야 다음 장이 곧바로 다시 걷어가 글자가 깜빡이기만 한다.</param>
+    async UniTask FlipAsync(int _target, int _dir, AlbumTheme _theme, float _from = 0f,
+                            float _durationScale = 1f, bool _restoreSides = true)
     {
         int t_gen = ++m_flipGen;
 
@@ -773,7 +849,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 이미 세워둔 만큼은 빼고 남은 구간만 트윈한다 — 안 그러면 손가락이 민 거리가 두 번 재생된다.
             // 접히는 한 구간이 넘김의 전부이므로 남은 몫에 duration을 통째로 배분한다(예전의 절반 배분 아님).
             float t_p     = Mathf.Clamp(_from, 0f, 0.5f);
-            float t_first = pageFlip.Duration * (1f - t_p / 0.5f);
+            float t_first = pageFlip.Duration * Mathf.Max(0.05f, _durationScale) * (1f - t_p / 0.5f);
 
             pageFlip.SetFlipProgress(t_p);
             if (t_first > 0.001f)
@@ -794,6 +870,9 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 종이는 접혀 사라진 자리에서 곧바로 눕히고, 아래에서 기다리던 장이 그 자리를 잇는다.
             pageFlip.Cancel();
             HideUnderPage();
+
+            // 되감기 중간 장은 여기서 끝낸다 — 글자를 되돌려봐야 다음 장이 곧바로 다시 걷어간다.
+            if (!_restoreSides) return;
 
             // 자세는 이미 평평하지만 게이지·페이지 번호는 접히는 동안 걷혀 있었다 — 글자만 짧게 되돌린다.
             // 여기서 안 되돌리면 새 번호가 한 프레임에 툭 튀어나온다.
@@ -819,6 +898,8 @@ public class AlbumPageOverlayView : MonoBehaviour
     void CancelFlip()
     {
         m_flipGen++;                 // 진행 중이던 넘김의 커밋·정리를 무효화한다
+        m_rewindGen++;               // 여러 장짜리 되감기도 같이 끊는다(다음 장을 이어 넘기지 않게)
+        m_rewinding    = false;
         m_dragging     = false;      // 손가락이 세워둔 자세도 여기서 함께 버린다
         m_dragArmed    = false;
         m_dragReturning = false;

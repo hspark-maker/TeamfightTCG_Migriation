@@ -7,6 +7,7 @@ public class PackOddsRow : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI cardNameText;
     [SerializeField] TextMeshProUGUI rateText;
+    [SerializeField] Image cardImage;
 
     public void Bind(PackOddsEntry _entry)
     {
@@ -17,5 +18,7 @@ public class PackOddsRow : MonoBehaviour
 
         if (this.rateText != null)
             this.rateText.text = PackOdds.FormatRate(_entry.Rate);
+
+        this.cardImage.sprite = t_card.battleImage;
     }
 }

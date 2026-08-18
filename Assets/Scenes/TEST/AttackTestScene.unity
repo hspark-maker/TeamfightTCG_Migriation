@@ -579,7 +579,7 @@ MonoBehaviour:
   killWeakerSide: 1
   hitVfxOnCounter: 0
   attackVfx:
-    folder: Assets/PurchasedAssets
+    folder: Assets/Assets/Particle/_Vendor
     filter: 
     prefabs: []
     use: 1
@@ -589,7 +589,7 @@ MonoBehaviour:
     sortingOrder: 100
     spawnDelay: 0
   hitVfx:
-    folder: Assets/PurchasedAssets
+    folder: Assets/Assets/Particle/_Vendor
     filter: 
     prefabs:
     - {fileID: 138791133666993695, guid: 8b9686ac53bb5464fbb649e69a87f5b1, type: 3}

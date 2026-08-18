@@ -52,12 +52,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const string NoValue     = "-";
     const string FreeCost    = "무료";   // 안내가 대준 한 방. 숫자 0을 띄우면 값을 치르는 칸처럼 읽힌다
 
+    // 상단바 뒤를 메우는 딤의 짙기. 배경판(0.98)과 같은 값까지 올릴 필요는 없다 —
+    // 실제로 보이는 건 바의 둥근 모서리 틈뿐이고, 경계선은 바가 덮어 이음매가 안 드러난다.
+    const float CONTENT_DIM_ALPHA = 0.8f;
+
     // 강화가 왜 막혔는지. 결과판의 "한 번 더" 아래 문구가 쓴다.
     // 재화 표시명의 공용 진실원은 아직 없다 — 강화가 쓰는 재화가 둘뿐이라 표를 만들지 않았다.
-    const string MaxLevelNotice          = "최고 레벨에 도달했다";
-    const string NotAffordableNotice     = "골드가 부족하다";
-    const string NotAffordableDiaNotice  = "다이아가 부족하다";
-    const string NotAffordableEnergyNotice = "에너지가 부족하다";
+    const string MaxLevelNotice          = "최고 레벨에 도달했습니다!";
+    const string NotAffordableNotice     = "골드가 부족합니다";
+    const string NotAffordableDiaNotice  = "다이아가 부족합니다";
+    const string NotAffordableEnergyNotice = "에너지가 부족합니다";
 
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
@@ -477,6 +481,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
+        // 이 오버레이의 배경판은 상단바 **아래**에서 시작한다(바를 덮으면 재화가 안 보인다).
+        // 그래서 바의 둥근 좌우 모서리 틈으로 로비가 그대로 비친다 — 그 뒤를 Content 딤이 메운다.
+        // Content 딤은 로비 셸 안에서 바보다 아래에 깔려 있어 **바 자체는 덮지 않고 뒤만** 어둡게 한다.
+        ScreenDim.Show(this, CONTENT_DIM_ALPHA, true, 0f, EDimLayer.Content);
+
         if (this.enhanceButton != null)
         {
             this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
@@ -512,6 +521,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         // 요청을 물리면 아래에 깔린 화면(페이지 오버레이)의 범위가 다시 적용된다.
         LobbyShellBars.Show(this);
+
+        ScreenDim.Hide(this, EDimLayer.Content);
 
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 

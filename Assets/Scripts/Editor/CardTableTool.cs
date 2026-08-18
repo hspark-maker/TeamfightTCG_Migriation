@@ -22,6 +22,36 @@ using UnityEngine;
 /// </summary>
 public static partial class CardTableTool
 {
+    // Asset filenames were standardized in English. Keep accepting the legacy
+    // Korean sheet keys during the external Google Sheet transition window.
+    static readonly Dictionary<string, string> LegacyCardAssetNames = new Dictionary<string, string>
+    {
+        { "모닥콩", "Campbean" }, { "포슬램", "Poslamb" }, { "찌릿핀", "Sparkfin" },
+        { "물방울룽", "WaterdropLong" }, { "바위콩", "Rockbean" }, { "깜밤이", "Nightchestnut" },
+        { "솜구름몽", "Cloudmong" }, { "얼음꼬미", "Icekomi" }, { "꿀꿀비", "Honeybee" },
+        { "톱니두더", "Gearmole" }, { "화르룩스", "Flarelux" }, { "철갑몽치", "IronMongchi" },
+        { "풍선펭", "BalloonPeng" }, { "버섯냥", "MushroomCat" }, { "별토리", "Startori" },
+        { "늪꾸리", "Swampfrog" }, { "번개뿔", "Thunderhorn" }, { "단풍꼬리", "Mapletail" },
+        { "눈덩곰", "SnowballBear" }, { "와글도도", "Waggledodo" }, { "자석게", "MagnetCrab" },
+        { "해롱문어", "DizzyOctopus" }, { "폭탄밤", "Bombbat" }, { "우드혼", "Woodhorn" },
+        { "파도리", "Waveri" }, { "모래몽", "Sandmong" }, { "수정뿔루", "Crystalhorn" },
+        { "대장부리", "CaptainBeak" }, { "꿈먹이", "Dreameater" },
+        { "왕밤도치", "KingChestnutHedgehog" }
+    };
+
+    static readonly Dictionary<string, string> LegacySynergyAssetNames = new Dictionary<string, string>
+    {
+        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "무리", "Swarm" },
+        { "비늘", "Scale" }, { "성벽", "Rampart" }, { "언데드", "Undead" },
+        { "유산", "Legacy" }, { "청소부", "Cleaner" }, { "흐름", "Flow" }
+    };
+
+    static string NormalizeCardAssetName(string _name)
+        => LegacyCardAssetNames.TryGetValue(_name, out string t_name) ? "Data_Card_" + t_name : _name;
+
+    static string NormalizeSynergyAssetName(string _name)
+        => LegacySynergyAssetNames.TryGetValue(_name, out string t_name) ? "Data_Synergy_" + t_name : _name;
+
     const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
     const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;
     const string REGISTRY_PATH   = "Assets/SO/CardRegistry.asset";
@@ -112,7 +142,7 @@ public static partial class CardTableTool
         for (int r = 1; r < t_rows.Count; r++)
         {
             List<string> t_row = t_rows[r];
-            string t_name = Cell(t_row, t_header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(t_row, t_header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;   // 빈 행(Excel이 흔히 남긴다)
 
             // 번호 → 이름 순으로 찾는다. 둘 다 없을 때만 새 카드다.
@@ -191,7 +221,7 @@ public static partial class CardTableTool
 
         for (int r = 1; r < _rows.Count; r++)
         {
-            string t_name = Cell(_rows[r], _header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(_rows[r], _header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;
 
             int t_id = ParseInt(Cell(_rows[r], _header, "id"), 0);
@@ -375,7 +405,7 @@ public static partial class CardTableTool
 
         foreach (string t_raw in _text.Split('|'))
         {
-            string t_token = t_raw.Trim();
+            string t_token = NormalizeSynergyAssetName(t_raw.Trim());
             if (t_token.Length == 0) continue;
 
             if (_known.TryGetValue(t_token, out ScriptableObject t_so) && t_so is SynergyData t_syn)
