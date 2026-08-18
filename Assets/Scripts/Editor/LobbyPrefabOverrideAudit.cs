@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public static class LobbyPrefabOverrideAudit
 {
     const string k_LobbyCanvasPath =
         "Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab";
+    const string k_LobbyScenePath = "Assets/Scenes/LobbyScene.unity";
     const string k_VendorRoot = "Assets/Layer Lab/";
     const int k_WarningThreshold = 30;
     const int k_ErrorThreshold = 60;
@@ -15,7 +18,8 @@ public static class LobbyPrefabOverrideAudit
     {
         "m_Sprite",
         "m_Color",
-        "m_Text"
+        "m_Text",
+        "m_text"
     };
 
     [MenuItem("Tools/Lobby/Audit Prefab Overrides")]
@@ -29,88 +33,153 @@ public static class LobbyPrefabOverrideAudit
             return;
         }
 
-        int t_errors = 0;
-        int t_warnings = 0;
-        List<GameObject> t_nestedRoots = FindNestedRoots(t_canvas);
-
-        foreach (GameObject t_root in t_nestedRoots)
+        try
         {
-            PropertyModification[] t_modifications =
-                PrefabUtility.GetPropertyModifications(t_root) ??
-                Array.Empty<PropertyModification>();
-            string t_sourcePath = SourcePath(t_root);
+            int t_errors = 0;
+            int t_warnings = 0;
+            List<GameObject> t_nestedRoots = FindNestedRoots(t_canvas);
 
-            if (t_modifications.Length > k_ErrorThreshold)
+            foreach (GameObject t_root in t_nestedRoots)
             {
-                t_errors++;
-                Debug.LogError(
-                    $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
-                    $"{t_modifications.Length} overrides (> {k_ErrorThreshold})",
-                    t_root);
+                PropertyModification[] t_modifications =
+                    PrefabUtility.GetPropertyModifications(t_root) ??
+                    Array.Empty<PropertyModification>();
+                string t_sourcePath = SourcePath(t_root);
+
+                if (t_modifications.Length > k_ErrorThreshold)
+                {
+                    t_errors++;
+                    Debug.LogError(
+                        $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
+                        $"{t_modifications.Length} overrides (> {k_ErrorThreshold})",
+                        t_root);
+                }
+                else if (t_modifications.Length > k_WarningThreshold)
+                {
+                    t_warnings++;
+                    Debug.LogWarning(
+                        $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
+                        $"{t_modifications.Length} overrides (> {k_WarningThreshold})",
+                        t_root);
+                }
+
+                foreach (PropertyModification t_modification in t_modifications)
+                {
+                    if (!IsSkinProperty(t_modification.propertyPath))
+                        continue;
+
+                    t_errors++;
+                    Debug.LogError(
+                        $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
+                        $"skin override {t_modification.propertyPath}",
+                        t_root);
+                }
+
+                if (t_sourcePath.StartsWith(
+                        k_VendorRoot,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    t_errors++;
+                    Debug.LogError(
+                        $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
+                        $"direct vendor instance {t_sourcePath}",
+                        t_root);
+                }
             }
-            else if (t_modifications.Length > k_WarningThreshold)
+
+            int t_missing = CountMissingComponents(t_canvas);
+            if (t_missing > 0)
+            {
+                t_errors += t_missing;
+                Debug.LogError(
+                    $"[LobbyPrefabOverrideAudit] Missing scripts/components: {t_missing}",
+                    t_canvas);
+            }
+
+            int t_crossBoundaryReferences =
+                CountCrossBoundaryReferences(t_canvas, t_nestedRoots);
+            if (t_crossBoundaryReferences > 0)
             {
                 t_warnings++;
                 Debug.LogWarning(
-                    $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
-                    $"{t_modifications.Length} overrides (> {k_WarningThreshold})",
-                    t_root);
+                    $"[LobbyPrefabOverrideAudit] References into nested prefab " +
+                    $"children: {t_crossBoundaryReferences}",
+                    t_canvas);
             }
 
-            foreach (PropertyModification t_modification in t_modifications)
-            {
-                if (!IsSkinProperty(t_modification.propertyPath))
-                    continue;
-
-                t_errors++;
-                Debug.LogError(
-                    $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
-                    $"skin override {t_modification.propertyPath}",
-                    t_root);
-            }
-
-            if (t_sourcePath.StartsWith(
-                    k_VendorRoot,
-                    StringComparison.OrdinalIgnoreCase))
+            int t_unusedSceneOverrides = CountUnusedLobbySceneOverrides();
+            if (t_unusedSceneOverrides > 0)
             {
                 t_errors++;
                 Debug.LogError(
-                    $"[LobbyPrefabOverrideAudit] {t_root.name}: " +
-                    $"direct vendor instance {t_sourcePath}",
-                    t_root);
+                    $"[LobbyPrefabOverrideAudit] LobbyScene has " +
+                    $"{t_unusedSceneOverrides} unused LobbyCanvas overrides. " +
+                    "Run Tools/Lobby/Remove Unused Scene Overrides.");
             }
+
+            string t_summary =
+                $"[LobbyPrefabOverrideAudit] roots={t_nestedRoots.Count}, " +
+                $"errors={t_errors}, warnings={t_warnings}, " +
+                $"crossBoundaryRefs={t_crossBoundaryReferences}";
+            if (t_errors == 0)
+                Debug.Log(t_summary, t_canvas);
+            else
+                Debug.LogError(t_summary, t_canvas);
         }
-
-        int t_missing = CountMissingComponents(t_canvas);
-        if (t_missing > 0)
+        finally
         {
-            t_errors += t_missing;
+            PrefabUtility.UnloadPrefabContents(t_canvas);
+        }
+    }
+
+    [MenuItem("Tools/Lobby/Remove Unused Scene Overrides")]
+    public static void RemoveUnusedSceneOverrides()
+    {
+        Scene t_scene = SceneManager.GetActiveScene();
+        GameObject t_lobbyCanvas = FindSceneLobbyCanvas(t_scene);
+        if (t_lobbyCanvas == null)
+        {
             Debug.LogError(
-                $"[LobbyPrefabOverrideAudit] Missing scripts/components: {t_missing}",
-                t_canvas);
+                $"[LobbyPrefabOverrideAudit] Open {k_LobbyScenePath} first.");
+            return;
         }
 
-        int t_crossBoundaryReferences =
-            CountCrossBoundaryReferences(t_canvas, t_nestedRoots);
-        if (t_crossBoundaryReferences > 0)
+        PrefabUtility.RemoveUnusedOverrides(
+            new[] { t_lobbyCanvas },
+            InteractionMode.AutomatedAction);
+        EditorSceneManager.SaveScene(t_scene);
+        Debug.Log("[LobbyPrefabOverrideAudit] Removed unused scene overrides.");
+    }
+
+    static int CountUnusedLobbySceneOverrides()
+    {
+        GameObject t_lobbyCanvas = FindSceneLobbyCanvas(
+            SceneManager.GetActiveScene());
+        if (t_lobbyCanvas == null)
+            return 0;
+
+        int t_count = 0;
+        foreach (PropertyModification t_modification in
+                 PrefabUtility.GetPropertyModifications(t_lobbyCanvas) ??
+                 Array.Empty<PropertyModification>())
         {
-            t_warnings++;
-            Debug.LogWarning(
-                $"[LobbyPrefabOverrideAudit] References into nested prefab " +
-                $"children: {t_crossBoundaryReferences}",
-                t_canvas);
+            if (t_modification.target == null)
+                t_count++;
         }
+        return t_count;
+    }
 
-        string t_summary =
-            $"[LobbyPrefabOverrideAudit] roots={t_nestedRoots.Count}, " +
-            $"errors={t_errors}, warnings={t_warnings}, " +
-            $"crossBoundaryRefs={t_crossBoundaryReferences}";
-        if (t_errors == 0)
-            Debug.Log(t_summary, t_canvas);
-        else
-            Debug.LogError(t_summary, t_canvas);
+    static GameObject FindSceneLobbyCanvas(Scene _scene)
+    {
+        if (!_scene.IsValid() || _scene.path != k_LobbyScenePath)
+            return null;
 
-        PrefabUtility.UnloadPrefabContents(t_canvas);
+        foreach (GameObject t_root in _scene.GetRootGameObjects())
+        {
+            if (SourcePath(t_root) == k_LobbyCanvasPath)
+                return t_root;
+        }
+        return null;
     }
 
     static List<GameObject> FindNestedRoots(GameObject _canvas)
@@ -144,7 +213,13 @@ public static class LobbyPrefabOverrideAudit
         foreach (string t_property in s_SkinProperties)
         {
             if (_propertyPath == t_property ||
-                _propertyPath.EndsWith("." + t_property, StringComparison.Ordinal))
+                _propertyPath.StartsWith(
+                    t_property + ".",
+                    StringComparison.Ordinal) ||
+                _propertyPath.EndsWith(
+                    "." + t_property,
+                    StringComparison.Ordinal) ||
+                _propertyPath.Contains("." + t_property + "."))
                 return true;
         }
         return false;
