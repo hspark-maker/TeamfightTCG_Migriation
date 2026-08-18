@@ -6,7 +6,6 @@ public static class CardPackRewardHandoff
     static readonly CurrencyGainBucket s_pendingRefund = new CurrencyGainBucket();
     static readonly List<CardData> s_pendingCards = new List<CardData>();
 
-    // 로비에서 연출할 개봉 결과가 실려 있는지
     public static bool HasPending => !s_pendingRefund.IsEmpty || s_pendingCards.Count > 0;
 
     // 개봉 결과를 싣는다 — 로비 도달 전 연속 개봉도 남도록 누적

@@ -29,6 +29,9 @@ public static class RankManager
     // 현재 포인트가 가리키는 티어 인덱스(티어는 points의 순수 파생)
     public static int TierIndex => Config.ResolveTierIndex(Points);
 
+    // 현재 티어의 등급. 등급만 필요한 호출부가 GetInfo() 체인을 늘어놓지 않게 하는 단일 창구.
+    public static ERankGrade CurrentGrade => GetInfo().Grade;
+
     /// <summary>현재 티어의 AI 카드 레벨. **티어 기준값이지 실제 카드 레벨이 아니다**(카드별 값은 <see cref="AiCardLevelOf"/>).
     /// 난이도 축의 유일한 조회 지점 — 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
     public static int AiCardLevel => Config.AiCardLevelAt(TierIndex);
