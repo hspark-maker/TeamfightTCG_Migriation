@@ -133,7 +133,7 @@ public static class LobbyPrefabOverrideAudit
     static string SourcePath(GameObject _instanceRoot)
     {
         GameObject t_source =
-            PrefabUtility.GetCorrespondingObjectFromOriginalSource(_instanceRoot);
+            PrefabUtility.GetCorrespondingObjectFromSource(_instanceRoot);
         return t_source == null ? string.Empty : AssetDatabase.GetAssetPath(t_source);
     }
 
