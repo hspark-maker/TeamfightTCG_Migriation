@@ -1,12 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 카드팩 1종의 정의 데이터 SO.
-//
-// **값의 진실원은 스펙시트(CardPack / CardPackDrop)이고, 이 에셋은 packId와 팩 아트만 소유한다.**
-// 아래 숫자 필드는 시트를 못 읽을 때의 폴백이다 — 카드(CardData)와 달리 팩은 아트 외에 물려 있는
-// 에셋이 없어서 값을 굽지 않고 런타임에 시트를 그대로 읽는다(PackSpec).
-// 소비자가 이 프로퍼티만 보게 두는 이유: 시트/폴백 판정이 여기 한 곳에 있어야 "어느 값이 이겼는지"가 갈리지 않는다.
+// 카드팩 1종의 정의 데이터 SO. 값의 진실원은 스펙시트(CardPack/CardPackDrop)이고,
+// 아래 직렬화 필드는 시트를 못 읽을 때의 폴백이다 — 시트/폴백 판정은 이 프로퍼티들에만 둔다.
 [CreateAssetMenu(fileName = "CardPackData", menuName = "Card Battle/Card Pack Data")]
 public class CardPackData : ScriptableObject
 {
@@ -43,7 +39,9 @@ public class CardPackData : ScriptableObject
     [SerializeField] List<RankPackPool> rankPools = new List<RankPackPool>();
 
     public string PackId => packId;
-    public Sprite PackArt => packArt;   // 시트가 가질 수 없는 유일한 축 — 항상 이 에셋이 소유한다.
+
+    // 시트가 가질 수 없는 유일한 축 — 항상 이 에셋이 소유한다.
+    public Sprite PackArt => packArt;
 
     public string DisplayName
         => Spec(out CardPack t_row) ? t_row.displayName : displayName;
@@ -68,13 +66,12 @@ public class CardPackData : ScriptableObject
 
     public int PoolCount => Pool.Count;
 
-    // 가중치 없는 카드 목록. 스타터덱 지급·튜토리얼 덱 자동장착처럼 "이 팩에 뭐가 들었나"만 묻는 소비자용.
-    // 랭크는 현재 등급으로 해석한다 — 추첨(ResolvePool)과 다른 목록을 보여주지 않기 위해서다.
+    // 가중치를 벗긴 카드 목록. 랭크는 현재 등급으로 해석한다 — 추첨(ResolvePool)과 다른 목록을 보여주지 않기 위해서다.
     public IReadOnlyList<CardData> Pool
     {
         get
         {
-            IReadOnlyList<WeightedCard> t_weighted = ResolvePool(RankManager.GetInfo().Grade);
+            IReadOnlyList<WeightedCard> t_weighted = ResolvePool(RankManager.CurrentGrade);
             if (t_weighted.Count == 0)
                 return pool != null ? pool : (IReadOnlyList<CardData>)System.Array.Empty<CardData>();
 
@@ -98,7 +95,6 @@ public class CardPackData : ScriptableObject
         return FallbackPool(_grade);
     }
 
-    // 스펙 미로드/미등록 시의 인스펙터 저작 값. 예전 동작 그대로 — rankPools 매치 우선, 없으면 pool 균등.
     IReadOnlyList<WeightedCard> FallbackPool(ERankGrade _grade)
     {
         RankPackPool t_best = null;
@@ -131,7 +127,6 @@ public struct WeightedCard
     [Tooltip("추첨 가중치. 0 = 미지정 → 1(균등)로 취급된다. 이 카드를 안 나오게 하려면 0이 아니라 리스트에서 삭제할 것. 예: 가중치 3은 가중치 1 카드보다 3배 잘 나온다.")]
     public int weight;
 
-    // 0 = 인스펙터 리스트 추가 시 기본값 → 균등 취급 (제외는 삭제로)
     public int EffectiveWeight => weight > 0 ? weight : 1;
 }
 

@@ -80,6 +80,9 @@ public class LobbyRankEffectDirector : MonoBehaviour
             if (!RankResultHandoff.TryConsume(out var t_result)) yield break;
             if (!RankHud.TryGet(out var t_hud)) yield break;
 
+            // 진행 호도 전투 직전 위치에서 출발해야 한다. Delta는 클램프 뒤 실증감이라 현재 포인트에서 빼면 그때 값이다.
+            t_hud.PrepareProgress(RankManager.Points - t_result.Delta);
+
             // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
             // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다(승급·강등 같은 이유).
             if (t_result.IsTierUp || t_result.IsTierDown)
@@ -144,6 +147,6 @@ public class LobbyRankEffectDirector : MonoBehaviour
                                   this.angleStart, this.angleSpan, this.scatterRadius, this.gatherDuration);
 
         // 스프라이트가 비어 있으면 BuildBurst가 빈 시퀀스로 즉시 통지한다 — 조각 없이 배지 펀치만 남는다.
-        return this.pointBurst.BuildBurst((_arrived, _total) => _hud.PlayGainImpact(_arrived >= _total));
+        return this.pointBurst.BuildBurst((_arrived, _total) => _hud.PlayGainImpact(_arrived, _total));
     }
 }

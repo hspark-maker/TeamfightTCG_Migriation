@@ -8,62 +8,63 @@ public static class CardPackOpener
     // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 환급, 실패 시 차감 없이 사유 반환
     public static OpenedPack TryPurchase(CardPackData _pack)
     {
-        if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound, null);
+        if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound);
 
-        string t_packId = _pack.PackId;
+        IReadOnlyList<WeightedCard> t_pool = _pack.ResolvePool(RankManager.CurrentGrade);
+        if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool);
 
-        // 빈 풀 판정은 랭크 해석 후의 실제 추첨 풀 기준
-        var t_pool = _pack.ResolvePool(RankManager.GetInfo().Grade);
-        if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool, t_packId);
-
-        long t_price = _pack.Price;
         ECurrencyType t_priceCurrency = _pack.PriceType;
-        ECurrencyType t_refundType = _pack.RefundType;
+        long t_price = _pack.Price;
 
         if (!CurrencyManager.CanAfford(t_priceCurrency, t_price))
-            return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold, t_packId);
+            return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold);
 
         if (!CurrencyManager.Spend(t_priceCurrency, t_price))
-            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed, t_packId);
+            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
 
+        ECurrencyType t_refundType = _pack.RefundType;
+        List<DrawnCard> t_drawn = Draw(_pack, t_pool, t_refundType);
+
+        CurrencyManager.Save();
+
+        return OpenedPack.CreateSuccess(t_drawn, t_refundType);
+    }
+
+    static List<DrawnCard> Draw(CardPackData _pack, IReadOnlyList<WeightedCard> _pool, ECurrencyType _refundType)
+    {
         long t_refundEach = _pack.RefundAmount;
-        int t_drawCount = _pack.DrawCount;
 
         bool t_unique = _pack.UniqueDraw;
-        if (t_unique && t_drawCount > t_pool.Count) t_drawCount = t_pool.Count;
+        int t_drawCount = _pack.DrawCount;
+        if (t_unique && t_drawCount > _pool.Count) t_drawCount = _pool.Count;
 
-        var t_candidates = new List<int>(t_pool.Count);
-        for (int t_i = 0; t_i < t_pool.Count; t_i++) t_candidates.Add(t_i);
+        var t_candidates = new List<int>(_pool.Count);
+        for (int t_i = 0; t_i < _pool.Count; t_i++) t_candidates.Add(t_i);
 
         var t_drawn = new List<DrawnCard>(t_drawCount);
         for (int t_i = 0; t_i < t_drawCount; t_i++)
         {
-            int t_pick = PickWeighted(t_pool, t_candidates);
-            CardData t_card = t_pool[t_candidates[t_pick]].card;
+            int t_pick = PickWeightedCandidate(_pool, t_candidates);
+            CardData t_card = _pool[t_candidates[t_pick]].card;
             if (t_unique) t_candidates.RemoveAt(t_pick);
 
             // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 환급이 새어나간다
             if (t_card == null) continue;
 
-            bool t_isNew = OwnershipManager.Grant(CardCatalog.IdOf(t_card));
-
-            long t_refund = 0;
-            if (!t_isNew)
-            {
-                CurrencyManager.Earn(t_refundType, t_refundEach);
-                t_refund = t_refundEach;
-            }
-
-            t_drawn.Add(new DrawnCard(t_card, t_isNew, t_refund));
+            t_drawn.Add(GrantAndRefund(t_card, _refundType, t_refundEach));
         }
-
-        CurrencyManager.Save();
-
-        return OpenedPack.CreateSuccess(t_packId, t_drawn, t_refundType);
+        return t_drawn;
     }
 
-    // 가중치 추첨 — 합에서 굴린 값을 누적 스캔, uniqueDraw 제거 후에도 매회 합을 재계산
-    static int PickWeighted(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)
+    static DrawnCard GrantAndRefund(CardData _card, ECurrencyType _refundType, long _refundEach)
+    {
+        if (OwnershipManager.Grant(CardCatalog.IdOf(_card))) return new DrawnCard(_card, true, 0);
+
+        CurrencyManager.Earn(_refundType, _refundEach);
+        return new DrawnCard(_card, false, _refundEach);
+    }
+
+    static int PickWeightedCandidate(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)
     {
         int t_sum = 0;
         for (int t_i = 0; t_i < _candidates.Count; t_i++)

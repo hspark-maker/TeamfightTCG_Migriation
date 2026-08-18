@@ -1018,17 +1018,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_keywords != CardKeyword.None) this.keywordSectionReveal?.Play();
         if (_synergy)                      this.synergySectionReveal?.Play();
 
-        List<UnlockIntro> t_intros = CollectUnseenIntros(CardAt(this.m_index), _keywords, _synergy);
+        CardData          t_card   = CardAt(this.m_index);
+        List<UnlockIntro> t_intros = CollectUnseenIntros(t_card, _keywords, _synergy);
         if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); return; }
 
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) { ShowBottomBar(); return; }
 
-        // 낙인은 닫힐 때가 아니라 **띄우는 순간** 찍는다. 안 그러면 안내를 읽는 도중 앱이 죽었을 때
-        // 다음 부팅에 같은 안내가 다시 선다 — 이미 상세창에 남아 있는 내용이라 다시 세울 값어치가 없다.
-        for (int t_i = 0; t_i < t_intros.Count; t_i++)
-            OutgameTutorialProgress.MarkUnlockIntroSeen(t_intros[t_i].Key);
+        // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
+        int t_shown = t_overlay.Show(t_intros, t_card, ShowBottomBar);
 
-        t_overlay.Show(t_intros, ShowBottomBar);
+        // 낙인은 닫힐 때가 아니라 **띄운 직후** 찍는다. 안 그러면 안내를 읽는 도중 앱이 죽었을 때
+        // 다음 부팅에 같은 안내가 다시 선다 — 이미 상세창에 남아 있는 내용이라 다시 세울 값어치가 없다.
+        //
+        // 세운 줄까지만 찍는 것이 중요하다. 프리팹에 깔린 줄보다 많이 열리면 뒤쪽은 뜨지 않는데,
+        // 그것까지 본 것으로 찍으면 유저가 **영영 못 보는** 안내가 생긴다(1회성이라 되돌릴 길이 없다).
+        for (int t_i = 0; t_i < t_shown && t_i < t_intros.Count; t_i++)
+            OutgameTutorialProgress.MarkUnlockIntroSeen(t_intros[t_i].Key);
     }
 
     /// <summary>이번에 열린 것 중 <b>아직 전면으로 안내한 적 없는</b> 개념들. 없으면 null.
