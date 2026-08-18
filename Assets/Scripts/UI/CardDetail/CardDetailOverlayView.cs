@@ -207,6 +207,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     IReadOnlyList<CardData> m_cards;
     int m_index;
 
+
     // 전환 트윈의 중간 지점에서 갈아끼울 카드. 트윈이 잘리면 콜백이 오지 않으므로 잘라내는 쪽(CancelSlide)이
     // 이 카드를 버린다(취소 경로는 모두 직후에 다른 카드가 확정된다). 트윈 자체는 핸들이 아니라 id(this)로 찾아 자른다.
     CardData m_pendingCard;
@@ -477,6 +478,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
+        // 그 재화 바의 문맥 칸은 조각을 띄운다 — 이 화면이 계속 쓰는 강화 재료다.
+        // 스텝의 결제 재화를 따라가지 않는 이유는 진화 게이트(5·10레벨)가 다이아라서다.
+        // 다이아는 상시 칸에 이미 떠 있으므로 문맥 칸까지 다이아가 되면 같은 재화가 두 칸을 먹고 조각이 사라진다.
+        // 이번 레벨이 무엇으로 얼마인지는 버튼 옆 비용 아이콘이 이미 말하고 있다.
+        ContextCurrencySlot.Request(this, ECurrencyType.Shard);
+
         // 이 오버레이의 배경판은 상단바 **아래**에서 시작한다(바를 덮으면 재화가 안 보인다).
         // 그래서 바의 둥근 좌우 모서리 틈으로 로비가 그대로 비친다 — 그 뒤를 Content 딤이 메운다.
         // Content 딤은 로비 셸 안에서 바보다 아래에 깔려 있어 **바 자체는 덮지 않고 뒤만** 어둡게 한다.
@@ -517,6 +524,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         // 요청을 물리면 아래에 깔린 화면(페이지 오버레이)의 범위가 다시 적용된다.
         LobbyShellBars.Show(this);
+        ContextCurrencySlot.Release(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
 
