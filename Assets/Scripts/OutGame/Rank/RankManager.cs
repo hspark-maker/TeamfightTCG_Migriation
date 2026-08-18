@@ -53,6 +53,10 @@ public static class RankManager
         return t_max > 0 && t_level > t_max ? t_max : t_level;
     }
 
+    /// <summary>티어 스냅샷 하나를 얻는다. 설정(RankConfig)을 밖으로 내보내지 않으면서
+    /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
+    public static bool TryGetTier(int _index, out RankTier _tier) => Config.TryGetTier(_index, out _tier);
+
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo() => GetInfoAt(Points);
 

@@ -81,41 +81,75 @@ public class LobbyRankEffectDirector : MonoBehaviour
 
             // 연출할 자리가 없어도 소비한다 — 남기면 다음 전투 결과에 옛 소식이 병합돼 두 배로 계산된다.
             if (!RankResultHandoff.TryConsume(out var t_result)) yield break;
-            if (!RankHud.TryGet(out var t_hud)) yield break;
 
-            // 진행 호도 전투 직전 위치에서 출발해야 한다. Delta는 클램프 뒤 실증감이라 현재 포인트에서 빼면 그때 값이다.
-            t_hud.PrepareProgress(RankManager.Points - t_result.Delta);
+            // 배지 연출은 랭크 탭이 떠 있을 때만 성립한다. 여기서 통째로 빠져나가면 안 된다 —
+            // 승급 오버레이는 어느 탭에 있든 떠야 하는 화면이라, 배지가 없다는 이유로 함께 사라지면
+            // 메타에서 제일 큰 사건이 탭 위치에 따라 조용히 스킵된다.
+            if (RankHud.TryGet(out var t_hud)) yield return this.PlayHudEffects(t_hud, t_result);
+            else                               yield return new WaitWhile(() => LoadingCoverView.IsCovering);
 
-            // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 별·배지가 전투 직전으로 되돌아가야
-            // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다.
-            // 강등은 세우지 않는다 — 포인트 바닥이 현재 단계 진입선이라 티어가 내려가는 일 자체가 없다.
-            if (t_result.IsTierUp)
-            {
-                this.m_tierChange = t_hud.BuildTierUp(t_result.PrevTierIndex);
-                this.m_tierChange.Pause();
-            }
-
-            yield return new WaitWhile(() => LoadingCoverView.IsCovering);
-
-            if (this.startDelay > 0f) yield return new WaitForSeconds(this.startDelay);
-
-            yield return this.PlayPointChange(t_hud, t_result);
-
-            // 포인트가 다 찬 뒤에 별이 켜진다 — 순서가 뒤집히면 "왜 올랐는지"가 사라진다.
-            var t_seq = this.m_tierChange;
-            this.m_tierChange = null;
-            if (t_seq == null) yield break;
-
-            t_seq.Play();
-
-            // 별이 다 켜질 때까지 기다린다. 화면에 보이는 것은 전과 같고 코루틴이 끝나는 시점만 정확해진다 —
-            // 뒤에 이어 붙는 안내가 승급 연출 위에 겹쳐 뜨지 않으려면 이 끝이 진짜 끝이어야 한다.
-            yield return t_seq.WaitForKill();
+            yield return this.PlayPromote(t_result);
         }
         finally
         {
+            // 오버레이가 뜨지 않는 길(디버그 티어 이동 등)로 빠져도 표시가 옛 등급에 고착되지 않게 여기서 확정한다.
+            if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant();
+
             OnAnyFinished?.Invoke();
         }
+    }
+
+    // 배지에서 벌어지는 몫(포인트 조각 → 별 → 티어 변화). 랭크 탭이 떠 있을 때만 지나는 길이다.
+    IEnumerator PlayHudEffects(RankHud _hud, RankApplyResult _result)
+    {
+        // 진행 호도 전투 직전 위치에서 출발해야 한다. Delta는 클램프 뒤 실증감이라 현재 포인트에서 빼면 그때 값이다.
+        _hud.PrepareProgress(RankManager.Points - _result.Delta);
+
+        // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 별·배지가 전투 직전으로 되돌아가야
+        // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다.
+        // 강등은 세우지 않는다 — 포인트 바닥이 현재 단계 진입선이라 티어가 내려가는 일 자체가 없다.
+        if (_result.IsTierUp)
+        {
+            this.m_tierChange = _hud.BuildTierUp(_result.PrevTierIndex);
+            this.m_tierChange.Pause();
+        }
+
+        yield return new WaitWhile(() => LoadingCoverView.IsCovering);
+
+        if (this.startDelay > 0f) yield return new WaitForSeconds(this.startDelay);
+
+        yield return this.PlayPointChange(_hud, _result);
+
+        // 포인트가 다 찬 뒤에 별이 켜진다 — 순서가 뒤집히면 "왜 올랐는지"가 사라진다.
+        var t_seq = this.m_tierChange;
+        this.m_tierChange = null;
+        if (t_seq == null) yield break;
+
+        t_seq.Play();
+
+        // 별이 다 켜질 때까지 기다린다. 화면에 보이는 것은 전과 같고 코루틴이 끝나는 시점만 정확해진다 —
+        // 뒤에 이어 붙는 안내가 승급 연출 위에 겹쳐 뜨지 않으려면 이 끝이 진짜 끝이어야 한다.
+        yield return t_seq.WaitForKill();
+    }
+
+    // 등급이 갈린 판만 전면 오버레이로 세우고, 닫힐 때까지 기다린다.
+    // 조건은 **승급전 승리** 하나다 — 등급이 그대로인 평범한 상승에 뜨면 이 화면의 무게가 사라진다.
+    IEnumerator PlayPromote(RankApplyResult _result)
+    {
+        if (!_result.PrevPromoPending || !_result.IsTierUp) yield break;
+        if (!RankManager.TryGetTier(_result.TierIndex, out RankTier t_tier)) yield break;
+        if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) yield break;
+
+        bool t_closed = false;
+        t_overlay.Show(t_tier,
+                       // 암전이 덮은 프레임에 로비 표시를 새 등급으로 갈아끼운다 — 배지 안무는 여기서 돌지 않는다.
+                       _onCovered: () => { if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant(); },
+                       _onClose: () => t_closed = true);
+
+        // 화면이 걷힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라,
+        // 여기서 안 기다리면 튜토리얼 안내가 오버레이 위에 겹친다.
+        // IsOpen도 함께 본다: 콜백을 거치지 않고 꺼지는 길(부모 비활성)에서 여기 걸리면 뒤따르는 안내가 영영 멈춘다.
+        yield return new WaitUntil(() => t_closed || !RankPromoteOverlay.IsOpen);
     }
 
     // 증감 반응 1개를 재생하고 끝날 때까지 기다린다. 완료가 아니라 Kill을 기다린다 — 도중에 끊겨도 티어 연출로 넘어간다.

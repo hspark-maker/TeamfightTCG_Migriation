@@ -56,6 +56,8 @@ ShaderVariantCollection:
       variants:
       - keywords: 
         passType: 0
+      - keywords: COLOR_FILTER
+        passType: 0
       - keywords: COLOR_FILTER EDGE_SHINY
         passType: 0
       - keywords: COLOR_FILTER TONE_GRAYSCALE

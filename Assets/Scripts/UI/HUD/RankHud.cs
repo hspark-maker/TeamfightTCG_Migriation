@@ -26,11 +26,12 @@ public class RankHud : MonoBehaviour
     [SerializeField] RankProgressGauge gauge;
 
     [Tooltip("조각이 꽂힌 프레임부터 게이지가 목표치까지 가는 시간. 전진은 한 번뿐이라 이 값이 곧 '차오르는 시간' 전부다.\n" +
-             "승급 연출에서 별을 한 칸씩 채우는 시간도 같은 값을 쓴다 — 조각 간격(pipStep)보다 짧게 둔다.")]
+             "첫 진입 연출에서 별을 한 칸씩 채우는 시간도 같은 값을 쓴다 — 조각 간격(pipStep)보다 짧게 둔다.")]
     [SerializeField] float gaugeAdvanceDuration = 0.25f;
 
-    [Header("승급 연출")]
-    [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 채워져야 '변했다'가 보인다.")]
+    [Header("티어 변화 연출")]
+    [Tooltip("첫 진입(언랭크 → 첫 등급)에서 별을 채우기 전 뜸. 화면이 눈에 들어온 뒤에 채워져야 '변했다'가 보인다.\n" +
+             "등급 승급(브론즈 → 실버)은 전면 오버레이가 맡으므로 이 값을 쓰지 않는다.")]
     [SerializeField] float enterDelay = 0.35f;
 
     [Tooltip("마디를 되짚어 내려갈 때(별이 다시 모자라짐) 별이 움츠러드는 세기. 전진 쪽 점등은 '별 점등' 항목이 맡는다.")]
@@ -41,12 +42,6 @@ public class RankHud : MonoBehaviour
 
     [Tooltip("마지막 별이 찬 뒤의 여운.")]
     [SerializeField] float finishDelay = 0.6f;
-
-    [Tooltip("등급 승급 때 차 있던 별이 한꺼번에 비워지며 움츠러드는 세기.")]
-    [SerializeField] float pipBlowOut = 0.1f;
-
-    [Tooltip("등급이 갈리는 순간의 배지 안무(파열 → 강림). 값은 전부 여기 안에 있다.")]
-    [SerializeField] RankPromoteEffect promote = new RankPromoteEffect();
 
     [Header("포인트 획득 반응")]
     [Tooltip("조각이 꽂히는 프레임의 배지 펀치 세기. 한 판에 한 번뿐이라 크게 준다.")]
@@ -78,6 +73,16 @@ public class RankHud : MonoBehaviour
     [Tooltip("넘겨받는 별의 밑판이 잠깐 물드는 색. 원복은 저작 색으로 돌아간다.")]
     [SerializeField] Color handoffColor = Color.white;
 
+    [Header("승급전 대기")]
+    [Tooltip("별 넷이 꽉 찬 뒤의 '승급전' 상태 표현(배지 뒤 광선 · 문구 · 배지 호흡). 값은 전부 여기 안에 있다.")]
+    [SerializeField] RankPromoStandby promoStandby = new RankPromoStandby();
+
+    [Tooltip("고스트가 배지로 출발하는 프레임에 별 넷이 함께 맥동하는 세기.")]
+    [SerializeField] float promoStarPulse = 0.22f;
+
+    [Tooltip("배지로 수렴하는 고스트가 줄어드는 배율. 1보다 작아야 '빨려들었다'로 읽힌다.")]
+    [SerializeField] float promoGhostScale = 0.35f;
+
     [Header("포인트 손실 반응")]
     [Tooltip("게이지가 줄어든 자리까지 뒤로 미끄러지는 시간. 획득은 느리고 시끄럽게, 손실은 빠르고 조용하게 — 짧게 둔다.")]
     [SerializeField] float lossSlideDuration = 0.2f;
@@ -91,7 +96,10 @@ public class RankHud : MonoBehaviour
     // 진행 중 티어 변화 연출. 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).
     Sequence m_tierSeq;
 
-    // 포인트 손실 반응. 배지 색·스케일을 함께 잡으므로 획득 플래시와 겹쳐 돌지 않게 따로 든다.
+    // 승급 오버레이가 화면을 덮을 때까지 표시를 옛 등급에 묶어 두는 잠금. 푸는 자리는 ApplyTierInstant 하나다.
+    bool m_holdTier;
+
+    // 포인트 손실 반응(게이지가 뒤로 미끄러지는 것뿐). 획득 쪽 반응과 겹쳐 돌지 않게 따로 든다.
     Sequence m_lossSeq;
 
     // 조각이 꽂힐 때의 밝아짐.
@@ -103,11 +111,21 @@ public class RankHud : MonoBehaviour
     // 켜진 별 자리에 띄운 고스트들. 시퀀스가 어디서 끊겨도 여기로 걷는다.
     readonly List<GameObject> m_ghosts = new List<GameObject>();
 
+    // 승급전 진입 연출(별 → 배지). 별 점등 한 박(m_starSeq)보다 오래 살아남아야 해서 따로 든다.
+    Sequence m_promoSeq;
+
+    // 배지로 수렴하는 고스트들. 점등 쪽 고스트와 섞으면 별 정리(RestorePipScales)가 비행 중인 이것들까지 걷는다.
+    readonly List<GameObject> m_promoGhosts = new List<GameObject>();
+
+    // 이번 정산이 승급전 대기로 넘어가는가. PrepareProgress가 세우고 마지막 별이 찰 때 한 번 소비한다 —
+    // 평범한 렌더로는 서지 않으므로 로비를 다시 열어도 진입 연출이 두 번 재생되지 않는다.
+    bool m_promoEnterDue;
+
     // 별 채움·밑판의 저작 색. 연출이 물들인 뒤 되돌릴 기준이다.
     Color[] m_starFillColors;
     Color[] m_starPlateColors;
 
-    // 조각 연출이 출발한 비율과 도착 비율. 조각이 꽂힐 때마다 이 사이를 등분해 전진한다.
+    // 조각 연출이 출발한 비율과 도착 비율. 조각이 꽂히는 프레임에 이 구간을 한 번에 건넌다.
     float m_gainFrom;
     float m_gainTo;
 
@@ -141,6 +159,11 @@ public class RankHud : MonoBehaviour
         this.m_gainTo   = t_now.Grade != t_prev.Grade ? 1f : GaugeRatioOf(t_now);
 
         this.SetGaugeRatio(this.m_gainFrom);
+
+        // 전투 직전엔 아직 승급전이 아니었다 — 대기 표시를 걷어 두고, 마지막 별이 차는 프레임에 진입 연출로 켠다.
+        // 등급이 갈리는 판도 도착지가 1이지만 그 결과는 대기가 아니라 승급이라 여기 걸리지 않는다.
+        this.m_promoEnterDue = RankManager.IsPromoPending && this.m_gainFrom < 1f && this.m_gainTo >= 1f;
+        if (this.m_promoEnterDue) this.promoStandby.SetStandby(false);
     }
 
     /// <summary>조각이 배지에 꽂힌 프레임. 배지와 채워지는 별이 함께 튀고, 게이지가 목표치까지 한 번에 전진한다.</summary>
@@ -189,6 +212,8 @@ public class RankHud : MonoBehaviour
     /// 티어가 오른 순간을 그린다. 표시는 이미 최종 티어이므로 _prevTierIndex 상태에서 출발해 지금으로 건너온다.
     /// 재생은 호출자 몫 — 끝난 뒤에 무엇을 이을지는 부르는 쪽이 정한다.
     /// _prevTierIndex가 음수면 첫 진입(언랭크 → 첫 티어)으로 본다.
+    /// 등급이 갈리는 판은 표시를 옛 등급에 묶어 두기만 한다 — 그 사건은 전면 오버레이가 맡고,
+    /// 덮인 프레임에 <see cref="ApplyTierInstant"/>가 최종값으로 갈아끼운다.
     /// </summary>
     public Sequence BuildTierUp(int _prevTierIndex)
     {
@@ -197,7 +222,6 @@ public class RankHud : MonoBehaviour
         int t_divisions = RankConfig.DivisionsPerGrade;
         var t_info = RankManager.GetInfo();
 
-        int t_prevDivision = _prevTierIndex < 0 ? 0 : _prevTierIndex % t_divisions + 1;
         int t_prevGrade    = _prevTierIndex < 0 ? -1 : _prevTierIndex / t_divisions;
         bool t_gradeUp     = t_info.TierIndex / t_divisions != t_prevGrade;
 
@@ -210,40 +234,42 @@ public class RankHud : MonoBehaviour
         // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 별 줄이 꺼진 채 시작해 첫 칸이 찰 때 함께 나타난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
 
-        if (t_gradeUp)
+        // 등급이 갈리는 판은 여기서 아무것도 하지 않는다 — 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
+        // 표시를 옛 등급으로 되돌린 채 묶어 두고, 오버레이가 화면을 덮은 프레임에 ApplyTierInstant가 최종값으로 갈아끼운다.
+        // 같은 등급 안 상승(브론즈 2 → 1)은 둘 다 아니다 — 조각이 게이지를 미는 동안 채움 머리가 그 별을 꽉 채운다.
+        if (t_gradeUp && _prevTierIndex >= 0)
         {
-            // 첫 진입은 되돌릴 '이전 등급'이 없다 — 언랭크 배지로 되돌려야 그것이 파열하고 첫 등급이 강림한다.
-            // 안 되돌리면 이미 떠 있는 새 배지가 터지고 같은 배지가 다시 내려온다.
-            if (_prevTierIndex >= 0) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
-            else
-            {
-                RankManager.GetUnrankedDisplay(out string t_unrankedName, out Sprite t_unrankedBadge);
-                this.RenderTier(t_unrankedName, t_unrankedBadge);
-            }
+            this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
+            this.m_holdTier = true;
         }
-
-        // 옛 상태를 한 박자 보여준 뒤에 바꾼다 — 등급이 갈리는 판에서만 필요하다.
-        // 같은 등급 안 상승은 앞선 조각 단계가 이미 옛 상태에서 출발하는 것을 다 보여줬다.
-        if (t_gradeUp) this.m_tierSeq.AppendInterval(this.enterDelay);
-
-        // 같은 등급 안 상승(브론즈 1 → 2)의 별은 여기서 채우지 않는다 —
-        // 조각이 게이지를 미는 동안 채움 머리가 그 별을 꽉 채운다. 여기서 또 채우면 시계가 둘이 된다.
-        if (t_gradeUp) this.StageGradeUp(this.m_tierSeq, t_info, t_prevDivision, t_divisions);
+        // 첫 진입(언랭크 → 첫 등급)은 되돌릴 옛 등급이 없어 오버레이도 뜨지 않는다 — 별이 차오르는 것으로 족하다.
+        // 화면이 눈에 들어온 뒤에 채워져야 '변했다'가 보이므로 한 박 띄우고 시작한다.
+        else if (t_gradeUp)
+        {
+            this.m_tierSeq.AppendInterval(this.enterDelay);
+            this.StageFirstEntry(this.m_tierSeq, t_info, t_divisions);
+        }
 
         // 여운 없이 끝내면 마지막 별이 튀는 도중에 연출이 잘린 것처럼 보인다.
         this.m_tierSeq.AppendInterval(this.finishDelay);
 
         // 어떤 이유로 끊겨도 표시가 중간 상태로 굳지 않게 한다(연출 가드를 먼저 풀고 정상 규칙으로 되돌린다).
-        // Restore가 배지의 자리·배율과 런타임 생성물을 함께 걷는다.
         this.m_tierSeq.OnKill(() =>
         {
             this.m_tierSeq = null;
-            this.promote.Restore();
             this.RestorePipScales();
             this.Render();
         });
 
         return this.m_tierSeq;
+    }
+
+    /// <summary>연출 없이 지금 랭크의 최종값(배지·티어명·게이지)으로 표시를 세운다.
+    /// 승급 오버레이가 화면을 덮은 프레임에 디렉터가 부른다 — 갈아끼우는 것이 보이지 않는 유일한 자리다.</summary>
+    public void ApplyTierInstant()
+    {
+        this.m_holdTier = false;
+        this.Render();
     }
 
     void Awake()
@@ -255,6 +281,7 @@ public class RankHud : MonoBehaviour
         if (this.gauge != null) this.gauge.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
 
         this.CacheStarColors();
+        this.promoStandby.Capture();
     }
 
     // 연출이 물들이기 전의 별 색을 떠 둔다(어디서 끊겨도 여기로 되돌린다).
@@ -301,6 +328,15 @@ public class RankHud : MonoBehaviour
         this.KillReactions();
         this.RestorePipScales();
 
+        // 대기 표시는 상태라 다시 켜지지만, 무한 루프와 런타임 생성물은 여기서 반드시 걷는다.
+        // 다음 활성화의 Render가 SetStandby로 제 상태를 즉시 되세운다.
+        this.KillPromoEnter();
+        this.promoStandby.Reset();
+        this.m_promoEnterDue = false;
+
+        // 오버레이를 못 보고 꺼지는 길(탭 전환·씬 언로드)에서 표시가 옛 등급에 고착되지 않게 묶음을 푼다.
+        this.m_holdTier = false;
+
         if (this.gauge != null) this.gauge.Stop();
     }
 
@@ -309,6 +345,9 @@ public class RankHud : MonoBehaviour
         // 연출 중에는 손대지 않는다 — 과거 상태에서 출발하는 연출을 최종값으로 덮어버린다.
         if (this.m_tierSeq != null && this.m_tierSeq.IsActive()) return;
 
+        // 승급 오버레이가 화면을 덮기 전까지 표시는 옛 등급에 묶여 있다 — 푸는 자리는 ApplyTierInstant 하나다.
+        if (this.m_holdTier) return;
+
         var t_info = RankManager.GetInfo();
 
         this.RenderTier(t_info.DisplayName, t_info.Badge);
@@ -316,6 +355,10 @@ public class RankHud : MonoBehaviour
         // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 별 줄 자체를 감춘다.
         this.SetPipsVisible(!t_info.IsUnranked);
         this.SetGaugeRatio(GaugeRatioOf(t_info));
+
+        // 승급전은 사건이 아니라 상태다 — 로비에 들어올 때마다 여기서 즉시(연출 없이) 되세운다.
+        // 진입 연출이 도는 중이면 이미 대기 상태라 이 호출이 그 위를 덮지 않는다.
+        this.promoStandby.SetStandby(RankManager.IsPromoPending);
     }
 
     // 게이지에 먹일 비율. 진행을 그리는 값은 전부 여기를 지난다.
@@ -341,13 +384,65 @@ public class RankHud : MonoBehaviour
         }
 
         this.PlayStarLit(_index);
+        this.TryPlayPromoEnter(_index);
+    }
+
+    // 마지막 별이 전진으로 찬 프레임 = 승급전 대기로 넘어가는 순간. 시선을 별에서 배지로 넘기는 것이 이 연출의 전부다.
+    void TryPlayPromoEnter(int _index)
+    {
+        if (!this.m_promoEnterDue || _index != RankConfig.DivisionsPerGrade - 1) return;
+
+        // 한 번 소비하면 끝이다 — 승급전을 치르고 나면 IsPromoPending이 false가 되어 Render가 알아서 끈다.
+        this.m_promoEnterDue = false;
+
+        this.KillPromoEnter();
+
+        this.m_promoSeq = this.promoStandby.BuildEnter(this.BadgeRect);
+        this.StagePromoSuck(this.m_promoSeq);
+        this.m_promoSeq.SetLink(this.gameObject)
+                       .OnKill(() =>
+                       {
+                           this.m_promoSeq = null;
+                           this.ClearGhosts(this.m_promoGhosts);
+                       });
+    }
+
+    // 별 넷이 함께 맥동하고, 각 별의 고스트가 배지로 수렴하며 줄어들고 사라진다.
+    void StagePromoSuck(Sequence _seq)
+    {
+        var t_gauge = this.gauge as RankStarGauge;
+        var t_badge = this.BadgeRect;
+        if (t_gauge == null || t_badge == null) return;
+
+        float t_at  = this.promoStandby.SuckAt;
+        float t_dur = this.promoStandby.SuckDuration;
+
+        for (int t_i = 0; t_i < t_gauge.StarCount; t_i++)
+        {
+            int t_index = t_i;   // 클로저가 반복마다 새 변수를 잡아야 마지막 별만 맥동하지 않는다
+            _seq.InsertCallback(t_at, () => UiPunch.Play(this.PipTransform(t_index), this.promoStarPulse));
+
+            var t_img = this.SpawnStarGhost(t_gauge, t_i, this.m_promoGhosts);
+            if (t_img == null) continue;
+
+            Color t_lit  = t_img.color;
+            Color t_gone = t_lit;
+            t_gone.a     = 0f;
+            t_img.color  = t_gone;   // 출발 전까지는 보이지 않는다 — 밑판 복제라 그냥 두면 채워진 별을 가린다
+
+            // 부모가 다른 사각으로 건너가므로 자리는 월드로 잡는다.
+            _seq.Insert(t_at, t_img.rectTransform.DOMove(t_badge.position, t_dur).SetEase(Ease.InQuad));
+            _seq.Insert(t_at, t_img.rectTransform.DOScale(this.promoGhostScale, t_dur).SetEase(Ease.InQuad));
+            _seq.Insert(t_at, t_img.DOColor(t_gone, t_dur).From(t_lit, setImmediately: false).SetEase(Ease.InQuad));
+        }
     }
 
     // 별이 꽉 차는 프레임에 사건을 몰아넣는다(흰 플래시 + 1.5배에서 내려앉기 + 고스트 확산),
     // 한 박 뒤 다음 별이 시선을 넘겨받는다. 마지막 별은 넘길 곳이 없어 여운만 남긴다.
     void PlayStarLit(int _index)
     {
-        this.KillStarBeat();
+        // 한 번에 두 마디를 뛰어넘으면 앞 별의 박이 아직 돌고 있다 — 배율·색이 중간값으로 굳지 않게 먼저 되돌린다.
+        this.RestorePipScales();
 
         var t_gauge = this.gauge as RankStarGauge;
         if (t_gauge == null) return;
@@ -370,26 +465,37 @@ public class RankHud : MonoBehaviour
         t_rect.localScale = Vector3.one * this.starPopScale;
         this.m_starSeq.Join(t_rect.DOScale(1f, this.starPopDuration).SetEase(Ease.OutQuad));
 
-        this.SpawnStarGhost(t_gauge, _index);
+        this.StageGhostSpread(t_gauge, _index);
         this.StageHandoff(t_gauge, _index + 1);
 
         this.m_starSeq.OnKill(() =>
         {
             this.m_starSeq = null;
-            this.ClearGhosts();
+            this.ClearGhosts(this.m_ghosts);
         });
     }
 
-    // 켜진 별 자리에 밑판 스프라이트를 복제해 띄우고 퍼지며 사라지게 한다(전용 링 텍스처가 없어 별 모양 그대로 쓴다).
-    void SpawnStarGhost(RankStarGauge _gauge, int _index)
+    // 켜진 별 자리에 남은 고스트가 퍼지며 사라진다(점등의 잔향).
+    void StageGhostSpread(RankStarGauge _gauge, int _index)
+    {
+        var t_img = this.SpawnStarGhost(_gauge, _index, this.m_ghosts);
+        if (t_img == null) return;
+
+        this.m_starSeq.Join(t_img.rectTransform.DOScale(this.ghostScale, this.ghostDuration).SetEase(Ease.OutQuad));
+        this.m_starSeq.Join(t_img.DOFade(0f, this.ghostDuration).SetEase(Ease.OutQuad));
+    }
+
+    // 별 밑판 스프라이트를 복제한 고스트를 별 자리에 띄운다(전용 링 텍스처가 없어 별 모양 그대로 쓴다).
+    // 어디로 어떻게 보낼지는 부르는 쪽이 정한다 — 퍼뜨리거나(점등) 배지로 수렴시키거나(승급전 진입).
+    Image SpawnStarGhost(RankStarGauge _gauge, int _index, List<GameObject> _bin)
     {
         var t_plate = _gauge.StarPlate(_index);
         var t_rect  = _gauge.StarRect(_index);
-        if (t_plate == null || t_rect == null || t_rect.parent == null) return;
+        if (t_plate == null || t_rect == null || t_rect.parent == null) return null;
 
         var t_go = new GameObject("StarGhost", typeof(RectTransform), typeof(CanvasRenderer),
                                   typeof(Image), typeof(LayoutElement));
-        this.m_ghosts.Add(t_go);
+        _bin.Add(t_go);
 
         var t_ghost = (RectTransform)t_go.transform;
         t_ghost.SetParent(t_rect.parent, false);
@@ -410,8 +516,7 @@ public class RankHud : MonoBehaviour
         t_img.preserveAspect = t_plate.preserveAspect;
         t_img.raycastTarget  = false;
 
-        this.m_starSeq.Join(t_ghost.DOScale(this.ghostScale, this.ghostDuration).SetEase(Ease.OutQuad));
-        this.m_starSeq.Join(t_img.DOFade(0f, this.ghostDuration).SetEase(Ease.OutQuad));
+        return t_img;
     }
 
     // 다음 별이 시선을 넘겨받는 한 박. 크기 강조는 상태가 아니라 순간이라 곧바로 원복한다.
@@ -464,34 +569,21 @@ public class RankHud : MonoBehaviour
         return t_ratios;
     }
 
-    // 등급 승급: 구 배지가 파열하고 → 새 배지가 강림해 착지하고 → 그제서야 새 등급의 별이 채워진다.
-    // 별을 뒤에서부터 하나씩 줄이지 않는다 — 오르는 순간에 '잃는 그림'을 끼우면 감정이 역행한다.
-    void StageGradeUp(Sequence _seq, in RankInfo _info, int _prevDivision, int _divisions)
+    // 첫 진입(언랭크 → 첫 등급)의 별 채움. 등급 승급(브론즈 → 실버)은 이 길로 오지 않는다 —
+    // 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
+    void StageFirstEntry(Sequence _seq, in RankInfo _info, int _divisions)
     {
         // in 파라미터는 람다가 잡을 수 없다 — 콜백이 쓸 값만 먼저 떠 둔다.
-        string t_name = _info.DisplayName;
-        Sprite t_badge = _info.Badge;
-        int t_division = _info.Division;
-        int t_prev = _prevDivision;
+        int   t_division = _info.Division;
         float t_progress = GaugeRatioOf(_info);
 
-        // 게이지는 배지가 터지는 프레임에 새 등급의 출발선으로 되감긴다 — 옛 등급의 승급선에 머물면 다 채운 채로 보인다.
-        this.promote.Build(_seq, this.badgeImage, this.descText, t_name, t_badge,
-                           _onBurst: () => this.BlowOutGauge(t_prev));
+        // 조각이 밀어 둔 게이지를 출발선으로 되감는다 — 다 채운 채로 시작하면 채워지는 그림이 없다.
+        // 무통지 스냅이다(통지하면 마디가 우수수 역행하며 방금 켜진 펀치를 되감는다).
+        _seq.AppendCallback(() => this.SetGaugeRatio(0f));
 
-        // 새 등급의 1단계부터 다시 쌓는다. 마지막 토막은 실제 진행까지만 찬다 — 도달값보다 더 채우면 거짓말이 된다.
+        // 1단계부터 하나씩 쌓는다. 마지막 토막은 실제 진행까지만 찬다 — 도달값보다 더 채우면 거짓말이 된다.
         for (int t_i = 0; t_i < t_division && t_i < _divisions; t_i++)
             this.StageStarFill(_seq, Mathf.Min((float)(t_i + 1) / _divisions, t_progress));
-    }
-
-    // 차 있던 별이 배지가 터지는 것과 같은 프레임에 한꺼번에 비워지며 움츠러든다(순서대로 지우면 그만큼 잃는 장면이 길어진다).
-    void BlowOutGauge(int _prevDivision)
-    {
-        // 무통지 스냅이다 — 통지하면 마디가 우수수 역행하며 방금 켜진 펀치를 되감는다.
-        this.SetGaugeRatio(0f);
-
-        for (int t_i = 0; t_i < _prevDivision; t_i++)
-            UiPunch.Play(this.PipTransform(t_i), -this.pipBlowOut);
     }
 
     // 게이지가 _ratio까지 차오르는 단위 동작(별 한 칸 분량). 꽉 차는 순간의 펀치는 마디 통과 통지가 낸다.
@@ -545,6 +637,16 @@ public class RankHud : MonoBehaviour
         this.m_tierSeq = null;
     }
 
+    // 승급전 진입 연출만 걷는다. 대기 '상태'는 여기서 끄지 않는다 — 끄고 켜는 축은 Render 하나다.
+    void KillPromoEnter()
+    {
+        var t_seq = this.m_promoSeq;
+        this.m_promoSeq = null;
+        if (t_seq != null) t_seq.Kill();
+
+        this.ClearGhosts(this.m_promoGhosts);
+    }
+
     // 배지 색·스케일을 잡는 연출을 모두 걷는다(각 OnKill이 저작 상태로 되돌린다).
     void KillReactions()
     {
@@ -568,9 +670,14 @@ public class RankHud : MonoBehaviour
     }
 
     // 별 펀치·점등은 시퀀스 밖에서도 도는 트윈이라, 연출이 중간에 끊기면 배율·색이 중간값으로 굳고 고스트가 남는다.
+    // 점등 한 박을 걷을 때 참조를 먼저 비운다 — 시퀀스의 OnKill이 여기로 되돌아 들어오지 않게.
     void RestorePipScales()
     {
-        this.KillStarBeat();
+        var t_seq = this.m_starSeq;
+        this.m_starSeq = null;
+        if (t_seq != null) t_seq.Kill();
+
+        this.ClearGhosts(this.m_ghosts);
 
         var t_star = this.gauge as RankStarGauge;
         if (t_star == null) return;
@@ -599,24 +706,14 @@ public class RankHud : MonoBehaviour
         }
     }
 
-    // 점등 한 박을 걷고 남은 고스트를 지운다(참조를 먼저 비워 OnKill이 되돌아 들어오지 않게 한다).
-    void KillStarBeat()
+    void ClearGhosts(List<GameObject> _bin)
     {
-        var t_seq = this.m_starSeq;
-        this.m_starSeq = null;
-        if (t_seq != null) t_seq.Kill();
-
-        this.ClearGhosts();
-    }
-
-    void ClearGhosts()
-    {
-        for (int t_i = 0; t_i < this.m_ghosts.Count; t_i++)
+        for (int t_i = 0; t_i < _bin.Count; t_i++)
         {
-            if (this.m_ghosts[t_i] == null) continue;
-            Destroy(this.m_ghosts[t_i]);
+            if (_bin[t_i] == null) continue;
+            Destroy(_bin[t_i]);
         }
 
-        this.m_ghosts.Clear();
+        _bin.Clear();
     }
 }

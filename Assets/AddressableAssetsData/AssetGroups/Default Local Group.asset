@@ -21,6 +21,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1538dcd081334f64ebf7f0e6803135a0
+    m_Address: RankPromoteOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/KeywordExplain.prefab
     m_ReadOnly: 0
