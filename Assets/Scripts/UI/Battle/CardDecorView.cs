@@ -32,10 +32,10 @@ public class CardDecorView
     readonly Transform        keywordIconRoot;
     readonly GameObject       keywordIconPrefab;
     readonly KeywordIconConfig keywordIconConfig;
-    readonly float            iconSpacing;
-    readonly bool             keywordIconsUseSynergySlot;
-    readonly Vector2          keywordIconStart;   // 시너지 자리를 쓸 때 첫 아이콘 좌표
+    readonly Vector2          keywordIconStart;   // 첫 아이콘 좌표(keywordIconRoot 기준)
     readonly Vector2          keywordIconStep;    // 그 다음 아이콘마다 더할 간격
+    readonly GameObject       keywordBg;          // 키워드가 열려 있는 카드의 아이콘 줄 배경판
+    readonly GameObject       keywordOnlyBg;      // 띄울 키워드가 없는 카드의 좁은 배경판
     readonly CardView.KeywordFrame[] keywordFrames;
     readonly Transform        synergyBadgeRoot;
     readonly SynergyBadgeView synergyBadgePrefab;
@@ -60,10 +60,10 @@ public class CardDecorView
         Transform               _keywordIconRoot,
         GameObject              _keywordIconPrefab,
         KeywordIconConfig       _keywordIconConfig,
-        float                   _iconSpacing,
-        bool                    _keywordIconsUseSynergySlot,
         Vector2                 _keywordIconStart,
         Vector2                 _keywordIconStep,
+        GameObject              _keywordBg,
+        GameObject              _keywordOnlyBg,
         CardView.KeywordFrame[] _keywordFrames,
         Transform               _synergyBadgeRoot,
         SynergyBadgeView        _synergyBadgePrefab,
@@ -79,10 +79,10 @@ public class CardDecorView
         this.keywordIconRoot            = _keywordIconRoot;
         this.keywordIconPrefab          = _keywordIconPrefab;
         this.keywordIconConfig          = _keywordIconConfig;
-        this.iconSpacing                = _iconSpacing;
-        this.keywordIconsUseSynergySlot = _keywordIconsUseSynergySlot;
         this.keywordIconStart           = _keywordIconStart;
         this.keywordIconStep            = _keywordIconStep;
+        this.keywordBg                  = _keywordBg;
+        this.keywordOnlyBg              = _keywordOnlyBg;
         this.keywordFrames              = _keywordFrames;
         this.synergyBadgeRoot           = _synergyBadgeRoot;
         this.synergyBadgePrefab         = _synergyBadgePrefab;
@@ -112,8 +112,8 @@ public class CardDecorView
     /// 아이콘/배지는 CardAnimator FadeView·Pop 트윈 대상이라 파괴 전 DOKill이 규약이다(Refresh와 동일).</summary>
     public void Cleanup()
     {
-        KillChildTweens(KeywordAnchor);
-        if (this.synergyBadgeRoot != KeywordAnchor) KillChildTweens(this.synergyBadgeRoot);
+        KillChildTweens(this.keywordIconRoot);
+        if (this.synergyBadgeRoot != this.keywordIconRoot) KillChildTweens(this.synergyBadgeRoot);
         this.iconMap.Clear();
         this.lastBadgeCard  = null;
         this.lastBadgeState = null;
@@ -122,14 +122,24 @@ public class CardDecorView
     #region Keyword icons
     // 아이콘 줄에는 캐릭터 고유 특성만 그린다. 일회용/디버프(무적·추가체력·전투 중 걸린 표식)는
     // 아예 표시하지 않는다 — 무엇을 띄울지 판정은 CardVisualRules 단독(아웃게임과 같은 호출).
-    /// <summary>키워드 아이콘이 실제로 붙는 앵커. 시너지 자리를 쓰면 synergyBadgeRoot(좌측 세로열),
-    /// 아니면 종전 keywordIconRoot(우하단 가로줄). 앵커 미배선이면 기존 루트로 폴백한다.</summary>
-    Transform KeywordAnchor => this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
-        ? this.synergyBadgeRoot : this.keywordIconRoot;
+    /// <summary>아이콘 줄 배경판 선택. 띄울 키워드가 하나도 없으면(키워드 없는 카드 · 아직 해금 전 ·
+    /// 뒷면/빈 슬롯) 좁은 판, 있으면 기본 판. 판정 기준은 아이콘 줄과 **같은** IconKeywords 하나다 —
+    /// 기준이 갈리면 아이콘은 떴는데 배경만 좁은(또는 그 반대) 카드가 생긴다.
+    /// 폴백 기본 아이콘은 실제 보유 키워드가 아니므로 여기서는 "없음"으로 친다.</summary>
+    void RefreshKeywordBg(CardInstance _card)
+    {
+        bool t_hasKeyword = _card != null && _card.isRevealed
+                         && CardVisualRules.IconKeywords(_card) != CardKeyword.None;
+
+        if (this.keywordBg     != null) this.keywordBg.SetActive(t_hasKeyword);
+        if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!t_hasKeyword);
+    }
 
     void RefreshKeywordIcons(CardInstance _card)
     {
-        Transform t_root = KeywordAnchor;
+        RefreshKeywordBg(_card);
+
+        Transform t_root = this.keywordIconRoot;
         if (t_root == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
 
         foreach (Transform t_child in t_root)
@@ -149,16 +159,15 @@ public class CardDecorView
         List<CardVisualRules.KeywordIcon> t_icons =
             CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
 
-        // 배치 두 가지. 시너지 자리: 카드 하단 줄(이름 왼쪽)에서 keywordIconStep만큼 밀며 나열.
-        // 기존 자리: keywordIconRoot를 카드 오른쪽 아래 코너에 두고 원점에서 왼쪽으로 가로 정렬.
+        // 배치는 한 가지. keywordIconRoot(= 배경판의 큰 칸) 기준으로 keywordIconStart에서 시작해
+        // keywordIconStep만큼 밀며 나열한다. 시너지 배지 자리와는 서로 독립이다.
         float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_icons.Count; t_i++)
         {
             GameObject t_obj = UnityEngine.Object.Instantiate(this.keywordIconPrefab, t_root);
-            t_obj.transform.localPosition = this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null
-                ? new Vector3(this.keywordIconStart.x + this.keywordIconStep.x * t_i,
-                              this.keywordIconStart.y + this.keywordIconStep.y * t_i, 0f)
-                : new Vector3(-t_i * this.iconSpacing, 0f, 0f);
+            t_obj.transform.localPosition = new Vector3(
+                this.keywordIconStart.x + this.keywordIconStep.x * t_i,
+                this.keywordIconStart.y + this.keywordIconStep.y * t_i, 0f);
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
@@ -243,15 +252,11 @@ public class CardDecorView
     void RefreshSynergyBadges(CardInstance _card, SynergyState _synergy)
     {
         // 스냅샷은 **배지를 그리든 안 그리든 항상** 기록한다. 롱프레스 정보창이 활성/비활성을 가르는 근거라
-        // 여기서 빠지면 정보창이 상태를 못 받아 전부 활성으로 그린다(배지 자리를 키워드가 쓰는 지금 모드에서
-        // 아래 early return에 걸려 실제로 그랬다).
+        // 여기서 빠지면 정보창이 상태를 못 받아 전부 활성으로 그린다.
         bool t_sameAsBefore = _card == this.lastBadgeCard && _synergy == this.lastBadgeState;
         this.lastBadgeCard  = _card;
         this.lastBadgeState = _synergy;
 
-        // 그 자리를 키워드 아이콘이 쓰는 모드면 배지를 아예 만들지 않는다(겹침 방지).
-        // 배지가 존재하지 않으므로 FindBadgeAt은 null → 롱프레스는 카드 정보 팝업으로, PopSynergyBadge는 no-op.
-        if (this.keywordIconsUseSynergySlot && this.synergyBadgeRoot != null) return;
         if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
 
         // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →
@@ -277,16 +282,22 @@ public class CardDecorView
         // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
         if (_card == null || _card.data == null || !_card.isRevealed) return;
 
+        // 시너지 해금 레벨(1차 진화)에 닿지 않은 카드는 배지가 없다 — 실제로 시너지에 참여하지 않으므로
+        // 띄우면 "가졌지만 꺼진 것"이 아니라 그냥 오정보다. 판정은 인스턴스가 이미 들고 있는 게이트 하나.
+        if (!_card.synergyEnabled) return;
+
         // 표시 대상·순서(중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한 적용)는 CardVisualRules 단독.
-        // 여기 남는 건 세로 배치와 배지 Set뿐. 활성 판정도 같은 규칙 헬퍼를 재사용해 정렬과 아이콘이 어긋나지 않게 한다.
+        // 그중 **지금 켜진 것만** 남긴다: 비활성 배지는 카드 위에서 켜진 것과 구분이 어렵고 자리만 차지한다.
+        // 활성 판정은 확정 스냅샷 조회(재계산 금지) — 정렬과 같은 규칙 헬퍼를 재사용한다.
         List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.data.synergies, _synergy, this.synergyMaxBadges);
+        t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
 
         float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_tags.Count; t_i++)
         {
             SynergyBadgeView t_badge = UnityEngine.Object.Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
             t_badge.transform.localPosition = new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f);
-            t_badge.Set(t_tags[t_i], CardVisualRules.IsSynergyActive(_synergy, t_tags[t_i]));
+            t_badge.Set(t_tags[t_i], _active: true);
 
             // 키워드 아이콘과 같은 이유: 배지는 **지금 막 생성**돼 직전 페이드에 참여하지 못했다.
             // 그대로 두면 죽은 카드가 사라진 자리에 몸통 없이 배지만 먼저 보인다.

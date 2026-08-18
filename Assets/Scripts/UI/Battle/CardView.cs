@@ -78,16 +78,17 @@ public class CardView : MonoBehaviour
     [SerializeField] Transform keywordIconRoot;
     [SerializeField] GameObject keywordIconPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
-    [SerializeField] float iconSpacing = 0.3f;
-    // true면 키워드 아이콘이 시너지 배지 자리를 차지하고, 시너지 배지는 표시하지 않는다.
-    // 한 자리에 둘 다 그리면 겹치므로 "그 자리의 주인"은 이 스위치 하나가 정한다(양쪽 분기의 단일 진실원).
-    // false로 되돌리면 종전대로 키워드=우하단 가로줄 + 시너지 배지 복귀.
-    [SerializeField] bool keywordIconsUseSynergySlot = true;
 
-    // 위 스위치가 true일 때 아이콘이 놓이는 자리. 이름 왼쪽(카드 하단 줄)에서 오른쪽으로 나열한다 —
-    // 예전엔 시너지 배지와 같은 세로열 값을 그대로 썼는데, 그러면 배지 좌표를 손댈 때마다 아이콘이 따라 움직였다.
-    [SerializeField] Vector2 keywordIconStart = new Vector2(-0.54f, -1.14f);
+    // 아이콘이 놓이는 자리(keywordIconRoot 기준). 배경판의 **큰 칸**이 키워드 몫이다 —
+    // 작은 칸은 시너지 배지가 쓰며(synergyBadge*), 둘은 서로 독립 좌표라 한쪽을 손봐도 다른 쪽이 안 따라온다.
+    [SerializeField] Vector2 keywordIconStart = new Vector2(-0.636f, -1.099f);
     [SerializeField] Vector2 keywordIconStep  = new Vector2(0.42f, 0f);
+
+    // 아이콘 줄 배경판 두 장(Frame 자식). 키워드가 실제로 열려 있는 카드는 기본판,
+    // 키워드가 없거나 아직 안 열린(= 아이콘 줄에 띄울 것이 없는) 카드는 좁은 판을 쓴다.
+    // 어느 쪽을 켤지 정하는 지점은 CardDecorView 한 곳뿐이다 — 두 판이 동시에 켜지면 겹쳐 그려진다.
+    [SerializeField] GameObject keywordBg;        // SynergyKewordBG (기본)
+    [SerializeField] GameObject keywordOnlyBg;    // SynergyKewordBG_kewordOnly
 
     // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
     // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.
@@ -103,8 +104,8 @@ public class CardView : MonoBehaviour
     [Header("Synergy")]
     [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
     [SerializeField] SynergyBadgeView synergyBadgePrefab; // 색+텍스트 배지 프리팹.
-    [SerializeField] float synergyBadgeXPos   = 0.55f;  // 배지 세로열 X(synergyBadgeRoot 기준).
-    [SerializeField] float synergyBadgeYStart = 0.95f;  // 첫 배지(i=0) Y.
+    [SerializeField] float synergyBadgeXPos   = -0.335f; // 배지 세로열 X(synergyBadgeRoot = 배경판 작은 칸 기준).
+    [SerializeField] float synergyBadgeYStart = -1.216f; // 첫 배지(i=0) Y.
     [SerializeField] float synergyBadgeYStep  = -0.5f;  // 배지 간 Y 간격(아래로 쌓기).
     // 표시 최대 배지 수(초과분 드롭). 기본값은 CardVisualRules 상수 하나에서 — 프리팹 오버라이드는 남지만
     // 아웃게임 타일과 기본값이 따로 놀지 않게 코드 소스를 통일한다.
@@ -202,10 +203,10 @@ public class CardView : MonoBehaviour
         this.keywordIconRoot,
         this.keywordIconPrefab,
         this.keywordIconConfig,
-        this.iconSpacing,
-        this.keywordIconsUseSynergySlot,
         this.keywordIconStart,
         this.keywordIconStep,
+        this.keywordBg,
+        this.keywordOnlyBg,
         this.keywordFrames,
         this.synergyBadgeRoot,
         this.synergyBadgePrefab,

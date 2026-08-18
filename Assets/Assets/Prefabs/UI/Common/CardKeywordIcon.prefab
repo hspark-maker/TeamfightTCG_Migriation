@@ -87,6 +87,8 @@ GameObject:
   - component: {fileID: 2385189430452251770}
   - component: {fileID: 5908648893267473254}
   - component: {fileID: 2263209049379785608}
+  - component: {fileID: 8811002451237100011}
+  - component: {fileID: 8811002451237100012}
   m_Layer: 0
   m_Name: CardKeywordIcon
   m_TagString: Untagged
@@ -165,3 +167,29 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardKeywordIconView
   icon: {fileID: 7860762651793056443}
+--- !u!114 &8811002451237100011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4674822623048758913}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 975052f43828f2c4fad9a9a25724d12a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  threshold: 0.45
+  cancelDistance: 12
+--- !u!114 &8811002451237100012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4674822623048758913}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e300b16a0155d3a48bf0c479aa7acd32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

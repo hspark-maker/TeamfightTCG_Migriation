@@ -8483,13 +8483,13 @@ MonoBehaviour:
   targetFocusDur: 0.15
   weaponAnchor: {fileID: 8226864931356317243}
   armedVfxSortingOrder: 20
-  keywordIconRoot: {fileID: 4085148608198730300}
+  keywordIconRoot: {fileID: 3242344529736856691}
   keywordIconPrefab: {fileID: 2919412587841445740, guid: 54491c579fc1c4b41858c46a28206e8c, type: 3}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
-  iconSpacing: 0.3
-  keywordIconsUseSynergySlot: 1
-  keywordIconStart: {x: -0.335, y: -1.216}
+  keywordIconStart: {x: -0.636, y: -1.099}
   keywordIconStep: {x: 0.42, y: 0}
+  keywordBg: {fileID: 8118348141885956522}
+  keywordOnlyBg: {fileID: 2423938216929680886}
   keywordFrames:
   - keyword: 4
     overlay: {fileID: 7016833276713273353}
@@ -8505,10 +8505,10 @@ MonoBehaviour:
     overlay: {fileID: 6697701302518551064}
   - keyword: 32
     overlay: {fileID: 1928933477296888043}
-  synergyBadgeRoot: {fileID: 3242344529736856691}
+  synergyBadgeRoot: {fileID: 5097841172674652361}
   synergyBadgePrefab: {fileID: 8437468774932756809, guid: 8d611272942ca6d4fb970a8928035eaf, type: 3}
-  synergyBadgeXPos: -0.65
-  synergyBadgeYStart: -1.14
+  synergyBadgeXPos: -0.335
+  synergyBadgeYStart: -1.216
   synergyBadgeYStep: -0.5
   synergyMaxBadges: 3
   aimTiltMaxAngle: 10

@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { processHook } = require("./map-gate.js");
+const { processHook, FREE_SEARCHES } = require("./map-gate.js");
 const { bashSearch, powershellSearch, mapReadSucceeded } = require("../lib/search-detect.js");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "map-gate-test-"));
@@ -34,11 +34,23 @@ function hook(event, tool, input, response, session = "s1") {
 
 const denied = (result) => Boolean(result) && result.hookSpecificOutput.permissionDecision === "deny";
 
+/* 요청당 무료 탐색을 다 쓴다. 게이트는 세 번째 검색부터 막으므로 테스트도 같은 전제를 밟아야 한다. */
+function exhaustFree(session = "s1", extra = {}) {
+  for (let i = 0; i < FREE_SEARCHES; i += 1) {
+    const result = processHook({
+      hook_event_name: "PreToolUse", tool_name: "Grep", tool_input: { pattern: `warmup${i}` },
+      session_id: session, cwd: projectDir, ...extra,
+    }, { projectDir, stateRoot });
+    assert.equal(result, null, "무료 구간은 통과해야 한다");
+  }
+}
+
 let passed = 0;
 function check(label, fn) { fn(); passed += 1; console.log(`  ok  ${label}`); }
 
 try {
-  check("1. 지도 미열람 상태의 첫 Grep 은 차단된다", () => {
+  check("1. 무료 구간을 넘긴 Grep 은 차단된다", () => {
+    exhaustFree();
     assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "Card" })));
   });
 
@@ -57,17 +69,20 @@ try {
   });
 
   check("5. Bash 지도 읽기 실패는 기록되지 않는다 (exitCode 없는 실측 스키마)", () => {
+    exhaustFree("bash-fail");
     hook("PostToolUse", "Bash", { command: "cat .claude/orch-feature-map.md" },
       bashFail("cat: .claude/orch-feature-map.md: No such file or directory"), "bash-fail");
     assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "Card" }, undefined, "bash-fail")));
   });
 
   check("6. 내용이 거의 없는 출력도 열람으로 치지 않는다", () => {
+    exhaustFree("empty-grep");
     hook("PostToolUse", "Bash", { command: "grep lobby .claude/orch-feature-map.md" }, bashOk(""), "empty-grep");
     assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "Card" }, undefined, "empty-grep")));
   });
 
   check("7. Read 실패(is_error)도 기록되지 않는다", () => {
+    exhaustFree("failed-read");
     hook("PostToolUse", "Read", { file_path: ".claude/orch-feature-map.md" }, { is_error: true }, "failed-read");
     assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "Card" }, undefined, "failed-read")));
   });
@@ -81,6 +96,7 @@ try {
   });
 
   check("9. 연속 3회 차단 뒤 fail-open (교착 방지)", () => {
+    exhaustFree("cap");
     for (let i = 0; i < 3; i += 1) {
       assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "x" }, undefined, "cap")), `${i + 1}회차 차단`);
     }
@@ -108,6 +124,7 @@ try {
       "gci . -r",
     ]) assert.ok(powershellSearch(command), `${command} 은 탐색`);
     assert.equal(powershellSearch("Get-Content foo.txt"), false);
+    exhaustFree("ps");
     assert.ok(denied(hook("PreToolUse", "PowerShell",
       { command: "Select-String -Pattern CardView -Path Assets" }, undefined, "ps")));
   });
@@ -125,7 +142,51 @@ try {
     assert.equal(mapReadSucceeded(readOk), true);
   });
 
-  console.log(`map-gate tests: ${passed}/13 passed (subagent context: 미검증 — sidechain 기록 없음)`);
+  check("14. 요청이 바뀌면 해제가 풀린다 — 세션 단위 해제의 구멍", () => {
+    const transcript = path.join(root, "session.jsonl");
+    const user = (uuid, text) => JSON.stringify({ type: "user", uuid, message: { role: "user", content: text } });
+    const call = (event, tool, input, response) => processHook({
+      hook_event_name: event, tool_name: tool, tool_input: input, tool_response: response,
+      session_id: "scoped", cwd: projectDir, transcript_path: transcript,
+    }, { projectDir, stateRoot });
+
+    fs.writeFileSync(transcript, user("req-1", "첫 요청"));
+    exhaustFree("scoped", { transcript_path: transcript });
+    assert.ok(denied(call("PreToolUse", "Grep", { pattern: "Card" })), "요청1 무료 구간 뒤 차단");
+    call("PostToolUse", "Read", { file_path: ".claude/orch-feature-map.md" }, readOk);
+    assert.equal(call("PreToolUse", "Grep", { pattern: "Card" }), null, "요청1 해제");
+
+    fs.appendFileSync(transcript, String.fromCharCode(10) + user("req-2", "다른 주제 요청"));
+    exhaustFree("scoped", { transcript_path: transcript });
+    assert.ok(denied(call("PreToolUse", "Grep", { pattern: "Deck" })), "요청2 는 다시 차단");
+    call("PostToolUse", "Bash", { command: "cat .claude/orch-feature-map.md" }, bashOk(mapBody));
+    assert.equal(call("PreToolUse", "Glob", { pattern: "**/*.cs" }), null, "요청2 해제");
+  });
+
+  check("15. 주입 메시지는 요청 경계가 아니다", () => {
+    const transcript = path.join(root, "noise.jsonl");
+    const line = (uuid, text) => JSON.stringify({ type: "user", uuid, message: { role: "user", content: text } });
+    const call = (event, tool, input, response) => processHook({
+      hook_event_name: event, tool_name: tool, tool_input: input, tool_response: response,
+      session_id: "noise", cwd: projectDir, transcript_path: transcript,
+    }, { projectDir, stateRoot });
+
+    fs.writeFileSync(transcript, line("r-1", "진짜 요청"));
+    exhaustFree("noise", { transcript_path: transcript });
+    assert.ok(denied(call("PreToolUse", "Grep", { pattern: "Card" })));
+    call("PostToolUse", "Read", { file_path: ".claude/orch-feature-map.md" }, readOk);
+    fs.appendFileSync(transcript, String.fromCharCode(10) + line("r-2", "<system-reminder>주입</system-reminder>"));
+    assert.equal(call("PreToolUse", "Grep", { pattern: "Card" }), null, "주입은 경계가 아니므로 계속 열려 있어야 한다");
+  });
+
+  check("16. 요청당 무료 탐색은 막지 않는다 — 검색 1~2회로 끝나는 49% 를 위한 여유", () => {
+    for (let i = 0; i < FREE_SEARCHES; i += 1) {
+      assert.equal(hook("PreToolUse", "Grep", { pattern: `free${i}` }, undefined, "free"), null);
+    }
+    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "over" }, undefined, "free")), "무료 구간 초과분은 차단");
+  });
+
+  console.log(`map-gate tests: ${passed}/16 passed (subagent context: 미검증 — sidechain 기록 없음)`);
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

@@ -30,14 +30,16 @@ public class DeckPileUI : MonoBehaviour
     [SerializeField] Button backgroundCloseButton;
 
     [Header("Player")]
-    [SerializeField] CardElement cardElementPrefab;
+    // 카드 그림은 CardVisualView(도감·덱편집·정보창과 같은 컴포넌트)가 그리고,
+    // 누름 입력은 같은 오브젝트의 CardPressRelay가 중계한다.
+    [SerializeField] CardVisualView cardElementPrefab;
 
     [Header("Enemy")]
     [SerializeField] GameObject faceDownEntryPrefab;
 
     static DeckPileUI currentOpen;
 
-    readonly List<CardElement> cardElementPool = new List<CardElement>();
+    readonly List<CardVisualView> cardElementPool = new List<CardVisualView>();
     readonly List<GameObject> faceDownPool = new List<GameObject>();
 
     bool panelOpen;
@@ -338,13 +340,14 @@ public class DeckPileUI : MonoBehaviour
     /// <summary>목록 카드를 <b>누르고 있는 동안</b>의 상세. 전투 중 롱프레스와 **같은 창**(PooledCardElement)을 쓴다 —
     /// 여기서 별도 상세 UI를 만들면 카드 정보를 보는 방법이 두 벌이 된다.
     /// 시너지 활성 여부는 이 필드의 확정 스냅샷을 그대로 넘긴다(재계산 금지).</summary>
-    void ShowCardDetail(CardData _card)
+    void ShowCardDetail(CardInstance _card)
     {
-        if (_card == null) return;
+        if (_card?.data == null) return;
         UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
         {
-            card    = _card,
-            synergy = this.field != null ? this.field.Synergy : null,
+            card     = _card.data,
+            instance = _card,   // 대기 카드도 전투 인스턴스다 — 체력·키워드의 진실원을 넘긴다
+            synergy  = this.field != null ? this.field.Synergy : null,
         });
     }
 
@@ -352,7 +355,7 @@ public class DeckPileUI : MonoBehaviour
 
     void PopulateList()
     {
-        foreach (CardElement t_e in this.cardElementPool) t_e.gameObject.SetActive(false);
+        foreach (CardVisualView t_e in this.cardElementPool) t_e.gameObject.SetActive(false);
         foreach (GameObject t_e in this.faceDownPool) t_e.SetActive(false);
 
         int t_ceIdx = 0;
@@ -364,7 +367,7 @@ public class DeckPileUI : MonoBehaviour
 
             if (t_showCard)
             {
-                CardElement t_entry;
+                CardVisualView t_entry;
                 if (t_ceIdx < this.cardElementPool.Count)
                 {
                     t_entry = this.cardElementPool[t_ceIdx];
@@ -375,13 +378,19 @@ public class DeckPileUI : MonoBehaviour
                     t_entry = Instantiate(this.cardElementPrefab, this.cardListRoot);
                     this.cardElementPool.Add(t_entry);
                 }
-                t_entry.Init(t_card, CardElementMod.Full);
+                // 대기 중인 **그 인스턴스**를 그린다 — 현재 체력·그 카드가 실제로 가진 키워드가 정답이다.
+                t_entry.Bind(t_card);
 
                 // 공개된 카드는 **누르고 있는 동안** 상세가 뜬다(떼면 사라진다).
-                // 콜백은 대입이라 풀에서 재사용돼도 중복되지 않는다.
-                t_entry.SetInteractable(true, false);
-                t_entry.onPressStart = ShowCardDetail;
-                t_entry.onPressEnd   = HideCardDetail;
+                // 콜백은 대입이라 풀에서 재사용돼도 중복되지 않는다. 루프 변수는 지역으로 떠서 캡처한다.
+                CardInstance    t_captured = t_card;
+                CardPressRelay t_press    = t_entry.GetComponent<CardPressRelay>();
+                if (t_press != null)
+                {
+                    t_press.SetInteractable(true);
+                    t_press.onPressStart = () => ShowCardDetail(t_captured);
+                    t_press.onPressEnd   = HideCardDetail;
+                }
                 t_ceIdx++;
             }
             else
