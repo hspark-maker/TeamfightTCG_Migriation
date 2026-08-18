@@ -94,6 +94,24 @@ public static class RankManager
         _badge       = t_config.unrankedBadge != null ? t_config.unrankedBadge : t_first.Badge;
     }
 
+    /// <summary>다음 등급의 배지. 진행 호 끝에 세우는 승급 목표 표시가 쓴다 —
+    /// 등급 테이블(RankConfig.grades)을 UI로 내보내지 않으려고 여기서 파생해 준다.
+    /// 최대 등급이거나 배지가 미저작이면 false(그때는 목표를 감춘다).</summary>
+    public static bool TryGetNextGradeBadge(out Sprite _badge)
+    {
+        _badge = null;
+
+        var t_config = Config;
+        if (t_config.grades == null) return false;
+
+        int t_next = TierIndex / RankConfig.DivisionsPerGrade + 1;
+        if (t_next >= t_config.grades.Count) return false;
+
+        RankGradeConfig t_grade = t_config.grades[t_next];
+        _badge = t_grade != null ? t_grade.badge : null;
+        return _badge != null;
+    }
+
     /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
     /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
     public static bool TryEnterFirstTier(out RankApplyResult _result)

@@ -130,7 +130,14 @@
       "Bash(sort -u -k2)",
       "Bash(awk '/^--- !u!114 &3692091235067170845/,/^--- !u!.*&\\(?!3692091235067170845\\)/' \"Assets/Assets/Prefabs/UI/CardView/CardUIView.prefab\")",
       "Bash(awk 'NR>=2768 && NR<=3200' \"Assets/Assets/Prefabs/UI/LobbyUI/Album/Panel_PageOverlay.prefab\")",
-      "Bash(awk 'NR>=3415 && NR<=3446' Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab)"
+      "Bash(awk 'NR>=3415 && NR<=3446' Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab)",
+      "Bash(cat)",
+      "Bash(awk -v ins=C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/6e1f10cd-e1cf-4219-81ac-4e211855f476/scratchpad/ins.txt '{print} /public static int TierIndex =>/{while\\(\\(getline line < ins\\)>0\\) print line; close\\(ins\\)}' OutGame/Rank/RankManager.cs)",
+      "Bash(mv C:/Users/cookapps/AppData/Local/Temp/claude/C--mgJeon-TeamfightTCG-Migriation/6e1f10cd-e1cf-4219-81ac-4e211855f476/scratchpad/rm.cs OutGame/Rank/RankManager.cs)",
+      "Bash(sed -i 's/OpenedPack\\\\.CreateSuccess\\(t_packId, t_drawn, t_refundType\\)/OpenedPack.CreateSuccess\\(t_drawn, t_refundType\\)/' UI/Shop/PackStandaloneBoot.cs)",
+      "Bash(sed -i 's/\\\\bPickCandidate\\\\b/PickWeightedCandidate/g' OutGame/CardPack/CardPackOpener.cs)",
+      "Bash(sed -i 's|// 현재 티어의 등급\\\\. 등급만 필요한 소비자\\(카드팩 풀 해석 등\\)가 GetInfo 스냅샷을 헤집지 않게 여기서 파생해 준다\\\\.|// 현재 티어의 등급. 등급만 필요한 호출부가 GetInfo\\(\\) 체인을 늘어놓지 않게 하는 단일 창구.|' OutGame/Rank/RankManager.cs)",
+      "Bash(sed -i 's|// 한 팩의 카드별 등장 확률\\(현재 랭크 기준\\)\\\\. uniqueDraw 팩도 값은 1회 추첨 기준이다\\\\.|// 한 팩의 카드별 등장 확률\\(현재 랭크 기준\\). uniqueDraw 팩은 비복원이라 매회 잔여 풀이 줄지만, 고지 값은 첫 추첨 기준이다.|' OutGame/CardPack/PackOdds.cs)"
     ]
   },
   "enabledMcpjsonServers": [

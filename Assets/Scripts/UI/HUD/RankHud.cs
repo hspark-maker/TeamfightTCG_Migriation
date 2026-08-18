@@ -29,6 +29,17 @@ public class RankHud : MonoBehaviour
     [Tooltip("조각 하나가 꽂힐 때 호가 다음 눈금까지 가는 시간. 조각 간격보다 짧게 둔다 — 길면 다음 조각이 앞 트윈을 밟는다.")]
     [SerializeField] float arcStepDuration = 0.18f;
 
+    [Tooltip("호 끝(승급선)에 앉는 목표 마커. 스프라이트·자리·색은 표시할 때마다 코드가 덮으므로 저작값은 에디터 미리보기용이다.\n" +
+             "미배선이면 런타임에 pipsRoot 아래로 만들어진다.")]
+    [SerializeField] Image goalMarker;
+
+    [Tooltip("목표 마커의 색. 다음 등급 배지를 이 색으로 어둡게 깔아 '여기까지 채우면 저게 된다'를 보여준다.")]
+    [SerializeField] Color goalMarkerColor = new Color(0.66f, 0.66f, 0.78f, 0.95f);
+
+    [Tooltip("마커를 런타임에 만들 때 줄 크기(저작된 마커는 자기 크기를 그대로 쓴다). 별(56)보다 크게 둔다 — " +
+             "등급 배지는 별보다 복잡한 그림이라 같은 크기면 뭉개진다.")]
+    [SerializeField] Vector2 goalMarkerSize = new Vector2(88f, 88f);
+
     [Header("승급 연출")]
     [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 켜져야 '변했다'가 보인다.")]
     [SerializeField] float enterDelay = 0.35f;
@@ -102,6 +113,9 @@ public class RankHud : MonoBehaviour
 
     // 강등 흔들림이 되돌릴 배지 자리. 흔들림이 중간에 끊기면 배지가 어긋난 채 굳는다.
     Vector2 m_badgeBasePos;
+
+    // 호 끝의 승급 목표 마커(런타임 생성). 다음 등급이 없으면 만들어만 두고 끈다.
+    Image m_goalMarker;
 
     /// <summary>조각이 튀어나올 원점이자 도착지. 연출 디렉터가 쓴다.</summary>
     public RectTransform BadgeRect => this.badgeImage != null ? (RectTransform)this.badgeImage.transform : null;
@@ -232,14 +246,19 @@ public class RankHud : MonoBehaviour
             }
         }
 
-        // 옛 상태를 한 박자 보여준 뒤에 바꾼다 — 곧장 켜면 무엇이 달라졌는지 못 본다.
-        this.m_tierSeq.AppendInterval(this.enterDelay);
+        // 옛 상태를 한 박자 보여준 뒤에 바꾼다 — 등급이 갈리는 판에서만 필요하다.
+        // 같은 등급 안 상승은 앞선 조각 단계가 이미 옛 상태에서 출발하는 것을 다 보여줬다.
+        if (t_gradeUp) this.m_tierSeq.AppendInterval(this.enterDelay);
 
-        // 같은 등급 안 상승(브론즈 1 → 2)도 같은 길을 탄다 — 새로 도달한 칸을 순서대로 켠다(두 칸 이상 뛰어도 다 켜진다).
+        // 같은 등급 안 상승(브론즈 1 → 2)의 별은 여기서 켜지 않는다 —
+        // 조각이 호를 미는 동안 채움 머리가 그 별을 지나며 켠다(OnMarkerCrossed). 여기서 또 켜면 시계가 둘이 된다.
         if (t_gradeUp) this.StageGradeUp(this.m_tierSeq, t_info, t_prevDivision, t_divisions);
-        else
+        else if (this.arc == null)
+        {
+            // 호가 미배선이면 통과를 알려 줄 사람이 없다 — 종전처럼 여기서 순서대로 켠다.
             for (int t_i = t_prevDivision; t_i < t_info.Division && t_i < t_divisions; t_i++)
                 this.StagePipOn(this.m_tierSeq, t_i);
+        }
 
         // 여운 없이 끝내면 마지막 별이 튀는 도중에 연출이 잘린 것처럼 보인다.
         this.m_tierSeq.AppendInterval(this.finishDelay);
@@ -284,12 +303,23 @@ public class RankHud : MonoBehaviour
 
         this.m_tierSeq.AppendInterval(this.enterDelay);
 
-        // 등급이 그대로면 잃은 칸만, 갈릴 거면 켜져 있던 칸을 전부 — 뒤에서부터 하나씩 꺼진다.
-        int t_stop = t_gradeDown ? 0 : t_info.Division;
-        for (int t_i = t_prevDivision - 1; t_i >= t_stop; t_i--)
-            this.StagePipOff(this.m_tierSeq, t_i);
+        if (t_gradeDown)
+        {
+            // 등급이 갈릴 거면 켜져 있던 칸을 전부 — 뒤에서부터 하나씩 꺼진다.
+            for (int t_i = t_prevDivision - 1; t_i >= 0; t_i--)
+                this.StagePipOff(this.m_tierSeq, t_i);
 
-        if (t_gradeDown) this.StageGradeDown(this.m_tierSeq, t_info);
+            this.StageGradeDown(this.m_tierSeq, t_info);
+        }
+        else
+        {
+            // 같은 등급 안 강등은 호가 물러나며 별을 끈다(OnMarkerCrossed) — 별만 따로 지우면 게이지가 옛 자리에 남는다.
+            // 이 경로에선 손실 반응이 생략되므로(디렉터가 티어 변화와 겹치지 않게 건너뛴다) 호를 움직일 사람이 여기밖에 없다.
+            if (this.arc != null) this.StageArcRetreat(this.m_tierSeq, t_info.GradeProgress);
+            else
+                for (int t_i = t_prevDivision - 1; t_i >= t_info.Division; t_i--)
+                    this.StagePipOff(this.m_tierSeq, t_i);
+        }
 
         this.m_tierSeq.AppendInterval(this.finishDelay);
 
@@ -309,6 +339,9 @@ public class RankHud : MonoBehaviour
     {
         // 연출이 되돌릴 기준색. 배지 스프라이트는 티어 변화로 갈리지만 색은 저작값 그대로다.
         if (this.badgeImage != null) this.m_badgeBaseColor = this.badgeImage.color;
+
+        // 별은 스스로 켜지지 않는다 — 채움 머리가 자기 마디를 지날 때만 켜진다.
+        if (this.arc != null) this.arc.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
     }
 
     void Start()
@@ -348,8 +381,97 @@ public class RankHud : MonoBehaviour
 
         // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 핍 줄 자체를 감춘다.
         this.SetPipsVisible(!t_info.IsUnranked);
+        this.RenderGoalMarker(!t_info.IsUnranked);
+        this.LayoutMarkers();
         this.RenderPips(t_info.IsUnranked ? 0 : t_info.Division);
         this.SetArc(t_info.IsUnranked ? 0f : t_info.GradeProgress);
+    }
+
+    // 마디 자리는 호가 낸다 — 손으로 찍은 좌표는 span·회전이 바뀌는 순간 어긋난다(별 넷을 호 양 끝에 걸쳐 놓은 것이 옛 어긋남의 원인이었다).
+    void LayoutMarkers()
+    {
+        if (this.arc == null) return;
+
+        int t_divisions = RankConfig.DivisionsPerGrade;
+
+        if (this.divisionPips != null)
+        {
+            for (int t_i = 0; t_i < this.divisionPips.Length && t_i < t_divisions; t_i++)
+            {
+                var t_pip = this.divisionPips[t_i];
+                if (t_pip == null) continue;
+
+                // 별 K는 그 칸이 시작되는 자리에 앉는다 — 켜지는 시점과 앉은 자리가 같아야 머리가 지나며 켤 수 있다.
+                ((RectTransform)t_pip.transform).anchoredPosition = this.arc.MarkerPos((float)t_i / t_divisions);
+            }
+        }
+
+        // 별 넷이 4구간을 열고, 마지막 기둥(승급선)이 그 구간을 닫는다.
+        if (this.m_goalMarker != null)
+            ((RectTransform)this.m_goalMarker.transform).anchoredPosition = this.arc.MarkerPos(1f);
+    }
+
+    // 채움 머리가 마디를 지나는 그 프레임에 별이 켜진다(물러나면 꺼진다).
+    // 점등을 따로 재생하면 호와 별이 서로 다른 시계로 돌아 어긋난다.
+    void OnMarkerCrossed(int _index, bool _forward)
+    {
+        this.SetPip(_index, _forward);
+        UiPunch.Play(this.PipTransform(_index), _forward ? this.pipPunch : -this.demotePipShrink);
+    }
+
+    // 칸 K가 시작되는 비율들. 0번은 등급 진입선이라 통과가 일어나지 않지만(호가 그 아래로 내려가지 않는다)
+    // 인덱스를 별 번호와 맞춰 두려고 자리를 비워 두지 않는다.
+    static float[] BuildMarkerRatios()
+    {
+        int t_divisions = RankConfig.DivisionsPerGrade;
+
+        var t_ratios = new float[t_divisions];
+        for (int t_i = 0; t_i < t_divisions; t_i++) t_ratios[t_i] = (float)t_i / t_divisions;
+
+        return t_ratios;
+    }
+
+    // 다음 등급 배지를 어둡게 깐 목표 마커. 최대 등급·언랭크면 감춘다(도달할 곳이 없거나 아직 등급 안이 아니다).
+    void RenderGoalMarker(bool _visible)
+    {
+        Sprite t_badge = null;
+        bool t_show = _visible && RankManager.TryGetNextGradeBadge(out t_badge);
+
+        // 저작된 마커는 감출 때도 손에 넣어야 한다 — 안 그러면 언랭크에서 켜진 채로 남는다(런타임 생성은 보여줄 때만 만든다).
+        var t_marker = t_show || this.goalMarker != null ? this.EnsureGoalMarker() : this.m_goalMarker;
+        if (t_marker == null) return;
+
+        t_marker.gameObject.SetActive(t_show);
+        if (!t_show) return;
+
+        t_marker.sprite = t_badge;
+        t_marker.color = this.goalMarkerColor;
+    }
+
+    // 저작된 마커가 있으면 그것을 쓴다. 없으면 만든다 — 그림의 출처가 등급 테이블이라 저작 없이도 성립한다.
+    Image EnsureGoalMarker()
+    {
+        if (this.m_goalMarker != null) return this.m_goalMarker;
+        if (this.goalMarker != null) return this.m_goalMarker = this.goalMarker;
+        if (this.pipsRoot == null || this.arc == null) return null;
+
+        var t_go = new GameObject("RankGoalMarker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        t_go.layer = this.pipsRoot.layer;
+
+        var t_rect = (RectTransform)t_go.transform;
+        t_rect.SetParent(this.pipsRoot.transform, worldPositionStays: false);
+        t_rect.anchorMin = t_rect.anchorMax = t_rect.pivot = new Vector2(0.5f, 0.5f);
+        t_rect.localScale = Vector3.one;
+        t_rect.sizeDelta = this.goalMarkerSize;
+
+        // 호 바로 위, 별 아래 — 목표는 밑그림이지 주인공이 아니다.
+        t_rect.SetSiblingIndex(1);
+
+        this.m_goalMarker = t_go.GetComponent<Image>();
+        this.m_goalMarker.raycastTarget = false;
+        this.m_goalMarker.preserveAspect = true;
+
+        return this.m_goalMarker;
     }
 
     // 등급 승급: 구 배지가 파열하고 → 새 배지가 강림해 착지하고 → 그제서야 새 등급의 별이 채워진다.
@@ -423,6 +545,16 @@ public class RankHud : MonoBehaviour
         _seq.Append(t_rect.DOShakeAnchorPos(this.badgeShakeDuration, this.badgeShakeStrength, vibrato: 14));
         _seq.Join(this.badgeImage.DOColor(this.demoteBadgeColor, this.badgeShakeDuration * 0.5f)
                                  .SetLoops(2, LoopType.Yoyo));
+    }
+
+    // 호가 _ratio까지 물러난다. 지나치는 별은 통과 통지가 끈다.
+    void StageArcRetreat(Sequence _seq, float _ratio)
+    {
+        if (this.arc == null) return;
+
+        // Append로 붙여 시퀀스가 이 트윈이 끝날 때까지 기다리게 한다(여운이 물러남 도중에 겹치지 않게).
+        Tween t_arc = this.arc.TweenTo(_ratio, this.lossDuration);
+        if (t_arc != null) _seq.Append(t_arc);
     }
 
     // 핍 하나가 조용히 꺼지는 단위 동작. 켜질 때의 탁 튀는 손맛과 반대로 움츠러들었다 돌아온다.
