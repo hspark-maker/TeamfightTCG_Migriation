@@ -2,21 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 카드팩 스펙시트(CardPack / CardPackDrop) 런타임 조회 창구.
-//
-// 카드(CardData)와 달리 팩은 아트 말고 물려 있는 에셋이 없다 — 값이 전부 숫자·키·카드 id다.
-// 그래서 에셋에 굽지 않고 시트를 그대로 읽는다. CardPackData SO는 packId와 팩 아트만 소유한다.
-//
-// 시트를 못 읽거나 packId가 시트에 없으면 조회가 전부 실패로 떨어지고, CardPackData가 자기
-// 인스펙터 값으로 폴백한다 — 스펙 파이프라인이 끊겨도 팩 상점이 빈 화면이 되지는 않는다.
+// 시트를 못 읽거나 packId가 없으면 조회가 실패로 떨어지고 CardPackData가 인스펙터 값으로 폴백한다.
 public static class PackSpec
 {
     static bool s_loaded;
     static readonly Dictionary<string, CardPack> s_packs = new Dictionary<string, CardPack>();
     static readonly Dictionary<string, List<CardPackDrop>> s_drops = new Dictionary<string, List<CardPackDrop>>();
 
-    public static bool IsReady => s_loaded && s_packs.Count > 0;
-
-    // 부트에서 1회. 첫 조회에서도 지연 로드되므로 필수는 아니지만, 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
+    // 부트에서 1회. 지연 로드도 되지만 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
     public static bool TryGetPack(string _packId, out CardPack _row)
@@ -26,9 +19,8 @@ public static class PackSpec
         return !string.IsNullOrEmpty(_packId) && s_packs.TryGetValue(_packId, out _row);
     }
 
-    // 이 팩에서 뽑을 수 있는 카드와 가중치. 랭크 오버라이드는 **만족하는 등급 중 가장 높은 하나**만 적용된다
+    // 이 팩에서 뽑을 수 있는 카드와 가중치. 랭크 오버라이드는 만족하는 등급 중 가장 높은 하나만 적용된다
     // (하위 등급과 합산하지 않는다 — CardPackData.ResolvePool과 같은 규약).
-    // 카드 조회는 CardCatalog 단독이라, 카탈로그에 없는 id(테스트 전용 등)는 조용히 빠진다.
     public static List<WeightedCard> ResolveDrops(string _packId, ERankGrade _grade)
     {
         EnsureLoaded();

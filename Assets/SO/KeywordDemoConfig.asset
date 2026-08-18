@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 094a9f30f4831f647ba24d1cac7330d6, type: 3}
+  m_Name: KeywordDemoConfig
+  m_EditorClassIdentifier: Assembly-CSharp::KeywordDemoConfig
+  defaultOpponent: {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  defaultNeighbor: {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
+  entries: []

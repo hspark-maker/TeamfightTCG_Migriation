@@ -48,7 +48,7 @@ public class PackStandaloneBoot : MonoBehaviour
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
         var t_refundType = dummyPack != null ? dummyPack.RefundType : ECurrencyType.Gold;
-        PackHandoff.Set(OpenedPack.CreateSuccess(t_packId, t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneBoot] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
     }

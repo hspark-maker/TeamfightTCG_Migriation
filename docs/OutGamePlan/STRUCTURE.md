@@ -820,6 +820,80 @@ flowchart TD
 **보상은 무수정** — `RankRewardManager.StateOf`가 티어 인덱스가 아니라 **포인트 기준**이고 `Claimed` 낙인을 먼저 보므로, 강등해도 수령분은 유지되고 미수령 상위 행만 `Locked`로 되돌아간다(이미 강등을 전제한 코드였다).
 
 
+### 랭크 진행 호 — 배지를 감싸는 게이지 (2026-08-14)
+
+핍 4칸은 *"지금 몇 단계"*만 답하고 *"다음 별까지 얼마나"*는 답하지 못했다. 단계 간격 20~60에 승리 +10이라 **한 단계가 2~6승**인데, 그 사이의 승리는 화면에 아무 흔적을 남기지 않았다. `RankInfo.NextRequired`는 이미 계산돼 있었으나 **소비처가 0곳**이었다.
+
+#### 배치가 이미 원이었다
+
+`RankPips`의 `HorizontalLayoutGroup`은 **`m_Enabled: 0`**이라 저작 좌표가 곧 런타임 배치다. 네 핍 `(-150,-80) (-60,0) (60,0) (150,-80)`은 **중심 `(0,-158.125)` · 반지름 `169.13` 원 위에 오차 없이** 놓이고 각 간격은 41.7°로 균일하다. 그 원의 중심은 `RankBadge` 중심에서 12px 아래 — 별들은 처음부터 배지를 감싸는 링이었다.
+
+호를 **위쪽 중심 166.6°(±83.3°)**로 두고 4등분하면 경계가 `-83.3 / -41.7 / 0 / +41.7 / +83.3`이고 **별 하나가 각 칸의 정중앙**에 온다.
+
+- 채움 머리가 K번 칸에 있다 ⟺ K단계 ⟺ K번 별이 켜져 있다 — **기존 핍 의미·좌표 무변경**
+- 채움 `1.0` = 호의 오른쪽 끝 = **승급선**. 4단계를 3개 간격에 욱여넣지 않아도 되는 유일한 매핑이다
+- 호 = 연속 진행, 별 = 이산 단계. 역할이 겹치지 않는다
+
+`Image Type=Filled / Radial360`은 `fillOrigin=Top`에서만 시작하므로, 호를 위쪽 중심에 세우는 방법은 **루트를 span의 절반만큼 돌리는 것**뿐이다(링은 회전 대칭이라 그림은 그대로다). 가시 범위 자체도 `fillAmount` 상한(`span/360`)이 만든다 — 원 한 바퀴를 그린 뒤 잘라내지 않는다.
+
+#### 연출은 기존 시간축에 그대로 얹힌다
+
+`LobbyRankEffectDirector`는 이미 **조각 완료 → 티어 변화** 순서라, 호가 별에 닿고 → 그다음에 별이 켜진다.
+
+| 시점 | 호 |
+|---|---|
+| 캐리어 소비 직후(커버 아래) | `PrepareProgress(Points - Delta)` — 전투 직전 위치로. `Delta`가 클램프 뒤 실증감이라 이 뺄셈이 곧 그때 값이다 |
+| 조각 1개 도착마다 | `PlayGainImpact(_arrived, _total)`이 출발↔도착을 등분해 한 칸씩 전진 |
+| 등급 승급 파열 프레임 | `promote.Build`의 `_onBurst`에서 `BlowOutPips`와 **같은 프레임**에 새 등급 출발선으로 되감김 |
+| 포인트 손실 | 조각이 없는 경로 — 감소 트윈을 `BuildLossReaction` 시퀀스에 `Join`. **요요 없이 한 방향**(줄어든 자리가 곧 지금 값) |
+| 모든 `OnKill` / `Render()` | 진실값에 안착(조각 연출이 통째로 생략되는 경로들의 폴백) |
+
+등급이 갈리는 판의 도착지는 새 등급의 자리가 아니라 **옛 등급의 승급선(1.0)**이다 — 그 뒤는 파열이 이어받는다.
+
+| 신규/변경 파일 | 내용 |
+|---|---|
+| `Prefabs/UI/LobbyUI/RankInfo.prefab` 🆕 | 랭크 표시 전체(배지·티어명·핍·호). `LobbyCanvas`는 이걸 중첩 인스턴스로 문다 |
+| `UI/HUD/RankProgressArc.cs` 🆕 | 호 1개. `SetRatio` / `TweenTo` / `Stop`. `Awake`가 span에서 회전과 track `fillAmount`를 파생 |
+| `Prefabs/UI/LobbyUI/RankProgressArc.prefab` 🆕 | `Track`(어둡게) + `Fill`(금색), 스프라이트는 `BasicFrame_CircleLine_155_White2`(실제 도넛, 바깥 r=77 안 r=72). `sizeDelta 351.9` = 스트로크 중심을 핍 반지름 169.13에 맞춘 값 |
+| `OutGame/Rank/RankManager.cs` | `GetInfoAt(long)` 분리(연출이 '전투 직전' 스냅샷을 묻는다) · `RankInfo.TierRequired` 추가 · `TierProgress` / `GradeProgress` 파생 |
+| `UI/HUD/RankHud.cs` | `arc` 배선 · `PrepareProgress(long)` 추가 · `PlayGainImpact(bool)` → **`PlayGainImpact(int, int)`** |
+| `UI/Lobby/LobbyRankEffectDirector.cs` | `PrepareProgress` 호출 1줄 · 도착 콜백이 `(_arrived, _total)`을 그대로 넘김 |
+
+**랭크 표시 전체가 `RankInfo.prefab`으로 빠졌다.** `LobbyCanvas`의 `MatchContent/RankInfo`는 이제 그 프리팹의 중첩 인스턴스이고(형제 1번, `pos (0,209)` `size 700x700` — 좌표 무변경), 배지·티어명·핍 4개·호가 전부 그 안에 있다. 랭크 표시를 만질 때 LobbyCanvas를 열 필요가 없다.
+
+```
+RankInfo.prefab            [RankHud]
+├ RankBadge                 └ RankText
+└ RankPips                  (HorizontalLayoutGroup은 m_Enabled: 0 — 저작 좌표가 곧 배치)
+  ├ RankProgressArc        ← 형제 0 = 별들보다 앞 = 뒤에 깔린다 (RankProgressArc.prefab 중첩)
+  └ Pip1~Pip4
+```
+
+호가 `pipsRoot`의 자식이라 **언랭크에서 별 줄과 함께 통째로 꺼지는** 이득이 따라온다.
+
+#### LobbyCanvas를 열지 않고 구조를 바꾸는 법 (2026-08-14 실측)
+
+`LoadPrefabContents` + `SaveAsPrefabAsset`이 금지된 이 프리팹도 **targeted API로는 안전하게 고칠 수 있다.**
+
+**노드를 프리팹으로 빼내기** — 프리뷰 씬 사본을 `PrefabUtility.UnpackPrefabInstance(inst, OutermostRoot, AutomatedAction)`로 먼저 푼다(에셋은 안 건드린다. 안 풀면 *"Can't save part of a Prefab instance as a Prefab"*). 그다음 대상 노드에 `SaveAsPrefabAsset`. 안쪽 중첩(탭·호)은 `OutermostRoot`라 인스턴스로 남는다.
+
+**노드를 인스턴스로 교체** — 같은 프리뷰 씬에서 새 인스턴스를 붙여 `ApplyAddedGameObject` → 옛 노드를 `DestroyImmediate` → `ApplyRemovedGameObject(inst, 미리 잡아 둔 에셋측 노드, AutomatedAction)`. 에셋측 노드는 지우기 **전에** `GetCorrespondingObjectFromSource`로 잡아 둬야 한다.
+
+> ⚠ 이때 git diff는 **130삽입 / 704삭제**로 무섭게 보이지만 Unity의 YAML 문서 재배열이 섞인 것이다. 줄 수로 판정하지 말고 `.backup_lobby/tools/dump2.js`로 **계층을 덤프해 대조**할 것 — 실제로 바뀐 것은 `RankInfo` 한 줄뿐이었다.
+
+**자식만 더할 때**는 언팩도 필요 없다. 다음 조합이면 diff가 **순수 추가(116삽입 / 0삭제)**로 떨어진다:
+
+1. `EditorSceneManager.NewPreviewScene()`에 `PrefabUtility.InstantiatePrefab(canvasAsset, preview)` — 열린 씬을 안 건드린다
+2. 인스턴스 안에서 자식을 붙이고 `PrefabUtility.ApplyAddedGameObject(child, CANVAS, AutomatedAction)` — **추가된 그 오브젝트 하나만** 에셋에 쓴다
+3. `ClosePreviewScene`
+
+**`AssetDatabase.SaveAssets()`를 부르면 안 된다.** 같은 절차에 이 한 줄을 붙였더니 144삽입/**31삭제**가 나고 무관한 중첩 프리팹의 `m_IsActive`·`m_SizeDelta`·좌표가 함께 갈렸다 — 에디터에 떠 있던 무관한 dirty가 같이 flush된 것이다. 필드 배선도 `AssetDatabase.SaveAssetIfDirty(대상)`만 쓴다.
+
+> `git checkout`으로 되돌린 뒤에는 **`AssetDatabase.ImportAsset(path, ForceUpdate)`로 메모리를 디스크에 맞춘다.** 안 하면 다음 저장이 옛 메모리 상태를 도로 쓴다.
+
+**경계**: 최대 티어는 `TierProgress = 1` 고정(더 갈 곳이 없는데 게이지를 비워 두면 오해가 된다). 등급 바닥에 걸려 패배해도 포인트가 안 깎이는 구간에서는 호도 그대로다.
+
+
 ### 매치 덱 선택·편집 (`UI/Match/`) — ✅ 코드+검수 완료 (2026-08-03), 프리팹·씬 저작 대기
 
 전투 진입 직전 화면에서 **덱을 고르고 그 자리에서 수정**하는 흐름. 편집 본체는 로비와 같은 `DeckEditController`를 그대로 쓰고, 매치는 그 위에 셸과 가로 리스트만 얹는다.
@@ -1064,6 +1138,13 @@ sequenceDiagram
 > 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체한** 새 축. **구 도감은 2026-08-14에 코드·에셋째 삭제됐고 병존은 끝났다** — 도감 축은 이제 앨범 하나다.
 > 폴더·접두어를 **`Album`으로 물리 분리**한 판단(`OutGame/Album/` · `UI/Album/`)이 그 삭제로 실증됐다 — 구 파일이 섞였다면 "라인 단위 수술"이었을 것이 폴더 통째 삭제로 끝났다.
 
+**구조 정리 (2026-08-18)** — 동작·낙인 키·소비자 API 무변경으로 `OutGame/Album/` 내부만 재편했다. `CardAlbum`(334줄)에서 **조립**(`AlbumBuilder`)과 **진단**(`AlbumValidator`, `#if UNITY_EDITOR`)을 떼어내 조회 파사드 86줄로 줄였고, 테마·페이지의 공통 축을 `AlbumSection`으로 올려 `OwnedCountOf`/`TotalCountOf`/`IsComplete` 오버로드 6→3, `AlbumRewardManager`의 페이지·테마 판정 중복을 `InfoOf`/`StateOf(AlbumSection)` 한 쌍으로 합쳤다.
+
+> **`RewardKey` 조립은 파생 생성자에 그대로 뒀다** — 기반이 `접두사 + Key`로 조립하면 페이지 낙인이 `p:테마/페이지` → `p:페이지`가 되어 결정 #3이 깨진다. 기반은 `HasStableKey`면 받은 문자열을, 아니면 `null`을 담을 뿐이다.
+> **`Cards`는 공통 축에 올리지 않았다** — 테마는 null 제외 평탄화, 페이지는 null 포함 칸 순서라 이름만 같고 계약이 다르다. 공통은 완성 판정 모수인 `CardIds`뿐이다.
+> **삭제한 데드 API**: `TryGetTheme`/`TryGetPage`(+ 이것만 쓰던 인덱스 딕셔너리 2개), `AlbumSignature` 캐시 시그니처(→ `CardAlbumConfig.OnValidate`가 에디터 저작 변경 시 `InvalidateIfSource`), `HasAnyClaimable`/`ClaimableCountOf`/`ResetForDebug`, `AlbumTheme.Index`, `AlbumPage.ThemeKey`, `AlbumRewardInfo.Tier` + `EAlbumRewardTier`.
+> `HasAnyClaimable`은 랭크의 `RankRewardAlertDot`에 대응하는 **앨범 알림 점이 없어서** 죽어 있던 것이다 — 그 UI를 만들 때 `ClaimableCountOf`와 함께 되살릴 것.
+
 **실측 전제 (설계 당시 = 2026-08-06 기준. 아래 구 도감 관련 항목은 2026-08-14 삭제로 소멸했다)**
 
 - 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이었다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있어 **역참조 0건 = 로비에서 도달 불가**였다. → 지금 탭 idx 4는 `Tab_Collection_New.prefab`(앨범) 하나뿐이다.
@@ -1135,13 +1216,16 @@ flowchart TD
         RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
     end
     subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
-        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
-        THEME["AlbumTheme<br/>테마 1개 런타임 뷰<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
-        PAGE["AlbumPage<br/>페이지 1장 런타임 뷰<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구 = 조회만<br/>SetSource · Invalidate · Themes<br/>OwnedCountOf/TotalCountOf/IsComplete(AlbumSection)"]:::chg
+        BUILD["AlbumBuilder (internal static)<br/>저작 def → 런타임 뷰 조립<br/>Build(CardAlbumConfig)"]:::new
+        SEC["AlbumSection (abstract)<br/>테마·페이지 공통 축<br/>Key · Rewards · CardIds<br/>HasStableKey · RewardKey"]:::new
+        THEME["AlbumTheme : AlbumSection<br/>테마 1개 런타임 뷰<br/>RewardKey='t:id'<br/>Pages · Cards(null 제외)"]:::chg
+        PAGE["AlbumPage : AlbumSection<br/>페이지 1장 런타임 뷰<br/>RewardKey='p:테마/페이지'<br/>Index · Cards(null 포함)"]:::chg
+        VALID["AlbumValidator (internal static)<br/>저작↔카탈로그 드리프트 진단<br/>#if UNITY_EDITOR · ContextMenu 전용"]:::new
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
-        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
-        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>공용 판정 InfoOf/StateOf(AlbumSection) · OnChanged"]:::chg
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Rewards[] (복수)<br/>Owned/Total · State"]:::chg
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
     subgraph UI["UI (UI/Album/ · 실측 7파일 — 그리드·스테퍼는 오버레이에 흡수)"]
@@ -1176,7 +1260,12 @@ flowchart TD
     PDEF -.-> RDEF
     BOOTI -->|SetSource| BOOK
     CFG --> BOOK
-    BOOK --> THEME --> PAGE
+    BOOK -->|"조립 위임(lazy 1회)"| BUILD
+    CFG --> BUILD
+    CFG -.->|"ContextMenu 앨범 배치 검증"| VALID
+    BUILD --> THEME --> PAGE
+    SEC -.->|상속| THEME
+    SEC -.->|상속| PAGE
     CAT -->|카드 키| BOOK
     OWN -->|"소유 집합 = 진행도의 유일한 원천"| BOOK
     BOOK -->|완성 판정| RMGR
