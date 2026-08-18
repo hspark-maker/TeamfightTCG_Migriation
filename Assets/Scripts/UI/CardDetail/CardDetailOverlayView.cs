@@ -282,6 +282,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     CardKeyword m_pendingUnlockedKeywords;
     bool        m_pendingSynergyUnlockFx;
 
+    // 해금 연출(판 걷힘 → 내용 등장)이 도는 동안. 이 구간의 탭은 닫기가 아니라 스킵이다 —
+    // 지금 화면이 하는 말이 "무엇이 열렸는가"라, 손이 스쳐 창이 사라지면 그 답을 다시 볼 자리가 없다
+    // (강화 연출의 m_ritualPlaying과 같은 규약). 마지막 축이 끝나면 내린다.
+    bool m_unlockFxPlaying;
+
     /// <summary>_card의 상세를 띄운다. 오버레이가 씬에 없으면 경고 1회 후 무시.
     /// 넘길 이웃이 없는 1장짜리 목록으로 취급한다(화살표·스와이프가 꺼진다).</summary>
     public static void Open(CardData _card)
@@ -460,7 +465,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.cardView != null)
         {
             LongPressDetector t_tap = this.cardView.GetComponent<LongPressDetector>();
-            if (t_tap != null) t_tap.OnTap = SkipRitual;
+            if (t_tap != null) t_tap.OnTap = () => SkipPlayingFx();
         }
     }
 
@@ -622,7 +627,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_e.dragging) return;
 
         // 연출 중의 탭은 어디를 눌렀든 스킵이다 — 연타하는 조작이라 기다리게만 두면 지겹다.
-        if (this.m_ritualPlaying) { SkipRitual(); return; }
+        // 배경 탭까지 닫기에서 걷어낸다: 해금 구간을 탭으로 지워버리면 방금 열린 능력을 못 본 채 지나가는데,
+        // 그 사건은 이 카드에 두 번 오지 않는다.
+        if (SkipPlayingFx()) return;
 
         if (_e.pointerPressRaycast.gameObject != gameObject) return;
 
@@ -635,6 +642,48 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void SkipRitual()
     {
         if (this.m_ritualPlaying) this.m_activeRitual?.RequestSkip();
+    }
+
+    /// <summary>지금 도는 연출을 한 박 당긴다. 당길 것이 있었으면 true —
+    /// 부른 쪽은 "이 탭은 스킵으로 쓰였다"로 읽고 자기 일(닫기)을 하지 않는다.
+    ///
+    /// 카드 그림 위 탭과 배경 탭이 같은 답을 봐야 해서 판정을 여기 하나로 둔다.</summary>
+    bool SkipPlayingFx()
+    {
+        if (this.m_ritualPlaying)   { SkipRitual();   return true; }
+        if (this.m_unlockFxPlaying) { SkipUnlockFx(); return true; }
+
+        return false;
+    }
+
+    /// <summary>해금 연출의 지금 박을 최종 상태로 끌어당긴다. 판이 걷히는 중이면 <b>그 박까지만</b> —
+    /// 다음 박을 여는 곳이 그 완료 콜백이라, 탭 한 번이 한 박씩 넘긴다.</summary>
+    void SkipUnlockFx()
+    {
+        // 자물쇠 판이 아직 도는 중. 두 줄이 함께 열렸으면 둘 다 당긴다(한 쪽만 남으면 박자가 갈린다).
+        bool t_lock  = SkipSectionUnlock(this.keywordSectionLock);
+             t_lock |= SkipSectionUnlock(this.synergySectionLock);
+        if (t_lock) return;
+
+        // 내용이 들어오는 박. 따라가던 스크롤도 함께 도착시킨다 — 글자만 앉고 화면이 계속 미끄러지면 따로 논다.
+        if (this.detailScroll != null && this.detailScroll.content != null)
+            this.detailScroll.content.DOComplete();
+
+        bool t_reveal  = this.keywordSectionReveal != null && this.keywordSectionReveal.RequestSkip();
+             t_reveal |= this.synergySectionReveal != null && this.synergySectionReveal.RequestSkip();
+
+        // 당길 것이 하나도 없었다 = 흐름은 이미 끝났는데 플래그만 남은 자리다(끝 콜백이 잘린 경로).
+        // 여기서 내려야 다음 탭에 창이 닫힌다 — 안 그러면 나가는 문이 없는 화면이 된다.
+        if (!t_reveal) this.m_unlockFxPlaying = false;
+    }
+
+    // 걷히는 중인 판을 지금 끝낸다. 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.
+    static bool SkipSectionUnlock(GameObject _lock)
+    {
+        if (_lock == null || !_lock.activeSelf) return false;
+
+        var t_fx = _lock.GetComponent<SectionUnlockFx>();
+        return t_fx != null && t_fx.RequestSkip();
     }
 
     /// <summary>어느 연출이 서 있었든 무대를 잘라낸다(카드 전환·닫힘·중단 경로).
@@ -988,6 +1037,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 걷을 판도, 돌 연출도 없었다 — 바는 호출부가 이미 되돌렸다.
         if (t_fx == null && t_keywords == CardKeyword.None && !t_synergy) { ShowBottomBar(); return; }
 
+        // 여기부터 마지막 축이 끝날 때까지 탭은 닫기가 아니다(OnPointerClick).
+        this.m_unlockFxPlaying = true;
+
         HideBottomBar();
 
         // 걷힌 판이 하나뿐이어도 스크롤은 그 줄로 간다. 두 줄이 함께 열렸으면 위쪽(키워드)을 기준으로 삼는다 —
@@ -1006,17 +1058,21 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         ScrollTo(_focus);
 
-        if (_keywords != CardKeyword.None) this.keywordSectionReveal?.Play();
-        if (_synergy)                      this.synergySectionReveal?.Play();
+        // 마지막 축을 잡아 둔다 — 안내가 서지 않는 판에서는 이 안무가 끝나야 탭이 닫기로 돌아온다.
+        Tween t_reveal = null;
+        if (_keywords != CardKeyword.None) t_reveal = (this.keywordSectionReveal?.Play()) ?? t_reveal;
+        if (_synergy)                      t_reveal = (this.synergySectionReveal?.Play()) ?? t_reveal;
 
         CardData          t_card   = CardAt(this.m_index);
         List<UnlockIntro> t_intros = CollectIntros(t_card, _keywords, _synergy);
-        if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); return; }
+        if (t_intros == null || t_intros.Count == 0) { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
 
-        if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) { ShowBottomBar(); return; }
+        if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay))
+        { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
-        t_overlay.Show(t_intros, t_card, ShowBottomBar);
+        // 안내가 서면 그 닫힘이 이 흐름의 끝이다(그동안 화면은 안내가 덮어 이 창에 탭이 오지 않는다).
+        t_overlay.Show(t_intros, t_card, () => { this.m_unlockFxPlaying = false; ShowBottomBar(); });
     }
 
     /// <summary>이번에 열린 개념들. 없으면 null.
@@ -1102,6 +1158,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         this.m_pendingUnlockedKeywords = CardKeyword.None;
         this.m_pendingSynergyUnlockFx  = false;
+
+        // 흐름이 끊긴 자리이기도 하다(카드 전환·창 닫힘) — 잘린 안무는 끝 콜백이 오지 않으므로
+        // 여기서 내리지 않으면 탭이 영영 닫기로 돌아오지 않는다.
+        this.m_unlockFxPlaying = false;
+    }
+
+    // 안내가 서지 않는 판의 마지막 축. 이 안무가 끝나면 탭은 다시 닫기다.
+    // 도중에 잘리는 경로는 DropPendingUnlockFx가 못 박는다(잘린 트윈에는 이 콜백이 오지 않는다).
+    void EndUnlockFxAfter(Tween _reveal)
+    {
+        if (_reveal == null || !_reveal.IsActive()) { this.m_unlockFxPlaying = false; return; }
+
+        _reveal.OnComplete(() => this.m_unlockFxPlaying = false);
     }
 
     /// <summary>키워드 줄이 통째로 잠겼는가. 판정이 두 곳에 갈리지 않게 여기 하나로 둔다
