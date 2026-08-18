@@ -1206,14 +1206,6 @@ PrefabInstance:
       propertyPath: m_SizeDelta.x
       value: -654
       objectReference: {fileID: 0}
-    - target: {fileID: 3104272828158937348, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
-      propertyPath: m_UVRect.width
-      value: 1.2032388
-      objectReference: {fileID: 0}
-    - target: {fileID: 3104272828158937348, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
-      propertyPath: m_UVRect.height
-      value: 2.3505337
-      objectReference: {fileID: 0}
     - target: {fileID: 3141243031146455928, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.x
       value: 1
