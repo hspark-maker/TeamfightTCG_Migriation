@@ -5,9 +5,8 @@
 전체 파일 목록만 필요하면 Glob 또는 rg --files로 현재 상태를 조회한다.
 
 <!-- orch:feature-map-sync:start -->
-<!-- orch:source files=394 public-types=483 unmapped-public-types=170 -->
-<!-- orch:emptied-bullets=1 -->
-<!-- orch:missing-dir OutGame/Collection/ since=2026-08-14 -->
+<!-- orch:source files=418 public-types=504 unmapped-public-types=1 -->
+<!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
@@ -18,13 +17,15 @@
 - 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
 - 보드·대상: `BattleField` · `TargetFilter` · `BattleResultBeat` · 공격 튜닝 `NormalTuning` · `PeerlessTuning`
 - 규칙·판정: `BattleRules` · `ExecutionRule` · `BattleOverForecast` · `BattleFinisher` · `BattleCleanup`
+- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `Core/BootInstaller` 가 주입한다 — 실제 레벨은 `RankManager.AiCardLevelOf` / `RankConfig.AiCardLevelAt`, 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`. 밴드 검증 `Editor/AIDeckBandValidator`
 - 초기화·셔플: `GameInitializer` · `ShufflePolicy` · `MulliganPhase` · `MatchSeeding` · `MatchRandom` · `DeckConfig` · `AIDeckConfig` (`DeckEntry`)
 - 타이밍: `Battle/Timing/BattleTimingConfig` · `Battle/Timing/GameTiming` · `BattleTimings`
 - 사망·처형 연출: 길이 단일 지점 `Battle/Timing/BattleTimingConfig.DeathDuration` (내부 박자는 전부 이 값 안에서 끝난다) · 애니 `UI/Battle/CardAnimator.PlayDeathAnim` · 시퀀스 `AttackSequence.PlayVictimDeaths` · 처형 `ExecutionRule` · `ExecutionVfx` · 사운드 `Audio/SoundManager.PlayDeath` · `SoundManager.PlayDeathVoice` · 미리보기 플래그 `UI/Battle/BattleUxFlags.DeathPreview` · 사망 트리거 `SynergyTriggers.Lethal` · `SynergyTriggers.Removed`
-- 연출: `BattleIntro` · `BattleVfx` · `BattleVfxId` · `CardAppearVfx` · `CardAppearSequence` · `HitImpact` · `HealVfx` · `ExecutionVfx` · `Battle/Cinematic/CardCinematicRules` (`CinemaAttackStyle`) · 재생 `UI/Cinematic/CardCinematicPlayer`
+- 연출: `BattleIntro` · `BattleVfx` · `BattleVfxId` · `CardAppearVfx` · `CardAppearSequence` · `HitImpact` · `HealVfx` · `ExecutionVfx` · `Battle/Cinematic/CardCinematicRules` (`CinemaAttackStyle`) · 에너지 구체 돌진 `AttackSequence.EnergyOrbDash` (프리팹은 `BattleVfxLibrary` 의 `BattleVfxId.CinemaEnergyOrb`, 등장 연출 `CardAppearVfx` 와 구체를 공유 — `CardData.cinemaAttackStyle` 한 축으로 묶여 따로 못 끈다) · 재생 `UI/Cinematic/CardCinematicPlayer`
 
 ## 시너지 (`Battle/Synergy/`, 15파일 995줄)
 
+- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 청소부=Cleaner · 흐름=Flow · 유산=Legacy · 성벽=Rampart · 비늘=Scale · 무리=Swarm · 언데드=Undead. 데이터는 Assets/SO/Synergies/Data_Synergy_\*.asset (지도 범위 밖), 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
 - 적용 지점: `SynergyApplier.ApplyAll` — 공격 계산에는 `CardInstance.AttackDamage` / `CardInstance.ApplySynergy` 경유로 반영
 - 트리거: `SynergyTriggers` (DamageDealt / Attacked / Lethal / SwappedOut)
 - 해석·진행도: `SynergyResolver` · `SynergyProgress` · `ActiveSynergy` · `SynergyText`
@@ -38,6 +39,7 @@
 ## 카드 (`Card/`, 18파일)
 
 - 런타임 인스턴스: `CardInstance` (스탯·데미지 계산의 단일 지점)
+- 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
 - 키워드·패시브: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`) · `Card/Passives/` 의 챔피언별 패시브 9종 (`AatroxPassive`, `FizzPassive`, `GwenPassive`, `KindredPassive`, `MaokaiPassive`, `OrnnPassive`, `PoppyPassive`, `RammusPassive`, `TeemoPassive`)
 - 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.evolvedArts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
@@ -122,7 +124,7 @@
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
 - 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` · `UI/CardElement` (`CardElementMod`) · `UI/SettingsPanel`
 - 풀·매니저: `UI/UIManager/UIPoolManager` · `PooledCardElement` (`PooledCardElementData`) · `PooledUIBase` (`UIData`) · `UIAnimator` · `IUIController` · `SimpleYNPopup` (`SimpleYNPopupData`) · 상시 오버레이 `SingletonOverlay` · `SingletonOverlayBase` · `RuntimeOverlayPrefabs` · `SyncUiPrefabCatalog` (`ESyncUiPrefab` · `SyncUiPrefabs`)
-- 로비: `UI/Lobby/LobbyTabController` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay`
+- 로비: `UI/Lobby/LobbyTabController` · `LobbyTabServices` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay`
 - 입력 제스처: `UI/Input/HorizontalSwipeDetector` · `LongPressDetector` · `SwipeThroughScrollRect` · `SwipeGuide` · `HintArrow`
 
 ## 부트·코어·유틸

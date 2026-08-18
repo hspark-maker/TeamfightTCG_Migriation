@@ -13,6 +13,8 @@ const {
 } = require("./lib/search-detect.js");
 
 const DEFAULT_INSTALLED_AT = "2026-08-14T06:18:00.000Z";
+/* 게이트가 settings.json 에 붙은 시각. --gate-at 으로 덮어쓴다. */
+const DEFAULT_GATE_AT = "2026-08-18T06:40:00.000Z";   // 첫 실차단 06:41:46Z 로 확인
 const NOISE_PREFIX = /^\s*<(?:task-notification|system-reminder|local-command-[^>]*|command-name|hook[^>]*)>/i;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
@@ -103,14 +105,22 @@ function newSegment(event, carriedMap) {
   };
 }
 
-function finish(segment, installedAt) {
+/* 지도 도입과 게이트 도입은 서로 다른 개입이다. 시점이 하나뿐이면 게이트 이후 세션이
+   "지도는 있었지만 게이트는 없던" 구간과 한 그룹에 섞여 효과가 희석된다. */
+function finish(segment, installedAt, gateAt) {
   if (!segment || segment.searches === 0) return null;
+  const startedAt = Date.parse(segment.startedAt);
   let group;
-  if (Date.parse(segment.startedAt) < installedAt) group = "미설치·미사용";
-  else if (segment.carriedMap) group = "선로드(이월)";
-  else if (segment.loadedWithin && !segment.loadedAfterSearch) group = "선로드(세그내)";
-  else if (segment.loadedWithin) group = "늦게 로드";
-  else group = "설치후 미로드";
+  if (startedAt < installedAt) group = "미설치·미사용";
+  else {
+    const era = Number.isFinite(gateAt) && startedAt >= gateAt ? "게이트후" : "게이트전";
+    let kind;
+    if (segment.carriedMap) kind = "선로드(이월)";
+    else if (segment.loadedWithin && !segment.loadedAfterSearch) kind = "선로드(세그내)";
+    else if (segment.loadedWithin) kind = "늦게 로드";
+    else kind = "미로드";
+    group = `${era}·${kind}`;
+  }
   const usage = [...segment.usage.values()];
   return {
     ...segment,
@@ -121,13 +131,13 @@ function finish(segment, installedAt) {
   };
 }
 
-function parseTranscript(file, installedAt) {
+function parseTranscript(file, installedAt, gateAt) {
   const samples = [];
   let mapLoaded = false;
   let segment = null;
   for (const event of readEvents(file)) {
     if (isRealUser(event)) {
-      const done = finish(segment, installedAt);
+      const done = finish(segment, installedAt, gateAt);
       if (done) samples.push(done);
       segment = newSegment(event, mapLoaded);
       continue;
@@ -159,7 +169,7 @@ function parseTranscript(file, installedAt) {
       if (isEdit(call) && segment.firstEditTurn === null) segment.firstEditTurn = segment.turns.size;
     }
   }
-  const done = finish(segment, installedAt);
+  const done = finish(segment, installedAt, gateAt);
   if (done) samples.push(done);
   return samples;
 }
@@ -171,9 +181,14 @@ function percentile(values, fraction) {
 }
 
 function stats(samples) {
-  const groups = ["미설치·미사용", "설치후 미로드", "늦게 로드", "선로드(세그내)", "선로드(이월)"];
+  const groups = [
+    "미설치·미사용",
+    "게이트전·미로드", "게이트전·늦게 로드", "게이트전·선로드(세그내)", "게이트전·선로드(이월)",
+    "게이트후·미로드", "게이트후·늦게 로드", "게이트후·선로드(세그내)", "게이트후·선로드(이월)",
+  ];
   return groups.map((group) => {
     const rows = samples.filter((sample) => sample.group === group);
+    if (!rows.length) return null;   // 아직 표본 없는 시기는 표에서 뺀다
     const metric = (name, fraction) => percentile(rows.map((row) => row[name]).filter(Number.isFinite), fraction);
     return {
       group, n: rows.length,
@@ -184,7 +199,7 @@ function stats(samples) {
       firstSearchTurnMedian: metric("firstSearchTurn", 0.5),
       firstEditTurnMedian: metric("firstEditTurn", 0.5),
     };
-  });
+  }).filter(Boolean);
 }
 
 function display(value) {
@@ -196,18 +211,21 @@ function main() {
   const installedAtText = option("installed-at", DEFAULT_INSTALLED_AT);
   const installedAt = Date.parse(installedAtText);
   if (!Number.isFinite(installedAt)) throw new Error(`잘못된 --installed-at: ${installedAtText}`);
+  const gateAtText = option("gate-at", DEFAULT_GATE_AT);
+  const gateAt = Date.parse(gateAtText);
+  if (!Number.isFinite(gateAt)) throw new Error(`잘못된 --gate-at: ${gateAtText}`);
   const files = discoverTranscripts(projectDir);
   if (!files.length) throw new Error(`트랜스크립트를 찾지 못했습니다: ${projectDir}`);
-  const samples = files.flatMap((file) => parseTranscript(file, installedAt));
+  const samples = files.flatMap((file) => parseTranscript(file, installedAt, gateAt));
   const summary = stats(samples);
 
   console.log("관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.");
-  console.log(`트랜스크립트 ${files.length}개 | 탐색형 요청 ${samples.length}개 | 설치 기준 ${installedAtText}`);
-  console.log("그룹                 n  검색중앙  검색p75  로드전검색  턴중앙  입력토큰중앙");
+  console.log(`트랜스크립트 ${files.length}개 | 탐색형 요청 ${samples.length}개 | 지도 ${installedAtText} · 게이트 ${gateAtText}`);
+  console.log("그룹                       n  검색중앙  검색p75  로드전검색  턴중앙  입력토큰중앙");
   for (const row of summary) {
     const token = row.n < 20 ? "판정 불가" : display(row.inputMedian);
     console.log(
-      row.group.padEnd(18) +
+      row.group.padEnd(24) +
       String(row.n).padStart(4) +
       display(row.searchMedian).padStart(10) +
       display(row.searchP75).padStart(9) +
@@ -218,15 +236,18 @@ function main() {
   }
 
   if (process.argv.includes("--write-baseline")) {
+    // 기준선은 정의상 게이트 이전이다. 언제 다시 만들어도 게이트 이후 표본이 섞이지 않게 자른다.
+    const preGate = samples.filter((sample) => Date.parse(sample.startedAt) < gateAt);
+    const preGateSummary = stats(preGate);
     // 추적되는 경로에 둔다. .orch/ 는 gitignore 라 정리 한 번이면 비교 기준이 사라진다.
     const output = path.join(projectDir, ".claude", "map-baseline.json");
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, JSON.stringify({
-      generatedAt: new Date().toISOString(), projectDir, installedAt: installedAtText,
+      generatedAt: new Date().toISOString(), projectDir, installedAt: installedAtText, gateAt: gateAtText,
       detectorVersion: DETECTOR_VERSION,
       warning: "관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.",
       note: "집계 대상 트랜스크립트는 전부 게이트 도입 이전 기록이다. detectorVersion 이 바뀌면 다시 만들어야 비교가 성립한다.",
-      transcriptCount: files.length, exploratoryRequestCount: samples.length, groups: summary,
+      transcriptCount: files.length, exploratoryRequestCount: preGate.length, groups: preGateSummary,
     }, null, 2) + "\n");
     console.log(`기준선 저장: ${output}`);
   }

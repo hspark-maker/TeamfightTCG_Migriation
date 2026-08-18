@@ -29,6 +29,13 @@ public class DeckTabController : LobbyTabPanel
     bool          m_topBarHidden;
     bool          m_editing;
 
+    /// <summary>로비가 넘긴 서비스를 편집 화면에 전달한다. 드래그 레이어는 탭 콘텐츠 위에 떠야 해서
+    /// 이 프리팹 밖(로비 캔버스)에 사는데, 인스펙터로 물리면 그 배선이 탭 인스턴스 오버라이드로 남는다.</summary>
+    public override void Initialize(LobbyTabServices _services)
+    {
+        if (editController != null) editController.SetDragController(_services?.DragController);
+    }
+
     // 덱 탭을 단독 배치한 테스트 씬에서는 셸이 없을 수 있다 → 호출측은 항상 null을 감안한다.
     void OnEnable()
     {

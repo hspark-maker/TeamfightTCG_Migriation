@@ -34,13 +34,19 @@ try {
     tool("Glob", { pattern: "**/*.cs" }, "r3"),
   ];
   fs.writeFileSync(file, events.map((event) => JSON.stringify(event)).join("\n"));
-  const samples = parseTranscript(file, Date.parse("2026-08-14T06:18:00Z"));
+  const GATE_AT = Date.parse("2026-08-18T06:40:00Z");
+  const samples = parseTranscript(file, Date.parse("2026-08-14T06:18:00Z"), GATE_AT);
   assert.equal(samples.length, 2);
-  assert.equal(samples[0].group, "선로드(세그내)");
+  assert.equal(samples[0].group, "게이트전·선로드(세그내)");
   assert.equal(samples[0].inputTokens, 60, "서로 다른 requestId usage 합계");
-  assert.equal(samples[1].group, "선로드(이월)");
+  assert.equal(samples[1].group, "게이트전·선로드(이월)");
   assert.equal(samples[1].searchesBeforeMap, 0);
-  console.log("map-savings tests: noise filter + map carry passed");
+  // 게이트 이후 표본은 다른 그룹으로 갈라져야 한다 — 개입이 섞이면 비교가 무의미해진다.
+  const postGate = [user("게이트 이후 요청", "2026-08-18T08:00:00Z"), tool("Grep", { pattern: "Card" }, "r9")];
+  fs.writeFileSync(file, postGate.map((event) => JSON.stringify(event)).join(String.fromCharCode(10)));
+  const after = parseTranscript(file, Date.parse("2026-08-14T06:18:00Z"), GATE_AT);
+  assert.equal(after[0].group, "게이트후·미로드", "게이트 이후는 별도 그룹");
+  console.log("map-savings tests: noise filter + map carry + gate era passed");
 } finally {
   fs.rmSync(path.dirname(file), { recursive: true, force: true });
 }

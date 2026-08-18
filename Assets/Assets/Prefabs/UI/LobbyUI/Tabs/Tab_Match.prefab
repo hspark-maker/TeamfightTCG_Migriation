@@ -1635,6 +1635,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyMatchTabPanel
   playButton: {fileID: 3012333432691450594}
+  rankRewardButton: {fileID: 1256508294006608552}
+  keywordGrowthButton: {fileID: 1710277767761490410}
 --- !u!1 &6296034889460009951
 GameObject:
   m_ObjectHideFlags: 0
@@ -2268,19 +2270,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 8714331744915864214}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: RankRewardPanel, Assembly-CSharp
-        m_MethodName: Open
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!1 &8714331745377208106
 GameObject:
   m_ObjectHideFlags: 0
@@ -2630,19 +2620,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 5918704710621876351}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: KeywordGrowthPanel, Assembly-CSharp
-        m_MethodName: Open
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!1001 &6835340826455182862
 PrefabInstance:
   m_ObjectHideFlags: 0

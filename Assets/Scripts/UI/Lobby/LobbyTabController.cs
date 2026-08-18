@@ -21,6 +21,11 @@ public class LobbyTabController : MonoBehaviour
     [SerializeField] int defaultIndex = 2;
     [SerializeField] GameObject alertDotPrefab;
 
+    [Header("탭에 넘길 캔버스 레벨 서비스")]
+    [Tooltip("덱 편집 드래그(로비 캔버스의 DragLayer). 여기서 받아 탭에 넘긴다 —\n"
+           + "탭 프리팹 안쪽을 인스펙터로 직접 배선하면 그 배선이 오버라이드로 남아 탭 diff를 흐린다.")]
+    [SerializeField] DeckEditDragController dragController;
+
     int m_currentIndex = -1;
 
     public LobbyTabPanel CurrentPanel
@@ -31,9 +36,14 @@ public class LobbyTabController : MonoBehaviour
     void Awake()
     {
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
+
+        // 서비스 주입은 첫 Select(Start)보다 먼저 끝나야 한다 — OnEnter에서 이미 쓸 수 있어야 하므로.
+        var t_services = new LobbyTabServices(dragController);
+
         for (int i = 0; i < tabs.Count; i++)
         {
             Tab t_tab = tabs[i];
+            t_tab.panel?.Initialize(t_services);
             tabBar?.ConfigureItem(
                 i,
                 string.IsNullOrEmpty(t_tab.label) ? t_tab.name : t_tab.label,
