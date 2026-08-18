@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-08-18T06:50:07.894Z",
+  "projectDir": "C:\\Users\\cookapps\\TeamfightTCG_Migriation",
+  "installedAt": "2026-08-14T06:18:00.000Z",
+  "detectorVersion": 2,
+  "warning": "관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.",
+  "note": "집계 대상 트랜스크립트는 전부 게이트 도입 이전 기록이다. detectorVersion 이 바뀌면 다시 만들어야 비교가 성립한다.",
+  "transcriptCount": 83,
+  "exploratoryRequestCount": 709,
+  "groups": [
+    {
+      "group": "미설치·미사용",
+      "n": 678,
+      "searchMedian": 3,
+      "searchP75": 5,
+      "turnMedian": 11,
+      "turnP75": 17,
+      "inputMedian": 2758307,
+      "inputP75": 5370175,
+      "searchesBeforeMapMedian": 3,
+      "firstSearchTurnMedian": 1,
+      "firstEditTurnMedian": 4
+    },
+    {
+      "group": "설치후 미로드",
+      "n": 2,
+      "searchMedian": 15,
+      "searchP75": 24,
+      "turnMedian": 18,
+      "turnP75": 25,
+      "inputMedian": 1665789,
+      "inputP75": 2127981,
+      "searchesBeforeMapMedian": 15,
+      "firstSearchTurnMedian": 1,
+      "firstEditTurnMedian": null
+    },
+    {
+      "group": "늦게 로드",
+      "n": 1,
+      "searchMedian": 8,
+      "searchP75": 8,
+      "turnMedian": 12,
+      "turnP75": 12,
+      "inputMedian": 1802331,
+      "inputP75": 1802331,
+      "searchesBeforeMapMedian": 1,
+      "firstSearchTurnMedian": 1,
+      "firstEditTurnMedian": null
+    },
+    {
+      "group": "선로드(세그내)",
+      "n": 2,
+      "searchMedian": 5,
+      "searchP75": 7,
+      "turnMedian": 10,
+      "turnP75": 21,
+      "inputMedian": 679032,
+      "inputP75": 1553519,
+      "searchesBeforeMapMedian": 0,
+      "firstSearchTurnMedian": 1,
+      "firstEditTurnMedian": null
+    },
+    {
+      "group": "선로드(이월)",
+      "n": 26,
+      "searchMedian": 5,
+      "searchP75": 8,
+      "turnMedian": 11,
+      "turnP75": 19,
+      "inputMedian": 2726020,
+      "inputP75": 4988761,
+      "searchesBeforeMapMedian": 0,
+      "firstSearchTurnMedian": 2,
+      "firstEditTurnMedian": 13
+    }
+  ]
+}

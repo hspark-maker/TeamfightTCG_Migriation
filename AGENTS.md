@@ -38,4 +38,4 @@
 
 지도를 고쳤으면 `node .claude/check-feature-map.js` 로 타입 실재를 검증한다.
 
-파일 목록만 필요할 때는 `.claude/orch-pathmap.md` (orch 자동 생성, 약 15k 토큰 — 웬만하면 쓰지 말 것).
+전체 파일 목록만 필요하면 `Glob` 또는 `rg --files`로 현재 상태를 조회한다.

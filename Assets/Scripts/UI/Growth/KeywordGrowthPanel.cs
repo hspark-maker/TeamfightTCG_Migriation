@@ -5,9 +5,15 @@ using UnityEngine.UI;
 using TMPro;
 
 // 키워드 강화 패널(KeywordGrowthOverlay에 부착). 키워드 칸을 전부 생성하고 강화 흐름을 중계한다.
-// 씬에 직접 저작되므로 PooledUIBase가 아니라 SetActive 토글로 열고 닫는다(RankRewardPanel과 같은 규약).
-public class KeywordGrowthPanel : MonoBehaviour
+// 풀(UIPoolManager)이 수명을 쥔다 — 규약은 RankRewardPanel과 같다(캔버스 기준 해상도 주의 포함).
+public class KeywordGrowthPanel : PooledUIBase
 {
+    public override void Initialization(UIData _data) { }
+
+    public override void Show() => this.Open();
+
+    public override void Hide() => this.Close();
+
     [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 

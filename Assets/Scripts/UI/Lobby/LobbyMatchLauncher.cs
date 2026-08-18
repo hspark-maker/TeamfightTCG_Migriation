@@ -32,7 +32,34 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
-    MatchDeckShell DeckShell => overlayHost != null ? overlayHost.MatchDeckShell : null;
+    LobbyOverlayHost m_overlayHost;
+
+    /// <summary>
+    /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
+    ///
+    /// 에셋을 물면 화면에 없는 원본을 조작하게 된다 — 매치 덱 화면이 열리지 않고, 에디터에서는 그 조작이
+    /// 프리팹 파일에 그대로 기록된다(자식을 지우는 순간 "Destroying assets is not permitted"로 터진다).
+    /// 프리팹 에셋은 씬에 속하지 않으므로 gameObject.scene.IsValid()로 구분할 수 있다.
+    /// </summary>
+    LobbyOverlayHost OverlayHost
+    {
+        get
+        {
+            if (m_overlayHost != null) return m_overlayHost;
+
+            if (overlayHost != null && overlayHost.gameObject.scene.IsValid())
+                return m_overlayHost = overlayHost;
+
+            if (overlayHost != null)
+                Debug.LogError(
+                    "[LobbyMatchLauncher] overlayHost에 프리팹 에셋이 물려 있다 — 인스펙터에서 씬 인스턴스로 다시 배선할 것. "
+                  + "이번 실행은 계층에서 찾아 진행한다.", this);
+
+            return m_overlayHost = transform.root.GetComponentInChildren<LobbyOverlayHost>(true);
+        }
+    }
+
+    MatchDeckShell DeckShell => OverlayHost != null ? OverlayHost.MatchDeckShell : null;
 
     // 페이크 → 실제 Photon 매칭 교체는 이 한 줄이 전부다.
     IMatchmaker Matchmaker => m_matchmaker ??= new FakeMatchmaker(aiDeckConfig, profilePool);

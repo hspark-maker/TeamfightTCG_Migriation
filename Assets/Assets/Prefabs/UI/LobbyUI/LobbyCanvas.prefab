@@ -249,7 +249,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfb6a90ff9f624546bed8431065f842d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyMatchLauncher
-  overlayHost: {fileID: 5669133056140632728, guid: 9b188dc86813a7d428389756daef394d, type: 3}
+  overlayHost: {fileID: 7849464544123050706}
   aiDeckConfig: {fileID: 11400000, guid: 7275411125aa5674a90a9f07342babbc, type: 2}
   matchShellPrefab: {fileID: 6346514855679779509, guid: 9c3999eeb9743ed4bac70b580dd24467, type: 3}
   profilePool: {fileID: 11400000, guid: 7f6df2feb8d5076418b96358ee58377d, type: 2}
@@ -1381,6 +1381,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb445d9e5520717438622ad14a76e609, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeywordGrowthPanel
+--- !u!114 &7849464544123050706 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5669133056140632728, guid: 9b188dc86813a7d428389756daef394d, type: 3}
+  m_PrefabInstance: {fileID: 2468579596259670090}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6429bffe9af4c749b5e67fb36a0e294, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyOverlayHost
 --- !u!1001 &3878173979988034791
 PrefabInstance:
   m_ObjectHideFlags: 0

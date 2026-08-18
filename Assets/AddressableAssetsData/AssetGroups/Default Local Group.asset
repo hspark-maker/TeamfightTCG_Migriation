@@ -39,8 +39,20 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4124b08d48d20e947a8ce81242bc1032
+    m_Address: KeywordGrowthOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 61430c10ca6949a798ec10b366fae820
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+    m_Address: RankRewardOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
