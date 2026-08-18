@@ -83,12 +83,12 @@ public class LobbyRankEffectDirector : MonoBehaviour
             // 진행 호도 전투 직전 위치에서 출발해야 한다. Delta는 클램프 뒤 실증감이라 현재 포인트에서 빼면 그때 값이다.
             t_hud.PrepareProgress(RankManager.Points - t_result.Delta);
 
-            // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 핍·배지가 전투 직전으로 되돌아가야
-            // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다(승급·강등 같은 이유).
-            if (t_result.IsTierUp || t_result.IsTierDown)
+            // 티어 변화는 커버 아래에서 세워 둔다 — 조립 시점에 별·배지가 전투 직전으로 되돌아가야
+            // 커버가 걷히는 순간 유저가 처음 보는 화면이 "변하기 전"이 된다.
+            // 강등은 세우지 않는다 — 포인트 바닥이 현재 단계 진입선이라 티어가 내려가는 일 자체가 없다.
+            if (t_result.IsTierUp)
             {
-                this.m_tierChange = t_result.IsTierUp ? t_hud.BuildTierUp(t_result.PrevTierIndex)
-                                                      : t_hud.BuildTierDown(t_result.PrevTierIndex);
+                this.m_tierChange = t_hud.BuildTierUp(t_result.PrevTierIndex);
                 this.m_tierChange.Pause();
             }
 

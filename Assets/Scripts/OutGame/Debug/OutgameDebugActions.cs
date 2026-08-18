@@ -129,6 +129,26 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel} — 씬 재진입 시 연출 재생");
     }
 
+    // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
+    public static void JumpToPromoStandby()
+    {
+        int t_before  = RankManager.GetInfo().TierIndex;
+        long t_points = RankManager.Points;
+
+        if (!RankManager.SetPromoStandbyForDebug())
+        {
+            Debug.Log("[OutgameDebug] 승급전 대기로 갈 수 없다 — 언랭크이거나 최고 등급이다");
+            return;
+        }
+
+        RankInfo t_info = RankManager.GetInfo();
+
+        // StepTier와 같은 이유로 캐리어에 싣는다 — 실어야 씬 재진입 때 승급전 진입 연출이 재생된다.
+        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_info.TierIndex, false, true));
+
+        Debug.Log($"[OutgameDebug] 승급전 대기 — {t_info.DisplayName} / 포인트 {t_info.Points} — 씬 재진입 시 연출 재생");
+    }
+
     // 랭크 포인트 초기화(브론즈 1로)
     public static void ResetTier()
     {

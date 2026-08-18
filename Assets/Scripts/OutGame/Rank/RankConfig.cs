@@ -12,13 +12,15 @@ public class RankConfig : ScriptableObject
     // 승리 시 더할 랭크 포인트
     [Tooltip("승리 시 더할 랭크 포인트. 전 등급 공용이다. 저작 규칙: 모든 등급의 pointsPerDivision보다 작게 둔다 — " +
              "그래야 '이겼는데 단계는 아직'인 판이 생겨 한 단계가 여러 판의 결과로 읽힌다. " +
-             "가장 좁은 등급(현재 브론즈 20)에서도 2승은 걸리게 잡는다. 같게 두면 1승 = 1단계라 단계 표시가 승패 로그와 다를 게 없어진다.")]
+             "가장 좁은 등급(현재 브론즈 20)에서도 2승은 걸리게 잡는다. 같게 두면 1승 = 1단계라 단계 표시가 승패 로그와 다를 게 없어진다. " +
+             "승급전(다음 등급 진입선 바로 아래에서 치르는 한 판)에는 이 값이 쓰이지 않는다 — 승급전은 가감이 아니라 스냅이다.")]
     public long winPoints = 10;
 
     // 패배 시 뺄 랭크 포인트(양수로 입력)
     [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다). 저작 규칙: winPoints보다 작게 둔다(승/패 비대칭) — " +
              "같게 두면 승률 50%에서 진행이 제자리라 계속 이겨야만 오르는 게임이 된다. " +
-             "단계 강등은 이 값으로 일어나지만 등급은 내려가지 않는다(등급 진입 임계치가 바닥) — 배지는 유지되고 단계만 오르내린다.")]
+             "포인트 바닥은 현재 단계의 진입 임계치라 등급도 단계도 내려가지 않는다 — 한 번 켠 별은 꺼지지 않고, 이 값은 단계 안 진행률만 깎는다. " +
+             "승급전에도 이 값이 쓰이지 않는다(패배 시 그 단계 절반으로 스냅).")]
     public long losePoints = 6;
 
     // 첫 티어 미도달(언랭크) 상태의 표시명
@@ -125,6 +127,27 @@ public class RankConfig : ScriptableObject
         return t_grade != null ? t_grade.entryPoints : 0;
     }
 
+    /// <summary>_points가 속한 등급의 다음 등급 진입 임계치 = 승급 관문 점수. 최고 등급이면 long.MaxValue(승급전 없음).
+    /// 일반 전투는 이 값 바로 아래에서 멈추고, 넘는 일은 승급전 한 판만 한다.</summary>
+    public long GradeCeilingPoints(long _points)
+    {
+        if (grades == null || grades.Count == 0) return long.MaxValue;
+
+        int t_next = ResolveTierIndex(_points) / DivisionsPerGrade + 1;
+        if (t_next >= grades.Count || grades[t_next] == null) return long.MaxValue;
+
+        return grades[t_next].entryPoints;
+    }
+
+    /// <summary>_points가 속한 티어(단계)의 진입 임계치 = 단계 강등을 막는 바닥(첫 등급 미도달이면 0).
+    /// "켜진 별은 잠긴다"의 단일 진실원 — 임계치 계산은 TryGetTier에 맡긴다.</summary>
+    public long DivisionFloorPoints(long _points)
+    {
+        if (grades == null || grades.Count == 0 || _points < FirstTierPoints) return 0;
+
+        return TryGetTier(ResolveTierIndex(_points), out RankTier t_tier) ? t_tier.RequiredPoints : 0;
+    }
+
     // 티어 스냅샷 파생(범위 밖·null 등급 행이면 false + RankTier.None)
     public bool TryGetTier(int _index, out RankTier _tier)
     {
@@ -215,11 +238,13 @@ public class RankGradeConfig
     public Sprite badge;
 
     // 이 등급 1단계 진입 임계치
-    [Tooltip("이 등급 1단계 진입 임계치. 저작 규칙: 임계치는 하향만 — 상향하면 임계치 아래로 내려간 기존 유저가 소급 강등된다.")]
+    [Tooltip("이 등급 1단계 진입 임계치. 저작 규칙: 임계치는 하향만 — 상향하면 임계치 아래로 내려간 기존 유저가 소급 강등된다. " +
+             "이 값은 앞 등급의 승급 관문이기도 하다: 일반 전투는 이 값 -1에서 막히고, 그 상태에서 치른 한 판(승급전)을 이겨야 정확히 이 값으로 올라온다(= 새 등급 1단계 0%).")]
     public long entryPoints;
 
     // 단계 간 포인트 간격
-    [Tooltip("단계 간 포인트 간격. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. 저작 규칙: entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다.")]
+    [Tooltip("단계 간 포인트 간격. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. 저작 규칙: entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다. " +
+             "승급전 패배 시 복귀선도 이 값에서 나온다: 4단계 임계치 + 이 값의 절반(= 마지막 단계 50%)으로 스냅한다.")]
     public long pointsPerDivision;
 
     // 이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다)

@@ -20,7 +20,13 @@ public static class RankResultHandoff
             // 예외는 첫 티어 진입의 센티널 -1 하나뿐 — 언제 실리든 이긴다. 삼켜지면 진입 연출이 사라진다.
             int t_from = _result.PrevTierIndex < 0 ? _result.PrevTierIndex : t_prev.PrevTierIndex;
 
-            s_pending = new RankApplyResult(t_prev.Delta + _result.Delta, t_from, _result.TierIndex);
+            // 승급전 상태도 출발/도착과 같은 규칙 — 관문에 섰던 건 처음 판, 관문 앞에 서 있는 건 마지막 판이다.
+            s_pending = new RankApplyResult(
+                t_prev.Delta + _result.Delta,
+                t_from,
+                _result.TierIndex,
+                t_prev.PrevPromoPending,
+                _result.PromoPending);
             return;
         }
 

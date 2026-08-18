@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-// 로비 랭크 표시(배지 = 등급, 핍 = 등급 안 단계, 텍스트 = 티어명).
+// 로비 랭크 표시(배지 = 등급, 별 = 등급 안 진행, 텍스트 = 티어명).
 // 랭크는 전투 씬에서만 변하므로 변경 이벤트 없이 표시 시점에 RankManager를 재조회한다.
 // 포인트 수치는 화면에 두지 않는다 — 증감은 배지 반응으로만 알린다(조립은 LobbyRankEffectDirector).
 public class RankHud : MonoBehaviour
@@ -12,20 +12,15 @@ public class RankHud : MonoBehaviour
     [SerializeField] Image badgeImage;   // 티어 배지
     [SerializeField] TMP_Text descText;  // 티어 표시명("브론즈 1")
 
-    [Header("단계 핍")]
-    [Tooltip("핍을 묶는 노드(RankPips). 언랭크면 통째로 끈다 — 빈 별 네 칸은 '아직 아무것도 아님'을 알리는 데 방해만 된다.\n" +
+    [Header("단계 별")]
+    [Tooltip("별을 묶는 노드(RankPips). 언랭크면 통째로 끈다 — 빈 별 네 칸은 '아직 아무것도 아님'을 알리는 데 방해만 된다.\n" +
              "미배선이면 끄지 않고 빈 칸만 그린다.")]
     [SerializeField] GameObject pipsRoot;
 
-    [Tooltip("등급 안 단계를 표시하는 칸(왼쪽부터). 개수는 RankConfig.DivisionsPerGrade와 맞춘다 — 모자라면 그만큼만 그린다.")]
-    [SerializeField] Image[] divisionPips;
-    [SerializeField] Sprite pipOn;
-    [SerializeField] Sprite pipOff;
-
     [Header("진행 게이지")]
-    [Tooltip("등급 안 진행을 그리는 게이지(RankProgressGauge 구현이면 무엇이든). pipsRoot 아래 별들보다 앞선 형제로 둘 것 — " +
-             "그래야 별 뒤에 깔리고, 언랭크에서 별 줄과 함께 꺼진다.\n" +
-             "별이 앉는 자리와 켜지는 시점을 모두 이 게이지가 낸다 — 갈아끼우면 별도 따라온다. 미배선이면 게이지 없이 종전대로 동작한다.")]
+    [Tooltip("등급 안 진행을 그리는 게이지(RankProgressGauge 구현이면 무엇이든).\n" +
+             "별이 얼마나 찼는지도, 언제 꽉 차는지도 모두 이 게이지가 낸다 — 진행을 그리는 축은 이것 하나뿐이다.\n" +
+             "미배선이면 진행 표시 없이 배지·이름만 갱신된다.")]
     [FormerlySerializedAs("arc")]
     [SerializeField] RankProgressGauge gauge;
 
@@ -33,32 +28,19 @@ public class RankHud : MonoBehaviour
     [FormerlySerializedAs("arcStepDuration")]
     [SerializeField] float gaugeStepDuration = 0.18f;
 
-    [Tooltip("게이지 끝(승급선)에 앉는 목표 마커. 스프라이트·자리·색은 표시할 때마다 코드가 덮으므로 저작값은 에디터 미리보기용이다.\n" +
-             "미배선이면 런타임에 pipsRoot 아래로 만들어진다.")]
-    [SerializeField] Image goalMarker;
-
-    [Tooltip("목표 마커의 색. 다음 등급 배지를 이 색으로 어둡게 깔아 '여기까지 채우면 저게 된다'를 보여준다.")]
-    [SerializeField] Color goalMarkerColor = new Color(0.66f, 0.66f, 0.78f, 0.95f);
-
-    [Tooltip("마커를 런타임에 만들 때 줄 크기(저작된 마커는 자기 크기를 그대로 쓴다). 별(56)보다 크게 둔다 — " +
-             "등급 배지는 별보다 복잡한 그림이라 같은 크기면 뭉개진다.")]
-    [SerializeField] Vector2 goalMarkerSize = new Vector2(88f, 88f);
-
     [Header("승급 연출")]
-    [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 켜져야 '변했다'가 보인다.")]
+    [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 채워져야 '변했다'가 보인다.")]
     [SerializeField] float enterDelay = 0.35f;
 
     [SerializeField] float pipPunch = UiPunch.DEFAULT_SCALE;
 
-    [Tooltip("핍 하나가 켜지고(꺼지고) 다음으로 넘어가는 간격. 펀치 길이(0.3초)보다 짧으면 연출이 잘린다.")]
+    [Tooltip("별 하나가 꽉 차고 다음으로 넘어가는 간격. 펀치 길이(0.3초)보다 짧으면 연출이 잘린다.")]
     [SerializeField] float pipStep = 0.35f;
 
-    [Tooltip("마지막 별이 켜진 뒤의 여운.")]
+    [Tooltip("마지막 별이 찬 뒤의 여운.")]
     [SerializeField] float finishDelay = 0.6f;
-    [Tooltip("핍이 다 꺼진 뒤 배지가 갈리기까지의 뜸(강등 전용 — 승급은 배지 안무가 박자를 갖는다).")]
-    [SerializeField] float badgeSwapDelay = 0.15f;
 
-    [Tooltip("등급 승급 때 켜져 있던 별이 한꺼번에 꺼지며 움츠러드는 세기.")]
+    [Tooltip("등급 승급 때 차 있던 별이 한꺼번에 비워지며 움츠러드는 세기.")]
     [SerializeField] float pipBlowOut = 0.1f;
 
     [Tooltip("등급이 갈리는 순간의 배지 안무(파열 → 강림). 값은 전부 여기 안에 있다.")]
@@ -78,28 +60,13 @@ public class RankHud : MonoBehaviour
     [Tooltip("배지가 잠깐 식는 색. 붉은 경고가 아니라 채도가 빠지는 쪽 — 패배를 두 번 때리지 않는다.")]
     [SerializeField] Color lossColor = new Color(0.6f, 0.6f, 0.7f);
 
-    [Header("강등 연출")]
-    [Tooltip("별 하나가 꺼지고 다음으로 넘어가는 간격. 승급(pipStep)보다 짧게 둔다 — 잃는 장면을 길게 끌지 않는다.")]
-    [SerializeField] float demotePipStep = 0.22f;
-
-    [Tooltip("꺼지는 별이 움츠러드는 세기. 켜질 때의 펀치와 반대 방향으로 들어간다.")]
-    [SerializeField] float demotePipShrink = 0.18f;
-
-    [Tooltip("등급이 갈릴 때만 쓰는 배지 흔들림 세기(px). 별 하나 제거에는 쓰지 않는다 — 강도는 빈도를 따른다.")]
-    [SerializeField] float badgeShakeStrength = 18f;
-    [SerializeField] float badgeShakeDuration = 0.45f;
-
-    [Tooltip("등급이 갈리는 순간 배지가 잠깐 잠기는 색.")]
-    [SerializeField] Color demoteBadgeColor = new Color(0.45f, 0.42f, 0.5f);
-
     // 활성 인스턴스(연출 호출자가 찾는 창구). 로비에 하나뿐이지만 탭 토글로 꺼지므로 활성분만 든다.
     static RankHud s_instance;
 
     // 최초 렌더를 Start로 미루기 위한 표식 — RankConfig 주입(DataLibrary.Awake)보다 OnEnable이 먼저 돌 수 있다.
     bool m_started;
 
-    // 진행 중 티어 변화 연출(승급·강등 공용 — 둘이 함께 돌 일이 없고 Render의 연출 가드는 하나여야 한다).
-    // 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).
+    // 진행 중 티어 변화 연출. 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).
     Sequence m_tierSeq;
 
     // 포인트 손실 반응. 배지 색·스케일을 함께 잡으므로 획득 플래시와 겹쳐 돌지 않게 따로 든다.
@@ -114,12 +81,6 @@ public class RankHud : MonoBehaviour
 
     // 배지의 저작 색. 연출이 어디서 끊겨도 여기로 되돌린다(티어업이 스프라이트를 갈아도 색은 그대로다).
     Color m_badgeBaseColor = Color.white;
-
-    // 강등 흔들림이 되돌릴 배지 자리. 흔들림이 중간에 끊기면 배지가 어긋난 채 굳는다.
-    Vector2 m_badgeBasePos;
-
-    // 게이지 끝의 승급 목표 마커(런타임 생성). 다음 등급이 없으면 만들어만 두고 끈다.
-    Image m_goalMarker;
 
     /// <summary>조각이 튀어나올 원점이자 도착지. 연출 디렉터가 쓴다.</summary>
     public RectTransform BadgeRect => this.badgeImage != null ? (RectTransform)this.badgeImage.transform : null;
@@ -144,8 +105,8 @@ public class RankHud : MonoBehaviour
         var t_prev = RankManager.GetInfoAt(_points);
         var t_now  = RankManager.GetInfo();
 
-        this.m_gainFrom = t_prev.GradeProgress;
-        this.m_gainTo   = t_now.Grade != t_prev.Grade ? 1f : t_now.GradeProgress;
+        this.m_gainFrom = GaugeRatioOf(t_prev);
+        this.m_gainTo   = t_now.Grade != t_prev.Grade ? 1f : GaugeRatioOf(t_now);
 
         this.SetGaugeRatio(this.m_gainFrom);
     }
@@ -188,9 +149,10 @@ public class RankHud : MonoBehaviour
                                                .SetLoops(2, LoopType.Yoyo));
 
         // 게이지는 요요로 되돌아오지 않는다 — 줄어든 자리가 곧 지금 값이다(배지만 식었다 돌아온다).
+        // 꽉 찬 별은 바닥이 현재 단계 진입선이라 꺼지지 않는다. 채우던 중인 별만 줄어든다.
         if (this.gauge != null)
         {
-            Tween t_gauge = this.gauge.TweenTo(RankManager.GetInfo().GradeProgress, this.lossDuration);
+            Tween t_gauge = this.gauge.TweenTo(GaugeRatioOf(RankManager.GetInfo()), this.lossDuration);
             if (t_gauge != null) this.m_lossSeq.Join(t_gauge);
         }
 
@@ -232,11 +194,11 @@ public class RankHud : MonoBehaviour
         this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
 
         // 출발점 = 오르기 직전 화면. 되돌리기는 시퀀스가 아니라 조립 시점에 즉시 건다 —
-        // 앞 단계(포인트 조각)가 도는 동안 새 핍이 이미 켜져 있으면 "포인트가 차서 별이 켜졌다"는 인과가 깨진다.
+        // 앞 단계(포인트 조각)가 도는 동안 새 별이 이미 차 있으면 "포인트가 차서 별이 찼다"는 인과가 깨진다.
         // m_tierSeq 대입 뒤여야 Render의 연출 가드가 이 상태를 최종값으로 덮지 않는다.
-        // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 핍 줄이 꺼진 채 시작해 첫 칸이 켜질 때 함께 나타난다.
+        // 게이지 값은 여기서 손대지 않는다 — 전투 직전 비율은 PrepareProgress가 이미 세워 뒀다(그리는 축은 하나다).
+        // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 별 줄이 꺼진 채 시작해 첫 칸이 찰 때 함께 나타난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
-        this.RenderPips(t_prevDivision);
 
         if (t_gradeUp)
         {
@@ -254,15 +216,9 @@ public class RankHud : MonoBehaviour
         // 같은 등급 안 상승은 앞선 조각 단계가 이미 옛 상태에서 출발하는 것을 다 보여줬다.
         if (t_gradeUp) this.m_tierSeq.AppendInterval(this.enterDelay);
 
-        // 같은 등급 안 상승(브론즈 1 → 2)의 별은 여기서 켜지 않는다 —
-        // 조각이 게이지를 미는 동안 채움 머리가 그 별을 지나며 켠다(OnMarkerCrossed). 여기서 또 켜면 시계가 둘이 된다.
+        // 같은 등급 안 상승(브론즈 1 → 2)의 별은 여기서 채우지 않는다 —
+        // 조각이 게이지를 미는 동안 채움 머리가 그 별을 꽉 채운다. 여기서 또 채우면 시계가 둘이 된다.
         if (t_gradeUp) this.StageGradeUp(this.m_tierSeq, t_info, t_prevDivision, t_divisions);
-        else if (this.gauge == null)
-        {
-            // 게이지가 미배선이면 통과를 알려 줄 사람이 없다 — 종전처럼 여기서 순서대로 켠다.
-            for (int t_i = t_prevDivision; t_i < t_info.Division && t_i < t_divisions; t_i++)
-                this.StagePipOn(this.m_tierSeq, t_i);
-        }
 
         // 여운 없이 끝내면 마지막 별이 튀는 도중에 연출이 잘린 것처럼 보인다.
         this.m_tierSeq.AppendInterval(this.finishDelay);
@@ -280,71 +236,12 @@ public class RankHud : MonoBehaviour
         return this.m_tierSeq;
     }
 
-    /// <summary>
-    /// 티어가 내려간 순간을 그린다. 표시는 이미 최종 티어이므로 _prevTierIndex 상태에서 출발해 지금으로 내려온다.
-    /// 재생은 호출자 몫(BuildTierUp과 같은 규약).
-    /// 강도는 빈도를 따른다 — 별 하나 제거는 조용히, 등급이 갈릴 때만 배지를 흔들어 크게 알린다.
-    /// </summary>
-    public Sequence BuildTierDown(int _prevTierIndex)
-    {
-        this.KillTierChange();
-
-        int t_divisions = RankConfig.DivisionsPerGrade;
-        var t_info = RankManager.GetInfo();
-
-        int t_prevDivision = _prevTierIndex % t_divisions + 1;
-        bool t_gradeDown   = t_info.TierIndex / t_divisions != _prevTierIndex / t_divisions;
-
-        this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
-
-        // 흔들림이 되돌아올 자리는 여기서 잡는다 — Awake는 레이아웃 전이라 배지가 아직 제자리가 아닐 수 있다.
-        var t_badgeRect = this.BadgeRect;
-        if (t_badgeRect != null) this.m_badgeBasePos = t_badgeRect.anchoredPosition;
-
-        // 출발점 = 떨어지기 직전 화면(BuildTierUp과 같은 규율 — 조립 시점에 즉시 되돌린다).
-        this.RenderPips(t_prevDivision);
-        if (t_gradeDown) this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
-
-        this.m_tierSeq.AppendInterval(this.enterDelay);
-
-        if (t_gradeDown)
-        {
-            // 등급이 갈릴 거면 켜져 있던 칸을 전부 — 뒤에서부터 하나씩 꺼진다.
-            for (int t_i = t_prevDivision - 1; t_i >= 0; t_i--)
-                this.StagePipOff(this.m_tierSeq, t_i);
-
-            this.StageGradeDown(this.m_tierSeq, t_info);
-        }
-        else
-        {
-            // 같은 등급 안 강등은 게이지가 물러나며 별을 끈다(OnMarkerCrossed) — 별만 따로 지우면 게이지가 옛 자리에 남는다.
-            // 이 경로에선 손실 반응이 생략되므로(디렉터가 티어 변화와 겹치지 않게 건너뛴다) 게이지를 움직일 사람이 여기밖에 없다.
-            if (this.gauge != null) this.StageGaugeRetreat(this.m_tierSeq, t_info.GradeProgress);
-            else
-                for (int t_i = t_prevDivision - 1; t_i >= t_info.Division; t_i--)
-                    this.StagePipOff(this.m_tierSeq, t_i);
-        }
-
-        this.m_tierSeq.AppendInterval(this.finishDelay);
-
-        this.m_tierSeq.OnKill(() =>
-        {
-            this.m_tierSeq = null;
-            this.RestoreBadgeColor();
-            this.RestoreBadgePosition();
-            this.RestorePipScales();
-            this.Render();
-        });
-
-        return this.m_tierSeq;
-    }
-
     void Awake()
     {
         // 연출이 되돌릴 기준색. 배지 스프라이트는 티어 변화로 갈리지만 색은 저작값 그대로다.
         if (this.badgeImage != null) this.m_badgeBaseColor = this.badgeImage.color;
 
-        // 별은 스스로 켜지지 않는다 — 채움 머리가 자기 마디를 지날 때만 켜진다.
+        // 별은 스스로 반응하지 않는다 — 채움 머리가 자기 마디를 지날 때만 튄다.
         if (this.gauge != null) this.gauge.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
     }
 
@@ -383,99 +280,38 @@ public class RankHud : MonoBehaviour
 
         this.RenderTier(t_info.DisplayName, t_info.Badge);
 
-        // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 핍 줄 자체를 감춘다.
+        // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 별 줄 자체를 감춘다.
         this.SetPipsVisible(!t_info.IsUnranked);
-        this.RenderGoalMarker(!t_info.IsUnranked);
-        this.LayoutMarkers();
-        this.RenderPips(t_info.IsUnranked ? 0 : t_info.Division);
-        this.SetGaugeRatio(t_info.IsUnranked ? 0f : t_info.GradeProgress);
+        this.SetGaugeRatio(GaugeRatioOf(t_info));
     }
 
-    // 마디 자리는 게이지가 낸다 — 손으로 찍은 좌표는 span·회전이 바뀌는 순간 어긋난다(별 넷을 게이지 양 끝에 걸쳐 놓은 것이 옛 어긋남의 원인이었다).
-    void LayoutMarkers()
+    // 게이지에 먹일 비율. 진행을 그리는 값은 전부 여기를 지난다.
+    // 승급전 대기의 실제 포인트는 '등급 천장 - 1'이라 GradeProgress가 0.95쯤 나오지만, 기획상 그 상태는 "별 넷이 꽉 참"이다 —
+    // 이 보정은 여기 한 지점뿐이다(과거 포인트를 그린 스냅샷은 보정하지 않는다).
+    static float GaugeRatioOf(in RankInfo _info)
     {
-        if (this.gauge == null) return;
+        if (_info.IsUnranked) return 0f;
+        if (_info.Points == RankManager.Points && RankManager.IsPromoPending) return 1f;
 
-        int t_divisions = RankConfig.DivisionsPerGrade;
-
-        if (this.divisionPips != null)
-        {
-            for (int t_i = 0; t_i < this.divisionPips.Length && t_i < t_divisions; t_i++)
-            {
-                var t_pip = this.divisionPips[t_i];
-                if (t_pip == null) continue;
-
-                // 별 K는 그 칸이 시작되는 자리에 앉는다 — 켜지는 시점과 앉은 자리가 같아야 머리가 지나며 켤 수 있다.
-                ((RectTransform)t_pip.transform).anchoredPosition = this.gauge.MarkerPos((float)t_i / t_divisions);
-            }
-        }
-
-        // 별 넷이 4구간을 열고, 마지막 기둥(승급선)이 그 구간을 닫는다.
-        if (this.m_goalMarker != null)
-            ((RectTransform)this.m_goalMarker.transform).anchoredPosition = this.gauge.MarkerPos(1f);
+        return _info.GradeProgress;
     }
 
-    // 채움 머리가 마디를 지나는 그 프레임에 별이 켜진다(물러나면 꺼진다).
-    // 점등을 따로 재생하면 게이지와 별이 서로 다른 시계로 돌아 어긋난다.
+    // 채움 머리가 마디를 지나는 그 프레임의 반응(전진 = 별이 꽉 찼다, 후퇴 = 다시 모자라다).
+    // 점등은 따로 있는 상태가 아니라 fillAmount == 1 그 자체다 — 여기서 별을 켜고 끄지 않는다.
     void OnMarkerCrossed(int _index, bool _forward)
     {
-        this.SetPip(_index, _forward);
-        UiPunch.Play(this.PipTransform(_index), _forward ? this.pipPunch : -this.demotePipShrink);
+        UiPunch.Play(this.PipTransform(_index), _forward ? this.pipPunch : -this.pipPunch);
     }
 
-    // 칸 K가 시작되는 비율들. 0번은 등급 진입선이라 통과가 일어나지 않지만(게이지가 그 아래로 내려가지 않는다)
-    // 인덱스를 별 번호와 맞춰 두려고 자리를 비워 두지 않는다.
+    // 별 K가 꽉 차는 비율들. 사건은 "별이 다 찼다"이지 "채우기 시작했다"가 아니라 구간의 끝을 잡는다.
     static float[] BuildMarkerRatios()
     {
         int t_divisions = RankConfig.DivisionsPerGrade;
 
         var t_ratios = new float[t_divisions];
-        for (int t_i = 0; t_i < t_divisions; t_i++) t_ratios[t_i] = (float)t_i / t_divisions;
+        for (int t_i = 0; t_i < t_divisions; t_i++) t_ratios[t_i] = (float)(t_i + 1) / t_divisions;
 
         return t_ratios;
-    }
-
-    // 다음 등급 배지를 어둡게 깐 목표 마커. 최대 등급·언랭크면 감춘다(도달할 곳이 없거나 아직 등급 안이 아니다).
-    void RenderGoalMarker(bool _visible)
-    {
-        Sprite t_badge = null;
-        bool t_show = _visible && RankManager.TryGetNextGradeBadge(out t_badge);
-
-        // 저작된 마커는 감출 때도 손에 넣어야 한다 — 안 그러면 언랭크에서 켜진 채로 남는다(런타임 생성은 보여줄 때만 만든다).
-        var t_marker = t_show || this.goalMarker != null ? this.EnsureGoalMarker() : this.m_goalMarker;
-        if (t_marker == null) return;
-
-        t_marker.gameObject.SetActive(t_show);
-        if (!t_show) return;
-
-        t_marker.sprite = t_badge;
-        t_marker.color = this.goalMarkerColor;
-    }
-
-    // 저작된 마커가 있으면 그것을 쓴다. 없으면 만든다 — 그림의 출처가 등급 테이블이라 저작 없이도 성립한다.
-    Image EnsureGoalMarker()
-    {
-        if (this.m_goalMarker != null) return this.m_goalMarker;
-        if (this.goalMarker != null) return this.m_goalMarker = this.goalMarker;
-        if (this.pipsRoot == null || this.gauge == null) return null;
-
-        var t_go = new GameObject("RankGoalMarker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        t_go.layer = this.pipsRoot.layer;
-
-        var t_rect = (RectTransform)t_go.transform;
-        t_rect.SetParent(this.pipsRoot.transform, worldPositionStays: false);
-        t_rect.anchorMin = t_rect.anchorMax = t_rect.pivot = new Vector2(0.5f, 0.5f);
-        t_rect.localScale = Vector3.one;
-        t_rect.sizeDelta = this.goalMarkerSize;
-
-        // 게이지 바로 위, 별 아래 — 목표는 밑그림이지 주인공이 아니다.
-        t_rect.SetSiblingIndex(1);
-
-        this.m_goalMarker = t_go.GetComponent<Image>();
-        this.m_goalMarker.raycastTarget = false;
-        this.m_goalMarker.preserveAspect = true;
-
-        return this.m_goalMarker;
     }
 
     // 등급 승급: 구 배지가 파열하고 → 새 배지가 강림해 착지하고 → 그제서야 새 등급의 별이 채워진다.
@@ -487,89 +323,38 @@ public class RankHud : MonoBehaviour
         Sprite t_badge = _info.Badge;
         int t_division = _info.Division;
         int t_prev = _prevDivision;
-        float t_progress = _info.GradeProgress;
+        float t_progress = GaugeRatioOf(_info);
 
-        // 게이지도 별과 같은 프레임에 새 등급의 출발선으로 되감긴다 — 옛 등급의 승급선에 머물면 다 채운 채로 보인다.
+        // 게이지는 배지가 터지는 프레임에 새 등급의 출발선으로 되감긴다 — 옛 등급의 승급선에 머물면 다 채운 채로 보인다.
         this.promote.Build(_seq, this.badgeImage, this.descText, t_name, t_badge,
-                           _onBurst: () => { this.BlowOutPips(t_prev); this.SetGaugeRatio(t_progress); });
+                           _onBurst: () => this.BlowOutGauge(t_prev));
 
-        // 새 등급의 1단계부터 다시 쌓기 시작한다(도달 단계가 2 이상인 경우도 순서대로 켠다).
+        // 새 등급의 1단계부터 다시 쌓는다. 마지막 토막은 실제 진행까지만 찬다 — 도달값보다 더 채우면 거짓말이 된다.
         for (int t_i = 0; t_i < t_division && t_i < _divisions; t_i++)
-            this.StagePipOn(_seq, t_i);
+            this.StageStarFill(_seq, Mathf.Min((float)(t_i + 1) / _divisions, t_progress));
     }
 
-    // 켜져 있던 별이 배지가 터지는 것과 같은 프레임에 한꺼번에 꺼진다(순서대로 지우면 그만큼 잃는 장면이 길어진다).
-    void BlowOutPips(int _prevDivision)
+    // 차 있던 별이 배지가 터지는 것과 같은 프레임에 한꺼번에 비워지며 움츠러든다(순서대로 지우면 그만큼 잃는 장면이 길어진다).
+    void BlowOutGauge(int _prevDivision)
     {
+        // 무통지 스냅이다 — 통지하면 마디가 우수수 역행하며 방금 켜진 펀치를 되감는다.
+        this.SetGaugeRatio(0f);
+
         for (int t_i = 0; t_i < _prevDivision; t_i++)
-        {
-            this.SetPip(t_i, false);
             UiPunch.Play(this.PipTransform(t_i), -this.pipBlowOut);
-        }
     }
 
-    // 핍 하나가 탁 켜지는 단위 동작. _index = 켜질 칸(0-based).
-    void StagePipOn(Sequence _seq, int _index)
+    // 게이지가 _ratio까지 차오르는 단위 동작(별 한 칸 분량). 꽉 차는 순간의 펀치는 마디 통과 통지가 낸다.
+    void StageStarFill(Sequence _seq, float _ratio)
     {
         _seq.AppendCallback(() =>
         {
-            // 언랭크에서 올라오는 첫 진입은 핍 줄이 꺼진 채 출발한다 — 켜는 것이 펀치보다 먼저여야 한다.
+            // 언랭크에서 올라오는 첫 진입은 별 줄이 꺼진 채 출발한다 — 켜는 것이 채움보다 먼저여야 한다.
             this.SetPipsVisible(true);
-            this.SetPip(_index, true);
-            UiPunch.Play(this.PipTransform(_index), this.pipPunch);
+
+            if (this.gauge != null) this.gauge.TweenTo(_ratio, this.gaugeStepDuration);
         });
         _seq.AppendInterval(this.pipStep);
-    }
-
-    // 등급 강등: 배지가 흔들리며 아래 등급으로 갈리고, 새 등급의 별 4칸은 한 번에 켜진다.
-    // 칸을 하나씩 켜는 건 승급의 문법이라 여기서 재사용하면 "별이 늘었다 = 올랐다"로 읽힌다.
-    void StageGradeDown(Sequence _seq, in RankInfo _info)
-    {
-        // in 파라미터는 람다가 잡을 수 없다 — 콜백이 쓸 값만 먼저 떠 둔다(StageGradeUp과 같은 사정).
-        string t_name = _info.DisplayName;
-        Sprite t_badge = _info.Badge;
-        int t_division = _info.Division;
-        float t_progress = _info.GradeProgress;
-
-        _seq.AppendInterval(this.badgeSwapDelay);
-        _seq.AppendCallback(() =>
-        {
-            this.RenderTier(t_name, t_badge);
-            this.RenderPips(t_division);
-            this.SetGaugeRatio(t_progress);
-        });
-
-        // 흔들림·어두워짐은 시퀀스 멤버로 단다 — 콜백 안에서 따로 띄우면 시퀀스가 죽어도 살아남아 배지가 어긋난 채 굳는다.
-        // 배지가 미배선이면 둘 다 없다(핍만 갈린다). BadgeRect가 non-null이면 badgeImage도 non-null이다.
-        var t_rect = this.BadgeRect;
-        if (t_rect == null) return;
-
-        // 콜백 뒤에는 Join이 아니라 Append로 붙인다 — 길이 0인 콜백은 시퀀스 길이를 늘리지 않아
-        // Append가 곧 "콜백과 같은 시각"이고, Join의 기준점보다 이쪽이 분명하다.
-        _seq.Append(t_rect.DOShakeAnchorPos(this.badgeShakeDuration, this.badgeShakeStrength, vibrato: 14));
-        _seq.Join(this.badgeImage.DOColor(this.demoteBadgeColor, this.badgeShakeDuration * 0.5f)
-                                 .SetLoops(2, LoopType.Yoyo));
-    }
-
-    // 게이지가 _ratio까지 물러난다. 지나치는 별은 통과 통지가 끈다.
-    void StageGaugeRetreat(Sequence _seq, float _ratio)
-    {
-        if (this.gauge == null) return;
-
-        // Append로 붙여 시퀀스가 이 트윈이 끝날 때까지 기다리게 한다(여운이 물러남 도중에 겹치지 않게).
-        Tween t_gauge = this.gauge.TweenTo(_ratio, this.lossDuration);
-        if (t_gauge != null) _seq.Append(t_gauge);
-    }
-
-    // 핍 하나가 조용히 꺼지는 단위 동작. 켜질 때의 탁 튀는 손맛과 반대로 움츠러들었다 돌아온다.
-    void StagePipOff(Sequence _seq, int _index)
-    {
-        _seq.AppendCallback(() =>
-        {
-            this.SetPip(_index, false);
-            UiPunch.Play(this.PipTransform(_index), -this.demotePipShrink);
-        });
-        _seq.AppendInterval(this.demotePipStep);
     }
 
     void RenderTier(in RankRewardInfo _info) => this.RenderTier(_info.DisplayName, _info.Badge);
@@ -579,15 +364,6 @@ public class RankHud : MonoBehaviour
     {
         if (this.badgeImage != null && _badge != null) this.badgeImage.sprite = _badge;
         if (this.descText != null && _displayName != null) this.descText.text = _displayName;
-    }
-
-    // _filled칸까지 켜고 나머지는 끈다.
-    void RenderPips(int _filled)
-    {
-        if (this.divisionPips == null) return;
-
-        for (int t_i = 0; t_i < this.divisionPips.Length; t_i++)
-            this.SetPip(t_i, t_i < _filled);
     }
 
     void SetGaugeRatio(float _ratio)
@@ -603,23 +379,11 @@ public class RankHud : MonoBehaviour
         this.pipsRoot.SetActive(_visible);
     }
 
-    void SetPip(int _index, bool _on)
-    {
-        if (this.divisionPips == null || _index < 0 || _index >= this.divisionPips.Length) return;
-
-        var t_pip = this.divisionPips[_index];
-        if (t_pip == null) return;
-
-        var t_sprite = _on ? this.pipOn : this.pipOff;
-        if (t_sprite != null) t_pip.sprite = t_sprite;
-    }
-
+    // 펀치할 별. 자리도 개수도 게이지가 안다 — HUD는 별 목록을 따로 들지 않는다.
     Transform PipTransform(int _index)
     {
-        if (this.divisionPips == null || _index < 0 || _index >= this.divisionPips.Length) return null;
-
-        var t_pip = this.divisionPips[_index];
-        return t_pip != null ? t_pip.transform : null;
+        var t_star = this.gauge as RankStarGauge;
+        return t_star != null ? t_star.StarRect(_index) : null;
     }
 
     void KillTierChange()
@@ -653,24 +417,19 @@ public class RankHud : MonoBehaviour
         if (this.badgeImage != null) this.badgeImage.color = this.m_badgeBaseColor;
     }
 
-    void RestoreBadgePosition()
-    {
-        var t_rect = this.BadgeRect;
-        if (t_rect != null) t_rect.anchoredPosition = this.m_badgeBasePos;
-    }
-
-    // 핍 펀치는 시퀀스 멤버가 아니라 따로 뜬 트윈이라, 연출이 중간에 끊기면 줄어든(혹은 커진) 배율로 굳는다.
+    // 별 펀치는 시퀀스 멤버가 아니라 따로 뜬 트윈이라, 연출이 중간에 끊기면 줄어든(혹은 커진) 배율로 굳는다.
     void RestorePipScales()
     {
-        if (this.divisionPips == null) return;
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null) return;
 
-        for (int t_i = 0; t_i < this.divisionPips.Length; t_i++)
+        for (int t_i = 0; t_i < t_star.StarCount; t_i++)
         {
-            var t_pip = this.divisionPips[t_i];
-            if (t_pip == null) continue;
+            var t_rect = t_star.StarRect(t_i);
+            if (t_rect == null) continue;
 
-            t_pip.transform.DOKill();
-            t_pip.transform.localScale = Vector3.one;
+            t_rect.DOKill();
+            t_rect.localScale = Vector3.one;
         }
     }
 }
