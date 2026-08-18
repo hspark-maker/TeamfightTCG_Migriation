@@ -57,7 +57,7 @@ public static partial class CardTableTool
         for (int r = 1; r < t_rows.Count; r++)
         {
             List<string> t_row = t_rows[r];
-            string t_name = Cell(t_row, t_header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(t_row, t_header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;   // 빈 행(Excel이 흔히 남긴다)
 
             if (!t_inTable.Add(t_name))

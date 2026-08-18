@@ -16,7 +16,7 @@ using UnityEngine;
 public class VfxSlot
 {
     [Tooltip("에디터 전용. 이 폴더 아래 프리팹 전부가 후보. 비우면 prefabs 배열만 사용.")]
-    public string folder = "Assets/PurchasedAssets";
+    public string folder = "Assets/Assets/Particle/_Vendor";
     [Tooltip("파일명에 이 문자열이 포함된 프리팹만 후보(대소문자 무시). 예: hit, slash, fire.")]
     public string filter = "";
     [Tooltip("폴더 대신 직접 지정할 후보들. 비어있지 않으면 이쪽이 우선.")]
