@@ -1,0 +1,21 @@
+LobbyCanvas P0 baseline
+Captured: 2026-08-18
+Unity: 6000.3.10f1
+Asset: Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab
+
+Nested prefab instances: 16
+Total property modifications: 1351
+LobbyCanvas YAML lines: 10868
+
+P0 targets before migration:
+- Tab_Collection_New: 305 properties, 0 added objects, 0 added components, 0 removed components
+- MatchDeckRoot: 312 properties, 0 added objects, 2 added components, 2 removed components
+- CardDetailOverlay: 48 properties, 0 structural overrides
+- Tab_Deck: 141 properties, 1 added object
+- RankReward: 27 properties, 2 added objects, 2 added components
+- Status_Energy (asset instance name Currency): 169 properties, 3 added components, 1 removed component
+- Button_Collection (asset instance name Menu_BottomBtn): 144 properties, 10 added objects
+
+Expected structural floor after ownership migration: 21-25 property modifications per instance.
+Stop conditions: changed GUID, disconnected prefab, missing reference/script, unexpected override growth,
+unrelated LobbyCanvas YAML change, or Unity compilation error.
