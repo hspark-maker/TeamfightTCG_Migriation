@@ -45,6 +45,14 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] TMP_Text   levelText;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
+
+    // 아이콘 줄 배경판 두 장. 인게임 CardView.keywordBg / keywordOnlyBg 와 같은 스프라이트·같은 자리(프레임 비율로 환산)이며,
+    // 어느 쪽을 켤지 정하는 판정도 아래 RefreshKeywordBg 한 곳뿐이다 — 두 장이 같이 켜지면 겹쳐 그려진다.
+    // 배경판은 아이콘·프레임보다 뒤에 그려져야 해서 프리팹 자식 순서상 keywordIconRoot 앞에 둔다.
+    // **판정 기준은 키워드가 아니라 시너지다**: 넓은 판은 시너지 배지 자리가 딸린 판이라, 시너지가 없거나
+    // 아직 안 열린 카드에서 켜면 빈 칸이 남는다. 키워드 아이콘은 두 판 모두 같은 자리에 얹힌다.
+    [SerializeField] GameObject keywordBg;      // SynergyKewordBG (시너지가 열린 카드 = 키워드 + 시너지 칸)
+    [SerializeField] GameObject keywordOnlyBg;  // SynergyKewordBG_kewordOnly (시너지 없음·미해금 = 키워드 칸만)
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
     [SerializeField] CardSynergyBadgeView  synergyBadgePrefab;
     [SerializeField] KeywordIconConfig     keywordIconConfig;
@@ -60,6 +68,16 @@ public class CardVisualView : MonoBehaviour
     }
     [SerializeField] KeywordFrame[] keywordFrames;
 
+    [Header("시너지 배지 자리")]
+    // 단위는 **uGUI 픽셀**이다(배지 루트 rect 왼쪽아래 모서리 기준). 인게임 좌표 환산은 하지 않는다 —
+    // 자리는 프리팹에서 눈으로 맞추는 값이고, 코드는 여기 적힌 오프셋을 anchoredPosition에 그대로 넣는다.
+    // 픽셀이므로 프리팹마다 값이 다르다(카드 rect가 420x558 · 677x900 · 400x600로 제각각) — 공유 상수로 묶지 말 것.
+    // 배지 크기는 건드리지 않는다(배지 프리팹 authoring 크기 유지).
+    [Tooltip("첫 배지(i=0) 자리. 배지 루트 rect 왼쪽아래(0,0) 기준 픽셀.")]
+    [SerializeField] Vector2 synergyBadgeStart = new Vector2(151f, 65f);
+    [Tooltip("배지 간 간격 픽셀(아래로 쌓기라 y는 음수).")]
+    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -88f);
+
     [Header("표시 옵션")]
     // 작은 타일에서 요소를 끄기 위한 프리팹별 스위치. 소비자 코드는 Bind만 호출하고
     // "무엇을 보일지"는 프리팹이 결정한다(호출부에 표시 분기를 만들지 않기 위함).
@@ -68,8 +86,19 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] bool showLevel     = true;
     [SerializeField] bool showKeywords  = true;
     [SerializeField] bool showSynergies = true;
+    // 정보창처럼 "이 카드가 앞으로 뭘 여는지"까지 보여주는 화면은 true — 해금 전 키워드도 아이콘 줄에 띄운다.
+    // 카드 위 표시는 지금 쓸 수 있는 것만이라는 기본 규칙의 유일한 예외라 프리팹 스위치로 둔다.
+    // 전투 인스턴스 바인딩에는 적용되지 않는다 — 적 카드에 실제로 못 쓰는 키워드를 띄우면 오정보다.
+    [SerializeField] bool showLockedKeywords;
+    // 아이콘을 눌러 키워드 설명을 띄우는 화면(카드 정보창)만 true. 도감·덱편집 타일은 누름이 다른 뜻이라
+    // (카드 상세 열기·드래그 시작) 여기서 설명 팝업이 끼어들면 안 된다.
+    [SerializeField] bool keywordExplainOnPress;
     // 표시 최대 배지 수. 기본값은 인게임과 같은 코드 상수 하나에서 온다(각자 3을 적어두면 한쪽만 바뀌어도 조용히 갈라진다).
     [SerializeField] int  synergyMaxBadges = CardVisualRules.MaxSynergyBadges;
+
+    // 전투 인스턴스로 바인딩됐다면 그쪽이 값의 진실원이다(현재 체력·인스턴스 키워드·전투 아트).
+    // CardData로 바인딩하면 null로 돌아가 아웃게임(내 성장) 기준을 탄다 — 적 카드에 내 강화를 얹지 않기 위함.
+    CardInstance m_instance;
 
     // 프레임과 아트만 남기는 런타임 마스크(도감 "일러스트만 보기"). 프리팹 스위치(show*)를 끄지 않고 **그 위에 얹는다** —
     // 직접 끄면 껐다 켤 때 프리팹이 원래 무엇을 보이던 타일이었는지(작은 타일은 이름·HP가 애초에 꺼져 있다)를 잃는다.
@@ -133,6 +162,22 @@ public class CardVisualView : MonoBehaviour
     // 레벨(랭크 티어가 정한 AI 레벨)로 체력·레벨을 그린다. 둘을 같게 두면 상대가 실제보다 약해 보인다.
     public void Bind(CardData _card, bool _owned, bool _mine = true)
     {
+        this.m_instance = null;   // CardData 바인딩 = 아웃게임(내 성장) 기준으로 되돌린다
+        BindInternal(_card, _owned, _mine);
+    }
+
+    /// <summary>전투 인스턴스로 바인딩(전투 덱 목록·카드 정보창). 값의 출처가 아웃게임 경로와 갈린다:
+    /// 체력 = 인스턴스의 <b>현재</b> 값, 아트 = <see cref="CardVisualRules.PickBattleArt"/>,
+    /// 키워드 = 그 인스턴스가 실제로 가진 것. 적 카드에 내 강화·진화를 얹지 않기 위해 인스턴스가 이긴다.
+    /// 강화 레벨은 내 진행도 표기라 인스턴스 경로에선 숨긴다.</summary>
+    public void Bind(CardInstance _instance)
+    {
+        this.m_instance = _instance;
+        BindInternal(_instance?.data, _owned: true, _mine: true);
+    }
+
+    void BindInternal(CardData _card, bool _owned, bool _mine)
+    {
         if (_card == null)
         {
             gameObject.SetActive(false);
@@ -161,10 +206,11 @@ public class CardVisualView : MonoBehaviour
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
-        SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
+        SetLevelDisplay(_card, _owned && this.ShowLevel && this.m_instance == null, _mine);
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
-        RefreshSynergyBadges(_card, _owned && this.ShowSynergies);
+        RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine);
+        RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine);
 
         // 미소유 = 잠김 오버레이 on(아트를 어둡게 덮어 실루엣화).
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
@@ -190,7 +236,10 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card == null || this.portrait == null) return;
 
-        Sprite t_art = CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
+        // 인스턴스가 있으면 진화 단계도 그 인스턴스의 값이다 — 적 카드에 내 진화 단계를 얹지 않는다.
+        Sprite t_art = this.m_instance != null
+            ? CardVisualRules.PickBattleArt(this.m_instance)
+            : CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
         this.portrait.sprite  = t_art;
         this.portrait.enabled = t_art != null;
     }
@@ -206,6 +255,10 @@ public class CardVisualView : MonoBehaviour
 
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
+        // 시너지 해금(1차 진화 레벨)도 이 프레임에 같이 일어난다 — 배지와 배경판을 여기서 안 다시 그리면
+        // 강화 화면에서 레벨만 오르고 시너지는 다음 재바인딩까지 안 보인다.
+        RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine: true);
+        RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine: true);
     }
 
     /// <summary>지금 꺼져 있지만 _card 기준으로는 켜져야 할 프레임 장식들 = 이번 성장으로 새로 열릴 문양.
@@ -354,14 +407,18 @@ public class CardVisualView : MonoBehaviour
         if (this.hpText != null)
         {
             this.hpText.gameObject.SetActive(_show);
-            if (_show) this.hpText.text = DeckPower.MaxHpOf(_card, _mine).ToString();
+            if (_show)
+                this.hpText.text = (this.m_instance != null
+                    ? this.m_instance.hp
+                    : DeckPower.MaxHpOf(_card, _mine)).ToString();
         }
 
         if (this.bonusHpText != null)
         {
-            bool t_hasBonus = _show && _card.bonusHp > 0;
+            int t_bonus = this.m_instance != null ? this.m_instance.bonusHp : _card.bonusHp;
+            bool t_hasBonus = _show && t_bonus > 0;
             this.bonusHpText.gameObject.SetActive(t_hasBonus);
-            if (t_hasBonus) this.bonusHpText.text = $"+{_card.bonusHp}";
+            if (t_hasBonus) this.bonusHpText.text = $"+{t_bonus}";
         }
     }
 
@@ -379,13 +436,68 @@ public class CardVisualView : MonoBehaviour
         // (아이콘 줄 전용 제외분 = 표식. 프레임 장식은 아래 RefreshKeywordFrames가 TraitKeywords로 그대로 띄운다.)
         int t_index = 0;
         foreach (CardVisualRules.KeywordIcon t_entry in
-                 CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig))
+                 CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig))
         {
             CardKeywordIconView t_view = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
             t_view.SetIcon(t_entry.Icon);
             PlaceKeywordIcon(t_view.transform as RectTransform, t_index++);
+            BindKeywordExplain(t_view, t_entry.Keyword);
         }
     }
+
+    /// <summary>아이콘 줄 배경판 선택. 기준은 <b>시너지 하나</b>다 — 시너지를 가졌고 그게 해금까지 됐으면
+    /// 시너지 칸이 딸린 넓은 판, 아니면(시너지 없음 · 아직 해금 전 · 미소유로 정보를 숨긴 칸) 키워드 칸만 있는 좁은 판.
+    /// 키워드 유무는 판을 바꾸지 않는다: 키워드 아이콘은 두 판 모두 같은 자리에 얹힌다.
+    /// 판정은 배지를 그리는 <see cref="SynergyBadges"/>와 같은 호출이라 "배지는 없는데 자리만 넓은" 카드가 생기지 않는다.
+    /// 배선이 없는 프리팹(고스트·작은 타일)은 조용히 건너뛴다.</summary>
+    void RefreshKeywordBg(CardData _card, bool _show, bool _mine)
+    {
+        bool t_synergy = _show && SynergyBadges(_card, _mine).Count > 0;
+
+        if (this.keywordBg     != null) this.keywordBg.SetActive(t_synergy);
+        if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!t_synergy);
+    }
+
+    /// <summary>아이콘 줄에 띄울 키워드 집합. 네 갈래가 여기 한 곳에서만 갈린다 —
+    /// 인스턴스 유무(적 카드에 내 성장 금지) × 잠긴 키워드 표시 여부(정보창만).
+    /// 인스턴스 경로에는 잠김 표시가 없다: 그 카드가 지금 실제로 가진 것이 곧 정답이다.</summary>
+    CardKeyword KeywordIconSet(CardData _card)
+    {
+        if (this.m_instance != null)
+            return this.showLockedKeywords
+                ? CardVisualRules.InfoKeywords(this.m_instance)
+                : CardVisualRules.IconKeywords(this.m_instance);
+
+        return this.showLockedKeywords
+            ? CardVisualRules.InfoKeywordsWithLocked(_card)
+            : CardVisualRules.IconKeywords(_card);
+    }
+
+    /// <summary>아이콘 롱프레스 → 키워드 설명 팝업. 프리팹에 누름 부품이 없으면 조용히 건너뛴다
+    /// (도감·덱편집 타일처럼 설명을 띄우지 않는 화면은 그 부품을 달지 않으면 된다).
+    /// 폴백 아이콘(Keyword.None)은 실제 보유 키워드가 아니라 설명할 것이 없다.</summary>
+    void BindKeywordExplain(CardKeywordIconView _view, CardKeyword _keyword)
+    {
+        if (!this.keywordExplainOnPress) return;
+        if (_view == null || _keyword == CardKeyword.None || this.keywordIconConfig == null) return;
+        if (!this.keywordIconConfig.TryGetEntry(_keyword, out KeywordIconConfig.Entry t_entry)) return;
+
+        var t_rect = _view.transform as RectTransform;
+        _view.BindExplain(() => ShowKeywordExplain(t_entry, t_rect), HideKeywordExplain);
+    }
+
+    static void ShowKeywordExplain(KeywordIconConfig.Entry _entry, RectTransform _iconRect)
+    {
+        UIPoolManager.Instance?.AddOrUpdateUI<KeywordExplainPopupUI>(new KeywordExplainData
+        {
+            icon        = _entry.icon,
+            displayName = _entry.displayName,
+            explain     = _entry.explain,
+            iconRect    = _iconRect,
+        });
+    }
+
+    static void HideKeywordExplain() => UIPoolManager.Instance?.HideUI<KeywordExplainPopupUI>();
 
     // 인게임은 keywordIconStart에서 keywordIconStep만큼 밀며 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
     // 맡기지 않고 같은 좌표를 정규화 앵커로 옮긴다 — LayoutGroup은 간격·크기를 픽셀로 잡아서 카드 셀 크기가
@@ -411,7 +523,9 @@ public class CardVisualView : MonoBehaviour
     {
         if (this.keywordFrames == null) return;
 
-        CardKeyword t_keywords = _show ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
+        CardKeyword t_keywords = !_show ? CardKeyword.None
+                               : this.m_instance != null ? CardVisualRules.TraitKeywords(this.m_instance)
+                                                         : CardVisualRules.TraitKeywords(_card);
 
         foreach (KeywordFrame t_frame in this.keywordFrames)
         {
@@ -422,26 +536,62 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
+    /// <summary>이 카드가 카드 위에 띄울 시너지 목록. 배지와 배경판이 <b>같은</b> 이 목록을 본다 —
+    /// 갈리면 "배지는 없는데 배경만 넓은" 카드가 생긴다.
+    ///
+    /// 게이트는 인게임 CardDecorView.RefreshSynergyBadges와 같은 두 개다:
+    /// 튜토리얼 미도입 구간(<see cref="TutorialConfig.SynergyVisible"/>)과 시너지 해금 레벨.
+    /// 해금 전 카드는 실제로 시너지에 참여하지 않으므로 띄우면 오정보다.
+    /// 해금 판정의 출처는 전투 인스턴스면 그 인스턴스(적 카드에 내 진행도 금지), 아니면 표시 대상의 레벨이다.</summary>
+    List<SynergyData> SynergyBadges(CardData _card, bool _mine)
+    {
+        if (_card == null || !TutorialConfig.SynergyVisible) return EmptySynergies;
+
+        bool t_open = this.m_instance != null
+            ? this.m_instance.synergyEnabled
+            : DeckPower.SynergyUnlockedOf(_card, _mine);
+        if (!t_open) return EmptySynergies;
+
+        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
+        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
+        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
+        return CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+    }
+
+    static readonly List<SynergyData> EmptySynergies = new List<SynergyData>();
+
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    void RefreshSynergyBadges(CardData _card, bool _show)
+    void RefreshSynergyBadges(CardData _card, bool _show, bool _mine)
     {
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
-        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
-        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+        List<SynergyData> t_tags = SynergyBadges(_card, _mine);
 
-        foreach (SynergyData t_syn in t_tags)
+        for (int t_i = 0; t_i < t_tags.Count; t_i++)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
+            PlaceSynergyBadge(t_badge.transform as RectTransform, t_i);
             // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
             // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
-            t_badge.Set(t_syn, true);
+            t_badge.Set(t_tags[t_i], _active: true);
         }
+    }
+
+    /// <summary>배지 i번째 자리 = synergyBadgeStart + synergyBadgeStep * i (배지 루트 왼쪽아래 기준 픽셀).
+    /// 앵커를 루트 왼쪽아래 한 점으로 고정하고 오프셋만 준다 — 그래야 인스펙터 숫자가 곧 "모서리에서 몇 px"이 된다.
+    /// 키워드 아이콘과 달리 크기는 건드리지 않는다:
+    /// 배지 프리팹이 authoring 크기를 들고 있고, 칸 크기 차이는 UniformFitContent가 배율로 흡수한다.</summary>
+    void PlaceSynergyBadge(RectTransform _rect, int _index)
+    {
+        if (_rect == null) return;
+
+        _rect.anchorMin        = Vector2.zero;
+        _rect.anchorMax        = Vector2.zero;
+        _rect.anchoredPosition = this.synergyBadgeStart + this.synergyBadgeStep * _index;
+        _rect.localScale       = Vector3.one;
     }
 
     // 재바인딩 시 이전 아이콘/배지를 제거. 인게임은 파괴 전 DOKill로 tween을 정리하지만

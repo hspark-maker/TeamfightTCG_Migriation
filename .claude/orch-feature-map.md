@@ -5,13 +5,13 @@
 전체 파일 목록만 필요하면 Glob 또는 rg --files로 현재 상태를 조회한다.
 
 <!-- orch:feature-map-sync:start -->
-<!-- orch:source files=418 public-types=504 unmapped-public-types=1 -->
+<!-- orch:source files=419 public-types=502 unmapped-public-types=3 -->
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
 
-- 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
+- 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` (`EnemyAi`) · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
 - 공격 실행: `AttackProcessor` · `AttackSequence` · `AttackFlow` (BeforeAttack / Attacked / AfterAttack 훅) · `Battle/Attack/AttackPreview` · `Battle/Attack/AttackResult`
 - 훅 컨텍스트 (`BattleTimings` 안 struct): `BeforeAttackCtx` · `AttackedCtx` · `DamageDealtCtx` · `DeathCtx` · `SwapOutCtx` · `AfterAttackCtx` · `TurnCtx` · `BoardCtx` · `SpawnCtx` · `DeckCtx`
 - 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
@@ -88,7 +88,7 @@
 
 - 저장·구성: `DeckSaveManager` · `StarterDeck` · `DeckPower`
 - 편집 UI: `UI/Deck/DeckEditController` · `DeckEditDragController` · `DeckEditCollectionGrid` · `DeckEditSlotView` · `DeckListController` · `DeckTabController` · `DeckEditCardTile` · `DeckSlotView` · 이미지 `DeckImageCatalog` · `DeckImages` · `UI/DeckSelectPopup`
-- 빌더: `UI/MainMenu/DeckBuilderUI` · `DeckSynergyStrip` · `DeckGroup` · `MainMenuManager` · `GameReadyPanel` · `SynergyCountIcon` · `SynergyTooltip` · `SceneTransitionVideo`
+- 빌더: `DeckSynergyStrip` · `MainMenuManager` · `SynergyCountIcon` · `SynergyTooltip` · `SceneTransitionVideo`
 
 ## 성장·강화 (`OutGame/Growth/`, `UI/Growth/`)
 
@@ -119,10 +119,10 @@
 
 ## 공용 UI·연출 (`UI/Common/`, `UI/UIManager/`, `UI/Lobby/`)
 
-- 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `FeatureLockView` · `AlertDotView`
+- 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
 - 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
-- 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` · `UI/CardElement` (`CardElementMod`) · `UI/SettingsPanel`
+- 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` () · `UI/SettingsPanel`
 - 풀·매니저: `UI/UIManager/UIPoolManager` · `PooledCardElement` (`PooledCardElementData`) · `PooledUIBase` (`UIData`) · `UIAnimator` · `IUIController` · `SimpleYNPopup` (`SimpleYNPopupData`) · 상시 오버레이 `SingletonOverlay` · `SingletonOverlayBase` · `RuntimeOverlayPrefabs` · `SyncUiPrefabCatalog` (`ESyncUiPrefab` · `SyncUiPrefabs`)
 - 로비: `UI/Lobby/LobbyTabController` · `LobbyTabServices` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay`
 - 입력 제스처: `UI/Input/HorizontalSwipeDetector` · `LongPressDetector` · `SwipeThroughScrollRect` · `SwipeGuide` · `HintArrow`

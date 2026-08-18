@@ -11,30 +11,17 @@ const {
   isSearchTool,
   mentionsMap,
 } = require("./lib/search-detect.js");
+const { isRealUser, textContent } = require("./lib/transcript.js");
 
 const DEFAULT_INSTALLED_AT = "2026-08-14T06:18:00.000Z";
 /* 게이트가 settings.json 에 붙은 시각. --gate-at 으로 덮어쓴다. */
 const DEFAULT_GATE_AT = "2026-08-18T06:40:00.000Z";   // 첫 실차단 06:41:46Z 로 확인
-const NOISE_PREFIX = /^\s*<(?:task-notification|system-reminder|local-command-[^>]*|command-name|hook[^>]*)>/i;
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 function option(name, fallback) {
   const prefix = `--${name}=`;
   const value = process.argv.find((arg) => arg.startsWith(prefix));
   return value ? value.slice(prefix.length) : fallback;
-}
-
-function textContent(content) {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content.filter((part) => part && part.type === "text").map((part) => part.text || "").join("\n");
-}
-
-function isRealUser(event) {
-  if (event.type !== "user" || !event.message) return false;
-  if (Array.isArray(event.message.content) && event.message.content.some((part) => part && part.type === "tool_result")) return false;
-  const text = textContent(event.message.content).trim();
-  return Boolean(text) && !NOISE_PREFIX.test(text);
 }
 
 function isSearch(call) {
@@ -87,12 +74,13 @@ function readEvents(file) {
   return events;
 }
 
-function newSegment(event, carriedMap) {
+function newSegment(event, carriedMap, sessionTurnsSoFar) {
   return {
     sessionId: event.sessionId || "",
     startedAt: event.timestamp || "",
     request: textContent(event.message.content).replace(/\s+/g, " ").slice(0, 120),
     carriedMap,
+    startTurn: sessionTurnsSoFar,   // 세션 내 위치. 턴당 토큰은 이 값에 크게 좌우된다
     loadedWithin: false,
     loadedAfterSearch: false,
     searches: 0,
@@ -122,10 +110,15 @@ function finish(segment, installedAt, gateAt) {
     group = `${era}·${kind}`;
   }
   const usage = [...segment.usage.values()];
+  const turns = segment.turns.size;
+  const inputTokens = usage.reduce((sum, value) => sum + value.input, 0);
+  /* 세그먼트 합계는 "세션 어디쯤인가"가 지배한다 — 긴 세션 후반은 검색을 안 해도 비싸다.
+     개입 효과를 보려면 왕복 1회의 값인 턴당으로 나눠야 한다. */
   return {
     ...segment,
-    turns: segment.turns.size,
-    inputTokens: usage.reduce((sum, value) => sum + value.input, 0),
+    turns,
+    inputTokens,
+    inputPerTurn: turns ? Math.round(inputTokens / turns) : null,
     outputTokens: usage.reduce((sum, value) => sum + value.output, 0),
     group,
   };
@@ -135,11 +128,12 @@ function parseTranscript(file, installedAt, gateAt) {
   const samples = [];
   let mapLoaded = false;
   let segment = null;
+  const sessionTurns = new Set();
   for (const event of readEvents(file)) {
     if (isRealUser(event)) {
       const done = finish(segment, installedAt, gateAt);
       if (done) samples.push(done);
-      segment = newSegment(event, mapLoaded);
+      segment = newSegment(event, mapLoaded, sessionTurns.size);
       continue;
     }
     if (!segment || event.isSidechain) continue;
@@ -147,6 +141,7 @@ function parseTranscript(file, installedAt, gateAt) {
       const turnId = event.requestId || event.message?.id || event.uuid;
       if (turnId) {
         segment.turns.add(turnId);
+        sessionTurns.add(turnId);
         const current = usageTokens(event);
         const previous = segment.usage.get(turnId) || { input: 0, output: 0 };
         segment.usage.set(turnId, { input: Math.max(previous.input, current.input), output: Math.max(previous.output, current.output) });
@@ -195,6 +190,8 @@ function stats(samples) {
       searchMedian: metric("searches", 0.5), searchP75: metric("searches", 0.75),
       turnMedian: metric("turns", 0.5), turnP75: metric("turns", 0.75),
       inputMedian: metric("inputTokens", 0.5), inputP75: metric("inputTokens", 0.75),
+      perTurnMedian: metric("inputPerTurn", 0.5), perTurnP75: metric("inputPerTurn", 0.75),
+      startTurnMedian: metric("startTurn", 0.5),
       searchesBeforeMapMedian: metric("searchesBeforeMap", 0.5),
       firstSearchTurnMedian: metric("firstSearchTurn", 0.5),
       firstEditTurnMedian: metric("firstEditTurn", 0.5),
@@ -221,9 +218,9 @@ function main() {
 
   console.log("관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.");
   console.log(`트랜스크립트 ${files.length}개 | 탐색형 요청 ${samples.length}개 | 지도 ${installedAtText} · 게이트 ${gateAtText}`);
-  console.log("그룹                       n  검색중앙  검색p75  로드전검색  턴중앙  입력토큰중앙");
+  console.log("그룹                       n  검색중앙  검색p75  로드전검색  턴중앙   턴당토큰중앙   턴당p75  세션내위치");
   for (const row of summary) {
-    const token = row.n < 20 ? "판정 불가" : display(row.inputMedian);
+    const enough = row.n >= 20;
     console.log(
       row.group.padEnd(24) +
       String(row.n).padStart(4) +
@@ -231,7 +228,9 @@ function main() {
       display(row.searchP75).padStart(9) +
       display(row.searchesBeforeMapMedian).padStart(11) +
       display(row.turnMedian).padStart(8) +
-      token.padStart(16)
+      (enough ? display(row.perTurnMedian) : "판정 불가").padStart(15) +
+      (enough ? display(row.perTurnP75) : "-").padStart(10) +
+      display(row.startTurnMedian).padStart(9)
     );
   }
 
