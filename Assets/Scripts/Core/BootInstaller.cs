@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // 전역 부트 프리팹의 루트. 사본이 LoadingScene·LobbyScene 둘이라 먼저 깬 쪽이 부트를 선점한다
 // (정상 경로는 로딩 씬이, 로비 단독 Play는 로비 사본이 맡는다).
@@ -22,7 +23,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardGrowthConfig growthConfig;
     // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
     [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
-    [SerializeField] RuntimeUiPrefabCatalog runtimeUiPrefabs;
+    [FormerlySerializedAs("runtimeUiPrefabs")]
+    [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
 
     static bool s_booted;
 
@@ -37,7 +39,7 @@ public class BootInstaller : MonoBehaviour
 
         s_booted = true;
         DontDestroyOnLoad(gameObject);
-        RuntimeUiPrefabs.SetSource(runtimeUiPrefabs);
+        SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;

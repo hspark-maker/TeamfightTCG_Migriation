@@ -98,11 +98,11 @@ public class FeatureLockView : MonoBehaviour
             return;
         }
 
-        var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.LockBadge);
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LockBadge);
         if (t_prefab == null)
         {
             this.m_badgeMissing = true;
-            Debug.LogWarning($"[FeatureLockView] Boot 카탈로그 자물쇠 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
+            Debug.LogWarning($"[FeatureLockView] 동기 UI 카탈로그 자물쇠 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
             return;
         }
 

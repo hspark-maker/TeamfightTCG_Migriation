@@ -8,7 +8,7 @@ using UnityEngine.UI;
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
 //  - 부트: StartScene(빌드 0번)에 저작된 인스턴스. DataLibrary의 Addressables UI 로드를 기다렸다가
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
-//  - 전환: LoadScene(scene)이 Resources에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
+//  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
 // 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
 //
@@ -67,13 +67,13 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
-        var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.LoadingCover);
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
-            Debug.LogWarning("[LoadingCoverView] Boot 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
+            Debug.LogWarning("[LoadingCoverView] 동기 UI 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
             _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;

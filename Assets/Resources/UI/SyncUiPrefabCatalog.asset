@@ -10,11 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6c40563cb20634b42aca917277172513, type: 3}
-  m_Name: RuntimeUiPrefabCatalog
-  m_EditorClassIdentifier: Assembly-CSharp::RuntimeUiPrefabCatalog
-  cardRewardOverlay: {fileID: 1600789160134675030, guid: ce8e0425d90f4b843a806f6d4ab5f045, type: 3}
-  cardSetRewardOverlay: {fileID: 1600789160134675030, guid: d6e19f59ebf8d1e469e3206f09162b0f, type: 3}
-  unlockIntroOverlay: {fileID: 4063509746243267929, guid: bab0c173e1415bd49a7b0ffd3bb1567c, type: 3}
+  m_Name: SyncUiPrefabCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::SyncUiPrefabCatalog
   sceneCurtain: {fileID: 2491093736843398019, guid: edfb63b93c4650142b908a5d7cfcbff1, type: 3}
   lockBadge: {fileID: 6417392085531120441, guid: ee7c257e8609beb44971c07a85276030, type: 3}
   loadingCover: {fileID: 504259994518015037, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}

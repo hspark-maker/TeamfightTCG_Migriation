@@ -75,9 +75,9 @@ public class DataLibrary : MonoBehaviour
         this.uiPrefabs = new Dictionary<Type, GameObject>();
         this.uiHandle = Addressables.LoadAssetsAsync<GameObject>("UIPrefab", (t_prefab) =>
         {
-            var t_ui = t_prefab.GetComponent<PooledUIBase>();
-            if (t_ui != null)
-                this.uiPrefabs[t_ui.GetType()] = t_prefab;
+            Component t_ui = t_prefab.GetComponent<PooledUIBase>();
+            if (t_ui == null) t_ui = t_prefab.GetComponent<SingletonOverlayBase>();
+            if (t_ui != null) RegisterUiPrefab(t_ui.GetType(), t_prefab);
         });
         await uiHandle.ToUniTask();
     }
@@ -92,6 +92,28 @@ public class DataLibrary : MonoBehaviour
 
         LogUtil.Log($"UI Prefab Not Found: {typeof(T).Name}");
         return null;
+    }
+
+    public bool TryGetUiPrefab(Type _type, out GameObject _prefab)
+    {
+        _prefab = null;
+        return this.uiPrefabs != null &&
+               this.uiPrefabs.TryGetValue(_type, out _prefab) &&
+               _prefab != null;
+    }
+
+    void RegisterUiPrefab(Type _type, GameObject _prefab)
+    {
+        if (this.uiPrefabs.TryGetValue(_type, out GameObject t_existing) &&
+            t_existing != _prefab)
+        {
+            Debug.LogError(
+                $"[DataLibrary] UIPrefab 타입 중복: {_type.Name} " +
+                $"({t_existing.name}, {_prefab.name})");
+            return;
+        }
+
+        this.uiPrefabs[_type] = _prefab;
     }
 
     #endregion
