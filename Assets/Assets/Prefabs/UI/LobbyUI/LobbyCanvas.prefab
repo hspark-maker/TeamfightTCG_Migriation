@@ -1148,21 +1148,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3535906181901233073}
     m_Modifications:
-    - target: {fileID: 2409881490114025726, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_hasFontAssetChanged
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6026687782905527840, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_hasFontAssetChanged
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 6063502013743064060, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
       propertyPath: m_Name
       value: Tab_Pack
-      objectReference: {fileID: 0}
-    - target: {fileID: 6063502013743064060, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7439957041477675410, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
       propertyPath: m_Pivot.x
@@ -1242,22 +1230,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7439957041477675410, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7449017013084663661, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7449017013084663661, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7449017013084663661, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7449017013084663661, guid: 7021c8d42663a0441b6eddc10f571328, type: 3}
-      propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -1376,10 +1348,6 @@ PrefabInstance:
     - target: {fileID: 4828347936769036100, guid: 9b188dc86813a7d428389756daef394d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7938917997669544514, guid: 9b188dc86813a7d428389756daef394d, type: 3}
-      propertyPath: target
-      value: 
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
