@@ -10,6 +10,7 @@ public static class LobbyPrefabOverrideAudit
     const string k_LobbyCanvasPath =
         "Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab";
     const string k_LobbyScenePath = "Assets/Scenes/LobbyScene.unity";
+    const string k_OwnedPrefabRoot = "Assets/Assets/Prefabs/UI/Common";
     const string k_VendorRoot = "Assets/Layer Lab/";
     const int k_WarningThreshold = 30;
     const int k_ErrorThreshold = 60;
@@ -107,6 +108,8 @@ public static class LobbyPrefabOverrideAudit
                     t_canvas);
             }
 
+            t_errors += AuditOwnedPrefabDuplicates();
+
             int t_unusedSceneOverrides = CountUnusedLobbySceneOverrides();
             if (t_unusedSceneOverrides > 0)
             {
@@ -130,6 +133,90 @@ public static class LobbyPrefabOverrideAudit
         {
             PrefabUtility.UnloadPrefabContents(t_canvas);
         }
+    }
+
+    static int AuditOwnedPrefabDuplicates()
+    {
+        int t_errors = 0;
+        foreach (string t_guid in AssetDatabase.FindAssets(
+                     "t:Prefab",
+                     new[] { k_OwnedPrefabRoot }))
+        {
+            string t_path = AssetDatabase.GUIDToAssetPath(t_guid);
+            string t_name = System.IO.Path.GetFileNameWithoutExtension(t_path);
+            if (!t_name.StartsWith("UI_", StringComparison.Ordinal))
+                continue;
+
+            GameObject t_root = PrefabUtility.LoadPrefabContents(t_path);
+            try
+            {
+                t_errors += CountDuplicateContent(t_root, t_path);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(t_root);
+            }
+        }
+        return t_errors;
+    }
+
+    static int CountDuplicateContent(GameObject _root, string _label)
+    {
+        int t_errors = 0;
+        foreach (Transform t_parent in
+                 _root.GetComponentsInChildren<Transform>(true))
+        {
+            var t_componentTypes = new HashSet<Type>();
+            foreach (Component t_component in
+                     t_parent.GetComponents<Component>())
+            {
+                if (t_component == null || t_component is Transform)
+                    continue;
+                if (t_componentTypes.Add(t_component.GetType()))
+                    continue;
+
+                t_errors++;
+                Debug.LogError(
+                    $"[LobbyPrefabOverrideAudit] {_label}: duplicate " +
+                    $"component {t_component.GetType().Name} on " +
+                    HierarchyPath(t_parent, _root.transform),
+                    t_parent);
+            }
+
+            var t_children = new HashSet<string>();
+            for (int i = 0; i < t_parent.childCount; i++)
+            {
+                Transform t_child = t_parent.GetChild(i);
+                UnityEngine.Object t_source =
+                    PrefabUtility.GetCorrespondingObjectFromSource(
+                        t_child.gameObject);
+                string t_sourceId = t_source == null
+                    ? "added"
+                    : GlobalObjectId.GetGlobalObjectIdSlow(t_source).ToString();
+                string t_key = t_child.name + "|" + t_sourceId;
+                if (t_children.Add(t_key))
+                    continue;
+
+                t_errors++;
+                Debug.LogError(
+                    $"[LobbyPrefabOverrideAudit] {_label}: duplicate child " +
+                    $"{t_child.name} under " +
+                    HierarchyPath(t_parent, _root.transform),
+                    t_parent);
+            }
+        }
+        return t_errors;
+    }
+
+    static string HierarchyPath(Transform _target, Transform _root)
+    {
+        string t_path = _target.name;
+        while (_target != _root)
+        {
+            _target = _target.parent;
+            t_path = _target.name + "/" + t_path;
+        }
+        return t_path;
     }
 
     [MenuItem("Tools/Lobby/Remove Unused Scene Overrides")]
