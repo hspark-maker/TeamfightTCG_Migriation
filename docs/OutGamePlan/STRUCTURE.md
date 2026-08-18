@@ -1138,6 +1138,13 @@ sequenceDiagram
 > 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체한** 새 축. **구 도감은 2026-08-14에 코드·에셋째 삭제됐고 병존은 끝났다** — 도감 축은 이제 앨범 하나다.
 > 폴더·접두어를 **`Album`으로 물리 분리**한 판단(`OutGame/Album/` · `UI/Album/`)이 그 삭제로 실증됐다 — 구 파일이 섞였다면 "라인 단위 수술"이었을 것이 폴더 통째 삭제로 끝났다.
 
+**구조 정리 (2026-08-18)** — 동작·낙인 키·소비자 API 무변경으로 `OutGame/Album/` 내부만 재편했다. `CardAlbum`(334줄)에서 **조립**(`AlbumBuilder`)과 **진단**(`AlbumValidator`, `#if UNITY_EDITOR`)을 떼어내 조회 파사드 86줄로 줄였고, 테마·페이지의 공통 축을 `AlbumSection`으로 올려 `OwnedCountOf`/`TotalCountOf`/`IsComplete` 오버로드 6→3, `AlbumRewardManager`의 페이지·테마 판정 중복을 `InfoOf`/`StateOf(AlbumSection)` 한 쌍으로 합쳤다.
+
+> **`RewardKey` 조립은 파생 생성자에 그대로 뒀다** — 기반이 `접두사 + Key`로 조립하면 페이지 낙인이 `p:테마/페이지` → `p:페이지`가 되어 결정 #3이 깨진다. 기반은 `HasStableKey`면 받은 문자열을, 아니면 `null`을 담을 뿐이다.
+> **`Cards`는 공통 축에 올리지 않았다** — 테마는 null 제외 평탄화, 페이지는 null 포함 칸 순서라 이름만 같고 계약이 다르다. 공통은 완성 판정 모수인 `CardIds`뿐이다.
+> **삭제한 데드 API**: `TryGetTheme`/`TryGetPage`(+ 이것만 쓰던 인덱스 딕셔너리 2개), `AlbumSignature` 캐시 시그니처(→ `CardAlbumConfig.OnValidate`가 에디터 저작 변경 시 `InvalidateIfSource`), `HasAnyClaimable`/`ClaimableCountOf`/`ResetForDebug`, `AlbumTheme.Index`, `AlbumPage.ThemeKey`, `AlbumRewardInfo.Tier` + `EAlbumRewardTier`.
+> `HasAnyClaimable`은 랭크의 `RankRewardAlertDot`에 대응하는 **앨범 알림 점이 없어서** 죽어 있던 것이다 — 그 UI를 만들 때 `ClaimableCountOf`와 함께 되살릴 것.
+
 **실측 전제 (설계 당시 = 2026-08-06 기준. 아래 구 도감 관련 항목은 2026-08-14 삭제로 소멸했다)**
 
 - 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이었다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있어 **역참조 0건 = 로비에서 도달 불가**였다. → 지금 탭 idx 4는 `Tab_Collection_New.prefab`(앨범) 하나뿐이다.
@@ -1209,13 +1216,16 @@ flowchart TD
         RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
     end
     subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
-        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
-        THEME["AlbumTheme<br/>테마 1개 런타임 뷰<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
-        PAGE["AlbumPage<br/>페이지 1장 런타임 뷰<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구 = 조회만<br/>SetSource · Invalidate · Themes<br/>OwnedCountOf/TotalCountOf/IsComplete(AlbumSection)"]:::chg
+        BUILD["AlbumBuilder (internal static)<br/>저작 def → 런타임 뷰 조립<br/>Build(CardAlbumConfig)"]:::new
+        SEC["AlbumSection (abstract)<br/>테마·페이지 공통 축<br/>Key · Rewards · CardIds<br/>HasStableKey · RewardKey"]:::new
+        THEME["AlbumTheme : AlbumSection<br/>테마 1개 런타임 뷰<br/>RewardKey='t:id'<br/>Pages · Cards(null 제외)"]:::chg
+        PAGE["AlbumPage : AlbumSection<br/>페이지 1장 런타임 뷰<br/>RewardKey='p:테마/페이지'<br/>Index · Cards(null 포함)"]:::chg
+        VALID["AlbumValidator (internal static)<br/>저작↔카탈로그 드리프트 진단<br/>#if UNITY_EDITOR · ContextMenu 전용"]:::new
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
-        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
-        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>공용 판정 InfoOf/StateOf(AlbumSection) · OnChanged"]:::chg
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Rewards[] (복수)<br/>Owned/Total · State"]:::chg
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
     subgraph UI["UI (UI/Album/ · 실측 7파일 — 그리드·스테퍼는 오버레이에 흡수)"]
@@ -1250,7 +1260,12 @@ flowchart TD
     PDEF -.-> RDEF
     BOOTI -->|SetSource| BOOK
     CFG --> BOOK
-    BOOK --> THEME --> PAGE
+    BOOK -->|"조립 위임(lazy 1회)"| BUILD
+    CFG --> BUILD
+    CFG -.->|"ContextMenu 앨범 배치 검증"| VALID
+    BUILD --> THEME --> PAGE
+    SEC -.->|상속| THEME
+    SEC -.->|상속| PAGE
     CAT -->|카드 키| BOOK
     OWN -->|"소유 집합 = 진행도의 유일한 원천"| BOOK
     BOOK -->|완성 판정| RMGR

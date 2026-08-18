@@ -19,8 +19,13 @@ public class CardAlbumConfig : ScriptableObject
     public IReadOnlyList<AlbumRewardDef> AlbumRewards
         => albumRewards != null ? albumRewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
 
+#if UNITY_EDITOR
     [ContextMenu("앨범 배치 검증")]
-    void ValidateAlbum() => CardAlbum.ValidateAlbum();
+    void ValidateAlbum() => AlbumValidator.Validate();
+
+    // 저작 변경 즉시 반영 — 구조 캐시는 SetSource 외엔 스스로 갱신하지 않는다
+    void OnValidate() => CardAlbum.InvalidateIfSource(this);
+#endif
 }
 
 // 앨범 테마 하나의 저작 항목
