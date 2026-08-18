@@ -11,18 +11,32 @@ using UnityEngine.UI;
 // 지금 구현은 씬 로드(SceneLoadSwap) 하나뿐이지만, 커튼이 씬을 직접 알던 시절엔 씬 로드가 이 코루틴에
 // 섞여 있어 폴백이 두 곳으로 갈리고 씬 없는 전환을 표현할 방법이 없었다.
 //
-// 아트의 진실원은 프리팹이다(Resources/UI/SceneCurtain). 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
+// 아트의 진실원은 부트 프리팹에 상주하는 이 노드다. 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
 // 코드는 화면 크기에 맞춰 판을 키우고 움직이기만 한다. 판의 색·대각은 매치 덱 확인 화면에서 가져왔다 —
 // 덱을 확인하던 화면이 그대로 접히는 것처럼 보이도록.
 //
-// ⚠ 프리팹 루트는 독립 캔버스여야 한다. 중첩 캔버스는 sortingOrder를 올려도 부모 루트가 그려지는 자리 안에서만 정렬된다.
-// ⚠ DontDestroyOnLoad로 씬을 넘어간다 — 씬이 갈린 뒤에 열려야 하므로. 그 대가로 어떻게 빠져나가든 반드시 스스로를
-//   파괴해야 한다. 남기면 커튼의 sortingOrder와 입력 차단판이 이후 모든 씬을 영구 입력 불가로 잠근다.
+// 커튼은 어느 씬의 것도 아니다(로비 것도 전투 것도 아닌, 씬 **사이**의 물건). 그래서 앱이 소유한다 —
+// 부트 프리팹의 자식으로 **꺼진 채** 상주하며, 쓸 때 켜고 끝나면 다시 끈다. 씬을 넘는 것은 부트 루트가 책임진다.
+//
+// ⚠ 이 노드는 독립 캔버스여야 한다. 중첩 캔버스는 sortingOrder를 올려도 부모 루트가 그려지는 자리 안에서만 정렬된다.
+//   그래서 부트 프리팹 루트에는 캔버스가 없어야 한다(지금은 없다).
 public class CurtainView : MonoBehaviour
 {
-    // 커튼을 얻는 유일한 경로. Addressables가 아닌 이유는 LoadingCoverView와 같다 —
-    // "UIPrefab" 라벨은 PooledUIBase만 등록한다(DataLibrary.LoadUIPrefab).
-    const string ResourcePath = "UI/SceneCurtain";
+    // 부트 프리팹에 상주하는 한 장. 어느 씬 것도 아닌 물건이라 앱이 소유한다.
+    static CurtainView s_instance;
+
+    /// <summary>상주 커튼을 꽂는다. BootInstaller가 자기 자식을 넘긴다(부트 1회).</summary>
+    // 자기 등록(Awake)도 검색(FindObjectsInactive)도 쓰지 않는다 — 앞은 켜 둔 채 저작해야 해서
+    // 편집 화면이 덮이고, 뒤는 조달을 검색으로 푸는 것이라 배선이 코드에서 안 보인다.
+    public static void SetInstance(CurtainView _view) => s_instance = _view;
+
+    // 도메인 리로드를 끄면 static이 이전 재생의 인스턴스를 물고 있다(프로젝트 공통 규약).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics()
+    {
+        s_instance = null;
+        s_busy     = false;
+    }
 
     [Tooltip("위 판(상대색). 아랫변이 이음매다.\n"
            + "저작해서 쓰는 값: 색·스프라이트 / 기울기(회전 Z) / 이음매 세로 위치(앵커 Y).\n"
@@ -73,8 +87,11 @@ public class CurtainView : MonoBehaviour
 
     ICurtainSwap m_swap;
 
-    // 프리팹을 못 얻어 판 없이 세워진 커튼. 미배선 오류와 구분하려고 든다 — 그쪽은 이미 경고를 냈다.
+    // 상주 커튼을 못 찾아 판 없이 세워진 커튼. 미배선 오류와 구분하려고 든다 — 그쪽은 이미 경고를 냈다.
     bool m_panelless;
+
+    // 이번 한 번을 위해 코드가 세운 호스트인가. 상주본은 걷어서 재사용하고, 이쪽만 파괴한다.
+    bool m_disposable;
 
     // 프리팹에 저작된 이음매 값. 코드가 크기를 다시 잡을 때 덮어쓰지 않도록 시작 시 떠 둔다.
     Color m_seamColor;
@@ -115,22 +132,23 @@ public class CurtainView : MonoBehaviour
 
         if (s_busy) return false;   // 두 번째 클릭이 전환을 두 번 걸지 못하게
 
-        var t_prefab = Resources.Load<GameObject>(ResourcePath);
-        var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<CurtainView>() : null;
+        var t_view = s_instance;
 
-        // 판을 못 얻어도 전환 자체는 되게 한다. 빈 오브젝트를 세워 코루틴 호스트로만 쓰면
+        // 상주 커튼을 못 얻어도 전환 자체는 되게 한다. 빈 오브젝트를 세워 코루틴 호스트로만 쓰면
         // 폴백이 "판 없는 커튼" 한 갈래로 모인다 — 여기서 교체를 직접 돌리면 경로가 둘로 갈린다.
         if (t_view == null)
         {
-            Debug.LogWarning($"[CurtainView] Resources/{ResourcePath} 를 찾지 못해 커튼 없이 전환합니다.");
+            Debug.LogWarning("[CurtainView] 상주 커튼이 없어 커튼 없이 전환합니다(BootInstaller의 sceneCurtain 배선 확인).");
             t_view = new GameObject("Curtain (판 없음)").AddComponent<CurtainView>();
-            t_view.m_panelless = true;
+            t_view.m_panelless  = true;
+            t_view.m_disposable = true;
         }
 
         s_busy = true;
 
-        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 연출 시작보다 먼저다.
+        // 켜지기 전에 대입해야 한다 — OnEnable이 그 자리에서 연출을 시작한다.
         t_view.m_swap = _swap;
+        t_view.gameObject.SetActive(true);
 
         return true;
     }
@@ -160,15 +178,11 @@ public class CurtainView : MonoBehaviour
         _travelDown = t_down + t_half * t_tan + _pad;
     }
 
-    void Start()
+    // 저작된 값은 여기서 한 번만 뜬다. 매 전환마다 뜨면 지난 번 연출이 남긴 값(알파 0)을 진실원으로 삼게 된다.
+    // 비활성으로 저작되므로 이 Awake는 첫 전환에 켜지는 순간 돈다 — OnEnable보다 먼저다.
+    void Awake()
     {
-        if (!HasPanels)
-        {
-            // 프리팹은 얻었는데 판이 미배선인 경우. 하드컷으로 진행하되 저작 실수를 알린다.
-            if (!m_panelless)
-                Debug.LogError("[CurtainView] 판이 미배선이라 커튼을 칠 수 없습니다 — 커튼 없이 전환합니다.");
-        }
-        else
+        if (HasPanels)
         {
             WarnOnMisauthoredPanels();
 
@@ -176,9 +190,22 @@ public class CurtainView : MonoBehaviour
             {
                 m_seamColor     = seam.color;
                 m_seamThickness = seam.rectTransform.sizeDelta.y;
-                SetSeamAlpha(0f);
             }
         }
+        else if (!m_panelless)
+        {
+            // 판이 미배선인 경우. 하드컷으로 진행하되 저작 실수를 알린다.
+            Debug.LogError("[CurtainView] 판이 미배선이라 커튼을 칠 수 없습니다 — 커튼 없이 전환합니다.");
+        }
+    }
+
+    // 연출의 시작점. Start가 아닌 이유는 상주본이 두 번째 전환에서도 돌아야 하기 때문이다.
+    void OnEnable()
+    {
+        // 누가 손으로 켜 둔 경우. 저작 상태로 뜬 커튼이 제 혼자 돌지 않게 막는다.
+        if (m_swap == null) return;
+
+        if (seam != null) SetSeamAlpha(0f);
 
         StartCoroutine(CoRun());
     }
@@ -191,6 +218,8 @@ public class CurtainView : MonoBehaviour
 
     void OnDestroy()
     {
+        if (s_instance == this) s_instance = null;
+
         Finish();
     }
 
@@ -201,7 +230,8 @@ public class CurtainView : MonoBehaviour
         m_swap.Prepare();
 
         // 교체가 씬을 갈아탈 수 있다 — 그래도 커튼이 살아남아 열림을 마쳐야 한다.
-        DontDestroyOnLoad(gameObject);
+        // 상주본은 부트 루트가 이미 넘겨 주므로 제 힘으로 넘어야 하는 것은 폴백 호스트뿐이다.
+        if (m_disposable) DontDestroyOnLoad(gameObject);
 
         try
         {
@@ -231,7 +261,14 @@ public class CurtainView : MonoBehaviour
         finally
         {
             Finish();
-            if (this != null) Destroy(gameObject);
+
+            // 상주본은 걷기만 한다 — 파괴하면 다음 전환에 커튼이 없다.
+            // 판을 열린 채로 굳혀 두는 것은 BuildOpen의 OnKill이 맡는다(다음 전환은 BuildClose가 다시 잡는다).
+            if (this != null)
+            {
+                if (m_disposable) Destroy(gameObject);
+                else              gameObject.SetActive(false);
+            }
         }
     }
 

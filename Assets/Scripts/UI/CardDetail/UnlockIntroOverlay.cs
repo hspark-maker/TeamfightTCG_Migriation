@@ -8,8 +8,9 @@ using UnityEngine.UI;
 // 무엇을 보여줄지는 호출부가 정하고(UnlockIntro 목록), 여기는 세우고 [확인]을 기다린다 —
 // 그래서 "처음 보는 것인가"라는 판정을 알 필요가 없다(CardRewardOverlay가 지급을 모르는 것과 같은 규약).
 //
-// 씬에 저작하지 않고 Resources에서 세운다(CardRewardOverlay와 같은 규약) — 로비 캔버스에 중첩하면
-// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
+// 로비 캔버스에 비활성으로 저작해 둔 한 장을 찾아 쓴다(RewardClaimPopup·CardDetailOverlay와 같은 규약).
+// 코드로 세우지 않는 이유는 조달처를 하나로 두기 위해서다 — 씬에 심은 것과 코드가 세운 것이 섞이면
+// 화면에 뜬 것이 어디서 왔는지 로그 없이 답할 수 없다.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 읽어야 넘어가는 자리라 나가는 문은 [확인] 하나뿐이다.
 //
@@ -20,8 +21,6 @@ using UnityEngine.UI;
 // anchoredPosition을 밀면 리빌드가 매 프레임 되돌려 안무가 통째로 안 보인다(진화 연출의 stageFitter와 같은 함정).
 public class UnlockIntroOverlay : MonoBehaviour
 {
-    const string ResourcePath = "UI/UnlockIntroOverlay";
-
     static UnlockIntroOverlay s_instance;
 
     /// <summary>안내가 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
@@ -74,32 +73,22 @@ public class UnlockIntroOverlay : MonoBehaviour
     // 프리팹에 깔린 행이 모자란 것은 저작 문제다 — 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
 
-    /// <summary>안내 오버레이를 얻는다. 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다
-    /// (CardRewardOverlay와 같은 규약).</summary>
+    // 씬 미배치도 같다 — 카드를 열 때마다 경고하면 로그가 묻힌다.
+    static bool s_missingWarned;
+
+    /// <summary>
+    /// 씬의 공용 안내 오버레이를 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
+    /// 자가 설치는 하지 않는다(저작된 행·데모 무대가 있어 코드로 세울 수 있는 물건이 아니다).
+    /// </summary>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
     {
         if (s_instance == null)
             s_instance = FindFirstObjectByType<UnlockIntroOverlay>(FindObjectsInactive.Include);
 
-        if (s_instance == null)
+        if (s_instance == null && !s_missingWarned)
         {
-            var t_prefab = Resources.Load<GameObject>(ResourcePath);
-            if (t_prefab == null)
-            {
-                Debug.LogWarning($"[UnlockIntroOverlay] Resources/{ResourcePath} 를 찾지 못해 해금 안내를 세울 수 없습니다.");
-            }
-            else
-            {
-                var t_go = Instantiate(t_prefab);
-                s_instance = t_go.GetComponent<UnlockIntroOverlay>();
-
-                // 컴포넌트가 없으면 세운 것이 화면을 덮은 채 남는다 — 부를 때마다 한 장씩 쌓이므로 즉시 걷는다.
-                if (s_instance == null)
-                {
-                    Debug.LogWarning($"[UnlockIntroOverlay] Resources/{ResourcePath} 에 UnlockIntroOverlay가 없습니다(프리팹 배선 확인).");
-                    Destroy(t_go);
-                }
-            }
+            s_missingWarned = true;
+            Debug.LogError("[UnlockIntroOverlay] 현재 씬에 해금 안내 오버레이가 배치되지 않았습니다 — 키워드를 처음 얻어도 안내가 뜨지 않습니다.");
         }
 
         _overlay = s_instance;

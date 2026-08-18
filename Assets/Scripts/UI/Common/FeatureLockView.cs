@@ -11,7 +11,16 @@ using UnityEngine;
 // 배지는 "나중에 열린다"를 덧붙이는 것이라, 배지 프리팹이 없으면 경고 한 번 뒤 탈채도만으로 간다.
 public class FeatureLockView : MonoBehaviour
 {
-    const string BadgePath = "UI/LockBadge";
+    // 배지를 얻는 유일한 경로. 잠긴 요소마다 새로 붙는 물건이라 상주시킬 수 없어
+    // BootInstaller가 프리팹을 꽂아 준다.
+    static GameObject s_badgePrefab;
+
+    /// <summary>자물쇠 배지 프리팹을 꽂는다. BootInstaller가 부트 1회 호출한다.</summary>
+    public static void SetBadgePrefab(GameObject _prefab) => s_badgePrefab = _prefab;
+
+    // 도메인 리로드를 끄면 static이 이전 재생의 프리팹을 물고 있다(프로젝트 공통 규약).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => s_badgePrefab = null;
 
     [Tooltip("이 UI를 여는 기능 키. None이면 항상 열려 있다")]
     [SerializeField] EOutgameFeature feature;
@@ -100,16 +109,15 @@ public class FeatureLockView : MonoBehaviour
             return;
         }
 
-        var t_prefab = Resources.Load<GameObject>(BadgePath);
-        if (t_prefab == null)
+        if (s_badgePrefab == null)
         {
             this.m_badgeMissing = true;
-            Debug.LogWarning($"[FeatureLockView] Resources/{BadgePath} 미배치 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
+            Debug.LogWarning($"[FeatureLockView] 배지 프리팹 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다). BootInstaller의 lockBadgePrefab 확인.");
             return;
         }
 
         // 저작된 앵커·비율을 그대로 살린다. 여기서 크기를 다시 잡으면 대상마다 어긋나던 옛 방식으로 돌아간다.
-        this.m_badge      = Instantiate(t_prefab, t_parent, false);
+        this.m_badge      = Instantiate(s_badgePrefab, t_parent, false);
         this.m_badge.name = "LockBadge";
         this.m_badge.transform.SetAsLastSibling();
     }
