@@ -58,10 +58,10 @@ public static class CardPackOpener
 
     static DrawnCard GrantAndRefund(CardData _card, ECurrencyType _refundType, long _refundEach)
     {
-        if (OwnershipManager.Grant(CardCatalog.IdOf(_card))) return new DrawnCard(_card, true, 0);
+        if (OwnershipManager.Grant(CardCatalog.IdOf(_card))) return new DrawnCard(_card, true, 0, _refundType);
 
         CurrencyManager.Earn(_refundType, _refundEach);
-        return new DrawnCard(_card, false, _refundEach);
+        return new DrawnCard(_card, false, _refundEach, _refundType);
     }
 
     static int PickWeightedCandidate(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)

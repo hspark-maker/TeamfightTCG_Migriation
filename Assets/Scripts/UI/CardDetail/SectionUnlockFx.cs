@@ -109,6 +109,18 @@ public class SectionUnlockFx : MonoBehaviour
         return t_seq;
     }
 
+    /// <summary>남은 구간을 최종 상태로 끌어당긴다(탭 스킵). 완료 콜백은 정상 종료와 같게 흐른다 —
+    /// 다음 박을 여는 곳이 그 콜백이라 Kill로 끊으면 흐름이 그 자리에서 멈춘다.
+    /// 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.</summary>
+    public bool RequestSkip()
+    {
+        Sequence t_seq = this.m_seq;
+        if (t_seq == null || !t_seq.IsActive()) return false;
+
+        t_seq.Complete(true);
+        return true;
+    }
+
     void Awake()
     {
         Graphic t_plate = this.Plate;

@@ -925,9 +925,6 @@ MonoBehaviour:
   enhanceButton: {fileID: 3597991617153345238}
   enhanceCostText: {fileID: 2695298836730381123}
   enhanceCostIcon: {fileID: 4008388626039349161}
-  goldIcon: {fileID: 21300000, guid: a779b38098fc44264b31817b3dca64ba, type: 3}
-  diamondIcon: {fileID: 21300000, guid: a0c93c8818ff74825a9bcdcb94cf9a57, type: 3}
-  energyIcon: {fileID: 0}
   successRateText: {fileID: 8423584013530615387}
   evolveButton: {fileID: 2654429095011287775}
   evolveLabelText: {fileID: 3239840589700687580}

@@ -156,11 +156,13 @@ public class OutgameDebugOverlay : MonoBehaviour
     {
         RankInfo t_info = RankManager.GetInfo();
 
-        GUILayout.Label($"TIER {t_info.DisplayName}  (AI Lv{RankManager.AiCardLevel})  ※ ±는 씬 재진입 시 연출");
+        string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
+        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI Lv{RankManager.AiCardLevel})  ※ ±는 씬 재진입 시 연출");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
         if (GUILayout.Button("TIER +", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RaiseTier();
+        if (GUILayout.Button("PROMO", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.JumpToPromoStandby();
         if (GUILayout.Button("RESET", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.ResetTier();
         GUILayout.EndHorizontal();
     }
@@ -171,6 +173,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button($"+G {CurrencyManager.Gold}",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantGold();
         if (GUILayout.Button($"+D {CurrencyManager.Diamond}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantDiamond();
         if (GUILayout.Button($"+E {CurrencyManager.Energy}",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantEnergy();
+        if (GUILayout.Button($"+S {CurrencyManager.Shard}",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantShard();
         GUILayout.EndHorizontal();
     }
 

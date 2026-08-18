@@ -158,6 +158,13 @@ public class PackCardView : MonoBehaviour
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
 
+    // 환급 재화 종류. 코인 그림이 갈리는 유일한 근거라 Bind에서 받아 둔다.
+    ECurrencyType m_refundType;
+
+    // refundCoin의 Image. 갱신마다 자식을 뒤지지 않도록 첫 조회에 캐시한다.
+    Image m_refundCoinImage;
+    bool m_refundCoinImageResolved;
+
     /// <summary>카드 비주얼 노드. 탭을 받는 것이 이 노드다(LongPressDetector가 여기 붙어 있다) —
     /// 결과 격자가 상세 열기를 물릴 때 쓴다. 이 클래스 자신은 여전히 입력을 모른다(헤더 주석 참고).</summary>
     public CardVisualView Visual => this.cardVisual;
@@ -200,6 +207,7 @@ public class PackCardView : MonoBehaviour
     {
         IsNew = _drawn.IsNew;
         Refund = _drawn.Refund;
+        m_refundType = _drawn.RefundType;
         m_accented = false;
 
         // 개봉 카드는 항상 소유(위 헤더 주석) → _owned는 true 고정.
@@ -500,7 +508,11 @@ public class PackCardView : MonoBehaviour
         // 대신 숫자와 코인만 내려가 "중복"만 남는다.
         bool t_hasRefund = Refund > 0;
         if (refundText != null) refundText.text = t_hasRefund ? $"+{Refund:N0}" : string.Empty;
-        if (refundCoin != null) refundCoin.SetActive(t_hasRefund);
+        if (refundCoin != null)
+        {
+            refundCoin.SetActive(t_hasRefund);
+            ApplyRefundCoinIcon();
+        }
 
         var t_tr = refundBadge.transform;
         if (!m_refundHomeCaptured)
@@ -565,6 +577,23 @@ public class PackCardView : MonoBehaviour
 
         m_refundSeq.Kill();
         m_refundSeq = null;
+    }
+
+    // 환급 재화에 맞는 코인 그림. 표가 답을 안 주면(null) 프리팹에 저작된 그림을 그대로 둔다 —
+    // null을 대입하면 아이콘이 통째로 사라진다.
+    void ApplyRefundCoinIcon()
+    {
+        if (!m_refundCoinImageResolved)
+        {
+            m_refundCoinImage = refundCoin.GetComponent<Image>();
+            if (m_refundCoinImage == null) m_refundCoinImage = refundCoin.GetComponentInChildren<Image>(true);
+            m_refundCoinImageResolved = true;
+        }
+
+        if (m_refundCoinImage == null) return;
+
+        Sprite t_icon = CurrencyLook.IconOf(m_refundType);
+        if (t_icon != null) m_refundCoinImage.sprite = t_icon;
     }
 
     // 칩의 알파 손잡이. 프리팹 배선이 없어도 페이드가 성립해야 하므로 카드 본체의 Group과 같은 규약을 쓴다.

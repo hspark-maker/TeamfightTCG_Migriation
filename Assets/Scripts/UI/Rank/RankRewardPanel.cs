@@ -182,6 +182,10 @@ public class RankRewardPanel : PooledUIBase
         if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
         else ScreenDim.Hide(this);
 
+        // 풀 계약(PooledUIBase.isShow). 열고 닫는 길이 여기 하나뿐이라 상태도 여기서만 쓴다 —
+        // 이 값을 읽고 닫힘을 기다리는 쪽(LobbyRankEffectDirector)이 있으므로 빠뜨리면 그쪽이 멈춘다.
+        this.isShow = _visible;
+
         this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
 

@@ -21,6 +21,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1538dcd081334f64ebf7f0e6803135a0
+    m_Address: RankPromoteOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/KeywordExplain.prefab
     m_ReadOnly: 0
@@ -47,6 +53,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 61430c10ca6949a798ec10b366fae820
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 846d825ba21303740ae41a6a317b231e
+    m_Address: KeywordDemoStage
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

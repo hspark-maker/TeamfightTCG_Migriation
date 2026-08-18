@@ -14,7 +14,7 @@ public static class RuntimeOverlayPrefabs
     static readonly Dictionary<Type, AsyncOperationHandle<GameObject>> s_fallbackHandles =
         new Dictionary<Type, AsyncOperationHandle<GameObject>>();
 
-    public static GameObject Get<T>() where T : SingletonOverlay<T>
+    public static GameObject Get<T>() where T : SingletonOverlayBase
     {
         Type t_type = typeof(T);
         if (DataLibrary.instance != null &&

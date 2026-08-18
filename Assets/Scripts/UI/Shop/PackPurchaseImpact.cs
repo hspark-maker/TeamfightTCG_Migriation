@@ -75,8 +75,9 @@ public class PackPurchaseImpact : MonoBehaviour
     /// 구매 임팩트를 즉시 재생한다. _onCover는 화면이 플래시로 완전히 덮인 순간 1회 불린다
     /// — 개봉 화면은 반드시 그때 열어야 전환 프레임이 드러나지 않는다.
     /// 연출이 어떤 이유로 끊겨도 _onCover는 반드시 불린다(카드는 이미 지급됐고, 화면을 못 보는 상태가 최악이다).
+    /// _plate를 주면 전역 플래시 대신 그 판에서 덮는다(판보다 뒤에 놓인 UI는 남는다).
     /// </summary>
-    public void Play(RectTransform _packRect, ScreenFlashCover _cover, Action _onCover)
+    public void Play(RectTransform _packRect, ScreenFlashCover _cover, Action _onCover, Image _plate = null)
     {
         if (m_current != null && m_current.IsActive()) m_current.Kill();
 
@@ -96,7 +97,7 @@ public class PackPurchaseImpact : MonoBehaviour
 
         // OnKill은 덮어쓰기라 단계마다 걸 수 없다 — 정리는 여기 하나로 모아 마지막에 한 번만 건다.
         Action t_cleanup = StagePack(t_seq, _packRect);
-        StageScreenFlash(t_seq, t_style);
+        StageScreenFlash(t_seq, t_style, _plate);
 
         // 덮임 시각은 덮개가 정한다 — 이 값이 어긋나면 아직 비치는 화면 위에서 교체가 일어난다.
         t_seq.InsertCallback(this.flashAt + t_style.rise, Fire);
@@ -201,11 +202,14 @@ public class PackPurchaseImpact : MonoBehaviour
     }
 
     // 화면을 덮는 플래시. 설치할 자리가 없으면 이 축만 건너뛴다(전환이 하드컷으로 돌아갈 뿐이다).
-    void StageScreenFlash(Sequence _seq, ScreenFlashCover _style)
+    // _plate를 주면 그 판 위에서 덮는다 — 판보다 뒤에 놓인 UI는 덮이지 않는다(ScreenFlash.BuildCoverOn 참고).
+    void StageScreenFlash(Sequence _seq, ScreenFlashCover _style, Image _plate)
     {
-        if (!ScreenFlash.TryGet(out var t_flash)) return;
+        Sequence t_cover;
+        if (_plate != null) t_cover = ScreenFlash.BuildCoverOn(_plate, _style);
+        else if (ScreenFlash.TryGet(out var t_flash)) t_cover = t_flash.BuildCover(_style);
+        else return;
 
-        var t_cover = t_flash.BuildCover(_style);
         if (t_cover == null) return;
 
         _seq.Insert(this.flashAt, t_cover);

@@ -92,38 +92,12 @@ public static class OutgameTutorialProgress
         Save();
     }
 
-    // 이 해금 개념을 전면으로 안내한 적이 있는가(키는 UnlockIntro가 단독으로 만든다)
-    public static bool IsUnlockIntroSeen(string _key)
-    {
-        if (string.IsNullOrEmpty(_key)) return true;
-
-        var t_seen = Slot.seenUnlockIntros;
-        return t_seen != null && t_seen.Contains(_key);
-    }
-
-    // 해금 안내 낙인(개념당 1회)
-    public static void MarkUnlockIntroSeen(string _key)
-    {
-        if (string.IsNullOrEmpty(_key)) return;
-
-        var t_slot = Slot;
-        if (t_slot.seenUnlockIntros == null) t_slot.seenUnlockIntros = new List<string>();
-
-        if (t_slot.seenUnlockIntros.Contains(_key)) return;
-
-        t_slot.seenUnlockIntros.Add(_key);
-        Save();
-    }
-
-    // 디버그 전용 — 트리거 낙인과 해금 안내 낙인을 전부 걷는다(온보딩 좌표·완료는 유지)
+    // 디버그 전용 — 트리거 낙인을 전부 걷는다(온보딩 좌표·완료는 유지)
     public static void ClearTriggersForDebug()
     {
         var t_slot = Slot;
         if (t_slot.completedTriggers == null) t_slot.completedTriggers = new List<string>();
         else                                  t_slot.completedTriggers.Clear();
-
-        if (t_slot.seenUnlockIntros == null) t_slot.seenUnlockIntros = new List<string>();
-        else                                 t_slot.seenUnlockIntros.Clear();
 
         Save();
     }

@@ -11,6 +11,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardRegistry cardRegistry;
     // 카드 앨범(신규 도감) SO. 미배선(null)이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
     [SerializeField] CardAlbumConfig albumConfig;
+    // 재화 아이콘·표시명 표 SO. 미배선(null)이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
+    [SerializeField] CurrencyLook currencyLook;
     // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
     // 트리거 발화 튜토리얼 목록 SO(탭 첫 진입 등). 미배선(null)이면 트리거는 조용히 발화하지 않는다.
@@ -53,6 +55,9 @@ public class BootInstaller : MonoBehaviour
 
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CardAlbum.SetSource(albumConfig);
+
+        // 재화 그림 주입 — 조회는 lazy라 재화 UI가 처음 그려지기 전에만 꽂히면 된다.
+        CurrencyLook.SetActive(currencyLook);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();

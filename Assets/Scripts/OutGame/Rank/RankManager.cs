@@ -13,6 +13,10 @@ public static class RankManager
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
     public static bool IsRanked => Points >= Config.FirstTierPoints;
 
+    /// <summary>다음 판이 승급전(단판 관문)인가. 일반 전투 천장이 '등급 천장 - 1'이라
+    /// "등급 마지막 단계를 꽉 채웠지만 아직 승급은 아닌" 상태가 points 하나로 표현된다(세이브 필드 없음).</summary>
+    public static bool IsPromoPending => PromoPendingAt(Points);
+
     static RankConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
 
@@ -48,6 +52,10 @@ public static class RankManager
         int t_max = CardGrowthManager.MaxLevel;
         return t_max > 0 && t_level > t_max ? t_max : t_level;
     }
+
+    /// <summary>티어 스냅샷 하나를 얻는다. 설정(RankConfig)을 밖으로 내보내지 않으면서
+    /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
+    public static bool TryGetTier(int _index, out RankTier _tier) => Config.TryGetTier(_index, out _tier);
 
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo() => GetInfoAt(Points);
@@ -125,7 +133,12 @@ public static class RankManager
         t_slot.points = Config.FirstTierPoints;
         Save();
 
-        _result = new RankApplyResult(t_slot.points - t_points, -1, Config.ResolveTierIndex(t_slot.points));
+        _result = new RankApplyResult(
+            t_slot.points - t_points,
+            -1,
+            Config.ResolveTierIndex(t_slot.points),
+            false,
+            PromoPendingAt(t_slot.points));
         return true;
     }
 
@@ -141,15 +154,23 @@ public static class RankManager
 
         int t_index = t_config.ResolveTierIndex(t_points);
 
-        // 단계 강등은 열어 두되 바닥은 현재 등급 진입선 — 등급이 내려가면 카드팩 풀(CardPackData.ResolvePool)이 같이 하향된다.
-        // 언랭크(첫 티어 미도달)만 0 — 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
-        long t_floor = IsRanked ? t_config.GradeFloorPoints(t_points) : 0;
+        // 튜토리얼 전투는 승급전 경로를 타지 않는다 — 튜토는 첫 티어를 넘지 못하므로 관문에 설 일도 없다.
+        if (!_tutorial && PromoPendingAt(t_points))
+            return ApplyPromoResult(t_slot, t_points, t_index, _won);
 
-        // 튜토리얼 전투는 첫 티어를 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
+        // 단계 강등이 없다 — 바닥은 현재 단계 진입선(한 번 켠 별은 꺼지지 않는다).
+        // 언랭크(첫 티어 미도달)만 0 — 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
+        long t_floor = IsRanked ? t_config.DivisionFloorPoints(t_points) : 0;
+
+        // 일반 전투는 다음 등급 진입선 바로 아래에서 멈춘다 — 등급을 넘는 일은 승급전(위 분기) 한 판만 한다.
+        // 최고 등급이면 GradeCeilingPoints가 long.MaxValue라 사실상 천장이 없다.
+        long t_ceiling = t_config.GradeCeilingPoints(t_points) - 1;
+
+        // 튜토리얼 전투는 첫 티어도 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
         // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
         // 그래도 천장을 현재 포인트 아래로는 내리지 않는다 — 이미 랭크에 오른 세이브로 튜토 전투를 돌면(디버그 승급 등)
         // 고정 천장이 곧 강등이 된다.
-        long t_ceiling = _tutorial ? Math.Max(t_config.FirstTierPoints - 1, t_points) : long.MaxValue;
+        if (_tutorial) t_ceiling = Math.Min(t_ceiling, Math.Max(t_config.FirstTierPoints - 1, t_points));
 
         t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
@@ -157,7 +178,9 @@ public static class RankManager
         return new RankApplyResult(
             t_slot.points - t_points,
             t_index,
-            t_config.ResolveTierIndex(t_slot.points));
+            t_config.ResolveTierIndex(t_slot.points),
+            false,
+            PromoPendingAt(t_slot.points));
     }
 
     /// <summary>티어를 _index로 바로 옮긴다(디버그 전용). 포인트를 그 티어의 진입 임계치에 맞춘다 —
@@ -182,6 +205,22 @@ public static class RankManager
     public static int StepTierForDebug(int _step)
         => SetTierForDebug(Config.ResolveTierIndex(Points) + _step);
 
+    /// <summary>승급전 대기선에 바로 세운다(디버그 전용). SetTierForDebug는 티어 임계치에 세우므로
+    /// 대기선(다음 등급 진입선 - 1)에는 도달할 방법이 없어 따로 둔다.
+    /// 언랭크이거나 최고 등급이면 아무것도 하지 않고 false.</summary>
+    public static bool SetPromoStandbyForDebug()
+    {
+        if (!IsRanked) return false;
+
+        long t_ceiling = Config.GradeCeilingPoints(Points);
+        if (t_ceiling == long.MaxValue) return false;
+
+        Slot.points = t_ceiling - 1;
+        Save();
+
+        return true;
+    }
+
     // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
@@ -194,6 +233,32 @@ public static class RankManager
         Slot.points = 0;
         Save();
     }
+
+    /// <summary>승급전 한 판의 정산 — 승리는 다음 등급 진입선, 패배는 현 단계 절반으로 **스냅**한다.
+    /// 가감이 아닌 이유: 승급전은 점수판이 아니라 관문이다(가감이면 승급 직후 진행률이 어정쩡하게 남고,
+    /// 승/패 점수가 비대칭이라 패배 복귀선도 정확히 절반이 되지 않는다).</summary>
+    static RankApplyResult ApplyPromoResult(RankSaveData _slot, long _points, int _index, bool _won)
+    {
+        var t_config = Config;
+
+        long t_ceiling = t_config.GradeCeilingPoints(_points);
+        long t_floor   = t_config.DivisionFloorPoints(_points);
+
+        // 승급전은 등급 마지막 단계에서만 서므로 천장 - 바닥 = 그 등급의 pointsPerDivision이다.
+        _slot.points = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
+        Save();
+
+        return new RankApplyResult(
+            _slot.points - _points,
+            _index,
+            t_config.ResolveTierIndex(_slot.points),
+            true,
+            PromoPendingAt(_slot.points));
+    }
+
+    // _points가 승급전 대기선(다음 등급 진입선 - 1)인가. 최고 등급은 천장이 long.MaxValue라 늘 false.
+    static bool PromoPendingAt(long _points)
+        => _points >= Config.FirstTierPoints && _points == Config.GradeCeilingPoints(_points) - 1;
 
     /// <summary>하향 편차는 체력만 깎는다 — 기준 레벨이 이미 연 시너지·키워드를 도로 잠그면 카드 정체성이 사라진다
     /// (시너지가 꺼진 카드는 집계에서 빠져 3장 요구 시너지가 성립조차 못 한다). 해금이 기준과 같아지는 가장 낮은 레벨까지만 내린다.</summary>
@@ -224,17 +289,25 @@ public readonly struct RankApplyResult
     public readonly int PrevTierIndex;
     public readonly int TierIndex;
 
+    // 이 전투가 승급전이었는지(정산 전 상태)
+    public readonly bool PrevPromoPending;
+
+    // 이 전투로 승급전 대기에 들어갔는지(정산 후 상태)
+    public readonly bool PromoPending;
+
     // 이번 정산으로 티어가 올랐는지
     public bool IsTierUp => this.TierIndex > this.PrevTierIndex;
 
     // 내렸는지. 첫 진입 센티널(PrevTierIndex = -1)은 여기 걸리지 않는다.
     public bool IsTierDown => this.TierIndex < this.PrevTierIndex;
 
-    public RankApplyResult(long _delta, int _prevTierIndex, int _tierIndex)
+    public RankApplyResult(long _delta, int _prevTierIndex, int _tierIndex, bool _prevPromoPending = false, bool _promoPending = false)
     {
         Delta = _delta;
         PrevTierIndex = _prevTierIndex;
         TierIndex = _tierIndex;
+        PrevPromoPending = _prevPromoPending;
+        PromoPending = _promoPending;
     }
 }
 

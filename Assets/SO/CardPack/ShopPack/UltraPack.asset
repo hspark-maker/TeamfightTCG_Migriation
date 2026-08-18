@@ -19,8 +19,8 @@ MonoBehaviour:
   price: 30
   drawCount: 6
   uniqueDraw: 1
-  refundType: 0
-  refundAmount: 50
+  refundType: 3
+  refundAmount: 8
   pool:
   - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
   - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}

@@ -72,6 +72,10 @@ public class AlbumTabController : LobbyTabPanel
 
         Refresh();
 
+        // 페이지·앨범 완성 보상이 에너지로 떨어진다 — 상단 문맥 칸이 에너지여야 코인이 날아가 꽂힐 자리가 있다.
+        // (그 위에 카드 상세가 뜨면 상세가 조각을 요구해 잠시 갈렸다가, 닫히면 여기로 돌아온다.)
+        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
+
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
         TryBeginInsert();
     }
@@ -81,6 +85,8 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
+
+        ContextCurrencySlot.Release(this);
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;

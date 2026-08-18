@@ -1,7 +1,8 @@
 using System;
 using UnityEngine;
 
-/// <summary>Marker base used by DataLibrary to index non-pooled runtime overlays.</summary>
+/// <summary>Marker base used by DataLibrary to index non-pooled runtime prefabs resolved by
+/// component type — 전면 오버레이뿐 아니라 화면 밖 무대처럼 타입으로 찾는 단일 인스턴스 프리팹도 포함한다.</summary>
 public abstract class SingletonOverlayBase : MonoBehaviour
 {
 }

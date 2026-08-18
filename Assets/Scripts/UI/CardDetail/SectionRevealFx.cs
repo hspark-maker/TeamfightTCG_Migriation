@@ -88,6 +88,17 @@ public class SectionRevealFx : MonoBehaviour
         return t_seq;
     }
 
+    /// <summary>남은 구간을 최종 상태로 끌어당긴다(탭 스킵). 돌고 있지 않으면 false
+    /// (<see cref="SectionUnlockFx.RequestSkip"/>과 같은 규약).</summary>
+    public bool RequestSkip()
+    {
+        Sequence t_seq = this.m_seq;
+        if (t_seq == null || !t_seq.IsActive()) return false;
+
+        t_seq.Complete(true);
+        return true;
+    }
+
     void OnDisable()
     {
         // 연출 도중 꺼지면 마무리 콜백이 오지 않는다 — 여기서 끊어 반투명하게 굳는 것을 막는다.

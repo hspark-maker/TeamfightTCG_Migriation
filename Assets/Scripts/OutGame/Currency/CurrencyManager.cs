@@ -12,6 +12,7 @@ public static class CurrencyManager
     public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
     public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
     public static long Energy => s_currencies[(int)ECurrencyType.Energy];
+    public static long Shard   => s_currencies[(int)ECurrencyType.Shard];
 
     public static long GetBalance(ECurrencyType _type) => s_currencies[(int)_type];
 
@@ -21,18 +22,21 @@ public static class CurrencyManager
     public static void Init()
     {
         var t_data = DataSaveManager.Data.currency;
-        s_currencies[(int)ECurrencyType.Gold]    = t_data.gold;
-        s_currencies[(int)ECurrencyType.Diamond] = t_data.diamond;
-        s_currencies[(int)ECurrencyType.Energy]  = t_data.energy;
+        t_data.Normalize();
+
+        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
+            s_currencies[t_i] = t_data.balances[t_i];
     }
 
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화
     public static void Save()
     {
         var t_data = DataSaveManager.Data.currency;
-        t_data.gold    = s_currencies[(int)ECurrencyType.Gold];
-        t_data.diamond = s_currencies[(int)ECurrencyType.Diamond];
-        t_data.energy  = s_currencies[(int)ECurrencyType.Energy];
+        t_data.Normalize();
+
+        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
+            t_data.balances[t_i] = s_currencies[t_i];
+
         DataSaveManager.Save();
     }
 
