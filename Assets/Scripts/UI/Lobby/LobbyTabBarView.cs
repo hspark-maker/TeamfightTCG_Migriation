@@ -78,6 +78,11 @@ public sealed class LobbyTabBarView : MonoBehaviour
             ? t_item.button.transform as RectTransform
             : null;
 
+    public RectTransform GetVisualAnchor(int _index)
+        => focus != null && m_previousIndex == _index
+            ? focus
+            : GetButtonAnchor(_index);
+
     public void SetSelected(int _index)
     {
         if (!TryGetItem(_index, out _)) return;
