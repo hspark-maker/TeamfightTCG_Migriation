@@ -22,6 +22,7 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardGrowthConfig growthConfig;
     // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
     [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
+    [SerializeField] RuntimeUiPrefabCatalog runtimeUiPrefabs;
 
     static bool s_booted;
 
@@ -36,6 +37,7 @@ public class BootInstaller : MonoBehaviour
 
         s_booted = true;
         DontDestroyOnLoad(gameObject);
+        RuntimeUiPrefabs.SetSource(runtimeUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;

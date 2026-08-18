@@ -20,8 +20,6 @@ using UnityEngine.UI;
 // anchoredPosition을 밀면 리빌드가 매 프레임 되돌려 안무가 통째로 안 보인다(진화 연출의 stageFitter와 같은 함정).
 public class UnlockIntroOverlay : MonoBehaviour
 {
-    const string ResourcePath = "UI/UnlockIntroOverlay";
-
     static UnlockIntroOverlay s_instance;
 
     /// <summary>안내가 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
@@ -83,10 +81,10 @@ public class UnlockIntroOverlay : MonoBehaviour
 
         if (s_instance == null)
         {
-            var t_prefab = Resources.Load<GameObject>(ResourcePath);
+            var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.UnlockIntroOverlay);
             if (t_prefab == null)
             {
-                Debug.LogWarning($"[UnlockIntroOverlay] Resources/{ResourcePath} 를 찾지 못해 해금 안내를 세울 수 없습니다.");
+                Debug.LogWarning("[UnlockIntroOverlay] Boot 카탈로그에서 해금 안내 프리팹을 찾지 못했습니다.");
             }
             else
             {
@@ -96,7 +94,7 @@ public class UnlockIntroOverlay : MonoBehaviour
                 // 컴포넌트가 없으면 세운 것이 화면을 덮은 채 남는다 — 부를 때마다 한 장씩 쌓이므로 즉시 걷는다.
                 if (s_instance == null)
                 {
-                    Debug.LogWarning($"[UnlockIntroOverlay] Resources/{ResourcePath} 에 UnlockIntroOverlay가 없습니다(프리팹 배선 확인).");
+                    Debug.LogWarning("[UnlockIntroOverlay] 카탈로그 프리팹에 UnlockIntroOverlay가 없습니다(프리팹 배선 확인).");
                     Destroy(t_go);
                 }
             }

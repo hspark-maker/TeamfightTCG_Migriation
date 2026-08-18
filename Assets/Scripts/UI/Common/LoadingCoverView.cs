@@ -21,11 +21,8 @@ public class LoadingCoverView : MonoBehaviour
     // 저작 데이터가 아니라 시스템 고정 경로라 상수로 둔다(OutgameTutorialRunner와 같은 규약).
     const string LobbyScene = "LobbyScene";
 
-    // 전환 모드가 커버를 얻는 유일한 경로. Addressables가 아니라 Resources인 이유는 둘 다다 —
-    // ① "UIPrefab" 라벨은 PooledUIBase만 등록한다(DataLibrary.LoadUIPrefab) ② 부트 모드는 그 로드가
-    // 끝나기 전에 화면에 떠 있어야 한다. Resources 선례는 TutorialUIStyle의 폰트 로드.
-    const string ResourcePath = "UI/LoadingCover";
-
+    // 전환 모드가 커버를 얻는 유일한 경로. Addressables 초기화보다 먼저 필요할 수 있으므로
+    // Boot가 직렬화한 카탈로그에서 동기적으로 얻는다.
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
 
@@ -70,13 +67,13 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
-        var t_prefab = Resources.Load<GameObject>(ResourcePath);
+        var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.LoadingCover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
-            Debug.LogWarning($"[LoadingCoverView] Resources/{ResourcePath} 를 찾지 못해 커버 없이 전환합니다.");
+            Debug.LogWarning("[LoadingCoverView] Boot 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
             _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;

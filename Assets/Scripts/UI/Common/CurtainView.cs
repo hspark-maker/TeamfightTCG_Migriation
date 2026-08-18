@@ -11,7 +11,7 @@ using UnityEngine.UI;
 // 지금 구현은 씬 로드(SceneLoadSwap) 하나뿐이지만, 커튼이 씬을 직접 알던 시절엔 씬 로드가 이 코루틴에
 // 섞여 있어 폴백이 두 곳으로 갈리고 씬 없는 전환을 표현할 방법이 없었다.
 //
-// 아트의 진실원은 프리팹이다(Resources/UI/SceneCurtain). 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
+// 아트의 진실원은 Boot 카탈로그의 SceneCurtain 프리팹이다. 색·기울기·이음매 위치·두께는 전부 거기서 읽고,
 // 코드는 화면 크기에 맞춰 판을 키우고 움직이기만 한다. 판의 색·대각은 매치 덱 확인 화면에서 가져왔다 —
 // 덱을 확인하던 화면이 그대로 접히는 것처럼 보이도록.
 //
@@ -20,10 +20,7 @@ using UnityEngine.UI;
 //   파괴해야 한다. 남기면 커튼의 sortingOrder와 입력 차단판이 이후 모든 씬을 영구 입력 불가로 잠근다.
 public class CurtainView : MonoBehaviour
 {
-    // 커튼을 얻는 유일한 경로. Addressables가 아닌 이유는 LoadingCoverView와 같다 —
-    // "UIPrefab" 라벨은 PooledUIBase만 등록한다(DataLibrary.LoadUIPrefab).
-    const string ResourcePath = "UI/SceneCurtain";
-
+    // 커튼은 씬 전환 직전에 동기 생성되어야 하므로 Boot가 직렬화한 카탈로그에서 직접 얻는다.
     [Tooltip("위 판(상대색). 아랫변이 이음매다.\n"
            + "저작해서 쓰는 값: 색·스프라이트 / 기울기(회전 Z) / 이음매 세로 위치(앵커 Y).\n"
            + "⚠ 크기와 위치는 런타임이 화면에 맞춰 다시 잡는다 — 프리팹의 Width·Height·Pos는 편집 중 미리보기일 뿐 무시된다.\n"
@@ -115,14 +112,14 @@ public class CurtainView : MonoBehaviour
 
         if (s_busy) return false;   // 두 번째 클릭이 전환을 두 번 걸지 못하게
 
-        var t_prefab = Resources.Load<GameObject>(ResourcePath);
+        var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.SceneCurtain);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<CurtainView>() : null;
 
         // 판을 못 얻어도 전환 자체는 되게 한다. 빈 오브젝트를 세워 코루틴 호스트로만 쓰면
         // 폴백이 "판 없는 커튼" 한 갈래로 모인다 — 여기서 교체를 직접 돌리면 경로가 둘로 갈린다.
         if (t_view == null)
         {
-            Debug.LogWarning($"[CurtainView] Resources/{ResourcePath} 를 찾지 못해 커튼 없이 전환합니다.");
+            Debug.LogWarning("[CurtainView] Boot 카탈로그에서 커튼 프리팹을 찾지 못해 커튼 없이 전환합니다.");
             t_view = new GameObject("Curtain (판 없음)").AddComponent<CurtainView>();
             t_view.m_panelless = true;
         }

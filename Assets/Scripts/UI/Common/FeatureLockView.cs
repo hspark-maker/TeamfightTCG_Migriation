@@ -11,8 +11,6 @@ using UnityEngine;
 // 배지는 "나중에 열린다"를 덧붙이는 것이라, 배지 프리팹이 없으면 경고 한 번 뒤 탈채도만으로 간다.
 public class FeatureLockView : MonoBehaviour
 {
-    const string BadgePath = "UI/LockBadge";
-
     [Tooltip("이 UI를 여는 기능 키. None이면 항상 열려 있다")]
     [SerializeField] EOutgameFeature feature;
 
@@ -100,11 +98,11 @@ public class FeatureLockView : MonoBehaviour
             return;
         }
 
-        var t_prefab = Resources.Load<GameObject>(BadgePath);
+        var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.LockBadge);
         if (t_prefab == null)
         {
             this.m_badgeMissing = true;
-            Debug.LogWarning($"[FeatureLockView] Resources/{BadgePath} 미배치 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
+            Debug.LogWarning($"[FeatureLockView] Boot 카탈로그 자물쇠 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
             return;
         }
 

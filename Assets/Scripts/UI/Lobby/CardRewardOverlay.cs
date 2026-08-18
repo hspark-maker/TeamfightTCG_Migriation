@@ -16,8 +16,6 @@ using TMPro;
 // 등장은 조각마다 자기 박자로 들어오고 충격은 꽂히는 한 프레임에 전부 몰아넣는다.
 public class CardRewardOverlay : MonoBehaviour
 {
-    const string ResourcePath = "UI/CardRewardOverlay";
-
     static CardRewardOverlay s_instance;
 
     /// <summary>보상 화면이 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
@@ -143,10 +141,10 @@ public class CardRewardOverlay : MonoBehaviour
 
         if (s_instance == null)
         {
-            var t_prefab = Resources.Load<GameObject>(ResourcePath);
+            var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.CardRewardOverlay);
             if (t_prefab == null)
             {
-                Debug.LogWarning($"[CardRewardOverlay] Resources/{ResourcePath} 를 찾지 못해 보상 화면을 세울 수 없습니다.");
+                Debug.LogWarning("[CardRewardOverlay] Boot 카탈로그에서 보상 프리팹을 찾지 못했습니다.");
             }
             else
             {
@@ -156,7 +154,7 @@ public class CardRewardOverlay : MonoBehaviour
                 // 컴포넌트가 없으면 세운 것이 화면을 덮은 채 남는다 — 부를 때마다 한 장씩 쌓이므로 즉시 걷는다.
                 if (s_instance == null)
                 {
-                    Debug.LogWarning($"[CardRewardOverlay] Resources/{ResourcePath} 에 CardRewardOverlay가 없습니다(프리팹 배선 확인).");
+                    Debug.LogWarning("[CardRewardOverlay] 카탈로그 프리팹에 CardRewardOverlay가 없습니다(프리팹 배선 확인).");
                     Destroy(t_go);
                 }
             }

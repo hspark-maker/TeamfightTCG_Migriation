@@ -17,8 +17,6 @@ using TMPro;
 // 여기서 카드가 서는 리듬은 PackResultGrid의 순차 팝이 대신 쥔다.
 public class CardSetRewardOverlay : MonoBehaviour
 {
-    const string ResourcePath = "UI/CardSetRewardOverlay";
-
     static CardSetRewardOverlay s_instance;
 
     /// <summary>보상 화면이 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
@@ -71,10 +69,10 @@ public class CardSetRewardOverlay : MonoBehaviour
 
         if (s_instance == null)
         {
-            var t_prefab = Resources.Load<GameObject>(ResourcePath);
+            var t_prefab = RuntimeUiPrefabs.Get(ERuntimeUiPrefab.CardSetRewardOverlay);
             if (t_prefab == null)
             {
-                Debug.LogWarning($"[CardSetRewardOverlay] Resources/{ResourcePath} 를 찾지 못해 보상 화면을 세울 수 없습니다.");
+                Debug.LogWarning("[CardSetRewardOverlay] Boot 카탈로그에서 보상 프리팹을 찾지 못했습니다.");
             }
             else
             {
@@ -84,7 +82,7 @@ public class CardSetRewardOverlay : MonoBehaviour
                 // 컴포넌트가 없으면 세운 것이 화면을 덮은 채 남는다 — 부를 때마다 한 장씩 쌓이므로 즉시 걷는다.
                 if (s_instance == null)
                 {
-                    Debug.LogWarning($"[CardSetRewardOverlay] Resources/{ResourcePath} 에 CardSetRewardOverlay가 없습니다(프리팹 배선 확인).");
+                    Debug.LogWarning("[CardSetRewardOverlay] 카탈로그 프리팹에 CardSetRewardOverlay가 없습니다(프리팹 배선 확인).");
                     Destroy(t_go);
                 }
             }
