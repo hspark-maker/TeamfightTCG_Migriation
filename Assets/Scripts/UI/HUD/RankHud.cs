@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -24,14 +25,15 @@ public class RankHud : MonoBehaviour
     [FormerlySerializedAs("arc")]
     [SerializeField] RankProgressGauge gauge;
 
-    [Tooltip("조각 하나가 꽂힐 때 게이지가 다음 눈금까지 가는 시간. 조각 간격보다 짧게 둔다 — 길면 다음 조각이 앞 트윈을 밟는다.")]
-    [FormerlySerializedAs("arcStepDuration")]
-    [SerializeField] float gaugeStepDuration = 0.18f;
+    [Tooltip("조각이 꽂힌 프레임부터 게이지가 목표치까지 가는 시간. 전진은 한 번뿐이라 이 값이 곧 '차오르는 시간' 전부다.\n" +
+             "승급 연출에서 별을 한 칸씩 채우는 시간도 같은 값을 쓴다 — 조각 간격(pipStep)보다 짧게 둔다.")]
+    [SerializeField] float gaugeAdvanceDuration = 0.25f;
 
     [Header("승급 연출")]
     [Tooltip("연출을 시작하기 전 뜸. 화면이 눈에 들어온 뒤에 별이 채워져야 '변했다'가 보인다.")]
     [SerializeField] float enterDelay = 0.35f;
 
+    [Tooltip("마디를 되짚어 내려갈 때(별이 다시 모자라짐) 별이 움츠러드는 세기. 전진 쪽 점등은 '별 점등' 항목이 맡는다.")]
     [SerializeField] float pipPunch = UiPunch.DEFAULT_SCALE;
 
     [Tooltip("별 하나가 꽉 차고 다음으로 넘어가는 간격. 펀치 길이(0.3초)보다 짧으면 연출이 잘린다.")]
@@ -47,18 +49,38 @@ public class RankHud : MonoBehaviour
     [SerializeField] RankPromoteEffect promote = new RankPromoteEffect();
 
     [Header("포인트 획득 반응")]
-    [Tooltip("조각이 닿을 때마다 배지가 튀는 세기. 여러 번 겹치므로 작게 준다.")]
-    [SerializeField] float gainPunch = 0.12f;
-    [Tooltip("마지막 조각이 닿을 때 한 번 크게.")]
-    [SerializeField] float gainFinalPunch = 0.3f;
+    [Tooltip("조각이 꽂히는 프레임의 배지 펀치 세기. 한 판에 한 번뿐이라 크게 준다.")]
+    [SerializeField] float gainImpactPunch = 0.3f;
+    [Tooltip("같은 프레임에 '지금 채워지는 별'이 튀는 세기. 조각 → 별로 인과가 이어지게 하는 값이라 배지보다 작게.")]
+    [SerializeField] float gainStarPunch = 0.2f;
     [SerializeField] Color gainFlashColor = Color.white;
     [SerializeField] float gainFlashDuration = 0.18f;
 
+    [Header("별 점등")]
+    [Tooltip("별이 꽉 차는 프레임에 채움이 한 번 튀는 색. 여기서 곧바로 저작 색(골드)으로 돌아온다.")]
+    [SerializeField] Color starFlashColor = Color.white;
+    [Tooltip("흰 플래시가 골드로 돌아오는 시간. 짧을수록 '한 프레임 번쩍'에 가깝다.")]
+    [SerializeField] float starFlashDuration = 0.1f;
+    [Tooltip("켜지는 별이 출발하는 배율. 여기서 1로 내려앉는다.")]
+    [SerializeField] float starPopScale = 1.5f;
+    [SerializeField] float starPopDuration = 0.12f;
+    [Tooltip("켜진 별 자리에 남는 고스트(밑판 스프라이트 복제)가 퍼져 나가는 배율.")]
+    [SerializeField] float ghostScale = 2.2f;
+    [Tooltip("고스트가 퍼지며 사라지는 시간.")]
+    [SerializeField] float ghostDuration = 0.25f;
+
+    [Tooltip("켜진 뒤 다음 별이 시선을 넘겨받기까지의 뜸. 사건이 겹치지 않게 한 박 띄운다.")]
+    [SerializeField] float handoffDelay = 0.15f;
+    [Tooltip("넘겨받는 별이 잠깐 커지는 배율. 상태가 아니라 순간이다 — 곧바로 1로 돌아온다.")]
+    [SerializeField] float handoffScale = 1.15f;
+    [Tooltip("넘겨받는 별이 밝아졌다 원복하고 배율이 돌아오는 시간.")]
+    [SerializeField] float handoffDuration = 0.2f;
+    [Tooltip("넘겨받는 별의 밑판이 잠깐 물드는 색. 원복은 저작 색으로 돌아간다.")]
+    [SerializeField] Color handoffColor = Color.white;
+
     [Header("포인트 손실 반응")]
-    [SerializeField] float lossDuration = 0.45f;
-    [SerializeField] float lossShrink = 0.08f;
-    [Tooltip("배지가 잠깐 식는 색. 붉은 경고가 아니라 채도가 빠지는 쪽 — 패배를 두 번 때리지 않는다.")]
-    [SerializeField] Color lossColor = new Color(0.6f, 0.6f, 0.7f);
+    [Tooltip("게이지가 줄어든 자리까지 뒤로 미끄러지는 시간. 획득은 느리고 시끄럽게, 손실은 빠르고 조용하게 — 짧게 둔다.")]
+    [SerializeField] float lossSlideDuration = 0.2f;
 
     // 활성 인스턴스(연출 호출자가 찾는 창구). 로비에 하나뿐이지만 탭 토글로 꺼지므로 활성분만 든다.
     static RankHud s_instance;
@@ -72,8 +94,18 @@ public class RankHud : MonoBehaviour
     // 포인트 손실 반응. 배지 색·스케일을 함께 잡으므로 획득 플래시와 겹쳐 돌지 않게 따로 든다.
     Sequence m_lossSeq;
 
-    // 마지막 조각이 꽂힐 때의 밝아짐. 손실 반응과 같은 색을 쓴다.
+    // 조각이 꽂힐 때의 밝아짐.
     Tween m_flashTween;
+
+    // 별 하나가 켜지는 한 박(플래시 + 팝 + 고스트 + 넘겨받기). 다음 별이 켜지면 앞 박을 걷고 다시 세운다.
+    Sequence m_starSeq;
+
+    // 켜진 별 자리에 띄운 고스트들. 시퀀스가 어디서 끊겨도 여기로 걷는다.
+    readonly List<GameObject> m_ghosts = new List<GameObject>();
+
+    // 별 채움·밑판의 저작 색. 연출이 물들인 뒤 되돌릴 기준이다.
+    Color[] m_starFillColors;
+    Color[] m_starPlateColors;
 
     // 조각 연출이 출발한 비율과 도착 비율. 조각이 꽂힐 때마다 이 사이를 등분해 전진한다.
     float m_gainFrom;
@@ -111,20 +143,16 @@ public class RankHud : MonoBehaviour
         this.SetGaugeRatio(this.m_gainFrom);
     }
 
-    /// <summary>조각 하나가 배지에 꽂혔다(_arrived = 1부터 세는 누적, _total = 전체).
-    /// 마지막 조각이면 크게 튀고 한 번 밝아진다.</summary>
-    public void PlayGainImpact(int _arrived, int _total)
+    /// <summary>조각이 배지에 꽂힌 프레임. 배지와 채워지는 별이 함께 튀고, 게이지가 목표치까지 한 번에 전진한다.</summary>
+    public void PlayGainImpact()
     {
-        bool t_final = _arrived >= _total;
+        UiPunch.Play(this.BadgeRect, this.gainImpactPunch);
+        UiPunch.Play(this.PipTransform(this.FillingStarIndex()), this.gainStarPunch);
 
-        UiPunch.Play(this.BadgeRect, t_final ? this.gainFinalPunch : this.gainPunch);
+        // 한 판에 반 칸씩 움직이는 값이라 잘게 쪼개면 사건이 밍밍해진다 — 조각 하나에 전진 한 번이다.
+        if (this.gauge != null) this.gauge.TweenTo(this.m_gainTo, this.gaugeAdvanceDuration);
 
-        // 조각이 꽂힌 만큼만 게이지가 전진한다 — 한 번에 도착시키면 "무엇 때문에 찼는지"가 사라진다.
-        if (this.gauge != null && _total > 0)
-            this.gauge.TweenTo(Mathf.Lerp(this.m_gainFrom, this.m_gainTo, (float)_arrived / _total),
-                               this.gaugeStepDuration);
-
-        if (!t_final || this.badgeImage == null) return;
+        if (this.badgeImage == null) return;
 
         this.KillFlash();
         this.m_flashTween = this.badgeImage.DOColor(this.gainFlashColor, this.gainFlashDuration * 0.5f)
@@ -135,8 +163,8 @@ public class RankHud : MonoBehaviour
     }
 
     /// <summary>
-    /// 포인트가 깎인 순간. 배지가 잠깐 식었다 돌아온다 — 패배 팝업에서 이미 본 손실이라 여기서 또 때리지 않는다.
-    /// 재생은 호출자 몫(BuildTierUp과 같은 규약).
+    /// 포인트가 깎인 순간. 게이지가 뒤로 미끄러지는 것만 보여준다 — 패배 팝업에서 이미 본 손실이라
+    /// 배지를 식히거나 움츠러뜨려 두 번 때리지 않는다. 재생은 호출자 몫(BuildTierUp과 같은 규약).
     /// </summary>
     public Sequence BuildLossReaction()
     {
@@ -144,33 +172,15 @@ public class RankHud : MonoBehaviour
 
         this.m_lossSeq = DOTween.Sequence().SetLink(this.gameObject);
 
-        if (this.badgeImage != null)
-            this.m_lossSeq.Join(this.badgeImage.DOColor(this.lossColor, this.lossDuration * 0.5f)
-                                               .SetLoops(2, LoopType.Yoyo));
-
-        // 게이지는 요요로 되돌아오지 않는다 — 줄어든 자리가 곧 지금 값이다(배지만 식었다 돌아온다).
+        // 게이지는 요요로 되돌아오지 않는다 — 줄어든 자리가 곧 지금 값이다.
         // 꽉 찬 별은 바닥이 현재 단계 진입선이라 꺼지지 않는다. 채우던 중인 별만 줄어든다.
         if (this.gauge != null)
         {
-            Tween t_gauge = this.gauge.TweenTo(GaugeRatioOf(RankManager.GetInfo()), this.lossDuration);
+            Tween t_gauge = this.gauge.TweenTo(GaugeRatioOf(RankManager.GetInfo()), this.lossSlideDuration);
             if (t_gauge != null) this.m_lossSeq.Join(t_gauge);
         }
 
-        var t_rect = this.BadgeRect;
-        if (t_rect != null)
-            this.m_lossSeq.Join(t_rect.DOScale(1f - this.lossShrink, this.lossDuration * 0.5f)
-                                      .SetLoops(2, LoopType.Yoyo)
-                                      .SetEase(Ease.OutQuad));
-
-        // 어떤 이유로 끊겨도 색·스케일이 중간값에 굳지 않게 한다(스케일을 잡는 유일한 반응이라 여기서만 되돌린다).
-        this.m_lossSeq.OnKill(() =>
-        {
-            this.m_lossSeq = null;
-            this.RestoreBadgeColor();
-
-            var t_badge = this.BadgeRect;
-            if (t_badge != null) t_badge.localScale = Vector3.one;
-        });
+        this.m_lossSeq.OnKill(() => this.m_lossSeq = null);
 
         return this.m_lossSeq;
     }
@@ -243,6 +253,28 @@ public class RankHud : MonoBehaviour
 
         // 별은 스스로 반응하지 않는다 — 채움 머리가 자기 마디를 지날 때만 튄다.
         if (this.gauge != null) this.gauge.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
+
+        this.CacheStarColors();
+    }
+
+    // 연출이 물들이기 전의 별 색을 떠 둔다(어디서 끊겨도 여기로 되돌린다).
+    void CacheStarColors()
+    {
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null) return;
+
+        int t_count = t_star.StarCount;
+        this.m_starFillColors  = new Color[t_count];
+        this.m_starPlateColors = new Color[t_count];
+
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            var t_fill  = t_star.StarFill(t_i);
+            var t_plate = t_star.StarPlate(t_i);
+
+            this.m_starFillColors[t_i]  = t_fill  != null ? t_fill.color  : Color.white;
+            this.m_starPlateColors[t_i] = t_plate != null ? t_plate.color : Color.white;
+        }
     }
 
     void Start()
@@ -264,9 +296,10 @@ public class RankHud : MonoBehaviour
     {
         if (s_instance == this) s_instance = null;
 
-        // 꺼지는 동안 트윈만 남으면 다음 활성화가 중간 상태를 물려받는다.
+        // 꺼지는 동안 트윈만 남으면 다음 활성화가 중간 상태를 물려받는다(고스트도 여기서 걷힌다).
         this.KillTierChange();
         this.KillReactions();
+        this.RestorePipScales();
 
         if (this.gauge != null) this.gauge.Stop();
     }
@@ -300,8 +333,125 @@ public class RankHud : MonoBehaviour
     // 점등은 따로 있는 상태가 아니라 fillAmount == 1 그 자체다 — 여기서 별을 켜고 끄지 않는다.
     void OnMarkerCrossed(int _index, bool _forward)
     {
-        UiPunch.Play(this.PipTransform(_index), _forward ? this.pipPunch : -this.pipPunch);
+        // 후퇴는 조용해야 한다 — 되짚어 내려간 자리를 축하할 이유가 없다.
+        if (!_forward)
+        {
+            UiPunch.Play(this.PipTransform(_index), -this.pipPunch);
+            return;
+        }
+
+        this.PlayStarLit(_index);
     }
+
+    // 별이 꽉 차는 프레임에 사건을 몰아넣는다(흰 플래시 + 1.5배에서 내려앉기 + 고스트 확산),
+    // 한 박 뒤 다음 별이 시선을 넘겨받는다. 마지막 별은 넘길 곳이 없어 여운만 남긴다.
+    void PlayStarLit(int _index)
+    {
+        this.KillStarBeat();
+
+        var t_gauge = this.gauge as RankStarGauge;
+        if (t_gauge == null) return;
+
+        var t_rect = t_gauge.StarRect(_index);
+        if (t_rect == null) return;
+
+        this.m_starSeq = DOTween.Sequence().SetLink(this.gameObject);
+
+        var t_fill = t_gauge.StarFill(_index);
+        if (t_fill != null)
+        {
+            t_fill.DOKill();
+            t_fill.color = this.starFlashColor;
+            this.m_starSeq.Join(t_fill.DOColor(this.StarFillColor(_index), this.starFlashDuration));
+        }
+
+        // 조각이 꽂힐 때 걸어 둔 펀치가 아직 돌고 있으면 배율이 겹친다 — 걷고 나서 내려앉힌다.
+        t_rect.DOKill();
+        t_rect.localScale = Vector3.one * this.starPopScale;
+        this.m_starSeq.Join(t_rect.DOScale(1f, this.starPopDuration).SetEase(Ease.OutQuad));
+
+        this.SpawnStarGhost(t_gauge, _index);
+        this.StageHandoff(t_gauge, _index + 1);
+
+        this.m_starSeq.OnKill(() =>
+        {
+            this.m_starSeq = null;
+            this.ClearGhosts();
+        });
+    }
+
+    // 켜진 별 자리에 밑판 스프라이트를 복제해 띄우고 퍼지며 사라지게 한다(전용 링 텍스처가 없어 별 모양 그대로 쓴다).
+    void SpawnStarGhost(RankStarGauge _gauge, int _index)
+    {
+        var t_plate = _gauge.StarPlate(_index);
+        var t_rect  = _gauge.StarRect(_index);
+        if (t_plate == null || t_rect == null || t_rect.parent == null) return;
+
+        var t_go = new GameObject("StarGhost", typeof(RectTransform), typeof(CanvasRenderer),
+                                  typeof(Image), typeof(LayoutElement));
+        this.m_ghosts.Add(t_go);
+
+        var t_ghost = (RectTransform)t_go.transform;
+        t_ghost.SetParent(t_rect.parent, false);
+
+        // 별 줄이 레이아웃으로 정렬돼 있으면 새 형제가 칸을 밀어낸다 — 계산에서 빼 둔다.
+        t_go.GetComponent<LayoutElement>().ignoreLayout = true;
+
+        t_ghost.anchorMin        = t_rect.anchorMin;
+        t_ghost.anchorMax        = t_rect.anchorMax;
+        t_ghost.pivot            = t_rect.pivot;
+        t_ghost.anchoredPosition = t_rect.anchoredPosition;
+        t_ghost.sizeDelta        = t_rect.sizeDelta;
+        t_ghost.SetAsLastSibling();
+
+        var t_img = t_go.GetComponent<Image>();
+        t_img.sprite         = t_plate.sprite;
+        t_img.color          = t_plate.color;
+        t_img.preserveAspect = t_plate.preserveAspect;
+        t_img.raycastTarget  = false;
+
+        this.m_starSeq.Join(t_ghost.DOScale(this.ghostScale, this.ghostDuration).SetEase(Ease.OutQuad));
+        this.m_starSeq.Join(t_img.DOFade(0f, this.ghostDuration).SetEase(Ease.OutQuad));
+    }
+
+    // 다음 별이 시선을 넘겨받는 한 박. 크기 강조는 상태가 아니라 순간이라 곧바로 원복한다.
+    void StageHandoff(RankStarGauge _gauge, int _index)
+    {
+        var t_rect = _gauge.StarRect(_index);
+        if (t_rect == null) return;
+
+        this.m_starSeq.Insert(this.handoffDelay,
+                              // setImmediately를 끄지 않으면 조립하는 순간 커져 버려 한 박 내내 부풀어 있는다.
+                              t_rect.DOScale(1f, this.handoffDuration)
+                                    .From(Vector3.one * this.handoffScale, false)
+                                    .SetEase(Ease.OutQuad));
+
+        var t_plate = _gauge.StarPlate(_index);
+        if (t_plate == null) return;
+
+        t_plate.DOKill();
+        t_plate.color = this.StarPlateColor(_index);
+        this.m_starSeq.Insert(this.handoffDelay,
+                              t_plate.DOColor(this.handoffColor, this.handoffDuration * 0.5f)
+                                     .SetLoops(2, LoopType.Yoyo));
+    }
+
+    // 지금 채워지고 있는 별. 조각이 꽂히는 순간 움직이기 시작하는 칸이라 여기를 함께 튀긴다.
+    int FillingStarIndex()
+    {
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null || t_star.StarCount == 0) return 0;
+
+        return Mathf.Clamp(Mathf.FloorToInt(this.m_gainFrom * t_star.StarCount), 0, t_star.StarCount - 1);
+    }
+
+    Color StarFillColor(int _index)
+        => this.m_starFillColors != null && _index < this.m_starFillColors.Length
+         ? this.m_starFillColors[_index] : Color.white;
+
+    Color StarPlateColor(int _index)
+        => this.m_starPlateColors != null && _index < this.m_starPlateColors.Length
+         ? this.m_starPlateColors[_index] : Color.white;
 
     // 별 K가 꽉 차는 비율들. 사건은 "별이 다 찼다"이지 "채우기 시작했다"가 아니라 구간의 끝을 잡는다.
     static float[] BuildMarkerRatios()
@@ -352,7 +502,7 @@ public class RankHud : MonoBehaviour
             // 언랭크에서 올라오는 첫 진입은 별 줄이 꺼진 채 출발한다 — 켜는 것이 채움보다 먼저여야 한다.
             this.SetPipsVisible(true);
 
-            if (this.gauge != null) this.gauge.TweenTo(_ratio, this.gaugeStepDuration);
+            if (this.gauge != null) this.gauge.TweenTo(_ratio, this.gaugeAdvanceDuration);
         });
         _seq.AppendInterval(this.pipStep);
     }
@@ -417,19 +567,56 @@ public class RankHud : MonoBehaviour
         if (this.badgeImage != null) this.badgeImage.color = this.m_badgeBaseColor;
     }
 
-    // 별 펀치는 시퀀스 멤버가 아니라 따로 뜬 트윈이라, 연출이 중간에 끊기면 줄어든(혹은 커진) 배율로 굳는다.
+    // 별 펀치·점등은 시퀀스 밖에서도 도는 트윈이라, 연출이 중간에 끊기면 배율·색이 중간값으로 굳고 고스트가 남는다.
     void RestorePipScales()
     {
+        this.KillStarBeat();
+
         var t_star = this.gauge as RankStarGauge;
         if (t_star == null) return;
 
         for (int t_i = 0; t_i < t_star.StarCount; t_i++)
         {
             var t_rect = t_star.StarRect(t_i);
-            if (t_rect == null) continue;
+            if (t_rect != null)
+            {
+                t_rect.DOKill();
+                t_rect.localScale = Vector3.one;
+            }
 
-            t_rect.DOKill();
-            t_rect.localScale = Vector3.one;
+            var t_fill = t_star.StarFill(t_i);
+            if (t_fill != null)
+            {
+                t_fill.DOKill();
+                t_fill.color = this.StarFillColor(t_i);
+            }
+
+            var t_plate = t_star.StarPlate(t_i);
+            if (t_plate == null) continue;
+
+            t_plate.DOKill();
+            t_plate.color = this.StarPlateColor(t_i);
         }
+    }
+
+    // 점등 한 박을 걷고 남은 고스트를 지운다(참조를 먼저 비워 OnKill이 되돌아 들어오지 않게 한다).
+    void KillStarBeat()
+    {
+        var t_seq = this.m_starSeq;
+        this.m_starSeq = null;
+        if (t_seq != null) t_seq.Kill();
+
+        this.ClearGhosts();
+    }
+
+    void ClearGhosts()
+    {
+        for (int t_i = 0; t_i < this.m_ghosts.Count; t_i++)
+        {
+            if (this.m_ghosts[t_i] == null) continue;
+            Destroy(this.m_ghosts[t_i]);
+        }
+
+        this.m_ghosts.Clear();
     }
 }

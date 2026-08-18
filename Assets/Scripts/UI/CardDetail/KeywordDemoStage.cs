@@ -17,10 +17,8 @@ using UnityEngine;
 //
 // BattleFieldView는 두지 않는다 — 그것이 필요한 곳은 시네마 이동(MoveToCenter)뿐이고,
 // 이 무대는 _forceSpecial: false로 시네마를 아예 끈다.
-public class KeywordDemoStage : MonoBehaviour
+public class KeywordDemoStage : SingletonOverlayBase
 {
-    const string ResourcePath = "UI/KeywordDemoStage";
-
     // 로비 카메라의 시야 밖. UiRectCapture가 같은 이유로 같은 자리를 쓴다.
     static readonly Vector3 StageOrigin = new Vector3(0f, 20000f, 0f);
 
@@ -71,19 +69,17 @@ public class KeywordDemoStage : MonoBehaviour
     {
         if (s_instance == null)
         {
-            var t_prefab = Resources.Load<GameObject>(ResourcePath);
-            if (t_prefab == null)
-            {
-                Debug.LogWarning($"[KeywordDemoStage] Resources/{ResourcePath} 를 찾지 못해 데모를 세울 수 없습니다.");
-            }
-            else
+            // 오버레이와 같은 경로로 해석한다(UIPrefab 라벨 → DataLibrary 타입 색인, 주소는 클래스명).
+            // 못 찾으면 그쪽이 이미 로그를 남긴다. SingletonOverlay.TryGetOrCreate는 위치 인자를 안 받아 쓰지 않는다.
+            var t_prefab = RuntimeOverlayPrefabs.Get<KeywordDemoStage>();
+            if (t_prefab != null)
             {
                 GameObject t_go = Instantiate(t_prefab, StageOrigin, Quaternion.identity);
                 s_instance = t_go.GetComponent<KeywordDemoStage>();
 
                 if (s_instance == null)
                 {
-                    Debug.LogWarning($"[KeywordDemoStage] Resources/{ResourcePath} 에 KeywordDemoStage가 없습니다(프리팹 배선 확인).");
+                    Debug.LogWarning($"[KeywordDemoStage] {t_prefab.name} 루트에 KeywordDemoStage가 없습니다(프리팹 배선 확인).");
                     Destroy(t_go);
                 }
             }

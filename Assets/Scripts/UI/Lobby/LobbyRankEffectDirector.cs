@@ -16,19 +16,22 @@ public class LobbyRankEffectDirector : MonoBehaviour
     [SerializeField] Sprite pieceSprite;
 
     [Header("포인트 획득")]
-    [Tooltip("조각 수는 증감량을 따라간다 — 숫자를 지운 화면에서 '얼마나'를 비추는 유일한 단서다.")]
-    [SerializeField] int pieceMin = 4;
-    [SerializeField] int pieceMax = 10;
-
-    [Tooltip("아래(핍 방향)를 비운 부채꼴. 조각이 핍을 덮으면 곧 켜질 별이 가려진다.")]
-    [SerializeField] float angleStart = 300f;
-    [SerializeField] float angleSpan = 300f;
+    [Tooltip("조각이 튀어 오르는 방향(도). 90이면 배지 바로 위 — 아래(별 방향)로 두면 곧 켜질 별이 가려진다.")]
+    [SerializeField] float angleStart = 90f;
+    [Tooltip("조각이 튀어 오르는 거리(px). 실제 도달은 이 값의 0.7배다.")]
     [SerializeField] float scatterRadius = 170f;
-    [SerializeField] float gatherDuration = 0.32f;
+    [Tooltip("조각이 튀어 오르는 시간.")]
+    [SerializeField] float scatterDuration = 0.16f;
+    [Tooltip("조각이 배지로 빨려드는 시간. 튀어오름과 합쳐 획득 연출 전체 길이(0.4초)가 된다.")]
+    [SerializeField] float gatherDuration = 0.24f;
 
     [Header("공통")]
     [Tooltip("커버가 걷힌 뒤 시작까지의 뜸. 상단바 코인이 먼저 착지하도록 비켜 준다.")]
     [SerializeField] float startDelay = 0.15f;
+
+    // 조각은 하나뿐이다 — 매 전투마다 보는 연출이라 여러 개로 쪼개면 사건이 밍밍해진다.
+    // 얼마나 올랐는지는 게이지가 한 번에 전진하는 폭이 답한다(조각 수가 아니다).
+    const int PIECE_COUNT = 1;
 
     // 커버 아래에서 미리 세워 둔 티어 변화 연출(승급·강등, 재생 대기 중). 조립하는 순간 표시가 과거로 되돌아간다.
     Sequence m_tierChange;
@@ -126,15 +129,15 @@ public class LobbyRankEffectDirector : MonoBehaviour
         // 강등이 뒤따르면 손실 반응도 생략한다 — 배지가 두 번 식는다.
         if (_result.Delta < 0 && (_result.IsTierUp || _result.IsTierDown)) yield break;
 
-        var t_seq = _result.Delta > 0 ? this.BuildGain(_hud, _result.Delta) : _hud.BuildLossReaction();
+        var t_seq = _result.Delta > 0 ? this.BuildGain(_hud) : _hud.BuildLossReaction();
         if (t_seq == null) yield break;
 
         t_seq.Play();
         yield return t_seq.WaitForKill();
     }
 
-    // 조각이 배지 자리에서 튀어 제자리로 빨려든다(재화가 수치 자리에서 튀는 것과 같은 문법).
-    Sequence BuildGain(RankHud _hud, long _delta)
+    // 조각 하나가 배지 자리에서 튀어 제자리로 빨려든다(재화가 수치 자리에서 튀는 것과 같은 문법).
+    Sequence BuildGain(RankHud _hud)
     {
         if (this.pointBurst == null)
         {
@@ -142,11 +145,12 @@ public class LobbyRankEffectDirector : MonoBehaviour
             return null;
         }
 
-        int t_pieces = Mathf.Clamp((int)_delta, this.pieceMin, this.pieceMax);
-        this.pointBurst.Configure(this.pieceSprite, _hud.BadgeRect, _hud.BadgeRect, t_pieces,
-                                  this.angleStart, this.angleSpan, this.scatterRadius, this.gatherDuration);
+        // 조각이 하나라 부채꼴 폭은 의미가 없다 — 0으로 두면 angleStart 방향 그대로 튄다.
+        this.pointBurst.Configure(this.pieceSprite, _hud.BadgeRect, _hud.BadgeRect, PIECE_COUNT,
+                                  this.angleStart, 0f, this.scatterRadius, this.gatherDuration,
+                                  _scatterDuration: this.scatterDuration);
 
         // 스프라이트가 비어 있으면 BuildBurst가 빈 시퀀스로 즉시 통지한다 — 조각 없이 배지 펀치만 남는다.
-        return this.pointBurst.BuildBurst((_arrived, _total) => _hud.PlayGainImpact(_arrived, _total));
+        return this.pointBurst.BuildBurst((_arrived, _total) => _hud.PlayGainImpact());
     }
 }

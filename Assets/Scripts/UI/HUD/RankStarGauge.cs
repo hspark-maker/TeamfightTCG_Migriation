@@ -17,6 +17,33 @@ public class RankStarGauge : RankProgressGauge
 
         [Tooltip("채워지는 On 스프라이트. Image Type=Filled / Fill Method=Vertical / Fill Origin=Bottom 전제.")]
         public Image fill;
+
+        // 밑판(Off). 연출이 색을 물들이고 고스트로 복제하는 대상이라 참조가 필요하지만,
+        // 배선을 늘리지 않으려고 이름이 아니라 "채움이 아닌 쪽"으로 찾는다(한 번만 찾고 든다).
+        Image m_plate;
+        bool m_plateResolved;
+
+        public Image Plate
+        {
+            get
+            {
+                if (this.m_plateResolved) return this.m_plate;
+                this.m_plateResolved = true;
+
+                if (this.rect == null) return null;
+
+                var t_images = this.rect.GetComponentsInChildren<Image>(true);
+                for (int t_i = 0; t_i < t_images.Length; t_i++)
+                {
+                    if (t_images[t_i] == this.fill) continue;
+
+                    this.m_plate = t_images[t_i];
+                    break;
+                }
+
+                return this.m_plate;
+            }
+        }
     }
 
     [Tooltip("왼쪽부터 순서대로. 개수는 RankConfig.DivisionsPerGrade와 맞춘다 — " +
@@ -33,6 +60,26 @@ public class RankStarGauge : RankProgressGauge
 
         var t_star = this.stars[_index];
         return t_star != null ? t_star.rect : null;
+    }
+
+    /// <summary>점등 연출이 물들일 채움 이미지. 범위 밖이면 null.</summary>
+    public Image StarFill(int _index)
+    {
+        var t_star = this.StarAt(_index);
+        return t_star != null ? t_star.fill : null;
+    }
+
+    /// <summary>고스트로 복제할 밑판 이미지. 범위 밖이거나 밑판이 없으면 null.</summary>
+    public Image StarPlate(int _index)
+    {
+        var t_star = this.StarAt(_index);
+        return t_star != null ? t_star.Plate : null;
+    }
+
+    Star StarAt(int _index)
+    {
+        if (this.stars == null || _index < 0 || _index >= this.stars.Length) return null;
+        return this.stars[_index];
     }
 
     public override Vector2 MarkerPos(float _ratio)

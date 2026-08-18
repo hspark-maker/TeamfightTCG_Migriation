@@ -44,20 +44,8 @@ public class CurrencyHud : MonoBehaviour
 
     [Tooltip("롤다운이 도는 내내 유지할 확대 배율. 어느 재화가 빠지는 중인지 눈이 놓치지 않게 " +
              "이 HUD만 커진 채로 숫자가 굴러간다 — 롤이 끝나야 원래 크기로 내려온다.\n" +
-             "칸 점등이 시선을 끄는 몫을 나눠 지므로 크게 잡지 말 것. 옆 HUD와 겹친다.")]
+             "옆 HUD와 겹치므로 크게 잡지 말 것 — localScale은 LayoutGroup 계산에 안 잡힌다.")]
     [SerializeField, Range(1f, 1.6f)] float spendHoldScale = 1.08f;
-
-    [Tooltip("소비 순간 달아오를 칸 밑판. 미배선이면 이 노드의 Image(= 재화 칸 알약)를 쓴다.")]
-    [SerializeField] Image frameImage;
-
-    [Tooltip("칸이 달아오르는 세기. 밑판의 **원래 색**을 아래 색 쪽으로 이만큼 끌어올린다.\n" +
-             "색을 직접 지정하지 않고 원색에서 끌어올리는 이유는 저작을 없애기 위해서다 — " +
-             "밑판이 어둡든 밝든, 재화가 무엇이든 그 칸에 맞는 '달아오름'이 자동으로 나온다.\n" +
-             "0이면 점등하지 않는다.")]
-    [SerializeField, Range(0f, 1f)] float spendFlashBoost = 0.55f;
-
-    [Tooltip("달아오르는 방향 색. 흰색이면 원래 색이 그대로 밝아지고, 다른 색을 넣으면 그쪽으로 물든다.")]
-    [SerializeField] Color spendFlashTint = Color.white;
 
     [Tooltip("눌렸다 확대 배율까지 올라가는 데 걸리는 시간. 롤다운보다 훨씬 짧아야 '툭' 하는 한 박으로 들린다.")]
     [SerializeField, Min(0.01f)] float spendPressDuration = 0.14f;
@@ -78,8 +66,6 @@ public class CurrencyHud : MonoBehaviour
     Tween m_spendMotion;
     Color m_baseTextColor = Color.white;
     bool m_tinted;
-    Color m_baseFrameColor = Color.white;
-    bool m_frameHot;
 
     /// <summary>수치 텍스트의 RectTransform. 코인이 날아와 꽂히는 **도착 지점**이다.</summary>
     public RectTransform TextRect => this.valueText != null ? (RectTransform)this.valueText.transform : null;
@@ -160,9 +146,6 @@ public class CurrencyHud : MonoBehaviour
         // 물들이기 전 색을 여기서 잡아 둔다 — 연출 도중 잡으면 소비 색이 기준색으로 굳는다.
         if (this.valueText != null) m_baseTextColor = this.valueText.color;
 
-        // 칸 밑판은 이 컴포넌트가 붙은 노드가 곧 재화 칸(Status_* 알약)이라 배선 없이 잡힌다.
-        if (this.frameImage == null) this.frameImage = GetComponent<Image>();
-        if (this.frameImage != null) m_baseFrameColor = this.frameImage.color;
 
         // 프리팹을 복제해 type만 바꾼 HUD(조각 등)가 그림까지 따라오게 한다.
         if (this.iconImage != null)
@@ -196,7 +179,6 @@ public class CurrencyHud : MonoBehaviour
         this.KillSpendTween();
         this.KillSpendMotion();
         this.ClearTint(false);
-        this.ClearFrameFlash();
         if (this.PunchRect != null) this.PunchRect.DOComplete();
         // 연출 도중 꺼지면 해제 호출이 오지 않는다 — 고정을 여기서 풀어 다음 활성화가 잔액을 못 따라가는 상태를 막는다.
         m_held = false;
@@ -245,8 +227,6 @@ public class CurrencyHud : MonoBehaviour
         // 중간에 배율을 더 흔들면 정보가 아니라 노이즈가 된다.
         this.PlayLift();
         this.ApplyTint();
-        // 식는 데 걸리는 시간이 곧 롤 길이다 — 칸이 원래 색을 되찾는 순간이 숫자가 멎는 순간과 같다.
-        this.PlayFrameFlash(t_duration);
 
         Tweener t_tween = DOTween.To(() => t_value,
                                     _value =>
@@ -272,16 +252,8 @@ public class CurrencyHud : MonoBehaviour
         m_spendTween = null;
         this.ClearTint(_settle);
         // 끊긴 롤은 내려오는 연출 없이 크기를 즉시 되돌린다 — 커진 채로 굳는 것만은 막아야 한다.
-        if (_settle)
-        {
-            this.PlaySettle();
-            m_frameHot = false;   // 식는 트윈이 롤과 같은 길이라 이 시점에 이미 원래 색이다
-        }
-        else
-        {
-            this.KillSpendMotion();
-            this.ClearFrameFlash();
-        }
+        if (_settle) this.PlaySettle();
+        else this.KillSpendMotion();
         this.ReleaseDisplay(_revision);
     }
 
@@ -318,36 +290,6 @@ public class CurrencyHud : MonoBehaviour
         m_spendMotion = t_rect.DOScale(1f, Mathf.Max(0.01f, this.spendReturnDuration))
                               .SetEase(Ease.OutBack)
                               .SetLink(t_rect.gameObject);
-    }
-
-    /// <summary>칸 밑판을 원래 색에서 끌어올렸다가 주어진 시간에 걸쳐 식힌다.
-    /// 크기와 달리 레이아웃을 전혀 건드리지 않아서, 칸이 붙어 있는 화면에서도 마음껏 셀 수 있다.</summary>
-    void PlayFrameFlash(float _duration)
-    {
-        if (this.frameImage == null || this.spendFlashBoost <= 0f) return;
-
-        Color t_hot = Color.Lerp(m_baseFrameColor, this.spendFlashTint, this.spendFlashBoost);
-        // 알파는 원래 값을 지킨다 — 반투명 밑판이 잠깐 불투명해지면 칸이 떠오른 것처럼 튄다.
-        t_hot.a = m_baseFrameColor.a;
-
-        this.frameImage.DOKill();
-        this.frameImage.color = t_hot;
-        m_frameHot = true;
-        this.frameImage.DOColor(m_baseFrameColor, Mathf.Max(0.01f, _duration))
-                       .SetEase(Ease.OutQuad)
-                       .SetLink(this.frameImage.gameObject);
-    }
-
-    /// <summary>식는 도중 끊겼을 때 밑판 색을 즉시 되돌린다.</summary>
-    void ClearFrameFlash()
-    {
-        if (!m_frameHot) return;
-
-        m_frameHot = false;
-        if (this.frameImage == null) return;
-
-        this.frameImage.DOKill();
-        this.frameImage.color = m_baseFrameColor;
     }
 
     void ApplyTint()
