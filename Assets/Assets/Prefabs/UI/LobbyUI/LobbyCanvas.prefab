@@ -4883,14 +4883,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tab_Shop
       objectReference: {fileID: 0}
-    - target: {fileID: 1449577490459917885, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_fontAsset
-      value: 
-      objectReference: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
-    - target: {fileID: 1449577490459917885, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_hasFontAssetChanged
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 2067141598830091887, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -4970,22 +4962,6 @@ PrefabInstance:
     - target: {fileID: 2067141598830091887, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6089393766117567868, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_Sprite
-      value: 
-      objectReference: {fileID: 21300000, guid: 0bcfe6fc62a614b258ed80fc124b663b, type: 3}
-    - target: {fileID: 6089393766117567868, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_Color.b
-      value: 0.9490196
-      objectReference: {fileID: 0}
-    - target: {fileID: 6089393766117567868, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_Color.g
-      value: 0.92156863
-      objectReference: {fileID: 0}
-    - target: {fileID: 6089393766117567868, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
-      propertyPath: m_Color.r
-      value: 0.8862745
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
