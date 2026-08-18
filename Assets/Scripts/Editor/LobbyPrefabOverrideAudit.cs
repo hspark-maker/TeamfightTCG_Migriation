@@ -11,6 +11,8 @@ public static class LobbyPrefabOverrideAudit
         "Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab";
     const string k_LobbyScenePath = "Assets/Scenes/LobbyScene.unity";
     const string k_OwnedPrefabRoot = "Assets/Assets/Prefabs/UI/Common";
+    const string k_OverlayHostPath =
+        "Assets/Assets/Prefabs/UI/LobbyUI/LobbyOverlayHost.prefab";
     const string k_VendorRoot = "Assets/Layer Lab/";
     const int k_WarningThreshold = 30;
     const int k_ErrorThreshold = 60;
@@ -156,6 +158,19 @@ public static class LobbyPrefabOverrideAudit
             {
                 PrefabUtility.UnloadPrefabContents(t_root);
             }
+        }
+
+        GameObject t_overlayHost =
+            PrefabUtility.LoadPrefabContents(k_OverlayHostPath);
+        try
+        {
+            t_errors += CountDuplicateContent(
+                t_overlayHost,
+                k_OverlayHostPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(t_overlayHost);
         }
         return t_errors;
     }
