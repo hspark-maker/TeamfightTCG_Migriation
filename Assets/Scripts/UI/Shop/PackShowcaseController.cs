@@ -27,17 +27,13 @@ public class PackShowcaseController : MonoBehaviour
     [SerializeField] Button oddsButton;
     [SerializeField] TextMeshProUGUI packNameText;  // 중앙 팩 표시명(옵션 — 미배선 무시).
     [SerializeField] TextMeshProUGUI priceText;     // 가격 숫자(재화 종류는 팩마다 다르다 — 옵션, 미배선 무시).
-    [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 스프라이트가 바뀐다(옵션 — 미배선 무시).")]
+    [Tooltip("가격 옆 재화 아이콘. 중앙 팩의 결제 재화를 따라 CurrencyLook 표의 그림으로 갈린다 — 표가 비면 프리팹 그림 그대로다(옵션 — 미배선 무시).")]
     [SerializeField] Image priceIcon;
     [Tooltip("튜토리얼이 가격 자리 문구(예: \"무료\")를 저작했을 때 대신 켜지는 라벨. 그동안 위 아이콘:숫자 "
            + "쌍은 노드째로 꺼진다 — 쌍은 아이콘 자리를 비워 둔 좌표에 손으로 박혀 있어서, 아이콘만 걷으면 "
            + "문구가 그 자리를 물려받지 못하고 한쪽으로 치우친다. 가운데 정렬로 저작할 것. "
            + "미배선이면 예전처럼 숫자 칸이 문구를 대신 쓴다(치우침도 그대로).")]
     [SerializeField] TextMeshProUGUI forcedPriceText;
-    [Tooltip("골드 결제 팩에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
-    [SerializeField] Sprite goldIcon;
-    [Tooltip("다이아 결제 팩에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
-    [SerializeField] Sprite diamondIcon;
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
     [SerializeField] List<CardPackData> packs = new List<CardPackData>();
     [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
@@ -267,12 +263,12 @@ public class PackShowcaseController : MonoBehaviour
         }
     }
 
-    // 결제 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 — 둘 다 있을 때만 바꾼다.
-    Sprite ResolveCurrencyIcon(CardPackData _pack)
+    // 결제 재화 아이콘. 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹 그림을 그대로 둔다.
+    static Sprite ResolveCurrencyIcon(CardPackData _pack)
     {
-        if (_pack == null || goldIcon == null || diamondIcon == null) return null;
+        if (_pack == null) return null;
 
-        return _pack.PriceType == ECurrencyType.Diamond ? diamondIcon : goldIcon;
+        return CurrencyLook.IconOf(_pack.PriceType);
     }
 
     // 확률 고지 클릭: 지금 진열 중인 팩의 등장 확률을 연다. 구매 잠금(잔액·기능잠금)과 무관하게 항상 열린다 —
@@ -351,10 +347,10 @@ public class PackShowcaseController : MonoBehaviour
     {
         // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
         var t_pack = ResolvePack();
-        string t_currency = t_pack != null && t_pack.PriceType == ECurrencyType.Diamond ? "다이아" : "골드";
+        string t_currency = CurrencyLook.NameOf(t_pack != null ? t_pack.PriceType : ECurrencyType.Gold);
 
         string t_message = _result == EPackOpenResult.InsufficientGold
-            ? $"{t_currency}가 부족합니다."
+            ? $"{t_currency}{KoreanText.Subject(t_currency)} 부족합니다."
             : "구매할 수 없습니다.";
 
         UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData

@@ -39,15 +39,17 @@ public class PackStandaloneBoot : MonoBehaviour
         }
 
         // 소유 세이브를 읽지 않으므로 신규 여부는 사후 판정이 불가하다 — 여기서 저작한 값을 그대로 태운다.
+        var t_refundType = dummyPack != null ? dummyPack.RefundType : ECurrencyType.Gold;
+
         var t_drawn = new List<DrawnCard>(t_cards.Count);
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
         {
             bool t_isNew = !alternateDuplicates || (t_i % 2 == 0);
-            t_drawn.Add(new DrawnCard(t_cards[t_i], t_isNew, t_isNew ? 0 : dummyRefund));
+            if (t_isNew) t_drawn.Add(new DrawnCard(t_cards[t_i], true));
+            else         t_drawn.Add(new DrawnCard(t_cards[t_i], false, dummyRefund, t_refundType));
         }
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
-        var t_refundType = dummyPack != null ? dummyPack.RefundType : ECurrencyType.Gold;
         PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneBoot] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");

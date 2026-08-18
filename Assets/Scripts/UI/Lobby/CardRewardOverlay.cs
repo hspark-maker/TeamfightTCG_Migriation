@@ -178,7 +178,7 @@ public class CardRewardOverlay : MonoBehaviour
         if (this.titleText != null) this.titleText.text = _title;
 
         // 보상으로 주는 카드는 언제나 새 카드로 세운다 — 중복 표식(탈채도·환급 칩)이 설 자리가 아니다.
-        if (this.cardView != null) this.cardView.Bind(new DrawnCard(_card, true, 0L));
+        if (this.cardView != null) this.cardView.Bind(new DrawnCard(_card, true));
 
         if (this.acquireButton != null)
         {

@@ -56,6 +56,7 @@ public class KeywordGrowthPanel : MonoBehaviour
     public void Open()
     {
         this.SetVisible(true);
+        this.ApplyEnergyIcon();
 
         if (this.m_built) this.RefreshAll();
         else this.Build();
@@ -184,9 +185,19 @@ public class KeywordGrowthPanel : MonoBehaviour
 
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
-        if (_type != ECurrencyType.Gold) return;
+        // 이 패널이 무는 재화는 에너지다 — 골드만 보면 잔액 표시도 버튼 활성도 따라오지 않는다.
+        if (_type != ECurrencyType.Energy) return;
 
         this.RefreshAll();
+    }
+
+    // 표에 에너지 그림이 저작돼 있을 때만 갈아낀다(비면 프리팹 그림 그대로).
+    void ApplyEnergyIcon()
+    {
+        if (this.energyIcon == null) return;
+
+        Sprite t_icon = CurrencyLook.IconOf(ECurrencyType.Energy);
+        if (t_icon != null) this.energyIcon.sprite = t_icon;
     }
 
     void RefreshAll()

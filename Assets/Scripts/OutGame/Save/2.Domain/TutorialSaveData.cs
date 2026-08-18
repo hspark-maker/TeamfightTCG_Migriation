@@ -26,8 +26,4 @@ public class TutorialSaveData
 
     // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름)
     public List<string> completedTriggers = new List<string>();
-
-    // 전면으로 한 번 안내한 해금 개념의 키(UnlockIntro.Key). 목록에 없으면 아직 안 본 것이다 —
-    // 그래서 구 세이브(키 없음 → 빈 목록)가 곧 "전부 처음"으로 읽힌다.
-    public List<string> seenUnlockIntros = new List<string>();
 }

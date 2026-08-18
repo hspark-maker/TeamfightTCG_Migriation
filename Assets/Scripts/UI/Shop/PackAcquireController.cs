@@ -28,12 +28,8 @@ public class PackAcquireController : MonoBehaviour
     [SerializeField] Button retryButton;
     [Tooltip("한 번 더 버튼에 상시 띄우는 가격 숫자. 살 수 없을 때도 값은 보여야 유저가 이유를 안다.")]
     [SerializeField] TMP_Text retryPriceText;
-    [Tooltip("가격 옆 재화 아이콘. 아래 두 스프라이트를 모두 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
+    [Tooltip("가격 옆 재화 아이콘. 팩의 결제 재화를 따라 CurrencyLook 표의 그림으로 갈린다 — 표가 비면 프리팹 그림 그대로다.")]
     [SerializeField] Image retryPriceIcon;
-    [Tooltip("골드 결제 팩에 쓸 아이콘.")]
-    [SerializeField] Sprite goldIcon;
-    [Tooltip("다이아 결제 팩에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
-    [SerializeField] Sprite diamondIcon;
     [Tooltip("못 누르는 동안 버튼 밑판에 까는 무채색 그림. 이걸 쓰려면 Button의 Disabled Color를 불투명 흰색으로 " +
              "둘 것 — 틴트가 남아 있으면 무채색 위에 한 번 더 곱해진다. 미배선이면 그림은 건드리지 않는다.")]
     [SerializeField] Sprite disabledPlate;
@@ -298,10 +294,16 @@ public class PackAcquireController : MonoBehaviour
         // 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
         retryPriceIcon.enabled = m_pack != null;
 
-        // 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 — 둘 다 있을 때만 바꾼다.
-        if (m_pack == null || goldIcon == null || diamondIcon == null) return;
+        var t_icon = ResolveCurrencyIcon(m_pack);
+        if (t_icon != null) retryPriceIcon.sprite = t_icon;
+    }
 
-        retryPriceIcon.sprite = m_pack.PriceType == ECurrencyType.Diamond ? diamondIcon : goldIcon;
+    // 결제 재화 아이콘. 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹 그림을 그대로 둔다.
+    static Sprite ResolveCurrencyIcon(CardPackData _pack)
+    {
+        if (_pack == null) return null;
+
+        return CurrencyLook.IconOf(_pack.PriceType);
     }
 
     // 한 번 더 클릭: 같은 팩을 되사서 오버레이를 닫지 않고 세션만 갈아끼운다(팩 등장부터 다시).

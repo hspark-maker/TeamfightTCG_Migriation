@@ -360,7 +360,11 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     Sprite ResolveSprite(ECurrencyType _type, RectTransform _textRect)
     {
         int t_slot = (int)_type;
-        if (this.m_coinSprites[t_slot] == null) this.m_coinSprites[t_slot] = FindIconSpriteNear(_textRect);
+        if (this.m_coinSprites[t_slot] != null) return this.m_coinSprites[t_slot];
+
+        // 표가 정본. 표가 비면 예전처럼 HUD 옆 아이콘에서 빌린다 — HUD가 없는 화면에서도 연출이 살아야 한다.
+        Sprite t_icon = CurrencyLook.IconOf(_type);
+        this.m_coinSprites[t_slot] = t_icon != null ? t_icon : FindIconSpriteNear(_textRect);
         return this.m_coinSprites[t_slot];
     }
 

@@ -17,11 +17,25 @@ public readonly struct DrawnCard
     public readonly bool IsNew;
     public readonly long Refund;
 
-    public DrawnCard(CardData _card, bool _isNew, long _refund)
+    // 환급 재화 종류. 액수만으로는 무슨 재화인지 답할 수 없어 뷰가 아이콘을 고를 근거가 없다.
+    public readonly ECurrencyType RefundType;
+
+    // 환급이 없는 지급(보상 오버레이 등). 환급 표식 자체가 뜨지 않아 재화를 물을 일이 없다.
+    public DrawnCard(CardData _card, bool _isNew)
+    {
+        Card = _card;
+        IsNew = _isNew;
+        Refund = 0L;
+        RefundType = ECurrencyType.Gold;
+    }
+
+    // 환급이 있으면 재화 종류가 필수다 — 기본값을 열어두면 조각 환급이 골드 코인으로 조용히 표시된다.
+    public DrawnCard(CardData _card, bool _isNew, long _refund, ECurrencyType _refundType)
     {
         Card = _card;
         IsNew = _isNew;
         Refund = _refund;
+        RefundType = _refundType;
     }
 }
 

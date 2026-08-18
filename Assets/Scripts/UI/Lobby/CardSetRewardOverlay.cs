@@ -107,7 +107,7 @@ public class CardSetRewardOverlay : MonoBehaviour
         this.m_drawn.Clear();
         if (_cards != null)
             for (int t_i = 0; t_i < _cards.Count; t_i++)
-                if (_cards[t_i] != null) this.m_drawn.Add(new DrawnCard(_cards[t_i], true, 0L));
+                if (_cards[t_i] != null) this.m_drawn.Add(new DrawnCard(_cards[t_i], true));
 
         if (this.claimButton != null)
         {

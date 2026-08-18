@@ -4,6 +4,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 public class CurrencyHud : MonoBehaviour
 {
@@ -17,6 +18,9 @@ public class CurrencyHud : MonoBehaviour
     // 표시할 재화 종류. 기본값이 Gold라 기존 골드 HUD 배선은 그대로 동작하고,
     // 다이아 등 다른 재화는 이 값만 바꿔 같은 컴포넌트를 재사용한다(연출 API도 종류를 따라간다).
     [SerializeField] ECurrencyType type = ECurrencyType.Gold;
+
+    [Tooltip("재화 아이콘(옵션). CurrencyLook 표에 그림이 있을 때만 갈아낀다 — 비워두면 프리팹 그림 그대로다.")]
+    [SerializeField] Image iconImage;
 
     [Tooltip("이 HUD를 그 재화의 대표(코인이 날아와 꽂히는 곳)로 등록할지.\n\n" +
              "화면당 대표는 재화별로 딱 한 장이고, 겹치면 마지막에 켜진 쪽이 이긴다. " +
@@ -118,6 +122,13 @@ public class CurrencyHud : MonoBehaviour
     void Awake()
     {
         if (this.valueText == null) this.valueText = GetComponent<TMP_Text>();
+
+        // 프리팹을 복제해 type만 바꾼 HUD(조각 등)가 그림까지 따라오게 한다.
+        if (this.iconImage != null)
+        {
+            Sprite t_icon = CurrencyLook.IconOf(this.type);
+            if (t_icon != null) this.iconImage.sprite = t_icon;
+        }
     }
 
     void OnEnable()

@@ -56,12 +56,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 실제로 보이는 건 바의 둥근 모서리 틈뿐이고, 경계선은 바가 덮어 이음매가 안 드러난다.
     const float CONTENT_DIM_ALPHA = 0.8f;
 
-    // 강화가 왜 막혔는지. 결과판의 "한 번 더" 아래 문구가 쓴다.
-    // 재화 표시명의 공용 진실원은 아직 없다 — 강화가 쓰는 재화가 둘뿐이라 표를 만들지 않았다.
-    const string MaxLevelNotice          = "최고 레벨에 도달했습니다!";
-    const string NotAffordableNotice     = "골드가 부족합니다";
-    const string NotAffordableDiaNotice  = "다이아가 부족합니다";
-    const string NotAffordableEnergyNotice = "에너지가 부족합니다";
+    // 강화가 왜 막혔는지. 결과판의 "한 번 더" 아래 문구가 쓴다. 재화 이름은 CurrencyLook이 대준다.
+    const string MaxLevelNotice      = "최고 레벨에 도달했습니다!";
+    const string NotAffordableFormat = "{0}{1} 부족합니다";
 
     [Header("배선")]
     [SerializeField] CardVisualView cardView;        // CardArea 안의 CardUIView 인스턴스
@@ -75,14 +72,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
     [SerializeField] TMP_Text   enhanceCostText;    // 다음 레벨 비용(재화는 레벨마다 다르다 — 아래 아이콘이 말한다)
-    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다(옵션 — 미배선 무시).")]
+    [Tooltip("비용 옆 재화 아이콘. 재화 그림은 CurrencyLook 표가 대준다 — 표가 비면 프리팹 그림 그대로다(옵션 — 미배선 무시).")]
     [SerializeField] Image      enhanceCostIcon;
-    [Tooltip("골드 비용 레벨에 쓸 아이콘. 아래 다이아 아이콘과 둘 다 채워야 전환이 돈다(한쪽만 비면 프리팹 그림 그대로).")]
-    [SerializeField] Sprite     goldIcon;
-    [Tooltip("다이아 비용 레벨(진화)에 쓸 아이콘. 그 외 재화는 골드 아이콘을 쓴다.")]
-    [SerializeField] Sprite     diamondIcon;
-    [Tooltip("에너지 비용 레벨(일반 강화)에 쓸 아이콘. 비우면 골드 아이콘으로 떨어진다.")]
-    [SerializeField] Sprite     energyIcon;
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
 
     [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
@@ -1009,7 +1000,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         else              t_fx.OnComplete(() => RevealUnlockedSections(t_focus, t_keywords, t_synergy));
     }
 
-    // 걷힌 줄로 스크롤을 옮기고 내용을 들여보낸 뒤, 처음 보는 개념이 있으면 전면 안내로 넘긴다.
+    // 걷힌 줄로 스크롤을 옮기고 내용을 들여보낸 뒤, 이번에 열린 개념을 전면 안내로 넘긴다.
     // 하단 바를 되돌리는 곳은 이 함수의 끝 **한 곳**이다(안내가 서면 그 닫힘이 곧 끝이다).
     void RevealUnlockedSections(GameObject _focus, CardKeyword _keywords, bool _synergy)
     {
@@ -1019,26 +1010,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_synergy)                      this.synergySectionReveal?.Play();
 
         CardData          t_card   = CardAt(this.m_index);
-        List<UnlockIntro> t_intros = CollectUnseenIntros(t_card, _keywords, _synergy);
+        List<UnlockIntro> t_intros = CollectIntros(t_card, _keywords, _synergy);
         if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); return; }
 
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) { ShowBottomBar(); return; }
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
-        int t_shown = t_overlay.Show(t_intros, t_card, ShowBottomBar);
-
-        // 낙인은 닫힐 때가 아니라 **띄운 직후** 찍는다. 안 그러면 안내를 읽는 도중 앱이 죽었을 때
-        // 다음 부팅에 같은 안내가 다시 선다 — 이미 상세창에 남아 있는 내용이라 다시 세울 값어치가 없다.
-        //
-        // 세운 줄까지만 찍는 것이 중요하다. 프리팹에 깔린 줄보다 많이 열리면 뒤쪽은 뜨지 않는데,
-        // 그것까지 본 것으로 찍으면 유저가 **영영 못 보는** 안내가 생긴다(1회성이라 되돌릴 길이 없다).
-        for (int t_i = 0; t_i < t_shown && t_i < t_intros.Count; t_i++)
-            OutgameTutorialProgress.MarkUnlockIntroSeen(t_intros[t_i].Key);
+        t_overlay.Show(t_intros, t_card, ShowBottomBar);
     }
 
-    /// <summary>이번에 열린 것 중 <b>아직 전면으로 안내한 적 없는</b> 개념들. 없으면 null.
-    /// 순서는 화면 순서와 같다(키워드 줄이 위, 시너지 줄이 아래).</summary>
-    List<UnlockIntro> CollectUnseenIntros(CardData _card, CardKeyword _keywords, bool _synergy)
+    /// <summary>이번에 열린 개념들. 없으면 null.
+    /// 순서는 화면 순서와 같다(키워드 줄이 위, 시너지 줄이 아래).
+    ///
+    /// 개념당 1회라는 낙인은 두지 않는다 — 방아쇠는 "그 개념을 처음 배웠는가"가 아니라 <b>능력이 열린 순간</b>이다.
+    /// 한 카드가 능력을 여는 일은 그 카드에 한 번뿐이고(키워드는 keywordUnlockLevel에서 통째로 열린다),
+    /// 같은 키워드라도 다음 카드에서 열리는 것은 그 카드에겐 처음 있는 사건이라 그 자리에서 다시 읽혀야 한다.</summary>
+    List<UnlockIntro> CollectIntros(CardData _card, CardKeyword _keywords, bool _synergy)
     {
         List<UnlockIntro> t_list = null;
 
@@ -1047,17 +1034,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 if (t_kw == CardKeyword.None || (_keywords & t_kw) == 0) continue;
                 if (!UnlockIntro.TryForKeyword(this.keywordIconConfig, t_kw, out UnlockIntro t_intro)) continue;
-                if (OutgameTutorialProgress.IsUnlockIntroSeen(t_intro.Key)) continue;
 
                 (t_list ??= new List<UnlockIntro>()).Add(t_intro);
             }
 
-        // 시너지는 개념 하나라 어느 시너지로 배우든 키가 같다 → 카드가 여럿 물고 있어도 첫 장 하나면 된다.
+        // 시너지는 개념 하나라 카드가 여럿 물고 있어도 첫 장 하나면 된다.
         if (_synergy && _card != null && _card.synergies != null)
             foreach (SynergyData t_syn in _card.synergies)
             {
                 if (!UnlockIntro.TryForSynergy(t_syn, out UnlockIntro t_intro)) continue;
-                if (OutgameTutorialProgress.IsUnlockIntroSeen(t_intro.Key)) break;
 
                 (t_list ??= new List<UnlockIntro>()).Add(t_intro);
                 break;
@@ -1234,18 +1219,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                                                        : _cost <= 0 ? FreeCost
                                                                     : _cost.ToString("N0");
 
-    /// <summary>비용 재화 아이콘. 한쪽만 배선하면 되돌아올 스프라이트가 없어 아이콘이 눌러붙는다 —
-    /// 둘 다 있을 때만 바꾼다(카드팩 진열대의 <c>ResolveCurrencyIcon</c>과 같은 규약).
-    /// 더 올릴 단계가 없으면 숫자가 "-"로 비므로 아이콘도 함께 걷는다(숫자 없이 그림만 남는 칸 방지).</summary>
-    Sprite CostIconOf(ECurrencyType _currency)
-    {
-        if (this.goldIcon == null || this.diamondIcon == null) return null;
-
-        // 에너지 아이콘은 아직 없을 수 있다(재화 그림이 미제작) → 없으면 골드 그림으로 떨어진다.
-        if (_currency == ECurrencyType.Energy) return this.energyIcon != null ? this.energyIcon : this.goldIcon;
-
-        return _currency == ECurrencyType.Diamond ? this.diamondIcon : this.goldIcon;
-    }
+    /// <summary>비용 재화 아이콘. 표(CurrencyLook)가 유일한 창구라 새 재화가 골드 그림으로 조용히 떨어지지 않는다.
+    /// 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹에 저작된 그림을 그대로 둔다.</summary>
+    static Sprite CostIconOf(ECurrencyType _currency) => CurrencyLook.IconOf(_currency);
 
     /// <summary>비용 숫자·아이콘을 두 버튼 **모두**에 채운다. 보이는 것은 서 있는 쪽뿐이지만,
     /// 물러나 있는 쪽에 옛 값을 남겨두면 교체되는 프레임에 그 값이 그대로 비친다.</summary>
@@ -1299,12 +1275,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (!_hasStep) return MaxLevelNotice;
         if (_canPay)   return string.Empty;
 
-        switch (_currency)
-        {
-            case ECurrencyType.Diamond: return NotAffordableDiaNotice;
-            case ECurrencyType.Energy:  return NotAffordableEnergyNotice;
-            default:                    return NotAffordableNotice;
-        }
+        string t_name = CurrencyLook.NameOf(_currency);
+        return string.Format(NotAffordableFormat, t_name, KoreanText.Subject(t_name));
     }
 
     void OnEnhancePressed()

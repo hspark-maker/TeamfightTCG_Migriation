@@ -110,11 +110,8 @@ public class UnlockIntroOverlay : MonoBehaviour
     /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.
     ///
     /// _card는 데모 무대의 공격자로 선다(<see cref="KeywordDemoStage"/>). null이면 데모 없이 글자만 —
-    /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.
-    ///
-    /// <returns>실제로 세운 줄 수(앞에서부터). 프리팹에 깔린 줄보다 많이 넘기면 뒤쪽은 뜨지 않으므로,
-    /// **본 것으로 낙인찍는 쪽은 이 수만큼만** 찍어야 한다 — 안 뜬 안내가 본 것이 되면 영영 못 본다.</returns></summary>
-    public int Show(IReadOnlyList<UnlockIntro> _intros, CardData _card, Action _onClose)
+    /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.</summary>
+    public void Show(IReadOnlyList<UnlockIntro> _intros, CardData _card, Action _onClose)
     {
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
@@ -127,7 +124,7 @@ public class UnlockIntroOverlay : MonoBehaviour
         {
             this.m_onClose = null;
             _onClose?.Invoke();
-            return 0;
+            return;
         }
 
         this.m_onClose = _onClose;
@@ -148,8 +145,6 @@ public class UnlockIntroOverlay : MonoBehaviour
 
         this.m_intro = BuildIntro();
         this.m_intro.Play();
-
-        return this.m_shownRows;
     }
 
     /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다 —

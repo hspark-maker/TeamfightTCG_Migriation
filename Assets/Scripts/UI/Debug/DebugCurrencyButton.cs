@@ -20,4 +20,10 @@ public class DebugCurrencyButton : MonoBehaviour
     {
         OutgameDebugActions.GrantEnergy();
     }
+
+    // Button OnClick entry point: grants the standard debug amount and persists it immediately.
+    public void GrantShard()
+    {
+        OutgameDebugActions.GrantShard();
+    }
 }

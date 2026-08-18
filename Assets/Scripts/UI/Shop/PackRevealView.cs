@@ -113,6 +113,9 @@ public class PackRevealView : MonoBehaviour
     [Tooltip("코인+합계 숫자 칩 묶음. 미배선이면 숫자만 토글된다(뒷배경 없이).")]
     [SerializeField] GameObject totalRefundBadge;
     [SerializeField] TMP_Text totalRefundText;     // 중복 환급 합계
+    [Tooltip("합계 칩의 재화 아이콘. 비워두면 프리팹에 저작된 그림 그대로다(자동 탐색하지 않는다 — " +
+             "칩의 자식 Image는 밑판일 수 있다).")]
+    [SerializeField] Image totalRefundCoin;
     [Tooltip("합계가 0에서 이 값까지 굴러 오르는 시간. 0이면 곧장 최종 숫자.")]
     [SerializeField] float totalRefundCountUp = 0.5f;
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
@@ -498,6 +501,13 @@ public class PackRevealView : MonoBehaviour
 
         bool t_show = _refund > 0;
         if (totalRefundBadge != null) totalRefundBadge.SetActive(t_show);
+
+        // 아이콘은 환급 재화를 따른다. 표가 답을 안 주면 프리팹 그림을 그대로 둔다(null 대입 금지).
+        if (totalRefundCoin != null && m_pending != null)
+        {
+            Sprite t_icon = CurrencyLook.IconOf(m_pending.TotalRefund.Type);
+            if (t_icon != null) totalRefundCoin.sprite = t_icon;
+        }
 
         // 칩이 미배선이어도 숫자만으로 성립하도록 텍스트도 직접 토글한다.
         if (totalRefundText != null) totalRefundText.gameObject.SetActive(t_show);
