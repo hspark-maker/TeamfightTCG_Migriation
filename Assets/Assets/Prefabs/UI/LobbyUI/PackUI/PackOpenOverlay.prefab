@@ -1600,6 +1600,7 @@ MonoBehaviour:
     closeToScale: 0.9
   shardHud: {fileID: 1233335916983582206}
   refundEffect: {fileID: 3812066844301809083}
+  refundLightSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
   retryCover: {fileID: 1696983070036817495}
   retryFlash:
     rise: 0.04
@@ -1652,8 +1653,9 @@ MonoBehaviour:
   newCardFlash: {fileID: 996968366795449023}
   totalRefundBadge: {fileID: 864226460166676112}
   totalRefundText: {fileID: 1008161770802814602}
-  totalRefundCoin: {fileID: 0}
+  totalRefundCoin: {fileID: 3211550607516963539}
   totalRefundCountUp: 0.5
+  totalRefundDismiss: 0.22
   summaryGroup: {fileID: 1154068148363219607}
   resultGrid: {fileID: 1412703472447813272}
   skipButton: {fileID: 7593341080687916580}
@@ -2330,8 +2332,11 @@ MonoBehaviour:
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
   spendRollDuration: 0.55
-  spendPulseCount: 3
-  spendPunch: 0.35
+  spendPressScale: 0.92
+  spendHoldScale: 1.15
+  spendPressDuration: 0.14
+  spendReturnDuration: 0.2
+  spendTint: {r: 1, g: 0.42, b: 0.35, a: 1}
 --- !u!1 &3259210012666952426
 GameObject:
   m_ObjectHideFlags: 0
@@ -2988,8 +2993,11 @@ MonoBehaviour:
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
   spendRollDuration: 0.55
-  spendPulseCount: 3
-  spendPunch: 0.35
+  spendPressScale: 0.92
+  spendHoldScale: 1.15
+  spendPressDuration: 0.14
+  spendReturnDuration: 0.2
+  spendTint: {r: 1, g: 0.42, b: 0.35, a: 1}
 --- !u!1 &5280605415593194277
 GameObject:
   m_ObjectHideFlags: 0
@@ -3194,8 +3202,11 @@ MonoBehaviour:
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
   spendRollDuration: 0.55
-  spendPulseCount: 3
-  spendPunch: 0.35
+  spendPressScale: 0.92
+  spendHoldScale: 1.15
+  spendPressDuration: 0.14
+  spendReturnDuration: 0.2
+  spendTint: {r: 1, g: 0.42, b: 0.35, a: 1}
 --- !u!1 &5344767420245058982
 GameObject:
   m_ObjectHideFlags: 0

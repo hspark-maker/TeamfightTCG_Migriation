@@ -118,6 +118,9 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] Image totalRefundCoin;
     [Tooltip("합계가 0에서 이 값까지 굴러 오르는 시간. 0이면 곧장 최종 숫자.")]
     [SerializeField] float totalRefundCountUp = 0.5f;
+    [Tooltip("환급이 빛이 되어 떠날 때 칩이 사그라드는 시간. 빛이 피어나는 시간과 겹쳐야 '그것이 변했다'로 읽힌다 — " +
+             "길면 빛이 먼저 날아가고 칩만 남아 두 사건으로 갈린다.")]
+    [SerializeField] float totalRefundDismiss = 0.22f;
     [SerializeField] GameObject summaryGroup;      // 요약 단계에서만 켜지는 묶음
     [Tooltip("모든 카드를 3열로 다시 보여주는 결과 격자. summaryGroup에 직접 붙이면 그 묶음 전체가 페이드인된다.")]
     [SerializeField] PackResultGrid resultGrid;
@@ -144,6 +147,12 @@ public class PackRevealView : MonoBehaviour
 
     // 환급 합계가 굴러 오르는 트윈. 다음 개봉이 시작될 때 끊지 않으면 이전 세션의 숫자가 계속 올라간다.
     Tween m_totalRefundTween;
+
+    // 합계 칩이 빛이 되어 걷히는 트윈. 위와 한 축이라 같은 자리에서 함께 끊는다.
+    Tween m_refundDismissTween;
+
+    // 칩의 알파를 다루는 손잡이. 프리팹이 안 들고 있으면 처음 쓸 때 붙인다.
+    CanvasGroup m_refundGroup;
 
     // 스킵 횟수. 첫 번째는 현재 단계만, 두 번째부터는 요약까지 단번에.
     int m_skips;
@@ -502,6 +511,10 @@ public class PackRevealView : MonoBehaviour
         bool t_show = _refund > 0;
         if (totalRefundBadge != null) totalRefundBadge.SetActive(t_show);
 
+        // 지난 세션이 빛으로 걷어 간 알파를 되돌린다 — 안 되돌리면 재개봉의 칩이 투명한 채 뜬다.
+        var t_group = ResolveRefundGroup();
+        if (t_group != null) t_group.alpha = 1f;
+
         // 아이콘은 환급 재화를 따른다. 표가 답을 안 주면 프리팹 그림을 그대로 둔다(null 대입 금지).
         if (totalRefundCoin != null && m_pending != null)
         {
@@ -537,10 +550,62 @@ public class PackRevealView : MonoBehaviour
 
     void KillTotalRefundTween()
     {
-        if (m_totalRefundTween == null) return;
+        if (m_totalRefundTween != null)
+        {
+            m_totalRefundTween.Kill();
+            m_totalRefundTween = null;
+        }
 
-        m_totalRefundTween.Kill();
-        m_totalRefundTween = null;
+        if (m_refundDismissTween == null) return;
+
+        m_refundDismissTween.Kill();
+        m_refundDismissTween = null;
+    }
+
+    /// <summary>환급이 빛으로 피어날 자리(합계 칩의 재화 아이콘). 미배선이면 null —
+    /// 호출부는 그때 자기 폴백으로 내려간다.</summary>
+    public RectTransform RefundCoinRect => totalRefundCoin != null ? (RectTransform)totalRefundCoin.transform : null;
+
+    /// <summary>합계가 다 굴러 오르는 데 걸리는 시간. 획득 연출은 이 뒤에 와야 한다 —
+    /// 세는 도중에 칩을 걷으면 얼마를 받았는지 읽을 자리가 사라진다.</summary>
+    public float RefundCountUp => totalRefundCountUp;
+
+    /// <summary>합계 칩을 사그라뜨려 걷는다. 빛이 피어나는 것과 같은 시각에 불러야
+    /// "그것이 빛이 되어 갔다"로 읽힌다(따로 부르면 그냥 사라진 것이 된다).</summary>
+    public void DismissRefundBadge()
+    {
+        var t_target = totalRefundBadge != null ? totalRefundBadge
+                     : totalRefundText != null ? totalRefundText.gameObject : null;
+        if (t_target == null || !t_target.activeSelf) return;
+
+        var t_group = ResolveRefundGroup();
+        if (t_group == null)
+        {
+            t_target.SetActive(false);
+            return;
+        }
+
+        m_refundDismissTween = t_group.DOFade(0f, totalRefundDismiss)
+                               .SetEase(Ease.InQuad)
+                               .SetLink(t_target)
+                               // 끊겨도 결과는 같다 — 칩은 걷힌 상태로 끝난다(알파는 다음 세션이 되돌린다).
+                               .OnKill(() => { if (t_target != null) t_target.SetActive(false); });
+    }
+
+    // 칩의 CanvasGroup. 프리팹이 안 들고 있어도 붙여서 쓴다(PackCardView의 환급 칩과 같은 관용구).
+    CanvasGroup ResolveRefundGroup()
+    {
+        var t_target = totalRefundBadge != null ? totalRefundBadge
+                     : totalRefundText != null ? totalRefundText.gameObject : null;
+        if (t_target == null) return null;
+
+        if (m_refundGroup == null || m_refundGroup.gameObject != t_target)
+        {
+            m_refundGroup = t_target.GetComponent<CanvasGroup>();
+            if (m_refundGroup == null) m_refundGroup = t_target.AddComponent<CanvasGroup>();
+        }
+
+        return m_refundGroup;
     }
 
     // ── 스킵 ────────────────────────────────────────────────────

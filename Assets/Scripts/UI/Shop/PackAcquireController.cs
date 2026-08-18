@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -43,9 +44,12 @@ public class PackAcquireController : MonoBehaviour
     [SerializeField] PopupTransition barTransition = new PopupTransition();
     [Tooltip("바 안의 조각 칩. 중복 환급 코인이 여기로 꽂힌다. 'Register As Primary'는 꺼 둘 것.")]
     [SerializeField] CurrencyHud shardHud;
-    [Tooltip("환급 코인을 조각 칩으로 흘려보낼 재생기. 개봉 캔버스 안에 둘 것('Shared'는 꺼 둘 것). " +
+    [Tooltip("환급을 조각 칩으로 흘려보낼 재생기. 개봉 캔버스 안에 둘 것('Shared'는 꺼 둘 것). " +
              "미배선이면 환급을 로비 획득 연출로 넘긴다.")]
     [SerializeField] CurrencyGainEffectPlayer refundEffect;
+    [Tooltip("환급이 피어날 빛 그림. Sprites/CardPack/Glow_Radial 권장(앨범 보상이 쓰는 것과 같은 훈김). " +
+             "미배선이면 코인 그림이 그대로 흐른다 — 줄기 하나가 가는 그림은 같다.")]
+    [SerializeField] Sprite refundLightSprite;
 
     [Header("재개봉 전환")]
     [Tooltip("재개봉을 덮는 판. 재화 바보다 앞 형제로 둘 것 — 뒤에 두면 바까지 덮여 골드 차감이 안 보인다. " +
@@ -189,21 +193,35 @@ public class PackAcquireController : MonoBehaviour
     }
 
     // 중복 환급을 조각 칩으로 흘려보낸다. 카드가 다 깔린 이 시점이어야 —
-    // 넘기는 도중에 쏘면 "이 카드가 중복이었다"는 낱장의 사연이 합계 코인에 묻힌다.
-    // 화면 중앙의 환급 칩이 같은 순간 합계를 굴려 올리므로, 코인은 그 값이 어디로 갔는지를 잇는 역할이다.
+    // 넘기는 도중에 쏘면 "이 카드가 중복이었다"는 낱장의 사연이 합계에 묻힌다.
+    //
+    // 앨범 보상과 같은 축이다(RewardClaimPopup.OnClaimClicked) — 합계 칩이 빛 한 줄기로 피어나 조각 칩으로 흐르고,
+    // 칩은 그 빛 밑에서 사그라든다. 코인 다발이 아니라 이동체가 하나여야 눈이 따라갈 대상이 정해진다.
     void PlayRefundGain()
     {
-        if (m_refundShown || refundEffect == null || !m_refund.HasAmount) return;
+        if (m_refundShown || refundEffect == null || view == null || !m_refund.HasAmount) return;
 
         // 받을 자리가 이 화면에 서 있을 때만 쏜다. 없으면(팩의 환급 재화가 조각 칩과 다른 경우 등)
-        // 그대로 두어 로비 획득 연출이 가져가게 한다 — 여기서 쏘면 코인이 지금 안 보이는 곳으로 날아가
+        // 그대로 두어 로비 획득 연출이 가져가게 한다 — 여기서 쏘면 빛이 지금 안 보이는 곳으로 날아가
         // 유저는 환급을 한 번도 못 보게 된다.
         var t_hud = ActiveShardHud(m_refund.Type);
         if (t_hud == null) return;
 
         // 잔액이 이미 최종값이라는 전제(TryPurchase가 환급까지 끝냈다) — 재생기가 그만큼 되돌렸다 올린다.
-        // 출발점을 주지 않아 수치 자리에서 튀어 제자리로 돌아온다(도감 수확과 같은 손맛).
-        m_refundShown = refundEffect.Play(null, m_refund, t_hud);
+        var t_light = refundEffect.BuildLightGain(m_refund, view.RefundCoinRect, t_hud, refundLightSprite);
+        if (t_light == null) return;
+
+        // 빛이 칩 '위'에 떠야 칩이 그 아래서 사라진 것으로 읽힌다(앨범 팝업과 같은 한 줄).
+        refundEffect.transform.SetAsLastSibling();
+
+        // 합계가 다 굴러 오른 뒤에 쏜다 — 세는 도중에 칩을 걷으면 얼마를 받았는지 읽을 자리가 사라진다.
+        // 사그라듦과 피어남을 같은 시각에 놓는 것이 이 연출의 전부다.
+        var t_seq = DOTween.Sequence().SetLink(gameObject);
+        t_seq.InsertCallback(view.RefundCountUp, view.DismissRefundBadge);
+        t_seq.Insert(view.RefundCountUp, t_light);
+
+        m_refundShown = true;
+        t_seq.Play();
     }
 
     /// <summary>로비로 넘길 환급. 이 화면에서 이미 코인으로 보여줬다면 넘길 것이 없다.

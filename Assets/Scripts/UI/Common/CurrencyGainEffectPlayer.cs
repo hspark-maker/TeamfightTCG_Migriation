@@ -220,7 +220,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             var t_type   = (ECurrencyType)t_i;
             var t_origin = _origins != null && t_i < _origins.Length ? _origins[t_i] : null;
 
-            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, _lightSprite, t_i);
+            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, null, _lightSprite, t_i);
             if (t_seq == null) continue;
 
             t_master ??= DOTween.Sequence().SetLink(gameObject);
@@ -230,10 +230,18 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         return t_master;
     }
 
+    /// <summary>
+    /// 재화 하나치 빛 줄기. 위 묶음판과 다른 점은 <b>도착지 HUD를 호출부가 지정</b>한다는 것뿐이다 —
+    /// 대표 등록이 꺼진 화면 안의 칩(팩 개봉 오버레이의 조각 칩 등)으로 흘려보낼 때 쓴다.
+    /// _hud가 null이면 그 재화의 대표 HUD를 찾는다(묶음판과 같은 길).
+    /// </summary>
+    public Sequence BuildLightGain(CurrencyGain _gain, RectTransform _origin, CurrencyHud _hud, Sprite _lightSprite)
+        => this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
+
     // 종류 하나치 빛 줄기. 배선을 못 찾거나 줄 것이 없으면 null —
     // 판정은 전부 BeginGainRollUp보다 앞에 둔다(고정만 걸고 빠져나가면 수치가 영영 안 풀린다).
     Sequence BuildLightStreak(ECurrencyType _type, long _amount, RectTransform _origin,
-                              Sprite _lightSprite, int _lane)
+                              CurrencyHud _hud, Sprite _lightSprite, int _lane)
     {
         if (_amount <= 0) return null;
 
@@ -244,9 +252,16 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             return null;
         }
 
-        if (!CurrencyHud.TryGet(_type, out var t_hud) || t_hud.TextRect == null)
+        // 지정된 칩이 있으면 그쪽으로 흐른다. 없을 때만 대표 HUD를 찾는다.
+        var t_hud = _hud;
+        if (t_hud == null && !CurrencyHud.TryGet(_type, out t_hud))
         {
             Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD를 찾지 못해 연출을 건너뛴다.");
+            return null;
+        }
+        if (t_hud.TextRect == null)
+        {
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD에 수치 텍스트가 없어 연출을 건너뛴다.");
             return null;
         }
 
