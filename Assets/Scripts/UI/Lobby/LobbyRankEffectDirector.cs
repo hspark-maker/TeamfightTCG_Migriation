@@ -29,6 +29,9 @@ public class LobbyRankEffectDirector : MonoBehaviour
     [Tooltip("커버가 걷힌 뒤 시작까지의 뜸. 상단바 코인이 먼저 착지하도록 비켜 준다.")]
     [SerializeField] float startDelay = 0.15f;
 
+    [Tooltip("승급 오버레이가 걷힌 뒤 랭크 보상 목록이 뜨기까지의 뜸. 두 화면이 맞물려 뜨면 한 화면이 갈아끼워진 것처럼 읽힌다.")]
+    [SerializeField] float rewardPanelDelay = 0.25f;
+
     // 조각은 하나뿐이다 — 매 전투마다 보는 연출이라 여러 개로 쪼개면 사건이 밍밍해진다.
     // 얼마나 올랐는지는 게이지가 한 번에 전진하는 폭이 답한다(조각 수가 아니다).
     const int PIECE_COUNT = 1;
@@ -38,6 +41,10 @@ public class LobbyRankEffectDirector : MonoBehaviour
 
     static LobbyRankEffectDirector s_instance;
 
+    // 이번 씬의 랭크 연출이 이미 끝났는가. 이벤트만으로는 늦게 온 쪽이 신호를 놓친다 —
+    // 나중에 매치 탭으로 들어오는 표시가 뒤늦게라도 물어볼 수 있게 래치로 남긴다.
+    static bool s_finished;
+
     /// <summary>랭크 연출이 끝났다. <b>보여줄 것이 없어 그냥 지나간 경우도 포함</b>해서 알린다 —
     /// 이 뒤에 이어 붙는 안내(온보딩 4챕터)가 신호를 놓치면 그 자리에서 영영 멈춘다.</summary>
     public static event System.Action OnAnyFinished;
@@ -45,9 +52,14 @@ public class LobbyRankEffectDirector : MonoBehaviour
     /// <summary>이 씬에 랭크 연출 디렉터가 있는가. 없으면 기다릴 신호도 없다는 뜻이다.</summary>
     public static bool Exists => s_instance != null;
 
+    /// <summary>랭크 연출이 아직 도는 중인가(= <see cref="OnAnyFinished"/> 전). 연출이 끝나기를 기다렸다가
+    /// 표시를 바꾸는 쪽이 읽는다 — 구독보다 먼저 끝나 신호를 놓쳐도 이 값으로 따라잡을 수 있다.</summary>
+    public static bool Playing => s_instance != null && !s_finished;
+
     void Awake()
     {
         s_instance = this;
+        s_finished = false;
     }
 
     void OnDestroy()
@@ -95,6 +107,8 @@ public class LobbyRankEffectDirector : MonoBehaviour
             // 오버레이가 뜨지 않는 길(디버그 티어 이동 등)로 빠져도 표시가 옛 등급에 고착되지 않게 여기서 확정한다.
             if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant();
 
+            // 래치를 먼저 세운다 — 이 알림을 받아 표시를 다시 그리는 쪽이 Playing을 곧바로 되물을 수 있어야 한다.
+            s_finished = true;
             OnAnyFinished?.Invoke();
         }
     }
@@ -133,23 +147,69 @@ public class LobbyRankEffectDirector : MonoBehaviour
     }
 
     // 등급이 갈린 판만 전면 오버레이로 세우고, 닫힐 때까지 기다린다.
-    // 조건은 **승급전 승리** 하나다 — 등급이 그대로인 평범한 상승에 뜨면 이 화면의 무게가 사라진다.
+    // 조건은 둘뿐이다 — **승급전 승리**와 **첫 진입(언랭크 → 브론즈 1)**.
+    // 등급이 그대로인 평범한 상승에 뜨면 이 화면의 무게가 사라진다.
     IEnumerator PlayPromote(RankApplyResult _result)
     {
-        if (!_result.PrevPromoPending || !_result.IsTierUp) yield break;
+        if (!_result.IsTierUp) yield break;
+
+        // 첫 진입은 승급전을 거치지 않지만, 게임에서 처음 얻는 등급이라 오히려 제일 큰 판이다.
+        bool t_firstEntry = _result.PrevTierIndex < 0;
+        if (!_result.PrevPromoPending && !t_firstEntry) yield break;
+
         if (!RankManager.TryGetTier(_result.TierIndex, out RankTier t_tier)) yield break;
         if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) yield break;
 
         bool t_closed = false;
         t_overlay.Show(t_tier,
                        // 암전이 덮은 프레임에 로비 표시를 새 등급으로 갈아끼운다 — 배지 안무는 여기서 돌지 않는다.
-                       _onCovered: () => { if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant(); },
+                       // 첫 진입만 별 줄을 감춘 채 남긴다. 그 줄이 드러나는 것이 오버레이 다음 박이다.
+                       _onCovered: () => { if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant(t_firstEntry); },
                        _onClose: () => t_closed = true);
 
         // 화면이 걷힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라,
         // 여기서 안 기다리면 튜토리얼 안내가 오버레이 위에 겹친다.
         // IsOpen도 함께 본다: 콜백을 거치지 않고 꺼지는 길(부모 비활성)에서 여기 걸리면 뒤따르는 안내가 영영 멈춘다.
         yield return new WaitUntil(() => t_closed || !RankPromoteOverlay.IsOpen);
+
+        // 보상이 먼저다 — 오버레이가 걷힌 그 자리에서 곧바로 이어져야 "승급했으니 이걸 받아라"로 읽힌다.
+        // 배지·별 연출 뒤로 밀면 두 사건 사이가 벌어져 목록이 따로 뜬 화면처럼 보인다.
+        yield return this.PlayRewardPanel();
+
+        yield return this.PlayFirstEntryReveal(t_firstEntry);
+    }
+
+    // 승급 오버레이를 실제로 본 판에만 이어 붙는 보상 목록.
+    // 새 등급의 보상은 소식을 들은 그 자리에서 받는 것이 자연스럽다 — 배지만 보고 목록을 따로 찾아가게 두지 않는다.
+    // 열지 않는 길이 셋 있다: 기능이 아직 잠겨 있거나(튜토리얼 진행 중), 받을 것이 없거나, 풀이 없을 때.
+    IEnumerator PlayRewardPanel()
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.RankReward)) yield break;
+        if (RankRewardManager.TopClaimableIndex < 0) yield break;
+        if (UIPoolManager.Instance == null) yield break;
+
+        if (this.rewardPanelDelay > 0f) yield return new WaitForSeconds(this.rewardPanelDelay);
+
+        RankRewardPanel t_panel = UIPoolManager.Instance.AddOrUpdateUI<RankRewardPanel>();
+        if (t_panel == null) yield break;
+
+        // 닫힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라, 안 기다리면 튜토리얼 안내가 목록 위에 겹친다.
+        // 비활성으로 빠지는 길도 닫힘으로 본다: 여기서 영영 멈추면 뒤따르는 안내가 통째로 잠긴다.
+        yield return new WaitWhile(() => t_panel != null && t_panel.isActiveAndEnabled && t_panel.isShow);
+    }
+
+    // 첫 진입의 마지막 박 — 오버레이가 걷힌 자리에 별 줄이 드러난다.
+    // 어느 길로 빠져도 표시는 finally의 ApplyTierInstant()가 최종 상태로 확정한다.
+    IEnumerator PlayFirstEntryReveal(bool _firstEntry)
+    {
+        if (!_firstEntry) yield break;
+        if (!RankHud.TryGet(out RankHud t_hud)) yield break;
+
+        Sequence t_seq = t_hud.BuildFirstEntryReveal();
+        if (t_seq == null) yield break;
+
+        t_seq.Play();
+        yield return t_seq.WaitForKill();
     }
 
     // 증감 반응 1개를 재생하고 끝날 때까지 기다린다. 완료가 아니라 Kill을 기다린다 — 도중에 끊겨도 티어 연출로 넘어간다.

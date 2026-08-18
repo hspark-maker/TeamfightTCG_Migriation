@@ -3,7 +3,8 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 승급전 대기의 **상태 표현**(배지 뒤 광선 · "승급전" 문구 · 배지 호흡). 한 번 터지고 잊히는 연출이 아니라,
+// 승급전 대기의 **상태 표현**(배지 뒤 광선 · 배지 호흡). 문구는 여기 없다 —
+// "승급전"이라는 말은 매치 탭의 전투 진입 버튼이 진다(LobbyMatchTabPanel). 한 번 터지고 잊히는 연출이 아니라,
 // 로비에 들어올 때마다 배지에서 "너 지금 승급전이야"가 계속 읽혀야 하는 상태다 — 그래서 상태(SetStandby)와
 // 그 상태로 넘어가는 사건(BuildEnter)을 나눠 든다.
 //
@@ -21,12 +22,6 @@ public class RankPromoStandby
              "  · 각도를 등간격으로 두지 말 것 — 나란하면 바람개비로 읽힌다.\n" +
              "배지보다 **앞선 형제**여야 배지를 가리지 않는다(uGUI는 나중 형제를 위에 그린다).")]
     [SerializeField] Graphic[] rays;
-
-    [Tooltip("\"승급전\" 문구 노드. 비면 문구 축을 건너뛴다. 자리는 저작값 그대로 쓴다 — 코드는 내려꽂는 동안만 민다.")]
-    [SerializeField] RectTransform label;
-
-    [Tooltip("문구의 CanvasGroup. label과 같은 노드에 붙이면 된다. 비면 문구가 늘 보이는 채로 자리만 움직인다.")]
-    [SerializeField] CanvasGroup labelGroup;
 
     [Tooltip("호흡시킬 배지 사각. RankHud가 그리는 배지와 같은 노드다 — " +
              "로비 재진입(연출 없는 경로)에는 배지를 넘겨줄 자리가 없어 여기서 든다.")]
@@ -70,16 +65,6 @@ public class RankPromoStandby
     [Tooltip("과다 노출이 저작 알파로 가라앉는 시간.")]
     [SerializeField] float igniteSettle = 0.2f;
 
-    [Header("문구")]
-    [Tooltip("충격 프레임에서 문구가 내려꽂히기까지의 뜸.")]
-    [SerializeField] float labelDelay = 0.15f;
-
-    [Tooltip("문구가 출발하는 높이(px, 저작 자리 기준 위쪽).")]
-    [SerializeField] float labelDropHeight = 40f;
-
-    [Tooltip("내려꽂히는 시간. 짧게 둔다 — 굴리지 말고 도착하는 순간 이미 찍혀 있어야 한다.")]
-    [SerializeField] float labelDrop = 0.14f;
-
     [Header("상태 유지 루프")]
     [Tooltip("광선 뭉치가 한 바퀴 도는 각도. 부호로 방향이 갈린다.")]
     [SerializeField] float spinDegrees = 360f;
@@ -95,8 +80,6 @@ public class RankPromoStandby
 
     RayPose[] m_poses;                  // 광선 판의 저작 자세
     float[]   m_rayAlphas;              // 광선 판의 저작 알파(점화가 정착할 목표)
-    Vector2   m_labelPos;               // 문구의 저작 자리
-    float     m_labelAlpha;             // 문구의 저작 알파
     bool      m_captured;
 
     Tween[]       m_spins;              // 무한 회전. 참조를 들고 있다가 Reset에서 걷는다
@@ -132,9 +115,6 @@ public class RankPromoStandby
                 this.m_rayAlphas[t_i] = this.rays[t_i].color.a;
             }
         }
-
-        if (this.label != null) this.m_labelPos = this.label.anchoredPosition;
-        this.m_labelAlpha = this.labelGroup != null ? this.labelGroup.alpha : 1f;
 
         this.ApplyOff();
     }
@@ -175,7 +155,6 @@ public class RankPromoStandby
 
         this.StageBadge(t_seq, t_badge, t_impact);
         this.StageRays(t_seq, t_impact);
-        this.StageLabel(t_seq, t_impact + Mathf.Max(0f, this.labelDelay));
 
         // 상태로 넘어가는 자리. 호흡은 펀치가 끝난 뒤여야 같은 배율을 두 트윈이 밀지 않는다.
         t_seq.InsertCallback(t_impact, this.StartSpin);
@@ -260,34 +239,15 @@ public class RankPromoStandby
         }
     }
 
-    // 위에서 내려꽂히며 알파 in. 굴리지 않는다 — 도착하는 순간 이미 찍혀 있어야 한다.
-    void StageLabel(Sequence _seq, float _at)
-    {
-        if (this.label == null) return;
-
-        float t_drop = Mathf.Max(0.05f, this.labelDrop);
-
-        _seq.Insert(_at, this.label.DOAnchorPos(this.m_labelPos, t_drop)
-                                   .From(this.m_labelPos + Vector2.up * this.labelDropHeight, setImmediately: false)
-                                   .SetEase(Ease.OutQuad));
-
-        if (this.labelGroup == null) return;
-
-        _seq.Insert(_at, this.labelGroup.DOFade(this.m_labelAlpha, t_drop * 0.6f)
-                                        .From(0f, setImmediately: false));
-    }
-
     // 저작 상태 그대로 켜 둔다(진입 연출이 끝난 자리와 같은 그림이라, 렌더가 덮어도 튀지 않는다).
     void ApplyOn()
     {
         this.RestoreRays(_lit: true);
-        this.RestoreLabel(_visible: true);
     }
 
     void ApplyOff()
     {
         this.RestoreRays(_lit: false);
-        this.RestoreLabel(_visible: false);
 
         var t_badge = this.Badge;
         if (t_badge == null) return;
@@ -308,20 +268,6 @@ public class RankPromoStandby
             this.m_poses[t_i].ApplyTo(this.rays[t_i].rectTransform);
             SetAlpha(this.rays[t_i], _lit ? this.m_rayAlphas[t_i] : 0f);
         }
-    }
-
-    void RestoreLabel(bool _visible)
-    {
-        if (this.label != null)
-        {
-            this.label.DOKill();
-            this.label.anchoredPosition = this.m_labelPos;
-        }
-
-        if (this.labelGroup == null) return;
-
-        this.labelGroup.DOKill();
-        this.labelGroup.alpha = _visible ? this.m_labelAlpha : 0f;
     }
 
     // 광선 뭉치가 천천히 돈다. 저작 각도에서 절대값으로 목표를 잡는다 — 상대 회전은 반복할수록 밀린다.

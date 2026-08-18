@@ -1,18 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>상단바의 **변동 칸** — 지금 열린 화면이 요구하는 재화를 따라간다.
-///
-/// 상단바는 두 종류로 갈린다. 골드·다이아는 어느 화면에서나 뜻이 있어 칸이 **고정**이고(그 칸의
-/// <see cref="CurrencyHud.Type"/>이 곧 그 칸의 재화다), 조각·에너지는 쓰는 화면이 정해져 있어
-/// 한 칸을 **돌려 쓴다**. 이 컴포넌트는 그 돌려 쓰는 칸 하나를 가리키는 것이 전부다 —
-/// 칸이 셋뿐인데 재화가 넷이라 생긴 자리다.
-///
-/// 요청은 owner 키로 쌓이고 걷히는 재화는 **가장 마지막 요청**이다(<see cref="LobbyShellBars"/>와 같은 관용구).
-/// 도감 탭이 에너지를 요구한 위에 카드 상세가 조각을 요구하면 조각이 뜨고, 상세를 닫으면 에너지로 돌아온다.
-/// 요청이 하나도 없으면 <see cref="defaultType"/>으로 되돌아간다.
-///
-/// 이 칸이 중요한 이유는 잔액 표시보다 **획득 연출의 도착 지점**이다 —
+/// <summary>상단바의 **변동 칸** - 지금 열린 화면이 요구하는 재화를 따라간다.
 /// 그 재화의 대표 HUD가 화면에 없으면 <see cref="CurrencyGainEffectPlayer"/>가 그 재화 연출을 통째로 건너뛴다.</summary>
 public class ContextCurrencySlot : MonoBehaviour
 {
@@ -24,7 +13,7 @@ public class ContextCurrencySlot : MonoBehaviour
 
     static readonly List<Entry> s_requests = new List<Entry>();
     static CurrencyHud s_slot;
-    // 물릴 때 함께 받아 둔다 — 칸 자신은 런타임 값만 들고 있어 저작값을 되물을 수 없다.
+   
     static ECurrencyType s_defaultType;
 
     [Tooltip("돌려 쓸 칸. 고정 칸(골드·다이아)을 여기 물리지 말 것 — 그 칸의 재화가 화면마다 갈려 버린다.")]

@@ -3922,6 +3922,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3535906181901233073}
     m_Modifications:
+    - target: {fileID: 1195070175191597604, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 100
+      objectReference: {fileID: 0}
     - target: {fileID: 3255850436131616674, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4284079103

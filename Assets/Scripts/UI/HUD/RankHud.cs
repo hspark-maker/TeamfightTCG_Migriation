@@ -30,9 +30,16 @@ public class RankHud : MonoBehaviour
     [SerializeField] float gaugeAdvanceDuration = 0.25f;
 
     [Header("티어 변화 연출")]
-    [Tooltip("첫 진입(언랭크 → 첫 등급)에서 별을 채우기 전 뜸. 화면이 눈에 들어온 뒤에 채워져야 '변했다'가 보인다.\n" +
-             "등급 승급(브론즈 → 실버)은 전면 오버레이가 맡으므로 이 값을 쓰지 않는다.")]
+    [Tooltip("첫 진입(언랭크 → 첫 등급)에서 승급 오버레이가 걷힌 뒤, 별 줄 네 칸이 나타나기 시작하기까지의 뜸.\n" +
+             "화면이 눈에 들어온 뒤에 나타나야 '생겼다'가 보인다.")]
     [SerializeField] float enterDelay = 0.35f;
+
+    [Tooltip("나타나는 별 칸이 출발하는 배율. 여기서 1로 튀어 오른다(OutBack).")]
+    [SerializeField] float pipsAppearScale = 0.4f;
+    [Tooltip("별 칸 하나가 제 크기로 올라서는 시간.")]
+    [SerializeField] float pipsAppearDuration = 0.18f;
+    [Tooltip("별 칸끼리의 간격. 0이면 네 칸이 한 번에 나타난다 — 줄로 읽히려면 조금 어긋나야 한다.")]
+    [SerializeField] float pipsAppearStep = 0.07f;
 
     [Tooltip("마디를 되짚어 내려갈 때(별이 다시 모자라짐) 별이 움츠러드는 세기. 전진 쪽 점등은 '별 점등' 항목이 맡는다.")]
     [SerializeField] float pipPunch = UiPunch.DEFAULT_SCALE;
@@ -98,6 +105,10 @@ public class RankHud : MonoBehaviour
 
     // 승급 오버레이가 화면을 덮을 때까지 표시를 옛 등급에 묶어 두는 잠금. 푸는 자리는 ApplyTierInstant 하나다.
     bool m_holdTier;
+
+    // 별 줄만 따로 묶어 두는 잠금(첫 진입 전용). 오버레이가 덮인 프레임에 배지는 갈아끼우되 별 줄은 감춘 채 남긴다 —
+    // 드러나는 자리는 오버레이가 걷힌 뒤(BuildFirstEntryReveal)다.
+    bool m_holdPips;
 
     // 포인트 손실 반응(게이지가 뒤로 미끄러지는 것뿐). 획득 쪽 반응과 겹쳐 돌지 않게 따로 든다.
     Sequence m_lossSeq;
@@ -212,7 +223,7 @@ public class RankHud : MonoBehaviour
     /// 티어가 오른 순간을 그린다. 표시는 이미 최종 티어이므로 _prevTierIndex 상태에서 출발해 지금으로 건너온다.
     /// 재생은 호출자 몫 — 끝난 뒤에 무엇을 이을지는 부르는 쪽이 정한다.
     /// _prevTierIndex가 음수면 첫 진입(언랭크 → 첫 티어)으로 본다.
-    /// 등급이 갈리는 판은 표시를 옛 등급에 묶어 두기만 한다 — 그 사건은 전면 오버레이가 맡고,
+    /// 등급이 갈리는 판(첫 진입 포함)은 표시를 옛 상태에 묶어 두기만 한다 — 그 사건은 전면 오버레이가 맡고,
     /// 덮인 프레임에 <see cref="ApplyTierInstant"/>가 최종값으로 갈아끼운다.
     /// </summary>
     public Sequence BuildTierUp(int _prevTierIndex)
@@ -231,7 +242,7 @@ public class RankHud : MonoBehaviour
         // 앞 단계(포인트 조각)가 도는 동안 새 별이 이미 차 있으면 "포인트가 차서 별이 찼다"는 인과가 깨진다.
         // m_tierSeq 대입 뒤여야 Render의 연출 가드가 이 상태를 최종값으로 덮지 않는다.
         // 게이지 값은 여기서 손대지 않는다 — 전투 직전 비율은 PrepareProgress가 이미 세워 뒀다(그리는 축은 하나다).
-        // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 별 줄이 꺼진 채 시작해 첫 칸이 찰 때 함께 나타난다.
+        // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 별 줄이 꺼진 채 시작해 오버레이가 걷힌 뒤에 드러난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
 
         // 등급이 갈리는 판은 여기서 아무것도 하지 않는다 — 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
@@ -242,12 +253,16 @@ public class RankHud : MonoBehaviour
             this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
             this.m_holdTier = true;
         }
-        // 첫 진입(언랭크 → 첫 등급)은 되돌릴 옛 등급이 없어 오버레이도 뜨지 않는다 — 별이 차오르는 것으로 족하다.
-        // 화면이 눈에 들어온 뒤에 채워져야 '변했다'가 보이므로 한 박 띄우고 시작한다.
+        // 첫 진입(언랭크 → 첫 등급)도 사건의 주인은 같은 오버레이다 — 게임에서 처음 얻는 등급이라 오히려 제일 큰 판이다.
+        // 여기서는 언랭크 화면으로 되돌려 묶어 두기만 한다. 배지가 갈리는 것을 안 보여주면 첫 등급이 '이미 그랬던 것'으로 읽힌다.
+        // 별 줄은 배지와 따로 묶는다 — 오버레이가 걷힌 뒤에 드러나는 것이 이 사건의 마지막 박이다.
         else if (t_gradeUp)
         {
-            this.m_tierSeq.AppendInterval(this.enterDelay);
-            this.StageFirstEntry(this.m_tierSeq, t_info, t_divisions);
+            RankManager.GetUnrankedDisplay(out string t_unrankedName, out Sprite t_unrankedBadge);
+            this.RenderTier(t_unrankedName, t_unrankedBadge);
+
+            this.m_holdTier = true;
+            this.m_holdPips = true;
         }
 
         // 여운 없이 끝내면 마지막 별이 튀는 도중에 연출이 잘린 것처럼 보인다.
@@ -265,11 +280,55 @@ public class RankHud : MonoBehaviour
     }
 
     /// <summary>연출 없이 지금 랭크의 최종값(배지·티어명·게이지)으로 표시를 세운다.
-    /// 승급 오버레이가 화면을 덮은 프레임에 디렉터가 부른다 — 갈아끼우는 것이 보이지 않는 유일한 자리다.</summary>
-    public void ApplyTierInstant()
+    /// 승급 오버레이가 화면을 덮은 프레임에 디렉터가 부른다 — 갈아끼우는 것이 보이지 않는 유일한 자리다.
+    /// _keepPipsHidden이면 별 줄만 감춘 채 남긴다(첫 진입 전용 — 드러나는 자리는 <see cref="BuildFirstEntryReveal"/>).
+    /// 기본값이 '감춤 해제'인 것이 안전망이다: 오버레이를 못 세우는 길로 빠져도 표시가 별 줄 없이 고착되지 않는다.</summary>
+    public void ApplyTierInstant(bool _keepPipsHidden = false)
     {
         this.m_holdTier = false;
+        if (!_keepPipsHidden) this.m_holdPips = false;
+
         this.Render();
+    }
+
+    /// <summary>첫 진입에서 오버레이가 걷힌 뒤의 마지막 박 — 별 줄이 드러난다.
+    /// 브론즈 1은 채울 칸이 0이라 '차오름'으로는 아무것도 안 보인다. 네 칸이 차례로 나타나는 것 자체가 이 박의 내용이고,
+    /// 뜻은 "이제부터 이걸 채운다"다. 진행이 0이 아닌 첫 진입이 생기면 뒤이어 실제 진행까지 찬다.
+    /// 재생은 호출자 몫(BuildTierUp과 같은 규약).</summary>
+    public Sequence BuildFirstEntryReveal()
+    {
+        this.KillTierChange();
+
+        var t_info = RankManager.GetInfo();
+
+        this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
+
+        // 오버레이가 걷힌 화면이 눈에 들어올 시간을 먼저 준다 — 걷히자마자 나타나면 오버레이의 잔상에 묻힌다.
+        this.m_tierSeq.AppendInterval(this.enterDelay);
+
+        // 묶음을 푸는 것과 켜는 것을 시퀀스 안에서 한다 — 조립 시점에 풀면 오버레이가 걷히기 전에 별 줄이 드러난다.
+        // 켜는 프레임에 곧바로 출발 배율까지 눌러 둔다. 한 프레임이라도 제 크기로 서면 '나타남'이 아니라 '깜빡임'이 된다.
+        this.m_tierSeq.AppendCallback(() =>
+        {
+            this.m_holdPips = false;
+            this.SetPipsVisible(true);
+            this.SetGaugeRatio(0f);
+            this.SetPipScales(this.pipsAppearScale);
+        });
+
+        this.StagePipsAppear(this.m_tierSeq);
+        this.StageFirstEntry(this.m_tierSeq, t_info, RankConfig.DivisionsPerGrade);
+
+        this.m_tierSeq.AppendInterval(this.finishDelay);
+
+        this.m_tierSeq.OnKill(() =>
+        {
+            this.m_tierSeq = null;
+            this.RestorePipScales();
+            this.Render();
+        });
+
+        return this.m_tierSeq;
     }
 
     void Awake()
@@ -336,6 +395,7 @@ public class RankHud : MonoBehaviour
 
         // 오버레이를 못 보고 꺼지는 길(탭 전환·씬 언로드)에서 표시가 옛 등급에 고착되지 않게 묶음을 푼다.
         this.m_holdTier = false;
+        this.m_holdPips = false;
 
         if (this.gauge != null) this.gauge.Stop();
     }
@@ -353,7 +413,8 @@ public class RankHud : MonoBehaviour
         this.RenderTier(t_info.DisplayName, t_info.Badge);
 
         // 미도달(언랭크)은 아직 한 칸도 딛지 않았다 — 티어 인덱스는 0이지만 별 줄 자체를 감춘다.
-        this.SetPipsVisible(!t_info.IsUnranked);
+        // 첫 진입 연출 중에는 이미 도달했어도 감춘 채로 둔다(m_holdPips).
+        this.SetPipsVisible(!t_info.IsUnranked && !this.m_holdPips);
         this.SetGaugeRatio(GaugeRatioOf(t_info));
 
         // 승급전은 사건이 아니라 상태다 — 로비에 들어올 때마다 여기서 즉시(연출 없이) 되세운다.
@@ -567,6 +628,34 @@ public class RankHud : MonoBehaviour
         for (int t_i = 0; t_i < t_divisions; t_i++) t_ratios[t_i] = (float)(t_i + 1) / t_divisions;
 
         return t_ratios;
+    }
+
+    // 별 줄 네 칸이 차례로 제 크기로 올라선다. 채움이 아니라 '그릇이 생긴다'를 그리는 자리다.
+    void StagePipsAppear(Sequence _seq)
+    {
+        float t_at = _seq.Duration(false);
+
+        for (int t_i = 0; t_i < RankConfig.DivisionsPerGrade; t_i++)
+        {
+            Transform t_pip = this.PipTransform(t_i);
+            if (t_pip == null) continue;
+
+            _seq.Insert(t_at + t_i * this.pipsAppearStep,
+                        t_pip.DOScale(1f, this.pipsAppearDuration).SetEase(Ease.OutBack));
+        }
+
+        // Insert는 이어붙이는 머리를 밀지 않는다 — 뒤에 오는 채움이 나타남 위로 겹치지 않게 여기서 밀어 준다.
+        _seq.AppendInterval((RankConfig.DivisionsPerGrade - 1) * this.pipsAppearStep + this.pipsAppearDuration);
+    }
+
+    // 별 칸 전체를 한 배율로 눌러 둔다(나타남의 출발점). 되돌림은 RestorePipScales가 맡는다.
+    void SetPipScales(float _scale)
+    {
+        for (int t_i = 0; t_i < RankConfig.DivisionsPerGrade; t_i++)
+        {
+            Transform t_pip = this.PipTransform(t_i);
+            if (t_pip != null) t_pip.localScale = Vector3.one * _scale;
+        }
     }
 
     // 첫 진입(언랭크 → 첫 등급)의 별 채움. 등급 승급(브론즈 → 실버)은 이 길로 오지 않는다 —
