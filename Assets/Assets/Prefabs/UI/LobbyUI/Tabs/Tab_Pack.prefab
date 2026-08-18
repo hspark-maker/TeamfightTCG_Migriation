@@ -1421,6 +1421,7 @@ GameObject:
   - component: {fileID: 4962127597130090111}
   - component: {fileID: 3788674691775156783}
   - component: {fileID: 4501266090730845887}
+  - component: {fileID: 5085416356580079115}
   m_Layer: 0
   m_Name: Tab_Pack
   m_TagString: Untagged
@@ -1525,6 +1526,18 @@ MonoBehaviour:
     burstFall: 0.45
     burstSpin: 0
     burstAdditive: 1
+--- !u!114 &5085416356580079115
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6063502013743064060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a170282e7ed1b574db040296a8ed8793, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyTabPanel
 --- !u!1 &6487736475670867845
 GameObject:
   m_ObjectHideFlags: 0

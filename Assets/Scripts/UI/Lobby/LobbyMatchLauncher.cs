@@ -18,7 +18,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     [Header("유효 덱 없음 안내")]
     [SerializeField] LobbyTabController lobbyTabController;
-    [SerializeField] int deckTabIndex = 3;   // LobbyTabController.tabs: 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection
+    [SerializeField] LobbyTabPanel deckPanel;
 
     [Header("기능 잠금")]
     [Tooltip("전투 진입 버튼(PlayBtn). 이 컴포넌트가 LobbyPlay 해금 여부로 interactable을 소유한다.\n" +
@@ -212,7 +212,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void GoToDeckTab()
     {
-        lobbyTabController?.Select(deckTabIndex);
+        if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
     // 셸 미배선 폴백 전용. 저장된 슬롯 중 첫 유효 덱을 DeckConfig에 적용하고, 없으면 false.
