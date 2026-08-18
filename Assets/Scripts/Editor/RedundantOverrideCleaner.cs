@@ -86,6 +86,26 @@ static class RedundantOverrideCleaner
                 + $"오버라이드 {t_before} -> {t_kept} (무의미 {t_removed} 제거)\n{t_report}");
     }
 
+    internal static int CountRedundantOwnedOverrides(GameObject _root)
+    {
+        int t_count = 0;
+        foreach (Transform t_child in _root.GetComponentsInChildren<Transform>(true))
+        {
+            GameObject t_go = t_child.gameObject;
+            if (t_go == _root || !PrefabUtility.IsAnyPrefabInstanceRoot(t_go)) continue;
+            if (PrefabUtility.GetOutermostPrefabInstanceRoot(t_go) != t_go) continue;
+
+            foreach (PropertyModification t_mod in
+                     PrefabUtility.GetPropertyModifications(t_go) ??
+                     System.Array.Empty<PropertyModification>())
+            {
+                if (!IsInstanceRootBookkeeping(t_go, t_mod) && IsRedundant(t_mod))
+                    t_count++;
+            }
+        }
+        return t_count;
+    }
+
     /// <summary>인스턴스 루트의 Transform 값과 이름은 유니티가 늘 다시 쓴다 — 판단 대상에서 뺀다.</summary>
     static bool IsInstanceRootBookkeeping(GameObject _instanceRoot, PropertyModification _mod)
     {

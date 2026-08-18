@@ -110,6 +110,17 @@ public static class LobbyPrefabOverrideAudit
                     t_canvas);
             }
 
+            int t_redundantOverrides =
+                RedundantOverrideCleaner.CountRedundantOwnedOverrides(t_canvas);
+            if (t_redundantOverrides > 0)
+            {
+                t_warnings++;
+                Debug.LogWarning(
+                    $"[LobbyPrefabOverrideAudit] Redundant overrides: " +
+                    $"{t_redundantOverrides}. Run Tools/Lobby/Redundant Overrides - Apply.",
+                    t_canvas);
+            }
+
             t_errors += AuditOwnedPrefabDuplicates();
 
             int t_unusedSceneOverrides = CountUnusedLobbySceneOverrides();
@@ -125,7 +136,8 @@ public static class LobbyPrefabOverrideAudit
             string t_summary =
                 $"[LobbyPrefabOverrideAudit] roots={t_nestedRoots.Count}, " +
                 $"errors={t_errors}, warnings={t_warnings}, " +
-                $"crossBoundaryRefs={t_crossBoundaryReferences}";
+                $"crossBoundaryRefs={t_crossBoundaryReferences}, " +
+                $"redundantOverrides={t_redundantOverrides}";
             if (t_errors == 0)
                 Debug.Log(t_summary, t_canvas);
             else
