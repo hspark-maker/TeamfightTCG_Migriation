@@ -36,26 +36,22 @@ public class PackAcquireController : MonoBehaviour
     [Tooltip("모자란 가격 숫자의 색. 무채색 밑판이 '못 누른다'를 말하고 이 색이 '어디가 모자란가'를 말한다.")]
     [SerializeField] Color shortPriceColor  = new Color(0.95f, 0.30f, 0.28f, 1f);
     [SerializeField] Color normalPriceColor = Color.white;
-    [Tooltip("개봉 화면 위에 띄우는 잔액 표시들(재화별로 한 장씩). 이번 팩의 결제 재화 하나만 켜진다.\n\n" +
-             "개봉 화면이 로비를 통째로 덮어 로비 재화 바가 보이지 않는다 — 되사기로 재화가 빠지는데 " +
-             "줄어드는 숫자가 화면에 없으면 유저는 얼마가 남았는지 모른 채 반복 구매한다.\n\n" +
-             "여기 넣는 CurrencyHud는 'Register As Primary'를 반드시 꺼 둘 것(그 필드 툴팁 참고). " +
-             "미배선이면 잔액 표시 없이 예전처럼 돈다.")]
-    [SerializeField] CurrencyHud[] balanceHuds;
-    [Tooltip("여닫을 잔액 표시 묶음(위 칩들의 부모). 결과 화면에서 들어오고 되사기로 다시 나간다 " +
-             "— 개봉 연출 내내 떠 있으면 팩에 가 있어야 할 시선을 숫자가 가져간다. " +
-             "미배선이면 연출 없이 칩만 토글된다.")]
-    [SerializeField] GameObject balanceRoot;
-    [Tooltip("잔액 묶음의 등장·퇴장 연출. Panel에 위 묶음의 RectTransform을 물려야 스케일 팝이 돈다.")]
-    [SerializeField] PopupTransition balanceTransition = new PopupTransition();
-    [Tooltip("중복 환급 코인을 위 잔액 표시로 흘려보낼 재생기. 개봉 캔버스 안에 있어야 코인이 이 화면 위에 보인다 " +
-             "— 로비 쪽 재생기를 물리면 코인이 이 화면 밑에 그려져 숫자만 오른다.\n\n" +
-             "이 재생기의 'Shared'는 반드시 꺼 둘 것(그 필드 툴팁 참고).\n\n" +
-             "미배선이면 환급을 여기서 보여주지 않고 예전처럼 로비 획득 연출로 넘긴다.")]
+    [Header("재화 상단바")]
+    [Tooltip("결과 화면 상단바(조각·골드·다이아 한 줄). 결과에서만 뜬다 — 개봉 연출 중엔 걷혀 있다.")]
+    [SerializeField] GameObject currencyBar;
+    [Tooltip("상단바 등장 연출. Panel에 바의 RectTransform을 물릴 것.")]
+    [SerializeField] PopupTransition barTransition = new PopupTransition();
+    [Tooltip("바 안의 조각 칩. 중복 환급 코인이 여기로 꽂힌다. 'Register As Primary'는 꺼 둘 것.")]
+    [SerializeField] CurrencyHud shardHud;
+    [Tooltip("환급 코인을 조각 칩으로 흘려보낼 재생기. 개봉 캔버스 안에 둘 것('Shared'는 꺼 둘 것). " +
+             "미배선이면 환급을 로비 획득 연출로 넘긴다.")]
     [SerializeField] CurrencyGainEffectPlayer refundEffect;
-    [Tooltip("재구매 → 재개봉으로 갈아치울 때 화면을 덮는 플래시의 생김새. " +
-             "첫 구매(PackShowcaseController의 '구매 → 개봉 전환 플래시')와 같은 값으로 둘 것 — " +
-             "두 결제가 다른 사건으로 보이면 '또 샀다'가 읽히지 않는다.")]
+
+    [Header("재개봉 전환")]
+    [Tooltip("재개봉을 덮는 판. 재화 바보다 앞 형제로 둘 것 — 뒤에 두면 바까지 덮여 골드 차감이 안 보인다. " +
+             "미배선이면 전역 플래시로 덮는다(바도 함께 덮인다).")]
+    [SerializeField] Image retryCover;
+    [Tooltip("재개봉 전환 플래시의 생김새. 첫 구매(PackShowcaseController)와 같은 값으로 둘 것.")]
     [SerializeField] ScreenFlashCover retryFlash = new ScreenFlashCover();
 
     // 캐리어에서 받은 목적지 컨텍스트(Start에서 캡처, 이후 재판정 안 함).
@@ -84,6 +80,7 @@ public class PackAcquireController : MonoBehaviour
     // 이번 세션의 환급을 이 화면에서 이미 보여줬는가. 보여줬으면 로비로 넘기지 않는다 —
     // 같은 코인을 두 화면에서 두 번 받는 그림이 되고, 유저는 두 배를 받은 줄로 읽는다.
     bool m_refundShown;
+
 
     /// <summary>캐리어에 실린 개봉 세션을 뷰에 태운다. 오버레이가 열릴 때마다 호출된다
     /// — Start에 두면 오버레이는 한 번만 열리는 화면이 된다(재개봉 불가).</summary>
@@ -115,14 +112,9 @@ public class PackAcquireController : MonoBehaviour
         m_refundShown = false;
         BindRetryPrice();
 
-        // 잔액은 결과 화면의 것이다 — 세션 시작 시엔 연출 없이 즉시 치운다(퇴장을 여기서 또 돌리면
-        // 첫 개봉에서 칩이 잠깐 떴다 사라지는 프레임이 생긴다). 어느 칩을 쓸지는 지금 정해 둔다.
-        if (balanceRoot != null)
-        {
-            balanceRoot.SetActive(false);
-            balanceTransition.HandleDisabled(balanceRoot);
-        }
-        BindBalanceHud();
+        // 바는 결과 화면의 것이다 — 세션이 갈리는 지금 연출 없이 즉시 치운다. 재개봉이 여기 올 때는
+        // 덮개가 이미 화면을 가린 뒤라(차감 롤다운도 그 앞에서 끝난다) 걷히는 프레임이 드러나지 않는다.
+        HideBar();
 
         view.BeginOpen(t_opened, m_pack);
         return true;
@@ -151,7 +143,7 @@ public class PackAcquireController : MonoBehaviour
         m_retrying = false;
 
         // 퇴장 중에 오버레이가 닫히면 완료 콜백이 오지 않는다 — 켜진 채 남으면 다음 개봉에서 유령 프레임이 뜬다.
-        if (balanceRoot != null) balanceTransition.HandleDisabled(balanceRoot);
+        HideBar();
     }
 
     IEnumerator CloseNextFrame()
@@ -188,25 +180,25 @@ public class PackAcquireController : MonoBehaviour
         if (retryButton != null) retryButton.gameObject.SetActive(true);
         RefreshRetryLock();
 
-        // 잔액을 먼저 세운다. SetVisible이 같은 프레임에 SetActive(true)까지 끝내므로 아래 환급 연출이
-        // 곧바로 그 칩을 찾을 수 있고, 되감기(BeginGainRollUp)도 등장과 같은 프레임에 걸린다
+        // 바를 먼저 세운다. SetVisible이 같은 프레임에 SetActive(true)까지 끝내므로 아래 환급 연출이
+        // 곧바로 조각 칩을 찾을 수 있고, 되감기(BeginGainRollUp)도 등장과 같은 프레임에 걸린다
         // — 한 프레임이라도 늦으면 환급이 이미 반영된 최종값이 먼저 보였다가 뒤로 떨어진다.
-        if (balanceRoot != null) balanceTransition.SetVisible(balanceRoot, true);
+        if (currencyBar != null) barTransition.SetVisible(currencyBar, true);
 
         PlayRefundGain();
     }
 
-    // 중복 환급을 이 화면의 잔액 표시로 흘려보낸다. 카드가 다 깔린 이 시점이어야 —
+    // 중복 환급을 조각 칩으로 흘려보낸다. 카드가 다 깔린 이 시점이어야 —
     // 넘기는 도중에 쏘면 "이 카드가 중복이었다"는 낱장의 사연이 합계 코인에 묻힌다.
     // 화면 중앙의 환급 칩이 같은 순간 합계를 굴려 올리므로, 코인은 그 값이 어디로 갔는지를 잇는 역할이다.
     void PlayRefundGain()
     {
         if (m_refundShown || refundEffect == null || !m_refund.HasAmount) return;
 
-        // 받을 자리가 이 화면에 서 있을 때만 쏜다. 없으면(팩의 환급 재화가 결제 재화와 다른 경우 등)
+        // 받을 자리가 이 화면에 서 있을 때만 쏜다. 없으면(팩의 환급 재화가 조각 칩과 다른 경우 등)
         // 그대로 두어 로비 획득 연출이 가져가게 한다 — 여기서 쏘면 코인이 지금 안 보이는 곳으로 날아가
         // 유저는 환급을 한 번도 못 보게 된다.
-        var t_hud = ResolveBalanceHud(m_refund.Type);
+        var t_hud = ActiveShardHud(m_refund.Type);
         if (t_hud == null) return;
 
         // 잔액이 이미 최종값이라는 전제(TryPurchase가 환급까지 끝냈다) — 재생기가 그만큼 되돌렸다 올린다.
@@ -218,17 +210,18 @@ public class PackAcquireController : MonoBehaviour
     /// 카드는 언제나 넘긴다 — 도감에 꽂히는 연출은 로비에만 자리가 있다.</summary>
     CurrencyGain PendingRefund() => m_refundShown ? CurrencyGain.None : m_refund;
 
-    // 이 화면에 **떠 있는** 그 재화의 잔액 표시. 꺼져 있으면 없는 것과 같다 —
+    // 이 화면에 **떠 있는** 조각 칩. 꺼져 있으면 없는 것과 같다 —
     // CoinBurstEffect는 비활성 노드에서 코인을 즉시 걷어 숫자만 오르는 그림이 된다.
-    CurrencyHud ResolveBalanceHud(ECurrencyType _type)
+    CurrencyHud ActiveShardHud(ECurrencyType _type)
+        => shardHud != null && shardHud.Type == _type && shardHud.isActiveAndEnabled ? shardHud : null;
+
+    // 연출 없이 즉시 치운다.
+    void HideBar()
     {
-        if (balanceHuds == null) return null;
+        if (currencyBar == null) return;
 
-        for (int t_i = 0; t_i < balanceHuds.Length; t_i++)
-            if (balanceHuds[t_i] != null && balanceHuds[t_i].Type == _type
-                && balanceHuds[t_i].isActiveAndEnabled) return balanceHuds[t_i];
-
-        return null;
+        currencyBar.SetActive(false);
+        barTransition.HandleDisabled(currencyBar);
     }
 
     // 살 수 없으면 잠근다(잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없다 — 상점 RefreshBuyLock과 같은 방침).
@@ -256,33 +249,6 @@ public class PackAcquireController : MonoBehaviour
         // 빨강은 "여기가 모자란다" 한 축에만 쓴다 — 튜토리얼·기능잠금은 모자란 것이 아니다.
         if (retryPriceText != null)
             retryPriceText.color = t_allowed && !t_afford ? shortPriceColor : normalPriceColor;
-    }
-
-    // 이 개봉으로 값이 움직이는 재화만 띄운다. 쓰지도 않는 숫자를 늘리면 유저가 두 값을 견주기 시작한다.
-    // 차감 연출(롤다운+펄스)은 CurrencyHud가 OnCurrencySpent를 직접 받아 스스로 돈다 — 여기서 지시하지 않는다.
-    void BindBalanceHud()
-    {
-        if (balanceHuds == null) return;
-
-        for (int t_i = 0; t_i < balanceHuds.Length; t_i++)
-        {
-            if (balanceHuds[t_i] == null) continue;
-
-            balanceHuds[t_i].gameObject.SetActive(MovesInThisPack(balanceHuds[t_i].Type));
-        }
-    }
-
-    /// <summary>이 팩을 여는 동안 잔액이 움직이는 재화인가. 결제 재화는 언제나(되사기가 거기서 빠진다),
-    /// 환급 재화는 종류가 갈릴 때 하나 더 — 다이아로 사고 골드로 돌려받는 팩이 있다(UltraPack).
-    ///
-    /// 판정을 이번 결과가 아니라 <b>팩 저작값</b>으로 하는 이유: 중복이 없는 세션에서만 칩이 사라지면
-    /// 같은 팩인데 열 때마다 화면 구성이 달라진다.</summary>
-    bool MovesInThisPack(ECurrencyType _type)
-    {
-        if (m_pack == null) return false;
-        if (_type == m_pack.PriceType) return true;
-
-        return m_pack.RefundAmount > 0 && _type == m_pack.RefundType;
     }
 
     // 한 번 더 버튼의 가격 표시. 세션당 한 번만 바뀐다(같은 팩을 되사므로 값이 움직이지 않는다).
@@ -332,31 +298,29 @@ public class PackAcquireController : MonoBehaviour
         // 목적지 컨텍스트는 그대로 물려준다 — 어느 세션에서 획득을 누르든 나가는 곳은 같아야 한다.
         PackHandoff.Set(t_opened, m_pack, m_nextScene, m_startTutorial);
 
-        // 잔액은 결과 화면과 함께 물러난다. 퇴장(0.15s)이 플래시가 덮는 시각(0.26s)보다 짧아 온전히 보인다.
-        if (balanceRoot != null) balanceTransition.SetVisible(balanceRoot, false);
-
-        // 결제는 끝났고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다 —
-        // 버튼을 죽이면 획득이 반투명 회색으로 사라지는 것이 덮이기 전 0.26초 동안 그대로 보인다
+        // 결제는 끝났고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다
         // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
         m_retrying = true;
 
         // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
         // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.
+        // 덮개는 전역이 아니라 프리팹 판이다 — 전역으로 덮으면 재화 바까지 가려 골드 차감이 안 보인다.
         // 연출을 세우지 못하면 예전처럼 즉시 갈아끼운다(연출은 있으면 좋은 것이지, 재개봉의 조건이 아니다).
         if (PackPurchaseImpact.TryGet(this, out var t_impact))
-            t_impact.Play(retryButton != null ? (RectTransform)retryButton.transform : null, retryFlash, RestartSession);
+            t_impact.Play(retryButton != null ? (RectTransform)retryButton.transform : null,
+                          retryFlash, RestartSession, retryCover);
         else
             RestartSession();
     }
 
-    // 화면이 플래시로 덮인 순간 1회(끊겨도 임팩트가 반드시 부른다). 여기서만 세션을 갈아끼운다 —
+    // 화면이 덮인 순간 1회(끊겨도 임팩트가 반드시 부른다). 여기서만 세션을 갈아끼운다 —
     // 결과 격자가 걷히고 팩이 서는 프레임이 덮개 밑에 숨어야 하드컷으로 드러나지 않는다.
     void RestartSession()
     {
         if (!m_retrying) return;
         m_retrying = false;
 
-        // 덮이는 사이 화면을 떠났다면(획득·씬 전이) 되살릴 세션이 없다 — 캐리어는 다음 개봉이 소비한다.
+        // 그 사이 화면을 떠났다면(획득·씬 전이) 되살릴 세션이 없다 — 캐리어는 다음 개봉이 소비한다.
         if (m_left) return;
 
         view.ResetSession();   // 요약 상태를 되돌려야 BeginOpen의 재진입 가드가 풀린다.
