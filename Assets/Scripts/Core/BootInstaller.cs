@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // 전역 부트 프리팹의 루트. 사본이 LoadingScene·LobbyScene 둘이라 먼저 깬 쪽이 부트를 선점한다
 // (정상 경로는 로딩 씬이, 로비 단독 Play는 로비 사본이 맡는다).
@@ -24,25 +25,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardGrowthConfig growthConfig;
     // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
     [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
-
-    [Header("전역 UI — 상주 자식")]
-    // 씬 전환을 덮는 두 장. 어느 씬 것도 아닌 물건이라 부트 프리팹의 자식으로 **꺼진 채** 상주한다
-    // (SceneTransition과 같은 자리). 여기 꽂는 것은 프리팹이 아니라 그 자식 인스턴스 자신이다 —
-    // 이미 존재하는 것을 넘기므로 코드가 세울 일도, 찾을 일도 없다.
-
-    // 씬 전환 커튼(로비 → 전투). 미배선(null)이면 커튼 없이 전환만 된다.
-    [SerializeField] CurtainView sceneCurtain;
-    // 씬 전환 로딩 커버(전투 → 로비). 미배선(null)이면 커버 없이 전환만 된다.
-    // StartScene의 부트 커버는 씬에 따로 저작된 별개 노드라 이 배선과 무관하다.
-    [SerializeField] LoadingCoverView loadingCover;
-
-    [Header("전역 UI — 찍어내는 프리팹")]
-    // 자물쇠는 잠긴 요소마다 새로 붙어 개수가 런타임에 정해진다 — 상주시킬 수 없는 유일한 것이라
-    // 여기만 프리팹을 들고 있다가 static에 꽂는다. 전투 씬에는 부트 사본이 없지만 이 주입이
-    // DontDestroyOnLoad를 타고 넘어가므로 배선이 따로 필요 없다.
-
-    // 잠긴 기능에 붙는 자물쇠 배지. 미배선(null)이면 잠김이 흑백으로만 보인다.
-    [SerializeField] GameObject lockBadgePrefab;
+    [FormerlySerializedAs("runtimeUiPrefabs")]
+    [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
 
     static bool s_booted;
 
@@ -57,11 +41,7 @@ public class BootInstaller : MonoBehaviour
 
         s_booted = true;
         DontDestroyOnLoad(gameObject);
-
-        // 전역 UI 주입 — 데이터와 순서 관계가 없어 가장 앞에 둔다.
-        CurtainView.SetInstance(sceneCurtain);
-        LoadingCoverView.SetInstance(loadingCover);
-        FeatureLockView.SetBadgePrefab(lockBadgePrefab);
+        SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;

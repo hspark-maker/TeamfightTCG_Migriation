@@ -21,5 +21,31 @@
   },
   "enabledMcpjsonServers": [
     "unity-mcp"
-  ]
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Grep|Glob|Bash|PowerShell|mcp__unity-mcp__Unity_(Grep|FindInFile|FindProjectAssets))$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/map-gate.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Read|Bash|PowerShell)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/map-gate.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
 }

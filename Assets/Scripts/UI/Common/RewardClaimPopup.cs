@@ -11,10 +11,8 @@ using TMPro;
 //
 // ⚠ 어느 탭에도 속하지 않는 공용 1개다. 랭크 오버레이 밑에 두면 그 오버레이를 켜야만 뜨므로,
 //   앨범 수령에서 랭크 보상 목록이 뒤에 같이 켜진다 — 반드시 두 오버레이의 형제로 선다.
-public class RewardClaimPopup : MonoBehaviour
+public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 {
-    static RewardClaimPopup s_instance;
-
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 
@@ -62,13 +60,7 @@ public class RewardClaimPopup : MonoBehaviour
     /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).
     /// </summary>
     public static bool TryGet(out RewardClaimPopup _popup)
-    {
-        if (s_instance == null)
-            s_instance = FindFirstObjectByType<RewardClaimPopup>(FindObjectsInactive.Include);
-
-        _popup = s_instance;
-        return _popup != null;
-    }
+        => TryGetExisting(out _popup);
 
     /// <summary>
     /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —

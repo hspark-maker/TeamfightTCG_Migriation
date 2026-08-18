@@ -401,6 +401,8 @@ GameObject:
   m_Component:
   - component: {fileID: 7284149686138063173}
   - component: {fileID: 5348725580790043576}
+  - component: {fileID: 2836729118353540666}
+  - component: {fileID: 2020216312440142933}
   m_Layer: 0
   m_Name: RewardClaimPopup
   m_TagString: Untagged
@@ -442,7 +444,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de872598cf74eb749b54f9aa8b7d8b87, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RankRewardClaimPopup
+  m_EditorClassIdentifier: Assembly-CSharp::RewardClaimPopup
   root: {fileID: 1600789160134675030}
   titleText: {fileID: 7863546268192744097}
   claimButton: {fileID: 7856946437835751216}
@@ -520,6 +522,46 @@ MonoBehaviour:
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   burstOrigin: {fileID: 5164052484891302055}
+--- !u!223 &2836729118353540666
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1600789160134675030}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 2
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 0
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 410
+  m_TargetDisplay: 0
+--- !u!114 &2020216312440142933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1600789160134675030}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &2007582290194512035
 GameObject:
   m_ObjectHideFlags: 0

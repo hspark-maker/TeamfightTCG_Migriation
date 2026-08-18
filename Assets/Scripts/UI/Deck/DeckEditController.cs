@@ -19,6 +19,8 @@ public class DeckEditController : MonoBehaviour
     [Header("편성 UI")]
     [SerializeField] DeckEditSlotView[]     slots;          // 크기 6
     [SerializeField] DeckEditCollectionGrid collectionGrid;
+    [Tooltip("로비에서는 LobbyTabController가 Initialize로 넘긴다(탭 프리팹에 오버라이드를 남기지 않으려고).\n"
+           + "여기 배선은 덱 편집을 단독으로 띄우는 테스트 씬용 폴백이다.")]
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
@@ -61,6 +63,13 @@ public class DeckEditController : MonoBehaviour
     // OnDisable에서 지우지 않는다 — 이건 편집 상태가 아니라 배선이고, 패널을 껐다 켤 때마다
     // 다시 주입해야 하면 호스트가 이 패널의 라이프사이클을 추적해야 한다.
     public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
+
+    /// <summary>드래그 컨트롤러 주입. 로비는 탭 초기화에서 넘기고, 테스트 씬은 인스펙터 배선을 그대로 쓴다.
+    /// null을 넘기면 기존 배선을 지우지 않는다 — 로비에 미배선인 경우 폴백이 살아남게.</summary>
+    public void SetDragController(DeckEditDragController _controller)
+    {
+        if (_controller != null) dragController = _controller;
+    }
 
     void Awake()
     {

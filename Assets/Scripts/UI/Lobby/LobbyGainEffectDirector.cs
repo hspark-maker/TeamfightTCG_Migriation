@@ -17,13 +17,8 @@ using UnityEngine;
 public class LobbyGainEffectDirector : MonoBehaviour
 {
     [Header("배선 (비우면 자동 탐색)")]
-    [Tooltip("카드가 빨려들 도감 탭 버튼. 비우면 collectionTabName으로 찾는다.")]
-    [SerializeField] RectTransform collectionTabTarget;
-    [Tooltip("도감 탭 버튼 오브젝트 이름(자동 탐색용).")]
-    [SerializeField] string collectionTabName = "Button_Collection";
-    [Tooltip("도감 탭이 선택돼 원 버튼이 꺼져 있을 때 대신 쓸 오브젝트 이름.")]
-    [SerializeField] string tabFocusName = "Button_Focus";
-
+    [Tooltip("카드가 빨려들 도감 탭의 시각 앵커를 제공한다.")]
+    [SerializeField] LobbyTabBarView tabBar;
     [Header("삽입 세션 (비우면 자동 탐색)")]
     [SerializeField] LobbyTabController lobbyTabController;
     [Tooltip("도감 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
@@ -42,6 +37,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
     // 이번 재생분만 쓰는 카드 출발점(PlayNow가 실어 준다). 보여 주던 화면이 있으면 그 카드가 서 있던
     // 자리에서 출발해야 "방금 본 그 카드가 도감으로 갔다"가 한 줄로 이어진다.
     RectTransform m_cardOrigin;
+    RectTransform m_collectionTarget;
 
     // 이번 재생분 식별자. 앞 연출을 강제 마무리(Complete)하면 그 시퀀스의 완료 콜백도 함께 터지는데,
     // 그것을 이번 재생의 종료로 오인하면 기다리던 안내가 카드가 날기도 전에 다음으로 넘어간다.
@@ -231,7 +227,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         }
 
         // _fireTrigger는 반드시 false — true면 도감 탭 첫 진입 튜토리얼이 발화해 딤이 삽입 세션을 덮는다.
-        if (this.lobbyTabController != null) this.lobbyTabController.Select(this.collectionTabIndex, false);
+        if (this.lobbyTabController != null) this.lobbyTabController.Select(t_album, false);
 
         // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.
         if (!t_album.isActiveAndEnabled)
@@ -254,9 +250,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
     // 도감 탭은 평소 꺼져 있다 — 비활성 포함으로 찾는다.
     AlbumTabController ResolveAlbumTab()
     {
-        if (this.albumTabController == null)
-            this.albumTabController = FindFirstObjectByType<AlbumTabController>(FindObjectsInactive.Include);
-
         return this.albumTabController;
     }
 
@@ -276,16 +269,16 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards, RectTransform _origin)
     {
-        if (this.collectionTabTarget == null) this.collectionTabTarget = FindTabTarget();
-        if (this.collectionTabTarget == null)
+        m_collectionTarget = tabBar != null ? tabBar.GetVisualAnchor(collectionTabIndex) : null;
+        if (m_collectionTarget == null)
         {
-            Debug.LogWarning($"[LobbyGainEffectDirector] 도감 탭('{this.collectionTabName}')을 찾지 못해 카드 연출을 건너뛴다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭 앵커가 연결되지 않아 카드 연출을 건너뛴다.");
             return false;
         }
 
         // 출발점이 없으면 목적지에서 분출한다(씬 로드·팩 닫힘 경로 — 보여 주던 카드가 없다).
         var t_flight = EnsureCardFlight();
-        t_flight.Configure(_origin != null ? _origin : this.collectionTabTarget, this.collectionTabTarget);
+        t_flight.Configure(_origin != null ? _origin : m_collectionTarget, m_collectionTarget);
 
         _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
         return true;
@@ -293,7 +286,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     void OnCardArrived()
     {
-        UiPunch.Play(PunchTargetOf(this.collectionTabTarget), this.tabPunch);
+        UiPunch.Play(PunchTargetOf(m_collectionTarget), this.tabPunch);
     }
 
     CardGainFlightEffect EnsureCardFlight()
@@ -311,26 +304,4 @@ public class LobbyGainEffectDirector : MonoBehaviour
     }
 
     // 도감 탭 RectTransform 탐색. 선택된 탭은 버튼이 꺼지고 Focus가 그 자리를 대신하므로 그때는 Focus를 쓴다.
-    RectTransform FindTabTarget()
-    {
-        var t_root = GetComponentInParent<Canvas>();
-        if (t_root == null) return null;
-
-        var t_tab = FindByName(t_root.transform, this.collectionTabName);
-        if (t_tab != null && t_tab.gameObject.activeInHierarchy) return t_tab;
-
-        var t_focus = FindByName(t_root.transform, this.tabFocusName);
-        return t_focus != null && t_focus.gameObject.activeInHierarchy ? t_focus : t_tab;
-    }
-
-    static RectTransform FindByName(Transform _root, string _name)
-    {
-        if (string.IsNullOrEmpty(_name)) return null;
-
-        var t_all = _root.GetComponentsInChildren<RectTransform>(true);
-        for (int t_i = 0; t_i < t_all.Length; t_i++)
-            if (t_all[t_i].name == _name) return t_all[t_i];
-
-        return null;
-    }
 }

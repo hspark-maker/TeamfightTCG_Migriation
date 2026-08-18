@@ -39,7 +39,4 @@
 
 지도를 고쳤으면 `node .claude/check-feature-map.js` 로 타입 실재를 검증한다.
 
-## 경로 맵 (orch 관리)
-<!-- orch:pathmap:start -->
-<!-- 항상 로드 금지. 경로 맵은 `.claude/orch-pathmap.md`에 있음 — 필요할 때 Read/Glob으로 조회. (@import 시 세션당 ~15k 토큰 상주) -->
-<!-- orch:pathmap:end -->
+전체 파일 목록만 필요하면 Glob 또는 rg --files 로 현재 상태를 조회한다.

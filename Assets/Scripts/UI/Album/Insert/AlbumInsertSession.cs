@@ -22,10 +22,23 @@ public class AlbumInsertSession : MonoBehaviour
     /// <summary>안내가 이 세션을 몰고 있다 — 탭 이탈을 삼키고, 끝나면 페이지 오버레이까지 걷는다.</summary>
     public static bool TutorialMode;
 
+    public void RequestLeave(Action _proceed)
+    {
+        if (!IsRunning)
+        {
+            _proceed?.Invoke();
+            return;
+        }
+
+        if (TutorialMode) return;
+
+        AbortAll();
+        _proceed?.Invoke();
+    }
+
     [Header("바깥 연결")]
     [SerializeField] AlbumTabController   albumTabController;
     [SerializeField] AlbumPageOverlayView pageOverlay;
-    [SerializeField] LobbyTabController   lobbyTabController;
 
     [Header("패널 내부")]
     [SerializeField] AlbumSleeveView          sleeve;
@@ -132,9 +145,6 @@ public class AlbumInsertSession : MonoBehaviour
         // 다른 탭으로 나가려 하면 자동 진행이 아니라 즉시 끝낸다 — 안 보이는 화면에서 연출을 계속 돌릴 이유가 없다.
         // 안내 중에는 이탈 자체를 삼킨다 — 선택된 탭은 버튼이 꺼지고 Focus가 대신하므로(LobbyTabController.Select),
         // 유저가 먼저 그 탭으로 가 버리면 뒤이어 그 버튼을 가리키는 안내가 영영 뜨지 못한다. 탈출로는 건너뛰기다.
-        if (lobbyTabController != null)
-            lobbyTabController.SetLeaveGuard(_p => { if (TutorialMode) return; AbortAll(); _p(); });
-
         if (pageOverlay != null)
         {
             // 오버레이를 셸 위로 올려 그 딤 한 장이 화면 전체를 덮게 한다 —
@@ -495,8 +505,6 @@ public class AlbumInsertSession : MonoBehaviour
             pageOverlay.SetInteractionLocked(false);
             pageOverlay.SetFrontmost(false);
         }
-        if (lobbyTabController != null) lobbyTabController.ClearLeaveGuard();
-
         IsRunning = false;
 
         // 전면 Blocker가 남아 있으면 세션이 끝난 뒤에도 도감 입력을 계속 먹는다.

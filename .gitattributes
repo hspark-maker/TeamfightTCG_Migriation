@@ -14,3 +14,6 @@
 #   등록 안 하면 예전처럼 충돌만 날 뿐 손상되지는 않는다.
 Assets/Fonts/**/*.asset          -text merge=ours
 Assets/Resources/Fonts/*.asset   -text merge=ours
+
+# Unity prefab YAML must use Smart Merge to keep nested-prefab edits reviewable.
+*.prefab merge=unityyamlmerge

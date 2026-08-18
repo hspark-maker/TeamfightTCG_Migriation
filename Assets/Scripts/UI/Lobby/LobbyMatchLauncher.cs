@@ -2,14 +2,13 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// 로비 PlayBtn → 출전 덱 확정 → AI 대전 진입.
 /// 전투가 소비하는 DeckConfig.PlayerDeck을 채우는 지점은 이 진입점이 여는 덱 화면(MatchDeckShell) 하나뿐이다.
 /// 배틀 씬은 확정된 값을 읽기만 한다 — 확정 지점이 씬을 넘어 둘로 갈리지 않게.
 public class LobbyMatchLauncher : MonoBehaviour
 {
-    [SerializeField] MatchDeckShell shell;          // 미배선이면 게이트 없이 첫 유효 덱으로 진입(구 동작)
+    [SerializeField] LobbyOverlayHost overlayHost;
     [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
@@ -18,12 +17,12 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     [Header("유효 덱 없음 안내")]
     [SerializeField] LobbyTabController lobbyTabController;
-    [SerializeField] int deckTabIndex = 3;   // LobbyTabController.tabs: 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection
+    [SerializeField] LobbyTabPanel deckPanel;
 
     [Header("기능 잠금")]
     [Tooltip("전투 진입 버튼(PlayBtn). 이 컴포넌트가 LobbyPlay 해금 여부로 interactable을 소유한다.\n" +
              "미배선이면 잠김이 화면에 안 드러난다 — 진입 차단 자체는 StartAiBattle이 따로 막는다.")]
-    [SerializeField] Button playButton;
+    [SerializeField] LobbyMatchTabPanel matchPanel;
 
     const string BATTLE_SCENE = "BattleScene";
 
@@ -33,6 +32,34 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
+    LobbyOverlayHost m_overlayHost;
+
+    /// <summary>
+    /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
+    ///
+    /// 에셋을 물면 화면에 없는 원본을 조작하게 된다 — 매치 덱 화면이 열리지 않고, 에디터에서는 그 조작이
+    /// 프리팹 파일에 그대로 기록된다(자식을 지우는 순간 "Destroying assets is not permitted"로 터진다).
+    /// 프리팹 에셋은 씬에 속하지 않으므로 gameObject.scene.IsValid()로 구분할 수 있다.
+    /// </summary>
+    LobbyOverlayHost OverlayHost
+    {
+        get
+        {
+            if (m_overlayHost != null) return m_overlayHost;
+
+            if (overlayHost != null && overlayHost.gameObject.scene.IsValid())
+                return m_overlayHost = overlayHost;
+
+            if (overlayHost != null)
+                Debug.LogError(
+                    "[LobbyMatchLauncher] overlayHost에 프리팹 에셋이 물려 있다 — 인스펙터에서 씬 인스턴스로 다시 배선할 것. "
+                  + "이번 실행은 계층에서 찾아 진행한다.", this);
+
+            return m_overlayHost = transform.root.GetComponentInChildren<LobbyOverlayHost>(true);
+        }
+    }
+
+    MatchDeckShell DeckShell => OverlayHost != null ? OverlayHost.MatchDeckShell : null;
 
     // 페이크 → 실제 Photon 매칭 교체는 이 한 줄이 전부다.
     IMatchmaker Matchmaker => m_matchmaker ??= new FakeMatchmaker(aiDeckConfig, profilePool);
@@ -56,12 +83,14 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void OnEnable()
     {
+        if (matchPanel != null) matchPanel.PlayRequested += StartAiBattle;
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
     }
 
     void OnDisable()
     {
+        if (matchPanel != null) matchPanel.PlayRequested -= StartAiBattle;
         OutgameFeatureLock.OnChanged -= ApplyPlayLock;
     }
 
@@ -136,7 +165,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         ConfirmOpponent(t_opponent);
 
-        if (shell == null)
+        if (DeckShell == null)
         {
             Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
 
@@ -147,7 +176,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         }
 
         // 매칭을 거치지 않은 경로(튜토리얼)는 옮겨 앉힐 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
-        if (t_opponent == null) return await shell.RunSelectionAsync(_ct);
+        if (t_opponent == null) return await DeckShell.RunSelectionAsync(_ct);
 
         return await RunSelectionWithHandoffAsync(_ct);
     }
@@ -157,10 +186,10 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 가리면 같은 무대라는 사실이 오히려 지워진다(자세한 규약은 MatchHandoffFx 참고).
     async UniTask<bool> RunSelectionWithHandoffAsync(CancellationToken _ct)
     {
-        MatchHandoffTargets t_targets = shell.PrepareForHandoff();
+        MatchHandoffTargets t_targets = DeckShell.PrepareForHandoff();
 
         // 선택 게이트는 전환이 도는 동안 시작해 첫 대기에서 멈춘다 — 전환이 끝난 프레임엔 이미 서 있어야 한다.
-        UniTask<bool> t_selection = shell.RunSelectionAsync(_ct);
+        UniTask<bool> t_selection = DeckShell.RunSelectionAsync(_ct);
 
         await m_matchShell.PlayHandoffAsync(t_targets, _ct);
 
@@ -196,7 +225,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void ApplyPlayLock()
     {
-        if (playButton != null) playButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.LobbyPlay);
+        matchPanel?.SetPlayInteractable(OutgameFeatureLock.IsUnlocked(EOutgameFeature.LobbyPlay));
     }
 
     void ShowNoDeckPopup()
@@ -212,7 +241,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void GoToDeckTab()
     {
-        lobbyTabController?.Select(deckTabIndex);
+        if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
     // 셸 미배선 폴백 전용. 저장된 슬롯 중 첫 유효 덱을 DeckConfig에 적용하고, 없으면 false.

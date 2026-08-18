@@ -8,9 +8,8 @@ using UnityEngine.UI;
 // 무엇을 보여줄지는 호출부가 정하고(UnlockIntro 목록), 여기는 세우고 [확인]을 기다린다 —
 // 그래서 "처음 보는 것인가"라는 판정을 알 필요가 없다(CardRewardOverlay가 지급을 모르는 것과 같은 규약).
 //
-// 로비 캔버스에 비활성으로 저작해 둔 한 장을 찾아 쓴다(RewardClaimPopup·CardDetailOverlay와 같은 규약).
-// 코드로 세우지 않는 이유는 조달처를 하나로 두기 위해서다 — 씬에 심은 것과 코드가 세운 것이 섞이면
-// 화면에 뜬 것이 어디서 왔는지 로그 없이 답할 수 없다.
+// 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(CardRewardOverlay와 같은 규약) — 로비 캔버스에 중첩하면
+// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 읽어야 넘어가는 자리라 나가는 문은 [확인] 하나뿐이다.
 //
@@ -19,16 +18,8 @@ using UnityEngine.UI;
 //
 // 행의 등장은 **자리가 아니라 배율**로 준다. 행은 레이아웃 그룹에 매달릴 물건이라
 // anchoredPosition을 밀면 리빌드가 매 프레임 되돌려 안무가 통째로 안 보인다(진화 연출의 stageFitter와 같은 함정).
-public class UnlockIntroOverlay : MonoBehaviour
+public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 {
-    static UnlockIntroOverlay s_instance;
-
-    /// <summary>안내가 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
-    public static bool IsOpen { get; private set; }
-
-    /// <summary>닫힌 직후. 이 시점엔 IsOpen이 이미 false다.</summary>
-    public static event Action OnAnyClosed;
-
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 
@@ -73,27 +64,10 @@ public class UnlockIntroOverlay : MonoBehaviour
     // 프리팹에 깔린 행이 모자란 것은 저작 문제다 — 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
 
-    // 씬 미배치도 같다 — 카드를 열 때마다 경고하면 로그가 묻힌다.
-    static bool s_missingWarned;
-
-    /// <summary>
-    /// 씬의 공용 안내 오버레이를 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
-    /// 자가 설치는 하지 않는다(저작된 행·데모 무대가 있어 코드로 세울 수 있는 물건이 아니다).
-    /// </summary>
+    /// <summary>안내 오버레이를 얻는다. 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다
+    /// (CardRewardOverlay와 같은 규약).</summary>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
-    {
-        if (s_instance == null)
-            s_instance = FindFirstObjectByType<UnlockIntroOverlay>(FindObjectsInactive.Include);
-
-        if (s_instance == null && !s_missingWarned)
-        {
-            s_missingWarned = true;
-            Debug.LogError("[UnlockIntroOverlay] 현재 씬에 해금 안내 오버레이가 배치되지 않았습니다 — 키워드를 처음 얻어도 안내가 뜨지 않습니다.");
-        }
-
-        _overlay = s_instance;
-        return _overlay != null;
-    }
+        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<UnlockIntroOverlay>, out _overlay);
 
     /// <summary>_intros를 세우고 [확인]을 기다린다. _onClose는 걷힌 뒤 정확히 한 번 온다.
     /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.
@@ -150,7 +124,7 @@ public class UnlockIntroOverlay : MonoBehaviour
         SetVisible(false);
         ResetChoreography();
 
-        if (t_wasOpen) OnAnyClosed?.Invoke();
+        if (t_wasOpen) RaiseClosed();
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -173,14 +147,6 @@ public class UnlockIntroOverlay : MonoBehaviour
         IsOpen = false;
     }
 
-    void OnDestroy()
-    {
-        if (s_instance == this) s_instance = null;
-
-        // 열린 채 씬이 바뀌면 플래그가 남아 다음 씬의 안내가 영영 억제된다.
-        IsOpen = false;
-    }
-
     void OnConfirmClicked()
     {
         // 콜백을 먼저 비워 연타로 두 번 흐르는 경로를 막는다.
@@ -198,7 +164,7 @@ public class UnlockIntroOverlay : MonoBehaviour
         SetVisible(false);
         ResetChoreography();
 
-        if (t_wasOpen) OnAnyClosed?.Invoke();
+        if (t_wasOpen) RaiseClosed();
 
         // 넘겨주기는 정리가 다 끝난 뒤다 — 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 한다.
         t_callback.Invoke();

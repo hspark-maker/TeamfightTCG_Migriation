@@ -8,9 +8,8 @@ using UnityEngine.UI;
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
 //  - 부트: StartScene(빌드 0번)에 저작된 인스턴스. DataLibrary의 Addressables UI 로드를 기다렸다가
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
-//  - 전환: 부트 프리팹에 **꺼진 채** 상주하는 한 장. LoadScene(scene)이 켜고, 걷은 뒤 다시 끈다.
-//          전투 → 로비 복귀처럼 부트가 이미 끝난 상태의 씬 전환을 덮는다(BattleCleanup 경유).
-//          어느 씬 것도 아니라 앱이 소유한다. 둘을 가르는 것은 BootInstaller가 꽂아 줬는가 하나다.
+//  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
+//          상태의 씬 전환을 덮는다(BattleCleanup 경유).
 // 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
 //
 // 커버를 제자리에서 페이드아웃하지 않는 이유: 부트 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
@@ -22,33 +21,8 @@ public class LoadingCoverView : MonoBehaviour
     // 저작 데이터가 아니라 시스템 고정 경로라 상수로 둔다(OutgameTutorialRunner와 같은 규약).
     const string LobbyScene = "LobbyScene";
 
-    // 부트 프리팹에 상주하는 전환 모드 커버. 어느 씬 것도 아닌 물건이라 앱이 소유한다
-    // (SceneTransitionVideo·CurtainView와 같은 규약). 부트 모드 커버는 이것과 별개다 — StartScene 저작 인스턴스.
-    static LoadingCoverView s_instance;
-
-    // 도메인 리로드를 끄면 static이 이전 재생의 인스턴스를 물고 있다(프로젝트 공통 규약).
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics()
-    {
-        s_instance = null;
-        s_active   = null;
-    }
-
-    /// <summary>상주 커버를 꽂는다. BootInstaller가 자기 자식을 넘긴다(부트 1회).</summary>
-    // 자기 등록(Awake)도 검색(FindObjectsInactive)도 쓰지 않는다 — 앞은 켜 둔 채 저작해야 해서
-    // 편집 화면이 덮이고, 뒤는 조달을 검색으로 푸는 것이라 배선이 코드에서 안 보인다.
-    // 꽂힌 쪽이 곧 상주본이므로 "어느 모드인가"를 저작 스위치로 물을 필요도 없다.
-    public static void SetInstance(LoadingCoverView _view)
-    {
-        s_instance = _view;
-
-        if (_view != null) _view.m_resident = true;
-    }
-
-    // 부트 프리팹에 상주하는 전환 모드 커버인가. 부트 모드 커버(StartScene 저작)는 false로 남아
-    // 제 힘으로 시작하고 끝나면 스스로 파괴된다.
-    bool m_resident;
-
+    // 전환 모드가 커버를 얻는 유일한 경로. Addressables 초기화보다 먼저 필요할 수 있으므로
+    // Boot가 직렬화한 카탈로그에서 동기적으로 얻는다.
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
 
@@ -93,71 +67,45 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
-        var t_view = s_instance;
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
+        var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
-            Debug.LogWarning("[LoadingCoverView] 상주 커버가 없어 커버 없이 전환합니다(BootInstaller의 loadingCover 배선 확인).");
+            Debug.LogWarning("[LoadingCoverView] 동기 UI 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
             _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;
         }
 
-        t_view.m_beforeLoad  = _onBeforeLoad;
+        t_view.m_beforeLoad = _onBeforeLoad;
+
+        // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 모드 분기보다 먼저다.
         t_view.m_targetScene = _scene;
-        t_view.gameObject.SetActive(true);
-        t_view.BeginSceneLoad();
+
+        // 페이드인 시작값도 같은 이유로 여기서 준다. Start를 기다리면 프리팹의 alpha 1이 한 프레임 그려져
+        // 하드컷으로 덮은 뒤 페이드인이 도는 꼴이 된다. alpha 0이어도 blocksRaycasts는 그대로라 입력은 이미 막힌다.
+        if (t_view.m_group != null && t_view.fadeInDuration > 0f) t_view.m_group.alpha = 0f;
     }
 
-    // 상주본은 꺼진 채 저작되므로 이 Awake는 첫 전환에 켜지는 순간 돈다. 부트 커버는 씬 로드와 함께 곧바로 돈다.
     void Awake()
     {
-        m_group = GetComponent<CanvasGroup>();
-
-        if (m_resident) return;   // 상주본의 초기화는 BeginSceneLoad가 매번 다시 잡는다
-
-        // 씬에 저작된 부트 커버는 처음부터 화면을 덮고 있다.
         s_active = this;
+        m_group = GetComponent<CanvasGroup>();
 
         if (progressBar != null) progressBar.normalizedValue = 0f;
     }
 
-    void OnDisable()
-    {
-        // 상주본은 파괴되지 않고 걷히기만 하므로, "덮고 있는가"의 해제 신호가 여기다.
-        if (s_active == this) s_active = null;
-    }
-
-    // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 씬에 저작된 커버는 여기가 "이제 화면이 보인다"의 신호다.
+    // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
     void OnDestroy()
     {
-        if (s_instance == this) s_instance = null;
-        if (s_active   == this) s_active   = null;
+        if (s_active == this) s_active = null;
     }
 
     void Start()
     {
-        // 상주본도 첫 활성화에서 Start가 한 번 돈다 — 그 자리에서 부트 모드가 겹쳐 뜨지 않게 막는다.
-        // 전환 모드는 LoadScene이 BeginSceneLoad로 직접 연다.
-        if (m_resident) return;
-
-        StartCoroutine(CoRunBoot());
-    }
-
-    // 전환 모드의 시작점. 상주본은 두 번째 전환에서도 돌아야 해서 Start에 기댈 수 없다.
-    void BeginSceneLoad()
-    {
-        s_active = this;
-
-        if (progressBar != null) progressBar.normalizedValue = 0f;
-
-        // 페이드인 시작값을 켜자마자 준다. 한 프레임이라도 늦으면 저작된 alpha 1이 그려져
-        // 하드컷으로 덮은 뒤 페이드인이 도는 꼴이 된다. alpha 0이어도 blocksRaycasts는 그대로라 입력은 이미 막힌다.
-        // fadeIn이 0이면 걷힌 채 남은 지난번 alpha를 되돌려 놔야 한다 — 아니면 투명한 커버가 된다.
-        if (m_group != null) m_group.alpha = fadeInDuration > 0f ? 0f : 1f;
-
-        StartCoroutine(CoRunSceneLoad());
+        StartCoroutine(m_targetScene == null ? CoRunBoot() : CoRunSceneLoad());
     }
 
     // ── 부트 모드 ─────────────────────────────────────────────────────────────
@@ -283,34 +231,21 @@ public class LoadingCoverView : MonoBehaviour
         if (progressBar != null) progressBar.normalizedValue = 1f;
     }
 
-    // 다음 씬 위에서 커버를 걷는다. DDOL로 살아남은 오브젝트라 알파만 내려서는 부족하다 — Dispose까지 가야 한다.
+    // 다음 씬 위에서 커버를 걷고 자신을 파괴한다. DDOL로 살아남은 오브젝트라 비활성화로는 부족하다.
     void Reveal()
     {
         if (this == null) return;   // 오브젝트가 이미 파괴돼 코루틴이 잘려 들어온 경우 — 걷을 커버가 없다.
 
-        if (m_group == null) { Dispose(); return; }
+        if (m_group == null) { Destroy(gameObject); return; }
 
         // 페이드 내내 blocksRaycasts를 유지한다(퇴장 시작에 푸는 PopupTransition과 다른 선택) —
-        // 반쯤 비치는 다음 화면을 오조작하지 않게. 커버가 통째로 걷히므로 입력이 막힌 채 남을 일은 없다.
+        // 반쯤 비치는 다음 화면을 오조작하지 않게. 커버가 통째로 사라지므로 입력이 막힌 채 남을 일은 없다.
         m_group.DOKill();
         m_group.DOFade(0f, fadeDuration)
             .SetUpdate(true)              // 다음 씬이 timeScale을 0으로 잡아도 걷히도록.
             .SetLink(gameObject)
-            .OnComplete(Dispose)
-            .OnKill(() => { if (this != null) Dispose(); })   // 외부에서 트윈이 죽어도 커버는 남기지 않는다.
+            .OnComplete(() => Destroy(gameObject))
+            .OnKill(() => { if (this != null) Destroy(gameObject); })   // 외부에서 트윈이 죽어도 커버는 남기지 않는다.
             .Play();                      // 재생 책임을 코드에 남긴다(전역 autoPlay 설정에 기대지 않게).
-    }
-
-    // 걷은 뒤의 처분. 상주본은 다음 전환을 위해 꺼두기만 하고, 씬에 저작된 부트 커버는 제 씬과 함께 사라진다.
-    void Dispose()
-    {
-        if (m_resident)
-        {
-            m_targetScene = null;
-            gameObject.SetActive(false);
-            return;
-        }
-
-        Destroy(gameObject);
     }
 }

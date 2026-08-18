@@ -6,26 +6,16 @@ using TMPro;
 
 // 카드 한 장을 크게 세워 보여주고 [획득]으로 받게 하는 보상 오버레이.
 // 표시와 확인 콜백만 담당하고 지급은 호출자가 한다 — 그래서 출처(튜토리얼 보너스든 그 밖이든)를 알 필요가 없다.
-// 로비 캔버스에 비활성으로 저작해 둔 한 장을 찾아 쓴다(RewardClaimPopup과 같은 규약) — 자가 설치는 하지 않는다.
+// 씬에 저작하지 않고 Addressables 타입 색인에서 얻어 독립 Canvas로 세운다 — 로비 캔버스에 중첩하면
+// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 받아야 넘어가는 자리에 쓰는 물건이라 나가는 문은 [획득] 하나뿐이다.
 //
 // 안무는 두 박자다 — 화면이 준다(딤 → 제목 → 카드가 내려꽂힌다) → 내가 받는다([획득] → 카드가 도감으로 간다).
 // 조각들이 한 덩어리로 페이드인하면 카드가 꽂히기도 전에 답을 다 보여주게 되므로,
 // 등장은 조각마다 자기 박자로 들어오고 충격은 꽂히는 한 프레임에 전부 몰아넣는다.
-public class CardRewardOverlay : MonoBehaviour
+public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 {
-    static CardRewardOverlay s_instance;
-
-    // 씬 미배치는 저작 문제다 — 보상을 줄 때마다 경고하면 로그가 묻힌다.
-    static bool s_missingWarned;
-
-    /// <summary>보상 화면이 떠 있는가. 로비 쪽 안내가 이 위에 겹치지 않게 볼 때 쓴다.</summary>
-    public static bool IsOpen { get; private set; }
-
-    /// <summary>닫힌 직후. 이 시점엔 IsOpen이 이미 false다.</summary>
-    public static event Action OnAnyClosed;
-
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 
@@ -133,24 +123,11 @@ public class CardRewardOverlay : MonoBehaviour
     /// "방금 본 그 카드가 도감으로 갔다"가 한 줄로 이어진다.</summary>
     public RectTransform CardAnchor => this.cardSlot;
 
-    /// <summary>
-    /// 씬의 공용 보상 오버레이를 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
-    /// 자가 설치는 하지 않는다(저작된 빛·카드 자리가 있어 코드로 세울 수 있는 물건이 아니다).
-    /// </summary>
+    /// <summary>보상 오버레이를 얻는다. 씬에 저작해 두지 않고 Addressables 타입 색인에서 세운다 —
+    /// 로비 캔버스에 중첩하면 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다(LoadingCover와 같은 이유).
+    /// 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다.</summary>
     public static bool TryGet(out CardRewardOverlay _overlay)
-    {
-        if (s_instance == null)
-            s_instance = FindFirstObjectByType<CardRewardOverlay>(FindObjectsInactive.Include);
-
-        if (s_instance == null && !s_missingWarned)
-        {
-            s_missingWarned = true;
-            Debug.LogError("[CardRewardOverlay] 현재 씬에 카드 보상 오버레이가 배치되지 않았습니다 — 보상을 줘도 화면이 뜨지 않습니다.");
-        }
-
-        _overlay = s_instance;
-        return _overlay != null;
-    }
+        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<CardRewardOverlay>, out _overlay);
 
     /// <summary>카드 한 장을 띄운다. _onAcquire는 [획득]을 누른 <b>즉시</b> 불린다 —
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출과 겹쳐 걷힌다).</summary>
@@ -196,7 +173,7 @@ public class CardRewardOverlay : MonoBehaviour
         this.SetVisible(false);
         this.ResetChoreography();
 
-        if (t_wasOpen) OnAnyClosed?.Invoke();
+        if (t_wasOpen) RaiseClosed();
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -216,14 +193,6 @@ public class CardRewardOverlay : MonoBehaviour
 
         // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
         // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 되어 뒤의 안내가 서지 못한다.
-        IsOpen = false;
-    }
-
-    void OnDestroy()
-    {
-        if (s_instance == this) s_instance = null;
-
-        // 열린 채 씬이 바뀌면 플래그가 남아 다음 씬의 안내가 영영 억제된다.
         IsOpen = false;
     }
 
@@ -428,7 +397,7 @@ public class CardRewardOverlay : MonoBehaviour
         t_seq.InsertCallback(this.handoffPopDuration, () =>
         {
             this.SetVisible(false);
-            if (_wasOpen) OnAnyClosed?.Invoke();
+            if (_wasOpen) RaiseClosed();
         });
 
         t_seq.OnComplete(() => this.m_choreo = null);

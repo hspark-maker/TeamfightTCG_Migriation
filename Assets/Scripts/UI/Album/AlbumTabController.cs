@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 카드 앨범 탭 표면(Tab_Collection_New 루트 부착) — 전체 보상 요약 + 테마 갤러리
-public class AlbumTabController : MonoBehaviour
+public class AlbumTabController : LobbyTabPanel
 {
     [Header("전체 보상")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
@@ -104,6 +104,18 @@ public class AlbumTabController : MonoBehaviour
 
         m_insertSession = pageOverlay.GetComponentInChildren<AlbumInsertSession>(true);
         return m_insertSession;
+    }
+
+    public override void RequestLeave(System.Action _proceed)
+    {
+        AlbumInsertSession t_session = ResolveInsertSession();
+        if (t_session == null)
+        {
+            _proceed?.Invoke();
+            return;
+        }
+
+        t_session.RequestLeave(_proceed);
     }
 
     // 더미 정리 1회 기준 — 빈 앨범 0셀도 정상이라 셀 빌드 성공과는 무관
