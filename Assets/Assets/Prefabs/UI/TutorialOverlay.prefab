@@ -57,7 +57,7 @@ MonoBehaviour:
   bannerLowerMiddlePos: {x: 0, y: 600}
   bannerBottomPos: {x: 0, y: 160}
   focusCornerRadius: 36
-  handSprite: {fileID: 21300000, guid: 0088150468c2f2841b6aaaf8a2493a6a, type: 3}
+  handSprite: {fileID: 21300000, guid: 7ed0bf73b0adc4d89b35fd3708dec02c, type: 3}
   handSize: 260
   handBobHeight: 34
   handTapPeriod: 1.1
