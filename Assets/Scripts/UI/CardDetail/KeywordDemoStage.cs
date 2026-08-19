@@ -24,6 +24,9 @@ public class KeywordDemoStage : SingletonOverlayBase
 
     static KeywordDemoStage s_instance;
 
+    // 세운 무대 수. 자리를 옆으로 밀어 겹침을 피하는 데만 쓴다(TryGet 주석 참고).
+    static int s_stageSerial;
+
     [Header("무대 배선")]
     [Tooltip("이 무대만 담는 카메라. tag는 반드시 Untagged — MainCamera를 달면 로비 배경 영상이 이쪽으로 튄다.")]
     [SerializeField] Camera demoCamera;
@@ -64,6 +67,17 @@ public class KeywordDemoStage : SingletonOverlayBase
     int  m_ownerIndex0;
     bool m_inputAllowed0;
 
+    // 빌린 상태인가. 되돌리기는 한 번뿐이어야 한다 — 이미 돌려준 값을 나중에 또 덮어쓰면
+    // 그 사이에 시작한 전투의 상태를 걷어차게 된다.
+    bool m_borrowed;
+
+    // 대본 한 판이 도는 중인가. AttackSequence는 취소 토큰을 받지 않아 **중간에 끊을 수 없다** —
+    // 도는 동안 무대를 부수면 시퀀스가 이미 사라진 CardView를 만져 MissingReferenceException이 난다.
+    bool m_playing;
+
+    // 걷으라는 지시가 판이 도는 중에 들어왔다. 부수는 일은 그 판이 스스로 풀린 뒤 RunLoop이 한다.
+    bool m_disposePending;
+
     /// <summary>무대를 세운다. 위치를 Instantiate 인자로 주는 것이 중요하다 —
     /// <c>CardAnimator.Awake</c>가 그 프레임의 <c>transform.position</c>을 슬롯 자리로 못 박기 때문에,
     /// 세운 뒤에 옮기면 카드가 공격하고 **원점으로 돌아간다**.</summary>
@@ -76,7 +90,11 @@ public class KeywordDemoStage : SingletonOverlayBase
             var t_prefab = RuntimeOverlayPrefabs.Get<KeywordDemoStage>();
             if (t_prefab != null)
             {
-                GameObject t_go = Instantiate(t_prefab, StageOrigin, Quaternion.identity);
+                // 무대마다 자리를 옆으로 옮긴다. 걷혔지만 아직 못 부순 무대(끊을 수 없는 판이 도는 중)와
+                // 같은 자리에 세우면, 새 무대의 카메라가 죽어가는 카드까지 함께 비춘다.
+                Vector3 t_origin = StageOrigin + new Vector3(1000f * (s_stageSerial++ & 7), 0f, 0f);
+
+                GameObject t_go = Instantiate(t_prefab, t_origin, Quaternion.identity);
                 s_instance = t_go.GetComponent<KeywordDemoStage>();
 
                 if (s_instance == null)
@@ -99,8 +117,13 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         Stop();
 
-        this.m_ownerIndex0   = TurnState.LocalOwnerIndex;
-        this.m_inputAllowed0 = TurnState.InputAllowed;
+        // 빌리기는 한 번만 기록한다 — 이미 빌린 채로 다시 들어오면 **내가 바꿔 놓은 값**을 원본으로 적게 된다.
+        if (!this.m_borrowed)
+        {
+            this.m_ownerIndex0   = TurnState.LocalOwnerIndex;
+            this.m_inputAllowed0 = TurnState.InputAllowed;
+            this.m_borrowed      = true;
+        }
 
         // 공격자가 아군 기준이어야 VFX 오프셋·회전이 전투와 같은 방향으로 선다.
         TurnState.LocalOwnerIndex = 0;
@@ -120,12 +143,24 @@ public class KeywordDemoStage : SingletonOverlayBase
         return this.m_texture;
     }
 
-    /// <summary>무대를 걷는다. 텍스처는 여기서 해제되므로 부른 쪽은 RawImage에서 먼저 떼야 한다.</summary>
+    /// <summary>무대를 걷는다. 텍스처는 여기서 해제되므로 부른 쪽은 RawImage에서 먼저 떼야 한다.
+    ///
+    /// ⚠ 도는 판이 있으면 **곧바로 부수지 않는다**. AttackSequence는 취소를 받지 않아 걷으라는 말을
+    /// 알아듣지 못하고, 그 와중에 카드가 사라지면 시퀀스가 죽은 CardView를 만진다.
+    /// 화면에서는 즉시 사라지고(카메라를 끈다) 부수는 일만 판이 풀린 뒤로 미룬다.</summary>
     public void End()
     {
         Stop();
         Restore();
         ReleaseTexture();
+
+        // 카메라를 끄는 일이 곧 "화면에서 걷혔다"다 — 텍스처만 떼면 이 카메라가 화면에 직접 그린다.
+        if (this.demoCamera != null) this.demoCamera.enabled = false;
+
+        // 자리를 먼저 비운다. 안 그러면 다음 Begin이 부서지기를 기다리는 이 무대를 다시 잡는다.
+        if (s_instance == this) s_instance = null;
+
+        if (this.m_playing) { this.m_disposePending = true; return; }
 
         // 남겨두면 BattleBoardView 정적 레지스트리에 데모 카드가 계속 등록돼 있어,
         // 전투에 들어갔을 때 CardView.FadeAll이 이 셋까지 함께 흐리게 만든다.
@@ -197,11 +232,19 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         while (!_token.IsCancellationRequested)
         {
+            // 한 판은 끊을 수 없다(AttackSequence가 취소를 안 받는다) — 도는 동안 End가 오면
+            // 그쪽이 부수기를 미루고, 판이 풀린 아래에서 이 루프가 마무리한다.
+            this.m_playing = true;
             await PlayOnce(_keyword, _token);
-            if (_token.IsCancellationRequested) return;
+            this.m_playing = false;
+
+            if (_token.IsCancellationRequested) break;
 
             await UniTask.Delay(Ms(this.loopGap), cancellationToken: _token).SuppressCancellationThrow();
         }
+
+        this.m_playing = false;
+        if (this.m_disposePending) Destroy(gameObject);
     }
 
     async UniTask PlayOnce(CardKeyword _keyword, CancellationToken _token)
@@ -372,6 +415,9 @@ public class KeywordDemoStage : SingletonOverlayBase
     // 다음 전투가 "입력 잠김" 상태로 시작한다.
     void Restore()
     {
+        if (!this.m_borrowed) return;   // 이미 돌려줬다 — 두 번째 되돌리기는 남의 상태를 덮는다
+        this.m_borrowed = false;
+
         TurnState.LocalOwnerIndex = this.m_ownerIndex0;
         TurnState.InputAllowed    = this.m_inputAllowed0;
     }

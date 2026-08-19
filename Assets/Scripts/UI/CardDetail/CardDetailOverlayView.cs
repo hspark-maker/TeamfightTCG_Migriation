@@ -1732,7 +1732,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         HideChipsFrom(this.keywordChipRoot, t_used);
-        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned);
+
+        // 설명 줄을 누르면 해금 때 봤던 안내를 다시 연다. 목록은 자동 안내와 같은 생성기(CollectIntros)로 만든다 —
+        // 둘이 다른 길로 만들면 문구·순서가 조용히 갈라진다. InfoKeywords는 **지금 열려 있는 것**만이라
+        // 잠긴 키워드는 자연히 빠진다(칩에 남는 잠김 룩과 축이 다르다).
+        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned,
+                     IntroClick(_owned && !this.m_shownKeywordLocked
+                                ? CollectIntros(_card, CardVisualRules.InfoKeywords(_card), false)
+                                : null));
     }
 
     void BuildSynergySection(CardData _card, bool _owned)
@@ -1772,7 +1779,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         HideChipsFrom(this.synergyChipRoot, t_used);
-        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
+
+        // 키워드 줄과 같은 규약. 시너지는 관문 하나로 통째로 열리므로 열림 여부만 보면 된다.
+        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned,
+                     IntroClick(_owned && this.m_shownSynergyOpen
+                                ? CollectIntros(_card, CardKeyword.None, true)
+                                : null));
+    }
+
+    /// <summary>이 목록을 여는 손잡이. 세울 것이 없으면 null — 그 자리는 눌리지 않는다.</summary>
+    Action IntroClick(List<UnlockIntro> _intros)
+    {
+        if (_intros == null || _intros.Count == 0) return null;
+        return () => ShowIntros(_intros);
     }
 
     // 카드가 바뀌면 읽던 자리도 같이 바뀐다 — 되감지 않으면 새 카드가 설명 중간부터 펼쳐진 채 들어온다.
@@ -1805,14 +1824,58 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 들쭉날쭉해 어디를 읽던 중이었는지 잃는다. 빈 섹션은 자리를 지킨 채 "없음"(미소유는 ???)만 적는다.
     // 패널 자체의 높이는 프리팹 DetailFrame의 LayoutElement.preferredHeight가 고정하므로,
     // 안쪽 줄 수가 얼마든 카드 그림의 크기·위치는 카드마다 흔들리지 않는다.
-    static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned)
+    //
+    // _onClick이 있으면 설명 줄이 눌리는 자리가 된다(해금 안내 다시 보기). null이면 눌리지 않는다 —
+    // 열 것이 없는 자리가 눌리는 것처럼 보이면 "눌렀는데 아무 일도 없다"가 된다.
+    static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned,
+                             Action _onClick = null)
     {
         if (_desc != null)
+        {
             _desc.text = _lines.Count > 0 ? string.Join("\n", _lines)
                        : _owned           ? NoneValue
                                           : LockedName;
 
+            BindDescClick(_desc, _onClick);
+        }
+
         if (_section != null) _section.SetActive(true);
+    }
+
+    /// <summary>설명 줄을 눌러 열 수 있게 만든다. 저작(프리팹)은 건드리지 않고 런타임에만 세운다 —
+    /// 상세창 프리팹을 저장하는 길은 다른 저작까지 함께 흔든다(시너지 아이콘 줄이 SynergyIconButton을
+    /// 런타임에 붙이는 것과 같은 규약).
+    ///
+    /// 글자는 프리팹에서 raycastTarget이 꺼져 있어 그대로면 탭이 뒤로 통과한다(= 딤 탭 = 창이 닫힌다).</summary>
+    static void BindDescClick(TMP_Text _desc, Action _onClick)
+    {
+        var t_button = _desc.GetComponent<Button>();
+        if (t_button == null)
+        {
+            t_button = _desc.gameObject.AddComponent<Button>();
+
+            // 글자에 색 전이를 얹으면 잠김 룩의 회색과 섞여 "지금 눌리는가"가 오히려 안 읽힌다.
+            t_button.transition = Selectable.Transition.None;
+        }
+
+        // 칩과 달리 이 노드는 카드를 넘겨도 그대로 재사용된다 — 지우지 않으면 앞 카드의 개념이 함께 열린다.
+        t_button.onClick.RemoveAllListeners();
+
+        _desc.raycastTarget  = _onClick != null;
+        t_button.interactable = _onClick != null;
+
+        if (_onClick != null) t_button.onClick.AddListener(() => _onClick());
+    }
+
+    /// <summary>개념 안내를 전면에 다시 세운다(해금 순간의 자동 안내와 같은 화면).
+    /// 뒤처리가 없어 닫힘 콜백을 넘기지 않는다 — 그동안 이 창은 오버레이에 덮여 입력을 받지 않는다.</summary>
+    void ShowIntros(List<UnlockIntro> _intros)
+    {
+        if (_intros == null || _intros.Count == 0) return;
+        if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) return;
+
+        // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다(자동 안내와 같은 인자).
+        t_overlay.Show(_intros, CardAt(this.m_index), null);
     }
 
     /// <summary>줄에 <b>미리 깔아 둔</b> _index번째 칩을 채워 켠다. 칩이 모자라면 false —

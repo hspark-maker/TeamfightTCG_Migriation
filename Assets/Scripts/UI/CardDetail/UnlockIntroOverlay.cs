@@ -4,9 +4,13 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 방금 열린 개념(키워드·시너지)을 전면에서 한 번 가르치는 오버레이.
+// 개념(키워드·시너지)을 전면에서 가르치는 오버레이.
 // 무엇을 보여줄지는 호출부가 정하고(UnlockIntro 목록), 여기는 세우고 [확인]을 기다린다 —
 // 그래서 "처음 보는 것인가"라는 판정을 알 필요가 없다(CardRewardOverlay가 지급을 모르는 것과 같은 규약).
+//
+// 이 화면으로 오는 길은 둘이다: 강화로 능력이 열리는 순간의 **자동 안내**와,
+// 카드 상세창의 설명 줄을 눌러 여는 **다시 보기**(CardDetailOverlayView). 둘의 화면은 같아야 한다 —
+// 해금 때 본 것을 다시 찾는 자리라 다른 그림이 뜨면 같은 것을 본 줄 모른다.
 //
 // 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(CardRewardOverlay와 같은 규약) — 로비 캔버스에 중첩하면
 // 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
@@ -149,14 +153,16 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     void OnConfirmClicked()
     {
-        // 콜백을 먼저 비워 연타로 두 번 흐르는 경로를 막는다.
+        // 연타 차단은 **열려 있는가**로 판정한다. 콜백 유무로 막으면 뒤처리가 없는 호출부(_onClose = null,
+        // 상세창의 다시 보기)에서 [확인]이 아무 일도 안 하는 모달이 된다.
+        if (!IsOpen) return;
+
+        // 콜백은 먼저 비워 둔다 — 정리 도중 다시 들어와도 두 번 흐르지 않게.
         var t_callback = this.m_onClose;
         this.m_onClose = null;
-        if (t_callback == null) return;
 
         SetInputEnabled(false);
 
-        bool t_wasOpen = IsOpen;
         IsOpen = false;
 
         KillIntro();
@@ -164,10 +170,10 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         SetVisible(false);
         ResetChoreography();
 
-        if (t_wasOpen) RaiseClosed();
+        RaiseClosed();
 
         // 넘겨주기는 정리가 다 끝난 뒤다 — 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 한다.
-        t_callback.Invoke();
+        t_callback?.Invoke();
     }
 
     // 행을 채운다. 프리팹에 미리 깔린 것을 꺼내 쓰고 남는 것은 끈다(상세창 칩 TryShowChip과 같은 규약).
