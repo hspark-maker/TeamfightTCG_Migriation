@@ -506,6 +506,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7319777168212348896}
   - component: {fileID: 7346869729862744808}
+  - component: {fileID: 2869244063669808199}
   m_Layer: 0
   m_Name: MapScroll
   m_TagString: Untagged
@@ -563,6 +564,21 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2869244063669808199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3699018832454184809}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1704e5298d39b9c44a1df91784cc5b12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenCoverBackground
+  offset: {x: 0, y: 0}
+  overscan: 1
+  stretchToScreen: 1
 --- !u!1 &3752309405738342226
 GameObject:
   m_ObjectHideFlags: 0
