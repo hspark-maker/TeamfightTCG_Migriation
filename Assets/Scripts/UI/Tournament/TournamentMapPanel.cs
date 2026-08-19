@@ -23,6 +23,12 @@ public class TournamentMapPanel : LobbyTabPanel
     [Tooltip("첫 정점 아래 · 마지막 정점 위에 남길 여백(px).")]
     [SerializeField] float edgePadding = 260f;
 
+    [Header("배경(선택)")]
+    [Tooltip("맵과 함께 스크롤할 배경. Content 안에 한 장 놓아 두면 Content 높이를 채울 만큼 세로로 반복해 깐다.\n" +
+             "**raycastTarget을 켜 둘 것** — 이 그림이 Content 전면을 덮어야 정점 사이 빈 자리에서도 스크롤이 잡힌다.\n" +
+             "비우면 탭 루트의 배경만 남고 화면에 고정된다(맵이 올라가도 배경이 안 따라온다).")]
+    [SerializeField] Image backdropTile;
+
     [Header("경로 저작(선택)")]
     [Tooltip("경로 포인트의 부모. 자식이 놓인 자리가 곧 정점 자리이고, 형제 순서가 정점 순서다(첫 자식 = 1번 정점).\n" +
              "포인트가 정점 수보다 적으면 남는 정점은 마지막 포인트에서 아래 간격·진폭 공식으로 이어 붙인다.\n" +
@@ -107,9 +113,11 @@ public class TournamentMapPanel : LobbyTabPanel
         }
 
         // 높이는 가장 높은 정점에서 파생한다 — 저작 포인트가 공식 간격을 따르지 않아도 맞는다.
-        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_top + this.edgePadding);
+        float t_height = t_top + this.edgePadding;
+        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_height);
 
-        // 연결선을 먼저 세운다 — 나중에 붙는 정점이 자연히 그 위에 온다(형제 순서 = 그리는 순서).
+        // 배경 → 연결선 → 정점 순으로 세운다. 형제 순서가 곧 그리는 순서라 이 순서가 곧 깊이다.
+        this.BuildBackdrop(t_height);
         this.BuildConnectors(t_positions);
 
         for (int t_i = 0; t_i < t_count; t_i++)
@@ -138,6 +146,37 @@ public class TournamentMapPanel : LobbyTabPanel
             Transform t_point = this.pathRoot.GetChild(t_i);
             this.m_points.Add(this.content.InverseTransformPoint(t_point.position));
             t_point.gameObject.SetActive(false);   // 저작용 표식이라 실행 화면에는 남기지 않는다
+        }
+    }
+
+    // 배경을 Content 높이만큼 세로로 반복해 깐다. 한 장 높이는 Content 폭에 그림 비율을 맞춰 정한다 —
+    // 저작 크기를 그대로 쓰면 기기 폭에 따라 좌우가 잘리거나 뜬다.
+    void BuildBackdrop(float _height)
+    {
+        if (this.backdropTile == null) return;
+
+        // 원본은 저작용 한 장이라 숨기고 사본만 남긴다(지우면 다음 Build가 배경 없이 선다).
+        this.backdropTile.gameObject.SetActive(false);
+
+        float t_width = this.content.rect.width;
+        Sprite t_sprite = this.backdropTile.sprite;
+        float t_tile = t_sprite != null && t_sprite.rect.width > 0f
+            ? t_width * (t_sprite.rect.height / t_sprite.rect.width)
+            : this.backdropTile.rectTransform.rect.height;
+
+        if (t_tile <= 1f) return;
+
+        int t_count = Mathf.CeilToInt(_height / t_tile);
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            Image t_copy = Instantiate(this.backdropTile, this.content);
+            t_copy.gameObject.SetActive(true);
+
+            RectTransform t_rect = t_copy.rectTransform;
+            this.Place(t_rect, new Vector2(0f, t_tile * (t_i + 0.5f)));
+            t_rect.sizeDelta = new Vector2(t_width, t_tile);
+
+            this.m_spawned.Add(t_copy.gameObject);
         }
     }
 
