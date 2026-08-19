@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-// 로비 랭크 표시(배지 = 등급, 별 = 등급 안 진행, 텍스트 = 티어명).
+// 로비 랭크 표시(배지 = 등급, 별 = 단계 안 진행 — 한 칸이 1승이고 네 칸이 차면 다음 단계, 텍스트 = 티어명).
 // 랭크는 전투 씬에서만 변하므로 변경 이벤트 없이 표시 시점에 RankManager를 재조회한다.
 // 포인트 수치는 화면에 두지 않는다 — 증감은 배지 반응으로만 알린다(조립은 LobbyRankEffectDirector).
 public class RankHud : MonoBehaviour
@@ -19,7 +19,7 @@ public class RankHud : MonoBehaviour
     [SerializeField] GameObject pipsRoot;
 
     [Header("진행 게이지")]
-    [Tooltip("등급 안 진행을 그리는 게이지(RankProgressGauge 구현이면 무엇이든).\n" +
+    [Tooltip("단계 안 진행을 그리는 게이지(RankProgressGauge 구현이면 무엇이든).\n" +
              "별이 얼마나 찼는지도, 언제 꽉 차는지도 모두 이 게이지가 낸다 — 진행을 그리는 축은 이것 하나뿐이다.\n" +
              "미배선이면 진행 표시 없이 배지·이름만 갱신된다.")]
     [FormerlySerializedAs("arc")]
@@ -160,19 +160,21 @@ public class RankHud : MonoBehaviour
     }
 
     /// <summary>연출을 _points(전투 직전) 시점에서 출발시킨다. 조각이 채워 갈 구간도 여기서 정한다 —
-    /// 등급이 갈리는 판이면 도착지는 새 등급의 자리가 아니라 옛 등급의 승급선(1)이다. 그 뒤는 파열이 이어받는다.</summary>
+    /// 단계가 갈리는 판이면 도착지는 새 단계의 자리(0)가 아니라 옛 단계의 승격선(1)이다. 그 뒤는 티어 변화 연출이 이어받는다.</summary>
     public void PrepareProgress(long _points)
     {
         var t_prev = RankManager.GetInfoAt(_points);
         var t_now  = RankManager.GetInfo();
 
+        // 단계가 오르면 새 단계의 진행은 0이라, 최종값을 그대로 쓰면 게이지가 역행해 별 넷이 우수수 꺼진다(승격인데 후퇴 연출).
+        // 채우는 것까지가 이 구간의 몫이고, 비우는 것은 BuildTierUp이 스냅으로 한다.
         this.m_gainFrom = GaugeRatioOf(t_prev);
-        this.m_gainTo   = t_now.Grade != t_prev.Grade ? 1f : GaugeRatioOf(t_now);
+        this.m_gainTo   = t_now.TierIndex != t_prev.TierIndex ? 1f : GaugeRatioOf(t_now);
 
         this.SetGaugeRatio(this.m_gainFrom);
 
         // 전투 직전엔 아직 승급전이 아니었다 — 대기 표시를 걷어 두고, 마지막 별이 차는 프레임에 진입 연출로 켠다.
-        // 등급이 갈리는 판도 도착지가 1이지만 그 결과는 대기가 아니라 승급이라 여기 걸리지 않는다.
+        // 단계·등급이 갈리는 판도 도착지가 1이지만 그 결과는 대기가 아니라 승격·승급이라 여기 걸리지 않는다.
         this.m_promoEnterDue = RankManager.IsPromoPending && this.m_gainFrom < 1f && this.m_gainTo >= 1f;
         if (this.m_promoEnterDue) this.promoStandby.SetStandby(false);
     }
@@ -183,7 +185,7 @@ public class RankHud : MonoBehaviour
         UiPunch.Play(this.BadgeRect, this.gainImpactPunch);
         UiPunch.Play(this.PipTransform(this.FillingStarIndex()), this.gainStarPunch);
 
-        // 한 판에 반 칸씩 움직이는 값이라 잘게 쪼개면 사건이 밍밍해진다 — 조각 하나에 전진 한 번이다.
+        // 한 판에 한 칸씩 움직이는 값이라 잘게 쪼개면 사건이 밍밍해진다 — 조각 하나에 전진 한 번이다.
         if (this.gauge != null) this.gauge.TweenTo(this.m_gainTo, this.gaugeAdvanceDuration);
 
         if (this.badgeImage == null) return;
@@ -223,18 +225,12 @@ public class RankHud : MonoBehaviour
     /// 티어가 오른 순간을 그린다. 표시는 이미 최종 티어이므로 _prevTierIndex 상태에서 출발해 지금으로 건너온다.
     /// 재생은 호출자 몫 — 끝난 뒤에 무엇을 이을지는 부르는 쪽이 정한다.
     /// _prevTierIndex가 음수면 첫 진입(언랭크 → 첫 티어)으로 본다.
-    /// 등급이 갈리는 판(첫 진입 포함)은 표시를 옛 상태에 묶어 두기만 한다 — 그 사건은 전면 오버레이가 맡고,
+    /// 표시를 옛 상태에 묶어 두는 것이 전부다 — 티어가 오르는 사건은 단계든 등급이든 전면 오버레이가 맡고,
     /// 덮인 프레임에 <see cref="ApplyTierInstant"/>가 최종값으로 갈아끼운다.
     /// </summary>
     public Sequence BuildTierUp(int _prevTierIndex)
     {
         this.KillTierChange();
-
-        int t_divisions = RankConfig.DivisionsPerGrade;
-        var t_info = RankManager.GetInfo();
-
-        int t_prevGrade    = _prevTierIndex < 0 ? -1 : _prevTierIndex / t_divisions;
-        bool t_gradeUp     = t_info.TierIndex / t_divisions != t_prevGrade;
 
         this.m_tierSeq = DOTween.Sequence().SetLink(this.gameObject);
 
@@ -245,10 +241,10 @@ public class RankHud : MonoBehaviour
         // 첫 진입(_prevTierIndex < 0)의 출발점은 언랭크다 — 별 줄이 꺼진 채 시작해 오버레이가 걷힌 뒤에 드러난다.
         this.SetPipsVisible(_prevTierIndex >= 0);
 
-        // 등급이 갈리는 판은 여기서 아무것도 하지 않는다 — 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
-        // 표시를 옛 등급으로 되돌린 채 묶어 두고, 오버레이가 화면을 덮은 프레임에 ApplyTierInstant가 최종값으로 갈아끼운다.
-        // 같은 등급 안 상승(브론즈 2 → 1)은 둘 다 아니다 — 조각이 게이지를 미는 동안 채움 머리가 그 별을 꽉 채운다.
-        if (t_gradeUp && _prevTierIndex >= 0)
+        // 티어가 오르는 판은 여기서 아무것도 그리지 않는다 — 단계 상승(브론즈 1 → 브론즈 2)이든 등급 승급(브론즈 → 실버)이든
+        // 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
+        // 표시를 옛 티어로 되돌린 채 묶어 두고, 오버레이가 화면을 덮은 프레임에 ApplyTierInstant가 최종값으로 갈아끼운다.
+        if (_prevTierIndex >= 0)
         {
             this.RenderTier(RankRewardManager.GetInfo(_prevTierIndex));
             this.m_holdTier = true;
@@ -256,7 +252,7 @@ public class RankHud : MonoBehaviour
         // 첫 진입(언랭크 → 첫 등급)도 사건의 주인은 같은 오버레이다 — 게임에서 처음 얻는 등급이라 오히려 제일 큰 판이다.
         // 여기서는 언랭크 화면으로 되돌려 묶어 두기만 한다. 배지가 갈리는 것을 안 보여주면 첫 등급이 '이미 그랬던 것'으로 읽힌다.
         // 별 줄은 배지와 따로 묶는다 — 오버레이가 걷힌 뒤에 드러나는 것이 이 사건의 마지막 박이다.
-        else if (t_gradeUp)
+        else
         {
             RankManager.GetUnrankedDisplay(out string t_unrankedName, out Sprite t_unrankedBadge);
             this.RenderTier(t_unrankedName, t_unrankedBadge);
@@ -317,7 +313,7 @@ public class RankHud : MonoBehaviour
         });
 
         this.StagePipsAppear(this.m_tierSeq);
-        this.StageFirstEntry(this.m_tierSeq, t_info, RankConfig.DivisionsPerGrade);
+        this.StageFirstEntry(this.m_tierSeq, t_info, RankConfig.WinsPerDivision);
 
         this.m_tierSeq.AppendInterval(this.finishDelay);
 
@@ -423,14 +419,14 @@ public class RankHud : MonoBehaviour
     }
 
     // 게이지에 먹일 비율. 진행을 그리는 값은 전부 여기를 지난다.
-    // 승급전 대기의 실제 포인트는 '등급 천장 - 1'이라 GradeProgress가 0.95쯤 나오지만, 기획상 그 상태는 "별 넷이 꽉 참"이다 —
+    // 승급전 대기의 실제 포인트는 '등급 천장 - 1'이라 TierProgress가 0.975로 나오지만, 기획상 그 상태는 "별 넷이 꽉 참"이다 —
     // 이 보정은 여기 한 지점뿐이다(과거 포인트를 그린 스냅샷은 보정하지 않는다).
     static float GaugeRatioOf(in RankInfo _info)
     {
         if (_info.IsUnranked) return 0f;
         if (_info.Points == RankManager.Points && RankManager.IsPromoPending) return 1f;
 
-        return _info.GradeProgress;
+        return _info.TierProgress;
     }
 
     // 채움 머리가 마디를 지나는 그 프레임의 반응(전진 = 별이 꽉 찼다, 후퇴 = 다시 모자라다).
@@ -451,7 +447,7 @@ public class RankHud : MonoBehaviour
     // 마지막 별이 전진으로 찬 프레임 = 승급전 대기로 넘어가는 순간. 시선을 별에서 배지로 넘기는 것이 이 연출의 전부다.
     void TryPlayPromoEnter(int _index)
     {
-        if (!this.m_promoEnterDue || _index != RankConfig.DivisionsPerGrade - 1) return;
+        if (!this.m_promoEnterDue || _index != RankConfig.WinsPerDivision - 1) return;
 
         // 한 번 소비하면 끝이다 — 승급전을 치르고 나면 IsPromoPending이 false가 되어 Render가 알아서 끈다.
         this.m_promoEnterDue = false;
@@ -622,10 +618,10 @@ public class RankHud : MonoBehaviour
     // 별 K가 꽉 차는 비율들. 사건은 "별이 다 찼다"이지 "채우기 시작했다"가 아니라 구간의 끝을 잡는다.
     static float[] BuildMarkerRatios()
     {
-        int t_divisions = RankConfig.DivisionsPerGrade;
+        int t_stars = RankConfig.WinsPerDivision;
 
-        var t_ratios = new float[t_divisions];
-        for (int t_i = 0; t_i < t_divisions; t_i++) t_ratios[t_i] = (float)(t_i + 1) / t_divisions;
+        var t_ratios = new float[t_stars];
+        for (int t_i = 0; t_i < t_stars; t_i++) t_ratios[t_i] = (float)(t_i + 1) / t_stars;
 
         return t_ratios;
     }
@@ -635,7 +631,7 @@ public class RankHud : MonoBehaviour
     {
         float t_at = _seq.Duration(false);
 
-        for (int t_i = 0; t_i < RankConfig.DivisionsPerGrade; t_i++)
+        for (int t_i = 0; t_i < RankConfig.WinsPerDivision; t_i++)
         {
             Transform t_pip = this.PipTransform(t_i);
             if (t_pip == null) continue;
@@ -645,13 +641,13 @@ public class RankHud : MonoBehaviour
         }
 
         // Insert는 이어붙이는 머리를 밀지 않는다 — 뒤에 오는 채움이 나타남 위로 겹치지 않게 여기서 밀어 준다.
-        _seq.AppendInterval((RankConfig.DivisionsPerGrade - 1) * this.pipsAppearStep + this.pipsAppearDuration);
+        _seq.AppendInterval((RankConfig.WinsPerDivision - 1) * this.pipsAppearStep + this.pipsAppearDuration);
     }
 
     // 별 칸 전체를 한 배율로 눌러 둔다(나타남의 출발점). 되돌림은 RestorePipScales가 맡는다.
     void SetPipScales(float _scale)
     {
-        for (int t_i = 0; t_i < RankConfig.DivisionsPerGrade; t_i++)
+        for (int t_i = 0; t_i < RankConfig.WinsPerDivision; t_i++)
         {
             Transform t_pip = this.PipTransform(t_i);
             if (t_pip != null) t_pip.localScale = Vector3.one * _scale;
@@ -660,19 +656,19 @@ public class RankHud : MonoBehaviour
 
     // 첫 진입(언랭크 → 첫 등급)의 별 채움. 등급 승급(브론즈 → 실버)은 이 길로 오지 않는다 —
     // 그 사건의 주인은 전면 오버레이(RankPromoteOverlay) 하나다.
-    void StageFirstEntry(Sequence _seq, in RankInfo _info, int _divisions)
+    void StageFirstEntry(Sequence _seq, in RankInfo _info, int _stars)
     {
         // in 파라미터는 람다가 잡을 수 없다 — 콜백이 쓸 값만 먼저 떠 둔다.
-        int   t_division = _info.Division;
         float t_progress = GaugeRatioOf(_info);
 
         // 조각이 밀어 둔 게이지를 출발선으로 되감는다 — 다 채운 채로 시작하면 채워지는 그림이 없다.
         // 무통지 스냅이다(통지하면 마디가 우수수 역행하며 방금 켜진 펀치를 되감는다).
         _seq.AppendCallback(() => this.SetGaugeRatio(0f));
 
-        // 1단계부터 하나씩 쌓는다. 마지막 토막은 실제 진행까지만 찬다 — 도달값보다 더 채우면 거짓말이 된다.
-        for (int t_i = 0; t_i < t_division && t_i < _divisions; t_i++)
-            this.StageStarFill(_seq, Mathf.Min((float)(t_i + 1) / _divisions, t_progress));
+        // 도달한 진행까지 한 칸씩 쌓는다. 마지막 토막은 실제 진행까지만 찬다 — 도달값보다 더 채우면 거짓말이 된다.
+        // 브론즈 1은 진행이 0이라 채울 칸이 없다. 별 줄이 나타나는 것 자체가 그 판의 내용이다.
+        for (int t_i = 0; t_i < _stars && (float)t_i / _stars < t_progress; t_i++)
+            this.StageStarFill(_seq, Mathf.Min((float)(t_i + 1) / _stars, t_progress));
     }
 
     // 게이지가 _ratio까지 차오르는 단위 동작(별 한 칸 분량). 꽉 차는 순간의 펀치는 마디 통과 통지가 낸다.
