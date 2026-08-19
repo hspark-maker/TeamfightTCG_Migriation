@@ -259,11 +259,11 @@ RectTransform:
   - {fileID: 3982529511438541904}
   m_Father: {fileID: 251925667401682032}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 28, y: -18}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 36, y: 36}
   m_SizeDelta: {x: 168, y: 130}
-  m_Pivot: {x: 0, y: 1}
+  m_Pivot: {x: 0, y: 0}
 --- !u!222 &4923669004485242262
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -774,6 +774,12 @@ MonoBehaviour:
   backdropTile: {fileID: 7226325308440332143}
   pathRoot: {fileID: 1922937516111304400}
   connectorPrefab: {fileID: 0}
+  transition:
+    panel: {fileID: 0}
+    openDuration: 0.25
+    closeDuration: 0.15
+    openFromScale: 0.9
+    closeToScale: 0.9
 --- !u!1 &5063594569244960649
 GameObject:
   m_ObjectHideFlags: 0
@@ -1335,7 +1341,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:

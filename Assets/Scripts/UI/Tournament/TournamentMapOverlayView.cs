@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 보상 토너먼트 세로 경로 맵(로비 Content를 채우는 탭 패널).
+// 보상 토너먼트 세로 경로 맵(로비 위를 덮는 전체 화면 오버레이).
 //
 // 정점 수·좌표를 전부 코드가 만든다 — 프리팹에 정점을 손으로 박으면 SO 저작이 늘 때 화면이 조용히 어긋난다.
-// 씬 전환·탭 이동은 모른다. 도전·뒤로가기를 이벤트로 올리고 LobbyRoot(LobbyMatchLauncher)가 처리한다.
-public class TournamentMapPanel : LobbyTabPanel
+// 자기 여닫음은 스스로 소유하고, 씬 전환만 모른다 — 도전을 이벤트로 올리면 LobbyRoot(LobbyMatchLauncher)가 잇는다.
+public class TournamentMapOverlayView : MonoBehaviour
 {
     [SerializeField] ScrollRect scrollRect;
     [SerializeField] RectTransform content;          // 정점이 놓일 Content(레이아웃 그룹 없이 코드가 좌표를 잡는다)
@@ -41,11 +41,14 @@ public class TournamentMapPanel : LobbyTabPanel
              "가로로 누운 그림을 저작할 것 — 두 정점 사이 거리만큼 폭(width)이 늘고 각도가 돌아간다.")]
     [SerializeField] RectTransform connectorPrefab;
 
+    [Header("연출")]
+    [SerializeField] PopupTransition transition = new PopupTransition();
+
     /// <summary>정점 도전 요청(도전 가능한 정점만 올라온다). LobbyRoot가 전투로 잇는다.</summary>
     public event Action<int> NodeSelected;
 
-    /// <summary>맵을 닫고 매치 탭으로 돌아가는 요청. 탭 이동의 주체는 LobbyRoot다.</summary>
-    public event Action BackRequested;
+    /// <summary>맵이 화면에 떠 있는가.</summary>
+    public bool IsOpen => this.gameObject.activeInHierarchy;
 
     readonly List<TournamentNodeView> m_nodes = new List<TournamentNodeView>();
 
@@ -60,30 +63,48 @@ public class TournamentMapPanel : LobbyTabPanel
 
     void Awake()
     {
-        if (this.backButton != null) this.backButton.onClick.AddListener(this.OnBackClicked);
+        if (this.backButton != null) this.backButton.onClick.AddListener(this.Close);
     }
 
     void OnDestroy()
     {
-        if (this.backButton != null) this.backButton.onClick.RemoveListener(this.OnBackClicked);
+        if (this.backButton != null) this.backButton.onClick.RemoveListener(this.Close);
     }
 
     void OnEnable()
     {
         TournamentProgress.OnChanged += this.RefreshNodes;
+
+        // 세로 맵이 화면을 다 쓰도록 하단 탭바만 걷는다(재화 HUD는 남긴다).
+        LobbyShellBars.Hide(this, this.transform, EShellBars.Bottom);
     }
 
     void OnDisable()
     {
         TournamentProgress.OnChanged -= this.RefreshNodes;
+
+        LobbyShellBars.Show(this);            // 씬 이탈로 잘려도 바가 걷힌 채 굳지 않게
+        this.transition.HandleDisabled(this.gameObject);
     }
 
-    public override void OnEnter()
+    /// <summary>맵을 연다. 정점 세우기·스크롤은 활성화 뒤에 돈다 — rect가 0이면 스크롤 계산이 깨진다.</summary>
+    public void Open()
     {
+        if (this.IsOpen) return;
+
+        this.transition.SetVisible(this.gameObject, true);
+
         if (this.m_built) this.RefreshNodes();
         else this.Build();
 
         this.ScrollToCurrent();
+    }
+
+    /// <summary>맵을 닫는다. 하단바는 퇴장 트윈과 나란히 돌려준다 — OnDisable을 기다리면 늦는다.</summary>
+    public void Close()
+    {
+        LobbyShellBars.Show(this);
+        this.transition.SetVisible(this.gameObject, false);
     }
 
     // 정점을 TournamentProgress.NodeCount만큼 세운다(정점 수는 SO에서 파생 — 상수 하드코딩 금지).
@@ -273,6 +294,4 @@ public class TournamentMapPanel : LobbyTabPanel
 
         this.NodeSelected?.Invoke(_index);
     }
-
-    void OnBackClicked() => this.BackRequested?.Invoke();
 }

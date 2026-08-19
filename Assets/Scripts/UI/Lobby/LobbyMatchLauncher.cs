@@ -25,8 +25,8 @@ public class LobbyMatchLauncher : MonoBehaviour
     [SerializeField] LobbyMatchTabPanel matchPanel;
 
     [Header("보상 토너먼트")]
-    [Tooltip("토너먼트 맵 탭 패널. 탭 이동·전투 진입의 주체가 로비 쪽이라 여기서 구독한다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
-    [SerializeField] TournamentMapPanel tournamentPanel;
+    [Tooltip("토너먼트 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
+    [SerializeField] TournamentMapOverlayView tournamentPanel;
 
     const string BATTLE_SCENE = "BattleScene";
 
@@ -90,14 +90,10 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (matchPanel != null)
         {
             matchPanel.PlayRequested += StartAiBattle;
-            matchPanel.TournamentRequested += GoToTournamentTab;
+            matchPanel.TournamentRequested += OpenTournamentMap;
         }
 
-        if (tournamentPanel != null)
-        {
-            tournamentPanel.NodeSelected += StartTournamentBattle;
-            tournamentPanel.BackRequested += GoToMatchTab;
-        }
+        if (tournamentPanel != null) tournamentPanel.NodeSelected += StartTournamentBattle;
 
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
@@ -108,14 +104,10 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (matchPanel != null)
         {
             matchPanel.PlayRequested -= StartAiBattle;
-            matchPanel.TournamentRequested -= GoToTournamentTab;
+            matchPanel.TournamentRequested -= OpenTournamentMap;
         }
 
-        if (tournamentPanel != null)
-        {
-            tournamentPanel.NodeSelected -= StartTournamentBattle;
-            tournamentPanel.BackRequested -= GoToMatchTab;
-        }
+        if (tournamentPanel != null) tournamentPanel.NodeSelected -= StartTournamentBattle;
 
         OutgameFeatureLock.OnChanged -= ApplyPlayLock;
     }
@@ -312,17 +304,13 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void GoToDeckTab()
     {
+        tournamentPanel?.Close();   // 맵이 떠 있는 채로 덱 탭에 가면 오버레이가 덱 화면을 가린다
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
-    void GoToTournamentTab()
+    void OpenTournamentMap()
     {
-        if (tournamentPanel != null) lobbyTabController?.Select(tournamentPanel);
-    }
-
-    void GoToMatchTab()
-    {
-        if (matchPanel != null) lobbyTabController?.Select(matchPanel);
+        tournamentPanel?.Open();
     }
 
     // 셸 미배선 폴백 전용. 저장된 슬롯 중 첫 유효 덱을 DeckConfig에 적용하고, 없으면 false.
