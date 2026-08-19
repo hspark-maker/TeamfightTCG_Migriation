@@ -9871,6 +9871,7 @@ GameObject:
   - component: {fileID: 5976618170882732702}
   - component: {fileID: 2704555447230243880}
   - component: {fileID: 5197080960649100998}
+  - component: {fileID: -7679795382591938162}
   m_Layer: 6
   m_Name: FX_Healer
   m_TagString: Untagged
@@ -14697,6 +14698,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-7679795382591938162
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536638742950671837}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &3091942362630355966
 GameObject:
   m_ObjectHideFlags: 0

@@ -84,11 +84,11 @@ public class CardView : MonoBehaviour
     [SerializeField] Vector2 keywordIconStart = new Vector2(-0.636f, -1.099f);
     [SerializeField] Vector2 keywordIconStep  = new Vector2(0.42f, 0f);
 
-    // 아이콘 줄 배경판 두 장(Frame 자식). 키워드가 실제로 열려 있는 카드는 기본판,
-    // 키워드가 없거나 아직 안 열린(= 아이콘 줄에 띄울 것이 없는) 카드는 좁은 판을 쓴다.
+    // 아이콘 줄 배경판 두 장(Frame 자식). 시너지 배지가 실제로 뜨는 카드만 시너지 칸이 있는 기본판,
+    // 시너지가 충족 안 된(또는 미해금/뒷면) 카드는 시너지 칸이 없는 좁은 판을 쓴다.
     // 어느 쪽을 켤지 정하는 지점은 CardDecorView 한 곳뿐이다 — 두 판이 동시에 켜지면 겹쳐 그려진다.
-    [SerializeField] GameObject keywordBg;        // SynergyKewordBG (기본)
-    [SerializeField] GameObject keywordOnlyBg;    // SynergyKewordBG_kewordOnly
+    [SerializeField] GameObject keywordBg;        // SynergyKewordBG (시너지 칸 포함)
+    [SerializeField] GameObject keywordOnlyBg;    // SynergyKewordBG_kewordOnly (시너지 칸 없음)
 
     // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
     // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.

@@ -19476,6 +19476,7 @@ GameObject:
   - component: {fileID: 8906774521402832339}
   - component: {fileID: 1493733128908877399}
   - component: {fileID: 8872152325057318034}
+  - component: {fileID: -7122649679436148755}
   m_Layer: 6
   m_Name: FX_Range
   m_TagString: Untagged
@@ -24302,6 +24303,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-7122649679436148755
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6566167575339027792}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &7218294760875996920
 GameObject:
   m_ObjectHideFlags: 0

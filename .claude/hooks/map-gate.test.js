@@ -5,20 +5,23 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { processHook, FREE_SEARCHES } = require("./map-gate.js");
+const { processHook, FREE_SEARCHES, shouldGate } = require("./map-gate.js");
 const { bashSearch, powershellSearch, mapReadSucceeded } = require("../lib/search-detect.js");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "map-gate-test-"));
 const projectDir = path.join(root, "project");
 const stateRoot = path.join(root, "state");
 fs.mkdirSync(path.join(projectDir, ".claude"), { recursive: true });
-fs.writeFileSync(path.join(projectDir, ".claude", "orch-feature-map.md"), "# map\n");
 
 /* 실측 스키마 — Claude Code 의 Bash 결과에는 exitCode 도 is_error 도 없다.
    합성 객체로 테스트하면 실패 판정이 거짓 통과한다. 이 파일의 핵심 회귀점. */
 const bashOk = (stdout) => ({ stdout, stderr: "", interrupted: false, isImage: false, noOutputExpected: false });
 const bashFail = (message) => bashOk(message);
-const mapBody = "# 기능 지도\n".padEnd(400, "전투 시너지 카드 멀티플레이 세이브 재화 보상 카드팩 컬렉션 덱 성장 랭크 튜토리얼 ");
+const mapBody = [
+  "# 기능 지도", "## 전투 (`Battle/`)",
+  "- 카드 표시: `CardView` · `CardDecorView`", "- 덱: `DeckBuilderUI`", "- 시너지: `LegacySynergyEffect`",
+].join("\n").padEnd(400, " 전투 시너지 카드 멀티플레이 세이브 재화 보상 카드팩 컬렉션 덱 성장 랭크 튜토리얼");
+fs.writeFileSync(path.join(projectDir, ".claude", "orch-feature-map.md"), mapBody);
 const readOk = { file: { filePath: ".claude/orch-feature-map.md", content: mapBody, numLines: 40 } };
 
 function hook(event, tool, input, response, session = "s1") {
@@ -51,7 +54,9 @@ function check(label, fn) { fn(); passed += 1; console.log(`  ok  ${label}`); }
 try {
   check("1. 무료 구간을 넘긴 Grep 은 차단된다", () => {
     exhaustFree();
-    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "Card" })));
+    const result = hook("PreToolUse", "Grep", { pattern: "Card" });
+    assert.ok(denied(result));
+    assert.match(result.hookSpecificOutput.permissionDecisionReason, /\[MAP_GATE_EXCERPT_V1 hits=\d+/);
   });
 
   check("2. 지도 Read 자체는 차단되지 않는다", () => {
@@ -95,12 +100,11 @@ try {
     ]) assert.equal(hook("PreToolUse", "Bash", { command }, undefined, label), null, `${command} 미차단`);
   });
 
-  check("9. 연속 3회 차단 뒤 fail-open (교착 방지)", () => {
-    exhaustFree("cap");
-    for (let i = 0; i < 3; i += 1) {
-      assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "x" }, undefined, "cap")), `${i + 1}회차 차단`);
-    }
-    assert.equal(hook("PreToolUse", "Grep", { pattern: "x" }, undefined, "cap"), null);
+  check("9. 지도 0건은 통과하고, 발췌를 받은 요청은 재시도가 열린다", () => {
+    exhaustFree("excerpt");
+    assert.equal(hook("PreToolUse", "Grep", { pattern: "UnfindableConcept" }, undefined, "excerpt"), null);
+    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "CardView" }, undefined, "excerpt")));
+    assert.equal(hook("PreToolUse", "Grep", { pattern: "CardView" }, undefined, "excerpt"), null);
   });
 
   check("10. Bash 탐색 변형이 모두 잡힌다", () => {
@@ -183,10 +187,34 @@ try {
     for (let i = 0; i < FREE_SEARCHES; i += 1) {
       assert.equal(hook("PreToolUse", "Grep", { pattern: `free${i}` }, undefined, "free"), null);
     }
-    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "over" }, undefined, "free")), "무료 구간 초과분은 차단");
+    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "CardView" }, undefined, "free")), "무료 구간 초과분은 지도 매칭 시 차단");
   });
 
-  console.log(`map-gate tests: ${passed}/16 passed (subagent context: 미검증 — sidechain 기록 없음)`);
+  check("17. 지도가 못 받는 대상(프리팹·SO·guid·git)은 막지 않는다", () => {
+    const exempt = [
+      { command: "grep -n m_Name Assets/Assets/Prefabs/UI/CardView.prefab" },
+      { command: "grep -rn displayName Assets/SO/Synergies" },
+      { command: "grep -rl 4c4b3cb345915fd48ad7bfcc494749d9 Assets" },
+      { command: "git --no-pager diff --stat -- Assets | grep -i synergy" },
+    ];
+    for (const input of exempt) {
+      // 무료 구간을 이미 넘긴 세션에서도 통과해야 예외가 성립한다.
+      assert.equal(hook("PreToolUse", "Bash", input, undefined, "exempt"), null,
+        `${input.command} 은 지도 범위 밖`);
+    }
+    assert.equal(shouldGate("Glob", { pattern: "**/FX_*.prefab" }), false);
+
+    // 코드가 명시되면 에셋 경로가 섞여 있어도 게이트 대상이다.
+    assert.ok(shouldGate("Bash", { command: "grep -rn Crown Assets/Scripts --include=*.cs; ls Assets/SO" }));
+    // 대상이 불분명하면 보수적으로 막는다.
+    assert.ok(shouldGate("Bash", { command: "rg Crown" }));
+
+    exhaustFree("exempt2");
+    assert.ok(denied(hook("PreToolUse", "Grep", { pattern: "CardView", glob: "*.cs" }, undefined, "exempt2")),
+      "코드 검색은 그대로 막힌다");
+  });
+
+  console.log(`map-gate tests: ${passed}/17 passed (subagent context: 미검증 — sidechain 기록 없음)`);
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

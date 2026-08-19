@@ -8,12 +8,14 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { mapSymbols } = require("./lib/map-index.js");
 
 const root = path.resolve(__dirname, "..");
 const mapFile = path.join(__dirname, "orch-feature-map.md");
 const backupFile = mapFile + ".bak";
 const srcRoot = path.join(root, "Assets", "Scripts");
 const BLOCK_RE = /<!-- orch:feature-map-sync:start -->[\s\S]*?<!-- orch:feature-map-sync:end -->/;
+const AUTO_DRAFT_RE = /<!-- orch:auto-draft:start -->[\s\S]*?<!-- orch:auto-draft:end -->/;
 const REMOVED_TOKEN = "\u0000";
 const MAX_REMOVAL_RATIO = 0.05;
 const today = new Date().toISOString().slice(0, 10);
@@ -40,6 +42,7 @@ function scanSource() {
       else if (entry.isFile() && entry.name.endsWith(".cs")) files.push(full);
     }
   })(srcRoot);
+  files.sort();
 
   const declarations = new Map();
   const publicTypes = new Set();
@@ -87,6 +90,28 @@ function chooseMovedPath(info, declarations, warnings) {
   return actual[0] + (info.members.length ? "." + info.members.join(".") : "");
 }
 
+function autoDraft(unmapped, source, eol) {
+  if (!unmapped.length) return "";
+  const byDir = new Map();
+  for (const name of unmapped) {
+    const declaration = (source.declarations.get(name) || ["(root)"])[0];
+    const slash = declaration.lastIndexOf("/");
+    const dir = slash >= 0 ? declaration.slice(0, slash + 1) : "(root)";
+    if (!byDir.has(dir)) byDir.set(dir, []);
+    byDir.get(dir).push(name);
+  }
+  const lines = [
+    "<!-- orch:auto-draft:start -->",
+    "## 미분류 자동 초안 (섹션으로 옮기면 다음 동기화에서 빠집니다)",
+    "",
+    ...[...byDir].sort(([a], [b]) => a.localeCompare(b)).map(([dir, names]) =>
+      `- \`${dir}\` — ${names.sort().map((name) => `\`${name}\``).join(" · ")}`
+    ),
+    "<!-- orch:auto-draft:end -->",
+  ];
+  return lines.join(eol);
+}
+
 function sync() {
   if (!fs.existsSync(mapFile) || !fs.existsSync(srcRoot)) throw new Error("기능 지도 또는 Assets/Scripts가 없습니다");
   const original = fs.readFileSync(mapFile, "utf8");
@@ -101,7 +126,7 @@ function sync() {
       .map((m) => [m[1].trim(), m[2]])
   );
 
-  let body = original.replace(BLOCK_RE, "");
+  let body = original.replace(BLOCK_RE, "").replace(AUTO_DRAFT_RE, "");
   const originalTypeTokens = new Set(
     [...body.matchAll(/`([^`]+)`/g)]
       .map((m) => m[1].trim())
@@ -113,7 +138,6 @@ function sync() {
     if (info.kind !== "type") return whole;
     const declarations = source.declarations.get(info.typeName) || [];
     if (!declarations.length) { removed.add(raw); return REMOVED_TOKEN; }
-    mappedTypes.add(info.typeName);
     const replacement = chooseMovedPath(info, source.declarations, warnings);
     if (!replacement) return whole;
     moved.set(raw, replacement);
@@ -153,33 +177,40 @@ function sync() {
     return !/^[\s\-*·/|,;:()[\]—–]+$/.test(line);
   }).join(eol);
 
-  const mapTokens = [...body.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim());
-  const missingDirs = [...new Set(mapTokens.filter((raw) => {
+  const tokens = [...body.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim());
+  const missingDirs = [...new Set(tokens.filter((raw) => {
     if (!raw.endsWith("/")) return false;
     const key = raw.replace(/^Assets\/Scripts\//, "");
     if (source.dirs.has(key)) return false;
     return !/^(Assets|Photon|Plugins|PurchasedAssets|AmplifyShaderEditor|GUIPackCartoon)\//.test(raw);
   }))].sort();
+  for (const name of mapSymbols(body).types) mappedTypes.add(name);
   const unmappedPublic = [...source.publicTypes].filter((name) => !mappedTypes.has(name)).sort();
+  const draft = autoDraft(unmappedPublic, source, eol);
+  const draftBytes = Buffer.byteLength(draft);
+  if (unmappedPublic.length > 20 || draftBytes > 2000) {
+    warnings.push(`자동 초안 정리 필요: ${unmappedPublic.length}개 타입, ${draftBytes} bytes`);
+  }
   const generated = [
     "<!-- orch:feature-map-sync:start -->",
-    `<!-- orch:source files=${source.files.length} public-types=${source.publicTypes.size} unmapped-public-types=${unmappedPublic.length} -->`,
+    `<!-- orch:source files=${source.files.length} public-types=${source.publicTypes.size} unmapped-public-types=0 auto-draft-types=${unmappedPublic.length} -->`,
     `<!-- orch:emptied-bullets=${emptiedBullets} -->`,
     ...missingDirs.map((dir) => `<!-- orch:missing-dir ${dir} since=${previousMissingSince.get(dir) || today} -->`),
     "<!-- orch:feature-map-sync:end -->",
   ].join(eol);
   const firstSection = body.indexOf("## ");
-  const next = firstSection >= 0
+  let next = firstSection >= 0
     ? body.slice(0, firstSection).trimEnd() + eol + eol + generated + eol + eol + body.slice(firstSection).trimStart()
     : generated + eol + body;
+  next = next.trimEnd() + (draft ? eol + eol + draft : "") + eol;
 
   if (next === original) {
-    console.log(`feature map unchanged: ${source.files.length} files, ${unmappedPublic.length} unmapped public types`);
+    console.log(`feature map unchanged: ${source.files.length} files, ${unmappedPublic.length} auto-draft types`);
     return;
   }
   atomicWrite(backupFile, original);
   atomicWrite(mapFile, next);
-  console.log(`feature map synced: removed ${removed.size}, moved ${moved.size}, missing dirs ${missingDirs.length}, unmapped public types ${unmappedPublic.length}`);
+  console.log(`feature map synced: removed ${removed.size}, moved ${moved.size}, missing dirs ${missingDirs.length}, auto-draft types ${unmappedPublic.length}`);
   for (const [from, to] of moved) console.log(`  moved: ${from} -> ${to}`);
   for (const item of removed) console.log(`  removed: ${item}`);
   for (const dir of missingDirs) console.warn(`  warning: section directory missing: ${dir}`);

@@ -4963,6 +4963,7 @@ GameObject:
   - component: {fileID: 1171546471629770266}
   - component: {fileID: 4569267855948253729}
   - component: {fileID: 7814128602907309338}
+  - component: {fileID: 8537280245042082341}
   m_Layer: 6
   m_Name: FX_Taunt
   m_TagString: Untagged
@@ -9789,6 +9790,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &8537280245042082341
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3243629766246550057}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &4645754632871422485
 GameObject:
   m_ObjectHideFlags: 0

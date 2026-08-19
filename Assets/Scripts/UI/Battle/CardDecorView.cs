@@ -34,8 +34,8 @@ public class CardDecorView
     readonly KeywordIconConfig keywordIconConfig;
     readonly Vector2          keywordIconStart;   // 첫 아이콘 좌표(keywordIconRoot 기준)
     readonly Vector2          keywordIconStep;    // 그 다음 아이콘마다 더할 간격
-    readonly GameObject       keywordBg;          // 키워드가 열려 있는 카드의 아이콘 줄 배경판
-    readonly GameObject       keywordOnlyBg;      // 띄울 키워드가 없는 카드의 좁은 배경판
+    readonly GameObject       keywordBg;          // 시너지 칸이 있는 넓은 배경판(활성 시너지 배지가 있을 때만)
+    readonly GameObject       keywordOnlyBg;      // 시너지 칸이 없는 좁은 배경판(그 외 전부)
     readonly CardView.KeywordFrame[] keywordFrames;
     readonly Transform        synergyBadgeRoot;
     readonly SynergyBadgeView synergyBadgePrefab;
@@ -103,9 +103,14 @@ public class CardDecorView
     /// 빈 슬롯/뒷면 은닉 판정은 각 항목이 스스로 한다(정보 은닉 규칙의 단일 지점).</summary>
     public void Refresh(CardInstance _card, SynergyState _synergy)
     {
+        // 배경판 선택과 배지 생성이 **같은 목록**을 보게 여기서 한 번만 뽑아 둘에 나눠 준다.
+        // 따로 계산하면 "배지는 없는데 시너지 칸이 있는 판" 같은 어긋남이 생긴다.
+        List<SynergyData> t_badges = CollectVisibleSynergyBadges(_card, _synergy);
+
         RefreshKeywordIcons(_card);
+        RefreshKeywordBg(t_badges.Count > 0);
         RefreshKeywordFrames(_card);
-        RefreshSynergyBadges(_card, _synergy);
+        RefreshSynergyBadges(_card, _synergy, t_badges);
     }
 
     /// <summary>소유자(CardView) 파괴 시 정리. 장식 자식들의 트윈을 끊고 참조를 놓는다 —
@@ -122,23 +127,21 @@ public class CardDecorView
     #region Keyword icons
     // 아이콘 줄에는 캐릭터 고유 특성만 그린다. 일회용/디버프(무적·추가체력·전투 중 걸린 표식)는
     // 아예 표시하지 않는다 — 무엇을 띄울지 판정은 CardVisualRules 단독(아웃게임과 같은 호출).
-    /// <summary>아이콘 줄 배경판 선택. 띄울 키워드가 하나도 없으면(키워드 없는 카드 · 아직 해금 전 ·
-    /// 뒷면/빈 슬롯) 좁은 판, 있으면 기본 판. 판정 기준은 아이콘 줄과 **같은** IconKeywords 하나다 —
-    /// 기준이 갈리면 아이콘은 떴는데 배경만 좁은(또는 그 반대) 카드가 생긴다.
-    /// 폴백 기본 아이콘은 실제 보유 키워드가 아니므로 여기서는 "없음"으로 친다.</summary>
-    void RefreshKeywordBg(CardInstance _card)
+    /// <summary>아이콘 줄 배경판 선택. 넓은 판(Card_Icon_Frame)은 시너지 칸이 있는 판이라
+    /// **실제로 그려질 활성 시너지 배지가 있을 때만** 쓴다. 시너지가 없거나(미충족 · 미해금 ·
+    /// 튜토리얼 은닉 · 뒷면/빈 슬롯) 배지를 못 그리면 시너지 칸이 없는 좁은 판(_kewordOnly)을 쓴다.
+    ///
+    /// 판정 기준은 배지 생성과 **같은 목록**(<see cref="CollectVisibleSynergyBadges"/>) 하나다 —
+    /// 기준이 갈리면 배지는 없는데 시너지 칸만 빈 채로 남는 카드가 생긴다(이전 동작: 키워드 유무로 갈랐다).
+    /// 두 판이 동시에 켜지면 겹쳐 그려지므로 언제나 정확히 한 장만 켠다.</summary>
+    void RefreshKeywordBg(bool _hasSynergyBadge)
     {
-        bool t_hasKeyword = _card != null && _card.isRevealed
-                         && CardVisualRules.IconKeywords(_card) != CardKeyword.None;
-
-        if (this.keywordBg     != null) this.keywordBg.SetActive(t_hasKeyword);
-        if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!t_hasKeyword);
+        if (this.keywordBg     != null) this.keywordBg.SetActive(_hasSynergyBadge);
+        if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!_hasSynergyBadge);
     }
 
     void RefreshKeywordIcons(CardInstance _card)
     {
-        RefreshKeywordBg(_card);
-
         Transform t_root = this.keywordIconRoot;
         if (t_root == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
 
@@ -245,11 +248,33 @@ public class CardDecorView
     #endregion
 
     #region Synergy badges
+    /// <summary>이 카드 위에 **실제로 그려질** 시너지 배지 목록(없으면 빈 리스트). 배지 생성과
+    /// 배경판 선택이 공유하는 단일 판정 지점이다.
+    ///
+    /// 게이트 순서: 튜토리얼 은닉 → 빈 슬롯/뒷면(정보 은닉) → 시너지 해금(1차 진화) →
+    /// 표시 대상·순서(CardVisualRules 단독: 중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한) →
+    /// **지금 켜진 것만** 남기기. 비활성 배지는 카드 위에서 켜진 것과 구분이 어렵고 자리만 차지한다.
+    /// 활성 판정은 확정 SynergyState 조회다(재계산·집계 금지).
+    ///
+    /// 배선(root/prefab)이 비어 있으면 배지를 못 그리므로 여기서도 "없음"으로 친다 —
+    /// 배경판이 못 그릴 배지를 기다리며 시너지 칸을 열어두지 않게.</summary>
+    List<SynergyData> CollectVisibleSynergyBadges(CardInstance _card, SynergyState _synergy)
+    {
+        if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return new List<SynergyData>();
+        if (!TutorialConfig.SynergyVisible)                                   return new List<SynergyData>();
+        if (_card == null || _card.data == null || !_card.isRevealed)         return new List<SynergyData>();
+        if (!_card.synergyEnabled)                                            return new List<SynergyData>();
+
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.data.synergies, _synergy, this.synergyMaxBadges);
+        t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
+        return t_tags;
+    }
+
     // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 세로 정렬 표시(최대 synergyMaxBadges개).
     // 선택·정렬 규칙(활성 우선 → requiredCount 내림차순)은 CardVisualRules 소유 — 아웃게임 타일과 순서가 갈라지지 않게.
     // 활성/티어 판정은 확정 SynergyState.Active 참조 조회(재계산·집계 금지).
     // _synergy는 이 카드가 속한 BattleField.Synergy(BattleFieldView가 Render로 주입). null이면 전부 비활성 취급.
-    void RefreshSynergyBadges(CardInstance _card, SynergyState _synergy)
+    void RefreshSynergyBadges(CardInstance _card, SynergyState _synergy, List<SynergyData> _badges)
     {
         // 스냅샷은 **배지를 그리든 안 그리든 항상** 기록한다. 롱프레스 정보창이 활성/비활성을 가르는 근거라
         // 여기서 빠지면 정보창이 상태를 못 받아 전부 활성으로 그린다.
@@ -275,29 +300,12 @@ public class CardDecorView
             UnityEngine.Object.Destroy(t_child.gameObject);
         }
 
-        // 튜토리얼: 시너지 개념 미도입 구간은 배지 숨김. 판정은 TutorialConfig.SynergyVisible 단독
-        // (롱프레스 정보창의 아이콘 줄·설명 목록도 같은 게이트를 쓴다).
-        if (!TutorialConfig.SynergyVisible) return;
-
-        // 빈 슬롯·뒷면 카드는 배지 없음(뒷면 적의 종족/직업 정보 노출 방지).
-        if (_card == null || _card.data == null || !_card.isRevealed) return;
-
-        // 시너지 해금 레벨(1차 진화)에 닿지 않은 카드는 배지가 없다 — 실제로 시너지에 참여하지 않으므로
-        // 띄우면 "가졌지만 꺼진 것"이 아니라 그냥 오정보다. 판정은 인스턴스가 이미 들고 있는 게이트 하나.
-        if (!_card.synergyEnabled) return;
-
-        // 표시 대상·순서(중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한 적용)는 CardVisualRules 단독.
-        // 그중 **지금 켜진 것만** 남긴다: 비활성 배지는 카드 위에서 켜진 것과 구분이 어렵고 자리만 차지한다.
-        // 활성 판정은 확정 스냅샷 조회(재계산 금지) — 정렬과 같은 규칙 헬퍼를 재사용한다.
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.data.synergies, _synergy, this.synergyMaxBadges);
-        t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
-
         float t_alpha = CurrentBodyAlpha;
-        for (int t_i = 0; t_i < t_tags.Count; t_i++)
+        for (int t_i = 0; t_i < _badges.Count; t_i++)
         {
             SynergyBadgeView t_badge = UnityEngine.Object.Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
             t_badge.transform.localPosition = new Vector3(this.synergyBadgeXPos, this.synergyBadgeYStart + this.synergyBadgeYStep * t_i, 0f);
-            t_badge.Set(t_tags[t_i], _active: true);
+            t_badge.Set(_badges[t_i], _active: true);
 
             // 키워드 아이콘과 같은 이유: 배지는 **지금 막 생성**돼 직전 페이드에 참여하지 못했다.
             // 그대로 두면 죽은 카드가 사라진 자리에 몸통 없이 배지만 먼저 보인다.
