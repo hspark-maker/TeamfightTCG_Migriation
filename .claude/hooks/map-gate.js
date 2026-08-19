@@ -23,6 +23,21 @@ const MAX_BLOCKS = 3;
    차지하므로, 세 번째 검색에서 막으면 헤매는 쪽만 걸린다. */
 const FREE_SEARCHES = Number(process.env.MAP_GATE_FREE_SEARCHES ?? 2);
 
+/* 저장소 루트 찾기.
+   input.cwd 는 모델이 `cd` 하면 하위 디렉터리가 된다 — 실측 로그에 
+   `.../Assets/.claude/orch-feature-map.md` 를 찾다 실패해 게이트가 조용히 꺼진 기록이 있다.
+   그래서 CLAUDE_PROJECT_DIR 을 먼저 보고, 없으면 지도가 나올 때까지 위로 올라간다. */
+function resolveProjectDir(start) {
+  let dir = start ? path.resolve(start) : null;
+  while (dir) {
+    if (fs.existsSync(path.join(dir, ".claude", MAP_NAME))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
 function statePath(stateRoot, projectDir, sessionId) {
   const key = crypto.createHash("sha256").update(`${path.resolve(projectDir)}\0${sessionId}`).digest("hex").slice(0, 32);
   return path.join(stateRoot, `${key}.json`);
@@ -56,7 +71,11 @@ function deny() {
 
 function processHook(input, options = {}) {
   const stateRoot = options.stateRoot || path.join(os.tmpdir(), "orch-map-gate");
-  const projectDir = options.projectDir || input.cwd || process.env.CLAUDE_PROJECT_DIR;
+  const projectDir = options.projectDir
+    || resolveProjectDir(process.env.CLAUDE_PROJECT_DIR)
+    || resolveProjectDir(input.cwd)
+    || process.env.CLAUDE_PROJECT_DIR
+    || input.cwd;
   const sessionId = input.session_id || process.env.CLAUDE_CODE_SESSION_ID;
   if (!projectDir || !sessionId) {
     logFailOpen(stateRoot, "fail-open: project or session identifier missing");

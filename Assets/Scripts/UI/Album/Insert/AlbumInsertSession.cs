@@ -46,6 +46,7 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] AlbumInsertHintView      hint;
     [SerializeField] CardVisualView           cardVisual;
     [SerializeField] CanvasGroup              group;
+    [SerializeField] AlbumInsertFanfareFx     fanfare = new AlbumInsertFanfareFx();
 
     [Header("타이밍")]
     // 페이지 넘김 시간은 여기 두지 않는다 — AlbumPageOverlayView.FlipDuration이 단일 진실원이다
@@ -66,6 +67,10 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] float  settlePulseScale    = 0.9f;
     [Tooltip("줄었다 돌아오기까지의 전체 시간.")]
     [SerializeField] float  settlePulseDuration = 0.24f;
+    [Tooltip("수동 삽입에서 빵빠레가 보이도록 다음 카드로 넘어가기 전에 남기는 짧은 여운.")]
+    [Range(0f, 0.5f)] [SerializeField] float fanfareHold = 0.25f;
+    [Tooltip("모두 넣기의 마지막 장도 색종이가 보이도록 보장하는 최소 여운.")]
+    [Range(0f, 0.3f)] [SerializeField] float quickFinalFanfareHold = 0.18f;
     [SerializeField] string guideMessage     = "슬리브에 넣기 위해 스와이프하세요";
 
     [Header("건너뛰기 글자")]
@@ -229,7 +234,7 @@ public class AlbumInsertSession : MonoBehaviour
                     if (m_autoPlay) yield return new WaitForSecondsRealtime(this.autoStepGap);
                     else            yield return this.AwaitDrag();
 
-                    yield return this.Seat(t_step);
+                    yield return this.Seat(t_step, t_i == m_steps.Count - 1);
                 }
 
                 m_steps.Clear();
@@ -346,7 +351,7 @@ public class AlbumInsertSession : MonoBehaviour
         m_seatRequested = false;
     }
 
-    IEnumerator Seat(AlbumInsertStep _step)
+    IEnumerator Seat(AlbumInsertStep _step, bool _lastInBatch)
     {
         dragger.Interactable = false;
         if (hint != null) hint.PauseFinger();
@@ -378,6 +383,12 @@ public class AlbumInsertSession : MonoBehaviour
         this.HideCard();
 
         this.SettlePulse(m_slotRect);
+        this.fanfare?.Play(m_slotRect, m_autoPlay);
+
+        float t_fanfareHold = m_autoPlay
+                            ? (_lastInBatch ? this.quickFinalFanfareHold : 0f)
+                            : this.fanfareHold;
+        if (t_fanfareHold > 0f) yield return new WaitForSecondsRealtime(t_fanfareHold);
     }
 
     // 안착 마무리 강조 — 부풀리는 펀치 대신 "원래크기 → 축소 → 원래크기"로 꾹 눌러 담는 손맛을 낸다.
@@ -480,6 +491,7 @@ public class AlbumInsertSession : MonoBehaviour
     {
         // 펄스가 도는 중에 끝나면 남의 칸이 줄어든 채로 도감에 남는다 — 완료(=원래 크기 복귀)시키고 놓는다.
         if (m_slotRect != null) m_slotRect.DOComplete();
+        this.fanfare?.Reset();
 
         m_steps.Clear();
         m_openTheme = null;

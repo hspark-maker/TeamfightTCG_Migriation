@@ -5,7 +5,7 @@
 전체 파일 목록만 필요하면 Glob 또는 rg --files로 현재 상태를 조회한다.
 
 <!-- orch:feature-map-sync:start -->
-<!-- orch:source files=419 public-types=502 unmapped-public-types=3 -->
+<!-- orch:source files=425 public-types=509 unmapped-public-types=10 -->
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
@@ -66,7 +66,7 @@
 - 재화: `CurrencyManager.Init` / `CurrencyManager.Save` · `ECurrencyType` · `CurrencyGainBucket` (`CurrencyGain`) · `RewardLine`
 - 전투 보상: `BattleReward` · `BattleRewardHandoff`
 - 지급 서비스: `Utils/RewardService`
-- UI: `UI/HUD/CurrencyHud` · `UI/Common/CurrencyGainEffectPlayer` · `UI/Common/CurrencyRewardSlotView` · `UI/Common/RewardClaimPopup` · `UI/Common/CoinBurstEffect`
+- UI: `UI/HUD/CurrencyHud` · `ContextCurrencySlot` · `CurrencyLook` · `UI/Common/CurrencyGainEffectPlayer` · `UI/Common/CurrencyRewardSlotView` · `UI/Common/RewardClaimPopup` · `UI/Common/CoinBurstEffect`
 
 ## 카드팩 (`OutGame/CardPack/`, `UI/Shop/`)
 
@@ -82,7 +82,7 @@
 - 테마: `AlbumTheme` · `AlbumThemeDef` · `AlbumSection` · UI `UI/Album/AlbumThemeCellView`
 - 도감: `CardAlbum` · `AlbumPage` · `AlbumTheme` · `CardAlbumConfig` · `AlbumRewardManager` · `AlbumRewardInfo` · `AlbumPageDef` · `AlbumRewardDef` · `EAlbumRewardState`
 - 카드 상세(`UI/CardDetail/`): `CardDetailOverlayView` (최대 UI 파일) · `CardDetailOpenOptions` · 키워드 데모 `KeywordDemoConfig` · `KeywordDemoStage` · 해금 연출 `SectionRevealFx` · `SectionUnlockFx` · `UnlockIntro` · `UnlockIntroOverlay` · `UnlockIntroRow`
-- 도감 UI: `UI/Album/AlbumPageOverlayView` · `AlbumPageFlipView` · `AlbumTabController` · `AlbumChestView` · `AlbumRewardClaimFlow` · `UI/Album/Insert/AlbumInsertSession` · `AlbumInsertCardDragger` · `AlbumInsertPlan` · `AlbumInsertQueue` · `AlbumInsertStep` · `AlbumInsertHintView` · `AlbumInsertMask` · `AlbumSleeveView` · `UI/Album/AlbumCardSlotView` · `AlbumGaugeView`
+- 도감 UI: `UI/Album/AlbumPageOverlayView` · `AlbumPageFlipView` · `AlbumTabController` · `AlbumChestView` · `AlbumRewardClaimFlow` · `UI/Album/Insert/AlbumInsertSession` · `AlbumInsertCardDragger` · `AlbumInsertPlan` · `AlbumInsertQueue` · `AlbumInsertStep` · `AlbumInsertFanfareFx` · `AlbumInsertHintView` · `AlbumInsertMask` · `AlbumSleeveView` · `UI/Album/AlbumCardSlotView` · `AlbumGaugeView`
 
 ## 덱 (`OutGame/Deck/`, `UI/Deck/`, `UI/MainMenu/`)
 
@@ -98,7 +98,7 @@
 ## 랭크·매치메이킹 (`OutGame/Rank/`, `OutGame/Match/`)
 
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
-- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `RankRewardAlertDot` · `UI/HUD/RankProgressArc` · `RankProgressGauge` · `RankPromoteEffect`
+- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `RankRewardAlertDot` · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
 - 매칭 UI: `UI/Match/MatchmakingShell` · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
 
@@ -120,7 +120,7 @@
 ## 공용 UI·연출 (`UI/Common/`, `UI/UIManager/`, `UI/Lobby/`)
 
 - 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
-- 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
+- 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `UI/ScreenCoverBackground` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
 - 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` () · `UI/SettingsPanel`
 - 풀·매니저: `UI/UIManager/UIPoolManager` · `PooledCardElement` (`PooledCardElementData`) · `PooledUIBase` (`UIData`) · `UIAnimator` · `IUIController` · `SimpleYNPopup` (`SimpleYNPopupData`) · 상시 오버레이 `SingletonOverlay` · `SingletonOverlayBase` · `RuntimeOverlayPrefabs` · `SyncUiPrefabCatalog` (`ESyncUiPrefab` · `SyncUiPrefabs`)
@@ -130,7 +130,7 @@
 ## 부트·코어·유틸
 
 - 기동: `Core/BootInstaller` · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
-- 데이터·풀: `Utils/DataLibrary` · `ObjectPooler` · `ParticlePooler` · `PooledParticle` · `LogUtil` · `CameraUtil` · `EdgeShadeSprite` · `ShineBandSprite`
+- 데이터·풀: `Utils/DataLibrary` · `ObjectPooler` · `ParticlePooler` · `PooledParticle` · `LogUtil` · `CameraUtil` · `KoreanText` · `EdgeShadeSprite` · `ShineBandSprite`
 - 사운드: `Audio/SoundManager` · `SoundConfig` · `UIClickSound`
 - 디버그: `OutGame/Debug/OutgameDebugOverlay` · `OutgameDebugActions` · `UI/Debug/DebugCurrencyButton` · `UnlockAllCardsButton` · `Test/VfxDebugWindow` (`VfxSlot`) · `Test/AttackAnimTester` (`AttackStep`) · `SynergyPreviewKind` · `KeywordPreviewKind`
 
