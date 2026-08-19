@@ -23,6 +23,13 @@ public class TournamentMapPanel : LobbyTabPanel
     [Tooltip("첫 정점 아래 · 마지막 정점 위에 남길 여백(px).")]
     [SerializeField] float edgePadding = 260f;
 
+    [Header("경로 저작(선택)")]
+    [Tooltip("경로 포인트의 부모. 자식이 놓인 자리가 곧 정점 자리이고, 형제 순서가 정점 순서다(첫 자식 = 1번 정점).\n" +
+             "포인트가 정점 수보다 적으면 남는 정점은 마지막 포인트에서 아래 간격·진폭 공식으로 이어 붙인다.\n" +
+             "포인트에 표식 그림을 달아 두면 저작 중에만 보이고 실행할 때 꺼진다.\n" +
+             "비우면 전부 공식 배치다.")]
+    [SerializeField] RectTransform pathRoot;
+
     [Header("경로 장식(선택)")]
     [Tooltip("정점 사이를 잇는 선 프리팹. 비우면 선 없이 정점만 놓는다.\n" +
              "가로로 누운 그림을 저작할 것 — 두 정점 사이 거리만큼 폭(width)이 늘고 각도가 돌아간다.")]
@@ -35,6 +42,12 @@ public class TournamentMapPanel : LobbyTabPanel
     public event Action BackRequested;
 
     readonly List<TournamentNodeView> m_nodes = new List<TournamentNodeView>();
+
+    // 저작 포인트를 Content 좌표로 읽어 둔 것. 정점 수보다 적어도 되고, 비어 있으면 전부 공식 배치다.
+    readonly List<Vector2> m_points = new List<Vector2>();
+
+    // 이 화면이 만든 것만 추적한다 — Content를 통째로 비우면 저작한 포인트·배경 장식이 함께 지워진다.
+    readonly List<GameObject> m_spawned = new List<GameObject>();
 
     // 정점 생성 여부. 저작 정점 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
@@ -67,49 +80,76 @@ public class TournamentMapPanel : LobbyTabPanel
         this.ScrollToCurrent();
     }
 
-    // Content의 목업 정점을 걷고 TournamentProgress.NodeCount만큼 재생성(정점 수는 SO에서 파생 — 상수 하드코딩 금지).
+    // 정점을 TournamentProgress.NodeCount만큼 세운다(정점 수는 SO에서 파생 — 상수 하드코딩 금지).
+    // 위치는 저작 포인트가 있으면 그 자리, 없으면 공식이다.
     void Build()
     {
         this.m_nodes.Clear();
         if (this.content == null || this.nodePrefab == null) return;
 
-        // Destroy는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃에서 빠져야 이번 프레임 스크롤 위치가 맞는다.
-        // nodePrefab이 Content 안의 목업으로 배선되는 저작도 허용해야 하므로 원본은 숨기기만 한다(지우면 다음 Build가 0개).
-        GameObject t_template = this.nodePrefab.gameObject;
-        for (int t_i = this.content.childCount - 1; t_i >= 0; t_i--)
-        {
-            GameObject t_child = this.content.GetChild(t_i).gameObject;
-            t_child.SetActive(false);
-            if (t_child != t_template) Destroy(t_child);
-        }
+        // 이 화면이 직전에 만든 것만 걷는다. Content를 통째로 비우면 저작한 포인트·배경 장식이 함께 지워진다.
+        for (int t_i = 0; t_i < this.m_spawned.Count; t_i++)
+            if (this.m_spawned[t_i] != null) Destroy(this.m_spawned[t_i]);
+        this.m_spawned.Clear();
+
+        // 목업으로 Content 안에 놓인 원본은 숨기기만 한다(지우면 다음 Build가 0개가 된다).
+        if (this.nodePrefab.gameObject.scene.IsValid()) this.nodePrefab.gameObject.SetActive(false);
+
+        this.CollectAuthoredPoints();
 
         int t_count = TournamentProgress.NodeCount;
-        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, this.ContentHeightFor(t_count));
+        var t_positions = new Vector2[t_count];
+        float t_top = 0f;
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            t_positions[t_i] = this.PositionOf(t_i);
+            if (t_positions[t_i].y > t_top) t_top = t_positions[t_i].y;
+        }
+
+        // 높이는 가장 높은 정점에서 파생한다 — 저작 포인트가 공식 간격을 따르지 않아도 맞는다.
+        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_top + this.edgePadding);
+
+        // 연결선을 먼저 세운다 — 나중에 붙는 정점이 자연히 그 위에 온다(형제 순서 = 그리는 순서).
+        this.BuildConnectors(t_positions);
 
         for (int t_i = 0; t_i < t_count; t_i++)
         {
             TournamentNodeView t_node = Instantiate(this.nodePrefab, this.content);
-            t_node.gameObject.SetActive(true);   // 위에서 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
-            this.Place(t_node.transform as RectTransform, this.PositionOf(t_i));
+            t_node.gameObject.SetActive(true);   // 목업 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
+            this.Place(t_node.transform as RectTransform, t_positions[t_i]);
             t_node.Bind(t_i, this.OnNodeTapped);
             this.m_nodes.Add(t_node);
+            this.m_spawned.Add(t_node.gameObject);
         }
-
-        this.BuildConnectors(t_count);
 
         // 정점이 하나도 안 나왔으면(설정 미주입 등) 다음 진입에서 다시 시도한다 — 빈 맵으로 세션 내내 고착되지 않게.
         this.m_built = t_count > 0;
     }
 
-    // 정점 사이 연결선. 정점보다 뒤에 깔리도록 항상 맨 앞 형제로 보낸다.
-    void BuildConnectors(int _count)
+    // 저작 포인트를 Content 좌표(가로=중앙 기준, 세로=바닥 기준)로 읽고 표식은 끈다.
+    // Content pivot이 바닥(0.5, 0)이라는 전제다 — 높이가 변해도 바닥이 안 움직여 좌표가 흔들리지 않는다.
+    void CollectAuthoredPoints()
+    {
+        this.m_points.Clear();
+        if (this.pathRoot == null) return;
+
+        for (int t_i = 0; t_i < this.pathRoot.childCount; t_i++)
+        {
+            Transform t_point = this.pathRoot.GetChild(t_i);
+            this.m_points.Add(this.content.InverseTransformPoint(t_point.position));
+            t_point.gameObject.SetActive(false);   // 저작용 표식이라 실행 화면에는 남기지 않는다
+        }
+    }
+
+    // 정점 사이 연결선.
+    void BuildConnectors(Vector2[] _positions)
     {
         if (this.connectorPrefab == null) return;
 
-        for (int t_i = 0; t_i < _count - 1; t_i++)
+        for (int t_i = 0; t_i < _positions.Length - 1; t_i++)
         {
-            Vector2 t_from = this.PositionOf(t_i);
-            Vector2 t_to = this.PositionOf(t_i + 1);
+            Vector2 t_from = _positions[t_i];
+            Vector2 t_to = _positions[t_i + 1];
             Vector2 t_delta = t_to - t_from;
 
             RectTransform t_line = Instantiate(this.connectorPrefab, this.content);
@@ -117,21 +157,24 @@ public class TournamentMapPanel : LobbyTabPanel
             this.Place(t_line, (t_from + t_to) * 0.5f);
             t_line.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, t_delta.magnitude);
             t_line.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(t_delta.y, t_delta.x) * Mathf.Rad2Deg);
-            t_line.SetAsFirstSibling();
+            this.m_spawned.Add(t_line.gameObject);
         }
     }
 
-    // 정점 i의 좌표. y는 Content 바닥 기준이라 인덱스 0이 맨 아래다 —
-    // 경로를 위로 "올라가는" 것으로 읽히게 하려는 것(레퍼런스가 아래에서 위로 오른다).
+    // 정점 i의 좌표. 저작 포인트가 있으면 그 자리를 그대로 쓰고, 모자라면 마지막 포인트에서 공식으로 이어 붙인다.
+    // y는 Content 바닥 기준이라 인덱스 0이 맨 아래다 — 경로가 위로 "올라가는" 것으로 읽히게(레퍼런스가 아래에서 위로 오른다).
     Vector2 PositionOf(int _index)
     {
-        float t_y = this.edgePadding + this.nodeSpacing * _index;
-        float t_x = (_index & 1) == 0 ? -this.pathAmplitude : this.pathAmplitude;
-        return new Vector2(t_x, t_y);
-    }
+        if (_index < this.m_points.Count) return this.m_points[_index];
 
-    float ContentHeightFor(int _count)
-        => this.edgePadding * 2f + this.nodeSpacing * Mathf.Max(0, _count - 1);
+        float t_x = (_index & 1) == 0 ? -this.pathAmplitude : this.pathAmplitude;
+
+        if (this.m_points.Count == 0)
+            return new Vector2(t_x, this.edgePadding + this.nodeSpacing * _index);
+
+        Vector2 t_last = this.m_points[this.m_points.Count - 1];
+        return new Vector2(t_x, t_last.y + this.nodeSpacing * (_index - this.m_points.Count + 1));
+    }
 
     // 앵커를 코드가 Content 하단 중앙으로 고정한다 — 프리팹 저작 앵커에 따라 좌표가 달라지지 않게.
     void Place(RectTransform _rect, Vector2 _position)
