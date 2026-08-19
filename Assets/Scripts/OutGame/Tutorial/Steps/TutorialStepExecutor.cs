@@ -11,6 +11,7 @@ public static class TutorialStepExecutor
     // 제목 없는 보상 화면을 띄우느니 덜 맞는 문구라도 서는 편이 낫다.
     const string DefaultRewardTitle  = "첫 승리 보너스";
     const string DefaultCardSetTitle = "기본 카드 세트";
+    const string DefaultPackNoticeTitle = "무료 카드팩 도착";
 
     // 스텝 진입 — 무엇을 하고 끝났는지는 반환값이 말한다(호출자가 좌표 델타로 되짚지 않게)
     public static EOutgameTutorialStepResult Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -41,6 +42,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.DeckGrant:    return EnterDeckGrant(_step, _context);
             case EOutgameTutorialAction.CardGrant:    return EnterCardGrant(_step, _context);
             case EOutgameTutorialAction.CardSetGrant: return EnterCardSetGrant(_step, _context);
+            case EOutgameTutorialAction.PackNotice:   return EnterPackNotice(_step, _context);
         }
 
         // 저작 실수라 정책을 물을 자리가 아니다 — 시퀀스가 이 칸에 걸리지 않게 넘긴다.
@@ -267,6 +269,25 @@ public static class TutorialStepExecutor
         LobbyGainEffectDirector.NotifySkipped();
 
         Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급은 완료).");
+    }
+
+    // 팩이 도착했음을 알리는 자리. 지급도 구매도 하지 않는다 —
+    // 실제 획득은 이 뒤의 상점 스텝 몫이라, 실패해도 되돌릴 것이 없다.
+    //
+    // 팝업이 걷힌 뒤 팩 탭으로는 안내가 손가락으로 데려간다(다음 스텝) — 대신 눌러 주지 않는다.
+    // 화면이 저절로 바뀌면 그 이동이 이 팝업과 이어진 한 줄로 읽히지 않는다.
+    //
+    // 진입에 성공하면 완료를 넘기지 않는다(EnterCardGrant와 같은 규약) — 완료는 팝업이 닫히는 신호가 확정한다.
+    static EOutgameTutorialStepResult EnterPackNotice(TutorialStepDef _step, OutgameTutorialStepContext _context)
+    {
+        if (_step.Pack == null)
+            return Fail(_step, _context, "PackNotice에 팩이 미배선");
+
+        if (!PackRewardOverlay.TryGet(out var t_overlay))
+            return Fail(_step, _context, "팩 예고 오버레이 없음(Addressables·UIPrefab 색인 확인)");
+
+        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.Pack);
+        return EOutgameTutorialStepResult.Gated;
     }
 
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context,

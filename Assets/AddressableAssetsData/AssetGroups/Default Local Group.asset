@@ -63,6 +63,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89e3d50d5c5c36a46b4a906607f64fff
+    m_Address: VersusIntroShell
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
     m_Address: RankRewardOverlay
     m_ReadOnly: 0
@@ -95,6 +101,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
     m_Address: Assets/Assets/Prefabs/PooledCardElement.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fb2856c6be5c5864b80e81dca6d06777
+    m_Address: PackRewardOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

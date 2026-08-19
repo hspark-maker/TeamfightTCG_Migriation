@@ -40,7 +40,8 @@ public class TutorialStepDef
     [Tooltip("타깃 외 입력을 딤으로 막을지. 끄면 화면이 어두워지지 않고 입력도 막지 않는다(차단은 아래 locks가 맡는다)")]
     [SerializeField] bool useDim = true;
 
-    [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀")]
+    [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀 / "
+           + "PackNotice: 예고 팝업에 세울 팩(아트·이름만 읽는다 — 지급도 구매도 하지 않는다)")]
     [SerializeField] CardPackData pack;
 
     [Tooltip("이 스텝 동안 상점 가격 자리에 대신 띄울 문구(예: \"무료\"). 비우면 팩의 실제 가격이 숫자로 나온다.\n"
@@ -93,7 +94,7 @@ public class TutorialStepDef
            + "  멈춘다고 게임까지 막히지는 않는다 — 정지로 판정되는 즉시 남은 기능이 전부 열린다(안내만 끝난다).\n"
            + "⚠ 뒤 스텝이 이 스텝의 결과에 기대는 경우에만 Halt를 쓴다(예: 여기서 산 팩을 다음 스텝이 개봉).\n"
            + "  그렇지 않으면 Skip이 낫다 — 안내가 끝까지 흐르는 편이 유저에게 이롭다.\n"
-           + "⚠ 실패 분기가 있는 액션(AutoPurchase·DeckGrant·CardGrant·CardSetGrant)에서만 뜬다. "
+           + "⚠ 실패 분기가 있는 액션(AutoPurchase·DeckGrant·CardGrant·CardSetGrant·PackNotice)에서만 뜬다. "
            + "다른 액션은 실패해도 이 값을 보지 않는다")]
     [SerializeField] EOutgameTutorialFailure onFailure;
 
@@ -155,6 +156,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
         EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
+        EOutgameTutorialAction.PackNotice      => EOutgameTutorialCompletion.PackNotice,
         EOutgameTutorialAction.CardGrant       or
         EOutgameTutorialAction.CardSetGrant    => EOutgameTutorialCompletion.CardGain,
 
@@ -211,7 +213,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
         EOutgameTutorialAction.CardGrant       or
-        EOutgameTutorialAction.CardSetGrant    => false,
+        EOutgameTutorialAction.CardSetGrant    or
+        EOutgameTutorialAction.PackNotice      => false,
 
         _ => true,
     };
@@ -229,7 +232,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
         EOutgameTutorialAction.CardGrant       or
-        EOutgameTutorialAction.CardSetGrant    => false,
+        EOutgameTutorialAction.CardSetGrant    or
+        EOutgameTutorialAction.PackNotice      => false,
 
         _ => true,
     };
@@ -249,9 +253,11 @@ public class TutorialStepDef
         => _action == EOutgameTutorialAction.WaitEnhance
         || _action == EOutgameTutorialAction.WaitKeywordEnhance;
 
-    // 이 액션이 보상 화면을 세우는가
+    // 이 액션이 보상 화면을 세우는가(예고 팝업도 같은 자리에 제목을 쓴다)
     public static bool UsesRewardTitle(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.CardGrant || _action == EOutgameTutorialAction.CardSetGrant;
+        => _action == EOutgameTutorialAction.CardGrant
+        || _action == EOutgameTutorialAction.CardSetGrant
+        || _action == EOutgameTutorialAction.PackNotice;
 
     // 이 액션이 딤을 걸 수 있는가
     public static bool UsesDim(EOutgameTutorialAction _action) =>
@@ -262,7 +268,8 @@ public class TutorialStepDef
     {
         EOutgameTutorialAction.WaitPurchase  or
         EOutgameTutorialAction.AutoPurchase  or
-        EOutgameTutorialAction.DeckAutoEquip => true,
+        EOutgameTutorialAction.DeckAutoEquip or
+        EOutgameTutorialAction.PackNotice    => true,
 
         _ => false,
     };
@@ -296,7 +303,8 @@ public class TutorialStepDef
         EOutgameTutorialAction.AutoPurchase or
         EOutgameTutorialAction.DeckGrant    or
         EOutgameTutorialAction.CardGrant    or
-        EOutgameTutorialAction.CardSetGrant => true,
+        EOutgameTutorialAction.CardSetGrant or
+        EOutgameTutorialAction.PackNotice   => true,
 
         _ => false,
     };

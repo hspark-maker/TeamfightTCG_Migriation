@@ -122,6 +122,25 @@ MonoBehaviour:
       onFailure: 0
   - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
     stepDefs:
+    - action: 19
+      anchor: 0
+      guideMessage: 
+      messageAtBottom: 0
+      unlocks: 02000000
+      unlocksAll: 0
+      locks: 06000000
+      useDim: 0
+      pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      rewardTitle: "\uC2E0\uADDC \uCE74\uB4DC\uD329 \uD574\uAE08"
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
     - action: 0
       anchor: 2
       guideMessage: 
