@@ -187,6 +187,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 판정을 함께 넘기는 이유는 성공과 실패가 다른 길로 가기 때문이다(실패는 같은 자리에서 다시 누르는 일이다).</summary>
     public static event Action<EnhanceResult> OnAnyEnhanceResultReady;
 
+    /// <summary>해금 연출의 마지막 축까지 끝났다(판 걷힘 → 내용 등장 → 전면 안내). 중간에 잘린 경로
+    /// (탭 스킵·카드 전환·창 닫힘)도 같이 쏜다 — 기다리는 쪽(튜토리얼)이 오지 않는 신호를 붙들고
+    /// 그 자리에 굳지 않게 하기 위함이다(fail-open).</summary>
+    public static event Action OnAnyUnlockFxFinished;
+
     /// <summary>떠 있는 강화 결과판을 밖에서 걷는다(튜토리얼 자동 복귀). 탭과 **같은 길**로 흘려보내므로
     /// 무대 복귀·완료 신호(<see cref="OnAnyEnhanceSettled"/>)가 그대로 이어진다. 떠 있지 않으면 아무 일도 없다.</summary>
     public static void CloseEnhanceResult()
@@ -198,6 +203,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+
+    /// <summary>지금 해금 연출이 도는 중인가(판 걷힘 → 내용 등장 → 전면 안내 전체가 한 덩이다).</summary>
+    public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
 
     static CardDetailOverlayView s_instance;
     static bool s_missingWarned;
@@ -557,9 +565,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.resultPanel?.HideImmediate();
         this.m_retryQueued = false;
 
-        // 안 보이는 채로 터뜨릴 판은 없다. 대기만 버리고 판은 다음 열기의 Build가 지금 상태로 맞춘다.
-        DropPendingUnlockFx();
-
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
 
@@ -571,6 +576,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 창의 상태를 다시 물어볼 수 있어야 한다.
         OnAnyClosed?.Invoke();
+
+        // 해금 대기는 정리의 맨 끝에서 버린다. 이 파기가 곧 "연출이 끝났다" 신호라
+        // 앞에 두면 그 신호를 받은 쪽(튜토리얼)이 OnDisable 한복판의 이 창에 다시 손을 댄다.
+        // 안 보이는 채로 터뜨릴 판은 없다 — 판은 다음 열기의 Build가 지금 상태로 맞춘다.
+        DropPendingUnlockFx();
     }
 
     void OnDestroy()
@@ -682,7 +692,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 당길 것이 하나도 없었다 = 흐름은 이미 끝났는데 플래그만 남은 자리다(끝 콜백이 잘린 경로).
         // 여기서 내려야 다음 탭에 창이 닫힌다 — 안 그러면 나가는 문이 없는 화면이 된다.
-        if (!t_reveal) this.m_unlockFxPlaying = false;
+        if (!t_reveal) SetUnlockFxPlaying(false);
     }
 
     // 걷히는 중인 판을 지금 끝낸다. 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.
@@ -1046,7 +1056,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_fx == null && t_keywords == CardKeyword.None && !t_synergy) { ShowBottomBar(); return; }
 
         // 여기부터 마지막 축이 끝날 때까지 탭은 닫기가 아니다(OnPointerClick).
-        this.m_unlockFxPlaying = true;
+        SetUnlockFxPlaying(true);
 
         HideBottomBar();
 
@@ -1073,14 +1083,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         CardData          t_card   = CardAt(this.m_index);
         List<UnlockIntro> t_intros = CollectIntros(t_card, _keywords, _synergy);
-        if (t_intros == null || t_intros.Count == 0) { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
+        if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); EndUnlockFxAfter(t_reveal); return; }
 
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay))
-        { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
+        { ShowBottomBar(); EndUnlockFxAfter(t_reveal); return; }
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
         // 안내가 서면 그 닫힘이 이 흐름의 끝이다(그동안 화면은 안내가 덮어 이 창에 탭이 오지 않는다).
-        t_overlay.Show(t_intros, t_card, () => { this.m_unlockFxPlaying = false; ShowBottomBar(); });
+        t_overlay.Show(t_intros, t_card, () => { ShowBottomBar(); SetUnlockFxPlaying(false); });
     }
 
     /// <summary>이번에 열린 개념들. 없으면 null.
@@ -1169,16 +1179,26 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 흐름이 끊긴 자리이기도 하다(카드 전환·창 닫힘) — 잘린 안무는 끝 콜백이 오지 않으므로
         // 여기서 내리지 않으면 탭이 영영 닫기로 돌아오지 않는다.
-        this.m_unlockFxPlaying = false;
+        SetUnlockFxPlaying(false);
     }
 
     // 안내가 서지 않는 판의 마지막 축. 이 안무가 끝나면 탭은 다시 닫기다.
     // 도중에 잘리는 경로는 DropPendingUnlockFx가 못 박는다(잘린 트윈에는 이 콜백이 오지 않는다).
     void EndUnlockFxAfter(Tween _reveal)
     {
-        if (_reveal == null || !_reveal.IsActive()) { this.m_unlockFxPlaying = false; return; }
+        if (_reveal == null || !_reveal.IsActive()) { SetUnlockFxPlaying(false); return; }
 
-        _reveal.OnComplete(() => this.m_unlockFxPlaying = false);
+        _reveal.OnComplete(() => SetUnlockFxPlaying(false));
+    }
+
+    // 해금 연출의 "도는 중" 플래그를 여는·닫는 단 하나의 창구. 끝나는 길이 여럿이라(안내 닫힘·마지막 트윈·
+    // 스킵·중단) 신호도 각자 쏘면 중복되거나 빠진다 → 켜짐이 실제로 꺼짐으로 바뀐 전이에서만 한 번 쏜다.
+    void SetUnlockFxPlaying(bool _playing)
+    {
+        if (this.m_unlockFxPlaying == _playing) return;
+
+        this.m_unlockFxPlaying = _playing;
+        if (!_playing) OnAnyUnlockFxFinished?.Invoke();
     }
 
     /// <summary>키워드 줄이 통째로 잠겼는가. 판정이 두 곳에 갈리지 않게 여기 하나로 둔다

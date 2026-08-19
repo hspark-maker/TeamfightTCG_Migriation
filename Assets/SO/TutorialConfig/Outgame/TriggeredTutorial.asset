@@ -28,7 +28,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -47,7 +49,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -67,7 +71,31 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - action: 1
+      anchor: 0
+      guideMessage: "\uC790\uC2E0\uB9CC\uC758 \uB371\uC744 \uB9CC\uB4E4\uC5B4\n\uC804\uD22C\uC5D0\uC11C
+        \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -89,7 +117,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -106,9 +136,11 @@ MonoBehaviour:
       useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
-      anchorCard: {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+      anchorCard: {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -125,9 +157,11 @@ MonoBehaviour:
       useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
-      anchorCard: {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+      anchorCard: {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -146,27 +180,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 1
+      waitUnlockIntro: 1
       rewardTitle: 
-      scenario: {fileID: 0}
-      card: {fileID: 0}
-      cards: []
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-    - action: 1
-      anchor: 0
-      guideMessage: "\uAC15\uD654 \uC131\uACF5! \uCE74\uB4DC\uC758 \uACF5\uACA9\uB825\uC774
-        \uC99D\uAC00\uD588\uC5B4\uC694!"
-      messageAtBottom: 1
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      packPriceLabel: 
-      anchorCard: {fileID: 0}
-      freeOfCharge: 0
-      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -185,27 +201,30 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
-      anchor: 1
-      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
-        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
+    - action: 20
+      anchor: 0
+      guideMessage: 
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -228,7 +247,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -247,7 +268,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 1
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -270,7 +293,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -289,7 +314,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 0
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -308,7 +335,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 1
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []
@@ -328,7 +357,9 @@ MonoBehaviour:
       packPriceLabel: 
       anchorCard: {fileID: 0}
       freeOfCharge: 1
+      waitUnlockIntro: 0
       rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
       card: {fileID: 0}
       cards: []

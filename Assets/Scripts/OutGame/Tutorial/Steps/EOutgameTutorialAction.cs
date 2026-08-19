@@ -24,4 +24,5 @@ public enum EOutgameTutorialAction
     CardSetGrant    = 17,   // 입력 없이 카드 여러 장을 한 묶음으로 지급(CardGrant의 N장 판)
     WaitKeywordEnhance = 18,    // 키워드 강화 "성공"까지 대기(누르는 것만으로는 끝나지 않는다 — 카드 강화의 키워드 판)
     PackNotice      = 19,   // 입력 없이 카드팩 예고 팝업을 세우고, 유저가 닫으면 팩 탭으로 데려간다(지급은 하지 않는다)
+    CloseAlbumPage  = 20,   // 입력 없이 도감 페이지 오버레이를 걷어 그 아래 앨범 테마 화면을 드러낸다(CloseCardDetail의 도감 판)
 }

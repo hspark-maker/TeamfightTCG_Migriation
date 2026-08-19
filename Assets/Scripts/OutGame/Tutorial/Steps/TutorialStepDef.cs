@@ -61,6 +61,13 @@ public class TutorialStepDef
            + "다음 스텝으로 넘어가면 저절로 풀린다")]
     [SerializeField] bool freeOfCharge;
 
+    [Tooltip("이 스텝을 끝내는 것이 강화 \"성공\"이 아니라, 그 성공이 연 해금 연출이 **모두 끝난 순간**이 된다.\n"
+           + "(잠금판이 걷히고 → 내용이 들어오고 → 전면 해금 안내까지 닫히는 한 줄이다)\n"
+           + "켜면 강화 결과판을 유저 탭 대신 안내가 잠깐 뒤 대신 걷는다 — 무대를 돌려줘야 해금 연출이 설 자리가 생긴다.\n"
+           + "이번 강화로 열릴 것이 하나도 없으면 기다리지 않고 종전처럼 곧장 넘어간다.\n"
+           + "⚠ 대상 카드의 keywordUnlockLevel에 실제로 걸리는 강화여야 의미가 있다 — 아니면 켜도 아무 차이가 없다")]
+    [SerializeField] bool waitUnlockIntro;
+
     [Tooltip("CardGrant·CardSetGrant: 보상 화면에 띄울 제목. 비우면 기본 문구를 쓴다")]
     [SerializeField] string rewardTitle;
 
@@ -133,6 +140,9 @@ public class TutorialStepDef
 
     // 이 스텝이 시키는 성장 한 방이 무료인가(값 저작이 없는 액션은 저작값이 남아 있어도 유료로 본다)
     public bool FreeOfCharge => UsesFreeOfCharge(action) && freeOfCharge;
+
+    // 강화 성공이 연 해금 연출까지 기다리는가(연출을 트지 않는 액션은 저작값이 남아 있어도 없는 것으로 본다)
+    public bool WaitUnlockIntro => UsesWaitUnlockIntro(action) && waitUnlockIntro;
 
     // 보상 화면 제목(비우면 호출자가 기본 문구를 쓴다)
     public string RewardTitle => UsesRewardTitle(action) ? rewardTitle : null;
@@ -219,6 +229,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.AutoPurchase    or
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.CloseAlbumPage  or
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
@@ -238,6 +249,7 @@ public class TutorialStepDef
         EOutgameTutorialAction.AutoPurchase    or
         EOutgameTutorialAction.DeckGrant       or
         EOutgameTutorialAction.CloseCardDetail or
+        EOutgameTutorialAction.CloseAlbumPage  or
         EOutgameTutorialAction.EnterFirstRank  or
         EOutgameTutorialAction.WaitLobbyReturn or
         EOutgameTutorialAction.WaitCardDetailReturn or
@@ -262,6 +274,10 @@ public class TutorialStepDef
     public static bool UsesFreeOfCharge(EOutgameTutorialAction _action)
         => _action == EOutgameTutorialAction.WaitEnhance
         || _action == EOutgameTutorialAction.WaitKeywordEnhance;
+
+    // 이 액션이 해금 연출을 여는가(카드 강화만 — 키워드 강화는 잠금판을 여는 자리가 아니다)
+    public static bool UsesWaitUnlockIntro(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.WaitEnhance;
 
     // 이 액션이 보상 화면을 세우는가(예고 팝업도 같은 자리에 제목을 쓴다)
     public static bool UsesRewardTitle(EOutgameTutorialAction _action)

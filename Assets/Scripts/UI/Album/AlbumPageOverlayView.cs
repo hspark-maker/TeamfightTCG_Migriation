@@ -118,6 +118,14 @@ public class AlbumPageOverlayView : MonoBehaviour
     /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
+    /// <summary>밖(튜토리얼 자동 복귀)에서 이 오버레이를 걷어 그 아래 앨범 테마 화면을 드러낸다.
+    /// 열려 있지 않으면 아무 일도 없다.</summary>
+    public static void CloseOpen()
+    {
+        if (!IsOpen) return;
+        s_instance.Close();
+    }
+
     bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding;
 
     // 딤판의 rect. 닫기 버튼과 같은 오브젝트라는 저작 규약을 여기 한 곳에서만 읽는다(dimButton 툴팁 참고).

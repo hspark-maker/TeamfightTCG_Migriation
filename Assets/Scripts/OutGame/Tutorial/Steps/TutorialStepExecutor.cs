@@ -35,6 +35,7 @@ public static class TutorialStepExecutor
                 return EOutgameTutorialStepResult.Gated;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);
+            case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
             case EOutgameTutorialAction.EnterFirstRank: return EnterFirstRank(_context);
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);
             case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
@@ -104,6 +105,16 @@ public static class TutorialStepExecutor
     static EOutgameTutorialStepResult EnterCloseCardDetail(OutgameTutorialStepContext _context)
     {
         CardDetailOverlayView.Close();
+
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+        return EOutgameTutorialStepResult.Advanced;
+    }
+
+    // 도감 페이지를 걷어 안내가 시작된 테마 화면으로 무대를 돌려놓는다(다음 안내가 그 화면을 가리킨다).
+    static EOutgameTutorialStepResult EnterCloseAlbumPage(OutgameTutorialStepContext _context)
+    {
+        AlbumPageOverlayView.CloseOpen();
 
         _context.CommitAdvance();
         _context.CompleteIfLast();
