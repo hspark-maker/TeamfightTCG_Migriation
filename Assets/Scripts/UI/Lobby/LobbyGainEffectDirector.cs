@@ -254,7 +254,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
         // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
         // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
-        if (OutgameTutorialRunner.IsRunning)
+        // 전체 해금(첫 랭크 승급) 뒤는 예외다 — 그 뒤 획득은 안내가 짠 순서가 아니므로 일반 경로대로 탭을 대신 켠다.
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked)
         {
             t_album.TryBeginInsert();
             return;

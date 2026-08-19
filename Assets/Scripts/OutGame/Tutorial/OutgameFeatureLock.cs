@@ -55,6 +55,18 @@ public static class OutgameFeatureLock
         return s_all || s_unlocked.Contains(_feature);
     }
 
+    // 남은 기능이 전부 열렸는가(저작의 UnlocksAll·정지 판정·디버그 전체 해금 중 하나라도 섰으면 참).
+    // 안내는 아직 돌고 있어도 게임의 문은 이미 다 열린 구간이라는 뜻이다 —
+    // "안내 중이라 막는다"는 예외를 그 구간에서 걷어야 할 때 이걸 본다(일시 잠금은 여기에 섞지 않는다).
+    public static bool AllUnlocked
+    {
+        get
+        {
+            Refresh();
+            return s_all;
+        }
+    }
+
     // 진행 변화를 지금 반영하고, 달라졌으면 OnChanged 발화
     public static void Refresh()
     {

@@ -243,7 +243,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 05000000
       unlocksAll: 0
-      locks: 06000000
+      locks: 0600000007000000
       useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
@@ -500,7 +500,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 0d000000
       unlocksAll: 1
-      locks: 
+      locks: 0e000000
       useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
@@ -522,7 +522,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 
+      locks: 0e000000
       useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
@@ -543,7 +543,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 
+      locks: 0e000000
       useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
@@ -566,7 +566,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 
+      locks: 0e000000
       useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
@@ -581,14 +581,13 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
-      anchor: 0
-      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD560
-        \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+    - action: 0
+      anchor: 18
+      guideMessage: 
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 
+      locks: 0e000000
       useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
@@ -605,11 +604,11 @@ MonoBehaviour:
       onFailure: 0
     - action: 0
       anchor: 19
-      guideMessage: 
+      guideMessage: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574\uBD05\uC2DC\uB2E4."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 
+      locks: 0e000000
       useDim: 0
       pack: {fileID: 0}
       packPriceLabel: 
@@ -628,7 +627,7 @@ MonoBehaviour:
       anchor: 20
       guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
       messageAtBottom: 0
-      unlocks: 
+      unlocks: 0e000000
       unlocksAll: 0
       locks: 
       useDim: 1
