@@ -311,6 +311,9 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.RankEffect) return;
 
+        // 승급 연출까지 다 봤다 — 트리거 튜토리얼의 문은 졸업이 아니라 여기서 열린다.
+        TriggeredTutorialRunner.NotifyRankPromotionFinished();
+
         OnGateSatisfied();
     }
 

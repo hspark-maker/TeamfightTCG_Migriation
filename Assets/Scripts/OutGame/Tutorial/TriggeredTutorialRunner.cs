@@ -9,6 +9,11 @@ public static class TriggeredTutorialRunner
     static TriggeredTutorialEntry s_active;
     static int                    s_index;
 
+    // 첫 랭크 승급 연출이 끝나 열린 문. 온보딩은 그 뒤로도 이어지지만(카드 강화 편) 그때부터는
+    // 트리거 튜토리얼이 나란히 서도 되는 구간이라 졸업 낙인을 기다리지 않는다.
+    // 세이브하지 않는다 — 재시작하면 남은 온보딩을 마칠 때까지 닫혀 있다가 졸업 낙인이 다시 연다.
+    static bool s_openedAtRankPromotion;
+
     // 트리거가 실제로 발화했을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
     public static event Action OnActivated;
 
@@ -26,7 +31,7 @@ public static class TriggeredTutorialRunner
 
     // 온보딩 졸업 전에는 트리거 튜토리얼이 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
     // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
-    static bool IsOpen => OutgameTutorialProgress.IsCompleted;
+    static bool IsOpen => OutgameTutorialProgress.IsCompleted || s_openedAtRankPromotion;
 
     // 이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
     // UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).
@@ -42,6 +47,16 @@ public static class TriggeredTutorialRunner
     // 온보딩 졸업으로 게이트가 열리면 그 전까지 전부 false였던 HasPending의 답이 한꺼번에 뒤집힌다 —
     // 이미 그린 쪽(알림 점)에 다시 물어보게 한다.
     public static void NotifyOnboardingCompleted() => OnChanged?.Invoke();
+
+    /// <summary>첫 랭크 승급 연출까지 끝났다 — 여기서부터 트리거 튜토리얼이 열린다(졸업은 아직 남았다).
+    /// 승급 뒤의 온보딩과 겹칠 수 있고, 겹칠 때의 우선순위는 OutgameTutorialGuide가 정한다.</summary>
+    public static void NotifyRankPromotionFinished()
+    {
+        if (s_openedAtRankPromotion) return;
+
+        s_openedAtRankPromotion = true;
+        OnChanged?.Invoke();
+    }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
     public static void EnsureData(TriggeredTutorialData _data)
@@ -123,6 +138,9 @@ public static class TriggeredTutorialRunner
     {
         s_active = null;
         s_index  = 0;
+
+        // 되감기로 온보딩이 다시 진행 중이 되면 승급으로 연 문도 함께 닫혀야 한다 — 남으면 튜토 도중에 점이 뜬다.
+        s_openedAtRankPromotion = false;
 
         // 디버그 낙인 초기화가 이 경로로 들어온다 — 걷힌 트리거를 알림 점이 다시 집어야 한다.
         OnChanged?.Invoke();

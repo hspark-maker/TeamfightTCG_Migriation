@@ -87,6 +87,9 @@ public static class TutorialStepExecutor
         // 실패가 아니라 정상 통과라 실패 정책을 묻지 않는다.
         if (!RankManager.TryEnterFirstTier(out var t_entry))
         {
+            // 볼 연출이 없으니 "연출이 끝난 뒤"가 곧 지금이다 — 트리거 문도 여기서 연다.
+            TriggeredTutorialRunner.NotifyRankPromotionFinished();
+
             _context.CommitAdvance();
             _context.CompleteIfLast();
             return EOutgameTutorialStepResult.Advanced;
@@ -94,9 +97,8 @@ public static class TutorialStepExecutor
 
         RankResultHandoff.Set(t_entry);
 
-        // 트리거 문을 여기서 미리 열지 않는다 — 승급 뒤에도 가르칠 것(카드 강화)이 남아 있어
-        // 먼저 열면 그 강화가 진화 튜토를 깨우고, 겹칠 땐 트리거가 이겨(OutgameTutorialGuide)
-        // 온보딩이 대주던 무료 한 방이 조용히 무시된다. 알림 점은 졸업 낙인 때 뜬다.
+        // 문은 여기서 열지 않는다 — 연출을 다 본 뒤(Completion.RankEffect)가 여는 자리이고,
+        // 그 신호를 받는 브리지가 연다.
         return EOutgameTutorialStepResult.Gated;
     }
 
