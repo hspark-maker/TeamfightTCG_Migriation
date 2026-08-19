@@ -38,6 +38,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
     void Awake()
     {
+        // 데이터 주입보다 먼저 등록한다 — 주입이 곧바로 되묻기를 방송하고, 그 답에 이 판정이 쓰인다.
+        TriggeredTutorialRunner.SetStageGuard(IsLobbyStageClear);
+
         TriggeredTutorialRunner.EnsureData(this.data);
 
         TriggeredTutorialRunner.OnActivated  += OnActivated;
@@ -80,6 +83,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
         AlbumInsertSession.OnAnyFinished -= OnInsertFinished;
 
         KeywordGrowthManager.OnEnhanced -= OnKeywordEnhanced;
+
+        // 무대 판정은 걷지 않는다 — 씬 오브젝트가 아니라 static 메서드라 남아도 새지 않고,
+        // 여기서 비우면 다음 씬 브리지가 이미 등록한 것을 지운다(파괴가 그쪽 Awake보다 늦을 수 있다).
 
         CloseGate();
     }
@@ -227,14 +233,15 @@ public class TriggeredTutorialBridge : MonoBehaviour
     void TryRequestRetry()
     {
         if (TriggeredTutorialRunner.IsRunning) return;
-        if (!IsStageClear()) return;
+        if (!TriggeredTutorialRunner.IsStageClear) return;
 
         TriggeredTutorialRunner.RequestRetry();
     }
 
     // 안내를 세워도 되는 무대인가 — 로비 표면이 그대로 보이고 삽입 연출도 남지 않은 상태.
     // 삽입 중에 세우면 딤이 그 연출을 덮는다(그래서 도감 탭을 대신 켜는 쪽이 발화를 미룬 것이다).
-    static bool IsStageClear()
+    // ⚠ 탭바는 오버레이 위에 서므로 삽입 중에도 탭이 눌린다 — 되묻는 모든 경로가 이 판정을 거쳐야 한다.
+    static bool IsLobbyStageClear()
         => IsLobbySurfaceVisible() && !AlbumInsertSession.IsRunning && !AlbumInsertQueue.HasPending;
 
     // 이 완료 조건이 "유저가 화면을 닫기를 기다리는" 부류인가.

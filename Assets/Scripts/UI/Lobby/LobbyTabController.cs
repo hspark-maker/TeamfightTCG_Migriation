@@ -110,6 +110,9 @@ public class LobbyTabController : MonoBehaviour
     {
         if (m_currentIndex < 0 || m_currentIndex >= tabs.Count) return;
 
+        // 탭바는 오버레이 위에 서 있어 삽입 연출 중에도 눌린다 — 무대를 쥔 연출 위에 안내를 얹지 않는다.
+        if (!TriggeredTutorialRunner.IsStageClear) return;
+
         LobbyTabPanel t_panel = CurrentPanel;
         if (t_panel != null && !t_panel.isActiveAndEnabled) return;
 

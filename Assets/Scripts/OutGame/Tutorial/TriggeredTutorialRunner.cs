@@ -13,6 +13,9 @@ public static class TriggeredTutorialRunner
     // 알림 점은 연출과 나란히 떠야 해서, 그 사이를 이 래치가 잇는다.
     static bool s_openedAtFinale;
 
+    // "지금 안내를 세워도 되는 무대인가"의 판정. 조건이 씬·UI 사정이라 여기 적지 않고 브리지가 등록한다.
+    static Func<bool> s_stageGuard;
+
     // 트리거가 실제로 발화했을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
     public static event Action OnActivated;
 
@@ -46,6 +49,13 @@ public static class TriggeredTutorialRunner
 
         return TryGetEntry(_trigger, out var t_entry) && t_entry.StepCount > 0;
     }
+
+    /// <summary>무대가 비어 안내를 세워도 되는가. 미등록이면 항상 열린 것으로 본다.
+    /// 되묻는 쪽이 저마다 조건을 복제하지 않도록 답을 여기 한 곳에서만 낸다.</summary>
+    public static bool IsStageClear => s_stageGuard == null || s_stageGuard();
+
+    /// <summary>무대 판정을 등록한다(씬 브리지가 자기 수명 동안만). 러너는 조건을 모른 채 물어보기만 한다.</summary>
+    public static void SetStageGuard(Func<bool> _guard) => s_stageGuard = _guard;
 
     /// <summary>발화를 걸어 둔 쪽에 "지금 다시 물어봐라"를 방송한다. Fire의 거절은 대부분 일시적인데
     /// (데이터 미주입·다른 안내 진행 중·온보딩 미졸업·무대가 다른 연출에 점유됨) 그 자리에서 버리면 기회가 영영 사라진다.
