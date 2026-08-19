@@ -50,13 +50,18 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyClosed             += OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
 
+        AlbumInsertSession.OnAnyFinished += OnInsertFinished;
+
         KeywordGrowthManager.OnEnhanced += OnKeywordEnhanced;
     }
 
     void Start()
     {
         // 씬 재진입 재개. 발화 자체는 OnActivated가 잡으므로 여기서는 이미 도는 런만 이어받는다.
-        if (TriggeredTutorialRunner.IsRunning) ApplyCurrentStep();
+        if (TriggeredTutorialRunner.IsRunning) { ApplyCurrentStep(); return; }
+
+        // 도는 런이 없다면 이 씬에 들어오기까지 놓친 발화가 있을 수 있다 — 무대가 비었으면 되묻는다.
+        TryRequestRetry();
     }
 
     void OnDestroy()
@@ -71,6 +76,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;
         CardDetailOverlayView.OnAnyClosed             -= OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
+
+        AlbumInsertSession.OnAnyFinished -= OnInsertFinished;
 
         KeywordGrowthManager.OnEnhanced -= OnKeywordEnhanced;
 
@@ -199,11 +206,36 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다.
     void OnOverlayClosed()
     {
-        if (m_step == null || !IsSurfaceWait(m_step.Completion)) return;
+        if (m_step == null)
+        {
+            // 걸린 스텝이 없다 = 도는 런이 없다. 오버레이가 걷힌 이 순간이 놓친 발화를 되묻기 좋은 자리다.
+            TryRequestRetry();
+            return;
+        }
+
+        if (!IsSurfaceWait(m_step.Completion)) return;
         if (!IsSurfaceReady(m_step.Completion)) return;
 
         OnGateSatisfied();
     }
+
+    // 삽입 연출이 끝났다. 팩 개봉 경로는 이때 도감 페이지가 아직 열린 채라 대개 여기서는 아직 이르고,
+    // 그 페이지가 걷히는 OnOverlayClosed가 이어받는다 — 튜토 모드처럼 세션이 스스로 닫는 경우만 여기서 선다.
+    void OnInsertFinished() => TryRequestRetry();
+
+    // 무대가 비었으면 발화를 되묻는다. 발화 여부 자체는 러너가 판정하므로 여기서 복제하지 않는다.
+    void TryRequestRetry()
+    {
+        if (TriggeredTutorialRunner.IsRunning) return;
+        if (!IsStageClear()) return;
+
+        TriggeredTutorialRunner.RequestRetry();
+    }
+
+    // 안내를 세워도 되는 무대인가 — 로비 표면이 그대로 보이고 삽입 연출도 남지 않은 상태.
+    // 삽입 중에 세우면 딤이 그 연출을 덮는다(그래서 도감 탭을 대신 켜는 쪽이 발화를 미룬 것이다).
+    static bool IsStageClear()
+        => IsLobbySurfaceVisible() && !AlbumInsertSession.IsRunning && !AlbumInsertQueue.HasPending;
 
     // 이 완료 조건이 "유저가 화면을 닫기를 기다리는" 부류인가.
     static bool IsSurfaceWait(EOutgameTutorialCompletion _completion)

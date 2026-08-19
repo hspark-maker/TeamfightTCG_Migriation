@@ -37,6 +37,8 @@ public class LobbyTabController : MonoBehaviour
     {
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
+        TriggeredTutorialRunner.OnRetryRequested += RetryCurrentTabTrigger;
+
         // 서비스 주입은 첫 Select(Start)보다 먼저 끝나야 한다 — OnEnter에서 이미 쓸 수 있어야 하므로.
         var t_services = new LobbyTabServices(dragController);
 
@@ -57,6 +59,9 @@ public class LobbyTabController : MonoBehaviour
     void OnDestroy()
     {
         if (tabBar != null) tabBar.Selected -= HandleTabSelected;
+
+        // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
+        TriggeredTutorialRunner.OnRetryRequested -= RetryCurrentTabTrigger;
     }
 
     void Start() => Select(defaultIndex, false);
@@ -78,6 +83,10 @@ public class LobbyTabController : MonoBehaviour
         if (_index == m_currentIndex)
         {
             tabBar?.SetSelected(_index);
+
+            // 이미 서 있는 탭을 다시 눌러도 발화 기회다 — 알림 점은 상태를 보고 떠 있는데
+            // 전이가 없다고 여기서 끊으면 그 점을 눌러도 아무 일이 없다.
+            if (_fireTrigger) RetryCurrentTabTrigger();
             return;
         }
 
@@ -92,6 +101,19 @@ public class LobbyTabController : MonoBehaviour
         {
             if (this != null) CommitSelection(_index, _fireTrigger);
         });
+    }
+
+    /// <summary>지금 서 있는 탭의 트리거 튜토리얼을 다시 물어본다. 탭 발화는 전이 1회성이라
+    /// 다른 경로로 탭이 켜진 동안(팩 개봉 후 도감 착지 등) 놓친 기회를 여기서 되찾는다.
+    /// 띄울지 말지는 복제하지 않고 전적으로 Fire가 판정한다.</summary>
+    public void RetryCurrentTabTrigger()
+    {
+        if (m_currentIndex < 0 || m_currentIndex >= tabs.Count) return;
+
+        LobbyTabPanel t_panel = CurrentPanel;
+        if (t_panel != null && !t_panel.isActiveAndEnabled) return;
+
+        TriggeredTutorialRunner.Fire(tabs[m_currentIndex].tutorialTrigger);
     }
 
     void CommitSelection(int _index, bool _fireTrigger)
