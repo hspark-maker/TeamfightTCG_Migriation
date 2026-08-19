@@ -120,6 +120,38 @@ public class LobbyMatchLauncher : MonoBehaviour
         RunEntryAsync().Forget();
     }
 
+    /// <summary>보상 토너먼트 정점 도전. 상대·덱·AI 레벨이 저작 고정이라 매칭을 태우지 않는다.
+    /// TournamentRun.Begin은 모든 가드를 통과한 뒤에 온다 — 중간에 return하며 세워 두면 그게 곧 로비 누수다.</summary>
+    public void StartTournamentBattle(int _nodeIndex)
+    {
+        if (m_running) return;
+
+        if (TournamentProgress.StateOf(_nodeIndex) != ETournamentNodeState.Playable) return;
+        if (!TournamentProgress.TryGetNode(_nodeIndex, out TournamentNodeDef t_node)) return;
+
+        // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
+        if (t_node.enemyDeck == null || t_node.enemyDeck.Count == 0)
+        {
+            Debug.LogWarning($"[LobbyMatchLauncher] 토너먼트 정점 '{t_node.nodeId}'에 상대 덱이 없어 진입을 막는다 — 저작 검증 필요.");
+            return;
+        }
+
+        DeckConfig.SetMultiplayer(false);
+
+        if (!DeckSaveManager.HasAnyValidSlot())
+        {
+            ShowNoDeckPopup();
+            return;
+        }
+
+        if (!TournamentRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
+
+        var t_preset = new MatchOpponent(
+            MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.enemyDeck);
+
+        RunEntryAsync(t_preset).Forget();
+    }
+
     // 로비에서 전투로 넘어가는 유일한 문. 세 진입 경로가 여기로 모인다 — 전환 연출을 갈아끼울 때 손댈 자리가 하나여야 한다.
     //
     // m_running을 되돌리지 않는 이유: 커튼이 도는 동안 로비는 그대로 살아 있다. 하드컷 시절엔 그 창이 한 프레임이라
@@ -132,19 +164,23 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.
-    async UniTaskVoid RunEntryAsync()
+    async UniTaskVoid RunEntryAsync(MatchOpponent? _preset = null)
     {
         var t_ct = this.GetCancellationTokenOnDestroy();
 
-        bool t_confirmed;
+        // 전투로 닫히지 않은 모든 끝(포기·취소·예외)에서 토너먼트 플래그를 끊는다. 그 경로엔 씬 전환이 없어
+        // TurnRunner.Cleanup이 영영 돌지 않는다 — 남겨 두면 다음 일반 전투의 AI 레벨이 정점 레벨로 굳고
+        // 랭크 정산이 통째로 스킵된다. m_running과 같은 finally에 두는 이유도 같다(체인이 던져도 새지 않게).
+        bool t_confirmed = false;
         m_running = true;
         try
         {
-            t_confirmed = await RunEntryChainAsync(t_ct);
+            t_confirmed = await RunEntryChainAsync(t_ct, _preset);
         }
         finally
         {
             m_running = false;
+            if (!t_confirmed) TournamentRun.End();
         }
 
         // 씬이 내려가며 취소된 경우 — 파괴 중인 오브젝트를 건드리지 않는다.
@@ -154,16 +190,17 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     // 매칭 연출 → 상대 확정 → 출전 덱 확정. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
-    async UniTask<bool> RunEntryChainAsync(CancellationToken _ct)
+    async UniTask<bool> RunEntryChainAsync(CancellationToken _ct, MatchOpponent? _preset = null)
     {
-        MatchOpponent? t_opponent = null;
-        if (UseMatchmaking)
+        // 고정 상대(토너먼트 정점)는 뽑을 것이 없다 — 매칭 단계를 통째로 건너뛴다.
+        MatchOpponent? t_opponent = _preset;
+        if (!_preset.HasValue && UseMatchmaking)
         {
             t_opponent = await MatchShell.RunMatchAsync(Matchmaker, _ct);
             if (t_opponent == null) return false;   // 취소 = 로비로 되돌아간다
         }
 
-        ConfirmOpponent(t_opponent);
+        ConfirmOpponent(t_opponent, _preset.HasValue);
 
         if (DeckShell == null)
         {
@@ -175,8 +212,8 @@ public class LobbyMatchLauncher : MonoBehaviour
             return TryApplyFirstValidDeck();
         }
 
-        // 매칭을 거치지 않은 경로(튜토리얼)는 옮겨 앉힐 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
-        if (t_opponent == null) return await DeckShell.RunSelectionAsync(_ct);
+        // 매칭을 거치지 않은 경로(튜토리얼·토너먼트)는 옮겨 앉힐 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
+        if (_preset.HasValue || t_opponent == null) return await DeckShell.RunSelectionAsync(_ct);
 
         return await RunSelectionWithHandoffAsync(_ct);
     }
@@ -199,8 +236,16 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.
     // 튜토리얼은 전투가 TutorialConfig.EnemyDeck으로 초기화되므로(GameInitializer) 여기서 랜덤을 뽑으면
     // 화면에 그린 6장이 실제 상대와 달라진다 — "상대 덱을 미리 확인한다"는 안내가 거짓이 된다.
-    void ConfirmOpponent(MatchOpponent? _matched)
+    void ConfirmOpponent(MatchOpponent? _matched, bool _preset = false)
     {
+        // 고정 상대는 저작값이 곧 진실이다 — 어떤 폴백도 태우지 않는다(태우면 맵에 그린 정점과 실제 상대가 갈린다).
+        if (_preset && _matched.HasValue)
+        {
+            MatchOpponentHandoff.Set(_matched.Value);
+            DeckConfig.SetEnemyDeck(_matched.Value.Deck);
+            return;
+        }
+
         if (TutorialConfig.IsActive && TutorialConfig.EnemyDeck != null)
         {
             MatchOpponentHandoff.Clear();

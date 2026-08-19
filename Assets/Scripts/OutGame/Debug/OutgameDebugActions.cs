@@ -166,6 +166,27 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 기능 잠금 {(OutgameFeatureLock.ForceUnlockAllForDebug ? "무시(전체 해금)" : "정상 적용")}");
     }
 
+    // 토너먼트 현재 정점 도전(맵 UI가 붙기 전 검증용). 로비 진입점을 그대로 태운다 — 전투 진입 규율을 우회하지 않는다.
+    public static void StartCurrentTournamentNode()
+    {
+        int t_index = TournamentProgress.CurrentNodeIndex;
+        if (t_index < 0)
+        {
+            Debug.LogWarning("[OutgameDebug] 도전 가능한 정점이 없다 — TournamentConfig 미배선/미저작이거나 전부 클리어했다.");
+            return;
+        }
+
+        var t_launcher = Object.FindFirstObjectByType<LobbyMatchLauncher>(FindObjectsInactive.Include);
+        if (t_launcher == null)
+        {
+            Debug.LogWarning("[OutgameDebug] 씬에 LobbyMatchLauncher가 없어 정점 도전을 건너뛴다 — 로비 씬에서 실행할 것.");
+            return;
+        }
+
+        t_launcher.StartTournamentBattle(t_index);
+        Debug.Log($"[OutgameDebug] 토너먼트 정점 #{t_index + 1} 도전 — 덱 화면 진입");
+    }
+
     // 팩 없이 앨범 삽입 연출만 반복 검증. 소유 카드를 그대로 다시 꽂는 연출이라 소유·세이브는 건드리지 않는다.
     public static void ForceAlbumInsertSession(int _count = 3)
     {
