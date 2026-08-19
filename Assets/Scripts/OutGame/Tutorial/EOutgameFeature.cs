@@ -16,4 +16,5 @@ public enum EOutgameFeature
     DeckAutoEquip      = 11,
     CollectionHarvest  = 12,   // 폐기(구 도감 수확) — 소비처 0. 값은 뒤 항목이 밀리지 않게 남긴다
     RankReward         = 13,
+    CardEnhance        = 14,   // 카드 상세의 성장 한 방(강화·진화 버튼이 자리를 번갈아 쓰는 그 한 칸)
 }

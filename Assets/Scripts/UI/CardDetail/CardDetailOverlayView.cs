@@ -441,6 +441,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
         if (this.evolveButton  != null) this.m_evolveTone  = this.evolveButton.GetComponent<UIEffect>();
 
+        // 강화는 안내가 그 챕터에 닿기 전까지 잠긴다. 두 버튼은 같은 한 방이 자리를 번갈아 쓰는 것이라 키도 하나다.
+        // 룩만 얹는 부착이다 — 차단은 아래 RefreshGrowthActions의 계산식이 진다.
+        if (this.enhanceButton != null) FeatureLockView.Attach(this.enhanceButton.gameObject, EOutgameFeature.CardEnhance);
+        if (this.evolveButton  != null) FeatureLockView.Attach(this.evolveButton.gameObject,  EOutgameFeature.CardEnhance);
+
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
         // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
         // 카드는 배경이 아니므로 여기서 닫지 않는다. 연출 중 스킵만 받는다.
@@ -498,6 +503,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 잔액이 바뀌면 버튼 활성이 따라와야 한다(다른 화면·디버그 지급으로도 바뀐다).
         CurrencyManager.OnCurrencyChanged += HandleCurrencyChanged;
 
+        // 강화 해금은 이 창이 열린 **뒤에** 온다 — 같은 클릭이 도감 칸을 눌러 상세를 먼저 띄우고,
+        // 안내가 그다음 스텝으로 넘어가면서 잠금이 풀린다. 안 들으면 버튼이 잠긴 채로 굳어 안내가 멈춘다.
+        OutgameFeatureLock.OnChanged += OnFeatureLockChanged;
+
         RefreshArrows();
     }
 
@@ -527,6 +536,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
+        OutgameFeatureLock.OnChanged      -= OnFeatureLockChanged;
 
         // 전환 도중에 닫히면 slideTarget이 옆으로 밀린 채·반투명인 채 굳는다 → 다음 열기에 그대로 보인다.
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
@@ -875,6 +885,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
 
+    // 안내가 강화를 열었다(또는 닫았다) — 잔액 변화와 같은 자리에서 다시 판정하면 된다.
+    void OnFeatureLockChanged()
+    {
+        if (this.m_ritualPlaying) return;
+
+        CardData t_card = CardAt(this.m_index);
+        if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+    }
+
     // 재화 종류에 따라 버튼 활성만 바뀐다 — 어느 종류든 다시 판정하면 되므로 걸러내지 않는다.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
@@ -1217,7 +1236,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
-        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying);
+        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying
+                       && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance));
 
         ApplyCost(t_hasStep, t_step);
 
