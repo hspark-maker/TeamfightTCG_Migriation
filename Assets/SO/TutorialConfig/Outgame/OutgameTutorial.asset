@@ -492,3 +492,24 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+    - action: 5
+      anchor: 1
+      guideMessage: "\uC774\uC81C \uB7AD\uD06C\uC804\uC5D0 \uCC38\uC5EC\uD560 \uC218
+        \uC788\uC2B5\uB2C8\uB2E4!"
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 1
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
