@@ -107,7 +107,8 @@ MonoBehaviour:
     stepDefs:
     - action: 1
       anchor: 0
-      guideMessage: "\uB2E4\uC74C\uC73C\uB85C, \uAC19\uC774 \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD574\uBD10\uC694!"
+      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD560
+        \uC218 \uC788\uC2B5\uB2C8\uB2E4"
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -213,6 +214,28 @@ MonoBehaviour:
     - action: 20
       anchor: 0
       guideMessage: 
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - action: 1
+      anchor: 0
+      guideMessage: "\uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uBC30\uD2C0\uC5D0\uC11C
+        \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
