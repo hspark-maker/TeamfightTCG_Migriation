@@ -15,14 +15,18 @@ public class TournamentNodeView : MonoBehaviour
     [Tooltip("보상 미리보기 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
 
-    [Header("상태 노드(선택 — 미배선 시 null 가드)")]
-    [SerializeField] GameObject lockedMark;      // 잠김(자물쇠)
-    [SerializeField] GameObject clearedMark;     // 클리어(체크)
-    [SerializeField] GameObject currentMark;     // 지금 도전할 정점 강조
+    [Header("상태 레이어(선택 — 미배선 시 null 가드)")]
+    [Tooltip("상태마다 켜지는 '묶음'이다 — 표식 한 장이 아니라 그 상태에서만 보여야 할 것을 통째로 담는다.\n" +
+             "잠김: 어두운 베일 + 자물쇠 / 클리어: 금테 + 체크 배지 / 도전 가능: 포커스 링 + 이름표 + 보상칸.\n" +
+             "이름표·보상칸을 currentMark 안에 두는 것이 곧 '도전할 정점에만 정보를 편다'는 규칙이다.")]
+    [SerializeField] GameObject lockedMark;      // 잠김(베일 + 자물쇠)
+    [SerializeField] GameObject clearedMark;     // 클리어(금테 + 체크)
+    [SerializeField] GameObject currentMark;     // 지금 도전할 정점(포커스 링 + 이름표 + 보상)
     [SerializeField] CanvasGroup canvasGroup;
 
-    [Tooltip("잠긴 정점의 알파. 클리어는 따로 딤하지 않는다(체크 표식이 상태를 말한다).")]
-    [SerializeField] float lockedAlpha = 0.45f;
+    [Tooltip("잠긴 정점의 알파. 무채색화와 병용이라 너무 낮추면 배경에 묻힌다.\n" +
+             "클리어는 따로 딤하지 않는다(체크 표식이 상태를 말한다).")]
+    [SerializeField] float lockedAlpha = 0.7f;
 
     // 보상 조회용 공용 버퍼 — 칸이 값을 즉시 복사하므로 뷰마다 리스트를 들 이유가 없다.
     static readonly List<RewardLine> s_rewardBuffer = new List<RewardLine>();
@@ -31,6 +35,9 @@ public class TournamentNodeView : MonoBehaviour
 
     // 표시 대상 정점. -1 = 미바인딩(Refresh 무시).
     int m_index = -1;
+
+    // 잠김 무채색화를 되돌릴 자리. null = 지금 색이 살아 있다.
+    List<UiGrayscale.Toned> m_toned;
 
     Action<int> m_onTap;
 
@@ -72,6 +79,25 @@ public class TournamentNodeView : MonoBehaviour
         if (this.clearedMark != null) this.clearedMark.SetActive(t_cleared);
         if (this.currentMark != null) this.currentMark.SetActive(t_playable);
         if (this.canvasGroup != null) this.canvasGroup.alpha = t_locked ? this.lockedAlpha : 1f;
+
+        this.ApplyLockedTone(t_locked);
+    }
+
+    // 잠긴 정점은 딤만으로 안 갈린다 — 비활성 버튼과 같은 축으로 노드 전체의 채도를 뺀다.
+    // 자물쇠 묶음은 제외한다(잠김을 말하는 표식이 저 혼자 회색이면 읽히지 않는다).
+    void ApplyLockedTone(bool _locked)
+    {
+        if (_locked)
+        {
+            if (this.m_toned != null) return;
+            this.m_toned = UiGrayscale.Apply(this.gameObject, this.lockedMark != null ? this.lockedMark.transform : null);
+        }
+        else
+        {
+            if (this.m_toned == null) return;
+            UiGrayscale.Restore(this.m_toned);
+            this.m_toned = null;
+        }
     }
 
     void BindRewardSlots()
