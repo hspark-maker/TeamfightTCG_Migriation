@@ -25,7 +25,7 @@ public class EmoteEntry
 [CreateAssetMenu(fileName = "EmoteCatalog", menuName = "Card Battle/Emote Catalog")]
 public class EmoteCatalog : ScriptableObject
 {
-    public const int Capacity = 9;
+    public const int Capacity = 6;   // 2×3(가로 2 × 세로 3)
 
     [SerializeField] EmoteEntry[] entries = new EmoteEntry[Capacity];
 

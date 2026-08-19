@@ -766,28 +766,4 @@ public class TutorialOverlayUI : MonoBehaviour
         t_es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
     }
 
-#if UNITY_EDITOR
-    // 코드 빌드(BuildUI)와 동일한 레이아웃을 프리팹으로 저장. 디자이너가 프리팹에서 dim/배너/문구를
-    // 직접 수정한 뒤 GameInitializer의 tutorialOverlayPrefab [SerializeField]에 물려주면 런타임이 사용한다.
-    [UnityEditor.MenuItem("Tools/Tutorial/Rebuild Overlay Prefab")]
-    static void RebuildOverlayPrefab()
-    {
-        const string t_dir  = "Assets/Prefabs/Tutorial";
-        const string t_path = t_dir + "/TutorialOverlay.prefab";
-        if (!UnityEditor.AssetDatabase.IsValidFolder("Assets/Prefabs"))
-            UnityEditor.AssetDatabase.CreateFolder("Assets", "Prefabs");
-        if (!UnityEditor.AssetDatabase.IsValidFolder(t_dir))
-            UnityEditor.AssetDatabase.CreateFolder("Assets/Prefabs", "Tutorial");
-
-        var t_go = new GameObject("TutorialOverlay");
-        try
-        {
-            t_go.AddComponent<TutorialOverlayUI>().BuildUI();   // 참조 배선된 채로 저장(탭 콜백만 런타임)
-            UnityEditor.PrefabUtility.SaveAsPrefabAsset(t_go, t_path);
-            Debug.Log($"[Tutorial] Overlay prefab saved: {t_path}");
-        }
-        finally { DestroyImmediate(t_go); }
-        UnityEditor.AssetDatabase.Refresh();
-    }
-#endif
 }

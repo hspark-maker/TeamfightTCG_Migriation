@@ -134,14 +134,13 @@
 - 사운드: `Audio/SoundManager` · `SoundConfig` · `UIClickSound`
 - 디버그: `OutGame/Debug/OutgameDebugOverlay` · `OutgameDebugActions` · `UI/Debug/DebugCurrencyButton` · `UnlockAllCardsButton` · `Test/VfxDebugWindow` (`VfxSlot`) · `Test/AttackAnimTester` (`AttackStep`) · `SynergyPreviewKind` · `KeywordPreviewKind`
 
-## 에디터 도구 (`Editor/`, 19파일 3,626줄)
+## 에디터 도구 (`Editor/`, 19파일 3,585줄)
 
-`CardTableTool` · `CardAuthoringWindow` · `CardSpecImporter` · `CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `AIDeckBandValidator` · `OutgameTutorialStepWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `LobbyLayoutAudit` · `LobbyPrefabOverrideAudit` · `AssetNamingMigration` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `FontCleanupTool` · `SafeAreaInstaller`
+`CardTableTool` · `CardAuthoringWindow` · `CardSpecImporter` · `CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `AIDeckBandValidator` · `OutgameTutorialStepWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `SafeAreaInstaller` · `UiSpriteAnimationClipCreator` · `UiSpriteAnimationClipWriter`
 
 <!-- orch:auto-draft:start -->
 ## 미분류 자동 초안 (섹션으로 옮기면 다음 동기화에서 빠집니다)
 
-- `Editor/` — `SpriteFileIdDumper`
 - `Test/` — `BattleDebugKill`
 - `UI/Battle/Emote/` — `EmoteCatalog` · `EmoteDirector` · `EmoteEntry` · `EmotePickerUI` · `EmoteStickerView`
 - `UI/Common/` — `StickerPeelGraphic`

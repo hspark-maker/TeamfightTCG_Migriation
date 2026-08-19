@@ -2,11 +2,11 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>감정표현 버튼 하나 + 3×3 선택 표. 열고 · 고르고 · 닫는 것까지만 한다 —
+/// <summary>감정표현 버튼 하나 + 2×3 선택 표. 열고 · 고르고 · 닫는 것까지만 한다 —
 /// 무엇이 뜨는지·어디에 뜨는지는 <see cref="EmoteDirector"/>가 정한다(발화 지점 하나).
 ///
-/// 칸 9개는 **씬에서 저작**하고 여기서는 켜고 끄기만 한다(UI 자식 런타임 생성 금지 규약).
-/// 목록이 9개보다 짧으면 남는 칸은 꺼진다 — 빈 버튼을 눌러 아무 일도 안 일어나는 상태를 만들지 않는다.
+/// 칸 6개는 **씬에서 저작**하고 여기서는 켜고 끄기만 한다(UI 자식 런타임 생성 금지 규약).
+/// 목록이 6개보다 짧으면 남는 칸은 꺼진다 — 빈 버튼을 눌러 아무 일도 안 일어나는 상태를 만들지 않는다.
 ///
 /// 표는 한 번 고르면 닫힌다. 열어 둔 채로 연타하게 두면 스티커가 계속 갈아 끼워져
 /// "내가 뭘 냈는지"가 화면에 안 남는다.</summary>
@@ -15,19 +15,19 @@ public class EmotePickerUI : MonoBehaviour
     [Tooltip("표를 여는 버튼(전투 화면에 상시 노출).")]
     [SerializeField] Button openButton;
 
-    [Tooltip("3×3 표 루트. 시작은 꺼진 상태다.")]
+    [Tooltip("2×3 표 루트. 시작은 꺼진 상태다.")]
     [SerializeField] GameObject panel;
 
     [Tooltip("표 바깥을 눌러 닫는 투명 버튼. 없으면 다시 openButton을 눌러야 닫힌다.")]
     [SerializeField] Button closeBlocker;
 
-    [Tooltip("칸 9개(왼쪽 위 → 오른쪽 아래 순서). 카탈로그 순서와 1:1이다.")]
+    [Tooltip("칸 6개(왼쪽 위 → 오른쪽 아래 순서). 카탈로그 순서와 1:1이다.")]
     [SerializeField] Button[] slots = new Button[EmoteCatalog.Capacity];
 
-    [Tooltip("칸에 그림을 그릴 Image 9개(칸과 같은 순서). 비워도 된다 — 그때는 글자만 쓴다.")]
+    [Tooltip("칸에 그림을 그릴 Image 6개(칸과 같은 순서). 비워도 된다 — 그때는 글자만 쓴다.")]
     [SerializeField] Image[] slotIcons = new Image[EmoteCatalog.Capacity];
 
-    [Tooltip("칸에 글자를 그릴 TMP 9개(칸과 같은 순서). 그림이 있는 감정표현은 자동으로 꺼진다.")]
+    [Tooltip("칸에 글자를 그릴 TMP 6개(칸과 같은 순서). 그림이 있는 감정표현은 자동으로 꺼진다.")]
     [SerializeField] TMP_Text[] slotLabels = new TMP_Text[EmoteCatalog.Capacity];
 
     void Awake()

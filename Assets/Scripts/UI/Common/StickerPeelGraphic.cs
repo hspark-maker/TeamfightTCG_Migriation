@@ -110,30 +110,72 @@ public class StickerPeelGraphic : Image
         }
     }
 
+    /// <summary>그림을 실제로 올릴 사각형.
+    ///
+    /// 두 단계다.
+    /// ① 스프라이트 **셀 전체**(<c>sprite.rect</c>)를 기준으로 비율을 맞춰 rect 안에 넣는다.
+    ///    셀 기준이어야 프레임마다 그림 크기·자리가 안 흔들린다(내용 기준으로 맞추면 프레임마다 확대율이 달라진다).
+    /// ② 그 안에서 **실제 그림이 차지하는 칸**으로 좁힌다.
+    ///
+    /// ②가 없으면 늘어난다: 임포트가 Tight면 Unity가 투명 여백을 잘라낸 <c>textureRect</c>를 들고 있고
+    /// <see cref="DataUtility.GetOuterUV"/>가 돌려주는 UV도 그 잘린 영역이다. 그걸 셀 크기 사각형에 그대로 씌우면
+    /// 잘려나간 여백만큼 그림이 늘어나고, 프레임마다 잘린 양이 다르므로 위아래로 눌렸다 폈다 한다.
+    /// (임포트를 Full Rect로 바꾸면 offset이 0이라 이 보정은 그냥 무동작이 된다 — 어느 설정이든 맞게 그린다.)</summary>
     Rect DrawingRect()
     {
         Rect t_rect = this.GetPixelAdjustedRect();
-        if (!this.preserveAspect || this.sprite == null) return t_rect;
+        if (this.sprite == null) return t_rect;
 
-        Rect t_spriteRect = this.sprite.rect;
-        if (t_spriteRect.width <= 0f || t_spriteRect.height <= 0f) return t_rect;
+        Rect t_cell = this.sprite.rect;
+        if (t_cell.width <= 0f || t_cell.height <= 0f) return t_rect;
 
-        float t_spriteRatio = t_spriteRect.width / t_spriteRect.height;
-        float t_rectRatio = t_rect.width / t_rect.height;
-        if (t_spriteRatio > t_rectRatio)
+        if (this.preserveAspect)
         {
-            float t_height = t_rect.width / t_spriteRatio;
-            t_rect.y += (t_rect.height - t_height) * this.rectTransform.pivot.y;
-            t_rect.height = t_height;
-        }
-        else
-        {
-            float t_width = t_rect.height * t_spriteRatio;
-            t_rect.x += (t_rect.width - t_width) * this.rectTransform.pivot.x;
-            t_rect.width = t_width;
+            float t_spriteRatio = t_cell.width / t_cell.height;
+            float t_rectRatio = t_rect.width / t_rect.height;
+            if (t_spriteRatio > t_rectRatio)
+            {
+                float t_height = t_rect.width / t_spriteRatio;
+                t_rect.y += (t_rect.height - t_height) * this.rectTransform.pivot.y;
+                t_rect.height = t_height;
+            }
+            else
+            {
+                float t_width = t_rect.height * t_spriteRatio;
+                t_rect.x += (t_rect.width - t_width) * this.rectTransform.pivot.x;
+                t_rect.width = t_width;
+            }
         }
 
-        return t_rect;
+        return ContentRect(t_rect, t_cell);
+    }
+
+    /// <summary>셀 사각형 안에서 **잘리고 남은 그림**이 실제로 놓이는 칸. 여백이 안 잘린 스프라이트(Full Rect)면
+    /// textureRect가 셀과 같아 원래 사각형을 그대로 돌려준다.</summary>
+    Rect ContentRect(Rect _cellRect, Rect _cell)
+    {
+        Rect t_content;
+        try
+        {
+            t_content = this.sprite.textureRect;   // 아틀라스 tight 패킹이면 예외 — 그때는 보정 없이 간다
+        }
+        catch (System.Exception)
+        {
+            return _cellRect;
+        }
+
+        if (t_content.width <= 0f || t_content.height <= 0f) return _cellRect;
+        if (Mathf.Approximately(t_content.width, _cell.width) &&
+            Mathf.Approximately(t_content.height, _cell.height)) return _cellRect;
+
+        Vector2 t_offset = this.sprite.textureRectOffset;   // 셀 왼쪽아래 기준, 잘려나간 여백만큼의 이동
+        float   t_scaleX = _cellRect.width  / _cell.width;
+        float   t_scaleY = _cellRect.height / _cell.height;
+
+        return new Rect(_cellRect.x + t_offset.x * t_scaleX,
+                        _cellRect.y + t_offset.y * t_scaleY,
+                        t_content.width  * t_scaleX,
+                        t_content.height * t_scaleY);
     }
 
     void BuildColumn(int _index, float _surfaceDistance, float _contact, float _radius,

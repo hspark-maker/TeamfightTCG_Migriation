@@ -14,32 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EmoteCatalog
   entries:
   - sprite: {fileID: -881465105, guid: dfc4a384019cc0346831aa24c26eeef5, type: 3}
-    clip: {fileID: 7400000, guid: c46abf73e0c492548ab93005a1f3e162, type: 2}
-    label: "\uC548\uB155"
-  - sprite: {fileID: 21300000, guid: 76d80665c27d779480ce8fffb3b46c79, type: 3}
-    clip: {fileID: 0}
-    label: "\uC88B\uC544"
-  - sprite: {fileID: 21300000, guid: 045b17ccb60ea412649b1b67e201d368, type: 3}
-    clip: {fileID: 0}
-    label: "\uACE0\uB9C8\uC6CC"
-  - sprite: {fileID: 21300000, guid: 6b1b8fc006b3e2533c6639ca087b96c5, type: 3}
-    clip: {fileID: 0}
-    label: "\uC6C3\uC74C"
-  - sprite: {fileID: 21300000, guid: f52364e17f9b803e29e1bcd64b581921, type: 3}
-    clip: {fileID: 0}
-    label: "\uB180\uB78C"
-  - sprite: {fileID: 21300000, guid: 6ed138516e2b9fda82fcf82ea1569014, type: 3}
-    clip: {fileID: 0}
-    label: "\uC2AC\uD514"
-  - sprite: {fileID: 21300000, guid: a98e2542a3dd701deed2256ecef9d40f, type: 3}
-    clip: {fileID: 0}
-    label: "\uD654\uB0A8"
-  - sprite: {fileID: 21300000, guid: e484b8aab5d154bd683ca1a1e79e70b8, type: 3}
-    clip: {fileID: 0}
-    label: "\uBBF8\uC548"
-  - sprite: {fileID: 21300000, guid: 9dccf6e719b1bce54521bfa0808f2f03, type: 3}
-    clip: {fileID: 0}
-    label: "\uC798\uAC00"
+    clip: {fileID: 7400000, guid: 2050c077f07951d49a217a8008ac2122, type: 2}
+    label: Hi
+  - sprite: {fileID: -524654387, guid: f634b1bc11f239845982a6755c5a1537, type: 3}
+    clip: {fileID: 7400000, guid: 64e59eadaa5b423409e8dc19158be750, type: 2}
+    label: Dizzy
+  - sprite: {fileID: -80752865, guid: 13b68470fea4f7d4392f9ba97626b02b, type: 3}
+    clip: {fileID: 7400000, guid: e5fe17b9b0936d64184af09419076987, type: 2}
+    label: Thanks
+  - sprite: {fileID: 51337476, guid: 9bd000808185c0242892dc3671455143, type: 3}
+    clip: {fileID: 7400000, guid: ebb4ac3d1e1ffa44d808a321b8e3e88a, type: 2}
+    label: Sad
+  - sprite: {fileID: -433437760, guid: ca481716380744f43a87fac7b0387aeb, type: 3}
+    clip: {fileID: 7400000, guid: ccdaf067d6e5ee54e92775b2d1a0febc, type: 2}
+    label: Angry
+  - sprite: {fileID: 1416332904, guid: 1a8f5653cf1705244a204951bfa824fc, type: 3}
+    clip: {fileID: 7400000, guid: ada22603774e241408fe6c06838629aa, type: 2}
+    label: laugh
   showDuration: 2.5
   fadeDuration: 0.3
   popScale: 1.25
