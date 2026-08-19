@@ -1947,6 +1947,12 @@ MonoBehaviour:
     tutorialAnchor: 18
     tutorialTrigger: 2
     unlockFeature: 5
+  - name: Tournament
+    panel: {fileID: 2259189210714536949}
+    label: "\uD1A0\uB108\uBA3C\uD2B8"
+    tutorialAnchor: 0
+    tutorialTrigger: 0
+    unlockFeature: 0
   defaultIndex: 2
   alertDotPrefab: {fileID: 4440091932380886368, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
   dragController: {fileID: 3668802067711513282}
@@ -1969,6 +1975,7 @@ MonoBehaviour:
   lobbyTabController: {fileID: 3797395670514148879}
   deckPanel: {fileID: 3228001466242478929}
   matchPanel: {fileID: 5258775699516550056}
+  tournamentPanel: {fileID: 2259189210714536949}
 --- !u!1 &1277695433697971614
 GameObject:
   m_ObjectHideFlags: 0
@@ -2100,6 +2107,14 @@ MonoBehaviour:
   collectionTabIndex: 4
   albumTabController: {fileID: 4683642452828895422}
   tabPunch: 0.3
+  packTabIndex: 1
+  packFlightSize: {x: 240, y: 300}
+  packScatterRadius: 120
+  packScatterDuration: 0.24
+  packGatherDuration: 0.42
+  packPopDuration: 0.14
+  packGatherScale: 0.15
+  packArcHeight: 160
 --- !u!114 &7770487399785170923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2329,6 +2344,7 @@ RectTransform:
   - {fileID: 4666472679374348862}
   - {fileID: 7436770203067346680}
   - {fileID: 4851138677411654716}
+  - {fileID: 1969243790938775373}
   m_Father: {fileID: 8136611112812122143}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -3527,6 +3543,123 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1001 &1741536001019040573
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3535906181901233073}
+    m_Modifications:
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Name
+      value: Tab_Tournament
+      objectReference: {fileID: 0}
+    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+--- !u!224 &1969243790938775373 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+  m_PrefabInstance: {fileID: 1741536001019040573}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2259189210714536949 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 536330063969495240, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+  m_PrefabInstance: {fileID: 1741536001019040573}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 671d6cff0c20bd64c853db48bac7bf36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TournamentMapPanel
 --- !u!1001 &2184112627954846968
 PrefabInstance:
   m_ObjectHideFlags: 0
