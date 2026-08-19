@@ -1825,43 +1825,53 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 패널 자체의 높이는 프리팹 DetailFrame의 LayoutElement.preferredHeight가 고정하므로,
     // 안쪽 줄 수가 얼마든 카드 그림의 크기·위치는 카드마다 흔들리지 않는다.
     //
-    // _onClick이 있으면 설명 줄이 눌리는 자리가 된다(해금 안내 다시 보기). null이면 눌리지 않는다 —
+    // _onClick이 있으면 섹션 띠 전체가 눌리는 자리가 된다(해금 안내 다시 보기). null이면 눌리지 않는다 —
     // 열 것이 없는 자리가 눌리는 것처럼 보이면 "눌렀는데 아무 일도 없다"가 된다.
     static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned,
                              Action _onClick = null)
     {
         if (_desc != null)
-        {
             _desc.text = _lines.Count > 0 ? string.Join("\n", _lines)
                        : _owned           ? NoneValue
                                           : LockedName;
 
-            BindDescClick(_desc, _onClick);
+        if (_section != null)
+        {
+            BindSectionClick(_section, _onClick);
+            _section.SetActive(true);
         }
-
-        if (_section != null) _section.SetActive(true);
     }
 
-    /// <summary>설명 줄을 눌러 열 수 있게 만든다. 저작(프리팹)은 건드리지 않고 런타임에만 세운다 —
+    /// <summary>섹션을 눌러 열 수 있게 만든다. 저작(프리팹)은 건드리지 않고 런타임에만 세운다 —
     /// 상세창 프리팹을 저장하는 길은 다른 저작까지 함께 흔든다(시너지 아이콘 줄이 SynergyIconButton을
     /// 런타임에 붙이는 것과 같은 규약).
     ///
-    /// 글자는 프리팹에서 raycastTarget이 꺼져 있어 그대로면 탭이 뒤로 통과한다(= 딤 탭 = 창이 닫힌다).</summary>
-    static void BindDescClick(TMP_Text _desc, Action _onClick)
+    /// 손잡이는 설명 줄이 아니라 <b>섹션 뿌리</b>다 — 글자만 받으면 줄이 짧은 카드에서 노릴 곳이 실오라기만 해진다.
+    /// 뿌리엔 그림이 없어 그대로면 탭이 뒤로 통과하므로(= 딤 탭 = 창이 닫힌다) 안 보이는 판을 깔아 띠를 통째로 받는다.
+    /// 칩은 제 버튼을 먼저 먹으므로 칩의 동작은 그대로다.</summary>
+    static void BindSectionClick(GameObject _section, Action _onClick)
     {
-        var t_button = _desc.GetComponent<Button>();
+        var t_button = _section.GetComponent<Button>();
         if (t_button == null)
         {
-            t_button = _desc.gameObject.AddComponent<Button>();
+            var t_hit = _section.GetComponent<Image>();
+            if (t_hit == null)
+            {
+                t_hit = _section.AddComponent<Image>();
+                t_hit.color = Color.clear;
+            }
 
-            // 글자에 색 전이를 얹으면 잠김 룩의 회색과 섞여 "지금 눌리는가"가 오히려 안 읽힌다.
+            t_button = _section.AddComponent<Button>();
+            t_button.targetGraphic = t_hit;
+
+            // 띠에 색 전이를 얹으면 잠김 룩의 회색과 섞여 "지금 눌리는가"가 오히려 안 읽힌다.
             t_button.transition = Selectable.Transition.None;
         }
 
         // 칩과 달리 이 노드는 카드를 넘겨도 그대로 재사용된다 — 지우지 않으면 앞 카드의 개념이 함께 열린다.
         t_button.onClick.RemoveAllListeners();
 
-        _desc.raycastTarget  = _onClick != null;
+        if (t_button.targetGraphic != null) t_button.targetGraphic.raycastTarget = _onClick != null;
         t_button.interactable = _onClick != null;
 
         if (_onClick != null) t_button.onClick.AddListener(() => _onClick());
