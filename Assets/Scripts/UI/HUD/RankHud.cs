@@ -94,6 +94,53 @@ public class RankHud : MonoBehaviour
     [Tooltip("게이지가 줄어든 자리까지 뒤로 미끄러지는 시간. 획득은 느리고 시끄럽게, 손실은 빠르고 조용하게 — 짧게 둔다.")]
     [SerializeField] float lossSlideDuration = 0.2f;
 
+    [Header("단계 상승 — 제자리 연출")]
+    [Tooltip("연출 동안 로비를 덮는 딤의 짙기. **입력은 막지 않는다**(_block:false) — 이 사건은 화면을 멈춰 세우지 않는다.\n" +
+             "0.6을 넘기면 '팝업이 떴다'로 읽혀 안 멈춘다는 취지가 무너진다. 딤을 아예 끄려면 0으로 둔다.")]
+    [Range(0f, 1f)]
+    [SerializeField] float dimAlpha = 0.5f;
+
+    [Tooltip("딤이 깔리는 시간 = 안무가 시작되기까지의 뜸.\n" +
+             "⚠ 걷히는 쪽은 페이드가 없다(ScreenDim은 즉시 감춘다) — 여운 끝의 한 프레임에 끊는다.")]
+    [SerializeField] float dimFade = 0.15f;
+
+    [Tooltip("연출 동안 쓰는 정렬 순서. 로비 셸(PlayBtn·상단바·탭바)보다 위여야 가리지 않는다.\n" +
+             "**딤이 있으므로 이 값은 필수다** — 정렬을 안 올리면 표시가 딤 아래로 들어가 함께 어두워지고, " +
+             "그건 예전에 '안 보인다'로 롤백된 모양이다.\n" +
+             "임시 Canvas + GraphicRaycaster를 런타임에 붙여 덮어쓰고, 끝나면 원래 값으로 되돌린다.")]
+    [FormerlySerializedAs("liftSortingOrder")]
+    [SerializeField] int frontSortingOrder = 500;
+
+    [Tooltip("딤이 깔리고 번쩍이 오기까지 **아무 일도 없는** 시간.\n" +
+             "**이 여백이 이 안무의 핵심이다 — 줄이지 마라.** 별 넷이 다 찬 화면을 읽는 시간이 여기뿐이다.")]
+    [FormerlySerializedAs("liftHold")]
+    [SerializeField] float divisionReadHold = 0.35f;
+
+    [Tooltip("번쩍 프레임에 별들이 함께 받는 펀치 세기. **여기가 이 안무의 번쩍이다** — 전면 섬광은 쓰지 않는다.\n" +
+             "화면 전체가 하얘지는 것 자체가 '멈췄다'는 신호라 안 멈추는 연출과 어긋나고, " +
+             "ScreenFlash는 이 표시보다 위에 그려져 정작 별을 가린다.")]
+    [SerializeField] float divisionStarPunch = 0.3f;
+
+    [Tooltip("그 펀치가 도는 시간 = 수렴이 시작되기까지의 간격.")]
+    [SerializeField] float divisionPunchDuration = 0.3f;
+
+    [Tooltip("별들이 가운데로 빨려들어 사라지는 시간. **이 끝이 티어명이 갈리는 프레임이다** — " +
+             "오버레이가 없으니 암전도 없고, 별의 부재가 그 자리를 대신한다.")]
+    [SerializeField] float divisionConverge = 0.28f;
+
+    [Tooltip("새 티어명이 출발하는 배율(저작 크기 대비).")]
+    [SerializeField] float divisionNameSlamFrom = 1.9f;
+
+    [Tooltip("새 티어명이 제자리로 오는 시간(가속).")]
+    [SerializeField] float divisionNameSlam = 0.1f;
+
+    [Tooltip("빈 별 칸이 하나씩 돌아오는 간격. 0이면 네 칸이 한 번에 선다 — 줄로 읽히려면 조금 어긋나야 한다.\n" +
+             "칸 하나가 서는 시간은 첫 진입과 같은 값(pipsAppearDuration)을 쓴다.")]
+    [SerializeField] float divisionPipsStep = 0.05f;
+
+    [Tooltip("별 줄이 다 돌아온 뒤 연출이 끝나기까지 머무는 시간(= 여운). 새 이름을 읽는 시간이다.")]
+    [SerializeField] float divisionOutro = 0.4f;
+
     // 활성 인스턴스(연출 호출자가 찾는 창구). 로비에 하나뿐이지만 탭 토글로 꺼지므로 활성분만 든다.
     static RankHud s_instance;
 
@@ -142,6 +189,24 @@ public class RankHud : MonoBehaviour
 
     // 배지의 저작 색. 연출이 어디서 끊겨도 여기로 되돌린다(티어업이 스프라이트를 갈아도 색은 그대로다).
     Color m_badgeBaseColor = Color.white;
+
+    // 제자리 들어올리기(단계 상승). 표시를 멈춰 세우지 않는 연출이라 m_tierSeq와 따로 든다 —
+    // 같이 두면 Render의 연출 가드에 걸려 ApplyTierInstant가 아무것도 못 바꾼다.
+    Sequence m_inPlaceSeq;
+
+    // 지금 앞으로 세워져 있는가(딤 + 정렬 덮어쓰기). 세우기·걷기가 이 하나를 보고 갈리므로 복원이 멱등해진다.
+    bool m_frontmost;
+
+    // 정렬을 덮어쓸 임시 캔버스와 그 원래 값(해제는 지우는 것이 아니라 이 값으로 되돌리는 것이다).
+    Canvas m_frontCanvas;
+    bool   m_homeOverrideSorting;
+    int    m_homeSortingOrder;
+
+    // 별 칸의 저작 자리. 수렴이 좌표를 밀므로 원본이 없으면 네 칸이 한 점에 겹친 채 남는다.
+    Vector2[] m_starHomePos;
+
+    // 티어명의 저작 배율(슬램이 미는 축).
+    Vector3 m_descHomeScale = Vector3.one;
 
     /// <summary>조각이 튀어나올 원점이자 도착지. 연출 디렉터가 쓴다.</summary>
     public RectTransform BadgeRect => this.badgeImage != null ? (RectTransform)this.badgeImage.transform : null;
@@ -327,10 +392,261 @@ public class RankHud : MonoBehaviour
         return this.m_tierSeq;
     }
 
+    /// <summary>단계 상승(같은 등급 안에서 단계만 오른 판)을 **화면을 멈추지 않고** 그린다.
+    /// RankInfo는 **제자리·제 크기 그대로** 있고 그 자리에서 별이 번쩍이고 수렴한 뒤 이름이 갈린다.
+    /// 로비는 계속 보이고 입력도 막지 않는다 — 4승마다 오는 사건이라 전면 오버레이로 멈춰 세우면 방해가 된다
+    /// (등급 승급·첫 진입은 드물게 오므로 지금도 오버레이가 멈춰 세운다 — 그래야 격 차이가 오히려 벌어진다).
+    /// 표시를 옮기거나 키우지 않는 대신 딤과 정렬 올리기가 시선을 만든다.
+    /// 재생은 호출자 몫(BuildTierUp과 같은 규약) — <b>조립만으로는 화면이 바뀌지 않는다.</b>
+    /// 딤·정렬 덮어쓰기는 재생이 시작되는 프레임에 켜지므로 미리 세워 두고 나중에 재생해도 안전하다.</summary>
+    public Sequence BuildDivisionUpInPlace()
+    {
+        this.KillInPlace();
+
+        var t_seq = DOTween.Sequence().SetLink(this.gameObject);
+        this.m_inPlaceSeq = t_seq;
+
+        // 딤과 정렬 덮어쓰기는 **재생이 시작되는 프레임**에 켠다 — 조립 시점에 켜면 미리 세워 둔 안무가
+        // 재생 전부터 로비를 어둡게 만든다(BuildTierUp처럼 Pause해 두는 관용구를 그대로 쓸 수 있어야 한다).
+        t_seq.InsertCallback(0f, () => this.SetFrontmost(true));
+
+        float t_burstAt = Mathf.Max(0f, this.dimFade) + Mathf.Max(0f, this.divisionReadHold);
+        float t_convAt  = t_burstAt + Mathf.Max(0.05f, this.divisionPunchDuration);
+        float t_nameAt  = t_convAt + Mathf.Max(0.05f, this.divisionConverge);
+
+        // 끝은 별 줄이 다 돌아온 뒤부터 잰다 — 이름만 보고 재면 마지막 칸이 서는 도중에 딤이 걷힌다.
+        float t_endAt = t_nameAt
+                      + Mathf.Max(this.PipsReturnSpan(), Mathf.Max(0.02f, this.divisionNameSlam))
+                      + Mathf.Max(0f, this.divisionOutro);
+
+        this.StageDivisionBurst(t_seq, t_burstAt);
+        this.StageDivisionConverge(t_seq, t_convAt);
+        this.StageDivisionReveal(t_seq, t_nameAt);
+        this.StageDivisionOutro(t_seq, t_endAt);
+
+        // 정상 종료든 중단이든 여기로 온다 — 앞으로 세운 채 굳으면 로비에 딤이 남고 정렬이 되돌아오지 않는다.
+        t_seq.OnKill(() =>
+        {
+            this.m_inPlaceSeq = null;
+            this.SetFrontmost(false);
+            this.RestorePipScales();
+            this.Render();
+        });
+
+        return t_seq;
+    }
+
+    // 번쩍 — 별이 스스로 밝아지며 튄다. 채움이 흰 쪽으로 밀렸다 저작 색으로 돌아오는 것은 별 점등과 같은 문법이다.
+    //
+    // **전면 섬광(ScreenFlash)은 쓰지 않는다.** 그쪽은 sortingOrder 32000이라 앞으로 세운 이 표시(frontSortingOrder)
+    // 위를 덮어 정작 별 펀치를 흰 베일 아래로 넣고, 화면 전체가 하얘지는 것 자체가 "멈췄다"는 신호라
+    // 안 멈추는 연출의 취지와 정면으로 어긋난다.
+    void StageDivisionBurst(Sequence _seq, float _at)
+    {
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null) return;
+
+        float t_dur   = Mathf.Max(0.05f, this.divisionPunchDuration);
+        float t_flash = Mathf.Max(0.02f, this.starFlashDuration);
+
+        for (int t_i = 0; t_i < t_star.StarCount; t_i++)
+        {
+            RectTransform t_pip = t_star.StarRect(t_i);
+            if (t_pip != null)
+            {
+                _seq.InsertCallback(_at, () => t_pip.localScale = Vector3.one);
+                _seq.Insert(_at, t_pip.DOPunchScale(Vector3.one * this.divisionStarPunch, t_dur,
+                                                    vibrato: 1, elasticity: 0f));
+            }
+
+            Image t_fill = t_star.StarFill(t_i);
+            if (t_fill == null) continue;
+
+            int t_index = t_i;
+
+            _seq.InsertCallback(_at, () => t_fill.color = this.starFlashColor);
+            _seq.Insert(_at, t_fill.DOColor(this.StarFillColor(t_index), t_flash).SetEase(Ease.OutQuad));
+        }
+    }
+
+    // 별들이 가운데 한 점으로 빨려들며 사라진다. 이 소멸이 티어명 교체의 앞박이다.
+    void StageDivisionConverge(Sequence _seq, float _at)
+    {
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null) return;
+
+        float t_dur = Mathf.Max(0.05f, this.divisionConverge);
+
+        for (int t_i = 0; t_i < t_star.StarCount; t_i++)
+        {
+            RectTransform t_pip = t_star.StarRect(t_i);
+            if (t_pip == null) continue;
+
+            _seq.Insert(_at, t_pip.DOAnchorPos(Vector2.zero, t_dur).SetEase(Ease.InBack));
+            _seq.Insert(_at, t_pip.DOScale(0f, t_dur).SetEase(Ease.InBack));
+        }
+    }
+
+    // 별이 화면에서 사라진 프레임. **별의 부재가 암전을 대신한다** —
+    // 값이 굴러가는 것을 보여주지 않고 여기서 한 박에 드러낸다.
+    void StageDivisionReveal(Sequence _seq, float _at)
+    {
+        _seq.InsertCallback(_at, () =>
+        {
+            // 티어명·배지·게이지가 여기서 최종값이 된다. 게이지 비움은 SetRatio(무통지 스냅)라 마디 통과가 역행 통지되지 않는다 —
+            // 트윈으로 되감으면 방금 켠 별 넷이 우수수 움츠러든다.
+            this.ApplyTierInstant();
+
+            // 새 단계의 별 줄은 빈 채로 다시 선다. 켜는 프레임에 곧바로 0으로 눌러 둬야 나타남이 되고 깜빡임이 안 된다.
+            this.SetPipScales(0f);
+        });
+
+        var t_star   = this.gauge as RankStarGauge;
+        int t_count  = t_star != null ? t_star.StarCount : 0;
+        float t_step = Mathf.Max(0f, this.divisionPipsStep);
+
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            RectTransform t_pip = t_star.StarRect(t_i);
+            if (t_pip == null) continue;
+
+            int t_index = t_i;
+
+            // 수렴으로 가운데 모인 자리에서 저작 자리로 되돌린 뒤 커진다(자리와 배율이 같은 박에 돌아온다).
+            _seq.InsertCallback(_at + t_i * t_step,
+                                () => t_pip.anchoredPosition = this.StarHomePos(t_index, t_pip));
+            _seq.Insert(_at + t_i * t_step,
+                        t_pip.DOScale(1f, Mathf.Max(0.02f, this.pipsAppearDuration)).SetEase(Ease.OutBack));
+        }
+
+        if (this.descText == null) return;
+
+        RectTransform t_desc = this.descText.rectTransform;
+
+        _seq.InsertCallback(_at, () => t_desc.localScale = this.m_descHomeScale
+                                                        * Mathf.Max(1f, this.divisionNameSlamFrom));
+        _seq.Insert(_at, t_desc.DOScale(this.m_descHomeScale, Mathf.Max(0.02f, this.divisionNameSlam))
+                                .SetEase(Ease.InQuad));
+    }
+
+    // 여운의 끝. 딤을 걷는 한 박이자 **시퀀스의 길이를 정하는 자리**다 —
+    // 여기 아무것도 없으면 마지막 트윈이 끝나는 순간 시퀀스가 닫혀 여운(divisionOutro)이 통째로 잘린다.
+    // 딤은 걷히는 페이드가 없다(ScreenDim은 즉시 감춘다). 정렬 되돌리기는 곧바로 OnKill이 잇는다.
+    void StageDivisionOutro(Sequence _seq, float _at)
+    {
+        _seq.InsertCallback(_at, () => ScreenDim.Hide(this));
+    }
+
+    // 빈 별 칸이 전부 돌아오는 데 걸리는 시간.
+    float PipsReturnSpan()
+    {
+        var t_star  = this.gauge as RankStarGauge;
+        int t_count = t_star != null ? t_star.StarCount : 0;
+        if (t_count <= 0) return 0f;
+
+        return (t_count - 1) * Mathf.Max(0f, this.divisionPipsStep) + Mathf.Max(0.02f, this.pipsAppearDuration);
+    }
+
+    // 딤과 정렬 올리기를 세우고 걷는다. **멱등이다** — 이미 그 상태면 아무것도 하지 않으므로 두 번 불러도 안전하고,
+    // 트윈이 어디서 잘려도 여기 한 번만 들르면 정렬·딤·별 자리가 전부 원래대로 돌아온다.
+    //
+    // 표시를 옮기지도 키우지도 않지만 **정렬 올리기는 뺄 수 없다** — 딤이 깔리는 판이라,
+    // 정렬을 안 올리면 RankInfo가 딤 아래로 들어가 함께 어두워진다(예전에 "안 보인다"로 롤백된 모양이다).
+    void SetFrontmost(bool _front)
+    {
+        if (this.m_frontmost == _front) return;
+        this.m_frontmost = _front;
+
+        if (_front)
+        {
+            this.AttachFrontCanvas();
+
+            // 입력을 막지 않는다(_block:false) — 로비를 계속 쓸 수 있어야 안 멈춘다가 성립한다.
+            ScreenDim.Show(this, Mathf.Clamp01(this.dimAlpha), false, Mathf.Max(0f, this.dimFade), EDimLayer.Full);
+            return;
+        }
+
+        // DOKill을 걸지 않는다 — 이 축을 미는 트윈은 전부 시퀀스에 중첩돼 있어 시퀀스가 죽을 때 함께 죽는다.
+        // 대상에 DOKill을 걸면 이 연출과 무관한 트윈(로비 전환 등이 같은 노드를 미는 경우)까지 함께 걷힌다.
+        if (this.descText != null) this.descText.rectTransform.localScale = this.m_descHomeScale;
+
+        // 수렴이 밀어 둔 별 자리를 되돌린다 — 표시는 제자리에 있어도 별은 가운데로 모였다 온다.
+        this.RestoreStarPositions();
+
+        this.DetachFrontCanvas();
+        ScreenDim.Hide(this);
+    }
+
+    // 딤 위로 올린 표시가 PlayBtn·상단바·탭바에 가리지 않게 임시 캔버스로 정렬을 덮는다
+    // (AlbumPageOverlayView.SetFrontmost와 같은 관용구). 캔버스는 지우지 않고 덮어쓴 값만 되돌린다.
+    void AttachFrontCanvas()
+    {
+        if (this.m_frontCanvas == null)
+        {
+            this.m_frontCanvas = this.gameObject.GetComponent<Canvas>();
+            if (this.m_frontCanvas == null) this.m_frontCanvas = this.gameObject.AddComponent<Canvas>();
+
+            // 정렬을 덮어쓴 캔버스는 자기 레이캐스터가 있어야 입력도 그 순서를 따른다 —
+            // 없으면 그림만 위로 오고 클릭은 아래 셸이 먼저 먹는다.
+            if (this.gameObject.GetComponent<GraphicRaycaster>() == null)
+                this.gameObject.AddComponent<GraphicRaycaster>();
+
+            this.m_homeOverrideSorting = this.m_frontCanvas.overrideSorting;
+            this.m_homeSortingOrder    = this.m_frontCanvas.sortingOrder;
+        }
+
+        this.m_frontCanvas.overrideSorting = true;
+        this.m_frontCanvas.sortingOrder    = this.frontSortingOrder;
+    }
+
+    void DetachFrontCanvas()
+    {
+        if (this.m_frontCanvas == null) return;
+
+        this.m_frontCanvas.overrideSorting = this.m_homeOverrideSorting;
+        this.m_frontCanvas.sortingOrder    = this.m_homeSortingOrder;
+    }
+
+    // 수렴이 가운데로 모아 둔 별 자리를 저작 자리로 되돌린다.
+    // 공용 복원(RestorePipScales)이 아니라 여기에 두는 이유: 좌표를 옮기는 것은 제자리 연출뿐이라,
+    // 공용 경로가 매번 좌표를 덮으면 "자리는 프리팹 저작값" 계약을 연출과 무관한 길에서도 깨게 된다.
+    void RestoreStarPositions()
+    {
+        var t_star = this.gauge as RankStarGauge;
+        if (t_star == null) return;
+
+        for (int t_i = 0; t_i < t_star.StarCount; t_i++)
+        {
+            RectTransform t_rect = t_star.StarRect(t_i);
+            if (t_rect == null) continue;
+
+            t_rect.anchoredPosition = this.StarHomePos(t_i, t_rect);
+        }
+    }
+
+    // 별 칸의 저작 자리. 캐시가 없으면 지금 자리를 그대로 답한다 — 모르는 값을 (0,0)으로 찍으면 별 줄이 한 점에 겹친다.
+    Vector2 StarHomePos(int _index, RectTransform _rect)
+        => this.m_starHomePos != null && _index >= 0 && _index < this.m_starHomePos.Length
+               ? this.m_starHomePos[_index]
+               : (_rect != null ? _rect.anchoredPosition : Vector2.zero);
+
+    // 제자리 연출을 걷는다. 시퀀스가 없던 길로도 딤·정렬이 남지 않게 복원까지 한 번 더 확인한다(멱등).
+    void KillInPlace()
+    {
+        var t_seq = this.m_inPlaceSeq;
+        this.m_inPlaceSeq = null;
+        if (t_seq != null) t_seq.Kill();
+
+        this.SetFrontmost(false);
+    }
+
     void Awake()
     {
         // 연출이 되돌릴 기준색. 배지 스프라이트는 티어 변화로 갈리지만 색은 저작값 그대로다.
         if (this.badgeImage != null) this.m_badgeBaseColor = this.badgeImage.color;
+
+        // 슬램이 미는 배율의 원본. 트윈이 값을 밀기 전인 여기서만 뜬다.
+        if (this.descText != null) this.m_descHomeScale = this.descText.rectTransform.localScale;
 
         // 별은 스스로 반응하지 않는다 — 채움 머리가 자기 마디를 지날 때만 튄다.
         if (this.gauge != null) this.gauge.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
@@ -348,14 +664,17 @@ public class RankHud : MonoBehaviour
         int t_count = t_star.StarCount;
         this.m_starFillColors  = new Color[t_count];
         this.m_starPlateColors = new Color[t_count];
+        this.m_starHomePos     = new Vector2[t_count];
 
         for (int t_i = 0; t_i < t_count; t_i++)
         {
             var t_fill  = t_star.StarFill(t_i);
             var t_plate = t_star.StarPlate(t_i);
+            var t_rect  = t_star.StarRect(t_i);
 
             this.m_starFillColors[t_i]  = t_fill  != null ? t_fill.color  : Color.white;
             this.m_starPlateColors[t_i] = t_plate != null ? t_plate.color : Color.white;
+            this.m_starHomePos[t_i]     = t_rect  != null ? t_rect.anchoredPosition : Vector2.zero;
         }
     }
 
@@ -380,6 +699,9 @@ public class RankHud : MonoBehaviour
 
         // 꺼지는 동안 트윈만 남으면 다음 활성화가 중간 상태를 물려받는다(고스트도 여기서 걷힌다).
         this.KillTierChange();
+
+        // 연출 중에 꺼지면 정렬이 그대로 굳고 딤이 화면에 남는다.
+        this.KillInPlace();
         this.KillReactions();
         this.RestorePipScales();
 

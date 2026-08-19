@@ -12,7 +12,8 @@ public class RankStarGauge : RankProgressGauge
     [Serializable]
     public class Star
     {
-        [Tooltip("펀치가 겨눌 별의 사각. 자리는 프리팹 저작값을 그대로 쓴다 — 코드가 좌표를 덮지 않는다.")]
+        [Tooltip("펀치가 겨눌 별의 사각. 자리는 프리팹 저작값이 정본이다 — " +
+                 "연출이 잠시 옮기더라도(단계 상승의 수렴) 끝나면 반드시 이 자리로 되돌린다.")]
         public RectTransform rect;
 
         [Tooltip("채워지는 On 스프라이트. Image Type=Filled / Fill Method=Vertical / Fill Origin=Bottom 전제.")]

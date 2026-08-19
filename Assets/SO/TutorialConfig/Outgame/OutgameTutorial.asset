@@ -102,7 +102,8 @@ MonoBehaviour:
       onFailure: 0
     - action: 5
       anchor: 1
-      guideMessage: 
+      guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uC6D0\uAC70\uB9AC' \uCE74\uB4DC\uB97C
+        \uC0AC\uC6A9\uD574\uBD05\uC2DC\uB2E4"
       messageAtBottom: 0
       unlocks: 06000000
       unlocksAll: 0
