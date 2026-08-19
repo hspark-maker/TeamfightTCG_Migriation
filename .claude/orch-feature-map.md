@@ -122,6 +122,7 @@
 - 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
 - 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `UI/ScreenCoverBackground` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
+- 정렬 층(무엇이 무엇 위에 뜨는가): `UiSortingOrder` — 프리팹 저작값·코드 상수 모두 이 표를 따른다. 순서를 런타임에 재지 않는다
 - 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` () · `UI/SettingsPanel`
 - 풀·매니저: `UI/UIManager/UIPoolManager` · `PooledCardElement` (`PooledCardElementData`) · `PooledUIBase` (`UIData`) · `UIAnimator` · `IUIController` · `SimpleYNPopup` (`SimpleYNPopupData`) · 상시 오버레이 `SingletonOverlay` · `SingletonOverlayBase` · `RuntimeOverlayPrefabs` · `SyncUiPrefabCatalog` (`ESyncUiPrefab` · `SyncUiPrefabs`)
 - 로비: `UI/Lobby/LobbyTabController` · `LobbyTabServices` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay`
