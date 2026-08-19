@@ -252,7 +252,14 @@ public class LobbyGainEffectDirector : MonoBehaviour
             return;
         }
 
-        // 안내 중에도 같은 길을 탄다 — 삽입은 유저가 찾아가는 것이 아니라 획득에 딸려 오는 사건이다.
+        // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
+        // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
+        if (OutgameTutorialRunner.IsRunning)
+        {
+            t_album.TryBeginInsert();
+            return;
+        }
+
         // _fireTrigger는 반드시 false — true면 도감 탭 첫 진입 튜토리얼이 발화해 딤이 삽입 세션을 덮는다.
         if (this.lobbyTabController != null) this.lobbyTabController.Select(t_album, false);
 

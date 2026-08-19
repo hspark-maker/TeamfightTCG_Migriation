@@ -180,11 +180,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             AlbumInsertSession.TutorialMode = true;
 
             // 설 세션이 아예 없으면(연출 배선 실패·좌표가 밀린 옛 세이브) 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
-            // 단 이 스텝은 [획득] 클릭과 같은 프레임에 선다 — 큐는 오버레이가 닫히고 획득 연출이 도는 뒤에야 찬다.
-            // 그 사이를 "기다릴 것 없음"으로 읽으면 삽입을 통째로 건너뛰므로, 곧 올 것이 있으면 판정을 미룬다
-            // (재판정은 OnPackOverlayClosed와 OnCardGainFinished가 이어 받는다).
-            if (!AlbumInsertQueue.HasPending && !AlbumInsertSession.IsRunning
-                && !PackOpenOverlay.IsOpen && !CardPackRewardHandoff.HasPending) OnGateSatisfied();
+            if (!AlbumInsertQueue.HasPending && !AlbumInsertSession.IsRunning) OnGateSatisfied();
             return;
         }
 
@@ -328,18 +324,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 지급이 트는 연출은 화면을 먼저 닫고 시작하므로 이 가드에 걸리지 않는다.
     void OnCardGainFinished()
     {
-        if (m_step == null) return;
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.CardGain) return;
         if (AnyRewardOverlayOpen) return;
-
-        // 삽입 대기 스텝이 이 연출보다 먼저 섰다 — 연출이 끝나도 꽂을 카드가 없으면(중복만 나온 개봉)
-        // 큐는 끝내 안 찬다. 이 신호가 그 경우의 마지막 탈출로다("실을 것이 없어 지나간 경우"도 반드시 온다).
-        if (m_step.Completion == EOutgameTutorialCompletion.AlbumInsert)
-        {
-            if (!AlbumInsertQueue.HasPending && !AlbumInsertSession.IsRunning) OnGateSatisfied();
-            return;
-        }
-
-        if (m_step.Completion != EOutgameTutorialCompletion.CardGain) return;
 
         OnGateSatisfied();
     }
