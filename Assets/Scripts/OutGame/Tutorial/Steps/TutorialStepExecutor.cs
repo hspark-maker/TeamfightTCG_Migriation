@@ -206,18 +206,24 @@ public static class TutorialStepExecutor
 
         // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin));
+        bool t_parallel = _step.ParallelGain;
+        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [획득]이 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(CardData _card, RectTransform _origin)
+    static bool AcquireCard(CardData _card, RectTransform _origin, bool _parallel)
     {
         OwnershipManager.Grant(CardCatalog.IdOf(_card));
 
         CardPackRewardHandoff.Set(CurrencyGain.None, new List<CardData> { _card });
-        if (LobbyGainEffectDirector.PlayNow(_origin)) return true;
+        if (LobbyGainEffectDirector.PlayNow(_origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 다음 안내가 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return true;
+        }
 
         // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
         CardPackRewardHandoff.TryConsume(null, out _);
@@ -252,17 +258,23 @@ public static class TutorialStepExecutor
             return FailAfterSetGrant(_step, _context, t_cards, "보상 오버레이·획득 연출 없음(로비 씬 배선 확인)");
 
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin));
+        bool t_parallel = _step.ParallelGain;
+        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [받기]가 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
-    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin)
+    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin, bool _parallel)
     {
         OwnershipManager.GrantAll(ToIds(_cards));
 
         CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
-        if (LobbyGainEffectDirector.PlayNow(_origin)) return;
+        if (LobbyGainEffectDirector.PlayNow(_origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 다음 안내가 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return;
+        }
 
         // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
         CardPackRewardHandoff.TryConsume(null, out _);
@@ -274,20 +286,43 @@ public static class TutorialStepExecutor
     // 팩이 도착했음을 알리는 자리. 지급도 구매도 하지 않는다 —
     // 실제 획득은 이 뒤의 상점 스텝 몫이라, 실패해도 되돌릴 것이 없다.
     //
-    // 팝업이 걷힌 뒤 팩 탭으로는 안내가 손가락으로 데려간다(다음 스텝) — 대신 눌러 주지 않는다.
-    // 화면이 저절로 바뀌면 그 이동이 이 팝업과 이어진 한 줄로 읽히지 않는다.
+    // [확인]을 누르면 팩이 팩 탭으로 빨려들고, 그 비행이 끝난 뒤에야 손가락 안내(다음 스텝)가 선다 —
+    // 탭을 대신 눌러 주지는 않는다. 화면이 저절로 바뀌면 그 이동이 이 팝업과 이어진 한 줄로 읽히지 않는다.
     //
-    // 진입에 성공하면 완료를 넘기지 않는다(EnterCardGrant와 같은 규약) — 완료는 팝업이 닫히는 신호가 확정한다.
+    // 진입에 성공하면 완료를 넘기지 않는다(EnterCardGrant와 같은 규약) — 완료는 그 비행의 종료 신호가 확정한다.
     static EOutgameTutorialStepResult EnterPackNotice(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
         if (_step.Pack == null)
             return Fail(_step, _context, "PackNotice에 팩이 미배선");
 
-        if (!PackRewardOverlay.TryGet(out var t_overlay))
-            return Fail(_step, _context, "팩 예고 오버레이 없음(Addressables·UIPrefab 색인 확인)");
+        // 디렉터를 오버레이보다 먼저 본다 — 순서를 뒤집으면 로비가 아닌 씬에서도 팝업이 세워져 그 씬에 남는다.
+        if (!LobbyGainEffectDirector.Exists || !PackRewardOverlay.TryGet(out var t_overlay))
+            return Fail(_step, _context, "예고 오버레이·획득 연출 없음(로비 씬 배선 확인)");
 
-        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.Pack);
+        // 팩이 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 팝업과 탭이 한 줄로 이어진다.
+        var t_origin   = t_overlay.PackAnchor;
+        var t_art      = _step.Pack.PackArt;
+        bool t_parallel = _step.ParallelGain;
+
+        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.Pack, () => FlyPackToTab(t_art, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
+    }
+
+    // [확인]이 눌린 순간. 로비 획득 연출에 넘긴다(팩이 팩 탭으로 날아간다) — 지급은 없다, 예고일 뿐이다.
+    // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
+    static void FlyPackToTab(Sprite _art, RectTransform _origin, bool _parallel)
+    {
+        if (LobbyGainEffectDirector.PlayPackFlight(_art, _origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 손가락이 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return;
+        }
+
+        // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
+        LobbyGainEffectDirector.NotifySkipped();
+
+        Debug.LogWarning("[TutorialStepExecutor] 팩 비행을 재생하지 못해 생략합니다(안내는 계속 진행).");
     }
 
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context,

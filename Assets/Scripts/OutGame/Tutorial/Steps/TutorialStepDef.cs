@@ -64,6 +64,11 @@ public class TutorialStepDef
     [Tooltip("CardGrant·CardSetGrant: 보상 화면에 띄울 제목. 비우면 기본 문구를 쓴다")]
     [SerializeField] string rewardTitle;
 
+    [Tooltip("획득 연출(카드가 도감 탭으로 빨려드는 비행)이 끝나기를 기다리지 않고 다음 스텝으로 넘어간다.\n"
+           + "뒤이을 안내가 그 비행과 나란히 서서, 흡수가 다 끝난 뒤에야 손가락이 뜨는 빈 구간이 사라진다.\n"
+           + "⚠ 다음 스텝이 또 보상 화면을 세우는 자리에는 켜지 마라 — 아직 날고 있는 카드 위를 그 화면이 덮는다")]
+    [SerializeField] bool parallelGain;
+
     [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
     [SerializeField] TutorialScenarioData scenario;
 
@@ -132,6 +137,9 @@ public class TutorialStepDef
     // 보상 화면 제목(비우면 호출자가 기본 문구를 쓴다)
     public string RewardTitle => UsesRewardTitle(action) ? rewardTitle : null;
 
+    // 획득 연출의 종료를 기다리지 않고 넘어가는가(지급 액션이 아니면 저작값이 남아 있어도 없는 것으로 본다)
+    public bool ParallelGain => UsesParallelGain(action) && parallelGain;
+
     public IReadOnlyList<CardData> Cards => cards;
 
     public bool ShowDeckGate => showDeckGate;
@@ -156,7 +164,9 @@ public class TutorialStepDef
         EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
         EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
         EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
-        EOutgameTutorialAction.PackNotice      => EOutgameTutorialCompletion.PackNotice,
+        // 예고 팝업은 닫히는 것으로 끝나지 않는다 — 팩이 탭으로 빨려드는 비행까지가 이 스텝이다.
+        // 그 비행이 카드 획득과 같은 디렉터·같은 종료 신호를 쓰므로 완료 조건도 같은 것을 본다.
+        EOutgameTutorialAction.PackNotice      or
         EOutgameTutorialAction.CardGrant       or
         EOutgameTutorialAction.CardSetGrant    => EOutgameTutorialCompletion.CardGain,
 
@@ -255,6 +265,12 @@ public class TutorialStepDef
 
     // 이 액션이 보상 화면을 세우는가(예고 팝업도 같은 자리에 제목을 쓴다)
     public static bool UsesRewardTitle(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.CardGrant
+        || _action == EOutgameTutorialAction.CardSetGrant
+        || _action == EOutgameTutorialAction.PackNotice;
+
+    // 이 액션이 획득 연출을 트는가(그 연출을 기다릴지 말지를 저작받는 자리)
+    public static bool UsesParallelGain(EOutgameTutorialAction _action)
         => _action == EOutgameTutorialAction.CardGrant
         || _action == EOutgameTutorialAction.CardSetGrant
         || _action == EOutgameTutorialAction.PackNotice;

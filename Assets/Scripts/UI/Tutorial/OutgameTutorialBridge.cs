@@ -149,10 +149,6 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        // 팩 예고 팝업이 무대를 쥐고 있는 구간 — 세운 것은 실행기이고 여기는 닫히는 신호만 기다린다.
-        // 세우지 못한 경우는 실행기가 이미 실패로 답해 여기까지 오지 않는다.
-        if (m_step.Completion == EOutgameTutorialCompletion.PackNotice) return;
-
         // 유저가 열어 둔 오버레이를 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
         // 이미 로비 표면이면 기다릴 것이 없다(뒤이을 안내를 한 프레임도 미루지 않는다).
         if (m_step.Completion == EOutgameTutorialCompletion.LobbyReturn)
@@ -294,14 +290,6 @@ public class OutgameTutorialBridge : MonoBehaviour
     static bool AnyRewardOverlayOpen
         => CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen;
 
-    // 팩 예고 팝업이 닫혔다. 닫으면서 팩 탭으로 옮겨 갔으므로 다음 안내(구매)를 그대로 이어 건다.
-    void OnPackNoticeClosed()
-    {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.PackNotice) return;
-
-        OnGateSatisfied();
-    }
-
     // 랭크 연출 종료 신호. 보여줄 것이 없어 지나간 경우도 같은 신호로 온다.
     void OnRankEffectFinished()
     {
@@ -433,7 +421,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardRewardOverlay.OnAnyClosed             += OnOverlayClosed;
         CardSetRewardOverlay.OnAnyClosed          += OnOverlayClosed;
         PackRewardOverlay.OnAnyClosed             += OnOverlayClosed;
-        PackRewardOverlay.OnAnyClosed             += OnPackNoticeClosed;
         m_subscribed = true;
     }
 
@@ -456,7 +443,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
         CardSetRewardOverlay.OnAnyClosed          -= OnOverlayClosed;
         PackRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
-        PackRewardOverlay.OnAnyClosed             -= OnPackNoticeClosed;
         m_subscribed = false;
     }
 }

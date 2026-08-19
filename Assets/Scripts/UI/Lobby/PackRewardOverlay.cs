@@ -1,3 +1,4 @@
+using System;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,8 +8,9 @@ using TMPro;
 // 표시와 닫힘 콜백만 담당하고 지급·구매는 하지 않는다 — 실제 획득은 이 뒤의 상점 흐름 몫이다.
 // 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(두 카드 보상 오버레이와 같은 규약).
 //
-// ⚠ 딤을 눌러 닫히지 않는다. 나가는 문은 [확인] 하나뿐이다 — 닫는 순간이 팩 탭으로 데려가는 순간이라
-//   유저가 모르게 새어 나가면 그 이동이 사건으로 읽히지 않는다.
+// ⚠ 딤을 눌러 닫히지 않는다. 나가는 문은 [확인] 하나뿐이다 — 닫는 순간이 팩이 탭으로 날아가는 순간이라
+//   유저가 모르게 새어 나가면 그 비행이 어디서 출발한 것인지 읽히지 않는다.
+//   비행 자체는 이 화면 밖(LobbyGainEffectDirector)이 맡는다 — 카드 보상이 도감 탭으로 넘기는 것과 같은 규약이다.
 //
 // 팩은 가만히 서 있지 않는다. 축이 둘이고 서로 만지는 노드가 다르다 —
 //   등장(내려꽂힘·착지 펀치)은 여기서 packRoot를, 부유·펄스는 PackIdleMotion이 그 자식을 만진다.
@@ -49,8 +51,8 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     [Tooltip("내려앉는 시간. 길면 '떨어진다'가 되고 짧아야 '꽂힌다'가 된다.")]
     [SerializeField] float packDropDuration = 0.13f;
 
-    [Tooltip("착지 순간 팩이 이만큼 부풀었다 돌아온다(1이면 펀치 없음).")]
-    [SerializeField] float packLandPunch = 1.08f;
+    [Tooltip("착지 순간 팩이 부푸는 양(0.08이면 8% 부풀었다 돌아온다. 0이면 펀치 없음).")]
+    [SerializeField] float packLandPunch = 0.08f;
 
     [SerializeField] float packLandPunchDuration = 0.22f;
 
@@ -60,6 +62,9 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     // 진행 중 등장 안무. 확인·닫기가 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
+
+    // 닫힘 콜백. 한 번 쓰면 비워 연타를 막는다.
+    Action m_onClosed;
 
     // 팩의 제자리. 프리팹 저작값이 곧 제자리라 최초 1회만 캡처한다.
     Vector2 m_packHome;
@@ -73,10 +78,16 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     public static bool TryGet(out PackRewardOverlay _overlay)
         => TryGetOrCreate(RuntimeOverlayPrefabs.Get<PackRewardOverlay>, out _overlay);
 
-    /// <summary>팩 하나를 띄운다. 나가는 문은 [확인] 하나뿐이고, 닫힘은 정적 신호(OnAnyClosed)로 알린다 —
-    /// 뒤를 잇는 쪽(안내)이 이 팝업을 알 필요가 없게.</summary>
-    public void Show(string _title, CardPackData _pack)
+    /// <summary>팩이 서 있는 자리. 닫은 뒤 이어지는 비행이 여기서 출발해야
+    /// "방금 본 그 팩이 팩 탭으로 갔다"가 한 줄로 이어진다(CardRewardOverlay.CardAnchor와 같은 규약).</summary>
+    public RectTransform PackAnchor => this.packRoot;
+
+    /// <summary>팩 하나를 띄운다. 나가는 문은 [확인] 하나뿐이다.
+    /// <paramref name="_onClosed"/>는 화면이 걷힌 <b>뒤</b>에 불린다 — 그쪽이 이어지는 비행을 튼다
+    /// (화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
+    public void Show(string _title, CardPackData _pack, Action _onClosed)
     {
+        this.m_onClosed = _onClosed;
         this.KillIntro();
 
         if (this.titleText != null) this.titleText.text = _title;
@@ -141,10 +152,18 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     void OnConfirmClicked()
     {
-        if (!IsOpen) return;   // 연타로 닫힘 신호가 두 번 나가는 경로를 막는다(Hide가 이 값을 내린다)
+        // 콜백을 먼저 비워 연타로 두 번 도는 경로를 막는다.
+        var t_callback = this.m_onClosed;
+        this.m_onClosed = null;
+        if (t_callback == null) return;
 
         this.SetInputEnabled(false);
+
+        // 화면을 먼저 걷고 콜백을 부른다. 그 콜백이 트는 비행의 종료 신호를 기다리는 쪽이
+        // "팝업이 떠 있는 동안 온 신호"로 오인해 흘려보내지 않도록(OutgameTutorialBridge.OnCardGainFinished).
         this.Hide();
+
+        t_callback.Invoke();
     }
 
     // 등장 안무. 팩만 위에서 내려앉고, 착지 한 프레임에 펀치를 몰아넣는다.
@@ -163,7 +182,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
             t_seq.Insert(this.packDropDelay,
                          this.packRoot.DOScale(this.m_packHomeScale, this.packDropDuration).SetEase(Ease.InQuad));
 
-            if (this.packLandPunch > 1f)
+            if (this.packLandPunch > 0f)
                 t_seq.InsertCallback(t_land, () => UiPunch.Play(this.packRoot, this.packLandPunch, this.packLandPunchDuration));
         }
 
@@ -195,8 +214,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
         this.m_packHomeScale = this.packRoot.localScale;
 
         // 프리팹에 없으면 붙여 준다 — 배선 여부와 무관하게 안무가 성립해야 한다.
-        this.m_packGroup = this.packRoot.GetComponent<CanvasGroup>();
-        if (this.m_packGroup == null) this.m_packGroup = this.packRoot.gameObject.AddComponent<CanvasGroup>();
+        this.m_packGroup = GroupOf(this.packRoot.gameObject);
     }
 
     // 다음 표시가 중간값(어긋난 자리·줄어든 배율·반투명)에서 시작하지 않게 원복.
@@ -207,7 +225,18 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
         this.packRoot.DOKill();
         this.packRoot.anchoredPosition = this.m_packHome;
         this.packRoot.localScale = this.m_packHomeScale;
-        if (this.m_packGroup != null) this.m_packGroup.alpha = 1f;
+
+        if (this.m_packGroup != null)
+        {
+            this.m_packGroup.DOKill();
+            this.m_packGroup.alpha = 1f;
+        }
+    }
+
+    static CanvasGroup GroupOf(GameObject _go)
+    {
+        var t_group = _go.GetComponent<CanvasGroup>();
+        return t_group != null ? t_group : _go.AddComponent<CanvasGroup>();
     }
 
     void KillIntro()

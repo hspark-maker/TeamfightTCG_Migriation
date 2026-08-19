@@ -269,7 +269,7 @@ MonoBehaviour:
   packDropDistance: 380
   packDropScale: 1.35
   packDropDuration: 0.13
-  packLandPunch: 1.08
+  packLandPunch: 0.08
   packLandPunchDuration: 0.22
   confirmDelay: 0.45
 --- !u!1 &1618820920085967210
