@@ -44,10 +44,6 @@ public class AlbumTabController : LobbyTabPanel
         if (!isActiveAndEnabled || m_insertPending) return;
         if (!AlbumInsertQueue.HasPending || AlbumInsertSession.IsRunning) return;
 
-        // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
-        // 여기서 막지 않으면 테마를 누르라는 스텝을 세션이 대신 해 버린다.
-        if (OutgameTutorialRunner.IsRunning && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
-
         var t_session = ResolveInsertSession();
         if (t_session == null)
         {
@@ -235,7 +231,7 @@ public class AlbumTabController : LobbyTabPanel
     {
         OpenThemePage(_theme, 0);
 
-        // 안내 중이면 이 클릭이 세션의 출발 신호다 — 그전까지는 오버레이가 닫혀 있어 대기했다
+        // 이 클릭보다 큐가 늦게 찼을 수 있다(획득 연출이 도는 중에 유저가 먼저 들어온 경우)
         TryBeginInsert();
     }
 
