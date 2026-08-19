@@ -558,6 +558,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  - label: "\uCE74\uB4DC \uAC15\uD654"
+    stepDefs:
     - action: 14
       anchor: 0
       guideMessage: 
