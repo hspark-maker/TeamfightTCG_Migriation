@@ -94,9 +94,9 @@ public static class TutorialStepExecutor
 
         RankResultHandoff.Set(t_entry);
 
-        // 이 뒤로 가르칠 것이 없는 관람 구간이다 — 졸업 낙인(연출이 끝나야 찍힌다)을 기다리지 않고
-        // 트리거 튜토리얼의 알림 점이 승급 연출과 나란히 뜨게 문을 먼저 연다.
-        TriggeredTutorialRunner.NotifyOnboardingFinale();
+        // 트리거 문을 여기서 미리 열지 않는다 — 승급 뒤에도 가르칠 것(카드 강화)이 남아 있어
+        // 먼저 열면 그 강화가 진화 튜토를 깨우고, 겹칠 땐 트리거가 이겨(OutgameTutorialGuide)
+        // 온보딩이 대주던 무료 한 방이 조용히 무시된다. 알림 점은 졸업 낙인 때 뜬다.
         return EOutgameTutorialStepResult.Gated;
     }
 

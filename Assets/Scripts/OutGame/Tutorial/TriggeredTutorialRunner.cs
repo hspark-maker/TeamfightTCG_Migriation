@@ -9,10 +9,6 @@ public static class TriggeredTutorialRunner
     static TriggeredTutorialEntry s_active;
     static int                    s_index;
 
-    // 졸업 낙인보다 먼저 열린 게이트(승급 연출 관람 구간). 낙인은 그 연출이 끝나야 찍히는데
-    // 알림 점은 연출과 나란히 떠야 해서, 그 사이를 이 래치가 잇는다.
-    static bool s_openedAtFinale;
-
     // 트리거가 실제로 발화했을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
     public static event Action OnActivated;
 
@@ -30,7 +26,7 @@ public static class TriggeredTutorialRunner
 
     // 온보딩 졸업 전에는 트리거 튜토리얼이 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
     // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
-    static bool IsOpen => OutgameTutorialProgress.IsCompleted || s_openedAtFinale;
+    static bool IsOpen => OutgameTutorialProgress.IsCompleted;
 
     // 이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
     // UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).
@@ -46,16 +42,6 @@ public static class TriggeredTutorialRunner
     // 온보딩 졸업으로 게이트가 열리면 그 전까지 전부 false였던 HasPending의 답이 한꺼번에 뒤집힌다 —
     // 이미 그린 쪽(알림 점)에 다시 물어보게 한다.
     public static void NotifyOnboardingCompleted() => OnChanged?.Invoke();
-
-    /// <summary>온보딩이 마지막 스텝(승급 연출을 관람만 하는 자리)에 들어섰다 — 가르칠 것은 끝났고 낙인만 남았다.
-    /// 알림 점이 그 연출과 나란히 뜨도록 게이트를 여기서 미리 연다(기능 해금이 UnlocksAll로 하는 일과 같은 취지).</summary>
-    public static void NotifyOnboardingFinale()
-    {
-        if (s_openedAtFinale) return;
-
-        s_openedAtFinale = true;
-        OnChanged?.Invoke();
-    }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)
     public static void EnsureData(TriggeredTutorialData _data)
@@ -137,9 +123,6 @@ public static class TriggeredTutorialRunner
     {
         s_active = null;
         s_index  = 0;
-
-        // 되감기로 온보딩이 다시 진행 중이 되면 미리 연 문도 함께 닫혀야 한다 — 남으면 튜토 도중에 점이 뜬다.
-        s_openedAtFinale = false;
 
         // 디버그 낙인 초기화가 이 경로로 들어온다 — 걷힌 트리거를 알림 점이 다시 집어야 한다.
         OnChanged?.Invoke();

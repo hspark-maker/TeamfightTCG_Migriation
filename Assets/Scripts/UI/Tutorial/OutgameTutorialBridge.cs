@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,6 +18,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 화면 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다. 개봉 오버레이가 떠 있는 동안은 이 값과 무관하게 자동 억제된다.")]
     [SerializeField] bool suppressGuideUI;
 
+    [Tooltip("강화 결과판을 대신 걷기까지 쥐고 있는 시간(초). 결과 행이 다 떠오른 시점부터 센다.\n" +
+             "**실패한** 판, 그리고 해금 연출을 기다리는(waitUnlockIntro) **성공한** 판이 이 시간 뒤에 걷힌다.\n" +
+             "그 밖의 성공한 판은 걷지 않는다 — 다음 안내가 그 화면 위에서 이어지고, 닫는 것도 그쪽 몫이다.\n" +
+             "튜토리얼 동안에만 적용된다 — 평상시의 결과판은 유저가 탭할 때까지 그대로 서 있다.")]
+    [SerializeField] float enhanceResultHold = 1.1f;
+
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
     TutorialStepDef m_step;
     bool m_subscribed;
@@ -28,6 +35,14 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 스텝 진입이 오버레이를 열어 ApplyCurrentStep이 자기 자신을 다시 부르는 경로를 막는다(예약 후 재실행).
     bool m_applying;
     bool m_pendingApply;
+
+    // 강화 연출이 무대를 쥔 구간. 이 동안의 앵커 재등록은 무시한다 —
+    // 진화 연출은 공개 시점에 다음 단계(진화 아님)로 버튼을 갈아끼워 같은 키를 다시 등록하는데,
+    // 그때 버튼은 연출 잠금으로 비활성이라 게이트가 뜨지 못하고 경고만 남는다.
+    bool m_enhancing;
+
+    // 강화 성공이 연 해금 연출이 끝나기를 기다리는 구간(waitUnlockIntro 저작이 켜진 스텝에서만).
+    bool m_awaitingUnlockFx;
 
     // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
@@ -251,6 +266,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
+        if (m_enhancing || m_awaitingUnlockFx) return;
         if (m_step == null || _key != m_step.Anchor) return;
 
         TryOpenGate();
@@ -318,18 +334,66 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
+        m_enhancing = true;
         HideGuide();
+    }
+
+    // 결과판에 읽을 것이 다 떠올랐다. 성공이면 판을 걷지 않고 여기서 다음 안내로 넘긴다 —
+    // 결과를 읽고 있는 그 화면이 마지막 말을 얹을 자리이고, 판은 그 말을 받은 다음 스텝이 닫는다.
+    // 해금 연출을 기다리는 스텝만은 성공도 넘기지 않는다 — 결과판을 실패와 같이 대신 걷어
+    // 무대를 돌려줘야 그 연출이 설 자리가 생긴다(m_enhancing은 켠 채 둔다).
+    void OnEnhanceResultReady(EnhanceResult _result)
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+
+        if (_result.Outcome == EEnhanceOutcome.Success && !m_step.WaitUnlockIntro)
+        {
+            // 무대는 아직 강화가 쥐고 있지만 안내는 여기서 손을 뗀다 — 남겨 두면 다음 스텝의 앵커 등록을 무시한다.
+            m_enhancing = false;
+            OnGateSatisfied();
+            return;
+        }
+
+        DOVirtual.DelayedCall(Mathf.Max(0f, this.enhanceResultHold), CardDetailOverlayView.CloseEnhanceResult)
+                 .SetLink(gameObject);
     }
 
     // 강화 한 방이 연출·결과판까지 끝나 상세로 돌아왔다. 판정 순간에 넘겨받으면 다음 스텝(상세 닫기)이
     // 연출을 통째로 잘라내므로 이 시점을 쓴다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
     void OnEnhanceSettled(EnhanceResult _result)
     {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance)
+        {
+            m_enhancing = false;
+            return;
+        }
+
+        if (_result.Outcome == EEnhanceOutcome.Success && m_step.WaitUnlockIntro)
+        {
+            // 이 통지는 해금 연출을 트는 PlayPendingUnlockFx() "다음"에 온다 —
+            // 그래서 지금의 IsUnlockFxPlaying이 "연출이 설지 말지"의 확정 답이다.
+            if (CardDetailOverlayView.IsUnlockFxPlaying) { m_awaitingUnlockFx = true; return; }
+
+            m_enhancing = false;
+            OnGateSatisfied();
+            return;
+        }
+
+        m_enhancing = false;
 
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
 
         TryOpenGate();
+    }
+
+    // 해금 연출이 마지막 축까지 끝났다(잘려 끝난 경우 포함) — 미뤄 둔 완료를 여기서 넘긴다.
+    void OnUnlockFxFinished()
+    {
+        if (!m_awaitingUnlockFx) return;
+
+        m_awaitingUnlockFx = false;
+        m_enhancing        = false;
+        OnGateSatisfied();
     }
 
     // 구매 성공 신호. 곧바로 개봉 오버레이가 열리므로 커밋만 하고, 다음 스텝은 OnPackOverlayOpened가 재개한다.
@@ -412,8 +476,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
-        CardDetailOverlayView.OnAnyEnhanceStarted += OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyUnlockFxFinished   += OnUnlockFxFinished;
         LobbyRankEffectDirector.OnAnyFinished     += OnRankEffectFinished;
         LobbyGainEffectDirector.OnAnyFinished     += OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
@@ -434,8 +500,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
-        CardDetailOverlayView.OnAnyEnhanceStarted -= OnEnhanceStarted;
-        CardDetailOverlayView.OnAnyEnhanceSettled -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
+        CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;
         LobbyRankEffectDirector.OnAnyFinished     -= OnRankEffectFinished;
         LobbyGainEffectDirector.OnAnyFinished     -= OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;
