@@ -5,7 +5,7 @@
 전체 파일 목록만 필요하면 Glob 또는 rg --files로 현재 상태를 조회한다.
 
 <!-- orch:feature-map-sync:start -->
-<!-- orch:source files=425 public-types=509 unmapped-public-types=10 -->
+<!-- orch:source files=435 public-types=520 unmapped-public-types=0 auto-draft-types=8 -->
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
@@ -29,8 +29,8 @@
 - 적용 지점: `SynergyApplier.ApplyAll` — 공격 계산에는 `CardInstance.AttackDamage` / `CardInstance.ApplySynergy` 경유로 반영
 - 트리거: `SynergyTriggers` (DamageDealt / Attacked / Lethal / SwappedOut)
 - 해석·진행도: `SynergyResolver` · `SynergyProgress` · `ActiveSynergy` · `SynergyText`
-- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `SwarmSynergyEffect` · `RampartSynergyEffect` · `CaretakerSynergyEffect` · `CleanerSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (공통 `SynergyEffect`)
-- 엠블럼·연출: `SynergyEmblemSpec` · `SynergyEmblemVfx` · `SynergyEmblemEntry` · `SynergyVfx` · `PopEmblem` · `RiseAndShakeEmblem` · `DropAndShineEmblem` · `StackUpEmblem` · `PrefabEmblem` · `JointGap`
+- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `SwarmSynergyEffect` · `RampartSynergyEffect` · `CaretakerSynergyEffect` · `CleanerSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
+- 엠블럼·연출: `SynergyEmblemSpec` · `SynergyEmblemVfx` · `SynergyEmblemEntry` · `SynergyVfx` · `PopEmblem` · `RiseAndShakeEmblem` · `DropAndShineEmblem` · `StackUpEmblem` · `PrefabEmblem` · `ParticleEmblem` · `JointGap`
 - Vfx 설정·라이브러리: `SynergyVfxConfig` · `FlowSynergyVfxConfig` · `SwarmSynergyVfxConfig` · `EmblemOnlySynergyVfxConfig` · `BattleVfxLibrary` · `VfxEntry` · `VfxHandle` · `VfxStrengthScaler` · `CunningVfx` · `SwarmVfx`
 - 회복: `HealerEffect` · `HealVfx` — 트레일 잔상 `BattleTimingConfig.HealTrailLinger`
 - 상태 보관: `SynergyState` · `SynergyPreview`
@@ -137,3 +137,12 @@
 ## 에디터 도구 (`Editor/`, 19파일 3,626줄)
 
 `CardTableTool` · `CardAuthoringWindow` · `CardSpecImporter` · `CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `AIDeckBandValidator` · `OutgameTutorialStepWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `LobbyLayoutAudit` · `LobbyPrefabOverrideAudit` · `AssetNamingMigration` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `FontCleanupTool` · `SafeAreaInstaller`
+
+<!-- orch:auto-draft:start -->
+## 미분류 자동 초안 (섹션으로 옮기면 다음 동기화에서 빠집니다)
+
+- `Editor/` — `SpriteFileIdDumper`
+- `Test/` — `BattleDebugKill`
+- `UI/Battle/Emote/` — `EmoteCatalog` · `EmoteDirector` · `EmoteEntry` · `EmotePickerUI` · `EmoteStickerView`
+- `UI/Common/` — `StickerPeelGraphic`
+<!-- orch:auto-draft:end -->

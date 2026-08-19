@@ -9,9 +9,11 @@ const {
   DETECTOR_VERSION,
   isMapReadTool,
   isSearchTool,
+  mapReadSucceeded,
   mentionsMap,
 } = require("./lib/search-detect.js");
 const { isRealUser, textContent } = require("./lib/transcript.js");
+const EXCERPT_MARKER = "[MAP_GATE_EXCERPT_V1";
 
 const DEFAULT_INSTALLED_AT = "2026-08-14T06:18:00.000Z";
 /* 게이트가 settings.json 에 붙은 시각. --gate-at 으로 덮어쓴다. */
@@ -38,7 +40,22 @@ function isEdit(call) {
 function toolCalls(event) {
   const content = event && event.message && event.message.content;
   if (event.type !== "assistant" || !Array.isArray(content)) return [];
-  return content.filter((part) => part && part.type === "tool_use").map((part) => ({ name: part.name, input: part.input || {} }));
+  return content.filter((part) => part && part.type === "tool_use")
+    .map((part) => ({ id: part.id, name: part.name, input: part.input || {} }));
+}
+
+function toolResults(event) {
+  const content = event && event.type === "user" && event.message && event.message.content;
+  if (!Array.isArray(content)) return [];
+  return content.filter((part) => part && part.type === "tool_result")
+    .map((part) => ({ id: part.tool_use_id, content: part.content }));
+}
+
+function hasMapExcerpt(event) {
+  const content = event && event.type === "user" && event.message && event.message.content;
+  return Array.isArray(content) && content.some((part) =>
+    part && part.type === "tool_result" && JSON.stringify(part.content || "").includes(EXCERPT_MARKER)
+  );
 }
 
 function usageTokens(event) {
@@ -83,6 +100,9 @@ function newSegment(event, carriedMap, sessionTurnsSoFar) {
     startTurn: sessionTurnsSoFar,   // 세션 내 위치. 턴당 토큰은 이 값에 크게 좌우된다
     loadedWithin: false,
     loadedAfterSearch: false,
+    excerpts: 0,
+    mapReads: 0,
+    mapReadsAfterExcerpt: 0,
     searches: 0,
     searchesBeforeMap: 0,
     tools: 0,
@@ -129,6 +149,7 @@ function parseTranscript(file, installedAt, gateAt) {
   let mapLoaded = false;
   let segment = null;
   const sessionTurns = new Set();
+  const pendingMapReads = new Map();
   for (const event of readEvents(file)) {
     if (isRealUser(event)) {
       const done = finish(segment, installedAt, gateAt);
@@ -150,18 +171,35 @@ function parseTranscript(file, installedAt, gateAt) {
     for (const call of toolCalls(event)) {
       segment.tools += 1;
       if (mentionsMap(call.input) && isMapReadTool(call.name)) {
-        if (!mapLoaded) {
-          segment.loadedWithin = true;
-          segment.loadedAfterSearch = segment.searches > 0;
-        }
-        mapLoaded = true;
+        if (call.id) pendingMapReads.set(call.id, { segment, afterExcerpt: segment.excerpts > 0 });
       }
       if (isSearch(call)) {
         segment.searches += 1;
-        if (!mapLoaded) segment.searchesBeforeMap += 1;
+        if (!mapLoaded && segment.excerpts === 0) segment.searchesBeforeMap += 1;
         if (segment.firstSearchTurn === null) segment.firstSearchTurn = segment.turns.size;
       }
       if (isEdit(call) && segment.firstEditTurn === null) segment.firstEditTurn = segment.turns.size;
+    }
+    // 발췌는 요청 범위의 지도 열람을 대신하지만 세션 전체 mapLoaded로 이월하지 않는다.
+    if (hasMapExcerpt(event)) {
+      segment.excerpts += 1;
+      if (!mapLoaded) {
+        segment.loadedWithin = true;
+        segment.loadedAfterSearch = segment.searches > 0;
+      }
+    }
+    for (const result of toolResults(event)) {
+      const pending = pendingMapReads.get(result.id);
+      if (!pending) continue;
+      pendingMapReads.delete(result.id);
+      if (!mapReadSucceeded(result.content)) continue;
+      pending.segment.mapReads += 1;
+      if (pending.afterExcerpt) pending.segment.mapReadsAfterExcerpt += 1;
+      if (!mapLoaded) {
+        pending.segment.loadedWithin = true;
+        pending.segment.loadedAfterSearch = pending.segment.searches > 0;
+      }
+      mapLoaded = true;
     }
   }
   const done = finish(segment, installedAt, gateAt);
@@ -234,6 +272,10 @@ function main() {
     );
   }
 
+  const excerptSamples = samples.filter((sample) => sample.excerpts > 0);
+  const excerptThenRead = excerptSamples.filter((sample) => sample.mapReadsAfterExcerpt > 0).length;
+  console.log(`발췌 요청 ${excerptSamples.length}개 | 발췌 뒤 별도 지도 열람 ${excerptThenRead}개`);
+
   if (process.argv.includes("--write-baseline")) {
     // 기준선은 정의상 게이트 이전이다. 언제 다시 만들어도 게이트 이후 표본이 섞이지 않게 자른다.
     const preGate = samples.filter((sample) => Date.parse(sample.startedAt) < gateAt);
@@ -254,4 +296,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { discoverTranscripts, isRealUser, isSearch, parseTranscript, stats };
+module.exports = { discoverTranscripts, hasMapExcerpt, isRealUser, isSearch, parseTranscript, stats };

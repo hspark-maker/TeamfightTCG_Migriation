@@ -49114,6 +49114,7 @@ GameObject:
   - component: {fileID: 6145401893498110347}
   - component: {fileID: 3736958320299414099}
   - component: {fileID: 1615635528310424364}
+  - component: {fileID: -7053934093672502096}
   m_Layer: 6
   m_Name: FX_Scale
   m_TagString: Untagged
@@ -53979,6 +53980,19 @@ PlayableDirector:
     - 1f53e189720b86f4d8261e98ca43d543: {fileID: 2121523552217353410}
     - bdd4986afbe31914184ed552e7fd99eb: {fileID: 7160043054313545831}
     - e0fdc13c20fa5444d8679a7bbf474ff7: {fileID: 2138800925198607189}
+--- !u!210 &-7053934093672502096
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8113935365038023920}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &8592908232357579890
 GameObject:
   m_ObjectHideFlags: 0

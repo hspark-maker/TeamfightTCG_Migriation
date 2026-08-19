@@ -21,6 +21,11 @@ public static class ParticlePooler
         }
     }
 
+    /// <summary>풀에서 빌려 나간 연출이 전부 매달리는 컨테이너(없으면 만든다).
+    /// 히트스탑처럼 "지금 화면에 떠 있는 전투 파티클 전부"를 한 번에 다뤄야 하는 쪽이 여기로 들어온다 —
+    /// 각 연출이 자기가 띄운 것만 들고 있으면 남이 띄운 파티클은 못 멈춘다.</summary>
+    public static Transform Container => Root;
+
     static void Init()
     {
         if (initialized) return;

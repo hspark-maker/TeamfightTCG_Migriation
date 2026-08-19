@@ -48898,6 +48898,7 @@ GameObject:
   - component: {fileID: 1844298570923804150}
   - component: {fileID: 6694493096227469541}
   - component: {fileID: 6677876893637683441}
+  - component: {fileID: -1646305963716464111}
   m_Layer: 6
   m_Name: FX_Synergy_Bulk
   m_TagString: Untagged
@@ -53724,6 +53725,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-1646305963716464111
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5938740339086977113}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &7223263542236216949
 GameObject:
   m_ObjectHideFlags: 0

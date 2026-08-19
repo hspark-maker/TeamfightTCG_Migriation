@@ -24481,6 +24481,7 @@ GameObject:
   - component: {fileID: 7331701169301818546}
   - component: {fileID: 156990946075021659}
   - component: {fileID: 1988984797527616639}
+  - component: {fileID: -1197563233689935346}
   m_Layer: 6
   m_Name: FX_Common_Death
   m_TagString: Untagged
@@ -29307,6 +29308,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-1197563233689935346
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2521560478900743221}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &4242976614053398641
 GameObject:
   m_ObjectHideFlags: 0

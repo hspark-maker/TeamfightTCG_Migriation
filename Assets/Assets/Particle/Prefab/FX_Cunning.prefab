@@ -39274,6 +39274,7 @@ GameObject:
   - component: {fileID: 8947313700018496720}
   - component: {fileID: 2149369564823643977}
   - component: {fileID: 2244127849258563955}
+  - component: {fileID: -2668904442499521190}
   m_Layer: 6
   m_Name: FX_Cunning
   m_TagString: Untagged
@@ -44100,3 +44101,16 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-2668904442499521190
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8375247606419957278}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0

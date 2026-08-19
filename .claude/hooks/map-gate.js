@@ -9,11 +9,12 @@ const path = require("node:path");
 const {
   MAP_NAME,
   isMapReadTool,
-  isSearchTool,
+  shouldGate,
   mapReadSucceeded,
   mentionsMap,
 } = require("../lib/search-detect.js");
 const { lastRequestKey } = require("../lib/transcript.js");
+const { buildMapExcerpt } = require("../lib/map-excerpt.js");
 
 /* 요청 하나당 최대 차단 수. 요청이 바뀌면 다시 0 부터다. */
 const MAX_BLOCKS = 3;
@@ -59,12 +60,13 @@ function logFailOpen(stateRoot, message) {
   } catch { /* fail-open logging must never block work */ }
 }
 
-function deny() {
+function deny(excerpt) {
+  const marker = `[MAP_GATE_EXCERPT_V1 hits=${excerpt.hits} shown=${excerpt.shown} weighted=${excerpt.weighted}]`;
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: "위치 탐색 전에 .claude/orch-feature-map.md를 Read하세요. 지도가 해당 영역을 다루지 않으면 이후 검색을 계속하세요.",
+      permissionDecisionReason: `${marker}\n지도에서 찾은 줄:\n${excerpt.text}\n여기서 해결되면 바로 진행하고, 아니면 검색을 계속하세요.`,
     },
   };
 }
@@ -112,7 +114,7 @@ function processHook(input, options = {}) {
     return null;
   }
 
-  if (event !== "PreToolUse" || state.loaded || !isSearchTool(toolName, toolInput)) return null;
+  if (event !== "PreToolUse" || state.loaded || !shouldGate(toolName, toolInput)) return null;
 
   const searches = (state.searches || 0) + 1;
   if (searches <= FREE_SEARCHES) {
@@ -124,12 +126,30 @@ function processHook(input, options = {}) {
     return null;
   }
 
-  try { writeState(file, { requestKey: state.requestKey || null, loaded: false, searches, blocks: (state.blocks || 0) + 1 }); }
+  let excerpt;
+  try { excerpt = buildMapExcerpt(mapFile, toolName, toolInput, input.transcript_path); }
+  catch (error) {
+    logFailOpen(stateRoot, `fail-open: map excerpt failed (${error.message})`);
+    return null;
+  }
+  // 현재 검색어가 지도 본문에 없으면 지도 열람을 강제해도 이득이 없다.
+  if (!excerpt.hits) {
+    /* 통과 사유를 구분해 남긴다. no-terms 는 "지도에 없다"가 아니라 **추출기가 검색어를 못 뽑았다**는
+       뜻이라 게이트 구멍의 신호다 — 로그가 없으면 추출기 버그가 조용한 무력화로 번역된다. */
+    if (excerpt.reason === "no-terms") {
+      logFailOpen(stateRoot, `pass: no-terms (${toolName}) ${JSON.stringify(toolInput).slice(0, 160)}`);
+    }
+    try { writeState(file, { ...state, searches }); } catch { /* 통과 경로는 실패해도 막지 않는다 */ }
+    return null;
+  }
+
+  // 발췌가 지도 열람을 대신한다. 다음 재시도는 바로 통과시켜 별도 Read 왕복을 없앤다.
+  try { writeState(file, { requestKey: state.requestKey || null, loaded: true, searches, blocks: (state.blocks || 0) + 1 }); }
   catch {
     logFailOpen(stateRoot, "fail-open: could not persist block count");
     return null;
   }
-  return deny();
+  return deny(excerpt);
 }
 
 function main() {
@@ -149,4 +169,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { FREE_SEARCHES, MAX_BLOCKS, isSearchTool, mapReadSucceeded, mentionsMap, processHook, statePath };
+module.exports = { FREE_SEARCHES, MAX_BLOCKS, mapReadSucceeded, mentionsMap, processHook, shouldGate, statePath };

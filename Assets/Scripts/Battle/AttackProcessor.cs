@@ -165,8 +165,13 @@ public static class AttackProcessor
         };
     }
 
-    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.</summary>
-    static void RemoveDead(BattleField _field)
+    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.
+    ///
+    /// public인 이유는 디버그 도구(<c>Test/BattleDebugKill</c>) 하나 때문이다 — 그쪽이 카드를 강제로
+    /// 죽인 뒤 **같은 순서**로 정리해야 훅(Lethal/Removed)이 전투와 똑같이 돈다.
+    /// 전투 규칙 쪽에서 새로 부르지 마라: 호출 지점은 지금도 Resolve 하나뿐이고,
+    /// 치사 래치보다 먼저 부르면 언데드 부활 판정이 뒤집힌다.</summary>
+    public static void RemoveDead(BattleField _field)
     {
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {

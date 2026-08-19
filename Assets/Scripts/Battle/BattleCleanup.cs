@@ -18,6 +18,7 @@ public static class BattleCleanup
         ObjectPooler.Flush<UnityEngine.GameObject>();
 
         CardView.Cleanup();
+        LegacyCrownVfx.Clear();   // 왕관은 카드·씬 수명 밖 월드 오브젝트다 — 참조를 놓지 않으면 다음 판까지 남는다
         TurnState.Reset();
         TurnRunner.Cleanup();
     }

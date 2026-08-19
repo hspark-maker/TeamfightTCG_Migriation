@@ -15,8 +15,11 @@ const tool = (name, input, requestId) => ({
   type: "assistant", requestId, isSidechain: false,
   message: {
     usage: { input_tokens: 10, cache_read_input_tokens: 20, output_tokens: 5 },
-    content: [{ type: "tool_use", name, input }],
+    content: [{ type: "tool_use", id: `${requestId}-tool`, name, input }],
   },
+});
+const toolResult = (content, toolUseId) => ({
+  type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content }] },
 });
 
 assert.equal(isRealUser(user("<task-notification>done</task-notification>", "2026-08-15T00:00:00Z")), false);
@@ -28,6 +31,7 @@ try {
   const events = [
     user("첫 요청", "2026-08-15T00:00:00Z"),
     tool("Read", { file_path: ".claude/orch-feature-map.md" }, "r1"),
+    toolResult("# map\n".padEnd(300, "지도"), "r1-tool"),
     user("<system-reminder>경계를 만들면 안 됨</system-reminder>", "2026-08-15T00:00:01Z"),
     tool("Grep", { pattern: "Card" }, "r2"),
     user("둘째 요청", "2026-08-15T00:01:00Z"),
@@ -46,6 +50,23 @@ try {
   fs.writeFileSync(file, postGate.map((event) => JSON.stringify(event)).join(String.fromCharCode(10)));
   const after = parseTranscript(file, Date.parse("2026-08-14T06:18:00Z"), GATE_AT);
   assert.equal(after[0].group, "게이트후·미로드", "게이트 이후는 별도 그룹");
+  const excerptEvents = [
+    user("발췌 요청", "2026-08-18T08:10:00Z"),
+    tool("Grep", { pattern: "Card" }, "r10"),
+    toolResult("[MAP_GATE_EXCERPT_V1 hits=3 shown=3 weighted=true]\n지도에서 찾은 줄"),
+    tool("Grep", { pattern: "CardView" }, "r11"),
+    tool("Read", { file_path: ".claude/orch-feature-map.md" }, "r12"),
+    toolResult("# map\n".padEnd(300, "지도"), "r12-tool"),
+    tool("Read", { file_path: ".claude/orch-feature-map.md" }, "r13"),
+    toolResult("No such file or directory", "r13-tool"),
+  ];
+  fs.writeFileSync(file, excerptEvents.map((event) => JSON.stringify(event)).join(String.fromCharCode(10)));
+  const excerpt = parseTranscript(file, Date.parse("2026-08-14T06:18:00Z"), GATE_AT);
+  assert.equal(excerpt[0].group, "게이트후·늦게 로드", "발췌는 현재 요청의 지도 로드로 집계");
+  assert.equal(excerpt[0].excerpts, 1);
+  assert.equal(excerpt[0].mapReads, 1, "성공한 지도 열람만 집계");
+  assert.equal(excerpt[0].mapReadsAfterExcerpt, 1, "발췌 이후 성공한 열람을 별도 집계");
+  assert.equal(excerpt[0].searchesBeforeMap, 1, "발췌 뒤 검색은 로드 전 검색으로 세지 않음");
   console.log("map-savings tests: noise filter + map carry + gate era passed");
 } finally {
   fs.rmSync(path.dirname(file), { recursive: true, force: true });
