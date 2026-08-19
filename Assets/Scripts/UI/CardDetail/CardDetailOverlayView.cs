@@ -28,8 +28,8 @@ public readonly struct CardDetailOpenOptions
     /// <summary>강화·진화 조작을 통째로 걷고 표시만 한다(개봉 결과처럼 "확인하는 자리").</summary>
     public readonly bool ReadOnly;
 
-    /// <summary>지금 떠 있는 모든 캔버스 위로 올라탄다. 순서 값은 상세가 스스로 구한다 —
-    /// 여는 쪽은 "위에 떠라"만 말하면 된다.</summary>
+    /// <summary>개봉·보상 화면 위 층으로 올라탄다(<see cref="UiSortingOrder.CardDetailLifted"/>).
+    /// 순서 값은 층 표가 쥔다 — 여는 쪽은 "위에 떠라"만 말하면 된다.</summary>
     public readonly bool LiftAboveAll;
 
     /// <summary>로비 상단 재화 바를 비켜 앉은 크기를 부모 가득 편다.
@@ -372,14 +372,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         return s_instance;
     }
 
-    /// <summary>지금 떠 있는 모든 캔버스 위로 올라타거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
+    /// <summary>이 창을 다른 화면 위 층으로 올리거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
     ///
     /// 필요한 이유: 이 화면은 로비 캔버스 안에 있어(sortingOrder 0) 그보다 위에 뜨는 별도 캔버스 —
     /// 카드팩 개봉 화면 같은 것 — 위에서 열면 그 뒤에 가려 보이지 않는다. 두 캔버스 모두 Overlay 루트라
     /// 계층상의 앞뒤(sibling)로는 순서가 정해지지 않고 sortingOrder만이 답이다.
     ///
     /// <b>순서 값을 여는 쪽에서 받지 않는다.</b> 받으면 상세를 여는 화면마다 "누구보다 위인가"를 각자 계산하고,
-    /// 그중 하나만 옛 값으로 남는다. 지금 화면을 보고 여기서 구하는 편이 계산 지점을 하나로 묶는다.
+    /// 그중 하나만 옛 값으로 남는다. 층은 <see cref="UiSortingOrder"/> 표가 쥐고, 여는 쪽은 "위에 떠라"만 말한다.
+    ///
+    /// <b>지금 떠 있는 캔버스를 재서 그 위에 올라타지 않는다.</b> 재던 시절엔 무대 밖의 상시 캔버스까지 후보가 됐다 —
+    /// 항상 켜져 있는 UIPoolManager 컨테이너(400) 때문에 이 창이 401로 뛰어, 이 창 위에 서야 할
+    /// 해금 안내(UnlockIntroOverlay, 150)가 뒤에 묻혔다. 예외를 하나씩 빼는 방식으로는 다음 상시 캔버스를 못 막는다.
     ///
     /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
     /// 떨어져 나온다 — 없으면 눈에는 위에 보이는데 탭은 밑 화면이 먹는다.
@@ -408,39 +412,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
 
-        // 순서를 먼저 끈다 — 켜진 채로 재면 지난번에 올라탄 자기 값이 후보에 끼어 열 때마다 한 칸씩 올라간다.
-        this.m_sortingCanvas.overrideSorting = false;
-
-        this.m_sortingCanvas.sortingOrder    = TopSortingOrder() + 1;
+        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.CardDetailLifted);
         this.m_sortingCanvas.overrideSorting = true;
-    }
-
-    /// <summary>지금 화면에서 가장 위에 그려지는 순서. 꺼져 있는 캔버스는 세지 않는다 —
-    /// 안 뜬 화면까지 넘으려 들면 값만 커지고 넘을 이유는 없다.
-    ///
-    /// 순서를 실제로 정하는 것은 루트 캔버스이거나 overrideSorting을 켠 캔버스뿐이다.
-    /// 그 외 중첩 캔버스의 sortingOrder는 그려지는 자리와 무관한 값이라 후보에서 뺀다.
-    ///
-    /// 튜토리얼 게이트(350)만은 넘을 대상이 아니라 예외다 — 이 창을 **가리키는** 층이라 항상 위에 있어야 한다.
-    /// 세면 상세가 그 위로 올라타, 상세를 무대로 쓰는 안내(강화·진화)의 딤·문구가 상세 뒤에 깔려 보이지 않는다.</summary>
-    int TopSortingOrder()
-    {
-        int t_top = 0;
-
-        OutgameTutorialGateUI t_gate = OutgameTutorialGateUI.Instance;
-
-        Canvas[] t_canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-        for (int t_i = 0; t_i < t_canvases.Length; t_i++)
-        {
-            Canvas t_canvas = t_canvases[t_i];
-            if (t_canvas == null || t_canvas == this.m_sortingCanvas) continue;
-            if (t_canvas != t_canvas.rootCanvas && !t_canvas.overrideSorting) continue;
-            if (t_gate != null && t_canvas.transform.IsChildOf(t_gate.transform)) continue;
-
-            t_top = Mathf.Max(t_top, t_canvas.sortingOrder);
-        }
-
-        return t_top;
     }
 
     /// <summary>이 오버레이를 부모(SafeArea) 가득 펴거나 authoring 크기로 되돌린다.

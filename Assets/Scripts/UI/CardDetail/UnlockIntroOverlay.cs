@@ -131,6 +131,13 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         if (t_wasOpen) RaiseClosed();
     }
 
+    // 이 화면이 서는 층은 프리팹 저작값이 아니라 표가 쥔다 — 상세(CardDetailLifted) 위여야 한다는 것이
+    // 두 파일에 흩어져 있으면 한쪽만 옮겨져도 아무도 모른다.
+    void Awake()
+    {
+        UiSortingOrder.Stamp(GetComponent<Canvas>(), UiSortingOrder.Intro);
+    }
+
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [확인]이 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
     void OnEnable()
