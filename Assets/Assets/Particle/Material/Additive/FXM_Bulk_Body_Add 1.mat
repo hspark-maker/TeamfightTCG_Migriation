@@ -55,7 +55,7 @@ Material:
     - _Dissovle: 2
     - _Dissovle_Upanner: 0
     - _Dissovle_Vpanner: 0
-    - _Main_Ins: 1.68
+    - _Main_Ins: 3.44
     - _Main_Power: 1
     - _QueueControl: 0
     - _QueueOffset: 0
@@ -63,6 +63,6 @@ Material:
     - _USE_Dissovle: 1
     - _XRMotionVectorsPass: 1
     m_Colors:
-    - _Main_Color: {r: 1, g: 1, b: 1, a: 0}
+    - _Main_Color: {r: 1, g: 0.5739954, b: 0.27058828, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
