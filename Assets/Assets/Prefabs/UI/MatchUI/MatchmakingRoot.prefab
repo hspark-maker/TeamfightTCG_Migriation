@@ -1300,8 +1300,11 @@ MonoBehaviour:
       burstAdditive: 1
     dim:
       dim: {fileID: 3258554939496773107}
-      darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
-      brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+      darkColor: {r: 0.05, g: 0.04, b: 0.09, a: 1}
+      brightColor: {r: 1, g: 0.97, b: 0.9, a: 1}
+      extraDims:
+      - {fileID: 8848570705721382248}
+      - {fileID: 2668579091312518857}
   entryFx:
     dimFade: 0.18
     rootStartScale: 1.06

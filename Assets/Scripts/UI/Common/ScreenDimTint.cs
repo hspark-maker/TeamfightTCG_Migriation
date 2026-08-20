@@ -14,7 +14,13 @@ public class ScreenDimTint
     [SerializeField] Color   darkColor   = new Color(0.02f, 0.02f, 0.05f, 1f);  // Level -1
     [SerializeField] Color   brightColor = new Color(0.30f, 0.28f, 0.45f, 1f);  // Level +1
 
+    [Tooltip("함께 미는 추가 덮개. 화면을 덮은 것이 판 여러 장일 때 쓴다 — 매칭 화면은 검은 딤이 꺼져 있고 " +
+             "대각으로 갈린 배경 두 판이 그 자리를 대신한다.\n" +
+             "각 판은 자기 저작 색을 기준으로 같은 Level만큼 움직인다(색이 서로 달라도 된다). 비우면 dim 하나만 민다.")]
+    [SerializeField] Graphic[] extraDims;
+
     Color m_base;                           // authoring 색. 중간값을 기준으로 잡으면 반복할수록 밀린다
+    Color[] m_extraBases;                   // 추가 덮개의 authoring 색. 판마다 색이 달라 한 벌로 묶을 수 없다
     bool  m_captured;
     float m_level;
 
@@ -32,12 +38,20 @@ public class ScreenDimTint
         {
             this.m_level = value;
 
-            if (this.dim == null || !this.m_captured) return;
+            if (!this.m_captured) return;
 
-            Color t_c = value < 0f ? Color.Lerp(this.m_base, this.darkColor, -value)
-                                   : Color.Lerp(this.m_base, this.brightColor, value);
-            t_c.a          = this.m_base.a;
-            this.dim.color = t_c;
+            // dim이 비어 있어도 추가 덮개는 밀어야 한다 — 매칭 화면처럼 딤을 끄고 판만 쓰는 배선이 있다.
+            if (this.dim != null) this.dim.color = this.Tinted(this.m_base, value);
+
+            if (this.extraDims == null || this.m_extraBases == null) return;
+
+            for (int t_i = 0; t_i < this.extraDims.Length && t_i < this.m_extraBases.Length; t_i++)
+            {
+                var t_extra = this.extraDims[t_i];
+                if (t_extra == null) continue;
+
+                t_extra.color = this.Tinted(this.m_extraBases[t_i], value);
+            }
         }
     }
 
@@ -49,15 +63,42 @@ public class ScreenDimTint
 
     public void Capture()
     {
-        if (this.m_captured || this.dim == null) return;
+        // dim이 없어도 추가 덮개만으로 성립한다 — 둘 다 없을 때만 이 축이 통째로 빠진다.
+        if (this.m_captured) return;
+        if (this.dim == null && (this.extraDims == null || this.extraDims.Length == 0)) return;
 
         this.m_captured = true;
-        this.m_base     = this.dim.color;
+        if (this.dim != null) this.m_base = this.dim.color;
+
+        if (this.extraDims == null) return;
+
+        this.m_extraBases = new Color[this.extraDims.Length];
+
+        for (int t_i = 0; t_i < this.extraDims.Length; t_i++)
+            if (this.extraDims[t_i] != null) this.m_extraBases[t_i] = this.extraDims[t_i].color;
     }
 
     public void Reset()
     {
         this.m_level = 0f;
-        if (this.m_captured && this.dim != null) this.dim.color = this.m_base;
+
+        if (!this.m_captured) return;
+
+        if (this.dim != null) this.dim.color = this.m_base;
+
+        if (this.extraDims == null || this.m_extraBases == null) return;
+
+        for (int t_i = 0; t_i < this.extraDims.Length && t_i < this.m_extraBases.Length; t_i++)
+            if (this.extraDims[t_i] != null) this.extraDims[t_i].color = this.m_extraBases[t_i];
+    }
+
+    // 저작 색을 기준으로 한 단계 민다. 알파는 언제나 저작값 그대로다 — 두께가 바뀌면 구도가 흔들린다.
+    Color Tinted(Color _base, float _level)
+    {
+        Color t_c = _level < 0f ? Color.Lerp(_base, this.darkColor,   -_level)
+                                : Color.Lerp(_base, this.brightColor,  _level);
+        t_c.a = _base.a;
+
+        return t_c;
     }
 }
