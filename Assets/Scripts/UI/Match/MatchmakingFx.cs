@@ -114,8 +114,18 @@ public class MatchmakingFx
 
     [Min(0.01f)] [SerializeField] float windUpDuration = 0.1f;
 
+    [Tooltip("물러난 최고점에서 얼어붙어 있는 시간(초). 쌓인 것이 눈에 보이는 한 박이다 — " +
+             "0이면 물러나자마자 돌진해 '당겨졌다'가 화면에 남지 않고, 그만큼 방출도 작아진다.\n" +
+             "0.12를 넘기면 당겨진 게 아니라 멈춘 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float windUpHold = 0.06f;
+
     [Tooltip("부딪히는 데 걸리는 시간. 물러나는 시간보다 반드시 짧아야 '때렸다'로 읽힌다.")]
     [Min(0.01f)] [SerializeField] float impactDuration = 0.08f;
+
+    [Tooltip("부딪힌 자리에서 두 배너가 얼어붙는 시간(초) — 히트스톱. 충격을 빛이 아니라 무게로 만드는 축이다.\n" +
+             "이 정지 동안 배너는 겹친 채 멈춰 있고 섬광·VS·가로선만 돈다. 그래서 '부딪혔다'가 몸으로 온다.\n" +
+             "0.08을 넘기면 충돌이 아니라 화면이 걸린 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float impactHold = 0.04f;
 
     [Min(0.01f)] [SerializeField] float settleDuration = 0.26f;
 
@@ -203,8 +213,21 @@ public class MatchmakingFx
     /// <summary>발견 안무가 끝나는 시각 — 조임은 이 뒤에 이어 붙는다.</summary>
     public float FoundDuration => this.slamDuration + this.infoStagger * 2f + 0.2f;
 
-    /// <summary>대치 안무가 끝나는 시각.</summary>
-    public float VersusDuration => this.windUpDuration + this.impactDuration + this.settleDuration;
+    /// <summary>상대 카드가 꽂히는 시각. 발견에 얹을 다른 축은 이 한 프레임에 맞춰 붙는다(대치의 HitAt과 같은 자리다).</summary>
+    public float SlamAt => this.slamDuration;
+
+    /// <summary>대치 안무가 끝나는 시각. 두 정지(windUpHold·impactHold)도 길이에 든다 —
+    /// 빼먹으면 셸의 여운이 안무보다 먼저 끝나 갈라짐이 충돌 위로 겹친다.</summary>
+    public float VersusDuration => this.HitAt + this.impactHold + this.settleDuration;
+
+    /// <summary>
+    /// 두 배너가 부딪히는 시각. 충돌의 표식(섬광·VS·가로선·킥·딤)은 전부 이 한 시각에 몰린다 —
+    /// 히트스톱(impactHold)은 이 뒤에 붙어, 표식이 도는 동안 배너만 겹친 채 얼어 있다.
+    /// </summary>
+    float HitAt => this.windUpDuration + this.windUpHold + this.impactDuration;
+
+    /// <summary>돌진이 시작되는 시각. 물러남과 돌진 사이의 정지가 여기서 갈린다.</summary>
+    float ImpactAt => this.windUpDuration + this.windUpHold;
 
     /// <summary>대치가 끝난 뒤 VS가 한 번 쉬는 데 걸리는 시각. 셸의 여운이 이보다 짧으면 호흡이 잘린다.</summary>
     public float AfterglowDuration => this.afterglowBreath > 0f ? this.afterglowBreathDuration : 0f;
@@ -439,7 +462,7 @@ public class MatchmakingFx
         this.StageClash(t_seq, _my,  _myHome,   _step);
         this.StageClash(t_seq, _opp, _oppHome, -_step);
 
-        float t_hit = this.windUpDuration + this.impactDuration;
+        float t_hit = this.HitAt;
 
         // 조임이 어둠을 끌어내렸으므로 여기는 "더 어둡게"가 아니라 "밝은 쪽으로" 넘겨야 왕복이 생긴다.
         // 조임 없이 열리는 길(디버그·미배선)에서도 versusDimPunch가 앞을 맡아 왕복 자체는 남는다.
@@ -590,10 +613,16 @@ public class MatchmakingFx
 
         Vector2 t_back = _step.sqrMagnitude > 0.0001f ? -_step.normalized * this.windUpDistance : Vector2.zero;
 
+        // 세 구간 사이의 빈 시간이 곧 정지다. 트윈을 걸지 않은 구간에는 아무것도 이 배너를 움직이지 않는다 —
+        // 물러난 최고점(windUpHold)과 부딪힌 자리(impactHold), 두 번 얼어붙는다.
         _seq.Insert(0f, _rect.DOAnchorPos(_home + t_back, this.windUpDuration).SetEase(Ease.OutQuad));
-        _seq.Insert(this.windUpDuration,
+
+        _seq.Insert(this.ImpactAt,
                     _rect.DOAnchorPos(_home + _step, this.impactDuration).SetEase(Ease.InQuad));
-        _seq.Insert(this.windUpDuration + this.impactDuration,
+
+        // 히트스톱이 끝나면 튕겨 돌아온다. OutBack의 오버슈트가 여기서는 반동이라 그대로 둔다 —
+        // 얼어 있다 풀리는 자리라 오히려 튕김이 있어야 한다.
+        _seq.Insert(this.HitAt + this.impactHold,
                     _rect.DOAnchorPos(_home, this.settleDuration).SetEase(Ease.OutBack));
     }
 
