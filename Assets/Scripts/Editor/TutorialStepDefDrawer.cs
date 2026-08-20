@@ -95,29 +95,45 @@ public class TutorialStepDefDrawer : PropertyDrawer
     {
         yield return "action";
 
-        if (TutorialStepDef.UsesAnchor(_action))         yield return "anchor";
-        if (TutorialStepDef.UsesAnchor(_action) && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
-        if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
-        if (TutorialStepDef.UsesMessagePlacement(_action)) yield return "messageAtBottom";
-        if (TutorialStepDef.UsesFreeOfCharge(_action))   yield return "freeOfCharge";
-        if (TutorialStepDef.UsesWaitUnlockIntro(_action)) yield return "waitUnlockIntro";
-        if (TutorialStepDef.UsesPack(_action))           yield return "pack";
-        if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
-        if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
-        if (TutorialStepDef.UsesCard(_action))           yield return "card";
-        if (TutorialStepDef.UsesCards(_action))          yield return "cards";
-        if (TutorialStepDef.UsesRewardTitle(_action))    yield return "rewardTitle";
-        if (TutorialStepDef.UsesParallelGain(_action))   yield return "parallelGain";
-        if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
-        if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
-        if (TutorialStepDef.UsesFailurePolicy(_action))  yield return "onFailure";
-        if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
+        EStepField t_fields = TutorialStepDef.FieldsOf(_action);
+
+        for (int t_i = 0; t_i < s_order.Length; t_i++)
+        {
+            if ((t_fields & s_order[t_i].Field) == 0) continue;
+
+            yield return s_order[t_i].Name;
+
+            // 도감 칸처럼 대상이 여럿인 앵커만 "어느 것"까지 저작받는다(축이 앵커라 테이블 밖이다).
+            if (s_order[t_i].Field == EStepField.Anchor && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
+        }
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
         yield return "unlocksAll";
         yield return "unlocks";
         yield return "locks";
     }
+
+    // 필드 축 ↔ 직렬화 필드명, 그리고 저작 순서. 새 축을 늘릴 때 손댈 곳은 여기 한 줄뿐이다
+    // (무엇이 보이는가는 TutorialActionMeta의 테이블이 정하고, 이 표는 이름과 순서만 안다).
+    static readonly (EStepField Field, string Name)[] s_order =
+    {
+        (EStepField.Anchor,           "anchor"),
+        (EStepField.GuideMessage,     "guideMessage"),
+        (EStepField.MessagePlacement, "messageAtBottom"),
+        (EStepField.FreeOfCharge,     "freeOfCharge"),
+        (EStepField.WaitUnlockIntro,  "waitUnlockIntro"),
+        (EStepField.Pack,             "pack"),
+        (EStepField.PackPriceLabel,   "packPriceLabel"),
+        (EStepField.Scenario,         "scenario"),
+        (EStepField.Card,             "card"),
+        (EStepField.Cards,            "cards"),
+        (EStepField.RewardTitle,      "rewardTitle"),
+        (EStepField.ParallelGain,     "parallelGain"),
+        (EStepField.ShowDeckGate,     "showDeckGate"),
+        (EStepField.DeckName,         "deckName"),
+        (EStepField.FailurePolicy,    "onFailure"),
+        (EStepField.Dim,              "useDim"),
+    };
 
     static EOutgameTutorialAction ActionOf(SerializedProperty _property)
     {
