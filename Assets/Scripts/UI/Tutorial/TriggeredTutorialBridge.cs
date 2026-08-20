@@ -143,7 +143,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
             if (m_step.Anchor == EOutgameTutorialAnchor.None)
             {
                 OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                    .ShowMessageGate(null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                    .ShowMessageGate(this, null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
                 return;
             }
 
@@ -182,7 +182,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -193,7 +193,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
             ? null
             : (Action)OnGateSatisfied;
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
     }
 
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다.
@@ -328,7 +328,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // CloseGate와 갈라 둔다: 그쪽은 m_step까지 비워 완료 신호를 받을 주체가 사라진다.
     void HideGuide()
     {
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
 
     void CloseGate()
@@ -337,6 +337,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
         m_enhancing        = false;
         m_awaitingUnlockFx = false;
 
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
 }

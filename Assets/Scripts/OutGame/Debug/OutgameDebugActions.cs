@@ -72,7 +72,7 @@ public static class OutgameDebugActions
     {
         OutgameTutorialRunner.CompleteSequence();   // 스킵도 졸업 — 첫 랭크 진입을 동일하게 받는다
         TriggeredTutorialRunner.Abort();
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log("[OutgameDebug] 튜토리얼 완료 처리 — 게이트 해제");
     }
@@ -91,12 +91,15 @@ public static class OutgameDebugActions
         // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
         OutgameTutorialProgress.ClearTriggersForDebug();
         TriggeredTutorialRunner.Abort();
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");
     }
 
-    // 튜토리얼 N편 처음으로 되감기 (소유·재화 유지, 씬 재진입 시 적용)
+    // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
+    // 소유·재화·덱·랭크·성장은 그대로 남으므로 여기서 본 화면은 실제 신규 유저의 화면과 다르다
+    // (덱 지급은 이미 있는 슬롯을 만나 조용히 지나가고, 카드 세트 지급은 가진 카드를 신규처럼 다시 연출한다).
+    // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 스텝 되감기]로 예약하고 재생한다.
     public static void RestartTutorialFromChapter(int _chapterIndex)
     {
         int t_last    = OutgameTutorialRunner.ChapterCount - 1;
@@ -104,9 +107,9 @@ public static class OutgameDebugActions
 
         OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
         TriggeredTutorialRunner.Abort();
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
+        Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 좌표만 되감음(소유·재화 유지). 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
     // 티어 1단계 올리기/내리기. AI 카드 레벨이 티어에서 나오므로 난이도 곡선을 이걸로 확인한다.
