@@ -2122,7 +2122,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 1
     m_LineSpacing: 1
-  m_Text: ISOLATED TEST SCENE  /  PRODUCTION WIN UI IS UNCHANGED
+  m_Text: MOTION LAB  /  EDITS THE PRODUCTION VICTORY BANNER
 --- !u!222 &2040171346
 CanvasRenderer:
   m_ObjectHideFlags: 0

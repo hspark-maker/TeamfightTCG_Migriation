@@ -11,9 +11,9 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Source of truth for the isolated Victory banner prefab, Animator assets,
-/// particle atlas setup, and review scene. This builder never connects the
-/// result to a production scene or Build Settings.
+/// Source of truth for the Victory banner prefab, Animator assets,
+/// particle atlas setup, and review scene. The prefab it bakes is the production
+/// title used by WinUI — the TEST scene is a lab for it, not a separate copy.
 /// </summary>
 public static class VictoryBannerTestBuilder
 {
@@ -24,16 +24,16 @@ public static class VictoryBannerTestBuilder
     private const int ParticleAtlasRows = 2;
     private const int ParticleAtlasTileSize = 64;
     private const int ParticleAtlasSize = ParticleAtlasTileSize * ParticleAtlasColumns;
-    private const string PrefabFolder = "Assets/Assets/Prefabs/UI/Test";
-    private const string PrefabPath = PrefabFolder + "/VictoryBannerTest.prefab";
+    private const string PrefabFolder = "Assets/Assets/Prefabs/UI";
+    private const string PrefabPath = PrefabFolder + "/VictoryBanner.prefab";
     private const string SceneFolder = "Assets/Scenes/TEST";
     private const string ScenePath = SceneFolder + "/VictoryBannerTest.unity";
-    private const string MotionFolder = "Assets/Assets/Animations/UI/Test";
-    private const string HiddenClipPath = MotionFolder + "/VictoryBannerTest_Hidden.anim";
-    private const string ShowClipPath = MotionFolder + "/VictoryBannerTest_Show.anim";
-    private const string ShownClipPath = MotionFolder + "/VictoryBannerTest_Shown.anim";
-    private const string HideClipPath = MotionFolder + "/VictoryBannerTest_Hide.anim";
-    private const string ControllerPath = MotionFolder + "/VictoryBannerTest.controller";
+    private const string MotionFolder = "Assets/Assets/Animations/UI";
+    private const string HiddenClipPath = MotionFolder + "/VictoryBanner_Hidden.anim";
+    private const string ShowClipPath = MotionFolder + "/VictoryBanner_Show.anim";
+    private const string ShownClipPath = MotionFolder + "/VictoryBanner_Shown.anim";
+    private const string HideClipPath = MotionFolder + "/VictoryBanner_Hide.anim";
+    private const string ControllerPath = MotionFolder + "/VictoryBanner.controller";
 
     private const float SourceWidth = 1672f;
     private const float SourceHeight = 941f;
@@ -83,7 +83,7 @@ public static class VictoryBannerTestBuilder
         new Vector2(190f, 237f)
     };
 
-    [MenuItem("Tools/Victory Banner Test/Rebuild Test Environment")]
+    [MenuItem("Tools/Result Banner/Rebuild Victory Banner + Lab Scene")]
     public static void BuildAndOpen()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -97,7 +97,7 @@ public static class VictoryBannerTestBuilder
         BuildTestEnvironment(true);
     }
 
-    [MenuItem("Tools/Victory Banner Test/Open Review Scene %#v")]
+    [MenuItem("Tools/Result Banner/Open Victory Lab Scene %#v")]
     public static void OpenTestSceneOnLaunch()
     {
         Scene currentScene = SceneManager.GetActiveScene();
@@ -458,10 +458,10 @@ public static class VictoryBannerTestBuilder
         LayerData medal,
         IReadOnlyList<ShineBuildData> shines)
     {
-        AnimationClip hidden = LoadOrCreateClip(HiddenClipPath, "VictoryBannerTest_Hidden");
-        AnimationClip show = LoadOrCreateClip(ShowClipPath, "VictoryBannerTest_Show");
-        AnimationClip shown = LoadOrCreateClip(ShownClipPath, "VictoryBannerTest_Shown");
-        AnimationClip hide = LoadOrCreateClip(HideClipPath, "VictoryBannerTest_Hide");
+        AnimationClip hidden = LoadOrCreateClip(HiddenClipPath, "VictoryBanner_Hidden");
+        AnimationClip show = LoadOrCreateClip(ShowClipPath, "VictoryBanner_Show");
+        AnimationClip shown = LoadOrCreateClip(ShownClipPath, "VictoryBanner_Shown");
+        AnimationClip hide = LoadOrCreateClip(HideClipPath, "VictoryBanner_Hide");
         ClearClip(hidden);
         ClearClip(show);
         ClearClip(shown);
@@ -906,11 +906,16 @@ public static class VictoryBannerTestBuilder
             ? new ParticleSystem.MinMaxCurve(100f, 180f)
             : new ParticleSystem.MinMaxCurve(-180f, -100f);
         velocity.y = new ParticleSystem.MinMaxCurve(110f, 170f);
+        // x/y/z는 반드시 같은 MinMaxCurve 모드여야 한다. z를 기본값(Constant)으로 두면
+        // 재생마다 "Particle Velocity curves must all be in the same mode" 에러가 뜬다.
+        velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
         ParticleSystem.ForceOverLifetimeModule force = particles.forceOverLifetime;
         force.enabled = true;
         force.space = ParticleSystemSimulationSpace.Local;
+        force.x = new ParticleSystem.MinMaxCurve(0f, 0f);
         force.y = new ParticleSystem.MinMaxCurve(-1200f, -1000f);
+        force.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
         ParticleSystem.RotationOverLifetimeModule rotation = particles.rotationOverLifetime;
         rotation.enabled = true;
@@ -1003,7 +1008,7 @@ public static class VictoryBannerTestBuilder
             outline.effectDistance = new Vector2(3f, -3f);
 
             CreateText(glow.transform, "LabTitle", "VICTORY TITLE MOTION LAB", 42, FontStyle.Bold, new Vector2(920f, 70f), new Vector2(0f, 625f), new Color(0.74f, 0.82f, 1f, 1f));
-            CreateText(glow.transform, "SeparationNotice", "ISOLATED TEST SCENE  /  PRODUCTION WIN UI IS UNCHANGED", 22, FontStyle.Normal, new Vector2(920f, 50f), new Vector2(0f, 572f), new Color(0.48f, 0.58f, 0.78f, 1f));
+            CreateText(glow.transform, "SeparationNotice", "MOTION LAB  /  EDITS THE PRODUCTION VICTORY BANNER", 22, FontStyle.Normal, new Vector2(920f, 50f), new Vector2(0f, 572f), new Color(0.48f, 0.58f, 0.78f, 1f));
 
             GameObject dimOverlay = CreateRectObject("MotionReferenceDim", glow.transform);
             StretchToParent(dimOverlay.GetComponent<RectTransform>());
