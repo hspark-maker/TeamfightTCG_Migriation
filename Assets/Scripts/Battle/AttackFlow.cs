@@ -37,7 +37,7 @@ public static class AttackFlow
         return (t_splash, t_view);
     }
 
-    /// <summary>[BeforeAttack] 공격 개시 직전 공격자 트리거 발동(패시브 → 시너지 무리 선피해 등).
+    /// <summary>[BeforeAttack] 공격 개시 직전 공격자 트리거 발동(패시브 → 시너지 낙인 선피해 등).
     /// AttackSequence.Play 직전(PreSelectSplash 이후)에 호출 → Execute 전 원자 완료. RNG 미소비(splash 스트림 미교란).</summary>
     public static async UniTask RunBeforeAttack(
         CardInstance _attacker, CardInstance _defender,
@@ -49,12 +49,12 @@ public static class AttackFlow
         var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField);
         await (_attacker.data.passive?.OnBeforeAttack(t_ctx) ?? UniTask.CompletedTask);
         await SynergyTriggers.BeforeAttack(t_ctx);
-        // 무리 선피해가 반영된 **최신 보드**에서 전투 종료를 예측한다 — 선피해로 이미 hp 0이 된 카드가
+        // 낙인 선피해가 반영된 **최신 보드**에서 전투 종료를 예측한다 — 선피해로 이미 hp 0이 된 카드가
         // 슬롯에 남아 있는 상태라, 여기보다 앞에서 계산하면 그 피해를 빼먹는다.
         BattleFinisher.ArmApproach(_attacker, _defender, _attackerField, _defenderField, _preSelectedSplash);
     }
 
-    /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 성벽 반격 등).
+    /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 OnAttacked).
     /// 양쪽 다 동기 void — AttackProcessor의 counter 해결 직후 치사 래치 전에 인라인 완결(hp 기준시점 통일).</summary>
     public static void RunAttacked(
         CardInstance _defender, CardInstance _attacker,
@@ -66,7 +66,7 @@ public static class AttackFlow
     }
 
     /// <summary>[Attacked] 무쌍 광역 피해를 맞은 카드의 **시너지** 트리거만 발동.
-    /// 광역도 공격 직격(비늘·성벽 감소 대상)이라 주 대상과 같은 시너지가 일하는데,
+    /// 광역도 공격 직격(비늘 감소 대상)이라 주 대상과 같은 시너지가 일하는데,
     /// 그 발동이 화면에 안 뜨면 "무쌍만 시너지가 없는" 그림이 된다.
     ///
     /// **패시브(가시 반격 등)는 일부러 뺐다** — 반격은 주 대상 1장 규칙이고, 여기서 같이 돌리면
@@ -89,7 +89,7 @@ public static class AttackFlow
         var t_ctx = new AfterAttackCtx(_attacker, _defender, _attackerField, _defenderField,
                                        _result.damageDealt, _result.defenderKilled);
         await (_attacker.data.passive?.OnAfterAttack(t_ctx) ?? UniTask.CompletedTask);
-        // 시너지 공격-후 트리거(청소부 회복 등). 패시브 발화 직후, 생존 가드 이후.
+        // 시너지 공격-후 트리거(포식자 회복 등). 패시브 발화 직후, 생존 가드 이후.
         await SynergyTriggers.AfterAttack(t_ctx);
     }
 

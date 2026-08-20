@@ -23,7 +23,6 @@ public class CardInstance
 
     // 시너지: 덱 확정 시 1회 적용, 전투 중 재계산 없음.
     // runtimeKeywords와 분리(그웬·피즈 무적 토글이 시너지 키워드를 clobber하지 않도록).
-    public int synergyAtk;
     public CardKeyword synergyKeywords;
     public int synergyDmgReduction;   // 비늘: 받는 피해 상시 -N. 정적(drain 안 됨) → ClearSynergy 리셋 대상.
 
@@ -31,10 +30,8 @@ public class CardInstance
     // 양 클라가 동일 스폰/사망/턴종료 경로에서 순수 산술로 동일하게 파생 → 동기화 불필요.
     public int  flowBonus;     // 흐름: AttackDamage에 가산되는 흐름 스택(스택 1당 공격력 +1). 등장마다 성장(무제한).
     public int  legacyStack;   // 유산: 내 턴 종료마다 +1, 사망 시 아군 회복량.
-    // 성벽: 필드의 라이브 성벽 아군 수. EffectiveDamage에 synergyDmgReduction과 함께 가산(공격 직격만).
-    // BoardChanged 타이밍마다 RampartSynergyEffect가 재동기 — 여기 직접 쓰지 말 것.
-    public int  rampartReduction;
     public bool reviveUsed;    // 언데드: 게임당 1회 부활 소진 플래그.
+    public bool hasShield;      // 보호막: 다음 양수 피해 1회 무시. bool이라 재부여해도 중첩되지 않는다.
 
     // 교활 효과로 필드에서 물러난 뒤 재등장하는 카드인지 표시.
     public bool returnedFromField;
@@ -60,7 +57,7 @@ public class CardInstance
     /// <summary>이 카드가 가하는 기본 공격력. 도발이면 현재 체력의 절반(최소 1).</summary>
     public int AttackDamage() =>
         (HasKeyword(CardKeyword.Taunt) ? UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.hp * 0.5f)) : this.hp)
-        + this.synergyAtk + this.flowBonus;   // 가산(synergyAtk/흐름 스택)은 도발 반감 뒤에 더함(보너스는 반감 안 받음)
+        + this.flowBonus;   // 가산(흐름 스택)은 도발 반감 뒤에 더함(보너스는 반감 안 받음)
 
     /// <summary>무쌍 광역 피해량. AttackDamage()와 별개 규칙 — 도발/시너지 보정 없는 순수 hp 기준(v1 시맨틱 보존).</summary>
     public int SplashDamage() => UnityEngine.Mathf.FloorToInt(this.hp * 0.5f);
@@ -95,65 +92,98 @@ public class CardInstance
     /// 무적은 <b>첫 타가 소진</b>하고 그 다음 타부터 정상으로 들어간다(TakeDamage와 같은 순서).
     /// 첫 타로 쓰러지면 둘째 타는 아예 없다 — "살아 있는 대상에게 한 번 더"가 강화의 계약이다.</summary>
     public (int applied, bool dies) PreviewAttackChain(int _firstRaw, int _secondRaw) =>
-        PreviewDamageChain(_firstRaw, _secondRaw, true);
+        PreviewDamageChain(_firstRaw, _secondRaw);
 
-    /// <summary>같은 해결 순서 안에서 연달아 들어오는 두 피해의 결과를 부작용 없이 계산한다.
-    /// 공격 직격은 <paramref name="_isAttackHit"/>을 true, 반격/가시는 false로 넘긴다.</summary>
-    public (int applied, bool dies) PreviewDamageChain(int _firstRaw, int _secondRaw, bool _isAttackHit)
+    /// <summary>같은 해결 순서 안에서 연달아 들어오는 두 피해의 결과를 부작용 없이 계산한다.</summary>
+    public (int applied, bool dies) PreviewDamageChain(int _firstRaw, int _secondRaw)
     {
         int  t_hp          = this.hp;
         int  t_bonus       = this.bonusHp;
+        bool t_shield      = this.hasShield;
         bool t_invincible  = HasKeyword(CardKeyword.Invincible);
         int  t_applied     = 0;
 
         for (int t_i = 0; t_i < 2; t_i++)
         {
             int t_raw = t_i == 0 ? _firstRaw : _secondRaw;
-            if (t_raw <= 0) continue;
+            DamageResolution t_result = ResolveDamage(t_raw, t_hp, t_bonus, t_shield, t_invincible);
+            t_hp          = t_result.hp;
+            t_bonus       = t_result.bonusHp;
+            t_shield      = t_result.hasShield;
+            t_invincible  = t_result.hasInvincible;
+            t_applied    += t_result.applied;
             if (t_hp <= 0) break;
-            if (t_invincible) { t_invincible = false; continue; }   // 무적 1회 소멸(피해 0)
-
-            int t_eff   = EffectiveDamage(t_raw, _isAttackHit);
-            int t_drain = UnityEngine.Mathf.Min(t_bonus, t_eff);
-            t_applied  += UnityEngine.Mathf.Min(t_eff, t_hp + t_bonus);
-            t_bonus    -= t_drain;
-            t_hp        = UnityEngine.Mathf.Max(0, t_hp - (t_eff - t_drain));
         }
 
         return (t_applied, t_hp <= 0);
     }
 
-    /// <summary>피해 감소(비늘/성벽)가 깎아낼 수 있는 하한. 감소가 걸려도 **최소 1은 들어간다** —
+    /// <summary>피해 감소(비늘)가 깎아낼 수 있는 하한. 감소가 걸려도 **최소 1은 들어간다** —
     /// 0까지 떨어지면 그 카드는 그 공격에 대해 완전 무효가 되어 전투가 멈춘다(무적과 구분이 사라진다).
     /// 원래 0인 피해에는 적용하지 않는다(없던 피해를 만들지 않는다).</summary>
     const int MinReducedDamage = 1;
 
-    /// <summary>받는 피해 단일 폴딩 지점. 공격 직격(_isAttackHit=true)일 때만 비늘·성벽 감소 적용,
-    /// 하한은 <see cref="MinReducedDamage"/>.
-    /// 반격/가시/기타 패시브 피해는 감소 없음(소스를 호출부가 정적 결정 → 양클라 대칭).
+    /// <summary>받는 피해 감소 지점. 비늘 감소는 모든 피해에 적용하며 하한은
+    /// <see cref="MinReducedDamage"/>.
     /// Clamp/사망판정/프리뷰/실적용이 모두 이 식을 통과해야 프리뷰↔실제·양클라 일치.</summary>
-    int EffectiveDamage(int _raw, bool _isAttackHit)
+    int EffectiveDamage(int _raw)
     {
-        if (_raw <= 0) return 0;   // 없던 피해를 만들지 않는다(0 데미지로 무적을 태우는 경로도 그대로 유지)
+        if (_raw <= 0) return 0;
 
-        int t_cut = _isAttackHit ? this.synergyDmgReduction + this.rampartReduction : 0;
+        int t_cut = this.synergyDmgReduction;
         return t_cut > 0 ? UnityEngine.Mathf.Max(MinReducedDamage, _raw - t_cut) : _raw;
     }
 
-    /// <summary>실제 적용 데미지(현재 체력+보너스로 상한). _isAttackHit=공격 직격 소스(비늘 감소 대상, 기본 true).
-    /// 반격 맥락 호출부는 false 전달 → 실제 TakeDamage(false)와 프리뷰/계산 일치.</summary>
-    public int ClampDamage(int _raw, bool _isAttackHit = true) =>
-        UnityEngine.Mathf.Min(EffectiveDamage(_raw, _isAttackHit), this.hp + this.bonusHp);
+    readonly struct DamageResolution
+    {
+        public readonly int  hp;
+        public readonly int  bonusHp;
+        public readonly bool hasShield;
+        public readonly bool hasInvincible;
+        public readonly int  applied;
+        public bool Dies => this.hp <= 0;
 
-    /// <summary>_raw 데미지로 이 카드가 죽는가(무적이면 소멸만, 죽지 않음). _isAttackHit=공격 직격 소스(기본 true).
-    /// 반격 맥락 호출부는 false 전달 → 실제 반격 TakeDamage(false)와 사망 프리뷰 일치.</summary>
-    public bool WouldDieFrom(int _raw, bool _isAttackHit = true) =>
-        !HasKeyword(CardKeyword.Invincible) && EffectiveDamage(_raw, _isAttackHit) >= this.hp + this.bonusHp;
+        public DamageResolution(int _hp, int _bonusHp, bool _hasShield, bool _hasInvincible, int _applied)
+        {
+            this.hp             = _hp;
+            this.bonusHp        = _bonusHp;
+            this.hasShield      = _hasShield;
+            this.hasInvincible  = _hasInvincible;
+            this.applied        = _applied;
+        }
+    }
+
+    /// <summary>피해 해석의 단일 진실원. 무적 → 보호막 → 비늘 → 추가 생명력 → 생명력 순서로
+    /// 부작용 없이 계산한다. 실제 상태 반영과 프리뷰가 모두 이 결과를 사용한다.</summary>
+    DamageResolution ResolveDamage(int _raw, int _hp, int _bonusHp, bool _hasShield, bool _hasInvincible)
+    {
+        if (_raw <= 0 || _hp <= 0)
+            return new DamageResolution(_hp, _bonusHp, _hasShield, _hasInvincible, 0);
+        if (_hasInvincible)
+            return new DamageResolution(_hp, _bonusHp, _hasShield, false, 0);
+        if (_hasShield)
+            return new DamageResolution(_hp, _bonusHp, false, _hasInvincible, 0);
+
+        int t_effective  = EffectiveDamage(_raw);
+        int t_applied    = UnityEngine.Mathf.Min(t_effective, _hp + _bonusHp);
+        int t_bonusDrain = UnityEngine.Mathf.Min(_bonusHp, t_effective);
+        int t_bonusAfter = _bonusHp - t_bonusDrain;
+        int t_hpAfter    = UnityEngine.Mathf.Max(0, _hp - (t_effective - t_bonusDrain));
+        return new DamageResolution(t_hpAfter, t_bonusAfter, _hasShield, _hasInvincible, t_applied);
+    }
+
+    /// <summary>보호막·피해 감소·현재 체력 상한을 반영한 실제 적용 예상 피해.</summary>
+    public int ClampDamage(int _raw) =>
+        ResolveDamage(_raw, this.hp, this.bonusHp, this.hasShield, HasKeyword(CardKeyword.Invincible)).applied;
+
+    /// <summary>_raw 피해 1회로 이 카드가 죽는가. 보호막·무적 소모까지 실제 규칙과 같이 계산한다.</summary>
+    public bool WouldDieFrom(int _raw) =>
+        ResolveDamage(_raw, this.hp, this.bonusHp, this.hasShield, HasKeyword(CardKeyword.Invincible)).Dies;
 
     /// <summary>이 카드가 _defender를 공격할 때 반격을 받는가. 원거리면 무반격, 대상이 표식이면 무반격.
     ///
     /// **이미 죽어 있는 방어자는 반격하지 않는다.** 공격 개시 전에 죽는 경로가 실재한다 —
-    /// 무리 선피해([BeforeAttack])가 hp를 0으로 만들어도 시체 정리(RemoveDead)는 Execute 안에서야 돌아서,
+    /// 낙인 선피해([BeforeAttack])가 hp를 0으로 만들어도 시체 정리(RemoveDead)는 Execute 안에서야 돌아서,
     /// 그 사이 방어자는 hp 0인 채 슬롯에 남아 있다. 그 상태로 AttackDamage()를 읽으면 도발 하한(최소 1) 때문에
     /// **hp 0짜리가 1을 반격**한다. 직격으로 죽는 정상 경로는 이 판정이 피해 적용 **전** 스냅샷이라 영향 없다
     /// (동시 해결 = 공격 전 수치로 반격).</summary>
@@ -184,25 +214,23 @@ public class CardInstance
 
     // ── 시너지 적용 (SynergyApplier가 호출하는 계약: 덱 확정 시 1회, 가산/합집합) ──
     // _bonusHp(덩치): stateful(데미지로 소진)이라 ClearSynergy가 리셋하지 않음 → ApplyAll 이중호출 금지(1회 전제 유지).
-    public void ApplySynergy(int _atk, int _bonusHp, CardKeyword _kw, int _dmgReduction)
+    // 시너지는 공격력을 올리지 않는다 — 스탯 항목이 생명력(bonusHp)뿐이고, 공격력은 hp에서 파생되므로
+    // 별도 가산 항을 두면 진실원이 둘로 갈린다.
+    public void ApplySynergy(int _bonusHp, CardKeyword _kw, int _dmgReduction)
     {
-        this.synergyAtk          += _atk;
         this.bonusHp             += _bonusHp;
         this.synergyKeywords     |= _kw;
         this.synergyDmgReduction += _dmgReduction;
     }
-    // 정적 스탯(synergyAtk/keywords/dmgReduction)만 리셋 → ApplyAll 멱등. bonusHp(덩치)는 stateful이라 제외.
-    public void ClearSynergy() { this.synergyAtk = 0; this.synergyKeywords = CardKeyword.None; this.synergyDmgReduction = 0; }
+    // 정적 스탯(keywords/dmgReduction)만 리셋 → ApplyAll 멱등. bonusHp(덩치)는 stateful이라 제외.
+    public void ClearSynergy() { this.synergyKeywords = CardKeyword.None; this.synergyDmgReduction = 0; }
 
-    /// <summary>_damage 적용 후 (hp, bonusHp)를 부작용 없이 계산. TakeDamage와 동일 규칙(프리뷰 공용).
-    /// _isAttackHit=공격 직격 소스(비늘 감소 대상). 반격/가시 등은 false.</summary>
-    public (int hp, int bonusHp) PreviewAfterDamage(int _damage, bool _isAttackHit)
+    /// <summary>_damage 적용 후 (hp, bonusHp)를 부작용 없이 계산. TakeDamage와 동일 규칙(프리뷰 공용).</summary>
+    public (int hp, int bonusHp) PreviewAfterDamage(int _damage)
     {
-        int t_eff        = EffectiveDamage(_damage, _isAttackHit);
-        int t_bonusDrain = UnityEngine.Mathf.Min(this.bonusHp, t_eff);
-        int t_bonusAfter = this.bonusHp - t_bonusDrain;
-        int t_hpAfter    = UnityEngine.Mathf.Max(0, this.hp - (t_eff - t_bonusDrain));
-        return (t_hpAfter, t_bonusAfter);
+        DamageResolution t_result = ResolveDamage(
+            _damage, this.hp, this.bonusHp, this.hasShield, HasKeyword(CardKeyword.Invincible));
+        return (t_result.hp, t_result.bonusHp);
     }
 
     /// <summary>체력 회복(단일 진실원). hp만 회복하며 기본적으로 maxHp 상한(보너스HP는 회복 대상 아님).
@@ -218,7 +246,7 @@ public class CardInstance
             ? this.hp + _amount
             : UnityEngine.Mathf.Min(this.hp + _amount, this.maxHp);
         int t_healed = this.hp - t_before;
-        // 실제 회복량으로 연출 1회(힐러/돌보미/유산/청소부 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
+        // 실제 회복량으로 연출 1회(힐러/돌보미/유산/포식자 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
         // 표기를 미루는 호출부(_showEffect:false)는 **미룬다는 사실 자체를 뷰에 알린다** — 그러지 않으면
         // 그 사이 화면 갱신(Render)이 최신 hp를 먼저 찍어, 투사체는 나중에 오는데 숫자는 이미 올라가 있다.
         if (t_healed > 0)
@@ -235,6 +263,9 @@ public class CardInstance
         if (_amount > 0) this.bonusHp += _amount;
     }
 
+    public void GrantShield() => this.hasShield = true;
+    public void ClearShield() => this.hasShield = false;
+
     /// <summary>언데드: 파괴 순간 체력 50%(최소 1)로 게임당 1회 부활. 성공 시 true(제자리 hp 복구).
     /// 무적 등과 무관한 순수 산술 — RemoveDead가 이 결과로 RemoveCard 게이팅.</summary>
     public bool ReviveAtHalf()
@@ -246,15 +277,16 @@ public class CardInstance
         return true;
     }
 
-    /// <summary>피해 적용. _isAttackHit=공격 직격(defender 직격/스플래시/무리 선피해)일 때만 비늘 감소 대상.
-    /// 반격/가시/기타 패시브 피해는 기본값 false로 호출 → 감소 없음. 소스는 호출부가 정적 결정(양클라 대칭).</summary>
-    public void TakeDamage(int _damage, bool _isAttackHit = false)
+    /// <summary>피해 적용. 무적·보호막 소모와 비늘·추가 생명력·생명력 폴딩을 한 번에 반영한다.</summary>
+    public void TakeDamage(int _damage)
     {
-        if (HasKeyword(CardKeyword.Invincible))
-        {
+        bool t_hadInvincible = HasKeyword(CardKeyword.Invincible);
+        DamageResolution t_result = ResolveDamage(
+            _damage, this.hp, this.bonusHp, this.hasShield, t_hadInvincible);
+        if (t_hadInvincible && !t_result.hasInvincible)
             this.runtimeKeywords &= ~CardKeyword.Invincible;
-            return;
-        }
-        (this.hp, this.bonusHp) = PreviewAfterDamage(_damage, _isAttackHit);
+        this.hasShield = t_result.hasShield;
+        this.hp        = t_result.hp;
+        this.bonusHp   = t_result.bonusHp;
     }
 }

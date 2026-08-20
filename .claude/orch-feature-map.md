@@ -25,11 +25,11 @@
 
 ## 시너지 (`Battle/Synergy/`, 15파일 995줄)
 
-- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 청소부=Cleaner · 흐름=Flow · 유산=Legacy · 성벽=Rampart · 비늘=Scale · 무리=Swarm · 언데드=Undead. 데이터는 Assets/SO/Synergies/Data_Synergy_\*.asset (지도 범위 밖), 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
+- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 포식자=Predator · 흐름=Flow · 유산=Legacy · 수호자=Guardian · 비늘=Scale · 낙인=Brand · 언데드=Undead. 데이터는 Assets/SO/Synergies/Data_Synergy_\*.asset (지도 범위 밖), 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
 - 적용 지점: `SynergyApplier.ApplyAll` — 공격 계산에는 `CardInstance.AttackDamage` / `CardInstance.ApplySynergy` 경유로 반영
 - 트리거: `SynergyTriggers` (DamageDealt / Attacked / Lethal / SwappedOut)
 - 해석·진행도: `SynergyResolver` · `SynergyProgress` · `ActiveSynergy` · `SynergyText`
-- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `SwarmSynergyEffect` · `RampartSynergyEffect` · `CaretakerSynergyEffect` · `CleanerSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
+- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `BrandSynergyEffect` · `GuardianSynergyEffect` · `CaretakerSynergyEffect` · `PredatorSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
 - 엠블럼·연출: `SynergyEmblemSpec` · `SynergyEmblemVfx` · `SynergyEmblemEntry` · `SynergyVfx` · `PopEmblem` · `RiseAndShakeEmblem` · `DropAndShineEmblem` · `StackUpEmblem` · `PrefabEmblem` · `ParticleEmblem` · `JointGap`
 - Vfx 설정·라이브러리: `SynergyVfxConfig` · `FlowSynergyVfxConfig` · `SwarmSynergyVfxConfig` · `EmblemOnlySynergyVfxConfig` · `BattleVfxLibrary` · `VfxEntry` · `VfxHandle` · `VfxStrengthScaler` · `CunningVfx` · `SwarmVfx`
 - 회복: `HealerEffect` · `HealVfx` — 트레일 잔상 `BattleTimingConfig.HealTrailLinger`
@@ -40,7 +40,7 @@
 
 - 런타임 인스턴스: `CardInstance` (스탯·데미지 계산의 단일 지점)
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
-- 키워드·패시브: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`) · `Card/Passives/` 의 챔피언별 패시브 9종 (`AatroxPassive`, `FizzPassive`, `GwenPassive`, `KindredPassive`, `MaokaiPassive`, `OrnnPassive`, `PoppyPassive`, `RammusPassive`, `TeemoPassive`)
+- 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.evolvedArts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`

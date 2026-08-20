@@ -5,10 +5,10 @@ using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
-/// 무리(Swarm) 선피해 연출의 **순서**만 소유한다: 필드의 무리 아군이 슬롯 순서대로 작은 투사체를
+/// 낙인 선피해 연출의 **순서**만 소유한다: 필드의 낙인 아군이 슬롯 순서대로 작은 투사체를
 /// 하나씩 쏘고 → 대상에 착탄 → 마지막 착탄 여운 뒤 호출부(본 공격 연출)로 제어가 돌아간다.
 ///
-/// 프리팹/형태 = SwarmSynergyVfxConfig(무리 시너지 연출 에셋), 시간 = BattleTimingConfig,
+/// 프리팹/형태 = SwarmSynergyVfxConfig(낙인 시너지 연출 에셋), 시간 = BattleTimingConfig,
 /// 스폰·반납·정렬 = BattleVfx. 여기엔 어느 것도 두지 않는다(HealVfx와 같은 규약).
 ///
 /// **선피해 수치는 호출부가 이미 적용한 뒤다 — 여기선 표시만 늦춘다.**
@@ -19,7 +19,7 @@ using UnityEngine;
 /// </summary>
 public static class SwarmVfx
 {
-    /// <summary>무리 아군 <paramref name="_sources"/>가 <paramref name="_target"/>에게 일제 사격.
+    /// <summary>낙인 아군 <paramref name="_sources"/>가 <paramref name="_target"/>에게 일제 사격.
     /// 마지막 착탄 + 여운까지 기다린 뒤 완료된다 — 호출부는 이걸 await 해서 본 공격을 뒤로 미룬다.
     ///
     /// <paramref name="_damages"/> = 발당 표시할 피해량(합 = 실제 적용된 총량).

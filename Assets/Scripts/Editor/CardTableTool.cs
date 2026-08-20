@@ -41,9 +41,9 @@ public static partial class CardTableTool
 
     static readonly Dictionary<string, string> LegacySynergyAssetNames = new Dictionary<string, string>
     {
-        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "무리", "Swarm" },
-        { "비늘", "Scale" }, { "성벽", "Rampart" }, { "언데드", "Undead" },
-        { "유산", "Legacy" }, { "청소부", "Cleaner" }, { "흐름", "Flow" }
+        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "낙인", "Brand" },
+        { "비늘", "Scale" }, { "수호자", "Guardian" }, { "언데드", "Undead" },
+        { "유산", "Legacy" }, { "포식자", "Predator" }, { "흐름", "Flow" }
     };
 
     static string NormalizeCardAssetName(string _name)

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>엠블럼 연출을 띄울 타이밍(복수 선택). **시너지마다 "그 시너지의 순간"이 다르다** —
-/// 무리는 공격 전 선피해가, 성벽은 피격이, 덩치는 배치가 그 순간이라 코드가 한 지점을 못 고른다.
+/// 낙인은 공격 전 선피해가, 수호자는 배치가, 덩치는 배치가 그 순간이라 코드가 한 지점을 못 고른다.
 /// 그래서 발동 지점 자체는 각 효과가 <see cref="SynergyTriggers.Fire"/>로 이미 알리고,
 /// **그중 어느 것을 엠블럼으로 보여줄지만** 이 플래그가 고른다(효과 로직과 연출 선택의 분리).</summary>
 [System.Flags]
@@ -16,7 +16,7 @@ public enum SynergyEmblemTiming
 public enum SynergyEmblemScope
 {
     Self       = 0,   // 발동 주체 1장
-    AllMembers = 1,   // 그 필드의 라이브 소속 아군 전원(무리 선피해처럼 전원이 함께 일하는 효과)
+    AllMembers = 1,   // 그 필드의 라이브 소속 아군 전원(낙인 선피해처럼 전원이 함께 일하는 효과)
 }
 
 // 엠블럼의 움직임 스타일은 enum이 아니라 **타입**이다 — SynergyEmblemSpec의 자식 하나가 몸짓 하나다.

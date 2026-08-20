@@ -19,7 +19,12 @@ MonoBehaviour:
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 41b8d69778c346a438e8234a9d55d548, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 3a4c16d21cdc99a4fbefbf03f3bf3f35, type: 3}
+  vfx: {fileID: 0}
   tiers:
+  - requiredCount: 3
+    label: "\uB3CC\uBCF4\uBBF8"
+    effects:
+    - {fileID: 11400000, guid: 180216abb08b44947b486290b8276e51, type: 2}
   - requiredCount: 4
     label: "\uB3CC\uBCF4\uBBF8"
     effects:

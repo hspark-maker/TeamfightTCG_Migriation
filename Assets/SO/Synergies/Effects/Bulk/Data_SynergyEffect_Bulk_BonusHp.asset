@@ -12,6 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f07f34679d9ae14e8a7a514834dc90b, type: 3}
   m_Name: Data_SynergyEffect_Bulk_BonusHp
   m_EditorClassIdentifier: Assembly-CSharp::StatSynergyEffect
-  bonusAtk: 0
   bonusHp: 3
   grantedKeywords: 0

@@ -10,7 +10,7 @@ using Cysharp.Threading.Tasks;
 // 반환 계약(동기 void / .Forget / await)은 BattleEffect 선언을 그대로 따른다 — BattleTimings 참조.
 //
 // BelongsTo(self) 필터: 대부분의 타이밍은 self 소속 시너지만 발화한다.
-// 예외는 Entered / BoardChanged 둘뿐 — 비소속 카드까지 훑어야 하는 효과(흐름 상속, 성벽 라이브 카운트)가
+// 예외는 Entered / BoardChanged 둘뿐 — 비소속 카드까지 훑어야 하는 효과(흐름 상속, 보드 파생 상태)가
 // 있어 필터를 걸지 않고 효과가 ctx.synergy로 스스로 소속 판정한다(각 메서드 주석 참조).
 //
 // [DeckResolved]는 여기 없다 — 덱 확정 적용은 SynergyApplier.ApplyAll이 소유한다(시너지×카드 순회 형태가
@@ -24,7 +24,7 @@ public static class SynergyTriggers
     // ([Triggered] 플래그). 배너/배지는 발동 주체 1장 고정이고(스팸 방지), 엠블럼만 범위를 갖는다.
     // field는 AllMembers 범위 해석에만 쓴다. null이면 그 범위를 못 푸니 self 1장으로 떨어진다.
     //
-    // 반환값 = 엠블럼을 띄웠는가. 연출이 끝나길 기다렸다가 다음 연출을 잇는 호출부(무리 선피해 → 볼리)가
+    // 반환값 = 엠블럼을 띄웠는가. 연출이 끝나길 기다렸다가 다음 연출을 잇는 호출부(낙인 선피해 → 볼리)가
     // 이걸 보고 대기 여부를 정한다. 대부분의 호출부는 무시한다(기다릴 게 없는 표시성 발동).
     public static bool Fire(CardInstance self, SynergyData synergy, BattleField field = null)
     {
@@ -106,7 +106,7 @@ public static class SynergyTriggers
         }
     }
 
-    // [BeforeAttack] 공격 개시 직전 self(공격자) 소속 활성 시너지 효과 발화(무리 선피해 등).
+    // [BeforeAttack] 공격 개시 직전 self(공격자) 소속 활성 시너지 효과 발화(낙인 선피해 등).
     // 데미지 해결(Execute) 전에 완료돼야 하므로 반드시 await. RNG 미소비(net SAFE).
     public static async UniTask BeforeAttack(BeforeAttackCtx ctx)
     {
@@ -126,7 +126,7 @@ public static class SynergyTriggers
         }
     }
 
-    // [Attacked] 피격 시 self(방어자) 소속 활성 시너지 효과 발화(성벽 반격 등).
+    // [Attacked] 피격 시 self(방어자) 소속 활성 시너지 효과 발화.
     // 동기 void — 치사 래치 전 인라인 완료 필수(AttackProcessor에서 counter 해결 직후 호출).
     public static void Attacked(AttackedCtx ctx)
     {

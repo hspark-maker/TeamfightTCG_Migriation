@@ -22,7 +22,7 @@ using UnityEngine;
 public enum SynergyPreviewKind
 {
     Emblem,          // 고른 시너지의 엠블럼(타이밍은 아래 emblemTiming)
-    SwarmVolley,     // 무리: 아군 전원 → 적 슬롯0 선피해 볼리
+    SwarmVolley,     // 낙인: 아군 전원 → 적 슬롯0 선피해 볼리
     FlowWind,        // 흐름: 아군 필드를 지나는 바람(중첩만큼 커진다)
     CaretakerHeal,   // 돌보미: 아군 전원 회복(힐러와 같은 연출)
 }
@@ -41,9 +41,9 @@ public enum AttackStep
 {
     PlacedEmblem,     // 배치 상징(고른 시너지의 Placed 엠블럼)
     FlowWind,         // 등장 바람(흐름)
-    SwarmVolley,      // 공격 전 선피해(무리)
+    SwarmVolley,      // 공격 전 선피해(낙인)
     Attack,           // 공격 시퀀스 — 무장·접근·접촉·피격·처형까지
-    AfterAttackHeal,  // 공격 후 회복(청소부·돌보미가 쓰는 힐 연출)
+    AfterAttackHeal,  // 공격 후 회복(포식자·돌보미가 쓰는 힐 연출)
     TriggeredEmblem,  // 발동 상징(고른 시너지의 Triggered 엠블럼)
     CunningSwap,      // 교활 퇴장 + 재등장
     Wait,             // 한 박자 쉬기
@@ -109,7 +109,7 @@ public class AttackAnimTester : MonoBehaviour
     [Range(0f, 2f)] [SerializeField] float emblemReplayGap = 0.35f;
     [Tooltip("흐름 바람을 어느 중첩으로 볼지. 중첩이 클수록 크게 재생된다")]
     [Min(1)] [SerializeField] int flowStack = 3;
-    [Tooltip("무리 볼리 한 발당 표기 피해(연출용 숫자, 실제 피해 없음)")]
+    [Tooltip("낙인 볼리 한 발당 표기 피해(연출용 숫자, 실제 피해 없음)")]
     [SerializeField] int swarmDamagePerShot = 1;
     [Tooltip("돌보미 회복 표기량(연출용 숫자, 실제 회복 없음)")]
     [SerializeField] int caretakerHeal = 1;
@@ -551,7 +551,7 @@ public class AttackAnimTester : MonoBehaviour
                          || t_syn.vfx.PlaysEmblemAt(SynergyEmblemTiming.Triggered));
         if (t_hasEmblem) t_list.Add(SynergyPreviewKind.Emblem);
 
-        if (HasEffect<SwarmSynergyEffect>(t_syn))     t_list.Add(SynergyPreviewKind.SwarmVolley);
+        if (HasEffect<BrandSynergyEffect>(t_syn))     t_list.Add(SynergyPreviewKind.SwarmVolley);
         if (HasEffect<FlowSynergyEffect>(t_syn))      t_list.Add(SynergyPreviewKind.FlowWind);
         if (HasEffect<CaretakerSynergyEffect>(t_syn)) t_list.Add(SynergyPreviewKind.CaretakerHeal);
 
@@ -600,7 +600,7 @@ public class AttackAnimTester : MonoBehaviour
         }
     }
 
-    /// <summary>무리 선피해 볼리: 아군 라이브 슬롯 전원이 적 슬롯0에게 한 발씩.</summary>
+    /// <summary>낙인 선피해 볼리: 아군 라이브 슬롯 전원이 적 슬롯0에게 한 발씩.</summary>
     public void PlaySwarmVolley() => PreviewSwarmVolley().Forget();
 
     async UniTask PreviewSwarmVolley()
@@ -737,7 +737,7 @@ public class AttackAnimTester : MonoBehaviour
     ///
     /// 시너지 연출은 시너지가 늘 때마다 에셋이 하나씩 는다 — 씬에 손으로 꽂는 방식이면 새 연출을 만든 사람이
     /// 배선을 잊는 순간 "테스터에선 안 보인다"가 된다. 그래서 프로젝트의 SynergyData 전부를 목록으로 잡는다.
-    /// 무리/흐름 고유 연출도 그 시너지의 <c>SynergyData.vfx</c>에서 꺼낸다 — 인게임이 타는 것과 같은 에셋이어야
+    /// 낙인/흐름 고유 연출도 그 시너지의 <c>SynergyData.vfx</c>에서 꺼낸다 — 인게임이 타는 것과 같은 에셋이어야
     /// 테스트 결과가 인게임과 일치한다.</summary>
     void ResolveSynergyAssets()
     {

@@ -590,7 +590,7 @@ public class CardView : MonoBehaviour
         this.hpDisplayTarget = _hp;
 
         // 시작점은 **지금 눈에 보이는 숫자**다. 목표값을 먼저 shownHp에 넣어두면, 굴리는 도중 다음 갱신이
-        // 들어왔을 때(무리 다단 착탄) 아직 화면에 뜨지도 않은 값에서 굴러 내려간다.
+        // 들어왔을 때(낙인 다단 착탄) 아직 화면에 뜨지도 않은 값에서 굴러 내려간다.
         KillHpRoll();
         int t_from = this.shownHp;
 
@@ -824,7 +824,7 @@ public class CardView : MonoBehaviour
     }
 
     /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
-    /// 회복이면 경로(힐러/돌보미/청소부/유산/부활) 불문 여기 하나로 수렴한다.</summary>
+    /// 회복이면 경로(힐러/돌보미/포식자/유산/부활) 불문 여기 하나로 수렴한다.</summary>
     public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
     {
         // 힐러 경로는 여기가 **표기의 발화점**이다 — 수치는 턴 시작에 이미 들어갔고(결정론),
