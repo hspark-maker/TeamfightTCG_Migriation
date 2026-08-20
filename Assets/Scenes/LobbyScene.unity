@@ -2150,10 +2150,6 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: -554.0013
       objectReference: {fileID: 0}
-    - target: {fileID: 3797395670514148879, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
-      propertyPath: tabs.Array.data[4].panel
-      value: 
-      objectReference: {fileID: 0}
     - target: {fileID: 3801186755785379298, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
