@@ -59,6 +59,32 @@ public class PackShellRig : MonoBehaviour
              "길면 팩이 다 내려간 뒤에도 빛이 남고, 짧으면 빛만 먼저 꺼져 팩이 맨몸으로 움직인다.")]
     [SerializeField] float glowFadeDuration = 0.4f;
 
+    [Header("개봉 링")]
+    [Tooltip("다 찢은 순간 팩 입구에서 링이 퍼진다. 링을 그리는 것은 광채 노드의 재질(UI/PackRing)이다 — " +
+             "링만을 위한 UI 자식을 따로 두지 않으려고 같은 그래픽에 얹었다.")]
+    [SerializeField] float ringDuration = 0.55f;
+    [Tooltip("시작 배율(씬 배치 크기 기준). 작게 시작해야 \"입구에서 터져 나왔다\"가 된다.")]
+    [Range(0.01f, 1f)] [SerializeField] float ringStartScale = 0.08f;
+    [Tooltip("끝 배율. 화면 밖으로 빠져나갈 만큼 키워야 시선이 카드 쪽으로 끌려간다.")]
+    [Range(0.2f, 4f)] [SerializeField] float ringEndScale = 1.6f;
+    [Tooltip("가장 셀 때의 밝기(그림 몫). 재질의 _Intensity가 여기에 한 번 더 곱해진다.")]
+    [Range(0f, 1f)] [SerializeField] float ringStrength = 1f;
+    [Tooltip("그림 위에 얹는 절차적 링의 두께(그래픽 UV). 그림만으로는 두께를 못 바꾼다 — " +
+             "선을 굵히려면 이 값을 올려라. 0이면 그림만 쓴다.")]
+    [Range(0f, 0.4f)] [SerializeField] float ringThickness = 0.14f;
+    [Tooltip("절차적 링의 밝기. 그림 몫과 따로 둔다 — 굵기만 올리고 밝기는 그대로 두고 싶을 때가 있다.")]
+    [Range(0f, 1f)] [SerializeField] float ringStrokeStrength = 0.85f;
+
+    [Header("개봉 흔들림")]
+    [Tooltip("링이 퍼질 때 무대(팩+카드)가 흔들리는 최대 거리(캔버스 참조px). 0이면 흔들리지 않는다. " +
+             "화면 전체가 아니라 무대만 흔든다 — SafeArea는 SafeAreaFitter가 매 프레임 자리를 되잡아 " +
+             "거기에 흔들림을 얹으면 그대로 먹힌다.")]
+    [SerializeField] float shakeAmplitude = 18f;
+    [Tooltip("흔들림이 잦아드는 시간. 링보다 짧아야 \"충격은 한순간\"으로 읽힌다.")]
+    [SerializeField] float shakeDuration = 0.28f;
+    [Tooltip("초당 흔들리는 횟수에 해당하는 노이즈 주파수. 높을수록 잘게 떤다.")]
+    [SerializeField] float shakeFrequency = 26f;
+
     [Header("연결")]
     [Tooltip("뜯기 진행도를 구독해 손가락이 닿은 동안 아이들을 멈춘다. 미배선이면 항상 동작.")]
     [SerializeField] PackTearHandle tearHandle;
@@ -90,6 +116,23 @@ public class PackShellRig : MonoBehaviour
 
     float m_time;
     float m_settle = 1f;   // 아이들 반영 비율(1 = 완전 적용, 0 = 정지)
+
+    // 개봉 링. 밖에서 트윈을 걸 수 없어(ApplyGlow가 매 프레임 glow를 덮는다) 여기서 시간을 센다.
+    // 음수 = 재생 안 함. 0 이상이면 그만큼 흐른 시간이다.
+    float m_ringTime = -1f;
+    // 재질 런타임 사본. 에셋에 직접 쓰면 플레이 중 밝기가 .mat에 눌어붙는다.
+    Material m_ringMat;
+    Vector3 m_glowHomeScale = Vector3.one;
+
+    // 흔들림은 링과 같은 시계를 쓰되 더 빨리 끝난다. 무대 오프셋에 더하는 값이라 별도 상태가 없다.
+    float m_shakeTime = -1f;
+
+    // 링은 그림(원형 테두리 글로우) + 그 위에 얹는 절차적 선이다. 그림은 결을, 절차적 선은 두께를 준다 —
+    // 그림만으로는 두께를 바꿀 수 없어(스프라이트에 새겨져 있다) 굵기 조절이 필요하면 선이 있어야 한다.
+    // _RingRadius는 재질이 쥔다(그림의 테두리 반지름과 맞춰 둔 값). 배율은 트랜스폼이 함께 키운다.
+    static readonly int ID_SPRITE_AMOUNT = Shader.PropertyToID("_SpriteAmount");
+    static readonly int ID_RING_WIDTH    = Shader.PropertyToID("_RingWidth");
+    static readonly int ID_RING_STRENGTH = Shader.PropertyToID("_RingStrength");
 
     // 아이들을 멈추는 축이 둘이다. 연출(뷰)의 판단과 손가락이 닿았다는 사실은 서로 다른 사건이라
     // 한 플래그를 두 쪽이 덮어쓰면, 손을 뗀 순간 뷰가 꺼 둔 부유가 되살아난다. 따로 두고 AND 한다.
@@ -140,6 +183,15 @@ public class PackShellRig : MonoBehaviour
         Apply();
     }
 
+    /// <summary>다 찢은 순간 팩 입구에서 링이 퍼진다(작게 시작해 커지며 얇아진다).
+    /// 개봉이 시작되면 평소 광채는 이미 걷혀 있으므로(m_glowFade=0) 이 링만 보인다.
+    /// 재생 중에 다시 불러도 처음부터 다시 퍼진다 — 겹쳐 봐야 두 번 터진 것으로 안 읽힌다.</summary>
+    public void PlayOpenBurst()
+    {
+        m_ringTime = 0f;
+        m_shakeTime = 0f;
+    }
+
     /// <summary>아이들(부유·펄스) 온오프. 카드를 빼내는 순간부터는 꺼야 뽑는 손맛이 흔들리지 않는다.</summary>
     public void SetIdle(bool _running) => m_idleAllowed = _running;
 
@@ -181,6 +233,18 @@ public class PackShellRig : MonoBehaviour
             ? Mathf.MoveTowards(m_glowFade, t_glowTarget, t_dt / glowFadeDuration)
             : t_glowTarget;
 
+        if (m_ringTime >= 0f)
+        {
+            m_ringTime += t_dt;
+            if (m_ringTime > ringDuration) m_ringTime = -1f;   // 다 퍼지면 평소 경로로 돌려준다
+        }
+
+        if (m_shakeTime >= 0f)
+        {
+            m_shakeTime += t_dt;
+            if (m_shakeTime > shakeDuration) m_shakeTime = -1f;
+        }
+
         Apply();
     }
 
@@ -201,7 +265,9 @@ public class PackShellRig : MonoBehaviour
         // 무대: 씬 배치 + 연출 오프셋 + 부유. 팩과 카드가 함께 움직인다.
         if (stage != null)
         {
-            stage.anchoredPosition = m_stageHome + StageOffset + new Vector2(0f, t_float * floatDistance);
+            stage.anchoredPosition = m_stageHome + StageOffset
+                                   + new Vector2(0f, t_float * floatDistance)
+                                   + ShakeOffset();
             stage.localScale = m_stageHomeScale * StageScale * Mathf.Lerp(1f, pulseScale, t_pulse);
         }
 
@@ -251,14 +317,100 @@ public class PackShellRig : MonoBehaviour
     {
         if (glow == null) return;
 
-        var t_c = glow.color;
-        t_c.a = Mathf.Lerp(glowAlphaMin, glowAlphaMax, _pulse01) * m_glowFade;
-        glow.color = t_c;
+        float t_ambient = Mathf.Lerp(glowAlphaMin, glowAlphaMax, _pulse01) * m_glowFade;
+
+        Material t_mat = RingMaterial();
+        if (t_mat != null)
+        {
+            // 그래픽 알파는 1로 고정하고, 평소 방사광의 밝기는 재질이 따로 쥔다.
+            // 한 알파로 둘을 조절하면 링을 보이려고 알파를 올리는 순간 꺼 둔 방사광까지 살아난다.
+            var t_c = glow.color;
+            t_c.a = 1f;
+            glow.color = t_c;
+            t_mat.SetFloat(ID_SPRITE_AMOUNT, t_ambient);
+        }
+        else
+        {
+            // 링 재질이 아니면(다른 재질로 갈아 끼운 경우) 예전처럼 그래픽 알파로만 조절한다.
+            var t_c = glow.color;
+            t_c.a = t_ambient;
+            glow.color = t_c;
+        }
+
+        ApplyRing();
 
         // 회전에는 m_settle도 m_glowFade도 곱하지 않는다 — 누적 각도라 비율을 곱하면 멈출 때
         // 빛살이 0도로 되감긴다. 손가락이 닿아 아이들이 서면 m_time이 멈추므로 회전도 그 자리에 선다(그게 의도한 정지다).
         if (Mathf.Abs(glowSpinPeriod) > 0.01f)
             glow.transform.localRotation = Quaternion.Euler(0f, 0f, m_time * 360f / glowSpinPeriod);
+    }
+
+    // 개봉 충격. 랜덤 대신 펄린 노이즈를 쓴다 — 프레임마다 튀는 난수는 떨림이 아니라 지직거림으로 보인다.
+    // 세기는 제곱으로 잦아든다(한 번 세게 치고 빨리 죽는다). 두 축에 서로 다른 노이즈 줄을 태워
+    // x와 y가 같은 파형으로 움직이는(= 대각선으로만 흔들리는) 그림을 피한다.
+    Vector2 ShakeOffset()
+    {
+        if (m_shakeTime < 0f || shakeAmplitude <= 0.0001f) return Vector2.zero;
+
+        float t_p = Mathf.Clamp01(m_shakeTime / Mathf.Max(0.0001f, shakeDuration));
+        float t_amp = shakeAmplitude * (1f - t_p) * (1f - t_p);
+        float t_n = m_shakeTime * shakeFrequency;
+
+        return new Vector2(
+            (Mathf.PerlinNoise(t_n, 0.37f) * 2f - 1f) * t_amp,
+            (Mathf.PerlinNoise(0.71f, t_n) * 2f - 1f) * t_amp);
+    }
+
+    // 링 그림(원형 테두리 글로우)을 작게 시작해 크게 부풀린다.
+    //   배율: 3제곱 이즈아웃 — 초반에 확 벌어지고 끝에서 눕는다("팍"의 정체가 이 곡선이다).
+    //   밝기: 뒤로 갈수록 사그라든다. 배율과 같은 곡선을 쓰면 다 퍼진 순간에도 밝아 잔상이 남는다.
+    //
+    // 밝기를 그래픽 알파가 아니라 재질의 스프라이트 몫으로 내는 이유는 ApplyGlow 주석 그대로다 —
+    // 알파 하나로 평소 방사광과 링을 함께 조절하면 링을 켜는 순간 꺼 둔 방사광까지 살아난다.
+    void ApplyRing()
+    {
+        Material t_mat = RingMaterial();
+
+        if (m_ringTime < 0f)
+        {
+            // 끝났으면 씬 배치 크기로 돌려둔다 — 부푼 채로 두면 다음 개봉이 큰 원에서 시작한다.
+            if (glow != null) glow.transform.localScale = m_glowHomeScale;
+            if (t_mat != null) t_mat.SetFloat(ID_RING_STRENGTH, 0f);
+            return;   // 스프라이트 몫은 ApplyGlow가 이미 평소 값으로 밀어 뒀다.
+        }
+
+        float t_p = Mathf.Clamp01(m_ringTime / Mathf.Max(0.0001f, ringDuration));
+        float t_ease = 1f - Mathf.Pow(1f - t_p, 3f);
+
+        if (glow != null)
+            glow.transform.localScale = m_glowHomeScale * Mathf.Lerp(ringStartScale, ringEndScale, t_ease);
+
+        if (t_mat != null)
+        {
+            float t_fade = (1f - t_p) * (1f - t_p);
+            t_mat.SetFloat(ID_SPRITE_AMOUNT, ringStrength * t_fade);
+            t_mat.SetFloat(ID_RING_WIDTH, Mathf.Max(ringThickness, 0.001f));
+            t_mat.SetFloat(ID_RING_STRENGTH, ringStrokeStrength * t_fade);
+        }
+    }
+
+    // 재질 사본. UI Graphic은 material에 대입해야 사본이 물린다(MaterialPropertyBlock가 안 먹는다).
+    Material RingMaterial()
+    {
+        if (glow == null) return null;
+        if (m_ringMat != null) return m_ringMat;
+
+        var t_src = glow.material;
+        if (t_src == null || t_src.shader == null || !t_src.shader.name.Contains("PackRing")) return null;
+
+        m_ringMat = new Material(t_src);
+        glow.material = m_ringMat;
+        return m_ringMat;
+    }
+
+    void OnDestroy()
+    {
+        if (m_ringMat != null) Destroy(m_ringMat);
     }
 
     // 진행도가 조금이라도 붙으면 = 손가락이 팩을 잡고 있다.
@@ -273,6 +425,8 @@ public class PackShellRig : MonoBehaviour
 
         if (shellBack != null)  { m_backHome  = shellBack.anchoredPosition;  m_backHomeScale  = shellBack.localScale; }
         if (shellFront != null) { m_frontHome = shellFront.anchoredPosition; m_frontHomeScale = shellFront.localScale; }
+
+        m_glowHomeScale = glow != null ? glow.transform.localScale : Vector3.one;
 
         m_shadowHome = shadow != null ? shadow.anchoredPosition : Vector2.zero;
         m_shadowHomeScale = shadow != null ? shadow.localScale : Vector3.one;

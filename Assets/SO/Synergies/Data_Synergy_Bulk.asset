@@ -24,3 +24,7 @@ MonoBehaviour:
     label: "\uB369\uCE58"
     effects:
     - {fileID: 11400000, guid: 7fe982b8a25ec3040a6d1069522fc31b, type: 2}
+  - requiredCount: 4
+    label: "\uB369\uCE58"
+    effects:
+    - {fileID: 11400000, guid: 7960be06fda1e304daabc13eff7658bd, type: 2}

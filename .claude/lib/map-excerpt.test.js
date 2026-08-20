@@ -5,13 +5,20 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { MAX_CHARS, MAX_LINES, buildMapExcerpt, searchTerms } = require("./map-excerpt.js");
+const { MAX_CHARS, MAX_LINES, buildMapExcerpt, searchCommandPolicy, searchTerms } = require("./map-excerpt.js");
+const { SEARCH_COMMANDS } = require("./search-detect.js");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "map-excerpt-test-"));
 const mapFile = path.join(root, "map.md");
 const transcript = path.join(root, "session.jsonl");
 
 try {
+  for (const command of SEARCH_COMMANDS) {
+    assert.ok(searchCommandPolicy(command), `${command} must have an explicit query extraction policy`);
+  }
+  assert.deepEqual(searchTerms("Bash", { command: "dir /s /b *CardView*.cs" }), ["CardView"]);
+  assert.deepEqual(searchTerms("Bash", { command: "dir /s /b C:\\repo\\Assets\\Scripts\\*CardView*.cs" }), ["CardView"]);
+  assert.deepEqual(searchTerms("PowerShell", { command: "dir -Recurse -Filter *ZzzNope*.cs" }), ["ZzzNope"]);
   fs.writeFileSync(mapFile, [
     "# 지도", "## 전투 (`Battle/`)",
     "- 카드 표시: `CardView`", "- 카드 장식: `CardDecorView`", "- 카드 데이터: `CardData`",
@@ -56,6 +63,25 @@ try {
   // hits 0 의 두 원인이 구분돼야 한다.
   assert.equal(buildMapExcerpt(mapFile, "Bash", { command: 'find . -path "*X*"' }, null).reason, "no-terms");
   assert.equal(buildMapExcerpt(mapFile, "Grep", { pattern: "ZzzNope" }, null).reason, "no-map-match");
+  // C# 키워드 회귀 — class/public 이 검색어로 새어 지도 33줄에 매칭되고 무관한 발췌가 실제로 나갔다.
+  assert.deepEqual(searchTerms("Bash", { command: 'grep -n "class Card" Assets/Table/SpecDatas.cs' }), ["Card"]);
+  assert.deepEqual(searchTerms("Bash", { command: 'grep -rn "public class" Assets/Scripts' }), []);
+  assert.deepEqual(searchTerms("Grep", { pattern: "public static void Foo" }), ["Foo"]);
+  // 실제 타입 이름은 살아남아야 한다.
+  assert.deepEqual(searchTerms("Bash", { command: "grep -rn TurnRunner Assets/Scripts" }), ["TurnRunner"]);
+  // too-broad 회귀 — 매칭되는 검색어가 전부 흔하면 발췌 대신 통과한다.
+  {
+    const broad = ["# map"].concat(Array.from({ length: 12 }, (_, i) => `- 구역 ${i}: \`Card${i}\` 관련`));
+    const broadFile = path.join(root, "broad.md");
+    fs.writeFileSync(broadFile, broad.join(String.fromCharCode(10)));
+    const wide = buildMapExcerpt(broadFile, "Grep", { pattern: "Card" }, null);
+    assert.equal(wide.reason, "too-broad", "흔한 검색어 하나만 남으면 통과");
+    assert.equal(wide.shown, 0);
+    assert.ok(wide.hits > 0, "hits 는 로그용으로 실제 값을 유지한다");
+    // 좁은 검색어가 하나라도 있으면 발췌를 만든다.
+    const narrow = buildMapExcerpt(broadFile, "Grep", { pattern: "Card|Card7" }, null);
+    assert.equal(narrow.reason, "hit");
+  }
   console.log("map-excerpt tests: query-first ranking, capped session weight, limits passed");
 } finally {
   fs.rmSync(root, { recursive: true, force: true });

@@ -12,7 +12,7 @@ public enum BattleVfxId
     HealerImpact     = 3,   // (사용 안 함) 도착 폭발은 HealerArrival(20)로 되살아났다 — 옛 에셋에 값이
                             // 남아 있을 수 있어 3은 재사용하지 않는다.
     Hit              = 4,   // 피격 파티클(맞은 카드에 부착)
-    Heal             = 5,   // 회복 파티클(회복된 카드에 부착 — 힐러/돌보미/청소부/유산 등 모든 회복 경로 공통)
+    Heal             = 5,   // 회복 파티클(회복된 카드에 부착 — 힐러/돌보미/포식자/유산 등 모든 회복 경로 공통)
     CinemaEnergyOrb  = 6,   // 시네마 공격(EnergyOrbDash): 카드가 변하는 에너지 구체. 수명은 호출부가 관리
     PeerlessSlash    = 7,   // 무쌍 연출의 베기 섬광(대상 위치에 방향 맞춰 1회). 수명은 항목 lifetime
     PeerlessSwing    = 8,   // 무쌍 연출의 휘두름(공격자 앞에서 대상 쪽으로). 베기와 짝 — 벨 때마다 같이 난다
@@ -37,7 +37,7 @@ public enum BattleVfxId
     CardAppear       = 19,
     HealerArrival    = 20,  // 힐러 투사체가 대상에 닿는 순간의 임팩트. **힐러 경로 전용**이라
                             // 모든 회복이 공통으로 내는 Heal(5)과 겹쳐 난다 — 둘을 합치면
-                            // 돌보미·청소부처럼 투사체가 없는 회복에서도 도착 임팩트가 터진다.
+                            // 돌보미·포식자처럼 투사체가 없는 회복에서도 도착 임팩트가 터진다.
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

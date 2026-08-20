@@ -2,19 +2,32 @@
 "use strict";
 
 const fs = require("node:fs");
-const { isSearchTool } = require("./search-detect.js");
+const { SEARCH_COMMANDS, isSearchTool } = require("./search-detect.js");
 const { isRealUser } = require("./transcript.js");
 
 const MAX_LINES = 5;
 const MAX_CHARS = 1200;
 const TAIL_BYTES = 256 * 1024;
 const FREQUENCY_CAP = 3;
+/* 검색어가 지도 전반에 흔하면 상위 5줄은 정답일 근거가 없다.
+   실측: `grep "class Card"` 의 Card 하나가 지도 33줄에 걸려 무관한 발췌가 나갔다.
+   매칭되는 검색어가 **전부** 이보다 흔하면 지도가 좁히지 못한 것으로 보고 통과시킨다
+   — 엉뚱한 5줄은 지도가 없는 것보다 나쁘다. 과거 발췌의 2.5%가 여기 해당한다. */
+const BROAD_TERM_LINES = 10;
 const WORD = /[A-Za-z_][A-Za-z0-9_]{2,}|[가-힣]{2,}/g;
 const STOP = new Set([
+  // 셸·도구 어휘
   "assets", "scripts", "include", "files", "matches", "content", "output", "pattern", "path",
   "grep", "egrep", "fgrep", "find", "glob", "select", "string", "recurse", "recursive",
   "head", "tail", "sort", "type", "name", "true", "false", "file", "directory", "command",
   "prefab", "asset", "meta", "unity", "claude", "orch", "result", "results",
+  /* C# 언어 키워드. 이게 빠져 있어 `grep "class Card\|public Card"` 의 class·public 이
+     검색어가 됐고, 지도 33줄에 매칭돼 질문과 무관한 발췌가 실제로 나갔다(2026-08-19 09:19). */
+  "class", "struct", "interface", "enum", "namespace", "using", "public", "private",
+  "protected", "internal", "static", "readonly", "const", "abstract", "sealed", "partial",
+  "virtual", "override", "return", "void", "null", "this", "base", "new", "var",
+  "async", "await", "get", "set", "value", "params", "where", "select", "from",
+  "int", "bool", "float", "double", "byte", "char", "long", "short", "object",
 ]);
 
 function shellWords(text) {
@@ -48,10 +61,25 @@ function shellSegments(command) {
    grep 계열은 "첫 비플래그 인자"가 패턴이고, find 계열은 -name/-iname 뒤 값이 이름 패턴이다.
    find 규칙이 없던 동안 실측으로 게이트 대상의 9.3%가 검색어 없이 통과했다(표본 전부 find). */
 const PATTERN_FIRST = /(?:^|\s)(?:(?:sudo\s+)?(?:rg|grep|egrep|fgrep|ack|ag|fd)(?:\.exe)?|git\s+grep|Select-String|sls)\s+([\s\S]*)/i;
-const NAME_FLAGGED = /(?:^|\s)(?:(?:sudo\s+)?(?:find|dir)(?:\.exe)?)\s+([\s\S]*)/i;
+const NAME_FLAGGED = /(?:^|\s)(?:(?:sudo\s+)?find(?:\.exe)?)\s+([\s\S]*)/i;
+const DIR_FLAGGED = /(?:^|\s)(?:(?:sudo\s+)?dir(?:\.exe)?)\s+([\s\S]*)/i;
 /* -path/-wholename 은 경로 필터라 개념 검색어가 아니다 — 포함하면 `-path "*Battle*"` 의
    Battle 이 지도 20줄에 매칭돼 엉뚱한 발췌가 나간다(grep 쪽에서 이미 고친 오탐과 같은 것). */
 const NAME_FLAG = /^(?:-i?name|-i?regex)$/i;
+const PATTERN_FIRST_COMMANDS = new Set(["rg", "grep", "egrep", "fgrep", "fd", "ack", "ag", "git grep"]);
+const NAME_FLAGGED_COMMANDS = new Set(["find"]);
+const PATH_PATTERN_COMMANDS = new Set(["dir"]);
+const NO_SEMANTIC_QUERY_COMMANDS = new Set(["ls"]);
+
+/** SEARCH_COMMANDS의 각 항목이 어떤 추출 정책을 갖는지 테스트 가능한 형태로 노출한다. */
+function searchCommandPolicy(command) {
+  if (!SEARCH_COMMANDS.includes(command)) return null;
+  if (PATTERN_FIRST_COMMANDS.has(command)) return "pattern-first";
+  if (NAME_FLAGGED_COMMANDS.has(command)) return "name-flagged";
+  if (PATH_PATTERN_COMMANDS.has(command)) return "path-pattern";
+  if (NO_SEMANTIC_QUERY_COMMANDS.has(command)) return "no-semantic-query";
+  return null;
+}
 
 /** find 계열: 이름 플래그 뒤의 값만 검색어로 본다. 경로 인자는 검색어가 아니다. */
 function nameFlagQueries(rest) {
@@ -66,9 +94,35 @@ function nameFlagQueries(rest) {
   return found;
 }
 
+function dirQueries(rest) {
+  const words = shellWords(rest);
+  const found = [];
+  const basename = (word) => String(word).split(/[\\/]/).pop();
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
+    if (/^-(?:Filter|Include)$/i.test(word) && words[index + 1]) {
+      found.push(basename(words[index + 1]));
+      index += 1;
+      continue;
+    }
+    if (/^-(?:Path|LiteralPath)$/i.test(word) && words[index + 1]) {
+      index += 1;
+      continue;
+    }
+    if (/^[-/]/.test(word)) continue;
+    found.push(basename(word));
+  }
+  return found;
+}
+
 function commandQueries(command) {
   const queries = [];
   for (const part of shellSegments(command)) {
+    const dirMatch = part.match(DIR_FLAGGED);
+    if (dirMatch) {
+      queries.push(...dirQueries(dirMatch[1]));
+      continue;
+    }
     const nameMatch = part.match(NAME_FLAGGED);
     if (nameMatch) {
       queries.push(...nameFlagQueries(nameMatch[1]));
@@ -182,6 +236,17 @@ function buildMapExcerpt(mapFile, toolName, toolInput, transcriptPath) {
   if (!queryTerms.length) return { terms: [], reason: "no-terms", hits: 0, shown: 0, weighted: false, text: "" };
   const history = sessionFrequencies(transcriptPath);
   const lines = fs.readFileSync(mapFile, "utf8").split(/\r?\n/);
+
+  /* 검색어별 매칭 줄 수 중 가장 좁은 값. 0매칭 검색어는 특정성 신호가 아니라 제외한다
+     (지도에 없는 단어가 min 을 0 으로 끌어내려 판정을 무력화한다). */
+  const bodyLower = lines
+    .map((line) => line.trim().toLowerCase())
+    .filter((line) => line && !line.startsWith("<!--"));
+  const termLineCounts = queryTerms
+    .map((term) => bodyLower.filter((line) => line.includes(term.toLowerCase())).length)
+    .filter((count) => count > 0);
+  const narrowest = termLineCounts.length ? Math.min(...termLineCounts) : 0;
+
   const candidates = [];
   let header = "";
 
@@ -214,6 +279,13 @@ function buildMapExcerpt(mapFile, toolName, toolInput, transcriptPath) {
     candidates.push({ index, line, header, score, historyBoost });
   }
 
+  if (narrowest > BROAD_TERM_LINES) {
+    return {
+      terms: queryTerms, narrowest, reason: "too-broad",
+      hits: candidates.length, shown: 0, weighted: false, text: "",
+    };
+  }
+
   candidates.sort((a, b) => b.score - a.score || a.index - b.index);
   const selected = [];
   let weighted = false;
@@ -231,6 +303,7 @@ function buildMapExcerpt(mapFile, toolName, toolInput, transcriptPath) {
   }
   return {
     terms: queryTerms,
+    narrowest,
     reason: candidates.length ? "hit" : "no-map-match",
     hits: candidates.length,
     shown: selected.length,
@@ -241,6 +314,6 @@ function buildMapExcerpt(mapFile, toolName, toolInput, transcriptPath) {
 
 module.exports = {
   FREQUENCY_CAP, MAX_CHARS, MAX_LINES,
-  NAME_FLAG, PATTERN_FIRST,
-  buildMapExcerpt, commandQueries, nameFlagQueries, queryText, searchTerms, sessionFrequencies, shellSegments, shellWords,
+  BROAD_TERM_LINES, NAME_FLAG, PATTERN_FIRST,
+  buildMapExcerpt, commandQueries, dirQueries, nameFlagQueries, queryText, searchCommandPolicy, searchTerms, sessionFrequencies, shellSegments, shellWords,
 };

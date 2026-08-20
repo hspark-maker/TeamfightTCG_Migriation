@@ -15,6 +15,7 @@ MonoBehaviour:
   id: 3
   displayName: "\uBCC4\uD1A0\uB9AC"
   channel: 1
+  grade: 1
   keywords: 64
   maxHp: 4
   bonusHp: 0
@@ -27,7 +28,6 @@ MonoBehaviour:
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: a6ea06b9bace67e4a8d40c2a7a97f20e, type: 3}
   - battleImage: {fileID: 21300000, guid: 0cce95d1ac3666249989e950a9c9582f, type: 3}
-  - battleImage: {fileID: 0}
   defaultEvolutionStage: 0
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0

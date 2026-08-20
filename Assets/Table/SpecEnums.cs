@@ -27,3 +27,12 @@ public enum CARD_CHANNEL
     TestOnly = 0,
     Live = 1,
 }
+
+/// 카드 등급
+public enum CARD_GRADE
+{
+    Unknown = 0,
+    Silver = 1,
+    Gold = 2,
+    Prism = 3,
+}

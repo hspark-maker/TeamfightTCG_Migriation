@@ -41,9 +41,9 @@ public static partial class CardTableTool
 
     static readonly Dictionary<string, string> LegacySynergyAssetNames = new Dictionary<string, string>
     {
-        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "무리", "Swarm" },
-        { "비늘", "Scale" }, { "성벽", "Rampart" }, { "언데드", "Undead" },
-        { "유산", "Legacy" }, { "청소부", "Cleaner" }, { "흐름", "Flow" }
+        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "낙인", "Brand" },
+        { "비늘", "Scale" }, { "수호자", "Guardian" }, { "언데드", "Undead" },
+        { "유산", "Legacy" }, { "포식자", "Predator" }, { "흐름", "Flow" }
     };
 
     static string NormalizeCardAssetName(string _name)
@@ -66,7 +66,7 @@ public static partial class CardTableTool
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
         "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
-        "cardExplain",
+        "cardExplain", "grade",
     };
 
     /// <summary>창이 띄우는 열 설명. 규칙 문구의 진실원을 표 도구 쪽에 둔다(UI가 규칙을 다시 적지 않게).</summary>
@@ -76,6 +76,8 @@ public static partial class CardTableTool
         "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
         "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림.\n" +
         "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
+        "· grade : 카드 희소 등급 이름(Silver/Gold/Prism). 빈칸 = Unknown(미배정).\n" +
+        "  숫자나 모르는 이름은 값을 바꾸지 않고 경고만 남긴다.\n" +
         "· hp2~hp10 : 그 레벨 진입 시 증가 HP. 강화는 Lv2부터라 그 아래 열은 없다. 9칸 전부 비면\n" +
         "  CardGrowthConfig 전역식, 하나라도 채우면 나머지 빈칸은 0으로 저장된다.\n" +
         "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
@@ -316,6 +318,22 @@ public static partial class CardTableTool
             if (Enum.TryParse(t_channel, true, out ECardChannel t_parsed)) _card.channel = t_parsed;
             else _warnings.Add($"{_name}.channel: 알 수 없는 채널 '{t_channel}' — 기존 값 유지");
         }
+        if (_header.ContainsKey("grade"))
+        {
+            string t_grade = Cell(_row, _header, "grade").Trim();
+            // Enum.TryParse는 "3"이나 "99" 같은 숫자 문자열도 통과시킨다 — 정의에 없는 값까지 만들어 낸다.
+            // 등급은 사람이 적는 저작 값이라 **이름으로만** 받고, 숫자·오타는 덮어쓰지 않고 경고로 남긴다
+            // (조용히 기본 등급으로 떨어지면 표와 에셋이 갈린 걸 아무도 못 본다).
+            if (t_grade.Length == 0)
+                _card.grade = ECardGrade.Unknown;
+            else if (!char.IsDigit(t_grade[0])
+                     && Enum.TryParse(t_grade, true, out ECardGrade t_parsedGrade)
+                     && Enum.IsDefined(typeof(ECardGrade), t_parsedGrade))
+                _card.grade = t_parsedGrade;
+            else
+                _warnings.Add($"{_name}.grade: 알 수 없는 등급 '{t_grade}' — 기존 값 유지(등급 이름으로 적을 것)");
+        }
+
         if (_header.ContainsKey("maxHp")) _card.maxHp = ParseInt(Cell(_row, _header, "maxHp"), _card.maxHp);
 
         if (_header.ContainsKey("keywords"))

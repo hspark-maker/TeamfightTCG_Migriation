@@ -6,7 +6,7 @@ public struct AttackResult
     public CardInstance splashDefender;   // 무쌍: 광역 피해 대상
     public CardKeyword  attackerKeywords; // 발동된 공격자 키워드
     public CardKeyword  defenderKeywords; // 발동된 수비자 키워드 (e.g. 표식)
-    public int          damageDealt;      // 주 대상 기본타의 실제 HP+보너스HP 감소량. 트리거(청소부 회복 등)용. struct 기본 0.
+    public int          damageDealt;      // 주 대상 기본타의 실제 HP+보너스HP 감소량. 트리거(포식자 회복 등)용. struct 기본 0.
     public int          enhanceDamage;    // 일반 강화 추가타로 주 대상에 실제 적용된 데미지. 0 = 미발동.
 
     /// <summary>주 대상이 이 공격으로 받은 총 피해(기본타 + 강화 추가타). 표시·예측용.

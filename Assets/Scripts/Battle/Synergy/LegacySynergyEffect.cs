@@ -14,6 +14,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "LegacySynergyEffect", menuName = "Card Battle/Synergy Effect/Legacy")]
 public class LegacySynergyEffect : SynergyEffect
 {
+    [SerializeField, Min(1)] int amount = 1;
+
     // 한 카드가 죽으며 아군을 회복시키면, RemoveDead의 같은 루프에서 hp 0으로 대기 중이던 다른 아군이
     // 되살아나 제거를 면할 수 있다 — 즉 전멸 예측이 틀릴 수 있다.
     public override bool CanAlterLethalOutcome => true;
@@ -33,7 +35,7 @@ public class LegacySynergyEffect : SynergyEffect
     {
         if (_ctx.self == null || !_ctx.self.IsAlive) return UniTask.CompletedTask;
 
-        _ctx.self.legacyStack++;
+        _ctx.self.legacyStack += this.amount;
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스택 적립 표시(배너 + 배지 pop)
         LegacyCrownVfx.Show(_ctx.self, _ctx.synergy);                // 오른 값만큼 왕관
 

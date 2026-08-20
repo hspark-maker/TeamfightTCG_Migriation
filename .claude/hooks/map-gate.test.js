@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { processHook, FREE_SEARCHES, shouldGate } = require("./map-gate.js");
-const { bashSearch, powershellSearch, mapReadSucceeded } = require("../lib/search-detect.js");
+const { processHook, FREE_SEARCHES, pruneStateFiles, shouldGate } = require("./map-gate.js");
+const { MAP_SCOPE_OUTSIDE_MARKER, bashSearch, isOutsideMapScope, powershellSearch, mapReadSucceeded } = require("../lib/search-detect.js");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "map-gate-test-"));
 const projectDir = path.join(root, "project");
@@ -214,7 +214,36 @@ try {
       "코드 검색은 그대로 막힌다");
   });
 
-  console.log(`map-gate tests: ${passed}/17 passed (subagent context: 미검증 — sidechain 기록 없음)`);
+  check("18. stale state cleanup is daily and leaves fresh state", () => {
+    const cleanupRoot = path.join(root, "cleanup-state");
+    fs.mkdirSync(cleanupRoot, { recursive: true });
+    const stale = path.join(cleanupRoot, "stale.json");
+    const fresh = path.join(cleanupRoot, "fresh.json");
+    fs.writeFileSync(stale, "{}");
+    fs.writeFileSync(fresh, "{}");
+    const now = Date.now();
+    fs.utimesSync(stale, new Date(now - 2 * 24 * 60 * 60 * 1000), new Date(now - 2 * 24 * 60 * 60 * 1000));
+    assert.equal(pruneStateFiles(cleanupRoot, now), 1);
+    assert.equal(fs.existsSync(stale), false);
+    assert.equal(fs.existsSync(fresh), true);
+    const throttled = path.join(cleanupRoot, "throttled.json");
+    fs.writeFileSync(throttled, "{}");
+    fs.utimesSync(throttled, new Date(now - 2 * 24 * 60 * 60 * 1000), new Date(now - 2 * 24 * 60 * 60 * 1000));
+    assert.equal(pruneStateFiles(cleanupRoot, now + 1), 0);
+    assert.equal(fs.existsSync(throttled), true, "cleanup marker limits pruning to once per day");
+    assert.equal(isOutsideMapScope({ path: "Assets/Table/SpecDatas.cs" }), true);
+    assert.equal(isOutsideMapScope({ path: "Assets/Scripts/Battle/Card.cs" }), false);
+    assert.equal(isOutsideMapScope({ path: "Assets\\Scripts\\Battle\\Card.cs" }), false);
+    assert.equal(isOutsideMapScope({ path: "Assets/SO/Card.asset" }), false);
+  });
+
+  check("19. outside-map .cs search writes observation marker without changing policy", () => {
+    assert.equal(hook("PreToolUse", "Bash", { command: "rg Card Assets/Table/SpecDatas.cs" }, undefined, "scope-observe"), null);
+    const log = fs.readFileSync(path.join(stateRoot, "map-gate.log"), "utf8");
+    assert.ok(log.includes(MAP_SCOPE_OUTSIDE_MARKER));
+  });
+
+  console.log(`map-gate tests: ${passed}/19 passed (subagent context: 미검증 — sidechain 기록 없음)`);
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

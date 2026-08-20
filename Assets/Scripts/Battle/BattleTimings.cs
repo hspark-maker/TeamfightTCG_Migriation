@@ -36,13 +36,13 @@
 /// 15   BoardChanged   BattleField 보드 구성 변화        동기 void. 아래 ※
 ///
 /// ※ BoardChanged: 필드의 **라이브 카드 구성이 바뀔 때마다** 발화한다(배치 확정 / 등장 / 제거).
-///   "필드의 X 수만큼"처럼 보드를 세서 파생 상태를 유지해야 하는 효과(성벽 피해감소)가 쓴다.
+///   "필드의 X 수만큼"처럼 보드를 세서 파생 상태를 유지해야 하는 효과가 쓴다.
 ///   발화점은 전부 BattleField 안이다 — ApplyDeckSynergy / NotifyEntered / RemoveCard.
 ///
 /// ※ Hit(7)은 **훅이 없다.** 타임라인상 실재하는 지점(모든 피해원이 통과하는 CardInstance.TakeDamage)이라
 ///   어휘에는 남겨두지만, 구 CardPassive.OnHit이 구현체 0이라 제거했다. 필요해지면 여기에 되살린다.
 ///
-/// ★ Attacked가 **동기 void**인 이유: 성벽/가시 반격이 치사 래치(AttackProcessor의 t_defKilled)보다
+/// ★ Attacked가 **동기 void**인 이유: 가시 등 피격 반응이 치사 래치(AttackProcessor의 t_defKilled)보다
 ///   **먼저** hp에 반영돼야 한다. UniTask면 await 지점에서 래치가 반격 전 hp를 읽을 수 있다.
 ///   양쪽 계약을 통일할 때는 **느슨한 쪽이 아니라 엄격한 쪽**으로 맞춘다.
 ///
@@ -50,14 +50,13 @@
 ///   Removed와 슬롯 제거가 통째로 스킵된다. 두 타이밍을 하나로 합칠 수 없는 이유.
 ///
 /// ── 결정론 규약 (전 타이밍 공통) ──────────────────────────────────────────
-/// - **훅에서 MatchRandom 소비 금지.** 게임 RNG 소비는 AttackProcessor.PickSplash 한 곳과
-///   OrnnPassive(AfterAttack, await 경로)뿐이다. .Forget/동기 void 훅에서 뽑으면 즉시 divergence.
+/// - **훅에서 MatchRandom 소비 금지. 예외 없음.** .Forget/동기 void 훅에서 뽑으면 즉시 divergence.
 /// - .Forget으로 발화되는 훅은 **첫 await 전에 상태변이를 완결**해야 한다(양 클라 동형 보장).
 /// - 순서는 데이터가 아니라 코드로 고정. 한 타이밍에서 **passive → synergy** 순으로 발화한다.
 ///
 /// ◆ DeckResolved만 **synergy → passive** 역순이다. 고칠 수 있는 순서 문제가 아니라 구조적 제약이다:
 ///   `SynergyApplier.ApplyAll` **안에** `ClearSynergy()`가 있어서, passive를 먼저 돌리면 passive가 넣은
-///   synergyAtk/keywords/dmgReduction이 그 Clear에 통째로 지워진다. 순서를 뒤집으려면 ClearSynergy 소유권을
+///   synergy keywords/dmgReduction이 그 Clear에 통째로 지워진다. 순서를 뒤집으려면 ClearSynergy 소유권을
 ///   ApplyAll 밖으로 빼야 한다. 지금은 결과 영향 0(passive DeckResolved 구현체 없음).
 /// </summary>
 public static class BattleTimings { }
