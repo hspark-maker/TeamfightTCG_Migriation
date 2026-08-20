@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 전투 결과 팝업의 등장 연출 진행자.
-// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 장씩 골드로 빨려들며 계단식 가산) → 랭크 줄 → 안내문.
+// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 박에 통째로 골드로 빨려들며 가산) → 랭크 줄 → 안내문.
 // 패배 팝업은 라인 등장까지만 하고 분출·롤링을 접는다 — 같은 스크립트를 승패 플래그로 갈라 쓴다.
 public class GameResultPopup : MonoBehaviour
 {
@@ -45,7 +45,10 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] float dimAlpha = 0.94f;      // 암막 짙기(ScreenDim에 넘기는 값)
     [SerializeField] float enterDuration = 0.45f;
     [SerializeField] float rewardRevealDuration = 0.3f; // 패널 등장 뒤 보상 라인이 팝하는 시간.
-    [SerializeField] float goldRollDuration = 0.15f;    // 아이콘 하나가 닿을 때 수치가 굴러가는 시간(골드·랭크 공용).
+    [Tooltip("도착에 맞춰 수치가 굴러가는 시간(골드·랭크 공용). 생존 카드는 한 박에 다 닿으므로 골드는 "
+           + "이 시간 동안 0에서 확정값까지 한 번에 오른다 — 카드가 날아가는 시간(SurvivorGoldFlight의 "
+           + "flyDuration)보다 많이 짧으면 숫자가 카드보다 먼저 도착해 인과가 끊긴다.")]
+    [SerializeField] float goldRollDuration = 0.15f;
     [SerializeField] float hintFadeDuration = 0.25f;
 
     [Tooltip("골드 줄이 패널 팝의 몇 지점에서 끼어드는가(0=동시, 1=끝난 뒤). 매 판 보는 화면이라 겹쳐서 줄인다.")]
@@ -85,11 +88,11 @@ public class GameResultPopup : MonoBehaviour
     /// <summary>
     /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
-    /// _survivorCards는 승리 보상을 만든 생존 카드로, 한 장씩 골드로 빨려들며 계단을 만든다.
+    /// _survivorCards는 승리 보상을 만든 생존 카드로, 한 박에 통째로 골드로 빨려든다.
     /// null과 빈 리스트는 다른 뜻이다 — null은 "생존 수를 모른다"(코인 분출로 폴백),
     /// 빈 리스트는 "0장"(카드도 코인도 없이 하한 보상만). 합치면 카드 없이 코인이 터져 인과가 거꾸로 학습된다.
     /// _fallenCards는 이번 판에 잃은 카드로, 같은 줄 오른쪽에 흑백으로 서기만 한다 —
-    /// 보상에도 골드 계단의 분모에도 관여하지 않는다. 오직 "몇 장 중"을 보여주는 몫이다.
+    /// 보상에도 골드 가산의 분모에도 관여하지 않는다. 오직 "몇 장 중"을 보여주는 몫이다.
     /// </summary>
     public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true,
                      IReadOnlyList<CardData> _survivorCards = null,
@@ -107,7 +110,7 @@ public class GameResultPopup : MonoBehaviour
         IReadOnlyList<CardData> t_cards  = _won ? _survivorCards : null;
         IReadOnlyList<CardData> t_fallen = _won ? _fallenCards   : null;
 
-        // 카드가 0장이면 굴릴 계단이 없다 — 0에서 출발시키면 어디서 왔는지 모를 숫자가 혼자 오른다.
+        // 카드가 0장이면 값을 실어 나를 것이 없다 — 0에서 출발시키면 어디서 왔는지 모를 숫자가 혼자 오른다.
         bool t_goldWillRoll = _won && t_gold != 0 && (t_cards == null || t_cards.Count > 0);
 
         ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_cards, t_fallen);
@@ -153,8 +156,8 @@ public class GameResultPopup : MonoBehaviour
     }
 
     // 골드 줄. 수치가 팝하는 동안 이번 판에 데리고 나간 카드가 나란히 서고(전사는 흑백으로 오른쪽),
-    // 살아남은 카드만 한 장씩 골드로 빨려들며 그만큼 계단이 오른다.
-    // 카드 축이 설 수 없으면(_cards == null) 예전 코인 분출로 폴백한다 — 계단 없이 값만 툭 뜨는 것보다 낫다.
+    // 살아남은 카드가 한 박에 통째로 골드로 빨려들며 그만큼 수치가 오른다.
+    // 카드 축이 설 수 없으면(_cards == null) 예전 코인 분출로 폴백한다 — 값만 툭 뜨는 것보다 낫다.
     // _cardsFlew는 호출자가 랭크 줄을 뒤로 미룰지 판단하는 데 쓴다.
     Sequence BuildGoldLine(bool _animate, IReadOnlyList<CardData> _cards, IReadOnlyList<CardData> _fallen,
                            out bool _cardsFlew)

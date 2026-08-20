@@ -224,19 +224,15 @@ MonoBehaviour:
     maxRowWidth: 1000
     enterStagger: 0.06
     enterDuration: 0.18
-    enterRise: 90
     maxEnterSpan: 0.45
     holdBase: 0.3
     holdPerCard: 0.03
-    flyStagger: 0.18
     flyDuration: 0.26
     flyScale: 0.18
     flySpin: 12
-    maxFlySpan: 1
     fallenTint: {r: 0.42, g: 0.42, b: 0.48, a: 1}
     fallenFadeDuration: 0.2
     crumbleDuration: 0.35
-    crumbleStagger: 0.04
     crumbleEdgeColor: {r: 0.62, g: 0.72, b: 0.95, a: 1}
     crumbleEdgeWidth: 0.2
     crumbleSink: 8
@@ -245,7 +241,7 @@ MonoBehaviour:
   dimAlpha: 0.94
   enterDuration: 0.45
   rewardRevealDuration: 0.3
-  goldRollDuration: 0.15
+  goldRollDuration: 0.26
   hintFadeDuration: 0.25
   panelOverlap: 0.6
   rankOverlap: 0.3
