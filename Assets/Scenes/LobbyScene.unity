@@ -791,6 +791,14 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1666237788719880847, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: d19fee22f76f74de3899afcfb6db29f2, type: 3}
+    - target: {fileID: 2032130053468978476, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 150.00024
+      objectReference: {fileID: 0}
     - target: {fileID: 2070003143218701192, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0
@@ -810,6 +818,10 @@ PrefabInstance:
     - target: {fileID: 2133760500883959679, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 53.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 3167194917130028334, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -100.000244
       objectReference: {fileID: 0}
     - target: {fileID: 3698317298848926238, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_LocalPosition.y
@@ -841,11 +853,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6721733558820667366, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_CellSize.x
-      value: 534.72284
+      value: 320
       objectReference: {fileID: 0}
     - target: {fileID: 6721733558820667366, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_CellSize.y
-      value: 711.73456
+      value: 425.93103
+      objectReference: {fileID: 0}
+    - target: {fileID: 6791821487794382101, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -189.0393
       objectReference: {fileID: 0}
     - target: {fileID: 7199074612625639083, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
       propertyPath: m_Pivot.x
@@ -948,6 +964,7 @@ PrefabInstance:
     - {fileID: 3127148494837582176, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
     m_RemovedGameObjects:
     - {fileID: 4701944558679076711, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
+    - {fileID: 5428781983957731503, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1c1712ad39fe2fb49b161eae277c37f7, type: 3}
