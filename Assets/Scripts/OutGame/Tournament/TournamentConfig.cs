@@ -1,27 +1,14 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 // 보상 토너먼트 저작 데이터 — 챕터 → 정점 2계층의 단일 진실원.
 // 소비처가 쓰는 평탄 정점 인덱스는 전부 여기서 파생한다(챕터 경계는 이 애셋만 안다).
 [CreateAssetMenu(fileName = "TournamentConfig", menuName = "Card Battle/Tournament Config")]
 public class TournamentConfig : ScriptableObject
 {
-    // 레거시 평탄 목록을 감쌀 때 쓰는 합성 챕터 키(저작된 챕터가 이 키를 쓰면 안 된다)
-    public const string LEGACY_CHAPTER_ID = "legacy";
-
-    const int LEGACY_CHAPTER_SIZE = 6;   // 1챕터 = 정점 6개(이관 규격)
-
     [Header("챕터 목록 (순서 = 진행 순서, 아래로 갈수록 뒤)")]
     [SerializeField] List<TournamentChapterDef> chapters = new List<TournamentChapterDef>();
-
-    // 챕터 도입 이전의 평탄 정점 목록(레거시). chapters가 비어 있을 때만 임시 챕터 하나로 감싸 읽는다 —
-    // 세이브에는 영향이 없는 읽기전용 파생이다. 숨긴 필드라 인스펙터로는 옮길 수 없으니
-    // 우클릭 [레거시 nodes → 챕터 이관]으로 옮겨라. 이관이 끝나면 이 필드는 제거될 예정이다.
-    [SerializeField, HideInInspector] List<TournamentNodeDef> nodes = new List<TournamentNodeDef>();
 
     // 평탄화 캐시 — 최초 접근 시 구축, OnValidate에서 무효화
     bool m_built;
@@ -31,9 +18,6 @@ public class TournamentConfig : ScriptableObject
     List<int> m_nodeChapters;
     Dictionary<string, int> m_nodeIndexById;
     Dictionary<string, int> m_chapterIndexById;
-
-    // 챕터·레거시 동시 저작 경고는 세션 1회만 — EnsureBuilt는 캐시가 무효화될 때마다 다시 돈다
-    static bool s_legacyWarned;
 
     // 전체 정점 수(챕터를 가로지른 합). 소비처는 맵 셀 수를 이 값에서 파생한다
     public int NodeCount
@@ -189,23 +173,7 @@ public class TournamentConfig : ScriptableObject
         m_nodeIndexById.Clear();
         m_chapterIndexById.Clear();
 
-        int t_legacyCount = nodes != null ? nodes.Count : 0;
-
-        if (chapters != null && chapters.Count > 0)
-        {
-            m_chapters.AddRange(chapters);
-
-            if (t_legacyCount > 0 && !s_legacyWarned)
-            {
-                s_legacyWarned = true;
-                Debug.LogWarning($"[Tournament] 챕터와 레거시 nodes가 둘 다 저작돼 있다 — 레거시 정점 {t_legacyCount}개는 무시된다. " +
-                                 "TournamentConfig 우클릭 [레거시 nodes → 챕터 이관]으로 옮기고 비워라.");
-            }
-        }
-        else if (t_legacyCount > 0)
-        {
-            m_chapters.Add(WrapLegacy());
-        }
+        if (chapters != null) m_chapters.AddRange(chapters);
 
         for (int t_c = 0; t_c < m_chapters.Count; t_c++)
         {
@@ -232,19 +200,6 @@ public class TournamentConfig : ScriptableObject
         m_built = true;
     }
 
-    // 챕터 이전 저작을 런타임에서만 챕터 1개로 감싼다(세이브 무관, 저작 이관 전 임시 경로)
-    TournamentChapterDef WrapLegacy()
-    {
-        return new TournamentChapterDef
-        {
-            chapterId = LEGACY_CHAPTER_ID,
-            title = string.Empty,
-            tilePrefab = null,
-            nodes = nodes,
-            completionRewards = null,
-        };
-    }
-
     // 액수 0 이하는 지급도 표시도 되지 않으므로 담지 않는다
     static void FillFrom(List<AlbumRewardDef> _rewards, List<RewardLine> _sink)
     {
@@ -262,49 +217,5 @@ public class TournamentConfig : ScriptableObject
 #if UNITY_EDITOR
     [ContextMenu("토너먼트 저작 검증")]
     void ValidateTournament() => TournamentValidator.Validate(this);
-
-    /// <summary>레거시 평탄 nodes를 6개씩 끊어 챕터로 옮긴다(1회성 저작 이관).
-    /// nodeId는 그대로 옮긴다 — 세이브 clearedNodeIds의 낙인 키라 바꾸면 기클리어가 통째로 풀린다.</summary>
-    [ContextMenu("레거시 nodes → 챕터 이관")]
-    public void MigrateLegacyNodes()
-    {
-        if (chapters != null && chapters.Count > 0)
-        {
-            Debug.LogWarning($"[Tournament] 챕터가 이미 {chapters.Count}개 저작돼 있어 이관하지 않는다 — 덮어쓰면 저작이 사라진다.");
-            return;
-        }
-
-        if (nodes == null || nodes.Count == 0)
-        {
-            Debug.LogWarning("[Tournament] 이관할 레거시 nodes가 없다.");
-            return;
-        }
-
-        if (chapters == null) chapters = new List<TournamentChapterDef>();
-
-        for (int t_i = 0; t_i < nodes.Count; t_i += LEGACY_CHAPTER_SIZE)
-        {
-            int t_count = Mathf.Min(LEGACY_CHAPTER_SIZE, nodes.Count - t_i);
-            int t_no = chapters.Count + 1;
-
-            chapters.Add(new TournamentChapterDef
-            {
-                chapterId = $"chapter_{t_no:00}",
-                title = $"제{t_no}장",
-                tilePrefab = null,
-                nodes = nodes.GetRange(t_i, t_count),
-                completionRewards = new List<AlbumRewardDef>(),
-            });
-        }
-
-        int t_moved = nodes.Count;
-        nodes.Clear();
-        m_built = false;
-
-        EditorUtility.SetDirty(this);
-        AssetDatabase.SaveAssets();
-
-        Debug.Log($"[Tournament] 레거시 이관 완료 — 정점 {t_moved}개 → 챕터 {chapters.Count}개. 완주 보상은 챕터마다 직접 저작할 것.");
-    }
 #endif
 }

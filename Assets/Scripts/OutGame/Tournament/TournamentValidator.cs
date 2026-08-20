@@ -87,19 +87,22 @@ internal static class TournamentValidator
                 Debug.LogError($"[Tournament] 정점 0개 (챕터 #{t_i} '{t_chapter.title}') — 완주 판정 모수가 없다.");
             }
 
-            // 레거시 합성 챕터는 저작물이 아니다 — 이관 전에는 완주 보상이 없는 게 정상이라 세지 않는다
-            if (!IsLegacy(t_chapter) && CountRewards(t_chapter.completionRewards) == 0)
+            if (CountRewards(t_chapter.completionRewards) == 0)
             {
                 t_fault++;
                 Debug.LogWarning($"[Tournament] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
+            }
+
+            // 챕터 띠의 보상 슬롯이 2칸이라 3줄부터는 앞칸만 뜬다(지급은 되지만 표시가 잘린다)
+            if (CountRewards(t_chapter.completionRewards) > 2)
+            {
+                t_fault++;
+                Debug.LogWarning($"[Tournament] 완주 보상 {CountRewards(t_chapter.completionRewards)}줄 (챕터 #{t_i} '{t_chapter.title}') — 띠 슬롯 2칸을 넘어 뒷줄이 표시되지 않는다.");
             }
         }
 
         return t_fault;
     }
-
-    static bool IsLegacy(TournamentChapterDef _chapter)
-        => string.Equals(_chapter.chapterId, TournamentConfig.LEGACY_CHAPTER_ID, System.StringComparison.Ordinal);
 
     static int CountCards(List<CardData> _cards)
     {
