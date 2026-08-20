@@ -409,6 +409,8 @@ MonoBehaviour:
   content: {fileID: 8428450167813815031}
   nodePrefab: {fileID: 1868372172615882828, guid: d3385ffdf3e2b6b4ab464f92ce667ab9, type: 3}
   backButton: {fileID: 5247582889174933828}
+  bandPrefab: {fileID: 3570876922390722369, guid: 81b178fdcf0ff514e9b24bad1d572fda, type: 3}
+  topPadding: 400
   clearedColor: {r: 1, g: 0.82, b: 0.35, a: 1}
   lockedColor: {r: 1, g: 1, b: 1, a: 0.7}
   transition:

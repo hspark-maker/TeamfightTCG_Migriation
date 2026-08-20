@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TournamentConfig
   chapters:
   - chapterId: chapter_01
-    title: "\uC81C1\uC7A5"
+    title: "\uC81C1\uC7A5 \xB7 \uC548\uAC1C \uC232"
     tilePrefab: {fileID: 8869288645222550817, guid: 6bbd58836419ece4a8496d321a477357, type: 3}
     nodes:
     - nodeId: node_01
@@ -107,9 +107,15 @@ MonoBehaviour:
       - currency: 3
         amount: 25
         icon: {fileID: 0}
-    completionRewards: []
+    completionRewards:
+    - currency: 0
+      amount: 1000
+      icon: {fileID: 0}
+    - currency: 1
+      amount: 30
+      icon: {fileID: 0}
   - chapterId: chapter_02
-    title: "\uC81C2\uC7A5"
+    title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
     tilePrefab: {fileID: 6468447428658967276, guid: f1351b2ef4a274a4f83cb6d9c6801545, type: 3}
     nodes:
     - nodeId: node_07
@@ -202,5 +208,11 @@ MonoBehaviour:
       - currency: 1
         amount: 40
         icon: {fileID: 0}
-    completionRewards: []
+    completionRewards:
+    - currency: 0
+      amount: 2500
+      icon: {fileID: 0}
+    - currency: 1
+      amount: 60
+      icon: {fileID: 0}
   nodes: []

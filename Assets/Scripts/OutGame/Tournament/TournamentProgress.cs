@@ -128,6 +128,21 @@ public static class TournamentProgress
         return true;
     }
 
+    // 챕터 진행 눈금(클리어 수 / 정점 수). 띠가 "3 / 6"을 그리는 단일 기준이라 세는 자리를 화면에 두지 않는다.
+    public static bool TryGetChapterProgress(int _chapterIndex, out int _cleared, out int _total)
+    {
+        _cleared = 0;
+        _total = 0;
+
+        if (!Config.TryGetNodeRange(_chapterIndex, out int t_start, out int t_count)) return false;
+
+        _total = t_count;
+        for (int t_i = 0; t_i < t_count; t_i++)
+            if (StateOf(t_start + t_i) == ETournamentNodeState.Cleared) _cleared++;
+
+        return true;
+    }
+
     public static bool IsChapterRewardClaimed(string _chapterId)
         => !string.IsNullOrEmpty(_chapterId) && ClaimedChapters.Contains(_chapterId);
 
