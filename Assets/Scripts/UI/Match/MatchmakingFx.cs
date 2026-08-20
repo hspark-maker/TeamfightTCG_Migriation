@@ -119,11 +119,19 @@ public class MatchmakingFx
 
     [Min(0.01f)] [SerializeField] float settleDuration = 0.26f;
 
-    [Tooltip("VS가 튀어나오기 전 각도(도). 충돌의 결과로 튀어나온 것처럼 보이게 하는 축이다.")]
-    [SerializeField] float vsSpin = -14f;
-
+    [Tooltip("VS가 꽂히기 전 배율. 이 배율은 t=0에 즉시 적용되고 트윈은 회복만 한다 — 발견 슬램과 같은 규약이다.\n" +
+             "⚠ 되돌아오는 이징에 오버슈트를 쓰지 않는다(OutBack 금지). 1 아래로 언더슛하는 순간 " +
+             "'꽂혔다'가 '통통 튄다'가 된다 — 이 화면의 임팩트는 스쿼시도 회전도 아니고 한 프레임에 몰린 슬램이다.")]
     [Min(0f)] [SerializeField] float vsOvershoot = 0.4f;
+
     [Min(0.01f)] [SerializeField] float vsPopDuration = 0.14f;
+
+    [Tooltip("VS 좌우 가로선이 바깥에서 날아와 글자에 꽂히는 거리(px). 두 배너가 부딪히는 그 프레임에 " +
+             "선도 함께 부딪혀야 화면 전체가 한 사건이 된다.\n" +
+             "0이면 선은 제자리에 있고 배율 축만 남는다.")]
+    [Min(0f)] [SerializeField] float vsDividerTravel = 130f;
+
+    [Min(0.01f)] [SerializeField] float vsDividerDuration = 0.13f;
 
     [Range(-1f, 0f)] [SerializeField] float versusDimPunch = -0.35f;
 
@@ -170,6 +178,13 @@ public class MatchmakingFx
     Tween         m_idleOpponent;
     RectTransform m_idleMyRect;
     RectTransform m_idleOpponentRect;
+
+    // VS 글자를 감싼 좌우 가로선과 그 저작 자리. 어느 쪽이 왼쪽인지는 저작 좌표가 정한다(CaptureVsDividers).
+    RectTransform m_vsLeft;
+    RectTransform m_vsRight;
+    Vector2       m_vsLeftHome;
+    Vector2       m_vsRightHome;
+    bool          m_vsDividersCaptured;
 
     // 조임이 세운 빛. 조임 시퀀스가 끊기고(대치가 무대를 갈아탄다) 나서도 살아 있어야 충돌이 이걸 터뜨릴 수 있다 —
     // 그래서 시퀀스가 아니라 여기가 소유한다. 실제로 걷는 것은 ClearCharge / BuildVersus의 마지막 콜백이다.
@@ -442,11 +457,18 @@ public class MatchmakingFx
         {
             _vs.DOKill();
             _vs.localScale    = Vector3.one * (1f + this.vsOvershoot);
-            _vs.localRotation = Quaternion.Euler(0f, 0f, this.vsSpin);
+            _vs.localRotation = Quaternion.identity;   // 기울이지 않는다 — 아래 주석 참고
 
             // VS는 충돌의 결과로 튀어나온다 — 켜지는 시각이 부딪히는 프레임과 어긋나면 따로 논다.
-            t_seq.Insert(t_hit, _vs.DOScale(1f, this.vsPopDuration).SetEase(Ease.OutBack));
-            t_seq.Insert(t_hit, _vs.DOLocalRotate(Vector3.zero, this.vsPopDuration).SetEase(Ease.OutBack));
+            //
+            // 기울였다 되돌리는 축(예전의 vsSpin + OutBack 회전)은 뺐다. OutBack이 0도를 지나쳤다 돌아와
+            // 배지가 흔들렸고, 배율까지 OutBack이라 1 아래로 언더슛해 두 오버슈트가 겹쳤다 —
+            // 임팩트가 아니라 떨림으로 읽혔다. 이 화면의 임팩트는 스쿼시도 회전도 아니라 한 프레임에 몰린 슬램이다.
+            t_seq.Insert(t_hit, _vs.DOScale(1f, this.vsPopDuration).SetEase(Ease.OutQuint));
+
+            // 좌우 가로선이 바깥에서 날아와 글자에 꽂힌다. 두 배너가 부딪히는 바로 그 프레임이라
+            // 화면 전체가 한 사건이 된다 — 회전이 하던 "충돌의 결과"라는 말을 이쪽이 대신한다.
+            this.StageVsDividers(t_seq, t_hit, _vs);
 
             // 여운의 한 박. 안무가 끝난 화면이 완전히 굳으면 정지가 '멈춤'으로 읽힌다 —
             // 숨 한 번이 "다음이 온다"로 바꿔 준다. 배율은 반드시 1로 돌아온다(Yoyo).
@@ -482,8 +504,77 @@ public class MatchmakingFx
         if (_vs == null) return;
 
         _vs.DOKill();
-        _vs.localScale    = Vector3.one;
+        _vs.localScale = Vector3.one;
+
+        // 회전은 이제 아무도 밀지 않지만 되돌리는 일은 남긴다 — 예전 안무(vsSpin)가 기울여 놓은 채
+        // 굳은 프리팹·씬이 있을 수 있고, 그 기울기를 풀어 줄 곳이 여기뿐이다.
         _vs.localRotation = Quaternion.identity;
+
+        RestoreVsDivider(this.m_vsLeft,  this.m_vsLeftHome,  this.m_vsDividersCaptured);
+        RestoreVsDivider(this.m_vsRight, this.m_vsRightHome, this.m_vsDividersCaptured);
+    }
+
+    // 가로선을 저작 자리로. 홈은 안무가 한 번이라도 돌아야 잡힌다 — 그 전이면 밀린 적이 없어 되돌릴 것도 없다.
+    static void RestoreVsDivider(RectTransform _rect, Vector2 _home, bool _captured)
+    {
+        if (_rect == null || !_captured) return;
+
+        _rect.DOKill();
+        _rect.anchoredPosition = _home;
+    }
+
+    // VS 글자를 감싼 좌우 가로선이 바깥에서 날아와 꽂힌다.
+    //
+    // 어느 것이 왼쪽인지는 저작 좌표가 말해 준다 — 이름이나 자식 순서로 판정하지 않는다(프리팹이 바뀌면 조용히 틀어진다).
+    // 글자(TMP_Text)는 건너뛰고 그림을 가진 자식만 본다.
+    void StageVsDividers(Sequence _seq, float _at, RectTransform _vs)
+    {
+        if (this.vsDividerTravel <= 0f) return;
+
+        this.CaptureVsDividers(_vs);
+
+        this.InsertVsDivider(_seq, _at, this.m_vsLeft,  this.m_vsLeftHome,  -1f);
+        this.InsertVsDivider(_seq, _at, this.m_vsRight, this.m_vsRightHome, +1f);
+    }
+
+    void InsertVsDivider(Sequence _seq, float _at, RectTransform _rect, Vector2 _home, float _side)
+    {
+        if (_rect == null) return;
+
+        _rect.DOKill();
+        _rect.anchoredPosition = _home + new Vector2(_side * this.vsDividerTravel, 0f);
+
+        // 오버슈트 없는 감속. 지나쳤다 돌아오면 선이 글자를 뚫고 나갔다 되돌아온 것으로 보인다.
+        _seq.Insert(_at, _rect.DOAnchorPos(_home, this.vsDividerDuration).SetEase(Ease.OutQuint));
+    }
+
+    // 가로선의 저작 자리는 한 번만 잡는다 — 이미 밀린 값을 다시 캡처하면 매칭마다 선이 바깥으로 걸어 나간다.
+    void CaptureVsDividers(RectTransform _vs)
+    {
+        if (this.m_vsDividersCaptured || _vs == null) return;
+
+        this.m_vsDividersCaptured = true;
+
+        var t_images = _vs.GetComponentsInChildren<Image>(true);
+
+        for (int t_i = 0; t_i < t_images.Length; t_i++)
+        {
+            var t_rect = (RectTransform)t_images[t_i].transform;
+
+            // 그룹 자신에 그림이 붙어 있을 수 있다 — 그건 선이 아니다.
+            if (t_rect == _vs) continue;
+
+            if (t_rect.anchoredPosition.x < 0f && this.m_vsLeft == null)
+            {
+                this.m_vsLeft     = t_rect;
+                this.m_vsLeftHome = t_rect.anchoredPosition;
+            }
+            else if (t_rect.anchoredPosition.x > 0f && this.m_vsRight == null)
+            {
+                this.m_vsRight     = t_rect;
+                this.m_vsRightHome = t_rect.anchoredPosition;
+            }
+        }
     }
 
     // 물러났다 부딪히고 제자리로. 홈 좌표는 호출자가 Awake에서 잡아 둔 값이라 반복해도 밀리지 않는다.
