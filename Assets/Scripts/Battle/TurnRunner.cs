@@ -374,6 +374,15 @@ public class TurnRunner : MonoBehaviour
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
         BattleRewardHandoff.Set(this.lastReward);
 
+        // 토너먼트 전투는 랭크에 반영하지 않는다 — 정산을 통째로 건너뛰고 정점 결과만 로비로 싣는다.
+        // (ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.)
+        if (TournamentRun.IsActive)
+        {
+            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
+            this.lastRankDelta = 0;   // 결과 팝업의 포인트 줄이 직전 판 값을 물려받지 않게
+            return;
+        }
+
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
         // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
         // 다만 튜토 전투는 첫 티어를 넘지 못한다(랭크 진입은 졸업만이 결정한다) — 그 판정을 랭크가 스스로 할 수 없어 여기서 넘긴다.
@@ -404,6 +413,7 @@ public class TurnRunner : MonoBehaviour
         TurnEvents.Reset();
         MatchRandom.Reset();
         TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
+        TournamentRun.End();         // 토너먼트 정점도 같은 수명 — 남으면 다음 판 AI 레벨·랭크 정산이 정점 규칙으로 굳는다.
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
         DeckConfig.ClearEnemyDeck(); // 상대 덱을 확정하지 않는 진입점이 직전 판의 상대를 물려받지 않게(같은 규율).
         MatchOpponentHandoff.Clear();// 매칭 상대 표시도 같은 수명 — 덱만 비우면 다음 판 화면에 직전 상대 이름이 남는다.

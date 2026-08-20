@@ -11,6 +11,7 @@ public static class TutorialStepExecutor
     // 제목 없는 보상 화면을 띄우느니 덜 맞는 문구라도 서는 편이 낫다.
     const string DefaultRewardTitle  = "첫 승리 보너스";
     const string DefaultCardSetTitle = "기본 카드 세트";
+    const string DefaultPackNoticeTitle = "무료 카드팩 도착";
 
     // 스텝 진입 — 무엇을 하고 끝났는지는 반환값이 말한다(호출자가 좌표 델타로 되짚지 않게)
     public static EOutgameTutorialStepResult Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -34,6 +35,7 @@ public static class TutorialStepExecutor
                 return EOutgameTutorialStepResult.Gated;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);
+            case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
             case EOutgameTutorialAction.EnterFirstRank: return EnterFirstRank(_context);
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);
             case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
@@ -41,6 +43,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.DeckGrant:    return EnterDeckGrant(_step, _context);
             case EOutgameTutorialAction.CardGrant:    return EnterCardGrant(_step, _context);
             case EOutgameTutorialAction.CardSetGrant: return EnterCardSetGrant(_step, _context);
+            case EOutgameTutorialAction.PackNotice:   return EnterPackNotice(_step, _context);
         }
 
         // 저작 실수라 정책을 물을 자리가 아니다 — 시퀀스가 이 칸에 걸리지 않게 넘긴다.
@@ -84,6 +87,9 @@ public static class TutorialStepExecutor
         // 실패가 아니라 정상 통과라 실패 정책을 묻지 않는다.
         if (!RankManager.TryEnterFirstTier(out var t_entry))
         {
+            // 볼 연출이 없으니 "연출이 끝난 뒤"가 곧 지금이다 — 트리거 문도 여기서 연다.
+            TriggeredTutorialRunner.NotifyRankPromotionFinished();
+
             _context.CommitAdvance();
             _context.CompleteIfLast();
             return EOutgameTutorialStepResult.Advanced;
@@ -91,9 +97,8 @@ public static class TutorialStepExecutor
 
         RankResultHandoff.Set(t_entry);
 
-        // 이 뒤로 가르칠 것이 없는 관람 구간이다 — 졸업 낙인(연출이 끝나야 찍힌다)을 기다리지 않고
-        // 트리거 튜토리얼의 알림 점이 승급 연출과 나란히 뜨게 문을 먼저 연다.
-        TriggeredTutorialRunner.NotifyOnboardingFinale();
+        // 문은 여기서 열지 않는다 — 연출을 다 본 뒤(Completion.RankEffect)가 여는 자리이고,
+        // 그 신호를 받는 브리지가 연다.
         return EOutgameTutorialStepResult.Gated;
     }
 
@@ -102,6 +107,16 @@ public static class TutorialStepExecutor
     static EOutgameTutorialStepResult EnterCloseCardDetail(OutgameTutorialStepContext _context)
     {
         CardDetailOverlayView.Close();
+
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+        return EOutgameTutorialStepResult.Advanced;
+    }
+
+    // 도감 페이지를 걷어 안내가 시작된 테마 화면으로 무대를 돌려놓는다(다음 안내가 그 화면을 가리킨다).
+    static EOutgameTutorialStepResult EnterCloseAlbumPage(OutgameTutorialStepContext _context)
+    {
+        AlbumPageOverlayView.CloseOpen();
 
         _context.CommitAdvance();
         _context.CompleteIfLast();
@@ -204,18 +219,24 @@ public static class TutorialStepExecutor
 
         // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin));
+        bool t_parallel = _step.ParallelGain;
+        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [획득]이 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(CardData _card, RectTransform _origin)
+    static bool AcquireCard(CardData _card, RectTransform _origin, bool _parallel)
     {
         OwnershipManager.Grant(CardCatalog.IdOf(_card));
 
         CardPackRewardHandoff.Set(CurrencyGain.None, new List<CardData> { _card });
-        if (LobbyGainEffectDirector.PlayNow(_origin)) return true;
+        if (LobbyGainEffectDirector.PlayNow(_origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 다음 안내가 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return true;
+        }
 
         // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
         CardPackRewardHandoff.TryConsume(null, out _);
@@ -250,23 +271,71 @@ public static class TutorialStepExecutor
             return FailAfterSetGrant(_step, _context, t_cards, "보상 오버레이·획득 연출 없음(로비 씬 배선 확인)");
 
         var t_origin = t_overlay.CardAnchor;
-        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin));
+        bool t_parallel = _step.ParallelGain;
+        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [받기]가 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
-    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin)
+    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin, bool _parallel)
     {
         OwnershipManager.GrantAll(ToIds(_cards));
 
         CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
-        if (LobbyGainEffectDirector.PlayNow(_origin)) return;
+        if (LobbyGainEffectDirector.PlayNow(_origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 다음 안내가 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return;
+        }
 
         // 재생이 안 되면 캐리어가 소비되지 못한 채 살아남아 다음 로비 진입의 획득 연출에 섞인다 — 여기서 거둔다.
         CardPackRewardHandoff.TryConsume(null, out _);
         LobbyGainEffectDirector.NotifySkipped();
 
         Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급은 완료).");
+    }
+
+    // 팩이 도착했음을 알리는 자리. 지급도 구매도 하지 않는다 —
+    // 실제 획득은 이 뒤의 상점 스텝 몫이라, 실패해도 되돌릴 것이 없다.
+    //
+    // [확인]을 누르면 팩이 팩 탭으로 빨려들고, 그 비행이 끝난 뒤에야 손가락 안내(다음 스텝)가 선다 —
+    // 탭을 대신 눌러 주지는 않는다. 화면이 저절로 바뀌면 그 이동이 이 팝업과 이어진 한 줄로 읽히지 않는다.
+    //
+    // 진입에 성공하면 완료를 넘기지 않는다(EnterCardGrant와 같은 규약) — 완료는 그 비행의 종료 신호가 확정한다.
+    static EOutgameTutorialStepResult EnterPackNotice(TutorialStepDef _step, OutgameTutorialStepContext _context)
+    {
+        if (_step.Pack == null)
+            return Fail(_step, _context, "PackNotice에 팩이 미배선");
+
+        // 디렉터를 오버레이보다 먼저 본다 — 순서를 뒤집으면 로비가 아닌 씬에서도 팝업이 세워져 그 씬에 남는다.
+        if (!LobbyGainEffectDirector.Exists || !PackRewardOverlay.TryGet(out var t_overlay))
+            return Fail(_step, _context, "예고 오버레이·획득 연출 없음(로비 씬 배선 확인)");
+
+        // 팩이 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 팝업과 탭이 한 줄로 이어진다.
+        var t_origin   = t_overlay.PackAnchor;
+        var t_art      = _step.Pack.PackArt;
+        bool t_parallel = _step.ParallelGain;
+
+        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.Pack, () => FlyPackToTab(t_art, t_origin, t_parallel));
+        return EOutgameTutorialStepResult.Gated;
+    }
+
+    // [확인]이 눌린 순간. 로비 획득 연출에 넘긴다(팩이 팩 탭으로 날아간다) — 지급은 없다, 예고일 뿐이다.
+    // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
+    static void FlyPackToTab(Sprite _art, RectTransform _origin, bool _parallel)
+    {
+        if (LobbyGainEffectDirector.PlayPackFlight(_art, _origin))
+        {
+            // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 손가락이 그 비행과 나란히 선다.
+            if (_parallel) LobbyGainEffectDirector.NotifyDetached();
+            return;
+        }
+
+        // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
+        LobbyGainEffectDirector.NotifySkipped();
+
+        Debug.LogWarning("[TutorialStepExecutor] 팩 비행을 재생하지 못해 생략합니다(안내는 계속 진행).");
     }
 
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context,

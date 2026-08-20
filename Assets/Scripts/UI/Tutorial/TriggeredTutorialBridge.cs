@@ -13,8 +13,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
-    [Tooltip("**실패한** 강화의 결과판을 대신 걷기까지 쥐고 있는 시간(초). 결과 행이 다 떠오른 시점부터 센다.\n" +
-             "성공한 판은 걷지 않는다 — 다음 안내가 그 화면 위에서 이어지고, 닫는 것도 그쪽 몫이다.\n" +
+    [Tooltip("강화 결과판을 대신 걷기까지 쥐고 있는 시간(초). 결과 행이 다 떠오른 시점부터 센다.\n" +
+             "**실패한** 판, 그리고 해금 연출을 기다리는(waitUnlockIntro) **성공한** 판이 이 시간 뒤에 걷힌다.\n" +
+             "그 밖의 성공한 판은 걷지 않는다 — 다음 안내가 그 화면 위에서 이어지고, 닫는 것도 그쪽 몫이다.\n" +
              "튜토리얼 동안에만 적용된다 — 평상시의 결과판은 유저가 탭할 때까지 그대로 서 있다.")]
     [SerializeField] float enhanceResultHold = 1.1f;
 
@@ -30,6 +31,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 그때 버튼은 연출 잠금으로 비활성이라 게이트가 뜨지 못하고 경고만 남는다.
     bool m_enhancing;
 
+    // 강화 성공이 연 해금 연출이 끝나기를 기다리는 구간(waitUnlockIntro 저작이 켜진 스텝에서만).
+    bool m_awaitingUnlockFx;
+
     // 구독이 Start가 아니라 Awake인 이유: 발화 지점인 LobbyTabController.Start()가 이 브리지 Start보다 먼저 돌 수 있고
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
     void Awake()
@@ -42,6 +46,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyUnlockFxFinished   += OnUnlockFxFinished;
         CardDetailOverlayView.OnAnyClosed             += OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
 
@@ -63,6 +68,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
+        CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;
         CardDetailOverlayView.OnAnyClosed             -= OnOverlayClosed;
         AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
 
@@ -235,7 +241,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
-        if (_result.Outcome == EEnhanceOutcome.Success)
+        // 해금 연출을 기다리는 스텝은 성공도 넘기지 않는다 — 결과판을 실패와 같이 대신 걷어
+        // 무대를 돌려줘야 그 연출이 설 자리가 생긴다(m_enhancing은 켠 채 둔다: 연출 중 앵커 재등록으로 손가락이 다시 뜨면 안 된다).
+        if (_result.Outcome == EEnhanceOutcome.Success && !m_step.WaitUnlockIntro)
         {
             // 무대는 아직 강화가 쥐고 있지만 안내는 여기서 손을 뗀다 — 남겨 두면 다음 스텝의 앵커 등록을 무시한다.
             m_enhancing = false;
@@ -252,13 +260,39 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 결과판 없이 끝난 강화(연출 미배선)만 성공 분기로 들어온다.
     void OnEnhanceSettled(EnhanceResult _result)
     {
-        m_enhancing = false;
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance)
+        {
+            m_enhancing = false;
+            return;
+        }
 
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+        if (_result.Outcome == EEnhanceOutcome.Success && m_step.WaitUnlockIntro)
+        {
+            // 이 통지는 해금 연출을 트는 PlayPendingUnlockFx() "다음"에 온다 —
+            // 그래서 지금의 IsUnlockFxPlaying이 "연출이 설지 말지"의 확정 답이다.
+            // 선다면 앵커 가드(m_enhancing)를 켠 채 그 종료 신호를 기다린다.
+            if (CardDetailOverlayView.IsUnlockFxPlaying) { m_awaitingUnlockFx = true; return; }
+
+            m_enhancing = false;
+            OnGateSatisfied();
+            return;
+        }
+
+        m_enhancing = false;
 
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
 
         TryOpenGate();
+    }
+
+    // 해금 연출이 마지막 축까지 끝났다(잘려 끝난 경우 포함) — 미뤄 둔 완료를 여기서 넘긴다.
+    void OnUnlockFxFinished()
+    {
+        if (!m_awaitingUnlockFx) return;
+
+        m_awaitingUnlockFx = false;
+        m_enhancing        = false;
+        OnGateSatisfied();
     }
 
     // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.
@@ -271,7 +305,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
-        if (m_enhancing) return;
+        if (m_enhancing || m_awaitingUnlockFx) return;
         if (m_step == null || _key != m_step.Anchor) return;
 
         TryOpenGate();
@@ -299,8 +333,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     void CloseGate()
     {
-        m_step      = null;
-        m_enhancing = false;
+        m_step             = null;
+        m_enhancing        = false;
+        m_awaitingUnlockFx = false;
 
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
     }

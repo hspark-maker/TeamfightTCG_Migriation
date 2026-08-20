@@ -23,4 +23,6 @@ public class UserSaveData
     public KeywordGrowthSaveData keywordGrowth = new KeywordGrowthSaveData();
 
     public AlbumRewardSaveData albumReward = new AlbumRewardSaveData();
+
+    public TournamentSaveData tournament = new TournamentSaveData();
 }
