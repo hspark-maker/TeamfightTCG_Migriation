@@ -4676,7 +4676,7 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   battleIntro: {fileID: 1572181725}
-  battleBGM: {fileID: 8300000, guid: 140dd8561d180464e9eb100e24b3d143, type: 3}
+  battleBGM: {fileID: 8300000, guid: c24a58a7ceda4aa9a281e4f299b628e4, type: 3}
   tutorialOverlayPrefab: {fileID: 1373953528122502585, guid: 7e3565f15335afd45905a0d13c508ae8, type: 3}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!4 &1572181723
