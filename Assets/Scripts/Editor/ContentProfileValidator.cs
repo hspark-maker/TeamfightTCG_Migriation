@@ -17,6 +17,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     {
         ValidateOrThrow();
         WarnTableDrift(_report);
+        AIDeckBandValidator.WarnBands();
     }
 
     /// <summary>빌드에 실릴 카드 SO가 그 빌드가 쓸 표와 다른지 **경고만** 한다(막지 않는다).
