@@ -10,7 +10,13 @@ using UnityEngine.UI;
 public class GameResultPopup : MonoBehaviour
 {
     [Header("배선")]
+    [Tooltip("정지 타이틀. banner를 배선하지 않은 화면(DefeatUI)만 이쪽으로 돈다 — enterDuration 동안 "
+           + "OutBack으로 팝한다. banner가 있으면 여기엔 손대지 않으니 비워 둬라.")]
     [SerializeField] RectTransform panel;
+
+    [Tooltip("결과 배너(승리/패배 타이틀). 배선하면 panel 대신 이 배너의 Animator 등장이 화면을 이끌고, "
+           + "보상 줄이 그 도중에 끼어든다. 길이는 enterDuration이 아니라 배너의 showDuration을 따른다.")]
+    [SerializeField] VictoryBannerView banner;
     [SerializeField] Button mainMenuButton;       // 전체화면 터치 영역(연출 중엔 스킵, 끝난 뒤엔 메인 이동)
     [SerializeField] string mainMenuScene = "LobbyScene";
     // 암막은 ScreenDim(Canvas 직하 공유 딤)이 그린다 — SafeArea 밖이라 노치까지 덮는다.
@@ -51,7 +57,7 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] float goldRollDuration = 0.15f;
     [SerializeField] float hintFadeDuration = 0.25f;
 
-    [Tooltip("골드 줄이 패널 팝의 몇 지점에서 끼어드는가(0=동시, 1=끝난 뒤). 매 판 보는 화면이라 겹쳐서 줄인다.")]
+    [Tooltip("골드 줄이 타이틀 등장(배너 showDuration 또는 enterDuration)의 몇 지점에서 끼어드는가(0=동시, 1=끝난 뒤). 매 판 보는 화면이라 겹쳐서 줄인다.")]
     [SerializeField, Range(0f, 1f)] float panelOverlap = 0.6f;
 
     [Tooltip("랭크 줄이 골드 줄 끝보다 이만큼 일찍 시작한다.")]
@@ -70,7 +76,15 @@ public class GameResultPopup : MonoBehaviour
 
     void Awake()
     {
-        this.panel.localScale = Vector3.zero;
+        // 타이틀은 배너든 패널이든 하나는 있어야 한다. 둘 다 비면 제목 없이 보상 줄만 뜨는데,
+        // 매 판 보는 화면이라 조용히 넘어가면 아무도 배선이 끊긴 줄 모른다.
+        if (this.banner == null && this.panel == null)
+            Debug.LogError($"[{name}] 결과창에 타이틀이 없다 — banner 또는 panel 중 하나는 배선해야 한다.", this);
+
+        // 배너가 화면을 이끄는 배선에서는 패널 스케일에 손대지 않는다 — Animator 포즈와 싸운다.
+        if (this.banner == null && this.panel != null)
+            this.panel.localScale = Vector3.zero;
+
         this.mainMenuButton?.onClick.AddListener(HandleTouch);
 
         this.m_gold = new RollingCounter(this.rewardGoldText, gameObject, this.goldRollDuration, this.goldPunch);
@@ -115,7 +129,10 @@ public class GameResultPopup : MonoBehaviour
 
         ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_cards, t_fallen);
 
-        this.revealSeq = DOTween.Sequence().SetLink(gameObject);
+        // 결과 연출은 통째로 unscaled로 돈다. 배너 Animator가 unscaled로 못박혀 있는 데다,
+        // 부전승 경로(TurnRunner의 _withBeat:false)는 결정타 강조가 눌러둔 timeScale을
+        // 되돌리지 않고 이 팝업으로 들어온다 — scaled로 두면 배너만 정상 속도로 서고 보상 줄이 기어온다.
+        this.revealSeq = DOTween.Sequence().SetUpdate(true).SetLink(gameObject);
 
         float t_cursor = 0f;
 
@@ -131,17 +148,33 @@ public class GameResultPopup : MonoBehaviour
             t_cursor += this.dimDuration;
         }
 
-        this.revealSeq.Insert(t_cursor, this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
+        // 타이틀 등장. 배너가 배선돼 있으면 그 Animator 재생이 이 자리를 대신한다 —
+        // 트윈이 아니라 자기가 도므로 시퀀스는 그 길이만큼 비워 두고 뒷줄을 그 위에 겹친다.
+        float t_enter = this.enterDuration;
+        if (this.banner != null)
+        {
+            t_enter = this.banner.ShowDuration;
+            this.revealSeq.InsertCallback(t_cursor, this.banner.Show);
+        }
+        else if (this.panel != null)
+        {
+            this.revealSeq.Insert(t_cursor, this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
+        }
 
-        float t_end = t_cursor + this.enterDuration;
+        float t_end = t_cursor + t_enter;
 
-        // 골드 줄은 패널이 다 커지기 전에 끼어든다 — 순차로 두면 그만큼 결과 화면이 길어진다.
-        float t_goldAt = t_cursor + this.enterDuration * this.panelOverlap;
+        // 골드 줄은 타이틀이 다 서기 전에 끼어든다 — 순차로 두면 그만큼 결과 화면이 길어진다.
+        float t_goldAt = t_cursor + t_enter * this.panelOverlap;
         t_end = Mathf.Max(t_end, InsertLine(BuildGoldLine(_won, t_cards, t_fallen, out bool t_cardsFlew), t_goldAt));
 
         // 카드가 날아갈 때만 랭크를 뒤로 미룬다(꼬리는 물린다). 그 외에는 예전처럼 같은 시점에 겹친다.
         float t_rankAt = t_cardsFlew ? Mathf.Max(t_goldAt, t_end - this.rankOverlap) : t_goldAt;
         t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_rank, this.rankBurst, _won), t_rankAt));
+
+        // 배너는 콜백 한 번으로 켜질 뿐 시퀀스에 길이를 남기지 않는다.
+        // 끝점을 못 박아 두지 않으면 뒷줄이 전부 미배선인 화면에서 duration 0으로 즉시 완료되고,
+        // 배너가 도는 중에 m_revealDone이 서서 첫 터치가 스킵이 아니라 씬 이동이 된다.
+        this.revealSeq.InsertCallback(t_end, () => { });
 
         if (this.hintGroup != null)
             this.revealSeq.Insert(t_end, this.hintGroup.DOFade(1f, this.hintFadeDuration));
@@ -237,7 +270,8 @@ public class GameResultPopup : MonoBehaviour
     void ResetVisual(long _gold, long _rankDelta, bool _animate, bool _goldWillRoll,
                      IReadOnlyList<CardData> _survivorCards, IReadOnlyList<CardData> _fallenCards)
     {
-        this.panel.localScale = Vector3.zero;
+        if (this.banner != null) this.banner.HideImmediate();
+        else if (this.panel != null) this.panel.localScale = Vector3.zero;
 
         if (this.dimGroup != null) this.dimGroup.alpha = 0f;
         if (this.hintGroup != null) this.hintGroup.alpha = 0f;
@@ -273,6 +307,10 @@ public class GameResultPopup : MonoBehaviour
         {
             if (this.revealSeq != null && this.revealSeq.IsActive()) this.revealSeq.Complete(true);
             else this.m_revealDone = true;   // 시퀀스가 이미 사라진 예외 상황 — 다음 터치가 먹히게.
+
+            // 배너는 트윈이 아니라 Animator라 Complete로 끝나지 않는다.
+            // Complete가 콜백을 먼저 흘려 Show를 켜므로, 그 뒤에 최종 포즈로 못 박는다.
+            if (this.banner != null) this.banner.ShowImmediate();
             return;
         }
 
@@ -342,8 +380,10 @@ public class GameResultPopup : MonoBehaviour
             long t_start = m_shown;
 
             m_rollTween?.Kill();
+            // 시퀀스와 같은 시계(unscaled)로 굴린다 — 도착과 숫자가 어긋나면 인과가 끊긴다.
             m_rollTween = DOVirtual.Float(0f, 1f, m_rollDuration,
                                           _t => Render(t_start + (long)((t_goal - t_start) * _t)))
+                                   .SetUpdate(true)
                                    .SetLink(m_link)
                                    .OnComplete(() => Render(t_goal));
 
@@ -351,6 +391,7 @@ public class GameResultPopup : MonoBehaviour
             m_punchTween?.Kill(true);
             m_punchTween = m_text.transform
                                  .DOPunchScale(Vector3.one * m_punch, m_rollDuration, 1, 0.6f)
+                                 .SetUpdate(true)
                                  .SetLink(m_link);
         }
 
