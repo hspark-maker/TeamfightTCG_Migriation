@@ -24,7 +24,13 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [SerializeField] Button keywordGrowthButton;
 
+    [Header("보상 토너먼트")]
+    [Tooltip("보상 토너먼트 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
+    [SerializeField] Button tournamentButton;
+
     public event Action PlayRequested;
+
+    public event Action TournamentRequested;
 
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
@@ -34,11 +40,15 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
+        if (tournamentButton != null) tournamentButton.onClick.AddListener(HandleTournamentRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
 
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         LobbyRankEffectDirector.OnAnyFinished += RefreshPlayLabel;
+
+        // 같은 이유로 여기서 무장한다(정점 보상 팝업은 탭 활성과 무관하게 떠야 한다). 내부에 멱등 가드가 있다.
+        TournamentReturnFlow.Arm();
     }
 
     // 첫 반영은 Awake가 아니라 여기다 — 디렉터의 Awake보다 먼저 물으면 "연출 없음"으로 읽혀 결말을 미리 말한다.
@@ -52,6 +62,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
+        if (tournamentButton != null) tournamentButton.onClick.RemoveListener(HandleTournamentRequested);
 
         LobbyRankEffectDirector.OnAnyFinished -= RefreshPlayLabel;
     }
@@ -94,4 +105,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     }
 
     void HandlePlayRequested() => PlayRequested?.Invoke();
+
+    void HandleTournamentRequested() => TournamentRequested?.Invoke();
 }

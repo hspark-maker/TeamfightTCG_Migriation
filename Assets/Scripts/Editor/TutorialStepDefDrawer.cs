@@ -100,12 +100,14 @@ public class TutorialStepDefDrawer : PropertyDrawer
         if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
         if (TutorialStepDef.UsesMessagePlacement(_action)) yield return "messageAtBottom";
         if (TutorialStepDef.UsesFreeOfCharge(_action))   yield return "freeOfCharge";
+        if (TutorialStepDef.UsesWaitUnlockIntro(_action)) yield return "waitUnlockIntro";
         if (TutorialStepDef.UsesPack(_action))           yield return "pack";
         if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
         if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
         if (TutorialStepDef.UsesCard(_action))           yield return "card";
         if (TutorialStepDef.UsesCards(_action))          yield return "cards";
         if (TutorialStepDef.UsesRewardTitle(_action))    yield return "rewardTitle";
+        if (TutorialStepDef.UsesParallelGain(_action))   yield return "parallelGain";
         if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
         if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
         if (TutorialStepDef.UsesFailurePolicy(_action))  yield return "onFailure";

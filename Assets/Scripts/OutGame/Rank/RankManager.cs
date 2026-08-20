@@ -329,7 +329,8 @@ public readonly struct RankInfo
     // 첫 티어 미도달(언랭크). TierIndex는 이때도 0이라 인덱스로는 구분되지 않는다.
     public readonly bool IsUnranked;
 
-    /// <summary>현재 단계를 얼마나 채웠는가(0~1). 최대 티어는 1 — 더 갈 곳이 없어 게이지를 비워 두면 오해가 된다.</summary>
+    /// <summary>현재 단계를 얼마나 채웠는가(0~1) = 별 줄이 그리는 값. 1승이 정확히 1/4이다.
+    /// 최대 티어는 1 — 더 갈 곳이 없어 게이지를 비워 두면 오해가 된다.</summary>
     public float TierProgress
     {
         get
@@ -340,9 +341,6 @@ public readonly struct RankInfo
             return t_span > 0 ? Mathf.Clamp01((float)(Points - TierRequired) / t_span) : 0f;
         }
     }
-
-    /// <summary>등급 안 4단계를 통틀어 얼마나 왔는가(0~1). 1 = 승급선.</summary>
-    public float GradeProgress => (Division - 1 + TierProgress) / RankConfig.DivisionsPerGrade;
 
     public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _tierRequired, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
     {

@@ -9,19 +9,26 @@ public class RankConfig : ScriptableObject
     // 등급당 단계 수(티어 인덱스 = 등급인덱스 * 4 + 단계 - 1)
     public const int DivisionsPerGrade = 4;
 
+    /// <summary>단계 하나를 채우는 승수 = 별 줄의 칸 수. 1승이 별 한 칸이고, 네 칸이 차면 다음 단계다(브론즈 1 → 브론즈 2).
+    /// <see cref="DivisionsPerGrade"/>와 값은 같지만 뜻이 다르다 — 이쪽은 단계 <b>안</b>을, 저쪽은 등급 <b>안</b>을 나눈다.
+    /// 별을 세는 자리는 전부 이 값을 봐야 한다.</summary>
+    public const int WinsPerDivision = 4;
+
     // 승리 시 더할 랭크 포인트
-    [Tooltip("승리 시 더할 랭크 포인트. 전 등급 공용이다. 저작 규칙: 모든 등급의 pointsPerDivision보다 작게 둔다 — " +
-             "그래야 '이겼는데 단계는 아직'인 판이 생겨 한 단계가 여러 판의 결과로 읽힌다. " +
-             "가장 좁은 등급(현재 브론즈 20)에서도 2승은 걸리게 잡는다. 같게 두면 1승 = 1단계라 단계 표시가 승패 로그와 다를 게 없어진다. " +
+    [Tooltip("승리 시 더할 랭크 포인트 = 별 한 칸. 전 등급 공용이다. 저작 규칙: 모든 등급의 pointsPerDivision을 " +
+             "이 값 x 4(별 칸 수)로 맞춘다 — 어긋나면 1승이 별 한 칸을 정확히 채우지 못하고 칸 경계가 승패와 따로 논다. " +
+             "값 자체를 바꿀 일은 거의 없다(화면에 포인트 수치가 없어 크기는 보이지 않는다). 너무 작게 잡지는 말 것 — " +
+             "일반 전투 천장이 '다음 등급 진입선 - 1'이라, 단계 폭이 좁으면 그 1점 센티널이 별 한 칸을 통째로 삼켜 마지막 승리가 안 보인다. " +
              "승급전(다음 등급 진입선 바로 아래에서 치르는 한 판)에는 이 값이 쓰이지 않는다 — 승급전은 가감이 아니라 스냅이다.")]
     public long winPoints = 10;
 
     // 패배 시 뺄 랭크 포인트(양수로 입력)
-    [Tooltip("패배 시 뺄 랭크 포인트. 양수로 입력한다(코드에서 뺀다). 저작 규칙: winPoints보다 작게 둔다(승/패 비대칭) — " +
-             "같게 두면 승률 50%에서 진행이 제자리라 계속 이겨야만 오르는 게임이 된다. " +
-             "포인트 바닥은 현재 단계의 진입 임계치라 등급도 단계도 내려가지 않는다 — 한 번 켠 별은 꺼지지 않고, 이 값은 단계 안 진행률만 깎는다. " +
-             "승급전에도 이 값이 쓰이지 않는다(패배 시 그 단계 절반으로 스냅).")]
-    public long losePoints = 6;
+    [Tooltip("패배 시 뺄 랭크 포인트 = 별 한 칸. 양수로 입력한다(코드에서 뺀다). 1승 1칸 / 1패 1칸의 대칭이라 winPoints와 같게 둔다. " +
+             "그래서 단계 안에서는 승률 50%면 제자리이고, 오르려면 절반보다 더 이겨야 한다. " +
+             "다만 포인트 바닥이 현재 단계의 진입 임계치라 한 번 딴 단계는 잃지 않는다(별 줄이 비어도 브론즈 2는 브론즈 2다) — " +
+             "이 값은 현재 단계 안의 별만 깎는다. " +
+             "승급전에는 이 값이 쓰이지 않는다(패배 시 그 단계 절반 = 별 두 칸으로 스냅).")]
+    public long losePoints = 10;
 
     // 첫 티어 미도달(언랭크) 상태의 표시명
     [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
@@ -33,14 +40,15 @@ public class RankConfig : ScriptableObject
     public Sprite unrankedBadge;
 
     // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
-    [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다.")]
+    [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다. " +
+             "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다 — 등급마다 난이도를 다르게 주는 축은 aiCardLevels 하나다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
-        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 20, rewards = GoldOnly(100,  50) },
-        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 180, pointsPerDivision = 30, rewards = GoldOnly(300,  50) },
-        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 300, pointsPerDivision = 40, rewards = GoldOnly(500,  100) },
-        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 460, pointsPerDivision = 50, rewards = GoldOnly(900,  100) },
-        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 660, pointsPerDivision = 60, rewards = GoldOnly(1400, 200) },
+        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 40, rewards = GoldOnly(100,  50) },
+        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 260, pointsPerDivision = 40, rewards = GoldOnly(300,  50) },
+        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 420, pointsPerDivision = 40, rewards = GoldOnly(500,  100) },
+        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 580, pointsPerDivision = 40, rewards = GoldOnly(900,  100) },
+        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 740, pointsPerDivision = 40, rewards = GoldOnly(1400, 200) },
     };
 
     /// <summary>티어별 AI 카드 레벨(index = 티어 인덱스). 난이도 곡선의 단일 진실원.
@@ -243,8 +251,10 @@ public class RankGradeConfig
     public long entryPoints;
 
     // 단계 간 포인트 간격
-    [Tooltip("단계 간 포인트 간격. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. 저작 규칙: entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다. " +
-             "승급전 패배 시 복귀선도 이 값에서 나온다: 4단계 임계치 + 이 값의 절반(= 마지막 단계 50%)으로 스냅한다.")]
+    [Tooltip("단계 간 포인트 간격 = 별 네 칸. 단계 N의 임계치 = entryPoints + (N-1) * 이 값. " +
+             "저작 규칙: 반드시 winPoints x 4(별 칸 수)로 둔다 — 어긋나면 1승이 별 한 칸을 정확히 채우지 못한다. " +
+             "값을 바꿀 때도 entryPoints와 동일하게 하향만 — 상향하면 단계 2~4 임계치가 올라 기존 유저가 소급 강등된다. " +
+             "승급전 패배 시 복귀선도 이 값에서 나온다: 4단계 임계치 + 이 값의 절반(= 별 두 칸)으로 스냅한다.")]
     public long pointsPerDivision;
 
     // 이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다)

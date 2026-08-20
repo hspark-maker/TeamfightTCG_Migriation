@@ -21,6 +21,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] DeckImageCatalog deckImageCatalog;
     // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선(null)이면 지급을 건너뛴다.
     [SerializeField] CardPackData starterDeck;
+    // 보상 토너먼트 경로 SO. 미배선(null)이면 정점이 0개라 토너먼트 진입이 열리지 않는다.
+    [SerializeField] TournamentConfig tournamentConfig;
     // 카드 강화·진화 튜닝 SO. 미배선(null)이면 CardGrowthManager가 코드 기본식·기본 게이트로 동작한다.
     [SerializeField] CardGrowthConfig growthConfig;
     // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
@@ -59,6 +61,9 @@ public class BootInstaller : MonoBehaviour
         // 재화 그림 주입 — 조회는 lazy라 재화 UI가 처음 그려지기 전에만 꽂히면 된다.
         CurrencyLook.SetActive(currencyLook);
 
+        // 토너먼트 경로 주입 — 정점 상태 조회가 이 애셋에서 나온다(미배선이면 정점 0개).
+        TournamentProgress.SetConfig(tournamentConfig);
+
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();
         // Live 카탈로그 밖의 레거시 소유 키가 정리된 뒤 튜토리얼 완료 여부를 판정한다.
@@ -83,7 +88,9 @@ public class BootInstaller : MonoBehaviour
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
         // 레벨은 전투 시작 시점에 읽어야 한다(부트 때 굳히면 랭크가 올라도 난이도가 안 따라온다).
         // 레벨은 카드마다 다르다(티어 레벨이 기준값).
-        GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, RankManager.AiCardLevelOf(_card));
+        // 토너먼트 정점은 난이도가 저작 고정이라 랭크 티어를 타지 않는다. 만렙 클램프를 여기서 다시 거는 이유:
+        // 그 클램프가 RankManager.AiCardLevelOf 안에 있어서 이 우회로에는 따라오지 않는다(곡선 밖 레벨은 보너스가 멈춘다).
+        GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevelOf(_card));
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
         // 튜토리얼 전투용 미강화 기준값. 레벨은 바닥 고정이라 체력은 안 오르고 해금 게이트만 산다 —
@@ -115,5 +122,14 @@ public class BootInstaller : MonoBehaviour
         // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
         OutgameTutorialRewind.ApplyReplayIfScheduled();
+    }
+
+    // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
+    static int EnemyCardLevelOf(CardData _card)
+    {
+        if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_card);
+
+        int t_max = CardGrowthManager.MaxLevel;
+        return t_max > 0 && TournamentRun.AiCardLevel > t_max ? t_max : TournamentRun.AiCardLevel;
     }
 }

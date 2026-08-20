@@ -36,7 +36,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     //
     // 손가락·문구가 타깃보다 위인 이유: 딤 위로 승격된 타깃이 자기 위에 겹친 안내를 그대로 덮어버린다.
     // 딤만 타깃 아래에 남는다 — 딤까지 올리면 타깃이 다시 묻혀 누를 수 없게 된다.
-    const int GateOrder     = 350;
+    const int GateOrder     = UiSortingOrder.TutorialGate;
     const int TargetOrder   = GateOrder + 1;
     const int OrnamentOrder = TargetOrder + 1;
 

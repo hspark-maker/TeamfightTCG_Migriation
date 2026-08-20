@@ -64,7 +64,7 @@ public class ScreenFlash : MonoBehaviour
     const string BURST_NAME = "ScreenFlashBurst";
 
     // 어떤 UI보다도 위. 오버레이 캔버스와 다투지 않도록 넉넉히 띄운다.
-    const int SORTING_ORDER = 32000;
+    const int SORTING_ORDER = UiSortingOrder.ScreenFlash;
 
     static ScreenFlash s_instance;
 

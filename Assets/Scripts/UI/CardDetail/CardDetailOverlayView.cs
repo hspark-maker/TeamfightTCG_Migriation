@@ -28,8 +28,8 @@ public readonly struct CardDetailOpenOptions
     /// <summary>강화·진화 조작을 통째로 걷고 표시만 한다(개봉 결과처럼 "확인하는 자리").</summary>
     public readonly bool ReadOnly;
 
-    /// <summary>지금 떠 있는 모든 캔버스 위로 올라탄다. 순서 값은 상세가 스스로 구한다 —
-    /// 여는 쪽은 "위에 떠라"만 말하면 된다.</summary>
+    /// <summary>개봉·보상 화면 위 층으로 올라탄다(<see cref="UiSortingOrder.CardDetailLifted"/>).
+    /// 순서 값은 층 표가 쥔다 — 여는 쪽은 "위에 떠라"만 말하면 된다.</summary>
     public readonly bool LiftAboveAll;
 
     /// <summary>로비 상단 재화 바를 비켜 앉은 크기를 부모 가득 편다.
@@ -187,6 +187,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 판정을 함께 넘기는 이유는 성공과 실패가 다른 길로 가기 때문이다(실패는 같은 자리에서 다시 누르는 일이다).</summary>
     public static event Action<EnhanceResult> OnAnyEnhanceResultReady;
 
+    /// <summary>해금 연출의 마지막 축까지 끝났다(판 걷힘 → 내용 등장 → 전면 안내). 중간에 잘린 경로
+    /// (탭 스킵·카드 전환·창 닫힘)도 같이 쏜다 — 기다리는 쪽(튜토리얼)이 오지 않는 신호를 붙들고
+    /// 그 자리에 굳지 않게 하기 위함이다(fail-open).</summary>
+    public static event Action OnAnyUnlockFxFinished;
+
     /// <summary>떠 있는 강화 결과판을 밖에서 걷는다(튜토리얼 자동 복귀). 탭과 **같은 길**로 흘려보내므로
     /// 무대 복귀·완료 신호(<see cref="OnAnyEnhanceSettled"/>)가 그대로 이어진다. 떠 있지 않으면 아무 일도 없다.</summary>
     public static void CloseEnhanceResult()
@@ -198,6 +203,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+
+    /// <summary>지금 해금 연출이 도는 중인가(판 걷힘 → 내용 등장 → 전면 안내 전체가 한 덩이다).</summary>
+    public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
 
     static CardDetailOverlayView s_instance;
     static bool s_missingWarned;
@@ -364,14 +372,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         return s_instance;
     }
 
-    /// <summary>지금 떠 있는 모든 캔버스 위로 올라타거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
+    /// <summary>이 창을 다른 화면 위 층으로 올리거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
     ///
     /// 필요한 이유: 이 화면은 로비 캔버스 안에 있어(sortingOrder 0) 그보다 위에 뜨는 별도 캔버스 —
     /// 카드팩 개봉 화면 같은 것 — 위에서 열면 그 뒤에 가려 보이지 않는다. 두 캔버스 모두 Overlay 루트라
     /// 계층상의 앞뒤(sibling)로는 순서가 정해지지 않고 sortingOrder만이 답이다.
     ///
     /// <b>순서 값을 여는 쪽에서 받지 않는다.</b> 받으면 상세를 여는 화면마다 "누구보다 위인가"를 각자 계산하고,
-    /// 그중 하나만 옛 값으로 남는다. 지금 화면을 보고 여기서 구하는 편이 계산 지점을 하나로 묶는다.
+    /// 그중 하나만 옛 값으로 남는다. 층은 <see cref="UiSortingOrder"/> 표가 쥐고, 여는 쪽은 "위에 떠라"만 말한다.
+    ///
+    /// <b>지금 떠 있는 캔버스를 재서 그 위에 올라타지 않는다.</b> 재던 시절엔 무대 밖의 상시 캔버스까지 후보가 됐다 —
+    /// 항상 켜져 있는 UIPoolManager 컨테이너(400) 때문에 이 창이 401로 뛰어, 이 창 위에 서야 할
+    /// 해금 안내(UnlockIntroOverlay, 150)가 뒤에 묻혔다. 예외를 하나씩 빼는 방식으로는 다음 상시 캔버스를 못 막는다.
     ///
     /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
     /// 떨어져 나온다 — 없으면 눈에는 위에 보이는데 탭은 밑 화면이 먹는다.
@@ -400,39 +412,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
 
-        // 순서를 먼저 끈다 — 켜진 채로 재면 지난번에 올라탄 자기 값이 후보에 끼어 열 때마다 한 칸씩 올라간다.
-        this.m_sortingCanvas.overrideSorting = false;
-
-        this.m_sortingCanvas.sortingOrder    = TopSortingOrder() + 1;
+        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.CardDetailLifted);
         this.m_sortingCanvas.overrideSorting = true;
-    }
-
-    /// <summary>지금 화면에서 가장 위에 그려지는 순서. 꺼져 있는 캔버스는 세지 않는다 —
-    /// 안 뜬 화면까지 넘으려 들면 값만 커지고 넘을 이유는 없다.
-    ///
-    /// 순서를 실제로 정하는 것은 루트 캔버스이거나 overrideSorting을 켠 캔버스뿐이다.
-    /// 그 외 중첩 캔버스의 sortingOrder는 그려지는 자리와 무관한 값이라 후보에서 뺀다.
-    ///
-    /// 튜토리얼 게이트(350)만은 넘을 대상이 아니라 예외다 — 이 창을 **가리키는** 층이라 항상 위에 있어야 한다.
-    /// 세면 상세가 그 위로 올라타, 상세를 무대로 쓰는 안내(강화·진화)의 딤·문구가 상세 뒤에 깔려 보이지 않는다.</summary>
-    int TopSortingOrder()
-    {
-        int t_top = 0;
-
-        OutgameTutorialGateUI t_gate = OutgameTutorialGateUI.Instance;
-
-        Canvas[] t_canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
-        for (int t_i = 0; t_i < t_canvases.Length; t_i++)
-        {
-            Canvas t_canvas = t_canvases[t_i];
-            if (t_canvas == null || t_canvas == this.m_sortingCanvas) continue;
-            if (t_canvas != t_canvas.rootCanvas && !t_canvas.overrideSorting) continue;
-            if (t_gate != null && t_canvas.transform.IsChildOf(t_gate.transform)) continue;
-
-            t_top = Mathf.Max(t_top, t_canvas.sortingOrder);
-        }
-
-        return t_top;
     }
 
     /// <summary>이 오버레이를 부모(SafeArea) 가득 펴거나 authoring 크기로 되돌린다.
@@ -459,6 +440,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
         if (this.evolveButton  != null) this.m_evolveTone  = this.evolveButton.GetComponent<UIEffect>();
+
+        // 강화는 안내가 그 챕터에 닿기 전까지 잠긴다. 두 버튼은 같은 한 방이 자리를 번갈아 쓰는 것이라 키도 하나다.
+        // 룩만 얹는 부착이다 — 차단은 아래 RefreshGrowthActions의 계산식이 진다.
+        if (this.enhanceButton != null) FeatureLockView.Attach(this.enhanceButton.gameObject, EOutgameFeature.CardEnhance);
+        if (this.evolveButton  != null) FeatureLockView.Attach(this.evolveButton.gameObject,  EOutgameFeature.CardEnhance);
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
         // LongPressDetector가 pointerPress를 가져가 클릭 대상 비교가 어긋난다.
@@ -517,6 +503,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 잔액이 바뀌면 버튼 활성이 따라와야 한다(다른 화면·디버그 지급으로도 바뀐다).
         CurrencyManager.OnCurrencyChanged += HandleCurrencyChanged;
 
+        // 강화 해금은 이 창이 열린 **뒤에** 온다 — 같은 클릭이 도감 칸을 눌러 상세를 먼저 띄우고,
+        // 안내가 그다음 스텝으로 넘어가면서 잠금이 풀린다. 안 들으면 버튼이 잠긴 채로 굳어 안내가 멈춘다.
+        OutgameFeatureLock.OnChanged += OnFeatureLockChanged;
+
         RefreshArrows();
     }
 
@@ -546,6 +536,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         CardGrowthManager.OnGrowthChanged -= OnGrowthChanged;
         CurrencyManager.OnCurrencyChanged -= HandleCurrencyChanged;
+        OutgameFeatureLock.OnChanged      -= OnFeatureLockChanged;
 
         // 전환 도중에 닫히면 slideTarget이 옆으로 밀린 채·반투명인 채 굳는다 → 다음 열기에 그대로 보인다.
         // pending 카드는 버린다 — 안 보이는 채로 칩을 재생성할 이유가 없고, 씬 언로드 경로에서 Instantiate/Destroy를 도는 건 위험하다.
@@ -556,9 +547,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         CancelRituals();
         this.resultPanel?.HideImmediate();
         this.m_retryQueued = false;
-
-        // 안 보이는 채로 터뜨릴 판은 없다. 대기만 버리고 판은 다음 열기의 Build가 지금 상태로 맞춘다.
-        DropPendingUnlockFx();
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
         this.transition.HandleDisabled(gameObject);
@@ -571,6 +559,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 창의 상태를 다시 물어볼 수 있어야 한다.
         OnAnyClosed?.Invoke();
+
+        // 해금 대기는 정리의 맨 끝에서 버린다. 이 파기가 곧 "연출이 끝났다" 신호라
+        // 앞에 두면 그 신호를 받은 쪽(튜토리얼)이 OnDisable 한복판의 이 창에 다시 손을 댄다.
+        // 안 보이는 채로 터뜨릴 판은 없다 — 판은 다음 열기의 Build가 지금 상태로 맞춘다.
+        DropPendingUnlockFx();
     }
 
     void OnDestroy()
@@ -682,7 +675,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 당길 것이 하나도 없었다 = 흐름은 이미 끝났는데 플래그만 남은 자리다(끝 콜백이 잘린 경로).
         // 여기서 내려야 다음 탭에 창이 닫힌다 — 안 그러면 나가는 문이 없는 화면이 된다.
-        if (!t_reveal) this.m_unlockFxPlaying = false;
+        if (!t_reveal) SetUnlockFxPlaying(false);
     }
 
     // 걷히는 중인 판을 지금 끝낸다. 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.
@@ -892,6 +885,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
     }
 
+    // 안내가 강화를 열었다(또는 닫았다) — 잔액 변화와 같은 자리에서 다시 판정하면 된다.
+    void OnFeatureLockChanged()
+    {
+        if (this.m_ritualPlaying) return;
+
+        CardData t_card = CardAt(this.m_index);
+        if (t_card != null) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+    }
+
     // 재화 종류에 따라 버튼 활성만 바뀐다 — 어느 종류든 다시 판정하면 되므로 걸러내지 않는다.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
@@ -1046,7 +1048,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_fx == null && t_keywords == CardKeyword.None && !t_synergy) { ShowBottomBar(); return; }
 
         // 여기부터 마지막 축이 끝날 때까지 탭은 닫기가 아니다(OnPointerClick).
-        this.m_unlockFxPlaying = true;
+        SetUnlockFxPlaying(true);
 
         HideBottomBar();
 
@@ -1073,14 +1075,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         CardData          t_card   = CardAt(this.m_index);
         List<UnlockIntro> t_intros = CollectIntros(t_card, _keywords, _synergy);
-        if (t_intros == null || t_intros.Count == 0) { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
+        if (t_intros == null || t_intros.Count == 0) { ShowBottomBar(); EndUnlockFxAfter(t_reveal); return; }
 
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay))
-        { EndUnlockFxAfter(t_reveal); ShowBottomBar(); return; }
+        { ShowBottomBar(); EndUnlockFxAfter(t_reveal); return; }
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
         // 안내가 서면 그 닫힘이 이 흐름의 끝이다(그동안 화면은 안내가 덮어 이 창에 탭이 오지 않는다).
-        t_overlay.Show(t_intros, t_card, () => { this.m_unlockFxPlaying = false; ShowBottomBar(); });
+        t_overlay.Show(t_intros, t_card, () => { ShowBottomBar(); SetUnlockFxPlaying(false); });
     }
 
     /// <summary>이번에 열린 개념들. 없으면 null.
@@ -1169,16 +1171,26 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 흐름이 끊긴 자리이기도 하다(카드 전환·창 닫힘) — 잘린 안무는 끝 콜백이 오지 않으므로
         // 여기서 내리지 않으면 탭이 영영 닫기로 돌아오지 않는다.
-        this.m_unlockFxPlaying = false;
+        SetUnlockFxPlaying(false);
     }
 
     // 안내가 서지 않는 판의 마지막 축. 이 안무가 끝나면 탭은 다시 닫기다.
     // 도중에 잘리는 경로는 DropPendingUnlockFx가 못 박는다(잘린 트윈에는 이 콜백이 오지 않는다).
     void EndUnlockFxAfter(Tween _reveal)
     {
-        if (_reveal == null || !_reveal.IsActive()) { this.m_unlockFxPlaying = false; return; }
+        if (_reveal == null || !_reveal.IsActive()) { SetUnlockFxPlaying(false); return; }
 
-        _reveal.OnComplete(() => this.m_unlockFxPlaying = false);
+        _reveal.OnComplete(() => SetUnlockFxPlaying(false));
+    }
+
+    // 해금 연출의 "도는 중" 플래그를 여는·닫는 단 하나의 창구. 끝나는 길이 여럿이라(안내 닫힘·마지막 트윈·
+    // 스킵·중단) 신호도 각자 쏘면 중복되거나 빠진다 → 켜짐이 실제로 꺼짐으로 바뀐 전이에서만 한 번 쏜다.
+    void SetUnlockFxPlaying(bool _playing)
+    {
+        if (this.m_unlockFxPlaying == _playing) return;
+
+        this.m_unlockFxPlaying = _playing;
+        if (!_playing) OnAnyUnlockFxFinished?.Invoke();
     }
 
     /// <summary>키워드 줄이 통째로 잠겼는가. 판정이 두 곳에 갈리지 않게 여기 하나로 둔다
@@ -1224,7 +1236,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
-        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying);
+        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying
+                       && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance));
 
         ApplyCost(t_hasStep, t_step);
 
@@ -1732,7 +1745,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         HideChipsFrom(this.keywordChipRoot, t_used);
-        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned);
+
+        // 설명 줄을 누르면 해금 때 봤던 안내를 다시 연다. 목록은 자동 안내와 같은 생성기(CollectIntros)로 만든다 —
+        // 둘이 다른 길로 만들면 문구·순서가 조용히 갈라진다. InfoKeywords는 **지금 열려 있는 것**만이라
+        // 잠긴 키워드는 자연히 빠진다(칩에 남는 잠김 룩과 축이 다르다).
+        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned,
+                     IntroClick(_owned && !this.m_shownKeywordLocked
+                                ? CollectIntros(_card, CardVisualRules.InfoKeywords(_card), false)
+                                : null));
     }
 
     void BuildSynergySection(CardData _card, bool _owned)
@@ -1772,7 +1792,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         HideChipsFrom(this.synergyChipRoot, t_used);
-        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned);
+
+        // 키워드 줄과 같은 규약. 시너지는 관문 하나로 통째로 열리므로 열림 여부만 보면 된다.
+        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned,
+                     IntroClick(_owned && this.m_shownSynergyOpen
+                                ? CollectIntros(_card, CardKeyword.None, true)
+                                : null));
+    }
+
+    /// <summary>이 목록을 여는 손잡이. 세울 것이 없으면 null — 그 자리는 눌리지 않는다.</summary>
+    Action IntroClick(List<UnlockIntro> _intros)
+    {
+        if (_intros == null || _intros.Count == 0) return null;
+        return () => ShowIntros(_intros);
     }
 
     // 카드가 바뀌면 읽던 자리도 같이 바뀐다 — 되감지 않으면 새 카드가 설명 중간부터 펼쳐진 채 들어온다.
@@ -1805,14 +1837,68 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 들쭉날쭉해 어디를 읽던 중이었는지 잃는다. 빈 섹션은 자리를 지킨 채 "없음"(미소유는 ???)만 적는다.
     // 패널 자체의 높이는 프리팹 DetailFrame의 LayoutElement.preferredHeight가 고정하므로,
     // 안쪽 줄 수가 얼마든 카드 그림의 크기·위치는 카드마다 흔들리지 않는다.
-    static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned)
+    //
+    // _onClick이 있으면 섹션 띠 전체가 눌리는 자리가 된다(해금 안내 다시 보기). null이면 눌리지 않는다 —
+    // 열 것이 없는 자리가 눌리는 것처럼 보이면 "눌렀는데 아무 일도 없다"가 된다.
+    static void ApplySection(GameObject _section, TMP_Text _desc, List<string> _lines, bool _owned,
+                             Action _onClick = null)
     {
         if (_desc != null)
             _desc.text = _lines.Count > 0 ? string.Join("\n", _lines)
                        : _owned           ? NoneValue
                                           : LockedName;
 
-        if (_section != null) _section.SetActive(true);
+        if (_section != null)
+        {
+            BindSectionClick(_section, _onClick);
+            _section.SetActive(true);
+        }
+    }
+
+    /// <summary>섹션을 눌러 열 수 있게 만든다. 저작(프리팹)은 건드리지 않고 런타임에만 세운다 —
+    /// 상세창 프리팹을 저장하는 길은 다른 저작까지 함께 흔든다(시너지 아이콘 줄이 SynergyIconButton을
+    /// 런타임에 붙이는 것과 같은 규약).
+    ///
+    /// 손잡이는 설명 줄이 아니라 <b>섹션 뿌리</b>다 — 글자만 받으면 줄이 짧은 카드에서 노릴 곳이 실오라기만 해진다.
+    /// 뿌리엔 그림이 없어 그대로면 탭이 뒤로 통과하므로(= 딤 탭 = 창이 닫힌다) 안 보이는 판을 깔아 띠를 통째로 받는다.
+    /// 칩은 제 버튼을 먼저 먹으므로 칩의 동작은 그대로다.</summary>
+    static void BindSectionClick(GameObject _section, Action _onClick)
+    {
+        var t_button = _section.GetComponent<Button>();
+        if (t_button == null)
+        {
+            var t_hit = _section.GetComponent<Image>();
+            if (t_hit == null)
+            {
+                t_hit = _section.AddComponent<Image>();
+                t_hit.color = Color.clear;
+            }
+
+            t_button = _section.AddComponent<Button>();
+            t_button.targetGraphic = t_hit;
+
+            // 띠에 색 전이를 얹으면 잠김 룩의 회색과 섞여 "지금 눌리는가"가 오히려 안 읽힌다.
+            t_button.transition = Selectable.Transition.None;
+        }
+
+        // 칩과 달리 이 노드는 카드를 넘겨도 그대로 재사용된다 — 지우지 않으면 앞 카드의 개념이 함께 열린다.
+        t_button.onClick.RemoveAllListeners();
+
+        if (t_button.targetGraphic != null) t_button.targetGraphic.raycastTarget = _onClick != null;
+        t_button.interactable = _onClick != null;
+
+        if (_onClick != null) t_button.onClick.AddListener(() => _onClick());
+    }
+
+    /// <summary>개념 안내를 전면에 다시 세운다(해금 순간의 자동 안내와 같은 화면).
+    /// 뒤처리가 없어 닫힘 콜백을 넘기지 않는다 — 그동안 이 창은 오버레이에 덮여 입력을 받지 않는다.</summary>
+    void ShowIntros(List<UnlockIntro> _intros)
+    {
+        if (_intros == null || _intros.Count == 0) return;
+        if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) return;
+
+        // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다(자동 안내와 같은 인자).
+        t_overlay.Show(_intros, CardAt(this.m_index), null);
     }
 
     /// <summary>줄에 <b>미리 깔아 둔</b> _index번째 칩을 채워 켠다. 칩이 모자라면 false —

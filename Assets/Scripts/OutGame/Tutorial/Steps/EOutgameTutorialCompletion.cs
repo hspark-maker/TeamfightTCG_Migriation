@@ -11,6 +11,6 @@ public enum EOutgameTutorialCompletion
     RankEffect,  // 로비 랭크 연출이 끝나는 것이 완료(입력 없음 — 안내가 그 연출 위에 겹치지 않게 기다린다)
     LobbyReturn, // 열려 있던 오버레이가 모두 닫혀 로비 표면이 드러나는 것이 완료
     CardDetailReturn, // 카드 상세 하나가 닫히는 것이 완료(뒤에 남는 도감 페이지까지는 묻지 않는다)
-    CardGain,    // 로비 획득 연출(카드 비행)이 끝나는 것이 완료 — RankEffect와 같은 이유로 기다린다
+    CardGain,    // 로비 획득 연출(카드·팩 비행)이 끝나는 것이 완료 — RankEffect와 같은 이유로 기다린다
     KeywordEnhance, // 키워드 강화 성공이 완료. 무대를 쥐는 결과판이 없어 성공 그 순간에 넘어간다(Enhance와 다르다)
 }

@@ -719,6 +719,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 3274920063880162034, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3274920064314322781, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
       propertyPath: 'm_ActiveFontFeatures.Array.data[0]'
       value: 1801810542
@@ -852,8 +856,8 @@ MonoBehaviour:
   versusRoot: {fileID: 3258554939077957295}
   searchingTitle: "\uC0C1\uB300\uB97C \uCC3E\uB294 \uC911"
   foundTitle: "\uC0C1\uB300\uB97C \uCC3E\uC558\uB2E4!"
-  foundHold: 0.7
-  versusHold: 0.5
+  chargeHold: 0.62
+  afterglowHold: 0.34
   versusApproach: 60
   fx:
     scanSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
@@ -882,6 +886,16 @@ MonoBehaviour:
       burstFall: 0.4
       burstSpin: 0
       burstAdditive: 1
+    chargeDim: -0.32
+    chargeDrift: 8
+    chargeShake: 2.4
+    chargeShakeFreq: 26
+    chargeGlowSize: 260
+    chargeGlowSprite: {fileID: 0}
+    chargeGlowColor: {r: 0.62, g: 0.82, b: 1, a: 1}
+    chargeGlowAlpha: 0.38
+    chargeGlowFrom: 0.55
+    chargeGlowTo: 1.05
     windUpDistance: 26
     windUpDuration: 0.1
     impactDuration: 0.08
@@ -890,6 +904,12 @@ MonoBehaviour:
     vsOvershoot: 0.4
     vsPopDuration: 0.14
     versusDimPunch: -0.35
+    releaseDimPeak: 0.2
+    releaseKick: 0.09
+    releaseGlowBurst: 0.18
+    releaseGlowScale: 2.1
+    afterglowBreath: 0.035
+    afterglowBreathDuration: 0.34
     versusFlash:
       rise: 0.02
       hold: 0
@@ -909,13 +929,25 @@ MonoBehaviour:
       darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
       brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   handoffFx:
-    moveDuration: 0.25
-    cardEndScale: 0.45
-    fadeStart: 0.5
-    versusEndScale: 0.7
-    dimAt: 0.06
-    dimFade: 0.24
-    introAt: 0.2
+    vsStrike: 0.07
+    vsStrikeScale: 1.16
+    partSweep: 0.24
+    partDistance: 620
+    partFadeStart: 0.62
+    rayLength: 900
+    rayWidthRatio: 0.12
+    rayRise: 0.08
+    rayFall: 0.26
+    rayColor: {r: 0.72, g: 0.88, b: 1, a: 1}
+    rayAlpha: 0.9
+    matchEndScale: 0.86
+    deckStartScale: 1.08
+    zoomDuration: 0.3
+    dimOutAt: 0.05
+    dimOutFade: 0.26
+    deckAt: 0.06
+    vsHandoverAt: 0.15
+    vsHandoverFade: 0.13
 --- !u!1 &3258554938269669891 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3274920063186257180, guid: 963a8cda4e5794769af29d6b397c3662, type: 3}
