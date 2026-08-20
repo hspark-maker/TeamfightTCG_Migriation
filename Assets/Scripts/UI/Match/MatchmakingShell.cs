@@ -46,6 +46,10 @@ public class MatchmakingShell : MonoBehaviour
              "배너가 나중에 밀려날 그 방향에서 되돌아 들어온다.")]
     [SerializeField] MatchmakingEntryFx entryFx = new MatchmakingEntryFx();
 
+    [Tooltip("배경 두 판(BG/Top·BG/Bottom). 이 화면의 등장은 두 판이 대각으로 맞물리는 것이고 " +
+             "퇴장은 그 대각이 갈라지는 것이다 — 판이 곧 이 화면의 문이다.")]
+    [SerializeField] MatchmakingBgFx bgFx = new MatchmakingBgFx();
+
     [Tooltip("덱 화면으로 넘어가는 전환. 커튼으로 덮지 않고 두 화면을 잇는다 — 자세한 규약은 MatchHandoffFx 참고.")]
     [SerializeField] MatchHandoffFx handoffFx = new MatchHandoffFx();
 
@@ -164,14 +168,20 @@ public class MatchmakingShell : MonoBehaviour
     {
         KillStage();
 
+        var t_root = (RectTransform)transform;
+
         m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
-                                  (RectTransform)transform, Riders, fx.RaySprite, in _targets);
+                                  t_root, Riders, fx.RaySprite, in _targets);
         m_stage.SetLink(gameObject);
 
-        // 배너가 다 나가고 어둠까지 다 걷힌 프레임에 내려간다(CloseAt). 한 프레임이라도 일찍 내리면
-        // 남아 있던 어둠이 통째로 사라져 전환 한복판이 번쩍인다 — 걷어내는 도중에 끄는 것이 곧 하드컷이다.
+        // 배경 두 판이 갈라지며 덱 화면이 드러난다. 이 축이 없으면 판(alpha 0.94)이 덱을 가린 채
+        // 등장 안무가 진행되다가, 화면을 내리는 프레임에 이미 절반쯤 진행된 덱이 튀어나온다.
+        m_stage.Insert(0f, bgFx.BuildPart(t_root));
+
+        // 배너가 다 나가고 배경 판까지 다 열린 프레임에 내려간다. 한 프레임이라도 일찍 내리면
+        // 아직 화면에 남아 있던 판이 통째로 사라져 전환 한복판이 끊긴다 — 걷어내는 도중에 끄는 것이 곧 하드컷이다.
         // 뒤의 덱 등장까지 켜 두지 않는 이유는 알파 0짜리 딤이 그동안 터치를 먹기 때문이다.
-        m_stage.InsertCallback(handoffFx.CloseAt, Close);
+        m_stage.InsertCallback(Mathf.Max(handoffFx.CloseAt, bgFx.PartDuration), Close);
 
         await m_stage.ToUniTask(cancellationToken: _ct).SuppressCancellationThrow();
 
@@ -222,6 +232,9 @@ public class MatchmakingShell : MonoBehaviour
         fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
         handoffFx.Reset((RectTransform)transform, VersusRect);
 
+        // 지난 전환이 배경 두 판을 화면 밖으로 밀어 놓고 끝났다 — 되돌리지 않으면 다음 매칭이 배경 없이 열린다.
+        bgFx.Reset();
+
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
         RestoreRiders();
@@ -241,8 +254,13 @@ public class MatchmakingShell : MonoBehaviour
         //
         // 여는 순서가 곧 전제다: 바로 위에서 fx.Reset·RestoreHome이 저작 상태로 되돌린 뒤라야
         // 안무가 지금 자리를 홈으로, 지금 딤 알파를 목표로 삼을 수 있다.
+        var t_root = (RectTransform)transform;
+
         var t_enter = entryFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
-                                    (RectTransform)transform, Riders);
+                                    t_root, Riders, bgFx.EnterNormal);
+
+        // 배경 두 판이 맞물려 로비를 덮는 것이 곧 이 화면의 등장이다 — 배너는 그 뒤에 들어온다(entryFx.bannerAt).
+        t_enter.Insert(0f, bgFx.BuildClose(t_root));
 
         // 스캔·호흡은 배너가 앉은 뒤에 켠다 — 아직 날아드는 틀 안에서 띠가 돌면 두 움직임이 겹쳐 어느 쪽도 읽히지 않는다.
         // 안무가 그 전에 잘리는 길은 발견(ShowFound)과 씬 파괴뿐이고, 둘 다 켜면 안 되는 자리라 보정하지 않는다.

@@ -1314,6 +1314,19 @@ MonoBehaviour:
     riderDuration: 0.22
     riderDistance: 80
     scanAt: 0.24
+  bgFx:
+    top: {fileID: 8436660722486483894}
+    bottom: {fileID: 2351059224164199041}
+    closeDuration: 0.22
+    closeEase: 8
+    partDuration: 0.32
+    partEase: 8
+    seamThickness: 7
+    seamColor: {r: 1, g: 0.97, b: 0.88, a: 1}
+    seamAlpha: 0.85
+    seamRise: 0.05
+    seamFall: 0.22
+    pad: 48
   handoffFx:
     vsStrike: 0.07
     vsStrikeScale: 1.16
