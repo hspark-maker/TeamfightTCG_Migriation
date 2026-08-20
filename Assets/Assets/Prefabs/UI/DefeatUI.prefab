@@ -1319,6 +1319,7 @@ MonoBehaviour:
   mainMenuScene: LobbyScene
   dimGroup: {fileID: 927969613996793465}
   rewardGoldText: {fileID: 1326343525789108706}
+  goldLine: {fileID: 8481984089480436516}
   coinBurst: {fileID: 2869416880398450074}
   hintGroup: {fileID: 6791858688075882130}
   dimDuration: 0.2

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -40,6 +41,18 @@ public class TournamentMapOverlayView : MonoBehaviour
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
+    [Tooltip("보상 팝업이 걷히고 길이 차오르기까지의 정박. 팝업 딤이 사라지는 시간을 벌어 준다.")]
+    [SerializeField] float claimHoldIn = 0.1f;
+
+    [Tooltip("길 점 하나가 금색으로 물드는 시간.")]
+    [SerializeField] float linkDotDuration = 0.15f;
+
+    [Tooltip("길 점과 점 사이 간격. 구간마다 점이 6~9개로 갈리므로 총 길이도 함께 갈린다.")]
+    [SerializeField] float linkDotStagger = 0.06f;
+
+    [Tooltip("길이 다 찬 뒤 다음 정점이 열리기까지의 정박.")]
+    [SerializeField] float claimHoldOut = 0.1f;
+
     /// <summary>정점 도전 요청(도전 가능한 정점만 올라온다). LobbyRoot가 전투로 잇는다.</summary>
     public event Action<int> NodeSelected;
 
@@ -69,6 +82,14 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 정점 생성 여부. 저작 정점 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
 
+    // 점등 연출이 도는 동안 진행 통지의 즉시 반영을 미룬다 — 안 그러면 수령 순간 결말이 먼저 나온다.
+    bool m_suspendRefresh;
+
+    Sequence m_claimSeq;
+
+    // 등장 연출을 기다리는 정점(빈 값 = 없음). 그때까지 그 정점의 선물은 숨어 있다.
+    string m_armedGiftNodeId;
+
     void Awake()
     {
         if (this.backButton != null) this.backButton.onClick.AddListener(this.Close);
@@ -91,6 +112,8 @@ public class TournamentMapOverlayView : MonoBehaviour
     {
         TournamentProgress.OnChanged -= this.RefreshNodes;
 
+        this.AbortClaimSequence();
+
         LobbyShellBars.Show(this);            // 씬 이탈로 잘려도 바가 걷힌 채 굳지 않게
         this.transition.HandleDisabled(this.gameObject);
     }
@@ -99,6 +122,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     public void Open()
     {
         if (this.IsOpen) return;
+
+        // 억제 스위치가 켜진 채 남아 있으면 아래 RefreshNodes가 통째로 무시돼 맵이 옛 그림으로 굳는다.
+        this.AbortClaimSequence();
 
         this.transition.SetVisible(this.gameObject, true);
 
@@ -111,8 +137,30 @@ public class TournamentMapOverlayView : MonoBehaviour
     /// <summary>맵을 닫는다. 하단바는 퇴장 트윈과 나란히 돌려준다 — OnDisable을 기다리면 늦는다.</summary>
     public void Close()
     {
+        // OnDisable은 퇴장 트윈이 끝난 뒤에 온다 — 그 사이 억제가 살아 있으면 안 되므로 여기서 먼저 건다.
+        this.AbortClaimSequence();
+
         LobbyShellBars.Show(this);
         this.transition.SetVisible(this.gameObject, false);
+    }
+
+    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 선물은 숨어 있다.</summary>
+    public void ArmGiftReveal(string _nodeId)
+    {
+        this.m_armedGiftNodeId = _nodeId;
+        this.ApplyArmedGift();
+    }
+
+    /// <summary>예약해 둔 선물 등장을 1회 재생한다(맵이 이미 열려 있어야 한다).</summary>
+    public void PlayGiftReveal(string _nodeId)
+    {
+        this.m_armedGiftNodeId = null;
+
+        int t_index = TournamentProgress.IndexOf(_nodeId);
+        if (t_index < 0 || t_index >= this.m_nodes.Count) return;
+
+        this.ScrollToNode(t_index);
+        this.m_nodes[t_index]?.PlayGiftReveal();
     }
 
     // 챕터 타일을 쌓고 타일에 저작된 자리에만 정점을 세운다. 좌표를 코드가 만들지 않으므로 저작이 빠지면 그 정점은 안 나온다.
@@ -437,6 +485,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 진행 통지 → 전 정점 재바인딩 + 길 색 갱신. 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
     void RefreshNodes()
     {
+        // 점등 연출이 결말을 손에 쥐고 있다 — 다 돌고 나서 스스로 푼다.
+        if (this.m_suspendRefresh) return;
+
         for (int t_i = 0; t_i < this.m_nodes.Count; t_i++)
             if (this.m_nodes[t_i] != null) this.m_nodes[t_i].Refresh();
 
@@ -444,13 +495,25 @@ public class TournamentMapOverlayView : MonoBehaviour
             if (this.m_bands[t_i] != null) this.m_bands[t_i].Refresh();
 
         this.RefreshLinks();
+        this.ApplyArmedGift();
     }
 
-    // 지금 도전할 정점을 화면 중앙에 둔다.
+    // 예약을 정점 뷰에 옮긴다. Refresh 뒤에 와야 방금 켠 선물을 도로 감출 수 있다(같은 프레임이라 깜빡임은 없다).
+    void ApplyArmedGift()
+    {
+        if (string.IsNullOrEmpty(this.m_armedGiftNodeId)) return;
+
+        int t_index = TournamentProgress.IndexOf(this.m_armedGiftNodeId);
+        if (t_index < 0 || t_index >= this.m_nodes.Count) return;
+
+        this.m_nodes[t_index]?.ArmGiftReveal();
+    }
+
+    // 받을 선물이 있으면 그 정점, 없으면 지금 도전할 정점을 화면 중앙에 둔다.
     // 전부 클리어(-1)면 마지막 챕터 띠로 — 끝 표지와 마지막 완주 보상이 거기 서 있다(정점 위가 아니다).
     void ScrollToCurrent()
     {
-        int t_index = TournamentProgress.CurrentNodeIndex;
+        int t_index = TournamentProgress.FocusNodeIndex;
         if (t_index >= 0)
         {
             this.ScrollToNode(t_index);
@@ -511,9 +574,115 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 정점 뷰가 이미 잠긴 버튼을 죽여 두지만, 진입 판정의 주인은 화면이다(저작·상태가 갈려도 새지 않게).
     void OnNodeTapped(int _index)
     {
+        if (this.m_claimSeq != null) return;   // 점등이 도는 동안은 정점 입력을 받지 않는다(스크롤은 살아 있다)
+
+        // 선물은 도전이 아니라 수령이다 — 전투로 잇지 않고 보상 팝업으로 간다.
+        if (TournamentProgress.IsRewardPending(_index))
+        {
+            this.OpenNodeReward(_index);
+            return;
+        }
+
         if (!TournamentProgress.CanEnter(_index)) return;
 
         this.NodeSelected?.Invoke(_index);
+    }
+
+    // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.
+    void OpenNodeReward(int _index)
+    {
+        if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)) return;
+
+        this.m_suspendRefresh = true;
+
+        // 폴백(보상 0건·팝업 미배선)은 팝업 없이 지급만 끝난다 — 닫힘 콜백이 오지 않으니 곧바로 점등으로 잇는다.
+        if (!TournamentRewardFlow.Open(t_node.nodeId, () => this.PlayClaimSequence(_index)))
+            this.PlayClaimSequence(_index);
+    }
+
+    // 길이 차오르고 다음 정점이 열리는 한 박. 상태는 이미 커밋됐고 이건 그 위에 덮인 장식이다.
+    void PlayClaimSequence(int _index)
+    {
+        // 맵을 떠난 뒤 콜백이 도착했다 — 다음 진입에서 진실이 그려진다.
+        if (!this.IsOpen)
+        {
+            this.AbortClaimSequence();
+            return;
+        }
+
+        // 수령이 성사되지 않은 채 닫혔다면 보여줄 결말이 없다(외부 강제 Hide 경로).
+        if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)
+            || !TournamentProgress.IsCleared(t_node.nodeId))
+        {
+            this.AbortClaimSequence();
+            return;
+        }
+
+        this.m_claimSeq = DOTween.Sequence().SetLink(this.gameObject);
+
+        // 시퀀스 커서를 손으로 든다 — Insert는 Append 커서를 밀지 않아서, 섞어 쓰면 해금이 점등을 앞지른다.
+        float t_at = this.claimHoldIn;
+
+        int t_slot = this.m_links.FindIndex(_link => _link.Index == _index);
+        t_at += t_slot >= 0 ? this.InsertLinkFill(this.m_links[t_slot], t_at)
+                            : this.InsertChapterSeam(_index, t_at);
+
+        t_at += this.claimHoldOut;
+
+        this.m_claimSeq.InsertCallback(t_at, () => this.RevealUnlock(_index));
+        this.m_claimSeq.OnComplete(() => this.m_claimSeq = null);
+    }
+
+    // 구간의 점을 저작 순서(정점 i → i+1)대로 물들인다. 걸린 시간을 돌려준다.
+    float InsertLinkFill(PathLink _link, float _at)
+    {
+        if (_link.Graphics == null) return 0f;
+
+        float t_fill = 0f;
+
+        for (int t_i = 0; t_i < _link.Graphics.Length; t_i++)
+        {
+            Graphic t_dot = _link.Graphics[t_i];
+            if (t_dot == null) continue;
+
+            float t_offset = t_i * this.linkDotStagger;
+            this.m_claimSeq.Insert(_at + t_offset, t_dot.DOColor(this.clearedColor, this.linkDotDuration));
+            t_fill = Mathf.Max(t_fill, t_offset + this.linkDotDuration);
+        }
+
+        return t_fill;
+    }
+
+    // 챕터 경계·마지막 정점은 길 조각이 없다(링크는 타일 안에만 저작된다).
+    // 다음 정점이 화면 밖이므로 스크롤이 곧 "다음 장이 열렸다"는 문장이 된다.
+    float InsertChapterSeam(int _index, float _at)
+    {
+        if (_index + 1 >= this.m_nodes.Count) return 0f;
+
+        this.m_claimSeq.InsertCallback(_at + 0.15f, () => this.ScrollToNode(_index + 1));
+        return 0.15f;
+    }
+
+    // 억제를 풀어 진실을 그리고, 그 프레임에 다음 정점이 튄다.
+    void RevealUnlock(int _index)
+    {
+        this.m_suspendRefresh = false;
+        this.RefreshNodes();
+
+        int t_next = _index + 1;
+        if (t_next >= 0 && t_next < this.m_nodes.Count) this.m_nodes[t_next]?.PlayUnlockPunch();
+    }
+
+    // 어디서 끊겨도 진실로 스냅시킨다 — 연출은 장식일 뿐이라 중간 색에서 굳는 것만 막으면 된다.
+    void AbortClaimSequence()
+    {
+        if (this.m_claimSeq != null && this.m_claimSeq.IsActive()) this.m_claimSeq.Kill();
+        this.m_claimSeq = null;
+
+        if (!this.m_suspendRefresh) return;
+
+        this.m_suspendRefresh = false;
+        this.RefreshNodes();
     }
 
     // 구간 하나의 길 조각. 평탄 인덱스·루트·틴트 대상이 늘 붙어 다녀야 해서 병렬 리스트로 흩지 않는다.

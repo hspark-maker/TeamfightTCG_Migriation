@@ -18,6 +18,10 @@ public struct TournamentNodeDef
     [Tooltip("상대 초상. 비우면 맵 셀 프리팹에 저작된 스프라이트를 그대로 쓴다.")]
     public Sprite avatar;
 
+    [Tooltip("정점 종류. 표식만 갈린다 — 진입 자격도 전투 흐름도 보상 지급도 이 값과 무관하다.\n" +
+             "Battle(기본)은 표식이 없고 Elite는 왕관을 단다. 강함 자체는 상대 덱이 말한다.")]
+    public ETournamentNodeKind kind;
+
     [Tooltip("이 정점의 고정 상대 덱. 비면 전투를 열 수 없다(검증기가 보고한다).")]
     public List<CardData> enemyDeck;
 

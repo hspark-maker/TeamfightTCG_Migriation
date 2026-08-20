@@ -29,6 +29,22 @@ public static class TournamentProgress
         }
     }
 
+    // 맵이 처음 보여줘야 할 정점 — 받을 선물이 있으면 그쪽이 먼저다(없으면 도전할 정점)
+    public static int FocusNodeIndex
+    {
+        get
+        {
+            string t_pending = PendingRewardNodeId;
+            if (string.IsNullOrEmpty(t_pending)) return CurrentNodeIndex;
+
+            int t_index = IndexOf(t_pending);
+            return t_index >= 0 ? t_index : CurrentNodeIndex;
+        }
+    }
+
+    // 깼지만 아직 보상을 받지 않은 정점(없으면 빈 문자열)
+    public static string PendingRewardNodeId => Slot.pendingRewardNodeId ?? string.Empty;
+
     // 지금 진행 중인 챕터(첫 미완주 챕터, 전부 완주면 마지막 · 챕터가 없으면 -1)
     public static int CurrentChapterIndex
     {
@@ -82,13 +98,17 @@ public static class TournamentProgress
     public static bool TryGetChapter(int _chapterIndex, out TournamentChapterDef _chapter)
         => Config.TryGetChapter(_chapterIndex, out _chapter);
 
-    // 정점 상태(3종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
+    // 정점 상태(4종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
     public static ETournamentNodeState StateOf(int _index)
     {
         if (!Config.TryGetNode(_index, out TournamentNodeDef t_node) || !t_node.HasStableKey)
             return ETournamentNodeState.Locked;
 
         if (Slot.clearedNodeIds.Contains(t_node.nodeId)) return ETournamentNodeState.Cleared;
+
+        // 미수령은 클리어가 아니다 — 다음 정점 해금도 링크 점등도 수령(ClearNode)이 열쇠다
+        if (t_node.nodeId == PendingRewardNodeId) return ETournamentNodeState.RewardPending;
+
         if (_index == 0) return ETournamentNodeState.Playable;
 
         if (Config.TryGetNode(_index - 1, out TournamentNodeDef t_prev)
@@ -99,11 +119,34 @@ public static class TournamentProgress
         return ETournamentNodeState.Locked;
     }
 
-    // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다)
-    public static bool CanEnter(int _index) => StateOf(_index) != ETournamentNodeState.Locked;
+    // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다).
+    // 미수령 정점은 진입이 아니라 수령이 남은 자리라 제외한다.
+    public static bool CanEnter(int _index)
+    {
+        ETournamentNodeState t_state = StateOf(_index);
+        return t_state == ETournamentNodeState.Playable || t_state == ETournamentNodeState.Cleared;
+    }
 
     public static bool IsCleared(string _nodeId)
         => !string.IsNullOrEmpty(_nodeId) && Slot.clearedNodeIds.Contains(_nodeId);
+
+    public static bool IsRewardPending(int _index)
+        => StateOf(_index) == ETournamentNodeState.RewardPending;
+
+    // 승리 낙인 — 지급은 하지 않는다. 수령(ClearNode)이 지급·해금·낙인 해제를 마저 한다.
+    // 전투 씬에서 불린다: 로비까지 미루면 로딩 중 종료가 승리를 삼킨다.
+    public static bool MarkRewardPending(string _nodeId)
+    {
+        if (string.IsNullOrEmpty(_nodeId)) return false;
+        if (IsCleared(_nodeId)) return false;
+        if (Slot.pendingRewardNodeId == _nodeId) return false;
+
+        Slot.pendingRewardNodeId = _nodeId;
+
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+        return true;
+    }
 
     // 정점 클리어 확정 — 보상 지급까지 여기서 한다(수령 팝업의 onConfirm이 이 메서드를 부른다)
     public static bool ClearNode(string _nodeId)
@@ -177,6 +220,7 @@ public static class TournamentProgress
     {
         Slot.clearedNodeIds.Clear();
         ClaimedChapters.Clear();
+        Slot.pendingRewardNodeId = "";
         DataSaveManager.Save();
         OnChanged?.Invoke();
     }
@@ -191,6 +235,9 @@ public static class TournamentProgress
             CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
 
         Slot.clearedNodeIds.Add(_nodeId);
+
+        // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
+        if (Slot.pendingRewardNodeId == _nodeId) Slot.pendingRewardNodeId = "";
 
         // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
         CurrencyManager.Save();
@@ -213,10 +260,11 @@ public static class TournamentProgress
     }
 }
 
-// 정점 상태(3종 배타)
+// 정점 상태(4종 배타)
 public enum ETournamentNodeState
 {
     Locked,
     Playable,
+    RewardPending,   // 깼지만 보상을 아직 안 받았다 — 진입이 아니라 수령이 남은 자리
     Cleared,
 }

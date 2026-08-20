@@ -14,4 +14,8 @@ public class TournamentSaveData
 
     // 완주 보상을 수령한 챕터의 안정 키(TournamentChapterDef.chapterId). 순서는 의미 없다
     public List<string> claimedChapterIds = new List<string>();
+
+    // 깼지만 아직 보상을 받지 않은 정점(빈 문자열 = 없음).
+    // 목록이 아니라 한 칸이다 — 미수령이 있으면 다음 정점이 잠기고 그 정점 자신도 재진입이 막혀 둘이 동시에 생기지 않는다
+    public string pendingRewardNodeId = "";
 }

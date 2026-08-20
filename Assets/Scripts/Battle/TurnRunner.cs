@@ -369,19 +369,25 @@ public class TurnRunner : MonoBehaviour
         // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
         this.lastFallenCards = new List<CardData>(this.playerField.FallenCards);
 
+        // 토너먼트 전투는 전투 보상도 랭크도 없다 — 정점의 상은 맵에서 받는 그 보상 하나뿐이다.
+        // (전투 골드까지 주면 클리어 정점 재도전이 그대로 파밍이 되고, 상이 둘로 갈려 무엇을 받았는지도 흐려진다.)
+        // ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.
+        if (TournamentRun.IsActive)
+        {
+            // 승리 낙인은 여기서 영속한다 — 로비까지 미루면 로딩 중 종료가 승리를 삼킨다. 지급은 수령 시점 한 곳뿐이다.
+            if (_won) TournamentProgress.MarkRewardPending(TournamentRun.NodeId);
+
+            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
+
+            this.lastReward = default;   // 결과 팝업의 골드 줄이 직전 판 값을 물려받지 않게
+            this.lastRankDelta = 0;      // 포인트 줄도 같은 이유로 0
+            return;
+        }
+
         this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
         BattleRewardHandoff.Set(this.lastReward);
-
-        // 토너먼트 전투는 랭크에 반영하지 않는다 — 정산을 통째로 건너뛰고 정점 결과만 로비로 싣는다.
-        // (ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.)
-        if (TournamentRun.IsActive)
-        {
-            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
-            this.lastRankDelta = 0;   // 결과 팝업의 포인트 줄이 직전 판 값을 물려받지 않게
-            return;
-        }
 
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
         // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.

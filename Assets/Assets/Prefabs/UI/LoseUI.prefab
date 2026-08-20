@@ -494,6 +494,7 @@ MonoBehaviour:
   mainMenuScene: LobbyScene
   dimGroup: {fileID: 6155415066963052024}
   rewardGoldText: {fileID: 8736551682670538682}
+  goldLine: {fileID: 986566054249784812}
   goldIconRect: {fileID: 7638171519202395914}
   survivorLabel: {fileID: 0}
   survivorFormat: "\uC0DD\uC874 {0}\uC7A5"
