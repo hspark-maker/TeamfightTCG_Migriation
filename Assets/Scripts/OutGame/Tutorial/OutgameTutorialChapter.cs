@@ -16,6 +16,14 @@ public class OutgameTutorialChapter
 
     public int StepCount => stepDefs != null ? stepDefs.Count : 0;
 
+#if UNITY_EDITOR
+    // 저작 도구 전용 — 런타임은 읽기만 한다(TryGetStep/StepCount). 편집 규칙은 TutorialSequenceEditOps에 있다.
+    public List<TutorialStepDef> EditorSteps => stepDefs ??= new List<TutorialStepDef>();
+
+    // 저작 도구 전용 — 런타임은 읽기만 한다(Label)
+    public string EditorLabel { get => label; set => label = value; }
+#endif
+
     // 순번의 스텝 조회 — 범위 밖·빈 칸이면 false
     public bool TryGetStep(int _index, out TutorialStepDef _step)
     {

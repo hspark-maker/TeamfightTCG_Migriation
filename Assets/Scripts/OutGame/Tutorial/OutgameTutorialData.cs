@@ -18,6 +18,11 @@ public class OutgameTutorialData : ScriptableObject
     [SerializeField, HideInInspector] int nextStepId = 1;
 
 #if UNITY_EDITOR
+    /// <summary>저작 도구 전용 — 런타임은 읽기만 한다. 다음 번호를 한 개 떼어 준다(떼면 카운터가 올라간다).
+    /// 새 스텝·복제본에 번호를 내주는 <b>유일한 창구</b>다. 여기를 거치지 않고 손으로 번호를 매기면
+    /// 지운 번호를 재발급하게 되고, 삭제된 스텝에 서 있던 세이브가 경고 없이 무관한 스텝으로 옮겨간다.</summary>
+    public int TakeNextStepIdForEditor() => nextStepId++;
+
     /// <summary>빈 stepId를 채우고 겹친 번호를 걷는다. 스텝을 추가하거나 행을 복제한 뒤에 돌린다.
     /// 겹쳤을 때는 먼저 나온 칸이 번호를 지키고 뒤쪽이 새로 받는다 — 그 외에는 아무 번호도 건드리지 않아
     /// 몇 번을 돌려도 결과가 같다.</summary>
@@ -60,7 +65,7 @@ public class OutgameTutorialData : ScriptableObject
         // 2패스 — 빈 칸과 겹친 칸에만 새 번호를 내준다
         for (int t_i = 0; t_i < t_needs.Count; t_i++)
         {
-            t_needs[t_i].Step.SetStepIdForEditor(nextStepId++);
+            t_needs[t_i].Step.SetStepIdForEditor(TakeNextStepIdForEditor());
 
             if (t_needs[t_i].Duplicate) t_freed.Add(t_needs[t_i].Coord);
             else                        t_assigned.Add(t_needs[t_i].Coord);

@@ -404,7 +404,19 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
-    DBGS["OutgameTutorialStepWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>SO 직독으로 편·스텝을 펼치고 칸 하나를 예약한다"]:::new
+    DBGS["TutorialAuthoringWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 저작 도구<br/><b>왼쪽 목록(스텝당 한 줄) / 오른쪽 상세</b> — 값·상태·문제·되감기를 고른 하나에 모은다<br/>온보딩·트리거를 같은 목록 코드로 그린다. 구 OutgameTutorialStepWindow를 흡수했다"]:::new
+    VSTATE["TutorialSequenceState (에디터)<br/>OutgameFeatureLock.Recalculate의 거울 — 스텝마다 누적 해금·일시 잠금을 미리 굽는다<br/>fail-open 3종(stalled·디버그·미실행)은 일부러 모델링하지 않는다"]:::new
+    VLD["TutorialValidator (에디터)<br/>저작 규칙 정적 판정 — 부트 LogWarning으로만 있던 규약을 창으로 승격<br/>앵커 잠김 · stepId 중복 · 덱게이트 미폐쇄 · 필수 참조 미배선 …"]:::new
+    AMETA["TutorialAnchorMeta (에디터)<br/>앵커 한 줄 = 잠금 기능 · 화면 · 등록처<br/>TutorialActionMeta와 같은 관용구(인덱스=enum, static 생성자 검증)"]:::new
+    EOPS["TutorialSequenceEditOps (에디터)<br/>추가·복제·삭제·순서·<b>편 간 이동</b>·챕터 조작의 단일 창구<br/>stepId 계약(추가·복제=부여 · 이동=유지 · 삭제=소각)과 Undo가 여기 산다<br/>구조를 바꾸면 되감기 예약을 걷는다(예약은 좌표라 밀리면 엉뚱한 곳까지 재생한다)"]:::new
+    DBGS -->|"편집 모드(지연 실행)"| EOPS
+    EOPS -->|"TakeNextStepIdForEditor · EditorSteps"| STEP
+    DBGS --> VSTATE
+    DBGS --> VLD
+    VLD --> VSTATE
+    VLD --> AMETA
+    VSTATE -.->|"규칙을 베낀 정본(어긋나면 오탐)"| FLOCK
+    AMETA -.->|"Gate 근거 = Attach 호출부·탭 짝"| FLV
     RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
     BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
     DBGS -->|"Schedule(좌표)"| RWD

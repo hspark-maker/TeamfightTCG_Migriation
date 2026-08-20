@@ -100,6 +100,9 @@ public static class OutgameFeatureLock
         Refresh();
     }
 
+    // ⚠ 이 계산에는 에디터 거울이 있다 — Editor/Tutorial/TutorialSequenceState가 저작 검증을 위해
+    //   같은 규칙(자기 칸 포함 누적 · locks 우선 · 저작 unlock 없으면 전체 개방)을 플레이 없이 다시 편다.
+    //   여기를 고치면 그쪽도 함께 고쳐라. 어긋나면 저작 검증기가 멀쩡한 저작을 오류로 찍는다.
     static bool Recalculate()
     {
         int  t_chapter = OutgameTutorialProgress.ChapterIndex;
