@@ -6,7 +6,7 @@ using UnityEngine;
 [Serializable]
 public class OutgameTutorialChapter
 {
-    [Tooltip("기획의 'N편'과 맞추는 이름. 표시·로그용일 뿐 진행도 식별은 인덱스가 한다")]
+    [Tooltip("기획의 'N편'과 맞추는 이름. 표시·로그용일 뿐이다 — 세이브가 붙잡는 것은 스텝의 stepId이고, 챕터·스텝 인덱스는 런타임 커서다")]
     [SerializeField] string label;
 
     [Tooltip("이 편의 스텝 순서. 마지막은 씬을 떠나는 전투 스텝이어야 한다(챕터 경계 = 씬 전환 경계)")]

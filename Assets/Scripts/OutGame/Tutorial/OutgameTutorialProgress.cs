@@ -17,6 +17,9 @@ public static class OutgameTutorialProgress
     // 챕터 안에서의 스텝 순번(시퀀스 전체 통산이 아니다)
     public static int StepIndex => Slot.outgameChapterStepIndex;
 
+    // 서 있는 스텝의 불변 번호(0 = 앵커 없음). 좌표가 커서라면 이쪽이 세이브의 정체성이다.
+    public static int StepId => Slot.outgameStepId;
+
     static TutorialSaveData Slot
     {
         get
@@ -45,6 +48,11 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+
+        // 좌표가 움직이는 모든 런타임 경로가 이 창구를 지나므로, 앵커도 여기서만 갱신하면 된다.
+        // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 부트가 좌표에서 다시 채운다.
+        t_slot.outgameStepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
+
         Save();
     }
 
@@ -113,6 +121,7 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+        t_slot.outgameStepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.outgameCompleted        = false;
         t_slot.migrationChecked        = true;
         Save();

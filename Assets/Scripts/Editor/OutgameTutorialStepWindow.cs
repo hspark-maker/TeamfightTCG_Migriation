@@ -50,7 +50,13 @@ public class OutgameTutorialStepWindow : EditorWindow
 
     void DrawHeader()
     {
+        EditorGUILayout.BeginHorizontal();
         this.data = (OutgameTutorialData)EditorGUILayout.ObjectField("시퀀스 SO", this.data, typeof(OutgameTutorialData), false);
+
+        // 스텝을 추가하거나 행을 복제한 뒤 눌러야 세이브가 그 스텝을 붙잡을 수 있다.
+        using (new EditorGUI.DisabledScope(this.data == null))
+            if (GUILayout.Button("ID 부여", GUILayout.Width(64))) this.data.AssignMissingStepIds();
+        EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.LabelField("현재 좌표", CurrentCoordLabel(), EditorStyles.boldLabel);
 
@@ -131,8 +137,11 @@ public class OutgameTutorialStepWindow : EditorWindow
             // ▶ = 지금 서 있는 칸(플레이 중), ◆ = 다음 플레이에 시작할 칸
             string t_mark = t_isScheduled ? "◆" : t_isHere ? "▶" : "  ";
 
+            // #N = 세이브가 붙잡는 번호. 0이면 아직 부여 전이라 그 스텝은 좌표로만 지목된다(밀릴 수 있다).
+            string t_id = t_found && t_def.StepId > 0 ? $"#{t_def.StepId}" : "#-";
+
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"{t_mark} {_chapter}-{_step}  {t_name}",
+            EditorGUILayout.LabelField($"{t_mark} {_chapter}-{_step}  {t_id}  {t_name}",
                                        t_isHere || t_isScheduled ? EditorStyles.boldLabel : EditorStyles.label);
 
             if (GUILayout.Button(t_isScheduled ? "예약됨" : "여기부터", GUILayout.Width(64)))

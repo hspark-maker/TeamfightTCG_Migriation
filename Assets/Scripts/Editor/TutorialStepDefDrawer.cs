@@ -11,6 +11,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
     const float RowGap      = 2f;
     const float FoldoutWide = 14f;
     const float IndexWide   = 26f;
+    const float StepIdWide  = 34f;
     const float ActionWide  = 104f;
     const float AnchorWide  = 152f;
 
@@ -65,6 +66,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         float t_left = _rect.width - FoldoutWide;
 
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, IndexOf(_property), EditorStyles.miniLabel);
+        DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, StepIdLabel(_property), EditorStyles.miniLabel, StepIdWide);
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, _action.ToString(), EditorStyles.boldLabel, ActionWide);
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, AnchorLabel(_property, _action), EditorStyles.miniLabel, AnchorWide);
 
@@ -81,9 +83,13 @@ public class TutorialStepDefDrawer : PropertyDrawer
         s_tailStyle ??= new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Italic };
 
     static void DrawColumn(ref float _x, ref float _left, float _y, float _height, string _text, GUIStyle _style, float _width = IndexWide)
+        => DrawColumn(ref _x, ref _left, _y, _height, new GUIContent(_text), _style, _width);
+
+    // 툴팁을 실을 수 있는 쪽. 필드로 노출하지 않는 값(stepId)의 안내가 여기로 온다.
+    static void DrawColumn(ref float _x, ref float _left, float _y, float _height, GUIContent _content, GUIStyle _style, float _width = IndexWide)
     {
         float t_width = Mathf.Min(_width, Mathf.Max(0f, _left));
-        if (t_width > 0f) EditorGUI.LabelField(new Rect(_x, _y, t_width, _height), _text, _style);
+        if (t_width > 0f) EditorGUI.LabelField(new Rect(_x, _y, t_width, _height), _content, _style);
 
         _x    += t_width;
         _left -= t_width;
@@ -192,6 +198,19 @@ public class TutorialStepDefDrawer : PropertyDrawer
     }
 
     static string Truncate(string _text, int _max) => _text.Length <= _max ? _text : _text.Substring(0, _max) + "…";
+
+    // 세이브가 이 스텝을 지목하는 번호. 읽기 전용 표기다 — 값을 만지는 것은 시퀀스 SO의 [스텝 ID 부여]뿐이라
+    // 필드로 노출하지 않는다. 그래서 저작자용 안내를 이 열의 툴팁으로 붙인다(필드 [Tooltip]은 뜰 자리가 없다).
+    static GUIContent StepIdLabel(SerializedProperty _property)
+    {
+        var t_field = _property.FindPropertyRelative("stepId");
+        int t_id    = t_field != null ? t_field.intValue : 0;
+
+        return new GUIContent(t_id > 0 ? "#" + t_id : "#-",
+            t_id > 0
+                ? $"세이브가 이 스텝을 붙잡는 번호 #{t_id}. 스텝을 옮기거나 끼워 넣어도 진행 중인 세이브가 이 번호를 따라온다."
+                : "아직 번호가 없다 — 시퀀스 SO 우클릭 [스텝 ID 부여]를 돌려라. 그때까지 이 스텝은 좌표로만 지목되어 저작이 바뀌면 밀린다.");
+    }
 
     // 배열 요소의 순번. 요약 줄의 첫 열이라 propertyPath에서 뽑는다("...stepDefs.Array.data[3]").
     static string IndexOf(SerializedProperty _property)

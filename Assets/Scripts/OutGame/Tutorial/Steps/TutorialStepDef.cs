@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 튜토리얼 시퀀스의 한 행(런타임 상태를 갖지 않아 같은 행을 여러 자리에 복제해도 안전)
+// 튜토리얼 시퀀스의 한 행(런타임 상태를 갖지 않는다 — 세이브가 붙잡는 것은 stepId 하나뿐이다)
 [Serializable]
 public class TutorialStepDef
 {
+    // 세이브가 이 스텝을 붙잡는 불변 번호(0 = 미부여). 시퀀스 SO의 [스텝 ID 부여]만 값을 만진다 —
+    // 드로어가 필드로 노출하지 않고 요약 줄에 #N으로만 보여 주므로 [Tooltip]을 달지 않는다(뜰 자리가 없다).
+    // 저작자용 안내는 TutorialStepDefDrawer.StepIdLabel의 툴팁에 있다.
+    [SerializeField] int stepId;
+
     [Tooltip("이 스텝이 무엇을 하는가. 완료 조건·씬 이탈 여부가 여기서 파생된다")]
     [SerializeField] EOutgameTutorialAction action;
 
@@ -110,7 +115,15 @@ public class TutorialStepDef
            + "다른 액션은 실패해도 이 값을 보지 않는다")]
     [SerializeField] EOutgameTutorialFailure onFailure;
 
+    // 세이브가 이 스텝을 지목하는 불변 번호(0 = 미부여). 좌표는 런타임 커서일 뿐 세이브의 앵커는 이것이다.
+    public int StepId => stepId;
+
     public EOutgameTutorialAction Action => action;
+
+#if UNITY_EDITOR
+    // 부여 도구 전용(OutgameTutorialData.AssignMissingStepIds). 런타임에서 번호를 바꿀 일은 없다.
+    public void SetStepIdForEditor(int _id) => stepId = _id;
+#endif
 
     public string GuideMessage => guideMessage;
 
