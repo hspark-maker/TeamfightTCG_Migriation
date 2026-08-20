@@ -181,6 +181,11 @@ function finish(segment, installedAt, gateAt) {
     legacyTotal,
     weightedCost,
     weightedPerTurn: turns ? Math.round(weightedCost / turns) : null,
+    /* 종점을 '첫 편집' 하나로만 두면 조사·질문·제안처럼 편집 없이 끝나는 요청이 전부 null 이 되어
+       표본이 임계치에 영원히 도달하지 못한다(실측: 발췌 8건 전부 첫 편집 0건).
+       local.searches 는 이미 '첫 편집 또는 요청 끝'까지만 세므로, 종점 종류만 함께 기록하면 된다. */
+    excerptSearches: local ? local.searches : null,
+    excerptTerminal: local ? (local.firstEditTurn !== null ? "edit" : "end") : null,
     excerptSearchesToFirstEdit: local && local.firstEditTurn !== null ? local.searches : null,
     excerptTurnsToFirstEdit: local && local.firstEditTurn !== null ? local.firstEditTurn : null,
     excerptIgnoredProxy: local ? local.uniqueSearches.size >= 3 : null,
@@ -334,9 +339,13 @@ function positionStats(samples) {
 function excerptStats(samples) {
   const rows = samples.filter((sample) => sample.excerpts > 0);
   const withEdit = rows.filter((sample) => Number.isFinite(sample.excerptSearchesToFirstEdit));
+  const anyTerm = rows.filter((sample) => Number.isFinite(sample.excerptSearches));
   return {
     n: rows.length,
     withEdit: withEdit.length,
+    toEnd: anyTerm.length - withEdit.length,
+    anySearchesMedian: percentile(anyTerm.map((sample) => sample.excerptSearches), 0.5),
+    anySearchesP75: percentile(anyTerm.map((sample) => sample.excerptSearches), 0.75),
     searchesMedian: percentile(withEdit.map((sample) => sample.excerptSearchesToFirstEdit), 0.5),
     turnsMedian: percentile(withEdit.map((sample) => sample.excerptTurnsToFirstEdit), 0.5),
     ignored: rows.filter((sample) => sample.excerptIgnoredProxy).length,
@@ -410,12 +419,17 @@ function main() {
 
   const local = excerptStats(samples);
   console.log("\n발췌 직후 국소 지표");
-  if (local.n < 20) {
-    console.log(`표본 ${local.n}개 — 판정 불가 (최소 20개, 권장 30개). 첫 편집 관측 ${local.withEdit}개.`);
+  const enoughLocal = local.n >= 20;
+  console.log(`표본 ${local.n}개 (종점: 편집 ${local.withEdit} · 요청끝 ${local.toEnd})`
+    + (enoughLocal ? "" : " — 판정 불가 (최소 20개, 권장 30개)"));
+  if (enoughLocal) {
+    console.log(`발췌 후 추가 검색 중앙 ${display(local.anySearchesMedian)} · p75 ${display(local.anySearchesP75)}`
+      + `  |  편집까지만: 검색 중앙 ${display(local.searchesMedian)} · 턴 중앙 ${display(local.turnsMedian)}`);
+    console.log(`발췌 무시 proxy(서로 다른 추가 검색 3회+) ${local.ignored}/${local.n} | 발췌 뒤 별도 지도 열람 ${local.readAfter}/${local.n}`);
   } else {
-    console.log(`표본 ${local.n}개 | 첫 편집까지 추가 검색 중앙 ${display(local.searchesMedian)} | 턴 중앙 ${display(local.turnsMedian)}`);
+    // 표본 미달이면 비율도 숨긴다 — 한쪽만 가리면 같은 표본에 두 신뢰도가 공존한다.
+    console.log("비율 지표도 표본이 찰 때까지 보류한다.");
   }
-  console.log(`발췌 무시 proxy(서로 다른 추가 검색 3회+) ${local.ignored}/${local.n} | 발췌 뒤 별도 지도 열람 ${local.readAfter}/${local.n}`);
 
   if (process.argv.includes("--write-baseline")) {
     // 기준선은 정의상 게이트 이전이다. 언제 다시 만들어도 게이트 이후 표본이 섞이지 않게 자른다.

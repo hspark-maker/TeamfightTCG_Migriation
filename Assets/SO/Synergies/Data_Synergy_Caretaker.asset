@@ -25,7 +25,7 @@ MonoBehaviour:
     label: "\uB3CC\uBCF4\uBBF8"
     effects:
     - {fileID: 11400000, guid: 180216abb08b44947b486290b8276e51, type: 2}
-  - requiredCount: 4
+  - requiredCount: 5
     label: "\uB3CC\uBCF4\uBBF8"
     effects:
-    - {fileID: 11400000, guid: 180216abb08b44947b486290b8276e51, type: 2}
+    - {fileID: 11400000, guid: 6f10d34c28cc6be4299b89d3a5a8efac, type: 2}

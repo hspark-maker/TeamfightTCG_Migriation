@@ -1641,7 +1641,6 @@ MonoBehaviour:
   packOpenScale: 1.15
   packShiftDuration: 0.4
   packShiftHold: 0.1
-  sealTearDuration: 0.45
   cardPullDelay: 0.12
   cardPullDuration: 0.55
   pullHold: 0.35
@@ -2083,7 +2082,7 @@ MonoBehaviour:
   flickSpeed: 1400
   flickMinProgress: 0.15
   deadZone: 12
-  rewindDuration: 0.28
+  finishDuration: 0.28
 --- !u!114 &3480698031403633388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2120,6 +2119,38 @@ MonoBehaviour:
   mouthShadow: {fileID: 9179316989243037363}
   tearGlow: {fileID: 4265340372555632584}
   tearHandle: {fileID: 8492758770188128739}
+  glowReach: 0.16
+  baseGlow: {r: 0.88, g: 0.9, b: 0.92, a: 1}
+  gradeTintStart: 0.5
+  gradeTintFull: 0.95
+  goldGlow: {r: 1, g: 0.82, b: 0.35, a: 1}
+  prismCycleSpeed: 0.5
+  prismSaturation: 0.8
+  prismValue: 1
+  glowRamp:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   lidPivot: {fileID: 1952982339451470153}
   peelAngle: -30
   peelLift: 40
@@ -2156,6 +2187,15 @@ MonoBehaviour:
   glowAlphaMax: 0
   glowSpinPeriod: 24
   glowFadeDuration: 0.4
+  ringDuration: 0.55
+  ringStartScale: 0.08
+  ringEndScale: 1.6
+  ringStrength: 1
+  ringThickness: 0.14
+  ringStrokeStrength: 0.85
+  shakeAmplitude: 18
+  shakeDuration: 0.28
+  shakeFrequency: 26
   tearHandle: {fileID: 8492758770188128739}
   settleSpeed: 12
 --- !u!1 &3250771434740593995
@@ -3348,11 +3388,11 @@ RectTransform:
   m_LocalScale: {x: 1.55, y: 1.55, z: 1.55}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 6085610784462947787}
   - {fileID: 3785560295067536689}
   - {fileID: 4435166034145627920}
   - {fileID: 701373936639769598}
   - {fileID: 1952982339451470153}
-  - {fileID: 6085610784462947787}
   m_Father: {fileID: 8075960111081696800}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
