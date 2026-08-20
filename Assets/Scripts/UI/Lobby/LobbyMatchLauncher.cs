@@ -95,6 +95,9 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (tournamentPanel != null) tournamentPanel.NodeSelected += StartTournamentBattle;
 
+        TournamentReturnFlow.ReturnRequested += HandleTournamentReturn;
+        TournamentReturnFlow.GiftRevealRequested += HandleGiftReveal;
+
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
     }
@@ -109,7 +112,20 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (tournamentPanel != null) tournamentPanel.NodeSelected -= StartTournamentBattle;
 
+        TournamentReturnFlow.ReturnRequested -= HandleTournamentReturn;
+        TournamentReturnFlow.GiftRevealRequested -= HandleGiftReveal;
+
         OutgameFeatureLock.OnChanged -= ApplyPlayLock;
+    }
+
+    // 로비가 서는 즉시 떠났던 화면을 되돌린다. 골드 흡입을 기다리지 않는다 — 기다리면 로비가 한참 드러난다.
+    // 한 프레임 미루는 것은 레이아웃 때문이다: rect가 0인 프레임에 맵을 열면 스크롤 계산이 깨져 정점이 바닥에 뭉친다.
+    System.Collections.IEnumerator Start()
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        TournamentReturnFlow.Restore();
     }
 
     public void StartAiBattle()
@@ -312,6 +328,24 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         tournamentPanel?.Open();
     }
+
+    // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.
+    // 선물 등장은 여기서 하지 않는다(골드 흡입 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
+    void HandleTournamentReturn(string _nodeId, bool _won)
+    {
+        // 탭 트리거는 끈다 — 탭 진입 튜토리얼이 방금 세운 맵을 덮으면 복귀가 무의미해진다.
+        if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
+        if (tournamentPanel == null) return;
+
+        // 등장이 올 자리를 열기 전에 비워 둔다 — 순서를 뒤집으면 선물이 이미 서 있다가 다시 튀어나온다.
+        if (_won) tournamentPanel.ArmGiftReveal(_nodeId);
+
+        tournamentPanel.Open();
+    }
+
+    // 골드 흡입이 끝난 뒤의 선물 등장. PlayGiftReveal이 예약도 함께 푼다 — 맵을 떠났어도 반드시 불러야
+    // 선물이 감춰진 채 남지 않는다.
+    void HandleGiftReveal(string _nodeId) => tournamentPanel?.PlayGiftReveal(_nodeId);
 
     // 셸 미배선 폴백 전용. 저장된 슬롯 중 첫 유효 덱을 DeckConfig에 적용하고, 없으면 false.
     static bool TryApplyFirstValidDeck()

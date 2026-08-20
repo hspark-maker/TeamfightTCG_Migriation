@@ -5,10 +5,14 @@ using UnityEngine.UI;
 
 // 로비 → 매칭 화면 진입의 안무. MatchHandoffFx(매칭 → 덱)의 앞자리 짝이다.
 //
-// 동사는 "켜진다"가 아니라 "덮어 온다"이다. 어둠이 로비 위로 차오르고, 그 위로 두 배너가 각자의 바깥에서 —
-// 나중에 갈라짐이 배너를 밀어낼 바로 그 방향에서 — 되돌아 꽂힌다. 로비·매칭·덱 세 화면이
-// 상대 위 / VS 가운데 / 나 아래라는 한 축을 공유한다는 주장이 이 방향이다.
+// 동사는 "켜진다"가 아니라 "덮어 온다"이다. 배경 두 판이 대각으로 맞물려 로비를 덮고(MatchmakingBgFx),
+// 그 위로 두 배너가 각자의 바깥에서 — 나중에 갈라짐이 배너를 밀어낼 바로 그 방향에서 — 되돌아 꽂힌다.
+// 로비·매칭·덱 세 화면이 상대 위 / VS 가운데 / 나 아래라는 한 축을 공유한다는 주장이 이 방향이다.
 // 방향 부호를 뒤집으면 두 배너가 서로를 스쳐 지나가고, 그 순간 축은 사라진다.
+//
+// ⚠ 덮는 일은 배경 판이 한다. 딤(Dimed)은 이 프리팹에서 꺼져 있다 — BG 두 판이 이미 화면을 채우기 때문이다.
+//   그래서 알파를 미는 아래 dimFade 축은 실제로는 아무 일도 하지 않는다(딤을 되살리는 날을 위해 남겨 둔 것).
+//   밝기 축은 다르다 — ScreenDimTint가 두 판을 extraDims로 함께 밀어 살아 있다.
 //
 // 들어오는 것은 감속(OutCubic)이고 갈라짐의 나가는 것은 가속(InCubic)이다 — 앉는 것과 밀리는 것의 차이다.
 //
@@ -32,8 +36,9 @@ public class MatchmakingEntryFx
     [Min(0.01f)] public float rootDuration = 0.26f;
 
     [Header("배너 — 바깥에서 꽂힌다")]
-    [Tooltip("배너가 움직이기 시작하는 시각(초). 어둠이 차오르는 중에 겹쳐야 한 사건으로 읽힌다.")]
-    [Min(0f)] public float bannerAt = 0.04f;
+    [Tooltip("배너가 움직이기 시작하는 시각(초). 배경 두 판이 절반 넘게 맞물린 뒤여야 한다(MatchmakingBgFx.closeDuration=0.22) — " +
+             "판이 열려 있는 동안 배너가 보이면 아직 로비인 화면 위에 배너가 떠 있는 꼴이 된다.")]
+    [Min(0f)] public float bannerAt = 0.12f;
 
     [Min(0.01f)] public float bannerDuration = 0.26f;
 
@@ -48,7 +53,7 @@ public class MatchmakingEntryFx
 
     [Header("따라 들어오는 것들 — 제목·취소")]
     [Tooltip("제목·취소 버튼이 들어오는 시각(초). 배너보다 늦어야 시선이 배너에 먼저 간다.")]
-    [Min(0f)] public float riderAt = 0.10f;
+    [Min(0f)] public float riderAt = 0.18f;
 
     [Min(0.01f)] public float riderDuration = 0.22f;
 
@@ -58,7 +63,10 @@ public class MatchmakingEntryFx
     [Header("스캔")]
     [Tooltip("빈 틀을 훑는 띠가 켜지는 시각(초). 배너가 자리를 잡은 뒤여야 한다 — " +
              "날아드는 틀 안에서 띠가 돌면 두 움직임이 겹쳐 어느 쪽도 읽히지 않는다.")]
-    [Min(0f)] public float scanAt = 0.24f;
+    [Min(0f)] public float scanAt = 0.34f;
+
+    // 이번 진입이 쓸 방향. Build가 인자로 받아 세우고 각 축이 읽는다 — 축마다 인자로 흘리면 서명만 길어진다.
+    Vector2 m_normal = Vector2.up;
 
     /// <summary>빈 틀 스캔을 켜야 하는 시각. 켜는 일은 셸이 한다 — 무엇을 훑을지는 이 클래스가 모른다.</summary>
     public float ScanAt => this.scanAt;
@@ -71,10 +79,17 @@ public class MatchmakingEntryFx
     /// <summary>진입 안무를 만들어 돌려준다(재생은 호출자).</summary>
     /// <param name="_riders">배너에 실리지 않은 것들(제목·취소 버튼). 방향은 각자의 y가 VS의 어느 쪽인지가 정한다 —
     /// 갈라짐(MatchHandoffFx.StageRiders)과 같은 규약이라 나간 자리에서 되돌아 들어온다.</param>
+    /// <param name="_normal">
+    /// 들어오는 방향. 배경 이음매의 법선(MatchmakingBgFx.EnterNormal)을 받으면 배너가 두 판이 맞물리는
+    /// 그 대각을 타고 미끄러져, 배너·판·이음매가 한 축으로 정렬된다. Vector2.zero면 수직으로 들어온다.
+    /// </param>
     public Sequence Build(MatchProfileView _my, MatchProfileView _opponent, RectTransform _versus,
-                          Graphic _dim, RectTransform _root, RectTransform[] _riders)
+                          Graphic _dim, RectTransform _root, RectTransform[] _riders, Vector2 _normal)
     {
         var t_seq = DOTween.Sequence();
+
+        // 이 화면의 축이 곧 방향이다. 못 받았으면 수직 — 배경이 미배선이어도 진입은 돌아야 한다.
+        this.m_normal = _normal.sqrMagnitude > 0.0001f ? _normal.normalized : Vector2.up;
 
         // 위/아래를 가르는 기준선은 VS다 — 이 화면에서 VS는 아직 꺼져 있지만 좌표는 읽을 수 있다.
         // 갈라짐이 쓰는 것과 같은 한 줄이라, 나갈 방향과 들어온 방향이 저절로 맞는다.
@@ -140,7 +155,8 @@ public class MatchmakingEntryFx
         Vector2 t_home = _rect.anchoredPosition;
         float   t_sign = t_home.y >= _axisY ? 1f : -1f;
 
-        _rect.anchoredPosition = t_home + new Vector2(0f, t_sign * _distance);
+        // 이음매의 법선을 타고 들어온다 — 배경 두 판이 맞물리는 방향과 같아야 화면이 한 축으로 읽힌다.
+        _rect.anchoredPosition = t_home + this.m_normal * (t_sign * _distance);
 
         // 감속이라 "자리에 앉았다"가 된다. 가속이면 무언가에 밀려 들어온 것으로 보인다.
         _seq.Insert(_at, _rect.DOAnchorPos(t_home, _duration).SetEase(Ease.OutCubic));

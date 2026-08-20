@@ -1300,8 +1300,11 @@ MonoBehaviour:
       burstAdditive: 1
     dim:
       dim: {fileID: 3258554939496773107}
-      darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
-      brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+      darkColor: {r: 0.05, g: 0.04, b: 0.09, a: 1}
+      brightColor: {r: 1, g: 0.97, b: 0.9, a: 1}
+      extraDims:
+      - {fileID: 8848570705721382248}
+      - {fileID: 2668579091312518857}
   entryFx:
     dimFade: 0.18
     rootStartScale: 1.06
@@ -1314,6 +1317,19 @@ MonoBehaviour:
     riderDuration: 0.22
     riderDistance: 80
     scanAt: 0.24
+  bgFx:
+    top: {fileID: 8436660722486483894}
+    bottom: {fileID: 2351059224164199041}
+    closeDuration: 0.22
+    closeEase: 8
+    partDuration: 0.32
+    partEase: 8
+    seamThickness: 7
+    seamColor: {r: 1, g: 0.97, b: 0.88, a: 1}
+    seamAlpha: 0.85
+    seamRise: 0.05
+    seamFall: 0.22
+    pad: 48
   handoffFx:
     vsStrike: 0.07
     vsStrikeScale: 1.16
