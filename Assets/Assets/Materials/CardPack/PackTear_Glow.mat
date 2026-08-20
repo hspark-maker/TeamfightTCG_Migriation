@@ -23,6 +23,10 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _GlowTex:
+        m_Texture: {fileID: 2800000, guid: 28585f52f992cf04f8efecf1c34265b8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _JagTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -35,12 +39,26 @@ Material:
     m_Floats:
     - _ColorMask: 15
     - _DstBlend: 1
-    - _EdgeSoft: 0.0015
+    - _EdgeSoft: 0.00075
     - _FrontFeather: 0.004
-    - _GlowWidth: 0.01
+    - _GlowEnd: 0.35
+    - _GlowFalloff: 2.2
+    - _GlowHalo: 0.7
+    - _GlowRippleFreq: 6.3
+    - _GlowRise: 0.16
+    - _GlowRiseByProgress: 1
+    - _GlowSideSoft: 0.14
+    - _GlowSourceVScale: 2
+    - _GlowSpread: 1.6
+    - _GlowStartSoft: 0.02
+    - _GlowStreak: 0.55
+    - _GlowStreakLength: 0.45
+    - _GlowStreakScroll: 0.12
+    - _GlowTexAmount: 1
+    - _GlowWidth: 0.005
     - _HeadWidth: 0.05
-    - _JagAmpA: 0.028
-    - _JagAmpB: 0.008
+    - _JagAmpA: 0.014
+    - _JagAmpB: 0.004
     - _JagFreqA: 1
     - _JagFreqB: 4.37
     - _MouthDepth: 0.055
@@ -50,11 +68,14 @@ Material:
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
+    - _TearDirection: 1
     - _TearMode: 3
     - _TearProgress: 0
-    - _TearY: 0.873
+    - _TearY: 0.4365
     - _UseUIAlphaClip: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowTexScroll: {r: 0.06, g: 0, b: 0, a: 0}
+    - _GlowTexTile: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -17,7 +17,7 @@ public static class SynergyEmblemVfx
         => _synergy != null && _synergy.vfx != null ? _synergy.vfx.EntryFor(_timing) : null;
 
     /// <summary>이 타이밍 엠블럼 1회 재생 길이(초, 배속 적용). 연출이 끝나길 기다렸다가
-    /// 다음 연출을 잇는 호출부(무리 선피해 → 볼리)가 쓴다. 배선이 없으면 0 — 기다릴 것도 없다.</summary>
+    /// 다음 연출을 잇는 호출부(낙인 선피해 → 볼리)가 쓴다. 배선이 없으면 0 — 기다릴 것도 없다.</summary>
     public static float DurationOf(SynergyData _synergy, SynergyEmblemTiming _timing)
     {
         SynergyEmblemEntry t_entry = EntryOf(_synergy, _timing);
@@ -46,7 +46,7 @@ public static class SynergyEmblemVfx
     }
 
     /// <summary>[Triggered] 효과가 실제로 일한 순간. 범위(자기 1장 / 소속 아군 전원)는 그 줄이 정한다 —
-    /// 무리 선피해처럼 전원이 함께 일하는 효과는 발동 주체 한 장만 빛나면 그림과 어긋난다.
+    /// 낙인 선피해처럼 전원이 함께 일하는 효과는 발동 주체 한 장만 빛나면 그림과 어긋난다.
     /// 반환값 = 실제로 띄웠는가(연출이 끝나길 기다릴지 호출부가 판단하는 근거).
     /// 순수 연출이라 결정론과 무관하다(상태·RNG 무접촉).</summary>
     public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleField _field)

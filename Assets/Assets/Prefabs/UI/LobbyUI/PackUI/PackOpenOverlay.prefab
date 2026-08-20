@@ -1271,8 +1271,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 677, y: 1015.5}
+  m_AnchoredPosition: {x: 0, y: 507.75}
+  m_SizeDelta: {x: 677, y: 2031}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2416401453737633109
 CanvasRenderer:
@@ -1641,7 +1641,6 @@ MonoBehaviour:
   packOpenScale: 1.15
   packShiftDuration: 0.4
   packShiftHold: 0.1
-  sealTearDuration: 0.45
   cardPullDelay: 0.12
   cardPullDuration: 0.55
   pullHold: 0.35
@@ -2083,7 +2082,7 @@ MonoBehaviour:
   flickSpeed: 1400
   flickMinProgress: 0.15
   deadZone: 12
-  rewindDuration: 0.28
+  finishDuration: 0.28
 --- !u!114 &3480698031403633388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2119,6 +2118,39 @@ MonoBehaviour:
   lid: {fileID: 2536646738382517465}
   mouthShadow: {fileID: 9179316989243037363}
   tearGlow: {fileID: 4265340372555632584}
+  tearHandle: {fileID: 8492758770188128739}
+  glowReach: 0.16
+  baseGlow: {r: 0.88, g: 0.9, b: 0.92, a: 1}
+  gradeTintStart: 0.5
+  gradeTintFull: 0.95
+  goldGlow: {r: 1, g: 0.82, b: 0.35, a: 1}
+  prismCycleSpeed: 0.5
+  prismSaturation: 0.8
+  prismValue: 1
+  glowRamp:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   lidPivot: {fileID: 1952982339451470153}
   peelAngle: -30
   peelLift: 40
@@ -2151,10 +2183,19 @@ MonoBehaviour:
   pulsePeriod: 2
   shadowScaleAtTop: 0.82
   shadowAlphaAtTop: 0.55
-  glowAlphaMin: 0.18
-  glowAlphaMax: 0.34
+  glowAlphaMin: 0
+  glowAlphaMax: 0
   glowSpinPeriod: 24
   glowFadeDuration: 0.4
+  ringDuration: 0.55
+  ringStartScale: 0.08
+  ringEndScale: 1.6
+  ringStrength: 1
+  ringThickness: 0.14
+  ringStrokeStrength: 0.85
+  shakeAmplitude: 18
+  shakeDuration: 0.28
+  shakeFrequency: 26
   tearHandle: {fileID: 8492758770188128739}
   settleSpeed: 12
 --- !u!1 &3250771434740593995
@@ -2367,7 +2408,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7429717905004580723}
+  m_Father: {fileID: 5895301881091186177}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -2394,7 +2435,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 156ecd5703baf6e4c838dddea5309afa, type: 2}
   m_Color: {r: 0.6, g: 0.66, b: 1, a: 0.24}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -2402,7 +2443,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 4f227f4e384d0a64d8792c7524c0ba43, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ccba10f5b1d78416a902acdf9f25a5ca, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2526,7 +2567,6 @@ RectTransform:
   m_LocalScale: {x: 1.55, y: 1.55, z: 1.55}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3963600293554096947}
   - {fileID: 3855892148570698422}
   m_Father: {fileID: 8075960111081696800}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2568,6 +2608,7 @@ RectTransform:
   - {fileID: 606576077719889057}
   - {fileID: 5536087141056582611}
   - {fileID: 8075960111081696800}
+  - {fileID: 3963600293554096947}
   - {fileID: 7143424345597507835}
   - {fileID: 2668003287496627745}
   - {fileID: 3712830489292936202}
@@ -3347,11 +3388,11 @@ RectTransform:
   m_LocalScale: {x: 1.55, y: 1.55, z: 1.55}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 6085610784462947787}
   - {fileID: 3785560295067536689}
   - {fileID: 4435166034145627920}
   - {fileID: 701373936639769598}
   - {fileID: 1952982339451470153}
-  - {fileID: 6085610784462947787}
   m_Father: {fileID: 8075960111081696800}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}

@@ -2,7 +2,7 @@
 using UnityEngine;
 
 /// <summary>전투 중 카드를 **강제로 죽이는** 디버그 창(F2). 사망 시 발동하는 것들
-/// (유산 왕관 비행 · 언데드 부활 · 청소부 · 사망 연출)을 판을 끝까지 굴리지 않고 보기 위한 도구다.
+/// (유산 왕관 비행 · 언데드 부활 · 포식자 · 사망 연출)을 판을 끝까지 굴리지 않고 보기 위한 도구다.
 ///
 /// 씬에 배선하지 않는다 — <see cref="Install"/>가 실행 시점에 자기 GameObject를 만든다.
 /// 디버그 하나 때문에 전투 씬 YAML을 건드리면 씬 병합 충돌만 늘어난다(VfxDebugWindow는 테스트 씬 전용이라
@@ -95,12 +95,12 @@ public class BattleDebugKill : MonoBehaviour
     }
 
     /// <summary>전투와 같은 순서로 죽인다 — 피해를 체력만큼 넣고 필드 정리를 돌린다.
-    /// 추가 체력(덩치)까지 함께 깎아야 한 번에 죽는다. 무적은 첫 타를 삼키므로 두 번 넣는다.</summary>
+    /// 추가 체력(덩치)까지 함께 깎아야 한 번에 죽는다. 무적·보호막이 각각 한 타를 삼킬 수 있어 최대 세 번 넣는다.</summary>
     static void Kill(BattleField _field, BattleFieldView _view, CardInstance _card)
     {
-        int t_total = _card.hp + _card.bonusHp;
-        _card.TakeDamage(t_total, _isAttackHit: true);
-        if (_card.IsAlive) _card.TakeDamage(_card.hp + _card.bonusHp, _isAttackHit: true);   // 무적 1회 소진분
+        _card.TakeDamage(int.MaxValue);
+        if (_card.IsAlive) _card.TakeDamage(int.MaxValue);   // 무적/보호막 1회 소진분
+        if (_card.IsAlive) _card.TakeDamage(int.MaxValue);   // 둘 다 있었을 때 남은 1회
 
         // [Lethal] → [Removed] → 슬롯 제거. 전투와 같은 함수라 훅 순서가 갈라지지 않는다.
         AttackProcessor.RemoveDead(_field);

@@ -13,6 +13,7 @@
  */
 
 const DETECTOR_VERSION = 2;
+const MAP_SCOPE_OUTSIDE_MARKER = "MAP_SCOPE_OUTSIDE_V1";
 
 const MAP_NAME = "orch-feature-map.md";
 
@@ -103,6 +104,12 @@ function shouldGate(toolName, toolInput) {
   return isSearchTool(toolName, toolInput) && isMapAnswerable(toolInput);
 }
 
+/** 관측 전용 상한: .cs를 명시했지만 지도 범위인 Assets/Scripts는 명시하지 않은 검색. */
+function isOutsideMapScope(toolInput) {
+  const text = JSON.stringify(toolInput || {}).replace(/\\\\/g, "/");
+  return /\.cs\b/i.test(text) && !/Assets[\\/]Scripts\b/i.test(text);
+}
+
 /* 지도 열람이 성립하는 도구. Read 만 보면 안 된다 — 실측 열람 3회 중 2회가 Bash(cat/grep)였다. */
 function isMapReadTool(toolName) {
   return toolName === "Read" || toolName === "Bash" || toolName === "PowerShell";
@@ -129,7 +136,9 @@ function mapReadSucceeded(response) {
 
 module.exports = {
   DETECTOR_VERSION,
+  MAP_SCOPE_OUTSIDE_MARKER,
   SEARCH_COMMANDS,
+  isOutsideMapScope,
   isMapAnswerable,
   shouldGate,
   MAP_NAME,

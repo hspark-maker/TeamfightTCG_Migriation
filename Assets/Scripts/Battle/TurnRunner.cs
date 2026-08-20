@@ -320,6 +320,14 @@ public class TurnRunner : MonoBehaviour
                 SynergyTriggers.TurnEnded(t_endedCtx);
             }
 
+            // 보호막은 받은 뒤 상대의 공격 턴 하나를 버티는 상태다.
+            // 현재 행동 진영의 반대 필드 전체에서 지워야 수호자 5티어가 비수호자에게 준 보호막도 만료된다.
+            BattleField t_oppositeField = t_field == this.playerField ? this.enemyField : this.playerField;
+            foreach (var t_c in t_oppositeField.GetActiveCards())
+                t_c.ClearShield();
+            foreach (var t_c in t_oppositeField.GetWaitingCards())
+                t_c.ClearShield();
+
             if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
 
             // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다

@@ -40,12 +40,12 @@ public abstract class SynergyEmblemSpec
     public int sortingOrder = 2;
 
     /// <summary>띄울 그림이 있는가. 배선 판정(<see cref="SynergyEmblemEntry.Covers"/>)이 이걸 본다.
-    /// 그림을 여러 장 쓰는 몸짓(성벽 StackUpEmblem)은 자기 목록으로 다시 답한다 —
+    /// 그림을 여러 장 쓰는 몸짓(수호자 StackUpEmblem)은 자기 목록으로 다시 답한다 —
     /// 여기서 <c>sprite</c> 하나만 보면 그런 몸짓이 배선돼도 줄 전체가 꺼진다.</summary>
     public virtual bool HasArt => this.sprite != null;
 
     /// <summary>배속이 적용된 실제 재생 길이(초). 자식 구현과, 연출이 끝나길 기다리는 호출부
-    /// (무리 선피해 → 볼리)가 같은 이 값을 본다 — 대기 시간과 실제 길이가 갈라지지 않게.</summary>
+    /// (낙인 선피해 → 볼리)가 같은 이 값을 본다 — 대기 시간과 실제 길이가 갈라지지 않게.</summary>
     public float Duration => GameTiming.Battle.Scaled(Mathf.Max(0.05f, this.duration));
 
     /// <summary>몸짓 재생. 그림을 만드는 것까지는 베이스가 하고(<see cref="Create"/>),

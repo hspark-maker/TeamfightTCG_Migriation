@@ -10,6 +10,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "FlowSynergyEffect", menuName = "Card Battle/Synergy Effect/Flow")]
 public class FlowSynergyEffect : SynergyEffect
 {
+    [SerializeField] int amount = 1;
+
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
     public override UniTask OnEntered(SpawnCtx _ctx)
     {
@@ -19,12 +21,12 @@ public class FlowSynergyEffect : SynergyEffect
         if (!SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return UniTask.CompletedTask;
 
         // 매 등장마다 스택 +1(Cunning 재진입 포함, 무제한 성장).
-        _ctx.field.AddFlowStack();
+        _ctx.field.AddFlowStack(amount);
         // 흐름 카드들만 현재 스택으로 재동기(비흐름 카드는 건드리지 않음).
         foreach (var t_card in _ctx.field.GetActiveCards())
             if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 흐름 카드 등장 시 배너+배지 pop
+        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field); // 흐름 카드 등장 시 배너+배지 pop
         // 바람 스펙은 흐름 시너지의 연출 에셋이 소유. 타입 불일치면 null → 바람만 생략된다.
         SynergyVfx.PlayFlowWind(_ctx.field, _ctx.synergy?.vfx as FlowSynergyVfxConfig);
         return UniTask.CompletedTask;
