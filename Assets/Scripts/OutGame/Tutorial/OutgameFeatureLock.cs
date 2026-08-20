@@ -88,6 +88,18 @@ public static class OutgameFeatureLock
         Refresh();
     }
 
+    /// <summary>정지 판정을 되돌린다 — 되감기·디버그 점프로 진행을 다시 세울 때의 짝이다.
+    /// 이 판정은 세이브가 아니라 static에 있어, 걷지 않으면 세이브를 밀어도 전 기능이 열린 채로 남아
+    /// 잠금 저작을 검증할 수 없다.</summary>
+    public static void ClearStall()
+    {
+        if (!s_stalled) return;
+
+        s_stalled = false;
+        s_valid   = false;
+        Refresh();
+    }
+
     static bool Recalculate()
     {
         int  t_chapter = OutgameTutorialProgress.ChapterIndex;

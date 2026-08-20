@@ -66,7 +66,7 @@ public class OutgameTutorialStepWindow : EditorWindow
 
     void DrawScheduleBanner()
     {
-        if (!OutgameTutorialRewind.TryGetScheduled(out int t_chapter, out int t_step))
+        if (!OutgameTutorialRewind.TryGetScheduled(out int t_chapter, out int t_step, out bool t_wipePending))
         {
             EditorGUILayout.LabelField("예약", "없음", EditorStyles.miniLabel);
             return;
@@ -76,6 +76,12 @@ public class OutgameTutorialStepWindow : EditorWindow
         EditorGUILayout.LabelField("예약", $"{t_chapter}-{t_step}  {ActionNameAt(t_chapter, t_step)}", EditorStyles.boldLabel);
         if (GUILayout.Button("예약 취소", GUILayout.Width(72))) OutgameTutorialRewind.Cancel();
         EditorGUILayout.EndHorizontal();
+
+        // 밀기만 돌고 지급 재생 전에 부트가 끊긴 상태(BootInstaller 없는 씬에서 Play 등).
+        // 이 자리에 드러내지 않으면 취소할 방법이 없어, 한참 진행한 세이브 위에 다음 부트가 지급을 덧씌운다.
+        if (!t_wipePending)
+            EditorGUILayout.HelpBox("세이브 밀기는 이미 끝났고 지급 재생만 남았다 — 다음 부트가 이 좌표까지의 지급을 얹는다. "
+                                  + "그 사이에 진행했다면 [예약 취소]로 걷어라.", MessageType.Warning);
 
         // 예약은 부트에서만 소비된다 — 지금 도는 플레이는 그대로다.
         if (Application.isPlaying)
@@ -179,7 +185,7 @@ public class OutgameTutorialStepWindow : EditorWindow
         && OutgameTutorialProgress.StepIndex == _step;
 
     static bool IsScheduled(int _chapter, int _step)
-        => OutgameTutorialRewind.TryGetScheduled(out int t_c, out int t_s) && t_c == _chapter && t_s == _step;
+        => OutgameTutorialRewind.TryGetScheduled(out int t_c, out int t_s, out _) && t_c == _chapter && t_s == _step;
 
     string CurrentCoordLabel()
     {

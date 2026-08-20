@@ -116,6 +116,11 @@ public static class OutgameTutorialProgress
         t_slot.outgameCompleted        = false;
         t_slot.migrationChecked        = true;
         Save();
+
+        // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 부트 만에 오탐 정지가 뜬다.
+        // 이미 선 판정도 함께 걷어야 잠금이 실제로 돌아온다(둘을 갈라 두면 한쪽만 풀려 검증이 오염된다).
+        ResetStallWatch();
+        OutgameFeatureLock.ClearStall();
     }
 
     // 소유 카드가 이미 있는 구 세이브는 튜토리얼을 마친 것으로 본다(계정당 1회)
