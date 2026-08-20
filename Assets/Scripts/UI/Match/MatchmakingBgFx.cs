@@ -51,6 +51,21 @@ public class MatchmakingBgFx
     [Min(0.01f)] [SerializeField] float seamRise = 0.05f;
     [Min(0.01f)] [SerializeField] float seamFall = 0.22f;
 
+    [Header("확정 — 상대가 정해지면 판이 진해진다")]
+    [Tooltip("상대가 확정되는 순간 위 판이 옮겨 앉을 색. 덱 화면 EnemySection의 판 색을 그대로 넣는다 —\n" +
+             "두 화면은 같은 팔레트로 저작돼 있어서(위쪽은 RGB가 아예 같고 알파만 0.94다) " +
+             "여기서 색을 맞춰 두면 판이 갈라질 때 밑에서 나오는 색과 정확히 이어진다.\n" +
+             "알파를 1로 올리는 것이 곧 '진해짐'이다 — 로비가 비치던 6%가 여기서 닫힌다.")]
+    [SerializeField] Color topConfirmColor = new Color(0.878f, 0.357f, 0.357f, 1f);
+
+    [Tooltip("아래 판이 옮겨 앉을 색. 덱 화면 MySection의 판 색이다 — 매칭의 청록(B 0.682)보다 " +
+             "파랑 쪽(B 0.941)이라 확정되는 순간 색이 한 걸음 옮겨 앉는 것이 눈에 보인다.")]
+    [SerializeField] Color bottomConfirmColor = new Color(0.290f, 0.639f, 0.941f, 1f);
+
+    [Tooltip("색이 옮겨 앉는 시간(초). 발견의 한 방이 아니라 그 뒤로 천천히 스며야 한다 — " +
+             "짧으면 슬램과 겹쳐 색 변화가 묻히고, 조임 구간(chargeHold)을 넘기면 충돌 때까지 안 끝난다.")]
+    [Min(0.01f)] [SerializeField] float confirmDuration = 0.55f;
+
     [Header("기하")]
     [Tooltip("판을 화면 밖까지 넉넉히 밀어내는 여유(px). 기울어진 이음매는 화면 좌우 끝에서 더 내려앉아 " +
              "여유가 없으면 판 귀퉁이가 화면에 남는다(계산은 CurtainView.Solve가 한다).")]
@@ -60,6 +75,13 @@ public class MatchmakingBgFx
     Vector2 m_topHome;
     Vector2 m_bottomHome;
     bool    m_captured;
+
+    // 색 축이 쓰는 것들. 저작 색도 같은 이유의 1회 캡처다 — 확정이 옮겨 놓은 색을 다시 잡으면 되돌릴 자리가 사라진다.
+    Image m_topImage;
+    Image m_bottomImage;
+    Color m_topBaseColor;
+    Color m_bottomBaseColor;
+    bool  m_imagesCaptured;
 
     /// <summary>갈라짐이 끝나는 시각. 화면을 내리는 쪽(셸)이 이보다 일찍 내리면 판이 또 증발한다.</summary>
     public float PartDuration => this.HasPanels ? this.partDuration : 0f;
@@ -136,8 +158,37 @@ public class MatchmakingBgFx
         return t_seq;
     }
 
+    /// <summary>
+    /// 상대가 확정되면 두 판이 덱 화면의 섹션 색으로 옮겨 앉는다(재생은 호출자).
+    /// 색을 직접 칠하지 않고 밝기 축의 <b>기준</b>을 미는 이유는, 이 구간에도 조임·충돌의 밝기 왕복이
+    /// 계속 돌기 때문이다 — 같은 Graphic에 두 축이 직접 쓰면 늦게 쓴 쪽이 이긴다.
+    /// </summary>
+    public Sequence BuildConfirm(ScreenDimTint _tint)
+    {
+        var t_seq = DOTween.Sequence();
+
+        if (_tint == null || !this.HasPanels) return t_seq;
+
+        this.CaptureImages();
+
+        Color t_topFrom = _tint.GetExtraBase(this.m_topImage);
+        Color t_botFrom = _tint.GetExtraBase(this.m_bottomImage);
+
+        // 기준이 안 잡혔다(딤이 이 판들을 모른다) — 색 축만 조용히 빠진다.
+        if (t_topFrom.a <= 0f && t_botFrom.a <= 0f) return t_seq;
+
+        t_seq.Insert(0f, DOTween.To(() => 0f, _v =>
+        {
+            _tint.SetExtraBase(this.m_topImage,    Color.Lerp(t_topFrom, this.topConfirmColor,    _v));
+            _tint.SetExtraBase(this.m_bottomImage, Color.Lerp(t_botFrom, this.bottomConfirmColor, _v));
+        }, 1f, this.confirmDuration).SetEase(Ease.OutQuad));
+
+        return t_seq;
+    }
+
     /// <summary>안무가 세운 중간값을 저작 자리로 되돌린다. 잘려도 배경이 화면 밖으로 나간 채 굳지 않게.</summary>
-    public void Reset()
+    /// <param name="_tint">밝기 축. 확정이 옮겨 놓은 기준 색을 저작값으로 되돌리려면 이쪽을 거쳐야 한다.</param>
+    public void Reset(ScreenDimTint _tint)
     {
         if (!this.m_captured || !this.HasPanels) return;
 
@@ -145,6 +196,27 @@ public class MatchmakingBgFx
         this.bottom.DOKill();
         this.top.anchoredPosition    = this.m_topHome;
         this.bottom.anchoredPosition = this.m_bottomHome;
+
+        // 지난 매칭이 덱 색으로 옮겨 놓은 기준을 되돌린다 — 안 되돌리면 다음 매칭이 덱 색으로 열린다.
+        if (_tint == null || !this.m_imagesCaptured) return;
+
+        _tint.SetExtraBase(this.m_topImage,    this.m_topBaseColor);
+        _tint.SetExtraBase(this.m_bottomImage, this.m_bottomBaseColor);
+    }
+
+    // 판의 Image와 저작 색. 색은 한 번만 잡는다 — 확정이 옮겨 놓은 색을 다시 캡처하면 되돌릴 자리가 사라진다.
+    void CaptureImages()
+    {
+        if (this.m_imagesCaptured || !this.HasPanels) return;
+
+        this.m_topImage    = this.top.GetComponent<Image>();
+        this.m_bottomImage = this.bottom.GetComponent<Image>();
+
+        if (this.m_topImage == null || this.m_bottomImage == null) return;
+
+        this.m_imagesCaptured  = true;
+        this.m_topBaseColor    = this.m_topImage.color;
+        this.m_bottomBaseColor = this.m_bottomImage.color;
     }
 
     // 판이 화면을 완전히 비우는 거리. 이음매가 화면 중앙(0.5)에 있는 기하라 커튼과 같은 식이 그대로 성립한다 —

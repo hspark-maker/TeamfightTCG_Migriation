@@ -229,11 +229,13 @@ public class MatchmakingShell : MonoBehaviour
 
         // 직전 전환이 배너를 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
         KillStage();
+        // 배경을 먼저 되돌린다 — 지난 전환이 판을 화면 밖으로 밀어 놓았고, 지난 확정이 밝기 축의 기준 색을
+        // 덱 색으로 옮겨 놓았다. 기준을 저작값으로 돌린 뒤라야 이어지는 fx.Reset이 옳은 색으로 칠한다
+        // (순서를 뒤집으면 fx.Reset이 덱 색을 칠하고 다음 매칭이 그 색으로 열린다).
+        bgFx.Reset(fx.Dim);
+
         fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
         handoffFx.Reset((RectTransform)transform, VersusRect);
-
-        // 지난 전환이 배경 두 판을 화면 밖으로 밀어 놓고 끝났다 — 되돌리지 않으면 다음 매칭이 배경 없이 열린다.
-        bgFx.Reset();
 
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
@@ -299,6 +301,12 @@ public class MatchmakingShell : MonoBehaviour
 
         var t_root = (RectTransform)transform;
         var t_seq  = fx.BuildFound(opponentProfile, t_root);
+
+        // 카드가 꽂히는 그 프레임부터 배경 두 판이 덱 화면의 섹션 색으로 옮겨 앉는다 —
+        // 상대가 정해졌다는 사실이 배너 한 장이 아니라 화면 전체의 색으로 드러나고,
+        // 그 색이 이미 다음 화면의 색이라 나중에 판이 갈라질 때 두 화면이 색으로 이어진다.
+        // 조임보다 먼저 끝나야 한다(confirmDuration 툴팁) — 안 끝나면 대치가 무대를 갈아탈 때 잘린다.
+        t_seq.Insert(fx.SlamAt, bgFx.BuildConfirm(fx.Dim));
 
         // 조임은 꽂힘이 끝나는 자리에 이어 붙인다. 별도 무대로 돌리면 그 사이 한 프레임이 완전 정지가 되어,
         // 채우려던 바로 그 공백이 앞으로 옮겨 갈 뿐이다.
