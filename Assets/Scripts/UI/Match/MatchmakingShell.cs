@@ -42,6 +42,10 @@ public class MatchmakingShell : MonoBehaviour
     [Header("연출")]
     [SerializeField] MatchmakingFx fx = new MatchmakingFx();
 
+    [Tooltip("로비에서 이 화면이 덮어 오는 진입. 갈라짐(handoffFx)의 앞자리 짝이다 — " +
+             "배너가 나중에 밀려날 그 방향에서 되돌아 들어온다.")]
+    [SerializeField] MatchmakingEntryFx entryFx = new MatchmakingEntryFx();
+
     [Tooltip("덱 화면으로 넘어가는 전환. 커튼으로 덮지 않고 두 화면을 잇는다 — 자세한 규약은 MatchHandoffFx 참고.")]
     [SerializeField] MatchHandoffFx handoffFx = new MatchHandoffFx();
 
@@ -229,7 +233,20 @@ public class MatchmakingShell : MonoBehaviour
         SetCancelInteractable(true);
         StartDots();
 
-        if (opponentProfile != null) fx.StartScan(opponentProfile.SearchingRect);
+        // 진입 안무. 어둠이 로비 위로 차오르고 두 배너가 바깥에서 꽂힌다 — 이게 없으면 로비가 한 프레임에
+        // 사라져 매칭이 "다음 화면"이 되고, 갈라짐(handoffFx)이 세운 축과도 끊긴다.
+        //
+        // 여는 순서가 곧 전제다: 바로 위에서 fx.Reset·RestoreHome이 저작 상태로 되돌린 뒤라야
+        // 안무가 지금 자리를 홈으로, 지금 딤 알파를 목표로 삼을 수 있다.
+        var t_enter = entryFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
+                                    (RectTransform)transform, Riders);
+
+        // 스캔은 배너가 앉은 뒤에 켠다 — 아직 날아드는 틀 안에서 띠가 돌면 두 움직임이 겹쳐 어느 쪽도 읽히지 않는다.
+        // 안무가 그 전에 잘리는 길은 발견(ShowFound)과 씬 파괴뿐이고, 둘 다 스캔을 켜면 안 되는 자리라 보정하지 않는다.
+        if (opponentProfile != null)
+            t_enter.InsertCallback(entryFx.ScanAt, () => fx.StartScan(opponentProfile.SearchingRect));
+
+        PlayStage(t_enter);
     }
 
     // 여기서부터 취소를 받지 않는다 — 이미 뽑은 상대를 버리고 다시 누르면 다른 상대가 나와,
