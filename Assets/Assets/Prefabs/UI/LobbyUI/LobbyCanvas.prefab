@@ -5383,38 +5383,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tab_Tournament
       objectReference: {fileID: 0}
-    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_AnchorMax.x
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_AnchorMin.x
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_SizeDelta.x
-      value: 1080
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_SizeDelta.y
-      value: 2280
-      objectReference: {fileID: 0}
-    - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 53.25
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
