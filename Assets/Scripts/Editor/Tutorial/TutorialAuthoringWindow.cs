@@ -10,6 +10,14 @@ using UnityEngine;
 /// 저작 오류 · 되감기), 그것을 목록에 다 펴면 33스텝이 곧 160줄짜리 벽이 된다. 그래서 목록은 한 줄로 줄이고
 /// 나머지는 전부 오른쪽으로 보냈다.
 ///
+/// <b>"고른 것 하나" = 스텝이 아니라 비트다</b>(<see cref="TutorialBeatGrouping"/>). 저작 행의 3분의 1은
+/// 유저에게 아무것도 그리지 않는 잡일(지급 · 오버레이 닫기 · 연출 종료 대기)인데, 그것들이 사건과 같은 무게로
+/// 목록에 서면 목록이 "유저가 겪는 순서"가 아니라 "실행기가 처리하는 순서"로 읽힌다. 그래서 잡일 행은
+/// 자기가 딸린 사건 줄로 접어 넣고, 오른쪽에서 그 사건과 함께 편집한다.
+///
+/// 접기는 <b>파생일 뿐이다</b> — 저작 SO의 행도, 세이브가 붙잡는 stepId도, 실행 순서도 접기 전과 같다.
+/// 되감기와 구조 편집이 여전히 행 단위로 남아 있는 이유다.
+///
 /// 상태와 검증을 한 창에 둔 이유: 저작 실수는 런타임이 대부분 조용히 삼키고(기본 onFailure=Skip), 진행이 막히면
 /// fail-open이 전 기능을 열어 증상까지 위장한다. 그래서 "돌려보고 안다"가 성립하지 않는다 — 플레이 전에 보여야 한다.
 ///
@@ -56,6 +64,9 @@ public class TutorialAuthoringWindow : EditorWindow
 
     // 캐시 — 매 OnGUI마다 33스텝을 다시 훑을 이유가 없다. 무효화는 아래 Invalidate 계열이 맡는다.
     TutorialSequenceState state;
+
+    // 편마다 접힌 비트 목록(파생 — 저작 데이터는 평평한 그대로다)
+    Dictionary<int, List<TutorialBeat>> beats;
 
     List<TutorialIssue> issues;
     List<TutorialIssue> triggeredIssues;
@@ -118,6 +129,7 @@ public class TutorialAuthoringWindow : EditorWindow
     void Invalidate()
     {
         this.state                = null;
+        this.beats                = null;
         this.issues               = null;
         this.triggeredIssues      = null;
         this.issueByStep          = null;
@@ -257,6 +269,9 @@ public class TutorialAuthoringWindow : EditorWindow
             this.mode = t_mode;
             this.selectedOuter = -1;
             this.selectedStep  = -1;
+
+            // 비트 캐시는 편 번호로만 키가 잡혀 있다 — 버리지 않으면 트리거 묶음에 온보딩 접기가 씌워진다.
+            Invalidate();
         }
 
         GUILayout.Space(8);
@@ -364,7 +379,8 @@ public class TutorialAuthoringWindow : EditorWindow
 
         EditorGUILayout.EndHorizontal();
 
-        for (int t_s = 0; t_s < t_steps; t_s++) DrawStepRow(_outer, t_s);
+        var t_beats = BeatsOf(_outer);
+        for (int t_b = 0; t_b < t_beats.Count; t_b++) DrawBeatRow(_outer, t_beats[t_b]);
 
         if (this.structureEdit && GUILayout.Button(t_steps == 0 ? "  + 첫 스텝" : "  + 스텝", EditorStyles.miniButton))
         {
@@ -373,15 +389,18 @@ public class TutorialAuthoringWindow : EditorWindow
         }
     }
 
-    void DrawStepRow(int _outer, int _step)
+    // 목록의 한 줄 = 비트 하나. 무대 준비·뒤처리 행은 줄로 서지 않고 대표 줄 옆에 개수로만 남는다 —
+    // 그래야 목록이 "실행기가 처리하는 순서"가 아니라 "유저가 겪는 순서"로 읽힌다.
+    void DrawBeatRow(int _outer, TutorialBeat _beat)
     {
-        var t_issues = IssuesAt(_outer, _step);
+        var t_issues = BeatIssues(_outer, _beat);
         if (this.issuesOnly && t_issues == null) return;
 
-        bool t_found       = TryGetStepAt(_outer, _step, out var t_def);
-        bool t_selected    = this.selectedOuter == _outer && this.selectedStep == _step;
-        bool t_isHere      = this.mode == EMode.Onboarding && IsCurrent(_outer, _step);
-        bool t_isScheduled = this.mode == EMode.Onboarding && IsScheduled(_outer, _step);
+        int  t_primary  = _beat.PrimaryStep;
+        bool t_found    = TryGetStepAt(_outer, t_primary, out var t_def);
+        bool t_selected = this.selectedOuter == _outer && _beat.Contains(this.selectedStep);
+
+        BeatMarks(_outer, _beat, out bool t_isHere, out bool t_isScheduled);
 
         // ▶ = 지금 서 있는 칸(플레이 중), ◆ = 다음 플레이에 시작할 칸
         string t_mark = t_isScheduled ? "◆" : t_isHere ? "▶" : " ";
@@ -397,9 +416,76 @@ public class TutorialAuthoringWindow : EditorWindow
                     : t_isHere || t_isScheduled              ? RowMarkedStyle
                     :                                          RowStyle;
 
-        GUILayout.Label($"{t_mark} {_outer}-{_step} {t_id} {t_name}{t_badge}", t_style);
+        GUILayout.Label($"{t_mark} {_outer}-{t_primary} {t_id} {t_name}{ChipsOf(_beat)}{t_badge}", t_style);
 
-        if (ClickedLastRect()) Select(_outer, _step);
+        if (ClickedLastRect()) Select(_outer, t_primary);
+    }
+
+    // 대표 줄 옆에 접혀 들어간 행의 개수. 사건 없이 잡일만 모인 무리는 첫 행이 대표로 서므로 그 한 줄은 뺀다.
+    static string ChipsOf(TutorialBeat _beat)
+    {
+        int t_pre  = _beat.PreCount;
+        int t_post = _beat.PostCount;
+
+        if (_beat.BeatStep < 0)
+        {
+            if (t_pre > 0)       t_pre--;
+            else if (t_post > 0) t_post--;
+        }
+
+        string t_text = string.Empty;
+
+        if (t_pre  > 0) t_text += $"  ·무대 {t_pre}";
+        if (t_post > 0) t_text += $"  ·정리 {t_post}";
+
+        return t_text;
+    }
+
+    // 좌표 표시(▶·◆)는 비트 안 어느 행에 서 있어도 그 비트에 뜬다 — 접혀 들어간 행에 서면 표시가 사라지면 안 된다.
+    void BeatMarks(int _outer, TutorialBeat _beat, out bool _isHere, out bool _isScheduled)
+    {
+        _isHere      = false;
+        _isScheduled = false;
+
+        if (this.mode != EMode.Onboarding) return;
+
+        for (int t_s = _beat.First; t_s <= _beat.Last; t_s++)
+        {
+            _isHere      |= IsCurrent(_outer, t_s);
+            _isScheduled |= IsScheduled(_outer, t_s);
+        }
+    }
+
+    // 비트가 품은 행들의 이슈를 합친다(한 행짜리면 그 행의 목록을 그대로 쓴다 — 대부분이 이쪽이다).
+    List<TutorialIssue> BeatIssues(int _outer, TutorialBeat _beat)
+    {
+        if (_beat.Count == 1) return IssuesAt(_outer, _beat.First);
+
+        List<TutorialIssue> t_merged = null;
+
+        for (int t_s = _beat.First; t_s <= _beat.Last; t_s++)
+        {
+            var t_bucket = IssuesAt(_outer, t_s);
+            if (t_bucket == null) continue;
+
+            (t_merged ??= new List<TutorialIssue>()).AddRange(t_bucket);
+        }
+
+        return t_merged;
+    }
+
+    List<TutorialBeat> BeatsOf(int _outer)
+    {
+        this.beats ??= new Dictionary<int, List<TutorialBeat>>();
+
+        if (this.beats.TryGetValue(_outer, out var t_cached)) return t_cached;
+
+        t_cached = TutorialBeatGrouping.Build(StepCountOf(_outer),
+                                              _step => TryGetStepAt(_outer, _step, out var t_def) ? t_def : null);
+
+        this.beats[_outer] = t_cached;
+
+        return t_cached;
     }
 
     void Select(int _outer, int _step)
@@ -447,10 +533,10 @@ public class TutorialAuthoringWindow : EditorWindow
         if (this.selectedOuter < 0)
         {
             EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("왼쪽에서 스텝을 고르면 여기에 값 · 상태 · 문제가 함께 뜬다.", WrapStyle);
+            EditorGUILayout.LabelField("왼쪽에서 비트를 고르면 여기에 값 · 상태 · 문제가 함께 뜬다.", WrapStyle);
         }
         else if (this.selectedStep < 0) DrawOuterDetail(this.selectedOuter);
-        else                            DrawStepDetail(this.selectedOuter, this.selectedStep);
+        else                            DrawBeatDetail(this.selectedOuter, this.selectedStep);
 
         EditorGUIUtility.labelWidth = t_labelWidth;
 
@@ -521,30 +607,99 @@ public class TutorialAuthoringWindow : EditorWindow
         }
     }
 
-    void DrawStepDetail(int _outer, int _step)
+    /// <summary>고른 것 하나 = 비트 하나. 사건 행만이 아니라 그 사건에 매달린 무대 준비·뒤처리까지
+    /// 한 화면에서 편집한다 — 팩 하나를 팔려고 목록을 세 번 오가던 동선이 여기서 끝난다.</summary>
+    void DrawBeatDetail(int _outer, int _step)
     {
-        bool t_found = TryGetStepAt(_outer, _step, out var t_def);
+        var t_beats = BeatsOf(_outer);
+        int t_index = TutorialBeatGrouping.IndexOf(t_beats, _step);
 
-        DrawStepHeader(_outer, _step, t_found, t_def);
+        // 접기가 못 닿는 좌표(편집 직후의 한 프레임 등)는 한 행짜리 비트로 본다 — 종전 화면 그대로다.
+        var t_beat = t_index >= 0 ? t_beats[t_index] : new TutorialBeat(_step, _step, _step, 0, 0);
 
-        DrawIssueCards(IssuesAt(_outer, _step));
+        int  t_primary = t_beat.PrimaryStep;
+        bool t_found   = TryGetStepAt(_outer, t_primary, out var t_def);
 
-        if (t_found) DrawStateBox(_outer, _step, t_def);
+        DrawBeatHeader(_outer, t_beat, t_found, t_def);
 
-        if (this.structureEdit)
+        // 접혀 들어간 행의 문제도 여기서 다 보여야 한다 — 목록에 줄이 없으니 드러날 다른 자리가 없다.
+        for (int t_s = t_beat.First; t_s <= t_beat.Last; t_s++)
+            DrawIssueCards(IssuesAt(_outer, t_s), t_beat.Count > 1 ? $"{_outer}-{t_s} · " : string.Empty);
+
+        if (t_found) DrawStateBox(_outer, t_primary, t_def);
+
+        // 한 행짜리 비트는 접을 것이 없다 — 섹션 머리를 세우지 않고 종전대로 그린다.
+        if (t_beat.Count == 1)
         {
-            EditorGUILayout.Space(4);
-            DrawStepTools(_outer, _step);
-        }
+            if (this.structureEdit)
+            {
+                EditorGUILayout.Space(4);
+                DrawStepTools(_outer, t_beat.First);
+            }
 
-        if (!t_found)
-        {
             EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("이 칸은 비어 있다 — 행을 지우거나 액션을 저작해야 한다.", WrapStyle);
+            DrawStepValue(_outer, t_beat.First);
             return;
         }
 
-        EditorGUILayout.Space(6);
+        int t_preEnd   = t_beat.First + t_beat.PreCount  - 1;
+        int t_postFrom = t_beat.Last  - t_beat.PostCount + 1;
+
+        DrawBeatSection("무대 · 사건이 서기 전에 갖추는 것", _outer, t_beat.First, t_preEnd);
+
+        if (t_beat.BeatStep >= 0) DrawBeatSection("사건 · 유저가 겪는 것", _outer, t_beat.BeatStep, t_beat.BeatStep);
+
+        DrawBeatSection("뒤처리 · 사건이 남긴 것을 치운다", _outer, t_postFrom, t_beat.Last);
+    }
+
+    void DrawBeatSection(string _title, int _outer, int _from, int _to)
+    {
+        if (_from > _to) return;
+
+        EditorGUILayout.Space(8);
+
+        var t_line = GUILayoutUtility.GetRect(1f, 1f, GUILayout.ExpandWidth(true));
+        EditorGUI.DrawRect(t_line, SplitterColor);
+
+        EditorGUILayout.LabelField(_title, EditorStyles.miniBoldLabel);
+
+        for (int t_s = _from; t_s <= _to; t_s++) DrawMemberStep(_outer, t_s);
+    }
+
+    // 비트 안의 한 행. 되감기와 구조 편집은 여전히 행 단위다 — stepId도 되감기 좌표도 행을 가리키기 때문이다.
+    void DrawMemberStep(int _outer, int _step)
+    {
+        bool t_found = TryGetStepAt(_outer, _step, out var t_def);
+
+        EditorGUILayout.BeginHorizontal();
+
+        string t_id = this.mode == EMode.Onboarding && t_found && t_def.StepId > 0 ? $"  #{t_def.StepId}" : string.Empty;
+        EditorGUILayout.LabelField($"{_outer}-{_step}{t_id}   {(t_found ? t_def.Action.ToString() : "(빈 칸)")}",
+                                   EditorStyles.miniBoldLabel);
+
+        if (this.mode == EMode.Onboarding)
+        {
+            bool t_scheduled = IsScheduled(_outer, _step);
+
+            if (GUILayout.Button(t_scheduled ? "예약됨" : "여기부터", EditorStyles.miniButton, GUILayout.Width(56))
+             && ConfirmRewind(_outer, _step))
+                OutgameTutorialRewind.Schedule(_outer, _step);
+        }
+
+        EditorGUILayout.EndHorizontal();
+
+        if (this.structureEdit) DrawStepTools(_outer, _step);
+
+        DrawStepValue(_outer, _step);
+    }
+
+    void DrawStepValue(int _outer, int _step)
+    {
+        if (!TryGetStepAt(_outer, _step, out _))
+        {
+            EditorGUILayout.LabelField("이 칸은 비어 있다 — 행을 지우거나 액션을 저작해야 한다.", WrapStyle);
+            return;
+        }
 
         // 값 편집은 드로어에 맡긴다 — 어떤 액션이 어떤 필드를 쓰는지는 TutorialActionMeta가 이미 답한다.
         // (드로어가 자기 요약 줄을 머리에 그리므로 여기에 "값" 라벨을 따로 세우지 않는다.)
@@ -555,19 +710,23 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.PropertyField(t_property, GUIContent.none, true);
     }
 
-    void DrawStepHeader(int _outer, int _step, bool _found, TutorialStepDef _def)
+    // 되감기 대상은 비트의 첫 행이다 — "이 비트부터 다시"가 곧 그 사건의 무대 준비부터 다시라는 뜻이다.
+    // 사건 행만 콕 집어 되감으려면 아래 섹션의 행별 [여기부터]를 쓴다.
+    void DrawBeatHeader(int _outer, TutorialBeat _beat, bool _found, TutorialStepDef _def)
     {
         EditorGUILayout.BeginHorizontal();
 
-        string t_id = this.mode == EMode.Onboarding && _found && _def.StepId > 0 ? $"  #{_def.StepId}" : string.Empty;
-        EditorGUILayout.LabelField($"{_outer}-{_step}{t_id}   {(_found ? _def.Action.ToString() : "(빈 칸)")}", EditorStyles.boldLabel);
+        string t_coord = _beat.Count == 1 ? $"{_outer}-{_beat.First}" : $"{_outer}-{_beat.First}~{_beat.Last}";
+        string t_id    = this.mode == EMode.Onboarding && _found && _def.StepId > 0 ? $"  #{_def.StepId}" : string.Empty;
+
+        EditorGUILayout.LabelField($"{t_coord}{t_id}   {(_found ? _def.Action.ToString() : "(빈 칸)")}", EditorStyles.boldLabel);
 
         if (this.mode == EMode.Onboarding)
         {
-            bool t_scheduled = IsScheduled(_outer, _step);
+            bool t_scheduled = IsScheduled(_outer, _beat.First);
 
-            if (GUILayout.Button(t_scheduled ? "예약됨" : "여기부터", GUILayout.Width(64)) && ConfirmRewind(_outer, _step))
-                OutgameTutorialRewind.Schedule(_outer, _step);
+            if (GUILayout.Button(t_scheduled ? "예약됨" : "여기부터", GUILayout.Width(64)) && ConfirmRewind(_outer, _beat.First))
+                OutgameTutorialRewind.Schedule(_outer, _beat.First);
         }
 
         EditorGUILayout.EndHorizontal();
@@ -673,7 +832,7 @@ public class TutorialAuthoringWindow : EditorWindow
         t_menu.ShowAsContext();
     }
 
-    void DrawIssueCards(List<TutorialIssue> _issues)
+    void DrawIssueCards(List<TutorialIssue> _issues, string _prefix = "")
     {
         if (_issues == null) return;
 
@@ -685,7 +844,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField($"{MarkOf(t_issue.Level)} {t_issue.Rule}", StyleOf(t_issue.Level));
+                EditorGUILayout.LabelField($"{MarkOf(t_issue.Level)} {_prefix}{t_issue.Rule}", StyleOf(t_issue.Level));
                 EditorGUILayout.LabelField(t_issue.Message, WrapStyle);
 
                 if (!string.IsNullOrEmpty(t_issue.Fix)) EditorGUILayout.LabelField("고치는 법 · " + t_issue.Fix, FixStyle);
