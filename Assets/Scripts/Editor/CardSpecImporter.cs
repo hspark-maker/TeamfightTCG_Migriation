@@ -34,7 +34,7 @@ public static class CardSpecImporter
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
         "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
-        "cardExplain",
+        "cardExplain", "grade",
     };
 
     [MenuItem("Tools/Card Battle/스펙시트(라이브) → 카드 에셋 적용")]

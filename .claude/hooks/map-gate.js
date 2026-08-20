@@ -8,6 +8,8 @@ const path = require("node:path");
 
 const {
   MAP_NAME,
+  MAP_SCOPE_OUTSIDE_MARKER,
+  isOutsideMapScope,
   isMapReadTool,
   shouldGate,
   mapReadSucceeded,
@@ -18,6 +20,9 @@ const { buildMapExcerpt } = require("../lib/map-excerpt.js");
 
 /* 요청 하나당 최대 차단 수. 요청이 바뀌면 다시 0 부터다. */
 const MAX_BLOCKS = 3;
+const STATE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const CLEANUP_MARKER = ".last-cleanup";
 
 /* 요청당 그냥 통과시킬 탐색 횟수. 실측: 탐색형 요청의 49%가 검색 1~2회로 끝난다 —
    그런 요청까지 막으면 지도 열람이 순수 오버헤드다. 반면 검색 8회 이상인 13%가 전체 검색의 39%를
@@ -60,6 +65,28 @@ function logFailOpen(stateRoot, message) {
   } catch { /* fail-open logging must never block work */ }
 }
 
+function pruneStateFiles(stateRoot, now = Date.now()) {
+  fs.mkdirSync(stateRoot, { recursive: true });
+  const marker = path.join(stateRoot, CLEANUP_MARKER);
+  try {
+    if (now - fs.statSync(marker).mtimeMs < CLEANUP_INTERVAL_MS) return 0;
+  } catch { /* 첫 실행 또는 오래된 marker */ }
+
+  let removed = 0;
+  for (const entry of fs.readdirSync(stateRoot, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    const file = path.join(stateRoot, entry.name);
+    try {
+      if (now - fs.statSync(file).mtimeMs > STATE_MAX_AGE_MS) {
+        fs.unlinkSync(file);
+        removed += 1;
+      }
+    } catch { /* 다른 hook 프로세스와 경합하면 다음 정리에서 처리 */ }
+  }
+  fs.writeFileSync(marker, new Date(now).toISOString());
+  return removed;
+}
+
 function deny(excerpt) {
   const marker = `[MAP_GATE_EXCERPT_V1 hits=${excerpt.hits} shown=${excerpt.shown} weighted=${excerpt.weighted}]`;
   return {
@@ -73,6 +100,8 @@ function deny(excerpt) {
 
 function processHook(input, options = {}) {
   const stateRoot = options.stateRoot || path.join(os.tmpdir(), "orch-map-gate");
+  try { pruneStateFiles(stateRoot); }
+  catch (error) { logFailOpen(stateRoot, `cleanup failed (${error.message})`); }
   const projectDir = options.projectDir
     || resolveProjectDir(process.env.CLAUDE_PROJECT_DIR)
     || resolveProjectDir(input.cwd)
@@ -115,6 +144,9 @@ function processHook(input, options = {}) {
   }
 
   if (event !== "PreToolUse" || state.loaded || !shouldGate(toolName, toolInput)) return null;
+  if (isOutsideMapScope(toolInput)) {
+    logFailOpen(stateRoot, `observe: ${MAP_SCOPE_OUTSIDE_MARKER} (${toolName}) ${JSON.stringify(toolInput).slice(0, 140)}`);
+  }
 
   const searches = (state.searches || 0) + 1;
   if (searches <= FREE_SEARCHES) {
@@ -133,11 +165,12 @@ function processHook(input, options = {}) {
     return null;
   }
   // 현재 검색어가 지도 본문에 없으면 지도 열람을 강제해도 이득이 없다.
-  if (!excerpt.hits) {
+  // too-broad = 지도가 좁히지 못했다. 0건과 같이 통과시킨다(엉뚱한 5줄은 지도 없는 것보다 나쁘다).
+  if (!excerpt.hits || excerpt.reason === "too-broad") {
     /* 통과 사유를 구분해 남긴다. no-terms 는 "지도에 없다"가 아니라 **추출기가 검색어를 못 뽑았다**는
        뜻이라 게이트 구멍의 신호다 — 로그가 없으면 추출기 버그가 조용한 무력화로 번역된다. */
-    if (excerpt.reason === "no-terms") {
-      logFailOpen(stateRoot, `pass: no-terms (${toolName}) ${JSON.stringify(toolInput).slice(0, 160)}`);
+    if (excerpt.reason === "no-terms" || excerpt.reason === "too-broad") {
+      logFailOpen(stateRoot, `pass: ${excerpt.reason} narrowest=${excerpt.narrowest ?? "-"} hits=${excerpt.hits} (${toolName}) ${JSON.stringify(toolInput).slice(0, 140)}`);
     }
     try { writeState(file, { ...state, searches }); } catch { /* 통과 경로는 실패해도 막지 않는다 */ }
     return null;
@@ -169,4 +202,7 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { FREE_SEARCHES, MAX_BLOCKS, mapReadSucceeded, mentionsMap, processHook, shouldGate, statePath };
+module.exports = {
+  CLEANUP_INTERVAL_MS, FREE_SEARCHES, MAX_BLOCKS, STATE_MAX_AGE_MS,
+  mapReadSucceeded, mentionsMap, processHook, pruneStateFiles, shouldGate, statePath,
+};

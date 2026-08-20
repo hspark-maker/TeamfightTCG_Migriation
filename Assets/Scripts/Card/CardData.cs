@@ -7,6 +7,22 @@ public enum ECardChannel
     Live = 1,
 }
 
+/// <summary>카드 희소 등급. 랭크 등급(<see cref="ERankGrade"/>)과는 **다른 축**이다 —
+/// 저건 플레이어 실력 구간이고 이건 카드 자체의 희소도다. 이름을 재사용하면 팩 배출 규칙에서 둘이 섞인다.
+///
+/// 값에 숫자를 명시하는 이유: 에셋에 int로 직렬화되므로 중간에 항목을 끼우면 **기존 카드의 등급이 조용히 밀린다.**
+/// 새 등급은 뒤에 붙이고, 스펙시트 CARD_GRADE와 이름·숫자를 함께 맞춘다(표는 이름 문자열로 받는다).
+///
+/// **Silver·Gold는 <see cref="ERankGrade"/>에도 같은 이름이 있다.** 타입이 달라 코드는 갈라지지만
+/// 시트·로그에서는 같은 글자라 사람이 헷갈린다 — 카드 등급은 `grade` 열, 랭크 쪽은 `minGrade` 열이다.</summary>
+public enum ECardGrade
+{
+    Unknown = 0,   // 미배정. 등급을 아직 정하지 않은 카드가 머무는 기본값이다(표의 빈 칸도 여기로 온다).
+    Silver  = 1,
+    Gold    = 2,
+    Prism   = 3,
+}
+
 /// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 그림이 바뀐다.
 /// 단계별로 Sprite 필드를 평평하게 늘어놓으면(evolved2BattleImage…) 단계 추가 때마다 필드가 늘고
 /// 호출부가 단계→필드 매핑을 손으로 분기하게 된다 → 세트를 배열 원소로 만들어 단계는 인덱스로만 다룬다.
@@ -35,6 +51,10 @@ public class CardData : ScriptableObject
     public string displayName;
     [Tooltip("Live는 실제 실행에도 노출되고, TestOnly는 테스트 실행에서만 노출됩니다.")]
     public ECardChannel channel;
+    /// <summary>카드 희소 등급. 표시·배출 큐레이션 축이고 **전투 규칙에는 관여하지 않는다**(공격력·체력은 maxHp 소유).
+    /// 진실원은 스펙시트 `grade` 열이며 표 가져오기가 여기 굽는다.</summary>
+    [Tooltip("카드 희소 등급. 스펙시트 grade 열이 진실원. Unknown = 미배정.")]
+    public ECardGrade grade;
     /// <summary>이 카드의 키워드. <see cref="keywordUnlockLevel"/>에 도달해야 열린다(미지정이면 처음부터).
     /// "강화 키워드"(2차 진화)는 별도 필드가 아니라 **이 키워드가 강화되는 것**이라 여기 한 축만 둔다.</summary>
     public CardKeyword keywords;

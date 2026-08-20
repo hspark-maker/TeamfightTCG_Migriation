@@ -106,6 +106,7 @@ public static partial class CardTableTool
 
             Compare(_drift, _name, "displayName", _card.displayName, t_expected.displayName);
             Compare(_drift, _name, "channel", _card.channel.ToString(), t_expected.channel.ToString());
+            Compare(_drift, _name, "grade", _card.grade.ToString(), t_expected.grade.ToString());
             Compare(_drift, _name, "maxHp", _card.maxHp, t_expected.maxHp);
             Compare(_drift, _name, "keywords", KeywordsToText(_card.keywords), KeywordsToText(t_expected.keywords));
             Compare(_drift, _name, "keywordUnlockLevel", _card.keywordUnlockLevel, t_expected.keywordUnlockLevel);

@@ -135,4 +135,6 @@ public partial class Card_Test
     public int hp10;
     /// 도감 설명문
     public string cardExplain;
+    /// 카드 등급(Silver/Gold/Prism/Legendary)
+    public string grade;
 }
