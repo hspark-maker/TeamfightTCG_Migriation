@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 튜토리얼 시퀀스의 한 행(런타임 상태를 갖지 않아 같은 행을 여러 자리에 복제해도 안전)
+// 튜토리얼 시퀀스의 한 행(런타임 상태를 갖지 않는다 — 세이브가 붙잡는 것은 stepId 하나뿐이다)
 [Serializable]
 public class TutorialStepDef
 {
+    // 세이브가 이 스텝을 붙잡는 불변 번호(0 = 미부여). 시퀀스 SO의 [스텝 ID 부여]만 값을 만진다 —
+    // 드로어가 필드로 노출하지 않고 요약 줄에 #N으로만 보여 주므로 [Tooltip]을 달지 않는다(뜰 자리가 없다).
+    // 저작자용 안내는 TutorialStepDefDrawer.StepIdLabel의 툴팁에 있다.
+    [SerializeField] int stepId;
+
     [Tooltip("이 스텝이 무엇을 하는가. 완료 조건·씬 이탈 여부가 여기서 파생된다")]
     [SerializeField] EOutgameTutorialAction action;
 
@@ -110,7 +115,15 @@ public class TutorialStepDef
            + "다른 액션은 실패해도 이 값을 보지 않는다")]
     [SerializeField] EOutgameTutorialFailure onFailure;
 
+    // 세이브가 이 스텝을 지목하는 불변 번호(0 = 미부여). 좌표는 런타임 커서일 뿐 세이브의 앵커는 이것이다.
+    public int StepId => stepId;
+
     public EOutgameTutorialAction Action => action;
+
+#if UNITY_EDITOR
+    // 부여 도구 전용(OutgameTutorialData.AssignMissingStepIds). 런타임에서 번호를 바꿀 일은 없다.
+    public void SetStepIdForEditor(int _id) => stepId = _id;
+#endif
 
     public string GuideMessage => guideMessage;
 
@@ -162,41 +175,18 @@ public class TutorialStepDef
     // 안내 타깃(앵커를 쓰지 않는 액션은 저작값이 남아 있어도 None으로 본다)
     public EOutgameTutorialAnchor Anchor => UsesAnchor(action) ? anchor : EOutgameTutorialAnchor.None;
 
+    // 이 액션의 메타(완료 조건·씬 이탈·저작 필드) — 아래 파생값의 유일한 출처다.
+    TutorialActionMeta Meta => TutorialActionMeta.Of(action);
+
     // 무엇이 이 스텝을 완료시키는가(액션에서 파생)
-    public EOutgameTutorialCompletion Completion => action switch
-    {
-        EOutgameTutorialAction.Message         => EOutgameTutorialCompletion.Confirm,
-        EOutgameTutorialAction.WaitPurchase    => EOutgameTutorialCompletion.Purchase,
-        EOutgameTutorialAction.WaitPackOpen    => EOutgameTutorialCompletion.PackOpen,
-        EOutgameTutorialAction.WaitAlbumInsert => EOutgameTutorialCompletion.AlbumInsert,
-        EOutgameTutorialAction.WaitEnhance     => EOutgameTutorialCompletion.Enhance,
-        EOutgameTutorialAction.WaitKeywordEnhance => EOutgameTutorialCompletion.KeywordEnhance,
-        EOutgameTutorialAction.EnterFirstRank  => EOutgameTutorialCompletion.RankEffect,
-        EOutgameTutorialAction.WaitLobbyReturn => EOutgameTutorialCompletion.LobbyReturn,
-        EOutgameTutorialAction.WaitCardDetailReturn => EOutgameTutorialCompletion.CardDetailReturn,
-        // 예고 팝업은 닫히는 것으로 끝나지 않는다 — 팩이 탭으로 빨려드는 비행까지가 이 스텝이다.
-        // 그 비행이 카드 획득과 같은 디렉터·같은 종료 신호를 쓰므로 완료 조건도 같은 것을 본다.
-        EOutgameTutorialAction.PackNotice      or
-        EOutgameTutorialAction.CardGrant       or
-        EOutgameTutorialAction.CardSetGrant    => EOutgameTutorialCompletion.CardGain,
+    public EOutgameTutorialCompletion Completion => Meta.Completion;
 
-        EOutgameTutorialAction.WaitClick     or
-        EOutgameTutorialAction.DeckAutoEquip or
-        EOutgameTutorialAction.BattleEntry   or
-        EOutgameTutorialAction.BattleStart   => EOutgameTutorialCompletion.Click,
+    // 완료 뒤 이 씬에서 이어 걸 스텝이 없다(씬 전환·전투가 화면을 넘겨받는 경우).
+    // 덱 게이트를 켠 전투 진입만 예외다 — 그때는 덱 화면이 같은 씬에 서므로 안내를 이어 걸어야 한다.
+    // 테이블로 접히지 않는 유일한 파생값이다(액션이 아니라 이 행의 저작값에 달렸다).
+    public bool LeavesScene => Meta.LeavesScene
+                            && !(action == EOutgameTutorialAction.BattleEntry && showDeckGate);
 
-        _ => EOutgameTutorialCompletion.Auto,
-    };
-
-    // 완료 뒤 이 씬에서 이어 걸 스텝이 없다(씬 전환·전투가 화면을 넘겨받는 경우)
-    public bool LeavesScene => action switch
-    {
-        EOutgameTutorialAction.AutoBattle  => true,
-        EOutgameTutorialAction.BattleStart => true,
-        EOutgameTutorialAction.BattleEntry => !showDeckGate,
-
-        _ => false,
-    };
 
     // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true(가격 자리 문구도 함께 — 비었으면 실제 가격을 쓰라는 뜻)
     public bool TryGetForcedPack(out CardPackData _pack, out string _priceLabel)
@@ -220,132 +210,69 @@ public class TutorialStepDef
         return _cards != null;
     }
 
-    // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
-    public static bool UsesAnchor(EOutgameTutorialAction _action) => _action switch
-    {
-        EOutgameTutorialAction.WaitPackOpen    or
-        EOutgameTutorialAction.WaitAlbumInsert or
-        EOutgameTutorialAction.AutoBattle      or
-        EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       or
-        EOutgameTutorialAction.CloseCardDetail or
-        EOutgameTutorialAction.CloseAlbumPage  or
-        EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn or
-        EOutgameTutorialAction.WaitCardDetailReturn or
-        EOutgameTutorialAction.CardGrant       or
-        EOutgameTutorialAction.CardSetGrant    or
-        EOutgameTutorialAction.PackNotice      => false,
+    // ── 액션별 저작 필드 ────────────────────────────────────────────────────
+    // 답은 전부 TutorialActionMeta의 테이블 한 곳에서 나온다. 술어 이름을 남겨 둔 이유는
+    // 호출부(드로어·실행기·화면 6파일)가 이 이름으로 묻기 때문이다 — 판정은 여기서 하지 않는다.
 
-        _ => true,
-    };
+    // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
+    public static bool UsesAnchor(EOutgameTutorialAction _action) => Uses(_action, EStepField.Anchor);
 
     // 이 액션이 안내 문구를 띄우는가(자동 스텝은 화면에 아무것도 그리지 않는다)
-    // 삽입 대기는 자동 스텝이 아니지만 연출 자체가 손가락·문구를 띄운다 — 겹쳐 그리지 않는다
-    public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => _action switch
-    {
-        EOutgameTutorialAction.WaitAlbumInsert or
-        EOutgameTutorialAction.AutoBattle      or
-        EOutgameTutorialAction.AutoPurchase    or
-        EOutgameTutorialAction.DeckGrant       or
-        EOutgameTutorialAction.CloseCardDetail or
-        EOutgameTutorialAction.CloseAlbumPage  or
-        EOutgameTutorialAction.EnterFirstRank  or
-        EOutgameTutorialAction.WaitLobbyReturn or
-        EOutgameTutorialAction.WaitCardDetailReturn or
-        EOutgameTutorialAction.CardGrant       or
-        EOutgameTutorialAction.CardSetGrant    or
-        EOutgameTutorialAction.PackNotice      => false,
+    public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => Uses(_action, EStepField.GuideMessage);
 
-        _ => true,
-    };
+    // 이 액션이 딤을 걸 수 있는가(개봉 대기는 문구만 띄운다 — 딤이 스와이프 제스처를 삼킨다)
+    public static bool UsesDim(EOutgameTutorialAction _action) => Uses(_action, EStepField.Dim);
 
     // 이 액션이 문구 자리를 저작하는가(딤 탭으로 넘기는 설명 스텝뿐 — 나머지는 타깃을 피해 자리가 정해진다)
-    public static bool UsesMessagePlacement(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.Message;
+    public static bool UsesMessagePlacement(EOutgameTutorialAction _action) => Uses(_action, EStepField.MessagePlacement);
 
     // 이 앵커가 "그 자리 중 어느 것"까지 저작받아야 하는가.
     // 도감은 같은 종류의 자리가 여럿이라 키만으로는 대상이 정해지지 않는다(버튼 하나짜리 앵커는 물을 것이 없다).
+    // 축이 액션이 아니라 앵커라 테이블 밖에 남는다.
     public static bool UsesAnchorCard(EOutgameTutorialAnchor _anchor)
         => _anchor == EOutgameTutorialAnchor.AlbumThemeCell
         || _anchor == EOutgameTutorialAnchor.AlbumCardSlot;
 
     // 이 액션이 값을 무는가(안내가 대신 내줄 수 있는 자리 = 성장 한 방을 시키는 스텝)
-    public static bool UsesFreeOfCharge(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.WaitEnhance
-        || _action == EOutgameTutorialAction.WaitKeywordEnhance;
+    public static bool UsesFreeOfCharge(EOutgameTutorialAction _action) => Uses(_action, EStepField.FreeOfCharge);
 
     // 이 액션이 해금 연출을 여는가(카드 강화만 — 키워드 강화는 잠금판을 여는 자리가 아니다)
-    public static bool UsesWaitUnlockIntro(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.WaitEnhance;
+    public static bool UsesWaitUnlockIntro(EOutgameTutorialAction _action) => Uses(_action, EStepField.WaitUnlockIntro);
 
     // 이 액션이 보상 화면을 세우는가(예고 팝업도 같은 자리에 제목을 쓴다)
-    public static bool UsesRewardTitle(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.CardGrant
-        || _action == EOutgameTutorialAction.CardSetGrant
-        || _action == EOutgameTutorialAction.PackNotice;
+    public static bool UsesRewardTitle(EOutgameTutorialAction _action) => Uses(_action, EStepField.RewardTitle);
 
     // 이 액션이 획득 연출을 트는가(그 연출을 기다릴지 말지를 저작받는 자리)
-    public static bool UsesParallelGain(EOutgameTutorialAction _action)
-        => _action == EOutgameTutorialAction.CardGrant
-        || _action == EOutgameTutorialAction.CardSetGrant
-        || _action == EOutgameTutorialAction.PackNotice;
+    public static bool UsesParallelGain(EOutgameTutorialAction _action) => Uses(_action, EStepField.ParallelGain);
 
-    // 이 액션이 딤을 걸 수 있는가
-    public static bool UsesDim(EOutgameTutorialAction _action) =>
-        ShowsGuideMessage(_action) && _action != EOutgameTutorialAction.WaitPackOpen;
-
-    // 이 액션이 팩을 쓰는가(진열 고정·자동 구매·자동 편성 풀)
-    public static bool UsesPack(EOutgameTutorialAction _action) => _action switch
-    {
-        EOutgameTutorialAction.WaitPurchase  or
-        EOutgameTutorialAction.AutoPurchase  or
-        EOutgameTutorialAction.DeckAutoEquip or
-        EOutgameTutorialAction.PackNotice    => true,
-
-        _ => false,
-    };
+    // 이 액션이 팩을 쓰는가(진열 고정·자동 구매·자동 편성 풀·예고)
+    public static bool UsesPack(EOutgameTutorialAction _action) => Uses(_action, EStepField.Pack);
 
     // 이 액션이 가격 표기 문구를 쓰는가(상점 진열을 덮어쓰는 액션만 — 화면에 가격 자리가 있는 경우다)
-    public static bool UsesPackPriceLabel(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.WaitPurchase;
+    public static bool UsesPackPriceLabel(EOutgameTutorialAction _action) => Uses(_action, EStepField.PackPriceLabel);
 
     // 이 액션이 시나리오를 쓰는가(전투 주입 또는 덱 정본)
-    public static bool UsesScenario(EOutgameTutorialAction _action) => _action switch
-    {
-        EOutgameTutorialAction.BattleEntry or
-        EOutgameTutorialAction.AutoBattle  or
-        EOutgameTutorialAction.DeckGrant   => true,
-
-        _ => false,
-    };
+    public static bool UsesScenario(EOutgameTutorialAction _action) => Uses(_action, EStepField.Scenario);
 
     // 이 액션이 덱 게이트 노출을 정하는가(전투에 넣는 액션만)
-    public static bool UsesShowDeckGate(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.BattleEntry || _action == EOutgameTutorialAction.AutoBattle;
+    public static bool UsesShowDeckGate(EOutgameTutorialAction _action) => Uses(_action, EStepField.ShowDeckGate);
 
     // 이 액션이 덱 이름을 쓰는가
-    public static bool UsesDeckName(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.DeckGrant;
+    public static bool UsesDeckName(EOutgameTutorialAction _action) => Uses(_action, EStepField.DeckName);
 
     // 이 액션이 실패 정책을 쓰는가 — 실행기가 실제로 실패 분기를 갖는 액션만.
     // 대기형은 실패 개념이 없고, 전투 진입 계열은 시나리오가 비어도 일반 전투로 그냥 들어간다(실패로 치지 않는다).
-    public static bool UsesFailurePolicy(EOutgameTutorialAction _action) => _action switch
-    {
-        EOutgameTutorialAction.AutoPurchase or
-        EOutgameTutorialAction.DeckGrant    or
-        EOutgameTutorialAction.CardGrant    or
-        EOutgameTutorialAction.CardSetGrant or
-        EOutgameTutorialAction.PackNotice   => true,
-
-        _ => false,
-    };
+    public static bool UsesFailurePolicy(EOutgameTutorialAction _action) => Uses(_action, EStepField.FailurePolicy);
 
     // 이 액션이 카드 한 장을 쓰는가(지급 대상)
-    public static bool UsesCard(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.CardGrant;
+    public static bool UsesCard(EOutgameTutorialAction _action) => Uses(_action, EStepField.Card);
 
     // 이 액션이 카드 묶음을 쓰는가(한 번에 지급하는 세트)
-    public static bool UsesCards(EOutgameTutorialAction _action) =>
-        _action == EOutgameTutorialAction.CardSetGrant;
+    public static bool UsesCards(EOutgameTutorialAction _action) => Uses(_action, EStepField.Cards);
+
+    /// <summary>이 액션이 저작받는 필드 축의 목록. 드로어가 노출 목록을 만들 때 이 값을 순회한다
+    /// — 술어를 하나씩 다시 부르지 않아야 새 축을 늘려도 드로어를 고칠 일이 없다.</summary>
+    public static EStepField FieldsOf(EOutgameTutorialAction _action) => TutorialActionMeta.Of(_action).Fields;
+
+    static bool Uses(EOutgameTutorialAction _action, EStepField _field) => TutorialActionMeta.Of(_action).Uses(_field);
 }

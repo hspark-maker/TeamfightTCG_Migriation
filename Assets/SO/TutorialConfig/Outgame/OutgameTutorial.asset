@@ -15,7 +15,8 @@ MonoBehaviour:
   chapters:
   - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
     stepDefs:
-    - action: 7
+    - stepId: 1
+      action: 7
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -38,7 +39,8 @@ MonoBehaviour:
       onFailure: 0
   - label: "\uB450 \uBC88\uCA30 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
     stepDefs:
-    - action: 17
+    - stepId: 2
+      action: 17
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -66,7 +68,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 15
+    - stepId: 3
+      action: 15
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -87,7 +90,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 9
+    - stepId: 4
+      action: 9
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -108,7 +112,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: "\uC6D0\uAC70\uB9AC \uB371"
       onFailure: 0
-    - action: 5
+    - stepId: 5
+      action: 5
       anchor: 1
       guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uC6D0\uAC70\uB9AC' \uCE74\uB4DC\uB97C
         \uC0AC\uC6A9\uD574\uBD05\uC2DC\uB2E4"
@@ -132,7 +137,8 @@ MonoBehaviour:
       onFailure: 0
   - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
     stepDefs:
-    - action: 19
+    - stepId: 6
+      action: 19
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -153,7 +159,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 7
+      action: 0
       anchor: 2
       guideMessage: 
       messageAtBottom: 0
@@ -174,7 +181,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 2
+    - stepId: 8
+      action: 2
       anchor: 3
       guideMessage: 
       messageAtBottom: 0
@@ -195,7 +203,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 3
+    - stepId: 9
+      action: 3
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -216,7 +225,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 10
+      action: 0
       anchor: 4
       guideMessage: 
       messageAtBottom: 0
@@ -237,7 +247,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 11
+      action: 0
       anchor: 18
       guideMessage: 
       messageAtBottom: 0
@@ -258,7 +269,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 12
+      action: 0
       anchor: 19
       guideMessage: 
       messageAtBottom: 0
@@ -279,7 +291,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 10
+    - stepId: 13
+      action: 10
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -300,7 +313,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 14
+      action: 0
       anchor: 6
       guideMessage: "\uC0C8\uB85C\uC6B4 \uCE74\uB4DC\uB97C \uC2DC\uD5D8\uD574\uBD05\uC2DC\uB2E4."
       messageAtBottom: 0
@@ -321,7 +335,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 9
+    - stepId: 15
+      action: 9
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -342,7 +357,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: "\uD0A4\uC6CC\uB4DC \uB371"
       onFailure: 0
-    - action: 5
+    - stepId: 16
+      action: 5
       anchor: 1
       guideMessage: 
       messageAtBottom: 0
@@ -363,7 +379,8 @@ MonoBehaviour:
       showDeckGate: 1
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 17
+      action: 1
       anchor: 15
       guideMessage: "\uC544\uB798\uCABD\uC740 \uB0B4 \uB371\uC785\uB2C8\uB2E4. \uC804\uD22C\uC5D0
         \uB0B4\uBCF4\uB0BC \uCE74\uB4DC 6\uC7A5\uC744 \uC5EC\uAE30\uC11C \uD655\uC778\uD569\uB2C8\uB2E4."
@@ -385,7 +402,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 18
+      action: 1
       anchor: 16
       guideMessage: "\uC704\uCABD\uC740 \uC0C1\uB300\uC758 \uB371\uC785\uB2C8\uB2E4.
         \uC804\uD22C \uC804\uC5D0 \uBBF8\uB9AC \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."
@@ -407,7 +425,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 19
+      action: 0
       anchor: 12
       guideMessage: 
       messageAtBottom: 0
@@ -428,7 +447,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 20
+      action: 0
       anchor: 17
       guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uD0A4\uC6CC\uB4DC \uB371'\uC744
         \uC120\uD0DD\uD574\uBCF4\uC138\uC694."
@@ -450,7 +470,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 21
+      action: 0
       anchor: 11
       guideMessage: 
       messageAtBottom: 0
@@ -471,7 +492,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 6
+    - stepId: 22
+      action: 6
       anchor: 13
       guideMessage: 
       messageAtBottom: 0
@@ -494,7 +516,8 @@ MonoBehaviour:
       onFailure: 0
   - label: "\uCCAB \uB7AD\uD06C \uC2B9\uAE09"
     stepDefs:
-    - action: 13
+    - stepId: 23
+      action: 13
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -515,7 +538,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 24
+      action: 1
       anchor: 0
       guideMessage: "\uC774\uC81C \uB7AD\uD06C\uC804\uC5D0 \uCC38\uC5EC\uD560 \uC218
         \uC788\uC2B5\uB2C8\uB2E4!"
@@ -537,7 +561,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 5
+    - stepId: 25
+      action: 5
       anchor: 1
       guideMessage: 
       messageAtBottom: 0
@@ -560,7 +585,8 @@ MonoBehaviour:
       onFailure: 0
   - label: "\uCE74\uB4DC \uAC15\uD654"
     stepDefs:
-    - action: 14
+    - stepId: 26
+      action: 14
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -581,7 +607,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 27
+      action: 0
       anchor: 18
       guideMessage: 
       messageAtBottom: 0
@@ -602,7 +629,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 28
+      action: 0
       anchor: 19
       guideMessage: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574\uBD05\uC2DC\uB2E4."
       messageAtBottom: 0
@@ -623,7 +651,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 29
+      action: 0
       anchor: 20
       guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
       messageAtBottom: 0
@@ -644,7 +673,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 11
+    - stepId: 30
+      action: 11
       anchor: 21
       guideMessage: 
       messageAtBottom: 0
@@ -665,7 +695,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 12
+    - stepId: 31
+      action: 12
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -686,7 +717,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 20
+    - stepId: 32
+      action: 20
       anchor: 0
       guideMessage: 
       messageAtBottom: 0
@@ -707,7 +739,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 33
+      action: 1
       anchor: 0
       guideMessage: "\uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uBC30\uD2C0\uC5D0\uC11C
         \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
@@ -729,3 +762,4 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  nextStepId: 34

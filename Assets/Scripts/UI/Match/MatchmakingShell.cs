@@ -42,6 +42,10 @@ public class MatchmakingShell : MonoBehaviour
     [Header("연출")]
     [SerializeField] MatchmakingFx fx = new MatchmakingFx();
 
+    [Tooltip("로비에서 이 화면이 덮어 오는 진입. 갈라짐(handoffFx)의 앞자리 짝이다 — " +
+             "배너가 나중에 밀려날 그 방향에서 되돌아 들어온다.")]
+    [SerializeField] MatchmakingEntryFx entryFx = new MatchmakingEntryFx();
+
     [Tooltip("덱 화면으로 넘어가는 전환. 커튼으로 덮지 않고 두 화면을 잇는다 — 자세한 규약은 MatchHandoffFx 참고.")]
     [SerializeField] MatchHandoffFx handoffFx = new MatchHandoffFx();
 
@@ -226,10 +230,38 @@ public class MatchmakingShell : MonoBehaviour
         if (opponentProfile != null) opponentProfile.ShowSearching();
         if (versusRoot      != null) versusRoot.SetActive(false);
 
+        // 지난 매칭이 발견 순간에 내려 둔 버튼이다(DismissCancel) — 자리·알파는 RestoreRiders가 이미 되돌렸다.
+        if (cancelButton != null) cancelButton.gameObject.SetActive(true);
+
         SetCancelInteractable(true);
         StartDots();
 
+        // 진입 안무. 어둠이 로비 위로 차오르고 두 배너가 바깥에서 꽂힌다 — 이게 없으면 로비가 한 프레임에
+        // 사라져 매칭이 "다음 화면"이 되고, 갈라짐(handoffFx)이 세운 축과도 끊긴다.
+        //
+        // 여는 순서가 곧 전제다: 바로 위에서 fx.Reset·RestoreHome이 저작 상태로 되돌린 뒤라야
+        // 안무가 지금 자리를 홈으로, 지금 딤 알파를 목표로 삼을 수 있다.
+        var t_enter = entryFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
+                                    (RectTransform)transform, Riders);
+
+        // 스캔·호흡은 배너가 앉은 뒤에 켠다 — 아직 날아드는 틀 안에서 띠가 돌면 두 움직임이 겹쳐 어느 쪽도 읽히지 않는다.
+        // 안무가 그 전에 잘리는 길은 발견(ShowFound)과 씬 파괴뿐이고, 둘 다 켜면 안 되는 자리라 보정하지 않는다.
+        //
+        // 호흡을 함께 거는 이유: 대기는 이 화면에서 가장 긴 구간인데(2~3.5초) 축이 스캔 하나뿐이라,
+        // 띠가 서너 번 지나고 나면 그 뒤로는 정지 화면과 구분되지 않는다.
+        t_enter.InsertCallback(entryFx.ScanAt, StartWaitingAxes);
+
+        PlayStage(t_enter);
+    }
+
+    // 기다리는 동안 도는 상주 축들(스캔 띠 · 두 틀의 호흡). 끝을 모르므로 무한 반복이고,
+    // 걷는 것은 발견(ShowFound)과 화면이 내려갈 때(OnDestroy·fx.Reset)뿐이다.
+    void StartWaitingAxes()
+    {
         if (opponentProfile != null) fx.StartScan(opponentProfile.SearchingRect);
+
+        fx.StartIdle(myProfile       != null ? myProfile.FoundRect       : null,
+                     opponentProfile != null ? opponentProfile.SearchingRect : null);
     }
 
     // 여기서부터 취소를 받지 않는다 — 이미 뽑은 상대를 버리고 다시 누르면 다른 상대가 나와,
@@ -238,7 +270,8 @@ public class MatchmakingShell : MonoBehaviour
     {
         StopDots();
         fx.StopScan();
-        SetCancelInteractable(false);
+        fx.StopIdle();
+        DismissCancel();
 
         if (titleText != null) titleText.text = foundTitle;
 
@@ -329,6 +362,26 @@ public class MatchmakingShell : MonoBehaviour
     void SetCancelInteractable(bool _on)
     {
         if (cancelButton != null) cancelButton.interactable = _on;
+    }
+
+    // 취소 버튼을 자리에서 물러나게 한 뒤 내린다. interactable만 끄면 반투명한 버튼이 그 자리에 남아
+    // "눌러도 되나?"를 남긴다 — 여기서부터 물러날 수 없다는 사실은 흐려짐이 아니라 자리를 뜨는 것으로 말해야 한다.
+    //
+    // 내려도 갈라짐(MatchHandoffFx)의 rider 목록에는 그대로 남는다 — 비활성 오브젝트 위의 트윈은 그려지지 않아
+    // 무해하고, 배열에서 빼면 홈 좌표(m_riderHomes)의 인덱스가 어긋난다.
+    void DismissCancel()
+    {
+        SetCancelInteractable(false);
+
+        if (cancelButton == null) return;
+
+        var t_seq = fx.BuildCancelDismiss((RectTransform)cancelButton.transform);
+
+        t_seq.SetLink(gameObject);
+
+        // 발견 안무(m_stage)와 나란히 돈다 — 같은 사건의 두 축이라 한쪽이 다른 쪽을 기다리면 박자가 어긋난다.
+        t_seq.OnComplete(() => { if (cancelButton != null) cancelButton.gameObject.SetActive(false); });
+        t_seq.Play();
     }
 
     // 제목·취소 버튼의 저작 자리를 한 번만 잡는다. Riders 프로퍼티가 배열을 세우고 여기가 그 자세를 기록한다.

@@ -74,6 +74,22 @@ public class MatchDeckIntroFx
     [Tooltip("마지막에 전투 버튼이 한 번 튀는 정도. 시선이 어디에 착지해야 하는지를 이 한 번이 정한다.")]
     [Min(0f)] [SerializeField] float battlePulse = 0.16f;
 
+    [Header("출전 — 커튼이 덮기 전 한 박")]
+    [Tooltip("전투 시작을 누른 순간 버튼이 튀는 정도. 이게 없으면 커튼이 클릭보다 먼저 온 것처럼 읽힌다.")]
+    [Min(0f)] [SerializeField] float launchPunch = 0.2f;
+
+    [Tooltip("화면이 한 발 앞으로 나가는 배율. 커튼은 이 화면과 같은 색·같은 대각이라 " +
+             "닫힘 자체로는 '무엇이 접히는지'가 안 보인다 — 이 한 발이 그 답이다.\n" +
+             "1.06을 넘기면 커튼 뒤에서 화면이 튀어나온 것으로 보인다.")]
+    [Min(1f)] [SerializeField] float launchScale = 1.04f;
+
+    [Min(0.01f)] [SerializeField] float launchDuration = 0.26f;
+
+    [Tooltip("전투 시작 게이트가 열리는 시각(초). 커튼은 이 뒤에 닫히기 시작한다.\n" +
+             "안무가 다 끝난 뒤로 미루면 응답과 커튼이 순차로 붙어 굼떠지고, 0이면 한 박이 통째로 커튼에 묻힌다 — " +
+             "버튼이 튀는 것만 커튼 밖에서 읽히고 나머지는 덮여 가는 이 지점이 '누른 화면이 그대로 접힌다'가 된다.")]
+    [Min(0f)] [SerializeField] float launchGateAt = 0.09f;
+
     // 저작 위치는 한 번만 잡는다 — 이미 밀린 값을 다시 캡처하면 열 때마다 바가 아래로 내려앉는다.
     // 아래 인포바·칸의 홈도 전부 같은 이유의 1회 캡처다.
     Vector2 m_bottomHome;
@@ -123,6 +139,35 @@ public class MatchDeckIntroFx
         this.StagePower(t_seq, _myPower,    _myPowerValue);
 
         this.StageBottom(t_seq, _battleButton);
+
+        return t_seq;
+    }
+
+    /// <summary>전투 시작 게이트가 열려야 하는 시각. 커튼은 이 뒤에 닫히기 시작한다 — 여는 일은 셸이 한다.</summary>
+    public float LaunchGateAt => this.launchGateAt;
+
+    /// <summary>
+    /// 전투 시작에 대한 응답 한 박을 만들어 돌려준다(재생은 호출자). 등장(BuildIntro)의 반대 사건이라 같은 클래스에 둔다 —
+    /// 두 안무가 같은 부품의 같은 홈을 쓰기 때문에, 나뉘면 홈을 두 곳에서 캡처하게 되고 그때부터 화면이 조금씩 걸어 나간다.
+    ///
+    /// 칸(12장)을 건드리지 않는 이유: 칸의 홈은 등장 안무가 한 번 돌아야 잡히는데, 이 한 박은 전환을 타지 않는 길
+    /// (디버그·튜토리얼)에서도 돈다 — 되돌릴 홈이 없는 채로 밀면 그 화면은 밀린 칸을 물려받는다.
+    /// 대신 루트를 통째로 민다. 배율은 홈이 없어도 1로 되돌릴 수 있다.
+    /// </summary>
+    public Sequence BuildLaunch(RectTransform _root, Button _battleButton)
+    {
+        var t_seq = DOTween.Sequence();
+
+        if (_battleButton != null && this.launchPunch > 0f)
+            UiPunch.Play(_battleButton.transform, this.launchPunch, 0.22f);
+
+        if (_root == null) return t_seq;
+
+        _root.DOKill();
+        _root.localScale = Vector3.one;
+
+        // 가속이라 "들어간다"가 된다. 감속이면 다 와서 멈춘 것이 되어 커튼이 그 위에 얹힌 꼴이 된다.
+        t_seq.Insert(0f, _root.DOScale(this.launchScale, this.launchDuration).SetEase(Ease.InQuad));
 
         return t_seq;
     }

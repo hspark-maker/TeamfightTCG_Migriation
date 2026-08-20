@@ -47,6 +47,19 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
 
+    // 무대를 트리거 튜토리얼이 쥐고 있는가. 강화·오버레이 신호는 두 브리지가 같은 static 이벤트로 함께 듣기 때문에,
+    // 이 술어로 가르지 않으면 강화 성공 한 번이 온보딩과 트리거의 좌표를 동시에 민다.
+    // 우선순위는 OutgameTutorialGuide와 같은 규칙이다(겹치면 트리거가 답).
+    static bool StageTakenByTriggered => TriggeredTutorialRunner.IsRunning;
+
+    // 지금 오는 강화 신호가 내 것인가. 무대 소유만으로 가르면 안 된다 — 내가 시작한 강화가 아직 끝나기 전에
+    // 트리거가 발화하면 그 결말 신호까지 버려져, m_enhancing·m_awaitingUnlockFx가 내려가지 않고 굳는다
+    // (두 플래그는 앵커 재등록을 영구 차단한다). 이미 강화 중이면 신호는 내 것이다.
+    bool OwnsEnhanceSignal => m_enhancing || m_awaitingUnlockFx || !StageTakenByTriggered;
+
+    // 트리거가 무대를 쥐어 진입을 미뤄 둔 상태. 트리거가 끝나면 여기서부터 이어간다.
+    bool m_deferred;
+
     void Awake() => OutgameTutorialRunner.EnsureData(data);
 
     void Start()
@@ -71,6 +84,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     void ApplyCurrentStep()
     {
         if (!OutgameTutorialRunner.IsRunning) return;   // 온보딩이 끝난 뒤엔 게이트를 건드리지 않는다 — 트리거 튜토리얼이 쓰고 있을 수 있다.
+
+        // 트리거가 무대를 쥔 동안에는 진입도 표시도 미룬다. 우선순위가 트리거 우선이기도 하지만,
+        // 여기서 진행하면 화면을 걷는 자동 스텝(CloseCardDetail 등)이 그 런이 서 있는 무대를 치워 정지시킨다.
+        // 재개는 트리거가 끝났다는 통지(OnTriggeredChanged)가 맡는다.
+        if (StageTakenByTriggered) { m_deferred = true; CloseGate(); return; }
+
         if (m_applying) { m_pendingApply = true; return; }
 
         m_applying = true;
@@ -137,12 +156,24 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         m_step = t_step;
 
+        PresentStep();
+    }
+
+    // 현재 스텝의 표시를 세운다 — 진입(EnterCurrentStep)과 갈라 둔다.
+    // 트리거가 무대를 가져갔다 돌려줄 때 이 함수만 다시 부르면 되고, 스텝을 다시 진입시키지 않는다
+    // (자동 스텝이 좌표를 두 번 커밋하는 사고를 막는다).
+    // 이미 만족된 완료 조건을 여기서 다시 판정하는 것도 같은 이유다 — 무대를 뺏긴 사이에 지나간 신호
+    // (오버레이 닫힘 등)는 다시 오지 않으므로, 상태를 되물어야 진행이 되살아난다.
+    void PresentStep()
+    {
+        if (m_step == null) return;
+
         // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(개봉 화면의 팩엔 TutorialAnchor가 없다).
         // 그래서 게이트를 건너뛰고 배너만 띄운다. 아래 앵커 조회에 도달하지 않는 유일한 스텝이다.
         // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_step.Completion == EOutgameTutorialCompletion.PackOpen)
         {
-            if (!SuppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(m_step.GuideMessage);
+            if (!SuppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this, m_step.GuideMessage);
             return;
         }
 
@@ -189,7 +220,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -215,7 +246,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -233,7 +264,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
     }
 
     // 딤 없이 클릭만 듣는다. onSatisfied가 null인 스텝(구매 대기)은 딤이 유일한 표시였으므로 걸 것이 없다
@@ -266,6 +297,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
+        if (StageTakenByTriggered) return;   // 트리거가 무대를 쥔 동안 내 안내를 그 위에 덮어 세우지 않는다
         if (m_enhancing || m_awaitingUnlockFx) return;
         if (m_step == null || _key != m_step.Anchor) return;
 
@@ -291,6 +323,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 오버레이 하나가 닫혔다. 남은 것이 아직 있으면 계속 기다린다 — 완료는 "로비 표면이 드러났는가" 하나로 판정한다.
     void OnOverlayClosed()
     {
+        if (StageTakenByTriggered) return;
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.LobbyReturn) return;
         if (!IsLobbySurfaceVisible()) return;
 
@@ -335,6 +368,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 결과판이 닫히지 않아 완료 신호가 영영 오지 않는다(= 이 스텝이 반복되는 것처럼 보인다).
     void OnEnhanceStarted()
     {
+        if (StageTakenByTriggered) return;
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         m_enhancing = true;
@@ -347,6 +381,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 무대를 돌려줘야 그 연출이 설 자리가 생긴다(m_enhancing은 켠 채 둔다).
     void OnEnhanceResultReady(EnhanceResult _result)
     {
+        if (!OwnsEnhanceSignal) return;
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
         if (_result.Outcome == EEnhanceOutcome.Success && !m_step.WaitUnlockIntro)
@@ -365,6 +400,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 연출을 통째로 잘라내므로 이 시점을 쓴다. 실패는 같은 자리에서 다시 누르는 일이라 안내만 되세운다.
     void OnEnhanceSettled(EnhanceResult _result)
     {
+        if (!OwnsEnhanceSignal) return;   // 내 강화가 아니다 — m_enhancing도 내 것이 아니므로 건드리지 않는다
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance)
         {
             m_enhancing = false;
@@ -392,6 +428,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 해금 연출이 마지막 축까지 끝났다(잘려 끝난 경우 포함) — 미뤄 둔 완료를 여기서 넘긴다.
     void OnUnlockFxFinished()
     {
+        if (!OwnsEnhanceSignal) return;
         if (!m_awaitingUnlockFx) return;
 
         m_awaitingUnlockFx = false;
@@ -451,7 +488,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     void HideGuide()
     {
         DetachSilent();
-        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear();
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
 
     void CloseGate()
@@ -463,10 +500,26 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         DetachSilent();   // 리스너가 남으면 다음 스텝·다음 씬에서 오발화한다
 
-        // 표시는 트리거 튜토리얼과 공용이다 — 승급 연출과 나란히 뜬 알림 점을 유저가 먼저 눌렀다면
-        // 지금 무대를 쥔 것은 그쪽이다. 남의 안내를 걷으면 그 런은 완료 신호를 받을 주체를 잃고 영영 멈춘다.
-        if (!TriggeredTutorialRunner.IsRunning && OutgameTutorialGateUI.Instance != null)
-            OutgameTutorialGateUI.Instance.Clear();
+        // 표시는 트리거 튜토리얼과 공용이다 — 남의 안내를 걷으면 그 런은 완료 신호를 받을 주체를 잃고 영영 멈춘다.
+        // 판정은 게이트가 소유권으로 한다(불변식 3): 무대가 트리거의 것이면 이 호출은 조용히 지나간다.
+        if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
+    }
+
+    // 트리거 런이 끝나 무대가 비었다 — 미뤄 둔 진입을 재개하거나, 서 있던 스텝의 표시를 다시 세운다.
+    // 이것이 없으면 무대가 돌아오지 않아 안내가 사라진 채로 남는다(앵커 없는 설명 스텝은 그대로 영구 정지).
+    void OnTriggeredChanged()
+    {
+        if (TriggeredTutorialRunner.IsRunning) return;
+        if (!OutgameTutorialRunner.IsRunning) return;   // 완주 통지도 이 이벤트로 온다 — 끝난 시퀀스를 되세우지 않는다
+
+        if (m_deferred)
+        {
+            m_deferred = false;
+            ApplyCurrentStep();
+            return;
+        }
+
+        PresentStep();
     }
 
     void Subscribe()
@@ -474,6 +527,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
+        TriggeredTutorialRunner.OnChanged     += OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
@@ -498,6 +552,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
+        TriggeredTutorialRunner.OnChanged     -= OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;

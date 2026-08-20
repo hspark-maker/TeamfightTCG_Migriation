@@ -15,6 +15,11 @@ public class MatchProfileView : MonoBehaviour
     [Tooltip("상대가 확정된 뒤 보일 채워진 틀. 비우면 항상 보이는 것으로 친다.")]
     [SerializeField] GameObject foundRoot;
 
+    [Tooltip("상대를 찾는 동안 이름 자리에 세울 문구. 이름·랭크 텍스트는 foundRoot 밖(배너 직속)에 있어 " +
+             "틀을 감춰도 같이 감춰지지 않는다 — 비워 두면 원본 프리팹(Layer Lab 데모)의 더미 이름이 " +
+             "상대를 찾기도 전에 노출된다.")]
+    [SerializeField] string searchingNickname = "???";
+
     [Header("칠할 곳")]
     [SerializeField] Image    avatarImage;
     [SerializeField] TMP_Text nicknameText;
@@ -31,6 +36,10 @@ public class MatchProfileView : MonoBehaviour
 
     /// <summary>상대를 찾는 동안 훑을 빈 틀. 없으면(내 쪽) 스캔 축이 통째로 빠진다.</summary>
     public RectTransform SearchingRect => searchingRoot != null ? (RectTransform)searchingRoot.transform : null;
+
+    /// <summary>채워진 틀. 기다리는 동안 숨쉬는 대상이다 — 배너 전체가 아니라 이 틀만 움직여야 화면이 맥동하지 않는다.
+    /// 비면(항상 보이는 것으로 치는 배선) 이 쪽 호흡 축만 빠진다.</summary>
+    public RectTransform FoundRect => foundRoot != null ? (RectTransform)foundRoot.transform : null;
 
     // 전환이 카드를 통째로 흐린다. 저작에 없어도 되게 런타임에 붙인다 — 프리팹마다 하나씩 꽂게 하면 배선이 늘기만 한다.
     CanvasGroup m_group;
@@ -50,6 +59,15 @@ public class MatchProfileView : MonoBehaviour
     {
         if (searchingRoot != null) searchingRoot.SetActive(true);
         if (foundRoot     != null) foundRoot.SetActive(false);
+
+        // 이름·랭크는 foundRoot 밖에 있어 틀과 함께 감춰지지 않는다 — 여기서 직접 비우지 않으면
+        // 원본 프리팹의 더미 이름이 상대를 찾기도 전에 그대로 보인다.
+        if (nicknameText != null) nicknameText.text = searchingNickname;
+        if (rankNameText != null) rankNameText.text = string.Empty;
+
+        // 배지도 같은 이유로 직접 감춘다. 스프라이트를 비우지 않고 오브젝트를 내리는 이유는
+        // Render가 "스프라이트가 null이면 저작값 유지" 규약이라 비워 두면 되살릴 값이 사라지기 때문이다.
+        if (rankBadge != null) rankBadge.gameObject.SetActive(false);
     }
 
     // 스프라이트가 null이면 저작값을 그대로 둔다 — 풀이 비어 있어도 칸이 뚫리지 않게.
@@ -61,7 +79,14 @@ public class MatchProfileView : MonoBehaviour
         if (nicknameText != null) nicknameText.text = _profile.Nickname;
         if (rankNameText != null) rankNameText.text = _profile.RankName;
 
-        if (avatarImage != null && _profile.Avatar    != null) avatarImage.sprite = _profile.Avatar;
-        if (rankBadge   != null && _profile.RankBadge != null) rankBadge.sprite   = _profile.RankBadge;
+        if (avatarImage != null && _profile.Avatar != null) avatarImage.sprite = _profile.Avatar;
+
+        // 배지는 랭크가 있을 때만 세운다 — 토너먼트 정점은 랭크를 비워 오므로(MatchProfile.OfTournamentNode)
+        // 저작 스프라이트가 남아 있으면 없는 랭크전을 있는 것처럼 보이게 한다.
+        if (rankBadge == null) return;
+
+        if (_profile.RankBadge != null) rankBadge.sprite = _profile.RankBadge;
+
+        rankBadge.gameObject.SetActive(_profile.RankBadge != null);
     }
 }

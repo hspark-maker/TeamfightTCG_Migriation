@@ -13,6 +13,9 @@ public static class TournamentRewardFlow
     {
         if (string.IsNullOrEmpty(_nodeId)) return;
 
+        // 재도전 승리는 지급이 없다 — 정점 보상은 최초 1회다. 빈 상자를 세우지 않게 팝업 이전에 끊는다.
+        if (TournamentProgress.IsCleared(_nodeId)) return;
+
         int t_index = TournamentProgress.IndexOf(_nodeId);
 
         // 매번 새 리스트 — 팝업이 Show 시점 스냅샷을 들고 있다가 나중에 소비하므로 공용 버퍼를 넘기면 stale이 된다.

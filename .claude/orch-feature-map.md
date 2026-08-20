@@ -105,6 +105,7 @@
 ## 튜토리얼 (`OutGame/Tutorial/`, `UI/Tutorial/`)
 
 - 실행: `OutgameTutorialRunner` · `TriggeredTutorialRunner` · `OutGame/Tutorial/Steps/TutorialStepExecutor` · `TutorialStepDef` · `EOutgameTutorialAction` · `EOutgameTutorialCompletion` · `EOutgameTutorialFailure` · `EOutgameTutorialStepResult` · `OutgameTutorialStepContext`
+- **액션 메타의 정본**: `OutGame/Tutorial/Steps/TutorialActionMeta` (`EStepField`) — 액션당 한 줄로 완료 조건·씬 이탈·저작 필드를 정한다. `TutorialStepDef`의 완료조건·씬이탈·Uses\* 술어 15종과 `Editor/TutorialStepDefDrawer`의 노출 목록이 전부 여기서 파생된다. **새 액션 = 테이블 한 줄 + `TutorialStepExecutor.Enter` case 1개**(드로어는 손대지 않는다)
 - 진행·잠금: `OutgameTutorialProgress` · `OutgameFeatureLock` · `EOutgameFeature` · `ITutorialProgressSink` · `OutgameTutorialRewind`
 - 앵커·데이터: `TutorialAnchorRegistry` · `TutorialAnchor` · `EOutgameTutorialAnchor` · `OutgameTutorialData` · `OutgameTutorialChapter` · `OutgameTutorialGuide` · `EOutgameTutorialTrigger` · `TriggeredTutorialData` (`TriggeredTutorialEntry`)
 - UI: `UI/Tutorial/OutgameTutorialGateUI` · `OutgameTutorialBridge` · `TriggeredTutorialBridge` · `UI/TutorialOverlayUI` · `UI/TutorialSetupUI` · `UI/TutorialUIStyle` · `UI/Tutorial/TutorialAlertDot` · `UI/Input/TutorialTapCatcher`

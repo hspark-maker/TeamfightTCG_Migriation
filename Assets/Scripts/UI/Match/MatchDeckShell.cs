@@ -41,6 +41,10 @@ public class MatchDeckShell : MonoBehaviour
     // 전환이 이미 세워 둔 화면인가. 다시 열면 등장 안무가 세운 알파·배율이 저작값으로 되돌아간다.
     bool m_prepared;
 
+    // 전투 시작 응답 한 박이 도는 중인가. 커튼이 걸린 뒤에도 되돌리지 않는다 — 이 화면 밑에서 씬이 갈리기 때문이다.
+    // 되돌리는 곳은 진입(Open) 한 곳뿐이라, 전투로 닫히지 않은 화면이 다시 열릴 때만 풀린다.
+    bool m_launching;
+
     void Awake()
     {
         EnsureWired();
@@ -110,8 +114,15 @@ public class MatchDeckShell : MonoBehaviour
 
     // 전투 시작 버튼. 선택된 덱을 씬 전환 캐리어에 실은 뒤에만 게이트를 연다 —
     // 실패(유효 덱 없음)하면 화면을 유지한다. 버튼 interactable로도 막히지만 그건 표시일 뿐이다.
+    //
+    // 게이트를 바로 열지 않고 응답 한 박을 먼저 태운다. 호스트는 게이트가 열리는 즉시 커튼을 걸므로
+    // (LobbyMatchLauncher.EnterBattle) 여기서 바로 열면 클릭과 커튼 사이가 0프레임이다 —
+    // 매칭에서 이 화면으로 넘어오는 길은 그렇게 이어 놓고 나가는 길만 하드컷이면 흐름이 끝에서 끊긴다.
     public void Confirm()
     {
+        // 한 박이 도는 동안 다시 눌리면 안무가 두 벌 겹치고 게이트가 두 번 열린다.
+        if (m_launching) return;
+
         if (!TryConfirmSelection())
         {
             Debug.LogWarning("[MatchDeckShell] 유효한 덱이 선택되지 않았다 — 전투를 시작하지 않는다.");
@@ -119,7 +130,17 @@ public class MatchDeckShell : MonoBehaviour
             return;
         }
 
-        m_gate = EGate.Confirmed;
+        m_launching = true;
+
+        // 뷰가 없으면 태울 안무도 없다 — 연출 때문에 전투가 시작되지 않는 길을 만들지 않는다.
+        if (panelView == null)
+        {
+            m_gate = EGate.Confirmed;
+
+            return;
+        }
+
+        panelView.PlayLaunch(() => m_gate = EGate.Confirmed);
     }
 
     // 전투 포기. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
@@ -150,6 +171,9 @@ public class MatchDeckShell : MonoBehaviour
 
         gameObject.SetActive(true);
         EnsureWired();
+
+        // 전투로 닫히지 않은 화면이 다시 열린다 — 지난번 응답 한 박의 가드를 물려받으면 전투 시작이 영영 안 눌린다.
+        m_launching = false;
 
         SelectedSlot = ResolveSlot(_slotIndex);
 

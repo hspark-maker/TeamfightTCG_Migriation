@@ -27,6 +27,27 @@ public class MatchmakingFx
 
     [Range(0f, 1f)] [SerializeField] float scanAlpha = 0.5f;
 
+    [Header("대기(호흡)")]
+    [Tooltip("기다리는 동안 두 프로필 틀이 쉬는 호흡의 배율. 이 화면에서 대기는 가장 긴 구간인데" +
+             "(길이의 주인이 매치메이커다) 축이 스캔 띠 하나뿐이라, 0으로 두면 그 구간이 통째로 정지 화면이 된다.\n" +
+             "배너(가로 띠) 전체가 아니라 틀만 숨쉬는 이유: 띠를 부풀리면 화면이 커졌다 작아진 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float idleBreath = 0.014f;
+
+    [Tooltip("한 번 숨쉬는 데 걸리는 시간(초). 스캔 주기와 같게 두면 두 축이 한 덩어리로 붙어 하나로 읽힌다.")]
+    [Min(0.1f)] [SerializeField] float idleBreathDuration = 1.15f;
+
+    [Tooltip("내 쪽과 상대 쪽 호흡이 어긋나는 시간(초). 0이면 두 틀이 동시에 부풀어 " +
+             "'각자 기다린다'가 아니라 '화면이 맥동한다'가 된다.")]
+    [Min(0f)] [SerializeField] float idleBreathOffset = 0.55f;
+
+    [Header("발견(취소 물러남)")]
+    [Tooltip("상대가 확정되는 순간 취소 버튼이 물러나는 거리(px). 여기서부터는 물러날 수 없다는 사실을 " +
+             "버튼이 흐려지는 것이 아니라 자리를 뜨는 것으로 말한다 — 흐린 버튼은 '눌러도 되나?'를 남긴다.\n" +
+             "0이면 물러남 없이 그 자리에서 꺼진다.")]
+    [Min(0f)] [SerializeField] float cancelDismissDrop = 44f;
+
+    [Min(0.01f)] [SerializeField] float cancelDismissDuration = 0.18f;
+
     [Header("발견(슬램)")]
     [Tooltip("상대 카드가 꽂히기 전 배율. 이 배율은 t=0에 즉시 적용되고 트윈은 회복만 한다 — " +
              "눈이 봐야 하는 것은 커지는 과정이 아니라 이미 큰 것이 내려꽂히는 순간이다.")]
@@ -142,6 +163,14 @@ public class MatchmakingFx
     Tween  m_scanTween;
     Image  m_scanBand;
 
+    // 호흡도 스캔과 같은 상주 트윈이다(길이의 주인이 매치메이커라 끝을 모른다) — StopIdle이 반드시 걷는다.
+    // 배율을 미는 축이라 걷을 때 1로 되돌리는 일까지 여기가 책임진다. 안 되돌리면 발견 슬램이
+    // 1.008배쯤 부푼 틀에서 시작해, 이후 어느 축도 그 어긋남을 바로잡지 않는다.
+    Tween         m_idleMy;
+    Tween         m_idleOpponent;
+    RectTransform m_idleMyRect;
+    RectTransform m_idleOpponentRect;
+
     // 조임이 세운 빛. 조임 시퀀스가 끊기고(대치가 무대를 갈아탄다) 나서도 살아 있어야 충돌이 이걸 터뜨릴 수 있다 —
     // 그래서 시퀀스가 아니라 여기가 소유한다. 실제로 걷는 것은 ClearCharge / BuildVersus의 마지막 콜백이다.
     Image m_chargeGlow;
@@ -168,6 +197,93 @@ public class MatchmakingFx
     public void Capture()
     {
         this.dim.Capture();
+    }
+
+    /// <summary>
+    /// 기다리는 동안 두 프로필 틀이 쉬는 호흡을 건다. 스캔과 같은 이유로 무한 반복이다 — 길이의 주인은 매치메이커다.
+    /// 무는 것은 <b>틀</b>이지 배너가 아니다(배너를 부풀리면 화면이 커졌다 작아진 것으로 읽힌다).
+    /// </summary>
+    public void StartIdle(RectTransform _myFrame, RectTransform _opponentFrame)
+    {
+        this.StopIdle();
+
+        if (this.idleBreath <= 0f) return;
+
+        // 서로 어긋난 위상으로 돈다 — 같이 부풀면 두 사람이 각자 기다리는 것이 아니라 화면 하나가 맥동하는 것이 된다.
+        this.m_idleMyRect       = _myFrame;
+        this.m_idleOpponentRect = _opponentFrame;
+
+        this.m_idleMy       = this.BuildBreath(_myFrame,       0f);
+        this.m_idleOpponent = this.BuildBreath(_opponentFrame, this.idleBreathOffset);
+    }
+
+    /// <summary>호흡을 걷고 배율을 저작값으로 되돌린다. 되돌리지 않으면 발견 슬램이 부푼 틀에서 시작한다.</summary>
+    public void StopIdle()
+    {
+        this.m_idleMy?.Kill();
+        this.m_idleOpponent?.Kill();
+        this.m_idleMy       = null;
+        this.m_idleOpponent = null;
+
+        RestoreScale(this.m_idleMyRect);
+        RestoreScale(this.m_idleOpponentRect);
+
+        this.m_idleMyRect       = null;
+        this.m_idleOpponentRect = null;
+    }
+
+    Tween BuildBreath(RectTransform _rect, float _delay)
+    {
+        if (_rect == null) return null;
+
+        _rect.DOKill();
+        _rect.localScale = Vector3.one;
+
+        return _rect.DOScale(1f + this.idleBreath, this.idleBreathDuration)
+                    .SetEase(Ease.InOutSine)
+                    .SetLoops(-1, LoopType.Yoyo)
+                    .SetDelay(_delay)
+                    .SetLink(_rect.gameObject);
+    }
+
+    static void RestoreScale(RectTransform _rect)
+    {
+        // ?. 을 쓰지 않는다 — UnityEngine.Object의 가짜 null은 null 조건 연산자가 걸러 주지 못한다.
+        if (_rect == null) return;
+
+        _rect.DOKill();
+        _rect.localScale = Vector3.one;
+    }
+
+    /// <summary>
+    /// 상대가 확정되는 순간 취소 버튼이 물러나는 안무(재생은 호출자). 끝나면 호출자가 버튼을 내린다 —
+    /// 흐려진 채 남겨 두면 "눌러도 되나?"가 남고, 그 상태로 갈라짐(MatchHandoffFx)이 알파를 1로 되돌려 다시 비친다.
+    /// </summary>
+    public Sequence BuildCancelDismiss(RectTransform _cancel)
+    {
+        var t_seq = DOTween.Sequence();
+
+        if (_cancel == null) return t_seq;
+
+        _cancel.DOKill();
+
+        var t_group = _cancel.GetComponent<CanvasGroup>();
+        if (t_group == null) t_group = _cancel.gameObject.AddComponent<CanvasGroup>();
+
+        t_group.DOKill();
+        t_group.alpha = 1f;
+
+        // 가속이라 "물러났다"가 된다. 자리는 셸이 홈으로 되돌린다(RestoreRiders) — 여기는 밀기만 한다.
+        if (this.cancelDismissDrop > 0f)
+        {
+            Vector2 t_to = _cancel.anchoredPosition - new Vector2(0f, this.cancelDismissDrop);
+
+            t_seq.Insert(0f, _cancel.DOAnchorPos(t_to, this.cancelDismissDuration).SetEase(Ease.InQuad));
+        }
+
+        t_seq.Insert(0f, t_group.DOFade(0f, this.cancelDismissDuration).SetEase(Ease.InQuad));
+
+        return t_seq;
     }
 
     /// <summary>빈 상대 틀을 훑기 시작한다. 대기 시간의 주인은 매치메이커라 길이를 모르므로 무한 반복이다.</summary>
@@ -347,6 +463,7 @@ public class MatchmakingFx
     public void Reset(MatchProfileView _my, MatchProfileView _opponent, RectTransform _root, RectTransform _vs)
     {
         this.StopScan();
+        this.StopIdle();
         this.ClearCharge();
         this.dim.Reset();
 

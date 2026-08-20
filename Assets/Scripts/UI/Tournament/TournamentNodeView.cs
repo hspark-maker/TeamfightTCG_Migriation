@@ -74,7 +74,8 @@ public class TournamentNodeView : MonoBehaviour
         bool t_cleared = t_state == ETournamentNodeState.Cleared;
         bool t_locked = t_state == ETournamentNodeState.Locked;
 
-        if (this.tapButton != null) this.tapButton.interactable = t_playable;
+        // 클리어 정점도 다시 도전할 수 있다 — 탭 자격은 CanEnter가 정본이고, 아래 표식은 3상태 그대로다.
+        if (this.tapButton != null) this.tapButton.interactable = TournamentProgress.CanEnter(this.m_index);
         if (this.lockedMark != null) this.lockedMark.SetActive(t_locked);
         if (this.clearedMark != null) this.clearedMark.SetActive(t_cleared);
         if (this.currentMark != null) this.currentMark.SetActive(t_playable);

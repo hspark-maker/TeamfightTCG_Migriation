@@ -115,6 +115,10 @@ public class BootInstaller : MonoBehaviour
         OutgameTutorialRunner.EnsureData(tutorialData);
         TriggeredTutorialRunner.EnsureData(triggeredTutorialData);
 
+        // 세이브가 붙잡아 둔 스텝 번호로 좌표를 되찾는다 — 저작이 스텝을 끼워 넣거나 옮겼어도 같은 스텝에 선다.
+        // 시퀀스를 읽어야 하므로 EnsureData 뒤, 좌표를 쓰는 아래 둘보다는 반드시 앞이다.
+        OutgameTutorialRunner.ResolveProgressAnchor();
+
         // 대본 전투가 연 화면 안에서 앱이 닫혔으면 좌표를 그 전투 진입 스텝으로 되감는다(부트당 1회는 여기가 유일).
         // 디버그 되감기보다 앞이다 — 디버그가 찍은 좌표는 그대로 서야 한다.
         OutgameTutorialRunner.RewindToPendingBattleEntry();
