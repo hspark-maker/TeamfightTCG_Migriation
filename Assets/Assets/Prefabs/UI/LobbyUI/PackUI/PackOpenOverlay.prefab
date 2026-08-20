@@ -1271,8 +1271,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 677, y: 1015.5}
+  m_AnchoredPosition: {x: 0, y: 507.75}
+  m_SizeDelta: {x: 677, y: 2031}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2416401453737633109
 CanvasRenderer:
@@ -2119,6 +2119,7 @@ MonoBehaviour:
   lid: {fileID: 2536646738382517465}
   mouthShadow: {fileID: 9179316989243037363}
   tearGlow: {fileID: 4265340372555632584}
+  tearHandle: {fileID: 8492758770188128739}
   lidPivot: {fileID: 1952982339451470153}
   peelAngle: -30
   peelLift: 40
@@ -2151,8 +2152,8 @@ MonoBehaviour:
   pulsePeriod: 2
   shadowScaleAtTop: 0.82
   shadowAlphaAtTop: 0.55
-  glowAlphaMin: 0.18
-  glowAlphaMax: 0.34
+  glowAlphaMin: 0
+  glowAlphaMax: 0
   glowSpinPeriod: 24
   glowFadeDuration: 0.4
   tearHandle: {fileID: 8492758770188128739}
@@ -2367,7 +2368,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7429717905004580723}
+  m_Father: {fileID: 5895301881091186177}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -2394,7 +2395,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 156ecd5703baf6e4c838dddea5309afa, type: 2}
   m_Color: {r: 0.6, g: 0.66, b: 1, a: 0.24}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -2402,7 +2403,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 4f227f4e384d0a64d8792c7524c0ba43, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ccba10f5b1d78416a902acdf9f25a5ca, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2526,7 +2527,6 @@ RectTransform:
   m_LocalScale: {x: 1.55, y: 1.55, z: 1.55}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3963600293554096947}
   - {fileID: 3855892148570698422}
   m_Father: {fileID: 8075960111081696800}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -2568,6 +2568,7 @@ RectTransform:
   - {fileID: 606576077719889057}
   - {fileID: 5536087141056582611}
   - {fileID: 8075960111081696800}
+  - {fileID: 3963600293554096947}
   - {fileID: 7143424345597507835}
   - {fileID: 2668003287496627745}
   - {fileID: 3712830489292936202}

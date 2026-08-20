@@ -19,8 +19,7 @@ MonoBehaviour:
   keywords: 0
   maxHp: 3
   bonusHp: 0
-  synergies:
-  - {fileID: 11400000, guid: fcb84e498c66194468fe9a236338aa3e, type: 2}
+  synergies: []
   battleImage: {fileID: 21300000, guid: 3598f6dd3630ec476d141ca614cf6bd5, type: 3}
   deckPreview: {fileID: 21300000, guid: 8927795470cb8804b81689efcb778d4e, type: 3}
   hpGainByLevel: 0000000000000000020000000100000002000000010000000200000001000000010000000200000001000000
