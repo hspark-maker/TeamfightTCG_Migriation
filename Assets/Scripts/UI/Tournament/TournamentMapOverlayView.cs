@@ -5,43 +5,23 @@ using UnityEngine.UI;
 
 // 보상 토너먼트 세로 경로 맵(로비 위를 덮는 전체 화면 오버레이).
 //
-// 정점 수·좌표를 전부 코드가 만든다 — 프리팹에 정점을 손으로 박으면 SO 저작이 늘 때 화면이 조용히 어긋난다.
+// 좌표의 진실원은 챕터 타일 프리팹이다 — 정점 자리도 길 조각도 디자이너가 타일 안에 저작하고,
+// 코드는 타일을 쌓고 저작된 자리에 정점을 놓고 길 조각을 상태에 따라 틴트할 뿐 좌표를 만들지 않는다.
 // 자기 여닫음은 스스로 소유하고, 씬 전환만 모른다 — 도전을 이벤트로 올리면 LobbyRoot(LobbyMatchLauncher)가 잇는다.
 public class TournamentMapOverlayView : MonoBehaviour
 {
     [SerializeField] ScrollRect scrollRect;
-    [SerializeField] RectTransform content;          // 정점이 놓일 Content(레이아웃 그룹 없이 코드가 좌표를 잡는다)
+    [SerializeField] RectTransform content;          // 타일과 정점이 놓일 Content(레이아웃 그룹 없이 코드가 좌표를 잡는다)
     [SerializeField] TournamentNodeView nodePrefab;
     [SerializeField] Button backButton;
 
-    [Tooltip("정점 사이 세로 간격(px). 정점 수가 늘면 Content 높이가 이 값에서 파생된다.")]
-    [SerializeField] float nodeSpacing = 320f;
+    [Header("길 색")]
+    [Tooltip("깬 구간(정점 i를 클리어)의 길 색. 아래에서 위로 차오르는 진행 표시다.")]
+    [SerializeField] Color clearedColor = new Color(1f, 0.82f, 0.35f, 1f);
 
-    [Tooltip("경로가 좌우로 흔들리는 진폭(px). 정점은 중앙에서 ±이 값만큼 번갈아 놓인다. 0이면 일직선.")]
-    [SerializeField] float pathAmplitude = 180f;
-
-    [Tooltip("첫 정점 아래 · 마지막 정점 위에 남길 여백(px).")]
-    [SerializeField] float edgePadding = 260f;
-
-    [Header("배경(선택)")]
-    [Tooltip("챕터 타일이 하나도 저작되지 않았을 때만 쓰는 폴백 배경이다 — 챕터 중 하나라도 tilePrefab이 배선되면 이 그림은 무시되고 꺼진다.\n" +
-             "맵과 함께 스크롤할 배경. Content 안에 한 장 놓아 두면 Content 높이를 채울 만큼 세로로 반복해 깐다.\n" +
-             "**raycastTarget을 켜 둘 것** — 이 그림이 Content 전면을 덮어야 정점 사이 빈 자리에서도 스크롤이 잡힌다.\n" +
-             "비우면 탭 루트의 배경만 남고 화면에 고정된다(맵이 올라가도 배경이 안 따라온다).")]
-    [SerializeField] Image backdropTile;
-
-    [Header("경로 저작(선택)")]
-    [Tooltip("챕터 타일이 하나도 저작되지 않았을 때만 쓰는 폴백 경로다 — 챕터 중 하나라도 tilePrefab이 배선되면 이 자식들은 무시되고 꺼진다.\n" +
-             "경로 포인트의 부모. 자식이 놓인 자리가 곧 정점 자리이고, 형제 순서가 정점 순서다(첫 자식 = 1번 정점).\n" +
-             "포인트가 정점 수보다 적으면 남는 정점은 마지막 포인트에서 아래 간격·진폭 공식으로 이어 붙인다.\n" +
-             "포인트에 표식 그림을 달아 두면 저작 중에만 보이고 실행할 때 꺼진다.\n" +
-             "비우면 전부 공식 배치다.")]
-    [SerializeField] RectTransform pathRoot;
-
-    [Header("경로 장식(선택)")]
-    [Tooltip("정점 사이를 잇는 선 프리팹. 비우면 선 없이 정점만 놓는다.\n" +
-             "가로로 누운 그림을 저작할 것 — 두 정점 사이 거리만큼 폭(width)이 늘고 각도가 돌아간다.")]
-    [SerializeField] RectTransform connectorPrefab;
+    [Tooltip("아직 못 깬 구간의 길 색. 배경 그림에 이미 길이 그려져 있으므로 길을 덮지 않는 옅은 색이라야 한다 " +
+             "— 흰색 반투명이 숲·설원·화산 배경 모두에서 읽힌다.")]
+    [SerializeField] Color lockedColor = new Color(1f, 1f, 1f, 0.7f);
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
@@ -52,20 +32,21 @@ public class TournamentMapOverlayView : MonoBehaviour
     /// <summary>맵이 화면에 떠 있는가.</summary>
     public bool IsOpen => this.gameObject.activeInHierarchy;
 
+    // 타일 안에서 정점 자리·길 조각을 담고 있는 자식 이름(타일 프리팹 규약)
+    const string PATH_ROOT_NAME = "PathRoot";
+    const string LINK_ROOT_NAME = "LinkRoot";
+
+    // 평탄 정점 번호와 칸이 1:1이다. 자리가 저작되지 않은 정점은 빈칸으로 남는다 — ScrollToNode가 번호로 찾는다.
     readonly List<TournamentNodeView> m_nodes = new List<TournamentNodeView>();
 
-    // 저작 포인트를 Content 좌표로 읽어 둔 것. 정점 수보다 적어도 되고, 비어 있으면 전부 공식 배치다.
-    readonly List<Vector2> m_points = new List<Vector2>();
+    // 구간별 길 조각. 진행에 따라 색을 바꾸려면 만든 뒤에도 들고 있어야 한다.
+    readonly List<PathLink> m_links = new List<PathLink>();
 
-    // 이 화면이 만든 것만 추적한다 — Content를 통째로 비우면 저작한 포인트·배경 장식이 함께 지워진다.
+    // 이 화면이 만든 것만 추적한다 — Content를 통째로 비우면 저작한 것이 함께 지워진다.
     readonly List<GameObject> m_spawned = new List<GameObject>();
 
-    // 챕터 타일 안에서 경로 포인트를 담고 있는 자식 이름(타일 프리팹 규약)
-    const string PATH_ROOT_NAME = "PathRoot";
-
-    // 저작 경고를 낸 챕터(타일·포인트 수 결함 · 앵커 규약 위반). 챕터마다 1회만 보고한다.
-    readonly HashSet<int> m_warnedChapters = new HashSet<int>();
-    readonly HashSet<int> m_warnedAnchors = new HashSet<int>();
+    // 저작 결함 보고는 같은 내용 1회만. 챕터·항목이 다르면 각각 나온다.
+    readonly HashSet<string> m_reported = new HashSet<string>();
 
     // 정점 생성 여부. 저작 정점 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
@@ -116,14 +97,14 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.transition.SetVisible(this.gameObject, false);
     }
 
-    // 정점을 TournamentProgress.NodeCount만큼 세운다(정점 수는 SO에서 파생 — 상수 하드코딩 금지).
-    // 배경·좌표는 챕터 타일에서 오고, 타일이 없으면 옛 경로(단일 배경 반복 + 패널 pathRoot)로 떨어진다.
+    // 챕터 타일을 쌓고 타일에 저작된 자리에만 정점을 세운다. 좌표를 코드가 만들지 않으므로 저작이 빠지면 그 정점은 안 나온다.
     void Build()
     {
         this.m_nodes.Clear();
+        this.m_links.Clear();
         if (this.content == null || this.nodePrefab == null) return;
 
-        // 이 화면이 직전에 만든 것만 걷는다. Content를 통째로 비우면 저작한 포인트·배경 장식이 함께 지워진다.
+        // 이 화면이 직전에 만든 것만 걷는다. Content를 통째로 비우면 저작한 것이 함께 지워진다.
         for (int t_i = 0; t_i < this.m_spawned.Count; t_i++)
             if (this.m_spawned[t_i] != null) Destroy(this.m_spawned[t_i]);
         this.m_spawned.Clear();
@@ -131,95 +112,65 @@ public class TournamentMapOverlayView : MonoBehaviour
         // 목업으로 Content 안에 놓인 원본은 숨기기만 한다(지우면 다음 Build가 0개가 된다).
         if (this.nodePrefab.gameObject.scene.IsValid()) this.nodePrefab.gameObject.SetActive(false);
 
-        this.m_points.Clear();
-
-        // 챕터 타일이 하나라도 저작돼 있으면 타일 스택, 아니면 옛 경로(배경 한 장 반복 + 패널 pathRoot) 그대로다.
-        bool t_tiled = this.HasAnyChapterTile();
-        float t_stack = t_tiled ? this.BuildChapterTiles() : 0f;
-        if (t_tiled) this.HideLegacyAuthoring();
-        else this.CollectAuthoredPoints();
-
         int t_count = TournamentProgress.NodeCount;
-        var t_positions = new Vector2[t_count];
-        float t_top = 0f;
+        var t_positions = new Vector2?[t_count];
+
+        // 타일을 먼저 전부 쌓는다 — 형제 순서가 곧 깊이라 뒤에 세우는 정점이 배경 위로 온다.
+        // 길 조각은 타일 안에 저작돼 있어 코드가 순서를 만들 필요가 없다.
+        float t_stack = this.BuildChapterTiles(t_positions);
+        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_stack);
+
+        int t_placed = 0;
         for (int t_i = 0; t_i < t_count; t_i++)
         {
-            t_positions[t_i] = this.PositionOf(t_i);
-            if (t_positions[t_i].y > t_top) t_top = t_positions[t_i].y;
-        }
-
-        // 높이는 쌓인 타일과 가장 높은 정점 중 큰 쪽에서 파생한다 — 저작 포인트가 공식 간격을 따르지 않아도 맞는다.
-        // 정점 쪽이 이기면 타일 위로 배경 없는 띠가 생기고 거기선 드래그가 안 잡힌다(타일에 Bg가 없다) —
-        // 마지막 챕터의 최상단 포인트 + edgePadding이 타일 윗변을 넘지 않게 저작하는 것이 전제다.
-        float t_height = Mathf.Max(t_stack, t_top + this.edgePadding);
-        this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_height);
-
-        // 배경 → 연결선 → 정점 순으로 세운다. 형제 순서가 곧 그리는 순서라 이 순서가 곧 깊이다.
-        if (!t_tiled) this.BuildBackdrop(t_height);
-        this.BuildConnectors(t_positions);
-
-        for (int t_i = 0; t_i < t_count; t_i++)
-        {
-            TournamentNodeView t_node = Instantiate(this.nodePrefab, this.content);
-            t_node.gameObject.SetActive(true);   // 목업 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
-            this.Place(t_node.transform as RectTransform, t_positions[t_i]);
-            t_node.Bind(t_i, this.OnNodeTapped);
-            this.m_nodes.Add(t_node);
-            this.m_spawned.Add(t_node.gameObject);
-        }
-
-        // 정점이 하나도 안 나왔으면(설정 미주입 등) 다음 진입에서 다시 시도한다 — 빈 맵으로 세션 내내 고착되지 않게.
-        this.m_built = t_count > 0;
-    }
-
-    // 타일 경로에선 CollectAuthoredPoints/BuildBackdrop이 안 돌아 옛 목업이 그대로 보인다 — 여기서 걷는다.
-    void HideLegacyAuthoring()
-    {
-        if (this.backdropTile != null) this.backdropTile.gameObject.SetActive(false);
-        if (this.pathRoot == null) return;
-
-        for (int t_i = 0; t_i < this.pathRoot.childCount; t_i++)
-            this.pathRoot.GetChild(t_i).gameObject.SetActive(false);
-    }
-
-    // 챕터 중 하나라도 타일을 저작했는가. 전부 미저작이면 옛 배경 반복 경로로 간다.
-    bool HasAnyChapterTile()
-    {
-        int t_count = TournamentProgress.ChapterCount;
-        for (int t_i = 0; t_i < t_count; t_i++)
-            if (TournamentProgress.TryGetChapter(t_i, out TournamentChapterDef t_chapter) && t_chapter.tilePrefab != null)
-                return true;
-
-        return false;
-    }
-
-    // 챕터 타일을 Content 바닥부터 순서대로 쌓고 타일 안 경로 포인트를 평탄 목록에 이어 붙인다. 반환값은 쌓인 총 높이.
-    // 챕터마다 m_points.Count == 그 챕터까지의 정점 누계를 반드시 맞춘다 — 한 칸이라도 어긋나면 뒤 챕터 정점이 통째로 밀린다.
-    float BuildChapterTiles()
-    {
-        float t_cursor = 0f;
-        int t_count = TournamentProgress.ChapterCount;
-
-        for (int t_i = 0; t_i < t_count; t_i++)
-        {
-            // 타일이 없거나 루트가 RectTransform이 아니면(= 화면에 놓을 수 없다) 배경 없이 좌표만 이어 붙인다.
-            if (!TournamentProgress.TryGetChapter(t_i, out TournamentChapterDef t_chapter)
-                || t_chapter.tilePrefab == null
-                || !(t_chapter.tilePrefab.transform is RectTransform))
+            // 자리가 없는 정점은 만들지 않는다. 목록엔 빈칸을 남겨 칸 번호를 평탄 정점 번호에 붙들어 둔다.
+            if (t_positions[t_i] == null)
             {
-                this.WarnChapter(t_i, "쓸 수 있는 tilePrefab이 없어 배경 없이 공식 좌표로 놓는다 — TournamentConfig에서 타일을 저작할 것.");
-                t_cursor = this.FillFormulaPoints(t_i, t_cursor);
+                this.m_nodes.Add(null);
                 continue;
             }
 
-            t_cursor = this.PlaceChapterTile(t_i, t_chapter, t_cursor);
+            TournamentNodeView t_node = Instantiate(this.nodePrefab, this.content);
+            t_node.gameObject.SetActive(true);   // 목업 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
+            this.Place(t_node.transform as RectTransform, t_positions[t_i].Value);
+            t_node.Bind(t_i, this.OnNodeTapped);
+            this.m_nodes.Add(t_node);
+            this.m_spawned.Add(t_node.gameObject);
+            t_placed++;
+        }
+
+        this.RefreshLinks();   // 길 색은 만들자마자 한 번 맞춰 둔다
+
+        // 하나도 못 세웠으면(설정 미주입 등) 다음 진입에서 다시 시도한다 — 빈 맵으로 세션 내내 고착되지 않게.
+        this.m_built = t_placed > 0;
+    }
+
+    // 챕터 타일을 Content 바닥부터 순서대로 쌓는다. 반환값은 쌓인 총 높이(= Content 높이).
+    // _positions는 평탄 정점 번호로 색인한다 — 챕터 시작 오프셋을 누적해 넣는다.
+    float BuildChapterTiles(Vector2?[] _positions)
+    {
+        float t_cursor = 0f;
+        int t_nodeStart = 0;
+        int t_chapters = TournamentProgress.ChapterCount;
+
+        for (int t_c = 0; t_c < t_chapters; t_c++)
+        {
+            if (!TournamentProgress.TryGetChapter(t_c, out TournamentChapterDef t_chapter)) continue;
+
+            // 타일이 없으면 그 챕터 정점은 아예 만들지 않는다 — 좌표를 지어내면 배경 길과 어긋난 자리에 놓인다.
+            if (t_chapter.tilePrefab == null || !(t_chapter.tilePrefab.transform is RectTransform))
+                this.ErrorChapter(t_c, "쓸 수 있는 tilePrefab이 없다 — 이 챕터의 정점과 길이 화면에 나오지 않는다. TournamentConfig에 타일을 저작할 것.");
+            else
+                t_cursor = this.PlaceChapterTile(t_c, t_chapter, t_cursor, t_nodeStart, _positions);
+
+            t_nodeStart += t_chapter.NodeCount;
         }
 
         return t_cursor;
     }
 
-    // 타일 한 장을 커서 높이에 세우고 그 안의 경로 포인트를 걷는다. 반환값은 타일 윗변(= 다음 커서).
-    float PlaceChapterTile(int _chapterIndex, TournamentChapterDef _chapter, float _cursor)
+    // 타일 한 장을 커서 높이에 세우고 그 안의 정점 자리·길 조각을 걷는다. 반환값은 타일 윗변(= 다음 커서).
+    float PlaceChapterTile(int _chapterIndex, TournamentChapterDef _chapter, float _cursor, int _nodeStart, Vector2?[] _positions)
     {
         GameObject t_tile = Instantiate(_chapter.tilePrefab, this.content);
         t_tile.SetActive(true);
@@ -232,199 +183,129 @@ public class TournamentMapOverlayView : MonoBehaviour
         t_rect.pivot = new Vector2(0.5f, 0f);
         t_rect.anchoredPosition = new Vector2(0f, _cursor);
 
-        // 폭 맞춤을 sizeDelta가 아니라 균등 스케일로 한다 — 안의 경로 포인트를 산술로 환산할 수 있다.
+        // 폭 맞춤을 sizeDelta가 아니라 균등 스케일로 한다 — 안의 저작 좌표를 산술로 환산할 수 있고 길 조각도 같이 따라온다.
         // 활성화 첫 프레임엔 Content rect가 0일 수 있다 — 그때는 저작 크기 그대로(스케일 1) 둔다.
         float t_tileWidth = t_rect.rect.width;
         float t_contentWidth = this.content.rect.width;
         float t_scale = t_tileWidth > 1f && t_contentWidth > 1f ? t_contentWidth / t_tileWidth : 1f;
         t_rect.localScale = new Vector3(t_scale, t_scale, 1f);
 
-        this.CollectTilePoints(_chapterIndex, t_rect, _cursor, t_scale, _chapter.NodeCount);
+        this.CollectTilePoints(_chapterIndex, t_rect, _cursor, t_scale, _nodeStart, _chapter.NodeCount, _positions);
+        this.CollectTileLinks(_chapterIndex, t_rect, _nodeStart, _chapter.NodeCount);
 
-        // 커서는 타일 높이가 지배한다 — 포인트를 보충해도 그 y는 타일 안이라 FillFormulaPoints 반환값을 쓰지 않는다.
         return _cursor + t_rect.rect.height * t_scale;
     }
 
-    // 타일 안 PathRoot 자식을 Content 좌표로 옮겨 담는다. 챕터 정점 수에 정확히 맞춰 담는 것이 계약이다 —
-    // 남으면 버리고 모자라면 마지막 자리에서 이어 붙인다(둘 다 저작 실수라 경고한다).
-    //
-    // 월드 좌표(t_point.position)를 읽지 않는다 — 생성 직후 프레임엔 레이아웃이 아직 안 서서 전부 타일 바닥에 뭉친다.
-    // 타일 규약이 anchorMin == anchorMax라 anchoredPosition 합산으로 같은 값을 프레임과 무관하게 얻는다.
-    void CollectTilePoints(int _chapterIndex, RectTransform _tile, float _cursor, float _scale, int _nodeCount)
+    // 타일 안 PathRoot 자식(= 정점 자리)을 Content 좌표로 환산해 담는다. 개수가 안 맞으면 메우지 말고 보고한다.
+    // 자리 좌표는 LocalOffsetInTile이 앵커·피벗과 무관하게 구한다 — 저작 앵커에 규약을 걸지 않는다.
+    void CollectTilePoints(int _chapterIndex, RectTransform _tile, float _cursor, float _scale, int _nodeStart, int _nodeCount, Vector2?[] _positions)
     {
-        if (_nodeCount <= 0) return;
-
-        int t_start = this.m_points.Count;
-        int t_target = t_start + _nodeCount;
-
         RectTransform t_root = _tile.Find(PATH_ROOT_NAME) as RectTransform;
-        int t_authored = t_root != null ? t_root.childCount : 0;
-
-        Vector2 t_rootOffset = Vector2.zero;
-        if (t_root != null)
+        if (t_root == null)
         {
-            this.WarnStretchAnchor(_chapterIndex, t_root);
-            t_rootOffset = t_root.anchoredPosition;
+            this.ErrorChapter(_chapterIndex, $"타일에 '{PATH_ROOT_NAME}'이 없다 — 이 챕터 정점 {_nodeCount}개가 화면에 나오지 않는다.");
+            return;
         }
+
+        int t_authored = t_root.childCount;
+        if (t_authored != _nodeCount)
+            this.ErrorChapter(_chapterIndex, $"'{PATH_ROOT_NAME}' 자리 {t_authored}개 ≠ 정점 {_nodeCount}개 — 자리가 있는 만큼만 놓는다. 자식 수를 정점 수에 맞출 것.");
+
+        int t_take = Mathf.Min(t_authored, _nodeCount);
 
         for (int t_i = 0; t_i < t_authored; t_i++)
         {
             Transform t_child = t_root.GetChild(t_i);
             t_child.gameObject.SetActive(false);   // 저작용 표식이라 실행 화면에는 남기지 않는다
 
-            if (this.m_points.Count >= t_target) continue;   // 정점 수를 넘는 저작은 버린다
+            if (t_i >= t_take) continue;
             if (!(t_child is RectTransform t_point)) continue;
 
-            this.WarnStretchAnchor(_chapterIndex, t_point);
-
-            Vector2 t_offset = t_rootOffset + t_point.anchoredPosition;
-            this.m_points.Add(new Vector2(t_offset.x * _scale, _cursor + t_offset.y * _scale));
+            Vector2 t_offset = LocalOffsetInTile(t_point, _tile);
+            _positions[_nodeStart + t_i] = new Vector2(t_offset.x * _scale, _cursor + t_offset.y * _scale);
         }
+    }
 
-        if (this.m_points.Count == t_target)
+    // 타일 안 LinkRoot 자식(= 길 조각)을 형제 순서로 걷어 담는다. transform은 절대 건드리지 않는다 — 색만 바꾼다.
+    // 챕터 c의 링크 i는 평탄 구간 (_nodeStart + i)다. 챕터 경계 구간에는 링크가 없다(조각이 두 타일에 걸치지 않게).
+    void CollectTileLinks(int _chapterIndex, RectTransform _tile, int _nodeStart, int _nodeCount)
+    {
+        Transform t_root = _tile.Find(LINK_ROOT_NAME);
+        if (t_root == null)
         {
-            if (t_authored > _nodeCount) this.WarnPointCount(_chapterIndex, t_authored, _nodeCount);
+            this.WarnChapter(_chapterIndex, $"타일에 '{LINK_ROOT_NAME}'이 없다 — 길 없이 정점만 뜬다.");
             return;
         }
 
-        this.WarnPointCount(_chapterIndex, t_authored, _nodeCount);
+        int t_expected = Mathf.Max(_nodeCount - 1, 0);
+        int t_authored = t_root.childCount;
+        if (t_authored != t_expected)
+            this.ErrorChapter(_chapterIndex, $"'{LINK_ROOT_NAME}' 조각 {t_authored}개 ≠ 구간 {t_expected}개(정점 수 - 1) — 형제 순서가 곧 구간 순서다. 개수를 맞출 것.");
 
-        // 한 점도 못 걷었으면 공식 배치로, 일부만 걷었으면 마지막 자리에서 간격만큼 이어 붙인다.
-        if (this.m_points.Count == t_start)
+        int t_take = Mathf.Min(t_authored, t_expected);
+        for (int t_i = 0; t_i < t_take; t_i++)
         {
-            this.FillFormulaPoints(_chapterIndex, _cursor);
-            return;
-        }
+            GameObject t_link = t_root.GetChild(t_i).gameObject;
 
-        while (this.m_points.Count < t_target)
-        {
-            Vector2 t_last = this.m_points[this.m_points.Count - 1];
-            this.m_points.Add(new Vector2(this.AmplitudeX(this.m_points.Count), t_last.y + this.nodeSpacing));
-        }
-    }
-
-    // 타일이 없는 챕터의 정점 수만큼 공식 좌표를 이어 붙인다. 반환값은 그 챕터 윗변(= 다음 커서).
-    float FillFormulaPoints(int _chapterIndex, float _cursor)
-    {
-        if (!TournamentProgress.TryGetChapter(_chapterIndex, out TournamentChapterDef t_chapter)) return _cursor;
-
-        int t_count = t_chapter.NodeCount;
-        if (t_count <= 0) return _cursor;
-
-        float t_y = _cursor + this.edgePadding;
-        for (int t_i = 0; t_i < t_count; t_i++)
-        {
-            this.m_points.Add(new Vector2(this.AmplitudeX(this.m_points.Count), t_y));
-            if (t_i < t_count - 1) t_y += this.nodeSpacing;
-        }
-
-        return t_y + this.edgePadding;
-    }
-
-    // 챕터 저작 경고는 챕터마다 1회 — 두 번째 결함 챕터가 첫 챕터에 묻히지 않게 한다.
-    void WarnChapter(int _chapterIndex, string _message)
-    {
-        if (!this.m_warnedChapters.Add(_chapterIndex)) return;
-
-        Debug.LogWarning($"[Tournament] 챕터 #{_chapterIndex}: {_message}");
-    }
-
-    // 포인트 수 ≠ 정점 수는 조용히 넘기면 뒤 챕터 좌표가 통째로 밀린다.
-    void WarnPointCount(int _chapterIndex, int _authored, int _nodeCount)
-        => this.WarnChapter(_chapterIndex, $"타일 경로 포인트 {_authored}개 ≠ 정점 {_nodeCount}개 — " +
-                                           "남는 포인트는 버리고 모자란 자리는 공식으로 채운다. PathRoot 자식 수를 정점 수에 맞출 것.");
-
-    // 포인트·PathRoot가 스트레치 앵커면 anchoredPosition 합산이 실제 자리와 어긋난다(타일 규약은 anchorMin == anchorMax).
-    void WarnStretchAnchor(int _chapterIndex, RectTransform _rect)
-    {
-        if (_rect.anchorMin == _rect.anchorMax) return;
-        if (!this.m_warnedAnchors.Add(_chapterIndex)) return;
-
-        Debug.LogWarning($"[Tournament] 챕터 #{_chapterIndex} 타일의 '{_rect.name}'이 스트레치 앵커다 — 경로 포인트는 anchorMin == anchorMax로 저작할 것.");
-    }
-
-    // 저작 포인트를 Content 좌표(가로=중앙 기준, 세로=바닥 기준)로 읽고 표식은 끈다.
-    // Content pivot이 바닥(0.5, 0)이라는 전제다 — 높이가 변해도 바닥이 안 움직여 좌표가 흔들리지 않는다.
-    void CollectAuthoredPoints()
-    {
-        if (this.pathRoot == null) return;
-
-        for (int t_i = 0; t_i < this.pathRoot.childCount; t_i++)
-        {
-            Transform t_point = this.pathRoot.GetChild(t_i);
-            this.m_points.Add(this.content.InverseTransformPoint(t_point.position));
-            t_point.gameObject.SetActive(false);   // 저작용 표식이라 실행 화면에는 남기지 않는다
+            // Graphic은 여기서 한 번만 캐시한다 — 갱신은 진행마다 도는데 탐색까지 매번 하면 낭비다.
+            this.m_links.Add(new PathLink(_nodeStart + t_i, t_link, t_link.GetComponentsInChildren<Graphic>(true)));
         }
     }
 
-    // 배경을 Content 높이만큼 세로로 반복해 깐다. 한 장 높이는 Content 폭에 그림 비율을 맞춰 정한다 —
-    // 저작 크기를 그대로 쓰면 기기 폭에 따라 좌우가 잘리거나 뜬다.
-    void BuildBackdrop(float _height)
+    // 구간 i는 정점 i를 깼으면 클리어 색, 아니면 미클리어 색이다.
+    // 숨기지 않는다 — 첫 진입은 클리어가 0개라 숨기면 길이 통째로 사라진다.
+    void RefreshLinks()
     {
-        if (this.backdropTile == null) return;
-
-        // 원본은 저작용 한 장이라 숨기고 사본만 남긴다(지우면 다음 Build가 배경 없이 선다).
-        this.backdropTile.gameObject.SetActive(false);
-
-        float t_width = this.content.rect.width;
-        Sprite t_sprite = this.backdropTile.sprite;
-        float t_tile = t_sprite != null && t_sprite.rect.width > 0f
-            ? t_width * (t_sprite.rect.height / t_sprite.rect.width)
-            : this.backdropTile.rectTransform.rect.height;
-
-        if (t_tile <= 1f) return;
-
-        int t_count = Mathf.CeilToInt(_height / t_tile);
-        for (int t_i = 0; t_i < t_count; t_i++)
+        for (int t_i = 0; t_i < this.m_links.Count; t_i++)
         {
-            Image t_copy = Instantiate(this.backdropTile, this.content);
-            t_copy.gameObject.SetActive(true);
+            PathLink t_link = this.m_links[t_i];
+            if (t_link.Graphics == null) continue;
 
-            RectTransform t_rect = t_copy.rectTransform;
-            this.Place(t_rect, new Vector2(0f, t_tile * (t_i + 0.5f)));
-            t_rect.sizeDelta = new Vector2(t_width, t_tile);
+            Color t_color = TournamentProgress.StateOf(t_link.Index) == ETournamentNodeState.Cleared
+                ? this.clearedColor
+                : this.lockedColor;
 
-            this.m_spawned.Add(t_copy.gameObject);
+            for (int t_g = 0; t_g < t_link.Graphics.Length; t_g++)
+                if (t_link.Graphics[t_g] != null) t_link.Graphics[t_g].color = t_color;
         }
     }
 
-    // 정점 사이 연결선.
-    void BuildConnectors(Vector2[] _positions)
-    {
-        if (this.connectorPrefab == null) return;
+    // 저작 결함은 조용히 메우지 않고 보고한다(같은 내용은 1회).
+    void ErrorChapter(int _chapterIndex, string _message) => this.Report(_chapterIndex, _message, true);
 
-        for (int t_i = 0; t_i < _positions.Length - 1; t_i++)
+    void WarnChapter(int _chapterIndex, string _message) => this.Report(_chapterIndex, _message, false);
+
+    void Report(int _chapterIndex, string _message, bool _isError)
+    {
+        string t_line = $"[Tournament] 챕터 #{_chapterIndex}: {_message}";
+        if (!this.m_reported.Add(t_line)) return;
+
+        if (_isError) Debug.LogError(t_line);
+        else Debug.LogWarning(t_line);
+    }
+
+    // 자식의 "타일 루트 피벗 원점" 기준 좌표. 타일 루트에 닿을 때까지 부모를 타고 올라가며 한 단계씩 누적한다 —
+    // 중간에 몇 겹이 끼든, 앵커·피벗을 어떻게 저작하든 맞는 일반식이다.
+    //
+    // 월드 좌표도 localPosition도 읽지 않는다 — Canvas 밖에서 만든 프리팹은 localPosition이 전부 0이고
+    // 생성 직후 프레임엔 레이아웃도 아직 안 서 있다. anchoredPosition과 부모 rect만으로 산술한다.
+    static Vector2 LocalOffsetInTile(RectTransform _rect, RectTransform _tile)
+    {
+        Vector2 t_offset = Vector2.zero;
+
+        for (RectTransform t_cur = _rect; t_cur != null && t_cur != _tile; t_cur = t_cur.parent as RectTransform)
         {
-            Vector2 t_from = _positions[t_i];
-            Vector2 t_to = _positions[t_i + 1];
-            Vector2 t_delta = t_to - t_from;
+            if (!(t_cur.parent is RectTransform t_parent)) break;
 
-            RectTransform t_line = Instantiate(this.connectorPrefab, this.content);
-            t_line.gameObject.SetActive(true);
-            this.Place(t_line, (t_from + t_to) * 0.5f);
-            t_line.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, t_delta.magnitude);
-            t_line.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(t_delta.y, t_delta.x) * Mathf.Rad2Deg);
-            this.m_spawned.Add(t_line.gameObject);
+            // 앵커가 부모 rect 안에서 가리키는 기준점(부모 피벗 원점 기준) + 그 기준점에서의 오프셋
+            Vector2 t_anchorCenter = (t_cur.anchorMin + t_cur.anchorMax) * 0.5f;
+            Vector2 t_refPoint = (t_anchorCenter - t_parent.pivot) * t_parent.rect.size;
+
+            t_offset += t_refPoint + t_cur.anchoredPosition;
         }
+
+        return t_offset;
     }
-
-    // 정점 i의 좌표. 저작 포인트가 있으면 그 자리를 그대로 쓰고, 모자라면 마지막 포인트에서 공식으로 이어 붙인다.
-    // y는 Content 바닥 기준이라 인덱스 0이 맨 아래다 — 경로가 위로 "올라가는" 것으로 읽히게(레퍼런스가 아래에서 위로 오른다).
-    Vector2 PositionOf(int _index)
-    {
-        if (_index < this.m_points.Count) return this.m_points[_index];
-
-        float t_x = this.AmplitudeX(_index);
-
-        if (this.m_points.Count == 0)
-            return new Vector2(t_x, this.edgePadding + this.nodeSpacing * _index);
-
-        Vector2 t_last = this.m_points[this.m_points.Count - 1];
-        return new Vector2(t_x, t_last.y + this.nodeSpacing * (_index - this.m_points.Count + 1));
-    }
-
-    // 공식 배치의 좌우 진폭(짝수 인덱스는 왼쪽, 홀수는 오른쪽).
-    float AmplitudeX(int _index) => (_index & 1) == 0 ? -this.pathAmplitude : this.pathAmplitude;
 
     // 앵커를 코드가 Content 하단 중앙으로 고정한다 — 프리팹 저작 앵커에 따라 좌표가 달라지지 않게.
     void Place(RectTransform _rect, Vector2 _position)
@@ -437,11 +318,13 @@ public class TournamentMapOverlayView : MonoBehaviour
         _rect.anchoredPosition = _position;
     }
 
-    // 진행 통지 → 전 정점 재바인딩. 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
+    // 진행 통지 → 전 정점 재바인딩 + 길 색 갱신. 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
     void RefreshNodes()
     {
         for (int t_i = 0; t_i < this.m_nodes.Count; t_i++)
             if (this.m_nodes[t_i] != null) this.m_nodes[t_i].Refresh();
+
+        this.RefreshLinks();
     }
 
     // 지금 도전할 정점을 화면 중앙에 둔다. 전부 클리어(-1)면 마지막 정점.
@@ -453,7 +336,7 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.ScrollToNode(t_index);
     }
 
-    // 인덱스 비례가 아니라 정점의 실제 y로 계산한다(지그재그·여백 때문에 비례식이 안 맞는다).
+    // 인덱스 비례가 아니라 정점의 실제 y로 계산한다(저작 자리가 고르지 않아 비례식이 안 맞는다).
     // 생성 직후 프레임은 레이아웃이 서 있지 않아 rect가 0이므로 강제로 갱신한 뒤에 읽는다.
     void ScrollToNode(int _index)
     {
@@ -483,5 +366,20 @@ public class TournamentMapOverlayView : MonoBehaviour
         if (!TournamentProgress.CanEnter(_index)) return;
 
         this.NodeSelected?.Invoke(_index);
+    }
+
+    // 구간 하나의 길 조각. 평탄 인덱스·루트·틴트 대상이 늘 붙어 다녀야 해서 병렬 리스트로 흩지 않는다.
+    readonly struct PathLink
+    {
+        public readonly int Index;            // 정점 Index → Index + 1 사이 구간(평탄 번호)
+        public readonly GameObject Root;      // 저작 단위. 위치·회전·크기는 코드가 건드리지 않는다
+        public readonly Graphic[] Graphics;   // 색을 입힐 대상(조각 아래 전부). 생성 때 한 번만 캐시한다
+
+        public PathLink(int _index, GameObject _root, Graphic[] _graphics)
+        {
+            Index = _index;
+            Root = _root;
+            Graphics = _graphics;
+        }
     }
 }

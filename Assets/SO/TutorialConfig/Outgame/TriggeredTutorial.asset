@@ -16,7 +16,8 @@ MonoBehaviour:
   - trigger: 1
     label: "\uB371 \uD0ED \uC548\uB0B4"
     stepDefs:
-    - action: 0
+    - stepId: 0
+      action: 0
       anchor: 7
       guideMessage: "\uC774\uACF3\uC5D0\uC11C \uB371\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
       messageAtBottom: 0
@@ -37,7 +38,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 8
       guideMessage: "\uC774\uACF3\uC740 \uB0B4\uAC00 \uC18C\uC720\uD55C \uCE74\uB4DC\uC785\uB2C8\uB2E4"
       messageAtBottom: 0
@@ -58,7 +60,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 9
       guideMessage: "\uC774\uACF3\uC5D0 \uCE74\uB4DC\uB97C \uC62C\uB824 \uB371\uC744
         \uAD6C\uC131\uD569\uB2C8\uB2E4"
@@ -80,7 +83,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 0
       guideMessage: "\uC790\uC2E0\uB9CC\uC758 \uB371\uC744 \uB9CC\uB4E4\uC5B4\n\uC804\uD22C\uC5D0\uC11C
         \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
@@ -102,13 +106,14 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-  - trigger: 2
+  - trigger: 1
     label: "\uCE74\uB4DC \uAC15\uD654"
     stepDefs: []
   - trigger: 3
     label: "\uCCAB \uC9C4\uD654 \uC548\uB0B4"
     stepDefs:
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 0
       guideMessage: "\uB808\uBCA8 5\uAC00 \uB418\uBA74 \uC774 \uCE74\uB4DC\uAC00
         \uC9C4\uD654\uD569\uB2C8\uB2E4!"
@@ -130,7 +135,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 11
+    - stepId: 0
+      action: 11
       anchor: 21
       guideMessage: "\uBB34\uB8CC\uB85C \uC9C4\uD654\uD574 \uBCF4\uC138\uC694!"
       messageAtBottom: 0
@@ -154,7 +160,8 @@ MonoBehaviour:
   - trigger: 4
     label: "\uD0A4\uC6CC\uB4DC \uAC15\uD654"
     stepDefs:
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 0
       guideMessage: "\uC774\uACF3\uC5D0\uC11C \uD0A4\uC6CC\uB4DC\uB97C \uC601\uAD6C\uC801\uC73C\uB85C
         \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
@@ -176,7 +183,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 0
+    - stepId: 0
+      action: 0
       anchor: 22
       guideMessage: "'\uC6D0\uAC70\uB9AC' \uD0A4\uC6CC\uB4DC\uB97C \uAC15\uD654\uD558\uC138\uC694"
       messageAtBottom: 0
@@ -197,7 +205,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 18
+    - stepId: 0
+      action: 18
       anchor: 23
       guideMessage: 
       messageAtBottom: 0
@@ -218,7 +227,8 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 0
       guideMessage: "\uD574\uB2F9 \uD0A4\uC6CC\uB4DC\uB97C \uAC00\uC9C4 \uCE74\uB4DC\uAC00
         \uAC15\uB825\uD574\uC84C\uC2B5\uB2C8\uB2E4!.\n\uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
