@@ -144,7 +144,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (m_running) return;
 
-        if (TournamentProgress.StateOf(_nodeIndex) != ETournamentNodeState.Playable) return;
+        if (!TournamentProgress.CanEnter(_nodeIndex)) return;
         if (!TournamentProgress.TryGetNode(_nodeIndex, out TournamentNodeDef t_node)) return;
 
         // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
