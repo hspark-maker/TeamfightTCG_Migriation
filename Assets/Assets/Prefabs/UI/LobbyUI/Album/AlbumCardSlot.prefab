@@ -191,7 +191,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: e4d4397b068a146afb97820c51a021cd, type: 3}
+  m_Sprite: {fileID: 21300000, guid: f0bdcf4700e3143dd941fff695e8c391, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -385,8 +385,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 956301311
-  m_fontColor: {r: 1, g: 1, b: 1, a: 0.22}
+    rgba: 939524096
+  m_fontColor: {r: 0, g: 0, b: 0, a: 0.22}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -495,6 +495,14 @@ PrefabInstance:
     - target: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: keywordFrames.Array.data[6].keyword
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.76751536
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.76751536
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
