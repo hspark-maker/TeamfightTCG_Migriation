@@ -67,13 +67,28 @@ public class TournamentNodeView : MonoBehaviour
     [SerializeField] float focusGlowLow = 0.35f;
     [SerializeField] float focusGlowHigh = 0.7f;
 
-    [Tooltip("빛이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 0이면 0초짜리 무한 루프가 된다.")]
+    [Tooltip("상시 모션이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 빛 맥박과 원판 부유가 이 한 박을 함께 쓴다 —\n" +
+             "박이 갈리면 정점 하나가 두 군데서 따로 뛰는 것으로 읽힌다. 0이면 0초짜리 무한 루프가 된다.")]
     [Min(0.1f)]
     [SerializeField] float focusGlowCycle = 1.6f;
 
-    [Tooltip("발밑 그림자. 클리어한 정점은 낮게 앉아 길의 일부처럼 읽혀야 한다.")]
+    [Tooltip("맥박의 정점에서 빛이 부푸는 배율. 알파만 오가면 밝은 배경에 묻힌다 — 크기가 함께 변해야 맥이 뛴다.")]
+    [SerializeField] float focusGlowPulseScale = 1.12f;
+
+    [Tooltip("원판이 떠오르는 높이(px). 지도에서 자리를 옮기는 것은 이 정점 하나뿐이라, 빛과 달리 배경에 묻히지 않는다.\n" +
+             "미는 축이 y라서 원판을 두고 다투는 스케일 연출들(선물·해금 펀치·도장 반동)과 겹치지 않는다.")]
+    [SerializeField] float bobHeight = 6f;
+
+    [Tooltip("발밑 그림자. 클리어한 정점은 낮게 앉아 길의 일부처럼 읽혀야 한다.\n" +
+             "부유 중엔 이 그림자가 함께 물러나야 한다 — 고정된 그림자 위에서 원판만 오르내리면 뜨는 것이 아니라 떠는 것이 된다.")]
     [SerializeField] Image shadowImage;
     [SerializeField] float clearedShadowAlpha = 0.2f;
+
+    [Tooltip("가장 높이 떴을 때의 그림자 크기·알파 배율(저작값 대비).")]
+    [SerializeField] float bobShadowScale = 0.88f;
+
+    [Range(0f, 1f)]
+    [SerializeField] float bobShadowAlpha = 0.6f;
 
     [Tooltip("클리어한 정점의 초상 색. 채도를 빼면 잠김과 안 갈리므로 밝기만 한 단 낮춘다.")]
     [SerializeField] Color clearedPortraitTint = new Color(0.85f, 0.85f, 0.85f, 1f);
@@ -146,10 +161,15 @@ public class TournamentNodeView : MonoBehaviour
 
     // 그림자·종류 표식의 저작값. 상태가 풀리면 여기로 돌아간다.
     float? m_shadowAlpha0;
+    Vector3 m_shadowScale0 = Vector3.one;
     Color? m_kindColor0;
 
-    // 포커스 빛의 호흡. 도전할 정점에만 돈다.
-    Tween m_glowIdle;
+    // 원판의 저작 자리. 부유가 끝나면 여기로 돌아간다(무한 Yoyo는 아무 자리에서나 죽는다).
+    Vector2? m_bobHome;
+
+    // 도전할 정점의 상시 모션(빛 맥박 + 원판 부유 + 그림자 연동)을 한 손잡이에 묶는다.
+    // 따로 돌리면 트윈마다 시작 프레임이 갈려 같은 박으로 안 뛴다.
+    Sequence m_idleSeq;
 
     // 클리어 도장(1회). 도는 동안 Refresh가 정지 상태로 덮지 않게 여기로 확인한다.
     Sequence m_stampSeq;
@@ -213,7 +233,7 @@ public class TournamentNodeView : MonoBehaviour
         this.ApplyLockedTone(t_locked);
         this.ApplyStateScale(t_cleared, t_playable || t_gift);
         this.ApplyStampRest(t_cleared);
-        this.ApplyFocusGlow(t_playable);
+        this.ApplyIdleMotion(t_playable);
         this.ApplyShadow(t_cleared);
     }
 
@@ -319,7 +339,7 @@ public class TournamentNodeView : MonoBehaviour
     void OnDisable()
     {
         this.KillGiftTweens();
-        this.KillGlowTween();
+        this.KillIdleMotion();
 
         // 반쯤 떨어진 도장이 그대로 굳으면 다음에 맵을 열었을 때 배지가 3배로 떠 있다.
         this.KillStampTweens();
@@ -342,28 +362,83 @@ public class TournamentNodeView : MonoBehaviour
         t_root.localScale = Vector3.one * t_scale;
     }
 
-    // 도전할 정점의 빛만 숨쉰다. 멈춘 빛은 지도에 깔린 스물넷 중 하나를 집어내지 못한다.
-    void ApplyFocusGlow(bool _playable)
+    // 도전할 정점만 상시 움직인다 — 지도에서 살아 있는 자리가 하나뿐이어야 "지금 여기"가 성립한다.
+    // 빛의 세기·크기와 원판의 높이·그림자를 한 시퀀스에 넣어 같은 박으로 뛰게 한다.
+    void ApplyIdleMotion(bool _playable)
     {
-        if (this.focusGlow == null) return;
-
         if (!_playable)
         {
-            this.KillGlowTween();
+            this.KillIdleMotion();
             return;
         }
 
-        if (this.m_glowIdle != null && this.m_glowIdle.IsActive()) return;
+        if (this.m_idleSeq != null && this.m_idleSeq.IsActive()) return;
 
-        Color t_color = this.focusGlow.color;
-        t_color.a = this.focusGlowLow;
-        this.focusGlow.color = t_color;
+        this.EnsureIdleHome();
 
-        this.m_glowIdle = this.focusGlow
-            .DOFade(this.focusGlowHigh, this.focusGlowCycle * 0.5f)
-            .SetEase(Ease.InOutSine)
-            .SetLoops(-1, LoopType.Yoyo)
-            .SetLink(this.gameObject);
+        float t_half = this.focusGlowCycle * 0.5f;
+        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
+        bool t_any = false;
+
+        // 빛 — 세기와 크기가 함께 오른다. 알파만으로는 밝은 배경 위에서 맥이 안 잡힌다.
+        if (this.focusGlow != null)
+        {
+            SetAlpha(this.focusGlow, this.focusGlowLow);
+            this.focusGlow.rectTransform.localScale = Vector3.one;
+
+            t_seq.Insert(0f, this.focusGlow.DOFade(this.focusGlowHigh, t_half).SetEase(Ease.InOutSine));
+            t_seq.Insert(0f, this.focusGlow.rectTransform.DOScale(this.focusGlowPulseScale, t_half).SetEase(Ease.InOutSine));
+            t_any = true;
+        }
+
+        // 원판 — y로만 민다. 이 대상의 스케일은 선물·해금 펀치·도장이 나눠 쥐고 있어 건드리면 안 된다.
+        if (this.giftPunchTarget != null && this.bobHeight > 0f && this.m_bobHome != null)
+        {
+            this.giftPunchTarget.anchoredPosition = this.m_bobHome.Value;
+
+            t_seq.Insert(0f, this.giftPunchTarget
+                .DOAnchorPosY(this.m_bobHome.Value.y + this.bobHeight, t_half).SetEase(Ease.InOutSine));
+            t_any = true;
+
+            // 그림자가 함께 물러나야 "떠올랐다"가 된다(고정 그림자 위의 상하 운동은 떨림으로 읽힌다).
+            if (this.shadowImage != null)
+            {
+                RectTransform t_shadow = this.shadowImage.rectTransform;
+                t_shadow.localScale = this.m_shadowScale0;
+                SetAlpha(this.shadowImage, this.m_shadowAlpha0.Value);
+
+                t_seq.Insert(0f, t_shadow.DOScale(this.m_shadowScale0 * this.bobShadowScale, t_half).SetEase(Ease.InOutSine));
+                t_seq.Insert(0f, this.shadowImage
+                    .DOFade(this.m_shadowAlpha0.Value * this.bobShadowAlpha, t_half).SetEase(Ease.InOutSine));
+            }
+        }
+
+        // 아무것도 안 물렸으면 빈 시퀀스가 즉시 완료돼 손잡이만 남는다.
+        if (!t_any)
+        {
+            t_seq.Kill();
+            return;
+        }
+
+        t_seq.SetLoops(-1, LoopType.Yoyo);
+        this.m_idleSeq = t_seq;
+    }
+
+    // 상시 모션이 되돌릴 자리. 그림자 저작값은 ApplyShadow와 함께 쓴다.
+    void EnsureIdleHome()
+    {
+        if (this.m_bobHome == null && this.giftPunchTarget != null)
+            this.m_bobHome = this.giftPunchTarget.anchoredPosition;
+
+        this.EnsureShadowHome();
+    }
+
+    void EnsureShadowHome()
+    {
+        if (this.shadowImage == null || this.m_shadowAlpha0 != null) return;
+
+        this.m_shadowAlpha0 = this.shadowImage.color.a;
+        this.m_shadowScale0 = this.shadowImage.rectTransform.localScale;
     }
 
     /// <summary>클리어 도장(수령 직후 1회). 상태는 이미 커밋됐고, 이건 그 프레임에 얹는 사건이다.</summary>
@@ -452,10 +527,21 @@ public class TournamentNodeView : MonoBehaviour
         this.m_stampSeq = null;
     }
 
-    void KillGlowTween()
+    // 무한 Yoyo는 완료로 끝나지 않아 아무 자리에서나 죽는다 — 뜬 원판·부푼 빛·줄어든 그림자를 손으로 세운다.
+    void KillIdleMotion()
     {
-        if (this.m_glowIdle != null && this.m_glowIdle.IsActive()) this.m_glowIdle.Kill();
-        this.m_glowIdle = null;
+        if (this.m_idleSeq == null) return;
+
+        if (this.m_idleSeq.IsActive()) this.m_idleSeq.Kill();
+        this.m_idleSeq = null;
+
+        if (this.focusGlow != null) this.focusGlow.rectTransform.localScale = Vector3.one;
+        if (this.giftPunchTarget != null && this.m_bobHome != null) this.giftPunchTarget.anchoredPosition = this.m_bobHome.Value;
+
+        if (this.shadowImage == null) return;
+
+        this.shadowImage.rectTransform.localScale = this.m_shadowScale0;
+        if (this.m_shadowAlpha0 != null) SetAlpha(this.shadowImage, this.m_shadowAlpha0.Value);
     }
 
     // 클리어한 정점은 그림자를 낮춰 바닥에 앉힌다. 크기 축과 같은 말을 그림자로 한 번 더 한다.
@@ -463,11 +549,12 @@ public class TournamentNodeView : MonoBehaviour
     {
         if (this.shadowImage == null) return;
 
-        if (this.m_shadowAlpha0 == null) this.m_shadowAlpha0 = this.shadowImage.color.a;
+        this.EnsureShadowHome();
 
-        Color t_color = this.shadowImage.color;
-        t_color.a = _cleared ? this.clearedShadowAlpha : this.m_shadowAlpha0.Value;
-        this.shadowImage.color = t_color;
+        // 부유가 도는 중이면 그림자는 그쪽이 쥔다 — 여기서 덮으면 매 Refresh마다 한 프레임이 튄다.
+        if (this.m_idleSeq != null && this.m_idleSeq.IsActive()) return;
+
+        SetAlpha(this.shadowImage, _cleared ? this.clearedShadowAlpha : this.m_shadowAlpha0.Value);
     }
 
     // 수령 대기의 상시 상태(흔들림). 그림 교체는 ApplyPortrait가 쥐고, 등장 연출은 여기서 돌리지 않는다 —

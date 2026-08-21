@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 295194958856629777}
   - component: {fileID: 8356755850377313475}
   - component: {fileID: 4702734583765009455}
+  - component: {fileID: 8801220000000000011}
   m_Layer: 0
   m_Name: TopFog
   m_TagString: Untagged
@@ -207,6 +208,7 @@ GameObject:
   - component: {fileID: 3737722962652829203}
   - component: {fileID: 6854846104047088865}
   - component: {fileID: 5106823298118884605}
+  - component: {fileID: 8801220000000000012}
   m_Layer: 0
   m_Name: BottomFog
   m_TagString: Untagged
@@ -685,3 +687,45 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &8801220000000000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2387639663242054126}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c7b1e9a4d2f48a6b95c0e71fd83ab24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: {fileID: 295194958856629777}
+  driftX: 26
+  periodX: 13
+  driftY: 9
+  periodY: 9
+  fade: {fileID: 4702734583765009455}
+  fadeAmount: 0.12
+  fadePeriod: 11
+  phase: 0
+--- !u!114 &8801220000000000012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2902789026409314515}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c7b1e9a4d2f48a6b95c0e71fd83ab24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: {fileID: 3737722962652829203}
+  driftX: 26
+  periodX: 13
+  driftY: 9
+  periodY: 9
+  fade: {fileID: 5106823298118884605}
+  fadeAmount: 0.12
+  fadePeriod: 11
+  phase: 0.37
