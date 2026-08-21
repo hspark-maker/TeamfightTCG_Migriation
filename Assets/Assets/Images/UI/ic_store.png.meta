@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 4ae51f75cd49a6e44bd08095f8d3a211
+AssetOrigin:
+  serializedVersion: 1
+  productId: 311704
+  packageName: Simple UI Icons
+  packageVersion: 1.1
+  assetPath: Assets/HardArtcore/UI/SimpleIcons/Sprites/Icons/Border/ic_store.png
+  uploadId: 742599
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -75,7 +82,7 @@ TextureImporter:
     maxTextureSize: 512
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -167,10 +174,3 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 311704
-  packageName: Simple UI Icons
-  packageVersion: 1.1
-  assetPath: Assets/HardArtcore/UI/SimpleIcons/Sprites/Icons/Border/ic_store.png
-  uploadId: 742599
