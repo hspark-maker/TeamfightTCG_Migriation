@@ -419,10 +419,9 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
-  claimHoldIn: 0.1
+  claimHoldIn: 0.45
   linkDotDuration: 0.15
   linkDotStagger: 0.06
-  claimHoldOut: 0.1
 --- !u!1 &5063594569244960649
 GameObject:
   m_ObjectHideFlags: 0
