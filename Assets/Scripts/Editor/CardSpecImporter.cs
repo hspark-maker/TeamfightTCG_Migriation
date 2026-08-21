@@ -33,7 +33,7 @@ public static class CardSpecImporter
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
-        "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
+        "hp2", "hp3", "hp4",
         "cardExplain", "grade",
     };
 

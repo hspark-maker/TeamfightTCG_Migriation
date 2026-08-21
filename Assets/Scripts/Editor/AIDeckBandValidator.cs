@@ -46,7 +46,7 @@ public static class AIDeckBandValidator
             int t_level = t_rank.AiCardLevelAt(t_tier);
             List<AIDeckConfig.DeckEntry> t_candidates = CandidatesAt(t_config, t_tier);
             int t_totalWeight = TotalWeight(t_candidates);
-            t_report.Append($"Tier {t_tier} / AI Lv{t_level}: ");
+            t_report.Append($"Tier {t_tier} / AI {GrowthStar.Label(t_level)}: ");
 
             if (t_candidates.Count == 0)
             {
@@ -123,7 +123,7 @@ public static class AIDeckBandValidator
             int t_aiLevel = _rank.AiCardLevelAt(t_entry.fromTier);
             int t_identityLevel = IdentityLevelOf(t_entry, _growth);
             if (t_aiLevel < t_identityLevel)
-                _errors.Add($"AI 덱 '{t_name}'는 Tier {t_entry.fromTier}의 AI Lv{t_aiLevel}에서 완전히 발현되지 않습니다. 필요 Lv{t_identityLevel}: {LockedFeatures(t_entry, t_aiLevel, _growth)}");
+                _errors.Add($"AI 덱 '{t_name}'는 Tier {t_entry.fromTier}의 AI {GrowthStar.Label(t_aiLevel)}에서 완전히 발현되지 않습니다. 필요 {GrowthStar.Label(t_identityLevel)}: {LockedFeatures(t_entry, t_aiLevel, _growth)}");
         }
     }
 
@@ -194,9 +194,9 @@ public static class AIDeckBandValidator
         if (_entry?.cards != null)
             foreach (CardData t_card in _entry.cards)
                 if (t_card != null && t_card.keywordUnlockLevel > _aiLevel)
-                    t_locked.Add($"{t_card.displayName} 키워드(Lv{t_card.keywordUnlockLevel})");
+                    t_locked.Add($"{t_card.displayName} 키워드({GrowthStar.Label(t_card.keywordUnlockLevel)})");
         if (!_growth.SynergyUnlockedAt(_aiLevel) && SynergyResolver.Resolve(_entry?.cards).Active.Count > 0)
-            t_locked.Add($"시너지(Lv{_growth.FirstEvolutionLevel})");
+            t_locked.Add($"시너지({GrowthStar.Label(_growth.FirstEvolutionLevel)})");
         return string.Join(", ", t_locked);
     }
 

@@ -41,8 +41,10 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] float      growthIconPulse = 0.12f;
     [Tooltip("부풀었다 돌아오는 데 걸리는 시간. 섬광이 물러나는 동안 안에서 끝나야 '드러나며 강조된다'로 읽힌다.")]
     [SerializeField] float      growthFlashDuration = 0.45f;
-    [Tooltip("강화 레벨 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
+    [Tooltip("성장 성급 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
     [SerializeField] TMP_Text   levelText;
+    [Tooltip("고정 3칸 성장 별. 프리팹에서 미리 저작하고 런타임에는 채움 상태만 바꾼다.")]
+    [SerializeField] Image[]    growthStars;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
 
@@ -394,10 +396,26 @@ public class CardVisualView : MonoBehaviour
     /// 값의 기준만 갈린다(내 카드=내 진행도, 상대=랭크 티어 AI 레벨). 판정은 DeckPower가 소유.</summary>
     void SetLevelDisplay(CardData _card, bool _show, bool _mine)
     {
-        if (this.levelText == null) return;
+        int t_level = DeckPower.LevelOf(_card, _mine);
+        if (this.levelText != null)
+        {
+            this.levelText.gameObject.SetActive(_show);
+            if (_show) this.levelText.text = GrowthStar.Label(t_level);
+        }
 
-        this.levelText.gameObject.SetActive(_show);
-        if (_show) this.levelText.text = $"Lv{DeckPower.LevelOf(_card, _mine)}";
+        if (this.growthStars == null) return;
+
+        int t_star = GrowthStar.FromLevel(t_level);
+        for (int t_i = 0; t_i < this.growthStars.Length; t_i++)
+        {
+            Image t_icon = this.growthStars[t_i];
+            if (t_icon == null) continue;
+
+            t_icon.gameObject.SetActive(_show);
+            Color t_color = t_icon.color;
+            t_color.a = t_i < t_star ? 1f : 0.22f;
+            t_icon.color = t_color;
+        }
     }
 
     void SetHpDisplay(CardData _card, bool _show, bool _mine)

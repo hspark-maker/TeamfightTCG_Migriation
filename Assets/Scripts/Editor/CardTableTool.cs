@@ -65,7 +65,7 @@ public static partial class CardTableTool
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
-        "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
+        "hp2", "hp3", "hp4",
         "cardExplain", "grade",
     };
 
@@ -74,11 +74,11 @@ public static partial class CardTableTool
         "열: " + string.Join(", ", Columns) + "\n\n" +
         "· id : 카드 고유 번호. 한 번 부여하면 바꾸지 않는다. 빈칸이면 남은 번호를 자동 부여한다.\n" +
         "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
-        "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림.\n" +
+        "· keywordUnlockLevel : keywords가 열리는 내부 성장값. 0/빈칸 = 0성부터, 2 = 1성부터 열림.\n" +
         "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
         "· grade : 카드 희소 등급 이름(Silver/Gold/Prism). 빈칸 = Unknown(미배정).\n" +
         "  숫자나 모르는 이름은 값을 바꾸지 않고 경고만 남긴다.\n" +
-        "· hp2~hp10 : 그 레벨 진입 시 증가 HP. 강화는 Lv2부터라 그 아래 열은 없다. 9칸 전부 비면\n" +
+        "· hp2~hp4 : 각 성급 진입 시 증가 HP(내부값 2~4 = 1~3성). 3칸 전부 비면\n" +
         "  CardGrowthConfig 전역식, 하나라도 채우면 나머지 빈칸은 0으로 저장된다.\n" +
         "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
         "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
@@ -475,7 +475,7 @@ public static partial class CardTableTool
         if (t_curveColumnCount == 0) return;
         if (t_curveColumnCount != HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1)
         {
-            _warnings.Add($"{_name}: hp2~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
+            _warnings.Add($"{_name}: hp2~hp4 열이 일부만 존재 — 기존 성장 곡선 유지");
             return;
         }
         _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();

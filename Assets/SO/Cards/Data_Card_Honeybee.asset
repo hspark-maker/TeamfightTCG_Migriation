@@ -22,7 +22,7 @@ MonoBehaviour:
   synergies: []
   battleImage: {fileID: 21300000, guid: 3598f6dd3630ec476d141ca614cf6bd5, type: 3}
   deckPreview: {fileID: 21300000, guid: 8927795470cb8804b81689efcb778d4e, type: 3}
-  hpGainByLevel: 0000000000000000020000000100000002000000010000000200000001000000010000000200000001000000
+  hpGainByLevel: 0000000000000000050000000400000004000000
   keywordUnlockLevel: 0
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 617b6cce22f19c84ead56ad3fdf3333e, type: 3}

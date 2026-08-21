@@ -40,7 +40,7 @@ public class CardData : ScriptableObject
     /// <summary>성장 곡선이 값을 갖는 첫 레벨 = 첫 강화 레벨. 바닥(<see cref="CardGrowth.BaseLevel"/>)은
     /// 강화로 도달하는 레벨이 아니라 곡선에 칸이 없다 — 표에도 hp2부터만 열이 있다.</summary>
     public const int MinHpCurveLevel = CardGrowth.BaseLevel + 1;
-    public const int MaxHpCurveLevel = 10;
+    public const int MaxHpCurveLevel = 4;
 
     /// <summary>카드 고유 번호. 에셋 이름·표 행 순서와 무관하게 카드를 가리키는 안정 키다 —
     /// 리네임·행 이동에도 이 값은 따라가지 않는다. **한 번 부여하면 바꾸지 않는다.**

@@ -58,18 +58,18 @@ public class RankConfig : ScriptableObject
     [Tooltip("티어별 AI 카드 레벨. index = 티어 인덱스(등급×4 + 단계-1). 짧으면 마지막 값이 이어진다.")]
     public List<int> aiCardLevels = new List<int>
     {
-        1, 1, 2, 2,      // 브론즈 1~4 — 플레이어보다 확실히 약하다
-        3, 3, 4, 5,      // 실버   1~4 — 따라붙어 실버 끝에서 동급
-        6, 6, 7, 7,      // 골드   1~4 — 여기서부터 플레이어보다 강하다
-        8, 8, 9, 9,      // 플래티넘 1~4
-        10, 10, 10, 10,  // 다이아  1~4 — 만렙
+        1, 1, 1, 2,
+        2, 2, 2, 3,
+        3, 3, 3, 3,
+        3, 4, 4, 4,
+        4, 4, 4, 4,
     };
 
     [Tooltip("AI 카드 레벨 하향 편차. 티어 레벨보다 최대 이만큼 낮은 카드가 섞인다. 0이면 하향 없음.")]
-    public int aiLevelSpreadDown = 1;
+    public int aiLevelSpreadDown = 0;
 
     [Tooltip("AI 카드 레벨 상향 편차. 티어 레벨보다 최대 이만큼 높은 카드가 섞인다. 0이면 상향 없음.")]
-    public int aiLevelSpreadUp = 1;
+    public int aiLevelSpreadUp = 0;
 
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
