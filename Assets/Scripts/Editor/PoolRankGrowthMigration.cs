@@ -19,9 +19,9 @@ using UnityEngine.UI;
 /// </summary>
 static class PoolRankGrowthMigration
 {
-    const string RankOverlay    = "Assets/Assets/Prefabs/UI/LobbyUI/RankRewardOverlay.prefab";
-    const string GrowthOverlay  = "Assets/Assets/Prefabs/UI/LobbyUI/KeywordGrowthOverlay.prefab";
-    const string ClaimPopup     = "Assets/Assets/Prefabs/UI/LobbyUI/RewardClaimPopup.prefab";
+    const string RankOverlay    = "Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab";
+    const string GrowthOverlay  = "Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab";
+    const string ClaimPopup     = "Assets/Assets/Prefabs/UI/PooledUI/RewardClaimPopup.prefab";
 
     /// <summary>풀 uiRoot(Boot 캔버스)가 400이다. 수령 팝업은 그 위에 서야 한다.</summary>
     const int ClaimPopupSortingOrder = 410;

@@ -7,11 +7,13 @@ using TMPro;
 
 // 보상 수령 팝업. 표시와 확인 콜백만 담당하고 지급은 호출자가 자기 매니저에 위임한다 —
 // 그래서 랭크 티어든 앨범 완성이든 출처를 알 필요가 없다(제목 + RewardLine 목록이면 뜬다).
-// 씬에 직접 저작되므로 PooledUIBase가 아니라 SetActive 토글로 동작한다.
 //
-// ⚠ 어느 탭에도 속하지 않는 공용 1개다. 랭크 오버레이 밑에 두면 그 오버레이를 켜야만 뜨므로,
-//   앨범 수령에서 랭크 보상 목록이 뒤에 같이 켜진다 — 반드시 두 오버레이의 형제로 선다.
-public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
+// ⚠ 어느 탭에도 속하지 않는 공용 1개다. 도감·랭크·상점 셋이 같은 팝업을 부르므로 탭 프리팹에 사본을 두면
+//   저작본이 세 벌로 갈린다 → UIPoolManager가 세우는 풀드 UI다(프리팹은 Addressables "UIPrefab" 라벨).
+//
+// 풀 캔버스(order 400) 위에 서야 랭크 보상 목록(같은 풀) 위에 뜬다 —
+// 프리팹 루트에 Canvas overrideSorting=1 / sortingOrder=410 + GraphicRaycaster가 저작돼 있다. 떼지 말 것.
+public class RewardClaimPopup : PooledUIBase
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
@@ -55,20 +57,29 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 이 팝업이 세운 분출. 딤을 눌러 닫고 다음 행을 바로 수령할 수 있어 두 연출이 겹친다.
     Sequence m_burst;
 
-    /// <summary>
-    /// 씬의 공용 팝업을 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
-    /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).
-    /// </summary>
-    public static bool TryGet(out RewardClaimPopup _popup)
-        => TryGetExisting(out _popup);
+    // 이번 표시의 보상 칸 수. 등장 안무(ApplyCount)가 Show에서 필요한데 값은 Initialization에서 확정된다.
+    int m_rewardCount;
 
     /// <summary>
-    /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
+    /// 보상을 띄운다. 풀이 Initialization → Show 순으로 부르므로 여기는 <b>값 채우기</b>만 한다 —
+    /// 보이기와 등장 안무는 <see cref="Show"/>다. 둘을 한 메서드에 두면 풀이 재사용 인스턴스에
+    /// Show를 한 번 더 불러 안무가 두 번 돈다.
+    ///
+    /// onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
     /// 실패(팝업이 뜬 사이 상태가 바뀜)면 분출 없이 닫는다.
     /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm, bool _claimOnDim = false)
+    public override void Initialization(UIData _data)
     {
-        this.m_onConfirm = _onConfirm;
+        this.data = _data;
+
+        var t_data = _data as RewardClaimPopupData;
+        if (t_data == null)
+        {
+            Debug.LogError("[RewardClaimPopup] RewardClaimPopupData가 아니면 띄울 보상이 없다.", this);
+            return;
+        }
+
+        this.m_onConfirm = t_data.onConfirm;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         this.KillIntro();
@@ -76,17 +87,18 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         // 직전 분출의 소유권도 뗀다. 안 떼면 옛 분출의 종료 콜백이 방금 연 이 팝업을 닫는다(수령 경로와 같은 이유).
         this.m_burst = null;
 
-        var t_rewards = _rewards ?? Array.Empty<RewardLine>();
+        var t_rewards = t_data.rewards ?? Array.Empty<RewardLine>();
+        this.m_rewardCount = t_rewards.Count;
 
         this.m_rewards.Clear();
         for (int t_i = 0; t_i < t_rewards.Count; t_i++) this.m_rewards.Add(t_rewards[t_i].Gain);
 
-        if (this.titleText != null) this.titleText.text = _title;
+        if (this.titleText != null) this.titleText.text = t_data.title;
         this.BindRewardSlots(t_rewards);
 
         if (this.claimButton != null)
         {
-            this.claimButton.gameObject.SetActive(!_claimOnDim);
+            this.claimButton.gameObject.SetActive(!t_data.claimOnDim);
             this.claimButton.onClick.RemoveAllListeners(); // 재표시마다 중복 등록 방지
             this.claimButton.onClick.AddListener(this.OnClaimClicked);
         }
@@ -94,14 +106,19 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         if (this.dimButton != null)
         {
             this.dimButton.onClick.RemoveAllListeners();
-            if (_claimOnDim) this.dimButton.onClick.AddListener(this.OnClaimClicked);
+            if (t_data.claimOnDim) this.dimButton.onClick.AddListener(this.OnClaimClicked);
             else this.dimButton.onClick.AddListener(this.Hide);
         }
+    }
+
+    public override void Show()
+    {
+        this.isShow = true;
 
         this.SetVisible(true);
 
         this.dimTint.Capture();
-        this.reveal.ApplyCount(t_rewards.Count);
+        this.reveal.ApplyCount(this.m_rewardCount);
 
         // 등장이 도는 동안은 손을 막는다 — 보상이 다 서기 전에 눌러 닫히면 무엇을 받았는지 못 본다.
         this.SetInputEnabled(false);
@@ -111,12 +128,32 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.m_intro.SetLink(this.gameObject).Play();
     }
 
-    public void Hide()
+    public override void Hide()
     {
+        this.isShow      = false;
         this.m_onConfirm = null;
         this.KillIntro();
         this.SetVisible(false);
     }
+
+    /// <summary>수령 팝업을 띄우는 유일한 창구. 풀이 없으면(부트 미초기화) false —
+    /// 호출부는 확인 없이 바로 지급하는 폴백으로 내려간다(배선 전에도 루프가 닫히도록).</summary>
+    public static bool TryShow(string _title, IReadOnlyList<RewardLine> _rewards,
+                               Func<bool> _onConfirm, bool _claimOnDim = false)
+    {
+        if (UIPoolManager.Instance == null) return false;
+
+        return UIPoolManager.Instance.AddOrUpdateUI<RewardClaimPopup>(new RewardClaimPopupData
+        {
+            title      = _title,
+            rewards    = _rewards,
+            onConfirm  = _onConfirm,
+            claimOnDim = _claimOnDim,
+        }) != null;
+    }
+
+    /// <summary>떠 있으면 닫는다. 없으면 아무 일도 하지 않는다(풀이 세운 적 없으면 GetUI가 null).</summary>
+    public static void HideIfOpen() => UIPoolManager.Instance?.GetUI<RewardClaimPopup>()?.Hide();
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [획득]도 딤도 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
@@ -263,4 +300,18 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     }
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
+}
+
+/// <summary>수령 팝업 한 번의 표시분. rewards는 <b>호출부가 매번 새로 만든 목록</b>이어야 한다 —
+/// 팝업이 표시 시점 스냅샷을 들고 있다가 [획득]에서 소비하므로 공용 버퍼를 돌려주면 stale이 된다.</summary>
+public sealed class RewardClaimPopupData : UIData
+{
+    public string title;
+    public IReadOnlyList<RewardLine> rewards;
+
+    /// <summary>[획득]이 부른다. <b>지급 성공 여부</b>를 돌려줘야 한다(실패면 분출 없이 닫는다).</summary>
+    public Func<bool> onConfirm;
+
+    /// <summary>true면 [획득] 버튼 없이 배경(딤)을 눌러 받는다.</summary>
+    public bool claimOnDim;
 }

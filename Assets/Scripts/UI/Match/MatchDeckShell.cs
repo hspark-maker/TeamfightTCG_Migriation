@@ -13,15 +13,13 @@ using UnityEngine.UI;
 public class MatchDeckShell : MonoBehaviour
 {
     [SerializeField] GameObject matchPanel;   // MatchDeckPanel 인스턴스
-    [SerializeField] GameObject editPanel;    // MatchDeckEditPanel 인스턴스
 
     [Header("컨트롤러")]
-    [SerializeField] MatchDeckPanelView       panelView;
-    [SerializeField] DeckEditController       editController;
-    [SerializeField] MatchDeckStripController strip;
+    [SerializeField] MatchDeckPanelView panelView;
 
-    // 편집 패널 좌하단 뒤로가기. 배리언트에서 원본 BackButton을 삭제했으므로 편집 화면의 유일한 종료 경로다.
-    [SerializeField] Button editBackButton;
+    // 편집 화면은 이 프리팹 안에 없다 — 로비 덱 탭과 같은 한 인스턴스를 풀에서 받아 쓴다.
+    // 가로 덱 리스트·뒤로가기 버튼도 그 프리팹 안에 있고, 켜고 끄는 축은 DeckEditData가 실어 보낸다.
+    bool m_editing;
 
     // 현재 선택된 저장 슬롯. 유효한 덱이 하나도 없으면 -1.
     public int SelectedSlot { get; private set; } = -1;
@@ -31,9 +29,6 @@ public class MatchDeckShell : MonoBehaviour
 
     EGate m_gate = EGate.Pending;
 
-    // 루트가 비활성인 채로 Open이 불릴 수 있다(SetActive가 Awake를 동기 실행하지만 순서에 기대지 않는다).
-    bool m_wired;
-
     // 게이트가 열려 있는가. 화면이 켜졌는지로 판정하지 않는 이유는 전환이 이 화면을 게이트보다 "먼저" 세우기 때문이다
     // (PrepareForHandoff) — 켜짐을 진행 중으로 읽으면 정작 진짜 진입이 중복으로 걸려 그대로 포기 처리된다.
     bool m_selecting;
@@ -41,31 +36,14 @@ public class MatchDeckShell : MonoBehaviour
     // 전환이 이미 세워 둔 화면인가. 다시 열면 등장 안무가 세운 알파·배율이 저작값으로 되돌아간다.
     bool m_prepared;
 
-    void Awake()
+    // 편집 화면이 떠 있으면 내린다. 저장 판정은 편집기의 뒤로가기(RequestLeave)가 이미 거쳤다고 본다 —
+    // 여기서 부르는 경로는 전부 "이미 나가기로 결정된" 뒤다.
+    void HideEditorIfOpen()
     {
-        EnsureWired();
-    }
+        if (!m_editing) return;   // 연 적이 없으면 풀에 묻지 않는다(GetUI가 "No Such UI" 로그를 남긴다)
 
-    // 배선은 한 번만. 편집 종료 훅과 뒤로가기 버튼을 여기서 건다 —
-    // 프리팹 onClick으로 배선하면 셸이 모르는 종료 경로가 생겨 복귀 후 MySection 갱신을 놓친다.
-    void EnsureWired()
-    {
-        if (m_wired) return;
-        m_wired = true;
-
-        if (editController != null) editController.SetExitHandler(OnEditorExit);
-
-        if (editBackButton != null)
-        {
-            editBackButton.onClick.RemoveAllListeners();
-            // 셸이 아니라 컨트롤러로 직행한다 — 저장 판정·미완성 확인 팝업은 RequestLeave 한 곳에만 있다.
-            editBackButton.onClick.AddListener(OnEditBackClicked);
-        }
-        else
-        {
-            // 원본 BackButton을 배리언트에서 지웠기 때문에, 이게 없으면 편집 화면에서 나갈 방법이 전혀 없다.
-            Debug.LogError("[MatchDeckShell] editBackButton 미배선 — 편집 화면에서 빠져나올 수 없다.");
-        }
+        m_editing = false;
+        DeckEditController.HidePooled();
     }
 
     // 전투 시작 게이트. 호스트(LobbyMatchLauncher)가 씬을 로드하기 "전에" 이걸 await 하고,
@@ -144,12 +122,10 @@ public class MatchDeckShell : MonoBehaviour
     // _slotIndex가 음수면 이전 선택 → 첫 유효 슬롯 순으로 알아서 고른다.
     public void Open(int _slotIndex = -1)
     {
-        // 루트를 켜기 전에 편집 패널을 내린다 — 비활성 부모 아래에선 OnEnable이 돌지 않으므로,
-        // 편집 패널의 튜토리얼 앵커(로비 덱 편집과 키를 공유한다)가 켜졌다 꺼지며 로비 쪽 등록을 지우는 일이 없다.
-        if (editPanel != null) editPanel.SetActive(false);
+        // 루트를 켜기 전에 편집 화면을 내린다 — 편집 화면은 풀 캔버스에 살아서 이 루트를 꺼도 같이 꺼지지 않는다.
+        HideEditorIfOpen();
 
         gameObject.SetActive(true);
-        EnsureWired();
 
         SelectedSlot = ResolveSlot(_slotIndex);
 
@@ -161,16 +137,17 @@ public class MatchDeckShell : MonoBehaviour
 
     public void Close()
     {
-        // 편집 중 닫히는 경로는 없지만(편집은 뒤로가기로만 나간다), 패널이 켜진 채 루트가 꺼지면
-        // DeckEditController.OnDisable이 편집 상태를 무저장 폐기한다 — 그게 이 화면의 사양이다.
+        // 편집 중 닫히는 경로는 없지만(편집은 뒤로가기로만 나간다), 편집 화면은 풀 캔버스에 살아서
+        // 이 루트를 꺼도 같이 꺼지지 않는다 — 남으면 로비 위에 편집 화면만 떠 있는 상태가 된다.
+        // 내리면 DeckEditController.OnDisable이 편집 상태를 무저장 폐기한다 — 그게 이 화면의 사양이다.
+        HideEditorIfOpen();
+
         gameObject.SetActive(false);
     }
 
     // 매치 패널 EditButton. 편집 대상은 지금 선택된 덱이다.
     public void OpenEditor()
     {
-        EnsureWired();
-
         SelectedSlot = ResolveSlot(SelectedSlot);
 
         // 매치 화면은 신규 덱 생성을 지원하지 않는다(가로 리스트에 + 칸이 없다) → 편집할 원본이 없으면 열지 않는다.
@@ -181,13 +158,25 @@ public class MatchDeckShell : MonoBehaviour
             return;
         }
 
-        if (matchPanel != null) matchPanel.SetActive(false);
-        if (editPanel  != null) editPanel.SetActive(true);
+        // 가로 리스트와 뒤로가기는 편집 화면이 자기 안에서 세운다 — 셸은 "무엇을 켤지"만 실어 보낸다.
+        // 리스트 선택 표시는 편집기가 여는 순간 이미 맞아 있다(같은 데이터로 한 번에 세우므로
+        // "잠깐 다른 칸이 선택돼 보이는" 한 프레임이 없다).
+        DeckEditController t_editor = DeckEditController.OpenPooled(new DeckEditData
+        {
+            slotIndex        = SelectedSlot,
+            onExit           = OnEditorExit,
+            showDeckStrip    = true,
+            showTitle        = false,   // 그 자리를 가로 덱 리스트가 쓴다
+            showDeckPower    = false,   // 리스트 칸에 이미 나와 있다
+            tutorialDeckSlot = TutorialDeckSlot(),
+            onSlotSwitched   = _slot => SelectedSlot = _slot,
+        });
 
-        // 리스트를 먼저 세운 뒤 편집기를 연다 — 편집기가 여는 순간의 선택 표시가 이미 맞아 있어야
-        // "잠깐 다른 칸이 선택돼 보이는" 한 프레임이 생기지 않는다.
-        if (strip          != null) strip.Build(SelectedSlot, OnStripSlotClicked, TutorialDeckSlot());
-        if (editController != null) editController.Open(SelectedSlot);
+        // 못 세우면 매치 패널에 머문다 — 빈 화면으로 갇히면 전투 시작 게이트가 통째로 막힌다.
+        if (t_editor == null) return;
+
+        m_editing = true;
+        if (matchPanel != null) matchPanel.SetActive(false);
     }
 
     // 선택된 덱을 씬 전환 캐리어에 싣는다. Confirm이 게이트를 열기 직전에 부르는 유일한 지점이다.
@@ -200,41 +189,20 @@ public class MatchDeckShell : MonoBehaviour
         return true;
     }
 
-    // 가로 덱 리스트 클릭. 편집 화면에 머문 채 대상 슬롯만 갈아탄다.
-    // 저장 여부(6/6이면 조용히 저장, 미만이면 폐기)는 SwitchTo가 판정한다 — 셸은 관여하지 않는다.
-    void OnStripSlotClicked(int _slotIndex)
-    {
-        if (_slotIndex == SelectedSlot) return;
-
-        // 전환이 거부되면(저장 실패 등) 선택 상태를 옮기지 않는다 —
-        // 셸의 SelectedSlot과 컨트롤러의 편집 대상이 어긋나면 복귀 후 엉뚱한 덱이 그려진다.
-        if (editController != null && !editController.SwitchTo(_slotIndex)) return;
-
-        SelectedSlot = _slotIndex;
-
-        if (strip != null) strip.SetSelected(_slotIndex);
-    }
-
-    void OnEditBackClicked()
-    {
-        // 저장·미완성 확인은 컨트롤러가 하고, 실제 복귀는 아래 OnEditorExit로 되돌아온다.
-        if (editController != null) editController.RequestExit();
-    }
-
-    // DeckEditController에 주입한 종료 훅. 로비의 DeckTabController.CloseEditor 자리다.
+    // DeckEditData에 실어 보낸 종료 훅. 로비의 DeckTabController.CloseEditor 자리다.
+    // 저장·미완성 확인은 편집 화면의 뒤로가기가 이미 거쳤다(RequestLeave 한 곳뿐이다).
     void OnEditorExit()
     {
-        if (editController != null) editController.Close();
-        if (strip          != null) strip.Clear();
+        HideEditorIfOpen();
 
         // 편집분이 저장됐을 수 있으므로 세이브에서 다시 읽어 그린다(편집기가 준 값을 받아쓰지 않는다).
         ShowMatchPanel();
     }
 
-    // 편집 패널을 반드시 함께 내린다 — 진입(Open)이 편집 도중 닫힌 상태를 물려받으면 두 패널이 겹친 채 뜬다.
+    // 편집 화면을 반드시 함께 내린다 — 풀 캔버스에 살아서 이 루트를 꺼도 같이 꺼지지 않는다.
     void ShowMatchPanel()
     {
-        if (editPanel  != null) editPanel.SetActive(false);
+        HideEditorIfOpen();
         if (matchPanel != null) matchPanel.SetActive(true);
 
         if (panelView == null) return;

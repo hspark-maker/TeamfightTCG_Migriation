@@ -5,12 +5,50 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
+/// <summary>덱 편집 한 번의 진입분. 로비 탭(DeckTabController)과 매치 셸(MatchDeckShell)이 같은 화면을
+/// 서로 다른 요구로 여는데, 그 차이를 <b>전부 여기 필드로</b> 표현한다 — 프리팹 사본이나 배리언트로 갈리지 않게.</summary>
+public sealed class DeckEditData : UIData
+{
+    /// <summary>편집할 저장 슬롯. <see cref="isNew"/>가 true면 무시한다.</summary>
+    public int slotIndex = -1;
+
+    /// <summary>신규 덱 생성. 저장 좌표는 6/6 완성 저장 시점에 정해진다(매치 화면은 쓰지 않는다).</summary>
+    public bool isNew;
+
+    /// <summary>편집 종료 시 호스트 복귀. 미주입이면 로비 탭 셸 경로를 탄다.</summary>
+    public Action onExit;
+
+    /// <summary>드래그 레이어. 프리팹이 자기 것을 들고 있으면 무시된다 —
+    /// 덱 편집을 단독으로 띄우는 테스트 씬처럼 프리팹에 없을 때만 쓰인다.</summary>
+    public DeckEditDragController dragController;
+
+    /// <summary>가로 덱 리스트를 켤지(매치 화면 전용). 로비 탭은 목록 화면이 따로 있어 쓰지 않는다.</summary>
+    public bool showDeckStrip;
+
+    /// <summary>가로 리스트에서 이번 튜토리얼 덱의 자리. -1이면 없음.</summary>
+    public int tutorialDeckSlot = -1;
+
+    /// <summary>상단 제목. 매치 화면은 가로 덱 리스트가 그 자리를 쓰므로 끈다.
+    /// (예전에는 배리언트가 노드를 아예 삭제해서 껐다 — 그래서 저작본이 둘로 갈렸다.)</summary>
+    public bool showTitle = true;
+
+    /// <summary>덱 전투력 표시. 매치 화면은 리스트 칸에 이미 나와 있어 끈다.</summary>
+    public bool showDeckPower = true;
+
+    /// <summary>가로 리스트로 다른 덱에 갈아탄 뒤. 호스트가 자기 선택 상태를 맞춘다.</summary>
+    public Action<int> onSlotSwitched;
+}
+
 // 덱 구성 화면(DeckEditPanel에 부착). 편성 상태의 진실원이자 저장 진입점.
 //
 // 편집은 전부 m_working(6칸, null 허용) 위에서만 일어나고 DeckSaveManager에는 손대지 않는다.
 // "취소하면 원상복구"를 별도 스냅샷 없이 성립시키기 위한 구조다 — 세이브를 편집 중에 건드리는 순간
 // 취소 경로에서 복원할 원본이 사라진다.
-public class DeckEditController : MonoBehaviour
+//
+// 풀드 UI다. 예전에는 로비 탭 안에 한 벌, 매치 오버레이 안에 한 벌(MatchDeckEditPanel 배리언트) —
+// 저작본이 둘로 갈려 레이아웃 오버라이드가 쌓였다. 지금은 UIPoolManager가 세우는 인스턴스 하나뿐이고
+// 두 호스트의 차이는 전부 DeckEditData로 들어온다.
+public class DeckEditController : PooledUIBase
 {
     [SerializeField] TMP_InputField    nameInput;      // 덱 이름 입력/표시
     [SerializeField] Button            backButton;
@@ -31,6 +69,17 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] Button autoEquipButton;
     [Tooltip("우측 하단 저장 버튼. 바꾼 게 있을 때만 눌린다(미배선이면 나갈 때 확인만으로 저장한다).")]
     [SerializeField] Button saveButton;
+
+    [Header("호스트별로 켜고 끄는 것 (선택)")]
+    [Tooltip("가로 덱 리스트. DeckEditData.showDeckStrip이 true일 때만 켜진다 —\n"
+           + "로비 탭은 목록 화면이 따로 있어 쓰지 않는다. 미배선이면 그 축을 통째로 건너뛴다.")]
+    [SerializeField] MatchDeckStripController deckStrip;
+
+    [Tooltip("상단 제목 노드. 매치 화면은 그 자리를 가로 덱 리스트가 쓴다.")]
+    [SerializeField] GameObject titleNode;
+
+    [Tooltip("덱 전투력 표시 노드. 매치 화면은 리스트 칸에 이미 나와 있다.")]
+    [SerializeField] GameObject deckPowerNode;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -64,15 +113,21 @@ public class DeckEditController : MonoBehaviour
     // 다시 주입해야 하면 호스트가 이 패널의 라이프사이클을 추적해야 한다.
     public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
 
-    /// <summary>드래그 컨트롤러 주입. 로비는 탭 초기화에서 넘기고, 테스트 씬은 인스펙터 배선을 그대로 쓴다.
-    /// null을 넘기면 기존 배선을 지우지 않는다 — 로비에 미배선인 경우 폴백이 살아남게.</summary>
+    /// <summary>드래그 컨트롤러 주입. <b>프리팹이 자기 것을 들고 있으면 주입을 무시한다</b> —
+    /// 풀드 UI는 자기 캔버스(order 400)에 살아서, 로비 캔버스(order 0)의 DragLayer를 주입받으면
+    /// 고스트가 패널 뒤로 깔린다. 프리팹 안에 레이어가 없는 경우(단독 테스트 씬)에만 주입이 먹는다.</summary>
     public void SetDragController(DeckEditDragController _controller)
     {
-        if (_controller != null) dragController = _controller;
+        if (dragController == null && _controller != null) dragController = _controller;
     }
 
-    void Awake()
+    // 이번 진입 요청. Open은 Show에서 돈다 — BeginEdit이 컬렉션 그리드를 세우므로 활성 상태여야 한다.
+    DeckEditData m_request;
+
+    protected override void Awake()
     {
+        base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
+
         if (backButton != null)
         {
             backButton.onClick.RemoveAllListeners();
@@ -109,6 +164,15 @@ public class DeckEditController : MonoBehaviour
 
         // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
+
+        // 열리기 전에는 반드시 꺼져 있다. 켜고 끄는 주인은 풀(Show/Hide)뿐이다.
+        //
+        // 왜 코드로 강제하나: 씬/프리팹에 저작된 인스턴스가 켜진 채로 남아 있으면
+        // (Tab_Deck의 DeckEditPanel 인스턴스가 m_IsActive=1로 저작돼 있다) 전체화면 편집 화면이
+        // 로비 위에 깔려 하단 탭바까지 클릭을 먹는다 — 예전엔 호스트의 SetActive(false)가 매번 지웠지만
+        // 그 책임이 풀로 옮겨간 지금은 "열 때만 켠다"를 여기서 불변식으로 박아야 한다.
+        // 배선은 이 위에서 이미 끝났으므로 지금 꺼도 다음 열기에 그대로 살아 있다.
+        if (!this.isShow) gameObject.SetActive(false);
     }
 
     // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
@@ -131,6 +195,114 @@ public class DeckEditController : MonoBehaviour
             collectionGrid.SetSynergyFocus(_synergy);
             collectionGrid.SetScrollLocked(t_focusing);
         }
+    }
+
+    /// <summary>풀이 넘긴 진입 요청을 받아둔다. 실제 열기는 <see cref="Show"/>다 —
+    /// 재사용 인스턴스는 이 시점에 아직 비활성이고, BeginEdit이 세우는 컬렉션 그리드는 활성이라야 레이아웃이 선다.</summary>
+    public override void Initialization(UIData _data)
+    {
+        this.data    = _data;
+        this.m_request = _data as DeckEditData;
+
+        if (this.m_request == null)
+        {
+            Debug.LogError("[DeckEditController] DeckEditData가 아니면 어느 덱을 열지 알 수 없다.", this);
+            return;
+        }
+
+        SetExitHandler(this.m_request.onExit);
+        SetDragController(this.m_request.dragController);
+    }
+
+    public override void Show()
+    {
+        if (this.m_request == null) return;
+
+        gameObject.SetActive(true);   // OnEnable이 여기서 돌아 소유 변경·해금 구독이 선다
+        this.isShow = true;
+
+        ApplyHostChrome();
+
+        if (this.m_request.isNew) OpenNew();
+        else                      Open(this.m_request.slotIndex);
+
+        BuildDeckStrip();
+    }
+
+    // 호스트마다 켜고 끄는 장식. 노드를 지우지 않고 끄기만 한다 —
+    // 예전에는 매치 배리언트가 Title·DeckPower·BackButton을 **삭제**해서 저작본이 둘로 갈렸다.
+    void ApplyHostChrome()
+    {
+        if (this.titleNode     != null) this.titleNode.SetActive(this.m_request.showTitle);
+        if (this.deckPowerNode != null) this.deckPowerNode.SetActive(this.m_request.showDeckPower);
+    }
+
+    /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
+    /// 그건 RequestLeave 한 곳뿐이고, 호스트는 허가가 떨어진 뒤에 이걸 부른다.
+    /// (곧바로 부르면 확인 없이 편성분이 사라진다.)</summary>
+    public override void Hide()
+    {
+        this.isShow = false;
+
+        Close();
+        if (this.deckStrip != null) this.deckStrip.Clear();
+
+        gameObject.SetActive(false);   // OnDisable이 드래그 고스트까지 걷는 최종 방어선
+    }
+
+    /// <summary>덱 편집을 여는 유일한 창구. 두 호스트가 같은 한 인스턴스를 쓴다.
+    /// 풀이 없으면(부트 미초기화) null — 호스트는 진입 자체를 포기해야 한다(빈 화면으로 갇히지 않게).</summary>
+    public static DeckEditController OpenPooled(DeckEditData _data)
+    {
+        if (UIPoolManager.Instance == null)
+        {
+            Debug.LogError("[DeckEditController] UIPoolManager가 없어 덱 편집을 열 수 없다 — Boot 초기화를 확인할 것.");
+
+            return null;
+        }
+
+        return UIPoolManager.Instance.AddOrUpdateUI<DeckEditController>(_data);
+    }
+
+    /// <summary>풀이 세워 둔 편집 화면. <b>편집 중임을 아는 호스트만</b> 부를 것 —
+    /// 세운 적 없으면 풀이 "No Such UI" 로그를 남긴다(상태 질의용 창구가 아니다).</summary>
+    public static DeckEditController Pooled()
+        => UIPoolManager.instance != null ? UIPoolManager.instance.GetUI<DeckEditController>() : null;
+
+    /// <summary>풀이 세워 둔 편집 화면을 닫는다. 저장 판정은 호스트가 <see cref="RequestLeave"/>로 이미 받았다고 본다.</summary>
+    public static void HidePooled() => Pooled()?.Hide();
+
+    // 가로 덱 리스트. 매치 화면만 켠다 — 로비 탭은 목록 화면이 따로 있다.
+    void BuildDeckStrip()
+    {
+        if (this.deckStrip == null) return;
+
+        bool t_show = this.m_request != null && this.m_request.showDeckStrip;
+
+        this.deckStrip.gameObject.SetActive(t_show);
+        if (!t_show)
+        {
+            this.deckStrip.Clear();
+            return;
+        }
+
+        this.deckStrip.Build(m_slotIndex, OnStripSlotClicked,
+                             this.m_request.tutorialDeckSlot);
+    }
+
+    // 가로 리스트 클릭. 편집 화면에 머문 채 대상 슬롯만 갈아탄다.
+    // 저장 여부(6/6이면 조용히 저장, 미만이면 폐기)는 SwitchTo가 판정한다.
+    void OnStripSlotClicked(int _slotIndex)
+    {
+        if (_slotIndex == m_slotIndex) return;
+
+        // 전환이 거부되면(저장 실패 등) 선택 표시를 옮기지 않는다 —
+        // 표시와 실제 편집 대상이 어긋나면 복귀 후 엉뚱한 덱이 그려진다.
+        if (!SwitchTo(_slotIndex)) return;
+
+        if (this.deckStrip != null) this.deckStrip.SetSelected(m_slotIndex);
+
+        this.m_request?.onSlotSwitched?.Invoke(m_slotIndex);
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.

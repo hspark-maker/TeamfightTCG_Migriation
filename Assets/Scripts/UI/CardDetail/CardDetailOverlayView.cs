@@ -11,8 +11,9 @@ using TMPro;
 // 카드 타일을 길게 누르면 열리고, 누른 카드의 이름·체력·키워드·시너지를 채운다.
 // 닫기 버튼은 두지 않는다 — 배경(딤)을 탭하면 닫힌다. 카드·상세 패널·조작 바 위의 탭은 닫지 않는다.
 //
-// 인게임 카드 정보창(PooledCardElement)과 달리 풀드 UI가 아니라 로비 씬에 직접 배치한다 —
-// 로비 전용 풀스크린 한 장이라 Addressables("UIPrefab" 라벨) 등록까지 갈 이유가 없다(PackOpenOverlay와 같은 결).
+// 인게임 카드 정보창(PooledCardElement)과 같은 풀드 UI다 — 도감·덱편집·상점 어느 탭에서도 열리므로
+// 탭 프리팹에 두면 저작본이 탭 수만큼 갈린다. 프리팹은 Addressables "UIPrefab" 라벨로 등록돼 있고
+// UIPoolManager가 타입으로 하나만 세운다.
 //
 // 표시 규칙은 복제하지 않는다: 카드 그림 한 장은 CardVisualView.Bind, 시너지 이름은 SynergyText,
 // 키워드 아이콘·표시명·설명은 KeywordIconConfig가 정본이다.
@@ -44,7 +45,16 @@ public readonly struct CardDetailOpenOptions
     }
 }
 
-public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
+/// <summary>상세 한 번의 표시분. cards는 <b>화면에 보이는 순서</b> 그대로여야 하고, 창은 이 목록을
+/// 복사하지 않고 참조로 든다 — 도감 재빌드가 같은 List를 재사용해도 최신 내용이 그대로 보인다.</summary>
+public sealed class CardDetailOverlayData : UIData
+{
+    public IReadOnlyList<CardData> cards;
+    public int index;
+    public CardDetailOpenOptions options;
+}
+
+public class CardDetailOverlayView : PooledUIBase, IPointerClickHandler
 {
     const string LockedName  = "???";
     const string LockedValue = "?";
@@ -199,8 +209,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
+    // 풀이 세운 인스턴스가 Awake에서 자신을 꽂는다. 정적 창구(Close·CloseEnhanceResult·IsOpen)가 쓰는 참조로,
+    // 풀 조회(GetUI)와 달리 없을 때 로그를 남기지 않는다 — 이 셋은 "안 떠 있으면 아무 일도 없음"이 정상이다.
     static CardDetailOverlayView s_instance;
-    static bool s_missingWarned;
 
     // 지금 넘겨볼 수 있는 카드들과 그 안에서의 위치. 목록은 호출처가 쥔 것을 참조로 들고 있을 뿐이라
     // 여기서 복사하거나 수정하지 않는다(도감 재빌드가 같은 List를 재사용해도 최신 내용이 그대로 보인다).
@@ -306,14 +317,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         if (_cards == null || _cards.Count == 0) return;
 
-        CardDetailOverlayView t_view = Resolve();
-        if (t_view == null) return;
+        if (UIPoolManager.Instance == null) return;   // 부트 미초기화 — Instance 게터가 1회 에러를 남긴다
 
-        // 세 축을 각각 세운다. 창을 닫을 때 셋 다 내려가므로(OnDisable) 여기서 매번 다시 세우면 그만이다.
-        t_view.m_readOnly = _options.ReadOnly;
-        t_view.LiftAbove(_options.LiftAboveAll);
-        t_view.SetFullScreen(_options.CoverFullScreen);
-        t_view.Show(_cards, _index);
+        // 세 축은 데이터로 실어 보낸다(Initialization이 세운다). 창을 닫을 때 셋 다 내려가므로(OnDisable)
+        // 열 때마다 다시 세우면 그만이다.
+        UIPoolManager.Instance.AddOrUpdateUI<CardDetailOverlayView>(new CardDetailOverlayData
+        {
+            cards   = _cards,
+            index   = _index,
+            options = _options,
+        });
     }
 
     public static void Close()
@@ -344,24 +357,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 대입(+= 아님) — 타일이 재사용·재바인딩돼도 이전 콜백이 겹쳐 남지 않는다(CardElement와 같은 관용구).
         t_press.OnTap = () => Open(_cards, _index, _options);
-    }
-
-    // 오버레이는 씬에 **비활성**으로 배치된다. 비활성 오브젝트는 Awake가 돌지 않아
-    // PackOpenOverlay식 Awake 싱글턴으로는 자신을 등록할 수 없다 → 첫 호출 때 비활성 포함으로 찾아 캐시한다.
-    // 씬이 바뀌면 참조가 죽으므로 아래 null 검사에서 자연히 재탐색된다.
-    static CardDetailOverlayView Resolve()
-    {
-        if (s_instance != null) return s_instance;
-
-        s_instance = FindFirstObjectByType<CardDetailOverlayView>(FindObjectsInactive.Include);
-
-        if (s_instance == null && !s_missingWarned)
-        {
-            s_missingWarned = true;
-            Debug.LogError("[CardDetailOverlayView] 현재 씬에 카드 상세 오버레이가 배치되지 않았습니다 — 카드를 길게 눌러도 열리지 않습니다.");
-        }
-
-        return s_instance;
     }
 
     /// <summary>지금 떠 있는 모든 캔버스 위로 올라타거나(_on), 로비 캔버스 안의 제자리로 되돌린다.
@@ -453,8 +448,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         t_rect.offsetMax = _on ? Vector2.zero : this.m_baseOffsetMax;
     }
 
-    void Awake()
+    protected override void Awake()
     {
+        base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
+
         s_instance = this;
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
@@ -573,29 +570,59 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         OnAnyClosed?.Invoke();
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();      // 풀 등록 해제
+
         if (s_instance == this) s_instance = null;
     }
 
-    // 켜는 것이 먼저다 — 비활성으로 시작한 오브젝트는 이 시점에 Awake가 돌아 닫기 버튼 배선이 성립한다.
-    // 목록·인덱스는 그보다 먼저 확정한다(SetVisible이 유발하는 OnEnable의 RefreshArrows가 이미 최신을 보게).
-    void Show(IReadOnlyList<CardData> _cards, int _index)
+    // 이번 요청에 띄울 카드가 있는가. 풀은 Initialization 실패를 모른 채 Show를 이어 부르므로
+    // 여기서 끊지 않으면 빈 창이 화면을 덮는다.
+    bool m_pendingValid;
+
+    /// <summary>표시 요청을 받아 <b>값만</b> 세운다 — 보이기는 <see cref="Show"/>다.
+    /// 세 축(읽기전용·올라타기·전체화면)은 창을 닫을 때 전부 내려가므로(OnDisable) 매번 다시 세우면 그만이다.</summary>
+    public override void Initialization(UIData _data)
     {
+        this.data           = _data;
+        this.m_pendingValid = false;
+
+        var t_data = _data as CardDetailOverlayData;
+        if (t_data == null || t_data.cards == null || t_data.cards.Count == 0)
+        {
+            Debug.LogError("[CardDetailOverlayView] 띄울 카드 목록이 없다 — CardDetailOverlayData를 넘길 것.", this);
+            return;
+        }
+
+        this.m_readOnly = t_data.options.ReadOnly;
+        LiftAbove(t_data.options.LiftAboveAll);
+        SetFullScreen(t_data.options.CoverFullScreen);
+
         // 유효 인덱스를 **확정한 뒤에** 목록을 갈아끼운다 — 전부 null인 목록에서 중도 return하면
         // m_cards만 새 목록이 되고 m_index는 이전 목록 기준으로 남아 화살표·넘기기가 엉뚱한 자리를 가리킨다.
         //
         // 요청 위치가 비었으면(드리프트로 null 슬롯) 가장 가까운 유효 카드로 물러선다 — 빈 상세를 띄우느니 낫다.
         // 탐색이 순환하므로 한 방향만 봐도 목록 전체를 훑는다(전부 null일 때만 -1).
-        int t_index = Mathf.Clamp(_index, 0, _cards.Count - 1);
-        if (_cards[t_index] == null)
+        int t_index = Mathf.Clamp(t_data.index, 0, t_data.cards.Count - 1);
+        if (t_data.cards[t_index] == null)
         {
-            t_index = FindValidIn(_cards, t_index, 1);
+            t_index = FindValidIn(t_data.cards, t_index, 1);
             if (t_index < 0) return;
         }
 
-        this.m_cards = _cards;
-        this.m_index = t_index;
+        this.m_cards        = t_data.cards;
+        this.m_index        = t_index;
+        this.m_pendingValid = true;
+    }
+
+    // 켜는 것이 먼저다 — 비활성으로 시작한 오브젝트는 이 시점에 Awake가 돌아 닫기 버튼 배선이 성립한다.
+    // 목록·인덱스는 그보다 먼저 확정한다(SetVisible이 유발하는 OnEnable의 RefreshArrows가 이미 최신을 보게).
+    public override void Show()
+    {
+        if (!this.m_pendingValid) return;
+
+        this.isShow = true;
 
         // 곧바로 Apply가 이어지므로 pending은 버린다(중간 카드에 칩을 한 번 더 짓지 않게).
         CancelSlide();
@@ -608,8 +635,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         RefreshArrows();
     }
 
-    void Hide()
+    public override void Hide()
     {
+        this.isShow = false;
+
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 화살표·스와이프가 전환을 시작하면 close 시퀀스와 같은 노드를 두고 싸운다.
         // 다시 열 때는 SetVisible(true) → OnEnable → RefreshArrows()가 되살린다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;

@@ -69,6 +69,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 900576455767af6468c2f5dfdb5ff54b
+    m_Address: RewardClaimPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bab0c173e1415bd49a7b0ffd3bb1567c
     m_Address: UnlockIntroOverlay
     m_ReadOnly: 0
@@ -77,6 +83,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ce8e0425d90f4b843a806f6d4ab5f045
     m_Address: CardRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d13625a8928721c4d8c58190b4816059
+    m_Address: CardDetailOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
