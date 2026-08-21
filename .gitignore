@@ -84,6 +84,8 @@ CLAUDE.local.md
 
 # Codex 지침
 .codex
+.codex/
+.codex_tmp/
 
 # orch 세션 상태 (append 로그, 동시작업 충돌원)
 .orch/

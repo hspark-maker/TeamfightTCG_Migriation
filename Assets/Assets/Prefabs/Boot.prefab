@@ -58,6 +58,7 @@ MonoBehaviour:
   tournamentConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
   growthConfig: {fileID: 11400000, guid: 29d2bc1886de275478143db4a63e16e1, type: 2}
   keywordGrowthConfig: {fileID: 0}
+  profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
   syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
