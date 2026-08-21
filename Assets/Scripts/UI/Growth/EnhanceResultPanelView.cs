@@ -87,7 +87,7 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] CanvasGroup[] rows;
     [Tooltip("오른 체력 \"체력 71 → 73\". 뒤 숫자가 굴러 오른다.")]
     [SerializeField] TMP_Text effectValueText;
-    [Tooltip("오른 레벨 \"Lv 4 → 5\".")]
+    [Tooltip("오른 성급 \"1성 → 2성\".")]
     [SerializeField] TMP_Text gradeValueText;
 
     [Header("한 번 더 (선택)")]
@@ -181,8 +181,8 @@ public class EnhanceResultPanelView : MonoBehaviour
         }
 
         if (this.gradeValueText != null)
-            this.gradeValueText.text = t_success ? $"Lv {_line.FromLevel} → {_line.ToLevel}"
-                                                 : $"Lv {_line.FromLevel} 유지";
+            this.gradeValueText.text = t_success ? GrowthStar.TransitionLabel(_line.FromLevel, _line.ToLevel)
+                                                 : $"{GrowthStar.Label(_line.FromLevel)} 유지";
 
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;

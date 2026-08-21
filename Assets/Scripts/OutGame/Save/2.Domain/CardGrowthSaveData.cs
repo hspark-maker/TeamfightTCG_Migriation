@@ -5,11 +5,11 @@ using System.Collections.Generic;
 [Serializable]
 public class CardGrowthSaveData
 {
-    public const int VERSION = 1;
+    public const int VERSION = 6;
 
     public int version = VERSION;
 
-    // 강화한 카드만 담는다(미강화 Lv1은 항목 없음)
+    // 진행도가 있는 카드만 담는다(강화 또는 간식). 빈 항목은 CardGrowthManager가 저장 때 거른다.
     public List<CardGrowthEntry> entries = new List<CardGrowthEntry>();
 }
 
@@ -23,4 +23,10 @@ public class CardGrowthEntry
     public string cardKey;
 
     public int level;
+
+    // 간식 보유량(카드팩 중복으로만 쌓인다). 카드별 재화라 전역 잔액 배열에 못 넣어 여기 얹었다.
+    public int snack;
+
+    // 카드별 한계돌파 단계.
+    public int limitBreak;
 }

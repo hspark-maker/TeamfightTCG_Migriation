@@ -2,25 +2,44 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 카드 성장(강화 레벨)의 static 단일 창구
-public static class CardGrowthManager
+// 카드 성장(강화 레벨)의 static 단일 창구. 간식은 같은 세이브 항목을 써서 partial 조각(.Snack.cs)이 맡는다.
+public static partial class CardGrowthManager
 {
     static readonly Dictionary<int, CardGrowthEntry> s_growth = new Dictionary<int, CardGrowthEntry>();
 
     static readonly System.Random s_rng = new System.Random();
 
     static CardGrowthConfig s_config;
+    static bool s_configInjected;
+    static bool s_missingConfigLogged;
 
     static bool s_initialized;
 
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 강화 곡선 설정(미배선이면 기본 인스턴스)
+    // 강화 곡선 설정(미배선이면 표시 호환용 기본 인스턴스, 실제 강화는 차단)
     public static CardGrowthConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<CardGrowthConfig>());
+    {
+        get
+        {
+            if (s_config == null)
+                s_config = ScriptableObject.CreateInstance<CardGrowthConfig>();
+
+            if (!s_configInjected && !s_missingConfigLogged)
+            {
+                Debug.LogError("[CardGrowth] CardGrowthConfig가 주입되지 않아 기본 표시값을 사용합니다. 강화는 차단됩니다.");
+                s_missingConfigLogged = true;
+            }
+
+            return s_config;
+        }
+    }
+
+    public static bool IsConfigReady => s_configInjected;
 
     public static int MaxLevel => Config.MaxLevel;
+    public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
 
     // 레벨 _level로 올리는 한 방이 진화인가(관문 레벨은 곡선이 소유한다)
     public static bool IsEvolutionLevel(int _level) => Config.IsEvolutionLevel(_level);
@@ -28,10 +47,12 @@ public static class CardGrowthManager
     // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
 
-    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 부트스트랩에서 실제 애셋 주입. null이면 이전 설정을 버리고 미주입 상태로 되돌린다.
     public static void SetConfig(CardGrowthConfig _config)
     {
-        if (_config != null) s_config = _config;
+        s_config              = _config;
+        s_configInjected      = _config != null;
+        s_missingConfigLogged = false;
     }
 
     // 부트에서 DataSaveManager.Load() 이후 1회 호출
@@ -43,7 +64,6 @@ public static class CardGrowthManager
         KeywordGrowthManager.OnChanged += NotifyGrowthChanged;
 
         var t_data = DataSaveManager.Data.cardGrowth;
-        bool t_migrated = false;
         if (t_data != null && t_data.entries != null)
         {
             foreach (var t_entry in t_data.entries)
@@ -51,39 +71,42 @@ public static class CardGrowthManager
                 if (t_entry == null) continue;
 
                 int t_id = t_entry.cardId;
-                if (t_id <= 0)
-                {
-                    // 구 세이브(이름 키) 이관 — 카탈로그 미준비면 이번 부트는 건너뛰고 값을 보존한다.
-                    if (!CardCatalog.IsReady) continue;
-
-                    t_id = CardCatalog.LegacyIdOfName(t_entry.cardKey);
-                    if (t_id <= 0) continue;                 // 사라진 카드의 진행도는 버린다
-
-                    t_entry.cardId  = t_id;
-                    t_entry.cardKey = null;
-                    t_migrated      = true;
-                }
-
-                if (s_growth.ContainsKey(t_id)) continue;
+                if (t_id <= 0 || s_growth.ContainsKey(t_id)) continue;
                 s_growth[t_id] = t_entry;
             }
         }
 
         s_initialized = true;
-
-        if (t_migrated) Save();
     }
 
     static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
+
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음). 한 흐름이 여러 도메인을 건드릴 때
+    /// 도메인마다 Save()를 부르면 같은 파일을 여러 번 쓰므로, 디스크 쓰기는 마지막 한 곳이 맡는다.
+    /// 진행도 없는 항목(미강화 + 간식 0)은 직렬화에서 뺀다.</summary>
+    internal static void FlushToData()
+    {
+        if (!s_initialized) return;
+
+        var t_data = DataSaveManager.Data.cardGrowth ?? (DataSaveManager.Data.cardGrowth = new CardGrowthSaveData());
+        t_data.version = CardGrowthSaveData.VERSION;
+
+        var t_entries = new List<CardGrowthEntry>(s_growth.Count);
+        foreach (var t_entry in s_growth.Values)
+        {
+            if (t_entry == null) continue;
+            if (t_entry.level <= CardGrowth.BaseLevel && t_entry.snack <= 0 && t_entry.limitBreak <= 0) continue;
+            t_entries.Add(t_entry);
+        }
+        t_data.entries = t_entries;
+    }
 
     // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
     public static void Save()
     {
         if (!s_initialized) return;
 
-        var t_data = DataSaveManager.Data.cardGrowth ?? (DataSaveManager.Data.cardGrowth = new CardGrowthSaveData());
-        t_data.version = CardGrowthSaveData.VERSION;
-        t_data.entries = new List<CardGrowthEntry>(s_growth.Values);
+        FlushToData();
         DataSaveManager.Save();
     }
 
@@ -92,7 +115,7 @@ public static class CardGrowthManager
     /// <summary>세이브와 무관하게 **지정 레벨**의 성장 스냅샷. AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다 —
     /// 곡선 해석(체력·진화·키워드·시너지 해금)을 한 곳에 두려고 여기서 내준다.</summary>
     public static CardGrowth GrowthAtLevel(CardData _card, int _level)
-        => Snapshot(_card, _level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _level, false);
+        => Snapshot(_card, ClampLevel(_level), false);
 
     // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
     public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id), true);
@@ -104,8 +127,11 @@ public static class CardGrowthManager
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return CardGrowth.BaseLevel;
 
         // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
-        return t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
+        return ClampLevel(t_entry.level);
     }
+
+    static int ClampLevel(int _level)
+        => Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
 
@@ -128,6 +154,11 @@ public static class CardGrowthManager
     public static EnhanceResult TryEnhance(CardData _card)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
+        if (!s_configInjected)
+        {
+            _ = Config; // 누락 로그는 Config 접근 경로에서 한 번만 남긴다.
+            return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
+        }
 
         int t_id = CardCatalog.IdOf(_card);
         if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
@@ -141,7 +172,7 @@ public static class CardGrowthManager
         if (!TryGetStepAt(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        // 재화는 곡선이 정한다 — 진화 레벨(Lv5·Lv10)만 다이아를 물고 나머지는 골드다.
+        // 재화는 곡선이 정한다 — 1·2성은 조각, 최종 3성은 다이아를 쓴다.
         if (!CurrencyManager.CanAfford(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
@@ -231,7 +262,11 @@ public static class CardGrowthManager
         CardGrowthConfig t_config = Config;
         CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_card, _level);
         int t_hpBonus = t_config.HpBonusAt(_card, _level);
-        if (_includeKeywordGrowth) t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
+        if (_includeKeywordGrowth)
+        {
+            t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
+            t_hpBonus += t_config.LimitBreakHpBonusAt(LimitBreakOf(CardCatalog.IdOf(_card)));
+        }
 
         return new CardGrowth(
             _level,
