@@ -13,13 +13,14 @@ public class ProfileAvatarEntry
     [Tooltip("선택 화면에 보일 이름. 표시용이라 언제든 고쳐도 된다.")]
     public string displayName;
 
-    [Tooltip("판 위에 얹을 얼굴. 프로필 화면·매칭 배너에 쓰는 큰 그림이다.")]
+    [Tooltip("판을 꽉 채우는 아바타 그림. 프로필 화면·매칭 배너에 쓰는 큰 그림이다. " +
+             "정사각으로 저작해라 — 세로가 짧으면 위아래에 판 색 띠가 생긴다. 모서리는 원형 마스크가 잘라내므로 미리 오려 올 필요 없다.")]
     public Sprite large;
 
     [Tooltip("로비 버튼 등 작은 자리에 쓰는 얼굴. 비워두면 large로 폴백된다(1사이즈만 있는 아바타 허용).")]
     public Sprite small;
 
-    [Tooltip("얼굴 뒤 판의 색. 얼굴 스프라이트가 흰색인 것도 있어 판 색이 곧 그 아바타의 정체성이다.")]
+    [Tooltip("얼굴 뒤 판의 색. 얼굴이 판을 꽉 채우면 보이지 않는다 — 투명한 부분이 있는 아트에서만 뒤로 비친다.")]
     public Color color = Color.white;
 
     // 작은 자리용 얼굴. 미저작이면 큰 그림을 그대로 쓴다.
@@ -36,12 +37,12 @@ public class ProfileFrameEntry
     [Tooltip("선택 화면에 보일 이름. 표시용이라 언제든 고쳐도 된다.")]
     public string displayName;
 
-    [Tooltip("아바타 맨 뒤에 까는 프레임 원판. 앞의 얼굴 판이 가운데를 덮어 바깥 테두리만 링으로 드러난다 — " +
-             "그래서 속이 뚫린 링이 아니라 얼굴 판보다 한 치수 큰 채워진 판을 넣어야 한다.")]
+    [Tooltip("아바타 위에 덧씌우는 속이 뚫린 테두리 링. 가운데가 막힌 그림을 넣으면 얼굴을 통째로 덮는다. " +
+             "링 안쪽 반지름이 뷰의 76%보다 크면 얼굴 판과 링 사이에 투명한 틈이 보인다.")]
     public Sprite sprite;
 
-    [Tooltip("스프라이트는 흰 마스터고 실제 색은 이 값이 정한다. 같은 마스터에 색만 달리해 프레임을 늘릴 수 있다. " +
-             "흰색(기본)이면 스프라이트 원본 색 그대로.")]
+    [Tooltip("흰 마스터를 곱연산 틴트해 색을 늘리려는 값. 이미 칠해진 완성 아트면 흰색으로 둬라 — " +
+             "안 그러면 아트 본래 색이 탁해진다.")]
     public Color color = Color.white;
 }
 
@@ -49,8 +50,9 @@ public class ProfileFrameEntry
 [CreateAssetMenu(fileName = "ProfileConfig", menuName = "Card Battle/Profile Config")]
 public class ProfileConfig : ScriptableObject
 {
-    [Tooltip("모든 아바타가 공유하는 얼굴 뒤 판 마스터. 흰 마스터고 실제 색은 아바타별 color가 정한다. " +
-             "이 스프라이트의 모양이 곧 얼굴이 잘리는 모양이다(뷰의 Mask가 이걸 쓴다) — 원형을 유지하려면 원판을 넣어라.")]
+    [Tooltip("모든 아바타가 공유하는 원형 마스크 판. 뷰의 Mask가 이걸 쓰므로 " +
+             "이 스프라이트의 모양이 곧 아바타가 잘리는 모양이다 — 원형을 유지하려면 채워진 원판을 넣어라. " +
+             "얼굴이 판을 꽉 채우니 판 자체는 평소 보이지 않는다.")]
     [SerializeField] Sprite avatarPlate;
 
     [Tooltip("선택 화면 정렬 = 이 리스트 순서. 0번이 신규 유저의 기본 아바타다.")]

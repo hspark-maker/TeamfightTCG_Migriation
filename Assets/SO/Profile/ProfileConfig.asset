@@ -15,67 +15,12 @@ MonoBehaviour:
   avatarPlate: {fileID: 21300000, guid: 4d39085bb0991451392165e2e08c0b56, type: 3}
   avatars:
   - id: avatar_00
-    displayName: "\uC544\uBC14\uD0C0 1"
-    large: {fileID: 21300000, guid: bfc4aca618adf45c29d218eb21af955b, type: 3}
-    small: {fileID: 21300000, guid: fe2b8eaa34c2b42f1866ef0582bba1e0, type: 3}
-    color: {r: 0.2, g: 0.45, b: 0.95, a: 1}
-  - id: avatar_01
-    displayName: "\uC544\uBC14\uD0C0 2"
-    large: {fileID: 21300000, guid: 6da590f65df28408ba06aa91cd70d137, type: 3}
-    small: {fileID: 21300000, guid: f99a26cca1c1443749dc1ea572f03b32, type: 3}
-    color: {r: 0.95, g: 0.42, b: 0.28, a: 1}
-  - id: avatar_02
-    displayName: "\uC544\uBC14\uD0C0 3"
-    large: {fileID: 21300000, guid: 352f489531627499b92495c2c5310fa2, type: 3}
-    small: {fileID: 21300000, guid: ed03cf219abb94d53b3ddc29ac3847ad, type: 3}
-    color: {r: 0.3, g: 0.75, b: 0.35, a: 1}
-  - id: avatar_03
-    displayName: "\uC544\uBC14\uD0C0 4"
-    large: {fileID: 21300000, guid: af68d78c5f2754f96a9806012d2e5a28, type: 3}
-    small: {fileID: 21300000, guid: 17ac63489deb24a7e9b5dbe1e5502f0d, type: 3}
-    color: {r: 0.96, g: 0.72, b: 0.15, a: 1}
-  - id: avatar_04
-    displayName: "\uC544\uBC14\uD0C0 5"
-    large: {fileID: 21300000, guid: 67ea9b85224964fcd965f68fe7eb26ea, type: 3}
-    small: {fileID: 21300000, guid: 7a8d5ecca1e384881ac0f8353aff646e, type: 3}
-    color: {r: 0.86, g: 0.3, b: 0.52, a: 1}
-  - id: avatar_05
-    displayName: "\uC544\uBC14\uD0C0 6"
-    large: {fileID: 21300000, guid: 58a548e4f779f42f2953f197f372e70b, type: 3}
-    small: {fileID: 21300000, guid: bf4c997fde47c4f4396495913f34e9cf, type: 3}
-    color: {r: 0.25, g: 0.72, b: 0.86, a: 1}
-  - id: avatar_06
-    displayName: "\uC544\uBC14\uD0C0 7"
-    large: {fileID: 21300000, guid: ff1b243988fe74a41844f0cdfa77581c, type: 3}
-    small: {fileID: 21300000, guid: 96e17a7f024b04e85b5e815b3eaacb6e, type: 3}
-    color: {r: 0.6, g: 0.36, b: 0.88, a: 1}
-  - id: avatar_07
-    displayName: "\uC544\uBC14\uD0C0 8"
-    large: {fileID: 21300000, guid: e70616f0fefec460aaadbac7e3ca7450, type: 3}
-    small: {fileID: 21300000, guid: 20acaf7a6add74c6ba29a0f83bf69751, type: 3}
-    color: {r: 0.42, g: 0.48, b: 0.6, a: 1}
+    displayName: "\uAE30\uBCF8"
+    large: {fileID: 21300000, guid: ad30e2de36cf44529ab127de2a9487f1, type: 3}
+    small: {fileID: 21300000, guid: ad30e2de36cf44529ab127de2a9487f1, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
   frames:
-  - id: frame_silver
-    displayName: "\uC2E4\uBC84"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 0.82, g: 0.86, b: 0.92, a: 1}
-  - id: frame_blue
-    displayName: "\uBE14\uB8E8"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 0.24, g: 0.55, b: 0.98, a: 1}
-  - id: frame_green
-    displayName: "\uADF8\uB9B0"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 0.28, g: 0.82, b: 0.36, a: 1}
-  - id: frame_gold
-    displayName: "\uACE8\uB4DC"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 1, g: 0.78, b: 0.12, a: 1}
-  - id: frame_red
-    displayName: "\uB808\uB4DC"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 0.96, g: 0.3, b: 0.3, a: 1}
-  - id: frame_purple
-    displayName: "\uD37C\uD50C"
-    sprite: {fileID: 21300000, guid: b2aafe14d1c3148d280838902a81c067, type: 3}
-    color: {r: 0.66, g: 0.38, b: 0.95, a: 1}
+  - id: frame_default
+    displayName: "\uAE30\uBCF8"
+    sprite: {fileID: 21300000, guid: c67025f4437b4a648d8bb4619c33051c, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}

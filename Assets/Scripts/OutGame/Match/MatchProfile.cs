@@ -12,7 +12,7 @@ public readonly struct MatchProfile
     public readonly Sprite Avatar;
     public readonly Sprite Frame;
 
-    // 프레임은 얼굴 판 뒤에 깔리는 원판이고 스프라이트가 흰 마스터라 이 색이 실제 테두리 색이 된다.
+    // 프레임은 아바타 위에 덧씌우는 속 뚫린 링이다. 흰 마스터면 이 색이 실제 링 색이 되고, 완성 아트면 흰색으로 둔다.
     public readonly Color  FrameColor;
 
     // 얼굴 뒤 판. 판 색은 아바타별로 갈린다(그림 자체의 일부).
