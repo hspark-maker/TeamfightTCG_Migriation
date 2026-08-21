@@ -321,7 +321,7 @@ public class TurnRunner : MonoBehaviour
             }
 
             // 보호막은 받은 뒤 상대의 공격 턴 하나를 버티는 상태다.
-            // 현재 행동 진영의 반대 필드 전체에서 지워야 수호자 5티어가 비수호자에게 준 보호막도 만료된다.
+            // 현재 행동 진영의 반대 필드 전체에서 지워야 부여 대상과 무관하게 보호막이 함께 만료된다.
             BattleField t_oppositeField = t_field == this.playerField ? this.enemyField : this.playerField;
             foreach (var t_c in t_oppositeField.GetActiveCards())
                 t_c.ClearShield();

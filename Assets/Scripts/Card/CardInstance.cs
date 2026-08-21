@@ -263,8 +263,17 @@ public class CardInstance
         if (_amount > 0) this.bonusHp += _amount;
     }
 
-    public void GrantShield() => this.hasShield = true;
-    public void ClearShield() => this.hasShield = false;
+    public void GrantShield()
+    {
+        this.hasShield = true;
+        CardView.GetView(this)?.SetShieldVisible(this.isRevealed);
+    }
+
+    public void ClearShield()
+    {
+        this.hasShield = false;
+        CardView.GetView(this)?.SetShieldVisible(false);
+    }
 
     /// <summary>언데드: 파괴 순간 체력 50%(최소 1)로 게임당 1회 부활. 성공 시 true(제자리 hp 복구).
     /// 무적 등과 무관한 순수 산술 — RemoveDead가 이 결과로 RemoveCard 게이팅.</summary>
@@ -281,6 +290,7 @@ public class CardInstance
     public void TakeDamage(int _damage)
     {
         bool t_hadInvincible = HasKeyword(CardKeyword.Invincible);
+        bool t_hadShield     = this.hasShield;
         DamageResolution t_result = ResolveDamage(
             _damage, this.hp, this.bonusHp, this.hasShield, t_hadInvincible);
         if (t_hadInvincible && !t_result.hasInvincible)
@@ -288,5 +298,7 @@ public class CardInstance
         this.hasShield = t_result.hasShield;
         this.hp        = t_result.hp;
         this.bonusHp   = t_result.bonusHp;
+        if (t_hadShield && !t_result.hasShield)
+            CardView.GetView(this)?.PlayShieldBreakEffect();
     }
 }

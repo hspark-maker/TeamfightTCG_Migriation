@@ -60,6 +60,9 @@ public class CardView : MonoBehaviour
     [SerializeField] GameObject infoRoot;
     [SerializeField] GameObject emptyOverlay;
 
+    [Header("Shield")]
+    [SerializeField] SpriteRenderer shieldIndicator;
+
     [Header("Highlight / Glow")]
     [SerializeField] SpriteRenderer selectedHighlight;
     [SerializeField] ParticleSystem passiveGlowSystem;
@@ -231,6 +234,10 @@ public class CardView : MonoBehaviour
     // 숫자만 먼저 올라간다. 힐러가 둘이면 몫이 둘 쌓이고, 투사체가 도착할 때마다 자기 몫씩 빠진다.
     int hpPendingHeal;
     Sequence hpRollSeq;
+    Sequence shieldBreakSeq;
+    Vector3  shieldIndicatorScale;
+    Color    shieldIndicatorColor;
+    bool     shieldIndicatorCached;
 
     public CardInstance BoundCard => this.boundCard;
     #endregion
@@ -271,6 +278,7 @@ public class CardView : MonoBehaviour
         this.weaponView?.Cleanup();  // 무기 인스턴스는 자식이라 Unity가 함께 파괴 — 참조만 끊는다
         this.decorView?.Cleanup();   // 아이콘/배지 트윈 끊기(파괴 전 DOKill 규약) + 스냅샷 참조 해제
         KillHpRoll();
+        KillShieldTween();
         if (this.hpText != null) this.hpText.DOKill();
     }
 
@@ -351,6 +359,7 @@ public class CardView : MonoBehaviour
 
         if (t_isEmpty)
         {
+            SetShieldVisible(false);
             SetFaceDownLook(false);
             SetupWeapon(null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
@@ -377,6 +386,7 @@ public class CardView : MonoBehaviour
             this.illustration.sprite = t_art;
 
         SetFaceDownLook(t_isFaceDown);
+        SetShieldVisible(!t_isFaceDown && _card.hasShield);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
@@ -417,6 +427,59 @@ public class CardView : MonoBehaviour
 
         this.illustration.sprite = this.cardBackSprite;
         this.illustration.transform.localScale = FitBackScale();
+    }
+
+    void CacheShieldVisual()
+    {
+        if (this.shieldIndicatorCached || this.shieldIndicator == null) return;
+        this.shieldIndicatorScale  = this.shieldIndicator.transform.localScale;
+        this.shieldIndicatorColor  = this.shieldIndicator.color;
+        this.shieldIndicatorCached = true;
+    }
+
+    void KillShieldTween()
+    {
+        if (this.shieldBreakSeq != null && this.shieldBreakSeq.IsActive())
+            this.shieldBreakSeq.Kill();
+        this.shieldBreakSeq = null;
+    }
+
+    /// <summary>프리팹에 저작된 보호막 표시를 현재 카드 상태로 즉시 맞춘다.</summary>
+    public void SetShieldVisible(bool _visible)
+    {
+        if (this.shieldIndicator == null) return;
+        CacheShieldVisual();
+        KillShieldTween();
+        this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+        this.shieldIndicator.color = this.shieldIndicatorColor;
+        this.shieldIndicator.gameObject.SetActive(_visible);
+    }
+
+    /// <summary>실제 피해 적용으로 보호막이 소진됐을 때만 호출하는 순수 연출.</summary>
+    public void PlayShieldBreakEffect()
+    {
+        if (this.shieldIndicator == null || this.boundCard == null || !this.boundCard.isRevealed) return;
+        CacheShieldVisual();
+        KillShieldTween();
+
+        CardInstance t_card = this.boundCard;
+        this.shieldIndicator.gameObject.SetActive(true);
+        this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+        this.shieldIndicator.color = this.shieldIndicatorColor;
+
+        this.shieldBreakSeq = DOTween.Sequence()
+            .Append(this.shieldIndicator.transform.DOPunchScale(
+                this.shieldIndicatorScale * 0.3f, 0.12f, vibrato: 4, elasticity: 0.35f))
+            .Append(this.shieldIndicator.DOFade(0f, 0.1f))
+            .SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                this.shieldBreakSeq = null;
+                if (this == null || this.boundCard != t_card || (t_card != null && t_card.hasShield)) return;
+                this.shieldIndicator.gameObject.SetActive(false);
+                this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+                this.shieldIndicator.color = this.shieldIndicatorColor;
+            });
     }
 
     /// <summary>뒷면 그림을 카드 테두리 높이에 맞추는 로컬 스케일. 테두리가 없으면 원래 스케일 유지.</summary>

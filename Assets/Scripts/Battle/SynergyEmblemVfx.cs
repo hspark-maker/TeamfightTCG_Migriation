@@ -61,7 +61,12 @@ public static class SynergyEmblemVfx
             {
                 if (t_card == null || !t_card.IsAlive) continue;
                 if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
-                t_entry.spec.Play(CardView.GetView(t_card), _synergy);
+
+                // 뷰가 없는 시점(InitializeViews 이전)에도 규칙이 Fire를 걸 수 있다 — 몸짓은 뷰 자리를
+                // 읽어야 만들어지므로 여기서 걸러낸다(단일 대상 경로와 같은 가드).
+                CardView t_memberView = CardView.GetView(t_card);
+                if (t_memberView == null) continue;
+                t_entry.spec.Play(t_memberView, _synergy);
             }
             return true;
         }
