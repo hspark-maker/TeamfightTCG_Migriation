@@ -89,6 +89,7 @@ GameObject:
   - component: {fileID: 587671665146809398}
   - component: {fileID: 1263959577841236636}
   - component: {fileID: 4115879774860849968}
+  - component: {fileID: 8384351457268999054}
   m_Layer: 0
   m_Name: ProfileItemCell
   m_TagString: Untagged
@@ -228,6 +229,24 @@ MonoBehaviour:
   button: {fileID: 587671665146809398}
   dimGroup: {fileID: 1263959577841236636}
   dimAlpha: 0.4
+  pressRelay: {fileID: 8384351457268999054}
+  pressShrink: 0.08
+  pressDuration: 0.07
+  releasePop: 0.1
+  popDuration: 0.1
+  settleDuration: 0.14
+--- !u!114 &8384351457268999054
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3631443927566594155}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c1de5b04a9f4d24b8f3ce1a90d7b511, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardPressRelay
 --- !u!1 &7024392178618491649
 GameObject:
   m_ObjectHideFlags: 0

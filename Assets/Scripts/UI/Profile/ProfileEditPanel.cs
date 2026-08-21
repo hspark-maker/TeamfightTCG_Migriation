@@ -72,7 +72,6 @@ public class ProfileEditPanel : PooledUIBase
 
         this.SetTab(true);                 // 열 때마다 아바타 탭부터 — 이전 세션의 탭이 남지 않게.
         this.RefreshSelection();
-        this.RefreshCellArt();
         this.RefreshPreview();
         this.RefreshNicknameField();
 
@@ -147,8 +146,8 @@ public class ProfileEditPanel : PooledUIBase
             var t_cell = this.CreateCell(this.avatarContent);
             if (t_cell == null) continue;
 
-            // 아바타 칸은 판·얼굴이 그 칸 것이고, 링은 "지금 고른 프레임"이다.
-            t_cell.Bind(t_entry.id, t_config.LookOf(t_entry.id, this.m_draftFrameId),
+            // 아바타 칸은 아바타 그림만 보여준다 — 프레임과 겹친 실제 조합은 위쪽 미리보기가 맡는다.
+            t_cell.Bind(t_entry.id, t_config.LookOf(t_entry.id, null), EProfileAxis.Avatar,
                 ProfileManager.IsAvatarOwned(t_entry.id), this.OnAvatarClicked);
             this.m_avatarCells.Add(t_cell);
         }
@@ -162,9 +161,8 @@ public class ProfileEditPanel : PooledUIBase
             var t_cell = this.CreateCell(this.frameContent);
             if (t_cell == null) continue;
 
-            // 프레임 칸은 반대로 링이 그 칸 것이고 판·얼굴이 "지금 고른 아바타"다 —
-            // 그 프레임을 썼을 때의 실제 조합이 그대로 보인다.
-            t_cell.Bind(t_entry.id, t_config.LookOf(this.m_draftAvatarId, t_entry.id),
+            // 프레임 칸은 링만 보여준다.
+            t_cell.Bind(t_entry.id, t_config.LookOf(null, t_entry.id), EProfileAxis.Frame,
                 ProfileManager.IsFrameOwned(t_entry.id), this.OnFrameClicked);
             this.m_frameCells.Add(t_cell);
         }
@@ -206,7 +204,6 @@ public class ProfileEditPanel : PooledUIBase
     {
         this.m_draftAvatarId = _id;
         SetSelectedIn(this.m_avatarCells, _id);
-        this.RefreshCellArt();
         this.RefreshPreview();
         this.RefreshSaveButton();
     }
@@ -215,7 +212,6 @@ public class ProfileEditPanel : PooledUIBase
     {
         this.m_draftFrameId = _id;
         SetSelectedIn(this.m_frameCells, _id);
-        this.RefreshCellArt();
         this.RefreshPreview();
         this.RefreshSaveButton();
     }
@@ -260,26 +256,6 @@ public class ProfileEditPanel : PooledUIBase
     {
         SetSelectedIn(this.m_avatarCells, this.m_draftAvatarId);
         SetSelectedIn(this.m_frameCells, this.m_draftFrameId);
-    }
-
-    // 드래프트가 바뀌면 두 그리드의 "교차 층"만 갈아 끼운다 — 칸을 다시 만들지 않는다.
-    // 아바타 칸은 링이 고른 프레임을, 프레임 칸은 판·얼굴이 고른 아바타를 따라간다.
-    void RefreshCellArt()
-    {
-        var t_config = ProfileManager.Config;
-        if (t_config == null) return;
-
-        for (int t_i = 0; t_i < this.m_avatarCells.Count; t_i++)
-        {
-            var t_cell = this.m_avatarCells[t_i];
-            if (t_cell != null) t_cell.SetLook(t_config.LookOf(t_cell.Id, this.m_draftFrameId));
-        }
-
-        for (int t_i = 0; t_i < this.m_frameCells.Count; t_i++)
-        {
-            var t_cell = this.m_frameCells[t_i];
-            if (t_cell != null) t_cell.SetLook(t_config.LookOf(this.m_draftAvatarId, t_cell.Id));
-        }
     }
 
     // 미리보기 줄만 즉시 반영한다 — 팝업 밖(로비 버튼 등)은 저장 전까지 예전 값 그대로다.
