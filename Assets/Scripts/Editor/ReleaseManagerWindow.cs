@@ -10,22 +10,19 @@ using UnityEngine;
 /// 모드 · 카드 표 · 검증 · 빌드를 한 화면에 묶는다. 셋이 따로 놀면 조용히 어긋나기 때문이다:
 /// 모드만 바꾸고 표를 안 실으면 수치가 틀리고, 표만 갈고 빌드하면 런타임 프로필과 데이터가 갈린다.
 ///
-/// **빌드의 실행 모드는 에디터 모드와 무관하다.** <see cref="ContentProfileConfig"/>는 빌드에서
-/// EditorPrefs를 읽지 않고 `DEVELOPMENT_BUILD ? Test : Live`로 결정한다. 그래서 이 창은
-/// "개발 빌드 = 테스트 프로필 / 릴리즈 빌드 = 라이브 프로필"을 명시하고, 에셋에 실린 표가
-/// 그 프로필과 다르면 빌드를 막는다.
+/// 현재 에디터 프로필이 곧 빌드 실행 모드다. 테스트 프로필은 개발 빌드로, 라이브 프로필은
+/// 릴리즈 빌드로 만들며, 에셋에 실린 표가 그 프로필과 다르면 빌드를 막는다.
 /// </summary>
 public class ReleaseManagerWindow : EditorWindow
 {
     const string PREF_BUILD_DIR = "Release.BuildDir";
-    const string PREF_DEV_BUILD = "Release.DevelopmentBuild";
 
     string buildDir;
-    bool   developmentBuild;
 
     Vector2 scroll;
     string  lastReport;
     List<string> issues;
+    List<string> validationWarnings;   // 빌드를 막지 않는다 — 밸런스 눈치용
     bool showColumnHelp;
 
     // 표 대조 결과 캐시. 매 프레임 CSV를 파싱하고 카드를 복제할 수는 없으므로 모드가 바뀌거나
@@ -40,15 +37,13 @@ public class ReleaseManagerWindow : EditorWindow
 
     void OnEnable()
     {
-        this.buildDir         = EditorPrefs.GetString(PREF_BUILD_DIR, "Builds");
-        this.developmentBuild = EditorPrefs.GetBool(PREF_DEV_BUILD, true);
+        this.buildDir = EditorPrefs.GetString(PREF_BUILD_DIR, "Builds");
         Revalidate();
     }
 
     void OnDisable()
     {
         EditorPrefs.SetString(PREF_BUILD_DIR, this.buildDir);
-        EditorPrefs.SetBool(PREF_DEV_BUILD, this.developmentBuild);
     }
 
     void OnGUI()
@@ -166,19 +161,21 @@ public class ReleaseManagerWindow : EditorWindow
             EditorGUILayout.HelpBox("아직 검사하지 않았다.", MessageType.Info);
             return;
         }
-        if (this.issues.Count == 0)
-        {
+        if (this.issues.Count > 0)
+            EditorGUILayout.HelpBox($"문제 {this.issues.Count}건 — 빌드가 막힌다.\n· " + string.Join("\n· ", this.issues),
+                MessageType.Error);
+        else
             EditorGUILayout.HelpBox("통과 — 프로필·레지스트리·라이브 소비 SO 모두 정상.", MessageType.Info);
-            return;
-        }
 
-        EditorGUILayout.HelpBox($"문제 {this.issues.Count}건 — 빌드가 막힌다.\n· " + string.Join("\n· ", this.issues),
-            MessageType.Error);
+        if (this.validationWarnings != null && this.validationWarnings.Count > 0)
+            EditorGUILayout.HelpBox($"경고 {this.validationWarnings.Count}건 — 빌드는 막지 않는다.\n· "
+                + string.Join("\n· ", this.validationWarnings), MessageType.Warning);
     }
 
     void Revalidate()
     {
-        this.issues     = ContentProfileValidator.Collect();
+        this.validationWarnings = new List<string>();
+        this.issues     = ContentProfileValidator.Collect(this.validationWarnings);
         this.driftValid = false;   // 표를 갈았거나 에셋이 움직였다 — 대조 결과도 같이 낡는다
     }
 
@@ -201,7 +198,7 @@ public class ReleaseManagerWindow : EditorWindow
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField("표 대조", $"{t_label} 표 ↔ 카드 에셋");
+            EditorGUILayout.LabelField("표 대조 (빌드 실행 모드 기준)", $"{t_label} 표 ↔ 카드 에셋");
             if (GUILayout.Button("다시 대조", GUILayout.Width(80))) this.driftValid = false;
         }
 
@@ -232,12 +229,10 @@ public class ReleaseManagerWindow : EditorWindow
         BuildTarget t_target = EditorUserBuildSettings.activeBuildTarget;
         EditorGUILayout.LabelField("타겟 플랫폼", $"{t_target}  (바꾸려면 File > Build Settings)");
 
-        this.developmentBuild = EditorGUILayout.Toggle("개발 빌드", this.developmentBuild);
         this.buildDir = EditorGUILayout.TextField("출력 폴더", this.buildDir);
 
-        EContentRunMode t_runtimeMode = this.developmentBuild ? EContentRunMode.Test : EContentRunMode.Live;
-        EditorGUILayout.LabelField("빌드 실행 모드", $"{ContentRunModeEditor.Label(t_runtimeMode)} " +
-            $"({(this.developmentBuild ? "DEVELOPMENT_BUILD" : "릴리즈")} 기준 — 에디터 모드와 무관)");
+        EContentRunMode t_runtimeMode = ContentRunModeEditor.Current;
+        EditorGUILayout.LabelField("빌드 실행 모드", ContentRunModeEditor.Label(t_runtimeMode));
 
         int t_scenes = EnabledScenes().Length;
         EditorGUILayout.LabelField("포함 씬", $"{t_scenes}개 (Build Settings 기준)");
@@ -275,7 +270,7 @@ public class ReleaseManagerWindow : EditorWindow
 
     void RunBuild(BuildTarget _target, EContentRunMode _runtimeMode)
     {
-        string t_path = Path.Combine(this.buildDir, OutputName(_target));
+        string t_path = Path.Combine(this.buildDir, OutputName(_target, _runtimeMode));
 
         // 대조 경고는 빌드를 막지 않는다(의도적으로 에셋만 손댄 상태로 뽑는 일이 있다) —
         // 대신 되돌리기 어려운 시점에 한 번 더 눈에 띄게 한다.
@@ -295,7 +290,7 @@ public class ReleaseManagerWindow : EditorWindow
             scenes           = EnabledScenes(),
             locationPathName = t_path,
             target           = _target,
-            options          = this.developmentBuild ? BuildOptions.Development : BuildOptions.None,
+            options          = _runtimeMode == EContentRunMode.Test ? BuildOptions.Development : BuildOptions.None,
         };
 
         BuildReport t_report = BuildPipeline.BuildPlayer(t_options);
@@ -321,16 +316,18 @@ public class ReleaseManagerWindow : EditorWindow
         return t_list.ToArray();
     }
 
-    static string OutputName(BuildTarget _target)
+    static string OutputName(BuildTarget _target, EContentRunMode _runtimeMode)
     {
         string t_product = string.IsNullOrEmpty(PlayerSettings.productName) ? "Game" : PlayerSettings.productName;
+        string t_suffix = _runtimeMode == EContentRunMode.Test ? "_test" : "_live";
+        string t_name = t_product + t_suffix;
         switch (_target)
         {
             case BuildTarget.StandaloneWindows:
-            case BuildTarget.StandaloneWindows64: return $"{t_product}/{t_product}.exe";
-            case BuildTarget.Android:             return $"{t_product}.apk";
-            case BuildTarget.StandaloneOSX:       return $"{t_product}.app";
-            default:                              return t_product;
+            case BuildTarget.StandaloneWindows64: return $"{t_name}/{t_name}.exe";
+            case BuildTarget.Android:             return $"{t_name}.apk";
+            case BuildTarget.StandaloneOSX:       return $"{t_name}.app";
+            default:                              return t_name;
         }
     }
 
