@@ -31,11 +31,51 @@ public class CardGrowthConfig : ScriptableObject
     [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
     [SerializeField] List<GrowthLevelStep> levelSteps = new List<GrowthLevelStep>();
 
+    [Header("한계돌파")]
+    [Min(0)] [SerializeField] int maxLimitBreak = 3;
+    [SerializeField] List<LimitBreakStep> limitBreakSteps = new List<LimitBreakStep>
+    {
+        new LimitBreakStep(1, 5, 1),
+        new LimitBreakStep(2, 5, 2),
+        new LimitBreakStep(3, 5, 3),
+    };
+
     // 강화 상한 레벨(바닥 아래 오설정은 바닥으로 보정 = 강화 없음)
     public int MaxLevel => maxLevel < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : maxLevel;
 
     public int FirstEvolutionLevel  => firstEvolutionLevel;
     public int SecondEvolutionLevel => secondEvolutionLevel;
+    public int MaxLimitBreak => Mathf.Max(0, maxLimitBreak);
+
+    public bool TryGetLimitBreakStep(int _stage, out LimitBreakStep _step)
+    {
+        _step = default;
+        if (_stage <= 0 || _stage > MaxLimitBreak) return false;
+
+        if (limitBreakSteps != null)
+            for (int t_i = 0; t_i < limitBreakSteps.Count; t_i++)
+            {
+                LimitBreakStep t_row = limitBreakSteps[t_i];
+                if (t_row.Stage != _stage) continue;
+
+                _step = new LimitBreakStep(_stage, Mathf.Max(0, t_row.HpGain), Mathf.Max(1, t_row.SnackCost));
+                return true;
+            }
+
+        // 기존 설정 에셋에 신규 필드가 없어도 기본 곡선으로 동작한다.
+        _step = new LimitBreakStep(_stage, 5, _stage);
+        return true;
+    }
+
+    public int LimitBreakHpBonusAt(int _stage)
+    {
+        int t_top = Mathf.Clamp(_stage, 0, MaxLimitBreak);
+        int t_sum = 0;
+        for (int t_i = 1; t_i <= t_top; t_i++)
+            if (TryGetLimitBreakStep(t_i, out LimitBreakStep t_step)) t_sum += t_step.HpGain;
+
+        return t_sum;
+    }
 
     /// <summary>레벨 _level에서의 진화 단계(0=미진화). 2차가 1차보다 낮게 설정돼도 높은 쪽이 이긴다 —
     /// 오설정으로 단계가 역행하지 않게 도달한 관문 중 가장 높은 단계를 준다.</summary>
@@ -171,5 +211,24 @@ public readonly struct GrowthStep
         Currency    = _currency;
         Cost        = _cost;
         SuccessRate = _successRate;
+    }
+}
+
+[System.Serializable]
+public struct LimitBreakStep
+{
+    [Min(1)] [SerializeField] int stage;
+    [Min(0)] [SerializeField] int hpGain;
+    [Min(1)] [SerializeField] int snackCost;
+
+    public int Stage => stage;
+    public int HpGain => hpGain;
+    public int SnackCost => snackCost;
+
+    public LimitBreakStep(int _stage, int _hpGain, int _snackCost)
+    {
+        stage = _stage;
+        hpGain = _hpGain;
+        snackCost = _snackCost;
     }
 }
