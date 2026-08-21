@@ -21,16 +21,16 @@ MonoBehaviour:
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
-      amount: 50
+      amount: 20
       icon: {fileID: 21300000, guid: 9d828b669d63a451c8ae0a8541df8dc1, type: 3}
     - currency: 3
-      amount: 100
+      amount: 150
       icon: {fileID: 21300000, guid: c223086f28141415195e48481a321563, type: 3}
     pages:
     - pageId: P1
       rewards:
       - currency: 2
-        amount: 10
+        amount: 50
         icon: {fileID: 21300000, guid: c7d57f4fc0ffe4a20af1d5b43a2b2c0d, type: 3}
       cards:
       - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
@@ -45,7 +45,7 @@ MonoBehaviour:
     - pageId: P2
       rewards:
       - currency: 2
-        amount: 10
+        amount: 50
         icon: {fileID: 21300000, guid: c7d57f4fc0ffe4a20af1d5b43a2b2c0d, type: 3}
       cards:
       - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
@@ -60,7 +60,7 @@ MonoBehaviour:
     - pageId: P3
       rewards:
       - currency: 2
-        amount: 10
+        amount: 50
         icon: {fileID: 21300000, guid: c7d57f4fc0ffe4a20af1d5b43a2b2c0d, type: 3}
       cards:
       - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
@@ -75,7 +75,7 @@ MonoBehaviour:
     - pageId: P4
       rewards:
       - currency: 2
-        amount: 10
+        amount: 50
         icon: {fileID: 21300000, guid: c7d57f4fc0ffe4a20af1d5b43a2b2c0d, type: 3}
       cards:
       - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
@@ -83,11 +83,11 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   albumRewards:
   - currency: 0
-    amount: 3000
+    amount: 1500
     icon: {fileID: 21300000, guid: cb9ac5c430df5468c8ecf26434823ecb, type: 3}
   - currency: 1
-    amount: 100
-    icon: {fileID: 21300000, guid: e0940f4e599044730b69eb2f0af6617d, type: 3}
-  - currency: 2
     amount: 30
-    icon: {fileID: 21300000, guid: 58716c3f53a384ba7992b78410462bfe, type: 3}
+    icon: {fileID: 21300000, guid: e0940f4e599044730b69eb2f0af6617d, type: 3}
+  - currency: 3
+    amount: 300
+    icon: {fileID: 21300000, guid: c223086f28141415195e48481a321563, type: 3}
