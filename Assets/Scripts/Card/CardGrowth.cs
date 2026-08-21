@@ -5,6 +5,22 @@
 ///
 /// Battle과 OutGame 양쪽이 함께 쓰므로 어느 한쪽 폴더에 두지 않는다(경계: Battle은 OutGame을 참조하지 않는다).
 /// 성장값을 만드는 쪽은 OutGame(CardGrowthManager), 소비하는 쪽은 Battle이며, 전달은 상위 부트/초기화가 한다.</summary>
+public static class GrowthStar
+{
+    public const int MinStar = 0;
+
+    public static int FromLevel(int _level)
+        => _level <= CardGrowth.BaseLevel ? MinStar : _level - CardGrowth.BaseLevel;
+
+    public static string Label(int _level) => $"{FromLevel(_level)}성";
+
+    public static string ProgressLabel(int _level, int _maxLevel)
+        => $"{Label(_level)} / {Label(_maxLevel)}";
+
+    public static string TransitionLabel(int _fromLevel, int _toLevel)
+        => $"{Label(_fromLevel)} → {Label(_toLevel)}";
+}
+
 public readonly struct CardGrowth
 {
     /// <summary>미강화 카드의 레벨. 레벨은 1부터 세고 강화가 여기서부터 올린다 — 강화 횟수는 (Level - BaseLevel)이다.</summary>

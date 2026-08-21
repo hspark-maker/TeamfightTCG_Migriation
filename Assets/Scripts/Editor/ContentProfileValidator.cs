@@ -17,7 +17,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     {
         ValidateOrThrow();
         WarnTableDrift(_report);
-        AIDeckBandValidator.WarnBands();
     }
 
     /// <summary>빌드에 실릴 카드 SO가 그 빌드가 쓸 표와 다른지 **경고만** 한다(막지 않는다).
@@ -49,8 +48,11 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     }
 
     /// <summary>문제 목록을 던지지 않고 돌려준다(빈 목록 = 통과). 릴리즈 관리 창이 목록으로 띄우는 진입점 —
-    /// 빌드 전처리와 **같은 규칙**을 써야 창에서 통과한 것이 빌드에서 막히지 않는다.</summary>
-    public static List<string> Collect()
+    /// 빌드 전처리와 **같은 규칙**을 써야 창에서 통과한 것이 빌드에서 막히지 않는다.
+    ///
+    /// 반환값은 빌드를 막는 에러만이다. <paramref name="_warnings"/>를 주면 검증기가 보고하는
+    /// 비차단 경고를 별도로 담아준다.</summary>
+    public static List<string> Collect(List<string> _warnings = null)
     {
         var t_errors = new List<string>();
         CardRegistry t_registry = AssetDatabase.LoadAssetAtPath<CardRegistry>(REGISTRY_PATH);
@@ -87,14 +89,17 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             ValidateLiveConsumers(t_errors);
         }
 
-        AIDeckBandValidator.CollectErrors(t_errors);
+        AIDeckBandValidator.CollectIssues(t_errors, _warnings ?? new List<string>());
 
         return t_errors;
     }
 
     static void ValidateOrThrow()
     {
-        List<string> t_errors = Collect();
+        var t_warnings = new List<string>();
+        List<string> t_errors = Collect(t_warnings);
+        if (t_warnings.Count > 0)
+            Debug.LogWarning("[ContentProfile] 경고(빌드는 막지 않는다)\n- " + string.Join("\n- ", t_warnings));
         if (t_errors.Count > 0)
             throw new BuildFailedException("[ContentProfile] 검증 실패\n- " + string.Join("\n- ", t_errors));
     }

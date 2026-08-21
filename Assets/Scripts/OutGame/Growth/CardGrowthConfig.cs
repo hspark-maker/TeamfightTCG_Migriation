@@ -7,35 +7,76 @@ public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
     [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
-    [Min(0)] [SerializeField] int hpPerLevel = 2;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 4;
+    [Min(0)] [SerializeField] int hpPerLevel = 4;
 
     [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(골드)다.")]
     [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
-    [SerializeField] long baseEnhanceCost = 100;
+    [SerializeField] long baseEnhanceCost = 25;
 
     [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
     [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
-    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
+    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0f;
 
     [Header("진화 레벨 (전역 — 카드 SO에 적지 않는다)")]
     // 키워드 해금 레벨은 여기 없다. 카드마다 다르므로 CardData.keywordUnlockLevel이 소유한다.
     [Tooltip("1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 5;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 3;
 
     [Tooltip("2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 10;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 4;
 
     [Header("레벨별 상세 (비어 있는 레벨은 위 기본식으로 계산)")]
     [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
     [SerializeField] List<GrowthLevelStep> levelSteps = new List<GrowthLevelStep>();
+
+    // 한계돌파는 강화와 별개 축의 **덤**이다 — 단계당 +1로 얕게 둔다(주 성장 수단은 강화 곡선).
+    [Header("한계돌파")]
+    [Min(0)] [SerializeField] int maxLimitBreak = 3;
+    [SerializeField] List<LimitBreakStep> limitBreakSteps = new List<LimitBreakStep>
+    {
+        new LimitBreakStep(1, 1, 1),
+        new LimitBreakStep(2, 1, 2),
+        new LimitBreakStep(3, 1, 3),
+    };
 
     // 강화 상한 레벨(바닥 아래 오설정은 바닥으로 보정 = 강화 없음)
     public int MaxLevel => maxLevel < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : maxLevel;
 
     public int FirstEvolutionLevel  => firstEvolutionLevel;
     public int SecondEvolutionLevel => secondEvolutionLevel;
+    public int MaxLimitBreak => Mathf.Max(0, maxLimitBreak);
+
+    public bool TryGetLimitBreakStep(int _stage, out LimitBreakStep _step)
+    {
+        _step = default;
+        if (_stage <= 0 || _stage > MaxLimitBreak) return false;
+
+        if (limitBreakSteps != null)
+            for (int t_i = 0; t_i < limitBreakSteps.Count; t_i++)
+            {
+                LimitBreakStep t_row = limitBreakSteps[t_i];
+                if (t_row.Stage != _stage) continue;
+
+                _step = new LimitBreakStep(_stage, Mathf.Max(0, t_row.HpGain), Mathf.Max(1, t_row.SnackCost));
+                return true;
+            }
+
+        // 기존 설정 에셋에 신규 필드가 없어도 기본 곡선으로 동작한다(위 저작 기본값과 같은 +1).
+        _step = new LimitBreakStep(_stage, 1, _stage);
+        return true;
+    }
+
+    public int LimitBreakHpBonusAt(int _stage)
+    {
+        int t_top = Mathf.Clamp(_stage, 0, MaxLimitBreak);
+        int t_sum = 0;
+        for (int t_i = 1; t_i <= t_top; t_i++)
+            if (TryGetLimitBreakStep(t_i, out LimitBreakStep t_step)) t_sum += t_step.HpGain;
+
+        return t_sum;
+    }
 
     /// <summary>레벨 _level에서의 진화 단계(0=미진화). 2차가 1차보다 낮게 설정돼도 높은 쪽이 이긴다 —
     /// 오설정으로 단계가 역행하지 않게 도달한 관문 중 가장 높은 단계를 준다.</summary>
@@ -171,5 +212,24 @@ public readonly struct GrowthStep
         Currency    = _currency;
         Cost        = _cost;
         SuccessRate = _successRate;
+    }
+}
+
+[System.Serializable]
+public struct LimitBreakStep
+{
+    [Min(1)] [SerializeField] int stage;
+    [Min(0)] [SerializeField] int hpGain;
+    [Min(1)] [SerializeField] int snackCost;
+
+    public int Stage => stage;
+    public int HpGain => hpGain;
+    public int SnackCost => snackCost;
+
+    public LimitBreakStep(int _stage, int _hpGain, int _snackCost)
+    {
+        stage = _stage;
+        hpGain = _hpGain;
+        snackCost = _snackCost;
     }
 }

@@ -38,7 +38,7 @@ public static class OutgameDebugActions
             return;
         }
 
-        Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 Lv{CardGrowthManager.MaxLevel}");
+        Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 {CardGrowthManager.MaxStar}성");
     }
 
     // 강화 레벨·진화 단계 초기화 (소유·재화는 유지)
@@ -46,7 +46,7 @@ public static class OutgameDebugActions
     {
         CardGrowthManager.DebugResetAll();
 
-        Debug.Log("[OutgameDebug] 카드 성장 초기화 — 전 카드 Lv0 · 미진화");
+        Debug.Log("[OutgameDebug] 카드 성장 초기화 — 전 카드 0성 · 미진화");
     }
 
     // 카탈로그 전량 지급
@@ -129,7 +129,7 @@ public static class OutgameDebugActions
         // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
         RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
 
-        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI 카드 레벨 {RankManager.AiCardLevel} — 씬 재진입 시 연출 재생");
+        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI {GrowthStar.Label(RankManager.AiCardLevel)} — 씬 재진입 시 연출 재생");
     }
 
     // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
@@ -158,7 +158,7 @@ public static class OutgameDebugActions
         RankManager.ResetForDebug();
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName} / AI 카드 레벨 {RankManager.AiCardLevel}");
+        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName} / AI {GrowthStar.Label(RankManager.AiCardLevel)}");
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)
