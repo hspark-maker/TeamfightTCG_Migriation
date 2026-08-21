@@ -6,6 +6,7 @@ public static class DataSaveManager
 {
     const string SAVE_KEY    = "outgame_save";
     const string CORRUPT_KEY = "outgame_save_corrupt";
+    const string VERSION_BACKUP_KEY_PREFIX = "outgame_save_v";
 
     static IRepository s_repository = new JsonFileRepository();
 
@@ -31,6 +32,19 @@ public static class DataSaveManager
         try
         {
             Data = JsonUtility.FromJson<UserSaveData>(t_json) ?? new UserSaveData();
+            if (Data.version != UserSaveData.VERSION)
+            {
+                var t_loadedVersion = Data.version;
+                var t_backupKey = $"{VERSION_BACKUP_KEY_PREFIX}{t_loadedVersion}";
+                s_repository.Save(t_backupKey, t_json);
+
+                Debug.LogWarning(
+                    $"[DataSaveManager] 세이브 버전 불일치(v{t_loadedVersion} -> v{UserSaveData.VERSION}). " +
+                    $"런칭 전 개발 정책에 따라 전체 진행도를 초기화합니다. 원본 백업: '{t_backupKey}'");
+
+                Data = new UserSaveData();
+                Save();
+            }
         }
         catch (Exception t_e)
         {

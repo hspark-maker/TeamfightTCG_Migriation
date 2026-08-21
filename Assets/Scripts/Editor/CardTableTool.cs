@@ -79,7 +79,8 @@ public static partial class CardTableTool
         "· grade : 카드 희소 등급 이름(Silver/Gold/Prism). 빈칸 = Unknown(미배정).\n" +
         "  숫자나 모르는 이름은 값을 바꾸지 않고 경고만 남긴다.\n" +
         "· hp2~hp4 : 각 성급 진입 시 증가 HP(내부값 2~4 = 1~3성). 3칸 전부 비면\n" +
-        "  CardGrowthConfig 전역식, 하나라도 채우면 나머지 빈칸은 0으로 저장된다.\n" +
+        "  CardGrowthConfig 전역식, 전부 채우면 카드 곡선으로 저장한다. 일부만 채우면\n" +
+        "  기존 성장 곡선을 유지하고 경고를 남긴다.\n" +
         "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
         "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
         "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).\n" +
@@ -445,7 +446,8 @@ public static partial class CardTableTool
                              string _name, List<string> _warnings)
     {
         int t_curveColumnCount = 0;
-        bool t_hasValue = false;
+        int t_valueCellCount = 0;
+        bool t_hasParseFailure = false;
         var t_values = new int[HP_CURVE_MAX_LEVEL + 1];
 
         for (int t_level = HP_CURVE_MIN_LEVEL; t_level <= HP_CURVE_MAX_LEVEL; t_level++)
@@ -457,10 +459,11 @@ public static partial class CardTableTool
             string t_text = Cell(_row, _header, t_column).Trim();
             if (t_text.Length == 0) continue;
 
-            t_hasValue = true;
+            t_valueCellCount++;
             if (!int.TryParse(t_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_hp))
             {
-                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 0으로 처리");
+                t_hasParseFailure = true;
+                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 기존 성장 곡선 유지");
                 continue;
             }
 
@@ -473,12 +476,25 @@ public static partial class CardTableTool
         }
 
         if (t_curveColumnCount == 0) return;
-        if (t_curveColumnCount != HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1)
+        int t_expectedCellCount = HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1;
+        if (t_curveColumnCount != t_expectedCellCount)
         {
             _warnings.Add($"{_name}: hp2~hp4 열이 일부만 존재 — 기존 성장 곡선 유지");
             return;
         }
-        _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();
+        if (t_hasParseFailure) return;
+        if (t_valueCellCount == 0)
+        {
+            _card.hpGainByLevel = Array.Empty<int>();
+            return;
+        }
+        if (t_valueCellCount != t_expectedCellCount)
+        {
+            _warnings.Add($"{_name}: hp2~hp4 값이 일부만 입력됨({t_valueCellCount}/{t_expectedCellCount}) — 기존 성장 곡선 유지");
+            return;
+        }
+
+        _card.hpGainByLevel = t_values;
     }
 
     static bool TryParseHpColumn(string _column, out int _level)

@@ -10,15 +10,33 @@ public static class CardGrowthManager
     static readonly System.Random s_rng = new System.Random();
 
     static CardGrowthConfig s_config;
+    static bool s_configInjected;
+    static bool s_missingConfigLogged;
 
     static bool s_initialized;
 
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 강화 곡선 설정(미배선이면 기본 인스턴스)
+    // 강화 곡선 설정(미배선이면 표시 호환용 기본 인스턴스, 실제 강화는 차단)
     public static CardGrowthConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<CardGrowthConfig>());
+    {
+        get
+        {
+            if (s_config == null)
+                s_config = ScriptableObject.CreateInstance<CardGrowthConfig>();
+
+            if (!s_configInjected && !s_missingConfigLogged)
+            {
+                Debug.LogError("[CardGrowth] CardGrowthConfig가 주입되지 않아 기본 표시값을 사용합니다. 강화는 차단됩니다.");
+                s_missingConfigLogged = true;
+            }
+
+            return s_config;
+        }
+    }
+
+    public static bool IsConfigReady => s_configInjected;
 
     public static int MaxLevel => Config.MaxLevel;
     public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
@@ -29,10 +47,12 @@ public static class CardGrowthManager
     // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
 
-    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 부트스트랩에서 실제 애셋 주입. null이면 이전 설정을 버리고 미주입 상태로 되돌린다.
     public static void SetConfig(CardGrowthConfig _config)
     {
-        if (_config != null) s_config = _config;
+        s_config              = _config;
+        s_configInjected      = _config != null;
+        s_missingConfigLogged = false;
     }
 
     // 부트에서 DataSaveManager.Load() 이후 1회 호출
@@ -44,7 +64,6 @@ public static class CardGrowthManager
         KeywordGrowthManager.OnChanged += NotifyGrowthChanged;
 
         var t_data = DataSaveManager.Data.cardGrowth;
-        bool t_migrated = false;
         if (t_data != null && t_data.entries != null)
         {
             foreach (var t_entry in t_data.entries)
@@ -52,27 +71,12 @@ public static class CardGrowthManager
                 if (t_entry == null) continue;
 
                 int t_id = t_entry.cardId;
-                if (t_id <= 0)
-                {
-                    // 구 세이브(이름 키) 이관 — 카탈로그 미준비면 이번 부트는 건너뛰고 값을 보존한다.
-                    if (!CardCatalog.IsReady) continue;
-
-                    t_id = CardCatalog.LegacyIdOfName(t_entry.cardKey);
-                    if (t_id <= 0) continue;                 // 사라진 카드의 진행도는 버린다
-
-                    t_entry.cardId  = t_id;
-                    t_entry.cardKey = null;
-                    t_migrated      = true;
-                }
-
-                if (s_growth.ContainsKey(t_id)) continue;
+                if (t_id <= 0 || s_growth.ContainsKey(t_id)) continue;
                 s_growth[t_id] = t_entry;
             }
         }
 
         s_initialized = true;
-
-        if (t_migrated) Save();
     }
 
     static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
@@ -132,6 +136,11 @@ public static class CardGrowthManager
     public static EnhanceResult TryEnhance(CardData _card)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
+        if (!s_configInjected)
+        {
+            _ = Config; // 누락 로그는 Config 접근 경로에서 한 번만 남긴다.
+            return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
+        }
 
         int t_id = CardCatalog.IdOf(_card);
         if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);

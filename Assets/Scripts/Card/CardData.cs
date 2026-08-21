@@ -133,7 +133,7 @@ public class CardData : ScriptableObject
         _hpGain = 0;
         if (this.hpGainByLevel == null || this.hpGainByLevel.Length == 0) return false;
         if (_level < MinHpCurveLevel || _level > MaxHpCurveLevel) return false;
-        if (_level >= this.hpGainByLevel.Length) return true;
+        if (_level >= this.hpGainByLevel.Length) return false;
 
         _hpGain = Mathf.Max(0, this.hpGainByLevel[_level]);
         return true;

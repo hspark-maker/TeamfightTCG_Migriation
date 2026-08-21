@@ -35,20 +35,10 @@ public partial class Card
     public int hp3;
     /// Lv4 진입 시 증가 HP
     public int hp4;
-    /// Lv5 진입 시 증가 HP
-    public int hp5;
-    /// Lv6 진입 시 증가 HP
-    public int hp6;
-    /// Lv7 진입 시 증가 HP
-    public int hp7;
-    /// Lv8 진입 시 증가 HP
-    public int hp8;
-    /// Lv9 진입 시 증가 HP
-    public int hp9;
-    /// Lv10 진입 시 증가 HP
-    public int hp10;
     /// 도감 설명문
     public string cardExplain;
+    /// 카드 등급(Silver/Gold/Prism)
+    public string grade;
 }
 
 [GeneratorSpecData]
@@ -79,21 +69,9 @@ public partial class Card_Test
     public int hp3;
     /// Lv4 진입 시 증가 HP
     public int hp4;
-    /// Lv5 진입 시 증가 HP
-    public int hp5;
-    /// Lv6 진입 시 증가 HP
-    public int hp6;
-    /// Lv7 진입 시 증가 HP
-    public int hp7;
-    /// Lv8 진입 시 증가 HP
-    public int hp8;
-    /// Lv9 진입 시 증가 HP
-    public int hp9;
-    /// Lv10 진입 시 증가 HP
-    public int hp10;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism/Legendary)
+    /// 카드 등급(Silver/Gold/Prism)
     public string grade;
 }
 
