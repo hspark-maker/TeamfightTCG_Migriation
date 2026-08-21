@@ -115,8 +115,9 @@ public class CardPackData : ScriptableObject
 
     bool Spec(out CardPack _row) => PackSpec.TryGetPack(packId, out _row);
 
+    // 팩 가격은 오타여도 화면이 서야 하므로 Gold로 떨어진다(보상은 반대로 그 줄을 버린다 — RewardSpec)
     static ECurrencyType ParseCurrency(string _value)
-        => System.Enum.TryParse(_value, out ECurrencyType t_type) ? t_type : ECurrencyType.Gold;
+        => CurrencyCode.TryParse(_value, out ECurrencyType t_type) ? t_type : ECurrencyType.Gold;
 }
 
 [System.Serializable]

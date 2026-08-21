@@ -41,17 +41,15 @@ public class TournamentMapOverlayView : MonoBehaviour
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
-    [Tooltip("보상 팝업이 걷히고 길이 차오르기까지의 정박. 팝업 딤이 사라지는 시간을 벌어 준다.")]
-    [SerializeField] float claimHoldIn = 0.1f;
+    [Tooltip("보상 팝업이 걷히고 길이 차오르기까지의 정박. 이 사이에 클리어 도장이 꽂힌다 —\n" +
+             "너무 짧으면 도장과 길이 겹쳐 사건이 둘 다 뭉갠다.")]
+    [SerializeField] float claimHoldIn = 0.45f;
 
     [Tooltip("길 점 하나가 금색으로 물드는 시간.")]
     [SerializeField] float linkDotDuration = 0.15f;
 
     [Tooltip("길 점과 점 사이 간격. 구간마다 점이 6~9개로 갈리므로 총 길이도 함께 갈린다.")]
     [SerializeField] float linkDotStagger = 0.06f;
-
-    [Tooltip("길이 다 찬 뒤 다음 정점이 열리기까지의 정박.")]
-    [SerializeField] float claimHoldOut = 0.1f;
 
     /// <summary>정점 도전 요청(도전 가능한 정점만 올라온다). LobbyRoot가 전투로 잇는다.</summary>
     public event Action<int> NodeSelected;
@@ -62,7 +60,6 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 타일 안에서 정점 자리·길 조각을 담고 있는 자식 이름(타일 프리팹 규약)
     const string PATH_ROOT_NAME = "PathRoot";
     const string LINK_ROOT_NAME = "LinkRoot";
-    const string SEAM_FOG_NAME  = "SeamFog";
 
     // 평탄 정점 번호와 칸이 1:1이다. 자리가 저작되지 않은 정점은 빈칸으로 남는다 — ScrollToNode가 번호로 찾는다.
     readonly List<TournamentNodeView> m_nodes = new List<TournamentNodeView>();
@@ -84,6 +81,14 @@ public class TournamentMapOverlayView : MonoBehaviour
 
     // 점등 연출이 도는 동안 진행 통지의 즉시 반영을 미룬다 — 안 그러면 수령 순간 결말이 먼저 나온다.
     bool m_suspendRefresh;
+
+    // 도장이 꽂히는 중인 정점(없으면 -1). 팝업의 [획득]이 있던 자리에 그 정점이 그대로 서 있어,
+    // 여벌 탭 하나가 재도전 전투로 새면 사슬이 통째로 잘린다.
+    int m_claimNode = -1;
+
+    // 지금 점등 트윈이 물들이는 중인 구간(없으면 -1). RefreshLinks가 이 한 칸만 건너뛴다 —
+    // 상태를 먼저 커밋하면 길도 같은 프레임에 금색이 돼 차오르는 연출이 통째로 사라진다.
+    int m_litLink = -1;
 
     Sequence m_claimSeq;
 
@@ -189,9 +194,6 @@ public class TournamentMapOverlayView : MonoBehaviour
         float t_stack = this.BuildChapterTiles(t_positions, t_bandBottoms);
         this.content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_stack);
 
-        // 여백을 준 만큼 첫 타일 아랫변이 하늘에 드러난다 — 이음매와 같은 구름으로 덮어 맵을 닫는다.
-        this.BuildBottomCap(this.BottomInset);
-
         // 띠를 정점보다 먼저 세운다 — 이음매에 걸친 정점이 띠 위로 오게(정점이 진행의 주인공이다).
         this.BuildChapterBands(t_bandBottoms);
 
@@ -277,48 +279,6 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.CollectTileLinks(_chapterIndex, t_rect, _nodeStart, _chapter.NodeCount);
 
         return _cursor + t_rect.rect.height * t_scale;
-    }
-
-    // 맵의 아랫변(첫 타일 아랫변)을 이음매와 같은 구름으로 닫는다. 그림은 타일이 저작한 SeamFog에서 빌린다 —
-    // 여기서 따로 스프라이트를 물리면 타일별로 안개가 갈릴 때 이 한 장만 옛 그림으로 남는다.
-    // 첫 타일에는 SeamFog가 없으므로(맵의 아랫변은 이음매가 아니다) 챕터가 하나뿐이면 조용히 건너뛴다.
-    void BuildBottomCap(float _bottom)
-    {
-        if (_bottom <= 0f) return;   // 여백이 없으면 아랫변이 하단 안개 밑에 그대로 잠긴다(예전과 같다)
-
-        Image t_source = null;
-        Vector3 t_tileScale = Vector3.one;
-
-        for (int t_i = 0; t_i < this.m_spawned.Count && t_source == null; t_i++)
-        {
-            if (this.m_spawned[t_i] == null) continue;
-
-            Transform t_fog = this.m_spawned[t_i].transform.Find(SEAM_FOG_NAME);
-            if (t_fog == null) continue;
-
-            t_source = t_fog.GetComponent<Image>();
-
-            // 원본은 폭 맞춤으로 스케일된 타일 '안'에 있고 이 한 장은 Content 직속이다 —
-            // 타일 스케일을 함께 가져와야 끝 구름만 다른 크기로 뜨지 않는다.
-            t_tileScale = this.m_spawned[t_i].transform.localScale;
-        }
-
-        if (t_source == null || t_source.sprite == null) return;
-
-        var t_cap = new GameObject("BottomCapFog", typeof(RectTransform), typeof(Image));
-        var t_rect = (RectTransform)t_cap.transform;
-        t_rect.SetParent(this.content, false);
-
-        var t_image = t_cap.GetComponent<Image>();
-        t_image.sprite = t_source.sprite;
-        t_image.color = t_source.color;
-        t_image.raycastTarget = false;   // 구름 뒤 정점을 눌러야 한다
-
-        this.Place(t_rect, new Vector2(0f, _bottom));
-        t_rect.sizeDelta = ((RectTransform)t_source.transform).sizeDelta;
-        t_rect.localScale = t_tileScale;
-
-        this.m_spawned.Add(t_cap);
     }
 
     // 챕터마다 띠를 그 타일 아랫변에 앉힌다. 이음매 구름 한가운데 서서 여기부터 그 장이라는 것을 말하고,
@@ -424,6 +384,7 @@ public class TournamentMapOverlayView : MonoBehaviour
         {
             PathLink t_link = this.m_links[t_i];
             if (t_link.Graphics == null) continue;
+            if (t_link.Index == this.m_litLink) continue;   // 트윈이 쥐고 있는 구간은 덮지 않는다
 
             Color t_color = TournamentProgress.StateOf(t_link.Index) == ETournamentNodeState.Cleared
                 ? this.clearedColor
@@ -574,7 +535,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 정점 뷰가 이미 잠긴 버튼을 죽여 두지만, 진입 판정의 주인은 화면이다(저작·상태가 갈려도 새지 않게).
     void OnNodeTapped(int _index)
     {
-        if (this.m_claimSeq != null) return;   // 점등이 도는 동안은 정점 입력을 받지 않는다(스크롤은 살아 있다)
+        // 길 점등은 관문이 아니다(상태가 이미 진실이라 다음 정점은 눌러도 된다).
+        // 다만 도장이 꽂히는 중인 그 정점만은 막는다.
+        if (this.m_claimSeq != null && _index == this.m_claimNode) return;
 
         // 선물은 도전이 아니라 수령이다 — 전투로 잇지 않고 보상 팝업으로 간다.
         if (TournamentProgress.IsRewardPending(_index))
@@ -585,7 +548,22 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         if (!TournamentProgress.CanEnter(_index)) return;
 
-        this.NodeSelected?.Invoke(_index);
+        this.OpenNodeChallenge(_index);
+    }
+
+    // 도전 확인 팝업. 정점을 누르면 곧장 씬이 갈리던 것을 한 박 세워, 무엇과 싸우고 무엇을 받는지 보고 고르게 한다.
+    // 팝업이 서지 않으면(프리팹 미배선) 예전처럼 곧바로 도전한다 — 확인 한 겹 때문에 진행이 막히지는 않게.
+    void OpenNodeChallenge(int _index)
+    {
+        var t_data = new TournamentNodePopupData
+        {
+            nodeIndex = _index,
+            onBattle = () => this.NodeSelected?.Invoke(_index),
+        };
+
+        if (UIPoolManager.Instance == null
+            || UIPoolManager.Instance.AddOrUpdateUI<TournamentNodePopup>(t_data) == null)
+            this.NodeSelected?.Invoke(_index);
     }
 
     // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.
@@ -600,7 +578,8 @@ public class TournamentMapOverlayView : MonoBehaviour
             this.PlayClaimSequence(_index);
     }
 
-    // 길이 차오르고 다음 정점이 열리는 한 박. 상태는 이미 커밋됐고 이건 그 위에 덮인 장식이다.
+    // 팝업이 걷히는 프레임에 결말을 그리고, 길이 차오르는 것은 그 위에 얹는다.
+    // 해금을 점등 끝에 매달아 두면 상태를 보려고 길이 다 찰 때까지 기다려야 한다 — 길은 장식이지 관문이 아니다.
     void PlayClaimSequence(int _index)
     {
         // 맵을 떠난 뒤 콜백이 도착했다 — 다음 진입에서 진실이 그려진다.
@@ -618,22 +597,36 @@ public class TournamentMapOverlayView : MonoBehaviour
             return;
         }
 
+        // 길이 차기 전에 결말부터 그린다. 이 구간만 아직 흰색으로 남겨 두어야 점등이 눈에 보인다.
+        int t_slot = this.m_links.FindIndex(_link => _link.Index == _index);
+        this.m_litLink = t_slot >= 0 ? _index : -1;
+
+        this.RevealClear(_index);
+
+        this.m_claimNode = _index;
         this.m_claimSeq = DOTween.Sequence().SetLink(this.gameObject);
 
-        // 시퀀스 커서를 손으로 든다 — Insert는 Append 커서를 밀지 않아서, 섞어 쓰면 해금이 점등을 앞지른다.
         float t_at = this.claimHoldIn;
-
-        int t_slot = this.m_links.FindIndex(_link => _link.Index == _index);
         t_at += t_slot >= 0 ? this.InsertLinkFill(this.m_links[t_slot], t_at)
                             : this.InsertChapterSeam(_index, t_at);
 
-        t_at += this.claimHoldOut;
-
-        this.m_claimSeq.InsertCallback(t_at, () => this.RevealUnlock(_index));
-        this.m_claimSeq.OnComplete(() => this.m_claimSeq = null);
+        this.m_claimSeq.InsertCallback(t_at, () => this.PunchNext(_index));
+        this.m_claimSeq.OnComplete(this.EndClaimSequence);
     }
 
-    // 구간의 점을 저작 순서(정점 i → i+1)대로 물들인다. 걸린 시간을 돌려준다.
+    // 점등이 끝났다 — 쥐고 있던 구간을 놓고 진실로 맞춘다(트윈이 남긴 색과 저작색이 미세하게 갈릴 수 있다).
+    void EndClaimSequence()
+    {
+        this.m_claimSeq = null;
+        this.m_claimNode = -1;
+
+        if (this.m_litLink < 0) return;
+
+        this.m_litLink = -1;
+        this.RefreshLinks();
+    }
+
+    // 구간의 점을 저작 순서(정점 i → i+1)대로 물들인다. 다 차기까지 걸린 시간을 돌려준다.
     float InsertLinkFill(PathLink _link, float _at)
     {
         if (_link.Graphics == null) return 0f;
@@ -663,12 +656,19 @@ public class TournamentMapOverlayView : MonoBehaviour
         return 0.15f;
     }
 
-    // 억제를 풀어 진실을 그리고, 그 프레임에 다음 정점이 튄다.
-    void RevealUnlock(int _index)
+    // 억제를 풀어 진실을 그리고, 그 프레임에 도장이 꽂힌다(팝업이 걷히는 바로 그 프레임이다).
+    void RevealClear(int _index)
     {
         this.m_suspendRefresh = false;
         this.RefreshNodes();
 
+        if (_index >= 0 && _index < this.m_nodes.Count) this.m_nodes[_index]?.PlayClearStamp();
+    }
+
+    // 사슬의 끝 — 길이 다 찬 자리에서 다음 정점이 튄다.
+    // 상태는 이미 팝업이 걷히던 프레임에 열렸고, 이 펀치는 "여기가 다음이다"를 가리키는 손짓이다.
+    void PunchNext(int _index)
+    {
         int t_next = _index + 1;
         if (t_next >= 0 && t_next < this.m_nodes.Count) this.m_nodes[t_next]?.PlayUnlockPunch();
     }
@@ -678,8 +678,16 @@ public class TournamentMapOverlayView : MonoBehaviour
     {
         if (this.m_claimSeq != null && this.m_claimSeq.IsActive()) this.m_claimSeq.Kill();
         this.m_claimSeq = null;
+        this.m_claimNode = -1;
 
-        if (!this.m_suspendRefresh) return;
+        // 점등이 반쯤 찬 구간을 쥔 채 끊겼다 — 놓지 않으면 그 구간만 영영 갱신에서 빠진다.
+        this.m_litLink = -1;
+
+        if (!this.m_suspendRefresh)
+        {
+            this.RefreshLinks();
+            return;
+        }
 
         this.m_suspendRefresh = false;
         this.RefreshNodes();

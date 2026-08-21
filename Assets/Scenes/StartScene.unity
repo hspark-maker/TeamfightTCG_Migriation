@@ -255,6 +255,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 296217864068907159, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 100
+      objectReference: {fileID: 0}
     - target: {fileID: 504259994518015037, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_Name
       value: LoadingCover

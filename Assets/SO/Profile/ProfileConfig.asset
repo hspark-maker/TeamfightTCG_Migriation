@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5219971656b98e469a060b0513a1df0, type: 3}
+  m_Name: ProfileConfig
+  m_EditorClassIdentifier: Assembly-CSharp::ProfileConfig
+  avatarPlate: {fileID: 21300000, guid: 4d39085bb0991451392165e2e08c0b56, type: 3}
+  avatars:
+  - id: avatar_00
+    displayName: "\uAE30\uBCF8"
+    large: {fileID: 21300000, guid: dc1daa1759ce1044f9619fd266295508, type: 3}
+    small: {fileID: 21300000, guid: dc1daa1759ce1044f9619fd266295508, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  frames:
+  - id: frame_default
+    displayName: "\uAE30\uBCF8"
+    sprite: {fileID: 21300000, guid: c67025f4437b4a648d8bb4619c33051c, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_frost
+    displayName: "\uD504\uB85C\uC2A4\uD2B8"
+    sprite: {fileID: 21300000, guid: 4464309f3dbfda24793ef4e2afcb9e11, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_ember
+    displayName: "\uC5E0\uBC84"
+    sprite: {fileID: 21300000, guid: 5d724eaefefb4b74285fa23217e16b8a, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_emerald
+    displayName: "\uC5D0\uBA54\uB784\uB4DC"
+    sprite: {fileID: 21300000, guid: 3955c7cecbedaa542ad52cf65775702b, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_arcane
+    displayName: "\uC544\uCF00\uC778"
+    sprite: {fileID: 21300000, guid: 2fed7660ffe42c8448b9e456deb84021, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_silver
+    displayName: "\uC2E4\uBC84"
+    sprite: {fileID: 21300000, guid: 3fa87731f67ce27419c3f7d6b8f27887, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}

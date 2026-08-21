@@ -32,8 +32,7 @@ public static class AlbumRewardClaimFlow
             // 0짜리는 칸만 잡는다(AlbumRewardManager.Claim도 같은 기준으로 건너뛴다).
             if (_rewards[t_i].amount <= 0) continue;
 
-            t_lines.Add(new RewardLine(new CurrencyGain(_rewards[t_i].currency, _rewards[t_i].amount),
-                                       _rewards[t_i].icon));
+            t_lines.Add(new RewardLine(new CurrencyGain(_rewards[t_i].currency, _rewards[t_i].amount)));
         }
 
         return t_lines;

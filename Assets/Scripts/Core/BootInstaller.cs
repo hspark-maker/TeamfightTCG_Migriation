@@ -27,6 +27,8 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] CardGrowthConfig growthConfig;
     // 키워드 전역 강화 설정. 미배선 시 코드 기본값으로 동작한다.
     [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
+    // 프로필 아바타·프레임 표 SO. 미배선(null)이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
+    [SerializeField] ProfileConfig profileConfig;
     [FormerlySerializedAs("runtimeUiPrefabs")]
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
 
@@ -55,6 +57,11 @@ public class BootInstaller : MonoBehaviour
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
         PackSpec.Init();
 
+        // 보상 스펙시트 선로드 — 토너먼트·앨범 보상 값의 진실원. 파싱은 SpecSource가 이미 1회 했으므로
+        // 여기서 드는 비용은 키 색인뿐이다.
+        TournamentSpec.Init();
+        AlbumSpec.Init();
+
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CardAlbum.SetSource(albumConfig);
 
@@ -63,6 +70,10 @@ public class BootInstaller : MonoBehaviour
 
         // 토너먼트 경로 주입 — 정점 상태 조회가 이 애셋에서 나온다(미배선이면 정점 0개).
         TournamentProgress.SetConfig(tournamentConfig);
+
+        // 프로필 주입·로드 — 세이브 의존이 없어 순서는 자유다.
+        ProfileManager.SetConfig(profileConfig);
+        ProfileManager.Init();
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
         OwnershipManager.Init();

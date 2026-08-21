@@ -54,19 +54,8 @@ public static class PackSpec
         if (s_loaded) return;
         s_loaded = true;   // 실패해도 매 조회마다 재파싱하지 않는다(폴백으로 계속 돈다).
 
-        string t_json = SpecDataResourceLoader.LoadSpecData();
-        if (string.IsNullOrEmpty(t_json))
-        {
-            Debug.LogWarning("[PackSpec] SpecData 리소스를 못 읽었다. 팩은 SO 인스펙터 값으로 돈다.");
-            return;
-        }
-
-        var t_manager = new SpecDataManager();
-        if (!t_manager.Load(t_json))
-        {
-            Debug.LogWarning("[PackSpec] SpecData 파싱 실패. 팩은 SO 인스펙터 값으로 돈다.");
-            return;
-        }
+        SpecDataManager t_manager = SpecSource.Manager;
+        if (t_manager == null) return;   // 못 읽은 경고는 SpecSource가 이미 냈다. 팩은 SO 인스펙터 값으로 돈다.
 
         IReadOnlyList<CardPack> t_packRows = t_manager.CardPack?.All;
         if (t_packRows != null)

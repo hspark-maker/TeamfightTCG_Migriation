@@ -42,6 +42,29 @@ public static class DeckPower
     public static int Of(CardData _card, bool _mine = true)
         => _card != null ? MaxHpOf(_card, _mine) + _card.bonusHp : 0;
 
+    /// <summary>지정한 레벨에 선 카드의 표시용 최대 체력. 레벨을 랭크 티어가 아니라 <b>저작이</b> 정하는
+    /// 상대(토너먼트 정점)를 위한 길이다 — LevelOf는 내 랭크를 읽으므로 그쪽으로 가면 정점마다 같은 수가 나온다.</summary>
+    public static int MaxHpAtLevel(CardData _card, int _level)
+        => _card != null ? _card.maxHp + CardGrowthManager.GrowthAtLevel(_card, _level).HpBonus : 0;
+
+    /// <summary>덱 전체가 지정한 레벨에 섰을 때의 파워 합. 정점의 권장 전투력이 여기서 나온다 —
+    /// 난이도를 SO에 따로 저작하면 적 덱을 고칠 때마다 두 수가 어긋난다.</summary>
+    public static int OfAtLevel(IReadOnlyList<CardData> _deck, int _level)
+    {
+        if (_deck == null) return 0;
+
+        int t_sum = 0;
+        for (int t_i = 0; t_i < _deck.Count; t_i++)
+        {
+            CardData t_card = _deck[t_i];
+            if (t_card == null) continue;
+
+            t_sum += MaxHpAtLevel(t_card, _level) + t_card.bonusHp;
+        }
+
+        return t_sum;
+    }
+
     // 덱 전체 파워 합
     public static int Of(IReadOnlyList<CardData> _deck, bool _mine = true)
     {

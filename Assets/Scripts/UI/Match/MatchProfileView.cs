@@ -21,7 +21,8 @@ public class MatchProfileView : MonoBehaviour
     [SerializeField] string searchingNickname = "???";
 
     [Header("칠할 곳")]
-    [SerializeField] Image    avatarImage;
+    [Tooltip("판·얼굴·링 3층을 그리는 공용 프로필 뷰. 비우면 프로필 그림 갱신만 건너뛴다 — 이름·랭크는 그대로 칠한다.")]
+    [SerializeField] ProfileAvatarView profileView;
     [SerializeField] TMP_Text nicknameText;
     [SerializeField] Image    rankBadge;
     [SerializeField] TMP_Text rankNameText;
@@ -79,7 +80,12 @@ public class MatchProfileView : MonoBehaviour
         if (nicknameText != null) nicknameText.text = _profile.Nickname;
         if (rankNameText != null) rankNameText.text = _profile.RankName;
 
-        if (avatarImage != null && _profile.Avatar != null) avatarImage.sprite = _profile.Avatar;
+        // 판·얼굴·링은 공용 뷰가 그린다. 층별 스프라이트가 null이면 그 층은 저작값이 유지된다(상대·토너먼트는 판·링이 null).
+        if (profileView != null)
+        {
+            profileView.Render(new ProfileLook(_profile.Plate, _profile.PlateColor,
+                                               _profile.Avatar, _profile.Frame, _profile.FrameColor));
+        }
 
         // 배지는 랭크가 있을 때만 세운다 — 토너먼트 정점은 랭크를 비워 오므로(MatchProfile.OfTournamentNode)
         // 저작 스프라이트가 남아 있으면 없는 랭크전을 있는 것처럼 보이게 한다.

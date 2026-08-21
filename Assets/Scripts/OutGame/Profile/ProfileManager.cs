@@ -1,0 +1,88 @@
+using System;
+using UnityEngine;
+
+// 내 프로필(닉네임·아바타·프레임)의 static 단일 창구
+public static class ProfileManager
+{
+    public const int    NICKNAME_MAX_LENGTH = 12;
+    public const string DEFAULT_NICKNAME    = "나";
+
+    // 프로필 변경 통지 — UI 갱신용
+    public static event Action OnChanged;
+
+    public static ProfileConfig Config { get; private set; }
+
+    public static string Nickname { get; private set; } = DEFAULT_NICKNAME;
+    public static string AvatarId { get; private set; } = string.Empty;
+    public static string FrameId  { get; private set; } = string.Empty;
+
+    // 그림은 null을 허용한다 — 뷰가 프리팹에 저작된 스프라이트를 그대로 유지한다.
+    public static Sprite AvatarLarge => Config != null && Config.TryGetAvatar(AvatarId, out var t_entry) ? t_entry.large : null;
+    public static Sprite AvatarSmall => Config != null && Config.TryGetAvatar(AvatarId, out var t_entry) ? t_entry.SmallOrLarge : null;
+    public static Sprite Frame       => Config != null && Config.TryGetFrame(FrameId,   out var t_entry) ? t_entry.sprite : null;
+
+    // 프레임 스프라이트는 흰 마스터라 이 색으로 틴트해야 저작한 색이 나온다. 미조회면 white(틴트 안 함).
+    public static Color FrameColor  => Config != null && Config.TryGetFrame(FrameId,   out var t_entry) ? t_entry.color : Color.white;
+
+    // 얼굴 뒤 판은 모든 아바타가 같은 흰 마스터를 쓰고 색만 아바타별로 갈린다.
+    public static Sprite AvatarPlate => Config != null ? Config.AvatarPlate : null;
+    public static Color  AvatarColor => Config != null && Config.TryGetAvatar(AvatarId, out var t_entry) ? t_entry.color : Color.white;
+
+    // 판·얼굴·링 한 벌. 프로필을 그리는 화면은 값을 따로 집지 말고 이걸 받아라.
+    public static ProfileLook CurrentLook => Config != null ? Config.LookOf(AvatarId, FrameId) : new ProfileLook(null, Color.white, null, null, Color.white);
+
+    // 부트에서 1회 주입. 미배선(null)이면 그림이 전부 null로 떨어진다(화면은 저작값 유지).
+    public static void SetConfig(ProfileConfig _config)
+    {
+        Config = _config;
+    }
+
+    // 부트에서 SetConfig 이후 1회 호출. 세이브가 없는 지금은 Config 기본값으로 채운다.
+    public static void Init()
+    {
+        // TODO 세이브: UserSaveData의 nickname/avatarId/frameId를 읽어 아래 기본값 자리를 덮는다.
+        Nickname = DEFAULT_NICKNAME;
+        AvatarId = Config != null ? Config.DefaultAvatarId : string.Empty;
+        FrameId  = Config != null ? Config.DefaultFrameId  : string.Empty;
+    }
+
+    // 프로필 3값 일괄 반영. 모르는 아바타·프레임 ID는 무시하고 기존값을 남긴다.
+    public static void Apply(string _nickname, string _avatarId, string _frameId)
+    {
+        string t_nickname = SanitizeNickname(_nickname);
+        string t_avatarId = Config != null && Config.TryGetAvatar(_avatarId, out _) ? _avatarId : AvatarId;
+        string t_frameId  = Config != null && Config.TryGetFrame(_frameId,   out _) ? _frameId  : FrameId;
+
+        if (t_nickname == Nickname && t_avatarId == AvatarId && t_frameId == FrameId) return;
+
+        Nickname = t_nickname;
+        AvatarId = t_avatarId;
+        FrameId  = t_frameId;
+
+        Persist();
+        OnChanged?.Invoke();
+    }
+
+    // 해금 훅 자리 — 아바타 해금이 붙으면 여기서 소유 여부를 판정한다(지금은 전부 열려 있다).
+    public static bool IsAvatarOwned(string _id) => true;
+
+    // 해금 훅 자리 — 프레임 해금이 붙으면 여기서 소유 여부를 판정한다(지금은 전부 열려 있다).
+    public static bool IsFrameOwned(string _id) => true;
+
+    // 앞뒤 공백 제거 → 길이 클램프 → 비면 기본 닉네임
+    public static string SanitizeNickname(string _raw)
+    {
+        if (string.IsNullOrEmpty(_raw)) return DEFAULT_NICKNAME;
+
+        string t_name = _raw.Trim();
+        if (t_name.Length > NICKNAME_MAX_LENGTH) t_name = t_name.Substring(0, NICKNAME_MAX_LENGTH);
+
+        return t_name.Length > 0 ? t_name : DEFAULT_NICKNAME;
+    }
+
+    static void Persist()
+    {
+        // TODO 세이브: 여기와 Init() 두 곳만 채우면 된다 —
+        // UserSaveData에 nickname/avatarId/frameId 3필드를 추가한 뒤 DataSaveManager로 flush.
+    }
+}

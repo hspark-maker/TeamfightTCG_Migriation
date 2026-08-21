@@ -57,11 +57,11 @@ public struct AlbumPageDef
     public List<CardData> cards;
 }
 
-// 보상 1건 저작값
+// 보상 1건 저작값. 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이고,
+// 이 값은 스펙시트로도 저작되므로 에셋 참조를 실을 자리가 없다.
 [System.Serializable]
 public struct AlbumRewardDef
 {
     public ECurrencyType currency;
     public long amount;
-    public Sprite icon;
 }
