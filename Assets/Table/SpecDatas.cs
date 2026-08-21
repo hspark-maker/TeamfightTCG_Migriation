@@ -35,20 +35,10 @@ public partial class Card
     public int hp3;
     /// Lv4 진입 시 증가 HP
     public int hp4;
-    /// Lv5 진입 시 증가 HP
-    public int hp5;
-    /// Lv6 진입 시 증가 HP
-    public int hp6;
-    /// Lv7 진입 시 증가 HP
-    public int hp7;
-    /// Lv8 진입 시 증가 HP
-    public int hp8;
-    /// Lv9 진입 시 증가 HP
-    public int hp9;
-    /// Lv10 진입 시 증가 HP
-    public int hp10;
     /// 도감 설명문
     public string cardExplain;
+    /// 카드 등급(Silver/Gold/Prism)
+    public string grade;
 }
 
 [GeneratorSpecData]
@@ -79,21 +69,9 @@ public partial class Card_Test
     public int hp3;
     /// Lv4 진입 시 증가 HP
     public int hp4;
-    /// Lv5 진입 시 증가 HP
-    public int hp5;
-    /// Lv6 진입 시 증가 HP
-    public int hp6;
-    /// Lv7 진입 시 증가 HP
-    public int hp7;
-    /// Lv8 진입 시 증가 HP
-    public int hp8;
-    /// Lv9 진입 시 증가 HP
-    public int hp9;
-    /// Lv10 진입 시 증가 HP
-    public int hp10;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism/Legendary)
+    /// 카드 등급(Silver/Gold/Prism)
     public string grade;
 }
 
@@ -137,4 +115,38 @@ public partial class CardPackDrop
     public int cardId;
     /// 추첨 가중치(같은 packId+minGrade 안에서 정규화)
     public int weight;
+}
+
+[GeneratorSpecData]
+public partial class TournamentReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 보상을 받는 대상 — TournamentNode.nodeId 또는 TournamentChapter.chapterId
+    public string ownerKey;
+    /// 같은 ownerKey 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
+    public long amount;
+}
+
+[GeneratorSpecData]
+public partial class AlbumReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// AlbumTheme.themeId — 비우면 앨범 전체 보상
+    public string themeId;
+    /// AlbumPage.pageId — 비우면 테마 완성 보상
+    public string pageId;
+    /// 같은 대상 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
+    public long amount;
 }

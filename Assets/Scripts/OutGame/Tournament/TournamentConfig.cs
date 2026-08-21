@@ -133,6 +133,8 @@ public class TournamentConfig : ScriptableObject
         if (_sink == null) return;
         _sink.Clear();
 
+        if (TournamentSpec.TryGetRewards(_nodeId, out List<AlbumRewardDef> t_spec)) { FillFrom(t_spec, _sink); return; }
+
         int t_index = IndexOf(_nodeId);
         if (t_index < 0) return;
 
@@ -144,6 +146,8 @@ public class TournamentConfig : ScriptableObject
     {
         if (_sink == null) return;
         _sink.Clear();
+
+        if (TournamentSpec.TryGetRewards(_chapterId, out List<AlbumRewardDef> t_spec)) { FillFrom(t_spec, _sink); return; }
 
         int t_index = ChapterIndexOf(_chapterId);
         if (t_index < 0) return;
@@ -210,7 +214,7 @@ public class TournamentConfig : ScriptableObject
             AlbumRewardDef t_def = _rewards[t_i];
             if (t_def.amount <= 0) continue;
 
-            _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount), t_def.icon));
+            _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
         }
     }
 

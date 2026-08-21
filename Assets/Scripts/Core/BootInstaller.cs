@@ -57,6 +57,11 @@ public class BootInstaller : MonoBehaviour
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
         PackSpec.Init();
 
+        // 보상 스펙시트 선로드 — 토너먼트·앨범 보상 값의 진실원. 파싱은 SpecSource가 이미 1회 했으므로
+        // 여기서 드는 비용은 키 색인뿐이다.
+        TournamentSpec.Init();
+        AlbumSpec.Init();
+
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog.IdOf를 읽는다).
         CardAlbum.SetSource(albumConfig);
 

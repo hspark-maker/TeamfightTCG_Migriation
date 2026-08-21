@@ -262,7 +262,8 @@ public class AlbumTabController : LobbyTabPanel
         {
             if (rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(_rewards[t_i].icon, _rewards[t_i].amount);
+            // 그림은 저작값이 아니라 재화 표에서 온다(RewardLine과 같은 창구).
+            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(CurrencyLook.IconOf(_rewards[t_i].currency), _rewards[t_i].amount);
             else rewardSlots[t_i].Hide();
         }
 

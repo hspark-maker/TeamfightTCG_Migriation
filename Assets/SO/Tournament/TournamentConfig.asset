@@ -32,7 +32,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 200
-        icon: {fileID: 0}
     - nodeId: node_02
       displayName: "\uB2AA\uC9C0\uC758 \uCD94\uC801\uC790"
       avatar: {fileID: 0}
@@ -48,7 +47,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 50
-        icon: {fileID: 0}
     - nodeId: node_03
       displayName: "\uBC14\uC704\uAD74 \uAD11\uBD80"
       avatar: {fileID: 0}
@@ -64,7 +62,6 @@ MonoBehaviour:
       rewards:
       - currency: 2
         amount: 40
-        icon: {fileID: 0}
     - nodeId: node_04
       displayName: "\uC124\uC6D0\uC758 \uAD70\uC8FC"
       avatar: {fileID: 0}
@@ -80,7 +77,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 250
-        icon: {fileID: 0}
     - nodeId: node_05
       displayName: "\uC7BF\uBE5B \uB300\uC7A5\uC7A5\uC774"
       avatar: {fileID: 0}
@@ -96,7 +92,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 60
-        icon: {fileID: 0}
     - nodeId: node_06
       displayName: "\uBB3C\uACB0\uC758 \uBB34\uD76C"
       avatar: {fileID: 0}
@@ -112,14 +107,11 @@ MonoBehaviour:
       rewards:
       - currency: 1
         amount: 10
-        icon: {fileID: 0}
     completionRewards:
     - currency: 0
       amount: 300
-      icon: {fileID: 0}
     - currency: 3
       amount: 40
-      icon: {fileID: 0}
   - chapterId: chapter_02
     title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
     tilePrefab: {fileID: 6468447428658967276, guid: f1351b2ef4a274a4f83cb6d9c6801545, type: 3}
@@ -139,7 +131,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 250
-        icon: {fileID: 0}
     - nodeId: node_08
       displayName: "\uD669\uAE08\uAC00\uC9C0 \uC0AC\uC81C"
       avatar: {fileID: 0}
@@ -155,7 +146,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 60
-        icon: {fileID: 0}
     - nodeId: node_09
       displayName: "\uC2EC\uC5F0\uC758 \uAD00\uCE21\uC790"
       avatar: {fileID: 0}
@@ -171,7 +161,6 @@ MonoBehaviour:
       rewards:
       - currency: 2
         amount: 50
-        icon: {fileID: 0}
     - nodeId: node_10
       displayName: "\uD3D0\uD5C8\uC758 \uC218\uC9D1\uAC00"
       avatar: {fileID: 0}
@@ -187,7 +176,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 300
-        icon: {fileID: 0}
     - nodeId: node_11
       displayName: "\uC7BF\uBD88\uC758 \uC804\uC870"
       avatar: {fileID: 0}
@@ -203,7 +191,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 70
-        icon: {fileID: 0}
     - nodeId: node_12
       displayName: "\uC655\uAD00 \uC5C6\uB294 \uC655"
       avatar: {fileID: 0}
@@ -219,14 +206,11 @@ MonoBehaviour:
       rewards:
       - currency: 1
         amount: 15
-        icon: {fileID: 0}
     completionRewards:
     - currency: 0
       amount: 450
-      icon: {fileID: 0}
     - currency: 3
       amount: 50
-      icon: {fileID: 0}
   - chapterId: chapter_03
     title: "\uC81C3\uC7A5 \xB7 \uC5BC\uC5B4\uBD99\uC740 \uC124\uC6D0"
     tilePrefab: {fileID: 668995502536726736, guid: 246083bed930b714c9d233dfe489ceba, type: 3}
@@ -246,7 +230,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 300
-        icon: {fileID: 0}
     - nodeId: node_14
       displayName: "\uB208\uBCF4\uB77C \uBB34\uB9AC"
       avatar: {fileID: 0}
@@ -262,7 +245,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 70
-        icon: {fileID: 0}
     - nodeId: node_15
       displayName: "\uC5BC\uC74C\uBB3C\uACB0 \uC220\uC0AC"
       avatar: {fileID: 0}
@@ -278,7 +260,6 @@ MonoBehaviour:
       rewards:
       - currency: 2
         amount: 70
-        icon: {fileID: 0}
     - nodeId: node_16
       displayName: "\uC11C\uB9AC\uBB34\uB364 \uC8FC\uC778"
       avatar: {fileID: 0}
@@ -294,7 +275,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 400
-        icon: {fileID: 0}
     - nodeId: node_17
       displayName: "\uC138\uAC08\uB798 \uC720\uBB3C\uAE30\uC0AC"
       avatar: {fileID: 0}
@@ -310,7 +290,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 80
-        icon: {fileID: 0}
     - nodeId: node_18
       displayName: "\uC124\uC6D0\uC758 \uC131\uC8FC"
       avatar: {fileID: 0}
@@ -326,14 +305,11 @@ MonoBehaviour:
       rewards:
       - currency: 1
         amount: 25
-        icon: {fileID: 0}
     completionRewards:
     - currency: 0
       amount: 550
-      icon: {fileID: 0}
     - currency: 3
       amount: 50
-      icon: {fileID: 0}
   - chapterId: chapter_04
     title: "\uC81C4\uC7A5 \xB7 \uC7BF\uBD88\uC758 \uD654\uC0B0"
     tilePrefab: {fileID: 9106813324675404984, guid: 25c79d556422e184fb2a0f4db1f7dba4, type: 3}
@@ -353,7 +329,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 400
-        icon: {fileID: 0}
     - nodeId: node_20
       displayName: "\uBD88\uD2F0 \uB5BC"
       avatar: {fileID: 0}
@@ -369,7 +344,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 80
-        icon: {fileID: 0}
     - nodeId: node_21
       displayName: "\uD751\uC694\uC11D \uBC29\uBCBD\uB300"
       avatar: {fileID: 0}
@@ -385,7 +359,6 @@ MonoBehaviour:
       rewards:
       - currency: 2
         amount: 90
-        icon: {fileID: 0}
     - nodeId: node_22
       displayName: "\uC628\uCC9C\uC758 \uC218\uD638\uC790"
       avatar: {fileID: 0}
@@ -401,7 +374,6 @@ MonoBehaviour:
       rewards:
       - currency: 0
         amount: 500
-        icon: {fileID: 0}
     - nodeId: node_23
       displayName: "\uC7BF\uB354\uBBF8 \uAC70\uC778\uB300"
       avatar: {fileID: 0}
@@ -417,7 +389,6 @@ MonoBehaviour:
       rewards:
       - currency: 3
         amount: 90
-        icon: {fileID: 0}
     - nodeId: node_24
       displayName: "\uC7BF\uBD88\uC758 \uC655"
       avatar: {fileID: 0}
@@ -433,11 +404,8 @@ MonoBehaviour:
       rewards:
       - currency: 1
         amount: 30
-        icon: {fileID: 0}
     completionRewards:
     - currency: 0
       amount: 600
-      icon: {fileID: 0}
     - currency: 3
       amount: 50
-      icon: {fileID: 0}
