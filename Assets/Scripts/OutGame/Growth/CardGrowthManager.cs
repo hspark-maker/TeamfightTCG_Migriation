@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 카드 성장(강화 레벨)의 static 단일 창구
-public static class CardGrowthManager
+// 카드 성장(강화 레벨)의 static 단일 창구. 간식은 같은 세이브 항목을 써서 partial 조각(.Snack.cs)이 맡는다.
+public static partial class CardGrowthManager
 {
     static readonly Dictionary<int, CardGrowthEntry> s_growth = new Dictionary<int, CardGrowthEntry>();
 
@@ -81,14 +81,32 @@ public static class CardGrowthManager
 
     static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
 
-    // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
-    public static void Save()
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음). 한 흐름이 여러 도메인을 건드릴 때
+    /// 도메인마다 Save()를 부르면 같은 파일을 여러 번 쓰므로, 디스크 쓰기는 마지막 한 곳이 맡는다.
+    /// 진행도 없는 항목(미강화 + 간식 0)은 직렬화에서 뺀다.</summary>
+    internal static void FlushToData()
     {
         if (!s_initialized) return;
 
         var t_data = DataSaveManager.Data.cardGrowth ?? (DataSaveManager.Data.cardGrowth = new CardGrowthSaveData());
         t_data.version = CardGrowthSaveData.VERSION;
-        t_data.entries = new List<CardGrowthEntry>(s_growth.Values);
+
+        var t_entries = new List<CardGrowthEntry>(s_growth.Count);
+        foreach (var t_entry in s_growth.Values)
+        {
+            if (t_entry == null) continue;
+            if (t_entry.level <= CardGrowth.BaseLevel && t_entry.snack <= 0 && t_entry.limitBreak <= 0) continue;
+            t_entries.Add(t_entry);
+        }
+        t_data.entries = t_entries;
+    }
+
+    // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
+    public static void Save()
+    {
+        if (!s_initialized) return;
+
+        FlushToData();
         DataSaveManager.Save();
     }
 
@@ -244,7 +262,11 @@ public static class CardGrowthManager
         CardGrowthConfig t_config = Config;
         CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_card, _level);
         int t_hpBonus = t_config.HpBonusAt(_card, _level);
-        if (_includeKeywordGrowth) t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
+        if (_includeKeywordGrowth)
+        {
+            t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
+            t_hpBonus += t_config.LimitBreakHpBonusAt(LimitBreakOf(CardCatalog.IdOf(_card)));
+        }
 
         return new CardGrowth(
             _level,

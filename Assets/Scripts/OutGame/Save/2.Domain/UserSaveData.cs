@@ -8,7 +8,9 @@ public class UserSaveData
     // 버전 불일치는 원본 JSON을 백업한 뒤 전체 세이브를 초기화한다.
     // 2: 도감 방치 생산 폐기로 collection 슬롯 삭제
     // 3: 카드 강화 레벨제를 0~3성 등급제로 전환
-    public const int VERSION = 3;
+    // 4: 카드별 간식(카드팩 중복 보상) 추가
+    // 5: 카드별 한계돌파 단계 추가
+    public const int VERSION = 5;
 
     public int version = VERSION;
 

@@ -155,8 +155,12 @@ public class PackCardView : MonoBehaviour
     [Tooltip("머문 뒤 사라지는 시간. 0이면 사라지지 않고 카드에 박힌 채 남는다 — 그 상태가 결과 격자까지 따라간다.")]
     [SerializeField] float refundFadeDuration = 0.3f;
 
+    [Tooltip("결과 격자에서 간식 문구가 뜨는 동안 카드 그림이 내려가는 알파. 0이면 무슨 카드였는지를 잃는다.")]
+    [Range(0f, 1f)] [SerializeField] float snackLoopCardAlpha = 0.15f;
+
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
+    public int Snack { get; private set; }
 
     // 환급 재화 종류. 코인 그림이 갈리는 유일한 근거라 Bind에서 받아 둔다.
     ECurrencyType m_refundType;
@@ -182,6 +186,8 @@ public class PackCardView : MonoBehaviour
         }
     }
 
+    CanvasGroup m_cardVisualGroup;
+
     // 강조가 이미 재생됐는지. 스킵과 정상 진행이 겹쳐도 두 번 터지지 않게 한다.
     bool m_accented;
 
@@ -189,6 +195,7 @@ public class PackCardView : MonoBehaviour
     // 재생이 끝나면 여기로 되돌려 놓는다(다음 Bind가 어긋난 자리에서 시작하지 않게).
     Vector3 m_refundHome;
     Vector3 m_refundRestScale = Vector3.one;
+    int m_refundSiblingIndex;
     bool m_refundHomeCaptured;
 
     // 환급 칩의 등장→체류→퇴장 한 묶음. 트랜스폼과 CanvasGroup 두 대상에 걸쳐 있어
@@ -207,6 +214,7 @@ public class PackCardView : MonoBehaviour
     {
         IsNew = _drawn.IsNew;
         Refund = _drawn.Refund;
+        Snack = _drawn.Snack;
         m_refundType = _drawn.RefundType;
         m_accented = false;
 
@@ -271,8 +279,9 @@ public class PackCardView : MonoBehaviour
 
         SetRim(false);
 
-        // 중복 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
+        // 낱장 확인용 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
         // 격자가 아닌 경로로 이 상태에 들어오는 카드(낱장 확인 중 요약으로 넘어간 경우)도 있어 여기서 못 박는다.
+        // 그 자리에 격자 전용 간식 반복을 새로 세운다(아래 PlayResultSnackLoop).
         KillRefundSeq();
         HideRefundBadge();
 
@@ -283,6 +292,8 @@ public class PackCardView : MonoBehaviour
             cardGleam.toneFilter = ToneFilter.Grayscale;
             cardGleam.toneIntensity = dupeResultDesaturation;
         }
+
+        PlayResultSnackLoop();
     }
 
     // 광택 띠가 카드를 한 번(신규는 그 이상) 훑고 지나간다.
@@ -359,6 +370,9 @@ public class PackCardView : MonoBehaviour
     // 걷어낼 시점을 아는 쪽이 그쪽이라 취소도 그쪽이 SnapPunchToRest로 부른다.
     void ResetAccent()
     {
+        // 이미 붙어 있을 때만 되돌린다 — 여기서 ResolveCardVisualGroup을 부르면 간식 반복과
+        // 무관한 카드(신규 포함) 전부에 CanvasGroup이 붙는다.
+        if (m_cardVisualGroup != null) m_cardVisualGroup.alpha = 1f;
         Group.alpha = 1f;   // 더미에서든 결과 격자에서든 카드는 선명한 상태로 시작한다.
 
         if (newBadge != null) newBadge.SetActive(false);
@@ -494,9 +508,9 @@ public class PackCardView : MonoBehaviour
     {
         if (refundBadge == null) return;
 
-        // 결과 격자에서는 칩을 띄우지 않는다. 거기서 카드는 셀에 맞춰 통째로 축소되므로(PackResultGrid.CardScale)
-        // 칩도 같은 배율로 줄어 읽히지 않는 얼룩이 된다 — 격자의 환급은 총합 한 줄이 대신 말한다.
-        // 중복이라는 사실 자체는 탈채도가 이미 쥐고 있다(ApplyResultContrast).
+        // 결과 격자에서는 이 칩을 띄우지 않는다. 거기서 카드는 셀에 맞춰 통째로 축소되므로(PackResultGrid.CardScale)
+        // 칩도 같은 배율로 줄어 읽히지 않는 얼룩이 된다.
+        // 격자의 간식 표시는 ApplyResultContrast가 따로 쥔다(반복 교차 페이드).
         if (_instant)
         {
             KillRefundSeq();
@@ -519,6 +533,7 @@ public class PackCardView : MonoBehaviour
         {
             m_refundHome = t_tr.localPosition;
             m_refundRestScale = t_tr.localScale;
+            m_refundSiblingIndex = t_tr.GetSiblingIndex();
             m_refundHomeCaptured = true;
         }
 
@@ -548,6 +563,56 @@ public class PackCardView : MonoBehaviour
             .OnComplete(HideRefundBadge);
     }
 
+    // 결과 격자에서만 도는 임시 간식 표시. 카드 그림과 칩이 서로 반대 알파로 무한 교차한다 —
+    // 격자에서는 칩이 0.42배로 줄어 가만히 두면 안 읽히므로, 자리를 옮기는 대신 카드를 비켜 준다.
+    //
+    // 칩을 솟아오르게 하지 않는다. 반복 시퀀스는 매 바퀴 시작값으로 되감기므로 상승을 넣으면
+    // 사이클마다 아래에서 다시 튀어오른다 — 요청은 페이드 반복이지 등장 반복이 아니다.
+    void PlayResultSnackLoop()
+    {
+        if (refundBadge == null || cardVisual == null) return;
+        if (Snack <= 0) return;
+
+        if (refundText != null) refundText.text = $"간식 {Snack:N0}개 획득";
+        if (refundCoin != null) refundCoin.SetActive(false);
+
+        var t_tr = refundBadge.transform;
+        if (!m_refundHomeCaptured)
+        {
+            m_refundHome = t_tr.localPosition;
+            m_refundRestScale = t_tr.localScale;
+            m_refundSiblingIndex = t_tr.GetSiblingIndex();
+            m_refundHomeCaptured = true;
+        }
+
+        var t_group = ResolveRefundGroup();
+        var t_cardGroup = ResolveCardVisualGroup();
+
+        KillRefundSeq();
+        refundBadge.SetActive(true);
+
+        // 문구는 카드 한가운데에 앉는다 — 흐려진 카드가 비운 자리를 그대로 받는다.
+        // (프리팹 자리는 카드 밖 아래라, 카드가 사라지는 동안 시선이 빈 곳을 본다.)
+        // 배율은 프리팹 값 그대로. 반복이 건드리는 축은 알파 둘뿐이다.
+        t_tr.localPosition = CardCenterIn(t_tr.parent);
+        t_tr.localScale = m_refundRestScale;
+
+        // 카드보다 뒤에 그려지면 반투명 카드에 문구가 묻힌다. 원래 순서는 HideRefundBadge가 되돌린다.
+        t_tr.SetAsLastSibling();
+        t_group.alpha = 0f;
+        t_cardGroup.alpha = 1f;
+
+        m_refundSeq = DOTween.Sequence()
+            .SetLink(gameObject)
+            .Append(t_cardGroup.DOFade(snackLoopCardAlpha, refundFadeDuration).SetEase(Ease.InOutSine))
+            .Join(t_group.DOFade(1f, refundFadeDuration).SetEase(Ease.InOutSine))
+            .AppendInterval(refundHoldDuration)
+            .Append(t_cardGroup.DOFade(1f, refundFadeDuration).SetEase(Ease.InOutSine))
+            .Join(t_group.DOFade(0f, refundFadeDuration).SetEase(Ease.InOutSine))
+            .AppendInterval(refundHoldDuration)
+            .SetLoops(-1);
+    }
+
     // 칩을 내리고 다음 재생이 쓸 출발 상태로 되돌린다. 자리를 아직 캡처하지 않았다면
     // 프리팹 값이 그대로 제자리이므로 건드리지 않는다.
     //
@@ -564,6 +629,7 @@ public class PackCardView : MonoBehaviour
         {
             t_tr.localPosition = m_refundHome;
             t_tr.localScale = m_refundRestScale;
+            t_tr.SetSiblingIndex(m_refundSiblingIndex);
         }
 
         // 알파는 1로 되돌린다 — 0으로 남으면 다음 카드의 칩이 켜져도 보이지 않는다.
@@ -573,10 +639,19 @@ public class PackCardView : MonoBehaviour
 
     void KillRefundSeq()
     {
-        if (m_refundSeq == null) return;
+        if (m_refundSeq != null)
+        {
+            m_refundSeq.Kill();
+            m_refundSeq = null;
+        }
 
-        m_refundSeq.Kill();
-        m_refundSeq = null;
+        if (m_cardVisualGroup != null) m_cardVisualGroup.alpha = 1f;
+    }
+
+    void OnDisable()
+    {
+        KillRefundSeq();
+        HideRefundBadge();
     }
 
     // 환급 재화에 맞는 코인 그림. 표가 답을 안 주면(null) 프리팹에 저작된 그림을 그대로 둔다 —
@@ -605,6 +680,28 @@ public class PackCardView : MonoBehaviour
         if (refundGroup == null) refundGroup = refundBadge.AddComponent<CanvasGroup>();
 
         return refundGroup;
+    }
+
+    // 카드 그림의 한가운데를 _space 기준 로컬 좌표로. rect.center를 쓰는 이유는 피벗이 가운데가
+    // 아닐 수 있어서다 — transform.position만 보면 피벗만큼 어긋난다.
+    Vector3 CardCenterIn(Transform _space)
+    {
+        var t_cardRt = cardVisual.transform as RectTransform;
+        Vector3 t_world = t_cardRt != null
+            ? t_cardRt.TransformPoint(t_cardRt.rect.center)
+            : cardVisual.transform.position;
+
+        return _space != null ? _space.InverseTransformPoint(t_world) : t_world;
+    }
+
+    CanvasGroup ResolveCardVisualGroup()
+    {
+        if (m_cardVisualGroup != null) return m_cardVisualGroup;
+
+        m_cardVisualGroup = cardVisual.GetComponent<CanvasGroup>();
+        if (m_cardVisualGroup == null) m_cardVisualGroup = cardVisual.gameObject.AddComponent<CanvasGroup>();
+
+        return m_cardVisualGroup;
     }
 
     static void SetAlpha(Graphic _graphic, float _alpha)
