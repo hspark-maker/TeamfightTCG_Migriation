@@ -21,6 +21,7 @@ public static class CardGrowthManager
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<CardGrowthConfig>());
 
     public static int MaxLevel => Config.MaxLevel;
+    public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
 
     // 레벨 _level로 올리는 한 방이 진화인가(관문 레벨은 곡선이 소유한다)
     public static bool IsEvolutionLevel(int _level) => Config.IsEvolutionLevel(_level);
@@ -92,7 +93,7 @@ public static class CardGrowthManager
     /// <summary>세이브와 무관하게 **지정 레벨**의 성장 스냅샷. AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다 —
     /// 곡선 해석(체력·진화·키워드·시너지 해금)을 한 곳에 두려고 여기서 내준다.</summary>
     public static CardGrowth GrowthAtLevel(CardData _card, int _level)
-        => Snapshot(_card, _level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _level, false);
+        => Snapshot(_card, ClampLevel(_level), false);
 
     // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
     public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id), true);
@@ -104,8 +105,11 @@ public static class CardGrowthManager
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return CardGrowth.BaseLevel;
 
         // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
-        return t_entry.level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_entry.level;
+        return ClampLevel(t_entry.level);
     }
+
+    static int ClampLevel(int _level)
+        => Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
 
     public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
 
@@ -141,7 +145,7 @@ public static class CardGrowthManager
         if (!TryGetStepAt(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        // 재화는 곡선이 정한다 — 진화 레벨(Lv5·Lv10)만 다이아를 물고 나머지는 골드다.
+        // 재화는 곡선이 정한다 — 1·2성은 조각, 최종 3성은 다이아를 쓴다.
         if (!CurrencyManager.CanAfford(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 

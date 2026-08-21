@@ -47,7 +47,7 @@ public static class AIDeckBandValidator
             int t_level = t_rank.AiCardLevelAt(t_tier);
             List<AIDeckConfig.DeckEntry> t_candidates = CandidatesAt(t_config, t_tier);
             int t_totalWeight = TotalWeight(t_candidates);
-            t_report.Append($"Tier {t_tier} / AI Lv{t_level}: ");
+            t_report.Append($"Tier {t_tier} / AI {GrowthStar.Label(t_level)}: ");
 
             if (t_candidates.Count == 0)
             {

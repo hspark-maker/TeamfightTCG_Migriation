@@ -115,7 +115,7 @@ public static partial class CardTableTool
             Compare(_drift, _name, "synergies", SynergiesToText(_card.synergies), SynergiesToText(t_expected.synergies));
 
             if (!SameCurve(_card.hpGainByLevel, t_expected.hpGainByLevel))
-                _drift.Add(Line(_name, "hp2~hp10", CurveToText(t_expected.hpGainByLevel), CurveToText(_card.hpGainByLevel)));
+                _drift.Add(Line(_name, "hp2~hp4", CurveToText(t_expected.hpGainByLevel), CurveToText(_card.hpGainByLevel)));
         }
         finally
         {

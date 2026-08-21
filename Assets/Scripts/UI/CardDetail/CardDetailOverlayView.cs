@@ -57,7 +57,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     const float CONTENT_DIM_ALPHA = 0.8f;
 
     // 강화가 왜 막혔는지. 결과판의 "한 번 더" 아래 문구가 쓴다. 재화 이름은 CurrencyLook이 대준다.
-    const string MaxLevelNotice      = "최고 레벨에 도달했습니다!";
+    const string MaxLevelNotice      = "최고 성급에 도달했습니다!";
     const string NotAffordableFormat = "{0}{1} 부족합니다";
 
     [Header("배선")]
@@ -67,7 +67,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] ScrollRect     detailScroll;
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
-    [SerializeField] TMP_Text levelValueText;      // 강화 레벨 "Lv 3 / 10"
+    [SerializeField] TMP_Text levelValueText;      // 성장 성급 "2성 / 3성"
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
@@ -465,7 +465,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
         // 그 재화 바의 문맥 칸은 조각을 띄운다 — 이 화면이 계속 쓰는 강화 재료다.
-        // 스텝의 결제 재화를 따라가지 않는 이유는 진화 게이트(5·10레벨)가 다이아라서다.
+        // 스텝의 결제 재화를 따라가지 않는 이유는 최종 진화 게이트가 다이아이기 때문이다.
         // 다이아는 상시 칸에 이미 떠 있으므로 문맥 칸까지 다이아가 되면 같은 재화가 두 칸을 먹고 조각이 사라진다.
         // 이번 레벨이 무엇으로 얼마인지는 버튼 옆 비용 아이콘이 이미 말하고 있다.
         ContextCurrencySlot.Request(this, ECurrencyType.Shard);
@@ -1699,7 +1699,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void SetLevelText(int _level)
     {
-        if (this.levelValueText != null) this.levelValueText.text = $"Lv {_level} / {CardGrowthManager.MaxLevel}";
+        if (this.levelValueText != null)
+            this.levelValueText.text = GrowthStar.ProgressLabel(_level, CardGrowthManager.MaxLevel);
     }
 
     void BuildKeywordSection(CardData _card, bool _owned)

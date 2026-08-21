@@ -5,7 +5,7 @@ using System.Collections.Generic;
 [Serializable]
 public class CardGrowthSaveData
 {
-    public const int VERSION = 1;
+    public const int VERSION = 2;
 
     public int version = VERSION;
 

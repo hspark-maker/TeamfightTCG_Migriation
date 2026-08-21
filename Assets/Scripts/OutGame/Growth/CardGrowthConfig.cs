@@ -7,25 +7,25 @@ public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
     [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
-    [Min(0)] [SerializeField] int hpPerLevel = 2;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 4;
+    [Min(0)] [SerializeField] int hpPerLevel = 4;
 
     [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(골드)다.")]
     [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
-    [SerializeField] long baseEnhanceCost = 100;
+    [SerializeField] long baseEnhanceCost = 25;
 
     [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
     [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
-    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
+    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0f;
 
     [Header("진화 레벨 (전역 — 카드 SO에 적지 않는다)")]
     // 키워드 해금 레벨은 여기 없다. 카드마다 다르므로 CardData.keywordUnlockLevel이 소유한다.
     [Tooltip("1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 5;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 3;
 
     [Tooltip("2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 10;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 4;
 
     [Header("레벨별 상세 (비어 있는 레벨은 위 기본식으로 계산)")]
     [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
