@@ -31,13 +31,14 @@ public class CardGrowthConfig : ScriptableObject
     [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
     [SerializeField] List<GrowthLevelStep> levelSteps = new List<GrowthLevelStep>();
 
+    // 한계돌파는 강화와 별개 축의 **덤**이다 — 단계당 +1로 얕게 둔다(주 성장 수단은 강화 곡선).
     [Header("한계돌파")]
     [Min(0)] [SerializeField] int maxLimitBreak = 3;
     [SerializeField] List<LimitBreakStep> limitBreakSteps = new List<LimitBreakStep>
     {
-        new LimitBreakStep(1, 5, 1),
-        new LimitBreakStep(2, 5, 2),
-        new LimitBreakStep(3, 5, 3),
+        new LimitBreakStep(1, 1, 1),
+        new LimitBreakStep(2, 1, 2),
+        new LimitBreakStep(3, 1, 3),
     };
 
     // 강화 상한 레벨(바닥 아래 오설정은 바닥으로 보정 = 강화 없음)
@@ -62,8 +63,8 @@ public class CardGrowthConfig : ScriptableObject
                 return true;
             }
 
-        // 기존 설정 에셋에 신규 필드가 없어도 기본 곡선으로 동작한다.
-        _step = new LimitBreakStep(_stage, 5, _stage);
+        // 기존 설정 에셋에 신규 필드가 없어도 기본 곡선으로 동작한다(위 저작 기본값과 같은 +1).
+        _step = new LimitBreakStep(_stage, 1, _stage);
         return true;
     }
 

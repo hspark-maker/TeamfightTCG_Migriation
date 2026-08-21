@@ -5,7 +5,7 @@ using System.Collections.Generic;
 [Serializable]
 public class CardGrowthSaveData
 {
-    public const int VERSION = 5;
+    public const int VERSION = 6;
 
     public int version = VERSION;
 
@@ -27,6 +27,6 @@ public class CardGrowthEntry
     // 간식 보유량(카드팩 중복으로만 쌓인다). 카드별 재화라 전역 잔액 배열에 못 넣어 여기 얹었다.
     public int snack;
 
-    // 3성 만렙 이후의 한계돌파 단계.
+    // 카드별 한계돌파 단계.
     public int limitBreak;
 }

@@ -10,9 +10,11 @@ public class UserSaveData
     // 3: 카드 강화 레벨제를 0~3성 등급제로 전환
     // 4: 카드별 간식(카드팩 중복 보상) 추가
     // 5: 카드별 한계돌파 단계 추가
-    public const int VERSION = 5;
+    // 6: 한계돌파 밸런스 변경에 따라 개발 세이브 초기화
+    public const int VERSION = 6;
 
-    public int version = VERSION;
+    // JSON에 version 필드가 없는 레거시 세이브는 v0으로 판정한다.
+    public int version;
 
     public CurrencySaveData currency = new CurrencySaveData();
     public OwnershipSaveData ownership = new OwnershipSaveData();

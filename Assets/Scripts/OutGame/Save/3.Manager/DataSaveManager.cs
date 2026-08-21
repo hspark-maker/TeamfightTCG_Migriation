@@ -11,7 +11,12 @@ public static class DataSaveManager
     static IRepository s_repository = new JsonFileRepository();
 
     // 현재 세이브 값 — 바꾼 뒤 Save() 호출
-    public static UserSaveData Data { get; private set; } = new UserSaveData();
+    public static UserSaveData Data { get; private set; } = CreateCurrentData();
+
+    static UserSaveData CreateCurrentData()
+    {
+        return new UserSaveData { version = UserSaveData.VERSION };
+    }
 
     // 저장 매체 교체(Load 이전에 호출)
     public static void SetRepository(IRepository _repository)
@@ -25,13 +30,13 @@ public static class DataSaveManager
         var t_json = s_repository.Load(SAVE_KEY);
         if (string.IsNullOrEmpty(t_json))
         {
-            Data = new UserSaveData();
+            Data = CreateCurrentData();
             return;
         }
 
         try
         {
-            Data = JsonUtility.FromJson<UserSaveData>(t_json) ?? new UserSaveData();
+            Data = JsonUtility.FromJson<UserSaveData>(t_json) ?? CreateCurrentData();
             if (Data.version != UserSaveData.VERSION)
             {
                 var t_loadedVersion = Data.version;
@@ -42,7 +47,7 @@ public static class DataSaveManager
                     $"[DataSaveManager] 세이브 버전 불일치(v{t_loadedVersion} -> v{UserSaveData.VERSION}). " +
                     $"런칭 전 개발 정책에 따라 전체 진행도를 초기화합니다. 원본 백업: '{t_backupKey}'");
 
-                Data = new UserSaveData();
+                Data = CreateCurrentData();
                 Save();
             }
         }
@@ -50,7 +55,7 @@ public static class DataSaveManager
         {
             Debug.LogError($"[DataSaveManager] 로드 실패, 원본 백업 후 기본값으로 시작: {t_e}");
             s_repository.Save(CORRUPT_KEY, t_json);
-            Data = new UserSaveData();
+            Data = CreateCurrentData();
         }
     }
 

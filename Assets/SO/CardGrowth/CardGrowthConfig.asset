@@ -36,3 +36,14 @@ MonoBehaviour:
     costCurrency: 1
     cost: 50
     successRate: 1
+  maxLimitBreak: 3
+  limitBreakSteps:
+  - stage: 1
+    hpGain: 1
+    snackCost: 1
+  - stage: 2
+    hpGain: 1
+    snackCost: 2
+  - stage: 3
+    hpGain: 1
+    snackCost: 3

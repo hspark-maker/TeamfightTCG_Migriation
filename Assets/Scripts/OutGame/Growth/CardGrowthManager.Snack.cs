@@ -57,9 +57,9 @@ public static partial class CardGrowthManager
         _step = default;
         if (!s_initialized || !s_configInjected || _card == null) return false;
 
+        // 강화 레벨을 보지 않는다 — 한계돌파는 간식으로만 무는 별개 축이라 0성부터 열려 있다.
         int t_id = CardCatalog.IdOf(_card);
         if (!OwnershipManager.IsOwned(t_id)) return false;
-        if (LevelOf(t_id) < MaxLevel) return false;
 
         return Config.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
     }

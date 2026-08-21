@@ -1237,9 +1237,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         GrowthStep t_step = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
-        // 강화 단계가 남아 있는 동안에는 한계돌파를 꺼내지 않는다 — 만렙이 곧 이 버튼의 조건이다.
+        // 한계돌파는 강화 레벨과 무관한 별개 축이라 0성부터 선다 — 강화 버튼과 나란히 놓인다.
         LimitBreakStep t_lbStep = default;
-        bool t_hasLimitBreak = _owned && !t_hasStep
+        bool t_hasLimitBreak = _owned
                             && CardGrowthManager.TryGetNextLimitBreakStep(_card, out t_lbStep);
         int t_snack = _owned ? CardGrowthManager.SnackOf(_card) : 0;
 
@@ -1250,18 +1250,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
         // 열람 전용도 같은 길로 내린다: 바 자체는 이미 걷혀 있지만, 그 안에서 살아 있는 버튼을 남겨 두면
         // 알파만 0인 채로 탭을 먹는다(blocksRaycasts는 창을 여는 순서에 따라 늦게 내려갈 수 있다).
-        // 한계돌파 버튼이 배선돼 있을 때만 자리를 넘긴다 — 미배선이면 지금까지처럼 강화 버튼이 그대로 선다.
         bool t_limit = this.limitBreakButton != null && t_hasLimitBreak;
 
+        // 강화·진화는 여전히 한 자리를 번갈아 쓰지만, 한계돌파는 그 옆에 따로 선다(ActionRow가 가로로 정렬).
         bool t_actions = _owned && !this.m_readOnly;
-        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve && !t_limit);
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve);
         if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(t_actions &&  t_evolve);
         if (this.limitBreakButton != null) this.limitBreakButton.gameObject.SetActive(t_actions && t_limit);
 
-        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서고 두 버튼이 자리를 번갈아 쓰므로
-        // 프리팹 표식(TutorialAnchor)으로는 잡을 수 없다.
+        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서고 버튼이 자리를 번갈아 쓰므로
+        // 프리팹 표식(TutorialAnchor)으로는 잡을 수 없다. 강화 축이 남아 있으면 그쪽이 안내의 주인공이다.
         ApplyGrowthAnchor(!t_actions ? null
                         : t_evolve ? this.evolveButton
+                        : t_hasStep ? this.enhanceButton
                         : t_limit  ? this.limitBreakButton
                         : this.enhanceButton);
 
