@@ -14,8 +14,10 @@ public class ProfileItemCell : MonoBehaviour
 {
     [Tooltip("판·얼굴·링 한 덩어리.")]
     [SerializeField] ProfileAvatarView avatarView;
-    [Tooltip("선택 테두리. 선택된 칸에서만 켠다.")]
+    [Tooltip("선택 배지(체크). 선택된 칸에서만 켠다.")]
     [SerializeField] GameObject selectedMark;
+    [Tooltip("선택 칸을 감싸는 초점 링. 밑판이 가운데를 덮어 삐져나온 테두리만 보이므로 밑판보다 커야 한다.")]
+    [SerializeField] GameObject focusRing;
     [SerializeField] Button button;
     [Tooltip("미소유 딤. 칸 프리팹에 배선돼 있다 — 미배선이면 딤 없이 버튼만 잠근다.")]
     [SerializeField] CanvasGroup dimGroup;
@@ -82,10 +84,11 @@ public class ProfileItemCell : MonoBehaviour
         this.SetSelected(false);
     }
 
-    /// <summary>선택 테두리를 켜고 끈다. 선택은 패널이 단일 진실원으로 쥔다 — 칸이 스스로 뒤집지 않는다.</summary>
+    /// <summary>선택 표시를 켜고 끈다. 선택은 패널이 단일 진실원으로 쥔다 — 칸이 스스로 뒤집지 않는다.</summary>
     public void SetSelected(bool _on)
     {
         if (this.selectedMark != null) this.selectedMark.SetActive(_on);
+        if (this.focusRing != null) this.focusRing.SetActive(_on);
     }
 
     // 누르는 동안 오므리고, 떼면 부풀렸다 되돌린다. 밑판은 어느 쪽에서도 움직이지 않는다.
