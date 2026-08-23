@@ -57,6 +57,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8134ddc58443c3348a644266ea3669ec
+    m_Address: Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 846d825ba21303740ae41a6a317b231e
     m_Address: KeywordDemoStage
     m_ReadOnly: 0

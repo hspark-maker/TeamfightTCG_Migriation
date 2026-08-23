@@ -170,6 +170,7 @@ public class MatchDeckShell : MonoBehaviour
             showDeckPower    = false,   // 리스트 칸에 이미 나와 있다
             tutorialDeckSlot = TutorialDeckSlot(),
             onSlotSwitched   = _slot => SelectedSlot = _slot,
+            onPlay           = OnEditorPlay,   // 편집 화면에서도 바로 전투로 갈 수 있어야 한다
         });
 
         // 못 세우면 매치 패널에 머문다 — 빈 화면으로 갇히면 전투 시작 게이트가 통째로 막힌다.
@@ -187,6 +188,21 @@ public class MatchDeckShell : MonoBehaviour
         DeckConfig.Set(DeckSaveManager.GetSlot(SelectedSlot));
 
         return true;
+    }
+
+    // 편집 화면의 전투 시작. 저장·미완성 확인은 편집기의 RequestLeave가 이미 거쳤다 —
+    // 여기 도착했다는 것은 세이브가 확정됐다는 뜻이고, Confirm은 그 세이브를 읽는다.
+    //
+    // 편집 화면을 반드시 먼저 내린다: 풀 캔버스(DontDestroyOnLoad)에 살아서 배틀 씬으로 넘어가도
+    // 그대로 떠 있는다. 매치 패널을 되살리는 것은 커튼 때문이다 — 커튼이 이 화면의 색으로 접히므로
+    // 씬이 로드되는 동안 그 밑에 깔려 있어야 한다.
+    void OnEditorPlay()
+    {
+        HideEditorIfOpen();
+        ShowMatchPanel();
+
+        // 유효 덱이 아니면 Confirm이 게이트를 열지 않는다 — 그때는 매치 패널에 머문다.
+        Confirm();
     }
 
     // DeckEditData에 실어 보낸 종료 훅. 로비의 DeckTabController.CloseEditor 자리다.

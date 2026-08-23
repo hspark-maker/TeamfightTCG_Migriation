@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 136089387091211161}
   - component: {fileID: 136089387091211162}
   - component: {fileID: 136089387091211163}
+  - component: {fileID: 2160291917118028732}
   m_Layer: 0
   m_Name: Battle
   m_TagString: Untagged
@@ -91,6 +92,28 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.6392157}
   m_EffectDistance: {x: -3.5, y: -5.57}
   m_UseGraphicAlpha: 1
+--- !u!114 &2160291917118028732
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 136089387091211165}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26bcf39f33cca42479a64af5731778f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabButtonView
+  background: {fileID: 0}
+  label: {fileID: 0}
+  icon: {fileID: 0}
+  selectedMark: {fileID: 0}
+  selectedSprite: {fileID: 0}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.15, g: 0.18, b: 0.22, a: 1}
+  normalSprite: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0}
+  normalLabelColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
 --- !u!1 &136089387282325408
 GameObject:
   m_ObjectHideFlags: 0
@@ -178,6 +201,7 @@ GameObject:
   - component: {fileID: 136089387860047092}
   - component: {fileID: 136089387860047093}
   - component: {fileID: 136089387860047094}
+  - component: {fileID: 1333784474247923668}
   m_Layer: 0
   m_Name: Pack
   m_TagString: Untagged
@@ -257,6 +281,28 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.6392157}
   m_EffectDistance: {x: -3.5, y: -5.57}
   m_UseGraphicAlpha: 1
+--- !u!114 &1333784474247923668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 136089387860047096}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26bcf39f33cca42479a64af5731778f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabButtonView
+  background: {fileID: 0}
+  label: {fileID: 0}
+  icon: {fileID: 0}
+  selectedMark: {fileID: 0}
+  selectedSprite: {fileID: 0}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.15, g: 0.18, b: 0.22, a: 1}
+  normalSprite: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0}
+  normalLabelColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
 --- !u!1 &136089388530379125
 GameObject:
   m_ObjectHideFlags: 0
@@ -444,17 +490,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50416ab1669c53a428741627fefd134f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyTabBarView
-  items:
-  - button: {fileID: 0}
-    icon: {fileID: 0}
-  - button: {fileID: 0}
-    icon: {fileID: 136089387860047093}
-  - button: {fileID: 0}
-    icon: {fileID: 136089387091211162}
-  - button: {fileID: 0}
-    icon: {fileID: 0}
-  - button: {fileID: 0}
-    icon: {fileID: 0}
   focus: {fileID: 136089388530379124}
   focusIcon: {fileID: 0}
   focusLabel: {fileID: 0}
@@ -732,6 +767,7 @@ GameObject:
   - component: {fileID: 5957213071061199151}
   - component: {fileID: 1524656365523408706}
   - component: {fileID: 6863070797569716126}
+  - component: {fileID: 908745048155152558}
   m_Layer: 0
   m_Name: Deck
   m_TagString: Untagged
@@ -811,6 +847,28 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.6392157}
   m_EffectDistance: {x: -3.5, y: -5.57}
   m_UseGraphicAlpha: 1
+--- !u!114 &908745048155152558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1371695978696897926}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26bcf39f33cca42479a64af5731778f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabButtonView
+  background: {fileID: 0}
+  label: {fileID: 0}
+  icon: {fileID: 0}
+  selectedMark: {fileID: 0}
+  selectedSprite: {fileID: 0}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.15, g: 0.18, b: 0.22, a: 1}
+  normalSprite: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0}
+  normalLabelColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
 --- !u!1 &1602550880231397688
 GameObject:
   m_ObjectHideFlags: 0
@@ -2809,6 +2867,7 @@ GameObject:
   - component: {fileID: 1676892586037542424}
   - component: {fileID: 271507856952312555}
   - component: {fileID: 1241621658500778579}
+  - component: {fileID: 8244308456681280714}
   m_Layer: 0
   m_Name: Shop
   m_TagString: Untagged
@@ -2932,6 +2991,28 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &8244308456681280714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3688359407973065945}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26bcf39f33cca42479a64af5731778f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabButtonView
+  background: {fileID: 0}
+  label: {fileID: 0}
+  icon: {fileID: 0}
+  selectedMark: {fileID: 0}
+  selectedSprite: {fileID: 0}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.15, g: 0.18, b: 0.22, a: 1}
+  normalSprite: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0}
+  normalLabelColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
 --- !u!1 &3864912534804374465
 GameObject:
   m_ObjectHideFlags: 0
@@ -2941,7 +3022,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5433243546042994903}
-  - component: {fileID: 2239218047050792931}
   m_Layer: 0
   m_Name: BottomBar
   m_TagString: Untagged
@@ -2969,26 +3049,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 1080, y: 183.16016}
   m_Pivot: {x: 0.5, y: 0}
---- !u!114 &2239218047050792931
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3864912534804374465}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
-  m_MinWidth: -1
-  m_MinHeight: -1
-  m_PreferredWidth: -1
-  m_PreferredHeight: 220
-  m_FlexibleWidth: -1
-  m_FlexibleHeight: -1
-  m_LayoutPriority: 1
 --- !u!1 &3871382350235012647
 GameObject:
   m_ObjectHideFlags: 0
@@ -3165,6 +3225,7 @@ GameObject:
   - component: {fileID: 4985095777589460205}
   - component: {fileID: 6394870316509827293}
   - component: {fileID: 5849294012686147765}
+  - component: {fileID: 3507929693929327754}
   m_Layer: 0
   m_Name: Collection
   m_TagString: Untagged
@@ -3244,6 +3305,28 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.6392157}
   m_EffectDistance: {x: -3.5, y: -5.57}
   m_UseGraphicAlpha: 1
+--- !u!114 &3507929693929327754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4622387729458687997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26bcf39f33cca42479a64af5731778f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabButtonView
+  background: {fileID: 0}
+  label: {fileID: 0}
+  icon: {fileID: 0}
+  selectedMark: {fileID: 0}
+  selectedSprite: {fileID: 0}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.15, g: 0.18, b: 0.22, a: 1}
+  normalSprite: {fileID: 0}
+  normalColor: {r: 1, g: 1, b: 1, a: 0}
+  normalLabelColor: {r: 0.72, g: 0.76, b: 0.82, a: 1}
 --- !u!1 &4922353551759096608
 GameObject:
   m_ObjectHideFlags: 0
@@ -3662,8 +3745,8 @@ RectTransform:
   - {fileID: 2760559286507228899}
   m_Father: {fileID: 7199074612625639083}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.04028436}
-  m_AnchorMax: {x: 1, y: 0.9443128}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3694,7 +3777,6 @@ GameObject:
   - component: {fileID: 8007912968602242820}
   - component: {fileID: 3324641289957846807}
   - component: {fileID: 1502954666589672254}
-  - component: {fileID: 7887993482082612531}
   m_Layer: 0
   m_Name: TopBar
   m_TagString: Untagged
@@ -3761,26 +3843,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &7887993482082612531
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8228682013219654997}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
-  m_MinWidth: -1
-  m_MinHeight: -1
-  m_PreferredWidth: -1
-  m_PreferredHeight: 180
-  m_FlexibleWidth: -1
-  m_FlexibleHeight: -1
-  m_LayoutPriority: 1
 --- !u!1001 &2184112627954846968
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5590,6 +5652,14 @@ PrefabInstance:
       propertyPath: m_SizeDelta.y
       value: 91
       objectReference: {fileID: 0}
+    - target: {fileID: 422184336720226580, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 44.399994
+      objectReference: {fileID: 0}
+    - target: {fileID: 422184336720226580, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -20.800049
+      objectReference: {fileID: 0}
     - target: {fileID: 553564076150556539, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
       propertyPath: m_AnchorMax.y
       value: 1
@@ -5820,11 +5890,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7037263806783972837, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
       propertyPath: m_CellSize.x
-      value: 312.42096
+      value: 320
       objectReference: {fileID: 0}
     - target: {fileID: 7037263806783972837, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
       propertyPath: m_CellSize.y
-      value: 415.84308
+      value: 425.93103
       objectReference: {fileID: 0}
     - target: {fileID: 7823000829783424967, guid: 03bd8a9b5f05fd14aaf54e107e6ac408, type: 3}
       propertyPath: m_AnchorMax.y

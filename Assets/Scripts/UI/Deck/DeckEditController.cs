@@ -37,6 +37,14 @@ public sealed class DeckEditData : UIData
 
     /// <summary>가로 리스트로 다른 덱에 갈아탄 뒤. 호스트가 자기 선택 상태를 맞춘다.</summary>
     public Action<int> onSlotSwitched;
+
+    /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
+    /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
+    /// 로비 탭은 미주입 → 버튼이 꺼진다.
+    ///
+    /// 호출 시점은 편집기의 이탈 판정(RequestLeave)을 통과한 뒤다 — 전투가 소비하는 것은 세이브이므로
+    /// 저장하지 않은 편성분을 안고 시작하면 화면에 그린 덱과 실제 출전 덱이 갈린다.</summary>
+    public Action onPlay;
 }
 
 // 덱 구성 화면(DeckEditPanel에 부착). 편성 상태의 진실원이자 저장 진입점.
@@ -80,6 +88,10 @@ public class DeckEditController : PooledUIBase
 
     [Tooltip("덱 전투력 표시 노드. 매치 화면은 리스트 칸에 이미 나와 있다.")]
     [SerializeField] GameObject deckPowerNode;
+
+    [Tooltip("전투 시작 버튼. DeckEditData.onPlay가 주입됐을 때만 켜진다 —\n"
+           + "로비 탭에서는 여기서 전투로 갈 곳이 없다. 미배선이면 그 축을 통째로 건너뛴다.")]
+    [SerializeField] Button playButton;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -153,6 +165,12 @@ public class DeckEditController : PooledUIBase
         {
             saveButton.onClick.RemoveAllListeners();
             saveButton.onClick.AddListener(OnSaveClicked);
+        }
+
+        if (playButton != null)
+        {
+            playButton.onClick.RemoveAllListeners();
+            playButton.onClick.AddListener(OnPlayClicked);
         }
 
         if (nameInput != null)
@@ -235,6 +253,9 @@ public class DeckEditController : PooledUIBase
     {
         if (this.titleNode     != null) this.titleNode.SetActive(this.m_request.showTitle);
         if (this.deckPowerNode != null) this.deckPowerNode.SetActive(this.m_request.showDeckPower);
+
+        // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
+        if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
     }
 
     /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
@@ -693,6 +714,19 @@ public class DeckEditController : PooledUIBase
     }
 
     void OnBackClicked() => RequestLeave(ExitEditor);
+
+    // 전투 시작. 나가기와 같은 판정을 거친다 — 전투가 소비하는 것은 세이브라, 저장하지 않은 편성분을
+    // 안고 시작하면 화면에 그린 덱과 실제 출전 덱이 갈린다(RequestLeave가 저장·미완성 확인을 맡는다).
+    //
+    // 호출 시점의 요청을 잡아 둔다: 확인 팝업 응답을 기다리는 동안 호스트가 다른 요청으로 이 화면을
+    // 다시 열면 m_request가 갈리고, 그때 허가가 떨어지면 엉뚱한 호스트의 전투가 시작된다.
+    void OnPlayClicked()
+    {
+        Action t_onPlay = this.m_request?.onPlay;
+        if (t_onPlay == null) return;
+
+        RequestLeave(t_onPlay);
+    }
 
     // 편집 화면을 떠나도 되는지 판정하는 단일 창구. 뒤로가기든 탭 버튼이든 전부 여기로 모은다 —
     // 경로마다 판정이 갈리면 "어떤 버튼으로 나갔는지"에 따라 편성분이 사라지고 말고가 달라진다.

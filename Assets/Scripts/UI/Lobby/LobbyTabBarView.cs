@@ -8,42 +8,41 @@ using UnityEngine.UI;
 /// <summary>Owns every visual and input detail inside the lobby bottom tab bar.</summary>
 public sealed class LobbyTabBarView : MonoBehaviour
 {
-    [Serializable]
-    sealed class Item
-    {
-        public Button button;
-        public Image icon;
-    }
-
-    [SerializeField] List<Item> items = new List<Item>();
     [SerializeField] RectTransform focus;
     [SerializeField] Image focusIcon;
     [SerializeField] TMP_Text focusLabel;
     [SerializeField] RectTransform focusHighlight;
     [SerializeField] float focusSpinSeconds = 6f;
     [SerializeField] bool focusSpinClockwise = true;
-    [SerializeField] bool animateTabWidth = true;
-    [Range(1f, 2f)] [SerializeField] float selectedWidthWeight = 1.25f;
-    [SerializeField] float widthTweenDuration = 0.2f;
+    [Tooltip("알약이 선택 탭 자리로 미끄러지는 시간(초). 0이면 즉시 이동")]
+    [SerializeField] float focusSlideSeconds = 0.22f;
 
     readonly List<string> m_labels = new List<string>();
     TabButtonView[] m_views;
     int m_previousIndex = -1;
+    bool m_focusResolved;
 
     public event Action<int> Selected;
-    public int Count => items.Count;
+    public int Count { get { EnsureViews(); return m_views.Length; } }
 
-    void Awake()
+    void Awake() => EnsureViews();
+
+    /// <summary>탭 목록은 인스펙터 배선이 아니라 자식 계층의 TabButtonView를 훑어 만든다 —
+    /// 클릭 이벤트는 각 탭이 스스로 소유하고(BindClick), 여기는 계층 순서로 인덱스만 정한다.
+    /// 그래서 탭 순서 = 계층 순서 = LobbyTabController.tabs 순서가 계약이다.
+    ///
+    /// Awake에서만 모으면 안 된다 — LobbyTabController.Awake가 먼저 돌아 ConfigureItem을 부를 수 있다.</summary>
+    void EnsureViews()
     {
-        m_views = new TabButtonView[items.Count];
-        EnsureLabelCapacity(items.Count);
-        for (int i = 0; i < items.Count; i++)
+        if (m_views != null) return;
+
+        m_views = GetComponentsInChildren<TabButtonView>(true);
+        EnsureLabelCapacity(m_views.Length);
+
+        for (int i = 0; i < m_views.Length; i++)
         {
             int t_index = i;
-            Button t_button = items[i].button;
-            if (t_button == null) continue;
-            t_button.onClick.AddListener(() => Selected?.Invoke(t_index));
-            m_views[i] = t_button.GetComponent<TabButtonView>();
+            m_views[i].BindClick(() => Selected?.Invoke(t_index));
         }
     }
 
@@ -57,25 +56,28 @@ public sealed class LobbyTabBarView : MonoBehaviour
     public void ConfigureItem(int _index, string _label, EOutgameTutorialAnchor _anchor,
         EOutgameTutorialTrigger _trigger, EOutgameFeature _feature, GameObject _alertDotPrefab)
     {
-        if (!TryGetItem(_index, out Item t_item)) return;
-        EnsureLabelCapacity(items.Count);
+        if (!TryGetView(_index, out TabButtonView t_view)) return;
+        EnsureLabelCapacity(m_views.Length);
         m_labels[_index] = _label;
 
-        if (t_item.button != null)
+        Button t_button = t_view.Button;
+        if (t_button != null)
         {
             if (_anchor != EOutgameTutorialAnchor.None)
-                TutorialAnchorRegistry.Register(_anchor, t_item.button.transform as RectTransform, t_item.button);
-            FeatureLockView.Attach(t_item.button.gameObject, _feature);
+                TutorialAnchorRegistry.Register(_anchor, t_button.transform as RectTransform, t_button);
+            FeatureLockView.Attach(t_button.gameObject, _feature);
         }
 
-        if (_alertDotPrefab != null && _trigger != EOutgameTutorialTrigger.None && t_item.icon != null
-            && t_item.icon.GetComponent<TutorialAlertDot>() == null)
-            t_item.icon.gameObject.AddComponent<TutorialAlertDot>().Bind(_trigger, _feature, _alertDotPrefab);
+        // 아이콘 배선은 옵션이다 — 비어 있으면 탭 자신이 알림 점의 자리다(탭 그래픽이 곧 아이콘인 저작).
+        GameObject t_dotHost = t_view.Icon != null ? t_view.Icon.gameObject : t_view.gameObject;
+        if (_alertDotPrefab != null && _trigger != EOutgameTutorialTrigger.None
+            && t_dotHost.GetComponent<TutorialAlertDot>() == null)
+            t_dotHost.AddComponent<TutorialAlertDot>().Bind(_trigger, _feature, _alertDotPrefab);
     }
 
     public RectTransform GetButtonAnchor(int _index)
-        => TryGetItem(_index, out Item t_item) && t_item.button != null
-            ? t_item.button.transform as RectTransform
+        => TryGetView(_index, out TabButtonView t_view)
+            ? t_view.transform as RectTransform
             : null;
 
     public RectTransform GetVisualAnchor(int _index)
@@ -85,98 +87,97 @@ public sealed class LobbyTabBarView : MonoBehaviour
 
     public void SetSelected(int _index)
     {
-        if (!TryGetItem(_index, out _)) return;
+        if (!TryGetView(_index, out _)) return;
         bool t_useFocus = focus != null;
-        for (int i = 0; i < items.Count; i++)
+        bool t_animate = m_previousIndex >= 0 && m_previousIndex != _index;
+
+        for (int i = 0; i < m_views.Length; i++)
         {
             bool t_on = i == _index;
-            Button t_button = items[i].button;
-            if (t_useFocus && t_button != null) t_button.gameObject.SetActive(!t_on);
-            if (!t_useFocus && m_views != null && m_views[i] != null) m_views[i].SetSelected(t_on);
+            // 알약이 선택 탭 자리를 대신 채운다 — 원래 탭을 남겨 두면 알약 밑으로 겹쳐 보인다.
+            if (t_useFocus) m_views[i].gameObject.SetActive(!t_on);
+            else            m_views[i].SetSelected(t_on);
         }
 
-        if (t_useFocus) ApplyFocus(_index);
-        ApplyTabWidths(_index, m_previousIndex >= 0 && m_previousIndex != _index);
+        if (t_useFocus) ApplyFocus(_index, t_animate);
         m_previousIndex = _index;
     }
 
-    void ApplyFocus(int _index)
+    void ApplyFocus(int _index, bool _animate)
     {
-        if (!TryGetItem(_index, out Item t_item) || t_item.button == null) return;
-        focus.SetSiblingIndex(t_item.button.transform.GetSiblingIndex());
-        if (focusIcon != null && t_item.icon != null)
+        if (!TryGetView(_index, out TabButtonView t_view)) return;
+
+        EnsureFocusParts();
+
+        var t_slot = t_view.transform as RectTransform;
+
+        // 레이아웃 그룹이 없으니 형제 순서는 자리가 아니라 그리는 순서다 — 알약은 늘 맨 위여야 한다.
+        // (탭 인덱스 자리로 옮기면 뒤 형제 탭들이 알약 위에 겹쳐 그려진다. 알약이 탭보다 넓다.)
+        focus.SetAsLastSibling();
+
+        Image t_icon = t_view.Icon;
+        if (focusIcon != null && t_icon != null)
         {
-            focusIcon.sprite = t_item.icon.sprite;
-            focusIcon.rectTransform.sizeDelta = t_item.icon.rectTransform.sizeDelta;
+            focusIcon.sprite = t_icon.sprite;
+            focusIcon.rectTransform.sizeDelta = t_icon.rectTransform.sizeDelta;
         }
         if (focusLabel != null) focusLabel.text = m_labels[_index];
+
+        SlideFocusTo(t_slot, _animate);
     }
 
-    void ApplyTabWidths(int _index, bool _animate)
+    /// <summary>알약을 선택 탭 자리로 옮긴다.
+    ///
+    /// 레이아웃 그룹을 쓰지 않는다 — 씬 쪽 오버라이드가 계속 끼어들어 걷어낸 구조라, 알약 위치는
+    /// 코드가 단독으로 소유한다. 탭은 저작된 고정 좌표에 그대로 있고 알약만 그 위로 미끄러진다.
+    ///
+    /// x만 맞춘다. y는 저작값을 지킨다 — 알약은 바 위로 솟은 디자인이라 탭과 높이가 다르다.
+    /// 앵커가 탭마다 달라(어떤 탭은 좌상단, 어떤 탭은 중앙) 공통 기준인 localPosition으로 차이를 재고
+    /// 그만큼 anchoredPosition을 민다. 트윈 중에 다시 불려도 현재 값에서 다시 재므로 어긋나지 않는다.</summary>
+    void SlideFocusTo(RectTransform _slot, bool _animate)
     {
-        if (!animateTabWidth || items.Count <= 1) return;
-        float t_selected = Mathf.Clamp(selectedWidthWeight, 0.01f, items.Count - 0.01f);
-        float t_normal = (items.Count - t_selected) / (items.Count - 1);
-        bool t_useFocus = focus != null;
-        float t_previousFocusWeight = t_useFocus ? GetWidthWeight(focus, t_selected) : t_selected;
-        float t_newSlotWeight = t_normal;
-        RectTransform t_newSlot = GetButtonAnchor(_index);
-        if (t_useFocus && t_newSlot != null) t_newSlotWeight = GetWidthWeight(t_newSlot, t_normal);
+        float t_x = focus.anchoredPosition.x + (_slot.localPosition.x - focus.localPosition.x);
 
-        for (int i = 0; i < items.Count; i++)
+        focus.DOKill();
+
+        if (!_animate || focusSlideSeconds <= 0f)
         {
-            RectTransform t_slot = GetButtonAnchor(i);
-            if (t_slot == null || (t_useFocus && i == _index)) continue;
-            if (t_useFocus && i == m_previousIndex && _animate) SetWidthWeight(t_slot, t_previousFocusWeight);
-            TweenWidthWeight(t_slot, t_normal, _animate);
-        }
-
-        RectTransform t_grow = t_useFocus ? focus : t_newSlot;
-        if (t_grow == null) return;
-        if (t_useFocus && _animate) SetWidthWeight(t_grow, t_newSlotWeight);
-        TweenWidthWeight(t_grow, t_selected, _animate);
-    }
-
-    static LayoutElement EnsureWidthSlot(RectTransform _slot)
-    {
-        LayoutElement t_element = _slot.GetComponent<LayoutElement>();
-        if (t_element == null) t_element = _slot.gameObject.AddComponent<LayoutElement>();
-        t_element.minWidth = 0f;
-        t_element.preferredWidth = 0f;
-        return t_element;
-    }
-
-    static void SetWidthWeight(RectTransform _slot, float _weight)
-    {
-        LayoutElement t_element = EnsureWidthSlot(_slot);
-        DOTween.Kill(t_element);
-        t_element.flexibleWidth = _weight;
-    }
-
-    static float GetWidthWeight(RectTransform _slot, float _fallback)
-    {
-        LayoutElement t_element = _slot != null ? _slot.GetComponent<LayoutElement>() : null;
-        return t_element != null && t_element.flexibleWidth >= 0f ? t_element.flexibleWidth : _fallback;
-    }
-
-    void TweenWidthWeight(RectTransform _slot, float _weight, bool _animate)
-    {
-        LayoutElement t_element = EnsureWidthSlot(_slot);
-        DOTween.Kill(t_element);
-        if (!_animate || Mathf.Approximately(t_element.flexibleWidth, _weight))
-        {
-            t_element.flexibleWidth = _weight;
+            focus.anchoredPosition = new Vector2(t_x, focus.anchoredPosition.y);
             return;
         }
-        float t_from = t_element.flexibleWidth;
-        DOTween.To(() => t_from, _v => { t_from = _v; t_element.flexibleWidth = _v; }, _weight,
-                Mathf.Max(0.01f, widthTweenDuration))
-            .SetEase(Ease.OutCubic).SetUpdate(true).SetTarget(t_element).SetLink(_slot.gameObject);
+
+        focus.DOAnchorPosX(t_x, focusSlideSeconds)
+             .SetEase(Ease.OutCubic)
+             .SetUpdate(true)   // 결과창 등에서 timeScale이 눌려도 탭 전환은 같은 속도로 돈다
+             .SetLink(focus.gameObject);
+    }
+
+    /// <summary>알약 안쪽(하이라이트·아이콘·라벨)은 이름 규약으로 찾는다 — 씬 배선을 늘리지 않는다.
+    /// "Light"는 원래부터 회전 하이라이트의 이름 규약이었고, 아이콘은 "알약 배경도 하이라이트도 아닌
+    /// 첫 Image"로 잡는다. 인스펙터에 배선돼 있으면 그쪽이 이긴다.</summary>
+    void EnsureFocusParts()
+    {
+        if (m_focusResolved || focus == null) return;
+        m_focusResolved = true;
+
+        if (focusHighlight == null) focusHighlight = focus.Find("Light") as RectTransform;
+        if (focusLabel == null) focusLabel = focus.GetComponentInChildren<TMP_Text>(true);
+        if (focusIcon != null) return;
+
+        Image[] t_images = focus.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < t_images.Length; i++)
+        {
+            RectTransform t_rect = t_images[i].rectTransform;
+            if (t_rect == focus || t_rect == focusHighlight) continue;
+
+            focusIcon = t_images[i];
+            break;
+        }
     }
 
     void StartFocusHighlightSpin()
     {
-        if (focusHighlight == null && focus != null) focusHighlight = focus.Find("Light") as RectTransform;
+        EnsureFocusParts();
         if (focusHighlight == null) return;
         DOTween.Kill(focusHighlight);
         focusHighlight.localRotation = Quaternion.identity;
@@ -186,10 +187,11 @@ public sealed class LobbyTabBarView : MonoBehaviour
             .SetTarget(focusHighlight).SetLink(focusHighlight.gameObject);
     }
 
-    bool TryGetItem(int _index, out Item _item)
+    bool TryGetView(int _index, out TabButtonView _view)
     {
-        _item = _index >= 0 && _index < items.Count ? items[_index] : null;
-        return _item != null;
+        EnsureViews();
+        _view = _index >= 0 && _index < m_views.Length ? m_views[_index] : null;
+        return _view != null;
     }
 
     void EnsureLabelCapacity(int _count)

@@ -44,14 +44,20 @@ static class BottomBarClickDiagnostic
     {
         _sb.AppendLine($"[탭바] '{_bar.name}' activeInHierarchy={_bar.gameObject.activeInHierarchy}");
 
-        var t_so    = new SerializedObject(_bar);
-        var t_items = t_so.FindProperty("items");
+        // 탭은 자식 계층의 TabButtonView 순서로 정해진다(인스펙터 배선 없음) — 진단도 같은 경로로 읽는다.
+        TabButtonView[] t_views = _bar.GetComponentsInChildren<TabButtonView>(true);
+        _sb.AppendLine($"  수집된 탭 {t_views.Length}개 (계층 순서 = 탭 인덱스)");
 
-        for (int t_i = 0; t_i < t_items.arraySize; t_i++)
+        for (int t_i = 0; t_i < t_views.Length; t_i++)
         {
-            var t_button = t_items.GetArrayElementAtIndex(t_i)
-                                  .FindPropertyRelative("button").objectReferenceValue as Button;
-            if (t_button == null) { _sb.AppendLine($"  [{t_i}] button 미배선(NULL) ← 이러면 절대 안 눌린다"); continue; }
+            // 프로퍼티(TabButtonView.Button)를 쓰지 않는다 — 그쪽은 없으면 AddComponent라 진단이 씬을 바꾼다.
+            var t_button = t_views[t_i].GetComponent<Button>();
+            if (t_button == null)
+            {
+                _sb.AppendLine($"  [{t_i}] {t_views[t_i].name} : Button 없음"
+                             + (Application.isPlaying ? " ← 런타임 확보에 실패한 것이다" : " (플레이 시 TabButtonView가 확보한다)"));
+                continue;
+            }
 
             // 리스너 수: 프리팹 onClick(persistent) + 코드가 건 것(runtime)을 함께 본다.
             int t_persistent = t_button.onClick.GetPersistentEventCount();
