@@ -655,7 +655,12 @@ public class TournamentMapOverlayView : MonoBehaviour
     void PunchNext(int _index)
     {
         int t_next = _index + 1;
-        if (t_next >= 0 && t_next < this.m_nodes.Count) this.m_nodes[t_next]?.PlayUnlockPunch();
+        if (t_next < 0 || t_next >= this.m_nodes.Count) return;
+
+        // 챕터가 랭크로 잠겨 있으면 튀지 않는다 — 자물쇠가 튀면 "열렸다"는 거짓말이 된다.
+        if (TournamentProgress.IsRankLocked(t_next)) return;
+
+        this.m_nodes[t_next]?.PlayUnlockPunch();
     }
 
     // 어디서 끊겨도 진실로 스냅시킨다 — 연출은 장식일 뿐이라 중간 색에서 굳는 것만 막으면 된다.

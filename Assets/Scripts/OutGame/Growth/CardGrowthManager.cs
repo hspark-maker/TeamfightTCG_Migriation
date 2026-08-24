@@ -172,7 +172,7 @@ public static partial class CardGrowthManager
         if (!TryGetStepAt(_card, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        // 재화는 곡선이 정한다 — 1·2성은 조각, 최종 3성은 다이아를 쓴다.
+        // 재화는 스텝이 들고 온다 — 성급별로 무엇을 무는지 여기 적으면 곡선과 이중 진실원이 된다.
         if (!CurrencyManager.CanAfford(t_step.Currency, t_step.Cost))
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 

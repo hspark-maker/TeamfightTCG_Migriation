@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Coffee.UIEffects;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -59,21 +60,34 @@ public class TournamentNodeView : MonoBehaviour
     [Tooltip("도전할 정점의 크기 배율.")]
     [SerializeField] float playableScale = 1.1f;
 
-    [Tooltip("도전할 정점의 포커스 빛(CurrentMark 안). 세기를 오가며 숨쉰다 —\n" +
-             "멈춘 빛은 24정점이 깔린 지도에서 '지금 여기'를 집어내지 못한다.")]
-    [SerializeField] Image focusGlow;
-    [SerializeField] float focusGlowLow = 0.35f;
-    [SerializeField] float focusGlowHigh = 0.7f;
+    [Tooltip("도전할 정점의 원판 발광(원판 자신에 붙인 UIEffect). 맥박 없이 상시로 켜 둔다 —\n" +
+             "지도에서 움직이는 자리는 챕터 보스뿐이어야 그 장의 목표가 집힌다.\n" +
+             "저작한 colorIntensity가 곧 켰을 때의 세기다(코드는 그 값과 0 사이를 오간다).\n" +
+             "잠김 무채색화가 같은 컴포넌트를 재사용하므로 컴포넌트 자체를 꺼서는 안 된다.")]
+    [SerializeField] UIEffect medallionGlow;
 
-    [Tooltip("상시 모션이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 빛 맥박과 원판 부유가 이 한 박을 함께 쓴다 —\n" +
+    [Tooltip("챕터 보스의 방사형 광채(원판 뒤). 상시로 돌면서 세기·크기가 함께 숨쉰다.\n" +
+             "원판 폭으로 깔면 초상을 뿌옇게 뭉갠다 — 포커스 빛보다 크지 않게 저작할 것.")]
+    [SerializeField] Image finalShine;
+    [SerializeField] float shinePulseLow = 0.55f;
+    [SerializeField] float shinePulseHigh = 0.9f;
+
+    [Tooltip("광채가 한 바퀴 도는 데 걸리는 시간(초). 맥박보다 훨씬 느려야 회전이 배경으로 가라앉는다. 0 이하면 돌지 않는다.")]
+    [SerializeField] float finalSpinPeriod = 24f;
+
+    [Tooltip("챕터 보스임을 알리는 \"최종 보상\" 문구 묶음. 해금된 챕터에서 클리어 전까지 켜진다 —\n" +
+             "순차로 아직 못 여는 보스에도 뜬다. 그 장의 목표를 미리 말해 주는 자리다.")]
+    [SerializeField] GameObject finalLabel;
+
+    [Tooltip("상시 모션이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 광채 맥박과 원판 부유가 이 한 박을 함께 쓴다 —\n" +
              "박이 갈리면 정점 하나가 두 군데서 따로 뛰는 것으로 읽힌다. 0이면 0초짜리 무한 루프가 된다.")]
     [Min(0.1f)]
-    [SerializeField] float focusGlowCycle = 1.6f;
+    [SerializeField] float idleCycle = 1.6f;
 
-    [Tooltip("맥박의 정점에서 빛이 부푸는 배율. 알파만 오가면 밝은 배경에 묻힌다 — 크기가 함께 변해야 맥이 뛴다.")]
-    [SerializeField] float focusGlowPulseScale = 1.12f;
+    [Tooltip("맥박의 정점에서 광채가 부푸는 배율. 알파만 오가면 밝은 배경에 묻힌다 — 크기가 함께 변해야 맥이 뛴다.")]
+    [SerializeField] float shinePulseScale = 1.12f;
 
-    [Tooltip("원판이 떠오르는 높이(px). 지도에서 자리를 옮기는 것은 이 정점 하나뿐이라, 빛과 달리 배경에 묻히지 않는다.\n" +
+    [Tooltip("챕터 보스 원판이 떠오르는 높이(px). 지도에서 자리를 옮기는 것은 이 정점들뿐이라, 빛과 달리 배경에 묻히지 않는다.\n" +
              "미는 축이 y라서 원판을 두고 다투는 스케일 연출들(선물·해금 펀치·도장 반동)과 겹치지 않는다.")]
     [SerializeField] float bobHeight = 6f;
 
@@ -163,9 +177,15 @@ public class TournamentNodeView : MonoBehaviour
     // 원판의 저작 자리. 부유가 끝나면 여기로 돌아간다(무한 Yoyo는 아무 자리에서나 죽는다).
     Vector2? m_bobHome;
 
-    // 도전할 정점의 상시 모션(빛 맥박 + 원판 부유 + 그림자 연동)을 한 손잡이에 묶는다.
+    // 챕터 보스의 상시 모션(광채 맥박 + 원판 부유 + 그림자 연동)을 한 손잡이에 묶는다.
     // 따로 돌리면 트윈마다 시작 프레임이 갈려 같은 박으로 안 뛴다.
     Sequence m_idleSeq;
+
+    // 광채의 상시 회전. 한 바퀴가 맥박보다 훨씬 길어 같은 시퀀스에 못 넣는다.
+    Tween m_shineSpin;
+
+    // 발광의 저작 세기. 켤 때 돌아갈 자리다.
+    float? m_glowIntensity0;
 
     // 클리어 도장(1회). 도는 동안 Refresh가 정지 상태로 덮지 않게 여기로 확인한다.
     Sequence m_stampSeq;
@@ -205,10 +225,19 @@ public class TournamentNodeView : MonoBehaviour
         TournamentProgress.TryGetNode(this.m_index, out TournamentNodeDef t_node);
         ETournamentNodeState t_state = TournamentProgress.StateOf(this.m_index);
 
-        bool t_playable = t_state == ETournamentNodeState.Playable;
+        // 랭크 잠금은 진행 낙인과 축이 다르다 — 정점 상태에 섞지 않고 여기서 곱한다.
+        bool t_rankLocked = TournamentProgress.IsRankLocked(this.m_index);
+
         bool t_cleared = t_state == ETournamentNodeState.Cleared;
-        bool t_locked = t_state == ETournamentNodeState.Locked;
-        bool t_gift = t_state == ETournamentNodeState.RewardPending;
+        bool t_playable = t_state == ETournamentNodeState.Playable && !t_rankLocked;
+        bool t_gift = t_state == ETournamentNodeState.RewardPending && !t_rankLocked;
+
+        // 잠김 표현의 유일한 조건. 순차로 아직 못 여는 정점은 여기 안 걸려 저작 원색 그대로 선다 —
+        // 정점 대부분이 실루엣으로 눌리면 잠김이 말해 주는 정보가 없다.
+        bool t_locked = t_rankLocked && !t_cleared;
+
+        // 챕터의 마지막 정점만 지도의 랜드마크로 선다. 깨고 나면 물러난다.
+        bool t_final = t_node.kind == ETournamentNodeKind.Elite && !t_rankLocked && !t_cleared;
 
         this.ApplyRewardIcon();
 
@@ -225,7 +254,9 @@ public class TournamentNodeView : MonoBehaviour
         this.ApplyLockedTone(t_locked);
         this.ApplyStateScale(t_cleared, t_playable || t_gift);
         this.ApplyStampRest(t_cleared);
-        this.ApplyIdleMotion(t_playable);
+        this.ApplyPlayableGlow(t_playable || t_gift);
+        this.ApplyFinalMark(t_final);
+        this.ApplyIdleMotion(t_final);
         this.ApplyShadow(t_cleared);
     }
 
@@ -371,11 +402,54 @@ public class TournamentNodeView : MonoBehaviour
         t_root.localScale = Vector3.one * t_scale;
     }
 
-    // 도전할 정점만 상시 움직인다 — 지도에서 살아 있는 자리가 하나뿐이어야 "지금 여기"가 성립한다.
-    // 빛의 세기·크기와 원판의 높이·그림자를 한 시퀀스에 넣어 같은 박으로 뛰게 한다.
-    void ApplyIdleMotion(bool _playable)
+    // 도전할 정점의 원판을 밝힌다. 맥박 없이 상시로 켜 둬도 24정점 중 하나만 밝으면 "지금 여기"는 집힌다.
+    void ApplyPlayableGlow(bool _on)
     {
-        if (!_playable)
+        if (this.medallionGlow == null) return;
+
+        if (this.m_glowIntensity0 == null) this.m_glowIntensity0 = this.medallionGlow.colorIntensity;
+
+        // 컴포넌트를 끄지 않는다 — 잠김 무채색화가 같은 UIEffect를 재사용하므로 비활성이면 채도까지 안 빠진다.
+        this.medallionGlow.colorIntensity = _on ? this.m_glowIntensity0.Value : 0f;
+    }
+
+    // 챕터 보스의 랜드마크(광채 + 문구). 광채의 맥박과 회전은 상시 모션이 이어서 세운다.
+    void ApplyFinalMark(bool _final)
+    {
+        if (this.finalLabel != null) this.finalLabel.SetActive(_final);
+        if (this.finalShine != null) this.finalShine.gameObject.SetActive(_final);
+    }
+
+    // 광채는 한 방향으로만 돈다. 오가는 맥박과 축을 갈라 둬야 "숨쉬는 빛"과 "도는 빛"이 겹쳐 하나로 읽힌다.
+    void StartShineSpin()
+    {
+        if (this.m_shineSpin != null && this.m_shineSpin.IsActive()) return;
+        if (this.finalShine == null || this.finalSpinPeriod <= 0f) return;
+
+        RectTransform t_rect = this.finalShine.rectTransform;
+        t_rect.localRotation = Quaternion.identity;
+
+        this.m_shineSpin = t_rect
+            .DOLocalRotate(new Vector3(0f, 0f, -360f), this.finalSpinPeriod, RotateMode.FastBeyond360)
+            .SetEase(Ease.Linear)
+            .SetLoops(-1, LoopType.Restart)
+            .SetLink(this.gameObject);
+    }
+
+    // 상시 회전은 오브젝트를 꺼도 멈추지 않는다 — 손으로 죽이고 각도까지 세워야 다음에 열 때 기울어 있지 않다.
+    void KillShineSpin()
+    {
+        if (this.m_shineSpin != null && this.m_shineSpin.IsActive()) this.m_shineSpin.Kill();
+        this.m_shineSpin = null;
+
+        if (this.finalShine != null) this.finalShine.rectTransform.localRotation = Quaternion.identity;
+    }
+
+    // 챕터 보스만 상시 움직인다 — 도전할 정점은 발광이 맡고, 움직이는 자리는 그 장의 목표로 남긴다.
+    // 광채의 세기·크기와 원판의 높이·그림자를 한 시퀀스에 넣어 같은 박으로 뛰게 한다.
+    void ApplyIdleMotion(bool _final)
+    {
+        if (!_final)
         {
             this.KillIdleMotion();
             return;
@@ -385,19 +459,21 @@ public class TournamentNodeView : MonoBehaviour
 
         this.EnsureIdleHome();
 
-        float t_half = this.focusGlowCycle * 0.5f;
+        float t_half = this.idleCycle * 0.5f;
         Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
         bool t_any = false;
 
-        // 빛 — 세기와 크기가 함께 오른다. 알파만으로는 밝은 배경 위에서 맥이 안 잡힌다.
-        if (this.focusGlow != null)
+        // 광채 — 세기와 크기가 함께 오른다. 알파만으로는 밝은 배경 위에서 맥이 안 잡힌다.
+        if (this.finalShine != null)
         {
-            SetAlpha(this.focusGlow, this.focusGlowLow);
-            this.focusGlow.rectTransform.localScale = Vector3.one;
+            SetAlpha(this.finalShine, this.shinePulseLow);
+            this.finalShine.rectTransform.localScale = Vector3.one;
 
-            t_seq.Insert(0f, this.focusGlow.DOFade(this.focusGlowHigh, t_half).SetEase(Ease.InOutSine));
-            t_seq.Insert(0f, this.focusGlow.rectTransform.DOScale(this.focusGlowPulseScale, t_half).SetEase(Ease.InOutSine));
+            t_seq.Insert(0f, this.finalShine.DOFade(this.shinePulseHigh, t_half).SetEase(Ease.InOutSine));
+            t_seq.Insert(0f, this.finalShine.rectTransform.DOScale(this.shinePulseScale, t_half).SetEase(Ease.InOutSine));
             t_any = true;
+
+            this.StartShineSpin();
         }
 
         // 원판 — y로만 민다. 이 대상의 스케일은 선물·해금 펀치·도장이 나눠 쥐고 있어 건드리면 안 된다.
@@ -536,15 +612,18 @@ public class TournamentNodeView : MonoBehaviour
         this.m_stampSeq = null;
     }
 
-    // 무한 Yoyo는 완료로 끝나지 않아 아무 자리에서나 죽는다 — 뜬 원판·부푼 빛·줄어든 그림자를 손으로 세운다.
+    // 무한 Yoyo는 완료로 끝나지 않아 아무 자리에서나 죽는다 — 뜬 원판·부푼 광채·줄어든 그림자를 손으로 세운다.
     void KillIdleMotion()
     {
+        // 회전은 시퀀스 밖에서 도니 시퀀스가 없어도 먼저 걷는다.
+        this.KillShineSpin();
+
         if (this.m_idleSeq == null) return;
 
         if (this.m_idleSeq.IsActive()) this.m_idleSeq.Kill();
         this.m_idleSeq = null;
 
-        if (this.focusGlow != null) this.focusGlow.rectTransform.localScale = Vector3.one;
+        if (this.finalShine != null) this.finalShine.rectTransform.localScale = Vector3.one;
         if (this.giftPunchTarget != null && this.m_bobHome != null) this.giftPunchTarget.anchoredPosition = this.m_bobHome.Value;
 
         if (this.shadowImage == null) return;

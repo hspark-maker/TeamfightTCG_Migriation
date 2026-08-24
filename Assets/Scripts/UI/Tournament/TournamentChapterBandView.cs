@@ -27,6 +27,17 @@ public class TournamentChapterBandView : MonoBehaviour
              "미배선이면 끝 상태가 화면에 드러나지 않을 뿐 진행에는 영향이 없다.")]
     [SerializeField] GameObject endMark;
 
+    [Tooltip("랭크 미달로 챕터 전체가 잠겼음을 알리는 묶음. 다른 어떤 상태 묶음보다 먼저다 —\n" +
+             "들어갈 수 없는 장에서 진행 눈금이나 보상 미리보기를 펴 봐야 읽을 사람이 없다.\n" +
+             "미배선이면 잠김이 화면에 드러나지 않을 뿐 진입은 그대로 막힌다.")]
+    [SerializeField] GameObject rankLockMark;
+
+    [Tooltip("잠김 안내 문구. 요구 등급 표시명을 코드가 채운다.")]
+    [SerializeField] TMP_Text rankLockText;
+
+    [Tooltip("요구 등급 배지(선택). 등급에 배지가 저작되지 않았으면 그림 없이 문구만 남는다.")]
+    [SerializeField] Image rankLockBadge;
+
     [Tooltip("완주하지 않은 챕터 띠의 알파. 배경 그림을 가리지 않을 만큼만 죽인다.")]
     [SerializeField] float lockedAlpha = 0.88f;
 
@@ -78,6 +89,10 @@ public class TournamentChapterBandView : MonoBehaviour
 
         this.BindRewardSlots();
 
+        // 랭크 잠금은 진행과 축이 다르다 — 완주한 장이 저작 변경·강등으로 다시 잠겨도 그 성취까지 가리지는 않는다.
+        bool t_rankLocked = TournamentProgress.IsChapterRankLocked(this.m_index) && t_cleared < t_total;
+        this.ApplyRankLock(t_rankLocked, this.m_index);
+
         // 완주 판정을 눈금에서 파생시킨다 — IsChapterComplete를 따로 부르면 같은 정점을 한 번 더 훑는다.
         // 정점 0개 챕터가 완주로 통과하는 것도 그대로다(0 == 0).
         bool t_complete = t_cleared == t_total;
@@ -85,12 +100,29 @@ public class TournamentChapterBandView : MonoBehaviour
         // 수령 자격은 흐름이 단독으로 판정한다 — 여기서 조건을 더 곱하면 띠와 팝업이 서로 다른 자격을 보게 된다.
         bool t_claimable = TournamentChapterRewardFlow.CanClaim(this.m_index);
 
-        if (this.progressMark != null) this.progressMark.SetActive(!t_complete);
-        if (this.claimableMark != null) this.claimableMark.SetActive(t_claimable);
+        if (this.progressMark != null) this.progressMark.SetActive(!t_complete && !t_rankLocked);
+        if (this.claimableMark != null) this.claimableMark.SetActive(t_claimable && !t_rankLocked);
         if (this.clearedMark != null) this.clearedMark.SetActive(t_complete && !t_claimable);
         if (this.endMark != null) this.endMark.SetActive(this.m_isLast && t_complete);
-        if (this.claimButton != null) this.claimButton.interactable = t_claimable;
+        if (this.claimButton != null) this.claimButton.interactable = t_claimable && !t_rankLocked;
         if (this.canvasGroup != null) this.canvasGroup.alpha = t_complete ? 1f : this.lockedAlpha;
+    }
+
+    // 잠김 안내. 요구 등급의 표시명·배지는 랭크가 소유하므로 여기서 문자열을 짓지 않는다.
+    void ApplyRankLock(bool _locked, int _chapterIndex)
+    {
+        if (this.rankLockMark != null) this.rankLockMark.SetActive(_locked);
+        if (!_locked) return;
+
+        if (!TournamentProgress.TryGetRequiredGrade(_chapterIndex, out ERankGrade t_grade)) return;
+        if (!RankManager.TryGetGradeDisplay(t_grade, out string t_name, out Sprite t_badge)) return;
+
+        if (this.rankLockText != null) this.rankLockText.text = $"{t_name} 도달 시 해금";
+
+        if (this.rankLockBadge == null) return;
+
+        this.rankLockBadge.gameObject.SetActive(t_badge != null);
+        if (t_badge != null) this.rankLockBadge.sprite = t_badge;
     }
 
     // 수령은 흐름이 소유한다 — 자격 판정 · 팝업 · 지급이 한 자리에 있어야 띠와 판정이 갈리지 않는다.

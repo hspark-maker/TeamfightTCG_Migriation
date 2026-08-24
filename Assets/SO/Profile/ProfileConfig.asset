@@ -16,31 +16,35 @@ MonoBehaviour:
   avatars:
   - id: avatar_00
     displayName: "\uAE30\uBCF8"
-    large: {fileID: 21300000, guid: dc1daa1759ce1044f9619fd266295508, type: 3}
-    small: {fileID: 21300000, guid: dc1daa1759ce1044f9619fd266295508, type: 3}
+    large: {fileID: 21300000, guid: 5df687fb4fb94a688e63effeede8d451, type: 3}
+    small: {fileID: 21300000, guid: 5df687fb4fb94a688e63effeede8d451, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}
   frames:
   - id: frame_default
     displayName: "\uAE30\uBCF8"
-    sprite: {fileID: 21300000, guid: c67025f4437b4a648d8bb4619c33051c, type: 3}
+    sprite: {fileID: 21300000, guid: 67f0892ab45c4cdef5061728394a5b6c, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}
-  - id: frame_frost
-    displayName: "\uD504\uB85C\uC2A4\uD2B8"
-    sprite: {fileID: 21300000, guid: 4464309f3dbfda24793ef4e2afcb9e11, type: 3}
+  - id: frame_Sun
+    displayName: "\uD0DC\uC591"
+    sprite: {fileID: 21300000, guid: 12ab34cd56ef4789a0b1c2d3e4f50617, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}
-  - id: frame_ember
-    displayName: "\uC5E0\uBC84"
-    sprite: {fileID: 21300000, guid: 5d724eaefefb4b74285fa23217e16b8a, type: 3}
-    color: {r: 1, g: 1, b: 1, a: 1}
-  - id: frame_emerald
+  - id: frame_Emerald
     displayName: "\uC5D0\uBA54\uB784\uB4DC"
-    sprite: {fileID: 21300000, guid: 3955c7cecbedaa542ad52cf65775702b, type: 3}
+    sprite: {fileID: 21300000, guid: 23bc45de67f1489ab1c2d3e4f5061728, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}
-  - id: frame_arcane
-    displayName: "\uC544\uCF00\uC778"
-    sprite: {fileID: 21300000, guid: 2fed7660ffe42c8448b9e456deb84021, type: 3}
+  - id: frame_Frost
+    displayName: "\uD504\uB85C\uC2A4\uD2B8"
+    sprite: {fileID: 21300000, guid: 56ef7819a34b4bcde4f5061728394a5b, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}
-  - id: frame_silver
-    displayName: "\uC2E4\uBC84"
-    sprite: {fileID: 21300000, guid: 3fa87731f67ce27419c3f7d6b8f27887, type: 3}
+  - id: frame_Rose
+    displayName: "\uB85C\uC988"
+    sprite: {fileID: 21300000, guid: 45de67f8923a4abcd3e4f5061728394a, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Moon
+    displayName: "\uB2EC\uBE5B"
+    sprite: {fileID: 21300000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Ocean
+    displayName: "\uBC14\uB2E4"
+    sprite: {fileID: 21300000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
     color: {r: 1, g: 1, b: 1, a: 1}

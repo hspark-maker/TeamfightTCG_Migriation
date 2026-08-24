@@ -185,7 +185,7 @@ public struct GrowthLevelStep
     public int hpGain;
 
     [Tooltip("이 레벨업에 소모할 재화. 비용과 달리 '미지정'이 없다 — 행이 있으면 이 값이 그대로 쓰인다. " +
-             "일반 강화는 에너지, 진화 레벨에 다이아를 물리는 것이 이 칸의 용도다.")]
+             "레벨마다 결제 재화를 손으로 갈라 놓고 싶을 때 쓰는 칸이다.")]
     public ECurrencyType costCurrency;
 
     [Tooltip("이 레벨업의 비용. 0 이하면 기본식을 쓴다. 단위는 위 재화다(기본식은 항상 골드).")]

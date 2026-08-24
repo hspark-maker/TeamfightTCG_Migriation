@@ -57,6 +57,29 @@ public static class RankManager
     /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
     public static bool TryGetTier(int _index, out RankTier _tier) => Config.TryGetTier(_index, out _tier);
 
+    /// <summary>등급 하나의 표시명·배지(단계 숫자 없이). 등급 단위 안내 문구가
+    /// RankConfig를 직접 열지 않게 하는 창구다 — 미저작 등급이면 false + 빈 값.</summary>
+    public static bool TryGetGradeDisplay(ERankGrade _grade, out string _name, out Sprite _badge)
+    {
+        _name  = string.Empty;
+        _badge = null;
+
+        var t_grades = Config.grades;
+        if (t_grades == null) return false;
+
+        for (int t_i = 0; t_i < t_grades.Count; t_i++)
+        {
+            RankGradeConfig t_entry = t_grades[t_i];
+            if (t_entry == null || t_entry.grade != _grade) continue;
+
+            _name  = t_entry.displayName;
+            _badge = t_entry.badge;
+            return true;
+        }
+
+        return false;
+    }
+
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo() => GetInfoAt(Points);
 

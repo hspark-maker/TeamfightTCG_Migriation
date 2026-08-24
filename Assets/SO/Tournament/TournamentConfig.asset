@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TournamentConfig
   chapters:
   - chapterId: chapter_01
+    requiredGrade: 0
     title: "\uC81C1\uC7A5 \xB7 \uC548\uAC1C \uC232"
     tilePrefab: {fileID: 8869288645222550817, guid: 6bbd58836419ece4a8496d321a477357, type: 3}
     nodes:
@@ -113,6 +114,7 @@ MonoBehaviour:
     - currency: 3
       amount: 40
   - chapterId: chapter_02
+    requiredGrade: 1
     title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
     tilePrefab: {fileID: 6468447428658967276, guid: f1351b2ef4a274a4f83cb6d9c6801545, type: 3}
     nodes:
@@ -212,6 +214,7 @@ MonoBehaviour:
     - currency: 3
       amount: 50
   - chapterId: chapter_03
+    requiredGrade: 2
     title: "\uC81C3\uC7A5 \xB7 \uC5BC\uC5B4\uBD99\uC740 \uC124\uC6D0"
     tilePrefab: {fileID: 668995502536726736, guid: 246083bed930b714c9d233dfe489ceba, type: 3}
     nodes:
@@ -311,6 +314,7 @@ MonoBehaviour:
     - currency: 3
       amount: 50
   - chapterId: chapter_04
+    requiredGrade: 3
     title: "\uC81C4\uC7A5 \xB7 \uC7BF\uBD88\uC758 \uD654\uC0B0"
     tilePrefab: {fileID: 9106813324675404984, guid: 25c79d556422e184fb2a0f4db1f7dba4, type: 3}
     nodes:

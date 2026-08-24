@@ -92,7 +92,7 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 0
+      useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
       anchorCard: {fileID: 0}
