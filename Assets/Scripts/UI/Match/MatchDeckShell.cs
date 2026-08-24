@@ -229,6 +229,10 @@ public class MatchDeckShell : MonoBehaviour
 
         if (panelView == null) return;
 
+        // 편집이 슬롯을 비우거나 6장 미만으로 만들고 나올 수 있다(onSlotSwitched는 받은 값을 검사하지 않는다).
+        // 그대로 그리면 전투 시작 버튼이 잠긴 채 남고, 그 버튼을 가리키는 튜토리얼 안내는 풀릴 길 없이 대기한다.
+        SelectedSlot = ResolveSlot(SelectedSlot);
+
         panelView.Render(SelectedSlot);
 
         // 전환을 타고 들어온 직전 표시가 칸을 감춘 채 끝났을 수 있다 — 전환을 타지 않는 경로는 반드시 여기서 되돌린다.
@@ -253,14 +257,23 @@ public class MatchDeckShell : MonoBehaviour
         return t_tutorial;
     }
 
-    // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 목록에 없으면 -1.
+    // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 고를 덱이 하나도 없으면 -1.
     // 전투 덱 정본은 TutorialConfig(시나리오)이고 DeckGrant 스텝이 같은 구성을 세이브에 넣어둔다 —
     // 좌표를 여기서 되찾는 이유는 세이브 삽입이 항상 맨 앞이라 스텝이 좌표를 알려줄 수 없기 때문.
     static int TutorialDeckSlot()
     {
         if (!TutorialConfig.IsActive) return -1;
 
-        return DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index) ? t_index : -1;
+        if (DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index)) return t_index;
+
+        // 앞선 DeckGrant 스텝이 건너뛰어져 그 덱이 세이브에 없다. 아무 칸도 안 가리키면 그 칸을 지목하는
+        // 안내(MatchDeckTutorialDeck)가 등록을 영영 기다린다 — 첫 유효 슬롯으로 떨어뜨려 안내를 세운다.
+        // "목록에서 골라 쓴다"는 학습 목표는 어느 덱을 가리켜도 그대로 산다
+        // (지목 실패 시 화면이 대신 고르는 AlbumTabController.FindAnchorThemeIndex와 같은 관용구).
+        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+            if (DeckSaveManager.IsSlotValid(t_i)) return t_i;
+
+        return -1;
     }
 
     // DeckSaveManager.IsSlotValid는 범위 가드 없이 슬롯 배열을 직접 인덱싱한다 —

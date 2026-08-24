@@ -182,7 +182,9 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.RankEffect)
         {
             // 놓아줄 디렉터가 이 씬에 없으면 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
-            if (!LobbyRankEffectDirector.Exists) OnGateSatisfied();
+            // 완료만 넘기면 안 된다: 트리거 튜토리얼의 문은 졸업이 아니라 이 연출의 종료가 여는데,
+            // 그 자리를 건너뛰면 문이 닫힌 채 남아 뒤따르는 트리거 안내가 통째로 사라진다(OnRankEffectFinished가 그 짝이다).
+            if (!LobbyRankEffectDirector.Exists) OnRankEffectFinished();
             return;
         }
 
