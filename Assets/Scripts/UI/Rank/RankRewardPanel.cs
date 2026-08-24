@@ -125,21 +125,25 @@ public class RankRewardPanel : PooledUIBase
             if (this.m_rows[t_i] != null) this.m_rows[t_i].Refresh();
     }
 
-    // 행 클릭 → 수령 팝업. 팝업을 못 세우면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
+    // 행 클릭 → 수령 팝업. 팝업이 씬에 없으면 확인 없이 바로 수령한다(배선 전에도 루프가 닫히도록).
     void OnRowClicked(int _tierIndex)
     {
         if (!RankRewardManager.CanClaim(_tierIndex)) return;
 
-        var t_info = RankRewardManager.GetInfo(_tierIndex);
-
-        if (!RewardClaimPopup.TryShow(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex), true))
+        if (!RewardClaimPopup.TryGet(out var t_popup))
+        {
             this.Claim(_tierIndex);
+            return;
+        }
+
+        var t_info = RankRewardManager.GetInfo(_tierIndex);
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex), true);
     }
 
-    // 팝업은 이 패널의 소유가 아니라 풀이 세우는 공용 1개다 — 안 떠 있으면 아무 일도 하지 않는다.
+    // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
     static void HideClaimPopup()
     {
-        RewardClaimPopup.HideIfOpen();
+        if (RewardClaimPopup.TryGet(out var t_popup)) t_popup.Hide();
     }
 
     // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshRows를 유발한다.
