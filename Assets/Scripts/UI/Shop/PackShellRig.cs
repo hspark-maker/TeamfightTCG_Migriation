@@ -84,6 +84,12 @@ public class PackShellRig : MonoBehaviour
     [SerializeField] float shakeDuration = 0.28f;
     [Tooltip("초당 흔들리는 횟수에 해당하는 노이즈 주파수. 높을수록 잘게 떤다.")]
     [SerializeField] float shakeFrequency = 26f;
+    [Tooltip("희귀 팩 개봉 흔들림 배율. 일반은 기존 진폭 1배를 유지한다.")]
+    [Min(0f)] [SerializeField] float rareShakeScale = 1.5f;
+    [Tooltip("신비 팩 개봉 흔들림 배율.")]
+    [Min(0f)] [SerializeField] float arcaneShakeScale = 2.2f;
+    [Tooltip("신화 팩 개봉 흔들림 배율.")]
+    [Min(0f)] [SerializeField] float mythicShakeScale = 3f;
 
     [Header("연결")]
     [Tooltip("뜯기 진행도를 구독해 손가락이 닿은 동안 아이들을 멈춘다. 미배선이면 항상 동작.")]
@@ -122,6 +128,10 @@ public class PackShellRig : MonoBehaviour
     float m_ringTime = -1f;
     // 재질 런타임 사본. 에셋에 직접 쓰면 플레이 중 밝기가 .mat에 눌어붙는다.
     Material m_ringMat;
+    ECardGrade m_ringGrade;
+    PackGradeFxPalette m_ringPalette;
+    Color m_ringHomeColor = Color.white;
+    bool m_ringHomeColorCaptured;
     Vector3 m_glowHomeScale = Vector3.one;
 
     // 흔들림은 링과 같은 시계를 쓰되 더 빨리 끝난다. 무대 오프셋에 더하는 값이라 별도 상태가 없다.
@@ -133,6 +143,7 @@ public class PackShellRig : MonoBehaviour
     static readonly int ID_SPRITE_AMOUNT = Shader.PropertyToID("_SpriteAmount");
     static readonly int ID_RING_WIDTH    = Shader.PropertyToID("_RingWidth");
     static readonly int ID_RING_STRENGTH = Shader.PropertyToID("_RingStrength");
+    static readonly int ID_RING_COLOR    = Shader.PropertyToID("_RingColor");
 
     // 아이들을 멈추는 축이 둘이다. 연출(뷰)의 판단과 손가락이 닿았다는 사실은 서로 다른 사건이라
     // 한 플래그를 두 쪽이 덮어쓰면, 손을 뗀 순간 뷰가 꺼 둔 부유가 되살아난다. 따로 두고 AND 한다.
@@ -180,7 +191,28 @@ public class PackShellRig : MonoBehaviour
         m_touching = false;
         m_settle = 1f;
         m_glowFade = 1f;   // 개봉 시작마다 광채를 되살린다 — 지난 세션에서 걷어 둔 채로 시작하면 팩이 맨몸으로 등장한다.
+        m_ringTime = -1f;
+        m_shakeTime = -1f;
+        m_ringGrade = ECardGrade.Unknown;
+        m_ringPalette = null;
+        if (glow != null) glow.transform.localScale = m_glowHomeScale;
+        Material t_mat = RingMaterial();
+        if (t_mat != null)
+        {
+            t_mat.SetFloat(ID_RING_STRENGTH, 0f);
+            RestoreRingColor(t_mat);
+        }
         Apply();
+    }
+
+    /// <summary>이번 개봉 최고 등급을 링에 물린다. 실제 색 평가는 링 재생 중 매 프레임 수행한다.</summary>
+    public void SetRingGrade(ECardGrade _grade, PackGradeFxPalette _palette)
+    {
+        m_ringGrade = _grade;
+        m_ringPalette = _palette;
+
+        if (_palette == null || !_palette.TryEvaluate(_grade, out _))
+            RestoreRingColor(RingMaterial());
     }
 
     /// <summary>다 찢은 순간 팩 입구에서 링이 퍼진다(작게 시작해 커지며 얇아진다).
@@ -350,15 +382,24 @@ public class PackShellRig : MonoBehaviour
     // x와 y가 같은 파형으로 움직이는(= 대각선으로만 흔들리는) 그림을 피한다.
     Vector2 ShakeOffset()
     {
-        if (m_shakeTime < 0f || shakeAmplitude <= 0.0001f) return Vector2.zero;
+        float t_peak = shakeAmplitude * ShakeScale();
+        if (m_shakeTime < 0f || t_peak <= 0.0001f) return Vector2.zero;
 
         float t_p = Mathf.Clamp01(m_shakeTime / Mathf.Max(0.0001f, shakeDuration));
-        float t_amp = shakeAmplitude * (1f - t_p) * (1f - t_p);
+        float t_amp = t_peak * (1f - t_p) * (1f - t_p);
         float t_n = m_shakeTime * shakeFrequency;
 
         return new Vector2(
             (Mathf.PerlinNoise(t_n, 0.37f) * 2f - 1f) * t_amp,
             (Mathf.PerlinNoise(0.71f, t_n) * 2f - 1f) * t_amp);
+    }
+
+    float ShakeScale()
+    {
+        if (m_ringGrade == ECardGrade.Mythic) return mythicShakeScale;
+        if (m_ringGrade == ECardGrade.Arcane) return arcaneShakeScale;
+        if (m_ringGrade == ECardGrade.Rare) return rareShakeScale;
+        return 1f;
     }
 
     // 링 그림(원형 테두리 글로우)을 작게 시작해 크게 부풀린다.
@@ -375,7 +416,11 @@ public class PackShellRig : MonoBehaviour
         {
             // 끝났으면 씬 배치 크기로 돌려둔다 — 부푼 채로 두면 다음 개봉이 큰 원에서 시작한다.
             if (glow != null) glow.transform.localScale = m_glowHomeScale;
-            if (t_mat != null) t_mat.SetFloat(ID_RING_STRENGTH, 0f);
+            if (t_mat != null)
+            {
+                t_mat.SetFloat(ID_RING_STRENGTH, 0f);
+                RestoreRingColor(t_mat);
+            }
             return;   // 스프라이트 몫은 ApplyGlow가 이미 평소 값으로 밀어 뒀다.
         }
 
@@ -387,6 +432,11 @@ public class PackShellRig : MonoBehaviour
 
         if (t_mat != null)
         {
+            if (m_ringPalette != null && m_ringPalette.TryEvaluate(m_ringGrade, out Color t_ringColor))
+                t_mat.SetColor(ID_RING_COLOR, t_ringColor);
+            else
+                RestoreRingColor(t_mat);
+
             float t_fade = (1f - t_p) * (1f - t_p);
             t_mat.SetFloat(ID_SPRITE_AMOUNT, ringStrength * t_fade);
             t_mat.SetFloat(ID_RING_WIDTH, Mathf.Max(ringThickness, 0.001f));
@@ -404,8 +454,19 @@ public class PackShellRig : MonoBehaviour
         if (t_src == null || t_src.shader == null || !t_src.shader.name.Contains("PackRing")) return null;
 
         m_ringMat = new Material(t_src);
+        if (m_ringMat.HasProperty(ID_RING_COLOR))
+        {
+            m_ringHomeColor = m_ringMat.GetColor(ID_RING_COLOR);
+            m_ringHomeColorCaptured = true;
+        }
         glow.material = m_ringMat;
         return m_ringMat;
+    }
+
+    void RestoreRingColor(Material _material)
+    {
+        if (_material != null && m_ringHomeColorCaptured && _material.HasProperty(ID_RING_COLOR))
+            _material.SetColor(ID_RING_COLOR, m_ringHomeColor);
     }
 
     void OnDestroy()

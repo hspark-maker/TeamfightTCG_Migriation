@@ -145,11 +145,27 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
         if (GUILayout.Button("TOURNAMENT NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentTournamentNode();
 
+        DrawRarityPackControls();
         DrawCurrencyGrants();
         DrawTierControls();
         DrawChapterJumps();
 
         GUILayout.EndScrollView();
+    }
+
+    void DrawRarityPackControls()
+    {
+        ECardGrade t_grade = ECardGrade.Unknown;
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("RARE",   GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Rare;
+        if (GUILayout.Button("ARCANE", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Arcane;
+        if (GUILayout.Button("MYTHIC", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Mythic;
+        GUILayout.EndHorizontal();
+
+        if (t_grade == ECardGrade.Unknown) return;
+        SetOpen(false);
+        OutgameDebugActions.OpenRarityTestPack(t_grade);
     }
 
     // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.

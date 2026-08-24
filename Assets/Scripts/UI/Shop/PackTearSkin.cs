@@ -42,6 +42,10 @@ public class PackTearSkin : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] float gradeTintStart = 0.5f;
     [Tooltip("등급 색이 완전히 드러나는 진행도. 시작점과 같거나 작으면 그 지점에서 즉시 바뀐다.")]
     [Range(0f, 1f)] [SerializeField] float gradeTintFull = 0.95f;
+    [Tooltip("신화 빛이 배어 나오기 시작하는 진행도. 신화는 백색 예고 구간을 짧게 쓴다.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintStart = 0.25f;
+    [Tooltip("신화 팔레트가 완전히 드러나는 진행도.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintFull = 0.75f;
     [Tooltip("희귀 등급의 빛 색. 알파는 씬에 저작된 빛의 알파를 상한으로 쓴다.")]
     [FormerlySerializedAs("goldGlow")]
     [SerializeField] Color rareGlow = new Color(1f, 0.82f, 0.35f, 1f);
@@ -105,6 +109,7 @@ public class PackTearSkin : MonoBehaviour
 
     // 찢기 상태와 등급 빛은 같은 진행도 하나를 공유한다.
     ECardGrade m_glowGrade;
+    PackGradeFxPalette m_gradePalette;
     float m_tearProgress;
     float m_tearDirection = 1f;
     Color m_glowHome = Color.white;
@@ -193,10 +198,11 @@ public class PackTearSkin : MonoBehaviour
     ///
     /// <see cref="ResetTear"/> <b>뒤에</b> 부를 것. 되돌리기가 세기를 0으로 내리므로 순서가 뒤집히면
     /// 등급을 물린 첫 프레임이 곧바로 지워진다.</summary>
-    public void SetGlowGrade(ECardGrade _grade)
+    public void SetGlowGrade(ECardGrade _grade, PackGradeFxPalette _palette = null)
     {
         CaptureGlowHome();
         m_glowGrade = _grade;
+        m_gradePalette = _palette;
         ApplyGlow();
     }
 
@@ -306,15 +312,23 @@ public class PackTearSkin : MonoBehaviour
         if (m_glowGrade != ECardGrade.Rare
             && m_glowGrade != ECardGrade.Arcane
             && m_glowGrade != ECardGrade.Mythic) return 0f;
-        if (m_tearProgress <= gradeTintStart) return 0f;
-        if (gradeTintFull <= gradeTintStart) return 1f;   // 구간이 없으면 그 지점에서 즉시 물든다
+        float t_start = m_glowGrade == ECardGrade.Mythic ? mythicTintStart : gradeTintStart;
+        float t_full = m_glowGrade == ECardGrade.Mythic ? mythicTintFull : gradeTintFull;
+        if (m_tearProgress <= t_start) return 0f;
+        if (t_full <= t_start) return 1f;   // 구간이 없으면 그 지점에서 즉시 물든다
 
-        return Mathf.Clamp01((m_tearProgress - gradeTintStart) / (gradeTintFull - gradeTintStart));
+        return Mathf.Clamp01((m_tearProgress - t_start) / (t_full - t_start));
     }
 
-    Color GradeColor() => m_glowGrade == ECardGrade.Mythic
-        ? MythicPaletteColor()
-        : m_glowGrade == ECardGrade.Arcane ? arcaneGlow : rareGlow;
+    Color GradeColor()
+    {
+        if (m_gradePalette != null && m_gradePalette.TryEvaluate(m_glowGrade, out Color t_color))
+            return t_color;
+
+        return m_glowGrade == ECardGrade.Mythic
+            ? MythicPaletteColor()
+            : m_glowGrade == ECardGrade.Arcane ? arcaneGlow : rareGlow;
+    }
 
     Color MythicPaletteColor()
     {
