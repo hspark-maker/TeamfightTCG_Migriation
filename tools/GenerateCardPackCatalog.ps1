@@ -36,17 +36,17 @@ $packRows = @(Read-SpecCsv $packPath | Where-Object { $_.packId -notin @(
     'HuntingBrandPack', 'ImmortalLegacyPack', 'IronArmorPack', 'GiantsGardenPack', 'ElementalFlowPack'
 ) })
 $packRows += @(
-    [pscustomobject]@{ id=7; packId='HuntingBrandPack'; displayName=(Decode-Utf8 '7IKs64Ol7J2YIOuCmeyduA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8 },
-    [pscustomobject]@{ id=8; packId='ImmortalLegacyPack'; displayName=(Decode-Utf8 '67aI66m47J2YIOycoOyCsA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8 },
-    [pscustomobject]@{ id=9; packId='IronArmorPack'; displayName=(Decode-Utf8 '7LKg67K97J2YIOqwkeyjvA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8 },
-    [pscustomobject]@{ id=10; packId='GiantsGardenPack'; displayName=(Decode-Utf8 '6rGw7J247J2YIOygleybkA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8 },
-    [pscustomobject]@{ id=11; packId='ElementalFlowPack'; displayName=(Decode-Utf8 '7JuQ7IaM7J2YIO2dkOumhA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8 }
+    [pscustomobject]@{ id=7; packId='HuntingBrandPack'; displayName=(Decode-Utf8 '64KZ7J247J2YIOu5hOuKmA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8; minRankGrade='Platinum' },
+    [pscustomobject]@{ id=8; packId='ImmortalLegacyPack'; displayName=(Decode-Utf8 '67aI66m47J2YIOycoOyCsA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8; minRankGrade='Diamond' },
+    [pscustomobject]@{ id=9; packId='IronArmorPack'; displayName=(Decode-Utf8 '7IiY7Zi47J2YIOygleybkA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8; minRankGrade='Silver' },
+    [pscustomobject]@{ id=10; packId='GiantsGardenPack'; displayName=(Decode-Utf8 '6rGw7J247J2YIOyCrOuDpQ=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8; minRankGrade='Gold' },
+    [pscustomobject]@{ id=11; packId='ElementalFlowPack'; displayName=(Decode-Utf8 '7JuQ7IaM7J2YIO2dkOumhA=='); channel='Live'; priceType='Diamond'; price=30; drawCount=6; uniqueDraw=0; refundType='Shard'; refundAmount=8; minRankGrade='Bronze' }
 )
-Write-SpecCsv $packPath $packLines[0..2] $packRows @('id','packId','displayName','channel','priceType','price','drawCount','uniqueDraw','refundType','refundAmount')
+Write-SpecCsv $packPath $packLines[0..2] $packRows @('id','packId','displayName','channel','priceType','price','drawCount','uniqueDraw','refundType','refundAmount','minRankGrade')
 
 $dropLines = [IO.File]::ReadAllLines($dropPath)
 $allDropRows = @(Read-SpecCsv $dropPath)
-$managedPackIds = @('NormalPack_TEST','SpecialPack','HuntingBrandPack','ImmortalLegacyPack','IronArmorPack','GiantsGardenPack','ElementalFlowPack')
+$managedPackIds = @('NormalPack_TEST','SpecialPack','UltraPack','HuntingBrandPack','ImmortalLegacyPack','IronArmorPack','GiantsGardenPack','ElementalFlowPack')
 $existingIds = @{}
 $maxId = 0
 foreach ($row in $allDropRows) {
@@ -72,45 +72,55 @@ function Add-Drop([string]$PackId, [string]$Grade, [int]$CardId, [int]$Weight) {
 $rankPools = [ordered]@{
     Bronze  = @(1,2,3,5,6,17,18,19,29,30)
     Silver  = @(1,2,3,4,5,6,8,9,10,13,14,17,18,19,29,30)
-    Gold    = @(1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,22,25,29,30)
-    Platinum = @(1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20,22,25,28,29,30,31,32,33)
-    Diamond = @(1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20,22,25,28,29,30,31,32,33,34,35,36,37,38)
+    Gold    = @(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,22,25,29,30)
+    Platinum = @(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,28,29,30,31,32,33)
+    Diamond = @(1..38)
 }
 
-function Add-RankPool([string]$PackId, [string]$Grade, [int[]]$CardIds, [int]$CommonMass, [int]$RareMass) {
-    $byGrade = @{
-        Common = @($CardIds | Where-Object { $cardById[$_].grade -eq 'Common' } | Sort-Object)
-        Rare = @($CardIds | Where-Object { $cardById[$_].grade -eq 'Rare' } | Sort-Object)
-    }
-    foreach ($gradeName in @('Common','Rare')) {
-        $ids = $byGrade[$gradeName]
+function Add-WeightedPool([string]$PackId, [string]$RankGrade, [int[]]$CardIds, [hashtable]$GradeMasses) {
+    foreach ($gradeName in @('Common','Rare','Arcane','Mythic')) {
+        $ids = @($CardIds | Where-Object { $cardById[$_].grade -eq $gradeName } | Sort-Object)
+        $budget = [int]$GradeMasses[$gradeName]
         if ($ids.Count -eq 0) { continue }
-        $budget = $(if ($gradeName -eq 'Common') { $CommonMass * 100 } else { $RareMass * 100 })
+        if ($budget -le 0) { throw "$PackId/$RankGrade contains $gradeName cards with no weight budget" }
         $base = [math]::Floor($budget / $ids.Count)
         $remainder = $budget - ($base * $ids.Count)
         for ($i = 0; $i -lt $ids.Count; $i++) {
-            Add-Drop $PackId $Grade $ids[$i] ([int]$base + $(if ($i -lt $remainder) { 1 } else { 0 }))
+            Add-Drop $PackId $RankGrade $ids[$i] ([int]$base + $(if ($i -lt $remainder) { 1 } else { 0 }))
         }
     }
 }
 
 foreach ($entry in $rankPools.GetEnumerator()) {
-    Add-RankPool 'NormalPack_TEST' $entry.Key $entry.Value 80 20
+    $masses = $(if ($entry.Key -in @('Bronze','Silver')) {
+        @{ Common=8000; Rare=2000; Arcane=0; Mythic=0 }
+    } else {
+        @{ Common=7960; Rare=1990; Arcane=50; Mythic=0 }
+    })
+    Add-WeightedPool 'NormalPack_TEST' $entry.Key $entry.Value $masses
 }
 foreach ($entry in $rankPools.GetEnumerator()) {
-    Add-RankPool 'SpecialPack' $entry.Key $entry.Value 60 40
+    $masses = $(if ($entry.Key -in @('Bronze','Silver')) {
+        @{ Common=6000; Rare=4000; Arcane=0; Mythic=0 }
+    } else {
+        @{ Common=5970; Rare=3980; Arcane=50; Mythic=0 }
+    })
+    Add-WeightedPool 'SpecialPack' $entry.Key $entry.Value $masses
 }
 
 $themes = [ordered]@{
-    HuntingBrandPack = [ordered]@{ 13=11; 14=30; 17=11; 18=11; 19=11; 20=10; 35=10; 39=6 }
-    ImmortalLegacyPack = [ordered]@{ 8=6; 9=32; 10=6; 11=6; 12=6; 28=6; 33=32; 40=6 }
-    IronArmorPack = [ordered]@{ 5=8; 6=8; 7=3; 21=3; 22=7; 29=32; 31=7; 37=32 }
-    GiantsGardenPack = [ordered]@{ 1=13; 2=13; 3=13; 4=13; 23=3; 24=3; 32=12; 34=15; 38=15 }
-    ElementalFlowPack = [ordered]@{ 15=16; 16=16; 25=30; 26=3; 27=3; 30=16; 36=16 }
+    HuntingBrandPack = @(17,18,19,20,21,22,31,37,39,40)
+    IronArmorPack = @(1,2,3,4,5,6,7,32,39,40)
+    GiantsGardenPack = @(13,14,23,24,30,34,35,38,39,40)
+    ImmortalLegacyPack = @(8,9,10,11,12,29,33,39,40)
+    ElementalFlowPack = @(15,16,25,26,27,28,36,39,40)
 }
 foreach ($pack in $themes.GetEnumerator()) {
-    foreach ($card in $pack.Value.GetEnumerator()) { Add-Drop $pack.Key 'Bronze' ([int]$card.Key) ([int]$card.Value) }
+    Add-WeightedPool $pack.Key 'Bronze' $pack.Value @{ Common=6631; Rare=3109; Arcane=200; Mythic=60 }
 }
+
+$ultraCardIds = @(10,12,14,15,16,25,13,19,3,1,24,7,21,23,26,27,39,40)
+Add-WeightedPool 'UltraPack' 'Bronze' $ultraCardIds @{ Common=6631; Rare=3109; Arcane=200; Mythic=60 }
 
 $rows = @($keptRows) + @($generated | Sort-Object id)
 Write-SpecCsv $dropPath $dropLines[0..2] $rows @('id','packId','minGrade','cardId','weight','#cardName')
@@ -119,23 +129,54 @@ $errors = New-Object System.Collections.Generic.List[string]
 if (@($packRows.id | Group-Object | Where-Object Count -gt 1).Count -gt 0) { $errors.Add('CardPack id duplicate') }
 if (@($packRows.packId | Group-Object | Where-Object Count -gt 1).Count -gt 0) { $errors.Add('CardPack packId duplicate') }
 if (@($rows.id | Group-Object | Where-Object Count -gt 1).Count -gt 0) { $errors.Add('CardPackDrop id duplicate') }
+if (@($rows | Group-Object packId,minGrade,cardId | Where-Object Count -gt 1).Count -gt 0) { $errors.Add('CardPackDrop tuple duplicate') }
+if (@($rows | Where-Object { -not $cardById.ContainsKey([int]$_.cardId) }).Count -gt 0) { $errors.Add('CardPackDrop references missing card') }
 
 $previous = @()
+$expectedRankCounts = @(10,16,23,31,38)
+$rankIndex = 0
 foreach ($entry in $rankPools.GetEnumerator()) {
     $current = @($entry.Value)
     if (@($previous | Where-Object { $_ -notin $current }).Count -gt 0) { $errors.Add("rank pool is not cumulative: $($entry.Key)") }
-    if (@($current | Where-Object { $cardById[$_].grade -in @('Arcane','Mythic') }).Count -gt 0) { $errors.Add("Arcane/Mythic in gold pack: $($entry.Key)") }
+    if ($current.Count -ne $expectedRankCounts[$rankIndex]) { $errors.Add("unexpected rank pool count: $($entry.Key)") }
+    if (@($current | Where-Object { $cardById[$_].grade -eq 'Mythic' }).Count -gt 0) { $errors.Add("Mythic in gold pack: $($entry.Key)") }
     $previous = $current
+    $rankIndex++
 }
-if ((@($rankPools.Values | ForEach-Object Count) -join ',') -ne '10,16,22,27,32') { $errors.Add('unexpected rank pool counts') }
 
-$themeIds = @($themes.Values | ForEach-Object { $_.Keys } | ForEach-Object { [int]$_ })
-if ($themeIds.Count -ne 40 -or @($themeIds | Sort-Object -Unique).Count -ne 40 -or ($themeIds | Measure-Object -Minimum).Minimum -ne 1 -or ($themeIds | Measure-Object -Maximum).Maximum -ne 40) {
-    $errors.Add('theme packs must cover card ids 1..40 exactly once')
+foreach ($packId in @('NormalPack_TEST','SpecialPack')) {
+    foreach ($entry in $rankPools.GetEnumerator()) {
+        $block = @($rows | Where-Object { $_.packId -eq $packId -and $_.minGrade -eq $entry.Key })
+        $mass = @{}
+        foreach ($gradeName in @('Common','Rare','Arcane','Mythic')) {
+            $mass[$gradeName] = (@($block | Where-Object { $cardById[[int]$_.cardId].grade -eq $gradeName }).weight | Measure-Object -Sum).Sum
+            if ($null -eq $mass[$gradeName]) { $mass[$gradeName] = 0 }
+        }
+        $expectedArcane = $(if ($entry.Key -in @('Bronze','Silver')) { 0 } else { 50 })
+        if ($mass.Arcane -ne $expectedArcane -or $mass.Mythic -ne 0) { $errors.Add("bad gold high-grade mass: $packId/$($entry.Key)") }
+    }
 }
-foreach ($pack in $themes.GetEnumerator()) {
-    if (($pack.Value.Values | Measure-Object -Sum).Sum -ne 100) { $errors.Add("theme weight must total 100: $($pack.Key)") }
+
+$diamondPaid = @('UltraPack') + @($themes.Keys)
+foreach ($packId in $diamondPaid) {
+    $block = @($rows | Where-Object { $_.packId -eq $packId -and $_.minGrade -eq 'Bronze' })
+    $actual = @{}
+    foreach ($gradeName in @('Common','Rare','Arcane','Mythic')) {
+        $actual[$gradeName] = (@($block | Where-Object { $cardById[[int]$_.cardId].grade -eq $gradeName }).weight | Measure-Object -Sum).Sum
+    }
+    if ($actual.Common -ne 6631 -or $actual.Rare -ne 3109 -or $actual.Arcane -ne 200 -or $actual.Mythic -ne 60) {
+        $errors.Add("bad diamond grade mass: $packId")
+    }
+}
+
+$themeNonMythicIds = @($themes.Values | ForEach-Object { $_ | Where-Object { $_ -le 38 } })
+if ($themeNonMythicIds.Count -ne 38 -or @($themeNonMythicIds | Sort-Object -Unique).Count -ne 38 -or ($themeNonMythicIds | Measure-Object -Minimum).Minimum -ne 1 -or ($themeNonMythicIds | Measure-Object -Maximum).Maximum -ne 38) {
+    $errors.Add('theme packs must cover non-Mythic card ids 1..38 exactly once')
+}
+foreach ($mythicId in @(39,40)) {
+    $count = @($themes.Values | Where-Object { $mythicId -in $_ }).Count
+    if ($count -ne 5) { $errors.Add("Mythic card $mythicId must appear in all five themes") }
 }
 if ($errors.Count -gt 0) { throw ($errors -join '; ') }
 
-Write-Host "CardPack rows: $($packRows.Count); CardPackDrop rows: $($rows.Count); rank pools: 10/16/22/27/32; themes: 40 unique"
+Write-Host "CardPack rows: $($packRows.Count); CardPackDrop rows: $($rows.Count); rank pools: 10/16/23/31/38; themes: 1..38 unique + shared Mythics"

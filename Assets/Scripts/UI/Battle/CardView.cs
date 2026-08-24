@@ -344,6 +344,7 @@ public class CardView : MonoBehaviour
         // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 초기화한다.
         if (this.boundCard != _card)
         {
+            this.cardAnim.ResetHitEffect();
             this.armedVfxView?.Hide();   // 이전 카드의 무장 이펙트가 새 카드에 남지 않게
             // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
             KillHpRoll();

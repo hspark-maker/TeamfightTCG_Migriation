@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Moonbite
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 35
-  displayName: "문바이트"
+  displayName: "\uBB38\uBC14\uC774\uD2B8"
   channel: 1
   grade: 1
-  keywords: 0
+  keywords: 2
   maxHp: 4
   bonusHp: 0
   synergies:
@@ -24,7 +24,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: b2c9d62ba0827df418038bbe6e7cd404, type: 3}
   deckPreview: {fileID: 21300000, guid: b2c9d62ba0827df418038bbe6e7cd404, type: 3}
   hpGainByLevel: 0000000000000000050000000400000004000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: d8bdea7a6f5947d4a9e53d396dc9873b, type: 3}
   - battleImage: {fileID: 21300000, guid: 5e2bacbc7b2f5704789246e95222b41b, type: 3}
@@ -42,5 +42,7 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "엄청난 식욕으로 모든것을 먹는다. 그러니 달이 매일 모양이 달라지는 이유에 대해 묻지 말자."
+  cardExplain: "\uC5C4\uCCAD\uB09C \uC2DD\uC695\uC73C\uB85C \uBAA8\uB4E0\uAC83\uC744
+    \uBA39\uB294\uB2E4. \uADF8\uB7EC\uB2C8 \uB2EC\uC774 \uB9E4\uC77C \uBAA8\uC591\uC774
+    \uB2EC\uB77C\uC9C0\uB294 \uC774\uC720\uC5D0 \uB300\uD574 \uBB3B\uC9C0 \uB9D0\uC790."
   explainKeywords: 0

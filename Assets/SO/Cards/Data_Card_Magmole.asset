@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Magmole
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 34
-  displayName: "마그몰"
+  displayName: "\uB9C8\uADF8\uBAB0"
   channel: 1
   grade: 2
-  keywords: 0
+  keywords: 8
   maxHp: 5
   bonusHp: 0
   synergies:
@@ -42,5 +42,7 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "화를 참는 편이다. 문제는 참으면 화산이 생긴다. 그리고 화산이 생기면 폭발한다."
+  cardExplain: "\uD654\uB97C \uCC38\uB294 \uD3B8\uC774\uB2E4. \uBB38\uC81C\uB294
+    \uCC38\uC73C\uBA74 \uD654\uC0B0\uC774 \uC0DD\uAE34\uB2E4. \uADF8\uB9AC\uACE0
+    \uD654\uC0B0\uC774 \uC0DD\uAE30\uBA74 \uD3ED\uBC1C\uD55C\uB2E4."
   explainKeywords: 0

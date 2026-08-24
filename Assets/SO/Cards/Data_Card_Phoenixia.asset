@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Phoenixia
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 40
-  displayName: "피닉시아"
+  displayName: "\uD53C\uB2C9\uC2DC\uC544"
   channel: 1
   grade: 4
-  keywords: 0
+  keywords: 8
   maxHp: 6
   bonusHp: 0
   synergies:
@@ -25,7 +25,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: 7116ba67d00bf53489b2d5568589997d, type: 3}
   deckPreview: {fileID: 21300000, guid: 7116ba67d00bf53489b2d5568589997d, type: 3}
   hpGainByLevel: 0000000000000000030000000500000006000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 69a0be68c11962d4ca3b0a7721da9300, type: 3}
   - battleImage: {fileID: 21300000, guid: 3c733fd7e33dd1742b3c88a0563c5a2b, type: 3}
@@ -43,5 +43,9 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "죽음과 재생을 상징하는 전설의 신수지만 생각보다 성격은 꽤 수다스럽다. 오래된 숲이 불타거나 새로운 생명이 태어나는 순간 나타나 꽃잎처럼 빛을 흩뿌린다."
+  cardExplain: "\uC8FD\uC74C\uACFC \uC7AC\uC0DD\uC744 \uC0C1\uC9D5\uD558\uB294 \uC804\uC124\uC758
+    \uC2E0\uC218\uC9C0\uB9CC \uC0DD\uAC01\uBCF4\uB2E4 \uC131\uACA9\uC740 \uAF64 \uC218\uB2E4\uC2A4\uB7FD\uB2E4.
+    \uC624\uB798\uB41C \uC232\uC774 \uBD88\uD0C0\uAC70\uB098 \uC0C8\uB85C\uC6B4 \uC0DD\uBA85\uC774
+    \uD0DC\uC5B4\uB098\uB294 \uC21C\uAC04 \uB098\uD0C0\uB098 \uAF43\uC78E\uCC98\uB7FC
+    \uBE5B\uC744 \uD769\uBFCC\uB9B0\uB2E4."
   explainKeywords: 0

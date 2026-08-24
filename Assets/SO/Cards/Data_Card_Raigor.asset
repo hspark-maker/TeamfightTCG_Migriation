@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Raigor
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 39
-  displayName: "라이고르"
+  displayName: "\uB77C\uC774\uACE0\uB974"
   channel: 1
   grade: 4
-  keywords: 0
+  keywords: 2
   maxHp: 6
   bonusHp: 0
   synergies:
@@ -25,7 +25,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: f7059a20f7e98cf428c5bb1a41b33c15, type: 3}
   deckPreview: {fileID: 21300000, guid: f7059a20f7e98cf428c5bb1a41b33c15, type: 3}
   hpGainByLevel: 0000000000000000040000000400000006000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 7430e1d31ec5a10469e858ed35371f96, type: 3}
   - battleImage: {fileID: 21300000, guid: 5b19561eaaaf293438660b72ba99b991, type: 3}
@@ -43,5 +43,9 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "아주 오래전 하늘이 처음 천둥을 울렸을 때 태어났다고 전해지는 신수. 평소에는 느긋하게 구름 위에서 낮잠을 자지만, 화가 나면 주변 하늘이 통째로 검게 변한다."
+  cardExplain: "\uC544\uC8FC \uC624\uB798\uC804 \uD558\uB298\uC774 \uCC98\uC74C \uCC9C\uB465\uC744
+    \uC6B8\uB838\uC744 \uB54C \uD0DC\uC5B4\uB0AC\uB2E4\uACE0 \uC804\uD574\uC9C0\uB294
+    \uC2E0\uC218. \uD3C9\uC18C\uC5D0\uB294 \uB290\uAE0B\uD558\uAC8C \uAD6C\uB984
+    \uC704\uC5D0\uC11C \uB0AE\uC7A0\uC744 \uC790\uC9C0\uB9CC, \uD654\uAC00 \uB098\uBA74
+    \uC8FC\uBCC0 \uD558\uB298\uC774 \uD1B5\uC9F8\uB85C \uAC80\uAC8C \uBCC0\uD55C\uB2E4."
   explainKeywords: 0

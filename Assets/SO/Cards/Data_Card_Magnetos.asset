@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Magnetos
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 37
-  displayName: "마그네토스"
+  displayName: "\uB9C8\uADF8\uB124\uD1A0\uC2A4"
   channel: 1
-  grade: 1
-  keywords: 0
+  grade: 2
+  keywords: 8
   maxHp: 4
   bonusHp: 0
   synergies:
@@ -24,7 +24,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: 6ef189f2dfb18844ab881e58d9756267, type: 3}
   deckPreview: {fileID: 21300000, guid: 6ef189f2dfb18844ab881e58d9756267, type: 3}
   hpGainByLevel: 0000000000000000050000000400000003000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 2a5bcf73f8b354545953b946761e4b1d, type: 3}
   - battleImage: {fileID: 21300000, guid: edbb2b4097a01b04caa5db671e501fd0, type: 3}
@@ -42,5 +42,7 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "강력한 자석 뿔로 친해지고 싶으면 끌어당기고, 싫으면 아주 멀리 보낸다."
+  cardExplain: "\uAC15\uB825\uD55C \uC790\uC11D \uBFD4\uB85C \uCE5C\uD574\uC9C0\uACE0
+    \uC2F6\uC73C\uBA74 \uB04C\uC5B4\uB2F9\uAE30\uACE0, \uC2EB\uC73C\uBA74 \uC544\uC8FC
+    \uBA40\uB9AC \uBCF4\uB0B8\uB2E4."
   explainKeywords: 0

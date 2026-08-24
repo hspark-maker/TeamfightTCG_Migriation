@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Startail
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 32
-  displayName: "별꼬리"
+  displayName: "\uBCC4\uAF2C\uB9AC"
   channel: 1
-  grade: 1
-  keywords: 0
+  grade: 3
+  keywords: 16
   maxHp: 3
   bonusHp: 0
   synergies:
@@ -24,7 +24,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: 80cd7b3323c0b35458bf42c6e12b23e2, type: 3}
   deckPreview: {fileID: 21300000, guid: 80cd7b3323c0b35458bf42c6e12b23e2, type: 3}
   hpGainByLevel: 0000000000000000040000000400000005000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 91f03a321944ba940b007a31802df1c2, type: 3}
   - battleImage: {fileID: 21300000, guid: 6bbed8260137a7a42a144c007896d4c4, type: 3}
@@ -42,5 +42,7 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "긴 꼬리 끝에 별이 떠다니며 항상 분주하다. 멈추는 법을 배우는 중이다. 아직 성공한 적은 없다."
+  cardExplain: "\uAE34 \uAF2C\uB9AC \uB05D\uC5D0 \uBCC4\uC774 \uB5A0\uB2E4\uB2C8\uBA70
+    \uD56D\uC0C1 \uBD84\uC8FC\uD558\uB2E4. \uBA48\uCD94\uB294 \uBC95\uC744 \uBC30\uC6B0\uB294
+    \uC911\uC774\uB2E4. \uC544\uC9C1 \uC131\uACF5\uD55C \uC801\uC740 \uC5C6\uB2E4."
   explainKeywords: 0

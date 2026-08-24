@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_Card_Crackmon
   m_EditorClassIdentifier: Assembly-CSharp::CardData
   id: 38
-  displayName: "크랙몬"
+  displayName: "\uD06C\uB799\uBAAC"
   channel: 1
-  grade: 2
-  keywords: 0
+  grade: 3
+  keywords: 4
   maxHp: 5
   bonusHp: 0
   synergies:
@@ -24,7 +24,7 @@ MonoBehaviour:
   battleImage: {fileID: 21300000, guid: 7034fc1ef5878d94e8d33a1bd5c61354, type: 3}
   deckPreview: {fileID: 21300000, guid: 7034fc1ef5878d94e8d33a1bd5c61354, type: 3}
   hpGainByLevel: 0000000000000000060000000400000003000000
-  keywordUnlockLevel: 0
+  keywordUnlockLevel: 2
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 70da18273350c40468117731f65a170c, type: 3}
   - battleImage: {fileID: 21300000, guid: 69c4ff9877d68194f8b3bf93fc6413a2, type: 3}
@@ -42,5 +42,7 @@ MonoBehaviour:
   deathVoices: []
   effectVoices: []
   effectClips: []
-  cardExplain: "현실의 틈에서 튀어나온 정체불명의 네발 생물. 문을 사용하지 않아 노크를 모른다."
+  cardExplain: "\uD604\uC2E4\uC758 \uD2C8\uC5D0\uC11C \uD280\uC5B4\uB098\uC628 \uC815\uCCB4\uBD88\uBA85\uC758
+    \uB124\uBC1C \uC0DD\uBB3C. \uBB38\uC744 \uC0AC\uC6A9\uD558\uC9C0 \uC54A\uC544
+    \uB178\uD06C\uB97C \uBAA8\uB978\uB2E4."
   explainKeywords: 0

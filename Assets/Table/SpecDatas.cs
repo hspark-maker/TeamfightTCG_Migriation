@@ -89,7 +89,7 @@ public partial class CardPack
     public string channel;
     /// Live=실행 노출 / TestOnly=테스트만
     public string priceType;
-    /// 결제 재화(Gold/Diamond/Energy)
+    /// 결제 재화(Gold/Diamond/Energy/Shard)
     public long price;
     /// 가격
     public int drawCount;
@@ -99,6 +99,8 @@ public partial class CardPack
     public string refundType;
     /// 중복 환급 재화
     public long refundAmount;
+    /// 중복 1장당 환급량(0=환급 없음)
+    public string minRankGrade;
 }
 
 [GeneratorSpecData]
@@ -115,4 +117,38 @@ public partial class CardPackDrop
     public int cardId;
     /// 추첨 가중치(같은 packId+minGrade 안에서 정규화)
     public int weight;
+}
+
+[GeneratorSpecData]
+public partial class TournamentReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 보상을 받는 대상 — TournamentNode.nodeId 또는 TournamentChapter.chapterId
+    public string ownerKey;
+    /// 같은 ownerKey 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
+    public long amount;
+}
+
+[GeneratorSpecData]
+public partial class AlbumReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// AlbumTheme.themeId — 비우면 앨범 전체 보상
+    public string themeId;
+    /// AlbumPage.pageId — 비우면 테마 완성 보상
+    public string pageId;
+    /// 같은 대상 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
+    public long amount;
 }
