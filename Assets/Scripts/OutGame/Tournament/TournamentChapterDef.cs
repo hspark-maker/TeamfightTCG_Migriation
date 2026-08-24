@@ -36,6 +36,14 @@ public struct TournamentChapterDef
              "비워두면 완주해도 지급이 없다(다음 챕터 해금만 된다).")]
     public List<AlbumRewardDef> completionRewards;
 
+    [Tooltip("이 챕터를 여는 데 필요한 랭크 등급. 이 등급에 도달하기 전에는 챕터 전체가 잠기고 정점에 들어갈 수 없다.\n" +
+             "· 등급 순서는 브론즈 < 실버 < 골드 < 플래티넘 < 다이아몬드다(선언 순서가 곧 강함 순서).\n" +
+             "· 미저작(브론즈)은 사실상 항상 열림이다 — 아직 랭크에 오르지 못한 유저도 브론즈로 판정되기 때문이다. 첫 챕터는 반드시 브론즈로 둔다.\n" +
+             "· 챕터 순서대로 같거나 높게 저작해라. 앞 챕터보다 낮게 두면 뒤 챕터가 먼저 열려 여정의 순서가 뒤집힌다.\n" +
+             "· 한 번 저작한 값을 올리지 마라 — 이미 그 챕터를 진행하던 유저가 소급해서 막힌다(내리는 것은 안전하다).\n" +
+             "· 이미 깬 정점의 클리어 표식과 챕터 완주 보상은 잠겨도 회수되지 않는다.")]
+    public ERankGrade requiredGrade;
+
     // 거짓이면 완주 보상을 수령할 수 없다 — 낙인을 남길 키가 없다
     public bool HasStableKey => !string.IsNullOrEmpty(this.chapterId);
 

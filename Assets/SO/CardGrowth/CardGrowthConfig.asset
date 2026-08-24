@@ -33,8 +33,8 @@ MonoBehaviour:
     successRate: 1
   - level: 4
     hpGain: 0
-    costCurrency: 1
-    cost: 50
+    costCurrency: 3
+    cost: 150
     successRate: 1
   maxLimitBreak: 3
   limitBreakSteps:

@@ -78,7 +78,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
     [Tooltip("진화 관문 레벨(CardGrowthConfig의 1·2차 진화 레벨)에서 강화 버튼 대신 서는 버튼. " +
-             "누르는 결과는 강화와 같다 — 진화는 다이아를 무는 레벨업 1회일 뿐이다.")]
+             "누르는 결과는 강화와 같은 레벨업 1회다 — 갈리는 것은 얼굴(라벨·연출)뿐이다.")]
     [SerializeField] Button   evolveButton;
     [SerializeField] TMP_Text evolveLabelText;
     [SerializeField] TMP_Text evolveCostText;
@@ -474,9 +474,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
-        // 그 재화 바의 문맥 칸은 조각을 띄운다 — 이 화면이 계속 쓰는 강화 재료다.
-        // 스텝의 결제 재화를 따라가지 않는 이유는 최종 진화 게이트가 다이아이기 때문이다.
-        // 다이아는 상시 칸에 이미 떠 있으므로 문맥 칸까지 다이아가 되면 같은 재화가 두 칸을 먹고 조각이 사라진다.
+        // 그 재화 바의 문맥 칸은 조각을 띄운다 — 이 화면이 처음부터 끝까지 쓰는 성장 재료다.
+        // 스텝의 결제 재화를 따라가지 않는다: 고정 칸이 이미 맡은 재화는 문맥 칸이 받지 않으므로
+        // (ContextCurrencySlot.IsCoveredElsewhere) 스텝마다 갈아끼우면 그 레벨에서 칸이 조용히 빈다.
         // 이번 레벨이 무엇으로 얼마인지는 버튼 옆 비용 아이콘이 이미 말하고 있다.
         ContextCurrencySlot.Request(this, ECurrencyType.Shard);
 
@@ -1557,10 +1557,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.
                 NotifyEnhanceSettled(t_result);
 
-                // 결과판이 걷히고 하단 바에 진화 버튼이 선 지금이 첫 진화 안내의 자리다.
-                // "한 번 더"로 이어가는 중이면 아직 무대가 돌지 않았다 — 그 체인이 끝난 뒤 같은 자리에서 다시 묻는다.
-                if (!this.m_retryQueued) TryFireFirstEvolutionTutorial(t_now);
-
                 // 구독자가 이 결과를 듣고 창을 닫았다면 예약은 Hide가 이미 지웠다 — 체인은 여기서 끝난다.
                 if (!this.m_retryQueued) return;
 
@@ -1588,23 +1584,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_button != null)
             TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.CardDetailEnhanceButton,
                                             _button.transform as RectTransform, _button);
-    }
-
-    /// <summary>다음 한 방이 첫 진화면 무료 진화 안내를 깨운다. 관문 레벨을 여기서 적지 않는 이유는
-    /// 그것을 곡선(CardGrowthConfig)이 소유하기 때문이다 — 1회성은 트리거 완주 낙인이 보장한다.</summary>
-    void TryFireFirstEvolutionTutorial(CardData _card)
-    {
-        if (_card == null) return;
-        if (CardGrowthManager.GrowthOf(_card).EvolutionStage != 0) return;
-        if (!CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next)) return;
-        if (!CardGrowthManager.IsEvolutionLevel(t_next.Level)) return;
-
-        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.FirstEvolutionReady);
-
-        // 발화로 이 한 칸이 무료가 됐다 — 비용 표시·활성 판정을 다시 읽힌다.
-        // 위(_onFinished)의 RefreshGrowth는 발화보다 앞이라 아직 다이아 값을 그려 뒀다.
-        if (TriggeredTutorialRunner.IsRunningTrigger(EOutgameTutorialTrigger.FirstEvolutionReady))
-            RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
     }
 
     // 성공한 강화가 다 끝났음을 바깥에 알린다. 실패·미결제는 알리지 않는다 —
@@ -1640,7 +1619,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     // 결과를 읽는 중엔 강화 버튼만 "한 번 더"가 된다. 진화 버튼은 결과판 위에서도 "진화"다 —
-    // 그 한 방은 방금 한 일의 반복이 아니라 다른 종류의 일이고, 무는 재화도 다르다.
+    // 그 한 방은 방금 한 일의 반복이 아니라 단계가 바뀌는 사건이라 이름이 흔들리면 안 된다.
     void SetActionLabel(bool _retry)
     {
         if (this.enhanceLabelText != null) this.enhanceLabelText.text = _retry ? this.retryLabel : this.enhanceLabel;
@@ -1684,8 +1663,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // "한 번 더"의 가부는 오른 뒤의 다음 단계로 판정한다 — 방금 쓴 비용이 아니라 지금 낼 비용이 기준이다.
         bool t_hasNext = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
 
-        // 다음 한 방이 진화 관문이면 여기서 잇지 않는다. 진화는 방금 한 일의 반복이 아니라 다른 재화를 무는
-        // 다른 종류의 일이라, 골드를 연타하던 손에 그대로 걸리면 안 된다 — 상세로 돌아가 스스로 고르는 자리다.
+        // 다음 한 방이 진화 관문이면 여기서 잇지 않는다. 무는 재화는 같지만 무대가 갈린다 —
+        // RitualFor가 진화 얼굴을 내주므로 이어가도 EndAwaitForChain으로 못 물려받고 무대를 되돌려야 해서,
+        // 연타의 이득인 "왕복 없는 리듬"이 어차피 사라진다. 게다가 진화는 성급·아트가 바뀌는 관람 대상이라
+        // 연타로 지나가면 자기 카드가 무엇이 됐는지 못 본다(바로 아래 t_unlocked와 같은 축).
         bool t_nextIsEvolve = t_hasNext && CardGrowthManager.IsEvolutionLevel(t_next.Level);
 
         // 이번 한 방으로 키워드·시너지가 열렸으면 같은 이유로 잇지 않는다 — 방금 연 칩 줄은 상세에 있고,
@@ -1710,13 +1691,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                                            _fromHp, DeckPower.MaxHpOf(_card),
                                            _fromLevel, _result.Level,
                                            // 못 잇는 이유가 잔액이 아니라 규칙이면 안내도 없다 —
-                                           // GrowthNotice를 그대로 흘리면 "다이아가 부족"이라는 거짓 문장이 뜬다.
+                                           // GrowthNotice를 그대로 흘리면 잔액이 멀쩡한데 부족하다는 거짓 문장이 뜬다.
                                            t_canRetry,
                                            t_barStaysDown ? string.Empty
                                                           : GrowthNotice(t_hasNext, t_canRetry, t_next.Currency),
                                            // 비용도 "지금 낼 값" 기준 — 판정(t_canRetry)과 같은 단계를 봐야 숫자와 가부가 어긋나지 않는다.
                                            CostLabel(t_hasNext, t_next.Cost),
-                                           // Lv4를 막 올린 참이면 다음 한 방은 다이아다 — 그림까지 같이 넘겨야 값이 거짓말을 안 한다.
+                                           // 그림도 판정과 같은 단계에서 뽑는다 — 재화는 레벨마다 갈릴 수 있다.
                                            CostIconOf(t_next.Currency),
                                            UnlockLabel(_card, _fromLevel, _result.Level),
                                            _evolve ? this.evolveResultTitle : null);
@@ -1742,6 +1723,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                               //
                               // 단, 이어받을 수 있는 것은 **같은 연출**뿐이다(EndAwaitForChain 주석) —
                               // 다음 한 방이 다른 얼굴이면(강화 ↔ 진화) 무대를 제대로 돌려보내고 새로 시작한다.
+                              // 진화 앞은 위 t_nextIsEvolve가 이미 끊으므로 이 갈래는 카드가 넘어간 경우의 방어다.
                               _onRetry: () =>
                               {
                                   this.m_retryQueued = true;

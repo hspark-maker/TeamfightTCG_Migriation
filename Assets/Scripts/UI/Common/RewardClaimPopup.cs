@@ -153,6 +153,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
         bool t_granted = t_callback != null && t_callback.Invoke();
+        // 가드에 걸려 되돌아간 클릭에는 줄 것이 없다 — 소리도 없다.
+        if (t_granted) SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
 
         // 실패(팝업이 뜬 사이 상태가 바뀌어 가드에 걸림)면 줄 것이 없으니 연출도 없다.
         if (!t_granted || !CurrencyGainEffectPlayer.TryGet(this, out var t_player))

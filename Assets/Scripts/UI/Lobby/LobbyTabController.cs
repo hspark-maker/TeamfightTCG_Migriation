@@ -37,6 +37,11 @@ public class LobbyTabController : MonoBehaviour
     {
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
+        // 로비 버튼 전체에 공통 클릭음을 한 번에 건다. 꺼져 있는 탭 패널까지 훑으므로 여기 한 번으로 끝난다.
+        // 탭바는 제외한다 — 탭은 아래 CommitSelection이 제 소리를 내므로 얹으면 한 번 눌러 두 소리가 난다.
+        LobbyClickSoundBinder.Clear();
+        LobbyClickSoundBinder.Bind(transform.root, tabBar != null ? tabBar.transform : null);
+
         // 서비스 주입은 첫 Select(Start)보다 먼저 끝나야 한다 — OnEnter에서 이미 쓸 수 있어야 하므로.
         var t_services = new LobbyTabServices(dragController);
 
@@ -96,6 +101,9 @@ public class LobbyTabController : MonoBehaviour
 
     void CommitSelection(int _index, bool _fireTrigger)
     {
+        // 화면을 세우거나(첫 선택) 코드가 되돌려 놓는 선택(_fireTrigger=false)은 사용자가 넘긴 게 아니라 소리를 내지 않는다.
+        if (m_currentIndex >= 0 && _fireTrigger) SoundManager.Instance?.PlayCue(EOutgameSound.TabTurn);
+
         LobbyTabPanel t_previous = CurrentPanel;
         if (t_previous != null)
         {

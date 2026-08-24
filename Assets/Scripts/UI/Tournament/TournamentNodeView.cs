@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using DG.Tweening;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -19,27 +18,26 @@ public class TournamentNodeView : MonoBehaviour
         public Sprite badge;
     }
 
-    [SerializeField] Image avatarImage;      // 상대 초상(저작 미배선이면 프리팹 기본 유지)
-    [SerializeField] TMP_Text nameText;      // 상대 표시명
+    [Tooltip("원판 한가운데 그림. 이 정점을 깨면 무엇이 오는지를 그림 한 장으로 말한다 —\n" +
+             "보상 1건이면 그 재화 아이콘, 여러 건이면 상자다(수량은 어디에도 적지 않는다).")]
+    [SerializeField] Image rewardImage;
+
     [SerializeField] Button tapButton;       // 정점 = 도전 버튼
 
-    [Tooltip("보상 미리보기 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
-    [SerializeField] CurrencyRewardSlotView[] rewardSlots;
+    [Tooltip("보상이 여러 건일 때 재화 아이콘 대신 놓을 상자. 칸 = 보상 건수다 —\n" +
+             "0번 칸이 2건, 1번 칸이 3건이고, 저작한 칸보다 보상이 많으면 마지막 칸이 계속 쓰인다.\n" +
+             "비우면 첫 보상의 아이콘이 그대로 선다(상자 미저작으로 원판이 비지 않게).")]
+    [SerializeField] Sprite[] multiRewardChests;
 
     [Header("상태 레이어(선택 — 미배선 시 null 가드)")]
     [Tooltip("상태마다 켜지는 '묶음'이다 — 표식 한 장이 아니라 그 상태에서만 보여야 할 것을 통째로 담는다.\n" +
-             "잠김: 어두운 베일 + 자물쇠 / 클리어: 금테 + 체크 배지 / 도전 가능: 포커스 링 + 이름표 + 보상칸.\n" +
-             "이름표·보상칸을 currentMark 안에 두는 것이 곧 '도전할 정점에만 정보를 편다'는 규칙이다.")]
+             "잠김: 어두운 베일 + 자물쇠 / 클리어: 금테 + 체크 배지 / 도전 가능: 포커스 링.")]
     [SerializeField] GameObject lockedMark;      // 잠김(베일 + 자물쇠)
     [SerializeField] GameObject clearedMark;     // 클리어(금테 + 체크)
-    [SerializeField] GameObject currentMark;     // 지금 도전할 정점(포커스 링 + 이름표 + 보상)
+    [SerializeField] GameObject currentMark;     // 지금 도전할 정점(포커스 링)
     [SerializeField] CanvasGroup canvasGroup;
 
     [Header("수령 대기(깼지만 미수령)")]
-    [Tooltip("수령 대기 정점의 초상 자리에 놓을 그림. 표식을 따로 얹지 않고 초상 자체가 선물로 바뀐다 —\n" +
-             "원판 위에 무엇을 덧대면 그 상태만 형태가 달라져 다른 상태와 한 벌로 안 읽힌다.")]
-    [SerializeField] Sprite giftPortrait;
-
     [Tooltip("선물 등장·대기 흔들림이 미는 대상(보통 Medallion). 비우면 연출 없이 그림만 바뀐다.\n" +
              "초상만 미는 것이 아니라 원판째 밀어야 '정점에 사건이 났다'로 읽힌다.")]
     [SerializeField] RectTransform giftPunchTarget;
@@ -48,7 +46,7 @@ public class TournamentNodeView : MonoBehaviour
              "클리어는 따로 딤하지 않는다(체크 표식이 상태를 말한다).")]
     [SerializeField] float lockedAlpha = 0.7f;
 
-    [Tooltip("잠긴 정점의 초상을 누를 색. 무채색화만으론 '누구인지'가 그대로 보여 미리보기가 성립하지 않는다.\n" +
+    [Tooltip("잠긴 정점의 그림을 누를 색. 무채색화만으론 무엇이 걸렸는지가 그대로 보여 미리보기가 성립하지 않는다.\n" +
              "완전한 검정이 아닌 이유는 원판의 윤곽이 남아야 실루엣으로 읽히기 때문이다.")]
     [SerializeField] Color lockedSilhouette = new Color(0.12f, 0.14f, 0.20f, 1f);
 
@@ -61,21 +59,41 @@ public class TournamentNodeView : MonoBehaviour
     [Tooltip("도전할 정점의 크기 배율.")]
     [SerializeField] float playableScale = 1.1f;
 
-    [Tooltip("도전할 정점의 포커스 빛(CurrentMark 안). 세기를 오가며 숨쉰다 —\n" +
-             "멈춘 빛은 24정점이 깔린 지도에서 '지금 여기'를 집어내지 못한다.")]
-    [SerializeField] Image focusGlow;
-    [SerializeField] float focusGlowLow = 0.35f;
-    [SerializeField] float focusGlowHigh = 0.7f;
+    [Tooltip("도전할 정점의 원판 발광 호흡(원판의 UIEffect와 같은 오브젝트에 붙인다).\n" +
+             "밝기만 오간다 — 자리·크기는 챕터 보스가 쥐고 있어 여기서 겹치면 두 자리가 같은 축으로 뛴다.\n" +
+             "켜고 끄는 것은 이 뷰가 enabled로 한다(끄면 부품이 발광을 0으로 되돌린다).\n" +
+             "원판의 UIEffect 자체는 끄지 마라 — 잠김 무채색화가 같은 컴포넌트를 toneFilter 축으로 재사용한다.")]
+    [SerializeField] UiGlowBlink medallionBlink;
 
-    [Tooltip("상시 모션이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 빛 맥박과 원판 부유가 이 한 박을 함께 쓴다 —\n" +
+    [Tooltip("챕터 보스의 방사형 광채(원판 뒤). 상시로 돌면서 세기·크기가 함께 숨쉰다.\n" +
+             "⚠ 가산 합성을 쓰지 마라 — 지도 배경이 밝은 하늘색이라 가산은 금색을 흰 안개로 밀어낸다.\n" +
+             "진한 금색 + 알파 합성이어야 금색으로 읽힌다(캡처로 확인).")]
+    [SerializeField] Image finalShine;
+    [SerializeField] float shinePulseLow = 0.35f;
+    [SerializeField] float shinePulseHigh = 0.65f;
+
+    [Tooltip("챕터 보스의 원형 발광(방사광 뒤). 돌지 않는다 — 도는 빛 한 장만 있으면 회전이 그림째 흔들리는 것으로 읽힌다.\n" +
+             "형제 순서가 원판보다 앞(뒤에 깔림)이라 코인 밖으로 삐져나온 만큼만 보인다 —\n" +
+             "원판보다 크게 저작할 것.\n" +
+             "⚠ 스프라이트는 부드러운 후광(Glow01_225)이어야 한다. Glow_Radial은 빛살 다발이라 방사광에 묻혀 안 보였다.")]
+    [SerializeField] Image finalGlow;
+
+    [Tooltip("광채가 한 바퀴 도는 데 걸리는 시간(초). 맥박보다 훨씬 느려야 회전이 배경으로 가라앉는다. 0 이하면 돌지 않는다.")]
+    [SerializeField] float finalSpinPeriod = 12f;
+
+    [Tooltip("챕터 보스임을 알리는 \"최종 보상\" 문구 묶음. 해금된 챕터에서 클리어 전까지 켜진다 —\n" +
+             "순차로 아직 못 여는 보스에도 뜬다. 그 장의 목표를 미리 말해 주는 자리다.")]
+    [SerializeField] GameObject finalLabel;
+
+    [Tooltip("상시 모션이 한 번 오갔다 돌아오는 데 걸리는 시간(초). 광채 맥박과 원판 부유가 이 한 박을 함께 쓴다 —\n" +
              "박이 갈리면 정점 하나가 두 군데서 따로 뛰는 것으로 읽힌다. 0이면 0초짜리 무한 루프가 된다.")]
     [Min(0.1f)]
-    [SerializeField] float focusGlowCycle = 1.6f;
+    [SerializeField] float idleCycle = 1.6f;
 
-    [Tooltip("맥박의 정점에서 빛이 부푸는 배율. 알파만 오가면 밝은 배경에 묻힌다 — 크기가 함께 변해야 맥이 뛴다.")]
-    [SerializeField] float focusGlowPulseScale = 1.12f;
+    [Tooltip("맥박의 정점에서 광채가 부푸는 배율. 알파만 오가면 밝은 배경에 묻힌다 — 크기가 함께 변해야 맥이 뛴다.")]
+    [SerializeField] float shinePulseScale = 1.12f;
 
-    [Tooltip("원판이 떠오르는 높이(px). 지도에서 자리를 옮기는 것은 이 정점 하나뿐이라, 빛과 달리 배경에 묻히지 않는다.\n" +
+    [Tooltip("챕터 보스 원판이 떠오르는 높이(px). 지도에서 자리를 옮기는 것은 이 정점들뿐이라, 빛과 달리 배경에 묻히지 않는다.\n" +
              "미는 축이 y라서 원판을 두고 다투는 스케일 연출들(선물·해금 펀치·도장 반동)과 겹치지 않는다.")]
     [SerializeField] float bobHeight = 6f;
 
@@ -90,7 +108,7 @@ public class TournamentNodeView : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] float bobShadowAlpha = 0.6f;
 
-    [Tooltip("클리어한 정점의 초상 색. 채도를 빼면 잠김과 안 갈리므로 밝기만 한 단 낮춘다.")]
+    [Tooltip("클리어한 정점의 그림 색. 채도를 빼면 잠김과 안 갈리므로 밝기만 한 단 낮춘다.")]
     [SerializeField] Color clearedPortraitTint = new Color(0.85f, 0.85f, 0.85f, 1f);
 
     [Header("클리어 도장 — 수령 직후 1회")]
@@ -104,8 +122,8 @@ public class TournamentNodeView : MonoBehaviour
     [Tooltip("착지 프레임에 원판을 물들이는 흰 판.")]
     [SerializeField] Image stampFlash;
 
-    [Tooltip("섬광의 최대 세기. 1에 가까우면 초상이 통째로 지워져 '정점이 사라졌다'로 읽힌다 —\n" +
-             "얼굴이 비쳐 보이는 선까지만 올린다.")]
+    [Tooltip("섬광의 최대 세기. 1에 가까우면 그림이 통째로 지워져 '정점이 사라졌다'로 읽힌다 —\n" +
+             "밑그림이 비쳐 보이는 선까지만 올린다.")]
     [Range(0f, 1f)]
     [SerializeField] float stampFlashAlpha = 0.4f;
 
@@ -145,10 +163,8 @@ public class TournamentNodeView : MonoBehaviour
              "표식이 상태 묶음 밖에 있어 색이 유일한 표현 수단이다.")]
     [SerializeField] Color clearedKindTint = new Color(1f, 0.761f, 0.29f, 1f);
 
-    // 보상 조회용 공용 버퍼 — 칸이 값을 즉시 복사하므로 뷰마다 리스트를 들 이유가 없다.
+    // 보상 조회용 공용 버퍼 — 건수와 첫 아이콘만 즉시 읽고 버리므로 뷰마다 리스트를 들 이유가 없다.
     static readonly List<RewardLine> s_rewardBuffer = new List<RewardLine>();
-
-    static bool s_overflowWarned;
 
     // 표시 대상 정점. -1 = 미바인딩(Refresh 무시).
     int m_index = -1;
@@ -156,8 +172,8 @@ public class TournamentNodeView : MonoBehaviour
     // 잠김 무채색화를 되돌릴 자리. null = 지금 색이 살아 있다.
     List<UiGrayscale.Toned> m_toned;
 
-    // 실루엣을 되돌릴 자리. 초상의 저작색이 흰색이라는 보장이 없어 처음 볼 때 받아 둔다.
-    Color? m_avatarColor0;
+    // 실루엣을 되돌릴 자리. 그림의 저작색이 흰색이라는 보장이 없어 처음 볼 때 받아 둔다.
+    Color? m_rewardColor0;
 
     // 그림자·종류 표식의 저작값. 상태가 풀리면 여기로 돌아간다.
     float? m_shadowAlpha0;
@@ -167,9 +183,12 @@ public class TournamentNodeView : MonoBehaviour
     // 원판의 저작 자리. 부유가 끝나면 여기로 돌아간다(무한 Yoyo는 아무 자리에서나 죽는다).
     Vector2? m_bobHome;
 
-    // 도전할 정점의 상시 모션(빛 맥박 + 원판 부유 + 그림자 연동)을 한 손잡이에 묶는다.
+    // 챕터 보스의 상시 모션(광채 맥박 + 원판 부유 + 그림자 연동)을 한 손잡이에 묶는다.
     // 따로 돌리면 트윈마다 시작 프레임이 갈려 같은 박으로 안 뛴다.
     Sequence m_idleSeq;
+
+    // 광채의 상시 회전. 한 바퀴가 맥박보다 훨씬 길어 같은 시퀀스에 못 넣는다.
+    Tween m_shineSpin;
 
     // 클리어 도장(1회). 도는 동안 Refresh가 정지 상태로 덮지 않게 여기로 확인한다.
     Sequence m_stampSeq;
@@ -180,10 +199,10 @@ public class TournamentNodeView : MonoBehaviour
     Sequence m_giftSeq;
     Tween m_giftIdle;
 
-    // 초상의 프리팹 저작값. 선물로 갈아끼운 뒤 되돌릴 자리다(저작 초상이 없는 정점이 대부분이라 필요하다).
-    Sprite m_portrait0;
+    // 그림의 프리팹 저작값. 보상이 0건이거나 아이콘이 비었을 때 원판이 비지 않게 여기로 떨어진다.
+    Sprite m_rewardSprite0;
 
-    // 등장 연출을 기다리는 중 — 그때까진 선물을 숨긴다(이미 서 있다가 다시 튀어나오면 등장이 아니다).
+    // 등장 연출을 기다리는 중 — 그때까진 흔들림을 재우다(먼저 흔들리고 있으면 등장이 사건이 아니다).
     bool m_giftArmed;
 
     // 정점 인덱스 배선 + 리스너 1회 등록(재빌드마다 중복 방지).
@@ -209,16 +228,21 @@ public class TournamentNodeView : MonoBehaviour
         TournamentProgress.TryGetNode(this.m_index, out TournamentNodeDef t_node);
         ETournamentNodeState t_state = TournamentProgress.StateOf(this.m_index);
 
-        if (this.nameText != null && !string.IsNullOrEmpty(t_node.displayName)) this.nameText.text = t_node.displayName;
+        // 랭크 잠금은 진행 낙인과 축이 다르다 — 정점 상태에 섞지 않고 여기서 곱한다.
+        bool t_rankLocked = TournamentProgress.IsRankLocked(this.m_index);
 
-        this.BindRewardSlots();
-
-        bool t_playable = t_state == ETournamentNodeState.Playable;
         bool t_cleared = t_state == ETournamentNodeState.Cleared;
-        bool t_locked = t_state == ETournamentNodeState.Locked;
-        bool t_gift = t_state == ETournamentNodeState.RewardPending;
+        bool t_playable = t_state == ETournamentNodeState.Playable && !t_rankLocked;
+        bool t_gift = t_state == ETournamentNodeState.RewardPending && !t_rankLocked;
 
-        this.ApplyPortrait(t_node, t_gift);
+        // 잠김 표현의 유일한 조건. 순차로 아직 못 여는 정점은 여기 안 걸려 저작 원색 그대로 선다 —
+        // 정점 대부분이 실루엣으로 눌리면 잠김이 말해 주는 정보가 없다.
+        bool t_locked = t_rankLocked && !t_cleared;
+
+        // 챕터의 마지막 정점만 지도의 랜드마크로 선다. 깨고 나면 물러난다.
+        bool t_final = t_node.kind == ETournamentNodeKind.Elite && !t_rankLocked && !t_cleared;
+
+        this.ApplyRewardIcon();
 
         // 미수령 정점도 눌러야 한다(진입이 아니라 수령이다) — 그래서 탭 자격은 CanEnter에 선물을 더한 값이다.
         if (this.tapButton != null) this.tapButton.interactable = t_gift || TournamentProgress.CanEnter(this.m_index);
@@ -229,33 +253,53 @@ public class TournamentNodeView : MonoBehaviour
 
         this.ApplyKind(t_node.kind, t_cleared);
         this.ApplyGift(t_gift);
-        this.ApplyPortraitTone(t_locked, t_cleared);
+        this.ApplyRewardTone(t_locked, t_cleared);
         this.ApplyLockedTone(t_locked);
         this.ApplyStateScale(t_cleared, t_playable || t_gift);
         this.ApplyStampRest(t_cleared);
-        this.ApplyIdleMotion(t_playable);
+        this.ApplyPlayableBlink(t_playable || t_gift);
+        this.ApplyFinalMark(t_final);
+        this.ApplyIdleMotion(t_final);
         this.ApplyShadow(t_cleared);
     }
 
-    // 초상 한 자리. 저작 초상 → 프리팹 저작값 순으로 떨어지고, 수령 대기면 그 위를 선물이 덮는다.
-    // 표식을 얹지 않고 초상 자체를 바꾸는 이유: 원판 위에 무엇을 덧대면 그 상태만 형태가 달라져
-    // 다른 상태(잠김·도전 가능·클리어)와 한 벌로 안 읽힌다.
-    void ApplyPortrait(TournamentNodeDef _node, bool _gift)
+    // 원판 한 자리. 이 정점을 깨면 무엇이 오는지를 그림으로 말한다. 상태가 갈려도 그림은 그대로다 —
+    // 수령 대기까지 그림을 바꾸면 원판이 상태마다 다른 물건이 되어 한 벌로 안 읽힌다.
+    // 그 상태가 말할 것은 그림이 아니라 움직임(등장 + 흔들림)이 맡는다.
+    void ApplyRewardIcon()
     {
-        if (this.avatarImage == null) return;
+        if (this.rewardImage == null) return;
 
-        // 프리팹 저작값은 처음 볼 때 받아 둔다 — 선물로 갈아끼운 뒤 되돌릴 자리가 여기밖에 없다.
-        if (this.m_portrait0 == null) this.m_portrait0 = this.avatarImage.sprite;
+        // 프리팹 저작값은 처음 볼 때 받아 둔다 — 보상이 없는 정점이 여기로 떨어진다.
+        if (this.m_rewardSprite0 == null) this.m_rewardSprite0 = this.rewardImage.sprite;
 
-        // 등장 연출을 기다리는 중이면 아직 평소 얼굴이다(이미 선물이 서 있다가 튀어나오면 등장이 아니다).
-        if (_gift && !this.m_giftArmed && this.giftPortrait != null)
-        {
-            this.avatarImage.sprite = this.giftPortrait;
-            return;
-        }
+        Sprite t_icon = this.RewardSprite();
+        if (t_icon != null) this.rewardImage.sprite = t_icon;
+    }
 
-        Sprite t_normal = _node.avatar != null ? _node.avatar : this.m_portrait0;
-        if (t_normal != null) this.avatarImage.sprite = t_normal;
+    // 보상 1건이면 그 재화 아이콘, 여러 건이면 상자. 수량은 어디에도 적지 않는다 —
+    // 정점이 답해야 하는 것은 "무엇이 걸렸나"까지고, 얼마인지는 눌러서 여는 화면의 몫이다.
+    Sprite RewardSprite()
+    {
+        TournamentProgress.FillRewards(this.m_index, s_rewardBuffer);
+
+        if (s_rewardBuffer.Count == 0) return this.m_rewardSprite0;
+
+        Sprite t_first = s_rewardBuffer[0].Icon;
+        if (s_rewardBuffer.Count == 1) return t_first != null ? t_first : this.m_rewardSprite0;
+
+        Sprite t_chest = this.ChestOf(s_rewardBuffer.Count);
+        return t_chest != null ? t_chest : t_first != null ? t_first : this.m_rewardSprite0;
+    }
+
+    // 칸 = 보상 건수(0번 칸이 2건). 저작한 칸보다 보상이 많으면 마지막 칸이 계속 쓰인다 —
+    // 보상을 한 건 더 얹었다고 원판이 비면 저작 실수가 화면에서 사고가 된다.
+    Sprite ChestOf(int _count)
+    {
+        if (this.multiRewardChests == null || this.multiRewardChests.Length == 0) return null;
+
+        int t_slot = Mathf.Clamp(_count - 2, 0, this.multiRewardChests.Length - 1);
+        return this.multiRewardChests[t_slot];
     }
 
     // 종류 표식. 상태보다 먼저 세운다 — 잠김 무채색화가 이 표식까지 함께 덮어야 한 덩어리로 읽힌다.
@@ -282,13 +326,13 @@ public class TournamentNodeView : MonoBehaviour
         return null;
     }
 
-    /// <summary>등장 연출이 올 때까지 평소 얼굴을 유지한다(Refresh보다 나중에 불려야 한다).</summary>
+    /// <summary>등장 연출이 올 때까지 정점을 재워 둔다(Refresh보다 나중에 불려야 한다).</summary>
     public void ArmGiftReveal()
     {
         this.m_giftArmed = true;
 
         this.KillGiftTweens();
-        this.Refresh();   // 예약을 세운 뒤 다시 그려야 초상이 평소 얼굴로 돌아간다
+        this.Refresh();   // 예약을 세운 뒤 다시 그려야 흔들림이 다시 붙지 않는다
     }
 
     /// <summary>선물 등장(복귀 직후 1회). 대기 흔들림은 Refresh가 따로 소유한다.</summary>
@@ -302,10 +346,9 @@ public class TournamentNodeView : MonoBehaviour
         if (TournamentProgress.StateOf(this.m_index) != ETournamentNodeState.RewardPending) return;
 
         this.KillGiftTweens();
-        this.Refresh();   // 예약이 풀렸으니 여기서 초상이 선물로 갈린다
 
         RectTransform t_rect = this.giftPunchTarget;
-        if (t_rect == null) return;   // 연출 대상 미배선이면 그림만 바뀌고 끝난다
+        if (t_rect == null) return;   // 연출 대상 미배선이면 조용히 접는다
 
         // 원판을 통째로 밀어 등장을 만든다. 0에서 키우지 않는 이유: 정점이 사라졌다 나타나면
         // "새로 생긴 정점"으로 읽힌다 — 여기서 말할 것은 "이 정점에 사건이 났다"다.
@@ -362,11 +405,53 @@ public class TournamentNodeView : MonoBehaviour
         t_root.localScale = Vector3.one * t_scale;
     }
 
-    // 도전할 정점만 상시 움직인다 — 지도에서 살아 있는 자리가 하나뿐이어야 "지금 여기"가 성립한다.
-    // 빛의 세기·크기와 원판의 높이·그림자를 한 시퀀스에 넣어 같은 박으로 뛰게 한다.
-    void ApplyIdleMotion(bool _playable)
+    // 도전할 정점의 원판을 밝힌다. 24정점 중 이 자리만 밝기가 오가면 "지금 여기"는 집힌다.
+    void ApplyPlayableBlink(bool _on)
     {
-        if (!_playable)
+        if (this.medallionBlink == null) return;
+
+        // 부품만 끈다 — UIEffect를 끄면 잠김 무채색화가 같은 컴포넌트를 못 쓴다(부품이 발광을 0으로 되돌린다).
+        this.medallionBlink.enabled = _on;
+    }
+
+    // 챕터 보스의 랜드마크(광채 + 문구). 광채의 맥박과 회전은 상시 모션이 이어서 세운다.
+    void ApplyFinalMark(bool _final)
+    {
+        if (this.finalLabel != null) this.finalLabel.SetActive(_final);
+        if (this.finalShine != null) this.finalShine.gameObject.SetActive(_final);
+        if (this.finalGlow != null) this.finalGlow.gameObject.SetActive(_final);
+    }
+
+    // 광채는 한 방향으로만 돈다. 오가는 맥박과 축을 갈라 둬야 "숨쉬는 빛"과 "도는 빛"이 겹쳐 하나로 읽힌다.
+    void StartShineSpin()
+    {
+        if (this.m_shineSpin != null && this.m_shineSpin.IsActive()) return;
+        if (this.finalShine == null || this.finalSpinPeriod <= 0f) return;
+
+        RectTransform t_rect = this.finalShine.rectTransform;
+        t_rect.localRotation = Quaternion.identity;
+
+        this.m_shineSpin = t_rect
+            .DOLocalRotate(new Vector3(0f, 0f, -360f), this.finalSpinPeriod, RotateMode.FastBeyond360)
+            .SetEase(Ease.Linear)
+            .SetLoops(-1, LoopType.Restart)
+            .SetLink(this.gameObject);
+    }
+
+    // 상시 회전은 오브젝트를 꺼도 멈추지 않는다 — 손으로 죽이고 각도까지 세워야 다음에 열 때 기울어 있지 않다.
+    void KillShineSpin()
+    {
+        if (this.m_shineSpin != null && this.m_shineSpin.IsActive()) this.m_shineSpin.Kill();
+        this.m_shineSpin = null;
+
+        if (this.finalShine != null) this.finalShine.rectTransform.localRotation = Quaternion.identity;
+    }
+
+    // 챕터 보스만 상시 움직인다 — 도전할 정점은 발광이 맡고, 움직이는 자리는 그 장의 목표로 남긴다.
+    // 광채의 세기·크기와 원판의 높이·그림자를 한 시퀀스에 넣어 같은 박으로 뛰게 한다.
+    void ApplyIdleMotion(bool _final)
+    {
+        if (!_final)
         {
             this.KillIdleMotion();
             return;
@@ -376,19 +461,21 @@ public class TournamentNodeView : MonoBehaviour
 
         this.EnsureIdleHome();
 
-        float t_half = this.focusGlowCycle * 0.5f;
+        float t_half = this.idleCycle * 0.5f;
         Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
         bool t_any = false;
 
-        // 빛 — 세기와 크기가 함께 오른다. 알파만으로는 밝은 배경 위에서 맥이 안 잡힌다.
-        if (this.focusGlow != null)
+        // 광채 — 세기와 크기가 함께 오른다. 알파만으로는 밝은 배경 위에서 맥이 안 잡힌다.
+        if (this.finalShine != null)
         {
-            SetAlpha(this.focusGlow, this.focusGlowLow);
-            this.focusGlow.rectTransform.localScale = Vector3.one;
+            SetAlpha(this.finalShine, this.shinePulseLow);
+            this.finalShine.rectTransform.localScale = Vector3.one;
 
-            t_seq.Insert(0f, this.focusGlow.DOFade(this.focusGlowHigh, t_half).SetEase(Ease.InOutSine));
-            t_seq.Insert(0f, this.focusGlow.rectTransform.DOScale(this.focusGlowPulseScale, t_half).SetEase(Ease.InOutSine));
+            t_seq.Insert(0f, this.finalShine.DOFade(this.shinePulseHigh, t_half).SetEase(Ease.InOutSine));
+            t_seq.Insert(0f, this.finalShine.rectTransform.DOScale(this.shinePulseScale, t_half).SetEase(Ease.InOutSine));
             t_any = true;
+
+            this.StartShineSpin();
         }
 
         // 원판 — y로만 민다. 이 대상의 스케일은 선물·해금 펀치·도장이 나눠 쥐고 있어 건드리면 안 된다.
@@ -464,6 +551,7 @@ public class TournamentNodeView : MonoBehaviour
         float t_land = this.stampFallTime;
 
         this.m_stampSeq.Insert(t_land, this.stampRim.DOFade(1f, 0.08f).SetEase(Ease.OutQuad));
+        this.m_stampSeq.InsertCallback(t_land, () => SoundManager.Instance?.PlayCue(EOutgameSound.TournamentClear));
 
         this.m_stampSeq.Insert(t_land, this.stampFlash.DOFade(this.stampFlashAlpha, 0.03f));
         this.m_stampSeq.Insert(t_land + 0.03f, this.stampFlash.DOFade(0f, 0.18f).SetEase(Ease.OutQuad));
@@ -527,15 +615,18 @@ public class TournamentNodeView : MonoBehaviour
         this.m_stampSeq = null;
     }
 
-    // 무한 Yoyo는 완료로 끝나지 않아 아무 자리에서나 죽는다 — 뜬 원판·부푼 빛·줄어든 그림자를 손으로 세운다.
+    // 무한 Yoyo는 완료로 끝나지 않아 아무 자리에서나 죽는다 — 뜬 원판·부푼 광채·줄어든 그림자를 손으로 세운다.
     void KillIdleMotion()
     {
+        // 회전은 시퀀스 밖에서 도니 시퀀스가 없어도 먼저 걷는다.
+        this.KillShineSpin();
+
         if (this.m_idleSeq == null) return;
 
         if (this.m_idleSeq.IsActive()) this.m_idleSeq.Kill();
         this.m_idleSeq = null;
 
-        if (this.focusGlow != null) this.focusGlow.rectTransform.localScale = Vector3.one;
+        if (this.finalShine != null) this.finalShine.rectTransform.localScale = Vector3.one;
         if (this.giftPunchTarget != null && this.m_bobHome != null) this.giftPunchTarget.anchoredPosition = this.m_bobHome.Value;
 
         if (this.shadowImage == null) return;
@@ -557,7 +648,7 @@ public class TournamentNodeView : MonoBehaviour
         SetAlpha(this.shadowImage, _cleared ? this.clearedShadowAlpha : this.m_shadowAlpha0.Value);
     }
 
-    // 수령 대기의 상시 상태(흔들림). 그림 교체는 ApplyPortrait가 쥐고, 등장 연출은 여기서 돌리지 않는다 —
+    // 수령 대기의 상시 상태(흔들림). 등장 연출은 여기서 돌리지 않는다 —
     // 재진입 때마다 다시 튀면 사건이 아니라 소음이다.
     void ApplyGift(bool _gift)
     {
@@ -607,18 +698,18 @@ public class TournamentNodeView : MonoBehaviour
         if (this.giftPunchTarget != null) this.giftPunchTarget.localScale = Vector3.one;
     }
 
-    // 잠긴 정점의 초상을 눌러 실루엣으로 만든다. 무채색화는 채도만 빼서 얼굴이 그대로 읽히는데,
-    // 잠긴 정점이 말해야 하는 건 "잠겼다"가 아니라 "누구인지 모른다"다 — 그 자리를 '?'가 대신 맡는다.
+    // 잠긴 정점의 그림을 눌러 실루엣으로 만든다. 무채색화는 채도만 빼서 무엇이 걸렸는지 그대로 읽히는데,
+    // 잠긴 정점이 말해야 하는 건 "잠겼다"가 아니라 "아직 볼 것이 아니다"다.
     // 클리어는 밝기만 한 단 내린다 — 채도까지 빼면 잠김과 같은 자리로 떨어진다.
-    void ApplyPortraitTone(bool _locked, bool _cleared)
+    void ApplyRewardTone(bool _locked, bool _cleared)
     {
-        if (this.avatarImage == null) return;
+        if (this.rewardImage == null) return;
 
-        if (this.m_avatarColor0 == null) this.m_avatarColor0 = this.avatarImage.color;
+        if (this.m_rewardColor0 == null) this.m_rewardColor0 = this.rewardImage.color;
 
-        this.avatarImage.color = _locked  ? this.lockedSilhouette
+        this.rewardImage.color = _locked  ? this.lockedSilhouette
                                : _cleared ? this.clearedPortraitTint
-                                          : this.m_avatarColor0.Value;
+                                          : this.m_rewardColor0.Value;
     }
 
     // 잠긴 정점은 딤만으로 안 갈린다 — 비활성 버튼과 같은 축으로 노드 전체의 채도를 뺀다.
@@ -641,34 +732,11 @@ public class TournamentNodeView : MonoBehaviour
         }
     }
 
-    void BindRewardSlots()
-    {
-        if (this.rewardSlots == null || this.rewardSlots.Length == 0) return;
-
-        TournamentProgress.FillRewards(this.m_index, s_rewardBuffer);
-
-        for (int t_i = 0; t_i < this.rewardSlots.Length; t_i++)
-        {
-            if (this.rewardSlots[t_i] == null) continue;
-
-            if (t_i < s_rewardBuffer.Count)
-                this.rewardSlots[t_i].Bind(s_rewardBuffer[t_i].Icon, s_rewardBuffer[t_i].Gain.Amount);
-            else
-                this.rewardSlots[t_i].Hide();
-        }
-
-        // 저작 문제라 정점마다 찍으면 소음이다 — 세션에 한 번이면 족하다.
-        if (s_rewardBuffer.Count > this.rewardSlots.Length && !s_overflowWarned)
-        {
-            s_overflowWarned = true;
-            Debug.LogWarning($"[TournamentNodeView] 정점 보상 {s_rewardBuffer.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
-        }
-    }
-
     // 도전 요청은 맵으로 올린다(정점은 씬 전환을 모른다). 잠김 판정은 맵이 한 번 더 본다.
     void OnTapped()
     {
         if (this.m_index < 0) return;
+        SoundManager.Instance?.PlayCue(EOutgameSound.TournamentNodeTap);
         this.m_onTap?.Invoke(this.m_index);
     }
 }

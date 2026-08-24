@@ -417,6 +417,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: 354fc699ded8b7849ac32ab399efef7f, type: 2}
+  outgameSoundBank: {fileID: 11400000, guid: 71d3c5a08e6b492fa04c7b18d2e6539f, type: 2}
   sfxPoolSize: 8
   voiceBaseChance: 0.4
   voiceChanceIncrement: 0.25

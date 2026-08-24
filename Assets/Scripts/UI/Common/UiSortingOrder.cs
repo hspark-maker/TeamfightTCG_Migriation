@@ -38,6 +38,12 @@ public static class UiSortingOrder
     /// 가리킬 대상(상세·안내)보다 항상 위에 있어야 한다.</summary>
     public const int TutorialGate = 350;
 
+    /// <summary>풀에서 여는 로비 오버레이(KeywordGrowthOverlay 등). 담기는 자리인 <see cref="Pool"/>(400)는
+    /// 튜토리얼 게이트(<see cref="TutorialGate"/>)보다 위라, <b>안내가 가리켜야 하는 무대</b>는 이 층으로 내려앉는다
+    /// — 자기 Canvas + overrideSorting으로 컨테이너에서 떨어져 나온다.
+    /// 컨테이너 값을 내리는 것은 답이 아니다: 딤에 묻히면 안 되는 실패 팝업까지 함께 내려간다.</summary>
+    public const int PooledOverlay = 300;
+
     /// <summary>UIPoolManager의 UI 컨테이너(Boot.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
     /// 비어 있어도 항상 켜져 있다 — 이 표가 생긴 이유다.</summary>
     public const int Pool = 400;

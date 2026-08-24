@@ -25,10 +25,6 @@ public static class TriggeredTutorialRunner
     // 실행 중인 묶음 안에서의 스텝 순번
     public static int StepIndex => s_index;
 
-    // 지금 도는 런이 이 트리거의 것인가(성장 곡선이 "안내가 대주는 구간인가"를 묻는 창구)
-    public static bool IsRunningTrigger(EOutgameTutorialTrigger _trigger)
-        => s_active != null && s_active.Trigger == _trigger;
-
     // 온보딩 졸업 전에는 트리거 튜토리얼이 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
     // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
     static bool IsOpen => OutgameTutorialProgress.IsCompleted || s_openedAtRankPromotion;

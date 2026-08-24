@@ -36,6 +36,7 @@ public static class TournamentChapterBandBuilder
         Sprite t_button = FindSprite("Button01_s_Green");
         Sprite t_coin   = FindSprite("ResourceBar_Single_Icon_Coin");
         Sprite t_gem    = FindSprite("ResourceBar_Single_Icon_Gem");
+        Sprite t_lock   = FindSprite("Image_UI_GUIPackCartoon_Icon_Lock_Silver");
 
         // ⚠ 루트의 anchoredPosition은 맵이 '이음매로부터의 오프셋'으로 읽는다(TournamentMapOverlayView.bandPrefab 참고).
         //   여기서 (0,0)으로 뽑으므로 이 빌더를 다시 돌리면 손으로 맞춘 오프셋이 0으로 되돌아간다.
@@ -88,7 +89,23 @@ public static class TournamentChapterBandBuilder
         AddPlatedText(t_endMark, "EndText", new Vector2(360f, 48f), new Vector2(0f, 142f),
             t_plateSmall, t_font, "다음 여정 준비 중", 28f);
 
-        Wire(t_view, t_title, t_progress, t_buttonComp, t_slots, t_progressMark, t_claimableMark, t_clearedMark, t_endMark, t_group);
+        // 랭크 미달 — 이 장에 아직 들어갈 수 없다. 눈금·보상 미리보기를 대신해 요구 등급 하나만 말한다.
+        // 자물쇠(잠겼다) · 배지(어느 등급) · 문구(무엇을 하면 열리나) 셋이 한 줄에 선다.
+        GameObject t_rankLockMark = NewRect("RankLockMark", t_root, Vector2.zero, Vector2.zero);
+        AddImage(NewRect("Lock", t_rankLockMark, new Vector2(44f, 44f), new Vector2(-108f, -58f)), t_lock, Color.white)
+            .raycastTarget = false;
+
+        // 배지는 등급이 정해질 때 코드가 켠다 — 스프라이트 없는 Image를 켜 두면 흰 사각형이 남는다.
+        GameObject t_rankBadge = NewRect("Badge", t_rankLockMark, new Vector2(52f, 52f), new Vector2(-172f, -58f));
+        Image t_rankBadgeImage = AddImage(t_rankBadge, null, Color.white);
+        t_rankBadgeImage.raycastTarget = false;
+        t_rankBadge.SetActive(false);
+
+        TMP_Text t_rankLockText = AddPlatedText(t_rankLockMark, "RankLockText", new Vector2(300f, 46f), new Vector2(76f, -58f),
+            t_plateSmall, t_font, "실버 도달 시 해금", 28f);
+
+        Wire(t_view, t_title, t_progress, t_buttonComp, t_slots, t_progressMark, t_claimableMark, t_clearedMark, t_endMark,
+             t_rankLockMark, t_rankLockText, t_rankBadgeImage, t_group);
 
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PREFAB_PATH));
         PrefabUtility.SaveAsPrefabAsset(t_root, PREFAB_PATH);
@@ -103,7 +120,8 @@ public static class TournamentChapterBandBuilder
     // 인스펙터 배선은 SerializedObject로 한다 — private [SerializeField]에 리플렉션 없이 닿는 유일한 길이다.
     static void Wire(TournamentChapterBandView _view, TMP_Text _title, TMP_Text _progress, Button _claim,
                      List<SlotParts> _slots, GameObject _progressMark, GameObject _claimableMark,
-                     GameObject _clearedMark, GameObject _endMark, CanvasGroup _group)
+                     GameObject _clearedMark, GameObject _endMark, GameObject _rankLockMark,
+                     TMP_Text _rankLockText, Image _rankLockBadge, CanvasGroup _group)
     {
         var t_so = new SerializedObject(_view);
         t_so.FindProperty("titleText").objectReferenceValue = _title;
@@ -113,6 +131,9 @@ public static class TournamentChapterBandBuilder
         t_so.FindProperty("claimableMark").objectReferenceValue = _claimableMark;
         t_so.FindProperty("clearedMark").objectReferenceValue = _clearedMark;
         t_so.FindProperty("endMark").objectReferenceValue = _endMark;
+        t_so.FindProperty("rankLockMark").objectReferenceValue = _rankLockMark;
+        t_so.FindProperty("rankLockText").objectReferenceValue = _rankLockText;
+        t_so.FindProperty("rankLockBadge").objectReferenceValue = _rankLockBadge;
         t_so.FindProperty("canvasGroup").objectReferenceValue = _group;
 
         SerializedProperty t_array = t_so.FindProperty("rewardSlots");

@@ -714,6 +714,8 @@ public class CardEvolveRitualView : CardGrowthRitualView
         float t_settle = Mathf.Max(0.05f, _tail - ShockRise);
         float t_decay  = Mathf.Max(0.05f, this.impactDecay);
 
+        _seq.InsertCallback(_at, () => SoundManager.Instance?.PlayCue(EOutgameSound.EvolveBurst));
+
         // 킥. 부양을 여기서 0으로 내린다 — 자세를 킥이 소유하는 순간부터 남은 높이가 그대로 오프셋이 된다.
         _seq.InsertCallback(_at, () =>
         {

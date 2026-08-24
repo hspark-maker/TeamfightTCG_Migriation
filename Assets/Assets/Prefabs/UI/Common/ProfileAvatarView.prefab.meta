@@ -1,13 +1,7 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:Assets/Assets/Prefabs/UI/Common/ProfileAvatarView.prefab.meta
-guid: 7752e29235392fa45bf92f100f495ee7
+guid: 5546f9bfd73e1fe4d9747b69a1bd53c3
 PrefabImporter:
-========
-guid: bc4ee79a7997218488a54f155191453a
-NativeFormatImporter:
->>>>>>>> main:Assets/Assets/Images/Emotes/Anim_Emote_LongCat.anim.meta
   externalObjects: {}
-  mainObjectFileID: 7400000
   userData: 
   assetBundleName: 
   assetBundleVariant: 

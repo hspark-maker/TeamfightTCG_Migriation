@@ -149,11 +149,41 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.transition.SetVisible(this.gameObject, false);
     }
 
-    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 선물은 숨어 있다.</summary>
+    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 정점은 재워 둔다.</summary>
     public void ArmGiftReveal(string _nodeId)
     {
         this.m_armedGiftNodeId = _nodeId;
         this.ApplyArmedGift();
+    }
+
+    /// <summary>정점이 지금 화면의 어디에 있는가. 대치 인트로가 상대를 이 자리에서 띄워 올린다 —
+    /// 전환에 원인을 남기는 유일한 재료라, 못 구하면 상대는 그냥 바깥에서 들어온다.</summary>
+    public bool TryGetNodeScreenPoint(int _index, out Vector2 _point)
+    {
+        _point = default;
+
+        if (_index < 0 || _index >= this.m_nodes.Count) return false;
+
+        TournamentNodeView t_view = this.m_nodes[_index];
+        if (t_view == null) return false;
+
+        // 중심은 네 귀퉁이의 평균으로 잡는다 — 피벗을 아무렇게나 저작해도 맞고,
+        // 상태 배율(Cleared 0.86 / Playable 1.10)이 걸려 있어도 실제로 보이는 자리를 준다.
+        var t_rect = (RectTransform)t_view.transform;
+
+        var t_corners = new Vector3[4];
+        t_rect.GetWorldCorners(t_corners);
+
+        Vector3 t_center = (t_corners[0] + t_corners[2]) * 0.5f;
+
+        Canvas t_canvas = t_rect.GetComponentInParent<Canvas>();
+        Camera t_cam    = t_canvas != null && t_canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                        ? t_canvas.worldCamera
+                        : null;
+
+        _point = RectTransformUtility.WorldToScreenPoint(t_cam, t_center);
+
+        return true;
     }
 
     /// <summary>예약해 둔 선물 등장을 1회 재생한다(맵이 이미 열려 있어야 한다).</summary>
@@ -548,22 +578,7 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         if (!TournamentProgress.CanEnter(_index)) return;
 
-        this.OpenNodeChallenge(_index);
-    }
-
-    // 도전 확인 팝업. 정점을 누르면 곧장 씬이 갈리던 것을 한 박 세워, 무엇과 싸우고 무엇을 받는지 보고 고르게 한다.
-    // 팝업이 서지 않으면(프리팹 미배선) 예전처럼 곧바로 도전한다 — 확인 한 겹 때문에 진행이 막히지는 않게.
-    void OpenNodeChallenge(int _index)
-    {
-        var t_data = new TournamentNodePopupData
-        {
-            nodeIndex = _index,
-            onBattle = () => this.NodeSelected?.Invoke(_index),
-        };
-
-        if (UIPoolManager.Instance == null
-            || UIPoolManager.Instance.AddOrUpdateUI<TournamentNodePopup>(t_data) == null)
-            this.NodeSelected?.Invoke(_index);
+        this.NodeSelected?.Invoke(_index);
     }
 
     // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.
@@ -670,7 +685,12 @@ public class TournamentMapOverlayView : MonoBehaviour
     void PunchNext(int _index)
     {
         int t_next = _index + 1;
-        if (t_next >= 0 && t_next < this.m_nodes.Count) this.m_nodes[t_next]?.PlayUnlockPunch();
+        if (t_next < 0 || t_next >= this.m_nodes.Count) return;
+
+        // 챕터가 랭크로 잠겨 있으면 튀지 않는다 — 자물쇠가 튀면 "열렸다"는 거짓말이 된다.
+        if (TournamentProgress.IsRankLocked(t_next)) return;
+
+        this.m_nodes[t_next]?.PlayUnlockPunch();
     }
 
     // 어디서 끊겨도 진실로 스냅시킨다 — 연출은 장식일 뿐이라 중간 색에서 굳는 것만 막으면 된다.
