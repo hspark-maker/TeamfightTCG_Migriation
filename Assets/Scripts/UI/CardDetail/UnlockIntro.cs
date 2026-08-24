@@ -18,6 +18,10 @@ public readonly struct UnlockIntro
     /// 데모 무대(<see cref="KeywordDemoStage"/>)가 이 값으로 대본을 고른다.</summary>
     public readonly CardKeyword Keyword;
 
+    /// <summary>덱 편성 규칙(시너지)인가. 키워드 칸은 <see cref="Keyword"/>가 반드시 채워지므로
+    /// None인 칸은 시너지뿐이다.</summary>
+    public bool IsSynergy => this.Keyword == CardKeyword.None;
+
     UnlockIntro(Sprite _icon, float _iconScale, string _name, string _body, CardKeyword _keyword)
     {
         this.Icon      = _icon;

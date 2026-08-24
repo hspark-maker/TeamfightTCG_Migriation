@@ -149,7 +149,7 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.transition.SetVisible(this.gameObject, false);
     }
 
-    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 선물은 숨어 있다.</summary>
+    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 정점은 재워 둔다.</summary>
     public void ArmGiftReveal(string _nodeId)
     {
         this.m_armedGiftNodeId = _nodeId;
@@ -548,22 +548,7 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         if (!TournamentProgress.CanEnter(_index)) return;
 
-        this.OpenNodeChallenge(_index);
-    }
-
-    // 도전 확인 팝업. 정점을 누르면 곧장 씬이 갈리던 것을 한 박 세워, 무엇과 싸우고 무엇을 받는지 보고 고르게 한다.
-    // 팝업이 서지 않으면(프리팹 미배선) 예전처럼 곧바로 도전한다 — 확인 한 겹 때문에 진행이 막히지는 않게.
-    void OpenNodeChallenge(int _index)
-    {
-        var t_data = new TournamentNodePopupData
-        {
-            nodeIndex = _index,
-            onBattle = () => this.NodeSelected?.Invoke(_index),
-        };
-
-        if (UIPoolManager.Instance == null
-            || UIPoolManager.Instance.AddOrUpdateUI<TournamentNodePopup>(t_data) == null)
-            this.NodeSelected?.Invoke(_index);
+        this.NodeSelected?.Invoke(_index);
     }
 
     // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.

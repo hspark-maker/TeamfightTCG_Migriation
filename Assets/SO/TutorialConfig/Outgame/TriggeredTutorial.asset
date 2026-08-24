@@ -106,57 +106,6 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-  - trigger: 1
-    label: "\uCE74\uB4DC \uAC15\uD654"
-    stepDefs: []
-  - trigger: 3
-    label: "\uCCAB \uC9C4\uD654 \uC548\uB0B4"
-    stepDefs:
-    - stepId: 0
-      action: 1
-      anchor: 0
-      guideMessage: "\uB808\uBCA8 5\uAC00 \uB418\uBA74 \uC774 \uCE74\uB4DC\uAC00
-        \uC9C4\uD654\uD569\uB2C8\uB2E4!"
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 1
-      pack: {fileID: 0}
-      packPriceLabel: 
-      anchorCard: {fileID: 0}
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      card: {fileID: 0}
-      cards: []
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-    - stepId: 0
-      action: 11
-      anchor: 21
-      guideMessage: "\uBB34\uB8CC\uB85C \uC9C4\uD654\uD574 \uBCF4\uC138\uC694!"
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 1
-      pack: {fileID: 0}
-      packPriceLabel: 
-      anchorCard: {fileID: 0}
-      freeOfCharge: 1
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      card: {fileID: 0}
-      cards: []
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
   - trigger: 4
     label: "\uD0A4\uC6CC\uB4DC \uAC15\uD654"
     stepDefs:
