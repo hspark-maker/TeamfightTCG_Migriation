@@ -48,7 +48,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2af6ca4c6a95fd8499f70c9c63b28073, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchDeckShell
   matchPanel: {fileID: 7169988449207279310}
   editPanel: {fileID: 6063061821537634163}
@@ -737,7 +737,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!114 &3019038460908467554 stripped
 MonoBehaviour:
@@ -748,7 +748,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8849d1f844bbdc041ad585cd761c0209, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckEditController
 --- !u!1 &3613753254097635865 stripped
 GameObject:

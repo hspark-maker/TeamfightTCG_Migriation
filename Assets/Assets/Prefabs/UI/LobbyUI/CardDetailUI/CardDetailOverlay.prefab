@@ -1050,6 +1050,7 @@ MonoBehaviour:
     dim: {fileID: 4389903715525950018}
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+    extraDims: []
   blindPeak: 1
   overheatStart: 0.4
   overheatRise: 0.55
@@ -1163,6 +1164,7 @@ MonoBehaviour:
     dim: {fileID: 4389903715525950018}
     darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
     brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
+    extraDims: []
   emblems:
     engraveDur: 0.28
     stagger: 0.07
@@ -2468,7 +2470,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -2560,7 +2562,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcd162ab5f95d4f82a841acc1e950418, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Coffee.UIEffect::Coffee.UIEffects.UIEffectReplica
   m_Target: {fileID: 5035937900323319397}
   m_Preset: {fileID: 0}
@@ -3777,7 +3779,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -3807,7 +3809,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcd162ab5f95d4f82a841acc1e950418, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Coffee.UIEffect::Coffee.UIEffects.UIEffectReplica
   m_Target: {fileID: 5035937900323319397}
   m_Preset: {fileID: 0}
@@ -6302,7 +6304,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcd162ab5f95d4f82a841acc1e950418, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Coffee.UIEffect::Coffee.UIEffects.UIEffectReplica
   m_Target: {fileID: 5035937900323319397}
   m_Preset: {fileID: 0}
@@ -6365,7 +6367,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -6889,7 +6891,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -6919,7 +6921,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcd162ab5f95d4f82a841acc1e950418, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Coffee.UIEffect::Coffee.UIEffects.UIEffectReplica
   m_Target: {fileID: 5035937900323319397}
   m_Preset: {fileID: 0}
@@ -10996,7 +10998,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -11026,7 +11028,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
   m_Navigation:
     m_Mode: 3
@@ -11070,7 +11072,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
   m_IgnoreLayout: 0
   m_MinWidth: -1
@@ -11090,7 +11092,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 938fce054c42f40a3969e27a88d9bdd8, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Coffee.UIEffect::Coffee.UIEffects.UIEffect
   m_ToneFilter: 1
   m_ToneIntensity: 0
@@ -11999,11 +12001,11 @@ PrefabInstance:
       objectReference: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
     - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1.0141354
+      value: 1.7857143
       objectReference: {fileID: 0}
     - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.0141354
+      value: 1.7857143
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x

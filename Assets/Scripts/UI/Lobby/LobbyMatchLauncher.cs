@@ -398,7 +398,13 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void OpenTournamentMap()
     {
+        // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
+        // 정점 전투 복귀(HandleTournamentReturn)는 이 문을 거치지 않는다 — 거치게 하면 랭크가 복귀를 삼킨다.
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament)) return;
+
         tournamentPanel?.Open();
+        // 복귀 재오픈(HandleTournamentReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
+        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.TournamentMapFirstOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Coffee.UIEffects;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -60,20 +59,27 @@ public class TournamentNodeView : MonoBehaviour
     [Tooltip("도전할 정점의 크기 배율.")]
     [SerializeField] float playableScale = 1.1f;
 
-    [Tooltip("도전할 정점의 원판 발광(원판 자신에 붙인 UIEffect). 맥박 없이 상시로 켜 둔다 —\n" +
-             "지도에서 움직이는 자리는 챕터 보스뿐이어야 그 장의 목표가 집힌다.\n" +
-             "저작한 colorIntensity가 곧 켰을 때의 세기다(코드는 그 값과 0 사이를 오간다).\n" +
-             "잠김 무채색화가 같은 컴포넌트를 재사용하므로 컴포넌트 자체를 꺼서는 안 된다.")]
-    [SerializeField] UIEffect medallionGlow;
+    [Tooltip("도전할 정점의 원판 발광 호흡(원판의 UIEffect와 같은 오브젝트에 붙인다).\n" +
+             "밝기만 오간다 — 자리·크기는 챕터 보스가 쥐고 있어 여기서 겹치면 두 자리가 같은 축으로 뛴다.\n" +
+             "켜고 끄는 것은 이 뷰가 enabled로 한다(끄면 부품이 발광을 0으로 되돌린다).\n" +
+             "원판의 UIEffect 자체는 끄지 마라 — 잠김 무채색화가 같은 컴포넌트를 toneFilter 축으로 재사용한다.")]
+    [SerializeField] UiGlowBlink medallionBlink;
 
     [Tooltip("챕터 보스의 방사형 광채(원판 뒤). 상시로 돌면서 세기·크기가 함께 숨쉰다.\n" +
-             "원판 폭으로 깔면 초상을 뿌옇게 뭉갠다 — 포커스 빛보다 크지 않게 저작할 것.")]
+             "⚠ 가산 합성을 쓰지 마라 — 지도 배경이 밝은 하늘색이라 가산은 금색을 흰 안개로 밀어낸다.\n" +
+             "진한 금색 + 알파 합성이어야 금색으로 읽힌다(캡처로 확인).")]
     [SerializeField] Image finalShine;
-    [SerializeField] float shinePulseLow = 0.55f;
-    [SerializeField] float shinePulseHigh = 0.9f;
+    [SerializeField] float shinePulseLow = 0.35f;
+    [SerializeField] float shinePulseHigh = 0.65f;
+
+    [Tooltip("챕터 보스의 원형 발광(방사광 뒤). 돌지 않는다 — 도는 빛 한 장만 있으면 회전이 그림째 흔들리는 것으로 읽힌다.\n" +
+             "형제 순서가 원판보다 앞(뒤에 깔림)이라 코인 밖으로 삐져나온 만큼만 보인다 —\n" +
+             "원판보다 크게 저작할 것.\n" +
+             "⚠ 스프라이트는 부드러운 후광(Glow01_225)이어야 한다. Glow_Radial은 빛살 다발이라 방사광에 묻혀 안 보였다.")]
+    [SerializeField] Image finalGlow;
 
     [Tooltip("광채가 한 바퀴 도는 데 걸리는 시간(초). 맥박보다 훨씬 느려야 회전이 배경으로 가라앉는다. 0 이하면 돌지 않는다.")]
-    [SerializeField] float finalSpinPeriod = 24f;
+    [SerializeField] float finalSpinPeriod = 12f;
 
     [Tooltip("챕터 보스임을 알리는 \"최종 보상\" 문구 묶음. 해금된 챕터에서 클리어 전까지 켜진다 —\n" +
              "순차로 아직 못 여는 보스에도 뜬다. 그 장의 목표를 미리 말해 주는 자리다.")]
@@ -184,9 +190,6 @@ public class TournamentNodeView : MonoBehaviour
     // 광채의 상시 회전. 한 바퀴가 맥박보다 훨씬 길어 같은 시퀀스에 못 넣는다.
     Tween m_shineSpin;
 
-    // 발광의 저작 세기. 켤 때 돌아갈 자리다.
-    float? m_glowIntensity0;
-
     // 클리어 도장(1회). 도는 동안 Refresh가 정지 상태로 덮지 않게 여기로 확인한다.
     Sequence m_stampSeq;
 
@@ -254,7 +257,7 @@ public class TournamentNodeView : MonoBehaviour
         this.ApplyLockedTone(t_locked);
         this.ApplyStateScale(t_cleared, t_playable || t_gift);
         this.ApplyStampRest(t_cleared);
-        this.ApplyPlayableGlow(t_playable || t_gift);
+        this.ApplyPlayableBlink(t_playable || t_gift);
         this.ApplyFinalMark(t_final);
         this.ApplyIdleMotion(t_final);
         this.ApplyShadow(t_cleared);
@@ -402,15 +405,13 @@ public class TournamentNodeView : MonoBehaviour
         t_root.localScale = Vector3.one * t_scale;
     }
 
-    // 도전할 정점의 원판을 밝힌다. 맥박 없이 상시로 켜 둬도 24정점 중 하나만 밝으면 "지금 여기"는 집힌다.
-    void ApplyPlayableGlow(bool _on)
+    // 도전할 정점의 원판을 밝힌다. 24정점 중 이 자리만 밝기가 오가면 "지금 여기"는 집힌다.
+    void ApplyPlayableBlink(bool _on)
     {
-        if (this.medallionGlow == null) return;
+        if (this.medallionBlink == null) return;
 
-        if (this.m_glowIntensity0 == null) this.m_glowIntensity0 = this.medallionGlow.colorIntensity;
-
-        // 컴포넌트를 끄지 않는다 — 잠김 무채색화가 같은 UIEffect를 재사용하므로 비활성이면 채도까지 안 빠진다.
-        this.medallionGlow.colorIntensity = _on ? this.m_glowIntensity0.Value : 0f;
+        // 부품만 끈다 — UIEffect를 끄면 잠김 무채색화가 같은 컴포넌트를 못 쓴다(부품이 발광을 0으로 되돌린다).
+        this.medallionBlink.enabled = _on;
     }
 
     // 챕터 보스의 랜드마크(광채 + 문구). 광채의 맥박과 회전은 상시 모션이 이어서 세운다.
@@ -418,6 +419,7 @@ public class TournamentNodeView : MonoBehaviour
     {
         if (this.finalLabel != null) this.finalLabel.SetActive(_final);
         if (this.finalShine != null) this.finalShine.gameObject.SetActive(_final);
+        if (this.finalGlow != null) this.finalGlow.gameObject.SetActive(_final);
     }
 
     // 광채는 한 방향으로만 돈다. 오가는 맥박과 축을 갈라 둬야 "숨쉬는 빛"과 "도는 빛"이 겹쳐 하나로 읽힌다.
