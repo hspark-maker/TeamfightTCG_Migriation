@@ -156,36 +156,6 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.ApplyArmedGift();
     }
 
-    /// <summary>정점이 지금 화면의 어디에 있는가. 대치 인트로가 상대를 이 자리에서 띄워 올린다 —
-    /// 전환에 원인을 남기는 유일한 재료라, 못 구하면 상대는 그냥 바깥에서 들어온다.</summary>
-    public bool TryGetNodeScreenPoint(int _index, out Vector2 _point)
-    {
-        _point = default;
-
-        if (_index < 0 || _index >= this.m_nodes.Count) return false;
-
-        TournamentNodeView t_view = this.m_nodes[_index];
-        if (t_view == null) return false;
-
-        // 중심은 네 귀퉁이의 평균으로 잡는다 — 피벗을 아무렇게나 저작해도 맞고,
-        // 상태 배율(Cleared 0.86 / Playable 1.10)이 걸려 있어도 실제로 보이는 자리를 준다.
-        var t_rect = (RectTransform)t_view.transform;
-
-        var t_corners = new Vector3[4];
-        t_rect.GetWorldCorners(t_corners);
-
-        Vector3 t_center = (t_corners[0] + t_corners[2]) * 0.5f;
-
-        Canvas t_canvas = t_rect.GetComponentInParent<Canvas>();
-        Camera t_cam    = t_canvas != null && t_canvas.renderMode != RenderMode.ScreenSpaceOverlay
-                        ? t_canvas.worldCamera
-                        : null;
-
-        _point = RectTransformUtility.WorldToScreenPoint(t_cam, t_center);
-
-        return true;
-    }
-
     /// <summary>예약해 둔 선물 등장을 1회 재생한다(맵이 이미 열려 있어야 한다).</summary>
     public void PlayGiftReveal(string _nodeId)
     {

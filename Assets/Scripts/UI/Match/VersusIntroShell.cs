@@ -11,8 +11,14 @@ using UnityEngine;
 // IMatchmaker가 전부 없고, 발견 슬램(MatchmakingFx.BuildFound)도 쓰지 않는다.
 // 찾지 않은 상대를 찾은 척하면 그 자리에서 매칭 문법이 거짓이 된다.
 //
-// 그 대신 진입이 그 몫을 한다: 상대가 눌린 정점 자리에서 커지며 올라와 앉는다.
-// 사건의 원인이 화면에 있어야 대치가 켜진 것이 아니라 벌어진 것으로 읽힌다.
+// 이 화면의 사건은 셋뿐이다.
+//   ① 커튼 두 판이 위·아래에서 가속 낙하하고, 두 프로필이 그 판에 실려 함께 떨어져 이음매에서 부딪힌다
+//   ② 부딪힌 결과로 대립 구도가 선다 — VS가 튀어나오고 화면이 한 박 쉰다
+//   ③ 판이 갈라지며 덱 화면이 열린다
+//
+// 부딪힘은 한 번뿐이다. 내려온 그 힘이 곧 공격이라, 매칭 화면이 갖고 있는 조임 구간
+// (둘이 서로에게 끌리다 다시 부딪히는 박자)은 여기에 없다 — 있으면 사건이 두 번이 된다.
+// 대신 조임이 만들던 압력(어둠·떨림·고이는 빛)만 낙하 위에 겹쳐 함께 차오른다.
 //
 // 무엇을 어떻게 움직일지는 전부 MatchmakingFx·MatchmakingBgFx·MatchmakingEntryFx·MatchHandoffFx가 쥔다.
 // 셸은 언제만 정한다 — MatchmakingShell과 같은 규약이라 두 화면의 결이 갈리지 않는다.
@@ -28,38 +34,27 @@ public class VersusIntroShell : MonoBehaviour
     [SerializeField] string versusTitle = "도전";
 
     [Header("연출 박자")]
-    [Tooltip("진입이 끝난 뒤 충돌까지의 조임 구간(초). 이 구간은 빈 정지가 아니라 압력이 차오르는 시간이다 " +
-             "— 이름을 읽는 시간이기도 하다.\n" +
-             "매칭 화면보다 길게 잡아야 한다: 그쪽은 앞에 탐색 대기가 있어 이미 긴장이 쌓인 채 이 구간에 " +
-             "들어오는데, 여기는 진입 직후라 쌓인 것이 없다. 짧으면 충돌도 같이 약해진다.")]
-    [Min(0f)] [SerializeField] float chargeHold = 0.78f;
-
-    [Tooltip("충돌·정착이 끝난 뒤 갈라짐까지의 여운(초). 마지막 한 박은 완전 정지여야 다음 사건이 새 사건으로 읽힌다.")]
+    [Tooltip("충돌·정착이 끝난 뒤 갈라짐까지의 여운(초). 마지막 한 박은 완전 정지여야 다음 사건이 새 사건으로 읽힌다.\n" +
+             "이름을 읽는 시간이기도 하다 — 이 화면 전체 길이를 조절하는 유일한 손잡이다.\n" +
+             "낙하(MatchmakingBgFx.closeDuration)와 충돌(MatchmakingFx.VersusDuration)은 각자의 진실원이 " +
+             "따로 있어 여기서 못 만진다.")]
     [Min(0f)] [SerializeField] float afterglowHold = 0.34f;
 
-    [Tooltip("대치할 때 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
-    [SerializeField] float versusApproach = 60f;
-
-    [Header("정점에서 올라오는 상대")]
-    [Tooltip("상대 배너가 눌린 정점 자리에서 제자리까지 올라오는 시간(초).")]
-    [Min(0.01f)] [SerializeField] float originDuration = 0.34f;
-
-    [Tooltip("정점 자리에서 출발할 때의 배율. 맵의 정점 원판만 한 크기에서 배너 크기로 커진다 — " +
-             "1이면 커지는 사건이 없어 그냥 미끄러져 온 것이 된다.")]
-    [Min(0.05f)] [SerializeField] float originStartScale = 0.34f;
-
-    [Tooltip("상대가 올라오기 시작하는 시각(초). 배경 두 판이 절반 넘게 맞물린 뒤여야 한다 — " +
-             "판이 열려 있는 동안 배너가 보이면 아직 맵인 화면 위에 배너가 떠 있는 꼴이 된다.")]
-    [Min(0f)] [SerializeField] float originAt = 0.1f;
+    [Tooltip("대치할 때 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.\n" +
+             "매칭 화면보다 크게 잡는다 — 그쪽은 물러났다 치는 예비동작이 있지만 여기는 낙하가 그 몫을 " +
+             "대신하고 곧바로 관성으로 박히기 때문이다.")]
+    [SerializeField] float versusApproach = 90f;
 
     [Header("연출")]
     [SerializeField] MatchmakingFx fx = new MatchmakingFx();
 
-    [Tooltip("맵 위로 이 화면이 덮어 오는 진입. 갈라짐(handoffFx)의 앞자리 짝이다.")]
+    [Tooltip("맵 위로 이 화면이 덮어 오는 진입. 갈라짐(handoffFx)의 앞자리 짝이다.\n" +
+             "⚠ 이 화면에서는 프로필을 태우지 않는다 — 프로필은 판에 실려 떨어진다. 여기 남은 것은 " +
+             "화면 배율과 제목뿐이라 banner* 값은 저작해도 아무 일도 하지 않는다.")]
     [SerializeField] MatchmakingEntryFx entryFx = new MatchmakingEntryFx();
 
-    [Tooltip("배경 두 판(BG/Top·BG/Bottom). 이 화면의 등장은 두 판이 대각으로 맞물리는 것이고 " +
-             "퇴장은 그 대각이 갈라지는 것이다.")]
+    [Tooltip("배경 두 판(BG/Top·BG/Bottom). 이 화면의 등장은 두 판이 맞물리는 것이고 " +
+             "퇴장은 그 맞물림이 갈라지는 것이다. 프로필의 낙하 거리·시간·이징도 전부 여기서 나온다.")]
     [SerializeField] MatchmakingBgFx bgFx = new MatchmakingBgFx();
 
     [Tooltip("덱 화면으로 넘어가는 전환. 커튼으로 덮지 않고 두 화면을 잇는다 — 자세한 규약은 MatchHandoffFx 참고.")]
@@ -67,25 +62,30 @@ public class VersusIntroShell : MonoBehaviour
 
     bool m_running;
 
-    // 대치 연출이 배너를 밀었다 되돌릴 기준 위치. 연출 도중 다시 열려도 어긋난 자리를 홈으로 삼지 않게 Awake에서만 잡는다.
+    // 대치 연출이 프로필을 밀었다 되돌릴 기준 위치. 연출 도중 다시 열려도 어긋난 자리를 홈으로 삼지 않게 Awake에서만 잡는다.
     Vector2 m_myHome;
     Vector2 m_opponentHome;
 
-    // 갈라짐에 함께 실려 나가는 것(제목)과 그 기준 위치. 배너와 같은 이유로 Awake에서만 잡는다.
+    // 갈라짐에 함께 실려 나가는 것(제목)과 그 기준 위치. 프로필과 같은 이유로 Awake에서만 잡는다.
     RectTransform[] m_riders;
     Vector2[]       m_riderHomes;
+
+    // 조임의 떨림이 밀어 놓을 화면 자리. 같은 이유의 1회 캡처다 — 떨리는 중에 다시 잡으면 어긋난 자리가 홈이 된다.
+    Vector2 m_rootHome;
 
     // 지금 화면에 떠 있는 안무. 화면이 내려갈 때 함께 걷지 않으면 파괴된 대상 위에서 계속 돈다.
     Sequence m_stage;
 
-    // 이번 진입이 실제로 끝나는 시각. 정점에서 올라오는 길은 entryFx보다 늦게 끝날 수 있어(정점 착지 0.44 > 진입 0.32)
-    // 저작값으로 고정할 수 없다 — 조임이 이 값보다 먼저 시작하면 착지 중인 배너를 두 시퀀스가 함께 붙든다.
-    float m_entryEnd;
+    // 판이 맞물리는 시각 = 프로필이 부딪히는 시각. 낙하와 충돌이 같은 프레임에서 만나는 자리라
+    // 이 화면의 모든 박자가 여기를 기준으로 붙는다.
+    float m_landAt;
 
     void Awake()
     {
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
+
+        m_rootHome = ((RectTransform)transform).anchoredPosition;
 
         CaptureRiderHomes();
 
@@ -104,9 +104,7 @@ public class VersusIntroShell : MonoBehaviour
     /// 대치 게이트. 호스트가 덱 화면을 세우기 "전에" 이걸 await 한다. 취소 버튼이 없으므로 끝은 하나뿐이다 —
     /// 끝까지 돌거나 씬이 내려간다. 물러나는 자리는 다음 화면(덱)의 취소 버튼이다.
     /// </summary>
-    /// <param name="_originScreenPoint">눌린 정점의 화면 좌표. 없으면 상대도 배너처럼 바깥에서 들어온다.</param>
-    public async UniTask PlayVersusAsync(MatchOpponent _opponent, Vector2? _originScreenPoint,
-                                         CancellationToken _ct)
+    public async UniTask PlayVersusAsync(MatchOpponent _opponent, CancellationToken _ct)
     {
         // 이미 진행 중인데 다시 부르면 두 await가 같은 화면을 두고 경쟁한다.
         if (m_running)
@@ -122,16 +120,12 @@ public class VersusIntroShell : MonoBehaviour
         bool t_handedOn = false;
         try
         {
-            Open(_opponent, _originScreenPoint);
+            Open(_opponent);
 
-            // 진입 + 조임. 조임은 진입 시퀀스에 이어 붙어 돌고 있다.
-            if (await WaitAsync(m_entryEnd + chargeHold, _ct)) return;
-
-            // 충돌이 무대를 갈아탄다. 조임이 끌어다 놓은 자리에서 그대로 이어받으므로 되돌리지 않는다.
-            PlayVersus();
-
-            // 정착 + 여운. 여운이 안무보다 짧으면 VS의 호흡이 잘린 채 갈라짐이 시작된다.
-            if (await WaitAsync(fx.VersusDuration + Mathf.Max(fx.AfterglowDuration, afterglowHold), _ct)) return;
+            // 낙하 → 충돌 → 여운이 한 무대에서 이어 돈다. 무대를 갈아타지 않으므로 기다림도 한 번뿐이다.
+            if (await WaitAsync(m_landAt + fx.VersusDuration
+                              + Mathf.Max(fx.AfterglowDuration, afterglowHold), _ct))
+                return;
 
             t_handedOn = true;
         }
@@ -163,7 +157,7 @@ public class VersusIntroShell : MonoBehaviour
         // 화면을 내리는 프레임에 이미 절반쯤 진행된 덱이 튀어나온다.
         m_stage.Insert(0f, bgFx.BuildPart(t_root));
 
-        // 배너가 다 나가고 배경 판까지 다 열린 프레임에 내려간다. 걷어내는 도중에 끄는 것이 곧 하드컷이다.
+        // 프로필이 다 나가고 배경 판까지 다 열린 프레임에 내려간다. 걷어내는 도중에 끄는 것이 곧 하드컷이다.
         m_stage.InsertCallback(Mathf.Max(handoffFx.CloseAt, bgFx.PartDuration), Close);
 
         await m_stage.ToUniTask(cancellationToken: _ct).SuppressCancellationThrow();
@@ -179,12 +173,19 @@ public class VersusIntroShell : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    // 진입. 상대가 이미 정해져 있으므로 두 배너를 처음부터 그린 채 연다.
-    void Open(in MatchOpponent _opponent, Vector2? _originScreenPoint)
+    // 진입 = 낙하 = 충돌. 셋이 한 무대에서 이어 돈다.
+    //
+    // ⚠ 짓는 순서가 계약이다. 부품들이 "짓는 순간" 대상을 DOKill 하거나 자가설치 노드를 세우기 때문에,
+    //   순서를 바꾸면 방금 지은 축이 그 자리에서 지워지거나 아직 없는 것을 참조하게 된다.
+    //     ① entryFx — StageZoom이 화면을 DOKill 한다
+    //     ② 조임     — 여기서 VS 자리의 빛(ChargeGlow)이 실제로 세워진다
+    //     ③ 충돌     — 짓는 시점에 ②의 빛을 읽어 폭발을 예약하고, 두 프로필을 DOKill 한다
+    //     ④ 낙하     — ③의 DOKill 뒤에 지어야 살아남는다
+    void Open(in MatchOpponent _opponent)
     {
         gameObject.SetActive(true);
 
-        // 직전 전환이 배너를 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
+        // 직전 전환이 프로필을 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
         KillStage();
 
         // 배경을 먼저 되돌린다 — 지난 전환이 판을 화면 밖으로 밀어 놓았고, 지난 확정이 밝기 축의 기준 색을
@@ -197,6 +198,7 @@ public class VersusIntroShell : MonoBehaviour
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
         RestoreRiders();
+        RestoreRootHome();
 
         if (titleText  != null) titleText.text = versusTitle;
         if (versusRoot != null) versusRoot.SetActive(false);
@@ -206,113 +208,83 @@ public class VersusIntroShell : MonoBehaviour
 
         var t_root = (RectTransform)transform;
 
-        // 정점에서 올라오는 길이 있으면 상대는 진입 안무에 맡기지 않는다 — 그쪽은 바깥에서 꽂히는 축이라
-        // 출발 자리를 자기가 못 박기 때문이다. 이 화면에서 상대의 출발 자리는 눌린 정점이다.
-        //
-        // 자리를 **먼저** 풀어 두는 이유: 좌표 변환이 실패하면 상대를 진입 안무에 그대로 태워야 하는데,
-        // 안무를 지은 뒤에 실패를 알면 상대가 어느 축에도 안 실려 t=0부터 그냥 떠 있게 된다
-        // (배경 두 판이 아직 닫히는 중인 화면 위에 배너가 떠 있는 꼴 — originAt 툴팁이 경계한 그림이다).
-        Vector2 t_originAnchored = default;
-        bool    t_fromNode       = _originScreenPoint.HasValue
-                                && opponentProfile != null
-                                && TryResolveOriginAnchored(_originScreenPoint.Value, out t_originAnchored);
+        // 낙하 거리는 판이 푼다. 실린 것이 판과 같은 거리를 써야 이음매 위에 얹혀 있는 것으로 읽힌다.
+        bgFx.SolveTravel(t_root, out float t_up, out float t_down);
 
-        // 상대가 정점에서 올라오면 진입은 그 착지까지다. 배너 중 가장 늦게 앉는 것이 진입의 끝이다.
-        m_entryEnd = t_fromNode
-                   ? Mathf.Max(entryFx.Duration, originAt + originDuration)
-                   : entryFx.Duration;
+        // 판이 맞물리는 시각이 곧 부딪히는 시각이다. 화면이 다 들어오기 전에 부딪히면
+        // 아직 로비가 비치는 화면 위에서 사건이 벌어진다.
+        m_landAt = Mathf.Max(entryFx.Duration, bgFx.CloseDuration);
 
-        Sequence t_enter = entryFx.Build(myProfile, t_fromNode ? null : opponentProfile, VersusRect,
+        // 프로필을 entryFx에 태우지 않는다 — 바깥에서 따로 꽂히는 축과 판에 실려 떨어지는 축은 배타적이다.
+        // 남는 것은 화면 배율과 제목뿐이다.
+        Sequence t_enter = entryFx.Build(null, null, VersusRect,
                                          fx.Dim.Target, t_root, Riders, bgFx.EnterNormal);
 
-        // 배경 두 판이 맞물려 맵을 덮는 것이 곧 이 화면의 등장이다 — 배너는 그 뒤에 들어온다.
+        // 판 두 장이 맞물려 로비를 덮는다. 이게 이 화면의 등장이다.
         t_enter.Insert(0f, bgFx.BuildClose(t_root));
 
-        // 상대가 정해졌다는 사실을 화면 전체의 색이 말한다. 그 색이 이미 다음 화면의 색이라
-        // 나중에 판이 갈라질 때 두 화면이 색으로 이어진다.
-        t_enter.Insert(0f, bgFx.BuildConfirm(fx.Dim));
+        // 낙하 위에 압력이 함께 차오른다 — 어둠이 내려가고 화면이 점점 떨리고 VS 자리에 빛이 고인다.
+        // 프로필 인자를 비우는 것은 서로에게 끌리는 축(드리프트)만 빼기 위해서다.
+        // ⚠ 통째로 빼면 안 된다. 여기서 세워지는 빛이 없으면 아래 충돌의 빛 폭발이 함께 사라진다.
+        t_enter.Insert(0f, fx.BuildCharge(null, default, null, default,
+                                          VersusStep, t_root, VersusAnchored, m_landAt));
 
-        // entryFx가 DOKill로 출발 자세를 지운 뒤에 얹는다 — 순서를 뒤집으면 이 자세가 그 자리에서 지워진다.
-        if (t_fromNode) StageOriginRise(t_enter, t_originAnchored);
+        // 관성 그대로 박힌다. 예비동작 거리를 0으로 저작해 두면 낙하 자체가 그 몫을 한다.
+        Sequence t_clash = fx.BuildVersus(myProfile != null ? myProfile.Rect : null, m_myHome,
+                                          opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
+                                          VersusStep, VersusRect, t_root);
 
-        // 조임은 진입이 끝나는 자리에 이어 붙인다. 별도 무대로 돌리면 그 사이 한 프레임이 완전 정지가 되어,
-        // 채우려던 바로 그 공백이 앞으로 옮겨 갈 뿐이다.
-        t_enter.Insert(m_entryEnd,
-                       fx.BuildCharge(myProfile != null ? myProfile.Rect : null, m_myHome,
-                                      opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
-                                      VersusStep, t_root, VersusAnchored, chargeHold));
+        // 충돌이 프로필을 DOKill 한 뒤에 얹는다 — 순서를 뒤집으면 낙하가 그 자리에서 지워져
+        // 두 프로필이 t=0부터 제자리에 붙은 채 판만 떨어진다.
+        StageRide(t_enter, t_up, t_down);
+
+        // 떨림은 진폭이 t²라 착지 프레임에 가장 크다. 무대를 갈아타지 않아 조임의 자체 복구(OnKill)가
+        // 여기서 안 돌므로, 부딪힌 자리에서 화면을 직접 제자리로 돌려놓는다.
+        t_enter.InsertCallback(m_landAt, RestoreRootHome);
+
+        // 색이 덱 색으로 옮겨 앉는 것은 부딪힘의 결과다 — 착지 뒤에 시작해야 원인과 결과가 갈린다.
+        t_enter.Insert(m_landAt, bgFx.BuildConfirm(fx.Dim));
+
+        // VS는 부딪히는 그 프레임에 켜진다. 미리 켜면 슬램의 출발 배율(1 + vsOvershoot)이 먼저 보여
+        // 튀어나온 것이 아니라 줄어든 것이 된다.
+        t_enter.InsertCallback(m_landAt + fx.HitAt, ShowVersus);
+
+        t_enter.Insert(m_landAt, t_clash);
 
         PlayStage(t_enter);
     }
 
-    // 정점의 화면 좌표를 상대 배너의 출발 anchoredPosition으로 옮긴다. 아무것도 건드리지 않는다 —
-    // 실패를 안무를 짓기 전에 알아야 폴백(진입 안무에 태우기)이 가능하기 때문이다.
-    bool TryResolveOriginAnchored(Vector2 _screenPoint, out Vector2 _anchored)
+    // 두 프로필이 판에 실려 함께 떨어진다.
+    //
+    // 부모를 판으로 갈아끼우지 않는다 — 판은 기울어 있고 배율도 1이 아니라, 자식으로 옮기면 프로필이
+    // 함께 기울고 줄어든다. 게다가 두 프로필의 좌표계가 서로 갈려 대치 걸음(VersusStep)도
+    // 갈라짐의 밀어내기도 전부 무의미해진다.
+    // 실려 있다는 말은 부모가 같다는 뜻이 아니라 거리·시간·이징이 같다는 뜻이다.
+    void StageRide(Sequence _seq, float _up, float _down)
     {
-        _anchored = default;
-
-        RectTransform t_rect   = opponentProfile.Rect;
-        var           t_parent = t_rect.parent as RectTransform;
-
-        if (t_parent == null) return false;
-
-        // 오버레이 캔버스는 ScreenSpaceOverlay라 카메라가 null이어야 한다 — 물리면 좌표가 통째로 어긋난다.
-        Canvas t_canvas = t_rect.GetComponentInParent<Canvas>();
-        Camera t_cam    = t_canvas != null && t_canvas.renderMode != RenderMode.ScreenSpaceOverlay
-                        ? t_canvas.worldCamera
-                        : null;
-
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(t_parent, _screenPoint, t_cam,
-                                                                    out Vector2 t_local))
-            return false;
-
-        // 부모 피벗 기준 로컬 좌표를 anchoredPosition으로 옮긴다 — 앵커를 아무렇게나 저작해도 맞는 산술이다.
-        Vector2 t_refPoint = (t_rect.anchorMin + t_rect.anchorMax) * 0.5f - t_parent.pivot;
-
-        _anchored = t_local - new Vector2(t_refPoint.x * t_parent.rect.width,
-                                          t_refPoint.y * t_parent.rect.height);
-
-        return true;
+        // 방향은 순수 수직이다 — 판도 (0, ±travel)로만 움직인다. 이음매 법선을 태우면 프로필이
+        // 판 위에서 가로로 미끄러져 실려 있음이 깨진다(법선은 바깥에서 들어오는 제목 몫으로 남는다).
+        StageRideOne(_seq, opponentProfile, m_opponentHome,  _up);
+        StageRideOne(_seq, myProfile,       m_myHome,       -_down);
     }
 
-    // 상대가 눌린 정점 자리에서 커지며 제자리로 올라온다. 맵의 원판이 배너가 되는 것이라,
-    // 이 화면이 어디서 왔는지가 화면 안에 남는다.
-    void StageOriginRise(Sequence _seq, Vector2 _fromAnchored)
+    void StageRideOne(Sequence _seq, MatchProfileView _view, Vector2 _home, float _offsetY)
     {
-        RectTransform t_rect  = opponentProfile.Rect;
-        CanvasGroup   t_group = opponentProfile.Group;
+        if (_view == null || Mathf.Approximately(_offsetY, 0f)) return;
 
-        t_rect.DOKill();
-        t_group.DOKill();
+        RectTransform t_rect = _view.Rect;
 
-        t_rect.anchoredPosition = _fromAnchored;
-        t_rect.localScale       = Vector3.one * originStartScale;
-        t_group.alpha           = 0f;
+        t_rect.anchoredPosition = _home + new Vector2(0f, _offsetY);
 
-        // 감속이라 자리에 앉았다가 된다. 가속이면 무언가에 밀려 들어온 것으로 보인다.
-        _seq.Insert(originAt, t_rect.DOAnchorPos(m_opponentHome, originDuration).SetEase(Ease.OutCubic));
-        _seq.Insert(originAt, t_rect.DOScale(1f, originDuration).SetEase(Ease.OutCubic));
-
-        // 앞에서 다 나타난다 — 끝까지 흐리면 제자리에서 생겨난 것으로 보여 올라온 사실이 지워진다.
-        _seq.Insert(originAt, t_group.DOFade(1f, originDuration * 0.55f).SetEase(Ease.OutQuad));
+        _seq.Insert(0f, t_rect.DOAnchorPos(_home, bgFx.CloseDuration).SetEase(bgFx.CloseEase));
     }
 
-    void PlayVersus()
+    void ShowVersus()
     {
-        RectTransform t_vs = VersusRect;
         if (versusRoot != null) versusRoot.SetActive(true);
-
-        // 짓기 전에 먼저 걷는다. PlayStage도 걷지만 그건 인자를 다 만든 뒤라,
-        // 안무를 짓는 동안 조임이 아직 살아 있어 같은 배너를 두 시퀀스가 붙들고 있는 순간이 생긴다.
-        KillStage();
-
-        PlayStage(fx.BuildVersus(myProfile != null ? myProfile.Rect : null, m_myHome,
-                                 opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
-                                 VersusStep, t_vs, (RectTransform)transform));
     }
 
-    // 미는 방향은 두 배너의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
-    // 조임과 충돌이 같은 걸음을 써야 끌린 방향 그대로 부딪힌다.
+    // 미는 방향은 두 프로필의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
     Vector2 VersusStep
     {
         get
@@ -328,14 +300,14 @@ public class VersusIntroShell : MonoBehaviour
 
     RectTransform VersusRect => versusRoot != null ? (RectTransform)versusRoot.transform : null;
 
-    // 배너에 실리지 않은 것. 갈라짐이 이것도 함께 실어 내보낸다 —
+    // 프로필에 실리지 않은 것. 갈라짐이 이것도 함께 실어 내보낸다 —
     // 아니면 전환 한복판에서 제목이 한 프레임에 증발한다. 취소 버튼이 없어 매칭 화면보다 한 칸 짧다.
     RectTransform[] Riders => m_riders ??= new[]
     {
         titleText != null ? (RectTransform)titleText.transform : null,
     };
 
-    // 한 번에 도는 안무는 하나뿐이다 — 진입이 아직 도는 중에 대치가 겹치면 같은 배너를 두 트윈이 민다.
+    // 한 번에 도는 안무는 하나뿐이다 — 진입이 아직 도는 중에 다른 축이 겹치면 같은 프로필을 두 트윈이 민다.
     void PlayStage(Sequence _seq)
     {
         KillStage();
@@ -386,6 +358,13 @@ public class VersusIntroShell : MonoBehaviour
         }
     }
 
+    // 떨림이 밀어 놓은 화면을 제자리로. 조임이 자체 복구(OnKill)를 갖고 있지만 이 화면은 무대를
+    // 갈아타지 않아 그것이 안무가 다 끝난 뒤에야 돈다 — 부딪힌 자리에서 셸이 직접 되돌린다.
+    void RestoreRootHome()
+    {
+        ((RectTransform)transform).anchoredPosition = m_rootHome;
+    }
+
     static void RestoreHome(MatchProfileView _view, Vector2 _home)
     {
         if (_view == null) return;
@@ -394,7 +373,7 @@ public class VersusIntroShell : MonoBehaviour
         _view.Rect.anchoredPosition = _home;
         _view.Rect.localScale       = Vector3.one;
 
-        // 전환이 배너를 통째로 흐려 놓고 끝난다 — 되돌리지 않으면 다음 대치가 투명한 배너로 열린다.
+        // 전환이 프로필을 통째로 흐려 놓고 끝난다 — 되돌리지 않으면 다음 대치가 투명한 프로필로 열린다.
         _view.Group.DOKill();
         _view.Group.alpha = 1f;
     }

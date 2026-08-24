@@ -86,6 +86,26 @@ public class MatchmakingBgFx
     /// <summary>갈라짐이 끝나는 시각. 화면을 내리는 쪽(셸)이 이보다 일찍 내리면 판이 또 증발한다.</summary>
     public float PartDuration => this.HasPanels ? this.partDuration : 0f;
 
+    /// <summary>두 판이 맞물리는 데 걸리는 시간. 판에 무언가를 실어 함께 내리려면 같은 값을 써야 한다.</summary>
+    public float CloseDuration => this.closeDuration;
+
+    /// <summary>맞물림의 이징. 실려 오는 쪽이 값을 복제하면 다음 튜닝에 판만 바뀌고 실린 것이 남는다.</summary>
+    public Ease CloseEase => this.closeEase;
+
+    /// <summary>
+    /// 두 판이 화면을 비우는 거리(위·아래). 판에 실려 함께 떨어질 것이 <b>같은 거리</b>를 쓰게 하려고 연다 —
+    /// 이음매 각도와 여유는 이 클래스만 알고 있어서, 실어 오는 쪽이 직접 풀면 기하 진실원이 둘이 된다.
+    /// 판이 미배선이면 0이다 — 실을 판이 없으면 실린 것도 움직이지 않아야 한다.
+    /// </summary>
+    public void SolveTravel(RectTransform _screen, out float _up, out float _down)
+    {
+        _up = _down = 0f;
+
+        if (!this.HasPanels) return;
+
+        this.Solve(_screen, out _up, out _down);
+    }
+
     /// <summary>
     /// 배너가 들어오고 나갈 방향. 이음매의 법선이라 판이 맞물리는 방향과 같아진다 —
     /// 이 벡터를 쓰면 배너·판·이음매가 한 축으로 정렬된다. 판이 없으면 그냥 위쪽이다.
