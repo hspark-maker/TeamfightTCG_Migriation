@@ -16,6 +16,7 @@ Shader "VFX/FX_Alphablend"
 		_Normal_Upanner( "Normal_Upanner", Float ) = 0
 		_Normal_Vpanner( "Normal_Vpanner", Float ) = 0
 		[Toggle( _USE_Y_OFFSET_ON )] _USE_Y_Offset( "USE_Y_Offset", Float ) = 0
+		[Toggle( _USE_X_OFFSET_ON )] _USE_X_Offset( "USE_X_Offset", Float ) = 0
 
 
 		//_TessPhongStrength( "Tess Phong Strength", Range( 0, 1 ) ) = 0.5
@@ -258,6 +259,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_COLOR
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -503,14 +505,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord3.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord3.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord3.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord3.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord3.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord3.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -632,6 +641,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -824,14 +834,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -906,6 +923,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			struct Attributes
@@ -1089,14 +1107,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -1164,6 +1189,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			struct Attributes
@@ -1346,14 +1372,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -1428,6 +1461,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -1649,14 +1683,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord2.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord2.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord2.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord2.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord2.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord2.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -1786,6 +1827,7 @@ Shader "VFX/FX_Alphablend"
 			#define ASE_NEEDS_FRAG_TEXTURE_COORDINATES0
 			#define ASE_NEEDS_FRAG_COLOR
 			#pragma shader_feature_local _USE_Y_OFFSET_ON
+			#pragma shader_feature_local _USE_X_OFFSET_ON
 
 
 			#if defined(ASE_WRITE_DEPTH_CONSERVATIVE) && (SHADER_TARGET >= 45)
@@ -2019,14 +2061,21 @@ Shader "VFX/FX_Alphablend"
 				float2 uv_Normal_Tex = input.ase_texcoord3.xy * _Normal_Tex_ST.xy + _Normal_Tex_ST.zw;
 				float2 panner113 = ( 1.0 * _Time.y * appendResult115 + uv_Normal_Tex);
 				float2 uv_Main_Tex = input.ase_texcoord3.xy * _Main_Tex_ST.xy + _Main_Tex_ST.zw;
-				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + uv_Main_Tex);
-				float2 appendResult94 = (float2(uv_Main_Tex.x , ( uv_Main_Tex.y + input.ase_texcoord3.z )));
+				float2 temp_output_133_0 = ( uv_Main_Tex * uv_Main_Tex.x );
+				float2 panner114 = ( 1.0 * _Time.y * float2( 0,0 ) + temp_output_133_0);
+				float2 appendResult94 = (float2(uv_Main_Tex.x , ( temp_output_133_0 + input.ase_texcoord3.z ).x));
 				#ifdef _USE_Y_OFFSET_ON
 				float2 staticSwitch121 = appendResult94;
 				#else
 				float2 staticSwitch121 = panner114;
 				#endif
-				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 ) );
+				float2 appendResult130 = (float2(( uv_Main_Tex.x + input.ase_texcoord3.z ) , uv_Main_Tex.y));
+				#ifdef _USE_X_OFFSET_ON
+				float2 staticSwitch131 = appendResult130;
+				#else
+				float2 staticSwitch131 = panner114;
+				#endif
+				float4 tex2DNode82 = tex2D( _Main_Tex, ( ( (UnpackNormalScale( tex2D( _Normal_Tex, panner113 ), 1.0f )).xy * _distortion ) + staticSwitch121 + staticSwitch131 ) );
 				float2 appendResult76 = (float2(_Noise_UPanner , _Noise_VPanner));
 				float2 uv_Noise_Tex = input.ase_texcoord3.xy * _Noise_Tex_ST.xy + _Noise_Tex_ST.zw;
 				float2 panner78 = ( 1.0 * _Time.y * appendResult76 + uv_Noise_Tex);
@@ -2117,26 +2166,30 @@ Version=19912
 {"type":"AmplifyShaderEditor.CommentaryNode, AmplifyShaderEditor","id":126,"pos":[-2530,1926],"params":["Inherit","False","1419.47","747","Comment","10","74","75","99","76","78","80","103","71","107","81","Dissovle_Tex","1,0.7914926,0,1","0","0"]}
 {"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":110,"pos":[-3560,600],"params":["Inherit","False","0","108","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":115,"pos":[-3400,856],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
-{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":93,"pos":[-3136,1672],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
-{"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":92,"pos":[-3056,1264],"params":["Inherit","False","0","82","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":74,"pos":[-2432,2368],"params":["Float","False","Property","_Noise_UPanner","Noise_UPanner","9","0","Create","True","0","0","0","False","0","False","Object","-1","","0.1","0","0","0","0","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":75,"pos":[-2432,2504],"params":["Float","False","Property","_Noise_VPanner","Noise_VPanner","10","0","Create","True","0","0","0","False","0","False","Object","-1","","0","0","0","0","0","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.PannerNode, AmplifyShaderEditor","id":113,"pos":[-3240,776],"params":["Inherit","False","3","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","1","FLOAT","1","False","1","FLOAT2","0"]}
-{"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":95,"pos":[-2784,1648],"params":["Inherit","False","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
+{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":93,"pos":[-3280,1584],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
+{"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":92,"pos":[-3472,1264],"params":["Inherit","False","0","82","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.TextureCoordinatesNode, AmplifyShaderEditor","id":99,"pos":[-2480,2120],"params":["Inherit","False","0","80","2","3","2","SAMPLER2D","","False","0","FLOAT2","1,1","False","1","FLOAT2","0,0","False","5","FLOAT2","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":76,"pos":[-2232,2376],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.SamplerNode, AmplifyShaderEditor","id":108,"pos":[-2816,608],"params":["Inherit","True","Property","_Normal_Tex","Normal_Tex","18","1","[Normal]","Create","True","0","0","0","False","0","False","","-1","None","None","True","0","False","bump","Auto","True","Object","-1","Auto","Texture2D","False","8","0","SAMPLER2D","","False","1","FLOAT2","0,0","False","2","FLOAT","0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT","1","False","6","FLOAT","0","False","7","SAMPLERSTATE","","False","6","FLOAT3","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
-{"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":94,"pos":[-2656,1560],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
+{"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":95,"pos":[-2992,1584],"params":["Inherit","False","2","2","0","FLOAT2","0,0","False","1","FLOAT","0","False","1","FLOAT2","0"]}
+{"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":128,"pos":[-2872,1768],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
+{"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":133,"pos":[-3064,1120],"params":["Inherit","False","2","2","0","FLOAT2","0,0","False","1","FLOAT","0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.PannerNode, AmplifyShaderEditor","id":114,"pos":[-2648,1264],"params":["Inherit","False","3","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","1","FLOAT","1","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.PannerNode, AmplifyShaderEditor","id":78,"pos":[-2136,2192],"params":["Inherit","False","3","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","1","FLOAT","1","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.ComponentMaskNode, AmplifyShaderEditor","id":109,"pos":[-2512,608],"params":["Inherit","True","True","True","False","True","1","0","FLOAT3","0,0,0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":111,"pos":[-2496,808],"params":["Inherit","False","Property","_distortion","distortion","19","0","Create","True","0","0","0","False","0","False","Object","-1","","0","0","0","1","0","1","FLOAT","0"]}
+{"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":130,"pos":[-2544,1608],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
+{"type":"AmplifyShaderEditor.DynamicAppendNode, AmplifyShaderEditor","id":94,"pos":[-2728,1408],"params":["Inherit","False","FLOAT2","4","0","FLOAT","0","False","1","FLOAT","0","False","2","FLOAT","0","False","3","FLOAT","0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.StaticSwitch, AmplifyShaderEditor","id":121,"pos":[-2416,1424],"params":["Inherit","False","Property","_USE_Y_Offset","USE_Y_Offset","22","0","Create","True","0","0","0","False","0","False","","0","0","0","True","","Toggle","2","Key0","Key1","Create","True","True","All","9","1","FLOAT2","0,0","False","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT2","0,0","False","6","FLOAT2","0,0","False","7","FLOAT2","0,0","False","8","FLOAT2","0,0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.SamplerNode, AmplifyShaderEditor","id":80,"pos":[-1872,2112],"params":["Inherit","True","Property","_Noise_Tex","Noise_Tex","8","0","Create","True","0","0","0","False","0","False","","-1","None","3ca43113611e8be408ad544dd02eddf8","True","0","False","white","Auto","False","Object","-1","Auto","Texture2D","False","8","0","SAMPLER2D","","False","1","FLOAT2","0,0","False","2","FLOAT","0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT","1","False","6","FLOAT","0","False","7","SAMPLERSTATE","","False","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":112,"pos":[-2256,640],"params":["Inherit","False","2","2","0","FLOAT2","0,0","False","1","FLOAT","0","False","1","FLOAT2","0"]}
-{"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":122,"pos":[-2000,1176],"params":["Inherit","False","2","2","0","FLOAT2","0,0","False","1","FLOAT2","0,0","False","1","FLOAT2","0"]}
-{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":103,"pos":[-2016,2464],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
+{"type":"AmplifyShaderEditor.StaticSwitch, AmplifyShaderEditor","id":131,"pos":[-2286.992,1600.901],"params":["Inherit","False","Property","_USE_X_Offset","USE_X_Offset","23","0","Create","True","0","0","0","False","0","False","","0","0","0","True","","Toggle","2","Key0","Key1","Create","True","True","All","9","1","FLOAT2","0,0","False","0","FLOAT2","0,0","False","2","FLOAT2","0,0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT2","0,0","False","6","FLOAT2","0,0","False","7","FLOAT2","0,0","False","8","FLOAT2","0,0","False","1","FLOAT2","0"]}
+{"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":122,"pos":[-2000,1176],"params":["Inherit","False","3","3","0","FLOAT2","0,0","False","1","FLOAT2","0,0","False","2","FLOAT2","0,0","False","1","FLOAT2","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":107,"pos":[-1552,1976],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
+{"type":"AmplifyShaderEditor.TexCoordVertexDataNode, AmplifyShaderEditor","id":103,"pos":[-2016,2464],"params":["Inherit","False","0","4","0","5","FLOAT4","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4"]}
 {"type":"AmplifyShaderEditor.SamplerNode, AmplifyShaderEditor","id":82,"pos":[-1880,1352],"params":["Inherit","True","Property","_Main_Tex","Main_Tex","0","0","Create","True","0","0","0","False","0","False","","-1","None","1db9306db1c82a04faaf9f51a2e747b8","True","0","False","white","Auto","False","Object","-1","Auto","Texture2D","False","8","0","SAMPLER2D","","False","1","FLOAT2","0,0","False","2","FLOAT","0","False","3","FLOAT2","0,0","False","4","FLOAT2","0,0","False","5","FLOAT","1","False","6","FLOAT","0","False","7","SAMPLERSTATE","","False","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":81,"pos":[-1344,2336],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":83,"pos":[-928,1120],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
@@ -2193,24 +2246,33 @@ Version=19912
 {"wire":[115,1,117,0]}
 {"wire":[113,0,110,0]}
 {"wire":[113,2,115,0]}
-{"wire":[95,0,92,2]}
-{"wire":[95,1,93,3]}
 {"wire":[76,0,74,0]}
 {"wire":[76,1,75,0]}
 {"wire":[108,1,113,0]}
-{"wire":[94,0,92,1]}
-{"wire":[94,1,95,0]}
-{"wire":[114,0,92,0]}
+{"wire":[95,0,133,0]}
+{"wire":[95,1,93,3]}
+{"wire":[128,0,92,1]}
+{"wire":[128,1,93,3]}
+{"wire":[133,0,92,0]}
+{"wire":[133,1,92,1]}
+{"wire":[114,0,133,0]}
 {"wire":[78,0,99,0]}
 {"wire":[78,2,76,0]}
 {"wire":[109,0,108,0]}
+{"wire":[130,0,128,0]}
+{"wire":[130,1,92,2]}
+{"wire":[94,0,92,1]}
+{"wire":[94,1,95,0]}
 {"wire":[121,1,114,0]}
 {"wire":[121,0,94,0]}
 {"wire":[80,1,78,0]}
 {"wire":[112,0,109,0]}
 {"wire":[112,1,111,0]}
+{"wire":[131,1,114,0]}
+{"wire":[131,0,130,0]}
 {"wire":[122,0,112,0]}
 {"wire":[122,1,121,0]}
+{"wire":[122,2,131,0]}
 {"wire":[107,0,82,1]}
 {"wire":[107,1,80,1]}
 {"wire":[82,1,122,0]}
@@ -2255,4 +2317,4 @@ Version=19912
 {"wire":[23,2,90,0]}
 {"wire":[23,3,91,0]}
 ASEEND*/
-//CHKSM=B4646AA40B439A6723D5D1DB51E88E0A8EA4F0A8
+//CHKSM=46850F2A8CEBBC27DE894E292FD293A61ABF28C5
