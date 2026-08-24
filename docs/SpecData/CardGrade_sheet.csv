@@ -1,6 +1,7 @@
 ﻿등급 고유 번호(부여 후 변경 금지),등급 키(코드 enum 이름과 1:1 · 변경 금지),화면 표시 이름,정렬 순서(작을수록 낮은 등급),프레임/텍스트 색 HEX(# 없이 6자리),1=등장 컷씬 대상 등급,기획 메모
 id,gradeKey,displayName,sortOrder,colorHex,playsAppearCinematic,memo
 int,string,string,int,string,int,string
-1,Silver,실버,1,C9D1DA,0,기본 등급 · 팩 다수 배출
-2,Gold,골드,2,F2B33D,0,중간 등급
-3,Prism,프리즘,3,9B6BF5,1,최고 등급 · 등장 컷씬 대상
+1,Common,일반,1,C9D1DA,0,기본 등급 · 팩 다수 배출
+2,Rare,희귀,2,F2B33D,0,중간 등급
+3,Arcane,신비,3,9B6BF5,0,상위 등급
+4,Mythic,신화,4,FF5A36,1,최고 등급 · 등장 컷씬 대상

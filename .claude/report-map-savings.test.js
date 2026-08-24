@@ -5,7 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { COST_WEIGHTS, excerptStats, isRealUser, parseTranscript } = require("./report-map-savings.js");
+const {
+  COST_WEIGHTS, excerptStats, isRealUser, parseTranscript,
+  transcriptSessionIds, warnMissingBaselineSessions,
+} = require("./report-map-savings.js");
 
 const user = (content, timestamp) => ({
   type: "user", timestamp, sessionId: "test-session",
@@ -26,7 +29,8 @@ assert.equal(isRealUser(user("<task-notification>done</task-notification>", "202
 assert.equal(isRealUser(user("<system-reminder>note</system-reminder>", "2026-08-15T00:00:00Z")), false);
 assert.equal(isRealUser(user("<current_user_request>진짜 요청</current_user_request>", "2026-08-15T00:00:00Z")), true);
 
-const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "map-report-test-")), "session.jsonl");
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "map-report-test-"));
+const file = path.join(dir, "session.jsonl");
 try {
   const events = [
     user("첫 요청", "2026-08-15T00:00:00Z"),
@@ -81,7 +85,27 @@ try {
   assert.equal(excerpt[0].excerptSearchesToFirstEdit, 3, "차단된 원 검색의 첫 재시도는 국소 검색에서 제외");
   assert.equal(excerpt[0].excerptIgnoredProxy, true, "서로 다른 추가 검색 3회 이상은 무시 proxy");
   assert.equal(excerptStats(excerpt).withEdit, 1);
-  console.log("map-savings tests: noise filter + map carry + gate era passed");
+
+  fs.writeFileSync(file, JSON.stringify({
+    sessionId: "kept", type: "user", message: { content: "비탐색 요청" },
+  }) + "\n");
+  const currentIds = transcriptSessionIds([file]);
+  assert.deepEqual([...currentIds], ["kept"], "탐색 호출이 없어도 트랜스크립트 세션을 찾아야 한다");
+  fs.mkdirSync(path.join(dir, ".claude"));
+  fs.writeFileSync(path.join(dir, ".claude", "map-baseline.json"), JSON.stringify({
+    samples: [{ sessionId: "kept" }, { sessionId: "missing" }],
+  }));
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(message);
+  try {
+    assert.deepEqual(warnMissingBaselineSessions(dir, currentIds), ["missing"]);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /baseline 세션 1개/);
+  console.log("map-savings tests: noise filter + map carry + gate era + session loss passed");
 } finally {
-  fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true });
 }

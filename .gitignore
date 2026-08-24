@@ -94,6 +94,9 @@ CLAUDE.local.md
 # 기능 지도 SessionStart 동기화의 로컬 롤링 백업/중단 잔여물
 .claude/orch-feature-map.md.bak
 .claude/orch-feature-map.md*.tmp-*
+.claude/agents-map-inline.bak
+.claude/agents-map-inline.bak.tmp-*
+AGENTS.md.tmp-*
 
 # TMP 폰트 아틀라스 재생성물 (conflict 방지, meta는 추적 유지)
 Assets/Fonts/MalgunGothic_TMP.asset

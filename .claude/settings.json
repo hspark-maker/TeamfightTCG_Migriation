@@ -1,4 +1,7 @@
 {
+  "env": {
+    "MAP_GATE_MODE": "observe"
+  },
   "permissions": {
     "allow": [
       "Bash(git status:*)",

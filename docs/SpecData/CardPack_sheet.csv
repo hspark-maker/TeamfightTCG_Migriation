@@ -7,3 +7,8 @@ int,string,string,string,string,long,int,int,string,long
 4,KeywordDeck,키워드덱,Live,Gold,0,6,1,Shard,3
 5,StarterPack,스타터팩,Live,Gold,0,6,1,Shard,0
 6,SynergyPack,시너지팩,Live,Gold,0,6,1,Shard,0
+7,HuntingBrandPack,사냥의 낙인,Live,Diamond,30,6,0,Shard,8
+8,ImmortalLegacyPack,불멸의 유산,Live,Diamond,30,6,0,Shard,8
+9,IronArmorPack,철벽의 갑주,Live,Diamond,30,6,0,Shard,8
+10,GiantsGardenPack,거인의 정원,Live,Diamond,30,6,0,Shard,8
+11,ElementalFlowPack,원소의 흐름,Live,Diamond,30,6,0,Shard,8

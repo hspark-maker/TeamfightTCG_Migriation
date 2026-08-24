@@ -13,14 +13,14 @@ public enum ECardChannel
 /// 값에 숫자를 명시하는 이유: 에셋에 int로 직렬화되므로 중간에 항목을 끼우면 **기존 카드의 등급이 조용히 밀린다.**
 /// 새 등급은 뒤에 붙이고, 스펙시트 CARD_GRADE와 이름·숫자를 함께 맞춘다(표는 이름 문자열로 받는다).
 ///
-/// **Silver·Gold는 <see cref="ERankGrade"/>에도 같은 이름이 있다.** 타입이 달라 코드는 갈라지지만
-/// 시트·로그에서는 같은 글자라 사람이 헷갈린다 — 카드 등급은 `grade` 열, 랭크 쪽은 `minGrade` 열이다.</summary>
+/// 카드 희소도는 Common/Rare/Arcane/Mythic, 플레이어 랭크는 <see cref="ERankGrade"/>로 서로 다른 축이다.</summary>
 public enum ECardGrade
 {
     Unknown = 0,   // 미배정. 등급을 아직 정하지 않은 카드가 머무는 기본값이다(표의 빈 칸도 여기로 온다).
-    Silver  = 1,
-    Gold    = 2,
-    Prism   = 3,
+    Common  = 1,
+    Rare    = 2,
+    Arcane  = 3,
+    Mythic  = 4,
 }
 
 /// <summary>카드 한 상태(미진화 / 진화 N단계)의 아트 묶음. 진화 단계마다 이 그림이 바뀐다.

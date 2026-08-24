@@ -12,6 +12,8 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "map-gate-test-"));
 const projectDir = path.join(root, "project");
 const stateRoot = path.join(root, "state");
 fs.mkdirSync(path.join(projectDir, ".claude"), { recursive: true });
+const inheritedGateMode = process.env.MAP_GATE_MODE;
+delete process.env.MAP_GATE_MODE;
 
 /* 실측 스키마 — Claude Code 의 Bash 결과에는 exitCode 도 is_error 도 없다.
    합성 객체로 테스트하면 실패 판정이 거짓 통과한다. 이 파일의 핵심 회귀점. */
@@ -243,7 +245,32 @@ try {
     assert.ok(log.includes(MAP_SCOPE_OUTSIDE_MARKER));
   });
 
-  console.log(`map-gate tests: ${passed}/19 passed (subagent context: 미검증 — sidechain 기록 없음)`);
+  check("20. observe mode logs a would-block without denying the search", () => {
+    const session = "observe-mode";
+    const previous = process.env.MAP_GATE_MODE;
+    process.env.MAP_GATE_MODE = "observe";
+    try {
+      for (let i = 0; i < FREE_SEARCHES; i += 1) {
+        assert.equal(processHook({
+          hook_event_name: "PreToolUse", tool_name: "Grep", tool_input: { pattern: `warmup${i}` },
+          session_id: session, cwd: projectDir,
+        }, { projectDir, stateRoot }), null);
+      }
+      const result = processHook({
+        hook_event_name: "PreToolUse", tool_name: "Grep", tool_input: { pattern: "CardView" },
+        session_id: session, cwd: projectDir,
+      }, { projectDir, stateRoot });
+      assert.equal(result, null);
+      assert.match(fs.readFileSync(path.join(stateRoot, "map-gate.log"), "utf8"), /observe: would-block hits=\d+/);
+    } finally {
+      if (previous === undefined) delete process.env.MAP_GATE_MODE;
+      else process.env.MAP_GATE_MODE = previous;
+    }
+  });
+
+  console.log(`map-gate tests: ${passed}/20 passed (subagent context: 미검증 — sidechain 기록 없음)`);
 } finally {
+  if (inheritedGateMode === undefined) delete process.env.MAP_GATE_MODE;
+  else process.env.MAP_GATE_MODE = inheritedGateMode;
   fs.rmSync(root, { recursive: true, force: true });
 }

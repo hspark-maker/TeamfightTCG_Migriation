@@ -1510,7 +1510,11 @@ MonoBehaviour:
   packs:
   - {fileID: 11400000, guid: dc5d796287646fe44937453728a1cf97, type: 2}
   - {fileID: 11400000, guid: 022c53aec58d27948af9fff21e9d76fe, type: 2}
-  - {fileID: 11400000, guid: 14ae3da35afdd404894e0b4b8eafd1cd, type: 2}
+  - {fileID: 11400000, guid: ac88b48d42c80d94ebbc9d395b283cf1, type: 2}
+  - {fileID: 11400000, guid: a7b6f23e694fdfa4893f7170390148b4, type: 2}
+  - {fileID: 11400000, guid: 1b6d5825e040d8e49854f7717176062e, type: 2}
+  - {fileID: 11400000, guid: 335ae6f685d42ab479fdd47fd7d749ce, type: 2}
+  - {fileID: 11400000, guid: 5b9266053c9633e4193ac279a593044e, type: 2}
   carousel: {fileID: 7471955986726886911}
   purchaseFlash:
     rise: 0.04

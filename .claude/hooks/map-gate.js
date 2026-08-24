@@ -176,6 +176,13 @@ function processHook(input, options = {}) {
     return null;
   }
 
+  const gateMode = process.env.MAP_GATE_MODE || "enforce";
+  if (gateMode === "observe") {
+    logFailOpen(stateRoot, `observe: would-block hits=${excerpt.hits} shown=${excerpt.shown} (${toolName}) ${JSON.stringify(toolInput).slice(0, 140)}`);
+    try { writeState(file, { ...state, searches }); } catch { /* 관측 실패가 탐색을 막으면 안 된다 */ }
+    return null;
+  }
+
   // 발췌가 지도 열람을 대신한다. 다음 재시도는 바로 통과시켜 별도 Read 왕복을 없앤다.
   try { writeState(file, { requestKey: state.requestKey || null, loaded: true, searches, blocks: (state.blocks || 0) + 1 }); }
   catch {

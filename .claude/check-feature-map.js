@@ -11,6 +11,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { mapTokens } = require("./lib/map-index.js");
+const { checkInstructionsSync } = require("./check-instructions-sync.js");
 
 const root = path.resolve(__dirname, "..");
 const MAP = path.join(root, ".claude", "orch-feature-map.md");
@@ -25,6 +26,7 @@ function ageDays(since) {
 
 assert.ok(fs.existsSync(MAP), "기능 지도가 없습니다: .claude/orch-feature-map.md");
 assert.ok(fs.existsSync(SRC), "자체 코드 디렉터리가 없습니다: Assets/Scripts");
+checkInstructionsSync();
 
 const map = fs.readFileSync(MAP, "utf8");
 

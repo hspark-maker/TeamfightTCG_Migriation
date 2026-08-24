@@ -37,7 +37,7 @@ public partial class Card
     public int hp4;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism)
+    /// 카드 등급(Common/Rare/Arcane/Mythic)
     public string grade;
 }
 
@@ -71,7 +71,7 @@ public partial class Card_Test
     public int hp4;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism)
+    /// 카드 등급(Common/Rare/Arcane/Mythic)
     public string grade;
 }
 

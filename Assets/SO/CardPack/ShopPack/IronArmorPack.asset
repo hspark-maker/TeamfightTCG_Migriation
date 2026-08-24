@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef172436211a3934fb172f7d6ab7ebab, type: 3}
+  m_Name: IronArmorPack
+  m_EditorClassIdentifier: Assembly-CSharp::CardPackData
+  packId: IronArmorPack
+  displayName: "\uCCA0\uBCBD\uC758 \uAC11\uC8FC"
+  packArt: {fileID: 21300000, guid: 2644fb62a8b387a4e99510306ddf5d8b, type: 3}
+  priceType: 1
+  price: 30
+  drawCount: 6
+  uniqueDraw: 0
+  refundType: 3
+  refundAmount: 8
+  pool:
+  - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
+  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+  - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+  - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+  - {fileID: 11400000, guid: f383ec8cdb05832b1de3826a78bf3744, type: 2}
+  - {fileID: 11400000, guid: 0872d44c4ea2ab5816259fa1f61765fe, type: 2}
+  rankPools:
+  - minGrade: 0
+    cards:
+    - card: {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
+      weight: 8
+    - card: {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+      weight: 8
+    - card: {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+      weight: 3
+    - card: {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+      weight: 3
+    - card: {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+      weight: 7
+    - card: {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
+      weight: 32
+    - card: {fileID: 11400000, guid: f383ec8cdb05832b1de3826a78bf3744, type: 2}
+      weight: 7
+    - card: {fileID: 11400000, guid: 0872d44c4ea2ab5816259fa1f61765fe, type: 2}
+      weight: 32
