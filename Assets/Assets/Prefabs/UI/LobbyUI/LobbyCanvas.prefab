@@ -1318,7 +1318,7 @@ MonoBehaviour:
   tabBar: {fileID: 689375099676913591}
   lobbyTabController: {fileID: 3797395670514148879}
   collectionTabIndex: 4
-  albumTabController: {fileID: 0}
+  albumTabController: {fileID: 4638979334226172188}
   tabPunch: 0.3
   packTabIndex: 1
   packFlightSize: {x: 240, y: 300}
