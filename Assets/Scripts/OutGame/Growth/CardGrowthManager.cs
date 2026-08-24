@@ -81,9 +81,8 @@ public static partial class CardGrowthManager
 
     static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
 
-    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음). 한 흐름이 여러 도메인을 건드릴 때
-    /// 도메인마다 Save()를 부르면 같은 파일을 여러 번 쓰므로, 디스크 쓰기는 마지막 한 곳이 맡는다.
-    /// 진행도 없는 항목(미강화 + 간식 0)은 직렬화에서 뺀다.</summary>
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음) — 여러 도메인을 건드리는 흐름에서
+    /// 같은 파일을 반복해 쓰지 않도록 디스크 쓰기는 마지막 한 곳이 맡는다.</summary>
     internal static void FlushToData()
     {
         if (!s_initialized) return;
@@ -112,8 +111,7 @@ public static partial class CardGrowthManager
 
     public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)), true);
 
-    /// <summary>세이브와 무관하게 **지정 레벨**의 성장 스냅샷. AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다 —
-    /// 곡선 해석(체력·진화·키워드·시너지 해금)을 한 곳에 두려고 여기서 내준다.</summary>
+    /// <summary>세이브와 무관하게 지정 레벨의 성장 스냅샷(AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다).</summary>
     public static CardGrowth GrowthAtLevel(CardData _card, int _level)
         => Snapshot(_card, ClampLevel(_level), false);
 
@@ -144,13 +142,11 @@ public static partial class CardGrowthManager
         return TryGetStepAt(_card, GrowthOf(_card).Level + 1, out _step);
     }
 
-    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다(안내가 강화 스텝에 들어선 순간).
-    /// 레벨도 잔액도 그대로지만 **낼 값**이 달라지므로, 이미 그려 둔 화면이 비용을 다시 읽어야 한다 —
-    /// 안 알리면 상세가 옛 비용을 띄운 채로 굳고, 잔액이 그에 못 미치는 유저는 강화 버튼이 비활성인 채
-    /// 안내가 시킨 일을 하지 못한다(표시·활성 판정·소모가 같은 값을 봐야 한다는 <see cref="TryGetStepAt"/> 규약).</summary>
+    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다 — 레벨도 잔액도 그대로지만 낼 값이 달라져
+    /// 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
     public static void NotifyCostRuleChanged() => OnGrowthChanged?.Invoke();
 
-    // 강화 1회 시도(실패해도 골드는 소모, 레벨 하락 없음)
+    // 강화 1회 시도(실패해도 비용은 소모, 레벨 하락 없음)
     public static EnhanceResult TryEnhance(CardData _card)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
@@ -186,8 +182,7 @@ public static partial class CardGrowthManager
             Entry(t_id).level = t_level;
             Save();
 
-            // 안내가 대준 한 방을 여기서 소진한다. 실패에는 걸지 않는다 —
-            // 실패로 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
+            // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
             if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
                 OutgameTutorialGuide.ConsumeFreeShot();
         }
@@ -199,10 +194,7 @@ public static partial class CardGrowthManager
     }
 
     /// <summary>전 카드를 만렙으로 올린다(디버그 전용). 반환값은 실제로 레벨이 오른 카드 수.
-    ///
-    /// TryEnhance를 돌리지 않는다 — 재화·성공률을 타면 골드가 마르거나 실패로 레벨이 들쭉날쭉해져
-    /// "전부 만렙"이라는 목적을 못 채운다. 여기서는 곡선이 정한 상한을 레벨에 직접 쓴다.
-    /// 진화 단계·키워드 해금은 레벨에서 파생되므로(GrowthOf) 따로 손대지 않아도 같이 열린다.</summary>
+    /// TryEnhance를 안 타는 이유는 재화·성공률에 걸려 "전부 만렙"을 못 채우기 때문이다.</summary>
     public static int DebugMaxAll()
     {
         if (!s_initialized) return 0;
@@ -241,22 +233,18 @@ public static partial class CardGrowthManager
         OnGrowthChanged?.Invoke();
     }
 
-    // 레벨 _level로 올리는 한 스텝. 곡선 조회를 여기 하나로 모으는 이유는 튜토리얼 보정 때문이다 —
-    // 안내가 강화를 시키는 동안은 비용을 0으로 눕히는데, 조회가 갈리면 화면엔 100골드가 뜨는데
-    // 실제로는 0이 나가고 잔액이 모자란 유저는 버튼이 비활성으로 굳는다(표시·활성 판정·소모가 같은 값을 봐야 한다).
+    // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
     static bool TryGetStepAt(CardData _card, int _level, out GrowthStep _step)
     {
         if (!Config.TryGetStep(_card, _level, out _step)) return false;
 
-        // 무료 한 방의 원장은 OutgameTutorialGuide가 쥔다(키워드 강화도 같은 원장을 본다 — 축으로 갈린다).
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
 
         return true;
     }
 
-    // 레벨 하나에서 전투가 쓸 파생값을 전부 만든다(곡선·관문을 아는 것은 OutGame뿐이라는 규약).
-    // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 조용히 레벨까지 잃지 않는다.
+    // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 레벨까지 잃지 않는다.
     static CardGrowth Snapshot(CardData _card, int _level, bool _includeKeywordGrowth)
     {
         CardGrowthConfig t_config = Config;
