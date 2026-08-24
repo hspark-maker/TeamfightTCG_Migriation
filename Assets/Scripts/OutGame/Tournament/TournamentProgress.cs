@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 보상 토너먼트 진행도의 static 단일 창구(정점 해금 판정 · 클리어 지급 · 낙인)
+// 보상 토너먼트 진행도의 static 단일 창구(정점 해금 판정 · 클리어 지급 · 챕터 완주 보상 · 낙인)
 public static class TournamentProgress
 {
     static TournamentConfig s_config;
@@ -12,6 +12,9 @@ public static class TournamentProgress
 
     // 전체 정점 수
     public static int NodeCount => Config.NodeCount;
+
+    // 챕터 수
+    public static int ChapterCount => Config.ChapterCount;
 
     // 지금 도전할 수 있는 정점(없으면 -1). 맵의 자동 스크롤·강조가 공통으로 쓰는 단일 기준.
     public static int CurrentNodeIndex
@@ -23,6 +26,35 @@ public static class TournamentProgress
                 if (StateOf(t_i) == ETournamentNodeState.Playable) return t_i;
 
             return -1;
+        }
+    }
+
+    // 맵이 처음 보여줘야 할 정점 — 받을 선물이 있으면 그쪽이 먼저다(없으면 도전할 정점)
+    public static int FocusNodeIndex
+    {
+        get
+        {
+            string t_pending = PendingRewardNodeId;
+            if (string.IsNullOrEmpty(t_pending)) return CurrentNodeIndex;
+
+            int t_index = IndexOf(t_pending);
+            return t_index >= 0 ? t_index : CurrentNodeIndex;
+        }
+    }
+
+    // 깼지만 아직 보상을 받지 않은 정점(없으면 빈 문자열)
+    public static string PendingRewardNodeId => Slot.pendingRewardNodeId ?? string.Empty;
+
+    // 지금 진행 중인 챕터(첫 미완주 챕터, 전부 완주면 마지막 · 챕터가 없으면 -1)
+    public static int CurrentChapterIndex
+    {
+        get
+        {
+            int t_count = ChapterCount;
+            for (int t_i = 0; t_i < t_count; t_i++)
+                if (!IsChapterComplete(t_i)) return t_i;
+
+            return t_count - 1;
         }
     }
 
@@ -42,6 +74,17 @@ public static class TournamentProgress
         }
     }
 
+    // JsonUtility는 기본 생성자를 태워 이 목록을 빈 리스트로 채운다 — 수동 편집·다른 역직렬화 경로만 대비한 보정이다
+    static List<string> ClaimedChapters
+    {
+        get
+        {
+            TournamentSaveData t_slot = Slot;
+            if (t_slot.claimedChapterIds == null) t_slot.claimedChapterIds = new List<string>();
+            return t_slot.claimedChapterIds;
+        }
+    }
+
     // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(TournamentConfig _config)
     {
@@ -52,13 +95,20 @@ public static class TournamentProgress
 
     public static int IndexOf(string _nodeId) => Config.IndexOf(_nodeId);
 
-    // 정점 상태(3종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
+    public static bool TryGetChapter(int _chapterIndex, out TournamentChapterDef _chapter)
+        => Config.TryGetChapter(_chapterIndex, out _chapter);
+
+    // 정점 상태(4종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
     public static ETournamentNodeState StateOf(int _index)
     {
         if (!Config.TryGetNode(_index, out TournamentNodeDef t_node) || !t_node.HasStableKey)
             return ETournamentNodeState.Locked;
 
         if (Slot.clearedNodeIds.Contains(t_node.nodeId)) return ETournamentNodeState.Cleared;
+
+        // 미수령은 클리어가 아니다 — 다음 정점 해금도 링크 점등도 수령(ClearNode)이 열쇠다
+        if (t_node.nodeId == PendingRewardNodeId) return ETournamentNodeState.RewardPending;
+
         if (_index == 0) return ETournamentNodeState.Playable;
 
         if (Config.TryGetNode(_index - 1, out TournamentNodeDef t_prev)
@@ -69,8 +119,34 @@ public static class TournamentProgress
         return ETournamentNodeState.Locked;
     }
 
+    // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다).
+    // 미수령 정점은 진입이 아니라 수령이 남은 자리라 제외한다.
+    public static bool CanEnter(int _index)
+    {
+        ETournamentNodeState t_state = StateOf(_index);
+        return t_state == ETournamentNodeState.Playable || t_state == ETournamentNodeState.Cleared;
+    }
+
     public static bool IsCleared(string _nodeId)
         => !string.IsNullOrEmpty(_nodeId) && Slot.clearedNodeIds.Contains(_nodeId);
+
+    public static bool IsRewardPending(int _index)
+        => StateOf(_index) == ETournamentNodeState.RewardPending;
+
+    // 승리 낙인 — 지급은 하지 않는다. 수령(ClearNode)이 지급·해금·낙인 해제를 마저 한다.
+    // 전투 씬에서 불린다: 로비까지 미루면 로딩 중 종료가 승리를 삼킨다.
+    public static bool MarkRewardPending(string _nodeId)
+    {
+        if (string.IsNullOrEmpty(_nodeId)) return false;
+        if (IsCleared(_nodeId)) return false;
+        if (Slot.pendingRewardNodeId == _nodeId) return false;
+
+        Slot.pendingRewardNodeId = _nodeId;
+
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+        return true;
+    }
 
     // 정점 클리어 확정 — 보상 지급까지 여기서 한다(수령 팝업의 onConfirm이 이 메서드를 부른다)
     public static bool ClearNode(string _nodeId)
@@ -82,6 +158,49 @@ public static class TournamentProgress
         return true;
     }
 
+    // 챕터의 모든 정점이 Cleared인가. 정점 0개 챕터는 완주로 통과시킨다 — 저작 실수로 진행이 영영 막히지 않게
+    // (검증기가 Error로 잡는 몫이다).
+    public static bool IsChapterComplete(int _chapterIndex)
+    {
+        if (!Config.TryGetNodeRange(_chapterIndex, out int t_start, out int t_count)) return false;
+        if (t_count <= 0) return true;
+
+        for (int t_i = 0; t_i < t_count; t_i++)
+            if (StateOf(t_start + t_i) != ETournamentNodeState.Cleared) return false;
+
+        return true;
+    }
+
+    // 챕터 진행 눈금(클리어 수 / 정점 수). 띠가 "3 / 6"을 그리는 단일 기준이라 세는 자리를 화면에 두지 않는다.
+    public static bool TryGetChapterProgress(int _chapterIndex, out int _cleared, out int _total)
+    {
+        _cleared = 0;
+        _total = 0;
+
+        if (!Config.TryGetNodeRange(_chapterIndex, out int t_start, out int t_count)) return false;
+
+        _total = t_count;
+        for (int t_i = 0; t_i < t_count; t_i++)
+            if (StateOf(t_start + t_i) == ETournamentNodeState.Cleared) _cleared++;
+
+        return true;
+    }
+
+    public static bool IsChapterRewardClaimed(string _chapterId)
+        => !string.IsNullOrEmpty(_chapterId) && ClaimedChapters.Contains(_chapterId);
+
+    // 챕터 완주 보상 수령(자격 = 완주 && 미수령). 지급·낙인·영속·통지가 한 트랜잭션이다
+    public static bool ClaimChapterReward(string _chapterId)
+    {
+        int t_index = Config.ChapterIndexOf(_chapterId);
+        if (t_index < 0) return false;
+        if (!IsChapterComplete(t_index)) return false;
+        if (ClaimedChapters.Contains(_chapterId)) return false;
+
+        PayoutChapter(_chapterId);
+        return true;
+    }
+
     // 정점 _index의 보상 스냅샷(범위 밖·미저작이면 빈 목록)
     public static void FillRewards(int _index, List<RewardLine> _sink)
     {
@@ -89,10 +208,19 @@ public static class TournamentProgress
         Config.FillRewards(t_node.nodeId, _sink);
     }
 
-    // 클리어 낙인만 지운다(디버그 전용, 지급된 재화는 회수하지 않는다)
+    // 챕터 _chapterIndex의 완주 보상 스냅샷(범위 밖·미저작이면 빈 목록)
+    public static void FillChapterRewards(int _chapterIndex, List<RewardLine> _sink)
+    {
+        Config.TryGetChapter(_chapterIndex, out TournamentChapterDef t_chapter);
+        Config.FillChapterRewards(t_chapter.chapterId, _sink);
+    }
+
+    // 클리어·수령 낙인만 지운다(디버그 전용, 지급된 재화는 회수하지 않는다)
     public static void ResetForDebug()
     {
         Slot.clearedNodeIds.Clear();
+        ClaimedChapters.Clear();
+        Slot.pendingRewardNodeId = "";
         DataSaveManager.Save();
         OnChanged?.Invoke();
     }
@@ -108,16 +236,35 @@ public static class TournamentProgress
 
         Slot.clearedNodeIds.Add(_nodeId);
 
+        // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
+        if (Slot.pendingRewardNodeId == _nodeId) Slot.pendingRewardNodeId = "";
+
         // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
+        CurrencyManager.Save();
+        OnChanged?.Invoke();
+    }
+
+    // 챕터 완주 보상 지급 → 낙인 → 즉시 영속 → 통지(정점 Payout과 같은 순서)
+    static void PayoutChapter(string _chapterId)
+    {
+        var t_rewards = new List<RewardLine>();
+        Config.FillChapterRewards(_chapterId, t_rewards);
+
+        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
+            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
+
+        ClaimedChapters.Add(_chapterId);
+
         CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 }
 
-// 정점 상태(3종 배타)
+// 정점 상태(4종 배타)
 public enum ETournamentNodeState
 {
     Locked,
     Playable,
+    RewardPending,   // 깼지만 보상을 아직 안 받았다 — 진입이 아니라 수령이 남은 자리
     Cleared,
 }

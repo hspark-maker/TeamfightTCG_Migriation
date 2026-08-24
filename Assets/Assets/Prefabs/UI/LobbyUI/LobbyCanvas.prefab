@@ -1948,7 +1948,7 @@ MonoBehaviour:
     tutorialTrigger: 2
     unlockFeature: 5
   - name: Tournament
-    panel: {fileID: 2259189210714536949}
+    panel: {fileID: 0}
     label: "\uD1A0\uB108\uBA3C\uD2B8"
     tutorialAnchor: 0
     tutorialTrigger: 0
@@ -5383,10 +5383,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tab_Tournament
       objectReference: {fileID: 0}
-    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5650,6 +5646,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 100
       objectReference: {fileID: 0}
+    - target: {fileID: 1320787919957749206, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+      propertyPath: m_text
+      value: "\uBAA8\uD5D8"
+      objectReference: {fileID: 0}
     - target: {fileID: 2613078674125030523, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_SizeDelta.x
       value: 1519.6289
@@ -5674,9 +5674,17 @@ PrefabInstance:
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
+    - target: {fileID: 4146536642369644062, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+      propertyPath: nicknameText
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 5513956980374487650, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_Name
       value: Tab_Match
+      objectReference: {fileID: 0}
+    - target: {fileID: 6861458297151960254, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
       objectReference: {fileID: 0}
     - target: {fileID: 8727275443176196410, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_Pivot.x
@@ -5759,7 +5767,8 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 2227583950628433296, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 // 정점 클리어 보상의 수령 흐름(앨범 3단 수령과 같은 순서를 따른다).
@@ -9,9 +10,16 @@ public static class TournamentRewardFlow
     const string TITLE_SUFFIX   = " 격파";
     const string TITLE_FALLBACK = "정점 클리어";
 
-    public static void Open(string _nodeId)
+    /// <summary>
+    /// 보상 팝업을 연다. <b>팝업이 실제로 떴는지</b>를 돌려준다 —
+    /// 폴백(보상 0건·팝업 미배선)으로 지급만 끝난 경우 _onClosed가 영영 오지 않으므로 호출부가 알아야 한다.
+    /// </summary>
+    public static bool Open(string _nodeId, Action _onClosed = null)
     {
-        if (string.IsNullOrEmpty(_nodeId)) return;
+        if (string.IsNullOrEmpty(_nodeId)) return false;
+
+        // 재도전 승리는 지급이 없다 — 정점 보상은 최초 1회다. 빈 상자를 세우지 않게 팝업 이전에 끊는다.
+        if (TournamentProgress.IsCleared(_nodeId)) return false;
 
         int t_index = TournamentProgress.IndexOf(_nodeId);
 
@@ -25,11 +33,13 @@ public static class TournamentRewardFlow
         if (t_lines.Count == 0 || !RewardClaimPopup.TryGet(out var t_popup))
         {
             TournamentProgress.ClearNode(_nodeId);
-            return;
+            return false;
         }
 
         // 랭크·앨범과 같은 규약 — [획득] 버튼 없이 배경을 눌러 받는다.
-        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNode(_nodeId), _claimOnDim: true);
+        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNode(_nodeId),
+                     _claimOnDim: true, _onClosed: _onClosed);
+        return true;
     }
 
     // 표시명이 비었거나 저작에서 사라진 정점이면 상대를 특정하지 않는 문구로 내려간다(빈 제목으로 새지 않게).

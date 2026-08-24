@@ -88,6 +88,21 @@ public static class OutgameFeatureLock
         Refresh();
     }
 
+    /// <summary>정지 판정을 되돌린다 — 되감기·디버그 점프로 진행을 다시 세울 때의 짝이다.
+    /// 이 판정은 세이브가 아니라 static에 있어, 걷지 않으면 세이브를 밀어도 전 기능이 열린 채로 남아
+    /// 잠금 저작을 검증할 수 없다.</summary>
+    public static void ClearStall()
+    {
+        if (!s_stalled) return;
+
+        s_stalled = false;
+        s_valid   = false;
+        Refresh();
+    }
+
+    // ⚠ 이 계산에는 에디터 거울이 있다 — Editor/Tutorial/TutorialSequenceState가 저작 검증을 위해
+    //   같은 규칙(자기 칸 포함 누적 · locks 우선 · 저작 unlock 없으면 전체 개방)을 플레이 없이 다시 편다.
+    //   여기를 고치면 그쪽도 함께 고쳐라. 어긋나면 저작 검증기가 멀쩡한 저작을 오류로 찍는다.
     static bool Recalculate()
     {
         int  t_chapter = OutgameTutorialProgress.ChapterIndex;

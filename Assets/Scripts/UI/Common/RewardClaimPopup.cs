@@ -46,6 +46,9 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
     Func<bool> m_onConfirm;
 
+    // 닫힘 콜백. 연 쪽이 팝업 뒤에 연출을 이을 때만 쓴다(공용 팝업이라 static 이벤트로 두면 다른 소비처에 샌다).
+    Action m_onClosed;
+
     // 표시 중인 행의 보상. 재화가 갈리면 각자의 HUD로 각자의 빛이 흘러가므로 종류별로 담아 둔다.
     readonly CurrencyGainBucket m_rewards = new CurrencyGainBucket();
 
@@ -66,9 +69,11 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
     /// 실패(팝업이 뜬 사이 상태가 바뀜)면 분출 없이 닫는다.
     /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm, bool _claimOnDim = false)
+    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm,
+                     bool _claimOnDim = false, Action _onClosed = null)
     {
         this.m_onConfirm = _onConfirm;
+        this.m_onClosed = _onClosed;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         this.KillIntro();
@@ -116,6 +121,11 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.m_onConfirm = null;
         this.KillIntro();
         this.SetVisible(false);
+
+        // 먼저 비우고 부른다 — 콜백이 이 팝업을 다시 열어도(Show) 방금 심은 콜백을 덮지 않게.
+        var t_closed = this.m_onClosed;
+        this.m_onClosed = null;
+        t_closed?.Invoke();
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어

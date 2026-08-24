@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 토너먼트 저작 결함(키 안정성·상대 덱·보상) 로그 진단(에디터 수동 실행 전용)
+// 토너먼트 저작 결함(챕터·키 안정성·상대 덱·보상) 로그 진단(에디터 수동 실행 전용)
 internal static class TournamentValidator
 {
     // TournamentConfig의 [ContextMenu]가 유일한 진입점
@@ -10,7 +10,10 @@ internal static class TournamentValidator
     {
         if (_config == null) return;
 
+        var t_chapters = _config.Chapters;
         var t_nodes = _config.Nodes;
+
+        int t_chapterFault = ValidateChapters(t_chapters);
 
         int t_unstable = 0;
         int t_emptyDeck = 0;
@@ -18,6 +21,7 @@ internal static class TournamentValidator
         int t_dupKey = 0;
         var t_keys = new HashSet<string>();
 
+        // 정점 검증은 챕터를 가로질러 평탄 기준으로 본다 — nodeId 중복은 전역 판정이다
         for (int t_i = 0; t_i < t_nodes.Count; t_i++)
         {
             TournamentNodeDef t_node = t_nodes[t_i];
@@ -46,8 +50,58 @@ internal static class TournamentValidator
             }
         }
 
-        if (t_unstable == 0 && t_dupKey == 0 && t_emptyDeck == 0 && t_noReward == 0)
-            Debug.Log($"[Tournament] 저작 검증 통과 — 정점 {t_nodes.Count}개, 결함 없음.");
+        if (t_chapterFault == 0 && t_unstable == 0 && t_dupKey == 0 && t_emptyDeck == 0 && t_noReward == 0)
+            Debug.Log($"[Tournament] 저작 검증 통과 — 챕터 {t_chapters.Count}개 · 정점 {t_nodes.Count}개, 결함 없음.");
+    }
+
+    // 챕터 결함 수(경고 포함)를 돌려준다
+    static int ValidateChapters(IReadOnlyList<TournamentChapterDef> _chapters)
+    {
+        int t_fault = 0;
+        var t_keys = new HashSet<string>();
+
+        if (_chapters.Count == 0)
+        {
+            Debug.LogError("[Tournament] 챕터 미저작 — 맵에 아무것도 뜨지 않는다.");
+            return 1;
+        }
+
+        for (int t_i = 0; t_i < _chapters.Count; t_i++)
+        {
+            TournamentChapterDef t_chapter = _chapters[t_i];
+
+            if (!t_chapter.HasStableKey)
+            {
+                t_fault++;
+                Debug.LogError($"[Tournament] chapterId 미저작 (챕터 #{t_i}) — 완주 보상을 영영 받을 수 없다.");
+            }
+            else if (!t_keys.Add(t_chapter.chapterId))
+            {
+                t_fault++;
+                Debug.LogError($"[Tournament] chapterId 중복 '{t_chapter.chapterId}' (챕터 #{t_i}) — 수령 낙인이 한 챕터로 합쳐진다.");
+            }
+
+            if (t_chapter.NodeCount == 0)
+            {
+                t_fault++;
+                Debug.LogError($"[Tournament] 정점 0개 (챕터 #{t_i} '{t_chapter.title}') — 완주 판정 모수가 없다.");
+            }
+
+            if (CountRewards(t_chapter.completionRewards) == 0)
+            {
+                t_fault++;
+                Debug.LogWarning($"[Tournament] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
+            }
+
+            // 챕터 띠의 보상 슬롯이 2칸이라 3줄부터는 앞칸만 뜬다(지급은 되지만 표시가 잘린다)
+            if (CountRewards(t_chapter.completionRewards) > 2)
+            {
+                t_fault++;
+                Debug.LogWarning($"[Tournament] 완주 보상 {CountRewards(t_chapter.completionRewards)}줄 (챕터 #{t_i} '{t_chapter.title}') — 띠 슬롯 2칸을 넘어 뒷줄이 표시되지 않는다.");
+            }
+        }
+
+        return t_fault;
     }
 
     static int CountCards(List<CardData> _cards)
