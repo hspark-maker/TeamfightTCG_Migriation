@@ -10,6 +10,9 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] BattleFieldView enemyFieldView;
     [SerializeField] BattleIntro battleIntro;
     [SerializeField] AudioClip battleBGM;
+
+    // 커튼이 열리는 동안 올라오게 — 로비를 뺄 때와 같은 규약으로 배틀도 페이드로 들어온다.
+    const float BattleBgmFadeInSeconds = 0.8f;
     [SerializeField] TutorialOverlayUI tutorialOverlayPrefab;   // 튜토리얼 오버레이 프리팹(비우면 코드 빌드 폴백)
     [SerializeField] BattleVfxLibrary battleVfxLibrary;         // 규칙 기반 연출 배선 단일 지점(비우면 해당 연출만 생략)
     // 덱 확인/편집 게이트(MatchDeckShell)는 여기 없다 — 로비(LobbyMatchLauncher)가 씬 로드 전에 돌린다.
@@ -128,7 +131,7 @@ public class GameInitializer : MonoBehaviour
             }
         }
 
-        SoundManager.Instance?.PlayBGM(this.battleBGM);
+        SoundManager.Instance?.PlayBGM(this.battleBGM, BattleBgmFadeInSeconds);
 
         // 인트로 순서: 카메라 확대 → 코인 토스 → 선공 턴 전환 연출 → 카드 배치(딜) → 턴 루프.
         var t_runner = GetComponent<TurnRunner>();

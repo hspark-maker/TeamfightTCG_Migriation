@@ -624,7 +624,7 @@ GameObject:
   - component: {fileID: 1900100002}
   - component: {fileID: 1900100003}
   m_Layer: 0
-  m_Name: LobbyBGM
+  m_Name: LobbyAudio
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -654,10 +654,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 1900100001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0759f1c03cb944708e742c1bf85ff113, type: 3}
+  m_Script: {fileID: 11500000, guid: 8e4d1a76b3c05f2947e8d29c1a6b3f04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   bgm: {fileID: 8300000, guid: 518197c824c00314eb5dd82f69391c52, type: 3}
+  fadeInSeconds: 1.2
 --- !u!1001 &3864070791857446870
 PrefabInstance:
   m_ObjectHideFlags: 0

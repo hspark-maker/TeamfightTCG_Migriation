@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c8b2f14a76d3e0498fa1b60c3d27e85, type: 3}
+  m_Name: OutgameSoundBank
+  m_EditorClassIdentifier: 
+  cues:
+  - cue: 100
+    clips: []
+    volumeScale: 1
+  - cue: 101
+    clips: []
+    volumeScale: 1
+  - cue: 102
+    clips: []
+    volumeScale: 1
+  - cue: 103
+    clips: []
+    volumeScale: 1
+  - cue: 200
+    clips: []
+    volumeScale: 1
+  - cue: 201
+    clips: []
+    volumeScale: 1
+  - cue: 202
+    clips: []
+    volumeScale: 1
+  - cue: 203
+    clips: []
+    volumeScale: 1
+  - cue: 300
+    clips: []
+    volumeScale: 1
+  - cue: 301
+    clips: []
+    volumeScale: 1
+  - cue: 302
+    clips: []
+    volumeScale: 1
+  - cue: 303
+    clips: []
+    volumeScale: 1
+  - cue: 400
+    clips: []
+    volumeScale: 1
+  - cue: 401
+    clips: []
+    volumeScale: 1
+  - cue: 402
+    clips: []
+    volumeScale: 1
+  - cue: 500
+    clips: []
+    volumeScale: 1
+  - cue: 501
+    clips: []
+    volumeScale: 1
+  - cue: 600
+    clips: []
+    volumeScale: 1
+  - cue: 601
+    clips: []
+    volumeScale: 1
+  - cue: 700
+    clips: []
+    volumeScale: 1
+  - cue: 701
+    clips: []
+    volumeScale: 1
+  - cue: 800
+    clips: []
+    volumeScale: 1
+  - cue: 801
+    clips: []
+    volumeScale: 1
+  - cue: 802
+    clips: []
+    volumeScale: 1

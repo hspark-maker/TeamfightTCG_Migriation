@@ -549,6 +549,7 @@ public class TournamentNodeView : MonoBehaviour
         float t_land = this.stampFallTime;
 
         this.m_stampSeq.Insert(t_land, this.stampRim.DOFade(1f, 0.08f).SetEase(Ease.OutQuad));
+        this.m_stampSeq.InsertCallback(t_land, () => SoundManager.Instance?.PlayCue(EOutgameSound.TournamentClear));
 
         this.m_stampSeq.Insert(t_land, this.stampFlash.DOFade(this.stampFlashAlpha, 0.03f));
         this.m_stampSeq.Insert(t_land + 0.03f, this.stampFlash.DOFade(0f, 0.18f).SetEase(Ease.OutQuad));
@@ -733,6 +734,7 @@ public class TournamentNodeView : MonoBehaviour
     void OnTapped()
     {
         if (this.m_index < 0) return;
+        SoundManager.Instance?.PlayCue(EOutgameSound.TournamentNodeTap);
         this.m_onTap?.Invoke(this.m_index);
     }
 }

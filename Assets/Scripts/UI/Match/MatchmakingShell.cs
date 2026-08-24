@@ -271,6 +271,9 @@ public class MatchmakingShell : MonoBehaviour
         // 띠가 서너 번 지나고 나면 그 뒤로는 정지 화면과 구분되지 않는다.
         t_enter.InsertCallback(entryFx.ScanAt, StartWaitingAxes);
 
+        // 배너가 앉고 탐색 표현이 도는 프레임에 맞춘다 — 여는 순간에 울리면 로비 탭 소리와 겹친다.
+        t_enter.InsertCallback(entryFx.ScanAt, () => SoundManager.Instance?.PlayCue(EOutgameSound.MatchSearch));
+
         PlayStage(t_enter);
     }
 
@@ -307,6 +310,7 @@ public class MatchmakingShell : MonoBehaviour
         // 그 색이 이미 다음 화면의 색이라 나중에 판이 갈라질 때 두 화면이 색으로 이어진다.
         // 조임보다 먼저 끝나야 한다(confirmDuration 툴팁) — 안 끝나면 대치가 무대를 갈아탈 때 잘린다.
         t_seq.Insert(fx.SlamAt, bgFx.BuildConfirm(fx.Dim));
+        t_seq.InsertCallback(fx.SlamAt, () => SoundManager.Instance?.PlayCue(EOutgameSound.MatchFound));
 
         // 조임은 꽂힘이 끝나는 자리에 이어 붙인다. 별도 무대로 돌리면 그 사이 한 프레임이 완전 정지가 되어,
         // 채우려던 바로 그 공백이 앞으로 옮겨 갈 뿐이다.
@@ -326,6 +330,8 @@ public class MatchmakingShell : MonoBehaviour
         // 짓기 전에 먼저 걷는다. PlayStage도 걷지만 그건 인자를 다 만든 뒤라,
         // 안무를 짓는 동안 조임이 아직 살아 있어 같은 카드를 두 시퀀스가 붙들고 있는 순간이 생긴다.
         KillStage();
+
+        SoundManager.Instance?.PlayCue(EOutgameSound.MatchVersus);
 
         PlayStage(fx.BuildVersus(myProfile != null ? myProfile.Rect : null,       m_myHome,
                                  opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
