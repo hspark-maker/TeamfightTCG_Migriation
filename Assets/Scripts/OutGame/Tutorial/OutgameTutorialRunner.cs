@@ -263,6 +263,38 @@ public static class OutgameTutorialRunner
         OnStepChanged?.Invoke();
     }
 
+    /// <summary>덱 게이트에서 전투가 시작됐다 — 좌표를 그 전투를 여는 스텝 뒤로 옮긴다.
+    ///
+    /// 안내가 짠 순서(덱 선택 → 뒤로가기 → 전투 시작) 말고도 전투로 나가는 길이 있다(덱 편집 화면의 전투 버튼).
+    /// 그 길로 나가면 남은 안내 스텝의 앵커가 전부 사라진 화면으로 돌아와 등록을 영영 기다린다 —
+    /// 전투는 이미 치렀는데 좌표만 그 앞에 남아, 다음 챕터가 시작되지 않는다.
+    ///
+    /// 전투 스텝에 이미 서 있으면 아무 일도 하지 않는다 — 그 자리는 게이트가 스스로 넘긴다(이중 전진 방지).</summary>
+    public static void NotifyDeckGateBattleLaunched()
+    {
+        if (!IsRunning) return;
+
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_step    = OutgameTutorialProgress.StepIndex;
+
+        for (int t_i = t_step + 1; t_i < StepCountOf(t_chapter); t_i++)
+        {
+            if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
+            if (t_def.Action != EOutgameTutorialAction.BattleStart) continue;
+
+            Debug.LogWarning($"[OutgameTutorialRunner] 안내를 거치지 않고 전투가 시작됐습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 스텝 {t_chapter}-{t_i} 뒤로 옮깁니다.");
+
+            TryGetNext(t_chapter, t_i, out int t_nextChapter, out int t_nextStep);
+            OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
+
+            // 건너뛴 스텝들의 unlocks도 좌표에서 파생되므로 여기서 한 번 반영한다(잠김 룩이 옛 상태에 고착되지 않게).
+            OutgameFeatureLock.Refresh();
+
+            OnStepChanged?.Invoke();
+            return;
+        }
+    }
+
     // 시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다
     public static IEnumerable<TutorialStepDef> EnumerateUpTo(int _chapter, int _step)
     {
