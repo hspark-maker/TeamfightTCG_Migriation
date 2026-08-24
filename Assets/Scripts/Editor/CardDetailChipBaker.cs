@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// 칩 수를 늘리거나 프리팹을 다시 깔아야 하면 메뉴에서 한 번 더 돌리면 된다(멱등).</summary>
 static class CardDetailChipBaker
 {
-    const string OverlayPath = "Assets/Assets/Prefabs/UI/LobbyUI/CardDetailUI/CardDetailOverlay.prefab";
+    const string OverlayPath = "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab";
 
     // 키워드는 CardKeyword 선언 수(None 제외)가 곧 한 카드가 가질 수 있는 최대치다.
     // 시너지는 지금 카드당 1개지만 늘어날 여지를 둔다 — 모자라면 런타임이 앞에서부터만 채우고 경고한다.

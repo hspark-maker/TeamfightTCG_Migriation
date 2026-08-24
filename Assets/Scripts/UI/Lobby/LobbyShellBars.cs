@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>로비 셸에서 걷을 수 있는 바. 화면마다 걷는 범위가 달라 요청에 실어 보낸다.</summary>
 [System.Flags]
@@ -48,6 +49,14 @@ public static class LobbyShellBars
         Apply();
     }
 
+    /// <summary>죽은 요청을 걷고 지금 상태를 다시 적용한다. 로비에 들어설 때 한 번 부른다 —
+    /// 요청을 흘린 화면이 있어도 로비를 다시 밟으면 바가 되살아난다(안 그러면 재시작 말고는 길이 없다).</summary>
+    public static void Refresh()
+    {
+        Prune();
+        Apply();
+    }
+
     public static void Show(object _owner)
     {
         if (_owner == null) return;
@@ -73,7 +82,9 @@ public static class LobbyShellBars
     }
 
     /// <summary>요청자가 늘 LobbyRoot 안에 있지는 않다 — 탭 콘텐츠는 자손이지만
-    /// SafeArea 직속 오버레이(카드 상세 등)는 형제다. 위로 훑고, 없으면 캔버스에서 내려찾는다.</summary>
+    /// SafeArea 직속 오버레이는 형제이고, <b>풀드 UI(카드 상세)는 아예 다른 캔버스</b>다
+    /// (UIPoolManager 캔버스는 DontDestroyOnLoad라 로비 캔버스 계층 밖이다).
+    /// 위로 훑고 → 자기 캔버스에서 내려찾고 → 그래도 없으면 로드된 씬 전체를 훑는다.</summary>
     static Transform FindLobbyRoot(Transform _context)
     {
         for (Transform t_node = _context; t_node != null; t_node = t_node.parent)
@@ -81,8 +92,33 @@ public static class LobbyShellBars
 
         Transform t_canvas = _context.root;
         Transform t_fast   = t_canvas.Find("SafeArea/LobbyRoot");
+        if (t_fast != null) return t_fast;
 
-        return t_fast != null ? t_fast : FindDescendant(t_canvas, "LobbyRoot");
+        Transform t_local = FindDescendant(t_canvas, "LobbyRoot");
+        if (t_local != null) return t_local;
+
+        return FindInLoadedScenes();
+    }
+
+    /// <summary>로드된 씬들의 루트를 훑어 LobbyRoot를 찾는다. Bind 한 번당 최대 1회만 도는 경로다
+    /// (물린 뒤에는 Bind가 즉시 반환한다) — GetRootGameObjects의 할당을 매 프레임 치르지 않는다.
+    /// 전투 씬처럼 로비가 없는 곳에서는 null이고, 그때는 조용히 아무 일도 하지 않는다.</summary>
+    static Transform FindInLoadedScenes()
+    {
+        for (int t_i = 0; t_i < SceneManager.sceneCount; t_i++)
+        {
+            Scene t_scene = SceneManager.GetSceneAt(t_i);
+            if (!t_scene.isLoaded) continue;
+
+            GameObject[] t_roots = t_scene.GetRootGameObjects();
+            for (int t_r = 0; t_r < t_roots.Length; t_r++)
+            {
+                Transform t_found = FindDescendant(t_roots[t_r].transform, "LobbyRoot");
+                if (t_found != null) return t_found;
+            }
+        }
+
+        return null;
     }
 
     static Transform FindDescendant(Transform _node, string _name)
@@ -127,7 +163,17 @@ public static class LobbyShellBars
     static void ApplyTo(CanvasGroup _group, bool _hide, bool _wasHidden)
     {
         if (_group == null) return;   // 씬 전환으로 이미 파괴됐다
-        if (_hide == _wasHidden) return;
+
+        // 되돌리는 방향은 캐시를 믿지 않는다. s_applied는 static이라 씬이 다시 로드돼도 살아남고,
+        // 트윈이 중간에 잘리면 알파만 되돌아오고 blocksRaycasts는 false로 남는다 —
+        // 그러면 바가 **보이는데 안 눌리는** 상태로 굳고, 캐시가 "이미 펼침"이라 믿어 아무도 고치지 않는다.
+        // 펼치기는 멱등하므로 매번 확인해도 비용이 없다(값이 이미 맞으면 트윈도 걸지 않는다).
+        if (!_hide)
+        {
+            bool t_alreadyOpen = _group.blocksRaycasts && _group.interactable && _group.alpha >= 0.999f;
+            if (t_alreadyOpen) return;
+        }
+        else if (_hide == _wasHidden) return;
 
         // 걷힌 바 위로 손가락이 지나가도 버튼이 눌리면 안 된다.
         _group.blocksRaycasts = !_hide;
@@ -157,10 +203,19 @@ public static class LobbyShellBars
             if (ReferenceEquals(s_requests[t_i].owner, _owner)) s_requests.RemoveAt(t_i);
     }
 
-    // 요청자가 Show 없이 파괴되면 바가 영영 걷힌 채 남는다 — 호출마다 걷어낸다.
+    // 요청자가 Show 없이 사라지면 바가 영영 걷힌 채 남는다 — 호출마다 걷어낸다.
+    //
+    // 파괴만으로는 부족하다. 풀드 UI는 파괴되지 않고 비활성으로만 남으므로(UIPoolManager가 재사용한다)
+    // 파괴 검사에 걸리지 않는다 — 꺼진 화면이 바를 걷은 채 붙들고 있으면 아무도 그 요청을 회수하지 못한다.
+    // 지금 화면에 없는 주인은 바를 걷을 자격도 없다.
     static void Prune()
     {
         for (int t_i = s_requests.Count - 1; t_i >= 0; t_i--)
-            if (s_requests[t_i].owner is Object t_owner && t_owner == null) s_requests.RemoveAt(t_i);
+        {
+            object t_raw = s_requests[t_i].owner;
+
+            if (t_raw is Object t_owner && t_owner == null) { s_requests.RemoveAt(t_i); continue; }
+            if (t_raw is Behaviour t_behaviour && !t_behaviour.isActiveAndEnabled) s_requests.RemoveAt(t_i);
+        }
     }
 }

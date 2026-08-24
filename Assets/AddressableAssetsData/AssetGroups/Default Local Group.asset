@@ -57,6 +57,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8134ddc58443c3348a644266ea3669ec
+    m_Address: Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 846d825ba21303740ae41a6a317b231e
     m_Address: KeywordDemoStage
     m_ReadOnly: 0
@@ -65,6 +71,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
     m_Address: RankRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 900576455767af6468c2f5dfdb5ff54b
+    m_Address: RewardClaimPopup
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -83,6 +95,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d39777ec9f35af14b9b4397582338e12
     m_Address: ProfileEditPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d13625a8928721c4d8c58190b4816059
+    m_Address: CardDetailOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
