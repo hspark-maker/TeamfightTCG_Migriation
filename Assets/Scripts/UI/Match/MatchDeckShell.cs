@@ -97,6 +97,10 @@ public class MatchDeckShell : MonoBehaviour
 
         m_launching = true;
 
+        // 안내가 시킨 순서를 거치지 않고 이 화면을 떠나는 길이 있다(편집 화면의 전투 버튼) —
+        // 좌표를 두고 가면 앵커가 사라진 화면으로 돌아와 영영 대기한다. 전투 스텝에 이미 서 있으면 무시된다.
+        OutgameTutorialRunner.NotifyDeckGateBattleLaunched();
+
         // 뷰가 없으면 태울 안무도 없다 — 연출 때문에 전투가 시작되지 않는 길을 만들지 않는다.
         if (panelView == null)
         {
