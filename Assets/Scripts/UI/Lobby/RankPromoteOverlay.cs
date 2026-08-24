@@ -543,6 +543,8 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     // 섬광 · 링 · 킥 · 배지 눌림. 넷이 같은 시각이라 하나의 타격으로 읽힌다.
     void StageImpact(Sequence _seq, float _at, RectTransform _badge)
     {
+        _seq.InsertCallback(_at, () => SoundManager.Instance?.PlayCue(EOutgameSound.RankPromote));
+
         if (ScreenFlash.TryGet(out ScreenFlash t_flash))
         {
             Sequence t_cover = t_flash.BuildCover(this.flash);

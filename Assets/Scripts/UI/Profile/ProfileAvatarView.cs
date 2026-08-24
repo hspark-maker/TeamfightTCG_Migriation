@@ -3,22 +3,22 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 프로필 그림 한 덩어리(밑판·판·얼굴·링). 이걸 쓰는 화면은 층을 따로 알 필요가 없다.
-//
-// 판·링 색은 스프라이트와 한 쌍으로 들어온다 — 흰 마스터를 틴트해 쓰는 아트가 섞여 있어서다.
-// 완성 아트면 색을 흰색으로 두면 그대로 나온다.
-// 층의 앞뒤는 프리팹이 잡는다(코드에서 형제 순서를 건드리지 않는다).
-//
-// 맨 뒤 밑판은 코드가 잡지 않는다 — 누름 연출에서 홀로 제자리에 남아야 눌린 깊이가 드러나기 때문이다.
 public class ProfileAvatarView : MonoBehaviour
 {
-    [Tooltip("원형 마스크 겸 얼굴 뒤 판(아바타 색). 이 스프라이트 모양이 곧 얼굴이 잘리는 모양이다.")]
+    [Tooltip("얼굴 뒤 판(아바타 색). 이 스프라이트 모양이 곧 얼굴이 잘리는 모양이다.")]
     [SerializeField] Image plateImage;
-    [Tooltip("아바타 그림. 판을 꽉 채우고 판의 Mask에 원형으로 잘린다.")]
+    [Tooltip("아바타 그림. 판을 꽉 채우고 판 모양대로 오려진다.")]
     [SerializeField] Image faceImage;
     [Tooltip("맨 위 — 아바타 위에 덧씌우는 속이 뚫린 테두리 링(프레임 색).")]
     [SerializeField] Image ringImage;
 
-    // 누름 연출 한 벌. 새 연출이 들어오면 이전 것을 죽여 배율이 누적되지 않게 한다.
+    [Tooltip("얼굴을 판 모양대로 오려내는 재질(UI/ProfileAvatarMask). 미배선이면 얼굴이 판 밖까지 네모로 그려진다.")]
+    [SerializeField] Material faceMaskMaterial;
+
+    // 뷰마다 복제하면 UI 배칭이 뷰 수만큼 끊겨 한 벌을 나눠 쓴다.
+    static Material s_faceMaskInstance;
+    static readonly int MASK_TEX_ID = Shader.PropertyToID("_MaskTex");
+
     Sequence m_pressSeq;
 
     /// <summary>세 층을 한 벌로 그린다.</summary>
@@ -27,6 +27,8 @@ public class ProfileAvatarView : MonoBehaviour
         ApplyLayer(this.plateImage, _look.Plate, _look.PlateColor);
         ApplyLayer(this.faceImage, _look.Face, null);
         ApplyLayer(this.ringImage, _look.Ring, _look.RingColor);
+
+        this.ApplyFaceMask(_look.Plate);
     }
 
     /// <summary>한 축만 남기고 끈다. 선택 칸처럼 "그 항목 자체"만 보여야 하는 자리가 쓴다.</summary>
@@ -56,7 +58,7 @@ public class ProfileAvatarView : MonoBehaviour
         this.InsertScale(_popDuration, 1f, _settleDuration, Ease.OutBack);
     }
 
-    // 풀 반납·목록 갱신으로 꺼지면 눌린 배율이 그대로 굳는다 — 여기서 기준으로 되돌린다.
+    // 풀 반납·목록 갱신으로 꺼지면 눌린 배율이 그대로 굳는다.
     void OnDisable()
     {
         this.KillPress();
@@ -64,7 +66,7 @@ public class ProfileAvatarView : MonoBehaviour
         SetScale(this.ringImage, 1f);
     }
 
-    // 밑판을 뺀 나머지 층을 같은 박자로 움직인다. 판을 잡으면 그 자식인 얼굴도 따라온다.
+    // 밑판은 뺀다 — 홀로 제자리에 남아야 눌린 깊이가 드러난다.
     void InsertScale(float _at, float _to, float _duration, Ease _ease)
     {
         InsertOne(this.m_pressSeq, _at, this.plateImage, _to, _duration, _ease);
@@ -96,12 +98,32 @@ public class ProfileAvatarView : MonoBehaviour
         if (_image != null) _image.gameObject.SetActive(_on);
     }
 
-    // 한 층. 스프라이트가 없으면 그 층은 저작값 그대로 두고 지나간다 — 설정 미배선이 빈 칸으로 드러나지 않게.
+    // 스프라이트가 없으면 저작값을 그대로 둔다 — 설정 미배선이 빈 칸으로 드러나지 않게.
     static void ApplyLayer(Image _image, Sprite _sprite, Color? _color)
     {
         if (_image == null || _sprite == null) return;
 
         _image.sprite = _sprite;
         if (_color.HasValue) _image.color = _color.Value;
+    }
+
+    // uGUI Mask는 스텐실 이진 판정이라 원형 경계가 계단으로 남는다 — 판 알파를 곱해 오려낸다.
+    void ApplyFaceMask(Sprite _plate)
+    {
+        if (this.faceImage == null || this.faceMaskMaterial == null) return;
+        if (_plate == null || _plate.texture == null) return;
+
+        Material t_mask = MaskMaterialWith(this.faceMaskMaterial, _plate.texture);
+        if (this.faceImage.material != t_mask) this.faceImage.material = t_mask;
+    }
+
+    static Material MaskMaterialWith(Material _source, Texture _maskTex)
+    {
+        // 에셋을 그대로 물리면 SetTexture가 에셋 파일을 고친다 — 인스턴스를 하나 떠서 그쪽만 만진다.
+        if (s_faceMaskInstance == null) s_faceMaskInstance = new Material(_source) { hideFlags = HideFlags.HideAndDontSave };
+
+        if (s_faceMaskInstance.GetTexture(MASK_TEX_ID) != _maskTex) s_faceMaskInstance.SetTexture(MASK_TEX_ID, _maskTex);
+
+        return s_faceMaskInstance;
     }
 }

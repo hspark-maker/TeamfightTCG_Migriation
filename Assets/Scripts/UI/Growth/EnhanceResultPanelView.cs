@@ -23,7 +23,7 @@ public readonly struct EnhanceResultLine
 
     /// <summary>"한 번 더"의 비용 재화 아이콘. 스프라이트째 받는 이유는 <see cref="RetryCostText"/>와 같다 —
     /// 재화에서 그림을 고르는 규칙이 화면마다 따로 있으면 하단 바와 결과판이 같은 비용을 다른 아이콘으로 띄운다.
-    /// null이면 프리팹 그림을 그대로 둔다(강화가 늘 골드였던 시절의 배선도 그대로 산다).</summary>
+    /// null이면 프리팹에 저작된 그림을 그대로 둔다(미배선 허용).</summary>
     public readonly Sprite RetryCostIcon;
 
     /// <summary>이번 강화로 **새로 열린 것**(키워드·시너지·진화). 없으면 null/빈 문자열이고 그 행은 아예 뜨지 않는다.
@@ -97,7 +97,7 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] TMP_Text retryNoticeText;
     [Tooltip("다음 강화에 들 비용. 하단 바의 강화 버튼과 같은 값·같은 표기를 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
     [SerializeField] TMP_Text retryCostText;
-    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다. 스프라이트도 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
+    [Tooltip("비용 옆 재화 아이콘. 재화는 레벨마다 갈릴 수 있어 그림도 호출부가 스텝에서 골라 넘긴다(미배선이면 조용히 건너뛴다).")]
     [SerializeField] Image    retryCostIcon;
 
     [Header("해금 알림 (선택)")]

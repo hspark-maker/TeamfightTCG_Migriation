@@ -98,6 +98,27 @@ public static class TournamentProgress
     public static bool TryGetChapter(int _chapterIndex, out TournamentChapterDef _chapter)
         => Config.TryGetChapter(_chapterIndex, out _chapter);
 
+    // 챕터가 랭크 미달로 통째로 잠겼는가. 진행 낙인과 무관한 파생값이라 정점 상태(StateOf)와 축이 다르다 —
+    // 포인트가 오르면 저작을 건드리지 않아도 저절로 풀린다.
+    public static bool IsChapterRankLocked(int _chapterIndex)
+    {
+        if (!Config.TryGetChapter(_chapterIndex, out TournamentChapterDef t_chapter)) return false;
+
+        return RankManager.CurrentGrade < t_chapter.requiredGrade;
+    }
+
+    // 정점이 속한 챕터가 랭크로 잠겼는가(정점 뷰가 챕터를 다시 세지 않게 하는 창구)
+    public static bool IsRankLocked(int _index)
+        => IsChapterRankLocked(Config.ChapterIndexOfNode(_index));
+
+    // 챕터를 여는 데 필요한 등급(범위 밖이면 false). 챕터 띠가 잠김 문구를 그리는 재료다.
+    public static bool TryGetRequiredGrade(int _chapterIndex, out ERankGrade _grade)
+    {
+        bool t_found = Config.TryGetChapter(_chapterIndex, out TournamentChapterDef t_chapter);
+        _grade = t_found ? t_chapter.requiredGrade : default;
+        return t_found;
+    }
+
     // 정점 상태(4종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
     public static ETournamentNodeState StateOf(int _index)
     {
@@ -121,8 +142,11 @@ public static class TournamentProgress
 
     // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다).
     // 미수령 정점은 진입이 아니라 수령이 남은 자리라 제외한다.
+    // 랭크 잠금을 여기서 곱한다 — 진입 게이트가 맵과 로비 둘로 갈려 있어 상태 판정에 섞는 것보다 여기가 단일 지점이다.
     public static bool CanEnter(int _index)
     {
+        if (IsRankLocked(_index)) return false;
+
         ETournamentNodeState t_state = StateOf(_index);
         return t_state == ETournamentNodeState.Playable || t_state == ETournamentNodeState.Cleared;
     }

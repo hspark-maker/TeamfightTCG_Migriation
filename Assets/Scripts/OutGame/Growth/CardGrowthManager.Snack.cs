@@ -1,12 +1,8 @@
 using UnityEngine;
 
-// 카드별 간식(카드팩 중복 보상)의 조회·적립.
-//
-// 간식은 그 카드에만 쓰는 재화라 전역 잔액 배열(CurrencySaveData.balances)에 못 담는다. 이미 cardId로
-// 갈라져 있는 CardGrowthEntry에 얹었고, 그래서 캐시·flush를 쥔 이 매니저가 그대로 창구가 된다.
-//
-// 적립 지점은 CardPackOpener 하나다. OwnershipManager.Grant 안에 넣으면 스타터덱·튜토리얼·디버그
-// 전체 해금까지 간식을 뿌리고, 소유 관리가 성장 도메인을 아는 역방향 의존이 생긴다.
+// 카드별 간식(카드팩 중복 보상)의 조회·적립과 한계돌파.
+// 간식은 그 카드에만 쓰는 재화라 전역 잔액이 아니라 cardId로 갈린 CardGrowthEntry에 얹혀 있다.
+// 적립 지점은 CardPackOpener 하나다 — OwnershipManager.Grant에 넣으면 스타터덱·디버그 해금까지 간식이 딸려 온다.
 public static partial class CardGrowthManager
 {
     // 카드 번호의 간식 보유량(기록 없으면 0). 음수 세이브는 0으로 읽는다.
@@ -20,9 +16,8 @@ public static partial class CardGrowthManager
 
     public static int SnackOf(CardData _card) => SnackOf(CardCatalog.IdOf(_card));
 
-    /// <summary>간식을 적립한다(적립됐으면 true). <b>디스크에 쓰지 않는다</b> — 호출부가 흐름 끝에
-    /// <see cref="FlushToData"/>나 <see cref="Save"/>로 반영해야 한다. 한 번 개봉에 중복이 여러 장
-    /// 나올 수 있어 장당 저장을 피하려는 분할이다. 미초기화·잘못된 번호·0 이하 수량은 조용히 거절.</summary>
+    /// <summary>간식을 적립한다(적립됐으면 true). <b>디스크에 쓰지 않는다</b> — 한 번 개봉에 중복이 여러 장
+    /// 나올 수 있어, 호출부가 흐름 끝에 <see cref="FlushToData"/>나 <see cref="Save"/>로 한 번만 반영한다.</summary>
     public static bool AddSnack(int _id, int _amount)
     {
         if (!s_initialized) return false;

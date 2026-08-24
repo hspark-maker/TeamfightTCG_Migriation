@@ -478,6 +478,12 @@ sequenceDiagram
 > 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
 > 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
 >
+> 2026-08-24: 위 **첫 진화 안내 철회.** 진화가 다이아를 무는 벽이라 대준 한 방이었는데,
+> 진화 재화가 강화와 같은 조각으로 통일되면서 벽이 사라졌다. 발화처(`CardDetailOverlayView`)와
+> 조회 창구(`TriggeredTutorialRunner.IsRunningTrigger`)를 제거했고, `TriggeredTutorial.asset`에는
+> 원래부터 이 트리거의 엔트리가 없어 실제로 뜬 적이 없다. `EOutgameTutorialTrigger.FirstEvolutionReady`
+> 값은 세이브(`completedTriggers`, 이름 문자열)와 뒤 항목 보존을 위해 남긴다.
+>
 > 2026-08-14: **키워드 강화 안내(`KeywordGrowthFirstOpen`)** 추가 — 발화 축이 탭·강화 결과에 이어 **화면 열림**까지 왔다.
 > 그리고 "무엇이 공짜인가"의 주인이 코드에서 **저작(`TutorialStepDef.freeOfCharge`)**으로, 소진 원장이
 > `CardGrowthManager`에서 **`OutgameTutorialGuide`로** 옮겨 세 축(카드 강화·진화·키워드 강화)이 같은 원장을 본다.
@@ -530,7 +536,7 @@ flowchart TD
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady · KeywordGrowthFirstOpen<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · KeywordGrowthFirstOpen (+ FirstEvolutionReady = 폐기, 값만 보존)<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
@@ -541,12 +547,10 @@ flowchart TD
     TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
-    CDO["CardDetailOverlayView<br/>강화 완료(_onFinished)에서 다음 한 방이 첫 진화면 Fire<br/>+ 발화 직후 RefreshGrowth로 0원 표시 반영"]:::chg
     KGP["KeywordGrowthPanel<br/>Open() 끝에서 Fire — SetVisible·Build 뒤라야 앵커가 서 있다<br/>칸/업그레이드 버튼 앵커를 코드로 등록·해제"]:::new
     KGM["KeywordGrowthManager<br/>TryGetStepAt 단일 퍼널(표시=활성=소모)<br/>event OnEnhanced(성공만) · NotifyCostRuleChanged"]:::new
     FREE["OutgameTutorialGuide — 무료 한 방 원장<br/>HasFreeShot · ConsumeFreeShot · ResetFreeShotForDebug<br/>무엇이 공짜인지는 저작(freeOfCharge)이 정한다"]:::new
     GROW["CardGrowthManager.TryGetStepAt<br/>원장을 직접 쥐지 않고 Guide에 묻는다"]:::chg
-    CDO -->|"Fire(FirstEvolutionReady)"| TRUN
     KGP -->|"Fire(KeywordGrowthFirstOpen)"| TRUN
     KGM -->|"OnEnhanced"| TBRG
     GROW --- FREE

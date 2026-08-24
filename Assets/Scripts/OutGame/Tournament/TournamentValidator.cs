@@ -60,6 +60,9 @@ internal static class TournamentValidator
         int t_fault = 0;
         var t_keys = new HashSet<string>();
 
+        // 앞 챕터의 요구 등급. 여정이 뒤로 갈수록 낮아지면 순서가 뒤집힌다.
+        ERankGrade t_prevGrade = ERankGrade.Bronze;
+
         if (_chapters.Count == 0)
         {
             Debug.LogError("[Tournament] 챕터 미저작 — 맵에 아무것도 뜨지 않는다.");
@@ -92,6 +95,20 @@ internal static class TournamentValidator
                 t_fault++;
                 Debug.LogWarning($"[Tournament] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
             }
+
+            if (t_i == 0 && t_chapter.requiredGrade != ERankGrade.Bronze)
+            {
+                t_fault++;
+                Debug.LogError($"[Tournament] 첫 챕터의 requiredGrade가 {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 랭크에 오르기 전 유저는 토너먼트에 아예 못 들어간다.");
+            }
+
+            if (t_chapter.requiredGrade < t_prevGrade)
+            {
+                t_fault++;
+                Debug.LogWarning($"[Tournament] requiredGrade 역행 {t_prevGrade} → {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 뒤 챕터가 먼저 열려 여정의 순서가 뒤집힌다.");
+            }
+
+            t_prevGrade = t_chapter.requiredGrade;
 
             // 챕터 띠의 보상 슬롯이 2칸이라 3줄부터는 앞칸만 뜬다(지급은 되지만 표시가 잘린다)
             if (CountRewards(t_chapter.completionRewards) > 2)

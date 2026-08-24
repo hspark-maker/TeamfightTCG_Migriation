@@ -44,7 +44,13 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
 
+        // 잠김 룩은 코드로 얹는다 — 기능키↔버튼 짝이 아래 계산식 바로 옆에 있어야 둘이 갈리지 않는다.
+        // PlayBtn만 프리팹 저작인 것은 그쪽 잠금 주체가 LobbyMatchLauncher라 중립 지점이 필요했기 때문이다.
+        if (keywordGrowthButton != null) FeatureLockView.Attach(keywordGrowthButton.gameObject, EOutgameFeature.KeywordGrowth);
+        if (tournamentButton != null) FeatureLockView.Attach(tournamentButton.gameObject, EOutgameFeature.Tournament);
+
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
+        OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished += RefreshPlayLabel;
 
         // 같은 이유로 여기서 무장한다(정점 보상 팝업은 탭 활성과 무관하게 떠야 한다). 내부에 멱등 가드가 있다.
@@ -55,6 +61,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     void Start()
     {
         RefreshPlayLabel();
+        ApplyFeatureLocks();
     }
 
     void OnDestroy()
@@ -64,12 +71,14 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (tournamentButton != null) tournamentButton.onClick.RemoveListener(HandleTournamentRequested);
 
+        OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished -= RefreshPlayLabel;
     }
 
     public override void OnEnter()
     {
         RefreshPlayLabel();
+        ApplyFeatureLocks();
     }
 
     /// <summary>승급전 대기면 버튼 문구를 갈고, 아니면 저작 문구로 되돌린다.
@@ -83,10 +92,27 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         playLabel.text = t_promo && !string.IsNullOrEmpty(promoLabelText) ? promoLabelText : m_defaultPlayText;
     }
 
+    /// <summary>잠긴 기능의 버튼을 죽인다. 잠김 룩(FeatureLockView)과 달리 차단은 이 패널이 소유한다 —
+    /// 두 축이 같은 컴포넌트에 있으면 어느 쪽이 이겼는지가 호출 순서에 달린다.</summary>
+    void ApplyFeatureLocks()
+    {
+        if (keywordGrowthButton != null)
+            keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
+
+        if (tournamentButton != null)
+            tournamentButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament);
+    }
+
     /// <summary>랭크 보상 목록. 풀이 없으면(부트 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
     public void OpenRankRewards() => OpenPooled<RankRewardPanel>();
 
-    public void OpenKeywordGrowth() => OpenPooled<KeywordGrowthPanel>();
+    public void OpenKeywordGrowth()
+    {
+        // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth)) return;
+
+        OpenPooled<KeywordGrowthPanel>();
+    }
 
     static void OpenPooled<T>() where T : PooledUIBase
     {

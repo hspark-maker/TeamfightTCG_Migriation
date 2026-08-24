@@ -119,6 +119,10 @@ public readonly struct TutorialAnchorMeta
 
         // 23 UI/Growth/KeywordGrowthPanel.cs:335(패널이 열려 있는 동안만). 잠금 없음
         new(A.KeywordGrowthUpgradeButton, F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs:335"),
+
+        // 24 Tab_Match.prefab의 TournamentBtn(2563422757509691373)에 key: 24.
+        //    잠금은 프리팹 저작이 아니라 UI/Lobby/LobbyMatchTabPanel.cs의 Awake가 FeatureLockView.Attach(Tournament)로 건다
+        new(A.TournamentButton,           F.Tournament,         "로비/배틀 탭",          "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Match.prefab"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 부팅이 아니다).

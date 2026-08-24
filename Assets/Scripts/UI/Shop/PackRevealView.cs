@@ -225,6 +225,8 @@ public class PackRevealView : MonoBehaviour
             return;
         }
 
+        SoundManager.Instance?.PlayCue(EOutgameSound.PackOpenBegin);
+
         m_pending = _opened;
         m_skips = 0;
         m_announced = false;
@@ -393,6 +395,8 @@ public class PackRevealView : MonoBehaviour
     {
         if (m_stage != EStage.Tearing) return;
 
+        SoundManager.Instance?.PlayCue(EOutgameSound.PackTear);
+
         if (tearSkin != null) tearSkin.SetProgress(1f);
         AnnounceOpened();
         SetTearHint(false);
@@ -554,6 +558,8 @@ public class PackRevealView : MonoBehaviour
     {
         if (m_stage == EStage.Summary) return;
         m_stage = EStage.Summary;
+
+        SoundManager.Instance?.PlayCue(EOutgameSound.PackSummary);
 
         KillStageSeq();
         GateInput(true);
@@ -736,6 +742,7 @@ public class PackRevealView : MonoBehaviour
         if (_view == null) return;
 
         _view.PlayRevealAccent();
+        SoundManager.Instance?.PlayCue(EOutgameSound.PackCardFlick);
 
         // 카드 한 장의 축(뷰)과 화면의 축(여기)을 갈라 둔다 — 화면 전체가 반응하는 것은 신규뿐이라
         // 그 판단을 카드 프리팹 안에 두면 "이 화면에 Dim이 있는가"를 카드가 알아야 한다.

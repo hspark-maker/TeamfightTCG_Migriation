@@ -763,6 +763,7 @@ public class RankHud : MonoBehaviour
         }
 
         this.PlayStarLit(_index);
+        SoundManager.Instance?.PlayCue(EOutgameSound.RankStarFill);
         this.TryPlayPromoEnter(_index);
     }
 

@@ -233,6 +233,7 @@ public class CardEnhanceRitualView : CardGrowthRitualView
 
         // 잉걸빛으로 시작한다 — 처음부터 흰색이면 번지는 것이 열이 아니라 안개로 보인다.
         _seq.InsertCallback(t_from, () => this.shading.BlindColor = this.shading.Ember);
+        _seq.InsertCallback(t_from, () => SoundManager.Instance?.PlayCue(EOutgameSound.EnhanceCharge));
 
         _seq.Insert(t_from, this.shading.TweenBlind(t_rise, t_span).SetEase(Ease.InQuad));
         _seq.Insert(t_from, this.shading.TweenBlindColor(this.shading.LightAt(0.6f), t_span));
@@ -292,6 +293,8 @@ public class CardEnhanceRitualView : CardGrowthRitualView
     {
         float t_settle = Mathf.Max(0.05f, this.burstSettle);
 
+        _seq.InsertCallback(_at, () => SoundManager.Instance?.PlayCue(EOutgameSound.EnhanceSuccess));
+
         // 백열이 걷히며 카드가 드러난다. 열은 잔열만 남기고 천천히 식는다 — 방금 벼려낸 쇠붙이의 결.
         _seq.Insert(_at, this.shading.TweenBlind(0f, t_settle).SetEase(Ease.InQuad));
         _seq.Insert(_at, this.shading.TweenCover(0f, t_settle * 0.7f).SetEase(Ease.InQuad));
@@ -342,6 +345,8 @@ public class CardEnhanceRitualView : CardGrowthRitualView
         float t_snuff = Mathf.Max(0.02f, this.snuffDuration);
         float t_sweep = Mathf.Max(0.05f, this.ashSweep);
         float t_out   = _at + t_snuff;
+
+        _seq.InsertCallback(_at, () => SoundManager.Instance?.PlayCue(EOutgameSound.EnhanceFail));
 
         _seq.Insert(_at, this.halo.TweenAlpha(0f, 0.03f));
 
