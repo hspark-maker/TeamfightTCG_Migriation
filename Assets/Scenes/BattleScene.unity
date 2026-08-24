@@ -4331,6 +4331,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 419135865}
     m_Modifications:
+    - target: {fileID: 4610578626289128396, guid: 3b7e91c4d0a25f24ab6d8e0f5c1937ad, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 00032503578262e44b4c73d1f884cd81, type: 3}
     - target: {fileID: 8300000000000000001, guid: 3b7e91c4d0a25f24ab6d8e0f5c1937ad, type: 3}
       propertyPath: m_Name
       value: Panel_Emote
@@ -5045,7 +5049,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1755558529
 RectTransform:
   m_ObjectHideFlags: 0

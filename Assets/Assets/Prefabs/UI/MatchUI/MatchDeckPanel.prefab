@@ -3498,7 +3498,7 @@ MonoBehaviour:
   - {fileID: 3927920344760086061}
   - {fileID: 2903166991755586172}
   - {fileID: 2890221419403269162}
-  myPowerText: {fileID: 0}
+  myPowerText: {fileID: 6700513873089585387}
   enemyPowerText: {fileID: 1251643176279656888}
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
