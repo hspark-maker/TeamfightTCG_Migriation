@@ -45,6 +45,8 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] TMP_Text   levelText;
     [Tooltip("고정 3칸 성장 별. 프리팹에서 미리 저작하고 런타임에는 채움 상태만 바꾼다.")]
     [SerializeField] Image[]    growthStars;
+    [SerializeField] CardKeywordIconView[]  keywordIconSlots;
+    [SerializeField] CardSynergyBadgeView[] synergyBadgeSlots;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
 
@@ -71,14 +73,16 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] KeywordFrame[] keywordFrames;
 
     [Header("시너지 배지 자리")]
-    // 단위는 **uGUI 픽셀**이다(배지 루트 rect 왼쪽아래 모서리 기준). 인게임 좌표 환산은 하지 않는다 —
-    // 자리는 프리팹에서 눈으로 맞추는 값이고, 코드는 여기 적힌 오프셋을 anchoredPosition에 그대로 넣는다.
-    // 픽셀이므로 프리팹마다 값이 다르다(카드 rect가 420x558 · 677x900 · 400x600로 제각각) — 공유 상수로 묶지 말 것.
-    // 배지 크기는 건드리지 않는다(배지 프리팹 authoring 크기 유지).
-    [Tooltip("첫 배지(i=0) 자리. 배지 루트 rect 왼쪽아래(0,0) 기준 픽셀.")]
-    [SerializeField] Vector2 synergyBadgeStart = new Vector2(151f, 65f);
-    [Tooltip("배지 간 간격 픽셀(아래로 쌓기라 y는 음수).")]
-    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -88f);
+    // 단위는 **배지 루트 rect 비율**이다(왼쪽아래 0,0 ~ 오른쪽위 1,1). 픽셀로 두면 카드 rect가 화면마다
+    // 다른 순간(도감 타일 400x600 · 덱편집/팩카드는 셀에 stretch) 배지만 제자리에 남아 카드에서 밀린다.
+    // 저작 픽셀값을 각 프리팹 rect로 나누면 세 프리팹이 같은 비율로 수렴한다:
+    //   151/420 = 243.5/677 = 143.9/400 = 0.3596 · 65/558 = 105.2/900 = 70.2/600 = 0.1166
+    //   step -88/558 = -141.8/900 = -94.5/600 = -0.1576
+    // 크기는 여전히 건드리지 않는다(배지 프리팹 authoring 크기 유지 — 칸 차이는 UniformFitContent 배율이 흡수).
+    [Tooltip("첫 배지(i=0) 자리. 배지 루트 rect 왼쪽아래(0,0)~오른쪽위(1,1) 비율.")]
+    [SerializeField] Vector2 synergyBadgeStart = new Vector2(0.3596f, 0.1166f);
+    [Tooltip("배지 간 간격(루트 rect 비율. 아래로 쌓기라 y는 음수).")]
+    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -0.1576f);
 
     [Header("표시 옵션")]
     // 작은 타일에서 요소를 끄기 위한 프리팹별 스위치. 소비자 코드는 Bind만 호출하고
@@ -444,6 +448,34 @@ public class CardVisualView : MonoBehaviour
     // 아웃게임엔 런타임 부여 키워드(CardInstance.runtimeKeywords)가 없으므로 마스터 데이터의 keywords만 넘긴다.
     void RefreshKeywordIcons(CardData _card, bool _show)
     {
+        if (HasWiredSlot(this.keywordIconSlots))
+        {
+            foreach (CardKeywordIconView t_slot in this.keywordIconSlots)
+            {
+                if (t_slot == null) continue;
+                t_slot.BindExplain(null, null);
+                t_slot.SetIcon(null);
+                t_slot.gameObject.SetActive(false);
+            }
+
+            if (!_show || this.keywordIconConfig == null) return;
+
+            List<CardVisualRules.KeywordIcon> t_entries =
+                CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig);
+            int t_count = Mathf.Min(t_entries.Count, this.keywordIconSlots.Length);
+            for (int t_i = 0; t_i < t_count; t_i++)
+            {
+                CardKeywordIconView t_view = this.keywordIconSlots[t_i];
+                if (t_view == null) continue;
+
+                CardVisualRules.KeywordIcon t_entry = t_entries[t_i];
+                t_view.gameObject.SetActive(true);
+                t_view.SetIcon(t_entry.Icon);
+                BindKeywordExplain(t_view, t_entry.Keyword);
+            }
+            return;
+        }
+
         if (this.keywordIconRoot == null) return;
         ClearChildren(this.keywordIconRoot);
 
@@ -581,6 +613,23 @@ public class CardVisualView : MonoBehaviour
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
     void RefreshSynergyBadges(CardData _card, bool _show, bool _mine)
     {
+        if (HasWiredSlot(this.synergyBadgeSlots))
+        {
+            foreach (CardSynergyBadgeView t_slot in this.synergyBadgeSlots)
+                if (t_slot != null) t_slot.Set(null, _active: false);
+
+            if (!_show) return;
+
+            List<SynergyData> t_slotTags = SynergyBadges(_card, _mine);
+            int t_count = Mathf.Min(t_slotTags.Count, this.synergyBadgeSlots.Length);
+            for (int t_i = 0; t_i < t_count; t_i++)
+            {
+                CardSynergyBadgeView t_badge = this.synergyBadgeSlots[t_i];
+                if (t_badge != null) t_badge.Set(t_slotTags[t_i], _active: true);
+            }
+            return;
+        }
+
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
@@ -598,17 +647,28 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    /// <summary>배지 i번째 자리 = synergyBadgeStart + synergyBadgeStep * i (배지 루트 왼쪽아래 기준 픽셀).
-    /// 앵커를 루트 왼쪽아래 한 점으로 고정하고 오프셋만 준다 — 그래야 인스펙터 숫자가 곧 "모서리에서 몇 px"이 된다.
+    static bool HasWiredSlot<T>(T[] _slots) where T : Component
+    {
+        if (_slots == null) return false;
+        foreach (T t_slot in _slots)
+            if (t_slot != null) return true;
+        return false;
+    }
+
+    /// <summary>배지 i번째 자리 = synergyBadgeStart + synergyBadgeStep * i (배지 루트 rect 비율).
+    /// 앵커 한 점을 그 비율에 찍고 오프셋은 0으로 둔다 — 픽셀로 두면 카드 rect 크기가 바뀌는 화면
+    /// (셀에 stretch되는 덱편집 타일·팩 카드)에서 배지만 카드를 따라가지 못하고 자리가 밀린다.
     /// 키워드 아이콘과 달리 크기는 건드리지 않는다:
     /// 배지 프리팹이 authoring 크기를 들고 있고, 칸 크기 차이는 UniformFitContent가 배율로 흡수한다.</summary>
     void PlaceSynergyBadge(RectTransform _rect, int _index)
     {
         if (_rect == null) return;
 
-        _rect.anchorMin        = Vector2.zero;
-        _rect.anchorMax        = Vector2.zero;
-        _rect.anchoredPosition = this.synergyBadgeStart + this.synergyBadgeStep * _index;
+        Vector2 t_anchor = this.synergyBadgeStart + this.synergyBadgeStep * _index;
+
+        _rect.anchorMin        = t_anchor;
+        _rect.anchorMax        = t_anchor;
+        _rect.anchoredPosition = Vector2.zero;
         _rect.localScale       = Vector3.one;
     }
 

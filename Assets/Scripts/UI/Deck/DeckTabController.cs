@@ -3,14 +3,14 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 덱 탭 루트(Tab_Deck에 부착). 목록/편집 두 패널의 SetActive 전환만 담당한다(씬 로드 없음).
+// 덱 탭 루트(Tab_Deck에 부착). 목록 화면을 소유하고, 편집은 풀(UIPoolManager)이 세운 화면에 넘긴다.
 // 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
 // "탭이 켜지면 항상 목록부터"를 OnEnable로 보장한다.
+//
+// 편집 화면은 이 프리팹 안에 없다 — 매치 셸과 같은 한 인스턴스를 공유한다(DeckEditController).
 public class DeckTabController : LobbyTabPanel
 {
-    [SerializeField] GameObject         listPanel;
-    [SerializeField] GameObject         editPanel;
-    [SerializeField] DeckEditController editController;   // 옵션 — 미배선이면 패널 토글만 한다
+    [SerializeField] GameObject listPanel;
 
     [Tooltip("덱 탭에 있는 동안 숨길 로비 상단 바. 미배선이면 LobbyRoot/TopBar를 찾아 쓴다.")]
     [SerializeField] GameObject topBar;
@@ -29,11 +29,14 @@ public class DeckTabController : LobbyTabPanel
     bool          m_topBarHidden;
     bool          m_editing;
 
-    /// <summary>로비가 넘긴 서비스를 편집 화면에 전달한다. 드래그 레이어는 탭 콘텐츠 위에 떠야 해서
-    /// 이 프리팹 밖(로비 캔버스)에 사는데, 인스펙터로 물리면 그 배선이 탭 인스턴스 오버라이드로 남는다.</summary>
+    // 로비가 넘긴 드래그 레이어. 편집 화면이 자기 레이어를 들고 있으면 무시된다
+    // (풀드 화면은 자기 캔버스에 살아서 로비 캔버스의 고스트가 뒤로 깔린다 — SetDragController 주석).
+    DeckEditDragController m_dragController;
+
+    /// <summary>로비가 넘긴 서비스를 받아둔다. 편집 화면은 열 때 세워지므로 여기서 전달하지 못한다.</summary>
     public override void Initialize(LobbyTabServices _services)
     {
-        if (editController != null) editController.SetDragController(_services?.DragController);
+        m_dragController = _services?.DragController;
     }
 
     // 덱 탭을 단독 배치한 테스트 씬에서는 셸이 없을 수 있다 → 호출측은 항상 null을 감안한다.
@@ -133,8 +136,12 @@ public class DeckTabController : LobbyTabPanel
     {
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return;
 
-        ShowEditor();
-        if (editController != null) editController.Open(_slotIndex);
+        ShowEditor(new DeckEditData
+        {
+            slotIndex      = _slotIndex,
+            onExit         = CloseEditor,
+            dragController = m_dragController,
+        });
     }
 
     // 신규 덱 진입. 좌표는 저장이 확정되는 순간(TryInsertFront)에 생기므로 여기서는 만석만 막는다.
@@ -142,8 +149,12 @@ public class DeckTabController : LobbyTabPanel
     {
         if (DeckSaveManager.IsFull) return;
 
-        ShowEditor();
-        if (editController != null) editController.OpenNew();
+        ShowEditor(new DeckEditData
+        {
+            isNew          = true,
+            onExit         = CloseEditor,
+            dragController = m_dragController,
+        });
     }
 
     // 편집 종료 = 편집 진입 이전 화면(덱 탭 목록)으로 복귀. 탭은 건드리지 않는다.
@@ -162,35 +173,43 @@ public class DeckTabController : LobbyTabPanel
             return;
         }
 
-        if (editController == null)
+        DeckEditController t_editor = DeckEditController.Pooled();
+        if (t_editor == null)
         {
+            CloseEditor();
             _proceed();
 
             return;
         }
 
-        editController.RequestLeave(() =>
+        t_editor.RequestLeave(() =>
         {
             CloseEditor();
             _proceed();
         });
     }
 
-    void ShowEditor()
+    // 편집 화면을 세우지 못하면(풀 미초기화) 목록에 머문다 — 빈 화면으로 갇히지 않게.
+    void ShowEditor(DeckEditData _data)
     {
+        if (DeckEditController.OpenPooled(_data) == null) return;
+
         m_editing = true;
         if (listPanel != null) listPanel.SetActive(false);
-        if (editPanel != null) editPanel.SetActive(true);
 
-        // 탭 버튼은 편집 패널 위에 그대로 노출돼 있다 → 뒤로가기와 같은 확인을 거치게 가로챈다.
+        // ⚠ 편집 화면은 풀 캔버스(order 400)라 하단 탭바를 덮는다 — 예전 탭 안 패널과 달리 탭 버튼이 안 보인다.
+        //   나가는 길은 편집 화면의 뒤로가기 하나이고, 저장 확인은 그 경로가 이미 거친다(RequestLeave).
     }
 
     void ShowList()
     {
-        m_editing = false;
         // 가드를 먼저 내린다 — 허가 경로가 이 뒤에 원래 탭 전환을 재개하는데, 남아 있으면 그게 다시 가드로 들어온다.
-        if (editController != null) editController.Close();
-        if (editPanel != null) editPanel.SetActive(false);
+        bool t_wasEditing = m_editing;
+        m_editing = false;
+
+        // 편집을 연 적이 없으면 풀에 묻지 않는다 — GetUI가 "No Such UI" 로그를 남긴다.
+        if (t_wasEditing) DeckEditController.HidePooled();
+
         if (listPanel != null) listPanel.SetActive(true);
     }
 }

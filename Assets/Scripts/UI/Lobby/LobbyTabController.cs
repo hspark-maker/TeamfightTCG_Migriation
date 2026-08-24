@@ -14,6 +14,7 @@ public class LobbyTabController : MonoBehaviour
         public EOutgameTutorialAnchor tutorialAnchor;
         public EOutgameTutorialTrigger tutorialTrigger;
         public EOutgameFeature unlockFeature;
+        public GameObject background;
     }
 
     [SerializeField] LobbyTabBarView tabBar;
@@ -64,7 +65,14 @@ public class LobbyTabController : MonoBehaviour
         if (tabBar != null) tabBar.Selected -= HandleTabSelected;
     }
 
-    void Start() => Select(defaultIndex, false);
+    void Start()
+    {
+        // 이전 화면이 바 걷기 요청을 흘렸으면 여기서 회수한다 — 안 그러면 하단 탭바가 눌리지 않아
+        // 다른 탭으로 나갈 수도 없다(스스로 못 빠져나오는 상태가 된다).
+        LobbyShellBars.Refresh();
+
+        Select(defaultIndex, false);
+    }
 
     void HandleTabSelected(int _index) => Select(_index);
 
@@ -116,6 +124,9 @@ public class LobbyTabController : MonoBehaviour
             LobbyTabPanel t_panel = tabs[i].panel;
             if (t_panel != null && i != _index)
                 t_panel.gameObject.SetActive(false);
+
+            if (tabs[i].background != null)
+                tabs[i].background.SetActive(i == _index);
         }
 
         m_currentIndex = _index;
