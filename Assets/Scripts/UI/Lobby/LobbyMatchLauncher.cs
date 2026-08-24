@@ -42,10 +42,6 @@ public class LobbyMatchLauncher : MonoBehaviour
     VersusIntroShell m_versusShell;
     LobbyOverlayHost m_overlayHost;
 
-    // 이번 도전이 출발한 정점의 화면 자리. 대치 인트로가 상대를 여기서 띄워 올린다.
-    // 맵이 닫혀 있거나(복귀 경로) 정점을 못 찾으면 비어 있고, 그러면 상대는 그냥 바깥에서 들어온다.
-    Vector2? m_nodeOrigin;
-
     /// <summary>
     /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
     ///
@@ -201,12 +197,6 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (!TournamentRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
 
-        // 맵이 아직 떠 있는 지금 읽어야 한다 — 대치가 시작될 즈음엔 화면이 덮여 자리를 잴 수 없다.
-        m_nodeOrigin = tournamentPanel != null
-                    && tournamentPanel.TryGetNodeScreenPoint(_nodeIndex, out Vector2 t_origin)
-                     ? t_origin
-                     : (Vector2?)null;
-
         var t_preset = new MatchOpponent(
             MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.enemyDeck);
 
@@ -298,7 +288,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     async UniTask<bool> RunSelectionWithVersusAsync(VersusIntroShell _versus, MatchOpponent _opponent,
                                                     CancellationToken _ct)
     {
-        await _versus.PlayVersusAsync(_opponent, m_nodeOrigin, _ct);
+        await _versus.PlayVersusAsync(_opponent, _ct);
 
         // 씬이 내려가는 중이다 — 파괴될 화면을 세우지 않는다.
         if (_ct.IsCancellationRequested) return false;

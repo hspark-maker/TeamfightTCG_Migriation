@@ -1068,12 +1068,8 @@ MonoBehaviour:
   titleText: {fileID: 3258554938092359122}
   versusRoot: {fileID: 3258554939077957295}
   versusTitle: "도전"
-  chargeHold: 0.78
   afterglowHold: 0.34
-  versusApproach: 60
-  originDuration: 0.34
-  originStartScale: 0.34
-  originAt: 0.1
+  versusApproach: 90
   fx:
     scanSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
     scanColor: {r: 0.55, g: 0.85, b: 1, a: 1}
@@ -1108,17 +1104,17 @@ MonoBehaviour:
       burstAdditive: 1
     chargeDim: -0.32
     chargeDrift: 8
-    chargeShake: 2.4
+    chargeShake: 3.6
     chargeShakeFreq: 26
     chargeGlowSize: 260
     chargeGlowSprite: {fileID: 0}
     chargeGlowColor: {r: 0.62, g: 0.82, b: 1, a: 1}
     chargeGlowAlpha: 0.38
-    chargeGlowFrom: 0.55
+    chargeGlowFrom: 0.3
     chargeGlowTo: 1.05
-    windUpDistance: 26
-    windUpDuration: 0.1
-    windUpHold: 0.06
+    windUpDistance: 0
+    windUpDuration: 0.01
+    windUpHold: 0
     impactDuration: 0.08
     impactHold: 0.04
     settleDuration: 0.26
@@ -1128,7 +1124,7 @@ MonoBehaviour:
     vsDividerDuration: 0.13
     versusDimPunch: -0.35
     releaseDimPeak: 0.2
-    releaseKick: 0.09
+    releaseKick: 0.12
     releaseGlowBurst: 0.18
     releaseGlowScale: 2.1
     afterglowBreath: 0.035
@@ -1157,13 +1153,13 @@ MonoBehaviour:
   entryFx:
     dimFade: 0.18
     rootStartScale: 1.06
-    rootDuration: 0.26
-    bannerAt: 0.04
-    bannerDuration: 0.26
-    bannerDistance: 190
+    rootDuration: 0.2
+    bannerAt: 0
+    bannerDuration: 0.01
+    bannerDistance: 0
     bannerFadeRatio: 0.55
-    riderAt: 0.1
-    riderDuration: 0.22
+    riderAt: 0
+    riderDuration: 0.2
     riderDistance: 80
     scanAt: 0.24
   bgFx:
@@ -1173,7 +1169,7 @@ MonoBehaviour:
     closeEase: 8
     partDuration: 0.32
     partEase: 8
-    seamThickness: 7
+    seamThickness: 10
     seamColor: {r: 1, g: 0.97, b: 0.88, a: 1}
     seamAlpha: 0.85
     seamRise: 0.05

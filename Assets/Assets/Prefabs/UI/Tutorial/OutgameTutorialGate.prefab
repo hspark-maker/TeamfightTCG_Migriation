@@ -34,7 +34,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 130}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 28.064877, y: 157.62401}
   m_SizeDelta: {x: 260, y: 260}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8407995172004752600
@@ -194,7 +194,7 @@ MonoBehaviour:
   hand: {fileID: 6510000000000000041}
   messageRect: {fileID: 6510000000000000051}
   messageText: {fileID: 6510000000000000063}
-  handOffset: {x: 100, y: 100}
+  handOffset: {x: 0, y: 0}
   messageMargin: 36
   messageBottomInset: 120
   pulseScale: 1.08

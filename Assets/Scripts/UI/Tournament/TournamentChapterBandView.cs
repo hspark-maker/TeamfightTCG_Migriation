@@ -97,8 +97,8 @@ public class TournamentChapterBandView : MonoBehaviour
         // 정점 0개 챕터가 완주로 통과하는 것도 그대로다(0 == 0).
         bool t_complete = t_cleared == t_total;
 
-        // 수령 자격은 흐름이 단독으로 판정한다 — 여기서 조건을 더 곱하면 띠와 팝업이 서로 다른 자격을 보게 된다.
-        bool t_claimable = TournamentChapterRewardFlow.CanClaim(this.m_index);
+        // 수령 자격은 진행도가 단독으로 판정한다 — 여기서 조건을 더 곱하면 띠와 팝업이 서로 다른 자격을 보게 된다.
+        bool t_claimable = TournamentProgress.CanClaimChapterReward(this.m_index);
 
         if (this.progressMark != null) this.progressMark.SetActive(!t_complete && !t_rankLocked);
         if (this.claimableMark != null) this.claimableMark.SetActive(t_claimable && !t_rankLocked);

@@ -73,9 +73,6 @@ public class KeywordGrowthPanel : PooledUIBase
         this.SetVisible(true);
         this.ApplyEnergyIcon();
 
-        // 이 패널이 무는 재화는 에너지다 — 상단 문맥 칸도 그동안 에너지를 띄운다(소비 롤다운이 설 자리).
-        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
-
         if (this.m_built) this.RefreshAll();
         else this.Build();
 
@@ -87,7 +84,6 @@ public class KeywordGrowthPanel : PooledUIBase
     {
         this.KillUpgradeFx();
         this.SetVisible(false);
-        ContextCurrencySlot.Release(this);
     }
 
     void OnEnable()

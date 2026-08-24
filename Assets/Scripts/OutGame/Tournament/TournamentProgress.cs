@@ -7,6 +7,9 @@ public static class TournamentProgress
 {
     static TournamentConfig s_config;
 
+    // 챕터 수령 자격 판정용 조회 버퍼 — 판정은 한 프레임 안에서 끝나고 값을 들고 있지 않는다.
+    static readonly List<RewardLine> s_chapterProbe = new List<RewardLine>();
+
     // 진행 통지 — 맵이 정점 상태를 다시 그리는 트리거
     public static event Action OnChanged;
 
@@ -59,6 +62,34 @@ public static class TournamentProgress
     }
 
     public static bool HasAnyPlayable => CurrentNodeIndex >= 0;
+
+    // 지금 받을 수 있는 것이 있는가(미수령 정점 · 미수령 완주 챕터). 싼 조건부터 본다 — 챕터 훑기가 가장 비싸다.
+    public static bool HasAnyClaimable
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(PendingRewardNodeId)) return true;
+
+            int t_count = ChapterCount;
+            for (int t_i = 0; t_i < t_count; t_i++)
+                if (CanClaimChapterReward(t_i)) return true;
+
+            return false;
+        }
+    }
+
+    // 모험에 유저를 부를 이유가 있는가 — 받을 것이 있거나, 지금 들어갈 수 있는 정점이 있거나.
+    // CanEnter를 곱해야 한다: StateOf는 랭크 잠금을 보지 않아 도전 정점 유무만으로는 못 들어갈 곳까지 참이 된다.
+    public static bool HasAnyWaiting
+    {
+        get
+        {
+            if (HasAnyClaimable) return true;
+
+            int t_index = CurrentNodeIndex;   // 전수 스캔이라 한 번만 구한다
+            return t_index >= 0 && CanEnter(t_index);
+        }
+    }
 
     static TournamentConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<TournamentConfig>());
@@ -212,6 +243,19 @@ public static class TournamentProgress
 
     public static bool IsChapterRewardClaimed(string _chapterId)
         => !string.IsNullOrEmpty(_chapterId) && ClaimedChapters.Contains(_chapterId);
+
+    /// <summary>완주 보상 수령 자격 = 안정 키 · 완주 · 미수령 · 받을 것이 있음. 띠의 [보상 받기] 표시와 알림 점이 이 판정만 본다.</summary>
+    public static bool CanClaimChapterReward(int _chapterIndex)
+    {
+        if (!TryGetChapter(_chapterIndex, out TournamentChapterDef t_chapter)) return false;
+        if (!t_chapter.HasStableKey) return false;
+        if (!IsChapterComplete(_chapterIndex)) return false;
+        if (IsChapterRewardClaimed(t_chapter.chapterId)) return false;
+
+        // 보상 미저작 챕터는 받을 것이 없다 — 낙인을 남길 이유도, 눌러도 아무 일 없는 버튼을 띄울 이유도 없다.
+        FillChapterRewards(_chapterIndex, s_chapterProbe);
+        return s_chapterProbe.Count > 0;
+    }
 
     // 챕터 완주 보상 수령(자격 = 완주 && 미수령). 지급·낙인·영속·통지가 한 트랜잭션이다
     public static bool ClaimChapterReward(string _chapterId)

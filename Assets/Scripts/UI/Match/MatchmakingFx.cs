@@ -224,7 +224,7 @@ public class MatchmakingFx
     /// 두 배너가 부딪히는 시각. 충돌의 표식(섬광·VS·가로선·킥·딤)은 전부 이 한 시각에 몰린다 —
     /// 히트스톱(impactHold)은 이 뒤에 붙어, 표식이 도는 동안 배너만 겹친 채 얼어 있다.
     /// </summary>
-    float HitAt => this.windUpDuration + this.windUpHold + this.impactDuration;
+    public float HitAt => this.windUpDuration + this.windUpHold + this.impactDuration;
 
     /// <summary>돌진이 시작되는 시각. 물러남과 돌진 사이의 정지가 여기서 갈린다.</summary>
     float ImpactAt => this.windUpDuration + this.windUpHold;

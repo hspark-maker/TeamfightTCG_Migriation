@@ -199,3 +199,53 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  - trigger: 7
+    label: "랭크 단계 첫 상승"
+    stepDefs:
+    - stepId: 0
+      action: 1
+      anchor: 0
+      guideMessage: "랭크 단계가 올랐습니다!"
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+  - trigger: 8
+    label: "랭크 등급 첫 승급"
+    stepDefs:
+    - stepId: 0
+      action: 1
+      anchor: 0
+      guideMessage: "새로운 등급에 올랐습니다!"
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
