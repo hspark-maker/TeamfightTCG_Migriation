@@ -8267,7 +8267,7 @@ SpriteRenderer:
   m_Sprite: {fileID: 21300000, guid: 3ccd76da422b6d64b99e2aeb55123545, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
-  m_FlipY: 1
+  m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
@@ -8476,6 +8476,7 @@ MonoBehaviour:
   frameRoot: {fileID: 8681528260152100001}
   infoRoot: {fileID: 7044237012601426011}
   emptyOverlay: {fileID: 8327822384652261773}
+  shieldIndicator: {fileID: 0}
   selectedHighlight: {fileID: 8502626170652285422}
   passiveGlowSystem: {fileID: 2328157398231393809}
   keywordGlowPrefab: {fileID: 2890053908263222535, guid: 7b52d2097149d4a42be13fcb12f5a761, type: 3}
@@ -8532,6 +8533,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hitOverlay: {fileID: 6457352146740746207}
+  hitEffect: {fileID: 0}
   cinemaSpacing: 1.6
   twitchTarget: {fileID: 2310979913566655346}
   twitchDistance: 0.12
