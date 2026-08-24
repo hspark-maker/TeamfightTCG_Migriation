@@ -1449,7 +1449,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1557.3767, y: 2336.6355}
+  m_SizeDelta: {x: 1519.6289, y: 2280}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8526807957522186786
 CanvasRenderer:
@@ -1792,6 +1792,20 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0.5}
+--- !u!114 &5080837079681544086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3003377214903688635}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2b19bc529d681e41aa3bda7dcc6e497, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ContextCurrencySlot
+  slot: {fileID: 193870954230821135}
+  defaultType: 3
 --- !u!1 &3052451018715491496
 GameObject:
   m_ObjectHideFlags: 0
@@ -3907,8 +3921,8 @@ RectTransform:
   - {fileID: 8136611112812122143}
   m_Father: {fileID: 7199074612625639083}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.03671706}
-  m_AnchorMax: {x: 1, y: 0.9492441}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 0.96282893}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -5808,8 +5822,29 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4027481061485666156, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1551458262524963329}
   m_SourcePrefab: {fileID: 100100000, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+--- !u!1 &1025512590792127592 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4027481061485666156, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
+  m_PrefabInstance: {fileID: 4170094572064320260}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1551458262524963329
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1025512590792127592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 24
 --- !u!224 &4666472679374348862 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8727275443176196410, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
@@ -8149,17 +8184,3 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 2067141598830091887, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
   m_PrefabInstance: {fileID: 7857085950436996758}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &5080837079681544086
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3003377214903688635}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e2b19bc529d681e41aa3bda7dcc6e497, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ContextCurrencySlot
-  slot: {fileID: 193870954230821135}
-  defaultType: 3
