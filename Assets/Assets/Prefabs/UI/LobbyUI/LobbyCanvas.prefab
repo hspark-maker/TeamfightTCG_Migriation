@@ -897,8 +897,8 @@ MonoBehaviour:
   lobbyTabController: {fileID: 3797395670514148879}
   deckPanel: {fileID: 3228001466242478929}
   matchPanel: {fileID: 5258775699516550056}
-  tournamentPanel: {fileID: 0}
-  versusShellPrefab: {fileID: 0}
+  tournamentPanel: {fileID: 6741009150353787377}
+  versusShellPrefab: {fileID: 6346514855679779509, guid: 3b8d6f27c04e1a5497d2e08b6fa1c539, type: 3}
 --- !u!1 &1244772157711284030
 GameObject:
   m_ObjectHideFlags: 0
@@ -1612,6 +1612,7 @@ RectTransform:
   - {fileID: 4666472679374348862}
   - {fileID: 7436770203067346680}
   - {fileID: 4885807676394851742}
+  - {fileID: 6449867485213273417}
   m_Father: {fileID: 8136611112812122143}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -5638,7 +5639,7 @@ PrefabInstance:
     - target: {fileID: 7147693986502689013, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_Sprite
       value: 
-      objectReference: {fileID: 21300000, guid: 68b8dc2343e66462b9d5635ede6f5a36, type: 3}
+      objectReference: {fileID: 21300000, guid: 95938dc48c63e07499dc095027d6ec80, type: 3}
     - target: {fileID: 8727275443176196410, guid: 26a9dbb86e9b8aa44bfce3164d92368b, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -6904,6 +6905,119 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 1610654802589759795, guid: 2c0edc8d4a2a3b843b72a7c60a866543, type: 3}
   m_PrefabInstance: {fileID: 6167629320258319533}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &6556551944364450105
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3535906181901233073}
+    m_Modifications:
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_Name
+      value: Tab_Tournament
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+--- !u!224 &6449867485213273417 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 251925667401682032, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+  m_PrefabInstance: {fileID: 6556551944364450105}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &6741009150353787377 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 536330063969495240, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+  m_PrefabInstance: {fileID: 6556551944364450105}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 671d6cff0c20bd64c853db48bac7bf36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TournamentMapPanel
 --- !u!1001 &7857085950436996758
 PrefabInstance:
   m_ObjectHideFlags: 0
