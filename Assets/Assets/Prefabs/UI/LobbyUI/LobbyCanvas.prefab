@@ -3059,7 +3059,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3127148494294134174}
-  - component: {fileID: 5080837079681544086}
   m_Layer: 0
   m_Name: UI_StatusBar_Currency
   m_TagString: Untagged
@@ -3089,20 +3088,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0.5}
---- !u!114 &5080837079681544086
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3127148494294134175}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e2b19bc529d681e41aa3bda7dcc6e497, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ContextCurrencySlot
-  slot: {fileID: 7159752664088481013}
-  defaultType: 3
 --- !u!1 &3127148494493612630
 GameObject:
   m_ObjectHideFlags: 0

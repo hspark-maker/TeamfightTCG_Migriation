@@ -23,7 +23,7 @@ MonoBehaviour:
     - currency: 1
       amount: 20
     - currency: 3
-      amount: 150
+      amount: 250
     pages:
     - pageId: P1
       rewards:
@@ -77,8 +77,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
   albumRewards:
   - currency: 0
-    amount: 1500
+    amount: 1000
   - currency: 1
     amount: 30
   - currency: 3
-    amount: 300
+    amount: 400
