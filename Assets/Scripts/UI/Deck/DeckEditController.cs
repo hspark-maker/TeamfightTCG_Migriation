@@ -268,6 +268,10 @@ public class DeckEditController : PooledUIBase
         Close();
         if (this.deckStrip != null) this.deckStrip.Clear();
 
+        this.data = null;
+        this.m_request = null;
+        this.m_onExit = null;
+
         gameObject.SetActive(false);   // OnDisable이 드래그 고스트까지 걷는 최종 방어선
     }
 
