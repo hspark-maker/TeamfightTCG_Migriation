@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 // 팩 찢김 표현의 단일 창구. 진행도(0~1) 하나를 받아 "UI/PackTear"를 쓰는 네 그래픽에 똑같이 물린다.
@@ -41,12 +42,17 @@ public class PackTearSkin : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] float gradeTintStart = 0.5f;
     [Tooltip("등급 색이 완전히 드러나는 진행도. 시작점과 같거나 작으면 그 지점에서 즉시 바뀐다.")]
     [Range(0f, 1f)] [SerializeField] float gradeTintFull = 0.95f;
-    [Tooltip("골드 등급의 빛 색. 알파는 씬에 저작된 빛의 알파를 상한으로 쓴다.")]
-    [SerializeField] Color goldGlow = new Color(1f, 0.82f, 0.35f, 1f);
-    [Tooltip("프리즘 등급 색상환이 도는 속도(1 = 초당 한 바퀴). 0이면 무지개가 멈춘 채 물든다.")]
-    [SerializeField] float prismCycleSpeed = 0.5f;
-    [Range(0f, 1f)] [SerializeField] float prismSaturation = 0.8f;
-    [Range(0f, 1f)] [SerializeField] float prismValue = 1f;
+    [Tooltip("신화 빛이 배어 나오기 시작하는 진행도. 신화는 백색 예고 구간을 짧게 쓴다.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintStart = 0.25f;
+    [Tooltip("신화 팔레트가 완전히 드러나는 진행도.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintFull = 0.75f;
+    [Tooltip("희귀 등급의 빛 색. 알파는 씬에 저작된 빛의 알파를 상한으로 쓴다.")]
+    [FormerlySerializedAs("goldGlow")]
+    [SerializeField] Color rareGlow = new Color(1f, 0.82f, 0.35f, 1f);
+    [SerializeField] Color arcaneGlow = new Color(0.6078f, 0.4196f, 0.9608f, 1f);
+    [Tooltip("신화 등급 6색 팔레트가 도는 속도(1 = 초당 한 바퀴). 0이면 첫 색에 멈춘 채 물든다.")]
+    [FormerlySerializedAs("prismCycleSpeed")]
+    [SerializeField] float mythicCycleSpeed = 0.5f;
     [Tooltip("진행도(0~1)를 빛 세기(0~1)로 바꾸는 곡선. 끝에서 급히 밝아져야 \"터지기 직전\"으로 읽힌다.")]
     [SerializeField] AnimationCurve glowRamp = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
@@ -82,6 +88,15 @@ public class PackTearSkin : MonoBehaviour
     static readonly int ID_GLOW_RISE      = Shader.PropertyToID("_GlowRise");
     static readonly int ID_JAG_TEX       = Shader.PropertyToID("_JagTex");
     static readonly int ID_TEAR_Y        = Shader.PropertyToID("_TearY");
+    static readonly Color32[] MYTHIC_PALETTE =
+    {
+        new Color32(0xE8, 0xF3, 0xF8, 0xFF),
+        new Color32(0xBF, 0xF7, 0xD0, 0xFF),
+        new Color32(0xE2, 0xF1, 0xDA, 0xFF),
+        new Color32(0xC7, 0xF0, 0xF3, 0xFF),
+        new Color32(0xE5, 0xD1, 0xF5, 0xFF),
+        new Color32(0xE2, 0xD3, 0xCD, 0xFF),
+    };
 
     // 런타임 사본 재질(에셋 오염 방지). 파괴 시 함께 정리한다.
     Material[] m_mats;
@@ -94,6 +109,7 @@ public class PackTearSkin : MonoBehaviour
 
     // 찢기 상태와 등급 빛은 같은 진행도 하나를 공유한다.
     ECardGrade m_glowGrade;
+    PackGradeFxPalette m_gradePalette;
     float m_tearProgress;
     float m_tearDirection = 1f;
     Color m_glowHome = Color.white;
@@ -127,10 +143,10 @@ public class PackTearSkin : MonoBehaviour
         if (tearHandle != null) tearHandle.OnProgress -= HandleTearProgress;
     }
 
-    // 무지개는 색이 계속 돌아야 무지개로 읽힌다 — 프리즘일 때만, 그리고 빛이 켜져 있을 때만 다시 칠한다.
+    // 팔레트는 신화일 때만, 그리고 빛이 켜져 있을 때만 다시 칠한다.
     void Update()
     {
-        if (m_glowGrade != ECardGrade.Prism || tearGlow == null) return;
+        if (m_glowGrade != ECardGrade.Mythic || tearGlow == null) return;
         if (GradeTint() <= 0f) return;   // 아직 시작 색 구간이면 다시 칠할 것이 없다
 
         ApplyGlow();
@@ -177,15 +193,16 @@ public class PackTearSkin : MonoBehaviour
     }
 
     /// <summary>이번 개봉에서 나올 <b>최고 등급</b>을 물려 찢김선 빛의 색과 세기를 정한다.
-    /// 골드=금빛, 프리즘=무지갯빛. 그 아래 등급은 씬에 저작된 원래 빛 그대로다 —
+    /// 희귀=금빛, 신비=보랏빛, 신화=무지갯빛. 일반은 씬에 저작된 원래 빛 그대로다 —
     /// 평범한 팩에서도 빛이 새면 "고등급이 온다"는 신호 자체가 죽는다.
     ///
     /// <see cref="ResetTear"/> <b>뒤에</b> 부를 것. 되돌리기가 세기를 0으로 내리므로 순서가 뒤집히면
     /// 등급을 물린 첫 프레임이 곧바로 지워진다.</summary>
-    public void SetGlowGrade(ECardGrade _grade)
+    public void SetGlowGrade(ECardGrade _grade, PackGradeFxPalette _palette = null)
     {
         CaptureGlowHome();
         m_glowGrade = _grade;
+        m_gradePalette = _palette;
         ApplyGlow();
     }
 
@@ -292,17 +309,35 @@ public class PackTearSkin : MonoBehaviour
     // 등급 색이 얼마나 배었는가(0~1). 등급 미달은 끝까지 0 — 시작 색 그대로 간다.
     float GradeTint()
     {
-        if (m_glowGrade != ECardGrade.Gold && m_glowGrade != ECardGrade.Prism) return 0f;
-        if (m_tearProgress <= gradeTintStart) return 0f;
-        if (gradeTintFull <= gradeTintStart) return 1f;   // 구간이 없으면 그 지점에서 즉시 물든다
+        if (m_glowGrade != ECardGrade.Rare
+            && m_glowGrade != ECardGrade.Arcane
+            && m_glowGrade != ECardGrade.Mythic) return 0f;
+        float t_start = m_glowGrade == ECardGrade.Mythic ? mythicTintStart : gradeTintStart;
+        float t_full = m_glowGrade == ECardGrade.Mythic ? mythicTintFull : gradeTintFull;
+        if (m_tearProgress <= t_start) return 0f;
+        if (t_full <= t_start) return 1f;   // 구간이 없으면 그 지점에서 즉시 물든다
 
-        return Mathf.Clamp01((m_tearProgress - gradeTintStart) / (gradeTintFull - gradeTintStart));
+        return Mathf.Clamp01((m_tearProgress - t_start) / (t_full - t_start));
     }
 
-    Color GradeColor() => m_glowGrade == ECardGrade.Prism
-        // 시각을 위상으로 쓴다 — 개봉마다 상태를 들고 다니지 않아도 색이 이어서 돈다.
-        ? Color.HSVToRGB(Mathf.Repeat(Time.unscaledTime * prismCycleSpeed, 1f), prismSaturation, prismValue)
-        : goldGlow;
+    Color GradeColor()
+    {
+        if (m_gradePalette != null && m_gradePalette.TryEvaluate(m_glowGrade, out Color t_color))
+            return t_color;
+
+        return m_glowGrade == ECardGrade.Mythic
+            ? MythicPaletteColor()
+            : m_glowGrade == ECardGrade.Arcane ? arcaneGlow : rareGlow;
+    }
+
+    Color MythicPaletteColor()
+    {
+        // 시각을 위상으로 쓴다. 마지막 색 다음을 첫 색으로 잡아 경계도 끈김 없이 이어진다.
+        float t_scaledPhase = Mathf.Repeat(Time.unscaledTime * mythicCycleSpeed, 1f) * MYTHIC_PALETTE.Length;
+        int t_from = Mathf.FloorToInt(t_scaledPhase);
+        int t_to = (t_from + 1) % MYTHIC_PALETTE.Length;
+        return Color.Lerp(MYTHIC_PALETTE[t_from], MYTHIC_PALETTE[t_to], t_scaledPhase - t_from);
+    }
 
     // 빛 길이는 **런타임 사본에만** 쓴다 — 재질 에셋에 직접 쓰면 플레이 중 값이 .mat에 눌어붙는다
     // (진행도를 사본으로 돌리는 이유와 같다).

@@ -113,6 +113,15 @@ function readEvents(file) {
   return events;
 }
 
+function transcriptSessionIds(files) {
+  const ids = new Set();
+  for (const file of files) {
+    const sessionId = readEvents(file).find((event) => event && event.sessionId)?.sessionId;
+    if (sessionId) ids.add(sessionId);
+  }
+  return ids;
+}
+
 function newSegment(event, carriedMap, sessionTurnsSoFar) {
   return {
     sessionId: event.sessionId || "",
@@ -357,6 +366,34 @@ function display(value) {
   return value === null ? "-" : Number(value).toLocaleString("ko-KR");
 }
 
+function baselineSample(sample) {
+  return {
+    sessionId: sample.sessionId,
+    startedAt: sample.startedAt,
+    group: sample.group,
+    searches: sample.searches,
+    turns: sample.turns,
+    newInputTokens: sample.newInputTokens,
+    cacheWriteTokens: sample.cacheWriteTokens,
+    cacheReadTokens: sample.cacheReadTokens,
+    outputTokens: sample.outputTokens,
+  };
+}
+
+function warnMissingBaselineSessions(projectDir, currentIds) {
+  const baselinePath = path.join(projectDir, ".claude", "map-baseline.json");
+  let baseline;
+  try { baseline = JSON.parse(fs.readFileSync(baselinePath, "utf8")); }
+  catch { return []; }
+  if (!Array.isArray(baseline.samples)) return [];
+  const savedIds = new Set(baseline.samples.map((sample) => sample.sessionId).filter(Boolean));
+  const missing = [...savedIds].filter((sessionId) => !currentIds.has(sessionId));
+  if (missing.length) {
+    console.warn(`경고: baseline 세션 ${missing.length}개가 현재 트랜스크립트에서 소실됨 (저장 ${savedIds.size} · 현재 ${currentIds.size})`);
+  }
+  return missing;
+}
+
 function main() {
   const projectDir = path.resolve(option("project", path.join(__dirname, "..")));
   const installedAtText = option("installed-at", DEFAULT_INSTALLED_AT);
@@ -368,6 +405,7 @@ function main() {
   const files = discoverTranscripts(projectDir);
   if (!files.length) throw new Error(`트랜스크립트를 찾지 못했습니다: ${projectDir}`);
   const samples = files.flatMap((file) => parseTranscript(file, installedAt, gateAt));
+  warnMissingBaselineSessions(projectDir, transcriptSessionIds(files));
   const summary = stats(samples);
 
   console.log("관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.");
@@ -435,6 +473,7 @@ function main() {
     // 기준선은 정의상 게이트 이전이다. 언제 다시 만들어도 게이트 이후 표본이 섞이지 않게 자른다.
     const preGate = samples.filter((sample) => Date.parse(sample.startedAt) < gateAt);
     const preGateSummary = stats(preGate);
+    const preGateSessionCount = new Set(preGate.map((sample) => sample.sessionId).filter(Boolean)).size;
     // 추적되는 경로에 둔다. .orch/ 는 gitignore 라 정리 한 번이면 비교 기준이 사라진다.
     const output = path.join(projectDir, ".claude", "map-baseline.json");
     fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -442,8 +481,10 @@ function main() {
       generatedAt: new Date().toISOString(), projectDir, installedAt: installedAtText, gateAt: gateAtText,
       detectorVersion: DETECTOR_VERSION,
       warning: "관측 차이 — 인과 아님. 작업 난이도·선택편향 미보정.",
-      note: "집계 대상 트랜스크립트는 전부 게이트 도입 이전 기록이다. detectorVersion 이 바뀌면 다시 만들어야 비교가 성립한다.",
-      transcriptCount: files.length, exploratoryRequestCount: preGate.length, groups: preGateSummary,
+      note: "저장된 표본은 전부 게이트 도입 이전 기록이다. detectorVersion 이 바뀌면 다시 만들어야 비교가 성립한다.",
+      discoveredTranscriptCount: files.length, baselineSessionCount: preGateSessionCount,
+      exploratoryRequestCount: preGate.length, groups: preGateSummary,
+      samples: preGate.map(baselineSample),
     }, null, 2) + "\n");
     console.log(`기준선 저장: ${output}`);
   }
@@ -460,6 +501,9 @@ module.exports = {
   isSearch,
   parseTranscript,
   positionStats,
+  baselineSample,
   stats,
+  transcriptSessionIds,
   usageTokens,
+  warnMissingBaselineSessions,
 };

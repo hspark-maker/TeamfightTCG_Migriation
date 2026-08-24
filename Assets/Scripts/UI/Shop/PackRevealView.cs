@@ -5,6 +5,47 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+[Serializable]
+public sealed class PackGradeFxPalette
+{
+    [SerializeField] Color rare = new Color(0.92f, 0.72f, 0.32f, 1f);
+    [SerializeField] Color arcane = new Color(0.48f, 0.30f, 0.72f, 1f);
+    [SerializeField] Gradient mythic = CreateMythicGradient();
+    [Min(0f)] [SerializeField] float mythicCyclesPerSecond = 0.5f;
+
+    public bool TryEvaluate(ECardGrade _grade, out Color _color)
+    {
+        if (_grade == ECardGrade.Rare)   { _color = rare; return true; }
+        if (_grade == ECardGrade.Arcane) { _color = arcane; return true; }
+        if (_grade == ECardGrade.Mythic && mythic != null)
+        {
+            _color = mythic.Evaluate(Mathf.Repeat(Time.unscaledTime * mythicCyclesPerSecond, 1f));
+            return true;
+        }
+
+        _color = default;
+        return false;
+    }
+
+    static Gradient CreateMythicGradient()
+    {
+        var t_gradient = new Gradient();
+        t_gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(new Color(1f, 0.55f, 0.02f), 0f),
+                new GradientColorKey(new Color(1f, 0.02f, 0.55f), 0.16f),
+                new GradientColorKey(new Color(0.48f, 0.03f, 1f), 0.32f),
+                new GradientColorKey(new Color(0.02f, 0.25f, 1f), 0.48f),
+                new GradientColorKey(new Color(0.02f, 0.9f, 1f), 0.64f),
+                new GradientColorKey(new Color(0.05f, 1f, 0.35f), 0.8f),
+                new GradientColorKey(new Color(1f, 0.55f, 0.02f), 1f),
+            },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
+        return t_gradient;
+    }
+}
+
 // 카드팩 개봉 연출의 진행자. 스테이지를 순서대로 몰고 가며, 각 단계의 실제 조작·표현은
 // PackTearHandle(스와이프 제스처) · PackTearSkin(찢김 그림) · PackShellRig(팩의 몸짓) ·
 // PackCardStack(카드 더미)이 나눠 맡는다.
@@ -40,6 +81,7 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] PackTearHandle tearHandle;    // 개봉을 여는 스와이프 제스처
     [SerializeField] PackTearSkin tearSkin;        // 찢김 그림(구멍·조각·그늘·빛)
     [SerializeField] PackShellRig shellRig;        // 팩의 몸짓(등장·부유·퇴장)
+    [SerializeField] PackGradeFxPalette gradeFxPalette = new PackGradeFxPalette();
 
     [Tooltip("팩이 이만큼 아래에서 올라오며 등장한다(캔버스 참조px, 1440x3120 기준). 카드도 팩 속에 든 채 함께 올라온다.")]
     [SerializeField] float packEnterDrop = 811f;
@@ -96,6 +138,16 @@ public class PackRevealView : MonoBehaviour
              "화면을 덮는 어둠은 PackStage보다 앞 sibling의 별도 Dim이 상시 깔고 있다.")]
     [SerializeField] CanvasGroup revealPanel;
 
+    [Header("개봉 화면 흔들림")]
+    [Tooltip("팩이 완전히 찢기는 순간 최상위 UI 캔버스 전체를 흔드는 시간.")]
+    [Min(0f)] [SerializeField] float screenShakeDuration = 0.72f;
+    [Tooltip("기본 화면 흔들림 거리(px). 희귀 1.5배, 신비 2.25배, 신화 3.25배로 강해진다.")]
+    [Min(0f)] [SerializeField] float screenShakeStrength = 52.5f;
+    [Tooltip("화면 흔들림의 방향 전환 횟수.")]
+    [Min(1)] [SerializeField] int screenShakeVibrato = 48;
+    [Tooltip("기본 회전 흔들림 각도. 카드 등급 배율을 동일하게 적용한다.")]
+    [Min(0f)] [SerializeField] float screenShakeRotation = 1.05f;
+
     [Header("신규 카드 반응")]
     [Tooltip("신규 카드가 드러나는 순간 화면 전체가 순간 밝아졌다 돌아온다. Dim에 붙인 PackScreenFlash를 물린다. " +
              "화면이 반응하는 것은 신규뿐이어야 한다 — 중복까지 번쩍이면 그 대비가 사라진다. 미배선이면 화면 반응 없음.")]
@@ -138,9 +190,14 @@ public class PackRevealView : MonoBehaviour
 
     // 이번 개봉 세션 결과.
     OpenedPack m_pending;
+    ECardGrade m_topGrade = ECardGrade.Unknown;
 
     // 현재 스테이지의 시간 기반 연출. 스킵은 이걸 Complete로 밀어 다음 단계로 넘긴다.
     Sequence m_stageSeq;
+    Sequence m_screenShakeSeq;
+    RectTransform m_screenShakeRoot;
+    Vector2 m_screenShakeHome;
+    Quaternion m_screenShakeRotationHome;
 
     // 환급 합계가 굴러 오르는 트윈. 다음 개봉이 시작될 때 끊지 않으면 이전 세션의 숫자가 계속 올라간다.
     Tween m_totalRefundTween;
@@ -173,11 +230,18 @@ public class PackRevealView : MonoBehaviour
         m_pending = _opened;
         m_skips = 0;
         m_announced = false;
+        ECardGrade t_topGrade = TopGrade(_opened.Cards);
+        m_topGrade = t_topGrade;
 
         GateInput(false);
         SetTearHint(false, true);
 
-        if (shellRig != null) { shellRig.ShowShells(); shellRig.ResetPose(); }
+        if (shellRig != null)
+        {
+            shellRig.ShowShells();
+            shellRig.ResetPose();
+            shellRig.SetRingGrade(t_topGrade, gradeFxPalette);
+        }
         if (tearSkin != null)
         {
             // 그림을 먼저 갈고 상태를 되돌린다 — 진행도·조각 자리는 그림과 무관하지만 순서를 고정해 둔다.
@@ -185,7 +249,7 @@ public class PackRevealView : MonoBehaviour
             tearSkin.ResetTear();
             // 되돌린 **뒤에** 등급을 물린다(ResetTear가 세기를 0으로 내린다).
             // 찢는 동안 새는 빛이 곧 "무엇이 나오는가"의 예고다.
-            tearSkin.SetGlowGrade(TopGrade(_opened.Cards));
+            tearSkin.SetGlowGrade(t_topGrade, gradeFxPalette);
         }
 
         if (resultGrid != null) resultGrid.Hide();
@@ -249,6 +313,7 @@ public class PackRevealView : MonoBehaviour
 
         m_stage = EStage.Idle;
         m_pending = null;
+        m_topGrade = ECardGrade.Unknown;
         m_announced = false;
         m_skips = 0;
     }
@@ -296,6 +361,7 @@ public class PackRevealView : MonoBehaviour
         // 진행 중이던 세션은 여기서 끊긴다 — 결과까지 함께 비워 다음 BeginOpen이 온전히 새 세션이 되게 한다.
         m_stage = EStage.Idle;
         m_pending = null;
+        m_topGrade = ECardGrade.Unknown;
         m_announced = false;
     }
 
@@ -407,6 +473,7 @@ public class PackRevealView : MonoBehaviour
 
         KillStageSeq();
         m_stageSeq = DOTween.Sequence().SetLink(gameObject);
+        PlayScreenShake();
 
         // 뜯긴 조각이 날아간다.
         if (tearSkin != null)
@@ -720,7 +787,101 @@ public class PackRevealView : MonoBehaviour
 
     void KillStageSeq()
     {
+        StopScreenShake();
         if (m_stageSeq != null && m_stageSeq.IsActive()) m_stageSeq.Kill();
         m_stageSeq = null;
+    }
+
+    // Screen Space Overlay에서는 카메라 Transform을 흔들어도 UI가 움직이지 않는다.
+    // 팩 무대와 결과 UI를 함께 품은 최상위 Canvas를 흔들어 개봉 충격이 화면 전체에 걸리게 한다.
+    void PlayScreenShake()
+    {
+        StopScreenShake();
+
+        if (screenShakeDuration <= 0f) return;
+        RectTransform t_root = ResolveScreenShakeRoot();
+        if (t_root == null) return;
+
+        float t_gradeScale = ScreenShakeGradeScale(m_topGrade);
+        m_screenShakeHome = t_root.anchoredPosition;
+        m_screenShakeRotationHome = t_root.localRotation;
+
+        Sequence t_sequence = DOTween.Sequence()
+            .SetUpdate(true)
+            .SetLink(gameObject);
+        m_screenShakeSeq = t_sequence;
+
+        t_sequence.Join(t_root.DOShakeAnchorPos(
+            screenShakeDuration,
+            screenShakeStrength * t_gradeScale,
+            screenShakeVibrato,
+            90f,
+            false,
+            true));
+        t_sequence.Join(t_root.DOShakeRotation(
+            screenShakeDuration,
+            new Vector3(0f, 0f, screenShakeRotation * t_gradeScale),
+            screenShakeVibrato,
+            90f,
+            true));
+        t_sequence.OnComplete(() =>
+        {
+            t_root.anchoredPosition = m_screenShakeHome;
+            t_root.localRotation = m_screenShakeRotationHome;
+            if (m_screenShakeSeq == t_sequence) m_screenShakeSeq = null;
+        });
+    }
+
+    RectTransform ResolveScreenShakeRoot()
+    {
+        if (m_screenShakeRoot != null) return m_screenShakeRoot;
+
+        Canvas t_canvas = shellRig != null ? shellRig.GetComponentInParent<Canvas>() : null;
+        if (t_canvas == null || shellRig == null) return null;
+
+        // Canvas 자체는 렌더 모드가 좌표를 관리하고, SafeArea는 해상도 변경 시 Fitter가 좌표를 다시 쓴다.
+        // SafeArea 직하의 화면 요소들을 별도 래퍼로 한 번 감싸 그 래퍼만 흔든다.
+        Transform t_safeArea = shellRig.transform;
+        while (t_safeArea.parent != null && t_safeArea.parent != t_canvas.transform)
+            t_safeArea = t_safeArea.parent;
+        if (t_safeArea.parent != t_canvas.transform) return null;
+
+        int t_childCount = t_safeArea.childCount;
+        var t_children = new List<Transform>(t_childCount);
+        for (int t_i = 0; t_i < t_childCount; t_i++) t_children.Add(t_safeArea.GetChild(t_i));
+
+        var t_rootObject = new GameObject("PackScreenShakeRoot", typeof(RectTransform));
+        t_rootObject.layer = t_safeArea.gameObject.layer;
+        m_screenShakeRoot = (RectTransform)t_rootObject.transform;
+        m_screenShakeRoot.SetParent(t_safeArea, false);
+        m_screenShakeRoot.anchorMin = Vector2.zero;
+        m_screenShakeRoot.anchorMax = Vector2.one;
+        m_screenShakeRoot.offsetMin = Vector2.zero;
+        m_screenShakeRoot.offsetMax = Vector2.zero;
+        m_screenShakeRoot.pivot = new Vector2(0.5f, 0.5f);
+
+        for (int t_i = 0; t_i < t_children.Count; t_i++)
+            t_children[t_i].SetParent(m_screenShakeRoot, false);
+
+        return m_screenShakeRoot;
+    }
+
+    static float ScreenShakeGradeScale(ECardGrade _grade)
+    {
+        if (_grade == ECardGrade.Rare) return 1.5f;
+        if (_grade == ECardGrade.Arcane) return 2.25f;
+        if (_grade == ECardGrade.Mythic) return 3.25f;
+        return 1f;
+    }
+
+    void StopScreenShake()
+    {
+        Sequence t_sequence = m_screenShakeSeq;
+        m_screenShakeSeq = null;
+        if (t_sequence != null && t_sequence.IsActive()) t_sequence.Kill();
+
+        if (m_screenShakeRoot == null) return;
+        m_screenShakeRoot.anchoredPosition = m_screenShakeHome;
+        m_screenShakeRoot.localRotation = m_screenShakeRotationHome;
     }
 }

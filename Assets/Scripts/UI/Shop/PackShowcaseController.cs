@@ -86,6 +86,7 @@ public class PackShowcaseController : MonoBehaviour
         }
 
         CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
+        RankManager.OnChanged                += Refresh;
         OutgameTutorialRunner.OnStepChanged  += Refresh;
         OutgameFeatureLock.OnChanged         += Refresh;
         PackOpenOverlay.OnClosed             += OnOverlayClosed;
@@ -99,6 +100,7 @@ public class PackShowcaseController : MonoBehaviour
         if (carousel != null) carousel.OnIndexChanged -= OnPageChanged;
 
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
+        RankManager.OnChanged                -= Refresh;
         OutgameTutorialRunner.OnStepChanged  -= Refresh;
         OutgameFeatureLock.OnChanged         -= Refresh;
         PackOpenOverlay.OnClosed             -= OnOverlayClosed;
@@ -161,7 +163,8 @@ public class PackShowcaseController : MonoBehaviour
         }
 
         for (int t_i = 0; t_i < packs.Count; t_i++)
-            if (packs[t_i] != null) m_display.Add(packs[t_i]);   // 미할당 슬롯이 빈 페이지가 되지 않게 거른다.
+            if (packs[t_i] != null && PackUnlockRules.IsUnlocked(packs[t_i]))
+                m_display.Add(packs[t_i]);   // 미할당 슬롯과 잠긴 팩은 페이지를 만들지 않는다.
     }
 
     // 캐러셀 동기화. 목록이 실제로 달라졌을 때만 재구축한다 —
@@ -215,6 +218,7 @@ public class PackShowcaseController : MonoBehaviour
         buyButton.interactable = t_pack != null
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
+                              && PackUnlockRules.IsUnlocked(t_pack)
                               && CurrencyManager.CanAfford(t_pack.PriceType, t_pack.Price);
     }
 
@@ -224,6 +228,20 @@ public class PackShowcaseController : MonoBehaviour
         var t_pack = ResolvePack();
 
         if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
+        bool t_rankLocked = t_pack != null && !PackUnlockRules.IsUnlocked(t_pack);
+        if (oddsButton != null) oddsButton.interactable = t_pack != null && !t_rankLocked;
+
+        if (t_rankLocked)
+        {
+            if (forcedPriceText != null) forcedPriceText.gameObject.SetActive(false);
+            if (priceText != null)
+            {
+                priceText.gameObject.SetActive(true);
+                priceText.text = PackUnlockRules.UnlockLabel(t_pack);
+            }
+            if (priceIcon != null) priceIcon.gameObject.SetActive(false);
+            return;
+        }
 
         // 튜토리얼 스텝이 가격 자리 문구를 저작했으면 숫자 대신 그 말을 띄운다(예: "무료").
         bool t_labeled = t_pack != null && m_forced && !string.IsNullOrEmpty(m_forcedPriceLabel);
@@ -276,7 +294,7 @@ public class PackShowcaseController : MonoBehaviour
     void OnOddsPressed()
     {
         var t_pack = ResolvePack();
-        if (t_pack == null) return;
+        if (t_pack == null || !PackUnlockRules.IsUnlocked(t_pack)) return;
 
         UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
     }
@@ -349,9 +367,11 @@ public class PackShowcaseController : MonoBehaviour
         var t_pack = ResolvePack();
         string t_currency = CurrencyLook.NameOf(t_pack != null ? t_pack.PriceType : ECurrencyType.Gold);
 
-        string t_message = _result == EPackOpenResult.InsufficientGold
-            ? $"{t_currency}{KoreanText.Subject(t_currency)} 부족합니다."
-            : "구매할 수 없습니다.";
+        string t_message = _result == EPackOpenResult.RankLocked
+            ? PackUnlockRules.UnlockLabel(t_pack)
+            : _result == EPackOpenResult.InsufficientGold
+                ? $"{t_currency}{KoreanText.Subject(t_currency)} 부족합니다."
+                : "구매할 수 없습니다.";
 
         UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {

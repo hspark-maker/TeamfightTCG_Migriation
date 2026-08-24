@@ -9,6 +9,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { mapSymbols } = require("./lib/map-index.js");
+const { syncAgentsMap } = require("./sync-agents-map.js");
 
 const root = path.resolve(__dirname, "..");
 const mapFile = path.join(__dirname, "orch-feature-map.md");
@@ -20,6 +21,15 @@ const REMOVED_TOKEN = "\u0000";
 const MAX_REMOVAL_RATIO = 0.05;
 const today = new Date().toISOString().slice(0, 10);
 const tempFiles = new Set();
+
+function syncAgentsMapRequired() {
+  try { syncAgentsMap(); }
+  catch (error) {
+    const wrapped = new Error(`AGENTS map inline sync failed: ${String(error && error.message || error)}`);
+    wrapped.code = "AGENTS_MAP_SYNC_FAILED";
+    throw wrapped;
+  }
+}
 
 function atomicWrite(file, content) {
   const temp = file + `.tmp-${process.pid}-${Date.now()}`;
@@ -206,10 +216,12 @@ function sync() {
 
   if (next === original) {
     console.log(`feature map unchanged: ${source.files.length} files, ${unmappedPublic.length} auto-draft types`);
+    syncAgentsMapRequired();
     return;
   }
   atomicWrite(backupFile, original);
   atomicWrite(mapFile, next);
+  syncAgentsMapRequired();
   console.log(`feature map synced: removed ${removed.size}, moved ${moved.size}, missing dirs ${missingDirs.length}, auto-draft types ${unmappedPublic.length}`);
   for (const [from, to] of moved) console.log(`  moved: ${from} -> ${to}`);
   for (const item of removed) console.log(`  removed: ${item}`);
@@ -221,7 +233,8 @@ try {
   sync();
 } catch (error) {
   console.warn("feature map sync skipped: " + String(error && error.message || error));
+  if (error && error.code === "AGENTS_MAP_SYNC_FAILED") process.exitCode = 1;
 } finally {
   for (const temp of tempFiles) { try { fs.unlinkSync(temp); } catch { /* best effort */ } }
-  process.exitCode = 0;
+  if (process.exitCode === undefined) process.exitCode = 0;
 }

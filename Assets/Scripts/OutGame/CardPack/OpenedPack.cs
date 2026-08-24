@@ -9,6 +9,7 @@ public enum EPackOpenResult
     EmptyPool,
     SpendFailed,
     NotReady,
+    RankLocked,
 }
 
 // 개봉으로 뽑힌 카드 1장의 스냅샷(불변)

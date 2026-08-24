@@ -5,7 +5,7 @@
 전체 파일 목록만 필요하면 Glob 또는 rg --files로 현재 상태를 조회한다.
 
 <!-- orch:feature-map-sync:start -->
-<!-- orch:source files=432 public-types=524 unmapped-public-types=0 auto-draft-types=0 -->
+<!-- orch:source files=433 public-types=527 unmapped-public-types=0 auto-draft-types=3 -->
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
@@ -148,3 +148,11 @@
 ## 에디터 도구 (`Editor/`, 19파일 3,585줄)
 
 `CardTableTool` · `CardAuthoringWindow` · `CardSpecImporter` · `CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `AIDeckBandValidator` · `OutgameTutorialStepWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `SafeAreaInstaller` · `UiSpriteAnimationClipCreator` · `UiSpriteAnimationClipWriter`
+
+<!-- orch:auto-draft:start -->
+## 미분류 자동 초안 (섹션으로 옮기면 다음 동기화에서 빠집니다)
+
+- `Battle/` — `AttackerTier`
+- `Card/` — `GrowthStar`
+- `OutGame/Growth/` — `LimitBreakStep`
+<!-- orch:auto-draft:end -->

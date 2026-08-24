@@ -76,7 +76,7 @@ public static partial class CardTableTool
         "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
         "· keywordUnlockLevel : keywords가 열리는 내부 성장값. 0/빈칸 = 0성부터, 2 = 1성부터 열림.\n" +
         "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
-        "· grade : 카드 희소 등급 이름(Silver/Gold/Prism). 빈칸 = Unknown(미배정).\n" +
+        "· grade : 카드 희소 등급 이름(Common/Rare/Arcane/Mythic). 빈칸 = Unknown(미배정).\n" +
         "  숫자나 모르는 이름은 값을 바꾸지 않고 경고만 남긴다.\n" +
         "· hp2~hp4 : 각 성급 진입 시 증가 HP(내부값 2~4 = 1~3성). 3칸 전부 비면\n" +
         "  CardGrowthConfig 전역식, 전부 채우면 카드 곡선으로 저장한다. 일부만 채우면\n" +

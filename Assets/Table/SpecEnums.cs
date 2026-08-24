@@ -32,7 +32,8 @@ public enum CARD_CHANNEL
 public enum CARD_GRADE
 {
     Unknown = 0,
-    Silver = 1,
-    Gold = 2,
-    Prism = 3,
+    Common = 1,
+    Rare = 2,
+    Arcane = 3,
+    Mythic = 4,
 }

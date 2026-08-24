@@ -4,6 +4,8 @@ using UnityEngine;
 // 랭크(표시용 티어 진행도)의 static 단일 창구 — 티어는 points의 순수 파생이라 세이브엔 points만 둔다
 public static class RankManager
 {
+    public static event Action OnChanged;
+
     static RankConfig s_config;
 
     // 현재 랭크 포인트
@@ -301,7 +303,11 @@ public static class RankManager
         return _base;
     }
 
-    static void Save() => DataSaveManager.Save();
+    static void Save()
+    {
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+    }
 }
 
 // 전투 1회 정산 결과

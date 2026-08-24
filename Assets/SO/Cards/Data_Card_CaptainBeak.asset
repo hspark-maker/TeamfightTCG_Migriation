@@ -15,7 +15,7 @@ MonoBehaviour:
   id: 12
   displayName: "\uB300\uC7A5\uBD80\uB9AC"
   channel: 1
-  grade: 2
+  grade: 3
   keywords: 34
   maxHp: 5
   bonusHp: 0

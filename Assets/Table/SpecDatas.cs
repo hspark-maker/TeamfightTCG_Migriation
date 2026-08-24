@@ -37,7 +37,7 @@ public partial class Card
     public int hp4;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism)
+    /// 카드 등급(Common/Rare/Arcane/Mythic)
     public string grade;
 }
 
@@ -71,7 +71,7 @@ public partial class Card_Test
     public int hp4;
     /// 도감 설명문
     public string cardExplain;
-    /// 카드 등급(Silver/Gold/Prism)
+    /// 카드 등급(Common/Rare/Arcane/Mythic)
     public string grade;
 }
 
@@ -89,7 +89,7 @@ public partial class CardPack
     public string channel;
     /// Live=실행 노출 / TestOnly=테스트만
     public string priceType;
-    /// 결제 재화(Gold/Diamond/Energy)
+    /// 결제 재화(Gold/Diamond/Energy/Shard)
     public long price;
     /// 가격
     public int drawCount;
@@ -99,6 +99,8 @@ public partial class CardPack
     public string refundType;
     /// 중복 환급 재화
     public long refundAmount;
+    /// 중복 1장당 환급량(0=환급 없음)
+    public string minRankGrade;
 }
 
 [GeneratorSpecData]

@@ -10,6 +10,11 @@ public class CardPackData : ScriptableObject
     [SerializeField] string packId;
     [SerializeField] string displayName;
 
+    [Header("Rank Unlock (fallback)")]
+    [Tooltip("SpecData CardPack.minRankGrade가 없을 때만 사용하는 폴백 조건.")]
+    [SerializeField] bool rankLocked;
+    [SerializeField] ERankGrade minRankGrade = ERankGrade.Bronze;
+
     [Header("표시")]
     [Tooltip("진열·개봉에 쓰는 팩 아트. 미지정이면 진열 뷰가 자기 기본 이미지를 유지한다.")]
     [SerializeField] Sprite packArt;
@@ -63,6 +68,28 @@ public class CardPackData : ScriptableObject
 
     public long RefundAmount
         => Spec(out CardPack t_row) ? t_row.refundAmount : refundAmount;
+
+    public bool TryGetMinRankGrade(out ERankGrade _grade)
+    {
+        if (Spec(out CardPack t_row))
+        {
+            _grade = default;
+            if (string.IsNullOrWhiteSpace(t_row.minRankGrade)) return false;
+
+            if (System.Enum.TryParse(t_row.minRankGrade, true, out ERankGrade t_grade)
+                && System.Enum.IsDefined(typeof(ERankGrade), t_grade))
+            {
+                _grade = t_grade;
+                return true;
+            }
+
+            Debug.LogWarning($"[CardPackData] {packId}.minRankGrade 값이 올바르지 않습니다: '{t_row.minRankGrade}'", this);
+            return false;
+        }
+
+        _grade = minRankGrade;
+        return rankLocked;
+    }
 
     public int PoolCount => Pool.Count;
 

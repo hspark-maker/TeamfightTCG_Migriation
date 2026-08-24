@@ -12,6 +12,8 @@ public static class CardPackOpener
     public static OpenedPack TryPurchase(CardPackData _pack)
     {
         if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound);
+        if (!PackUnlockRules.IsUnlocked(_pack))
+            return OpenedPack.CreateFailure(EPackOpenResult.RankLocked);
         if (!CardCatalog.IsReady || !CardGrowthManager.IsReady)
             return OpenedPack.CreateFailure(EPackOpenResult.NotReady);
 

@@ -18,6 +18,58 @@ public static class OutgameDebugActions
 
     public static void GrantShard() => GrantCurrency(ECurrencyType.Shard, DEBUG_SHARD_AMOUNT);
 
+    // 카드 희귀도별 개봉 연출만 검증한다. 소유·중복 보상·재화·랭크·세이브는 건드리지 않는다.
+    public static void OpenRarityTestPack(ECardGrade _grade)
+    {
+        if (_grade != ECardGrade.Rare && _grade != ECardGrade.Arcane && _grade != ECardGrade.Mythic)
+        {
+            Debug.LogWarning($"[OutgameDebug] 희귀도 테스트 팩 미지원 등급: {_grade}");
+            return;
+        }
+        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning)
+        {
+            Debug.LogWarning("[OutgameDebug] 튜토리얼 진행 중에는 진행도 이벤트를 보호하기 위해 희귀도 테스트 팩을 열 수 없다.");
+            return;
+        }
+        if (PackOpenOverlay.Instance == null || PackOpenOverlay.IsOpen)
+        {
+            Debug.LogWarning("[OutgameDebug] 개봉 오버레이가 없거나 이미 열려 있어 희귀도 테스트 팩을 열 수 없다.");
+            return;
+        }
+        if (PackHandoff.HasPending)
+        {
+            Debug.LogWarning("[OutgameDebug] 소비되지 않은 개봉 세션이 있어 희귀도 테스트 팩을 열 수 없다.");
+            return;
+        }
+        if (!CardCatalog.IsReady)
+        {
+            Debug.LogWarning("[OutgameDebug] 카드 카탈로그가 아직 준비되지 않아 희귀도 테스트 팩을 열 수 없다.");
+            return;
+        }
+
+        var t_cards = new List<CardData>();
+        for (int t_i = 0; t_i < CardCatalog.All.Count; t_i++)
+        {
+            CardData t_card = CardCatalog.All[t_i];
+            if (t_card != null && t_card.grade == _grade) t_cards.Add(t_card);
+        }
+        if (t_cards.Count == 0)
+        {
+            Debug.LogWarning($"[OutgameDebug] {_grade} 카드가 없어 희귀도 테스트 팩을 열 수 없다.");
+            return;
+        }
+
+        var t_drawn = new List<DrawnCard>(6);
+        for (int t_i = 0; t_i < 6; t_i++)
+            t_drawn.Add(new DrawnCard(t_cards[t_i % t_cards.Count], false));
+
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, ECurrencyType.Gold), null, null, false);
+        if (PackOpenOverlay.TryOpen()) return;
+
+        PackHandoff.Consume();
+        Debug.LogWarning($"[OutgameDebug] {_grade} 희귀도 테스트 팩 개봉 화면을 열지 못했다.");
+    }
+
     // 재화 즉시 지급 + 즉시 영속
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {
