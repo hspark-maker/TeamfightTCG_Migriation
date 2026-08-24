@@ -29,7 +29,8 @@ public class LobbyRankEffectDirector : MonoBehaviour
     [Tooltip("커버가 걷힌 뒤 시작까지의 뜸. 상단바 코인이 먼저 착지하도록 비켜 준다.")]
     [SerializeField] float startDelay = 0.15f;
 
-    [Tooltip("승급 오버레이가 걷힌 뒤 랭크 보상 목록이 뜨기까지의 뜸. 두 화면이 맞물려 뜨면 한 화면이 갈아끼워진 것처럼 읽힌다.")]
+    [Tooltip("티어 변화 연출(제자리 들어올림 · 승급 오버레이)이 끝난 뒤 랭크 보상 목록이 뜨기까지의 뜸.\n" +
+             "두 화면이 맞물려 뜨면 한 화면이 갈아끼워진 것처럼 읽힌다.")]
     [SerializeField] float rewardPanelDelay = 0.25f;
 
     // 조각은 하나뿐이다 — 매 전투마다 보는 연출이라 여러 개로 쪼개면 사건이 밍밍해진다.
@@ -146,41 +147,83 @@ public class LobbyRankEffectDirector : MonoBehaviour
         yield return t_seq.WaitForKill();
     }
 
-    // 등급이 갈린 판만 전면 오버레이로 세우고, 닫힐 때까지 기다린다.
-    // 조건은 둘뿐이다 — **승급전 승리**와 **첫 진입(언랭크 → 브론즈 1)**.
-    // 등급이 그대로인 평범한 상승에 뜨면 이 화면의 무게가 사라진다.
+    // 티어가 오른 판을 세우고 끝날 때까지 기다린다.
+    // 여기가 세 갈래(단계 상승 · 등급 승급 · 첫 진입)를 판정하는 유일한 자리고, **갈래마다 그릇이 다르다** —
+    // 자주 오는 단계 상승은 화면을 안 멈추는 제자리 연출로, 드물게 오는 등급 승급·첫 진입은 전면 오버레이로 간다.
     IEnumerator PlayPromote(RankApplyResult _result)
     {
         if (!_result.IsTierUp) yield break;
 
         // 첫 진입은 승급전을 거치지 않지만, 게임에서 처음 얻는 등급이라 오히려 제일 큰 판이다.
+        // **반드시 먼저 거른다** — 이전 티어가 없는(음수) 판이라 등급 비교에 들어가면 답이 없다.
         bool t_firstEntry = _result.PrevTierIndex < 0;
-        if (!_result.PrevPromoPending && !t_firstEntry) yield break;
 
         if (!RankManager.TryGetTier(_result.TierIndex, out RankTier t_tier)) yield break;
-        if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) yield break;
 
-        bool t_closed = false;
-        t_overlay.Show(t_tier,
-                       // 암전이 덮은 프레임에 로비 표시를 새 등급으로 갈아끼운다 — 배지 안무는 여기서 돌지 않는다.
-                       // 첫 진입만 별 줄을 감춘 채 남긴다. 그 줄이 드러나는 것이 오버레이 다음 박이다.
-                       _onCovered: () => { if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant(t_firstEntry); },
-                       _onClose: () => t_closed = true);
+        // 등급이 갈렸는지는 ERankGrade를 직접 비교한다 — 티어 인덱스를 등급당 단계 수로 나눠 비교하지 말 것.
+        // 음수는 0으로 향해 잘려 첫 진입(-1)이 브론즈와 같은 등급으로 읽힌다.
+        RankTier t_from       = RankTier.None;
+        bool     t_divisionUp = false;
 
-        // 화면이 걷힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라,
-        // 여기서 안 기다리면 튜토리얼 안내가 오버레이 위에 겹친다.
-        // IsOpen도 함께 본다: 콜백을 거치지 않고 꺼지는 길(부모 비활성)에서 여기 걸리면 뒤따르는 안내가 영영 멈춘다.
-        yield return new WaitUntil(() => t_closed || !RankPromoteOverlay.IsOpen);
+        if (!t_firstEntry)
+        {
+            bool t_hasFrom = RankManager.TryGetTier(_result.PrevTierIndex, out t_from);
 
-        // 보상이 먼저다 — 오버레이가 걷힌 그 자리에서 곧바로 이어져야 "승급했으니 이걸 받아라"로 읽힌다.
+            // 등급이 갈렸으면 등급 승급, 아니면 단계 상승. 이전 티어를 못 얻으면 갈렸다고 볼 근거가 없으니 단계로 본다.
+            t_divisionUp = !t_hasFrom || t_from.Grade == t_tier.Grade;
+        }
+
+        // 갈래는 여기서 한 번만 이름을 얻는다 — 단계 상승은 오버레이를 안 쓰므로 EPromoteKind 자체가 필요 없다.
+        if (t_divisionUp)
+            yield return this.PlayDivisionUpInPlace();
+        else
+            yield return this.PlayPromoteOverlay(t_from, t_tier,
+                                                 t_firstEntry ? EPromoteKind.FirstEntry : EPromoteKind.GradeUp,
+                                                 t_firstEntry);
+
+        // 보상이 먼저다 — 화면이 걷힌 그 자리에서 곧바로 이어져야 "승급했으니 이걸 받아라"로 읽힌다.
         // 배지·별 연출 뒤로 밀면 두 사건 사이가 벌어져 목록이 따로 뜬 화면처럼 보인다.
         yield return this.PlayRewardPanel();
 
         yield return this.PlayFirstEntryReveal(t_firstEntry);
     }
 
-    // 승급 오버레이를 실제로 본 판에만 이어 붙는 보상 목록.
-    // 새 등급의 보상은 소식을 들은 그 자리에서 받는 것이 자연스럽다 — 배지만 보고 목록을 따로 찾아가게 두지 않는다.
+    // 단계 상승 — 오버레이를 띄우지 않는다. 로비가 그대로 보이고 입력도 살아 있는 채로 RankInfo가 제자리에서 들려 올라간다.
+    // 4승마다 오는 사건이라 전면 암전으로 멈춰 세우면 "별것도 아닌 걸로 오래 막는다"가 된다.
+    // HUD가 없으면(랭크 탭이 아닌 곳) 조용히 지나간다 — 표시는 PlayWhenReady의 finally가 최종값으로 확정한다.
+    IEnumerator PlayDivisionUpInPlace()
+    {
+        if (!RankHud.TryGet(out RankHud t_hud)) yield break;
+
+        Sequence t_seq = t_hud.BuildDivisionUpInPlace();
+        if (t_seq == null) yield break;
+
+        t_seq.Play();
+        yield return t_seq.WaitForKill();
+    }
+
+    // 등급 승급·첫 진입 — 화면을 멈춰 세우는 전면 오버레이. 드물게 오는 사건이라 여기서만 판을 크게 벌인다.
+    // 오버레이를 세우지 못하면 이 연출만 건너뛴다 — 보상 목록은 호출부에서 그대로 이어진다.
+    // 받을 것이 프리팹 로드 실패에 휩쓸리면 안 되기 때문이고, 표시는 PlayWhenReady의 finally가 최종값으로 확정한다.
+    IEnumerator PlayPromoteOverlay(RankTier _from, RankTier _to, EPromoteKind _kind, bool _firstEntry)
+    {
+        if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) yield break;
+
+        bool t_closed = false;
+        t_overlay.Show(_from, _to, _kind,
+                       // 암전이 덮은 프레임에 로비 표시를 새 티어로 갈아끼운다(별 줄도 여기서 비워진다) — 배지 안무는 여기서 돌지 않는다.
+                       // 첫 진입만 별 줄을 감춘 채 남긴다. 그 줄이 드러나는 것이 오버레이 다음 박이다.
+                       _onCovered: () => { if (RankHud.TryGet(out RankHud t_hud)) t_hud.ApplyTierInstant(_firstEntry); },
+                       _onClose: () => t_closed = true);
+
+        // 화면이 걷힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라,
+        // 여기서 안 기다리면 튜토리얼 안내가 오버레이 위에 겹친다.
+        // IsOpen도 함께 본다: 콜백을 거치지 않고 꺼지는 길(부모 비활성)에서 여기 걸리면 뒤따르는 안내가 영영 멈춘다.
+        yield return new WaitUntil(() => t_closed || !RankPromoteOverlay.IsOpen);
+    }
+
+    // 티어가 오른 판이면 갈래를 가리지 않고 이어 붙는 보상 목록(단계 상승의 제자리 연출 뒤에도 온다).
+    // 새 티어의 보상은 소식을 들은 그 자리에서 받는 것이 자연스럽다 — 배지만 보고 목록을 따로 찾아가게 두지 않는다.
     // 열지 않는 길이 셋 있다: 기능이 아직 잠겨 있거나(튜토리얼 진행 중), 받을 것이 없거나, 풀이 없을 때.
     IEnumerator PlayRewardPanel()
     {

@@ -17,9 +17,16 @@ public static class CardAlbum
 
     public static int ThemeCount => Themes.Count;
 
-    // 앨범 전체 완성 보상 저작값(미배선이면 빈 목록)
+    // 앨범 전체 완성 보상. 값의 진실원은 스펙시트고, 시트에 없을 때만 저작값으로 떨어진다(미배선이면 빈 목록)
     public static IReadOnlyList<AlbumRewardDef> AlbumRewards
-        => s_source != null ? s_source.AlbumRewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
+    {
+        get
+        {
+            if (AlbumSpec.TryGetRewards(null, null, out List<AlbumRewardDef> t_spec)) return t_spec;
+
+            return s_source != null ? s_source.AlbumRewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
+        }
+    }
 
     public static int CompletedThemeCount
     {

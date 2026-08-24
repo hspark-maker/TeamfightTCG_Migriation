@@ -254,6 +254,7 @@ public class PackAcquireController : MonoBehaviour
         bool t_allowed = m_pack != null
                       && !m_left
                       && !OutgameTutorialRunner.IsRunning
+                      && PackUnlockRules.IsUnlocked(m_pack)
                       && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy);
         bool t_afford = m_pack != null && CurrencyManager.CanAfford(m_pack.PriceType, m_pack.Price);
 

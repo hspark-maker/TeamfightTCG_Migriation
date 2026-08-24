@@ -14658,6 +14658,7 @@ GameObject:
   - component: {fileID: 4517604548946882608}
   - component: {fileID: 4958583255173337261}
   - component: {fileID: 6468512684913432187}
+  - component: {fileID: 9163399710675611660}
   m_Layer: 6
   m_Name: FX_Crown_Trail
   m_TagString: Untagged
@@ -19484,6 +19485,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &9163399710675611660
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4817761640177032771}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &5837932508254508764
 GameObject:
   m_ObjectHideFlags: 0

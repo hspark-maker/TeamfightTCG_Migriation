@@ -404,7 +404,19 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
-    DBGS["OutgameTutorialStepWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>SO 직독으로 편·스텝을 펼치고 칸 하나를 예약한다"]:::new
+    DBGS["TutorialAuthoringWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 저작 도구<br/><b>왼쪽 목록(스텝당 한 줄) / 오른쪽 상세</b> — 값·상태·문제·되감기를 고른 하나에 모은다<br/>온보딩·트리거를 같은 목록 코드로 그린다. 구 OutgameTutorialStepWindow를 흡수했다"]:::new
+    VSTATE["TutorialSequenceState (에디터)<br/>OutgameFeatureLock.Recalculate의 거울 — 스텝마다 누적 해금·일시 잠금을 미리 굽는다<br/>fail-open 3종(stalled·디버그·미실행)은 일부러 모델링하지 않는다"]:::new
+    VLD["TutorialValidator (에디터)<br/>저작 규칙 정적 판정 — 부트 LogWarning으로만 있던 규약을 창으로 승격<br/>앵커 잠김 · stepId 중복 · 덱게이트 미폐쇄 · 필수 참조 미배선 …"]:::new
+    AMETA["TutorialAnchorMeta (에디터)<br/>앵커 한 줄 = 잠금 기능 · 화면 · 등록처<br/>TutorialActionMeta와 같은 관용구(인덱스=enum, static 생성자 검증)"]:::new
+    EOPS["TutorialSequenceEditOps (에디터)<br/>추가·복제·삭제·순서·<b>편 간 이동</b>·챕터 조작의 단일 창구<br/>stepId 계약(추가·복제=부여 · 이동=유지 · 삭제=소각)과 Undo가 여기 산다<br/>구조를 바꾸면 되감기 예약을 걷는다(예약은 좌표라 밀리면 엉뚱한 곳까지 재생한다)"]:::new
+    DBGS -->|"편집 모드(지연 실행)"| EOPS
+    EOPS -->|"TakeNextStepIdForEditor · EditorSteps"| STEP
+    DBGS --> VSTATE
+    DBGS --> VLD
+    VLD --> VSTATE
+    VLD --> AMETA
+    VSTATE -.->|"규칙을 베낀 정본(어긋나면 오탐)"| FLOCK
+    AMETA -.->|"Gate 근거 = Attach 호출부·탭 짝"| FLV
     RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
     BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
     DBGS -->|"Schedule(좌표)"| RWD
@@ -466,6 +478,12 @@ sequenceDiagram
 > 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
 > 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
 >
+> 2026-08-24: 위 **첫 진화 안내 철회.** 진화가 다이아를 무는 벽이라 대준 한 방이었는데,
+> 진화 재화가 강화와 같은 조각으로 통일되면서 벽이 사라졌다. 발화처(`CardDetailOverlayView`)와
+> 조회 창구(`TriggeredTutorialRunner.IsRunningTrigger`)를 제거했고, `TriggeredTutorial.asset`에는
+> 원래부터 이 트리거의 엔트리가 없어 실제로 뜬 적이 없다. `EOutgameTutorialTrigger.FirstEvolutionReady`
+> 값은 세이브(`completedTriggers`, 이름 문자열)와 뒤 항목 보존을 위해 남긴다.
+>
 > 2026-08-14: **키워드 강화 안내(`KeywordGrowthFirstOpen`)** 추가 — 발화 축이 탭·강화 결과에 이어 **화면 열림**까지 왔다.
 > 그리고 "무엇이 공짜인가"의 주인이 코드에서 **저작(`TutorialStepDef.freeOfCharge`)**으로, 소진 원장이
 > `CardGrowthManager`에서 **`OutgameTutorialGuide`로** 옮겨 세 축(카드 강화·진화·키워드 강화)이 같은 원장을 본다.
@@ -518,7 +536,7 @@ flowchart TD
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · FirstEvolutionReady · KeywordGrowthFirstOpen<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · KeywordGrowthFirstOpen (+ FirstEvolutionReady = 폐기, 값만 보존)<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
@@ -529,12 +547,10 @@ flowchart TD
     TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
-    CDO["CardDetailOverlayView<br/>강화 완료(_onFinished)에서 다음 한 방이 첫 진화면 Fire<br/>+ 발화 직후 RefreshGrowth로 0원 표시 반영"]:::chg
     KGP["KeywordGrowthPanel<br/>Open() 끝에서 Fire — SetVisible·Build 뒤라야 앵커가 서 있다<br/>칸/업그레이드 버튼 앵커를 코드로 등록·해제"]:::new
     KGM["KeywordGrowthManager<br/>TryGetStepAt 단일 퍼널(표시=활성=소모)<br/>event OnEnhanced(성공만) · NotifyCostRuleChanged"]:::new
     FREE["OutgameTutorialGuide — 무료 한 방 원장<br/>HasFreeShot · ConsumeFreeShot · ResetFreeShotForDebug<br/>무엇이 공짜인지는 저작(freeOfCharge)이 정한다"]:::new
     GROW["CardGrowthManager.TryGetStepAt<br/>원장을 직접 쥐지 않고 Guide에 묻는다"]:::chg
-    CDO -->|"Fire(FirstEvolutionReady)"| TRUN
     KGP -->|"Fire(KeywordGrowthFirstOpen)"| TRUN
     KGM -->|"OnEnhanced"| TBRG
     GROW --- FREE

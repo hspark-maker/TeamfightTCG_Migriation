@@ -12,11 +12,11 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { mapSymbols } = require("./lib/map-index.js");
 
 const root = path.resolve(__dirname, "..");
 const SRC = path.join(root, "Assets", "Scripts");
 const MAP = path.join(__dirname, "orch-feature-map.md");
-const TICK = String.fromCharCode(96);
 
 const DECLARATION = /\bpublic\s+(?:sealed\s+|abstract\s+|static\s+|partial\s+|readonly\s+)*(?:class|struct|interface|enum)\s+([A-Z][A-Za-z0-9_]*)/g;
 
@@ -29,21 +29,8 @@ function sources(dir, out = []) {
   return out;
 }
 
-/* 지도의 백틱 토큰을 그대로 꺼내 심볼 집합으로 만든다.
-   정규식으로 본문을 훑으면 \b 이스케이프가 셸·JS 문자열을 거치며 깨지기 쉬워 토큰 비교로 간다. */
-function mappedSymbols(map) {
-  const symbols = new Set();
-  for (const raw of map.split(TICK).filter((_, index) => index % 2 === 1)) {
-    for (const piece of raw.split(/[\/.\s]+/)) {
-      const name = piece.replace(/\.cs$/, "").trim();
-      if (name) symbols.add(name);
-    }
-  }
-  return symbols;
-}
-
 const map = fs.readFileSync(MAP, "utf8");
-const mapped = mappedSymbols(map);
+const mapped = mapSymbols(map).types;
 const mapLower = map.toLowerCase();
 
 const declared = new Map();

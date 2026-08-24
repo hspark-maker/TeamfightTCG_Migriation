@@ -245,7 +245,7 @@ public static class AttackSequence
 
     /// <summary>제자리 발사 반동. 이동하지 않고 슬롯에서 살짝 밀렸다 돌아온다(각도 변화 없음).
     ///
-    /// 원거리 공격 외에 <b>무리 선피해 일제사격</b>(SwarmVfx)도 이걸 쓴다 — "쏘는 동작"은 한 가지여야
+    /// 원거리 공격 외에 <b>낙인 선피해 일제사격</b>(SwarmVfx)도 이걸 쓴다 — "쏘는 동작"은 한 가지여야
     /// 같은 카드가 경로에 따라 다르게 움직이지 않는다. 거리·시간은 박치기와 같은 SO 값(NormalTuning)이다.</summary>
     public static async UniTask RecoilInPlace(CardView _attacker, CardView _defender)
     {
@@ -537,10 +537,23 @@ public static class AttackSequence
     /// 재생 상태가 제각각이라 부모 하나에 Pause(withChildren)만 걸면 안 멈추는 자식이 남는다.
     /// 이미 반납/파괴된 것은 목록에서 지운다 — 풀 재사용분을 들고 있으면 **다음 연출이 쓰는 오브젝트를 멈춘다**.
     /// Time.timeScale을 안 쓰는 이유는 HitStop 주석과 같다(전역을 흔들지 않는다).</summary>
+    /// <summary>멈칫 동안 **이 연출이 띄운 것만** 세운다(무쌍이면 휘두름·베기).
+    ///
+    /// 풀 전체를 세우지 않는 이유 — 피격·먼지·착탄까지 얼리면 "때린 순간이 멎었다"가 아니라
+    /// 화면이 통째로 정지한 것으로 읽힌다. 타격은 계속 터지고 **칼만 멎어야** 벤 무게가 산다.
+    ///
+    /// 루트만 만지면 안 된다: 벤더 프리팹(EpicToonFX)은 파티클이 자식에 흩어져 있고
+    /// 회전은 자식에 붙은 스크립트(ETFXRotation)가 Update로 돌린다 —
+    /// 그래서 자식까지 훑어 파티클 · 스크립트 · Animator 세 축을 함께 세운다.</summary>
     static void PauseVfx(List<GameObject> _live, List<ParticleSystem> _frozen, List<float> _speeds)
     {
         _frozen.Clear();
         _speeds.Clear();
+        s_freezeSeen.Clear();
+        s_frozenBehaviours.Clear();
+        s_frozenAnimators.Clear();
+        s_animatorSpeeds.Clear();
+        s_resumeTweenRoots.Clear();
 
         for (int i = _live.Count - 1; i >= 0; i--)
         {
@@ -548,16 +561,89 @@ public static class AttackSequence
             if (t_go == null || !t_go.activeInHierarchy) { _live.RemoveAt(i); continue; }
 
             foreach (ParticleSystem t_ps in t_go.GetComponentsInChildren<ParticleSystem>(true))
-            {
-                ParticleSystem.MainModule t_main = t_ps.main;
+                FreezeOne(t_ps, _frozen, _speeds);
 
-                _frozen.Add(t_ps);
-                _speeds.Add(t_main.simulationSpeed);
-
-                t_main.simulationSpeed = 0f;
-                t_ps.Pause(withChildren: false);   // 자식은 이 반복문이 각자 처리한다(이중 처리 방지)
-            }
+            FreezeDrivers(t_go);
         }
+    }
+
+    /// <summary>파티클이 아니라 **코드가 움직이는** 축을 세운다 — 구매 에셋의 회전 스크립트(ETFXRotation 등)와
+    /// Animator, 그리고 이 오브젝트에 걸린 트윈. 자식까지 전부 훑는다.
+    /// 풀 반납을 담당하는 <see cref="PooledParticle"/>은 건드리지 않는다(끄면 그 연출이 영영 안 돌아온다).</summary>
+    static void FreezeDrivers(GameObject _go)
+    {
+        foreach (MonoBehaviour t_mb in _go.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (t_mb == null || !t_mb.enabled) continue;
+            if (t_mb is PooledParticle) continue;
+
+            t_mb.enabled = false;
+            s_frozenBehaviours.Add(t_mb);
+        }
+
+        foreach (Animator t_anim in _go.GetComponentsInChildren<Animator>(true))
+        {
+            if (t_anim == null) continue;
+
+            s_frozenAnimators.Add(t_anim);
+            s_animatorSpeeds.Add(t_anim.speed);
+            t_anim.speed = 0f;
+        }
+
+        // 자식 Transform에 걸린 트윈(스케일 펀치·이동)도 같이 세운다 — 파티클만 멈추면 칼이 계속 미끄러진다.
+        foreach (Transform t_tr in _go.GetComponentsInChildren<Transform>(true))
+            DOTween.Pause(t_tr);
+        s_resumeTweenRoots.Add(_go);
+    }
+
+    /// <summary>FreezeDrivers가 세운 것만 되살린다(그 사이 반납·파괴된 것은 건너뛴다).</summary>
+    static void ResumeDrivers()
+    {
+        for (int t_i = 0; t_i < s_frozenBehaviours.Count; t_i++)
+        {
+            if (s_frozenBehaviours[t_i] == null) continue;
+            s_frozenBehaviours[t_i].enabled = true;
+        }
+
+        for (int t_i = 0; t_i < s_frozenAnimators.Count; t_i++)
+            if (s_frozenAnimators[t_i] != null) s_frozenAnimators[t_i].speed = s_animatorSpeeds[t_i];
+
+        for (int t_i = 0; t_i < s_resumeTweenRoots.Count; t_i++)
+            if (s_resumeTweenRoots[t_i] != null)
+                foreach (Transform t_tr in s_resumeTweenRoots[t_i].GetComponentsInChildren<Transform>(true))
+                    DOTween.Play(t_tr);
+        s_resumeTweenRoots.Clear();
+
+        s_frozenBehaviours.Clear();
+        s_frozenAnimators.Clear();
+        s_animatorSpeeds.Clear();
+    }
+
+    // 같은 시스템을 두 번 세우면 ResumeVfx가 배속을 0으로 되돌려 놓는다(두 번째 기록값이 0이라)
+    // — 그래서 한 번 본 것은 건너뛴다.
+    static readonly HashSet<ParticleSystem> s_freezeSeen = new HashSet<ParticleSystem>();
+
+    // 파티클 말고 **스크립트로 움직이는 연출**도 같이 세운다.
+    // 베기(구매 에셋)는 ETFXRotation이 Update에서 transform을 계속 돌리고, 일부 프리팹은 Animator로 움직인다 —
+    // 파티클만 멈추면 그것들은 계속 돌아 "멈칫"이 아니라 "파티클만 끊긴 것"으로 보인다.
+    // 멈칫은 한 번에 하나만 돈다(한 공격 안에서 순차) → 정적 목록 하나로 충분하다.
+    static readonly List<Behaviour> s_frozenBehaviours = new List<Behaviour>();
+    static readonly List<Animator>  s_frozenAnimators  = new List<Animator>();
+    static readonly List<float>     s_animatorSpeeds   = new List<float>();
+    // 트윈은 개별 핸들이 아니라 타깃 단위로 세웠다 되살린다 — 세운 오브젝트 루트만 기억하면 된다.
+    static readonly List<GameObject> s_resumeTweenRoots = new List<GameObject>();
+
+    static void FreezeOne(ParticleSystem _ps, List<ParticleSystem> _frozen, List<float> _speeds)
+    {
+        if (_ps == null || !s_freezeSeen.Add(_ps)) return;
+
+        ParticleSystem.MainModule t_main = _ps.main;
+
+        _frozen.Add(_ps);
+        _speeds.Add(t_main.simulationSpeed);
+
+        t_main.simulationSpeed = 0f;
+        _ps.Pause(withChildren: false);   // 자식은 이 순회가 각자 처리한다(이중 처리 방지)
     }
 
     /// <summary>PauseVfx가 세운 것만 되살린다. 멈추기 전부터 끝나 있던 것은 isPaused가 아니므로
@@ -577,7 +663,12 @@ public static class AttackSequence
 
         _frozen.Clear();
         _speeds.Clear();
+        s_freezeSeen.Clear();
+
+        ResumeDrivers();
     }
+
+    // (되살리기는 ResumeDrivers 하나 — 세운 목록 밖은 건드리지 않는다)
 
     // ── 공유: 박치기 모션 ────────────────────────────────────────────────
     /// <summary>윈드업(뒤로 살짝) → 돌진(각도 틀며 접촉=히트) → 반동 → _home 복귀.
@@ -949,7 +1040,7 @@ public static class AttackSequence
             await BattleFinisher.End();
         }
 
-        // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(청소부 heal/OnAfterAttack 등) 실행
+        // 히트/사망 연출 완료 후, 제자리 복귀 전에 공격후 효과(포식자 heal/OnAfterAttack 등) 실행
         if (_afterHit != null)
             await _afterHit();
     }

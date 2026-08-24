@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f29fe7b850ce3d34d80849322628c0d1, type: 3}
+  m_Name: EmoteCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::EmoteCatalog
+  entries:
+  - sprite: {fileID: -881465105, guid: dfc4a384019cc0346831aa24c26eeef5, type: 3}
+    clip: {fileID: 7400000, guid: 2050c077f07951d49a217a8008ac2122, type: 2}
+    label: Hi
+  - sprite: {fileID: -524654387, guid: f634b1bc11f239845982a6755c5a1537, type: 3}
+    clip: {fileID: 7400000, guid: 64e59eadaa5b423409e8dc19158be750, type: 2}
+    label: Dizzy
+  - sprite: {fileID: -80752865, guid: 13b68470fea4f7d4392f9ba97626b02b, type: 3}
+    clip: {fileID: 7400000, guid: e5fe17b9b0936d64184af09419076987, type: 2}
+    label: Thanks
+  - sprite: {fileID: 51337476, guid: 9bd000808185c0242892dc3671455143, type: 3}
+    clip: {fileID: 7400000, guid: ebb4ac3d1e1ffa44d808a321b8e3e88a, type: 2}
+    label: Sad
+  - sprite: {fileID: -433437760, guid: ca481716380744f43a87fac7b0387aeb, type: 3}
+    clip: {fileID: 7400000, guid: ccdaf067d6e5ee54e92775b2d1a0febc, type: 2}
+    label: Angry
+  - sprite: {fileID: 1416332904, guid: 1a8f5653cf1705244a204951bfa824fc, type: 3}
+    clip: {fileID: 7400000, guid: ada22603774e241408fe6c06838629aa, type: 2}
+    label: laugh
+  showDuration: 2.5
+  fadeDuration: 0.3
+  popScale: 1.25
+  peelInDuration: 1
+  peelOutDuration: 1
+  peelStartAmount: 0.5
+  peelCurlRadius: 0.16
+  peelSegments: 20
+  aiReply: 1
+  aiReplyDelay: 1.5

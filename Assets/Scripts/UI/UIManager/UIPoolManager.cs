@@ -136,8 +136,6 @@ public class UIPoolManager : MonoBehaviour
             return null;
         }
 
-        DumpPrefabSource(uiPrefab);   // TODO 임시 진단용 — 폰트 이슈 확인 끝나면 제거할 것.
-
         T uiInstance = Instantiate(uiPrefab, uiRoot).GetComponent<T>();
         if (uiInstance == null)
         {
@@ -157,51 +155,9 @@ public class UIPoolManager : MonoBehaviour
         return uiInstance;
     }
 
-    /// <summary>TODO 임시 진단용 — Addressables가 넘겨준 "프리팹 원본"이 실제로 어떤 에셋이고,
-    /// 그 안의 TMP 폰트가 무엇인지 인스턴스화 전에 찍는다. 폰트 이슈 확인 끝나면 제거할 것.</summary>
-    static void DumpPrefabSource(GameObject _prefab)
-    {
-        string t_path = "(에디터 아님)";
-#if UNITY_EDITOR
-        t_path = UnityEditor.AssetDatabase.GetAssetPath(_prefab);
-        if (string.IsNullOrEmpty(t_path)) t_path = "(빈 경로 = 번들에서 로드됨)";
-#endif
-        LogUtil.Log($"[프리팹출처] {_prefab.name} ← {t_path}");
-
-        foreach (var t_text in _prefab.GetComponentsInChildren<TMPro.TMP_Text>(true))
-        {
-            string t_font = t_text.font != null ? t_text.font.name : "null";
-            LogUtil.Log($"[프리팹원본] {t_text.name} font={t_font}");
-        }
-    }
-
     public void RegisterUI(PooledUIBase _ui)
     {
-        Type t_type = _ui.GetType();
-
-        // 같은 타입이 둘 이상이면 나중 Awake가 이긴다 — 어느 쪽이 답이 될지는 씬 로드 순서에 달렸고,
-        // 조용히 넘어가면 "다른 인스턴스가 열리는" 증상으로만 드러난다(진단 불가).
-        // 풀드 UI는 타입당 하나가 계약이다. 마이그레이션 중간 상태(프리팹 인스턴스가 아직 씬에 남음)를 잡는 그물.
-        if (this.activeUIs.TryGetValue(t_type, out PooledUIBase t_existing) &&
-            t_existing != null && t_existing != _ui)
-        {
-            Debug.LogWarning(
-                $"[UIPoolManager] {t_type.Name}이 둘 이상 등록됐다 — 풀드 UI는 타입당 하나여야 한다.\n"
-              + $"  기존: {Path(t_existing)} (scene='{t_existing.gameObject.scene.name}')\n"
-              + $"  신규: {Path(_ui)} (scene='{_ui.gameObject.scene.name}')  ← 이쪽이 이긴다\n"
-              + "  씬/프리팹에 저작된 사본을 지우고 프리팹만 남길 것.", _ui);
-        }
-
-        this.activeUIs[t_type] = _ui;
-    }
-
-    static string Path(PooledUIBase _ui)
-    {
-        var t_path = new System.Text.StringBuilder(_ui.name);
-        for (Transform t_p = _ui.transform.parent; t_p != null; t_p = t_p.parent)
-            t_path.Insert(0, t_p.name + "/");
-
-        return t_path.ToString();
+        this.activeUIs[_ui.GetType()] = _ui;
     }
 
     public void UnregisterUI(PooledUIBase _ui)

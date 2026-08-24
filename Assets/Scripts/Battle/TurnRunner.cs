@@ -320,6 +320,14 @@ public class TurnRunner : MonoBehaviour
                 SynergyTriggers.TurnEnded(t_endedCtx);
             }
 
+            // 보호막은 받은 뒤 상대의 공격 턴 하나를 버티는 상태다.
+            // 현재 행동 진영의 반대 필드 전체에서 지워야 부여 대상과 무관하게 보호막이 함께 만료된다.
+            BattleField t_oppositeField = t_field == this.playerField ? this.enemyField : this.playerField;
+            foreach (var t_c in t_oppositeField.GetActiveCards())
+                t_c.ClearShield();
+            foreach (var t_c in t_oppositeField.GetWaitingCards())
+                t_c.ClearShield();
+
             if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
 
             // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다
@@ -369,6 +377,21 @@ public class TurnRunner : MonoBehaviour
         // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
         this.lastFallenCards = new List<CardData>(this.playerField.FallenCards);
 
+        // 토너먼트 전투는 전투 보상도 랭크도 없다 — 정점의 상은 맵에서 받는 그 보상 하나뿐이다.
+        // (전투 골드까지 주면 클리어 정점 재도전이 그대로 파밍이 되고, 상이 둘로 갈려 무엇을 받았는지도 흐려진다.)
+        // ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.
+        if (TournamentRun.IsActive)
+        {
+            // 승리 낙인은 여기서 영속한다 — 로비까지 미루면 로딩 중 종료가 승리를 삼킨다. 지급은 수령 시점 한 곳뿐이다.
+            if (_won) TournamentProgress.MarkRewardPending(TournamentRun.NodeId);
+
+            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
+
+            this.lastReward = default;   // 결과 팝업의 골드 줄이 직전 판 값을 물려받지 않게
+            this.lastRankDelta = 0;      // 포인트 줄도 같은 이유로 0
+            return;
+        }
+
         this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
@@ -404,6 +427,7 @@ public class TurnRunner : MonoBehaviour
         TurnEvents.Reset();
         MatchRandom.Reset();
         TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
+        TournamentRun.End();         // 토너먼트 정점도 같은 수명 — 남으면 다음 판 AI 레벨·랭크 정산이 정점 규칙으로 굳는다.
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
         DeckConfig.ClearEnemyDeck(); // 상대 덱을 확정하지 않는 진입점이 직전 판의 상대를 물려받지 않게(같은 규율).
         MatchOpponentHandoff.Clear();// 매칭 상대 표시도 같은 수명 — 덱만 비우면 다음 판 화면에 직전 상대 이름이 남는다.

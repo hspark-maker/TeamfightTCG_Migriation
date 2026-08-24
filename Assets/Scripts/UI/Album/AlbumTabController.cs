@@ -46,7 +46,10 @@ public class AlbumTabController : LobbyTabPanel
 
         // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
         // 여기서 막지 않으면 테마를 누르라는 스텝을 세션이 대신 해 버린다.
-        if (OutgameTutorialRunner.IsRunning && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
+        // 단 전체 해금(첫 랭크 승급) 뒤로는 예외를 걷는다 — 그 구간의 획득은 안내가 짠 것이 아니라 유저가 스스로 산 것이라
+        // 일반 경로와 같은 길(획득 → 도감 → 삽입)을 타야 한다.
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked
+            && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
 
         var t_session = ResolveInsertSession();
         if (t_session == null)
@@ -259,7 +262,8 @@ public class AlbumTabController : LobbyTabPanel
         {
             if (rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(_rewards[t_i].icon, _rewards[t_i].amount);
+            // 그림은 저작값이 아니라 재화 표에서 온다(RewardLine과 같은 창구).
+            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(CurrencyLook.IconOf(_rewards[t_i].currency), _rewards[t_i].amount);
             else rewardSlots[t_i].Hide();
         }
 

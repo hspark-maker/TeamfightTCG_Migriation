@@ -99,8 +99,8 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float healTravelDuration = 0.45f;   // 투사체 비행 시간
     [SerializeField] float healTrailLinger    = 0.25f;   // 도착 후 트레일 잔상 유지
 
-    [Header("Swarm Vfx (무리 선피해 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
-    [SerializeField] float swarmLaunchStagger  = 0.07f;   // 무리 카드별 발사 간격(한 프레임에 겹치면 한 덩어리로 보인다)
+    [Header("Brand Vfx (낙인 선피해 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
+    [SerializeField] float swarmLaunchStagger  = 0.07f;   // 낙인 카드별 발사 간격(한 프레임에 겹치면 한 덩어리로 보인다)
     [SerializeField] float swarmTravelDuration = 0.26f;   // 투사체 비행 시간. 본 공격 앞에 붙는 시간이라 짧게
     [SerializeField] float swarmImpactHold     = 0.10f;   // 마지막 착탄 후 본 공격까지의 여운
 

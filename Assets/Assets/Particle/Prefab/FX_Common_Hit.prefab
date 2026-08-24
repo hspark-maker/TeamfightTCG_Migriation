@@ -4905,6 +4905,7 @@ GameObject:
   - component: {fileID: 513103109434309914}
   - component: {fileID: 576393952818278118}
   - component: {fileID: 8665037784219604427}
+  - component: {fileID: 8198746526975539345}
   m_Layer: 6
   m_Name: FX_Common_Hit
   m_TagString: Untagged
@@ -9731,6 +9732,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &8198746526975539345
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2590653333717155793}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &4651822652110707771
 GameObject:
   m_ObjectHideFlags: 0

@@ -10,6 +10,11 @@ public class CardPackData : ScriptableObject
     [SerializeField] string packId;
     [SerializeField] string displayName;
 
+    [Header("Rank Unlock (fallback)")]
+    [Tooltip("SpecData CardPack.minRankGrade가 없을 때만 사용하는 폴백 조건.")]
+    [SerializeField] bool rankLocked;
+    [SerializeField] ERankGrade minRankGrade = ERankGrade.Bronze;
+
     [Header("표시")]
     [Tooltip("진열·개봉에 쓰는 팩 아트. 미지정이면 진열 뷰가 자기 기본 이미지를 유지한다.")]
     [SerializeField] Sprite packArt;
@@ -64,6 +69,28 @@ public class CardPackData : ScriptableObject
     public long RefundAmount
         => Spec(out CardPack t_row) ? t_row.refundAmount : refundAmount;
 
+    public bool TryGetMinRankGrade(out ERankGrade _grade)
+    {
+        if (Spec(out CardPack t_row))
+        {
+            _grade = default;
+            if (string.IsNullOrWhiteSpace(t_row.minRankGrade)) return false;
+
+            if (System.Enum.TryParse(t_row.minRankGrade, true, out ERankGrade t_grade)
+                && System.Enum.IsDefined(typeof(ERankGrade), t_grade))
+            {
+                _grade = t_grade;
+                return true;
+            }
+
+            Debug.LogWarning($"[CardPackData] {packId}.minRankGrade 값이 올바르지 않습니다: '{t_row.minRankGrade}'", this);
+            return false;
+        }
+
+        _grade = minRankGrade;
+        return rankLocked;
+    }
+
     public int PoolCount => Pool.Count;
 
     // 가중치를 벗긴 카드 목록. 랭크는 현재 등급으로 해석한다 — 추첨(ResolvePool)과 다른 목록을 보여주지 않기 위해서다.
@@ -115,8 +142,9 @@ public class CardPackData : ScriptableObject
 
     bool Spec(out CardPack _row) => PackSpec.TryGetPack(packId, out _row);
 
+    // 팩 가격은 오타여도 화면이 서야 하므로 Gold로 떨어진다(보상은 반대로 그 줄을 버린다 — RewardSpec)
     static ECurrencyType ParseCurrency(string _value)
-        => System.Enum.TryParse(_value, out ECurrencyType t_type) ? t_type : ECurrencyType.Gold;
+        => CurrencyCode.TryParse(_value, out ECurrencyType t_type) ? t_type : ECurrencyType.Gold;
 }
 
 [System.Serializable]

@@ -10,6 +10,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { mapTokens } = require("./lib/map-index.js");
+const { checkInstructionsSync } = require("./check-instructions-sync.js");
 
 const root = path.resolve(__dirname, "..");
 const MAP = path.join(root, ".claude", "orch-feature-map.md");
@@ -24,6 +26,7 @@ function ageDays(since) {
 
 assert.ok(fs.existsSync(MAP), "기능 지도가 없습니다: .claude/orch-feature-map.md");
 assert.ok(fs.existsSync(SRC), "자체 코드 디렉터리가 없습니다: Assets/Scripts");
+checkInstructionsSync();
 
 const map = fs.readFileSync(MAP, "utf8");
 
@@ -62,7 +65,7 @@ for (const f of relFiles) {
    - `Foo/Bar/` 로 끝나면 디렉터리
    - `Foo/Bar.cs` 나 `Foo/Bar` 처럼 슬래시 + 대문자 시작이면 경로가 붙은 타입
    - 그 외 대문자로 시작하는 식별자는 타입 이름 */
-const tokens = [...new Set([...map.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim()))];
+const tokens = mapTokens(map);
 const knownMissingDirs = new Map(
   [...map.matchAll(/<!--\s*orch:missing-dir\s+(.+?)\s+since=(\d{4}-\d{2}-\d{2})\s*-->/g)]
     .map((m) => [m[1].trim(), m[2]])

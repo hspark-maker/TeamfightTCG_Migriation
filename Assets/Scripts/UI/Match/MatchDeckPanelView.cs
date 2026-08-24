@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -119,6 +120,35 @@ public class MatchDeckPanelView : MonoBehaviour
 
         // 루트를 통째로 넘긴다 — 전환이 이 화면을 당겨 들이는(확대→1) 축의 대상이 이것이다.
         return new MatchHandoffTargets(introFx.VersusSeat, (RectTransform)transform, t_intro);
+    }
+
+    /// <summary>
+    /// 전투 시작에 대한 응답 한 박. 버튼이 튀고 화면이 한 발 앞으로 나간다 —
+    /// 게이트(_onGate)는 안무가 끝나기 전에 열려 커튼이 그 위로 닫히며 이 화면을 접어 간다.
+    /// 순차로 붙이면(안무가 다 끝난 뒤 게이트) 응답과 커튼이 두 사건이 되어 굼떠진다.
+    /// </summary>
+    public void PlayLaunch(Action _onGate)
+    {
+        SetInteractable(false);
+
+        // 게이트는 반드시 한 번은 열려야 하고, 두 번 열려도 안 된다. 안무가 잘리면(씬 파괴·DOTween.KillAll)
+        // 시각 콜백이 오지 않아 전투가 영영 시작되지 않는다 → OnKill로 받되 여기서 한 번으로 좁힌다.
+        bool t_opened = false;
+
+        void OpenGate()
+        {
+            if (t_opened) return;
+
+            t_opened = true;
+            _onGate?.Invoke();
+        }
+
+        Sequence t_seq = introFx.BuildLaunch((RectTransform)transform, battleButton);
+
+        t_seq.SetLink(gameObject);
+        t_seq.InsertCallback(introFx.LaunchGateAt, OpenGate);
+        t_seq.OnKill(OpenGate);
+        t_seq.Play();
     }
 
     /// <summary>안무가 세운 중간값을 저작 상태로 되돌린다. 전환을 타지 않고 열리는 경로가 반쯤 없는 화면을 물려받지 않게.</summary>

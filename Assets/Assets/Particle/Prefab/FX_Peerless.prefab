@@ -9744,6 +9744,7 @@ GameObject:
   - component: {fileID: 1035231839797326770}
   - component: {fileID: 8703843296892769857}
   - component: {fileID: 8234584499478820256}
+  - component: {fileID: 4535995063720507342}
   m_Layer: 0
   m_Name: FX_Peerless
   m_TagString: Untagged
@@ -14570,6 +14571,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &4535995063720507342
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129740873354057291}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &2825700569303402867
 GameObject:
   m_ObjectHideFlags: 0

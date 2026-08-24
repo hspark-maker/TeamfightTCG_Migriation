@@ -17,6 +17,9 @@ public static class OutgameTutorialProgress
     // 챕터 안에서의 스텝 순번(시퀀스 전체 통산이 아니다)
     public static int StepIndex => Slot.outgameChapterStepIndex;
 
+    // 서 있는 스텝의 불변 번호(0 = 앵커 없음). 좌표가 커서라면 이쪽이 세이브의 정체성이다.
+    public static int StepId => Slot.outgameStepId;
+
     static TutorialSaveData Slot
     {
         get
@@ -45,6 +48,11 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+
+        // 좌표가 움직이는 모든 런타임 경로가 이 창구를 지나므로, 앵커도 여기서만 갱신하면 된다.
+        // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 부트가 좌표에서 다시 채운다.
+        t_slot.outgameStepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
+
         Save();
     }
 
@@ -113,9 +121,15 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+        t_slot.outgameStepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.outgameCompleted        = false;
         t_slot.migrationChecked        = true;
         Save();
+
+        // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 부트 만에 오탐 정지가 뜬다.
+        // 이미 선 판정도 함께 걷어야 잠금이 실제로 돌아온다(둘을 갈라 두면 한쪽만 풀려 검증이 오염된다).
+        ResetStallWatch();
+        OutgameFeatureLock.ClearStall();
     }
 
     // 소유 카드가 이미 있는 구 세이브는 튜토리얼을 마친 것으로 본다(계정당 1회)

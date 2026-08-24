@@ -16,7 +16,7 @@ public class CurrencyLook : ScriptableObject
         [Tooltip("비워두면(None) 아이콘을 바꾸지 않는다 — 프리팹에 저작된 그림이 그대로 남는다.")]
         public Sprite icon;
 
-        [Tooltip("비워두면 코드 기본 이름(골드/다이아/에너지/카드 조각)으로 떨어진다.")]
+        [Tooltip("비워두면 코드 기본 이름(골드/다이아/에너지/강화 조각)으로 떨어진다.")]
         public string displayName;
     }
 
@@ -87,7 +87,7 @@ public class CurrencyLook : ScriptableObject
             case ECurrencyType.Gold:    return "골드";
             case ECurrencyType.Diamond: return "다이아";
             case ECurrencyType.Energy:  return "에너지";
-            case ECurrencyType.Shard:   return "카드 조각";
+            case ECurrencyType.Shard:   return "강화 조각";
             default:                    return _type.ToString();   // 새 재화를 여기 안 적으면 영문 이름이 그대로 보인다(주어 없는 문장 방지)
         }
     }

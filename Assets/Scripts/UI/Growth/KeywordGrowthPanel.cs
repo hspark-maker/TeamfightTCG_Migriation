@@ -10,6 +10,12 @@ public class KeywordGrowthPanel : PooledUIBase
 {
     public override void Initialization(UIData _data) { }
 
+    protected override void Awake()
+    {
+        base.Awake();
+        this.LiftToOverlayLayer();
+    }
+
     public override void Show() => this.Open();
 
     public override void Hide() => this.Close();
@@ -53,6 +59,9 @@ public class KeywordGrowthPanel : PooledUIBase
 
     // 업그레이드 버튼이 안내 타깃으로 등록된 상태(자기 것만 해제하려고 들고 있다)
     bool m_upgradeAnchored;
+
+    // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
+    Canvas m_sortingCanvas;
 
     // 화면이 서 있는가. 이 컴포넌트는 늘 켜져 있는 루트에 붙어 닫혀도 OnDisable이 안 도는데,
     // 구독은 살아 있어 RefreshAll이 계속 불린다 — 그때 꺼진 칸을 안내 타깃으로 다시 올리지 않게 한다.
@@ -342,6 +351,26 @@ public class KeywordGrowthPanel : PooledUIBase
         for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
             if (this.m_cells[t_i] != null)
                 this.m_cells[t_i].ApplyTutorialAnchor(false);
+    }
+
+    /// <summary>이 화면을 튜토리얼 게이트 <b>아래</b> 층으로 내려 앉힌다(<see cref="UiSortingOrder.PooledOverlay"/>).
+    /// 풀 컨테이너는 400이고 게이트는 350이라, 담긴 채로 두면 안내(손가락·문구·딤)가 이 패널 뒤에 통째로 묻힌다 —
+    /// 첫 스텝의 화면 탭조차 패널이 먼저 먹어 안내가 그 자리에 영영 선다.
+    ///
+    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
+    /// 떨어져 나온다 — 없으면 눈에는 보이는데 탭이 안 먹는다(CardDetailOverlayView.LiftAbove와 같은 관용구).</summary>
+    void LiftToOverlayLayer()
+    {
+        if (this.m_sortingCanvas == null)
+        {
+            this.m_sortingCanvas = GetComponent<Canvas>();
+            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
+        }
+
+        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+
+        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.PooledOverlay);
+        this.m_sortingCanvas.overrideSorting = true;
     }
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;

@@ -93,10 +93,16 @@ public class CurtainView : MonoBehaviour
         if (!TryPlay(_swap)) _swap?.Abort();
     }
 
+    // 커튼이 닫히는 0.22초에 맞춘 길이 — 소리가 커튼과 같이 빠져야 화면만 덮이고 소리는 남는 꼴이 안 된다.
+    const float BgmFadeOutSeconds = 0.25f;
+
     /// <summary>커튼이 덮은 사이 _scene으로 갈아탄다. 로비 → 배틀 진입 전용(복귀는 LoadingCoverView.LoadScene).</summary>
     /// <param name="_onBeforeLoad">씬 교체 직전 1회 호출. 계약은 SceneLoadSwap 참고.</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
+        // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
+        SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
+
         Play(new SceneLoadSwap(_scene, _onBeforeLoad));
     }
 

@@ -19611,6 +19611,7 @@ GameObject:
   - component: {fileID: 5943658253128121126}
   - component: {fileID: 3426623842688722460}
   - component: {fileID: 7528735975127821144}
+  - component: {fileID: 4543639609479219335}
   m_Layer: 6
   m_Name: FX_Healer_Trail
   m_TagString: Untagged
@@ -24459,6 +24460,19 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!210 &4543639609479219335
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7252720428228848482}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &7498180946821123204
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,19 +17,32 @@ MonoBehaviour:
     scope: 0
     spec:
       rid: 5071191787478451400
+  - timing: 2
+    scope: 0
+    spec:
+      rid: 5071191787478451401
   references:
     version: 2
     RefIds:
     - rid: 5071191787478451400
-      type: {class: PrefabEmblem, ns: , asm: Assembly-CSharp}
+      type: {class: ParticleEmblem, ns: , asm: Assembly-CSharp}
       data:
         sprite: {fileID: 0}
         duration: 2
         heightRatio: 0.9
         alpha: 1
         sortingOrder: 2
-        prefab: {fileID: 1538756665800276441, guid: 5421a9bdcfed0bb46a879c7e2b51e377, type: 3}
+        prefab: {fileID: 5938740339086977113, guid: 4c4b3cb345915fd48ad7bfcc494749d9, type: 3}
         offset: {x: 0, y: 0}
-        enterRatio: 0.12
-        exitRatio: 0.2
-        enterScale: 1.1
+        scale: 1
+    - rid: 5071191787478451401
+      type: {class: ParticleEmblem, ns: , asm: Assembly-CSharp}
+      data:
+        sprite: {fileID: 0}
+        duration: 1.2
+        heightRatio: 0.9
+        alpha: 1
+        sortingOrder: 2
+        prefab: {fileID: 5938740339086977113, guid: 4c4b3cb345915fd48ad7bfcc494749d9, type: 3}
+        offset: {x: 0, y: 0}
+        scale: 0.7

@@ -9,12 +9,16 @@ public static class AlbumRewardClaimFlow
 {
     public static void Open(string _title, IReadOnlyList<AlbumRewardDef> _rewards, Func<bool> _onConfirm)
     {
+        // 팝업이 씬에 없으면 확인 없이 바로 수령한다(랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
+        if (!RewardClaimPopup.TryGet(out var t_popup))
+        {
+            _onConfirm?.Invoke();
+            return;
+        }
+
         // 랭크 보상과 같은 규약 — [획득] 버튼 없이 **배경을 눌러** 받는다.
         // 세 단(페이지·테마·앨범)이 여기 한 줄을 공유하므로 수령 조작이 갈릴 여지가 없다.
-        //
-        // 팝업을 못 세우면(풀 미초기화) 확인 없이 바로 수령한다(랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
-        if (!RewardClaimPopup.TryShow(_title, ToLines(_rewards), _onConfirm, _claimOnDim: true))
-            _onConfirm?.Invoke();
+        t_popup.Show(_title, ToLines(_rewards), _onConfirm, _claimOnDim: true);
     }
 
     // 매번 새 리스트 — 팝업이 Show 시점 스냅샷을 들고 있다가 나중에 소비하므로 공용 버퍼를 돌려주면 stale이 된다.
@@ -28,8 +32,7 @@ public static class AlbumRewardClaimFlow
             // 0짜리는 칸만 잡는다(AlbumRewardManager.Claim도 같은 기준으로 건너뛴다).
             if (_rewards[t_i].amount <= 0) continue;
 
-            t_lines.Add(new RewardLine(new CurrencyGain(_rewards[t_i].currency, _rewards[t_i].amount),
-                                       _rewards[t_i].icon));
+            t_lines.Add(new RewardLine(new CurrencyGain(_rewards[t_i].currency, _rewards[t_i].amount)));
         }
 
         return t_lines;

@@ -4,6 +4,8 @@ using UnityEngine;
 // 랭크(표시용 티어 진행도)의 static 단일 창구 — 티어는 points의 순수 파생이라 세이브엔 points만 둔다
 public static class RankManager
 {
+    public static event Action OnChanged;
+
     static RankConfig s_config;
 
     // 현재 랭크 포인트
@@ -56,6 +58,29 @@ public static class RankManager
     /// <summary>티어 스냅샷 하나를 얻는다. 설정(RankConfig)을 밖으로 내보내지 않으면서
     /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
     public static bool TryGetTier(int _index, out RankTier _tier) => Config.TryGetTier(_index, out _tier);
+
+    /// <summary>등급 하나의 표시명·배지(단계 숫자 없이). 등급 단위 안내 문구가
+    /// RankConfig를 직접 열지 않게 하는 창구다 — 미저작 등급이면 false + 빈 값.</summary>
+    public static bool TryGetGradeDisplay(ERankGrade _grade, out string _name, out Sprite _badge)
+    {
+        _name  = string.Empty;
+        _badge = null;
+
+        var t_grades = Config.grades;
+        if (t_grades == null) return false;
+
+        for (int t_i = 0; t_i < t_grades.Count; t_i++)
+        {
+            RankGradeConfig t_entry = t_grades[t_i];
+            if (t_entry == null || t_entry.grade != _grade) continue;
+
+            _name  = t_entry.displayName;
+            _badge = t_entry.badge;
+            return true;
+        }
+
+        return false;
+    }
 
     // 랭크 표시용 1회 스냅샷
     public static RankInfo GetInfo() => GetInfoAt(Points);
@@ -278,7 +303,11 @@ public static class RankManager
         return _base;
     }
 
-    static void Save() => DataSaveManager.Save();
+    static void Save()
+    {
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+    }
 }
 
 // 전투 1회 정산 결과
@@ -329,7 +358,8 @@ public readonly struct RankInfo
     // 첫 티어 미도달(언랭크). TierIndex는 이때도 0이라 인덱스로는 구분되지 않는다.
     public readonly bool IsUnranked;
 
-    /// <summary>현재 단계를 얼마나 채웠는가(0~1). 최대 티어는 1 — 더 갈 곳이 없어 게이지를 비워 두면 오해가 된다.</summary>
+    /// <summary>현재 단계를 얼마나 채웠는가(0~1) = 별 줄이 그리는 값. 1승이 정확히 1/4이다.
+    /// 최대 티어는 1 — 더 갈 곳이 없어 게이지를 비워 두면 오해가 된다.</summary>
     public float TierProgress
     {
         get
@@ -340,9 +370,6 @@ public readonly struct RankInfo
             return t_span > 0 ? Mathf.Clamp01((float)(Points - TierRequired) / t_span) : 0f;
         }
     }
-
-    /// <summary>등급 안 4단계를 통틀어 얼마나 왔는가(0~1). 1 = 승급선.</summary>
-    public float GradeProgress => (Division - 1 + TierProgress) / RankConfig.DivisionsPerGrade;
 
     public RankInfo(int _tierIndex, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _points, long _tierRequired, long _nextRequired, bool _isMaxTier, bool _isUnranked = false)
     {

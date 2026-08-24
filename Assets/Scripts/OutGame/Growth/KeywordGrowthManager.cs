@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// 키워드 강화(키워드 한 종류의 레벨)의 static 단일 창구. 그 키워드를 가진 모든 카드에 체력으로 얹힌다.
 public static class KeywordGrowthManager
 {
     static readonly Dictionary<CardKeyword, KeywordGrowthEntry> s_growth =
@@ -61,6 +62,7 @@ public static class KeywordGrowthManager
         return s_growth.TryGetValue(_keyword, out var t_entry) && t_entry != null ? t_entry.level : 0;
     }
 
+    // 키워드 비트묶음이 받는 체력 합(같은 키워드를 두 번 세지 않는다)
     public static int HpBonusFor(CardKeyword _keywords)
     {
         int t_bonus = 0;
@@ -82,10 +84,11 @@ public static class KeywordGrowthManager
     public static bool TryGetNextStep(CardKeyword _keyword, out GrowthStep _step)
         => TryGetStepAt(_keyword, LevelOf(_keyword), out _step);
 
-    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다(안내가 강화 스텝에 들어선 순간).
-    /// 레벨도 잔액도 그대로지만 **낼 값**이 달라지므로, 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
+    /// <summary>무료 한 방의 조건이 바뀌었다고 알린다 — 레벨도 잔액도 그대로지만 낼 값이 달라져
+    /// 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
     public static void NotifyCostRuleChanged() => OnChanged?.Invoke();
 
+    // 키워드 강화 1회(카드 강화와 달리 확률 실패가 없다 — 결제되면 반드시 오른다)
     public static EnhanceResult TryEnhance(CardKeyword _keyword)
     {
         int t_level = LevelOf(_keyword);
@@ -99,8 +102,7 @@ public static class KeywordGrowthManager
         Entry(_keyword).level = t_level;
         SyncSaveData();
 
-        // 안내가 대준 한 방은 성공한 자리에서만 소진한다. OnEnhanced보다 앞이어야 한다 —
-        // 뒤로 밀면 그 신호를 받은 안내가 이미 다음 스텝에 들어선 뒤라 소진 표식이 엉뚱한 스텝에 찍힌다.
+        // OnEnhanced보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
             OutgameTutorialGuide.ConsumeFreeShot();
 
@@ -111,8 +113,7 @@ public static class KeywordGrowthManager
         return new EnhanceResult(EEnhanceOutcome.Success, t_level);
     }
 
-    // 레벨 _level에서 한 단계 올리는 스텝. 곡선 조회를 여기 하나로 모으는 이유는 튜토리얼 보정 때문이다 —
-    // 조회가 갈리면 화면엔 비용이 뜨는데 실제로는 0이 나가고, 잔액이 모자란 유저는 버튼이 비활성으로 굳는다.
+    // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
     static bool TryGetStepAt(CardKeyword _keyword, int _level, out GrowthStep _step)
     {
         if (!Config.TryGetNextStep(_keyword, _level, out _step)) return false;

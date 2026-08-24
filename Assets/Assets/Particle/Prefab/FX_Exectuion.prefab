@@ -19605,6 +19605,7 @@ GameObject:
   - component: {fileID: 5026950022086668048}
   - component: {fileID: 4001485901222896842}
   - component: {fileID: 3134683704607469303}
+  - component: {fileID: -7074731351470480492}
   m_Layer: 6
   m_Name: FX_Exectuion
   m_TagString: Untagged
@@ -24431,6 +24432,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-7074731351470480492
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5320869421729719446}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &6292874674121185155
 GameObject:
   m_ObjectHideFlags: 0

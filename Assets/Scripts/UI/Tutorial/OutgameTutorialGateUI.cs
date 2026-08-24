@@ -9,11 +9,16 @@ using UnityEngine.UI;
 // 전체화면 딤 1장이 입력을 전부 흡수하고, 타깃만 중첩 Canvas로 딤 위에 승격해 선명하게 보이고 눌리게 한다.
 // 완료 판정은 타깃 버튼 onClick 구독으로만 — 기존 리스너 무접촉이라 원래 동작이 그대로 실행된다.
 //
-// 불변식 2개:
+// 불변식 3개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
 //      단 스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
 //      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
+//  (3) 무대는 하나뿐이고 주인은 마지막에 건 쪽이다. 남의 무대는 걷지 않는다(m_owner·OwnedBy).
+//      온보딩(OutgameTutorialBridge)과 트리거(TriggeredTutorialBridge)가 이 인스턴스를 공유하므로,
+//      소유권 없이 걷으면 그 런은 완료 신호를 받을 주체를 잃고 영영 멈춘다.
+//      가져가는 것은 막지 않는다 — 트리거가 발화하면 무대를 넘겨받는 것이 맞고, 온보딩은
+//      트리거가 끝났다는 통지를 받아 자기 안내를 다시 세운다.
 //
 // 강조는 "딤 위로 올라온 대상" 그 자체다 — 테두리를 덧그리지 않는다. 봐야 할 것만 밝게 남는 것이 안내다.
 //
@@ -36,7 +41,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     //
     // 손가락·문구가 타깃보다 위인 이유: 딤 위로 승격된 타깃이 자기 위에 겹친 안내를 그대로 덮어버린다.
     // 딤만 타깃 아래에 남는다 — 딤까지 올리면 타깃이 다시 묻혀 누를 수 없게 된다.
-    const int GateOrder     = 350;
+    const int GateOrder     = UiSortingOrder.TutorialGate;
     const int TargetOrder   = GateOrder + 1;
     const int OrnamentOrder = TargetOrder + 1;
 
@@ -68,6 +73,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
     GameObject    m_gateRoot;
 
     readonly Vector3[] m_corners = new Vector3[4];   // GetWorldCorners 재사용 버퍼
+
+    // 지금 무대를 쥔 브리지. MonoBehaviour로 들고 있는 이유는 파괴 판정 때문이다 —
+    // object로 두면 씬과 함께 죽은 주인이 참조로 남아 무대가 영영 잠긴다(Unity의 == 오버로드가 안 걸린다).
+    MonoBehaviour m_owner;
 
     RectTransform m_target;
     Button        m_targetButton;
@@ -132,24 +141,26 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
     /// (구매처럼 눌러도 실패할 수 있는 스텝).
     /// <paramref name="_dim"/>=false면 손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
-    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.</summary>
-    public void ShowGate(RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
+    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.
+    /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>
+    public void ShowGate(MonoBehaviour _owner, RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
     {
         if (_target == null)
         {
             Debug.LogWarning("[OutgameTutorialGateUI] 타깃 RectTransform이 없어 게이트를 걸지 않습니다.");
-            HideGate();
+            HideGate(_owner);
             return;
         }
         if (_targetButton == null)
         {
             Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{_target.name}'에 Button이 없어 게이트를 걸지 않습니다(소프트락 방지).");
-            HideGate();
+            HideGate(_owner);
             return;
         }
 
         Release();
 
+        m_owner        = _owner;
         m_target       = _target;
         m_targetButton = _targetButton;
         m_targetCanvas = _target.GetComponentInParent<Canvas>();
@@ -171,10 +182,11 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 딤을 켜지 않는 것이 이 모드의 계약이다 — 개봉 스와이프(PackTearHandle)가 EventSystem.IsPointerOverGameObject로
     /// 시작 여부를 판정하므로, 전체화면 딤이 있으면 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
     /// 게다가 이 모드는 m_armed=false라 LateUpdate가 돌지 않아 탈출로도 없다.</summary>
-    public void ShowBanner(string _message)
+    public void ShowBanner(MonoBehaviour _owner, string _message)
     {
         Release();
 
+        m_owner        = _owner;
         m_target       = null;
         m_targetCanvas = null;
         m_onSatisfied  = null;
@@ -182,7 +194,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_blockWarned  = false;
         m_armed        = false;   // 추종할 타깃이 없다 → LateUpdate 미개입
 
-        if (string.IsNullOrEmpty(_message)) { HideGate(); return; }
+        if (string.IsNullOrEmpty(_message)) { HideGate(_owner); return; }
 
         SetBlocker(false, false);
         SetPointerActive(false);
@@ -197,12 +209,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 손가락이 없는 것도 이 모드의 계약이다. 그래서 하이라이트에 Button이 없어도(순수 영역) 정상이다.
     /// <paramref name="_atBottom"/>이면 문구의 홈이 하단이 된다 — 무대 한가운데를 비워야 하는 스텝용이다.
     /// <paramref name="_dim"/>을 끄면 판이 투명해진다(뒤 화면을 그대로 보여 주는 자리) — 다만 <b>입력은 그대로 막는다</b>.
-    /// 이 모드의 완료가 화면 탭이라 그렇다: 안 막으면 탭이 뒤 화면으로 새어 안내가 넘어가지 않는다.</summary>
-    public void ShowMessageGate(RectTransform _highlight, string _message, Action _onSatisfied,
+    /// 이 모드의 완료가 화면 탭이라 그렇다: 안 막으면 탭이 뒤 화면으로 새어 안내가 넘어가지 않는다.
+    /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>
+    public void ShowMessageGate(MonoBehaviour _owner, RectTransform _highlight, string _message, Action _onSatisfied,
                                 bool _atBottom = false, bool _dim = true)
     {
         Release();
 
+        m_owner        = _owner;
         m_target       = _highlight;
         m_targetButton = null;
         m_targetCanvas = _highlight != null ? _highlight.GetComponentInParent<Canvas>() : null;
@@ -231,8 +245,37 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_gateRoot.SetActive(true);
     }
 
-    /// <summary>딤을 숨기고 승격·리스너를 해제한다(앵커 미등장 시 대기 상태). 콜백은 유지되지 않는다.</summary>
-    public void HideGate()
+    // 자기 안내만 접는다(앵커 미등장 시 대기 상태). 남이 무대를 쥐고 있으면 아무 일도 하지 않는다.
+    // 공개면은 Show* / Clear(owner) / ClearForce 셋이면 충분하다 — 이것은 Show* 실패 경로의 내부 정리다.
+    void HideGate(MonoBehaviour _owner)
+    {
+        if (!OwnedBy(_owner)) return;
+
+        HideGateInternal();
+    }
+
+    /// <summary>자기 게이트를 전체 초기화한다(콜백·완료 가드 포함). 남의 무대는 건드리지 않는다.</summary>
+    public void Clear(MonoBehaviour _owner)
+    {
+        if (!OwnedBy(_owner)) return;
+
+        ClearForce();
+    }
+
+    /// <summary>소유권을 무시하고 무대를 비운다. 유저가 명시적으로 튜토리얼을 리셋하는 디버그 경로 전용이다.</summary>
+    public void ClearForce()
+    {
+        HideGateInternal();
+        m_onSatisfied = null;
+        m_satisfied   = false;
+        m_owner       = null;
+    }
+
+    // 무대의 주인인가. 주인이 없거나 씬과 함께 죽었으면(Unity의 == 오버로드) 누구든 접을 수 있다.
+    bool OwnedBy(MonoBehaviour _owner) => m_owner == null || m_owner == _owner;
+
+    // 소유권을 이미 확인한 뒤의 실제 접기. 게이트가 스스로 자기 상태를 되돌리는 경로도 여기로 온다.
+    void HideGateInternal()
     {
         Release();
 
@@ -243,14 +286,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         SetPointerActive(false);
         if (m_gateRoot != null) m_gateRoot.SetActive(false);
-    }
-
-    /// <summary>게이트 전체 초기화(콜백·완료 가드 포함).</summary>
-    public void Clear()
-    {
-        HideGate();
-        m_onSatisfied = null;
-        m_satisfied   = false;
     }
 
     void Awake()
@@ -281,7 +316,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     void LateUpdate()
     {
         if (!m_armed) return;
-        if (m_target == null) { HideGate(); return; }   // 타깃 파괴(씬 전환 등) 시 화면 잠김 방지
+        if (m_target == null) { HideGateInternal(); return; }   // 타깃 파괴(씬 전환 등) 시 화면 잠김 방지
 
         RefreshVisibility();
     }
@@ -598,7 +633,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied = true;
 
         Action t_callback = m_onSatisfied;
-        HideGate();          // 콜백이 다음 게이트를 걸 수 있도록 먼저 정리
+        HideGateInternal();  // 콜백이 다음 게이트를 걸 수 있도록 먼저 정리
         m_onSatisfied = null;
         t_callback?.Invoke();
     }
@@ -610,7 +645,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied = true;
 
         Action t_callback = m_onSatisfied;
-        HideGate();          // 콜백이 다음 게이트를 걸 수 있도록 먼저 정리
+        HideGateInternal();  // 콜백이 다음 게이트를 걸 수 있도록 먼저 정리
         m_onSatisfied = null;
         t_callback?.Invoke();
     }

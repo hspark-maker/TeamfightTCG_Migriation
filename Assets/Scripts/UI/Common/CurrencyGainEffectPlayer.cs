@@ -123,6 +123,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
 
         this.m_current[t_slot] = this.BuildGain(_from, _gain, _hud);
         this.m_current[t_slot]?.Play();
+        if (this.m_current[t_slot] != null) SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain);
 
         return this.m_current[t_slot] != null;
     }
@@ -201,6 +202,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             t_master.Insert(0f, t_seq);   // 재화가 갈려도 한 번의 획득이다 — 같은 0초에 함께 돈다.
         }
 
+        // 재화가 몇 종이든 한 번의 획득이다 — 마스터가 실제로 시작하는 박자에 한 번만 울린다.
+        t_master?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
         return t_master;
     }
 
@@ -227,6 +231,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             t_master.Insert(0f, t_seq);   // 재화가 갈려도 한 번의 획득이다 — 같은 0초에 함께 돈다.
         }
 
+        // 재화가 몇 종이든 한 번의 획득이다 — 마스터가 실제로 시작하는 박자에 한 번만 울린다.
+        t_master?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
         return t_master;
     }
 
@@ -236,7 +243,14 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     /// _hud가 null이면 그 재화의 대표 HUD를 찾는다(묶음판과 같은 길).
     /// </summary>
     public Sequence BuildLightGain(CurrencyGain _gain, RectTransform _origin, CurrencyHud _hud, Sprite _lightSprite)
-        => this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
+    {
+        var t_seq = this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
+
+        // 묶음판과 같은 규약 — 재화가 들어오는 사건은 어느 경로로 오든 같은 소리가 난다.
+        t_seq?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
+        return t_seq;
+    }
 
     // 종류 하나치 빛 줄기. 배선을 못 찾거나 줄 것이 없으면 null —
     // 판정은 전부 BeginGainRollUp보다 앞에 둔다(고정만 걸고 빠져나가면 수치가 영영 안 풀린다).

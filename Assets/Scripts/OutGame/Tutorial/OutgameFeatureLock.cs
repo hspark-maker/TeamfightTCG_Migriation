@@ -55,6 +55,18 @@ public static class OutgameFeatureLock
         return s_all || s_unlocked.Contains(_feature);
     }
 
+    // 남은 기능이 전부 열렸는가(저작의 UnlocksAll·정지 판정·디버그 전체 해금 중 하나라도 섰으면 참).
+    // 안내는 아직 돌고 있어도 게임의 문은 이미 다 열린 구간이라는 뜻이다 —
+    // "안내 중이라 막는다"는 예외를 그 구간에서 걷어야 할 때 이걸 본다(일시 잠금은 여기에 섞지 않는다).
+    public static bool AllUnlocked
+    {
+        get
+        {
+            Refresh();
+            return s_all;
+        }
+    }
+
     // 진행 변화를 지금 반영하고, 달라졌으면 OnChanged 발화
     public static void Refresh()
     {
@@ -76,6 +88,21 @@ public static class OutgameFeatureLock
         Refresh();
     }
 
+    /// <summary>정지 판정을 되돌린다 — 되감기·디버그 점프로 진행을 다시 세울 때의 짝이다.
+    /// 이 판정은 세이브가 아니라 static에 있어, 걷지 않으면 세이브를 밀어도 전 기능이 열린 채로 남아
+    /// 잠금 저작을 검증할 수 없다.</summary>
+    public static void ClearStall()
+    {
+        if (!s_stalled) return;
+
+        s_stalled = false;
+        s_valid   = false;
+        Refresh();
+    }
+
+    // ⚠ 이 계산에는 에디터 거울이 있다 — Editor/Tutorial/TutorialSequenceState가 저작 검증을 위해
+    //   같은 규칙(자기 칸 포함 누적 · locks 우선 · 저작 unlock 없으면 전체 개방)을 플레이 없이 다시 편다.
+    //   여기를 고치면 그쪽도 함께 고쳐라. 어긋나면 저작 검증기가 멀쩡한 저작을 오류로 찍는다.
     static bool Recalculate()
     {
         int  t_chapter = OutgameTutorialProgress.ChapterIndex;

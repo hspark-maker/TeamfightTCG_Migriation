@@ -27,3 +27,13 @@ public enum CARD_CHANNEL
     TestOnly = 0,
     Live = 1,
 }
+
+/// 카드 등급
+public enum CARD_GRADE
+{
+    Unknown = 0,
+    Common = 1,
+    Rare = 2,
+    Arcane = 3,
+    Mythic = 4,
+}

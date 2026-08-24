@@ -2,7 +2,7 @@ using System;
 using DG.Tweening;
 using UnityEngine;
 
-/// <summary>여러 단으로 잘린 그림이 **아래에서부터 한 단씩 쌓여 올라가는** 몸짓(성벽).
+/// <summary>여러 단으로 잘린 그림이 **아래에서부터 한 단씩 쌓여 올라가는** 몸짓(수호자).
 ///
 /// 다른 몸짓과 달리 그림이 하나가 아니다 — 그래서 베이스의 <see cref="SynergyEmblemSpec.Create"/>
 /// (스프라이트 하나짜리 루트)를 쓰지 않고, 빈 루트 아래에 단마다 렌더러를 하나씩 깐다.
@@ -37,7 +37,7 @@ public class StackUpEmblem : SynergyEmblemSpec
 
     [Header("구간 비율 (합 1, 나머지가 소멸 구간)")]
     [Range(0f, 1f)] public float buildRatio = 0.62f;   // 단이 전부 쌓이는 구간
-    [Range(0f, 1f)] public float holdRatio  = 0.18f;   // 다 쌓인 성벽을 보여주는 정지 구간
+    [Range(0f, 1f)] public float holdRatio  = 0.18f;   // 다 쌓인 수호자 엠블럼을 보여주는 정지 구간
 
     [Header("형태")]
     public float riseHeightRatio = 0.9f;    // 각 단이 아래에서 올라오는 거리(그 단 높이 대비)
@@ -123,7 +123,7 @@ public class StackUpEmblem : SynergyEmblemSpec
                         Mathf.Min(t_step * 0.5f, t_gapT * 0.9f), 1, 0.5f));
         }
 
-        // 3) 소멸 — 다 쌓인 채로 잠깐 서 있다가 그대로 투명해진다(무너뜨리지 않는다 — 성벽이 무너지면 그림이 반대다).
+        // 3) 소멸 — 다 쌓인 채로 잠깐 서 있다가 그대로 투명해진다.
         for (int i = 0; i < t_n; i++)
             t_seq.Insert(t_build + t_hold, t_srs[i].DOFade(0f, t_exit));
 
@@ -144,7 +144,7 @@ public class StackUpEmblem : SynergyEmblemSpec
 
     /// <summary>아래→위 순서의 단 목록. 빈 칸은 건너뛴다.
     /// **베이스 <c>sprite</c>(그림 한 장)는 이 몸짓에서 안 쓴다** — 그걸 맨 아랫단으로 얹으면
-    /// 통짜 그림 위에 단이 쌓이는 꼴이 돼 성벽이 두 겹으로 보인다. 단은 오직 <see cref="pieces"/>다.</summary>
+    /// 통짜 그림 위에 단이 쌓이는 꼴이 돼 엠블럼이 두 겹으로 보인다. 단은 오직 <see cref="pieces"/>다.</summary>
     Sprite[] Pieces()
     {
         int t_count = 0;

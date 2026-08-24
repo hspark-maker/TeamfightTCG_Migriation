@@ -597,8 +597,8 @@ MonoBehaviour:
   keywordIconPrefab: {fileID: 2263209049379785608, guid: 91c94acce9143cb41bd0f5b522849acc, type: 3}
   synergyBadgePrefab: {fileID: 4277293996584987652, guid: 957284f78ef5e394a90a83cbe4b4f71e, type: 3}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
-  synergyBadgeStart: {x: 243.5, y: 105.2}
-  synergyBadgeStep: {x: 0, y: -141.8}
+  synergyBadgeStart: {x: 0.359675, y: 0.116889}
+  synergyBadgeStep: {x: 0.000000, y: -0.157556}
   keywordFrames:
   - keyword: 32
     overlay: {fileID: 7700000000000000300}

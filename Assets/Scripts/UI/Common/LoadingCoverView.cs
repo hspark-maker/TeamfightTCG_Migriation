@@ -60,6 +60,9 @@ public class LoadingCoverView : MonoBehaviour
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
     Action m_beforeLoad;
 
+    // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
+    const float BgmFadeOutSeconds = 0.5f;
+
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
     /// 부트가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
@@ -67,6 +70,9 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
+        // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
+        SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
+
         var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 

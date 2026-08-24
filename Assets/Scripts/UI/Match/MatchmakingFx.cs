@@ -27,6 +27,27 @@ public class MatchmakingFx
 
     [Range(0f, 1f)] [SerializeField] float scanAlpha = 0.5f;
 
+    [Header("대기(호흡)")]
+    [Tooltip("기다리는 동안 두 프로필 틀이 쉬는 호흡의 배율. 이 화면에서 대기는 가장 긴 구간인데" +
+             "(길이의 주인이 매치메이커다) 축이 스캔 띠 하나뿐이라, 0으로 두면 그 구간이 통째로 정지 화면이 된다.\n" +
+             "배너(가로 띠) 전체가 아니라 틀만 숨쉬는 이유: 띠를 부풀리면 화면이 커졌다 작아진 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float idleBreath = 0.014f;
+
+    [Tooltip("한 번 숨쉬는 데 걸리는 시간(초). 스캔 주기와 같게 두면 두 축이 한 덩어리로 붙어 하나로 읽힌다.")]
+    [Min(0.1f)] [SerializeField] float idleBreathDuration = 1.15f;
+
+    [Tooltip("내 쪽과 상대 쪽 호흡이 어긋나는 시간(초). 0이면 두 틀이 동시에 부풀어 " +
+             "'각자 기다린다'가 아니라 '화면이 맥동한다'가 된다.")]
+    [Min(0f)] [SerializeField] float idleBreathOffset = 0.55f;
+
+    [Header("발견(취소 물러남)")]
+    [Tooltip("상대가 확정되는 순간 취소 버튼이 물러나는 거리(px). 여기서부터는 물러날 수 없다는 사실을 " +
+             "버튼이 흐려지는 것이 아니라 자리를 뜨는 것으로 말한다 — 흐린 버튼은 '눌러도 되나?'를 남긴다.\n" +
+             "0이면 물러남 없이 그 자리에서 꺼진다.")]
+    [Min(0f)] [SerializeField] float cancelDismissDrop = 44f;
+
+    [Min(0.01f)] [SerializeField] float cancelDismissDuration = 0.18f;
+
     [Header("발견(슬램)")]
     [Tooltip("상대 카드가 꽂히기 전 배율. 이 배율은 t=0에 즉시 적용되고 트윈은 회복만 한다 — " +
              "눈이 봐야 하는 것은 커지는 과정이 아니라 이미 큰 것이 내려꽂히는 순간이다.")]
@@ -93,16 +114,34 @@ public class MatchmakingFx
 
     [Min(0.01f)] [SerializeField] float windUpDuration = 0.1f;
 
+    [Tooltip("물러난 최고점에서 얼어붙어 있는 시간(초). 쌓인 것이 눈에 보이는 한 박이다 — " +
+             "0이면 물러나자마자 돌진해 '당겨졌다'가 화면에 남지 않고, 그만큼 방출도 작아진다.\n" +
+             "0.12를 넘기면 당겨진 게 아니라 멈춘 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float windUpHold = 0.06f;
+
     [Tooltip("부딪히는 데 걸리는 시간. 물러나는 시간보다 반드시 짧아야 '때렸다'로 읽힌다.")]
     [Min(0.01f)] [SerializeField] float impactDuration = 0.08f;
 
+    [Tooltip("부딪힌 자리에서 두 배너가 얼어붙는 시간(초) — 히트스톱. 충격을 빛이 아니라 무게로 만드는 축이다.\n" +
+             "이 정지 동안 배너는 겹친 채 멈춰 있고 섬광·VS·가로선만 돈다. 그래서 '부딪혔다'가 몸으로 온다.\n" +
+             "0.08을 넘기면 충돌이 아니라 화면이 걸린 것으로 읽힌다.")]
+    [Min(0f)] [SerializeField] float impactHold = 0.04f;
+
     [Min(0.01f)] [SerializeField] float settleDuration = 0.26f;
 
-    [Tooltip("VS가 튀어나오기 전 각도(도). 충돌의 결과로 튀어나온 것처럼 보이게 하는 축이다.")]
-    [SerializeField] float vsSpin = -14f;
-
+    [Tooltip("VS가 꽂히기 전 배율. 이 배율은 t=0에 즉시 적용되고 트윈은 회복만 한다 — 발견 슬램과 같은 규약이다.\n" +
+             "⚠ 되돌아오는 이징에 오버슈트를 쓰지 않는다(OutBack 금지). 1 아래로 언더슛하는 순간 " +
+             "'꽂혔다'가 '통통 튄다'가 된다 — 이 화면의 임팩트는 스쿼시도 회전도 아니고 한 프레임에 몰린 슬램이다.")]
     [Min(0f)] [SerializeField] float vsOvershoot = 0.4f;
+
     [Min(0.01f)] [SerializeField] float vsPopDuration = 0.14f;
+
+    [Tooltip("VS 좌우 가로선이 바깥에서 날아와 글자에 꽂히는 거리(px). 두 배너가 부딪히는 그 프레임에 " +
+             "선도 함께 부딪혀야 화면 전체가 한 사건이 된다.\n" +
+             "0이면 선은 제자리에 있고 배율 축만 남는다.")]
+    [Min(0f)] [SerializeField] float vsDividerTravel = 130f;
+
+    [Min(0.01f)] [SerializeField] float vsDividerDuration = 0.13f;
 
     [Range(-1f, 0f)] [SerializeField] float versusDimPunch = -0.35f;
 
@@ -142,6 +181,21 @@ public class MatchmakingFx
     Tween  m_scanTween;
     Image  m_scanBand;
 
+    // 호흡도 스캔과 같은 상주 트윈이다(길이의 주인이 매치메이커라 끝을 모른다) — StopIdle이 반드시 걷는다.
+    // 배율을 미는 축이라 걷을 때 1로 되돌리는 일까지 여기가 책임진다. 안 되돌리면 발견 슬램이
+    // 1.008배쯤 부푼 틀에서 시작해, 이후 어느 축도 그 어긋남을 바로잡지 않는다.
+    Tween         m_idleMy;
+    Tween         m_idleOpponent;
+    RectTransform m_idleMyRect;
+    RectTransform m_idleOpponentRect;
+
+    // VS 글자를 감싼 좌우 가로선과 그 저작 자리. 어느 쪽이 왼쪽인지는 저작 좌표가 정한다(CaptureVsDividers).
+    RectTransform m_vsLeft;
+    RectTransform m_vsRight;
+    Vector2       m_vsLeftHome;
+    Vector2       m_vsRightHome;
+    bool          m_vsDividersCaptured;
+
     // 조임이 세운 빛. 조임 시퀀스가 끊기고(대치가 무대를 갈아탄다) 나서도 살아 있어야 충돌이 이걸 터뜨릴 수 있다 —
     // 그래서 시퀀스가 아니라 여기가 소유한다. 실제로 걷는 것은 ClearCharge / BuildVersus의 마지막 콜백이다.
     Image m_chargeGlow;
@@ -159,8 +213,21 @@ public class MatchmakingFx
     /// <summary>발견 안무가 끝나는 시각 — 조임은 이 뒤에 이어 붙는다.</summary>
     public float FoundDuration => this.slamDuration + this.infoStagger * 2f + 0.2f;
 
-    /// <summary>대치 안무가 끝나는 시각.</summary>
-    public float VersusDuration => this.windUpDuration + this.impactDuration + this.settleDuration;
+    /// <summary>상대 카드가 꽂히는 시각. 발견에 얹을 다른 축은 이 한 프레임에 맞춰 붙는다(대치의 HitAt과 같은 자리다).</summary>
+    public float SlamAt => this.slamDuration;
+
+    /// <summary>대치 안무가 끝나는 시각. 두 정지(windUpHold·impactHold)도 길이에 든다 —
+    /// 빼먹으면 셸의 여운이 안무보다 먼저 끝나 갈라짐이 충돌 위로 겹친다.</summary>
+    public float VersusDuration => this.HitAt + this.impactHold + this.settleDuration;
+
+    /// <summary>
+    /// 두 배너가 부딪히는 시각. 충돌의 표식(섬광·VS·가로선·킥·딤)은 전부 이 한 시각에 몰린다 —
+    /// 히트스톱(impactHold)은 이 뒤에 붙어, 표식이 도는 동안 배너만 겹친 채 얼어 있다.
+    /// </summary>
+    float HitAt => this.windUpDuration + this.windUpHold + this.impactDuration;
+
+    /// <summary>돌진이 시작되는 시각. 물러남과 돌진 사이의 정지가 여기서 갈린다.</summary>
+    float ImpactAt => this.windUpDuration + this.windUpHold;
 
     /// <summary>대치가 끝난 뒤 VS가 한 번 쉬는 데 걸리는 시각. 셸의 여운이 이보다 짧으면 호흡이 잘린다.</summary>
     public float AfterglowDuration => this.afterglowBreath > 0f ? this.afterglowBreathDuration : 0f;
@@ -168,6 +235,93 @@ public class MatchmakingFx
     public void Capture()
     {
         this.dim.Capture();
+    }
+
+    /// <summary>
+    /// 기다리는 동안 두 프로필 틀이 쉬는 호흡을 건다. 스캔과 같은 이유로 무한 반복이다 — 길이의 주인은 매치메이커다.
+    /// 무는 것은 <b>틀</b>이지 배너가 아니다(배너를 부풀리면 화면이 커졌다 작아진 것으로 읽힌다).
+    /// </summary>
+    public void StartIdle(RectTransform _myFrame, RectTransform _opponentFrame)
+    {
+        this.StopIdle();
+
+        if (this.idleBreath <= 0f) return;
+
+        // 서로 어긋난 위상으로 돈다 — 같이 부풀면 두 사람이 각자 기다리는 것이 아니라 화면 하나가 맥동하는 것이 된다.
+        this.m_idleMyRect       = _myFrame;
+        this.m_idleOpponentRect = _opponentFrame;
+
+        this.m_idleMy       = this.BuildBreath(_myFrame,       0f);
+        this.m_idleOpponent = this.BuildBreath(_opponentFrame, this.idleBreathOffset);
+    }
+
+    /// <summary>호흡을 걷고 배율을 저작값으로 되돌린다. 되돌리지 않으면 발견 슬램이 부푼 틀에서 시작한다.</summary>
+    public void StopIdle()
+    {
+        this.m_idleMy?.Kill();
+        this.m_idleOpponent?.Kill();
+        this.m_idleMy       = null;
+        this.m_idleOpponent = null;
+
+        RestoreScale(this.m_idleMyRect);
+        RestoreScale(this.m_idleOpponentRect);
+
+        this.m_idleMyRect       = null;
+        this.m_idleOpponentRect = null;
+    }
+
+    Tween BuildBreath(RectTransform _rect, float _delay)
+    {
+        if (_rect == null) return null;
+
+        _rect.DOKill();
+        _rect.localScale = Vector3.one;
+
+        return _rect.DOScale(1f + this.idleBreath, this.idleBreathDuration)
+                    .SetEase(Ease.InOutSine)
+                    .SetLoops(-1, LoopType.Yoyo)
+                    .SetDelay(_delay)
+                    .SetLink(_rect.gameObject);
+    }
+
+    static void RestoreScale(RectTransform _rect)
+    {
+        // ?. 을 쓰지 않는다 — UnityEngine.Object의 가짜 null은 null 조건 연산자가 걸러 주지 못한다.
+        if (_rect == null) return;
+
+        _rect.DOKill();
+        _rect.localScale = Vector3.one;
+    }
+
+    /// <summary>
+    /// 상대가 확정되는 순간 취소 버튼이 물러나는 안무(재생은 호출자). 끝나면 호출자가 버튼을 내린다 —
+    /// 흐려진 채 남겨 두면 "눌러도 되나?"가 남고, 그 상태로 갈라짐(MatchHandoffFx)이 알파를 1로 되돌려 다시 비친다.
+    /// </summary>
+    public Sequence BuildCancelDismiss(RectTransform _cancel)
+    {
+        var t_seq = DOTween.Sequence();
+
+        if (_cancel == null) return t_seq;
+
+        _cancel.DOKill();
+
+        var t_group = _cancel.GetComponent<CanvasGroup>();
+        if (t_group == null) t_group = _cancel.gameObject.AddComponent<CanvasGroup>();
+
+        t_group.DOKill();
+        t_group.alpha = 1f;
+
+        // 가속이라 "물러났다"가 된다. 자리는 셸이 홈으로 되돌린다(RestoreRiders) — 여기는 밀기만 한다.
+        if (this.cancelDismissDrop > 0f)
+        {
+            Vector2 t_to = _cancel.anchoredPosition - new Vector2(0f, this.cancelDismissDrop);
+
+            t_seq.Insert(0f, _cancel.DOAnchorPos(t_to, this.cancelDismissDuration).SetEase(Ease.InQuad));
+        }
+
+        t_seq.Insert(0f, t_group.DOFade(0f, this.cancelDismissDuration).SetEase(Ease.InQuad));
+
+        return t_seq;
     }
 
     /// <summary>빈 상대 틀을 훑기 시작한다. 대기 시간의 주인은 매치메이커라 길이를 모르므로 무한 반복이다.</summary>
@@ -308,7 +462,7 @@ public class MatchmakingFx
         this.StageClash(t_seq, _my,  _myHome,   _step);
         this.StageClash(t_seq, _opp, _oppHome, -_step);
 
-        float t_hit = this.windUpDuration + this.impactDuration;
+        float t_hit = this.HitAt;
 
         // 조임이 어둠을 끌어내렸으므로 여기는 "더 어둡게"가 아니라 "밝은 쪽으로" 넘겨야 왕복이 생긴다.
         // 조임 없이 열리는 길(디버그·미배선)에서도 versusDimPunch가 앞을 맡아 왕복 자체는 남는다.
@@ -326,11 +480,18 @@ public class MatchmakingFx
         {
             _vs.DOKill();
             _vs.localScale    = Vector3.one * (1f + this.vsOvershoot);
-            _vs.localRotation = Quaternion.Euler(0f, 0f, this.vsSpin);
+            _vs.localRotation = Quaternion.identity;   // 기울이지 않는다 — 아래 주석 참고
 
             // VS는 충돌의 결과로 튀어나온다 — 켜지는 시각이 부딪히는 프레임과 어긋나면 따로 논다.
-            t_seq.Insert(t_hit, _vs.DOScale(1f, this.vsPopDuration).SetEase(Ease.OutBack));
-            t_seq.Insert(t_hit, _vs.DOLocalRotate(Vector3.zero, this.vsPopDuration).SetEase(Ease.OutBack));
+            //
+            // 기울였다 되돌리는 축(예전의 vsSpin + OutBack 회전)은 뺐다. OutBack이 0도를 지나쳤다 돌아와
+            // 배지가 흔들렸고, 배율까지 OutBack이라 1 아래로 언더슛해 두 오버슈트가 겹쳤다 —
+            // 임팩트가 아니라 떨림으로 읽혔다. 이 화면의 임팩트는 스쿼시도 회전도 아니라 한 프레임에 몰린 슬램이다.
+            t_seq.Insert(t_hit, _vs.DOScale(1f, this.vsPopDuration).SetEase(Ease.OutQuint));
+
+            // 좌우 가로선이 바깥에서 날아와 글자에 꽂힌다. 두 배너가 부딪히는 바로 그 프레임이라
+            // 화면 전체가 한 사건이 된다 — 회전이 하던 "충돌의 결과"라는 말을 이쪽이 대신한다.
+            this.StageVsDividers(t_seq, t_hit, _vs);
 
             // 여운의 한 박. 안무가 끝난 화면이 완전히 굳으면 정지가 '멈춤'으로 읽힌다 —
             // 숨 한 번이 "다음이 온다"로 바꿔 준다. 배율은 반드시 1로 돌아온다(Yoyo).
@@ -347,6 +508,7 @@ public class MatchmakingFx
     public void Reset(MatchProfileView _my, MatchProfileView _opponent, RectTransform _root, RectTransform _vs)
     {
         this.StopScan();
+        this.StopIdle();
         this.ClearCharge();
         this.dim.Reset();
 
@@ -365,8 +527,77 @@ public class MatchmakingFx
         if (_vs == null) return;
 
         _vs.DOKill();
-        _vs.localScale    = Vector3.one;
+        _vs.localScale = Vector3.one;
+
+        // 회전은 이제 아무도 밀지 않지만 되돌리는 일은 남긴다 — 예전 안무(vsSpin)가 기울여 놓은 채
+        // 굳은 프리팹·씬이 있을 수 있고, 그 기울기를 풀어 줄 곳이 여기뿐이다.
         _vs.localRotation = Quaternion.identity;
+
+        RestoreVsDivider(this.m_vsLeft,  this.m_vsLeftHome,  this.m_vsDividersCaptured);
+        RestoreVsDivider(this.m_vsRight, this.m_vsRightHome, this.m_vsDividersCaptured);
+    }
+
+    // 가로선을 저작 자리로. 홈은 안무가 한 번이라도 돌아야 잡힌다 — 그 전이면 밀린 적이 없어 되돌릴 것도 없다.
+    static void RestoreVsDivider(RectTransform _rect, Vector2 _home, bool _captured)
+    {
+        if (_rect == null || !_captured) return;
+
+        _rect.DOKill();
+        _rect.anchoredPosition = _home;
+    }
+
+    // VS 글자를 감싼 좌우 가로선이 바깥에서 날아와 꽂힌다.
+    //
+    // 어느 것이 왼쪽인지는 저작 좌표가 말해 준다 — 이름이나 자식 순서로 판정하지 않는다(프리팹이 바뀌면 조용히 틀어진다).
+    // 글자(TMP_Text)는 건너뛰고 그림을 가진 자식만 본다.
+    void StageVsDividers(Sequence _seq, float _at, RectTransform _vs)
+    {
+        if (this.vsDividerTravel <= 0f) return;
+
+        this.CaptureVsDividers(_vs);
+
+        this.InsertVsDivider(_seq, _at, this.m_vsLeft,  this.m_vsLeftHome,  -1f);
+        this.InsertVsDivider(_seq, _at, this.m_vsRight, this.m_vsRightHome, +1f);
+    }
+
+    void InsertVsDivider(Sequence _seq, float _at, RectTransform _rect, Vector2 _home, float _side)
+    {
+        if (_rect == null) return;
+
+        _rect.DOKill();
+        _rect.anchoredPosition = _home + new Vector2(_side * this.vsDividerTravel, 0f);
+
+        // 오버슈트 없는 감속. 지나쳤다 돌아오면 선이 글자를 뚫고 나갔다 되돌아온 것으로 보인다.
+        _seq.Insert(_at, _rect.DOAnchorPos(_home, this.vsDividerDuration).SetEase(Ease.OutQuint));
+    }
+
+    // 가로선의 저작 자리는 한 번만 잡는다 — 이미 밀린 값을 다시 캡처하면 매칭마다 선이 바깥으로 걸어 나간다.
+    void CaptureVsDividers(RectTransform _vs)
+    {
+        if (this.m_vsDividersCaptured || _vs == null) return;
+
+        this.m_vsDividersCaptured = true;
+
+        var t_images = _vs.GetComponentsInChildren<Image>(true);
+
+        for (int t_i = 0; t_i < t_images.Length; t_i++)
+        {
+            var t_rect = (RectTransform)t_images[t_i].transform;
+
+            // 그룹 자신에 그림이 붙어 있을 수 있다 — 그건 선이 아니다.
+            if (t_rect == _vs) continue;
+
+            if (t_rect.anchoredPosition.x < 0f && this.m_vsLeft == null)
+            {
+                this.m_vsLeft     = t_rect;
+                this.m_vsLeftHome = t_rect.anchoredPosition;
+            }
+            else if (t_rect.anchoredPosition.x > 0f && this.m_vsRight == null)
+            {
+                this.m_vsRight     = t_rect;
+                this.m_vsRightHome = t_rect.anchoredPosition;
+            }
+        }
     }
 
     // 물러났다 부딪히고 제자리로. 홈 좌표는 호출자가 Awake에서 잡아 둔 값이라 반복해도 밀리지 않는다.
@@ -382,10 +613,16 @@ public class MatchmakingFx
 
         Vector2 t_back = _step.sqrMagnitude > 0.0001f ? -_step.normalized * this.windUpDistance : Vector2.zero;
 
+        // 세 구간 사이의 빈 시간이 곧 정지다. 트윈을 걸지 않은 구간에는 아무것도 이 배너를 움직이지 않는다 —
+        // 물러난 최고점(windUpHold)과 부딪힌 자리(impactHold), 두 번 얼어붙는다.
         _seq.Insert(0f, _rect.DOAnchorPos(_home + t_back, this.windUpDuration).SetEase(Ease.OutQuad));
-        _seq.Insert(this.windUpDuration,
+
+        _seq.Insert(this.ImpactAt,
                     _rect.DOAnchorPos(_home + _step, this.impactDuration).SetEase(Ease.InQuad));
-        _seq.Insert(this.windUpDuration + this.impactDuration,
+
+        // 히트스톱이 끝나면 튕겨 돌아온다. OutBack의 오버슈트가 여기서는 반동이라 그대로 둔다 —
+        // 얼어 있다 풀리는 자리라 오히려 튕김이 있어야 한다.
+        _seq.Insert(this.HitAt + this.impactHold,
                     _rect.DOAnchorPos(_home, this.settleDuration).SetEase(Ease.OutBack));
     }
 

@@ -66,6 +66,8 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     [SerializeField] float pageStepOverride;
 
     readonly List<RectTransform> m_pages = new List<RectTransform>();
+    readonly List<Image> m_artImages = new List<Image>();
+    readonly List<Color> m_artBaseColors = new List<Color>();
 
     // 페이지별 아이들 모션. 중앙 한 장만 켜 둔다 — 화면 밖 N-1개가 매 프레임 sin을 도는 낭비를 없애고,
     // 꺼지는 순간 PackIdleMotion.OnDisable이 오프셋을 원복하므로 유령 좌표도 남지 않는다.
@@ -161,15 +163,17 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 
             // 그림이 없는 팩(packArt 미지정)은 템플릿 기본 이미지를 그대로 둔다 — 빈 사각형보다 낫다.
             var t_art = _arts[t_i];
+            var t_child = t_page.Find(artChildName);
+            var t_image = t_child != null ? t_child.GetComponent<Image>() : null;
             if (t_art != null)
             {
-                var t_child = t_page.Find(artChildName);
-                var t_image = t_child != null ? t_child.GetComponent<Image>() : null;
                 if (t_image != null) t_image.sprite = t_art;
                 else Debug.LogWarning($"[PackCarouselView] pageTemplate에 '{artChildName}'(Image) 자식이 없다 — 팩 그림이 반영되지 않는다.", this);
             }
 
             m_pages.Add(t_page);
+            m_artImages.Add(t_image);
+            m_artBaseColors.Add(t_image != null ? t_image.color : Color.white);
             m_motions.Add(t_page.GetComponent<PackIdleMotion>());
         }
 
@@ -181,6 +185,17 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
         if (dots != null) dots.Rebuild(m_pages.Count);
 
         GoTo(m_index, false);
+    }
+
+    public void SetPageLocked(int _index, bool _locked)
+    {
+        if (_index < 0 || _index >= m_artImages.Count) return;
+        Image t_art = m_artImages[_index];
+        if (t_art == null) return;
+
+        t_art.color = _locked
+            ? new Color(0.28f, 0.28f, 0.28f, 0.82f)
+            : m_artBaseColors[_index];
     }
 
     /// <summary>바깥에서 페이지를 지정한다(튜토리얼 고정·복원). 범위 밖은 클램프(순환 중엔 최단 방향으로 간다).</summary>
@@ -425,6 +440,8 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
         }
 
         m_pages.Clear();
+        m_artImages.Clear();
+        m_artBaseColors.Clear();
         m_motions.Clear();
     }
 }

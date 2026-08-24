@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.UI;
 
 // 로비에서 "방금 무엇을 얻었는지"를 한 번 보여주는 연출 브레인.
 // 진입점은 셋이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed,
@@ -27,6 +28,21 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     [Header("연출 값")]
     [SerializeField] float tabPunch = 0.3f;
+
+    [Header("팩 비행 (예고 팝업 → 팩 탭)")]
+    [Tooltip("팩 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
+    [SerializeField] int packTabIndex = 1;
+    [Tooltip("날아가는 팩의 화면 크기(px). 비율은 아트가 지킨다.")]
+    [SerializeField] Vector2 packFlightSize = new Vector2(240f, 300f);
+    [Tooltip("출발 직후 살짝 솟았다가 탭으로 빨려든다. 0이면 곧장 간다.")]
+    [SerializeField] float packScatterRadius = 120f;
+    [SerializeField] float packScatterDuration = 0.24f;
+    [SerializeField] float packGatherDuration = 0.42f;
+    [SerializeField] float packPopDuration = 0.14f;
+    [Tooltip("탭에 닿을 때의 배율 — 탭 안으로 삼켜지는 느낌.")]
+    [SerializeField] float packGatherScale = 0.15f;
+    [Tooltip("수렴 궤적이 직선에서 부푸는 폭(px). 0이면 직선.")]
+    [SerializeField] float packArcHeight = 160f;
 
     // 런타임에 만든 하위 연출기(직렬화 배선이 있으면 그것을 쓴다).
     CardGainFlightEffect m_cardFlight;
@@ -71,6 +87,24 @@ public class LobbyGainEffectDirector : MonoBehaviour
     /// <summary>재생할 수 없어 그냥 지나갔음을 알린다. 종료를 기다리는 쪽이 영영 멈추지 않게 하는 탈출로다
     /// (OnAnyFinished가 "보여줄 것이 없어 지나간 경우도 알린다"는 규약의 연장선).</summary>
     public static void NotifySkipped()
+    {
+        OnAnyFinished?.Invoke();
+    }
+
+    /// <summary>팩 하나가 (보통 예고 팝업이 세워 두던 자리에서) 팩 탭으로 빨려든다.
+    /// 카드 획득 비행과 같은 코어(UiGainBurst)를 쓰고 끝나면 같은 신호(OnAnyFinished)를 낸다 —
+    /// 기다리는 쪽이 "카드였나 팩이었나"를 가려 듣지 않아도 되게.
+    /// 소유·재화를 건드리지 않는다(예고일 뿐이다). <b>false면 아무것도 재생되지 않았고 종료 통지도 오지 않는다</b>.</summary>
+    public static bool PlayPackFlight(Sprite _art, RectTransform _origin)
+    {
+        if (!Exists) return false;
+
+        return s_instance.PlayPack(_art, _origin);
+    }
+
+    /// <summary>연출이 끝나기를 기다리지 않고 지금 놓아준다 — 흡수와 다음 안내를 나란히 세우는 저작이 쓴다.
+    /// 비행은 그대로 계속 돌고, 뒤늦게 오는 진짜 종료 신호는 그때의 스텝이 듣지 않아 삼켜진다.</summary>
+    public static void NotifyDetached()
     {
         OnAnyFinished?.Invoke();
     }
@@ -220,7 +254,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
         // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
         // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
-        if (OutgameTutorialRunner.IsRunning)
+        // 전체 해금(첫 랭크 승급) 뒤는 예외다 — 그 뒤 획득은 안내가 짠 순서가 아니므로 일반 경로대로 탭을 대신 켠다.
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked)
         {
             t_album.TryBeginInsert();
             return;
@@ -287,6 +322,69 @@ public class LobbyGainEffectDirector : MonoBehaviour
     void OnCardArrived()
     {
         UiPunch.Play(PunchTargetOf(m_collectionTarget), this.tabPunch);
+    }
+
+    // 팩 한 장짜리 비행. 카드 쪽과 달리 캐리어도 삽입 세션도 없다 — 만들고, 날리고, 지운다.
+    bool PlayPack(Sprite _art, RectTransform _origin)
+    {
+        if (_art == null) return false;
+        if (transform is not RectTransform t_layer) return false;
+
+        var t_target = this.tabBar != null ? this.tabBar.GetVisualAnchor(this.packTabIndex) : null;
+        if (t_target == null)
+        {
+            Debug.LogWarning("[LobbyGainEffectDirector] 팩 탭 앵커가 연결되지 않아 팩 비행을 건너뛴다.");
+            return false;
+        }
+
+        // 하단 탭 바보다 위에 그려져야 팩이 가려지지 않는다(카드 비행과 같은 이유).
+        transform.SetAsLastSibling();
+
+        int t_run = ++m_runId;
+
+        var t_settings = new UiGainBurst.Settings(1, this.packScatterRadius, this.packScatterDuration,
+                                                  this.packGatherDuration, 0f, this.packPopDuration,
+                                                  _angleStart: 90f, _angleSpan: 0f,
+                                                  _gatherScale: this.packGatherScale, _spinDegrees: 0f,
+                                                  _restScale: 1f, _arcHeight: this.packArcHeight);
+
+        GameObject t_flyer = null;
+
+        var t_seq = UiGainBurst.Build(t_layer,
+            UiGainBurst.ToLayerLocal(t_layer, _origin != null ? _origin : t_target),
+            UiGainBurst.ToLayerLocal(t_layer, t_target),
+            t_settings,
+            _spawn: _i =>
+            {
+                t_flyer = CreatePackFlyer(_art);
+                return (RectTransform)t_flyer.transform;
+            },
+            _despawn: _rt => { if (_rt != null) _rt.gameObject.SetActive(false); },
+            _onArrived: (_arrived, _total) => UiPunch.Play(PunchTargetOf(t_target), this.tabPunch));
+
+        t_seq.SetLink(gameObject);
+        t_seq.OnComplete(() =>
+        {
+            if (t_flyer != null) Destroy(t_flyer);
+            NotifyFinished(t_run);
+        });
+        t_seq.Play();
+
+        return true;
+    }
+
+    // 날아갈 팩 한 장. 개봉 화면의 팩 노드는 그 화면의 것이라 빌려올 수 없어 아트만 새로 세운다.
+    GameObject CreatePackFlyer(Sprite _art)
+    {
+        var t_go = new GameObject("PackFlyer", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+
+        var t_image = t_go.GetComponent<Image>();
+        t_image.sprite = _art;
+        t_image.preserveAspect = true;
+        t_image.raycastTarget = false;
+
+        ((RectTransform)t_go.transform).sizeDelta = this.packFlightSize;
+        return t_go;
     }
 
     CardGainFlightEffect EnsureCardFlight()

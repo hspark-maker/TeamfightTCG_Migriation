@@ -10,14 +10,14 @@ public static class BattleCleanup
         BattleResultBeat.Reset();
         BattleFinisher.Disarm();
 
-        // 전투 BGM은 전투 씬 것이다 — SoundManager가 DontDestroyOnLoad라 여기서 안 끊으면 로비까지 따라간다.
-        SoundManager.Instance?.StopBGM();
+        // 전투 BGM은 씬 전환 창구(LoadingCoverView.LoadScene)가 페이드로 뺀다 — 여기서 또 끊으면 하드컷이 페이드를 이긴다.
 
         DOTween.KillAll();
         ParticlePooler.Flush();
         ObjectPooler.Flush<UnityEngine.GameObject>();
 
         CardView.Cleanup();
+        LegacyCrownVfx.Clear();   // 왕관은 카드·씬 수명 밖 월드 오브젝트다 — 참조를 놓지 않으면 다음 판까지 남는다
         TurnState.Reset();
         TurnRunner.Cleanup();
     }

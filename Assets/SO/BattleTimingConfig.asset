@@ -25,7 +25,7 @@ MonoBehaviour:
   prlApproachDur: 0.18
   prlTurnDur: 0.17
   prlReturnDur: 0.17
-  prlHitStop: 0.04
+  prlHitStop: 0.12
   prlAfterHitHold: 0.01
   prlApproachT: 0.401
   prlMaxTurn: 16.3

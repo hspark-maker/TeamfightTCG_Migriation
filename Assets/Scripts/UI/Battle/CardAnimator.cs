@@ -6,6 +6,7 @@ using UnityEngine;
 public class CardAnimator : MonoBehaviour
 {
     [SerializeField] SpriteRenderer hitOverlay;
+    [SerializeField] HitEffectView hitEffect;
 
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용).
     float moveDuration => GameTiming.Battle.CardMoveDuration;
@@ -65,6 +66,10 @@ public class CardAnimator : MonoBehaviour
     /// 진행 중인 트윈에는 못 끼고 중간값에 그대로 굳는다(공격 후 아이콘만 흐린 채 남던 원인).
     /// 새로 만든 자식은 이 목표값으로 맞춘다. 알파를 바꾸는 경로는 전부 이 값을 같이 갱신할 것.</summary>
     public float FadeTarget { get; private set; } = 1f;
+
+    bool IsHitEffectPart(Component _component)
+        => _component != null && this.hitEffect != null
+            && _component.transform.IsChildOf(this.hitEffect.transform);
 
     public Vector3 SlotPosition => this.slotPosition;
 
@@ -132,6 +137,8 @@ public class CardAnimator : MonoBehaviour
 
     public void SetBoundCard(CardInstance _card) => this.boundCard = _card;
 
+    public void ResetHitEffect() => this.hitEffect?.Stop();
+
     // ── Move ─────────────────────────────────────────────────────────────
 
     /// <summary>내 필드의 가운데로. 공격자·피격자가 각자 자기 필드 중앙에 선다(세로 줄은 그대로 유지).
@@ -183,6 +190,7 @@ public class CardAnimator : MonoBehaviour
         {
             SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
+            if (IsHitEffectPart(t_sr)) continue;
             if (this.fadeExcludes.Contains(t_sr)) continue;
             t_sr.DOKill();
             t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], _duration).SetLink(gameObject);
@@ -190,6 +198,7 @@ public class CardAnimator : MonoBehaviour
         for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
             TMP_Text t_tmp = this.cachedTexts[t_i];
+            if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
             t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], _duration).SetLink(gameObject);
         }
@@ -204,12 +213,14 @@ public class CardAnimator : MonoBehaviour
         {
             SpriteRenderer t_sr = this.cachedRenderers[t_i];
             if (t_sr == this.hitOverlay) continue;
+            if (IsHitEffectPart(t_sr)) continue;
             t_sr.DOKill();
             t_sr.DOFade(_alpha * this.rendererBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
         for (int t_i = 0; t_i < this.cachedTexts.Length; t_i++)
         {
             TMP_Text t_tmp = this.cachedTexts[t_i];
+            if (IsHitEffectPart(t_tmp)) continue;
             t_tmp.DOKill();
             t_tmp.DOFade(_alpha * this.textBaseAlpha[t_i], this.moveDuration).SetLink(gameObject);
         }
@@ -334,6 +345,7 @@ public class CardAnimator : MonoBehaviour
     {
         if (_duration < 0f) _duration = GameTiming.Battle.HitDuration;
         SoundManager.Instance?.PlayHit();
+        this.hitEffect?.Play(_damage);
         PlayHitTwitch(_damage, _awayDir);
         if (this.hitOverlay == null) return;
         this.hitOverlay.DOKill();

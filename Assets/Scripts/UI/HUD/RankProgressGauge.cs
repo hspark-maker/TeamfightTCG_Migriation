@@ -2,7 +2,7 @@ using System;
 using DG.Tweening;
 using UnityEngine;
 
-// 등급 안 진행(0~1)을 그리는 게이지의 계약.
+// 단계 안 진행(0~1)을 그리는 게이지의 계약.
 // 값·트윈·마디 통과 판정은 여기서 관리하고, 구현체는 "비율을 어떻게 그리는가"와 "마디를 어디에 앉히는가"만 정한다 —
 // 게이지 그림을 갈아끼울 때 별과의 싱크가 함께 갈리지 않게 하려는 분리다(별 점등의 유일한 방아쇠가 이 통지다).
 public abstract class RankProgressGauge : MonoBehaviour

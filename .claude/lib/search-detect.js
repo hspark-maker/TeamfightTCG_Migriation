@@ -13,6 +13,7 @@
  */
 
 const DETECTOR_VERSION = 2;
+const MAP_SCOPE_OUTSIDE_MARKER = "MAP_SCOPE_OUTSIDE_V1";
 
 const MAP_NAME = "orch-feature-map.md";
 
@@ -23,6 +24,12 @@ const SEARCH_TOOLS = new Set([
   "mcp__unity-mcp__Unity_FindInFile",
   "mcp__unity-mcp__Unity_FindProjectAssets",
 ]);
+
+/* 탐색으로 치는 셸 명령의 단일 목록.
+   map-excerpt.js 가 이 목록을 읽어 "추출 규칙이 없는 명령"을 테스트에서 잡는다 —
+   한쪽에만 명령이 추가되면 "탐색으로 판정되는데 검색어는 못 뽑는" 사각지대가 생긴다.
+   실측: find 가 여기에만 있어 게이트 대상의 9.3%가 무조건 통과했다. */
+const SEARCH_COMMANDS = ["rg", "grep", "egrep", "fgrep", "find", "fd", "ack", "ag", "git grep", "dir", "ls"];
 
 /* ls 는 -R 만 재귀다. -r 은 역순 정렬이라 대소문자를 구분해야 오탐이 없다.
    그래서 이 정규식에는 /i 를 붙이면 안 된다. */
@@ -64,6 +71,45 @@ function isSearchTool(toolName, toolInput) {
   return false;
 }
 
+/* 지도가 확실히 코드를 가리키는 신호. 이게 있으면 무조건 게이트 대상이다. */
+const CODE_TARGET = /\.cs\b|Assets[\/\\]Scripts|--include=\*?\.?cs/i;
+
+/* 지도가 담지 않는 것들. 지도는 `Assets/Scripts/` 의 C# 타입만 담는다 —
+   프리팹·SO·이미지·guid·git 이력을 찾는 검색은 지도를 읽어도 답이 없다.
+   실측: 왕관 연출 세션의 검색 61건 중 27건(44%)이 .prefab/.asset 대상이었고,
+   그 요청들은 지도를 읽은 뒤에도 검색이 줄지 않았다. */
+const NON_CODE_TARGET = new RegExp([
+  "\\.(prefab|asset|meta|png|jpg|jpeg|psd|mat|anim|controller|unity|shader|shadergraph|ttf|otf|fbx|wav|mp3|spriteatlas)\\b",
+  "Assets[\\/\\\\](Assets|SO|Fonts|Resources|Plugins|Photon|PurchasedAssets|AmplifyShaderEditor|GUIPackCartoon|Scenes)[\\/\\\\]",
+  "\\bgit\\s+(?:--no-pager\\s+)?(?:diff|log|status|show|blame|ls-files|rev-list)\\b",
+  "\\b[0-9a-f]{32}\\b",                       // Unity guid
+  "(?:Library|Temp|Logs|obj|Build|Builds)[\\/\\\\]",
+  "\\.(claude|orch)[\\/\\\\]",
+].join("|"), "i");
+
+/**
+ * 이 탐색을 지도가 받아 줄 수 있나 — 게이트를 걸어도 되는 대상인지.
+ *
+ * 판단 불가면 **참**을 돌려 게이트를 건다(보수적). 지도 범위 밖 검색까지 막으면
+ * "지도 읽어라 → 읽어도 없음 → 다시 검색"이 되어 지도 없을 때보다 비싸진다.
+ */
+function isMapAnswerable(toolInput) {
+  const text = JSON.stringify(toolInput || {});
+  if (CODE_TARGET.test(text)) return true;        // 코드가 명시됐으면 에셋 경로가 섞여 있어도 게이트
+  return !NON_CODE_TARGET.test(text);
+}
+
+/** 게이트가 실제로 막아야 하는 호출 = 탐색이면서 지도가 답할 수 있는 것. */
+function shouldGate(toolName, toolInput) {
+  return isSearchTool(toolName, toolInput) && isMapAnswerable(toolInput);
+}
+
+/** 관측 전용 상한: .cs를 명시했지만 지도 범위인 Assets/Scripts는 명시하지 않은 검색. */
+function isOutsideMapScope(toolInput) {
+  const text = JSON.stringify(toolInput || {}).replace(/\\\\/g, "/");
+  return /\.cs\b/i.test(text) && !/Assets[\\/]Scripts\b/i.test(text);
+}
+
 /* 지도 열람이 성립하는 도구. Read 만 보면 안 된다 — 실측 열람 3회 중 2회가 Bash(cat/grep)였다. */
 function isMapReadTool(toolName) {
   return toolName === "Read" || toolName === "Bash" || toolName === "PowerShell";
@@ -90,6 +136,11 @@ function mapReadSucceeded(response) {
 
 module.exports = {
   DETECTOR_VERSION,
+  MAP_SCOPE_OUTSIDE_MARKER,
+  SEARCH_COMMANDS,
+  isOutsideMapScope,
+  isMapAnswerable,
+  shouldGate,
   MAP_NAME,
   MIN_MAP_OUTPUT,
   SEARCH_TOOLS,

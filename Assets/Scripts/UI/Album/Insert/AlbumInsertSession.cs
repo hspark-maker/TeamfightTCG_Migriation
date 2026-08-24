@@ -271,6 +271,7 @@ public class AlbumInsertSession : MonoBehaviour
         if (m_openTheme == _step.Theme && pageOverlay.PageIndex == _step.PageIndex) yield break;
 
         m_openTheme = _step.Theme;
+        SoundManager.Instance?.PlayCue(EOutgameSound.AlbumPageTurn);
 
         // 열려 있으면 책 넘김을, 닫혀 있으면 팝업 열기를 태운다 — 어느 쪽인지는 오버레이가 판단한다
         yield return pageOverlay.GoToPageAsync(_step.Theme, _step.PageIndex).ToCoroutine();
@@ -382,6 +383,7 @@ public class AlbumInsertSession : MonoBehaviour
         AlbumInsertMask.Reveal(_step.Card);
         this.HideCard();
 
+        SoundManager.Instance?.PlayCue(EOutgameSound.AlbumCardSeat);
         this.SettlePulse(m_slotRect);
         this.fanfare?.Play(m_slotRect, m_autoPlay);
 
@@ -489,6 +491,10 @@ public class AlbumInsertSession : MonoBehaviour
 
     void Finish()
     {
+        // 스텝을 다 소진하고 끝났을 때만 축하한다 — Finish는 건너뛰기(AbortAll)와 세션 파괴(ReleaseGuards)도 지나는
+        // 자리라, 남은 스텝이 있는 채로 들어왔으면 탭을 옮기다 축하음이 나는 꼴이 된다.
+        if (IsRunning && m_steps.Count == 0) SoundManager.Instance?.PlayCue(EOutgameSound.AlbumFanfare);
+
         // 펄스가 도는 중에 끝나면 남의 칸이 줄어든 채로 도감에 남는다 — 완료(=원래 크기 복귀)시키고 놓는다.
         if (m_slotRect != null) m_slotRect.DOComplete();
         this.fanfare?.Reset();

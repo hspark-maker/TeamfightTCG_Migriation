@@ -11,6 +11,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
     const float RowGap      = 2f;
     const float FoldoutWide = 14f;
     const float IndexWide   = 26f;
+    const float StepIdWide  = 34f;
     const float ActionWide  = 104f;
     const float AnchorWide  = 152f;
 
@@ -65,6 +66,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         float t_left = _rect.width - FoldoutWide;
 
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, IndexOf(_property), EditorStyles.miniLabel);
+        DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, StepIdLabel(_property), EditorStyles.miniLabel, StepIdWide);
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, _action.ToString(), EditorStyles.boldLabel, ActionWide);
         DrawColumn(ref t_x, ref t_left, _rect.y, _lineHeight, AnchorLabel(_property, _action), EditorStyles.miniLabel, AnchorWide);
 
@@ -81,9 +83,13 @@ public class TutorialStepDefDrawer : PropertyDrawer
         s_tailStyle ??= new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Italic };
 
     static void DrawColumn(ref float _x, ref float _left, float _y, float _height, string _text, GUIStyle _style, float _width = IndexWide)
+        => DrawColumn(ref _x, ref _left, _y, _height, new GUIContent(_text), _style, _width);
+
+    // 툴팁을 실을 수 있는 쪽. 필드로 노출하지 않는 값(stepId)의 안내가 여기로 온다.
+    static void DrawColumn(ref float _x, ref float _left, float _y, float _height, GUIContent _content, GUIStyle _style, float _width = IndexWide)
     {
         float t_width = Mathf.Min(_width, Mathf.Max(0f, _left));
-        if (t_width > 0f) EditorGUI.LabelField(new Rect(_x, _y, t_width, _height), _text, _style);
+        if (t_width > 0f) EditorGUI.LabelField(new Rect(_x, _y, t_width, _height), _content, _style);
 
         _x    += t_width;
         _left -= t_width;
@@ -95,27 +101,45 @@ public class TutorialStepDefDrawer : PropertyDrawer
     {
         yield return "action";
 
-        if (TutorialStepDef.UsesAnchor(_action))         yield return "anchor";
-        if (TutorialStepDef.UsesAnchor(_action) && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
-        if (TutorialStepDef.ShowsGuideMessage(_action))  yield return "guideMessage";
-        if (TutorialStepDef.UsesMessagePlacement(_action)) yield return "messageAtBottom";
-        if (TutorialStepDef.UsesFreeOfCharge(_action))   yield return "freeOfCharge";
-        if (TutorialStepDef.UsesPack(_action))           yield return "pack";
-        if (TutorialStepDef.UsesPackPriceLabel(_action)) yield return "packPriceLabel";
-        if (TutorialStepDef.UsesScenario(_action))       yield return "scenario";
-        if (TutorialStepDef.UsesCard(_action))           yield return "card";
-        if (TutorialStepDef.UsesCards(_action))          yield return "cards";
-        if (TutorialStepDef.UsesRewardTitle(_action))    yield return "rewardTitle";
-        if (TutorialStepDef.UsesShowDeckGate(_action))   yield return "showDeckGate";
-        if (TutorialStepDef.UsesDeckName(_action))       yield return "deckName";
-        if (TutorialStepDef.UsesFailurePolicy(_action))  yield return "onFailure";
-        if (TutorialStepDef.UsesDim(_action))            yield return "useDim";
+        EStepField t_fields = TutorialStepDef.FieldsOf(_action);
+
+        for (int t_i = 0; t_i < s_order.Length; t_i++)
+        {
+            if ((t_fields & s_order[t_i].Field) == 0) continue;
+
+            yield return s_order[t_i].Name;
+
+            // 도감 칸처럼 대상이 여럿인 앵커만 "어느 것"까지 저작받는다(축이 앵커라 테이블 밖이다).
+            if (s_order[t_i].Field == EStepField.Anchor && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
+        }
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
         yield return "unlocksAll";
         yield return "unlocks";
         yield return "locks";
     }
+
+    // 필드 축 ↔ 직렬화 필드명, 그리고 저작 순서. 새 축을 늘릴 때 손댈 곳은 여기 한 줄뿐이다
+    // (무엇이 보이는가는 TutorialActionMeta의 테이블이 정하고, 이 표는 이름과 순서만 안다).
+    static readonly (EStepField Field, string Name)[] s_order =
+    {
+        (EStepField.Anchor,           "anchor"),
+        (EStepField.GuideMessage,     "guideMessage"),
+        (EStepField.MessagePlacement, "messageAtBottom"),
+        (EStepField.FreeOfCharge,     "freeOfCharge"),
+        (EStepField.WaitUnlockIntro,  "waitUnlockIntro"),
+        (EStepField.Pack,             "pack"),
+        (EStepField.PackPriceLabel,   "packPriceLabel"),
+        (EStepField.Scenario,         "scenario"),
+        (EStepField.Card,             "card"),
+        (EStepField.Cards,            "cards"),
+        (EStepField.RewardTitle,      "rewardTitle"),
+        (EStepField.ParallelGain,     "parallelGain"),
+        (EStepField.ShowDeckGate,     "showDeckGate"),
+        (EStepField.DeckName,         "deckName"),
+        (EStepField.FailurePolicy,    "onFailure"),
+        (EStepField.Dim,              "useDim"),
+    };
 
     static EOutgameTutorialAction ActionOf(SerializedProperty _property)
     {
@@ -174,6 +198,19 @@ public class TutorialStepDefDrawer : PropertyDrawer
     }
 
     static string Truncate(string _text, int _max) => _text.Length <= _max ? _text : _text.Substring(0, _max) + "…";
+
+    // 세이브가 이 스텝을 지목하는 번호. 읽기 전용 표기다 — 값을 만지는 것은 시퀀스 SO의 [스텝 ID 부여]뿐이라
+    // 필드로 노출하지 않는다. 그래서 저작자용 안내를 이 열의 툴팁으로 붙인다(필드 [Tooltip]은 뜰 자리가 없다).
+    static GUIContent StepIdLabel(SerializedProperty _property)
+    {
+        var t_field = _property.FindPropertyRelative("stepId");
+        int t_id    = t_field != null ? t_field.intValue : 0;
+
+        return new GUIContent(t_id > 0 ? "#" + t_id : "#-",
+            t_id > 0
+                ? $"세이브가 이 스텝을 붙잡는 번호 #{t_id}. 스텝을 옮기거나 끼워 넣어도 진행 중인 세이브가 이 번호를 따라온다."
+                : "아직 번호가 없다 — 시퀀스 SO 우클릭 [스텝 ID 부여]를 돌려라. 그때까지 이 스텝은 좌표로만 지목되어 저작이 바뀌면 밀린다.");
+    }
 
     // 배열 요소의 순번. 요약 줄의 첫 열이라 propertyPath에서 뽑는다("...stepDefs.Array.data[3]").
     static string IndexOf(SerializedProperty _property)

@@ -98,10 +98,88 @@ public static class OutgameTutorialRunner
 
             // 매 부트 복구가 도는 좌표는 막힌 좌표가 아니다 — 정지 판정을 새 좌표에서 다시 세지 않으면
             // 게이트 구간에서 세 번 껐다 켜는 것만으로 fail-open이 오발동한다.
+            // 낙인까지 함께 걷는다: 카운터만 0으로 돌리면 이미 선 s_stalled가 남아 이번 세션은 전 기능이 열린 채다.
             OutgameTutorialProgress.ResetStallWatch();
+            OutgameFeatureLock.ClearStall();
             OutgameFeatureLock.Refresh();
             return;
         }
+    }
+
+    /// <summary>세이브가 붙잡아 둔 스텝 번호로 진행 좌표를 되찾는다. 부트에서 <b>EnsureData 직후,
+    /// RewindToPendingBattleEntry 직전</b>에 1회 부른다 — 되감기는 현재 좌표에서 같은 챕터를
+    /// 역방향으로 훑으므로, 좌표가 낡은 채로 그쪽이 먼저 돌면 엉뚱한 챕터를 뒤진다.
+    ///
+    /// 세션 가드를 두지 않는 이유는 필요가 없어서다 — 호출처가 부트 1곳뿐이고, 좌표가 이미 맞으면
+    /// 조기 반환이라 어디서 다시 불려도 무해하다.</summary>
+    public static void ResolveProgressAnchor()
+    {
+        if (s_data == null || OutgameTutorialProgress.IsCompleted) return;
+
+        int t_id = OutgameTutorialProgress.StepId;
+
+        // 앵커가 없는 세이브(옛 세이브·되감기가 새로 만든 슬롯·ID 미부여 시퀀스)는 좌표가 정본이다.
+        if (t_id <= 0) { StampAnchorAtCoord(); return; }
+
+        if (!TryFindStepId(t_id, out int t_chapter, out int t_step))
+        {
+            // 스텝이 삭제됐다 — 좌표 기준으로 되돌아간다(ID 도입 이전과 같은 동작).
+            Debug.LogWarning($"[OutgameTutorialRunner] 세이브가 가리키는 스텝 #{t_id}이(가) 시퀀스에 없습니다 — 좌표 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}를 그대로 씁니다.");
+            StampAnchorAtCoord();
+            return;
+        }
+
+        if (t_chapter == OutgameTutorialProgress.ChapterIndex && t_step == OutgameTutorialProgress.StepIndex) return;
+
+        Debug.Log($"[OutgameTutorialRunner] 스텝 #{t_id}이(가) {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} → {t_chapter}-{t_step}로 옮겨졌습니다 — 좌표를 따라갑니다.");
+
+        OutgameTutorialProgress.CommitStep(t_chapter, t_step);
+
+        // 정지 감시는 카운터와 낙인 둘 다 걷어야 한다. Progress.Init()의 DetectStall이 **낡은 좌표로 먼저** 돌아
+        // 임계치를 넘겼다면 s_stalled가 이미 서 있는데, 그건 static이라 카운터만 0으로 돌려서는 안 걷힌다
+        // — 그대로 두면 좌표를 바로잡고도 이번 세션 내내 전 기능이 열린 채다.
+        OutgameTutorialProgress.ResetStallWatch();   // 저작이 옮긴 좌표는 "막힌 좌표"가 아니다
+        OutgameFeatureLock.ClearStall();
+        OutgameFeatureLock.Refresh();                // 해금은 좌표에서 파생된다
+    }
+
+    // 좌표가 가리키는 스텝의 번호(미주입·범위 밖·빈 칸이면 0)
+    public static int StepIdAt(int _chapter, int _step)
+        => TryGetStepAt(_chapter, _step, out var t_def) ? t_def.StepId : 0;
+
+    // 지금 좌표의 스텝 번호를 앵커로 도장한다. 좌표에 스텝이 없으면(졸업 직전의 끝 좌표 센티넬 등)
+    // 아무 것도 쓰지 않는다 — 0으로 남아야 CloseOrWarnOnMissingStep의 졸업 확정이 그대로 산다.
+    static void StampAnchorAtCoord()
+    {
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_step    = OutgameTutorialProgress.StepIndex;
+
+        if (StepIdAt(t_chapter, t_step) <= 0) return;
+
+        OutgameTutorialProgress.CommitStep(t_chapter, t_step);   // 좌표는 그대로, 앵커만 채워진다
+    }
+
+    // 번호로 좌표 찾기. 33칸을 부트에 한 번 훑을 뿐이라 사전도 캐시도 만들지 않는다.
+    // 번호가 겹치면 먼저 나온 칸이 이긴다(CardCatalog.SetSource와 같은 규칙).
+    static bool TryFindStepId(int _id, out int _chapter, out int _step)
+    {
+        for (int t_c = 0; t_c < ChapterCount; t_c++)
+        {
+            if (!TryGetChapter(t_c, out var t_chapter)) continue;
+
+            for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
+            {
+                if (!t_chapter.TryGetStep(t_s, out var t_def) || t_def.StepId != _id) continue;
+
+                _chapter = t_c;
+                _step    = t_s;
+                return true;
+            }
+        }
+
+        _chapter = 0;
+        _step    = 0;
+        return false;
     }
 
     // 저작된 챕터의 스텝 수(범위 밖·빈 챕터는 0)
@@ -294,6 +372,41 @@ public static class OutgameTutorialRunner
             if (!t_chapter.TryGetStep(t_chapter.StepCount - 1, out var t_last) || !t_last.LeavesScene)
                 Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}('{t_chapter.Label}') 마지막 스텝이 씬을 떠나지 않습니다 — 챕터는 전투 스텝으로 끝나야 합니다.");
         }
+
+        WarnOnBadStepIds();
 #endif
     }
+
+#if UNITY_EDITOR
+    // 세이브 앵커가 성립하지 않는 저작을 부트에서 소리내어 잡는다. 부여 도구는 사람이 눌러야 도는데,
+    // 안 누른 채로 두면 복제본에 서 있던 세이브가 앞 원본으로 되감겨 지급이 다시 실행된다.
+    static void WarnOnBadStepIds()
+    {
+        var t_seen = new Dictionary<int, string>();
+
+        for (int t_c = 0; t_c < ChapterCount; t_c++)
+        {
+            if (!TryGetChapter(t_c, out var t_chapter)) continue;
+
+            for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
+            {
+                if (!t_chapter.TryGetStep(t_s, out var t_def)) continue;
+
+                if (t_def.StepId <= 0)
+                {
+                    Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {t_c}-{t_s}({t_def.Action})에 ID가 없습니다 — 시퀀스 SO의 [스텝 ID 부여]를 돌리세요. 지금은 좌표로만 지목되어 저작이 바뀌면 밀립니다.");
+                    continue;
+                }
+
+                if (t_seen.TryGetValue(t_def.StepId, out string t_first))
+                {
+                    Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {t_c}-{t_s}가 {t_first}과(와) 같은 ID #{t_def.StepId}입니다(행 복제?) — [스텝 ID 부여]를 돌리세요. 지금은 앞 칸이 이겨 진행이 그리로 되감깁니다.");
+                    continue;
+                }
+
+                t_seen[t_def.StepId] = $"{t_c}-{t_s}";
+            }
+        }
+    }
+#endif
 }

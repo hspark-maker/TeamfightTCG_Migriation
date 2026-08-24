@@ -33,8 +33,8 @@ public static class CardSpecImporter
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
-        "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
-        "cardExplain",
+        "hp2", "hp3", "hp4",
+        "cardExplain", "grade",
     };
 
     [MenuItem("Tools/Card Battle/스펙시트(라이브) → 카드 에셋 적용")]
@@ -160,18 +160,21 @@ public static class CardSpecImporter
         var t_byName = new Dictionary<string, FieldInfo>(t_fields.Length);
         foreach (FieldInfo t_f in t_fields) t_byName[t_f.Name] = t_f;
 
-        var t_columns = new List<string>(Columns.Length);
+        var t_validColumns = new List<string>(Columns.Length);
         foreach (string t_column in Columns)
-            if (t_byName.ContainsKey(t_column)) t_columns.Add(t_column);
+        {
+            if (t_byName.ContainsKey(t_column))
+                t_validColumns.Add(t_column);
+            else
+                Debug.LogWarning($"[CardSpec] {_rowType.Name} 시트에 '{t_column}' 열이 없다 — 그 축은 이번 적용에서 건너뛴다.");
+        }
 
-        // 없는 축을 빈 셀로 만들면 CardTableTool은 "열이 존재하고 값이 비었다"고 해석해
-        // 기존 에셋 값을 기본값으로 덮을 수 있다. 헤더부터 빼야 ContainsKey 게이트가 그 축을 보존한다.
-        var t_rows = new List<List<string>> { t_columns };
+        var t_rows = new List<List<string>> { new List<string>(t_validColumns) };
 
         foreach (object t_card in _rows)
         {
-            var t_row = new List<string>(t_columns.Count);
-            foreach (string t_column in t_columns)
+            var t_row = new List<string>(t_validColumns.Count);
+            foreach (string t_column in t_validColumns)
                 t_row.Add(Text(t_byName[t_column].GetValue(t_card)));
 
             t_rows.Add(t_row);

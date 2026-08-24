@@ -15,18 +15,18 @@ MonoBehaviour:
   id: 30
   displayName: "\uD3ED\uD0C4\uBC24"
   channel: 1
+  grade: 1
   keywords: 0
   maxHp: 4
   bonusHp: 0
   synergies: []
   battleImage: {fileID: 21300000, guid: 76d80665c27d779480ce8fffb3b46c79, type: 3}
   deckPreview: {fileID: 21300000, guid: 9bbae6d887fa66f41be087f0e7f7ff1d, type: 3}
-  hpGainByLevel: 0000000000000000020000000200000001000000010000000100000002000000010000000100000001000000
+  hpGainByLevel: 0000000000000000050000000400000003000000
   keywordUnlockLevel: 0
   evolvedArts:
   - battleImage: {fileID: 21300000, guid: 70f0676187d02464b92642a77e243994, type: 3}
   - battleImage: {fileID: 21300000, guid: f9b23a5140815df498d0cd93c39d66ca, type: 3}
-  - battleImage: {fileID: 0}
   defaultEvolutionStage: 0
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0

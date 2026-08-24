@@ -192,10 +192,10 @@ RectTransform:
   - {fileID: 3695250772657339563}
   m_Father: {fileID: 3305848328861197052}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 380, y: -140}
-  m_SizeDelta: {x: 230, y: 280}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &4034562904161412494
 MonoBehaviour:
@@ -1050,7 +1050,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &8784239543481267473
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1245,6 +1245,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb445d9e5520717438622ad14a76e609, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeywordGrowthPanel
+  animator: {fileID: 0}
+  contents: {fileID: 0}
+  isShow: 0
   root: {fileID: 4311466736855829682}
   grid: {fileID: 3305848328861197052}
   cellPrefab: {fileID: 4034562904161412494}
@@ -1262,6 +1265,7 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
+  dimAlpha: 0.75
 --- !u!1 &5395318737283933309
 GameObject:
   m_ObjectHideFlags: 0

@@ -50,7 +50,7 @@ internal static class AlbumBuilder
 
         return new AlbumTheme(
             _def.themeId, _def.displayName, _def.icon, _def.frame, _def.namePlate, _def.cellPrefab,
-            NormalizeRewards(_def.rewards), t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
+            ResolveRewards(_def.themeId, null, _def.rewards), t_pages.AsReadOnly(), t_cards.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
     }
 
     static AlbumPage BuildPage(string _themeKey, bool _themeStable, int _index, AlbumPageDef _def)
@@ -71,9 +71,15 @@ internal static class AlbumBuilder
         }
 
         return new AlbumPage(
-            _def.pageId, _index, NormalizeRewards(_def.rewards), _themeKey, t_stable,
+            _def.pageId, _index, ResolveRewards(_themeKey, _def.pageId, _def.rewards), _themeKey, t_stable,
             t_cards.AsReadOnly(), t_ids.AsReadOnly());
     }
+
+    // 값의 진실원은 스펙시트다 — 시트에 그 키의 줄이 없을 때만 SO 저작값으로 떨어진다
+    static IReadOnlyList<AlbumRewardDef> ResolveRewards(string _themeId, string _pageId, List<AlbumRewardDef> _authored)
+        => AlbumSpec.TryGetRewards(_themeId, _pageId, out List<AlbumRewardDef> t_spec)
+            ? t_spec
+            : NormalizeRewards(_authored);
 
     // def의 List는 null일 수 있다 — 소비자가 매번 null 가드하지 않게 빈 목록으로 정규화
     static IReadOnlyList<AlbumRewardDef> NormalizeRewards(List<AlbumRewardDef> _rewards)

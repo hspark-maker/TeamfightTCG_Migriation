@@ -143,12 +143,29 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
+        if (GUILayout.Button("TOURNAMENT NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentTournamentNode();
 
+        DrawRarityPackControls();
         DrawCurrencyGrants();
         DrawTierControls();
         DrawChapterJumps();
 
         GUILayout.EndScrollView();
+    }
+
+    void DrawRarityPackControls()
+    {
+        ECardGrade t_grade = ECardGrade.Unknown;
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("RARE",   GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Rare;
+        if (GUILayout.Button("ARCANE", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Arcane;
+        if (GUILayout.Button("MYTHIC", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Mythic;
+        GUILayout.EndHorizontal();
+
+        if (t_grade == ECardGrade.Unknown) return;
+        SetOpen(false);
+        OutgameDebugActions.OpenRarityTestPack(t_grade);
     }
 
     // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
@@ -157,7 +174,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         RankInfo t_info = RankManager.GetInfo();
 
         string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
-        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI Lv{RankManager.AiCardLevel})  ※ ±는 씬 재진입 시 연출");
+        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI {GrowthStar.Label(RankManager.AiCardLevel)})");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();

@@ -1,12 +1,12 @@
-﻿카드 키워드(비트 플래그),키워드 비트값,#,카드 노출 채널,채널 값
-CARD_KEYWORD,flag_value:CARD_KEYWORD,#,CARD_CHANNEL,value:CARD_CHANNEL
-None,0,,TestOnly,0
-Ranged,1,,Live,1
-Peerless,2,,,
-Execution,4,,,
-Taunt,8,,,
-Cunning,16,,,
-Mark,32,,,
-Healer,64,,,
-Invincible,128,,,
-BonusHp,256,,,
+﻿카드 키워드(비트 플래그),키워드 비트값,#,카드 노출 채널,채널 값,#,카드 등급,등급 값
+CARD_KEYWORD,flag_value:CARD_KEYWORD,#,CARD_CHANNEL,value:CARD_CHANNEL,#,CARD_GRADE,value:CARD_GRADE
+None,0,,TestOnly,0,,Unknown,0
+Ranged,1,,Live,1,,Common,1
+Peerless,2,,,,,Rare,2
+Execution,4,,,,,Arcane,3
+Taunt,8,,,,,Mythic,4
+Cunning,16,,,,,,
+Mark,32,,,,,,
+Healer,64,,,,,,
+Invincible,128,,,,,,
+BonusHp,256,,,,,,

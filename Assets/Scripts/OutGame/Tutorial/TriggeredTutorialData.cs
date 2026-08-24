@@ -21,6 +21,17 @@ public class TriggeredTutorialEntry
 
     public int StepCount => stepDefs != null ? stepDefs.Count : 0;
 
+#if UNITY_EDITOR
+    // 저작 도구 전용 — 런타임은 읽기만 한다(TryGetStep/StepCount). 편집 규칙은 TutorialSequenceEditOps에 있다.
+    public List<TutorialStepDef> EditorSteps => stepDefs ??= new List<TutorialStepDef>();
+
+    // 저작 도구 전용 — 런타임은 읽기만 한다(Label)
+    public string EditorLabel { get => label; set => label = value; }
+
+    // 저작 도구 전용 — 런타임은 읽기만 한다(Trigger). 이 값이 완주 낙인 식별자라 바꾸면 낙인이 갈린다.
+    public EOutgameTutorialTrigger EditorTrigger { get => trigger; set => trigger = value; }
+#endif
+
     // 순번의 스텝 조회 — 범위 밖·빈 칸이면 false
     public bool TryGetStep(int _index, out TutorialStepDef _step)
     {

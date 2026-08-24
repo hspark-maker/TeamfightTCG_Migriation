@@ -13,14 +13,17 @@ MonoBehaviour:
   m_Name: Data_Synergy_Flow
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
   displayName: "\uD750\uB984"
-  effectDescription: "\uD750\uB984 \uCE74\uB4DC\uAC00 \uB098\uC62C \uB54C \uD750\uB984
-    \uC911\uCCA9+1. \uC911\uCCA9\uB2F9 \uC8FC\uB294 \uD53C\uD574 +1"
+  effectDescription: "흐름 카드 등장 시 스택 +1/+2. 흐름 카드가 공격/반격으로 주는 피해가 스택만큼 증가"
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 6fd7e39804ddcec43ac9ba8a0aae1ea6, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 506a57c45d0495e47a3cad2e490f05c8, type: 3}
   vfx: {fileID: 11400000, guid: 9a51fecb872aff64ab428706c333400f, type: 2}
   tiers:
-  - requiredCount: 4
+  - requiredCount: 3
     label: "\uD750\uB984"
     effects:
     - {fileID: 11400000, guid: 7c577ba35b9538a4585c1423e80fc3ef, type: 2}
+  - requiredCount: 5
+    label: "흐름"
+    effects:
+    - {fileID: 11400000, guid: 1c30f3713cc349d5948a9ae4edbc2f95, type: 2}

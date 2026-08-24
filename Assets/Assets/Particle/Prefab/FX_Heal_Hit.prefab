@@ -24427,6 +24427,7 @@ GameObject:
   - component: {fileID: 3315440987000904105}
   - component: {fileID: 1418645236112101207}
   - component: {fileID: 5222279516236456954}
+  - component: {fileID: -3093654968097464929}
   m_Layer: 6
   m_Name: FX_Heal_Hit
   m_TagString: Untagged
@@ -29253,3 +29254,16 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-3093654968097464929
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7908370566408257381}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0

@@ -44,12 +44,12 @@ public static class AttackProcessor
 
         // ---- 고정 시퀀스 (순서 변경 금지) ----
         int t_defenderHpBefore = _defender.hp + _defender.bonusHp;
-        _defender.TakeDamage(t_atkDmg, true); // 직격: 비늘 감소 대상
+        _defender.TakeDamage(t_atkDmg);
         int t_actualAtkDmg = t_defenderHpBefore - (_defender.hp + _defender.bonusHp);
 
         int t_attackerHpBefore = _attacker.hp + _attacker.bonusHp;
         if (t_takesCounter)
-            _attacker.TakeDamage(t_ctrDmg); // 반격: 비늘 감소 없음(기본 false)
+            _attacker.TakeDamage(t_ctrDmg);
         int t_actualCtrDmg = t_takesCounter
             ? t_attackerHpBefore - (_attacker.hp + _attacker.bonusHp)
             : 0;
@@ -62,10 +62,10 @@ public static class AttackProcessor
             t_splash = _preSelectedSplash ?? PickSplash(_defender.slotIndex, _defenderField);
             t_splashHit = t_splash != null && t_splashDmg > 0; // 0 데미지로 무적 태우지 않기
             if (t_splashHit)
-                t_splash.TakeDamage(t_splashDmg, true); // 스플래시도 공격 직격: 비늘 감소 대상
+                t_splash.TakeDamage(t_splashDmg);
         }
 
-        AttackFlow.RunAttacked(_defender, _attacker, _defenderField, _attackerField); // 패시브 Attacked + 성벽 반격(동기)
+        AttackFlow.RunAttacked(_defender, _attacker, _defenderField, _attackerField); // 패시브/시너지 Attacked(동기)
         // 광역 피격자도 같은 직격이므로 시너지 [Attacked]를 발화한다(패시브는 제외 — RunSplashAttacked 주석 참조).
         if (t_splashHit)
             AttackFlow.RunSplashAttacked(t_splash, _attacker, _defenderField, _attackerField);
@@ -94,9 +94,9 @@ public static class AttackProcessor
         if (_attacker.IsAlive && _defender.IsAlive && _attacker.HasVanillaEnhance)
         {
             int t_enhanceRaw = _attacker.VanillaEnhanceDamage();
-            // 추가타도 '공격 직격'이라 비늘·성벽 감소를 다시 받는다.
+            // 추가타도 별도 피해 1회라 보호막·비늘 판정을 다시 받는다.
             int t_before = _defender.hp + _defender.bonusHp;
-            _defender.TakeDamage(t_enhanceRaw, true);
+            _defender.TakeDamage(t_enhanceRaw);
             t_enhanceDmg = t_before - (_defender.hp + _defender.bonusHp);
         }
 
@@ -165,8 +165,13 @@ public static class AttackProcessor
         };
     }
 
-    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.</summary>
-    static void RemoveDead(BattleField _field)
+    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.
+    ///
+    /// public인 이유는 디버그 도구(<c>Test/BattleDebugKill</c>) 하나 때문이다 — 그쪽이 카드를 강제로
+    /// 죽인 뒤 **같은 순서**로 정리해야 훅(Lethal/Removed)이 전투와 똑같이 돈다.
+    /// 전투 규칙 쪽에서 새로 부르지 마라: 호출 지점은 지금도 Resolve 하나뿐이고,
+    /// 치사 래치보다 먼저 부르면 언데드 부활 판정이 뒤집힌다.</summary>
+    public static void RemoveDead(BattleField _field)
     {
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {

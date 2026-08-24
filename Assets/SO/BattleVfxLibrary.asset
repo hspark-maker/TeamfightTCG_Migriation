@@ -70,8 +70,8 @@ MonoBehaviour:
     speedByStrength: {x: 0, y: 0}
   - id: 8
     prefab: {fileID: 2129740873354057291, guid: 6f0ba736d21c3ce48ba3fd1adbad747a, type: 3}
-    localOffset: {x: 0, y: 0, z: 0}
-    initialRotation: {x: 0, y: 0, z: 0}
+    localOffset: {x: 0, y: -1.5, z: 0}
+    initialRotation: {x: 0, y: 0, z: 60}
     lifetime: 1.2
     sortingOrder: 30
     scale: 1

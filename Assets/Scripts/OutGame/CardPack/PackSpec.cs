@@ -6,6 +6,8 @@ using UnityEngine;
 public static class PackSpec
 {
     static bool s_loaded;
+    static bool s_warnedCatalogNotReady;
+    static bool s_warnedUnresolvedDrops;
     static readonly Dictionary<string, CardPack> s_packs = new Dictionary<string, CardPack>();
     static readonly Dictionary<string, List<CardPackDrop>> s_drops = new Dictionary<string, List<CardPackDrop>>();
 
@@ -39,12 +41,30 @@ public static class PackSpec
         }
         if (!t_found) return t_result;
 
+        if (!CardCatalog.IsReady)
+        {
+            if (!s_warnedCatalogNotReady)
+            {
+                s_warnedCatalogNotReady = true;
+                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 부팅에서는 BootInstaller가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
+            }
+            return t_result;
+        }
+
+        int t_selectedRowCount = 0;
         foreach (CardPackDrop t_row in t_rows)
         {
             if (ParseGrade(t_row.minGrade) != t_best) continue;
+            t_selectedRowCount++;
             if (!CardCatalog.TryGet(t_row.cardId, out CardData t_card)) continue;
 
             t_result.Add(new WeightedCard { card = t_card, weight = Mathf.Max(1, t_row.weight) });
+        }
+
+        if (t_result.Count != t_selectedRowCount && !s_warnedUnresolvedDrops)
+        {
+            s_warnedUnresolvedDrops = true;
+            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 CardRegistry/CardPackDrop을 맞춰야 한다.");
         }
         return t_result;
     }
@@ -54,19 +74,8 @@ public static class PackSpec
         if (s_loaded) return;
         s_loaded = true;   // 실패해도 매 조회마다 재파싱하지 않는다(폴백으로 계속 돈다).
 
-        string t_json = SpecDataResourceLoader.LoadSpecData();
-        if (string.IsNullOrEmpty(t_json))
-        {
-            Debug.LogWarning("[PackSpec] SpecData 리소스를 못 읽었다. 팩은 SO 인스펙터 값으로 돈다.");
-            return;
-        }
-
-        var t_manager = new SpecDataManager();
-        if (!t_manager.Load(t_json))
-        {
-            Debug.LogWarning("[PackSpec] SpecData 파싱 실패. 팩은 SO 인스펙터 값으로 돈다.");
-            return;
-        }
+        SpecDataManager t_manager = SpecSource.Manager;
+        if (t_manager == null) return;   // 못 읽은 경고는 SpecSource가 이미 냈다. 팩은 SO 인스펙터 값으로 돈다.
 
         IReadOnlyList<CardPack> t_packRows = t_manager.CardPack?.All;
         if (t_packRows != null)
