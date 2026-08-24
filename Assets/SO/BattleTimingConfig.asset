@@ -91,4 +91,4 @@ MonoBehaviour:
   enemyExtraAttackDelay: 0.33
   opponentTurnStartDelay: 0.42
   opponentExtraAttackDelay: 0.33
-  turnThinkTime: 999
+  turnThinkTime: 30
