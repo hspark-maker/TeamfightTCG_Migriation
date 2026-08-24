@@ -474,6 +474,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
+        ContextCurrencySlot.Request(this, ECurrencyType.Shard);
+
         // 이 오버레이의 배경판은 상단바 **아래**에서 시작한다(바를 덮으면 재화가 안 보인다).
         // 그래서 바의 둥근 좌우 모서리 틈으로 로비가 그대로 비친다 — 그 뒤를 Content 딤이 메운다.
         // Content 딤은 로비 셸 안에서 바보다 아래에 깔려 있어 **바 자체는 덮지 않고 뒤만** 어둡게 한다.
@@ -525,6 +527,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         // 요청을 물리면 아래에 깔린 화면(페이지 오버레이)의 범위가 다시 적용된다.
         LobbyShellBars.Show(this);
+        ContextCurrencySlot.Release(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
 
@@ -1822,15 +1825,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
 
+                // 요구치는 이름 뒤에 붙인다("덩치 2장/4장") — 아래 설명줄까지 눈을 내렸다 올릴 것 없이
+                // 칩 한 줄에서 "무엇이 몇 장에 켜지는가"가 끝난다.
                 // 아이콘 배율은 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
+                string t_req  = SynergyText.Requirement(t_syn);
+                string t_name = string.IsNullOrEmpty(t_req) ? SynergyText.Name(t_syn)
+                                                            : $"{SynergyText.Name(t_syn)} {t_req}";
+
                 if (TryShowChip(this.synergyChipRoot, t_used, "시너지",
-                                t_syn.activeIcon, SynergyText.Name(t_syn),
+                                t_syn.activeIcon, t_name,
                                 SynergyIconStrip.IconPadCompensation, t_open))
                     t_used++;
 
-                // 효과만이 아니라 발동 요구치까지 적는다 — "몇 장 모으면 켜지는가"가 시너지의 본체이고,
-                // 해금 안내(UnlockIntro)와 같은 포맷이어야 방금 읽은 것을 여기서 다시 찾을 수 있다.
-                t_lines.Add(SynergyText.Body(t_syn));
+                // 아래 줄에는 효과 설명만 남긴다(요구치는 위 칩이 들고 있다).
+                // 설명이 비어 있는 시너지는 요구치라도 적어 준다 — 그 자리가 통째로 "없음"이 되지 않게.
+                string t_effect = SynergyText.Effect(t_syn);
+                t_lines.Add(string.IsNullOrEmpty(t_effect) ? t_name : t_effect);
             }
         }
 

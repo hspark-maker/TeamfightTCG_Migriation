@@ -75,6 +75,8 @@ public class AlbumTabController : LobbyTabPanel
 
         Refresh();
 
+        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
+
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
         TryBeginInsert();
     }
@@ -84,6 +86,8 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
+
+        ContextCurrencySlot.Release(this);
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;
