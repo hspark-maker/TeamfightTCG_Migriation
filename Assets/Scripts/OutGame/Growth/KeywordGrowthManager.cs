@@ -21,6 +21,27 @@ public static class KeywordGrowthManager
 
     public static bool IsReady => s_initialized;
 
+    /// <summary>지원 키워드 중 하나라도 다음 스텝이 있고 그 값을 낼 수 있는가(튜토리얼 무료 한 방 보정 포함).</summary>
+    public static bool HasAnyAffordableStep
+    {
+        get
+        {
+            // 세이브를 읽기 전엔 전 키워드가 레벨 0으로 보인다 — 가드가 없으면 "첫 스텝은 싸다"로 참이 된다.
+            if (!s_initialized) return false;
+
+            CardKeyword[] t_supported = Config.SupportedKeywords;
+            if (t_supported == null) return false;
+
+            for (int t_i = 0; t_i < t_supported.Length; t_i++)
+            {
+                if (!TryGetNextStep(t_supported[t_i], out GrowthStep t_step)) continue;
+                if (CurrencyManager.CanAfford(t_step.Currency, t_step.Cost)) return true;
+            }
+
+            return false;
+        }
+    }
+
     public static void SetConfig(KeywordGrowthConfig _config)
     {
         if (_config != null) s_config = _config;
