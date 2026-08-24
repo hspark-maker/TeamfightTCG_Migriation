@@ -17,6 +17,14 @@ public class SynergyExplainPopupUI : PooledUIBase
     [SerializeField] Image    accent;      // SynergyData.color 강조(선택)
     [SerializeField] float    iconGap = 8f;
 
+    RectTransform     m_anchor;
+    bool              m_hasWorldAnchor;
+    Vector3           m_worldAnchor;
+    float             m_worldHalfWidth;
+    Rect              m_lastSafeArea;
+    Vector2Int        m_lastScreen;
+    ScreenOrientation m_lastOrientation;
+
     public override void Initialization(UIData _data)
     {
         if (_data is not SynergyExplainData t_d || t_d.synergy == null) return;
@@ -36,12 +44,36 @@ public class SynergyExplainPopupUI : PooledUIBase
         if (this.accent      != null) this.accent.color     = t_s.TintOrWhite;   // 미배정 색이면 투명해지므로 폴백
 
         // 배치 규칙은 PopupPlacer가 단독 소유(키워드 팝업/시너지 툴팁과 동일 동작).
-        if (t_d.iconRect != null)
-            PopupPlacer.PlaceBesideAnchor((RectTransform)transform, t_d.iconRect, this.iconGap);
-        else if (t_d.hasWorldAnchor)   // 인게임 카드 배지 = 월드 스페이스
-            PopupPlacer.PlaceBesideWorldPoint((RectTransform)transform,
-                t_d.worldAnchor, t_d.worldHalfWidth, this.iconGap);
+        this.m_anchor         = t_d.iconRect;
+        this.m_hasWorldAnchor = t_d.hasWorldAnchor;
+        this.m_worldAnchor    = t_d.worldAnchor;
+        this.m_worldHalfWidth = t_d.worldHalfWidth;
+        Reposition();
     }
+
+    void LateUpdate()
+    {
+        if (!this.isShow || !ScreenStateChanged()) return;
+        Reposition();
+    }
+
+    void Reposition()
+    {
+        if (this.m_anchor != null)
+            PopupPlacer.PlaceBesideAnchor((RectTransform)transform, this.m_anchor, this.iconGap);
+        else if (this.m_hasWorldAnchor)
+            PopupPlacer.PlaceBesideWorldPoint((RectTransform)transform,
+                this.m_worldAnchor, this.m_worldHalfWidth, this.iconGap);
+
+        this.m_lastSafeArea    = Screen.safeArea;
+        this.m_lastScreen      = new Vector2Int(Screen.width, Screen.height);
+        this.m_lastOrientation = Screen.orientation;
+    }
+
+    bool ScreenStateChanged()
+        => Screen.safeArea != this.m_lastSafeArea
+           || Screen.width != this.m_lastScreen.x || Screen.height != this.m_lastScreen.y
+           || Screen.orientation != this.m_lastOrientation;
 
     public override void Show()
     {

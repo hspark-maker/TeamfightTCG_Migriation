@@ -14,6 +14,7 @@ public class LobbyTabController : MonoBehaviour
         public EOutgameTutorialAnchor tutorialAnchor;
         public EOutgameTutorialTrigger tutorialTrigger;
         public EOutgameFeature unlockFeature;
+        public GameObject background;
     }
 
     [SerializeField] LobbyTabBarView tabBar;
@@ -123,6 +124,9 @@ public class LobbyTabController : MonoBehaviour
             LobbyTabPanel t_panel = tabs[i].panel;
             if (t_panel != null && i != _index)
                 t_panel.gameObject.SetActive(false);
+
+            if (tabs[i].background != null)
+                tabs[i].background.SetActive(i == _index);
         }
 
         m_currentIndex = _index;

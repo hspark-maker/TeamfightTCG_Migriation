@@ -61,7 +61,7 @@ public static class PopupPlacer
         // 화면 px -> 캔버스 로컬 단위 (CanvasScaler 배율 보정)
         float t_scale = t_canvasRect.rect.width / Mathf.Max(1f, Screen.width);
 
-        Rect  t_bounds     = t_canvasRect.rect;
+        Rect  t_bounds     = SafeBounds(t_canvasRect, t_cam);
         float t_halfSelf   = _self.rect.width * 0.5f;
         float t_halfAnchor = _anchorHalfPx * t_scale;
         float t_offsetX    = t_halfSelf + t_halfAnchor + _gap;
@@ -87,5 +87,18 @@ public static class PopupPlacer
 
         // 부모가 무엇이든 결과가 같도록 월드 위치로 적용(앵커/피벗 산수 회피).
         _self.position = t_canvasRect.TransformPoint(new Vector3(t_x, t_y, 0f));
+    }
+
+    static Rect SafeBounds(RectTransform _canvasRect, Camera _camera)
+    {
+        Rect t_safe = Screen.safeArea;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRect, t_safe.min, _camera, out Vector2 t_min)
+            || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRect, t_safe.max, _camera, out Vector2 t_max)
+            || t_max.x <= t_min.x || t_max.y <= t_min.y)
+            return _canvasRect.rect;
+
+        return Rect.MinMaxRect(t_min.x, t_min.y, t_max.x, t_max.y);
     }
 }

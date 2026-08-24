@@ -32,19 +32,32 @@ public class SafeAreaFitter : MonoBehaviour
     Rect              lastSafeArea = new Rect(0f, 0f, 0f, 0f);
     Vector2Int        lastScreen   = Vector2Int.zero;
     ScreenOrientation lastOrientation = ScreenOrientation.AutoRotation;
+    bool              suppressedByAncestor;
+    bool              warnedAboutAncestor;
 
     void Awake() => this.rect = (RectTransform)transform;
 
     void OnEnable()
     {
         if (this.rect == null) this.rect = (RectTransform)transform;
-        Apply();
+        RefreshSuppression();
+        if (!this.suppressedByAncestor) Apply();
+    }
+
+    void OnTransformParentChanged()
+    {
+        if (this.rect == null) this.rect = (RectTransform)transform;
+        RefreshSuppression();
+        if (!this.suppressedByAncestor) Apply();
     }
 
     // 회전·해상도·안전영역은 언제든 바뀐다(분할화면, 폴더블 접기, 회전).
     // 이벤트가 없는 값이라 폴링이 유일한 방법인데, 비교 3개뿐이라 비용은 무시할 수준이다.
+    // 조상 Fitter 검사(RefreshSuppression)는 여기서 하지 않는다 — 계층 탐색이라 값 비교보다 훨씬 비싸고,
+    // 억제 여부가 바뀌는 계기는 켜질 때와 부모가 바뀔 때뿐이다(둘 다 아래 훅이 잡는다).
     void Update()
     {
+        if (this.suppressedByAncestor) return;
         if (Screen.safeArea == this.lastSafeArea
             && Screen.width == this.lastScreen.x && Screen.height == this.lastScreen.y
             && Screen.orientation == this.lastOrientation)
@@ -81,6 +94,34 @@ public class SafeAreaFitter : MonoBehaviour
         this.rect.offsetMax = Vector2.zero;
     }
 
+    void RefreshSuppression()
+    {
+        SafeAreaFitter t_ancestor = transform.parent != null
+            ? transform.parent.GetComponentInParent<SafeAreaFitter>(true)
+            : null;
+        bool t_suppressed = t_ancestor != null;
+        if (t_suppressed == this.suppressedByAncestor) return;
+
+        this.suppressedByAncestor = t_suppressed;
+
+        if (!this.suppressedByAncestor)
+        {
+            this.lastScreen = Vector2Int.zero;
+            this.warnedAboutAncestor = false;
+            return;
+        }
+
+        // 조상이 이미 안전영역을 적용하므로 이 래퍼는 전체 stretch로 남아야 두 번 줄지 않는다.
+        this.rect.anchorMin = Vector2.zero;
+        this.rect.anchorMax = Vector2.one;
+        this.rect.offsetMin = Vector2.zero;
+        this.rect.offsetMax = Vector2.zero;
+
+        if (this.warnedAboutAncestor) return;
+        this.warnedAboutAncestor = true;
+        Debug.LogWarning($"[SafeAreaFitter] 조상 '{t_ancestor.name}'이 이미 SafeArea를 적용해 '{name}'은 적용을 생략합니다.", this);
+    }
+
 #if UNITY_EDITOR
     // 인스펙터에서 변 토글을 바꾸면 즉시 반영(플레이 중이 아니어도 확인 가능).
     //
@@ -95,7 +136,8 @@ public class SafeAreaFitter : MonoBehaviour
             if (this == null) return;               // 지연 중 삭제됐을 수 있다
             this.rect = (RectTransform)transform;
             this.lastScreen = Vector2Int.zero;      // 다음 Apply를 강제
-            Apply();
+            RefreshSuppression();
+            if (!this.suppressedByAncestor) Apply();
         };
     }
 #endif
