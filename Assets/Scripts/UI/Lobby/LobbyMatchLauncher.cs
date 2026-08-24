@@ -28,6 +28,9 @@ public class LobbyMatchLauncher : MonoBehaviour
     [Tooltip("토너먼트 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
     [SerializeField] TournamentMapOverlayView tournamentPanel;
 
+    [Tooltip("정점 도전의 대치 인트로. 미배선이면 예전처럼 덱 화면이 곧장 뜬다 — 연출 때문에 전투가 막히지 않는다.")]
+    [SerializeField] VersusIntroShell versusShellPrefab;
+
     const string BATTLE_SCENE = "BattleScene";
 
     // 게이트가 열려 있는 동안 PlayBtn 재클릭을 막는다 — 두 번째 진입이 셸의 선택 상태를 덮고,
@@ -36,7 +39,12 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
+    VersusIntroShell m_versusShell;
     LobbyOverlayHost m_overlayHost;
+
+    // 이번 도전이 출발한 정점의 화면 자리. 대치 인트로가 상대를 여기서 띄워 올린다.
+    // 맵이 닫혀 있거나(복귀 경로) 정점을 못 찾으면 비어 있고, 그러면 상대는 그냥 바깥에서 들어온다.
+    Vector2? m_nodeOrigin;
 
     /// <summary>
     /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
@@ -78,6 +86,19 @@ public class LobbyMatchLauncher : MonoBehaviour
                 m_matchShell = Instantiate(matchShellPrefab, transform.parent);
 
             return m_matchShell;
+        }
+    }
+
+    // 매칭 셸과 같은 이유로 첫 도전 때 띄운다. 부모도 같다 — 나중에 생성돼 마지막 형제가 되므로
+    // 맵 오버레이 위에 선다(이 화면은 맵을 덮어야 한다).
+    VersusIntroShell VersusShell
+    {
+        get
+        {
+            if (m_versusShell == null && versusShellPrefab != null)
+                m_versusShell = Instantiate(versusShellPrefab, transform.parent);
+
+            return m_versusShell;
         }
     }
 
@@ -180,6 +201,12 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (!TournamentRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
 
+        // 맵이 아직 떠 있는 지금 읽어야 한다 — 대치가 시작될 즈음엔 화면이 덮여 자리를 잴 수 없다.
+        m_nodeOrigin = tournamentPanel != null
+                    && tournamentPanel.TryGetNodeScreenPoint(_nodeIndex, out Vector2 t_origin)
+                     ? t_origin
+                     : (Vector2?)null;
+
         var t_preset = new MatchOpponent(
             MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.enemyDeck);
 
@@ -246,10 +273,55 @@ public class LobbyMatchLauncher : MonoBehaviour
             return TryApplyFirstValidDeck();
         }
 
-        // 매칭을 거치지 않은 경로(튜토리얼·토너먼트)는 옮겨 앉힐 이전 화면이 없다 — 덱 화면이 곧장 뜬다.
+        // 고정 상대는 매칭 대신 대치 인트로를 앞세운다 — 정점을 누른 것과 덱을 짜는 것 사이가
+        // 비어 있으면 상대가 누구인지 화면이 한 번도 말하지 않는다.
+        //
+        // 셸을 여기서 붙잡아 넘긴다 — VersusShell은 비어 있으면 새로 만드는 프로퍼티라,
+        // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
+        if (_preset.HasValue)
+        {
+            VersusIntroShell t_versus = VersusShell;
+
+            if (t_versus != null) return await RunSelectionWithVersusAsync(t_versus, _preset.Value, _ct);
+        }
+
+        // 앞세울 화면이 없는 경로(튜토리얼·셸 미배선)는 옮겨 앉힐 이전 화면도 없다 — 덱 화면이 곧장 뜬다.
         if (_preset.HasValue || t_opponent == null) return await DeckShell.RunSelectionAsync(_ct);
 
         return await RunSelectionWithHandoffAsync(_ct);
+    }
+
+    // 대치 인트로 → 덱 화면. 매칭 경로(RunSelectionWithHandoffAsync)와 같은 규약이되 앞자리 화면만 다르다.
+    //
+    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 매칭은 상대를 기다리는 동안 세울 시간이 있지만
+    // 여기는 상대가 이미 정해져 있어 대기가 없다. 미리 세워 두면 그 레이아웃 비용이 진입 안무 첫 프레임에 얹힌다.
+    async UniTask<bool> RunSelectionWithVersusAsync(VersusIntroShell _versus, MatchOpponent _opponent,
+                                                    CancellationToken _ct)
+    {
+        await _versus.PlayVersusAsync(_opponent, m_nodeOrigin, _ct);
+
+        // 씬이 내려가는 중이다 — 파괴될 화면을 세우지 않는다.
+        if (_ct.IsCancellationRequested) return false;
+
+        // 여기서부터 화면을 내릴 책임은 갈라짐에 있다. 덱 화면을 세우다 던지면 넘겨받을 것이 없으므로,
+        // 대치 화면이 로비를 덮은 채(터치까지 먹는다) 남지 않게 이 구간만 감싼다.
+        try
+        {
+            MatchHandoffTargets t_targets = DeckShell.PrepareForHandoff();
+
+            // 선택 게이트는 전환이 도는 동안 시작해 첫 대기에서 멈춘다 — 전환이 끝난 프레임엔 이미 서 있어야 한다.
+            UniTask<bool> t_selection = DeckShell.RunSelectionAsync(_ct);
+
+            await _versus.PlayHandoffAsync(t_targets, _ct);
+
+            return await t_selection;
+        }
+        catch
+        {
+            _versus.Close();
+
+            throw;
+        }
     }
 
     // 매칭 화면 → 덱 화면. 덱 화면을 매칭 화면 "밑에" 먼저 세운 뒤, 매칭의 세 부품(내 카드·상대 카드·VS)이
