@@ -7,48 +7,31 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: FXM_AlphaBlend_01 6
-  m_Shader: {fileID: 4800000, guid: 768355665771fac468c262f54f1e3a12, type: 3}
+  m_Name: VFX_FX_ShockWave_02
+  m_Shader: {fileID: 4800000, guid: 12c79b06fa205d745b8f12928885fb92, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _RECEIVE_SHADOWS_OFF
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
-  disabledShaderPasses:
-  - Picking
-  - DepthNormalsOnly
-  - UniversalGBuffer
-  - SceneSelectionPass
+  disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _Main_Tex:
-        m_Texture: {fileID: 2800000, guid: 56d615ef59382644f913360f32e19e56, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _NoiseTex:
+    - _Mask_Tex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Noise_Tex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: de6bb19c600775c418896a80e4340d38, type: 3}
+        m_Scale: {x: 3, y: 0.5}
         m_Offset: {x: 0, y: 0}
     - _Normal_Tex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _TextureSample0:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _TextureSample1:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -67,26 +50,24 @@ Material:
     m_Ints: []
     m_Floats:
     - _AddPrecomputedVelocity: 1
-    - _Main_Ins: 13.33
-    - _Main_Ins1: 1
-    - _Main_Power: 3.33
-    - _Main_Power1: 1
-    - _Noise_UPanner: 0.1
-    - _Noise_UPanner_2: 0.1
+    - _Dissovle: 1
+    - _Distortion: 0
+    - _Emi_Power: 1
+    - _Emi_ins: 1
+    - _Mask_Y_Offset: 0
+    - _Noise_Upanner: -1
     - _Noise_VPanner: 0
-    - _Noise_VPanner_2: 0
-    - _Normal_Upanner: 0
-    - _Normal_Vpanner: 0
+    - _Normal_UPanner: 0
+    - _Normal_VPanner: 0
     - _Opacity: 1
-    - _Opacity1: 1
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _ReceiveShadows: 0
+    - _ReceiveShadows: 1
+    - _USE_Mask_Y_Offset: 0
     - _USE_Y_Offset: 0
     - _XRMotionVectorsPass: 1
-    - _distortion: 1
+    - _dissovle: 1
     m_Colors:
-    - _Main_Color: {r: 1, g: 1, b: 1, a: 0}
-    - _Main_Color_1: {r: 1, g: 1, b: 1, a: 0}
+    - _Emi_Color: {r: 1, g: 1, b: 1, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
