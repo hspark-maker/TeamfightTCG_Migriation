@@ -24,11 +24,9 @@ MonoBehaviour:
     pointsPerDivision: 40
     rewards:
     - currency: 0
-      icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
       amount: 100
       amountPerDivision: 50
     - currency: 1
-      icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 3
       amountPerDivision: 1
   - grade: 1
@@ -38,11 +36,9 @@ MonoBehaviour:
     pointsPerDivision: 40
     rewards:
     - currency: 0
-      icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
       amount: 300
       amountPerDivision: 50
     - currency: 1
-      icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 5
       amountPerDivision: 1
   - grade: 2
@@ -52,11 +48,9 @@ MonoBehaviour:
     pointsPerDivision: 40
     rewards:
     - currency: 0
-      icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
       amount: 500
       amountPerDivision: 100
     - currency: 1
-      icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 10
       amountPerDivision: 2
   - grade: 3
@@ -66,11 +60,9 @@ MonoBehaviour:
     pointsPerDivision: 40
     rewards:
     - currency: 0
-      icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
       amount: 900
       amountPerDivision: 100
     - currency: 1
-      icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 20
       amountPerDivision: 5
   - grade: 4
@@ -80,11 +72,9 @@ MonoBehaviour:
     pointsPerDivision: 40
     rewards:
     - currency: 0
-      icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
       amount: 1400
       amountPerDivision: 200
     - currency: 1
-      icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 40
       amountPerDivision: 10
   aiCardLevels: 0100000001000000010000000200000002000000020000000200000003000000030000000300000003000000030000000300000004000000040000000400000004000000040000000400000004000000
