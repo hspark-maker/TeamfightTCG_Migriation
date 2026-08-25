@@ -38,6 +38,11 @@ static class PlayerSaveSync
     internal static ESaveReconcileDecision LastDecision { get; private set; } = ESaveReconcileDecision.None;
     internal static bool IsGateComplete => s_gateComplete;
 
+    internal static void MarkGateComplete()
+    {
+        s_gateComplete = true;
+    }
+
     internal static void Initialize(string _profileId, bool _uploadAllowed)
     {
         Shutdown();
@@ -564,6 +569,7 @@ static class PlayerSaveSync
                 {
                     Debug.LogError($"[PlayerSaveSync] Remote apply failed: {t_error}");
                     GameManager.MarkRecoveryRequired();
+                    MarkGateComplete();
                     return;
                 }
 
