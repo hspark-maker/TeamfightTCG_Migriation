@@ -2,7 +2,7 @@ using System.IO;
 using UnityEngine;
 
 // IRepository의 JSON 파일 구현 — 키마다 persistentDataPath/{subFolder}/{key}.json
-public class JsonFileRepository : IRepository
+public class JsonFileRepository : IAtomicRepository
 {
     readonly string m_directory;
 
@@ -32,6 +32,39 @@ public class JsonFileRepository : IRepository
     {
         var t_path = PathOf(_key);
         if (File.Exists(t_path)) File.Delete(t_path);
+    }
+
+    public void ReplaceWithBackup(string _key, string _value, string _backupKey)
+    {
+        Directory.CreateDirectory(m_directory);
+
+        string t_path = PathOf(_key);
+        string t_backupPath = PathOf(_backupKey);
+        string t_tempPath = t_path + ".tmp";
+        try
+        {
+            using (var t_stream = new FileStream(t_tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var t_writer = new StreamWriter(t_stream))
+            {
+                t_writer.Write(_value);
+                t_writer.Flush();
+                t_stream.Flush(true);
+            }
+
+            if (File.Exists(t_path))
+            {
+                File.Copy(t_path, t_backupPath, true);
+                File.Replace(t_tempPath, t_path, null);
+            }
+            else
+            {
+                File.Move(t_tempPath, t_path);
+            }
+        }
+        finally
+        {
+            if (File.Exists(t_tempPath)) File.Delete(t_tempPath);
+        }
     }
 
     string PathOf(string _key)

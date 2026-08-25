@@ -205,6 +205,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LoadingCoverView
   progressBar: {fileID: 7004482626366096119}
+  statusText: {fileID: 1759463537223822466}
   minDuration: 1
   barFollowSpeed: 2
   maxDuration: 15

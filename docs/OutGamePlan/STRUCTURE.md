@@ -1,5 +1,21 @@
 # 아웃게임 구조도 (STRUCTURE)
 
+## Firestore 플레이어 세이브 미러 (2026-08-25)
+
+로컬 `JsonFileRepository`가 현재 진실원이고 Firestore는 쓰기 전용 검증 미러다.
+
+```text
+DataSaveManager.Save
+  ├─ JsonFileRepository 즉시 저장
+  └─ OnSaved(payload)
+       └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
+            └─ users/{firebaseUid}/save/{current|test}
+```
+
+- `Assets/Scripts/OutGame/Save/4.Sync/PlayerSaveSync.cs`: 인증 게이트, 프로필 분리, 업로드 상태와 best-effort flush를 소유한다.
+- Firestore 디스크 persistence는 끈다. 원격 pull·복원·충돌 해결은 아직 지원하지 않는다.
+- `revision`은 업로드 관측값이며 최신 상태 판정 근거가 아니다.
+
 > 사용자의 설계 승인과 구조 파악의 기준 문서.
 > 도메인 설계 확정 시, 구조 변경 시마다 갱신한다 (CLAUDE.md 아웃게임 운영 정책).
 > 갱신 주체: outgame-engineer 또는 메인. 근거 없는 노드 금지 — 실제 파일이 있거나 승인된 설계여야 한다.
@@ -1735,3 +1751,18 @@ UI에 손댈 것이 없는 이유:
 - **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
 - **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
 - **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.
+# Firestore save migration T0 (2026-08-25)
+
+- `GameManager.BootState` is the boot gate. `UpdateRequired` prevents `BootInstaller` initialization and keeps `LoadingCoverView` visible with an update message.
+- Failed Firestore uploads keep the latest pending payload but do not self-reschedule. Retry occurs only after a new local save, authentication recovery, or application resume.
+- `PlayerSaveSyncMetadata` is a profile-local sidecar containing UID, profile ID, confirmed full SHA-256, remote revision, and schema version. T0 records it but does not use it to skip startup uploads until T1 verifies the remote document.
+# Firestore save migration T1 dry-run (2026-08-25)
+
+- `PlayerSaveSync` reads `users/{uid}/save/{current|test}` from the server with a finite five-second timeout before allowing any remote write.
+- T1 validates schema, revision, payload size, JSON completeness, and the 16-character wire hash, then classifies local/remote/base as `InSync`, `LocalAhead`, `RemoteAhead`, `Diverged`, or a guarded failure.
+- T1 is deliberately read-only: it never replaces local data, updates remote data, or trusts metadata to skip startup inspection. Pending local payload remains available for the later transactional migration stage.
+# Firestore save migration T2/T3 (2026-08-25)
+
+- `BootInstaller` now installs infrastructure in `Awake`, waits for `PlayerSaveSync`, then installs all save-dependent managers exactly once before `GameManager` becomes `Ready`.
+- Reconciliation is active: `RemoteAhead` uses backup plus atomic local replacement, `RemoteMissing` and `LocalAhead` use revision/hash transactions, `InSync` skips the startup write, and conflicts are preserved as local sidecars with remote writes disabled.
+- Authentication, timeout, invalid remote data, future schema, stale sessions, and account ownership mismatches never overwrite local or remote data.

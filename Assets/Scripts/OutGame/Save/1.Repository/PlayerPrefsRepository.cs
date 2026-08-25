@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // IRepository의 PlayerPrefs 구현
-public class PlayerPrefsRepository : IRepository
+public class PlayerPrefsRepository : IAtomicRepository
 {
     public bool Has(string _key) => PlayerPrefs.HasKey(_key);
 
@@ -17,5 +17,11 @@ public class PlayerPrefsRepository : IRepository
     {
         PlayerPrefs.DeleteKey(_key);
         PlayerPrefs.Save();
+    }
+
+    public void ReplaceWithBackup(string _key, string _value, string _backupKey)
+    {
+        if (Has(_key)) Save(_backupKey, Load(_key));
+        Save(_key, _value);
     }
 }

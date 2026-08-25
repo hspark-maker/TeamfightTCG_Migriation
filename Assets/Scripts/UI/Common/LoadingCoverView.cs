@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -25,6 +26,7 @@ public class LoadingCoverView : MonoBehaviour
     // Boot가 직렬화한 카탈로그에서 동기적으로 얻는다.
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
+    [SerializeField] TMP_Text statusText;
 
     [Tooltip("로딩이 즉시 끝나도 이 시간(초)만큼은 노출한다 — 한 프레임 깜빡임 방지.")]
     [SerializeField] float minDuration = 1f;
@@ -118,9 +120,46 @@ public class LoadingCoverView : MonoBehaviour
 
     IEnumerator CoRunBoot()
     {
+        if (GameManager.BootState == EGameBootState.UpdateRequired)
+        {
+            if (statusText != null)
+                statusText.text = "새 버전으로 업데이트가 필요합니다.";
+            if (progressBar != null)
+                progressBar.gameObject.SetActive(false);
+            yield break;
+        }
+
+        if (statusText != null)
+            statusText.text = "플레이어 데이터를 동기화하는 중입니다.";
+
         // 완료 플래그 전에는 바가 1에 닿지 못하게 막는다 — PercentComplete는 프리팹 등록 콜백이
         // 끝나기 전에 1이 될 수 있어, 그대로 쓰면 등록이 덜 된 채로 다음 씬에 넘어간다.
-        yield return CoFillBar(() => DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f));
+        yield return CoFillBar(() =>
+        {
+            float t_dataProgress = DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f);
+            float t_syncProgress = BootInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
+            return (t_dataProgress + t_syncProgress) * 0.5f;
+        });
+
+        while (GameManager.BootState == EGameBootState.Syncing &&
+               !BootInstaller.IsSaveDependentInstalled)
+        {
+            yield return null;
+        }
+
+        if (GameManager.BootState == EGameBootState.UpdateRequired ||
+            GameManager.BootState == EGameBootState.RecoveryRequired)
+        {
+            if (statusText != null)
+            {
+                statusText.text = GameManager.BootState == EGameBootState.UpdateRequired
+                    ? "새 버전으로 업데이트가 필요합니다."
+                    : "저장 데이터를 복구하지 못했습니다.";
+            }
+            if (progressBar != null)
+                progressBar.gameObject.SetActive(false);
+            yield break;
+        }
 
         yield return CoGoNext();
     }
