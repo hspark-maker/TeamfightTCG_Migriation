@@ -26,7 +26,7 @@ public sealed class SyncUiPrefabCatalog : ScriptableObject
 
 public static class SyncUiPrefabs
 {
-    const string ResourcePath = "UI/SyncUiPrefabCatalog";
+    const string CatalogAddress = "SyncUiPrefabCatalog";
     static SyncUiPrefabCatalog s_catalog;
 
     public static void SetSource(SyncUiPrefabCatalog _catalog) => s_catalog = _catalog;
@@ -34,7 +34,7 @@ public static class SyncUiPrefabs
     public static GameObject Get(ESyncUiPrefab _id)
     {
         if (s_catalog == null)
-            s_catalog = Resources.Load<SyncUiPrefabCatalog>(ResourcePath);
+            s_catalog = SyncAddressable.Load<SyncUiPrefabCatalog>(CatalogAddress);
 
         GameObject t_prefab = s_catalog != null ? s_catalog.Get(_id) : null;
         if (t_prefab == null)

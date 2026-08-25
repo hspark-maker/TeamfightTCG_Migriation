@@ -4,13 +4,9 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
-using UnityEngine.UI;
 
 public class CurrencyHud : MonoBehaviour
 {
-    // 재화가 갈릴 때 주는 한 박. 화면 전환과 같은 프레임에 일어나므로 획득 펄스보다 작게 잡는다.
-    const float SWAP_PUNCH = 0.18f;
-
     // 활성 HUD를 재화별로 찾는 창구. 같은 GameObject에 종류가 다른 HUD가 여러 장 붙어 있어
     // 타입 탐색(FindFirstObjectByType)으로는 어느 쪽이 잡힐지 보장되지 않는다.
     static readonly Dictionary<ECurrencyType, CurrencyHud> s_huds = new Dictionary<ECurrencyType, CurrencyHud>();
@@ -18,11 +14,10 @@ public class CurrencyHud : MonoBehaviour
     [FormerlySerializedAs("goldText")]
     [SerializeField] TMP_Text valueText;
 
-    [Tooltip("이 칸이 맡을 재화. 이 값이 곧 그 칸의 재화이며 런타임에 갈리지 않는다.")]
+    [Tooltip("이 칸이 맡을 재화. 이 값이 곧 그 칸의 재화이며 런타임에 갈리지 않는다.\n\n" +
+             "아이콘은 코드가 손대지 않는다 — 상단바 아트는 보상 슬롯과 결이 달라 CurrencyLook 표를 따르지 않고 " +
+             "프리팹에 저작된 그림이 그대로 산다. 그림을 바꾸려면 이 칸의 Image를 직접 갈아끼울 것.")]
     [SerializeField] ECurrencyType type = ECurrencyType.Gold;
-
-    [Tooltip("재화 아이콘(옵션). CurrencyLook 표에 그림이 있을 때만 갈아낀다 — 비워두면 프리팹 그림 그대로다.")]
-    [SerializeField] Image iconImage;
 
     [Tooltip("이 HUD를 그 재화의 대표(코인이 날아와 꽂히는 곳)로 등록할지.\n\n" +
              "화면당 대표는 재화별로 딱 한 장이고, 겹치면 마지막에 켜진 쪽이 이긴다. " +
@@ -147,45 +142,6 @@ public class CurrencyHud : MonoBehaviour
 
         // 물들이기 전 색을 여기서 잡아 둔다 — 연출 도중 잡으면 소비 색이 기준색으로 굳는다.
         if (this.valueText != null) m_baseTextColor = this.valueText.color;
-
-        this.ApplyIcon();
-    }
-
-    // 프리팹을 복제해 type만 바꾼 HUD(조각 등)가 그림까지 따라오게 한다.
-    void ApplyIcon()
-    {
-        if (this.iconImage == null) return;
-
-        Sprite t_icon = CurrencyLook.IconOf(this.type);
-        if (t_icon != null) this.iconImage.sprite = t_icon;
-    }
-
-    /// <summary>이 칸이 맡을 재화를 갈아끼운다. **변동 칸 전용** — <see cref="ContextCurrencySlot"/>만 부른다.
-    /// 고정 칸에 대고 부르면 그 재화가 화면에서 사라지므로 다른 곳에서 쓰지 말 것.
-    /// 대표 등록·아이콘·표시값이 함께 따라간다.</summary>
-    public void SetType(ECurrencyType _type)
-    {
-        if (this.type == _type) return;
-
-        // 돌고 있던 연출은 옛 재화의 것이다 — 걷지 않으면 새 재화 숫자 위에서 롤다운이 계속된다.
-        m_displayRevision++;
-        m_held = false;
-        this.KillSpendTween();
-        this.KillSpendMotion();
-        this.ClearTint(false);
-
-        // 대표 자리도 함께 옮긴다. 안 옮기면 옛 재화의 코인이 이제 다른 재화를 띄우는 칸으로 날아온다.
-        if (s_huds.TryGetValue(this.type, out var t_cur) && t_cur == this) s_huds.Remove(this.type);
-
-        this.type = _type;
-
-        if (this.registerAsPrimary && this.isActiveAndEnabled) s_huds[this.type] = this;
-
-        this.ApplyIcon();
-        this.Render(CurrencyManager.GetBalance(this.type));
-
-        // 값이 아니라 **재화가** 갈린 것이라 한 박을 준다 — 없으면 숫자가 몰래 바뀐 것처럼 읽힌다.
-        if (this.isActiveAndEnabled) UiPunch.Play(this.PunchRect, SWAP_PUNCH);
     }
 
     void OnEnable()

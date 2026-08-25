@@ -73,7 +73,6 @@ public class KeywordGrowthPanel : PooledUIBase
         this.SetVisible(true);
         this.ApplyEnergyIcon();
 
-        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
         if (this.m_built) this.RefreshAll();
         else this.Build();
 
@@ -85,7 +84,6 @@ public class KeywordGrowthPanel : PooledUIBase
     {
         this.KillUpgradeFx();
         this.SetVisible(false);
-        ContextCurrencySlot.Release(this);
     }
 
     void OnEnable()
