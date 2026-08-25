@@ -124,6 +124,10 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // 여기서 가른다 — 매번 걸면 갱신마다 칸이 깜빡인다.
     bool m_swapVisualOn;
 
+    // 드래그가 켜 둔 칸 강조. 6칸이 다 찬 채로 끌기 시작하면 놓는 순간이 곧 교체라,
+    // 탭 교체(m_pendingSwapCard)와 같은 신호를 칸에 칠한다. 둘은 배타다 — 드래그 개시가 탭 모드를 내린다.
+    bool m_dragSwapVisual;
+
     /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
     public static event Action<CardData> OnAnyCardEquipped;
@@ -507,7 +511,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
 
-        if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
+        if (dragController != null) dragController.Setup(() => Slots, AssignSlot, OnDragEnded);
         // 배선이 프리팹 인스턴스 오버라이드로만 존재한다(DragLayer가 이 프리팹 밖에 있다) — Revert 한 번에 조용히 사라진다.
         // 여기서 알리지 않으면 "롱프레스해도 아무 일 없음"으로만 드러난다. 패널을 열 때 한 번만 찍힌다.
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
@@ -608,13 +612,30 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         if (_tile == null || dragController == null) return;
 
-        CancelSlotPick();   // 끌기 시작하면 놓을 칸은 손끝이 정한다 — 고르라는 신호가 남아 있을 이유가 없다
+        // 6칸이 다 찼으면 어디에 놓든 교체다 — 탭 교체와 같은 신호를 끌고 다니는 동안 켜 둔다.
+        // 플래그를 먼저 세워야, 탭 모드에서 곧바로 끌기 시작한 경우에 아래 CancelSlotPick이 칸 강조까지 걷어내지 않는다.
+        m_dragSwapVisual = FindFirstEmpty() < 0;
+
+        CancelSlotPick();       // 끌기 시작하면 놓을 칸은 손끝이 정한다 — 대기 카드와 컬렉션 딤은 여기서 내린다
+        ApplySlotPickVisual();  // 탭 모드가 아니었으면 위 호출이 조용히 물러나므로 드래그 신호는 여기서 칠한다
 
         // 고스트 크기는 그리드가 정한다 — 매치 패널은 GridRatioFitter가 cellSize를 런타임에 계산한다.
         dragController.Begin(_tile.Card,
                              _data,
                              collectionGrid != null ? collectionGrid.Scroll    : null,
                              collectionGrid != null ? collectionGrid.CellSize  : default);
+
+        // 드래그가 성립하지 못했으면(고스트 배선 누락) 종료 통지도 오지 않는다 — 켜 둔 강조를 여기서 직접 내린다.
+        if (!dragController.IsDragging) OnDragEnded();
+    }
+
+    // 드래그 종료(드롭·취소·화면 이탈 공통). 드롭이면 뒤이어 AssignSlot의 재바인딩이 칸을 다시 칠한다.
+    void OnDragEnded()
+    {
+        if (!m_dragSwapVisual) return;
+
+        m_dragSwapVisual = false;
+        ApplySlotPickVisual();
     }
 
     // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 빈 칸이 없으면 슬롯 선택 모드로 넘어간다 —
@@ -672,7 +693,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // _forceInstant면 상태가 바뀌는 되칠도 트윈 없이 맞춘다(호출자가 곧바로 재바인딩할 때).
     void ApplySlotPickVisual(bool _forceInstant = false)
     {
-        bool t_picking = m_pendingSwapCard != null;
+        // 드래그로 켠 강조는 칸에만 칠한다 — 손끝의 고스트가 이미 "무엇을 들고 있는지"를 말하므로 컬렉션 딤이 필요 없다.
+        bool t_picking = m_pendingSwapCard != null || m_dragSwapVisual;
 
         // 상태가 그대로인 되칠(재바인딩 직후)은 트윈 없이 즉시 맞춘다.
         bool t_instant = _forceInstant || t_picking == m_swapVisualOn;
@@ -694,6 +716,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         m_pendingSwapCard = null;
         m_swapVisualOn    = false;
+        m_dragSwapVisual  = false;
 
         if (slots != null)
         {
@@ -902,7 +925,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 위 재바인딩이 하이라이트·알파를 전부 원상복구한 뒤라야 모드 신호가 살아남는다.
         // 평상시에 되칠하지 않는 이유: 해제는 CancelSlotPick이 이미 했고, 여기서 한 번 더 지우면
         // 시너지 강조 도중 재갱신이 끼었을 때(해금·소유 변동) 그 강조까지 같이 걷힌다.
-        if (m_pendingSwapCard != null) ApplySlotPickVisual();
+        if (m_pendingSwapCard != null || m_dragSwapVisual) ApplySlotPickVisual();
     }
 
     /// <summary>저장 버튼은 <b>바꾼 게 있을 때만</b> 눌린다. 미완성이어도 눌리게 두는 이유는,

@@ -108,6 +108,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         public Canvas Canvas;
         public bool   AddedCanvas;
         public bool   AddedRaycaster;
+        public GraphicRaycaster MutedRaycaster;   // 읽을 영역에 이미 저작돼 있던 레이캐스터(승격 동안만 내렸다가 되돌린다)
         public bool   PrevOverrideSorting;
         public int    PrevSortingOrder;
         public int    PrevSortingLayerID;
@@ -337,7 +338,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 승격을 남겨 두면 게임이 막으려던 입력이 튜토리얼 때문에 뚫린다.
     void RefreshVisibility()
     {
-        bool t_active = m_target.gameObject.activeInHierarchy;
+        bool t_active = m_target.gameObject.activeInHierarchy && SpotlightActive();
 
         // 메시지 모드엔 누를 타깃이 없다(버튼 없는 순수 영역도 하이라이트한다) → 표시 여부는 활성 여부만으로 판정한다.
         // 화면 탭 자체가 탈출로라 딤이 유지돼도 불변식 (2)를 어기지 않는다.
@@ -368,6 +369,11 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_blockWarned = false;
         Layout();
     }
+
+    // 함께 밝힐 영역도 타깃과 같은 등급의 생존 조건이다 — 이 영역만 꺼져도(패널 닫힘·풀 반환) 승격을 내려야
+    // 그 오브젝트에 얹은 overrideSorting이 다음 사용자에게 새어 나가지 않는다(덱 편집 패널은 풀에서 재사용된다).
+    // 파괴는 여기서 보지 않는다: 파괴된 오브젝트의 Canvas도 함께 사라져 되돌릴 것이 남지 않는다(Demote가 건너뛴다).
+    bool SpotlightActive() => m_spotlight == null || m_spotlight.gameObject.activeInHierarchy;
 
     // 기능 잠금이 원인이면 대기가 영영 안 풀린다(잠금은 진행으로만 열리는데 진행이 이 스텝에서 멈춰 있다).
     // 다른 원인(골드 부족 등)은 유저가 스스로 풀 수 있어 정상 대기다 — 둘을 로그에서 구분해 준다.
@@ -543,11 +549,20 @@ public class OutgameTutorialGateUI : MonoBehaviour
             t_promotion.Canvas.additionalShaderChannels = t_root.additionalShaderChannels;
         }
 
-        // 읽을 영역(메시지 모드의 하이라이트·클릭 스텝의 스포트라이트)에는 레이캐스터를 붙이지 않는다 —
-        // 붙이면 그 영역이 탭을 삼켜, 메시지 모드는 완료가 막히고 클릭 스텝은 눌러야 할 곳이 둘로 늘어난다.
+        // 읽을 영역(메시지 모드의 하이라이트·클릭 스텝의 스포트라이트)에는 레이캐스터를 두지 않는다 —
+        // 있으면 그 영역이 탭을 삼켜, 메시지 모드는 완료가 막히고 클릭 스텝은 눌러야 할 곳이 둘로 늘어난다.
         // 중첩 Canvas에 레이캐스터가 없으면 그 아래 그래픽은 레이캐스트에서 빠져 탭이 딤까지 내려간다(보이기만 한다).
-        t_promotion.AddedRaycaster = _clickable && _go.GetComponent<GraphicRaycaster>() == null;
+        var t_raycaster = _go.GetComponent<GraphicRaycaster>();
+
+        t_promotion.AddedRaycaster = _clickable && t_raycaster == null;
         if (t_promotion.AddedRaycaster) _go.AddComponent<GraphicRaycaster>();
+
+        // 저작된 레이캐스터가 남아 있으면 승격(351)과 합쳐져 딤(350) 위에서 입력을 받는다 — 그 동안만 내린다.
+        else if (!_clickable && t_raycaster != null && t_raycaster.enabled)
+        {
+            t_promotion.MutedRaycaster = t_raycaster;
+            t_raycaster.enabled        = false;
+        }
 
         m_promotions.Add(t_promotion);
     }
@@ -561,6 +576,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
         for (int t_i = 0; t_i < m_promotions.Count; t_i++)
         {
             var t_promotion = m_promotions[t_i];
+
+            // 내려 둔 레이캐스터는 Canvas가 죽었더라도 되돌린다 — 그 컴포넌트는 남아 있을 수 있다.
+            if (t_promotion.MutedRaycaster != null) t_promotion.MutedRaycaster.enabled = true;
+
             if (t_promotion.Canvas == null) continue;   // 대상이 이미 파괴됨
 
             // 파괴 순서 고정: GraphicRaycaster가 Canvas를 RequireComponent하므로 Canvas를 먼저 지우면

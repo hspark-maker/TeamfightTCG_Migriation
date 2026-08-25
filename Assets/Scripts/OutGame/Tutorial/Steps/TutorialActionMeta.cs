@@ -107,7 +107,8 @@ public readonly struct TutorialActionMeta
         new(A.WaitKeywordEnhance,   C.KeywordEnhance,   F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.FreeOfCharge),
         new(A.PackNotice,           C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy),
         new(A.CloseAlbumPage,       C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
-        new(A.WaitDeckEquip,        C.DeckEquip,        F.Anchor | F.GuideMessage | F.Dim | F.Spotlight),
+        // 장착으로 슬롯 내용이 갱신되는 스텝이라 F.Spotlight를 주지 않는다 — 승격은 첫 프레임에 한 번만 걸린다.
+        new(A.WaitDeckEquip,        C.DeckEquip,        F.Anchor | F.GuideMessage | F.Dim),
     };
 
     // 이 구조의 조용한 실패 두 가지를 부팅 때 한 번 소리내어 잡는다.

@@ -22,7 +22,8 @@ public class TutorialStepDef
            + "영역 안에 카드가 있으면 영역째가 아니라 카드만 올라온다(패널 프레임·수치가 딸려 올라오면 무엇을 보라는지 흐려진다).\n"
            + "· 비우면(None) 종전대로 타깃만 올라온다.\n"
            + "· 아직 등록되지 않은 영역을 골라도 진행은 막지 않는다 — 강조 없이 그대로 흐른다.\n"
-           + "⚠ 스크롤 안쪽 영역은 고르지 마라 — 딤 위로 끌어올리면 뷰포트 잘라내기가 끊겨 내용이 화면 밖으로 샌다")]
+           + "⚠ 스크롤 안쪽 영역은 고르지 마라 — 딤 위로 끌어올리면 뷰포트 잘라내기가 끊겨 내용이 화면 밖으로 샌다.\n"
+           + "⚠ 내용이 도중에 갱신되는 영역도 지목하지 마라 — 승격은 첫 프레임에 한 번만 걸려, 그 뒤 새로 그려진 것은 딤 아래에 남는다")]
     [SerializeField] EOutgameTutorialAnchor spotlight;
 
     [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
@@ -228,8 +229,9 @@ public class TutorialStepDef
     // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
     public static bool UsesAnchor(EOutgameTutorialAction _action) => Uses(_action, EStepField.Anchor);
 
-    // 이 액션이 타깃 외에 "읽을 영역"을 함께 밝히는가(딤 위로 올릴 딤이 있는 클릭 게이트만 — 설명 스텝은 앵커 자체가 그 영역이다)
-    public static bool UsesSpotlight(EOutgameTutorialAction _action) => Uses(_action, EStepField.Spotlight);
+    // 이 액션이 타깃 외에 "읽을 영역"을 함께 밝히는가(딤 위로 올릴 딤이 있는 클릭 게이트만 — 설명 스텝은 앵커 자체가 그 영역이다).
+    // 다른 Uses*와 달리 밖에서 묻는 곳이 없다 — 노출 목록은 드로어의 표가, 검증은 위 게터가 답한다.
+    static bool UsesSpotlight(EOutgameTutorialAction _action) => Uses(_action, EStepField.Spotlight);
 
     // 이 액션이 안내 문구를 띄우는가(자동 스텝은 화면에 아무것도 그리지 않는다)
     public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => Uses(_action, EStepField.GuideMessage);
