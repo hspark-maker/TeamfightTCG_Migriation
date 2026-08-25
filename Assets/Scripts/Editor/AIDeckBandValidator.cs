@@ -9,7 +9,9 @@ public static class AIDeckBandValidator
     const string RANK_PATH = "Assets/SO/Rank/RankConfig.asset";
     const string GROWTH_PATH = "Assets/SO/CardGrowth/CardGrowthConfig.asset";
 
-    public static void CollectErrors(List<string> _errors)
+    /// <summary>에러와 경고를 분리해 수집한다.
+    /// 현재 경고 소스는 없지만 향후 티어제 검증을 위해 경고 배관은 유지한다.</summary>
+    public static void CollectIssues(List<string> _errors, List<string> _warnings)
     {
         AIDeckConfig t_config = AssetDatabase.LoadAssetAtPath<AIDeckConfig>(AI_DECK_PATH);
         RankConfig t_rank = AssetDatabase.LoadAssetAtPath<RankConfig>(RANK_PATH);
@@ -19,7 +21,7 @@ public static class AIDeckBandValidator
         if (t_rank == null) { _errors.Add($"랭크 설정 없음: {RANK_PATH}"); return; }
         if (t_growth == null) { _errors.Add($"카드 성장 설정 없음: {GROWTH_PATH}"); return; }
 
-        ValidateDecks(t_config, t_rank, t_growth, _errors);
+        ValidateDecks(t_config, t_rank, _errors);
         ValidateTierCoverage(t_config, t_rank, _errors);
     }
 
@@ -36,9 +38,8 @@ public static class AIDeckBandValidator
         }
 
         var t_errors = new List<string>();
-        CollectErrors(t_errors);
         var t_warnings = new List<string>();
-        CollectCurriculumWarnings(t_config, t_rank, t_growth, t_warnings);
+        CollectIssues(t_errors, t_warnings);
 
         var t_report = new StringBuilder("[AI 덱 티어 분포]\n");
         for (int t_tier = 0; t_tier < t_rank.TierCount; t_tier++)
@@ -46,7 +47,7 @@ public static class AIDeckBandValidator
             int t_level = t_rank.AiCardLevelAt(t_tier);
             List<AIDeckConfig.DeckEntry> t_candidates = CandidatesAt(t_config, t_tier);
             int t_totalWeight = TotalWeight(t_candidates);
-            t_report.Append($"Tier {t_tier} / AI Lv{t_level}: ");
+            t_report.Append($"Tier {t_tier} / AI {GrowthStar.Label(t_level)}: ");
 
             if (t_candidates.Count == 0)
             {
@@ -101,7 +102,7 @@ public static class AIDeckBandValidator
         PrintReport();
     }
 
-    static void ValidateDecks(AIDeckConfig _config, RankConfig _rank, CardGrowthConfig _growth, List<string> _errors)
+    static void ValidateDecks(AIDeckConfig _config, RankConfig _rank, List<string> _errors)
     {
         if (_config.decks == null) { _errors.Add("AI 덱 목록이 null입니다."); return; }
 
@@ -119,11 +120,6 @@ public static class AIDeckBandValidator
                 _errors.Add($"AI 덱 '{t_name}' 시작 티어 {t_entry.fromTier}가 유효 범위를 벗어났습니다.");
                 continue;
             }
-
-            int t_aiLevel = _rank.AiCardLevelAt(t_entry.fromTier);
-            int t_identityLevel = IdentityLevelOf(t_entry, _growth);
-            if (t_aiLevel < t_identityLevel)
-                _errors.Add($"AI 덱 '{t_name}'는 Tier {t_entry.fromTier}의 AI Lv{t_aiLevel}에서 완전히 발현되지 않습니다. 필요 Lv{t_identityLevel}: {LockedFeatures(t_entry, t_aiLevel, _growth)}");
         }
     }
 
@@ -132,29 +128,6 @@ public static class AIDeckBandValidator
         for (int t_tier = 0; t_tier < _rank.TierCount; t_tier++)
             if (CandidatesAt(_config, t_tier).Count == 0)
                 _errors.Add($"AI 덱 후보가 없는 티어: {t_tier}");
-    }
-
-    static void CollectCurriculumWarnings(AIDeckConfig _config, RankConfig _rank, CardGrowthConfig _growth, List<string> _warnings)
-    {
-        int t_firstSynergyTier = -1;
-        for (int t_tier = 0; t_tier < _rank.TierCount; t_tier++)
-        {
-            if (!_growth.SynergyUnlockedAt(_rank.AiCardLevelAt(t_tier))) continue;
-            t_firstSynergyTier = t_tier;
-            break;
-        }
-        if (t_firstSynergyTier < 0) return;
-
-        var t_warned = new HashSet<AIDeckConfig.DeckEntry>();
-        for (int t_tier = t_firstSynergyTier; t_tier <= t_firstSynergyTier + 1 && t_tier < _rank.TierCount; t_tier++)
-        {
-            foreach (AIDeckConfig.DeckEntry t_entry in CandidatesAt(_config, t_tier))
-            {
-                int t_synergyCount = SynergyResolver.Resolve(t_entry.cards).Active.Count;
-                if (t_synergyCount == 1 || !t_warned.Add(t_entry)) continue;
-                _warnings.Add($"시너지 입문 구간 덱 '{t_entry.deckName}'의 성립 시너지가 {t_synergyCount}개입니다(권장 1개).");
-            }
-        }
     }
 
     static int IdentityLevelOf(AIDeckConfig.DeckEntry _entry, CardGrowthConfig _growth)
@@ -186,18 +159,6 @@ public static class AIDeckBandValidator
         int t_total = 0;
         foreach (AIDeckConfig.DeckEntry t_entry in _entries) t_total += t_entry.WeightOrOne;
         return t_total;
-    }
-
-    static string LockedFeatures(AIDeckConfig.DeckEntry _entry, int _aiLevel, CardGrowthConfig _growth)
-    {
-        var t_locked = new List<string>();
-        if (_entry?.cards != null)
-            foreach (CardData t_card in _entry.cards)
-                if (t_card != null && t_card.keywordUnlockLevel > _aiLevel)
-                    t_locked.Add($"{t_card.displayName} 키워드(Lv{t_card.keywordUnlockLevel})");
-        if (!_growth.SynergyUnlockedAt(_aiLevel) && SynergyResolver.Resolve(_entry?.cards).Active.Count > 0)
-            t_locked.Add($"시너지(Lv{_growth.FirstEvolutionLevel})");
-        return string.Join(", ", t_locked);
     }
 
     static void AppendFeatures(StringBuilder _builder, AIDeckConfig.DeckEntry _entry, int _aiLevel, CardGrowthConfig _growth)

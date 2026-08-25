@@ -22,10 +22,23 @@ public class AlbumInsertSession : MonoBehaviour
     /// <summary>안내가 이 세션을 몰고 있다 — 탭 이탈을 삼키고, 끝나면 페이지 오버레이까지 걷는다.</summary>
     public static bool TutorialMode;
 
+    public void RequestLeave(Action _proceed)
+    {
+        if (!IsRunning)
+        {
+            _proceed?.Invoke();
+            return;
+        }
+
+        if (TutorialMode) return;
+
+        AbortAll();
+        _proceed?.Invoke();
+    }
+
     [Header("바깥 연결")]
     [SerializeField] AlbumTabController   albumTabController;
     [SerializeField] AlbumPageOverlayView pageOverlay;
-    [SerializeField] LobbyTabController   lobbyTabController;
 
     [Header("패널 내부")]
     [SerializeField] AlbumSleeveView          sleeve;
@@ -33,6 +46,7 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] AlbumInsertHintView      hint;
     [SerializeField] CardVisualView           cardVisual;
     [SerializeField] CanvasGroup              group;
+    [SerializeField] AlbumInsertFanfareFx     fanfare = new AlbumInsertFanfareFx();
 
     [Header("타이밍")]
     // 페이지 넘김 시간은 여기 두지 않는다 — AlbumPageOverlayView.FlipDuration이 단일 진실원이다
@@ -53,6 +67,10 @@ public class AlbumInsertSession : MonoBehaviour
     [SerializeField] float  settlePulseScale    = 0.9f;
     [Tooltip("줄었다 돌아오기까지의 전체 시간.")]
     [SerializeField] float  settlePulseDuration = 0.24f;
+    [Tooltip("수동 삽입에서 빵빠레가 보이도록 다음 카드로 넘어가기 전에 남기는 짧은 여운.")]
+    [Range(0f, 0.5f)] [SerializeField] float fanfareHold = 0.25f;
+    [Tooltip("모두 넣기의 마지막 장도 색종이가 보이도록 보장하는 최소 여운.")]
+    [Range(0f, 0.3f)] [SerializeField] float quickFinalFanfareHold = 0.18f;
     [SerializeField] string guideMessage     = "슬리브에 넣기 위해 스와이프하세요";
 
     [Header("건너뛰기 글자")]
@@ -117,7 +135,9 @@ public class AlbumInsertSession : MonoBehaviour
         else pageOverlay.Open(t_first.Theme, t_first.PageIndex);
 
         gameObject.SetActive(true);
-        transform.SetAsLastSibling();   // 프리팹 저작 순서 방어(중첩 Canvas·overrideSorting은 쓰지 않는다)
+        // 오버레이 안에서의 순서 방어 — 이 패널은 형제 순서로만 딤·프레임 위에 선다.
+        // (오버레이 자신이 로비 셸 위로 올라서는 것은 별개다 — AlbumPageOverlayView.SetFrontmost)
+        transform.SetAsLastSibling();
 
         // 부모(오버레이)가 끝내 안 켜졌으면 StartCoroutine이 예외다 — 위장을 되돌리고 조용히 물러난다.
         if (!gameObject.activeInHierarchy)
@@ -130,17 +150,13 @@ public class AlbumInsertSession : MonoBehaviour
         // 다른 탭으로 나가려 하면 자동 진행이 아니라 즉시 끝낸다 — 안 보이는 화면에서 연출을 계속 돌릴 이유가 없다.
         // 안내 중에는 이탈 자체를 삼킨다 — 선택된 탭은 버튼이 꺼지고 Focus가 대신하므로(LobbyTabController.Select),
         // 유저가 먼저 그 탭으로 가 버리면 뒤이어 그 버튼을 가리키는 안내가 영영 뜨지 못한다. 탈출로는 건너뛰기다.
-        if (lobbyTabController != null)
+        if (pageOverlay != null)
         {
-            lobbyTabController.SetLeaveGuard(_p => { if (TutorialMode) return; AbortAll(); _p(); });
-
-            // 어차피 가드에 막혀 눌러도 안 먹는 탭바다 — 걷어야 화면 맨 아래가 건너뛰기 자리로 열린다
-            lobbyTabController.SetBarRetracted(true);
-
-            // 페이지 오버레이의 딤은 탭 콘텐츠 안이라 상단 재화·메뉴를 못 덮는다 — 그쪽 탈출로는 셸 딤이 막는다
-            lobbyTabController.SetShellDimmed(true);
+            // 오버레이를 셸 위로 올려 그 딤 한 장이 화면 전체를 덮게 한다 —
+            // 상단 재화·메뉴도 탭바도 어두워진 채 제자리에 남고, 입력은 딤이 받는다.
+            pageOverlay.SetFrontmost(true);
+            pageOverlay.SetInteractionLocked(true);
         }
-        if (pageOverlay != null) pageOverlay.SetInteractionLocked(true);
 
         if (group != null) group.blocksRaycasts = true;
         this.HideCard();
@@ -218,7 +234,7 @@ public class AlbumInsertSession : MonoBehaviour
                     if (m_autoPlay) yield return new WaitForSecondsRealtime(this.autoStepGap);
                     else            yield return this.AwaitDrag();
 
-                    yield return this.Seat(t_step);
+                    yield return this.Seat(t_step, t_i == m_steps.Count - 1);
                 }
 
                 m_steps.Clear();
@@ -255,6 +271,7 @@ public class AlbumInsertSession : MonoBehaviour
         if (m_openTheme == _step.Theme && pageOverlay.PageIndex == _step.PageIndex) yield break;
 
         m_openTheme = _step.Theme;
+        SoundManager.Instance?.PlayCue(EOutgameSound.AlbumPageTurn);
 
         // 열려 있으면 책 넘김을, 닫혀 있으면 팝업 열기를 태운다 — 어느 쪽인지는 오버레이가 판단한다
         yield return pageOverlay.GoToPageAsync(_step.Theme, _step.PageIndex).ToCoroutine();
@@ -335,7 +352,7 @@ public class AlbumInsertSession : MonoBehaviour
         m_seatRequested = false;
     }
 
-    IEnumerator Seat(AlbumInsertStep _step)
+    IEnumerator Seat(AlbumInsertStep _step, bool _lastInBatch)
     {
         dragger.Interactable = false;
         if (hint != null) hint.PauseFinger();
@@ -366,7 +383,14 @@ public class AlbumInsertSession : MonoBehaviour
         AlbumInsertMask.Reveal(_step.Card);
         this.HideCard();
 
+        SoundManager.Instance?.PlayCue(EOutgameSound.AlbumCardSeat);
         this.SettlePulse(m_slotRect);
+        this.fanfare?.Play(m_slotRect, m_autoPlay);
+
+        float t_fanfareHold = m_autoPlay
+                            ? (_lastInBatch ? this.quickFinalFanfareHold : 0f)
+                            : this.fanfareHold;
+        if (t_fanfareHold > 0f) yield return new WaitForSecondsRealtime(t_fanfareHold);
     }
 
     // 안착 마무리 강조 — 부풀리는 펀치 대신 "원래크기 → 축소 → 원래크기"로 꾹 눌러 담는 손맛을 낸다.
@@ -467,8 +491,13 @@ public class AlbumInsertSession : MonoBehaviour
 
     void Finish()
     {
+        // 스텝을 다 소진하고 끝났을 때만 축하한다 — Finish는 건너뛰기(AbortAll)와 세션 파괴(ReleaseGuards)도 지나는
+        // 자리라, 남은 스텝이 있는 채로 들어왔으면 탭을 옮기다 축하음이 나는 꼴이 된다.
+        if (IsRunning && m_steps.Count == 0) SoundManager.Instance?.PlayCue(EOutgameSound.AlbumFanfare);
+
         // 펄스가 도는 중에 끝나면 남의 칸이 줄어든 채로 도감에 남는다 — 완료(=원래 크기 복귀)시키고 놓는다.
         if (m_slotRect != null) m_slotRect.DOComplete();
+        this.fanfare?.Reset();
 
         m_steps.Clear();
         m_openTheme = null;
@@ -489,14 +518,11 @@ public class AlbumInsertSession : MonoBehaviour
 
         // 위장 해제가 먼저다 — 잠금을 먼저 풀면 그 프레임에 빈 칸이 눌릴 수 있다.
         AlbumInsertMask.Clear();
-        if (pageOverlay != null) pageOverlay.SetInteractionLocked(false);
-        if (lobbyTabController != null)
+        if (pageOverlay != null)
         {
-            lobbyTabController.ClearLeaveGuard();
-            lobbyTabController.SetBarRetracted(false);
-            lobbyTabController.SetShellDimmed(false);
+            pageOverlay.SetInteractionLocked(false);
+            pageOverlay.SetFrontmost(false);
         }
-
         IsRunning = false;
 
         // 전면 Blocker가 남아 있으면 세션이 끝난 뒤에도 도감 입력을 계속 먹는다.

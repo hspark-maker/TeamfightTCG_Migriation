@@ -1,0 +1,44 @@
+using UnityEngine;
+
+public enum ESyncUiPrefab
+{
+    SceneCurtain,
+    LockBadge,
+    LoadingCover,
+}
+
+[CreateAssetMenu(fileName = "SyncUiPrefabCatalog", menuName = "UI/Sync UI Prefab Catalog")]
+public sealed class SyncUiPrefabCatalog : ScriptableObject
+{
+    [SerializeField] GameObject sceneCurtain;
+    [SerializeField] GameObject lockBadge;
+    [SerializeField] GameObject loadingCover;
+
+    public GameObject Get(ESyncUiPrefab _id)
+        => _id switch
+        {
+            ESyncUiPrefab.SceneCurtain => sceneCurtain,
+            ESyncUiPrefab.LockBadge => lockBadge,
+            ESyncUiPrefab.LoadingCover => loadingCover,
+            _ => null,
+        };
+}
+
+public static class SyncUiPrefabs
+{
+    const string ResourcePath = "UI/SyncUiPrefabCatalog";
+    static SyncUiPrefabCatalog s_catalog;
+
+    public static void SetSource(SyncUiPrefabCatalog _catalog) => s_catalog = _catalog;
+
+    public static GameObject Get(ESyncUiPrefab _id)
+    {
+        if (s_catalog == null)
+            s_catalog = Resources.Load<SyncUiPrefabCatalog>(ResourcePath);
+
+        GameObject t_prefab = s_catalog != null ? s_catalog.Get(_id) : null;
+        if (t_prefab == null)
+            Debug.LogError($"[SyncUiPrefabs] {_id} 프리팹이 동기 UI 카탈로그에 연결되지 않았습니다.");
+        return t_prefab;
+    }
+}

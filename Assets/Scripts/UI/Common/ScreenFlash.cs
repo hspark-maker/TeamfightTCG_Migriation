@@ -64,7 +64,7 @@ public class ScreenFlash : MonoBehaviour
     const string BURST_NAME = "ScreenFlashBurst";
 
     // 어떤 UI보다도 위. 오버레이 캔버스와 다투지 않도록 넉넉히 띄운다.
-    const int SORTING_ORDER = 32000;
+    const int SORTING_ORDER = UiSortingOrder.ScreenFlash;
 
     static ScreenFlash s_instance;
 
@@ -72,9 +72,6 @@ public class ScreenFlash : MonoBehaviour
     static readonly ScreenFlashCover s_default = new ScreenFlashCover();
 
     Image m_image;
-
-    // 이번 커버에만 쓰는 색. 필드로 눌러두지 않는 이유는 다음 호출이 앞 호출의 색을 물려받지 않게 하기 위해서다.
-    Color? m_coverColor;
 
     /// <summary>
     /// 플래시를 얻는다. 씬에 없으면 자가 설치한다(프리팹·씬 편집 없이).
@@ -94,27 +91,49 @@ public class ScreenFlash : MonoBehaviour
     /// 화면이 완전히 덮이는 시각은 _cover.rise다. 그 뒤 hold 동안 덮인 채로 있으니 화면 교체는 그 사이에 한다.
     /// 주입한 색은 이 시퀀스가 끝날 때까지만 유효하고 Clear에서 비워진다 — 다음 호출이 오염되지 않게.
     /// </summary>
-    public Sequence BuildCover(ScreenFlashCover _cover)
+    public Sequence BuildCover(ScreenFlashCover _cover) => BuildCoverOn(ResolveImage(), _cover);
+
+    /// <summary>
+    /// 지정한 판에 덮개 시퀀스를 세운다(재생은 호출자 몫). 자가설치 플래시와 프리팹에 저작된 덮개가
+    /// 같은 그림을 쓰게 하는 단일 지점 — 어느 쪽으로 덮든 생김새는 ScreenFlashCover 하나가 정한다.
+    ///
+    /// 판을 프리팹에 두면 <b>그 판보다 뒤에 놓인 UI는 덮이지 않는다</b>. 전환 중에도 남겨야 하는 표시가
+    /// 있을 때 쓴다(개봉 재개봉의 재화 바 — 덮으면 그 밑에서 차감 롤다운이 끝나 결제를 못 본다).
+    /// </summary>
+    public static Sequence BuildCoverOn(Image _plate, ScreenFlashCover _cover)
     {
-        var t_image = ResolveImage();
-        if (t_image == null) return null;
+        if (_plate == null) return null;
 
         var t_c = _cover ?? s_default;
 
-        m_coverColor = t_c.color;   // 알파를 굴리기 전에 정한다 — SetAlpha가 이 색을 읽는다.
-        SetAlpha(0f);
-        t_image.gameObject.SetActive(true);
+        _plate.raycastTarget = false;   // 덮인 동안 터치를 가로채지 않는다.
+        _plate.color = WithAlpha(t_c.color, 0f);
+        _plate.gameObject.SetActive(true);
 
-        var t_seq = DOTween.Sequence().SetLink(gameObject);
-        t_seq.Insert(0f, DOTween.To(GetAlpha, SetAlpha, t_c.peak, t_c.rise).SetEase(Ease.OutQuad));
-        t_seq.Insert(t_c.rise + t_c.hold, DOTween.To(GetAlpha, SetAlpha, 0f, t_c.fall).SetEase(Ease.InQuad));
+        var t_seq = DOTween.Sequence().SetLink(_plate.gameObject);
+        t_seq.Insert(0f, _plate.DOFade(t_c.peak, t_c.rise).SetEase(Ease.OutQuad));
+        t_seq.Insert(t_c.rise + t_c.hold, _plate.DOFade(0f, t_c.fall).SetEase(Ease.InQuad));
 
         // 빛은 덮개보다 오래 남을 수 있다 — 시퀀스 길이는 DOTween이 늘려 잡는다.
-        Action t_cleanup = StageBurst(t_seq, t_c);
+        Action t_cleanup = StageBurstOn((RectTransform)_plate.transform, t_seq, t_c);
 
         // 정상 종료든 중단이든 여기로 온다 — 밝은 채로 굳으면 화면이 하얗게 잠기고, 빛 노드가 남으면 잔해가 된다.
-        t_seq.OnKill(() => { Clear(); t_cleanup?.Invoke(); });
+        t_seq.OnKill(() =>
+        {
+            if (_plate != null)
+            {
+                _plate.color = WithAlpha(t_c.color, 0f);
+                _plate.gameObject.SetActive(false);
+            }
+            t_cleanup?.Invoke();
+        });
         return t_seq;
+    }
+
+    static Color WithAlpha(Color _color, float _alpha)
+    {
+        _color.a = _alpha;
+        return _color;
     }
 
     void Awake()
@@ -131,11 +150,9 @@ public class ScreenFlash : MonoBehaviour
 
     // 덮개 위에 얹는 빛. 스프라이트가 없으면 이 축만 건너뛴다(예전과 같은 단색 판으로 돌아갈 뿐이다).
     // 자식으로 붙는 이유: uGUI는 자식을 부모 그래픽 '위'에 그린다 — 덮개가 걷히는 동안 이 빛이 남아야 질감이 산다.
-    Action StageBurst(Sequence _seq, ScreenFlashCover _c)
+    static Action StageBurstOn(RectTransform t_root, Sequence _seq, ScreenFlashCover _c)
     {
         if (_c.burstSprite == null) return null;
-
-        var t_root = (RectTransform)transform;
 
         // 캔버스 rect가 곧 화면이다. 긴 변을 기준으로 잡아야 세로/가로 어느 화면비에서도 화면을 채운다.
         // ⚠ 자가설치된 바로 그 프레임에는 rect가 아직 0이다(캔버스가 한 번도 갱신되지 않았다).
@@ -207,23 +224,12 @@ public class ScreenFlash : MonoBehaviour
         return m_image;
     }
 
-    float GetAlpha() => m_image != null ? m_image.color.a : 0f;
-
-    void SetAlpha(float _a)
-    {
-        if (m_image == null) return;
-
-        // 색의 진실원은 ScreenFlashCover다. 여기 폴백은 커버 밖에서 알파만 0으로 지우는 경로(Awake/Clear)를 위한 것.
-        var t_c = m_coverColor ?? Color.white;
-        t_c.a = _a;
-        m_image.color = t_c;
-    }
-
     // 투명하게 되돌리고 노드를 꺼 둔다. 꺼 두는 이유는 알파 0짜리 전체 화면 이미지가 매 프레임 그려지지 않게.
     void Clear()
     {
-        SetAlpha(0f);
-        m_coverColor = null;   // 주입색은 한 번 쓰고 버린다(SetAlpha 뒤에 비워야 마지막 프레임이 제 색으로 지워진다).
-        if (m_image != null) m_image.gameObject.SetActive(false);
+        if (m_image == null) return;
+
+        m_image.color = WithAlpha(m_image.color, 0f);
+        m_image.gameObject.SetActive(false);
     }
 }

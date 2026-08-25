@@ -20,7 +20,7 @@ public class SettingsPanel : PooledUIBase
 
     // 설정창은 전투 UI(UIPoolManager 캔버스 400)·멀리건 오버레이(500) 위, 로딩 커버(1000) 아래에 선다.
     // 창이 떠 있는 동안 뒤에서 다른 UI가 등장해도 dim 아래로 깔려 튀어나오지 않는다.
-    const int SortingOrder = 900;
+    const int SortingOrder = UiSortingOrder.Setting;
 
     // 페이지 전환(메뉴 ↔ 환경설정) 피드백.
     const float PageSlideX    = 70f;

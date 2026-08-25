@@ -11,16 +11,12 @@
 flowchart TD
     subgraph GRP_A["A. 기반 인프라"]
         SAVE["세이브 스토어"]
-        TIME["시각 단일 창구"]
+        TIME["시각 단일 창구<br/>(GameClock — 2026-08-14 삭제)"]
         GOLD["재화 서비스<br/>골드 · 다이아"]:::chg
     end
     subgraph GRP_B["B. 마스터·소유"]
         CAT["카드 마스터 창구<br/>CardCatalog 읽기"]
         OWN["카드 소유권"]
-    end
-    subgraph GRP_C["C. 도감 생산"]
-        ROW["행 파생 모델"]
-        PROD["생산 상태머신<br/>경과시간 순수함수"]
     end
     D["D. 전투 보상 브리지 (완료)<br/>RewardService"]
     subgraph GRP_E["E. 카드팩"]
@@ -32,7 +28,7 @@ flowchart TD
     end
     subgraph GRP_F["F. 아웃게임 UI"]
         HUD["골드 HUD"]
-        GAL["도감 갤러리"]
+        GAL["카드 앨범(도감)<br/>UI/Album"]
         SHOP["상점"]
         GRWUI["강화 화면<br/>CardGrowthScreen"]:::new
     end
@@ -41,16 +37,12 @@ flowchart TD
 
     SAVE --> GOLD
     SAVE --> OWN
-    TIME --> PROD
-    CAT --> ROW
-    OWN --> ROW
-    ROW --> PROD
-    PROD -->|수확| GOLD
     D -->|지급| GOLD
     GOLD -->|차감| PACK
     PACK -->|부여| OWN
     GOLD --> HUD
-    ROW --> GAL
+    CAT --> GAL
+    OWN -->|"소유 파생"| GAL
     PACK --> SHOP
 
     SAVE --> GRW
@@ -70,7 +62,8 @@ flowchart TD
 ```
 
 > 이 그림에서 성장 노드(`:::new`)는 **도메인 문자를 아직 받지 않았다** — `OUTGAME_ROADMAP.md`의 도메인 분류(A~H) 밖에 신설된 축이라, 로드맵 편입 세션에서 문자를 부여할 때까지 이름으로만 부른다.
-> `재화 서비스`가 `:::chg`인 이유: 로드맵의 "단일 골드" 확정 스코프가 진화 비용 때문에 **골드 + 다이아 2종**으로 바뀌었다(보드 변경 로그 2026-08-04). 다만 다이아 **공급 경로는 아직 디버그 치트 하나뿐**이고, `ENHANCE_ECONOMY.md`가 주 공급원으로 설계한 도감 생산 배선은 다음 단계다.
+> **도메인 C(도감 방치 생산)는 2026-08-14 코드·에셋째 삭제됐다** — 행 파생 모델·생산 상태머신·수확이 전부 사라졌고 신규 도감(카드 앨범, `OutGame/Album/`)이 그 자리를 대신한다. 로드맵의 C절은 당시 계획 기록으로만 남는다. 시각 창구 `GameClock`도 소비처가 0이 되어 같이 삭제됐다.
+> `재화 서비스`가 `:::chg`인 이유: 로드맵의 "단일 골드" 확정 스코프가 진화 비용 때문에 **골드 + 다이아 2종**으로 바뀌었다(보드 변경 로그 2026-08-04). 다만 다이아 **공급 경로는 아직 디버그 치트 하나뿐**이다 — `ENHANCE_ECONOMY.md`가 주 공급원으로 설계했던 도감 생산이 폐기됐으므로 공급원 재설계가 남아 있다.
 
 ## 클래스 수준 구조 (도메인별)
 
@@ -87,9 +80,8 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph src["목록 공급자 (화면에 보이는 순서 = 넘기는 순서)"]
-        GRID["CollectionGridController<br/>m_order"]:::new
-        GAL["CollectionGalleryController<br/>m_flat (전 행 이어붙임) + 행별 오프셋"]:::new
-        ROW["CollectionRowView"]
+        PAGE["AlbumPageOverlayView<br/>m_order (페이지 칸 순서, null 슬롯 포함)"]
+        PRG["PackResultGrid<br/>m_order (개봉 결과 순서)"]
     end
 
     subgraph ov["CardDetailOverlay.prefab"]
@@ -99,8 +91,8 @@ flowchart TD
         SLIDE["CardUIView (slideTarget)<br/>+ CanvasGroup"]:::new
     end
 
-    GRID -->|"BindTile(tile, m_order, i)"| VIEW
-    GAL -->|"BindTile(tile, m_flat, offset+i)"| ROW --> VIEW
+    PAGE -->|"Open(m_order, i)"| VIEW
+    PRG -->|"BindTile(tile, m_order, i)"| VIEW
     SW -->|"OnSwipe(±1)"| VIEW
     PREV -->|"onClick"| VIEW
     VIEW -->|"PlaySlide: DOAnchorPosX + DOFade<br/>SetId(this)"| SLIDE
@@ -108,7 +100,7 @@ flowchart TD
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
 ```
 
-**흐름 시퀀스 — 갤러리에서 행 끝 카드를 "다음"으로 넘기기**
+**흐름 시퀀스 — 목록 끝 카드를 "다음"으로 넘기기**
 
 ```mermaid
 sequenceDiagram
@@ -121,7 +113,7 @@ sequenceDiagram
     U->>SW: 왼쪽으로 드래그 후 뗌
     SW->>SW: snapRatio 0.22 / flick 700 이중 판정
     SW->>V: OnSwipe(+1)
-    V->>V: FindValid(m_index+1, +1) — null 슬롯 건너뜀<br/>행 경계는 m_flat이 이미 이어져 있어 그대로 통과<br/>마지막 카드면 Wrap으로 0번 카드에 이어짐
+    V->>V: FindValid(m_index+1, +1) — null 슬롯 건너뜀<br/>마지막 카드면 Wrap으로 0번 카드에 이어짐
     V->>T: CancelSlide → DOTween.Kill(this) (연타 인계)
     T->>C: DOAnchorPosX(base-120, 0.09) + DOFade(0)
     T->>V: 중간 콜백 → ApplyPending() (카드 교체)
@@ -412,7 +404,19 @@ flowchart TD
     FTAB --> FLV
     BRG -->|"ApplyStepOnce · 완주 시 Refresh()"| FLOCK
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
-    DBGS["OutgameTutorialStepWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 스텝 되감기<br/>SO 직독으로 편·스텝을 펼치고 칸 하나를 예약한다"]:::new
+    DBGS["TutorialAuthoringWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 저작 도구<br/><b>왼쪽 목록(스텝당 한 줄) / 오른쪽 상세</b> — 값·상태·문제·되감기를 고른 하나에 모은다<br/>온보딩·트리거를 같은 목록 코드로 그린다. 구 OutgameTutorialStepWindow를 흡수했다"]:::new
+    VSTATE["TutorialSequenceState (에디터)<br/>OutgameFeatureLock.Recalculate의 거울 — 스텝마다 누적 해금·일시 잠금을 미리 굽는다<br/>fail-open 3종(stalled·디버그·미실행)은 일부러 모델링하지 않는다"]:::new
+    VLD["TutorialValidator (에디터)<br/>저작 규칙 정적 판정 — 부트 LogWarning으로만 있던 규약을 창으로 승격<br/>앵커 잠김 · stepId 중복 · 덱게이트 미폐쇄 · 필수 참조 미배선 …"]:::new
+    AMETA["TutorialAnchorMeta (에디터)<br/>앵커 한 줄 = 잠금 기능 · 화면 · 등록처<br/>TutorialActionMeta와 같은 관용구(인덱스=enum, static 생성자 검증)"]:::new
+    EOPS["TutorialSequenceEditOps (에디터)<br/>추가·복제·삭제·순서·<b>편 간 이동</b>·챕터 조작의 단일 창구<br/>stepId 계약(추가·복제=부여 · 이동=유지 · 삭제=소각)과 Undo가 여기 산다<br/>구조를 바꾸면 되감기 예약을 걷는다(예약은 좌표라 밀리면 엉뚱한 곳까지 재생한다)"]:::new
+    DBGS -->|"편집 모드(지연 실행)"| EOPS
+    EOPS -->|"TakeNextStepIdForEditor · EditorSteps"| STEP
+    DBGS --> VSTATE
+    DBGS --> VLD
+    VLD --> VSTATE
+    VLD --> AMETA
+    VSTATE -.->|"규칙을 베낀 정본(어긋나면 오탐)"| FLOCK
+    AMETA -.->|"Gate 근거 = Attach 호출부·탭 짝"| FLV
     RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
     BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
     DBGS -->|"Schedule(좌표)"| RWD
@@ -469,6 +473,20 @@ sequenceDiagram
 >
 > 2026-08-13: 온보딩 마지막 챕터였던 **카드 강화 안내가 도감 탭 트리거(`CollectionTabFirstEnter`)로 이관**됐다.
 > 온보딩에는 랭크 승급 연출(`EnterFirstRank` + `unlocksAll`) 한 스텝만 남아 그 자리가 곧 졸업이다.
+>
+> 2026-08-13: **첫 진화 안내(`FirstEvolutionReady`)** 추가 — 발화 축이 탭 밖으로 처음 나갔다.
+> 강화가 다 끝나(`_onFinished`) 다음 한 방이 첫 진화로 판정되면 `CardDetailOverlayView`가 직접 `Fire`한다.
+> 관문 레벨을 화면이 적지 않는다(`IsEvolutionLevel` + `EvolutionStage == 0`) — 곡선이 관문의 주인이다.
+>
+> 2026-08-24: 위 **첫 진화 안내 철회.** 진화가 다이아를 무는 벽이라 대준 한 방이었는데,
+> 진화 재화가 강화와 같은 조각으로 통일되면서 벽이 사라졌다. 발화처(`CardDetailOverlayView`)와
+> 조회 창구(`TriggeredTutorialRunner.IsRunningTrigger`)를 제거했고, `TriggeredTutorial.asset`에는
+> 원래부터 이 트리거의 엔트리가 없어 실제로 뜬 적이 없다. `EOutgameTutorialTrigger.FirstEvolutionReady`
+> 값은 세이브(`completedTriggers`, 이름 문자열)와 뒤 항목 보존을 위해 남긴다.
+>
+> 2026-08-14: **키워드 강화 안내(`KeywordGrowthFirstOpen`)** 추가 — 발화 축이 탭·강화 결과에 이어 **화면 열림**까지 왔다.
+> 그리고 "무엇이 공짜인가"의 주인이 코드에서 **저작(`TutorialStepDef.freeOfCharge`)**으로, 소진 원장이
+> `CardGrowthManager`에서 **`OutgameTutorialGuide`로** 옮겨 세 축(카드 강화·진화·키워드 강화)이 같은 원장을 본다.
 
 #### 두 축 대조 — 무엇이 갈리고 무엇이 같은가
 
@@ -514,21 +532,30 @@ flowchart TD
 
     subgraph scene["씬 레이어 — 브리지 2개, 게이트 1개"]
         BRG["OutgameTutorialBridge<br/>+ ApplyCurrentStep 최상단 IsRunning 가드"]:::chg
-        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · LobbyReturn"]:::chg
+        TBRG["TriggeredTutorialBridge (LobbyScene 1개)<br/>Awake:구독 · Start:재개 pull<br/>팩 구매·개봉 구독 없음 · 억제 모드 없음<br/>지원 완료조건: Confirm · Click · Enhance · KeywordEnhance · LobbyReturn · CardDetailReturn<br/>강화 연출 중엔 앵커 재등록을 무시(비활성 버튼에 게이트를 걸지 않는다)"]:::chg
         GATE["OutgameTutorialGateUI (싱글턴 1개)<br/>ShowGate · ShowMessageGate · Clear"]
     end
 
-    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
+    KEY["EOutgameTutorialTrigger (enum)<br/>DeckTabFirstEnter · CollectionTabFirstEnter · KeywordGrowthFirstOpen (+ FirstEvolutionReady = 폐기, 값만 보존)<br/>세이브엔 이름 문자열 → 리네임 금지"]:::new
     TAB["LobbyTabController.Tab.tutorialTrigger<br/>Select(idx, fireTrigger) — Start는 false<br/>+ alertDotPrefab: 탭 **아이콘**에 알림 점 런타임 부착"]:::chg
     BOOT["BootInstaller<br/>+ TriggeredTutorialData 주입"]:::chg
 
-    ADOT["AlertDotView (abstract, UI/Common)<br/>등장 팝 · 상시 맥동 · 퇴장 — 판정 없음<br/>파생: RankRewardAlertDot · TutorialAlertDot"]:::new
+    ADOT["AlertDotView (abstract, UI/Common)<br/>등장 팝 · 상시 맥동 · 퇴장 — 판정 없음<br/>파생: LobbyEntryAlertDot(랭크보상·강화·모험) · TutorialAlertDot"]:::new
     TDOT["TutorialAlertDot<br/>HasPending && FeatureLock.IsUnlocked"]:::new
     ADOT --- TDOT
     TAB -->|"AddComponent + Bind"| TDOT
     TDOT -->|"HasPending · OnChanged 구독"| TRUN
 
     TAB -->|"유저 탭 전환 시 Fire"| TRUN
+    KGP["KeywordGrowthPanel<br/>Open() 끝에서 Fire — SetVisible·Build 뒤라야 앵커가 서 있다<br/>칸/업그레이드 버튼 앵커를 코드로 등록·해제"]:::new
+    KGM["KeywordGrowthManager<br/>TryGetStepAt 단일 퍼널(표시=활성=소모)<br/>event OnEnhanced(성공만) · NotifyCostRuleChanged"]:::new
+    FREE["OutgameTutorialGuide — 무료 한 방 원장<br/>HasFreeShot · ConsumeFreeShot · ResetFreeShotForDebug<br/>무엇이 공짜인지는 저작(freeOfCharge)이 정한다"]:::new
+    GROW["CardGrowthManager.TryGetStepAt<br/>원장을 직접 쥐지 않고 Guide에 묻는다"]:::chg
+    KGP -->|"Fire(KeywordGrowthFirstOpen)"| TRUN
+    KGM -->|"OnEnhanced"| TBRG
+    GROW --- FREE
+    KGM --- FREE
+    FREE -->|"현재 스텝 조회"| TRUN
     KEY --- TRUN
     BOOT -->|"EnsureData(멱등)"| TRUN
     TBRG -->|"EnsureData · OnActivated 구독"| TRUN
@@ -544,6 +571,58 @@ flowchart TD
     classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
     classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
 ```
+
+---
+
+### G-TUT3 — 해금 안내 (키워드·시너지를 처음 열었을 때) — 2026-08-14
+
+강화로 키워드가, 1차 진화로 시너지가 열린다. 그 순간 설명은 이미 상세창에 깔려 있으므로
+**없는 것은 지식이 아니라 그것을 읽게 만드는 유도**다. 두 겹으로 답한다.
+
+| 겹 | 언제 | 무엇 |
+|---|---|---|
+| 매번 | 잠김 판이 걷힐 때마다 | 그 줄로 스크롤이 따라가고 칩 → 설명이 순차로 들어온다 (`SectionRevealFx`) |
+| 처음 1회 | 그 개념을 처음 열었을 때 | 전면 오버레이 한 장 (`UnlockIntroOverlay`) |
+
+**트리거 튜토리얼 축(G-TUT2)을 쓰지 않는 이유** — `TriggeredTutorialRunner.IsOpen`이
+"온보딩 졸업 후"로 잠겨 있어 첫 해금이 온보딩 중에 일어나면 영영 발화하지 않는다.
+얼굴도 다르다(손가락+말풍선 vs 축하 오버레이). 그래서 **낙인만 같은 세이브 슬롯을 빌린다.**
+
+```mermaid
+flowchart TD
+    subgraph persist["영속 — 창구는 그대로 하나"]
+        PRG["OutgameTutorialProgress (static)<br/>+ IsUnlockIntroSeen(key) · MarkUnlockIntroSeen(key)<br/>ClearTriggersForDebug가 이 목록도 비운다"]:::chg
+        SD["TutorialSaveData 슬롯<br/>+ List&lt;string&gt; seenUnlockIntros<br/>(키 문자열 — 추가만, VERSION 유지)"]:::chg
+    end
+
+    subgraph value["값 — 키워드와 시너지를 한 모양으로"]
+        UI2["UnlockIntro (readonly struct)<br/>Key · Icon · IconScale · Name · Body<br/>TryForKeyword(config, kw) · TryForSynergy(data)<br/>**낙인 키 조립의 단일 지점** — kw:이름 / syn"]:::new
+    end
+
+    subgraph screen["화면"]
+        CDO["CardDetailOverlayView.PlayPendingUnlockFx<br/>m_pendingUnlockedKeywords(CardKeyword) + m_pendingSynergyUnlockFx<br/>→ 판 걷힘 → RevealUnlockedSections<br/>하단 바 복귀는 이 흐름의 마지막 축 한 곳"]:::chg
+        SRF["SectionRevealFx (섹션 노드마다 1장)<br/>chipRoot → descText 순차 등장<br/>자리가 아니라 알파·배율만 (레이아웃 그룹 회피)"]:::new
+        OVL["UnlockIntroOverlay (Resources/UI, 자가설치)<br/>Show(intros, onClose) · IsOpen · OnAnyClosed<br/>행 = KeywordExplainItem, 프리팹에 미리 깔림<br/>여러 개도 한 화면에 쌓고 [확인]은 한 번"]:::new
+    end
+
+    TXT["SynergyText.Body<br/>효과 + 발동 요구치(2장). 티어 라벨이 시너지 이름과 같으면 생략<br/>상세창 synergyDescText도 같은 포맷을 쓴다"]:::chg
+
+    CDO -->|"CollectUnseenIntros"| UI2
+    UI2 -->|"IsUnlockIntroSeen"| PRG
+    CDO -->|"Play"| SRF
+    CDO -->|"띄우는 순간 MarkUnlockIntroSeen"| PRG
+    CDO -->|"Show(intros, ShowBottomBar)"| OVL
+    UI2 --> TXT
+    PRG <--> SD
+
+    classDef new fill:#1f6f3f,stroke:#7CFC9E,color:#fff;
+    classDef chg fill:#7a5b16,stroke:#f2c14e,color:#fff;
+```
+
+불변식 몇 개:
+- **낙인은 닫힐 때가 아니라 띄우는 순간** 찍는다 — 읽는 도중 앱이 죽어도 다시 세우지 않는다(내용은 상세창에 남아 있다).
+- 카드를 넘기거나 창을 닫으면 `DropPendingUnlockFx`가 대기를 버린다 → 오버레이도 뜨지 않는다.
+- 하단 바를 되돌리는 곳은 `RevealUnlockedSections`의 끝 **한 곳**뿐이다(오버레이가 서면 그 닫힘이 곧 끝).
 
 
 
@@ -688,7 +767,7 @@ flowchart TD
 | 캐리어 | `RankUpHandoff` · **티어 상승일 때만** 실림 | `RankResultHandoff` · 정산마다 실림(`Delta==0 && !IsTierUp`이면 스스로 거름). 연속 전투는 `Delta` 누적 + 도달 최고 티어 |
 | 소비처 | `RankRewardPanel.Start` 코루틴 | `LobbyRankEffectDirector`(`GainEffectLayer`에 부착 — 탭과 무관하게 항상 활성) |
 | 복귀 화면 | 승급 연출 후 **패널 자동 오픈** | 조각이 배지로 수렴 → 승급 연출 → 끝. 패널은 유저가 `RankReward` 버튼으로 연다 |
-| 보상 안내 | 없음(패널이 직접 떴다) | `RankRewardAlertDot` 배선(`RankReward/Dot`) — `HasAnyClaimable` 단일 근거 |
+| 보상 안내 | 없음(패널이 직접 떴다) | `LobbyEntryAlertDot` 배선(`RankReward/Dot`) — `HasAnyClaimable` 단일 근거 |
 
 **연출 순서의 근거**: 조각이 다 꽂힌 **뒤에** 핍이 켜진다. 그래서 `RankHud.BuildTierUp`의 "과거 상태 되돌리기"를 시퀀스 첫 콜백에서 **조립 시점 즉시 실행**으로 옮겼다 — 앞 단계가 도는 동안 새 핍이 이미 켜져 있으면 인과가 뒤집힌다.
 디렉터가 승급 시퀀스만 **커버 아래에서 조립해 `Pause`**로 들고 있다가 조각이 끝난 뒤 `Play`하는 이유도 같다(유저가 처음 보는 화면이 "오르기 전"이어야 한다).
@@ -702,7 +781,7 @@ flowchart TD
 | `UI/HUD/RankHud.cs` | `pointText` 제거 · `BadgeRect` / `PlayGainImpact(bool)` / `BuildLossReaction()` 추가 |
 | `OutGame/Rank/RankResultHandoff.cs` | 개명 + 병합 규칙 재작성 |
 | `UI/Rank/RankRewardPanel.cs` · `RankRewardRowView.cs` | 자동 오픈 경로와 `PlayTierUpEffect` 제거(최상위 행은 `readyPulse`가 이미 상시 강조) |
-| `UI/Rank/RankRewardAlertDot.cs` | **코드 무수정** — 구독·최초 렌더·`m_started` 가드까지 완비돼 있었고 배선만 없었다 |
+| `UI/Common/LobbyEntryAlertDot.cs` | **코드 무수정** — 구독·최초 렌더·`m_started` 가드까지 완비돼 있었고 배선만 없었다 |
 
 **알려진 한계**: 튜토리얼 졸업(`OutgameTutorialRunner.CompleteSequence`)은 로비 세션 **중간**에 `Set`을 부르므로 디렉터의 `Start`가 지난 뒤다 → 그 결과는 다음 로비 진입에서 소비된다(개편 전과 동일).
 
@@ -755,6 +834,80 @@ flowchart TD
 | `OutGame/Debug/OutgameDebugActions.cs` | `TIER ±`가 결과를 캐리어에 실어 **씬 재진입 시 연출을 재생**한다(없으면 강등 연출을 볼 길이 전투뿐) |
 
 **보상은 무수정** — `RankRewardManager.StateOf`가 티어 인덱스가 아니라 **포인트 기준**이고 `Claimed` 낙인을 먼저 보므로, 강등해도 수령분은 유지되고 미수령 상위 행만 `Locked`로 되돌아간다(이미 강등을 전제한 코드였다).
+
+
+### 랭크 진행 호 — 배지를 감싸는 게이지 (2026-08-14)
+
+핍 4칸은 *"지금 몇 단계"*만 답하고 *"다음 별까지 얼마나"*는 답하지 못했다. 단계 간격 20~60에 승리 +10이라 **한 단계가 2~6승**인데, 그 사이의 승리는 화면에 아무 흔적을 남기지 않았다. `RankInfo.NextRequired`는 이미 계산돼 있었으나 **소비처가 0곳**이었다.
+
+#### 배치가 이미 원이었다
+
+`RankPips`의 `HorizontalLayoutGroup`은 **`m_Enabled: 0`**이라 저작 좌표가 곧 런타임 배치다. 네 핍 `(-150,-80) (-60,0) (60,0) (150,-80)`은 **중심 `(0,-158.125)` · 반지름 `169.13` 원 위에 오차 없이** 놓이고 각 간격은 41.7°로 균일하다. 그 원의 중심은 `RankBadge` 중심에서 12px 아래 — 별들은 처음부터 배지를 감싸는 링이었다.
+
+호를 **위쪽 중심 166.6°(±83.3°)**로 두고 4등분하면 경계가 `-83.3 / -41.7 / 0 / +41.7 / +83.3`이고 **별 하나가 각 칸의 정중앙**에 온다.
+
+- 채움 머리가 K번 칸에 있다 ⟺ K단계 ⟺ K번 별이 켜져 있다 — **기존 핍 의미·좌표 무변경**
+- 채움 `1.0` = 호의 오른쪽 끝 = **승급선**. 4단계를 3개 간격에 욱여넣지 않아도 되는 유일한 매핑이다
+- 호 = 연속 진행, 별 = 이산 단계. 역할이 겹치지 않는다
+
+`Image Type=Filled / Radial360`은 `fillOrigin=Top`에서만 시작하므로, 호를 위쪽 중심에 세우는 방법은 **루트를 span의 절반만큼 돌리는 것**뿐이다(링은 회전 대칭이라 그림은 그대로다). 가시 범위 자체도 `fillAmount` 상한(`span/360`)이 만든다 — 원 한 바퀴를 그린 뒤 잘라내지 않는다.
+
+#### 연출은 기존 시간축에 그대로 얹힌다
+
+`LobbyRankEffectDirector`는 이미 **조각 완료 → 티어 변화** 순서라, 호가 별에 닿고 → 그다음에 별이 켜진다.
+
+| 시점 | 호 |
+|---|---|
+| 캐리어 소비 직후(커버 아래) | `PrepareProgress(Points - Delta)` — 전투 직전 위치로. `Delta`가 클램프 뒤 실증감이라 이 뺄셈이 곧 그때 값이다 |
+| 조각 1개 도착마다 | `PlayGainImpact(_arrived, _total)`이 출발↔도착을 등분해 한 칸씩 전진 |
+| 등급 승급 파열 프레임 | `promote.Build`의 `_onBurst`에서 `BlowOutPips`와 **같은 프레임**에 새 등급 출발선으로 되감김 |
+| 포인트 손실 | 조각이 없는 경로 — 감소 트윈을 `BuildLossReaction` 시퀀스에 `Join`. **요요 없이 한 방향**(줄어든 자리가 곧 지금 값) |
+| 모든 `OnKill` / `Render()` | 진실값에 안착(조각 연출이 통째로 생략되는 경로들의 폴백) |
+
+등급이 갈리는 판의 도착지는 새 등급의 자리가 아니라 **옛 등급의 승급선(1.0)**이다 — 그 뒤는 파열이 이어받는다.
+
+| 신규/변경 파일 | 내용 |
+|---|---|
+| `Prefabs/UI/LobbyUI/RankInfo.prefab` 🆕 | 랭크 표시 전체(배지·티어명·핍·호). `LobbyCanvas`는 이걸 중첩 인스턴스로 문다 |
+| `UI/HUD/RankProgressArc.cs` 🆕 | 호 1개. `SetRatio` / `TweenTo` / `Stop`. `Awake`가 span에서 회전과 track `fillAmount`를 파생 |
+| `Prefabs/UI/LobbyUI/RankProgressArc.prefab` 🆕 | `Track`(어둡게) + `Fill`(금색), 스프라이트는 `BasicFrame_CircleLine_155_White2`(실제 도넛, 바깥 r=77 안 r=72). `sizeDelta 351.9` = 스트로크 중심을 핍 반지름 169.13에 맞춘 값 |
+| `OutGame/Rank/RankManager.cs` | `GetInfoAt(long)` 분리(연출이 '전투 직전' 스냅샷을 묻는다) · `RankInfo.TierRequired` 추가 · `TierProgress` / `GradeProgress` 파생 |
+| `UI/HUD/RankHud.cs` | `arc` 배선 · `PrepareProgress(long)` 추가 · `PlayGainImpact(bool)` → **`PlayGainImpact(int, int)`** |
+| `UI/Lobby/LobbyRankEffectDirector.cs` | `PrepareProgress` 호출 1줄 · 도착 콜백이 `(_arrived, _total)`을 그대로 넘김 |
+
+**랭크 표시 전체가 `RankInfo.prefab`으로 빠졌다.** `LobbyCanvas`의 `MatchContent/RankInfo`는 이제 그 프리팹의 중첩 인스턴스이고(형제 1번, `pos (0,209)` `size 700x700` — 좌표 무변경), 배지·티어명·핍 4개·호가 전부 그 안에 있다. 랭크 표시를 만질 때 LobbyCanvas를 열 필요가 없다.
+
+```
+RankInfo.prefab            [RankHud]
+├ RankBadge                 └ RankText
+└ RankPips                  (HorizontalLayoutGroup은 m_Enabled: 0 — 저작 좌표가 곧 배치)
+  ├ RankProgressArc        ← 형제 0 = 별들보다 앞 = 뒤에 깔린다 (RankProgressArc.prefab 중첩)
+  └ Pip1~Pip4
+```
+
+호가 `pipsRoot`의 자식이라 **언랭크에서 별 줄과 함께 통째로 꺼지는** 이득이 따라온다.
+
+#### LobbyCanvas를 열지 않고 구조를 바꾸는 법 (2026-08-14 실측)
+
+`LoadPrefabContents` + `SaveAsPrefabAsset`이 금지된 이 프리팹도 **targeted API로는 안전하게 고칠 수 있다.**
+
+**노드를 프리팹으로 빼내기** — 프리뷰 씬 사본을 `PrefabUtility.UnpackPrefabInstance(inst, OutermostRoot, AutomatedAction)`로 먼저 푼다(에셋은 안 건드린다. 안 풀면 *"Can't save part of a Prefab instance as a Prefab"*). 그다음 대상 노드에 `SaveAsPrefabAsset`. 안쪽 중첩(탭·호)은 `OutermostRoot`라 인스턴스로 남는다.
+
+**노드를 인스턴스로 교체** — 같은 프리뷰 씬에서 새 인스턴스를 붙여 `ApplyAddedGameObject` → 옛 노드를 `DestroyImmediate` → `ApplyRemovedGameObject(inst, 미리 잡아 둔 에셋측 노드, AutomatedAction)`. 에셋측 노드는 지우기 **전에** `GetCorrespondingObjectFromSource`로 잡아 둬야 한다.
+
+> ⚠ 이때 git diff는 **130삽입 / 704삭제**로 무섭게 보이지만 Unity의 YAML 문서 재배열이 섞인 것이다. 줄 수로 판정하지 말고 `.backup_lobby/tools/dump2.js`로 **계층을 덤프해 대조**할 것 — 실제로 바뀐 것은 `RankInfo` 한 줄뿐이었다.
+
+**자식만 더할 때**는 언팩도 필요 없다. 다음 조합이면 diff가 **순수 추가(116삽입 / 0삭제)**로 떨어진다:
+
+1. `EditorSceneManager.NewPreviewScene()`에 `PrefabUtility.InstantiatePrefab(canvasAsset, preview)` — 열린 씬을 안 건드린다
+2. 인스턴스 안에서 자식을 붙이고 `PrefabUtility.ApplyAddedGameObject(child, CANVAS, AutomatedAction)` — **추가된 그 오브젝트 하나만** 에셋에 쓴다
+3. `ClosePreviewScene`
+
+**`AssetDatabase.SaveAssets()`를 부르면 안 된다.** 같은 절차에 이 한 줄을 붙였더니 144삽입/**31삭제**가 나고 무관한 중첩 프리팹의 `m_IsActive`·`m_SizeDelta`·좌표가 함께 갈렸다 — 에디터에 떠 있던 무관한 dirty가 같이 flush된 것이다. 필드 배선도 `AssetDatabase.SaveAssetIfDirty(대상)`만 쓴다.
+
+> `git checkout`으로 되돌린 뒤에는 **`AssetDatabase.ImportAsset(path, ForceUpdate)`로 메모리를 디스크에 맞춘다.** 안 하면 다음 저장이 옛 메모리 상태를 도로 쓴다.
+
+**경계**: 최대 티어는 `TierProgress = 1` 고정(더 갈 곳이 없는데 게이지를 비워 두면 오해가 된다). 등급 바닥에 걸려 패배해도 포인트가 안 깎이는 구간에서는 호도 그대로다.
 
 
 ### 매치 덱 선택·편집 (`UI/Match/`) — ✅ 코드+검수 완료 (2026-08-03), 프리팹·씬 저작 대기
@@ -996,17 +1149,24 @@ sequenceDiagram
 
 > **네이밍 은유 = 스티커 앨범.** 도감(圖鑑)은 **앨범**이고, 앨범에는 **페이지**가 있고, 페이지에는 카드를 꽂는 **칸(슬롯)** 이 있다. 이 은유가 요구된 3계층에 1:1로 맞아떨어져서, 클래스 이름만 읽어도 그게 무엇인지 알 수 있다.
 > **"챕터"는 의도적으로 피했다** — 튜토리얼이 이미 `TutorialSaveData.outgameChapterIndex`로 챕터를 쓰고 있어 같은 단어가 두 도메인을 가리키게 된다.
-> **"Collection" 접두어도 쓸 수 없다** — 구 도감이 `CollectionTheme`·`CollectionThemeConfig`·`CollectionProgressView` 등으로 이미 점유했고, 병존 기간에 이름이 겹치면 어느 쪽 파일인지 구분이 안 된다.
+> **"Collection" 접두어는 당시 구 도감이 점유하고 있었다** — `CollectionTheme`·`CollectionThemeConfig`·`CollectionProgressView` 등. 이름이 겹치면 병존 기간에 어느 쪽 파일인지 구분이 안 됐다.
 
-> 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체할** 새 축. **이번 플랜에 기존 삭제는 포함하지 않는다 — 병존**하고, 삭제는 후속 정리 패키지로 넘긴다.
-> 그래서 신규는 폴더·접두어를 **`Album`으로 물리 분리**한다(`OutGame/Album/` · `UI/Album/`). 구/신 파일이 `OutGame/Collection/`·`UI/Collection/`에 섞이면 후속 삭제가 "라인 단위 수술"이 되지만, 분리해 두면 `rm -r`로 끝난다.
+> 기존 도감(`OutGame/Collection/` 행+생산 축)을 **대체한** 새 축. **구 도감은 2026-08-14에 코드·에셋째 삭제됐고 병존은 끝났다** — 도감 축은 이제 앨범 하나다.
+> 폴더·접두어를 **`Album`으로 물리 분리**한 판단(`OutGame/Album/` · `UI/Album/`)이 그 삭제로 실증됐다 — 구 파일이 섞였다면 "라인 단위 수술"이었을 것이 폴더 통째 삭제로 끝났다.
 
-**실측 전제 (설계의 근거)**
+**구조 정리 (2026-08-18)** — 동작·낙인 키·소비자 API 무변경으로 `OutGame/Album/` 내부만 재편했다. `CardAlbum`(334줄)에서 **조립**(`AlbumBuilder`)과 **진단**(`AlbumValidator`, `#if UNITY_EDITOR`)을 떼어내 조회 파사드 86줄로 줄였고, 테마·페이지의 공통 축을 `AlbumSection`으로 올려 `OwnedCountOf`/`TotalCountOf`/`IsComplete` 오버로드 6→3, `AlbumRewardManager`의 페이지·테마 판정 중복을 `InfoOf`/`StateOf(AlbumSection)` 한 쌍으로 합쳤다.
 
-- 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있고 **역참조 0건 = 로비에서 도달 불가**.
-- 테마 축(`CollectionThemes`/`CollectionThemeConfig`/`CollectionThemeListController`/`CollectionThemeRowView`/`CollectionTabController`)은 코드만 있고 **에셋 0건 + 어떤 프리팹·씬에도 미부착 = 완전 휴면**. `Tab_Collection`의 `ThemeTab_All/01~06`은 컨트롤러 없는 **정적 목업**이다.
-- ⚠️ **`Boot.prefab:51-55`에 직렬화된 필드는 `cardRegistry`/`collectionLayout`/`tutorialData`/`deckImageCatalog`/`starterDeck` 5개뿐** — `BootInstaller.cs`의 `collectionThemes`·`triggeredTutorialData`·`growthConfig`는 프리팹에 없다(= null). 즉 매 부팅마다 `CollectionThemes`의 "테마 SO 미배선" 경고가 뜨고 있다. 신규 SO 배선도 **반드시 `Boot.prefab` 레벨**에 해야 한다 — `StartScene.unity:423-435`가 일부 SO를 **씬 오버라이드**로 꽂는 바람에 `LobbyScene` 단독 Play에서 null이 되는 기존 함정을 반복하지 않기 위해서다.
-- **도감에 "완성 보상 수령" 개념이 코드에 전혀 없다.** 수령 선례는 랭크(`RankRewardManager`)뿐이고, **페이지 개념도 데이터 모델에 없다**(`Tab_Collection`의 `ChapterLabel "01"`은 미배선 장식).
+> **`RewardKey` 조립은 파생 생성자에 그대로 뒀다** — 기반이 `접두사 + Key`로 조립하면 페이지 낙인이 `p:테마/페이지` → `p:페이지`가 되어 결정 #3이 깨진다. 기반은 `HasStableKey`면 받은 문자열을, 아니면 `null`을 담을 뿐이다.
+> **`Cards`는 공통 축에 올리지 않았다** — 테마는 null 제외 평탄화, 페이지는 null 포함 칸 순서라 이름만 같고 계약이 다르다. 공통은 완성 판정 모수인 `CardIds`뿐이다.
+> **삭제한 데드 API**: `TryGetTheme`/`TryGetPage`(+ 이것만 쓰던 인덱스 딕셔너리 2개), `AlbumSignature` 캐시 시그니처(→ `CardAlbumConfig.OnValidate`가 에디터 저작 변경 시 `InvalidateIfSource`), `HasAnyClaimable`/`ClaimableCountOf`/`ResetForDebug`, `AlbumTheme.Index`, `AlbumPage.ThemeKey`, `AlbumRewardInfo.Tier` + `EAlbumRewardTier`.
+> `HasAnyClaimable`은 랭크의 `LobbyEntryAlertDot`에 대응하는 **앨범 알림 점이 없어서** 죽어 있던 것이다 — 그 UI를 만들 때 `ClaimableCountOf`와 함께 되살릴 것.
+
+**실측 전제 (설계 당시 = 2026-08-06 기준. 아래 구 도감 관련 항목은 2026-08-14 삭제로 소멸했다)**
+
+- 로비 도감 탭(`LobbyTabController` idx 4 → `Tab_Collection.prefab`)에서 **실제로 도는 건 `CollectionGridController`(평면 4열 그리드) 하나뿐**이었다. 행·생산·수확 UI(`CollectionGalleryController`)는 `CollectionScreen.prefab`·`CollectionTest.unity`에만 있어 **역참조 0건 = 로비에서 도달 불가**였다. → 지금 탭 idx 4는 `Tab_Collection_New.prefab`(앨범) 하나뿐이다.
+- 테마 축(`CollectionThemes`/`CollectionThemeConfig`/`CollectionThemeListController`/`CollectionThemeRowView`/`CollectionTabController`)은 코드만 있고 **에셋 0건 + 어떤 프리팹·씬에도 미부착 = 완전 휴면**이었다. → 전부 삭제됐다.
+- ⚠️ **`Boot.prefab` 배선은 여전히 `BootInstaller`의 필드 일부만 채운다**(2026-08-14 실측) — 프리팹에 배선된 것은 `cardRegistry`·`albumConfig`·`tutorialData`·`deckImageCatalog`·`starterDeck`·`growthConfig`이고, **`triggeredTutorialData`·`keywordGrowthConfig`는 null**이다. 전자는 `StartScene.unity`가 **씬 오버라이드**로만 꽂아 `LobbyScene` 단독 Play에서 null이 되는 기존 함정이 남아 있다. 신규 SO 배선은 **반드시 `Boot.prefab` 레벨**에 한다. (구 `collectionLayout` 배선 라인이 아직 YAML에 남아 있으나 대응 `SerializeField`가 사라져 Unity가 무시하며, 다음 프리팹 저장 시 자동으로 걷힌다.)
+- **도감에 "완성 보상 수령" 개념이 코드에 전혀 없었다.** 수령 선례는 랭크(`RankRewardManager`)뿐이었고 **페이지 개념도 데이터 모델에 없었다**. → 앨범이 3단 수령(`AlbumRewardManager`)으로 채웠다.
 - 카드 총량 = **현재 31장**(`Assets/SO/Cards/*.asset`) / **계획 90장**(사용자 확정 2026-08-06).
 
 **저작 스케일 (사용자 확정 2026-08-06)**
@@ -1072,13 +1232,16 @@ flowchart TD
         RDEF["AlbumRewardDef (struct)<br/>보상 1건 — 계층마다 리스트 저작(복수 가능)<br/>currency · amount · icon"]:::new
     end
     subgraph DERIVE["구조 파생 (읽기 전용 · 무저장)"]
-        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구<br/>SetSource · Themes · TryGetTheme/Page<br/>OwnedCountOf · IsComplete · ValidateAlbum"]:::new
-        THEME["AlbumTheme<br/>테마 1개 런타임 뷰<br/>Key · RewardKey='t:id'<br/>Pages · Cards · CardKeys"]:::new
-        PAGE["AlbumPage<br/>페이지 1장 런타임 뷰<br/>Key · RewardKey='p:테마/페이지'<br/>Cards · CardKeys · HasStableKey"]:::new
+        BOOK["CardAlbum (static)<br/>앨범 구조 읽기 창구 = 조회만<br/>SetSource · Invalidate · Themes<br/>OwnedCountOf/TotalCountOf/IsComplete(AlbumSection)"]:::chg
+        BUILD["AlbumBuilder (internal static)<br/>저작 def → 런타임 뷰 조립<br/>Build(CardAlbumConfig)"]:::new
+        SEC["AlbumSection (abstract)<br/>테마·페이지 공통 축<br/>Key · Rewards · CardIds<br/>HasStableKey · RewardKey"]:::new
+        THEME["AlbumTheme : AlbumSection<br/>테마 1개 런타임 뷰<br/>RewardKey='t:id'<br/>Pages · Cards(null 제외)"]:::chg
+        PAGE["AlbumPage : AlbumSection<br/>페이지 1장 런타임 뷰<br/>RewardKey='p:테마/페이지'<br/>Index · Cards(null 포함)"]:::chg
+        VALID["AlbumValidator (internal static)<br/>저작↔카탈로그 드리프트 진단<br/>#if UNITY_EDITOR · ContextMenu 전용"]:::new
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
-        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>HasAnyClaimable · OnChanged"]:::new
-        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Tier · Rewards[] (복수)<br/>Owned/Total · State"]:::new
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>공용 판정 InfoOf/StateOf(AlbumSection) · OnChanged"]:::chg
+        RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Rewards[] (복수)<br/>Owned/Total · State"]:::chg
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
     subgraph UI["UI (UI/Album/ · 실측 7파일 — 그리드·스테퍼는 오버레이에 흡수)"]
@@ -1113,7 +1276,12 @@ flowchart TD
     PDEF -.-> RDEF
     BOOTI -->|SetSource| BOOK
     CFG --> BOOK
-    BOOK --> THEME --> PAGE
+    BOOK -->|"조립 위임(lazy 1회)"| BUILD
+    CFG --> BUILD
+    CFG -.->|"ContextMenu 앨범 배치 검증"| VALID
+    BUILD --> THEME --> PAGE
+    SEC -.->|상속| THEME
+    SEC -.->|상속| PAGE
     CAT -->|카드 키| BOOK
     OWN -->|"소유 집합 = 진행도의 유일한 원천"| BOOK
     BOOK -->|완성 판정| RMGR
@@ -1163,19 +1331,19 @@ flowchart TD
 | 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **부트에 줄이 0개 추가** | 캐시를 두면 "부트를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
 | 5 | **`StateOf`는 `Claimed`를 최우선 검사**, 3종 배타(`Locked`/`Claimable`/`Claimed`) | 완성 후 카드가 추가돼 미완성으로 되돌아간 뒤 다시 완성되면 **재수령이 뚫린다**. 랭크가 같은 이유로 같은 순서를 쓴다 |
 
-#### 병존 경계 — 기존 도감 코드 수정 0
+#### 병존 경계 (2026-08-06 착수 당시) — **병존은 2026-08-14 구 도감 삭제로 끝났다**
 
-신규가 **읽기만** 하는 것: `OwnershipManager.IsOwned` · `CardCatalog.KeyOf` · `CurrencyManager.Earn`/`Save` · `CardDetailOverlayView.BindTile`(무수정 재사용).
-신규가 **참조하지 않는** 것(리뷰 체크리스트): `CollectionThemes` · `CollectionTheme` · `CollectionThemeConfig` · `CatalogRows` · `CatalogRow` · `CollectionProductionManager` · `CollectionThemeListController` · `CollectionThemeRowView` · `CollectionGalleryController` · `CollectionRowView` · `CollectionProgressView` · `CollectionGridController`.
+신규가 **읽기만** 하는 것: `OwnershipManager.IsOwned` · `CardCatalog.KeyOf` · `CurrencyManager.Earn`/`Save` · `CardDetailOverlayView.BindTile`(무수정 재사용). — **이 관계는 지금도 유효하다.**
+당시 리뷰 체크리스트였던 "구 도감 타입 12종을 참조하지 않는다"는 **대상이 전부 삭제**돼 더 이상 검사할 것이 없다.
 
-기존 코드 수정은 **3파일 4줄**(BootInstaller·UserSaveData·CollectionThemeConfig), 프리팹은 신규 `Tab_Collection_New` + `LobbyCanvas` 재배선:
+착수 당시 기존 코드 수정은 **3파일 4줄**(BootInstaller·UserSaveData·CollectionThemeConfig), 프리팹은 신규 `Tab_Collection_New` + `LobbyCanvas` 재배선이었다:
 
 | 파일 | 변경 |
 |---|---|
-| `Core/BootInstaller.cs` | `[SerializeField] CardAlbumConfig albumConfig` + `CardAlbum.SetSource(albumConfig)` (기존 `CollectionThemes.SetSource` 바로 뒤) |
-| `OutGame/Save/2.Domain/UserSaveData.cs` | `albumReward` 슬롯 1줄. **`VERSION`은 1 유지**(슬롯 추가는 버전 유지가 규약) |
-| `OutGame/Collection/CollectionThemeConfig.cs` | `[CreateAssetMenu]` **봉인**(1줄) — 누군가 구 테마 SO를 새로 만들어 꽂으면 "카드→테마" 매핑이 2벌이 된다. 이게 이중 진실원의 유일한 실질 방어선 |
-| `Tab_Collection.prefab` | **무수정으로 변경(2026-08-06 실측)** — 사용자 목업 `Tab_Collection_New.prefab`이 탭을 통째로 대체하고, `LobbyCanvas.prefab`의 `LobbyTabController.tabs[4].content`를 신규 탭 인스턴스로 재배선했다(구 탭 인스턴스는 비활성 병존). 구 `CollectionGridController`는 탭 선택으로 활성화될 경로가 없어져 **가동 중단 목적(BindTile 가로채기 차단)은 동일하게 달성** |
+| `Core/BootInstaller.cs` | `[SerializeField] CardAlbumConfig albumConfig` + `CardAlbum.SetSource(albumConfig)`. (당시 앵커였던 `CollectionThemes.SetSource`는 삭제됐고, 지금 이 호출은 `PackSpec.Init()` 뒤·`OwnershipManager.Init()` 앞이다) |
+| `OutGame/Save/2.Domain/UserSaveData.cs` | `albumReward` 슬롯 1줄, 당시 **`VERSION` 1 유지**(슬롯 추가는 버전 유지가 규약). → **2026-08-14 `collection` 슬롯 삭제로 `VERSION`이 2로 올랐다**(삭제는 버전을 올린다) |
+| ~~`OutGame/Collection/CollectionThemeConfig.cs`~~ | 이중 진실원 방어선이던 `[CreateAssetMenu]` 봉인. **파일째 삭제(2026-08-14)** — 방어할 대상이 사라져 무효 |
+| ~~`Tab_Collection.prefab`~~ | 구 탭은 재배선으로 도달 불가 상태였다가 **2026-08-14 프리팹째 삭제**. 탭 idx 4는 `Tab_Collection_New.prefab` 하나뿐이다 |
 | `Tab_Collection_New.prefab` + `LobbyCanvas.prefab` | UI 컴포넌트 4건 부착 + 배선(MCP 일괄 수술): 목업 퍼시스턴트 onClick 11건 제거, 상자 Button 3곳 추가, 게이지 Fill 3곳 Filled(Horizontal) 전환, `tabs[4].content` 교체 |
 
 #### 배치 규약 (충돌 회피)
@@ -1188,10 +1356,10 @@ flowchart TD
 #### 알려진 함정
 
 - **완성 보상은 계층마다 `rewards` 리스트(복수 저작 가능, 2026-08-06).** 빈 리스트 = 보상 미저작 → **상자 숨김 + `Claimable` 불성립**(`CanClaim*`·알림 뱃지 미점등). 단 낙인 검사가 최우선이라 **기수령 낙인은 보상을 비워도 `Claimed` 유지**(재수령 안 뚫림). 수령은 리스트 순회 `Earn`(amount≤0 스킵) 후 `CurrencyManager.Save()` **1회** — 건별 Save 금지. 표시: 상자 아이콘 = 첫 보상, 앨범 `RewardSlot` 3칸 초과 저작은 앞칸만 + 경고.
-- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다(`CollectionThemeSlotView`가 `_card == null`을 미소유와 동일 취급하는 것과 같은 함정). → **`CardAlbum` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
-- **키 폴백에 `displayName`을 넣지 말 것.** `CollectionThemes.ResolveKey`는 `themeId → displayName → theme_{index}` 폴백을 허용하지만 거기는 표시 축이라 리네임 손해가 없었다. 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
+- **null 슬롯 = 페이지 영구 잠금.** 3×3 페이지에 카드를 4장만 저작하면 나머지 5칸이 영원히 미소유로 잡혀 페이지 완성 보상이 절대 안 열린다. → **`CardAlbum` 한 곳에서 "null 슬롯은 완성 판정 모수에서 제외"를 정의**하고 `n/N` 분모도 거기서만 산출한다.
+- **키 폴백에 `displayName`을 넣지 말 것.** 표시 축이라면 리네임 손해가 없지만, 여기서 리네임은 곧 **수령 기록 소실 → 재지급**이다. `themeId`/`pageId`는 필수, 없으면 `HasStableKey = false` + `LogError` + 그 보상 영구 `Locked`.
 - **`Claim` 순서 불변식**: `CanClaim 재검증 → 저작 조회 → CurrencyManager.Earn → 낙인 Add → CurrencyManager.Save() 1회 → OnChanged`. `DataSaveManager.Save()`를 따로 앞세우면 **골드 미반영 상태가 디스크에 기록**된다(`CurrencyManager.Save()`가 내부에서 부른다).
-- **카드 배치가 두 곳에 저작된다** — 신규 `CardAlbumConfig`(앨범 배치)와 기존 `CollectionLayoutConfig`(생산 행). 카드 1장 추가 시 **두 SO 모두** 손대야 하고, 한쪽만 갱신하면 "도감엔 있는데 생산엔 없는 카드"가 조용히 생긴다. 병존 기간 내내 지속되는 부채이며, 근본 해결(생산도 테마에서 파생)은 이번 스코프 밖이다.
+- ~~**카드 배치가 두 곳에 저작된다**(신규 `CardAlbumConfig` ↔ 기존 `CollectionLayoutConfig`)~~ → **2026-08-14 해소.** 구 도감이 삭제되면서 `CollectionLayoutConfig`도 함께 사라졌다. 카드 배치의 저작 창구는 **`CardAlbumConfig` 하나**다.
 
 #### 카드 삽입(수록) 연출 (`UI/Album/Insert/`, 실측 7파일) — 🔄 코드 완료 (2026-08-09) / **프리팹 배선·씰 아트 대기**
 
@@ -1287,14 +1455,14 @@ sequenceDiagram
 
 | 축 | 무엇을 | 어떻게 |
 |---|---|---|
-| **값** | 획득량 `long` → **쌍** | `readonly struct CurrencyGain(Type, Amount)`. 여러 재화가 섞이는 2곳(로비 합산·`HarvestAll`)만 `CurrencyGainBucket`(종류당 1칸 고정 배열, 가변 싱크라 class) |
+| **값** | 획득량 `long` → **쌍** | `readonly struct CurrencyGain(Type, Amount)`. 여러 재화가 섞이는 곳(로비 합산·랭크 보상 수령)만 `CurrencyGainBucket`(종류당 1칸 고정 배열, 가변 싱크라 class) |
 | **HUD 조회** | 타입 탐색 → **종류 조회** | `CurrencyHud`의 `static Dictionary<ECurrencyType, CurrencyHud>` + `TryGet`. `OnEnable` 등록 / `OnDisable`은 **본인일 때만** Remove(씬 전환 시 새 HUD의 OnEnable이 먼저 돌 수 있다) / `TryGet`이 파괴된 잔재 정리 |
 | **연출 상태** | 싱글턴 1벌 → **재화별 슬롯** | `CurrencyGainEffectPlayer`가 `m_bursts`·`m_current`·`m_coinSprites`를 `ECurrencyType.Count` 크기 배열로. 재화별 `CoinBurstEffect`는 **자식 `Burst_{type}` 노드**로 분리 |
 
 #### 단일 진실원
 
 - ~~**팩 결제·환급 재화** = `CardPackData.priceType` **하나**. 구매처(쇼케이스·튜토리얼 스텝)는 환급 **액수**만 넘긴다.~~ → **2026-08-10 개정**: 환급이 결제에서 떨어져 나갔다. 아래 "중복 환급 저작의 팩 SO 이관" 참조.
-- **전투 보상 재화** = `BattleReward.rewardType`. **생산 행 재화** = 기존 `CatalogRow.RewardType`. 둘 다 기본값 `Gold` → 기존 에셋 재저작 불필요.
+- **전투 보상 재화** = `BattleReward.rewardType`. 기본값 `Gold` → 기존 에셋 재저작 불필요. (같은 축이던 `CatalogRow.RewardType`은 2026-08-14 구 도감 삭제로 사라졌다.)
 - ~~**랭크 보상 재화** = `RankGradeConfig.rewardType`(4단계 공용)~~ → **2026-08-10 개정**: 재화 1종 스키마를 폐기하고 `RankGradeConfig.rewards`(`RankRewardDef` 목록 = 재화·아이콘·액수·단계증가분)로 바꿨다. 티어별 지급액의 단일 진실원은 `RankConfig.FillRewards` — 단계 배율(`amount + (단계-1) * amountPerDivision`)이 여기서만 계산된다. `RankConfig.asset`은 재저작했다(골드 값은 종전 그대로, 다이아 추가).
 
 #### 흐름
@@ -1315,7 +1483,6 @@ CardPackOpener(→OpenedPack.TotalRefund) → CardPackRewardHandoff ─┤→ Cu
                                                                         → 드래그 안착마다 AlbumInsertMask.Reveal
                                                                           → OnChanged → AlbumPageOverlayView.RefreshPage
 
-CollectionProductionManager.Harvest(→CurrencyGain) / HarvestAll(→Bucket) → CurrencyGainEffectPlayer.Play
 RankRewardManager.Claim(RankConfig.FillRewards → 재화별 Earn) → RankRewardClaimPopup → CurrencyGainEffectPlayer.BuildGain(Bucket)
 ```
 
@@ -1379,3 +1546,192 @@ RankRewardManager.Claim(RankConfig.FillRewards → 재화별 Earn) → RankRewar
 
 - 환급 칩·총합 배지의 **코인 아이콘은 여전히 프리팹에 골드로 굳어 있다**. 지금 저작값은 전 팩 Gold라 표시가 맞지만, `refundType`을 Diamond로 저작하는 순간 아이콘만 골드로 남는다 — 위 "알려진 잔여 이슈"의 재화 아이콘 조회 창구와 같은 문제다.
 - `PackStandaloneBoot.dummyRefund`는 유지(테스트 씬이 임의 값으로 연출을 검증하는 더미 — 지갑을 건드리지 않는다). 종류만 `dummyPack.RefundType`을 따른다.
+
+
+
+### 매칭 연출 (`OutGame/Match/`, `UI/Match/`) — ✅ 코드+검수+프리팹 저작·배선 완료 (2026-08-13, Play 검증 대기)
+
+**한 줄**: 로비 "대전 입장"과 출전 덱 화면 **사이**에 상대를 찾는 연출을 끼웠다. 전투 상대는 여전히 로컬 AI다 — 매칭은 체감을 만드는 껍데기이고, 나중에 실제 Photon 매칭으로 갈아끼울 접합점만 남겼다.
+
+#### 왜
+
+PlayBtn을 누르면 곧장 덱 화면이 떠서, 상대가 어디서 왔는지 유저가 느낄 순간이 없었다. "누군가와 붙는다"는 대치감이 붙는 자리가 진입 체인에 없었다.
+
+기존 PvP UI(`UI/MainMenu/RandomMatchPanel`)는 재활용하지 못한다 — 로직 전부가 Photon 콜백(`OnPlayerJoinedRoom`)에 묶여 있고 덱 게이트를 아예 거치지 않으며, 스크립트를 참조하는 씬·프리팹이 0개다(도달 불가 유물). 이번 작업은 그 파일을 건드리지 않는다.
+
+#### 구조 위치 (🆕 = 이번 신규)
+
+```mermaid
+graph TD
+    subgraph MatchData["OutGame/Match/ 🆕"]
+        IMM["IMatchmaker 🆕<br/>UniTask&lt;MatchOpponent?&gt; FindOpponentAsync(ct)<br/>취소·실패는 예외가 아니라 null"]
+        FAKE["FakeMatchmaker 🆕<br/>1.0~1.6s 대기 후 상대 생성<br/>UnityEngine.Random (MatchRandom 무접촉)"]
+        OPP["MatchOpponent 🆕<br/>Profile + Deck + IsValid"]
+        PROF["MatchProfile 🆕<br/>OfLocalPlayer / OfOpponent<br/>닉네임·티어·랭크명·배지·동상"]
+        HOFF["MatchOpponentHandoff 🆕<br/>비소비형 캐리어 (읽는 쪽 아직 없음)"]
+        POOL["OpponentProfilePool 🆕 (SO)<br/>닉네임·동상 후보 풀"]
+    end
+
+    subgraph MatchUI["UI/Match/ 🆕 + 기존"]
+        MSHELL["MatchmakingShell 🆕<br/>RunMatchAsync 게이트<br/>탐색→발견→대치→진입"]
+        MPV["MatchProfileView 🆕<br/>카드 한 장 렌더러<br/>null 스프라이트는 저작값 유지"]
+        DSHELL["MatchDeckShell (기존)<br/>RunSelectionAsync 게이트"]
+    end
+
+    subgraph Host["UI/Lobby/ · Battle/"]
+        LML["LobbyMatchLauncher<br/>🔸RunEntryChainAsync<br/>🔸ConfirmOpponent<br/>🔸MatchShell (런타임 생성)"]
+        RANK["RankManager<br/>TierIndex · GetInfo"]
+        AIDECK["AIDeckConfig<br/>GetDeckForTier"]
+        DCFG["DeckConfig<br/>씬 전환 캐리어"]
+        TRUN["TurnRunner.Cleanup<br/>🔸MatchOpponentHandoff.Clear"]
+    end
+
+    LML -->|await| MSHELL
+    LML -->|await| DSHELL
+    LML -.->|new| FAKE
+    MSHELL -->|FindOpponentAsync| IMM
+    FAKE -.->|구현| IMM
+    FAKE --> OPP
+    FAKE --> POOL
+    FAKE --> AIDECK
+    OPP --> PROF
+    PROF --> RANK
+    MSHELL --> MPV
+    MPV --> PROF
+    LML -->|Set| HOFF
+    LML -->|SetEnemyDeck<br/>확정 단일 지점| DCFG
+    TRUN -->|Clear| HOFF
+
+    style IMM fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style FAKE fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style OPP fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style PROF fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style HOFF fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style POOL fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style MSHELL fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style MPV fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style LML fill:#fcf8e3,stroke:#8a6d3b
+```
+
+#### 흐름 — PlayBtn → 매칭 → 덱 확정 → 전투
+
+```mermaid
+sequenceDiagram
+    actor U as 유저
+    participant LML as LobbyMatchLauncher
+    participant MS as MatchmakingShell
+    participant MM as IMatchmaker
+    participant DS as MatchDeckShell
+    participant DC as DeckConfig
+
+    U->>LML: PlayBtn (대전 입장)
+    LML->>LML: m_running 가드 · SetMultiplayer(false)
+    Note over LML: TutorialConfig.IsActive && !ShowDeckGate → 즉시 EnterBattle (매칭 미경유)
+    LML->>LML: HasAnyValidSlot() 검사 (덱 없으면 매칭 전에 차단)
+
+    alt UseMatchmaking — 튜토 전투가 아니고 프리팹이 배선됨
+        LML->>MS: await RunMatchAsync(Matchmaker, ct)
+        MS->>MS: ① 탐색중 — 내 프로필 Render · 상대 빈 틀 · 점 애니메이션
+        MS->>MM: FindOpponentAsync(m_cts.Token)
+        alt 취소 버튼
+            MM-->>MS: null
+            MS-->>LML: null → 로비 그대로 (false 복귀)
+        else 상대 확정
+            MM-->>MS: MatchOpponent (프로필 + 덱)
+            MS->>MS: ② 발견 — 상대 Render + 펀치 · 취소 잠금 (foundHold)
+            MS->>MS: ③ 대치 — VS 켜고 두 프로필 충돌 (versusHold)
+            MS-->>LML: MatchOpponent
+        end
+    end
+
+    LML->>LML: ConfirmOpponent(t_opponent)
+    LML->>DC: SetEnemyDeck(상대 덱) — 확정 단일 지점
+    Note over LML: 튜토·폴백 갈래는 Handoff.Clear, 매칭 갈래는 Handoff.Set
+
+    LML->>DS: await RunSelectionAsync(ct)
+    DS-->>LML: true (전투 시작) / false (뒤로가기)
+    LML->>LML: EnterBattle() → SceneCurtainView.LoadScene("BattleScene")
+```
+
+> 호스트는 **`LobbyMatchLauncher`**다. 위 「매치 덱 선택·편집」 절의 시퀀스는 게이트를 `GameInitializer`가 여는 구버전 서술이다 — 현행은 로비가 씬 로드 **전에** 두 게이트를 연달아 돌린다.
+
+#### 튜토리얼 게이트 — 술어는 `TutorialConfig.IsActive` 하나
+
+| 좌표 | 경로 | 매칭 |
+|---|---|---|
+| ch0-0 `AutoBattle` | `StartAiBattle` 미경유 (`SceneManager.LoadScene` 직행) | 없음 |
+| ch1-0 `BattleEntry` (showDeckGate=0) | `IsActive && !ShowDeckGate` 조기 반환 | 없음 |
+| ch2-9 `BattleEntry` (showDeckGate=1) | `UseMatchmaking`이 false → 덱 화면 직행 | **없음** ← 최대 회귀 위험 지점 |
+| ch2-15 `BattleStart` | 위와 같음 (마지막 튜토 전투) | 없음 |
+| ch3-7 `WaitClick`@LobbyPlayButton (졸업 클릭) | `TurnRunner.Cleanup`이 이미 `TutorialConfig.End()`를 했다 | **있음** |
+
+`IsActive`를 고른 이유는 그것이 **정확히 "튜토 전투 3판"의 수명**이기 때문이다(`TutorialStepExecutor`가 켜고 `TurnRunner.Cleanup`이 끈다). 기각한 후보:
+
+- **`OutgameTutorialRunner.IsRunning`** — 한 판 늦다. Unity `Button.onClick`은 persistent → runtime 순이라 ch3-7 졸업 클릭에서 `StartAiBattle()`이 먼저 돌고 `CompleteSequence()`가 뒤에 온다(`TutorialStepExecutor.cs:73` 주석이 그 순서를 명시). 즉 졸업 클릭 순간에도 여전히 true다.
+- **`EOutgameFeature`** — 판별력이 없다. ch3-0 `EnterFirstRank`가 `unlocksAll=1`이라 ch3-7 시점엔 전부 해금 상태다.
+
+ch3에 4번째 튜토 전투를 끼워 넣어도 `IsActive`는 자동으로 따라간다.
+
+#### 상대 확정의 단일 진실원 유지
+
+`DeckConfig.SetEnemyDeck` 호출은 여전히 `ConfirmOpponent` 안 **세 갈래**뿐이다(튜토 / 매칭 / 폴백). 매치메이커가 프로필과 덱을 **한 값(`MatchOpponent`)으로 묶어** 반환하고 호스트가 그 값에서 갈라 싣기 때문에, "매칭 화면에 뜬 상대 == 덱 화면 EnemySection == 실제 전투 상대"가 값 동일성으로 보장된다.
+
+**상대 랭크 표시는 `MatchProfile.OfOpponent`가 내 `RankManager.GetInfo()`를 그대로 비춘다.** 상대 덱(`AIDeckConfig.GetDeckForTier`)과 카드 레벨(`RankManager.AiCardLevelOf`)이 실제로 내 `TierIndex`를 쓰므로, 표시만 티어표에서 따로 읽으면 언랭크 유저에게 "나=언랭크 / 상대=브론즈 1"로 짝짝이가 된다.
+
+#### 저작값
+
+| 축 | 값 | 위치 |
+|---|---|---|
+| 탐색 대기 | 1.0 ~ 1.6s (랜덤) | `FakeMatchmaker` 생성자 기본값 |
+| 발견 뜸 (`foundHold`) | 0.7s | `MatchmakingShell` 인스펙터 |
+| 대치 뜸 (`versusHold`) | 0.8s | 〃 |
+| 충돌 거리 (`versusApproach`) | 60px (0이면 이동 없이 VS만) | 〃 |
+| 닉네임 후보 | 25개 + 숫자 꼬리(1~999) | `Assets/SO/OpponentProfilePool.asset` |
+| 동상 후보 | 미저작 (프리팹 저작 이미지 유지) | 〃 |
+
+취소 버튼은 **① 탐색중에만** 살아 있다. ② 발견 이후 잠그는 이유: 이미 뽑은 상대를 버리고 다시 누르면 다른 상대가 나와, 유저가 상대를 고르는 장치로 오해할 수 있다.
+
+#### 프리팹 저작 — 로비에 얹지 않고 런타임에 띄운다
+
+원본은 Layer Lab `GUI Pro-SuperCasual/Prefabs/Prefabs_DemoScene_Panels/Loading_Maching.prefab`의 배리언트(`Assets/Assets/Prefabs/UI/MatchUI/MatchmakingRoot.prefab`). 위 배너 = 상대(`ProfileFrame_Empty` → `ProfileFrame` 교체로 탐색→발견이 성립), 아래 파란 배너 = 나, 중앙 `Title_Line03_Group_VS`.
+
+**`MatchDeckRoot`와 달리 `LobbyCanvas.prefab`에 인스턴스를 얹지 않는다.** `PrefabUtility.LoadPrefabContents(LobbyCanvas)`가 `[ExecuteAlways]` 컴포넌트를 실제로 돌려서, 저장할 때 SafeArea `m_AnchorMax`가 런타임 계산값(`y: 0.954`)으로 굳고 탭 focus의 `m_Father`·형제 순서까지 함께 커밋된다(실측 129줄 오염). 대신 `LobbyMatchLauncher.MatchShell`이 첫 매칭 때 `Instantiate(matchShellPrefab, transform.parent)`로 띄우고 캐시한다 — 부모는 덱 화면과 같은 SafeArea이고, 로비 프리팹에 들어가는 것은 **참조 2줄**(`matchShellPrefab` / `profilePool`)뿐이다.
+
+저작 시 걸린 함정 둘: 원본 루트에 데모용 **missing script**가 있어 그대로는 배리언트 저장이 거부된다(재귀 `RemoveMonoBehavioursWithMissingScript` 필요). `Button_Cancel`에는 **`Button` 컴포넌트가 없고 `Image`만** 있어 `AddComponent<Button>()` + `targetGraphic` 지정이 필요하다.
+
+---
+
+### 향후 확장 — 실제 Photon 매칭으로 교체
+
+Photon Fusion 2.1.1과 결정론 락스텝 대전 코드(`Scripts/Network/`)는 **이미 완성돼 BattleScene에도 배선돼 있다** — 진입 UI가 없어 도달 불가일 뿐이다. `DeckConfig.SetMultiplayer(true)` + 러너에 2명이 붙으면 그대로 돈다.
+
+#### 교체 지점은 한 줄
+
+```csharp
+// LobbyMatchLauncher
+IMatchmaker Matchmaker => m_matchmaker ??= new FakeMatchmaker(aiDeckConfig, profilePool);
+//                                         └─ new PhotonMatchmaker(...) 로 바꾸면 끝
+```
+
+UI에 손댈 것이 없는 이유:
+
+- **취소가 `CancellationToken`으로 표현돼 있다** → 실제 구현은 `_ct.Register(() => NetworkSession.Instance.Disconnect())` 한 줄이면 유저 취소가 룸 퇴장으로 이어진다.
+- **결과가 `MatchOpponent` 값이다** → 화면은 "닉네임·랭크·덱을 그린다"만 알고, 그 값이 원격에서 왔는지 모른다.
+- **대기 시간의 주인이 매치메이커다** → `FakeMatchmaker`의 `UniTask.Delay`가 진짜 대기로 바뀌어도 셸이 가진 연출 박자(발견 이후)는 그대로 산다.
+
+#### 그때 함께 손봐야 할 것
+
+| 자리 | 지금 | 실제 매칭에서 |
+|---|---|---|
+| `LobbyMatchLauncher.StartAiBattle` L41 | `DeckConfig.SetMultiplayer(false)` 못 박음 | `MatchOpponent`에 `IsRemote`를 더해 `ConfirmOpponent`에서 갈라야 한다 |
+| `MatchOpponent.IsValid` | 페이크는 항상 덱이 찬다 | 상대 덱이 배틀 씬(`SyncInitialDecks`)에서 도착 → 이 시점엔 **프로필만** 온다. `IsValid`를 미리 넣어 둔 이유가 이것 |
+| `MatchmakingShell.RunStagesAsync` | 덱이 빈 상대도 통과시킨다(폴백은 호스트 전담) | 그대로 유효 — 셸은 `null`만 거른다 |
+| `MatchDeckShell` 게이트 | 매칭 뒤 덱 화면을 연다 | 상대가 타임아웃 없이 무한 대기하게 되므로 **멀티는 덱 게이트를 건너뛰거나 제한 시간이 필요**하다 |
+| 매칭 실패 | 취소와 같은 `null`로 합류 | "상대를 못 찾았다"는 취소와 구분해 안내하거나 AI 폴백으로 떨어뜨려야 한다 |
+| `MatchProfile.OfOpponent` | 내 랭크를 그대로 비춤 | 원격 상대의 실제 랭크를 와이어로 받아야 한다(현재 프로토콜에 프로필 메시지 없음) |
+
+#### 그 밖에 열려 있는 자리
+
+- **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
+- **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
+- **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.

@@ -23,7 +23,7 @@ public readonly struct EnhanceResultLine
 
     /// <summary>"한 번 더"의 비용 재화 아이콘. 스프라이트째 받는 이유는 <see cref="RetryCostText"/>와 같다 —
     /// 재화에서 그림을 고르는 규칙이 화면마다 따로 있으면 하단 바와 결과판이 같은 비용을 다른 아이콘으로 띄운다.
-    /// null이면 프리팹 그림을 그대로 둔다(강화가 늘 골드였던 시절의 배선도 그대로 산다).</summary>
+    /// null이면 프리팹에 저작된 그림을 그대로 둔다(미배선 허용).</summary>
     public readonly Sprite RetryCostIcon;
 
     /// <summary>이번 강화로 **새로 열린 것**(키워드·시너지·진화). 없으면 null/빈 문자열이고 그 행은 아예 뜨지 않는다.
@@ -56,6 +56,8 @@ public readonly struct EnhanceResultLine
 // 강화 한 번의 결과판(CardDetailOverlay 안의 한 상태).
 // 카드가 빛에 완전히 덮인 순간 태어나므로, 빛이 걷힐 때는 이미 거기 있다 — 페이드로 뒤늦게 붙으면 담금질의 인과가 끊긴다.
 // 그리고 탭할 때까지 걷히지 않는다. 자동 복귀를 없앤 것이 이 화면의 목적이다(결과를 읽을 시간).
+// 예외는 호출부가 켜 주는 구간뿐이다(Show의 _autoReturn) — 이어 누를 것이 없는 자리에서 탭을 요구하면
+// 손이 갈 곳 없이 멈춘다.
 //
 // 판정도 값 반영도 하지 않는다. 무엇이 바뀌었는지는 호출부가 전부 계산해 넘긴다(CardEnhanceRitualView와 같은 결).
 //
@@ -85,7 +87,7 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] CanvasGroup[] rows;
     [Tooltip("오른 체력 \"체력 71 → 73\". 뒤 숫자가 굴러 오른다.")]
     [SerializeField] TMP_Text effectValueText;
-    [Tooltip("오른 레벨 \"Lv 4 → 5\".")]
+    [Tooltip("오른 성급 \"1성 → 2성\".")]
     [SerializeField] TMP_Text gradeValueText;
 
     [Header("한 번 더 (선택)")]
@@ -95,7 +97,7 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] TMP_Text retryNoticeText;
     [Tooltip("다음 강화에 들 비용. 하단 바의 강화 버튼과 같은 값·같은 표기를 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
     [SerializeField] TMP_Text retryCostText;
-    [Tooltip("비용 옆 재화 아이콘. 다음 단계가 진화(다이아)면 그림이 바뀐다. 스프라이트도 호출부가 넘긴다(미배선이면 조용히 건너뛴다).")]
+    [Tooltip("비용 옆 재화 아이콘. 재화는 레벨마다 갈릴 수 있어 그림도 호출부가 스텝에서 골라 넘긴다(미배선이면 조용히 건너뛴다).")]
     [SerializeField] Image    retryCostIcon;
 
     [Header("해금 알림 (선택)")]
@@ -114,10 +116,16 @@ public class EnhanceResultPanelView : MonoBehaviour
     [SerializeField] float rowRise         = 18f;
     [Tooltip("체력이 굴러 오르는 시간. 한 칸짜리라도 숫자가 바뀌는 순간이 눈에 걸려야 한다.")]
     [SerializeField] float rollDuration    = 0.35f;
+    [Tooltip("행이 다 뜬 뒤 스스로 걷히기까지 머무는 시간. 자동 복귀를 켠 판(Show의 _autoReturn)에만 쓰인다.")]
+    [SerializeField] float autoReturnHold  = 1f;
 
     Sequence m_seq;
     Action   m_onClose;
     Action   m_onRetry;
+
+    // 자동 복귀 예약. 걷힌 뒤에 뒤늦게 오면 **다음 판**을 닫아버리므로 판이 바뀌는 길목마다 죽인다.
+    Tween m_autoReturn;
+    bool  m_autoReturnOn;
 
     // 행들의 authoring 좌표. 트윈 중간값을 기준으로 잡으면 열 때마다 자리가 밀린다 → 1회만 캡처한다.
     Vector2[] m_rowBase;
@@ -135,11 +143,11 @@ public class EnhanceResultPanelView : MonoBehaviour
     /// _onRetry는 "한 번 더"로 걷힌 시점 — 호출부가 복귀를 마친 뒤 다음 강화로 잇는다.
     /// 둘 중 정확히 하나만, 정확히 한 번 온다(중단 경로에선 어느 것도 오지 않는다 — <see cref="HideImmediate"/> 참고).
     ///
-    /// _onHpRoll은 체력 숫자가 굴러 오르기 시작하는 시점 — 인자는 굴리는 데 걸리는 시간이다.
-    /// 무대에 선 카드의 체력도 이 박자로 함께 굴리라고 알린다. 두 숫자가 한 박에 움직여야
-    /// "이 행이 저 카드의 저 자리"가 읽힌다. 굴릴 것이 없으면(실패·상승폭 0) 오지 않는다.</summary>
-    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry, Action<float> _onHpRoll = null,
-                     Action _onRowsDone = null)
+    /// _autoReturn이면 읽을 것이 다 나온 뒤 <see cref="autoReturnHold"/>만큼 머물다 스스로 걷는다(탭과 같은 길).
+    /// **어느 결과가 그 대상인지는 성장 규칙을 아는 호출부 몫**이고 여기는 켬/끔만 받는다
+    /// (<see cref="EnhanceResultLine.UnlockText"/>와 같은 규약) — 머무는 박자만 이쪽 저작값이다.</summary>
+    public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry,
+                     Action _onRowsDone = null, bool _autoReturn = false)
     {
         this.m_onRowsDone = _onRowsDone;
         this.m_rowsDone   = false;
@@ -154,11 +162,13 @@ public class EnhanceResultPanelView : MonoBehaviour
         gameObject.SetActive(true);
         EnsureBase();
         KillSeq();
+        KillAutoReturn();   // 앞 판의 예약이 살아 있으면 이제 막 뜬 이 판을 닫는다
 
-        this.m_onClose = _onClose;
-        this.m_onRetry = _onRetry;
-        this.m_open    = true;
-        this.m_closing = false;
+        this.m_onClose      = _onClose;
+        this.m_onRetry      = _onRetry;
+        this.m_open         = true;
+        this.m_closing      = false;
+        this.m_autoReturnOn = _autoReturn;
 
         bool t_success = _line.Outcome == EEnhanceOutcome.Success;
 
@@ -171,8 +181,8 @@ public class EnhanceResultPanelView : MonoBehaviour
         }
 
         if (this.gradeValueText != null)
-            this.gradeValueText.text = t_success ? $"Lv {_line.FromLevel} → {_line.ToLevel}"
-                                                 : $"Lv {_line.FromLevel} 유지";
+            this.gradeValueText.text = t_success ? GrowthStar.TransitionLabel(_line.FromLevel, _line.ToLevel)
+                                                 : $"{GrowthStar.Label(_line.FromLevel)} 유지";
 
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;
@@ -196,7 +206,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.titleText != null)
             t_seq.InsertCallback(0f, () => UiPunch.Play(this.titleText.transform));
 
-        BuildRows(t_seq, t_success, _line, _onHpRoll);
+        BuildRows(t_seq, t_success, _line);
 
         // 읽을 것이 다 나온 자리. 탭으로 당겨도 여기를 지나므로(Complete는 콜백을 그대로 실행) 신호가 유실되지 않는다.
         t_seq.OnComplete(MarkRowsDone);
@@ -217,16 +227,31 @@ public class EnhanceResultPanelView : MonoBehaviour
         OnRetryPressed();
     }
 
+    /// <summary>탭 대신 밖에서 걷는다(튜토리얼 자동 복귀). 탭과 **같은 길**이라 복귀 콜백도 그대로 1회 흐른다 —
+    /// 갈라 두면 "자동으로 닫혔을 때만 무대가 안 돌아오는" 경로가 생긴다(<see cref="RequestRetry"/>와 같은 규약).
+    /// 아직 행이 쌓이는 중이면 남은 구간을 최종 상태로 당기고 걷는다 — 자동 복귀는 읽을 것이 다 나온 뒤에
+    /// 부르는 것이 계약이지만, 그 사이 끼어들어도 중간 상태로 잘려 보이지 않게 한다.</summary>
+    public void RequestClose()
+    {
+        if (!IsOpen) return;
+
+        if (!this.m_rowsDone && this.m_seq != null && this.m_seq.IsActive()) this.m_seq.Complete(true);
+
+        BeginClose(this.m_onClose);
+    }
+
     /// <summary>결과판을 잘라내고 감춘다(카드 전환·닫힘 경로). 콜백은 흘리지 않는다 —
     /// 이 경로에선 호출부가 무대까지 함께 잘라내므로 복귀를 한 번 더 시킬 이유가 없다.</summary>
     public void HideImmediate()
     {
         KillSeq();
+        KillAutoReturn();
 
-        this.m_open    = false;
-        this.m_closing = false;
-        this.m_onClose = null;
-        this.m_onRetry = null;
+        this.m_open         = false;
+        this.m_closing      = false;
+        this.m_onClose      = null;
+        this.m_onRetry      = null;
+        this.m_autoReturnOn = false;
 
         if (this.group != null)
         {
@@ -260,19 +285,21 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (this.retryButton != null) this.retryButton.onClick.RemoveListener(OnRetryPressed);
 
         KillSeq();
+        KillAutoReturn();
 
         // 걷히는 도중에 꺼졌다면 OnComplete가 안 돌아 복귀 신호가 삼켜진다. 상태만은 반드시 풀어둔다 —
         // 다음에 켜졌을 때 "닫히는 중"으로 남아 있으면 탭이 통째로 먹힌다.
         // (무대 복귀는 이 경로에서 호출부가 CancelImmediate로 직접 한다.)
-        this.m_open    = false;
-        this.m_closing = false;
-        this.m_onClose = null;
-        this.m_onRetry = null;
+        this.m_open         = false;
+        this.m_closing      = false;
+        this.m_onClose      = null;
+        this.m_onRetry      = null;
+        this.m_autoReturnOn = false;
     }
 
     // 성공이면 행이 아래에서 차례로 떠오르고 오른 체력이 굴러 오른다.
     // 실패는 같은 행을 쓰되 박자를 뺀다 — 성공의 리듬이 있어야 실패의 정적이 아프다.
-    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line, Action<float> _onHpRoll)
+    void BuildRows(Sequence _seq, bool _success, EnhanceResultLine _line)
     {
         if (this.effectValueText != null)
             this.effectValueText.text = _success && _line.ToHp > _line.FromHp
@@ -312,10 +339,8 @@ public class EnhanceResultPanelView : MonoBehaviour
         float t_rollDur = Mathf.Max(0.05f, this.rollDuration);
 
         // 굴리기는 그 행이 다 떠오른 뒤에 — 떠오르는 중에 숫자까지 움직이면 둘 다 안 읽힌다.
+        // 카드 위 숫자는 여기 맞춰 굴리지 않는다: 그쪽은 섬광이 물러날 때 이미 새 값으로 드러났다(FlashGrowth).
         _seq.Insert(t_rollAt, BuildRoll(_line.FromHp, _line.ToHp, t_rollDur));
-
-        // 카드 위의 숫자도 같은 시각·같은 길이로 출발한다. 길이를 넘기는 이유는 저작값이 이쪽에만 있기 때문이다.
-        if (_onHpRoll != null) _seq.InsertCallback(t_rollAt, () => _onHpRoll(t_rollDur));
     }
 
     Tween BuildRoll(int _from, int _to, float _duration)
@@ -355,6 +380,13 @@ public class EnhanceResultPanelView : MonoBehaviour
 
         this.m_rowsDone = true;
         this.m_onRowsDone?.Invoke();
+
+        // 자동 복귀는 여기서부터 잰다 — 읽을 것이 다 나온 뒤가 계약이다.
+        // 이미 걷히는 중이면(BeginClose가 지나며 부른 경우) 예약할 것이 없다.
+        if (!this.m_autoReturnOn || this.m_closing) return;
+
+        this.m_autoReturn = DOVirtual.DelayedCall(Mathf.Max(0f, this.autoReturnHold), RequestClose)
+                                     .SetLink(gameObject);
     }
 
     void OnRetryPressed()
@@ -372,6 +404,7 @@ public class EnhanceResultPanelView : MonoBehaviour
 
         this.m_closing = true;
         KillSeq();
+        KillAutoReturn();   // 탭이 먼저 걷었다면 예약은 할 일이 없다
 
         // 걷히는 동안 입력을 죽인다 — 두 번째 탭이 복귀를 두 번 시작하면 무대가 두 번 되돌아간다.
         this.group.blocksRaycasts = false;
@@ -414,5 +447,11 @@ public class EnhanceResultPanelView : MonoBehaviour
     {
         this.m_seq?.Kill();
         this.m_seq = null;
+    }
+
+    void KillAutoReturn()
+    {
+        this.m_autoReturn?.Kill();
+        this.m_autoReturn = null;
     }
 }

@@ -13,110 +13,146 @@ MonoBehaviour:
   m_Name: TriggeredTutorial
   m_EditorClassIdentifier: Assembly-CSharp::TriggeredTutorialData
   entries:
-  - trigger: 1
-    label: "\uB371 \uD0ED \uC548\uB0B4"
+  - trigger: 4
+    label: "\uD0A4\uC6CC\uB4DC \uAC15\uD654"
     stepDefs:
-    - action: 0
-      anchor: 7
-      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uB371\uC744 \uB9CC\uB4E4 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+    - stepId: 0
+      action: 1
+      anchor: 0
+      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uD0A4\uC6CC\uB4DC\uB97C \uC601\uAD6C\uC801\uC73C\uB85C
+        \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+      messageAtBottom: 1
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
       showDeckGate: 0
       deckName: 
-    - action: 1
-      anchor: 8
-      guideMessage: "\uC774\uACF3\uC740 \uB0B4\uAC00 \uC18C\uC720\uD55C \uCE74\uB4DC\uC785\uB2C8\uB2E4"
+      onFailure: 0
+    - stepId: 0
+      action: 0
+      anchor: 22
+      guideMessage: "'\uC6D0\uAC70\uB9AC' \uD0A4\uC6CC\uB4DC\uB97C \uAC15\uD654\uD558\uC138\uC694"
+      messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
       showDeckGate: 0
       deckName: 
-    - action: 1
-      anchor: 9
-      guideMessage: "\uC774\uACF3\uC5D0 \uCE74\uB4DC\uB97C \uC62C\uB824 \uB371\uC744
-        \uAD6C\uC131\uD569\uB2C8\uB2E4"
+      onFailure: 0
+    - stepId: 0
+      action: 18
+      anchor: 23
+      guideMessage: 
+      messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 1
+      useDim: 0
       pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 1
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
       showDeckGate: 0
       deckName: 
-  - trigger: 2
-    label: "\uCE74\uB4DC \uAC15\uD654"
+      onFailure: 0
+    - stepId: 0
+      action: 1
+      anchor: 0
+      guideMessage: "\uD574\uB2F9 \uD0A4\uC6CC\uB4DC\uB97C \uAC00\uC9C4 \uCE74\uB4DC\uAC00
+        \uAC15\uB825\uD574\uC84C\uC2B5\uB2C8\uB2E4!.\n\uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
+      messageAtBottom: 1
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 1
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+  - trigger: 7
+    label: "\uB7AD\uD06C \uB2E8\uACC4 \uCCAB \uC0C1\uC2B9"
     stepDefs:
-    - action: 1
+    - stepId: 0
+      action: 1
       anchor: 0
-      guideMessage: "\uB2E4\uC74C\uC73C\uB85C, \uAC19\uC774 \uCE74\uB4DC\uB97C \uC5C5\uADF8\uB808\uC774\uB4DC\uD574\uBD10\uC694!"
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 19
-      guideMessage: 
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 20
-      guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
+      guideMessage: "\uB7AD\uD06C \uB2E8\uACC4\uAC00 \uC62C\uB790\uC2B5\uB2C8\uB2E4!"
+      messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
       showDeckGate: 0
       deckName: 
-    - action: 11
-      anchor: 21
-      guideMessage: "\uAC15\uD654\uB97C \uB20C\uB7EC \uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C\uBCF4\uC138\uC694!"
+      onFailure: 0
+  - trigger: 8
+    label: "\uB7AD\uD06C \uB4F1\uAE09 \uCCAB \uC2B9\uAE09"
+    stepDefs:
+    - stepId: 0
+      action: 1
+      anchor: 0
+      guideMessage: "\uC0C8\uB85C\uC6B4 \uB4F1\uAE09\uC5D0 \uC62C\uB790\uC2B5\uB2C8\uB2E4!"
+      messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
       locks: 
       useDim: 1
       pack: {fileID: 0}
+      packPriceLabel: 
+      anchorCard: {fileID: 0}
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
       scenario: {fileID: 0}
+      card: {fileID: 0}
+      cards: []
       showDeckGate: 0
       deckName: 
-    - action: 14
-      anchor: 0
-      guideMessage: 
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
-    - action: 0
-      anchor: 1
-      guideMessage: "\uC5C5\uADF8\uB808\uC774\uB4DC\uD55C \uCE74\uB4DC\uB97C \uBC14\uB85C
-        \uB300\uC804\uC5D0\uC11C \uC2DC\uD5D8\uD574\uBCF4\uC138\uC694!"
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 0
-      pack: {fileID: 0}
-      scenario: {fileID: 0}
-      showDeckGate: 0
-      deckName: 
+      onFailure: 0

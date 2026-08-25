@@ -13,8 +13,10 @@ public class PooledCardElement : PooledUIBase
     CardData cardData;
 
     // 이 창은 전체 카드 한 가지만 띄운다 — 작은(Simple) 모드는 폐지했다.
-    [SerializeField] GameObject  fullCardContents;
-    [SerializeField] CardElement fullCardElement;
+    [SerializeField] GameObject     fullCardContents;
+    // 카드 그림 한 장의 정본은 CardVisualView다(도감·덱편집·팩개봉과 같은 컴포넌트) —
+    // 정보창만 다른 구현으로 그리면 같은 카드가 화면마다 달라 보인다.
+    [SerializeField] CardVisualView fullCardElement;
 
     [SerializeField] Transform keywordListRoot;
     [SerializeField] GameObject keywordExplainItemPrefab;
@@ -210,10 +212,11 @@ public class PooledCardElement : PooledUIBase
         if (this.cardElementData.dimOnly) return;
 
         // 이 창은 전체 카드 한 가지만 띄운다(작은 모드 폐지) — mod 값이 뭐로 오든 Full로 그린다.
+        // 전투에서 열렸으면 인스턴스가 값의 진실원이다(현재 체력·그 카드가 실제로 가진 키워드).
         if (this.cardElementData.instance != null)
-            this.fullCardElement.Init(this.cardElementData.instance, CardElementMod.Full);
+            this.fullCardElement.Bind(this.cardElementData.instance);
         else
-            this.fullCardElement.Init(this.cardData, CardElementMod.Full);
+            this.fullCardElement.Bind(this.cardData, _owned: true);
         this.fullCardContents.SetActive(true);
 
 
@@ -327,8 +330,6 @@ public class PooledCardElementData : UIData
     /// <summary>전투 카드면 그 인스턴스. 있으면 키워드·체력의 진실원이 이쪽이다 —
     /// 적 카드 정보창에 내 강화 해금이 얹히는 것을 막는 유일한 구분이다.</summary>
     public CardInstance instance;
-
-    public CardElementMod mod = CardElementMod.Full;
 
     /// <summary>true면 배경 어둡기만 — 롱프레스가 차오르는 중이라 카드는 아직 띄우지 않는다.</summary>
     public bool  dimOnly;

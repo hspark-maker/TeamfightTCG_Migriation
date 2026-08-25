@@ -57,7 +57,7 @@ public static class BattleOverForecast
         bool t_takesCounter = _attacker.TakesCounterFrom(_defender);
         int  t_ctrDmg       = t_takesCounter ? _defender.AttackDamage() : 0;
         int  t_thorn        = _defender.data?.passive?.ThornDamage ?? 0;
-        (_, bool t_attackerDiesBeforeEnhance) = _attacker.PreviewDamageChain(t_ctrDmg, t_thorn, false);
+        (_, bool t_attackerDiesBeforeEnhance) = _attacker.PreviewDamageChain(t_ctrDmg, t_thorn);
         int  t_enhanceDmg   = _attacker.HasVanillaEnhance && !t_attackerDiesBeforeEnhance
             ? _attacker.VanillaEnhanceDamage()
             : 0;
@@ -65,15 +65,12 @@ public static class BattleOverForecast
         CardInstance t_splash = t_peerless && _preSelectedSplash != null && t_splashDmg > 0
             ? _preSelectedSplash : null;
 
-        // 공격자가 받는 것은 반격과 가시 둘 다 '감소 없음' 소스라 합산해도 실제와 같다 —
-        // **단 무적은 예외**다. 실제로는 첫 피해가 무적을 태우고 두 번째가 들어가는데,
-        // 합산 한 번으로는 그 순서를 재현할 수 없다. 그 경우는 아래 불확실 게이트가 잡는다.
         // ── 지는 편 판정 ──
         // 교활(공격자가 대기열로 빠짐)은 공격 측 후보가 WaitingCount==0 전제라 자연히 배제된다
         // (스왑할 대기 카드가 없으면 스왑도 없다).
-        bool t_defenderWiped = WipesField(_defenderField, _defender, t_atkDmg, true, t_splash, t_splashDmg, t_enhanceDmg);
+        bool t_defenderWiped = WipesField(_defenderField, _defender, t_atkDmg, t_splash, t_splashDmg, t_enhanceDmg);
         bool t_attackerWiped = (t_ctrDmg > 0 || t_thorn > 0)
-                            && WipesField(_attackerField, _attacker, t_ctrDmg, false, null, 0, t_thorn);
+                            && WipesField(_attackerField, _attacker, t_ctrDmg, null, 0, t_thorn);
 
         if (!t_defenderWiped && !t_attackerWiped) return false;
 
@@ -94,7 +91,7 @@ public static class BattleOverForecast
 
     /// <summary>이 필드가 이번 공격으로 통째로 비는가. 슬롯의 <b>모든</b> 카드가 죽어야 하고,
     /// 죽는 방식이 확실해야 한다.</summary>
-    static bool WipesField(BattleField _field, CardInstance _primary, int _primaryDmg, bool _primaryIsAttackHit,
+    static bool WipesField(BattleField _field, CardInstance _primary, int _primaryDmg,
                            CardInstance _splash, int _splashDmg, int _primaryExtraDmg)
     {
         if (_field.WaitingCount > 0) return false;   // 대기 카드가 채우면 전멸이 아니다
@@ -108,7 +105,7 @@ public static class BattleOverForecast
         {
             if (t_c == null) continue;
 
-            // 무리 선피해([BeforeAttack])로 이미 hp 0인데 시체 정리 전인 카드가 슬롯에 남아 있을 수 있다.
+            // 낙인 선피해([BeforeAttack])로 이미 hp 0인데 시체 정리 전인 카드가 슬롯에 남아 있을 수 있다.
             if (!t_c.IsAlive) continue;
 
             if (t_c == _primary)
@@ -119,15 +116,15 @@ public static class BattleOverForecast
                 // 강화 추가타가 있으면 두 직격을 폴딩해 본다(순서·감소·덩치 소진이 실제와 같아야 한다).
                 // 추가타가 없으면(0) 종전과 같은 한 번짜리 판정으로 환원된다.
                 bool t_primaryDies = _primaryExtraDmg > 0
-                    ? t_c.PreviewDamageChain(_primaryDmg, _primaryExtraDmg, _primaryIsAttackHit).dies
-                    : t_c.WouldDieFrom(_primaryDmg, _primaryIsAttackHit);
+                    ? t_c.PreviewDamageChain(_primaryDmg, _primaryExtraDmg).dies
+                    : t_c.WouldDieFrom(_primaryDmg);
                 if (!t_primaryDies) return false;
                 continue;
             }
 
             if (t_c == _splash)
             {
-                if (!t_c.WouldDieFrom(_splashDmg, true)) return false;
+                if (!t_c.WouldDieFrom(_splashDmg)) return false;
                 continue;
             }
 

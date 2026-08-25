@@ -22,6 +22,36 @@ using UnityEngine;
 /// </summary>
 public static partial class CardTableTool
 {
+    // Asset filenames were standardized in English. Keep accepting the legacy
+    // Korean sheet keys during the external Google Sheet transition window.
+    static readonly Dictionary<string, string> LegacyCardAssetNames = new Dictionary<string, string>
+    {
+        { "모닥콩", "Campbean" }, { "포슬램", "Poslamb" }, { "찌릿핀", "Sparkfin" },
+        { "물방울룽", "WaterdropLong" }, { "바위콩", "Rockbean" }, { "깜밤이", "Nightchestnut" },
+        { "솜구름몽", "Cloudmong" }, { "얼음꼬미", "Icekomi" }, { "꿀꿀비", "Honeybee" },
+        { "톱니두더", "Gearmole" }, { "화르룩스", "Flarelux" }, { "철갑몽치", "IronMongchi" },
+        { "풍선펭", "BalloonPeng" }, { "버섯냥", "MushroomCat" }, { "별토리", "Startori" },
+        { "늪꾸리", "Swampfrog" }, { "번개뿔", "Thunderhorn" }, { "단풍꼬리", "Mapletail" },
+        { "눈덩곰", "SnowballBear" }, { "와글도도", "Waggledodo" }, { "자석게", "MagnetCrab" },
+        { "해롱문어", "DizzyOctopus" }, { "폭탄밤", "Bombbat" }, { "우드혼", "Woodhorn" },
+        { "파도리", "Waveri" }, { "모래몽", "Sandmong" }, { "수정뿔루", "Crystalhorn" },
+        { "대장부리", "CaptainBeak" }, { "꿈먹이", "Dreameater" },
+        { "왕밤도치", "KingChestnutHedgehog" }
+    };
+
+    static readonly Dictionary<string, string> LegacySynergyAssetNames = new Dictionary<string, string>
+    {
+        { "덩치", "Bulk" }, { "돌보미", "Caretaker" }, { "낙인", "Brand" },
+        { "비늘", "Scale" }, { "수호자", "Guardian" }, { "언데드", "Undead" },
+        { "유산", "Legacy" }, { "포식자", "Predator" }, { "흐름", "Flow" }
+    };
+
+    static string NormalizeCardAssetName(string _name)
+        => LegacyCardAssetNames.TryGetValue(_name, out string t_name) ? "Data_Card_" + t_name : _name;
+
+    static string NormalizeSynergyAssetName(string _name)
+        => LegacySynergyAssetNames.TryGetValue(_name, out string t_name) ? "Data_Synergy_" + t_name : _name;
+
     const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
     const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;
     const string REGISTRY_PATH   = "Assets/SO/CardRegistry.asset";
@@ -35,8 +65,8 @@ public static partial class CardTableTool
         "name", "displayName", "channel", "maxHp",
         "keywords", "keywordUnlockLevel",
         "synergies", "defaultEvolutionStage",
-        "hp2", "hp3", "hp4", "hp5", "hp6", "hp7", "hp8", "hp9", "hp10",
-        "cardExplain",
+        "hp2", "hp3", "hp4",
+        "cardExplain", "grade",
     };
 
     /// <summary>창이 띄우는 열 설명. 규칙 문구의 진실원을 표 도구 쪽에 둔다(UI가 규칙을 다시 적지 않게).</summary>
@@ -44,10 +74,13 @@ public static partial class CardTableTool
         "열: " + string.Join(", ", Columns) + "\n\n" +
         "· id : 카드 고유 번호. 한 번 부여하면 바꾸지 않는다. 빈칸이면 남은 번호를 자동 부여한다.\n" +
         "· keywords : 키워드 이름을 | 로 나열 (예: Ranged|Peerless). 해금 전에는 없는 것으로 친다.\n" +
-        "· keywordUnlockLevel : keywords가 열리는 강화 레벨. 0/빈칸 = 처음부터 열림.\n" +
+        "· keywordUnlockLevel : keywords가 열리는 내부 성장값. 0/빈칸 = 0성부터, 2 = 1성부터 열림.\n" +
         "· synergies : SynergyData 에셋 이름을 | 로 나열\n" +
-        "· hp2~hp10 : 그 레벨 진입 시 증가 HP. 강화는 Lv2부터라 그 아래 열은 없다. 9칸 전부 비면\n" +
-        "  CardGrowthConfig 전역식, 하나라도 채우면 나머지 빈칸은 0으로 저장된다.\n" +
+        "· grade : 카드 희소 등급 이름(Common/Rare/Arcane/Mythic). 빈칸 = Unknown(미배정).\n" +
+        "  숫자나 모르는 이름은 값을 바꾸지 않고 경고만 남긴다.\n" +
+        "· hp2~hp4 : 각 성급 진입 시 증가 HP(내부값 2~4 = 1~3성). 3칸 전부 비면\n" +
+        "  CardGrowthConfig 전역식, 전부 채우면 카드 곡선으로 저장한다. 일부만 채우면\n" +
+        "  기존 성장 곡선을 유지하고 경고를 남긴다.\n" +
         "· 진화 레벨과 비용/성공률은 CardGrowthConfig 소유.\n" +
         "· 표에 없는 열(아트·패시브·보이스)은 건드리지 않는다.\n" +
         "· 행을 지워도 카드는 지워지지 않는다(에셋·등록 보존).\n" +
@@ -112,7 +145,7 @@ public static partial class CardTableTool
         for (int r = 1; r < t_rows.Count; r++)
         {
             List<string> t_row = t_rows[r];
-            string t_name = Cell(t_row, t_header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(t_row, t_header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;   // 빈 행(Excel이 흔히 남긴다)
 
             // 번호 → 이름 순으로 찾는다. 둘 다 없을 때만 새 카드다.
@@ -191,7 +224,7 @@ public static partial class CardTableTool
 
         for (int r = 1; r < _rows.Count; r++)
         {
-            string t_name = Cell(_rows[r], _header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(_rows[r], _header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;
 
             int t_id = ParseInt(Cell(_rows[r], _header, "id"), 0);
@@ -286,6 +319,22 @@ public static partial class CardTableTool
             if (Enum.TryParse(t_channel, true, out ECardChannel t_parsed)) _card.channel = t_parsed;
             else _warnings.Add($"{_name}.channel: 알 수 없는 채널 '{t_channel}' — 기존 값 유지");
         }
+        if (_header.ContainsKey("grade"))
+        {
+            string t_grade = Cell(_row, _header, "grade").Trim();
+            // Enum.TryParse는 "3"이나 "99" 같은 숫자 문자열도 통과시킨다 — 정의에 없는 값까지 만들어 낸다.
+            // 등급은 사람이 적는 저작 값이라 **이름으로만** 받고, 숫자·오타는 덮어쓰지 않고 경고로 남긴다
+            // (조용히 기본 등급으로 떨어지면 표와 에셋이 갈린 걸 아무도 못 본다).
+            if (t_grade.Length == 0)
+                _card.grade = ECardGrade.Unknown;
+            else if (!char.IsDigit(t_grade[0])
+                     && Enum.TryParse(t_grade, true, out ECardGrade t_parsedGrade)
+                     && Enum.IsDefined(typeof(ECardGrade), t_parsedGrade))
+                _card.grade = t_parsedGrade;
+            else
+                _warnings.Add($"{_name}.grade: 알 수 없는 등급 '{t_grade}' — 기존 값 유지(등급 이름으로 적을 것)");
+        }
+
         if (_header.ContainsKey("maxHp")) _card.maxHp = ParseInt(Cell(_row, _header, "maxHp"), _card.maxHp);
 
         if (_header.ContainsKey("keywords"))
@@ -375,7 +424,7 @@ public static partial class CardTableTool
 
         foreach (string t_raw in _text.Split('|'))
         {
-            string t_token = t_raw.Trim();
+            string t_token = NormalizeSynergyAssetName(t_raw.Trim());
             if (t_token.Length == 0) continue;
 
             if (_known.TryGetValue(t_token, out ScriptableObject t_so) && t_so is SynergyData t_syn)
@@ -397,7 +446,8 @@ public static partial class CardTableTool
                              string _name, List<string> _warnings)
     {
         int t_curveColumnCount = 0;
-        bool t_hasValue = false;
+        int t_valueCellCount = 0;
+        bool t_hasParseFailure = false;
         var t_values = new int[HP_CURVE_MAX_LEVEL + 1];
 
         for (int t_level = HP_CURVE_MIN_LEVEL; t_level <= HP_CURVE_MAX_LEVEL; t_level++)
@@ -409,10 +459,11 @@ public static partial class CardTableTool
             string t_text = Cell(_row, _header, t_column).Trim();
             if (t_text.Length == 0) continue;
 
-            t_hasValue = true;
+            t_valueCellCount++;
             if (!int.TryParse(t_text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_hp))
             {
-                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 0으로 처리");
+                t_hasParseFailure = true;
+                _warnings.Add($"{_name}.{t_column}: 정수가 아닌 값 '{t_text}' — 기존 성장 곡선 유지");
                 continue;
             }
 
@@ -425,12 +476,25 @@ public static partial class CardTableTool
         }
 
         if (t_curveColumnCount == 0) return;
-        if (t_curveColumnCount != HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1)
+        int t_expectedCellCount = HP_CURVE_MAX_LEVEL - HP_CURVE_MIN_LEVEL + 1;
+        if (t_curveColumnCount != t_expectedCellCount)
         {
-            _warnings.Add($"{_name}: hp2~hp10 열이 일부만 존재 — 기존 성장 곡선 유지");
+            _warnings.Add($"{_name}: hp2~hp4 열이 일부만 존재 — 기존 성장 곡선 유지");
             return;
         }
-        _card.hpGainByLevel = t_hasValue ? t_values : Array.Empty<int>();
+        if (t_hasParseFailure) return;
+        if (t_valueCellCount == 0)
+        {
+            _card.hpGainByLevel = Array.Empty<int>();
+            return;
+        }
+        if (t_valueCellCount != t_expectedCellCount)
+        {
+            _warnings.Add($"{_name}: hp2~hp4 값이 일부만 입력됨({t_valueCellCount}/{t_expectedCellCount}) — 기존 성장 곡선 유지");
+            return;
+        }
+
+        _card.hpGainByLevel = t_values;
     }
 
     static bool TryParseHpColumn(string _column, out int _level)

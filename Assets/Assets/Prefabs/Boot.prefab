@@ -49,14 +49,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BootInstaller
   cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
-  collectionLayout: {fileID: 11400000, guid: e7990a7c604be694486685834716e120, type: 2}
-  collectionThemes: {fileID: 0}
   albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
+  currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
   triggeredTutorialData: {fileID: 0}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
   starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
+  tournamentConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
   growthConfig: {fileID: 11400000, guid: 29d2bc1886de275478143db4a63e16e1, type: 2}
+  keywordGrowthConfig: {fileID: 0}
+  profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
+  syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0
@@ -344,7 +347,7 @@ MonoBehaviour:
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 1440, y: 2960}
+  m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -414,6 +417,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: 354fc699ded8b7849ac32ab399efef7f, type: 2}
+  outgameSoundBank: {fileID: 11400000, guid: 71d3c5a08e6b492fa04c7b18d2e6539f, type: 2}
   sfxPoolSize: 8
   voiceBaseChance: 0.4
   voiceChanceIncrement: 0.25
@@ -493,7 +497,7 @@ MonoBehaviour:
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 1440, y: 2960}
+  m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3

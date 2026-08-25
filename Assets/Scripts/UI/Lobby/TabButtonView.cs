@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 /// 탭 버튼 하나의 선택/비선택 겉모습 (탭 버튼 오브젝트에 부착, LobbyTabController가 SetSelected로 구동)
@@ -31,11 +32,40 @@ public class TabButtonView : MonoBehaviour
     // 현재 상태. 첫 호출은 무조건 적용해야 하므로 nullable로 "아직 없음"을 구분한다.
     bool? m_selected;
 
-    void Awake()
+    Button m_button;
+
+    /// 이 탭의 Button. 없으면 확보해서 준다 — 탭바가 인스펙터로 버튼을 배선하지 않기 때문이다.
+    public Button Button { get { EnsureRefs(); return m_button; } }
+
+    /// 아이콘. 따로 배선하지 않았으면 탭 그래픽 자체가 아이콘이다(지금 저작이 그렇다) —
+    /// 알약(LobbyTabBarView.focus)이 선택 탭의 그림을 복사해 갈 때 여기를 본다.
+    public Image Icon { get { EnsureRefs(); return this.icon != null ? this.icon : this.background; } }
+
+    void Awake() => EnsureRefs();
+
+    // 인스펙터 배선을 강요하지 않는다 — 탭을 복제해 늘릴 때 손이 덜 간다.
+    // 탭바(LobbyTabBarView)와 Awake 순서가 정해져 있지 않아 어느 쪽이 먼저 불러도 같은 결과가 나와야 한다.
+    void EnsureRefs()
     {
-        // 인스펙터 배선을 강요하지 않는다 — 탭을 복제해 늘릴 때 손이 덜 간다.
-        if (background == null) background = GetComponent<Image>();
-        if (label == null) label = GetComponentInChildren<TMP_Text>(true);
+        if (m_button != null) return;
+
+        if (this.background == null) this.background = GetComponent<Image>();
+        if (this.label == null) this.label = GetComponentInChildren<TMP_Text>(true);
+
+        m_button = GetComponent<Button>();
+        if (m_button != null) return;
+
+        // 새로 다는 Button은 룩에 손대지 않는다 — 색은 이 컴포넌트(SetSelected)가 단독으로 소유한다.
+        m_button = gameObject.AddComponent<Button>();
+        m_button.transition = Selectable.Transition.None;
+        m_button.targetGraphic = this.background;
+    }
+
+    /// 클릭 이벤트는 탭 자신이 소유한다. 탭바는 어떤 인덱스인지만 실어 보낸다.
+    public void BindClick(UnityAction _onClick)
+    {
+        EnsureRefs();
+        m_button.onClick.AddListener(_onClick);
     }
 
     /// 선택 여부에 맞춰 배경·라벨·아이콘을 한 번에 적용한다.

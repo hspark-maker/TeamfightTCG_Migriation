@@ -129,7 +129,7 @@ PlayBtn → ② 매칭중(AI 고정, 페이크 타이머 1.8s) → ③ 매칭완
 ## 5. 향후 작업 (백로그)
 
 - **탭 콘텐츠 이식** (대부분 Placeholder):
-  - **Cards / Collection = 도감**: `Assets/Scripts/UI/Collection/*` (CollectionTest로 검증됨). LobbyScene Collection 탭 갤러리 UI에 스크립트 연결.
+  - ~~**Cards / Collection = 도감**~~ → **완료.** 도감은 신규 앨범(`Assets/Scripts/UI/Album/*` + `OutGame/Album/*`)으로 재구현돼 로비 탭 idx 4(`Tab_Collection_New.prefab`)에 배선돼 있다. 구 도감(`UI/Collection/*` 방치 생산 컬렉션)은 2026-08-14에 코드·에셋째 삭제됐다.
   - **Pack = 카드팩**: `Assets/Scripts/UI/Shop/PackOpeningView`, `RevealCardView` (PackTest 검증). 데이터는 `Assets/Scripts/OutGame/CardPack/*`.
   - **Shop / Box**: 구현체 미정.
 - **덱 편성 UI 로비 이식**: 현재 덱 편성(`DeckBuilderUI`)은 MainMenu 씬에만 있음. 로비에 덱 탭/화면으로 이식 필요(매칭 플로우 ④의 덱 선택과도 연계).
@@ -166,4 +166,4 @@ PlayBtn → ② 매칭중(AI 고정, 페이크 타이머 1.8s) → ③ 매칭완
 | 카드 타일(재사용) | `Assets/Scripts/UI/CardElement.cs` |
 | 덱 6칸 표시(재사용) | `Assets/Scripts/UI/MainMenu/DeckGroup.cs` |
 | 카드 단일 진실원(레지스트리) | `Assets/Scripts/Network/CardRegistry.cs` · `Assets/SO/CardRegistry.asset` |
-| 아웃게임 카드 조회 | `Assets/Scripts/OutGame/Collection/CardCatalog.cs` |
+| 아웃게임 카드 조회 | `Assets/Scripts/OutGame/Card/CardCatalog.cs` |

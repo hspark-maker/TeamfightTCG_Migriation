@@ -7,7 +7,7 @@
 /// 의도적 미반영(프리뷰에 넣지 말 것):
 /// - 무쌍 스플래시 — 대상 선정이 MatchRandom을 소비한다. 프리뷰에서 뽑으면 스트림이 오염되어 멀티 divergence.
 /// 미반영이지만 넣을 수 있는 것(현재 갭, 별건):
-/// - 무리(Swarm) 선피해 / 성벽(Rampart) 반격 — 둘 다 RNG 미소비 순수 산술이라 추가 가능.
+/// - 낙인(Brand) 선피해 — RNG 미소비 순수 산술이라 추가 가능.
 /// </summary>
 public readonly struct AttackPreview
 {
@@ -37,8 +37,8 @@ public readonly struct AttackPreview
 
         // 실제 순서가 기본타 → 반격 → [Attacked](가시) → 강화 추가타이므로,
         // 공격자가 반격/가시에 쓰러지는지 먼저 계산해야 추가타를 정확히 켜고 끌 수 있다.
-        (int t_counterApplied, _) = _attacker.PreviewDamageChain(t_counterRaw, 0, false);
-        (_, bool t_attackerWouldDie) = _attacker.PreviewDamageChain(t_counterRaw, t_thornRaw, false);
+        (int t_counterApplied, _) = _attacker.PreviewDamageChain(t_counterRaw, 0);
+        (_, bool t_attackerWouldDie) = _attacker.PreviewDamageChain(t_counterRaw, t_thornRaw);
 
         int t_enhanceRaw = _attacker.HasVanillaEnhance && !t_attackerWouldDie
             ? _attacker.VanillaEnhanceDamage()

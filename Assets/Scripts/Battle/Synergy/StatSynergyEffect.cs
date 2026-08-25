@@ -1,12 +1,11 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 배선 데모용 선언형 효과: 공격력 가산 + 키워드 부여.
+// 배선 데모용 선언형 효과: 생명력 가산 + 키워드 부여 + 피해 감소.
 // "효과=데이터로 추가"의 증명 에셋. 규칙은 CardInstance.ApplySynergy에 위임.
 [CreateAssetMenu(fileName = "NewStatSynergyEffect", menuName = "Card Battle/Synergy Effect/Stat")]
 public class StatSynergyEffect : SynergyEffect
 {
-    [SerializeField] private int         bonusAtk;
     [SerializeField] private int         bonusHp;   // 덩치: 생애 1회 bonusHp 가산 (ApplyDeckSynergy 1회 경로 전용, stateful)
     [SerializeField] private CardKeyword grantedKeywords;
     [SerializeField] private int         dmgReduction;   // 비늘: 받는 피해 상시 -N (정적, 멱등)
@@ -14,7 +13,7 @@ public class StatSynergyEffect : SynergyEffect
     public override void OnDeckResolved(DeckCtx _ctx)
     {
         if (_ctx.card == null) return;
-        _ctx.card.ApplySynergy(bonusAtk, bonusHp, grantedKeywords, dmgReduction);
+        _ctx.card.ApplySynergy(bonusHp, grantedKeywords, dmgReduction);
     }
 
     // 정적 스탯이라 "발동 순간"이 없어 배너를 띄울 지점이 없었다(덩치·비늘이 한 판 내내 안 보이던 이유).

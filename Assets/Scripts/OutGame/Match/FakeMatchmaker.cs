@@ -12,7 +12,7 @@ public class FakeMatchmaker : IMatchmaker
     readonly float               m_minSeconds;
     readonly float               m_maxSeconds;
 
-    public FakeMatchmaker(AIDeckConfig _decks, OpponentProfilePool _pool, float _minSeconds = 1.0f, float _maxSeconds = 1.6f)
+    public FakeMatchmaker(AIDeckConfig _decks, OpponentProfilePool _pool, float _minSeconds = 2.0f, float _maxSeconds = 3.5f)
     {
         m_decks      = _decks;
         m_pool       = _pool;

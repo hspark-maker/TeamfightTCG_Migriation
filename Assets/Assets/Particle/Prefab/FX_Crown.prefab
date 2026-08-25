@@ -4905,6 +4905,7 @@ GameObject:
   - component: {fileID: 6491684070671776875}
   - component: {fileID: 7790782685031491495}
   - component: {fileID: 9054215651580322386}
+  - component: {fileID: -6050609796141468124}
   m_Layer: 6
   m_Name: FX_Crown
   m_TagString: Untagged
@@ -9731,6 +9732,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &-6050609796141468124
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5631213263390450891}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &7118509745621429598
 GameObject:
   m_ObjectHideFlags: 0

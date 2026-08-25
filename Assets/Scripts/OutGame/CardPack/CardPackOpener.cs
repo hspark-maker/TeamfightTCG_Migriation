@@ -5,65 +5,83 @@ public static class CardPackOpener
 {
     static readonly System.Random s_rng = new System.Random();
 
-    // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 환급, 실패 시 차감 없이 사유 반환
+    // 중복 1장이 주는 간식 수. 1:1로 묶어야 "한계돌파 N회 = 중복 몇 장"이 그대로 읽힌다.
+    public const int SnackPerDuplicate = 1;
+
+    // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 간식 적립, 실패 시 차감 없이 사유 반환
     public static OpenedPack TryPurchase(CardPackData _pack)
     {
-        if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound, null);
+        if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound);
+        if (!PackUnlockRules.IsUnlocked(_pack))
+            return OpenedPack.CreateFailure(EPackOpenResult.RankLocked);
+        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady)
+            return OpenedPack.CreateFailure(EPackOpenResult.NotReady);
 
-        string t_packId = _pack.PackId;
+        IReadOnlyList<WeightedCard> t_resolvedPool = _pack.ResolvePool(RankManager.CurrentGrade);
+        var t_pool = new List<WeightedCard>(t_resolvedPool.Count);
+        for (int t_i = 0; t_i < t_resolvedPool.Count; t_i++)
+        {
+            WeightedCard t_entry = t_resolvedPool[t_i];
+            if (t_entry.card != null && CardCatalog.Contains(CardCatalog.IdOf(t_entry.card)))
+                t_pool.Add(t_entry);
+        }
+        if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool);
 
-        // 빈 풀 판정은 랭크 해석 후의 실제 추첨 풀 기준
-        var t_pool = _pack.ResolvePool(RankManager.GetInfo().Grade);
-        if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool, t_packId);
-
-        long t_price = _pack.Price;
         ECurrencyType t_priceCurrency = _pack.PriceType;
-        ECurrencyType t_refundType = _pack.RefundType;
+        long t_price = _pack.Price;
 
         if (!CurrencyManager.CanAfford(t_priceCurrency, t_price))
-            return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold, t_packId);
+            return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold);
 
         if (!CurrencyManager.Spend(t_priceCurrency, t_price))
-            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed, t_packId);
+            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
 
-        long t_refundEach = _pack.RefundAmount;
-        int t_drawCount = _pack.DrawCount;
+        // 재화 환급은 나가지 않는다(중복 보상 = 간식). 팩의 환급 저작값은 되돌릴 여지를 두려고 남긴다.
+        ECurrencyType t_refundType = _pack.RefundType;
+        List<DrawnCard> t_drawn = Draw(_pack, t_pool);
 
+        // 간식은 반영만 하고 디스크 쓰기는 아래 재화 저장에 얹는다.
+        CardGrowthManager.FlushToData();
+        CurrencyManager.Save();
+
+        return OpenedPack.CreateSuccess(t_drawn, t_refundType);
+    }
+
+    static List<DrawnCard> Draw(CardPackData _pack, IReadOnlyList<WeightedCard> _pool)
+    {
         bool t_unique = _pack.UniqueDraw;
-        if (t_unique && t_drawCount > t_pool.Count) t_drawCount = t_pool.Count;
+        int t_drawCount = _pack.DrawCount;
+        if (t_unique && t_drawCount > _pool.Count) t_drawCount = _pool.Count;
 
-        var t_candidates = new List<int>(t_pool.Count);
-        for (int t_i = 0; t_i < t_pool.Count; t_i++) t_candidates.Add(t_i);
+        var t_candidates = new List<int>(_pool.Count);
+        for (int t_i = 0; t_i < _pool.Count; t_i++) t_candidates.Add(t_i);
 
         var t_drawn = new List<DrawnCard>(t_drawCount);
         for (int t_i = 0; t_i < t_drawCount; t_i++)
         {
-            int t_pick = PickWeighted(t_pool, t_candidates);
-            CardData t_card = t_pool[t_candidates[t_pick]].card;
+            int t_pick = PickWeightedCandidate(_pool, t_candidates);
+            CardData t_card = _pool[t_candidates[t_pick]].card;
             if (t_unique) t_candidates.RemoveAt(t_pick);
 
-            // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 환급이 새어나간다
+            // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 간식이 새어나간다
             if (t_card == null) continue;
 
-            bool t_isNew = OwnershipManager.Grant(CardCatalog.IdOf(t_card));
-
-            long t_refund = 0;
-            if (!t_isNew)
-            {
-                CurrencyManager.Earn(t_refundType, t_refundEach);
-                t_refund = t_refundEach;
-            }
-
-            t_drawn.Add(new DrawnCard(t_card, t_isNew, t_refund));
+            t_drawn.Add(GrantAndReward(t_card));
         }
-
-        CurrencyManager.Save();
-
-        return OpenedPack.CreateSuccess(t_packId, t_drawn, t_refundType);
+        return t_drawn;
     }
 
-    // 가중치 추첨 — 합에서 굴린 값을 누적 스캔, uniqueDraw 제거 후에도 매회 합을 재계산
-    static int PickWeighted(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)
+    // 신규면 소유만, 중복이면 간식 적립. 중복 판정이 Grant 반환값 하나뿐이라 호출 전에 null을 걸러야 한다.
+    static DrawnCard GrantAndReward(CardData _card)
+    {
+        int t_id = CardCatalog.IdOf(_card);
+        if (OwnershipManager.Grant(t_id)) return new DrawnCard(_card, true);
+
+        bool t_added = CardGrowthManager.AddSnack(t_id, SnackPerDuplicate);
+        return new DrawnCard(_card, false, t_added ? SnackPerDuplicate : 0);
+    }
+
+    static int PickWeightedCandidate(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)
     {
         int t_sum = 0;
         for (int t_i = 0; t_i < _candidates.Count; t_i++)

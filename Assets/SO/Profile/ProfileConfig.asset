@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5219971656b98e469a060b0513a1df0, type: 3}
+  m_Name: ProfileConfig
+  m_EditorClassIdentifier: Assembly-CSharp::ProfileConfig
+  avatarPlate: {fileID: 21300000, guid: 4d39085bb0991451392165e2e08c0b56, type: 3}
+  avatars:
+  - id: avatar_00
+    displayName: "\uAE30\uBCF8"
+    large: {fileID: 21300000, guid: 5df687fb4fb94a688e63effeede8d451, type: 3}
+    small: {fileID: 21300000, guid: 5df687fb4fb94a688e63effeede8d451, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: avatar_01
+    displayName: "\uBA54\uB871"
+    large: {fileID: 21300000, guid: 92c89d7a10715de41b1dfa2101574b0e, type: 3}
+    small: {fileID: 21300000, guid: 92c89d7a10715de41b1dfa2101574b0e, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: avatar_02
+    displayName: "\uB354\uC6CC"
+    large: {fileID: 21300000, guid: 6a32c852a8ce480b8f0f5ee83a29d4e1, type: 3}
+    small: {fileID: 21300000, guid: 6a32c852a8ce480b8f0f5ee83a29d4e1, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  frames:
+  - id: frame_default
+    displayName: "\uAE30\uBCF8"
+    sprite: {fileID: 21300000, guid: 67f0892ab45c4cdef5061728394a5b6c, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Sun
+    displayName: "\uD0DC\uC591"
+    sprite: {fileID: 21300000, guid: 12ab34cd56ef4789a0b1c2d3e4f50617, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Emerald
+    displayName: "\uC5D0\uBA54\uB784\uB4DC"
+    sprite: {fileID: 21300000, guid: 23bc45de67f1489ab1c2d3e4f5061728, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Frost
+    displayName: "\uD504\uB85C\uC2A4\uD2B8"
+    sprite: {fileID: 21300000, guid: 56ef7819a34b4bcde4f5061728394a5b, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Rose
+    displayName: "\uB85C\uC988"
+    sprite: {fileID: 21300000, guid: 45de67f8923a4abcd3e4f5061728394a, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Moon
+    displayName: "\uB2EC\uBE5B"
+    sprite: {fileID: 21300000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: frame_Ocean
+    displayName: "\uBC14\uB2E4"
+    sprite: {fileID: 21300000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}

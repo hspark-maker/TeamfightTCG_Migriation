@@ -12,16 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f355f7becae7e6942b0928d26746a712, type: 3}
   m_Name: RankConfig
   m_EditorClassIdentifier: Assembly-CSharp::RankConfig
-  winPoints: 25
-  losePoints: 25
+  winPoints: 10
+  losePoints: 10
   unrankedDisplayName: Unranked
   unrankedBadge: {fileID: 21300000, guid: 3fab8619b568843a1a5766e0df6d5300, type: 3}
   grades:
   - grade: 0
     displayName: Bronze
-    badge: {fileID: 21300000, guid: 8cf65c3ef86684908a00c57c340b3b8f, type: 3}
+    badge: {fileID: 21300000, guid: 073e687a687a64137b4fe82914a8b1e1, type: 3}
     entryPoints: 100
-    pointsPerDivision: 25
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -33,9 +33,9 @@ MonoBehaviour:
       amountPerDivision: 1
   - grade: 1
     displayName: Silver
-    badge: {fileID: 21300000, guid: b436adf7ef9c24c86a0085a4088ca7a0, type: 3}
-    entryPoints: 200
-    pointsPerDivision: 25
+    badge: {fileID: 21300000, guid: 71c61a848654145898eb22d1a20ffea7, type: 3}
+    entryPoints: 260
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -47,9 +47,9 @@ MonoBehaviour:
       amountPerDivision: 1
   - grade: 2
     displayName: Gold
-    badge: {fileID: 21300000, guid: 8b4adf7a4e9404fc0ba3f5ebde482e6c, type: 3}
-    entryPoints: 300
-    pointsPerDivision: 25
+    badge: {fileID: 21300000, guid: 0683381c2b89b4ecaaf1567e2253709a, type: 3}
+    entryPoints: 420
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -61,9 +61,9 @@ MonoBehaviour:
       amountPerDivision: 2
   - grade: 3
     displayName: Platinum
-    badge: {fileID: 21300000, guid: 98740b435ec5846ae98c8f153321003d, type: 3}
-    entryPoints: 400
-    pointsPerDivision: 25
+    badge: {fileID: 21300000, guid: 1b4f4208288d44c1d9db74049007e648, type: 3}
+    entryPoints: 580
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -75,9 +75,9 @@ MonoBehaviour:
       amountPerDivision: 5
   - grade: 4
     displayName: Diamond
-    badge: {fileID: 21300000, guid: 0f78de46475ea43c1a07d24efa7761f5, type: 3}
-    entryPoints: 500
-    pointsPerDivision: 25
+    badge: {fileID: 21300000, guid: 5189664aecd61428b95637b575a90f58, type: 3}
+    entryPoints: 740
+    pointsPerDivision: 40
     rewards:
     - currency: 0
       icon: {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
@@ -87,4 +87,6 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
       amount: 40
       amountPerDivision: 10
-  aiCardLevels: 010000000100000002000000020000000300000003000000040000000500000006000000060000000700000007000000080000000800000009000000090000000a0000000a0000000a0000000a000000
+  aiCardLevels: 0100000001000000010000000200000002000000020000000200000003000000030000000300000003000000030000000300000004000000040000000400000004000000040000000400000004000000
+  aiLevelSpreadDown: 0
+  aiLevelSpreadUp: 0

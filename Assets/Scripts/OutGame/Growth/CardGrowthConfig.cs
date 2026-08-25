@@ -7,38 +7,78 @@ public class CardGrowthConfig : ScriptableObject
 {
     [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
     [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 10;
-    [Min(0)] [SerializeField] int hpPerLevel = 2;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 4;
+    [Min(0)] [SerializeField] int hpPerLevel = 4;
 
     [Tooltip("첫 강화(Lv2로 올릴 때)의 비용. 단위는 기본 재화(골드)다.")]
     [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
-    [SerializeField] long baseEnhanceCost = 100;
+    [SerializeField] long baseEnhanceCost = 25;
 
     [Tooltip("레벨마다 늘어나는 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값.")]
     [SerializeField] long costGrowthPerLevel = 50;
     [Range(0f, 1f)] [SerializeField] float baseSuccessRate = 1f;
-    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0.08f;
+    [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0f;
 
     [Header("진화 레벨 (전역 — 카드 SO에 적지 않는다)")]
     // 키워드 해금 레벨은 여기 없다. 카드마다 다르므로 CardData.keywordUnlockLevel이 소유한다.
     [Tooltip("1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 5;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 3;
 
     [Tooltip("2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화.")]
-    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 10;
+    [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 4;
 
     [Header("레벨별 상세 (비어 있는 레벨은 위 기본식으로 계산)")]
     [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
     [SerializeField] List<GrowthLevelStep> levelSteps = new List<GrowthLevelStep>();
+
+    // 한계돌파는 강화와 별개 축의 **덤**이다 — 단계당 +1로 얕게 둔다(주 성장 수단은 강화 곡선).
+    [Header("한계돌파")]
+    [Min(0)] [SerializeField] int maxLimitBreak = 3;
+    [SerializeField] List<LimitBreakStep> limitBreakSteps = new List<LimitBreakStep>
+    {
+        new LimitBreakStep(1, 1, 1),
+        new LimitBreakStep(2, 1, 2),
+        new LimitBreakStep(3, 1, 3),
+    };
 
     // 강화 상한 레벨(바닥 아래 오설정은 바닥으로 보정 = 강화 없음)
     public int MaxLevel => maxLevel < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : maxLevel;
 
     public int FirstEvolutionLevel  => firstEvolutionLevel;
     public int SecondEvolutionLevel => secondEvolutionLevel;
+    public int MaxLimitBreak => Mathf.Max(0, maxLimitBreak);
 
-    /// <summary>레벨 _level에서의 진화 단계(0=미진화). 2차가 1차보다 낮게 설정돼도 높은 쪽이 이긴다 —
-    /// 오설정으로 단계가 역행하지 않게 도달한 관문 중 가장 높은 단계를 준다.</summary>
+    public bool TryGetLimitBreakStep(int _stage, out LimitBreakStep _step)
+    {
+        _step = default;
+        if (_stage <= 0 || _stage > MaxLimitBreak) return false;
+
+        if (limitBreakSteps != null)
+            for (int t_i = 0; t_i < limitBreakSteps.Count; t_i++)
+            {
+                LimitBreakStep t_row = limitBreakSteps[t_i];
+                if (t_row.Stage != _stage) continue;
+
+                _step = new LimitBreakStep(_stage, Mathf.Max(0, t_row.HpGain), Mathf.Max(1, t_row.SnackCost));
+                return true;
+            }
+
+        // 기존 설정 에셋에 신규 필드가 없어도 기본 곡선으로 동작한다(위 저작 기본값과 같은 +1).
+        _step = new LimitBreakStep(_stage, 1, _stage);
+        return true;
+    }
+
+    public int LimitBreakHpBonusAt(int _stage)
+    {
+        int t_top = Mathf.Clamp(_stage, 0, MaxLimitBreak);
+        int t_sum = 0;
+        for (int t_i = 1; t_i <= t_top; t_i++)
+            if (TryGetLimitBreakStep(t_i, out LimitBreakStep t_step)) t_sum += t_step.HpGain;
+
+        return t_sum;
+    }
+
+    /// <summary>레벨 _level에서의 진화 단계(0=미진화). 관문을 거꾸로 저작해도 도달한 것 중 높은 단계를 준다.</summary>
     public int EvolutionStageAt(int _level)
     {
         int t_stage = 0;
@@ -47,13 +87,11 @@ public class CardGrowthConfig : ScriptableObject
         return t_stage > CardData.MaxEvolutionStage ? CardData.MaxEvolutionStage : t_stage;
     }
 
-    /// <summary>레벨 _level로 올리는 것이 곧 진화인가(= 이 레벨에서 진화 단계가 오르는가).
-    /// 관문 레벨 숫자를 화면이 다시 적지 않게 여기서 답한다.</summary>
+    /// <summary>레벨 _level로 올리는 것이 곧 진화인가 — 관문 숫자를 화면이 다시 적지 않게 여기서 답한다.</summary>
     public bool IsEvolutionLevel(int _level) => EvolutionStageAt(_level) > EvolutionStageAt(_level - 1);
 
-    /// <summary>레벨 _level에서 **실제로 켜져 있는** 카드 키워드. 카드의 기본 키워드에 더하는 값이 아니라
-    /// 그것을 대체하는 값이다 — 키워드는 해금 전까지 아예 없는 것으로 친다.
-    /// 해금 레벨 미지정(0)이면 처음부터 열려 있다(해금 레벨을 아직 안 정한 카드 = 기본 키워드 카드).</summary>
+    /// <summary>레벨 _level에서 실제로 켜져 있는 카드 키워드. 기본 키워드에 더하는 값이 아니라 대체하는 값이다 —
+    /// 키워드는 해금 전까지 아예 없는 것으로 친다(해금 레벨 미지정이면 처음부터 열려 있다).</summary>
     public CardKeyword UnlockedKeywordsAt(CardData _card, int _level)
     {
         if (_card == null) return CardKeyword.None;
@@ -95,15 +133,15 @@ public class CardGrowthConfig : ScriptableObject
         int           t_hp       = hpPerLevel;
         long          t_cost     = baseEnhanceCost + costGrowthPerLevel * t_step;
         float         t_rate     = baseSuccessRate - rateDropPerLevel * t_step;
-        ECurrencyType t_currency = ECurrencyType.Gold;       // 기본식에는 재화 축이 없다 — 곡선은 골드가 전제다
-                                                             // (에너지는 키워드 강화 쪽 재화다 — KeywordGrowthConfig)
+        ECurrencyType t_currency = ECurrencyType.Gold;       // 기본식에는 재화 축이 없다
 
+        // 체력·재화는 행이 있으면 무조건 그 값이고, 비용·성공률만 미지정(0 이하 / 음수)을 기본식으로 되돌린다.
         if (TryGetLevelStep(_level, out var t_row))
         {
-            t_hp       = t_row.hpGain;                       // 행이 있으면 체력은 항상 그 값(레벨별 상세 저작이 목적)
-            t_currency = t_row.costCurrency;                 // 재화도 같은 규약 — 행이 있으면 그 칸이 그대로 쓰인다
-            if (t_row.cost        > 0)    t_cost = t_row.cost;   // 0 이하 = 미지정 → 기본식
-            if (t_row.successRate >= 0f)  t_rate = t_row.successRate;   // 음수 = 미지정 → 기본식
+            t_hp       = t_row.hpGain;
+            t_currency = t_row.costCurrency;
+            if (t_row.cost        > 0)    t_cost = t_row.cost;
+            if (t_row.successRate >= 0f)  t_rate = t_row.successRate;
         }
 
         if (_card != null && _card.TryGetHpGain(_level, out int t_cardHp))
@@ -131,9 +169,8 @@ public class CardGrowthConfig : ScriptableObject
     }
 }
 
-/// <summary>레벨 하나의 저작 값. 목록에 행이 있으면 그 레벨의 <see cref="hpGain"/>은 무조건 이 값이다 —
-/// "레벨당 오르는 체력"을 한 칸씩 손으로 정하는 게 이 목록의 존재 이유라 별도 override 체크를 두지 않는다.
-/// 비용·성공률만 미지정을 허용한다(각각 0 이하 / 음수 = 기본식 사용).</summary>
+/// <summary>레벨 하나의 저작 값. 한 칸씩 손으로 정하는 게 목적이라 override 체크를 두지 않는다 —
+/// 행이 있으면 체력·재화는 무조건 이 값이고, 비용·성공률만 미지정을 허용한다.</summary>
 [System.Serializable]
 public struct GrowthLevelStep
 {
@@ -144,7 +181,7 @@ public struct GrowthLevelStep
     public int hpGain;
 
     [Tooltip("이 레벨업에 소모할 재화. 비용과 달리 '미지정'이 없다 — 행이 있으면 이 값이 그대로 쓰인다. " +
-             "일반 강화는 에너지, 진화 레벨에 다이아를 물리는 것이 이 칸의 용도다.")]
+             "레벨마다 결제 재화를 손으로 갈라 놓고 싶을 때 쓰는 칸이다.")]
     public ECurrencyType costCurrency;
 
     [Tooltip("이 레벨업의 비용. 0 이하면 기본식을 쓴다. 단위는 위 재화다(기본식은 항상 골드).")]
@@ -171,5 +208,24 @@ public readonly struct GrowthStep
         Currency    = _currency;
         Cost        = _cost;
         SuccessRate = _successRate;
+    }
+}
+
+[System.Serializable]
+public struct LimitBreakStep
+{
+    [Min(1)] [SerializeField] int stage;
+    [Min(0)] [SerializeField] int hpGain;
+    [Min(1)] [SerializeField] int snackCost;
+
+    public int Stage => stage;
+    public int HpGain => hpGain;
+    public int SnackCost => snackCost;
+
+    public LimitBreakStep(int _stage, int _hpGain, int _snackCost)
+    {
+        stage = _stage;
+        hpGain = _hpGain;
+        snackCost = _snackCost;
     }
 }

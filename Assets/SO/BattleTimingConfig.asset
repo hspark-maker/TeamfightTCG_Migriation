@@ -12,20 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25215ec81c6a5e64eafec7630faa005f, type: 3}
   m_Name: BattleTimingConfig
   m_EditorClassIdentifier: Assembly-CSharp::BattleTimingConfig
-  globalSpeed: 1.2
-  cinemaDuration: 0.25
-  atkWindDur: 0.12
+  globalSpeed: 1
+  cinemaDuration: 0.21
+  atkWindDur: 0.1
   atkWindDist: 0.4
-  atkInDur: 0.1
-  atkRecoilDur: 0.2
+  atkInDur: 0.08
+  atkRecoilDur: 0.17
   atkRecoilDist: 1
-  atkOutDur: 0.3
+  atkOutDur: 0.25
   atkLungeT: 0.62
   atkMaxLean: 40
-  prlApproachDur: 0.22
-  prlTurnDur: 0.2
-  prlReturnDur: 0.2
-  prlHitStop: 0.05
+  prlApproachDur: 0.18
+  prlTurnDur: 0.17
+  prlReturnDur: 0.17
+  prlHitStop: 0.12
   prlAfterHitHold: 0.01
   prlApproachT: 0.401
   prlMaxTurn: 16.3
@@ -33,38 +33,38 @@ MonoBehaviour:
   prlTurnSideStep: 2
   prlWindupAngle: 30.7
   prlSlashMaxTurn: 30
-  cunFogLead: 0.15
-  cunSpinDur: 0.45
-  cunExitDur: 0.35
+  rangedFlightMin: 0.23
+  rangedSpeedMul: 1.5
+  cunFogLead: 0.13
+  cunSpinDur: 0.38
+  cunExitDur: 0.29
   cunShrinkRatio: 0.5
-  cameraIntroDuration: 0.8
-  cardDealDelay: 0.1
-  cardDealDuration: 0.4
-  deckDealDelay: 0.12
-  deckDealDuration: 0.35
-  cardMoveDuration: 0.3
-  hitDuration: 0.2
-  deathDuration: 0.9
-  deathFlash: 0.05
-  deathLift: 0.12
-  deathNovaAt: 0.28
-  dealAnimDuration: 1
-  dealMidPause: 0.5
-  deathPreviewFlash: 0.55
+  cameraIntroDuration: 0.67
+  cardDealDelay: 0.08
+  cardDealDuration: 0.33
+  deckDealDelay: 0.1
+  deckDealDuration: 0.29
+  cardMoveDuration: 0.25
+  hitDuration: 0.17
+  deathDuration: 0.75
+  deathLift: 0.1
+  deathNovaAt: 0.23
+  dealAnimDuration: 0.83
+  dealMidPause: 0.42
   longPress: 0.45
-  fadeViewDuration: 0.3
-  attackPreviewFlash: 0.55
-  keywordGlowHold: 0.8
-  hpPopDuration: 0.2
-  hpRollPerStep: 0.1
-  hpRollMax: 0.45
-  healLaunchLead: 0.15
-  healLaunchStagger: 0.06
-  healTravelDuration: 0.45
-  healTrailLinger: 0.25
-  swarmLaunchStagger: 0.07
-  swarmTravelDuration: 0.26
-  swarmImpactHold: 0.1
+  fadeViewDuration: 0.25
+  attackPreviewFlash: 0.46
+  keywordGlowHold: 0.67
+  hpPopDuration: 0.17
+  hpRollPerStep: 0.08
+  hpRollMax: 0.38
+  healLaunchLead: 0.13
+  healLaunchStagger: 0.05
+  healTravelDuration: 0.38
+  healTrailLinger: 0.21
+  swarmLaunchStagger: 0.06
+  swarmTravelDuration: 0.22
+  swarmImpactHold: 0.08
   approachSlow: 0.65
   approachFocusIn: 0.22
   approachFocusOut: 0.2
@@ -84,11 +84,11 @@ MonoBehaviour:
   resultBeatBgmPitch: 1
   resultBeatLoseRatio: 0.7
   resultBeatAfterFinish: 0.12
-  mulliganNoticeHold: 1.2
-  effectNotifyDisplay: 1
-  effectNotifySlide: 0.2
-  enemyTurnStartDelay: 0.8
-  enemyExtraAttackDelay: 0.4
-  opponentTurnStartDelay: 0.5
-  opponentExtraAttackDelay: 0.4
-  turnThinkTime: 999
+  mulliganNoticeHold: 1
+  effectNotifyDisplay: 0.83
+  effectNotifySlide: 0.17
+  enemyTurnStartDelay: 0.67
+  enemyExtraAttackDelay: 0.33
+  opponentTurnStartDelay: 0.42
+  opponentExtraAttackDelay: 0.33
+  turnThinkTime: 30

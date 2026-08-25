@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>도감 상세창(CardDetailOverlay)의 키워드·시너지 칩을 프리팹에 <b>박아 넣는</b> 일회성 도구.
+/// <summary>카드 상세창(CardDetailOverlay)의 키워드·시너지 칩을 프리팹에 <b>박아 넣는</b> 일회성 도구.
 ///
 /// 예전엔 런타임에 Instantiate/Destroy로 칩을 지었다 — 그래서 칩 위치·간격을 씬에서 눈으로 못 잡고,
 /// 줄(List) 노드에 레이아웃이 빠져 있어도 에디터에선 티가 안 났다(실제로 키워드 줄에 빠져 있었다).
@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// 칩 수를 늘리거나 프리팹을 다시 깔아야 하면 메뉴에서 한 번 더 돌리면 된다(멱등).</summary>
 static class CardDetailChipBaker
 {
-    const string OverlayPath = "Assets/Assets/Prefabs/UI/LobbyUI/CollectionUI/CardDetailOverlay.prefab";
+    const string OverlayPath = "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab";
 
     // 키워드는 CardKeyword 선언 수(None 제외)가 곧 한 카드가 가질 수 있는 최대치다.
     // 시너지는 지금 카드당 1개지만 늘어날 여지를 둔다 — 모자라면 런타임이 앞에서부터만 채우고 경고한다.

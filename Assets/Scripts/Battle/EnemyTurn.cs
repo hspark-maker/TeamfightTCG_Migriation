@@ -50,9 +50,9 @@ public class EnemyTurn : TurnBase
                 t_bannerAnchor = t_step.bannerAnchor;
                 if (IsFreeStep(t_step))
                 {
-                    // 자유공격: 슬롯 무지정 → AI가 결정론(MatchRandom)으로 공격자·타깃 선택.
-                    t_atk = t_forcedAttacker != null ? t_forcedAttacker : t_attackers[MatchRandom.Range(t_attackers.Count)];
-                    t_def = t_targets[MatchRandom.Range(t_targets.Count)];
+                    // 자유공격: 슬롯 무지정 → AI가 결정론으로 공격자·타깃 선택(규칙은 EnemyAi 단독).
+                    t_atk = t_forcedAttacker != null ? t_forcedAttacker : EnemyAi.PickAttacker(t_attackers);
+                    t_def = EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_atk));
                 }
                 else
                 {
@@ -81,14 +81,18 @@ public class EnemyTurn : TurnBase
             }
             else
             {
-                // 일반 AI 랜덤 공격. 튜토리얼/일반 구분 없이 MatchRandom 하나로 뽑는다 —
-                // 게임 로직 랜덤의 진실원은 MatchRandom이고, 시드는 GameInitializer가 전투 시작 전에 건다.
+                // 일반 AI 공격. 선택 규칙(공격자 가중치 룰렛 / 타깃 최저 체력)의 진실원은 EnemyAi 하나다 —
+                // 튜토리얼 자유공격 스텝도 같은 함수를 부른다. 룰렛이 쓰는 랜덤은 MatchRandom뿐이고,
+                // 시드는 GameInitializer가 전투 시작 전에 건다.
                 t_atk = t_forcedAttacker != null
                     ? t_forcedAttacker
-                    : t_attackers[MatchRandom.Range(t_attackers.Count)];
-                t_def = t_targets[MatchRandom.Range(t_targets.Count)];
+                    : EnemyAi.PickAttacker(t_attackers);
+                t_def = EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_atk));
             }
 
+            // 타깃은 공격자 확정 후 다시 뽑는다(GetValidTargets(t_atk) = 지정 타깃·도발이 이 공격자 기준).
+            // 위 t_targets는 "칠 대상이 아예 없는가"를 보는 루프 탈출 게이트 전용이라 여기 쓰지 않는다.
+            if (t_atk == null || t_def == null) return;
             if (!t_atk.IsAlive) return;
 
             CardView t_attackerView = this.ctx.enemyFieldView.GetSlotView(t_atk.slotIndex);
@@ -117,7 +121,7 @@ public class EnemyTurn : TurnBase
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 무리 선피해(Execute 전 원자)
+                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
                 t_atk.data.attackEffect, t_onEffect, t_preKw, t_atKw,

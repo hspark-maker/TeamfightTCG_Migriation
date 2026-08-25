@@ -1,5 +1,6 @@
 using UnityEngine;
 
+// 키워드 강화 튜닝 데이터(카드 한 장이 아니라 키워드 한 종류를 키운다)
 [CreateAssetMenu(fileName = "KeywordGrowthConfig", menuName = "Card Battle/Keyword Growth Config")]
 public class KeywordGrowthConfig : ScriptableObject
 {
@@ -15,11 +16,10 @@ public class KeywordGrowthConfig : ScriptableObject
 
     [Min(1)] [SerializeField] int maxLevel = 10;
     [Min(1)] [SerializeField] int hpPerLevel = 1;
-    // 키워드 강화의 재화는 에너지다(카드 강화는 골드 — CardGrowthConfig).
-    // 이름을 재화 중립으로 바꾸되 FormerlySerializedAs로 기존 에셋 값을 그대로 물려받는다.
+    // 키워드 강화의 재화는 에너지다(카드 강화는 조각 — CardGrowthConfig).
     [Min(0)] [UnityEngine.Serialization.FormerlySerializedAs("baseGoldCost")]
-    [SerializeField] long baseCost = 500;
-    [Min(0)] [SerializeField] long costGrowthPerLevel = 500;
+    [SerializeField] long baseCost = 5;
+    [Min(0)] [SerializeField] long costGrowthPerLevel = 5;
 
     public int MaxLevel => maxLevel < 1 ? 1 : maxLevel;
     public int HpPerLevel => hpPerLevel < 1 ? 1 : hpPerLevel;

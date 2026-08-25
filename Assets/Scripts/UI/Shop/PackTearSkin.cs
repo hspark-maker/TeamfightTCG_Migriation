@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 // 팩 찢김 표현의 단일 창구. 진행도(0~1) 하나를 받아 "UI/PackTear"를 쓰는 네 그래픽에 똑같이 물린다.
@@ -25,8 +26,35 @@ public class PackTearSkin : MonoBehaviour
     [SerializeField] Graphic lid;
     [Tooltip("입구 안쪽 그늘(_TearMode 2). 카드 위에, 몸통 아래에 그려야 한다.")]
     [SerializeField] Graphic mouthShadow;
-    [Tooltip("찢김선을 따라 새는 빛(_TearMode 3). 가산 합성 재질을 쓴다.")]
+    [Tooltip("찢김선을 따라 새는 빛(_TearMode 3). 가산 합성 재질을 쓴다. " +
+             "이번 개봉의 최고 등급에 따라 색과 세기가 바뀐다(SetGlowGrade).")]
     [SerializeField] Graphic tearGlow;
+
+    [Header("등급 빛")]
+    [Tooltip("손가락 진행도를 주는 찢기 제스처. 이 진행도가 실제 찢김과 등급 빛을 함께 구동한다.")]
+    [SerializeField] PackTearHandle tearHandle;
+    [Tooltip("빛이 찢김선에서 얼마나 멀리 뻗는가. 재질의 _GlowRise를 덮어쓴다 — " +
+             "색·세기와 같은 인스펙터에서 길이까지 잡으려고 여기로 끌어왔다.")]
+    [Range(0.02f, 1f)] [SerializeField] float glowReach = 0.16f;
+    [Tooltip("모든 등급이 공유하는 시작 색. 초반에는 등급을 숨겨야 중간부터 물드는 색이 신호가 된다.")]
+    [SerializeField] Color baseGlow = new Color(0.88f, 0.9f, 0.92f, 1f);
+    [Tooltip("등급 색이 배어 나오기 시작하는 진행도. 여기까지는 어느 등급이든 시작 색 그대로다.")]
+    [Range(0f, 1f)] [SerializeField] float gradeTintStart = 0.5f;
+    [Tooltip("등급 색이 완전히 드러나는 진행도. 시작점과 같거나 작으면 그 지점에서 즉시 바뀐다.")]
+    [Range(0f, 1f)] [SerializeField] float gradeTintFull = 0.95f;
+    [Tooltip("신화 빛이 배어 나오기 시작하는 진행도. 신화는 백색 예고 구간을 짧게 쓴다.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintStart = 0.25f;
+    [Tooltip("신화 팔레트가 완전히 드러나는 진행도.")]
+    [Range(0f, 1f)] [SerializeField] float mythicTintFull = 0.75f;
+    [Tooltip("희귀 등급의 빛 색. 알파는 씬에 저작된 빛의 알파를 상한으로 쓴다.")]
+    [FormerlySerializedAs("goldGlow")]
+    [SerializeField] Color rareGlow = new Color(1f, 0.82f, 0.35f, 1f);
+    [SerializeField] Color arcaneGlow = new Color(0.6078f, 0.4196f, 0.9608f, 1f);
+    [Tooltip("신화 등급 6색 팔레트가 도는 속도(1 = 초당 한 바퀴). 0이면 첫 색에 멈춘 채 물든다.")]
+    [FormerlySerializedAs("prismCycleSpeed")]
+    [SerializeField] float mythicCycleSpeed = 0.5f;
+    [Tooltip("진행도(0~1)를 빛 세기(0~1)로 바꾸는 곡선. 끝에서 급히 밝아져야 \"터지기 직전\"으로 읽힌다.")]
+    [SerializeField] AnimationCurve glowRamp = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
     [Header("조각 들림")]
     [Tooltip("조각이 도는 축. 위치는 진행도에서 계산해 매 프레임 찢김 선단(아직 붙어 있는 지점)에 붙인다 " +
@@ -56,8 +84,19 @@ public class PackTearSkin : MonoBehaviour
     [SerializeField] int jagSeed = 20260729;
 
     static readonly int ID_TEAR_PROGRESS = Shader.PropertyToID("_TearProgress");
+    static readonly int ID_TEAR_DIRECTION = Shader.PropertyToID("_TearDirection");
+    static readonly int ID_GLOW_RISE      = Shader.PropertyToID("_GlowRise");
     static readonly int ID_JAG_TEX       = Shader.PropertyToID("_JagTex");
     static readonly int ID_TEAR_Y        = Shader.PropertyToID("_TearY");
+    static readonly Color32[] MYTHIC_PALETTE =
+    {
+        new Color32(0xE8, 0xF3, 0xF8, 0xFF),
+        new Color32(0xBF, 0xF7, 0xD0, 0xFF),
+        new Color32(0xE2, 0xF1, 0xDA, 0xFF),
+        new Color32(0xC7, 0xF0, 0xF3, 0xFF),
+        new Color32(0xE5, 0xD1, 0xF5, 0xFF),
+        new Color32(0xE2, 0xD3, 0xCD, 0xFF),
+    };
 
     // 런타임 사본 재질(에셋 오염 방지). 파괴 시 함께 정리한다.
     Material[] m_mats;
@@ -67,6 +106,14 @@ public class PackTearSkin : MonoBehaviour
     // 조각의 원알파(개봉마다 되돌리는 기준). 자리·회전은 진행도에서 계산하므로 캡처할 것이 없다.
     float m_lidHomeAlpha = 1f;
     bool m_homeCaptured;
+
+    // 찢기 상태와 등급 빛은 같은 진행도 하나를 공유한다.
+    ECardGrade m_glowGrade;
+    PackGradeFxPalette m_gradePalette;
+    float m_tearProgress;
+    float m_tearDirection = 1f;
+    Color m_glowHome = Color.white;
+    bool  m_glowHomeCaptured;
 
     /// <summary>찢김선의 기준 높이(스프라이트 UV v). 카드를 입구에 맞춰 놓을 때 참고.</summary>
     public float TearLineV => m_mats != null && m_mats.Length > 0 && m_mats[0] != null
@@ -79,7 +126,30 @@ public class PackTearSkin : MonoBehaviour
         BuildJagTexture();
         InstanceMaterials();
         CaptureHome();
+        CaptureGlowHome();   // 세기를 물리기 전에 씬 저작 색을 잡아 둔다(상한의 기준).
+        ApplyGlowReach();
         SetProgress(0f);
+    }
+
+    // 손가락 진행도는 다른 소품(PackShellRig·PackSpecularSweep)과 같은 방식으로 직접 받는다 —
+    // 진행자(PackRevealView)를 거치면 빛 하나 때문에 단계 전이에 배관이 생긴다.
+    void OnEnable()
+    {
+        if (tearHandle != null) tearHandle.OnProgress += HandleTearProgress;
+    }
+
+    void OnDisable()
+    {
+        if (tearHandle != null) tearHandle.OnProgress -= HandleTearProgress;
+    }
+
+    // 팔레트는 신화일 때만, 그리고 빛이 켜져 있을 때만 다시 칠한다.
+    void Update()
+    {
+        if (m_glowGrade != ECardGrade.Mythic || tearGlow == null) return;
+        if (GradeTint() <= 0f) return;   // 아직 시작 색 구간이면 다시 칠할 것이 없다
+
+        ApplyGlow();
     }
 
     void OnDestroy()
@@ -110,9 +180,30 @@ public class PackTearSkin : MonoBehaviour
 
         if (m_mats != null)
             for (int t_i = 0; t_i < m_mats.Length; t_i++)
-                if (m_mats[t_i] != null) m_mats[t_i].SetFloat(ID_TEAR_PROGRESS, t_progress);
+                if (m_mats[t_i] != null)
+                {
+                    m_mats[t_i].SetFloat(ID_TEAR_PROGRESS, t_progress);
+                    m_mats[t_i].SetFloat(ID_TEAR_DIRECTION, m_tearDirection);
+                }
 
         ApplyPeel(t_progress);
+
+        m_tearProgress = t_progress;
+        ApplyGlow();
+    }
+
+    /// <summary>이번 개봉에서 나올 <b>최고 등급</b>을 물려 찢김선 빛의 색과 세기를 정한다.
+    /// 희귀=금빛, 신비=보랏빛, 신화=무지갯빛. 일반은 씬에 저작된 원래 빛 그대로다 —
+    /// 평범한 팩에서도 빛이 새면 "고등급이 온다"는 신호 자체가 죽는다.
+    ///
+    /// <see cref="ResetTear"/> <b>뒤에</b> 부를 것. 되돌리기가 세기를 0으로 내리므로 순서가 뒤집히면
+    /// 등급을 물린 첫 프레임이 곧바로 지워진다.</summary>
+    public void SetGlowGrade(ECardGrade _grade, PackGradeFxPalette _palette = null)
+    {
+        CaptureGlowHome();
+        m_glowGrade = _grade;
+        m_gradePalette = _palette;
+        ApplyGlow();
     }
 
     /// <summary>다 뜯긴 조각을 날려 보낸다. 반환 시퀀스를 호출부 흐름에 끼우면 스킵 한 번에 함께 끝난다.</summary>
@@ -125,8 +216,10 @@ public class PackTearSkin : MonoBehaviour
 
         // 지금 있는 자리에서 이어 날아간다 — 다 뜯긴 시점의 축은 진행도가 이미 제자리에 놓아 두었다.
         var t_seq = DOTween.Sequence().SetLink(gameObject);
-        t_seq.Join(lidPivot.DOAnchorPos(lidPivot.anchoredPosition + flyOffset, flyDuration).SetEase(Ease.OutCubic));
-        t_seq.Join(lidPivot.DOLocalRotate(new Vector3(0f, 0f, peelAngle + flySpin), flyDuration).SetEase(Ease.OutCubic));
+        Vector2 t_flyOffset = new Vector2(flyOffset.x * m_tearDirection, flyOffset.y);
+        float t_flyAngle = (peelAngle + flySpin) * m_tearDirection;
+        t_seq.Join(lidPivot.DOAnchorPos(lidPivot.anchoredPosition + t_flyOffset, flyDuration).SetEase(Ease.OutCubic));
+        t_seq.Join(lidPivot.DOLocalRotate(new Vector3(0f, 0f, t_flyAngle), flyDuration).SetEase(Ease.OutCubic));
 
         if (lidGroup != null)
         {
@@ -162,7 +255,9 @@ public class PackTearSkin : MonoBehaviour
             lidGroup.alpha = m_lidHomeAlpha;
         }
 
-        SetProgress(0f);
+        m_tearProgress = 0f;
+        m_tearDirection = 1f;
+        SetProgress(0f);   // 빛 세기도 여기서 함께 0으로 돌아간다.
     }
 
     // 뜯긴 만큼 조각이 들린다 — 축이 찢김 선단(아직 붙어 있는 지점)을 따라가야 그 지점은 붙은 채로,
@@ -174,7 +269,7 @@ public class PackTearSkin : MonoBehaviour
 
         var t_pivot = PivotAt(_progress);
         lidPivot.anchoredPosition = t_pivot + new Vector2(0f, peelLift * _progress);
-        lidPivot.localRotation = Quaternion.Euler(0f, 0f, peelAngle * _progress);
+        lidPivot.localRotation = Quaternion.Euler(0f, 0f, peelAngle * _progress * m_tearDirection);
 
         // 축이 움직인 만큼 조각을 되밀어야 그림이 팩 위에 정확히 겹친 채로 남는다.
         if (lid != null) ((RectTransform)lid.transform).anchoredPosition = -t_pivot;
@@ -184,7 +279,101 @@ public class PackTearSkin : MonoBehaviour
     Vector2 PivotAt(float _progress)
     {
         var t_rect = lid != null ? ((RectTransform)lid.transform).rect : new Rect(0f, 0f, 677f, 1015.5f);
-        return new Vector2(t_rect.width * (_progress - 0.5f), (TearLineV - 0.5f) * t_rect.height);
+        return new Vector2(t_rect.width * (_progress - 0.5f) * m_tearDirection,
+                           (TearLineV - 0.5f) * t_rect.height);
+    }
+
+    void HandleTearProgress(float _value)
+    {
+        if (tearHandle != null && tearHandle.DirectionSign != 0f)
+            m_tearDirection = Mathf.Sign(tearHandle.DirectionSign);
+
+        SetProgress(_value);
+    }
+
+    // 등급 색을 빛에 칠한다. 세기는 알파로만 낸다 — 크기를 키우면 찢김선과 어긋나 빛이 선에서 떠 보인다.
+    void ApplyGlow()
+    {
+        if (tearGlow == null) return;
+        CaptureGlowHome();
+
+        // 어느 등급이든 밝은 회색으로 시작한다 — 첫 빛에서 등급이 드러나면 찢는 내내 볼 것이 없다.
+        // 중간을 넘기면서 색이 배어 나오는 그 변화가 곧 "무엇이 나오는가"의 신호다.
+        Color t_color = Color.Lerp(baseGlow, GradeColor(), GradeTint());
+
+        // 알파 상한은 씬에 저작된 빛의 알파다 — 코드가 그 위로 올리면 저작자가 잡은 밝기가 무의미해진다.
+        t_color.a = m_glowHome.a * Mathf.Clamp01(glowRamp.Evaluate(m_tearProgress));
+        tearGlow.color = t_color;
+    }
+
+    // 등급 색이 얼마나 배었는가(0~1). 등급 미달은 끝까지 0 — 시작 색 그대로 간다.
+    float GradeTint()
+    {
+        if (m_glowGrade != ECardGrade.Rare
+            && m_glowGrade != ECardGrade.Arcane
+            && m_glowGrade != ECardGrade.Mythic) return 0f;
+        float t_start = m_glowGrade == ECardGrade.Mythic ? mythicTintStart : gradeTintStart;
+        float t_full = m_glowGrade == ECardGrade.Mythic ? mythicTintFull : gradeTintFull;
+        if (m_tearProgress <= t_start) return 0f;
+        if (t_full <= t_start) return 1f;   // 구간이 없으면 그 지점에서 즉시 물든다
+
+        return Mathf.Clamp01((m_tearProgress - t_start) / (t_full - t_start));
+    }
+
+    Color GradeColor()
+    {
+        if (m_gradePalette != null && m_gradePalette.TryEvaluate(m_glowGrade, out Color t_color))
+            return t_color;
+
+        return m_glowGrade == ECardGrade.Mythic
+            ? MythicPaletteColor()
+            : m_glowGrade == ECardGrade.Arcane ? arcaneGlow : rareGlow;
+    }
+
+    Color MythicPaletteColor()
+    {
+        // 시각을 위상으로 쓴다. 마지막 색 다음을 첫 색으로 잡아 경계도 끈김 없이 이어진다.
+        float t_scaledPhase = Mathf.Repeat(Time.unscaledTime * mythicCycleSpeed, 1f) * MYTHIC_PALETTE.Length;
+        int t_from = Mathf.FloorToInt(t_scaledPhase);
+        int t_to = (t_from + 1) % MYTHIC_PALETTE.Length;
+        return Color.Lerp(MYTHIC_PALETTE[t_from], MYTHIC_PALETTE[t_to], t_scaledPhase - t_from);
+    }
+
+    // 빛 길이는 **런타임 사본에만** 쓴다 — 재질 에셋에 직접 쓰면 플레이 중 값이 .mat에 눌어붙는다
+    // (진행도를 사본으로 돌리는 이유와 같다).
+    void ApplyGlowReach()
+    {
+        Material t_mat = GlowMaterial();
+        if (t_mat != null) t_mat.SetFloat(ID_GLOW_RISE, glowReach);
+    }
+
+    // 빛 그래픽의 재질 사본. 인덱스를 박아 두면 TearTargets 순서가 바뀔 때 조용히 다른 재질을 만진다.
+    Material GlowMaterial()
+    {
+        if (m_mats == null || tearGlow == null) return null;
+
+        var t_targets = TearTargets();
+        for (int t_i = 0; t_i < t_targets.Length && t_i < m_mats.Length; t_i++)
+            if (t_targets[t_i] == tearGlow) return m_mats[t_i];
+
+        return null;
+    }
+
+#if UNITY_EDITOR
+    // 플레이 중 슬라이더를 끌면 그 자리에서 보인다. 에디터 정지 상태에서는 사본이 없어 무동작 —
+    // 그때는 재질 에셋의 _GlowRise가 그대로 쓰인다.
+    void OnValidate()
+    {
+        if (Application.isPlaying) ApplyGlowReach();
+    }
+#endif
+
+    void CaptureGlowHome()
+    {
+        if (m_glowHomeCaptured || tearGlow == null) return;
+
+        m_glowHome = tearGlow.color;
+        m_glowHomeCaptured = true;
     }
 
     void CaptureHome()

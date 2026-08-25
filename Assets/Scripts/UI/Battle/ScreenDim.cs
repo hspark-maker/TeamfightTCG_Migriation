@@ -3,10 +3,17 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Battle Canvas 직하에서 전체 화면 딤을 공유한다.
-/// SafeArea 다음, MulliganOverlay 앞 형제 순서를 유지해야 HUD는 가리고 안내 UI는 가리지 않는다.</summary>
+public enum EDimLayer
+{
+    Full    = 0,
+    Content = 1,
+}
+
+/// <summary>씬에 저작된 레이어별 인스턴스에서 공용 화면 딤을 표시한다.</summary>
 public class ScreenDim : MonoBehaviour
 {
+    const int LAYER_COUNT = 2;
+
     sealed class Request
     {
         public object owner;
@@ -17,6 +24,7 @@ public class ScreenDim : MonoBehaviour
         public float fade;
     }
 
+    [SerializeField] EDimLayer layer = EDimLayer.Full;
     [SerializeField] CanvasGroup canvasGroup;
     [SerializeField] Image full;
     [SerializeField] RectTransform holeTop;
@@ -24,36 +32,67 @@ public class ScreenDim : MonoBehaviour
     [SerializeField] RectTransform holeLeft;
     [SerializeField] RectTransform holeRight;
 
-    static ScreenDim instance;
+    static readonly ScreenDim[] s_instances = new ScreenDim[LAYER_COUNT];
     readonly List<Request> requests = new List<Request>();
 
-    public static bool IsAvailable => instance != null;
+    public static bool IsAvailable => Get(EDimLayer.Full) != null;
+
+    public static ScreenDim Get(EDimLayer _layer)
+    {
+        int t_index = (int)_layer;
+        return t_index >= 0 && t_index < s_instances.Length ? s_instances[t_index] : null;
+    }
+
+    public static bool IsAvailableAt(EDimLayer _layer) => Get(_layer) != null;
 
     void Awake()
     {
-        if (instance != null && instance != this)
-            Debug.LogWarning("[ScreenDim] 씬에 인스턴스가 둘 이상 있습니다. 마지막 인스턴스를 사용합니다.");
-        instance = this;
+        int t_index = (int)this.layer;
+        if (t_index < 0 || t_index >= s_instances.Length)
+        {
+            Debug.LogError($"[ScreenDim] 지원하지 않는 레이어입니다: {this.layer}", this);
+            return;
+        }
+
+        ScreenDim t_previous = Get(this.layer);
+        if (t_previous != null && t_previous != this)
+            Debug.LogWarning($"[ScreenDim] 씬에 {this.layer} 인스턴스가 둘 이상 있습니다. 마지막 인스턴스를 사용합니다.");
+        s_instances[t_index] = this;
         ApplyHidden();
     }
 
     void OnDestroy()
     {
-        if (instance != this) return;
+        if (Get(this.layer) != this) return;
         this.requests.Clear();
-        instance = null;
+        s_instances[(int)this.layer] = null;
     }
 
-    public static void Show(object _owner, float _alpha = 0.62f, bool _block = true, float _fade = 0f)
-        => instance?.Push(_owner, _alpha, _block, false, default, _fade);
+    public static void Show(object _owner, float _alpha = 0.62f, bool _block = true, float _fade = 0f,
+        EDimLayer _layer = EDimLayer.Full)
+        => Get(_layer)?.Push(_owner, _alpha, _block, false, default, _fade);
 
     public static void ShowWithHole(object _owner, Rect _screenRect, float _alpha = 0.62f, bool _block = true)
-        => instance?.Push(_owner, _alpha, _block, true, _screenRect, 0f);
+        => Get(EDimLayer.Full)?.Push(_owner, _alpha, _block, true, _screenRect, 0f);
 
+    /// <summary>레이어를 지정하지 않으면 전 레이어에서 걷는다 —
+    /// Show에만 레이어를 넘기고 Hide에서 빠뜨리면 딤이 켜진 채 남아 입력이 영구히 죽기 때문이다.</summary>
     public static void Hide(object _owner)
     {
-        if (instance == null || _owner == null) return;
-        instance.Remove(_owner);
+        if (_owner == null) return;
+
+        for (int i = 0; i < s_instances.Length; i++)
+        {
+            ScreenDim t_instance = s_instances[i];
+            if (t_instance != null) t_instance.Remove(_owner);
+        }
+    }
+
+    public static void Hide(object _owner, EDimLayer _layer)
+    {
+        ScreenDim t_instance = Get(_layer);
+        if (t_instance == null || _owner == null) return;
+        t_instance.Remove(_owner);
     }
 
     void Push(object _owner, float _alpha, bool _block, bool _hasHole, Rect _hole, float _fade)

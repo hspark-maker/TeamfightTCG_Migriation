@@ -3,14 +3,14 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 덱 탭 루트(Tab_Deck에 부착). 목록/편집 두 패널의 SetActive 전환만 담당한다(씬 로드 없음).
+// 덱 탭 루트(Tab_Deck에 부착). 목록 화면을 소유하고, 편집은 풀(UIPoolManager)이 세운 화면에 넘긴다.
 // 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
 // "탭이 켜지면 항상 목록부터"를 OnEnable로 보장한다.
-public class DeckTabController : MonoBehaviour
+//
+// 편집 화면은 이 프리팹 안에 없다 — 매치 셸과 같은 한 인스턴스를 공유한다(DeckEditController).
+public class DeckTabController : LobbyTabPanel
 {
-    [SerializeField] GameObject         listPanel;
-    [SerializeField] GameObject         editPanel;
-    [SerializeField] DeckEditController editController;   // 옵션 — 미배선이면 패널 토글만 한다
+    [SerializeField] GameObject listPanel;
 
     [Tooltip("덱 탭에 있는 동안 숨길 로비 상단 바. 미배선이면 LobbyRoot/TopBar를 찾아 쓴다.")]
     [SerializeField] GameObject topBar;
@@ -19,7 +19,6 @@ public class DeckTabController : MonoBehaviour
     [SerializeField] float topBarSlideSeconds = 0.22f;
 
     // 탭 셸(LobbyRoot)은 이 오브젝트의 상위 계층에 있다 — 인스펙터 배선 없이 첫 사용 시 찾아 캐시한다.
-    LobbyTabController m_lobbyTabs;
 
     // 상단 바 접기에 쓰는 것들. 높이는 LobbyRoot의 세로 3분할이 읽는 값이라, 이걸 줄이면
     // Content가 그만큼 위로 올라온다(바가 위로 말려 들어가는 그림).
@@ -28,11 +27,19 @@ public class DeckTabController : MonoBehaviour
     float         m_topBarHeight = -1f;   // 펼친 높이. 접힌 상태를 원본으로 기억하지 않게 한 번만 잡는다
     Tween         m_topBarTween;
     bool          m_topBarHidden;
+    bool          m_editing;
+
+    // 로비가 넘긴 드래그 레이어. 편집 화면이 자기 레이어를 들고 있으면 무시된다
+    // (풀드 화면은 자기 캔버스에 살아서 로비 캔버스의 고스트가 뒤로 깔린다 — SetDragController 주석).
+    DeckEditDragController m_dragController;
+
+    /// <summary>로비가 넘긴 서비스를 받아둔다. 편집 화면은 열 때 세워지므로 여기서 전달하지 못한다.</summary>
+    public override void Initialize(LobbyTabServices _services)
+    {
+        m_dragController = _services?.DragController;
+    }
 
     // 덱 탭을 단독 배치한 테스트 씬에서는 셸이 없을 수 있다 → 호출측은 항상 null을 감안한다.
-    LobbyTabController LobbyTabs
-        => m_lobbyTabs != null ? m_lobbyTabs : (m_lobbyTabs = GetComponentInParent<LobbyTabController>(true));
-
     void OnEnable()
     {
         // 편집 중 탭이 꺼졌다 켜지면 여기서 무저장 폐기된다.
@@ -46,7 +53,6 @@ public class DeckTabController : MonoBehaviour
     // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어간다.
     void OnDisable()
     {
-        if (LobbyTabs != null) LobbyTabs.ClearLeaveGuard();
         SetTopBarHidden(false);
     }
 
@@ -130,8 +136,12 @@ public class DeckTabController : MonoBehaviour
     {
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return;
 
-        ShowEditor();
-        if (editController != null) editController.Open(_slotIndex);
+        ShowEditor(new DeckEditData
+        {
+            slotIndex      = _slotIndex,
+            onExit         = CloseEditor,
+            dragController = m_dragController,
+        });
     }
 
     // 신규 덱 진입. 좌표는 저장이 확정되는 순간(TryInsertFront)에 생기므로 여기서는 만석만 막는다.
@@ -139,8 +149,12 @@ public class DeckTabController : MonoBehaviour
     {
         if (DeckSaveManager.IsFull) return;
 
-        ShowEditor();
-        if (editController != null) editController.OpenNew();
+        ShowEditor(new DeckEditData
+        {
+            isNew          = true,
+            onExit         = CloseEditor,
+            dragController = m_dragController,
+        });
     }
 
     // 편집 종료 = 편집 진입 이전 화면(덱 탭 목록)으로 복귀. 탭은 건드리지 않는다.
@@ -151,38 +165,51 @@ public class DeckTabController : MonoBehaviour
 
     // 탭 셸이 넘긴 이탈 요청. 저장 판정과 미완성 확인은 편집기가 하고(경로가 뒤로가기와 한 벌이어야 한다),
     // 허가가 떨어지면 목록으로 되돌린 뒤 유저가 원래 누른 탭으로 보낸다.
-    void OnLobbyTabLeave(Action _proceed)
+    public override void RequestLeave(Action _proceed)
     {
-        if (editController == null)
+        if (!m_editing)
         {
+            _proceed?.Invoke();
+            return;
+        }
+
+        DeckEditController t_editor = DeckEditController.Pooled();
+        if (t_editor == null)
+        {
+            CloseEditor();
             _proceed();
 
             return;
         }
 
-        editController.RequestLeave(() =>
+        t_editor.RequestLeave(() =>
         {
             CloseEditor();
             _proceed();
         });
     }
 
-    void ShowEditor()
+    // 편집 화면을 세우지 못하면(풀 미초기화) 목록에 머문다 — 빈 화면으로 갇히지 않게.
+    void ShowEditor(DeckEditData _data)
     {
-        if (listPanel != null) listPanel.SetActive(false);
-        if (editPanel != null) editPanel.SetActive(true);
+        if (DeckEditController.OpenPooled(_data) == null) return;
 
-        // 탭 버튼은 편집 패널 위에 그대로 노출돼 있다 → 뒤로가기와 같은 확인을 거치게 가로챈다.
-        if (LobbyTabs != null) LobbyTabs.SetLeaveGuard(OnLobbyTabLeave);
+        m_editing = true;
+        if (listPanel != null) listPanel.SetActive(false);
+
+        // ⚠ 편집 화면은 풀 캔버스(order 400)라 하단 탭바를 덮는다 — 예전 탭 안 패널과 달리 탭 버튼이 안 보인다.
+        //   나가는 길은 편집 화면의 뒤로가기 하나이고, 저장 확인은 그 경로가 이미 거친다(RequestLeave).
     }
 
     void ShowList()
     {
         // 가드를 먼저 내린다 — 허가 경로가 이 뒤에 원래 탭 전환을 재개하는데, 남아 있으면 그게 다시 가드로 들어온다.
-        if (LobbyTabs != null) LobbyTabs.ClearLeaveGuard();
+        bool t_wasEditing = m_editing;
+        m_editing = false;
 
-        if (editController != null) editController.Close();
-        if (editPanel != null) editPanel.SetActive(false);
+        // 편집을 연 적이 없으면 풀에 묻지 않는다 — GetUI가 "No Such UI" 로그를 남긴다.
+        if (t_wasEditing) DeckEditController.HidePooled();
+
         if (listPanel != null) listPanel.SetActive(true);
     }
 }

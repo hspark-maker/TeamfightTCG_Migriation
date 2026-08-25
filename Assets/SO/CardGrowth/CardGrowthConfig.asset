@@ -12,57 +12,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58383e8ec353d4d42b9a10ac5f39c7fe, type: 3}
   m_Name: CardGrowthConfig
   m_EditorClassIdentifier: Assembly-CSharp::CardGrowthConfig
-  maxLevel: 10
-  hpPerLevel: 2
-  baseEnhanceCost: 100
+  maxLevel: 4
+  hpPerLevel: 4
+  baseEnhanceCost: 25
   costGrowthPerLevel: 50
   baseSuccessRate: 1
-  rateDropPerLevel: 0.08
-  firstEvolutionLevel: 5
-  secondEvolutionLevel: 10
+  rateDropPerLevel: 0
+  firstEvolutionLevel: 3
+  secondEvolutionLevel: 4
   levelSteps:
   - level: 2
     hpGain: 0
-    costCurrency: 0
-    cost: 50
+    costCurrency: 3
+    cost: 25
     successRate: 1
   - level: 3
     hpGain: 0
-    costCurrency: 0
-    cost: 80
+    costCurrency: 3
+    cost: 75
     successRate: 1
   - level: 4
     hpGain: 0
-    costCurrency: 0
-    cost: 120
+    costCurrency: 3
+    cost: 150
     successRate: 1
-  - level: 5
-    hpGain: 0
-    costCurrency: 1
-    cost: 15
-    successRate: 1
-  - level: 6
-    hpGain: 0
-    costCurrency: 0
-    cost: 200
-    successRate: 0.9
-  - level: 7
-    hpGain: 0
-    costCurrency: 0
-    cost: 260
-    successRate: 0.8
-  - level: 8
-    hpGain: 0
-    costCurrency: 0
-    cost: 330
-    successRate: 0.7
-  - level: 9
-    hpGain: 0
-    costCurrency: 0
-    cost: 400
-    successRate: 0.6
-  - level: 10
-    hpGain: 0
-    costCurrency: 1
-    cost: 35
-    successRate: 1
+  maxLimitBreak: 3
+  limitBreakSteps:
+  - stage: 1
+    hpGain: 1
+    snackCost: 1
+  - stage: 2
+    hpGain: 1
+    snackCost: 2
+  - stage: 3
+    hpGain: 1
+    snackCost: 3

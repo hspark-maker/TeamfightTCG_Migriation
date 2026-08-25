@@ -46,7 +46,7 @@ public class MultiplayerOpponentTurn : TurnBase
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 무리 선피해(Execute 전 원자)
+                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
                 t_atk.data.attackEffect, t_onEffect, t_preKw, t_atKw,

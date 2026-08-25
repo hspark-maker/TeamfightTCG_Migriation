@@ -1,11 +1,12 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using TMPro;
 
 // 아웃게임(uGUI) 카드 한 장의 비주얼 단일 진실원.
-// 도감 그리드 타일 / 도감 생산행 타일 / 덱편집 컬렉션 타일 / 덱편집 드래그 고스트가 모두 이 컴포넌트를 공유한다.
+// 앨범(도감) 칸 / 덱편집 컬렉션 타일 / 덱편집 드래그 고스트가 모두 이 컴포넌트를 공유한다.
 //
 // 인게임 CardView는 월드스페이스 SpriteRenderer, 로비는 ScreenSpaceOverlay uGUI라 프리팹을 복사할 수 없다.
 // 그래서 렌더러만 Image/TMP_Text로 바꾸고, "무엇을 어떤 순서로 몇 개까지 보이는가"라는 규칙은 복제하지 않고
@@ -28,18 +29,34 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] GameObject hpPanel;          // HP 표시 묶음(우상단)
     [SerializeField] TMP_Text   hpText;           // 강화 반영 최대 체력(DeckPower.MaxHpOf)
     [SerializeField] TMP_Text   bonusHpText;      // bonusHp > 0 일 때만 "+N"
-    [Tooltip("HP 아이콘. 체력이 굴러 오르는 동안 숫자와 같은 축으로 맥박친다(RollHp). 미배선이면 맥박만 조용히 빠진다.")]
+    [Tooltip("HP 아이콘. 새 값이 드러나는 한 박에 숫자와 같은 축으로 부푼다(FlashGrowth). 미배선이면 맥박만 조용히 빠진다.")]
     [SerializeField] Image      hpIcon;
-    [Tooltip("체력이 굴러 오르는 동안 물드는 색(RollHp). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
-    [SerializeField] Color      hpRollFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
-    [Tooltip("굴리는 동안 HP 아이콘이 부푸는 최대 비율. 아이콘(167.1)이 HpPanel(192.4) 안에 있어야 하므로 0.15를 넘기면 삐져나온다.")]
-    [SerializeField] float      hpIconPulse = 0.12f;
-    [Tooltip("굴리기가 끝나는 프레임 아이콘을 튀기는 세기. 숫자 펀치(UiPunch 기본값)보다 작아야 시선이 숫자에 남는다.")]
-    [SerializeField] float      hpIconPunch = 0.15f;
-    [Tooltip("강화 레벨 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
+    [Tooltip("새 값이 드러나는 한 박에 Lv·HP 글자가 물드는 색(FlashGrowth). 카드 위 숫자는 프레임 장식에 묻히므로 색이 있어야 눈이 먼저 온다.")]
+    [FormerlySerializedAs("hpRollFlashColor")]
+    [SerializeField] Color      growthFlashColor = new Color(0.45f, 1f, 0.55f, 1f);
+    [Tooltip("그 한 박에 Lv·HP 글자가 부푸는 최대 비율.")]
+    [SerializeField] float      growthTextPulse = 0.18f;
+    [Tooltip("그 한 박에 HP 아이콘이 부푸는 최대 비율. 아이콘(167.1)이 HpPanel(192.4) 안에 있어야 하므로 0.15를 넘기면 삐져나온다.")]
+    [FormerlySerializedAs("hpIconPulse")]
+    [SerializeField] float      growthIconPulse = 0.12f;
+    [Tooltip("부풀었다 돌아오는 데 걸리는 시간. 섬광이 물러나는 동안 안에서 끝나야 '드러나며 강조된다'로 읽힌다.")]
+    [SerializeField] float      growthFlashDuration = 0.45f;
+    [Tooltip("성장 성급 표시(카드 위쪽). 미배선이면 조용히 건너뛴다 — 작은 타일은 노드를 두지 않으면 된다.")]
     [SerializeField] TMP_Text   levelText;
+    [Tooltip("고정 3칸 성장 별. 프리팹에서 미리 저작하고 런타임에는 채움 상태만 바꾼다.")]
+    [SerializeField] Image[]    growthStars;
+    [SerializeField] CardKeywordIconView[]  keywordIconSlots;
+    [SerializeField] CardSynergyBadgeView[] synergyBadgeSlots;
     [SerializeField] Transform  keywordIconRoot;  // 키워드 아이콘 부모. 카드 rect 전체를 덮는 빈 컨테이너(배치는 코드가 앵커로).
     [SerializeField] Transform  synergyBadgeRoot; // 시너지 배지 부모. 인게임처럼 그 자리를 키워드가 쓰면 미배선(null)이라 배지는 안 그려진다.
+
+    // 아이콘 줄 배경판 두 장. 인게임 CardView.keywordBg / keywordOnlyBg 와 같은 스프라이트·같은 자리(프레임 비율로 환산)이며,
+    // 어느 쪽을 켤지 정하는 판정도 아래 RefreshKeywordBg 한 곳뿐이다 — 두 장이 같이 켜지면 겹쳐 그려진다.
+    // 배경판은 아이콘·프레임보다 뒤에 그려져야 해서 프리팹 자식 순서상 keywordIconRoot 앞에 둔다.
+    // **판정 기준은 키워드가 아니라 시너지다**: 넓은 판은 시너지 배지 자리가 딸린 판이라, 시너지가 없거나
+    // 아직 안 열린 카드에서 켜면 빈 칸이 남는다. 키워드 아이콘은 두 판 모두 같은 자리에 얹힌다.
+    [SerializeField] GameObject keywordBg;      // SynergyKewordBG (시너지가 열린 카드 = 키워드 + 시너지 칸)
+    [SerializeField] GameObject keywordOnlyBg;  // SynergyKewordBG_kewordOnly (시너지 없음·미해금 = 키워드 칸만)
     [SerializeField] CardKeywordIconView   keywordIconPrefab;
     [SerializeField] CardSynergyBadgeView  synergyBadgePrefab;
     [SerializeField] KeywordIconConfig     keywordIconConfig;
@@ -55,6 +72,18 @@ public class CardVisualView : MonoBehaviour
     }
     [SerializeField] KeywordFrame[] keywordFrames;
 
+    [Header("시너지 배지 자리")]
+    // 단위는 **배지 루트 rect 비율**이다(왼쪽아래 0,0 ~ 오른쪽위 1,1). 픽셀로 두면 카드 rect가 화면마다
+    // 다른 순간(도감 타일 400x600 · 덱편집/팩카드는 셀에 stretch) 배지만 제자리에 남아 카드에서 밀린다.
+    // 저작 픽셀값을 각 프리팹 rect로 나누면 세 프리팹이 같은 비율로 수렴한다:
+    //   151/420 = 243.5/677 = 143.9/400 = 0.3596 · 65/558 = 105.2/900 = 70.2/600 = 0.1166
+    //   step -88/558 = -141.8/900 = -94.5/600 = -0.1576
+    // 크기는 여전히 건드리지 않는다(배지 프리팹 authoring 크기 유지 — 칸 차이는 UniformFitContent 배율이 흡수).
+    [Tooltip("첫 배지(i=0) 자리. 배지 루트 rect 왼쪽아래(0,0)~오른쪽위(1,1) 비율.")]
+    [SerializeField] Vector2 synergyBadgeStart = new Vector2(0.3596f, 0.1166f);
+    [Tooltip("배지 간 간격(루트 rect 비율. 아래로 쌓기라 y는 음수).")]
+    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -0.1576f);
+
     [Header("표시 옵션")]
     // 작은 타일에서 요소를 끄기 위한 프리팹별 스위치. 소비자 코드는 Bind만 호출하고
     // "무엇을 보일지"는 프리팹이 결정한다(호출부에 표시 분기를 만들지 않기 위함).
@@ -63,8 +92,19 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] bool showLevel     = true;
     [SerializeField] bool showKeywords  = true;
     [SerializeField] bool showSynergies = true;
+    // 정보창처럼 "이 카드가 앞으로 뭘 여는지"까지 보여주는 화면은 true — 해금 전 키워드도 아이콘 줄에 띄운다.
+    // 카드 위 표시는 지금 쓸 수 있는 것만이라는 기본 규칙의 유일한 예외라 프리팹 스위치로 둔다.
+    // 전투 인스턴스 바인딩에는 적용되지 않는다 — 적 카드에 실제로 못 쓰는 키워드를 띄우면 오정보다.
+    [SerializeField] bool showLockedKeywords;
+    // 아이콘을 눌러 키워드 설명을 띄우는 화면(카드 정보창)만 true. 도감·덱편집 타일은 누름이 다른 뜻이라
+    // (카드 상세 열기·드래그 시작) 여기서 설명 팝업이 끼어들면 안 된다.
+    [SerializeField] bool keywordExplainOnPress;
     // 표시 최대 배지 수. 기본값은 인게임과 같은 코드 상수 하나에서 온다(각자 3을 적어두면 한쪽만 바뀌어도 조용히 갈라진다).
     [SerializeField] int  synergyMaxBadges = CardVisualRules.MaxSynergyBadges;
+
+    // 전투 인스턴스로 바인딩됐다면 그쪽이 값의 진실원이다(현재 체력·인스턴스 키워드·전투 아트).
+    // CardData로 바인딩하면 null로 돌아가 아웃게임(내 성장) 기준을 탄다 — 적 카드에 내 강화를 얹지 않기 위함.
+    CardInstance m_instance;
 
     // 프레임과 아트만 남기는 런타임 마스크(도감 "일러스트만 보기"). 프리팹 스위치(show*)를 끄지 않고 **그 위에 얹는다** —
     // 직접 끄면 껐다 켤 때 프리팹이 원래 무엇을 보이던 타일이었는지(작은 타일은 이름·HP가 애초에 꺼져 있다)를 잃는다.
@@ -106,12 +146,15 @@ public class CardVisualView : MonoBehaviour
     const float KeywordIconWidth  =        0.65f / IngameCardWidth;
     const float KeywordIconHeight =        0.65f / IngameCardHeight;
 
-    // 굴러 오르는 중인 체력. 도는 동안에는 이쪽이 숫자의 주인이다 — RefreshHp가 최종값을 먼저 찍으면 굴릴 것이 사라진다.
-    Tween m_hpRoll;
+    // 새 값이 드러나는 한 박의 강조(FlashGrowth). 값은 이미 찍혀 있고 여기서 도는 것은 색과 배율뿐이다.
+    Tween m_growthFlash;
 
-    // hpText의 authoring 색과 hpIcon의 authoring 배율. 물든 중간값이나 부푼 중간 배율을 기준으로 잡으면
-    // 굴릴 때마다 색과 크기가 밀린다 → 둘 다 1회만, 같은 시점에 캡처한다.
+    // Lv·HP 글자의 authoring 색과 글자·아이콘의 authoring 배율. 물든 중간값이나 부푼 중간 배율을 기준으로 잡으면
+    // 강조할 때마다 색과 크기가 밀린다 → 전부 1회만, 같은 시점에 캡처한다.
     Color   m_hpBaseColor;
+    Color   m_levelBaseColor;
+    Vector3 m_hpTextBaseScale;
+    Vector3 m_levelBaseScale;
     Vector3 m_hpIconBaseScale;
     bool    m_hpBaseCaptured;
 
@@ -119,11 +162,27 @@ public class CardVisualView : MonoBehaviour
     // 배선이 null인 필드는 조용히 건너뛴다 — 프리팹마다 일부 노드만 가질 수 있다(고스트/작은 타일).
     //
     // _mine: 이 칸이 내 카드인가. 기본 true인 이유는 호출부 전수가 "내 카드"이기 때문이다
-    // (도감 그리드·생산행·상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
+    // (앨범 칸·카드 상세, 덱편집 슬롯/타일/고스트, 강화 화면, 팩 개봉·획득 연출).
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots).
     // **false는 "성장 없음"이 아니라 "상대 기준"이다** — 내 강화분을 얹지 않되, 상대가 서 있는
     // 레벨(랭크 티어가 정한 AI 레벨)로 체력·레벨을 그린다. 둘을 같게 두면 상대가 실제보다 약해 보인다.
     public void Bind(CardData _card, bool _owned, bool _mine = true)
+    {
+        this.m_instance = null;   // CardData 바인딩 = 아웃게임(내 성장) 기준으로 되돌린다
+        BindInternal(_card, _owned, _mine);
+    }
+
+    /// <summary>전투 인스턴스로 바인딩(전투 덱 목록·카드 정보창). 값의 출처가 아웃게임 경로와 갈린다:
+    /// 체력 = 인스턴스의 <b>현재</b> 값, 아트 = <see cref="CardVisualRules.PickBattleArt"/>,
+    /// 키워드 = 그 인스턴스가 실제로 가진 것. 적 카드에 내 강화·진화를 얹지 않기 위해 인스턴스가 이긴다.
+    /// 강화 레벨은 내 진행도 표기라 인스턴스 경로에선 숨긴다.</summary>
+    public void Bind(CardInstance _instance)
+    {
+        this.m_instance = _instance;
+        BindInternal(_instance?.data, _owned: true, _mine: true);
+    }
+
+    void BindInternal(CardData _card, bool _owned, bool _mine)
     {
         if (_card == null)
         {
@@ -132,8 +191,8 @@ public class CardVisualView : MonoBehaviour
         }
         gameObject.SetActive(true);
 
-        // 다른 카드를 그리는 참이다 — 남은 굴리기가 이 카드 위에 옛 카드의 숫자를 마저 찍게 두지 않는다.
-        KillHpRoll();
+        // 다른 카드를 그리는 참이다 — 앞 카드의 강조(물든 색·부푼 배율)가 이 카드 위에 남게 두지 않는다.
+        RestoreGrowthFlash();
 
         RefreshArt(_card, _mine);
 
@@ -153,10 +212,11 @@ public class CardVisualView : MonoBehaviour
 
         // 미소유는 실루엣만 노출하는 게 기존 의도 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
-        SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
+        SetLevelDisplay(_card, _owned && this.ShowLevel && this.m_instance == null, _mine);
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
-        RefreshSynergyBadges(_card, _owned && this.ShowSynergies);
+        RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine);
+        RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine);
 
         // 미소유 = 잠김 오버레이 on(아트를 어둡게 덮어 실루엣화).
         if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
@@ -173,9 +233,6 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card == null) return;
 
-        // 굴리는 중이면 숫자의 주인은 그쪽이다 — 여기서 최종값을 먼저 찍으면 카운트업이 사라진다(끝나면 그쪽이 못 박는다).
-        if (this.m_hpRoll != null && this.m_hpRoll.IsActive()) return;
-
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
     }
@@ -185,7 +242,10 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card == null || this.portrait == null) return;
 
-        Sprite t_art = CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
+        // 인스턴스가 있으면 진화 단계도 그 인스턴스의 값이다 — 적 카드에 내 진화 단계를 얹지 않는다.
+        Sprite t_art = this.m_instance != null
+            ? CardVisualRules.PickBattleArt(this.m_instance)
+            : CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
         this.portrait.sprite  = t_art;
         this.portrait.enabled = t_art != null;
     }
@@ -201,6 +261,10 @@ public class CardVisualView : MonoBehaviour
 
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
+        // 시너지 해금(1차 진화 레벨)도 이 프레임에 같이 일어난다 — 배지와 배경판을 여기서 안 다시 그리면
+        // 강화 화면에서 레벨만 오르고 시너지는 다음 재바인딩까지 안 보인다.
+        RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine: true);
+        RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine: true);
     }
 
     /// <summary>지금 꺼져 있지만 _card 기준으로는 켜져야 할 프레임 장식들 = 이번 성장으로 새로 열릴 문양.
@@ -227,112 +291,105 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    /// <summary>바뀐 최대 체력을 _from에서부터 굴려 보여준다(강화 결과 공개용).
-    /// 표시 문장·최종값의 정본은 여전히 <see cref="SetHpDisplay"/>다 — 굴리는 동안의 중간 숫자만 여기서 만들고,
-    /// 끝나든 잘리든 그쪽으로 되돌려 못 박는다(반올림 중간값이 남지 않는다).
+    /// <summary>새 Lv·HP가 드러나는 한 박을 강조한다(강화 결과 공개용). **값은 손대지 않는다** —
+    /// 표시의 진실원은 여전히 <see cref="SetHpDisplay"/>·<see cref="SetLevelDisplay"/>이고,
+    /// 호출부가 이 프레임에 이미 새 값을 찍어 둔 상태로 부른다.
     ///
-    /// 굴릴 것이 없으면(미소유·표시 꺼짐·오르지 않음) 즉시 반영하고 null을 돌려준다 — 강화 실패가 이 길로 온다.
-    /// _duration은 호출부가 정한다: 결과판의 체력 행과 같은 길이여야 두 숫자가 한 박에 움직인다.</summary>
-    public Tween RollHp(CardData _card, bool _owned, int _from, float _duration)
+    /// 부르는 자리는 섬광이 물러나기 시작하는 프레임이다 — 그냥 바뀌어 있기만 하면 프레임 장식에 묻히므로
+    /// 글자가 물들고 글자·아이콘이 부풀었다 제자리로 돌아온다. 색과 배율은 **한 파형** 위에 얹는다:
+    /// 축을 나누면 따로 놀고, 잘렸을 때 한쪽만 물든 채 굳는다.</summary>
+    public void FlashGrowth()
     {
-        if (_card == null) return null;
+        if (this.hpText == null && this.levelText == null) return;
 
-        KillHpRoll();
-
-        int t_to = DeckPower.MaxHpOf(_card);
-
-        if (this.hpText == null || !(_owned && this.ShowHp) || _duration <= 0f || t_to <= _from)
-        {
-            RefreshHp(_card, _owned);
-            return null;
-        }
-
-        // 패널·보너스는 먼저 최종 상태로 세운다 — 굴러야 하는 것은 숫자 하나뿐이다.
-        SetHpDisplay(_card, true, true);
+        RestoreGrowthFlash();
         CaptureHpVisual();
-        this.hpText.text = _from.ToString();
 
-        float t_shown = _from;
-        float t_span  = t_to - _from;
-        bool  t_done  = false;   // 정상 종료 여부. 잘렸으면 마무리 박자도 없다.
+        Transform t_link = this.hpText != null ? this.hpText.transform : this.levelText.transform;
 
-        this.m_hpRoll = DOTween.To(() => t_shown, _v =>
-                                   {
-                                       t_shown = _v;
-                                       if (this.hpText == null) return;
+        this.m_growthFlash = DOVirtual.Float(0f, 1f, Mathf.Max(0.05f, this.growthFlashDuration),
+                                             _p =>
+                                             {
+                                                 float t_wave = Mathf.Sin(Mathf.Clamp01(_p) * Mathf.PI);
 
-                                       this.hpText.text = Mathf.RoundToInt(_v).ToString();
+                                                 ApplyFlash(this.hpText,    this.m_hpBaseColor,
+                                                            this.m_hpTextBaseScale, t_wave);
+                                                 ApplyFlash(this.levelText, this.m_levelBaseColor,
+                                                            this.m_levelBaseScale, t_wave);
 
-                                       // 색은 굴리는 도중에 가장 짙고 끝에서 원래 색으로 돌아온다.
-                                       // 별도 트윈으로 두면 잘렸을 때 물든 채 굳으므로 같은 축에 얹는다.
-                                       float t_p    = Mathf.Clamp01((_v - _from) / t_span);
-                                       float t_wave = Mathf.Sin(t_p * Mathf.PI);
-
-                                       this.hpText.color = Color.Lerp(this.m_hpBaseColor, this.hpRollFlashColor, t_wave);
-
-                                       // 아이콘도 같은 파형 위에서 부풀었다 돌아온다 — 축을 나누면 숫자와 따로 논다.
-                                       if (this.hpIcon != null)
-                                           this.hpIcon.transform.localScale =
-                                               this.m_hpIconBaseScale * (1f + this.hpIconPulse * t_wave);
-                                   },
-                                   (float)t_to, _duration)
-                               .SetEase(Ease.OutQuad)   // 결과판의 체력 행과 같은 곡선 — 두 숫자가 따로 놀지 않는다.
-                               .SetLink(this.hpText.gameObject)
-                               .OnComplete(() => t_done = true)
-                               .OnKill(() =>
-                               {
-                                   this.m_hpRoll = null;
-
-                                   // 복원이 먼저다 — autoKill이라 OnComplete와 같은 프레임에 여기 오므로,
-                                   // 펀치를 앞에 두면 배율 복원이 방금 시작한 펀치를 도로 걷어낸다.
-                                   RestoreHpVisual();
-
-                                   if (t_done)
-                                   {
-                                       UiPunch.Play(this.hpText.transform);
-                                       if (this.hpIcon != null) UiPunch.Play(this.hpIcon.transform, this.hpIconPunch);
-                                   }
-
-                                   RefreshHp(_card, _owned);
-                               });
-
-        return this.m_hpRoll;
+                                                 // 아이콘은 색을 건드리지 않는다 — 그림이 물들면 강조가 아니라 고장으로 읽힌다.
+                                                 if (this.hpIcon != null)
+                                                     this.hpIcon.transform.localScale =
+                                                         this.m_hpIconBaseScale * (1f + this.growthIconPulse * t_wave);
+                                             })
+                                       .SetLink(t_link.gameObject)
+                                       .OnKill(() =>
+                                       {
+                                           this.m_growthFlash = null;
+                                           RestoreHpVisual();
+                                       });
     }
 
-    void KillHpRoll()
+    /// <summary>강조를 걷고 authoring 상태로 못 박는다(멱등). 결과판이 읽기를 넘겨받는 자리와
+    /// 다른 카드를 그리는 자리가 이 길을 지난다 — 물든 색·부푼 배율이 다음 화면까지 따라가지 않게.</summary>
+    public void RestoreGrowthFlash()
     {
-        Tween t_roll  = this.m_hpRoll;
-        this.m_hpRoll = null;
-        t_roll?.Kill();   // OnKill이 숫자·색·배율을 되돌린다.
+        Tween t_flash      = this.m_growthFlash;
+        this.m_growthFlash = null;
+        t_flash?.Kill();   // OnKill이 색·배율을 되돌린다.
 
-        // 굴리기가 이미 끝났어도 마무리 펀치는 남아 있을 수 있다(그땐 m_hpRoll이 null이라 위 Kill이 못 잡는다).
-        // 카드 교체·연속 강화가 모두 여기를 지나므로 그 잔상도 여기서 걷는다.
-        RestoreHpVisual();
+        RestoreHpVisual();   // 트윈이 이미 죽어 있던 경우(위 Kill이 못 잡는 잔상)까지 여기서 걷는다.
+    }
+
+    // 물든 색과 부푼 배율을 한 파형에서 함께 얹는다. 미배선 노드는 조용히 건너뛴다.
+    void ApplyFlash(TMP_Text _text, Color _baseColor, Vector3 _baseScale, float _wave)
+    {
+        if (_text == null) return;
+
+        _text.color                = Color.Lerp(_baseColor, this.growthFlashColor, _wave);
+        _text.transform.localScale = _baseScale * (1f + this.growthTextPulse * _wave);
     }
 
     void CaptureHpVisual()
     {
-        if (this.m_hpBaseCaptured || this.hpText == null) return;
+        if (this.m_hpBaseCaptured) return;
+        if (this.hpText == null && this.levelText == null) return;
 
         this.m_hpBaseCaptured = true;
-        this.m_hpBaseColor    = this.hpText.color;
+
+        if (this.hpText != null)
+        {
+            this.m_hpBaseColor      = this.hpText.color;
+            this.m_hpTextBaseScale  = this.hpText.transform.localScale;
+        }
+
+        if (this.levelText != null)
+        {
+            this.m_levelBaseColor = this.levelText.color;
+            this.m_levelBaseScale = this.levelText.transform.localScale;
+        }
 
         if (this.hpIcon != null) this.m_hpIconBaseScale = this.hpIcon.transform.localScale;
     }
 
-    // 굴리기가 끝나든 잘리든 여기 한 곳에서 기준 상태로 못 박는다(멱등).
+    // 강조가 끝나든 잘리든 여기 한 곳에서 기준 상태로 못 박는다(멱등).
     void RestoreHpVisual()
     {
         if (!this.m_hpBaseCaptured) return;
 
-        if (this.hpText != null) this.hpText.color = this.m_hpBaseColor;
-
-        if (this.hpIcon != null)
+        if (this.hpText != null)
         {
-            // 대입만 하면 아직 도는 펀치가 다음 프레임에 제 배율을 다시 쓴다 → 먼저 완료시켜 소유권을 회수한다.
-            this.hpIcon.transform.DOComplete();
-            this.hpIcon.transform.localScale = this.m_hpIconBaseScale;
+            this.hpText.color                = this.m_hpBaseColor;
+            this.hpText.transform.localScale = this.m_hpTextBaseScale;
         }
+
+        if (this.levelText != null)
+        {
+            this.levelText.color                = this.m_levelBaseColor;
+            this.levelText.transform.localScale = this.m_levelBaseScale;
+        }
+
+        if (this.hpIcon != null) this.hpIcon.transform.localScale = this.m_hpIconBaseScale;
     }
 
     // HP 표시. 인게임 CardView.SetHpDisplay 규약과 동일 — bonus는 값이 있을 때만 오브젝트를 켠다.
@@ -343,10 +400,26 @@ public class CardVisualView : MonoBehaviour
     /// 값의 기준만 갈린다(내 카드=내 진행도, 상대=랭크 티어 AI 레벨). 판정은 DeckPower가 소유.</summary>
     void SetLevelDisplay(CardData _card, bool _show, bool _mine)
     {
-        if (this.levelText == null) return;
+        int t_level = DeckPower.LevelOf(_card, _mine);
+        if (this.levelText != null)
+        {
+            this.levelText.gameObject.SetActive(_show);
+            if (_show) this.levelText.text = GrowthStar.Label(t_level);
+        }
 
-        this.levelText.gameObject.SetActive(_show);
-        if (_show) this.levelText.text = $"Lv{DeckPower.LevelOf(_card, _mine)}";
+        if (this.growthStars == null) return;
+
+        int t_star = GrowthStar.FromLevel(t_level);
+        for (int t_i = 0; t_i < this.growthStars.Length; t_i++)
+        {
+            Image t_icon = this.growthStars[t_i];
+            if (t_icon == null) continue;
+
+            t_icon.gameObject.SetActive(_show);
+            Color t_color = t_icon.color;
+            t_color.a = t_i < t_star ? 1f : 0.22f;
+            t_icon.color = t_color;
+        }
     }
 
     void SetHpDisplay(CardData _card, bool _show, bool _mine)
@@ -356,14 +429,18 @@ public class CardVisualView : MonoBehaviour
         if (this.hpText != null)
         {
             this.hpText.gameObject.SetActive(_show);
-            if (_show) this.hpText.text = DeckPower.MaxHpOf(_card, _mine).ToString();
+            if (_show)
+                this.hpText.text = (this.m_instance != null
+                    ? this.m_instance.hp
+                    : DeckPower.MaxHpOf(_card, _mine)).ToString();
         }
 
         if (this.bonusHpText != null)
         {
-            bool t_hasBonus = _show && _card.bonusHp > 0;
+            int t_bonus = this.m_instance != null ? this.m_instance.bonusHp : _card.bonusHp;
+            bool t_hasBonus = _show && t_bonus > 0;
             this.bonusHpText.gameObject.SetActive(t_hasBonus);
-            if (t_hasBonus) this.bonusHpText.text = $"+{_card.bonusHp}";
+            if (t_hasBonus) this.bonusHpText.text = $"+{t_bonus}";
         }
     }
 
@@ -371,6 +448,34 @@ public class CardVisualView : MonoBehaviour
     // 아웃게임엔 런타임 부여 키워드(CardInstance.runtimeKeywords)가 없으므로 마스터 데이터의 keywords만 넘긴다.
     void RefreshKeywordIcons(CardData _card, bool _show)
     {
+        if (HasWiredSlot(this.keywordIconSlots))
+        {
+            foreach (CardKeywordIconView t_slot in this.keywordIconSlots)
+            {
+                if (t_slot == null) continue;
+                t_slot.BindExplain(null, null);
+                t_slot.SetIcon(null);
+                t_slot.gameObject.SetActive(false);
+            }
+
+            if (!_show || this.keywordIconConfig == null) return;
+
+            List<CardVisualRules.KeywordIcon> t_entries =
+                CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig);
+            int t_count = Mathf.Min(t_entries.Count, this.keywordIconSlots.Length);
+            for (int t_i = 0; t_i < t_count; t_i++)
+            {
+                CardKeywordIconView t_view = this.keywordIconSlots[t_i];
+                if (t_view == null) continue;
+
+                CardVisualRules.KeywordIcon t_entry = t_entries[t_i];
+                t_view.gameObject.SetActive(true);
+                t_view.SetIcon(t_entry.Icon);
+                BindKeywordExplain(t_view, t_entry.Keyword);
+            }
+            return;
+        }
+
         if (this.keywordIconRoot == null) return;
         ClearChildren(this.keywordIconRoot);
 
@@ -381,13 +486,68 @@ public class CardVisualView : MonoBehaviour
         // (아이콘 줄 전용 제외분 = 표식. 프레임 장식은 아래 RefreshKeywordFrames가 TraitKeywords로 그대로 띄운다.)
         int t_index = 0;
         foreach (CardVisualRules.KeywordIcon t_entry in
-                 CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig))
+                 CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig))
         {
             CardKeywordIconView t_view = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
             t_view.SetIcon(t_entry.Icon);
             PlaceKeywordIcon(t_view.transform as RectTransform, t_index++);
+            BindKeywordExplain(t_view, t_entry.Keyword);
         }
     }
+
+    /// <summary>아이콘 줄 배경판 선택. 기준은 <b>시너지 하나</b>다 — 시너지를 가졌고 그게 해금까지 됐으면
+    /// 시너지 칸이 딸린 넓은 판, 아니면(시너지 없음 · 아직 해금 전 · 미소유로 정보를 숨긴 칸) 키워드 칸만 있는 좁은 판.
+    /// 키워드 유무는 판을 바꾸지 않는다: 키워드 아이콘은 두 판 모두 같은 자리에 얹힌다.
+    /// 판정은 배지를 그리는 <see cref="SynergyBadges"/>와 같은 호출이라 "배지는 없는데 자리만 넓은" 카드가 생기지 않는다.
+    /// 배선이 없는 프리팹(고스트·작은 타일)은 조용히 건너뛴다.</summary>
+    void RefreshKeywordBg(CardData _card, bool _show, bool _mine)
+    {
+        bool t_synergy = _show && SynergyBadges(_card, _mine).Count > 0;
+
+        if (this.keywordBg     != null) this.keywordBg.SetActive(t_synergy);
+        if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!t_synergy);
+    }
+
+    /// <summary>아이콘 줄에 띄울 키워드 집합. 네 갈래가 여기 한 곳에서만 갈린다 —
+    /// 인스턴스 유무(적 카드에 내 성장 금지) × 잠긴 키워드 표시 여부(정보창만).
+    /// 인스턴스 경로에는 잠김 표시가 없다: 그 카드가 지금 실제로 가진 것이 곧 정답이다.</summary>
+    CardKeyword KeywordIconSet(CardData _card)
+    {
+        if (this.m_instance != null)
+            return this.showLockedKeywords
+                ? CardVisualRules.InfoKeywords(this.m_instance)
+                : CardVisualRules.IconKeywords(this.m_instance);
+
+        return this.showLockedKeywords
+            ? CardVisualRules.InfoKeywordsWithLocked(_card)
+            : CardVisualRules.IconKeywords(_card);
+    }
+
+    /// <summary>아이콘 롱프레스 → 키워드 설명 팝업. 프리팹에 누름 부품이 없으면 조용히 건너뛴다
+    /// (도감·덱편집 타일처럼 설명을 띄우지 않는 화면은 그 부품을 달지 않으면 된다).
+    /// 폴백 아이콘(Keyword.None)은 실제 보유 키워드가 아니라 설명할 것이 없다.</summary>
+    void BindKeywordExplain(CardKeywordIconView _view, CardKeyword _keyword)
+    {
+        if (!this.keywordExplainOnPress) return;
+        if (_view == null || _keyword == CardKeyword.None || this.keywordIconConfig == null) return;
+        if (!this.keywordIconConfig.TryGetEntry(_keyword, out KeywordIconConfig.Entry t_entry)) return;
+
+        var t_rect = _view.transform as RectTransform;
+        _view.BindExplain(() => ShowKeywordExplain(t_entry, t_rect), HideKeywordExplain);
+    }
+
+    static void ShowKeywordExplain(KeywordIconConfig.Entry _entry, RectTransform _iconRect)
+    {
+        UIPoolManager.Instance?.AddOrUpdateUI<KeywordExplainPopupUI>(new KeywordExplainData
+        {
+            icon        = _entry.icon,
+            displayName = _entry.displayName,
+            explain     = _entry.explain,
+            iconRect    = _iconRect,
+        });
+    }
+
+    static void HideKeywordExplain() => UIPoolManager.Instance?.HideUI<KeywordExplainPopupUI>();
 
     // 인게임은 keywordIconStart에서 keywordIconStep만큼 밀며 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
     // 맡기지 않고 같은 좌표를 정규화 앵커로 옮긴다 — LayoutGroup은 간격·크기를 픽셀로 잡아서 카드 셀 크기가
@@ -413,7 +573,9 @@ public class CardVisualView : MonoBehaviour
     {
         if (this.keywordFrames == null) return;
 
-        CardKeyword t_keywords = _show ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
+        CardKeyword t_keywords = !_show ? CardKeyword.None
+                               : this.m_instance != null ? CardVisualRules.TraitKeywords(this.m_instance)
+                                                         : CardVisualRules.TraitKeywords(_card);
 
         foreach (KeywordFrame t_frame in this.keywordFrames)
         {
@@ -424,26 +586,90 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    void RefreshSynergyBadges(CardData _card, bool _show)
+    /// <summary>이 카드가 카드 위에 띄울 시너지 목록. 배지와 배경판이 <b>같은</b> 이 목록을 본다 —
+    /// 갈리면 "배지는 없는데 배경만 넓은" 카드가 생긴다.
+    ///
+    /// 게이트는 인게임 CardDecorView.RefreshSynergyBadges와 같은 두 개다:
+    /// 튜토리얼 미도입 구간(<see cref="TutorialConfig.SynergyVisible"/>)과 시너지 해금 레벨.
+    /// 해금 전 카드는 실제로 시너지에 참여하지 않으므로 띄우면 오정보다.
+    /// 해금 판정의 출처는 전투 인스턴스면 그 인스턴스(적 카드에 내 진행도 금지), 아니면 표시 대상의 레벨이다.</summary>
+    List<SynergyData> SynergyBadges(CardData _card, bool _mine)
     {
+        if (_card == null || !TutorialConfig.SynergyVisible) return EmptySynergies;
+
+        bool t_open = this.m_instance != null
+            ? this.m_instance.synergyEnabled
+            : DeckPower.SynergyUnlockedOf(_card, _mine);
+        if (!t_open) return EmptySynergies;
+
+        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
+        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
+        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
+        return CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+    }
+
+    static readonly List<SynergyData> EmptySynergies = new List<SynergyData>();
+
+    // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
+    void RefreshSynergyBadges(CardData _card, bool _show, bool _mine)
+    {
+        if (HasWiredSlot(this.synergyBadgeSlots))
+        {
+            foreach (CardSynergyBadgeView t_slot in this.synergyBadgeSlots)
+                if (t_slot != null) t_slot.Set(null, _active: false);
+
+            if (!_show) return;
+
+            List<SynergyData> t_slotTags = SynergyBadges(_card, _mine);
+            int t_count = Mathf.Min(t_slotTags.Count, this.synergyBadgeSlots.Length);
+            for (int t_i = 0; t_i < t_count; t_i++)
+            {
+                CardSynergyBadgeView t_badge = this.synergyBadgeSlots[t_i];
+                if (t_badge != null) t_badge.Set(t_slotTags[t_i], _active: true);
+            }
+            return;
+        }
+
         if (this.synergyBadgeRoot == null) return;
         ClearChildren(this.synergyBadgeRoot);
 
         if (!_show || this.synergyBadgePrefab == null) return;
 
-        // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
-        // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
-        // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+        List<SynergyData> t_tags = SynergyBadges(_card, _mine);
 
-        foreach (SynergyData t_syn in t_tags)
+        for (int t_i = 0; t_i < t_tags.Count; t_i++)
         {
             CardSynergyBadgeView t_badge = Instantiate(this.synergyBadgePrefab, this.synergyBadgeRoot);
+            PlaceSynergyBadge(t_badge.transform as RectTransform, t_i);
             // 아이콘만은 활성(active=true)으로 그린다 — 도감/덱편집은 "이 카드가 가진 시너지" 소개가 목적이라
             // 전투 스냅샷이 없다는 이유로 전부 흐린 inactiveIcon을 보여줄 이유가 없다. 정렬만 인게임 규칙을 따른다.
-            t_badge.Set(t_syn, true);
+            t_badge.Set(t_tags[t_i], _active: true);
         }
+    }
+
+    static bool HasWiredSlot<T>(T[] _slots) where T : Component
+    {
+        if (_slots == null) return false;
+        foreach (T t_slot in _slots)
+            if (t_slot != null) return true;
+        return false;
+    }
+
+    /// <summary>배지 i번째 자리 = synergyBadgeStart + synergyBadgeStep * i (배지 루트 rect 비율).
+    /// 앵커 한 점을 그 비율에 찍고 오프셋은 0으로 둔다 — 픽셀로 두면 카드 rect 크기가 바뀌는 화면
+    /// (셀에 stretch되는 덱편집 타일·팩 카드)에서 배지만 카드를 따라가지 못하고 자리가 밀린다.
+    /// 키워드 아이콘과 달리 크기는 건드리지 않는다:
+    /// 배지 프리팹이 authoring 크기를 들고 있고, 칸 크기 차이는 UniformFitContent가 배율로 흡수한다.</summary>
+    void PlaceSynergyBadge(RectTransform _rect, int _index)
+    {
+        if (_rect == null) return;
+
+        Vector2 t_anchor = this.synergyBadgeStart + this.synergyBadgeStep * _index;
+
+        _rect.anchorMin        = t_anchor;
+        _rect.anchorMax        = t_anchor;
+        _rect.anchoredPosition = Vector2.zero;
+        _rect.localScale       = Vector3.one;
     }
 
     // 재바인딩 시 이전 아이콘/배지를 제거. 인게임은 파괴 전 DOKill로 tween을 정리하지만

@@ -57,7 +57,7 @@ public static partial class CardTableTool
         for (int r = 1; r < t_rows.Count; r++)
         {
             List<string> t_row = t_rows[r];
-            string t_name = Cell(t_row, t_header, "name").Trim();
+            string t_name = NormalizeCardAssetName(Cell(t_row, t_header, "name").Trim());
             if (string.IsNullOrEmpty(t_name)) continue;   // 빈 행(Excel이 흔히 남긴다)
 
             if (!t_inTable.Add(t_name))
@@ -106,6 +106,7 @@ public static partial class CardTableTool
 
             Compare(_drift, _name, "displayName", _card.displayName, t_expected.displayName);
             Compare(_drift, _name, "channel", _card.channel.ToString(), t_expected.channel.ToString());
+            Compare(_drift, _name, "grade", _card.grade.ToString(), t_expected.grade.ToString());
             Compare(_drift, _name, "maxHp", _card.maxHp, t_expected.maxHp);
             Compare(_drift, _name, "keywords", KeywordsToText(_card.keywords), KeywordsToText(t_expected.keywords));
             Compare(_drift, _name, "keywordUnlockLevel", _card.keywordUnlockLevel, t_expected.keywordUnlockLevel);
@@ -114,7 +115,7 @@ public static partial class CardTableTool
             Compare(_drift, _name, "synergies", SynergiesToText(_card.synergies), SynergiesToText(t_expected.synergies));
 
             if (!SameCurve(_card.hpGainByLevel, t_expected.hpGainByLevel))
-                _drift.Add(Line(_name, "hp2~hp10", CurveToText(t_expected.hpGainByLevel), CurveToText(_card.hpGainByLevel)));
+                _drift.Add(Line(_name, "hp2~hp4", CurveToText(t_expected.hpGainByLevel), CurveToText(_card.hpGainByLevel)));
         }
         finally
         {

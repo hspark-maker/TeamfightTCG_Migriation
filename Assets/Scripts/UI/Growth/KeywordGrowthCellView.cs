@@ -21,6 +21,9 @@ public class KeywordGrowthCellView : MonoBehaviour
 
     Action<CardKeyword> m_onSelect;
 
+    // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다(AlbumCardSlotView와 같은 관용구)
+    bool m_anchored;
+
     public void Bind(CardKeyword _keyword, Action<CardKeyword> _onSelect)
     {
         this.m_keyword  = _keyword;
@@ -53,6 +56,32 @@ public class KeywordGrowthCellView : MonoBehaviour
             this.bonusText.text = $"+{t_bonus}";
         }
         if (this.selectRing != null) this.selectRing.SetActive(_selected);
+    }
+
+    public void PlayUpgradePop()
+    {
+        UiPunch.Play(this.selectButton != null ? this.selectButton.transform : transform);
+    }
+
+    /// <summary>이 칸을 튜토리얼 안내 타깃으로 세우거나 내린다. 칸은 런타임 생성이라 프리팹 표식(TutorialAnchor)을
+    /// 붙일 수 없다 — 지금 어느 칸이 선택돼 있는지 아는 패널이 정한다.</summary>
+    public void ApplyTutorialAnchor(bool _on)
+    {
+        if (_on == this.m_anchored) return;
+
+        var t_rect = this.selectButton != null ? this.selectButton.transform as RectTransform : null;
+        if (t_rect == null) return;   // 미배선이면 플래그도 그대로 둔다(등록하지 않은 것을 등록했다고 기억하지 않게)
+
+        this.m_anchored = _on;
+
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.KeywordGrowthCell, t_rect, this.selectButton);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.KeywordGrowthCell, t_rect);
+    }
+
+    // 패널이 닫히면 칸도 함께 꺼진다 — 죽은 칸을 가리키는 등록이 로비 표면에 남지 않게 여기서 놓는다
+    void OnDisable()
+    {
+        this.ApplyTutorialAnchor(false);
     }
 
     void HandleClick()

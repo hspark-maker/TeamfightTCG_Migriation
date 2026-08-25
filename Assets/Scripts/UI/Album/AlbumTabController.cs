@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // 카드 앨범 탭 표면(Tab_Collection_New 루트 부착) — 전체 보상 요약 + 테마 갤러리
-public class AlbumTabController : MonoBehaviour
+public class AlbumTabController : LobbyTabPanel
 {
     [Header("전체 보상")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
@@ -46,7 +46,10 @@ public class AlbumTabController : MonoBehaviour
 
         // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
         // 여기서 막지 않으면 테마를 누르라는 스텝을 세션이 대신 해 버린다.
-        if (OutgameTutorialRunner.IsRunning && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
+        // 단 전체 해금(첫 랭크 승급) 뒤로는 예외를 걷는다 — 그 구간의 획득은 안내가 짠 것이 아니라 유저가 스스로 산 것이라
+        // 일반 경로와 같은 길(획득 → 도감 → 삽입)을 타야 한다.
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked
+            && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
 
         var t_session = ResolveInsertSession();
         if (t_session == null)
@@ -72,6 +75,8 @@ public class AlbumTabController : MonoBehaviour
 
         Refresh();
 
+        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
+
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
         TryBeginInsert();
     }
@@ -81,6 +86,8 @@ public class AlbumTabController : MonoBehaviour
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
+
+        ContextCurrencySlot.Release(this);
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;
@@ -104,6 +111,18 @@ public class AlbumTabController : MonoBehaviour
 
         m_insertSession = pageOverlay.GetComponentInChildren<AlbumInsertSession>(true);
         return m_insertSession;
+    }
+
+    public override void RequestLeave(System.Action _proceed)
+    {
+        AlbumInsertSession t_session = ResolveInsertSession();
+        if (t_session == null)
+        {
+            _proceed?.Invoke();
+            return;
+        }
+
+        t_session.RequestLeave(_proceed);
     }
 
     // 더미 정리 1회 기준 — 빈 앨범 0셀도 정상이라 셀 빌드 성공과는 무관
@@ -134,8 +153,8 @@ public class AlbumTabController : MonoBehaviour
     {
         var t_themes = CardAlbum.Themes;
 
-        // 안내는 아직 안 꽂은 카드가 있는 첫 테마 한 칸만 지목한다(앵커는 키당 1건).
-        // 꽂을 것이 하나도 없으면 첫 테마를 대신 지목한다 — 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 간다.
+        // 안내가 테마 한 칸만 지목한다(앵커는 키당 1건). 어느 칸인지는 저작(anchorCard)이 정하고,
+        // 비어 있을 때만 화면이 대신 고른다.
         int t_anchorIndex = FindAnchorThemeIndex(t_themes);
 
         if (galleryContent != null && cellTemplate != null)
@@ -184,13 +203,33 @@ public class AlbumTabController : MonoBehaviour
         BindRewardSlots(CardAlbum.AlbumRewards);
     }
 
-    // 안내가 지목할 테마 칸. 꽂을 카드가 남은 첫 테마가 우선이고, 없으면 첫 테마다(빈 갤러리면 -1).
+    /// <summary>안내가 가리킬 테마 칸(빈 갤러리면 -1). 저작이 카드를 지목했으면 그 카드가 든 테마다.
+    ///
+    /// 폴백(저작이 비었거나 그 카드가 도감에 없을 때)은 종전 규칙 그대로 — 아직 안 꽂은 카드가 있는 첫 테마,
+    /// 꽂을 것이 하나도 없으면 첫 테마. 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
     static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
     {
+        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_card))
+        {
+            for (int t_i = 0; t_i < _themes.Count; t_i++)
+                if (Contains(_themes[t_i], t_card)) return t_i;
+        }
+
         for (int t_i = 0; t_i < _themes.Count; t_i++)
             if (AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
 
         return _themes.Count > 0 ? 0 : -1;
+    }
+
+    static bool Contains(AlbumTheme _theme, CardData _card)
+    {
+        var t_cards = _theme != null ? _theme.Cards : null;
+        if (t_cards == null) return false;
+
+        for (int t_i = 0; t_i < t_cards.Count; t_i++)
+            if (t_cards[t_i] == _card) return true;
+
+        return false;
     }
 
     void OpenTheme(AlbumTheme _theme)
@@ -221,7 +260,8 @@ public class AlbumTabController : MonoBehaviour
         {
             if (rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(_rewards[t_i].icon, _rewards[t_i].amount);
+            // 그림은 저작값이 아니라 재화 표에서 온다(RewardLine과 같은 창구).
+            if (t_i < _rewards.Count) rewardSlots[t_i].Bind(CurrencyLook.IconOf(_rewards[t_i].currency), _rewards[t_i].amount);
             else rewardSlots[t_i].Hide();
         }
 

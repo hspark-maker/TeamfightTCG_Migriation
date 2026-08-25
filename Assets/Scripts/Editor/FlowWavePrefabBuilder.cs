@@ -17,9 +17,9 @@ using UnityEngine;
 /// </summary>
 public static class FlowWavePrefabBuilder
 {
-    const string MeshPath     = "Assets/Assets/Particle/시너지/WaveMesh.asset";
-    const string MaterialPath = "Assets/PurchasedAssets/Epic Toon FX/Materials/Misc/Unsorted/wave_soft_AB.mat";
-    const string OutputPath   = "Assets/Assets/Particle/시너지/FlowWave.prefab";
+    const string MeshPath     = "Assets/Assets/Particle/Synergy/WaveMesh.asset";
+    const string MaterialPath = "Assets/Assets/Particle/_Vendor/Epic Toon FX/Materials/Misc/Unsorted/Mat_Vfx_EpicToonFX_WaveSoftAB.mat";
+    const string OutputPath   = "Assets/Assets/Particle/Synergy/FlowWave.prefab";
 
     // ── 연출 파라미터 ──
     const int   Layers      = 3;      // 겹칠 파도 수

@@ -3,9 +3,20 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 랭크 보상 패널(RankRewardOverlay에 부착). 티어 행을 전부 생성하고 수령 흐름을 중계한다.
-// 씬에 직접 저작되므로 PooledUIBase가 아니라 SetActive 토글로 열고 닫는다(UIPoolManager 캔버스와 해상도가 달라 좌표계가 어긋난다).
-public class RankRewardPanel : MonoBehaviour
+//
+// 풀(UIPoolManager)이 수명을 쥔다 — 로비 프리팹에 상주하지 않고 필요할 때 세워진다.
+// 풀의 uiRoot(Boot 캔버스)와 로비 캔버스가 같은 1080x1920 기준이라 좌표계가 어긋나지 않는다.
+// **두 캔버스의 기준 해상도가 갈리면 이 화면 배치가 통째로 어긋난다** — 바꿀 땐 같이 맞출 것.
+public class RankRewardPanel : PooledUIBase
 {
+    // 풀 계약. 열고 닫는 실제 동작은 예전부터 있던 Open/Close가 그대로 쥔다 —
+    // 표시 데이터는 RankRewardManager에서 스스로 당기므로 UIData가 필요 없다.
+    public override void Initialization(UIData _data) { }
+
+    public override void Show() => this.Open();
+
+    public override void Hide() => this.Close();
+
     [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 
@@ -17,6 +28,9 @@ public class RankRewardPanel : MonoBehaviour
     [Header("연출")]
     [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+
+    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기. 예전 Root/Dim 저작값과 같은 0.72다.")]
+    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
 
@@ -52,6 +66,9 @@ public class RankRewardPanel : MonoBehaviour
     void OnDisable()
     {
         RankRewardManager.OnChanged -= this.RefreshRows;
+
+        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
+        ScreenDim.Hide(this);
 
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -120,7 +137,7 @@ public class RankRewardPanel : MonoBehaviour
         }
 
         var t_info = RankRewardManager.GetInfo(_tierIndex);
-        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex));
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex), true);
     }
 
     // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
@@ -160,6 +177,15 @@ public class RankRewardPanel : MonoBehaviour
     // 재진입마다 트윈을 걷고 시작값을 다시 잡는 PopupTransition 쪽 처리가 실질 방어선이다.
     void SetVisible(bool _visible)
     {
+        // 암막은 공용 ScreenDim(Full)이 그린다 — 오버레이마다 딤 한 장씩 들고 있던 것을 걷었다.
+        // Root/Dim 오브젝트는 알파 0으로 남아 "바깥 눌러 닫기" 판정만 맡는다.
+        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
+        else ScreenDim.Hide(this);
+
+        // 풀 계약(PooledUIBase.isShow). 열고 닫는 길이 여기 하나뿐이라 상태도 여기서만 쓴다 —
+        // 이 값을 읽고 닫힘을 기다리는 쪽(LobbyRankEffectDirector)이 있으므로 빠뜨리면 그쪽이 멈춘다.
+        this.isShow = _visible;
+
         this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
 

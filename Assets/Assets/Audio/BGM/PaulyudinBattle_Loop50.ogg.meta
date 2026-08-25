@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: d1283e70575b47d8b90dcf1b1c018ad4
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 8
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 2
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 0.7
+    conversionMode: 0
+    preloadAudioData: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  loadInBackground: 1
+  ambisonic: 0
+  3D: 1
+  userData: 49.93-second loop edit of user-provided paulyudin-battle-battle-music-491417.mp3
+  assetBundleName: 
+  assetBundleVariant: 

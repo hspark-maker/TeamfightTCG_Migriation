@@ -13,15 +13,29 @@ public static class OutgameTutorialRewind
 {
     const string PREF_KEY = "outgame.tutorial.rewind";
 
-    public static bool IsScheduled => PlayerPrefs.HasKey(PREF_KEY);
+    // 1단이 끝났음을 넘겨받는 키. 밀기와 지급 재생 사이에서 부트가 끊기면(예외·수동 정지) 예약이 남아
+    // 다음 부트가 세이브를 또 민다 — 그 사이에 유저가 플레이했다면 그 진행이 통째로 날아간다.
+    // 1단이 예약을 이 키로 옮겨 두면 다음 부트는 밀기 없이 재생만 마저 한다.
+    const string PREF_REPLAY_KEY = "outgame.tutorial.rewind.replay";
 
-    // 예약 좌표(없으면 false)
-    public static bool TryGetScheduled(out int _chapter, out int _step)
+    /// <summary>부트가 아직 처리하지 않은 예약 좌표. 밀기가 이미 끝났으면(1단 소비 후) 재생 대기 좌표를 답한다 —
+    /// 그 상태를 에디터 창이 못 보면 취소할 방법이 없어져, 유저가 한참 진행한 뒤 다음 부트가 그 위에 지급을 덧씌운다.
+    /// <paramref name="_wipePending"/>은 "세이브를 미는 단계가 아직 남았는가"로, 배너가 둘을 갈라 보여 준다.</summary>
+    public static bool TryGetScheduled(out int _chapter, out int _step, out bool _wipePending)
+    {
+        _wipePending = true;
+        if (TryGetCoord(PREF_KEY, out _chapter, out _step)) return true;
+
+        _wipePending = false;
+        return TryGetCoord(PREF_REPLAY_KEY, out _chapter, out _step);
+    }
+
+    static bool TryGetCoord(string _key, out int _chapter, out int _step)
     {
         _chapter = 0;
         _step    = 0;
 
-        string t_raw = PlayerPrefs.GetString(PREF_KEY, string.Empty);
+        string t_raw = PlayerPrefs.GetString(_key, string.Empty);
         if (string.IsNullOrEmpty(t_raw)) return false;
 
         string[] t_parts = t_raw.Split(',');
@@ -43,6 +57,7 @@ public static class OutgameTutorialRewind
     public static void Cancel()
     {
         PlayerPrefs.DeleteKey(PREF_KEY);
+        PlayerPrefs.DeleteKey(PREF_REPLAY_KEY);
         PlayerPrefs.Save();
     }
 
@@ -51,19 +66,23 @@ public static class OutgameTutorialRewind
     /// 매니저 Init()들이 슬롯 참조를 캐싱하고 나면 갈아끼운 슬롯이 반영되지 않는다.</summary>
     public static void ApplyWipeIfScheduled()
     {
-        if (!TryGetScheduled(out int t_chapter, out int t_step)) return;
+        // 밀기는 새 예약(PREF_KEY)에만 반응한다 — 재생만 남은 상태를 여기서 다시 집으면 매 부트 반복 와이프다.
+        if (!TryGetCoord(PREF_KEY, out int t_chapter, out int t_step)) return;
 
         var t_data = DataSaveManager.Data;
 
         // 슬롯을 통째로 새 인스턴스로 — 첫실행 기본값이 곧 값 객체의 초기값이다(골드 100 등).
-        t_data.currency    = new CurrencySaveData();
-        t_data.ownership   = new OwnershipSaveData();
-        t_data.deck        = new DeckSaveData();
-        t_data.collection  = new CollectionSaveData();
-        t_data.rank        = new RankSaveData();
-        t_data.cardGrowth  = new CardGrowthSaveData();
-        t_data.albumReward = new AlbumRewardSaveData();
-        t_data.tutorial    = new TutorialSaveData();
+        // UserSaveData의 슬롯 전부를 여기서 센다 — 하나라도 빠지면 그 축만 이전 세션 값으로 남아,
+        // 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
+        t_data.currency      = new CurrencySaveData();
+        t_data.ownership     = new OwnershipSaveData();
+        t_data.deck          = new DeckSaveData();
+        t_data.rank          = new RankSaveData();
+        t_data.cardGrowth    = new CardGrowthSaveData();
+        t_data.keywordGrowth = new KeywordGrowthSaveData();
+        t_data.albumReward   = new AlbumRewardSaveData();
+        t_data.tournament    = new TournamentSaveData();
+        t_data.tutorial      = new TutorialSaveData();
 
         t_data.tutorial.outgameChapterIndex     = t_chapter;
         t_data.tutorial.outgameChapterStepIndex = t_step;
@@ -74,7 +93,16 @@ public static class OutgameTutorialRewind
 
         DataSaveManager.Save();
 
-        Debug.Log($"[TutorialRewind] 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(소유·강화·재화·덱·랭크·도감보상 전부 첫실행).");
+        // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 부트가 세이브를 다시 밀지 않게 한다.
+        PlayerPrefs.DeleteKey(PREF_KEY);
+        PlayerPrefs.SetString(PREF_REPLAY_KEY, $"{t_chapter},{t_step}");
+        PlayerPrefs.Save();
+
+        // 정지 판정은 세이브 밖(static)이라 슬롯을 갈아도 남는다. 보통은 다음 부트의 도메인 리로드가
+        // 알아서 내리므로 no-op이고, 리로드를 끈 에디터 세션에서만 실효가 있다 — 그 한 경우를 위한 방어다.
+        OutgameFeatureLock.ClearStall();
+
+        Debug.Log($"[TutorialRewind] 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(모든 슬롯 첫실행 · 정지 판정 해제).");
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.
@@ -84,9 +112,10 @@ public static class OutgameTutorialRewind
     /// 팩 드로우는 랜덤이라 재현할 수 없어 풀 전량을 준다.</summary>
     public static void ApplyReplayIfScheduled()
     {
-        if (!TryGetScheduled(out int t_chapter, out int t_step)) return;
+        // 1단이 넘겨준 좌표를 읽는다. 1단을 건너뛴 부트(예약 없음)라면 재생할 것도 없다.
+        if (!TryGetCoord(PREF_REPLAY_KEY, out int t_chapter, out int t_step)) return;
 
-        Cancel();   // 1회 소비 — 재생이 실패해도 다음 부트마다 세이브를 다시 밀지 않게 먼저 걷는다.
+        Cancel();   // 1회 소비 — 재생이 실패해도 다음 부트가 같은 지급을 겹쳐 주지 않게 먼저 걷는다.
 
         int t_decks = 0;
         int t_cards = 0;
@@ -108,11 +137,42 @@ public static class OutgameTutorialRewind
                     continue;
                 }
 
-                if (t_row.Pack != null && TutorialStepDef.UsesPack(t_row.Action)) t_cards += GrantPackPool(t_row.Pack);
+                // 보상 카드도 순수 세이브 작업이다 — 부트 중에는 연출을 세울 무대가 없으니 소유권만 준다.
+                if (t_row.Action == EOutgameTutorialAction.CardGrant)
+                {
+                    if (t_row.Card != null && OwnershipManager.Grant(CardCatalog.IdOf(t_row.Card))) t_cards++;
+                    continue;
+                }
+
+                if (t_row.Action == EOutgameTutorialAction.CardSetGrant)
+                {
+                    t_cards += GrantCardSet(t_row.Cards);
+                    continue;
+                }
+
+
+                // 조건은 "팩 필드를 저작하는가"(UsesPack)가 아니라 "실제로 소유가 생기는가"다 — PackNotice는 팩을
+                // 가리키기만 하고 아무것도 주지 않는데, 전자로 물으면 그 풀 전량이 딸려 와 열지도 않은 팩의 카드를
+                // 이미 가진 채 개봉 스텝에 들어선다. 답은 액션 테이블이 갖고 있다.
+                if (t_row.Pack != null && TutorialActionMeta.Of(t_row.Action).GrantsPackPool)
+                    t_cards += GrantPackPool(t_row.Pack);
             }
         }
 
         Debug.Log($"[TutorialRewind] 좌표 {t_chapter}-{t_step}까지 지급 재생 — 덱 스텝 {t_decks}개 / 팩 풀 카드 {t_cards}장 · 소유 {OwnershipManager.OwnedCount}장");
+    }
+
+    static int GrantCardSet(IReadOnlyList<CardData> _cards)
+    {
+        if (_cards == null || _cards.Count == 0) return 0;
+
+        var t_ids = new List<int>(_cards.Count);
+        for (int t_i = 0; t_i < _cards.Count; t_i++)
+        {
+            if (_cards[t_i] != null) t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
+        }
+
+        return OwnershipManager.GrantAll(t_ids);
     }
 
     static int GrantPackPool(CardPackData _pack)

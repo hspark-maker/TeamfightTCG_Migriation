@@ -176,6 +176,10 @@ public class RewardRevealFx
     /// <summary>보상 개수에 맞춘 배율. 칸 정렬은 레이아웃 그룹이 이미 가운데로 모아 준다.</summary>
     public void ApplyCount(int _count)
     {
+        // 빛은 보상이 있을 때만 존재한다. Reset이 알파를 저작값으로 되살리므로(빛무리는 페이드인 시작점이
+        // 곧 저작값이다) 켜둔 채로 두면 받을 것이 없는 표시에서도 훈김만 남아 뜬다.
+        if (this.rayRoot != null) this.rayRoot.gameObject.SetActive(_count > 0);
+
         if (this.rewardRow == null) return;
 
         float t_scale = _count <= 1 ? this.soloScale

@@ -39,6 +39,9 @@ public class TurnRunner : MonoBehaviour
     // 보상을 만든 생존 카드 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
     List<CardData> lastSurvivorCards;
 
+    // 이번 판에 잃은 카드 스냅샷. 보상에는 관여하지 않고 결과 화면의 분모("몇 장 중")만 만든다.
+    List<CardData> lastFallenCards;
+
     // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
     CancellationToken destroyCt;
 
@@ -99,7 +102,7 @@ public class TurnRunner : MonoBehaviour
             await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorCards);
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorCards, this.lastFallenCards);
     }
 
 #if UNITY_EDITOR
@@ -130,11 +133,26 @@ public class TurnRunner : MonoBehaviour
     async UniTaskVoid PreviewResult(bool _won)
     {
         var t_reward = RewardService.CalculateReward(_won, s_previewSurvivors);
-        List<CardData> t_cards = BuildPreviewCards(s_previewSurvivors);
+        List<CardData> t_cards  = BuildPreviewCards(s_previewSurvivors);
+        List<CardData> t_fallen = BuildPreviewFallen(t_cards);
 
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards);
+        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards, t_fallen);
+    }
+
+    // 미리보기 전사 목록: 덱에서 생존 목록에 없는 카드를 담는다. 장수로 자르면 같은 카드가
+    // 산 채로도 죽은 채로도 한 줄에 서서, 실제 전투에서는 나올 수 없는 그림으로 연출을 튜닝하게 된다.
+    List<CardData> BuildPreviewFallen(List<CardData> _survivors)
+    {
+        var t_cards = new List<CardData>();
+        var t_deck  = DeckConfig.PlayerDeck;
+        if (t_deck == null) return t_cards;
+
+        for (int t_i = 0; t_i < t_deck.Count; t_i++)
+            if (!_survivors.Contains(t_deck[t_i])) t_cards.Add(t_deck[t_i]);
+
+        return t_cards;
     }
 
     // 실제 생존 카드 → 플레이어 덱 → 빈 자리 순으로 채운다. 마지막 폴백은 카드 없는 타일 경로까지 함께 검증한다.
@@ -302,6 +320,14 @@ public class TurnRunner : MonoBehaviour
                 SynergyTriggers.TurnEnded(t_endedCtx);
             }
 
+            // 보호막은 받은 뒤 상대의 공격 턴 하나를 버티는 상태다.
+            // 현재 행동 진영의 반대 필드 전체에서 지워야 부여 대상과 무관하게 보호막이 함께 만료된다.
+            BattleField t_oppositeField = t_field == this.playerField ? this.enemyField : this.playerField;
+            foreach (var t_c in t_oppositeField.GetActiveCards())
+                t_c.ClearShield();
+            foreach (var t_c in t_oppositeField.GetWaitingCards())
+                t_c.ClearShield();
+
             if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
 
             // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다
@@ -348,6 +374,24 @@ public class TurnRunner : MonoBehaviour
         // 보상을 만든 그 카드들을 그대로 팝업에 넘긴다 — 목록과 금액이 갈라지면 계단이 어긋난다.
         this.lastSurvivorCards = CollectSurvivorCards(t_active);
 
+        // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
+        this.lastFallenCards = new List<CardData>(this.playerField.FallenCards);
+
+        // 토너먼트 전투는 전투 보상도 랭크도 없다 — 정점의 상은 맵에서 받는 그 보상 하나뿐이다.
+        // (전투 골드까지 주면 클리어 정점 재도전이 그대로 파밍이 되고, 상이 둘로 갈려 무엇을 받았는지도 흐려진다.)
+        // ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.
+        if (TournamentRun.IsActive)
+        {
+            // 승리 낙인은 여기서 영속한다 — 로비까지 미루면 로딩 중 종료가 승리를 삼킨다. 지급은 수령 시점 한 곳뿐이다.
+            if (_won) TournamentProgress.MarkRewardPending(TournamentRun.NodeId);
+
+            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
+
+            this.lastReward = default;   // 결과 팝업의 골드 줄이 직전 판 값을 물려받지 않게
+            this.lastRankDelta = 0;      // 포인트 줄도 같은 이유로 0
+            return;
+        }
+
         this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
@@ -383,6 +427,7 @@ public class TurnRunner : MonoBehaviour
         TurnEvents.Reset();
         MatchRandom.Reset();
         TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
+        TournamentRun.End();         // 토너먼트 정점도 같은 수명 — 남으면 다음 판 AI 레벨·랭크 정산이 정점 규칙으로 굳는다.
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
         DeckConfig.ClearEnemyDeck(); // 상대 덱을 확정하지 않는 진입점이 직전 판의 상대를 물려받지 않게(같은 규율).
         MatchOpponentHandoff.Clear();// 매칭 상대 표시도 같은 수명 — 덱만 비우면 다음 판 화면에 직전 상대 이름이 남는다.

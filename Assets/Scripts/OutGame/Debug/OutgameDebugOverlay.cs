@@ -143,7 +143,9 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
+        if (GUILayout.Button("TOURNAMENT NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentTournamentNode();
 
+        DrawRarityPackControls();
         DrawCurrencyGrants();
         DrawTierControls();
         DrawChapterJumps();
@@ -151,16 +153,33 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.EndScrollView();
     }
 
+    void DrawRarityPackControls()
+    {
+        ECardGrade t_grade = ECardGrade.Unknown;
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("RARE",   GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Rare;
+        if (GUILayout.Button("ARCANE", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Arcane;
+        if (GUILayout.Button("MYTHIC", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Mythic;
+        GUILayout.EndHorizontal();
+
+        if (t_grade == ECardGrade.Unknown) return;
+        SetOpen(false);
+        OutgameDebugActions.OpenRarityTestPack(t_grade);
+    }
+
     // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
     void DrawTierControls()
     {
         RankInfo t_info = RankManager.GetInfo();
 
-        GUILayout.Label($"TIER {t_info.DisplayName}  (AI Lv{RankManager.AiCardLevel})  ※ ±는 씬 재진입 시 연출");
+        string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
+        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI {GrowthStar.Label(RankManager.AiCardLevel)})");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
         if (GUILayout.Button("TIER +", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RaiseTier();
+        if (GUILayout.Button("PROMO", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.JumpToPromoStandby();
         if (GUILayout.Button("RESET", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.ResetTier();
         GUILayout.EndHorizontal();
     }
@@ -170,6 +189,8 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Button($"+G {CurrencyManager.Gold}",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantGold();
         if (GUILayout.Button($"+D {CurrencyManager.Diamond}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantDiamond();
+        if (GUILayout.Button($"+E {CurrencyManager.Energy}",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantEnergy();
+        if (GUILayout.Button($"+S {CurrencyManager.Shard}",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantShard();
         GUILayout.EndHorizontal();
     }
 

@@ -4,10 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 재화 획득 코인 연출의 단일 재생기. "코인이 흩어졌다 수치로 빨려들며 숫자가 오른다"는 조립 순서를 여기 한 곳에만 둔다.
-// 로비 진입(LobbyGainEffectDirector)·도감 수확이 같은 손맛을 쓰고, 각자 복붙하지 않게.
+// 로비 진입(LobbyGainEffectDirector)·보상 수령이 같은 손맛을 쓰고, 각자 복붙하지 않게.
 //
 // 경계: 지급·저장은 호출부가 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
-// 도감 화면·행 뷰는 탭 전환에 꺼지고 재생성되므로 연출기를 거기 두면 OnDisable이 비행 중 코인을 걷어간다 —
+// 탭 전환에 꺼지고 재생성되는 화면에 연출기를 두면 OnDisable이 비행 중 코인을 걷어간다 —
 // 그래서 항상 켜져 있는 연출 레이어에 자리 잡고, 없으면 TryGet이 런타임에 자가 설치한다(프리팹 편집 없이).
 //
 // 재생 상태는 전부 재화별이다. 골드와 다이아가 같이 들어와도 각자의 HUD로 각자의 코인이 날아간다.
@@ -105,12 +105,6 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     }
 
     /// <summary>
-    /// 획득 연출을 즉시 재생한다. 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다.
-    /// _from을 비우면 수치 자리에서 튀어 제자리로 돌아오고, 주면 그 지점에서 수치까지 날아간다.
-    /// </summary>
-    public void Play(RectTransform _from, CurrencyGain _gain) => this.Play(_from, _gain, null);
-
-    /// <summary>
     /// 도착할 HUD를 지정해 재생한다. 공용 창구(CurrencyHud.TryGet)가 내주는 대표 HUD가 지금 화면에서
     /// 보이지 않을 때 쓴다 — 겹쳐 뜨는 화면이 자기 잔액 표시로 코인을 받는 경우다.
     /// _hud가 null이거나 재화가 어긋나면 평소처럼 대표 HUD로 간다.
@@ -129,20 +123,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
 
         this.m_current[t_slot] = this.BuildGain(_from, _gain, _hud);
         this.m_current[t_slot]?.Play();
+        if (this.m_current[t_slot] != null) SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain);
 
         return this.m_current[t_slot] != null;
-    }
-
-    /// <summary>여러 재화가 섞인 획득을 종류별로 나눠 동시에 재생한다.</summary>
-    public void Play(RectTransform _from, CurrencyGainBucket _gains)
-    {
-        if (_gains == null) return;
-
-        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-        {
-            var t_type = (ECurrencyType)t_i;
-            this.Play(_from, new CurrencyGain(t_type, _gains[t_type]));
-        }
     }
 
     // 종류 하나치 시퀀스. 배선을 못 찾거나 줄 것이 없으면 null.
@@ -219,6 +202,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             t_master.Insert(0f, t_seq);   // 재화가 갈려도 한 번의 획득이다 — 같은 0초에 함께 돈다.
         }
 
+        // 재화가 몇 종이든 한 번의 획득이다 — 마스터가 실제로 시작하는 박자에 한 번만 울린다.
+        t_master?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
         return t_master;
     }
 
@@ -238,20 +224,38 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             var t_type   = (ECurrencyType)t_i;
             var t_origin = _origins != null && t_i < _origins.Length ? _origins[t_i] : null;
 
-            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, _lightSprite, t_i);
+            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, null, _lightSprite, t_i);
             if (t_seq == null) continue;
 
             t_master ??= DOTween.Sequence().SetLink(gameObject);
             t_master.Insert(0f, t_seq);   // 재화가 갈려도 한 번의 획득이다 — 같은 0초에 함께 돈다.
         }
 
+        // 재화가 몇 종이든 한 번의 획득이다 — 마스터가 실제로 시작하는 박자에 한 번만 울린다.
+        t_master?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
         return t_master;
+    }
+
+    /// <summary>
+    /// 재화 하나치 빛 줄기. 위 묶음판과 다른 점은 <b>도착지 HUD를 호출부가 지정</b>한다는 것뿐이다 —
+    /// 대표 등록이 꺼진 화면 안의 칩(팩 개봉 오버레이의 조각 칩 등)으로 흘려보낼 때 쓴다.
+    /// _hud가 null이면 그 재화의 대표 HUD를 찾는다(묶음판과 같은 길).
+    /// </summary>
+    public Sequence BuildLightGain(CurrencyGain _gain, RectTransform _origin, CurrencyHud _hud, Sprite _lightSprite)
+    {
+        var t_seq = this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
+
+        // 묶음판과 같은 규약 — 재화가 들어오는 사건은 어느 경로로 오든 같은 소리가 난다.
+        t_seq?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
+
+        return t_seq;
     }
 
     // 종류 하나치 빛 줄기. 배선을 못 찾거나 줄 것이 없으면 null —
     // 판정은 전부 BeginGainRollUp보다 앞에 둔다(고정만 걸고 빠져나가면 수치가 영영 안 풀린다).
     Sequence BuildLightStreak(ECurrencyType _type, long _amount, RectTransform _origin,
-                              Sprite _lightSprite, int _lane)
+                              CurrencyHud _hud, Sprite _lightSprite, int _lane)
     {
         if (_amount <= 0) return null;
 
@@ -262,9 +266,16 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             return null;
         }
 
-        if (!CurrencyHud.TryGet(_type, out var t_hud) || t_hud.TextRect == null)
+        // 지정된 칩이 있으면 그쪽으로 흐른다. 없을 때만 대표 HUD를 찾는다.
+        var t_hud = _hud;
+        if (t_hud == null && !CurrencyHud.TryGet(_type, out t_hud))
         {
             Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD를 찾지 못해 연출을 건너뛴다.");
+            return null;
+        }
+        if (t_hud.TextRect == null)
+        {
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD에 수치 텍스트가 없어 연출을 건너뛴다.");
             return null;
         }
 
@@ -378,7 +389,11 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     Sprite ResolveSprite(ECurrencyType _type, RectTransform _textRect)
     {
         int t_slot = (int)_type;
-        if (this.m_coinSprites[t_slot] == null) this.m_coinSprites[t_slot] = FindIconSpriteNear(_textRect);
+        if (this.m_coinSprites[t_slot] != null) return this.m_coinSprites[t_slot];
+
+        // 표가 정본. 표가 비면 예전처럼 HUD 옆 아이콘에서 빌린다 — HUD가 없는 화면에서도 연출이 살아야 한다.
+        Sprite t_icon = CurrencyLook.IconOf(_type);
+        this.m_coinSprites[t_slot] = t_icon != null ? t_icon : FindIconSpriteNear(_textRect);
         return this.m_coinSprites[t_slot];
     }
 

@@ -8,7 +8,7 @@ using UnityEngine.UI;
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
 //  - 부트: StartScene(빌드 0번)에 저작된 인스턴스. DataLibrary의 Addressables UI 로드를 기다렸다가
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
-//  - 전환: LoadScene(scene)이 Resources에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
+//  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
 // 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
 //
@@ -21,11 +21,8 @@ public class LoadingCoverView : MonoBehaviour
     // 저작 데이터가 아니라 시스템 고정 경로라 상수로 둔다(OutgameTutorialRunner와 같은 규약).
     const string LobbyScene = "LobbyScene";
 
-    // 전환 모드가 커버를 얻는 유일한 경로. Addressables가 아니라 Resources인 이유는 둘 다다 —
-    // ① "UIPrefab" 라벨은 PooledUIBase만 등록한다(DataLibrary.LoadUIPrefab) ② 부트 모드는 그 로드가
-    // 끝나기 전에 화면에 떠 있어야 한다. Resources 선례는 TutorialUIStyle의 폰트 로드.
-    const string ResourcePath = "UI/LoadingCover";
-
+    // 전환 모드가 커버를 얻는 유일한 경로. Addressables 초기화보다 먼저 필요할 수 있으므로
+    // Boot가 직렬화한 카탈로그에서 동기적으로 얻는다.
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
 
@@ -63,6 +60,9 @@ public class LoadingCoverView : MonoBehaviour
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
     Action m_beforeLoad;
 
+    // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
+    const float BgmFadeOutSeconds = 0.5f;
+
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
     /// 부트가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
@@ -70,13 +70,16 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null)
     {
-        var t_prefab = Resources.Load<GameObject>(ResourcePath);
+        // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
+        SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
+
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
-            Debug.LogWarning($"[LoadingCoverView] Resources/{ResourcePath} 를 찾지 못해 커버 없이 전환합니다.");
+            Debug.LogWarning("[LoadingCoverView] 동기 UI 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
             _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;
@@ -140,9 +143,9 @@ public class LoadingCoverView : MonoBehaviour
 
             if (OutgameTutorialRunner.TryGetCurrentStep(out var t_step) && t_step.Action == EOutgameTutorialAction.AutoBattle)
             {
-                // 러너가 전투 씬을 걸었으면 false를 준다(커밋·시나리오 주입 포함). AutoBattle 진입은 실제로 항상 씬을 걸므로
+                // 러너가 전투 씬을 걸었으면 Gated가 아니다(커밋·시나리오 주입 포함). AutoBattle 진입은 실제로 항상 씬을 걸므로
                 // 로비가 필요해지는 건 스텝 판정이 어긋난 예외뿐이다. 조기 return은 두지 않는다 — 커버를 걷어야 하니까.
-                t_needLobby = OutgameTutorialRunner.EnterCurrentStep();
+                t_needLobby = OutgameTutorialRunner.EnterCurrentStep() == EOutgameTutorialStepResult.Gated;
             }
 
             if (t_needLobby) yield return SceneManager.LoadSceneAsync(LobbyScene);

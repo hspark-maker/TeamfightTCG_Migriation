@@ -60,6 +60,9 @@ public class CardView : MonoBehaviour
     [SerializeField] GameObject infoRoot;
     [SerializeField] GameObject emptyOverlay;
 
+    [Header("Shield")]
+    [SerializeField] SpriteRenderer shieldIndicator;
+
     [Header("Highlight / Glow")]
     [SerializeField] SpriteRenderer selectedHighlight;
     [SerializeField] ParticleSystem passiveGlowSystem;
@@ -78,16 +81,17 @@ public class CardView : MonoBehaviour
     [SerializeField] Transform keywordIconRoot;
     [SerializeField] GameObject keywordIconPrefab;
     [SerializeField] KeywordIconConfig keywordIconConfig;
-    [SerializeField] float iconSpacing = 0.3f;
-    // true면 키워드 아이콘이 시너지 배지 자리를 차지하고, 시너지 배지는 표시하지 않는다.
-    // 한 자리에 둘 다 그리면 겹치므로 "그 자리의 주인"은 이 스위치 하나가 정한다(양쪽 분기의 단일 진실원).
-    // false로 되돌리면 종전대로 키워드=우하단 가로줄 + 시너지 배지 복귀.
-    [SerializeField] bool keywordIconsUseSynergySlot = true;
 
-    // 위 스위치가 true일 때 아이콘이 놓이는 자리. 이름 왼쪽(카드 하단 줄)에서 오른쪽으로 나열한다 —
-    // 예전엔 시너지 배지와 같은 세로열 값을 그대로 썼는데, 그러면 배지 좌표를 손댈 때마다 아이콘이 따라 움직였다.
-    [SerializeField] Vector2 keywordIconStart = new Vector2(-0.54f, -1.14f);
+    // 아이콘이 놓이는 자리(keywordIconRoot 기준). 배경판의 **큰 칸**이 키워드 몫이다 —
+    // 작은 칸은 시너지 배지가 쓰며(synergyBadge*), 둘은 서로 독립 좌표라 한쪽을 손봐도 다른 쪽이 안 따라온다.
+    [SerializeField] Vector2 keywordIconStart = new Vector2(-0.636f, -1.099f);
     [SerializeField] Vector2 keywordIconStep  = new Vector2(0.42f, 0f);
+
+    // 아이콘 줄 배경판 두 장(Frame 자식). 시너지 배지가 실제로 뜨는 카드만 시너지 칸이 있는 기본판,
+    // 시너지가 충족 안 된(또는 미해금/뒷면) 카드는 시너지 칸이 없는 좁은 판을 쓴다.
+    // 어느 쪽을 켤지 정하는 지점은 CardDecorView 한 곳뿐이다 — 두 판이 동시에 켜지면 겹쳐 그려진다.
+    [SerializeField] GameObject keywordBg;        // SynergyKewordBG (시너지 칸 포함)
+    [SerializeField] GameObject keywordOnlyBg;    // SynergyKewordBG_kewordOnly (시너지 칸 없음)
 
     // 프레임에 얹는 키워드별 장식 이미지(아이콘 줄과 별개, 가시성 보강용). 아직 이미지가 없는 키워드는
     // 배열에서 빼두면 된다 — 없는 항목은 그냥 안 켜진다.
@@ -103,8 +107,8 @@ public class CardView : MonoBehaviour
     [Header("Synergy")]
     [SerializeField] Transform synergyBadgeRoot;         // 배지들을 붙일 앵커(자식 루트). keywordIconRoot와 동일 패턴.
     [SerializeField] SynergyBadgeView synergyBadgePrefab; // 색+텍스트 배지 프리팹.
-    [SerializeField] float synergyBadgeXPos   = 0.55f;  // 배지 세로열 X(synergyBadgeRoot 기준).
-    [SerializeField] float synergyBadgeYStart = 0.95f;  // 첫 배지(i=0) Y.
+    [SerializeField] float synergyBadgeXPos   = -0.335f; // 배지 세로열 X(synergyBadgeRoot = 배경판 작은 칸 기준).
+    [SerializeField] float synergyBadgeYStart = -1.216f; // 첫 배지(i=0) Y.
     [SerializeField] float synergyBadgeYStep  = -0.5f;  // 배지 간 Y 간격(아래로 쌓기).
     // 표시 최대 배지 수(초과분 드롭). 기본값은 CardVisualRules 상수 하나에서 — 프리팹 오버라이드는 남지만
     // 아웃게임 타일과 기본값이 따로 놀지 않게 코드 소스를 통일한다.
@@ -202,10 +206,10 @@ public class CardView : MonoBehaviour
         this.keywordIconRoot,
         this.keywordIconPrefab,
         this.keywordIconConfig,
-        this.iconSpacing,
-        this.keywordIconsUseSynergySlot,
         this.keywordIconStart,
         this.keywordIconStep,
+        this.keywordBg,
+        this.keywordOnlyBg,
         this.keywordFrames,
         this.synergyBadgeRoot,
         this.synergyBadgePrefab,
@@ -230,6 +234,10 @@ public class CardView : MonoBehaviour
     // 숫자만 먼저 올라간다. 힐러가 둘이면 몫이 둘 쌓이고, 투사체가 도착할 때마다 자기 몫씩 빠진다.
     int hpPendingHeal;
     Sequence hpRollSeq;
+    Sequence shieldBreakSeq;
+    Vector3  shieldIndicatorScale;
+    Color    shieldIndicatorColor;
+    bool     shieldIndicatorCached;
 
     public CardInstance BoundCard => this.boundCard;
     #endregion
@@ -270,6 +278,7 @@ public class CardView : MonoBehaviour
         this.weaponView?.Cleanup();  // 무기 인스턴스는 자식이라 Unity가 함께 파괴 — 참조만 끊는다
         this.decorView?.Cleanup();   // 아이콘/배지 트윈 끊기(파괴 전 DOKill 규약) + 스냅샷 참조 해제
         KillHpRoll();
+        KillShieldTween();
         if (this.hpText != null) this.hpText.DOKill();
     }
 
@@ -332,7 +341,7 @@ public class CardView : MonoBehaviour
     #region Visual State
     public void Render(CardInstance _card, SynergyState _synergy = null)
     {
-        // 슬롯 점유 카드가 바뀌면(사망→새 카드 스폰 등) 이전 피격 연출 잔여 제거 → 새 카드에 이월 방지.
+        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 초기화한다.
         if (this.boundCard != _card)
         {
             this.cardAnim.ResetHitEffect();
@@ -351,6 +360,7 @@ public class CardView : MonoBehaviour
 
         if (t_isEmpty)
         {
+            SetShieldVisible(false);
             SetFaceDownLook(false);
             SetupWeapon(null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
@@ -377,6 +387,7 @@ public class CardView : MonoBehaviour
             this.illustration.sprite = t_art;
 
         SetFaceDownLook(t_isFaceDown);
+        SetShieldVisible(!t_isFaceDown && _card.hasShield);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
@@ -417,6 +428,59 @@ public class CardView : MonoBehaviour
 
         this.illustration.sprite = this.cardBackSprite;
         this.illustration.transform.localScale = FitBackScale();
+    }
+
+    void CacheShieldVisual()
+    {
+        if (this.shieldIndicatorCached || this.shieldIndicator == null) return;
+        this.shieldIndicatorScale  = this.shieldIndicator.transform.localScale;
+        this.shieldIndicatorColor  = this.shieldIndicator.color;
+        this.shieldIndicatorCached = true;
+    }
+
+    void KillShieldTween()
+    {
+        if (this.shieldBreakSeq != null && this.shieldBreakSeq.IsActive())
+            this.shieldBreakSeq.Kill();
+        this.shieldBreakSeq = null;
+    }
+
+    /// <summary>프리팹에 저작된 보호막 표시를 현재 카드 상태로 즉시 맞춘다.</summary>
+    public void SetShieldVisible(bool _visible)
+    {
+        if (this.shieldIndicator == null) return;
+        CacheShieldVisual();
+        KillShieldTween();
+        this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+        this.shieldIndicator.color = this.shieldIndicatorColor;
+        this.shieldIndicator.gameObject.SetActive(_visible);
+    }
+
+    /// <summary>실제 피해 적용으로 보호막이 소진됐을 때만 호출하는 순수 연출.</summary>
+    public void PlayShieldBreakEffect()
+    {
+        if (this.shieldIndicator == null || this.boundCard == null || !this.boundCard.isRevealed) return;
+        CacheShieldVisual();
+        KillShieldTween();
+
+        CardInstance t_card = this.boundCard;
+        this.shieldIndicator.gameObject.SetActive(true);
+        this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+        this.shieldIndicator.color = this.shieldIndicatorColor;
+
+        this.shieldBreakSeq = DOTween.Sequence()
+            .Append(this.shieldIndicator.transform.DOPunchScale(
+                this.shieldIndicatorScale * 0.3f, 0.12f, vibrato: 4, elasticity: 0.35f))
+            .Append(this.shieldIndicator.DOFade(0f, 0.1f))
+            .SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                this.shieldBreakSeq = null;
+                if (this == null || this.boundCard != t_card || (t_card != null && t_card.hasShield)) return;
+                this.shieldIndicator.gameObject.SetActive(false);
+                this.shieldIndicator.transform.localScale = this.shieldIndicatorScale;
+                this.shieldIndicator.color = this.shieldIndicatorColor;
+            });
     }
 
     /// <summary>뒷면 그림을 카드 테두리 높이에 맞추는 로컬 스케일. 테두리가 없으면 원래 스케일 유지.</summary>
@@ -540,14 +604,11 @@ public class CardView : MonoBehaviour
             this.hpFallbackPreview = true;
         }
 
-        // 치사 예고(카드 흐려짐 + HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
-        // "이 카드는 못 잡는다"가 확정처럼 읽히고 흐려진 카드가 미관을 깬다는 판단. 되살릴 땐 플래그만 true.
-        if (_wouldDie && BattleUxFlags.DeathPreview)
-        {
-            if (this.hpText != null)
-                this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
-            this.cardAnim.ShowDeathPreview();
-        }
+        // 치사 예고(HP 점멸)는 BattleUxFlags.DeathPreview로 블라인드 —
+        // "이 카드는 못 잡는다"가 확정처럼 읽힌다는 판단. 되살릴 땐 플래그만 true.
+        // 함께 있던 카드 흐려짐 오버레이(DieOverlay)는 되살릴 계획이 없어 배선째 삭제했다.
+        if (_wouldDie && BattleUxFlags.DeathPreview && this.hpText != null)
+            this.hpText.DOFade(0f, GameTiming.Battle.AttackPreviewFlash).SetLoops(-1, LoopType.Yoyo).SetLink(gameObject);
     }
 
     public void HideAttackPreview()
@@ -569,9 +630,6 @@ public class CardView : MonoBehaviour
             RestoreHpDisplay();
             this.hpFallbackPreview = false;
         }
-
-        // 플래그로 꺼져 있어도 호출 — 과거 상태/플래그 전환 직후의 잔존 오버레이 정리.
-        this.cardAnim.HideDeathPreview();
     }
 
     /// <summary>표시용 HP를 임의 값으로 덮어쓴다. 규칙상 hp는 이미 확정됐는데(결정론: 상태변이 선행)
@@ -596,7 +654,7 @@ public class CardView : MonoBehaviour
         this.hpDisplayTarget = _hp;
 
         // 시작점은 **지금 눈에 보이는 숫자**다. 목표값을 먼저 shownHp에 넣어두면, 굴리는 도중 다음 갱신이
-        // 들어왔을 때(무리 다단 착탄) 아직 화면에 뜨지도 않은 값에서 굴러 내려간다.
+        // 들어왔을 때(낙인 다단 착탄) 아직 화면에 뜨지도 않은 값에서 굴러 내려간다.
         KillHpRoll();
         int t_from = this.shownHp;
 
@@ -774,8 +832,7 @@ public class CardView : MonoBehaviour
         // 숫자는 즉시 최종값으로 튀지 않고 굴러 내려간다(아이콘 팝 → 6·5·4·3 → 복귀).
         if (this.boundCard != null)
             AnimateHpDisplay(this.boundCard.hp, this.boundCard.bonusHp);
-        // 피격 파티클은 라이브러리 소유(미배선이면 무동작). 붐/숫자는 프리팹의 HitEffectView가 계속 담당 —
-        // 그쪽은 카드에 상주하며 상태(시퀀스/숫자)를 가지므로 1회성 파티클과 축이 다르다.
+        // 피격 파티클은 라이브러리 소유(미배선이면 무동작).
         Vector3 t_awayDir = _hitFrom != null ? transform.position - _hitFrom.transform.position : default;
         t_awayDir.z = 0f;   // 화면 평면 방향만 — 시네마 중 z가 벌어져 있으면 먼지가 카메라 쪽으로 튄다
         // 먼지의 양·속도도 화면 흔들림·카드 반동과 같은 세기(피해/최대체력)를 따른다 — 세 연출이 갈리면
@@ -801,11 +858,10 @@ public class CardView : MonoBehaviour
             t_ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         // 사망 파티클은 **카드에 붙이지 않는다**. 붙이면 위 Stop 루프와 사망 직후 HideSlot이 카드를 끄면서
-        // 별가루까지 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
+        // 같이 꺼져 뚝 끊긴다. 좌표는 죽는 그 자리로 고정 — 카드는 떠오르지만 바닥 파동은
         // 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
         Vector3 t_deathPosition = transform.position;
 
-        BattleVfx.Play(BattleVfxId.DeathStardust, t_deathPosition, VfxSortingLayerId);
         UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
 
         // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
@@ -831,8 +887,8 @@ public class CardView : MonoBehaviour
         await t_seq.ToUniTask().SuppressCancellationThrow();
     }
 
-    /// <summary>회복 연출(회복 파티클 + "+N") + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
-    /// 회복이면 경로(힐러/돌보미/청소부/유산/부활) 불문 여기 하나로 수렴한다.</summary>
+    /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
+    /// 회복이면 경로(힐러/돌보미/포식자/유산/부활) 불문 여기 하나로 수렴한다.</summary>
     public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
     {
         // 힐러 경로는 여기가 **표기의 발화점**이다 — 수치는 턴 시작에 이미 들어갔고(결정론),
@@ -852,7 +908,6 @@ public class CardView : MonoBehaviour
             AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
         }
         BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
-        this.cardAnim.PlayHealEffect(_amount);   // 숫자("+N") — 붐 스프라이트는 프리팹에서 비우면 파티클만 남는다
     }
     public void FadeView(float _alpha, float _dur) => this.cardAnim.FadeView(_alpha, _dur);
 
@@ -867,16 +922,11 @@ public class CardView : MonoBehaviour
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
     {
-        if (!UsesOrbAppear)
-        {
-            await this.cardAnim.PlayDealAnim(_from, _mid, _dest, _duration);
-            PlayPlacedEmblems();
-            return;
-        }
-
         // 구체 등장도 앞 토막(덱에서 나와 중앙 확대·정지)을 그대로 탄다 — 카드 정보를 보여주는 구간이
         // 이 연출에만 없으면 고등급 카드가 오히려 뭔지 모른 채 지나간다. 중간 정지는 일반 배치와 같은 값.
+        // 일반 배치와 구체 등장의 차이는 두 토막 **안쪽**(PlayDealToSlot)에서 갈리므로 여기선 나누지 않는다.
         await PlayDealToMid(_from, _mid, _dest, _duration);
+        if (this == null) return;
         bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
                 cancellationToken: this.GetCancellationTokenOnDestroy())
             .SuppressCancellationThrow();
@@ -892,8 +942,11 @@ public class CardView : MonoBehaviour
     /// <summary>배치 연출을 **중앙에서 끊어** 두 토막으로 쓰는 경로(등장 컷씬용).
     /// 앞 토막은 화면 밖 → 중앙까지만 가고 거기 멈춘다. 컷씬이 끝나면 PlayDealToSlot이 이어받는다.
     /// 구체 등장도 같은 앞 토막을 쓴다 — 중앙에 선 카드가 뒤 토막에서 구체로 변신한다.</summary>
-    public UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
-        => this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+    public async UniTask PlayDealToMid(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
+    {
+        await this.cardAnim.PlayDealToMid(_from, _mid, _dest, _duration);
+        if (this == null) return;
+    }
 
     /// <summary>뒤 토막: 중앙 → 슬롯. 구체 등장 카드는 중앙에 선 카드가 구체로 변신한 뒤 날아간다
     /// (_morphFromCard) — 카드가 이미 중앙에 있으므로 구체를 새로 "생성"하면 카드가 순간 사라져 보인다.</summary>

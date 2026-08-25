@@ -1,8 +1,14 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼 진행도의 static 단일 창구(세이브 슬롯 매핑을 여기서만 안다)
 public static class OutgameTutorialProgress
 {
+    // 같은 좌표로 이만큼 더 부팅하면 진행이 막힌 것으로 본다(0=직후, 2=세 번째 부팅).
+    // 두 번까지 봐주는 이유: 튜토 도중 앱을 끄는 것은 흔한 일이고, 오탐 대가(기능이 미리 열림)보다
+    // 놓쳤을 때 대가(게임 자체를 못 함)가 훨씬 크다.
+    const int STALL_BOOT_COUNT = 2;
+
     public static bool IsCompleted => Slot.outgameCompleted;
 
     // 진행 중인 챕터(기획의 "N편") 인덱스
@@ -10,6 +16,9 @@ public static class OutgameTutorialProgress
 
     // 챕터 안에서의 스텝 순번(시퀀스 전체 통산이 아니다)
     public static int StepIndex => Slot.outgameChapterStepIndex;
+
+    // 서 있는 스텝의 불변 번호(0 = 앵커 없음). 좌표가 커서라면 이쪽이 세이브의 정체성이다.
+    public static int StepId => Slot.outgameStepId;
 
     static TutorialSaveData Slot
     {
@@ -21,19 +30,11 @@ public static class OutgameTutorialProgress
         }
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 레거시 세이브 완료 판정 포함
+    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 레거시 세이브 완료 판정과 진행 정지 판정
     public static void Init()
     {
-        var t_slot = Slot;
-        if (t_slot.migrationChecked) return;
-
-        if (!t_slot.outgameCompleted
-            && t_slot.outgameStepIndex == 0 && t_slot.outgameChapterIndex == 0 && t_slot.outgameChapterStepIndex == 0
-            && OwnershipManager.HasAnyOwnedSaved())
-            t_slot.outgameCompleted = true;
-
-        t_slot.migrationChecked = true;
-        Save();
+        MigrateLegacyCompletion();
+        DetectStall();
     }
 
     // 진행도 영속화
@@ -47,6 +48,21 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+
+        // 좌표가 움직이는 모든 런타임 경로가 이 창구를 지나므로, 앵커도 여기서만 갱신하면 된다.
+        // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 부트가 좌표에서 다시 채운다.
+        t_slot.outgameStepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
+
+        Save();
+    }
+
+    // 정지 판정을 지금 좌표에서 다시 세기 시작한다 — 부트마다 자가 복구가 도는 좌표는 "막힌 좌표"가 아니다.
+    public static void ResetStallWatch()
+    {
+        var t_slot = Slot;
+        t_slot.lastBootChapterIndex = t_slot.outgameChapterIndex;
+        t_slot.lastBootStepIndex    = t_slot.outgameChapterStepIndex;
+        t_slot.sameCoordBootCount   = 0;
         Save();
     }
 
@@ -84,7 +100,7 @@ public static class OutgameTutorialProgress
         Save();
     }
 
-    // 디버그 전용 — 트리거 낙인만 전부 걷는다(온보딩 좌표·완료는 유지)
+    // 디버그 전용 — 트리거 낙인을 전부 걷는다(온보딩 좌표·완료는 유지)
     public static void ClearTriggersForDebug()
     {
         var t_slot = Slot;
@@ -105,8 +121,56 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         t_slot.outgameChapterIndex     = _chapter;
         t_slot.outgameChapterStepIndex = _step;
+        t_slot.outgameStepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.outgameCompleted        = false;
         t_slot.migrationChecked        = true;
         Save();
+
+        // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 부트 만에 오탐 정지가 뜬다.
+        // 이미 선 판정도 함께 걷어야 잠금이 실제로 돌아온다(둘을 갈라 두면 한쪽만 풀려 검증이 오염된다).
+        ResetStallWatch();
+        OutgameFeatureLock.ClearStall();
+    }
+
+    // 소유 카드가 이미 있는 구 세이브는 튜토리얼을 마친 것으로 본다(계정당 1회)
+    static void MigrateLegacyCompletion()
+    {
+        var t_slot = Slot;
+        if (t_slot.migrationChecked) return;
+
+        if (!t_slot.outgameCompleted
+            && t_slot.outgameStepIndex == 0 && t_slot.outgameChapterIndex == 0 && t_slot.outgameChapterStepIndex == 0
+            && OwnershipManager.HasAnyOwnedSaved())
+            t_slot.outgameCompleted = true;
+
+        t_slot.migrationChecked = true;
+        Save();
+    }
+
+    // 부팅을 거듭해도 좌표가 그대로면 그 스텝은 스스로 풀릴 수 없는 것이다 — 안내는 멈추더라도 게임은 열어 준다.
+    // 진입 실패는 브리지가 그 자리에서 잡고, 여기는 신호를 영영 못 받는 대기형 정지(앵커 미등록 등)를 잡는다.
+    static void DetectStall()
+    {
+        var t_slot = Slot;
+        if (t_slot.outgameCompleted) return;
+
+        if (t_slot.lastBootChapterIndex != t_slot.outgameChapterIndex
+         || t_slot.lastBootStepIndex    != t_slot.outgameChapterStepIndex)
+        {
+            t_slot.lastBootChapterIndex = t_slot.outgameChapterIndex;
+            t_slot.lastBootStepIndex    = t_slot.outgameChapterStepIndex;
+            t_slot.sameCoordBootCount   = 0;
+            Save();
+            return;
+        }
+
+        t_slot.sameCoordBootCount++;
+        Save();
+
+        if (t_slot.sameCoordBootCount < STALL_BOOT_COUNT) return;
+
+        Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.outgameChapterIndex}-{t_slot.outgameChapterStepIndex}에서 "
+                       + $"{t_slot.sameCoordBootCount + 1}번째 부팅 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
+        OutgameFeatureLock.NotifyStalled();
     }
 }

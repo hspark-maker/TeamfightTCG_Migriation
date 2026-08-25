@@ -9,6 +9,10 @@ using UnityEngine.UI;
 public class AlbumPageOverlayView : MonoBehaviour
 {
     [Header("닫기")]
+    [Tooltip("바깥을 눌러 닫는 딤판. **이 버튼이 딤판 그 자체**여야 한다 — 닫기 판정만 맡는 투명 버튼이면 안 된다.\n" +
+             "삽입 연출 중 SetFrontmost가 이 rect를 화면 끝까지 늘려 상단바·탭바까지 덮게 하므로,\n" +
+             "판정과 그림이 갈리면 늘어나는 것과 어두워지는 것이 서로 다른 오브젝트가 된다.\n\n" +
+             "⚠ Transition은 None으로 저작한다 — ColorTint면 잠금 시 상태색이 곱해져 딤이 옅어진다(ApplyInteractable 참고).")]
     [SerializeField] Button dimButton;
     [SerializeField] Button closeButton;
 
@@ -44,6 +48,20 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("임계 미달로 손을 뗐을 때 제자리로 돌아오는 시간.")]
     [SerializeField] float dragReturnDuration = 0.16f;
 
+    [Tooltip("끝↔처음으로 감길 때 사이 페이지를 훑는 한 장당 속도 배율. 0.3이면 평소 넘김의 30% 시간에 한 장.\n" +
+             "낮출수록 촤라락 빨라진다. 총 길이는 (페이지 수 - 1)장이 이 배율로 이어 붙은 만큼이다.")]
+    [Range(0.1f, 1f)] [SerializeField] float rewindStepScale = 0.3f;
+
+    [Header("삽입 연출 — 로비 셸 위로 올라서기")]
+    [Tooltip("이 오버레이는 탭 콘텐츠 안에 있어 평소엔 상단바·탭바 아래에 그려지고, 딤도 콘텐츠 영역까지만 덮는다.\n" +
+             "삽입 연출 동안만 이 order로 셸 위에 올라서서 딤 한 장이 화면 전체를 덮게 한다(SetFrontmost).\n" +
+             "로비 UI 중 정렬을 덮어쓰는 것은 여기뿐이라 값끼리 다툴 상대가 없다 — 양수면 된다.")]
+    [SerializeField] int frontSortingOrder = 100;
+
+    [Tooltip("올라선 동안 Dim이 콘텐츠 경계 밖으로 뻗는 여유(px). 상단바 180 / 하단바 220을 넘기기만 하면 되고,\n" +
+             "잘라내는 마스크가 없어 넉넉해도 손해가 없다. 기기별 안전영역 차이까지 삼키라고 크게 잡는다.")]
+    [SerializeField] float frontDimOverflow = 1000f;
+
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
     [SerializeField] AlbumPageFlipView pageFlip = new AlbumPageFlipView();
@@ -64,11 +82,22 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     // 삽입 세션이 켜는 잠금 — 탈출로를 세션의 건너뛰기 하나로 좁힌다
     bool m_sessionLocked;
+    // 셸 위로 올라설 때 얻는 캔버스와, 그때 늘렸다 되돌릴 딤의 원래 여백
+    Canvas  m_frontCanvas;
+    bool    m_dimStretched;
+    Vector2 m_dimOffsetMin;
+    Vector2 m_dimOffsetMax;
     // 넘김 한 번 동안만. 세션과 bool을 공유하면 넘김이 끝날 때 세션 잠금까지 같이 풀린다
     bool m_flipLocked;
     bool m_flipping;
     // 진행 중이던 넘김이 Open/OnDisable로 잘렸는지 판정. 잘린 넘김이 뒤늦게 인덱스를 덮어쓰면 안 된다
     int m_flipGen;
+
+    // 끝↔처음 되감기(여러 장 연속 넘김)가 도는 중. 한 장짜리 m_flipping과 갈라 둔다 —
+    // 되감기는 장과 장 사이에서 m_flipping이 잠깐 내려가므로, 그 틈에 새 입력이 끼어들지 못하게 막는 건 이쪽이다.
+    bool m_rewinding;
+    // 되감기 도중 Open/닫기로 잘렸는지 판정. m_flipGen은 한 장마다 새로 발급되어 여러 장에 걸친 판정에 못 쓴다
+    int m_rewindGen;
 
     // 손가락이 직접 종이를 밀고 있는 구간. 트윈(m_flipping)과 갈라 둔다 —
     // 드래그 중에는 아직 넘길지 말지 정해지지 않아 페이지를 교체하면 안 되고, 잠금도 걸지 않는다.
@@ -89,7 +118,18 @@ public class AlbumPageOverlayView : MonoBehaviour
     /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
 
-    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning;
+    /// <summary>밖(튜토리얼 자동 복귀)에서 이 오버레이를 걷어 그 아래 앨범 테마 화면을 드러낸다.
+    /// 열려 있지 않으면 아무 일도 없다.</summary>
+    public static void CloseOpen()
+    {
+        if (!IsOpen) return;
+        s_instance.Close();
+    }
+
+    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding;
+
+    // 딤판의 rect. 닫기 버튼과 같은 오브젝트라는 저작 규약을 여기 한 곳에서만 읽는다(dimButton 툴팁 참고).
+    RectTransform DimRect => dimButton != null ? dimButton.transform as RectTransform : null;
 
     public int PageIndex => m_pageIndex;
 
@@ -124,6 +164,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     public void Close()
     {
+        // 퇴장 연출과 나란히 돌려준다 — OnDisable을 기다리면 오버레이가 완전히 사라진 뒤에야 바가 돌아온다.
+        LobbyShellBars.Show(this);
         transition.SetVisible(gameObject, false);
     }
 
@@ -147,6 +189,52 @@ public class AlbumPageOverlayView : MonoBehaviour
         ApplyInteractable();
     }
 
+    /// <summary>삽입 연출 동안 이 오버레이를 로비 셸(상단바·탭바) 위로 올리고, 딤을 화면 끝까지 늘린다.
+    /// 딤 한 장이 화면 전체를 덮으므로 셸은 어두워진 채 제자리에 남고(걷지 않는다) 입력도 이 딤이 받는다.
+    /// 카드·프레임은 같은 캔버스 안이라 함께 올라가 딤 위에 그려진다.
+    /// ⚠ 자리(계층)는 건드리지 않는다 — 옮기면 rect가 바뀌어 프레임과 격자가 딸려 움직인다.</summary>
+    public void SetFrontmost(bool _front)
+    {
+        RectTransform t_dim = this.DimRect;
+
+        if (_front)
+        {
+            if (m_frontCanvas == null)
+            {
+                m_frontCanvas = gameObject.GetComponent<Canvas>();
+                if (m_frontCanvas == null) m_frontCanvas = gameObject.AddComponent<Canvas>();
+
+                // 정렬을 덮어쓴 캔버스는 자기 레이캐스터가 있어야 입력도 그 순서를 따른다 —
+                // 없으면 그림만 위로 오고 클릭은 아래 셸이 먼저 먹는다.
+                if (gameObject.GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+            }
+
+            m_frontCanvas.overrideSorting = true;
+            m_frontCanvas.sortingOrder    = frontSortingOrder;
+
+            if (t_dim != null && !m_dimStretched)
+            {
+                m_dimStretched = true;
+                m_dimOffsetMin = t_dim.offsetMin;
+                m_dimOffsetMax = t_dim.offsetMax;
+                t_dim.offsetMin = m_dimOffsetMin - new Vector2(0f, frontDimOverflow);
+                t_dim.offsetMax = m_dimOffsetMax + new Vector2(0f, frontDimOverflow);
+            }
+
+            return;
+        }
+
+        if (m_frontCanvas != null) m_frontCanvas.overrideSorting = false;
+
+        // 늘려둔 딤은 반드시 되돌린다 — 남으면 평소 도감 오버레이가 상단바·탭바까지 덮는다
+        if (t_dim != null && m_dimStretched)
+        {
+            m_dimStretched  = false;
+            t_dim.offsetMin = m_dimOffsetMin;
+            t_dim.offsetMax = m_dimOffsetMax;
+        }
+    }
+
     void SetFlipLocked(bool _locked)
     {
         m_flipLocked = _locked;
@@ -158,6 +246,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 색으로 잠긴 티를 내는 건 **세션 잠금**뿐이다. 넘김 잠금은 0.3초짜리라 Button의 Color Tint가
         // 켜졌다 꺼지는 것이 "dim이 풀렸다 돌아온다 / 칸이 깜빡인다"로 보인다.
         // 짧은 잠금은 색을 건드리지 않고 눌렀을 때 걸러낸다(HandleCloseRequest·HandleStepRequest).
+        //
+        // ⚠ Dim 버튼만은 **Transition을 None으로 저작**해야 한다. 딤판의 실제 색은
+        //   Image.color × 버튼 상태색이라, ColorTint면 여기서 끄는 순간 disabledColor(알파 0.5)가 곱해져
+        //   딤이 반쯤 옅어진다 — Image 알파를 아무리 올려도 그 절반에서 막힌다.
         bool t_dimmed = m_sessionLocked;
 
         if (dimButton != null) dimButton.interactable = !t_dimmed;
@@ -211,6 +303,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void OnEnable()
     {
+        // 페이지를 펼치는 동안은 로비 셸을 걷는다 — 이 오버레이가 화면을 통째로 쓴다.
+        LobbyShellBars.Hide(this, transform);
+
         if (!m_built) BuildSlots();
 
         OwnershipManager.OnOwnershipChanged += HandleChanged;
@@ -230,6 +325,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     void OnDisable()
     {
+        // 안전망 — 탭 전환·씬 이탈처럼 Close를 거치지 않는 경로로 꺼져도 셸은 돌아와야 한다.
+        LobbyShellBars.Show(this);
+
         OwnershipManager.OnOwnershipChanged -= HandleChanged;
         AlbumRewardManager.OnChanged -= HandleChanged;
         CardGrowthManager.OnGrowthChanged -= HandleChanged;
@@ -244,6 +342,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 안전망 — 세션 없이 위장만 남으면 카드가 영영 빈 칸으로 보인다
         if (!AlbumInsertSession.IsRunning) AlbumInsertMask.Clear();
+
+        // 셸 위로 올라선 채 꺼지면 다음에 열릴 때 늘어난 딤을 그대로 안고 열린다
+        SetFrontmost(false);
 
         // 탭 전환 등으로 넘김 도중에 꺼지면 종이가 세워진 채 굳는다
         CancelFlip();
@@ -352,8 +453,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
         int t_ownedInPage = 0;
 
-        // 안내는 이 페이지의 첫 꽂힌 칸 하나만 지목한다(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
-        bool t_anchorTaken = !_interactive;
+        // 안내가 이 페이지에서 지목할 칸(앵커는 키당 1건). 뒤쪽 버퍼는 눌리지 않으므로 제외한다
+        int t_anchorSlot = _interactive ? FindAnchorSlotIndex(t_cards) : -1;
 
         for (int t_i = 0; t_i < _slots.Count; t_i++)
         {
@@ -380,9 +481,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             t_slot.gameObject.SetActive(true);
             t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
 
-            bool t_anchor = !t_anchorTaken && t_owned;
-            t_anchorTaken |= t_anchor;
-            t_slot.ApplyTutorialAnchor(t_anchor);
+            t_slot.ApplyTutorialAnchor(t_i == t_anchorSlot);
 
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;
@@ -429,6 +528,22 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 잠금은 리프레시로 풀리지 않는다 — 넘김 중에도 이벤트가 이 함수를 부른다
         ApplyInteractable();
+    }
+
+    /// <summary>안내가 가리킬 칸의 순번. 저작(anchorCard)이 지목한 카드의 칸이고, 그 카드가 이 페이지에 없거나
+    /// 아직 빈 칸으로 보이면 폴백으로 첫 꽂힌 칸이다 — 없는 칸을 가리켜 안내가 멎는 것보다 낫다.</summary>
+    static int FindAnchorSlotIndex(IReadOnlyList<CardData> _cards)
+    {
+        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_target))
+        {
+            for (int t_i = 0; t_i < _cards.Count; t_i++)
+                if (_cards[t_i] == t_target && ShownAsOwned(t_target)) return t_i;
+        }
+
+        for (int t_i = 0; t_i < _cards.Count; t_i++)
+            if (ShownAsOwned(_cards[t_i])) return t_i;
+
+        return -1;
     }
 
     // 삽입 연출 중에는 아직 안 꽂은 카드를 빈 칸으로 위장한다. 소유는 이미 확정됐지만 화면상 꽂기 전이다.
@@ -631,7 +746,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     async UniTask FlipStepAsync(int _dir)
     {
-        if (m_flipping) return;   // 넘기는 중 재입력은 무시 — 인덱스만 앞서가는 분기를 원천 차단한다
+        if (m_flipping || m_rewinding) return;   // 넘기는 중 재입력은 무시 — 인덱스만 앞서가는 분기를 원천 차단한다
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
         // 손가락이 세워둔 자세를 이어받는다. 여기서 0부터 다시 시작하면 뗀 순간 종이가 도로 눕는다.
@@ -657,10 +772,76 @@ public class AlbumPageOverlayView : MonoBehaviour
             return;
         }
 
+        // 끝에서 처음으로(또는 처음에서 끝으로) 감기는 순간은 "다음 한 장"이 아니라 **되감기**다.
+        // 한 장만 넘기면 마지막 페이지와 1페이지가 이웃처럼 보여 한 바퀴 돌았다는 게 안 읽힌다 —
+        // 사이 페이지를 전부, 넘기던 것과 **반대 방향**으로 촤라락 훑어 처음으로 돌아온 길을 보여준다.
+        // (4→1은 왼쪽에서 오른쪽으로 덮이는 장이 연속, 1→4는 오른쪽에서 왼쪽으로 넘어가는 장이 연속.)
+        bool t_wrapped = _dir > 0 ? m_pageIndex == t_count - 1 : m_pageIndex == 0;
+        if (t_wrapped && t_count > 2)
+        {
+            await RewindAsync(-_dir, t_from);
+            return;
+        }
+
         await FlipAsync(t_target, _dir, null, t_from);
     }
 
-    async UniTask FlipAsync(int _target, int _dir, AlbumTheme _theme, float _from = 0f)
+    /// <summary>끝↔처음 순환을 사이 페이지까지 전부 훑으며 되감는다. 한 장씩 같은 넘김 연출을 쓰되
+    /// 배율(<c>rewindStepScale</c>)로 짧게 줄여 이어 붙인다 — 중간 장은 게이지·번호를 되돌리지 않아
+    /// 마지막 장에 닿을 때까지 종이만 계속 넘어가는 그림이 된다.</summary>
+    /// <param name="_dir">되감는 방향. 넘기려던 방향의 반대다.</param>
+    /// <param name="_from">손가락이 이미 세워둔 진행도. 방향이 반대라 이어받을 수 없어 눕히고 시작한다.</param>
+    async UniTask RewindAsync(int _dir, float _from)
+    {
+        int t_gen   = ++m_rewindGen;
+        int t_count = m_theme.Pages.Count;
+
+        m_rewinding = true;
+        SetFlipLocked(true);
+
+        try
+        {
+            if (_from > 0f) await LayPaperDownAsync(_from);
+
+            for (int t_i = 0; t_i < t_count - 1; t_i++)
+            {
+                // 매 장마다 다시 확인한다 — 되감는 도중 닫히거나 다른 테마로 열릴 수 있다.
+                if (t_gen != m_rewindGen || m_theme == null) return;
+
+                int  t_next = (m_pageIndex + _dir + t_count) % t_count;
+                bool t_last = t_i == t_count - 2;
+                await FlipAsync(t_next, _dir, null, 0f, this.rewindStepScale, t_last);
+            }
+        }
+        finally
+        {
+            if (t_gen == m_rewindGen)
+            {
+                m_rewinding = false;
+                SetFlipLocked(false);
+            }
+        }
+    }
+
+    /// <summary>손가락이 세워둔 종이를 짧게 눕힌다. 되감기는 반대 방향으로 도므로 그 자세를 이어받으면
+    /// 세우던 장과 다른 장이 접힌다 — 이어받지 않고 눕혀서 출발점을 맞춘다.</summary>
+    async UniTask LayPaperDownAsync(float _from)
+    {
+        float t_p   = Mathf.Clamp(_from, 0f, 0.5f);
+        float t_dur = Mathf.Min(0.12f, Mathf.Max(0.02f, this.dragReturnDuration) * (t_p / 0.5f));
+
+        await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 0f, t_dur)
+            .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this).ToUniTask();
+
+        pageFlip.Cancel();
+        HideUnderPage();
+    }
+
+    /// <param name="_durationScale">넘김 한 장의 길이 배율. 되감기의 중간 장을 짧게 줄일 때만 1이 아니다.</param>
+    /// <param name="_restoreSides">끝에서 게이지·페이지 번호를 되돌릴지. 되감기의 중간 장은 되돌리지 않는다 —
+    /// 되돌려봐야 다음 장이 곧바로 다시 걷어가 글자가 깜빡이기만 한다.</param>
+    async UniTask FlipAsync(int _target, int _dir, AlbumTheme _theme, float _from = 0f,
+                            float _durationScale = 1f, bool _restoreSides = true)
     {
         int t_gen = ++m_flipGen;
 
@@ -676,7 +857,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 이미 세워둔 만큼은 빼고 남은 구간만 트윈한다 — 안 그러면 손가락이 민 거리가 두 번 재생된다.
             // 접히는 한 구간이 넘김의 전부이므로 남은 몫에 duration을 통째로 배분한다(예전의 절반 배분 아님).
             float t_p     = Mathf.Clamp(_from, 0f, 0.5f);
-            float t_first = pageFlip.Duration * (1f - t_p / 0.5f);
+            float t_first = pageFlip.Duration * Mathf.Max(0.05f, _durationScale) * (1f - t_p / 0.5f);
 
             pageFlip.SetFlipProgress(t_p);
             if (t_first > 0.001f)
@@ -697,6 +878,9 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 종이는 접혀 사라진 자리에서 곧바로 눕히고, 아래에서 기다리던 장이 그 자리를 잇는다.
             pageFlip.Cancel();
             HideUnderPage();
+
+            // 되감기 중간 장은 여기서 끝낸다 — 글자를 되돌려봐야 다음 장이 곧바로 다시 걷어간다.
+            if (!_restoreSides) return;
 
             // 자세는 이미 평평하지만 게이지·페이지 번호는 접히는 동안 걷혀 있었다 — 글자만 짧게 되돌린다.
             // 여기서 안 되돌리면 새 번호가 한 프레임에 툭 튀어나온다.
@@ -722,6 +906,8 @@ public class AlbumPageOverlayView : MonoBehaviour
     void CancelFlip()
     {
         m_flipGen++;                 // 진행 중이던 넘김의 커밋·정리를 무효화한다
+        m_rewindGen++;               // 여러 장짜리 되감기도 같이 끊는다(다음 장을 이어 넘기지 않게)
+        m_rewinding    = false;
         m_dragging     = false;      // 손가락이 세워둔 자세도 여기서 함께 버린다
         m_dragArmed    = false;
         m_dragReturning = false;

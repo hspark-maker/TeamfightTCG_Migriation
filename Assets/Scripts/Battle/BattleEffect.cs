@@ -15,7 +15,7 @@ using UnityEngine;
 ///
 /// **계약은 반환 타입이 말한다.** 동기 void = "await 없이 그 자리에서 끝나야 한다"(순서 보장이 걸린 것),
 /// UniTask = "연출을 await해도 된다". 단 .Forget으로 발화되는 것은 **첫 await 전에 상태변이 완결**.
-/// **전 훅 MatchRandom 소비 금지**(예외: OrnnPassive의 AfterAttack — await 경로).
+/// **전 훅 MatchRandom 소비 금지.**
 ///
 /// ctx.synergy = 이 발화를 일으킨 시너지(passive 발화면 null). 시너지 효과는 이걸로
 /// SynergyApplier.BelongsTo 자기판정 + SynergyTriggers.Fire 배너 태그를 한다.

@@ -21,6 +21,12 @@ public static class DeckPower
     public static int EvolutionStageOf(CardData _card, bool _mine = true)
         => CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, _mine)).EvolutionStage;
 
+    /// <summary>표시용 시너지 해금 여부. 시너지는 1차 진화 레벨에서 열린다(CardGrowthConfig.SynergyUnlockedAt) →
+    /// 그 전 카드는 실제로 시너지에 참여하지 않으므로 카드 위에 배지·시너지용 배경판을 띄우면 오정보다.
+    /// 전투 인스턴스에는 이미 같은 게이트가 CardInstance.synergyEnabled로 박혀 있다 — 그쪽이 있으면 그쪽이 이긴다.</summary>
+    public static bool SynergyUnlockedOf(CardData _card, bool _mine = true)
+        => _card != null && CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, _mine)).SynergyUnlocked;
+
     // 표시용 최대 체력. 내 카드는 내 강화 진행도, 상대 카드는 상대 레벨 기준이다.
     public static int MaxHpOf(CardData _card, bool _mine = true)
     {
@@ -35,6 +41,29 @@ public static class DeckPower
     // 카드 1장의 파워(null은 0)
     public static int Of(CardData _card, bool _mine = true)
         => _card != null ? MaxHpOf(_card, _mine) + _card.bonusHp : 0;
+
+    /// <summary>지정한 레벨에 선 카드의 표시용 최대 체력. 레벨을 랭크 티어가 아니라 <b>저작이</b> 정하는
+    /// 상대(토너먼트 정점)를 위한 길이다 — LevelOf는 내 랭크를 읽으므로 그쪽으로 가면 정점마다 같은 수가 나온다.</summary>
+    public static int MaxHpAtLevel(CardData _card, int _level)
+        => _card != null ? _card.maxHp + CardGrowthManager.GrowthAtLevel(_card, _level).HpBonus : 0;
+
+    /// <summary>덱 전체가 지정한 레벨에 섰을 때의 파워 합. 정점의 권장 전투력이 여기서 나온다 —
+    /// 난이도를 SO에 따로 저작하면 적 덱을 고칠 때마다 두 수가 어긋난다.</summary>
+    public static int OfAtLevel(IReadOnlyList<CardData> _deck, int _level)
+    {
+        if (_deck == null) return 0;
+
+        int t_sum = 0;
+        for (int t_i = 0; t_i < _deck.Count; t_i++)
+        {
+            CardData t_card = _deck[t_i];
+            if (t_card == null) continue;
+
+            t_sum += MaxHpAtLevel(t_card, _level) + t_card.bonusHp;
+        }
+
+        return t_sum;
+    }
 
     // 덱 전체 파워 합
     public static int Of(IReadOnlyList<CardData> _deck, bool _mine = true)

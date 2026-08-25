@@ -13,6 +13,32 @@ public static class SynergyText
         return string.IsNullOrEmpty(_synergy.displayName) ? _synergy.name : _synergy.displayName;
     }
 
+    /// <summary>요구 장수만 짧게. 티어가 여럿이면 "2장/4장"으로 잇는다 —
+    /// 시너지 이름 옆에 붙일 자리(카드 상세 칩)는 한 줄이라 설명·라벨을 담지 못한다.
+    /// 티어가 없으면 빈 문자열(호출측이 이름만 쓰면 된다).</summary>
+    public static string Requirement(SynergyData _synergy)
+    {
+        SynergyTier[] t_tiers = _synergy != null ? _synergy.tiers : null;
+        if (t_tiers == null || t_tiers.Length == 0) return string.Empty;
+
+        var t_sb = new StringBuilder();
+        foreach (SynergyTier t_tier in t_tiers)
+        {
+            if (t_tier == null) continue;
+            if (t_sb.Length > 0) t_sb.Append('/');
+            t_sb.Append(t_tier.requiredCount).Append('장');
+        }
+
+        return t_sb.ToString();
+    }
+
+    /// <summary>효과 설명만(요구치 제외). 요구치를 이름 옆으로 올린 화면이 쓴다.</summary>
+    public static string Effect(SynergyData _synergy)
+    {
+        if (_synergy == null) return string.Empty;
+        return string.IsNullOrEmpty(_synergy.effectDescription) ? string.Empty : _synergy.effectDescription;
+    }
+
     /// <summary>설명 + 티어 목록.
     /// _ownedCount &gt;= 0 이면 보유 수 기준으로 열림(●)/미달(○)을 표시하고,
     /// 음수면 덱 문맥이 없는 것으로 보고 마커 없이 요구치만 나열한다(카드 정보 팝업 용도).</summary>
@@ -20,7 +46,8 @@ public static class SynergyText
     {
         if (_synergy == null) return string.Empty;
 
-        var t_sb = new StringBuilder();
+        string t_name = Name(_synergy);
+        var    t_sb   = new StringBuilder();
         if (!string.IsNullOrEmpty(_synergy.effectDescription))
             t_sb.Append(_synergy.effectDescription);
 
@@ -37,7 +64,9 @@ public static class SynergyText
                 if (_ownedCount >= 0)
                     t_sb.Append(t_tier.requiredCount <= _ownedCount ? "● " : "○ ");
                 t_sb.Append(t_tier.requiredCount).Append('장');
-                if (!string.IsNullOrEmpty(t_tier.label))
+
+                // 라벨이 시너지 이름과 같으면 적지 않는다 — 이름이 이미 위에 있어 "2장 — 덩치"가 같은 말을 두 번 한다.
+                if (!string.IsNullOrEmpty(t_tier.label) && t_tier.label != t_name)
                     t_sb.Append(" — ").Append(t_tier.label);
             }
         }

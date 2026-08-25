@@ -5,12 +5,53 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
+/// <summary>덱 편집 한 번의 진입분. 로비 탭(DeckTabController)과 매치 셸(MatchDeckShell)이 같은 화면을
+/// 서로 다른 요구로 여는데, 그 차이를 <b>전부 여기 필드로</b> 표현한다 — 프리팹 사본이나 배리언트로 갈리지 않게.</summary>
+public sealed class DeckEditData : UIData
+{
+    /// <summary>편집할 저장 슬롯. <see cref="isNew"/>가 true면 무시한다.</summary>
+    public int slotIndex = -1;
+
+    /// <summary>신규 덱 생성. 저장 좌표는 6/6 완성 저장 시점에 정해진다(매치 화면은 쓰지 않는다).</summary>
+    public bool isNew;
+
+    /// <summary>편집 종료 시 호스트 복귀. 미주입이면 로비 탭 셸 경로를 탄다.</summary>
+    public Action onExit;
+
+    /// <summary>드래그 레이어. 프리팹이 자기 것을 들고 있으면 무시된다 —
+    /// 덱 편집을 단독으로 띄우는 테스트 씬처럼 프리팹에 없을 때만 쓰인다.</summary>
+    public DeckEditDragController dragController;
+
+    /// <summary>편집을 열 때 이 카드 한 장을 덱에서 빼고 시작한다(없으면 저장된 그대로).
+    /// 튜토리얼이 "직접 골라 끼우기"를 가르치는 자리 — 빈 칸이 하나 있어야 가르칠 것이 생긴다.</summary>
+    public CardData holdoutCard;
+
+    /// <summary>상단 제목.
+    /// (예전에는 배리언트가 노드를 아예 삭제해서 껐다 — 그래서 저작본이 둘로 갈렸다.)</summary>
+    public bool showTitle = true;
+
+    /// <summary>덱 전투력 표시. 매치 화면은 끈다(덱 확인 패널이 그 자리를 쥔다).</summary>
+    public bool showDeckPower = true;
+
+    /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
+    /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
+    /// 로비 탭은 미주입 → 버튼이 꺼진다.
+    ///
+    /// 호출 시점은 편집기의 이탈 판정(RequestLeave)을 통과한 뒤다 — 전투가 소비하는 것은 세이브이므로
+    /// 저장하지 않은 편성분을 안고 시작하면 화면에 그린 덱과 실제 출전 덱이 갈린다.</summary>
+    public Action onPlay;
+}
+
 // 덱 구성 화면(DeckEditPanel에 부착). 편성 상태의 진실원이자 저장 진입점.
 //
 // 편집은 전부 m_working(6칸, null 허용) 위에서만 일어나고 DeckSaveManager에는 손대지 않는다.
 // "취소하면 원상복구"를 별도 스냅샷 없이 성립시키기 위한 구조다 — 세이브를 편집 중에 건드리는 순간
 // 취소 경로에서 복원할 원본이 사라진다.
-public class DeckEditController : MonoBehaviour
+//
+// 풀드 UI다. 예전에는 로비 탭 안에 한 벌, 매치 오버레이 안에 한 벌(MatchDeckEditPanel 배리언트) —
+// 저작본이 둘로 갈려 레이아웃 오버라이드가 쌓였다. 지금은 UIPoolManager가 세우는 인스턴스 하나뿐이고
+// 두 호스트의 차이는 전부 DeckEditData로 들어온다.
+public class DeckEditController : PooledUIBase
 {
     [SerializeField] TMP_InputField    nameInput;      // 덱 이름 입력/표시
     [SerializeField] Button            backButton;
@@ -19,6 +60,8 @@ public class DeckEditController : MonoBehaviour
     [Header("편성 UI")]
     [SerializeField] DeckEditSlotView[]     slots;          // 크기 6
     [SerializeField] DeckEditCollectionGrid collectionGrid;
+    [Tooltip("로비에서는 LobbyTabController가 Initialize로 넘긴다(탭 프리팹에 오버라이드를 남기지 않으려고).\n"
+           + "여기 배선은 덱 편집을 단독으로 띄우는 테스트 씬용 폴백이다.")]
     [SerializeField] DeckEditDragController dragController;
     [SerializeField] TMP_Text               countText;
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
@@ -29,6 +72,17 @@ public class DeckEditController : MonoBehaviour
     [SerializeField] Button autoEquipButton;
     [Tooltip("우측 하단 저장 버튼. 바꾼 게 있을 때만 눌린다(미배선이면 나갈 때 확인만으로 저장한다).")]
     [SerializeField] Button saveButton;
+
+    [Header("호스트별로 켜고 끄는 것 (선택)")]
+    [Tooltip("상단 제목 노드. 호스트가 DeckEditData.showTitle로 켜고 끈다.")]
+    [SerializeField] GameObject titleNode;
+
+    [Tooltip("덱 전투력 표시 노드. 호스트가 DeckEditData.showDeckPower로 켜고 끈다.")]
+    [SerializeField] GameObject deckPowerNode;
+
+    [Tooltip("전투 시작 버튼. DeckEditData.onPlay가 주입됐을 때만 켜진다 —\n"
+           + "로비 탭에서는 여기서 전투로 갈 곳이 없다. 미배선이면 그 축을 통째로 건너뛴다.")]
+    [SerializeField] Button playButton;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -48,6 +102,16 @@ public class DeckEditController : MonoBehaviour
     // 편집 진입 시점의 이름. 이름 변경 여부 판정 기준이자 빈 입력의 복구값이다.
     string m_savedName;
 
+    // 튜토리얼 게이트 아래 층으로 내려앉기 위한 자기 캔버스(LiftToOverlayLayer가 만든다).
+    Canvas m_sortingCanvas;
+
+    // 이번 편집에서 일부러 빼 둔 카드. 유저가 도로 끼우면 null로 돌아간다.
+    CardData m_holdout;
+
+    /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
+    /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
+    public static event Action<CardData> OnAnyCardEquipped;
+
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
     // 드래그 컨트롤러가 드롭 대상 판정에 쓰는 칸 목록. 미배선(null)이어도 호출측이 터지지 않게 빈 목록을 준다.
@@ -62,8 +126,21 @@ public class DeckEditController : MonoBehaviour
     // 다시 주입해야 하면 호스트가 이 패널의 라이프사이클을 추적해야 한다.
     public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
 
-    void Awake()
+    /// <summary>드래그 컨트롤러 주입. <b>프리팹이 자기 것을 들고 있으면 주입을 무시한다</b> —
+    /// 풀드 UI는 자기 캔버스(order 400)에 살아서, 로비 캔버스(order 0)의 DragLayer를 주입받으면
+    /// 고스트가 패널 뒤로 깔린다. 프리팹 안에 레이어가 없는 경우(단독 테스트 씬)에만 주입이 먹는다.</summary>
+    public void SetDragController(DeckEditDragController _controller)
     {
+        if (dragController == null && _controller != null) dragController = _controller;
+    }
+
+    // 이번 진입 요청. Open은 Show에서 돈다 — BeginEdit이 컬렉션 그리드를 세우므로 활성 상태여야 한다.
+    DeckEditData m_request;
+
+    protected override void Awake()
+    {
+        base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
+
         if (backButton != null)
         {
             backButton.onClick.RemoveAllListeners();
@@ -80,12 +157,21 @@ public class DeckEditController : MonoBehaviour
         {
             autoEquipButton.onClick.RemoveAllListeners();
             autoEquipButton.onClick.AddListener(AutoEquip);
+
+            // 잠김 룩은 한 번만 붙인다 — 이후 해금 반영은 붙은 컴포넌트가 스스로 한다.
+            FeatureLockView.Attach(autoEquipButton.gameObject, EOutgameFeature.DeckAutoEquip);
         }
 
         if (saveButton != null)
         {
             saveButton.onClick.RemoveAllListeners();
             saveButton.onClick.AddListener(OnSaveClicked);
+        }
+
+        if (playButton != null)
+        {
+            playButton.onClick.RemoveAllListeners();
+            playButton.onClick.AddListener(OnPlayClicked);
         }
 
         if (nameInput != null)
@@ -97,6 +183,15 @@ public class DeckEditController : MonoBehaviour
 
         // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
+
+        // 열리기 전에는 반드시 꺼져 있다. 켜고 끄는 주인은 풀(Show/Hide)뿐이다.
+        //
+        // 왜 코드로 강제하나: 씬/프리팹에 저작된 인스턴스가 켜진 채로 남아 있으면
+        // (Tab_Deck의 DeckEditPanel 인스턴스가 m_IsActive=1로 저작돼 있다) 전체화면 편집 화면이
+        // 로비 위에 깔려 하단 탭바까지 클릭을 먹는다 — 예전엔 호스트의 SetActive(false)가 매번 지웠지만
+        // 그 책임이 풀로 옮겨간 지금은 "열 때만 켠다"를 여기서 불변식으로 박아야 한다.
+        // 배선은 이 위에서 이미 끝났으므로 지금 꺼도 다음 열기에 그대로 살아 있다.
+        if (!this.isShow) gameObject.SetActive(false);
     }
 
     // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
@@ -120,6 +215,90 @@ public class DeckEditController : MonoBehaviour
             collectionGrid.SetScrollLocked(t_focusing);
         }
     }
+
+    /// <summary>풀이 넘긴 진입 요청을 받아둔다. 실제 열기는 <see cref="Show"/>다 —
+    /// 재사용 인스턴스는 이 시점에 아직 비활성이고, BeginEdit이 세우는 컬렉션 그리드는 활성이라야 레이아웃이 선다.</summary>
+    public override void Initialization(UIData _data)
+    {
+        this.data    = _data;
+        this.m_request = _data as DeckEditData;
+
+        if (this.m_request == null)
+        {
+            Debug.LogError("[DeckEditController] DeckEditData가 아니면 어느 덱을 열지 알 수 없다.", this);
+            return;
+        }
+
+        SetExitHandler(this.m_request.onExit);
+        SetDragController(this.m_request.dragController);
+    }
+
+    public override void Show()
+    {
+        if (this.m_request == null) return;
+
+        gameObject.SetActive(true);   // OnEnable이 여기서 돌아 소유 변경·해금 구독이 선다
+        this.isShow = true;
+
+        LiftToOverlayLayer();
+        ApplyHostChrome();
+
+        if (this.m_request.isNew) OpenNew();
+        else                      Open(this.m_request.slotIndex);
+    }
+
+    // 호스트마다 켜고 끄는 장식. 노드를 지우지 않고 끄기만 한다 —
+    // 예전에는 매치 배리언트가 Title·DeckPower·BackButton을 **삭제**해서 저작본이 둘로 갈렸다.
+    void ApplyHostChrome()
+    {
+        if (this.titleNode     != null) this.titleNode.SetActive(this.m_request.showTitle);
+        if (this.deckPowerNode != null) this.deckPowerNode.SetActive(this.m_request.showDeckPower);
+
+        // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
+        if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
+    }
+
+    /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
+    /// 그건 RequestLeave 한 곳뿐이고, 호스트는 허가가 떨어진 뒤에 이걸 부른다.
+    /// (곧바로 부르면 확인 없이 편성분이 사라진다.)</summary>
+    public override void Hide()
+    {
+        this.isShow = false;
+
+        Close();
+
+        // 그리드 Clear의 Destroy는 프레임 끝이라 등록이 한 프레임 더 살아 있다 — 여기서 명시로 걷는다.
+        if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(null);
+        this.m_holdout = null;
+
+        this.data = null;
+        this.m_request = null;
+        this.m_onExit = null;
+
+        gameObject.SetActive(false);   // OnDisable이 드래그 고스트까지 걷는 최종 방어선
+    }
+
+    /// <summary>덱 편집을 여는 유일한 창구. 두 호스트가 같은 한 인스턴스를 쓴다.
+    /// 풀이 없으면(부트 미초기화) null — 호스트는 진입 자체를 포기해야 한다(빈 화면으로 갇히지 않게).</summary>
+    public static DeckEditController OpenPooled(DeckEditData _data)
+    {
+        if (UIPoolManager.Instance == null)
+        {
+            Debug.LogError("[DeckEditController] UIPoolManager가 없어 덱 편집을 열 수 없다 — Boot 초기화를 확인할 것.");
+
+            return null;
+        }
+
+        return UIPoolManager.Instance.AddOrUpdateUI<DeckEditController>(_data);
+    }
+
+    /// <summary>풀이 세워 둔 편집 화면. <b>편집 중임을 아는 호스트만</b> 부를 것 —
+    /// 세운 적 없으면 풀이 "No Such UI" 로그를 남긴다(상태 질의용 창구가 아니다).</summary>
+    public static DeckEditController Pooled()
+        => UIPoolManager.instance != null ? UIPoolManager.instance.GetUI<DeckEditController>() : null;
+
+    /// <summary>풀이 세워 둔 편집 화면을 닫는다. 저장 판정은 호스트가 <see cref="RequestLeave"/>로 이미 받았다고 본다.</summary>
+    public static void HidePooled() => Pooled()?.Hide();
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
     public void Open(int _slotIndex)
@@ -146,40 +325,14 @@ public class DeckEditController : MonoBehaviour
 
         m_dirty = false;   // 로드 직후 = 디스크와 동일 → 그냥 나가면 파일 쓰기 없음
 
+        ApplyHoldout();
+
         // 표시용 폴백("덱 N")까지 포함한 값이라야, 입력을 안 건드렸을 때 rename 판정이 false로 유지된다.
         BeginEdit(DeckSaveManager.GetDisplayName(_slotIndex));
     }
 
     // backButton이 없는 화면(매치 편집 패널)의 종료 창구.
     public void RequestExit() => RequestLeave(ExitEditor);
-
-    // 편집 화면에 머문 채 다른 저장 슬롯으로 갈아탄다(매치 화면의 가로 덱 리스트).
-    // 6/6이면 조용히 저장하고 미완성이면 이번 편집분을 버린다 — 확인 팝업 없음(매치 화면 정책).
-    // 반환 false = 전환하지 않았다. 호출측이 자기 선택 상태를 되돌릴 수 있어야 한다.
-    public bool SwitchTo(int _slotIndex)
-    {
-        if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return false;
-
-        // 같은 덱 재클릭까지 재로드하면 아직 6/6이 아닌 편집분이 조용히 증발한다.
-        if (m_mode == EDeckEditMode.Edit && _slotIndex == m_slotIndex) return false;
-
-        // 드래그 도중 리스트가 눌릴 수 있다(고스트가 상단을 덮지 않는 배치) — RequestLeave와 같은 선처리.
-        if (dragController != null && dragController.IsDragging) dragController.Cancel();
-
-        // 신규 저장은 TryInsertFront가 맨 앞에 꽂아 기존 슬롯을 전부 한 칸 뒤로 민다 →
-        // 저장 전 좌표로 열면 유저가 고른 덱이 아니라 이웃 덱이 열린다. 저장 여부를 미리 확정해 좌표를 보정한다.
-        bool t_inserting = m_mode == EDeckEditMode.Create && CountFilled() == DeckSaveManager.DECK_SIZE;
-
-        // 저장에 실패했는데 전환하면 편성한 6장이 조용히 증발한다(RequestLeave가 화면을 유지하는 것과 같은 이유).
-        if (!SaveIfComplete()) return false;
-
-        int t_target = t_inserting ? _slotIndex + 1 : _slotIndex;
-        if (t_target >= DeckSaveManager.SLOT_COUNT) return false;   // 밀려서 범위를 벗어난 칸은 열 수 없다
-
-        Open(t_target);
-
-        return true;
-    }
 
     // 6/6일 때만 저장한다. 미완성이면 아무것도 하지 않는다(= 폐기).
     // 저장 규칙은 SaveNewDeck/SaveEditedDeck을 그대로 쓴다 — 규칙이 두 벌이 되는 순간 매치와 로비가 갈라진다.
@@ -225,6 +378,15 @@ public class DeckEditController : MonoBehaviour
     void OnEnable()
     {
         OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+
+        // 편집 화면이 열린 채 자동 편성이 해금될 수 있다 — 유저 조작으로만 도는 RefreshAll로는 그 순간을 못 잡아
+        // 버튼이 잠긴 채 굳는다(잠김 룩은 풀리는데 버튼은 안 풀리는 어긋남까지 생긴다).
+        OutgameFeatureLock.OnChanged += OnFeatureLockChanged;
+    }
+
+    void OnFeatureLockChanged()
+    {
+        if (IsOpen) RefreshAll();
     }
 
     // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
@@ -236,6 +398,7 @@ public class DeckEditController : MonoBehaviour
         // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
         collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         RefreshAll();
+        ScrollToHoldout();
     }
 
     // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
@@ -245,6 +408,7 @@ public class DeckEditController : MonoBehaviour
     void OnDisable()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        OutgameFeatureLock.OnChanged        -= OnFeatureLockChanged;
 
         m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
@@ -255,6 +419,42 @@ public class DeckEditController : MonoBehaviour
         if (dragController != null) dragController.Cancel();
         if (synergyStrip   != null) synergyStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
+    }
+
+    // 튜토리얼이 지목한 카드를 이번 편집에서만 빼 둔다 — 세이브는 건드리지 않는다(m_working 위에서만 일어난다).
+    // 칸을 앞으로 당기지 않고 그 자리를 비운다: 탭 배치(FindFirstEmpty)가 원래 자리를 되찾아야 편성 순서가 보존된다.
+    void ApplyHoldout()
+    {
+        m_holdout = m_request != null ? m_request.holdoutCard : null;
+        if (m_holdout == null) return;
+
+        for (int t_i = 0; t_i < m_working.Length; t_i++)
+        {
+            if (m_working[t_i] != m_holdout) continue;
+
+            m_working[t_i] = null;
+            return;
+        }
+
+        // 빼 둘 카드가 덱에 없으면 빈 칸이 안 생긴다 — "이 카드를 끼워라"라는 안내가 끼울 자리를 못 찾는다.
+        Debug.LogWarning($"[DeckEditController] 튜토리얼이 지목한 카드({m_holdout.name})가 이 덱에 없어 빈 칸을 만들지 못했다.");
+        m_holdout = null;
+    }
+
+    // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    void LiftToOverlayLayer()
+    {
+        this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+
+        LiftDragLayer();
+    }
+
+    // 드래그 고스트는 이 패널의 자식(DragLayer)이라 승격에 함께 딸려 내려간다 — 그대로 두면 게이트 딤 밑에서 끌린다.
+    void LiftDragLayer()
+    {
+        if (this.dragController == null) return;
+
+        UiSortingOrder.LiftNested(this.dragController.gameObject, UiSortingOrder.DragGhost);
     }
 
     // 두 진입점의 공통 후반부. m_mode·m_slotIndex·m_working은 호출 전에 확정돼 있어야 한다.
@@ -271,6 +471,13 @@ public class DeckEditController : MonoBehaviour
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
 
         RefreshAll();
+        ScrollToHoldout();
+    }
+
+    // 지목된 타일이 목록 밖에 있으면 게이트가 승격했을 때 클리핑이 끊겨 화면에 샌다 — 그리기 직후 안으로 들여놓는다.
+    void ScrollToHoldout()
+    {
+        if (m_holdout != null && collectionGrid != null) collectionGrid.EnsureVisible(m_holdout);
     }
 
     // 이름 입력 확정. 여기서는 표시만 정리하고 dirty를 세우지 않는다 —
@@ -343,7 +550,18 @@ public class DeckEditController : MonoBehaviour
 
         m_working[_slotIndex] = _card;
         m_dirty = true;
+
+        // 빼 뒀던 카드가 제자리로 돌아오면 디스크와 같아진다 — dirty를 남기면 튜토리얼 한복판에 저장 확인 팝업이 낀다.
+        // 다른 칸에 끼웠다면 편성 순서만 달라진 것이라 그 차이는 버린다(전투 덱은 시나리오가 정한다).
+        if (_card == m_holdout)
+        {
+            m_holdout = null;
+            if (CountFilled() == DeckSaveManager.DECK_SIZE) m_dirty = false;
+        }
+
         RefreshAll();
+
+        OnAnyCardEquipped?.Invoke(_card);
     }
 
     // 편성 칸 클릭 = 해제.
@@ -440,7 +658,11 @@ public class DeckEditController : MonoBehaviour
                 if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], ClearSlot);
         }
 
-        if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
+        if (collectionGrid != null)
+        {
+            collectionGrid.RefreshInDeck(m_working);
+            collectionGrid.ApplyTutorialAnchor(m_holdout);   // 끼우고 나면 m_holdout이 null이라 저절로 걷힌다
+        }
 
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";
@@ -499,6 +721,19 @@ public class DeckEditController : MonoBehaviour
     }
 
     void OnBackClicked() => RequestLeave(ExitEditor);
+
+    // 전투 시작. 나가기와 같은 판정을 거친다 — 전투가 소비하는 것은 세이브라, 저장하지 않은 편성분을
+    // 안고 시작하면 화면에 그린 덱과 실제 출전 덱이 갈린다(RequestLeave가 저장·미완성 확인을 맡는다).
+    //
+    // 호출 시점의 요청을 잡아 둔다: 확인 팝업 응답을 기다리는 동안 호스트가 다른 요청으로 이 화면을
+    // 다시 열면 m_request가 갈리고, 그때 허가가 떨어지면 엉뚱한 호스트의 전투가 시작된다.
+    void OnPlayClicked()
+    {
+        Action t_onPlay = this.m_request?.onPlay;
+        if (t_onPlay == null) return;
+
+        RequestLeave(t_onPlay);
+    }
 
     // 편집 화면을 떠나도 되는지 판정하는 단일 창구. 뒤로가기든 탭 버튼이든 전부 여기로 모은다 —
     // 경로마다 판정이 갈리면 "어떤 버튼으로 나갔는지"에 따라 편성분이 사라지고 말고가 달라진다.

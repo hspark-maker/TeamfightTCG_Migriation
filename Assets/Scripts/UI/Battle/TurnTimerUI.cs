@@ -81,9 +81,9 @@ public class TurnTimerUI : MonoBehaviour
 
         if (this.ring != null) this.ring.fillAmount = TurnThinkTimer.Normalized;
 
+        // 숫자 색은 씬 저작값 그대로 둔다 — 링·발광만 남은 시간을 색으로 말한다.
         Color t_color = ResolveColor(t_remain);
-        if (this.label != null) this.label.color = t_color;
-        if (this.ring  != null) this.ring.color  = t_color;
+        if (this.ring != null) this.ring.color = t_color;
 
         ApplyGlow(t_remain, t_color);
         ApplyScale(t_remain);

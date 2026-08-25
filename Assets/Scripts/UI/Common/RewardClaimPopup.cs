@@ -11,10 +11,8 @@ using TMPro;
 //
 // ⚠ 어느 탭에도 속하지 않는 공용 1개다. 랭크 오버레이 밑에 두면 그 오버레이를 켜야만 뜨므로,
 //   앨범 수령에서 랭크 보상 목록이 뒤에 같이 켜진다 — 반드시 두 오버레이의 형제로 선다.
-public class RewardClaimPopup : MonoBehaviour
+public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 {
-    static RewardClaimPopup s_instance;
-
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
     [SerializeField] GameObject root;
 
@@ -48,6 +46,9 @@ public class RewardClaimPopup : MonoBehaviour
     // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
     Func<bool> m_onConfirm;
 
+    // 닫힘 콜백. 연 쪽이 팝업 뒤에 연출을 이을 때만 쓴다(공용 팝업이라 static 이벤트로 두면 다른 소비처에 샌다).
+    Action m_onClosed;
+
     // 표시 중인 행의 보상. 재화가 갈리면 각자의 HUD로 각자의 빛이 흘러가므로 종류별로 담아 둔다.
     readonly CurrencyGainBucket m_rewards = new CurrencyGainBucket();
 
@@ -62,21 +63,17 @@ public class RewardClaimPopup : MonoBehaviour
     /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).
     /// </summary>
     public static bool TryGet(out RewardClaimPopup _popup)
-    {
-        if (s_instance == null)
-            s_instance = FindFirstObjectByType<RewardClaimPopup>(FindObjectsInactive.Include);
-
-        _popup = s_instance;
-        return _popup != null;
-    }
+        => TryGetExisting(out _popup);
 
     /// <summary>
     /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
     /// 실패(팝업이 뜬 사이 상태가 바뀜)면 분출 없이 닫는다.
     /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm)
+    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm,
+                     bool _claimOnDim = false, Action _onClosed = null)
     {
         this.m_onConfirm = _onConfirm;
+        this.m_onClosed = _onClosed;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         this.KillIntro();
@@ -94,8 +91,16 @@ public class RewardClaimPopup : MonoBehaviour
 
         if (this.claimButton != null)
         {
+            this.claimButton.gameObject.SetActive(!_claimOnDim);
             this.claimButton.onClick.RemoveAllListeners(); // 재표시마다 중복 등록 방지
             this.claimButton.onClick.AddListener(this.OnClaimClicked);
+        }
+
+        if (this.dimButton != null)
+        {
+            this.dimButton.onClick.RemoveAllListeners();
+            if (_claimOnDim) this.dimButton.onClick.AddListener(this.OnClaimClicked);
+            else this.dimButton.onClick.AddListener(this.Hide);
         }
 
         this.SetVisible(true);
@@ -116,6 +121,11 @@ public class RewardClaimPopup : MonoBehaviour
         this.m_onConfirm = null;
         this.KillIntro();
         this.SetVisible(false);
+
+        // 먼저 비우고 부른다 — 콜백이 이 팝업을 다시 열어도(Show) 방금 심은 콜백을 덮지 않게.
+        var t_closed = this.m_onClosed;
+        this.m_onClosed = null;
+        t_closed?.Invoke();
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -143,6 +153,8 @@ public class RewardClaimPopup : MonoBehaviour
 
         // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
         bool t_granted = t_callback != null && t_callback.Invoke();
+        // 가드에 걸려 되돌아간 클릭에는 줄 것이 없다 — 소리도 없다.
+        if (t_granted) SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
 
         // 실패(팝업이 뜬 사이 상태가 바뀌어 가드에 걸림)면 줄 것이 없으니 연출도 없다.
         if (!t_granted || !CurrencyGainEffectPlayer.TryGet(this, out var t_player))

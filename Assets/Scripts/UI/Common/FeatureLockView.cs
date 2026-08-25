@@ -1,163 +1,209 @@
+using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
-using UnityEngine.UI;
 
 // 튜토리얼 진행으로 아직 열리지 않은 UI에 잠김 룩을 얹는 표시 컴포넌트.
 // 판정은 갖지 않는다 — OutgameFeatureLock이 단일 진실원이고 여기는 그 결과를 그리기만 한다.
 //
-// 차단 수단이 둘로 갈리는 것이 이 컴포넌트의 핵심 계약이다:
-//  - 단일 위젯(버튼 하나)은 interactable=false가 막는다. 오버레이를 버튼 "자식"으로 넣으면
-//    자식 그래픽 클릭이 부모 Button으로 버블링되므로 딤만으로는 못 막는다.
-//  - 영역(패널 전체)은 오버레이 딤의 raycastTarget이 막는다. 그 안의 위젯을 하나씩 잠글 필요가 없다.
-// 따라서 controlInteractable을 끄는 대상(이미 다른 스크립트가 interactable을 매 갱신 덮어쓰는 곳)은
-// 반드시 그쪽 계산식에 OutgameFeatureLock.IsUnlocked를 넣어야 한다 — 여긴 룩만 담당하게 된다.
+// 차단은 이 컴포넌트의 몫이 아니다. interactable을 세우는 주체는 각 화면의 계산식이어야 한다 —
+// 여기서 함께 만지면 매 갱신마다 서로 덮어써 어느 쪽이 이겼는지가 호출 순서에 달리게 된다.
+//
+// 룩은 두 겹이다: 대상 전체 탈채도 + 그 위에 얹는 자물쇠 배지. 탈채도만으로도 "지금은 못 쓴다"가 성립하고
+// 배지는 "나중에 열린다"를 덧붙이는 것이라, 배지 프리팹이 없으면 경고 한 번 뒤 탈채도만으로 간다.
 public class FeatureLockView : MonoBehaviour
 {
-    const string OverlayPath = "UI/LockOverlay";
-    const string DimName     = "Dim";   // 오버레이 프리팹에서 실루엣을 갈아끼울 자식
-
     [Tooltip("이 UI를 여는 기능 키. None이면 항상 열려 있다")]
     [SerializeField] EOutgameFeature feature;
 
-    [Tooltip("잠글 대상. 비우면 자기 오브젝트에서 찾는다")]
-    [SerializeField] Selectable target;
+    [Tooltip("자물쇠 배지를 놓을 자리. 비우면 자기 RectTransform")]
+    [SerializeField] RectTransform badgeParent;
 
-    [Tooltip("interactable을 직접 건드릴지. 이미 다른 스크립트가 매 갱신마다 덮어쓰는 대상은 꺼서 경합을 없앤다")]
-    [SerializeField] bool controlInteractable = true;
+    [Tooltip("해제되는 순간 자물쇠가 터지는 길이(초). 0이면 예전처럼 즉시 사라진다")]
+    [SerializeField] float unlockFxDuration = 0.25f;
 
-    [Tooltip("잠김 오버레이를 놓을 자리. 비우면 자기 RectTransform")]
-    [SerializeField] RectTransform overlayParent;
+    GameObject m_badge;
+    bool       m_badgeMissing;   // 프리팹 미배치 경고·재시도는 1회로 끝낸다
+    Vector3    m_badgeScale0;    // 연출이 잘려도 저작 배율로 돌아갈 자리
 
-    GameObject m_overlay;
-    Selectable m_target;
-    bool       m_targetResolved;
-    bool       m_overlayMissing;   // 프리팹 미배치 경고·재시도는 1회로 끝낸다
+    Sequence m_unlockFx;
+    bool     m_wasLocked;        // 직전 적용 결과. 잠김→활성 뒤집힘을 이 컴포넌트가 스스로 잡는다
+    bool     m_synced;           // 첫 적용은 상태 맞추기일 뿐이라 연출을 태우지 않는다
+
+    List<UiGrayscale.Toned> m_toned;
 
     public EOutgameFeature Feature => feature;
 
     /// <summary>지금 이 UI가 잠겨 있는가. 튜토리얼 게이트가 "왜 타깃이 안 눌리는지"를 진단할 때 읽는다.</summary>
     public bool IsLocked => feature != EOutgameFeature.None && !OutgameFeatureLock.IsUnlocked(feature);
 
-    /// <summary>런타임 부착용(탭 버튼처럼 프리팹에 컴포넌트를 못 붙이는 대상).
-    /// AddComponent 직후엔 OnEnable이 이미 지나갔으므로 여기서 다시 적용한다.</summary>
-    public void Bind(EOutgameFeature _feature, bool _controlInteractable = true)
+    /// <summary>런타임 부착 창구. 프리팹에 컴포넌트를 못 붙이는 대상(Layer Lab 인스턴스 안의 stripped Button 등)이나
+    /// 잠금 대상이 코드로만 정해지는 자리에서 쓴다. 대상마다 거대 프리팹을 열지 않아도 되는 것이 요점이다.
+    ///
+    /// 한 번만 부르면 된다 — 이후 해금 반영은 이 컴포넌트가 OnChanged를 구독해 스스로 한다.</summary>
+    public static void Attach(GameObject _target, EOutgameFeature _feature)
     {
-        this.feature             = _feature;
-        this.controlInteractable = _controlInteractable;
+        if (_target == null || _feature == EOutgameFeature.None) return;
 
-        if (isActiveAndEnabled) Apply();
+        var t_view = _target.GetComponent<FeatureLockView>();
+        if (t_view == null) t_view = _target.AddComponent<FeatureLockView>();
+
+        // 저작 시절 꺼둔 채 남은 인스턴스가 있다 — GetComponent는 그것도 찾아오므로 켜 주지 않으면
+        // OnEnable이 돌지 않아 구독도 룩도 없이 조용히 넘어간다.
+        t_view.enabled = true;
+        t_view.Bind(_feature);
+    }
+
+    /// <summary>AddComponent 직후엔 OnEnable이 이미 지나갔으므로(구독만 걸린 채 feature가 비어 있다) 여기서 다시 적용한다.</summary>
+    public void Bind(EOutgameFeature _feature)
+    {
+        this.feature = _feature;
+
+        if (isActiveAndEnabled) Apply(_silent: true);
     }
 
     void OnEnable()
     {
-        OutgameFeatureLock.OnChanged += Apply;
-        Apply();
+        OutgameFeatureLock.OnChanged += OnLockChanged;
+
+        // 켜질 때는 상태만 맞춘다. 꺼져 있는 동안 열린 기능까지 여기서 터뜨리면
+        // 사건이 일어난 시점과 보이는 시점이 갈려 "방금 열렸다"로 안 읽힌다.
+        Apply(_silent: true);
     }
 
     void OnDisable()
     {
-        OutgameFeatureLock.OnChanged -= Apply;
+        OutgameFeatureLock.OnChanged -= OnLockChanged;
+        KillUnlockFx();
+        HideBadge();
     }
 
-    void Apply()
+    void OnLockChanged() => Apply(_silent: false);
+
+    void Apply(bool _silent)
     {
+        // 판정을 먼저 받는다 — 조회가 내부에서 OnChanged를 동기 발화해 이 메서드가 스스로 재진입할 수 있다.
+        // 상태를 그 뒤에만 만지면 중첩 호출이 먼저 끝나도 바깥이 같은 값으로 다시 세워 결과가 어긋나지 않는다.
         bool t_unlocked = OutgameFeatureLock.IsUnlocked(this.feature);
 
-        if (this.controlInteractable)
-        {
-            var t_target = ResolveTarget();
-            if (t_target != null) t_target.interactable = t_unlocked;
-        }
+        // 잠김→활성 뒤집힘은 이 위젯이 스스로 잡는다. OnChanged는 "무엇이 열렸는지"를 실어 주지 않지만
+        // 각자 자기 직전 상태를 알고 있어 그것만으로 "방금 내가 열렸다"가 성립한다.
+        // 판정을 IsUnlocked 뒤에 두는 것이 재진입 방어이기도 하다 — 중첩 호출이 이미 상태를 갱신했으면
+        // 바깥은 여기서 false를 받아 같은 해제로 두 번 터지지 않는다.
+        bool t_justUnlocked = !_silent && this.m_synced && this.m_wasLocked && t_unlocked;
 
-        // 열린 대다수는 오버레이를 만들지도 않는다 — 잠겼을 때만 생성한다.
+        this.m_wasLocked = !t_unlocked;
+        this.m_synced    = true;
+
+        // 다시 칠하기 전에 항상 저작값으로 되돌린다 — 잠긴 채로 자식이 늘어났을 수 있어 목록을 매번 새로 뜬다.
+        UiGrayscale.Restore(this.m_toned);
+
         if (t_unlocked)
         {
-            if (m_overlay != null) m_overlay.SetActive(false);
+            if (t_justUnlocked) PlayUnlockFx();
+            else              { KillUnlockFx(); HideBadge(); }
             return;
         }
 
-        EnsureOverlay();
-        if (m_overlay != null) m_overlay.SetActive(true);
+        KillUnlockFx();
+        EnsureBadge();
+
+        if (this.m_badge != null)
+        {
+            RestoreBadge();
+            this.m_badge.SetActive(true);
+        }
+
+        // 배지는 탈채도에서 제외한다. 자물쇠가 원래 무채색이라 지금은 티가 안 나지만, 생성 순서에 따라
+        // 걸리기도 안 걸리기도 하는 상태를 남기면 나중에 색 있는 배지로 갈았을 때 조용히 회색이 된다.
+        this.m_toned = UiGrayscale.Apply(gameObject, this.m_badge != null ? this.m_badge.transform : null);
     }
 
-    Selectable ResolveTarget()
+    /// <summary>잠김이 걷히는 한 박 — 자물쇠가 부풀며 사라지고 같은 박자에 대상이 한 번 튄다.
+    /// 색은 이 메서드에 오기 전에 이미 돌아와 있다. 원색이 자물쇠와 함께 걷혀서는 안 되고
+    /// 자물쇠가 터지는 프레임에 이미 들어와 있어야 "열렸다"가 사건으로 읽힌다.</summary>
+    void PlayUnlockFx()
     {
-        if (m_targetResolved) return m_target;
+        KillUnlockFx();
 
-        m_targetResolved = true;
-        m_target         = this.target != null ? this.target : GetComponent<Selectable>();
-        return m_target;
+        if (this.m_badge == null || this.unlockFxDuration <= 0f)
+        {
+            HideBadge();
+            return;
+        }
+
+        var t_tr = this.m_badge.transform;
+        var t_cg = this.m_badge.GetComponent<CanvasGroup>();
+        if (t_cg == null) t_cg = this.m_badge.AddComponent<CanvasGroup>();
+
+        this.m_badge.SetActive(true);
+        t_tr.localScale = this.m_badgeScale0;
+        t_cg.alpha      = 1f;
+
+        float t_len = this.unlockFxDuration;
+
+        this.m_unlockFx = DOTween.Sequence().SetLink(gameObject)
+                                 .Append(t_tr.DOScale(this.m_badgeScale0 * 1.6f, t_len).SetEase(Ease.OutQuad))
+                                 .Join(t_cg.DOFade(0f, t_len).SetEase(Ease.InQuad))
+                                 .OnComplete(HideBadge);
+
+        UiPunch.Play(transform);
     }
 
-    void EnsureOverlay()
+    void KillUnlockFx()
     {
-        if (m_overlay != null || m_overlayMissing) return;
+        if (this.m_unlockFx == null) return;
 
-        var t_parent = this.overlayParent != null ? this.overlayParent : transform as RectTransform;
+        // 먼저 비우고 죽인다 — Kill이 부르는 콜백이 다시 이 메서드로 들어와도 한 번만 돈다.
+        Sequence t_fx = this.m_unlockFx;
+        this.m_unlockFx = null;
+        t_fx.Kill();
+    }
+
+    void HideBadge()
+    {
+        if (this.m_badge == null) return;
+
+        RestoreBadge();
+        this.m_badge.SetActive(false);
+    }
+
+    /// <summary>연출이 정상 종료했든 잘렸든 배지를 저작 상태로 되돌린다 — 되감기나 재잠금으로
+    /// 다시 켜질 때 투명하거나 부푼 자물쇠가 뜨지 않게(멱등).</summary>
+    void RestoreBadge()
+    {
+        if (this.m_badge == null) return;
+
+        this.m_badge.transform.localScale = this.m_badgeScale0;
+
+        var t_cg = this.m_badge.GetComponent<CanvasGroup>();
+        if (t_cg != null) t_cg.alpha = 1f;
+    }
+
+    void EnsureBadge()
+    {
+        if (this.m_badge != null || this.m_badgeMissing) return;
+
+        var t_parent = this.badgeParent != null ? this.badgeParent : transform as RectTransform;
         if (t_parent == null)
         {
-            m_overlayMissing = true;
-            Debug.LogWarning($"[FeatureLockView] '{name}'이 RectTransform이 아니라 잠김 표시를 얹을 자리가 없습니다.");
+            this.m_badgeMissing = true;
+            Debug.LogWarning($"[FeatureLockView] '{name}'이 RectTransform이 아니라 자물쇠를 얹을 자리가 없습니다.");
             return;
         }
 
-        var t_prefab = Resources.Load<GameObject>(OverlayPath);
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LockBadge);
         if (t_prefab == null)
         {
-            m_overlayMissing = true;
-            Debug.LogWarning($"[FeatureLockView] Resources/{OverlayPath} 미배치 — '{name}'의 잠김 룩을 그리지 못합니다(차단은 interactable로만 걸립니다).");
+            this.m_badgeMissing = true;
+            Debug.LogWarning($"[FeatureLockView] 동기 UI 카탈로그 자물쇠 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
             return;
         }
 
-        m_overlay      = Instantiate(t_prefab, t_parent, false);
-        m_overlay.name = "LockOverlay";
+        // 저작된 앵커·비율을 그대로 살린다. 여기서 크기를 다시 잡으면 대상마다 어긋나던 옛 방식으로 돌아간다.
+        this.m_badge      = Instantiate(t_prefab, t_parent, false);
+        this.m_badge.name = "LockBadge";
+        this.m_badge.transform.SetAsLastSibling();
 
-        // 대상 전체를 덮도록 늘린다 — 프리팹 앵커가 좁게 저작돼도 차단 면적을 보장한다.
-        if (m_overlay.transform is RectTransform t_rect)
-        {
-            t_rect.anchorMin  = Vector2.zero;
-            t_rect.anchorMax  = Vector2.one;
-            t_rect.offsetMin  = Vector2.zero;
-            t_rect.offsetMax  = Vector2.zero;
-            t_rect.localScale = Vector3.one;
-        }
-
-        m_overlay.transform.SetAsLastSibling();   // 내용물 위에 그린다
-
-        ShapeDim(t_parent);
-    }
-
-    // 딤이 대상 실루엣을 따르게 스프라이트를 복사한다 — 원형·라운드 버튼에 사각 딤이 얹히면 모양이 어긋난다.
-    // 색은 프리팹의 검정 반투명 그대로라 스프라이트 알파가 곧 딤 모양이 된다.
-    void ShapeDim(RectTransform _parent)
-    {
-        var t_dim = m_overlay.transform.Find(DimName);
-        var t_dimImage = t_dim != null ? t_dim.GetComponent<Image>() : null;
-        if (t_dimImage == null) return;
-
-        var t_shape = FindShape(_parent);
-        if (t_shape == null || t_shape.sprite == null) return;   // 못 찾으면 프리팹의 사각 딤 그대로
-
-        t_dimImage.sprite                  = t_shape.sprite;
-        t_dimImage.type                    = t_shape.type;
-        t_dimImage.fillCenter              = t_shape.fillCenter;
-        t_dimImage.preserveAspect          = t_shape.preserveAspect;
-        t_dimImage.pixelsPerUnitMultiplier = t_shape.pixelsPerUnitMultiplier;
-
-        if (t_shape.type != Image.Type.Filled) return;
-
-        t_dimImage.fillMethod    = t_shape.fillMethod;
-        t_dimImage.fillAmount    = t_shape.fillAmount;
-        t_dimImage.fillClockwise = t_shape.fillClockwise;
-        t_dimImage.fillOrigin    = t_shape.fillOrigin;
-    }
-
-    // 오버레이가 덮는 면적의 주인이 곧 모양의 주인이다 — 오버레이 부모 → 잠금 대상 순으로 찾는다.
-    Image FindShape(RectTransform _parent)
-    {
-        var t_image = _parent.GetComponent<Image>();
-        if (t_image != null && t_image.sprite != null) return t_image;
-
-        var t_target = ResolveTarget();
-        return t_target != null ? t_target.image : null;
+        this.m_badgeScale0 = this.m_badge.transform.localScale;
     }
 }

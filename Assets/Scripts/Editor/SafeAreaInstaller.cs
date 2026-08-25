@@ -18,6 +18,37 @@ public static class SafeAreaInstaller
 {
     const string WrapperName = "SafeArea";
 
+    sealed class PooledLayout
+    {
+        public readonly string assetPath;
+        public readonly string parentPath;
+        public readonly string[] children;
+
+        public PooledLayout(string _assetPath, string _parentPath, params string[] _children)
+        {
+            this.assetPath  = _assetPath;
+            this.parentPath = _parentPath;
+            this.children   = _children;
+        }
+    }
+
+    // 딤·전체화면 입력은 원래 부모에 남기고 실제 콘텐츠만 감싼다.
+    // 이름/anchor 추론은 조용히 잘못 감쌀 수 있으므로 풀링 프리팹 계약을 명시한다.
+    static readonly PooledLayout[] PooledLayouts =
+    {
+        new("Assets/Assets/Prefabs/UI/PooledUI/ProfileEditPanel.prefab", "Root", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/SimpleYNPopup.prefab", "Contents", "TitleText", "YesButton", "NoButton"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab", "", "CardElement"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/TournamentNodePopup.prefab", "Contents", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/EffectNotifyUI.prefab", "", "Contents"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab", "Root", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Root", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab", "Contents", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab", "Contents", "Panel"),
+        new("Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab", "",
+            "Title", "BackButton", "DeckArea", "CollectionArea", "ButtonBar", "SaveButton", "PlayButton"),
+    };
+
     // 이름이 여기 포함되면 건너뛴다(전체 화면 연출용 캔버스).
     static readonly string[] SkipCanvases = { "CinematicCanvas", "CoinFlipCanvas" };
 
@@ -59,6 +90,88 @@ public static class SafeAreaInstaller
                   + (t_added > 0 ? " (씬 저장 필요)" : ""));
     }
 
+    [MenuItem("Tools/UI/Install SafeArea (Pooled UI Prefabs)")]
+    public static void InstallInPooledPrefabs()
+    {
+        int t_added = 0, t_skipped = 0, t_failed = 0;
+
+        foreach (PooledLayout t_layout in PooledLayouts)
+        {
+            GameObject t_root = PrefabUtility.LoadPrefabContents(t_layout.assetPath);
+            try
+            {
+                Transform t_parent = string.IsNullOrEmpty(t_layout.parentPath)
+                    ? t_root.transform
+                    : t_root.transform.Find(t_layout.parentPath);
+                if (t_parent == null)
+                {
+                    Debug.LogError($"[SafeArea] 부모 없음: {t_layout.assetPath}/{t_layout.parentPath}");
+                    t_failed++;
+                    continue;
+                }
+
+                Transform t_existing = t_parent.Find(WrapperName);
+                if (t_existing != null)
+                {
+                    if (t_existing.GetComponent<SafeAreaFitter>() == null)
+                        Debug.LogError($"[SafeArea] 이름은 있지만 Fitter 없음: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
+                    else
+                        Debug.Log($"[SafeArea] 이미 있음: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
+                    t_skipped++;
+                    continue;
+                }
+
+                var t_children = new List<Transform>(t_layout.children.Length);
+                foreach (string t_name in t_layout.children)
+                {
+                    Transform t_child = t_parent.Find(t_name);
+                    if (t_child == null || t_child.parent != t_parent)
+                    {
+                        Debug.LogError($"[SafeArea] 직속 자식 없음: {t_layout.assetPath}/{t_layout.parentPath}/{t_name}");
+                        t_children.Clear();
+                        break;
+                    }
+                    t_children.Add(t_child);
+                }
+
+                if (t_children.Count == 0)
+                {
+                    t_failed++;
+                    continue;
+                }
+
+                t_children.Sort((a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
+                int t_sibling = t_children[0].GetSiblingIndex();
+
+                var t_go = new GameObject(WrapperName, typeof(RectTransform));
+                t_go.layer = t_parent.gameObject.layer;
+                var t_rect = (RectTransform)t_go.transform;
+                t_rect.SetParent(t_parent, false);
+                Stretch(t_rect);
+                t_rect.SetSiblingIndex(t_sibling);
+
+                foreach (Transform t_child in t_children)
+                {
+                    t_child.SetParent(t_rect, false);
+                    t_child.SetAsLastSibling();
+                }
+
+                t_go.AddComponent<SafeAreaFitter>();
+                Stretch(t_rect); // ExecuteAlways가 현재 Device Simulator 값을 굽지 않게 저작 상태는 full stretch로 저장.
+                PrefabUtility.SaveAsPrefabAsset(t_root, t_layout.assetPath);
+                Debug.Log($"[SafeArea] 풀링 프리팹 적용: {t_layout.assetPath} (콘텐츠 {t_children.Count}개)");
+                t_added++;
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(t_root);
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SafeArea] 풀링 프리팹 완료: 적용 {t_added}건, 건너뜀 {t_skipped}건, 실패 {t_failed}건");
+    }
+
     static void Wrap(Canvas _canvas)
     {
         Transform t_canvasTr = _canvas.transform;
@@ -93,5 +206,14 @@ public static class SafeAreaInstaller
         t_rect.SetAsFirstSibling();
 
         Debug.Log($"[SafeArea] {_canvas.name} → {WrapperName} 삽입, 자식 {t_children.Count}개 이동");
+    }
+
+    static void Stretch(RectTransform _rect)
+    {
+        _rect.anchorMin = Vector2.zero;
+        _rect.anchorMax = Vector2.one;
+        _rect.offsetMin = Vector2.zero;
+        _rect.offsetMax = Vector2.zero;
+        _rect.localScale = Vector3.one;
     }
 }

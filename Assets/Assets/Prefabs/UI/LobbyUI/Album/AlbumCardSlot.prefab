@@ -191,7 +191,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: e4d4397b068a146afb97820c51a021cd, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8a7f153edfdec604691d23846b4cdfe9, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -200,7 +200,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 4.3
 --- !u!1 &4413552091200338031
 GameObject:
   m_ObjectHideFlags: 0
@@ -235,8 +235,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.072753906, y: 0.015429825}
   m_AnchorMax: {x: 0.9272461, y: 0.98457015}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0.25559998, y: -0.37631226}
+  m_SizeDelta: {x: -2.9361, y: -2.6535}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4413552091200338033
 CanvasRenderer:
@@ -259,7 +259,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.4}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -275,7 +275,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.55
 --- !u!1 &4413552091200338041
 GameObject:
   m_ObjectHideFlags: 0
@@ -385,8 +385,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 956301311
-  m_fontColor: {r: 1, g: 1, b: 1, a: 0.22}
+    rgba: 939524096
+  m_fontColor: {r: 0, g: 0, b: 0, a: 0.22}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -469,10 +469,6 @@ PrefabInstance:
       value: -1183493901
       objectReference: {fileID: 0}
     - target: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
-      propertyPath: showSynergies
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: keywordFrames.Array.data[0].keyword
       value: 0
       objectReference: {fileID: 0}
@@ -499,6 +495,14 @@ PrefabInstance:
     - target: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: keywordFrames.Array.data[6].keyword
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.76751536
+      objectReference: {fileID: 0}
+    - target: {fileID: 5591510803545823548, guid: e114849808e011c4ea757d3c052285ca, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.76751536
       objectReference: {fileID: 0}
     - target: {fileID: 7574799811676597539, guid: e114849808e011c4ea757d3c052285ca, type: 3}
       propertyPath: m_Pivot.x
