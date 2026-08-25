@@ -17,7 +17,7 @@ public class DeckEditSlotView : MonoBehaviour
     [SerializeField] CardVisualView cardVisual;       // 카드 비주얼 단일 진실원(빈 칸이면 스스로 숨는다)
     [SerializeField] GameObject     emptyMark;        // 빈 칸 표시(+ 아이콘 등). cardVisual 바깥에 두어야 통째로 꺼져도 남는다.
     [SerializeField] GameObject     highlightFrame;   // 드래그 오버 테두리
-    [SerializeField] GameObject     swapGlow;         // 슬롯 픽(교체) 모드의 어두운 뒤판. cardVisual 바깥에 둬야 빈 칸에서도 남는다.
+    [SerializeField] GameObject     swapGlow;         // 슬롯 픽(교체) 모드 발광. cardVisual 바깥에 둬야 빈 칸에서도 남는다.
     [SerializeField] CanvasGroup    canvasGroup;      // 시너지 강조 때 대상 아닌 칸을 죽이는 용도
 
     // 시너지 강조 중 "해당 없음" 칸의 알파. 0으로 두면 빈 칸인지 흐린 칸인지 구분이 안 된다.
@@ -28,10 +28,9 @@ public class DeckEditSlotView : MonoBehaviour
     const float FOCUS_SCALE      = 1.08f;
     const float FOCUS_SCALE_TIME = 0.12f;
 
-    // 슬롯 픽(교체) 모드는 반대로 카드를 눌러 둘레에 여백을 만든다 — 그 여백에 어두운 뒤판이 드러나
-    // 카드가 밝은 크림색 덱 배경에서 떠오른다. 눈에 걸리는 것은 발광이 아니라 이 명도 대비다.
+    // 슬롯 픽(교체) 모드는 반대로 카드를 눌러 둘레에 여백을 만든다 — 그 여백이 발광이 앉을 자리다.
     // 확대와 축소가 서로 다른 트랜스폼에 걸린다(강조는 칸 루트, 이쪽은 카드 비주얼 루트).
-    const float SWAP_SCALE      = 0.80f;
+    const float SWAP_SCALE      = 0.86f;
     const float SWAP_SCALE_TIME = 0.14f;
 
     // 6칸이 같은 박으로 숨쉬면 화면이 통째로 뛴다 → 칸 순서대로 발광 위상을 흩뿌린다.
