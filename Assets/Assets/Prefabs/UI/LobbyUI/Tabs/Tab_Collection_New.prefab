@@ -3016,8 +3016,8 @@ MonoBehaviour:
     icon: {fileID: 0}
     amountLabel: {fileID: 0}
   totalGauge:
-    fill: {fileID: 6867265101371200199}
-    fillRect: {fileID: 2541742600971677098}
+    fill: {fileID: 4265651817098574859}
+    fillRect: {fileID: 7258316458242399379}
     label: {fileID: 6355123015324538922}
   albumChest:
     button: {fileID: 389131545905321875}

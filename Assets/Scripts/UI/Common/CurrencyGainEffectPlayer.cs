@@ -114,6 +114,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     {
         if (!_gain.HasAmount) return false;
 
+        // 도착지를 내가 정해야 할 때만 빌린다(인스펙터 직결 HUD 경로는 그 화면 칩으로 받는다).
+        if (_hud == null || _hud.Type != _gain.Type) CurrencySlotBoard.Lend(_gain.Type);
+
         int t_slot = (int)_gain.Type;
 
         // 되감기(BeginGainRollUp)보다 먼저 죽여야 한다 — 순서가 뒤집히면 옛 시퀀스의 OnKill이
@@ -190,6 +193,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     {
         if (_gains == null || _gains.IsEmpty) return null;
 
+        // 도착지를 내가 정해야 할 때만 빌린다(인스펙터 직결 HUD 경로는 그 화면 칩으로 받는다).
+        CurrencySlotBoard.Lend(_gains);
+
         Sequence t_master = null;
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
         {
@@ -218,6 +224,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     {
         if (_gains == null || _gains.IsEmpty) return null;
 
+        // 도착지를 내가 정해야 할 때만 빌린다(인스펙터 직결 HUD 경로는 그 화면 칩으로 받는다).
+        CurrencySlotBoard.Lend(_gains);
+
         Sequence t_master = null;
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
         {
@@ -244,6 +253,9 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     /// </summary>
     public Sequence BuildLightGain(CurrencyGain _gain, RectTransform _origin, CurrencyHud _hud, Sprite _lightSprite)
     {
+        // 도착지를 내가 정해야 할 때만 빌린다(인스펙터 직결 HUD 경로는 그 화면 칩으로 받는다).
+        if (_hud == null || _hud.Type != _gain.Type) CurrencySlotBoard.Lend(_gain.Type);
+
         var t_seq = this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
 
         // 묶음판과 같은 규약 — 재화가 들어오는 사건은 어느 경로로 오든 같은 소리가 난다.

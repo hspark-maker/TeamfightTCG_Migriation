@@ -4,6 +4,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 public class CurrencyHud : MonoBehaviour
 {
@@ -14,10 +15,17 @@ public class CurrencyHud : MonoBehaviour
     [FormerlySerializedAs("goldText")]
     [SerializeField] TMP_Text valueText;
 
-    [Tooltip("이 칸이 맡을 재화. 이 값이 곧 그 칸의 재화이며 런타임에 갈리지 않는다.\n\n" +
-             "아이콘은 코드가 손대지 않는다 — 상단바 아트는 보상 슬롯과 결이 달라 CurrencyLook 표를 따르지 않고 " +
-             "프리팹에 저작된 그림이 그대로 산다. 그림을 바꾸려면 이 칸의 Image를 직접 갈아끼울 것.")]
+    [Tooltip("이 칸의 **고향 재화**(저작 시점의 값). 런타임에 갈린다 — 대표 HUD가 없는 재화(에너지 등)의 " +
+             "획득 연출이 도착지를 찾지 못하면 CurrencySlotBoard가 이 칸을 잠시 빌려 그 재화로 갈아입히고, " +
+             "로비 탭을 넘어갈 때 고향 재화로 되돌린다.\n\n" +
+             "아이콘은 CurrencyLook 표의 barIcon이 진실원이다 — 칸이 갈릴 때 아래 Image가 그 그림으로 갈린다. " +
+             "같은 표의 icon(보상 슬롯용)과는 일부러 갈라 둔 별개 칸이다.\n\n" +
+             "Type을 캐싱하지 말 것. 이 칸의 재화는 프레임마다 달라질 수 있으니 쓸 때마다 다시 물어라.")]
     [SerializeField] ECurrencyType type = ECurrencyType.Gold;
+
+    [Tooltip("이 칸의 재화 아이콘. 칸이 재화를 갈아입을 때 CurrencyLook 표의 barIcon으로 갈린다.\n" +
+             "미배선이면 이 칸은 빌려줄 수 없다(그림과 숫자가 어긋나느니 그 재화 연출을 건너뛴다).")]
+    [SerializeField] Image iconImage;
 
     [Tooltip("이 HUD를 그 재화의 대표(코인이 날아와 꽂히는 곳)로 등록할지.\n\n" +
              "화면당 대표는 재화별로 딱 한 장이고, 겹치면 마지막에 켜진 쪽이 이긴다. " +
@@ -31,6 +39,11 @@ public class CurrencyHud : MonoBehaviour
              "숫자 텍스트를 직접 물리지 말 것 — 그 rect는 LayoutGroup·ContentSizeFitter가 잡는 자식이라 " +
              "피벗이 묶음 한쪽으로 치우쳐 있고, 배율 축이 그 피벗이라 숫자가 옆으로 밀리듯 보인다.")]
     [SerializeField] RectTransform punchTarget;
+
+    [Tooltip("빌린 재화를 마저 보여 주는 시간(초). 획득 연출이 끝나는 순간부터 잰다 — 코인이 다 꽂히고 " +
+             "숫자가 멎은 뒤에도 이만큼은 그 재화가 이 칸에 남아 있다가 스스로 고향 재화로 돌아온다.\n\n" +
+             "짧으면 유저가 늘어난 잔액을 읽기 전에 칸이 갈리고, 길면 엉뚱한 재화가 상단바를 오래 차지한다.")]
+    [SerializeField, Min(0.1f)] float lendHoldDuration = 3f;
 
     [Header("소모 연출")]
     [SerializeField, Min(0.01f)] float spendRollDuration = 0.55f;
@@ -63,12 +76,33 @@ public class CurrencyHud : MonoBehaviour
     Tween m_spendMotion;
     Color m_baseTextColor = Color.white;
     bool m_tinted;
+    ECurrencyType m_defaultType;
+    int m_lendSerial;
+    Tween m_lendRelease;
 
     /// <summary>수치 텍스트의 RectTransform. 코인이 날아와 꽂히는 **도착 지점**이다.</summary>
     public RectTransform TextRect => this.valueText != null ? (RectTransform)this.valueText.transform : null;
 
-    /// <summary>이 HUD가 맡은 재화. 결제 재화에 맞는 잔액만 띄우려는 화면이 본다.</summary>
+    /// <summary>이 HUD가 <b>지금</b> 맡은 재화. 빌려간 동안 갈리므로 캐싱하지 말 것.</summary>
     public ECurrencyType Type => this.type;
+
+    /// <summary>저작 시점의 고향 재화. 반납하면 여기로 돌아온다.</summary>
+    public ECurrencyType DefaultType => m_defaultType;
+
+    /// <summary>다른 재화에 내줄 수 있는 칸인지. 아이콘을 갈아끼울 수 없거나 <b>되돌릴 그림이 없으면</b>
+    /// 내주지 않는다 — 고향 그림이 표에 없으면 반납해도 대여 재화 그림이 그대로 굳는다.</summary>
+    public bool IsLendable => this.registerAsPrimary
+                           && this.iconImage != null
+                           && CurrencyLook.BarIconOf(m_defaultType) != null;
+
+    /// <summary>지금 고향이 아닌 재화를 맡고 있는지.</summary>
+    public bool IsLent => this.type != m_defaultType;
+
+    /// <summary>빌려간 순번. 회수는 가장 오래된 대여부터.</summary>
+    public int LendSerial => m_lendSerial;
+
+    /// <summary>연출이 도는 중인지. 도중에 재화를 갈면 숫자가 튄다.</summary>
+    public bool IsBusy => m_held || (m_spendTween != null && m_spendTween.IsActive());
 
     /// <summary>펄스로 튀길 노드. 도착 지점과 갈라 둔다 — 코인은 숫자에 꽂혀야 하지만,
     /// 튀는 것은 아이콘까지 묶은 덩어리여야 축이 그 한가운데에 선다.</summary>
@@ -119,6 +153,85 @@ public class CurrencyHud : MonoBehaviour
         };
     }
 
+    /// <summary>이 칸을 다른 재화에 빌려준다. 배차는 CurrencySlotBoard가 정하고 여기서는 갈아입기만 한다.
+    /// 반납은 스스로 한다 — 획득 연출이 끝나고 lendHoldDuration만큼 더 보여준 뒤 고향 재화로 돌아온다.</summary>
+    public void Lend(ECurrencyType _type, int _serial)
+    {
+        m_lendSerial = _serial;
+        this.Rebind(_type);
+        this.ArmLendRelease();
+    }
+
+    /// <summary>고향 재화로 즉시 되돌린다.</summary>
+    public void Return()
+    {
+        this.KillLendRelease();
+        m_lendSerial = 0;
+        this.Rebind(m_defaultType);
+    }
+
+    // 반납 시계를 처음부터 다시 감는다. 연출이 끝나는 순간(ReleaseDisplay)마다 다시 감기므로
+    // 실제로 재는 것은 "마지막 연출이 멎은 뒤부터"다.
+    void ArmLendRelease()
+    {
+        this.KillLendRelease();
+        if (!this.IsLent) return;
+
+        m_lendRelease = DOVirtual.DelayedCall(Mathf.Max(0.1f, this.lendHoldDuration), this.ReleaseLendIfIdle)
+                                 .SetLink(gameObject);
+    }
+
+    void ReleaseLendIfIdle()
+    {
+        m_lendRelease = null;
+        if (!this.IsLent) return;
+
+        // 아직 코인이 날아오는 중이면 도착지를 치우지 않는다 — 한 박 더 기다린다.
+        if (this.IsBusy) { this.ArmLendRelease(); return; }
+
+        this.Return();
+    }
+
+    void KillLendRelease()
+    {
+        Tween t_tween = m_lendRelease;
+        m_lendRelease = null;
+        if (t_tween != null && t_tween.IsActive()) t_tween.Kill();
+    }
+
+    // 칸이 맡는 재화를 갈아끼운다. 이 순서가 곧 s_huds 규약이다 —
+    // 옛 재화의 연출을 먼저 무효화하고, 대표 등록을 옮긴 뒤, 그림과 숫자를 새 재화로 맞춘다.
+    void Rebind(ECurrencyType _type)
+    {
+        if (this.type == _type) return;
+
+        m_displayRevision++;
+        m_held = false;
+
+        this.KillSpendTween();
+        this.KillSpendMotion();
+        this.ClearTint(false);
+
+        // OnDisable과 같은 "본인일 때만" 문장 — 남의 등록을 밟지 않는다.
+        if (this.registerAsPrimary && s_huds.TryGetValue(this.type, out var t_cur) && t_cur == this) s_huds.Remove(this.type);
+
+        this.type = _type;
+        if (this.registerAsPrimary) s_huds[this.type] = this;
+
+        this.ApplyIcon();
+        this.Render(CurrencyManager.GetBalance(this.type));
+    }
+
+    // 표의 상단바 칸(barIcon)이 정본 — 단 재화가 갈리는 칸에 한해서다. 갈리지 않는 종속 표시(개봉 오버레이 칩 등)는
+    // 그 화면 아트가 진실원이라 건드리지 않는다. 표가 비어도 손대지 않는다.
+    void ApplyIcon()
+    {
+        if (!this.IsLendable) return;
+
+        var t_icon = CurrencyLook.BarIconOf(this.type);
+        if (t_icon != null) this.iconImage.sprite = t_icon;
+    }
+
     /// <summary>표시값을 연출용으로 고정한다. 실제 잔액 변경은 ReleaseDisplay까지 화면에 반영되지 않는다.</summary>
     void HoldDisplay(long _value)
     {
@@ -134,10 +247,16 @@ public class CurrencyHud : MonoBehaviour
         m_displayRevision++;
         m_held = false;
         this.Render(CurrencyManager.GetBalance(this.type));
+
+        // 연출이 멎은 지금이 "충분히 보여줄" 시간의 시작점이다 — 여기서 다시 감아야
+        // 코인이 날아온 시간만큼 대여가 짧아지지 않는다.
+        this.ArmLendRelease();
     }
 
     void Awake()
     {
+        m_defaultType = this.type;
+
         if (this.valueText == null) this.valueText = GetComponent<TMP_Text>();
 
         // 물들이기 전 색을 여기서 잡아 둔다 — 연출 도중 잡으면 소비 색이 기준색으로 굳는다.
@@ -148,7 +267,13 @@ public class CurrencyHud : MonoBehaviour
     {
         // 종류별 1장. 같은 종류가 겹치면 마지막이 이긴다(예외 없이).
         // 종속 표시(registerAsPrimary=false)는 이 자리를 넘보지 않는다 — 자세한 이유는 그 필드 툴팁.
-        if (this.registerAsPrimary) s_huds[this.type] = this;
+        if (this.registerAsPrimary)
+        {
+            s_huds[this.type] = this;
+            CurrencySlotBoard.Register(this);
+        }
+
+        this.ApplyIcon();
 
         // 활성화 시점의 실제 잔액으로 먼저 맞춘 뒤 이후 변경을 구독.
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
@@ -171,6 +296,13 @@ public class CurrencyHud : MonoBehaviour
         if (this.PunchRect != null) this.PunchRect.DOComplete();
         // 연출 도중 꺼지면 해제 호출이 오지 않는다 — 고정을 여기서 풀어 다음 활성화가 잔액을 못 따라가는 상태를 막는다.
         m_held = false;
+
+        // 꺼진 몸은 배차 대상이 아니다. 여기서 고향으로 되돌려 두면 씬 전환 반납이 따로 필요 없다
+        // (등록은 하지 않는다 — 다음 OnEnable이 s_huds를 다시 잡는다).
+        CurrencySlotBoard.Unregister(this);
+        this.KillLendRelease();
+        m_lendSerial = 0;
+        this.type = m_defaultType;
     }
 
     void HandleCurrencySpent(ECurrencyType _type, long _cost, long _balance)

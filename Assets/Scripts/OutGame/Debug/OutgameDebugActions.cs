@@ -76,6 +76,11 @@ public static class OutgameDebugActions
         CurrencyManager.Earn(_type, _amount);
         CurrencyManager.Save();
 
+        // 잔액이 최종값이 된 뒤에 연출을 태운다 — 상단바 칸 대여까지 실제 획득과 같은 경로로 검증된다.
+        // 재생기가 없는 화면(전투 등)이면 조용히 지급만 하고 지나간다.
+        if (CurrencyGainEffectPlayer.TryGet(null, out var t_player))
+            t_player.Play(null, new CurrencyGain(_type, _amount), null);
+
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }
 

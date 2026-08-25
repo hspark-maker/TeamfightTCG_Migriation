@@ -724,7 +724,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GoldHud
   valueText: {fileID: 2213473394888211526}
   type: 0
-  iconImage: {fileID: 0}
+  iconImage: {fileID: 2213473395040155412}
   registerAsPrimary: 1
   punchTarget: {fileID: 0}
   spendRollDuration: 0.55
@@ -763,7 +763,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GoldHud
   valueText: {fileID: 2213473394984092244}
   type: 1
-  iconImage: {fileID: 0}
+  iconImage: {fileID: 2213473395040155413}
   registerAsPrimary: 1
   punchTarget: {fileID: 0}
   spendRollDuration: 0.55
@@ -833,3 +833,25 @@ MonoBehaviour:
   spendPressDuration: 0.14
   spendReturnDuration: 0.2
   spendTint: {r: 1, g: 0.42, b: 0.35, a: 1}
+--- !u!114 &2213473395040155412 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4886405216883680446, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
+  m_PrefabInstance: {fileID: 6735179374781160537}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!114 &2213473395040155413 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4886405216349719418, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
+  m_PrefabInstance: {fileID: 6735179374781160537}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
