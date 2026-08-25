@@ -12,6 +12,9 @@ public class AlbumThemeCellView : MonoBehaviour
     [SerializeField] Image thumbFrame;
     [SerializeField] Image namePlate;
     [SerializeField] TMP_Text nameLabel;
+    [SerializeField] TMP_Text descriptionLabel;
+    [Tooltip("갤러리에서의 차례(1부터). 저작 순서를 그대로 읽는다.")]
+    [SerializeField] TMP_Text orderLabel;
     [SerializeField] GameObject progressRow;
     [SerializeField] AlbumGaugeView gauge = new AlbumGaugeView();
     [SerializeField] AlbumChestView chest = new AlbumChestView();
@@ -28,11 +31,15 @@ public class AlbumThemeCellView : MonoBehaviour
     CanvasGroup               m_group;
     List<UiGrayscale.Toned>   m_toned;
 
-    public void Bind(AlbumTheme _theme, Action<AlbumTheme> _onOpen, bool _tutorialTarget = false)
+    public void Bind(AlbumTheme _theme, int _order, Action<AlbumTheme> _onOpen, bool _tutorialTarget = false)
     {
         m_theme = _theme;
 
         ApplyLocked(_theme.IsLocked);
+
+        // 차례와 소개는 잠긴 테마에도 그대로 보인다 — 잠김은 흑백·자물쇠가 말한다
+        if (orderLabel != null) orderLabel.text = _order > 0 ? _order.ToString() : string.Empty;
+        if (descriptionLabel != null) descriptionLabel.text = _theme.Description;
 
         if (_theme.IsLocked)
         {
