@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 01bd1df8e7bd9404c90944b0d2f5df30
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_Component_Sliders/Slider_Basic_Round_Green.prefab
+  uploadId: 924690

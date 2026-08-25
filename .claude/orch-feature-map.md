@@ -41,7 +41,7 @@
 - 런타임 인스턴스: `CardInstance` (스탯·데미지 계산의 단일 지점)
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
 - 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
-- 등급: `ECardGrade`
+- 등급: `ECardGrade`
 - 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.evolvedArts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
@@ -99,7 +99,7 @@
 ## 랭크·매치메이킹 (`OutGame/Rank/`, `OutGame/Match/`)
 
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
-- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `RankRewardAlertDot` · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
+- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `UI/Common/LobbyEntryAlertDot` (`EAlertDotTarget`) · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
 - 매칭 UI: `UI/Match/MatchmakingShell` · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
 
@@ -124,7 +124,7 @@
 - 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `CardWeaponView` · `CardArmedVfx` · `CardFadeAlpha`
 - 보드·카메라: `BattleBoardView` · `BattleFieldView` · `BattleCamera` · `BattleCameraFit` · `BattleSelection`
 - 턴 표시: `TurnBannerUI` · `TurnTimerUI` · `TurnSideTint` · `ActionPanel` · `CoinFlipUI` · `MulliganOverlayUI`
-- 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`
+- 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`
 - 감정표현(`UI/Battle/Emote/`): 표시 단일 창구 `EmoteDirector` (플레이어·AI·상대 클라가 모두 여기로) · 목록 `EmoteCatalog` (`EmoteEntry`) · 선택 표 `EmotePickerUI` · 스티커 `EmoteStickerView` · `ScreenDim` · `EDimLayer` · `KeywordFrame` · `WeaponAnimSpec` · `EffectNotifyData`
 
 ## 공용 UI·연출 (`UI/Common/`, `UI/UIManager/`, `UI/Lobby/`)

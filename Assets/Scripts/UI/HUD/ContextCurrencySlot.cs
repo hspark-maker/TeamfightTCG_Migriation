@@ -90,7 +90,7 @@ public class ContextCurrencySlot : MonoBehaviour
 
     /// <summary>그 재화를 이미 다른 칸이 띄우고 있는가.
     /// 고정 칸(골드·다이아)이 맡은 재화를 변동 칸까지 받으면 같은 재화가 두 칸을 먹고,
-    /// 정작 변동 칸이 맡던 재화가 화면에서 사라진다.</summary>
+    /// 정작 변동 칸이 맡던 재화가 화면에서 사라진다 — 진화 게이트(다이아)에서 실제로 그렇게 됐다.</summary>
     static bool IsCoveredElsewhere(ECurrencyType _type)
         => CurrencyHud.TryGet(_type, out CurrencyHud t_hud) && t_hud != s_slot;
 

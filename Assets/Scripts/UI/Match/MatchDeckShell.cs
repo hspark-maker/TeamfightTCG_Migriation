@@ -1,7 +1,6 @@
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UI;
 
 // 로비 PlayBtn이 여는 출전 덱 확인/편집 오버레이의 셸(MatchDeckRoot에 부착). 로비 DeckTabController의 매치판.
 //
@@ -13,15 +12,9 @@ using UnityEngine.UI;
 public class MatchDeckShell : MonoBehaviour
 {
     [SerializeField] GameObject matchPanel;   // MatchDeckPanel 인스턴스
-    [SerializeField] GameObject editPanel;    // MatchDeckEditPanel 인스턴스
 
     [Header("컨트롤러")]
-    [SerializeField] MatchDeckPanelView       panelView;
-    [SerializeField] DeckEditController       editController;
-    [SerializeField] MatchDeckStripController strip;
-
-    // 편집 패널 좌하단 뒤로가기. 배리언트에서 원본 BackButton을 삭제했으므로 편집 화면의 유일한 종료 경로다.
-    [SerializeField] Button editBackButton;
+    [SerializeField] MatchDeckPanelView panelView;
 
     // 현재 선택된 저장 슬롯. 유효한 덱이 하나도 없으면 -1.
     public int SelectedSlot { get; private set; } = -1;
@@ -31,9 +24,6 @@ public class MatchDeckShell : MonoBehaviour
 
     EGate m_gate = EGate.Pending;
 
-    // 루트가 비활성인 채로 Open이 불릴 수 있다(SetActive가 Awake를 동기 실행하지만 순서에 기대지 않는다).
-    bool m_wired;
-
     // 게이트가 열려 있는가. 화면이 켜졌는지로 판정하지 않는 이유는 전환이 이 화면을 게이트보다 "먼저" 세우기 때문이다
     // (PrepareForHandoff) — 켜짐을 진행 중으로 읽으면 정작 진짜 진입이 중복으로 걸려 그대로 포기 처리된다.
     bool m_selecting;
@@ -41,36 +31,11 @@ public class MatchDeckShell : MonoBehaviour
     // 전환이 이미 세워 둔 화면인가. 다시 열면 등장 안무가 세운 알파·배율이 저작값으로 되돌아간다.
     bool m_prepared;
 
+    bool m_editing;
+
     // 전투 시작 응답 한 박이 도는 중인가. 커튼이 걸린 뒤에도 되돌리지 않는다 — 이 화면 밑에서 씬이 갈리기 때문이다.
     // 되돌리는 곳은 진입(Open) 한 곳뿐이라, 전투로 닫히지 않은 화면이 다시 열릴 때만 풀린다.
     bool m_launching;
-
-    void Awake()
-    {
-        EnsureWired();
-    }
-
-    // 배선은 한 번만. 편집 종료 훅과 뒤로가기 버튼을 여기서 건다 —
-    // 프리팹 onClick으로 배선하면 셸이 모르는 종료 경로가 생겨 복귀 후 MySection 갱신을 놓친다.
-    void EnsureWired()
-    {
-        if (m_wired) return;
-        m_wired = true;
-
-        if (editController != null) editController.SetExitHandler(OnEditorExit);
-
-        if (editBackButton != null)
-        {
-            editBackButton.onClick.RemoveAllListeners();
-            // 셸이 아니라 컨트롤러로 직행한다 — 저장 판정·미완성 확인 팝업은 RequestLeave 한 곳에만 있다.
-            editBackButton.onClick.AddListener(OnEditBackClicked);
-        }
-        else
-        {
-            // 원본 BackButton을 배리언트에서 지웠기 때문에, 이게 없으면 편집 화면에서 나갈 방법이 전혀 없다.
-            Debug.LogError("[MatchDeckShell] editBackButton 미배선 — 편집 화면에서 빠져나올 수 없다.");
-        }
-    }
 
     // 전투 시작 게이트. 호스트(LobbyMatchLauncher)가 씬을 로드하기 "전에" 이걸 await 하고,
     // true를 받으면 DeckConfig.PlayerDeck이 확정된 상태로 배틀 씬으로 넘어간다.
@@ -132,6 +97,10 @@ public class MatchDeckShell : MonoBehaviour
 
         m_launching = true;
 
+        // 안내가 시킨 순서를 거치지 않고 이 화면을 떠나는 길이 있다(편집 화면의 전투 버튼) —
+        // 좌표를 두고 가면 앵커가 사라진 화면으로 돌아와 영영 대기한다. 전투 스텝에 이미 서 있으면 무시된다.
+        OutgameTutorialRunner.NotifyDeckGateBattleLaunched();
+
         // 뷰가 없으면 태울 안무도 없다 — 연출 때문에 전투가 시작되지 않는 길을 만들지 않는다.
         if (panelView == null)
         {
@@ -167,10 +136,8 @@ public class MatchDeckShell : MonoBehaviour
     {
         // 루트를 켜기 전에 편집 패널을 내린다 — 비활성 부모 아래에선 OnEnable이 돌지 않으므로,
         // 편집 패널의 튜토리얼 앵커(로비 덱 편집과 키를 공유한다)가 켜졌다 꺼지며 로비 쪽 등록을 지우는 일이 없다.
-        if (editPanel != null) editPanel.SetActive(false);
-
+        HideEditorIfOpen();
         gameObject.SetActive(true);
-        EnsureWired();
 
         // 전투로 닫히지 않은 화면이 다시 열린다 — 지난번 응답 한 박의 가드를 물려받으면 전투 시작이 영영 안 눌린다.
         m_launching = false;
@@ -187,14 +154,13 @@ public class MatchDeckShell : MonoBehaviour
     {
         // 편집 중 닫히는 경로는 없지만(편집은 뒤로가기로만 나간다), 패널이 켜진 채 루트가 꺼지면
         // DeckEditController.OnDisable이 편집 상태를 무저장 폐기한다 — 그게 이 화면의 사양이다.
+        HideEditorIfOpen();
         gameObject.SetActive(false);
     }
 
     // 매치 패널 EditButton. 편집 대상은 지금 선택된 덱이다.
     public void OpenEditor()
     {
-        EnsureWired();
-
         SelectedSlot = ResolveSlot(SelectedSlot);
 
         // 매치 화면은 신규 덱 생성을 지원하지 않는다(가로 리스트에 + 칸이 없다) → 편집할 원본이 없으면 열지 않는다.
@@ -205,13 +171,21 @@ public class MatchDeckShell : MonoBehaviour
             return;
         }
 
-        if (matchPanel != null) matchPanel.SetActive(false);
-        if (editPanel  != null) editPanel.SetActive(true);
+        DeckEditController t_editor = DeckEditController.OpenPooled(new DeckEditData
+        {
+            slotIndex = SelectedSlot,
+            onExit = OnEditorExit,
+            showDeckStrip = true,
+            showTitle = false,
+            showDeckPower = false,
+            tutorialDeckSlot = TutorialDeckSlot(),
+            onSlotSwitched = _slot => SelectedSlot = _slot,
+            onPlay = OnEditorPlay,
+        });
+        if (t_editor == null) return;
 
-        // 리스트를 먼저 세운 뒤 편집기를 연다 — 편집기가 여는 순간의 선택 표시가 이미 맞아 있어야
-        // "잠깐 다른 칸이 선택돼 보이는" 한 프레임이 생기지 않는다.
-        if (strip          != null) strip.Build(SelectedSlot, OnStripSlotClicked, TutorialDeckSlot());
-        if (editController != null) editController.Open(SelectedSlot);
+        m_editing = true;
+        if (matchPanel != null) matchPanel.SetActive(false);
     }
 
     // 선택된 덱을 씬 전환 캐리어에 싣는다. Confirm이 게이트를 열기 직전에 부르는 유일한 지점이다.
@@ -224,44 +198,44 @@ public class MatchDeckShell : MonoBehaviour
         return true;
     }
 
-    // 가로 덱 리스트 클릭. 편집 화면에 머문 채 대상 슬롯만 갈아탄다.
-    // 저장 여부(6/6이면 조용히 저장, 미만이면 폐기)는 SwitchTo가 판정한다 — 셸은 관여하지 않는다.
-    void OnStripSlotClicked(int _slotIndex)
+    void HideEditorIfOpen()
     {
-        if (_slotIndex == SelectedSlot) return;
+        if (!m_editing) return;
 
-        // 전환이 거부되면(저장 실패 등) 선택 상태를 옮기지 않는다 —
-        // 셸의 SelectedSlot과 컨트롤러의 편집 대상이 어긋나면 복귀 후 엉뚱한 덱이 그려진다.
-        if (editController != null && !editController.SwitchTo(_slotIndex)) return;
-
-        SelectedSlot = _slotIndex;
-
-        if (strip != null) strip.SetSelected(_slotIndex);
+        m_editing = false;
+        DeckEditController.HidePooled();
     }
 
-    void OnEditBackClicked()
+    void OnDisable()
     {
-        // 저장·미완성 확인은 컨트롤러가 하고, 실제 복귀는 아래 OnEditorExit로 되돌아온다.
-        if (editController != null) editController.RequestExit();
+        HideEditorIfOpen();
+    }
+
+    void OnEditorPlay()
+    {
+        HideEditorIfOpen();
+        ShowMatchPanel();
+        Confirm();
     }
 
     // DeckEditController에 주입한 종료 훅. 로비의 DeckTabController.CloseEditor 자리다.
     void OnEditorExit()
     {
-        if (editController != null) editController.Close();
-        if (strip          != null) strip.Clear();
-
-        // 편집분이 저장됐을 수 있으므로 세이브에서 다시 읽어 그린다(편집기가 준 값을 받아쓰지 않는다).
+        HideEditorIfOpen();
         ShowMatchPanel();
     }
 
     // 편집 패널을 반드시 함께 내린다 — 진입(Open)이 편집 도중 닫힌 상태를 물려받으면 두 패널이 겹친 채 뜬다.
     void ShowMatchPanel()
     {
-        if (editPanel  != null) editPanel.SetActive(false);
+        HideEditorIfOpen();
         if (matchPanel != null) matchPanel.SetActive(true);
 
         if (panelView == null) return;
+
+        // 편집이 슬롯을 비우거나 6장 미만으로 만들고 나올 수 있다(onSlotSwitched는 받은 값을 검사하지 않는다).
+        // 그대로 그리면 전투 시작 버튼이 잠긴 채 남고, 그 버튼을 가리키는 튜토리얼 안내는 풀릴 길 없이 대기한다.
+        SelectedSlot = ResolveSlot(SelectedSlot);
 
         panelView.Render(SelectedSlot);
 
@@ -287,14 +261,23 @@ public class MatchDeckShell : MonoBehaviour
         return t_tutorial;
     }
 
-    // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 목록에 없으면 -1.
+    // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 고를 덱이 하나도 없으면 -1.
     // 전투 덱 정본은 TutorialConfig(시나리오)이고 DeckGrant 스텝이 같은 구성을 세이브에 넣어둔다 —
     // 좌표를 여기서 되찾는 이유는 세이브 삽입이 항상 맨 앞이라 스텝이 좌표를 알려줄 수 없기 때문.
     static int TutorialDeckSlot()
     {
         if (!TutorialConfig.IsActive) return -1;
 
-        return DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index) ? t_index : -1;
+        if (DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index)) return t_index;
+
+        // 앞선 DeckGrant 스텝이 건너뛰어져 그 덱이 세이브에 없다. 아무 칸도 안 가리키면 그 칸을 지목하는
+        // 안내(MatchDeckTutorialDeck)가 등록을 영영 기다린다 — 첫 유효 슬롯으로 떨어뜨려 안내를 세운다.
+        // "목록에서 골라 쓴다"는 학습 목표는 어느 덱을 가리켜도 그대로 산다
+        // (지목 실패 시 화면이 대신 고르는 AlbumTabController.FindAnchorThemeIndex와 같은 관용구).
+        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+            if (DeckSaveManager.IsSlotValid(t_i)) return t_i;
+
+        return -1;
     }
 
     // DeckSaveManager.IsSlotValid는 범위 가드 없이 슬롯 배열을 직접 인덱싱한다 —

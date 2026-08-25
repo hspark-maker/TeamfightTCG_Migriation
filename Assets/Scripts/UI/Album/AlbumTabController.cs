@@ -75,8 +75,6 @@ public class AlbumTabController : LobbyTabPanel
 
         Refresh();
 
-        // 페이지·앨범 완성 보상이 에너지로 떨어진다 — 상단 문맥 칸이 에너지여야 코인이 날아가 꽂힐 자리가 있다.
-        // (그 위에 카드 상세가 뜨면 상세가 조각을 요구해 잠시 갈렸다가, 닫히면 여기로 돌아온다.)
         ContextCurrencySlot.Request(this, ECurrencyType.Energy);
 
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다

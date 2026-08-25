@@ -827,7 +827,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 194.8}
+  m_AnchoredPosition: {x: 0, y: 194.7998}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &219975686
@@ -1253,8 +1253,8 @@ Transform:
   m_GameObject: {fileID: 282922646}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.0099, y: -0.0091, z: -0}
-  m_LocalScale: {x: 0.57898074, y: 0.7064888, z: 1.2650208}
+  m_LocalPosition: {x: 0, y: 0, z: -0}
+  m_LocalScale: {x: 0.8385001, y: 1.0231616, z: 1.8320472}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1615,8 +1615,8 @@ RectTransform:
   - {fileID: 1381618301}
   m_Father: {fileID: 1944050833}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0, y: 0.03671706}
+  m_AnchorMax: {x: 1, y: 0.9492441}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -1808,7 +1808,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -5.6916504}
+  m_AnchoredPosition: {x: 0, y: -5.6914062}
   m_SizeDelta: {x: 0, y: -1510.7705}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &490679279
@@ -3387,7 +3387,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -11.090668}
+  m_LocalPosition: {x: 0, y: 0, z: -13.490571}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3477,8 +3477,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.562  \uAC70\uB9AC 11.09  \uBC30\uC728 1.01\n\uAC00\uC2DC \xB13.60
-    x \xB16.40  (\uB2F4\uC744 \uC601\uC5ED \xB13.60 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.462  \uAC70\uB9AC 13.49  \uBC30\uC728 1.23\n\uAC00\uC2DC \xB13.60
+    x \xB17.79  (\uB2F4\uC744 \uC601\uC5ED \xB13.60 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!1 &982015555
 GameObject:
@@ -4355,6 +4355,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 419135865}
     m_Modifications:
+    - target: {fileID: 4610578626289128396, guid: 3b7e91c4d0a25f24ab6d8e0f5c1937ad, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 00032503578262e44b4c73d1f884cd81, type: 3}
     - target: {fileID: 8300000000000000001, guid: 3b7e91c4d0a25f24ab6d8e0f5c1937ad, type: 3}
       propertyPath: m_Name
       value: Panel_Emote
@@ -5375,7 +5379,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -5.6916504}
+  m_AnchoredPosition: {x: 0, y: -5.6914062}
   m_SizeDelta: {x: 0, y: -1510.7705}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1864844266

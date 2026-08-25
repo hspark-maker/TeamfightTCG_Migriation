@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: cba4f0a033b1740f0ad96431bc0ce164
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 280748
+  packageName: GUI - Vertical Casual
+  packageVersion: 1.0.6
+  assetPath: Assets/Layer Lab/GUI-VerticalCasual/Prefabs/Prefabs_DemoScene_Panels/Inventory_Fusion.prefab
+  uploadId: 924690

@@ -133,7 +133,7 @@
 ## 랭크·매치메이킹 (`OutGame/Rank/`, `OutGame/Match/`)
 
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
-- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `RankRewardAlertDot` · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
+- 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `UI/Common/LobbyEntryAlertDot` (`EAlertDotTarget`) · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
 - 매칭 UI: `UI/Match/MatchmakingShell` · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
 

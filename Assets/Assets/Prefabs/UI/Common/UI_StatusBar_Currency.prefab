@@ -695,9 +695,6 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 4886405216536851745, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8309362075534404465}
     - targetCorrespondingSourceObject: {fileID: 4886405217080758721, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5689223192650318093}
@@ -808,25 +805,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &2213473395122973048 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 4886405216536851745, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}
-  m_PrefabInstance: {fileID: 6735179374781160537}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &8309362075534404465
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2213473395122973048}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e2b19bc529d681e41aa3bda7dcc6e497, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ContextCurrencySlot
-  slot: {fileID: 6237071736169236498}
-  defaultType: 3
 --- !u!1 &2213473395555202455 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4886405215886387662, guid: 2a15b2cd46dee4a629118e9e72d6f5af, type: 3}

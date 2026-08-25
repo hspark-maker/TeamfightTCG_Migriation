@@ -18,11 +18,7 @@ public class CurrencyHud : MonoBehaviour
     [FormerlySerializedAs("goldText")]
     [SerializeField] TMP_Text valueText;
 
-    [Tooltip("이 칸이 맡을 재화.\n\n" +
-             "**고정 칸**(골드·다이아처럼 어느 화면에서나 뜻이 있는 칸)에서는 이 값이 곧 그 칸의 재화다.\n\n" +
-             "**변동 칸**(ContextCurrencySlot이 가리키는 칸)에서는 런타임에 화면을 따라 갈리므로 " +
-             "여기 저작한 값은 에디터에서 보이는 첫 그림일 뿐이다 — 그 칸의 기본 재화는 " +
-             "ContextCurrencySlot의 defaultType에 저작한다.")]
+    [Tooltip("이 칸이 맡을 재화. 이 값이 곧 그 칸의 재화이며 런타임에 갈리지 않는다.")]
     [SerializeField] ECurrencyType type = ECurrencyType.Gold;
 
     [Tooltip("재화 아이콘(옵션). CurrencyLook 표에 그림이 있을 때만 갈아낀다 — 비워두면 프리팹 그림 그대로다.")]
@@ -156,7 +152,6 @@ public class CurrencyHud : MonoBehaviour
     }
 
     // 프리팹을 복제해 type만 바꾼 HUD(조각 등)가 그림까지 따라오게 한다.
-    // 문맥 칸은 재화가 갈릴 때마다 다시 부른다 — 숫자만 바뀌고 그림이 남으면 어느 재화인지 거짓말이 된다.
     void ApplyIcon()
     {
         if (this.iconImage == null) return;

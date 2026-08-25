@@ -80,6 +80,59 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!1 &744386987320043229
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7252006848175344936}
+  - component: {fileID: 1156068701518046729}
+  m_Layer: 0
+  m_Name: SafeArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &7252006848175344936
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744386987320043229}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 182366430554581995}
+  m_Father: {fileID: 9017184902450823463}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 0.96282893}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1156068701518046729
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744386987320043229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c712f270305de14fadfe0cbad35e6d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SafeAreaFitter
+  applyLeft: 1
+  applyRight: 1
+  applyTop: 1
+  applyBottom: 1
 --- !u!1 &748873970800575955
 GameObject:
   m_ObjectHideFlags: 0
@@ -188,7 +241,7 @@ RectTransform:
   - {fileID: 5131416005614839919}
   - {fileID: 2535990283957695430}
   - {fileID: 1556845238083296395}
-  m_Father: {fileID: 9017184902450823463}
+  m_Father: {fileID: 7252006848175344936}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 1}
@@ -262,7 +315,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1184338725105337463}
-  - {fileID: 182366430554581995}
+  - {fileID: 7252006848175344936}
   m_Father: {fileID: 3367250344418263437}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -965,6 +1018,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56ac38ea328d1f34fbe6534cd342fc3c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankRewardPanel
+  animator: {fileID: 0}
+  contents: {fileID: 0}
+  isShow: 0
   root: {fileID: 1942211734502512221}
   scrollRect: {fileID: 9211548164941347223}
   content: {fileID: 5655762576460979311}
@@ -976,6 +1032,7 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
+  dimAlpha: 0.72
 --- !u!1001 &7069154783493001228
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1135,6 +1192,10 @@ PrefabInstance:
     - target: {fileID: 5561613606862386143, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
       propertyPath: m_fontSize
       value: 39.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
+      propertyPath: m_fontSize
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
       propertyPath: m_fontAsset
@@ -1319,6 +1380,10 @@ PrefabInstance:
       value: 39.8
       objectReference: {fileID: 0}
     - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
+      propertyPath: m_fontSize
+      value: 40
+      objectReference: {fileID: 0}
+    - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
       propertyPath: m_fontAsset
       value: 
       objectReference: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1499,6 +1564,10 @@ PrefabInstance:
     - target: {fileID: 5561613606862386143, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
       propertyPath: m_fontSize
       value: 39.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
+      propertyPath: m_fontSize
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 8079300186060191121, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}
       propertyPath: m_fontAsset
