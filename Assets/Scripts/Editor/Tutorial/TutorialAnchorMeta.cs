@@ -98,8 +98,8 @@ public readonly struct TutorialAnchorMeta
         // 16 MatchDeckPanel.prefab:200(key: 16, EnemySection) / MatchDeckRoot.prefab:1675. 잠금 없음
         new(A.MatchDeckEnemySection,      F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
 
-        // 17 UI/Match/MatchDeckStripController.cs:62가 튜토리얼 덱 칸에만 등록(해제는 :91). 잠금 없음
-        new(A.MatchDeckTutorialDeck,      F.None,               "매치 덱 화면(덱 목록)",   "UI/Match/MatchDeckStripController.cs:62"),
+        // 17 폐기 — 가로 덱 리스트가 사라져 이 키를 등록하는 곳이 없다. 저작이 남아 있으면 검증기가 "미등록"으로 잡는다
+        new(A.MatchDeckTutorialDeck,      F.None,               "매치 덱 화면(덱 목록)",   null),
 
         // 18 LobbyCanvas.prefab:1947(tutorialAnchor: 18) / :1949(unlockFeature: 5 = LobbyCollectionTab)
         new(A.LobbyCollectionTab,         F.LobbyCollectionTab, "로비/탭바",            "UI/Lobby/LobbyTabBarView.cs:67"),
@@ -123,6 +123,9 @@ public readonly struct TutorialAnchorMeta
         // 24 Tab_Match.prefab의 TournamentBtn(2563422757509691373)에 key: 24.
         //    잠금은 프리팹 저작이 아니라 UI/Lobby/LobbyMatchTabPanel.cs의 Awake가 FeatureLockView.Attach(Tournament)로 건다
         new(A.TournamentButton,           F.Tournament,         "로비/배틀 탭",          "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Match.prefab"),
+
+        // 25 UI/Deck/DeckEditCollectionGrid.cs가 anchorCard로 지목된 카드 타일에만 등록(해제는 Clear). 잠금 없음
+        new(A.DeckEditCollectionCard,     F.None,               "덱 편집(컬렉션 격자)",    "UI/Deck/DeckEditCollectionGrid.cs"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 부팅이 아니다).

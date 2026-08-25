@@ -106,6 +106,7 @@ public readonly struct TutorialActionMeta
         new(A.WaitKeywordEnhance,   C.KeywordEnhance,   F.Anchor | F.GuideMessage | F.Dim | F.FreeOfCharge),
         new(A.PackNotice,           C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy),
         new(A.CloseAlbumPage,       C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
+        new(A.WaitDeckEquip,        C.DeckEquip,        F.Anchor | F.GuideMessage | F.Dim),
     };
 
     // 이 구조의 조용한 실패 두 가지를 부팅 때 한 번 소리내어 잡는다.

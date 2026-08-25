@@ -159,6 +159,7 @@ public class MatchDeckShell : MonoBehaviour
     }
 
     // 매치 패널 EditButton. 편집 대상은 지금 선택된 덱이다.
+    // 튜토리얼이 카드 한 장을 직접 끼우게 하는 구간이면 그 카드를 빼 둔 채 연다(빈 칸이 있어야 가르칠 것이 생긴다).
     public void OpenEditor()
     {
         SelectedSlot = ResolveSlot(SelectedSlot);
@@ -175,11 +176,8 @@ public class MatchDeckShell : MonoBehaviour
         {
             slotIndex = SelectedSlot,
             onExit = OnEditorExit,
-            showDeckStrip = true,
-            showTitle = false,
             showDeckPower = false,
-            tutorialDeckSlot = TutorialDeckSlot(),
-            onSlotSwitched = _slot => SelectedSlot = _slot,
+            holdoutCard = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : null,
             onPlay = OnEditorPlay,
         });
         if (t_editor == null) return;
@@ -250,15 +248,16 @@ public class MatchDeckShell : MonoBehaviour
         if (IsValidSlot(_requested))   return _requested;
         if (IsValidSlot(SelectedSlot)) return SelectedSlot;
 
-        // 튜토리얼 덱은 방금 지급돼 목록 맨 앞(=첫 유효 슬롯)에 있다. 그대로 고르면 이미 선택된 채로 떠서
-        // "목록에서 골라 쓴다"를 가르칠 수 없다 → 다른 덱을 초기 선택으로 두고 유저가 옮겨오게 한다.
+        // 튜토리얼 중이면 이번 전투가 쓸 덱이 곧 기본 선택이다. 예전에는 일부러 다른 덱을 골라 두고
+        // 유저가 가로 덱 리스트에서 옮겨오게 했지만, 그 리스트가 사라져 옮겨올 수단 자체가 없다 —
+        // 엉뚱한 덱을 연 채로 두면 안내가 "이 카드를 끼워라"라고 가리키는 덱과 편집 중인 덱이 갈린다.
         int t_tutorial = TutorialDeckSlot();
+        if (IsValidSlot(t_tutorial)) return t_tutorial;
 
         for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
-            if (t_i != t_tutorial && DeckSaveManager.IsSlotValid(t_i)) return t_i;
+            if (DeckSaveManager.IsSlotValid(t_i)) return t_i;
 
-        // 튜토리얼 덱이 유일한 덱이면 그거라도 고른다 — 선택 없음(-1)은 전투 시작 버튼 자체를 잠근다.
-        return t_tutorial;
+        return -1;
     }
 
     // 이번 튜토리얼 전투가 쓸 덱의 저장 슬롯. 튜토리얼이 아니거나 고를 덱이 하나도 없으면 -1.
@@ -270,9 +269,7 @@ public class MatchDeckShell : MonoBehaviour
 
         if (DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index)) return t_index;
 
-        // 앞선 DeckGrant 스텝이 건너뛰어져 그 덱이 세이브에 없다. 아무 칸도 안 가리키면 그 칸을 지목하는
-        // 안내(MatchDeckTutorialDeck)가 등록을 영영 기다린다 — 첫 유효 슬롯으로 떨어뜨려 안내를 세운다.
-        // "목록에서 골라 쓴다"는 학습 목표는 어느 덱을 가리켜도 그대로 산다
+        // 앞선 DeckGrant 스텝이 건너뛰어져 그 덱이 세이브에 없다 — 첫 유효 슬롯으로 떨어뜨려 화면을 세운다
         // (지목 실패 시 화면이 대신 고르는 AlbumTabController.FindAnchorThemeIndex와 같은 관용구).
         for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
             if (DeckSaveManager.IsSlotValid(t_i)) return t_i;

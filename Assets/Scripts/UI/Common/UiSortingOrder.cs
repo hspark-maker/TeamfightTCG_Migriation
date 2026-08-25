@@ -44,6 +44,11 @@ public static class UiSortingOrder
     /// 컨테이너 값을 내리는 것은 답이 아니다: 딤에 묻히면 안 되는 실패 팝업까지 함께 내려간다.</summary>
     public const int PooledOverlay = 300;
 
+    /// <summary>덱 편집의 드래그 고스트(DragLayer). 끌고 있는 카드는 손가락을 따라다니므로 무엇에도 가리면 안 된다 —
+    /// 특히 편집 화면이 <see cref="PooledOverlay"/>로 내려앉은 뒤에는 튜토리얼 게이트 딤(<see cref="TutorialGate"/>)
+    /// 밑에서 끌리게 된다. 그래서 고스트만 게이트 위로 따로 올린다.</summary>
+    public const int DragGhost = 360;
+
     /// <summary>UIPoolManager의 UI 컨테이너(Boot.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
     /// 비어 있어도 항상 켜져 있다 — 이 표가 생긴 이유다.</summary>
     public const int Pool = 400;

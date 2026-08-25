@@ -15,7 +15,7 @@ using UnityEngine;
 /// 한 단계 = 한 메뉴 = 한 커밋, 매번 diff 확인.
 ///
 /// 순서:
-///   1) 원본에 옵션 노드 배선   : Title·DeckPower·DeckStrip을 코드가 켜고 끌 수 있게
+///   1) 원본에 옵션 노드 배선   : Title·DeckPower를 코드가 켜고 끌 수 있게(DeckStrip 축은 이후 제거됨)
 ///   2) 배리언트의 삭제 3건 복원 : Apply가 원본에서 Title·BackButton·DeckPower를 지우지 않게
 ///   3) (수동) 배리언트 Apply All: 매치 레이아웃을 원본에 올린다 — 눈으로 보며 해야 한다
 ///   4) Addressable + 폴더 이동  : 풀이 타입으로 찾을 수 있게
@@ -56,21 +56,15 @@ static class PoolDeckEditMigration
 
             GameObject t_title     = FindChild(t_root, "Title");
             GameObject t_deckPower = FindChild(t_root, "DeckPower");
-            var        t_strip     = t_root.GetComponentInChildren<MatchDeckStripController>(true);
 
             var t_so = new SerializedObject(t_controller);
             SetRef(t_so, "titleNode",     t_title);
             SetRef(t_so, "deckPowerNode", t_deckPower);
-            SetRef(t_so, "deckStrip",     t_strip);
             t_so.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(t_root, BasePanel);
 
-            Debug.Log($"[D-1] 배선 — title={(t_title != null)}, deckPower={(t_deckPower != null)}, "
-                    + $"strip={(t_strip != null)}\n"
-                    + (t_strip == null
-                        ? "⚠ 가로 덱 리스트가 원본에 아직 없다 — 3단계(배리언트 Apply All)로 넘어온다."
-                        : "가로 덱 리스트 배선 완료."));
+            Debug.Log($"[D-1] 배선 — title={(t_title != null)}, deckPower={(t_deckPower != null)}");
         }
         finally { PrefabUtility.UnloadPrefabContents(t_root); }
     }
