@@ -33,6 +33,9 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
 
     static bool s_booted;
+    static bool s_saveDependentInstalled;
+
+    internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     void Awake()
     {
@@ -73,18 +76,13 @@ public class BootInstaller : MonoBehaviour
 
         // 프로필 주입·로드 — 세이브 의존이 없어 순서는 자유다.
         ProfileManager.SetConfig(profileConfig);
-        ProfileManager.Init();
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
-        OwnershipManager.Init();
         // Live 카탈로그 밖의 레거시 소유 키가 정리된 뒤 튜토리얼 완료 여부를 판정한다.
-        OutgameTutorialProgress.Init();
 
         // 카드 성장 캐싱 — 세이브(DataSaveManager.Load)만 읽어 순서 무관하나, 곡선 조회가 Config를 쓰므로 주입이 먼저다.
         KeywordGrowthManager.SetConfig(keywordGrowthConfig);
-        KeywordGrowthManager.Init();
         CardGrowthManager.SetConfig(growthConfig);
-        CardGrowthManager.Init();
 
         // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
         // (GameInitializer.GrowthProvider 주석이 지정한 자리). 캐시가 준비된 Init 뒤여야 첫 전투부터 반영된다.
@@ -115,7 +113,6 @@ public class BootInstaller : MonoBehaviour
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
         DeckSaveManager.SetCardRegistry(t_availableCards);
-        DeckSaveManager.LoadFromSave(t_profile.RunMode == EContentRunMode.Live);
 
         // 덱 대표 이미지 후보 주입 — 신규 덱 저장 시 여기서 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);
@@ -123,7 +120,6 @@ public class BootInstaller : MonoBehaviour
         // 덱이 하나도 없는 신규 유저에게 스타터덱 지급(카드 소유권 포함).
         // 소유권 캐시·덱 로드 이후여야 하고, 대표 이미지 키를 뽑으므로 DeckImages 주입보다도 뒤에 온다.
         // 튜토리얼 첫실행 판정은 GameManager.Boot(BeforeSceneLoad)에서 이미 끝났으므로 여기 지급이 스킵을 유발하지 않는다.
-        StarterDeck.GrantIfNoDeck(starterDeck);
 
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
@@ -131,18 +127,61 @@ public class BootInstaller : MonoBehaviour
 
         // 세이브가 붙잡아 둔 스텝 번호로 좌표를 되찾는다 — 저작이 스텝을 끼워 넣거나 옮겼어도 같은 스텝에 선다.
         // 시퀀스를 읽어야 하므로 EnsureData 뒤, 좌표를 쓰는 아래 둘보다는 반드시 앞이다.
-        OutgameTutorialRunner.ResolveProgressAnchor();
 
         // 대본 전투가 연 화면 안에서 앱이 닫혔으면 좌표를 그 전투 진입 스텝으로 되감는다(부트당 1회는 여기가 유일).
         // 디버그 되감기보다 앞이다 — 디버그가 찍은 좌표는 그대로 서야 한다.
-        OutgameTutorialRunner.RewindToPendingBattleEntry();
 
         // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
-        OutgameTutorialRewind.ApplyReplayIfScheduled();
     }
 
     // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
+    System.Collections.IEnumerator Start()
+    {
+        while (!PlayerSaveSync.IsGateComplete &&
+               GameManager.BootState != EGameBootState.UpdateRequired &&
+               GameManager.BootState != EGameBootState.RecoveryRequired)
+        {
+            yield return null;
+        }
+
+        if (GameManager.BootState == EGameBootState.UpdateRequired ||
+            GameManager.BootState == EGameBootState.RecoveryRequired)
+            yield break;
+
+        try
+        {
+            InstallSaveDependent();
+        }
+        catch (System.Exception t_exception)
+        {
+            GameManager.MarkRecoveryRequired();
+            Debug.LogException(t_exception);
+        }
+    }
+
+    void InstallSaveDependent()
+    {
+        if (s_saveDependentInstalled) return;
+
+        OutgameTutorialRewind.ApplyWipeIfScheduled();
+        CurrencyManager.Init();
+        ProfileManager.Init();
+        OwnershipManager.Init();
+        OutgameTutorialProgress.Init();
+        if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
+        KeywordGrowthManager.Init();
+        CardGrowthManager.Init();
+        DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
+        StarterDeck.GrantIfNoDeck(starterDeck);
+        OutgameTutorialRunner.ResolveProgressAnchor();
+        OutgameTutorialRunner.RewindToPendingBattleEntry();
+        OutgameTutorialRewind.ApplyReplayIfScheduled();
+
+        s_saveDependentInstalled = true;
+        GameManager.MarkBootReady();
+    }
+
     static int EnemyCardLevelOf(CardData _card)
     {
         if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_card);

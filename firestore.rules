@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/save/{profileId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isKnownProfile() {
+        return profileId == 'current' || profileId == 'test';
+      }
+
+      function isValidSave() {
+        return request.resource.data.keys().hasOnly([
+          'schemaVersion', 'revision', 'payload', 'payloadHash',
+          'updatedAt', 'deviceId', 'appVersion'
+        ]) &&
+        request.resource.data.schemaVersion is int &&
+        request.resource.data.schemaVersion > 0 &&
+        request.resource.data.revision is int &&
+        request.resource.data.payload is string &&
+        request.resource.data.payload.size() <= 300000 &&
+        request.resource.data.payloadHash is string &&
+        request.resource.data.payloadHash.size() == 16 &&
+        request.resource.data.deviceId is string &&
+        request.resource.data.deviceId.size() == 32 &&
+        request.resource.data.appVersion is string &&
+        request.resource.data.appVersion.size() <= 64 &&
+        request.resource.data.updatedAt == request.time;
+      }
+
+      allow read: if isOwner() && isKnownProfile();
+      allow create: if isOwner() && isKnownProfile() && isValidSave() &&
+                    request.resource.data.revision == 1;
+      allow update: if isOwner() && isKnownProfile() && isValidSave() &&
+                    request.resource.data.schemaVersion >= resource.data.schemaVersion &&
+                    request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+  }
+}

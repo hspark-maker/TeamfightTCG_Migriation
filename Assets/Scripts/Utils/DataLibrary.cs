@@ -58,7 +58,6 @@ public class DataLibrary : MonoBehaviour
 
         // "튜토 졸업 = 첫 티어 도달"이 불변식이다. 완료 낙인만 있고 미도달인 세이브(레거시 흡수·구 버전)를
         // 티어 테이블 주입 직후에 맞춘다. 진입 연출은 싣지 않는다 — 실제로 졸업하는 순간에만 띄운다.
-        if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
         BattleVfx.SetLibrary(this.battleVfxLibrary);
         return true;
     }
