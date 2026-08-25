@@ -81,8 +81,16 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        PlayerSaveSync.Initialize(t_profile.CloudSaveProfileId, DataSaveManager.CloudUploadAllowed);
-        BootState = EGameBootState.Syncing;
+        try
+        {
+            PlayerSaveSync.Initialize(t_profile.CloudSaveProfileId, DataSaveManager.CloudUploadAllowed);
+            BootState = EGameBootState.Syncing;
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[GameManager] PlayerSaveSync.Initialize failed: {ex.Message}\n{ex.StackTrace}");
+            MarkRecoveryRequired();
+        }
     }
 
     public static void SetTargetFrameRate(int _frameRate, bool _save = true)
