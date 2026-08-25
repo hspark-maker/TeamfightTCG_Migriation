@@ -193,7 +193,16 @@ public class TriggeredTutorialBridge : MonoBehaviour
             ? null
             : (Action)OnGateSatisfied;
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab)
+            .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect());
+    }
+
+    // 타깃과 함께 밝힐 영역. 아직 등록되지 않았으면 강조 없이 진행한다 — 이 축이 진행을 막을 이유가 없다.
+    RectTransform SpotlightRect()
+    {
+        if (m_step == null || m_step.Spotlight == EOutgameTutorialAnchor.None) return null;
+
+        return TutorialAnchorRegistry.TryGet(m_step.Spotlight, out var t_rect, out _) ? t_rect : null;
     }
 
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다.
@@ -306,7 +315,10 @@ public class TriggeredTutorialBridge : MonoBehaviour
     void OnAnchorRegistered(EOutgameTutorialAnchor _key)
     {
         if (m_enhancing || m_awaitingUnlockFx) return;
-        if (m_step == null || _key != m_step.Anchor) return;
+        if (m_step == null) return;
+
+        // 함께 밝힐 영역이 늦게 등록되는 경우도 다시 세운다 — 안 그러면 그 스텝은 강조 없이 굳는다.
+        if (_key != m_step.Anchor && _key != m_step.Spotlight) return;
 
         TryOpenGate();
     }

@@ -21,6 +21,8 @@ using UnityEngine.UI;
 //      트리거가 끝났다는 통지를 받아 자기 안내를 다시 세운다.
 //
 // 강조는 "딤 위로 올라온 대상" 그 자체다 — 테두리를 덧그리지 않는다. 봐야 할 것만 밝게 남는 것이 안내다.
+// 클릭 스텝은 누를 타깃 외에 "읽을 영역"(spotlight)을 하나 더 올릴 수 있다 — 보고 나서 눌러야 성립하는 자리용이다.
+// 그 영역은 레이캐스터 없이 올라간다: 완료 신호는 타깃 클릭 하나뿐이어야 한다(PromoteRegion 참조).
 //
 // 메시지 모드(ShowMessageGate)는 손가락만 빼고 딤+승격을 켠다 — 읽을 영역이라도 딤 아래 깔리면
 // 무엇을 보라는 것인지 성립하지 않는다. 대신 승격에 레이캐스터를 달지 않는다(PromoteOne 참조).
@@ -79,6 +81,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     MonoBehaviour m_owner;
 
     RectTransform m_target;
+    RectTransform m_spotlight;        // 타깃과 함께 딤 위로 올릴 "읽을 영역"(레이캐스터를 붙이지 않아 눌리지 않는다)
     Button        m_targetButton;
     Canvas        m_targetCanvas;      // 승격 전에 잡아 둔 타깃의 원래 캔버스(스크린 변환·루트 조회에 쓴다)
     Action        m_onSatisfied;
@@ -105,6 +108,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         public Canvas Canvas;
         public bool   AddedCanvas;
         public bool   AddedRaycaster;
+        public GraphicRaycaster MutedRaycaster;   // 읽을 영역에 이미 저작돼 있던 레이캐스터(승격 동안만 내렸다가 되돌린다)
         public bool   PrevOverrideSorting;
         public int    PrevSortingOrder;
         public int    PrevSortingLayerID;
@@ -142,8 +146,11 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// (구매처럼 눌러도 실패할 수 있는 스텝).
     /// <paramref name="_dim"/>=false면 손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
     /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.
+    /// <paramref name="_spotlight"/>는 타깃과 함께 밝힐 영역이다 — 보라고 올릴 뿐 누를 수는 없다(레이캐스터를 붙이지 않는다).
+    /// 없으면(null) 종전대로 타깃만 올라간다.
     /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>
-    public void ShowGate(MonoBehaviour _owner, RectTransform _target, Button _targetButton, string _message, Action _onSatisfied, bool _dim = true)
+    public void ShowGate(MonoBehaviour _owner, RectTransform _target, Button _targetButton, string _message, Action _onSatisfied,
+                         bool _dim = true, RectTransform _spotlight = null)
     {
         if (_target == null)
         {
@@ -165,6 +172,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         m_owner        = _owner;
         m_target       = _target;
+        m_spotlight    = _spotlight;
         m_targetButton = _targetButton;
         m_targetCanvas = _target.GetComponentInParent<Canvas>();
         m_onSatisfied  = _onSatisfied;
@@ -330,7 +338,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 승격을 남겨 두면 게임이 막으려던 입력이 튜토리얼 때문에 뚫린다.
     void RefreshVisibility()
     {
-        bool t_active = m_target.gameObject.activeInHierarchy;
+        bool t_active = m_target.gameObject.activeInHierarchy && SpotlightActive();
 
         // 메시지 모드엔 누를 타깃이 없다(버튼 없는 순수 영역도 하이라이트한다) → 표시 여부는 활성 여부만으로 판정한다.
         // 화면 탭 자체가 탈출로라 딤이 유지돼도 불변식 (2)를 어기지 않는다.
@@ -361,6 +369,11 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_blockWarned = false;
         Layout();
     }
+
+    // 함께 밝힐 영역도 타깃과 같은 등급의 생존 조건이다 — 이 영역만 꺼져도(패널 닫힘·풀 반환) 승격을 내려야
+    // 그 오브젝트에 얹은 overrideSorting이 다음 사용자에게 새어 나가지 않는다(덱 편집 패널은 풀에서 재사용된다).
+    // 파괴는 여기서 보지 않는다: 파괴된 오브젝트의 Canvas도 함께 사라져 되돌릴 것이 남지 않는다(Demote가 건너뛴다).
+    bool SpotlightActive() => m_spotlight == null || m_spotlight.gameObject.activeInHierarchy;
 
     // 기능 잠금이 원인이면 대기가 영영 안 풀린다(잠금은 진행으로만 열리는데 진행이 이 스텝에서 멈춰 있다).
     // 다른 원인(골드 부족 등)은 유저가 스스로 풀 수 있어 정상 대기다 — 둘을 로그에서 구분해 준다.
@@ -461,42 +474,52 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         m_promoted = true;
 
-        CollectHighlights();
-        for (int t_i = 0; t_i < m_cardBuffer.Count; t_i++) PromoteOne(m_cardBuffer[t_i].gameObject);
+        PromoteRegion(m_target, m_confirmMode);
 
-        if (m_cardBuffer.Count == 0) PromoteOne(m_target.gameObject);
+        // 함께 밝힐 영역은 봐야 할 것이지 누를 것이 아니다 — 클릭 스텝에서도 읽을 영역으로만 올린다.
+        if (m_spotlight != null && m_spotlight != m_target) PromoteRegion(m_spotlight, true);
     }
 
-    // 설명 스텝은 영역째가 아니라 그 안의 카드만 올린다 — "이게 네 덱이다"는 카드만 보이면 성립하고,
+    // 영역 하나를 딤 위로 올린다. _readOnly면 그 안의 카드만(없으면 영역째) 올리고 레이캐스터를 붙이지 않는다.
+    void PromoteRegion(RectTransform _region, bool _readOnly)
+    {
+        CollectHighlights(_region, _readOnly);
+
+        for (int t_i = 0; t_i < m_cardBuffer.Count; t_i++) PromoteOne(m_cardBuffer[t_i].gameObject, !_readOnly);
+
+        if (m_cardBuffer.Count == 0) PromoteOne(_region.gameObject, !_readOnly);
+    }
+
+    // 읽을 영역은 영역째가 아니라 그 안의 카드만 올린다 — "이게 네 덱이다"는 카드만 보이면 성립하고,
     // 패널 프레임·수치·버튼까지 딸려 올라오면 무엇을 보라는 것인지 흐려진다.
-    // 클릭 스텝은 제외한다: 눌러야 할 것은 버튼이지 카드가 아니라, 카드만 올리면 정작 누를 것이 딤 아래 남는다.
+    // 누를 영역은 제외한다: 눌러야 할 것은 버튼이지 카드가 아니라, 카드만 올리면 정작 누를 것이 딤 아래 남는다.
     // 마스크 안의 카드(소유 카드 스크롤)도 제외 — 승격이 RectMask2D 클리핑을 끊어 카드가 뷰포트 밖으로 샌다.
-    void CollectHighlights()
+    void CollectHighlights(RectTransform _region, bool _readOnly)
     {
         m_cardBuffer.Clear();
-        if (!m_confirmMode) return;
+        if (!_readOnly) return;
 
-        m_target.GetComponentsInChildren(m_cardBuffer);   // 비활성 제외 = 빈 슬롯의 카드는 애초에 빠진다
+        _region.GetComponentsInChildren(m_cardBuffer);   // 비활성 제외 = 빈 슬롯의 카드는 애초에 빠진다
 
         for (int t_i = 0; t_i < m_cardBuffer.Count; t_i++)
         {
-            if (!IsClipped(m_cardBuffer[t_i].transform)) continue;
+            if (!IsClipped(m_cardBuffer[t_i].transform, _region)) continue;
 
             m_cardBuffer.Clear();   // 하나라도 잘리면 영역째 올리는 원래 방식으로 되돌린다
             return;
         }
     }
 
-    // 타깃과 카드 사이에 클리핑 마스크가 끼어 있는가.
-    bool IsClipped(Transform _card)
+    // 영역과 카드 사이에 클리핑 마스크가 끼어 있는가.
+    static bool IsClipped(Transform _card, RectTransform _region)
     {
-        for (var t_t = _card.parent; t_t != null && t_t != m_target; t_t = t_t.parent)
+        for (var t_t = _card.parent; t_t != null && t_t != _region; t_t = t_t.parent)
             if (t_t.GetComponent<RectMask2D>() != null || t_t.GetComponent<Mask>() != null) return true;
 
         return false;
     }
 
-    void PromoteOne(GameObject _go)
+    void PromoteOne(GameObject _go, bool _clickable)
     {
         var t_root = m_targetCanvas != null ? m_targetCanvas.rootCanvas : null;
 
@@ -526,10 +549,20 @@ public class OutgameTutorialGateUI : MonoBehaviour
             t_promotion.Canvas.additionalShaderChannels = t_root.additionalShaderChannels;
         }
 
-        // 메시지 모드는 딤 탭이 유일한 완료 경로다 — 레이캐스터를 붙이면 승격된 영역이 탭을 삼켜 진행이 막힌다.
+        // 읽을 영역(메시지 모드의 하이라이트·클릭 스텝의 스포트라이트)에는 레이캐스터를 두지 않는다 —
+        // 있으면 그 영역이 탭을 삼켜, 메시지 모드는 완료가 막히고 클릭 스텝은 눌러야 할 곳이 둘로 늘어난다.
         // 중첩 Canvas에 레이캐스터가 없으면 그 아래 그래픽은 레이캐스트에서 빠져 탭이 딤까지 내려간다(보이기만 한다).
-        t_promotion.AddedRaycaster = !m_confirmMode && _go.GetComponent<GraphicRaycaster>() == null;
+        var t_raycaster = _go.GetComponent<GraphicRaycaster>();
+
+        t_promotion.AddedRaycaster = _clickable && t_raycaster == null;
         if (t_promotion.AddedRaycaster) _go.AddComponent<GraphicRaycaster>();
+
+        // 저작된 레이캐스터가 남아 있으면 승격(351)과 합쳐져 딤(350) 위에서 입력을 받는다 — 그 동안만 내린다.
+        else if (!_clickable && t_raycaster != null && t_raycaster.enabled)
+        {
+            t_promotion.MutedRaycaster = t_raycaster;
+            t_raycaster.enabled        = false;
+        }
 
         m_promotions.Add(t_promotion);
     }
@@ -543,6 +576,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
         for (int t_i = 0; t_i < m_promotions.Count; t_i++)
         {
             var t_promotion = m_promotions[t_i];
+
+            // 내려 둔 레이캐스터는 Canvas가 죽었더라도 되돌린다 — 그 컴포넌트는 남아 있을 수 있다.
+            if (t_promotion.MutedRaycaster != null) t_promotion.MutedRaycaster.enabled = true;
+
             if (t_promotion.Canvas == null) continue;   // 대상이 이미 파괴됨
 
             // 파괴 순서 고정: GraphicRaycaster가 Canvas를 RequireComponent하므로 Canvas를 먼저 지우면
@@ -663,6 +700,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (m_targetButton != null) m_targetButton.onClick.RemoveListener(OnTargetClicked);
         m_targetButton = null;
+        m_spotlight    = null;   // 스텝의 것이다 — 남기면 다음 게이트가 무관한 영역을 함께 밝힌다
 
         // 메시지 모드 상태도 여기서 되돌린다 — 딤 리스너가 남으면 다음 스텝이 화면 탭만으로 넘어가 버린다.
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);

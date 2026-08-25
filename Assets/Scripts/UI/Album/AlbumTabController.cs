@@ -175,7 +175,7 @@ public class AlbumTabController : LobbyTabPanel
                 m_cells[t_i].transform.SetSiblingIndex(t_i);
                 m_cells[t_i].gameObject.SetActive(true);
 
-                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_i == t_anchorIndex);
+                m_cells[t_i].Bind(t_themes[t_i], t_i + 1, OpenTheme, t_i == t_anchorIndex);
             }
 
             for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)

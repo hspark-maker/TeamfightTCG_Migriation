@@ -3,13 +3,16 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 덱 탭 루트(Tab_Deck에 부착). 목록 화면을 소유하고, 편집은 풀(UIPoolManager)이 세운 화면에 넘긴다.
+// 덱 탭 루트(Tab_Deck에 부착). 탭에 들어오면 곧바로 편집 화면을 연다 — 목록 뎁스는 없다.
+// 덱을 갈아타는 일은 편집 화면 하단의 덱 선택 바(DeckStripView)가 맡는다.
+//
 // 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
-// "탭이 켜지면 항상 목록부터"를 OnEnable로 보장한다.
+// "탭이 켜지면 항상 편집 화면"을 OnEnable로 보장한다.
 //
 // 편집 화면은 이 프리팹 안에 없다 — 매치 셸과 같은 한 인스턴스를 공유한다(DeckEditController).
 public class DeckTabController : LobbyTabPanel
 {
+    [Tooltip("구 덱 목록 패널. 뎁스가 하나로 합쳐지면서 더 이상 켜지 않는다(노드째 비활성) — 배선만 남겨 둔 것은 롤백 여지다.")]
     [SerializeField] GameObject listPanel;
 
     [Tooltip("덱 탭에 있는 동안 숨길 로비 상단 바. 미배선이면 LobbyRoot/TopBar를 찾아 쓴다.")]
@@ -33,26 +36,36 @@ public class DeckTabController : LobbyTabPanel
     // (풀드 화면은 자기 캔버스에 살아서 로비 캔버스의 고스트가 뒤로 깔린다 — SetDragController 주석).
     DeckEditDragController m_dragController;
 
+    // 뒤로가기로 이 탭을 떠날 때 돌아갈 곳. 목록이 사라져 "편집 이전 화면"이 탭 밖에 있다.
+    LobbyTabController m_shell;
+
+    // 마지막으로 편집하던 저장 슬롯. 탭을 다시 열었을 때 보던 덱이 그대로 뜨게 한다(없으면 -1).
+    int m_lastSlot = -1;
+
     /// <summary>로비가 넘긴 서비스를 받아둔다. 편집 화면은 열 때 세워지므로 여기서 전달하지 못한다.</summary>
     public override void Initialize(LobbyTabServices _services)
     {
         m_dragController = _services?.DragController;
+        m_shell          = _services?.Shell;
     }
 
     // 덱 탭을 단독 배치한 테스트 씬에서는 셸이 없을 수 있다 → 호출측은 항상 null을 감안한다.
     void OnEnable()
     {
-        // 편집 중 탭이 꺼졌다 켜지면 여기서 무저장 폐기된다.
+        // 편집 중 탭이 꺼졌다 켜지면 이전 편집분은 무저장 폐기된다.
         // 편집은 DeckEditController의 메모리 사본에서만 일어나고 세이브는 손대지 않으므로
-        // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 목록으로 되돌려도 안전하다.
-        ShowList();
+        // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
+        if (listPanel != null) listPanel.SetActive(false);
+
+        OpenEditorForResolvedSlot();
         SetTopBarHidden(true);
     }
 
-    // 탭 전환이 아닌 경로(로비 캔버스 비활성·씬 전환)로 덱 탭이 꺼지면 ShowList를 거치지 않는다 →
-    // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어간다.
+    // 탭 전환이 아닌 경로(로비 캔버스 비활성·씬 전환)로 덱 탭이 꺼지면 CloseEditor를 거치지 않는다 →
+    // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어가고, 풀 캔버스의 편집 화면이 다른 탭 위에 남는다.
     void OnDisable()
     {
+        HideEditor();
         SetTopBarHidden(false);
     }
 
@@ -136,11 +149,14 @@ public class DeckTabController : LobbyTabPanel
     {
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return;
 
+        m_lastSlot = _slotIndex;
+
         ShowEditor(new DeckEditData
         {
             slotIndex      = _slotIndex,
             onExit         = CloseEditor,
             dragController = m_dragController,
+            showDeckStrip  = true,
         });
     }
 
@@ -154,17 +170,37 @@ public class DeckTabController : LobbyTabPanel
             isNew          = true,
             onExit         = CloseEditor,
             dragController = m_dragController,
+            showDeckStrip  = true,
         });
     }
 
-    // 편집 종료 = 편집 진입 이전 화면(덱 탭 목록)으로 복귀. 탭은 건드리지 않는다.
+    /// <summary>편집 종료 = 덱 탭을 떠난다. 돌아갈 목록이 없어졌으므로 셸의 기본 탭으로 보낸다.
+    ///
+    /// 편집기를 <b>먼저</b> 내리는 것이 계약이다 — 아래 탭 전환이 RequestLeave를 다시 태우는데,
+    /// 뒤로가기에서 "저장 안 함"을 고른 경우 m_dirty가 살아 있어 확인 팝업이 두 번 뜬다.</summary>
     public void CloseEditor()
     {
-        ShowList();
+        HideEditor();
+
+        LobbyTabController t_shell = Shell;
+        if (t_shell == null)
+        {
+            // 나갈 곳을 못 찾으면 전체화면 오버레이에 갇힌다 — 조용히 넘어가지 않고 소리내어 잡는다.
+            Debug.LogError("[DeckTabController] 탭 셸을 찾지 못해 덱 탭을 떠날 수 없다 — LobbyTabController 배선을 확인할 것.", this);
+            return;
+        }
+
+        t_shell.SelectDefault();
     }
 
+    // 셸은 Initialize로 주입받는다. 탭이 셸보다 먼저 켜지는 저작(Tab_Deck이 활성인 채 저장된 경우)에서는
+    // 주입이 아직 없으므로 상위 계층에서 찾아 캐시한다 — TopBar 프로퍼티와 같은 관례다.
+    LobbyTabController Shell
+        => this.m_shell != null ? this.m_shell : (this.m_shell = GetComponentInParent<LobbyTabController>(true));
+
     // 탭 셸이 넘긴 이탈 요청. 저장 판정과 미완성 확인은 편집기가 하고(경로가 뒤로가기와 한 벌이어야 한다),
-    // 허가가 떨어지면 목록으로 되돌린 뒤 유저가 원래 누른 탭으로 보낸다.
+    // 허가가 떨어지면 편집 화면만 내리고 유저가 원래 누른 탭으로 보낸다 —
+    // 여기서 CloseEditor를 부르면 기본 탭으로 한 번 갔다가 원래 누른 탭으로 또 가게 된다.
     public override void RequestLeave(Action _proceed)
     {
         if (!m_editing)
@@ -176,7 +212,7 @@ public class DeckTabController : LobbyTabPanel
         DeckEditController t_editor = DeckEditController.Pooled();
         if (t_editor == null)
         {
-            CloseEditor();
+            HideEditor();
             _proceed();
 
             return;
@@ -184,32 +220,58 @@ public class DeckTabController : LobbyTabPanel
 
         t_editor.RequestLeave(() =>
         {
-            CloseEditor();
+            HideEditor();
             _proceed();
         });
     }
 
-    // 편집 화면을 세우지 못하면(풀 미초기화) 목록에 머문다 — 빈 화면으로 갇히지 않게.
+    // 이 탭이 열 덱을 정한다: 마지막으로 보던 덱 → 첫 유효 덱 → 하나도 없으면 신규 생성.
+    // DeckEditController.Open(-1)은 에러만 남기고 화면을 안 세우므로 좌표 없는 상태를 여기서 걸러야 한다.
+    void OpenEditorForResolvedSlot()
+    {
+        int t_slot = ResolveSlot(m_lastSlot);
+
+        if (t_slot >= 0) OpenEditor(t_slot);
+        else             OpenNewDeckEditor();
+    }
+
+    static int ResolveSlot(int _requested)
+    {
+        if (IsValidSlot(_requested)) return _requested;
+
+        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+            if (DeckSaveManager.IsSlotValid(t_i)) return t_i;
+
+        return -1;
+    }
+
+    // DeckSaveManager.IsSlotValid는 범위 가드 없이 슬롯 배열을 직접 인덱싱한다 —
+    // "선택 없음"을 -1로 표현하므로 범위 검사를 반드시 앞에 둔다.
+    static bool IsValidSlot(int _slotIndex)
+        => _slotIndex >= 0 && _slotIndex < DeckSaveManager.SLOT_COUNT && DeckSaveManager.IsSlotValid(_slotIndex);
+
+    // 편집 화면을 세우지 못하면(풀 미초기화) 빈 탭에 머문다 — 나가는 길은 하단 탭바가 아니라 셸이 쥐고 있다.
     void ShowEditor(DeckEditData _data)
     {
         if (DeckEditController.OpenPooled(_data) == null) return;
 
         m_editing = true;
-        if (listPanel != null) listPanel.SetActive(false);
 
-        // ⚠ 편집 화면은 풀 캔버스(order 400)라 하단 탭바를 덮는다 — 예전 탭 안 패널과 달리 탭 버튼이 안 보인다.
+        // ⚠ 편집 화면은 풀 캔버스(order 300)라 하단 탭바를 덮는다 — 탭 버튼이 안 보인다.
         //   나가는 길은 편집 화면의 뒤로가기 하나이고, 저장 확인은 그 경로가 이미 거친다(RequestLeave).
     }
 
-    void ShowList()
+    // 편집 화면을 내린다. 가드를 먼저 내려야 허가 경로가 재개한 탭 전환이 다시 가드로 들어오지 않는다.
+    void HideEditor()
     {
-        // 가드를 먼저 내린다 — 허가 경로가 이 뒤에 원래 탭 전환을 재개하는데, 남아 있으면 그게 다시 가드로 들어온다.
-        bool t_wasEditing = m_editing;
+        if (!m_editing) return;   // 편집을 연 적이 없으면 풀에 묻지 않는다(GetUI가 "No Such UI" 로그를 남긴다)
+
         m_editing = false;
 
-        // 편집을 연 적이 없으면 풀에 묻지 않는다 — GetUI가 "No Such UI" 로그를 남긴다.
-        if (t_wasEditing) DeckEditController.HidePooled();
+        // 내리기 직전의 편집 대상을 회수한다 — 하단 바로 덱을 갈아탄 것은 편집기만 알고 있다.
+        DeckEditController t_editor = DeckEditController.Pooled();
+        if (t_editor != null && t_editor.CurrentSlot >= 0) m_lastSlot = t_editor.CurrentSlot;
 
-        if (listPanel != null) listPanel.SetActive(true);
+        DeckEditController.HidePooled();
     }
 }

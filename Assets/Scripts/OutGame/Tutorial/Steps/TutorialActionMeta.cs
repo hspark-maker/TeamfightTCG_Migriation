@@ -26,6 +26,7 @@ public enum EStepField
     FailurePolicy    = 1 << 13,
     Card             = 1 << 14,
     Cards            = 1 << 15,
+    Spotlight        = 1 << 16,
 }
 
 /// <summary>스텝 한 행이 비트(유저가 겪는 사건 하나) 안에서 맡는 자리.
@@ -85,27 +86,28 @@ public readonly struct TutorialActionMeta
     // 인덱스 = (int)EOutgameTutorialAction. 첫 칸의 액션 이름이 그 계약을 눈에 보이게 하고, static 생성자가 검증한다.
     static readonly TutorialActionMeta[] s_table =
     {
-        new(A.WaitClick,            C.Click,            F.Anchor | F.GuideMessage | F.Dim),
+        new(A.WaitClick,            C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight),
         new(A.Message,              C.Confirm,          F.Anchor | F.GuideMessage | F.Dim | F.MessagePlacement),
-        new(A.WaitPurchase,         C.Purchase,         F.Anchor | F.GuideMessage | F.Dim | F.Pack | F.PackPriceLabel, false, true),
+        new(A.WaitPurchase,         C.Purchase,         F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.Pack | F.PackPriceLabel, false, true),
         new(A.WaitPackOpen,         C.PackOpen,         F.GuideMessage),
-        new(A.DeckAutoEquip,        C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Pack),
-        new(A.BattleEntry,          C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Scenario | F.ShowDeckGate, true),
-        new(A.BattleStart,          C.Click,            F.Anchor | F.GuideMessage | F.Dim, true),
+        new(A.DeckAutoEquip,        C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.Pack),
+        new(A.BattleEntry,          C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.Scenario | F.ShowDeckGate, true),
+        new(A.BattleStart,          C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight, true),
         new(A.AutoBattle,           C.Auto,             F.Scenario | F.ShowDeckGate, true),
         new(A.AutoPurchase,         C.Auto,             F.Pack | F.FailurePolicy, false, true, EBeatSlot.Pre),
         new(A.DeckGrant,            C.Auto,             F.Scenario | F.DeckName | F.FailurePolicy, _beatSlot: EBeatSlot.Pre),
         new(A.WaitAlbumInsert,      C.AlbumInsert,      F.None, _beatSlot: EBeatSlot.Post),
-        new(A.WaitEnhance,          C.Enhance,          F.Anchor | F.GuideMessage | F.Dim | F.FreeOfCharge | F.WaitUnlockIntro),
+        new(A.WaitEnhance,          C.Enhance,          F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.FreeOfCharge | F.WaitUnlockIntro),
         new(A.CloseCardDetail,      C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
         new(A.EnterFirstRank,       C.RankEffect,       F.None, _beatSlot: EBeatSlot.Pre),
         new(A.WaitLobbyReturn,      C.LobbyReturn,      F.None, _beatSlot: EBeatSlot.Post),
         new(A.CardGrant,            C.CardGain,         F.RewardTitle | F.ParallelGain | F.FailurePolicy | F.Card, _beatSlot: EBeatSlot.Pre),
         new(A.WaitCardDetailReturn, C.CardDetailReturn, F.None, _beatSlot: EBeatSlot.Post),
         new(A.CardSetGrant,         C.CardGain,         F.RewardTitle | F.ParallelGain | F.FailurePolicy | F.Cards, _beatSlot: EBeatSlot.Pre),
-        new(A.WaitKeywordEnhance,   C.KeywordEnhance,   F.Anchor | F.GuideMessage | F.Dim | F.FreeOfCharge),
+        new(A.WaitKeywordEnhance,   C.KeywordEnhance,   F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.FreeOfCharge),
         new(A.PackNotice,           C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy),
         new(A.CloseAlbumPage,       C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
+        // 장착으로 슬롯 내용이 갱신되는 스텝이라 F.Spotlight를 주지 않는다 — 승격은 첫 프레임에 한 번만 걸린다.
         new(A.WaitDeckEquip,        C.DeckEquip,        F.Anchor | F.GuideMessage | F.Dim),
     };
 

@@ -18,6 +18,7 @@ public class DeckEditSlotView : MonoBehaviour
     [SerializeField] GameObject     emptyMark;        // 빈 칸 표시(+ 아이콘 등). cardVisual 바깥에 두어야 통째로 꺼져도 남는다.
     [SerializeField] GameObject     highlightFrame;   // 드래그 오버 테두리
     [SerializeField] GameObject     swapGlow;         // 슬롯 픽(교체) 모드 발광. cardVisual 바깥에 둬야 빈 칸에서도 남는다.
+    [SerializeField] GameObject     swapMark;         // 슬롯 픽(교체) 모드 반투명 판("교체"). 칸 프레임 안쪽 개구부에 고정 — 카드처럼 줄지 않는다.
     [SerializeField] CanvasGroup    canvasGroup;      // 시너지 강조 때 대상 아닌 칸을 죽이는 용도
 
     // 시너지 강조 중 "해당 없음" 칸의 알파. 0으로 두면 빈 칸인지 흐린 칸인지 구분이 안 된다.
@@ -110,6 +111,9 @@ public class DeckEditSlotView : MonoBehaviour
             // 발광 컴포넌트를 끄면 같은 UIEffect를 나눠 쓰는 표현까지 죽는다(UiGlowBlink 계약) → 오브젝트를 끈다.
             swapGlow.SetActive(_on);
         }
+
+        // 판은 카드 위에 얹히는 표식이라 빈 칸에서는 뜻이 없다 — 카드가 있을 때만 켠다.
+        if (swapMark != null) swapMark.SetActive(_on && m_card != null);
 
         ApplySwapScale(_on, _instant);
     }

@@ -21,6 +21,7 @@ public class DeckEditDragController : MonoBehaviour
 
     Func<IReadOnlyList<DeckEditSlotView>> m_slotProvider;
     Action<int, CardData>                 m_onDropped;
+    Action                                m_onEnded;
 
     RectTransform  m_ghostRect;
     CardVisualView m_ghostView;
@@ -50,10 +51,13 @@ public class DeckEditDragController : MonoBehaviour
                        ? rootCanvas.worldCamera
                        : null;
 
-    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, CardData> _onDropped)
+    /// <summary>_onEnded는 드롭 성사 여부와 무관하게 드래그가 끝날 때마다 발화한다(취소·화면 이탈 포함).
+    /// 드래그 동안 켜 둔 화면 신호를 끄는 자리다.</summary>
+    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, CardData> _onDropped, Action _onEnded = null)
     {
         m_slotProvider = _slotProvider;
         m_onDropped    = _onDropped;
+        m_onEnded      = _onEnded;
     }
 
     // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
@@ -240,6 +244,9 @@ public class DeckEditDragController : MonoBehaviour
         if (t_data != null) t_data.eligibleForClick = false;
 
         // 콜백은 정리 이후에 부른다 — 콜백이 그리드를 재빌드하며 Cancel을 되부를 수 있어 재진입에 안전해야 한다.
+        // 종료 통지가 드롭보다 먼저다 — 드롭 콜백이 칸을 재바인딩하며 새로 칠한 표시를 뒤늦은 통지가 지우면 안 된다.
+        m_onEnded?.Invoke();
+
         if (_slotIndex >= 0 && t_card != null) m_onDropped?.Invoke(_slotIndex, t_card);
     }
 

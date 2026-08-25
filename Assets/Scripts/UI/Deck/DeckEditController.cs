@@ -33,6 +33,10 @@ public sealed class DeckEditData : UIData
     /// <summary>덱 전투력 표시. 매치 화면은 끈다(덱 확인 패널이 그 자리를 쥔다).</summary>
     public bool showDeckPower = true;
 
+    /// <summary>하단 덱 선택 바. 로비 덱 탭은 목록 뎁스가 없어 여기서 덱을 갈아탄다 —
+    /// 매치 화면은 끈다(어느 덱으로 싸울지는 이미 그 앞 화면이 정했고, 하단 자리를 전투 시작 버튼이 쓴다).</summary>
+    public bool showDeckStrip;
+
     /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
     /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
     /// 로비 탭은 미주입 → 버튼이 꺼진다.
@@ -72,6 +76,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     [SerializeField] Button autoEquipButton;
     [Tooltip("우측 하단 저장 버튼. 바꾼 게 있을 때만 눌린다(미배선이면 나갈 때 확인만으로 저장한다).")]
     [SerializeField] Button saveButton;
+
+    [Tooltip("하단 덱 선택 바. 호스트가 DeckEditData.showDeckStrip로 켜고 끈다.")]
+    [SerializeField] DeckStripView deckStrip;
 
     [Header("호스트별로 켜고 끄는 것 (선택)")]
     [Tooltip("상단 제목 노드. 호스트가 DeckEditData.showTitle로 켜고 끈다.")]
@@ -117,11 +124,19 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // 여기서 가른다 — 매번 걸면 갱신마다 칸이 깜빡인다.
     bool m_swapVisualOn;
 
+    // 드래그가 켜 둔 칸 강조. 6칸이 다 찬 채로 끌기 시작하면 놓는 순간이 곧 교체라,
+    // 탭 교체(m_pendingSwapCard)와 같은 신호를 칸에 칠한다. 둘은 배타다 — 드래그 개시가 탭 모드를 내린다.
+    bool m_dragSwapVisual;
+
     /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
     public static event Action<CardData> OnAnyCardEquipped;
 
     public bool IsOpen => m_mode != EDeckEditMode.None;
+
+    /// <summary>지금 편집 중인 저장 슬롯(신규 생성 중이거나 닫혀 있으면 -1).
+    /// 하단 바로 덱을 갈아탄 사실은 이 값으로만 밖에 드러난다 — 호스트는 열 때 넘긴 좌표만 알고 있다.</summary>
+    public int CurrentSlot => m_slotIndex;
 
     // 드래그 컨트롤러가 드롭 대상 판정에 쓰는 칸 목록. 미배선(null)이어도 호출측이 터지지 않게 빈 목록을 준다.
     public IReadOnlyList<DeckEditSlotView> Slots => slots ?? Array.Empty<DeckEditSlotView>();
@@ -136,7 +151,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
 
     /// <summary>드래그 컨트롤러 주입. <b>프리팹이 자기 것을 들고 있으면 주입을 무시한다</b> —
-    /// 풀드 UI는 자기 캔버스(order 400)에 살아서, 로비 캔버스(order 0)의 DragLayer를 주입받으면
+    /// 풀드 UI는 자기 캔버스(UiSortingOrder.PooledOverlay)에 살아서, 로비 캔버스(order 0)의 DragLayer를 주입받으면
     /// 고스트가 패널 뒤로 깔린다. 프리팹 안에 레이어가 없는 경우(단독 테스트 씬)에만 주입이 먹는다.</summary>
     public void SetDragController(DeckEditDragController _controller)
     {
@@ -273,6 +288,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
         if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
+
+        // 하단 바와 전투 시작 버튼은 같은 자리를 쓴다 — 두 호스트가 배타적이라 축을 따로 두어도 겹치지 않는다.
+        if (this.deckStrip != null) this.deckStrip.gameObject.SetActive(this.m_request.showDeckStrip);
     }
 
     /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
@@ -391,6 +409,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
         if (synergyStrip   != null) synergyStrip.Clear();
+        if (deckStrip      != null) deckStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
     }
 
@@ -405,7 +424,13 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     void OnFeatureLockChanged()
     {
-        if (IsOpen) RefreshAll();
+        if (!IsOpen) return;
+
+        RefreshAll();
+
+        // ⊕ 칸의 interactable·클릭 콜백은 Build 시점 값으로 굳는다 — FeatureLockView는 흑백만 걷어서,
+        // 재빌드하지 않으면 잠김 룩은 풀렸는데 눌리지 않는 칸이 남는다(autoEquipButton과 같은 이유).
+        RebuildDeckStrip();
     }
 
     // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
@@ -438,6 +463,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         if (dragController != null) dragController.Cancel();
         if (synergyStrip   != null) synergyStrip.Clear();
+        if (deckStrip      != null) deckStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
     }
 
@@ -485,13 +511,70 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
 
-        if (dragController != null) dragController.Setup(() => Slots, AssignSlot);
+        if (dragController != null) dragController.Setup(() => Slots, AssignSlot, OnDragEnded);
         // 배선이 프리팹 인스턴스 오버라이드로만 존재한다(DragLayer가 이 프리팹 밖에 있다) — Revert 한 번에 조용히 사라진다.
         // 여기서 알리지 않으면 "롱프레스해도 아무 일 없음"으로만 드러난다. 패널을 열 때 한 번만 찍힌다.
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
 
         RefreshAll();
+        RebuildDeckStrip();
         ScrollToHoldout();
+    }
+
+    // 하단 덱 선택 바를 세운다. 저장으로 슬롯 좌표가 밀릴 수 있어(TryInsertFront는 항상 맨 앞에 꽂는다)
+    // 선택 표시만 옮기지 않고 통째로 다시 그린다.
+    void RebuildDeckStrip()
+    {
+        if (this.deckStrip == null || this.m_request == null || !this.m_request.showDeckStrip) return;
+
+        this.deckStrip.Build(this.m_slotIndex,
+                             this.m_mode == EDeckEditMode.Create,
+                             OnDeckStripSlotClicked,
+                             OnDeckStripCreateClicked);
+    }
+
+    // 하단 바에서 다른 덱을 골랐다. 이탈 판정은 뒤로가기와 같은 창구를 탄다 —
+    // 바꾼 게 있으면 저장 확인을 받고, 허가가 떨어져야 그 덱으로 재바인딩된다.
+    void OnDeckStripSlotClicked(int _slotIndex)
+    {
+        if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex) return;   // 이미 이 덱을 편집 중
+
+        // 확인 팝업 응답을 기다리는 사이 "저장"으로 신규 덱이 맨 앞에 꽂히면 뒤 덱 좌표가 전부 밀린다
+        // (TryInsertFront). 좌표를 그대로 들고 가면 엉뚱한 덱이 열리므로, 카드 구성으로 대상을 되찾는다.
+        List<CardData> t_target = _slotIndex >= 0 && _slotIndex < DeckSaveManager.SLOT_COUNT
+            ? DeckSaveManager.GetSlot(_slotIndex)
+            : null;
+
+        RequestLeave(() =>
+        {
+            int t_slot = _slotIndex;
+            if (t_target != null && DeckSaveManager.TryFindSlot(t_target, out int t_found)) t_slot = t_found;
+
+            ConsumeHoldout();
+            Open(t_slot);
+        });
+    }
+
+    // 하단 바의 신규 생성 칸. 만석은 칸 자체가 비활성이지만, 확인 팝업이 떠 있는 사이 만석이 될 수 있다.
+    void OnDeckStripCreateClicked()
+    {
+        if (this.m_mode == EDeckEditMode.Create) return;   // 이미 신규 편집 중
+
+        RequestLeave(() =>
+        {
+            if (DeckSaveManager.IsFull) return;
+
+            ConsumeHoldout();
+            OpenNew();
+        });
+    }
+
+    // 빼 둘 카드는 이번 "진입"의 요청이다 — 덱을 갈아탄 뒤에도 남아 있으면 새 덱에서 엉뚱한 칸이 비거나
+    // 그 카드가 없다는 경고만 남는다(ApplyHoldout). 화면 안에서 덱이 바뀌는 순간 요청을 소비한다.
+    void ConsumeHoldout()
+    {
+        if (this.m_request != null) this.m_request.holdoutCard = null;
+        this.m_holdout = null;
     }
 
     // 지목된 타일이 목록 밖에 있으면 게이트가 승격했을 때 클리핑이 끊겨 화면에 샌다 — 그리기 직후 안으로 들여놓는다.
@@ -529,13 +612,30 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         if (_tile == null || dragController == null) return;
 
-        CancelSlotPick();   // 끌기 시작하면 놓을 칸은 손끝이 정한다 — 고르라는 신호가 남아 있을 이유가 없다
+        // 6칸이 다 찼으면 어디에 놓든 교체다 — 탭 교체와 같은 신호를 끌고 다니는 동안 켜 둔다.
+        // 플래그를 먼저 세워야, 탭 모드에서 곧바로 끌기 시작한 경우에 아래 CancelSlotPick이 칸 강조까지 걷어내지 않는다.
+        m_dragSwapVisual = FindFirstEmpty() < 0;
+
+        CancelSlotPick();       // 끌기 시작하면 놓을 칸은 손끝이 정한다 — 대기 카드와 컬렉션 딤은 여기서 내린다
+        ApplySlotPickVisual();  // 탭 모드가 아니었으면 위 호출이 조용히 물러나므로 드래그 신호는 여기서 칠한다
 
         // 고스트 크기는 그리드가 정한다 — 매치 패널은 GridRatioFitter가 cellSize를 런타임에 계산한다.
         dragController.Begin(_tile.Card,
                              _data,
                              collectionGrid != null ? collectionGrid.Scroll    : null,
                              collectionGrid != null ? collectionGrid.CellSize  : default);
+
+        // 드래그가 성립하지 못했으면(고스트 배선 누락) 종료 통지도 오지 않는다 — 켜 둔 강조를 여기서 직접 내린다.
+        if (!dragController.IsDragging) OnDragEnded();
+    }
+
+    // 드래그 종료(드롭·취소·화면 이탈 공통). 드롭이면 뒤이어 AssignSlot의 재바인딩이 칸을 다시 칠한다.
+    void OnDragEnded()
+    {
+        if (!m_dragSwapVisual) return;
+
+        m_dragSwapVisual = false;
+        ApplySlotPickVisual();
     }
 
     // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 빈 칸이 없으면 슬롯 선택 모드로 넘어간다 —
@@ -593,7 +693,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // _forceInstant면 상태가 바뀌는 되칠도 트윈 없이 맞춘다(호출자가 곧바로 재바인딩할 때).
     void ApplySlotPickVisual(bool _forceInstant = false)
     {
-        bool t_picking = m_pendingSwapCard != null;
+        // 드래그로 켠 강조는 칸에만 칠한다 — 손끝의 고스트가 이미 "무엇을 들고 있는지"를 말하므로 컬렉션 딤이 필요 없다.
+        bool t_picking = m_pendingSwapCard != null || m_dragSwapVisual;
 
         // 상태가 그대로인 되칠(재바인딩 직후)은 트윈 없이 즉시 맞춘다.
         bool t_instant = _forceInstant || t_picking == m_swapVisualOn;
@@ -615,6 +716,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         m_pendingSwapCard = null;
         m_swapVisualOn    = false;
+        m_dragSwapVisual  = false;
 
         if (slots != null)
         {
@@ -823,7 +925,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 위 재바인딩이 하이라이트·알파를 전부 원상복구한 뒤라야 모드 신호가 살아남는다.
         // 평상시에 되칠하지 않는 이유: 해제는 CancelSlotPick이 이미 했고, 여기서 한 번 더 지우면
         // 시너지 강조 도중 재갱신이 끼었을 때(해금·소유 변동) 그 강조까지 같이 걷힌다.
-        if (m_pendingSwapCard != null) ApplySlotPickVisual();
+        if (m_pendingSwapCard != null || m_dragSwapVisual) ApplySlotPickVisual();
     }
 
     /// <summary>저장 버튼은 <b>바꾼 게 있을 때만</b> 눌린다. 미완성이어도 눌리게 두는 이유는,
@@ -922,7 +1024,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
                   yesText   = "저장",
                   // 삽입에 실패하면 나가지 않는다 — 그냥 내보내면 편성한 6장이 조용히 증발한다.
                   // 화면을 유지해 재시도 여지를 남긴다(실패 사유는 DeckSaveManager가 로그로 남긴다).
-                  yesAction = () => { if (SaveIfComplete()) _onGranted?.Invoke(); },
+                  // MarkSaved까지 태워야 dirty가 내려간다 — 안 그러면 저장이 끝났는데도 저장 버튼이 살아 있고,
+                  // 스트립이 새 이름·새 좌표를 모른 채 남아 다음 이탈에서 확인 팝업이 또 뜬다.
+                  yesAction = () => { if (SaveIfComplete()) { MarkSaved(); _onGranted?.Invoke(); } },
                   noText    = "저장 안 함",
                   noAction  = () => _onGranted?.Invoke(),
               }
@@ -998,6 +1102,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         m_savedName = ResolveName();
 
         RefreshAll();
+
+        // 저장이 목록을 바꾼다 — 신규는 맨 앞에 꽂혀 뒤 덱의 좌표를 전부 밀고, 이름 변경은 칸 라벨을 바꾼다.
+        RebuildDeckStrip();
     }
 
     // 신규 덱은 rename·dirty 판정이 없다 — 6/6이 채워졌으면 항상 저장 대상이다.

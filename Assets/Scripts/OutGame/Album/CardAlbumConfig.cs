@@ -36,6 +36,9 @@ public struct AlbumThemeDef
     public string themeId;
     public string displayName;
 
+    [Tooltip("셀에 한 줄로 붙는 테마 소개. 비우면 셀의 설명 줄이 빈다.")]
+    public string description;
+
     [Tooltip("준비 중 테마. 켜면 갤러리에 흑백+자물쇠로만 그려지고 열리지 않으며, 앨범 진행도·완성 보상 모수에서도 빠진다.")]
     public bool locked;
 
