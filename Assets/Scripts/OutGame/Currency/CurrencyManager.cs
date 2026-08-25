@@ -26,6 +26,9 @@ public static class CurrencyManager
 
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
             s_currencies[t_i] = t_data.balances[t_i];
+
+        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
+            OnCurrencyChanged?.Invoke((ECurrencyType)t_i, s_currencies[t_i]);
     }
 
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화
