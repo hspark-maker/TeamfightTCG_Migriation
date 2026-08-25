@@ -459,7 +459,7 @@ MonoBehaviour:
     pulseDuration: 0.5
     chestImage: {fileID: 7515356840252334017}
     closedSprite: {fileID: 21300000, guid: b4606bc313e68d84dba1db451ca8d998, type: 3}
-    openedSprite: {fileID: 21300000, guid: aa4c5318c9eb442e0a3526d9862a5b9f, type: 3}
+    openedSprite: {fileID: 21300000, guid: ff7c513f16bfa5e45b87e7d0e4acd66a, type: 3}
     glow: {fileID: 2880002788931961146}
     glowSpinSeconds: 6
   doneRow: {fileID: 9060130886107378088}
