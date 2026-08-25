@@ -214,7 +214,7 @@ MonoBehaviour:
   rankPointText: {fileID: 31623442940432697}
   rankBurst: {fileID: 8169535200608968343}
   rankLine: {fileID: 7719120126808185768}
-  goldLine: {fileID: 0}
+  goldLine: {fileID: 5494692073436078991}
   hintGroup: {fileID: 4680157987745065650}
   cardFlight:
     layerOverride: {fileID: 0}

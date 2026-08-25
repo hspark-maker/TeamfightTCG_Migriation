@@ -1672,8 +1672,8 @@ RectTransform:
   - {fileID: 1381618301}
   m_Father: {fileID: 1944050833}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.03671706}
-  m_AnchorMax: {x: 1, y: 0.9492441}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 0.96282893}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -2289,7 +2289,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3669285587999233026, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6512582292676332162, guid: f5e999e7cd2419d4b8e00e50afb50e8b, type: 3}
       propertyPath: m_LocalScale.x
@@ -3446,7 +3446,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -13.490571}
+  m_LocalPosition: {x: 0, y: 0, z: -13.163586}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3536,8 +3536,8 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.462  \uAC70\uB9AC 13.49  \uBC30\uC728 1.23\n\uAC00\uC2DC \xB13.60
-    x \xB17.79  (\uB2F4\uC744 \uC601\uC5ED \xB13.60 x \xB14.70)\nOK \u2014 \uC804\uBD80
+  status: "aspect 0.474  \uAC70\uB9AC 13.16  \uBC30\uC728 1.20\n\uAC00\uC2DC \xB13.60
+    x \xB17.60  (\uB2F4\uC744 \uC601\uC5ED \xB13.60 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!114 &963194232
 MonoBehaviour:

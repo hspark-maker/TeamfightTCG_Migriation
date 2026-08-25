@@ -112,6 +112,11 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // 편성 진실원(m_working)과 달리 이건 화면 조작 상태라 저장·dirty와 무관하다.
     CardData m_pendingSwapCard;
 
+    // 직전 ApplySlotPickVisual이 칠한 논리 상태. 화면에 표현이 실제로 남아 있는지가 아니다 —
+    // 재바인딩(Bind)이 표현만 되돌려도 이 값은 true로 남는다. 되칠할 때 트윈을 다시 걸지 말지를
+    // 여기서 가른다 — 매번 걸면 갱신마다 칸이 깜빡인다.
+    bool m_swapVisualOn;
+
     /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
     public static event Action<CardData> OnAnyCardEquipped;
@@ -381,7 +386,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
 
-        m_pendingSwapCard = null;
+        ClearSlotPickVisual();
 
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
@@ -429,7 +434,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         m_dirty     = false;
         m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
-        m_pendingSwapCard = null;
+        ClearSlotPickVisual();
 
         if (dragController != null) dragController.Cancel();
         if (synergyStrip   != null) synergyStrip.Clear();
@@ -572,30 +577,52 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     }
 
     // 슬롯 선택 모드 해제. 편성은 건드리지 않는다.
-    void CancelSlotPick()
+    // _instant면 축소를 트윈 없이 되돌린다 — 같은 프레임에 재바인딩이 뒤따르는 확정 경로 전용이다.
+    void CancelSlotPick(bool _instant = false)
     {
         if (m_pendingSwapCard == null) return;   // 평상시 클릭마다 그리드 전체를 되칠할 이유가 없다
 
         m_pendingSwapCard = null;
-        ApplySlotPickVisual();
+        ApplySlotPickVisual(_instant);
     }
 
-    // 모드 신호를 화면에 칠한다: 고르지 않은 컬렉션 카드를 눌러 딤을 깔고, 그 위로 편성 6칸과 고른 카드를
-    // 함께 띄운다 — 눌러야 할 것(6칸)과 들고 있는 것(고른 카드)이 같은 층에 남는다.
+    // 모드 신호를 화면에 칠한다: 고르지 않은 컬렉션 카드를 눌러 딤을 깔고, 편성 6칸은 살짝 줄어들며
+    // 둘레에 발광을 켠다 — 눌러야 할 것(6칸)과 들고 있는 것(고른 카드)이 같은 층에 남는다.
     // 테두리(highlightFrame)는 쓰지 않는다 — 그건 드래그 오버 전용 신호다.
     // 슬롯 재바인딩(Bind)과 컬렉션 착용딤(RefreshInDeck)이 이 표시를 원상복구하므로 반드시 그 뒤에 불러야 한다.
-    void ApplySlotPickVisual()
+    // _forceInstant면 상태가 바뀌는 되칠도 트윈 없이 맞춘다(호출자가 곧바로 재바인딩할 때).
+    void ApplySlotPickVisual(bool _forceInstant = false)
     {
         bool t_picking = m_pendingSwapCard != null;
 
+        // 상태가 그대로인 되칠(재바인딩 직후)은 트윈 없이 즉시 맞춘다.
+        bool t_instant = _forceInstant || t_picking == m_swapVisualOn;
+        m_swapVisualOn = t_picking;
+
         if (slots != null)
         {
-            // 6칸은 전부 골라야 할 대상이라 가려낼 것이 없다(_match는 항상 true).
+            // 6칸은 전부 골라야 할 대상이라 가려낼 것이 없다.
             for (int t_i = 0; t_i < slots.Length; t_i++)
-                if (slots[t_i] != null) slots[t_i].SetFocus(t_picking, true);
+                if (slots[t_i] != null) slots[t_i].SetSwapTarget(t_picking, t_instant);
         }
 
         if (collectionGrid != null) collectionGrid.SetPickedCard(m_pendingSwapCard);
+    }
+
+    // 화면을 떠나는 경로에서 모드와 그 표현을 함께 내린다. 풀드 인스턴스는 다음 열기에 같은 오브젝트로
+    // 되살아나므로 여기서 발광을 안 끄면 다른 화면에서 켜진 채 뜬다(칸 재바인딩은 발광을 모른다).
+    void ClearSlotPickVisual()
+    {
+        m_pendingSwapCard = null;
+        m_swapVisualOn    = false;
+
+        if (slots != null)
+        {
+            for (int t_i = 0; t_i < slots.Length; t_i++)
+                if (slots[t_i] != null) slots[t_i].SetSwapTarget(false, true);
+        }
+
+        if (collectionGrid != null) collectionGrid.SetPickedCard(null);
     }
 
     /// <summary>패널 여백 클릭 = 슬롯 선택 취소. 슬롯·컬렉션 타일·버튼은 자기 자리에서 클릭을 소비하므로
@@ -645,9 +672,37 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         var t_card = m_pendingSwapCard;
 
+        // 밀려날 카드는 AssignSlot이 덮어쓰기 전에 읽어야 한다 — 그 뒤에는 새 카드만 남는다.
+        var t_pushed = _slotIndex >= 0 && _slotIndex < m_working.Length ? m_working[_slotIndex] : null;
+
         // AssignSlot이 부르는 RefreshAll보다 먼저 내려야 교체 결과 위에 강조가 남지 않는다.
-        CancelSlotPick();
+        // 즉시 되돌리는 이유: 뒤따르는 재바인딩이 같은 프레임에 축소를 지워 복귀 트윈이 태어나자마자 죽는다 —
+        // 트윈을 걸면 교체한 칸뿐 아니라 6칸이 통째로 툭 커진다.
+        CancelSlotPick(true);
+        FlyPushedCardToCollection(_slotIndex, t_pushed);
         AssignSlot(_slotIndex, t_card);
+        PunchEquippedSlot(_slotIndex);
+    }
+
+    // 밀려난 카드가 컬렉션으로 돌아가는 짧은 비행. 드래그 고스트를 빌려 쓴다(드래그 중이면 스스로 물러난다).
+    // 탭 교체 확정 경로 전용이다 — 드래그 드롭도 같은 AssignSlot을 타지만 그 경로에는 걸지 않는다:
+    // 고스트가 방금 손끝에서 사라진 프레임이라 같은 인스턴스가 재진입하고, 덱 내 이동은 컬렉션으로 돌아가지도 않는다.
+    void FlyPushedCardToCollection(int _slotIndex, CardData _pushed)
+    {
+        if (_pushed == null || dragController == null || collectionGrid == null) return;
+        if (slots == null || _slotIndex < 0 || _slotIndex >= slots.Length || slots[_slotIndex] == null) return;
+
+        dragController.FlyOut(_pushed, slots[_slotIndex].Rect, collectionGrid.ListArea, collectionGrid.CellSize);
+    }
+
+    // 새 카드가 앉은 칸을 한 번 튀긴다. 반드시 AssignSlot 이후다 —
+    // 재바인딩이 슬롯 픽 축소를 되돌린 뒤라야 펀치와 축소 트윈이 같은 트랜스폼을 다투지 않는다.
+    void PunchEquippedSlot(int _slotIndex)
+    {
+        // AssignSlot 끝의 OnAnyCardEquipped가 튜토리얼을 진행시켜 이 화면을 닫았을 수 있다.
+        if (!IsOpen || slots == null || _slotIndex < 0 || _slotIndex >= slots.Length) return;
+
+        if (slots[_slotIndex] != null) slots[_slotIndex].PlayEquipPunch();
     }
 
     // 편성 칸 해제. 유일한 호출자는 OnSlotClicked다(슬롯은 코드에서만 Bind로 배선된다).

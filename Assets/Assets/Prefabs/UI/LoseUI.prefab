@@ -500,6 +500,7 @@ MonoBehaviour:
   rankPointText: {fileID: 3940828187706244952}
   rankBurst: {fileID: 8760854948223052529}
   rankLine: {fileID: 5900842752905199912}
+  goldLine: {fileID: 986566054249784812}
   hintGroup: {fileID: 7084887883192255366}
   cardFlight:
     layerOverride: {fileID: 0}

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,12 +17,32 @@ public class AlbumThemeCellView : MonoBehaviour
     [SerializeField] AlbumChestView chest = new AlbumChestView();
     [SerializeField] GameObject doneRow;
 
+    [Tooltip("잠긴 테마 셀의 밝기. 흑백만으로도 잠김이 읽히므로 너무 내리지 말 것(0이면 셀이 사라진다).")]
+    [SerializeField] float lockedAlpha = 0.6f;
+
     AlbumTheme m_theme;
     bool       m_anchored;   // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다
+
+    GameObject                m_lockBadge;
+    bool                      m_lockBadgeMissing;   // 카탈로그 미배선 경고·재시도는 1회로 끝낸다
+    CanvasGroup               m_group;
+    List<UiGrayscale.Toned>   m_toned;
 
     public void Bind(AlbumTheme _theme, Action<AlbumTheme> _onOpen, bool _tutorialTarget = false)
     {
         m_theme = _theme;
+
+        ApplyLocked(_theme.IsLocked);
+
+        if (_theme.IsLocked)
+        {
+            if (nameLabel != null) nameLabel.text = _theme.DisplayName;
+            if (progressRow != null) progressRow.SetActive(false);
+            if (doneRow != null) doneRow.SetActive(false);
+            chest.Bind(default(AlbumRewardInfo), null);
+            ApplyTutorialAnchor(false);
+            return;
+        }
 
         // 셀은 Cell_00 클론이라 저작이 없으면 9칸이 전부 같은 스킨이 된다 — null은 목업 보존이 아니라 "템플릿 색 그대로"
         if (thumbIcon != null && _theme.Icon != null) thumbIcon.sprite = _theme.Icon;
@@ -80,6 +101,63 @@ public class AlbumThemeCellView : MonoBehaviour
 
         if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.AlbumThemeCell, t_rect, thumbButton);
         else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.AlbumThemeCell, t_rect);
+    }
+
+    // 준비 중 테마의 잠김 룩 — 셀 전체 탈채도 + 썸네일 위 자물쇠(FeatureLockView·TournamentNodeView와 같은 관용구).
+    // 차단(interactable)도 여기서 세운다 — 이 셀에는 잠김을 세우는 다른 계산식이 없어 서로 덮어쓸 일이 없다.
+    void ApplyLocked(bool _locked)
+    {
+        // 다시 칠하기 전에 항상 저작값으로 되돌린다 — 셀은 재사용되고 Bind가 반복 호출된다.
+        UiGrayscale.Restore(this.m_toned);
+        this.m_toned = null;
+
+        if (thumbButton != null) thumbButton.interactable = !_locked;
+
+        if (!_locked)
+        {
+            if (this.m_lockBadge != null) this.m_lockBadge.SetActive(false);
+            if (this.m_group != null) this.m_group.alpha = 1f;
+            return;
+        }
+
+        EnsureLockBadge();
+
+        if (this.m_lockBadge != null)
+        {
+            this.m_lockBadge.SetActive(true);
+            this.m_lockBadge.transform.SetAsLastSibling();
+        }
+
+        if (this.m_group == null) this.m_group = gameObject.GetComponent<CanvasGroup>();
+        if (this.m_group == null) this.m_group = gameObject.AddComponent<CanvasGroup>();
+        this.m_group.alpha = this.lockedAlpha;
+
+        // 자물쇠는 탈채도에서 뺀다 — 잠김을 말하는 표식이 저 혼자 회색이면 읽히지 않는다.
+        this.m_toned = UiGrayscale.Apply(gameObject, this.m_lockBadge != null ? this.m_lockBadge.transform : null);
+    }
+
+    // 자물쇠는 셀 프리팹에 없다 — 동기 UI 카탈로그의 공용 배지를 썸네일 위에 1회 꽂아 재사용한다.
+    void EnsureLockBadge()
+    {
+        if (this.m_lockBadge != null || this.m_lockBadgeMissing) return;
+
+        var t_parent = thumbButton != null ? thumbButton.transform as RectTransform : transform as RectTransform;
+        if (t_parent == null)
+        {
+            this.m_lockBadgeMissing = true;
+            return;
+        }
+
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LockBadge);
+        if (t_prefab == null)
+        {
+            this.m_lockBadgeMissing = true;
+            Debug.LogWarning($"[AlbumThemeCellView] 동기 UI 카탈로그 자물쇠 미배선 — 잠긴 테마가 흑백으로만 보입니다.", this);
+            return;
+        }
+
+        this.m_lockBadge      = Instantiate(t_prefab, t_parent, false);
+        this.m_lockBadge.name = "LockBadge";
     }
 
     void ClaimReward()

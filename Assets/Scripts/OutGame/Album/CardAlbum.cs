@@ -28,6 +28,21 @@ public static class CardAlbum
         }
     }
 
+    // 완성 판정 모수 — 준비 중 테마는 세지 않는다. 카드 0장인 자리가 앨범 전체 보상을 영구 봉인하지 않게.
+    public static int UnlockedThemeCount
+    {
+        get
+        {
+            var t_themes = Themes;
+            int t_count = 0;
+            for (int t_i = 0; t_i < t_themes.Count; t_i++)
+            {
+                if (!t_themes[t_i].IsLocked) t_count++;
+            }
+            return t_count;
+        }
+    }
+
     public static int CompletedThemeCount
     {
         get
@@ -36,14 +51,15 @@ public static class CardAlbum
             int t_count = 0;
             for (int t_i = 0; t_i < t_themes.Count; t_i++)
             {
-                if (IsComplete(t_themes[t_i])) t_count++;
+                if (!t_themes[t_i].IsLocked && IsComplete(t_themes[t_i])) t_count++;
             }
             return t_count;
         }
     }
 
     // 빈 앨범·빈 테마 포함 시 미완성 — 저작 실수가 보상으로 새지 않게 보수적으로 판정
-    public static bool IsAlbumComplete => ThemeCount > 0 && CompletedThemeCount == ThemeCount;
+    // 분모는 열린 테마뿐이다 — 준비 중 테마가 하나라도 있으면 앨범이 영영 완성되지 않는다.
+    public static bool IsAlbumComplete => UnlockedThemeCount > 0 && CompletedThemeCount == UnlockedThemeCount;
 
     // 앨범 SO 주입 — null이면 빈 앨범
     public static void SetSource(CardAlbumConfig _config)
