@@ -47,6 +47,7 @@ public static class AlbumInsertPlan
         for (int t_t = 0; t_t < t_themes.Count; t_t++)
         {
             var t_theme = t_themes[t_t];
+            if (t_theme.IsLocked) continue;   // 준비 중 테마는 열리지 않는다 — 잠금 뒤로 카드를 꽂으러 들어가지 않는다
 
             // 도감 번호는 페이지가 아니라 테마 내 통번호다(AlbumPageOverlayView.RefreshPage와 같은 규칙).
             int t_base = 0;

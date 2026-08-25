@@ -428,7 +428,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -54.5541}
-  m_SizeDelta: {x: 1000, y: 570}
+  m_SizeDelta: {x: 1050, y: 570}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2119395285970280779
 MonoBehaviour:
@@ -463,6 +463,7 @@ MonoBehaviour:
     glow: {fileID: 2880002788931961146}
     glowSpinSeconds: 6
   doneRow: {fileID: 9060130886107378088}
+  lockedAlpha: 0.6
 --- !u!1 &998299586782620990
 GameObject:
   m_ObjectHideFlags: 0
@@ -2054,7 +2055,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 960, y: 540}
+  m_SizeDelta: {x: 1015, y: 540}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8827980482985792221
 CanvasRenderer:

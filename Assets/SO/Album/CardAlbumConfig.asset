@@ -15,9 +15,10 @@ MonoBehaviour:
   themes:
   - themeId: Theme_Nature
     displayName: "\uB369\uAD74\uC232"
-    icon: {fileID: 0}
-    frame: {fileID: 0}
-    namePlate: {fileID: 0}
+    locked: 0
+    icon: {fileID: 21300000, guid: 9091a358ab806bf44a32e91f5f6e6a07, type: 3}
+    frame: {fileID: 21300000, guid: 7292e4a47471d4f458c030c775ff3d3a, type: 3}
+    namePlate: {fileID: 21300000, guid: c3631c9cc0b34454c9a5a895af17fd81, type: 3}
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
@@ -90,6 +91,24 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 73ea7fd040fa6b5f18181840c5c61bba, type: 2}
       - {fileID: 11400000, guid: 0c1cd73b2574c1aa84d58d982ae0efd3, type: 2}
       - {fileID: 11400000, guid: 448ddbf23aa727d5a53f1840dd65e634, type: 2}
+  - themeId: Theme_Ocean
+    displayName: "\uD478\uB978\uBC14\uB2E4"
+    locked: 1
+    icon: {fileID: 0}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
+    cellPrefab: {fileID: 0}
+    rewards: []
+    pages: []
+  - themeId: Theme_Snow
+    displayName: "\uB208\uAF43\uC124\uC6D0"
+    locked: 1
+    icon: {fileID: 0}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
+    cellPrefab: {fileID: 0}
+    rewards: []
+    pages: []
   albumRewards:
   - currency: 0
     amount: 1000
