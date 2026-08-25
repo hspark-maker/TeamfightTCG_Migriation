@@ -441,25 +441,10 @@ public class DeckEditController : PooledUIBase
         m_holdout = null;
     }
 
-    /// <summary>이 화면을 튜토리얼 게이트 <b>아래</b> 층으로 내려 앉힌다(<see cref="UiSortingOrder.PooledOverlay"/>).
-    /// 풀 컨테이너는 400이고 게이트는 350이라, 담긴 채로 두면 안내(손가락·문구·딤)가 이 패널 뒤에 통째로 묻힌다.
-    ///
-    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
-    /// 떨어져 나온다 — 없으면 눈에는 보이는데 탭이 안 먹는다(KeywordGrowthPanel.LiftToOverlayLayer와 같은 관용구).</summary>
+    // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
     void LiftToOverlayLayer()
     {
-        if (this.m_sortingCanvas == null)
-        {
-            this.m_sortingCanvas = GetComponent<Canvas>();
-            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
-        }
-
-        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
-
-        // 순서가 계약이다 — overrideSorting이 꺼진 중첩 캔버스는 sortingOrder 대입을 버린다.
-        // 거꾸로 하면 값이 0으로 남아 로비(0)와 같은 층에 앉고, 화면이 통째로 로비 뒤에 묻힌다.
-        this.m_sortingCanvas.overrideSorting = true;
-        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.PooledOverlay);
+        this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
         LiftDragLayer();
     }
@@ -469,11 +454,7 @@ public class DeckEditController : PooledUIBase
     {
         if (this.dragController == null) return;
 
-        var t_canvas = this.dragController.GetComponent<Canvas>();
-        if (t_canvas == null) t_canvas = this.dragController.gameObject.AddComponent<Canvas>();
-
-        t_canvas.overrideSorting = true;   // 이 줄이 먼저다 — LiftToOverlayLayer 주석 참조
-        UiSortingOrder.Stamp(t_canvas, UiSortingOrder.DragGhost);
+        UiSortingOrder.LiftNested(this.dragController.gameObject, UiSortingOrder.DragGhost);
     }
 
     // 두 진입점의 공통 후반부. m_mode·m_slotIndex·m_working은 호출 전에 확정돼 있어야 한다.

@@ -351,25 +351,9 @@ public class KeywordGrowthPanel : PooledUIBase
                 this.m_cells[t_i].ApplyTutorialAnchor(false);
     }
 
-    /// <summary>이 화면을 튜토리얼 게이트 <b>아래</b> 층으로 내려 앉힌다(<see cref="UiSortingOrder.PooledOverlay"/>).
-    /// 풀 컨테이너는 400이고 게이트는 350이라, 담긴 채로 두면 안내(손가락·문구·딤)가 이 패널 뒤에 통째로 묻힌다 —
-    /// 첫 스텝의 화면 탭조차 패널이 먼저 먹어 안내가 그 자리에 영영 선다.
-    ///
-    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
-    /// 떨어져 나온다 — 없으면 눈에는 보이는데 탭이 안 먹는다(CardDetailOverlayView.LiftAbove와 같은 관용구).</summary>
+    // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
     void LiftToOverlayLayer()
-    {
-        if (this.m_sortingCanvas == null)
-        {
-            this.m_sortingCanvas = GetComponent<Canvas>();
-            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
-        }
-
-        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
-
-        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.PooledOverlay);
-        this.m_sortingCanvas.overrideSorting = true;
-    }
+        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }
