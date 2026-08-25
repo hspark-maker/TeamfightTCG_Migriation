@@ -23,7 +23,8 @@ public class AlbumThemeCellView : MonoBehaviour
     [Tooltip("잠긴 테마 셀의 밝기. 흑백만으로도 잠김이 읽히므로 너무 내리지 말 것(0이면 셀이 사라진다).")]
     [SerializeField] float lockedAlpha = 0.6f;
 
-    AlbumTheme m_theme;
+    AlbumTheme        m_theme;
+    AspectRatioFitter m_iconFitter;
     bool       m_anchored;   // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다
 
     GameObject                m_lockBadge;
@@ -52,7 +53,7 @@ public class AlbumThemeCellView : MonoBehaviour
         }
 
         // 셀은 Cell_00 클론이라 저작이 없으면 9칸이 전부 같은 스킨이 된다 — null은 목업 보존이 아니라 "템플릿 색 그대로"
-        if (thumbIcon != null && _theme.Icon != null) thumbIcon.sprite = _theme.Icon;
+        ApplyThumbIcon(_theme.Icon);
         if (thumbFrame != null && _theme.Frame != null) thumbFrame.sprite = _theme.Frame;
         if (namePlate != null && _theme.NamePlate != null) namePlate.sprite = _theme.NamePlate;
         if (nameLabel != null) nameLabel.text = _theme.DisplayName;
@@ -83,6 +84,21 @@ public class AlbumThemeCellView : MonoBehaviour
         }
 
         ApplyTutorialAnchor(_tutorialTarget);
+    }
+
+    // 썸네일은 액자(ArtClip)를 꽉 채우고 넘치는 만큼만 잘린다 — 잘라내기는 ArtClip의 Mask가 맡는다.
+    // 테마마다 원화 비율이 달라 저작값 하나로는 못 맞추므로 스프라이트를 꽂을 때마다 다시 잰다.
+    void ApplyThumbIcon(Sprite _icon)
+    {
+        if (thumbIcon == null || _icon == null) return;
+
+        thumbIcon.sprite = _icon;
+
+        if (m_iconFitter == null) m_iconFitter = thumbIcon.GetComponent<AspectRatioFitter>();
+        if (m_iconFitter == null) return;
+
+        var t_rect = _icon.rect;
+        if (t_rect.height > 0f) m_iconFitter.aspectRatio = t_rect.width / t_rect.height;
     }
 
     void Awake()

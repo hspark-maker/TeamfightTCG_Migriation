@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 덱 편집 화면 하단의 가로 덱 선택 바(DeckEditPanel/DeckStrip에 부착). 저장된 유효 덱을 나열하고 맨 뒤에 신규 생성 칸을 붙인다.
+// 덱 편집 화면 하단의 가로 덱 선택 바(DeckEditPanel/DeckStrip에 부착). 맨 앞에 신규 생성 칸을 두고 그 뒤로 저장된 유효 덱을 나열한다.
 // 세이브는 읽기만 한다 — 삽입·삭제는 편집기(DeckEditController)가 자기 저장 경로에서만 한다.
 //
 // 로비 목록(DeckListController)을 재사용하지 않는 이유: 그쪽은 2열 그리드에 삭제 경로와 편집 모드를 함께 들고 있다.
@@ -44,6 +44,9 @@ public class DeckStripView : MonoBehaviour
             Destroy(t_child);
         }
 
+        // 신규 생성 칸을 먼저 붙인다 — 이 바에서 ⊕는 맨 왼쪽 고정 자리다.
+        BuildCreateCell(_onCreateClick);
+
         // 상한은 SLOT_COUNT로 둔다 — DeckCount로 끊으면 불변식이 깨진 세이브(중간 구멍)에서 뒤쪽 덱이 통째로 사라진다.
         // 표시 번호는 유효 슬롯만 세므로 구멍 난 세이브에서도 "01, 02"가 연속된다.
         int t_display = 1;
@@ -64,8 +67,6 @@ public class DeckStripView : MonoBehaviour
             m_slotIndices.Add(t_i);
             t_display++;
         }
-
-        BuildCreateCell(_onCreateClick);
 
         SetSelected(_selectedSlot, _createSelected);
     }
@@ -101,7 +102,7 @@ public class DeckStripView : MonoBehaviour
         m_slotIndices.Clear();
     }
 
-    // 맨 뒤 신규 생성 칸. 만석이거나 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
+    // 맨 앞 신규 생성 칸. 만석이거나 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
     void BuildCreateCell(Action _onCreateClick)
     {
         if (_onCreateClick == null) return;   // 신규 생성을 지원하지 않는 호스트
