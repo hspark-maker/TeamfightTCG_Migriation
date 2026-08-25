@@ -37,6 +37,13 @@ public class BootInstaller : MonoBehaviour
 
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_booted = false;
+        s_saveDependentInstalled = false;
+    }
+
     void Awake()
     {
         // 두 번째 사본은 자식 매니저가 각자 자폭하기 전에 루트째로 걷어낸다(빈 루트가 씬에 남지 않게).
