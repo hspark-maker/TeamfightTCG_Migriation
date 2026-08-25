@@ -26411,9 +26411,17 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6742440419249864672, guid: 66e701be73057914bb095b4f86cd4b81, type: 3}
+      propertyPath: InitialModule.startSize.scalar
+      value: 1.16
+      objectReference: {fileID: 0}
     - target: {fileID: 7241249190464899892, guid: 66e701be73057914bb095b4f86cd4b81, type: 3}
       propertyPath: m_Name
       value: FX_Sitter
+      objectReference: {fileID: 0}
+    - target: {fileID: 8260865693443957066, guid: 66e701be73057914bb095b4f86cd4b81, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.854
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
