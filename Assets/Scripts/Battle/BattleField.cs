@@ -53,8 +53,7 @@ public class BattleField : MonoBehaviour
     void OnDestroy() => this.healerEffect?.Unsubscribe();
 
     /// <summary>_growthOf = 카드 영구 성장값 공급자(생략/ null이면 성장 미적용).
-    /// 태우는 곳은 싱글·튜토리얼의 **플레이어 필드뿐** — 멀티는 스탯을 와이어로 보내지 않는 결정론 lockstep이라
-    /// 한쪽만 강화되면 즉시 divergence다.</summary>
+    /// 싱글·튜토리얼은 로컬 공급자를, 멀티는 양쪽이 교환해 확정한 성장 스냅샷 공급자를 사용한다.</summary>
     public void Initialize(List<CardData> _deckData, int _ownerIndex, ShufflePolicy _shuffle,
         System.Func<CardData, CardGrowth> _growthOf = null)
     {
@@ -251,11 +250,19 @@ public class BattleField : MonoBehaviour
         return t_ids.ToArray();
     }
 
-    /// <summary>상대방에게 받은 카드 ID 배열로 enemyField 재구성. 셔플 동기화용.</summary>
-    public void InitializeFromRemote(int[] _ids, int _ownerIndex, CardRegistry _registry)
+    /// <summary>상대방에게 받은 카드 ID와 최종 성장 스냅샷으로 enemyField를 재구성한다.</summary>
+    public void InitializeFromRemote(int[] _ids, CardGrowth[] _growth, int _ownerIndex, CardRegistry _registry)
     {
         this.ownerIndex = _ownerIndex;
-        this.growthOf = null; // 원격 미러는 성장 미적용 고정(스탯을 와이어로 보내지 않으므로 로컬 가공 금지)
+        var t_growthById = new Dictionary<int, CardGrowth>(_ids?.Length ?? 0);
+        if (_ids != null && _growth != null)
+        {
+            for (int i = 0; i < _ids.Length && i < _growth.Length; i++)
+                t_growthById[_ids[i]] = _growth[i];
+        }
+        this.growthOf = _card => _card != null && t_growthById.TryGetValue(_card.id, out CardGrowth t_value)
+            ? t_value
+            : default;
         this.slots = new CardInstance[SLOT_COUNT];
         this.waitingQueue.Clear();
         this.fallenCards.Clear();
@@ -268,7 +275,7 @@ public class BattleField : MonoBehaviour
         {
             CardData t_data = _registry.GetData(_ids[i]);
             if (t_data == null) continue;
-            var t_card = new CardInstance(t_data, _ownerIndex);
+            var t_card = new CardInstance(t_data, _ownerIndex, GrowthOf(t_data));
             if (i < SLOT_COUNT)
             {
                 t_card.slotIndex = i;
@@ -305,7 +312,7 @@ public class BattleField : MonoBehaviour
         else
         {
             // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
-            Debug.LogWarning($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
+            Debug.LogError($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
                              $"(slot={_slot}, card={_data.name}, waiting={this.waitingQueue.Count})");
             t_card = new CardInstance(_data, this.ownerIndex, GrowthOf(_data)); // 성장원도 Initialize와 같은 소스로
             if (this.Synergy != null)

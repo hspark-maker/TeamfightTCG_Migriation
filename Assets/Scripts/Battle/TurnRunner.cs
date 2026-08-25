@@ -29,7 +29,9 @@ public class TurnRunner : MonoBehaviour
     public static TurnRunner Instance { get; private set; }
 
     TurnContext ctx;
-    bool disconnectWin;
+    TurnBase activeTurn;
+    bool aiTakeoverPending;
+    bool aiTakeoverFillPending;
     bool forcedEnd;      // 항복/디버그로 결과를 강제 확정했는가. 턴 루프를 다음 경계에서 끊는다.
     bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
@@ -61,21 +63,21 @@ public class TurnRunner : MonoBehaviour
     /// <summary>항복 = 즉시 패배 확정. 보상·랭크는 정상 패배와 같은 경로(CaptureResult)를 탄다.
     /// 멀티는 러너를 내려 상대에게 <b>기존 이탈-부전승 경로</b>(OnPlayerLeftRoom)로 승리를 준다 —
     /// 항복 전용 와이어 메시지를 새로 만들지 않는다(프로토콜 추가 0, 결과 동일).</summary>
-    public void Surrender() => ForceEnd(false);
+    public void Surrender() => ForceEnd(false, EMatchEndReason.Surrender);
 
 #if UNITY_EDITOR
     /// <summary>디버그 강제 승리. 에디터 전용 — 빌드에는 이 심볼 자체가 없다.
     /// 멀티에서는 이쪽 화면만 끝나고 상대는 계속 진행한다(디버그 용도라 동기화하지 않는다).</summary>
-    public void DebugForceWin() => ForceEnd(true);
+    public void DebugForceWin() => ForceEnd(true, EMatchEndReason.DebugForceWin);
 #endif
 
-    void ForceEnd(bool _won)
+    void ForceEnd(bool _won, EMatchEndReason _reason)
     {
         if (this.resultFinalized) return;   // 이미 승패 확정 — 보상 재지급·팝업 덮어쓰기 방지
 
         this.forcedEnd = true;
         // 강제 종료에는 여운을 붙이지 않는다 — 항복·디버그 승리는 화면에 강조할 "결정타"가 없다.
-        FinalizeResult(_won, _withBeat: false);
+        FinalizeResult(_won, _reason);
 
         if (!_won && DeckConfig.IsMultiplayer)
             NetworkSession.Instance?.Disconnect().Forget();
@@ -84,15 +86,80 @@ public class TurnRunner : MonoBehaviour
     /// <summary>이번 전투 결과를 확정하고 표시한다 — <b>결과가 화면에 나가는 유일한 출구</b>.
     /// 정상 승패·항복·전투 중 이탈·초기화 중 이탈이 전부 여기로 모인다. 두 경로가 경합해도 먼저 온 쪽만 이긴다
     /// (보상은 CaptureResult가, 팝업·여운은 이 게이트가 각각 한 번만 돌게 막는다).
-    /// <paramref name="_withBeat"/>면 팝업 앞에 승패 여운(<see cref="BattleResultBeat"/>)을 한 박자 넣는다.</summary>
-    void FinalizeResult(bool _won, bool _withBeat)
+    /// <paramref name="_reason"/>이 정상 승패면 팝업 앞에 승패 여운(<see cref="BattleResultBeat"/>)을 한 박자 넣는다.</summary>
+    void FinalizeResult(bool _won, EMatchEndReason _reason, bool _delayVoidExit = false)
     {
         if (this.resultFinalized) return;
         this.resultFinalized = true;
 
         TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
-        CaptureResult(_won);
-        ShowResult(_won, _withBeat).Forget();
+        if (_reason.IsVoid())
+        {
+            // 무효 경기는 씬 전환이 커버 연출을 태우느라 1초 넘게 걸린다. 그동안 전투 씬은 살아 있으므로
+            // 턴 루프를 여기서 끊지 않으면 커버 아래에서 공격이 더 나간다(멀티는 그게 그대로 상대에게 간다).
+            // 강제 종료와 같은 플래그를 쓴다 — RunTurns의 탈출 조건은 이 하나만 본다.
+            this.forcedEnd = true;
+            if (_delayVoidExit) LoadVoidResultNextFrame().Forget();
+            else                BattleCleanup.LoadScene(LobbySceneName);
+            return;
+        }
+
+        if (_reason.GrantsReward())
+            CaptureResult(_won);
+        ShowResult(_won, _reason.PlaysBeat()).Forget();
+    }
+
+    async UniTaskVoid LoadVoidResultNextFrame()
+    {
+        // ReliableData를 큐에 넣은 프레임에 Runner를 내리면 MatchAbort가 상대에게 도착하기 전에 유실될 수 있다.
+        await UniTask.NextFrame();
+        BattleCleanup.LoadScene(LobbySceneName);
+    }
+
+    /// <summary>로컬에서 감지한 통신 실패를 상대에게 알리고 같은 무효 사유로 종료한다.</summary>
+    public void AbortMatch(EMatchEndReason _reason)
+    {
+        if (!_reason.IsVoid())
+        {
+            Debug.LogError($"[Net] 무효 경기 사유가 아닌 값으로 AbortMatch를 요청했다: {_reason}");
+            return;
+        }
+        if (this.resultFinalized) return;
+
+        TurnState.InputAllowed = false;
+        try
+        {
+            NetworkGameController.Instance?.SendMatchAbort(_reason);
+        }
+        catch (Exception t_e)
+        {
+            // 전송 실패가 수신 콜백의 예외 처리로 다시 들어가 AbortMatch가 재귀하지 않게 여기서 끊는다.
+            Debug.LogError($"[Net] MatchAbort 전송 실패 — 로컬 무효 종료는 계속한다: {t_e}");
+        }
+        FinalizeResult(false, _reason, _delayVoidExit: true);
+        ReleaseNetworkWaits();
+    }
+
+    /// <summary>상대가 먼저 확정한 무효 경기 사유를 재전송 없이 적용한다.</summary>
+    public void HandleMatchAbort(EMatchEndReason _reason)
+    {
+        if (!_reason.IsVoid())
+        {
+            Debug.LogError($"[Net] 상대가 잘못된 MatchAbort 사유를 보냈다: {_reason}");
+            return;
+        }
+        if (this.resultFinalized) return;
+
+        TurnState.InputAllowed = false;
+        FinalizeResult(false, _reason);
+        ReleaseNetworkWaits();
+    }
+
+    void ReleaseNetworkWaits()
+    {
+        NetworkGameController.Instance?.ForceOpponentReady();
+        NetworkGameController.Instance?.ForceOpponentMulliganChoice();
+        MultiplayerTurnRunner.Instance?.AbortNetworkWaits();
     }
 
     // 여운은 표시 전용이라 결과·보상 확정 뒤에 돈다 — 도중에 씬이 내려가면 취소되고 팝업도 뜨지 않는다.
@@ -193,7 +260,6 @@ public class TurnRunner : MonoBehaviour
     /// → (4) 턴 루프(선공 배너는 이미 재생했으므로 첫 턴 배너 스킵). 코인은 싱글 AI전 전용(멀티 스킵).</summary>
     public async UniTask PlayIntroAndStart(System.Func<UniTask> _dealCards)
     {
-        this.disconnectWin = false;
         TurnCount = 1;
         SetTurnCountLabel();
         // 정상 경로의 시드 지점은 GameInitializer(덱 셔플이 MatchRandom을 소비하므로 필드 초기화 직전).
@@ -216,20 +282,20 @@ public class TurnRunner : MonoBehaviour
             mulliganOverlay  = this.mulliganOverlay,
         };
 
-        // (선/후공 판정 — 시드 확정 후) 멀티는 기존 고정(발산 방지), 싱글은 코인 랜덤.
-        bool t_playerFirst = DecideFirstPlayer();
-        int  t_first = t_playerFirst ? 0 : 1;   // 멀티는 playerFirst=true → 0(기존 동작)
+        // 선/후공은 owner 기준이다. 멀티 양쪽은 같은 합의 시드에서 같은 RNG 1회를 소비한다.
+        bool t_ownerZeroFirst = DecideFirstPlayer();
+        int  t_first = t_ownerZeroFirst ? 0 : 1;
 
         // 코인 토스 전에는 턴 정보(배경+레이블) 숨김(선/후공 미정 상태). 배너 GO에 배경 스프라이트+WhosTurn 라벨이 함께 있음.
         GameObject t_turnInfo = this.turnBanner != null ? this.turnBanner.gameObject
                               : (this.turnLabel != null ? this.turnLabel.gameObject : null);
         if (t_turnInfo != null) t_turnInfo.SetActive(false);
 
-        // (1) 코인 토스 — 카드 배치 전. 싱글 AI전 전용.
-        if (this.coinFlip != null && !DeckConfig.IsMultiplayer)
+        // (1) 코인 토스 — owner 기준 결과를 각 기기의 로컬 관점(내 선공 여부)으로 표시한다.
+        if (this.coinFlip != null)
         {
             this.coinFlip.gameObject.SetActive(true);
-            await this.coinFlip.Play(t_playerFirst);   // 앞면=선공(플레이어 먼저)
+            await this.coinFlip.Play(IsMyTurn(t_first));
             await UniTask.Delay(500);                   // 결과 잠깐 유지
             // 연출 대기 중 씬이 내려갔으면 아래는 전부 파괴된 오브젝트를 만진다.
             if (this.destroyCt.IsCancellationRequested) return;
@@ -249,9 +315,12 @@ public class TurnRunner : MonoBehaviour
         // (3) 카드 배치.
         if (_dealCards != null) await _dealCards();
 
-        // (3.5) 후공 어드밴티지 멀리건 — 첫 턴 시작 전, 보드가 채워진 뒤. 싱글 전용(멀티는 내부에서 no-op).
+        // (3.5) 후공 어드밴티지 멀리건 — 첫 턴 시작 전, 보드가 채워진 뒤.
         if (this.destroyCt.IsCancellationRequested) return;   // 딜 도중 씬 전환 — 멀리건·턴 루프를 시작하지 않는다
         await MulliganPhase.Run(this.ctx, t_first, this.destroyCt);
+
+        // 멀리건 RPC 상한이 무효 경기를 확정했거나 씬이 내려간 경우 턴 루프를 새로 시작하지 않는다.
+        if (this.destroyCt.IsCancellationRequested || this.resultFinalized || this.forcedEnd) return;
 
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
         RunTurns(t_first, _skipFirstBanner: true).Forget();
@@ -293,8 +362,14 @@ public class TurnRunner : MonoBehaviour
             }
             t_skipBanner = false;
 
+            if (this.aiTakeoverFillPending)
+            {
+                this.aiTakeoverFillPending = false;
+                await this.ctx.FillAndAnimate();
+            }
+
             TurnBase t_turn;
-            if (DeckConfig.IsMultiplayer)
+            if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)
             {
                 t_turn = t_isMyTurn
                     ? (TurnBase)new MultiplayerPlayerTurn(this.ctx)
@@ -302,14 +377,16 @@ public class TurnRunner : MonoBehaviour
             }
             else
             {
-                t_turn = t_current == 0
+                t_turn = t_isMyTurn
                     ? (TurnBase)new PlayerTurn(this.ctx)
                     : (TurnBase)new EnemyTurn(this.ctx);
             }
 
+            this.activeTurn = t_turn;
             t_turn.OnEnter();
             await t_turn.Execute();
             t_turn.OnExit();
+            this.activeTurn = null;
 
             // [TurnEnded] 이번 턴 필드의 라이브 카드마다 패시브 → 시너지 순(유산 legacyStack++ 등).
             // 동기 void, RNG 미소비. CheckGameOver 전에 인라인 완결.
@@ -328,13 +405,17 @@ public class TurnRunner : MonoBehaviour
             foreach (var t_c in t_oppositeField.GetWaitingCards())
                 t_c.ClearShield();
 
-            if (this.disconnectWin || this.forcedEnd || CheckGameOver()) break;
+            if (DeckConfig.IsMultiplayer)
+                LogDeterminismHash(t_current);
+
+            if (this.forcedEnd || CheckGameOver()) break;
 
             // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다
             // (흐림·클로즈업이 남은 채로 다음 턴이 시작되면 먹통으로 보인다). 안 돌았으면 무동작.
             BattleResultBeat.AbortFinish();
 
-            if (t_current == 1)
+            // 한 라운드는 선공 owner → 후공 owner 순서다. 선공이 1이어도 실제 후공 턴 뒤에만 증가한다.
+            if (t_current == 1 - _startCurrent)
             {
                 TurnCount++;
                 TurnEvents.RaiseTurnCountChanged(TurnCount);
@@ -345,13 +426,68 @@ public class TurnRunner : MonoBehaviour
         }
     }
 
-    /// <summary>선공(플레이어 먼저)인가. 멀티=기존 고정, 튜토리얼=스크립트 전제(플레이어 선공 고정),
-    /// 일반 싱글(AI전)=MatchRandom 코인. MatchRandom은 StartBattle에서 이미 시드됨.</summary>
+    void LogDeterminismHash(int _actingOwner)
+    {
+        BattleField t_ownerZero = this.playerField.OwnerIndex == 0 ? this.playerField : this.enemyField;
+        BattleField t_ownerOne  = this.playerField.OwnerIndex == 1 ? this.playerField : this.enemyField;
+
+        ulong t_hash = 14695981039346656037UL;
+        FoldField(ref t_hash, t_ownerZero);
+        FoldField(ref t_hash, t_ownerOne);
+        Debug.Log($"[Hash] turn={TurnCount} owner={_actingOwner} board=0x{t_hash:X16} draws={MatchRandom.DrawCount}");
+    }
+
+    static void FoldField(ref ulong _hash, BattleField _field)
+    {
+        FoldInt(ref _hash, _field?.OwnerIndex ?? -1);
+        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+            FoldCard(ref _hash, _field?.GetSlot(i));
+
+        FoldInt(ref _hash, _field?.WaitingCount ?? -1);
+        if (_field == null) return;
+        foreach (CardInstance t_card in _field.GetWaitingCards())
+            FoldCard(ref _hash, t_card);
+    }
+
+    static void FoldCard(ref ulong _hash, CardInstance _card)
+    {
+        if (_card == null)
+        {
+            FoldInt(ref _hash, -1);
+            return;
+        }
+
+        FoldInt(ref _hash, _card.data != null ? _card.data.id : -1);
+        FoldInt(ref _hash, _card.maxHp);
+        FoldInt(ref _hash, _card.hp);
+        FoldInt(ref _hash, _card.bonusHp);
+        FoldInt(ref _hash, _card.hasShield ? 1 : 0);
+        FoldInt(ref _hash, _card.evolutionStage);
+        FoldInt(ref _hash, (int)_card.unlockedKeywords);
+        FoldInt(ref _hash, _card.synergyEnabled ? 1 : 0);
+        FoldInt(ref _hash, (int)_card.runtimeKeywords);
+        FoldInt(ref _hash, (int)_card.synergyKeywords);
+    }
+
+    static void FoldInt(ref ulong _hash, int _value)
+    {
+        unchecked
+        {
+            uint t_value = (uint)_value;
+            for (int i = 0; i < 4; i++)
+            {
+                _hash ^= (byte)(t_value >> (i * 8));
+                _hash *= 1099511628211UL;
+            }
+        }
+    }
+
+    /// <summary>ownerIndex 0이 선공인가. 튜토리얼만 스크립트 전제로 owner 0 고정,
+    /// 일반 싱글과 멀티는 시드된 MatchRandom 코인으로 결정한다.</summary>
     bool DecideFirstPlayer()
     {
-        if (DeckConfig.IsMultiplayer) return true;   // 멀티(일시중지): 기존 동작 유지
         if (TutorialConfig.IsActive)  return true;   // 튜토리얼: 플레이어 선공 고정(스크립트 순서 전제)
-        return MatchRandom.Range(2) == 0;            // 일반 싱글: 코인 랜덤(0=플레이어 선공)
+        return MatchRandom.Range(2) == 0;
     }
 
     void SetTurnCountLabel()
@@ -437,36 +573,59 @@ public class TurnRunner : MonoBehaviour
     void HandlePlayerLeft(PlayerRef _p)
     {
         if (!DeckConfig.IsMultiplayer) return;
-        this.disconnectWin = true;
-        NetworkGameController.Instance?.ForceOpponentReady();
-        MultiplayerTurnRunner.Instance?.ForceOpponentAttackResolve();
-        // 부전승에는 여운이 없다 — 강조할 결정타가 없고, 이탈은 전투가 진행 중일 때도 들어온다.
-        FinalizeResult(true, _withBeat: false);
+        if (DeckConfig.AiTakeover || this.aiTakeoverPending || this.resultFinalized) return;
+
+        TurnState.InputAllowed = false;
+        if (NetTimeouts.OpponentDropGraceSec <= 0f)
+        {
+            BeginAiTakeover();
+            return;
+        }
+
+        this.aiTakeoverPending = true;
+        BeginAiTakeoverAfterGrace().Forget();
     }
 
-    /// <summary>
-    /// 초기화 단계(StartBattle 이전)에서 상대 이탈이 감지된 경우 GameInitializer가 호출.
-    /// RunTurns가 아직 시작 전이므로 기존 이탈 시맨틱(부전승)과 일관되게 승리 팝업만 노출.
-    /// StartBattle을 호출하지 않으므로 OnPlayerLeftRoom(HandlePlayerLeft) 구독도 발생하지 않아 이중 처리 없음.
-    /// </summary>
-    /// <summary>초기화가 **상한 초과**로 실패했을 때. 이탈 부전승과 반드시 구분한다 —
-    /// 타임아웃은 내 쪽 문제(스테일 러너·러너 미기동)일 수 있고 상대는 멀쩡히 대기 중일 수 있다.
-    /// 여기서 CaptureResult를 부르면 골드·랭크가 실제로 지급되고, 양쪽이 동시에 타임아웃 나면
-    /// 둘 다 승리 보상을 받아 랭크가 부풀어 오른다. 결과 없이 로비로 돌려보낸다.</summary>
-    public void HandleInitFailed()
+    async UniTaskVoid BeginAiTakeoverAfterGrace()
     {
-        Debug.LogError("[MultiInit] 초기화 상한 초과 — 결과·보상 없이 로비로 복귀한다.");
-        BattleCleanup.LoadScene(LobbySceneName);
+        await UniTask.Delay(TimeSpan.FromSeconds(NetTimeouts.OpponentDropGraceSec),
+                            ignoreTimeScale: true,
+                            cancellationToken: this.destroyCt)
+                     .SuppressCancellationThrow();
+
+        if (this.destroyCt.IsCancellationRequested || this.resultFinalized || DeckConfig.AiTakeover) return;
+        BeginAiTakeover();
+    }
+
+    void BeginAiTakeover()
+    {
+        this.aiTakeoverPending = false;
+        DeckConfig.SetAiTakeover(true);
+        if (!DeckConfig.AiTakeover) return;
+
+        TurnState.InputAllowed = false;
+        this.aiTakeoverFillPending = true;
+
+        // 공격 대기 TCS는 continuation을 동기 호출한다. 인수 플래그를 먼저 세운 뒤 깨워야 Timeout으로 재진입하지 않는다.
+        MultiplayerTurnRunner.Instance?.PrepareAiTakeover();
+        NetworkGameController.Instance?.ForceOpponentReady();
+        NetworkGameController.Instance?.ForceOpponentMulliganChoice();
+        (this.activeTurn as MultiplayerPlayerTurn)?.ContinueAfterAiTakeover();
+
+        Debug.Log("[Net] 상대 이탈 — 기존 보드 상태를 유지한 채 AI가 전투를 인수한다.");
+    }
+
+    /// <summary>초기화(StartBattle 이전)가 실패했을 때 GameInitializer가 부르는 출구.
+    /// 사유가 상한 초과든 상대 이탈이든 <b>전부 무효 경기</b>다 — 보드가 아직 서지 않아 승패를 매길 판이 없고,
+    /// AI가 인수할 상태도 없다. 여기서 CaptureResult를 부르면 골드·랭크가 실제로 지급되고,
+    /// 양쪽이 동시에 타임아웃 나면 둘 다 보상을 받아 랭크가 부풀어 오른다. 결과 없이 로비로 돌려보낸다.</summary>
+    public void HandleInitFailed(EMatchEndReason _reason)
+    {
+        Debug.LogError($"[MultiInit] 초기화 실패({_reason}) — 결과·보상 없이 로비로 복귀한다.");
+        AbortMatch(_reason);
     }
 
     const string LobbySceneName = "LobbyScene";
-
-    public void HandleOpponentLeftDuringInit()
-    {
-        if (!DeckConfig.IsMultiplayer) return;
-        this.disconnectWin = true;
-        FinalizeResult(true, _withBeat: false);
-    }
 
     bool CheckGameOver()
     {
@@ -474,12 +633,12 @@ public class TurnRunner : MonoBehaviour
         // 여운은 "정리된 보드를 한 박자 붙잡았다가" 팝업을 여는 연출이 된다.
         if (this.enemyField.IsEmpty)
         {
-            FinalizeResult(true, _withBeat: true);
+            FinalizeResult(true, EMatchEndReason.Normal);
             return true;
         }
         if (this.playerField.IsEmpty)
         {
-            FinalizeResult(false, _withBeat: true);
+            FinalizeResult(false, EMatchEndReason.Normal);
             return true;
         }
         return false;
