@@ -97,7 +97,8 @@ public static class CurrencySlotBoard
         for (int t_i = 0; t_i < s_slots.Count; t_i++)
         {
             CurrencyHud t_slot = s_slots[t_i];
-            if (!t_slot.IsLendable || t_slot.IsBusy) continue;
+            // 롤 중인 칸을 또 뺏으면 한 세대 밀린 그림이 빠져나간다.
+            if (!t_slot.IsLendable || t_slot.IsBusy || t_slot.IsRolling) continue;
             if (s_requested[(int)t_slot.Type]) continue;
 
             if (t_best == null || IsBetterVictim(t_slot, t_best)) t_best = t_slot;

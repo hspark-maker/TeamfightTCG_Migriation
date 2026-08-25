@@ -6,10 +6,10 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
+/// <summary>상단바 재화 칸 하나. 잔액을 띄우고 획득·소비 연출을 돌리며, 대표 칸이면 다른 재화에 잠시 빌려주기도 한다.</summary>
 public class CurrencyHud : MonoBehaviour
 {
-    // 활성 HUD를 재화별로 찾는 창구. 같은 GameObject에 종류가 다른 HUD가 여러 장 붙어 있어
-    // 타입 탐색(FindFirstObjectByType)으로는 어느 쪽이 잡힐지 보장되지 않는다.
+    // 타입 탐색(FindFirstObjectByType)으로는 한 GameObject에 여러 장 붙은 HUD 중 어느 쪽이 잡힐지 보장되지 않는다.
     static readonly Dictionary<ECurrencyType, CurrencyHud> s_huds = new Dictionary<ECurrencyType, CurrencyHud>();
 
     [FormerlySerializedAs("goldText")]
@@ -37,13 +37,22 @@ public class CurrencyHud : MonoBehaviour
 
     [Tooltip("배율 연출(획득 펄스·소비 눌림)이 물릴 노드. 미배선이면 이 컴포넌트가 붙은 노드(아이콘+숫자 묶음).\n" +
              "숫자 텍스트를 직접 물리지 말 것 — 그 rect는 LayoutGroup·ContentSizeFitter가 잡는 자식이라 " +
-             "피벗이 묶음 한쪽으로 치우쳐 있고, 배율 축이 그 피벗이라 숫자가 옆으로 밀리듯 보인다.")]
+             "피벗이 묶음 한쪽으로 치우쳐 있고, 배율 축이 그 피벗이라 숫자가 옆으로 밀리듯 보인다.\n\n" +
+             "칸 전환 롤의 창 안쪽 노드로도 물리지 말 것 — UiPunch가 대상의 트윈을 먼저 끝내므로 롤이 강제 완료된다.")]
     [SerializeField] RectTransform punchTarget;
+
+    [Tooltip("칸이 다른 재화로 갈릴 때 도는 세로 롤의 길이(초). 옛 내용이 한쪽으로 빠지고 새 내용이 반대쪽에서 올라온다.\n" +
+             "대여는 밑에서 위로, 반납은 위에서 아래로 — 방향이 곧 '빌렸다/돌아왔다'를 말한다.\n\n" +
+             "0으로 두면 롤 없이 한 프레임에 교체된다(연출을 끄는 스위치).")]
+    [SerializeField, Min(0f)] float rollDuration = 0.22f;
+
+    [Tooltip("롤이 멎는 감. OutBack이 살짝 지나갔다 돌아오며 릴이 '탁' 걸리는 소리를 낸다.")]
+    [SerializeField] Ease rollEase = Ease.OutBack;
 
     [Tooltip("빌린 재화를 마저 보여 주는 시간(초). 획득 연출이 끝나는 순간부터 잰다 — 코인이 다 꽂히고 " +
              "숫자가 멎은 뒤에도 이만큼은 그 재화가 이 칸에 남아 있다가 스스로 고향 재화로 돌아온다.\n\n" +
              "짧으면 유저가 늘어난 잔액을 읽기 전에 칸이 갈리고, 길면 엉뚱한 재화가 상단바를 오래 차지한다.")]
-    [SerializeField, Min(0.1f)] float lendHoldDuration = 3f;
+    [SerializeField, Min(0.1f)] float lendHoldDuration = 2f;
 
     [Header("소모 연출")]
     [SerializeField, Min(0.01f)] float spendRollDuration = 0.55f;
@@ -67,7 +76,7 @@ public class CurrencyHud : MonoBehaviour
              "반복 펄스를 대신하는 자리다 — 흔들지 않고도 '지금 줄고 있다'를 계속 말해 준다.")]
     [SerializeField] Color spendTint = new Color(1f, 0.42f, 0.35f);
 
-    // 획득 연출 중에는 실제 잔액 대신 연출이 지정한 표시값을 보여준다(코인이 도착하며 숫자가 오르는 구간).
+    // 연출이 도는 동안에는 실제 잔액 대신 연출이 지정한 표시값을 보여준다.
     bool m_held;
     long m_displayedValue;
     int m_displayRevision;
@@ -79,9 +88,13 @@ public class CurrencyHud : MonoBehaviour
     ECurrencyType m_defaultType;
     int m_lendSerial;
     Tween m_lendRelease;
+    readonly CurrencySlotRoll m_roll = new CurrencySlotRoll();
 
-    /// <summary>수치 텍스트의 RectTransform. 코인이 날아와 꽂히는 **도착 지점**이다.</summary>
-    public RectTransform TextRect => this.valueText != null ? (RectTransform)this.valueText.transform : null;
+    /// <summary>코인이 날아와 꽂히는 도착 지점.</summary>
+    // 롤이 붙은 칸은 수치가 아니라 그 창을 준다 — 도착 좌표는 조립 시점에 굳으므로 움직이는 rect를 내주면 궤적이 어긋난다.
+    public RectTransform TextRect => m_roll.TextWindow != null ? m_roll.TextWindow
+                                   : this.valueText != null ? (RectTransform)this.valueText.transform
+                                   : null;
 
     /// <summary>이 HUD가 <b>지금</b> 맡은 재화. 빌려간 동안 갈리므로 캐싱하지 말 것.</summary>
     public ECurrencyType Type => this.type;
@@ -89,8 +102,8 @@ public class CurrencyHud : MonoBehaviour
     /// <summary>저작 시점의 고향 재화. 반납하면 여기로 돌아온다.</summary>
     public ECurrencyType DefaultType => m_defaultType;
 
-    /// <summary>다른 재화에 내줄 수 있는 칸인지. 아이콘을 갈아끼울 수 없거나 <b>되돌릴 그림이 없으면</b>
-    /// 내주지 않는다 — 고향 그림이 표에 없으면 반납해도 대여 재화 그림이 그대로 굳는다.</summary>
+    /// <summary>다른 재화에 내줄 수 있는 칸인지.</summary>
+    // 고향 그림이 표에 없으면 내주지 않는다 — 반납해도 대여 재화 그림이 그대로 굳는다.
     public bool IsLendable => this.registerAsPrimary
                            && this.iconImage != null
                            && CurrencyLook.BarIconOf(m_defaultType) != null;
@@ -101,11 +114,14 @@ public class CurrencyHud : MonoBehaviour
     /// <summary>빌려간 순번. 회수는 가장 오래된 대여부터.</summary>
     public int LendSerial => m_lendSerial;
 
-    /// <summary>연출이 도는 중인지. 도중에 재화를 갈면 숫자가 튄다.</summary>
+    /// <summary>수치 연출이 도는 중인지.</summary>
     public bool IsBusy => m_held || (m_spendTween != null && m_spendTween.IsActive());
 
-    /// <summary>펄스로 튀길 노드. 도착 지점과 갈라 둔다 — 코인은 숫자에 꽂혀야 하지만,
-    /// 튀는 것은 아이콘까지 묶은 덩어리여야 축이 그 한가운데에 선다.</summary>
+    /// <summary>칸을 갈아입는 롤이 도는 중인지.</summary>
+    // IsBusy에 섞지 말 것 — 고향 칸 회수 경로가 IsBusy면 건너뛰므로 그 재화의 획득 연출이 통째로 사라진다.
+    public bool IsRolling => m_roll.IsRolling;
+
+    // 코인은 숫자에 꽂혀야 하지만 튀는 것은 아이콘까지 묶은 덩어리여야 축이 한가운데에 선다.
     RectTransform PunchRect => this.punchTarget != null ? this.punchTarget
                              : transform is RectTransform t_self ? t_self
                              : this.TextRect;
@@ -127,8 +143,8 @@ public class CurrencyHud : MonoBehaviour
 
     /// <summary>
     /// 획득 연출용 숫자 롤업을 시작하고, 코인 도착 콜백(도착 장수, 전체 장수)에 물릴 진행 핸들러를 돌려준다.
-    /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다(획득분만큼 되돌렸다가 도착에 맞춰 다시 올린다).
-    /// 연출이 끊겨도 고정이 풀리도록 호출부는 반환된 해제 콜백을 시퀀스 OnKill에 걸어둘 것.
+    /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다.
+    /// 호출부는 반환된 해제 콜백을 시퀀스 OnKill에 걸어 둘 것(연출이 끊겨도 고정이 풀리도록).
     /// </summary>
     public Action<int, int> BeginGainRollUp(long _gain, out Action _release,
                                             float _punch = UiPunch.DEFAULT_SCALE)
@@ -153,8 +169,7 @@ public class CurrencyHud : MonoBehaviour
         };
     }
 
-    /// <summary>이 칸을 다른 재화에 빌려준다. 배차는 CurrencySlotBoard가 정하고 여기서는 갈아입기만 한다.
-    /// 반납은 스스로 한다 — 획득 연출이 끝나고 lendHoldDuration만큼 더 보여준 뒤 고향 재화로 돌아온다.</summary>
+    /// <summary>이 칸을 다른 재화에 빌려준다. 배차는 CurrencySlotBoard가 정하고 여기서는 갈아입기만 한다.</summary>
     public void Lend(ECurrencyType _type, int _serial)
     {
         m_lendSerial = _serial;
@@ -170,8 +185,7 @@ public class CurrencyHud : MonoBehaviour
         this.Rebind(m_defaultType);
     }
 
-    // 반납 시계를 처음부터 다시 감는다. 연출이 끝나는 순간(ReleaseDisplay)마다 다시 감기므로
-    // 실제로 재는 것은 "마지막 연출이 멎은 뒤부터"다.
+    // 연출이 멎을 때마다(ReleaseDisplay) 다시 감기므로, 실제로 재는 것은 "마지막 연출이 끝난 뒤부터"다.
     void ArmLendRelease()
     {
         this.KillLendRelease();
@@ -186,8 +200,8 @@ public class CurrencyHud : MonoBehaviour
         m_lendRelease = null;
         if (!this.IsLent) return;
 
-        // 아직 코인이 날아오는 중이면 도착지를 치우지 않는다 — 한 박 더 기다린다.
-        if (this.IsBusy) { this.ArmLendRelease(); return; }
+        // 코인이 오는 중이면 도착지를 치우지 않고, 대여 롤이 도는 중이면 반납 롤이 겹치지 않게 한 박 더 기다린다.
+        if (this.IsBusy || this.IsRolling) { this.ArmLendRelease(); return; }
 
         this.Return();
     }
@@ -199,11 +213,13 @@ public class CurrencyHud : MonoBehaviour
         if (t_tween != null && t_tween.IsActive()) t_tween.Kill();
     }
 
-    // 칸이 맡는 재화를 갈아끼운다. 이 순서가 곧 s_huds 규약이다 —
-    // 옛 재화의 연출을 먼저 무효화하고, 대표 등록을 옮긴 뒤, 그림과 숫자를 새 재화로 맞춘다.
+    // 아래 순서가 곧 s_huds 규약이다 — 옛 연출을 먼저 무효화하고, 대표 등록을 옮긴 뒤, 그림과 숫자를 새 재화로 맞춘다.
     void Rebind(ECurrencyType _type)
     {
         if (this.type == _type) return;
+
+        Sprite t_oldIcon = this.iconImage != null ? this.iconImage.sprite : null;
+        string t_oldText = this.valueText != null ? this.valueText.text : null;
 
         m_displayRevision++;
         m_held = false;
@@ -220,10 +236,12 @@ public class CurrencyHud : MonoBehaviour
 
         this.ApplyIcon();
         this.Render(CurrencyManager.GetBalance(this.type));
+
+        // 고향으로 되돌아가는 길은 대여를 되감는 그림이라 방향이 반대다.
+        m_roll.Play(_upward: _type != m_defaultType, t_oldIcon, t_oldText, this.rollDuration, this.rollEase);
     }
 
-    // 표의 상단바 칸(barIcon)이 정본 — 단 재화가 갈리는 칸에 한해서다. 갈리지 않는 종속 표시(개봉 오버레이 칩 등)는
-    // 그 화면 아트가 진실원이라 건드리지 않는다. 표가 비어도 손대지 않는다.
+    // 갈리지 않는 종속 표시(개봉 오버레이 칩 등)는 그 화면 아트가 진실원이라 건드리지 않는다.
     void ApplyIcon()
     {
         if (!this.IsLendable) return;
@@ -232,14 +250,12 @@ public class CurrencyHud : MonoBehaviour
         if (t_icon != null) this.iconImage.sprite = t_icon;
     }
 
-    /// <summary>표시값을 연출용으로 고정한다. 실제 잔액 변경은 ReleaseDisplay까지 화면에 반영되지 않는다.</summary>
     void HoldDisplay(long _value)
     {
         m_held = true;
         this.Render(_value);
     }
 
-    /// <summary>고정을 풀고 실제 잔액으로 되돌린다.</summary>
     void ReleaseDisplay(int _revision)
     {
         if (_revision != m_displayRevision) return;
@@ -248,8 +264,7 @@ public class CurrencyHud : MonoBehaviour
         m_held = false;
         this.Render(CurrencyManager.GetBalance(this.type));
 
-        // 연출이 멎은 지금이 "충분히 보여줄" 시간의 시작점이다 — 여기서 다시 감아야
-        // 코인이 날아온 시간만큼 대여가 짧아지지 않는다.
+        // 연출이 멎은 지금이 "충분히 보여줄" 시간의 시작점이다. 여기서 안 감으면 코인이 날아온 만큼 대여가 짧아진다.
         this.ArmLendRelease();
     }
 
@@ -259,14 +274,17 @@ public class CurrencyHud : MonoBehaviour
 
         if (this.valueText == null) this.valueText = GetComponent<TMP_Text>();
 
-        // 물들이기 전 색을 여기서 잡아 둔다 — 연출 도중 잡으면 소비 색이 기준색으로 굳는다.
+        // 연출 도중에 잡으면 소비 색이 기준색으로 굳는다.
         if (this.valueText != null) m_baseTextColor = this.valueText.color;
+
+        // 게이트에 IsLendable을 쓰지 않는다 — 그 판정이 CurrencyLook을 읽어 부트 주입 순서에 매인다.
+        if (this.registerAsPrimary && this.iconImage != null && this.valueText != null)
+            m_roll.Bind(transform as RectTransform, this.iconImage, this.valueText);
     }
 
     void OnEnable()
     {
-        // 종류별 1장. 같은 종류가 겹치면 마지막이 이긴다(예외 없이).
-        // 종속 표시(registerAsPrimary=false)는 이 자리를 넘보지 않는다 — 자세한 이유는 그 필드 툴팁.
+        // 종류별 1장. 같은 종류가 겹치면 마지막이 이긴다(종속 표시는 이 자리를 넘보지 않는다 — registerAsPrimary 툴팁).
         if (this.registerAsPrimary)
         {
             s_huds[this.type] = this;
@@ -275,7 +293,6 @@ public class CurrencyHud : MonoBehaviour
 
         this.ApplyIcon();
 
-        // 활성화 시점의 실제 잔액으로 먼저 맞춘 뒤 이후 변경을 구독.
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
         CurrencyManager.OnCurrencySpent += this.HandleCurrencySpent;
         this.Render(CurrencyManager.GetBalance(this.type));
@@ -294,14 +311,15 @@ public class CurrencyHud : MonoBehaviour
         this.KillSpendMotion();
         this.ClearTint(false);
         if (this.PunchRect != null) this.PunchRect.DOComplete();
-        // 연출 도중 꺼지면 해제 호출이 오지 않는다 — 고정을 여기서 풀어 다음 활성화가 잔액을 못 따라가는 상태를 막는다.
+        // 연출 도중 꺼지면 해제 호출이 오지 않는다.
         m_held = false;
 
-        // 꺼진 몸은 배차 대상이 아니다. 여기서 고향으로 되돌려 두면 씬 전환 반납이 따로 필요 없다
-        // (등록은 하지 않는다 — 다음 OnEnable이 s_huds를 다시 잡는다).
         CurrencySlotBoard.Unregister(this);
         this.KillLendRelease();
+        // 위 DOComplete는 칸 자신만 잡는다 — 롤은 자식 anchoredPosition이라 여기서 따로 앉혀야 한다.
+        m_roll.Snap();
         m_lendSerial = 0;
+        // 고향으로 되돌려 두면 씬 전환 반납이 따로 필요 없다(등록은 하지 않는다 — 다음 OnEnable이 다시 잡는다).
         this.type = m_defaultType;
     }
 
@@ -312,7 +330,6 @@ public class CurrencyHud : MonoBehaviour
         this.BeginSpendRollDown(_cost, _balance);
     }
 
-    // 이 HUD가 맡은 재화의 변경만 반영. 다른 종류는 무시.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
         if (_type != this.type) return;
@@ -343,9 +360,7 @@ public class CurrencyHud : MonoBehaviour
 
         float t_duration = Mathf.Max(0.01f, this.spendRollDuration);
 
-        // 소비는 두 박이다 — 시작에 '툭'(눌렀다 확대 배율로 튀어 오름), 끝에 '탁'(원래 크기로 내려앉음).
-        // 그 사이는 커진 채로 색만 물들여 둔다. 롤다운 자체가 이미 "줄고 있다"를 말하고 있어서
-        // 중간에 배율을 더 흔들면 정보가 아니라 노이즈가 된다.
+        // 소비는 두 박이다 — 시작에 '툭', 끝에 '탁'. 그 사이에 배율을 더 흔들면 정보가 아니라 노이즈가 된다.
         this.PlayLift();
         this.ApplyTint();
 
@@ -360,8 +375,7 @@ public class CurrencyHud : MonoBehaviour
                                 .SetLink(gameObject);
 
         t_tween.OnComplete(() => this.FinishSpendRollDown(t_revision, _settle: true));
-        // 끝까지 돈 뒤에도 OnKill이 이어 오지만, 위 호출이 이미 리비전을 올려 두어 여기서 막힌다.
-        // 즉 이 경로가 잡는 것은 '중간에 끊긴 롤' 뿐이고, 그때는 정착 tick 없이 색만 되돌린다.
+        // 위 OnComplete가 리비전을 올려 두므로 이 경로가 잡는 것은 '중간에 끊긴 롤' 뿐이다.
         t_tween.OnKill(() => this.FinishSpendRollDown(t_revision, _settle: false));
         m_spendTween = t_tween;
     }
@@ -372,14 +386,13 @@ public class CurrencyHud : MonoBehaviour
 
         m_spendTween = null;
         this.ClearTint(_settle);
-        // 끊긴 롤은 내려오는 연출 없이 크기를 즉시 되돌린다 — 커진 채로 굳는 것만은 막아야 한다.
+        // 끊긴 롤은 내려오는 연출 없이 즉시 되돌린다 — 커진 채로 굳는 것만은 막아야 한다.
         if (_settle) this.PlaySettle();
         else this.KillSpendMotion();
         this.ReleaseDisplay(_revision);
     }
 
-    // 소비 첫 박. 안으로 한 번 눌렸다가 확대 배율까지 튀어 올라 **그대로 머문다** —
-    // 롤이 도는 내내 이 HUD만 커져 있어야 어느 재화가 빠지는 중인지 눈이 놓치지 않는다.
+    // 확대 배율까지 튀어 올라 **그대로 머문다** — 롤이 도는 내내 커져 있어야 어느 재화가 빠지는지 눈이 놓치지 않는다.
     void PlayLift()
     {
         RectTransform t_rect = this.PunchRect;
@@ -398,7 +411,6 @@ public class CurrencyHud : MonoBehaviour
         m_spendMotion = t_motion;
     }
 
-    // 롤이 목표값에 닿는 순간 원래 크기로 내려앉는다.
     // OutBack이 1 아래를 살짝 지나갔다 돌아와서, 따로 tick을 쏘지 않아도 '탁' 하고 멎는 소리가 난다.
     void PlaySettle()
     {
@@ -422,7 +434,6 @@ public class CurrencyHud : MonoBehaviour
         m_tinted = true;
     }
 
-    /// <summary>물들인 색을 되돌린다. 정상 종료면 한 박에 걸쳐 풀고, 끊긴 경우엔 즉시 되돌린다.</summary>
     void ClearTint(bool _fade)
     {
         if (!m_tinted) return;
@@ -444,7 +455,6 @@ public class CurrencyHud : MonoBehaviour
         if (t_tween != null && t_tween.IsActive()) t_tween.Kill();
     }
 
-    // 배율 연출을 걷는다. 기본은 기준 배율 복귀 — 확대·눌림이 겹쳐도 크기가 그 상태로 굳지 않게.
     // 이어서 지금 크기부터 트윈할 때만 _resetScale을 꺼서 출발점을 남긴다.
     void KillSpendMotion(bool _resetScale = true)
     {
@@ -458,7 +468,6 @@ public class CurrencyHud : MonoBehaviour
         if (t_rect != null) t_rect.localScale = Vector3.one;
     }
 
-    // 천단위 콤마 포맷
     void Render(long _amount)
     {
         m_displayedValue = _amount;

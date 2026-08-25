@@ -92,7 +92,20 @@ public class DeckEditCollectionGrid : MonoBehaviour
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
 
-            t_tile.SetSynergyFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+            t_tile.SetFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+        }
+    }
+
+    /// <summary>슬롯 선택 모드에서 고른 카드 한 장만 남기고 나머지를 흐리게 한다. null이면 전부 해제.</summary>
+    // SetSynergyFocus와 같은 알파 축을 쓴다 — 두 강조는 배타라(컨트롤러가 보장) 서로 덮어써도 흐린 채 굳지 않는다.
+    public void SetPickedCard(CardData _card)
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        {
+            var t_tile = m_tiles[t_i];
+            if (t_tile == null) continue;
+
+            t_tile.SetFocus(_card != null, t_tile.Card == _card);
         }
     }
 
