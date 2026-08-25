@@ -237,7 +237,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.6, g: 0.88, b: 1, a: 0.75}
+  m_Color: {r: 0.16, g: 0.11, b: 0.26, a: 0.96}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -418,8 +418,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UiGlowBlink
   target: {fileID: 4361908067519244707}
-  intensityLow: 0.1
-  intensityHigh: 0.6
+  intensityLow: 0
+  intensityHigh: 0.12
   period: 1.3
   phase: 0
   restIntensity: 0
