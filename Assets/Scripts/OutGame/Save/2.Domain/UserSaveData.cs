@@ -31,4 +31,6 @@ public class UserSaveData
     public AlbumRewardSaveData albumReward = new AlbumRewardSaveData();
 
     public TournamentSaveData tournament = new TournamentSaveData();
+
+    public ProfileSaveData profile = new ProfileSaveData();
 }

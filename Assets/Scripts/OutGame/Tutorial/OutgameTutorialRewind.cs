@@ -83,6 +83,7 @@ public static class OutgameTutorialRewind
         t_data.albumReward   = new AlbumRewardSaveData();
         t_data.tournament    = new TournamentSaveData();
         t_data.tutorial      = new TutorialSaveData();
+        t_data.profile       = new ProfileSaveData();
 
         t_data.tutorial.outgameChapterIndex     = t_chapter;
         t_data.tutorial.outgameChapterStepIndex = t_step;
