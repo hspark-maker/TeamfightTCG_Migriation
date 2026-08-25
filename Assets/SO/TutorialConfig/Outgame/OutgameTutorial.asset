@@ -448,10 +448,10 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
     - stepId: 20
-      action: 0
-      anchor: 17
-      guideMessage: "\uC0C8\uB85C \uC5BB\uC740 '\uD0A4\uC6CC\uB4DC \uB371'\uC744
-        \uC120\uD0DD\uD574\uBCF4\uC138\uC694."
+      action: 21
+      anchor: 25
+      guideMessage: "'\uBCC4\uD1A0\uB9AC'\uB97C \uB20C\uB7EC \uBE44\uC5B4 \uC788\uB294
+        \uC790\uB9AC\uC5D0 \uB123\uC5B4\uBCF4\uC138\uC694."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -459,29 +459,7 @@ MonoBehaviour:
       useDim: 1
       pack: {fileID: 0}
       packPriceLabel: 
-      anchorCard: {fileID: 0}
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      card: {fileID: 0}
-      cards: []
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-    - stepId: 21
-      action: 0
-      anchor: 11
-      guideMessage: 
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 1
-      pack: {fileID: 0}
-      packPriceLabel: 
-      anchorCard: {fileID: 0}
+      anchorCard: {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
       freeOfCharge: 0
       waitUnlockIntro: 0
       rewardTitle: 
@@ -495,7 +473,8 @@ MonoBehaviour:
     - stepId: 22
       action: 6
       anchor: 13
-      guideMessage: 
+      guideMessage: "\uB371\uC774 \uC644\uC131\uB410\uC2B5\uB2C8\uB2E4. [\uAC8C\uC784
+        \uC2DC\uC791]\uC744 \uB20C\uB7EC \uC804\uD22C\uC5D0 \uB4E4\uC5B4\uAC00\uC138\uC694."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0

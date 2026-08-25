@@ -125,8 +125,66 @@ public class DeckEditCollectionGrid : MonoBehaviour
         scrollRect.velocity = Vector2.zero;
     }
 
+    /// <summary>튜토리얼이 지목한 카드의 타일에만 앵커를 건다(null이면 해제).
+    /// 타일이 런타임 생성이라 프리팹에 TutorialAnchor를 저작할 수 없다 — AlbumCardSlotView와 같은 관용구다.</summary>
+    public void ApplyTutorialAnchor(CardData _card)
+    {
+        var t_tile = _card != null ? FindTile(_card) : null;
+        if (t_tile == null)
+        {
+            TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
+            return;
+        }
+
+        // 타일에는 Button이 없다(DeckEditCardTile이 IPointerClickHandler로 직접 받는다) —
+        // 이 스텝의 완료는 클릭이 아니라 장착 신호라 누를 대상 없이 강조만으로 충분하다.
+        TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.DeckEditCollectionCard,
+                                        t_tile.transform as RectTransform, null);
+    }
+
+    /// <summary>지목된 타일이 뷰포트 안에 오도록 스크롤한다. 게이트가 타깃을 승격하면 RectMask2D 클리핑이 끊겨
+    /// 목록 밖 카드가 화면에 그대로 새므로, 가리키기 전에 반드시 안으로 들여놔야 한다.</summary>
+    public void EnsureVisible(CardData _card)
+    {
+        if (scrollRect == null || content == null || _card == null) return;
+
+        var t_tile = FindTile(_card);
+        if (t_tile == null) return;
+
+        // 방금 Build한 타일은 아직 배치 전이라 좌표가 0이다.
+        Canvas.ForceUpdateCanvases();
+
+        var t_viewport = scrollRect.viewport != null ? scrollRect.viewport : scrollRect.transform as RectTransform;
+        if (t_viewport == null) return;
+
+        float t_range = content.rect.height - t_viewport.rect.height;
+        if (t_range <= 0f)
+        {
+            scrollRect.verticalNormalizedPosition = 1f;
+            return;
+        }
+
+        var t_rect = t_tile.transform as RectTransform;
+        if (t_rect == null) return;
+
+        float t_offset = Mathf.Clamp(-t_rect.anchoredPosition.y - t_viewport.rect.height * 0.5f, 0f, t_range);
+
+        scrollRect.StopMovement();
+        scrollRect.verticalNormalizedPosition = 1f - t_offset / t_range;
+    }
+
+    DeckEditCardTile FindTile(CardData _card)
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+            if (m_tiles[t_i] != null && m_tiles[t_i].Card == _card) return m_tiles[t_i];
+
+        return null;
+    }
+
     public void Clear()
     {
+        TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
+
         if (content != null)
         {
             // DeckListController.Build()와 동일한 순서: Destroy는 프레임 끝에 반영되므로

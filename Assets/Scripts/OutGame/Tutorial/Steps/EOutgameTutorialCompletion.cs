@@ -13,4 +13,5 @@ public enum EOutgameTutorialCompletion
     CardDetailReturn, // 카드 상세 하나가 닫히는 것이 완료(뒤에 남는 도감 페이지까지는 묻지 않는다)
     CardGain,    // 로비 획득 연출(카드·팩 비행)이 끝나는 것이 완료 — RankEffect와 같은 이유로 기다린다
     KeywordEnhance, // 키워드 강화 성공이 완료. 무대를 쥐는 결과판이 없어 성공 그 순간에 넘어간다(Enhance와 다르다)
+    DeckEquip,   // 지목한 카드가 덱 칸에 들어가는 것이 완료. 클릭이 아니라 장착이라 드래그 배치도 인정된다
 }

@@ -193,7 +193,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &703896174192520432
 Transform:
   m_ObjectHideFlags: 0
@@ -2767,7 +2767,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &3597434991347890582
 Transform:
   m_ObjectHideFlags: 0
@@ -2796,7 +2796,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6985f1a9ed92cbd4e869c40d65fee06b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PackOpenOverlay
-  content: {fileID: 376655640714115639}
   controller: {fileID: 827844586720592769}
   view: {fileID: 1623875942876989043}
 --- !u!1 &4603258059214006836

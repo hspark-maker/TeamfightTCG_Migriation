@@ -393,35 +393,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 항상 켜져 있는 UIPoolManager 컨테이너(400) 때문에 이 창이 401로 뛰어, 이 창 위에 서야 할
     /// 해금 안내(UnlockIntroOverlay, 150)가 뒤에 묻혔다. 예외를 하나씩 빼는 방식으로는 다음 상시 캔버스를 못 막는다.
     ///
-    /// GraphicRaycaster를 함께 붙이는 이유: overrideSorting을 켠 중첩 캔버스는 부모의 레이캐스터가 쥔 정렬에서
-    /// 떨어져 나온다 — 없으면 눈에는 위에 보이는데 탭은 밑 화면이 먹는다.
-    /// 컴포넌트를 없으면 붙여 쓰는 것은 이 파일의 CanvasGroup 확보(EnsureSlideBase)와 같은 관용구다.
-    ///
-    /// ⚠ 한 번 붙인 두 컴포넌트는 떼지 않는다(다음 열기에 다시 쓴다) → 내릴 때 **값 전부**를 원위치시킨다.
-    ///   sortingOrder까지 0으로 되돌리는 이유: Overlay 캔버스의 레이캐스트 우선순위는 overrideSorting이 아니라
-    ///   sortingOrder 값 그 자체를 읽는다. 숫자를 남겨두면 렌더는 제자리인데 입력만 위에 남아,
-    ///   나중에 상세 위에 뜨는 화면이 생기면 "보이는 건 위 화면인데 탭은 상세가 먹는" 역전이 된다.</summary>
+    /// 승격/복귀의 절차와 근거는 UiSortingOrder.LiftNested/DropNested가 쥔다.
+    /// ⚠ 한 번 붙인 캔버스는 떼지 않는다(다음 열기에 다시 쓴다) → 내릴 때 값 전부를 원위치시켜야 한다.</summary>
     void LiftAbove(bool _on)
     {
         if (!_on)
         {
-            if (this.m_sortingCanvas == null) return;
-
-            this.m_sortingCanvas.overrideSorting = false;
-            this.m_sortingCanvas.sortingOrder    = 0;
+            UiSortingOrder.DropNested(this.m_sortingCanvas);
             return;
         }
 
-        if (this.m_sortingCanvas == null)
-        {
-            this.m_sortingCanvas = GetComponent<Canvas>();
-            if (this.m_sortingCanvas == null) this.m_sortingCanvas = gameObject.AddComponent<Canvas>();
-        }
-
-        if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
-
-        UiSortingOrder.Stamp(this.m_sortingCanvas, UiSortingOrder.CardDetailLifted);
-        this.m_sortingCanvas.overrideSorting = true;
+        this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.CardDetailLifted);
     }
 
     /// <summary>이 오버레이를 부모(SafeArea) 가득 펴거나 authoring 크기로 되돌린다.

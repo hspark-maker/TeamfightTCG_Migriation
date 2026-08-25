@@ -151,7 +151,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
             HideGate(_owner);
             return;
         }
-        if (_targetButton == null)
+        // Button을 요구하는 것은 "클릭이 곧 완료"인 스텝뿐이다 — 그때만 버튼이 없으면 완료 신호가 사라져 소프트락이 된다.
+        // 완료를 따로 받는 스텝(장착·구매·강화)은 누를 대상이 아니라 강조할 자리만 있으면 되고,
+        // 실제로 덱 편집 컬렉션 타일에는 Button이 없다(IPointerClickHandler로 직접 받는다).
+        if (_targetButton == null && _onSatisfied != null)
         {
             Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{_target.name}'에 Button이 없어 게이트를 걸지 않습니다(소프트락 방지).");
             HideGate(_owner);
@@ -331,7 +334,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         // 메시지 모드엔 누를 타깃이 없다(버튼 없는 순수 영역도 하이라이트한다) → 표시 여부는 활성 여부만으로 판정한다.
         // 화면 탭 자체가 탈출로라 딤이 유지돼도 불변식 (2)를 어기지 않는다.
-        bool t_clickable = m_confirmMode || (m_targetButton != null && m_targetButton.IsInteractable());
+        // 버튼이 아예 없는 타깃(덱 편집 컬렉션 타일 등)도 같다 — 폴링할 대상이 없으니 활성 여부만 본다.
+        // "있는데 못 누른다"(interactable=false)만 숨김 대상이다.
+        bool t_clickable = m_confirmMode || m_targetButton == null || m_targetButton.IsInteractable();
         bool t_visible   = t_active && t_clickable;
 
         // 딤이 꺼진 스텝은 승격도 하지 않는다 — 승격은 딤 위로 끌어올리려는 장치인데 가릴 딤이 없다.

@@ -22,21 +22,16 @@ public sealed class DeckEditData : UIData
     /// 덱 편집을 단독으로 띄우는 테스트 씬처럼 프리팹에 없을 때만 쓰인다.</summary>
     public DeckEditDragController dragController;
 
-    /// <summary>가로 덱 리스트를 켤지(매치 화면 전용). 로비 탭은 목록 화면이 따로 있어 쓰지 않는다.</summary>
-    public bool showDeckStrip;
+    /// <summary>편집을 열 때 이 카드 한 장을 덱에서 빼고 시작한다(없으면 저장된 그대로).
+    /// 튜토리얼이 "직접 골라 끼우기"를 가르치는 자리 — 빈 칸이 하나 있어야 가르칠 것이 생긴다.</summary>
+    public CardData holdoutCard;
 
-    /// <summary>가로 리스트에서 이번 튜토리얼 덱의 자리. -1이면 없음.</summary>
-    public int tutorialDeckSlot = -1;
-
-    /// <summary>상단 제목. 매치 화면은 가로 덱 리스트가 그 자리를 쓰므로 끈다.
+    /// <summary>상단 제목.
     /// (예전에는 배리언트가 노드를 아예 삭제해서 껐다 — 그래서 저작본이 둘로 갈렸다.)</summary>
     public bool showTitle = true;
 
-    /// <summary>덱 전투력 표시. 매치 화면은 리스트 칸에 이미 나와 있어 끈다.</summary>
+    /// <summary>덱 전투력 표시. 매치 화면은 끈다(덱 확인 패널이 그 자리를 쥔다).</summary>
     public bool showDeckPower = true;
-
-    /// <summary>가로 리스트로 다른 덱에 갈아탄 뒤. 호스트가 자기 선택 상태를 맞춘다.</summary>
-    public Action<int> onSlotSwitched;
 
     /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
     /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
@@ -79,14 +74,10 @@ public class DeckEditController : PooledUIBase
     [SerializeField] Button saveButton;
 
     [Header("호스트별로 켜고 끄는 것 (선택)")]
-    [Tooltip("가로 덱 리스트. DeckEditData.showDeckStrip이 true일 때만 켜진다 —\n"
-           + "로비 탭은 목록 화면이 따로 있어 쓰지 않는다. 미배선이면 그 축을 통째로 건너뛴다.")]
-    [SerializeField] MatchDeckStripController deckStrip;
-
-    [Tooltip("상단 제목 노드. 매치 화면은 그 자리를 가로 덱 리스트가 쓴다.")]
+    [Tooltip("상단 제목 노드. 호스트가 DeckEditData.showTitle로 켜고 끈다.")]
     [SerializeField] GameObject titleNode;
 
-    [Tooltip("덱 전투력 표시 노드. 매치 화면은 리스트 칸에 이미 나와 있다.")]
+    [Tooltip("덱 전투력 표시 노드. 호스트가 DeckEditData.showDeckPower로 켜고 끈다.")]
     [SerializeField] GameObject deckPowerNode;
 
     [Tooltip("전투 시작 버튼. DeckEditData.onPlay가 주입됐을 때만 켜진다 —\n"
@@ -110,6 +101,16 @@ public class DeckEditController : PooledUIBase
 
     // 편집 진입 시점의 이름. 이름 변경 여부 판정 기준이자 빈 입력의 복구값이다.
     string m_savedName;
+
+    // 튜토리얼 게이트 아래 층으로 내려앉기 위한 자기 캔버스(LiftToOverlayLayer가 만든다).
+    Canvas m_sortingCanvas;
+
+    // 이번 편집에서 일부러 빼 둔 카드. 유저가 도로 끼우면 null로 돌아간다.
+    CardData m_holdout;
+
+    /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
+    /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
+    public static event Action<CardData> OnAnyCardEquipped;
 
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
@@ -239,12 +240,11 @@ public class DeckEditController : PooledUIBase
         gameObject.SetActive(true);   // OnEnable이 여기서 돌아 소유 변경·해금 구독이 선다
         this.isShow = true;
 
+        LiftToOverlayLayer();
         ApplyHostChrome();
 
         if (this.m_request.isNew) OpenNew();
         else                      Open(this.m_request.slotIndex);
-
-        BuildDeckStrip();
     }
 
     // 호스트마다 켜고 끄는 장식. 노드를 지우지 않고 끄기만 한다 —
@@ -266,7 +266,10 @@ public class DeckEditController : PooledUIBase
         this.isShow = false;
 
         Close();
-        if (this.deckStrip != null) this.deckStrip.Clear();
+
+        // 그리드 Clear의 Destroy는 프레임 끝이라 등록이 한 프레임 더 살아 있다 — 여기서 명시로 걷는다.
+        if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(null);
+        this.m_holdout = null;
 
         this.data = null;
         this.m_request = null;
@@ -297,39 +300,6 @@ public class DeckEditController : PooledUIBase
     /// <summary>풀이 세워 둔 편집 화면을 닫는다. 저장 판정은 호스트가 <see cref="RequestLeave"/>로 이미 받았다고 본다.</summary>
     public static void HidePooled() => Pooled()?.Hide();
 
-    // 가로 덱 리스트. 매치 화면만 켠다 — 로비 탭은 목록 화면이 따로 있다.
-    void BuildDeckStrip()
-    {
-        if (this.deckStrip == null) return;
-
-        bool t_show = this.m_request != null && this.m_request.showDeckStrip;
-
-        this.deckStrip.gameObject.SetActive(t_show);
-        if (!t_show)
-        {
-            this.deckStrip.Clear();
-            return;
-        }
-
-        this.deckStrip.Build(m_slotIndex, OnStripSlotClicked,
-                             this.m_request.tutorialDeckSlot);
-    }
-
-    // 가로 리스트 클릭. 편집 화면에 머문 채 대상 슬롯만 갈아탄다.
-    // 저장 여부(6/6이면 조용히 저장, 미만이면 폐기)는 SwitchTo가 판정한다.
-    void OnStripSlotClicked(int _slotIndex)
-    {
-        if (_slotIndex == m_slotIndex) return;
-
-        // 전환이 거부되면(저장 실패 등) 선택 표시를 옮기지 않는다 —
-        // 표시와 실제 편집 대상이 어긋나면 복귀 후 엉뚱한 덱이 그려진다.
-        if (!SwitchTo(_slotIndex)) return;
-
-        if (this.deckStrip != null) this.deckStrip.SetSelected(m_slotIndex);
-
-        this.m_request?.onSlotSwitched?.Invoke(m_slotIndex);
-    }
-
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
     public void Open(int _slotIndex)
     {
@@ -355,40 +325,14 @@ public class DeckEditController : PooledUIBase
 
         m_dirty = false;   // 로드 직후 = 디스크와 동일 → 그냥 나가면 파일 쓰기 없음
 
+        ApplyHoldout();
+
         // 표시용 폴백("덱 N")까지 포함한 값이라야, 입력을 안 건드렸을 때 rename 판정이 false로 유지된다.
         BeginEdit(DeckSaveManager.GetDisplayName(_slotIndex));
     }
 
     // backButton이 없는 화면(매치 편집 패널)의 종료 창구.
     public void RequestExit() => RequestLeave(ExitEditor);
-
-    // 편집 화면에 머문 채 다른 저장 슬롯으로 갈아탄다(매치 화면의 가로 덱 리스트).
-    // 6/6이면 조용히 저장하고 미완성이면 이번 편집분을 버린다 — 확인 팝업 없음(매치 화면 정책).
-    // 반환 false = 전환하지 않았다. 호출측이 자기 선택 상태를 되돌릴 수 있어야 한다.
-    public bool SwitchTo(int _slotIndex)
-    {
-        if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return false;
-
-        // 같은 덱 재클릭까지 재로드하면 아직 6/6이 아닌 편집분이 조용히 증발한다.
-        if (m_mode == EDeckEditMode.Edit && _slotIndex == m_slotIndex) return false;
-
-        // 드래그 도중 리스트가 눌릴 수 있다(고스트가 상단을 덮지 않는 배치) — RequestLeave와 같은 선처리.
-        if (dragController != null && dragController.IsDragging) dragController.Cancel();
-
-        // 신규 저장은 TryInsertFront가 맨 앞에 꽂아 기존 슬롯을 전부 한 칸 뒤로 민다 →
-        // 저장 전 좌표로 열면 유저가 고른 덱이 아니라 이웃 덱이 열린다. 저장 여부를 미리 확정해 좌표를 보정한다.
-        bool t_inserting = m_mode == EDeckEditMode.Create && CountFilled() == DeckSaveManager.DECK_SIZE;
-
-        // 저장에 실패했는데 전환하면 편성한 6장이 조용히 증발한다(RequestLeave가 화면을 유지하는 것과 같은 이유).
-        if (!SaveIfComplete()) return false;
-
-        int t_target = t_inserting ? _slotIndex + 1 : _slotIndex;
-        if (t_target >= DeckSaveManager.SLOT_COUNT) return false;   // 밀려서 범위를 벗어난 칸은 열 수 없다
-
-        Open(t_target);
-
-        return true;
-    }
 
     // 6/6일 때만 저장한다. 미완성이면 아무것도 하지 않는다(= 폐기).
     // 저장 규칙은 SaveNewDeck/SaveEditedDeck을 그대로 쓴다 — 규칙이 두 벌이 되는 순간 매치와 로비가 갈라진다.
@@ -454,6 +398,7 @@ public class DeckEditController : PooledUIBase
         // 드래그 중이어도 안전하다 — 드래그는 타일이 아니라 CardData를 들고 있다(DeckEditDragController.Begin).
         collectionGrid.Build(OnTileDragRequest, OnTileClicked);
         RefreshAll();
+        ScrollToHoldout();
     }
 
     // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
@@ -476,6 +421,42 @@ public class DeckEditController : PooledUIBase
         if (nameInput      != null) nameInput.DeactivateInputField();
     }
 
+    // 튜토리얼이 지목한 카드를 이번 편집에서만 빼 둔다 — 세이브는 건드리지 않는다(m_working 위에서만 일어난다).
+    // 칸을 앞으로 당기지 않고 그 자리를 비운다: 탭 배치(FindFirstEmpty)가 원래 자리를 되찾아야 편성 순서가 보존된다.
+    void ApplyHoldout()
+    {
+        m_holdout = m_request != null ? m_request.holdoutCard : null;
+        if (m_holdout == null) return;
+
+        for (int t_i = 0; t_i < m_working.Length; t_i++)
+        {
+            if (m_working[t_i] != m_holdout) continue;
+
+            m_working[t_i] = null;
+            return;
+        }
+
+        // 빼 둘 카드가 덱에 없으면 빈 칸이 안 생긴다 — "이 카드를 끼워라"라는 안내가 끼울 자리를 못 찾는다.
+        Debug.LogWarning($"[DeckEditController] 튜토리얼이 지목한 카드({m_holdout.name})가 이 덱에 없어 빈 칸을 만들지 못했다.");
+        m_holdout = null;
+    }
+
+    // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    void LiftToOverlayLayer()
+    {
+        this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+
+        LiftDragLayer();
+    }
+
+    // 드래그 고스트는 이 패널의 자식(DragLayer)이라 승격에 함께 딸려 내려간다 — 그대로 두면 게이트 딤 밑에서 끌린다.
+    void LiftDragLayer()
+    {
+        if (this.dragController == null) return;
+
+        UiSortingOrder.LiftNested(this.dragController.gameObject, UiSortingOrder.DragGhost);
+    }
+
     // 두 진입점의 공통 후반부. m_mode·m_slotIndex·m_working은 호출 전에 확정돼 있어야 한다.
     void BeginEdit(string _initialName)
     {
@@ -490,6 +471,13 @@ public class DeckEditController : PooledUIBase
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
 
         RefreshAll();
+        ScrollToHoldout();
+    }
+
+    // 지목된 타일이 목록 밖에 있으면 게이트가 승격했을 때 클리핑이 끊겨 화면에 샌다 — 그리기 직후 안으로 들여놓는다.
+    void ScrollToHoldout()
+    {
+        if (m_holdout != null && collectionGrid != null) collectionGrid.EnsureVisible(m_holdout);
     }
 
     // 이름 입력 확정. 여기서는 표시만 정리하고 dirty를 세우지 않는다 —
@@ -562,7 +550,18 @@ public class DeckEditController : PooledUIBase
 
         m_working[_slotIndex] = _card;
         m_dirty = true;
+
+        // 빼 뒀던 카드가 제자리로 돌아오면 디스크와 같아진다 — dirty를 남기면 튜토리얼 한복판에 저장 확인 팝업이 낀다.
+        // 다른 칸에 끼웠다면 편성 순서만 달라진 것이라 그 차이는 버린다(전투 덱은 시나리오가 정한다).
+        if (_card == m_holdout)
+        {
+            m_holdout = null;
+            if (CountFilled() == DeckSaveManager.DECK_SIZE) m_dirty = false;
+        }
+
         RefreshAll();
+
+        OnAnyCardEquipped?.Invoke(_card);
     }
 
     // 편성 칸 클릭 = 해제.
@@ -659,7 +658,11 @@ public class DeckEditController : PooledUIBase
                 if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], ClearSlot);
         }
 
-        if (collectionGrid != null) collectionGrid.RefreshInDeck(m_working);
+        if (collectionGrid != null)
+        {
+            collectionGrid.RefreshInDeck(m_working);
+            collectionGrid.ApplyTutorialAnchor(m_holdout);   // 끼우고 나면 m_holdout이 null이라 저절로 걷힌다
+        }
 
         int t_filled = CountFilled();
         if (countText        != null) countText.text   = $"{t_filled} / {DeckSaveManager.DECK_SIZE}";

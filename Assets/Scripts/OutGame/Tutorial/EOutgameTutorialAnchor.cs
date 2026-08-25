@@ -19,7 +19,7 @@ public enum EOutgameTutorialAnchor
     DeckUnequipAllButton  = 14,
     MatchDeckMySection    = 15,
     MatchDeckEnemySection = 16,
-    MatchDeckTutorialDeck = 17,
+    MatchDeckTutorialDeck = 17,   // 폐기 — 가로 덱 리스트가 사라졌다(값은 재사용 금지)
     LobbyCollectionTab    = 18,
     AlbumThemeCell        = 19,   // 갤러리 셀은 런타임 생성이라 아직 안 꽂은 카드가 있는 테마의 칸이 스스로 등록한다
     AlbumCardSlot         = 20,   // 페이지 오버레이의 첫 소유 칸. 칸도 런타임 생성이라 슬롯이 스스로 등록한다
@@ -27,4 +27,5 @@ public enum EOutgameTutorialAnchor
     KeywordGrowthCell       = 22, // 키워드 강화 격자의 칸. 칸도 런타임 생성이라 지금 선택된 칸이 스스로 등록한다
     KeywordGrowthUpgradeButton = 23, // 키워드 강화 하단의 업그레이드 버튼(패널이 열려 있는 동안만)
     TournamentButton           = 24, // 로비 매치 탭의 보상 토너먼트 버튼
+    DeckEditCollectionCard     = 25, // 덱 편집 컬렉션 격자에서 지목된 카드 타일. 타일이 런타임 생성이라 격자가 등록한다
 }

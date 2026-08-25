@@ -242,6 +242,35 @@ public static class OutgameTutorialRunner
         return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedDeck(out _cards);
     }
 
+    /// <summary>덱 편집을 열 때 빼 둘 카드 — 지금 좌표부터 같은 챕터 앞쪽에서 첫 <see cref="EOutgameTutorialAction.WaitDeckEquip"/>가
+    /// 지목한 카드다(전투 스텝을 만나면 중단).
+    ///
+    /// <b>"현재 스텝"을 묻지 않는 이유</b>: 편집 화면을 여는 버튼은 자기 리스너를 게이트보다 먼저 걸어서,
+    /// 패널이 다 세워진 <b>뒤에야</b> 좌표가 장착 스텝으로 넘어간다. 현재 스텝만 보면 그 순간엔 아직 이전 스텝이라
+    /// 빈 칸 없이 6/6으로 열리고, 끼울 자리가 없어 그 자리에서 영영 멈춘다.
+    /// 앞을 보면 어느 쪽 좌표에서 물어도 같은 답이 나온다(되감기로 다시 흘러도 멱등).</summary>
+    public static bool TryGetPendingEquipCard(out CardData _card)
+    {
+        _card = null;
+        if (!IsRunning) return false;
+
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+
+        for (int t_i = OutgameTutorialProgress.StepIndex; t_i < StepCountOf(t_chapter); t_i++)
+        {
+            if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
+
+            // 전투로 나가는 스텝을 넘어서면 이번 덱 화면의 일이 아니다.
+            if (t_def.Action == EOutgameTutorialAction.BattleStart) return false;
+            if (t_def.Action != EOutgameTutorialAction.WaitDeckEquip) continue;
+
+            _card = t_def.AnchorCard;
+            return _card != null;
+        }
+
+        return false;
+    }
+
     // 스텝 완료를 감지한 브리지가 호출 — 다음 좌표 커밋, 시퀀스를 넘어서면 완료 처리
     public static void NotifyStepSatisfied()
     {

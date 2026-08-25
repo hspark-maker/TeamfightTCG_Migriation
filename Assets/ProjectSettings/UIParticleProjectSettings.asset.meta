@@ -1,8 +1,15 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Fonts/MalgunGothic_TMP.asset.meta
+guid: fd623bc8378aa2341b4f334843c8c3e5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+========
 guid: c9e3d40f8ac19e44e99108fc092ae6bb
 NativeFormatImporter:
   externalObjects: {}
   mainObjectFileID: 11400000
+>>>>>>>> main:Assets/ProjectSettings/UIParticleProjectSettings.asset.meta
   userData: 
   assetBundleName: 
   assetBundleVariant: 

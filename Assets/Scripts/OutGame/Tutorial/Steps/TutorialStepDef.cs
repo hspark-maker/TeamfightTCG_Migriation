@@ -231,7 +231,8 @@ public class TutorialStepDef
     // 축이 액션이 아니라 앵커라 테이블 밖에 남는다.
     public static bool UsesAnchorCard(EOutgameTutorialAnchor _anchor)
         => _anchor == EOutgameTutorialAnchor.AlbumThemeCell
-        || _anchor == EOutgameTutorialAnchor.AlbumCardSlot;
+        || _anchor == EOutgameTutorialAnchor.AlbumCardSlot
+        || _anchor == EOutgameTutorialAnchor.DeckEditCollectionCard;
 
     // 이 액션이 값을 무는가(안내가 대신 내줄 수 있는 자리 = 성장 한 방을 시키는 스텝)
     public static bool UsesFreeOfCharge(EOutgameTutorialAction _action) => Uses(_action, EStepField.FreeOfCharge);

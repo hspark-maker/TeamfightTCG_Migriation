@@ -32,6 +32,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitKeywordEnhance:
             case EOutgameTutorialAction.WaitLobbyReturn:
             case EOutgameTutorialAction.WaitCardDetailReturn:
+            case EOutgameTutorialAction.WaitDeckEquip:
                 return EOutgameTutorialStepResult.Gated;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);

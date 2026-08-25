@@ -256,6 +256,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 완료는 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로 겸 연출 관람로).
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Purchase
                             || m_step.Completion == EOutgameTutorialCompletion.Enhance
+                            || m_step.Completion == EOutgameTutorialCompletion.DeckEquip
             ? null
             : (Action)OnGateSatisfied;
 
@@ -318,6 +319,16 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnAlbumInsertFinished()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.AlbumInsert) return;
+
+        OnGateSatisfied();
+    }
+
+    // 지목한 카드가 덱에 들어갔는가. anchorCard가 있으면 그 카드만 인정한다 — 아무 카드나 끼워도 넘어가면
+    // "이 카드를 골라라"라는 안내가 거짓말이 된다.
+    void OnDeckCardEquipped(CardData _card)
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckEquip) return;
+        if (m_step.AnchorCard != null && _card != m_step.AnchorCard) return;
 
         OnGateSatisfied();
     }
@@ -535,6 +546,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
+        DeckEditController.OnAnyCardEquipped  += OnDeckCardEquipped;
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
@@ -560,6 +572,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
+        DeckEditController.OnAnyCardEquipped  -= OnDeckCardEquipped;
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
