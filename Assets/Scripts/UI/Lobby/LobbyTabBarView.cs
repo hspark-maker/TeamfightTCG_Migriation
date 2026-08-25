@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -16,6 +16,9 @@ public sealed class LobbyTabBarView : MonoBehaviour
     [SerializeField] bool focusSpinClockwise = true;
     [Tooltip("알약이 선택 탭 자리로 미끄러지는 시간(초). 0이면 즉시 이동")]
     [SerializeField] float focusSlideSeconds = 0.22f;
+
+    /// <summary>알약 아이콘 표시 박스. 탭 아이콘 크기를 따라가지 않는다.</summary>
+    static readonly Vector2 FOCUS_ICON_SIZE = new Vector2(150f, 150f);
 
     readonly List<string> m_labels = new List<string>();
     TabButtonView[] m_views;
@@ -119,7 +122,10 @@ public sealed class LobbyTabBarView : MonoBehaviour
         if (focusIcon != null && t_icon != null)
         {
             focusIcon.sprite = t_icon.sprite;
-            focusIcon.rectTransform.sizeDelta = t_icon.rectTransform.sizeDelta;
+            // 크기는 탭에서 복사하지 않는다 — 탭마다 다른 sizeDelta·localScale이 그대로 옮겨와
+            // 알약 아이콘 폭이 두 배 넘게 벌어졌다. 고정 박스로 통일하고 스케일도 1로 눕힌다.
+            focusIcon.rectTransform.sizeDelta = FOCUS_ICON_SIZE;
+            focusIcon.rectTransform.localScale = Vector3.one;
         }
         if (focusLabel != null) focusLabel.text = m_labels[_index];
 
