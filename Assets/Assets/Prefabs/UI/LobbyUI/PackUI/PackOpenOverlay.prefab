@@ -1588,7 +1588,7 @@ MonoBehaviour:
   retryButton: {fileID: 537972317038493544}
   retryPriceText: {fileID: 8533393836143872618}
   retryPriceIcon: {fileID: 155727533404957297}
-  disabledPlate: {fileID: 21300000, guid: fdde60a141a004135a65e1d7c313a5a1, type: 3}
+  disabledPlate: {fileID: 0}
   shortPriceColor: {r: 0.95, g: 0.3, b: 0.28, a: 1}
   normalPriceColor: {r: 1, g: 1, b: 1, a: 1}
   currencyBar: {fileID: 8660306863430282596}
@@ -2413,6 +2413,9 @@ MonoBehaviour:
   iconImage: {fileID: 6472546636935697840}
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
+  rollDuration: 0.22
+  rollEase: 27
+  lendHoldDuration: 3
   spendRollDuration: 0.55
   spendPressScale: 0.92
   spendHoldScale: 1.15
@@ -3073,6 +3076,9 @@ MonoBehaviour:
   iconImage: {fileID: 3715868352907658075}
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
+  rollDuration: 0.22
+  rollEase: 27
+  lendHoldDuration: 3
   spendRollDuration: 0.55
   spendPressScale: 0.92
   spendHoldScale: 1.15
@@ -3282,6 +3288,9 @@ MonoBehaviour:
   iconImage: {fileID: 7431292631560757856}
   registerAsPrimary: 0
   punchTarget: {fileID: 0}
+  rollDuration: 0.22
+  rollEase: 27
+  lendHoldDuration: 3
   spendRollDuration: 0.55
   spendPressScale: 0.92
   spendHoldScale: 1.15

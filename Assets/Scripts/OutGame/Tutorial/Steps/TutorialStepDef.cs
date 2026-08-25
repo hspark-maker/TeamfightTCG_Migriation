@@ -17,6 +17,14 @@ public class TutorialStepDef
     [Tooltip("안내 타깃 위젯. 액션에 따라 누를 대상이거나 강조만 할 영역이다")]
     [SerializeField] EOutgameTutorialAnchor anchor;
 
+    [Tooltip("누를 타깃과 **함께** 딤 위로 올려 보여 줄 영역(눌리지는 않는다 — 클릭은 위 anchor 하나로만 끝난다).\n"
+           + "\"이걸 보고 저걸 눌러라\"가 성립해야 하는 자리에 쓴다 — 예: 완성된 덱 6칸을 보여 주며 전투 버튼을 누르게 한다.\n"
+           + "영역 안에 카드가 있으면 영역째가 아니라 카드만 올라온다(패널 프레임·수치가 딸려 올라오면 무엇을 보라는지 흐려진다).\n"
+           + "· 비우면(None) 종전대로 타깃만 올라온다.\n"
+           + "· 아직 등록되지 않은 영역을 골라도 진행은 막지 않는다 — 강조 없이 그대로 흐른다.\n"
+           + "⚠ 스크롤 안쪽 영역은 고르지 마라 — 딤 위로 끌어올리면 뷰포트 잘라내기가 끊겨 내용이 화면 밖으로 샌다")]
+    [SerializeField] EOutgameTutorialAnchor spotlight;
+
     [Tooltip("게이트 배너 문구. 비우면 배너를 띄우지 않는다")]
     [TextArea][SerializeField] string guideMessage;
 
@@ -175,6 +183,9 @@ public class TutorialStepDef
     // 안내 타깃(앵커를 쓰지 않는 액션은 저작값이 남아 있어도 None으로 본다)
     public EOutgameTutorialAnchor Anchor => UsesAnchor(action) ? anchor : EOutgameTutorialAnchor.None;
 
+    // 타깃과 함께 밝힐 영역(누르는 자리가 아니다 — 강조를 얹지 않는 액션은 저작값이 남아 있어도 None으로 본다)
+    public EOutgameTutorialAnchor Spotlight => UsesSpotlight(action) ? spotlight : EOutgameTutorialAnchor.None;
+
     // 이 액션의 메타(완료 조건·씬 이탈·저작 필드) — 아래 파생값의 유일한 출처다.
     TutorialActionMeta Meta => TutorialActionMeta.Of(action);
 
@@ -216,6 +227,9 @@ public class TutorialStepDef
 
     // 이 액션이 앵커를 쓰는가(런타임 판정과 드로어의 필드 노출이 공유)
     public static bool UsesAnchor(EOutgameTutorialAction _action) => Uses(_action, EStepField.Anchor);
+
+    // 이 액션이 타깃 외에 "읽을 영역"을 함께 밝히는가(딤 위로 올릴 딤이 있는 클릭 게이트만 — 설명 스텝은 앵커 자체가 그 영역이다)
+    public static bool UsesSpotlight(EOutgameTutorialAction _action) => Uses(_action, EStepField.Spotlight);
 
     // 이 액션이 안내 문구를 띄우는가(자동 스텝은 화면에 아무것도 그리지 않는다)
     public static bool ShowsGuideMessage(EOutgameTutorialAction _action) => Uses(_action, EStepField.GuideMessage);
