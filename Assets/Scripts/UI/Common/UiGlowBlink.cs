@@ -36,6 +36,12 @@ public class UiGlowBlink : MonoBehaviour
     UIEffect m_effect;
     bool m_resolved;
 
+    // 런타임에 받은 위상. 저작값(phase)을 덮어쓰지 않는다 — 덮어쓰면 에디트 모드 호출에 인스펙터 값이 조용히 사라진다.
+    float? m_phaseOverride;
+
+    /// <summary>시작 위상을 런타임에 준다. 같은 화면에 여럿 켤 때 호출자가 순번으로 흩뿌린다.</summary>
+    public void SetPhase(float _phase) => this.m_phaseOverride = Mathf.Repeat(_phase, 1f);
+
     void Awake() => this.Resolve();
 
     void OnEnable()
@@ -61,7 +67,8 @@ public class UiGlowBlink : MonoBehaviour
     {
         if (this.m_effect == null) return;
 
-        float t_wave = (Mathf.Sin((_time + this.phase * this.period) * Mathf.PI * 2f / this.period) + 1f) * 0.5f;
+        float t_phase = this.m_phaseOverride ?? this.phase;
+        float t_wave  = (Mathf.Sin((_time + t_phase * this.period) * Mathf.PI * 2f / this.period) + 1f) * 0.5f;
 
         this.m_effect.colorIntensity = Mathf.Lerp(this.intensityLow, this.intensityHigh, t_wave);
     }
