@@ -1748,7 +1748,7 @@ UI에 손댈 것이 없는 이유:
 
 #### 그 밖에 열려 있는 자리
 
-- **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
+- **내 닉네임·아바타·프레임**은 `ProfileManager`가 진실원이고 **`UserSaveData.profile` 슬롯에 영속화된다**(2026-08-25). `MatchProfile.OfLocalPlayer`가 그 값을 읽는다 — 옛 `MatchProfile.LOCAL_NICKNAME = "나"` 상수는 없어졌다. 슬롯 추가라 **`VERSION`은 6 유지**(위 규약과 같다). 세이브에 남은 id가 `ProfileConfig`에서 사라졌으면 `Default*Id`로 폴백한다.
 - **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
 - **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.
 # Firestore save migration T0 (2026-08-25)
