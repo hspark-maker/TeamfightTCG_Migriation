@@ -1,6 +1,18 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+# Unity YAML(프리팹·씬·에셋)은 텍스트 3-way 머지로 합치면 중첩 프리팹 오버라이드가
+# 뒤섞여 조용히 깨진다. UnityYAMLMerge(SmartMerge)가 fileID 단위로 합치게 한다.
+#
+# ⚠ merge=unityyamlmerge도 드라이버 등록이 있어야 동작한다. 클론한 사람마다 1회:
+#     git config merge.unityyamlmerge.name "Unity SmartMerge"
+#     git config merge.unityyamlmerge.driver '"C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Data/Tools/UnityYAMLMerge.exe" merge -p %O %B %A %A'
+#     git config merge.unityyamlmerge.recursive binary
+#   등록 안 하면 예전처럼 텍스트 머지로 처리될 뿐 즉시 손상되지는 않는다.
+*.prefab merge=unityyamlmerge
+*.unity  merge=unityyamlmerge
+*.asset  merge=unityyamlmerge
+
 # TMP 동적 폰트 에셋 — 에디터에서 플레이할 때마다 화면에 뜬 글자가 아틀라스 캐시로 파일에 적힌다.
 # 34MB짜리가 사람마다 다르게 자라 매 머지 충돌하는데, 정작 빌드에는 쓸모가 없다
 # (전부 m_ClearDynamicDataOnBuild: 1 — 빌드가 지우고 런타임이 다시 채운다).
@@ -12,8 +24,6 @@
 # ⚠ merge=ours는 드라이버 등록이 있어야 동작한다. 클론한 사람마다 1회:
 #     git config merge.ours.driver true
 #   등록 안 하면 예전처럼 충돌만 날 뿐 손상되지는 않는다.
+# ⚠ 이 두 줄은 위의 *.asset 규칙보다 뒤에 있어야 한다 — gitattributes는 마지막 일치가 이긴다.
 Assets/Fonts/**/*.asset          -text merge=ours
 Assets/Resources/Fonts/*.asset   -text merge=ours
-
-# Unity prefab YAML must use Smart Merge to keep nested-prefab edits reviewable.
-*.prefab merge=unityyamlmerge

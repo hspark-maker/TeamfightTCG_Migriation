@@ -51,7 +51,7 @@ public sealed class DeckEditData : UIData
 // 풀드 UI다. 예전에는 로비 탭 안에 한 벌, 매치 오버레이 안에 한 벌(MatchDeckEditPanel 배리언트) —
 // 저작본이 둘로 갈려 레이아웃 오버라이드가 쌓였다. 지금은 UIPoolManager가 세우는 인스턴스 하나뿐이고
 // 두 호스트의 차이는 전부 DeckEditData로 들어온다.
-public class DeckEditController : PooledUIBase
+public class DeckEditController : PooledUIBase, IPointerClickHandler
 {
     [SerializeField] TMP_InputField    nameInput;      // 덱 이름 입력/표시
     [SerializeField] Button            backButton;
@@ -107,6 +107,10 @@ public class DeckEditController : PooledUIBase
 
     // 이번 편집에서 일부러 빼 둔 카드. 유저가 도로 끼우면 null로 돌아간다.
     CardData m_holdout;
+
+    // 슬롯 선택 모드에서 교체될 차례를 기다리는 카드. null이면 평상시다.
+    // 편성 진실원(m_working)과 달리 이건 화면 조작 상태라 저장·dirty와 무관하다.
+    CardData m_pendingSwapCard;
 
     /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
@@ -200,12 +204,16 @@ public class DeckEditController : PooledUIBase
     {
         bool t_focusing = _synergy != null;
 
+        // 두 강조는 같은 알파 축을 쓴다 — 겹쳐 두면 시너지 롱프레스를 떼는 순간 슬롯 선택 딤까지 같이 풀려
+        // "모드는 켜졌는데 화면은 평상시"가 된다. 나중에 들어온 시너지 강조에 자리를 내준다.
+        if (t_focusing) CancelSlotPick();
+
         if (slots != null)
         {
             for (int t_i = 0; t_i < slots.Length; t_i++)
             {
                 if (slots[t_i] == null) continue;
-                slots[t_i].SetSynergyFocus(t_focusing, SynergyPreview.Has(slots[t_i].Card, _synergy));
+                slots[t_i].SetFocus(t_focusing, SynergyPreview.Has(slots[t_i].Card, _synergy));
             }
         }
 
@@ -214,6 +222,10 @@ public class DeckEditController : PooledUIBase
             collectionGrid.SetSynergyFocus(_synergy);
             collectionGrid.SetScrollLocked(t_focusing);
         }
+
+        // 강조를 걷은 자리에 모드 신호를 되돌린다. 손을 떼는 쪽은 위 CancelSlotPick을 타지 않으므로
+        // (멀티터치로 시너지 강조 중에 모드로 들어간 경우) 컬렉션 딤만 지워진 반쪽 화면이 남는다.
+        if (!t_focusing) ApplySlotPickVisual();
     }
 
     /// <summary>풀이 넘긴 진입 요청을 받아둔다. 실제 열기는 <see cref="Show"/>다 —
@@ -369,6 +381,8 @@ public class DeckEditController : PooledUIBase
         m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
 
+        m_pendingSwapCard = null;
+
         if (dragController != null) dragController.Cancel();
         if (collectionGrid != null) collectionGrid.Clear();
         if (synergyStrip   != null) synergyStrip.Clear();
@@ -415,6 +429,7 @@ public class DeckEditController : PooledUIBase
         m_dirty     = false;
         m_savedName = null;
         Array.Clear(m_working, 0, m_working.Length);
+        m_pendingSwapCard = null;
 
         if (dragController != null) dragController.Cancel();
         if (synergyStrip   != null) synergyStrip.Clear();
@@ -509,6 +524,8 @@ public class DeckEditController : PooledUIBase
     {
         if (_tile == null || dragController == null) return;
 
+        CancelSlotPick();   // 끌기 시작하면 놓을 칸은 손끝이 정한다 — 고르라는 신호가 남아 있을 이유가 없다
+
         // 고스트 크기는 그리드가 정한다 — 매치 패널은 GridRatioFitter가 cellSize를 런타임에 계산한다.
         dragController.Begin(_tile.Card,
                              _data,
@@ -516,7 +533,9 @@ public class DeckEditController : PooledUIBase
                              collectionGrid != null ? collectionGrid.CellSize  : default);
     }
 
-    // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.
+    // 컬렉션 칸 클릭 = 앞쪽 빈 칸에 자동 배치(드래그의 지름길). 빈 칸이 없으면 슬롯 선택 모드로 넘어간다 —
+    // 예전에는 여기서 조용히 물러나, 6칸을 채우고 나면 롱프레스 드래그 말고는 교체할 방법이 없었다.
+    // 이미 편성된 카드는 타일에서 걸러 여기 오지 않는다.
     // 배치는 AssignSlot에 위임한다 — 덱 내 중복 제거·dirty·재갱신을 드래그 드롭과 같은 경로로 태우기 위함이다.
     void OnTileClicked(DeckEditCardTile _tile)
     {
@@ -529,10 +548,64 @@ public class DeckEditController : PooledUIBase
         // 카드가 칸에 꽂히는 상태는 만들지 않는다.
         if (dragController != null && dragController.IsDragging) return;
 
-        int t_empty = FindFirstEmpty();
-        if (t_empty < 0) return;   // 6칸이 다 찼다 — 카운터와 자동편성 버튼 비활성으로 이미 드러나 있으므로 조용히 무시
+        // 고른 카드를 한 번 더 누르면 취소. 다른 카드를 누르면 아래에서 대상만 갈아탄다.
+        if (m_pendingSwapCard == _tile.Card) { CancelSlotPick(); return; }
 
+        int t_empty = FindFirstEmpty();
+
+        // 6칸이 다 찼다 — 어느 칸을 내줄지는 유저가 고른다.
+        if (t_empty < 0) { EnterSlotPick(_tile.Card); return; }
+
+        // 빈 칸이 있으면 고를 것이 없다. 모드 중에 칸이 비는 경로(슬롯 해제·전체 해제)가 있어 여기서도 내려둔다.
+        CancelSlotPick();
         AssignSlot(t_empty, _tile.Card);
+    }
+
+    // 교체를 기다리는 카드를 세운다. 편성(m_working)은 유저가 칸을 고를 때까지 그대로다 —
+    // 이 모드가 바꾸는 것은 "다음 클릭의 뜻"과 화면 신호뿐이다.
+    void EnterSlotPick(CardData _card)
+    {
+        if (_card == null) return;
+
+        m_pendingSwapCard = _card;
+        ApplySlotPickVisual();
+    }
+
+    // 슬롯 선택 모드 해제. 편성은 건드리지 않는다.
+    void CancelSlotPick()
+    {
+        if (m_pendingSwapCard == null) return;   // 평상시 클릭마다 그리드 전체를 되칠할 이유가 없다
+
+        m_pendingSwapCard = null;
+        ApplySlotPickVisual();
+    }
+
+    // 모드 신호를 화면에 칠한다: 고르지 않은 컬렉션 카드를 눌러 딤을 깔고, 그 위로 편성 6칸과 고른 카드를
+    // 함께 띄운다 — 눌러야 할 것(6칸)과 들고 있는 것(고른 카드)이 같은 층에 남는다.
+    // 테두리(highlightFrame)는 쓰지 않는다 — 그건 드래그 오버 전용 신호다.
+    // 슬롯 재바인딩(Bind)과 컬렉션 착용딤(RefreshInDeck)이 이 표시를 원상복구하므로 반드시 그 뒤에 불러야 한다.
+    void ApplySlotPickVisual()
+    {
+        bool t_picking = m_pendingSwapCard != null;
+
+        if (slots != null)
+        {
+            // 6칸은 전부 골라야 할 대상이라 가려낼 것이 없다(_match는 항상 true).
+            for (int t_i = 0; t_i < slots.Length; t_i++)
+                if (slots[t_i] != null) slots[t_i].SetFocus(t_picking, true);
+        }
+
+        if (collectionGrid != null) collectionGrid.SetPickedCard(m_pendingSwapCard);
+    }
+
+    /// <summary>패널 여백 클릭 = 슬롯 선택 취소. 슬롯·컬렉션 타일·버튼은 자기 자리에서 클릭을 소비하므로
+    /// 여기까지 올라오지 않는다 — 취소 전용 풀스크린 캐처를 따로 세울 필요가 없다.</summary>
+    public void OnPointerClick(PointerEventData _data)
+    {
+        // 입력 모듈은 우클릭·휠클릭에도 클릭 핸들러를 태운다(DeckEditCardTile.OnPointerClick과 같은 이유).
+        if (_data != null && _data.button != PointerEventData.InputButton.Left) return;
+
+        CancelSlotPick();
     }
 
     // 편성 칸에 카드를 놓는다. 같은 카드가 이미 다른 칸에 있으면 복사가 아니라 이동이다(덱 내 중복 금지).
@@ -564,8 +637,21 @@ public class DeckEditController : PooledUIBase
         OnAnyCardEquipped?.Invoke(_card);
     }
 
-    // 편성 칸 클릭 = 해제.
-    public void ClearSlot(int _slotIndex)
+    // 편성 칸 클릭. 뜻은 모드가 정한다 — 평상시엔 해제, 슬롯 선택 모드에선 고른 카드와 교체.
+    // 교체 전용 경로를 따로 두지 않는다: AssignSlot의 덧씌우기가 곧 교체다(드래그 드롭도 같은 길을 탄다).
+    void OnSlotClicked(int _slotIndex)
+    {
+        if (m_pendingSwapCard == null) { ClearSlot(_slotIndex); return; }
+
+        var t_card = m_pendingSwapCard;
+
+        // AssignSlot이 부르는 RefreshAll보다 먼저 내려야 교체 결과 위에 강조가 남지 않는다.
+        CancelSlotPick();
+        AssignSlot(_slotIndex, t_card);
+    }
+
+    // 편성 칸 해제. 유일한 호출자는 OnSlotClicked다(슬롯은 코드에서만 Bind로 배선된다).
+    void ClearSlot(int _slotIndex)
     {
         if (_slotIndex < 0 || _slotIndex >= m_working.Length) return;
         if (m_working[_slotIndex] == null) return;   // 빈 칸 클릭으로 dirty가 서면 나갈 때 불필요한 파일 쓰기가 생긴다
@@ -577,6 +663,10 @@ public class DeckEditController : PooledUIBase
 
     public void ClearAll()
     {
+        // 편성이 통째로 바뀌면 "6칸이 다 차서 고르는 중"이라는 모드의 전제가 사라진다.
+        // 남겨두면 빈 칸이 생긴 덱에서 다음 슬롯 탭이 교체가 아니라 이동이 되어 덱에 구멍이 난다.
+        CancelSlotPick();
+
         if (CountFilled() == 0) return;   // 이미 비어 있으면 dirty를 세우지 않는다
 
         Array.Clear(m_working, 0, m_working.Length);
@@ -589,6 +679,8 @@ public class DeckEditController : PooledUIBase
     // 채우는 순서는 체력 내림차순이다(마스터 등록 순서가 아니다) — "자동 편성"이 곧 "맨 앞 6장"이 되지 않게.
     public void AutoEquip()
     {
+        CancelSlotPick();   // ClearAll과 같은 이유 — 편성을 갈아엎고 나면 고르는 중이던 전제가 남지 않는다
+
         bool t_changed = false;
 
         // 튜토리얼이 지정한 덱이 최우선. 저작 의도가 소유 판정보다 앞서므로 미소유여도 경고만 남기고 채운다.
@@ -655,7 +747,7 @@ public class DeckEditController : PooledUIBase
             // 씬에서 칸을 덜 배선했거나 더 붙였을 수 있다 — 짧은 쪽 기준으로 돈다.
             int t_count = Mathf.Min(slots.Length, m_working.Length);
             for (int t_i = 0; t_i < t_count; t_i++)
-                if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], ClearSlot);
+                if (slots[t_i] != null) slots[t_i].Bind(t_i, m_working[t_i], OnSlotClicked);
         }
 
         if (collectionGrid != null)
@@ -672,6 +764,11 @@ public class DeckEditController : PooledUIBase
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
                                                                    && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);
         RefreshSaveButton();
+
+        // 위 재바인딩이 하이라이트·알파를 전부 원상복구한 뒤라야 모드 신호가 살아남는다.
+        // 평상시에 되칠하지 않는 이유: 해제는 CancelSlotPick이 이미 했고, 여기서 한 번 더 지우면
+        // 시너지 강조 도중 재갱신이 끼었을 때(해금·소유 변동) 그 강조까지 같이 걷힌다.
+        if (m_pendingSwapCard != null) ApplySlotPickVisual();
     }
 
     /// <summary>저장 버튼은 <b>바꾼 게 있을 때만</b> 눌린다. 미완성이어도 눌리게 두는 이유는,
@@ -808,6 +905,8 @@ public class DeckEditController : PooledUIBase
     void OnSaveClicked()
     {
         if (!IsOpen) return;
+
+        CancelSlotPick();   // 저장은 편성을 확정하는 사건이다 — 끝난 화면이 계속 칸을 고르라고 말하지 않게
 
         // 미완성은 저장하지 않는다 — 6장 미만으로 세이브를 덮으면 IsSlotValid가 false가 되어
         // 목록에서 그 덱이 통째로 사라진다(RequestLeave의 미완성 분기와 같은 이유).

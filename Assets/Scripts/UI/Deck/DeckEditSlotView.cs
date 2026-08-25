@@ -68,9 +68,10 @@ public class DeckEditSlotView : MonoBehaviour
         if (highlightFrame != null) highlightFrame.SetActive(_on);
     }
 
-    // 시너지 아이콘 롱프레스 중 호출. _match면 살짝 키워 띄우고, 아니면 흐리게 눌러 대비를 만든다.
+    // 칸을 흐리게 눌러 대비를 만든다(_match면 반대로 살짝 키워 띄운다).
+    // 시너지 강조와 슬롯 선택 모드가 함께 쓴다 — 두 강조는 배타라 알파 축을 공유해도 안전하다.
     // 테두리(highlightFrame)는 쓰지 않는다 — 그건 드래그 오버 전용 신호로 남긴다.
-    public void SetSynergyFocus(bool _focusing, bool _match)
+    public void SetFocus(bool _focusing, bool _match)
     {
         if (canvasGroup != null) canvasGroup.alpha = _focusing && !_match ? FOCUS_DIM_ALPHA : 1f;
 

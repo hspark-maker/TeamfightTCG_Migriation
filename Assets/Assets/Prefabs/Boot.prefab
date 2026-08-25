@@ -51,6 +51,7 @@ MonoBehaviour:
   cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
   albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
   currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
+  currencyHudLook: {fileID: 11400000, guid: dc7f233057744a44c850f04f9733b008, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
   triggeredTutorialData: {fileID: 0}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}

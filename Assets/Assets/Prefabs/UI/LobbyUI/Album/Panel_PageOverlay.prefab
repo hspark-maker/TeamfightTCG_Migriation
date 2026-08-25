@@ -1249,7 +1249,7 @@ MonoBehaviour:
   closeButton: {fileID: 4710797006238417973}
   pageGauge:
     fill: {fileID: 0}
-    fillRect: {fileID: 0}
+    fillRect: {fileID: 7158167857562711680}
     label: {fileID: 6526349891250661130}
   pageChest:
     button: {fileID: 4080383840422864266}
