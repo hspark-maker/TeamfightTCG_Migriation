@@ -35,17 +35,17 @@ public static class DeckPower
         CardGrowth t_growth = _mine
             ? CardGrowthManager.GrowthOf(_card)
             : CardGrowthManager.GrowthAtLevel(_card, LevelOf(_card, false));
-        return _card.maxHp + t_growth.HpBonus;
+        return CardCatalog.RequireSpec(_card).MaxHp + t_growth.HpBonus;
     }
 
     // 카드 1장의 파워(null은 0)
     public static int Of(CardData _card, bool _mine = true)
-        => _card != null ? MaxHpOf(_card, _mine) + _card.bonusHp : 0;
+        => _card != null ? MaxHpOf(_card, _mine) : 0;
 
     /// <summary>지정한 레벨에 선 카드의 표시용 최대 체력. 레벨을 랭크 티어가 아니라 <b>저작이</b> 정하는
     /// 상대(토너먼트 정점)를 위한 길이다 — LevelOf는 내 랭크를 읽으므로 그쪽으로 가면 정점마다 같은 수가 나온다.</summary>
     public static int MaxHpAtLevel(CardData _card, int _level)
-        => _card != null ? _card.maxHp + CardGrowthManager.GrowthAtLevel(_card, _level).HpBonus : 0;
+        => _card != null ? CardCatalog.RequireSpec(_card).MaxHp + CardGrowthManager.GrowthAtLevel(_card, _level).HpBonus : 0;
 
     /// <summary>덱 전체가 지정한 레벨에 섰을 때의 파워 합. 정점의 권장 전투력이 여기서 나온다 —
     /// 난이도를 SO에 따로 저작하면 적 덱을 고칠 때마다 두 수가 어긋난다.</summary>
@@ -59,7 +59,7 @@ public static class DeckPower
             CardData t_card = _deck[t_i];
             if (t_card == null) continue;
 
-            t_sum += MaxHpAtLevel(t_card, _level) + t_card.bonusHp;
+            t_sum += MaxHpAtLevel(t_card, _level);
         }
 
         return t_sum;

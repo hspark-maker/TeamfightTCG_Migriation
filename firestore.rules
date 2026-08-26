@@ -1,42 +1,14 @@
 rules_version = '2';
 
+// =====================================================================
+// 개발용 임시 규칙 — 전면 개방. 절대 운영 프로젝트에 배포하지 말 것.
+// 실제 규칙은 firestore.rules.prod 에 보존되어 있다.
+// 스펙 데이터 이관 툴 작업이 끝나면 .prod 를 되돌려 배포한다.
+// =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/save/{profileId} {
-      function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      function isKnownProfile() {
-        return profileId == 'current' || profileId == 'test';
-      }
-
-      function isValidSave() {
-        return request.resource.data.keys().hasOnly([
-          'schemaVersion', 'revision', 'payload', 'payloadHash',
-          'updatedAt', 'deviceId', 'appVersion'
-        ]) &&
-        request.resource.data.schemaVersion is int &&
-        request.resource.data.schemaVersion > 0 &&
-        request.resource.data.revision is int &&
-        request.resource.data.payload is string &&
-        request.resource.data.payload.size() <= 300000 &&
-        request.resource.data.payloadHash is string &&
-        request.resource.data.payloadHash.size() == 16 &&
-        request.resource.data.deviceId is string &&
-        request.resource.data.deviceId.size() == 32 &&
-        request.resource.data.appVersion is string &&
-        request.resource.data.appVersion.size() <= 64 &&
-        request.resource.data.updatedAt == request.time;
-      }
-
-      allow read: if isOwner() && isKnownProfile();
-      allow create: if isOwner() && isKnownProfile() && isValidSave() &&
-                    request.resource.data.revision == 1;
-      allow update: if isOwner() && isKnownProfile() && isValidSave() &&
-                    request.resource.data.schemaVersion >= resource.data.schemaVersion &&
-                    request.resource.data.revision == resource.data.revision + 1;
-      allow delete: if false;
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

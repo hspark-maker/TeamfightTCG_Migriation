@@ -32,7 +32,7 @@ public class CardAuthoringWindow : EditorWindow
     int         newBonusHp;
     CardKeyword newKeywords = CardKeyword.None;
     readonly List<SynergyData> newSynergies = new List<SynergyData>();
-    Sprite battleImage, deckPreview;
+    Sprite baseArt;
 
     Vector2 scroll;
     int     tab;
@@ -107,8 +107,7 @@ public class CardAuthoringWindow : EditorWindow
 
         EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("이미지 (나중에 채워도 됨)", EditorStyles.boldLabel);
-        this.battleImage = (Sprite)EditorGUILayout.ObjectField("battleImage", this.battleImage, typeof(Sprite), false);
-        this.deckPreview = (Sprite)EditorGUILayout.ObjectField("deckPreview", this.deckPreview, typeof(Sprite), false);
+        this.baseArt = (Sprite)EditorGUILayout.ObjectField("arts[0] (미진화)", this.baseArt, typeof(Sprite), false);
 
         EditorGUILayout.Space(10);
         string t_err = ValidateNew();
@@ -156,8 +155,8 @@ public class CardAuthoringWindow : EditorWindow
         t_card.maxHp       = this.newMaxHp;
         t_card.bonusHp     = this.newBonusHp;
         t_card.keywords    = this.newKeywords;
-        t_card.battleImage = this.battleImage;
-        t_card.deckPreview = this.deckPreview;
+        t_card.arts    = new CardArtSet[CardData.MaxEvolutionStage + 1];
+        t_card.arts[0] = new CardArtSet { battleImage = this.baseArt };
 
         var t_syn = new List<SynergyData>();
         foreach (var s in this.newSynergies)
@@ -181,7 +180,7 @@ public class CardAuthoringWindow : EditorWindow
 
         this.newName = ""; this.newDisplayName = "";
         this.newSynergies.Clear();
-        this.battleImage = this.deckPreview = null;
+        this.baseArt = null;
     }
 
     // ── 등록 상태 점검 ─────────────────────────────────────────────────────

@@ -61,8 +61,9 @@ public static class MatchGrowthValidation
     {
         if (_card == null) { _error = "카드가 null"; return false; }
         if (_card.id <= 0) { _error = $"카드 ID 오류({_card.id})"; return false; }
+        if (!CardCatalog.Contains(_card.id)) { _error = $"현재 프로필에 없는 카드({_card.id})"; return false; }
         if (!_growth.Applied) { _error = $"레벨 오류({_growth.Level})"; return false; }
-        if (_growth.HpBonus < 0 || _growth.HpBonus > int.MaxValue - _card.maxHp)
+        if (_growth.HpBonus < 0 || _growth.HpBonus > int.MaxValue - CardCatalog.RequireSpec(_card).MaxHp)
         {
             _error = $"HP 보너스 오류({_growth.HpBonus})";
             return false;

@@ -53,15 +53,28 @@ public class BootInstaller : MonoBehaviour
             return;
         }
 
-        s_booted = true;
         DontDestroyOnLoad(gameObject);
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
-        ContentProfileConfig t_profile = ContentProfileConfig.Active;
-        var t_availableCards = new System.Collections.Generic.List<CardData>(
-            cardRegistry.Available(t_profile.IncludeTestCards));
-        CardCatalog.SetSource(t_availableCards);
+        ContentProfileConfig t_profile;
+        System.Collections.Generic.List<CardData> t_availableCards;
+        try
+        {
+            t_profile = ContentProfileConfig.Active;
+            SpecSource.Init();
+            CardCatalog.SetSource(cardRegistry.All, t_profile.RunMode, t_profile.IncludeTestCards);
+            t_availableCards = new System.Collections.Generic.List<CardData>(CardCatalog.All);
+        }
+        catch (System.Exception t_exception)
+        {
+            GameManager.MarkRecoveryRequired();
+            Debug.LogException(t_exception);
+            Destroy(gameObject);
+            return;
+        }
+
+        s_booted = true;
 
         // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.

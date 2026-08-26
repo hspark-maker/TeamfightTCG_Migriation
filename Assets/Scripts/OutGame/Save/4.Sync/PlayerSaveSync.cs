@@ -16,11 +16,13 @@ static class PlayerSaveSync
     const int TRANSACTION_TIMEOUT_MS = 10000;
     const int PAYLOAD_WARNING_BYTES = 256 * 1024;
     const int PAYLOAD_MAX_BYTES = 300000;
+    const string ENV_ROOT_COLLECTION = "envs";
+    const string SAVE_DOC_ID = "current";
 
     static FirebaseFirestore s_firestore;
     static readonly Dictionary<string, string> s_uploadedHashes = new();
     static string s_activeUserId;
-    static string s_profileId;
+    static string s_envId;
     static string s_pendingPayload;
     static int s_pendingVersion;
     static int s_generation;
@@ -43,7 +45,7 @@ static class PlayerSaveSync
         s_gateComplete = true;
     }
 
-    internal static void Initialize(string _profileId, bool _uploadAllowed)
+    internal static void Initialize(string _envId, bool _uploadAllowed)
     {
         Shutdown();
 
@@ -51,7 +53,7 @@ static class PlayerSaveSync
         s_uploadAllowed = _uploadAllowed;
         s_remoteWriteApproved = false;
         s_gateComplete = false;
-        s_profileId = _profileId;
+        s_envId = _envId;
         s_activeUserId = FirebaseAuthService.Instance.IsCurrentUserActive
             ? FirebaseAuthService.Instance.UserId
             : string.Empty;
@@ -103,7 +105,7 @@ static class PlayerSaveSync
     {
         Shutdown();
         s_firestore = null;
-        s_profileId = string.Empty;
+        s_envId = string.Empty;
         s_pendingPayload = string.Empty;
         s_lastKnownRevision = -1;
         s_lastKnownRemoteHash = string.Empty;
@@ -212,7 +214,7 @@ static class PlayerSaveSync
             }
 
             string t_userId = FirebaseAuthService.Instance.UserId;
-            string t_profileId = s_profileId;
+            string t_envId = s_envId;
             string t_ownerUid = PlayerPrefs.GetString(OWNER_UID_KEY, string.Empty);
             if (DataSaveManager.HasLocalSave &&
                 !string.IsNullOrEmpty(t_ownerUid) &&
@@ -228,7 +230,7 @@ static class PlayerSaveSync
             await InspectRemoteAsync(
                 _generation,
                 t_userId,
-                t_profileId,
+                t_envId,
                 t_localPayload,
                 t_hasLocalSave);
         }
@@ -250,27 +252,27 @@ static class PlayerSaveSync
     static async UniTask InspectRemoteAsync(
         int _generation,
         string _userId,
-        string _profileId,
+        string _envId,
         string _localPayload,
         bool _hasLocalSave)
     {
         PullState = ESavePullState.Pulling;
-        Task<DocumentSnapshot> t_readTask = Document(_userId, _profileId).GetSnapshotAsync(Source.Server);
+        Task<DocumentSnapshot> t_readTask = Document(_userId, _envId).GetSnapshotAsync(Source.Server);
         Task t_completedTask = await Task.WhenAny(t_readTask, Task.Delay(PULL_TIMEOUT_MS));
         if (t_completedTask != t_readTask)
         {
             ObserveLateReadAsync(t_readTask).Forget();
-            if (!SessionMatches(_generation, _userId, _profileId)) return;
+            if (!SessionMatches(_generation, _userId, _envId)) return;
 
             PullState = ESavePullState.TimedOut;
             LastDecision = ESaveReconcileDecision.None;
             s_gateComplete = true;
-            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Remote read timed out. profile={_profileId}");
+            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Remote read timed out. env={_envId}");
             return;
         }
 
         DocumentSnapshot t_snapshot = await t_readTask;
-        if (!SessionMatches(_generation, _userId, _profileId))
+        if (!SessionMatches(_generation, _userId, _envId))
             return;
 
         if (!t_snapshot.Exists)
@@ -279,9 +281,9 @@ static class PlayerSaveSync
             s_lastKnownRemoteHash = string.Empty;
             PullState = ESavePullState.RemoteMissing;
             LastDecision = ESaveReconcileDecision.RemoteMissing;
-            LogDecision(_profileId, 0, _localPayload, string.Empty, null);
+            LogDecision(_envId, 0, _localPayload, string.Empty, null);
             await ResolveDecisionAsync(
-                _generation, _userId, _profileId, _localPayload, HashOf(_localPayload),
+                _generation, _userId, _envId, _localPayload, HashOf(_localPayload),
                 string.Empty, string.Empty, 0, UserSaveData.VERSION);
             return;
         }
@@ -292,7 +294,7 @@ static class PlayerSaveSync
             PullState = ESavePullState.Classified;
             LastDecision = ESaveReconcileDecision.InvalidRemote;
             s_gateComplete = true;
-            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Invalid remote save: schemaVersion missing. profile={_profileId}");
+            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Invalid remote save: schemaVersion missing. env={_envId}");
             return;
         }
 
@@ -304,7 +306,7 @@ static class PlayerSaveSync
             GameManager.MarkUpdateRequired();
             Debug.LogWarning(
                 $"[PlayerSaveSync][Reconcile] Remote schema v{t_declaredSchemaVersion} is newer than client v{UserSaveData.VERSION}. " +
-                $"profile={_profileId}");
+                $"env={_envId}");
             return;
         }
 
@@ -314,14 +316,14 @@ static class PlayerSaveSync
             PullState = ESavePullState.Classified;
             LastDecision = ESaveReconcileDecision.InvalidRemote;
             s_gateComplete = true;
-            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Invalid remote save: {t_error}. profile={_profileId}");
+            Debug.LogWarning($"[PlayerSaveSync][Reconcile] Invalid remote save: {t_error}. env={_envId}");
             return;
         }
 
         s_lastKnownRevision = t_revision;
         s_lastKnownRemoteHash = t_remoteFullHash;
         string t_localFullHash = HashOf(_localPayload);
-        PlayerSaveSyncMetadata t_base = PlayerSaveSyncMetadataStore.Load(_userId, _profileId);
+        PlayerSaveSyncMetadata t_base = PlayerSaveSyncMetadataStore.Load(_userId, _envId);
         LastDecision = Classify(
             _hasLocalSave,
             t_schemaVersion,
@@ -329,11 +331,11 @@ static class PlayerSaveSync
             t_remoteFullHash,
             t_base,
             _userId,
-            _profileId);
+            _envId);
         PullState = ESavePullState.Classified;
-        LogDecision(_profileId, t_revision, _localPayload, t_remotePayload, t_base);
+        LogDecision(_envId, t_revision, _localPayload, t_remotePayload, t_base);
         await ResolveDecisionAsync(
-            _generation, _userId, _profileId, _localPayload, t_localFullHash,
+            _generation, _userId, _envId, _localPayload, t_localFullHash,
             t_remotePayload, t_remoteFullHash, t_revision, t_schemaVersion);
     }
 
@@ -447,7 +449,7 @@ static class PlayerSaveSync
         string _remoteHash,
         PlayerSaveSyncMetadata _base,
         string _userId,
-        string _profileId)
+        string _envId)
     {
         if (_localHash == _remoteHash)
             return ESaveReconcileDecision.InSync;
@@ -463,7 +465,7 @@ static class PlayerSaveSync
 
         bool t_baseValid = _base != null &&
                            _base.firebaseUid == _userId &&
-                           _base.profileId == _profileId &&
+                           _base.envId == _envId &&
                            _base.schemaVersion == UserSaveData.VERSION &&
                            !string.IsNullOrEmpty(_base.lastSyncedHash);
         if (!t_baseValid)
@@ -482,7 +484,7 @@ static class PlayerSaveSync
     }
 
     static void LogDecision(
-        string _profileId,
+        string _envId,
         long _remoteRevision,
         string _localPayload,
         string _remotePayload,
@@ -497,7 +499,7 @@ static class PlayerSaveSync
             : ShortHash(_base.lastSyncedHash);
 
         Debug.Log(
-            $"[PlayerSaveSync][Reconcile] decision={LastDecision}, profile={_profileId}, revision={_remoteRevision}, " +
+            $"[PlayerSaveSync][Reconcile] decision={LastDecision}, env={_envId}, revision={_remoteRevision}, " +
             $"local={t_localHash}, remote={t_remoteHash}, base={t_baseHash}");
     }
 
@@ -509,7 +511,7 @@ static class PlayerSaveSync
     static async UniTask ResolveDecisionAsync(
         int _generation,
         string _userId,
-        string _profileId,
+        string _envId,
         string _localPayload,
         string _localFullHash,
         string _remotePayload,
@@ -517,12 +519,12 @@ static class PlayerSaveSync
         long _remoteRevision,
         long _remoteSchemaVersion)
     {
-        if (!SessionMatches(_generation, _userId, _profileId)) return;
+        if (!SessionMatches(_generation, _userId, _envId)) return;
 
         switch (LastDecision)
         {
             case ESaveReconcileDecision.InSync:
-                CompleteSynchronized(_userId, _profileId, _localFullHash, _remoteRevision);
+                CompleteSynchronized(_userId, _envId, _localFullHash, _remoteRevision);
                 return;
 
             case ESaveReconcileDecision.RemoteMissing:
@@ -532,14 +534,14 @@ static class PlayerSaveSync
                     return;
                 }
                 await PushInitialOrLocalAsync(
-                    _generation, _userId, _profileId, _localPayload, _localFullHash, 0, string.Empty);
+                    _generation, _userId, _envId, _localPayload, _localFullHash, 0, string.Empty);
                 return;
 
             case ESaveReconcileDecision.LocalAhead:
                 if (_remoteSchemaVersion < UserSaveData.VERSION)
                 {
                     SaveConflictOrRequireRecovery(
-                        _userId, _profileId, _remotePayload, _remoteFullHash,
+                        _userId, _envId, _remotePayload, _remoteFullHash,
                         _remoteRevision, _remoteSchemaVersion);
                     return;
                 }
@@ -549,7 +551,7 @@ static class PlayerSaveSync
                     return;
                 }
                 await PushInitialOrLocalAsync(
-                    _generation, _userId, _profileId, _localPayload, _localFullHash,
+                    _generation, _userId, _envId, _localPayload, _localFullHash,
                     _remoteRevision, _remoteFullHash);
                 return;
 
@@ -564,7 +566,7 @@ static class PlayerSaveSync
                 }
 
                 string t_backupKey =
-                    $"cloud_import_backup_{_userId}_{_profileId}_{_remoteRevision}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                    $"cloud_import_backup_{_userId}_{_envId}_{_remoteRevision}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
                 if (!DataSaveManager.TryApplyRemote(_remotePayload, t_backupKey, out string t_error))
                 {
                     Debug.LogError($"[PlayerSaveSync] Remote apply failed: {t_error}");
@@ -575,14 +577,14 @@ static class PlayerSaveSync
 
                 s_uploadAllowed = true;
                 s_pendingPayload = DataSaveManager.CreateSnapshot();
-                CompleteSynchronized(_userId, _profileId, _remoteFullHash, _remoteRevision);
+                CompleteSynchronized(_userId, _envId, _remoteFullHash, _remoteRevision);
                 return;
             }
 
             case ESaveReconcileDecision.Diverged:
             case ESaveReconcileDecision.NoBaseConflict:
                 SaveConflictOrRequireRecovery(
-                    _userId, _profileId, _remotePayload, _remoteFullHash,
+                    _userId, _envId, _remotePayload, _remoteFullHash,
                     _remoteRevision, _remoteSchemaVersion);
                 return;
 
@@ -595,7 +597,7 @@ static class PlayerSaveSync
     static async UniTask PushInitialOrLocalAsync(
         int _generation,
         string _userId,
-        string _profileId,
+        string _envId,
         string _payload,
         string _fullHash,
         long _expectedRevision,
@@ -605,21 +607,21 @@ static class PlayerSaveSync
         {
             long t_newRevision = await PushTransactionAsync(
                 _userId,
-                _profileId,
+                _envId,
                 _payload,
                 _fullHash,
                 _expectedRevision,
                 _expectedRemoteHash);
-            if (!SessionMatches(_generation, _userId, _profileId)) return;
+            if (!SessionMatches(_generation, _userId, _envId)) return;
 
             s_lastKnownRevision = t_newRevision;
             s_lastKnownRemoteHash = _fullHash;
             if (s_pendingPayload == _payload) s_pendingPayload = string.Empty;
-            CompleteSynchronized(_userId, _profileId, _fullHash, t_newRevision);
+            CompleteSynchronized(_userId, _envId, _fullHash, t_newRevision);
         }
         catch (Exception t_exception)
         {
-            if (!SessionMatches(_generation, _userId, _profileId)) return;
+            if (!SessionMatches(_generation, _userId, _envId)) return;
             s_remoteWriteApproved = false;
             s_gateComplete = true;
             PullState = ESavePullState.Failed;
@@ -631,13 +633,13 @@ static class PlayerSaveSync
 
     static async Task<long> PushTransactionAsync(
         string _userId,
-        string _profileId,
+        string _envId,
         string _payload,
         string _fullHash,
         long _expectedRevision,
         string _expectedRemoteHash)
     {
-        DocumentReference t_document = Document(_userId, _profileId);
+        DocumentReference t_document = Document(_userId, _envId);
         string t_wireHash = _fullHash.Substring(0, 16);
         string t_deviceId = DeviceId();
         string t_appVersion = Application.version;
@@ -702,7 +704,7 @@ static class PlayerSaveSync
 
     static void CompleteSynchronized(
         string _userId,
-        string _profileId,
+        string _envId,
         string _fullHash,
         long _revision)
     {
@@ -710,11 +712,11 @@ static class PlayerSaveSync
         s_lastKnownRemoteHash = _fullHash;
         if (!string.IsNullOrEmpty(s_pendingPayload) && HashOf(s_pendingPayload) == _fullHash)
         {
-            s_uploadedHashes[HashKey(_userId, _profileId)] = _fullHash.Substring(0, 16);
+            s_uploadedHashes[HashKey(_userId, _envId)] = _fullHash.Substring(0, 16);
             s_pendingPayload = string.Empty;
         }
         bool t_metadataSaved = PlayerSaveSyncMetadataStore.SaveConfirmed(
-            _userId, _profileId, _fullHash, _revision);
+            _userId, _envId, _fullHash, _revision);
         if (t_metadataSaved)
         {
             PlayerPrefs.SetString(OWNER_UID_KEY, _userId);
@@ -729,7 +731,7 @@ static class PlayerSaveSync
 
     static void SaveConflictOrRequireRecovery(
         string _userId,
-        string _profileId,
+        string _envId,
         string _payload,
         string _fullHash,
         long _revision,
@@ -738,14 +740,14 @@ static class PlayerSaveSync
         var t_conflict = new PlayerSaveConflictSnapshot
         {
             firebaseUid = _userId,
-            profileId = _profileId,
+            envId = _envId,
             payload = _payload,
             payloadHash = _fullHash,
             revision = _revision,
             schemaVersion = _schemaVersion,
             capturedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
-        string t_key = $"outgame_remote_conflict_{_userId}_{_profileId}_{_revision}_{t_conflict.capturedUnix}";
+        string t_key = $"outgame_remote_conflict_{_userId}_{_envId}_{_revision}_{t_conflict.capturedUnix}";
         if (!DataSaveManager.TrySaveRemoteConflict(t_key, JsonUtility.ToJson(t_conflict), out string t_error))
         {
             Debug.LogError($"[PlayerSaveSync] Conflict backup failed: {t_error}");
@@ -765,7 +767,7 @@ static class PlayerSaveSync
         bool t_succeeded = false;
         int t_generation = s_generation;
         string t_userId = FirebaseAuthService.Instance.UserId;
-        string t_profileId = s_profileId;
+        string t_envId = s_envId;
         string t_payload = s_pendingPayload;
         int t_payloadBytes = Encoding.UTF8.GetByteCount(t_payload);
         if (t_payloadBytes > PAYLOAD_MAX_BYTES)
@@ -780,7 +782,7 @@ static class PlayerSaveSync
 
         string t_fullHash = HashOf(t_payload);
         string t_hash = t_fullHash.Substring(0, 16);
-        string t_hashKey = HashKey(t_userId, t_profileId);
+        string t_hashKey = HashKey(t_userId, t_envId);
         if (s_uploadedHashes.TryGetValue(t_hashKey, out string t_uploadedHash) && t_uploadedHash == t_hash)
         {
             if (s_pendingPayload == t_payload) s_pendingPayload = string.Empty;
@@ -795,22 +797,22 @@ static class PlayerSaveSync
         {
             long t_newRevision = await PushTransactionAsync(
                 t_userId,
-                t_profileId,
+                t_envId,
                 t_payload,
                 t_fullHash,
                 s_lastKnownRevision,
                 s_lastKnownRemoteHash);
-            if (!SessionMatches(t_generation, t_userId, t_profileId)) return;
+            if (!SessionMatches(t_generation, t_userId, t_envId)) return;
             t_succeeded = true;
 
-            Debug.Log($"[PlayerSaveSync] Firestore mirror uploaded. profile={t_profileId}, bytes={t_payloadBytes}");
+            Debug.Log($"[PlayerSaveSync] Firestore mirror uploaded. env={t_envId}, bytes={t_payloadBytes}");
 
             s_lastKnownRevision = t_newRevision;
             s_lastKnownRemoteHash = t_fullHash;
             s_uploadedHashes[t_hashKey] = t_hash;
             bool t_metadataSaved = PlayerSaveSyncMetadataStore.SaveConfirmed(
                 t_userId,
-                t_profileId,
+                t_envId,
                 t_fullHash,
                 t_newRevision);
             if (!t_metadataSaved)
@@ -822,7 +824,7 @@ static class PlayerSaveSync
         }
         catch (Exception t_exception)
         {
-            if (!SessionMatches(t_generation, t_userId, t_profileId)) return;
+            if (!SessionMatches(t_generation, t_userId, t_envId)) return;
             s_remoteWriteApproved = false;
             PullState = ESavePullState.Failed;
             LastDecision = ESaveReconcileDecision.None;
@@ -831,12 +833,12 @@ static class PlayerSaveSync
         }
         finally
         {
-            if (SessionMatches(t_generation, t_userId, t_profileId))
+            if (SessionMatches(t_generation, t_userId, t_envId))
                 s_uploading = false;
         }
 
         if (t_succeeded &&
-            SessionMatches(t_generation, t_userId, t_profileId) &&
+            SessionMatches(t_generation, t_userId, t_envId) &&
             !string.IsNullOrEmpty(s_pendingPayload))
             ScheduleUpload();
     }
@@ -851,11 +853,11 @@ static class PlayerSaveSync
                !string.IsNullOrEmpty(FirebaseAuthService.Instance.UserId);
     }
 
-    static bool SessionMatches(int _generation, string _userId, string _profileId)
+    static bool SessionMatches(int _generation, string _userId, string _envId)
     {
         return _generation == s_generation &&
                _userId == FirebaseAuthService.Instance.UserId &&
-               _profileId == s_profileId &&
+               _envId == s_envId &&
                FirebaseAuthService.Instance.IsCurrentUserActive;
     }
 
@@ -868,12 +870,14 @@ static class PlayerSaveSync
         return s_firestore;
     }
 
-    static DocumentReference Document(string _userId, string _profileId)
+    static DocumentReference Document(string _userId, string _envId)
     {
-        return Firestore().Collection("users")
+        return Firestore().Collection(ENV_ROOT_COLLECTION)
+            .Document(_envId)
+            .Collection("users")
             .Document(_userId)
             .Collection("save")
-            .Document(_profileId);
+            .Document(SAVE_DOC_ID);
     }
 
     static string DeviceId()
@@ -887,9 +891,9 @@ static class PlayerSaveSync
         return t_deviceId;
     }
 
-    static string HashKey(string _userId, string _profileId)
+    static string HashKey(string _userId, string _envId)
     {
-        return $"firebase.playerSave.hash.{_userId}.{_profileId}";
+        return $"firebase.playerSave.hash.{_userId}.{_envId}";
     }
 
     static string HashOf(string _payload)

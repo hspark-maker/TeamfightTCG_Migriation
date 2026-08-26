@@ -21,11 +21,10 @@ MonoBehaviour:
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
-  battleImage: {fileID: 21300000, guid: 7201d2979297065d1c515af04cc3beec, type: 3}
-  deckPreview: {fileID: 21300000, guid: cedf9e7d3e78fc44398070d639405036, type: 3}
   hpGainByLevel: 0000000000000000030000000400000006000000
   keywordUnlockLevel: 2
-  evolvedArts:
+  arts:
+  - battleImage: {fileID: 21300000, guid: 7201d2979297065d1c515af04cc3beec, type: 3}
   - battleImage: {fileID: 21300000, guid: 6439cd0c2718d144d8bcf9cc1cd18a31, type: 3}
   - battleImage: {fileID: 21300000, guid: 8a5f6e0e2830bb34a82af0a350475902, type: 3}
   defaultEvolutionStage: 0

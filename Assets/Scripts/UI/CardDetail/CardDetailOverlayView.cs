@@ -1861,7 +1861,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         if (this.descriptionText == null) return;
 
-        string t_text = _owned && _card != null ? _card.cardExplain : null;
+        string t_text = _owned && _card != null ? CardCatalog.RequireSpec(_card).CardExplain : null;
 
         this.descriptionText.text = !string.IsNullOrEmpty(t_text) ? t_text
                                   : _owned                        ? NoneValue
