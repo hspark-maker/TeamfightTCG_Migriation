@@ -76,7 +76,7 @@ public interface IRepository
     UniTask DeleteAsync(string _key);
 }
 
-/// <summary>미러 파일을 원자 교체한다. 서버 스냅샷을 로컬에 받아 적을 때만 쓴다.</summary>
+/// <summary>기록을 원자 교체한다(교체 전 값은 백업 키로 남는다).</summary>
 public interface IAtomicRepository : IRepository
 {
     UniTask<ESaveWriteResult> ReplaceWithBackupAsync(string _key, string _value, string _backupKey);
@@ -87,11 +87,32 @@ public enum ESaveWriteResult
     Success,
     Blocked,      // 로드된 세이브가 상위 버전이라 쓰기 봉쇄
     IoFailed,
+    Conflict,     // 서버 문서가 내가 아는 revision보다 앞서 있다 (Phase 2)
+    Offline,      // 서버에 도달하지 못했다 — 재시도로 풀릴 수 있다 (Phase 2)
 }
 ```
 
-`CancellationToken`과 `Conflict`/`Offline`은 **Phase 2에서 추가한다.** 로컬 파일 단계에서는 발생할 수 없어
-지금 넣으면 검증 불가능한 죽은 분기가 된다. 호출부가 `SaveTransaction` 하나로 모여 있어 나중 추가 비용이 낮다.
+Phase 2에서 **능력 인터페이스 2종**이 추가됐다. 세 구현체가 같은 계약을 온전히 채우게 하고,
+`is not JsonFileRepository` 같은 **구체 타입 탐지를 코드베이스에서 0건으로 만들기 위해서**다.
+
+```csharp
+/// <summary>동기 쓰기가 가능한 매체(앱 종료 콜백은 await를 기다려주지 않는다).</summary>
+public interface IBlockingWriteRepository { ESaveWriteResult SaveBlocking(string _key, string _value); }
+
+/// <summary>종료 시점 세이브를 로컬에 동기 기록하고 다음 부팅에 소비하는 매체.
+/// 매체가 네트워크라 종료 콜백 안에서 쓰기를 끝낼 수 없을 때만 필요하다.</summary>
+public interface ISaveJournalRepository
+{
+    ESaveWriteResult WriteJournalBlocking(string _payload);
+    UniTask<ESaveWriteResult> ConsumeJournalAsync();
+}
+```
+
+`FirestoreSaveRepository`는 **`IAtomicRepository`를 구현한다.** 기존 구현체 2개가 모두 이 인터페이스라
+이게 사실상 유일한 계약이고, `IRepository`만 구현하면 "구현체만 교체한다"는 치환 가능성이 깨진다.
+
+`CancellationToken`은 **넣지 않았다.** 취소를 소비할 주체가 없다 — 호출부 15곳이 전부 fire-and-forget이고
+부트 커밋은 1회다. 타임아웃은 Firestore 호출 안쪽이 `Task.WhenAny`로 이미 소유한다.
 
 **커밋 진입점은 `SaveTransaction` 하나다.** 로드맵 초안은 "`Save()` 호출 15곳이 `await` 지점"이라고 봤으나,
 그대로 하면 `RewardClaimPopup`의 `Func<bool>` 계약(넘기는 곳 7건)과 `ITutorialProgressSink`가 깨지고
@@ -110,10 +131,14 @@ public enum ESaveWriteResult
 | `hash` | string | `payload` 무결성 |
 | `rev` | long | 단조 증가. 되감기·동시쓰기 차단 |
 | `schemaVersion` | long | `UserSaveData.VERSION` (현재 6) |
-| `requestId` | string | 마지막 커밋의 요청 id. ack 유실 판정용 |
 | `updatedAt` | timestamp | 서버 시각 |
+| `deviceId` · `appVersion` | string | 진단용 |
 
-`requestId`를 뺀 나머지는 이미 쓰이고 있다. **현행 `firestore.rules`(소유권 · `rev` 되감기 방지 · `schemaVersion` 되감기 방지 · payload 300000 상한)를 거의 그대로 재사용한다.** `requestId`가 직전 값과 달라야 한다는 조건만 추가한다.
+실제 필드명은 `hash`/`rev`가 아니라 **`payloadHash`(풀해시 앞 16자)/`revision`** 이다 — 현행 코드와 배포된 규칙이 쓰는 이름을 그대로 뒀다. 단일 창구는 `4.Sync/PlayerSaveDocument.cs`의 `FIELD_*` 상수다.
+
+**`requestId`는 넣지 않았고 `firestore.rules`는 무변경이다.** ack 유실 대응으로 계획했으나,
+`PlayerSaveDocument.PushTransactionAsync`에 **이미 hash 멱등 경로가 있다** — 서버 문서 hash가 올릴 hash와 같으면 현재 rev를 그대로 반환한다. 타임아웃 후 재전송 중복은 이걸로 막히고, 저널 재업로드는 `baseRevision` 대조가 잡는다.
+게다가 `hasOnly` 화이트리스트는 **단방향**이다 — 필드를 한 번 찍으면 되돌릴 때 그 문서의 모든 쓰기가 영구 거절된다. 안 넣는 편이 싸다.
 
 ### 부팅 흐름
 
@@ -122,11 +147,21 @@ public enum ESaveWriteResult
 2. FirestoreSaveRepository.LoadAsync  — 문서 1회 read
 3-a 성공        → 메모리 보유 + 미러 파일 기록 → DataSaveManager가 그 값으로 Load
 3-b 문서 없음   → 신규 세이브 생성 후 업로드
-3-c 실패·오프라인 → 미러 읽기 전용 모드(열람만, 쓰기 금지) 또는 RecoveryRequired
+3-c 실패·오프라인 → BlockedRetryable(차단 화면 + 재시도). 미러 열람 전용 모드는 만들지 않았다
 4. 게이트 통과 → BootInstaller.InstallSaveDependent()
 ```
 
-미러는 게임플레이가 절대 쓰지 않는다. 쓰기 주체는 "서버 스냅샷 수신" 한 곳뿐이다. 이 규정이 F-5(로컬 캐시가 가짜 진실원이 되는 것)와 T5(장애 시 기동 불가)를 동시에 만족시킨다. Firestore SDK 자체 캐시는 `PersistenceEnabled = false`로 끈다.
+미러는 게임플레이가 절대 쓰지 않는다. 쓰기 주체는 "서버 스냅샷 수신"과 "종료 저널" 둘뿐이다. Firestore SDK 자체 캐시는 `PersistenceEnabled = false`로 끈다.
+
+부트 게이트 신호는 Phase 2에서 `PlayerSaveSync`를 떠나 **`Core/BootGate.cs`** 로 옮겼다 — Cloud에서 `PlayerSaveSync`가 꺼지는데 부트 계약이 그 안에 남으면 **꺼진 부품이 부트를 붙잡는다.** `PlayerSaveSync.IsGateComplete`/`MarkGateComplete()`는 시그니처를 유지한 채 위임만 한다.
+
+### 종료 저널
+
+`OnApplicationQuit`/`OnApplicationPause(true)`는 `await`를 기다려주지 않아 Cloud에서는 동기 쓰기가 불가능하다.
+그래서 종료 시 `SaveJournalEntry`(payload · payloadHash · baseRevision · schemaVersion · profileId · uid · writtenAtUtcTicks)를 미러에 **동기 기록**하고, 다음 부팅의 `PrimeAsync` 직후 · `LoadAsync` 이전에 소비한다.
+
+채택 조건은 전부 만족해야 한다: `uid` 일치 · `profileId` 일치 · `schemaVersion` 일치 · `baseRevision == 서버 revision` · `payloadHash != 서버 hash` · payload 무결성(재해시 일치). 하나라도 어긋나면 폐기한다.
+`CommitBlocking`이 `s_writeChain` 밖인 것은 고치지 않았다 — 동기 경로에서 비동기 완료를 기다릴 수 없어 애초에 불가능하고, `baseRevision` 낙관 규칙이 순서 역전을 흡수한다.
 
 ### 저장 흐름
 
@@ -136,11 +171,13 @@ DataSaveManager.SaveAsync
   → requestId 생성
   → transaction: 서버 rev == 내 rev 이면 rev+1 로 커밋
   → Committed → 미러 갱신
-  → Conflict  → 서버 재read. blob이라 병합 불가 → 서버 채택 + 호출부에 Conflict 반환
-  → Offline / Failed → 재시도 큐. 호출부에 결과 반환
+  → Conflict  → 세션 종료 사유. 재시도로 풀리지 않는다(아래)
+  → Offline   → 대기 오버레이 → 실패 팝업(재시도 / 나중에). 종료 시 저널이 받는다
 ```
 
-**ack 유실 대응**: 응답을 못 받은 채 재연결되면 서버의 `requestId`를 읽어 내 요청 id와 같은지 본다. 같으면 커밋된 것이므로 재전송하지 않는다. `rev` 단조 증가만으로는 중복 적용을 막지 못한다.
+**`Conflict`는 재시도 대상이 아니다.** 쓰기 선조건이 부팅 때 읽은 `revision`이라 다시 밀어도 같은 자리에서 막힌다 — 재시도를 주면 무한 반복이 된다. 부트 커밋에서는 종료 상태로, 런타임에서는 "다른 기기가 먼저 저장했다 · 재시작 필요" 팝업으로 갈랐다. F-5의 "늦은 쪽 변경이 통째로 버려진다"가 그대로 관측되는 자리다.
+
+**ack 유실 대응**: `PushTransactionAsync`의 hash 멱등 경로가 맡는다 — 서버 문서 hash가 올릴 hash와 같으면 rev를 올리지 않고 현재 rev를 반환한다. 별도 `requestId` 필드가 필요 없다.
 
 ## 구현 시 걸리는 함정 (실측)
 
@@ -160,7 +197,7 @@ DataSaveManager.SaveAsync
 |---|---|---|---|---|
 | **0** | **인프라만. 게임 코드 0줄 변경** — dev 프로젝트 생성, 규칙 배포, `google-services.json` 2벌 + 빌드 훅, `.firebaserc` | `firestore.rules`, `Editor/ContentProfileValidator.cs` | dev에서 익명 로그인 성공. 규칙 시뮬레이터에서 위조 쓰기 거절 | 없음 |
 | **1** ✅ | **인터페이스 비동기화 — 완료(2026-08-26).** `IRepository`/`IAtomicRepository` UniTask화, 구현체 2종 적응, `DataSaveManager.LoadAsync/SaveAsync`, **커밋 진입점 `SaveTransaction` 신설**, 부트 코루틴 UniTask 승격. **진실원은 여전히 로컬 파일** | `1.Repository/*`, `3.Manager/DataSaveManager.cs` · `SaveTransaction.cs`, 도메인 매니저 11개, `Core/GameManager.cs` · `BootInstaller.cs` | 컴파일 0에러 · 미초기화 상태 커밋에도 세이브 무손실 확인. 함정 2·3 해소 | git revert |
-| **2** | **`FirestoreSaveRepository` + 미러.** 부팅 시 서버 1회 read, 미러 기록, 진실원 전환(전역 플래그) | `1.Repository/FirestoreSaveRepository.cs` 신규, `Core/BootInstaller.cs`, `Core/GameManager.cs` | 콘솔에서 `payload` 교체 → 재시작 시 반영. 오프라인 기동 시 미러 열람 전용 진입 | 전역 플래그 `local` |
+| **2** ✅ | **`FirestoreSaveRepository` + 미러 — 코드 완료(2026-08-26).** 부팅 시 서버 1회 read, 미러 기록, 진실원 전환(`ContentProfileConfig.SaveSourceMode`). 종료 저널 · 차단 화면 + 재시도 · 저장 대기 오버레이 포함 | `1.Repository/FirestoreSaveRepository.cs` · `ISaveJournalRepository.cs` · `IBlockingWriteRepository.cs` 신규, `2.Domain/SaveJournalEntry.cs`, `4.Sync/PlayerSaveDocument.cs`, `Save/SaveSourceMode.cs` · `ESaveBootBlockReason.cs`, `Core/BootGate.cs` 신규, `Core/GameManager.cs` · `BootInstaller.cs` · `EGameBootState.cs` · `ContentProfileConfig.cs`, `UI/Common/SaveBusyOverlay.cs` · `LoadingCoverView.cs` · `UiSortingOrder.cs` | 컴파일 0에러 · 계약 전수 확인. **실기 Play 검증 미완** | `SaveSourceMode` = `Local` |
 | **3** | **동기화 기계 철거.** `PlayerSaveSync` 3-way 판정·conflict sidecar·업로드 큐 제거 | `4.Sync/*` 대부분 삭제 | `RemoteAhead`/`Diverged`/`LocalAhead`/`NoBaseConflict` 코드 부재. **신규 계정 → 전 구간 플레이 → 앱 재시작 → 상태 100% 복원** | Phase 2 상태로 revert |
 
 ### 후속 (별도 착수)
@@ -178,9 +215,9 @@ DataSaveManager.SaveAsync
 | 단계 | 방법 |
 |---|---|
 | Phase 1 | 같은 조작 시퀀스 후 세이브 파일 내용 비교 — 비동기화 전후가 같아야 한다 |
-| Phase 2 | 콘솔에서 `payload` 교체 → 재시작 시 반영 / 기내모드 기동 → 열람 전용 진입 / `rev` 되감기 쓰기 → `PERMISSION_DENIED` |
+| Phase 2 | 콘솔에서 `payload` 교체 → 재시작 시 반영 / 기내모드 기동 → **차단 화면 + 재시도** / `rev` 되감기 쓰기 → `PERMISSION_DENIED` |
 | Phase 2 | 두 기기 동시 저장 → 늦은 쪽 `Conflict` 반환, 데이터 파손 없음 |
-| Phase 2 | 저장 중 강제 종료 → 재기동 시 `requestId` 대조로 중복 적용 없음 |
+| Phase 2 | 저장 중 강제 종료 → 재기동 시 저널 `baseRevision` 대조로 채택 또는 폐기, 중복 적용 없음 |
 | Phase 3 | 신규 계정 → 튜토리얼 완주 → 팩 구매 → 강화 → 전투 → **앱 재시작** → 상태 복원 |
 | 규칙 | 규칙 시뮬레이터에 위조 쓰기 3종(`rev` 미증가, `schemaVersion` 되감기, 남의 uid) → 전부 거절 |
 | 컴파일 | 각 Phase 후 `Unity_ReadConsole`로 CS 에러 0건 |
@@ -193,7 +230,7 @@ DataSaveManager.SaveAsync
 |---|---|---|
 | **F-1** | **판정이 전부 클라에 있다.** Spark라 클라가 문서를 직접 쓰므로, `payload`를 조작해 잔액·소유·진행도를 임의 설정할 수 있다. 규칙이 막는 것은 소유권·`rev` 되감기·크기뿐이다. 분해하더라도 마스터가 없는 한 결과는 같다 | 이번 범위의 명시적 한계. Blaze 전환 후 후속 6~8에서 해소 |
 | ~~**F-2**~~ | ~~`await` 사이 프레임이 끼면서 순서 의존이 위험해진다~~ | **해소(Phase 1)** — 순서를 고정한 게 아니라 없앴다. 커밋이 전 도메인을 함께 flush한다. 겹치는 쓰기는 `DataSaveManager.s_writeChain`이 직렬화해 구 스냅샷이 새 것을 덮지 못한다 |
-| **F-3** | **저장이 네트워크가 되어 실패가 실재한다.** 팩 구매 후 쓰기 실패 시 화면엔 카드가 있고 서버엔 없다 | 반환 채널(`ESaveWriteResult`)과 잠금 판정(`SaveTransaction.IsBusy`)은 Phase 1에서 만들어 뒀다. **실제 가드 배치와 UI 대기 표현은 Phase 2** — 로컬 쓰기는 즉시 완료라 지금 넣으면 발동하지 않는 죽은 분기가 된다 |
+| ~~**F-3**~~ | ~~저장이 네트워크가 되어 실패가 실재한다~~ | **해소(Phase 2)** — `SaveTransaction.CommitAsync()` 한 곳에 물렸다(호출부 15곳 무변경). 250ms 지연 후 `SaveBusyOverlay`(`UiSortingOrder.SaveBusy = 920`)로 입력 차단, 실패 시 `SimpleYNPopup` 재사용. `Request()` 경로에서도 뜬다. **부트 구간(`BootState != Ready`)은 배선이 돌지 않는다** — 재시도 창구가 `BootInstaller`와 둘로 갈리면 안 된다. `SaveBusyOverlay` 프리팹·Addressables 등록은 미완이며, 없으면 경고 1회 후 저장은 정상 진행된다 |
 | **F-4** | **Spark 일일 한도** — 읽기 50k / 쓰기 20k / 저장 1GiB. Blaze 전환 시 한도가 사용량 과금으로 바뀐다 | 실행당 read 1. 쓰기는 저장 1회당 1 — 팩 개봉이 최대 6회이므로 함정 3 해소가 곧 과금 절감 |
 | **F-5** | **blob 충돌은 병합 불가** — 두 기기 동시 플레이 시 늦은 쪽 변경이 통째로 버려진다 | 프로토 구간 감수. 계정 연동(후속 4) 전에는 다기기 시나리오 자체가 드물다 |
 | ~~**F-6**~~ | ~~`profile`이 저장되지 않는다~~ | **해소** — `870fe1723`(cherry-pick) + `8763786b1`. `UserSaveData.profile` 슬롯(`:35`) · `ProfileSaveData` · 되감기 목록(`:86`) · `PlayerSaveSync.IsComplete()`(`:441`). `VERSION`은 6 유지 |

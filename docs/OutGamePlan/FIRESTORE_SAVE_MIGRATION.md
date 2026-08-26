@@ -37,7 +37,7 @@
 
 ### 안 된 것
 
-- 진실원 전환 (로컬 → Firestore)
+- ~~진실원 전환 (로컬 → Firestore)~~ — **코드 완료(Phase 2). 실기 Play 검증 미완**
 - 소셜 로그인 (익명 UID는 재설치 시 소실)
 - 서버 권위 판정 — Spark에서는 불가. 요금제 전환(Blaze) 예정, 시점 미정
 
@@ -196,7 +196,27 @@ docs/OutGamePlan/STRUCTURE.md                  4.Sync 계층 반영됨
 2. **A3** — 되감기 예약 소비를 `PlayerSaveSync.Initialize`보다 앞으로 (미착수)
 3. ~~Phase 0 (인프라)~~ — **불필요해짐.** dev/prod 프로젝트를 나누지 않기로 해서 `.firebaserc`·Config 2벌·빌드 훅이 전부 빠졌다. 남은 것은 `firestore.rules`의 `requestId` 조건뿐이고 Phase 2에서 구현체와 함께 넣는다
 4. ~~**Phase 1** (인터페이스 비동기화)~~ — **완료(2026-08-26)**
-5. **Phase 2** (Firestore 구현체) ← **다음** · → Phase 3 (동기화 기계 철거)
+5. ~~**Phase 2** (Firestore 구현체)~~ — **코드 완료(2026-08-26). 실기 Play 검증 미완**
+6. **Phase 3** (동기화 기계 철거) ← **다음**
+
+### Phase 2 결과 (2026-08-26)
+
+`SaveSourceMode.Current`(← `ContentProfileConfig.saveSourceMode`)가 진실원을 가른다. **Test = `Cloud`, Live = `Local`.**
+에디터 RunMode도 Test로 맞춰 뒀으므로 지금 Play하면 `users/{uid}/save/test`를 친다 — 운영 문서 `current`는 안 건드린다.
+`google-services.json`이 한 벌뿐이라 **어느 프로필이든 실제 대상은 운영 프로젝트 `cardbattle-d94f7`** 이고, 갈리는 것은 문서 id뿐이다.
+
+| 축 | 결과 |
+|---|---|
+| 진실원 | `FirestoreSaveRepository`(`IRepository`+`IAtomicRepository`+`ISaveJournalRepository`). 세이브 본문 키만 서버, 나머지 키는 전부 미러 위임 |
+| 부트 | `Core/BootGate.cs`가 게이트 신호의 단일 창구. `GameManager.BootCloudSaveAsync`가 인증 → `PrimeAsync` → `ConsumeJournalAsync` → `LoadAsync` 재시도 루프를 소유 |
+| 종료 | `SaveJournalEntry`를 미러에 동기 기록 → 다음 부팅에 `baseRevision` 대조로 채택/폐기 |
+| 차단 | `EGameBootState.BlockedRetryable` + `ESaveBootBlockReason` + 로딩 커버 재시도 버튼(미배선 시 5초 자동 재시도) |
+| 쓰기 UI | `SaveBusyOverlay`(920) 250ms 지연 표시 + `SimpleYNPopup` 실패 팝업. `BootState == Ready`일 때만 배선이 돈다 |
+| 규칙 | **무변경.** `requestId`는 hash 멱등 경로가 대신해 불필요 |
+
+**미완**: `SaveBusyOverlay` 프리팹 + Addressables 등록(주소 `SaveBusyOverlay`, 라벨 `UIPrefab`). 없으면 경고 1회 후 저장은 정상 진행된다.
+
+**작업 중 잡은 기존 버그**: `LoadingCoverView.CoFillBar`가 15초에 강제 탈출한 뒤 이어지는 대기 조건이 `BootState == Syncing`이라, Cloud 부트(게이트 전 상태 `Booting`)에서는 한 프레임도 안 돌고 **세이브 미설치 상태로 로비를 열었다.** 대기 축을 설치/종료 상태로 바꿔 막았다.
 
 A3는 Phase 3에서 `PlayerSaveSync.Initialize` 자체가 사라지면 함께 해소된다. Phase 3 전까지 되감기를 쓸 일이 있으면 먼저 고친다.
 
