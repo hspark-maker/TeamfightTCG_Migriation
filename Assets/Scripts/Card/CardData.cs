@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.Video;
 
 public enum ECardChannel
@@ -31,7 +32,12 @@ public enum ECardGrade
 [System.Serializable]
 public class CardArtSet
 {
+    /// <summary>구(舊) 직접 참조. Addressables 이관 후에는 비어 있어야 한다 —
+    /// 여기 값이 남아 있으면 씬이 이 스프라이트를 강참조해 부팅 시 통째로 메모리에 올라온다.
+    /// 아직 이관 안 된 에셋의 폴백으로만 읽는다(<see cref="CardVisualRules.PickCardArt"/>).</summary>
     public Sprite battleImage;
+    /// <summary>이관 후의 진짜 아트 참조. 로드는 <see cref="CardArtCache"/>가 맡는다.</summary>
+    public AssetReferenceSprite battleImageRef;
 }
 
 [CreateAssetMenu(fileName = "NewCard", menuName = "Card Battle/Card Data")]
@@ -66,8 +72,14 @@ public class CardData : ScriptableObject
     // 카드 아트는 battleImage 한 장뿐이다. 예전엔 fullImage(로비 전신)·portrait(초상)를 따로 뒀지만
     // 실제로는 두 필드가 늘 같은 그림이었고, battleImage가 모든 폴백 사슬의 맨 앞이라 한 번도 도달하지 않았다.
     // deckPreview는 카드 아트가 아니라 **덱 목록 배너 전용** 그림이라 별개 축으로 남는다.
+    // 아래 두 Sprite 는 구(舊) 직접 참조다. Addressables 이관(CardArtBake)이 같은 그림을 *Ref 로 옮기고
+    // 여기를 비운다 — 비워야 씬→CardRegistry→CardData 사슬이 스프라이트를 더 이상 물지 않는다.
     public Sprite battleImage;
     public Sprite deckPreview;
+    /// <summary>전투/카드 아트. 로드는 <see cref="CardArtCache"/>, 선택 규칙은 <see cref="CardVisualRules"/>.</summary>
+    public AssetReferenceSprite battleImageRef;
+    /// <summary>덱 목록 배너 전용 그림. 카드 아트와 다른 축이라 별도 참조로 남는다.</summary>
+    public AssetReferenceSprite deckPreviewRef;
 
     [Header("Growth HP Curve")]
     // index = 레벨을 유지한다(호출부가 레벨→인덱스를 손으로 옮기지 않게). 그래서 [0]/[1]은 쓰지 않는 빈칸이다 —

@@ -1,0 +1,743 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: CardArt
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: CardArt
+  m_GUID: cb57ce5d1f7c84f40a9b77b77919d6f3
+  m_SerializeEntries:
+  - m_GUID: 00cf8c131e43ab34b857d20ff0adfd86
+    m_Address: Image_Card_Thunderhorn_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 03ffa3efd50149d0b0f3ae200ebf8355
+    m_Address: Image_Card_Woodhorn_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 045b17ccb60ea412649b1b67e201d368
+    m_Address: Image_Card_Campbean_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 056de8299a97d16feda45db633f83c89
+    m_Address: Image_Card_Rockbean_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0813913c13a638bff5148be2cda1f762
+    m_Address: Image_Card_Startori_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 08ec9e965eb22a94a84dddfdb7c124d4
+    m_Address: Image_Card_CrystalRhino_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0cce95d1ac3666249989e950a9c9582f
+    m_Address: Image_Card_Startori_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0d08bad4037063146a77b6eebc18808a
+    m_Address: Image_Card_Dreameater_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 12894fc907e687c448fa4cda99ee4a9b
+    m_Address: Image_Card_IronMongchi_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1301e6fe0e01a9a4e8d54e852ac29398
+    m_Address: Image_Card_Flarelux_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 165aad73094b2ab40958bcc8175543b2
+    m_Address: Image_Card_Gearmole_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 17dc3d48a61fbb94c9456ee7b16dce4f
+    m_Address: Image_Card_SnowballBear_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18257f3f2249ed040a81cd5e0bb57db8
+    m_Address: Image_Card_Waggledodo_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18f0755bd8f13d4459578fe32483c931
+    m_Address: Image_Card_Woodhorn_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1c7802b905acb03499fd7ce195b873db
+    m_Address: Image_Card_Cloudmong_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2188568cd265e5a4a9863518a7f904c8
+    m_Address: Image_Card_Woodhorn_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 21f10fb5898ac37498fd82852be6b1d3
+    m_Address: Image_Card_Sparkfin_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 232a4c95d28f23841878ea3b15deb26e
+    m_Address: Image_Card_IronMongchi_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 26fc67884e02e5e459d6fdfc70b990ec
+    m_Address: Image_Card_Sandmong_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 27130c3857a57a84db4e66fa928a5473
+    m_Address: Image_Card_Lumielk_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a5bcf73f8b354545953b946761e4b1d
+    m_Address: Image_Card_Magnetos_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e5e59c554f8fb14d6f867dccfaab10a
+    m_Address: Image_Card_Swampfrog_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e7cf94a11b82834da2efeaf59a42211
+    m_Address: Image_Card_Rockbean_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3086761e6f4bfcf48928c0fca75f0156
+    m_Address: Image_Card_MagnetCrab_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 309e0c3d5f33dbe499fcadf5c993f1fc
+    m_Address: Image_Card_Waveri_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3184ff0c6a81bc70aa5f311279ad4411
+    m_Address: Image_Card_Sandmong_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3598f6dd3630ec476d141ca614cf6bd5
+    m_Address: Image_Card_Honeybee_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3c733fd7e33dd1742b3c88a0563c5a2b
+    m_Address: Image_Card_Phoenixia_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3de304478fa08e340832f04f7d59066e
+    m_Address: Image_Card_Icekomi_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 40c5febf674f97d4397eb4d8e23f866d
+    m_Address: Image_Card_Icekomi_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 469c42e74b016cb478b1f82fea52fa40
+    m_Address: Image_Card_Poslamb_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 47ec6bf24e01d3a6f8154a2f1a1a5b4a
+    m_Address: Image_Card_SnowballBear_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4d66529454fb22b43acc6f06ca68b8b3
+    m_Address: Image_Card_Nightchestnut_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4fd7ffc34fb24a547a4bf90bfde28db9
+    m_Address: Image_Card_Rockbean_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5078820160e3e5d03691eb116af294b1
+    m_Address: Image_Card_Poslamb_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 52a475d2f643b0745b2a5d03b0008f14
+    m_Address: Image_Card_Lumielk_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54f8ab70785fdc2cd4b1a435d379976e
+    m_Address: Image_Card_BalloonPeng_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 568787ccb51e7684fa1143da50247fe4
+    m_Address: Image_Card_DizzyOctopus_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5793bf1bb5fa72800c3560b12a654ee6
+    m_Address: Image_Card_WaterdropLong_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5a1329cc4c475bc4ab765511735db6a3
+    m_Address: Image_Card_Thunderhorn_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5b19561eaaaf293438660b72ba99b991
+    m_Address: Image_Card_Raigor_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5e2bacbc7b2f5704789246e95222b41b
+    m_Address: Image_Card_Moonbite_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f9e92e1dd4b27feb87b2161652ce671
+    m_Address: Image_Card_Mapletail_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 617b6cce22f19c84ead56ad3fdf3333e
+    m_Address: Image_Card_Honeybee_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 62a68455ed5b4cd4389531f2277cc9cb
+    m_Address: Image_Card_MushroomCat_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 637fa720d8bf0854cad0548218791b95
+    m_Address: Image_Card_Flarelux_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6439cd0c2718d144d8bcf9cc1cd18a31
+    m_Address: Image_Card_KingChestnutHedgehog_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 67df5c5cc371cf34da8e32a03041447a
+    m_Address: Image_Card_WaterdropLong_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 69a0be68c11962d4ca3b0a7721da9300
+    m_Address: Image_Card_Phoenixia_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 69c4ff9877d68194f8b3bf93fc6413a2
+    m_Address: Image_Card_Crackmon_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6a8b7c69ff7745943ac945655730372d
+    m_Address: Image_Card_Poslamb_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6b1b8fc006b3e2533c6639ca087b96c5
+    m_Address: Image_Card_CaptainBeak_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6bbed8260137a7a42a144c007896d4c4
+    m_Address: Image_Card_Startail_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6e003421d556bb44d9fe4e111c0937db
+    m_Address: Image_Card_MushroomCat_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6ed138516e2b9fda82fcf82ea1569014
+    m_Address: Image_Card_Crystalhorn_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6ef189f2dfb18844ab881e58d9756267
+    m_Address: Image_Card_Magnetos_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6f089d7b32038494bb7f3aa7514579fd
+    m_Address: Image_Card_Nightchestnut_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7034fc1ef5878d94e8d33a1bd5c61354
+    m_Address: Image_Card_Crackmon_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7059d6baab6805c4abc2964f35e80d40
+    m_Address: Image_Card_Gearmole_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 70da18273350c40468117731f65a170c
+    m_Address: Image_Card_Crackmon_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 70f0676187d02464b92642a77e243994
+    m_Address: Image_Card_Bombbat_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7116ba67d00bf53489b2d5568589997d
+    m_Address: Image_Card_Phoenixia_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7201d2979297065d1c515af04cc3beec
+    m_Address: Image_Card_KingChestnutHedgehog_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7430e1d31ec5a10469e858ed35371f96
+    m_Address: Image_Card_Raigor_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7437d2e3730f5a7469ac19fd023054e3
+    m_Address: Image_Card_Crystalhorn_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7577244ae929f8f479b6886e2131a547
+    m_Address: Image_Card_Cloudmong_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76d80665c27d779480ce8fffb3b46c79
+    m_Address: Image_Card_Bombbat_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7c90cfc89d5464f29a8b81a08dc2d983
+    m_Address: Image_Card_Icekomi_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7dbd2fd9da78ba8c7187ce996f887e67
+    m_Address: Image_Card_Waveri_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 80cd7b3323c0b35458bf42c6e12b23e2
+    m_Address: Image_Card_Startail_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 81274f70ad15c2946a579d2f221c7b76
+    m_Address: Image_Card_BalloonPeng_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 83af70e1fb8d056d4a4597a2a1fedf96
+    m_Address: Image_Card_Nightchestnut_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8985cfef17bec1a4fb45f9aa80879aba
+    m_Address: Image_Card_Sparkfin_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a5f6e0e2830bb34a82af0a350475902
+    m_Address: Image_Card_KingChestnutHedgehog_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 91f03a321944ba940b007a31802df1c2
+    m_Address: Image_Card_Startail_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 93940ea1ba9ccea45b1a4a525ebefce0
+    m_Address: Image_Card_CrystalRhino_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 952b156c2e17b864d83580790011cbdf
+    m_Address: Image_Card_Ticktockgon_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 97686b50cc5219b498427ec7a431266f
+    m_Address: Image_Card_Magmole_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 992c09225174f6849b2605580b7faff4
+    m_Address: Image_Card_Dreameater_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99be48067e068fc16b6057fa65c30b1b
+    m_Address: Image_Card_MagnetCrab_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99d19ef028e86024f8822659d693339a
+    m_Address: Image_Card_Mapletail_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9dccf6e719b1bce54521bfa0808f2f03
+    m_Address: Image_Card_Flarelux_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9f6c353edb52bde409621efc37dccefe
+    m_Address: Image_Card_Ticktockgon_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a6ea06b9bace67e4a8d40c2a7a97f20e
+    m_Address: Image_Card_Startori_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a98e2542a3dd701deed2256ecef9d40f
+    m_Address: Image_Card_DizzyOctopus_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a991cdd0180cf2e46a23d7023ae1e594
+    m_Address: Image_Card_DizzyOctopus_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ae322aa4e09c3d84097854d63e9a6f70
+    m_Address: Image_Card_Crystalhorn_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: af640803ec164bb4b9ccf86e7a9eb077
+    m_Address: Image_Card_MagnetCrab_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2c9d62ba0827df418038bbe6e7cd404
+    m_Address: Image_Card_Moonbite_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b2d009fdad0607f42b33f368e6693dec
+    m_Address: Image_Card_BalloonPeng_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b7741208eda4c99fd01c8037e2dcfd7e
+    m_Address: Image_Card_IronMongchi_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b863fc091d133d1478f2112a968ea7ab
+    m_Address: Image_Card_Mapletail_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bd30f391097addd479f42b52435ad388
+    m_Address: Image_Card_Honeybee_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: be8901cbddebcd57bc43fe1daa328b3b
+    m_Address: Image_Card_Sparkfin_Stage1_Portrait3x4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bec705a1deb1be0593477bc19f4bf25f
+    m_Address: Image_Card_MushroomCat_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bee90b37f8c20c44eb4fb81004f19638
+    m_Address: Image_Card_Ticktockgon_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c150d29e369a2c044b658a51bdb352ba
+    m_Address: Image_Card_Waveri_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c2037f48dae22e1458006158fdf33b2f
+    m_Address: Image_Card_Campbean_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c3722d4fbeb5a4046aef5f25f9ab7ee1
+    m_Address: Image_Card_Swampfrog_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c37a48f638d00c9754451ce749e36365
+    m_Address: Image_Card_Thunderhorn_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c6a615355510b4f418707cf37c193c3d
+    m_Address: Image_Card_Lumielk_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c74c6adaaa1edfc40b24301e950ab213
+    m_Address: Image_Card_CaptainBeak_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c7f9f74e17ae58148aeb88fb95465173
+    m_Address: Image_Card_CrystalRhino_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c96ea0adfc4dd55b875a249451f168fe
+    m_Address: Image_Card_Waggledodo_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d40f3cbee62b2d54eb131e2370c9a8e5
+    m_Address: Image_Card_WaterdropLong_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d46c33f2380009841982907b2d351299
+    m_Address: Image_Card_Sandmong_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d71350b0236e7324ebf8796554081791
+    m_Address: Image_Card_Waggledodo_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d8bdea7a6f5947d4a9e53d396dc9873b
+    m_Address: Image_Card_Moonbite_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e102d5c699536c747b17b45f99b41986
+    m_Address: Image_Card_Campbean_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e484b8aab5d154bd683ca1a1e79e70b8
+    m_Address: Image_Card_Dreameater_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e821ae558fb22b445b015b57690ed6c6
+    m_Address: Image_Card_Magmole_Stage2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9f8153ed5ff59f5029cbca2c46e534d
+    m_Address: Image_Card_Gearmole_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ea4367fe077504a49befd6512ab04011
+    m_Address: Image_Card_Swampfrog_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: edbb2b4097a01b04caa5db671e501fd0
+    m_Address: Image_Card_Magnetos_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ef17b3b248162824aaab586988231b00
+    m_Address: Image_Card_SnowballBear_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f52364e17f9b803e29e1bcd64b581921
+    m_Address: Image_Card_Cloudmong_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f7059a20f7e98cf428c5bb1a41b33c15
+    m_Address: Image_Card_Raigor_Stage1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f9b23a5140815df498d0cd93c39d66ca
+    m_Address: Image_Card_Bombbat_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f9e3d238d23665d41ba818acc95c2dee
+    m_Address: Image_Card_Magmole_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: feac7d5cdd6426e47bfdd96252c9f630
+    m_Address: Image_Card_CaptainBeak_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: e3fe2cfed964aac4995d570598f9a972, type: 2}
+    - {fileID: 11400000, guid: 917f2ff646204a440b48e08fd383a2e0, type: 2}

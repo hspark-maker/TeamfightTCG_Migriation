@@ -139,7 +139,7 @@ public class CardGainFlightEffect : MonoBehaviour
     static Sprite ArtOf(CardData _card)
     {
         if (_card == null) return null;
-        return _card.deckPreview != null ? _card.deckPreview : CardVisualRules.PickCardArt(_card);
+        return CardVisualRules.PickDeckBanner(_card);
     }
 
     // 날아가는 카드가 탭 터치를 가로채지 않게.

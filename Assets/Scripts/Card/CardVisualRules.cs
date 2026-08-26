@@ -34,7 +34,11 @@ public static class CardVisualRules
         return PickCardArt(_card, s_evolutionStage != null ? s_evolutionStage(_card) : 0);
     }
 
-    /// <summary>지정 진화 단계의 아트. 해당 단계가 비었으면 이전 단계부터 미진화까지 차례로 폴백한다.</summary>
+    /// <summary>지정 진화 단계의 아트. 해당 단계가 비었으면 이전 단계부터 미진화까지 차례로 폴백한다.
+    ///
+    /// 폴백 판정은 **"그 단계에 그림이 배선되어 있는가"** 로 한다. 예전처럼 결과가 null인지로 판정하면
+    /// Addressables 이관 뒤에 깨진다 — 배선은 됐지만 아직 안 받아온 단계가 "빈 슬롯"으로 오해되어
+    /// 한 단계 아래 그림이 뜨고, 로드가 끝나면 그림이 갑자기 바뀐다. 배선 여부는 로드 없이 판정 가능하다.</summary>
     public static Sprite PickCardArt(CardData _card, int _stage)
     {
         if (_card == null) return null;
@@ -42,18 +46,47 @@ public static class CardVisualRules
         for (int t_stage = Mathf.Min(_stage, CardData.MaxEvolutionStage); t_stage > 0; t_stage--)
         {
             CardArtSet t_art = _card.GetEvolvedArt(t_stage);
-            Sprite t_sprite = PickArt(t_art);
-            if (t_sprite != null) return t_sprite;
+            if (!HasArt(t_art)) continue;
+            return Resolve(t_art);
         }
 
-        return _card.battleImage;
+        return CardArtCache.IsAssigned(_card.battleImageRef)
+            ? CardArtCache.Get(_card.battleImageRef)
+            : _card.battleImage;
     }
 
     /// <summary>전투 카드 인스턴스의 진화 단계를 반영한 아트.</summary>
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.data, _card.evolutionStage);
 
-    static Sprite PickArt(CardArtSet _art) => _art != null ? _art.battleImage : null;
+    /// <summary>덱 목록 배너 그림. 카드 아트와 다른 축이라 폴백 사슬에 끼지 않는다 —
+    /// 호출부가 각자 `.deckPreview`를 직접 읽으면 이관 후 구 필드(빈 값)를 보게 된다.</summary>
+    public static Sprite PickDeckPreview(CardData _card)
+    {
+        if (_card == null) return null;
+        return CardArtCache.IsAssigned(_card.deckPreviewRef)
+            ? CardArtCache.Get(_card.deckPreviewRef)
+            : _card.deckPreview;
+    }
+
+    /// <summary>덱 배너로 쓸 그림 = deckPreview가 배선돼 있으면 그것, 없으면 카드 아트.
+    /// 덱 목록과 카드 획득 비행 이펙트가 같은 폴백을 각자 적고 있었다 — 규칙을 여기 하나로 모은다.
+    /// 배선 여부로 판정하는 이유는 <see cref="PickCardArt"/>와 같다(로드 전 null을 빈 슬롯으로 오해 금지).</summary>
+    public static Sprite PickDeckBanner(CardData _card)
+    {
+        if (_card == null) return null;
+        bool t_hasPreview = CardArtCache.IsAssigned(_card.deckPreviewRef) || _card.deckPreview != null;
+        return t_hasPreview ? PickDeckPreview(_card) : PickCardArt(_card);
+    }
+
+    /// <summary>이 단계에 그림이 배선되어 있는가. 이관 전 에셋은 구 Sprite 필드로 판정한다.</summary>
+    static bool HasArt(CardArtSet _art)
+        => _art != null && (CardArtCache.IsAssigned(_art.battleImageRef) || _art.battleImage != null);
+
+    static Sprite Resolve(CardArtSet _art)
+        => CardArtCache.IsAssigned(_art.battleImageRef)
+            ? CardArtCache.Get(_art.battleImageRef)
+            : _art.battleImage;
 
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
     /// 인게임은 키워드까지 필요하고(iconMap → PlayKeywordGlow 역참조), 아웃게임은 스프라이트만 쓴다.

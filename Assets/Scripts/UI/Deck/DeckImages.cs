@@ -69,6 +69,6 @@ public static class DeckImages
         var t_first = _deck[0];
         if (t_first == null) return null;
 
-        return t_first.deckPreview != null ? t_first.deckPreview : CardVisualRules.PickCardArt(t_first);
+        return CardVisualRules.PickDeckBanner(t_first);
     }
 }

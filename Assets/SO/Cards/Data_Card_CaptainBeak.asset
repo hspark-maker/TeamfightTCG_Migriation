@@ -21,13 +21,37 @@ MonoBehaviour:
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 9bff0080901fae44eb15d5dfea14a160, type: 2}
-  battleImage: {fileID: 21300000, guid: 6b1b8fc006b3e2533c6639ca087b96c5, type: 3}
+  battleImage: {fileID: 0}
   deckPreview: {fileID: 21300000, guid: 79f44ccb10240c64f9659c0600b118c3, type: 3}
+  battleImageRef:
+    m_AssetGUID: 6b1b8fc006b3e2533c6639ca087b96c5
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 0
+  deckPreviewRef:
+    m_AssetGUID: 
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 0
   hpGainByLevel: 0000000000000000040000000300000007000000
   keywordUnlockLevel: 2
   evolvedArts:
-  - battleImage: {fileID: 21300000, guid: c74c6adaaa1edfc40b24301e950ab213, type: 3}
-  - battleImage: {fileID: 21300000, guid: feac7d5cdd6426e47bfdd96252c9f630, type: 3}
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: c74c6adaaa1edfc40b24301e950ab213
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: feac7d5cdd6426e47bfdd96252c9f630
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
   defaultEvolutionStage: 0
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0
