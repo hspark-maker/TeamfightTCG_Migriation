@@ -68,7 +68,7 @@ public class BootInstaller : MonoBehaviour
         }
         catch (System.Exception t_exception)
         {
-            GameManager.MarkRecoveryRequired();
+            GameInitialization.MarkRecoveryRequired();
             Debug.LogException(t_exception);
             Destroy(gameObject);
             return;
@@ -80,7 +80,7 @@ public class BootInstaller : MonoBehaviour
         // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
         // 지금은 전 카드를 받는다: 이관 전과 같은 "언제든 다 그려진다" 동작을 유지하기 위함이다.
         // 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다(좁히는 순간 미스 경고가 진단이 된다).
-        StartCoroutine(CardArtCache.Preload(t_availableCards));
+        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
 
         // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
@@ -164,24 +164,45 @@ public class BootInstaller : MonoBehaviour
     // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
     System.Collections.IEnumerator Start()
     {
-        while (!PlayerSaveSync.IsGateComplete &&
-               GameManager.BootState != EGameBootState.UpdateRequired &&
-               GameManager.BootState != EGameBootState.RecoveryRequired)
+        while (!PlayerSaveSync.IsGateComplete && !GameInitialization.IsTerminated)
         {
             yield return null;
         }
 
-        if (GameManager.BootState == EGameBootState.UpdateRequired ||
-            GameManager.BootState == EGameBootState.RecoveryRequired)
+        if (GameInitialization.IsTerminated)
             yield break;
+
+        if (DataLibrary.instance == null)
+        {
+            Debug.LogError("[BootInstaller] DataLibrary is missing from the boot hierarchy.");
+            GameInitialization.MarkRecoveryRequired();
+            yield break;
+        }
+
+        GameInitialization.SetState(EGameInitState.LoadingAssets);
+        while ((!CardArtCache.IsComplete || (!DataLibrary.IsLoaded && !DataLibrary.HasFailed)) &&
+               !GameInitialization.IsTerminated)
+        {
+            yield return null;
+        }
+
+        if (GameInitialization.IsTerminated)
+            yield break;
+
+        if (CardArtCache.HasFailed || DataLibrary.HasFailed)
+        {
+            GameInitialization.MarkRecoveryRequired();
+            yield break;
+        }
 
         try
         {
+            GameInitialization.SetState(EGameInitState.InstallingManagers);
             InstallSaveDependent();
         }
         catch (System.Exception t_exception)
         {
-            GameManager.MarkRecoveryRequired();
+            GameInitialization.MarkRecoveryRequired();
             Debug.LogException(t_exception);
         }
     }
@@ -204,7 +225,7 @@ public class BootInstaller : MonoBehaviour
         OutgameTutorialRewind.ApplyReplayIfScheduled();
 
         s_saveDependentInstalled = true;
-        GameManager.MarkBootReady();
+        GameInitialization.MarkReady();
     }
 
     static int EnemyCardLevelOf(CardData _card)

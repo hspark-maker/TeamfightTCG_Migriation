@@ -574,7 +574,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: be8901cbddebcd57bc43fe1daa328b3b
-    m_Address: Image_Card_Sparkfin_Stage1_Portrait3x4
+    m_Address: Image_Card_Sparkfin_Stage1
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards

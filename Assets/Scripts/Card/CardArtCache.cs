@@ -1,126 +1,234 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
-/// <summary>카드 아트(Addressables)를 미리 받아 두고 **동기로** 꺼내 쓰게 하는 캐시.
-///
-/// 왜 캐시가 필요한가: 카드 아트를 읽는 지점(<see cref="CardVisualRules.PickCardArt"/> 계열)은 전부
-/// `Sprite`를 그 프레임에 대입하는 동기 코드다. 아트를 AssetReference로 빼면서 그 시그니처를 async로 바꾸면
-/// CardView·CardVisualView·팩 연출·비행 이펙트까지 호출 사슬 전체가 전염된다. 그래서 **로드 시점과 사용 시점을
-/// 분리**한다 — 화면에 들어가기 전에 <see cref="Preload"/>로 채우고, 그리는 순간에는 사전에서 꺼내기만 한다.
-///
-/// 계약: 그릴 카드는 그리기 전에 반드시 Preload를 거친다. 안 거치면 그 프레임엔 null이 나가고(호출부가
-/// 렌더러를 끈다) 뒤늦게 로드가 걸린다 — 조용히 빈 카드가 뜨므로 미스는 경고로 남긴다.
-///
-/// 여기 넣지 않는 것: 무엇을 프리로드할지 고르는 규칙(덱·도감·소유 목록은 호출부가 안다),
-/// 진화 단계 폴백(그건 표시 규칙이라 <see cref="CardVisualRules"/> 소유).</summary>
+/// <summary>Cards 라벨의 Addressables 카탈로그를 조회하고 카드 아트를 앱 수명 동안 캐시한다.</summary>
 public static class CardArtCache
 {
-    // 키 = AssetReference.RuntimeKey(=에셋 guid 문자열). 같은 스프라이트를 두 카드가 공유해도 1회만 로드된다.
-    static readonly Dictionary<string, Sprite> s_loaded = new Dictionary<string, Sprite>();
+    const string CardsLabel = "Cards";
+    const string CardAssetPrefix = "Data_Card_";
+
+    static readonly HashSet<string> s_addresses = new HashSet<string>(StringComparer.Ordinal);
+    static readonly Dictionary<string, Sprite> s_loaded = new Dictionary<string, Sprite>(StringComparer.Ordinal);
     static readonly Dictionary<string, AsyncOperationHandle<Sprite>> s_handles =
-        new Dictionary<string, AsyncOperationHandle<Sprite>>();
-    // 로드 중인 키. 미스로 걸린 지연 로드가 같은 키를 중복 요청하지 않게 막는다.
-    static readonly HashSet<string> s_pending = new HashSet<string>();
+        new Dictionary<string, AsyncOperationHandle<Sprite>>(StringComparer.Ordinal);
+    static readonly HashSet<string> s_pending = new HashSet<string>(StringComparer.Ordinal);
+    static readonly HashSet<string> s_reportedMisses = new HashSet<string>(StringComparer.Ordinal);
 
-    /// <summary>프리로드가 끝나 새 아트가 들어왔을 때 발화. 미스로 뒤늦게 채워진 화면을 다시 그리고 싶은
-    /// 호출부가 구독한다(현재 구독자는 없다 — 프리로드 계약을 지키면 미스가 안 난다).</summary>
-    public static event System.Action OnArtLoaded;
+    static AsyncOperationHandle<IList<IResourceLocation>> s_catalogHandle;
+    static bool s_catalogRequested;
+    static bool s_catalogReady;
+    static bool s_catalogFailed;
+    static bool s_preloadStarted;
+    static bool s_preloadComplete;
+    static bool s_loadFailed;
+    static bool s_reportedCatalogNotReady;
+    static int s_wantedCount;
+    static int s_finishedCount;
+    static int s_generation;
 
-    /// <summary>참조가 실제로 배선되어 있는가. **로드하지 않고** 판정한다 —
-    /// 진화 단계 폴백(빈 슬롯이면 이전 단계로)은 로드 전에 결정해야 하므로 이 판정이 필수다.</summary>
-    public static bool IsAssigned(AssetReferenceSprite _ref)
-        => _ref != null && _ref.RuntimeKeyIsValid();
+    public static event Action OnArtLoaded;
 
-    static string KeyOf(AssetReferenceSprite _ref) => _ref.RuntimeKey.ToString();
+    public static bool IsCatalogReady => s_catalogReady;
+    public static bool IsComplete => s_preloadComplete;
+    public static bool HasFailed => s_catalogFailed || s_loadFailed;
+    public static bool IsReady => s_preloadComplete && !HasFailed;
+    public static bool IsBusy => (s_catalogRequested && !s_catalogReady && !s_catalogFailed) || s_pending.Count > 0;
+    public static int LoadedCount => s_loaded.Count;
 
-    /// <summary>캐시에 있으면 스프라이트, 없으면 null. 미스면 지연 로드를 걸어 두지만
-    /// **그 프레임엔 null이 나간다** — 호출부는 지금도 null을 렌더러 끄기로 처리하고 있다.</summary>
-    public static Sprite Get(AssetReferenceSprite _ref)
+    public static float LoadProgress
     {
-        if (!IsAssigned(_ref)) return null;
-
-        string t_key = KeyOf(_ref);
-        if (s_loaded.TryGetValue(t_key, out Sprite t_sprite)) return t_sprite;
-
-        if (s_pending.Add(t_key))
+        get
         {
-            Debug.LogWarning($"[CardArtCache] 프리로드 안 된 아트를 그리려 했다(이번 프레임은 빈 칸): {t_key}");
-            LoadOne(t_key, _ref);
+            if (s_preloadComplete) return 1f;
+            if (!s_catalogReady) return s_catalogRequested && s_catalogHandle.IsValid()
+                ? Mathf.Clamp01(s_catalogHandle.PercentComplete) * 0.1f
+                : 0f;
+            if (!s_preloadStarted || s_wantedCount == 0) return 0.1f;
+            return 0.1f + 0.9f * Mathf.Clamp01((float)s_finishedCount / s_wantedCount);
         }
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => ReleaseAll();
+
+    /// <summary>런타임 stage 0이 주소 Stage1에 대응한다.</summary>
+    public static string AddressOf(CardSpec _spec, int _stage)
+    {
+        if (_spec == null) throw new ArgumentNullException(nameof(_spec));
+        string t_name = _spec.AssetName;
+        if (t_name.StartsWith(CardAssetPrefix, StringComparison.Ordinal))
+            t_name = t_name.Substring(CardAssetPrefix.Length);
+        return $"Image_Card_{t_name}_Stage{_stage + 1}";
+    }
+
+    /// <summary>Cards 라벨 위치를 한 번 조회해 PrimaryKey 집합을 만든다. 실제 Sprite는 로드하지 않는다.</summary>
+    public static IEnumerator EnsureCatalog()
+    {
+        if (s_catalogReady || s_catalogFailed) yield break;
+
+        int t_generation = s_generation;
+
+        if (!s_catalogRequested)
+        {
+            s_catalogRequested = true;
+            s_catalogHandle = Addressables.LoadResourceLocationsAsync(CardsLabel, typeof(Sprite));
+        }
+
+        AsyncOperationHandle<IList<IResourceLocation>> t_handle = s_catalogHandle;
+
+        while (t_generation == s_generation && t_handle.IsValid() && !t_handle.IsDone) yield return null;
+        if (t_generation != s_generation) yield break;
+        if (s_catalogReady || s_catalogFailed) yield break;
+
+        if (!t_handle.IsValid() || t_handle.Status != AsyncOperationStatus.Succeeded)
+        {
+            s_catalogFailed = true;
+            Debug.LogError("[CardArtCache] Cards 라벨 Addressables 카탈로그 조회 실패.");
+        }
+        else
+        {
+            foreach (IResourceLocation t_location in t_handle.Result)
+                if (t_location != null && !string.IsNullOrEmpty(t_location.PrimaryKey))
+                    s_addresses.Add(t_location.PrimaryKey);
+            s_catalogReady = true;
+        }
+
+        if (t_handle.IsValid()) Addressables.Release(t_handle);
+        s_catalogHandle = default;
+    }
+
+    /// <summary>카탈로그에 주소가 실제로 등록되어 있는지 판정한다. 프리로드 여부와 무관하다.</summary>
+    public static bool Exists(string _address)
+    {
+        if (!s_catalogReady)
+        {
+            if (!s_reportedCatalogNotReady)
+            {
+                s_reportedCatalogNotReady = true;
+                Debug.LogWarning("[CardArtCache] 카탈로그가 준비되지 않아 카드 아트를 표시하지 않습니다.");
+            }
+            return false;
+        }
+        return !string.IsNullOrEmpty(_address) && s_addresses.Contains(_address);
+    }
+
+    public static Sprite Get(string _address)
+    {
+        if (string.IsNullOrEmpty(_address)) return null;
+        if (s_loaded.TryGetValue(_address, out Sprite t_sprite)) return t_sprite;
+        if (s_reportedMisses.Add(_address))
+            Debug.LogError($"[CardArtCache] 프리로드되지 않았거나 로드에 실패한 카드 아트: {_address}");
         return null;
     }
 
-    /// <summary>카드들의 아트를 전부 받아올 때까지 도는 코루틴. 이미 캐시에 있는 키는 건너뛴다.
-    /// 진화 단계 아트까지 전부 받는다 — 전투 중 진화하면 그 자리에서 그림이 바뀌어야 하기 때문이다.</summary>
-    public static IEnumerator Preload(IEnumerable<CardData> _cards)
+    public static IEnumerator Preload(IEnumerable<CardSpec> _specs)
     {
-        if (_cards == null) yield break;
+        if (s_preloadComplete) yield break;
 
-        var t_wanted = new Dictionary<string, AssetReferenceSprite>();
-        foreach (CardData t_card in _cards)
-            CollectRefs(t_card, t_wanted);
-
-        foreach (KeyValuePair<string, AssetReferenceSprite> t_pair in t_wanted)
+        int t_generation = s_generation;
+        if (s_preloadStarted)
         {
-            if (s_loaded.ContainsKey(t_pair.Key) || s_pending.Contains(t_pair.Key)) continue;
-            s_pending.Add(t_pair.Key);
-            LoadOne(t_pair.Key, t_pair.Value);
+            while (t_generation == s_generation && !s_preloadComplete) yield return null;
+            yield break;
         }
 
-        while (s_pending.Count > 0) yield return null;
+        s_preloadStarted = true;
+        yield return EnsureCatalog();
+        if (t_generation != s_generation) yield break;
+        if (!s_catalogReady)
+        {
+            s_preloadComplete = true;
+            yield break;
+        }
+
+        var t_wanted = new HashSet<string>(StringComparer.Ordinal);
+        if (_specs != null)
+        {
+            foreach (CardSpec t_spec in _specs)
+            {
+                if (t_spec == null) continue;
+                string t_baseAddress = AddressOf(t_spec, 0);
+                if (!s_addresses.Contains(t_baseAddress))
+                {
+                    s_loadFailed = true;
+                    Debug.LogError($"[CardArtCache] 기본 카드 아트 주소 없음: {t_baseAddress}");
+                }
+
+                for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+                {
+                    string t_address = AddressOf(t_spec, t_stage);
+                    if (s_addresses.Contains(t_address)) t_wanted.Add(t_address);
+                }
+            }
+        }
+
+        s_wantedCount = t_wanted.Count;
+        s_finishedCount = 0;
+
+        foreach (string t_address in t_wanted)
+        {
+            if (s_loaded.ContainsKey(t_address))
+            {
+                s_finishedCount++;
+                continue;
+            }
+            if (!s_pending.Add(t_address)) continue;
+            LoadOne(t_address, t_generation);
+        }
+
+        while (s_pending.Count > 0 && t_generation == s_generation) yield return null;
+        if (t_generation != s_generation) yield break;
+
+        s_preloadComplete = true;
         OnArtLoaded?.Invoke();
     }
 
-    /// <summary>이 카드가 쓰는 아트 참조 전부(미진화 0단계 ~ 최종 단계).</summary>
-    static void CollectRefs(CardData _card, Dictionary<string, AssetReferenceSprite> _into)
+    static void LoadOne(string _address, int _generation)
     {
-        if (_card == null) return;
-
-        for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+        AsyncOperationHandle<Sprite> t_handle = Addressables.LoadAssetAsync<Sprite>(_address);
+        s_handles[_address] = t_handle;
+        t_handle.Completed += _operation =>
         {
-            CardArtSet t_art = _card.GetArt(t_stage);
-            if (t_art != null) Add(t_art.battleImageRef, _into);
-        }
-    }
-
-    static void Add(AssetReferenceSprite _ref, Dictionary<string, AssetReferenceSprite> _into)
-    {
-        if (!IsAssigned(_ref)) return;
-        _into[KeyOf(_ref)] = _ref;
-    }
-
-    static void LoadOne(string _key, AssetReferenceSprite _ref)
-    {
-        // AssetReference 인스턴스는 CardData 에셋이 소유하므로 같은 참조를 두 번 LoadAssetAsync 하면
-        // 핸들이 겹친다. 키로 주소를 직접 로드해 참조 인스턴스 상태에 얽히지 않게 한다.
-        AsyncOperationHandle<Sprite> t_handle = Addressables.LoadAssetAsync<Sprite>(_key);
-        s_handles[_key] = t_handle;
-        t_handle.Completed += _op =>
-        {
-            s_pending.Remove(_key);
-            if (_op.Status == AsyncOperationStatus.Succeeded) s_loaded[_key] = _op.Result;
-            else Debug.LogError($"[CardArtCache] 카드 아트 로드 실패: {_key}");
+            if (_generation != s_generation) return;
+            s_pending.Remove(_address);
+            s_finishedCount++;
+            if (_operation.Status == AsyncOperationStatus.Succeeded && _operation.Result != null)
+                s_loaded[_address] = _operation.Result;
+            else
+            {
+                s_loadFailed = true;
+                Debug.LogError($"[CardArtCache] 카드 아트 로드 실패: {_address}");
+            }
         };
     }
 
-    /// <summary>받아 둔 아트를 전부 놓는다. 놓지 않으면 Addressables 참조 카운트가 남아
-    /// 씬을 나가도 메모리가 안 내려간다 — 화면을 벗어날 때 호출부가 불러야 한다.</summary>
     public static void ReleaseAll()
     {
+        s_generation++;
+        if (s_catalogHandle.IsValid()) Addressables.Release(s_catalogHandle);
         foreach (KeyValuePair<string, AsyncOperationHandle<Sprite>> t_pair in s_handles)
             if (t_pair.Value.IsValid()) Addressables.Release(t_pair.Value);
 
-        s_handles.Clear();
+        s_catalogHandle = default;
+        s_addresses.Clear();
         s_loaded.Clear();
+        s_handles.Clear();
         s_pending.Clear();
+        s_reportedMisses.Clear();
+        s_catalogRequested = false;
+        s_catalogReady = false;
+        s_catalogFailed = false;
+        s_preloadStarted = false;
+        s_preloadComplete = false;
+        s_loadFailed = false;
+        s_reportedCatalogNotReady = false;
+        s_wantedCount = 0;
+        s_finishedCount = 0;
+        OnArtLoaded = null;
     }
-
-    /// <summary>프리로드가 아직 도는 중인가.</summary>
-    public static bool IsBusy => s_pending.Count > 0;
-
-    /// <summary>지금 캐시에 올라와 있는 아트 수(진단용).</summary>
-    public static int LoadedCount => s_loaded.Count;
 }

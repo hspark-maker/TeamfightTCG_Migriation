@@ -196,7 +196,7 @@ public partial class ReleaseManagerWindow : EditorWindow
     void Revalidate()
     {
         this.validationWarnings = new List<string>();
-        this.issues     = ContentProfileValidator.Collect(this.validationWarnings);
+        this.issues     = ContentProfileValidator.Collect(this.validationWarnings, ContentRunModeEditor.Current);
         this.driftValid = false;   // 표를 갈았거나 에셋이 움직였다 — 대조 결과도 같이 낡는다
     }
 

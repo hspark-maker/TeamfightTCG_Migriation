@@ -76,7 +76,7 @@
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
 - 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 등급: `ECardGrade`
-- 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.evolvedArts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 진화 단계는 `CardGrowth.EvolutionStage`
+- 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.arts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 주소 기반 로드 `CardArtCache` · `CardSpec` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
 - 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `AttackEffect` · `ECardChannel` · `SynergyEmblemTiming`
@@ -155,7 +155,7 @@
 
 ## 전투 UI (`UI/Battle/`, 29파일 6,965줄)
 
-- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `CardWeaponView` · `CardArmedVfx` · `CardFadeAlpha`
+- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `CardArmedVfx` · `WeaponAnimSpec` · `CardFadeAlpha`
 - 보드·카메라: `BattleBoardView` · `BattleFieldView` · `BattleCamera` · `BattleCameraFit` · `BattleSelection`
 - 턴 표시: `TurnBannerUI` · `TurnTimerUI` · `TurnSideTint` · `ActionPanel` · `CoinFlipUI` · `MulliganOverlayUI`
 - 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`

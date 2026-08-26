@@ -7,6 +7,8 @@ public static class CardCatalog
 {
     static readonly List<CardData> s_all = new List<CardData>();
     static readonly IReadOnlyList<CardData> s_allReadonly = s_all.AsReadOnly();
+    static readonly List<CardSpec> s_allSpecs = new List<CardSpec>();
+    static readonly IReadOnlyList<CardSpec> s_allSpecsReadonly = s_allSpecs.AsReadOnly();
 
     // 카드 식별의 단일 축 — 세이브·도감 행·덱이 전부 이 번호를 쓴다.
     static readonly Dictionary<int, CardData> s_byId = new Dictionary<int, CardData>();
@@ -19,6 +21,7 @@ public static class CardCatalog
     public static bool IsReady { get; private set; }
 
     public static IReadOnlyList<CardData> All => s_allReadonly;
+    public static IReadOnlyList<CardSpec> AllSpecs => s_allSpecsReadonly;
 
     public static int Count => s_all.Count;
 
@@ -26,6 +29,7 @@ public static class CardCatalog
     static void ResetRuntimeState()
     {
         s_all.Clear();
+        s_allSpecs.Clear();
         s_byId.Clear();
         s_specById.Clear();
         s_legacyNameToId.Clear();
@@ -74,6 +78,7 @@ public static class CardCatalog
                 throw new InvalidOperationException($"[CardCatalog] CardData ID {t_pair.Key}('{t_pair.Value.name}')가 {_mode} 카드 표에 없다.");
 
         s_all.Clear();
+        s_allSpecs.Clear();
         s_byId.Clear();
         s_specById.Clear();
         s_legacyNameToId.Clear();
@@ -86,6 +91,7 @@ public static class CardCatalog
             {
                 s_byId.Add(t_id, t_asset);
                 s_all.Add(t_asset);
+                s_allSpecs.Add(t_spec);
             }
         }
         foreach (KeyValuePair<string, int> t_pair in t_legacyNames) s_legacyNameToId.Add(t_pair.Key, t_pair.Value);
@@ -109,6 +115,15 @@ public static class CardCatalog
     {
         _card = Get(_id);
         return _card != null;
+    }
+
+    public static bool TryGetSpec(CardData _card, out CardSpec _spec)
+        => TryGetSpec(IdOf(_card), out _spec);
+
+    public static bool TryGetSpec(int _id, out CardSpec _spec)
+    {
+        _spec = null;
+        return IsReady && _id > 0 && s_specById.TryGetValue(_id, out _spec);
     }
 
     public static CardSpec RequireSpec(CardData _card)

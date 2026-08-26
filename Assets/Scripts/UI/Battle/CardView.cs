@@ -347,7 +347,7 @@ public class CardView : MonoBehaviour
         if (t_isEmpty)
         {
             SetShieldVisible(false);
-            SetFaceDownLook(false);
+            SetFaceDownLook(false, null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
             return;
         }
@@ -368,10 +368,7 @@ public class CardView : MonoBehaviour
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
         Sprite t_art = CardVisualRules.PickBattleArt(_card);
-        if (this.illustration != null && !t_isFaceDown && t_art != null)
-            this.illustration.sprite = t_art;
-
-        SetFaceDownLook(t_isFaceDown);
+        SetFaceDownLook(t_isFaceDown, t_art);
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
@@ -386,12 +383,13 @@ public class CardView : MonoBehaviour
 
     Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
     bool    illustrationScaleCached;
+    bool    missingCardBackWarned;
 
     /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
     ///
     /// 뒷면 그림은 카드 아트와 원본 크기가 달라(덱 더미용 이미지) 그대로 넣으면 카드 밖으로 삐져나온다.
     /// 그래서 **테두리 높이에 맞춰 스케일을 계산**한다 — 매직넘버를 두면 뒷면 이미지를 교체할 때마다 어긋난다.</summary>
-    void SetFaceDownLook(bool _faceDown)
+    void SetFaceDownLook(bool _faceDown, Sprite _frontArt)
     {
         if (!this.illustrationScaleCached && this.illustration != null)
         {
@@ -404,13 +402,29 @@ public class CardView : MonoBehaviour
 
         if (this.illustration == null) return;
 
-        if (!_faceDown || this.cardBackSprite == null)
+        if (!_faceDown)
         {
+            this.illustration.sprite = _frontArt;
+            this.illustration.enabled = _frontArt != null;
             this.illustration.transform.localScale = this.illustrationBaseScale;
             return;
         }
 
+        if (this.cardBackSprite == null)
+        {
+            this.illustration.sprite = null;
+            this.illustration.enabled = false;
+            this.illustration.transform.localScale = this.illustrationBaseScale;
+            if (!this.missingCardBackWarned)
+            {
+                this.missingCardBackWarned = true;
+                Debug.LogWarning($"[CardView] cardBackSprite가 없어 뒷면을 숨깁니다: {name}", this);
+            }
+            return;
+        }
+
         this.illustration.sprite = this.cardBackSprite;
+        this.illustration.enabled = true;
         this.illustration.transform.localScale = FitBackScale();
     }
 

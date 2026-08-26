@@ -48,7 +48,7 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.LabelField("빌드 실행 모드", ContentRunModeEditor.Label(t_currentMode));
 
         bool t_hasEnv = TryGetDataEnvId(this.dataUploadMode, out string t_envId, out string t_envError);
-        EditorGUILayout.LabelField("문서 경로", t_hasEnv ? $"envs/{t_envId}/specs/<표 이름>" : "(환경 프로필 없음)");
+        EditorGUILayout.LabelField("문서 경로", t_hasEnv ? $"{FirebaseRootPath.Environment(t_envId)}/specs/<표 이름>" : "(환경 프로필 없음)");
 
         bool t_modeMismatch = this.dataUploadMode != t_currentMode;
         if (t_modeMismatch)
@@ -193,7 +193,7 @@ public partial class ReleaseManagerWindow
 
         if (!EditorUtility.DisplayDialog(
                 "스펙시트 업로드",
-                $"envs/{_envId}/specs/ 아래 표 {this.dataSelected.Count}개를 배포한다.\n" +
+                $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 표 {this.dataSelected.Count}개를 배포한다.\n" +
                 "표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
                 "업로드", "취소"))
             return;

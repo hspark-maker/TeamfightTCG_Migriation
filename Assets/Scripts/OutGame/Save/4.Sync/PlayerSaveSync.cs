@@ -12,14 +12,10 @@ static class PlayerSaveSync
     const string DEVICE_ID_KEY = "firebase.playerSave.deviceId";
     const string OWNER_UID_KEY = "firebase.playerSave.ownerUid";
     const int UPLOAD_DEBOUNCE_MS = 3000;
-    const int PULL_TIMEOUT_MS = 5000;
-    const int TRANSACTION_TIMEOUT_MS = 10000;
     const int PAYLOAD_WARNING_BYTES = 256 * 1024;
     const int PAYLOAD_MAX_BYTES = 300000;
-    const string ENV_ROOT_COLLECTION = "envs";
-    const string SAVE_DOC_ID = "current";
 
-    static FirebaseFirestore s_firestore;
+    static FirebaseContext s_context;
     static readonly Dictionary<string, string> s_uploadedHashes = new();
     static string s_activeUserId;
     static string s_envId;
@@ -45,15 +41,17 @@ static class PlayerSaveSync
         s_gateComplete = true;
     }
 
-    internal static void Initialize(string _envId, bool _uploadAllowed)
+    internal static void Initialize(in FirebaseContext _context, bool _uploadAllowed)
     {
+        if (!_context.IsValid) throw new ArgumentException("FirebaseContext is not initialized.", nameof(_context));
         Shutdown();
 
+        s_context = _context;
         s_initialized = true;
         s_uploadAllowed = _uploadAllowed;
         s_remoteWriteApproved = false;
         s_gateComplete = false;
-        s_envId = _envId;
+        s_envId = _context.EnvId;
         s_activeUserId = FirebaseAuthService.Instance.IsCurrentUserActive
             ? FirebaseAuthService.Instance.UserId
             : string.Empty;
@@ -81,6 +79,8 @@ static class PlayerSaveSync
         s_lastKnownRevision = -1;
         s_lastKnownRemoteHash = string.Empty;
         s_activeUserId = string.Empty;
+        s_envId = string.Empty;
+        s_context = default;
     }
 
     internal static void FlushPending()
@@ -104,7 +104,7 @@ static class PlayerSaveSync
     static void ResetRuntimeState()
     {
         Shutdown();
-        s_firestore = null;
+        s_context = default;
         s_envId = string.Empty;
         s_pendingPayload = string.Empty;
         s_lastKnownRevision = -1;
@@ -142,7 +142,7 @@ static class PlayerSaveSync
             if (t_switchedAccount)
             {
                 s_gateComplete = true;
-                GameManager.MarkRecoveryRequired();
+                GameInitialization.MarkRecoveryRequired();
                 Debug.LogError("[PlayerSaveSync] Firebase account changed during the session. Restart is required.");
                 return;
             }
@@ -191,7 +191,7 @@ static class PlayerSaveSync
         try
         {
             Task t_authTask = FirebaseAuthService.Instance.InitializeAsync().AsTask();
-            Task t_authCompleted = await Task.WhenAny(t_authTask, Task.Delay(PULL_TIMEOUT_MS));
+            Task t_authCompleted = await Task.WhenAny(t_authTask, Task.Delay(FirebaseTimeouts.AuthAndReadMilliseconds));
             if (t_authCompleted != t_authTask)
             {
                 ObserveLateTaskAsync(t_authTask).Forget();
@@ -221,7 +221,7 @@ static class PlayerSaveSync
                 t_ownerUid != t_userId)
             {
                 s_gateComplete = true;
-                GameManager.MarkRecoveryRequired();
+                GameInitialization.MarkRecoveryRequired();
                 Debug.LogError("[PlayerSaveSync] Local save belongs to a different Firebase UID.");
                 return;
             }
@@ -258,7 +258,7 @@ static class PlayerSaveSync
     {
         PullState = ESavePullState.Pulling;
         Task<DocumentSnapshot> t_readTask = Document(_userId, _envId).GetSnapshotAsync(Source.Server);
-        Task t_completedTask = await Task.WhenAny(t_readTask, Task.Delay(PULL_TIMEOUT_MS));
+        Task t_completedTask = await Task.WhenAny(t_readTask, Task.Delay(FirebaseTimeouts.AuthAndReadMilliseconds));
         if (t_completedTask != t_readTask)
         {
             ObserveLateReadAsync(t_readTask).Forget();
@@ -303,7 +303,7 @@ static class PlayerSaveSync
             PullState = ESavePullState.Classified;
             LastDecision = ESaveReconcileDecision.FutureSchema;
             s_gateComplete = true;
-            GameManager.MarkUpdateRequired();
+            GameInitialization.MarkUpdateRequired();
             Debug.LogWarning(
                 $"[PlayerSaveSync][Reconcile] Remote schema v{t_declaredSchemaVersion} is newer than client v{UserSaveData.VERSION}. " +
                 $"env={_envId}");
@@ -570,7 +570,7 @@ static class PlayerSaveSync
                 if (!DataSaveManager.TryApplyRemote(_remotePayload, t_backupKey, out string t_error))
                 {
                     Debug.LogError($"[PlayerSaveSync] Remote apply failed: {t_error}");
-                    GameManager.MarkRecoveryRequired();
+                    GameInitialization.MarkRecoveryRequired();
                     MarkGateComplete();
                     return;
                 }
@@ -692,7 +692,7 @@ static class PlayerSaveSync
 
         Task t_completedTask = await Task.WhenAny(
             t_transactionTask,
-            Task.Delay(TRANSACTION_TIMEOUT_MS));
+            Task.Delay(FirebaseTimeouts.TransactionMilliseconds));
         if (t_completedTask != t_transactionTask)
         {
             ObserveLateTaskAsync(t_transactionTask).Forget();
@@ -751,7 +751,7 @@ static class PlayerSaveSync
         if (!DataSaveManager.TrySaveRemoteConflict(t_key, JsonUtility.ToJson(t_conflict), out string t_error))
         {
             Debug.LogError($"[PlayerSaveSync] Conflict backup failed: {t_error}");
-            GameManager.MarkRecoveryRequired();
+            GameInitialization.MarkRecoveryRequired();
             return;
         }
 
@@ -863,21 +863,12 @@ static class PlayerSaveSync
 
     static FirebaseFirestore Firestore()
     {
-        if (s_firestore != null) return s_firestore;
-
-        s_firestore = FirebaseFirestore.DefaultInstance;
-        s_firestore.Settings.PersistenceEnabled = false;
-        return s_firestore;
+        return s_context.GetFirestore();
     }
 
     static DocumentReference Document(string _userId, string _envId)
     {
-        return Firestore().Collection(ENV_ROOT_COLLECTION)
-            .Document(_envId)
-            .Collection("users")
-            .Document(_userId)
-            .Collection("save")
-            .Document(SAVE_DOC_ID);
+        return Firestore().Document(PlayerSaveFirestorePaths.Current(_envId, _userId));
     }
 
     static string DeviceId()

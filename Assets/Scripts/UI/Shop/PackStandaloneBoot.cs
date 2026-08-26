@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,6 +9,7 @@ using UnityEngine;
 // 구매·차감·소유 부여는 하지 않는다(연출 배선 검증용 껍데기 결과). 경제 계약은 CardPackOpener만 건드린다.
 public class PackStandaloneBoot : MonoBehaviour
 {
+    [SerializeField] CardRegistry cardRegistry;
     [Header("더미 개봉 (PackHandoff 미배선일 때만)")]
     [Tooltip("더미 카드의 출처 팩. 풀 앞에서 DrawCount장을 순서대로 집는다(랜덤 아님 — 재현 가능).")]
     [SerializeField] CardPackData dummyPack;
@@ -29,6 +31,7 @@ public class PackStandaloneBoot : MonoBehaviour
     // 캐리어는 어떤 Start보다 먼저 차 있어야 한다 — 여는 쪽이 Start라 주입은 Awake다.
     void Awake()
     {
+        if (!CardStandaloneBootstrap.Ensure(this.cardRegistry)) return;
         if (PackHandoff.HasPending) return;   // 실제 진입 — 더미로 덮지 않는다.
 
         var t_cards = ResolveCards();
@@ -56,9 +59,16 @@ public class PackStandaloneBoot : MonoBehaviour
     }
 
     // 오버레이가 Awake에서 Instance를 선점하므로 열기는 Start까지 미룬다.
-    void Start()
+    IEnumerator Start()
     {
-        if (!PackHandoff.HasPending) return;   // 주입이 생략됐으면 열 팩이 없다.
+        if (!PackHandoff.HasPending) yield break;   // 주입이 생략됐으면 열 팩이 없다.
+
+        yield return CardArtCache.Preload(CardCatalog.AllSpecs);
+        if (!CardArtCache.IsReady)
+        {
+            Debug.LogError("[PackStandaloneBoot] 카드 아트 준비 실패.");
+            yield break;
+        }
 
         PackOpenOverlay.TryOpen();
     }

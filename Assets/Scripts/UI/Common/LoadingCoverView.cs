@@ -37,6 +37,11 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("로딩이 끝나지 않아도 이 시간(초)이 지나면 다음 씬으로 넘긴다 — 무한 대기 방지.")]
     [SerializeField] float maxDuration = 15f;
 
+    // 부팅 대기는 진행바 연출과 다른 축이다. maxDuration을 같이 쓰면 CoFillBar가 그 예산을 먼저
+    // 소진한 뒤 부팅 대기가 0초로 시작해, 조금만 느려도 곧장 복구 화면으로 떨어진다.
+    // 세이브 동기화만으로도 최악 15초(PlayerSaveSync의 pull 5s + transaction 10s)라 넉넉히 잡는다.
+    [SerializeField] float bootWaitTimeout = 45f;
+
     [Tooltip("진행바가 100%에 닿은 뒤 씬을 넘기기 전 유지 시간(초).")]
     [SerializeField] float holdBeforeLoad = 0.15f;
 
@@ -120,7 +125,7 @@ public class LoadingCoverView : MonoBehaviour
 
     IEnumerator CoRunBoot()
     {
-        if (GameManager.BootState == EGameBootState.UpdateRequired)
+        if (GameInitialization.State == EGameInitState.UpdateRequired)
         {
             if (statusText != null)
                 statusText.text = "새 버전으로 업데이트가 필요합니다.";
@@ -134,25 +139,27 @@ public class LoadingCoverView : MonoBehaviour
 
         // 완료 플래그 전에는 바가 1에 닿지 못하게 막는다 — PercentComplete는 프리팹 등록 콜백이
         // 끝나기 전에 1이 될 수 있어, 그대로 쓰면 등록이 덜 된 채로 다음 씬에 넘어간다.
-        yield return CoFillBar(() =>
-        {
-            float t_dataProgress = DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f);
-            float t_syncProgress = BootInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
-            return (t_dataProgress + t_syncProgress) * 0.5f;
-        });
+        yield return CoFillBar(() => GameInitialization.Progress);
 
-        while (GameManager.BootState == EGameBootState.Syncing &&
-               !BootInstaller.IsSaveDependentInstalled)
+        // 타임아웃은 로딩 화면의 진행 정책으로 유지하되, 완료 조건은 전역 초기화 창구만 본다.
+        float t_bootWaitStarted = Time.realtimeSinceStartup;
+        while (!GameInitialization.IsReady && !GameInitialization.IsTerminated)
         {
+            if (Time.realtimeSinceStartup - t_bootWaitStarted >= bootWaitTimeout)
+            {
+                Debug.LogError($"[LoadingCoverView] 게임 초기화가 {bootWaitTimeout}초 안에 끝나지 않아 복구 화면으로 전환합니다. " +
+                               $"상태={GameInitialization.State}");
+                GameInitialization.MarkRecoveryRequired();
+                break;
+            }
             yield return null;
         }
 
-        if (GameManager.BootState == EGameBootState.UpdateRequired ||
-            GameManager.BootState == EGameBootState.RecoveryRequired)
+        if (GameInitialization.IsTerminated)
         {
             if (statusText != null)
             {
-                statusText.text = GameManager.BootState == EGameBootState.UpdateRequired
+                statusText.text = GameInitialization.State == EGameInitState.UpdateRequired
                     ? "새 버전으로 업데이트가 필요합니다."
                     : "저장 데이터를 복구하지 못했습니다.";
             }

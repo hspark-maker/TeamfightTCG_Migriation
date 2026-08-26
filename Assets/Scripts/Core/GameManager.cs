@@ -13,7 +13,6 @@ public class GameManager : MonoBehaviour
 
     public static GameManager Instance { get; private set; }
     public static int CurrentFrameRate { get; private set; } = DefaultFrameRate;
-    internal static EGameBootState BootState { get; private set; } = EGameBootState.Booting;
 
     /// <summary>타격 화면 흔들림 사용 여부. 흔들림에 멀미를 느끼는 사용자를 위한 접근성 옵션이라 기본은 켬.
     /// 판정은 BattleCamera 한 곳에서만 본다 — 호출부(AttackSequence)는 이 값을 몰라야 한다.
@@ -49,7 +48,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        PlayerSaveSync.RetryPending();
+        FirebaseManager.RetryPending();
     }
 
     void OnApplicationQuit() => Flush();
@@ -57,7 +56,7 @@ public class GameManager : MonoBehaviour
     // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
     void Boot()
     {
-        BootState = EGameBootState.Booting;
+        GameInitialization.SetState(EGameInitState.Initializing);
 
         // 모바일 60프레임: 기본 30이라 명시 지정. vSync가 targetFrameRate를 덮어쓰지 않게 끔.
         int t_savedFrameRate = PlayerPrefs.GetInt(FrameRatePrefsKey, DefaultFrameRate);
@@ -76,7 +75,7 @@ public class GameManager : MonoBehaviour
         DataSaveManager.Load();             // 프로필별 세이브 로드
         if (DataSaveManager.IsSaveBlocked)
         {
-            BootState = EGameBootState.UpdateRequired;
+            GameInitialization.MarkUpdateRequired();
             Debug.LogError("[GameManager] Boot blocked because the local save requires a newer client.");
             return;
         }
@@ -84,13 +83,14 @@ public class GameManager : MonoBehaviour
         try
         {
             OutgameTutorialRewind.ApplyWipeIfScheduled();
-            PlayerSaveSync.Initialize(t_profile.CloudEnvId, DataSaveManager.CloudUploadAllowed);
-            BootState = EGameBootState.Syncing;
+            FirebaseManager.Register(new PlayerSaveFirebaseModule(DataSaveManager.CloudUploadAllowed));
+            GameInitialization.SetState(EGameInitState.SyncingSave);
+            FirebaseManager.Initialize(t_profile.CloudEnvId);
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"[GameManager] PlayerSaveSync.Initialize failed: {ex.Message}\n{ex.StackTrace}");
-            MarkRecoveryRequired();
+            Debug.LogError($"[GameManager] FirebaseManager.Initialize failed: {ex.Message}\n{ex.StackTrace}");
+            GameInitialization.MarkRecoveryRequired();
         }
     }
 
@@ -122,24 +122,8 @@ public class GameManager : MonoBehaviour
     // 앱이 떠날 때 영속화를 flush(모바일 종료 콜백 누락 대비).
     void Flush()
     {
-        if (BootInstaller.IsSaveDependentInstalled)
+        if (GameInitialization.IsReady)
             CurrencyManager.Save();
-        PlayerSaveSync.FlushPending();
-    }
-
-    internal static void MarkBootReady()
-    {
-        if (BootState == EGameBootState.Syncing)
-            BootState = EGameBootState.Ready;
-    }
-
-    internal static void MarkRecoveryRequired()
-    {
-        BootState = EGameBootState.RecoveryRequired;
-    }
-
-    internal static void MarkUpdateRequired()
-    {
-        BootState = EGameBootState.UpdateRequired;
+        FirebaseManager.FlushPending();
     }
 }

@@ -19,9 +19,7 @@ public static class SpecFirestoreUploader
     const string GOOGLE_SERVICES_PATH = "Assets/google-services.json";
     const string SPEC_COLLECTION = "specs";
     const string ROW_COLLECTION = "rows";
-    const string ENV_ROOT_COLLECTION = "envs";
     const int SCHEMA_VERSION = 2;
-    const int REQUEST_TIMEOUT_SEC = 10;
     const int LIST_PAGE_SIZE = 300;
     const int MAX_COMMIT_WRITES = 500;
     const int MAX_COMMIT_BYTES = 10 * 1024 * 1024;
@@ -90,7 +88,7 @@ public static class SpecFirestoreUploader
         if (!TryLoadManager(out object t_manager, out _error)) return null;
         if (!TryBuildSnapshot(t_manager, _table, out TableSnapshot t_snapshot, out _error)) return null;
 
-        using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(REQUEST_TIMEOUT_SEC) };
+        using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(FirebaseTimeouts.RestRequestSeconds) };
 
         if (!TryReadMeta(t_client, t_projectId, t_apiKey, _envId, _table,
                          out long t_currentRevision, out string t_updateTime, out bool t_metaExists, out _error))
@@ -131,7 +129,7 @@ public static class SpecFirestoreUploader
         if (!TryCommit(t_client, t_projectId, t_apiKey, t_body, out _error)) return null;
 
         return $"{_table}: rev {t_revision}, {t_snapshot.Rows.Count}행, 삭제 {t_remoteIds.Count}, " +
-               $"{t_snapshot.PayloadBytes:N0}B → {ENV_ROOT_COLLECTION}/{_envId}/{SPEC_COLLECTION}/{_table}";
+               $"{t_snapshot.PayloadBytes:N0}B → {FirebaseRootPath.Environment(_envId)}/{SPEC_COLLECTION}/{_table}";
     }
 
     static bool TryLoadManager(out object _manager, out string _error)
@@ -543,11 +541,17 @@ public static class SpecFirestoreUploader
         "/databases/(default)";
 
     static string DocumentUrl(string _projectId, string _envId, string _table) =>
-        ApiRoot(_projectId) + "/documents/" + ENV_ROOT_COLLECTION + "/" + Uri.EscapeDataString(_envId) +
+        ApiRoot(_projectId) + "/documents/" + EscapedEnvironmentPath(_envId) +
         "/" + SPEC_COLLECTION + "/" + Uri.EscapeDataString(_table);
 
+    static string EscapedEnvironmentPath(string _envId)
+    {
+        FirebaseRootPath.Environment(_envId);
+        return FirebaseRootPath.EnvironmentCollection + "/" + Uri.EscapeDataString(_envId);
+    }
+
     static string ResourceName(string _projectId, string _envId, string _table) =>
-        "projects/" + _projectId + "/databases/(default)/documents/" + ENV_ROOT_COLLECTION + "/" + _envId +
+        "projects/" + _projectId + "/databases/(default)/documents/" + FirebaseRootPath.Environment(_envId) +
         "/" + SPEC_COLLECTION + "/" + _table;
 
     static bool TryReadFirebaseConfig(out string _projectId, out string _apiKey, out string _error)

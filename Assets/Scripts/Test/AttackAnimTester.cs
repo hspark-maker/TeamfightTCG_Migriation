@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -51,6 +52,7 @@ public enum AttackStep
 
 public class AttackAnimTester : MonoBehaviour
 {
+    [SerializeField] CardRegistry cardRegistry;
     [Header("필드")]
     [SerializeField] BattleFieldView playerFieldView;
     [SerializeField] BattleFieldView enemyFieldView;
@@ -154,8 +156,16 @@ public class AttackAnimTester : MonoBehaviour
         }
     }
 
-    void Start()
+    IEnumerator Start()
     {
+        if (!CardStandaloneBootstrap.Ensure(this.cardRegistry)) yield break;
+        yield return CardArtCache.Preload(CardCatalog.AllSpecs);
+        if (!CardArtCache.IsReady)
+        {
+            Debug.LogError("[AttackAnimTester] 카드 아트 준비 실패.");
+            yield break;
+        }
+
         TurnState.LocalOwnerIndex = 0;   // 플레이어(owner 0)가 로컬 → 탭 무장 대상.
         TurnState.InputAllowed    = true;
 

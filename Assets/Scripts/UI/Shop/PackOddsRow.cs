@@ -19,6 +19,11 @@ public class PackOddsRow : MonoBehaviour
         if (this.rateText != null)
             this.rateText.text = PackOdds.FormatRate(_entry.Rate);
 
-        this.cardImage.sprite = CardVisualRules.PickCardArt(t_card);
+        if (this.cardImage != null)
+        {
+            Sprite t_art = CardVisualRules.PickCardArt(t_card);
+            this.cardImage.sprite = t_art;
+            this.cardImage.enabled = t_art != null;
+        }
     }
 }
