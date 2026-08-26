@@ -55,7 +55,7 @@ public static partial class CardGrowthManager
         s_missingConfigLogged = false;
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출
+    // 부트에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
     {
         s_growth.Clear();
@@ -63,16 +63,16 @@ public static partial class CardGrowthManager
         KeywordGrowthManager.OnChanged -= NotifyGrowthChanged;
         KeywordGrowthManager.OnChanged += NotifyGrowthChanged;
 
-        var t_data = DataSaveManager.Data.cardGrowth;
-        if (t_data != null && t_data.entries != null)
+        var t_data = DataSaveManager.Data.CardGrowth;
+        if (t_data != null && t_data.Entries != null)
         {
-            foreach (var t_entry in t_data.entries)
+            foreach (var t_pair in t_data.Entries)
             {
-                if (t_entry == null) continue;
-
-                int t_id = t_entry.cardId;
+                if (t_pair.Value == null) continue;
+                if (!int.TryParse(t_pair.Key, out int t_id)) continue;
                 if (t_id <= 0 || s_growth.ContainsKey(t_id)) continue;
-                s_growth[t_id] = t_entry;
+
+                s_growth[t_id] = t_pair.Value;
             }
         }
 
@@ -87,17 +87,18 @@ public static partial class CardGrowthManager
     {
         if (!s_initialized) return;
 
-        var t_data = DataSaveManager.Data.cardGrowth ?? (DataSaveManager.Data.cardGrowth = new CardGrowthSaveData());
-        t_data.version = CardGrowthSaveData.VERSION;
+        var t_data = DataSaveManager.Data.CardGrowth ?? (DataSaveManager.Data.CardGrowth = new CardGrowthSaveData());
 
-        var t_entries = new List<CardGrowthEntry>(s_growth.Count);
-        foreach (var t_entry in s_growth.Values)
+        var t_entries = new Dictionary<string, CardGrowthEntry>(s_growth.Count);
+        foreach (var t_pair in s_growth)
         {
+            var t_entry = t_pair.Value;
             if (t_entry == null) continue;
-            if (t_entry.level <= CardGrowth.BaseLevel && t_entry.snack <= 0 && t_entry.limitBreak <= 0) continue;
-            t_entries.Add(t_entry);
+            if (t_entry.Level <= CardGrowth.BaseLevel && t_entry.Snack <= 0 && t_entry.LimitBreak <= 0) continue;
+
+            t_entries[t_pair.Key.ToString()] = t_entry;
         }
-        t_data.entries = t_entries;
+        t_data.Entries = t_entries;
     }
 
     // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
@@ -122,7 +123,7 @@ public static partial class CardGrowthManager
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return CardGrowth.BaseLevel;
 
         // 바닥 아래 값은 미강화로 읽는다 — 레벨을 0부터 세던 시절의 세이브가 그렇다.
-        return ClampLevel(t_entry.level);
+        return ClampLevel(t_entry.Level);
     }
 
     static int ClampLevel(int _level)
@@ -176,7 +177,7 @@ public static partial class CardGrowthManager
         if (t_success)
         {
             t_level = t_growth.Level + 1;
-            Entry(t_id).level = t_level;
+            Entry(t_id).Level = t_level;
             Save();
 
             // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
@@ -206,7 +207,7 @@ public static partial class CardGrowthManager
             if (t_id <= 0) continue;
             if (LevelOf(t_id) >= t_max) continue;
 
-            Entry(t_id).level = t_max;
+            Entry(t_id).Level = t_max;
             t_changed++;
         }
 
@@ -262,7 +263,7 @@ public static partial class CardGrowthManager
     {
         if (s_growth.TryGetValue(_id, out var t_entry) && t_entry != null) return t_entry;
 
-        t_entry = new CardGrowthEntry { cardId = _id, level = CardGrowth.BaseLevel };
+        t_entry = new CardGrowthEntry { Level = CardGrowth.BaseLevel };
         s_growth[_id] = t_entry;
         return t_entry;
     }

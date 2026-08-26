@@ -1,18 +1,9 @@
-using System;
 using System.Collections.Generic;
+using Firebase.Firestore;
 
-[Serializable]
+// 키워드 강화 세이브 값 객체 — 키는 CardKeyword 값 문자열, 값은 레벨
+[FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class KeywordGrowthSaveData
 {
-    public const int VERSION = 1;
-
-    public int version = VERSION;
-    public List<KeywordGrowthEntry> entries = new List<KeywordGrowthEntry>();
-}
-
-[Serializable]
-public class KeywordGrowthEntry
-{
-    public int keyword;
-    public int level;
+    [FirestoreProperty("levels")] public Dictionary<string, int> Levels { get; set; } = new Dictionary<string, int>();
 }

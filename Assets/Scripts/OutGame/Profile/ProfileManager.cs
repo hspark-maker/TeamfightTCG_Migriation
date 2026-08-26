@@ -31,27 +31,48 @@ public static class ProfileManager
     // 판·얼굴·링 한 벌. 프로필을 그리는 화면은 값을 따로 집지 말고 이걸 받아라.
     public static ProfileLook CurrentLook => Config != null ? Config.LookOf(AvatarId, FrameId) : new ProfileLook(null, Color.white, null, null, Color.white);
 
+    static ProfileSaveData Slot
+    {
+        get
+        {
+            var t_data = DataSaveManager.Data;
+            if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
+            return t_data.Profile;
+        }
+    }
+
+    static string DefaultAvatarId => Config != null ? Config.DefaultAvatarId : string.Empty;
+    static string DefaultFrameId  => Config != null ? Config.DefaultFrameId  : string.Empty;
+
     // 부트에서 1회 주입. 미배선(null)이면 그림이 전부 null로 떨어진다(화면은 저작값 유지).
     public static void SetConfig(ProfileConfig _config)
     {
         Config = _config;
     }
 
-    // 부트에서 SetConfig 이후 1회 호출. 세이브가 없는 지금은 Config 기본값으로 채운다.
+    // 부트에서 SetConfig 이후 1회 호출. 클라우드 세이브 채택 뒤여야 세이브가 반영된다.
+    // 세이브가 비었거나 Config에서 사라진 id면 기본값으로 떨어진다 — 폴백 결과를 슬롯에 되쓰지는
+    // 않는다(부트마다 디스크 쓰기가 생긴다). 다음 Apply()가 정리한다.
     public static void Init()
     {
-        // TODO 세이브: UserSaveData의 nickname/avatarId/frameId를 읽어 아래 기본값 자리를 덮는다.
-        Nickname = DEFAULT_NICKNAME;
-        AvatarId = Config != null ? Config.DefaultAvatarId : string.Empty;
-        FrameId  = Config != null ? Config.DefaultFrameId  : string.Empty;
+        ProfileSaveData t_slot = Slot;
+
+        Nickname = string.IsNullOrEmpty(t_slot.Nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.Nickname);
+        AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
+        FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
+
+        // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
+        // 부트 한복판이라 구독자 예외를 여기서 흘리면 나머지 설치가 통째로 중단된다.
+        try { OnChanged?.Invoke(); }
+        catch (Exception t_exception) { Debug.LogException(t_exception); }
     }
 
     // 프로필 3값 일괄 반영. 모르는 아바타·프레임 ID는 무시하고 기존값을 남긴다.
     public static void Apply(string _nickname, string _avatarId, string _frameId)
     {
         string t_nickname = SanitizeNickname(_nickname);
-        string t_avatarId = Config != null && Config.TryGetAvatar(_avatarId, out _) ? _avatarId : AvatarId;
-        string t_frameId  = Config != null && Config.TryGetFrame(_frameId,   out _) ? _frameId  : FrameId;
+        string t_avatarId = IsKnownAvatar(_avatarId) ? _avatarId : AvatarId;
+        string t_frameId  = IsKnownFrame(_frameId)   ? _frameId  : FrameId;
 
         if (t_nickname == Nickname && t_avatarId == AvatarId && t_frameId == FrameId) return;
 
@@ -80,9 +101,19 @@ public static class ProfileManager
         return t_name.Length > 0 ? t_name : DEFAULT_NICKNAME;
     }
 
+    // 세이브 복원(Init)과 사용자 선택(Apply)이 같은 판정을 쓰게 하는 자리 — 폴백만 호출부가 정한다.
+    static bool IsKnownAvatar(string _id) => Config != null && Config.TryGetAvatar(_id, out _);
+
+    static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
+
+    // 통지는 호출부(Apply)가 한다 — 저장과 통지를 겹쳐 부르지 않게.
     static void Persist()
     {
-        // TODO 세이브: 여기와 Init() 두 곳만 채우면 된다 —
-        // UserSaveData에 nickname/avatarId/frameId 3필드를 추가한 뒤 DataSaveManager로 flush.
+        ProfileSaveData t_slot = Slot;
+        t_slot.Nickname = Nickname;
+        t_slot.AvatarId = AvatarId;
+        t_slot.FrameId  = FrameId;
+
+        DataSaveManager.Save();
     }
 }

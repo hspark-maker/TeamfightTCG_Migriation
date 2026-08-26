@@ -1,182 +1,187 @@
 using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using UnityEngine;
 
-// 아웃게임 세이브 매니저. 저장 매체는 IRepository로 교체한다.
+// 아웃게임 세이브 매니저. 진실원은 클라우드 문서이고 로컬은 오프라인 폴백용 캐시 봉투다.
 public static class DataSaveManager
 {
     const string SAVE_KEY = "outgame_save";
+    const string BACKUP_KEY = "outgame_save_prev";
     const string CORRUPT_KEY = "outgame_save_corrupt";
-    const string VERSION_BACKUP_KEY_PREFIX = "outgame_save_v";
+
+    // JsonUtility는 auto-property를 직렬화하지 못한다 — Firestore 매핑용 프로퍼티 모델과 같은 모양을 쓰려면 Newtonsoft여야 한다.
+    static readonly JsonSerializerSettings s_serializerSettings = new JsonSerializerSettings
+    {
+        Formatting = Formatting.None,
+
+        // Firestore 필드명과 같은 인코딩을 쓴다 — [FirestoreProperty] 이름이 전부 프로퍼티명의 camelCase다.
+        // 두 직렬화기가 같은 키를 내야 로컬 캐시와 원격 문서를 나란히 대조할 수 있다.
+        ContractResolver = new DefaultContractResolver
+        {
+            // 딕셔너리 키는 건드리지 않는다 — 재화 키가 ECurrencyType 이름이라 소문자로 바뀌면 파싱이 깨진다.
+            NamingStrategy = new CamelCaseNamingStrategy { ProcessDictionaryKeys = false },
+        },
+
+        // 기본값(Auto)은 프로퍼티 이니셜라이저로 만든 컬렉션에 이어붙인다 — 값이 조용히 중복되는 것을 막는다.
+        ObjectCreationHandling = ObjectCreationHandling.Replace,
+    };
 
     static IRepository s_repository = new JsonFileRepository();
-    static bool s_saveBlocked;
+    static Action s_immediateUploadHandler;
+    static long s_cachedRevision;
 
-    public static event Action<string> OnSaved;
+    public static event Action OnSaved;
 
-    public static UserSaveData Data { get; private set; } = CreateCurrentData();
-    public static bool CloudUploadAllowed { get; private set; } = true;
-    public static bool IsSaveBlocked => s_saveBlocked;
+    public static UserSaveData Data { get; private set; } = new UserSaveData();
+
     internal static bool HasLocalSave => s_repository.Has(SAVE_KEY);
 
-    // 저장 매체 교체. Load 이전에 호출한다.
+    // 저장 매체 교체. 클라우드 채택 이전에 호출한다.
     public static void SetRepository(IRepository _repository)
     {
         if (_repository != null) s_repository = _repository;
     }
 
-    // 부팅 시 한 번 호출한다. 원격보다 최신인 로컬 데이터는 보존하고 쓰기를 막는다.
-    public static void Load()
+    // 클라우드 계층이 꽂는다. 3계층이 4계층을 직접 참조하지 않게 하는 배선(OnSaved와 대칭).
+    public static void SetImmediateUploadHandler(Action _handler)
     {
-        s_saveBlocked = false;
-        CloudUploadAllowed = true;
-
-        string t_json = s_repository.Load(SAVE_KEY);
-        if (string.IsNullOrEmpty(t_json))
-        {
-            Data = CreateCurrentData();
-            return;
-        }
-
-        try
-        {
-            Data = JsonUtility.FromJson<UserSaveData>(t_json) ?? CreateCurrentData();
-            if (Data.version > UserSaveData.VERSION)
-            {
-                int t_loadedVersion = Data.version;
-                string t_backupKey = $"{VERSION_BACKUP_KEY_PREFIX}{t_loadedVersion}";
-                s_repository.Save(t_backupKey, t_json);
-
-                Debug.LogWarning(
-                    $"[DataSaveManager] Save v{t_loadedVersion} is newer than client v{UserSaveData.VERSION}. " +
-                    $"Local save and cloud upload are blocked. Backup: '{t_backupKey}'");
-
-                s_saveBlocked = true;
-                CloudUploadAllowed = false;
-                return;
-            }
-
-            if (Data.version < UserSaveData.VERSION)
-            {
-                int t_loadedVersion = Data.version;
-                string t_backupKey = $"{VERSION_BACKUP_KEY_PREFIX}{t_loadedVersion}";
-                s_repository.Save(t_backupKey, t_json);
-
-                Debug.LogWarning(
-                    $"[DataSaveManager] Save v{t_loadedVersion} reset for client v{UserSaveData.VERSION}. " +
-                    $"Cloud upload is blocked for this session. Backup: '{t_backupKey}'");
-
-                Data = CreateCurrentData();
-                CloudUploadAllowed = false;
-            }
-        }
-        catch (Exception t_exception)
-        {
-            Debug.LogError($"[DataSaveManager] Load failed. Backing up source and starting with defaults: {t_exception}");
-            s_repository.Save(CORRUPT_KEY, t_json);
-            Data = CreateCurrentData();
-            CloudUploadAllowed = false;
-        }
+        s_immediateUploadHandler = _handler;
     }
 
+    /// <summary>메모리 세이브를 캐시 봉투로 굳히고 변경을 통지한다(업로드는 클라우드 계층이 디바운스해서 한다).</summary>
     public static void Save()
     {
-        if (s_saveBlocked)
-        {
-            Debug.LogWarning("[DataSaveManager] Save blocked because the loaded save is newer than this client.");
-            return;
-        }
-
-        Data.version = UserSaveData.VERSION;
-        string t_json = JsonUtility.ToJson(Data);
-        s_repository.Save(SAVE_KEY, t_json);
-        OnSaved?.Invoke(t_json);
+        WriteCache();
+        OnSaved?.Invoke();
     }
 
+    /// <summary>디바운스를 기다리지 않고 업로드까지 요청하는 저장. 유실되면 안 되는 지점에서만 쓴다.</summary>
+    public static void SaveImmediate()
+    {
+        Save();
+        s_immediateUploadHandler?.Invoke();
+    }
+
+    /// <summary>도메인만 담은 직렬화 결과. 원격 문서 대조·변경 감지의 기준값이다(봉투 메타는 빠진다).</summary>
     public static string CreateSnapshot()
     {
-        Data.version = UserSaveData.VERSION;
-        return JsonUtility.ToJson(Data);
+        return SnapshotOf(Data);
     }
 
-    internal static string LoadSyncMetadata(string _key)
+    /// <summary>메모리에 세우지 않은 세이브의 스냅샷. 원격과 캐시를 같은 잣대로 대조할 때 쓴다.</summary>
+    internal static string SnapshotOf(UserSaveData _data)
     {
-        return s_repository.Load(_key);
+        // 정규화 후에 찍는다 — 한쪽만 슬롯이 비어 있으면 내용이 같아도 다른 스냅샷이 나온다.
+        return JsonConvert.SerializeObject(Normalize(_data), s_serializerSettings);
     }
 
-    internal static void SaveSyncMetadata(string _key, string _json)
+    /// <summary>부트에서 채택한 세이브를 메모리에 세우고 캐시 봉투를 갱신한다. 채택은 부트당 1회다.</summary>
+    internal static void AdoptRemote(UserSaveData _data, long _revision)
     {
-        s_repository.Save(_key, _json);
+        Data = Normalize(_data);
+        s_cachedRevision = _revision < 0 ? 0 : _revision;
+        WriteCache();
     }
 
-    internal static bool TryApplyRemote(
-        string _payload,
-        string _backupKey,
-        out string _error)
+    /// <summary>업로드에 성공한 revision을 캐시 봉투에 새긴다 — 다음 오프라인 세션의 기대값이 된다.</summary>
+    internal static void MarkUploadedRevision(long _revision)
     {
-        _error = string.Empty;
-        if (s_repository is not IAtomicRepository t_atomicRepository)
-        {
-            _error = "Active repository does not support atomic replacement.";
-            return false;
-        }
+        if (_revision <= s_cachedRevision) return;
 
-        string t_original = s_repository.Load(SAVE_KEY);
+        s_cachedRevision = _revision;
+        WriteCache();
+    }
+
+    /// <summary>오프라인 폴백용 캐시 읽기. 없거나 스키마가 어긋나면 false, 깨져 있으면 원본을 남기고 false.</summary>
+    internal static bool TryLoadCache(out UserSaveData _data, out long _revision)
+    {
+        _data = null;
+        _revision = 0;
+
+        string t_json = s_repository.Load(SAVE_KEY);
+        if (string.IsNullOrEmpty(t_json)) return false;
+
+        PlayerSaveCacheEnvelope t_envelope;
         try
         {
-            UserSaveData t_expectedData = JsonUtility.FromJson<UserSaveData>(_payload);
-            string t_expected = JsonUtility.ToJson(t_expectedData);
-
-            t_atomicRepository.ReplaceWithBackup(SAVE_KEY, _payload, _backupKey);
-            Load();
-            if (s_saveBlocked || CreateSnapshot() != t_expected)
-                throw new InvalidOperationException("Reloaded save does not match the remote payload.");
-
-            return true;
+            t_envelope = JsonConvert.DeserializeObject<PlayerSaveCacheEnvelope>(t_json, s_serializerSettings);
         }
         catch (Exception t_exception)
         {
-            _error = t_exception.Message;
-            try
-            {
-                if (string.IsNullOrEmpty(t_original))
-                    s_repository.Delete(SAVE_KEY);
-                else
-                    t_atomicRepository.ReplaceWithBackup(SAVE_KEY, t_original, _backupKey + "_failed_apply");
-                Load();
-
-                string t_restored = s_repository.Load(SAVE_KEY);
-                if (t_restored != t_original || s_saveBlocked)
-                    throw new InvalidOperationException(
-                        $"Original save restore verification failed. Recovery backup: '{_backupKey}'.");
-            }
-            catch (Exception t_restoreException)
-            {
-                _error += $" Restore failed: {t_restoreException.Message}";
-            }
-
+            // 원본을 백업하고 캐시를 걷는다 — 남겨 두면 매 부트 같은 LogError가 반복된다.
+            Debug.LogError($"[DataSaveManager] Local cache is corrupt. Backing up the source: {t_exception}");
+            s_repository.Save(CORRUPT_KEY, t_json);
+            s_repository.Delete(SAVE_KEY);
             return false;
         }
-    }
 
-    internal static bool TrySaveRemoteConflict(string _key, string _json, out string _error)
-    {
-        _error = string.Empty;
-        try
+        if (t_envelope?.Data == null)
         {
-            s_repository.Save(_key, _json);
-            if (s_repository.Load(_key) != _json)
-                throw new InvalidOperationException("Conflict backup verification failed.");
-            return true;
-        }
-        catch (Exception t_exception)
-        {
-            _error = t_exception.Message;
+            Debug.LogError("[DataSaveManager] Local cache has no save data. Backing up the source.");
+            s_repository.Save(CORRUPT_KEY, t_json);
+            s_repository.Delete(SAVE_KEY);
             return false;
         }
+
+        if (t_envelope.SchemaVersion != UserSaveData.VERSION)
+        {
+            // 변환 코드가 없어 쓸 수 없는 캐시다. 손상 경로와 같이 원본을 남기고 걷는다.
+            Debug.LogWarning(
+                $"[DataSaveManager] Local cache schema v{t_envelope.SchemaVersion} does not match client v{UserSaveData.VERSION}. Backing up and discarding.");
+            s_repository.Save(CORRUPT_KEY, t_json);
+            s_repository.Delete(SAVE_KEY);
+            return false;
+        }
+
+        _data = Normalize(t_envelope.Data);
+        _revision = t_envelope.Revision < 0 ? 0 : t_envelope.Revision;
+        return true;
     }
 
-    static UserSaveData CreateCurrentData()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
     {
-        return new UserSaveData { version = UserSaveData.VERSION };
+        OnSaved = null;
+        s_immediateUploadHandler = null;
+        s_cachedRevision = 0;
+        Data = new UserSaveData();
+    }
+
+    // 부분 기록으로 캐시가 깨지는 것을 막는다 — 봉투는 통째로만 유효하다.
+    static void WriteCache()
+    {
+        string t_json = JsonConvert.SerializeObject(
+            new PlayerSaveCacheEnvelope
+            {
+                SchemaVersion = UserSaveData.VERSION,
+                Revision = s_cachedRevision,
+                Data = Data,
+            },
+            s_serializerSettings);
+
+        if (s_repository is IAtomicRepository t_atomicRepository)
+            t_atomicRepository.ReplaceWithBackup(SAVE_KEY, t_json, BACKUP_KEY);
+        else
+            s_repository.Save(SAVE_KEY, t_json);
+    }
+
+    // 손으로 편집한 문서가 슬롯을 통째로 비워 두면 소비자가 NullReference로 죽는다 — 빠진 슬롯만 기본값으로 세운다.
+    static UserSaveData Normalize(UserSaveData _data)
+    {
+        UserSaveData t_data = _data ?? new UserSaveData();
+
+        if (t_data.Currency == null) t_data.Currency = new CurrencySaveData();
+        if (t_data.Ownership == null) t_data.Ownership = new OwnershipSaveData();
+        if (t_data.Deck == null) t_data.Deck = new DeckSaveData();
+        if (t_data.CardGrowth == null) t_data.CardGrowth = new CardGrowthSaveData();
+        if (t_data.KeywordGrowth == null) t_data.KeywordGrowth = new KeywordGrowthSaveData();
+        if (t_data.Rank == null) t_data.Rank = new RankSaveData();
+        if (t_data.AlbumReward == null) t_data.AlbumReward = new AlbumRewardSaveData();
+        if (t_data.Tournament == null) t_data.Tournament = new TournamentSaveData();
+        if (t_data.Tutorial == null) t_data.Tutorial = new TutorialSaveData();
+        if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
+
+        return t_data;
     }
 }

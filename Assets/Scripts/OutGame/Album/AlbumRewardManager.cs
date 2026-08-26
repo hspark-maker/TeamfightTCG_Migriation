@@ -16,8 +16,8 @@ public static class AlbumRewardManager
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.albumReward == null) t_data.albumReward = new AlbumRewardSaveData();
-            return t_data.albumReward;
+            if (t_data.AlbumReward == null) t_data.AlbumReward = new AlbumRewardSaveData();
+            return t_data.AlbumReward;
         }
     }
 
@@ -79,7 +79,7 @@ public static class AlbumRewardManager
             if (_rewards[t_i].amount <= 0) continue;
             CurrencyManager.Earn(_rewards[t_i].currency, _rewards[t_i].amount);
         }
-        Slot.claimedKeys.Add(_rewardKey);
+        Slot.ClaimedKeys.Add(_rewardKey);
 
         // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
         CurrencyManager.Save();
@@ -99,7 +99,7 @@ public static class AlbumRewardManager
     static EAlbumRewardState StateOf(string _rewardKey, bool _complete, bool _hasReward)
     {
         if (string.IsNullOrEmpty(_rewardKey)) return EAlbumRewardState.Locked;
-        if (Slot.claimedKeys.Contains(_rewardKey)) return EAlbumRewardState.Claimed;
+        if (Slot.ClaimedKeys.Contains(_rewardKey)) return EAlbumRewardState.Claimed;
         return _complete && _hasReward ? EAlbumRewardState.Claimable : EAlbumRewardState.Locked;
     }
 }

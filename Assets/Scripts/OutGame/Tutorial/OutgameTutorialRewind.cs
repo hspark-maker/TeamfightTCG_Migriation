@@ -6,7 +6,7 @@ using UnityEngine;
 /// 예약을 <b>PlayerPrefs</b>에 두는 이유: 에디터 창(정지 상태)이 쓰고 런타임(부트)이 읽어야 하는데
 /// EditorPrefs는 런타임이 못 읽고, 세이브 스키마에 디버그 필드를 넣는 것은 오염이다.
 ///
-/// 적용이 2단인 이유: 밀기는 매니저들이 슬롯을 캐싱하기 <b>전</b>(GameManager.Initialize)이어야 하고,
+/// 적용이 2단인 이유: 밀기는 클라우드 채택 뒤이면서 매니저들이 슬롯을 캐싱하기 <b>전</b>(InstallSaveDependent 맨 앞)이어야 하고,
 /// 지급 재생은 카탈로그·덱·시퀀스가 전부 준비된 <b>뒤</b>(InitializationInstaller 끝)여야 한다.
 /// </summary>
 public static class OutgameTutorialRewind
@@ -62,8 +62,8 @@ public static class OutgameTutorialRewind
     }
 
     /// <summary>1단 — 아웃게임 세이브를 첫실행으로 밀고 예약 좌표를 심는다.
-    /// <b>GameManager.Initialize의 DataSaveManager.Load() 직후</b>에만 호출한다 —
-    /// 매니저 Init()들이 슬롯 참조를 캐싱하고 나면 갈아끼운 슬롯이 반영되지 않는다.</summary>
+    /// <b>InitializationInstaller.InstallSaveDependent() 맨 앞</b>에서만 호출한다 —
+    /// 클라우드 채택보다 앞서면 채택이 슬롯을 그대로 덮고, 매니저 Init()들이 슬롯 참조를 캐싱한 뒤면 반영되지 않는다.</summary>
     public static void ApplyWipeIfScheduled()
     {
         // 밀기는 새 예약(PREF_KEY)에만 반응한다 — 재생만 남은 상태를 여기서 다시 집으면 매 부트 반복 와이프다.
@@ -71,25 +71,22 @@ public static class OutgameTutorialRewind
 
         var t_data = DataSaveManager.Data;
 
-        // 슬롯을 통째로 새 인스턴스로 — 첫실행 기본값이 곧 값 객체의 초기값이다(골드 100 등).
+        // 슬롯을 통째로 새 인스턴스로 — 잔액 맵이 빈 세이브를 CurrencyManager.Init이 신규 유저로 보고 초기 골드를 다시 지급한다.
         // UserSaveData의 슬롯 전부를 여기서 센다 — 하나라도 빠지면 그 축만 이전 세션 값으로 남아,
         // 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
-        t_data.currency      = new CurrencySaveData();
-        t_data.ownership     = new OwnershipSaveData();
-        t_data.deck          = new DeckSaveData();
-        t_data.rank          = new RankSaveData();
-        t_data.cardGrowth    = new CardGrowthSaveData();
-        t_data.keywordGrowth = new KeywordGrowthSaveData();
-        t_data.albumReward   = new AlbumRewardSaveData();
-        t_data.tournament    = new TournamentSaveData();
-        t_data.tutorial      = new TutorialSaveData();
+        t_data.Currency      = new CurrencySaveData();
+        t_data.Ownership     = new OwnershipSaveData();
+        t_data.Deck          = new DeckSaveData();
+        t_data.Rank          = new RankSaveData();
+        t_data.CardGrowth    = new CardGrowthSaveData();
+        t_data.KeywordGrowth = new KeywordGrowthSaveData();
+        t_data.AlbumReward   = new AlbumRewardSaveData();
+        t_data.Tournament    = new TournamentSaveData();
+        t_data.Tutorial      = new TutorialSaveData();
+        t_data.Profile       = new ProfileSaveData();
 
-        t_data.tutorial.outgameChapterIndex     = t_chapter;
-        t_data.tutorial.outgameChapterStepIndex = t_step;
-
-        // 레거시 판정은 이미 끝난 것으로 둔다 — 소유가 빈 세이브라 어차피 통과하지만,
-        // 판정을 남겨 두면 "첫실행 마이그레이션"이 되감기마다 한 번씩 도는 잡음이 된다.
-        t_data.tutorial.migrationChecked = true;
+        t_data.Tutorial.ChapterIndex     = t_chapter;
+        t_data.Tutorial.ChapterStepIndex = t_step;
 
         DataSaveManager.Save();
 

@@ -76,7 +76,7 @@
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
 - 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 등급: `ECardGrade`
-- 데이터 원본: 표 기반 `CardSpec` (진화 최대 단계 상수 포함) · 주소 기반 아트 로드 `CardArtCache` · `CardData`는 기존 직렬화 참조를 위한 id 전용 이관 껍데기 · 진화 단계는 `CardGrowth.EvolutionStage`
+- 데이터 원본: 표 기반 `CardSpec` (진화 최대 단계 상수 포함) · 주소 기반 아트 로드 `CardArtCache` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
 - 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `AttackEffect` · `ECardChannel` · `SynergyEmblemTiming`

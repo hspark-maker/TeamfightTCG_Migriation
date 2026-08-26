@@ -5,8 +5,7 @@ using UnityEngine;
 // 키워드 강화(키워드 한 종류의 레벨)의 static 단일 창구. 그 키워드를 가진 모든 카드에 체력으로 얹힌다.
 public static class KeywordGrowthManager
 {
-    static readonly Dictionary<CardKeyword, KeywordGrowthEntry> s_growth =
-        new Dictionary<CardKeyword, KeywordGrowthEntry>();
+    static readonly Dictionary<CardKeyword, int> s_growth = new Dictionary<CardKeyword, int>();
 
     static KeywordGrowthConfig s_config;
     static bool s_initialized;
@@ -51,18 +50,18 @@ public static class KeywordGrowthManager
     {
         s_growth.Clear();
 
-        var t_data = DataSaveManager.Data.keywordGrowth;
-        if (t_data != null && t_data.entries != null)
+        var t_data = DataSaveManager.Data.KeywordGrowth;
+        if (t_data != null && t_data.Levels != null)
         {
-            foreach (var t_entry in t_data.entries)
+            foreach (var t_pair in t_data.Levels)
             {
-                if (t_entry == null) continue;
+                if (!int.TryParse(t_pair.Key, out int t_raw)) continue;
 
-                var t_keyword = (CardKeyword)t_entry.keyword;
+                var t_keyword = (CardKeyword)t_raw;
                 if (!Config.Supports(t_keyword) || s_growth.ContainsKey(t_keyword)) continue;
 
-                t_entry.level = Mathf.Clamp(t_entry.level, 0, Config.MaxLevel);
-                if (t_entry.level > 0) s_growth[t_keyword] = t_entry;
+                int t_level = Mathf.Clamp(t_pair.Value, 0, Config.MaxLevel);
+                if (t_level > 0) s_growth[t_keyword] = t_level;
             }
         }
 
@@ -80,7 +79,7 @@ public static class KeywordGrowthManager
     public static int LevelOf(CardKeyword _keyword)
     {
         if (!Config.Supports(_keyword)) return 0;
-        return s_growth.TryGetValue(_keyword, out var t_entry) && t_entry != null ? t_entry.level : 0;
+        return s_growth.TryGetValue(_keyword, out int t_level) ? t_level : 0;
     }
 
     // 키워드 비트묶음이 받는 체력 합(같은 키워드를 두 번 세지 않는다)
@@ -120,7 +119,7 @@ public static class KeywordGrowthManager
             return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
         t_level++;
-        Entry(_keyword).level = t_level;
+        s_growth[_keyword] = t_level;
         SyncSaveData();
 
         // OnEnhanced보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
@@ -147,18 +146,13 @@ public static class KeywordGrowthManager
 
     static void SyncSaveData()
     {
-        var t_data = DataSaveManager.Data.keywordGrowth ??
-                     (DataSaveManager.Data.keywordGrowth = new KeywordGrowthSaveData());
-        t_data.version = KeywordGrowthSaveData.VERSION;
-        t_data.entries = new List<KeywordGrowthEntry>(s_growth.Values);
-    }
+        var t_data = DataSaveManager.Data.KeywordGrowth ??
+                     (DataSaveManager.Data.KeywordGrowth = new KeywordGrowthSaveData());
 
-    static KeywordGrowthEntry Entry(CardKeyword _keyword)
-    {
-        if (s_growth.TryGetValue(_keyword, out var t_entry) && t_entry != null) return t_entry;
+        var t_levels = new Dictionary<string, int>(s_growth.Count);
+        foreach (var t_pair in s_growth)
+            t_levels[((int)t_pair.Key).ToString()] = t_pair.Value;
 
-        t_entry = new KeywordGrowthEntry { keyword = (int)_keyword, level = 0 };
-        s_growth[_keyword] = t_entry;
-        return t_entry;
+        t_data.Levels = t_levels;
     }
 }

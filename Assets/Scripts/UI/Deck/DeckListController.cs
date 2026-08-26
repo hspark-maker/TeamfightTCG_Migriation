@@ -5,7 +5,7 @@ using TMPro;
 
 // 덱 목록 패널(DeckListPanel에 부착).
 // DeckSaveManager 6슬롯을 읽어 유효 덱만 칸으로 만들고, 0행 0열에 "신규 생성" 칸을 고정한다.
-// DeckSaveManager에 변경 통지 이벤트가 없으므로 "패널이 켜질 때 재빌드"가 유일한 갱신 경로다.
+// 갱신 경로는 "패널이 켜질 때 재빌드" + DeckSaveManager.OnDeckChanged 구독 둘이다.
 // 덱 세이브 접근은 이 클래스에만 가둔다(덱 목록 화면에서 세이브를 만지는 파일 1개).
 public class DeckListController : MonoBehaviour
 {
@@ -49,17 +49,15 @@ public class DeckListController : MonoBehaviour
 
         // 목록이 켜진 채 튜토리얼이 진행되면 "신규 생성" 칸의 잠금이 그때 풀린다 — 재빌드가 유일한 반영 경로다.
         OutgameFeatureLock.OnChanged += Build;
+
+        // 부트를 안 거친 씬 진입에서는 이 목록이 세이브 로드보다 먼저 그려진다 — 빈 목록이 고착되지 않게.
+        DeckSaveManager.OnDeckChanged += Build;
     }
 
     void OnDisable()
     {
         OutgameFeatureLock.OnChanged -= Build;
-    }
-
-    // 외부에서 강제 갱신할 때의 공개 창구(목록이 켜진 채 덱이 바뀌는 경로가 생기면 사용).
-    public void Refresh()
-    {
-        Build();
+        DeckSaveManager.OnDeckChanged -= Build;
     }
 
     void Build()
@@ -180,11 +178,9 @@ public class DeckListController : MonoBehaviour
                 }
 
                 // 실패 사유(미로드·레지스트리 미주입 등)는 DeckSaveManager가 이미 로그한다.
+                // 성공 시 재빌드는 OnDeckChanged가 건다(실패면 바뀐 게 없어 다시 그릴 것도 없다).
                 if (!DeckSaveManager.TryDeleteAt(_slotIndex))
                     Debug.LogWarning($"[DeckListController] 덱 삭제 실패 slot={_slotIndex}.");
-
-                // 삭제 후 뒤 덱이 앞으로 당겨져 슬롯 좌표·표시 번호가 전부 밀린다 → 부분 갱신이 성립하지 않는다.
-                Build();
             },
         });
     }

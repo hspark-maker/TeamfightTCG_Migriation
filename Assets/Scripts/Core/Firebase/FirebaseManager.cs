@@ -60,10 +60,13 @@ public static class FirebaseManager
         foreach (IFirebaseModule t_module in s_modules) t_module.RetryPending();
     }
 
-    internal static void FlushPending()
+    internal static UniTask FlushPendingAsync()
     {
-        if (!s_initialized) return;
-        foreach (IFirebaseModule t_module in s_modules) t_module.FlushPending();
+        if (!s_initialized) return UniTask.CompletedTask;
+
+        var t_flushes = new UniTask[s_modules.Count];
+        for (int t_i = 0; t_i < s_modules.Count; t_i++) t_flushes[t_i] = s_modules[t_i].FlushPendingAsync();
+        return UniTask.WhenAll(t_flushes);
     }
 
     internal static void Shutdown()

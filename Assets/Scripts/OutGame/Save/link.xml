@@ -1,0 +1,24 @@
+<!--
+  IL2CPP 스트리핑 방어. stripEngineCode가 켜져 있어 [FirestoreProperty] 접근자가
+  리플렉션으로만 호출되는 세이브 도메인은 코드 참조가 없는 것으로 보여 잘려 나갈 수 있다.
+  세이브 도메인 클래스를 추가하면 여기에도 넣어야 한다 — 빠지면 에디터는 통과하고 기기에서만 값이 빈다.
+-->
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="UserSaveData" preserve="all"/>
+    <type fullname="CurrencySaveData" preserve="all"/>
+    <type fullname="OwnershipSaveData" preserve="all"/>
+    <type fullname="DeckSaveData" preserve="all"/>
+    <type fullname="DeckSlotSaveData" preserve="all"/>
+    <type fullname="CardGrowthSaveData" preserve="all"/>
+    <type fullname="CardGrowthEntry" preserve="all"/>
+    <type fullname="KeywordGrowthSaveData" preserve="all"/>
+    <type fullname="RankSaveData" preserve="all"/>
+    <type fullname="AlbumRewardSaveData" preserve="all"/>
+    <type fullname="TournamentSaveData" preserve="all"/>
+    <type fullname="TutorialSaveData" preserve="all"/>
+    <type fullname="ProfileSaveData" preserve="all"/>
+    <type fullname="PlayerSaveCacheEnvelope" preserve="all"/>
+  </assembly>
+  <assembly fullname="Firebase.Firestore" preserve="all"/>
+</linker>
