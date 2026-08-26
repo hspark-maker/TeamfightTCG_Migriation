@@ -11,12 +11,6 @@ public static class StarterDeck
     {
         if (DeckSaveManager.HasAnySavedDeck()) return;
 
-        if (DeckSaveManager.LegacyMigrationPending)
-        {
-            Debug.LogWarning("[StarterDeck] 레거시 덱 이관 미완료 — 이번 부트는 지급을 보류한다.");
-            return;
-        }
-
         if (_starter == null)
         {
             Debug.LogWarning("[StarterDeck] 스타터덱 SO 미배선 — 지급 생략(BootInstaller 확인).");

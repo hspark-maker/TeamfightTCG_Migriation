@@ -3,6 +3,9 @@ using System;
 // 재화 잔액 변경의 단일 창구 (static)
 public static class CurrencyManager
 {
+    // 신규 유저 최초 지급 골드
+    const long STARTING_GOLD = 100;
+
     static readonly long[] s_currencies = new long[(int)ECurrencyType.Count];
 
     // 잔액 변경 통지 (종류, 변경 후 금액)
@@ -21,11 +24,16 @@ public static class CurrencyManager
     // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 세이브를 메모리에 캐싱
     public static void Init()
     {
-        var t_data = DataSaveManager.Data.currency;
+        var t_data = DataSaveManager.Data.Currency;
+
+        // 잔액 맵이 비어 있는 세이브 = 아직 한 번도 저장된 적 없는 계정. Normalize가 0을 채우기 전에 판정해야 한다.
+        bool t_firstRun = t_data.Balances == null || t_data.Balances.Count == 0;
         t_data.Normalize();
 
+        if (t_firstRun) t_data.Balances[KeyOf(ECurrencyType.Gold)] = STARTING_GOLD;
+
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-            s_currencies[t_i] = t_data.balances[t_i];
+            s_currencies[t_i] = t_data.Balances[KeyOf((ECurrencyType)t_i)];
 
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
             OnCurrencyChanged?.Invoke((ECurrencyType)t_i, s_currencies[t_i]);
@@ -34,11 +42,11 @@ public static class CurrencyManager
     // 메모리 금액을 세이브 슬롯에 flush 후 영속화
     public static void Save()
     {
-        var t_data = DataSaveManager.Data.currency;
+        var t_data = DataSaveManager.Data.Currency;
         t_data.Normalize();
 
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-            t_data.balances[t_i] = s_currencies[t_i];
+            t_data.Balances[KeyOf((ECurrencyType)t_i)] = s_currencies[t_i];
 
         DataSaveManager.Save();
     }
@@ -65,4 +73,6 @@ public static class CurrencyManager
         OnCurrencyChanged?.Invoke(_type, t_balance);
         return true;
     }
+
+    static string KeyOf(ECurrencyType _type) => _type.ToString();
 }

@@ -71,26 +71,22 @@ public static class OutgameTutorialRewind
 
         var t_data = DataSaveManager.Data;
 
-        // 슬롯을 통째로 새 인스턴스로 — 첫실행 기본값이 곧 값 객체의 초기값이다(골드 100 등).
+        // 슬롯을 통째로 새 인스턴스로 — 잔액 맵이 빈 세이브를 CurrencyManager.Init이 신규 유저로 보고 초기 골드를 다시 지급한다.
         // UserSaveData의 슬롯 전부를 여기서 센다 — 하나라도 빠지면 그 축만 이전 세션 값으로 남아,
         // 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
-        t_data.currency      = new CurrencySaveData();
-        t_data.ownership     = new OwnershipSaveData();
-        t_data.deck          = new DeckSaveData();
-        t_data.rank          = new RankSaveData();
-        t_data.cardGrowth    = new CardGrowthSaveData();
-        t_data.keywordGrowth = new KeywordGrowthSaveData();
-        t_data.albumReward   = new AlbumRewardSaveData();
-        t_data.tournament    = new TournamentSaveData();
-        t_data.tutorial      = new TutorialSaveData();
-        t_data.profile       = new ProfileSaveData();
+        t_data.Currency      = new CurrencySaveData();
+        t_data.Ownership     = new OwnershipSaveData();
+        t_data.Deck          = new DeckSaveData();
+        t_data.Rank          = new RankSaveData();
+        t_data.CardGrowth    = new CardGrowthSaveData();
+        t_data.KeywordGrowth = new KeywordGrowthSaveData();
+        t_data.AlbumReward   = new AlbumRewardSaveData();
+        t_data.Tournament    = new TournamentSaveData();
+        t_data.Tutorial      = new TutorialSaveData();
+        t_data.Profile       = new ProfileSaveData();
 
-        t_data.tutorial.outgameChapterIndex     = t_chapter;
-        t_data.tutorial.outgameChapterStepIndex = t_step;
-
-        // 레거시 판정은 이미 끝난 것으로 둔다 — 소유가 빈 세이브라 어차피 통과하지만,
-        // 판정을 남겨 두면 "첫실행 마이그레이션"이 되감기마다 한 번씩 도는 잡음이 된다.
-        t_data.tutorial.migrationChecked = true;
+        t_data.Tutorial.ChapterIndex     = t_chapter;
+        t_data.Tutorial.ChapterStepIndex = t_step;
 
         DataSaveManager.Save();
 

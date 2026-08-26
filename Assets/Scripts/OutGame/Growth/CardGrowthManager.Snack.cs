@@ -11,7 +11,7 @@ public static partial class CardGrowthManager
         if (_id <= 0) return 0;
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
-        return t_entry.snack > 0 ? t_entry.snack : 0;
+        return t_entry.Snack > 0 ? t_entry.Snack : 0;
     }
 
     public static int SnackOf(CardData _card) => SnackOf(CardCatalog.IdOf(_card));
@@ -25,11 +25,11 @@ public static partial class CardGrowthManager
         if (_amount <= 0) return false;
 
         CardGrowthEntry t_entry = Entry(_id);
-        int t_current = t_entry.snack > 0 ? t_entry.snack : 0;
+        int t_current = t_entry.Snack > 0 ? t_entry.Snack : 0;
 
         // long으로 더한 뒤 상한에서 자른다 — int 넘침 방지.
         long t_next = (long)t_current + _amount;
-        t_entry.snack = t_next > int.MaxValue ? int.MaxValue : (int)t_next;
+        t_entry.Snack = t_next > int.MaxValue ? int.MaxValue : (int)t_next;
 
         OnGrowthChanged?.Invoke();
         return true;
@@ -42,7 +42,7 @@ public static partial class CardGrowthManager
         if (_id <= 0) return 0;
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
-        return Mathf.Clamp(t_entry.limitBreak, 0, Config.MaxLimitBreak);
+        return Mathf.Clamp(t_entry.LimitBreak, 0, Config.MaxLimitBreak);
     }
 
     public static int LimitBreakOf(CardData _card) => LimitBreakOf(CardCatalog.IdOf(_card));
@@ -66,11 +66,11 @@ public static partial class CardGrowthManager
 
         int t_id = CardCatalog.IdOf(_card);
         CardGrowthEntry t_entry = Entry(t_id);
-        int t_snack = t_entry.snack > 0 ? t_entry.snack : 0;
+        int t_snack = t_entry.Snack > 0 ? t_entry.Snack : 0;
         if (t_snack < t_step.SnackCost) return false;
 
-        t_entry.snack = t_snack - t_step.SnackCost;
-        t_entry.limitBreak = t_step.Stage;
+        t_entry.Snack = t_snack - t_step.SnackCost;
+        t_entry.LimitBreak = t_step.Stage;
         Save();
         OnGrowthChanged?.Invoke();
         return true;

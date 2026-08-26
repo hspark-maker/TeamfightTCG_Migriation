@@ -1,36 +1,21 @@
-using System;
+using Firebase.Firestore;
 
 // 아웃게임 세이브 값 객체 — 전투 밖 유저 상태의 스냅샷
-[Serializable]
+[FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class UserSaveData
 {
-    // 런칭 전 정책: 어느 도메인이든 스키마를 변경하면 이 전역 버전을 올린다.
-    // 버전 불일치는 원본 JSON을 백업한 뒤 전체 세이브를 초기화한다.
-    // 2: 도감 방치 생산 폐기로 collection 슬롯 삭제
-    // 3: 카드 강화 레벨제를 0~3성 등급제로 전환
-    // 4: 카드별 간식(카드팩 중복 보상) 추가
-    // 5: 카드별 한계돌파 단계 추가
-    // 6: 한계돌파 밸런스 변경에 따라 개발 세이브 초기화
-    public const int VERSION = 6;
+    // 스키마 버전. 저장 문서 안이 아니라 클라우드 문서의 최상위 schemaVersion 메타 필드가 들고 있다.
+    // 7: Firestore 이관 — 필드 → 프로퍼티, 인덱스 배열 → 문자열 키 맵
+    public const int VERSION = 7;
 
-    // JSON에 version 필드가 없는 레거시 세이브는 v0으로 판정한다.
-    public int version;
-
-    public CurrencySaveData currency = new CurrencySaveData();
-    public OwnershipSaveData ownership = new OwnershipSaveData();
-    public DeckSaveData deck = new DeckSaveData();
-
-    public TutorialSaveData tutorial = new TutorialSaveData();
-
-    public RankSaveData rank = new RankSaveData();
-
-    public CardGrowthSaveData cardGrowth = new CardGrowthSaveData();
-
-    public KeywordGrowthSaveData keywordGrowth = new KeywordGrowthSaveData();
-
-    public AlbumRewardSaveData albumReward = new AlbumRewardSaveData();
-
-    public TournamentSaveData tournament = new TournamentSaveData();
-
-    public ProfileSaveData profile = new ProfileSaveData();
+    [FirestoreProperty("currency")] public CurrencySaveData Currency { get; set; } = new CurrencySaveData();
+    [FirestoreProperty("ownership")] public OwnershipSaveData Ownership { get; set; } = new OwnershipSaveData();
+    [FirestoreProperty("deck")] public DeckSaveData Deck { get; set; } = new DeckSaveData();
+    [FirestoreProperty("cardGrowth")] public CardGrowthSaveData CardGrowth { get; set; } = new CardGrowthSaveData();
+    [FirestoreProperty("keywordGrowth")] public KeywordGrowthSaveData KeywordGrowth { get; set; } = new KeywordGrowthSaveData();
+    [FirestoreProperty("rank")] public RankSaveData Rank { get; set; } = new RankSaveData();
+    [FirestoreProperty("albumReward")] public AlbumRewardSaveData AlbumReward { get; set; } = new AlbumRewardSaveData();
+    [FirestoreProperty("tournament")] public TournamentSaveData Tournament { get; set; } = new TournamentSaveData();
+    [FirestoreProperty("tutorial")] public TutorialSaveData Tutorial { get; set; } = new TutorialSaveData();
+    [FirestoreProperty("profile")] public ProfileSaveData Profile { get; set; } = new ProfileSaveData();
 }

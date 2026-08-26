@@ -36,8 +36,8 @@ public static class ProfileManager
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.profile == null) t_data.profile = new ProfileSaveData();
-            return t_data.profile;
+            if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
+            return t_data.Profile;
         }
     }
 
@@ -57,9 +57,9 @@ public static class ProfileManager
     {
         ProfileSaveData t_slot = Slot;
 
-        Nickname = string.IsNullOrEmpty(t_slot.nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.nickname);
-        AvatarId = IsKnownAvatar(t_slot.avatarId) ? t_slot.avatarId : DefaultAvatarId;
-        FrameId  = IsKnownFrame(t_slot.frameId)   ? t_slot.frameId  : DefaultFrameId;
+        Nickname = string.IsNullOrEmpty(t_slot.Nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.Nickname);
+        AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
+        FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
 
         // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
         // 부트 한복판이라 구독자 예외를 여기서 흘리면 나머지 설치가 통째로 중단된다.
@@ -110,9 +110,9 @@ public static class ProfileManager
     static void Persist()
     {
         ProfileSaveData t_slot = Slot;
-        t_slot.nickname = Nickname;
-        t_slot.avatarId = AvatarId;
-        t_slot.frameId  = FrameId;
+        t_slot.Nickname = Nickname;
+        t_slot.AvatarId = AvatarId;
+        t_slot.FrameId  = FrameId;
 
         DataSaveManager.Save();
     }

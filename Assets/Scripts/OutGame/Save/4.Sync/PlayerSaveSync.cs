@@ -411,7 +411,7 @@ static class PlayerSaveSync
         UserSaveData t_remoteData;
         try
         {
-            t_remoteData = JsonUtility.FromJson<UserSaveData>(_payload);
+            t_remoteData = DataSaveManager.Deserialize(_payload);
         }
         catch (Exception)
         {
@@ -419,7 +419,7 @@ static class PlayerSaveSync
             return false;
         }
 
-        if (!IsComplete(t_remoteData) || t_remoteData.version != _schemaVersion)
+        if (!IsComplete(t_remoteData))
         {
             _error = "payload schema does not match document";
             return false;
@@ -431,15 +431,15 @@ static class PlayerSaveSync
     static bool IsComplete(UserSaveData _data)
     {
         return _data != null &&
-               _data.currency != null &&
-               _data.ownership != null &&
-               _data.deck != null &&
-               _data.tutorial != null &&
-               _data.rank != null &&
-               _data.cardGrowth != null &&
-               _data.keywordGrowth != null &&
-               _data.albumReward != null &&
-               _data.tournament != null;
+               _data.Currency != null &&
+               _data.Ownership != null &&
+               _data.Deck != null &&
+               _data.Tutorial != null &&
+               _data.Rank != null &&
+               _data.CardGrowth != null &&
+               _data.KeywordGrowth != null &&
+               _data.AlbumReward != null &&
+               _data.Tournament != null;
     }
 
     static ESaveReconcileDecision Classify(

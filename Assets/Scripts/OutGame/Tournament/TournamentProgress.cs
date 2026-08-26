@@ -46,7 +46,7 @@ public static class TournamentProgress
     }
 
     // 깼지만 아직 보상을 받지 않은 정점(없으면 빈 문자열)
-    public static string PendingRewardNodeId => Slot.pendingRewardNodeId ?? string.Empty;
+    public static string PendingRewardNodeId => Slot.PendingRewardNodeId ?? string.Empty;
 
     // 지금 진행 중인 챕터(첫 미완주 챕터, 전부 완주면 마지막 · 챕터가 없으면 -1)
     public static int CurrentChapterIndex
@@ -100,19 +100,19 @@ public static class TournamentProgress
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.tournament == null) t_data.tournament = new TournamentSaveData();
-            return t_data.tournament;
+            if (t_data.Tournament == null) t_data.Tournament = new TournamentSaveData();
+            return t_data.Tournament;
         }
     }
 
-    // JsonUtility는 기본 생성자를 태워 이 목록을 빈 리스트로 채운다 — 수동 편집·다른 역직렬화 경로만 대비한 보정이다
+    // 역직렬화가 null을 남긴 경우에만 도는 보정이다(수동 편집·부분 문서 대비)
     static List<string> ClaimedChapters
     {
         get
         {
             TournamentSaveData t_slot = Slot;
-            if (t_slot.claimedChapterIds == null) t_slot.claimedChapterIds = new List<string>();
-            return t_slot.claimedChapterIds;
+            if (t_slot.ClaimedChapterIds == null) t_slot.ClaimedChapterIds = new List<string>();
+            return t_slot.ClaimedChapterIds;
         }
     }
 
@@ -156,7 +156,7 @@ public static class TournamentProgress
         if (!Config.TryGetNode(_index, out TournamentNodeDef t_node) || !t_node.HasStableKey)
             return ETournamentNodeState.Locked;
 
-        if (Slot.clearedNodeIds.Contains(t_node.nodeId)) return ETournamentNodeState.Cleared;
+        if (Slot.ClearedNodeIds.Contains(t_node.nodeId)) return ETournamentNodeState.Cleared;
 
         // 미수령은 클리어가 아니다 — 다음 정점 해금도 링크 점등도 수령(ClearNode)이 열쇠다
         if (t_node.nodeId == PendingRewardNodeId) return ETournamentNodeState.RewardPending;
@@ -165,7 +165,7 @@ public static class TournamentProgress
 
         if (Config.TryGetNode(_index - 1, out TournamentNodeDef t_prev)
             && t_prev.HasStableKey
-            && Slot.clearedNodeIds.Contains(t_prev.nodeId))
+            && Slot.ClearedNodeIds.Contains(t_prev.nodeId))
             return ETournamentNodeState.Playable;
 
         return ETournamentNodeState.Locked;
@@ -183,7 +183,7 @@ public static class TournamentProgress
     }
 
     public static bool IsCleared(string _nodeId)
-        => !string.IsNullOrEmpty(_nodeId) && Slot.clearedNodeIds.Contains(_nodeId);
+        => !string.IsNullOrEmpty(_nodeId) && Slot.ClearedNodeIds.Contains(_nodeId);
 
     public static bool IsRewardPending(int _index)
         => StateOf(_index) == ETournamentNodeState.RewardPending;
@@ -194,9 +194,9 @@ public static class TournamentProgress
     {
         if (string.IsNullOrEmpty(_nodeId)) return false;
         if (IsCleared(_nodeId)) return false;
-        if (Slot.pendingRewardNodeId == _nodeId) return false;
+        if (Slot.PendingRewardNodeId == _nodeId) return false;
 
-        Slot.pendingRewardNodeId = _nodeId;
+        Slot.PendingRewardNodeId = _nodeId;
 
         DataSaveManager.Save();
         OnChanged?.Invoke();
@@ -207,7 +207,7 @@ public static class TournamentProgress
     public static bool ClearNode(string _nodeId)
     {
         if (string.IsNullOrEmpty(_nodeId)) return false;
-        if (Slot.clearedNodeIds.Contains(_nodeId)) return false;
+        if (Slot.ClearedNodeIds.Contains(_nodeId)) return false;
 
         Payout(_nodeId);
         return true;
@@ -286,9 +286,9 @@ public static class TournamentProgress
     // 클리어·수령 낙인만 지운다(디버그 전용, 지급된 재화는 회수하지 않는다)
     public static void ResetForDebug()
     {
-        Slot.clearedNodeIds.Clear();
+        Slot.ClearedNodeIds.Clear();
         ClaimedChapters.Clear();
-        Slot.pendingRewardNodeId = "";
+        Slot.PendingRewardNodeId = "";
         DataSaveManager.Save();
         OnChanged?.Invoke();
     }
@@ -302,10 +302,10 @@ public static class TournamentProgress
         for (int t_i = 0; t_i < t_rewards.Count; t_i++)
             CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
 
-        Slot.clearedNodeIds.Add(_nodeId);
+        Slot.ClearedNodeIds.Add(_nodeId);
 
         // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
-        if (Slot.pendingRewardNodeId == _nodeId) Slot.pendingRewardNodeId = "";
+        if (Slot.PendingRewardNodeId == _nodeId) Slot.PendingRewardNodeId = "";
 
         // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
         CurrencyManager.Save();

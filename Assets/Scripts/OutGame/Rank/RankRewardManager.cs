@@ -37,10 +37,8 @@ public static class RankRewardManager
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.rank == null) t_data.rank = new RankSaveData();
-
-            MigrateClaimedCount(t_data.rank);
-            return t_data.rank;
+            if (t_data.Rank == null) t_data.Rank = new RankSaveData();
+            return t_data.Rank;
         }
     }
 
@@ -83,7 +81,7 @@ public static class RankRewardManager
         for (int t_i = 0; t_i < t_rewards.Count; t_i++)
             CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
 
-        Slot.claimedTiers.Add(_tierIndex);
+        Slot.ClaimedTiers.Add(_tierIndex);
 
         // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
         CurrencyManager.Save();
@@ -94,22 +92,9 @@ public static class RankRewardManager
     // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)
     public static void ResetForDebug()
     {
-        Slot.claimedTiers.Clear();
-        Slot.claimedCount = 0;
+        Slot.ClaimedTiers.Clear();
         DataSaveManager.Save();
         OnChanged?.Invoke();
-    }
-
-    // 구 커서 세이브를 낙인 리스트로 1회 흡수한다. 비운 뒤로는 no-op이라 Slot 접근마다 불려도 무해하다.
-    static void MigrateClaimedCount(RankSaveData _slot)
-    {
-        if (_slot.claimedCount <= 0) return;
-
-        for (int t_i = 0; t_i < _slot.claimedCount; t_i++)
-            if (!_slot.claimedTiers.Contains(t_i)) _slot.claimedTiers.Add(t_i);
-
-        _slot.claimedCount = 0;
-        DataSaveManager.Save();
     }
 
     // Claimed 검사가 먼저여야 한다 — 강등 등으로 도달 티어가 내려간 구간에서 수령 표시가 풀린다
@@ -118,7 +103,7 @@ public static class RankRewardManager
     static ERankRewardState StateOf(int _tierIndex)
     {
         if (_tierIndex < 0 || _tierIndex >= TierCount) return ERankRewardState.Locked;
-        if (Slot.claimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
+        if (Slot.ClaimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
 
         if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return ERankRewardState.Locked;
 

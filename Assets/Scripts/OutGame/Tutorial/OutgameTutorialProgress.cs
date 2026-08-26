@@ -9,31 +9,30 @@ public static class OutgameTutorialProgress
     // 놓쳤을 때 대가(게임 자체를 못 함)가 훨씬 크다.
     const int STALL_BOOT_COUNT = 2;
 
-    public static bool IsCompleted => Slot.outgameCompleted;
+    public static bool IsCompleted => Slot.OutgameCompleted;
 
     // 진행 중인 챕터(기획의 "N편") 인덱스
-    public static int ChapterIndex => Slot.outgameChapterIndex;
+    public static int ChapterIndex => Slot.ChapterIndex;
 
     // 챕터 안에서의 스텝 순번(시퀀스 전체 통산이 아니다)
-    public static int StepIndex => Slot.outgameChapterStepIndex;
+    public static int StepIndex => Slot.ChapterStepIndex;
 
     // 서 있는 스텝의 불변 번호(0 = 앵커 없음). 좌표가 커서라면 이쪽이 세이브의 정체성이다.
-    public static int StepId => Slot.outgameStepId;
+    public static int StepId => Slot.StepId;
 
     static TutorialSaveData Slot
     {
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.tutorial == null) t_data.tutorial = new TutorialSaveData();
-            return t_data.tutorial;
+            if (t_data.Tutorial == null) t_data.Tutorial = new TutorialSaveData();
+            return t_data.Tutorial;
         }
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 레거시 세이브 완료 판정과 진행 정지 판정
+    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 진행 정지 판정
     public static void Init()
     {
-        MigrateLegacyCompletion();
         DetectStall();
     }
 
@@ -46,12 +45,12 @@ public static class OutgameTutorialProgress
         if (_chapter < 0 || _step < 0) return;
 
         var t_slot = Slot;
-        t_slot.outgameChapterIndex     = _chapter;
-        t_slot.outgameChapterStepIndex = _step;
+        t_slot.ChapterIndex     = _chapter;
+        t_slot.ChapterStepIndex = _step;
 
         // 좌표가 움직이는 모든 런타임 경로가 이 창구를 지나므로, 앵커도 여기서만 갱신하면 된다.
         // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 부트가 좌표에서 다시 채운다.
-        t_slot.outgameStepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
+        t_slot.StepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
 
         Save();
     }
@@ -60,9 +59,9 @@ public static class OutgameTutorialProgress
     public static void ResetStallWatch()
     {
         var t_slot = Slot;
-        t_slot.lastBootChapterIndex = t_slot.outgameChapterIndex;
-        t_slot.lastBootStepIndex    = t_slot.outgameChapterStepIndex;
-        t_slot.sameCoordBootCount   = 0;
+        t_slot.LastBootChapterIndex = t_slot.ChapterIndex;
+        t_slot.LastBootStepIndex    = t_slot.ChapterStepIndex;
+        t_slot.SameCoordBootCount   = 0;
         Save();
     }
 
@@ -70,9 +69,9 @@ public static class OutgameTutorialProgress
     public static void Complete()
     {
         var t_slot = Slot;
-        if (t_slot.outgameCompleted) return;
+        if (t_slot.OutgameCompleted) return;
 
-        t_slot.outgameCompleted = true;
+        t_slot.OutgameCompleted = true;
         Save();
     }
 
@@ -81,7 +80,7 @@ public static class OutgameTutorialProgress
     {
         if (_trigger == EOutgameTutorialTrigger.None) return true;
 
-        var t_done = Slot.completedTriggers;
+        var t_done = Slot.CompletedTriggers;
         return t_done != null && t_done.Contains(_trigger.ToString());
     }
 
@@ -91,12 +90,12 @@ public static class OutgameTutorialProgress
         if (_trigger == EOutgameTutorialTrigger.None) return;
 
         var t_slot = Slot;
-        if (t_slot.completedTriggers == null) t_slot.completedTriggers = new List<string>();
+        if (t_slot.CompletedTriggers == null) t_slot.CompletedTriggers = new List<string>();
 
         string t_key = _trigger.ToString();
-        if (t_slot.completedTriggers.Contains(t_key)) return;
+        if (t_slot.CompletedTriggers.Contains(t_key)) return;
 
-        t_slot.completedTriggers.Add(t_key);
+        t_slot.CompletedTriggers.Add(t_key);
         Save();
     }
 
@@ -104,8 +103,8 @@ public static class OutgameTutorialProgress
     public static void ClearTriggersForDebug()
     {
         var t_slot = Slot;
-        if (t_slot.completedTriggers == null) t_slot.completedTriggers = new List<string>();
-        else                                  t_slot.completedTriggers.Clear();
+        if (t_slot.CompletedTriggers == null) t_slot.CompletedTriggers = new List<string>();
+        else                                  t_slot.CompletedTriggers.Clear();
 
         Save();
     }
@@ -119,11 +118,10 @@ public static class OutgameTutorialProgress
         if (_chapter < 0 || _step < 0) return;
 
         var t_slot = Slot;
-        t_slot.outgameChapterIndex     = _chapter;
-        t_slot.outgameChapterStepIndex = _step;
-        t_slot.outgameStepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
-        t_slot.outgameCompleted        = false;
-        t_slot.migrationChecked        = true;
+        t_slot.ChapterIndex     = _chapter;
+        t_slot.ChapterStepIndex = _step;
+        t_slot.StepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
+        t_slot.OutgameCompleted = false;
         Save();
 
         // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 부트 만에 오탐 정지가 뜬다.
@@ -132,45 +130,30 @@ public static class OutgameTutorialProgress
         OutgameFeatureLock.ClearStall();
     }
 
-    // 소유 카드가 이미 있는 구 세이브는 튜토리얼을 마친 것으로 본다(계정당 1회)
-    static void MigrateLegacyCompletion()
-    {
-        var t_slot = Slot;
-        if (t_slot.migrationChecked) return;
-
-        if (!t_slot.outgameCompleted
-            && t_slot.outgameStepIndex == 0 && t_slot.outgameChapterIndex == 0 && t_slot.outgameChapterStepIndex == 0
-            && OwnershipManager.HasAnyOwnedSaved())
-            t_slot.outgameCompleted = true;
-
-        t_slot.migrationChecked = true;
-        Save();
-    }
-
     // 부팅을 거듭해도 좌표가 그대로면 그 스텝은 스스로 풀릴 수 없는 것이다 — 안내는 멈추더라도 게임은 열어 준다.
     // 진입 실패는 브리지가 그 자리에서 잡고, 여기는 신호를 영영 못 받는 대기형 정지(앵커 미등록 등)를 잡는다.
     static void DetectStall()
     {
         var t_slot = Slot;
-        if (t_slot.outgameCompleted) return;
+        if (t_slot.OutgameCompleted) return;
 
-        if (t_slot.lastBootChapterIndex != t_slot.outgameChapterIndex
-         || t_slot.lastBootStepIndex    != t_slot.outgameChapterStepIndex)
+        if (t_slot.LastBootChapterIndex != t_slot.ChapterIndex
+         || t_slot.LastBootStepIndex    != t_slot.ChapterStepIndex)
         {
-            t_slot.lastBootChapterIndex = t_slot.outgameChapterIndex;
-            t_slot.lastBootStepIndex    = t_slot.outgameChapterStepIndex;
-            t_slot.sameCoordBootCount   = 0;
+            t_slot.LastBootChapterIndex = t_slot.ChapterIndex;
+            t_slot.LastBootStepIndex    = t_slot.ChapterStepIndex;
+            t_slot.SameCoordBootCount   = 0;
             Save();
             return;
         }
 
-        t_slot.sameCoordBootCount++;
+        t_slot.SameCoordBootCount++;
         Save();
 
-        if (t_slot.sameCoordBootCount < STALL_BOOT_COUNT) return;
+        if (t_slot.SameCoordBootCount < STALL_BOOT_COUNT) return;
 
-        Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.outgameChapterIndex}-{t_slot.outgameChapterStepIndex}에서 "
-                       + $"{t_slot.sameCoordBootCount + 1}번째 부팅 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
+        Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.ChapterIndex}-{t_slot.ChapterStepIndex}에서 "
+                       + $"{t_slot.SameCoordBootCount + 1}번째 부팅 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
         OutgameFeatureLock.NotifyStalled();
     }
 }

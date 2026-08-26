@@ -14,24 +14,16 @@ public static class OwnershipManager
     // 외부 변조 차단용 스냅샷(라이브 뷰 아님)
     public static IReadOnlyCollection<int> OwnedIds => new List<int>(s_owned);
 
-    // 메모리 캐시(Init) 없이 세이브의 소유 여부만 조회 — 첫실행 판정용.
-    // 이관 전 구 세이브도 "소유 있음"으로 읽어야 한다 — 아니면 기존 유저가 신규로 오인돼 스타터덱을 다시 받는다.
+    // 메모리 캐시(Init) 없이 세이브의 소유 여부만 조회 — 첫실행 판정용
     public static bool HasAnyOwnedSaved()
     {
-        var t_data = DataSaveManager.Data.ownership;
+        var t_data = DataSaveManager.Data.Ownership;
 
-        if (t_data.ownedCardIds != null)
+        if (t_data.CardIds != null)
         {
-            foreach (var t_id in t_data.ownedCardIds)
+            foreach (var t_id in t_data.CardIds)
             {
                 if (t_id > 0) return true;
-            }
-        }
-        if (t_data.ownedCardKeys != null)
-        {
-            foreach (var t_key in t_data.ownedCardKeys)
-            {
-                if (!string.IsNullOrEmpty(t_key)) return true;
             }
         }
         return false;
@@ -43,27 +35,15 @@ public static class OwnershipManager
         s_owned.Clear();
         bool t_dirty = false;
 
-        var t_data = DataSaveManager.Data.ownership;
-        if (t_data.ownedCardIds != null)
+        var t_data = DataSaveManager.Data.Ownership;
+        if (t_data.CardIds != null)
         {
-            foreach (var t_id in t_data.ownedCardIds)
+            foreach (var t_id in t_data.CardIds)
             {
                 if (t_id <= 0) continue;
                 if (!CardCatalog.IsReady || CardCatalog.Contains(t_id)) s_owned.Add(t_id);
                 else t_dirty = true;
             }
-        }
-
-        // 구 세이브(이름 키) 이관 — 카탈로그가 준비된 뒤에만 가능하다. 미준비면 다음 부트로 미룬다.
-        if (CardCatalog.IsReady && t_data.ownedCardKeys != null && t_data.ownedCardKeys.Count > 0)
-        {
-            foreach (var t_key in t_data.ownedCardKeys)
-            {
-                int t_id = CardCatalog.LegacyIdOfName(t_key);
-                if (t_id > 0) s_owned.Add(t_id);
-            }
-            t_data.ownedCardKeys.Clear();   // 한 번만 옮긴다 — 남겨두면 회수한 카드가 부트마다 되살아난다
-            t_dirty = true;
         }
 
         if (t_dirty) Save();
@@ -72,8 +52,8 @@ public static class OwnershipManager
     // 메모리 소유 집합을 세이브 슬롯에 flush 후 영속화
     public static void Save()
     {
-        var t_data = DataSaveManager.Data.ownership;
-        t_data.ownedCardIds = new List<int>(s_owned);
+        var t_data = DataSaveManager.Data.Ownership;
+        t_data.CardIds = new List<int>(s_owned);
         DataSaveManager.Save();
     }
 

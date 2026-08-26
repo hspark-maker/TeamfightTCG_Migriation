@@ -218,7 +218,7 @@ public class BootInstaller : MonoBehaviour
         if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
         KeywordGrowthManager.Init();
         CardGrowthManager.Init();
-        DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
+        DeckSaveManager.LoadFromSave();
         StarterDeck.GrantIfNoDeck(starterDeck);
         OutgameTutorialRunner.ResolveProgressAnchor();
         OutgameTutorialRunner.RewindToPendingBattleEntry();

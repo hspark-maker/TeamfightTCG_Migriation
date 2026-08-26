@@ -1,4 +1,5 @@
 using System;
+using Newtonsoft.Json;
 using UnityEngine;
 
 // 아웃게임 세이브 매니저. 저장 매체는 IRepository로 교체한다.
@@ -6,14 +7,22 @@ public static class DataSaveManager
 {
     const string SAVE_KEY = "outgame_save";
     const string CORRUPT_KEY = "outgame_save_corrupt";
-    const string VERSION_BACKUP_KEY_PREFIX = "outgame_save_v";
+
+    // JsonUtility는 auto-property를 직렬화하지 못한다 — Firestore 매핑용 프로퍼티 모델과 같은 모양을 쓰려면 Newtonsoft여야 한다.
+    static readonly JsonSerializerSettings s_serializerSettings = new JsonSerializerSettings
+    {
+        Formatting = Formatting.None,
+
+        // 기본값(Auto)은 프로퍼티 이니셜라이저로 만든 컬렉션에 이어붙인다 — 값이 조용히 중복되는 것을 막는다.
+        ObjectCreationHandling = ObjectCreationHandling.Replace,
+    };
 
     static IRepository s_repository = new JsonFileRepository();
     static bool s_saveBlocked;
 
     public static event Action<string> OnSaved;
 
-    public static UserSaveData Data { get; private set; } = CreateCurrentData();
+    public static UserSaveData Data { get; private set; } = new UserSaveData();
     public static bool CloudUploadAllowed { get; private set; } = true;
     public static bool IsSaveBlocked => s_saveBlocked;
     internal static bool HasLocalSave => s_repository.Has(SAVE_KEY);
@@ -24,7 +33,7 @@ public static class DataSaveManager
         if (_repository != null) s_repository = _repository;
     }
 
-    // 부팅 시 한 번 호출한다. 원격보다 최신인 로컬 데이터는 보존하고 쓰기를 막는다.
+    // 부팅 시 한 번 호출한다. 캐시가 깨져 있으면 원본을 남기고 기본값으로 시작한다.
     public static void Load()
     {
         s_saveBlocked = false;
@@ -33,47 +42,19 @@ public static class DataSaveManager
         string t_json = s_repository.Load(SAVE_KEY);
         if (string.IsNullOrEmpty(t_json))
         {
-            Data = CreateCurrentData();
+            Data = new UserSaveData();
             return;
         }
 
         try
         {
-            Data = JsonUtility.FromJson<UserSaveData>(t_json) ?? CreateCurrentData();
-            if (Data.version > UserSaveData.VERSION)
-            {
-                int t_loadedVersion = Data.version;
-                string t_backupKey = $"{VERSION_BACKUP_KEY_PREFIX}{t_loadedVersion}";
-                s_repository.Save(t_backupKey, t_json);
-
-                Debug.LogWarning(
-                    $"[DataSaveManager] Save v{t_loadedVersion} is newer than client v{UserSaveData.VERSION}. " +
-                    $"Local save and cloud upload are blocked. Backup: '{t_backupKey}'");
-
-                s_saveBlocked = true;
-                CloudUploadAllowed = false;
-                return;
-            }
-
-            if (Data.version < UserSaveData.VERSION)
-            {
-                int t_loadedVersion = Data.version;
-                string t_backupKey = $"{VERSION_BACKUP_KEY_PREFIX}{t_loadedVersion}";
-                s_repository.Save(t_backupKey, t_json);
-
-                Debug.LogWarning(
-                    $"[DataSaveManager] Save v{t_loadedVersion} reset for client v{UserSaveData.VERSION}. " +
-                    $"Cloud upload is blocked for this session. Backup: '{t_backupKey}'");
-
-                Data = CreateCurrentData();
-                CloudUploadAllowed = false;
-            }
+            Data = Parse(t_json);
         }
         catch (Exception t_exception)
         {
             Debug.LogError($"[DataSaveManager] Load failed. Backing up source and starting with defaults: {t_exception}");
             s_repository.Save(CORRUPT_KEY, t_json);
-            Data = CreateCurrentData();
+            Data = new UserSaveData();
             CloudUploadAllowed = false;
         }
     }
@@ -86,16 +67,19 @@ public static class DataSaveManager
             return;
         }
 
-        Data.version = UserSaveData.VERSION;
-        string t_json = JsonUtility.ToJson(Data);
+        string t_json = Serialize(Data);
         s_repository.Save(SAVE_KEY, t_json);
         OnSaved?.Invoke(t_json);
     }
 
     public static string CreateSnapshot()
     {
-        Data.version = UserSaveData.VERSION;
-        return JsonUtility.ToJson(Data);
+        return Serialize(Data);
+    }
+
+    internal static UserSaveData Deserialize(string _json)
+    {
+        return JsonConvert.DeserializeObject<UserSaveData>(_json, s_serializerSettings);
     }
 
     internal static string LoadSyncMetadata(string _key)
@@ -123,8 +107,7 @@ public static class DataSaveManager
         string t_original = s_repository.Load(SAVE_KEY);
         try
         {
-            UserSaveData t_expectedData = JsonUtility.FromJson<UserSaveData>(_payload);
-            string t_expected = JsonUtility.ToJson(t_expectedData);
+            string t_expected = Serialize(Parse(_payload));
 
             t_atomicRepository.ReplaceWithBackup(SAVE_KEY, _payload, _backupKey);
             Load();
@@ -175,8 +158,27 @@ public static class DataSaveManager
         }
     }
 
-    static UserSaveData CreateCurrentData()
+    // 손으로 편집한 문서가 슬롯을 통째로 비워 두면 소비자가 NullReference로 죽는다 — 빠진 슬롯만 기본값으로 세운다.
+    static UserSaveData Parse(string _json)
     {
-        return new UserSaveData { version = UserSaveData.VERSION };
+        var t_data = Deserialize(_json) ?? new UserSaveData();
+
+        if (t_data.Currency == null) t_data.Currency = new CurrencySaveData();
+        if (t_data.Ownership == null) t_data.Ownership = new OwnershipSaveData();
+        if (t_data.Deck == null) t_data.Deck = new DeckSaveData();
+        if (t_data.CardGrowth == null) t_data.CardGrowth = new CardGrowthSaveData();
+        if (t_data.KeywordGrowth == null) t_data.KeywordGrowth = new KeywordGrowthSaveData();
+        if (t_data.Rank == null) t_data.Rank = new RankSaveData();
+        if (t_data.AlbumReward == null) t_data.AlbumReward = new AlbumRewardSaveData();
+        if (t_data.Tournament == null) t_data.Tournament = new TournamentSaveData();
+        if (t_data.Tutorial == null) t_data.Tutorial = new TutorialSaveData();
+        if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
+
+        return t_data;
+    }
+
+    static string Serialize(UserSaveData _data)
+    {
+        return JsonConvert.SerializeObject(_data, s_serializerSettings);
     }
 }

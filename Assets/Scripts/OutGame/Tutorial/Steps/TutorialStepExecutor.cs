@@ -182,9 +182,6 @@ public static class TutorialStepExecutor
         if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.playerDeck, out List<CardData> t_cards))
             return Fail(_step, _context, $"시나리오 미배선 또는 덱이 {DeckSaveManager.DECK_SIZE}장을 이루지 못함");
 
-        if (DeckSaveManager.LegacyMigrationPending)
-            return Fail(_step, _context, "레거시 덱 이관 미완료");
-
         // 저장 덱과 소유권은 별도 데이터다. 둘이 어긋난 세이브라도
         // 가이드 진입 전 실제 카드 소유를 먼저 보장한다.
         OwnershipManager.GrantAll(ToIds(t_cards));

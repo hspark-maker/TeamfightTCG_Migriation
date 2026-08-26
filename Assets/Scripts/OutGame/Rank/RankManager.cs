@@ -9,7 +9,7 @@ public static class RankManager
     static RankConfig s_config;
 
     // 현재 랭크 포인트
-    public static long Points => Slot.points;
+    public static long Points => Slot.Points;
 
     /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
@@ -27,8 +27,8 @@ public static class RankManager
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.rank == null) t_data.rank = new RankSaveData();
-            return t_data.rank;
+            if (t_data.Rank == null) t_data.Rank = new RankSaveData();
+            return t_data.Rank;
         }
     }
 
@@ -153,17 +153,17 @@ public static class RankManager
         if (IsRanked) return false;
 
         var t_slot = Slot;
-        long t_points = t_slot.points;
+        long t_points = t_slot.Points;
 
-        t_slot.points = Config.FirstTierPoints;
+        t_slot.Points = Config.FirstTierPoints;
         Save();
 
         _result = new RankApplyResult(
-            t_slot.points - t_points,
+            t_slot.Points - t_points,
             -1,
-            Config.ResolveTierIndex(t_slot.points),
+            Config.ResolveTierIndex(t_slot.Points),
             false,
-            PromoPendingAt(t_slot.points));
+            PromoPendingAt(t_slot.Points));
         return true;
     }
 
@@ -174,7 +174,7 @@ public static class RankManager
         var t_config = Config;
         var t_slot = Slot;
 
-        long t_points = t_slot.points;
+        long t_points = t_slot.Points;
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
@@ -197,15 +197,15 @@ public static class RankManager
         // 고정 천장이 곧 강등이 된다.
         if (_tutorial) t_ceiling = Math.Min(t_ceiling, Math.Max(t_config.FirstTierPoints - 1, t_points));
 
-        t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
+        t_slot.Points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
 
         return new RankApplyResult(
-            t_slot.points - t_points,
+            t_slot.Points - t_points,
             t_index,
-            t_config.ResolveTierIndex(t_slot.points),
+            t_config.ResolveTierIndex(t_slot.Points),
             false,
-            PromoPendingAt(t_slot.points));
+            PromoPendingAt(t_slot.Points));
     }
 
     /// <summary>티어를 _index로 바로 옮긴다(디버그 전용). 포인트를 그 티어의 진입 임계치에 맞춘다 —
@@ -220,10 +220,10 @@ public static class RankManager
         int t_target = _index < 0 ? 0 : (_index > t_last ? t_last : _index);
         if (!t_config.TryGetTier(t_target, out RankTier t_tier)) return t_config.ResolveTierIndex(Points);
 
-        Slot.points = t_tier.RequiredPoints;
+        Slot.Points = t_tier.RequiredPoints;
         Save();
 
-        return t_config.ResolveTierIndex(Slot.points);
+        return t_config.ResolveTierIndex(Slot.Points);
     }
 
     /// <summary>티어를 _step만큼 올린다(음수면 내린다). 디버그 전용.</summary>
@@ -240,7 +240,7 @@ public static class RankManager
         long t_ceiling = Config.GradeCeilingPoints(Points);
         if (t_ceiling == long.MaxValue) return false;
 
-        Slot.points = t_ceiling - 1;
+        Slot.Points = t_ceiling - 1;
         Save();
 
         return true;
@@ -255,7 +255,7 @@ public static class RankManager
     // 포인트만 0으로 되돌린다(디버그 전용)
     public static void ResetForDebug()
     {
-        Slot.points = 0;
+        Slot.Points = 0;
         Save();
     }
 
@@ -270,15 +270,15 @@ public static class RankManager
         long t_floor   = t_config.DivisionFloorPoints(_points);
 
         // 승급전은 등급 마지막 단계에서만 서므로 천장 - 바닥 = 그 등급의 pointsPerDivision이다.
-        _slot.points = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
+        _slot.Points = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
         Save();
 
         return new RankApplyResult(
-            _slot.points - _points,
+            _slot.Points - _points,
             _index,
-            t_config.ResolveTierIndex(_slot.points),
+            t_config.ResolveTierIndex(_slot.Points),
             true,
-            PromoPendingAt(_slot.points));
+            PromoPendingAt(_slot.Points));
     }
 
     // _points가 승급전 대기선(다음 등급 진입선 - 1)인가. 최고 등급은 천장이 long.MaxValue라 늘 false.
