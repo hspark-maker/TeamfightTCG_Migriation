@@ -1,27 +1,37 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // IRepository의 PlayerPrefs 구현
 public class PlayerPrefsRepository : IAtomicRepository
 {
-    public bool Has(string _key) => PlayerPrefs.HasKey(_key);
+    public UniTask<bool> HasAsync(string _key) => UniTask.FromResult(PlayerPrefs.HasKey(_key));
 
-    public string Load(string _key) => PlayerPrefs.GetString(_key, "");
+    public UniTask<string> LoadAsync(string _key) => UniTask.FromResult(PlayerPrefs.GetString(_key, ""));
 
-    public void Save(string _key, string _value)
+    public UniTask<ESaveWriteResult> SaveAsync(string _key, string _value)
     {
-        PlayerPrefs.SetString(_key, _value);
-        PlayerPrefs.Save();
+        Write(_key, _value);
+        return UniTask.FromResult(ESaveWriteResult.Success);
     }
 
-    public void Delete(string _key)
+    public UniTask DeleteAsync(string _key)
     {
         PlayerPrefs.DeleteKey(_key);
         PlayerPrefs.Save();
+        return UniTask.CompletedTask;
     }
 
-    public void ReplaceWithBackup(string _key, string _value, string _backupKey)
+    // 원자성이 없다 — 두 번의 쓰기 사이에 죽으면 백업만 남는다(파일 구현과 달리 교체 보장이 없다).
+    public UniTask<ESaveWriteResult> ReplaceWithBackupAsync(string _key, string _value, string _backupKey)
     {
-        if (Has(_key)) Save(_backupKey, Load(_key));
-        Save(_key, _value);
+        if (PlayerPrefs.HasKey(_key)) Write(_backupKey, PlayerPrefs.GetString(_key, ""));
+        Write(_key, _value);
+        return UniTask.FromResult(ESaveWriteResult.Success);
+    }
+
+    static void Write(string _key, string _value)
+    {
+        PlayerPrefs.SetString(_key, _value);
+        PlayerPrefs.Save();
     }
 }

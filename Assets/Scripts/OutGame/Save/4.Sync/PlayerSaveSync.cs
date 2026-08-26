@@ -214,7 +214,7 @@ static class PlayerSaveSync
             string t_userId = FirebaseAuthService.Instance.UserId;
             string t_profileId = s_profileId;
             string t_ownerUid = PlayerPrefs.GetString(OWNER_UID_KEY, string.Empty);
-            if (DataSaveManager.HasLocalSave &&
+            if (await DataSaveManager.HasLocalSaveAsync() &&
                 !string.IsNullOrEmpty(t_ownerUid) &&
                 t_ownerUid != t_userId)
             {
@@ -224,7 +224,7 @@ static class PlayerSaveSync
                 return;
             }
             string t_localPayload = DataSaveManager.CreateSnapshot();
-            bool t_hasLocalSave = DataSaveManager.HasLocalSave;
+            bool t_hasLocalSave = await DataSaveManager.HasLocalSaveAsync();
             await InspectRemoteAsync(
                 _generation,
                 t_userId,
@@ -321,7 +321,7 @@ static class PlayerSaveSync
         s_lastKnownRevision = t_revision;
         s_lastKnownRemoteHash = t_remoteFullHash;
         string t_localFullHash = HashOf(_localPayload);
-        PlayerSaveSyncMetadata t_base = PlayerSaveSyncMetadataStore.Load(_userId, _profileId);
+        PlayerSaveSyncMetadata t_base = await PlayerSaveSyncMetadataStore.LoadAsync(_userId, _profileId);
         LastDecision = Classify(
             _hasLocalSave,
             t_schemaVersion,
@@ -523,7 +523,7 @@ static class PlayerSaveSync
         switch (LastDecision)
         {
             case ESaveReconcileDecision.InSync:
-                CompleteSynchronized(_userId, _profileId, _localFullHash, _remoteRevision);
+                await CompleteSynchronizedAsync(_userId, _profileId, _localFullHash, _remoteRevision);
                 return;
 
             case ESaveReconcileDecision.RemoteMissing:
@@ -539,7 +539,7 @@ static class PlayerSaveSync
             case ESaveReconcileDecision.LocalAhead:
                 if (_remoteSchemaVersion < UserSaveData.VERSION)
                 {
-                    SaveConflictOrRequireRecovery(
+                    await SaveConflictOrRequireRecoveryAsync(
                         _userId, _profileId, _remotePayload, _remoteFullHash,
                         _remoteRevision, _remoteSchemaVersion);
                     return;
@@ -566,9 +566,10 @@ static class PlayerSaveSync
 
                 string t_backupKey =
                     $"cloud_import_backup_{_userId}_{_profileId}_{_remoteRevision}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-                if (!DataSaveManager.TryApplyRemote(_remotePayload, t_backupKey, out string t_error))
+                SaveApplyReport t_applied = await DataSaveManager.ApplyRemoteAsync(_remotePayload, t_backupKey);
+                if (!t_applied.Success)
                 {
-                    Debug.LogError($"[PlayerSaveSync] Remote apply failed: {t_error}");
+                    Debug.LogError($"[PlayerSaveSync] Remote apply failed: {t_applied.Error}");
                     GameManager.MarkRecoveryRequired();
                     MarkGateComplete();
                     return;
@@ -576,13 +577,13 @@ static class PlayerSaveSync
 
                 s_uploadAllowed = true;
                 s_pendingPayload = DataSaveManager.CreateSnapshot();
-                CompleteSynchronized(_userId, _profileId, _remoteFullHash, _remoteRevision);
+                await CompleteSynchronizedAsync(_userId, _profileId, _remoteFullHash, _remoteRevision);
                 return;
             }
 
             case ESaveReconcileDecision.Diverged:
             case ESaveReconcileDecision.NoBaseConflict:
-                SaveConflictOrRequireRecovery(
+                await SaveConflictOrRequireRecoveryAsync(
                     _userId, _profileId, _remotePayload, _remoteFullHash,
                     _remoteRevision, _remoteSchemaVersion);
                 return;
@@ -616,7 +617,7 @@ static class PlayerSaveSync
             s_lastKnownRevision = t_newRevision;
             s_lastKnownRemoteHash = _fullHash;
             if (s_pendingPayload == _payload) s_pendingPayload = string.Empty;
-            CompleteSynchronized(_userId, _profileId, _fullHash, t_newRevision);
+            await CompleteSynchronizedAsync(_userId, _profileId, _fullHash, t_newRevision);
         }
         catch (Exception t_exception)
         {
@@ -701,7 +702,7 @@ static class PlayerSaveSync
         return await t_transactionTask;
     }
 
-    static void CompleteSynchronized(
+    static async UniTask CompleteSynchronizedAsync(
         string _userId,
         string _profileId,
         string _fullHash,
@@ -714,7 +715,7 @@ static class PlayerSaveSync
             s_uploadedHashes[HashKey(_userId, _profileId)] = _fullHash.Substring(0, 16);
             s_pendingPayload = string.Empty;
         }
-        bool t_metadataSaved = PlayerSaveSyncMetadataStore.SaveConfirmed(
+        bool t_metadataSaved = await PlayerSaveSyncMetadataStore.SaveConfirmedAsync(
             _userId, _profileId, _fullHash, _revision);
         if (t_metadataSaved)
         {
@@ -728,7 +729,7 @@ static class PlayerSaveSync
             : ESaveUploadState.Pending;
     }
 
-    static void SaveConflictOrRequireRecovery(
+    static async UniTask SaveConflictOrRequireRecoveryAsync(
         string _userId,
         string _profileId,
         string _payload,
@@ -747,9 +748,10 @@ static class PlayerSaveSync
             capturedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         };
         string t_key = $"outgame_remote_conflict_{_userId}_{_profileId}_{_revision}_{t_conflict.capturedUnix}";
-        if (!DataSaveManager.TrySaveRemoteConflict(t_key, JsonUtility.ToJson(t_conflict), out string t_error))
+        SaveApplyReport t_saved = await DataSaveManager.SaveRemoteConflictAsync(t_key, JsonUtility.ToJson(t_conflict));
+        if (!t_saved.Success)
         {
-            Debug.LogError($"[PlayerSaveSync] Conflict backup failed: {t_error}");
+            Debug.LogError($"[PlayerSaveSync] Conflict backup failed: {t_saved.Error}");
             GameManager.MarkRecoveryRequired();
             return;
         }
@@ -809,7 +811,7 @@ static class PlayerSaveSync
             s_lastKnownRevision = t_newRevision;
             s_lastKnownRemoteHash = t_fullHash;
             s_uploadedHashes[t_hashKey] = t_hash;
-            bool t_metadataSaved = PlayerSaveSyncMetadataStore.SaveConfirmed(
+            bool t_metadataSaved = await PlayerSaveSyncMetadataStore.SaveConfirmedAsync(
                 t_userId,
                 t_profileId,
                 t_fullHash,

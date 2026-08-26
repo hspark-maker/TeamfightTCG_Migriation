@@ -55,7 +55,7 @@ public static partial class CardGrowthManager
         s_missingConfigLogged = false;
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출
+    // 부트에서 DataSaveManager.LoadAsync() 이후 1회 호출
     public static void Init()
     {
         s_growth.Clear();
@@ -77,6 +77,9 @@ public static partial class CardGrowthManager
         }
 
         s_initialized = true;
+
+        // 부트 전에 그려진 화면은 레벨 0으로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다
+        OnGrowthChanged?.Invoke();
     }
 
     static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
@@ -106,7 +109,7 @@ public static partial class CardGrowthManager
         if (!s_initialized) return;
 
         FlushToData();
-        DataSaveManager.Save();
+        SaveTransaction.Request();
     }
 
     public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)), true);
@@ -180,14 +183,14 @@ public static partial class CardGrowthManager
         {
             t_level = t_growth.Level + 1;
             Entry(t_id).level = t_level;
-            Save();
 
             // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
             if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
                 OutgameTutorialGuide.ConsumeFreeShot();
         }
 
-        CurrencyManager.Save();
+        // 성공이든 실패든 재화는 이미 나갔다 — 커밋 한 번이 레벨과 잔액을 함께 기록한다.
+        SaveTransaction.Request();
         OnGrowthChanged?.Invoke();
 
         return new EnhanceResult(t_success ? EEnhanceOutcome.Success : EEnhanceOutcome.Failed, t_level);

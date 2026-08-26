@@ -30,7 +30,7 @@ public static class OutgameTutorialProgress
         }
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 레거시 세이브 완료 판정과 진행 정지 판정
+    // 부트에서 DataSaveManager.LoadAsync() 이후 1회 호출 — 레거시 세이브 완료 판정과 진행 정지 판정
     public static void Init()
     {
         MigrateLegacyCompletion();
@@ -38,7 +38,7 @@ public static class OutgameTutorialProgress
     }
 
     // 진행도 영속화
-    public static void Save() => DataSaveManager.Save();
+    public static void Save() => SaveTransaction.Request();
 
     // 진행 좌표를 즉시 커밋(실패 롤백용 감소도 허용)
     public static void CommitStep(int _chapter, int _step)

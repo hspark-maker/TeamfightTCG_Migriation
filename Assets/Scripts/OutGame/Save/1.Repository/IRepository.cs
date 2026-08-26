@@ -1,11 +1,13 @@
-// 세이브 저장 매체 추상화(키-값)
+using Cysharp.Threading.Tasks;
+
+// 세이브 저장 매체 추상화(키-값). 매체가 네트워크일 수 있어 전 메서드가 UniTask다.
 public interface IRepository
 {
-    bool Has(string _key);
+    UniTask<bool> HasAsync(string _key);
 
-    string Load(string _key);
+    UniTask<string> LoadAsync(string _key);
 
-    void Save(string _key, string _value);
+    UniTask<ESaveWriteResult> SaveAsync(string _key, string _value);
 
-    void Delete(string _key);
+    UniTask DeleteAsync(string _key);
 }

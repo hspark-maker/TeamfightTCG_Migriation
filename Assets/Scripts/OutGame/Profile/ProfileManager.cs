@@ -10,6 +10,11 @@ public static class ProfileManager
     // 프로필 변경 통지 — UI 갱신용
     public static event Action OnChanged;
 
+    static bool s_initialized;
+
+    // 저장된 아바타·프레임 id를 Config가 몰라 기본값으로 떨어진 상태(그 원본 id를 덮지 않는다)
+    static bool s_fellBackToDefault;
+
     public static ProfileConfig Config { get; private set; }
 
     public static string Nickname { get; private set; } = DEFAULT_NICKNAME;
@@ -50,7 +55,7 @@ public static class ProfileManager
         Config = _config;
     }
 
-    // 부트에서 SetConfig 이후 1회 호출. DataSaveManager.Load() 뒤여야 세이브가 반영된다.
+    // 부트에서 SetConfig 이후 1회 호출. DataSaveManager.LoadAsync() 뒤여야 세이브가 반영된다.
     // 세이브가 비었거나 Config에서 사라진 id면 기본값으로 떨어진다 — 폴백 결과를 슬롯에 되쓰지는
     // 않는다(부트마다 디스크 쓰기가 생긴다). 다음 Apply()가 정리한다.
     public static void Init()
@@ -60,6 +65,9 @@ public static class ProfileManager
         Nickname = string.IsNullOrEmpty(t_slot.nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.nickname);
         AvatarId = IsKnownAvatar(t_slot.avatarId) ? t_slot.avatarId : DefaultAvatarId;
         FrameId  = IsKnownFrame(t_slot.frameId)   ? t_slot.frameId  : DefaultFrameId;
+
+        s_fellBackToDefault = AvatarId != t_slot.avatarId || FrameId != t_slot.frameId;
+        s_initialized = true;
     }
 
     // 프로필 3값 일괄 반영. 모르는 아바타·프레임 ID는 무시하고 기존값을 남긴다.
@@ -74,6 +82,9 @@ public static class ProfileManager
         Nickname = t_nickname;
         AvatarId = t_avatarId;
         FrameId  = t_frameId;
+
+        // 사용자가 직접 고른 값이라 이제 슬롯에 써도 된다(Config 미배선으로 인한 폴백이 아니다).
+        s_fellBackToDefault = false;
 
         Persist();
         OnChanged?.Invoke();
@@ -101,14 +112,22 @@ public static class ProfileManager
 
     static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
 
-    // 통지는 호출부(Apply)가 한다 — 저장과 통지를 겹쳐 부르지 않게.
-    static void Persist()
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음).
+    /// 미초기화면 기본값이 저장분을 덮고, 폴백 상태면 Config가 못 읽은 원본 id가 지워진다 — 둘 다 건너뛴다.</summary>
+    internal static void FlushToData()
     {
+        if (!s_initialized || s_fellBackToDefault) return;
+
         ProfileSaveData t_slot = Slot;
         t_slot.nickname = Nickname;
         t_slot.avatarId = AvatarId;
         t_slot.frameId  = FrameId;
+    }
 
-        DataSaveManager.Save();
+    // 통지는 호출부(Apply)가 한다 — 저장과 통지를 겹쳐 부르지 않게.
+    static void Persist()
+    {
+        FlushToData();
+        SaveTransaction.Request();
     }
 }

@@ -40,9 +40,8 @@ public static class CardPackOpener
         ECurrencyType t_refundType = _pack.RefundType;
         List<DrawnCard> t_drawn = Draw(_pack, t_pool);
 
-        // 간식은 반영만 하고 디스크 쓰기는 아래 재화 저장에 얹는다.
-        CardGrowthManager.FlushToData();
-        CurrencyManager.Save();
+        // 전부 중복이면 소유가 안 변해 지급 쪽 커밋이 걸리지 않는다 — 간식·차감을 여기서 확정한다.
+        SaveTransaction.Request();
 
         return OpenedPack.CreateSuccess(t_drawn, t_refundType);
     }
@@ -56,6 +55,7 @@ public static class CardPackOpener
         var t_candidates = new List<int>(_pool.Count);
         for (int t_i = 0; t_i < _pool.Count; t_i++) t_candidates.Add(t_i);
 
+        var t_pendingNew = new HashSet<int>();
         var t_drawn = new List<DrawnCard>(t_drawCount);
         for (int t_i = 0; t_i < t_drawCount; t_i++)
         {
@@ -63,19 +63,24 @@ public static class CardPackOpener
             CardData t_card = _pool[t_candidates[t_pick]].card;
             if (t_unique) t_candidates.RemoveAt(t_pick);
 
-            // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 간식이 새어나간다
+            // null 풀 항목은 건너뛴다 — 신규 판정에 걸리지 않아 간식이 새어나간다
             if (t_card == null) continue;
 
-            t_drawn.Add(GrantAndReward(t_card));
+            t_drawn.Add(GrantAndReward(t_card, t_pendingNew));
         }
+
+        OwnershipManager.GrantAll(t_pendingNew);
         return t_drawn;
     }
 
-    // 신규면 소유만, 중복이면 간식 적립. 중복 판정이 Grant 반환값 하나뿐이라 호출 전에 null을 걸러야 한다.
-    static DrawnCard GrantAndReward(CardData _card)
+    /// <summary>신규면 지급 목록에 모으고, 중복이면 간식을 적립한다.
+    /// 소유 반영을 개봉이 끝난 뒤로 미루는 이유는 장당 지급이 곧 장당 저장이기 때문이다.
+    /// 이미 뽑은 번호를 <paramref name="_pendingNew"/>가 기억해야 같은 팩에서 두 번 나온 카드가 중복으로 잡힌다.</summary>
+    static DrawnCard GrantAndReward(CardData _card, HashSet<int> _pendingNew)
     {
         int t_id = CardCatalog.IdOf(_card);
-        if (OwnershipManager.Grant(t_id)) return new DrawnCard(_card, true);
+        if (t_id > 0 && !OwnershipManager.IsOwned(t_id) && _pendingNew.Add(t_id))
+            return new DrawnCard(_card, true);
 
         bool t_added = CardGrowthManager.AddSnack(t_id, SnackPerDuplicate);
         return new DrawnCard(_card, false, t_added ? SnackPerDuplicate : 0);

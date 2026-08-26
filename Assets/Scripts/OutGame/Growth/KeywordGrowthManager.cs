@@ -67,14 +67,17 @@ public static class KeywordGrowthManager
         }
 
         s_initialized = true;
+
+        // 부트 전에 그려진 화면은 키워드 레벨 0으로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다
+        OnChanged?.Invoke();
     }
 
     public static void Save()
     {
         if (!s_initialized) return;
 
-        SyncSaveData();
-        DataSaveManager.Save();
+        FlushToData();
+        SaveTransaction.Request();
     }
 
     public static int LevelOf(CardKeyword _keyword)
@@ -121,13 +124,12 @@ public static class KeywordGrowthManager
 
         t_level++;
         Entry(_keyword).level = t_level;
-        SyncSaveData();
 
         // OnEnhanced보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
             OutgameTutorialGuide.ConsumeFreeShot();
 
-        CurrencyManager.Save();
+        SaveTransaction.Request();
         OnChanged?.Invoke();
         OnEnhanced?.Invoke(_keyword);
 
@@ -145,8 +147,11 @@ public static class KeywordGrowthManager
         return true;
     }
 
-    static void SyncSaveData()
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음).</summary>
+    internal static void FlushToData()
     {
+        if (!s_initialized) return;
+
         var t_data = DataSaveManager.Data.keywordGrowth ??
                      (DataSaveManager.Data.keywordGrowth = new KeywordGrowthSaveData());
         t_data.version = KeywordGrowthSaveData.VERSION;

@@ -1,17 +1,33 @@
 # 아웃게임 구조도 (STRUCTURE)
 
-## Firestore 플레이어 세이브 미러 (2026-08-25)
+## Firestore 플레이어 세이브 미러 (2026-08-26 · 이관 Phase 1 반영)
 
 로컬 `JsonFileRepository`가 현재 진실원이고 Firestore는 쓰기 전용 검증 미러다.
+저장 매체가 네트워크로 바뀔 자리를 미리 만들어 두느라 `IRepository`부터 아래가 전부 UniTask다.
 
 ```text
-DataSaveManager.Save
-  ├─ JsonFileRepository 즉시 저장
-  └─ OnSaved(payload)
-       └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
-            └─ users/{firebaseUid}/save/{current|test}
+도메인 커맨드 (Grant · Earn · Claim · TryEnhance …)   ← 전부 동기. 메모리만 바꾼다
+  └─ SaveTransaction.Request / CommitAsync            ← 커밋의 단일 진입점
+       ├─ 캐시 보유 6개 도메인의 FlushToData()          ← 디스크에 닿지 않는 슬롯 반영
+       └─ DataSaveManager.SaveAsync                   ← 쓰기 사슬(s_writeChain)로 직렬화
+            ├─ JsonFileRepository 저장
+            └─ OnSaved(payload)
+                 └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
+                      └─ users/{firebaseUid}/save/{current|test}
 ```
 
+- **커밋은 전 도메인을 함께 flush한다.** 어느 도메인이 걸든 재화·소유·프로필·덱·성장이 같은 쓰기에 실린다 —
+  "재화는 차감 전인데 진행도는 차감 후"인 세이브가 구조적으로 생기지 않는다(호출 순서 의존 폐기).
+- **`FlushToData()`는 캐시를 믿을 수 없으면 건너뛴다.** 전 도메인 flush는 "그 도메인이 지금 커밋을 걸지 않았는데도
+  딸려 나가는" 자리라, 캐시가 세이브보다 모자란 상태면 그 차이가 그대로 유실이 된다. 세 가지 가드가 있다.
+  - **미초기화** — 부트 첫 줄(`ApplyWipeIfScheduled`)이 각 `Init()`보다 앞선다. 빈 캐시가 저장분을 덮는다.
+  - **덱 캐시 열화**(`s_slotsDegraded`) — 레지스트리가 못 읽은 카드가 있으면 그 장수만큼 깎인 채 저장된다.
+    명시적 전량 저장(`SaveAll`)은 사용자가 방금 만든 구성이라 이 가드를 타지 않는다.
+  - **프로필 폴백**(`s_fellBackToDefault`) — Config가 모르는 아바타·프레임 id가 기본값으로 덮인다. `Apply()`가 해제한다.
+- 되감기 와이프(`OutgameTutorialRewind`)만 커밋이 아니라 `DataSaveManager.SaveAsync()`를 직접 쓴다 —
+  갈아끼운 빈 슬롯을 이전 세션 캐시가 도로 덮으면 안 된다.
+- 앱 종료 경로만 `SaveTransaction.CommitBlocking()` → `JsonFileRepository.SaveBlocking()`으로 동기 기록한다.
+  종료 콜백은 비동기 완료를 기다려주지 않는다. 이 자리는 Phase 2에서도 남는다.
 - `Assets/Scripts/OutGame/Save/4.Sync/PlayerSaveSync.cs`: 인증 게이트, 프로필 분리, 업로드 상태와 best-effort flush를 소유한다.
 - Firestore 디스크 persistence는 끈다. 원격 pull·복원·충돌 해결은 아직 지원하지 않는다.
 - `revision`은 업로드 관측값이며 최신 상태 판정 근거가 아니다.

@@ -22,6 +22,12 @@ public static class DeckSaveManager
 
     static bool s_loaded;
 
+    // 레지스트리가 읽어내지 못한 카드가 있어 메모리 캐시가 세이브보다 모자란 상태
+    static bool s_slotsDegraded;
+
+    // 덱 변경 통지 — 구성·이름·이미지키를 바꾸는 모든 경로가 여기로 모인다(구독자가 직접 재빌드를 걸 필요 없다)
+    public static event Action OnDeckChanged;
+
     // 레거시 덱 이관이 끝나지 않은 상태(이때 슬롯을 새로 쓰면 구 덱이 묻힌다)
     public static bool LegacyMigrationPending { get; private set; }
 
@@ -43,7 +49,11 @@ public static class DeckSaveManager
 
     // 저장된 덱 이름 원본(빈 문자열 가능)
     public static string GetName(int _index) => s_names[_index] ?? "";
-    public static void SetName(int _index, string _name) => s_names[_index] = _name;
+    public static void SetName(int _index, string _name)
+    {
+        s_names[_index] = _name;
+        OnDeckChanged?.Invoke();
+    }
 
     // 표시용 덱 이름(비어 있으면 인덱스 폴백)
     public static string GetDisplayName(int _index)
@@ -80,6 +90,7 @@ public static class DeckSaveManager
         if (_index < 0 || _index >= SLOT_COUNT) return;
 
         s_imageKeys[_index] = _key ?? "";
+        OnDeckChanged?.Invoke();
     }
 
     public static bool IsSlotValid(int _index)
@@ -159,6 +170,7 @@ public static class DeckSaveManager
 
         SaveAll();
         _index = 0;
+        OnDeckChanged?.Invoke();
         return true;
     }
 
@@ -178,6 +190,7 @@ public static class DeckSaveManager
         ClearSlot(t_count - 1);
 
         SaveAll();
+        OnDeckChanged?.Invoke();
         return true;
     }
 
@@ -203,6 +216,7 @@ public static class DeckSaveManager
     {
         if (_allowLegacyMigration) TryMigrateLegacyFile();
         s_loaded = true;
+        s_slotsDegraded = false;
 
         var t_slots = NormalizedSlots();
         bool t_migrated = MigrateLegacyCardKeys(t_slots);
@@ -214,18 +228,31 @@ public static class DeckSaveManager
             s_names[t_i]     = t_slot.name;
             s_imageKeys[t_i] = t_slot.imageKey;
 
-            if (s_registry == null) continue;
+            if (s_registry == null)
+            {
+                s_slotsDegraded = true;
+                continue;
+            }
 
-            s_slots[t_i] = t_slot.cardIds
+            var t_cards = t_slot.cardIds
                 .Select(id => s_registry.FirstOrDefault(c => c != null && CardCatalog.IdOf(c) == id))
                 .Where(c => c != null)
                 .ToList();
+
+            // 못 읽은 카드가 있으면 이 캐시는 세이브보다 모자란다 — 통째로 내려쓰면 그 카드가 영구히 사라진다.
+            if (t_cards.Count != t_slot.cardIds.Length) s_slotsDegraded = true;
+
+            s_slots[t_i] = t_cards;
         }
 
-        if (s_registry == null) return;
+        if (s_registry != null)
+        {
+            // 압축이 없어도 이관분은 반드시 내려써야 한다 — 안 그러면 다음 부트에 같은 이관을 또 한다.
+            if (Compact() || t_migrated) SaveAll();
+        }
 
-        // 압축이 없어도 이관분은 반드시 내려써야 한다 — 안 그러면 다음 부트에 같은 이관을 또 한다.
-        if (Compact() || t_migrated) SaveAll();
+        // 부트 전에 그려진 UI는 빈 덱으로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다
+        OnDeckChanged?.Invoke();
     }
 
     /// <summary>구 세이브의 카드 이름 배열을 번호 배열로 옮긴다(슬롯당 1회). 카탈로그 미준비면 미룬다 —
@@ -248,14 +275,15 @@ public static class DeckSaveManager
         return t_changed;
     }
 
-    // 대상 슬롯만 세이브에 반영(나머지 슬롯은 저장된 값 보존)
+    // 대상 슬롯을 세이브에 반영. 캐시가 온전하면 커밋이 나머지 슬롯도 함께 내려쓴다(같은 값).
     public static void SaveSlot(int _index, IEnumerable<CardData> _deck)
     {
         if (_index < 0 || _index >= SLOT_COUNT) return;
 
         Save(_index, _deck);
         WriteSlot(NormalizedSlots(), _index);
-        DataSaveManager.Save();
+        SaveTransaction.Request();
+        OnDeckChanged?.Invoke();
     }
 
     static bool CanReorder()
@@ -269,6 +297,17 @@ public static class DeckSaveManager
     static void Save(int _index, IEnumerable<CardData> _deck)
         => s_slots[_index] = new List<CardData>(_deck.Where(d => d != null));
 
+    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음).
+    /// 다른 도메인이 건 커밋에 덱이 딸려 나가는 자리라, 캐시를 믿을 수 없으면 건너뛴다 —
+    /// 미로드거나 못 읽은 카드가 있는 상태로 내려쓰면 저장된 덱이 그만큼 깎인다.</summary>
+    internal static void FlushToData()
+    {
+        if (!s_loaded || s_slotsDegraded) return;
+
+        WriteAllSlots();
+    }
+
+    // 덱 편집이 직접 부르는 전량 저장. 여기는 사용자가 방금 만든 구성이라 캐시가 진실원이다.
     static void SaveAll()
     {
         if (!s_loaded)
@@ -277,11 +316,15 @@ public static class DeckSaveManager
             return;
         }
 
+        WriteAllSlots();
+        SaveTransaction.Request();
+    }
+
+    static void WriteAllSlots()
+    {
         var t_slots = NormalizedSlots();
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
             WriteSlot(t_slots, t_i);
-
-        DataSaveManager.Save();
     }
 
     // 원본을 지우지 않는 순수 복사(연쇄 이동에서 다음 이동의 원본이 살아 있어야 한다)
@@ -423,7 +466,7 @@ public static class DeckSaveManager
             }
 
             DataSaveManager.Data.deck.slots = t_built;
-            DataSaveManager.Save();
+            SaveTransaction.Request();
             LegacyMigrationPending = false;
 
             ArchiveLegacyFile(t_path);

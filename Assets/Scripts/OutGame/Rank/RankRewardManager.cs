@@ -85,8 +85,7 @@ public static class RankRewardManager
 
         Slot.claimedTiers.Add(_tierIndex);
 
-        // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
-        CurrencyManager.Save();
+        SaveTransaction.Request();
         OnChanged?.Invoke();
         return true;
     }
@@ -96,7 +95,7 @@ public static class RankRewardManager
     {
         Slot.claimedTiers.Clear();
         Slot.claimedCount = 0;
-        DataSaveManager.Save();
+        SaveTransaction.Request();
         OnChanged?.Invoke();
     }
 
@@ -109,7 +108,7 @@ public static class RankRewardManager
             if (!_slot.claimedTiers.Contains(t_i)) _slot.claimedTiers.Add(t_i);
 
         _slot.claimedCount = 0;
-        DataSaveManager.Save();
+        SaveTransaction.Request();
     }
 
     // Claimed 검사가 먼저여야 한다 — 강등 등으로 도달 티어가 내려간 구간에서 수령 표시가 풀린다

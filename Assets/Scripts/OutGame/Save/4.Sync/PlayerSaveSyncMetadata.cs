@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 [Serializable]
@@ -15,9 +16,9 @@ static class PlayerSaveSyncMetadataStore
 {
     const string KEY_PREFIX = "outgame_sync_state";
 
-    internal static PlayerSaveSyncMetadata Load(string _firebaseUid, string _profileId)
+    internal static async UniTask<PlayerSaveSyncMetadata> LoadAsync(string _firebaseUid, string _profileId)
     {
-        string t_json = DataSaveManager.LoadSyncMetadata(KeyOf(_firebaseUid, _profileId));
+        string t_json = await DataSaveManager.LoadSyncMetadataAsync(KeyOf(_firebaseUid, _profileId));
         if (string.IsNullOrEmpty(t_json)) return null;
 
         try
@@ -31,7 +32,7 @@ static class PlayerSaveSyncMetadataStore
         }
     }
 
-    internal static bool SaveConfirmed(
+    internal static async UniTask<bool> SaveConfirmedAsync(
         string _firebaseUid,
         string _profileId,
         string _fullHash,
@@ -48,7 +49,7 @@ static class PlayerSaveSyncMetadataStore
 
         try
         {
-            DataSaveManager.SaveSyncMetadata(
+            await DataSaveManager.SaveSyncMetadataAsync(
                 KeyOf(_firebaseUid, _profileId),
                 JsonUtility.ToJson(t_metadata));
             return true;

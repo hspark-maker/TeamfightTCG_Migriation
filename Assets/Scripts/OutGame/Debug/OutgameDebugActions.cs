@@ -74,7 +74,7 @@ public static class OutgameDebugActions
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {
         CurrencyManager.Earn(_type, _amount);
-        CurrencyManager.Save();
+        SaveTransaction.Request();
 
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }

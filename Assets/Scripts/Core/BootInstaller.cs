@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -140,22 +141,25 @@ public class BootInstaller : MonoBehaviour
     }
 
     // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
-    System.Collections.IEnumerator Start()
+    async UniTaskVoid Start()
     {
-        while (!PlayerSaveSync.IsGateComplete &&
-               GameManager.BootState != EGameBootState.UpdateRequired &&
-               GameManager.BootState != EGameBootState.RecoveryRequired)
-        {
-            yield return null;
-        }
-
-        if (GameManager.BootState == EGameBootState.UpdateRequired ||
-            GameManager.BootState == EGameBootState.RecoveryRequired)
-            yield break;
-
         try
         {
-            InstallSaveDependent();
+            await UniTask.WaitUntil(() =>
+                PlayerSaveSync.IsGateComplete ||
+                GameManager.BootState == EGameBootState.UpdateRequired ||
+                GameManager.BootState == EGameBootState.RecoveryRequired,
+                cancellationToken: this.GetCancellationTokenOnDestroy());
+
+            if (GameManager.BootState == EGameBootState.UpdateRequired ||
+                GameManager.BootState == EGameBootState.RecoveryRequired)
+                return;
+
+            await InstallSaveDependentAsync();
+        }
+        catch (System.OperationCanceledException)
+        {
+            // 씬이 먼저 내려간 것뿐이다 — 복구 상태로 볼 일이 아니다.
         }
         catch (System.Exception t_exception)
         {
@@ -164,7 +168,8 @@ public class BootInstaller : MonoBehaviour
         }
     }
 
-    void InstallSaveDependent()
+    // 부트 중 각 단계가 저마다 디스크에 쓰지 않는다 — 메모리를 다 채운 뒤 마지막에 한 번 커밋한다.
+    async UniTask InstallSaveDependentAsync()
     {
         if (s_saveDependentInstalled) return;
 
@@ -181,6 +186,8 @@ public class BootInstaller : MonoBehaviour
         OutgameTutorialRunner.ResolveProgressAnchor();
         OutgameTutorialRunner.RewindToPendingBattleEntry();
         OutgameTutorialRewind.ApplyReplayIfScheduled();
+
+        await SaveTransaction.CommitAsync();
 
         s_saveDependentInstalled = true;
         GameManager.MarkBootReady();

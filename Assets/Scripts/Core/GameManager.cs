@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 게임 전역을 관리하는 지속 싱글턴.
@@ -38,7 +39,7 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        Boot();
+        BootAsync().Forget();
     }
 
     void OnApplicationPause(bool _pause)
@@ -55,7 +56,7 @@ public class GameManager : MonoBehaviour
     void OnApplicationQuit() => Flush();
 
     // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
-    void Boot()
+    async UniTaskVoid BootAsync()
     {
         BootState = EGameBootState.Booting;
 
@@ -73,7 +74,19 @@ public class GameManager : MonoBehaviour
 
         ContentProfileConfig t_profile = ContentProfileConfig.Active;
         DataSaveManager.SetRepository(new JsonFileRepository(t_profile.SaveFolder));
-        DataSaveManager.Load();             // 프로필별 세이브 로드
+
+        // 여기서 빠져나가면 부트 게이트를 열 주체가 없어 로딩이 영원히 끝나지 않는다 — 반드시 상태를 남긴다.
+        try
+        {
+            await DataSaveManager.LoadAsync();  // 프로필별 세이브 로드
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[GameManager] 세이브 로드 실패: {t_exception.Message}\n{t_exception.StackTrace}");
+            MarkRecoveryRequired();
+            return;
+        }
+
         if (DataSaveManager.IsSaveBlocked)
         {
             BootState = EGameBootState.UpdateRequired;
@@ -119,10 +132,11 @@ public class GameManager : MonoBehaviour
     }
 
     // 앱이 떠날 때 영속화를 flush(모바일 종료 콜백 누락 대비).
+    // 종료 콜백은 await 완료를 기다려주지 않으므로 여기만 동기 쓰기를 쓴다.
     void Flush()
     {
         if (BootInstaller.IsSaveDependentInstalled)
-            CurrencyManager.Save();
+            SaveTransaction.CommitBlocking();
         PlayerSaveSync.FlushPending();
     }
 
