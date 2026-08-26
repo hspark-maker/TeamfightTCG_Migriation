@@ -24538,7 +24538,7 @@ ParticleSystemRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -128796785
   m_SortingLayer: 2
-  m_SortingOrder: 0
+  m_SortingOrder: 50
   m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
@@ -29523,7 +29523,7 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.45
+      scalar: 1.2
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -33731,13 +33731,13 @@ ParticleSystem:
         m_Curve:
         - serializedVersion: 3
           time: 0
-          value: 0.37718442
-          inSlope: 0.00005208051
-          outSlope: 0.00005208051
+          value: -1
+          inSlope: 3.7398322
+          outSlope: 3.7398322
           tangentMode: 0
           weightedMode: 0
           inWeight: 0.33333334
-          outWeight: 0.092702165
+          outWeight: 0.0433925
         - serializedVersion: 3
           time: 1
           value: 1
@@ -34268,7 +34268,7 @@ ParticleSystemRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -128796785
   m_SortingLayer: 2
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_RenderMode: 4
   m_MeshDistribution: 0
@@ -48900,7 +48900,7 @@ ParticleSystemRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -128796785
   m_SortingLayer: 2
-  m_SortingOrder: 0
+  m_SortingOrder: 100
   m_MaskInteraction: 0
   m_RenderMode: 0
   m_MeshDistribution: 0
