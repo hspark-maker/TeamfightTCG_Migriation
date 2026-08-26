@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using UnityEngine;
 
 // 아웃게임 세이브 매니저. 저장 매체는 IRepository로 교체한다.
@@ -12,6 +13,14 @@ public static class DataSaveManager
     static readonly JsonSerializerSettings s_serializerSettings = new JsonSerializerSettings
     {
         Formatting = Formatting.None,
+
+        // Firestore 필드명과 같은 인코딩을 쓴다 — [FirestoreProperty] 이름이 전부 프로퍼티명의 camelCase다.
+        // 두 직렬화기가 같은 키를 내야 로컬 캐시와 원격 문서를 나란히 대조할 수 있다.
+        ContractResolver = new DefaultContractResolver
+        {
+            // 딕셔너리 키는 건드리지 않는다 — 재화 키가 ECurrencyType 이름이라 소문자로 바뀌면 파싱이 깨진다.
+            NamingStrategy = new CamelCaseNamingStrategy { ProcessDictionaryKeys = false },
+        },
 
         // 기본값(Auto)은 프로퍼티 이니셜라이저로 만든 컬렉션에 이어붙인다 — 값이 조용히 중복되는 것을 막는다.
         ObjectCreationHandling = ObjectCreationHandling.Replace,
