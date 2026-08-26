@@ -26,8 +26,8 @@
 |---|---|---|
 | **P0** 확증 | ✅ 완료 | 매퍼 계약 확인, 콘솔 준비 |
 | **P1** 도메인 정리 | 🟡 코드 완료 · 검증 대기 | 레거시 제거, 프로퍼티 전환, 직렬화기 교체 |
-| **P2** 필드맵 전환 | ⬜ 대기 | 클라우드 계층 재작성 |
-| **P3** 실패 UX | ⬜ 대기 | 재시도 화면, 업로드 배너 |
+| **P2** 필드맵 전환 | 🟡 코드 완료 · 잔가지 6건 | 클라우드 계층 재작성 |
+| **P3** 실패 UX | 🟡 코드 완료 · 검증 대기 | 재시도 화면, 업로드 배너 |
 | **P4** 규칙·운영 | ⬜ 대기 | 보안 규칙, 실기 검증, 문서 |
 
 ---
@@ -82,34 +82,82 @@
 
 ---
 
-### P2 — 필드맵 전환 ⬜
+### P2 — 필드맵 전환 🟡
 
-- [ ] `PlayerSaveCloud` 신설 — 비동기 부트 로드, `AdoptRemote`, 디바운스 업로드, 캐시 봉투
-- [ ] `DataSaveManager` 재설계 — `Load()` 제거, 원격 채택 경로로 교체
-- [ ] `GameManager.Boot` 수정 — 동기 `Load()` 와 `IsSaveBlocked` 분기 삭제
-- [ ] 구 `PlayerSaveSync`(896줄) 삭제, 살릴 관용구만 이식
-- [ ] `link.xml` 에 세이브 타입 보존 항목 추가 (IL2CPP 리플렉션)
-- [ ] P1에서 남긴 데드코드 정리 — `CardCatalog.LegacyIdOfName` / `s_legacyNameToId` (마지막 호출자가 사라졌으나 카탈로그 빌드 경로라 P1 범위 밖으로 미룸)
-- [ ] `DataSaveManager.s_saveBlocked` / `IsSaveBlocked` 죽은 경로 정리 — 버전 분기 제거로 true가 되는 경로가 없어졌다 (`GameManager.cs:76` 업데이트 차단 분기도 함께)
-- [ ] `TryApplyRemote` 자기검증 재검토 — 현재 Dictionary 직렬화 순서가 round-trip에서 보존되는 것에 의존한다. 불안정하면 역직렬화 후 필드 비교로 교체
-- [ ] **초기 골드 재지급 경로** — `CreateSnapshot()` 이 `CurrencyManager.Init()` 보다 먼저(SyncingSave 단계) 찍혀 신규 계정의 최초 payload가 `balances:{}` 로 올라간다. 그 문서를 pull해 적용하면 `Init` 이 또 신규로 판정해 100골드를 재지급한다(기기 교체·재설치). "빈 맵 = 신규" 센티널을 명시적 플래그로 교체
-- [ ] **중첩 컬렉션 null 정규화** — `Parse` 가 최상위 슬롯만 채우고 중첩 컬렉션은 안 본다. 콘솔에서 사람이 `null` 을 넣으면 `TournamentProgress.ClearedNodeIds` · `AlbumRewardManager.ClaimedKeys` · `RankRewardManager.ClaimedTiers` 에서 NRE. `Parse` 에서 한 번에 정규화
-- [ ] **KeywordGrowth 키 규약 통일** — Currency는 enum 이름(`"Gold"`), KeywordGrowth는 enum 정수값(`"1"`,`"2"`). 콘솔 가독성이 목적이었으므로 이름 쪽으로 맞출 것
-- [ ] 데드코드 `OwnershipManager.HasAnyOwnedSaved()` — 유일한 소비자였던 `MigrateLegacyCompletion` 제거로 호출자 0
-- [ ] 구 세이브 파싱 실패 시 `SAVE_KEY` 원본이 남아 첫 `Save()` 전까지 매 부트 LogError 반복 (실측 확인됨)
+- [x] `PlayerSaveCloud` 신설 — 비동기 부트 로드, `AdoptRemote`, 디바운스 업로드, 캐시 봉투
+- [x] `DataSaveManager` 재설계 — `Load()` 제거, 원격 채택 경로로 교체
+- [x] `GameManager.Boot` 수정 — 동기 `Load()` 와 `IsSaveBlocked` 분기 삭제
+- [x] 구 `PlayerSaveSync`(896줄) 삭제, 살릴 관용구만 이식
+- [x] `link.xml` 에 세이브 타입 보존 항목 추가 (`Assets/Scripts/OutGame/Save/link.xml`)
+- [x] `DataSaveManager.s_saveBlocked` / `IsSaveBlocked` 죽은 경로 정리 — 코드에 없다
+- [x] **초기 골드 재지급 경로** — "빈 맵 = 신규" 센티널을 `PlayerSaveCloud.IsFreshAccount` 플래그로 교체.
+      `InitializationInstaller.InstallSaveDependent` 가 이 플래그만 보고 `CurrencyManager.Init(_freshAccount)` 를 부른다
+- [x] 캐시 봉투에서 미사용 `PendingUpload` 제거 — 미업로드 판정은
+      `캐시revision == 원격revision && 스냅샷 불일치` 로 한다(`PlayerSaveCloud.LoadCoreAsync`)
 
-**완료 판정 (이번 작업의 핵심 수용 기준)**:
+**남은 잔가지 6건** (실측 확인 2026-08-26, P3 범위 밖이라 미처리):
+
+- [ ] 데드코드 `CardCatalog.LegacyIdOfName` / `s_legacyNameToId` — 호출자 0건
+- [ ] 데드코드 `OwnershipManager.HasAnyOwnedSaved()` — 호출자 0건
+- [ ] **KeywordGrowth 키 규약 통일** — Currency는 enum 이름(`"Gold"`), KeywordGrowth는 여전히 정수 문자열
+      (`KeywordGrowthManager.SyncSaveData` 가 `((int)key).ToString()`). 콘솔 가독성이 목적이었으므로 이름 쪽으로 맞출 것
+- [ ] `TryApplyRemote` 자기검증 재검토 — Dictionary 직렬화 순서 의존. 불안정하면 역직렬화 후 필드 비교로 교체
+- [ ] **중첩 컬렉션 null 정규화** — 콘솔에서 사람이 `null` 을 넣으면 `TournamentProgress.ClearedNodeIds` ·
+      `AlbumRewardManager.ClaimedKeys` · `RankRewardManager.ClaimedTiers` 에서 NRE
+- [ ] 구 세이브 파싱 실패 시 `SAVE_KEY` 원본이 남아 첫 `Save()` 전까지 매 부트 LogError 반복
+
+**완료 판정 (미검증)**:
 콘솔에서 `currency.Gold` 를 손으로 고친다(타입 integer 유지) → 앱 재시작 → 로비 상단바에 그 값이 뜬다.
 
 ---
 
-### P3 — 실패 UX ⬜
+### P3 — 실패 UX 🟡
 
-- [ ] `4.Sync` 잔재 삭제 (`ESaveReconcileDecision`, `PlayerSaveSyncMetadata`, `PlayerSaveConflictSnapshot`)
-- [ ] `RecoveryRequired` 재시도 버튼 — **현재 `LoadingCoverView` 에 재시도 버튼이 없다. 신규 작업**
-- [ ] 업로드 실패 배너 (3회 연속 실패부터)
-- [ ] pause/quit flush 재검증
-- [ ] 부트 타임아웃 대소관계 정리 — auth+read 재시도 총합(~13초)이 `LoadingCoverView` 대기 타임아웃보다 길면 재시도가 끝나기 전에 실패 화면으로 튄다
+- [x] `4.Sync` 잔재 삭제 — 코드에 없다. P2 커밋에서 `4.Cloud` 로 재편되며 함께 사라졌다
+- [x] `RecoveryRequired` 재시도 버튼 — **인플레이스 재시도**(씬 재로드 없음)
+- [x] 업로드 실패 배너 (3회 연속 실패부터)
+- [x] 차단 세션(`Blocked`) 재시작 요구 모달 — 오프라인 배너와 표면 분리
+- [x] pause/quit flush 재검증 — **실기능 버그 1건 발견·수정**(아래)
+- [x] 부트 타임아웃 대소관계 정리 — `LoadingCoverView.initializeWaitTimeout = 45f` 가
+      최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)를 덮는다
+- [ ] 런타임 검증 (아래 완료 판정)
+
+**재시도 경로 — 이 순서가 계약이다** (`LoadingCoverView.CoRetry`):
+
+1. `GameInitialization.ResetForRetry()` — terminated를 먼저 푼다. 뒤 단계가 동기적으로 다시 실패해
+   `MarkRecoveryRequired()` 를 부를 수 있는데 그때 terminated가 남아 있으면 안 된다
+2. `GameManager.RetryInitialize()` → `FirebaseManager.Reinitialize(envId)` —
+   `PlayerSaveCloud.Initialize` 가 `Shutdown()` 을 태워 `s_gateComplete=false` 로 내린다.
+   **반드시 3번보다 앞** — 뒤로 가면 게이트가 직전 실패의 `gateComplete=true` 를 보고 그대로 통과한다
+3. `InitializationInstaller.RestartGate()`
+4. `CoRunInitialize()` 재진입 — 대기·타임아웃 예산 리셋·성공 시 씬 전환까지 기존 코루틴을 그대로 쓴다
+
+`UpdateRequired` 에는 재시도 버튼을 띄우지 않는다 — 원격 스키마가 높은 것은 재시도로 안 풀린다.
+
+**표면 3분할**
+
+| 상태 | 진입 | 표면 |
+|---|---|---|
+| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 다시 시도 버튼 |
+| `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달(`SimpleYNPopup`) 1회 |
+| `Offline` | 업로드 3회 연속 실패 | 상시 배너(`CloudSyncBannerView`, 층 940) |
+
+`BlockSession` 은 `MarkRecoveryRequired()` 를 더 이상 부르지 않는다 — 게이트 뒤라 화면을 못 바꾸면서
+`IsReady` 만 false로 떨어뜨렸다. 소비자는 부트 경로 둘뿐이라 안전(전수 확인).
+
+**이번 단계에서 함께 고친 실기능 버그 3건**
+
+1. `BattleContentFirebaseModule.FlushPendingAsync()` 가 `throw new NotImplementedException()` 이었다.
+   이 모듈이 먼저 등록돼 `FirebaseManager.FlushPendingAsync` 의 루프가 첫 원소에서 동기 예외로 죽어
+   **pause/quit 클라우드 flush가 한 번도 실행된 적 없었다**. 모듈별 try/catch로 팬아웃을 격리하고 본체도 수정
+2. 복구 문구(`Text_Value`)가 `Slider_LoadingBar_Green/FillArea` 자식이라, 문구를 넣은 직후 진행바를 끄면
+   **함께 사라졌다**. 슬라이더 밖 `RecoveryPanel/Text_Recovery` 로 분리
+3. `InstallSaveDependent()` 의 조기 return이 `MarkReady()` 까지 건너뛰어 재시도가 `Ready` 에 도달 못 했다
+
+**flush 커버리지 감사 결과 (코드 변경 없음)**: 진짜 지연 커밋 매니저는 `CurrencyManager` 하나뿐이다
+(`Earn`/`Spend` 가 `s_currencies` 미러만 갱신). 나머지 10개 매니저는 변경 시점에 `DataSaveManager.Data.*`
+까지 쓴다. 잠재 취약점 2곳 — `DeckSaveManager.SetName`/`SetImageKey` 와 `CardGrowthManager.AddSnack` 는
+지금은 호출부가 같은 동기 흐름에서 커밋하지만, 호출부가 늘면 pause/quit 유실 후보가 된다.
 
 **완료 판정**: 비행기 모드 부팅 → 재시도 화면 → 네트워크 복구 후 재시도 → 정상 진입.
 플레이 중 비행기 모드 → 배너 → 복귀 시 자동 업로드 → 콘솔 `revision` 증가.

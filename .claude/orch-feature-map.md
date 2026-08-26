@@ -53,13 +53,16 @@
 - 메시지 처리: `NetworkGameController.HandleMessage` — `NetworkSession` 이 Photon 콜백을 여기로 넘긴다
 - 서드파티 Photon Fusion 은 `Assets/Photon/` (지도 범위 밖)
 
-## 아웃게임 세이브 (`OutGame/Save/`, 14파일)
+## 아웃게임 세이브 (`OutGame/Save/`)
 
-3계층 구조다.
+**진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`)고 로컬 파일은 캐시 봉투다. 4계층 구조.
 
-- 저장소: `OutGame/Save/1.Repository/IRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData`
-- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Load` / `DataSaveManager.Save` / `DataSaveManager.Data`) — 각 기능 매니저가 여기로 flush 한다
+- 저장소: `OutGame/Save/1.Repository/IRepository` · `IAtomicRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · 캐시 봉투 `PlayerSaveCacheEnvelope`
+- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.TryLoadCache` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(부트 채택이 대신한다)
+- 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
+- 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면 + 인플레이스 재시도(`GameInitialization.ResetForRetry` → `GameManager.RetryInitialize` → `FirebaseManager.Reinitialize` → `InitializationInstaller.RestartGate`) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
+- Firebase 코어: `Core/Firebase/FirebaseManager` · `FirebaseAuthService` · `FirebaseContext` · `FirebaseTimeouts` · `IFirebaseModule` · `FirebaseRootPath` · `EFirebaseAuthState`
 
 ## 재화·보상 (`OutGame/Currency/`, `OutGame/Reward/`, `Utils/`)
 

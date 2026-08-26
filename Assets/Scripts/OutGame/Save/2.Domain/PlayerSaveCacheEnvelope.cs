@@ -8,9 +8,5 @@ public class PlayerSaveCacheEnvelope
     // 마지막으로 업로드에 성공한 revision. 오프라인 중에는 오르지 않는다.
     public long Revision { get; set; }
 
-    // 저장은 됐는데 아직 업로드되지 않은 변경분이 있다. 콘솔 손편집(revision을 올리지 않는다)과
-    // "내가 저장했는데 못 올렸다"를 구분하는 유일한 근거라, 이 플래그가 없으면 사람의 편집을 캐시가 덮는다.
-    public bool PendingUpload { get; set; }
-
     public UserSaveData Data { get; set; }
 }

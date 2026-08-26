@@ -45,6 +45,9 @@ public class InitializationInstaller : MonoBehaviour
     static bool s_initialized;
     static bool s_saveDependentInstalled;
 
+    // 부트를 선점한 사본. 재시도가 코루틴을 다시 걸 대상을 찾는 유일한 통로다(씬 탐색 금지).
+    static InitializationInstaller s_instance;
+
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -52,6 +55,7 @@ public class InitializationInstaller : MonoBehaviour
     {
         s_initialized = false;
         s_saveDependentInstalled = false;
+        s_instance = null;
     }
 
     void Awake()
@@ -63,6 +67,7 @@ public class InitializationInstaller : MonoBehaviour
             return;
         }
 
+        s_instance = this;
         DontDestroyOnLoad(gameObject);
 
         // 전역 static 주입. 전부 null이면 무시하는 시그니처라 미배선이 예외가 되지는 않는다
@@ -181,8 +186,21 @@ public class InitializationInstaller : MonoBehaviour
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
     }
 
-    // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
-    System.Collections.IEnumerator Start()
+    void Start() => StartCoroutine(CoRunGate());
+
+    /// <summary>복구 화면의 재시도가 부트 게이트를 처음부터 다시 태운다(씬 재로드 없음).</summary>
+    internal static void RestartGate()
+    {
+        if (s_instance == null)
+        {
+            Debug.LogError("[InitializationInstaller] 부트 사본이 없어 게이트를 다시 시작할 수 없습니다.");
+            return;
+        }
+
+        s_instance.StartCoroutine(s_instance.CoRunGate());
+    }
+
+    System.Collections.IEnumerator CoRunGate()
     {
         while (!PlayerSaveCloud.IsGateComplete && !GameInitialization.IsTerminated)
         {
@@ -230,6 +248,20 @@ public class InitializationInstaller : MonoBehaviour
 
     void InstallSaveDependent()
     {
+        // MarkReady()는 조기 return 바깥이다 — 재시도로 다시 들어오면 설치는 이미 끝나 있어 여기서 걷어차이는데,
+        // 그 경로가 Ready 전이까지 삼키면 게이트가 영영 Ready에 닿지 못한다.
+        // (MarkReady 자체가 InstallingManagers일 때만 전이하므로 무조건 호출이 안전하다.)
+        InstallSaveDependentOnce();
+
+        // 워처도 MarkReady와 같은 이유로 조기 return 바깥이다 — 설치 중 업로드가 던지면 once 플래그만 서고
+        // 워처는 미설치로 남아, 재시도가 조기 return하는 순간 그 세션은 배너도 차단 모달도 영영 못 띄운다.
+        // (Install 자체가 멱등이라 무조건 호출이 안전하다.)
+        CloudSyncStatusWatcher.Install();
+        GameInitialization.MarkReady();
+    }
+
+    void InstallSaveDependentOnce()
+    {
         if (s_saveDependentInstalled) return;
 
         // 클라우드 채택이 끝난 뒤여야 한다 — 채택 전에 슬롯을 갈아엎으면 채택이 그대로 덮어써 무효가 된다.
@@ -254,9 +286,9 @@ public class InitializationInstaller : MonoBehaviour
         // 신규 계정의 첫 문서를 여기서 한 번에 만든다. 이 업로드가 실패하면 원격 문서는 여전히 없으므로
         // 다음 부트도 신규로 판정되고 지급이 정확히 한 번만 남는다(멱등).
         DataSaveManager.SaveImmediate();
-        GameInitialization.MarkReady();
     }
 
+    // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
     static int EnemyCardLevelOf(int _cardId)
     {
         if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_cardId);

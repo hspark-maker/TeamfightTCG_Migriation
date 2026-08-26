@@ -66,6 +66,11 @@ public static class UiSortingOrder
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>
     public const int Setting = 900;
 
+    /// <summary>클라우드 세이브 동기화 지연 배너(CloudSyncBanner.prefab). 어떤 화면에서도 보여야 하므로 설정(<see cref="Setting"/>) 위다.
+    /// 다만 커튼(<see cref="Curtain"/>)·로딩 커버(<see cref="LoadingCover"/>)보다는 아래에 둔다 —
+    /// 화면을 갈아 끼우는 동안은 아무 것도 새면 안 되고, 배너는 갈아 끼운 뒤에도 그대로 떠 있다.</summary>
+    public const int CloudSyncBanner = 940;
+
     /// <summary>씬을 갈아 끼우는 커튼(SceneCurtain.prefab).</summary>
     public const int Curtain = 950;
 

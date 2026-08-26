@@ -243,11 +243,6 @@ sealed class BattleContentFirebaseModule : IFirebaseModule
 {
     public void Initialize(in FirebaseContext _context) => BattleContentSync.Initialize(in _context);
     public void RetryPending() { }
-    public UniTask FlushPendingAsync()
-    {
-        throw new NotImplementedException();
-    }
-
-    public void FlushPending() { }
+    public UniTask FlushPendingAsync() => UniTask.CompletedTask;
     public void Shutdown() => BattleContentSync.Shutdown();
 }

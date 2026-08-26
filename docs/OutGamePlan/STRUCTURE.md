@@ -43,7 +43,8 @@ flowchart TD
 - 3계층은 4계층을 **참조하지 않는다**. 배선은 `DataSaveManager.OnSaved`(이벤트)와 `SetImmediateUploadHandler`(콜백) 두 개뿐이다.
 - 로컬·원격이 같은 키를 내야 대조가 되므로 Newtonsoft는 camelCase(`ProcessDictionaryKeys=false`)로 `[FirestoreProperty]` 이름과 맞춰 둔다.
 - 문서 쓰기는 항상 `SetOptions.Overwrite` — MergeAll이면 삭제가 전파되지 않는다.
-- `PlayerSaveCacheEnvelope.PendingUpload`는 **선언만 있고 읽는 쪽이 없다**(현재 미사용).
+- 캐시 봉투는 `schemaVersion` · `revision` · `data` 셋뿐이다. "저장은 했는데 못 올렸다"는 플래그가 아니라 `캐시revision == 원격revision && 스냅샷 불일치`로 판정한다 — 그래서 콘솔 손편집(revision을 안 올린다)과는 구분되지 않는다(P3).
+- `FlushPendingAsync`는 모듈마다 있다: 세이브는 `PlayerSaveCloud.FlushAsync`, 스펙 동기화(`BattleContentFirebaseModule`)는 원격 쓰기가 없어 `UniTask.CompletedTask`. 한 모듈이 동기 throw하면 `WhenAll` 이전에 터져 나머지 모듈의 flush까지 죽는다(2026-08-26 수정).
 
 ### 부트 채택 — 원격 우선, 캐시 폴백
 
@@ -112,6 +113,64 @@ sequenceDiagram
         PC->>PC: Offline — 재시도는 다음 저장·복귀·flush 때
     end
 ```
+
+### 실패 표면 — 3분할 (2026-08-26 P3)
+
+세이브 진실원이 클라우드라 오프라인 폴백이 없다. 실패의 **성질**이 다르면 표면도 갈라야 한다.
+
+| 클라우드 상태 | 진입 | 표면 | 소유 |
+|---|---|---|---|
+| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 다시 시도 버튼 | `LoadingCoverView.ShowRecovery` |
+| `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달 1회 (`SimpleYNPopup`) | `CloudSyncStatusWatcher` |
+| `Offline` | 업로드 3회 연속 실패 | 상시 배너 (`UiSortingOrder.CloudSyncBanner` = 940) | `CloudSyncBannerView` |
+
+```mermaid
+flowchart LR
+    PC["PlayerSaveCloud<br/>SetState — State 대입의 유일 창구<br/>OnStateChanged · ConsecutiveUploadFailures"]
+    W["CloudSyncStatusWatcher<br/>static · 유일 구독자"]
+    B["CloudSyncBannerView<br/>SingletonOverlayBase · DDOL"]
+    M["SimpleYNPopup<br/>UIPoolManager"]
+    LC["LoadingCoverView<br/>부트 커버"]
+
+    PC -->|OnStateChanged| W
+    W -->|ShouldShowSyncBanner| B
+    W -->|Blocked 1회| M
+    PC -->|"Fail → MarkRecoveryRequired"| LC
+```
+
+- **판정은 MonoBehaviour 밖(`CloudSyncStatusWatcher`)에 둔다** — 배너 프리팹 로드가 실패해도 차단 모달은 떠야 한다.
+- **임계값(3)은 `PlayerSaveCloud` 가 쥔다**(`ShouldShowSyncBanner`). UI가 세면 오탐한다 — 오프라인 부트는 업로드를
+  한 번도 시도하지 않고 `Offline` 이 되는데, "시도했으나 실패"와 "애초에 못 올림"은 `UploadAsync` 안에서만 구분된다.
+- `BlockSession` 은 `MarkRecoveryRequired()` 를 부르지 않는다 — 게이트 뒤라 화면을 못 바꾸면서 `IsReady` 만
+  false로 떨어뜨렸다. `IsReady`/`IsTerminated` 소비자는 부트 경로 둘뿐이다.
+
+### 인플레이스 재시도
+
+씬을 다시 로드하지 않는다. 커버는 살아 있는 그 인스턴스 그대로고, 초기화 상태만 되돌려 채택을 다시 태운다.
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant LC as LoadingCoverView
+    participant GI as GameInitialization
+    participant GM as GameManager
+    participant II as InitializationInstaller
+
+    U->>LC: 다시 시도
+    LC->>GI: ResetForRetry() — terminated 해제
+    Note over LC,GI: 먼저다. 뒤 단계가 동기 실패하면 MarkRecoveryRequired가 다시 오는데<br/>그때 terminated가 남아 있으면 안 된다
+    LC->>GM: RetryInitialize() → FirebaseManager.Reinitialize(envId)
+    Note over GM: PlayerSaveCloud.Initialize가 Shutdown을 태워 s_gateComplete=false
+    LC->>II: RestartGate()
+    Note over LC,II: 이 순서가 계약 — RestartGate가 앞서면<br/>게이트가 직전 실패의 gateComplete=true를 보고 통과한다
+    LC->>LC: CoRunInitialize() 재진입 (타임아웃 예산 리셋)
+```
+
+- `FirebaseManager.Reinitialize` 는 `Initialize` 의 "already initialized" 가드를 넘는 유일한 합법 경로다.
+  `Shutdown` 이 `s_modules` 를 비우지 않아 모듈 재등록 없이 다시 탄다.
+- `UpdateRequired` 에는 재시도 버튼을 띄우지 않는다 — 원격 스키마가 높은 것은 재시도로 안 풀린다.
+- 복구 문구는 진행바(`Slider_LoadingBar_Green`) **밖**의 `RecoveryPanel/Text_Recovery` 다.
+  안에 두면 `progressBar.SetActive(false)` 가 문구까지 함께 끈다(2026-08-26 수정).
 
 ### 비동기 관용구
 
