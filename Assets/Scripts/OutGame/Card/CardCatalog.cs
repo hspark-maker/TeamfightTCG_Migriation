@@ -18,6 +18,7 @@ public static class CardCatalog
     static readonly Dictionary<int, CardSpec> s_specById = new Dictionary<int, CardSpec>();
     static readonly Dictionary<int, IReadOnlyList<SynergyData>> s_synergiesById = new Dictionary<int, IReadOnlyList<SynergyData>>();
     static readonly Dictionary<int, string> s_attackEffectKeyById = new Dictionary<int, string>();
+    static readonly HashSet<int> s_reportedLegacyAttackEffectIds = new HashSet<int>();
 
     // 구 세이브(에셋 이름 키) 이관 전용 역인덱스. 평상시 조회에 쓰지 마라 —
     // 이름은 리네임으로 갈리는 축이고, 그걸 끊으려고 번호를 도입했다.
@@ -41,6 +42,7 @@ public static class CardCatalog
         s_synergiesById.Clear();
         s_attackEffectKeyById.Clear();
         s_allAttackEffectKeys.Clear();
+        s_reportedLegacyAttackEffectIds.Clear();
         s_legacyNameToId.Clear();
         IsReady = false;
     }
@@ -99,7 +101,12 @@ public static class CardCatalog
 
             string t_key = t_pair.Value.AttackEffectKey;
             string t_legacyKey = AttackEffectCache.AddressOf(t_assets[t_pair.Key].attackEffect);
-            if (string.IsNullOrWhiteSpace(t_key)) t_key = t_legacyKey;
+            if (string.IsNullOrWhiteSpace(t_key))
+            {
+                t_key = t_legacyKey;
+                if (!string.IsNullOrEmpty(t_legacyKey) && s_reportedLegacyAttackEffectIds.Add(t_pair.Key))
+                    Debug.LogWarning($"[CardCatalog] 카드 {t_pair.Key}({t_pair.Value.AssetName})의 attackEffectKey가 비어 있어 CardData SO 호환값 '{t_legacyKey}'을 사용한다. 원본 Card/Card_Test 시트 이관이 아직 끝나지 않았다.");
+            }
             else if (!string.IsNullOrEmpty(t_legacyKey) && !string.Equals(t_key, t_legacyKey, StringComparison.Ordinal))
                 throw new InvalidOperationException($"[CardCatalog] 카드 {t_pair.Key} 공격 이펙트 불일치: 표='{t_key}', SO='{t_legacyKey}'.");
             t_attackEffectKeys.Add(t_pair.Key, t_key);
