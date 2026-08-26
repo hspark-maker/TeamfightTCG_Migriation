@@ -36,6 +36,9 @@ public class BootInstaller : MonoBehaviour
     static bool s_booted;
     static bool s_saveDependentInstalled;
 
+    // 메모리 채우기는 끝났으나 커밋만 실패한 상태를 구분한다 — 재시도로 지급·되감기를 두 번 돌리지 않기 위해서다.
+    static bool s_saveDependentPrepared;
+
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -43,6 +46,7 @@ public class BootInstaller : MonoBehaviour
     {
         s_booted = false;
         s_saveDependentInstalled = false;
+        s_saveDependentPrepared = false;
     }
 
     void Awake()
@@ -146,7 +150,7 @@ public class BootInstaller : MonoBehaviour
         try
         {
             await UniTask.WaitUntil(() =>
-                PlayerSaveSync.IsGateComplete ||
+                BootGate.IsComplete ||
                 GameManager.BootState == EGameBootState.UpdateRequired ||
                 GameManager.BootState == EGameBootState.RecoveryRequired,
                 cancellationToken: this.GetCancellationTokenOnDestroy());
@@ -156,6 +160,15 @@ public class BootInstaller : MonoBehaviour
                 return;
 
             await InstallSaveDependentAsync();
+
+            // 부트 커밋은 Cloud에서 네트워크 쓰기라 실패가 실재한다 — 그 재시도를 받아줄 주체가 여기밖에 없다.
+            while (!s_saveDependentInstalled &&
+                   GameManager.BootState == EGameBootState.BlockedRetryable)
+            {
+                await BootGate.WaitForRetryAsync();
+                GameManager.MarkBootRetrying();
+                await InstallSaveDependentAsync();
+            }
         }
         catch (System.OperationCanceledException)
         {
@@ -173,21 +186,39 @@ public class BootInstaller : MonoBehaviour
     {
         if (s_saveDependentInstalled) return;
 
-        OutgameTutorialRewind.ApplyWipeIfScheduled();
-        CurrencyManager.Init();
-        ProfileManager.Init();
-        OwnershipManager.Init();
-        OutgameTutorialProgress.Init();
-        if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
-        KeywordGrowthManager.Init();
-        CardGrowthManager.Init();
-        DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
-        StarterDeck.GrantIfNoDeck(starterDeck);
-        OutgameTutorialRunner.ResolveProgressAnchor();
-        OutgameTutorialRunner.RewindToPendingBattleEntry();
-        OutgameTutorialRewind.ApplyReplayIfScheduled();
+        // 커밋만 실패해 다시 들어온 경로는 메모리 채우기를 건너뛴다 — 지급·되감기가 두 번 돌면 안 된다.
+        if (!s_saveDependentPrepared)
+        {
+            OutgameTutorialRewind.ApplyWipeIfScheduled();
+            CurrencyManager.Init();
+            ProfileManager.Init();
+            OwnershipManager.Init();
+            OutgameTutorialProgress.Init();
+            if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
+            KeywordGrowthManager.Init();
+            CardGrowthManager.Init();
+            DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
+            StarterDeck.GrantIfNoDeck(starterDeck);
+            OutgameTutorialRunner.ResolveProgressAnchor();
+            OutgameTutorialRunner.RewindToPendingBattleEntry();
+            OutgameTutorialRewind.ApplyReplayIfScheduled();
+            s_saveDependentPrepared = true;
+        }
 
-        await SaveTransaction.CommitAsync();
+        ESaveWriteResult t_commit = await SaveTransaction.CommitAsync();
+        if (t_commit != ESaveWriteResult.Success)
+        {
+            // 여기서 그냥 진행하면 이번 부트가 지급한 것들이 서버에 없는 채로 게임이 열린다.
+            Debug.LogError($"[BootInstaller] 부트 커밋 실패({t_commit}) — 세이브 의존 설치를 확정하지 않는다.");
+
+            // Conflict는 재시도로 안 풀린다 — 쓰기 선조건이 부팅 때 읽은 revision이라 다시 밀어도 같은 자리에서 막힌다.
+            if (t_commit == ESaveWriteResult.Offline)
+                GameManager.MarkBlockedRetryable(SaveBootBlock.ReasonOf(t_commit));
+            else
+                GameManager.MarkRecoveryRequired();
+
+            return;
+        }
 
         s_saveDependentInstalled = true;
         GameManager.MarkBootReady();

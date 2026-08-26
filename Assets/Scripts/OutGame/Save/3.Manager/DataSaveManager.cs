@@ -5,7 +5,8 @@ using UnityEngine;
 // 아웃게임 세이브 매니저. 저장 매체는 IRepository로 교체한다.
 public static class DataSaveManager
 {
-    const string SAVE_KEY = "outgame_save";
+    // 저장소 구현체가 "어느 키가 세이브 본문인가"를 알아야 해서 노출한다 — 문자열이 두 곳에 생기면 안 된다.
+    internal const string SAVE_KEY = "outgame_save";
     const string CORRUPT_KEY = "outgame_save_corrupt";
     const string VERSION_BACKUP_KEY_PREFIX = "outgame_save_v";
 
@@ -90,7 +91,7 @@ public static class DataSaveManager
     public static UniTask<ESaveWriteResult> SaveAsync() => Serialize(WriteAsync);
 
     /// <summary>기다리지 않고 즉시 기록한다. 앱 종료 경로 전용 —
-    /// 파일 매체에서만 성립하며, 다른 매체면 경고 후 아무것도 하지 않는다.</summary>
+    /// Local 모드에서만 성립하며, Cloud면 경고 후 아무것도 하지 않는다(그 경로는 종료 저널이 받는다).</summary>
     internal static ESaveWriteResult SaveBlocking()
     {
         if (s_saveBlocked)
@@ -99,18 +100,43 @@ public static class DataSaveManager
             return ESaveWriteResult.Blocked;
         }
 
-        if (s_repository is not JsonFileRepository t_fileRepository)
+        if (SaveSourceMode.Current != ESaveSourceMode.Local)
         {
-            Debug.LogWarning("[DataSaveManager] 종료 경로 동기 저장은 파일 매체에서만 지원한다 — 이번 쓰기는 건너뛴다.");
+            Debug.LogWarning("[DataSaveManager] 종료 경로 동기 저장은 Local 모드에서만 성립한다 — 이번 쓰기는 건너뛴다.");
+            return ESaveWriteResult.IoFailed;
+        }
+
+        if (s_repository is not IBlockingWriteRepository t_blockingRepository)
+        {
+            Debug.LogWarning("[DataSaveManager] 활성 매체가 동기 쓰기를 지원하지 않는다 — 이번 쓰기는 건너뛴다.");
             return ESaveWriteResult.IoFailed;
         }
 
         Data.version = UserSaveData.VERSION;
         string t_json = JsonUtility.ToJson(Data);
-        ESaveWriteResult t_result = t_fileRepository.SaveBlocking(SAVE_KEY, t_json);
+        ESaveWriteResult t_result = t_blockingRepository.SaveBlocking(SAVE_KEY, t_json);
         if (t_result == ESaveWriteResult.Success) OnSaved?.Invoke(t_json);
 
         return t_result;
+    }
+
+    /// <summary>종료 시점 스냅샷을 매체의 로컬 저널에 동기 기록한다. 앱 종료 경로 전용 —
+    /// 네트워크 매체라 종료 콜백 안에서 쓰기를 끝낼 수 없을 때 SaveBlocking을 대신한다.</summary>
+    internal static ESaveWriteResult WriteJournalBlocking()
+    {
+        if (s_saveBlocked)
+        {
+            Debug.LogWarning("[DataSaveManager] Save blocked because the loaded save is newer than this client.");
+            return ESaveWriteResult.Blocked;
+        }
+
+        if (s_repository is not ISaveJournalRepository t_journalRepository)
+        {
+            Debug.LogWarning("[DataSaveManager] 활성 매체가 종료 저널을 지원하지 않는다 — 이번 쓰기는 건너뛴다.");
+            return ESaveWriteResult.IoFailed;
+        }
+
+        return t_journalRepository.WriteJournalBlocking(CreateSnapshot());
     }
 
     public static string CreateSnapshot()

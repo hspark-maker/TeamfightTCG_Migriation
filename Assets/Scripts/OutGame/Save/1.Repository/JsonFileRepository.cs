@@ -4,7 +4,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // IRepository의 JSON 파일 구현 — 키마다 persistentDataPath/{subFolder}/{key}.json
-public class JsonFileRepository : IAtomicRepository
+public class JsonFileRepository : IAtomicRepository, IBlockingWriteRepository
 {
     readonly string m_directory;
 

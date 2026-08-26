@@ -28,6 +28,10 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] Slider progressBar;
     [SerializeField] TMP_Text statusText;
 
+    [Tooltip("부트 차단(네트워크·인증 실패) 화면의 재시도 버튼. 평소엔 꺼둔 채로 배선한다.\n" +
+             "미배선이면 자동 재시도로 떨어진다 — 버튼이 없다고 부트가 갇히지는 않는다.")]
+    [SerializeField] Button retryButton;
+
     [Tooltip("로딩이 즉시 끝나도 이 시간(초)만큼은 노출한다 — 한 프레임 깜빡임 방지.")]
     [SerializeField] float minDuration = 1f;
 
@@ -65,6 +69,9 @@ public class LoadingCoverView : MonoBehaviour
     // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
     const float BgmFadeOutSeconds = 0.5f;
 
+    // 재시도 버튼이 미배선일 때만 쓰는 자동 재시도 간격(초).
+    const float AUTO_RETRY_SECONDS = 5f;
+
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
     /// 부트가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
@@ -97,12 +104,20 @@ public class LoadingCoverView : MonoBehaviour
         if (t_view.m_group != null && t_view.fadeInDuration > 0f) t_view.m_group.alpha = 0f;
     }
 
+    /// <summary>부트 차단 화면의 재시도 입력. 게이트를 여는 것이 아니라 멈춰 선 부트 단계를 다시 돌린다.</summary>
+    public void OnRetryPressed()
+    {
+        if (retryButton != null) retryButton.interactable = false;
+        BootGate.RequestRetry();
+    }
+
     void Awake()
     {
         s_active = this;
         m_group = GetComponent<CanvasGroup>();
 
         if (progressBar != null) progressBar.normalizedValue = 0f;
+        if (retryButton != null) retryButton.gameObject.SetActive(false);
     }
 
     // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
@@ -122,46 +137,94 @@ public class LoadingCoverView : MonoBehaviour
     {
         if (GameManager.BootState == EGameBootState.UpdateRequired)
         {
-            if (statusText != null)
-                statusText.text = "새 버전으로 업데이트가 필요합니다.";
-            if (progressBar != null)
-                progressBar.gameObject.SetActive(false);
+            ShowBootHalted();
             yield break;
         }
 
-        if (statusText != null)
-            statusText.text = "플레이어 데이터를 동기화하는 중입니다.";
-
-        // 완료 플래그 전에는 바가 1에 닿지 못하게 막는다 — PercentComplete는 프리팹 등록 콜백이
-        // 끝나기 전에 1이 될 수 있어, 그대로 쓰면 등록이 덜 된 채로 다음 씬에 넘어간다.
-        yield return CoFillBar(() =>
+        // 채우기와 차단 화면은 번갈아 돈다. 차단 중에도 바를 채우면 maxDuration이 바를 100%로 밀어
+        // 세이브가 붙지 않은 채 다음 씬으로 넘어간다 — 그게 무한 대기보다 큰 사고다.
+        while (true)
         {
-            float t_dataProgress = DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f);
-            float t_syncProgress = BootInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
-            return (t_dataProgress + t_syncProgress) * 0.5f;
-        });
+            ShowBootSyncing();
 
-        while (GameManager.BootState == EGameBootState.Syncing &&
-               !BootInstaller.IsSaveDependentInstalled)
+            // 완료 플래그 전에는 바가 1에 닿지 못하게 막는다 — PercentComplete는 프리팹 등록 콜백이
+            // 끝나기 전에 1이 될 수 있어, 그대로 쓰면 등록이 덜 된 채로 다음 씬에 넘어간다.
+            yield return CoFillBar(() =>
+            {
+                float t_dataProgress = DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f);
+                float t_syncProgress = BootInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
+                return (t_dataProgress + t_syncProgress) * 0.5f;
+            }, IsBootHalted);
+
+            if (!IsBootHalted()) break;
+
+            if (IsBootTerminal())
+            {
+                ShowBootHalted();
+                yield break;
+            }
+
+            yield return CoWaitRetry();
+        }
+
+        // 바가 다 찼다고 세이브 의존 설치가 끝난 것은 아니다(타임아웃으로 빠져나왔을 수 있다).
+        while (!BootInstaller.IsSaveDependentInstalled)
         {
+            if (IsBootTerminal())
+            {
+                ShowBootHalted();
+                yield break;
+            }
+
+            if (GameManager.BootState == EGameBootState.BlockedRetryable)
+            {
+                yield return CoWaitRetry();
+                ShowBootSyncing();
+                continue;
+            }
+
             yield return null;
         }
 
-        if (GameManager.BootState == EGameBootState.UpdateRequired ||
-            GameManager.BootState == EGameBootState.RecoveryRequired)
+        yield return CoGoNext();
+    }
+
+    // 차단 사유를 세우고 재시도가 들어올 때까지 붙잡는다. 상태를 벗어나면 원래 표시로 되돌린다.
+    IEnumerator CoWaitRetry()
+    {
+        if (statusText != null) statusText.text = BlockMessageOf(BootGate.BlockReason);
+        if (progressBar != null) progressBar.gameObject.SetActive(false);
+
+        if (retryButton != null)
         {
-            if (statusText != null)
-            {
-                statusText.text = GameManager.BootState == EGameBootState.UpdateRequired
-                    ? "새 버전으로 업데이트가 필요합니다."
-                    : "저장 데이터를 복구하지 못했습니다.";
-            }
-            if (progressBar != null)
-                progressBar.gameObject.SetActive(false);
-            yield break;
+            retryButton.onClick.AddListener(OnRetryPressed);
+            retryButton.interactable = true;
+            retryButton.gameObject.SetActive(true);
         }
 
-        yield return CoGoNext();
+        float t_sinceAutoRetry = 0f;
+
+        while (GameManager.BootState == EGameBootState.BlockedRetryable)
+        {
+            // 버튼이 아직 프리팹에 없어도 부트가 여기 갇히지 않게 하는 안전판.
+            if (retryButton == null)
+            {
+                t_sinceAutoRetry += Time.unscaledDeltaTime;
+                if (t_sinceAutoRetry >= AUTO_RETRY_SECONDS)
+                {
+                    t_sinceAutoRetry = 0f;
+                    BootGate.RequestRetry();
+                }
+            }
+
+            yield return null;
+        }
+
+        if (retryButton != null)
+        {
+            retryButton.onClick.RemoveListener(OnRetryPressed);
+            retryButton.gameObject.SetActive(false);
+        }
     }
 
     // 첫 스텝이 전투 직행이면 로비를 거치지 않는다. 다른 자동 스텝(AutoPurchase)까지 여기서 실행하지 않는 이유는
@@ -248,13 +311,16 @@ public class LoadingCoverView : MonoBehaviour
 
     // 바를 목표치까지 따라 올린다. 목표는 "실제 진행도"와 "최소 시간 진척" 중 느린 쪽이라
     // 로딩이 즉시 끝나도 바가 순간이동하지 않는다 — 커버가 minDuration만큼은 눈에 남는다.
-    IEnumerator CoFillBar(Func<float> _progress)
+    // _abort가 참이 되면 바를 그 자리에 두고 빠져나온다(부트 차단 화면이 끼어드는 통로).
+    IEnumerator CoFillBar(Func<float> _progress, Func<bool> _abort = null)
     {
         float t_elapsed = 0f;
         float t_shown   = 0f;   // 실제로 슬라이더에 그려지는 값(보간 결과)
 
         while (true)
         {
+            if (_abort != null && _abort()) yield break;
+
             t_elapsed += Time.unscaledDeltaTime;
 
             float t_target = Mathf.Min(_progress(), t_elapsed / Mathf.Max(minDuration, 0.01f));
@@ -274,6 +340,56 @@ public class LoadingCoverView : MonoBehaviour
         }
 
         if (progressBar != null) progressBar.normalizedValue = 1f;
+    }
+
+    // 부트가 더 진행하지 못하는 상태인가(탈출로 없는 종료 + 재시도 대기).
+    static bool IsBootHalted()
+    {
+        return GameManager.BootState == EGameBootState.BlockedRetryable || IsBootTerminal();
+    }
+
+    // 재시도로도 풀리지 않는 종료 상태인가.
+    static bool IsBootTerminal()
+    {
+        return GameManager.BootState == EGameBootState.UpdateRequired ||
+               GameManager.BootState == EGameBootState.RecoveryRequired;
+    }
+
+    void ShowBootSyncing()
+    {
+        if (statusText != null) statusText.text = "플레이어 데이터를 동기화하는 중입니다.";
+        if (progressBar != null) progressBar.gameObject.SetActive(true);
+    }
+
+    // 탈출로가 없는 종료 상태의 표시. 재시도가 없으므로 진행바도 버튼도 걷는다.
+    void ShowBootHalted()
+    {
+        if (statusText != null)
+        {
+            statusText.text = GameManager.BootState == EGameBootState.UpdateRequired
+                ? "새 버전으로 업데이트가 필요합니다."
+                : "저장 데이터를 복구하지 못했습니다.";
+        }
+        if (progressBar != null) progressBar.gameObject.SetActive(false);
+        if (retryButton != null) retryButton.gameObject.SetActive(false);
+    }
+
+    // 사유별 안내 문구의 소유자는 화면이다 — 부트 레이어는 사유만 넘긴다.
+    static string BlockMessageOf(ESaveBootBlockReason _reason)
+    {
+        switch (_reason)
+        {
+            case ESaveBootBlockReason.Auth:
+                return "로그인에 실패했습니다.\n네트워크를 확인한 뒤 다시 시도해 주세요.";
+            case ESaveBootBlockReason.ServerData:
+                return "서버의 저장 데이터를 읽지 못했습니다.\n다시 시도해 주세요.";
+            case ESaveBootBlockReason.Conflict:
+                return "다른 기기에서 먼저 저장했습니다.\n다시 시도해 주세요.";
+            case ESaveBootBlockReason.Storage:
+                return "저장 데이터를 기록하지 못했습니다.\n다시 시도해 주세요.";
+            default:
+                return "서버에 연결하지 못했습니다.\n네트워크를 확인한 뒤 다시 시도해 주세요.";
+        }
     }
 
     // 다음 씬 위에서 커버를 걷고 자신을 파괴한다. DDOL로 살아남은 오브젝트라 비활성화로는 부족하다.
