@@ -83,6 +83,7 @@ public class GameManager : MonoBehaviour
 
         try
         {
+            OutgameTutorialRewind.ApplyWipeIfScheduled();
             PlayerSaveSync.Initialize(t_profile.CloudSaveProfileId, DataSaveManager.CloudUploadAllowed);
             BootState = EGameBootState.Syncing;
         }

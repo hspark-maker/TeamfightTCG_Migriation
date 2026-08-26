@@ -206,8 +206,8 @@ public class CardInstance
         // 성장값 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과).
         // 진화 단계는 마스터 데이터(임시 입력)와 강화 해금 중 높은 쪽 — 성장 미주입이면 후자가 0이라 기존 동작 그대로.
         this.evolutionStage = UnityEngine.Mathf.Max(_data.defaultEvolutionStage, _growth.EvolutionStage);
-        // 성장을 태우는 경로만 해금 게이트를 받는다. 미주입(AI 적 필드·멀티 원격 미러)은 마스터 데이터 그대로 —
-        // 한쪽만 키워드가 사라지면 밸런스 기준선이 무너지고 멀티는 즉시 divergence다.
+        // 성장을 태우는 경로만 해금 게이트를 받는다. 멀티 양 필드는 교환된 최종 성장 스냅샷을 주입한다.
+        // 미주입 폴백은 성장 공급자가 없는 레거시/디버그 생성 경로만 마스터 데이터를 그대로 쓴다.
         this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : _data.keywords;
         this.synergyEnabled   = !_growth.Applied || _growth.SynergyUnlocked;
     }
