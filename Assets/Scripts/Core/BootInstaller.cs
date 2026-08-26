@@ -94,6 +94,9 @@ public class BootInstaller : MonoBehaviour
         // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
         // (GameInitializer.GrowthProvider 주석이 지정한 자리). 캐시가 준비된 Init 뒤여야 첫 전투부터 반영된다.
         GameInitializer.GrowthProvider = CardGrowthManager.GrowthOf;
+        // Firebase 구현이 먼저 주입되지 않은 개발/오프라인 환경에서만 로컬 세이브를 사용한다.
+        // 전투와 네트워크는 IMatchGrowthSource만 보므로 이후 공급자 교체가 와이어 계약을 바꾸지 않는다.
+        MatchGrowthSource.SetFallback(new LocalSaveMatchGrowthSource());
 
         // 표시용 해금 키워드도 같은 성장값에서 나온다. 이걸 안 꽂으면 아직 못 쓰는 키워드가
         // 도감·덱편집·정보창에 그대로 떠서 표시와 규칙이 갈라진다.
