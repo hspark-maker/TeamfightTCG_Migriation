@@ -39,7 +39,7 @@ public class LoadingCoverView : MonoBehaviour
 
     // 부팅 대기는 진행바 연출과 다른 축이다. maxDuration을 같이 쓰면 CoFillBar가 그 예산을 먼저
     // 소진한 뒤 부팅 대기가 0초로 시작해, 조금만 느려도 곧장 복구 화면으로 떨어진다.
-    // 세이브 동기화만으로도 최악 15초(PlayerSaveSync의 pull 5s + transaction 10s)라 넉넉히 잡는다.
+    // 세이브 채택만으로도 최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)라 넉넉히 잡는다.
     [SerializeField] float bootWaitTimeout = 45f;
 
     [Tooltip("진행바가 100%에 닿은 뒤 씬을 넘기기 전 유지 시간(초).")]

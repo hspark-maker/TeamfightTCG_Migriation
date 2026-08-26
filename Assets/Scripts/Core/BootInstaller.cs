@@ -164,7 +164,7 @@ public class BootInstaller : MonoBehaviour
     // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
     System.Collections.IEnumerator Start()
     {
-        while (!PlayerSaveSync.IsGateComplete && !GameInitialization.IsTerminated)
+        while (!PlayerSaveCloud.IsGateComplete && !GameInitialization.IsTerminated)
         {
             yield return null;
         }
@@ -211,7 +211,11 @@ public class BootInstaller : MonoBehaviour
     {
         if (s_saveDependentInstalled) return;
 
-        CurrencyManager.Init();
+        // 클라우드 채택이 끝난 뒤여야 한다 — 채택 전에 슬롯을 갈아엎으면 채택이 그대로 덮어써 무효가 된다.
+        OutgameTutorialRewind.ApplyWipeIfScheduled();
+
+        // 스타터 지급의 유일한 근거는 "원격 문서가 없다"이다. 오프라인 폴백 세션은 IsFreshAccount가 false다.
+        CurrencyManager.Init(PlayerSaveCloud.IsFreshAccount);
         ProfileManager.Init();
         OwnershipManager.Init();
         OutgameTutorialProgress.Init();
@@ -225,6 +229,10 @@ public class BootInstaller : MonoBehaviour
         OutgameTutorialRewind.ApplyReplayIfScheduled();
 
         s_saveDependentInstalled = true;
+
+        // 신규 계정의 첫 문서를 여기서 한 번에 만든다. 이 업로드가 실패하면 원격 문서는 여전히 없으므로
+        // 다음 부트도 신규로 판정되고 지급이 정확히 한 번만 남는다(멱등).
+        DataSaveManager.SaveImmediate();
         GameInitialization.MarkReady();
     }
 

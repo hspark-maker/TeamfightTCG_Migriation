@@ -1,7 +1,9 @@
+using Cysharp.Threading.Tasks;
+
 public interface IFirebaseModule
 {
     void Initialize(in FirebaseContext _context);
     void RetryPending();
-    void FlushPending();
+    UniTask FlushPendingAsync();
     void Shutdown();
 }

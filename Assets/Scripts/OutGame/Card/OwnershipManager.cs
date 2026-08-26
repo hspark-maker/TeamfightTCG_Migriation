@@ -29,7 +29,7 @@ public static class OwnershipManager
         return false;
     }
 
-    // 부트에서 DataSaveManager.Load()·CardCatalog.SetSource() 이후 1회 호출
+    // 부트에서 클라우드 세이브 채택·CardCatalog.SetSource() 이후 1회 호출
     public static void Init()
     {
         s_owned.Clear();

@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 게임 전역을 관리하는 지속 싱글턴.
@@ -44,14 +45,19 @@ public class GameManager : MonoBehaviour
     {
         if (_pause)
         {
-            Flush();
+            FlushAsync().Forget();
             return;
         }
 
         FirebaseManager.RetryPending();
     }
 
-    void OnApplicationQuit() => Flush();
+    // 종료 콜백에는 await 창이 없다 — 킥만 하고, 못 올라간 잔여 변경분은 로컬 캐시가 다음 부트에 살린다.
+    void OnApplicationQuit()
+    {
+        FlushLocal();
+        FirebaseManager.FlushPendingAsync().Forget();
+    }
 
     // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
     void Boot()
@@ -70,20 +76,13 @@ public class GameManager : MonoBehaviour
         // 저장된 흔들림 설정 복원(미저장이면 켬). 전투가 열리기 전에 확정돼 있어야 한다.
         SetScreenShake(PlayerPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
 
+        // 세이브의 진실원은 클라우드 문서다 — 여기서는 캐시 매체만 꽂고, 채택은 PlayerSaveCloud가 비동기로 한다.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;
         DataSaveManager.SetRepository(new JsonFileRepository(t_profile.SaveFolder));
-        DataSaveManager.Load();             // 프로필별 세이브 로드
-        if (DataSaveManager.IsSaveBlocked)
-        {
-            GameInitialization.MarkUpdateRequired();
-            Debug.LogError("[GameManager] Boot blocked because the local save requires a newer client.");
-            return;
-        }
 
         try
         {
-            OutgameTutorialRewind.ApplyWipeIfScheduled();
-            FirebaseManager.Register(new PlayerSaveFirebaseModule(DataSaveManager.CloudUploadAllowed));
+            FirebaseManager.Register(new PlayerSaveFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);
             FirebaseManager.Initialize(t_profile.CloudEnvId);
         }
@@ -119,11 +118,18 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    // 앱이 떠날 때 영속화를 flush(모바일 종료 콜백 누락 대비).
-    void Flush()
+    // 앱이 백그라운드로 갈 때 영속화를 flush. 업로드 완료까지 기다린다(안드로이드는 프로세스가 살아 PlayerLoop이 돈다).
+    async UniTaskVoid FlushAsync()
     {
-        if (GameInitialization.IsReady)
+        FlushLocal();
+        await FirebaseManager.FlushPendingAsync();
+    }
+
+    // 게이트가 아니라 매니저 설치 여부로 판정한다 — 세션 중 복구 요구가 뜨면 IsReady가 false로 떨어지는데,
+    // 그때 잔액 flush까지 멈추면 이미 번 재화가 로컬 캐시에도 안 남는다.
+    void FlushLocal()
+    {
+        if (BootInstaller.IsSaveDependentInstalled)
             CurrencyManager.Save();
-        FirebaseManager.FlushPending();
     }
 }

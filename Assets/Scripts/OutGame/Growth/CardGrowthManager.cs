@@ -55,7 +55,7 @@ public static partial class CardGrowthManager
         s_missingConfigLogged = false;
     }
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출
+    // 부트에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
     {
         s_growth.Clear();

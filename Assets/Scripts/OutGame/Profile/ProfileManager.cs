@@ -50,7 +50,7 @@ public static class ProfileManager
         Config = _config;
     }
 
-    // 부트에서 SetConfig 이후 1회 호출. DataSaveManager.Load() 뒤여야 세이브가 반영된다.
+    // 부트에서 SetConfig 이후 1회 호출. 클라우드 세이브 채택 뒤여야 세이브가 반영된다.
     // 세이브가 비었거나 Config에서 사라진 id면 기본값으로 떨어진다 — 폴백 결과를 슬롯에 되쓰지는
     // 않는다(부트마다 디스크 쓰기가 생긴다). 다음 Apply()가 정리한다.
     public static void Init()

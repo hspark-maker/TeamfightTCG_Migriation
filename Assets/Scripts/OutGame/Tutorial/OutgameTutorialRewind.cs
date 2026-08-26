@@ -62,8 +62,8 @@ public static class OutgameTutorialRewind
     }
 
     /// <summary>1단 — 아웃게임 세이브를 첫실행으로 밀고 예약 좌표를 심는다.
-    /// <b>GameManager.Boot의 DataSaveManager.Load() 직후</b>에만 호출한다 —
-    /// 매니저 Init()들이 슬롯 참조를 캐싱하고 나면 갈아끼운 슬롯이 반영되지 않는다.</summary>
+    /// <b>BootInstaller.InstallSaveDependent() 맨 앞</b>에서만 호출한다 —
+    /// 클라우드 채택보다 앞서면 채택이 슬롯을 그대로 덮고, 매니저 Init()들이 슬롯 참조를 캐싱한 뒤면 반영되지 않는다.</summary>
     public static void ApplyWipeIfScheduled()
     {
         // 밀기는 새 예약(PREF_KEY)에만 반응한다 — 재생만 남은 상태를 여기서 다시 집으면 매 부트 반복 와이프다.
