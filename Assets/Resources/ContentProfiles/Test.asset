@@ -15,3 +15,4 @@ MonoBehaviour:
   runMode: 1
   includeTestCards: 1
   saveFolder: Save_Test
+  saveSourceMode: 1
