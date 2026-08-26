@@ -4,6 +4,10 @@ using System.Collections.Generic;
 /// <summary>SpecData Card/Card_Test 행에서 만든 카드 정적 정의. Unity 에셋 참조는 CardData가 계속 소유한다.</summary>
 public sealed class CardSpec
 {
+    public const int MinHpCurveLevel = CardGrowth.BaseLevel + 1;
+    public const int MaxHpCurveLevel = 4;
+    public const int MaxEvolutionStage = 3;
+
     public int Id { get; }
     public string AssetName { get; }
     public string DisplayName { get; }
@@ -15,8 +19,6 @@ public sealed class CardSpec
     public int DefaultEvolutionStage { get; }
     public string CardExplain { get; }
     public IReadOnlyList<string> SynergyNames { get; }
-    public CinemaAttackStyle CinemaAttackStyle { get; }
-    public string AttackEffectKey { get; }
 
     readonly int[] hpGainByLevel;
 
@@ -28,14 +30,13 @@ public sealed class CardSpec
     CardSpec(
         int _id, string _assetName, string _displayName, string _channel, int _maxHp,
         string _keywords, int _keywordUnlockLevel, int _defaultEvolutionStage,
-        int _hp2, int _hp3, int _hp4, string _cardExplain, string _grade, string _synergies,
-        string _cinemaAttackStyle, string _attackEffectKey)
+        int _hp2, int _hp3, int _hp4, string _cardExplain, string _grade, string _synergies)
     {
         if (_id <= 0) throw new InvalidOperationException($"카드 표 ID가 올바르지 않다: {_id}");
         if (string.IsNullOrWhiteSpace(_assetName)) throw new InvalidOperationException($"카드 {_id}의 name이 비었다.");
         if (_maxHp <= 0) throw new InvalidOperationException($"카드 {_id}({_assetName})의 maxHp가 {_maxHp}다.");
         if (_keywordUnlockLevel < 0) throw new InvalidOperationException($"카드 {_id}({_assetName})의 keywordUnlockLevel이 음수다.");
-        if (_defaultEvolutionStage < 0 || _defaultEvolutionStage > CardData.MaxEvolutionStage)
+        if (_defaultEvolutionStage < 0 || _defaultEvolutionStage > MaxEvolutionStage)
             throw new InvalidOperationException($"카드 {_id}({_assetName})의 defaultEvolutionStage가 범위를 벗어났다.");
         if (_hp2 < 0 || _hp3 < 0 || _hp4 < 0)
             throw new InvalidOperationException($"카드 {_id}({_assetName})의 hp2~hp4에 음수가 있다.");
@@ -51,8 +52,6 @@ public sealed class CardSpec
         DefaultEvolutionStage = _defaultEvolutionStage;
         CardExplain = _cardExplain ?? string.Empty;
         SynergyNames = ParseSynergies(_synergies, _id, _assetName);
-        CinemaAttackStyle = ParseEnumOrDefault(_cinemaAttackStyle, CinemaAttackStyle.Default, _id, _assetName, "cinemaAttackStyle");
-        AttackEffectKey = _attackEffectKey?.Trim() ?? string.Empty;
         hpGainByLevel = new[] { 0, 0, _hp2, _hp3, _hp4 };
         hasAuthoredCurve = _hp2 != 0 || _hp3 != 0 || _hp4 != 0;
     }
@@ -63,7 +62,7 @@ public sealed class CardSpec
     {
         _hpGain = 0;
         if (!hasAuthoredCurve) return false;
-        if (_level < CardData.MinHpCurveLevel || _level > CardData.MaxHpCurveLevel) return false;
+        if (_level < MinHpCurveLevel || _level > MaxHpCurveLevel) return false;
         _hpGain = hpGainByLevel[_level];
         return true;
     }
@@ -95,7 +94,7 @@ public sealed class CardSpec
         if (_row == null) throw new InvalidOperationException("Card 표에 null 행이 있다.");
         return new CardSpec(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
             _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
-            _row.cardExplain, _row.grade, _row.synergies, _row.cinemaAttackStyle, _row.attackEffectKey);
+            _row.cardExplain, _row.grade, _row.synergies);
     }
 
     static CardSpec From(Card_Test _row)
@@ -103,7 +102,7 @@ public sealed class CardSpec
         if (_row == null) throw new InvalidOperationException("Card_Test 표에 null 행이 있다.");
         return new CardSpec(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
             _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
-            _row.cardExplain, _row.grade, _row.synergies, _row.cinemaAttackStyle, _row.attackEffectKey);
+            _row.cardExplain, _row.grade, _row.synergies);
     }
 
     static void Add(Dictionary<int, CardSpec> _specs, CardSpec _spec)
@@ -119,9 +118,6 @@ public sealed class CardSpec
             throw new InvalidOperationException($"카드 {_id}({_name}).{_field} 값 '{_value}'을 해석할 수 없다.");
         return t_value;
     }
-
-    static T ParseEnumOrDefault<T>(string _value, T _default, int _id, string _name, string _field) where T : struct
-        => string.IsNullOrWhiteSpace(_value) ? _default : ParseEnum<T>(_value, _id, _name, _field);
 
     static CardKeyword ParseKeywords(string _value, int _id, string _name)
     {

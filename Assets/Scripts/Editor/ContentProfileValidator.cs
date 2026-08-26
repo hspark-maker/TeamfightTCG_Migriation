@@ -9,7 +9,6 @@ using UnityEngine;
 
 public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 {
-    const string REGISTRY_PATH = "Assets/SO/CardRegistry.asset";
     const string SYNERGY_REGISTRY_PATH = "Assets/SO/SynergyRegistry.asset";
     const string LIVE_PROFILE_PATH = "Assets/Resources/ContentProfiles/Live.asset";
     const string TEST_PROFILE_PATH = "Assets/Resources/ContentProfiles/Test.asset";
@@ -20,7 +19,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     {
         EContentRunMode t_mode = BuildMode(_report);
         ValidateOrThrow(t_mode);
-        WarnTableDrift(t_mode);
     }
 
     static EContentRunMode BuildMode(BuildReport _report)
@@ -33,27 +31,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     ///
     /// 모드 판정은 <see cref="ContentProfileConfig"/>의 런타임 규칙과 같아야 한다 — 개발 빌드 = 테스트 프로필.
     /// 에디터 모드(EditorPrefs)는 빌드와 무관하므로 보지 않는다.</summary>
-    static void WarnTableDrift(EContentRunMode _mode)
-    {
-        string t_label = ContentRunModeEditor.Label(_mode);
-
-        List<string> t_drift = ContentRunModeEditor.DiffTable(_mode, out string t_error);
-        if (t_drift == null)
-        {
-            Debug.LogWarning($"[카드 표 대조] {t_label} 표를 읽지 못해 대조를 건너뛴다 — {t_error}");
-            return;
-        }
-        if (t_drift.Count == 0)
-        {
-            Debug.Log($"[카드 표 대조] {t_label} 표와 카드 에셋 일치.");
-            return;
-        }
-
-        Debug.LogWarning($"[카드 표 대조] {t_label} 빌드인데 카드 에셋이 {t_label} 표와 다르다 " +
-                         "— 이 빌드에 실리는 값은 표가 아니라 에셋이다.\n" +
-                         CardTableTool.DriftSummary(t_drift, 50));
-    }
-
     /// <summary>문제 목록을 던지지 않고 돌려준다(빈 목록 = 통과). 릴리즈 관리 창이 목록으로 띄우는 진입점 —
     /// 빌드 전처리와 **같은 규칙**을 써야 창에서 통과한 것이 빌드에서 막히지 않는다.
     ///
@@ -62,11 +39,9 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     public static List<string> Collect(List<string> _warnings = null, EContentRunMode? _mode = null)
     {
         var t_errors = new List<string>();
-        CardRegistry t_registry = AssetDatabase.LoadAssetAtPath<CardRegistry>(REGISTRY_PATH);
         ContentProfileConfig t_live = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(LIVE_PROFILE_PATH);
         ContentProfileConfig t_test = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(TEST_PROFILE_PATH);
 
-        if (t_registry == null) t_errors.Add($"CardRegistry 없음: {REGISTRY_PATH}");
         if (t_live == null) t_errors.Add($"Live 프로필 없음: {LIVE_PROFILE_PATH}");
         if (t_test == null) t_errors.Add($"Test 프로필 없음: {TEST_PROFILE_PATH}");
 
@@ -75,25 +50,25 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         if (t_test != null && (t_test.RunMode != EContentRunMode.Test || !t_test.IncludeTestCards || t_test.SaveFolder != "Save_Test"))
             t_errors.Add("Test 프로필은 Test/테스트 포함/Save_Test 조합이어야 함");
 
-        if (t_registry != null)
         {
             int t_liveCount = 0;
-            var t_registered = new HashSet<CardData>();
-            foreach (CardData t_card in t_registry.All)
+            var t_liveIds = new HashSet<int>();
+            try
             {
-                if (t_card == null) { t_errors.Add("CardRegistry에 null 슬롯 존재"); continue; }
-                if (!t_registered.Add(t_card)) t_errors.Add($"CardRegistry 중복 카드: {t_card.name}");
-                if (t_card.channel == ECardChannel.Live) t_liveCount++;
+                foreach (CardSpec t_spec in CardSpec.Load(EContentRunMode.Live).Values)
+                    if (t_spec.Channel == ECardChannel.Live) t_liveIds.Add(t_spec.Id);
             }
+            catch (Exception t_exception)
+            {
+                t_errors.Add($"Live 카드 표 검증 실패: {t_exception.Message}");
+            }
+            t_liveCount = t_liveIds.Count;
 
             // Live 0장은 빈 게임이라 진짜 오류다. TestOnly 0장은 아니다 —
             // Test 프로필은 IncludeTestCards로 TestOnly 카드를 **덤으로 더** 실을 뿐이라,
             // 0장이면 테스트 빌드가 Live와 같은 카드 목록을 쓰는 정상 상태다(전 카드 출시 = 이 상태).
             if (t_liveCount == 0) t_errors.Add("Live 카드가 없음");
-            foreach (CardData t_card in LoadAll<CardData>())
-                if (!t_registered.Contains(t_card))
-                    t_errors.Add($"CardRegistry 미등록 카드: {t_card.name}");
-            ValidateLiveConsumers(t_errors);
+            ValidateLiveConsumers(t_liveIds, t_errors);
         }
 
         ValidateCardArtAddresses(t_errors, _warnings, _mode);
@@ -178,7 +153,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             foreach (CardSpec t_spec in t_specs.Values)
             {
                 string t_missingAddress = null;
-                for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+                for (int t_stage = 0; t_stage <= CardSpec.MaxEvolutionStage; t_stage++)
                 {
                     string t_address = CardArtCache.AddressOf(t_spec, t_stage);
                     t_expected.Add(t_address);
@@ -211,24 +186,24 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             throw new BuildFailedException("[ContentProfile] 검증 실패\n- " + string.Join("\n- ", t_errors));
     }
 
-    static void ValidateLiveConsumers(List<string> _errors)
+    static void ValidateLiveConsumers(HashSet<int> _liveIds, List<string> _errors)
     {
         foreach (CardPackData t_pack in LoadBuildDependencies<CardPackData>())
         {
-            CheckCards(t_pack.Pool, t_pack.name, _errors);
+            CheckCards(t_pack.Pool, t_pack.name, _liveIds, _errors);
             foreach (RankPackPool t_rankPool in t_pack.RankPools)
-                CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _errors);
+                CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _liveIds, _errors);
         }
 
         foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
             if (t_ai.decks != null)
                 foreach (AIDeckConfig.DeckEntry t_deck in t_ai.decks)
-                    CheckCards(t_deck?.cards, $"{t_ai.name}/{t_deck?.deckName}", _errors);
+                    CheckCards(t_deck?.CardIds, $"{t_ai.name}/{t_deck?.deckName}", _liveIds, _errors);
 
         foreach (TutorialScenarioData t_scenario in LoadBuildDependencies<TutorialScenarioData>())
         {
-            CheckCards(t_scenario.playerDeck, $"{t_scenario.name}/player", _errors);
-            CheckCards(t_scenario.enemyDeck, $"{t_scenario.name}/enemy", _errors);
+            CheckCards(t_scenario.PlayerDeckIds, $"{t_scenario.name}/player", _liveIds, _errors);
+            CheckCards(t_scenario.EnemyDeckIds, $"{t_scenario.name}/enemy", _liveIds, _errors);
         }
     }
 
@@ -255,17 +230,17 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         }
     }
 
-    static IEnumerable<CardData> RankPoolCards(RankPackPool _pool)
+    static IEnumerable<int> RankPoolCards(RankPackPool _pool)
     {
         if (_pool?.cards == null) yield break;
-        foreach (WeightedCard t_weighted in _pool.cards) yield return t_weighted.card;
+        foreach (WeightedCard t_weighted in _pool.cards) yield return t_weighted.CardId;
     }
 
-    static void CheckCards(IEnumerable<CardData> _cards, string _owner, List<string> _errors)
+    static void CheckCards(IEnumerable<int> _cards, string _owner, HashSet<int> _liveIds, List<string> _errors)
     {
         if (_cards == null) return;
-        foreach (CardData t_card in _cards)
-            if (t_card != null && t_card.channel == ECardChannel.TestOnly)
-                _errors.Add($"Live 소비 SO '{_owner}'가 TestOnly 카드 '{t_card.name}' 참조");
+        foreach (int t_cardId in _cards)
+            if (t_cardId > 0 && !_liveIds.Contains(t_cardId))
+                _errors.Add($"Live 소비 SO '{_owner}'가 TestOnly/미존재 카드 ID '{t_cardId}' 참조");
     }
 }

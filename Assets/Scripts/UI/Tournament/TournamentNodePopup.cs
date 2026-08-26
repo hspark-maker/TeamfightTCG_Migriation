@@ -106,7 +106,7 @@ public class TournamentNodePopup : PooledUIBase
 
         if (this.powerText != null)
             this.powerText.text = string.Format(this.powerFormat,
-                DeckPower.OfAtLevel(t_node.enemyDeck, t_node.AiCardLevelOrBase));
+                DeckPower.OfAtLevel(t_node.enemyDeckIds, t_node.AiCardLevelOrBase));
 
         this.m_rewards.Clear();
         TournamentProgress.FillRewards(_index, this.m_rewards);

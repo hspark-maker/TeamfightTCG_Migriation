@@ -25,15 +25,15 @@ public static class SynergyIconStrip
     /// 아이콘이 없는(icon 미배정) 시너지는 건너뛴다 — 빈 사각형이 뜨는 것보다 낫다.</summary>
     /// <param name="_state">지금 필드의 확정 시너지 스냅샷. 넘기면 <b>활성이 앞, 비활성이 뒤</b>로 정렬되고
     /// 비활성은 회색(inactiveIcon)으로 그려진다. null이면 전부 활성으로 본다(덱 편성처럼 필드가 없는 화면).</param>
-    public static void Build(CardData _card, Transform _parent, GameObject _iconPrefab,
+    public static void Build(int _cardId, Transform _parent, GameObject _iconPrefab,
                              SynergyState _state = null, bool _clearFirst = true)
     {
         if (_parent == null || _iconPrefab == null) return;
 
         if (_clearFirst) Clear(_parent);
 
-        if (_card == null) return;
-        IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(_card);
+        if (_cardId <= 0) return;
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.RequireSynergies(_cardId);
         if (t_synergies.Count == 0) return;
 
         // 정렬·중복 제거 규칙은 카드 배지와 같은 곳(CardVisualRules) — 두 곳이 갈리면 같은 카드인데

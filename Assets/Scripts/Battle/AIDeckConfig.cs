@@ -8,7 +8,8 @@ public class AIDeckConfig : ScriptableObject
     public class DeckEntry
     {
         public string deckName;
-        public List<CardData> cards;
+        [CardId] public List<int> cardIds;
+        public IReadOnlyList<int> CardIds => cardIds;
 
         [Tooltip("등장 시작 티어 인덱스(등급×4 + 단계-1). 0 = 브론즈 1")]
         public int fromTier;
@@ -23,32 +24,32 @@ public class AIDeckConfig : ScriptableObject
 
     public List<DeckEntry> decks;
 
-    public List<CardData> GetRandomDeck()
+    public List<int> GetRandomDeck()
     {
-        if (this.decks == null || this.decks.Count == 0) return new List<CardData>();
+        if (this.decks == null || this.decks.Count == 0) return new List<int>();
 
         var t_candidates = new List<DeckEntry>();
         foreach (DeckEntry t_entry in this.decks)
             if (HasValidCards(t_entry)) t_candidates.Add(t_entry);
 
-        if (t_candidates.Count == 0) return new List<CardData>();
-        return t_candidates[Random.Range(0, t_candidates.Count)].cards;
+        if (t_candidates.Count == 0) return new List<int>();
+        return new List<int>(t_candidates[Random.Range(0, t_candidates.Count)].cardIds);
     }
 
-    public List<CardData> GetDeckForTier(int _tier)
+    public List<int> GetDeckForTier(int _tier)
     {
-        if (this.decks == null || this.decks.Count == 0) return new List<CardData>();
+        if (this.decks == null || this.decks.Count == 0) return new List<int>();
 
         for (int t_tier = Mathf.Max(0, _tier); t_tier >= 0; t_tier--)
         {
-            List<CardData> t_deck = PickWeighted(t_tier);
+            List<int> t_deck = PickWeighted(t_tier);
             if (t_deck != null) return t_deck;
         }
 
         return GetRandomDeck();
     }
 
-    List<CardData> PickWeighted(int _tier)
+    List<int> PickWeighted(int _tier)
     {
         int t_totalWeight = 0;
         foreach (DeckEntry t_entry in this.decks)
@@ -65,7 +66,7 @@ public class AIDeckConfig : ScriptableObject
             if (!IsAvailableAt(t_entry, _tier)) continue;
 
             t_roll -= t_entry.WeightOrOne;
-            if (t_roll < 0) return t_entry.cards;
+            if (t_roll < 0) return new List<int>(t_entry.cardIds);
         }
 
         return null;
@@ -78,9 +79,10 @@ public class AIDeckConfig : ScriptableObject
 
     static bool HasValidCards(DeckEntry _entry)
     {
-        if (_entry?.cards == null || _entry.cards.Count != DeckSaveManager.DECK_SIZE) return false;
-        foreach (CardData t_card in _entry.cards)
-            if (t_card == null) return false;
+        if (_entry?.cardIds == null || _entry.cardIds.Count != DeckSaveManager.DECK_SIZE) return false;
+        foreach (int t_cardId in _entry.cardIds)
+            if (t_cardId <= 0) return false;
         return true;
     }
+
 }

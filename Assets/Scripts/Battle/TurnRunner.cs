@@ -39,10 +39,10 @@ public class TurnRunner : MonoBehaviour
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
 
     // 보상을 만든 생존 카드 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
-    List<CardData> lastSurvivorCards;
+    List<int> lastSurvivorCards;
 
     // 이번 판에 잃은 카드 스냅샷. 보상에는 관여하지 않고 결과 화면의 분모("몇 장 중")만 만든다.
-    List<CardData> lastFallenCards;
+    List<int> lastFallenCards;
 
     // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
     CancellationToken destroyCt;
@@ -169,7 +169,8 @@ public class TurnRunner : MonoBehaviour
             await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, _won, this.lastSurvivorCards, this.lastFallenCards);
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won,
+            this.lastSurvivorCards, this.lastFallenCards);
     }
 
 #if UNITY_EDITOR
@@ -200,8 +201,8 @@ public class TurnRunner : MonoBehaviour
     async UniTaskVoid PreviewResult(bool _won)
     {
         var t_reward = RewardService.CalculateReward(_won, s_previewSurvivors);
-        List<CardData> t_cards  = BuildPreviewCards(s_previewSurvivors);
-        List<CardData> t_fallen = BuildPreviewFallen(t_cards);
+        List<int> t_cards  = BuildPreviewCards(s_previewSurvivors);
+        List<int> t_fallen = BuildPreviewFallen(t_cards);
 
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
@@ -210,9 +211,9 @@ public class TurnRunner : MonoBehaviour
 
     // 미리보기 전사 목록: 덱에서 생존 목록에 없는 카드를 담는다. 장수로 자르면 같은 카드가
     // 산 채로도 죽은 채로도 한 줄에 서서, 실제 전투에서는 나올 수 없는 그림으로 연출을 튜닝하게 된다.
-    List<CardData> BuildPreviewFallen(List<CardData> _survivors)
+    List<int> BuildPreviewFallen(List<int> _survivors)
     {
-        var t_cards = new List<CardData>();
+        var t_cards = new List<int>();
         var t_deck  = DeckConfig.PlayerDeck;
         if (t_deck == null) return t_cards;
 
@@ -223,9 +224,9 @@ public class TurnRunner : MonoBehaviour
     }
 
     // 실제 생존 카드 → 플레이어 덱 → 빈 자리 순으로 채운다. 마지막 폴백은 카드 없는 타일 경로까지 함께 검증한다.
-    List<CardData> BuildPreviewCards(int _count)
+    List<int> BuildPreviewCards(int _count)
     {
-        var t_cards = new List<CardData>(_count);
+        var t_cards = new List<int>(_count);
 
         List<CardInstance> t_active = this.playerField != null ? this.playerField.GetActiveCards() : null;
         var t_deck = DeckConfig.PlayerDeck;
@@ -233,11 +234,11 @@ public class TurnRunner : MonoBehaviour
         for (int t_i = 0; t_i < _count; t_i++)
         {
             if (t_active != null && t_i < t_active.Count)
-                t_cards.Add(t_active[t_i]?.data);
+                t_cards.Add(t_active[t_i]?.cardId ?? 0);
             else if (t_deck != null && t_i < t_deck.Count)
                 t_cards.Add(t_deck[t_i]);
             else
-                t_cards.Add(null);
+                t_cards.Add(0);
         }
 
         return t_cards;
@@ -455,7 +456,7 @@ public class TurnRunner : MonoBehaviour
             return;
         }
 
-        FoldInt(ref _hash, _card.data != null ? _card.data.id : -1);
+        FoldInt(ref _hash, _card.cardId);
         FoldInt(ref _hash, _card.maxHp);
         FoldInt(ref _hash, _card.hp);
         FoldInt(ref _hash, _card.bonusHp);
@@ -509,7 +510,7 @@ public class TurnRunner : MonoBehaviour
         this.lastSurvivorCards = CollectSurvivorCards(t_active);
 
         // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
-        this.lastFallenCards = new List<CardData>(this.playerField.FallenCards);
+        this.lastFallenCards = new List<int>(this.playerField.FallenCards);
 
         // 토너먼트 전투는 전투 보상도 랭크도 없다 — 정점의 상은 맵에서 받는 그 보상 하나뿐이다.
         // (전투 골드까지 주면 클리어 정점 재도전이 그대로 파밍이 되고, 상이 둘로 갈려 무엇을 받았는지도 흐려진다.)
@@ -543,15 +544,15 @@ public class TurnRunner : MonoBehaviour
 
     // 슬롯 → 대기 순. 데이터가 빈 카드도 자리를 지킨다 — 빼면 보상 계단의 분모가 카드 수와 어긋난다.
     // 그리는 일(진화 아트·프레임)은 넘겨받은 쪽(SurvivorGoldFlight → CardVisualView)이 한다.
-    List<CardData> CollectSurvivorCards(List<CardInstance> _active)
+    List<int> CollectSurvivorCards(List<CardInstance> _active)
     {
-        var t_cards = new List<CardData>(_active.Count + this.playerField.WaitingCount);
+        var t_cards = new List<int>(_active.Count + this.playerField.WaitingCount);
 
         for (int t_i = 0; t_i < _active.Count; t_i++)
-            t_cards.Add(_active[t_i]?.data);
+            t_cards.Add(_active[t_i]?.cardId ?? 0);
 
         foreach (CardInstance t_card in this.playerField.GetWaitingCards())
-            t_cards.Add(t_card?.data);
+            t_cards.Add(t_card?.cardId ?? 0);
 
         return t_cards;
     }

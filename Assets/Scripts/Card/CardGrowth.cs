@@ -39,7 +39,7 @@ public readonly struct CardGrowth
 
     /// <summary>이 레벨에서 **실제로 켜져 있는** 카드 키워드. 기본 키워드에 더하는 값이 아니라 **대체하는** 값이다 —
     /// 키워드는 해금 레벨 전까지 아예 없는 것으로 친다. 소비측은 <see cref="Applied"/>가 true일 때만 이 값을 쓰고,
-    /// 미주입(default)이면 CardData.keywords를 그대로 써야 한다(AI·원격 미러의 기존 동작 보존).</summary>
+    /// 미주입(default)이면 카드 스펙 keywords를 그대로 써야 한다(AI·원격 미러의 기존 동작 보존).</summary>
     public readonly CardKeyword UnlockedKeywords;
 
     /// <summary>성장원이 실제로 주입됐는가. default(Level 0)는 "성장 미적용"이고 <see cref="Fresh"/>(Level 1)는

@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 
-// 덱(CardData 목록)의 순수함수로 SynergyState를 1회 산출한다.
+// 카드 ID 덱의 순수함수로 SynergyState를 1회 산출한다.
 // 결정론: Dictionary 순회 tie-break 없이, 입력(덱) 등장 순서로 결정. UnityEngine.Random 금지.
 public static class SynergyResolver
 {
-    public static SynergyState Resolve(IEnumerable<CardData> deckCards)
+    public static SynergyState Resolve(IEnumerable<int> deckCards)
     {
         if (deckCards == null) return SynergyState.Empty;
 
@@ -14,8 +14,8 @@ public static class SynergyResolver
 
         foreach (var t_card in deckCards)
         {
-            if (t_card == null) continue;
-            IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(t_card);
+            if (!CardCatalog.Contains(t_card)) continue;
+            IReadOnlyList<SynergyData> t_synergies = CardCatalog.RequireSynergies(t_card);
 
             // 한 카드는 같은 시너지를 중복 나열해도 1회만 카운트(Distinct).
             // 배열 등장 순서로 순회 → 결정론 유지(HashSet은 중복 판정용, 순회 순서엔 미개입).

@@ -42,7 +42,7 @@ public class PackResultGrid : MonoBehaviour
 
     // 상세에서 좌우로 넘겨볼 목록 = 격자에 놓인 카드들, 놓인 순서 그대로. 상세 오버레이가 이것을 **참조**로 쥐므로
     // 인스턴스를 갈아치우지 않고 Clear + 재충전만 한다(CardDetailOverlayView.BindTile 주석과 같은 규약).
-    readonly List<CardData> m_order = new List<CardData>();
+    readonly List<int> m_order = new List<int>();
 
     CanvasGroup m_panel;
 
@@ -102,7 +102,7 @@ public class PackResultGrid : MonoBehaviour
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
             var t_drawn = _cards[t_i];
-            if (t_drawn.Card == null) continue;
+            if (t_drawn.CardId <= 0) continue;
 
             var t_view = Instantiate(cardPrefab, t_parent);
             t_view.Bind(t_drawn);
@@ -114,7 +114,7 @@ public class PackResultGrid : MonoBehaviour
 
             int t_index = m_views.Count;
             m_views.Add(t_view);
-            m_order.Add(t_drawn.Card);
+            m_order.Add(t_drawn.CardId);
             CardDetailOverlayView.BindTile(t_view.Visual, m_order, t_index, t_detailOptions);
             AllowSloppyTap(t_view.Visual);
 
@@ -185,7 +185,7 @@ public class PackResultGrid : MonoBehaviour
 
         int t_count = 0;
         for (int t_i = 0; t_i < _cards.Count; t_i++)
-            if (_cards[t_i].Card != null) t_count++;
+            if (_cards[t_i].CardId > 0) t_count++;
 
         return t_count;
     }

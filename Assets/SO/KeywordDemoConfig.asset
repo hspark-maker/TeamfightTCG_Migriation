@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 094a9f30f4831f647ba24d1cac7330d6, type: 3}
   m_Name: KeywordDemoConfig
   m_EditorClassIdentifier: Assembly-CSharp::KeywordDemoConfig
-  defaultOpponent: {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-  defaultNeighbor: {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
+  defaultOpponentId: 6
+  defaultNeighborId: 28
   entries: []

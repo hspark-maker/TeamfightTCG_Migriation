@@ -235,11 +235,11 @@ public static class OutgameTutorialRunner
     }
 
     // 이번 스텝이 자동 편성으로 채울 카드를 지정했으면 true(미지정이면 일반 편성 규칙)
-    public static bool TryGetForcedDeck(out IReadOnlyList<CardData> _cards)
+    public static bool TryGetForcedDeck(out IReadOnlyList<int> _cardIds)
     {
-        _cards = null;
+        _cardIds = null;
 
-        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedDeck(out _cards);
+        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedDeck(out _cardIds);
     }
 
     /// <summary>덱 편집을 열 때 빼 둘 카드 — 지금 좌표부터 같은 챕터 앞쪽에서 첫 <see cref="EOutgameTutorialAction.WaitDeckEquip"/>가
@@ -249,9 +249,9 @@ public static class OutgameTutorialRunner
     /// 패널이 다 세워진 <b>뒤에야</b> 좌표가 장착 스텝으로 넘어간다. 현재 스텝만 보면 그 순간엔 아직 이전 스텝이라
     /// 빈 칸 없이 6/6으로 열리고, 끼울 자리가 없어 그 자리에서 영영 멈춘다.
     /// 앞을 보면 어느 쪽 좌표에서 물어도 같은 답이 나온다(되감기로 다시 흘러도 멱등).</summary>
-    public static bool TryGetPendingEquipCard(out CardData _card)
+    public static bool TryGetPendingEquipCard(out int _cardId)
     {
-        _card = null;
+        _cardId = 0;
         if (!IsRunning) return false;
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
@@ -264,8 +264,8 @@ public static class OutgameTutorialRunner
             if (t_def.Action == EOutgameTutorialAction.BattleStart) return false;
             if (t_def.Action != EOutgameTutorialAction.WaitDeckEquip) continue;
 
-            _card = t_def.AnchorCard;
-            return _card != null;
+            _cardId = t_def.AnchorCardId;
+            return _cardId > 0;
         }
 
         return false;

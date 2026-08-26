@@ -113,8 +113,8 @@ public class GameResultPopup : MonoBehaviour
     /// 보상에도 골드 가산의 분모에도 관여하지 않는다. 오직 "몇 장 중"을 보여주는 몫이다.
     /// </summary>
     public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true,
-                     IReadOnlyList<CardData> _survivorCards = null,
-                     IReadOnlyList<CardData> _fallenCards = null)
+                     IReadOnlyList<int> _survivorCards = null,
+                     IReadOnlyList<int> _fallenCards = null)
     {
         gameObject.SetActive(true);
 
@@ -125,8 +125,8 @@ public class GameResultPopup : MonoBehaviour
         long t_gold = _reward.HasAmount ? _reward.Amount : 0;
 
         // 패배 보상은 카드와 무관한 고정액이라 카드 축을 세우지 않는다(줄이 없으면 전사자도 세울 자리가 없다).
-        IReadOnlyList<CardData> t_cards  = _won ? _survivorCards : null;
-        IReadOnlyList<CardData> t_fallen = _won ? _fallenCards   : null;
+        IReadOnlyList<int> t_cards  = _won ? _survivorCards : null;
+        IReadOnlyList<int> t_fallen = _won ? _fallenCards   : null;
 
         // 카드가 0장이면 값을 실어 나를 것이 없다 — 0에서 출발시키면 어디서 왔는지 모를 숫자가 혼자 오른다.
         bool t_goldWillRoll = _won && t_gold != 0 && (t_cards == null || t_cards.Count > 0);
@@ -196,7 +196,7 @@ public class GameResultPopup : MonoBehaviour
     // 살아남은 카드가 한 박에 통째로 골드로 빨려들며 그만큼 수치가 오른다.
     // 카드 축이 설 수 없으면(_cards == null) 예전 코인 분출로 폴백한다 — 값만 툭 뜨는 것보다 낫다.
     // _cardsFlew는 호출자가 랭크 줄을 뒤로 미룰지 판단하는 데 쓴다.
-    Sequence BuildGoldLine(bool _animate, IReadOnlyList<CardData> _cards, IReadOnlyList<CardData> _fallen,
+    Sequence BuildGoldLine(bool _animate, IReadOnlyList<int> _cards, IReadOnlyList<int> _fallen,
                            out bool _cardsFlew)
     {
         _cardsFlew = false;
@@ -272,7 +272,7 @@ public class GameResultPopup : MonoBehaviour
 
     // 연출 시작 상태로 되돌린다(재진입 대비).
     void ResetVisual(long _gold, long _rankDelta, bool _animate, bool _goldWillRoll,
-                     IReadOnlyList<CardData> _survivorCards, IReadOnlyList<CardData> _fallenCards)
+                     IReadOnlyList<int> _survivorCards, IReadOnlyList<int> _fallenCards)
     {
         if (this.banner != null) this.banner.HideImmediate();
         else if (this.panel != null) this.panel.localScale = Vector3.zero;

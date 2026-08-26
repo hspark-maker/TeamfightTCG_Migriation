@@ -159,7 +159,7 @@ public static class CardArtCache
                     Debug.LogError($"[CardArtCache] 기본 카드 아트 주소 없음: {t_baseAddress}");
                 }
 
-                for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+                for (int t_stage = 0; t_stage <= CardSpec.MaxEvolutionStage; t_stage++)
                 {
                     string t_address = AddressOf(t_spec, t_stage);
                     if (s_addresses.Contains(t_address)) t_wanted.Add(t_address);

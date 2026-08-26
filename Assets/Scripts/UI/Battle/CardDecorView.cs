@@ -262,10 +262,10 @@ public class CardDecorView
     {
         if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return new List<SynergyData>();
         if (!TutorialConfig.SynergyVisible)                                   return new List<SynergyData>();
-        if (_card == null || _card.data == null || !_card.isRevealed)         return new List<SynergyData>();
+        if (_card == null || !CardCatalog.Contains(_card.cardId) || !_card.isRevealed) return new List<SynergyData>();
         if (!_card.synergyEnabled)                                            return new List<SynergyData>();
 
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(CardCatalog.SynergiesOf(_card.data), _synergy, this.synergyMaxBadges);
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card.cardId), _synergy, this.synergyMaxBadges);
         t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
         return t_tags;
     }

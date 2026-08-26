@@ -112,7 +112,7 @@ public static class BattleVfx
     }
 
     /// <summary>라이브러리를 거치지 않고 **프리팹을 직접** 빌려 쓰는 스폰. 카드마다 다른 연출처럼
-    /// 배선 지점이 CardData 쪽인 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
+    /// 카드 데이터에 별도 배선된 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
     /// 풀·정렬 규약은 Spawn과 동일하고, 수명은 호출부가 쥔다.</summary>
     public static VfxHandle SpawnPrefab(GameObject _prefab, Vector3 _pos, int _sortingLayerId, int _sortingOrder = 30)
     {

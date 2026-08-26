@@ -62,12 +62,12 @@ public static class DeckImages
     // 덱 첫 카드의 아트 → 없으면 null.
     // 폴백을 CardVisualRules에 맡기는 건 여기서 카드 아트를 직접 적으면
     // 같은 카드가 덱 목록에서만 다른 그림으로 뜨는 드리프트가 생기기 때문이다.
-    static Sprite ResolveFromFirstCard(List<CardData> _deck)
+    static Sprite ResolveFromFirstCard(List<int> _deck)
     {
         if (_deck == null || _deck.Count == 0) return null;
 
         var t_first = _deck[0];
-        if (t_first == null) return null;
+        if (t_first <= 0) return null;
 
         return CardVisualRules.PickCardArt(t_first);
     }

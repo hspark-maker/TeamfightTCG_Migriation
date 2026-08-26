@@ -140,13 +140,13 @@ public static class OutgameTutorialRewind
                 // 보상 카드도 순수 세이브 작업이다 — 부트 중에는 연출을 세울 무대가 없으니 소유권만 준다.
                 if (t_row.Action == EOutgameTutorialAction.CardGrant)
                 {
-                    if (t_row.Card != null && OwnershipManager.Grant(CardCatalog.IdOf(t_row.Card))) t_cards++;
+                    if (t_row.CardId > 0 && OwnershipManager.Grant(t_row.CardId)) t_cards++;
                     continue;
                 }
 
                 if (t_row.Action == EOutgameTutorialAction.CardSetGrant)
                 {
-                    t_cards += GrantCardSet(t_row.Cards);
+                    t_cards += GrantCardSet(t_row.CardIds);
                     continue;
                 }
 
@@ -162,17 +162,9 @@ public static class OutgameTutorialRewind
         Debug.Log($"[TutorialRewind] 좌표 {t_chapter}-{t_step}까지 지급 재생 — 덱 스텝 {t_decks}개 / 팩 풀 카드 {t_cards}장 · 소유 {OwnershipManager.OwnedCount}장");
     }
 
-    static int GrantCardSet(IReadOnlyList<CardData> _cards)
+    static int GrantCardSet(IReadOnlyList<int> _cardIds)
     {
-        if (_cards == null || _cards.Count == 0) return 0;
-
-        var t_ids = new List<int>(_cards.Count);
-        for (int t_i = 0; t_i < _cards.Count; t_i++)
-        {
-            if (_cards[t_i] != null) t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
-        }
-
-        return OwnershipManager.GrantAll(t_ids);
+        return _cardIds == null ? 0 : OwnershipManager.GrantAll(_cardIds);
     }
 
     static int GrantPackPool(CardPackData _pack)
@@ -180,12 +172,6 @@ public static class OutgameTutorialRewind
         var t_pool = _pack.Pool;
         if (t_pool == null || t_pool.Count == 0) return 0;
 
-        var t_ids = new List<int>(t_pool.Count);
-        for (int t_i = 0; t_i < t_pool.Count; t_i++)
-        {
-            if (t_pool[t_i] != null) t_ids.Add(CardCatalog.IdOf(t_pool[t_i]));
-        }
-
-        return OwnershipManager.GrantAll(t_ids);
+        return OwnershipManager.GrantAll(t_pool);
     }
 }

@@ -12,7 +12,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
 {
     public static MultiplayerTurnRunner Instance { get; private set; }
 
-    [SerializeField] CardRegistry    cardRegistry;
     [SerializeField] BattleField     playerField;
     [SerializeField] BattleField     enemyField;
     [SerializeField] BattleFieldView playerFieldView;
@@ -76,7 +75,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.enemySpawnBuffer.Clear();
         this.localGrowthByCardId.Clear();
         this.matchGrowthSource = null;
-        this.cardRegistry?.Initialize();
         TrySetOwnerIndexFromRunner();
     }
 
@@ -91,14 +89,14 @@ public class MultiplayerTurnRunner : MonoBehaviour
         return true;
     }
 
-    public void SetLocalGrowthProfiles(IReadOnlyList<CardData> _cards, IReadOnlyList<CardGrowth> _growth)
+    public void SetLocalGrowthProfiles(IReadOnlyList<int> _cards, IReadOnlyList<CardGrowth> _growth)
     {
         this.localGrowthByCardId.Clear();
         if (_cards == null || _growth == null || _cards.Count != _growth.Count) return;
         for (int i = 0; i < _cards.Count; i++)
         {
-            CardData t_card = _cards[i];
-            if (t_card != null) this.localGrowthByCardId[t_card.id] = _growth[i];
+            int t_cardId = _cards[i];
+            if (CardCatalog.Contains(t_cardId)) this.localGrowthByCardId[t_cardId] = _growth[i];
         }
     }
 
@@ -143,15 +141,14 @@ public class MultiplayerTurnRunner : MonoBehaviour
             return;
         }
 
-        CardData t_data = this.cardRegistry?.GetData(_cardId);
-        if (t_data == null)
+        if (!CardCatalog.Contains(_cardId))
         {
             Debug.LogError($"[Net] CardSpawn 미상 카드 ID — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
             TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
             return;
         }
 
-        CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, t_data);
+        CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, _cardId);
         if (t_card == null)
         {
             Debug.LogError($"[Net] CardSpawn 미러 배치 실패 — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
@@ -185,14 +182,13 @@ public class MultiplayerTurnRunner : MonoBehaviour
                     $"InitialDeck 중복 카드 ID — index={i}, id={_cardIds[i]}");
                 return;
             }
-            CardData t_card = this.cardRegistry?.GetData(_cardIds[i]);
-            if (t_card == null)
+            if (!CardCatalog.Contains(_cardIds[i]))
             {
                 AbortInitialDeck(EMatchEndReason.Desync,
                     $"InitialDeck 미상 카드 ID — index={i}, id={_cardIds[i]}");
                 return;
             }
-            if (!MatchGrowthValidation.IsValid(t_card, _growth[i], out string t_error))
+            if (!MatchGrowthValidation.IsValid(_cardIds[i], _growth[i], out string t_error))
             {
                 AbortInitialDeck(EMatchEndReason.Desync,
                     $"InitialDeck 성장값 오류 — index={i}, id={_cardIds[i]}, {t_error}");
@@ -224,7 +220,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
                 return;
             }
 
-            this.enemyField?.InitializeFromRemote(_cardIds, _growth, _opponent.OwnerIndex, this.cardRegistry);
+            this.enemyField?.InitializeFromRemote(_cardIds, _growth, _opponent.OwnerIndex);
             this.enemyDeckReceived = true;
             this.initSyncTcs?.TrySetResult();
         }
@@ -287,7 +283,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         SubscribeInitAbort();
         try
         {
-            int[] t_myIds = this.playerField?.GetShuffledIds(this.cardRegistry);
+            int[] t_myIds = this.playerField?.GetShuffledIds();
             if (t_myIds == null) t_myIds = System.Array.Empty<int>();
             if (!TryBuildGrowthForIds(t_myIds, out CardGrowth[] t_myGrowth))
             {
@@ -589,7 +585,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         if (_placed == null) return;
         foreach (CardInstance t_card in _placed)
         {
-            int t_id = this.cardRegistry?.GetId(t_card?.data) ?? -1;
+            int t_id = t_card?.cardId ?? -1;
             NetworkGameController.Instance?.SendCardSpawn(t_card.slotIndex, t_id, this.MyOwnerIndex);
         }
     }

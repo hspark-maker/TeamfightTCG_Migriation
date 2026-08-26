@@ -56,15 +56,15 @@ public static class PackSpec
         {
             if (ParseGrade(t_row.minGrade) != t_best) continue;
             t_selectedRowCount++;
-            if (!CardCatalog.TryGet(t_row.cardId, out CardData t_card)) continue;
+            if (!CardCatalog.Contains(t_row.cardId)) continue;
 
-            t_result.Add(new WeightedCard { card = t_card, weight = Mathf.Max(1, t_row.weight) });
+            t_result.Add(new WeightedCard { cardId = t_row.cardId, weight = Mathf.Max(1, t_row.weight) });
         }
 
         if (t_result.Count != t_selectedRowCount && !s_warnedUnresolvedDrops)
         {
             s_warnedUnresolvedDrops = true;
-            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 CardRegistry/CardPackDrop을 맞춰야 한다.");
+            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 Card/CardPackDrop 표를 맞춰야 한다.");
         }
         return t_result;
     }

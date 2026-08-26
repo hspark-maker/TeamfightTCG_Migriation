@@ -131,7 +131,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
     /// <summary>카드 한 장을 띄운다. _onAcquire는 [획득]을 누른 <b>즉시</b> 불린다 —
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출과 겹쳐 걷힌다).</summary>
-    public void Show(string _title, CardData _card, Action _onAcquire)
+    public void Show(string _title, int _cardId, Action _onAcquire)
     {
         this.m_onAcquire = _onAcquire;
 
@@ -141,7 +141,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
         if (this.titleText != null) this.titleText.text = _title;
 
         // 보상으로 주는 카드는 언제나 새 카드로 세운다 — 중복 표식(탈채도·환급 칩)이 설 자리가 아니다.
-        if (this.cardView != null) this.cardView.Bind(new DrawnCard(_card, true));
+        if (this.cardView != null) this.cardView.Bind(new DrawnCard(_cardId, true));
 
         if (this.acquireButton != null)
         {

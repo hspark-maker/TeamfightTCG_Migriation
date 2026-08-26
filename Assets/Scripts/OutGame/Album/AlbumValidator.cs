@@ -37,16 +37,13 @@ internal static class AlbumValidator
                 if (CardAlbum.TotalCountOf(t_page) == 0)
                     Debug.LogWarning($"[CardAlbum] 카드 0장 페이지 '{t_theme.Key}/{t_page.Key}' — 영구 미완성이다.");
 
-                foreach (var t_card in t_page.Cards)
+                foreach (int t_id in t_page.CardIds)
                 {
-                    if (t_card == null) continue;
-
-                    int t_id = CardCatalog.IdOf(t_card);
                     // 미부여 id는 전부 0이라 중복·미존재 진단이 오염된다 — 카드명으로 따로 보고
                     if (t_id <= 0)
                     {
                         t_unassigned++;
-                        Debug.LogError($"[CardAlbum] id 미부여 카드 '{t_card.name}' (페이지 '{t_theme.Key}/{t_page.Key}') — 소유 불가라 페이지가 영구 미완성이다.");
+                        Debug.LogError($"[CardAlbum] id 미부여 카드 {t_id} (페이지 '{t_theme.Key}/{t_page.Key}') — 소유 불가라 페이지가 영구 미완성이다.");
                         continue;
                     }
                     if (!t_placed.Add(t_id)) t_dupCards.Add(t_id);
@@ -60,9 +57,8 @@ internal static class AlbumValidator
             Debug.LogWarning($"[CardAlbum] 카드 중복 배치 {t_dupCards.Count}건: {string.Join(", ", t_dupCards)}");
 
         var t_missing = new List<int>();
-        foreach (var t_card in CardCatalog.All)
+        foreach (int t_id in CardCatalog.AllIds)
         {
-            var t_id = CardCatalog.IdOf(t_card);
             if (t_id > 0 && !t_placed.Contains(t_id)) t_missing.Add(t_id);
         }
         var t_notInCatalog = new List<int>();

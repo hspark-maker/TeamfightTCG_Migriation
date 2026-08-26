@@ -124,7 +124,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         for (int t_i = t_count - 1; t_i >= 0; t_i--)
         {
             var t_drawn = _cards[t_i];
-            if (t_drawn.Card == null) continue;
+            if (t_drawn.CardId <= 0) continue;
 
             var t_view = Instantiate(cardPrefab, cardLayer);
             t_view.Bind(t_drawn);

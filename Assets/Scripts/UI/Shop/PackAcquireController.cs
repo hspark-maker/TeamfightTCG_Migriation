@@ -67,7 +67,7 @@ public class PackAcquireController : MonoBehaviour
 
     // 이번 개봉에서 처음 얻은 카드만(로비 도감 연출 대상). Consume은 1회뿐이라 여기 캐시한다.
     // 중복은 팩 결제 재화로 환급돼 코인 연출로 나가므로 도감 연출거리가 없다.
-    readonly List<CardData> m_newCards = new List<CardData>();
+    readonly List<int> m_newCards = new List<int>();
     // 이번 개봉의 중복 환급 합계(연출 표시용). 카드와 같은 시점에 캐시해야 짝이 갈라지지 않는다.
     CurrencyGain m_refund;
 
@@ -168,8 +168,8 @@ public class PackAcquireController : MonoBehaviour
 
         for (int t_i = 0; t_i < t_drawn.Count; t_i++)
         {
-            var t_card = t_drawn[t_i].Card;
-            if (t_card == null || !t_drawn[t_i].IsNew) continue;
+            int t_card = t_drawn[t_i].CardId;
+            if (t_card <= 0 || !t_drawn[t_i].IsNew) continue;
 
             m_newCards.Add(t_card);
         }

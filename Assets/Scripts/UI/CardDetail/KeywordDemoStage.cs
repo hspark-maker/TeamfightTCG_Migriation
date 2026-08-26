@@ -111,9 +111,9 @@ public class KeywordDemoStage : SingletonOverlayBase
 
     /// <summary>_card가 _keyword를 쓰는 모습을 반복 재생하고, 그 그림이 담긴 텍스처를 돌려준다.
     /// 세울 수 없으면 null — 부른 쪽은 띠를 끄고 글자만 보여주면 된다.</summary>
-    public Texture Begin(CardData _card, CardKeyword _keyword)
+    public Texture Begin(int _card, CardKeyword _keyword)
     {
-        if (_card == null || this.demoCamera == null || this.slotAttacker == null) return null;
+        if (_card <= 0 || this.demoCamera == null || this.slotAttacker == null) return null;
 
         Stop();
 
@@ -181,13 +181,13 @@ public class KeywordDemoStage : SingletonOverlayBase
     // 카드를 세운다. 앞자리는 언제나 그 카드, 나머지는 저작(KeywordDemoConfig)이 정한다.
     // 진영은 대본마다 갈린다 — 회복은 적에게 쏘지 않고, 도발은 아군을 대신 맞아주는 것이라
     // 곁자리가 적이면 "누구를 지켰나"가 성립하지 않는다.
-    bool BindRoles(CardData _card, CardKeyword _keyword)
+    bool BindRoles(int _card, CardKeyword _keyword)
     {
-        CardData t_opponent = null;
-        CardData t_neighbor = null;
+        int t_opponent = 0;
+        int t_neighbor = 0;
         this.config?.Roles(_keyword, out t_opponent, out t_neighbor);
 
-        if (t_opponent == null)
+        if (t_opponent <= 0)
         {
             Debug.LogWarning($"[KeywordDemoStage] {_keyword} 데모의 상대 카드가 저작되지 않았습니다(KeywordDemoConfig 확인).");
             return false;
@@ -209,14 +209,14 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         if (this.slotNeighbor != null)
         {
-            this.slotNeighbor.gameObject.SetActive(t_useNeighbor && t_neighbor != null);
-            if (t_useNeighbor && t_neighbor != null) Render(this.slotNeighbor, t_neighbor, t_neighborOwner, 2);
+            this.slotNeighbor.gameObject.SetActive(t_useNeighbor && t_neighbor > 0);
+            if (t_useNeighbor && t_neighbor > 0) Render(this.slotNeighbor, t_neighbor, t_neighborOwner, 2);
         }
 
         return true;
     }
 
-    static void Render(CardView _view, CardData _data, int _owner, int _slot)
+    static void Render(CardView _view, int _data, int _owner, int _slot)
     {
         if (_view == null) return;
 
@@ -294,15 +294,11 @@ public class KeywordDemoStage : SingletonOverlayBase
     {
         if (_token.IsCancellationRequested) return UniTask.CompletedTask;
 
-        AttackEffect t_effect = CardCatalog.AttackEffectOf(_atk.BoundCard?.data);
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_atk.BoundCard);
-
-        // 무장 이펙트는 무장(탭) 단계에서 켜진다. 여기엔 그 단계가 없어 대신 켜준다(AttackAnimTester와 같은 이유).
-        _atk.SetArmedVfx(true);
 
         CardView t_splashView = _splash != null && _splash.gameObject.activeSelf ? _splash : null;
 
-        return AttackSequence.PlaySplash(_atk, _def, t_effect,
+        return AttackSequence.PlaySplash(_atk, _def,
                                          _onEffect: null, _splashView: t_splashView,
                                          _preEffectKw: t_preKw, _atEffectKw: t_atKw,
                                          _forceSpecial: false);

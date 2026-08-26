@@ -18,9 +18,7 @@ public sealed class AlbumTheme : AlbumSection
 
     public IReadOnlyList<AlbumPage> Pages { get; }
 
-    // 테마 전체 카드 평탄화(null 슬롯 제외) — 페이지의 Cards와 달리 빈 칸이 없다
-    public IReadOnlyList<CardData> Cards { get; }
-
+    // 테마 전체 카드 ID 평탄화(0 슬롯 제외) — 페이지의 CardIds와 달리 빈 칸이 없다
     internal AlbumTheme(
         string _key,
         string _displayName,
@@ -30,7 +28,6 @@ public sealed class AlbumTheme : AlbumSection
         GameObject _cellPrefab,
         IReadOnlyList<AlbumRewardDef> _rewards,
         IReadOnlyList<AlbumPage> _pages,
-        IReadOnlyList<CardData> _cards,
         IReadOnlyList<int> _cardIds,
         bool _hasStableKey)
         : base(_key, _rewards, _cardIds, _hasStableKey ? "t:" + _key : null)
@@ -41,6 +38,5 @@ public sealed class AlbumTheme : AlbumSection
         NamePlate = _namePlate;
         CellPrefab = _cellPrefab;
         Pages = _pages;
-        Cards = _cards;
     }
 }

@@ -33,7 +33,7 @@ public abstract class CardPassive : BattleEffect
 
         UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
         {
-            portrait       = _iconOverride != null ? _iconOverride : CardVisualRules.PickCardArt(_self.data),
+            portrait       = _iconOverride != null ? _iconOverride : CardVisualRules.PickCardArt(_self.cardId, _self.evolutionStage),
             preserveAspect = _iconOverride != null,   // 아이콘은 정사각이라 늘리면 찌그러짐
             cardName       = _self.spec.DisplayName,
             effectLabel    = _effectLabel,

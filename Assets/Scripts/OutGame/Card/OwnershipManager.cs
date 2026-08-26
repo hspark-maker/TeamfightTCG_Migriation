@@ -84,8 +84,6 @@ public static class OwnershipManager
         return s_owned.Contains(_id);
     }
 
-    public static bool IsOwned(CardData _card) => IsOwned(CardCatalog.IdOf(_card));
-
     // 카드 1장 지급 — 신규 지급이면 true
     public static bool Grant(int _id)
     {
@@ -125,10 +123,7 @@ public static class OwnershipManager
         }
 
         var t_ids = new List<int>(CardCatalog.Count);
-        foreach (var t_card in CardCatalog.All)
-        {
-            t_ids.Add(CardCatalog.IdOf(t_card));
-        }
+        foreach (int t_cardId in CardCatalog.AllIds) t_ids.Add(t_cardId);
 
         return GrantAll(t_ids);
     }

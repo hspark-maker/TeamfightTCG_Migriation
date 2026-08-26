@@ -181,7 +181,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (!TournamentProgress.TryGetNode(_nodeIndex, out TournamentNodeDef t_node)) return;
 
         // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
-        if (t_node.enemyDeck == null || t_node.enemyDeck.Count == 0)
+        if (t_node.enemyDeckIds == null || t_node.enemyDeckIds.Count == 0)
         {
             Debug.LogWarning($"[LobbyMatchLauncher] 토너먼트 정점 '{t_node.nodeId}'에 상대 덱이 없어 진입을 막는다 — 저작 검증 필요.");
             return;
@@ -198,7 +198,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (!TournamentRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
 
         var t_preset = new MatchOpponent(
-            MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.enemyDeck);
+            MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.EnemyDeckIds);
 
         RunEntryAsync(t_preset).Forget();
     }
@@ -361,7 +361,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         DeckConfig.SetEnemyDeck(aiDeckConfig != null
             ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex)
-            : new List<CardData>());
+            : new List<int>());
     }
 
     void ApplyPlayLock()

@@ -37,7 +37,7 @@ public class CardPackData : ScriptableObject
     [Header("드로우 풀 (폴백 — 평소엔 시트 CardPackDrop이 이긴다)")]
     [Tooltip("시트를 못 읽거나 이 packId가 시트에 없을 때만 쓰이는 카드셋. 균등 확률로 drawCount회 뽑는다. "
            + "확률 조정은 여기가 아니라 CardPackDrop 시트의 weight로 한다.")]
-    [SerializeField] List<CardData> pool = new List<CardData>();
+    [SerializeField, CardId] List<int> poolIds = new List<int>();
 
     [Header("랭크별 풀 오버라이드 (폴백)")]
     [Tooltip("위 pool과 같은 폴백 축. 랭크별 큐레이션도 시트에서 minGrade 행으로 저작한다.")]
@@ -94,17 +94,19 @@ public class CardPackData : ScriptableObject
     public int PoolCount => Pool.Count;
 
     // 가중치를 벗긴 카드 목록. 랭크는 현재 등급으로 해석한다 — 추첨(ResolvePool)과 다른 목록을 보여주지 않기 위해서다.
-    public IReadOnlyList<CardData> Pool
+    public IReadOnlyList<int> Pool
     {
         get
         {
             IReadOnlyList<WeightedCard> t_weighted = ResolvePool(RankManager.CurrentGrade);
             if (t_weighted.Count == 0)
-                return pool != null ? pool : (IReadOnlyList<CardData>)System.Array.Empty<CardData>();
+            {
+                return poolIds != null ? poolIds : (IReadOnlyList<int>)System.Array.Empty<int>();
+            }
 
-            var t_result = new List<CardData>(t_weighted.Count);
+            var t_result = new List<int>(t_weighted.Count);
             for (int t_i = 0; t_i < t_weighted.Count; t_i++)
-                if (t_weighted[t_i].card != null) t_result.Add(t_weighted[t_i].card);
+                if (t_weighted[t_i].cardId > 0) t_result.Add(t_weighted[t_i].cardId);
             return t_result;
         }
     }
@@ -133,10 +135,10 @@ public class CardPackData : ScriptableObject
         if (t_best != null && t_best.cards != null && t_best.cards.Count > 0)
             return t_best.cards;
 
-        int t_count = pool != null ? pool.Count : 0;
+        int t_count = poolIds != null ? poolIds.Count : 0;
         var t_fallback = new List<WeightedCard>(t_count);
         for (int t_i = 0; t_i < t_count; t_i++)
-            t_fallback.Add(new WeightedCard { card = pool[t_i], weight = 1 });
+            t_fallback.Add(new WeightedCard { cardId = poolIds[t_i], weight = 1 });
         return t_fallback;
     }
 
@@ -150,12 +152,13 @@ public class CardPackData : ScriptableObject
 [System.Serializable]
 public struct WeightedCard
 {
-    public CardData card;
+    [CardId] public int cardId;
     [Min(0)]
     [Tooltip("추첨 가중치. 0 = 미지정 → 1(균등)로 취급된다. 이 카드를 안 나오게 하려면 0이 아니라 리스트에서 삭제할 것. 예: 가중치 3은 가중치 1 카드보다 3배 잘 나온다.")]
     public int weight;
 
     public int EffectiveWeight => weight > 0 ? weight : 1;
+    public int CardId => cardId;
 }
 
 [System.Serializable]

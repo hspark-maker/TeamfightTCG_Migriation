@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: RangePack
   displayName: "\uC6D0\uAC70\uB9AC\uB371"
+  rankLocked: 0
+  minRankGrade: 0
   packArt: {fileID: 0}
   priceType: 0
   price: 0
@@ -21,11 +23,5 @@ MonoBehaviour:
   uniqueDraw: 1
   refundType: 3
   refundAmount: 0
-  pool:
-  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-  - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
-  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+  poolIds: 010000000200000014000000080000001c00000006000000
   rankPools: []

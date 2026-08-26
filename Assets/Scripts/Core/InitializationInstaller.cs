@@ -8,8 +8,7 @@ using UnityEngine.Serialization;
 [DefaultExecutionOrder(-200)]
 public class InitializationInstaller : MonoBehaviour
 {
-    // 카드 목록은 CardRegistry(SO)가 단일 진실원. 씬에 사본을 두면 카드 추가 시 한쪽만 갱신된다.
-    [SerializeField] CardRegistry cardRegistry;
+    // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 부팅 시 구성한다.
     [SerializeField] SynergyRegistry synergyRegistry;
     // 카드 앨범(신규 도감) SO. 미배선(null)이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
     [SerializeField] CardAlbumConfig albumConfig;
@@ -78,13 +77,11 @@ public class InitializationInstaller : MonoBehaviour
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
         ContentProfileConfig t_profile;
-        System.Collections.Generic.List<CardData> t_availableCards;
         try
         {
             t_profile = ContentProfileConfig.Active;
             SpecSource.Init();
-            CardCatalog.SetSource(cardRegistry.All, synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
-            t_availableCards = new System.Collections.Generic.List<CardData>(CardCatalog.All);
+            CardCatalog.SetSource(synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
         }
         catch (System.Exception t_exception)
         {
@@ -101,7 +98,6 @@ public class InitializationInstaller : MonoBehaviour
         // 지금은 전 카드를 받는다: 이관 전과 같은 "언제든 다 그려진다" 동작을 유지하기 위함이다.
         // 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다(좁히는 순간 미스 경고가 진단이 된다).
         StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
-        StartCoroutine(AttackEffectCache.Preload(CardCatalog.AllAttackEffectKeys));
 
         // UI 프리팹 라벨 로드. 시작을 여기서 거는 이유는 CardArtCache와 같다 — 시작 시점이
         // 컴포넌트 실행 순서에 끌려다니지 않게 초기화 소유자가 명시적으로 건다.
@@ -163,7 +159,6 @@ public class InitializationInstaller : MonoBehaviour
 
         // 덱 복원은 세이브의 카드 키를 CardData로 재수화하므로, 카드 마스터 목록을 먼저 넘겨야 한다.
         // 이 호출이 없으면 세이브의 덱 카드가 복원되지 않고 슬롯이 무효가 된다.
-        DeckSaveManager.SetCardRegistry(t_availableCards);
 
         // 덱 대표 이미지 후보 주입 — 신규 덱 저장 시 여기서 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);
@@ -205,7 +200,7 @@ public class InitializationInstaller : MonoBehaviour
         }
 
         GameInitialization.SetState(EGameInitState.LoadingAssets);
-        while ((!CardArtCache.IsComplete || !AttackEffectCache.IsComplete ||
+        while ((!CardArtCache.IsComplete ||
                 (!UiPrefabCache.IsComplete && !UiPrefabCache.HasFailed)) &&
                !GameInitialization.IsTerminated)
         {
@@ -215,7 +210,7 @@ public class InitializationInstaller : MonoBehaviour
         if (GameInitialization.IsTerminated)
             yield break;
 
-        if (CardArtCache.HasFailed || AttackEffectCache.HasFailed || UiPrefabCache.HasFailed)
+        if (CardArtCache.HasFailed || UiPrefabCache.HasFailed)
         {
             GameInitialization.MarkRecoveryRequired();
             yield break;
@@ -254,9 +249,9 @@ public class InitializationInstaller : MonoBehaviour
         GameInitialization.MarkReady();
     }
 
-    static int EnemyCardLevelOf(CardData _card)
+    static int EnemyCardLevelOf(int _cardId)
     {
-        if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_card);
+        if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_cardId);
 
         int t_max = CardGrowthManager.MaxLevel;
         return t_max > 0 && TournamentRun.AiCardLevel > t_max ? t_max : TournamentRun.AiCardLevel;

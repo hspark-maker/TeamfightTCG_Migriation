@@ -6,6 +6,7 @@ using UnityEngine;
 
 public static class AttackSequence
 {
+    const int PROJECTILE_SORTING_ORDER = 33;
     // ── 박치기(일반) 연출 튜닝 ──
     // 값의 진실원은 BattleTimingConfig(SO) → 인게임 설정 지점이 여기 하나다.
     // 테스트 씬(AttackAnimTester)만 런타임에 덮어써 슬라이더로 굴린다.
@@ -67,28 +68,28 @@ public static class AttackSequence
         => _cfg.approachDur *= BattleFinisher.ApproachDurationFactor;
 
     public static UniTask PlaySingle(CardView _attacker, CardView _defender,
-        AttackEffect _effect, Action _onEffect = null,
+        Action _onEffect = null,
         CardKeyword _preEffectKw = CardKeyword.None,
         CardKeyword _atEffectKw  = CardKeyword.None,
         Func<UniTask> _afterHit = null,
         bool? _forceSpecial = null)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, null, _afterHit, _forceSpecial);
+        => PlayCore(_attacker, _defender, _onEffect, _preEffectKw, _atEffectKw, null, _afterHit, _forceSpecial);
 
     public static UniTask PlaySplash(CardView _attacker, CardView _defender,
-        AttackEffect _effect, Action _onEffect = null, CardView _splashView = null,
+        Action _onEffect = null, CardView _splashView = null,
         CardKeyword _preEffectKw = CardKeyword.None,
         CardKeyword _atEffectKw  = CardKeyword.None,
         Func<UniTask> _afterHit = null,
         bool? _forceSpecial = null)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit, _forceSpecial);
+        => PlayCore(_attacker, _defender, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit, _forceSpecial);
 
     /// <summary>splashView 유무로 splash/single 자동 선택. 호출부의 if/else 제거용.
     /// _afterHit: 히트/사망 연출 완료 후·제자리 복귀 직전에 실행되는 공격후 효과 콜백.</summary>
     public static UniTask Play(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect,
+        Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw,
         Func<UniTask> _afterHit = null)
-        => PlayCore(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
+        => PlayCore(_attacker, _defender, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
 
     /// <summary>시네마 연출 대상인가. **3단계 진화 카드의 첫 공격 1회만** — 등장 컷씬으로 들어온 카드가
     /// 처음 치는 순간을 클로즈업으로 보여주고, 그 뒤로는 일반 연출(박치기)로 돌아간다.
@@ -105,7 +106,7 @@ public static class AttackSequence
     /// - 일반(PlayNormal): 자기 위치에서 적 방향으로 각도 틀고 박치기.
     /// - 특별(PlayCinema): 둘만 앞으로 떠서 카메라 시네마 1vs1. 3단계 진화 카드의 첫 공격 1회.</summary>
     static async UniTask PlayCore(CardView _attacker, CardView _defender,
-        AttackEffect _effect, Action _onEffect,
+        Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit,
         bool? _forceSpecial = null)
     {
@@ -122,25 +123,25 @@ public static class AttackSequence
         {
             if (t_special)
             {
-                await PlayCinema(_attacker, _defender, _effect, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
+                await PlayCinema(_attacker, _defender, _onEffect, _preEffectKw, _atEffectKw, _splashView, _afterHit);
                 return;
             }
 
             // 원거리(Ranged)는 붙지 않는다 — 제자리에서 투사체를 쏘고, 투사체가 닿는 시점에 히트.
             if (IsRangedAttack(_attacker))
             {
-                await PlayRanged(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+                await PlayRanged(_attacker, _defender, _splashView, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
                 return;
             }
 
             // 무쌍은 광역 대상이 실제로 있을 때만 전용 연출로 간다.
             if (IsPeerlessAttack(_attacker) && _splashView != null)
             {
-                await PlayPeerless(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+                await PlayPeerless(_attacker, _defender, _splashView, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
                 return;
             }
 
-            await PlayNormal(_attacker, _defender, _splashView, _effect, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
+            await PlayNormal(_attacker, _defender, _splashView, _onEffect, _preEffectKw, _atEffectKw, _afterHit);
         }
         finally
         {
@@ -160,19 +161,13 @@ public static class AttackSequence
     // ── 일반 연출: 박치기 ─────────────────────────────────────────────────
     // 나머지 암전, 공격자가 제자리에서 적 방향으로 기울며 돌진 → 접촉(히트) → 튕겨 복귀.
     static async UniTask PlayNormal(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+        Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
-        float t_hitDelay = _effect?.hitDelay ?? 0f;
-
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
         else                     CardView.FadeCards(1f, _attacker, _defender);
 
-        bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
-        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
-                                BattleFinisher.ApproachDurationFactor);
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -180,48 +175,65 @@ public static class AttackSequence
         // 공격자 없음(환경 피해 등): 이동/회전 없이 히트만.
         if (_attacker == null)
         {
-            await ResolveHits(null, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
+            await ResolveHits(null, _defender, _splashView, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
             CardView.RestoreAllFades();
             return;
         }
 
-        await Headbutt(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+        await Headbutt(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit,
             _home: _attacker.SlotPosition);
 
         CardView.RestoreAllFades();
     }
 
+    static async UniTask LaunchRangedProjectile(CardView _attacker, CardView _defender, float _duration)
+    {
+        if (_attacker == null || _defender == null) return;
+        if (!BattleVfx.TryGetEntry(BattleVfxId.RangedProjectile, out VfxEntry t_entry) || t_entry.prefab == null)
+            return;
+
+        bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
+        Vector3 t_offset = t_flip ? -t_entry.localOffset : t_entry.localOffset;
+        Vector3 t_start = _attacker.transform.TransformPoint(t_offset);
+        Vector3 t_end = _defender.transform.position;
+        VfxHandle t_handle = BattleVfx.SpawnPrefab(
+            t_entry.prefab,
+            t_start,
+            _attacker.VfxSortingLayerId,
+            PROJECTILE_SORTING_ORDER);
+        if (!t_handle.Valid) return;
+
+        Vector3 t_direction = t_end - t_start;
+        if (t_direction != Vector3.zero) t_handle.Go.transform.right = t_direction.normalized;
+        if (_duration > 0f)
+            await t_handle.Go.transform.DOMove(t_end, _duration).SetEase(Ease.Linear).ToUniTask();
+        t_handle.Release();
+    }
+
     // ── 원거리 연출: 제자리 발사 ─────────────────────────────────────────
     /// <summary>원거리 공격. 공격자는 슬롯에 남아 반동(뒤로 살짝 → 복귀)만 하고, 투사체가 대신 날아간다.
     /// 히트 시점은 박치기와 같은 기준인 `hitDelay` — 그래야 투사체 도착과 데미지·피격 연출이 맞는다
-    /// (LaunchProjectile의 비행 시간도 hitDelay - spawnDelay로 잡혀 있다).
+    /// 기본 투사체의 비행 시간도 같은 값을 쓴다.
     ///
     /// 데미지 적용 지점은 ResolveHits 하나로 박치기와 공유한다 — 연출이 갈라져도 규칙 타임라인은 같다.
     /// 투사체 프리팹이 미배선이면 발사만 없고 나머지는 동일하게 흐른다(무동작 안전).</summary>
     static async UniTask PlayRanged(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+        Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
         float t_approachFactor = BattleFinisher.ApproachDurationFactor;
-        // 비행 시간엔 바닥값이 있다. hitDelay가 0(또는 AttackEffect 없음)이면 투사체가 스폰된 프레임에
+        // 비행 시간엔 바닥값이 있다. 값이 0이면 투사체가 스폰된 프레임에
         // 그대로 파괴돼 아무것도 안 보인다 — 원거리는 "날아가서 맞는다"가 규칙이므로 최소 비행은 보장한다.
         // 히트 시점도 같은 값을 쓴다(투사체 도착 = 피해·피격 연출).
         // 속도 배율은 바닥값에도 같이 건다 — 바닥값만 남겨두면 배율을 올려도 짧은 비행이 거기서 걸린다.
-        float t_hitDelay = Mathf.Max((_effect?.hitDelay ?? 0f) * t_approachFactor,
-                                     GameTiming.Battle.RangedFlightMin * t_approachFactor)
+        float t_hitDelay = GameTiming.Battle.RangedFlightMin * t_approachFactor
                          / GameTiming.Battle.RangedSpeedMul;
 
         CardView.FadeAll(0.3f);
         if (_splashView != null) CardView.FadeCards(1f, _attacker, _defender, _splashView);
         else                     CardView.FadeCards(1f, _attacker, _defender);
 
-        bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
-        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
-                                BattleFinisher.ApproachDurationFactor);
-        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform,
-                         t_hitDelay, _attacker != null ? _attacker.VfxSortingLayerId : _defender.VfxSortingLayerId,
-                         t_flip, t_approachFactor).Forget();
+        LaunchRangedProjectile(_attacker, _defender, t_hitDelay).Forget();
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
@@ -234,10 +246,9 @@ public static class AttackSequence
             await UniTask.Delay((int)(t_hitDelay * 1000));   // 투사체 비행 시간
 
         await UniTask.WhenAll(
-            ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true),
+            ResolveHits(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit, _skipRemain: true),
             t_kick);
 
-        _attacker?.SetArmedVfx(false);   // 박치기의 반동 지점과 같은 의미 — 발사가 끝나면 무장 해제
         CardView.RestoreAllFades();
     }
 
@@ -285,16 +296,12 @@ public static class AttackSequence
     // 베기 프리팹은 BattleVfxLibrary(BattleVfxId.PeerlessSlash) 소유 — 미배선이면 베기 없이 동작한다.
 
     static async UniTask PlayPeerless(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+        Action _onEffect, CardKeyword _preEffectKw, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
         CardView.FadeAll(0.3f);
         CardView.FadeCards(1f, _attacker, _defender, _splashView);
 
-        bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker.PlayAttackAnim();
-        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        _effect?.SpawnParticles(_attacker.transform, _defender.transform, t_flip,
-                                BattleFinisher.ApproachDurationFactor);
 
         if (_preEffectKw != CardKeyword.None)
             await _attacker.PlayKeywordGlow(_preEffectKw);
@@ -406,11 +413,10 @@ public static class AttackSequence
                            t_cfg.turnDur)
                        .SetEase(Ease.OutQuad).SetLink(_attacker.gameObject).ToUniTask();
 
-            SoundManager.Instance?.PlayRandom(_effect?.attackClips);
             SlashTarget(_splashView.transform.position);
         }
 
-        await ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+        await ResolveHits(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit,
             _skipRemain: true, _beforeSplashHit: TurnAndSlashSplash, _hitStop: FreezeBeat);
 
         if (_attacker == null) { t_swing.Release(); CardView.RestoreAllFades(); return; }
@@ -422,7 +428,6 @@ public static class AttackSequence
         // 휘두름은 여기서 반납한다 — 수명을 항목 lifetime에 맡기면 멈칫만큼 늘어난
         // 연출 도중에 먼저 사라진다(자기반납형 프리팹이면 Release가 무동작).
         t_swing.Release();
-        _attacker.SetArmedVfx(false);
 
         await UniTask.WhenAll(
             t_atk.DOMove(t_home, t_cfg.returnDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
@@ -672,7 +677,7 @@ public static class AttackSequence
     /// 히트/사망 해결(ResolveHits)과 반동/복귀는 병렬 — 데미지는 접촉 시점에 적용.
     /// 일반 연출은 _home=원래 슬롯, 시네마 연출은 _home=시네마 위치(이후 호출부가 슬롯으로 복귀시킴).</summary>
     static async UniTask Headbutt(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit, Vector3 _home)
+        Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit, Vector3 _home)
     {
         NormalTuning t_cfg = Normal;   // 이 공격 동안 쓸 튜닝 스냅샷.
         ApplyApproach(ref t_cfg);
@@ -706,7 +711,7 @@ public static class AttackSequence
         // 접촉: 히트/사망 해결과 공격자 반동/복귀를 동시 진행 → 중간 대기 없이 시퀀스 계속.
         // 데미지(_onEffect)는 ResolveHits 진입 즉시(=접촉 시점) 적용되고, 방어자 히트/사망 연출이
         // 공격자의 반동→복귀 모션과 병렬로 흐른다.
-        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
+        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
 
         Vector3 t_recoil = t_impact - t_dirN * t_cfg.recoilDist;   // 충격 지점 기준 뒤로 반동(적 반대 방향).
         t_recoil.z = _home.z;
@@ -718,7 +723,6 @@ public static class AttackSequence
 
             // 무장 이펙트는 반동이 끝나는 지점에서 꺼진다. 접촉 프레임(돌진 트윈 직후)에 끄면
             // 충돌 연출이 보이기 전에 사라져 "닿기 전에 꺼진" 것처럼 읽힌다.
-            _attacker.SetArmedVfx(false);
 
             await UniTask.WhenAll(
                 t_atk.DOMove(_home, t_cfg.outDur).SetEase(Ease.OutBack).SetLink(_attacker.gameObject).ToUniTask(),
@@ -731,10 +735,9 @@ public static class AttackSequence
     // ── 특별 연출: 카메라 시네마 1vs1 ────────────────────────────────────
     // 둘만(스플래시 포함) 앞으로 떠서 카메라가 확대, 무기 애니/파티클/발사체 후 히트.
     static async UniTask PlayCinema(CardView _attacker, CardView _defender,
-        AttackEffect _effect, Action _onEffect,
+        Action _onEffect,
         CardKeyword _preEffectKw, CardKeyword _atEffectKw, CardView _splashView, Func<UniTask> _afterHit)
     {
-        float t_hitDelay = _effect?.hitDelay ?? 0f;
         float t_cinema   = GameTiming.Battle.CinemaDuration;
 
         Vector3 t_defenderOrigin = _defender.SlotPosition;
@@ -770,31 +773,24 @@ public static class AttackSequence
         else
             await UniTask.Delay((int)(t_cinema * 1000));
 
-        bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
-        SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
-                                BattleFinisher.ApproachDurationFactor);
-        LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay,
-                         _attacker != null ? _attacker.VfxSortingLayerId : _defender.VfxSortingLayerId, t_flip).Forget();
 
         if (_preEffectKw != CardKeyword.None)
             await (_attacker?.PlayKeywordGlow(_preEffectKw) ?? UniTask.CompletedTask);
 
-        if (t_hitDelay > 0f)
-            await UniTask.Delay((int)(t_hitDelay * 1000));
-
         // 시네마 자리에서의 타격 모션. 카드마다 다른 연출을 주는 분기점 — 어떤 카드가 어떤 연출인지는
         // CardSpec.CinemaAttackStyle이 소유하고, 연출 구현은 여기 있다. 데미지 해결은 어느 쪽이든 ResolveHits 공용.
-        CinemaAttackStyle t_style = _attacker?.BoundCard?.spec?.CinemaAttackStyle ?? CinemaAttackStyle.Default;
+        // 카드별 시네마 스타일 축은 데이터가 0/40이라 폐기했다. EnergyOrbDash 연출 자체는 남겨 두었으므로
+        // 표에 열을 추가하고 여기 대입만 바꾸면 되살아난다.
+        CinemaAttackStyle t_style = CinemaAttackStyle.Default;
 
         if (_attacker != null && t_style == CinemaAttackStyle.EnergyOrbDash)
-            await EnergyOrbDash(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit);
+            await EnergyOrbDash(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit);
         else if (_attacker != null)
-            await Headbutt(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+            await Headbutt(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit,
                 _home: _attacker.transform.position);
         else
-            await ResolveHits(null, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
+            await ResolveHits(null, _defender, _splashView, _onEffect, _atEffectKw, _afterHit, _skipRemain: true);
 
         // 결정타가 열렸으면 시네마가 카메라 소유권을 돌려놓지 않는다.
         // FinishFocus가 현재 위치에서 이어받았는데 여기서 ExitCinema를 호출하면 강한 줌이 즉시 풀린다.
@@ -820,7 +816,7 @@ public static class AttackSequence
     const float ORB_DASH_SCALE = 1.8f;    // 돌진 중 구체가 커지는 배율(제자리 크기 대비) — 이동 궤적이 굵게 보이도록
 
     static async UniTask EnergyOrbDash(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
+        Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit)
     {
         Transform t_atk  = _attacker.transform;
         Vector3   t_home = t_atk.position;
@@ -856,7 +852,7 @@ public static class AttackSequence
         await t_mover.DOMove(t_impact, t_dash).SetEase(Ease.InQuad).ToUniTask();
 
         // 3) 충돌 = 데미지·피격·사망 해결(박치기와 동일 지점). 복귀 모션과 병렬로 흘린다.
-        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit,
+        UniTask t_resolve = ResolveHits(_attacker, _defender, _splashView, _onEffect, _atEffectKw, _afterHit,
             _skipRemain: true);
 
         async UniTask ReturnHome()
@@ -867,7 +863,6 @@ public static class AttackSequence
 
             await t_mover.DOMove(t_home, t_return).SetEase(Ease.OutQuad).ToUniTask();
 
-            _attacker.SetArmedVfx(false);   // 박치기의 반동 지점과 같은 의미 — 복귀가 끝나면 무장 해제
             _attacker.FadeView(1f, t_morph);   // 구체가 카드 자리로 돌아오며 카드가 다시 나타난다
             await UniTask.Delay((int)(t_morph * 1000));
 
@@ -904,11 +899,9 @@ public static class AttackSequence
     /// 둘 다 기본값이면 기존과 완전히 같은 동시 재생이다.
     /// **데미지 적용(_onEffect)은 어느 경우에도 여기 한 번뿐** — 갈라지는 건 표시 순서지 규칙이 아니다.</summary>
     static async UniTask ResolveHits(CardView _attacker, CardView _defender, CardView _splashView,
-        AttackEffect _effect, Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit,
+        Action _onEffect, CardKeyword _atEffectKw, Func<UniTask> _afterHit,
         bool _skipRemain = false, Func<UniTask> _beforeSplashHit = null, Func<UniTask> _hitStop = null)
     {
-        float t_hitDelay = _effect?.hitDelay ?? 0f;
-        float t_duration = _effect?.duration ?? 0f;
 
         // 데미지 숫자 = onEffect 전후 총 체력(hp+bonusHp) 감소분. 각 피격 뷰에 전달.
         int t_defBefore = HpTotal(_defender);
@@ -1008,10 +1001,6 @@ public static class AttackSequence
                                                             t_attackerKilled, t_defenderKilled, t_splashKilled);
 
             // 피니시가 이미 한 박자를 썼으므로 잔여 대기는 건너뛴다(끝난 판에서 빈 시간이 겹치지 않게).
-            float t_remain = t_duration - t_hitDelay;
-            if (!_skipRemain && !t_finished && t_remain > 0f)
-                await UniTask.Delay((int)(t_remain * 1000));
-
             _attacker?.FocusWeapon(false);
 
             // 공격자와 대상은 **같이 쓰러진다**. 순차로 세우면 서로의 사망 연출을 끝까지 기다려
@@ -1057,53 +1046,4 @@ public static class AttackSequence
 
     // 투사체·착탄 정렬. 카드 아트(최대 31: DieOverlay)보다 위, 피격 파티클(35·40)보다는 아래 —
     // 날아오는 구체가 카드를 가리되 착탄 순간의 피격 연출이 그 위에 얹힌다.
-    const int PROJECTILE_SORTING_ORDER = 33;
-
-    /// <param name="_sortingLayerId">공격자 카드의 정렬 레이어. 구매 에셋 투사체는 대개 Default 레이어라
-    /// 그대로 두면 Card 레이어인 카드/배경 **뒤로 깔려 아예 안 보인다** — 다른 연출 스폰 경로가 전부
-    /// BattleVfx.ApplySorting을 타는 것과 같은 이유로 여기서도 맞춘다.</param>
-    static async UniTask LaunchProjectile(ProjectileData _proj, Transform _attacker, Transform _defender,
-                                          float _duration, int _sortingLayerId, bool _flipOffset = false,
-                                          float _timingFactor = 1f)
-    {
-        if (_attacker == null || _defender == null) return;
-
-        // 카드가 자기 투사체를 안 가졌으면 키워드 기본 투사체로 떨어진다 — 원거리는 카드 고유 연출이 아니라
-        // **키워드가 만드는 규칙 연출**이라, 카드별 배선 누락이 "발사체 없는 원거리 공격"으로 새면 안 된다.
-        // (키워드 연출 미리보기처럼 원거리가 아닌 카드에 키워드만 얹는 경로도 여기서 살아난다.)
-        if (_proj.prefab == null && BattleVfx.TryGetEntry(BattleVfxId.RangedProjectile, out VfxEntry t_fallback))
-        {
-            _proj.prefab      = t_fallback.prefab;
-            _proj.localOffset = t_fallback.localOffset;
-        }
-        if (_proj.prefab == null) return;
-
-        float t_spawnDelay = _proj.spawnDelay * Mathf.Max(0f, _timingFactor);
-        if (t_spawnDelay > 0f)
-            await UniTask.Delay((int)(t_spawnDelay * 1000));
-
-        Vector3 t_offset = _flipOffset ? -_proj.localOffset : _proj.localOffset;
-        Vector3 t_start  = _attacker.TransformPoint(t_offset);
-        Vector3 t_end    = _defender.position;
-
-        GameObject t_proj = UnityEngine.Object.Instantiate(_proj.prefab, t_start, Quaternion.identity);
-        BattleVfx.ApplySorting(t_proj, _sortingLayerId, PROJECTILE_SORTING_ORDER);
-        Vector3 t_dir = t_end - t_start;
-        if (t_dir != Vector3.zero)
-            t_proj.transform.right = t_dir.normalized;
-
-        float t_travel = Mathf.Max(0f, _duration - t_spawnDelay);
-        if (t_travel > 0f)
-            await t_proj.transform.DOMove(t_end, t_travel).SetEase(Ease.Linear).ToUniTask();
-
-        UnityEngine.Object.Destroy(t_proj);
-
-        if (_proj.impactPrefab != null)
-        {
-            string t_id = _proj.impactPrefab.GetInstanceID().ToString();
-            ParticlePooler.Register(t_id, _proj.impactPrefab);
-            GameObject t_impact = ParticlePooler.Spawn(t_id, t_end, Quaternion.identity);
-            BattleVfx.ApplySorting(t_impact, _sortingLayerId, PROJECTILE_SORTING_ORDER);
-        }
-    }
 }

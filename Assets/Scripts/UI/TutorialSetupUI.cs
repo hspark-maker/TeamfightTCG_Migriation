@@ -16,8 +16,8 @@ public class TutorialSetupUI : MonoBehaviour
     [SerializeField] string battleSceneName = "BattleScene";
 
     [Header("고정 덱 (순서 = 등장 순서, 6장 이하)")]
-    [SerializeField] List<CardData> playerDeck = new List<CardData>();
-    [SerializeField] List<CardData> enemyDeck  = new List<CardData>();
+    [SerializeField, CardId] List<int> playerDeckIds = new List<int>();
+    [SerializeField, CardId] List<int> enemyDeckIds  = new List<int>();
 
     [Header("스크립트 공격 순서 (턴당 1건, 공격자 슬롯 → 타깃 슬롯)")]
     [SerializeField] List<ScriptedAttack> playerScript = new List<ScriptedAttack>();
@@ -34,7 +34,7 @@ public class TutorialSetupUI : MonoBehaviour
         if (this.scenario != null)
             TutorialConfig.Begin(this.scenario);
         else
-            TutorialConfig.Begin(this.playerDeck, this.enemyDeck, this.playerScript, this.enemyScript);
+            TutorialConfig.Begin(this.playerDeckIds, this.enemyDeckIds, this.playerScript, this.enemyScript);
 
         SceneManager.LoadScene(this.battleSceneName);
     }
@@ -59,7 +59,7 @@ public class TutorialSetupUI : MonoBehaviour
         t_infoGo.transform.SetParent(t_canvasGo.transform, false);
         var t_info = t_infoGo.AddComponent<TextMeshProUGUI>();
         TutorialUIStyle.ApplyFont(t_info);
-        t_info.text      = $"튜토리얼 셋업\n<size=60%>플레이어 {this.playerDeck.Count}장 · 적 {this.enemyDeck.Count}장</size>";
+        t_info.text      = $"튜토리얼 셋업\n<size=60%>플레이어 {this.playerDeckIds.Count}장 · 적 {this.enemyDeckIds.Count}장</size>";
         t_info.fontSize  = 48f;
         t_info.color     = Color.white;
         t_info.alignment = TextAlignmentOptions.Center;

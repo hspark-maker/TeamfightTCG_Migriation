@@ -1,6 +1,7 @@
 public class CardInstance
 {
-    public CardData data;
+    public readonly int cardId;
+    // Step 3 호환 다리: 잔여 UI가 ID API로 이관될 때까지 읽기 전용 역조회를 제공한다.
     public readonly CardSpec spec;
     public int hp;
     // 이 인스턴스의 최대 체력(= data.maxHp + 영구 강화분). 회복 상한·부활 기준은 전부 이 값이다 —
@@ -40,7 +41,7 @@ public class CardInstance
     // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
 
-    // 런타임 진화 단계. 0=미진화, 1~CardData.MaxEvolutionStage. 주입원은 마스터 데이터(defaultEvolutionStage).
+    // 런타임 진화 단계. 0=미진화, 1~CardSpec.MaxEvolutionStage. 주입원은 CardSpec.DefaultEvolutionStage.
     public int evolutionStage;
     // 등장 컷씬 1회성 래치. 스왑으로 대기열에 갔다가 다시 필드로 돌아오는 등 같은 인스턴스가
     // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
@@ -194,11 +195,11 @@ public class CardInstance
 
     /// <summary>_growth = 카드 영구 성장값(강화 체력). 기본값(default)이면 성장 미적용 —
     /// 성장을 태우지 않는 경로(AI 적 필드·멀티 원격 미러)는 인자를 생략한다.</summary>
-    public CardInstance(CardData _data, int _ownerIndex, CardGrowth _growth = default)
+    public CardInstance(int _cardId, int _ownerIndex, CardGrowth _growth = default)
     {
-        if (_data == null) throw new System.ArgumentNullException(nameof(_data));
-        this.data    = _data;
-        this.spec    = CardCatalog.RequireSpec(_data);
+        if (_cardId <= 0) throw new System.ArgumentOutOfRangeException(nameof(_cardId));
+        this.cardId  = _cardId;
+        this.spec    = CardCatalog.RequireSpec(_cardId);
         // 강화분은 최대 체력에 흡수(bonusHp는 데미지로 소진되는 시너지 채널이라 영구값을 담으면 안 된다).
         this.maxHp   = this.spec.MaxHp + _growth.HpBonus;
         this.hp      = this.maxHp;

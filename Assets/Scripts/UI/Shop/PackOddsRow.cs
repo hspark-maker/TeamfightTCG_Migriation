@@ -11,10 +11,10 @@ public class PackOddsRow : MonoBehaviour
 
     public void Bind(PackOddsEntry _entry)
     {
-        CardData t_card = _entry.Card;
+        int t_card = _entry.CardId;
         
         if (this.cardNameText != null)
-            this.cardNameText.text = t_card != null ? CardCatalog.RequireSpec(t_card).DisplayName : string.Empty;
+            this.cardNameText.text = t_card > 0 ? CardCatalog.RequireSpec(t_card).DisplayName : string.Empty;
 
         if (this.rateText != null)
             this.rateText.text = PackOdds.FormatRate(_entry.Rate);

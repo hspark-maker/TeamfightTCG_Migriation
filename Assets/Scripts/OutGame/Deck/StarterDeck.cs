@@ -30,33 +30,24 @@ public static class StarterDeck
             return;
         }
 
-        OwnershipManager.GrantAll(ToIds(t_cards));
+        OwnershipManager.GrantAll(t_cards);
 
         if (!DeckSaveManager.TryInsertFront(t_cards, DECK_NAME, DeckImages.PickRandomKey(), out _))
             Debug.LogWarning("[StarterDeck] 덱 삽입 실패 — 지급 생략(DeckSaveManager 로그 확인).");
     }
 
     // 드로우가 아니라 pool 앞에서부터의 고정 순서 복사(스타터덱은 매 계정 동일)
-    static List<CardData> TakeDeckCards(CardPackData _starter)
+    static List<int> TakeDeckCards(CardPackData _starter)
     {
-        var t_cards = new List<CardData>(DeckSaveManager.DECK_SIZE);
+        var t_cards = new List<int>(DeckSaveManager.DECK_SIZE);
         var t_pool  = _starter.Pool;
         for (int t_i = 0; t_i < t_pool.Count && t_cards.Count < DeckSaveManager.DECK_SIZE; t_i++)
         {
-            if (t_pool[t_i] == null || t_cards.Contains(t_pool[t_i])) continue;
+            if (!CardCatalog.Contains(t_pool[t_i]) || t_cards.Contains(t_pool[t_i])) continue;
 
             t_cards.Add(t_pool[t_i]);
         }
         return t_cards;
     }
 
-    static List<int> ToIds(List<CardData> _cards)
-    {
-        var t_ids = new List<int>(_cards.Count);
-        for (int t_i = 0; t_i < _cards.Count; t_i++)
-        {
-            t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
-        }
-        return t_ids;
-    }
 }

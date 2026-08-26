@@ -14,11 +14,9 @@ public static class DeckSaveManager
     const string LEGACY_FILE         = "decks.json";
     const string LEGACY_ARCHIVE_FILE = "decks_migrated.json";
 
-    static readonly List<CardData>[] s_slots = new List<CardData>[SLOT_COUNT];
+    static readonly List<int>[] s_slots = new List<int>[SLOT_COUNT];
     static readonly string[] s_names = new string[SLOT_COUNT];
     static readonly string[] s_imageKeys = new string[SLOT_COUNT];
-
-    static IReadOnlyList<CardData> s_registry;
 
     static bool s_loaded;
 
@@ -39,7 +37,7 @@ public static class DeckSaveManager
 
     public static bool IsFull => DeckCount >= SLOT_COUNT;
 
-    public static List<CardData> GetSlot(int _index) => s_slots[_index];
+    public static List<int> GetSlot(int _index) => s_slots[_index];
 
     // 저장된 덱 이름 원본(빈 문자열 가능)
     public static string GetName(int _index) => s_names[_index] ?? "";
@@ -83,7 +81,7 @@ public static class DeckSaveManager
     }
 
     public static bool IsSlotValid(int _index)
-        => s_slots[_index] != null && s_slots[_index].Count == DECK_SIZE && s_slots[_index].All(d => d != null);
+        => s_slots[_index] != null && s_slots[_index].Count == DECK_SIZE && s_slots[_index].All(CardCatalog.Contains);
 
     public static bool HasAnyValidSlot()
     {
@@ -94,16 +92,16 @@ public static class DeckSaveManager
     }
 
     // 카드 목록을 슬롯용 덱으로 정규화(null·중복 제거 후 정확히 DECK_SIZE장)
-    public static bool TryBuildDeck(IEnumerable<CardData> _source, out List<CardData> _deck)
+    public static bool TryBuildDeck(IEnumerable<int> _source, out List<int> _deck)
     {
-        _deck = new List<CardData>(DECK_SIZE);
+        _deck = new List<int>(DECK_SIZE);
 
         if (_source == null) return false;
 
-        foreach (CardData t_card in _source)
+        foreach (int t_card in _source)
         {
             if (_deck.Count >= DECK_SIZE) break;
-            if (t_card == null || _deck.Contains(t_card)) continue;
+            if (!CardCatalog.Contains(t_card) || _deck.Contains(t_card)) continue;
 
             _deck.Add(t_card);
         }
@@ -112,11 +110,11 @@ public static class DeckSaveManager
     }
 
     // 같은 카드 구성의 저장 슬롯 찾기(편성 순서 무관)
-    public static bool TryFindSlot(IEnumerable<CardData> _source, out int _index)
+    public static bool TryFindSlot(IEnumerable<int> _source, out int _index)
     {
         _index = -1;
 
-        if (!TryBuildDeck(_source, out List<CardData> t_deck)) return false;
+        if (!TryBuildDeck(_source, out List<int> t_deck)) return false;
 
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
         {
@@ -138,14 +136,14 @@ public static class DeckSaveManager
     }
 
     // 신규 덱을 목록 맨 앞에 삽입(이름·이미지키까지 한 번에 저장)
-    public static bool TryInsertFront(IEnumerable<CardData> _deck, string _name, string _imageKey, out int _index)
+    public static bool TryInsertFront(IEnumerable<int> _deck, string _name, string _imageKey, out int _index)
     {
         _index = -1;
 
         if (!CanReorder()) return false;
         if (IsFull) return false;
 
-        var t_cards = _deck != null ? _deck.Where(c => c != null).ToList() : new List<CardData>();
+        var t_cards = _deck != null ? _deck.Where(CardCatalog.Contains).ToList() : new List<int>();
         if (t_cards.Count != DECK_SIZE) return false;
 
         int t_count = DeckCount;
@@ -181,11 +179,10 @@ public static class DeckSaveManager
         return true;
     }
 
-    public static List<CardData> Load(int _index) => s_slots[_index] ?? new List<CardData>();
+    public static List<int> Load(int _index) => s_slots[_index] ?? new List<int>();
 
     // 카드 전체 목록 등록(LoadFromSave 전에 반드시 호출)
-    public static void SetCardRegistry(IEnumerable<CardData> _cards)
-        => s_registry = _cards.ToList();
+    public static void SetCardIds(IEnumerable<int> _cards) { }
 
     // 세이브에 덱이 하나라도 들어 있는지(메모리 아님).
     // 이관 전 구 세이브도 "덱 있음"으로 읽어야 한다 — 아니면 기존 유저에게 스타터덱이 다시 지급된다.
@@ -214,15 +211,10 @@ public static class DeckSaveManager
             s_names[t_i]     = t_slot.name;
             s_imageKeys[t_i] = t_slot.imageKey;
 
-            if (s_registry == null) continue;
-
             s_slots[t_i] = t_slot.cardIds
-                .Select(id => s_registry.FirstOrDefault(c => c != null && CardCatalog.IdOf(c) == id))
-                .Where(c => c != null)
+                .Where(CardCatalog.Contains)
                 .ToList();
         }
-
-        if (s_registry == null) return;
 
         // 압축이 없어도 이관분은 반드시 내려써야 한다 — 안 그러면 다음 부트에 같은 이관을 또 한다.
         if (Compact() || t_migrated) SaveAll();
@@ -249,7 +241,7 @@ public static class DeckSaveManager
     }
 
     // 대상 슬롯만 세이브에 반영(나머지 슬롯은 저장된 값 보존)
-    public static void SaveSlot(int _index, IEnumerable<CardData> _deck)
+    public static void SaveSlot(int _index, IEnumerable<int> _deck)
     {
         if (_index < 0 || _index >= SLOT_COUNT) return;
 
@@ -260,14 +252,14 @@ public static class DeckSaveManager
 
     static bool CanReorder()
     {
-        if (s_loaded && s_registry != null) return true;
+        if (s_loaded && CardCatalog.IsReady) return true;
 
         Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 또는 카드 레지스트리 미주입 — 순서 변경 거부(메모리·세이브 어긋남 방지). 부트 프리팹이 있는 씬에서 실행할 것.");
         return false;
     }
 
-    static void Save(int _index, IEnumerable<CardData> _deck)
-        => s_slots[_index] = new List<CardData>(_deck.Where(d => d != null));
+    static void Save(int _index, IEnumerable<int> _deck)
+        => s_slots[_index] = new List<int>(_deck.Where(CardCatalog.Contains));
 
     static void SaveAll()
     {
@@ -383,7 +375,7 @@ public static class DeckSaveManager
         var t_dst = _slots[_index];
 
         t_dst.name     = s_names[_index] ?? "";
-        t_dst.cardIds  = s_slots[_index]?.Where(c => c != null).Select(c => CardCatalog.IdOf(c)).ToArray()
+        t_dst.cardIds  = s_slots[_index]?.Where(CardCatalog.Contains).ToArray()
                          ?? new int[0];
         t_dst.cardKeys = new string[0];   // 이관 완료 슬롯은 구 필드를 비운 채로 유지한다
         t_dst.imageKey = s_imageKeys[_index] ?? "";

@@ -15,7 +15,7 @@ public enum EPackOpenResult
 // 개봉으로 뽑힌 카드 1장의 스냅샷(불변)
 public readonly struct DrawnCard
 {
-    public readonly CardData Card;
+    public readonly int CardId;
     public readonly bool IsNew;
     public readonly long Refund;
 
@@ -26,9 +26,9 @@ public readonly struct DrawnCard
     public readonly int Snack;
 
     // 환급도 간식도 없는 지급(보상 오버레이 등). 표식 자체가 뜨지 않아 재화를 물을 일이 없다.
-    public DrawnCard(CardData _card, bool _isNew)
+    public DrawnCard(int _cardId, bool _isNew)
     {
-        Card = _card;
+        CardId = _cardId;
         IsNew = _isNew;
         Refund = 0L;
         RefundType = ECurrencyType.Gold;
@@ -36,9 +36,9 @@ public readonly struct DrawnCard
     }
 
     // 중복 보상이 간식인 지급(카드팩). 재화 환급이 없으므로 재화 종류를 묻지 않는다.
-    public DrawnCard(CardData _card, bool _isNew, int _snack)
+    public DrawnCard(int _cardId, bool _isNew, int _snack)
     {
-        Card = _card;
+        CardId = _cardId;
         IsNew = _isNew;
         Refund = 0L;
         RefundType = ECurrencyType.Gold;
@@ -46,9 +46,9 @@ public readonly struct DrawnCard
     }
 
     // 환급이 있으면 재화 종류가 필수다 — 기본값을 열어두면 조각 환급이 골드 코인으로 조용히 표시된다.
-    public DrawnCard(CardData _card, bool _isNew, long _refund, ECurrencyType _refundType)
+    public DrawnCard(int _cardId, bool _isNew, long _refund, ECurrencyType _refundType)
     {
-        Card = _card;
+        CardId = _cardId;
         IsNew = _isNew;
         Refund = _refund;
         RefundType = _refundType;

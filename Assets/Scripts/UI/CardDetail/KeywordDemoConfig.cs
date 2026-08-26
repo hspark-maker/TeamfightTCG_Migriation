@@ -18,30 +18,30 @@ public class KeywordDemoConfig : ScriptableObject
         public CardKeyword keyword;
 
         [Tooltip("맞은편. 대개 맞는 쪽이고, 도발에서만 치러 오는 쪽이 된다. 비우면 defaultOpponent.")]
-        public CardData opponent;
+        [CardId] public int opponentId;
 
         [Tooltip("곁에 서는 쪽(무쌍의 광역 대상, 도발이 대신 맞아주는 아군, 힐러가 살리는 아군). 비우면 defaultNeighbor. " +
                  "진영은 코드가 정한다 — 무쌍만 적이고 도발·힐러는 아군이라, 같은 칸에 어떤 카드를 넣어도 편이 뒤집히지 않는다.")]
-        public CardData neighbor;
+        [CardId] public int neighborId;
     }
 
     [Header("기본 배역")]
     [Tooltip("특별할 것 없는 상대. 튀는 카드(키워드가 많거나 아트가 화려한 것)를 고르면 " +
              "정작 봐야 할 공격자의 연출이 묻힌다.")]
-    [SerializeField] CardData defaultOpponent;
+    [SerializeField, CardId] int defaultOpponentId;
 
     [Tooltip("곁에 서는 카드. 위와 **다른 카드**여야 한다 — 같으면 무쌍의 광역이 어디로 갔는지 안 읽힌다.")]
-    [SerializeField] CardData defaultNeighbor;
+    [SerializeField, CardId] int defaultNeighborId;
 
     [Header("키워드별 덮어쓰기 (선택)")]
     [SerializeField] Entry[] entries;
 
     /// <summary>이 키워드의 배역. 미저작이면 기본값, 그것도 없으면 null —
     /// 호출부는 null을 "그 자리를 비운다"로 읽고 조용히 건너뛴다.</summary>
-    public void Roles(CardKeyword _keyword, out CardData _opponent, out CardData _neighbor)
+    public void Roles(CardKeyword _keyword, out int _opponentId, out int _neighborId)
     {
-        _opponent = this.defaultOpponent;
-        _neighbor = this.defaultNeighbor;
+        _opponentId = this.defaultOpponentId;
+        _neighborId = this.defaultNeighborId;
 
         if (this.entries == null) return;
 
@@ -49,8 +49,8 @@ public class KeywordDemoConfig : ScriptableObject
         {
             if (t_e.keyword != _keyword) continue;
 
-            if (t_e.opponent != null) _opponent = t_e.opponent;
-            if (t_e.neighbor != null) _neighbor = t_e.neighbor;
+            if (t_e.opponentId > 0) _opponentId = t_e.opponentId;
+            if (t_e.neighborId > 0) _neighborId = t_e.neighborId;
             return;
         }
     }

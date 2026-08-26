@@ -9,7 +9,7 @@ using Cysharp.Threading.Tasks;
 public interface IMatchGrowthSource
 {
     /// <summary>구현은 취소 토큰을 지키고 초기화 상한 안에 끝내야 한다. Firebase 구현은 전투 진입 전 캐시를 권장한다.</summary>
-    UniTask<CardGrowth[]> ResolveMyGrowth(IReadOnlyList<CardData> _deck, CancellationToken _ct);
+    UniTask<CardGrowth[]> ResolveMyGrowth(IReadOnlyList<int> _deck, CancellationToken _ct);
 
     /// <summary>상대가 보고한 최종 성장 스냅샷을 출처의 정본과 대조한다.
     /// 로컬 임시 구현은 신뢰하고, Firebase 구현은 안정 UserId 기준 서버 값과 비교한다.</summary>
@@ -57,18 +57,17 @@ public static class MatchGrowthValidation
 {
     static readonly CardKeyword KnownKeywords = BuildKnownKeywords();
 
-    public static bool IsValid(CardData _card, CardGrowth _growth, out string _error)
+    public static bool IsValid(int _cardId, CardGrowth _growth, out string _error)
     {
-        if (_card == null) { _error = "카드가 null"; return false; }
-        if (_card.id <= 0) { _error = $"카드 ID 오류({_card.id})"; return false; }
-        if (!CardCatalog.Contains(_card.id)) { _error = $"현재 프로필에 없는 카드({_card.id})"; return false; }
+        if (_cardId <= 0) { _error = $"카드 ID 오류({_cardId})"; return false; }
+        if (!CardCatalog.Contains(_cardId)) { _error = $"현재 프로필에 없는 카드({_cardId})"; return false; }
         if (!_growth.Applied) { _error = $"레벨 오류({_growth.Level})"; return false; }
-        if (_growth.HpBonus < 0 || _growth.HpBonus > int.MaxValue - CardCatalog.RequireSpec(_card).MaxHp)
+        if (_growth.HpBonus < 0 || _growth.HpBonus > int.MaxValue - CardCatalog.RequireSpec(_cardId).MaxHp)
         {
             _error = $"HP 보너스 오류({_growth.HpBonus})";
             return false;
         }
-        if (_growth.EvolutionStage < 0 || _growth.EvolutionStage > CardData.MaxEvolutionStage)
+        if (_growth.EvolutionStage < 0 || _growth.EvolutionStage > CardSpec.MaxEvolutionStage)
         {
             _error = $"진화 단계 오류({_growth.EvolutionStage})";
             return false;

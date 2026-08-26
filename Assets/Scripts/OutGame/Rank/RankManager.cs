@@ -55,12 +55,12 @@ public static class RankManager
 
     /// <summary>현재 티어에서 카드 _card 한 장이 쓸 AI 레벨. 티어 기준 레벨 주변으로 카드마다 흩어지되,
     /// 강화 곡선 만렙을 넘지 않는다(넘으면 곡선에 없는 레벨이라 보너스가 멈춘 것처럼 보인다).</summary>
-    public static int AiCardLevelOf(CardData _card)
+    public static int AiCardLevelOf(int _cardId)
     {
         int t_base  = Config.AiCardLevelAt(TierIndex);
-        int t_level = _card == null
+        int t_level = _cardId <= 0
             ? t_base
-            : KeepUnlocks(_card, Config.AiCardLevelForCard(TierIndex, CardCatalog.IdOf(_card)), t_base);
+            : KeepUnlocks(_cardId, Config.AiCardLevelForCard(TierIndex, _cardId), t_base);
 
         int t_max = CardGrowthManager.MaxLevel;
         return t_max > 0 && t_level > t_max ? t_max : t_level;
@@ -316,17 +316,17 @@ public static class RankManager
 
     /// <summary>하향 편차는 체력만 깎는다 — 기준 레벨이 이미 연 시너지·키워드를 도로 잠그면 카드 정체성이 사라진다
     /// (시너지가 꺼진 카드는 집계에서 빠져 3장 요구 시너지가 성립조차 못 한다). 해금이 기준과 같아지는 가장 낮은 레벨까지만 내린다.</summary>
-    static int KeepUnlocks(CardData _card, int _level, int _base)
+    static int KeepUnlocks(int _cardId, int _level, int _base)
     {
         if (_level >= _base) return _level;
 
         CardGrowthConfig t_growth = CardGrowthManager.Config;
         bool             t_synergy  = t_growth.SynergyUnlockedAt(_base);
-        CardKeyword      t_keywords = t_growth.UnlockedKeywordsAt(_card, _base);
+        CardKeyword      t_keywords = t_growth.UnlockedKeywordsAt(_cardId, _base);
 
         for (int t_lv = _level; t_lv < _base; t_lv++)
         {
-            if (t_growth.SynergyUnlockedAt(t_lv) == t_synergy && t_growth.UnlockedKeywordsAt(_card, t_lv) == t_keywords)
+            if (t_growth.SynergyUnlockedAt(t_lv) == t_synergy && t_growth.UnlockedKeywordsAt(_cardId, t_lv) == t_keywords)
                 return t_lv;
         }
         return _base;

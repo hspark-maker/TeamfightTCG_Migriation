@@ -19,13 +19,13 @@ public class DeckEditDragController : MonoBehaviour
     [SerializeField] float            ghostAlpha = 0.85f;
 
     Func<IReadOnlyList<DeckEditSlotView>> m_slotProvider;
-    Action<int, CardData>                 m_onDropped;
+    Action<int, int>                      m_onDropped;
 
     RectTransform  m_ghostRect;
     CardVisualView m_ghostView;
 
     bool             m_dragging;
-    CardData         m_card;
+    int              m_card;
     PointerEventData m_data;
     int              m_finger = -1;   // 추적 중인 레거시 Input 터치의 fingerId. -1 = 마우스(터치 없음)
 
@@ -42,16 +42,16 @@ public class DeckEditDragController : MonoBehaviour
                        ? rootCanvas.worldCamera
                        : null;
 
-    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, CardData> _onDropped)
+    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, int> _onDropped)
     {
         m_slotProvider = _slotProvider;
         m_onDropped    = _onDropped;
     }
 
     // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
-    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
+    public void Begin(int _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
     {
-        if (m_dragging || _card == null || _data == null) return;
+        if (m_dragging || _card <= 0 || _data == null) return;
 
         // 1) ScrollRect가 이미 드래그 중이면 정상 종료 이벤트를 먹여서 끝낸다.
         //    pointerDrag만 null로 만들면 ScrollRect가 OnEndDrag를 못 받아
@@ -141,7 +141,7 @@ public class DeckEditDragController : MonoBehaviour
     // _slotIndex >= 0이면 드롭 성사. 성사 여부와 무관하게 드래그 상태는 항상 여기서 정리된다.
     void Finish(int _slotIndex)
     {
-        CardData         t_card = m_card;
+        int              t_card = m_card;
         PointerEventData t_data = m_data;
 
         if (m_ghostRect != null) m_ghostRect.gameObject.SetActive(false);
@@ -149,7 +149,7 @@ public class DeckEditDragController : MonoBehaviour
         UnlockScroll();
 
         m_dragging = false;
-        m_card     = null;
+        m_card     = 0;
         m_data     = null;
         m_finger   = -1;
 
@@ -158,7 +158,7 @@ public class DeckEditDragController : MonoBehaviour
         if (t_data != null) t_data.eligibleForClick = false;
 
         // 콜백은 정리 이후에 부른다 — 콜백이 그리드를 재빌드하며 Cancel을 되부를 수 있어 재진입에 안전해야 한다.
-        if (_slotIndex >= 0 && t_card != null) m_onDropped?.Invoke(_slotIndex, t_card);
+        if (_slotIndex >= 0 && t_card > 0) m_onDropped?.Invoke(_slotIndex, t_card);
     }
 
     // ScrollRect를 통째로 끄지 않는다(enabled=false) — 드래그 도중 꺼지면 OnEndDrag를 못 받아

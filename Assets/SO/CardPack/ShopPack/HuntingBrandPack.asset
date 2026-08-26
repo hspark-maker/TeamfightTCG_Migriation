@@ -23,31 +23,23 @@ MonoBehaviour:
   uniqueDraw: 0
   refundType: 3
   refundAmount: 8
-  pool:
-  - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
-  - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-  - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-  - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: 294b7250ef57dfa94e13fc54ac0fc763, type: 2}
-  - {fileID: 11400000, guid: 73ea7fd040fa6b5f18181840c5c61bba, type: 2}
+  poolIds: 0d0000000e000000110000001200000013000000140000002300000027000000
   rankPools:
   - minGrade: 0
     cards:
-    - card: {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+    - cardId: 13
       weight: 11
-    - card: {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
+    - cardId: 14
       weight: 30
-    - card: {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
+    - cardId: 17
       weight: 11
-    - card: {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
+    - cardId: 18
       weight: 11
-    - card: {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
+    - cardId: 19
       weight: 11
-    - card: {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
+    - cardId: 20
       weight: 10
-    - card: {fileID: 11400000, guid: 294b7250ef57dfa94e13fc54ac0fc763, type: 2}
+    - cardId: 35
       weight: 10
-    - card: {fileID: 11400000, guid: 73ea7fd040fa6b5f18181840c5c61bba, type: 2}
+    - cardId: 39
       weight: 6

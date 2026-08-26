@@ -565,29 +565,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttackAnimTester
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
-  playerCards:
-  - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-  - {fileID: 11400000, guid: 63e7eda3bd74481a9d6c2f799ad20a16, type: 2}
-  enemyCards:
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
-  - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-  - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
+  playerCardIds: 0c0000001200000000000000
+  enemyCardIds: 1b0000000600000009000000
+  attackerSlot: 0
+  defenderSlot: 0
   useSpecialCinema: 0
-  usePeerless: 0
   useExecution: 0
   killWeakerSide: 1
   hitVfxOnCounter: 0
-  attackVfx:
-    folder: Assets/Assets/Particle/_Vendor
-    filter: 
-    prefabs: []
-    use: 1
-    localOffset: {x: 0, y: 0, z: -0.5}
-    scale: 1
-    lifetime: 2
-    sortingOrder: 100
-    spawnDelay: 0
   hitVfx:
     folder: Assets/Assets/Particle/_Vendor
     filter: 
@@ -602,6 +587,8 @@ MonoBehaviour:
   timingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
   synergyIndex: 0
   synergyPreview: 0
+  keywordIndex: 0
+  keywordPreview: 0
   emblemSlot: 0
   emblemTiming: 1
   emblemAutoReplay: 0
@@ -609,6 +596,9 @@ MonoBehaviour:
   flowStack: 3
   swarmDamagePerShot: 1
   caretakerHeal: 1
+  sequence: 000000000200000003000000040000000500000006000000
+  stepGap: 0.25
+  untimedStepHold: 0.9
   emblemSynergies:
   - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
   - {fileID: 11400000, guid: dee4791a461125448898b01d9b781ae5, type: 2}
@@ -1019,7 +1009,7 @@ SpriteRenderer:
   m_Size: {x: 9.41, y: 16.72}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
 --- !u!4 &282922648
 Transform:
@@ -2609,6 +2599,14 @@ MonoBehaviour:
   cinemaZMoveRatio: 0.18
   longPressPullBackZ: 0.35
   longPressLiftDuration: 0.32
+  resultZMoveRatio: 0.045
+  finishZMoveRatio: 0.32
+  finishFollowXY: 0.92
+  approachZMoveRatio: 0.1
+  approachFollowXY: 0.5
+  shakeDuration: 0.18
+  shakeStrength: 0.15
+  shakeFrequency: 26
 --- !u!114 &963194230
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3684,6 +3682,7 @@ MonoBehaviour:
   playerDeckUI: {fileID: 733305396}
   enemyDeckUI: {fileID: 1114238246}
   turnBanner: {fileID: 994338013}
+  mulliganOverlay: {fileID: 0}
   coinFlip: {fileID: 1755558530}
   winPopup: {fileID: 604385529}
   losePopup: {fileID: 145518278}
@@ -3709,6 +3708,7 @@ MonoBehaviour:
   playerDeckTransform: {fileID: 641239829}
   enemyDeckTransform: {fileID: 118209418}
   deckCardCount: 3
+  deckStackStep: {x: 0, y: 5}
 --- !u!1 &1611700761
 GameObject:
   m_ObjectHideFlags: 0
@@ -3940,8 +3940,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce194215e4cdd19428080f5b978caf63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
-  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
   playerField: {fileID: 171939905}
   enemyField: {fileID: 1009741517}
   playerFieldView: {fileID: 282937760}
