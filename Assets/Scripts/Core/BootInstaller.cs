@@ -168,7 +168,6 @@ public class BootInstaller : MonoBehaviour
     {
         if (s_saveDependentInstalled) return;
 
-        OutgameTutorialRewind.ApplyWipeIfScheduled();
         CurrencyManager.Init();
         ProfileManager.Init();
         OwnershipManager.Init();
