@@ -4,7 +4,7 @@ using System;
 sealed class PlayerSaveConflictSnapshot
 {
     public string firebaseUid;
-    public string profileId;
+    public string envId;
     public string payload;
     public string payloadHash;
     public long revision;

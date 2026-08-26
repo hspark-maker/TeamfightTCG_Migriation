@@ -89,8 +89,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             ValidateLiveConsumers(t_errors);
         }
 
-        AIDeckBandValidator.CollectIssues(t_errors, _warnings ?? new List<string>());
-
         return t_errors;
     }
 

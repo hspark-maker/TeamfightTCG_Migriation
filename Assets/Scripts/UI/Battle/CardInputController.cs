@@ -807,7 +807,7 @@ public class CardInputController
         {
             portrait       = t_icon != null ? t_icon : CardVisualRules.PickCardArt(_tauntCard.data),
             preserveAspect = t_icon != null,
-            cardName       = _tauntCard.data.displayName,
+            cardName       = _tauntCard.spec.DisplayName,
             effectLabel    = TAUNT_BLOCKED_TEXT,
         });
     }

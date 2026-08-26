@@ -21,23 +21,16 @@ MonoBehaviour:
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: eb2ed99578dee8343bcb851b4578ddae, type: 2}
-  battleImage: {fileID: 0}
-  deckPreview: {fileID: 21300000, guid: 45328417f4af20d489b024b1322253ac, type: 3}
-  battleImageRef:
-    m_AssetGUID: 0813913c13a638bff5148be2cda1f762
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_SubObjectGUID: 
-    m_EditorAssetChanged: 0
-  deckPreviewRef:
-    m_AssetGUID: 
-    m_SubObjectName: 
-    m_SubObjectType: 
-    m_SubObjectGUID: 
-    m_EditorAssetChanged: 0
   hpGainByLevel: 0000000000000000050000000400000004000000
   keywordUnlockLevel: 0
-  evolvedArts:
+  arts:
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: 0813913c13a638bff5148be2cda1f762
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
   - battleImage: {fileID: 0}
     battleImageRef:
       m_AssetGUID: a6ea06b9bace67e4a8d40c2a7a97f20e
@@ -56,8 +49,6 @@ MonoBehaviour:
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0
   cinemaOrbPrefab: {fileID: 0}
-  weaponPrefab: {fileID: 0}
-  enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}
   passive: {fileID: 0}
   spawnVoices: []

@@ -1,6 +1,7 @@
 public class CardInstance
 {
     public CardData data;
+    public readonly CardSpec spec;
     public int hp;
     // 이 인스턴스의 최대 체력(= data.maxHp + 영구 강화분). 회복 상한·부활 기준은 전부 이 값이다 —
     // data.maxHp는 공유 에셋이라 강화값을 담을 수 없다. 강화분은 bonusHp(시너지 임시 채널)에 섞지 않는다.
@@ -72,7 +73,7 @@ public class CardInstance
     /// 판정을 <see cref="HasKeyword"/>가 아니라 <c>data.keywords</c>로 하는 이유: 시너지가 얹어 준 키워드나
     /// 전투 중 걸린 표식·무적 때문에 "일반 카드"라는 정체성이 중간에 바뀌면 안 된다. 강화는 카드 원본의 속성이다.</summary>
     public bool HasVanillaEnhance =>
-        this.evolutionStage >= EnhanceStage && this.data != null && this.data.keywords == CardKeyword.None;
+        this.evolutionStage >= EnhanceStage && this.spec.Keywords == CardKeyword.None;
 
     /// <summary>일반 강화 추가 피해 = <b>원래 체력</b>의 절반(버림).
     ///
@@ -80,7 +81,7 @@ public class CardInstance
     /// 현재 hp 기준이면 맞을수록 약해지는 도발과 같은 축이 되어 "강화"로 읽히지 않는다.
     /// 성장 HP·덩치(bonusHp)·시너지 공격력도 섞지 않는다 — 카드마다 고정된 값이라야 예측이 선다.</summary>
     public int VanillaEnhanceDamage() =>
-        this.data != null ? UnityEngine.Mathf.FloorToInt(this.data.maxHp * 0.5f) : 0;
+        UnityEngine.Mathf.FloorToInt(this.spec.MaxHp * 0.5f);
 
     /// <summary>같은 공격 안에서 연달아 들어오는 두 직격(기본타 → 강화 추가타)의 누적 결과를 <b>부작용 없이</b> 계산.
     /// 돌려주는 값 = (실제 들어갈 총 피해, 이 공격으로 죽는가).
@@ -195,20 +196,22 @@ public class CardInstance
     /// 성장을 태우지 않는 경로(AI 적 필드·멀티 원격 미러)는 인자를 생략한다.</summary>
     public CardInstance(CardData _data, int _ownerIndex, CardGrowth _growth = default)
     {
+        if (_data == null) throw new System.ArgumentNullException(nameof(_data));
         this.data    = _data;
+        this.spec    = CardCatalog.RequireSpec(_data);
         // 강화분은 최대 체력에 흡수(bonusHp는 데미지로 소진되는 시너지 채널이라 영구값을 담으면 안 된다).
-        this.maxHp   = _data.maxHp + _growth.HpBonus;
+        this.maxHp   = this.spec.MaxHp + _growth.HpBonus;
         this.hp      = this.maxHp;
-        this.bonusHp = _data.bonusHp;
+        this.bonusHp = 0;
         this.slotIndex   = -1;
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
         // 성장값 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과).
         // 진화 단계는 마스터 데이터(임시 입력)와 강화 해금 중 높은 쪽 — 성장 미주입이면 후자가 0이라 기존 동작 그대로.
-        this.evolutionStage = UnityEngine.Mathf.Max(_data.defaultEvolutionStage, _growth.EvolutionStage);
+        this.evolutionStage = UnityEngine.Mathf.Max(this.spec.DefaultEvolutionStage, _growth.EvolutionStage);
         // 성장을 태우는 경로만 해금 게이트를 받는다. 멀티 양 필드는 교환된 최종 성장 스냅샷을 주입한다.
         // 미주입 폴백은 성장 공급자가 없는 레거시/디버그 생성 경로만 마스터 데이터를 그대로 쓴다.
-        this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : _data.keywords;
+        this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : this.spec.Keywords;
         this.synergyEnabled   = !_growth.Applied || _growth.SynergyUnlocked;
     }
 

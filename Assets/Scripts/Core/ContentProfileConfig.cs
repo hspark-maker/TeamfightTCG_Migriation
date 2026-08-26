@@ -26,7 +26,7 @@ public class ContentProfileConfig : ScriptableObject
     public EContentRunMode RunMode => this.runMode;
     public bool IncludeTestCards => this.includeTestCards;
     public string SaveFolder => this.saveFolder;
-    public string CloudSaveProfileId => this.runMode == EContentRunMode.Test ? "test" : "current";
+    public string CloudEnvId => this.runMode == EContentRunMode.Test ? "test" : "live";
 
     public static ContentProfileConfig Active
     {

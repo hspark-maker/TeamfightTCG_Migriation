@@ -21,7 +21,7 @@ static class CardArtAddressableBake
     const string GroupName    = "CardArt";
     const string CardLabel    = "Cards";
 
-    /// <summary>한 카드에서 옮길 아트 한 칸. stage 0 = 미진화(battleImage), -1 = deckPreview.</summary>
+    /// <summary>한 카드에서 옮길 아트 한 칸. Stage = arts[] 인덱스(0 = 미진화 ~ 3 = 최종).</summary>
     readonly struct ArtSlot
     {
         public readonly CardData Card;
@@ -33,9 +33,7 @@ static class CardArtAddressableBake
             Card = _card; Stage = _stage; Sprite = _sprite;
         }
 
-        public string Label => Stage == -1 ? "deckPreview"
-                             : Stage == 0  ? "battleImage"
-                             : $"evolvedArts[{Stage - 1}]";
+        public string Label => $"arts[{Stage}]";
     }
 
     [MenuItem("Tools/Assets/Cards/Preview Card Art Addressable Bake")]
@@ -131,12 +129,9 @@ static class CardArtAddressableBake
             var t_card = AssetDatabase.LoadAssetAtPath<CardData>(AssetDatabase.GUIDToAssetPath(t_guid));
             if (t_card == null) continue;
 
-            Collect(t_card, -1, t_card.deckPreview, _slots, t_unique);
-            Collect(t_card, 0, t_card.battleImage, _slots, t_unique);
-
-            for (int t_stage = 1; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+            for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
             {
-                CardArtSet t_art = t_card.GetEvolvedArt(t_stage);
+                CardArtSet t_art = t_card.GetArt(t_stage);
                 if (t_art != null) Collect(t_card, t_stage, t_art.battleImage, _slots, t_unique);
             }
         }
@@ -166,15 +161,19 @@ static class CardArtAddressableBake
         _unique[AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(_sprite))] = _sprite;
     }
 
+    // arts[] 로 통합되면서 stage 0 특례가 사라졌다 — 인덱스 하나로 끝난다.
+    static SerializedProperty ArtElement(SerializedObject _so, int _stage)
+    {
+        SerializedProperty t_arts = _so.FindProperty("arts");
+        if (t_arts == null || _stage < 0 || _stage >= t_arts.arraySize) return null;
+        return t_arts.GetArrayElementAtIndex(_stage);
+    }
+
     static SerializedProperty FindSpriteProp(SerializedObject _so, int _stage)
-        => _stage == -1 ? _so.FindProperty("deckPreview")
-         : _stage == 0  ? _so.FindProperty("battleImage")
-         : _so.FindProperty("evolvedArts").GetArrayElementAtIndex(_stage - 1).FindPropertyRelative("battleImage");
+        => ArtElement(_so, _stage)?.FindPropertyRelative("battleImage");
 
     static SerializedProperty FindRefProp(SerializedObject _so, int _stage)
-        => _stage == -1 ? _so.FindProperty("deckPreviewRef")
-         : _stage == 0  ? _so.FindProperty("battleImageRef")
-         : _so.FindProperty("evolvedArts").GetArrayElementAtIndex(_stage - 1).FindPropertyRelative("battleImageRef");
+        => ArtElement(_so, _stage)?.FindPropertyRelative("battleImageRef");
 
     static AddressableAssetGroup EnsureGroup(AddressableAssetSettings _settings)
     {

@@ -74,17 +74,14 @@ public static class CardArtCache
         OnArtLoaded?.Invoke();
     }
 
-    /// <summary>이 카드가 쓰는 아트 참조 전부(미진화 + 진화 단계 + 덱 배너).</summary>
+    /// <summary>이 카드가 쓰는 아트 참조 전부(미진화 0단계 ~ 최종 단계).</summary>
     static void CollectRefs(CardData _card, Dictionary<string, AssetReferenceSprite> _into)
     {
         if (_card == null) return;
 
-        Add(_card.battleImageRef, _into);
-        Add(_card.deckPreviewRef, _into);
-
-        for (int t_stage = 1; t_stage <= CardData.MaxEvolutionStage; t_stage++)
+        for (int t_stage = 0; t_stage <= CardData.MaxEvolutionStage; t_stage++)
         {
-            CardArtSet t_art = _card.GetEvolvedArt(t_stage);
+            CardArtSet t_art = _card.GetArt(t_stage);
             if (t_art != null) Add(t_art.battleImageRef, _into);
         }
     }

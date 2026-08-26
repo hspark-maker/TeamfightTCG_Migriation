@@ -53,15 +53,28 @@ public class BootInstaller : MonoBehaviour
             return;
         }
 
-        s_booted = true;
         DontDestroyOnLoad(gameObject);
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
-        ContentProfileConfig t_profile = ContentProfileConfig.Active;
-        var t_availableCards = new System.Collections.Generic.List<CardData>(
-            cardRegistry.Available(t_profile.IncludeTestCards));
-        CardCatalog.SetSource(t_availableCards);
+        ContentProfileConfig t_profile;
+        System.Collections.Generic.List<CardData> t_availableCards;
+        try
+        {
+            t_profile = ContentProfileConfig.Active;
+            SpecSource.Init();
+            CardCatalog.SetSource(cardRegistry.All, t_profile.RunMode, t_profile.IncludeTestCards);
+            t_availableCards = new System.Collections.Generic.List<CardData>(CardCatalog.All);
+        }
+        catch (System.Exception t_exception)
+        {
+            GameManager.MarkRecoveryRequired();
+            Debug.LogException(t_exception);
+            Destroy(gameObject);
+            return;
+        }
+
+        s_booted = true;
 
         // 카드 아트 선로드. 아트는 이제 CardData가 직접 물지 않고 Addressables로 따로 온다
         // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.

@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>카드 프레임에 얹힌 **무기 장식의 애니메이션 구간 재생**을 소유한다(원거리 카드의 활 등).
 /// 그 장식 오브젝트(CardView의 Frame 아래) 루트에 붙인다.
 ///
-/// 이 장식은 CardData.weaponPrefab으로 만들어지는 무기(<see cref="CardWeaponView"/>)와 다른 것이다 —
+/// 이 장식은 카드마다 무기를 따로 Instantiate하던 구 경로(삭제됨)와 다른 것이다 —
 /// 저쪽은 런타임에 Instantiate하는 별도 프리팹이고, 이쪽은 카드 프레임 아트의 일부라 이미 카드 안에 있다.
 /// 켜고 끄는 주인은 여전히 CardView.keywordFrames다(원거리 키워드일 때만 보인다).
 /// 여기가 아는 것은 "언제 어느 구간을 트는가" 하나뿐이다.
