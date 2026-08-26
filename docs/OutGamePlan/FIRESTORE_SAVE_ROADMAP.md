@@ -59,7 +59,7 @@
 - [x] 호출처 27개 파일 갱신
 - [x] 컴파일 에러 0 확인 (Assembly-CSharp.dll 갱신 확인 · Editor.log CS 에러 없음)
 - [x] 기능 지도 동기화 (`sync-agents-map.js`)
-- [ ] `tcg-reviewer` 검수 반영
+- [x] `tcg-reviewer` 검수 — critical 1건(camelCase 인코딩 불일치) 해결, 나머지는 P2 이월
 - [ ] 런타임 검증 (아래 완료 판정)
 
 **이번 단계에서 건드리지 않는 것**: 클라우드 전송 경로는 기존 payload 방식 유지(직렬화기만 교체),
@@ -92,6 +92,11 @@
 - [ ] P1에서 남긴 데드코드 정리 — `CardCatalog.LegacyIdOfName` / `s_legacyNameToId` (마지막 호출자가 사라졌으나 카탈로그 빌드 경로라 P1 범위 밖으로 미룸)
 - [ ] `DataSaveManager.s_saveBlocked` / `IsSaveBlocked` 죽은 경로 정리 — 버전 분기 제거로 true가 되는 경로가 없어졌다 (`GameManager.cs:76` 업데이트 차단 분기도 함께)
 - [ ] `TryApplyRemote` 자기검증 재검토 — 현재 Dictionary 직렬화 순서가 round-trip에서 보존되는 것에 의존한다. 불안정하면 역직렬화 후 필드 비교로 교체
+- [ ] **초기 골드 재지급 경로** — `CreateSnapshot()` 이 `CurrencyManager.Init()` 보다 먼저(SyncingSave 단계) 찍혀 신규 계정의 최초 payload가 `balances:{}` 로 올라간다. 그 문서를 pull해 적용하면 `Init` 이 또 신규로 판정해 100골드를 재지급한다(기기 교체·재설치). "빈 맵 = 신규" 센티널을 명시적 플래그로 교체
+- [ ] **중첩 컬렉션 null 정규화** — `Parse` 가 최상위 슬롯만 채우고 중첩 컬렉션은 안 본다. 콘솔에서 사람이 `null` 을 넣으면 `TournamentProgress.ClearedNodeIds` · `AlbumRewardManager.ClaimedKeys` · `RankRewardManager.ClaimedTiers` 에서 NRE. `Parse` 에서 한 번에 정규화
+- [ ] **KeywordGrowth 키 규약 통일** — Currency는 enum 이름(`"Gold"`), KeywordGrowth는 enum 정수값(`"1"`,`"2"`). 콘솔 가독성이 목적이었으므로 이름 쪽으로 맞출 것
+- [ ] 데드코드 `OwnershipManager.HasAnyOwnedSaved()` — 유일한 소비자였던 `MigrateLegacyCompletion` 제거로 호출자 0
+- [ ] 구 세이브 파싱 실패 시 `SAVE_KEY` 원본이 남아 첫 `Save()` 전까지 매 부트 LogError 반복 (실측 확인됨)
 
 **완료 판정 (이번 작업의 핵심 수용 기준)**:
 콘솔에서 `currency.Gold` 를 손으로 고친다(타입 integer 유지) → 앱 재시작 → 로비 상단바에 그 값이 뜬다.
