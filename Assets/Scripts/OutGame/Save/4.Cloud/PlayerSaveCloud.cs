@@ -402,9 +402,12 @@ static class PlayerSaveCloud
 
     static async UniTask<string> AuthenticateAsync(int _generation)
     {
+        // 이 파일의 대기는 전부 DelayType.Realtime이다 — ignoreTimeScale(=UnscaledDeltaTime)은 Time.unscaledDeltaTime을
+        // 프레임마다 더하는데, BeforeSceneLoad에서 시작한 이 타임아웃의 첫 프레임 델타에 씬 로드 정지 구간이 통째로
+        // 실려 5초 예산이 1프레임 만에 소진된다(실측 705ms). 네트워크 시간은 실시간으로만 재야 한다.
         int t_winner = await UniTask.WhenAny(
             FirebaseAuthService.Instance.InitializeAsync(),
-            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, ignoreTimeScale: true));
+            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
         if (t_winner != 0) throw new TimeoutException("Firebase authentication timed out.");
         if (_generation != s_generation) return string.Empty;
 
@@ -421,7 +424,7 @@ static class PlayerSaveCloud
         {
             if (t_attempt > 0)
             {
-                await UniTask.Delay(READ_BACKOFF_MS, ignoreTimeScale: true);
+                await UniTask.Delay(READ_BACKOFF_MS, DelayType.Realtime);
                 if (_generation != s_generation) return null;
             }
 
@@ -430,7 +433,7 @@ static class PlayerSaveCloud
                 Task<DocumentSnapshot> t_readTask = Document(_userId).GetSnapshotAsync(Source.Server);
                 (bool t_hasResult, DocumentSnapshot t_document) = await UniTask.WhenAny(
                     t_readTask.AsUniTask(),
-                    UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, ignoreTimeScale: true));
+                    UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
                 if (!t_hasResult)
                 {
                     t_lastException = new TimeoutException("Firestore read timed out.");
@@ -469,7 +472,7 @@ static class PlayerSaveCloud
 
     static async UniTaskVoid DebounceUploadAsync(int _version, int _generation)
     {
-        await UniTask.Delay(UPLOAD_DEBOUNCE_MS, ignoreTimeScale: true);
+        await UniTask.Delay(UPLOAD_DEBOUNCE_MS, DelayType.Realtime);
         if (_generation != s_generation || _version != s_pendingVersion) return;
 
         await UploadAsync(_generation);
@@ -595,7 +598,7 @@ static class PlayerSaveCloud
 
         (bool t_hasResult, long t_revision) = await UniTask.WhenAny(
             t_transactionTask.AsUniTask(),
-            UniTask.Delay(FirebaseTimeouts.TransactionMilliseconds, ignoreTimeScale: true));
+            UniTask.Delay(FirebaseTimeouts.TransactionMilliseconds, DelayType.Realtime));
         if (!t_hasResult) throw new TimeoutException("Firestore save transaction timed out.");
 
         return t_revision;
