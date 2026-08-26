@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -5,10 +6,11 @@ using UnityEngine.Serialization;
 // (정상 경로는 로딩 씬이, 로비 단독 Play는 로비 사본이 맡는다).
 // 세이브 로드·재화 캐싱 등 씬 오브젝트가 필요 없는 부트는 GameManager가 앱 시작 시 먼저 처리한다.
 [DefaultExecutionOrder(-200)]
-public class BootInstaller : MonoBehaviour
+public class InitializationInstaller : MonoBehaviour
 {
     // 카드 목록은 CardRegistry(SO)가 단일 진실원. 씬에 사본을 두면 카드 추가 시 한쪽만 갱신된다.
     [SerializeField] CardRegistry cardRegistry;
+    [SerializeField] SynergyRegistry synergyRegistry;
     // 카드 앨범(신규 도감) SO. 미배선(null)이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
     [SerializeField] CardAlbumConfig albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선(null)이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
@@ -31,8 +33,17 @@ public class BootInstaller : MonoBehaviour
     [SerializeField] ProfileConfig profileConfig;
     [FormerlySerializedAs("runtimeUiPrefabs")]
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
+    // 아래 넷은 전역 static의 단일 주입 창구다. DataLibrary가 아니라 여기 있는 이유는 순서다 —
+    // 실행 순서가 보장되는 컴포넌트는 [DefaultExecutionOrder(-200)]인 이 클래스뿐이라,
+    // 다른 Awake보다 먼저 꽂히는 자리가 여기밖에 없다.
+    // 미배선(null)이면 각 static이 코드 기본값으로 동작하고 IsConfigured가 false로 남아 경고를 낸다.
+    [SerializeField] BattleTimingConfig battleTimingConfig;
+    [SerializeField] BattleReward battleRewardConfig;
+    // 티어 테이블과 랭크 보상 표는 같은 SO를 읽는다 — 둘로 나누면 승급 기준과 보상 기준이 갈린다.
+    [SerializeField] RankConfig rankConfig;
+    [SerializeField] BattleVfxLibrary battleVfxLibrary;
 
-    static bool s_booted;
+    static bool s_initialized;
     static bool s_saveDependentInstalled;
 
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
@@ -40,20 +51,29 @@ public class BootInstaller : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
-        s_booted = false;
+        s_initialized = false;
         s_saveDependentInstalled = false;
     }
 
     void Awake()
     {
         // 두 번째 사본은 자식 매니저가 각자 자폭하기 전에 루트째로 걷어낸다(빈 루트가 씬에 남지 않게).
-        if (s_booted)
+        if (s_initialized)
         {
             Destroy(gameObject);
             return;
         }
 
         DontDestroyOnLoad(gameObject);
+
+        // 전역 static 주입. 전부 null이면 무시하는 시그니처라 미배선이 예외가 되지는 않는다
+        // (대신 각 static이 기본값을 처음 꺼내 쓸 때 세션당 1회 경고한다).
+        GameTiming.SetConfig(battleTimingConfig);
+        RewardService.SetConfig(battleRewardConfig);
+        RankManager.SetConfig(rankConfig);
+        RankRewardManager.SetConfig(rankConfig);
+        BattleVfx.SetLibrary(battleVfxLibrary);
+
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
@@ -63,7 +83,7 @@ public class BootInstaller : MonoBehaviour
         {
             t_profile = ContentProfileConfig.Active;
             SpecSource.Init();
-            CardCatalog.SetSource(cardRegistry.All, t_profile.RunMode, t_profile.IncludeTestCards);
+            CardCatalog.SetSource(cardRegistry.All, synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
             t_availableCards = new System.Collections.Generic.List<CardData>(CardCatalog.All);
         }
         catch (System.Exception t_exception)
@@ -74,13 +94,18 @@ public class BootInstaller : MonoBehaviour
             return;
         }
 
-        s_booted = true;
+        s_initialized = true;
 
         // 카드 아트 선로드. 아트는 이제 CardData가 직접 물지 않고 Addressables로 따로 온다
         // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
         // 지금은 전 카드를 받는다: 이관 전과 같은 "언제든 다 그려진다" 동작을 유지하기 위함이다.
         // 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다(좁히는 순간 미스 경고가 진단이 된다).
         StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        StartCoroutine(AttackEffectCache.Preload(CardCatalog.AllAttackEffectKeys));
+
+        // UI 프리팹 라벨 로드. 시작을 여기서 거는 이유는 CardArtCache와 같다 — 시작 시점이
+        // 컴포넌트 실행 순서에 끌려다니지 않게 초기화 소유자가 명시적으로 건다.
+        UiPrefabCache.Preload().Forget();
 
         // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
@@ -145,7 +170,7 @@ public class BootInstaller : MonoBehaviour
 
         // 덱이 하나도 없는 신규 유저에게 스타터덱 지급(카드 소유권 포함).
         // 소유권 캐시·덱 로드 이후여야 하고, 대표 이미지 키를 뽑으므로 DeckImages 주입보다도 뒤에 온다.
-        // 튜토리얼 첫실행 판정은 GameManager.Boot(BeforeSceneLoad)에서 이미 끝났으므로 여기 지급이 스킵을 유발하지 않는다.
+        // 튜토리얼 첫실행 판정은 GameManager.Initialize(BeforeSceneLoad)에서 이미 끝났으므로 여기 지급이 스킵을 유발하지 않는다.
 
         // 주입은 멱등 — 씬 브리지가 같은 에셋을 다시 넣어도 조기 return한다.
         OutgameTutorialRunner.EnsureData(tutorialData);
@@ -174,13 +199,14 @@ public class BootInstaller : MonoBehaviour
 
         if (DataLibrary.instance == null)
         {
-            Debug.LogError("[BootInstaller] DataLibrary is missing from the boot hierarchy.");
+            Debug.LogError("[InitializationInstaller] DataLibrary is missing from the initialization hierarchy.");
             GameInitialization.MarkRecoveryRequired();
             yield break;
         }
 
         GameInitialization.SetState(EGameInitState.LoadingAssets);
-        while ((!CardArtCache.IsComplete || (!DataLibrary.IsLoaded && !DataLibrary.HasFailed)) &&
+        while ((!CardArtCache.IsComplete || !AttackEffectCache.IsComplete ||
+                (!UiPrefabCache.IsComplete && !UiPrefabCache.HasFailed)) &&
                !GameInitialization.IsTerminated)
         {
             yield return null;
@@ -189,7 +215,7 @@ public class BootInstaller : MonoBehaviour
         if (GameInitialization.IsTerminated)
             yield break;
 
-        if (CardArtCache.HasFailed || DataLibrary.HasFailed)
+        if (CardArtCache.HasFailed || AttackEffectCache.HasFailed || UiPrefabCache.HasFailed)
         {
             GameInitialization.MarkRecoveryRequired();
             yield break;

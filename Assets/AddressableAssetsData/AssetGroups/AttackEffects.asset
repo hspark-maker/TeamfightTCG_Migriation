@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: AttackEffects
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: AttackEffects
+  m_GUID: b1fff377bf50f5c4f9b44bae76ec2322
+  m_SerializeEntries:
+  - m_GUID: 1869af0b0d30c4c45be25d0524cef43d
+    m_Address: Effect_Attack_Waveri
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackEffect
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 77b6d36e1a62ff546919cdb5f5771344
+    m_Address: Effect_Attack_Sparkfin_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackEffect
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 969986abe04d9bf48a94145d59603f10
+    m_Address: Effect_Attack_Waggledodo
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackEffect
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9fe3558b2652cb7479a48f6933852b5a
+    m_Address: Effect_Attack_Sandmong
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackEffect
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d7803c9bdf127414b9f3e5347928c39a
+    m_Address: Effect_Attack_MushroomCat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - AttackEffect
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 721aaf99b99a31e4093a159c4e500fc2, type: 2}
+    - {fileID: 11400000, guid: 0b0981ede3d154741a3570c9a4ce212c, type: 2}

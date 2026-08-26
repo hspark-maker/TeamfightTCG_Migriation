@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.Video;
 
 public enum ECardChannel
 {
@@ -68,7 +67,6 @@ public class CardData : ScriptableObject
     public int bonusHp;
     // 카드가 가진 시너지들(가변 개수). main/sub 구분은 개념적일 뿐 같은 종류의 synergy.
     // 같은 SynergyData가 중복 나열돼도 카운트/적용/배지에서는 1회로 취급(소비측 Distinct).
-    public SynergyData[] synergies;
 
     [Header("Growth HP Curve")]
     // index = 레벨을 유지한다(호출부가 레벨→인덱스를 손으로 옮기지 않게). 그래서 [0]/[1]은 쓰지 않는 빈칸이다 —
@@ -98,31 +96,16 @@ public class CardData : ScriptableObject
     // CardInstance 생성 시 1회 복사되며, 세이브 연동이 들어오면 이 필드 대신 세이브가 주입한다.
     public int defaultEvolutionStage;
     // 등장 컷씬. null이면 컷씬 없음(대부분의 카드가 여기 해당 — 판정은 CardCinematicRules 단일 지점).
-    public VideoClip appearCinematic;
     // 시네마 공격(3단계 첫 공격) 연출 종류. 카드마다 다른 연출을 주는 축 — 연출 구현은 AttackSequence 소유.
     // **등장 연출도 이 값이 정한다**(EnergyOrbDash면 슬롯 배치도 같은 구체로 날아온다 — CardAppearVfx).
     // 등장용 축을 따로 두지 않는 이유: 공격과 등장이 같은 구체를 쓰는 한 몸 연출이라 배선이 갈라지면 어긋난다.
-    public CinemaAttackStyle cinemaAttackStyle;
     // EnergyOrbDash에서 카드가 변하는 구체 프리팹. 카드마다 테마가 달라 **카드 고유 축**에 둔다
     // (라이브러리는 규칙 기반 연출 전용). 비우면 BattleVfxLibrary의 CinemaEnergyOrb로 떨어진다.
-    public GameObject cinemaOrbPrefab;
 
     [Header("Attack")]
     public AttackEffect attackEffect;
-    public CardPassive  passive;
-
-    [Header("Voice")]
-    public AudioClip[] spawnVoices;
-    public AudioClip[] attackVoices;
-    public AudioClip[] killVoices;
-    public AudioClip[] deathVoices;
-    public AudioClip[] effectVoices;
-
-    [Header("Effect SFX")]
-    public AudioClip[] effectClips;
 
     public string cardExplain;
-    public CardKeyword explainKeywords;
 
     public bool HasKeyword(CardKeyword _kw) => (this.keywords & _kw) != 0;
 

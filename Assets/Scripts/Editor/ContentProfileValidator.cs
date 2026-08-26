@@ -10,6 +10,7 @@ using UnityEngine;
 public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 {
     const string REGISTRY_PATH = "Assets/SO/CardRegistry.asset";
+    const string SYNERGY_REGISTRY_PATH = "Assets/SO/SynergyRegistry.asset";
     const string LIVE_PROFILE_PATH = "Assets/Resources/ContentProfiles/Live.asset";
     const string TEST_PROFILE_PATH = "Assets/Resources/ContentProfiles/Test.asset";
 
@@ -96,8 +97,44 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         }
 
         ValidateCardArtAddresses(t_errors, _warnings, _mode);
+        ValidateSynergyRegistry(t_errors, _warnings, _mode);
 
         return t_errors;
+    }
+
+    static void ValidateSynergyRegistry(
+        List<string> _errors,
+        List<string> _warnings,
+        EContentRunMode? _mode)
+    {
+        SynergyRegistry t_registry = AssetDatabase.LoadAssetAtPath<SynergyRegistry>(SYNERGY_REGISTRY_PATH);
+        if (t_registry == null)
+        {
+            _errors.Add($"SynergyRegistry 없음: {SYNERGY_REGISTRY_PATH}");
+            return;
+        }
+
+        try { t_registry.ValidateOrThrow(); }
+        catch (Exception t_exception)
+        {
+            _errors.Add(t_exception.Message);
+            return;
+        }
+
+        foreach (EContentRunMode t_mode in new[] { EContentRunMode.Live, EContentRunMode.Test })
+        {
+            List<string> t_issues = !_mode.HasValue || _mode.Value == t_mode ? _errors : _warnings;
+            try
+            {
+                foreach (CardSpec t_spec in CardSpec.Load(t_mode).Values)
+                    foreach (string t_name in t_spec.SynergyNames)
+                        t_registry.Require(t_name);
+            }
+            catch (Exception t_exception)
+            {
+                t_issues?.Add($"{t_mode} 카드 시너지 검증 실패: {t_exception.Message}");
+            }
+        }
     }
 
     static void ValidateCardArtAddresses(

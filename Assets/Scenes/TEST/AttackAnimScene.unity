@@ -44407,6 +44407,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cardRegistry: {fileID: 11400000, guid: ad6d5a89b39a41b45b16993f8e254d5c, type: 2}
+  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
   playerField: {fileID: 171939905}
   enemyField: {fileID: 1009741517}
   playerFieldView: {fileID: 282937760}

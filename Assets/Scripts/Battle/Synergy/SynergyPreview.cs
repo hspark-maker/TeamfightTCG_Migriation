@@ -34,10 +34,11 @@ public static class SynergyPreview
     /// <summary>카드가 그 시너지를 갖는지. 집계(Resolve)와 강조 표시가 같은 판정을 쓰게 하는 창구다.</summary>
     public static bool Has(CardData _card, SynergyData _synergy)
     {
-        if (_card == null || _synergy == null || _card.synergies == null) return false;
+        if (_card == null || _synergy == null) return false;
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(_card);
 
-        for (int i = 0; i < _card.synergies.Length; i++)
-            if (_card.synergies[i] == _synergy) return true;
+        for (int i = 0; i < t_synergies.Count; i++)
+            if (t_synergies[i] == _synergy) return true;
 
         return false;
     }
@@ -53,10 +54,11 @@ public static class SynergyPreview
 
         foreach (var t_card in _deckCards)
         {
-            if (t_card == null || t_card.synergies == null) continue;
+            if (t_card == null) continue;
+            IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(t_card);
 
             var t_seen = new HashSet<SynergyData>();   // 한 카드가 같은 시너지를 중복 나열해도 1회만
-            foreach (var t_synergy in t_card.synergies)
+            foreach (var t_synergy in t_synergies)
             {
                 if (t_synergy == null) continue;
                 if (!t_seen.Add(t_synergy)) continue;

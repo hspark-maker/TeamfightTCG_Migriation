@@ -171,7 +171,6 @@ public static class AttackSequence
         bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
         _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
 
@@ -218,7 +217,6 @@ public static class AttackSequence
         bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
         _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
         LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform,
@@ -295,7 +293,6 @@ public static class AttackSequence
         bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        SoundManager.Instance?.PlayAttackVoice(_attacker.BoundCard?.data?.attackVoices);
         _effect?.SpawnParticles(_attacker.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
 
@@ -776,7 +773,6 @@ public static class AttackSequence
         bool t_flip = _attacker?.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
         _attacker?.PlayAttackAnim();
         SoundManager.Instance?.PlayRandom(_effect?.attackClips);
-        SoundManager.Instance?.PlayAttackVoice(_attacker?.BoundCard?.data?.attackVoices);
         _effect?.SpawnParticles(_attacker?.transform, _defender.transform, t_flip,
                                 BattleFinisher.ApproachDurationFactor);
         LaunchProjectile(_effect?.projectile ?? default, _attacker?.transform, _defender.transform, t_hitDelay,
@@ -789,9 +785,8 @@ public static class AttackSequence
             await UniTask.Delay((int)(t_hitDelay * 1000));
 
         // 시네마 자리에서의 타격 모션. 카드마다 다른 연출을 주는 분기점 — 어떤 카드가 어떤 연출인지는
-        // CardData.cinemaAttackStyle이 소유하고, 연출 구현은 여기 있다. 데미지 해결은 어느 쪽이든 ResolveHits 공용.
-        CinemaAttackStyle t_style = _attacker?.BoundCard?.data != null
-            ? _attacker.BoundCard.data.cinemaAttackStyle : CinemaAttackStyle.Default;
+        // CardSpec.CinemaAttackStyle이 소유하고, 연출 구현은 여기 있다. 데미지 해결은 어느 쪽이든 ResolveHits 공용.
+        CinemaAttackStyle t_style = _attacker?.BoundCard?.spec?.CinemaAttackStyle ?? CinemaAttackStyle.Default;
 
         if (_attacker != null && t_style == CinemaAttackStyle.EnergyOrbDash)
             await EnergyOrbDash(_attacker, _defender, _splashView, _effect, _onEffect, _atEffectKw, _afterHit);
@@ -841,10 +836,7 @@ public static class AttackSequence
         _attacker.FadeView(0f, t_morph);
         // 구체는 카드마다 테마가 다르다(전기/물/안개…). 카드에 지정된 게 있으면 그걸 쓰고,
         // 없으면 라이브러리 기본 구체로 떨어진다 — 배선을 안 해도 연출이 비지는 않게.
-        GameObject t_orbPrefab = _attacker.BoundCard?.data?.cinemaOrbPrefab;
-        VfxHandle  t_orb       = t_orbPrefab != null
-            ? BattleVfx.SpawnPrefab(t_orbPrefab, t_home, _attacker.VfxSortingLayerId)
-            : BattleVfx.Spawn(BattleVfxId.CinemaEnergyOrb, t_home, _attacker.VfxSortingLayerId);
+        VfxHandle t_orb = BattleVfx.Spawn(BattleVfxId.CinemaEnergyOrb, t_home, _attacker.VfxSortingLayerId);
         await UniTask.Delay((int)(t_morph * 1000));
 
         Transform t_orbTr = t_orb.Valid ? t_orb.Go.transform : null;
@@ -1051,11 +1043,10 @@ public static class AttackSequence
     static async UniTask PlayVictimDeaths(CardView _attacker, CardView _defender, CardView _splashView,
         bool _defenderKilled, bool _splashKilled)
     {
+        // 카드별 보이스 축은 제거됐고 사망 모션만 재생한다.
         if (_defenderKilled && _defender != null)   await _defender.PlayDeathAnim();
         if (_splashKilled   && _splashView != null) await _splashView.PlayDeathAnim();
 
-        if (_defenderKilled || _splashKilled)
-            SoundManager.Instance?.PlayKillVoice(_attacker?.BoundCard?.data?.killVoices);
     }
 
     /// <summary>타격 순간의 멈칫. 무엇을 멈출지는 호출부가 준 콜백이 정한다(미지정이면 멈칫 없음).

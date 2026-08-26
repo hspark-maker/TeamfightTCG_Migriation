@@ -347,7 +347,6 @@ public class TurnRunner : MonoBehaviour
                 if (t_c.justSpawned) { t_c.justSpawned = false; continue; }
                 // [TurnBegan] 카드 단위. 패시브 → 시너지 순.
                 var t_beganCtx = new TurnCtx(t_c, t_field);
-                await (t_c.data.passive?.OnTurnBegan(t_beganCtx) ?? UniTask.CompletedTask);
                 await SynergyTriggers.TurnBegan(t_beganCtx);
             }
             this.ctx.RefreshViews();
@@ -393,7 +392,6 @@ public class TurnRunner : MonoBehaviour
             foreach (var t_c in t_field.GetActiveCards())
             {
                 var t_endedCtx = new TurnCtx(t_c, t_field);
-                t_c.data.passive?.OnTurnEnded(t_endedCtx);
                 SynergyTriggers.TurnEnded(t_endedCtx);
             }
 

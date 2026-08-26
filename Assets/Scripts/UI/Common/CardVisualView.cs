@@ -605,7 +605,7 @@ public class CardVisualView : MonoBehaviour
         // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
         // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
         // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        return CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+        return CardVisualRules.CollectSynergyBadges(CardCatalog.SynergiesOf(_card), null, this.synergyMaxBadges);
     }
 
     static readonly List<SynergyData> EmptySynergies = new List<SynergyData>();

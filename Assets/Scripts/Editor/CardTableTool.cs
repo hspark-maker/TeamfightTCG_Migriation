@@ -50,7 +50,7 @@ public static partial class CardTableTool
         => LegacyCardAssetNames.TryGetValue(_name, out string t_name) ? "Data_Card_" + t_name : _name;
 
     static string NormalizeSynergyAssetName(string _name)
-        => LegacySynergyAssetNames.TryGetValue(_name, out string t_name) ? "Data_Synergy_" + t_name : _name;
+        => SynergyRegistry.NormalizeName(_name);
 
     const int HP_CURVE_MIN_LEVEL = CardData.MinHpCurveLevel;
     const int HP_CURVE_MAX_LEVEL = CardData.MaxHpCurveLevel;
@@ -133,8 +133,6 @@ public static partial class CardTableTool
         foreach (CardData c in t_existing.Values)
             if (c != null && c.id > 0 && !t_byId.ContainsKey(c.id)) t_byId[c.id] = c;
 
-        Dictionary<string, ScriptableObject> t_synergies = AllSynergies();
-
         int t_created = 0, t_updated = 0;
         var t_warnings = new List<string>();
 
@@ -173,7 +171,7 @@ public static partial class CardTableTool
 
             ApplyId(t_card, t_row, t_header, t_name, t_idOwner, t_warnings);
             if (t_card.id > 0) t_byId[t_card.id] = t_card;
-            ApplyRow(t_card, t_row, t_header, t_synergies, t_name, t_warnings);
+            ApplyRow(t_card, t_row, t_header, t_name, t_warnings);
             // 이미 존재하지만 Registry에서 빠진 카드도 가져오기 한 번으로 복구한다.
             // AppendToRegistry는 기존 참조면 no-op이며 항상 맨 뒤에만 추가해 와이어 ID를 보존한다.
             AppendToRegistry(t_card);
@@ -306,7 +304,7 @@ public static partial class CardTableTool
     }
 
     static void ApplyRow(CardData _card, List<string> _row, Dictionary<string, int> _header,
-                         Dictionary<string, ScriptableObject> _synergies, string _name, List<string> _warnings)
+                         string _name, List<string> _warnings)
     {
         if (_header.ContainsKey("displayName"))
         {
@@ -356,8 +354,6 @@ public static partial class CardTableTool
 
         if (_header.ContainsKey("cardExplain")) _card.cardExplain = Cell(_row, _header, "cardExplain");
 
-        if (_header.ContainsKey("synergies"))
-            _card.synergies = ParseSynergies(Cell(_row, _header, "synergies"), _synergies, _name, _warnings);
     }
 
     static CardData CreateCardAsset(string _cardRoot, string _name)

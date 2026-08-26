@@ -265,7 +265,7 @@ public class CardDecorView
         if (_card == null || _card.data == null || !_card.isRevealed)         return new List<SynergyData>();
         if (!_card.synergyEnabled)                                            return new List<SynergyData>();
 
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(_card.data.synergies, _synergy, this.synergyMaxBadges);
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(CardCatalog.SynergiesOf(_card.data), _synergy, this.synergyMaxBadges);
         t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
         return t_tags;
     }

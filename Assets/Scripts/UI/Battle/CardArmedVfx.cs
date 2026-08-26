@@ -72,7 +72,7 @@ public class CardArmedVfx
             return;
         }
 
-        AttackEffect t_fx = _card.data?.attackEffect;
+        AttackEffect t_fx = CardCatalog.AttackEffectOf(_card.data);
         if (t_fx == null) return;
         foreach (ParticleEntry t_entry in t_fx.ArmedEntries())
             Spawn(t_entry.prefab, t_entry.localOffset, t_entry.initialRotation);

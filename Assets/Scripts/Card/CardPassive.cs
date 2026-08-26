@@ -2,8 +2,6 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 카드 고유 효과 1건. 활성 조건 = "이 카드가 있다"(상시). 카드당 1개(CardData.passive 단수).
-///
 /// **훅은 <see cref="BattleEffect"/>에 선언돼 있다** — 여기엔 표시 유틸만 둔다.
 /// 어느 타이밍이 있는지·계약이 뭔지는 <see cref="BattleTimings"/>를 봐라.
 /// 덱 조합으로 열리는 효과는 이쪽이 아니라 SynergyEffect다(활성 조건만 다르고 훅은 동일).
@@ -29,9 +27,6 @@ public abstract class CardPassive : BattleEffect
     {
         if (string.IsNullOrEmpty(_effectLabel)) return;
         SoundManager.Instance?.PlayPassive();
-        SoundManager.Instance?.PlayRandom(_self.data?.effectClips);
-        SoundManager.Instance?.PlayEffectVoice(_self.data?.effectVoices);
-
         // 우측 슬라이드 배너는 BattleUxFlags.EffectNotifyBanner로 블라인드 중(가독성·학습성 판단).
         // 소리/보이스는 그대로 둔다 — 발동 자체의 피드백은 남겨야 한다. 배지 pop(SynergyTriggers.Fire)도 유지.
         if (!BattleUxFlags.EffectNotifyBanner) return;

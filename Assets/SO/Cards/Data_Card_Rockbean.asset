@@ -19,7 +19,6 @@ MonoBehaviour:
   keywords: 0
   maxHp: 5
   bonusHp: 0
-  synergies: []
   hpGainByLevel: 0000000000000000050000000400000003000000
   keywordUnlockLevel: 0
   arts:

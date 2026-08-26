@@ -1101,8 +1101,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             }
 
         // 시너지는 개념 하나라 카드가 여럿 물고 있어도 첫 장 하나면 된다.
-        if (_synergy && _card != null && _card.synergies != null)
-            foreach (SynergyData t_syn in _card.synergies)
+        if (_synergy && _card != null)
+            foreach (SynergyData t_syn in CardCatalog.SynergiesOf(_card))
             {
                 if (!UnlockIntro.TryForSynergy(t_syn, out UnlockIntro t_intro)) continue;
 
@@ -1789,21 +1789,24 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_shownSynergyOpen = _owned && SynergyUnlocked(_card);
 
         // 시너지는 1차 진화 관문 하나로 전부 열리고 전부 잠긴다 → 부분 잠김이 없어 항상 섹션째로 덮는다.
-        bool t_hasSynergy = _card != null && _card.synergies != null && _card.synergies.Length > 0;
+        IReadOnlyList<SynergyData> t_synergies = _card != null
+            ? CardCatalog.SynergiesOf(_card)
+            : Array.Empty<SynergyData>();
+        bool t_hasSynergy = t_synergies.Count > 0;
         SetSectionLock(this.synergySectionLock, _owned && t_hasSynergy && !this.m_shownSynergyOpen,
                        this.m_pendingSynergyUnlockFx);
 
         var t_lines = new List<string>();
         int t_used  = 0;
 
-        if (_owned && _card.synergies != null && this.synergyChipRoot != null)
+        if (_owned && t_synergies.Count > 0 && this.synergyChipRoot != null)
         {
             // 시너지는 카드마다가 아니라 **1차 진화 도달 여부**로 통째로 열린다(관문은 CardGrowthConfig 소유).
             // 그래서 칩마다 판정하지 않고 카드 하나에 한 번만 묻는다.
             bool t_open = SynergyUnlocked(_card);
 
             var t_seen = new HashSet<SynergyData>();
-            foreach (SynergyData t_syn in _card.synergies)
+            foreach (SynergyData t_syn in t_synergies)
             {
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
 

@@ -158,11 +158,12 @@ public class AttackAnimTester : MonoBehaviour
 
     IEnumerator Start()
     {
-        if (!CardStandaloneBootstrap.Ensure(this.cardRegistry)) yield break;
+        if (!CardStandaloneInitializer.Ensure(this.cardRegistry)) yield break;
         yield return CardArtCache.Preload(CardCatalog.AllSpecs);
-        if (!CardArtCache.IsReady)
+        yield return AttackEffectCache.Preload(CardCatalog.AllAttackEffectKeys);
+        if (!CardArtCache.IsReady || AttackEffectCache.HasFailed)
         {
-            Debug.LogError("[AttackAnimTester] 카드 아트 준비 실패.");
+            Debug.LogError("[AttackAnimTester] 카드 연출 에셋 준비 실패.");
             yield break;
         }
 
@@ -248,7 +249,7 @@ public class AttackAnimTester : MonoBehaviour
 
     async UniTask AttackCore(CardView _attacker, CardView _defender)
     {
-        AttackEffect t_effect = _attacker.BoundCard?.data?.attackEffect;
+        AttackEffect t_effect = CardCatalog.AttackEffectOf(_attacker.BoundCard?.data);
 
         // 적(비로컬) 공격이면 오프셋/회전 반전 — AttackSequence의 t_flip 규칙과 동일.
         bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
@@ -779,6 +780,8 @@ public class AttackAnimTester : MonoBehaviour
     /// 필드가 비어 있으면 프로젝트에서 찾아 쓴다(에디터 전용).</summary>
     void ResolveConfig()
     {
+        if (GameTiming.IsConfigured) return;
+
 #if UNITY_EDITOR
         if (this.timingConfig == null)
         {

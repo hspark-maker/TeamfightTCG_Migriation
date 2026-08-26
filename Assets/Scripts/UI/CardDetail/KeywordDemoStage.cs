@@ -294,7 +294,7 @@ public class KeywordDemoStage : SingletonOverlayBase
     {
         if (_token.IsCancellationRequested) return UniTask.CompletedTask;
 
-        AttackEffect t_effect = _atk.BoundCard?.data?.attackEffect;
+        AttackEffect t_effect = CardCatalog.AttackEffectOf(_atk.BoundCard?.data);
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_atk.BoundCard);
 
         // 무장 이펙트는 무장(탭) 단계에서 켜진다. 여기엔 그 단계가 없어 대신 켜준다(AttackAnimTester와 같은 이유).

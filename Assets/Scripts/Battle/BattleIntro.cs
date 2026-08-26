@@ -303,7 +303,6 @@ public class BattleIntro : MonoBehaviour
             // 고등급 등장 컷씬: 이 카드가 필드에 나오기 직전. 오프닝 배치도 "필드에 나오는" 순간이라 포함한다
             // (런타임 등장은 BattleFieldView.PlayFillAnim). 자격 판정은 CardCinematicRules 단독 —
             // 일반 카드는 Resolve가 null이라 즉시 통과하고, 같은 인스턴스는 래치로 두 번 재생되지 않는다.
-            await CardCinematicPlayer.Play(CardCinematicRules.Resolve(t_view.BoundCard));
 
             t_pile?.PlayIntroDraw();
 

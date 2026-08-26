@@ -32,12 +32,14 @@ public static class SynergyIconStrip
 
         if (_clearFirst) Clear(_parent);
 
-        if (_card?.synergies == null) return;
+        if (_card == null) return;
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(_card);
+        if (t_synergies.Count == 0) return;
 
         // 정렬·중복 제거 규칙은 카드 배지와 같은 곳(CardVisualRules) — 두 곳이 갈리면 같은 카드인데
         // 배지 순서와 정보창 순서가 달라진다. 여기선 상한만 풀어(전부 표시) 쓴다.
         List<SynergyData> t_ordered = CardVisualRules.CollectSynergyBadges(
-            _card.synergies, _state, _card.synergies.Length);
+            t_synergies, _state, t_synergies.Count);
 
         foreach (SynergyData t_synergy in t_ordered)
         {

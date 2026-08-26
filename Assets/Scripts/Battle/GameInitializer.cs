@@ -69,7 +69,7 @@ public class GameInitializer : MonoBehaviour
     {
         // 전투 씬 단독 실행에서도 배선되게 여기서 주입(DataLibrary 비의존).
         // 연출이 늘어도 이 필드는 하나로 고정 — 새 연출은 라이브러리 에셋의 목록에만 추가한다.
-        BattleVfx.SetLibrary(this.battleVfxLibrary);
+        if (!BattleVfx.HasLibrary) BattleVfx.SetLibrary(this.battleVfxLibrary);
     }
 
     async UniTaskVoid Start()

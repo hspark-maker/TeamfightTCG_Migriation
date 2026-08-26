@@ -7,14 +7,42 @@ using UnityEngine;
 public static class RewardService
 {
     static BattleReward _s;
+    static bool s_configured;
+    static bool s_warnedDefault;
+
+    public static bool IsConfigured => s_configured;
 
     public static BattleReward Config
-        => _s != null ? _s : (_s = ScriptableObject.CreateInstance<BattleReward>());
+    {
+        get
+        {
+            if (_s != null) return _s;
+            WarnDefaultConfig();
+            return _s = ScriptableObject.CreateInstance<BattleReward>();
+        }
+    }
 
     /// <summary>부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
     public static void SetConfig(BattleReward _config)
     {
-        if (_config != null) _s = _config;
+        if (_config == null) return;
+        _s = _config;
+        s_configured = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        _s = null;
+        s_configured = false;
+        s_warnedDefault = false;
+    }
+
+    static void WarnDefaultConfig()
+    {
+        if (s_warnedDefault) return;
+        s_warnedDefault = true;
+        Debug.LogWarning("[RewardService] BattleReward가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     /// <summary>

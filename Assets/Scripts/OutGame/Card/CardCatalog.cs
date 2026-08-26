@@ -9,10 +9,15 @@ public static class CardCatalog
     static readonly IReadOnlyList<CardData> s_allReadonly = s_all.AsReadOnly();
     static readonly List<CardSpec> s_allSpecs = new List<CardSpec>();
     static readonly IReadOnlyList<CardSpec> s_allSpecsReadonly = s_allSpecs.AsReadOnly();
+    static readonly IReadOnlyList<SynergyData> s_emptySynergies = Array.Empty<SynergyData>();
+    static readonly List<string> s_allAttackEffectKeys = new List<string>();
+    static readonly IReadOnlyList<string> s_allAttackEffectKeysReadonly = s_allAttackEffectKeys.AsReadOnly();
 
     // 카드 식별의 단일 축 — 세이브·도감 행·덱이 전부 이 번호를 쓴다.
     static readonly Dictionary<int, CardData> s_byId = new Dictionary<int, CardData>();
     static readonly Dictionary<int, CardSpec> s_specById = new Dictionary<int, CardSpec>();
+    static readonly Dictionary<int, IReadOnlyList<SynergyData>> s_synergiesById = new Dictionary<int, IReadOnlyList<SynergyData>>();
+    static readonly Dictionary<int, string> s_attackEffectKeyById = new Dictionary<int, string>();
 
     // 구 세이브(에셋 이름 키) 이관 전용 역인덱스. 평상시 조회에 쓰지 마라 —
     // 이름은 리네임으로 갈리는 축이고, 그걸 끊으려고 번호를 도입했다.
@@ -22,6 +27,7 @@ public static class CardCatalog
 
     public static IReadOnlyList<CardData> All => s_allReadonly;
     public static IReadOnlyList<CardSpec> AllSpecs => s_allSpecsReadonly;
+    public static IReadOnlyList<string> AllAttackEffectKeys => s_allAttackEffectKeysReadonly;
 
     public static int Count => s_all.Count;
 
@@ -32,14 +38,19 @@ public static class CardCatalog
         s_allSpecs.Clear();
         s_byId.Clear();
         s_specById.Clear();
+        s_synergiesById.Clear();
+        s_attackEffectKeyById.Clear();
+        s_allAttackEffectKeys.Clear();
         s_legacyNameToId.Clear();
         IsReady = false;
     }
 
     // 부트 주입 — 내부 인덱스 재구성
-    public static void SetSource(IEnumerable<CardData> _cards, EContentRunMode _mode, bool _includeTestCards)
+    public static void SetSource(IEnumerable<CardData> _cards, SynergyRegistry _synergyRegistry, EContentRunMode _mode, bool _includeTestCards)
     {
         IsReady = false;
+        if (_synergyRegistry == null) throw new InvalidOperationException("[CardCatalog] SynergyRegistry가 배선되지 않았다.");
+        _synergyRegistry.ValidateOrThrow();
         var t_assets = new Dictionary<int, CardData>();
         var t_legacyNames = new Dictionary<string, int>();
         var t_assetOrder = new List<int>();
@@ -66,6 +77,8 @@ public static class CardCatalog
         }
 
         Dictionary<int, CardSpec> t_specs = CardSpec.Load(_mode);
+        var t_resolvedSynergies = new Dictionary<int, IReadOnlyList<SynergyData>>();
+        var t_attackEffectKeys = new Dictionary<int, string>();
         foreach (KeyValuePair<int, CardSpec> t_pair in t_specs)
         {
             if (!t_assets.TryGetValue(t_pair.Key, out CardData t_asset))
@@ -77,16 +90,38 @@ public static class CardCatalog
             if (!t_specs.ContainsKey(t_pair.Key))
                 throw new InvalidOperationException($"[CardCatalog] CardData ID {t_pair.Key}('{t_pair.Value.name}')가 {_mode} 카드 표에 없다.");
 
+        foreach (KeyValuePair<int, CardSpec> t_pair in t_specs)
+        {
+            var t_resolved = new List<SynergyData>(t_pair.Value.SynergyNames.Count);
+            foreach (string t_name in t_pair.Value.SynergyNames)
+                t_resolved.Add(_synergyRegistry.Require(t_name));
+            t_resolvedSynergies.Add(t_pair.Key, t_resolved.AsReadOnly());
+
+            string t_key = t_pair.Value.AttackEffectKey;
+            string t_legacyKey = AttackEffectCache.AddressOf(t_assets[t_pair.Key].attackEffect);
+            if (string.IsNullOrWhiteSpace(t_key)) t_key = t_legacyKey;
+            else if (!string.IsNullOrEmpty(t_legacyKey) && !string.Equals(t_key, t_legacyKey, StringComparison.Ordinal))
+                throw new InvalidOperationException($"[CardCatalog] 카드 {t_pair.Key} 공격 이펙트 불일치: 표='{t_key}', SO='{t_legacyKey}'.");
+            t_attackEffectKeys.Add(t_pair.Key, t_key);
+        }
+
         s_all.Clear();
         s_allSpecs.Clear();
         s_byId.Clear();
         s_specById.Clear();
+        s_synergiesById.Clear();
+        s_attackEffectKeyById.Clear();
+        s_allAttackEffectKeys.Clear();
         s_legacyNameToId.Clear();
         foreach (int t_id in t_assetOrder)
         {
             CardData t_asset = t_assets[t_id];
             CardSpec t_spec = t_specs[t_id];
             s_specById.Add(t_id, t_spec);
+            s_synergiesById.Add(t_id, t_resolvedSynergies[t_id]);
+            string t_attackEffectKey = t_attackEffectKeys[t_id];
+            s_attackEffectKeyById.Add(t_id, t_attackEffectKey);
+            if (!string.IsNullOrEmpty(t_attackEffectKey)) s_allAttackEffectKeys.Add(t_attackEffectKey);
             if (_includeTestCards || t_spec.Channel == ECardChannel.Live)
             {
                 s_byId.Add(t_id, t_asset);
@@ -135,6 +170,26 @@ public static class CardCatalog
         if (_id <= 0 || !s_specById.TryGetValue(_id, out CardSpec t_spec))
             throw new InvalidOperationException($"[CardCatalog] 카드 ID {_id}의 CardSpec이 없다.");
         return t_spec;
+    }
+
+    public static IReadOnlyList<SynergyData> SynergiesOf(CardData _card)
+        => _card == null ? s_emptySynergies : RequireSynergies(IdOf(_card));
+
+    public static IReadOnlyList<SynergyData> RequireSynergies(int _id)
+    {
+        if (!IsReady) throw new InvalidOperationException("[CardCatalog] 초기화 전에 시너지를 조회했다.");
+        if (_id <= 0 || !s_synergiesById.TryGetValue(_id, out IReadOnlyList<SynergyData> t_synergies))
+            throw new InvalidOperationException($"[CardCatalog] 카드 ID {_id}의 시너지 스냅샷이 없다.");
+        return t_synergies;
+    }
+
+    public static AttackEffect AttackEffectOf(CardData _card)
+    {
+        if (_card == null) return null;
+        int t_id = IdOf(_card);
+        if (!IsReady || !s_attackEffectKeyById.TryGetValue(t_id, out string t_key))
+            throw new InvalidOperationException($"[CardCatalog] 카드 ID {t_id}의 공격 이펙트 키를 조회할 수 없다.");
+        return AttackEffectCache.Get(t_key);
     }
 
     /// <summary>구 세이브의 에셋 이름 키를 번호로 옮긴다. **세이브 이관 코드에서만 부를 것.**

@@ -14,12 +14,13 @@ public static class SynergyResolver
 
         foreach (var t_card in deckCards)
         {
-            if (t_card == null || t_card.synergies == null) continue;
+            if (t_card == null) continue;
+            IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(t_card);
 
             // 한 카드는 같은 시너지를 중복 나열해도 1회만 카운트(Distinct).
             // 배열 등장 순서로 순회 → 결정론 유지(HashSet은 중복 판정용, 순회 순서엔 미개입).
             var t_seen = new HashSet<SynergyData>();
-            foreach (var t_synergy in t_card.synergies)
+            foreach (var t_synergy in t_synergies)
             {
                 if (t_synergy == null) continue;
                 if (!t_seen.Add(t_synergy)) continue;  // 이 카드에서 이미 카운트한 시너지

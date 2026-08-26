@@ -125,7 +125,7 @@ public class EnemyTurn : TurnBase
                                              t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_atk.data.attackEffect, t_onEffect, t_preKw, t_atKw,
+                CardCatalog.AttackEffectOf(t_atk.data), t_onEffect, t_preKw, t_atKw,
                 () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.

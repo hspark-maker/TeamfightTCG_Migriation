@@ -912,7 +912,7 @@ public class CardView : MonoBehaviour
         this.cardAnim.FadeView(0f, 0.3f);
     }
 
-    /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardData.cinemaAttackStyle 하나로,
+    /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardSpec.CinemaAttackStyle 하나로,
     /// **공격 시네마와 같은 축을 쓴다**(같은 에너지 구체를 공유하는 한 몸 연출이라 배선을 갈라두지 않는다).
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
@@ -961,7 +961,7 @@ public class CardView : MonoBehaviour
         => SynergyEmblemVfx.PlayPlaced(this, this.boundCard, this.activeSynergyState);
 
     bool UsesOrbAppear => this.boundCard?.data != null
-                       && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;
+                       && this.boundCard.spec.CinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;
 
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();

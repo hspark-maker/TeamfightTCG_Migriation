@@ -349,9 +349,6 @@ public class BattleField : MonoBehaviour
         // [DeckResolved] 패시브 몫. **DeckResolved만 synergy→passive 역순인데 구조적 제약이다** —
         // ApplyAll 안에 ClearSynergy가 있어서 패시브를 먼저 돌리면 패시브가 넣은 정적 스탯이 지워진다.
         // (BattleTimings ◆ 참조.) ctx.state = 확정 스냅샷, ctx.synergy = null. 동기 void.
-        foreach (var t_card in t_cards)
-            t_card.data.passive?.OnDeckResolved(new DeckCtx(t_card, this.Synergy));
-
         // [Placed] 시너지 몫. Initialize 시점엔 this.Synergy가 아직 null이라 거기선 발화가 불가능하다
         // (패시브 Placed만 Initialize에서 발화 — justSpawned 판정에 무적 부여를 반영해야 하므로).
         // 그래서 시너지 Placed는 스냅샷이 확정된 여기서 슬롯 카드에 대해 발화한다.
@@ -374,7 +371,6 @@ public class BattleField : MonoBehaviour
         {
             CardInstance t_c = this.slots[i];
             if (t_c == null || !t_c.IsAlive) continue;
-            t_c.data.passive?.OnBoardChanged(new BoardCtx(this, t_c));
         }
 
         SynergyTriggers.BoardChanged(new BoardCtx(this));
@@ -385,7 +381,6 @@ public class BattleField : MonoBehaviour
     void NotifyPlaced(CardInstance _card)
     {
         var t_ctx = new SpawnCtx(_card, this);
-        _card.data.passive?.OnPlaced(t_ctx).Forget();
         SynergyTriggers.Placed(t_ctx);
     }
 
@@ -398,7 +393,6 @@ public class BattleField : MonoBehaviour
     void NotifyEntered(CardInstance _card)
     {
         var t_ctx = new SpawnCtx(_card, this);
-        _card.data.passive?.OnEntered(t_ctx).Forget();
         SynergyTriggers.Entered(t_ctx);
         NotifyBoardChanged(); // 등장으로 라이브 구성이 바뀜 → 파생 상태 재동기
     }

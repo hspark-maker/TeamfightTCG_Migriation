@@ -19,8 +19,6 @@ MonoBehaviour:
   keywords: 1
   maxHp: 2
   bonusHp: 0
-  synergies:
-  - {fileID: 11400000, guid: fcb84e498c66194468fe9a236338aa3e, type: 2}
   hpGainByLevel: 0000000000000000060000000400000003000000
   keywordUnlockLevel: 2
   arts:

@@ -37,7 +37,7 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        Boot();
+        Initialize();
     }
 
     void OnApplicationPause(bool _pause)
@@ -53,8 +53,8 @@ public class GameManager : MonoBehaviour
 
     void OnApplicationQuit() => Flush();
 
-    // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
-    void Boot()
+    // 전역 서브시스템 초기화. 순서 의존은 여기서 보장한다.
+    void Initialize()
     {
         GameInitialization.SetState(EGameInitState.Initializing);
 
@@ -76,7 +76,7 @@ public class GameManager : MonoBehaviour
         if (DataSaveManager.IsSaveBlocked)
         {
             GameInitialization.MarkUpdateRequired();
-            Debug.LogError("[GameManager] Boot blocked because the local save requires a newer client.");
+            Debug.LogError("[GameManager] Initialization blocked because the local save requires a newer client.");
             return;
         }
 

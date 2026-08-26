@@ -557,11 +557,11 @@ static class PlayerSaveSync
 
             case ESaveReconcileDecision.RemoteAhead:
             {
-                if (BootInstaller.IsSaveDependentInstalled)
+                if (InitializationInstaller.IsSaveDependentInstalled)
                 {
                     s_remoteWriteApproved = false;
                     s_gateComplete = true;
-                    Debug.LogWarning("[PlayerSaveSync] Remote apply deferred until the next boot because save caches are active.");
+                    Debug.LogWarning("[PlayerSaveSync] Remote apply deferred until the next initialization because save caches are active.");
                     return;
                 }
 

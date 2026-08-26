@@ -81,7 +81,7 @@ public class OutgameDebugOverlay : MonoBehaviour
     Vector2 m_scroll;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Bootstrap()
+    static void Initialize()
     {
         if (s_instance != null) return;
 

@@ -7,7 +7,7 @@ using UnityEngine;
 // 개봉 1회로 끝난다(획득 후 다시 보려면 Play를 다시 누른다) — 재개봉 트리거는 두지 않는다.
 // 정상 진입(상점/부트가 PackHandoff를 채운 상태)이면 주입은 건너뛴다 — 실제 세션이 항상 우선.
 // 구매·차감·소유 부여는 하지 않는다(연출 배선 검증용 껍데기 결과). 경제 계약은 CardPackOpener만 건드린다.
-public class PackStandaloneBoot : MonoBehaviour
+public class PackStandaloneInitializer : MonoBehaviour
 {
     [SerializeField] CardRegistry cardRegistry;
     [Header("더미 개봉 (PackHandoff 미배선일 때만)")]
@@ -31,13 +31,13 @@ public class PackStandaloneBoot : MonoBehaviour
     // 캐리어는 어떤 Start보다 먼저 차 있어야 한다 — 여는 쪽이 Start라 주입은 Awake다.
     void Awake()
     {
-        if (!CardStandaloneBootstrap.Ensure(this.cardRegistry)) return;
+        if (!CardStandaloneInitializer.Ensure(this.cardRegistry)) return;
         if (PackHandoff.HasPending) return;   // 실제 진입 — 더미로 덮지 않는다.
 
         var t_cards = ResolveCards();
         if (t_cards.Count == 0)
         {
-            Debug.LogWarning("[PackStandaloneBoot] 더미 카드 없음(dummyPack/dummyCards 미배선) — 주입 생략.");
+            Debug.LogWarning("[PackStandaloneInitializer] 더미 카드 없음(dummyPack/dummyCards 미배선) — 주입 생략.");
             return;
         }
 
@@ -55,7 +55,7 @@ public class PackStandaloneBoot : MonoBehaviour
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
         PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
 
-        Debug.Log($"[PackStandaloneBoot] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
+        Debug.Log($"[PackStandaloneInitializer] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
     }
 
     // 오버레이가 Awake에서 Instance를 선점하므로 열기는 Start까지 미룬다.
@@ -64,9 +64,10 @@ public class PackStandaloneBoot : MonoBehaviour
         if (!PackHandoff.HasPending) yield break;   // 주입이 생략됐으면 열 팩이 없다.
 
         yield return CardArtCache.Preload(CardCatalog.AllSpecs);
-        if (!CardArtCache.IsReady)
+        yield return AttackEffectCache.Preload(CardCatalog.AllAttackEffectKeys);
+        if (!CardArtCache.IsReady || AttackEffectCache.HasFailed)
         {
-            Debug.LogError("[PackStandaloneBoot] 카드 아트 준비 실패.");
+            Debug.LogError("[PackStandaloneInitializer] 카드 연출 에셋 준비 실패.");
             yield break;
         }
 

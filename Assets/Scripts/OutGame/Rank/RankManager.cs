@@ -7,6 +7,10 @@ public static class RankManager
     public static event Action OnChanged;
 
     static RankConfig s_config;
+    static bool s_configured;
+    static bool s_warnedDefault;
+
+    public static bool IsConfigured => s_configured;
 
     // 현재 랭크 포인트
     public static long Points => Slot.points;
@@ -20,7 +24,14 @@ public static class RankManager
     public static bool IsPromoPending => PromoPendingAt(Points);
 
     static RankConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
+    {
+        get
+        {
+            if (s_config != null) return s_config;
+            WarnDefaultConfig();
+            return s_config = ScriptableObject.CreateInstance<RankConfig>();
+        }
+    }
 
     static RankSaveData Slot
     {
@@ -249,7 +260,25 @@ public static class RankManager
     // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
-        if (_config != null) s_config = _config;
+        if (_config == null) return;
+        s_config = _config;
+        s_configured = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_config = null;
+        s_configured = false;
+        s_warnedDefault = false;
+        OnChanged = null;
+    }
+
+    static void WarnDefaultConfig()
+    {
+        if (s_warnedDefault) return;
+        s_warnedDefault = true;
+        Debug.LogWarning("[RankManager] RankConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     // 포인트만 0으로 되돌린다(디버그 전용)

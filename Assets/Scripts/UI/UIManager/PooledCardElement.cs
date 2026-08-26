@@ -247,11 +247,12 @@ public class PooledCardElement : PooledUIBase
         var t_active   = new List<SynergyData>();
         var t_inactive = new List<SynergyData>();
 
-        if (_card.synergies != null && TutorialConfig.SynergyVisible)
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.SynergiesOf(_card);
+        if (t_synergies.Count > 0 && TutorialConfig.SynergyVisible)
         {
             SynergyState t_state = this.cardElementData?.synergy;
             foreach (SynergyData t_syn in CardVisualRules.CollectSynergyBadges(
-                         _card.synergies, t_state, _card.synergies.Length))
+                         t_synergies, t_state, t_synergies.Count))
             {
                 if (t_syn == null) continue;
                 bool t_on = t_state == null || CardVisualRules.IsSynergyActive(t_state, t_syn);

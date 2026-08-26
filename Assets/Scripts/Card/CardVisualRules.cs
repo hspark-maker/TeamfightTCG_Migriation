@@ -125,7 +125,7 @@ public static class CardVisualRules
 
     /// <summary>이 카드가 가졌지만 **아직 해금 레벨에 닿지 않은** 키워드. 정보창이 잠김 룩으로 띄우는 대상이며,
     /// 아이콘 줄·프레임 장식은 이걸 띄우지 않는다(카드 위 표시는 지금 쓸 수 있는 것만).
-    /// explainKeywords는 빠진다 — 설명 전용은 해금 개념이 없는 안내용이라 잠글 것이 없다.</summary>
+    /// 아직 해금되지 않은 키워드만 반환한다.</summary>
     public static CardKeyword LockedKeywords(CardData _card)
         => _card == null ? CardKeyword.None : SpecKeywords(_card) & ~OwnedKeywords(_card);
 
@@ -135,18 +135,17 @@ public static class CardVisualRules
     public static CardKeyword InfoKeywordsWithLocked(CardData _card)
         => _card == null ? CardKeyword.None : InfoKeywords(_card) | SpecKeywords(_card);
 
-    /// <summary>**카드 정보창**이 띄울 키워드 = 지금 가진 키워드 + 설명 전용(explainKeywords).
+    /// <summary>**카드 정보창**이 띄울 키워드 = 지금 가진 키워드.
     /// 타일의 아이콘 줄과 목적이 다르다(설명까지 보여주는 창이라 AlwaysStatus를 빼지 않는다).
-    /// 이 규칙을 호출부가 각자 `keywords | explainKeywords`로 복제하면 해금 반영이 한쪽에서만 빠진다.</summary>
+    /// 이 규칙을 호출부가 각자 복제하면 해금 반영이 한쪽에서만 빠진다.</summary>
     public static CardKeyword InfoKeywords(CardData _card)
-        => _card == null ? CardKeyword.None : OwnedKeywords(_card) | _card.explainKeywords;
+        => _card == null ? CardKeyword.None : OwnedKeywords(_card);
 
     /// <summary>전투 인스턴스용 정보창 키워드. **인스턴스가 있으면 이쪽이 정답이다** —
     /// 적 카드에 내 성장을 얹지 않으려면 공급자(내 강화값)가 아니라 그 인스턴스의 값을 봐야 한다.</summary>
     public static CardKeyword InfoKeywords(CardInstance _card)
         => _card == null ? CardKeyword.None
-         : _card.unlockedKeywords | _card.synergyKeywords
-           | (_card.data != null ? _card.data.explainKeywords : CardKeyword.None);
+         : _card.unlockedKeywords | _card.synergyKeywords;
 
     /// <summary>아이콘 줄에서만 빼는 키워드. 프레임 장식으로는 그대로 보여준다.
     /// Mark(표식)=반격을 못 주는 대가라 프레임 테두리로 알리는 편이 맞고, 아이콘 줄에 넣으면
@@ -192,7 +191,7 @@ public static class CardVisualRules
     /// <summary>카드가 가진 시너지 중 배지로 표시할 것들을 표시 순서대로 뽑는다.
     /// null 스킵 → 같은 참조 중복은 1회 → 활성 우선, 동급이면 requiredCount 내림차순 정렬 → 상한 적용.
     /// _state가 null이면(아웃게임엔 전투 스냅샷이 없다) 활성 판정만 전부 false가 되고 requiredCount 정렬은 그대로 산다.</summary>
-    public static List<SynergyData> CollectSynergyBadges(SynergyData[] _synergies, SynergyState _state, int _max = MaxSynergyBadges)
+    public static List<SynergyData> CollectSynergyBadges(IReadOnlyList<SynergyData> _synergies, SynergyState _state, int _max = MaxSynergyBadges)
     {
         var t_tags = new List<SynergyData>();
         if (_synergies != null)

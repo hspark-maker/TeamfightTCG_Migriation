@@ -120,7 +120,7 @@ public static class OwnershipManager
     {
         if (!CardCatalog.IsReady)
         {
-            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(BootInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
+            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(InitializationInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
             return 0;
         }
 

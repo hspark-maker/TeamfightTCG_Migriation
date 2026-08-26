@@ -31,7 +31,6 @@ public class CardAuthoringWindow : EditorWindow
     int         newMaxHp = 5;
     int         newBonusHp;
     CardKeyword newKeywords = CardKeyword.None;
-    readonly List<SynergyData> newSynergies = new List<SynergyData>();
     Sprite baseArt;
 
     Vector2 scroll;
@@ -94,18 +93,6 @@ public class CardAuthoringWindow : EditorWindow
         this.newKeywords    = (CardKeyword)EditorGUILayout.EnumFlagsField("키워드", this.newKeywords);
 
         EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("시너지", EditorStyles.boldLabel);
-        for (int i = 0; i < this.newSynergies.Count; i++)
-        {
-            EditorGUILayout.BeginHorizontal();
-            this.newSynergies[i] = (SynergyData)EditorGUILayout.ObjectField(
-                this.newSynergies[i], typeof(SynergyData), false);
-            if (GUILayout.Button("−", GUILayout.Width(24))) { this.newSynergies.RemoveAt(i); i--; }
-            EditorGUILayout.EndHorizontal();
-        }
-        if (GUILayout.Button("시너지 추가", GUILayout.Width(120))) this.newSynergies.Add(null);
-
-        EditorGUILayout.Space(8);
         EditorGUILayout.LabelField("이미지 (나중에 채워도 됨)", EditorStyles.boldLabel);
         this.baseArt = (Sprite)EditorGUILayout.ObjectField("arts[0] (미진화)", this.baseArt, typeof(Sprite), false);
 
@@ -158,11 +145,6 @@ public class CardAuthoringWindow : EditorWindow
         t_card.arts    = new CardArtSet[CardData.MaxEvolutionStage + 1];
         t_card.arts[0] = new CardArtSet { battleImage = this.baseArt };
 
-        var t_syn = new List<SynergyData>();
-        foreach (var s in this.newSynergies)
-            if (s != null && !t_syn.Contains(s)) t_syn.Add(s);   // 중복 나열은 소비측에서 1회 취급 — 여기서 미리 정리
-        t_card.synergies = t_syn.ToArray();
-
         AssetDatabase.CreateAsset(t_card, t_path);
         AssetDatabase.SaveAssets();
 
@@ -179,7 +161,6 @@ public class CardAuthoringWindow : EditorWindow
             "남은 것: 이미지 / passive / attackEffect / 보이스 — 인스펙터에서 채울 것.", "확인");
 
         this.newName = ""; this.newDisplayName = "";
-        this.newSynergies.Clear();
         this.baseArt = null;
     }
 

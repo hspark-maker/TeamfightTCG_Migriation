@@ -49,8 +49,6 @@ public static partial class CardTableTool
         var t_cards = new Dictionary<string, CardData>();
         foreach (CardData c in AllCards()) t_cards[c.name] = c;
 
-        Dictionary<string, ScriptableObject> t_synergies = AllSynergies();
-
         var t_drift  = new List<string>();
         var t_inTable = new HashSet<string>();
 
@@ -72,7 +70,7 @@ public static partial class CardTableTool
                 continue;
             }
 
-            DiffCard(t_card, t_row, t_header, t_synergies, t_name, t_drift);
+            DiffCard(t_card, t_row, t_header, t_name, t_drift);
         }
 
         foreach (var t_pair in t_cards)
@@ -85,7 +83,7 @@ public static partial class CardTableTool
     /// <summary>한 장 대조. 복제본에 가져오기와 같은 <see cref="ApplyRow"/>를 태워 "표대로라면 어떤 값이 되는가"를
     /// 만들고 원본과 견준다. 가져오기가 내는 경고(모르는 키워드·없는 시너지)도 그대로 보고 대상이다.</summary>
     static void DiffCard(CardData _card, List<string> _row, Dictionary<string, int> _header,
-                         Dictionary<string, ScriptableObject> _synergies, string _name, List<string> _drift)
+                         string _name, List<string> _drift)
     {
         // id는 ApplyRow가 아니라 예약대장(ApplyId)이 다루는 축이라 여기서 직접 견준다.
         if (_header.ContainsKey("id"))
@@ -100,7 +98,7 @@ public static partial class CardTableTool
         try
         {
             var t_warnings = new List<string>();
-            ApplyRow(t_expected, _row, _header, _synergies, _name, t_warnings);
+            ApplyRow(t_expected, _row, _header, _name, t_warnings);
 
             foreach (string w in t_warnings) _drift.Add(w);
 
@@ -112,7 +110,6 @@ public static partial class CardTableTool
             Compare(_drift, _name, "keywordUnlockLevel", _card.keywordUnlockLevel, t_expected.keywordUnlockLevel);
             Compare(_drift, _name, "defaultEvolutionStage", _card.defaultEvolutionStage, t_expected.defaultEvolutionStage);
             Compare(_drift, _name, "cardExplain", _card.cardExplain, t_expected.cardExplain);
-            Compare(_drift, _name, "synergies", SynergiesToText(_card.synergies), SynergiesToText(t_expected.synergies));
 
             if (!SameCurve(_card.hpGainByLevel, t_expected.hpGainByLevel))
                 _drift.Add(Line(_name, "hp2~hp4", CurveToText(t_expected.hpGainByLevel), CurveToText(_card.hpGainByLevel)));

@@ -5,7 +5,7 @@ using UnityEngine.UI;
 // 랭크 보상 패널(RankRewardOverlay에 부착). 티어 행을 전부 생성하고 수령 흐름을 중계한다.
 //
 // 풀(UIPoolManager)이 수명을 쥔다 — 로비 프리팹에 상주하지 않고 필요할 때 세워진다.
-// 풀의 uiRoot(Boot 캔버스)와 로비 캔버스가 같은 1080x1920 기준이라 좌표계가 어긋나지 않는다.
+// 풀의 uiRoot(Initialize 캔버스)와 로비 캔버스가 같은 1080x1920 기준이라 좌표계가 어긋나지 않는다.
 // **두 캔버스의 기준 해상도가 갈리면 이 화면 배치가 통째로 어긋난다** — 바꿀 땐 같이 맞출 것.
 public class RankRewardPanel : PooledUIBase
 {

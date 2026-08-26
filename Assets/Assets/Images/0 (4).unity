@@ -666,7 +666,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2449901017464239670, guid: 305070bab040f1f4fb22ac7a6cf04f80, type: 3}
       propertyPath: m_Name
-      value: '[Boot]'
+      value: '[Initialize]'
       objectReference: {fileID: 0}
     - target: {fileID: 3392005005194032163, guid: 305070bab040f1f4fb22ac7a6cf04f80, type: 3}
       propertyPath: m_IsActive

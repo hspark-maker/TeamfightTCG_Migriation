@@ -6,6 +6,10 @@ using UnityEngine;
 public static class RankRewardManager
 {
     static RankConfig s_config;
+    static bool s_configured;
+    static bool s_warnedDefault;
+
+    public static bool IsConfigured => s_configured;
 
     // 수령 통지 — 패널이 행 상태를 다시 그리는 트리거
     public static event Action OnChanged;
@@ -30,7 +34,14 @@ public static class RankRewardManager
     public static bool HasAnyClaimable => TopClaimableIndex >= 0;
 
     static RankConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
+    {
+        get
+        {
+            if (s_config != null) return s_config;
+            WarnDefaultConfig();
+            return s_config = ScriptableObject.CreateInstance<RankConfig>();
+        }
+    }
 
     static RankSaveData Slot
     {
@@ -47,7 +58,25 @@ public static class RankRewardManager
     // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
-        if (_config != null) s_config = _config;
+        if (_config == null) return;
+        s_config = _config;
+        s_configured = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_config = null;
+        s_configured = false;
+        s_warnedDefault = false;
+        OnChanged = null;
+    }
+
+    static void WarnDefaultConfig()
+    {
+        if (s_warnedDefault) return;
+        s_warnedDefault = true;
+        Debug.LogWarning("[RankRewardManager] RankConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     // 티어 보상 행 1회 스냅샷(범위 밖은 None + Locked)

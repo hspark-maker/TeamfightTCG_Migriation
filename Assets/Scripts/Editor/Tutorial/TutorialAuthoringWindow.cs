@@ -752,7 +752,7 @@ public class TutorialAuthoringWindow : EditorWindow
         if (GUILayout.Button("취소", EditorStyles.miniButton, GUILayout.Width(44))) OutgameTutorialRewind.Cancel();
         EditorGUILayout.EndHorizontal();
 
-        // 밀기만 돌고 지급 재생 전에 부트가 끊긴 상태(BootInstaller 없는 씬에서 Play 등).
+        // 밀기만 돌고 지급 재생 전에 부트가 끊긴 상태(InitializationInstaller 없는 씬에서 Play 등).
         // 이 자리에 드러내지 않으면 취소할 방법이 없어, 한참 진행한 세이브 위에 다음 부트가 지급을 덧씌운다.
         if (!t_wipePending)
             EditorGUILayout.HelpBox("세이브 밀기는 끝났고 지급 재생만 남았다 — 그 사이에 진행했다면 [취소]로 걷어라.", MessageType.Warning);
