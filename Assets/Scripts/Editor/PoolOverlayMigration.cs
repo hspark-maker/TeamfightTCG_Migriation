@@ -85,12 +85,10 @@ static class PoolOverlayMigration
                 continue;
             }
 
-            AddressableAssetEntry t_entry = t_settings.CreateOrMoveEntry(t_guid, t_group);
+            if (!UiAddressableUtility.TryResolveAddress(t_path, out string t_address)) continue;
 
-            // 주소는 파일명으로 맞춘다 — 기존 오버레이(RankRewardOverlay 등)와 같은 규약이다.
-            // 풀 조회는 주소가 아니라 라벨로 모아 컴포넌트 타입에 색인하므로(DataLibrary.LoadUIPrefab)
-            // 주소가 타입명과 달라도(CardDetailOverlay ≠ CardDetailOverlayView) 동작한다.
-            t_entry.address = System.IO.Path.GetFileNameWithoutExtension(t_path);
+            AddressableAssetEntry t_entry = t_settings.CreateOrMoveEntry(t_guid, t_group);
+            t_entry.address = t_address;
             t_entry.SetLabel("UIPrefab", true, true);
 
             Debug.Log($"[C-2] Addressable 등록: {t_entry.address} (label UIPrefab)");

@@ -138,8 +138,10 @@ static class PoolDeckEditMigration
         if (t_settings == null) { Debug.LogError("[D-4] Addressables 설정이 없다."); return; }
 
         string t_guid = AssetDatabase.AssetPathToGUID(MovedPath);
+        if (!UiAddressableUtility.TryResolveAddress(MovedPath, out string t_address)) return;
+
         AddressableAssetEntry t_entry = t_settings.CreateOrMoveEntry(t_guid, t_settings.DefaultGroup);
-        t_entry.address = "DeckEditPanel";
+        t_entry.address = t_address;
         t_entry.SetLabel("UIPrefab", true, true);
 
         EditorUtility.SetDirty(t_settings);
