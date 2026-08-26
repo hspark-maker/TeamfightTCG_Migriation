@@ -23,15 +23,10 @@ public class ContentProfileConfig : ScriptableObject
     [SerializeField] bool includeTestCards;
     [SerializeField] string saveFolder = "Save";
 
-    [Tooltip("Cloud면 Firestore가 진실원이고 로컬 파일은 읽기 전용 미러가 된다. " +
-             "Local이 현행 동작이며 문제 시 롤백 지점이다.")]
-    [SerializeField] ESaveSourceMode saveSourceMode;
-
     public EContentRunMode RunMode => this.runMode;
     public bool IncludeTestCards => this.includeTestCards;
     public string SaveFolder => this.saveFolder;
-    public ESaveSourceMode SaveSourceMode => this.saveSourceMode;
-    public string CloudSaveProfileId => this.runMode == EContentRunMode.Test ? "test" : "current";
+    public string CloudEnvId => this.runMode == EContentRunMode.Test ? "test" : "live";
 
     public static ContentProfileConfig Active
     {

@@ -95,7 +95,8 @@ public class CardGrowthConfig : ScriptableObject
     public CardKeyword UnlockedKeywordsAt(CardData _card, int _level)
     {
         if (_card == null) return CardKeyword.None;
-        return _level >= _card.keywordUnlockLevel ? _card.keywords : CardKeyword.None;
+        CardSpec t_spec = CardCatalog.RequireSpec(_card);
+        return _level >= t_spec.KeywordUnlockLevel ? t_spec.Keywords : CardKeyword.None;
     }
 
     /// <summary>1차 진화(= 시너지 기능 해금) 도달 여부.</summary>
@@ -144,7 +145,7 @@ public class CardGrowthConfig : ScriptableObject
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;
         }
 
-        if (_card != null && _card.TryGetHpGain(_level, out int t_cardHp))
+        if (_card != null && CardCatalog.RequireSpec(_card).TryGetHpGain(_level, out int t_cardHp))
             t_hp = t_cardHp;
 
         if (t_cost < 0) t_cost = 0;

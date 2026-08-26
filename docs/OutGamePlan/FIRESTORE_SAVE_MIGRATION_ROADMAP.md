@@ -1,5 +1,13 @@
 # 로컬 세이브 → Firestore 이관 로드맵
 
+> **[2026-08-26] 이 문서가 서술하는 Phase 1·2 구현은 되돌려졌다.**
+> `박형석작업용` 머지에서 부트·세이브 축을 상대 설계(`GameInitialization` · `FirebaseManager` ·
+> 동기 `DataSaveManager` · `envId`)로 채택하기로 결정해, `SaveTransaction` · `BootGate` ·
+> `SaveSourceMode` · `FirestoreSaveRepository` 등은 트리에서 제거됐다.
+> 아래 내용은 **재작업 시 참조할 설계 기록**이며 현재 코드와 일치하지 않는다.
+> 구현 원본은 커밋 `525fda88b`(Phase 1) · `468f1bfa1`(Phase 2)에 남아 있다.
+
+
 갱신 2026-08-26 · 브랜치 `feature_Firestore` · 현황 문서: [FIRESTORE_SAVE_MIGRATION.md](FIRESTORE_SAVE_MIGRATION.md)
 
 ## 방향

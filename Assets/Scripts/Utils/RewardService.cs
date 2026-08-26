@@ -43,7 +43,7 @@ public static class RewardService
 
         CurrencyManager.Earn(t_reward.Type, t_reward.Amount);
         // Earn은 flush하지 않으므로 지급 직후 즉시 영속화(앱 강제 종료에도 보상 유실 방지).
-        SaveTransaction.Request();
+        CurrencyManager.Save();
 
         return t_reward;
     }

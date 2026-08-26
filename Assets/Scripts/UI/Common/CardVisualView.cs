@@ -206,7 +206,7 @@ public class CardVisualView : MonoBehaviour
             if (this.nameText != null)
             {
                 this.nameText.gameObject.SetActive(t_showName);
-                if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+                if (t_showName) this.nameText.text = CardCatalog.RequireSpec(_card).DisplayName;
             }
         }
 

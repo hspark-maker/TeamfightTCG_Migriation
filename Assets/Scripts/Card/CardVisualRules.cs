@@ -19,7 +19,7 @@ public static class CardVisualRules
     /// <summary>카드 한 장에 그릴 아트 스프라이트를 고른다(없으면 null → 호출부가 렌더러를 끈다).
     /// 소스는 battleImage 하나뿐이다 — 인게임 CardView.Render가 그리는 것과 같은 그림이라 로비/전투가 갈라지지 않는다.
     /// (예전엔 fullImage → portrait 폴백이 뒤에 붙어 있었지만, battleImage가 늘 채워져 있어 도달한 적이 없다.)
-    /// 덱 대표 이미지(deckPreview)처럼 "카드 아트가 아닌 목적 전용" 필드는 여기 넣지 않는다 — 호출부가 앞단에서 고른다.</summary>
+    /// "카드 아트가 아닌 목적 전용" 그림은 여기 넣지 않는다 — 호출부가 앞단에서 고른다.</summary>
     static System.Func<CardData, int> s_evolutionStage;
 
     /// <summary>아웃게임에서 내 카드의 현재 진화 단계를 공급한다. 미주입이면 미진화 아트를 쓴다.</summary>
@@ -34,26 +34,29 @@ public static class CardVisualRules
         return PickCardArt(_card, s_evolutionStage != null ? s_evolutionStage(_card) : 0);
     }
 
-    /// <summary>지정 진화 단계의 아트. 해당 단계가 비었으면 이전 단계부터 미진화까지 차례로 폴백한다.</summary>
+    /// <summary>지정 진화 단계의 아트. 해당 단계가 비었으면 이전 단계부터 미진화까지 차례로 폴백한다.
+    ///
+    /// 폴백 판정은 **"그 단계에 그림이 배선되어 있는가"** 로 한다. 결과가 null인지로 판정하면
+    /// Addressables 이관 뒤에 깨진다 — 배선은 됐지만 아직 안 받아온 단계가 "빈 슬롯"으로 오해되어
+    /// 한 단계 아래 그림이 뜨고, 로드가 끝나면 그림이 갑자기 바뀐다. 배선 여부는 로드 없이 판정 가능하다.</summary>
     public static Sprite PickCardArt(CardData _card, int _stage)
     {
         if (_card == null) return null;
+        if (!CardCatalog.TryGetSpec(_card, out CardSpec t_spec)) return null;
 
-        for (int t_stage = Mathf.Min(_stage, CardData.MaxEvolutionStage); t_stage > 0; t_stage--)
+        for (int t_stage = Mathf.Min(_stage, CardData.MaxEvolutionStage); t_stage >= 0; t_stage--)
         {
-            CardArtSet t_art = _card.GetEvolvedArt(t_stage);
-            Sprite t_sprite = PickArt(t_art);
-            if (t_sprite != null) return t_sprite;
+            string t_address = CardArtCache.AddressOf(t_spec, t_stage);
+            if (!CardArtCache.Exists(t_address)) continue;
+            return CardArtCache.Get(t_address);
         }
 
-        return _card.battleImage;
+        return null;
     }
 
     /// <summary>전투 카드 인스턴스의 진화 단계를 반영한 아트.</summary>
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.data, _card.evolutionStage);
-
-    static Sprite PickArt(CardArtSet _art) => _art != null ? _art.battleImage : null;
 
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
     /// 인게임은 키워드까지 필요하고(iconMap → PlayKeywordGlow 역참조), 아웃게임은 스프라이트만 쓴다.
@@ -110,7 +113,10 @@ public static class CardVisualRules
     /// <summary>이 카드가 지금 가진 키워드. 해금 전이면 비어 있다 —
     /// `data.keywords`를 직접 읽으면 아직 못 쓰는 키워드가 화면에 뜨고 규칙과 갈라진다.</summary>
     static CardKeyword OwnedKeywords(CardData _card)
-        => s_unlockedKeywords != null ? s_unlockedKeywords(_card) : _card.keywords;
+        => s_unlockedKeywords != null ? s_unlockedKeywords(_card) : SpecKeywords(_card);
+
+    static CardKeyword SpecKeywords(CardData _card)
+        => CardCatalog.TryGetSpec(_card, out CardSpec t_spec) ? t_spec.Keywords : CardKeyword.None;
 
     /// <summary>전투 인스턴스가 없는 아웃게임(도감/로비)용 같은 판정. 판정식을 여기 한 곳에만 둔다 —
     /// 호출부가 각자 `& ~AlwaysStatus`를 복제하면 로비와 전투 표시가 조용히 갈라진다.</summary>
@@ -121,13 +127,13 @@ public static class CardVisualRules
     /// 아이콘 줄·프레임 장식은 이걸 띄우지 않는다(카드 위 표시는 지금 쓸 수 있는 것만).
     /// explainKeywords는 빠진다 — 설명 전용은 해금 개념이 없는 안내용이라 잠글 것이 없다.</summary>
     public static CardKeyword LockedKeywords(CardData _card)
-        => _card == null ? CardKeyword.None : _card.keywords & ~OwnedKeywords(_card);
+        => _card == null ? CardKeyword.None : SpecKeywords(_card) & ~OwnedKeywords(_card);
 
     /// <summary>정보창이 **한 줄이라도 그릴** 키워드 전체 = 지금 가진 것 + 설명 전용 + 아직 잠긴 것.
     /// 잠긴 것을 목록에서 빼면 "이 카드가 앞으로 뭘 여는지"가 화면에서 사라진다 —
     /// 표시 여부와 잠김 여부는 다른 축이라 이 집합과 <see cref="LockedKeywords"/>를 짝으로 쓴다.</summary>
     public static CardKeyword InfoKeywordsWithLocked(CardData _card)
-        => _card == null ? CardKeyword.None : InfoKeywords(_card) | _card.keywords;
+        => _card == null ? CardKeyword.None : InfoKeywords(_card) | SpecKeywords(_card);
 
     /// <summary>**카드 정보창**이 띄울 키워드 = 지금 가진 키워드 + 설명 전용(explainKeywords).
     /// 타일의 아이콘 줄과 목적이 다르다(설명까지 보여주는 창이라 AlwaysStatus를 빼지 않는다).

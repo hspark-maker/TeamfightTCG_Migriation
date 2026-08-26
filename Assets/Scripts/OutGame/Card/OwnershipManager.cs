@@ -6,8 +6,6 @@ public static class OwnershipManager
 {
     static readonly HashSet<int> s_owned = new HashSet<int>();
 
-    static bool s_initialized;
-
     // 소유 변경 통지 — UI 갱신용
     public static event Action OnOwnershipChanged;
 
@@ -39,7 +37,7 @@ public static class OwnershipManager
         return false;
     }
 
-    // 부트에서 DataSaveManager.LoadAsync()·CardCatalog.SetSource() 이후 1회 호출
+    // 부트에서 DataSaveManager.Load()·CardCatalog.SetSource() 이후 1회 호출
     public static void Init()
     {
         s_owned.Clear();
@@ -68,29 +66,15 @@ public static class OwnershipManager
             t_dirty = true;
         }
 
-        s_initialized = true;
-
         if (t_dirty) Save();
-
-        // 부트 전에 그려진 UI는 빈 소유로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다
-        OnOwnershipChanged?.Invoke();
-    }
-
-    /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음).
-    /// 부트 전 커밋이 걸리면 빈 캐시가 저장된 소유를 덮으므로 미초기화면 건너뛴다.</summary>
-    internal static void FlushToData()
-    {
-        if (!s_initialized) return;
-
-        var t_data = DataSaveManager.Data.ownership;
-        t_data.ownedCardIds = new List<int>(s_owned);
     }
 
     // 메모리 소유 집합을 세이브 슬롯에 flush 후 영속화
     public static void Save()
     {
-        FlushToData();
-        SaveTransaction.Request();
+        var t_data = DataSaveManager.Data.ownership;
+        t_data.ownedCardIds = new List<int>(s_owned);
+        DataSaveManager.Save();
     }
 
     public static bool IsOwned(int _id)

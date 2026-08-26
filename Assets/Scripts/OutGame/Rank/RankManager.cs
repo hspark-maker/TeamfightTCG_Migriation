@@ -305,7 +305,7 @@ public static class RankManager
 
     static void Save()
     {
-        SaveTransaction.Request();
+        DataSaveManager.Save();
         OnChanged?.Invoke();
     }
 }

@@ -20,9 +20,11 @@ public class DataLibrary : MonoBehaviour
     AsyncOperationHandle<IList<GameObject>> uiHandle;
 
     bool m_loaded;
+    bool m_failed;
 
     // 부트 로딩 완료 여부. 시작 화면(LoadingCoverView)이 커버를 걷는 기준.
     public static bool IsLoaded => instance != null && instance.m_loaded;
+    public static bool HasFailed => instance != null && instance.m_failed;
 
     // 부트 로딩 진행도(0~1). 인스턴스가 아직 없으면 0 — 진행도의 단일 진실원.
     public static float LoadProgress
@@ -64,9 +66,17 @@ public class DataLibrary : MonoBehaviour
 
     public async UniTask Initialization()
     {
-        await LoadUIPrefab();
-        this.m_loaded = true;
-        LogUtil.Log("All Good");
+        try
+        {
+            await LoadUIPrefab();
+            this.m_loaded = true;
+            LogUtil.Log("All Good");
+        }
+        catch (Exception t_exception)
+        {
+            this.m_failed = true;
+            Debug.LogException(t_exception);
+        }
     }
 
     async UniTask LoadUIPrefab()
@@ -79,6 +89,8 @@ public class DataLibrary : MonoBehaviour
             if (t_ui != null) RegisterUiPrefab(t_ui.GetType(), t_prefab);
         });
         await uiHandle.ToUniTask();
+        if (uiHandle.Status != AsyncOperationStatus.Succeeded)
+            throw new InvalidOperationException("UIPrefab Addressables load failed.");
     }
 
 

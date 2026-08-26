@@ -172,7 +172,10 @@ public static class TournamentNodePopupBuilder
         string t_guid = AssetDatabase.AssetPathToGUID(PREFAB_PATH);
         AddressableAssetGroup t_group = GroupOfExistingUiPrefab(t_settings) ?? t_settings.DefaultGroup;
 
+        if (!UiAddressableUtility.TryResolveAddress(PREFAB_PATH, out string t_address)) return;
+
         AddressableAssetEntry t_entry = t_settings.CreateOrMoveEntry(t_guid, t_group);
+        t_entry.address = t_address;
         t_entry.SetLabel(UI_LABEL, true, true);
 
         t_settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryModified, t_entry, true);

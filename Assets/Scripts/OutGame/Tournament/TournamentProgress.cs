@@ -198,7 +198,7 @@ public static class TournamentProgress
 
         Slot.pendingRewardNodeId = _nodeId;
 
-        SaveTransaction.Request();
+        DataSaveManager.Save();
         OnChanged?.Invoke();
         return true;
     }
@@ -289,7 +289,7 @@ public static class TournamentProgress
         Slot.clearedNodeIds.Clear();
         ClaimedChapters.Clear();
         Slot.pendingRewardNodeId = "";
-        SaveTransaction.Request();
+        DataSaveManager.Save();
         OnChanged?.Invoke();
     }
 
@@ -307,7 +307,8 @@ public static class TournamentProgress
         // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
         if (Slot.pendingRewardNodeId == _nodeId) Slot.pendingRewardNodeId = "";
 
-        SaveTransaction.Request();
+        // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
+        CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 
@@ -322,7 +323,7 @@ public static class TournamentProgress
 
         ClaimedChapters.Add(_chapterId);
 
-        SaveTransaction.Request();
+        CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 }

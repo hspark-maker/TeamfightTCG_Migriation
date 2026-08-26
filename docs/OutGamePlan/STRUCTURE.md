@@ -1,33 +1,17 @@
 # 아웃게임 구조도 (STRUCTURE)
 
-## Firestore 플레이어 세이브 (2026-08-26 · 이관 Phase 2 작업분 반영)
+## Firestore 플레이어 세이브 미러 (2026-08-25)
 
-진실원은 `ContentProfileConfig.SaveSourceMode`가 가른다 — `Local`이면 `JsonFileRepository`가 진실원이고 Firestore는 `PlayerSaveSync`가 올리는 검증 미러, `Cloud`면 `FirestoreSaveRepository`가 진실원이고 로컬 파일이 진단용 미러로 뒤집힌다.
-저장 매체가 네트워크로 바뀔 자리를 미리 만들어 두느라 `IRepository`부터 아래가 전부 UniTask다.
+로컬 `JsonFileRepository`가 현재 진실원이고 Firestore는 쓰기 전용 검증 미러다.
 
 ```text
-도메인 커맨드 (Grant · Earn · Claim · TryEnhance …)   ← 전부 동기. 메모리만 바꾼다
-  └─ SaveTransaction.Request / CommitAsync            ← 커밋의 단일 진입점
-       ├─ 캐시 보유 6개 도메인의 FlushToData()          ← 디스크에 닿지 않는 슬롯 반영
-       └─ DataSaveManager.SaveAsync                   ← 쓰기 사슬(s_writeChain)로 직렬화
-            ├─ JsonFileRepository 저장
-            └─ OnSaved(payload)
-                 └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
-                      └─ users/{firebaseUid}/save/{current|test}
+DataSaveManager.Save
+  ├─ JsonFileRepository 즉시 저장
+  └─ OnSaved(payload)
+       └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
+            └─ users/{firebaseUid}/save/{current|test}
 ```
 
-- **커밋은 전 도메인을 함께 flush한다.** 어느 도메인이 걸든 재화·소유·프로필·덱·성장이 같은 쓰기에 실린다 —
-  "재화는 차감 전인데 진행도는 차감 후"인 세이브가 구조적으로 생기지 않는다(호출 순서 의존 폐기).
-- **`FlushToData()`는 캐시를 믿을 수 없으면 건너뛴다.** 전 도메인 flush는 "그 도메인이 지금 커밋을 걸지 않았는데도
-  딸려 나가는" 자리라, 캐시가 세이브보다 모자란 상태면 그 차이가 그대로 유실이 된다. 세 가지 가드가 있다.
-  - **미초기화** — 부트 첫 줄(`ApplyWipeIfScheduled`)이 각 `Init()`보다 앞선다. 빈 캐시가 저장분을 덮는다.
-  - **덱 캐시 열화**(`s_slotsDegraded`) — 레지스트리가 못 읽은 카드가 있으면 그 장수만큼 깎인 채 저장된다.
-    명시적 전량 저장(`SaveAll`)은 사용자가 방금 만든 구성이라 이 가드를 타지 않는다.
-  - **프로필 폴백**(`s_fellBackToDefault`) — Config가 모르는 아바타·프레임 id가 기본값으로 덮인다. `Apply()`가 해제한다.
-- 되감기 와이프(`OutgameTutorialRewind`)만 커밋이 아니라 `DataSaveManager.SaveAsync()`를 직접 쓴다 —
-  갈아끼운 빈 슬롯을 이전 세션 캐시가 도로 덮으면 안 된다.
-- 앱 종료 경로만 `SaveTransaction.CommitBlocking()` → `JsonFileRepository.SaveBlocking()`으로 동기 기록한다.
-  종료 콜백은 비동기 완료를 기다려주지 않는다. 이 자리는 Phase 2에서도 남는다.
 - `Assets/Scripts/OutGame/Save/4.Sync/PlayerSaveSync.cs`: 인증 게이트, 프로필 분리, 업로드 상태와 best-effort flush를 소유한다.
 - Firestore 디스크 persistence는 끈다. 원격 pull·복원·충돌 해결은 아직 지원하지 않는다.
 - `revision`은 업로드 관측값이며 최신 상태 판정 근거가 아니다.
@@ -36,156 +20,6 @@
 > 도메인 설계 확정 시, 구조 변경 시마다 갱신한다 (CLAUDE.md 아웃게임 운영 정책).
 > 갱신 주체: outgame-engineer 또는 메인. 근거 없는 노드 금지 — 실제 파일이 있거나 승인된 설계여야 한다.
 
-
-### 세이브 계층 시각 정리 (2026-08-26 · Phase 2 작업분 반영 · 미커밋)
-
-근거 파일은 전부 `Assets/Scripts/` 기준. `:N`은 해당 파일의 줄 번호다.
-
-#### 1. 구조 지도 — 4계층과 두 갈래 매체
-
-```mermaid
-flowchart TD
-    DOMAIN["도메인 매니저 10종<br/>캐시형 6 · 직독형 4"]
-
-    subgraph L3["3.Manager"]
-        TX["SaveTransaction :13<br/>커밋 단일 진입점"]
-        DSM["DataSaveManager :247<br/>Data 슬롯 · 쓰기 사슬"]
-    end
-    subgraph L2["2.Domain — 잎"]
-        USD["UserSaveData v6<br/>10블록"]
-        JRN["SaveJournalEntry<br/>종료 스냅샷"]
-    end
-    subgraph L1["1.Repository"]
-        IREPO["IRepository<br/>+Atomic +Blocking +Journal"]
-        FILE["JsonFileRepository"]
-        FS["FirestoreSaveRepository<br/>Prime · Push · Journal"]
-    end
-    subgraph L4["4.Sync — Local 모드 전용"]
-        SYNC["PlayerSaveSync :43<br/>3-way 판정 · 업로드 큐"]
-        DOC["PlayerSaveDocument :146<br/>문서 계약 · 트랜잭션"]
-    end
-
-    DOMAIN -->|"Request()"| TX
-    TX -->|"FlushAll — 캐시형 6종"| USD
-    TX --> DSM
-    DSM -->|"JsonUtility 직렬화"| USD
-    DSM --> IREPO
-    IREPO --> FILE
-    IREPO --> FS
-    FS -->|"본문 외 전 키 위임 · 미러"| FILE
-    FS --> DOC
-    FS -.->|"WriteJournalBlocking"| JRN
-    DSM -.->|"OnSaved :20 — 유일한 상향 통지"| SYNC
-    SYNC --> DOC
-```
-
-- `FirestoreSaveRepository`가 다루는 서버 키는 **세이브 본문 하나뿐**이다. 버전 백업·손상본·동기화 메타·conflict sidecar는 전부 `Mirror`(로컬 파일)로 위임된다.
-- `PlayerSaveSync`는 `SaveSourceMode.Current == Cloud`면 `Initialize` 첫 줄에서 즉시 return한다(`:43`). Cloud에서 이 계층은 통째로 죽어 있고, Phase 3에서 삭제된다.
-- 두 모드가 `PlayerSaveDocument`를 공유한다 — 문서 경로·필드·해시·트랜잭션의 단일 창구.
-
-#### 2. 부트 지도 — 게이트와 재시도
-
-```mermaid
-flowchart LR
-    GM["GameManager<br/>BootAsync :61"]
-    MODE{"SaveSourceMode<br/>.Current"}
-    LOCAL["파일 Load<br/>→ PlayerSaveSync.Initialize"]
-    CLOUD["BootCloudSaveAsync :124<br/>Prime → ConsumeJournal → Load"]
-    GATE["BootGate<br/>IsComplete · BlockReason<br/>WaitForRetryAsync"]
-    BI["BootInstaller.Start :150<br/>InstallSaveDependent"]
-    COVER["LoadingCoverView :111<br/>차단 문구 · 재시도"]
-
-    GM --> MODE
-    MODE -->|Local| LOCAL
-    MODE -->|Cloud| CLOUD
-    LOCAL -->|MarkComplete| GATE
-    CLOUD -->|"MarkComplete :182"| GATE
-    CLOUD -.->|"실패 → MarkBlockedRetryable"| GATE
-    GATE --> BI
-    COVER -->|RequestRetry| GATE
-    GATE -->|BlockReason| COVER
-    BI -.->|"부트 커밋 실패 → 재시도 루프 :164"| GATE
-```
-
-- **네트워크 실패는 종료가 아니라 대기다.** `EGameBootState.BlockedRetryable`은 `UpdateRequired`·`RecoveryRequired`와 달리 부트가 계속 기다리는 상태이며, 소비자가 이걸 종료로 취급하면 재시도해도 세이브 의존 설치가 붙지 않는다.
-- `BootInstaller`는 메모리 채우기(`s_saveDependentPrepared`)와 커밋 확정(`s_saveDependentInstalled`)을 갈라 둔다. 커밋만 실패해 다시 들어온 경로가 스타터덱 지급·되감기를 두 번 돌리지 않게 하기 위해서다.
-- 부트 커밋 실패 중 `Offline`만 재시도로 넘긴다. `Conflict`는 쓰기 선조건이 부팅 때 읽은 revision이라 다시 밀어도 같은 자리에서 막힌다 → `RecoveryRequired`.
-
-#### 3. 흐름 — 런타임 커밋 (Cloud)
-
-```mermaid
-sequenceDiagram
-    participant D as 도메인 커맨드
-    participant TX as SaveTransaction
-    participant DSM as DataSaveManager
-    participant FS as FirestoreSaveRepository
-    participant SV as Firestore
-
-    D->>D: 캐시/슬롯만 변경 (동기)
-    D->>TX: Request()
-    TX->>TX: FlushAll() — 캐시형 6종
-    TX->>DSM: SaveAsync()
-    DSM->>DSM: s_writeChain 직렬화 · JSON 직렬화
-    DSM->>FS: SaveAsync(SAVE_KEY, json)
-    FS->>FS: OwnerUid 대조 · SHA256
-    FS->>SV: PushTransactionAsync(rev, hash 선조건)
-    alt 커밋
-        SV-->>FS: newRevision
-        FS->>FS: 캐시 갱신 + 미러 기록
-        FS-->>DSM: Success
-    else 선조건 불일치
-        SV-->>FS: PreconditionException / Aborted
-        FS-->>DSM: Conflict
-    else 도달 불가
-        SV-->>FS: Unavailable / Timeout
-        FS-->>DSM: Offline
-    end
-    DSM-->>TX: ESaveWriteResult
-    TX->>TX: 실패면 사유 로그 (Offline은 warning)
-```
-
-`ClassifyPushFailure`가 SDK 예외 사슬을 훑어 `Conflict`/`Offline`/`IoFailed`로 접는다. Firestore SDK가 콜백 예외를 여러 겹으로 감싸므로 타입 검사가 `InnerException` 사슬 전체를 돈다.
-
-#### 4. 흐름 — 앱 종료 → 다음 부팅 (종료 저널)
-
-Cloud에서는 종료 콜백 안에서 네트워크 쓰기를 끝낼 수 없다. 그래서 종료 시점 스냅샷을 **로컬 저널**로 떨구고, 채택 여부는 다음 부팅이 서버 revision과 대조해 판정한다.
-
-```mermaid
-sequenceDiagram
-    participant GM as GameManager
-    participant TX as SaveTransaction
-    participant FS as FirestoreSaveRepository
-    participant M as Mirror (로컬 파일)
-    participant SV as Firestore
-
-    Note over GM,SV: ① 앱 종료 — OnApplicationQuit / Pause
-    GM->>TX: CommitBlocking()
-    TX->>TX: FlushAll()
-    TX->>FS: WriteJournalBlocking(snapshot)
-    FS->>M: SaveJournalEntry 동기 기록<br/>payload · hash · baseRevision · uid · profileId
-
-    Note over GM,SV: ② 다음 부팅
-    GM->>FS: PrimeAsync() — 서버 read 1회
-    SV-->>FS: payload · revision · hash
-    GM->>FS: ConsumeJournalAsync()
-    FS->>M: 저널 읽기
-    alt 채택 조건 통과
-        FS->>SV: PushTransactionAsync(baseRevision 선조건)
-        FS->>M: 저널 삭제
-    else uid·profile·schema 불일치 / 해시 깨짐 / 서버가 앞섬 / 이미 반영됨
-        FS->>M: 저널 폐기
-    else Conflict
-        FS->>M: 저널 폐기 — 남기면 매 부팅 실패한다
-    end
-```
-
-`RejectReasonOf`가 채택 조건 6개를 순서대로 본다: 계정 · 프로필 · 스키마 · payload 자기해시 · `baseRevision == 서버 revision` · 이미 반영 여부. 저널은 원자적으로 쓰이지 않으므로 자기해시 대조가 "종료 도중 잘린 payload"를 걸러낸다.
-
-#### 5. `SaveTransaction`의 역할과 후속 분해
-
-현재 원자성은 **매체가 준다** — 통짜 payload를 쓰므로 쓰기 1회가 전부-아니면-전무다. `SaveTransaction`이 지금 실제로 값하는 건 flush 누락 방지 쪽이다.
-
-문서 분해(로드맵 후속 5) 이후에는 그 관계가 뒤집혀, 원자성 경계를 코드가 직접 만들어야 한다. `FlushAll()`의 하드코딩 6종이 **"블록 → dirty 판정 → 소속 문서 매핑 → 트랜잭션 1회"** 표로 승격되는 자리다. 걷히는 것은 `4.Sync/`이고 이 계층은 반대로 무거워진다.
 
 ## 도메인 수준 구조 (OUTGAME_ROADMAP 기준)
 
@@ -1914,7 +1748,7 @@ UI에 손댈 것이 없는 이유:
 
 #### 그 밖에 열려 있는 자리
 
-- **내 닉네임·아바타·프레임**은 `ProfileManager`가 진실원이고 **`UserSaveData.profile` 슬롯에 영속화된다**(2026-08-25). `MatchProfile.OfLocalPlayer`가 그 값을 읽는다 — 옛 `MatchProfile.LOCAL_NICKNAME = "나"` 상수는 없어졌다. 슬롯 추가라 **`VERSION`은 6 유지**(위 규약과 같다). 세이브에 남은 id가 `ProfileConfig`에서 사라졌으면 `Default*Id`로 폴백한다.
+- **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
 - **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
 - **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.
 # Firestore save migration T0 (2026-08-25)

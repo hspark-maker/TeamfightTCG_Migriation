@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /envs/{envId}/users/{userId}/save/{docId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isKnownEnv() {
+        return envId == 'live' || envId == 'test';
+      }
+
+      function isKnownDoc() {
+        return docId == 'current';
+      }
+
+      function isValidSave() {
+        return request.resource.data.keys().hasOnly([
+          'schemaVersion', 'revision', 'payload', 'payloadHash',
+          'updatedAt', 'deviceId', 'appVersion'
+        ]) &&
+        request.resource.data.schemaVersion is int &&
+        request.resource.data.schemaVersion > 0 &&
+        request.resource.data.revision is int &&
+        request.resource.data.payload is string &&
+        request.resource.data.payload.size() <= 300000 &&
+        request.resource.data.payloadHash is string &&
+        request.resource.data.payloadHash.size() == 16 &&
+        request.resource.data.deviceId is string &&
+        request.resource.data.deviceId.size() == 32 &&
+        request.resource.data.appVersion is string &&
+        request.resource.data.appVersion.size() <= 64 &&
+        request.resource.data.updatedAt == request.time;
+      }
+
+      allow read: if isOwner() && isKnownEnv() && isKnownDoc();
+      allow create: if isOwner() && isKnownEnv() && isKnownDoc() && isValidSave() &&
+                    request.resource.data.revision == 1;
+      allow update: if isOwner() && isKnownEnv() && isKnownDoc() && isValidSave() &&
+                    request.resource.data.schemaVersion >= resource.data.schemaVersion &&
+                    request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+
+    // 스펙 데이터는 서버/Admin SDK 전용이다. Admin SDK는 Security Rules를 우회한다.
+    // API key만 쓰는 에디터 업로더는 임시 개방 규칙에서만 동작한다.
+    match /envs/{envId}/specs/{table} {
+      allow read: if false;
+      allow write: if false;
+
+      match /rows/{rowId} {
+        allow read: if false;
+        allow write: if false;
+      }
+    }
+  }
+}

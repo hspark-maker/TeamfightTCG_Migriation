@@ -14,11 +14,16 @@ public class PackOddsRow : MonoBehaviour
         CardData t_card = _entry.Card;
         
         if (this.cardNameText != null)
-            this.cardNameText.text = t_card != null ? t_card.displayName : string.Empty;
+            this.cardNameText.text = t_card != null ? CardCatalog.RequireSpec(t_card).DisplayName : string.Empty;
 
         if (this.rateText != null)
             this.rateText.text = PackOdds.FormatRate(_entry.Rate);
 
-        this.cardImage.sprite = t_card.battleImage;
+        if (this.cardImage != null)
+        {
+            Sprite t_art = CardVisualRules.PickCardArt(t_card);
+            this.cardImage.sprite = t_art;
+            this.cardImage.enabled = t_art != null;
+        }
     }
 }

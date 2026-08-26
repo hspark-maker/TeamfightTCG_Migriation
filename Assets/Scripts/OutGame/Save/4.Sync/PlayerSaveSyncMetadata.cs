@@ -1,12 +1,11 @@
 using System;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 [Serializable]
 sealed class PlayerSaveSyncMetadata
 {
     public string firebaseUid;
-    public string profileId;
+    public string envId;
     public string lastSyncedHash;
     public long lastRemoteRevision = -1;
     public int schemaVersion;
@@ -16,9 +15,9 @@ static class PlayerSaveSyncMetadataStore
 {
     const string KEY_PREFIX = "outgame_sync_state";
 
-    internal static async UniTask<PlayerSaveSyncMetadata> LoadAsync(string _firebaseUid, string _profileId)
+    internal static PlayerSaveSyncMetadata Load(string _firebaseUid, string _envId)
     {
-        string t_json = await DataSaveManager.LoadSyncMetadataAsync(KeyOf(_firebaseUid, _profileId));
+        string t_json = DataSaveManager.LoadSyncMetadata(KeyOf(_firebaseUid, _envId));
         if (string.IsNullOrEmpty(t_json)) return null;
 
         try
@@ -32,16 +31,16 @@ static class PlayerSaveSyncMetadataStore
         }
     }
 
-    internal static async UniTask<bool> SaveConfirmedAsync(
+    internal static bool SaveConfirmed(
         string _firebaseUid,
-        string _profileId,
+        string _envId,
         string _fullHash,
         long _remoteRevision)
     {
         var t_metadata = new PlayerSaveSyncMetadata
         {
             firebaseUid = _firebaseUid,
-            profileId = _profileId,
+            envId = _envId,
             lastSyncedHash = _fullHash,
             lastRemoteRevision = _remoteRevision,
             schemaVersion = UserSaveData.VERSION
@@ -49,8 +48,8 @@ static class PlayerSaveSyncMetadataStore
 
         try
         {
-            await DataSaveManager.SaveSyncMetadataAsync(
-                KeyOf(_firebaseUid, _profileId),
+            DataSaveManager.SaveSyncMetadata(
+                KeyOf(_firebaseUid, _envId),
                 JsonUtility.ToJson(t_metadata));
             return true;
         }
@@ -61,8 +60,8 @@ static class PlayerSaveSyncMetadataStore
         }
     }
 
-    static string KeyOf(string _firebaseUid, string _profileId)
+    static string KeyOf(string _firebaseUid, string _envId)
     {
-        return $"{KEY_PREFIX}_{_firebaseUid}_{_profileId}";
+        return $"{KEY_PREFIX}_{_firebaseUid}_{_envId}";
     }
 }

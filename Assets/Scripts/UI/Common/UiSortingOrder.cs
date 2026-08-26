@@ -66,10 +66,6 @@ public static class UiSortingOrder
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>
     public const int Setting = 900;
 
-    /// <summary>세이브 커밋 대기(SaveBusyOverlay.prefab). 설정 화면(<see cref="Setting"/>)에서도 커밋이 일어나므로 그 위여야 하고,
-    /// 커튼·로딩커버(<see cref="Curtain"/>·<see cref="LoadingCover"/>)는 이미 입력을 막고 있어 그 아래여도 된다.</summary>
-    public const int SaveBusy = 920;
-
     /// <summary>씬을 갈아 끼우는 커튼(SceneCurtain.prefab).</summary>
     public const int Curtain = 950;
 

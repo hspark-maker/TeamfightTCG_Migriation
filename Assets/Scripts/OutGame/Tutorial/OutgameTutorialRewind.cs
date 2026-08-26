@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>디버그 되감기 예약의 단일 창구 — "다음 부트에 세이브를 밀고 이 좌표에서 시작한다".
@@ -63,7 +62,7 @@ public static class OutgameTutorialRewind
     }
 
     /// <summary>1단 — 아웃게임 세이브를 첫실행으로 밀고 예약 좌표를 심는다.
-    /// <b>GameManager.BootAsync의 DataSaveManager.LoadAsync() 직후</b>에만 호출한다 —
+    /// <b>GameManager.Boot의 DataSaveManager.Load() 직후</b>에만 호출한다 —
     /// 매니저 Init()들이 슬롯 참조를 캐싱하고 나면 갈아끼운 슬롯이 반영되지 않는다.</summary>
     public static void ApplyWipeIfScheduled()
     {
@@ -93,9 +92,7 @@ public static class OutgameTutorialRewind
         // 판정을 남겨 두면 "첫실행 마이그레이션"이 되감기마다 한 번씩 도는 잡음이 된다.
         t_data.tutorial.migrationChecked = true;
 
-        // 커밋(전 도메인 flush)을 타지 않는다 — 도메인 리로드가 꺼져 이전 세션 캐시가 살아 있으면
-        // 방금 갈아끼운 빈 슬롯을 옛 값이 도로 덮는다. 여기서 쓸 것은 슬롯 그 자체다.
-        DataSaveManager.SaveAsync().Forget();
+        DataSaveManager.Save();
 
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 부트가 세이브를 다시 밀지 않게 한다.
         PlayerPrefs.DeleteKey(PREF_KEY);

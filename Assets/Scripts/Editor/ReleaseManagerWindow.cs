@@ -13,11 +13,19 @@ using UnityEngine;
 /// 현재 에디터 프로필이 곧 빌드 실행 모드다. 테스트 프로필은 개발 빌드로, 라이브 프로필은
 /// 릴리즈 빌드로 만들며, 에셋에 실린 표가 그 프로필과 다르면 빌드를 막는다.
 /// </summary>
-public class ReleaseManagerWindow : EditorWindow
+public partial class ReleaseManagerWindow : EditorWindow
 {
     const string PREF_BUILD_DIR = "Release.BuildDir";
+    const string PREF_TAB       = "Release.Tab";
+
+    enum Tab
+    {
+        Release,
+        Data,
+    }
 
     string buildDir;
+    Tab selectedTab;
 
     Vector2 scroll;
     string  lastReport;
@@ -38,12 +46,16 @@ public class ReleaseManagerWindow : EditorWindow
     void OnEnable()
     {
         this.buildDir = EditorPrefs.GetString(PREF_BUILD_DIR, "Builds");
+        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
         Revalidate();
+        EnableDataTab();
     }
 
     void OnDisable()
     {
         EditorPrefs.SetString(PREF_BUILD_DIR, this.buildDir);
+        EditorPrefs.SetInt(PREF_TAB, (int)this.selectedTab);
+        DisableDataTab();
     }
 
     void OnGUI()
@@ -54,14 +66,23 @@ public class ReleaseManagerWindow : EditorWindow
             return;
         }
 
-        this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
+        this.selectedTab = (Tab)GUILayout.Toolbar(
+            (int)this.selectedTab,
+            new[] { "릴리즈", "데이터 · Firestore" },
+            GUILayout.Height(26));
 
+        if (this.selectedTab == Tab.Data)
+        {
+            DrawDataTab();
+            return;
+        }
+
+        this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
         DrawModeSection();
         DrawTableSection();
         DrawValidationSection();
         DrawBuildSection();
         DrawReport();
-
         EditorGUILayout.EndScrollView();
     }
 
@@ -175,7 +196,7 @@ public class ReleaseManagerWindow : EditorWindow
     void Revalidate()
     {
         this.validationWarnings = new List<string>();
-        this.issues     = ContentProfileValidator.Collect(this.validationWarnings);
+        this.issues     = ContentProfileValidator.Collect(this.validationWarnings, ContentRunModeEditor.Current);
         this.driftValid = false;   // 표를 갈았거나 에셋이 움직였다 — 대조 결과도 같이 낡는다
     }
 

@@ -21,19 +21,34 @@ MonoBehaviour:
   bonusHp: 0
   synergies:
   - {fileID: 11400000, guid: 7e6c20c2bb8b5ad4c8b36ec6373665fa, type: 2}
-  battleImage: {fileID: 21300000, guid: b2c9d62ba0827df418038bbe6e7cd404, type: 3}
-  deckPreview: {fileID: 21300000, guid: b2c9d62ba0827df418038bbe6e7cd404, type: 3}
   hpGainByLevel: 0000000000000000050000000400000004000000
   keywordUnlockLevel: 2
-  evolvedArts:
-  - battleImage: {fileID: 21300000, guid: d8bdea7a6f5947d4a9e53d396dc9873b, type: 3}
-  - battleImage: {fileID: 21300000, guid: 5e2bacbc7b2f5704789246e95222b41b, type: 3}
+  arts:
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: b2c9d62ba0827df418038bbe6e7cd404
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: d8bdea7a6f5947d4a9e53d396dc9873b
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - battleImage: {fileID: 0}
+    battleImageRef:
+      m_AssetGUID: 5e2bacbc7b2f5704789246e95222b41b
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
   defaultEvolutionStage: 0
   appearCinematic: {fileID: 0}
   cinemaAttackStyle: 0
   cinemaOrbPrefab: {fileID: 0}
-  weaponPrefab: {fileID: 0}
-  enemyWeaponEuler: {x: 0, y: 0, z: 180}
   attackEffect: {fileID: 0}
   passive: {fileID: 0}
   spawnVoices: []

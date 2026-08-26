@@ -81,7 +81,8 @@ public static class AlbumRewardManager
         }
         Slot.claimedKeys.Add(_rewardKey);
 
-        SaveTransaction.Request();
+        // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
+        CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 

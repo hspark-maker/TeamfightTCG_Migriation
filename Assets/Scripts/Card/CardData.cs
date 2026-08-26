@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.Video;
 
 public enum ECardChannel
@@ -31,7 +32,12 @@ public enum ECardGrade
 [System.Serializable]
 public class CardArtSet
 {
+    /// <summary>구(舊) 직접 참조. Addressables 이관(CardArtBake) 후에는 비어 있어야 한다 —
+    /// 값이 남아 있으면 씬→CardRegistry→CardData 사슬이 이 스프라이트를 강참조해 부팅 시 통째로 올라온다.
+    /// 아직 이관 안 된 에셋의 폴백으로만 읽는다(<see cref="CardVisualRules.PickCardArt"/>).</summary>
     public Sprite battleImage;
+    /// <summary>이관 후의 진짜 아트 참조. 로드는 <see cref="CardArtCache"/>가 맡는다.</summary>
+    public AssetReferenceSprite battleImageRef;
 }
 
 [CreateAssetMenu(fileName = "NewCard", menuName = "Card Battle/Card Data")]
@@ -63,11 +69,6 @@ public class CardData : ScriptableObject
     // 카드가 가진 시너지들(가변 개수). main/sub 구분은 개념적일 뿐 같은 종류의 synergy.
     // 같은 SynergyData가 중복 나열돼도 카운트/적용/배지에서는 1회로 취급(소비측 Distinct).
     public SynergyData[] synergies;
-    // 카드 아트는 battleImage 한 장뿐이다. 예전엔 fullImage(로비 전신)·portrait(초상)를 따로 뒀지만
-    // 실제로는 두 필드가 늘 같은 그림이었고, battleImage가 모든 폴백 사슬의 맨 앞이라 한 번도 도달하지 않았다.
-    // deckPreview는 카드 아트가 아니라 **덱 목록 배너 전용** 그림이라 별개 축으로 남는다.
-    public Sprite battleImage;
-    public Sprite deckPreview;
 
     [Header("Growth HP Curve")]
     // index = 레벨을 유지한다(호출부가 레벨→인덱스를 손으로 옮기지 않게). 그래서 [0]/[1]은 쓰지 않는 빈칸이다 —
@@ -82,16 +83,15 @@ public class CardData : ScriptableObject
     [Min(0)] [Tooltip("이 레벨에 도달하면 keywords가 열린다. 0 = 처음부터 열려 있음(기본 키워드 카드).")]
     public int keywordUnlockLevel;
 
-    /// <summary>진화 최대 단계. 1단계=최초 진화 … 3단계=최종. 0단계(미진화) 아트는 위 기본 필드다.
+    /// <summary>진화 최대 단계. 1단계=최초 진화 … 3단계=최종. 0단계(미진화)는 arts[0]이다.
     /// 단계 수의 단일 진실원 — 진화 규칙·UI·에디터가 전부 이걸 보고, 숫자 3을 각자 적지 않는다.</summary>
     public const int MaxEvolutionStage = 3;
 
-    [Header("Evolution Art")]
-    // 진화 단계별 아트. index 0 = 1단계, index 2 = 3단계(GetEvolvedArt로 접근).
-    // 비어 있는 슬롯은 정상이다 — 모든 카드가 3단계 아트를 다 갖진 않는다. 호출부는 미진화 아트로 폴백하고
+    [Header("Arts")]
+    // 카드 아트 전부. index = 진화 단계 그대로다(0 = 미진화, 3 = 최종). GetArt로 접근한다.
+    // 비어 있는 슬롯은 정상이다 — 모든 카드가 3단계 아트를 다 갖진 않는다. 호출부는 낮은 단계로 폴백하고
     // 렌더러를 끄면 안 된다. 폴백 규칙 자체는 CardVisualRules에 둔다(로비/전투가 갈라지지 않게).
-    // deckPreview는 대응 필드를 두지 않는다: 덱 대표 배너는 아웃게임 정적 표시라 전투 중 진화 상태와 무관하다.
-    public CardArtSet[] evolvedArts = new CardArtSet[MaxEvolutionStage];
+    public CardArtSet[] arts = new CardArtSet[MaxEvolutionStage + 1];
 
     [Header("Evolution / Cinematic (임시 입력 — 등급 시스템 들어오면 세이브로 이관)")]
     // 0=미진화. 등급 획득/성장 시스템이 없으므로 지금은 이 값이 런타임 진화 단계의 유일한 입력원이다.
@@ -107,9 +107,7 @@ public class CardData : ScriptableObject
     // (라이브러리는 규칙 기반 연출 전용). 비우면 BattleVfxLibrary의 CinemaEnergyOrb로 떨어진다.
     public GameObject cinemaOrbPrefab;
 
-    [Header("Weapon")]
-    public GameObject weaponPrefab;
-    public Vector3    enemyWeaponEuler = new Vector3(0f, 0f, 180f);
+    [Header("Attack")]
     public AttackEffect attackEffect;
     public CardPassive  passive;
 
@@ -139,13 +137,11 @@ public class CardData : ScriptableObject
         return true;
     }
 
-    /// <summary>진화 _stage단계(1~MaxEvolutionStage)의 아트 세트. 범위를 벗어나거나 미배정이면 null.
-    /// 여기서는 인덱싱만 한다 — "비었으면 무엇으로 폴백하나"는 표시 규칙이라 CardVisualRules 몫이다.
-    /// 0단계(미진화)를 넣으면 null이 나온다. 미진화는 배열이 아니라 battleImage 쪽이다.</summary>
-    public CardArtSet GetEvolvedArt(int _stage)
+    /// <summary>진화 _stage단계(0=미진화 ~ MaxEvolutionStage)의 아트 세트. 범위를 벗어나거나 미배정이면 null.
+    /// 여기서는 인덱싱만 한다 — "비었으면 무엇으로 폴백하나"는 표시 규칙이라 CardVisualRules 몫이다.</summary>
+    public CardArtSet GetArt(int _stage)
     {
-        int t_index = _stage - 1;
-        if (this.evolvedArts == null || t_index < 0 || t_index >= this.evolvedArts.Length) return null;
-        return this.evolvedArts[t_index];
+        if (this.arts == null || _stage < 0 || _stage >= this.arts.Length) return null;
+        return this.arts[_stage];
     }
 }

@@ -1,4 +1,3 @@
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -36,9 +35,6 @@ public class BootInstaller : MonoBehaviour
     static bool s_booted;
     static bool s_saveDependentInstalled;
 
-    // 메모리 채우기는 끝났으나 커밋만 실패한 상태를 구분한다 — 재시도로 지급·되감기를 두 번 돌리지 않기 위해서다.
-    static bool s_saveDependentPrepared;
-
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -46,7 +42,6 @@ public class BootInstaller : MonoBehaviour
     {
         s_booted = false;
         s_saveDependentInstalled = false;
-        s_saveDependentPrepared = false;
     }
 
     void Awake()
@@ -58,15 +53,34 @@ public class BootInstaller : MonoBehaviour
             return;
         }
 
-        s_booted = true;
         DontDestroyOnLoad(gameObject);
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
-        ContentProfileConfig t_profile = ContentProfileConfig.Active;
-        var t_availableCards = new System.Collections.Generic.List<CardData>(
-            cardRegistry.Available(t_profile.IncludeTestCards));
-        CardCatalog.SetSource(t_availableCards);
+        ContentProfileConfig t_profile;
+        System.Collections.Generic.List<CardData> t_availableCards;
+        try
+        {
+            t_profile = ContentProfileConfig.Active;
+            SpecSource.Init();
+            CardCatalog.SetSource(cardRegistry.All, t_profile.RunMode, t_profile.IncludeTestCards);
+            t_availableCards = new System.Collections.Generic.List<CardData>(CardCatalog.All);
+        }
+        catch (System.Exception t_exception)
+        {
+            GameInitialization.MarkRecoveryRequired();
+            Debug.LogException(t_exception);
+            Destroy(gameObject);
+            return;
+        }
+
+        s_booted = true;
+
+        // 카드 아트 선로드. 아트는 이제 CardData가 직접 물지 않고 Addressables로 따로 온다
+        // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
+        // 지금은 전 카드를 받는다: 이관 전과 같은 "언제든 다 그려진다" 동작을 유지하기 위함이다.
+        // 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다(좁히는 순간 미스 경고가 진단이 된다).
+        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
 
         // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
@@ -86,7 +100,7 @@ public class BootInstaller : MonoBehaviour
         // 토너먼트 경로 주입 — 정점 상태 조회가 이 애셋에서 나온다(미배선이면 정점 0개).
         TournamentProgress.SetConfig(tournamentConfig);
 
-        // 프로필 주입 — Init은 세이브 슬롯을 읽으므로 InstallSaveDependent()로 미뤘다.
+        // 프로필 주입·로드 — 세이브 의존이 없어 순서는 자유다.
         ProfileManager.SetConfig(profileConfig);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).
@@ -99,6 +113,9 @@ public class BootInstaller : MonoBehaviour
         // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
         // (GameInitializer.GrowthProvider 주석이 지정한 자리). 캐시가 준비된 Init 뒤여야 첫 전투부터 반영된다.
         GameInitializer.GrowthProvider = CardGrowthManager.GrowthOf;
+        // Firebase 구현이 먼저 주입되지 않은 개발/오프라인 환경에서만 로컬 세이브를 사용한다.
+        // 전투와 네트워크는 IMatchGrowthSource만 보므로 이후 공급자 교체가 와이어 계약을 바꾸지 않는다.
+        MatchGrowthSource.SetFallback(new LocalSaveMatchGrowthSource());
 
         // 표시용 해금 키워드도 같은 성장값에서 나온다. 이걸 안 꽂으면 아직 못 쓰는 키워드가
         // 도감·덱편집·정보창에 그대로 떠서 표시와 규칙이 갈라진다.
@@ -145,83 +162,70 @@ public class BootInstaller : MonoBehaviour
     }
 
     // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
-    async UniTaskVoid Start()
+    System.Collections.IEnumerator Start()
     {
+        while (!PlayerSaveSync.IsGateComplete && !GameInitialization.IsTerminated)
+        {
+            yield return null;
+        }
+
+        if (GameInitialization.IsTerminated)
+            yield break;
+
+        if (DataLibrary.instance == null)
+        {
+            Debug.LogError("[BootInstaller] DataLibrary is missing from the boot hierarchy.");
+            GameInitialization.MarkRecoveryRequired();
+            yield break;
+        }
+
+        GameInitialization.SetState(EGameInitState.LoadingAssets);
+        while ((!CardArtCache.IsComplete || (!DataLibrary.IsLoaded && !DataLibrary.HasFailed)) &&
+               !GameInitialization.IsTerminated)
+        {
+            yield return null;
+        }
+
+        if (GameInitialization.IsTerminated)
+            yield break;
+
+        if (CardArtCache.HasFailed || DataLibrary.HasFailed)
+        {
+            GameInitialization.MarkRecoveryRequired();
+            yield break;
+        }
+
         try
         {
-            await UniTask.WaitUntil(() =>
-                BootGate.IsComplete ||
-                GameManager.BootState == EGameBootState.UpdateRequired ||
-                GameManager.BootState == EGameBootState.RecoveryRequired,
-                cancellationToken: this.GetCancellationTokenOnDestroy());
-
-            if (GameManager.BootState == EGameBootState.UpdateRequired ||
-                GameManager.BootState == EGameBootState.RecoveryRequired)
-                return;
-
-            await InstallSaveDependentAsync();
-
-            // 부트 커밋은 Cloud에서 네트워크 쓰기라 실패가 실재한다 — 그 재시도를 받아줄 주체가 여기밖에 없다.
-            while (!s_saveDependentInstalled &&
-                   GameManager.BootState == EGameBootState.BlockedRetryable)
-            {
-                await BootGate.WaitForRetryAsync();
-                GameManager.MarkBootRetrying();
-                await InstallSaveDependentAsync();
-            }
-        }
-        catch (System.OperationCanceledException)
-        {
-            // 씬이 먼저 내려간 것뿐이다 — 복구 상태로 볼 일이 아니다.
+            GameInitialization.SetState(EGameInitState.InstallingManagers);
+            InstallSaveDependent();
         }
         catch (System.Exception t_exception)
         {
-            GameManager.MarkRecoveryRequired();
+            GameInitialization.MarkRecoveryRequired();
             Debug.LogException(t_exception);
         }
     }
 
-    // 부트 중 각 단계가 저마다 디스크에 쓰지 않는다 — 메모리를 다 채운 뒤 마지막에 한 번 커밋한다.
-    async UniTask InstallSaveDependentAsync()
+    void InstallSaveDependent()
     {
         if (s_saveDependentInstalled) return;
 
-        // 커밋만 실패해 다시 들어온 경로는 메모리 채우기를 건너뛴다 — 지급·되감기가 두 번 돌면 안 된다.
-        if (!s_saveDependentPrepared)
-        {
-            OutgameTutorialRewind.ApplyWipeIfScheduled();
-            CurrencyManager.Init();
-            ProfileManager.Init();
-            OwnershipManager.Init();
-            OutgameTutorialProgress.Init();
-            if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
-            KeywordGrowthManager.Init();
-            CardGrowthManager.Init();
-            DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
-            StarterDeck.GrantIfNoDeck(starterDeck);
-            OutgameTutorialRunner.ResolveProgressAnchor();
-            OutgameTutorialRunner.RewindToPendingBattleEntry();
-            OutgameTutorialRewind.ApplyReplayIfScheduled();
-            s_saveDependentPrepared = true;
-        }
-
-        ESaveWriteResult t_commit = await SaveTransaction.CommitAsync();
-        if (t_commit != ESaveWriteResult.Success)
-        {
-            // 여기서 그냥 진행하면 이번 부트가 지급한 것들이 서버에 없는 채로 게임이 열린다.
-            Debug.LogError($"[BootInstaller] 부트 커밋 실패({t_commit}) — 세이브 의존 설치를 확정하지 않는다.");
-
-            // Conflict는 재시도로 안 풀린다 — 쓰기 선조건이 부팅 때 읽은 revision이라 다시 밀어도 같은 자리에서 막힌다.
-            if (t_commit == ESaveWriteResult.Offline)
-                GameManager.MarkBlockedRetryable(SaveBootBlock.ReasonOf(t_commit));
-            else
-                GameManager.MarkRecoveryRequired();
-
-            return;
-        }
+        CurrencyManager.Init();
+        ProfileManager.Init();
+        OwnershipManager.Init();
+        OutgameTutorialProgress.Init();
+        if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
+        KeywordGrowthManager.Init();
+        CardGrowthManager.Init();
+        DeckSaveManager.LoadFromSave(ContentProfileConfig.Active.RunMode == EContentRunMode.Live);
+        StarterDeck.GrantIfNoDeck(starterDeck);
+        OutgameTutorialRunner.ResolveProgressAnchor();
+        OutgameTutorialRunner.RewindToPendingBattleEntry();
+        OutgameTutorialRewind.ApplyReplayIfScheduled();
 
         s_saveDependentInstalled = true;
-        GameManager.MarkBootReady();
+        GameInitialization.MarkReady();
     }
 
     static int EnemyCardLevelOf(CardData _card)

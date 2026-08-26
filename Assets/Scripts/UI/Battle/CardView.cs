@@ -70,9 +70,6 @@ public class CardView : MonoBehaviour
     [SerializeField] float targetFocusScale = 1.15f;   // 드래그 조준 시 타겟 적 카드 확대 배율.
     [SerializeField] float targetFocusDur   = 0.15f;
 
-    [Header("Weapon")]
-    [SerializeField] Transform weaponAnchor;
-
     [Header("Armed VFX")]
     // 무장 이펙트를 카드 아트 위로 올릴 정렬 order(레이어는 카드와 동일하게 맞춘다).
     [SerializeField] int armedVfxSortingOrder = 20;
@@ -134,20 +131,10 @@ public class CardView : MonoBehaviour
 
     CardInstance boundCard;
 
-    // 무기 수명(Instantiate/Destroy)과 무장 이펙트 풀 대여/반납은 각각 아래 두 객체가 소유한다.
+    // 무장 이펙트 풀 대여/반납은 아래 객체가 소유한다.
     // MonoBehaviour가 아니라 순수 C# 객체 — 인스펙터 배선은 위 SerializeField에 그대로 남고 값만 주입한다.
     // 지연 생성인 이유: 비활성 상태로 Instantiate된 뷰는 Awake 전에 Render가 올 수 있다(주입값은 역직렬화 후에야 유효).
-    CardWeaponView weaponView;
-    CardArmedVfx   armedVfxView;
-
-    CardWeaponView WeaponView
-    {
-        get
-        {
-            if (this.weaponView == null) this.weaponView = new CardWeaponView(transform, this.weaponAnchor);
-            return this.weaponView;
-        }
-    }
+    CardArmedVfx armedVfxView;
 
     CardArmedVfx ArmedVfxView
     {
@@ -275,7 +262,6 @@ public class CardView : MonoBehaviour
     {
         BattleBoardView.Unregister(this);
         this.armedVfxView?.Hide();   // 풀 대여분을 물고 죽으면 풀이 파괴된 오브젝트를 들고 있게 된다
-        this.weaponView?.Cleanup();  // 무기 인스턴스는 자식이라 Unity가 함께 파괴 — 참조만 끊는다
         this.decorView?.Cleanup();   // 아이콘/배지 트윈 끊기(파괴 전 DOKill 규약) + 스냅샷 참조 해제
         KillHpRoll();
         KillShieldTween();
@@ -361,8 +347,7 @@ public class CardView : MonoBehaviour
         if (t_isEmpty)
         {
             SetShieldVisible(false);
-            SetFaceDownLook(false);
-            SetupWeapon(null);
+            SetFaceDownLook(false, null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
             return;
         }
@@ -379,21 +364,17 @@ public class CardView : MonoBehaviour
         else if (this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
             WriteHpDisplay(this.shownHp, this.shownBonusHp);
         else SnapHpDisplay(_card);
-        this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
+        this.nameText.text = t_isFaceDown ? "???" : _card.spec.DisplayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
         Sprite t_art = CardVisualRules.PickBattleArt(_card);
-        if (this.illustration != null && !t_isFaceDown && t_art != null)
-            this.illustration.sprite = t_art;
-
-        SetFaceDownLook(t_isFaceDown);
+        SetFaceDownLook(t_isFaceDown, t_art);
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
         this.activeSynergyState = _synergy;
 
-        SetupWeapon(_card.data);
         Decor.Refresh(_card, _synergy);   // 뒷면 은닉·표시 대상 판정은 CardDecorView 안에서.
     }
 
@@ -402,12 +383,13 @@ public class CardView : MonoBehaviour
 
     Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
     bool    illustrationScaleCached;
+    bool    missingCardBackWarned;
 
     /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
     ///
     /// 뒷면 그림은 카드 아트와 원본 크기가 달라(덱 더미용 이미지) 그대로 넣으면 카드 밖으로 삐져나온다.
     /// 그래서 **테두리 높이에 맞춰 스케일을 계산**한다 — 매직넘버를 두면 뒷면 이미지를 교체할 때마다 어긋난다.</summary>
-    void SetFaceDownLook(bool _faceDown)
+    void SetFaceDownLook(bool _faceDown, Sprite _frontArt)
     {
         if (!this.illustrationScaleCached && this.illustration != null)
         {
@@ -420,13 +402,29 @@ public class CardView : MonoBehaviour
 
         if (this.illustration == null) return;
 
-        if (!_faceDown || this.cardBackSprite == null)
+        if (!_faceDown)
         {
+            this.illustration.sprite = _frontArt;
+            this.illustration.enabled = _frontArt != null;
             this.illustration.transform.localScale = this.illustrationBaseScale;
             return;
         }
 
+        if (this.cardBackSprite == null)
+        {
+            this.illustration.sprite = null;
+            this.illustration.enabled = false;
+            this.illustration.transform.localScale = this.illustrationBaseScale;
+            if (!this.missingCardBackWarned)
+            {
+                this.missingCardBackWarned = true;
+                Debug.LogWarning($"[CardView] cardBackSprite가 없어 뒷면을 숨깁니다: {name}", this);
+            }
+            return;
+        }
+
         this.illustration.sprite = this.cardBackSprite;
+        this.illustration.enabled = true;
         this.illustration.transform.localScale = FitBackScale();
     }
 
@@ -499,12 +497,9 @@ public class CardView : MonoBehaviour
         return new Vector3(t_k, t_k, this.illustrationBaseScale.z);
     }
 
-    // ── 무기 / 무장 이펙트 위임 셰임 ──────────────────────────────────────
-    // 실제 구현은 CardWeaponView(무기 수명)와 CardArmedVfx(풀 대여/반납)가 소유한다.
+    // ── 무장 이펙트 위임 셰임 ────────────────────────────────────────────
+    // 실제 구현은 CardArmedVfx(풀 대여/반납)가 소유한다.
     // 아래는 기존 호출부(AttackSequence / AttackAnimTester / BattleSelection)를 위한 전달일 뿐이다.
-
-    // TODO: 호출부 이관 후 삭제
-    void SetupWeapon(CardData _data) => WeaponView.Setup(_data, this.boundCard);
 
     // 무장 이펙트는 여기 얹지 않는다 — ResolveHits가 접촉 직후 FocusWeapon(false)를 부르기 때문에
     // 같이 묶으면 반동이 끝나기도 전에 이펙트가 꺼진다. 무장/해제 시점에서 SetArmedVfx를 직접 부른다.
@@ -512,7 +507,7 @@ public class CardView : MonoBehaviour
     public void FocusWeapon(bool _active)
     {
         // 무기 애니메이션은 프레임에 얹힌 장식(WeaponAnimSpec)이 소유한다 — 무장에서 당기고 해제에서 되돌린다.
-        // CardData.weaponPrefab으로 무기를 따로 띄우던 경로(CardWeaponView)는 더 이상 타지 않는다:
+        // 무기를 카드마다 따로 Instantiate하던 구 경로는 삭제됐다:
         // 그 프리팹을 가진 카드가 하나도 없고, 두 경로가 같은 신호를 나눠 가지면 어느 쪽이 그렸는지 흐려진다.
         if (FrameWeaponAnim == null)
             Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': WeaponAnimSpec 없음", this);
@@ -1049,7 +1044,7 @@ public class CardView : MonoBehaviour
     // TODO: 호출부 이관 후 삭제
     public void PlayAttackAnim()
     {
-        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 weaponPrefab 경로의 배선)에 기대지 않는다 —
+        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 무기 프리팹 경로의 배선)에 기대지 않는다 —
         // 어느 상태를 트는지는 그 장식의 WeaponAnimSpec이 스스로 안다.
         if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': WeaponAnimSpec 없음", this);
         else                         FrameWeaponAnim.Fire();

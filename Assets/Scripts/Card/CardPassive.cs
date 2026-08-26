@@ -40,7 +40,7 @@ public abstract class CardPassive : BattleEffect
         {
             portrait       = _iconOverride != null ? _iconOverride : CardVisualRules.PickCardArt(_self.data),
             preserveAspect = _iconOverride != null,   // 아이콘은 정사각이라 늘리면 찌그러짐
-            cardName       = _self.data.displayName,
+            cardName       = _self.spec.DisplayName,
             effectLabel    = _effectLabel,
         });
     }

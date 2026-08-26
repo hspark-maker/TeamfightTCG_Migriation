@@ -279,7 +279,8 @@ public class PackRevealView : MonoBehaviour
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
             CardData t_card = _cards[t_i].Card;
-            if (t_card != null && t_card.grade > t_top) t_top = t_card.grade;
+            if (t_card != null && CardCatalog.RequireSpec(t_card).Grade > t_top)
+                t_top = CardCatalog.RequireSpec(t_card).Grade;
         }
         return t_top;
     }

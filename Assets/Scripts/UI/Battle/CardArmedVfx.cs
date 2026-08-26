@@ -8,7 +8,7 @@ using UnityEngine;
 /// 인스펙터 배선(armedVfxSortingOrder)은 CardView의 SerializeField에 그대로 남고 값만 생성자로 주입된다
 /// (프리팹/씬 YAML 재직렬화 회피).
 ///
-/// 무기(<see cref="CardWeaponView"/>)와는 별개 관심사다: 이쪽은 BattleVfx 풀 대여/반납,
+/// 프레임 무기 애니(<see cref="WeaponAnimSpec"/>)와는 별개 관심사다: 이쪽은 BattleVfx 풀 대여/반납,
 /// 저쪽은 Instantiate/Destroy다.</summary>
 public class CardArmedVfx
 {

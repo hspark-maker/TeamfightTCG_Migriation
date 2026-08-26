@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using Firebase;
 using Firebase.Auth;
@@ -18,20 +19,29 @@ public sealed class FirebaseAuthService
     FirebaseAuth auth;
     bool stateChangedSubscribed;
     string sessionUserId = string.Empty;
+    Task initializationTask;
+    int generation;
 
     FirebaseAuthService() { }
 
-    public async UniTask InitializeAsync()
+    public UniTask InitializeAsync()
     {
-        if (this.State == EFirebaseAuthState.Initializing ||
-            (this.State == EFirebaseAuthState.SignedIn && this.IsCurrentUserActive))
-            return;
+        if (this.State == EFirebaseAuthState.SignedIn && this.IsCurrentUserActive)
+            return UniTask.CompletedTask;
+        if (this.initializationTask != null && !this.initializationTask.IsCompleted)
+            return this.initializationTask.AsUniTask();
 
         SetState(EFirebaseAuthState.Initializing);
+        this.initializationTask = InitializeCoreAsync(this.generation);
+        return this.initializationTask.AsUniTask();
+    }
 
+    async Task InitializeCoreAsync(int _generation)
+    {
         try
         {
-            DependencyStatus t_dependencyStatus = await FirebaseApp.CheckAndFixDependenciesAsync().AsUniTask();
+            DependencyStatus t_dependencyStatus = await FirebaseApp.CheckAndFixDependenciesAsync();
+            if (_generation != this.generation) return;
             if (t_dependencyStatus != DependencyStatus.Available)
             {
                 SetFailure(EFirebaseAuthState.Unavailable, $"Firebase dependencies unavailable: {t_dependencyStatus}");
@@ -43,7 +53,8 @@ public sealed class FirebaseAuthService
             FirebaseUser t_user = this.auth.CurrentUser;
             if (t_user == null)
             {
-                AuthResult t_result = await this.auth.SignInAnonymouslyAsync().AsUniTask();
+                AuthResult t_result = await this.auth.SignInAnonymouslyAsync();
+                if (_generation != this.generation) return;
                 t_user = t_result.User;
             }
 
@@ -62,8 +73,24 @@ public sealed class FirebaseAuthService
         }
         catch (Exception _exception)
         {
+            if (_generation != this.generation) return;
             SetFailure(EFirebaseAuthState.Failed, _exception.GetBaseException().Message);
         }
+    }
+
+    internal void Shutdown()
+    {
+        this.generation++;
+        if (this.stateChangedSubscribed && this.auth != null)
+            this.auth.StateChanged -= HandleAuthStateChanged;
+        this.stateChangedSubscribed = false;
+        this.auth = null;
+        this.initializationTask = null;
+        this.sessionUserId = string.Empty;
+        this.UserId = string.Empty;
+        this.LastError = string.Empty;
+        this.State = EFirebaseAuthState.Uninitialized;
+        this.OnStateChanged = null;
     }
 
     void SetFailure(EFirebaseAuthState _state, string _error)

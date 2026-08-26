@@ -51,7 +51,7 @@ public static class OutgameDebugActions
         for (int t_i = 0; t_i < CardCatalog.All.Count; t_i++)
         {
             CardData t_card = CardCatalog.All[t_i];
-            if (t_card != null && t_card.grade == _grade) t_cards.Add(t_card);
+            if (t_card != null && CardCatalog.RequireSpec(t_card).Grade == _grade) t_cards.Add(t_card);
         }
         if (t_cards.Count == 0)
         {
@@ -74,7 +74,7 @@ public static class OutgameDebugActions
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {
         CurrencyManager.Earn(_type, _amount);
-        SaveTransaction.Request();
+        CurrencyManager.Save();
 
         Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
     }
