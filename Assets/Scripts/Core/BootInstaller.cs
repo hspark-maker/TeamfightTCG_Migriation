@@ -81,8 +81,7 @@ public class BootInstaller : MonoBehaviour
         // 토너먼트 경로 주입 — 정점 상태 조회가 이 애셋에서 나온다(미배선이면 정점 0개).
         TournamentProgress.SetConfig(tournamentConfig);
 
-        // 프로필 주입·로드 — Init이 세이브 슬롯을 읽으므로 DataSaveManager.Load() 이후여야 한다
-        // (GameManager가 씬 로드 전에 로드하므로 여기선 이미 만족된다).
+        // 프로필 주입 — Init은 세이브 슬롯을 읽으므로 InstallSaveDependent()로 미뤘다.
         ProfileManager.SetConfig(profileConfig);
 
         // 소유권 캐싱·최초 기본 지급 — CardCatalog 주입 이후여야 한다(기본 지급 fallback이 카탈로그를 읽음).

@@ -437,7 +437,8 @@ static class PlayerSaveSync
                _data.cardGrowth != null &&
                _data.keywordGrowth != null &&
                _data.albumReward != null &&
-               _data.tournament != null;
+               _data.tournament != null &&
+               _data.profile != null;
     }
 
     static ESaveReconcileDecision Classify(
