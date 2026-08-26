@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Firebase.Firestore;
 
-// 카드 성장(강화 레벨) 세이브 값 객체 — 키는 카드 고유 번호(CardCatalog.IdOf) 문자열
+// 카드 성장(강화 레벨) 세이브 값 객체 — 키는 카드 고유 번호(CardSpec.Id) 문자열
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class CardGrowthSaveData
 {

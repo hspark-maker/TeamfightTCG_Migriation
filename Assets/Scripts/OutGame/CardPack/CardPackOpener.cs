@@ -22,7 +22,7 @@ public static class CardPackOpener
         for (int t_i = 0; t_i < t_resolvedPool.Count; t_i++)
         {
             WeightedCard t_entry = t_resolvedPool[t_i];
-            if (t_entry.card != null && CardCatalog.Contains(CardCatalog.IdOf(t_entry.card)))
+            if (t_entry.cardId > 0 && CardCatalog.Contains(t_entry.cardId))
                 t_pool.Add(t_entry);
         }
         if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool);
@@ -60,25 +60,24 @@ public static class CardPackOpener
         for (int t_i = 0; t_i < t_drawCount; t_i++)
         {
             int t_pick = PickWeightedCandidate(_pool, t_candidates);
-            CardData t_card = _pool[t_candidates[t_pick]].card;
+            int t_cardId = _pool[t_candidates[t_pick]].cardId;
             if (t_unique) t_candidates.RemoveAt(t_pick);
 
             // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 간식이 새어나간다
-            if (t_card == null) continue;
+            if (!CardCatalog.Contains(t_cardId)) continue;
 
-            t_drawn.Add(GrantAndReward(t_card));
+            t_drawn.Add(GrantAndReward(t_cardId));
         }
         return t_drawn;
     }
 
     // 신규면 소유만, 중복이면 간식 적립. 중복 판정이 Grant 반환값 하나뿐이라 호출 전에 null을 걸러야 한다.
-    static DrawnCard GrantAndReward(CardData _card)
+    static DrawnCard GrantAndReward(int _cardId)
     {
-        int t_id = CardCatalog.IdOf(_card);
-        if (OwnershipManager.Grant(t_id)) return new DrawnCard(_card, true);
+        if (OwnershipManager.Grant(_cardId)) return new DrawnCard(_cardId, true);
 
-        bool t_added = CardGrowthManager.AddSnack(t_id, SnackPerDuplicate);
-        return new DrawnCard(_card, false, t_added ? SnackPerDuplicate : 0);
+        bool t_added = CardGrowthManager.AddSnack(_cardId, SnackPerDuplicate);
+        return new DrawnCard(_cardId, false, t_added ? SnackPerDuplicate : 0);
     }
 
     static int PickWeightedCandidate(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)

@@ -31,7 +31,7 @@ public class SynergyEmblemEntry
 /// **그 시너지에서만 쓰는 연출**(낙인 투사체, 흐름 바람)은 자식에 둔다. 한 타입에 다 몰아넣으면
 /// 시너지가 늘수록 슬롯 종류만 늘고 각 에셋은 안 쓰는 빈 슬롯으로 채워진다.
 ///
-/// 축 구분: 카드 고유 연출 = CardData.attackEffect / **시너지 고유 연출 = 이 에셋** /
+/// 축 구분: 카드 고유 연출 = AttackEffect(Addressables) / **시너지 고유 연출 = 이 에셋** /
 /// 키워드·전투 이벤트 공용 연출 = BattleVfxLibrary(Hit·Heal·처형·무쌍·교활 등).
 /// </summary>
 public abstract class SynergyVfxConfig : ScriptableObject

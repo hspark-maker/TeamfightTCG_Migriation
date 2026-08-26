@@ -15,8 +15,8 @@ public static class GameInitialization
     {
         get
         {
-            float t_dataProgress = DataLibrary.IsLoaded ? 1f : Mathf.Min(DataLibrary.LoadProgress, 0.99f);
-            float t_syncProgress = BootInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
+            float t_dataProgress = UiPrefabCache.IsComplete ? 1f : Mathf.Min(UiPrefabCache.LoadProgress, 0.99f);
+            float t_syncProgress = InitializationInstaller.IsSaveDependentInstalled ? 1f : 0.5f;
             float t_artProgress = CardArtCache.IsComplete ? 1f : Mathf.Min(CardArtCache.LoadProgress, 0.99f);
             return (t_dataProgress + t_syncProgress + t_artProgress) / 3f;
         }

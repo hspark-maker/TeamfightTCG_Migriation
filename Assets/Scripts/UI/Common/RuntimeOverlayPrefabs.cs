@@ -6,7 +6,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>
 /// Resolves authored, independently-instantiated overlays by component type.
-/// Normal boot uses DataLibrary's UIPrefab label index; standalone scene Play falls back
+/// Normal initialization uses DataLibrary's UIPrefab label index; standalone scene Play falls back
 /// to the same Addressables entry synchronously so editor workflows keep working.
 /// </summary>
 public static class RuntimeOverlayPrefabs
@@ -27,7 +27,7 @@ public static class RuntimeOverlayPrefabs
 #if !UNITY_EDITOR
         Debug.LogError(
             $"[RuntimeOverlayPrefabs] {t_type.Name} prefab is unavailable. " +
-            "Player builds must initialize Boot/DataLibrary before requesting overlays.");
+            "Player builds must initialize Initialize/DataLibrary before requesting overlays.");
         return null;
 #else
         AsyncOperationHandle<GameObject> t_handle =

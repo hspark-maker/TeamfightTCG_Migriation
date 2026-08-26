@@ -20,7 +20,7 @@ public class CardGrowthConfig : ScriptableObject
     [Range(0f, 1f)] [SerializeField] float rateDropPerLevel = 0f;
 
     [Header("진화 레벨 (전역 — 카드 SO에 적지 않는다)")]
-    // 키워드 해금 레벨은 여기 없다. 카드마다 다르므로 CardData.keywordUnlockLevel이 소유한다.
+    // 키워드 해금 레벨은 여기 없다. 카드마다 다르므로 CardSpec.KeywordUnlockLevel이 소유한다.
     [Tooltip("1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.")]
     [Min(CardGrowth.BaseLevel)] [SerializeField] int firstEvolutionLevel = 3;
 
@@ -84,7 +84,7 @@ public class CardGrowthConfig : ScriptableObject
         int t_stage = 0;
         if (_level >= firstEvolutionLevel)  t_stage = 1;
         if (_level >= secondEvolutionLevel) t_stage = 2;
-        return t_stage > CardData.MaxEvolutionStage ? CardData.MaxEvolutionStage : t_stage;
+        return t_stage > CardSpec.MaxEvolutionStage ? CardSpec.MaxEvolutionStage : t_stage;
     }
 
     /// <summary>레벨 _level로 올리는 것이 곧 진화인가 — 관문 숫자를 화면이 다시 적지 않게 여기서 답한다.</summary>
@@ -92,10 +92,10 @@ public class CardGrowthConfig : ScriptableObject
 
     /// <summary>레벨 _level에서 실제로 켜져 있는 카드 키워드. 기본 키워드에 더하는 값이 아니라 대체하는 값이다 —
     /// 키워드는 해금 전까지 아예 없는 것으로 친다(해금 레벨 미지정이면 처음부터 열려 있다).</summary>
-    public CardKeyword UnlockedKeywordsAt(CardData _card, int _level)
+    public CardKeyword UnlockedKeywordsAt(int _cardId, int _level)
     {
-        if (_card == null) return CardKeyword.None;
-        CardSpec t_spec = CardCatalog.RequireSpec(_card);
+        if (_cardId <= 0) return CardKeyword.None;
+        CardSpec t_spec = CardCatalog.RequireSpec(_cardId);
         return _level >= t_spec.KeywordUnlockLevel ? t_spec.Keywords : CardKeyword.None;
     }
 
@@ -103,17 +103,17 @@ public class CardGrowthConfig : ScriptableObject
     public bool SynergyUnlockedAt(int _level) => _level >= firstEvolutionLevel;
 
     // 레벨 _level로 올리는 한 스텝(범위 밖이면 false). 바닥 레벨은 강화로 도달하는 레벨이 아니다.
-    public bool TryGetStep(CardData _card, int _level, out GrowthStep _step)
+    public bool TryGetStep(int _cardId, int _level, out GrowthStep _step)
     {
         _step = default;
         if (_level <= CardGrowth.BaseLevel || _level > MaxLevel) return false;
 
-        _step = StepAt(_card, _level);
+        _step = StepAt(_cardId, _level);
         return true;
     }
 
     // 레벨 _level까지의 누적 HP 보너스
-    public int HpBonusAt(CardData _card, int _level)
+    public int HpBonusAt(int _cardId, int _level)
     {
         if (_level <= CardGrowth.BaseLevel) return 0;
 
@@ -121,12 +121,12 @@ public class CardGrowthConfig : ScriptableObject
         int t_sum = 0;
         for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
         {
-            t_sum += StepAt(_card, t_i).HpGain;
+            t_sum += StepAt(_cardId, t_i).HpGain;
         }
         return t_sum;
     }
 
-    GrowthStep StepAt(CardData _card, int _level)
+    GrowthStep StepAt(int _cardId, int _level)
     {
         // 첫 강화(바닥 바로 위)가 곡선의 0번째 칸이다 — 그래야 baseEnhanceCost·baseSuccessRate가 첫 강화의 값이 된다.
         int t_step = _level - CardGrowth.BaseLevel - 1;
@@ -145,7 +145,7 @@ public class CardGrowthConfig : ScriptableObject
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;
         }
 
-        if (_card != null && CardCatalog.RequireSpec(_card).TryGetHpGain(_level, out int t_cardHp))
+        if (_cardId > 0 && CardCatalog.RequireSpec(_cardId).TryGetHpGain(_level, out int t_cardHp))
             t_hp = t_cardHp;
 
         if (t_cost < 0) t_cost = 0;

@@ -23,7 +23,7 @@ public class LoadingCoverView : MonoBehaviour
     const string LobbyScene = "LobbyScene";
 
     // 전환 모드가 커버를 얻는 유일한 경로. Addressables 초기화보다 먼저 필요할 수 있으므로
-    // Boot가 직렬화한 카탈로그에서 동기적으로 얻는다.
+    // Initialize 프리팹이 직렬화한 카탈로그에서 동기적으로 얻는다.
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
     [SerializeField] TMP_Text statusText;
@@ -37,10 +37,10 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("로딩이 끝나지 않아도 이 시간(초)이 지나면 다음 씬으로 넘긴다 — 무한 대기 방지.")]
     [SerializeField] float maxDuration = 15f;
 
-    // 부팅 대기는 진행바 연출과 다른 축이다. maxDuration을 같이 쓰면 CoFillBar가 그 예산을 먼저
-    // 소진한 뒤 부팅 대기가 0초로 시작해, 조금만 느려도 곧장 복구 화면으로 떨어진다.
+    // 초기화 대기는 진행바 연출과 다른 축이다. maxDuration을 같이 쓰면 CoFillBar가 그 예산을 먼저
+    // 소진한 뒤 초기화 대기가 0초로 시작해, 조금만 느려도 곧장 복구 화면으로 떨어진다.
     // 세이브 채택만으로도 최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)라 넉넉히 잡는다.
-    [SerializeField] float bootWaitTimeout = 45f;
+    [SerializeField] float initializeWaitTimeout = 45f;
 
     [Tooltip("진행바가 100%에 닿은 뒤 씬을 넘기기 전 유지 시간(초).")]
     [SerializeField] float holdBeforeLoad = 0.15f;
@@ -118,12 +118,12 @@ public class LoadingCoverView : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(m_targetScene == null ? CoRunBoot() : CoRunSceneLoad());
+        StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
     }
 
     // ── 부트 모드 ─────────────────────────────────────────────────────────────
 
-    IEnumerator CoRunBoot()
+    IEnumerator CoRunInitialize()
     {
         if (GameInitialization.State == EGameInitState.UpdateRequired)
         {
@@ -142,12 +142,12 @@ public class LoadingCoverView : MonoBehaviour
         yield return CoFillBar(() => GameInitialization.Progress);
 
         // 타임아웃은 로딩 화면의 진행 정책으로 유지하되, 완료 조건은 전역 초기화 창구만 본다.
-        float t_bootWaitStarted = Time.realtimeSinceStartup;
+        float t_initializeWaitStarted = Time.realtimeSinceStartup;
         while (!GameInitialization.IsReady && !GameInitialization.IsTerminated)
         {
-            if (Time.realtimeSinceStartup - t_bootWaitStarted >= bootWaitTimeout)
+            if (Time.realtimeSinceStartup - t_initializeWaitStarted >= initializeWaitTimeout)
             {
-                Debug.LogError($"[LoadingCoverView] 게임 초기화가 {bootWaitTimeout}초 안에 끝나지 않아 복구 화면으로 전환합니다. " +
+                Debug.LogError($"[LoadingCoverView] 게임 초기화가 {initializeWaitTimeout}초 안에 끝나지 않아 복구 화면으로 전환합니다. " +
                                $"상태={GameInitialization.State}");
                 GameInitialization.MarkRecoveryRequired();
                 break;

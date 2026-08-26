@@ -67,11 +67,11 @@ public class AlbumCardSlotView : MonoBehaviour
     // (CardVisualView의 잠김 오버레이 경로는 여기서 아예 타지 않는다)
     //
     // _number: 칸에 찍을 도감 번호(1부터). 0 이하면 번호를 숨긴다.
-    public void Bind(CardData _card, bool _owned, int _number)
+    public void Bind(int _cardId, bool _owned, int _number)
     {
-        bool t_show = _card != null && _owned;
+        bool t_show = _cardId > 0 && _owned;
 
-        if (cardVisual != null) cardVisual.Bind(t_show ? _card : null, true);
+        if (cardVisual != null) cardVisual.Bind(t_show ? _cardId : 0, true);
 
         this.ApplyFrontAlpha();
 

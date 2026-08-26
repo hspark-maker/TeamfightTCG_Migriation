@@ -47,7 +47,6 @@ public static class AttackFlow
         BattleFinisher.ArmApproach(null, null, null, null);   // 이전 공격의 미소비 래치 제거
         if (!_attacker.IsAlive) return;
         var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField);
-        await (_attacker.data.passive?.OnBeforeAttack(t_ctx) ?? UniTask.CompletedTask);
         await SynergyTriggers.BeforeAttack(t_ctx);
         // 낙인 선피해가 반영된 **최신 보드**에서 전투 종료를 예측한다 — 선피해로 이미 hp 0이 된 카드가
         // 슬롯에 남아 있는 상태라, 여기보다 앞에서 계산하면 그 피해를 빼먹는다.
@@ -61,7 +60,6 @@ public static class AttackFlow
         BattleField _defenderField, BattleField _attackerField)
     {
         var t_ctx = new AttackedCtx(_defender, _attacker, _defenderField, _attackerField);
-        _defender.data.passive?.OnAttacked(t_ctx);
         SynergyTriggers.Attacked(t_ctx);
     }
 
@@ -88,7 +86,6 @@ public static class AttackFlow
         if (!_attacker.IsAlive) return;
         var t_ctx = new AfterAttackCtx(_attacker, _defender, _attackerField, _defenderField,
                                        _result.damageDealt, _result.defenderKilled);
-        await (_attacker.data.passive?.OnAfterAttack(t_ctx) ?? UniTask.CompletedTask);
         // 시너지 공격-후 트리거(포식자 회복 등). 패시브 발화 직후, 생존 가드 이후.
         await SynergyTriggers.AfterAttack(t_ctx);
     }

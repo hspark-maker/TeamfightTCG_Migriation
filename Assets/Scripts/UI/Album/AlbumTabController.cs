@@ -209,7 +209,7 @@ public class AlbumTabController : LobbyTabPanel
     /// 꽂을 것이 하나도 없으면 첫 테마. 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
     static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
     {
-        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_card))
+        if (OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
         {
             for (int t_i = 0; t_i < _themes.Count; t_i++)
                 if (Contains(_themes[t_i], t_card)) return t_i;
@@ -221,13 +221,13 @@ public class AlbumTabController : LobbyTabPanel
         return _themes.Count > 0 ? 0 : -1;
     }
 
-    static bool Contains(AlbumTheme _theme, CardData _card)
+    static bool Contains(AlbumTheme _theme, int _cardId)
     {
-        var t_cards = _theme != null ? _theme.Cards : null;
+        var t_cards = _theme != null ? _theme.CardIds : null;
         if (t_cards == null) return false;
 
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
-            if (t_cards[t_i] == _card) return true;
+            if (t_cards[t_i] == _cardId) return true;
 
         return false;
     }

@@ -170,7 +170,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_gains = new CurrencyGainBucket();
         BattleRewardHandoff.TryConsume(t_gains);
 
-        IReadOnlyList<CardData> t_cards = null;
+        IReadOnlyList<int> t_cards = null;
         if (CardPackRewardHandoff.TryConsume(t_gains, out var t_packCards)) t_cards = t_packCards;
 
         int t_cardCount = t_cards != null ? t_cards.Count : 0;
@@ -302,7 +302,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         return true;
     }
 
-    bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards, RectTransform _origin)
+    bool TryStageCards(Sequence _master, IReadOnlyList<int> _cards, RectTransform _origin)
     {
         m_collectionTarget = tabBar != null ? tabBar.GetVisualAnchor(collectionTabIndex) : null;
         if (m_collectionTarget == null)

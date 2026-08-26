@@ -24,7 +24,7 @@ public sealed class DeckEditData : UIData
 
     /// <summary>편집을 열 때 이 카드 한 장을 덱에서 빼고 시작한다(없으면 저장된 그대로).
     /// 튜토리얼이 "직접 골라 끼우기"를 가르치는 자리 — 빈 칸이 하나 있어야 가르칠 것이 생긴다.</summary>
-    public CardData holdoutCard;
+    [CardId] public int holdoutCard;
 
     /// <summary>상단 제목.
     /// (예전에는 배리언트가 노드를 아예 삭제해서 껐다 — 그래서 저작본이 둘로 갈렸다.)</summary>
@@ -91,7 +91,7 @@ public class DeckEditController : PooledUIBase
     enum EDeckEditMode { None, Edit, Create }
 
     // 편집 중인 덱 사본. 길이는 항상 DECK_SIZE 고정이고 빈 칸은 null이다(리스트로 두면 "3번 칸이 비었다"를 표현할 수 없다).
-    readonly CardData[] m_working = new CardData[DeckSaveManager.DECK_SIZE];
+    readonly int[] m_working = new int[DeckSaveManager.DECK_SIZE];
 
     EDeckEditMode m_mode = EDeckEditMode.None;
 
@@ -106,11 +106,11 @@ public class DeckEditController : PooledUIBase
     Canvas m_sortingCanvas;
 
     // 이번 편집에서 일부러 빼 둔 카드. 유저가 도로 끼우면 null로 돌아간다.
-    CardData m_holdout;
+    int m_holdout;
 
     /// <summary>어느 칸이든 카드가 편성된 직후 발화(탭·드래그 공통). 튜토리얼이 "지목한 카드를 끼웠는가"를
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
-    public static event Action<CardData> OnAnyCardEquipped;
+    public static event Action<int> OnAnyCardEquipped;
 
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
@@ -268,8 +268,8 @@ public class DeckEditController : PooledUIBase
         Close();
 
         // 그리드 Clear의 Destroy는 프레임 끝이라 등록이 한 프레임 더 살아 있다 — 여기서 명시로 걷는다.
-        if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(null);
-        this.m_holdout = null;
+        if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(0);
+        this.m_holdout = 0;
 
         this.data = null;
         this.m_request = null;
@@ -284,7 +284,7 @@ public class DeckEditController : PooledUIBase
     {
         if (UIPoolManager.Instance == null)
         {
-            Debug.LogError("[DeckEditController] UIPoolManager가 없어 덱 편집을 열 수 없다 — Boot 초기화를 확인할 것.");
+            Debug.LogError("[DeckEditController] UIPoolManager가 없어 덱 편집을 열 수 없다 — InitializationInstaller 초기화를 확인할 것.");
 
             return null;
         }
@@ -313,7 +313,7 @@ public class DeckEditController : PooledUIBase
         m_mode      = EDeckEditMode.Edit;
         m_slotIndex = _slotIndex;
 
-        // 세이브의 List<CardData>는 유효 슬롯이면 6개지만 불완전 슬롯이면 더 짧을 수 있다 → 앞에서부터 채운다.
+        // 세이브의 카드 ID 목록은 유효 슬롯이면 6개지만 불완전 슬롯이면 더 짧을 수 있다 → 앞에서부터 채운다.
         Array.Clear(m_working, 0, m_working.Length);
         var t_saved = DeckSaveManager.Load(_slotIndex);
         if (t_saved != null)
@@ -425,20 +425,20 @@ public class DeckEditController : PooledUIBase
     // 칸을 앞으로 당기지 않고 그 자리를 비운다: 탭 배치(FindFirstEmpty)가 원래 자리를 되찾아야 편성 순서가 보존된다.
     void ApplyHoldout()
     {
-        m_holdout = m_request != null ? m_request.holdoutCard : null;
-        if (m_holdout == null) return;
+        m_holdout = m_request != null ? m_request.holdoutCard : 0;
+        if (m_holdout <= 0) return;
 
         for (int t_i = 0; t_i < m_working.Length; t_i++)
         {
             if (m_working[t_i] != m_holdout) continue;
 
-            m_working[t_i] = null;
+            m_working[t_i] = 0;
             return;
         }
 
         // 빼 둘 카드가 덱에 없으면 빈 칸이 안 생긴다 — "이 카드를 끼워라"라는 안내가 끼울 자리를 못 찾는다.
-        Debug.LogWarning($"[DeckEditController] 튜토리얼이 지목한 카드({m_holdout.name})가 이 덱에 없어 빈 칸을 만들지 못했다.");
-        m_holdout = null;
+        Debug.LogWarning($"[DeckEditController] 튜토리얼이 지목한 카드({CardCatalog.RequireSpec(m_holdout).DisplayName})가 이 덱에 없어 빈 칸을 만들지 못했다.");
+        m_holdout = 0;
     }
 
     // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
@@ -477,7 +477,7 @@ public class DeckEditController : PooledUIBase
     // 지목된 타일이 목록 밖에 있으면 게이트가 승격했을 때 클리핑이 끊겨 화면에 샌다 — 그리기 직후 안으로 들여놓는다.
     void ScrollToHoldout()
     {
-        if (m_holdout != null && collectionGrid != null) collectionGrid.EnsureVisible(m_holdout);
+        if (m_holdout > 0 && collectionGrid != null) collectionGrid.EnsureVisible(m_holdout);
     }
 
     // 이름 입력 확정. 여기서는 표시만 정리하고 dirty를 세우지 않는다 —
@@ -523,7 +523,7 @@ public class DeckEditController : PooledUIBase
         // 편집이 닫힌 뒤 같은 프레임에 늦게 디스패치될 수 있다(그리드 Clear의 Destroy는 프레임 끝에 반영).
         // 가드가 없으면 닫힌 편집기의 0번 칸에 카드가 꽂히고 m_dirty까지 선다.
         if (!IsOpen) return;
-        if (_tile == null || _tile.Card == null) return;
+        if (_tile == null || _tile.Card <= 0) return;
 
         // 드래그 도중 들어온 클릭은 무시한다. 입력 모듈 쪽 차단(eligibleForClick)이 뚫려도 고스트가 붙은 채
         // 카드가 칸에 꽂히는 상태는 만들지 않는다.
@@ -536,17 +536,17 @@ public class DeckEditController : PooledUIBase
     }
 
     // 편성 칸에 카드를 놓는다. 같은 카드가 이미 다른 칸에 있으면 복사가 아니라 이동이다(덱 내 중복 금지).
-    public void AssignSlot(int _slotIndex, CardData _card)
+    public void AssignSlot(int _slotIndex, int _card)
     {
         if (_slotIndex < 0 || _slotIndex >= m_working.Length) return;
-        if (_card == null) return;
+        if (_card <= 0) return;
 
         // 제자리 드롭. 아래 이동 처리보다 먼저 걸러야 한다 — 뒤에 두면 원래 칸을 비우고 나가버린다.
         // 겸사겸사 dirty 오염(변화 없는데 저장 유발)도 막는다.
         if (m_working[_slotIndex] == _card) return;
 
         for (int t_i = 0; t_i < m_working.Length; t_i++)
-            if (t_i != _slotIndex && m_working[t_i] == _card) m_working[t_i] = null;
+            if (t_i != _slotIndex && m_working[t_i] == _card) m_working[t_i] = 0;
 
         m_working[_slotIndex] = _card;
         m_dirty = true;
@@ -555,7 +555,7 @@ public class DeckEditController : PooledUIBase
         // 다른 칸에 끼웠다면 편성 순서만 달라진 것이라 그 차이는 버린다(전투 덱은 시나리오가 정한다).
         if (_card == m_holdout)
         {
-            m_holdout = null;
+            m_holdout = 0;
             if (CountFilled() == DeckSaveManager.DECK_SIZE) m_dirty = false;
         }
 
@@ -568,9 +568,9 @@ public class DeckEditController : PooledUIBase
     public void ClearSlot(int _slotIndex)
     {
         if (_slotIndex < 0 || _slotIndex >= m_working.Length) return;
-        if (m_working[_slotIndex] == null) return;   // 빈 칸 클릭으로 dirty가 서면 나갈 때 불필요한 파일 쓰기가 생긴다
+        if (m_working[_slotIndex] <= 0) return;   // 빈 칸 클릭으로 dirty가 서면 나갈 때 불필요한 파일 쓰기가 생긴다
 
-        m_working[_slotIndex] = null;
+        m_working[_slotIndex] = 0;
         m_dirty = true;
         RefreshAll();
     }
@@ -597,11 +597,11 @@ public class DeckEditController : PooledUIBase
             for (int t_i = 0; t_i < t_forced.Count; t_i++)
             {
                 var t_card = t_forced[t_i];
-                if (t_card == null) continue;
+                if (t_card <= 0) continue;
                 if (ContainsInWorking(t_card)) continue;
 
                 if (!OwnershipManager.IsOwned(t_card))
-                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{t_card.name}'가 미소유 상태다 — 그대로 편성한다.");
+                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{CardCatalog.RequireSpec(t_card).DisplayName}'가 미소유 상태다 — 그대로 편성한다.");
 
                 if (!TryFillFirstEmpty(t_card)) break;   // 6칸이 다 찼다
                 t_changed = true;
@@ -612,13 +612,13 @@ public class DeckEditController : PooledUIBase
         // 이미 6칸이 찼으면 후보 수집·정렬 자체가 낭비다(버튼은 비활성이지만 이 메서드는 public).
         if (CardCatalog.IsReady && CountFilled() < DeckSaveManager.DECK_SIZE)
         {
-            var t_cards      = CardCatalog.All;
-            var t_candidates = new List<(CardData card, int order)>(t_cards.Count);
+            var t_cards      = CardCatalog.AllIds;
+            var t_candidates = new List<(int card, int order)>(t_cards.Count);
 
             for (int t_i = 0; t_i < t_cards.Count; t_i++)
             {
                 var t_card = t_cards[t_i];
-                if (t_card == null) continue;                     // CardRegistry의 ID 보존용 빈 칸
+                if (t_card <= 0) continue;
                 if (!OwnershipManager.IsOwned(t_card)) continue;
                 if (ContainsInWorking(t_card)) continue;
 
@@ -687,7 +687,7 @@ public class DeckEditController : PooledUIBase
     {
         int t_n = 0;
         for (int t_i = 0; t_i < m_working.Length; t_i++)
-            if (m_working[t_i] != null) t_n++;
+            if (m_working[t_i] > 0) t_n++;
 
         return t_n;
     }
@@ -696,14 +696,14 @@ public class DeckEditController : PooledUIBase
     int FindFirstEmpty()
     {
         for (int t_i = 0; t_i < m_working.Length; t_i++)
-            if (m_working[t_i] == null) return t_i;
+            if (m_working[t_i] <= 0) return t_i;
 
         return -1;
     }
 
     // 앞쪽 빈 칸 하나에 카드를 놓는다. 빈 칸이 없으면 false(호출측이 순회를 끊는 신호).
     // 자동 편성 전용 — dirty·재갱신은 호출측(AutoEquip)이 순회를 끝낸 뒤 한 번에 처리한다.
-    bool TryFillFirstEmpty(CardData _card)
+    bool TryFillFirstEmpty(int _card)
     {
         int t_empty = FindFirstEmpty();
         if (t_empty < 0) return false;
@@ -712,7 +712,7 @@ public class DeckEditController : PooledUIBase
         return true;
     }
 
-    bool ContainsInWorking(CardData _card)
+    bool ContainsInWorking(int _card)
     {
         for (int t_i = 0; t_i < m_working.Length; t_i++)
             if (m_working[t_i] == _card) return true;

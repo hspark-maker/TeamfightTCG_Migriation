@@ -21,14 +21,14 @@ public static class AlbumInsertMask
 
     public static int HiddenTotal => s_hidden.Count;
 
-    public static void HideAll(IReadOnlyList<CardData> _cards)
+    public static void HideAll(IReadOnlyList<int> _cards)
     {
         if (_cards == null || _cards.Count == 0) return;
 
         bool t_changed = false;
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
-            int t_id = CardCatalog.IdOf(_cards[t_i]);
+            int t_id = _cards[t_i];
             if (t_id <= 0) continue;
 
             t_changed |= s_hidden.Add(t_id);
@@ -37,9 +37,9 @@ public static class AlbumInsertMask
         if (t_changed) OnChanged?.Invoke();
     }
 
-    public static void Reveal(CardData _card)
+    public static void Reveal(int _cardId)
     {
-        int t_id = CardCatalog.IdOf(_card);
+        int t_id = _cardId;
         if (t_id <= 0) return;
         if (!s_hidden.Remove(t_id)) return;
 
@@ -54,11 +54,11 @@ public static class AlbumInsertMask
         OnChanged?.Invoke();
     }
 
-    public static bool IsHidden(CardData _card)
+    public static bool IsHidden(int _cardId)
     {
         if (s_hidden.Count == 0) return false;
 
-        int t_id = CardCatalog.IdOf(_card);
+        int t_id = _cardId;
         return t_id > 0 && s_hidden.Contains(t_id);
     }
 
@@ -67,14 +67,14 @@ public static class AlbumInsertMask
     {
         if (s_hidden.Count == 0 || _page == null) return 0;
 
-        return CountHidden(_page.Cards);
+        return CountHidden(_page.CardIds);
     }
 
     public static int HiddenCountIn(AlbumTheme _theme)
     {
         if (s_hidden.Count == 0 || _theme == null) return 0;
 
-        return CountHidden(_theme.Cards);
+        return CountHidden(_theme.CardIds);
     }
 
     // 도메인 리로드를 꺼두면 static 집합이 이전 플레이를 물고 넘어온다 — 시작마다 비운다.
@@ -85,14 +85,14 @@ public static class AlbumInsertMask
         OnChanged = null;
     }
 
-    static int CountHidden(IReadOnlyList<CardData> _cards)
+    static int CountHidden(IReadOnlyList<int> _cards)
     {
         if (_cards == null) return 0;
 
         int t_count = 0;
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
-            int t_id = CardCatalog.IdOf(_cards[t_i]);
+            int t_id = _cards[t_i];
             if (t_id > 0 && s_hidden.Contains(t_id)) t_count++;
         }
         return t_count;

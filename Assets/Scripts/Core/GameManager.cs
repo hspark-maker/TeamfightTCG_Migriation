@@ -38,7 +38,7 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
-        Boot();
+        Initialize();
     }
 
     void OnApplicationPause(bool _pause)
@@ -59,8 +59,8 @@ public class GameManager : MonoBehaviour
         FirebaseManager.FlushPendingAsync().Forget();
     }
 
-    // 전역 서브시스템 부트 초기화. 순서 의존은 여기서 보장한다.
-    void Boot()
+    // 전역 서브시스템 초기화. 순서 의존은 여기서 보장한다.
+    void Initialize()
     {
         GameInitialization.SetState(EGameInitState.Initializing);
 
@@ -129,7 +129,7 @@ public class GameManager : MonoBehaviour
     // 그때 잔액 flush까지 멈추면 이미 번 재화가 로컬 캐시에도 안 남는다.
     void FlushLocal()
     {
-        if (BootInstaller.IsSaveDependentInstalled)
+        if (InitializationInstaller.IsSaveDependentInstalled)
             CurrencyManager.Save();
     }
 }

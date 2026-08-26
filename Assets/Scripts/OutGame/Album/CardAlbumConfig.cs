@@ -54,7 +54,9 @@ public struct AlbumPageDef
     public string pageId;
     public List<AlbumRewardDef> rewards;
     [Tooltip("칸 순서 = 리스트 순서. null 칸 허용(완성 판정 모수에서 제외).")]
-    public List<CardData> cards;
+    [CardId] public List<int> cardIds;
+
+    public IReadOnlyList<int> CardIds => cardIds;
 }
 
 // 보상 1건 저작값. 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이고,

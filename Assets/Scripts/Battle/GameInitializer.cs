@@ -19,17 +19,17 @@ public class GameInitializer : MonoBehaviour
     // 덱 확인/편집 게이트(MatchDeckShell)는 여기 없다 — 로비(LobbyMatchLauncher)가 씬 로드 전에 돌린다.
     // 이 씬에 다시 두면 확정 지점이 씬을 넘어 둘로 갈린다. 배틀 씬은 확정된 DeckConfig를 읽기만 한다.
 
-    static System.Func<CardData, CardGrowth> s_growthProvider;
-    static System.Func<CardData, CardGrowth> s_enemyGrowthProvider;
-    static System.Func<CardData, CardGrowth> s_baseGrowthProvider;
-    static System.Func<CardData, int, CardGrowth> s_growthAtLevelProvider;
+    static System.Func<int, CardGrowth> s_growthProvider;
+    static System.Func<int, CardGrowth> s_enemyGrowthProvider;
+    static System.Func<int, CardGrowth> s_baseGrowthProvider;
+    static System.Func<int, int, CardGrowth> s_growthAtLevelProvider;
     static System.Func<int> s_enemyTierProvider;
     EMatchEndReason multiplayerFieldFailureReason = EMatchEndReason.Timeout;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
     /// 순수 주입점이라 set만 둔다(읽는 쪽은 이 클래스 내부뿐 — 밖으로 새면 성장값 조회 창구가 둘로 갈린다).</summary>
-    public static System.Func<CardData, CardGrowth> GrowthProvider
+    public static System.Func<int, CardGrowth> GrowthProvider
     {
         set => s_growthProvider = value;
     }
@@ -39,7 +39,7 @@ public class GameInitializer : MonoBehaviour
     ///
     /// **멀티·튜토리얼에는 넘기지 않는다.** 멀티는 IMatchGrowthSource가 확정한 최종 스냅샷을 원자 교환하고,
     /// 튜토리얼은 저작된 킬 수·턴 수에 기대는 시나리오라 이 난이도 공급자를 타면 안 된다.</summary>
-    public static System.Func<CardData, CardGrowth> EnemyGrowthProvider
+    public static System.Func<int, CardGrowth> EnemyGrowthProvider
     {
         set => s_enemyGrowthProvider = value;
     }
@@ -54,13 +54,13 @@ public class GameInitializer : MonoBehaviour
     /// 성장값을 아예 안 넘기는 것과 다르다 — 미주입은 <see cref="CardInstance"/>가 마스터 데이터의 키워드를
     /// **전부 열린 것으로** 취급하는 폴백을 타서, Lv1 표시인 카드가 해금 레벨 4짜리 키워드를 달고 나온다.
     /// Lv1 성장값을 넘기면 체력 가산분은 0이라 저작된 킬 수·턴 수 전제는 그대로 두고 해금 게이트만 살아난다.</summary>
-    public static System.Func<CardData, CardGrowth> BaseGrowthProvider
+    public static System.Func<int, CardGrowth> BaseGrowthProvider
     {
         set => s_baseGrowthProvider = value;
     }
 
     /// <summary>튜토리얼 시나리오가 저작한 레벨의 성장 스냅샷 공급자. 성장 계산은 OutGame이 소유한다.</summary>
-    public static System.Func<CardData, int, CardGrowth> GrowthAtLevelProvider
+    public static System.Func<int, int, CardGrowth> GrowthAtLevelProvider
     {
         set => s_growthAtLevelProvider = value;
     }
@@ -69,7 +69,7 @@ public class GameInitializer : MonoBehaviour
     {
         // 전투 씬 단독 실행에서도 배선되게 여기서 주입(DataLibrary 비의존).
         // 연출이 늘어도 이 필드는 하나로 고정 — 새 연출은 라이브러리 에셋의 목록에만 추가한다.
-        BattleVfx.SetLibrary(this.battleVfxLibrary);
+        if (!BattleVfx.HasLibrary) BattleVfx.SetLibrary(this.battleVfxLibrary);
     }
 
     async UniTaskVoid Start()
@@ -259,7 +259,7 @@ public class GameInitializer : MonoBehaviour
         }
         MultiplayerTurnRunner.Instance.SetMatchGrowthSource(t_source);
 
-        var t_deck = DeckConfig.PlayerDeck ?? new System.Collections.Generic.List<CardData>();
+        var t_deck = DeckConfig.PlayerDeck ?? new System.Collections.Generic.List<int>();
         CardGrowth[] t_growth;
         CancellationToken t_destroyCt = this.GetCancellationTokenOnDestroy();
         using var t_growthCts = CancellationTokenSource.CreateLinkedTokenSource(t_destroyCt);
@@ -296,31 +296,31 @@ public class GameInitializer : MonoBehaviour
         var t_growthByCard = new System.Collections.Generic.Dictionary<int, CardGrowth>(t_deck.Count);
         for (int i = 0; i < t_deck.Count; i++)
         {
-            CardData t_card = t_deck[i];
-            if (t_card == null)
+            int t_cardId = t_deck[i];
+            if (!CardCatalog.Contains(t_cardId))
             {
                 Debug.LogError($"[MatchGrowth] 내 덱 카드가 null이다: index={i}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
-            if (!MatchGrowthValidation.IsValid(t_card, t_growth[i], out string t_error))
+            if (!MatchGrowthValidation.IsValid(t_cardId, t_growth[i], out string t_error))
             {
                 Debug.LogError($"[MatchGrowth] 내 성장 스냅샷 오류(index={i}): {t_error}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
-            if (t_growthByCard.ContainsKey(t_card.id))
+            if (t_growthByCard.ContainsKey(t_cardId))
             {
-                Debug.LogError($"[MatchGrowth] 멀티 덱에 중복 카드가 있다: id={t_card.id}");
+                Debug.LogError($"[MatchGrowth] 멀티 덱에 중복 카드가 있다: id={t_cardId}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
-            t_growthByCard.Add(t_card.id, t_growth[i]);
+            t_growthByCard.Add(t_cardId, t_growth[i]);
         }
 
         MultiplayerTurnRunner.Instance.SetLocalGrowthProfiles(t_deck, t_growth);
         this.playerField.Initialize(t_deck, t_myIndex, ShufflePolicy.Local,
-            _card => t_growthByCard[_card.id]);
+            _cardId => t_growthByCard[_cardId]);
         return true;
     }
 
@@ -344,8 +344,8 @@ public class GameInitializer : MonoBehaviour
             //
             // 진행도 대신 시나리오 저작 레벨의 성장값을 넘긴다. 레벨을 캡처해 대기 카드가 뒤늦게 나와도
             // 같은 키워드·시너지·진화·HP 곡선을 탄다. 범용 공급자 미배선 시에는 기존 Lv1 공급자로 폴백한다.
-            System.Func<CardData, CardGrowth> t_playerGrowth = s_baseGrowthProvider;
-            System.Func<CardData, CardGrowth> t_enemyGrowth  = s_baseGrowthProvider;
+            System.Func<int, CardGrowth> t_playerGrowth = s_baseGrowthProvider;
+            System.Func<int, CardGrowth> t_enemyGrowth  = s_baseGrowthProvider;
             if (s_growthAtLevelProvider != null)
             {
                 int t_playerLevel = TutorialConfig.PlayerCardLevel;
@@ -361,7 +361,7 @@ public class GameInitializer : MonoBehaviour
             this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match, s_growthProvider);
             // 상대 덱은 게이트보다 앞선 ConfirmEnemyDeck이 확정해 뒀다(로비가 넘긴 값이면 그대로 유지된다).
             // 여기서 다시 뽑지 않는 게 핵심 — 뽑으면 게이트 화면에서 본 상대와 실제 상대가 갈린다.
-            var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<CardData>();
+            var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<int>();
             // AI도 티어 레벨을 받는다 — 체력뿐 아니라 키워드·시너지 해금까지 같은 곡선으로 정해진다.
             this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match, s_enemyGrowthProvider);
         }

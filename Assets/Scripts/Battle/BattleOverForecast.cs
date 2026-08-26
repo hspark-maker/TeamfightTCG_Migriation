@@ -56,7 +56,7 @@ public static class BattleOverForecast
         // 일반 강화(Lv10): 기본타 뒤 추가타. 주 대상에게만 들어가고 반격·[Attacked]는 없다(AttackProcessor와 같은 계약).
         bool t_takesCounter = _attacker.TakesCounterFrom(_defender);
         int  t_ctrDmg       = t_takesCounter ? _defender.AttackDamage() : 0;
-        int  t_thorn        = _defender.data?.passive?.ThornDamage ?? 0;
+        int  t_thorn        = 0;
         (_, bool t_attackerDiesBeforeEnhance) = _attacker.PreviewDamageChain(t_ctrDmg, t_thorn);
         int  t_enhanceDmg   = _attacker.HasVanillaEnhance && !t_attackerDiesBeforeEnhance
             ? _attacker.VanillaEnhanceDamage()
@@ -137,9 +137,6 @@ public static class BattleOverForecast
     /// 카드 패시브와 이 덱의 활성 시너지를 모두 본다.</summary>
     static bool HasLethalAlteringEffect(BattleField _field, List<CardInstance> _active)
     {
-        foreach (CardInstance t_c in _active)
-            if (t_c?.data?.passive != null && t_c.data.passive.CanAlterLethalOutcome) return true;
-
         SynergyState t_state = _field.Synergy;
         if (t_state == null) return false;
 

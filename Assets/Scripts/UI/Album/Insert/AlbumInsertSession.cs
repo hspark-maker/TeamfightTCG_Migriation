@@ -252,7 +252,7 @@ public class AlbumInsertSession : MonoBehaviour
     }
 
     // 카드 목록을 스텝으로 바꿔 담는다. 꽂을 칸이 없는 카드는 여기서 위장을 풀지 않으면 영영 빈 칸으로 남는다.
-    void TakeSteps(IReadOnlyList<CardData> _cards)
+    void TakeSteps(IReadOnlyList<int> _cards)
     {
         var t_steps = AlbumInsertPlan.Build(_cards, out var t_unplaced);
 
@@ -287,7 +287,7 @@ public class AlbumInsertSession : MonoBehaviour
         if (pageOverlay == null || !pageOverlay.TryGetSlot(_step.SlotIndex, out var t_slot))
         {
             Debug.LogWarning($"[AlbumInsertSession] 슬롯 {_step.SlotIndex}을 얻지 못했다 — 이 카드는 연출 없이 꽂는다.", this);
-            AlbumInsertMask.Reveal(_step.Card);
+            AlbumInsertMask.Reveal(_step.CardId);
             _result?.Invoke(false);
             yield break;
         }
@@ -300,7 +300,7 @@ public class AlbumInsertSession : MonoBehaviour
         dragger.TravelPixels = sleeve.CardHeight;
         dragger.ResetProgress();   // 카드가 실제로 시작 자리에 놓인 지금이 리셋 시점이다
 
-        cardVisual.Bind(_step.Card, true);
+        cardVisual.Bind(_step.CardId, true);
         cardVisual.gameObject.SetActive(true);
         UiPunch.Play(cardVisual.transform);
 
@@ -380,7 +380,7 @@ public class AlbumInsertSession : MonoBehaviour
         // 다 밀어 넣은 카드는 비닐(씰 앞면) 뒤에 잠겨 있고 번호도 그 카드에 덮여 있다.
         // 위장을 풀면 같은 칸이 같은 카드를 같은 자리·같은 크기로 그리므로, 같은 프레임에 드래그 카드를
         // 걷어도 교체가 보이지 않는다(이음매 0프레임). 비닐은 걷지 않는다 — 꽂힌 칸도 같은 톤으로 덮여 있다.
-        AlbumInsertMask.Reveal(_step.Card);
+        AlbumInsertMask.Reveal(_step.CardId);
         this.HideCard();
 
         SoundManager.Instance?.PlayCue(EOutgameSound.AlbumCardSeat);

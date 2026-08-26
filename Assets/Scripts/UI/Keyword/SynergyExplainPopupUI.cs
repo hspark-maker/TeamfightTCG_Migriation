@@ -6,7 +6,7 @@ using TMPro;
 /// 시너지 설명 팝업(풀드 UI). 카드 정보 창의 시너지 아이콘을 누르면 뜬다.
 /// KeywordExplainPopupUI와 같은 구조·같은 배치 로직 — 키워드/시너지 팝업 동작이 갈리지 않게 맞춘다.
 ///
-/// 프리팹은 Addressables "UIPrefab" 라벨이 있어야 DataLibrary.LoadUIPrefab이 찾는다.
+/// 프리팹은 Addressables "UIPrefab" 라벨이 있어야 UiPrefabCache가 색인한다.
 /// 문구 포맷은 SynergyText가 단독 소유한다(덱 편성 툴팁과 공용).
 /// </summary>
 public class SynergyExplainPopupUI : PooledUIBase

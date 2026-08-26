@@ -325,10 +325,10 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     // 지목한 카드가 덱에 들어갔는가. anchorCard가 있으면 그 카드만 인정한다 — 아무 카드나 끼워도 넘어가면
     // "이 카드를 골라라"라는 안내가 거짓말이 된다.
-    void OnDeckCardEquipped(CardData _card)
+    void OnDeckCardEquipped(int _cardId)
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckEquip) return;
-        if (m_step.AnchorCard != null && _card != m_step.AnchorCard) return;
+        if (m_step.AnchorCardId > 0 && _cardId != m_step.AnchorCardId) return;
 
         OnGateSatisfied();
     }

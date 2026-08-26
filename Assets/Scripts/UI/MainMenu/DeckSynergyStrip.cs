@@ -21,7 +21,7 @@ public class DeckSynergyStrip : MonoBehaviour
     [Tooltip("0보다 크면 이 개수까지만 표시한다.")]
     [SerializeField] int maxIcons;
 
-    readonly List<CardData> eligibleCards = new List<CardData>();
+    readonly List<int> eligibleCards = new List<int>();
 
     // 내가 연 popup이 떠 있는 동안만 true. 안 연 채로 닫으면 남의 popup을 대신 지운다.
     bool m_explainOpen;
@@ -46,14 +46,14 @@ public class DeckSynergyStrip : MonoBehaviour
         }
     }
 
-    public void Refresh(IEnumerable<CardData> _deck)
+    public void Refresh(IEnumerable<int> _deck)
     {
         this.eligibleCards.Clear();
         if (_deck != null)
         {
-            foreach (CardData t_card in _deck)
+            foreach (int t_card in _deck)
             {
-                if (t_card == null) continue;
+                if (t_card <= 0) continue;
                 if (DeckConfig.IsMultiplayer)
                 {
                     this.eligibleCards.Add(t_card);

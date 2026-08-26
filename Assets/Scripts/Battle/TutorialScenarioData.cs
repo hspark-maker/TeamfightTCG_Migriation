@@ -5,7 +5,7 @@ using UnityEngine;
 /// 튜토리얼(가이드형 스크립트 전투) 시나리오 — 디자이너 저작 단위(SO).
 /// 고정 덱(양측, 순서=등장 순서, 6장 이하 허용) + 스크립트 공격 순서(공격자→타깃).
 /// 런타임 단일 진실원은 <see cref="TutorialConfig"/>. 이 SO는 저작 데이터일 뿐.
-/// 카드는 CardRegistry.All 의 CardData 참조(선례: CardData/SynergyData/AIDeckConfig).
+/// 카드는 CardCatalog의 안정적인 int ID로 저작한다.
 /// </summary>
 [CreateAssetMenu(fileName = "TutorialScenario", menuName = "Card Battle/Tutorial Scenario")]
 public class TutorialScenarioData : ScriptableObject
@@ -106,8 +106,11 @@ public class TutorialScenarioData : ScriptableObject
     public int EnemyCardLevel  => Mathf.Max(CardGrowth.BaseLevel, this.enemyCardLevel);
 
     [Header("고정 덱 (순서 = 등장 순서, 셔플 없음, 6장 이하 허용)")]
-    public List<CardData> playerDeck;
-    public List<CardData> enemyDeck;
+    [CardId] public List<int> playerDeckIds;
+    [CardId] public List<int> enemyDeckIds;
+
+    public IReadOnlyList<int> PlayerDeckIds => playerDeckIds;
+    public IReadOnlyList<int> EnemyDeckIds  => enemyDeckIds;
 
     [Header("플레이어 강제 공격 순서 (턴당 1건, 처형 재공격 시 연속 소비)")]
     public List<ScriptedAttack> playerScript;

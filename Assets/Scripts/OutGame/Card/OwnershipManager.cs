@@ -64,8 +64,6 @@ public static class OwnershipManager
         return s_owned.Contains(_id);
     }
 
-    public static bool IsOwned(CardData _card) => IsOwned(CardCatalog.IdOf(_card));
-
     // 카드 1장 지급 — 신규 지급이면 true
     public static bool Grant(int _id)
     {
@@ -100,15 +98,12 @@ public static class OwnershipManager
     {
         if (!CardCatalog.IsReady)
         {
-            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(BootInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
+            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(InitializationInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
             return 0;
         }
 
         var t_ids = new List<int>(CardCatalog.Count);
-        foreach (var t_card in CardCatalog.All)
-        {
-            t_ids.Add(CardCatalog.IdOf(t_card));
-        }
+        foreach (int t_cardId in CardCatalog.AllIds) t_ids.Add(t_cardId);
 
         return GrantAll(t_ids);
     }

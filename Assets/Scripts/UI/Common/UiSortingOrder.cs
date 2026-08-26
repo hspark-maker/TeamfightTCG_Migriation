@@ -56,7 +56,7 @@ public static class UiSortingOrder
     /// 밑에서 끌리게 된다. 그래서 고스트만 게이트 위로 따로 올린다.</summary>
     public const int DragGhost = 360;
 
-    /// <summary>UIPoolManager의 UI 컨테이너(Boot.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
+    /// <summary>UIPoolManager의 UI 컨테이너(Initialize.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
     /// 비어 있어도 항상 켜져 있다 — 이 표가 생긴 이유다.</summary>
     public const int Pool = 400;
 

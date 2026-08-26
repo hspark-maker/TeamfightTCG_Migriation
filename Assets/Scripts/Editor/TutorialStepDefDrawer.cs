@@ -110,7 +110,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
             yield return s_order[t_i].Name;
 
             // 도감 칸처럼 대상이 여럿인 앵커만 "어느 것"까지 저작받는다(축이 앵커라 테이블 밖이다).
-            if (s_order[t_i].Field == EStepField.Anchor && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCard";
+            if (s_order[t_i].Field == EStepField.Anchor && TutorialStepDef.UsesAnchorCard(_anchor)) yield return "anchorCardId";
         }
 
         // 해금·일시 잠금은 자동 스텝에도 의미가 있다(좌표에서 파생되므로) — 항상 노출한다.
@@ -131,8 +131,8 @@ public class TutorialStepDefDrawer : PropertyDrawer
         (EStepField.Pack,             "pack"),
         (EStepField.PackPriceLabel,   "packPriceLabel"),
         (EStepField.Scenario,         "scenario"),
-        (EStepField.Card,             "card"),
-        (EStepField.Cards,            "cards"),
+        (EStepField.Card,             "cardId"),
+        (EStepField.Cards,            "cardIds"),
         (EStepField.RewardTitle,      "rewardTitle"),
         (EStepField.ParallelGain,     "parallelGain"),
         (EStepField.ShowDeckGate,     "showDeckGate"),
@@ -174,8 +174,8 @@ public class TutorialStepDefDrawer : PropertyDrawer
 
         if (TutorialStepDef.UsesScenario(_action)) return NameOf(_property, "scenario");
         if (TutorialStepDef.UsesPack(_action))     return NameOf(_property, "pack");
-        if (TutorialStepDef.UsesCard(_action))     return NameOf(_property, "card");
-        if (TutorialStepDef.UsesCards(_action))    return CountOf(_property, "cards");
+        if (TutorialStepDef.UsesCard(_action))     return IdOf(_property, "cardId");
+        if (TutorialStepDef.UsesCards(_action))    return CountOf(_property, "cardIds");
 
         return string.Empty;
     }
@@ -195,6 +195,12 @@ public class TutorialStepDefDrawer : PropertyDrawer
         var t_obj = t_ref != null ? t_ref.objectReferenceValue : null;
 
         return t_obj != null ? t_obj.name : "(미배선)";
+    }
+
+    static string IdOf(SerializedProperty _property, string _field)
+    {
+        var t_id = _property.FindPropertyRelative(_field);
+        return t_id != null && t_id.intValue > 0 ? $"Card #{t_id.intValue}" : "(미배선)";
     }
 
     static string Truncate(string _text, int _max) => _text.Length <= _max ? _text : _text.Substring(0, _max) + "…";

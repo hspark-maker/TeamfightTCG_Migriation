@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>Firebase 공급자가 붙기 전까지 현재 로컬 세이브의 전체 성장값을 매치 스냅샷으로 만든다.</summary>
 public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
 {
-    public UniTask<CardGrowth[]> ResolveMyGrowth(IReadOnlyList<CardData> _deck, CancellationToken _ct)
+    public UniTask<CardGrowth[]> ResolveMyGrowth(IReadOnlyList<int> _deck, CancellationToken _ct)
     {
         if (_ct.IsCancellationRequested) return UniTask.FromResult<CardGrowth[]>(null);
         if (!CardGrowthManager.IsReady || !CardGrowthManager.IsConfigReady || !KeywordGrowthManager.IsReady)
@@ -19,13 +19,13 @@ public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
         var t_result = new CardGrowth[t_count];
         for (int i = 0; i < t_count; i++)
         {
-            CardData t_card = _deck[i];
-            if (t_card == null)
+            int t_cardId = _deck[i];
+            if (!CardCatalog.Contains(t_cardId))
             {
                 Debug.LogError($"[MatchGrowth] 덱의 카드 참조가 비어 있다: index={i}");
                 return UniTask.FromResult<CardGrowth[]>(null);
             }
-            t_result[i] = CardGrowthManager.GrowthOf(t_card);
+            t_result[i] = CardGrowthManager.GrowthOf(t_cardId);
         }
         return UniTask.FromResult(t_result);
     }

@@ -219,7 +219,7 @@ public class PackCardView : MonoBehaviour
         m_accented = false;
 
         // 개봉 카드는 항상 소유(위 헤더 주석) → _owned는 true 고정.
-        if (cardVisual != null) cardVisual.Bind(_drawn.Card, true);
+        if (cardVisual != null) cardVisual.Bind(_drawn.CardId, true);
 
         ResetAccent();
     }

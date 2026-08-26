@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: UltraPack
   displayName: "\uC6B8\uD2B8\uB77C \uD329"
+  rankLocked: 0
+  minRankGrade: 0
   packArt: {fileID: 21300000, guid: 2644fb62a8b387a4e99510306ddf5d8b, type: 3}
   priceType: 1
   price: 30
@@ -21,61 +23,43 @@ MonoBehaviour:
   uniqueDraw: 1
   refundType: 3
   refundAmount: 8
-  pool:
-  - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
-  - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-  - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-  - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-  - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-  - {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
-  - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
-  - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-  - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-  - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-  - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-  - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
-  - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-  - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-  - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
-  - {fileID: 11400000, guid: 73ea7fd040fa6b5f18181840c5c61bba, type: 2}
-  - {fileID: 11400000, guid: 00b23640f13bccb29c29d393882c405d, type: 2}
+  poolIds: 0a0000000c0000000e0000000f00000010000000190000000d000000130000000300000001000000180000000700000015000000170000001a0000001b0000002700000028000000
   rankPools:
   - minGrade: 0
     cards:
-    - card: {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
+    - cardId: 10
       weight: 4
-    - card: {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
+    - cardId: 12
       weight: 4
-    - card: {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
+    - cardId: 14
       weight: 4
-    - card: {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
+    - cardId: 15
       weight: 3
-    - card: {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
+    - cardId: 16
       weight: 3
-    - card: {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
+    - cardId: 25
       weight: 4
-    - card: {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+    - cardId: 13
       weight: 3
-    - card: {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
+    - cardId: 19
       weight: 3
-    - card: {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
+    - cardId: 3
       weight: 3
-    - card: {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
+    - cardId: 1
       weight: 3
-    - card: {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
+    - cardId: 24
       weight: 1
-    - card: {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+    - cardId: 7
       weight: 1
-    - card: {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+    - cardId: 21
       weight: 1
-    - card: {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
+    - cardId: 23
       weight: 1
-    - card: {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
+    - cardId: 26
       weight: 1
-    - card: {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+    - cardId: 27
       weight: 1
-    - card: {fileID: 11400000, guid: 73ea7fd040fa6b5f18181840c5c61bba, type: 2}
+    - cardId: 39
       weight: 1
-    - card: {fileID: 11400000, guid: 00b23640f13bccb29c29d393882c405d, type: 2}
+    - cardId: 40
       weight: 1

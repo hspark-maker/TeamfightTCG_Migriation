@@ -49,7 +49,7 @@ public class CardGainFlightEffect : MonoBehaviour
     /// 펼침→수렴 시퀀스를 만들어 돌려준다(재생은 호출자 시퀀스에 맡긴다).
     /// _onArrived(도착한 장수, 전체 장수)는 카드가 목적지에 닿을 때마다 불린다 — 탭 강조를 여기에 맞물린다.
     /// </summary>
-    public Sequence BuildFlight(IReadOnlyList<CardData> _cards, Action<int, int> _onArrived)
+    public Sequence BuildFlight(IReadOnlyList<int> _cards, Action<int, int> _onArrived)
     {
         ClearCards();
 
@@ -100,7 +100,7 @@ public class CardGainFlightEffect : MonoBehaviour
         return this.cardSize.y / t_height;
     }
 
-    RectTransform CreateCard(CardData _card)
+    RectTransform CreateCard(int _card)
     {
         var t_rt = this.cardPrefab != null ? CreateFromPrefab(_card) : CreateFromArt(_card);
         if (t_rt == null) return null;
@@ -109,7 +109,7 @@ public class CardGainFlightEffect : MonoBehaviour
         return t_rt;
     }
 
-    RectTransform CreateFromPrefab(CardData _card)
+    RectTransform CreateFromPrefab(int _card)
     {
         var t_view = Instantiate(this.cardPrefab);
         t_view.Bind(_card, true);       // 이미 소유가 확정된 카드다(개봉 시점에 Grant 완료).
@@ -118,7 +118,7 @@ public class CardGainFlightEffect : MonoBehaviour
     }
 
     // 프리팹 미배선 폴백: 카드 아트 한 장으로도 "무엇이 날아갔는지"는 전달된다.
-    RectTransform CreateFromArt(CardData _card)
+    RectTransform CreateFromArt(int _card)
     {
         var t_sprite = ArtOf(_card);
         if (t_sprite == null) return null;
@@ -135,9 +135,9 @@ public class CardGainFlightEffect : MonoBehaviour
     }
 
     // 아트 선택은 CardVisualRules 하나에 맡긴다(여기서 필드를 직접 적으면 드리프트).
-    static Sprite ArtOf(CardData _card)
+    static Sprite ArtOf(int _card)
     {
-        if (_card == null) return null;
+        if (_card <= 0) return null;
         return CardVisualRules.PickCardArt(_card);
     }
 

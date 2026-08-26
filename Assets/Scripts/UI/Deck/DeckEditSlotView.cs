@@ -28,16 +28,16 @@ public class DeckEditSlotView : MonoBehaviour
     const float FOCUS_SCALE_TIME = 0.12f;
 
     int         m_index = -1;
-    CardData    m_card;
+    int         m_card;
     Action<int> m_onClick;
     Tween       m_focusTween;
 
     public int           Index => m_index;
-    public CardData      Card  => m_card;
+    public int           Card  => m_card;
     public RectTransform Rect  => (RectTransform)transform;
 
     // _card가 null이면 빈 칸 모드. 편집 중 매 변경마다 전량 재바인딩되는 전제라 상태를 남기지 않는다.
-    public void Bind(int _index, CardData _card, Action<int> _onClick)
+    public void Bind(int _index, int _card, Action<int> _onClick)
     {
         m_index   = _index;
         m_card    = _card;
@@ -49,7 +49,7 @@ public class DeckEditSlotView : MonoBehaviour
             clickButton.onClick.AddListener(() => m_onClick?.Invoke(m_index));
         }
 
-        bool t_has = _card != null;
+        bool t_has = _card > 0;
 
         // 편성 칸에는 소유한 카드만 올라간다(컬렉션 목록 자체가 소유분만 노출) → _owned는 true 고정.
         // 여기서 소유여부를 다시 계산하면 편성 배열과 소유 세이브라는 두 진실원이 생긴다.

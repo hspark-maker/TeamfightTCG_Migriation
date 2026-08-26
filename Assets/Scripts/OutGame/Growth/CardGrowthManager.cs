@@ -110,14 +110,11 @@ public static partial class CardGrowthManager
         DataSaveManager.Save();
     }
 
-    public static CardGrowth GrowthOf(CardData _card) => Snapshot(_card, LevelOf(CardCatalog.IdOf(_card)), true);
-
-    /// <summary>세이브와 무관하게 지정 레벨의 성장 스냅샷(AI 난이도처럼 소유 진행도가 없는 쪽이 쓴다).</summary>
-    public static CardGrowth GrowthAtLevel(CardData _card, int _level)
-        => Snapshot(_card, ClampLevel(_level), false);
+    public static CardGrowth GrowthAtLevel(int _id, int _level)
+        => Snapshot(_id, ClampLevel(_level), false);
 
     // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
-    public static CardGrowth GrowthOf(int _id) => Snapshot(CardCatalog.Get(_id), LevelOf(_id), true);
+    public static CardGrowth GrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true);
 
     // 카드의 현재 강화 레벨(기록 없음 = 미강화)
     public static int LevelOf(int _id)
@@ -132,15 +129,15 @@ public static partial class CardGrowthManager
     static int ClampLevel(int _level)
         => Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
 
-    public static int HpBonusOf(CardData _card) => GrowthOf(_card).HpBonus;
+    public static int HpBonusOf(int _cardId) => GrowthOf(_cardId).HpBonus;
 
     // 다음 레벨의 비용·성공률·HP 증가분(만렙이면 false)
-    public static bool TryGetNextStep(CardData _card, out GrowthStep _step)
+    public static bool TryGetNextStep(int _cardId, out GrowthStep _step)
     {
         _step = default;
-        if (_card == null) return false;
+        if (_cardId <= 0) return false;
 
-        return TryGetStepAt(_card, GrowthOf(_card).Level + 1, out _step);
+        return TryGetStepAt(_cardId, GrowthOf(_cardId).Level + 1, out _step);
     }
 
     /// <summary>무료 한 방의 조건이 바뀌었다고 알린다 — 레벨도 잔액도 그대로지만 낼 값이 달라져
@@ -148,7 +145,7 @@ public static partial class CardGrowthManager
     public static void NotifyCostRuleChanged() => OnGrowthChanged?.Invoke();
 
     // 강화 1회 시도(실패해도 비용은 소모, 레벨 하락 없음)
-    public static EnhanceResult TryEnhance(CardData _card)
+    public static EnhanceResult TryEnhance(int _cardId)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
         if (!s_configInjected)
@@ -157,7 +154,7 @@ public static partial class CardGrowthManager
             return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
         }
 
-        int t_id = CardCatalog.IdOf(_card);
+        int t_id = _cardId;
         if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
         CardGrowthConfig t_config = Config;
@@ -166,7 +163,7 @@ public static partial class CardGrowthManager
 
         if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!TryGetStepAt(_card, t_level + 1, out var t_step))
+        if (!TryGetStepAt(t_id, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         // 재화는 스텝이 들고 온다 — 성급별로 무엇을 무는지 여기 적으면 곡선과 이중 진실원이 된다.
@@ -203,13 +200,10 @@ public static partial class CardGrowthManager
         int t_max     = Config.MaxLevel;
         int t_changed = 0;
 
-        var t_cards = CardCatalog.All;
+        var t_cards = CardCatalog.AllIds;
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
         {
-            CardData t_card = t_cards[t_i];
-            if (t_card == null) continue;               // CardRegistry의 ID 보존용 빈 칸
-
-            int t_id = CardCatalog.IdOf(t_card);
+            int t_id = t_cards[t_i];
             if (t_id <= 0) continue;
             if (LevelOf(t_id) >= t_max) continue;
 
@@ -235,9 +229,9 @@ public static partial class CardGrowthManager
     }
 
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
-    static bool TryGetStepAt(CardData _card, int _level, out GrowthStep _step)
+    static bool TryGetStepAt(int _cardId, int _level, out GrowthStep _step)
     {
-        if (!Config.TryGetStep(_card, _level, out _step)) return false;
+        if (!Config.TryGetStep(_cardId, _level, out _step)) return false;
 
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
@@ -246,15 +240,15 @@ public static partial class CardGrowthManager
     }
 
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 레벨까지 잃지 않는다.
-    static CardGrowth Snapshot(CardData _card, int _level, bool _includeKeywordGrowth)
+    static CardGrowth Snapshot(int _cardId, int _level, bool _includeKeywordGrowth)
     {
         CardGrowthConfig t_config = Config;
-        CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_card, _level);
-        int t_hpBonus = t_config.HpBonusAt(_card, _level);
+        CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_cardId, _level);
+        int t_hpBonus = t_config.HpBonusAt(_cardId, _level);
         if (_includeKeywordGrowth)
         {
             t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
-            t_hpBonus += t_config.LimitBreakHpBonusAt(LimitBreakOf(CardCatalog.IdOf(_card)));
+            t_hpBonus += t_config.LimitBreakHpBonusAt(LimitBreakOf(_cardId));
         }
 
         return new CardGrowth(

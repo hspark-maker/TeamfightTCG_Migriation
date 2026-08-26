@@ -119,7 +119,7 @@ public class SurvivorGoldFlight
     /// _onEachArrived는 같은 순간의 화면 반응(아이콘 펀치)용.
     /// 날릴 것이 없거나 레이어를 확보하지 못하면 null — 호출자가 이 축을 통째로 건너뛴다.
     /// </summary>
-    public Sequence Build(IReadOnlyList<CardData> _cards, IReadOnlyList<CardData> _fallen,
+    public Sequence Build(IReadOnlyList<int> _cards, IReadOnlyList<int> _fallen,
                           RectTransform _root, RectTransform _target,
                           Action<int, int> _onArrived, Action _onEachArrived = null)
     {
@@ -160,7 +160,7 @@ public class SurvivorGoldFlight
         for (int t_i = 0; t_i < t_count; t_i++)
         {
             bool     t_alive = t_i < t_live;
-            CardData t_card  = t_alive ? _cards[t_i] : _fallen[t_i - t_live];
+            int t_card  = t_alive ? _cards[t_i] : _fallen[t_i - t_live];
 
             RectTransform t_tile = CreateTile(t_card, t_layer);
             if (t_tile == null) continue;
@@ -290,9 +290,9 @@ public class SurvivorGoldFlight
     }
 
     // 카드를 못 그려도 자리는 지킨다 — 리스트에서 빼면 계단의 분모가 어긋나 마지막 한 장이 남은 금액을 다 실어 나른다.
-    RectTransform CreateTile(CardData _card, RectTransform _layer)
+    RectTransform CreateTile(int _card, RectTransform _layer)
     {
-        RectTransform t_rt = this.cardPrefab != null && _card != null
+        RectTransform t_rt = this.cardPrefab != null && _card > 0
                            ? CreateFromPrefab(_card)
                            : CreateFromArt(_card);
 
@@ -341,7 +341,7 @@ public class SurvivorGoldFlight
 
     // 카드 생김새의 정본 경로. 이 줄은 장수를 세는 물건이라 이름·HP는 잔글씨로 뭉갠다 →
     // 아트와 프레임만 남긴다(SetArtOnly는 값만 세우므로 Bind가 뒤에 와야 실제로 반영된다).
-    RectTransform CreateFromPrefab(CardData _card)
+    RectTransform CreateFromPrefab(int _card)
     {
         var t_view = UnityEngine.Object.Instantiate(this.cardPrefab);
         t_view.SetArtOnly(true);
@@ -356,7 +356,7 @@ public class SurvivorGoldFlight
     }
 
     // 프리팹 미배선 폴백: 아트 한 장 + 테두리로 카드를 흉내 낸다.
-    RectTransform CreateFromArt(CardData _card)
+    RectTransform CreateFromArt(int _card)
     {
         var t_go = new GameObject("SurvivorTile", typeof(RectTransform));
         var t_rt = (RectTransform)t_go.transform;

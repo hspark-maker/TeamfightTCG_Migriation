@@ -198,13 +198,6 @@ public class AttackAnimTesterEditor : Editor
         Section("VFX 후보");
         using (new EditorGUILayout.HorizontalScope())
         {
-            EditorGUILayout.LabelField("무장", GUILayout.Width(40));
-            if (Button("◀")) _tester.CycleAttackVfx(-1);
-            if (Button("▶")) _tester.CycleAttackVfx(+1);
-            if (Button(_tester.ArmedPreview ? "미리보기 끄기" : "미리보기")) _tester.ToggleArmedPreview();
-        }
-        using (new EditorGUILayout.HorizontalScope())
-        {
             EditorGUILayout.LabelField("피격", GUILayout.Width(40));
             if (Button("◀")) _tester.CycleHitVfx(-1);
             if (Button("▶")) _tester.CycleHitVfx(+1);

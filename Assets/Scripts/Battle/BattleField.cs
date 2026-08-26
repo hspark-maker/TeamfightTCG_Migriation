@@ -27,12 +27,12 @@ public class BattleField : MonoBehaviour
 
     // 카드 영구 성장값 조회원. 인덱스 배열이 아니라 델리게이트인 이유는 셔플이 이 클래스 안에서 일어나기 때문 —
     // 카드로 조회하면 셔플 순서와 무관하게 맞는다. null이면 성장 미적용(= 기존 동작).
-    System.Func<CardData, CardGrowth> growthOf;
+    System.Func<int, CardGrowth> growthOf;
 
     // 이번 판에 확정 사망한 카드(슬롯에서 빠진 순서). 필드는 시체를 남기지 않으므로 —
     // RemoveCard가 슬롯을 null로 만들고 나면 그 CardInstance를 아무도 붙잡지 않는다 —
     // 빠지는 그 자리에서 적어두지 않으면 판이 끝난 뒤에는 "무엇을 잃었는가"를 복원할 방법이 없다.
-    readonly List<CardData> fallenCards = new List<CardData>();
+    readonly List<int> fallenCards = new List<int>();
 
     public int OwnerIndex => this.ownerIndex;
     public int WaitingCount => this.waitingQueue.Count;
@@ -41,7 +41,7 @@ public class BattleField : MonoBehaviour
     /// <summary>이번 판에 잃은 카드(사망 순서). 결과 화면이 "몇 장 중 몇 장을 지켰는가"를 그리는 출처다.
     /// <b>소비자는 플레이어 필드 하나뿐이다</b> — 상대 필드에도 똑같이 쌓이지만 읽는 곳이 없다
     /// (원격 미러는 상대 전사 목록의 정본이 아니다. 필요해지면 그때 경로를 확인하고 열 것).</summary>
-    public IReadOnlyList<CardData> FallenCards => this.fallenCards;
+    public IReadOnlyList<int> FallenCards => this.fallenCards;
 
     /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifyEntered)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
     /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
@@ -54,8 +54,8 @@ public class BattleField : MonoBehaviour
 
     /// <summary>_growthOf = 카드 영구 성장값 공급자(생략/ null이면 성장 미적용).
     /// 싱글·튜토리얼은 로컬 공급자를, 멀티는 양쪽이 교환해 확정한 성장 스냅샷 공급자를 사용한다.</summary>
-    public void Initialize(List<CardData> _deckData, int _ownerIndex, ShufflePolicy _shuffle,
-        System.Func<CardData, CardGrowth> _growthOf = null)
+    public void Initialize(List<int> _deckData, int _ownerIndex, ShufflePolicy _shuffle,
+        System.Func<int, CardGrowth> _growthOf = null)
     {
         this.ownerIndex = _ownerIndex;
         this.growthOf = _growthOf;
@@ -70,7 +70,7 @@ public class BattleField : MonoBehaviour
         // 빈 칸(null)은 여기서 걷어낸다. 덱 출처가 여럿이고(세이브·AI 에셋·튜토리얼 시나리오)
         // 에셋 참조가 끊기면 그 칸이 null로 들어오는데, 그대로 CardInstance를 만들면 NRE로 초기화가
         // 통째로 죽어 "아무것도 안 나오는 전투"가 된다. 한 장 빠진 채로라도 전투는 열려야 한다.
-        List<CardData> t_shuffled = Compact(_deckData, _ownerIndex);
+        List<int> t_shuffled = Compact(_deckData, _ownerIndex);
         Shuffle(t_shuffled, _shuffle);
 
         for (int i = 0; i < t_shuffled.Count; i++)
@@ -94,9 +94,9 @@ public class BattleField : MonoBehaviour
 
     // 덱 리스트에서 끊긴 참조를 제거한 사본. 빠진 칸은 로그로 남긴다 — 조용히 지우면
     // "덱이 6장인데 5장만 나온다"를 아무도 못 찾는다(에셋 참조가 끊긴 시나리오·AI 덱을 잡는 단서).
-    static List<CardData> Compact(List<CardData> _deckData, int _ownerIndex)
+    static List<int> Compact(List<int> _deckData, int _ownerIndex)
     {
-        var t_cards = new List<CardData>(_deckData != null ? _deckData.Count : 0);
+        var t_cards = new List<int>(_deckData != null ? _deckData.Count : 0);
         if (_deckData == null)
         {
             Debug.LogError($"[BattleField] owner {_ownerIndex} 덱이 null — 빈 필드로 시작한다.");
@@ -106,7 +106,7 @@ public class BattleField : MonoBehaviour
         int t_missing = 0;
         for (int i = 0; i < _deckData.Count; i++)
         {
-            if (_deckData[i] == null)
+            if (_deckData[i] <= 0 || !CardCatalog.Contains(_deckData[i]))
             {
                 t_missing++;
                 continue;
@@ -123,7 +123,7 @@ public class BattleField : MonoBehaviour
     }
 
     // 성장값 조회 단일 지점(미주입이면 default = 미적용). 카드 생성 경로가 늘어도 여기만 통과시킨다.
-    CardGrowth GrowthOf(CardData _data) => this.growthOf != null ? this.growthOf(_data) : default;
+    CardGrowth GrowthOf(int _cardId) => this.growthOf != null ? this.growthOf(_cardId) : default;
 
     // 빈 슬롯에 대기 카드 순서대로 배치. 채운 카드 목록 반환.
     public List<CardInstance> FillEmptySlots()
@@ -228,7 +228,7 @@ public class BattleField : MonoBehaviour
         if (t_card != null)
         {
             t_card.slotIndex = -1;
-            this.fallenCards.Add(t_card.data);
+            this.fallenCards.Add(t_card.cardId);
         }
 
         this.slots[_slotIndex] = null;
@@ -236,22 +236,22 @@ public class BattleField : MonoBehaviour
     }
 
     /// <summary>셔플된 카드 ID 배열 반환. 배틀 초기화 후 broadcast용.</summary>
-    public int[] GetShuffledIds(CardRegistry _registry)
+    public int[] GetShuffledIds()
     {
         var t_ids = new System.Collections.Generic.List<int>();
         for (int i = 0; i < SLOT_COUNT; i++)
         {
             if (this.slots[i] != null)
-                t_ids.Add(_registry.GetId(this.slots[i].data));
+                t_ids.Add(this.slots[i].cardId);
         }
 
         foreach (CardInstance t_c in this.waitingQueue)
-            t_ids.Add(_registry.GetId(t_c.data));
+            t_ids.Add(t_c.cardId);
         return t_ids.ToArray();
     }
 
     /// <summary>상대방에게 받은 카드 ID와 최종 성장 스냅샷으로 enemyField를 재구성한다.</summary>
-    public void InitializeFromRemote(int[] _ids, CardGrowth[] _growth, int _ownerIndex, CardRegistry _registry)
+    public void InitializeFromRemote(int[] _ids, CardGrowth[] _growth, int _ownerIndex)
     {
         this.ownerIndex = _ownerIndex;
         var t_growthById = new Dictionary<int, CardGrowth>(_ids?.Length ?? 0);
@@ -260,7 +260,7 @@ public class BattleField : MonoBehaviour
             for (int i = 0; i < _ids.Length && i < _growth.Length; i++)
                 t_growthById[_ids[i]] = _growth[i];
         }
-        this.growthOf = _card => _card != null && t_growthById.TryGetValue(_card.id, out CardGrowth t_value)
+        this.growthOf = _cardId => t_growthById.TryGetValue(_cardId, out CardGrowth t_value)
             ? t_value
             : default;
         this.slots = new CardInstance[SLOT_COUNT];
@@ -273,9 +273,9 @@ public class BattleField : MonoBehaviour
 
         for (int i = 0; i < _ids.Length; i++)
         {
-            CardData t_data = _registry.GetData(_ids[i]);
-            if (t_data == null) continue;
-            var t_card = new CardInstance(t_data, _ownerIndex, GrowthOf(t_data));
+            int t_cardId = _ids[i];
+            if (!CardCatalog.Contains(t_cardId)) continue;
+            var t_card = new CardInstance(t_cardId, _ownerIndex, GrowthOf(t_cardId));
             if (i < SLOT_COUNT)
             {
                 t_card.slotIndex = i;
@@ -298,14 +298,14 @@ public class BattleField : MonoBehaviour
     /// 그대로 배치한다. hp/bonusHp 같은 stateful 값을 원격에서 재부여하면 divergence가 나므로,
     /// 초기 대기 및 교활 복귀 모두 미러 인스턴스를 재사용해 소유 클라와 값이 정확히 일치하게 한다.
     /// </summary>
-    public CardInstance PlaceCardDirectly(int _slot, CardData _data)
+    public CardInstance PlaceCardDirectly(int _slot, int _cardId)
     {
-        if (_data == null || _slot < 0 || _slot >= SLOT_COUNT) return null;
+        if (!CardCatalog.Contains(_cardId) || _slot < 0 || _slot >= SLOT_COUNT) return null;
 
         // 미러 대기 인스턴스 dequeue (소유 클라 FillEmptySlots 소비와 lockstep: SwapWithWaiting은 양측이
         // 동일 순서로 큐를 변형, FillEmptySlots dequeue를 이 dequeue가 미러). cardId(참조 동일성)로 정합 검증.
         CardInstance t_card;
-        if (this.waitingQueue.Count > 0 && this.waitingQueue.Peek().data == _data)
+        if (this.waitingQueue.Count > 0 && this.waitingQueue.Peek().cardId == _cardId)
         {
             t_card = this.waitingQueue.Dequeue();
         }
@@ -313,8 +313,8 @@ public class BattleField : MonoBehaviour
         {
             // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
             Debug.LogError($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
-                             $"(slot={_slot}, card={_data.name}, waiting={this.waitingQueue.Count})");
-            t_card = new CardInstance(_data, this.ownerIndex, GrowthOf(_data)); // 성장원도 Initialize와 같은 소스로
+                             $"(slot={_slot}, cardId={_cardId}, waiting={this.waitingQueue.Count})");
+            t_card = new CardInstance(_cardId, this.ownerIndex, GrowthOf(_cardId)); // 성장원도 Initialize와 같은 소스로
             if (this.Synergy != null)
                 SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
         }
@@ -334,7 +334,7 @@ public class BattleField : MonoBehaviour
     /// <summary>
     /// 덱 시너지를 산출해 이 필드의 모든 카드(슬롯+대기)에 1회 적용. 배틀 시작 시 호출.
     /// 시너지는 덱 확정으로 결정되므로 전투 중 재계산 없음. 산출 결과는 Synergy에 보관.
-    /// 멀티 결정론: 양 클라가 동일 덱(동일 CardData 집합)으로 Resolve → 동일 결과.
+    /// 멀티 결정론: 양 클라가 동일 카드 ID 덱으로 Resolve → 동일 결과.
     /// </summary>
     public void ApplyDeckSynergy()
     {
@@ -344,14 +344,11 @@ public class BattleField : MonoBehaviour
         // 성장 카드의 시너지는 1차 진화부터 카운트한다. CardData만 넘기기 전에 인스턴스에서
         // 필터해야 Resolver가 성장 계층을 알지 않아도 되고 기존 순수 집계 계약도 유지된다.
         this.Synergy = SynergyResolver.Resolve(
-            t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.data));
+            t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.cardId));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
         // [DeckResolved] 패시브 몫. **DeckResolved만 synergy→passive 역순인데 구조적 제약이다** —
         // ApplyAll 안에 ClearSynergy가 있어서 패시브를 먼저 돌리면 패시브가 넣은 정적 스탯이 지워진다.
         // (BattleTimings ◆ 참조.) ctx.state = 확정 스냅샷, ctx.synergy = null. 동기 void.
-        foreach (var t_card in t_cards)
-            t_card.data.passive?.OnDeckResolved(new DeckCtx(t_card, this.Synergy));
-
         // [Placed] 시너지 몫. Initialize 시점엔 this.Synergy가 아직 null이라 거기선 발화가 불가능하다
         // (패시브 Placed만 Initialize에서 발화 — justSpawned 판정에 무적 부여를 반영해야 하므로).
         // 그래서 시너지 Placed는 스냅샷이 확정된 여기서 슬롯 카드에 대해 발화한다.
@@ -374,7 +371,6 @@ public class BattleField : MonoBehaviour
         {
             CardInstance t_c = this.slots[i];
             if (t_c == null || !t_c.IsAlive) continue;
-            t_c.data.passive?.OnBoardChanged(new BoardCtx(this, t_c));
         }
 
         SynergyTriggers.BoardChanged(new BoardCtx(this));
@@ -385,7 +381,6 @@ public class BattleField : MonoBehaviour
     void NotifyPlaced(CardInstance _card)
     {
         var t_ctx = new SpawnCtx(_card, this);
-        _card.data.passive?.OnPlaced(t_ctx).Forget();
         SynergyTriggers.Placed(t_ctx);
     }
 
@@ -398,7 +393,6 @@ public class BattleField : MonoBehaviour
     void NotifyEntered(CardInstance _card)
     {
         var t_ctx = new SpawnCtx(_card, this);
-        _card.data.passive?.OnEntered(t_ctx).Forget();
         SynergyTriggers.Entered(t_ctx);
         NotifyBoardChanged(); // 등장으로 라이브 구성이 바뀜 → 파생 상태 재동기
     }
@@ -475,7 +469,7 @@ public class BattleField : MonoBehaviour
     /// <summary>Fisher-Yates. 난수원은 정책이 정한다 — 필드가 모드 플래그를 읽지 않는다.
     /// Match면 MatchRandom(결정론 스트림)을 소비하므로 **양측 소비 횟수가 같아야 한다**:
     /// 지금 Match를 쓰는 건 싱글/튜토리얼뿐이라 스트림 공유 상대가 없다.</summary>
-    static void Shuffle(List<CardData> _list, ShufflePolicy _policy)
+    static void Shuffle(List<int> _list, ShufflePolicy _policy)
     {
         if (_policy == ShufflePolicy.None) return;
 

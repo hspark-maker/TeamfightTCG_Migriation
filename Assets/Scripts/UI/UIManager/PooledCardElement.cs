@@ -10,7 +10,7 @@ using UnityEngine.EventSystems;
 public class PooledCardElement : PooledUIBase
 {
     PooledCardElementData cardElementData;
-    CardData cardData;
+    int cardId;
 
     // 이 창은 전체 카드 한 가지만 띄운다 — 작은(Simple) 모드는 폐지했다.
     [SerializeField] GameObject     fullCardContents;
@@ -204,7 +204,7 @@ public class PooledCardElement : PooledUIBase
     {
         this.cardElementData = _data as PooledCardElementData;
         if (this.cardElementData == null) return;
-        this.cardData = this.cardElementData.card;
+        this.cardId = this.cardElementData.instance?.cardId ?? this.cardElementData.cardId;
 
         SetDim(this.cardElementData.dimProgress);
 
@@ -216,14 +216,14 @@ public class PooledCardElement : PooledUIBase
         if (this.cardElementData.instance != null)
             this.fullCardElement.Bind(this.cardElementData.instance);
         else
-            this.fullCardElement.Bind(this.cardData, _owned: true);
+            this.fullCardElement.Bind(this.cardId, _owned: true);
         this.fullCardContents.SetActive(true);
 
 
-        RefreshKeywordList(this.cardData);
+        RefreshKeywordList(this.cardId);
         // 시너지 아이콘 줄: 튜토리얼 미도입 구간에선 아예 만들지 않는다(적용도 안 된 효과라 설명할 게 없다).
         if (TutorialConfig.SynergyVisible)
-            SynergyIconStrip.Build(this.cardData, this.synergyIconRoot, this.synergyIconPrefab,
+            SynergyIconStrip.Build(this.cardId, this.synergyIconRoot, this.synergyIconPrefab,
                                    this.cardElementData.synergy);
         else
             SynergyIconStrip.Clear(this.synergyIconRoot);
@@ -233,25 +233,26 @@ public class PooledCardElement : PooledUIBase
     ///
     /// 지금 켜져 있는 것(활성 시너지·보유 키워드)이 위에 모이고, <b>아직 못 켠 시너지는 목록 맨 아래</b>로 내린다 —
     /// 회색으로만 구분하면 켜진 것 사이에 섞여 있어 "지금 이 카드가 무엇을 하는가"를 한눈에 못 읽는다.</summary>
-    void RefreshKeywordList(CardData _card)
+    void RefreshKeywordList(int _card)
     {
         if (this.keywordListRoot == null || this.keywordExplainItemPrefab == null) return;
 
         foreach (Transform t_child in this.keywordListRoot)
             Destroy(t_child.gameObject);
 
-        if (_card == null) return;
+        if (_card <= 0) return;
 
         // 시너지를 활성/비활성으로 가른다. 순서·중복 제거는 아이콘 줄과 같은 규칙(CardVisualRules) —
         // 두 곳이 갈리면 같은 카드인데 아이콘 순서와 설명 순서가 달라진다.
         var t_active   = new List<SynergyData>();
         var t_inactive = new List<SynergyData>();
 
-        if (_card.synergies != null && TutorialConfig.SynergyVisible)
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.RequireSynergies(_card);
+        if (t_synergies.Count > 0 && TutorialConfig.SynergyVisible)
         {
             SynergyState t_state = this.cardElementData?.synergy;
             foreach (SynergyData t_syn in CardVisualRules.CollectSynergyBadges(
-                         _card.synergies, t_state, _card.synergies.Length))
+                         t_synergies, t_state, t_synergies.Count))
             {
                 if (t_syn == null) continue;
                 bool t_on = t_state == null || CardVisualRules.IsSynergyActive(t_state, t_syn);
@@ -268,7 +269,7 @@ public class PooledCardElement : PooledUIBase
             foreach (CardKeyword t_kw in System.Enum.GetValues(typeof(CardKeyword)))
             {
                 if (t_kw == CardKeyword.None) continue;
-                if (!_card.HasKeyword(t_kw)) continue;
+                if (!CardCatalog.RequireSpec(_card).HasKeyword(t_kw)) continue;
                 if (!this.keywordIconConfig.TryGetEntry(t_kw, out var t_entry)) continue;
 
                 var t_obj = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
@@ -325,7 +326,7 @@ public class PooledCardElement : PooledUIBase
 
 public class PooledCardElementData : UIData
 {
-    public CardData card;
+    public int cardId;
 
     /// <summary>전투 카드면 그 인스턴스. 있으면 키워드·체력의 진실원이 이쪽이다 —
     /// 적 카드 정보창에 내 강화 해금이 얹히는 것을 막는 유일한 구분이다.</summary>

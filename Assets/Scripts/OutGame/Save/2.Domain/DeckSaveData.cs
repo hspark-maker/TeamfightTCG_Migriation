@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Firebase.Firestore;
 
-// 덱 세이브 값 객체 — 카드는 고유 번호(CardCatalog.IdOf)로 식별
+// 덱 세이브 값 객체 — 카드는 고유 번호(CardSpec.Id)로 식별
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class DeckSaveData
 {
