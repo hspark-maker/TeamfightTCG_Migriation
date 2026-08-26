@@ -243,6 +243,9 @@ public class MultiplayerTurnRunner : MonoBehaviour
         ReleaseInitWaits();
     }
 
+    public void OnContentMismatchReceived()
+        => AbortInitialDeck(EMatchEndReason.Desync, "상대와 전투 데이터 스냅샷이 달라 매치를 중단합니다.");
+
     public void OnSeedCommitReceived(byte[] _hash)
     {
         if (DeckConfig.AiTakeover) return;

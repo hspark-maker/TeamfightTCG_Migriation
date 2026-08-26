@@ -83,6 +83,7 @@ public class GameManager : MonoBehaviour
         try
         {
             OutgameTutorialRewind.ApplyWipeIfScheduled();
+            FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule(DataSaveManager.CloudUploadAllowed));
             GameInitialization.SetState(EGameInitState.SyncingSave);
             FirebaseManager.Initialize(t_profile.CloudEnvId);

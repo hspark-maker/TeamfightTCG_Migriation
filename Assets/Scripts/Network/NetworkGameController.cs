@@ -11,6 +11,7 @@ using UnityEngine;
 /// </summary>
 public class NetworkGameController : MonoBehaviour
 {
+    const int CONTENT_FINGERPRINT_BYTES = 32;
     public static NetworkGameController Instance { get; private set; }
 
     // Firebase 연동층이 Fusion PlayerRef를 계정의 안정 UserId로 해석하는 자리.
@@ -122,8 +123,9 @@ public class NetworkGameController : MonoBehaviour
 
                 case MsgType.InitialDeck:
                 {
-                    if (_data.Count < 9)
+                    if (_data.Count < 9 + CONTENT_FINGERPRINT_BYTES)
                     {
+                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
                         RejectMessage($"InitialDeck 길이 부족({_data.Count})");
                         return;
                     }
@@ -134,7 +136,23 @@ public class NetworkGameController : MonoBehaviour
                         RejectMessage($"InitialDeck 범위 오류(owner={t_ownerIdx}, count={t_count})");
                         return;
                     }
-                    if (!RequireLength(_data, 9 + t_count * 24, t_type)) return;
+                    if (_data.Count != 9 + CONTENT_FINGERPRINT_BYTES + t_count * 24)
+                    {
+                        Debug.LogWarning($"[Net] InitialDeck 길이 불일치 수신={_data.Count} 기대={9 + CONTENT_FINGERPRINT_BYTES + t_count * 24}" +
+                                         $" (count={t_count}) — 구버전 클라이언트이거나 손상 패킷이다.");
+                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
+                        return;
+                    }
+                    byte[] t_remoteFingerprint = new byte[CONTENT_FINGERPRINT_BYTES];
+                    Array.Copy(t_buf, t_offset + 9, t_remoteFingerprint, 0, CONTENT_FINGERPRINT_BYTES);
+                    if (!ContentFingerprintMatches(t_remoteFingerprint))
+                    {
+                        Debug.LogWarning($"[Net] 전투 데이터 지문 대조 실패\n  로컬={SpecSource.BattleFingerprint}" +
+                                         $"\n  상대={FingerprintHex(t_remoteFingerprint)}");
+                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
+                        return;
+                    }
+                    Debug.Log($"[Net] 전투 데이터 지문 일치 {SpecSource.BattleFingerprint} (owner={t_ownerIdx}, count={t_count})");
                     if (t_count < DeckSaveManager.DECK_SIZE)
                         Debug.LogError($"[Net] InitialDeck이 기준 장수보다 적다: {t_count}/{DeckSaveManager.DECK_SIZE}");
 
@@ -142,7 +160,7 @@ public class NetworkGameController : MonoBehaviour
                     CardGrowth[] t_growth = new CardGrowth[t_count];
                     for (int i = 0; i < t_count; i++)
                     {
-                        int t_entry = t_offset + 9 + i * 24;
+                        int t_entry = t_offset + 9 + CONTENT_FINGERPRINT_BYTES + i * 24;
                         t_ids[i] = ReadInt(t_buf, t_entry);
                         int t_level = ReadInt(t_buf, t_entry + 4);
                         int t_hpBonus = ReadInt(t_buf, t_entry + 8);
@@ -285,13 +303,19 @@ public class NetworkGameController : MonoBehaviour
             return false;
         }
 
-        byte[] t_msg   = new byte[9 + t_count * 24];
+        if (!TryContentFingerprintBytes(out byte[] t_fingerprint))
+        {
+            Debug.LogError("[Net] InitialDeck 송신 차단: 유효한 전투 데이터 지문이 없습니다.");
+            return false;
+        }
+        byte[] t_msg   = new byte[9 + CONTENT_FINGERPRINT_BYTES + t_count * 24];
         t_msg[0] = (byte)MsgType.InitialDeck;
         WriteInt(t_msg, 1, _ownerIndex);
         WriteInt(t_msg, 5, t_count);
+        Array.Copy(t_fingerprint, 0, t_msg, 9, CONTENT_FINGERPRINT_BYTES);
         for (int i = 0; i < t_count; i++)
         {
-            int t_entry = 9 + i * 24;
+            int t_entry = 9 + CONTENT_FINGERPRINT_BYTES + i * 24;
             WriteInt(t_msg, t_entry, _cardIds[i]);
             WriteInt(t_msg, t_entry + 4, _growth[i].Level);
             WriteInt(t_msg, t_entry + 8, _growth[i].HpBonus);
@@ -300,7 +324,47 @@ public class NetworkGameController : MonoBehaviour
             WriteInt(t_msg, t_entry + 20, _growth[i].SynergyUnlocked ? 1 : 0);
         }
         SendToOpponents(t_msg);
+        Debug.Log($"[Net] InitialDeck 송신 지문={SpecSource.BattleFingerprint} (owner={_ownerIndex}, count={t_count})");
         return true;
+    }
+
+    static bool TryContentFingerprintBytes(out byte[] _bytes)
+    {
+        string t_hex = SpecSource.BattleFingerprint;
+        if (t_hex == null || t_hex.Length != CONTENT_FINGERPRINT_BYTES * 2)
+        {
+            _bytes = null;
+            return false;
+        }
+        _bytes = new byte[CONTENT_FINGERPRINT_BYTES];
+        try
+        {
+            for (int i = 0; i < _bytes.Length; i++)
+                _bytes[i] = Convert.ToByte(t_hex.Substring(i * 2, 2), 16);
+            return true;
+        }
+        catch (FormatException)
+        {
+            _bytes = null;
+            return false;
+        }
+    }
+
+    static string FingerprintHex(byte[] _bytes)
+    {
+        if (_bytes == null) return "(없음)";
+        var t_builder = new System.Text.StringBuilder(_bytes.Length * 2);
+        foreach (byte t_byte in _bytes) t_builder.Append(t_byte.ToString("x2"));
+        return t_builder.ToString();
+    }
+
+    static bool ContentFingerprintMatches(byte[] _remote)
+    {
+        if (!TryContentFingerprintBytes(out byte[] t_local)) return false;
+        if (_remote == null || _remote.Length != t_local.Length) return false;
+        int t_diff = 0;
+        for (int i = 0; i < t_local.Length; i++) t_diff |= t_local[i] ^ _remote[i];
+        return t_diff == 0;
     }
 
     public void SendSeedCommit(byte[] _hash)

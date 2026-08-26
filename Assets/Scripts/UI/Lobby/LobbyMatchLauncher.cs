@@ -210,8 +210,37 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 이 지점보다 먼저 m_running을 내린다). 로비는 곧 파괴되므로 다시 세운 채 두면 된다.
     void EnterBattle()
     {
+        EnterBattleAsync().Forget();
+    }
+
+    async UniTaskVoid EnterBattleAsync()
+    {
+        if (m_running) return;
         m_running = true;
-        CurtainView.LoadScene(BATTLE_SCENE);
+
+        EBattleContentGateResult t_result = await BattleContentSync.CheckBeforeBattleAsync(
+            DeckConfig.IsMultiplayer, this.GetCancellationTokenOnDestroy());
+        if (this == null) return;
+
+        if (t_result == EBattleContentGateResult.Current ||
+            t_result == EBattleContentGateResult.OfflineAllowed)
+        {
+            if (t_result == EBattleContentGateResult.OfflineAllowed)
+                Debug.LogWarning("[BattleContent] Server comparison unavailable. Single-player battle continues with the current snapshot.");
+            CurtainView.LoadScene(BATTLE_SCENE);
+            return;
+        }
+
+        TournamentRun.End();
+        m_running = false;
+        bool t_updated = t_result == EBattleContentGateResult.UpdatedRestartRequired;
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = t_updated
+                ? "새 전투 데이터를 받았습니다.\n게임을 다시 시작한 뒤 전투를 시작해 주세요."
+                : "전투 데이터를 확인할 수 없습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+            yesText = "확인",
+        });
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.

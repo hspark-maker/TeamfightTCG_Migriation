@@ -19,7 +19,7 @@ public static class SpecFirestoreUploader
     const string GOOGLE_SERVICES_PATH = "Assets/google-services.json";
     const string SPEC_COLLECTION = "specs";
     const string ROW_COLLECTION = "rows";
-    const int SCHEMA_VERSION = 2;
+    const int SCHEMA_VERSION = SpecPayloadCodec.SchemaVersion;
     const int LIST_PAGE_SIZE = 300;
     const int MAX_COMMIT_WRITES = 500;
     const int MAX_COMMIT_BYTES = 10 * 1024 * 1024;
@@ -266,6 +266,16 @@ public static class SpecFirestoreUploader
             return false;
         }
 
+        t_rows.Sort((a, b) => int.Parse(a.Id, CultureInfo.InvariantCulture).CompareTo(int.Parse(b.Id, CultureInfo.InvariantCulture)));
+        t_payload.Clear().Append('[');
+        AppendJsonStringArray(t_payload, t_columns);
+        foreach (TableRow t_row in t_rows)
+        {
+            var t_textValues = new List<string>(t_row.Values.Length);
+            foreach (object t_value in t_row.Values) t_textValues.Add(Text(t_value));
+            t_payload.Append(',');
+            AppendJsonStringArray(t_payload, t_textValues);
+        }
         t_payload.Append(']');
         string t_payloadText = t_payload.ToString();
         _snapshot = new TableSnapshot
