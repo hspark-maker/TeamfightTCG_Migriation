@@ -186,7 +186,7 @@ static class MatchResultSubmission
     }
 
     /// <summary>재시도가 무의미한 서버 판정. Unauthenticated는 로그인이 붙으면 통과하므로 여기 넣지 않는다.</summary>
-    static bool IsPermanentRejection(Exception _exception, out FunctionsErrorCode _code)
+    internal static bool IsPermanentRejection(Exception _exception, out FunctionsErrorCode _code)
     {
         _code = FunctionsErrorCode.None;
         if (_exception.GetBaseException() is not FunctionsException t_functions) return false;
@@ -211,7 +211,7 @@ static class MatchResultSubmission
         }
     }
 
-    static async UniTask<bool> EnsureSignedIn()
+    internal static async UniTask<bool> EnsureSignedIn()
     {
         FirebaseAuthService t_auth = FirebaseAuthService.Instance;
         if (t_auth.IsCurrentUserActive) return true;
@@ -291,7 +291,7 @@ static class MatchResultSubmission
         return _value != null;
     }
 
-    static string MatchId(byte[] _myNonce, byte[] _opponentNonce)
+    internal static string MatchId(byte[] _myNonce, byte[] _opponentNonce)
     {
         byte[] t_seed = new byte[8];
         for (int i = 0; i < t_seed.Length; i++) t_seed[i] = (byte)(_myNonce[i] ^ _opponentNonce[i]);
@@ -304,7 +304,7 @@ static class MatchResultSubmission
         }
     }
 
-    static string Hex(byte[] _bytes)
+    internal static string Hex(byte[] _bytes)
     {
         var t_builder = new System.Text.StringBuilder(_bytes.Length * 2);
         foreach (byte t_byte in _bytes) t_builder.Append(t_byte.ToString("x2"));

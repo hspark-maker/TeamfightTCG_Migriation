@@ -30,10 +30,10 @@ public readonly struct CardGrowth
     public readonly int Level;
 
     /// <summary>강화로 얻은 최대 체력 가산분. 레벨에서 재계산하지 않고 값으로 들고 다닌다 —
-    /// 곡선(CardGrowthConfig)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
+    /// 곡선(GrowthRules·카드 스펙)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
     public readonly int HpBonus;
 
-    /// <summary>강화로 도달한 진화 단계(0 = 미진화). 관문 레벨은 CardGrowthConfig가 소유하고 여기엔 결과만 담긴다 —
+    /// <summary>강화로 도달한 진화 단계(0 = 미진화). 관문 레벨은 GrowthRules가 소유하고 여기엔 결과만 담긴다 —
     /// 전투가 곡선을 알 필요가 없다는 <see cref="HpBonus"/>와 같은 규약.</summary>
     public readonly int EvolutionStage;
 

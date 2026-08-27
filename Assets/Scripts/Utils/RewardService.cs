@@ -6,44 +6,32 @@ using UnityEngine;
 /// </summary>
 public static class RewardService
 {
-    static BattleReward _s;
-    static bool s_configured;
-    static bool s_warnedDefault;
-
-    public static bool IsConfigured => s_configured;
-
-    public static BattleReward Config
-    {
-        get
-        {
-            if (_s != null) return _s;
-            WarnDefaultConfig();
-            return _s = ScriptableObject.CreateInstance<BattleReward>();
-        }
-    }
-
-    /// <summary>초기화에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
-    public static void SetConfig(BattleReward _config)
-    {
-        if (_config == null) return;
-        _s = _config;
-        s_configured = true;
-    }
+    // 전투 보상 계수는 Reward 표(ownerType=Battle)가 소유한다 — 앨범·토너먼트·랭크와 같은 자리다.
+    // 표가 비면 매판 0을 지급하게 되므로 부팅이 RewardSpec.TryValidateRequired로 먼저 막는다.
+    static bool s_warnedMissing;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetRuntimeState()
+    static void ResetRuntimeState() => s_warnedMissing = false;
+
+    // 계수 한 칸. 표에 없으면 0을 돌려주되 세션당 1회 소리를 낸다(부팅 검사를 통과했다면 여기 오지 않는다).
+    static long CoefficientOf(string _ownerId)
     {
-        _s = null;
-        s_configured = false;
-        s_warnedDefault = false;
+        if (RewardSpec.TryGetSingle(ERewardOwnerType.Battle, _ownerId, out AlbumRewardDef t_def))
+            return t_def.amount;
+
+        if (!s_warnedMissing)
+        {
+            s_warnedMissing = true;
+            Debug.LogError($"[RewardService] Reward 표에 Battle/{_ownerId} 행이 없어 전투 보상이 0으로 계산됩니다.");
+        }
+        return 0;
     }
 
-    static void WarnDefaultConfig()
-    {
-        if (s_warnedDefault) return;
-        s_warnedDefault = true;
-        Debug.LogWarning("[RewardService] BattleReward가 주입되지 않아 기본값으로 동작합니다.");
-    }
+    // 지급 재화는 승리 계수 행이 정한다(패배는 자기 행의 재화를 쓴다).
+    static ECurrencyType CurrencyOf(string _ownerId)
+        => RewardSpec.TryGetSingle(ERewardOwnerType.Battle, _ownerId, out AlbumRewardDef t_def)
+            ? t_def.currency
+            : ECurrencyType.Gold;
 
     /// <summary>
     /// 전투 결과를 보상으로 환산(순수 함수). 승리는 남은 카드 수 × 장당 골드에 winFloor 하한,
@@ -51,14 +39,15 @@ public static class RewardService
     /// </summary>
     public static CurrencyGain CalculateReward(bool _won, int _remainingCards)
     {
-        var t_config = Config;
-
         // 패배가 남은 카드를 보지 않는 것이 규칙의 핵심이다 — 보면 첫 턴 항복(6장 생존)이 압승과 같은 액수가 된다.
-        long t_amount = _won
-            ? Math.Max((long)_remainingCards * t_config.goldPerCard, t_config.winFloor)
-            : t_config.loseGold;
+        if (!_won)
+            return new CurrencyGain(CurrencyOf(RewardSpec.BattleLoseFlat), CoefficientOf(RewardSpec.BattleLoseFlat));
 
-        return new CurrencyGain(t_config.rewardType, t_amount);
+        long t_amount = Math.Max(
+            (long)_remainingCards * CoefficientOf(RewardSpec.BattleWinPerCard),
+            CoefficientOf(RewardSpec.BattleWinFloor));
+
+        return new CurrencyGain(CurrencyOf(RewardSpec.BattleWinPerCard), t_amount);
     }
 
     /// <summary>

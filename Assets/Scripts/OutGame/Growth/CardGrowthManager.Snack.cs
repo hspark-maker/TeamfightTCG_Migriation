@@ -40,19 +40,19 @@ public static partial class CardGrowthManager
         if (_id <= 0) return 0;
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
-        return Mathf.Clamp(t_entry.LimitBreak, 0, Config.MaxLimitBreak);
+        return Mathf.Clamp(t_entry.LimitBreak, 0, GrowthRules.MaxLimitBreak);
     }
 
     public static bool TryGetNextLimitBreakStep(int _cardId, out LimitBreakStep _step)
     {
         _step = default;
-        if (!s_initialized || !s_configInjected || _cardId <= 0) return false;
+        if (!s_initialized || _cardId <= 0) return false;
 
         // 강화 레벨을 보지 않는다 — 한계돌파는 간식으로만 무는 별개 축이라 0성부터 열려 있다.
         int t_id = _cardId;
         if (!OwnershipManager.IsOwned(t_id)) return false;
 
-        return Config.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
+        return GrowthRules.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
     }
 
     // 간식 차감과 단계 증가는 반드시 함께 저장한다.

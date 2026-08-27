@@ -7,16 +7,12 @@ public static class KeywordGrowthManager
 {
     static readonly Dictionary<CardKeyword, int> s_growth = new Dictionary<CardKeyword, int>();
 
-    static KeywordGrowthConfig s_config;
     static bool s_initialized;
 
     public static event Action OnChanged;
 
     // 강화 "성공"만 알린다 — OnChanged는 값이 변했다는 갱신 신호라 완료 판정에 쓰면 의미가 갈린다
     public static event Action<CardKeyword> OnEnhanced;
-
-    public static KeywordGrowthConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<KeywordGrowthConfig>());
 
     public static bool IsReady => s_initialized;
 
@@ -28,7 +24,7 @@ public static class KeywordGrowthManager
             // 세이브를 읽기 전엔 전 키워드가 레벨 0으로 보인다 — 가드가 없으면 "첫 스텝은 싸다"로 참이 된다.
             if (!s_initialized) return false;
 
-            CardKeyword[] t_supported = Config.SupportedKeywords;
+            CardKeyword[] t_supported = KeywordGrowthRules.SupportedKeywords;
             if (t_supported == null) return false;
 
             for (int t_i = 0; t_i < t_supported.Length; t_i++)
@@ -39,11 +35,6 @@ public static class KeywordGrowthManager
 
             return false;
         }
-    }
-
-    public static void SetConfig(KeywordGrowthConfig _config)
-    {
-        if (_config != null) s_config = _config;
     }
 
     public static void Init()
@@ -58,9 +49,9 @@ public static class KeywordGrowthManager
                 if (!int.TryParse(t_pair.Key, out int t_raw)) continue;
 
                 var t_keyword = (CardKeyword)t_raw;
-                if (!Config.Supports(t_keyword) || s_growth.ContainsKey(t_keyword)) continue;
+                if (!KeywordGrowthRules.Supports(t_keyword) || s_growth.ContainsKey(t_keyword)) continue;
 
-                int t_level = Mathf.Clamp(t_pair.Value, 0, Config.MaxLevel);
+                int t_level = Mathf.Clamp(t_pair.Value, 0, KeywordGrowthRules.MaxLevel);
                 if (t_level > 0) s_growth[t_keyword] = t_level;
             }
         }
@@ -78,7 +69,7 @@ public static class KeywordGrowthManager
 
     public static int LevelOf(CardKeyword _keyword)
     {
-        if (!Config.Supports(_keyword)) return 0;
+        if (!KeywordGrowthRules.Supports(_keyword)) return 0;
         return s_growth.TryGetValue(_keyword, out int t_level) ? t_level : 0;
     }
 
@@ -87,15 +78,15 @@ public static class KeywordGrowthManager
     {
         int t_bonus = 0;
         CardKeyword t_counted = CardKeyword.None;
-        CardKeyword[] t_supported = Config.SupportedKeywords;
+        CardKeyword[] t_supported = KeywordGrowthRules.SupportedKeywords;
         if (t_supported == null) return 0;
 
         for (int t_i = 0; t_i < t_supported.Length; t_i++)
         {
             CardKeyword t_keyword = t_supported[t_i];
-            if (!Config.Supports(t_keyword) || (t_counted & t_keyword) != 0 || (_keywords & t_keyword) == 0) continue;
+            if (!KeywordGrowthRules.Supports(t_keyword) || (t_counted & t_keyword) != 0 || (_keywords & t_keyword) == 0) continue;
             t_counted |= t_keyword;
-            t_bonus += LevelOf(t_keyword) * Config.HpPerLevel;
+            t_bonus += LevelOf(t_keyword) * KeywordGrowthRules.HpPerLevel;
         }
 
         return t_bonus;
@@ -136,7 +127,7 @@ public static class KeywordGrowthManager
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
     static bool TryGetStepAt(CardKeyword _keyword, int _level, out GrowthStep _step)
     {
-        if (!Config.TryGetNextStep(_keyword, _level, out _step)) return false;
+        if (!KeywordGrowthRules.TryGetNextStep(_keyword, _level, out _step)) return false;
 
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);

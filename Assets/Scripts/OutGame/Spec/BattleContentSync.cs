@@ -130,8 +130,8 @@ public static class BattleContentSync
                 return Verdict(EBattleContentGateResult.Current, "서버와 동일 — 그대로 전투 진입");
             }
 
-            Debug.Log($"[BattleContent] 불일치 {t_mismatch}건 — 서버 스냅샷 전체 내려받기 시작");
-            Task<string> t_downloadTask = DownloadFullSnapshotAsync(t_envId, t_remoteHashes);
+            Debug.Log($"[BattleContent] 불일치 {t_mismatch}건 — 불일치 표만 내려받기 시작");
+            Task<string> t_downloadTask = DownloadSnapshotAsync(t_envId, t_remoteHashes, t_localTables);
             if (await Task.WhenAny(t_downloadTask, Task.Delay(FirebaseTimeouts.TransactionMilliseconds, _ct)) != t_downloadTask)
             {
                 TrackLate(t_downloadTask);
@@ -164,21 +164,47 @@ public static class BattleContentSync
         }
     }
 
-    static async Task<string> DownloadFullSnapshotAsync(string _envId, Dictionary<string, string> _beforeHashes)
+    /// <summary>불일치 표만 서버에서 받고, 해시가 이미 같은 표는 로컬 것을 그대로 쓴다.
+    /// 표 하나 바뀌었다고 여섯 표의 행 문서를 전부 다시 읽으면 read가 표 수만큼 곱해진다.</summary>
+    static async Task<string> DownloadSnapshotAsync(
+        string _envId, Dictionary<string, string> _beforeHashes, List<SpecTablePayload> _localTables)
     {
-        Task<SpecTablePayload>[] t_tasks = SpecPayloadCodec.TableNames.Select(t => FetchTableAsync(_envId, t)).ToArray();
-        SpecTablePayload[] t_tables = await Task.WhenAll(t_tasks);
+        var t_byTable = new Dictionary<string, SpecTablePayload>(StringComparer.Ordinal);
+        var t_stale = new List<string>();
+        foreach (SpecTablePayload t_local in _localTables)
+        {
+            if (_beforeHashes.TryGetValue(t_local.Table, out string t_remoteHash) &&
+                string.Equals(t_local.PayloadHash, t_remoteHash, StringComparison.Ordinal))
+                t_byTable[t_local.Table] = t_local;
+            else
+                t_stale.Add(t_local.Table);
+        }
+
+        Task<SpecTablePayload>[] t_tasks = t_stale
+            .Select(t => FetchTableAsync(_envId, t, _beforeHashes.TryGetValue(t, out string t_hash) ? t_hash : null))
+            .ToArray();
+        SpecTablePayload[] t_fetched = await Task.WhenAll(t_tasks);
+        foreach (SpecTablePayload t_table in t_fetched) t_byTable[t_table.Table] = t_table;
+
         Dictionary<string, string> t_afterHashes = await FetchMetaVectorAsync(_envId);
         if (_beforeHashes.Count != t_afterHashes.Count ||
             _beforeHashes.Any(t => !t_afterHashes.TryGetValue(t.Key, out string t_hash) ||
                                    !string.Equals(t.Value, t_hash, StringComparison.Ordinal)))
             throw new InvalidOperationException("Remote spec changed during download. Retry the battle entry.");
-        Array.Sort(t_tables, (a, b) => Array.IndexOf(SpecPayloadCodec.TableNames, a.Table).CompareTo(Array.IndexOf(SpecPayloadCodec.TableNames, b.Table)));
+
+        var t_tables = new SpecTablePayload[SpecPayloadCodec.TableNames.Length];
+        for (int i = 0; i < SpecPayloadCodec.TableNames.Length; i++)
+        {
+            string t_name = SpecPayloadCodec.TableNames[i];
+            if (!t_byTable.TryGetValue(t_name, out t_tables[i]))
+                throw new InvalidOperationException($"Spec table '{t_name}' missing after download.");
+        }
 
         var t_log = new StringBuilder();
         foreach (SpecTablePayload t_table in t_tables)
-            t_log.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash}");
-        Debug.Log($"[BattleContent] 서버 스냅샷 수신 env={_envId}{t_log}");
+            t_log.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash} " +
+                         $"{(t_stale.Contains(t_table.Table) ? "수신" : "로컬재사용")}");
+        Debug.Log($"[BattleContent] 스냅샷 구성 env={_envId} 수신 {t_stale.Count}/{t_tables.Length}표{t_log}");
 
         return SpecPayloadCodec.BuildManagerJson(t_tables);
     }
@@ -237,32 +263,30 @@ public static class BattleContentSync
         return true;
     }
 
-    static async Task<SpecTablePayload> FetchTableAsync(string _envId, string _table)
+    /// <summary>표 하나를 블롭 문서 한 번으로 받는다. <c>rows/</c> 서브컬렉션은 콘솔 열람용 미러라 런타임은 읽지 않는다
+    /// — 읽으면 read가 행 수에 비례한다. 블롭은 메타와 같은 commit에 실리므로 행 개수 경합 재시도가 필요 없다.</summary>
+    static async Task<SpecTablePayload> FetchTableAsync(string _envId, string _table, string _expectedHash)
     {
         FirebaseFirestore t_store = s_context.GetFirestore();
-        string t_path = FirebaseRootPath.Environment(_envId) + "/specs/" + _table;
-        for (int t_attempt = 0; t_attempt < 2; t_attempt++)
-        {
-            DocumentSnapshot t_meta = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
-            if (!t_meta.Exists) throw new InvalidOperationException($"Remote spec '{_table}' is missing.");
-            IDictionary<string, object> t_fields = t_meta.ToDictionary();
-            long t_schema = Convert.ToInt64(t_fields["schemaVersion"]);
-            long t_rowCount = Convert.ToInt64(t_fields["rowCount"]);
-            string t_hash = t_fields["payloadHash"] as string;
-            var t_columns = ((IEnumerable<object>)t_fields["columns"]).Select(v => v as string).ToList();
-            if (t_schema != SpecPayloadCodec.SchemaVersion || string.IsNullOrEmpty(t_hash))
-                throw new InvalidOperationException($"Remote spec '{_table}' metadata is incompatible.");
+        string t_path = FirebaseRootPath.Environment(_envId) + "/specs/" + _table + "/blob/current";
+        DocumentSnapshot t_blob = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
+        if (!t_blob.Exists) throw new InvalidOperationException($"Remote spec blob '{_table}' is missing.");
 
-            QuerySnapshot t_rows = await t_store.Collection(t_path + "/rows").GetSnapshotAsync(Source.Server);
-            var t_documents = t_rows.Documents.Select(d => (IDictionary<string, object>)d.ToDictionary()).ToList();
-            string t_error = t_documents.Count == t_rowCount ? null : $"row count {t_documents.Count}/{t_rowCount}";
-            if (t_documents.Count == t_rowCount &&
-                SpecPayloadCodec.TryBuildRemoteTable(_table, t_columns, t_documents, out SpecTablePayload t_payload, out t_error) &&
-                string.Equals(t_payload.PayloadHash, t_hash, StringComparison.Ordinal))
-                return t_payload;
-            if (t_attempt == 1) throw new InvalidOperationException($"Remote spec '{_table}' validation failed: {t_error}");
-        }
-        throw new InvalidOperationException($"Remote spec '{_table}' validation failed.");
+        IDictionary<string, object> t_fields = t_blob.ToDictionary();
+        if (Convert.ToInt64(t_fields["schemaVersion"]) != SpecPayloadCodec.SchemaVersion)
+            throw new InvalidOperationException($"Remote spec blob '{_table}' is incompatible.");
+        string t_payloadText = t_fields["payload"] as string;
+        if (string.IsNullOrEmpty(t_payloadText))
+            throw new InvalidOperationException($"Remote spec blob '{_table}' payload is empty.");
+
+        if (!SpecPayloadCodec.TryBuildFromPayloadText(_table, t_payloadText, out SpecTablePayload t_payload, out string t_error))
+            throw new InvalidOperationException($"Remote spec '{_table}' parse failed: {t_error}");
+
+        // 블롭이 메타보다 뒤처졌거나 내용이 손상됐으면 여기서 걸린다 — 해시는 파싱 결과로 다시 계산한 값이다.
+        if (!string.Equals(t_payload.PayloadHash, _expectedHash, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Remote spec '{_table}' hash mismatch: blob {t_payload.PayloadHash} vs meta {_expectedHash}.");
+        return t_payload;
     }
 }
 

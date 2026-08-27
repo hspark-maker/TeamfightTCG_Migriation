@@ -320,13 +320,12 @@ public static class RankManager
     {
         if (_level >= _base) return _level;
 
-        CardGrowthConfig t_growth = CardGrowthManager.Config;
-        bool             t_synergy  = t_growth.SynergyUnlockedAt(_base);
-        CardKeyword      t_keywords = t_growth.UnlockedKeywordsAt(_cardId, _base);
+        bool        t_synergy  = GrowthRules.SynergyUnlockedAt(_base);
+        CardKeyword t_keywords = GrowthRules.UnlockedKeywordsAt(_cardId, _base);
 
         for (int t_lv = _level; t_lv < _base; t_lv++)
         {
-            if (t_growth.SynergyUnlockedAt(t_lv) == t_synergy && t_growth.UnlockedKeywordsAt(_cardId, t_lv) == t_keywords)
+            if (GrowthRules.SynergyUnlockedAt(t_lv) == t_synergy && GrowthRules.UnlockedKeywordsAt(_cardId, t_lv) == t_keywords)
                 return t_lv;
         }
         return _base;

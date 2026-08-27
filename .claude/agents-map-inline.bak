@@ -43,6 +43,25 @@
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
+## 가로지르는 흐름
+
+폴더별 목록만으로는 "A 가 어디를 거쳐 B 로 가는지" 를 알 수 없어 경계를 넘는 경로만 따로 적는다. 각 줄은 코드에서 확인한 호출·대입 순서다.
+
+- 저장한 덱이 전투 필드로: 진실원 `OutGame/Save/3.Manager/DataSaveManager.Data` 의 `DeckSaveData` · 메모리 캐시 `OutGame/Deck/DeckSaveManager.GetSlot` / `DeckSaveManager.Load` · 전투 씬 진입 전 확정 `Battle/DeckConfig.Set` (호출부 `UI/Lobby/LobbyMatchLauncher` · `UI/Match/MatchDeckShell` · `UI/DeckSelectPopup`) · 배치 `Battle/GameInitializer` 가 `Battle/BattleField.Initialize` 에 `DeckConfig.PlayerDeck` 을 넘긴다
+- 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
+- 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`EnemyGrowthProvider` · `BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
+- 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
+- 시너지 계산이 전투 UI 로: `Battle/BattleField` 가 `SynergyResolver.Resolve` 로 계산하고 `SynergyApplier.ApplyAll` 로 적용 · 표시는 `UI/Battle/BattleFieldView` 가 `FieldSynergyPanel.Show`
+- 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
+- 재화 변동이 저장으로: `Utils/RewardService` 가 `CurrencyManager.Save` 를 부르고 그 뒤 `DataSaveManager.Save` 로 영속화된다 — 순서가 뒤집히면 반영 전 상태가 기록된다
+- 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
+
+## 사운드 (`Audio/`)
+
+- 재생 진입점: 싱글턴 `Audio/SoundManager.Instance` — BGM `PlayBGM` · `StopBGM` · `SetBGMPitch` · `SetBGMVolume` · 효과음 `PlaySFX` · `PlayRandom` · `PlayCue` · `SetSFXVolume`
+- 전투 훅: `PlayHit` · `PlayDeath` · `PlayTurnChange` · `PlayCinemaEnter` · `PlayPassive` · `PlayDealCard`
+- 데이터·식별자: `SoundConfig` · `SoundBank` (`SoundCueEntry`) · 아웃게임 사운드 열거 `EOutgameSound` · UI 클릭 `UIClickSound` (`SoundManager.PlayUIClick`)
+
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
 
 - 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` (`EnemyAi`) · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
@@ -92,9 +111,9 @@
 **진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`)고 로컬 파일은 캐시 봉투다. 4계층 구조.
 
 - 저장소: `OutGame/Save/1.Repository/IRepository` · `IAtomicRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · 캐시 봉투 `PlayerSaveCacheEnvelope`
-- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `SaveImmediate` / `Data` / `AdoptRemote` / `TryLoadCache` / `CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `Load()` 는 없다(부트 채택이 대신한다)
-- 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `IsGateComplete` · `IsFreshAccount` · `ShouldShowSyncBanner` · `OnStateChanged`) · `PlayerSaveDocument` (`ToFieldMap` / `TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · 캐시 봉투 `PlayerSaveCacheEnvelope`
+- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.TryLoadCache` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(부트 채택이 대신한다)
+- 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
 - 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면 + 인플레이스 재시도(`GameInitialization.ResetForRetry` → `GameManager.RetryInitialize` → `FirebaseManager.Reinitialize` → `InitializationInstaller.RestartGate`) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
 - Firebase 코어: `Core/Firebase/FirebaseManager` · `FirebaseAuthService` · `FirebaseContext` · `FirebaseTimeouts` · `IFirebaseModule` · `FirebaseRootPath` · `EFirebaseAuthState`
 
@@ -174,7 +193,7 @@
 - 로비: `UI/Lobby/LobbyTabController` · `LobbyTabServices` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay` · `PackRewardOverlay` · `EPromoteKind`
 - 입력 제스처: `UI/Input/HorizontalSwipeDetector` · `LongPressDetector` · `SwipeThroughScrollRect` · `SwipeGuide` · `HintArrow`
 
-## 부트·코어·유틸
+## 초기화·코어·유틸
 
 - 기동: `Core/InitializationInstaller` · `Core/GameInitialization` (`EGameInitState`) · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
 - 데이터·풀: `Utils/DataLibrary` · `ObjectPooler` · `ParticlePooler` · `PooledParticle` · `LogUtil` · `CameraUtil` · `KoreanText` · `EdgeShadeSprite` · `ShineBandSprite`

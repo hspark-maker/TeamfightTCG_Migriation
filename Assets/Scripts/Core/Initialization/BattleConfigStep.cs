@@ -7,7 +7,6 @@ using UnityEngine;
 public sealed class BattleConfigStep : MainInitializer
 {
     [SerializeField] BattleTimingConfig battleTimingConfig;
-    [SerializeField] BattleReward battleRewardConfig;
     // 티어 테이블과 랭크 보상 표는 같은 SO를 읽는다 — 둘로 나누면 승급 기준과 보상 기준이 갈린다.
     [SerializeField] RankConfig rankConfig;
     [SerializeField] BattleVfxLibrary battleVfxLibrary;
@@ -15,7 +14,6 @@ public sealed class BattleConfigStep : MainInitializer
     public override UniTask Initialize(InitializationContext _context)
     {
         GameTiming.SetConfig(battleTimingConfig);
-        RewardService.SetConfig(battleRewardConfig);
         RankManager.SetConfig(rankConfig);
         RankRewardManager.SetConfig(rankConfig);
         BattleVfx.SetLibrary(battleVfxLibrary);

@@ -40,11 +40,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
     [Tooltip("비워두면 저장된 덱 슬롯 0 → 그것도 없으면 카탈로그 앞에서 6장을 자동으로 채운다.")]
     [SerializeField] List<int> deckCardIds = new List<int>();
 
-    [Header("성장")]
-    [Tooltip("비워두면 에디터에서 프로젝트의 유일한 에셋을 자동으로 찾는다. 빌드로 돌릴 땐 직접 배선해라.")]
-    [SerializeField] CardGrowthConfig growthConfig;
-    [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
-
     [Header("테스트 계정")]
     [Tooltip("클라이언트마다 다른 값을 넣으면 서로 다른 Firebase 계정으로 접속한다(같은 값 = 같은 uid). " +
              "비워두면 이 기기의 기존 계정을 그대로 쓴다. " +
@@ -90,11 +85,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         // 멀티는 IMatchGrowthSource가 확정한 성장 스냅샷을 요구한다 — 설치기 없는 씬에서는 여기서 세운다.
-        if (!GrowthStandaloneInitializer.Ensure(this.growthConfig, this.keywordGrowthConfig))
-        {
-            SetStatus("성장 설정 초기화 실패. CardGrowthConfig 배선 확인.");
-            return;
-        }
+        GrowthStandaloneInitializer.Ensure();
 
         if (!TryResolveDeck(out this.resolvedDeck, out string t_deckError))
         {

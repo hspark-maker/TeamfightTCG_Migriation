@@ -185,21 +185,14 @@ public class RankConfig : ScriptableObject
         if (_sink == null) return;
         _sink.Clear();
 
-        if (grades == null || _index < 0 || _index >= TierCount) return;
+        if (_index < 0 || _index >= TierCount) return;
+        if (!RewardSpec.TryGetRewards(ERewardOwnerType.Rank, _index.ToString(), out List<AlbumRewardDef> t_rewards)) return;
 
-        RankGradeConfig t_grade = grades[_index / DivisionsPerGrade];
-        if (t_grade == null || t_grade.rewards == null) return;
-
-        long t_step = _index % DivisionsPerGrade;
-
-        for (int t_i = 0; t_i < t_grade.rewards.Count; t_i++)
+        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
         {
-            RankRewardDef t_def = t_grade.rewards[t_i];
+            AlbumRewardDef t_def = t_rewards[t_i];
             if (t_def.amount <= 0) continue;
-
-            _sink.Add(new RewardLine(
-                new CurrencyGain(t_def.currency, t_def.amount + t_step * t_def.amountPerDivision),
-                t_def.icon));
+            _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
         }
     }
 

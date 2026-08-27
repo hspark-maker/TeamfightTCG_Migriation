@@ -72,9 +72,7 @@ internal static class AlbumBuilder
     static IReadOnlyList<AlbumRewardDef> ResolveRewards(string _themeId, string _pageId, List<AlbumRewardDef> _authored)
         => AlbumSpec.TryGetRewards(_themeId, _pageId, out List<AlbumRewardDef> t_spec)
             ? t_spec
-            : NormalizeRewards(_authored);
+            : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
 
     // def의 List는 null일 수 있다 — 소비자가 매번 null 가드하지 않게 빈 목록으로 정규화
-    static IReadOnlyList<AlbumRewardDef> NormalizeRewards(List<AlbumRewardDef> _rewards)
-        => _rewards != null ? _rewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
 }

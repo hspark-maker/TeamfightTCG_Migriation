@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -19,7 +19,8 @@ public static class SpecPayloadCodec
     public const int SchemaVersion = 3;
     public static readonly string[] TableNames =
     {
-        "Card", "Card_Test", "CardPack", "CardPackDrop", "TournamentReward", "AlbumReward",
+        "Card", "Card_Test", "CardPack", "CardPackDrop", "Reward",
+        "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -50,10 +51,10 @@ public static class SpecPayloadCodec
         return TryCreate(_table, t_fields, t_rows, out _payload, out _error);
     }
 
-    public static bool TryBuildRemoteTable(
-        string _table, IReadOnlyList<string> _columns,
-        IEnumerable<IDictionary<string, object>> _documents,
-        out SpecTablePayload _payload, out string _error)
+    /// <summary>해시를 계산할 때 쓰는 정규화 텍스트(<c>[[열…],[값…],…]</c>)를 되읽는다.
+    /// 표 하나를 행 문서 N개가 아니라 블롭 문서 1개로 내려받기 위한 경로다 — read가 행 수에 비례하지 않는다.</summary>
+    public static bool TryBuildFromPayloadText(
+        string _table, string _text, out SpecTablePayload _payload, out string _error)
     {
         _payload = null;
         _error = null;
@@ -61,26 +62,32 @@ public static class SpecPayloadCodec
         if (t_rowType == null) { _error = $"Unknown spec table '{_table}'."; return false; }
         FieldInfo[] t_fields = t_rowType.GetFields(BindingFlags.Public | BindingFlags.Instance);
         if (!ValidateFields(_table, t_fields, out _error)) return false;
-        if (_columns == null || _columns.Count != t_fields.Length)
-        { _error = $"'{_table}' column count mismatch."; return false; }
+        if (!TryParseStringMatrix(_text, out List<string[]> t_matrix, out string t_parseError))
+        { _error = $"'{_table}' payload parse failed: {t_parseError}"; return false; }
+        if (t_matrix.Count < 2) { _error = $"'{_table}' payload has no rows."; return false; }
+
+        string[] t_columns = t_matrix[0];
+        if (t_columns.Length != t_fields.Length) { _error = $"'{_table}' column count mismatch."; return false; }
         for (int i = 0; i < t_fields.Length; i++)
-            if (!string.Equals(_columns[i], t_fields[i].Name, StringComparison.Ordinal))
+            if (!string.Equals(t_columns[i], t_fields[i].Name, StringComparison.Ordinal))
             { _error = $"'{_table}' column mismatch at {i}."; return false; }
 
-        var t_rows = new List<IReadOnlyList<string>>();
+        var t_rows = new List<IReadOnlyList<string>>(t_matrix.Count - 1);
         var t_ids = new HashSet<int>();
-        foreach (IDictionary<string, object> t_document in _documents)
+        for (int r = 1; r < t_matrix.Count; r++)
         {
-            var t_values = new string[t_fields.Length];
-            for (int i = 0; i < t_fields.Length; i++)
+            string[] t_values = t_matrix[r];
+            if (t_values.Length != t_fields.Length)
+            { _error = $"'{_table}' row {r} has {t_values.Length} values, expected {t_fields.Length}."; return false; }
+            for (int c = 0; c < t_fields.Length; c++)
             {
-                if (!t_document.TryGetValue(t_fields[i].Name, out object t_value))
-                { _error = $"'{_table}' row is missing '{t_fields[i].Name}'."; return false; }
-                if (!TryText(t_value, t_fields[i].FieldType, out t_values[i]))
-                { _error = $"'{_table}.{t_fields[i].Name}' has an invalid value."; return false; }
+                if (t_fields[c].FieldType == typeof(string)) continue;
+                if (!long.TryParse(t_values[c], NumberStyles.Integer, CultureInfo.InvariantCulture, out long t_number) ||
+                    (t_fields[c].FieldType == typeof(int) && (t_number < int.MinValue || t_number > int.MaxValue)))
+                { _error = $"'{_table}.{t_fields[c].Name}' has an invalid value."; return false; }
             }
-            int t_id = int.Parse(t_values[0], CultureInfo.InvariantCulture);
-            if (!t_ids.Add(t_id)) { _error = $"'{_table}' contains duplicate id {t_id}."; return false; }
+            if (!t_ids.Add(int.Parse(t_values[0], CultureInfo.InvariantCulture)))
+            { _error = $"'{_table}' contains duplicate id {t_values[0]}."; return false; }
             t_rows.Add(t_values);
         }
         t_rows.Sort((a, b) => int.Parse(a[0], CultureInfo.InvariantCulture).CompareTo(int.Parse(b[0], CultureInfo.InvariantCulture)));
@@ -147,6 +154,91 @@ public static class SpecPayloadCodec
         return true;
     }
 
+    /// <summary><see cref="AppendStringArray"/>가 만든 형태만 받는다 — 공백도 중첩도 없는 2단 문자열 배열.
+    /// 관대한 JSON 파서가 아니다. 형태가 어긋나면 조용히 넘기지 않고 실패시킨다.</summary>
+    static bool TryParseStringMatrix(string _text, out List<string[]> _matrix, out string _error)
+    {
+        _matrix = new List<string[]>();
+        _error = null;
+        int t_length = _text?.Length ?? 0;
+        int t_index = 0;
+        if (t_length < 2 || _text[t_index++] != '[') { _error = "missing outer '['"; return false; }
+        if (_text[t_index] == ']')
+            return ++t_index == t_length || Fail(out _error, "trailing text after payload");
+
+        while (true)
+        {
+            if (t_index >= t_length || _text[t_index++] != '[') return Fail(out _error, "missing row '['");
+            var t_values = new List<string>();
+            if (t_index < t_length && _text[t_index] == ']') t_index++;
+            else
+                while (true)
+                {
+                    if (!TryReadJsonString(_text, ref t_index, out string t_value, out _error)) return false;
+                    t_values.Add(t_value);
+                    if (t_index >= t_length) return Fail(out _error, "unterminated row");
+                    char t_delimiter = _text[t_index++];
+                    if (t_delimiter == ',') continue;
+                    if (t_delimiter == ']') break;
+                    return Fail(out _error, $"unexpected '{t_delimiter}' in row");
+                }
+
+            _matrix.Add(t_values.ToArray());
+            if (t_index >= t_length) return Fail(out _error, "unterminated payload");
+            char t_next = _text[t_index++];
+            if (t_next == ',') continue;
+            if (t_next == ']') break;
+            return Fail(out _error, $"unexpected '{t_next}' between rows");
+        }
+        return t_index == t_length || Fail(out _error, "trailing text after payload");
+    }
+
+    static bool TryReadJsonString(string _text, ref int _index, out string _value, out string _error)
+    {
+        _value = null;
+        _error = null;
+        int t_length = _text.Length;
+        if (_index >= t_length || _text[_index++] != '"') { _error = "missing '\"'"; return false; }
+
+        var t_builder = new StringBuilder();
+        while (_index < t_length)
+        {
+            char t_char = _text[_index++];
+            if (t_char == '"') { _value = t_builder.ToString(); return true; }
+            if (t_char != '\\') { t_builder.Append(t_char); continue; }
+            if (_index >= t_length) break;
+            char t_escape = _text[_index++];
+            switch (t_escape)
+            {
+                case '"': t_builder.Append('"'); break;
+                case '\\': t_builder.Append('\\'); break;
+                case '/': t_builder.Append('/'); break;
+                case 'b': t_builder.Append('\b'); break;
+                case 'f': t_builder.Append('\f'); break;
+                case 'n': t_builder.Append('\n'); break;
+                case 'r': t_builder.Append('\r'); break;
+                case 't': t_builder.Append('\t'); break;
+                case 'u':
+                    if (_index + 4 > t_length ||
+                        !int.TryParse(_text.Substring(_index, 4), NumberStyles.HexNumber,
+                                      CultureInfo.InvariantCulture, out int t_code))
+                        return Fail(out _error, "bad \\u escape");
+                    t_builder.Append((char)t_code);
+                    _index += 4;
+                    break;
+                default: return Fail(out _error, $"bad escape '\\{t_escape}'");
+            }
+        }
+        _error = "unterminated string";
+        return false;
+    }
+
+    static bool Fail(out string _error, string _message)
+    {
+        _error = _message;
+        return false;
+    }
+
     static bool ValidateFields(string _table, FieldInfo[] _fields, out string _error)
     {
         _error = null;
@@ -161,22 +253,11 @@ public static class SpecPayloadCodec
     static Type RowTypeOf(string _table) => _table switch
     {
         "Card" => typeof(Card), "Card_Test" => typeof(Card_Test), "CardPack" => typeof(CardPack),
-        "CardPackDrop" => typeof(CardPackDrop), "TournamentReward" => typeof(TournamentReward),
-        "AlbumReward" => typeof(AlbumReward), _ => null,
+        "CardPackDrop" => typeof(CardPackDrop), "Reward" => typeof(Reward),
+        "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
+        "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
+        "CardLimitBreak" => typeof(CardLimitBreak), _ => null,
     };
-
-    static bool TryText(object _value, Type _type, out string _text)
-    {
-        _text = null;
-        if (_type == typeof(string)) { _text = _value as string; return _text != null; }
-        if (_value is long t_long)
-        {
-            if (_type == typeof(int) && (t_long < int.MinValue || t_long > int.MaxValue)) return false;
-            _text = t_long.ToString(CultureInfo.InvariantCulture); return true;
-        }
-        if (_value is int t_int) { _text = t_int.ToString(CultureInfo.InvariantCulture); return true; }
-        return false;
-    }
 
     static string Text(object _value) => _value switch
     {

@@ -77,7 +77,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
 
     [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
-    [Tooltip("진화 관문 레벨(CardGrowthConfig의 1·2차 진화 레벨)에서 강화 버튼 대신 서는 버튼. " +
+    [Tooltip("진화 관문 레벨(GrowthRules의 1·2차 진화 레벨)에서 강화 버튼 대신 서는 버튼. " +
              "누르는 결과는 강화와 같은 레벨업 1회다 — 갈리는 것은 얼굴(라벨·연출)뿐이다.")]
     [SerializeField] Button   evolveButton;
     [SerializeField] TMP_Text evolveLabelText;
@@ -103,7 +103,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
     [SerializeField] CardEnhanceRitualView ritual;
 
-    [Tooltip("진화 관문(CardGrowthConfig의 1·2차 진화 레벨)에서 담금질 대신 서는 연출. " +
+    [Tooltip("진화 관문(GrowthRules의 1·2차 진화 레벨)에서 담금질 대신 서는 연출. " +
              "미배선이면 진화도 담금질로 보여준다(기능은 그대로).")]
     [SerializeField] CardEvolveRitualView evolveRitual;
 
@@ -694,7 +694,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>이 카드의 다음 한 방을 맡을 연출. 진화 관문은 담금질과 다른 얼굴을 쓴다 —
     /// 진화는 실패가 없어 기다릴 것이 없고, 감출 것도 없다(바뀌는 그림 자체가 볼거리다).
-    /// 관문 레벨 숫자는 CardGrowthConfig가 소유하고 여기선 그 판정만 읽는다.</summary>
+    /// 관문 레벨 숫자는 GrowthRules가 소유하고 여기선 그 판정만 읽는다.</summary>
     CardGrowthRitualView RitualFor(int _card)
     {
         if (this.evolveRitual != null
@@ -1194,7 +1194,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         => _owned && CardVisualRules.LockedKeywords(_card) != CardKeyword.None
                   && CardVisualRules.InfoKeywords(_card) == CardKeyword.None;
 
-    /// <summary>이 카드의 시너지가 열려 있는가. 관문(1차 진화 레벨)은 CardGrowthConfig가 소유하고
+    /// <summary>이 카드의 시너지가 열려 있는가. 관문(1차 진화 레벨)은 GrowthRules가 소유하고
     /// 여기선 그 결과만 읽는다 — 레벨 숫자를 이 화면이 직접 적으면 관문이 두 곳이 된다.</summary>
     static bool SynergyUnlocked(int _card) => CardGrowthManager.GrowthOf(_card).SynergyUnlocked;
 
@@ -1800,7 +1800,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (_owned && t_synergies.Count > 0 && this.synergyChipRoot != null)
         {
-            // 시너지는 카드마다가 아니라 **1차 진화 도달 여부**로 통째로 열린다(관문은 CardGrowthConfig 소유).
+            // 시너지는 카드마다가 아니라 **1차 진화 도달 여부**로 통째로 열린다(관문은 GrowthRules 소유).
             // 그래서 칩마다 판정하지 않고 카드 하나에 한 번만 묻는다.
             bool t_open = SynergyUnlocked(_card);
 

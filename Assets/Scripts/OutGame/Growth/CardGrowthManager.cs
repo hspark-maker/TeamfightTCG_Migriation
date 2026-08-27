@@ -9,51 +9,22 @@ public static partial class CardGrowthManager
 
     static readonly System.Random s_rng = new System.Random();
 
-    static CardGrowthConfig s_config;
-    static bool s_configInjected;
-    static bool s_missingConfigLogged;
-
     static bool s_initialized;
 
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 강화 곡선 설정(미배선이면 표시 호환용 기본 인스턴스, 실제 강화는 차단)
-    public static CardGrowthConfig Config
-    {
-        get
-        {
-            if (s_config == null)
-                s_config = ScriptableObject.CreateInstance<CardGrowthConfig>();
+    // 곡선·관문은 GrowthRules(코드 상수 + 카드 스펙)가 소유한다 — 주입 대상이 없어 항상 준비 상태다.
+    public static bool IsConfigReady => true;
 
-            if (!s_configInjected && !s_missingConfigLogged)
-            {
-                Debug.LogError("[CardGrowth] CardGrowthConfig가 주입되지 않아 기본 표시값을 사용합니다. 강화는 차단됩니다.");
-                s_missingConfigLogged = true;
-            }
-
-            return s_config;
-        }
-    }
-
-    public static bool IsConfigReady => s_configInjected;
-
-    public static int MaxLevel => Config.MaxLevel;
+    public static int MaxLevel => GrowthRules.MaxLevel;
     public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
 
     // 레벨 _level로 올리는 한 방이 진화인가(관문 레벨은 곡선이 소유한다)
-    public static bool IsEvolutionLevel(int _level) => Config.IsEvolutionLevel(_level);
+    public static bool IsEvolutionLevel(int _level) => GrowthRules.IsEvolutionLevel(_level);
 
     // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
-
-    // 초기화에서 실제 애셋 주입. null이면 이전 설정을 버리고 미주입 상태로 되돌린다.
-    public static void SetConfig(CardGrowthConfig _config)
-    {
-        s_config              = _config;
-        s_configInjected      = _config != null;
-        s_missingConfigLogged = false;
-    }
 
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
@@ -148,20 +119,13 @@ public static partial class CardGrowthManager
     public static EnhanceResult TryEnhance(int _cardId)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
-        if (!s_configInjected)
-        {
-            _ = Config; // 누락 로그는 Config 접근 경로에서 한 번만 남긴다.
-            return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
-        }
-
         int t_id = _cardId;
         if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
-        CardGrowthConfig t_config = Config;
-        CardGrowth       t_growth = GrowthOf(t_id);
-        int              t_level  = t_growth.Level;
+        CardGrowth t_growth = GrowthOf(t_id);
+        int        t_level  = t_growth.Level;
 
-        if (t_level >= t_config.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
+        if (t_level >= GrowthRules.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         if (!TryGetStepAt(t_id, t_level + 1, out var t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
@@ -197,7 +161,7 @@ public static partial class CardGrowthManager
     {
         if (!s_initialized) return 0;
 
-        int t_max     = Config.MaxLevel;
+        int t_max     = GrowthRules.MaxLevel;
         int t_changed = 0;
 
         var t_cards = CardCatalog.AllIds;
@@ -231,7 +195,7 @@ public static partial class CardGrowthManager
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
     static bool TryGetStepAt(int _cardId, int _level, out GrowthStep _step)
     {
-        if (!Config.TryGetStep(_cardId, _level, out _step)) return false;
+        if (!GrowthRules.TryGetStep(_cardId, _level, out _step)) return false;
 
         if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
@@ -242,21 +206,20 @@ public static partial class CardGrowthManager
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 레벨까지 잃지 않는다.
     static CardGrowth Snapshot(int _cardId, int _level, bool _includeKeywordGrowth)
     {
-        CardGrowthConfig t_config = Config;
-        CardKeyword t_unlockedKeywords = t_config.UnlockedKeywordsAt(_cardId, _level);
-        int t_hpBonus = t_config.HpBonusAt(_cardId, _level);
+        CardKeyword t_unlockedKeywords = GrowthRules.UnlockedKeywordsAt(_cardId, _level);
+        int t_hpBonus = GrowthRules.HpBonusAt(_cardId, _level);
         if (_includeKeywordGrowth)
         {
             t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
-            t_hpBonus += t_config.LimitBreakHpBonusAt(LimitBreakOf(_cardId));
+            t_hpBonus += GrowthRules.LimitBreakHpBonusAt(LimitBreakOf(_cardId));
         }
 
         return new CardGrowth(
             _level,
             t_hpBonus,
-            t_config.EvolutionStageAt(_level),
+            GrowthRules.EvolutionStageAt(_level),
             t_unlockedKeywords,
-            t_config.SynergyUnlockedAt(_level));
+            GrowthRules.SynergyUnlockedAt(_level));
     }
 
     static CardGrowthEntry Entry(int _id)

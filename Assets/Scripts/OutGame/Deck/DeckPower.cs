@@ -21,7 +21,7 @@ public static class DeckPower
     public static int EvolutionStageOf(int _cardId, bool _mine = true)
         => CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId, _mine)).EvolutionStage;
 
-    /// <summary>표시용 시너지 해금 여부. 시너지는 1차 진화 레벨에서 열린다(CardGrowthConfig.SynergyUnlockedAt) →
+    /// <summary>표시용 시너지 해금 여부. 시너지는 1차 진화 레벨에서 열린다(GrowthRules.SynergyUnlockedAt) →
     /// 그 전 카드는 실제로 시너지에 참여하지 않으므로 카드 위에 배지·시너지용 배경판을 띄우면 오정보다.
     /// 전투 인스턴스에는 이미 같은 게이트가 CardInstance.synergyEnabled로 박혀 있다 — 그쪽이 있으면 그쪽이 이긴다.</summary>
     public static bool SynergyUnlockedOf(int _cardId, bool _mine = true)

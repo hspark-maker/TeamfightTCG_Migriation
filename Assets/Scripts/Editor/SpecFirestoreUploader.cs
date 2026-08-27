@@ -20,11 +20,19 @@ public static class SpecFirestoreUploader
     const string GOOGLE_SERVICES_PATH = "Assets/google-services.json";
     const string SPEC_COLLECTION = "specs";
     const string ROW_COLLECTION = "rows";
+
+    // 런타임이 읽는 건 이 블롭 하나다. rows/ 는 콘솔 열람용 미러로만 남는다.
+    const string BLOB_COLLECTION = "blob";
+    const string BLOB_DOCUMENT = "current";
+
     const int SCHEMA_VERSION = SpecPayloadCodec.SchemaVersion;
     const int LIST_PAGE_SIZE = 300;
     const int MAX_COMMIT_WRITES = 500;
     const int MAX_COMMIT_BYTES = 10 * 1024 * 1024;
     const int MAX_ROW_DOCUMENT_WARN_BYTES = 900 * 1024;
+
+    /// <summary>Firestore 필드 값 한도(1 MiB - 89 B). 블롭 payload가 이걸 넘으면 commit이 거부된다.</summary>
+    const int MAX_FIELD_BYTES = 1024 * 1024 - 89;
 
     sealed class TableRow
     {
@@ -37,6 +45,7 @@ public static class SpecFirestoreUploader
         public FieldInfo[] Fields;
         public List<string> Columns;
         public List<TableRow> Rows;
+        public string PayloadText;
         public string PayloadHash;
         public int PayloadBytes;
     }
@@ -107,8 +116,14 @@ public static class SpecFirestoreUploader
         using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(FirebaseTimeouts.RestRequestSeconds) };
 
         if (!TryReadMeta(t_client, t_projectId, t_apiKey, _envId, _table,
-                         out long t_currentRevision, out string t_updateTime, out bool t_metaExists, out _error))
+                         out long t_currentRevision, out string t_updateTime, out string t_remoteHash,
+                         out bool t_metaExists, out _error))
             return null;
+
+        // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 행 목록을 조회할 이유도 없다.
+        // 여기서 끊지 않으면 안 바뀐 표마다 행 수만큼 read + 행 수만큼 write를 그대로 지불한다.
+        if (t_metaExists && string.Equals(t_remoteHash, t_snapshot.PayloadHash, StringComparison.Ordinal))
+            return $"{_table}: 변경 없음 — 건너뜀 (rev {t_currentRevision}, {t_snapshot.Rows.Count}행, hash {t_snapshot.PayloadHash})";
 
         if (t_currentRevision == long.MaxValue)
         {
@@ -124,11 +139,18 @@ public static class SpecFirestoreUploader
         foreach (TableRow t_row in t_snapshot.Rows) t_localIds.Add(t_row.Id);
         t_remoteIds.ExceptWith(t_localIds);
 
-        int t_writeCount = 1 + t_snapshot.Rows.Count + t_remoteIds.Count;
+        if (t_snapshot.PayloadBytes > MAX_FIELD_BYTES)
+        {
+            _error = $"{_table} 블롭 payload가 {t_snapshot.PayloadBytes:N0}B로 Firestore 필드 한도 " +
+                     $"{MAX_FIELD_BYTES:N0}B를 넘는다. 압축하거나 필드를 분할해야 한다.";
+            return null;
+        }
+
+        int t_writeCount = 2 + t_snapshot.Rows.Count + t_remoteIds.Count;
         if (t_writeCount > MAX_COMMIT_WRITES)
         {
             _error = $"{_table} 원자 커밋이 {t_writeCount} writes다. Firestore 한도 {MAX_COMMIT_WRITES}을 넘으므로 " +
-                     "분할하지 않고 중단한다(행 갱신 + 삭제 + 메타 포함).";
+                     "분할하지 않고 중단한다(행 갱신 + 삭제 + 메타 + 블롭 포함).";
             return null;
         }
 
@@ -299,6 +321,7 @@ public static class SpecFirestoreUploader
             Fields = t_fields,
             Columns = t_columns,
             Rows = t_rows,
+            PayloadText = t_payloadText,
             PayloadHash = HashOf(t_payloadText),
             PayloadBytes = Encoding.UTF8.GetByteCount(t_payloadText),
         };
@@ -318,10 +341,11 @@ public static class SpecFirestoreUploader
 
     static bool TryReadMeta(
         HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
-        out long _revision, out string _updateTime, out bool _exists, out string _error)
+        out long _revision, out string _updateTime, out string _payloadHash, out bool _exists, out string _error)
     {
         _revision = 0;
         _updateTime = null;
+        _payloadHash = null;
         _exists = false;
         _error = null;
 
@@ -346,6 +370,7 @@ public static class SpecFirestoreUploader
 
         _exists = true;
         _updateTime = t_document?.updateTime;
+        _payloadHash = t_document?.fields?.payloadHash?.stringValue;
         string t_revision = t_document?.fields?.revision?.integerValue;
         if (!string.IsNullOrEmpty(t_revision) &&
             !long.TryParse(t_revision, NumberStyles.Integer, CultureInfo.InvariantCulture, out _revision))
@@ -445,6 +470,13 @@ public static class SpecFirestoreUploader
         }
         t_builder.Append("}}");
 
+        // 블롭은 메타와 같은 commit에 실린다 — 둘이 서로 다른 revision을 가리키는 순간이 없어야 한다.
+        t_builder.Append(",{\"update\":{\"name\":");
+        AppendJsonString(t_builder, t_metaName + "/" + BLOB_COLLECTION + "/" + BLOB_DOCUMENT);
+        t_builder.Append(",\"fields\":");
+        AppendBlobFields(t_builder, _snapshot, _revision);
+        t_builder.Append("}}");
+
         foreach (TableRow t_row in _snapshot.Rows)
         {
             t_builder.Append(",{");
@@ -496,6 +528,19 @@ public static class SpecFirestoreUploader
         _builder.Append(",\"updatedAt\":{\"timestampValue\":\"")
                 .Append(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture))
                 .Append("\"}");
+        _builder.Append('}');
+    }
+
+    static void AppendBlobFields(StringBuilder _builder, TableSnapshot _snapshot, long _revision)
+    {
+        _builder.Append('{');
+        _builder.Append("\"schemaVersion\":{\"integerValue\":\"").Append(SCHEMA_VERSION).Append("\"}");
+        _builder.Append(",\"revision\":{\"integerValue\":\"").Append(_revision).Append("\"}");
+        _builder.Append(",\"rowCount\":{\"integerValue\":\"").Append(_snapshot.Rows.Count).Append("\"}");
+        _builder.Append(',');
+        AppendStringField(_builder, "payloadHash", _snapshot.PayloadHash);
+        _builder.Append(',');
+        AppendStringField(_builder, "payload", _snapshot.PayloadText);
         _builder.Append('}');
     }
 

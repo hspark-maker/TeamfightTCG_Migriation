@@ -23,7 +23,7 @@ public sealed class CardSpec
     readonly int[] hpGainByLevel;
 
     /// hp2~hp4가 전부 0이면 "미저작"으로 본다 — 구 SO의 빈 배열과 같은 뜻이고, 성장식은
-    /// CardGrowthConfig 전역값으로 떨어진다. 표는 빈 칸과 0을 구분해 주지 못하므로(둘 다 int 0)
+    /// 성장 없음(0)으로 떨어진다. 표는 빈 칸과 0을 구분해 주지 못하므로(둘 다 int 0)
     /// 이 규약이 없으면 열을 비운 카드가 조용히 "증가량 0"으로 굳는다.
     readonly bool hasAuthoredCurve;
 

@@ -16,10 +16,6 @@ public sealed class OutgameConfigStep : MainInitializer
     [SerializeField] TournamentConfig tournamentConfig;
     // 프로필 아바타·프레임 표 SO. 미배선이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
     [SerializeField] ProfileConfig profileConfig;
-    // 카드 강화·진화 튜닝 SO. 미배선이면 CardGrowthManager가 코드 기본식·기본 게이트로 동작한다.
-    [SerializeField] CardGrowthConfig growthConfig;
-    // 키워드 전역 강화 설정. 미배선이면 코드 기본값으로 동작한다.
-    [SerializeField] KeywordGrowthConfig keywordGrowthConfig;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
     [SerializeField] DeckImageCatalog deckImageCatalog;
 
@@ -32,10 +28,6 @@ public sealed class OutgameConfigStep : MainInitializer
         CurrencyLook.SetActive(currencyLook);
         TournamentProgress.SetConfig(tournamentConfig);
         ProfileManager.SetConfig(profileConfig);
-
-        // 성장 곡선 조회가 Config를 쓰므로 주입이 캐싱(Init)보다 먼저다.
-        KeywordGrowthManager.SetConfig(keywordGrowthConfig);
-        CardGrowthManager.SetConfig(growthConfig);
 
         // 신규 덱 저장 시 여기서 대표 이미지 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);

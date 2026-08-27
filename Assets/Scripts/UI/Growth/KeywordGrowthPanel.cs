@@ -127,7 +127,7 @@ public class KeywordGrowthPanel : PooledUIBase
         this.m_cells.Clear();
         if (this.grid == null || this.cellPrefab == null) return;
 
-        CardKeyword[] t_keywords = KeywordGrowthManager.Config.SupportedKeywords;
+        CardKeyword[] t_keywords = KeywordGrowthRules.SupportedKeywords;
         if (t_keywords == null) return;
 
         // cellPrefab이 grid 안의 목업 칸으로 배선되는 저작도 허용해야 하므로 원본은 지우지 않고 숨기기만 한다.
@@ -144,7 +144,7 @@ public class KeywordGrowthPanel : PooledUIBase
         for (int t_i = 0; t_i < t_keywords.Length; t_i++)
         {
             CardKeyword t_keyword = t_keywords[t_i];
-            if (!KeywordGrowthManager.Config.Supports(t_keyword) || (t_drawn & t_keyword) != 0) continue;
+            if (!KeywordGrowthRules.Supports(t_keyword) || (t_drawn & t_keyword) != 0) continue;
 
             t_drawn |= t_keyword;
 

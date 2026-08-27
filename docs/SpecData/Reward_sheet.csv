@@ -1,0 +1,87 @@
+﻿보상 행 ID,보상 소유 영역,기존 수령 키,표시 순서,지급물 종류,지급물 ID,수량,메모
+id,ownerType,ownerId,order,rewardType,rewardId,amount,#memo
+int,string,string,int,string,string,long,string
+1,Album,t:Theme_Nature,1,Currency,Diamond,20,자연 테마 완성
+2,Album,t:Theme_Nature,2,Currency,Shard,150,자연 테마 완성
+3,Album,p:Theme_Nature/P1,1,Currency,Energy,50,자연 P1 완성
+4,Album,p:Theme_Nature/P2,1,Currency,Energy,50,자연 P2 완성
+5,Album,p:Theme_Nature/P3,1,Currency,Energy,50,자연 P3 완성
+6,Album,p:Theme_Nature/P4,1,Currency,Energy,50,자연 P4 완성
+7,Album,b,1,Currency,Gold,1500,앨범 전체 완성
+8,Album,b,2,Currency,Diamond,30,앨범 전체 완성
+9,Album,b,3,Currency,Shard,300,앨범 전체 완성
+10,Tournament,node_01,1,Currency,Gold,200,
+11,Tournament,node_02,1,Currency,Shard,50,
+12,Tournament,node_03,1,Currency,Energy,40,
+13,Tournament,node_04,1,Currency,Gold,250,
+14,Tournament,node_05,1,Currency,Shard,60,
+15,Tournament,node_06,1,Currency,Diamond,10,
+16,Tournament,chapter_01,1,Currency,Gold,300,
+17,Tournament,chapter_01,2,Currency,Shard,40,
+18,Tournament,node_07,1,Currency,Gold,250,
+19,Tournament,node_08,1,Currency,Shard,60,
+20,Tournament,node_09,1,Currency,Energy,50,
+21,Tournament,node_10,1,Currency,Gold,300,
+22,Tournament,node_11,1,Currency,Shard,70,
+23,Tournament,node_12,1,Currency,Diamond,15,
+24,Tournament,chapter_02,1,Currency,Gold,450,
+25,Tournament,chapter_02,2,Currency,Shard,50,
+26,Tournament,node_13,1,Currency,Gold,300,
+27,Tournament,node_14,1,Currency,Shard,70,
+28,Tournament,node_15,1,Currency,Energy,70,
+29,Tournament,node_16,1,Currency,Gold,400,
+30,Tournament,node_17,1,Currency,Shard,80,
+31,Tournament,node_18,1,Currency,Diamond,25,
+32,Tournament,chapter_03,1,Currency,Gold,550,
+33,Tournament,chapter_03,2,Currency,Shard,50,
+34,Tournament,node_19,1,Currency,Gold,400,
+35,Tournament,node_20,1,Currency,Shard,80,
+36,Tournament,node_21,1,Currency,Energy,90,
+37,Tournament,node_22,1,Currency,Gold,500,
+38,Tournament,node_23,1,Currency,Shard,90,
+39,Tournament,node_24,1,Currency,Diamond,30,
+40,Tournament,chapter_04,1,Currency,Gold,600,
+41,Tournament,chapter_04,2,Currency,Shard,50,
+42,Rank,0,1,Currency,Gold,100,브론즈 1
+43,Rank,0,2,Currency,Diamond,3,브론즈 1
+44,Rank,1,1,Currency,Gold,150,브론즈 2
+45,Rank,1,2,Currency,Diamond,4,브론즈 2
+46,Rank,2,1,Currency,Gold,200,브론즈 3
+47,Rank,2,2,Currency,Diamond,5,브론즈 3
+48,Rank,3,1,Currency,Gold,250,브론즈 4
+49,Rank,3,2,Currency,Diamond,6,브론즈 4
+50,Rank,4,1,Currency,Gold,300,실버 1
+51,Rank,4,2,Currency,Diamond,5,실버 1
+52,Rank,5,1,Currency,Gold,350,실버 2
+53,Rank,5,2,Currency,Diamond,6,실버 2
+54,Rank,6,1,Currency,Gold,400,실버 3
+55,Rank,6,2,Currency,Diamond,7,실버 3
+56,Rank,7,1,Currency,Gold,450,실버 4
+57,Rank,7,2,Currency,Diamond,8,실버 4
+58,Rank,8,1,Currency,Gold,500,골드 1
+59,Rank,8,2,Currency,Diamond,10,골드 1
+60,Rank,9,1,Currency,Gold,600,골드 2
+61,Rank,9,2,Currency,Diamond,12,골드 2
+62,Rank,10,1,Currency,Gold,700,골드 3
+63,Rank,10,2,Currency,Diamond,14,골드 3
+64,Rank,11,1,Currency,Gold,800,골드 4
+65,Rank,11,2,Currency,Diamond,16,골드 4
+66,Rank,12,1,Currency,Gold,900,플래티넘 1
+67,Rank,12,2,Currency,Diamond,20,플래티넘 1
+68,Rank,13,1,Currency,Gold,1000,플래티넘 2
+69,Rank,13,2,Currency,Diamond,25,플래티넘 2
+70,Rank,14,1,Currency,Gold,1100,플래티넘 3
+71,Rank,14,2,Currency,Diamond,30,플래티넘 3
+72,Rank,15,1,Currency,Gold,1200,플래티넘 4
+73,Rank,15,2,Currency,Diamond,35,플래티넘 4
+74,Rank,16,1,Currency,Gold,1400,다이아몬드 1
+75,Rank,16,2,Currency,Diamond,40,다이아몬드 1
+76,Rank,17,1,Currency,Gold,1600,다이아몬드 2
+77,Rank,17,2,Currency,Diamond,50,다이아몬드 2
+78,Rank,18,1,Currency,Gold,1800,다이아몬드 3
+79,Rank,18,2,Currency,Diamond,60,다이아몬드 3
+80,Rank,19,1,Currency,Gold,2000,다이아몬드 4
+81,Rank,19,2,Currency,Diamond,70,다이아몬드 4
+82,Battle,win.perCard,1,Currency,Gold,10,승리 시 생존 카드 1장당 지급(계수)
+83,Battle,win.floor,1,Currency,Gold,10,승리 지급액 하한(부전승 바닥)
+84,Battle,lose.flat,1,Currency,Gold,5,패배 고정 지급(생존 카드 무관)

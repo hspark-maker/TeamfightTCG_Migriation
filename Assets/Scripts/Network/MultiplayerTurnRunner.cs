@@ -319,10 +319,35 @@ public class MultiplayerTurnRunner : MonoBehaviour
             // 같은 경기에서 InitialDeck은 한 번만 허용한다. 완료 플래그를 유지해 지연/중복 패킷을 거부한다.
             this.initSyncTcs = null;
 
-            // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
-            if (!await SyncMatchSeed()) return false;
+        // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
+        if (!await SyncMatchSeed()) return false;
 
-            // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
+        NetworkGameController t_network = NetworkGameController.Instance;
+        if (t_network == null)
+        {
+            AbortInitialDeck(EMatchEndReason.InitError, "서버 덱 검증 전 네트워크 컨트롤러 유실");
+            return false;
+        }
+        DeckLockResult t_lockResult = await DeckLockSubmission.TryLockAsync(
+            ContentProfileConfig.Active.CloudEnvId,
+            MatchResultSubmission.MatchId(this.myNonce, this.opponentNonce),
+            this.myNonce,
+            this.opponentNonce,
+            SpecSource.BattleFingerprint.ToLowerInvariant(),
+            t_network.LocalDeckHash,
+            t_myIds,
+            t_myGrowth);
+        if (InitAborted) return false;
+        if (t_lockResult != DeckLockResult.Approved)
+        {
+            EMatchEndReason t_reason = t_lockResult == DeckLockResult.Rejected
+                ? EMatchEndReason.Desync
+                : EMatchEndReason.InitError;
+            AbortInitialDeck(t_reason, "서버 덱 검증 실패");
+            return false;
+        }
+
+        // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
             // 대칭성: 내 playerField(내 덱) / enemyField(상대 덱 원격 재구성) 각각을 그 덱으로 Resolve →
             // 상대 클라도 동일 두 덱으로 동일 산출 → 결과 일치, 전투 중 재계산 없음.
             // 오프닝 배치는 Placed만 발화하고 시너지 Entered는 미발화 — 등장 트리거(돌보미/흐름)는 런타임 등장(FillEmptySlots/Swap/PlaceDirect)에서만.

@@ -24,7 +24,7 @@ public static class CardAlbum
         {
             if (AlbumSpec.TryGetRewards(null, null, out List<AlbumRewardDef> t_spec)) return t_spec;
 
-            return s_source != null ? s_source.AlbumRewards : (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
+            return (IReadOnlyList<AlbumRewardDef>)System.Array.Empty<AlbumRewardDef>();
         }
     }
 

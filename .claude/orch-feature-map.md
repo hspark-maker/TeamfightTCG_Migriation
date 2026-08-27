@@ -9,6 +9,25 @@
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
+## 가로지르는 흐름
+
+폴더별 목록만으로는 "A 가 어디를 거쳐 B 로 가는지" 를 알 수 없어 경계를 넘는 경로만 따로 적는다. 각 줄은 코드에서 확인한 호출·대입 순서다.
+
+- 저장한 덱이 전투 필드로: 진실원 `OutGame/Save/3.Manager/DataSaveManager.Data` 의 `DeckSaveData` · 메모리 캐시 `OutGame/Deck/DeckSaveManager.GetSlot` / `DeckSaveManager.Load` · 전투 씬 진입 전 확정 `Battle/DeckConfig.Set` (호출부 `UI/Lobby/LobbyMatchLauncher` · `UI/Match/MatchDeckShell` · `UI/DeckSelectPopup`) · 배치 `Battle/GameInitializer` 가 `Battle/BattleField.Initialize` 에 `DeckConfig.PlayerDeck` 을 넘긴다
+- 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
+- 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
+- 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
+- 시너지 계산이 전투 UI 로: `Battle/BattleField` 가 `SynergyResolver.Resolve` 로 계산하고 `SynergyApplier.ApplyAll` 로 적용 · 표시는 `UI/Battle/BattleFieldView` 가 `FieldSynergyPanel.Show`
+- 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
+- 재화 변동이 저장으로: `Utils/RewardService` 가 `CurrencyManager.Save` 를 부르고 그 뒤 `DataSaveManager.Save` 로 영속화된다 — 순서가 뒤집히면 반영 전 상태가 기록된다
+- 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
+
+## 사운드 (`Audio/`)
+
+- 재생 진입점: 싱글턴 `Audio/SoundManager.Instance` — BGM `SoundManager.PlayBGM` · `SoundManager.StopBGM` · `SoundManager.SetBGMPitch` · `SoundManager.SetBGMVolume` · 효과음 `SoundManager.PlaySFX` · `SoundManager.PlayRandom` · `SoundManager.PlayCue` · `SoundManager.SetSFXVolume`
+- 전투 훅: `SoundManager.PlayHit` · `SoundManager.PlayDeath` · `SoundManager.PlayTurnChange` · `SoundManager.PlayCinemaEnter` · `SoundManager.PlayPassive` · `SoundManager.PlayDealCard`
+- 데이터·식별자: `SoundConfig` · `SoundBank` (`SoundCueEntry`) · 아웃게임 사운드 열거 `EOutgameSound` · UI 클릭 `UIClickSound` (`SoundManager.PlayUIClick`)
+
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
 
 - 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` (`EnemyAi`) · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
