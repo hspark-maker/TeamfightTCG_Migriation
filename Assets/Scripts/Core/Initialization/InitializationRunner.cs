@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+// 부트 실행 주체. 저작된 스텝 목록을 순서대로 돌린다 — 순서는 코드가 아니라 이 리스트가 정한다.
 [DefaultExecutionOrder(-210)]
 public sealed class InitializationRunner : MonoBehaviour
 {
-    [Tooltip("후속 전환 단계에서만 켠다. 현재는 InitializationInstaller가 초기화를 계속 담당한다.")]
-    [SerializeField] bool initializeOnAwake;
+    [SerializeField] bool initializeOnAwake = true;
     [SerializeField] List<MainInitializer> initializers = new();
+
+    static InitializationRunner s_instance;
+
+    InitializationContext m_context;
 
     public IReadOnlyList<MainInitializer> Initializers => initializers;
 
@@ -19,7 +23,11 @@ public sealed class InitializationRunner : MonoBehaviour
     internal static void MarkBootClaimed() => BootClaimed = true;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetRuntimeState() => BootClaimed = false;
+    static void ResetRuntimeState()
+    {
+        BootClaimed = false;
+        s_instance = null;
+    }
 
     void Awake()
     {
@@ -36,12 +44,48 @@ public sealed class InitializationRunner : MonoBehaviour
             return;
         }
 
-        var t_context = new InitializationContext(this);
-        foreach (MainInitializer t_initializer in initializers)
+        // 부트를 선점한 러너. 재시도가 다시 걸 대상을 찾는 유일한 통로다(씬 탐색 금지).
+        s_instance = this;
+        m_context = new InitializationContext(this);
+
+        await RunFrom(0);
+    }
+
+    /// <summary>복구 화면의 재시도가 부트를 대기 지점부터 다시 태운다(씬 재로드 없음).
+    /// 어디서 다시 시작할지는 코드가 아니라 스텝의 retryEntry 저작값이 정한다.</summary>
+    internal static void RestartGate()
+    {
+        if (s_instance == null)
         {
+            Debug.LogError("[InitializationRunner] 부트 러너가 없어 재시도를 걸 수 없습니다.");
+            return;
+        }
+
+        s_instance.RestartFromRetryEntry().Forget();
+    }
+
+    async UniTask RestartFromRetryEntry()
+    {
+        int t_start = initializers.FindIndex(_step => _step != null && _step.RetryEntry);
+        if (t_start < 0)
+        {
+            Debug.LogError("[InitializationRunner] retryEntry로 표시된 스텝이 없어 재시도할 자리를 못 찾았습니다.", this);
+            return;
+        }
+
+        // 앞선 즉시 단계는 이미 섰고 멱등도 아니다 — 재시도는 대기 지점부터만 다시 돈다.
+        m_context ??= new InitializationContext(this);
+        await RunFrom(t_start);
+    }
+
+    async UniTask RunFrom(int _start)
+    {
+        for (int i = _start; i < initializers.Count; i++)
+        {
+            MainInitializer t_initializer = initializers[i];
             try
             {
-                await t_initializer.Initialize(t_context);
+                await t_initializer.Initialize(m_context);
             }
             catch (Exception t_exception)
             {
@@ -53,7 +97,7 @@ public sealed class InitializationRunner : MonoBehaviour
             }
 
             // 중단은 실패가 아니다 — 루트가 파괴됐을 수 있으므로 남은 스텝을 돌리지 않고 조용히 빠진다.
-            if (t_context.IsAborted) return;
+            if (m_context.IsAborted) return;
         }
     }
 

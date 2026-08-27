@@ -4,7 +4,7 @@ using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// <summary>멀티플레이 테스트 전용 단독 초기화. 로비 UI·세이브·InitializationInstaller 없이
+/// <summary>멀티플레이 테스트 전용 단독 초기화. 로비 UI·세이브·부트 초기화(InitializationRunner) 없이
 /// 덱을 정하고 방에 붙어 전투 씬까지 넘긴다. 정식 경로는 MultiplayerLobbyPanel이며,
 /// 이 스크립트는 그 흐름(덱 확정 → JoinRoom → 2인 → SetMultiplayer → Runner.LoadScene)을 그대로 따른다.</summary>
 public class MultiplayerTestInitializer : MonoBehaviour

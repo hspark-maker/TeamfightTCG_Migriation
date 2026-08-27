@@ -9,7 +9,7 @@ internal static class AlbumBuilder
     {
         if (_source == null || _source.ThemeDefCount == 0)
         {
-            Debug.LogWarning("[CardAlbum] 앨범 SO 미배선 또는 테마 0개 — 앨범이 비어 있다(InitializationInstaller 배선 확인).");
+            Debug.LogWarning("[CardAlbum] 앨범 SO 미배선 또는 테마 0개 — 앨범이 비어 있다(부트 초기화(InitializationRunner) 배선 확인).");
             return System.Array.Empty<AlbumTheme>();
         }
 

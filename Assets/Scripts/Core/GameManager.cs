@@ -147,7 +147,7 @@ public class GameManager : MonoBehaviour
     // 그때 잔액 flush까지 멈추면 이미 번 재화가 로컬 캐시에도 안 남는다.
     void FlushLocal()
     {
-        if (InitializationInstaller.IsSaveDependentInstalled)
+        if (SaveDependentManagersStep.IsInstalled)
             CurrencyManager.Save();
     }
 }

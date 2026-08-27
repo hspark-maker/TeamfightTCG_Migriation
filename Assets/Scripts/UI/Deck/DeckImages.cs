@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 덱 대표 이미지 조회 창구. 카탈로그(SO) 주입은 InitializationInstaller가 한 번만 한다.
+/// 덱 대표 이미지 조회 창구. 카탈로그(SO) 주입은 부트 초기화(InitializationRunner)가 한 번만 한다.
 /// 세이브는 키 문자열만 알고 스프라이트는 모른다 — 그 사이 변환을 여기 한 곳에 가둔다.
 /// </summary>
 public static class DeckImages

@@ -24,7 +24,7 @@ public abstract class AlertDotView : MonoBehaviour
     [Header("퇴장")]
     [SerializeField] float disappearDuration = 0.16f;
 
-    // 최초 렌더를 Start로 미루기 위한 표식 — 마스터 데이터 주입(InitializationInstaller.Awake)보다 OnEnable이 먼저 돌 수 있다.
+    // 최초 렌더를 Start로 미루기 위한 표식 — 마스터 데이터 주입(부트 스텝)보다 OnEnable이 먼저 돌 수 있다.
     bool m_started;
 
     // 지금 화면에 떠 있는가. 상태가 바뀔 때만 연출하고 같은 값이 다시 오면 무시한다(변경 통지가 잦다).

@@ -9,13 +9,19 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 214106123663399236}
-  - component: {fileID: 5390474672447089678}
   - component: {fileID: 1581884920793774140}
-  - component: {fileID: 1581884920793774141}
   - component: {fileID: 1581884920793774142}
   - component: {fileID: 1581884920793774143}
   - component: {fileID: 1581884920793774144}
   - component: {fileID: 1581884920793774145}
+  - component: {fileID: 1581884920793774146}
+  - component: {fileID: 1581884920793774147}
+  - component: {fileID: 1581884920793774148}
+  - component: {fileID: 1581884920793774149}
+  - component: {fileID: 1581884920793774150}
+  - component: {fileID: 1581884920793774151}
+  - component: {fileID: 1581884920793774152}
+  - component: {fileID: 1581884920793774153}
   m_Layer: 0
   m_Name: Initialize
   m_TagString: Untagged
@@ -42,29 +48,6 @@ Transform:
   - {fileID: 7487467368280614251}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &5390474672447089678
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2449901017464239670}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cdbb510cbd912084c9c4bfaf4fa535e8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InitializationInstaller
-  albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
-  currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
-  tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
-  triggeredTutorialData: {fileID: 11400000, guid: af7d8b417cb64f543acba89e6e31e427, type: 2}
-  deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
-  starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
-  tournamentConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
-  growthConfig: {fileID: 11400000, guid: 29d2bc1886de275478143db4a63e16e1, type: 2}
-  keywordGrowthConfig: {fileID: 0}
-  profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
-  syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
 --- !u!114 &1581884920793774140
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -83,23 +66,14 @@ MonoBehaviour:
   - {fileID: 1581884920793774143}
   - {fileID: 1581884920793774144}
   - {fileID: 1581884920793774145}
-  - {fileID: 1581884920793774141}
---- !u!114 &1581884920793774141
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2449901017464239670}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7c1f4a90e6d24b0a9f3c8d5124ab77e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LegacyInstallerStep
-  initializerId: LegacyInstaller
-  required: 1
-  requiredIds: []
-  installer: {fileID: 5390474672447089678}
+  - {fileID: 1581884920793774146}
+  - {fileID: 1581884920793774147}
+  - {fileID: 1581884920793774148}
+  - {fileID: 1581884920793774149}
+  - {fileID: 1581884920793774150}
+  - {fileID: 1581884920793774151}
+  - {fileID: 1581884920793774152}
+  - {fileID: 1581884920793774153}
 --- !u!114 &1581884920793774142
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -134,6 +108,151 @@ MonoBehaviour:
   battleRewardConfig: {fileID: 11400000, guid: 82d27bdccf4eec346b313f1ec6fafc4f, type: 2}
   rankConfig: {fileID: 11400000, guid: 408410dc0be34c648afdaf57203b958c, type: 2}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
+--- !u!114 &1581884920793774146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f7a91c4b0d84e3ab6f5183c7d29ea60, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OutgameConfigStep
+  initializerId: OutgameConfig
+  required: 1
+  requiredIds: 
+  - CardCatalog
+  retryEntry: 0
+  syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
+  albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
+  currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
+  tournamentConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
+  profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
+  growthConfig: {fileID: 11400000, guid: 29d2bc1886de275478143db4a63e16e1, type: 2}
+  keywordGrowthConfig: {fileID: 0}
+  deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
+--- !u!114 &1581884920793774147
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d3c56e2417b4f09a72e64b1cf38da75, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpecSheetPreloadStep
+  initializerId: SpecSheetPreload
+  required: 1
+  requiredIds: 
+  - CardCatalog
+  retryEntry: 0
+--- !u!114 &1581884920793774148
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41b9e83d5c7a4d2eb0918f6a2d47c3b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssetPreloadKickStep
+  initializerId: AssetPreloadKick
+  required: 1
+  requiredIds: 
+  - CardCatalog
+  retryEntry: 0
+--- !u!114 &1581884920793774149
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7150ec394a2b48f1ae6c0d5379214ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BattleGrowthBridgeStep
+  initializerId: BattleGrowthBridge
+  required: 1
+  requiredIds: 
+  - OutgameConfig
+  retryEntry: 0
+--- !u!114 &1581884920793774150
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e2d47a9138b4c50ae7f39c81b60d2f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialDataStep
+  initializerId: TutorialData
+  required: 1
+  requiredIds: []
+  retryEntry: 0
+  tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
+  triggeredTutorialData: {fileID: 11400000, guid: af7d8b417cb64f543acba89e6e31e427, type: 2}
+--- !u!114 &1581884920793774151
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c8f230a76e14b9db3a17e46c2058d1f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WaitCloudSaveGateStep
+  initializerId: WaitCloudSaveGate
+  required: 1
+  requiredIds: []
+  retryEntry: 1
+--- !u!114 &1581884920793774152
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a94e17b6d2c04f38b5e7013ca86df259, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WaitAssetPreloadStep
+  initializerId: WaitAssetPreload
+  required: 1
+  requiredIds: 
+  - AssetPreloadKick
+  retryEntry: 0
+--- !u!114 &1581884920793774153
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d6b35f81ea74c29ba4e7f0c1d8e6321, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SaveDependentManagersStep
+  initializerId: SaveDependentManagers
+  required: 1
+  requiredIds: 
+  - WaitCloudSaveGate
+  retryEntry: 0
+  starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
 --- !u!114 &1581884920793774144
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -212,7 +212,7 @@ public class LoadingCoverView : MonoBehaviour
         // 게이트 완료 플래그를 내린다. 뒤로 가면 게이트가 직전 실패의 완료 플래그를 보고 그대로 통과한다.
         GameManager.RetryInitialize();
 
-        InitializationInstaller.RestartGate();
+        InitializationRunner.RestartGate();
 
         if (recoveryPanel != null) recoveryPanel.SetActive(false);
         if (progressBar != null) progressBar.gameObject.SetActive(true);

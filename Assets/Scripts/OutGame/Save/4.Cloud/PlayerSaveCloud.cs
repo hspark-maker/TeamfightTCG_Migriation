@@ -244,7 +244,7 @@ static class PlayerSaveCloud
 #endif
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
-    // InitializationInstaller가 로딩 화면에서 타임아웃까지 돈다.
+    // 부트 초기화(InitializationRunner)가 로딩 화면에서 타임아웃까지 돈다.
     static async UniTaskVoid LoadAsync(int _generation)
     {
         try
