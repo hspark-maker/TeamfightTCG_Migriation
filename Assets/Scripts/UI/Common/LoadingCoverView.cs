@@ -29,10 +29,11 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] TMP_Text statusText;
 
     // 복구 문구를 statusText로 못 쓰는 이유: statusText가 진행바(Slider) 하위라 진행바를 끄는 순간 같이 사라진다.
-    [Tooltip("부트 실패 시 띄우는 안내·재시도 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
+    [Tooltip("부트 실패 시 띄우는 안내·종료 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
     [SerializeField] GameObject recoveryPanel;
     [SerializeField] TMP_Text   recoveryText;
-    [SerializeField] Button     retryButton;
+    [UnityEngine.Serialization.FormerlySerializedAs("retryButton")]
+    [SerializeField] Button     quitButton;
 
     [Tooltip("로딩이 즉시 끝나도 이 시간(초)만큼은 노출한다 — 한 프레임 깜빡임 방지.")]
     [SerializeField] float minDuration = 1f;
@@ -185,40 +186,24 @@ public class LoadingCoverView : MonoBehaviour
                 ? "새 버전으로 업데이트가 필요합니다."
                 : t_assetFailed
                     ? "게임 데이터를 불러오지 못했습니다.\n앱을 다시 시작해 주세요."
-                    : "저장 데이터를 복구하지 못했습니다.";
+                    : "서버에 연결하지 못했습니다.\n네트워크 연결을 확인한 뒤 앱을 다시 시작해 주세요.";
         }
 
-        if (retryButton == null) return;
+        if (quitButton == null) return;
 
-        // 원격 스키마가 더 높은 건 재시도로 풀리지 않는다 — 업데이트 요구에는 버튼 자체를 띄우지 않는다.
-        // 에셋 캐시 실패도 마찬가지다 — 재시도가 되살리는 것은 Firebase 채택뿐이고 프리로드는 Awake에서 한 번뿐이라,
-        // 다시 눌러도 같은 실패 플래그를 그대로 다시 본다.
-        retryButton.gameObject.SetActive(!t_updateRequired && !t_assetFailed);
-        retryButton.interactable = true;
-        retryButton.onClick.RemoveAllListeners();
-        retryButton.onClick.AddListener(() => StartCoroutine(CoRetry()));
+        quitButton.gameObject.SetActive(true);
+        quitButton.interactable = true;
+        quitButton.onClick.RemoveAllListeners();
+        quitButton.onClick.AddListener(QuitApp);
     }
 
-    // 씬 재로드 없이 부트를 되돌려 다시 태운다. 아래 순서는 계약이다.
-    IEnumerator CoRetry()
+    static void QuitApp()
     {
-        if (retryButton != null) retryButton.interactable = false;
-        if (recoveryText != null) recoveryText.text = "다시 시도하는 중입니다.";
-
-        // 뒤 단계가 동기적으로 다시 실패해 MarkRecoveryRequired()를 부를 수 있어, 종료 상태를 먼저 걷어낸다.
-        GameInitialization.ResetForRetry();
-
-        // 반드시 게이트 재시작보다 앞이다 — 여기서 PlayerSaveCloud.Initialize가 Shutdown을 태워
-        // 게이트 완료 플래그를 내린다. 뒤로 가면 게이트가 직전 실패의 완료 플래그를 보고 그대로 통과한다.
-        GameManager.RetryInitialize();
-
-        InitializationInstaller.RestartGate();
-
-        if (recoveryPanel != null) recoveryPanel.SetActive(false);
-        if (progressBar != null) progressBar.gameObject.SetActive(true);
-
-        // 대기·타임아웃 예산·성공 시 씬 전환까지 부트 코루틴을 그대로 재사용한다(대기 로직을 두 벌로 만들지 않는다).
-        yield return CoRunInitialize();
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     // 첫 스텝이 전투 직행이면 로비를 거치지 않는다. 다른 자동 스텝(AutoPurchase)까지 여기서 실행하지 않는 이유는
@@ -320,6 +305,10 @@ public class LoadingCoverView : MonoBehaviour
             if (progressBar != null) progressBar.normalizedValue = t_shown;
 
             if (t_shown >= 1f) break;
+
+            // 부트가 이미 실패를 확정했으면 바를 끝까지 태우지 않는다 — Progress는 매니저 미설치 구간에서
+            // 0.833을 넘지 못해 1f에 닿을 수 없고, 그대로 두면 복구 화면이 maxDuration만큼 늦게 뜬다.
+            if (GameInitialization.IsTerminated) break;
 
             if (t_elapsed >= maxDuration)
             {

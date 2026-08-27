@@ -66,7 +66,7 @@ internal static class CloudSyncStatusWatcher
         s_blockedShown = true;
     }
 
-    // "계속"을 남겨 두는 이유: 로컬 캐시 기록은 계속 살아 있어 다음 부트에 AdoptUnsyncedCache로 복구된다.
+    // "계속"을 남겨 두는 이유: 이번 세션을 마저 보게 해 줄 뿐이다 — 이 뒤의 진행분은 서버에 올라가지 않는다.
     static void QuitApp()
     {
 #if UNITY_EDITOR

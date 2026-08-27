@@ -114,7 +114,8 @@
 ### P3 — 실패 UX 🟡
 
 - [x] `4.Sync` 잔재 삭제 — 코드에 없다. P2 커밋에서 `4.Cloud` 로 재편되며 함께 사라졌다
-- [x] `RecoveryRequired` 재시도 버튼 — **인플레이스 재시도**(씬 재로드 없음)
+- [x] ~~`RecoveryRequired` 재시도 버튼 — **인플레이스 재시도**(씬 재로드 없음)~~
+      → **2026-08-27 폐기**. 온라인 전용 부트로 전환하며 재시도 경로를 걷고 종료 버튼으로 교체했다
 - [x] 업로드 실패 배너 (3회 연속 실패부터)
 - [x] 차단 세션(`Blocked`) 재시작 요구 모달 — 오프라인 배너와 표면 분리
 - [x] pause/quit flush 재검증 — **실기능 버그 1건 발견·수정**(아래)
@@ -122,23 +123,20 @@
       최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)를 덮는다
 - [ ] 런타임 검증 (아래 완료 판정)
 
-**재시도 경로 — 이 순서가 계약이다** (`LoadingCoverView.CoRetry`):
+**부트 실패 — 안내 + 종료** (2026-08-27, 위 재시도 계약을 대체)
 
-1. `GameInitialization.ResetForRetry()` — terminated를 먼저 푼다. 뒤 단계가 동기적으로 다시 실패해
-   `MarkRecoveryRequired()` 를 부를 수 있는데 그때 terminated가 남아 있으면 안 된다
-2. `GameManager.RetryInitialize()` → `FirebaseManager.Reinitialize(envId)` —
-   `PlayerSaveCloud.Initialize` 가 `Shutdown()` 을 태워 `s_gateComplete=false` 로 내린다.
-   **반드시 3번보다 앞** — 뒤로 가면 게이트가 직전 실패의 `gateComplete=true` 를 보고 그대로 통과한다
-3. `InitializationInstaller.RestartGate()`
-4. `CoRunInitialize()` 재진입 — 대기·타임아웃 예산 리셋·성공 시 씬 전환까지 기존 코루틴을 그대로 쓴다
+부트가 실패하면 진행하지 않는다. 인플레이스 재시도는 폐기됐고 `GameInitialization.ResetForRetry` ·
+`GameManager.RetryInitialize` · `FirebaseManager.Reinitialize` · `InitializationInstaller.RestartGate`
+네 심볼은 코드에 없다. 로컬 캐시 폴백도 함께 사라져 원격에 닿지 못하면 게임이 열리지 않는다.
 
-`UpdateRequired` 에는 재시도 버튼을 띄우지 않는다 — 원격 스키마가 높은 것은 재시도로 안 풀린다.
+`LoadingCoverView.ShowRecovery()` 는 안내 문구와 종료 버튼(`quitButton`)만 띄운다. 문구는 세 갈래 —
+업데이트 필요 / 게임 데이터 로드 실패 / 서버 연결 실패. 종료는 어느 실패에서도 유효하므로 버튼을 숨기지 않는다.
 
 **표면 3분할**
 
 | 상태 | 진입 | 표면 |
 |---|---|---|
-| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 다시 시도 버튼 |
+| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 종료 버튼(재시도 없음) |
 | `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달(`SimpleYNPopup`) 1회 |
 | `Offline` | 업로드 3회 연속 실패 | 상시 배너(`CloudSyncBannerView`, 층 940) |
 

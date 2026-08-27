@@ -18,7 +18,6 @@
     <type fullname="TournamentSaveData" preserve="all"/>
     <type fullname="TutorialSaveData" preserve="all"/>
     <type fullname="ProfileSaveData" preserve="all"/>
-    <type fullname="PlayerSaveCacheEnvelope" preserve="all"/>
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>
 </linker>
