@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7781487814590866782}
   - component: {fileID: 8048552017419885824}
   - component: {fileID: 3621734432356281732}
+  - component: {fileID: 9112412085724286075}
   m_Layer: 6
   m_Name: FX_Undead_ing
   m_TagString: Untagged
@@ -4837,6 +4838,19 @@ ParticleSystemRenderer:
   m_MeshWeighting1: 1
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
+--- !u!210 &9112412085724286075
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6726364820659964944}
+  m_Enabled: 1
+  m_SortingLayerID: -128796785
+  m_SortingLayer: 2
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &8331085642438369331
 GameObject:
   m_ObjectHideFlags: 0
