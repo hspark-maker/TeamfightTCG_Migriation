@@ -105,6 +105,14 @@ service cloud.firestore {
       allow read: if isSignedIn() && isKnownEnv(envId);
       allow write: if isAdmin() && isKnownEnv(envId);
 
+      // 런타임(BattleContentSync)이 실제로 읽는 경로. 표 하나가 문서 하나다.
+      match /blob/{blobId} {
+        allow read: if isSignedIn() && isKnownEnv(envId);
+        allow write: if isAdmin() && isKnownEnv(envId);
+      }
+
+      // 콘솔 열람용 미러. 업로더가 blob 과 같은 commit 에 함께 쓰지만, 런타임은 읽지 않는다 —
+      // 여기를 손으로 고쳐도 blob 해시만 검증되므로 게임에 반영되지 않는다.
       match /rows/{rowId} {
         allow read: if isSignedIn() && isKnownEnv(envId);
         allow write: if isAdmin() && isKnownEnv(envId);
