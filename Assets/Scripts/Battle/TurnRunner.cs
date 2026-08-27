@@ -105,7 +105,7 @@ public class TurnRunner : MonoBehaviour
         }
 
         if (_reason.GrantsReward())
-            CaptureResult(_won);
+            CaptureResult(_won, _reason);
         ShowResult(_won, _reason.PlaysBeat()).Forget();
     }
 
@@ -448,7 +448,7 @@ public class TurnRunner : MonoBehaviour
     }
 
     // 승패 확정 시점에 보상 지급
-    void CaptureResult(bool _won)
+    void CaptureResult(bool _won, EMatchEndReason _reason)
     {
         // 이미 승패가 확정된 뒤에는 이탈-부전승 등 후속 콜백이 결과를 덮어쓰지 못하게 한다.
         if (this.resultCaptured) return;
@@ -492,6 +492,25 @@ public class TurnRunner : MonoBehaviour
 
         // 승패 무관하게 싣는다 — 로비 랭크 배지가 포인트 증감에 반응한다(보여줄 것이 없는 결과는 캐리어가 스스로 거른다).
         RankResultHandoff.Set(t_rank);
+
+        SubmitMatchEvidence(_won, t_remaining, _reason);
+    }
+
+    /// <summary>멀티 매치의 대조 증거를 서버로 제출한다 — <b>수집 전용</b>이다.
+    /// 보상·랭크는 위에서 이미 로컬로 확정했고, 이 제출은 그 값에 관여하지 않는다.
+    /// 실패해도 무시한다(제출 모듈이 재시도 큐로 들고 간다).</summary>
+    void SubmitMatchEvidence(bool _won, int _remaining, EMatchEndReason _reason)
+    {
+        if (!DeckConfig.IsMultiplayer) return;
+
+        // 에디터 강제 승리는 이쪽 화면만 끝난다 — 상대는 계속 두고 있어 짝이 될 제출이 없다.
+        if (_reason == EMatchEndReason.DebugForceWin) return;
+
+        // 상대 이탈 후 AI가 인수한 판은 목격자가 하나뿐이라 대조가 성립하지 않는다.
+        if (DeckConfig.AiTakeover) return;
+
+        int t_opponentRemaining = this.enemyField.GetActiveCards().Count + this.enemyField.WaitingCount;
+        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining);
     }
 
     // 슬롯 → 대기 순. 데이터가 빈 카드도 자리를 지킨다 — 빼면 보상 계단의 분모가 카드 수와 어긋난다.

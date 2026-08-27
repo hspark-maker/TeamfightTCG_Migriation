@@ -10,6 +10,9 @@ using UnityEngine;
 static class PlayerSaveCloud
 {
     const string OWNER_UID_KEY = "firebase.playerSave.ownerUid";
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    const string TEST_DISABLED_KEY = "firebase.playerSave.testDisabled";
+#endif
     const int UPLOAD_DEBOUNCE_MS = 1000;
     const int READ_ATTEMPT_COUNT = 3;
     const int READ_BACKOFF_MS = 500;
@@ -31,6 +34,9 @@ static class PlayerSaveCloud
     static bool s_uploading;
     static bool s_gateComplete;
     static bool s_uploadApproved;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    static bool s_disabledForTestAccountSession;
+#endif
 
     // 아래 셋은 지금 소비자가 없다 — P3의 오프라인 배너·복구 화면이 읽을 자리로 남긴 진단값이다.
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
@@ -49,6 +55,22 @@ static class PlayerSaveCloud
     {
         if (!_context.IsValid) throw new ArgumentException("FirebaseContext is not initialized.", nameof(_context));
         Shutdown();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (IsTestAccountSessionDisabled())
+        {
+            s_hasCacheAtBoot = DataSaveManager.TryLoadCache(out UserSaveData t_cacheData, out long t_cacheRevision);
+            if (s_hasCacheAtBoot)
+            {
+                Revision = t_cacheRevision;
+                DataSaveManager.AdoptRemote(t_cacheData, t_cacheRevision);
+            }
+
+            State = EPlayerSaveCloudState.Disabled;
+            s_gateComplete = true;
+            return;
+        }
+#endif
 
         s_context = _context;
         s_envId = _context.EnvId;
@@ -151,6 +173,39 @@ static class PlayerSaveCloud
         s_uploadedSnapshot = string.Empty;
         LastError = string.Empty;
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    internal static bool IsTestAccountModeActive => IsTestAccountSessionDisabled();
+
+    static bool IsTestAccountSessionDisabled()
+    {
+        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test) return false;
+        return s_disabledForTestAccountSession || PlayerPrefs.GetInt(TEST_DISABLED_KEY, 0) == 1;
+    }
+
+    internal static void DisableForTestAccountSession()
+    {
+        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
+            throw new InvalidOperationException("Test save cloud can only be disabled in Test run mode.");
+        s_disabledForTestAccountSession = true;
+        PlayerPrefs.SetInt(TEST_DISABLED_KEY, 1);
+        PlayerPrefs.DeleteKey(OWNER_UID_KEY);
+        PlayerPrefs.Save();
+        s_ownerUid = string.Empty;
+    }
+
+    internal static void ClearTestAccountSession()
+    {
+        s_disabledForTestAccountSession = false;
+        PlayerPrefs.DeleteKey(TEST_DISABLED_KEY);
+        PlayerPrefs.DeleteKey(OWNER_UID_KEY);
+        PlayerPrefs.Save();
+        s_ownerUid = string.Empty;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetTestRuntimeState() => s_disabledForTestAccountSession = false;
+#endif
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
     // InitializationInstaller가 로딩 화면에서 타임아웃까지 돈다.

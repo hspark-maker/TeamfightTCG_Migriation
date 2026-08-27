@@ -1,14 +1,131 @@
 rules_version = '2';
 
 // =====================================================================
-// 개발용 임시 규칙 — 전면 개방. 절대 운영 프로젝트에 배포하지 말 것.
-// 실제 규칙은 firestore.rules.prod 에 보존되어 있다.
-// 스펙 데이터 이관 툴 작업이 끝나면 .prod 를 되돌려 배포한다.
+// 운영 규칙. 이 파일이 단일 진실원이다 — 개발용 개방판을 여기에 덮어쓰지 말 것.
+// 임시로 열어야 하면 별도 파일에 두고 firebase.json 의 rules 경로를 바꿔라.
+//
+// 기본은 전면 거부다. 아래 match 에 명시된 경로만 열린다.
+//
+// Assumed data model:
+// - envs/{env}/users/{uid}/save/current: 메타 5개 + 도메인 map 10개
+// - envs/{env}/matches/{matchId}: 양측 제출/대조 결과 (서버 전용, 클라이언트 접근 불가)
 // =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── 공통 판정 ──────────────────────────────────────────────────────
+    // envId 는 ContentProfileConfig.CloudEnvId 가 내는 두 값뿐이다.
+    function isKnownEnv(envId) {
+      return envId == 'live' || envId == 'test';
+    }
+
+    // 클라이언트는 익명 로그인(FirebaseAuthService)만 쓴다.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 마스터 데이터 배포자. 커스텀 클레임 admin=true 를 Admin SDK 로 부여한다.
+    // 일반 플레이어는 익명 계정이라 이 클레임을 절대 갖지 못한다.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // ── 유저 세이브 ────────────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /save/current
+    match /envs/{envId}/users/{userId}/save/{docId} {
+      function isOwner() {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isKnownDoc() {
+        return docId == 'current';
+      }
+
+      // 최상위 필드 전수 검증. 모르는 필드가 하나라도 있으면 거부한다.
+      function isValidSave() {
+        return request.resource.data.keys().hasOnly([
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
+          'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+        ]) &&
+        request.resource.data.schemaVersion is int &&
+        request.resource.data.schemaVersion > 0 &&
+        request.resource.data.revision is int &&
+        request.resource.data.deviceId is string &&
+        request.resource.data.deviceId.size() == 32 &&
+        request.resource.data.appVersion is string &&
+        request.resource.data.appVersion.size() <= 64 &&
+        request.resource.data.currency is map &&
+        request.resource.data.currency.keys().hasOnly(['balances']) &&
+        request.resource.data.currency.balances is map &&
+        request.resource.data.currency.balances.keys().hasOnly(['Gold', 'Diamond', 'Energy', 'Shard']) &&
+        request.resource.data.currency.balances.Gold is int &&
+        request.resource.data.currency.balances.Gold >= 0 &&
+        request.resource.data.currency.balances.Gold <= 1000000000000 &&
+        request.resource.data.currency.balances.Diamond is int &&
+        request.resource.data.currency.balances.Diamond >= 0 &&
+        request.resource.data.currency.balances.Diamond <= 1000000000000 &&
+        request.resource.data.currency.balances.Energy is int &&
+        request.resource.data.currency.balances.Energy >= 0 &&
+        request.resource.data.currency.balances.Energy <= 1000000000000 &&
+        request.resource.data.currency.balances.Shard is int &&
+        request.resource.data.currency.balances.Shard >= 0 &&
+        request.resource.data.currency.balances.Shard <= 1000000000000 &&
+        request.resource.data.rank is map &&
+        request.resource.data.rank.keys().hasOnly(['points', 'claimedTiers']) &&
+        request.resource.data.rank.points is int &&
+        request.resource.data.rank.points >= 0 &&
+        request.resource.data.rank.claimedTiers is list &&
+        request.resource.data.rank.claimedTiers.size() <= 20 &&
+        request.resource.data.ownership is map && request.resource.data.ownership.size() <= 2000 &&
+        request.resource.data.deck is map && request.resource.data.deck.size() <= 32 &&
+        request.resource.data.cardGrowth is map && request.resource.data.cardGrowth.size() <= 2000 &&
+        request.resource.data.keywordGrowth is map && request.resource.data.keywordGrowth.size() <= 64 &&
+        request.resource.data.albumReward is map && request.resource.data.albumReward.size() <= 128 &&
+        request.resource.data.tournament is map && request.resource.data.tournament.size() <= 128 &&
+        request.resource.data.tutorial is map && request.resource.data.tutorial.size() <= 128 &&
+        request.resource.data.profile is map && request.resource.data.profile.size() <= 64 &&
+        request.resource.data.updatedAt == request.time;
+      }
+
+      allow read: if isOwner() && isKnownEnv(envId) && isKnownDoc();
+      allow create: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
+                    request.resource.data.revision == 1;
+      // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
+      allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
+                    request.resource.data.schemaVersion >= resource.data.schemaVersion &&
+                    request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+
+    // ── 마스터 데이터(스펙) ────────────────────────────────────────────
+    // 읽기: 런타임 클라이언트가 BattleContentSync 로 메타·행을 내려받는다.
+    // 쓰기: 배포자(admin 클레임)만. 에디터 업로더는 ID 토큰을 실어야 한다.
+    match /envs/{envId}/specs/{table} {
+      allow read: if isSignedIn() && isKnownEnv(envId);
+      allow write: if isAdmin() && isKnownEnv(envId);
+
+      match /rows/{rowId} {
+        allow read: if isSignedIn() && isKnownEnv(envId);
+        allow write: if isAdmin() && isKnownEnv(envId);
+      }
+    }
+
+    // ── 매치 결과 ──────────────────────────────────────────────────────
+    // 서버(Admin SDK)만 쓴다. Admin SDK 는 이 규칙을 우회하므로 여기서는 전면 거부가 맞다.
+    // 클라이언트는 결과를 직접 쓰지 못하고 Callable 을 거쳐야 한다.
+    match /envs/{envId}/matches/{matchId} {
+      allow read, write: if false;
+
+      match /{sub=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── 그 외 전부 거부 ────────────────────────────────────────────────
+    // Firestore 기본값이 거부라 없어도 되지만, 새 경로가 조용히 열리지 않는다는 의도를 명시한다.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
