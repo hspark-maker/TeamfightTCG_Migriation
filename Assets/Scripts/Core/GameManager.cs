@@ -81,6 +81,8 @@ public class GameManager : MonoBehaviour
 
         try
         {
+            // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 부트 시점부터 산다.
+            FirebaseManager.Register(new CallableFirebaseModule(t_profile.FunctionsEmulatorOrigin));
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);

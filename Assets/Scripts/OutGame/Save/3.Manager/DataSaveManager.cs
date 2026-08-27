@@ -27,7 +27,13 @@ public static class DataSaveManager
 
     public static event Action OnSaved;
 
+    /// <summary>서버가 슬롯을 갈아끼웠다 — 슬롯을 캐싱한 매니저는 여기서 재수화한다.</summary>
+    public static event Action<ESaveSlot> OnServerSlotsAdopted;
+
     public static UserSaveData Data { get; private set; } = new UserSaveData();
+
+    /// <summary>스냅샷 대조와 callable 역직렬화가 함께 쓴다 — 여기 손대면 둘이 동시에 바뀐다.</summary>
+    internal static JsonSerializerSettings SaveSerializerSettings => s_serializerSettings;
 
     // 클라우드 계층이 꽂는다. 3계층이 4계층을 직접 참조하지 않게 하는 배선(OnSaved와 대칭).
     public static void SetImmediateUploadHandler(Action _handler)
@@ -61,10 +67,38 @@ public static class DataSaveManager
         Data = Normalize(_data);
     }
 
+    /// <summary>서버가 쓴 슬롯만 메모리 세이브에 갈아끼운다. null 슬롯은 서버가 건드리지 않은 것이다.</summary>
+    internal static ESaveSlot AdoptServerSlots(ServerSlotPatch _slots)
+    {
+        if (_slots == null) return ESaveSlot.None;
+
+        ESaveSlot t_touched = ESaveSlot.None;
+
+        if (_slots.Currency != null) { Data.Currency = _slots.Currency; t_touched |= ESaveSlot.Currency; }
+        if (_slots.Ownership != null) { Data.Ownership = _slots.Ownership; t_touched |= ESaveSlot.Ownership; }
+        if (_slots.Deck != null) { Data.Deck = _slots.Deck; t_touched |= ESaveSlot.Deck; }
+        if (_slots.CardGrowth != null) { Data.CardGrowth = _slots.CardGrowth; t_touched |= ESaveSlot.CardGrowth; }
+        if (_slots.KeywordGrowth != null) { Data.KeywordGrowth = _slots.KeywordGrowth; t_touched |= ESaveSlot.KeywordGrowth; }
+        if (_slots.Rank != null) { Data.Rank = _slots.Rank; t_touched |= ESaveSlot.Rank; }
+        if (_slots.AlbumReward != null) { Data.AlbumReward = _slots.AlbumReward; t_touched |= ESaveSlot.AlbumReward; }
+        if (_slots.Tournament != null) { Data.Tournament = _slots.Tournament; t_touched |= ESaveSlot.Tournament; }
+        if (_slots.Tutorial != null) { Data.Tutorial = _slots.Tutorial; t_touched |= ESaveSlot.Tutorial; }
+        if (_slots.Profile != null) { Data.Profile = _slots.Profile; t_touched |= ESaveSlot.Profile; }
+
+        Data = Normalize(Data);
+
+        // Save()·OnSaved를 발화하지 않는다 — PlayerSaveCloud.MarkDirty가 dirty를 하나 올려
+        // 방금 세운 업로드 기준선을 그 자리에서 깨뜨린다. 채택 결과의 기준선 정렬은 클라우드 계층이 직접 한다.
+        if (t_touched != ESaveSlot.None) OnServerSlotsAdopted?.Invoke(t_touched);
+
+        return t_touched;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
         OnSaved = null;
+        OnServerSlotsAdopted = null;
         s_immediateUploadHandler = null;
         Data = new UserSaveData();
     }

@@ -25,6 +25,9 @@ static class PlayerSaveCloud
     static int s_uploadedSerial;
     static int s_pendingVersion;
     static int s_generation;
+    static int s_serverCommandDepth;
+    static int s_suspendBaselineSerial;
+    static int s_serverCommandGeneration;
     static bool s_initialized;
     static bool s_uploading;
     static bool s_gateComplete;
@@ -51,6 +54,14 @@ static class PlayerSaveCloud
     internal static bool IsFreshAccount { get; private set; }
 
     internal static long Revision { get; private set; }
+
+    // 부트 게이트를 통과했고, 문서를 쓸 수 있는 상태다. Failed/Blocked/Loading에서 서버를 부르면
+    // 응답의 revision을 채택할 기준선 자체가 없다.
+    internal static bool CanRunServerCommand =>
+        s_gateComplete &&
+        (State == EPlayerSaveCloudState.Ready ||
+         State == EPlayerSaveCloudState.Offline ||
+         State == EPlayerSaveCloudState.Uploading);
 
     internal static void Initialize(in FirebaseContext _context)
     {
@@ -112,6 +123,82 @@ static class PlayerSaveCloud
         await UploadAsync(s_generation);
     }
 
+    /// <summary>서버 호출이 끝날 때까지 업로드를 봉인한다. 진행 중이던 업로드는 끝날 때까지 기다린다.</summary>
+    internal static async UniTask SuspendUploadsAsync()
+    {
+        // 봉인이 await보다 먼저다 — 뒤집으면 기다리는 사이 디바운스 타이머가 새 업로드를 띄우고,
+        // 그 업로드가 올린 revision을 서버가 모른 채 응답을 만들어 다음 트랜잭션이 충돌한다.
+        s_serverCommandDepth++;
+        s_serverCommandGeneration = s_generation;
+
+        UniTaskCompletionSource t_inFlight = s_uploadCompletion;
+        if (t_inFlight != null) await t_inFlight.Task;
+
+        s_suspendBaselineSerial = s_dirtySerial;
+    }
+
+    /// <summary>서버가 쓴 문서를 채택한다 — 슬롯을 갈아끼우고 revision과 업로드 기준선을 맞춘다.</summary>
+    internal static void AdoptServerResult(long _revision, ServerSlotPatch _updatedSlots)
+    {
+        // 통화 도중 Shutdown → Initialize가 끼면 여기 기준선은 남의 세션 것이다. 채택도 성공 반환도 하지 않는다.
+        if (!s_initialized || s_serverCommandGeneration != s_generation)
+            throw new ServerAdoptionException("The save session was replaced while the server command was in flight.");
+
+        // 서버 계약: callable 하나당 문서 쓰기는 정확히 1회다. 어긋났다면 우리가 모르는 쓰기가 끼어든 것이라
+        // 로컬 세이브를 원격과 맞출 방법이 없다.
+        if (_revision != Revision + 1)
+        {
+            string t_message = $"Server revision {_revision} does not follow the local revision {Revision}.";
+            BlockSession(t_message);
+
+            // 예외로 끊지 않으면 세션은 죽었는데 호출한 도메인은 응답을 성공으로 받아 보상 지급을 이어간다.
+            throw new ServerAdoptionException(t_message);
+        }
+
+        DataSaveManager.AdoptServerSlots(_updatedSlots);
+        Revision = _revision;
+
+        if (s_dirtySerial == s_suspendBaselineSerial)
+        {
+            // 통화 중 로컬 변경 없음 → 지금 Data가 곧 서버 문서다. 정확히 재기준화한다.
+            s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
+            s_uploadedSerial = s_dirtySerial;
+        }
+        else
+        {
+            // 통화 중 로컬이 움직였다 → 서버 문서 내용을 복원할 수 없으니 업로드 1회를 강제해 맞춘다.
+            // 여기서 스냅샷을 찍으면 그 변경분이 "서버에 이미 있다"고 거짓 기록되어 영원히 안 올라간다.
+            MarkUploadPending();
+        }
+    }
+
+    /// <summary>서버 호출이 끝났다 — 봉인을 풀고 밀린 변경분이 있으면 업로드를 예약한다.</summary>
+    internal static void ResumeUploads()
+    {
+        if (s_serverCommandDepth > 0) s_serverCommandDepth--;
+        if (s_serverCommandDepth != 0) return;
+        if (!s_initialized || !s_uploadApproved) return;
+        if (s_serverCommandGeneration != s_generation) return;
+        if (s_dirtySerial == s_uploadedSerial) return;
+
+        ScheduleUpload();
+    }
+
+    /// <summary>서버 호출 실패를 클라우드 상태에 반영한다. 로컬 세이브가 위태로운 경우에만 상태를 바꾼다.</summary>
+    internal static void ReportServerCommandFailure(Exception _exception)
+    {
+        if (_exception == null) return;
+        if (!s_initialized || s_serverCommandGeneration != s_generation) return;
+
+        // 서버가 쓰기 전에 거절했으면(Rejected·Unusable) 로컬 세이브는 멀쩡하다 — 상태를 건드리지 않는다.
+        // 여기서 세션을 끊으면 "재화 부족" 같은 정상적인 도메인 거절 한 번에 게임이 재시작을 요구한다.
+        // Transient만 위험하다: 요청이 닿아 문서가 바뀌었는데 응답을 못 받았을 수 있다.
+        LastError = _exception.GetBaseException().Message;
+        if (CloudFailureClassifier.Classify(_exception) != ECloudFailureKind.Transient) return;
+
+        SetUploadFailures(ConsecutiveUploadFailures + 1);
+        SetState(EPlayerSaveCloudState.Offline);
+    }
     /// <summary>복귀 시 재시도. 못 올린 변경분만 다시 태운다 — 재-pull은 하지 않는다.</summary>
     internal static void RetryPending()
     {
@@ -133,6 +220,9 @@ static class PlayerSaveCloud
         s_uploading = false;
         s_gateComplete = false;
         s_uploadApproved = false;
+        s_serverCommandDepth = 0;
+        s_suspendBaselineSerial = 0;
+        s_serverCommandGeneration = 0;
         s_activeUserId = string.Empty;
         s_envId = string.Empty;
         s_context = default;
@@ -327,6 +417,23 @@ static class PlayerSaveCloud
         SetState(EPlayerSaveCloudState.Ready);
     }
 
+    // 업로드 실패 전용 매핑. Fail/BlockSession이 private이라 분류기는 값만 돌려주고 매핑은 여기서 한다.
+    // 게이트 갈래를 두지 않는 이유: UploadAsync는 s_uploadApproved를 전제하고, 그건 게이트 완료와 함께 선다.
+    static void ApplyUploadFailure(ECloudFailureKind _kind, string _message)
+    {
+        if (_kind == ECloudFailureKind.Transient)
+        {
+            LastError = _message;
+            SetUploadFailures(ConsecutiveUploadFailures + 1);
+            SetState(EPlayerSaveCloudState.Offline);
+            Debug.LogWarning($"[PlayerSaveCloud] {_message}");
+            return;
+        }
+
+        // 룰 거부(Rejected)·배선 오류(Unusable)는 다시 태워도 같은 답이라 이 세션의 업로드는 여기서 끝이다.
+        BlockSession(_message);
+    }
+
     // 부트 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
     static void Fail(string _message)
     {
@@ -431,6 +538,8 @@ static class PlayerSaveCloud
 
     static async UniTask UploadAsync(int _generation)
     {
+        // 서버 호출 중에는 문서의 주인이 서버다. dirty는 s_dirtySerial에 그대로 쌓여 ResumeUploads가 태운다.
+        if (s_serverCommandDepth > 0) return;
         if (!s_initialized || !s_uploadApproved || s_uploading) return;
         if (_generation != s_generation) return;
 
@@ -498,10 +607,11 @@ static class PlayerSaveCloud
                 return;
             }
 
-            LastError = t_exception.GetBaseException().Message;
-            SetUploadFailures(ConsecutiveUploadFailures + 1);
-            SetState(EPlayerSaveCloudState.Offline);
-            Debug.LogWarning($"[PlayerSaveCloud] Upload failed: {LastError}");
+            // 오류 코드를 보지 않고 전부 Offline으로 접으면, 룰이 닫힌 뒤의 PermissionDenied가
+            // "동기화 지연" 배너로 위장한 채 영원히 재시도만 돈다.
+            ApplyUploadFailure(
+                CloudFailureClassifier.Classify(t_exception),
+                $"Upload failed: {t_exception.GetBaseException().Message}");
         }
         finally
         {

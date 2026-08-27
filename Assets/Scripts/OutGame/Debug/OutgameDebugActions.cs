@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 아웃게임 디버그 조작의 단일 창구 (인스펙터 ContextMenu·런타임 오버레이 공용)
@@ -69,6 +70,58 @@ public static class OutgameDebugActions
         PackHandoff.Consume();
         Debug.LogWarning($"[OutgameDebug] {_grade} 희귀도 테스트 팩 개봉 화면을 열지 못했다.");
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    // 서버 진단 호출. 세이브를 바꾸지 않아 채택 창구를 거치지 않는다.
+    public static void PingServer()
+    {
+        PingServerAsync().Forget();
+    }
+
+    // 서버가 문서를 쓰고 revision을 올리는 경로 검증 — 응답 채택이 세션을 끊지 않는지까지 본다.
+    public static void BumpServerRevision()
+    {
+        BumpServerRevisionAsync().Forget();
+    }
+
+    static async UniTaskVoid PingServerAsync()
+    {
+        try
+        {
+            var t_result = await ServerSaveCommands.InvokeReadOnlyAsync<PingResult>(
+                "ping", new { env = ContentProfileConfig.Active.CloudEnvId });
+
+            Debug.Log(
+                $"[OutgameDebug] ping ok={t_result.Ok} envKnown={t_result.EnvKnown} " +
+                $"uid={t_result.Uid} env={t_result.Env} " +
+                $"database={t_result.Database} schemaVersion={t_result.SchemaVersion} " +
+                $"exists={t_result.Exists} revision={t_result.Revision} readError={t_result.ReadError}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] ping 실패 — {t_exception.GetBaseException().Message}");
+        }
+    }
+
+    static async UniTaskVoid BumpServerRevisionAsync()
+    {
+        long t_before = PlayerSaveCloud.Revision;
+
+        try
+        {
+            var t_result = await ServerSaveCommands.InvokeAsync<ServerCommandResult>(
+                "devBumpRevision", new { env = ContentProfileConfig.Active.CloudEnvId, nickname = "r0-probe" });
+
+            Debug.Log(
+                $"[OutgameDebug] devBumpRevision revision {t_before} → {t_result.Revision} " +
+                $"(채택 후 {PlayerSaveCloud.Revision}), state={PlayerSaveCloud.State}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] devBumpRevision 실패 — {t_exception.GetBaseException().Message}");
+        }
+    }
+#endif
 
     // 재화 즉시 지급 + 즉시 영속
     public static void GrantCurrency(ECurrencyType _type, long _amount)
