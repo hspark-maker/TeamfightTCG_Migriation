@@ -1,20 +1,190 @@
 # 아웃게임 구조도 (STRUCTURE)
 
-## Firestore 플레이어 세이브 미러 (2026-08-25)
+## 유저 세이브 — 클라우드 진실원 + 로컬 캐시 (2026-08-26 갱신)
 
-로컬 `JsonFileRepository`가 현재 진실원이고 Firestore는 쓰기 전용 검증 미러다.
+Firestore 문서 `envs/{envId}/users/{uid}/save/current`가 **진실원**이고, 로컬 JSON 파일은 오프라인 폴백용 **캐시 봉투**다.
+(2026-08-25판 "쓰기 전용 미러 / PlayerSaveSync" 서술은 폐기 — `PlayerSaveSync` · `4.Sync/` · `BootInstaller`는 코드에 없다.)
 
-```text
-DataSaveManager.Save
-  ├─ JsonFileRepository 즉시 저장
-  └─ OnSaved(payload)
-       └─ PlayerSaveSync 3초 디바운스·동일 해시 생략
-            └─ users/{firebaseUid}/save/{current|test}
+### 계층 지도
+
+```mermaid
+flowchart TD
+    subgraph L4["OutGame/Save/4.Cloud — 클라우드 창구"]
+        CLOUD["PlayerSaveCloud<br/>static · 부트 채택 · 디바운스 업로드"]
+        DOC["PlayerSaveDocument<br/>필드맵 10슬롯+메타 5 · TryReadMeta"]
+        MOD["PlayerSaveFirebaseModule<br/>IFirebaseModule 어댑터"]
+    end
+    subgraph L3["OutGame/Save/3.Manager"]
+        DSM["DataSaveManager<br/>static · Data / Save / SaveImmediate<br/>Newtonsoft camelCase 스냅샷"]
+    end
+    subgraph L2["OutGame/Save/2.Domain"]
+        USD["UserSaveData VERSION=7<br/>FirestoreProperty 슬롯 10"]
+        ENV["PlayerSaveCacheEnvelope<br/>schemaVersion · revision · data"]
+    end
+    subgraph L1["OutGame/Save/1.Repository"]
+        JSON["JsonFileRepository : IAtomicRepository<br/>ReplaceWithBackup(tmp→copy→replace)"]
+    end
+    subgraph CORE["Core/Firebase"]
+        FBM["FirebaseManager<br/>모듈 등록 · Initialize · Flush · Retry"]
+        AUTH["FirebaseAuthService<br/>익명 로그인 · OnStateChanged"]
+    end
+    FS[("Firestore<br/>envs/{env}/users/{uid}/save/current")]
+
+    FBM -->|"Initialize(in FirebaseContext)"| MOD --> CLOUD
+    FBM --> AUTH
+    CLOUD -->|"OnSaved 구독 · SetImmediateUploadHandler"| DSM
+    CLOUD -->|"ToFieldMap · TryReadMeta"| DOC
+    CLOUD -->|"GetSnapshotAsync · RunTransactionAsync"| FS
+    DSM --> USD
+    DSM -->|봉투로 감싸 원자 기록| ENV --> JSON
+    AUTH -.->|UserId| CLOUD
 ```
 
-- `Assets/Scripts/OutGame/Save/4.Sync/PlayerSaveSync.cs`: 인증 게이트, 프로필 분리, 업로드 상태와 best-effort flush를 소유한다.
-- Firestore 디스크 persistence는 끈다. 원격 pull·복원·충돌 해결은 아직 지원하지 않는다.
-- `revision`은 업로드 관측값이며 최신 상태 판정 근거가 아니다.
+- 3계층은 4계층을 **참조하지 않는다**. 배선은 `DataSaveManager.OnSaved`(이벤트)와 `SetImmediateUploadHandler`(콜백) 두 개뿐이다.
+- 로컬·원격이 같은 키를 내야 대조가 되므로 Newtonsoft는 camelCase(`ProcessDictionaryKeys=false`)로 `[FirestoreProperty]` 이름과 맞춰 둔다.
+- 문서 쓰기는 항상 `SetOptions.Overwrite` — MergeAll이면 삭제가 전파되지 않는다.
+- 캐시 봉투는 `schemaVersion` · `revision` · `data` 셋뿐이다. "저장은 했는데 못 올렸다"는 플래그가 아니라 `캐시revision == 원격revision && 스냅샷 불일치`로 판정한다 — 그래서 콘솔 손편집(revision을 안 올린다)과는 구분되지 않는다(P3).
+- `FlushPendingAsync`는 모듈마다 있다: 세이브는 `PlayerSaveCloud.FlushAsync`, 스펙 동기화(`BattleContentFirebaseModule`)는 원격 쓰기가 없어 `UniTask.CompletedTask`. 한 모듈이 동기 throw하면 `WhenAll` 이전에 터져 나머지 모듈의 flush까지 죽는다(2026-08-26 수정).
+
+### 부트 채택 — 원격 우선, 캐시 폴백
+
+```mermaid
+sequenceDiagram
+    participant GM as GameManager(BeforeSceneLoad)
+    participant PC as PlayerSaveCloud
+    participant DSM as DataSaveManager(로컬 캐시)
+    participant AU as FirebaseAuthService
+    participant FS as Firestore
+
+    GM->>PC: FirebaseManager.Initialize → Module.Initialize
+    PC->>PC: LoadAsync(generation).Forget()
+    PC->>DSM: TryLoadCache(out data, out revision)
+    Note over DSM: 스키마 v≠7·파싱 실패 → corrupt 키로 백업 후 폐기
+    PC->>AU: InitializeAsync ⨯ Delay(5s, Realtime) → WhenAny
+    alt 인증 실패/타임아웃
+        PC->>DSM: AdoptRemote(캐시, 캐시revision) · Offline
+    else 인증 성공
+        PC->>FS: GetSnapshotAsync(Source.Server) ×3, 500ms 백오프
+        alt 문서 없음
+            PC->>DSM: AdoptRemote(new UserSaveData(), 0) · IsFreshAccount=true
+        else 스키마 v > 7
+            PC->>PC: MarkUpdateRequired (게이트만 해제)
+        else 스키마 v < 7 · revision<1 · 변환 실패
+            PC->>PC: Fail → MarkRecoveryRequired
+        else 정상
+            PC->>PC: 캐시revision == 원격revision && 스냅샷 다름?
+            alt 못 올린 잔여 변경분
+                PC->>DSM: 캐시 채택 + RequestImmediateUpload
+            else
+                PC->>DSM: AdoptRemote(원격, revision)
+            end
+        end
+    end
+    PC->>PC: s_gateComplete = true
+```
+
+`InitializationInstaller.Start`가 `PlayerSaveCloud.IsGateComplete`를 폴링해 기다리고, 게이트 통과 후에만 세이브 의존 매니저(`CurrencyManager.Init` 등)를 설치한다. 스타터 지급의 유일한 근거는 `IsFreshAccount`(= 원격 문서 부재)이며, 설치 끝에 `DataSaveManager.SaveImmediate()`로 첫 문서를 만든다.
+
+### 저장 → 업로드
+
+```mermaid
+sequenceDiagram
+    participant MGR as 도메인 매니저(CurrencyManager 등)
+    participant DSM as DataSaveManager
+    participant PC as PlayerSaveCloud
+    participant FS as Firestore
+
+    MGR->>DSM: Save() / SaveImmediate()
+    DSM->>DSM: WriteCache — 봉투 직렬화 후 ReplaceWithBackup
+    DSM-->>PC: OnSaved → MarkDirty (s_dirtySerial++)
+    alt SaveImmediate
+        PC->>PC: RequestImmediateUpload (디바운스 생략)
+    else 일반 Save
+        PC->>PC: Delay(1000ms, Realtime) — 최신 version만 생존
+    end
+    PC->>PC: dirty==uploaded면 중단 / 스냅샷 동일하면 revision 미증가
+    PC->>PC: 300000B 초과 시 업로드 거부
+    PC->>FS: RunTransactionAsync — revision CAS(현재==기대 → +1) + Overwrite
+    alt 성공
+        PC->>DSM: MarkUploadedRevision(new) → 캐시 봉투 갱신
+    else RevisionConflict(다른 기기가 먼저 씀)
+        PC->>PC: BlockSession — 이 세션 업로드 중단, 로컬 기록은 유지
+    else 네트워크 실패
+        PC->>PC: Offline — 재시도는 다음 저장·복귀·flush 때
+    end
+```
+
+### 실패 표면 — 3분할 (2026-08-26 P3)
+
+세이브 진실원이 클라우드라 오프라인 폴백이 없다. 실패의 **성질**이 다르면 표면도 갈라야 한다.
+
+| 클라우드 상태 | 진입 | 표면 | 소유 |
+|---|---|---|---|
+| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 다시 시도 버튼 | `LoadingCoverView.ShowRecovery` |
+| `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달 1회 (`SimpleYNPopup`) | `CloudSyncStatusWatcher` |
+| `Offline` | 업로드 3회 연속 실패 | 상시 배너 (`UiSortingOrder.CloudSyncBanner` = 940) | `CloudSyncBannerView` |
+
+```mermaid
+flowchart LR
+    PC["PlayerSaveCloud<br/>SetState — State 대입의 유일 창구<br/>OnStateChanged · ConsecutiveUploadFailures"]
+    W["CloudSyncStatusWatcher<br/>static · 유일 구독자"]
+    B["CloudSyncBannerView<br/>SingletonOverlayBase · DDOL"]
+    M["SimpleYNPopup<br/>UIPoolManager"]
+    LC["LoadingCoverView<br/>부트 커버"]
+
+    PC -->|OnStateChanged| W
+    W -->|ShouldShowSyncBanner| B
+    W -->|Blocked 1회| M
+    PC -->|"Fail → MarkRecoveryRequired"| LC
+```
+
+- **판정은 MonoBehaviour 밖(`CloudSyncStatusWatcher`)에 둔다** — 배너 프리팹 로드가 실패해도 차단 모달은 떠야 한다.
+- **임계값(3)은 `PlayerSaveCloud` 가 쥔다**(`ShouldShowSyncBanner`). UI가 세면 오탐한다 — 오프라인 부트는 업로드를
+  한 번도 시도하지 않고 `Offline` 이 되는데, "시도했으나 실패"와 "애초에 못 올림"은 `UploadAsync` 안에서만 구분된다.
+- `BlockSession` 은 `MarkRecoveryRequired()` 를 부르지 않는다 — 게이트 뒤라 화면을 못 바꾸면서 `IsReady` 만
+  false로 떨어뜨렸다. `IsReady`/`IsTerminated` 소비자는 부트 경로 둘뿐이다.
+
+### 인플레이스 재시도
+
+씬을 다시 로드하지 않는다. 커버는 살아 있는 그 인스턴스 그대로고, 초기화 상태만 되돌려 채택을 다시 태운다.
+
+```mermaid
+sequenceDiagram
+    participant U as 유저
+    participant LC as LoadingCoverView
+    participant GI as GameInitialization
+    participant GM as GameManager
+    participant II as InitializationInstaller
+
+    U->>LC: 다시 시도
+    LC->>GI: ResetForRetry() — terminated 해제
+    Note over LC,GI: 먼저다. 뒤 단계가 동기 실패하면 MarkRecoveryRequired가 다시 오는데<br/>그때 terminated가 남아 있으면 안 된다
+    LC->>GM: RetryInitialize() → FirebaseManager.Reinitialize(envId)
+    Note over GM: PlayerSaveCloud.Initialize가 Shutdown을 태워 s_gateComplete=false
+    LC->>II: RestartGate()
+    Note over LC,II: 이 순서가 계약 — RestartGate가 앞서면<br/>게이트가 직전 실패의 gateComplete=true를 보고 통과한다
+    LC->>LC: CoRunInitialize() 재진입 (타임아웃 예산 리셋)
+```
+
+- `FirebaseManager.Reinitialize` 는 `Initialize` 의 "already initialized" 가드를 넘는 유일한 합법 경로다.
+  `Shutdown` 이 `s_modules` 를 비우지 않아 모듈 재등록 없이 다시 탄다.
+- `UpdateRequired` 에는 재시도 버튼을 띄우지 않는다 — 원격 스키마가 높은 것은 재시도로 안 풀린다.
+- 복구 문구는 진행바(`Slider_LoadingBar_Green`) **밖**의 `RecoveryPanel/Text_Recovery` 다.
+  안에 두면 `progressBar.SetActive(false)` 가 문구까지 함께 끈다(2026-08-26 수정).
+
+### 비동기 관용구
+
+| 축 | 방식 | 근거 |
+|---|---|---|
+| 실행 | UniTask 단일 (`UniTaskVoid` + `.Forget()`), 코루틴은 게이트 폴링뿐 | `PlayerSaveCloud.LoadAsync`, `InitializationInstaller.Start` |
+| 타임아웃 | `UniTask.WhenAny(작업, UniTask.Delay(ms, DelayType.Realtime))` | auth·read 5s / 트랜잭션 10s. `ignoreTimeScale`은 씬 로드 정지가 첫 델타에 실려 5초가 1프레임에 소진된다(실측 705ms) |
+| 취소 | `s_generation` 카운터 대조 (CancellationToken 미사용) | 매 await 뒤 `_generation != s_generation` 확인 |
+| 중복 억제 | `s_pendingVersion`(디바운스 세대) · `s_dirtySerial`/`s_uploadedSerial`(변경 유무) · `s_uploadedSnapshot`(내용 동일) | 3중 게이트 |
+| 직렬화(업로드) | `s_uploading` 플래그 + `UniTaskCompletionSource`로 진행 중 업로드 대기 | `FlushAsync` |
+| 스레드 | Firebase 콜백은 스레드 미보장 → `UniTask.SwitchToMainThread()` 후 PlayerPrefs 접근 | `HandleAuthStateChangedAsync` |
+| 재시도 | 읽기 3회(500ms 백오프, PermissionDenied·Unauthenticated는 즉시 중단) / 업로드는 내부 재시도 없음 | `OnApplicationPause(false)` → `RetryPending`, `OnApplicationQuit` → `FlushPendingAsync().Forget()` |
+
+`OnApplicationPause(true)`는 `CurrencyManager.Save()`(로컬)를 먼저 하고 `FirebaseManager.FlushPendingAsync()`를 await한다. 종료 콜백에는 await 창이 없어 킥만 하고, 못 올린 변경분은 캐시가 다음 부트에 살린다.
 
 > 사용자의 설계 승인과 구조 파악의 기준 문서.
 > 도메인 설계 확정 시, 구조 변경 시마다 갱신한다 (CLAUDE.md 아웃게임 운영 정책).
@@ -1751,6 +1921,10 @@ UI에 손댈 것이 없는 이유:
 - **내 닉네임**이 `MatchProfile.LOCAL_NICKNAME = "나"` 상수다. 닉네임 설정 화면이 붙으면 이 자리만 세이브 조회로 갈아끼운다(`UserSaveData`에 필드 추가).
 - **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
 - **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.
+# (폐기) Firestore save migration T0~T3 (2026-08-25)
+
+아래 T0~T3 노트가 서술하는 `PlayerSaveSync` · `PlayerSaveSyncMetadata` · `BootInstaller` · `GameManager.BootState`는 2026-08-26 기준 코드에 존재하지 않는다. 현행 구조는 문서 상단 "유저 세이브 — 클라우드 진실원 + 로컬 캐시"를 본다. 기록용으로만 남긴다.
+
 # Firestore save migration T0 (2026-08-25)
 
 - `GameManager.BootState` is the boot gate. `UpdateRequired` prevents `BootInstaller` initialization and keeps `LoadingCoverView` visible with an update message.

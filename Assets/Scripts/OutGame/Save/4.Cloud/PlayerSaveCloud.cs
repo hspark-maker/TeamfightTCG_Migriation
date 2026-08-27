@@ -18,6 +18,7 @@ static class PlayerSaveCloud
     const int READ_BACKOFF_MS = 500;
     const int DOCUMENT_WARNING_BYTES = 256 * 1024;
     const int DOCUMENT_MAX_BYTES = 300000;
+    const int BANNER_FAILURE_THRESHOLD = 3;
 
     static FirebaseContext s_context;
     static string s_envId = string.Empty;
@@ -38,12 +39,21 @@ static class PlayerSaveCloud
     static bool s_disabledForTestAccountSession;
 #endif
 
-    // 아래 셋은 지금 소비자가 없다 — P3의 오프라인 배너·복구 화면이 읽을 자리로 남긴 진단값이다.
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
-    internal static bool IsOffline { get; private set; }
     internal static string LastError { get; private set; } = string.Empty;
 
-    // 초기화 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
+    // 폴링이 아니라 이벤트인 이유: 배너가 필요로 하는 것은 값이 아니라 엣지다
+    // — 실패 3회째 전이, 성공 시 리셋, Blocked 모달의 정확히 1회 오픈.
+    internal static event Action OnStateChanged;
+
+    // 카운터가 배너가 아니라 여기 있는 이유: 오프라인 부트는 업로드를 한 번도 시도하지 않고 Offline이 된다
+    // — "시도했으나 실패"와 "애초에 못 올림"을 가릴 수 있는 건 UploadAsync 내부뿐이다.
+    internal static int ConsecutiveUploadFailures { get; private set; }
+
+    // 임계값을 UI로 새게 두지 않는다.
+    internal static bool ShouldShowSyncBanner => ConsecutiveUploadFailures >= BANNER_FAILURE_THRESHOLD;
+
+    // 부트 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
     internal static bool IsGateComplete => s_gateComplete;
 
     // 원격 문서가 없어 이번 세션이 첫 문서를 만든다. 스타터 지급의 유일한 근거다.
@@ -78,11 +88,11 @@ static class PlayerSaveCloud
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
         s_uploadedSnapshot = string.Empty;
-        IsOffline = false;
         IsFreshAccount = false;
         Revision = 0;
         LastError = string.Empty;
-        State = EPlayerSaveCloudState.Loading;
+        SetUploadFailures(0);
+        SetState(EPlayerSaveCloudState.Loading);
 
         PlayerSaveDocument.CacheDeviceInfo();
         s_ownerUid = PlayerPrefs.GetString(OWNER_UID_KEY, string.Empty);
@@ -154,10 +164,10 @@ static class PlayerSaveCloud
         s_ownerUid = string.Empty;
         s_envId = string.Empty;
         s_context = default;
-        IsOffline = false;
         IsFreshAccount = false;
         Revision = 0;
-        State = EPlayerSaveCloudState.Disabled;
+        SetUploadFailures(0);
+        SetState(EPlayerSaveCloudState.Disabled);
 
         UniTaskCompletionSource t_completion = s_uploadCompletion;
         s_uploadCompletion = null;
@@ -167,11 +177,37 @@ static class PlayerSaveCloud
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
+        // 구독 해제는 여기서만 한다 — Shutdown은 재시도 경로에서도 불리는데, 그때 구독자가 사라지면 배너가 눈을 감는다.
+        OnStateChanged = null;
         Shutdown();
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
         s_uploadedSnapshot = string.Empty;
         LastError = string.Empty;
+        ConsecutiveUploadFailures = 0;
+    }
+
+    // State 대입의 유일한 창구. 메인 스레드 전용이라 락을 걸지 않는다.
+    static void SetState(EPlayerSaveCloudState _state)
+    {
+        if (State == _state) return;
+
+        State = _state;
+        RaiseChanged();
+    }
+
+    // 상태가 그대로여도 임계값을 넘는 순간은 구독자가 알아야 한다(Offline이 유지된 채 2회 → 3회).
+    static void SetUploadFailures(int _count)
+    {
+        if (ConsecutiveUploadFailures == _count) return;
+
+        ConsecutiveUploadFailures = _count;
+        RaiseChanged();
+    }
+
+    static void RaiseChanged()
+    {
+        OnStateChanged?.Invoke();
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -292,8 +328,8 @@ static class PlayerSaveCloud
         if (t_schemaVersion > UserSaveData.VERSION)
         {
             s_gateComplete = true;
-            State = EPlayerSaveCloudState.Failed;
             LastError = $"Remote schema v{t_schemaVersion} is newer than client v{UserSaveData.VERSION}.";
+            SetState(EPlayerSaveCloudState.Failed);
             GameInitialization.MarkUpdateRequired();
             Debug.LogWarning($"[PlayerSaveCloud] {LastError}");
             return;
@@ -345,7 +381,6 @@ static class PlayerSaveCloud
     static void AdoptRemote(string _userId, UserSaveData _data, long _revision)
     {
         IsFreshAccount = false;
-        IsOffline = false;
         Revision = _revision;
         DataSaveManager.AdoptRemote(_data, _revision);
         s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
@@ -357,7 +392,6 @@ static class PlayerSaveCloud
     static void AdoptUnsyncedCache(string _userId, UserSaveData _data, long _revision)
     {
         IsFreshAccount = false;
-        IsOffline = false;
         Revision = _revision;
         DataSaveManager.AdoptRemote(_data, _revision);
         MarkUploadPending();
@@ -371,7 +405,6 @@ static class PlayerSaveCloud
     static void AdoptFreshAccount(string _userId)
     {
         IsFreshAccount = true;
-        IsOffline = false;
         Revision = 0;
         DataSaveManager.AdoptRemote(new UserSaveData(), 0);
         MarkUploadPending();
@@ -389,7 +422,6 @@ static class PlayerSaveCloud
 
         // 캐시가 있다는 건 계정이 이미 있다는 뜻이다. 원격을 못 읽었다는 이유로 신규 판정이 나면 스타터가 재지급된다.
         IsFreshAccount = false;
-        IsOffline = true;
         Revision = _cacheRevision;
         DataSaveManager.AdoptRemote(_cacheData, _cacheRevision);
 
@@ -420,7 +452,7 @@ static class PlayerSaveCloud
 
         s_uploadApproved = true;
         s_gateComplete = true;
-        State = _state;
+        SetState(_state);
     }
 
     // 캐시가 없으면 소유권도 없다 — 재설치로 PlayerPrefs만 복원된 기기가 여기 걸리면 안 된다.
@@ -435,21 +467,21 @@ static class PlayerSaveCloud
     static void Fail(string _message)
     {
         LastError = _message;
-        State = EPlayerSaveCloudState.Failed;
         s_uploadApproved = false;
         s_gateComplete = true;
         GameInitialization.MarkRecoveryRequired();
+        SetState(EPlayerSaveCloudState.Failed);
         Debug.LogError($"[PlayerSaveCloud] {_message}");
     }
 
-    // 이미 게이트를 통과한 뒤라 MarkRecoveryRequired가 화면을 바꾸지 못한다(유저 표면은 P3 몫).
-    // 클라우드 업로드만 끊고 로컬 캐시 기록은 살려 둔다 — 진행분이 다음 초기화에 복구될 유일한 통로다.
+    // 게이트를 통과한 뒤라 MarkRecoveryRequired는 화면을 바꾸지 못한 채 IsReady만 떨어뜨렸다 — 그래서 부르지 않는다.
+    // 유저 표면은 Blocked를 보고 뜨는 재시작 모달(CloudSyncStatusWatcher)이 맡는다.
+    // 클라우드 업로드만 끊고 로컬 캐시 기록은 살려 둔다 — 진행분이 다음 부트에 복구될 유일한 통로다.
     static void BlockSession(string _message)
     {
         LastError = _message;
-        State = EPlayerSaveCloudState.Failed;
         s_uploadApproved = false;
-        GameInitialization.MarkRecoveryRequired();
+        SetState(EPlayerSaveCloudState.Blocked);
         Debug.LogError(
             $"[PlayerSaveCloud] {_message} Cloud uploads are stopped for this session; " +
             "the local cache keeps recording and the next boot recovers it. Restart is required.");
@@ -554,8 +586,8 @@ static class PlayerSaveCloud
         int t_bytes = Encoding.UTF8.GetByteCount(t_snapshot);
         if (t_bytes > DOCUMENT_MAX_BYTES)
         {
-            State = EPlayerSaveCloudState.Failed;
             LastError = $"Save document is too large: {t_bytes} bytes.";
+            SetState(EPlayerSaveCloudState.Failed);
             Debug.LogError($"[PlayerSaveCloud] {LastError}");
             return;
         }
@@ -566,16 +598,16 @@ static class PlayerSaveCloud
         if (!FirebaseAuthService.Instance.IsCurrentUserActive ||
             string.IsNullOrEmpty(FirebaseAuthService.Instance.UserId))
         {
-            IsOffline = true;
-            State = EPlayerSaveCloudState.Offline;
             LastError = "Upload postponed because Firebase authentication is unavailable.";
+            SetUploadFailures(ConsecutiveUploadFailures + 1);   // 시도는 했고 착지를 못 했다
+            SetState(EPlayerSaveCloudState.Offline);
             return;
         }
 
         string t_userId = FirebaseAuthService.Instance.UserId;
         s_uploading = true;
         s_uploadCompletion = new UniTaskCompletionSource();
-        State = EPlayerSaveCloudState.Uploading;
+        SetState(EPlayerSaveCloudState.Uploading);
         bool t_uploaded = false;
 
         try
@@ -586,9 +618,9 @@ static class PlayerSaveCloud
             Revision = t_newRevision;
             s_uploadedSnapshot = t_snapshot;
             s_uploadedSerial = t_serial;
-            IsOffline = false;
             LastError = string.Empty;
-            State = EPlayerSaveCloudState.Ready;
+            SetUploadFailures(0);
+            SetState(EPlayerSaveCloudState.Ready);
             DataSaveManager.MarkUploadedRevision(t_newRevision);
             t_uploaded = true;
         }
@@ -603,9 +635,9 @@ static class PlayerSaveCloud
                 return;
             }
 
-            IsOffline = true;
-            State = EPlayerSaveCloudState.Offline;
             LastError = t_exception.GetBaseException().Message;
+            SetUploadFailures(ConsecutiveUploadFailures + 1);
+            SetState(EPlayerSaveCloudState.Offline);
             Debug.LogWarning($"[PlayerSaveCloud] Upload failed: {LastError}");
         }
         finally

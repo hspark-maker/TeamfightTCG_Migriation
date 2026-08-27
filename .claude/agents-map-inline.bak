@@ -77,24 +77,26 @@
 - 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 등급: `ECardGrade`
 - 데이터 원본: 표 기반 `CardSpec` (진화 최대 단계 상수 포함) · 주소 기반 아트 로드 `CardArtCache` · 진화 단계는 `CardGrowth.EvolutionStage`
-- 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
-- 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `AttackEffect` · `ECardChannel` · `SynergyEmblemTiming`
+- 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `ECardChannel` · `ECardGrade` · `SynergyEmblemTiming`
 
 ## 멀티플레이 (`Network/`, 6파일 1,137줄)
 
-- 세션·제어: `NetworkSession` · `NetworkGameController` · `CardRegistry`
+- 세션·제어: `NetworkSession` · `NetworkGameController`
 - 턴 동기화: `MultiplayerTurnRunner` · `MultiplayerPlayerTurn` · `MultiplayerOpponentTurn`
 - 메시지 처리: `NetworkGameController.HandleMessage` — `NetworkSession` 이 Photon 콜백을 여기로 넘긴다
 - 서드파티 Photon Fusion 은 `Assets/Photon/` (지도 범위 밖)
 
-## 아웃게임 세이브 (`OutGame/Save/`, 14파일)
+## 아웃게임 세이브 (`OutGame/Save/`)
 
-3계층 구조다.
+**진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`)고 로컬 파일은 캐시 봉투다. 4계층 구조.
 
-- 저장소: `OutGame/Save/1.Repository/IRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` (`KeywordGrowthEntry`) · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData`
-- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Load` / `DataSaveManager.Save` / `DataSaveManager.Data`) — 각 기능 매니저가 여기로 flush 한다
+- 저장소: `OutGame/Save/1.Repository/IRepository` · `IAtomicRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · 캐시 봉투 `PlayerSaveCacheEnvelope`
+- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `SaveImmediate` / `Data` / `AdoptRemote` / `TryLoadCache` / `CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `Load()` 는 없다(부트 채택이 대신한다)
+- 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `IsGateComplete` · `IsFreshAccount` · `ShouldShowSyncBanner` · `OnStateChanged`) · `PlayerSaveDocument` (`ToFieldMap` / `TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
+- 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면 + 인플레이스 재시도(`GameInitialization.ResetForRetry` → `GameManager.RetryInitialize` → `FirebaseManager.Reinitialize` → `InitializationInstaller.RestartGate`) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
+- Firebase 코어: `Core/Firebase/FirebaseManager` · `FirebaseAuthService` · `FirebaseContext` · `FirebaseTimeouts` · `IFirebaseModule` · `FirebaseRootPath` · `EFirebaseAuthState`
 
 ## 재화·보상 (`OutGame/Currency/`, `OutGame/Reward/`, `Utils/`)
 
@@ -155,7 +157,7 @@
 
 ## 전투 UI (`UI/Battle/`, 29파일 6,965줄)
 
-- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `CardArmedVfx` · `WeaponAnimSpec` · `CardFadeAlpha`
+- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `WeaponAnimSpec` · `CardFadeAlpha`
 - 보드·카메라: `BattleBoardView` · `BattleFieldView` · `BattleCamera` · `BattleCameraFit` · `BattleSelection`
 - 턴 표시: `TurnBannerUI` · `TurnTimerUI` · `TurnSideTint` · `ActionPanel` · `CoinFlipUI` · `MulliganOverlayUI`
 - 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`

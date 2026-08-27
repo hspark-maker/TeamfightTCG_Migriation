@@ -99,6 +99,16 @@ public static class GameInitialization
         SetState(EGameInitState.UpdateRequired);
     }
 
+    // 씬 재로드 없이 부트를 다시 태우기 위해 종료 상태만 되돌린다.
+    // WhenReady 구독은 종료 시점에 Dispose+Clear로 이미 콜백까지 지워져 복원할 수단이 없다 —
+    // 재시도 이후 구독은 새로 걸어야 한다.
+    internal static void ResetForRetry()
+    {
+        if (!IsTerminated) return;
+
+        SetState(EGameInitState.SyncingSave);
+    }
+
     sealed class ReadySubscription : IDisposable
     {
         internal static readonly ReadySubscription Empty = new(null);

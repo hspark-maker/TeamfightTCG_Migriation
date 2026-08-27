@@ -52,7 +52,8 @@ public class GameManager : MonoBehaviour
         FirebaseManager.RetryPending();
     }
 
-    // 종료 콜백에는 await 창이 없다 — 킥만 하고, 못 올라간 잔여 변경분은 로컬 캐시가 다음 초기화에 살린다.
+    // 종료 콜백에는 await 창이 없어 이 킥의 Firestore 트랜잭션은 착지하지 못한다.
+    // 실질 복구선은 FlushLocal()이 남긴 로컬 캐시와, 다음 부트의 AdoptUnsyncedCache다.
     void OnApplicationQuit()
     {
         FlushLocal();
@@ -91,6 +92,21 @@ public class GameManager : MonoBehaviour
         catch (System.Exception ex)
         {
             Debug.LogError($"[GameManager] FirebaseManager.Initialize failed: {ex.Message}\n{ex.StackTrace}");
+            GameInitialization.MarkRecoveryRequired();
+        }
+    }
+
+    /// <summary>부트가 복구 화면에서 멈췄을 때 Firebase를 처음부터 다시 태운다(씬 재로드 없음).</summary>
+    // 여기에 두는 이유는 envId다 — 콘텐츠 프로필을 아는 곳이 이 클래스뿐이라, UI가 프로필을 직접 읽지 않게 한다.
+    public static void RetryInitialize()
+    {
+        try
+        {
+            FirebaseManager.Reinitialize(ContentProfileConfig.Active.CloudEnvId);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[GameManager] FirebaseManager.Reinitialize failed: {ex.Message}\n{ex.StackTrace}");
             GameInitialization.MarkRecoveryRequired();
         }
     }

@@ -87,6 +87,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6b465e52d99e8b4b9cc9eb742fbc1ac
+    m_Address: CloudSyncBannerView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1b37da6ebdd20e48954602bec574405
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab
     m_ReadOnly: 0
