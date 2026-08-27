@@ -14,6 +14,8 @@ GameObject:
   - component: {fileID: 1581884920793774141}
   - component: {fileID: 1581884920793774142}
   - component: {fileID: 1581884920793774143}
+  - component: {fileID: 1581884920793774144}
+  - component: {fileID: 1581884920793774145}
   m_Layer: 0
   m_Name: Initialize
   m_TagString: Untagged
@@ -52,7 +54,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdbb510cbd912084c9c4bfaf4fa535e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InitializationInstaller
-  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
   albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
   currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
@@ -80,6 +81,8 @@ MonoBehaviour:
   initializers:
   - {fileID: 1581884920793774142}
   - {fileID: 1581884920793774143}
+  - {fileID: 1581884920793774144}
+  - {fileID: 1581884920793774145}
   - {fileID: 1581884920793774141}
 --- !u!114 &1581884920793774141
 MonoBehaviour:
@@ -131,6 +134,38 @@ MonoBehaviour:
   battleRewardConfig: {fileID: 11400000, guid: 82d27bdccf4eec346b313f1ec6fafc4f, type: 2}
   rankConfig: {fileID: 11400000, guid: 408410dc0be34c648afdaf57203b958c, type: 2}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
+--- !u!114 &1581884920793774144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5d0392a71b64f8ea6e3418d7cb52099, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ContentProfileStep
+  initializerId: ContentProfile
+  required: 1
+  requiredIds: []
+--- !u!114 &1581884920793774145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e18b6f4d20c34a7db95c2f61847ae3d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardCatalogStep
+  initializerId: CardCatalog
+  required: 1
+  requiredIds: 
+  - ContentProfile
+  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0

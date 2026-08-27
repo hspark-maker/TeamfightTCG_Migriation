@@ -7,8 +7,6 @@ using UnityEngine.Serialization;
 // 세이브 로드·재화 캐싱 등 씬 오브젝트가 필요 없는 초기화는 GameManager가 앱 시작 시 먼저 처리한다.
 public class InitializationInstaller : MonoBehaviour
 {
-    // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 부팅 시 구성한다.
-    [SerializeField] SynergyRegistry synergyRegistry;
     // 카드 앨범(신규 도감) SO. 미배선(null)이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
     [SerializeField] CardAlbumConfig albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선(null)이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
@@ -31,11 +29,7 @@ public class InitializationInstaller : MonoBehaviour
     [SerializeField] ProfileConfig profileConfig;
     [FormerlySerializedAs("runtimeUiPrefabs")]
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
-    static bool s_initialized;
     static bool s_saveDependentInstalled;
-
-    // 루트 수명 판정은 RootLifecycleStep이 읽는다. 카탈로그 구성이 스텝으로 떨어져 나오면 소유도 같이 옮긴다.
-    internal static bool IsInitialized => s_initialized;
 
     // 부트를 선점한 사본. 재시도가 코루틴을 다시 걸 대상을 찾는 유일한 통로다(씬 탐색 금지).
     static InitializationInstaller s_instance;
@@ -45,40 +39,19 @@ public class InitializationInstaller : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
-        s_initialized = false;
         s_saveDependentInstalled = false;
         s_instance = null;
     }
 
     // 즉시 주입 단계. 실행 주체는 InitializationRunner(LegacyInstallerStep)다 —
     // 이 클래스는 더 이상 Awake/Start 메시지로 스스로 돌지 않는다.
-    // 반환값 false는 "이 사본은 여기서 끝"(중복 사본이거나 카탈로그 구성 실패로 루트를 파괴함)이다.
-    internal bool InstallImmediate()
+    internal void InstallImmediate()
     {
-        // 루트 수명(중복 사본 정리·DontDestroyOnLoad)과 전투 SO 주입은
-        // RootLifecycleStep·BattleConfigStep이 이 스텝보다 먼저 끝낸다.
-        // 여기까지 온 사본이 부트를 선점한 그 사본이다(중복은 RootLifecycleStep이 이미 걷어냈다).
+        // 루트 수명·전투 SO·프로필·카드 카탈로그는 앞선 스텝들이 이미 끝냈다.
+        // 여기까지 온 사본이 부트를 선점한 그 사본이다(중복은 RootLifecycleStep이 걷어냈다).
         s_instance = this;
 
         SyncUiPrefabs.SetSource(syncUiPrefabs);
-
-        // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
-        ContentProfileConfig t_profile;
-        try
-        {
-            t_profile = ContentProfileConfig.Active;
-            SpecSource.Init();
-            CardCatalog.SetSource(synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
-        }
-        catch (System.Exception t_exception)
-        {
-            GameInitialization.MarkRecoveryRequired();
-            Debug.LogException(t_exception);
-            Destroy(gameObject);
-            return false;
-        }
-
-        s_initialized = true;
 
         // 카드 아트 선로드. 아트는 이제 CardData가 직접 물지 않고 Addressables로 따로 온다
         // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
@@ -166,8 +139,6 @@ public class InitializationInstaller : MonoBehaviour
 
         // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
-
-        return true;
     }
 
     /// <summary>복구 화면의 재시도가 부트 게이트를 처음부터 다시 태운다(씬 재로드 없음).</summary>
@@ -183,7 +154,7 @@ public class InitializationInstaller : MonoBehaviour
     }
 
     // 세이브 게이트·에셋 로드를 기다린 뒤 세이브 의존 매니저를 설치하는 지연 단계.
-    // 최초 1회는 LegacyInstallerStep이 부르고(InstallImmediate가 true를 돌려준 사본에서만),
+    // 최초 1회는 LegacyInstallerStep이 부르고,
     // 재시도는 RestartGate가 같은 코루틴을 다시 건다.
     internal System.Collections.IEnumerator RunDeferred()
     {

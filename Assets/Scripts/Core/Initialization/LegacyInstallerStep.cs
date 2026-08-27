@@ -17,8 +17,7 @@ public sealed class LegacyInstallerStep : MainInitializer
         if (installer == null)
             throw new MissingComponentException("[LegacyInstallerStep] InitializationInstaller가 배선되지 않았다.");
 
-        // 두 번째 사본이거나 카탈로그 구성이 실패한 경로 — Installer가 루트째 파괴했으므로 여기서 끝낸다.
-        if (!installer.InstallImmediate()) return;
+        installer.InstallImmediate();
 
         // 원래 Start 코루틴이 서던 자리(형제 매니저의 Awake가 전부 끝난 뒤)를 유지한다.
         // 러너가 Awake(-210)에서 도는 탓에 곧바로 이어 돌리면 DataLibrary.Awake보다 앞서 검사하게 된다.

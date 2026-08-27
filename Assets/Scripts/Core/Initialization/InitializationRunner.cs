@@ -12,6 +12,15 @@ public sealed class InitializationRunner : MonoBehaviour
 
     public IReadOnlyList<MainInitializer> Initializers => initializers;
 
+    // 부트를 선점한 사본이 카드 카탈로그 구성까지 마쳤는가. 프리팹 사본이 둘이라 하나만 참이 된다.
+    // 실패한 사본은 루트째 걷히므로 false로 남고, 늦게 깬 사본이 처음부터 다시 시도한다.
+    internal static bool BootClaimed { get; private set; }
+
+    internal static void MarkBootClaimed() => BootClaimed = true;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => BootClaimed = false;
+
     void Awake()
     {
         if (!initializeOnAwake) return;
