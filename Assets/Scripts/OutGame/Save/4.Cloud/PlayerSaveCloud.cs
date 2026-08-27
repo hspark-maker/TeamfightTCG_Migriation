@@ -782,6 +782,50 @@ static class PlayerSaveCloud
         return Firestore().Document(PlayerSaveFirestorePaths.Current(s_envId, _userId));
     }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>배포된 보안 규칙이 경로 하나의 읽기를 실제로 막는지 잰 결과.</summary>
+    internal readonly struct RuleProbe
+    {
+        /// <summary>규칙이 읽기를 거부했다 — 진단이 기대하는 결과다.</summary>
+        internal bool Denied { get; }
+
+        /// <summary>판정 근거. 거부면 오류 코드, 통과했으면 문서 존재 여부다.</summary>
+        internal string Detail { get; }
+
+        internal RuleProbe(bool _denied, string _detail)
+        {
+            this.Denied = _denied;
+            this.Detail = _detail;
+        }
+    }
+
+    /// <summary>임의 경로를 한 번 읽어 배포된 규칙의 차단 여부를 잰다. 세이브 상태는 건드리지 않는다.</summary>
+    // 캐시에서 답이 나오면 규칙을 거치지 않아 진단이 성립하지 않는다 — Source.Server는 필수다.
+    internal static async UniTask<RuleProbe> ProbeReadDeniedAsync(string _documentPath)
+    {
+        if (!s_context.IsValid) return new RuleProbe(false, "firebase 미초기화");
+
+        try
+        {
+            Task<DocumentSnapshot> t_readTask =
+                Firestore().Document(_documentPath).GetSnapshotAsync(Source.Server);
+            (bool t_hasResult, DocumentSnapshot t_snapshot) = await UniTask.WhenAny(
+                t_readTask.AsUniTask(),
+                UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+
+            if (!t_hasResult) return new RuleProbe(false, "시간 초과");
+
+            return new RuleProbe(false, t_snapshot.Exists ? "문서 있음" : "문서 없음");
+        }
+        catch (Exception t_exception)
+        {
+            bool t_denied = t_exception.GetBaseException() is FirestoreException t_firestore &&
+                            t_firestore.ErrorCode == FirestoreError.PermissionDenied;
+            return new RuleProbe(t_denied, CloudFailureClassifier.Describe(t_exception));
+        }
+    }
+#endif
+
     sealed class RevisionConflictException : Exception
     {
         internal RevisionConflictException(string _message) : base(_message) { }

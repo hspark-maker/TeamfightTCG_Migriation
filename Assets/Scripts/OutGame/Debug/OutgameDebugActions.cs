@@ -84,6 +84,12 @@ public static class OutgameDebugActions
         BumpServerRevisionAsync().Forget();
     }
 
+    // 배포된 보안 규칙이 실클라를 실제로 막는지 검증. 세 경로 전부 거부돼야 정상이다.
+    public static void ProbeRuleDenials()
+    {
+        ProbeRuleDenialsAsync().Forget();
+    }
+
     static async UniTaskVoid PingServerAsync()
     {
         try
@@ -126,6 +132,44 @@ public static class OutgameDebugActions
         {
             Debug.LogError($"[OutgameDebug] devBumpRevision 실패 — {t_exception.GetBaseException().Message}");
         }
+    }
+
+    // 실재하지 않는 uid·env를 겨눈다. 규칙은 문서 존재보다 소유자·환경을 먼저 보므로
+    // 문서가 없어도 permission-denied가 나와야 하고, 없어서 통과하면 그건 규칙이 열린 것이다.
+    const string FOREIGN_PROBE_UID = "rules-probe-not-my-uid";
+    const string UNKNOWN_PROBE_ENV = "dev";
+    const int RULE_PROBE_COUNT = 3;
+
+    static async UniTaskVoid ProbeRuleDenialsAsync()
+    {
+        string t_uid = FirebaseAuthService.Instance.UserId;
+        if (string.IsNullOrEmpty(t_uid))
+        {
+            Debug.LogWarning("[OutgameDebug] 로그인 전이라 규칙 진단을 할 수 없다.");
+            return;
+        }
+
+        string t_env = ContentProfileConfig.Active.CloudEnvId;
+        int t_denied = 0;
+
+        if (await LogRuleProbeAsync("남의 uid", PlayerSaveFirestorePaths.Current(t_env, FOREIGN_PROBE_UID))) t_denied++;
+        if (await LogRuleProbeAsync("미지 env", PlayerSaveFirestorePaths.Current(UNKNOWN_PROBE_ENV, t_uid))) t_denied++;
+        if (await LogRuleProbeAsync("매치 문서", FirebaseRootPath.Environment(t_env) + "/matches/rules-probe")) t_denied++;
+
+        if (t_denied == RULE_PROBE_COUNT)
+            Debug.Log($"[OutgameDebug] 규칙 진단 {t_denied}/{RULE_PROBE_COUNT} 차단 — 배포된 규칙이 실클라를 막는다. (내 uid {t_uid})");
+        else
+            Debug.LogError($"[OutgameDebug] 규칙 진단 {t_denied}/{RULE_PROBE_COUNT} 차단 — 열린 경로가 있다.");
+    }
+
+    static async UniTask<bool> LogRuleProbeAsync(string _label, string _path)
+    {
+        PlayerSaveCloud.RuleProbe t_probe = await PlayerSaveCloud.ProbeReadDeniedAsync(_path);
+
+        if (t_probe.Denied) Debug.Log($"[OutgameDebug] 규칙 차단 OK — {_label} · {t_probe.Detail}");
+        else Debug.LogError($"[OutgameDebug] 규칙이 열려 있다 — {_label} · {t_probe.Detail} · {_path}");
+
+        return t_probe.Denied;
     }
 #endif
 
@@ -223,7 +267,7 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 좌표만 되감음(소유·재화 유지). 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
-    // 티어 1단계 올리기/내리기. AI 카드 레벨이 티어에서 나오므로 난이도 곡선을 이걸로 확인한다.
+    // 티어 1단계 올리기/내리기
     public static void RaiseTier() => StepTier(+1);
 
     public static void LowerTier() => StepTier(-1);
@@ -240,7 +284,7 @@ public static class OutgameDebugActions
         // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
         RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
 
-        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} / AI {GrowthStar.Label(RankManager.AiCardLevel)} — 씬 재진입 시 연출 재생");
+        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} — 씬 재진입 시 연출 재생");
     }
 
     // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
@@ -269,7 +313,7 @@ public static class OutgameDebugActions
         RankManager.ResetForDebug();
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName} / AI {GrowthStar.Label(RankManager.AiCardLevel)}");
+        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName}");
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)

@@ -172,13 +172,13 @@ public class OutgameDebugOverlay : MonoBehaviour
         OutgameDebugActions.OpenRarityTestPack(t_grade);
     }
 
-    // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
+    // 티어 이동(디버그). 표시·보상 확인용이다.
     void DrawTierControls()
     {
         RankInfo t_info = RankManager.GetInfo();
 
         string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
-        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI {GrowthStar.Label(RankManager.AiCardLevel)})");
+        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
@@ -205,6 +205,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("PING",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.PingServer();
         if (GUILayout.Button("BUMP",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.BumpServerRevision();
+        if (GUILayout.Button("DENY?", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ProbeRuleDenials();
         GUILayout.EndHorizontal();
     }
 

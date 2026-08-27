@@ -95,7 +95,7 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 | Phase | 상태 | 목표 | 선행 |
 |---|---|---|---|
 | **R0** 기반 배선 | 🟡 진행중 | 코드·설정 완료(에뮬레이터 블록, 클라 Callable 서비스, `ping` onCall, 채택 계약, 오류 분류기). **배포 1회 + 실왕복 검증 남음** | — |
-| **R1** 룰 1차 배포 | 🟡 진행중 | 소유권·형식·revision 뼈대(슬롯 동결은 아직 없음). 룰 본문 + 회귀 24케이스 완료, **배포 3단계 남음** | R0 |
+| **R1** 룰 1차 배포 | 🟡 진행중 | 소유권·형식·revision 뼈대(슬롯 동결은 아직 없음). 룰 본문 + 회귀 33케이스 + **실배포 완료(2026-08-27)**. 실플레이 왕복 실측만 남음 | R0 |
 | **R2** 로컬 캐시 제거 | ✅ 완료 | 캐시 4계층 삭제, 상태머신 정리 — 커밋 `d19590e2b` | — (병행 가능) |
 | **R3** 스펙 서버화 | ⬜ 대기 | 업로더 권한 이관 + 미업로드 SO 7종 승격 | R1 |
 | **R4** 계정 생성·스타터 | ⬜ 대기 | 신규 문서 생성을 서버가 소유 | R1 |
@@ -140,7 +140,7 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 
 ---
 
-### R1 — 룰 1차 배포 ⬜
+### R1 — 룰 1차 배포 🟡
 
 **목표**: 전면 개방을 끝낸다. **아직 슬롯은 동결하지 않는다** — 게임이 지금 그대로 돌아야 한다.
 
@@ -255,12 +255,49 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 기준 브랜치에 `functions/scripts/grant-admin.js` 가 있어 R3(a) 의 절반이 이미 있다.
 대가로 **`SpecFirestoreUploader` 는 ID 토큰을 실기 전까지 죽는다** — 룰 주석에도 적혀 있다.
 
-**남은 것 — 배포 3단계.** 룰 본문과 회귀 테스트는 끝났고 아래는 사람 승인이 필요하다:
+**배포 완료(2026-08-27).** 전면 개방(`allow read, write: if true`)은 끝났다.
 
 1. ~~포인터 스왑~~ — 불필요해졌다. `firestore.rules` 가 곧 진짜 룰이고 `firebase.json` 은 이미 그걸 가리킨다
-2. `firebase login` → `firebase deploy --only firestore:rules`
-   (`firestore.indexes.json` 이 없으므로 `--only firestore` 를 그냥 치면 안 된다)
-3. 배포 후 정상 플레이 왕복 + 타 uid 접근 차단 실측
+2. [x] 회귀 33케이스 재실행 전부 통과 → `firebase deploy --only firestore:rules --project bm-cardbattle`
+       (`firestore.indexes.json` 이 없으므로 `--only firestore` 를 그냥 치면 안 된다).
+       릴리즈된 곳은 `projects/bm-cardbattle/releases/cloud.firestore/cardbattle` —
+       **CLI 완료 문구는 DB 이름을 생략하고 `released rules ... to cloud.firestore` 라고만 찍는다.**
+       명명 DB(`cardbattle`)로 갔는지는 `--debug` 의 PATCH 경로로만 확인된다.
+       이 프로젝트에 `(default)` DB 는 아예 없다
+3. [ ] 배포 후 정상 플레이 왕복 + 타 uid 접근 차단 실측 — **사람이 1회 돌려야 한다**
+
+**실측은 F8 디버그 오버레이의 CLOUD 블록 하나로 끝난다.** 계기판 `CLOUD LIVE / Ready / rev N` +
+버튼 셋(`PING` · `BUMP` · `DENY?`). 두 ContentProfile 모두 `useLocalEmulators: 0` 이라
+에디터 Play 가 곧 실서버 왕복이다.
+
+| 잴 것 | 조작 | 통과 판정 |
+|---|---|---|
+| 부트 채택 | Play | 로비 진입. 막히면 `LoadingCoverView` 복구 화면이 뜬다 |
+| 읽기 + 서버 시야 | `PING` | `database=cardbattle` · `schemaVersion` == `documentSchemaVersion` · `revision` 이 계기판과 일치 |
+| **클라 쓰기(룰의 본무대)** | `+G`/`+D`/`+E`/`+S` | `rev` 가 정확히 +1, `Ready` 유지. 4재화를 다 눌러야 `balances` 검증 4줄을 전부 밟는다 |
+| 서버 쓰기 + 채택 계약 | `BUMP` → 곧바로 `+G` | 로그의 `→ N` 과 `(채택 후 N)` 이 같고, 이어지는 클라 저장이 N+1 로 통과 |
+| **타 uid·미지 env·매치 차단** | `DENY?` | `규칙 진단 3/3 차단` |
+
+`DENY?` 는 실클라 SDK로 세 경로를 `Source.Server` 로 실제 읽어 본다
+(`OutgameDebugActions.ProbeRuleDenials` → `PlayerSaveCloud.ProbeReadDeniedAsync`):
+남의 uid · `envs/dev/...` · `matches/...`. **셋 다 없는 문서를 겨눈다** — 룰이 문서 존재보다
+소유자·환경을 먼저 보므로 없어도 `permission-denied` 가 나와야 하고, "없어서" 통과하면 그건 룰이 열린 것이다.
+캐시 히트는 룰을 안 거치므로 `Source.Server` 가 필수다.
+
+> 콘솔 Rules Playground 로도 같은 걸 볼 수 있지만 그건 **룰만** 평가한다. R1 이 남긴 실측의
+> 값어치는 "룰 문법이 맞나"가 아니라 **실클라 × 실배포 룰** 이라 `DENY?` 쪽이 진짜 판정이다.
+
+> **에디터 2회차 Play 의 "client is offline" 은 룰 문제가 아니다** — Firestore 네이티브 인스턴스가
+> 도메인 리로드를 넘어 살아남아 생긴다. 보이면 Unity 를 완전 재시작하고 다시 재라.
+> 룰을 의심하기 전에 이걸 먼저 배제해야 한다.
+
+> **배포 즉시 `SpecFirestoreUploader` 가 죽는다** — specs `write` 가 `admin` 클레임 전용이 됐고
+> 업로더는 웹 API key + REST 라 `request.auth` 가 null 이다. 스펙 갱신은 R3(a) 의
+> `specUpload` callable 이관까지 막힌다(`functions/scripts/grant-admin.js` 가 절반을 갖고 있다).
+
+> **회귀 하네스의 `node_modules` 가 깨져 있었다** — 커밋된 `package-lock.json` 은 멀쩡한데
+> `@firebase/rules-unit-testing` 실체가 없어 `ERR_MODULE_NOT_FOUND` 로 죽는다.
+> `npm install` 한 번이면 복구된다. "테스트가 안 돈다"를 "룰이 틀렸다"로 읽지 말 것
 
 **순서 제약**: callable 경로의 `Rejected`/`Unusable` UX 표면이 서기 전에 룰을 닫으면
 룰 거부가 유저에게 아무 표면 없이 삼켜진다. 배포는 그 뒤여야 한다.

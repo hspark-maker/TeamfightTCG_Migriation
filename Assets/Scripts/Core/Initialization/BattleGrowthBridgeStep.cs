@@ -17,10 +17,10 @@ public sealed class BattleGrowthBridgeStep : MainInitializer
         CardVisualRules.UnlockedKeywordProvider = _card => CardGrowthManager.GrowthOf(_card).UnlockedKeywords;
         CardVisualRules.EvolutionStageProvider = _card => CardGrowthManager.GrowthOf(_card).EvolutionStage;
 
-        // 싱글 AI 난이도. 랭크 티어가 정한 레벨을 같은 성장 곡선에 태운다 —
+        // 싱글 AI 레벨. 토너먼트 정점 저작값만 남았고(랭크 티어로 적을 강화하던 축은 제거) 같은 성장 곡선에 태운다 —
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
-        // 레벨은 전투 시작 시점에 읽어야 한다(부트에서 굳히면 랭크가 올라도 난이도가 안 따라온다).
-        GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevelOf(_card));
+        // 레벨은 전투 시작 시점에 읽어야 한다(부트에서 굳히면 진행 중 바뀐 정점 값이 안 따라온다).
+        GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevel());
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
         // 튜토리얼 전투용 미강화 기준값. 레벨은 바닥 고정이라 체력은 안 오르고 해금 게이트만 산다 —
@@ -30,12 +30,11 @@ public sealed class BattleGrowthBridgeStep : MainInitializer
         return UniTask.CompletedTask;
     }
 
-    // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
-    // 만렙 클램프를 여기서 다시 거는 이유: 그 클램프가 RankManager.AiCardLevelOf 안에 있어서
-    // 토너먼트 우회로에는 따라오지 않는다(곡선 밖 레벨은 보너스가 멈춘다).
-    static int EnemyCardLevelOf(int _cardId)
+    // 이번 전투에서 적 카드가 쓸 레벨. 토너먼트면 정점 저작값(곡선 밖 레벨은 보너스가 멈추므로 만렙 클램프),
+    // 아니면 바닥이다 — 랭크 티어로 적 레벨을 올리던 축은 제거됐다.
+    static int EnemyCardLevel()
     {
-        if (!TournamentRun.IsActive) return RankManager.AiCardLevelOf(_cardId);
+        if (!TournamentRun.IsActive) return CardGrowth.BaseLevel;
 
         int t_max = CardGrowthManager.MaxLevel;
         return t_max > 0 && TournamentRun.AiCardLevel > t_max ? t_max : TournamentRun.AiCardLevel;

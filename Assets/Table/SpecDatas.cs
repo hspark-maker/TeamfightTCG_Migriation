@@ -152,3 +152,133 @@ public partial class AlbumReward
     /// 지급량(0 이하는 지급도 표시도 되지 않는다)
     public long amount;
 }
+
+[GeneratorSpecData]
+public partial class MatchReward
+{
+    /// 행 고유 번호(부여 후 변경 금지). 이 표는 한 줄만 쓴다 — id 1 행이 전역 설정이다
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 전투 보상으로 지급할 재화(Gold/Diamond/Energy/Shard)
+    public string rewardCurrency;
+    /// 승리 시 남은 카드 1장당 지급량. 승리에만 붙는다 — 패배는 남은 카드와 무관하게 loseAmount 고정이다
+    public long perSurvivorAmount;
+    /// 승리 지급량의 하한. 카드가 배치되기 전에 끝난 부전승(남은 카드 0장)을 받치는 바닥이라 장당 지급량 이하로 둔다
+    public long winFloor;
+    /// 패배 시 지급량(고정). 남은 카드 수를 보지 않는다 — 항복과 정상 패배가 같은 액수다
+    public long loseAmount;
+}
+
+[GeneratorSpecData]
+public partial class RankGrade
+{
+    /// 행 고유 번호(부여 후 변경 금지). id 오름차순이 곧 등급 순서이고, 티어 인덱스는 이 순서에서 파생된다
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 등급 키(코드 enum 이름과 1:1 · 변경 금지). Bronze/Silver/Gold/Platinum/Diamond
+    public string gradeKey;
+    /// 화면 표시명(단계 숫자 없이). 티어 이름은 "표시명 단계"로 조합된다
+    public string displayName;
+    /// 이 등급 1단계 진입 임계치. 저작 규칙: 하향만 한다 — 상향하면 임계치 아래로 내려간 기존 유저가 소급 강등된다
+    public long entryPoints;
+    /// 단계 간 포인트 간격 = 별 네 칸. 단계 N 임계치 = entryPoints + (N-1) * 이 값
+    public long pointsPerDivision;
+    /// 이 등급에서 승리 시 더할 랭크 포인트 = 별 한 칸. pointsPerDivision 을 이 값의 4배로 두면 4승에 한 단계다. 전 등급 같은 값이면 종전 동작 그대로고, 고랭크를 짜게 주려면 여기서 가른다
+    public long winPoints;
+    /// 이 등급에서 패배 시 뺄 랭크 포인트 = 별 한 칸. 양수로 적는다(코드가 뺀다). 승급전 한 판은 이 값을 쓰지 않는다 — 승급전은 천장/중간 지점으로 직접 쓴다
+    public long losePoints;
+}
+
+[GeneratorSpecData]
+public partial class RankGradeReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// RankGrade.gradeKey 참조. 한 등급의 4단계가 이 목록을 공유하고 단계마다 액수만 늘어난다
+    public string gradeKey;
+    /// 같은 등급 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 이 등급 1단계 지급액. 0 이하면 4단계 전부에서 지급도 표시도 되지 않는다(단계 증가분이 있어도 마찬가지)
+    public long amount;
+    /// 단계마다 늘어나는 증가분. 단계 N 지급액 = amount + (N-1) * 이 값. 0이면 4단계 모두 같은 액수
+    public long amountPerDivision;
+}
+
+[GeneratorSpecData]
+public partial class KeywordEnhance
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 강화 대상 키워드(Ranged/Peerless/Execution/Taunt/Cunning/Mark/Healer/Invincible/BonusHp). 행이 없는 키워드는 강화 자체가 열리지 않는다
+    public string keyword;
+    /// 이 키워드의 강화 상한 레벨. 1 미만은 1로 올라간다
+    public int maxLevel;
+    /// 레벨 1당 더해지는 최대 체력(그 키워드를 가진 카드 전부에 붙는다). 1 미만은 1로 올라간다
+    public int hpPerLevel;
+    /// 1레벨 강화 비용
+    public long baseCost;
+    /// 레벨마다 늘어나는 비용. 레벨 N 비용 = baseCost + (N-1) * 이 값
+    public long costGrowthPerLevel;
+    /// 소모 재화(Gold/Diamond/Energy/Shard). 카드 강화는 조각, 키워드 강화는 에너지 축이다
+    public string costCurrency;
+}
+
+[GeneratorSpecData]
+public partial class CardEnhance
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 대상 레벨(2 = 첫 강화). 1 이하는 강화로 도달하는 레벨이 아니라 무시된다
+    public int level;
+    /// 소모 재화(Gold/Diamond/Energy/Shard)
+    public string costCurrency;
+    /// 이 레벨업 비용. 0 이하면 무료
+    public long cost;
+    /// 성공률 1000분율(1000 = 100%). 범위 밖은 0~1000으로 조인다
+    public int successPermille;
+}
+
+[GeneratorSpecData]
+public partial class CardEnhanceRule
+{
+    /// 행 고유 번호(부여 후 변경 금지). 이 표는 한 줄만 쓴다 — id 1 행이 전역 설정이다
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 강화 상한 레벨. 미강화가 Lv1이라 강화 횟수는 이 값 - 1이다
+    public int maxLevel;
+    /// 레벨업 1회 기본 체력 증가. Card 표의 hp2~hp4 가 있으면 그 값이 이긴다
+    public int hpPerLevel;
+    /// 첫 강화(Lv2) 기본 비용. CardEnhance 표에 그 레벨 행이 있으면 그 값이 이긴다
+    public long baseEnhanceCost;
+    /// 레벨마다 늘어나는 기본 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값
+    public long costGrowthPerLevel;
+    /// 첫 강화 기본 성공률 1000분율(1000 = 100%)
+    public int baseSuccessPermille;
+    /// 레벨마다 떨어지는 성공률 1000분율. 레벨 N 성공률 = baseSuccessPermille - (N-2) * 이 값
+    public int rateDropPerLevelPermille;
+    /// 1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다
+    public int firstEvolutionLevel;
+    /// 2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화가 열린다
+    public int secondEvolutionLevel;
+    /// 한계돌파 최대 단계. CardLimitBreak 표는 이 단계까지만 읽힌다
+    public int maxLimitBreak;
+}
+
+[GeneratorSpecData]
+public partial class CardLimitBreak
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 한계돌파 단계(1부터). CardEnhanceRule.maxLimitBreak 를 넘는 단계는 무시된다
+    public int stage;
+    /// 이 단계에서 더해지는 최대 체력. 누적이라 3단계 카드는 1~3단계 합을 받는다
+    public int hpGain;
+    /// 이 단계에 드는 간식 수(카드마다 따로 쌓이는 중복 카드 간식). 1 미만은 1로 올라간다
+    public int snackCost;
+}
