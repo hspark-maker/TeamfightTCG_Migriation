@@ -335,7 +335,8 @@ static class PlayerSaveCloud
 
         if (!PlayerSaveDocument.TryReadMeta(t_document, out long t_schemaVersion, out long t_revision))
         {
-            Fail("Remote save metadata is missing or has a broken type.");
+            Fail("Remote save metadata is missing or has a broken type. " +
+                 $"[{PlayerSaveDocument.DescribeMeta(t_document)}]");
             return;
         }
 

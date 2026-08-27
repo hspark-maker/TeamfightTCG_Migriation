@@ -15,18 +15,20 @@ service cloud.firestore {
         return docId == 'current';
       }
 
+      // 키 목록은 PlayerSaveDocument 의 메타 5 + 슬롯 10 과 같아야 한다.
+      // 클라 쓰기는 SetOptions.Overwrite 라 문서 전체가 매번 이 목록으로 갈린다.
       function isValidSave() {
         return request.resource.data.keys().hasOnly([
-          'schemaVersion', 'revision', 'payload', 'payloadHash',
-          'updatedAt', 'deviceId', 'appVersion'
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
+          'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion'
         ]) &&
         request.resource.data.schemaVersion is int &&
         request.resource.data.schemaVersion > 0 &&
         request.resource.data.revision is int &&
-        request.resource.data.payload is string &&
-        request.resource.data.payload.size() <= 300000 &&
-        request.resource.data.payloadHash is string &&
-        request.resource.data.payloadHash.size() == 16 &&
         request.resource.data.deviceId is string &&
         request.resource.data.deviceId.size() == 32 &&
         request.resource.data.appVersion is string &&
