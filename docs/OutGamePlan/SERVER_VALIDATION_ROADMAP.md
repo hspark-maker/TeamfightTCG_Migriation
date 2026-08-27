@@ -177,7 +177,7 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
     `999999` 로 만들면 영구 고착되고 룰 층에 복구 경로가 없다 → `create` 는 현재 버전과
     정확히 같을 것을 요구. **`UserSaveData.VERSION` 을 올리면 이 줄도 같이 올려야 한다**
     (안 올리면 신규 계정만 못 만들어지는 부분 고장 — 회귀 테스트 `8b` 가 잡는다)
-- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **31케이스**, 전부 통과.
+- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **33케이스**, 전부 통과.
       요구된 3종(남의 uid 읽기 / revision 건너뛰기 / 정상 왕복) 포함.
       포트 8081 · 프로젝트 `tcg-rules-test` 로 갈라 루트 에뮬레이터(8080)와 안 부딪힌다.
       룰은 `initializeTestEnvironment` 가 `.prod` 를 직접 주입하므로 `firebase.json` 포인터와 무관하다.
@@ -224,6 +224,21 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
   `OutgameDebugActions.GrantCurrency`(**`#if UNITY_EDITOR` 가드 없음**) · `CardGrowthManager.DebugMaxAll` ·
   `OwnershipManager.GrantEntireCatalog` · `RankManager.SetTierForDebug` ·
   `TournamentProgress.ResetForDebug` · `UnlockAllCardsButton`
+
+**실클라 × 닫힌 룰 검증 — update 통과, create 미검증**
+
+닫힌 룰을 에뮬레이터에 걸고 Unity 클라를 붙였다. 기존 문서 채택 → 저장 2회 → revision 4,
+**룰 거부 0건**. `deck`·`tutorial`·`cardGrowth` 상한도 실제 문서에서 안 걸렸다.
+
+`create` 는 못 봤다. 문서를 지우고 재부트하면 **Unity Firestore 네이티브 클라이언트가
+에디터 2회차 Play 에서 "client is offline" 을 뱉는다**(네이티브 인스턴스가 도메인 리로드를
+넘어 살아남는다). 룰 문제가 아니라 에디터 완전 재시작이 필요한 항목이다. 여기에
+커밋 `c556b6a2d` 의 단발 `ReadAsync`(재시도의 주체는 복구 화면의 사람)가 겹쳐,
+이 일시적으로 보이는 조건이 첫 시도에 곧바로 부트 실패로 간다 — 설계 의도와는 일치하지만
+에디터 반복 Play 루프에서는 매번 걸린다.
+
+**그래서 `create` 는 하네스가 유일한 방어선이다.** 실클라가 만드는 첫 문서 모양을 그대로
+픽스처로 떠서 `14`·`14c`·`14d` 로 덮었다(빈 성장 map · 빈 덱 슬롯 · profile 3필드 null).
 
 **룰 진실원이 `firestore.rules` 하나로 통일됐다(2026-08-27).** `firestore.rules.prod` 는 삭제했다.
 

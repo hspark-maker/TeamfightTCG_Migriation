@@ -213,11 +213,31 @@ test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 �
 
 // --- 14. 신규 계정 방어 -----------------------------------------------------
 
+// 신규 계정의 첫 문서(create 경로). 픽스처는 에뮬레이터에 Unity 클라를 붙여 캡처한 모양이다.
+//
+// 이 경로는 실클라로 검증하지 못했다 — 문서를 지우고 재부트하면 Unity Firestore 네이티브
+// 클라이언트가 에디터 2회차 Play 에서 "client is offline" 을 뱉어(도메인 리로드를 넘어
+// 살아남는다) 부트가 룰까지 가지도 못한다. 에디터 완전 재시작이 필요하다.
+// 그래서 create 는 여기가 유일한 방어선이다.
+//
 // ProfileSaveData 의 nickname/avatarId/frameId 가 null 인 건 실수가 아니라 설계다 —
 // 기본 id 를 세이브에 굳히지 않으려는 것이고, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다.
-// 그러니 룰에서 'profile.nickname is string' 으로 조이면 안 된다. 신규 유저가 첫 저장부터 막힌다.
-test('14. profile 3필드가 null 인 신규 계정 첫 업로드는 통과', async () => {
+// 룰에서 'profile.nickname is string' 으로 조이면 신규 유저가 첫 저장부터 막힌다.
+test('14. 신규 계정 첫 문서로 create 가 통과한다 (profile 3필드 null)', async () => {
   await assertSucceeds(setDoc(doc(authed(), savePath()), freshAccountDocument()));
+});
+
+// 신규 계정은 성장 항목이 아직 없다 — 기본값 이하 항목은 저장에서 빠져 빈 map 으로 나간다.
+// 룰이 'cardGrowth is map' 만 보므로 통과해야 한다. 여기가 막히면 신규 계정이 전부 막힌다.
+test('14c. 빈 성장 map · 빈 덱 슬롯도 통과', async () => {
+  const t_doc = freshAccountDocument();
+  await assertSucceeds(setDoc(doc(authed(), savePath()), t_doc));
+});
+
+// create 로 들어온 문서가 이어서 update 되는지까지 봐야 신규 계정 한 바퀴가 닫힌다.
+test('14d. 신규 계정 create 직후 update 가 이어진다', async () => {
+  await assertSucceeds(setDoc(doc(authed(), savePath()), freshAccountDocument()));
+  await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });
 
 // 슬롯 '안쪽'의 null 은 허용하고(위 14), 슬롯 '자체'의 null 은 거부한다.
