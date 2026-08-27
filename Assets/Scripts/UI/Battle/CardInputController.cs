@@ -523,14 +523,13 @@ public class CardInputController
             SynergyBadgeView t_badge = FindBadgeAt(this.touchStartScreenPos);
             if (t_badge != null && t_badge.Synergy != null)
             {
-                UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
-                {
-                    synergy        = t_badge.Synergy,
-                    hasWorldAnchor = true,                       // 배지는 월드 스페이스라 RectTransform이 없다
-                    worldAnchor    = t_badge.transform.position,
-                    worldHalfWidth = BadgeHalfWidth(t_badge),
-                    ownedCount     = OwnedCountOf(t_badge.Synergy),
-                });
+                ExplainPopupData t_data = ExplainPopupData.ForSynergy(
+                    t_badge.Synergy, OwnedCountOf(t_badge.Synergy));
+                t_data.hasWorldAnchor = true;                    // 배지는 월드 스페이스라 RectTransform이 없다
+                t_data.worldAnchor    = t_badge.transform.position;
+                t_data.worldHalfWidth = BadgeHalfWidth(t_badge);
+
+                UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(t_data);
                 this.longPressSynergyShown = true;
             }
             else
@@ -630,7 +629,7 @@ public class CardInputController
     {
         // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
         if (this.longPressFired && this.longPressSynergyShown)
-            UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+            UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
 
         // 팝업이 뜨기 전에 취소돼도(= 다 누르지 못하고 뗌·드래그) 차오르던 배경은 반드시 지운다.
         if (this.longPressDimShown || (this.longPressFired && !this.longPressSynergyShown))

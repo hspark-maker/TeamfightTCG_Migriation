@@ -91,12 +91,12 @@ public static class SynergyIconStrip
 
     static void Show(SynergyData _synergy, RectTransform _iconRect)
     {
-        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
-        {
-            synergy  = _synergy,
-            iconRect = _iconRect,
-        });
+        ExplainPopupData t_data = ExplainPopupData.ForSynergy(_synergy);
+        if (t_data == null) return;
+
+        t_data.iconRect = _iconRect;
+        UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(t_data);
     }
 
-    static void Hide() => UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+    static void Hide() => UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
 }

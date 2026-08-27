@@ -20,6 +20,7 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
+    "/scripts/**/*", // 배포되지 않는 1회성 운영 스크립트(plain Node, tsconfig 밖).
   ],
   plugins: [
     "@typescript-eslint",
@@ -31,5 +32,7 @@ module.exports = {
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2],
+    "max-len": "off",
+    "require-jsdoc": "off",
   },
 };

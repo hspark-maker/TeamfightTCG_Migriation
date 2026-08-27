@@ -18,6 +18,11 @@ public partial class ReleaseManagerWindow
     Vector2 dataScroll;
     bool dataRulesOpen;
     bool dataRulesKnown;
+    string adminEmail;
+    string adminPassword = string.Empty;
+    string adminAuthError;
+    bool adminOAuthOpen;
+    bool adminPasswordOpen;
 
     void EnableDataTab()
     {
@@ -38,6 +43,7 @@ public partial class ReleaseManagerWindow
 
         Header("Firestore 데이터 관리");
         DrawRulesState();
+        DrawAdminAuth();
 
         EditorGUILayout.HelpBox(
             "SpecData 표를 Firestore의 환경별 문서로 업로드한다. 이 탭은 앞으로 데이터 배포·검수 기능의 단일 진입점으로 사용한다.",
@@ -83,6 +89,91 @@ public partial class ReleaseManagerWindow
         }
 
         EditorGUILayout.EndScrollView();
+    }
+
+    /// <summary>관리자 로그인 칸. 운영 규칙이 스펙 쓰기를 admin 클레임에만 허용하므로
+    /// 업로드 전에 여기서 로그인해야 한다. 비밀번호는 저장하지 않고, 토큰은 유니티 세션 동안만 산다.</summary>
+    void DrawAdminAuth()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("관리자 로그인", EditorStyles.boldLabel);
+
+        if (SpecAdminAuth.IsSignedIn)
+        {
+            if (SpecAdminAuth.HasAdminClaim)
+            {
+                EditorGUILayout.HelpBox($"{SpecAdminAuth.SignedInEmail} (admin) 로 로그인됨.", MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    $"{SpecAdminAuth.SignedInEmail} 로 로그인했지만 admin 클레임이 없다. " +
+                    "이 계정으로는 스펙을 쓸 수 없다 — functions/scripts/grant-admin.js 로 클레임을 부여한 뒤 " +
+                    "다시 로그인할 것(토큰에 클레임이 박히므로 재로그인이 필요하다).",
+                    MessageType.Error);
+            }
+
+            if (GUILayout.Button("로그아웃"))
+            {
+                SpecAdminAuth.SignOut();
+                this.adminPassword = string.Empty;
+                this.adminAuthError = null;
+            }
+            return;
+        }
+
+        using (new EditorGUI.DisabledScope(!GoogleOAuthSignIn.IsConfigured))
+        {
+            if (GUILayout.Button("구글 계정으로 로그인", GUILayout.Height(28)))
+            {
+                bool t_ok = SpecAdminAuth.TrySignInWithGoogle(out string t_error);
+                this.adminAuthError = t_ok ? null : t_error;
+                if (t_ok && !SpecAdminAuth.HasAdminClaim)
+                    this.adminAuthError = "로그인은 됐지만 admin 클레임이 없다.";
+            }
+        }
+
+        this.adminOAuthOpen = EditorGUILayout.Foldout(this.adminOAuthOpen, "구글 OAuth 클라이언트 설정", true);
+        if (this.adminOAuthOpen)
+        {
+            EditorGUILayout.HelpBox(
+                "Google Cloud 콘솔 > API 및 서비스 > 사용자 인증 정보에서 '데스크톱 앱' 유형 OAuth 클라이언트를 " +
+                "만들고 그 값을 넣는다. 리다이렉트는 루프백을 자동으로 쓰므로 따로 등록할 필요가 없다. " +
+                "이 값은 EditorPrefs에만 저장되고 저장소에는 들어가지 않는다.",
+                MessageType.Info);
+
+            string t_clientId = EditorGUILayout.TextField("클라이언트 ID", GoogleOAuthSignIn.ClientId);
+            if (t_clientId != GoogleOAuthSignIn.ClientId) GoogleOAuthSignIn.ClientId = t_clientId;
+
+            string t_clientSecret = EditorGUILayout.PasswordField("클라이언트 보안 비밀", GoogleOAuthSignIn.ClientSecret);
+            if (t_clientSecret != GoogleOAuthSignIn.ClientSecret) GoogleOAuthSignIn.ClientSecret = t_clientSecret;
+        }
+
+        EditorGUILayout.Space();
+        this.adminPasswordOpen = EditorGUILayout.Foldout(this.adminPasswordOpen, "이메일·비밀번호로 로그인", true);
+        if (this.adminPasswordOpen)
+        {
+            this.adminEmail ??= SpecAdminAuth.LastEmail;
+            this.adminEmail = EditorGUILayout.TextField("이메일", this.adminEmail);
+            this.adminPassword = EditorGUILayout.PasswordField("비밀번호", this.adminPassword);
+
+            if (GUILayout.Button("로그인"))
+            {
+                bool t_ok = SpecAdminAuth.TrySignIn(this.adminEmail, this.adminPassword, out string t_error);
+                this.adminAuthError = t_ok ? null : t_error;
+                // 성공하든 실패하든 비밀번호는 메모리에 남기지 않는다.
+                this.adminPassword = string.Empty;
+                if (t_ok && !SpecAdminAuth.HasAdminClaim)
+                    this.adminAuthError = "로그인은 됐지만 admin 클레임이 없다.";
+            }
+        }
+
+        if (!string.IsNullOrEmpty(this.adminAuthError))
+            EditorGUILayout.HelpBox(this.adminAuthError, MessageType.Error);
+        else if (!GoogleOAuthSignIn.IsConfigured)
+            EditorGUILayout.HelpBox("구글 OAuth 클라이언트 ID를 넣으면 구글 로그인을 쓸 수 있다.", MessageType.Warning);
+        else
+            EditorGUILayout.HelpBox("스펙 업로드에는 admin 클레임을 가진 계정 로그인이 필요하다.", MessageType.Warning);
     }
 
     void DrawRulesState()
@@ -168,6 +259,8 @@ public partial class ReleaseManagerWindow
     string DataUploadBlocker(bool _hasEnv, string _envError)
     {
         if (!_hasEnv) return _envError;
+        if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요하다.";
+        if (!SpecAdminAuth.HasAdminClaim) return "로그인한 계정에 admin 클레임이 없어 스펙을 쓸 수 없다.";
         if (!string.IsNullOrEmpty(this.dataLoadError)) return "표 목록을 먼저 정상적으로 읽어야 한다.";
         if (this.dataSelected.Count == 0) return "업로드할 표를 하나 이상 선택해야 한다.";
         if (this.issues == null) return "콘텐츠 검증을 먼저 실행해야 한다.";

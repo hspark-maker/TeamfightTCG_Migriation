@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -61,6 +62,17 @@ public class NetworkGameController : MonoBehaviour
     ulong remoteStateHash;
     bool  hasRemoteStateHash;
     int   remoteStateHashSeq;
+    ulong lastAgreedStateHash;
+    ulong stateHashChain = 14695981039346656037UL;
+    ulong stateHashChainPrev = 14695981039346656037UL;
+    int stateHashChainLength;
+
+    public string LocalDeckHash { get; private set; }
+    public string OpponentDeckHash { get; private set; }
+    public ulong FinalStateHash => this.lastAgreedStateHash;
+    public ulong StateHashChain => this.stateHashChain;
+    public ulong StateHashChainPrev => this.stateHashChainPrev;
+    public int StateHashChainLength => this.stateHashChainLength;
 
     void Awake()
     {
@@ -72,6 +84,12 @@ public class NetworkGameController : MonoBehaviour
     void InitializeInstance()
     {
         Instance = this;
+        this.LocalDeckHash = string.Empty;
+        this.OpponentDeckHash = string.Empty;
+        this.lastAgreedStateHash = 0UL;
+        this.stateHashChain = 14695981039346656037UL;
+        this.stateHashChainPrev = 14695981039346656037UL;
+        this.stateHashChainLength = 0;
     }
 
     void ResolveLocalOwnerIndex()
@@ -208,6 +226,7 @@ public class NetworkGameController : MonoBehaviour
                         t_growth[i] = new CardGrowth(t_level, t_hpBonus, t_evolution,
                                                      t_keywords, t_synergyRaw == 1);
                     }
+                    this.OpponentDeckHash = ComputeDeckHash(t_ids, t_growth);
                     var t_opponent = new MatchGrowthOpponent(
                         t_ownerIdx, _sender.ToString(), ResolveStablePlayerId(_sender));
                     MultiplayerTurnRunner.Instance?.OnInitialDeckReceived(t_opponent, t_ids, t_growth);
@@ -341,6 +360,7 @@ public class NetworkGameController : MonoBehaviour
             Debug.LogError("[Net] InitialDeck 송신 차단: 유효한 전투 데이터 지문이 없습니다.");
             return false;
         }
+        this.LocalDeckHash = ComputeDeckHash(_cardIds, _growth);
         byte[] t_msg   = new byte[9 + CONTENT_FINGERPRINT_BYTES + t_count * 24];
         t_msg[0] = (byte)MsgType.InitialDeck;
         WriteInt(t_msg, 1, _ownerIndex);
@@ -389,6 +409,25 @@ public class NetworkGameController : MonoBehaviour
         var t_builder = new System.Text.StringBuilder(_bytes.Length * 2);
         foreach (byte t_byte in _bytes) t_builder.Append(t_byte.ToString("x2"));
         return t_builder.ToString();
+    }
+
+    static string ComputeDeckHash(int[] _cardIds, CardGrowth[] _growth)
+    {
+        int t_count = _cardIds?.Length ?? 0;
+        byte[] t_bytes = new byte[4 + t_count * 24];
+        WriteInt(t_bytes, 0, t_count);
+        for (int i = 0; i < t_count; i++)
+        {
+            int t_entry = 4 + i * 24;
+            WriteInt(t_bytes, t_entry, _cardIds[i]);
+            WriteInt(t_bytes, t_entry + 4, _growth[i].Level);
+            WriteInt(t_bytes, t_entry + 8, _growth[i].HpBonus);
+            WriteInt(t_bytes, t_entry + 12, _growth[i].EvolutionStage);
+            WriteInt(t_bytes, t_entry + 16, (int)_growth[i].UnlockedKeywords);
+            WriteInt(t_bytes, t_entry + 20, _growth[i].SynergyUnlocked ? 1 : 0);
+        }
+        using (SHA256 t_sha = SHA256.Create())
+            return FingerprintHex(t_sha.ComputeHash(t_bytes));
     }
 
     static bool ContentFingerprintMatches(byte[] _remote)
@@ -562,11 +601,35 @@ public class NetworkGameController : MonoBehaviour
         if (this.remoteStateHash == 0UL) return;   // 상대가 지문을 못 맡겼다(센티널)
 
         this.hasRemoteStateHash = false;
-        if (this.remoteStateHash == this.stagedStateHash) return;
+        AppendStateProof(this.stagedStateHashSeq, this.stagedStateHash);
+        if (this.remoteStateHash == this.stagedStateHash)
+        {
+            this.lastAgreedStateHash = this.stagedStateHash;
+            return;
+        }
 
         Debug.LogError($"[Hash] **상태 불일치** seq={this.stagedStateHashSeq} " +
                        $"local=0x{this.stagedStateHash:X16} remote=0x{this.remoteStateHash:X16}\n" +
                        $"  로컬 상태: {this.stagedStateDump}");
+    }
+
+    void AppendStateProof(int _seq, ulong _hash)
+    {
+        unchecked
+        {
+            this.stateHashChainPrev = this.stateHashChain;
+            for (int t_shift = 0; t_shift < 32; t_shift += 8)
+            {
+                this.stateHashChain ^= (byte)(_seq >> t_shift);
+                this.stateHashChain *= 1099511628211UL;
+            }
+            for (int t_shift = 0; t_shift < 64; t_shift += 8)
+            {
+                this.stateHashChain ^= (byte)(_hash >> t_shift);
+                this.stateHashChain *= 1099511628211UL;
+            }
+            this.stateHashChainLength++;
+        }
     }
 
     /// <summary>이번 배리어를 닫는다. 다음 배리어의 지문이 이미 도착해 있을 수 있으므로

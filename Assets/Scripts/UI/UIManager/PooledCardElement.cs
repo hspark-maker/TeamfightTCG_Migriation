@@ -23,7 +23,7 @@ public class PooledCardElement : PooledUIBase
     [SerializeField] KeywordIconConfig keywordIconConfig;
 
     [Header("Synergy Icons")]
-    // 카드 정보 창의 시너지 아이콘 줄. 아이콘을 누르면 SynergyExplainPopupUI가 뜬다.
+    // 카드 정보 창의 시너지 아이콘 줄. 아이콘을 누르면 ExplainPopupUI가 뜬다.
     [SerializeField] Transform synergyIconRoot;
     [SerializeField] GameObject synergyIconPrefab;
 

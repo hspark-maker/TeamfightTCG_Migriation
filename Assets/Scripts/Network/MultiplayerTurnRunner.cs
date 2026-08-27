@@ -34,7 +34,11 @@ public class MultiplayerTurnRunner : MonoBehaviour
     bool   seedCommitReceived;
     bool   seedRevealReceived;
     byte[] opponentCommit;
+    byte[] myNonce;
     byte[] opponentNonce;
+
+    public byte[] MyNonce => this.myNonce;
+    public byte[] OpponentNonce => this.opponentNonce;
 
     // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
     // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
@@ -360,15 +364,15 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// </summary>
     async UniTask<bool> SyncMatchSeed()
     {
-        byte[] t_myNonce  = MatchRandom.NewNonce();
-        byte[] t_myCommit = MatchRandom.Hash(t_myNonce);
+        this.myNonce = MatchRandom.NewNonce();
+        byte[] t_myCommit = MatchRandom.Hash(this.myNonce);
 
         NetworkGameController.Instance?.SendSeedCommit(t_myCommit);
         await AwaitInitStep(WaitOpponentCommit(), "시드 commit");
         if (InitAborted) return false;
 
         // 상대 commit 확보 후에야 내 nonce 공개
-        NetworkGameController.Instance?.SendSeedReveal(t_myNonce);
+        NetworkGameController.Instance?.SendSeedReveal(this.myNonce);
         await AwaitInitStep(WaitOpponentReveal(), "시드 reveal");
         if (InitAborted) return false;
 
@@ -382,7 +386,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
             return false;
         }
 
-        ulong t_seed = MatchRandom.ReadU64(t_myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
+        ulong t_seed = MatchRandom.ReadU64(this.myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
         MatchRandom.Seed(t_seed);
         return true;
     }
@@ -408,6 +412,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.seedCommitReceived = false;
         this.seedRevealReceived = false;
         this.opponentCommit     = null;
+        this.myNonce            = null;
         this.opponentNonce      = null;
     }
 

@@ -126,7 +126,7 @@ public class FieldSynergyPanel : MonoBehaviour
     /// **그 시너지를 가진 이 필드 카드들이 확대**된다. 손을 떼면 둘 다 원복 —
     /// 토글이면 닫는 걸 잊은 채 판이 진행돼 확대된 카드가 계속 남는다.
     ///
-    /// 팝업·확대 둘 다 기존 기능을 그대로 부른다: 카드 배지 롱프레스가 쓰는 <see cref="SynergyExplainPopupUI"/>와
+    /// 팝업·확대 둘 다 기존 기능을 그대로 부른다: 카드 배지 롱프레스가 쓰는 <see cref="ExplainPopupUI"/>와
     /// 드래그 조준이 쓰는 <see cref="CardView.SetTargetFocus"/>. 여기서 새 연출을 만들지 마라 —
     /// 같은 정보가 경로마다 다르게 보이면 어느 쪽이 맞는지 알 수 없다.</summary>
     void OnIconPressed(SynergyIconView _icon)
@@ -136,12 +136,12 @@ public class FieldSynergyPanel : MonoBehaviour
         Deselect();
         this.selected = _icon.Synergy;
 
-        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
+        ExplainPopupData t_data = ExplainPopupData.ForSynergy(_icon.Synergy, _icon.OwnedCount);
+        if (t_data != null)
         {
-            synergy    = _icon.Synergy,
-            iconRect   = (RectTransform)_icon.transform,   // uGUI 아이콘이라 월드 앵커가 아니라 이쪽
-            ownedCount = _icon.OwnedCount,
-        });
+            t_data.iconRect = (RectTransform)_icon.transform;   // uGUI 아이콘이라 월드 앵커가 아니라 이쪽
+            UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(t_data);
+        }
 
         SetFocus(this.selected, true);
     }
@@ -156,7 +156,7 @@ public class FieldSynergyPanel : MonoBehaviour
 
         SetFocus(this.selected, false);
         this.selected = null;
-        UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+        UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
     }
 
     /// <summary>이 필드에서 그 시너지 소속인 라이브 카드의 뷰를 켜고 끈다.

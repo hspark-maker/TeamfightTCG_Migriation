@@ -28,19 +28,13 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/KeywordExplain.prefab
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/ExplainPopup.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
     m_Address: Assets/Prefabs/UI/SimpleYNPopup.prefab
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 29f233bc9c3458e45a4e649c6185bbc1
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/SynergyExplain.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

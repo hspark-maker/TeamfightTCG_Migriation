@@ -94,6 +94,7 @@ public class GameManager : MonoBehaviour
             FirebaseManager.Register(new CallableFirebaseModule(t_emulators.FunctionsOrigin));
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
+            FirebaseManager.Register(new MatchResultFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);
             FirebaseManager.Initialize(t_profile.CloudEnvId, t_emulators);
         }

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -83,6 +84,21 @@ public static class SpecFirestoreUploader
     public static string Upload(string _envId, string _table, out string _error)
     {
         _error = null;
+
+        // 표를 스냅샷으로 뜨는 비용을 치르기 전에 자격부터 본다. 여기서 막지 않으면
+        // 수십 초 걸리는 준비를 다 하고 첫 요청에서 403으로 죽는다.
+        if (!SpecAdminAuth.IsSignedIn)
+        {
+            _error = "관리자 로그인이 필요하다. 데이터 탭에서 로그인한 뒤 다시 시도할 것.";
+            return null;
+        }
+
+        if (!SpecAdminAuth.HasAdminClaim)
+        {
+            _error = $"'{SpecAdminAuth.SignedInEmail}' 계정에 admin 클레임이 없다. " +
+                     "스펙 쓰기는 규칙에서 거부된다 — functions/scripts/grant-admin.js 로 클레임을 부여할 것.";
+            return null;
+        }
 
         if (!TryReadFirebaseConfig(out string t_projectId, out string t_apiKey, out _error)) return null;
         if (!TryLoadManager(out object t_manager, out _error)) return null;
@@ -532,7 +548,12 @@ public static class SpecFirestoreUploader
         _error = null;
         try
         {
+            // 운영 규칙에서 스펙 문서는 admin 클레임을 가진 계정만 쓸 수 있고 읽기도 로그인이 필요하다.
+            // API key는 프로젝트를 가리킬 뿐 신원이 아니라, 모든 요청에 ID 토큰을 함께 싣는다.
+            if (!SpecAdminAuth.TryGetIdToken(out string t_idToken, out _error)) return false;
+
             using var t_request = new HttpRequestMessage(_method, _url);
+            t_request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", t_idToken);
             if (_body != null) t_request.Content = new StringContent(_body, Encoding.UTF8, "application/json");
             using HttpResponseMessage t_response = _client.SendAsync(t_request).GetAwaiter().GetResult();
             _status = t_response.StatusCode;
@@ -564,7 +585,9 @@ public static class SpecFirestoreUploader
         "projects/" + _projectId + "/databases/" + FirebaseRootPath.DatabaseId + "/documents/" + FirebaseRootPath.Environment(_envId) +
         "/" + SPEC_COLLECTION + "/" + _table;
 
-    static bool TryReadFirebaseConfig(out string _projectId, out string _apiKey, out string _error)
+    /// <summary>google-services.json에서 프로젝트·API key를 읽는다.
+    /// <see cref="SpecAdminAuth"/>가 로그인에 같은 API key를 써야 해서 internal이다.</summary>
+    internal static bool TryReadFirebaseConfig(out string _projectId, out string _apiKey, out string _error)
     {
         _projectId = null;
         _apiKey = null;

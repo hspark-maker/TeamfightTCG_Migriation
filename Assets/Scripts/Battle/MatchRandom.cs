@@ -14,9 +14,11 @@ using System.Security.Cryptography;
 public static class MatchRandom
 {
     static ulong s_state;
+    static ulong s_initialSeed;
     static bool  s_seeded;
 
     public static bool IsSeeded => s_seeded;
+    public static ulong InitialSeed => s_initialSeed;
 
     /// <summary>스트림 전진 횟수. Range(n)은 n&lt;=1이면 전진하지 않으므로 이 값이 곧 '실제 소비 횟수'.
     /// 양 클라가 같은 시점에 같은 값이어야 함 — 어긋나면 그 순간부터 영구 divergence.
@@ -25,6 +27,7 @@ public static class MatchRandom
 
     public static void Seed(ulong _seed)
     {
+        s_initialSeed = _seed;
         s_state   = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;  // 0-state 회피
         s_seeded  = true;
         DrawCount = 0;
@@ -36,6 +39,7 @@ public static class MatchRandom
     public static void Reset()
     {
         s_state   = 0;
+        s_initialSeed = 0;
         s_seeded  = false;
         DrawCount = 0;
     }
