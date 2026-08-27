@@ -177,7 +177,7 @@ public static class TutorialStepExecutor
     {
         _context.CommitAdvance();
 
-        // ⚠ 이 스텝은 앵커가 없어 되돌리면(Halt) 이 부트에서 다시 세울 신호가 없다 —
+        // ⚠ 이 스텝은 앵커가 없어 되돌리면(Halt) 이 초기화에서 다시 세울 신호가 없다 —
         //   덱은 유저가 직접 만들 수 있으니 저작은 Skip으로 두는 편이 낫다.
         if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.PlayerDeckIds, out List<int> t_cards))
             return Fail(_step, _context, $"시나리오 미배선 또는 덱이 {DeckSaveManager.DECK_SIZE}장을 이루지 못함");

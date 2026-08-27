@@ -124,7 +124,7 @@ public class ProfileEditPanel : PooledUIBase
         this.transition.HandleDisabled(this.ResolveTarget());
     }
 
-    // 아바타·프레임 칸을 한 번에 세운다. 설정이 아직 없으면(부트 배선 전) 조용히 비운다 — 씬이 죽지 않게.
+    // 아바타·프레임 칸을 한 번에 세운다. 설정이 아직 없으면(초기화 배선 전) 조용히 비운다 — 씬이 죽지 않게.
     void Build()
     {
         this.m_avatarCells.Clear();
@@ -133,7 +133,7 @@ public class ProfileEditPanel : PooledUIBase
         this.ClearContent(this.avatarContent);
         this.ClearContent(this.frameContent);
 
-        // 부트 배선 전이면 빈 그리드로 두고 조용히 넘어간다 — 씬이 죽지 않게.
+        // 초기화 배선 전이면 빈 그리드로 두고 조용히 넘어간다 — 씬이 죽지 않게.
         var t_config = ProfileManager.Config;
         if (t_config == null || this.cellPrefab == null) return;
 

@@ -10,7 +10,7 @@ internal static class AlbumValidator
     {
         if (!CardCatalog.IsReady)
         {
-            Debug.LogWarning("[CardAlbum] CardCatalog 미준비 — 앨범 검증을 생략한다(부트 순서 확인).");
+            Debug.LogWarning("[CardAlbum] CardCatalog 미준비 — 앨범 검증을 생략한다(초기화 순서 확인).");
             return;
         }
 

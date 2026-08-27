@@ -220,7 +220,7 @@ public class KeywordDemoStage : SingletonOverlayBase
     {
         if (_view == null) return;
 
-        _view.InitializeAnimator();   // 부트스트랩(GameInitializer)이 없는 씬이라 직접 깨운다
+        _view.InitializeAnimator();   // 초기화(GameInitializer)이 없는 씬이라 직접 깨운다
         _view.Render(new CardInstance(_data, _owner) { isRevealed = true, slotIndex = _slot });
     }
 

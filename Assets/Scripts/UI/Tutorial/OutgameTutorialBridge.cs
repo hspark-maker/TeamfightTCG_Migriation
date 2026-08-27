@@ -68,7 +68,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         Subscribe();          // 타깃이 나중에 등장하는 경우를 기다린다(구독은 스텝 진입 전에).
 
-        // 부트 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
+        // 초기화 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
         ApplyCurrentStep();
     }
 

@@ -17,7 +17,7 @@ public static class TournamentSpec
         return !string.IsNullOrEmpty(_ownerKey) && s_rewards.TryGetValue(_ownerKey, out _rewards);
     }
 
-    // 부트에서 1회. 맵 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
+    // 초기화에서 1회. 맵 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
     static void EnsureLoaded()

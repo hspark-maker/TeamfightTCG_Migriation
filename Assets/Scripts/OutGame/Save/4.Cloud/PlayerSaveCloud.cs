@@ -5,8 +5,8 @@ using Cysharp.Threading.Tasks;
 using Firebase.Firestore;
 using UnityEngine;
 
-// 아웃게임 세이브의 클라우드 창구. 원격 문서 채택과 업로드를 모두 여기서 한다.
-// 채택은 부트당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
+// 아웃게임 세이브의 클라우드 창구. 초기화 채택(원격 → 캐시 폴백)과 업로드를 모두 여기서 한다.
+// 채택은 초기화당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
 static class PlayerSaveCloud
 {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -364,8 +364,8 @@ static class PlayerSaveCloud
     static void ResetTestRuntimeState() => s_disabledForTestAccountSession = false;
 #endif
 
-    // 채택 경로의 예외를 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
-    // InitializationInstaller가 로딩 화면에서 타임아웃까지 돈다.
+    // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
+    // 부트 초기화(InitializationRunner)가 로딩 화면에서 타임아웃까지 돈다.
     static async UniTaskVoid LoadAsync(int _generation)
     {
         try
@@ -554,7 +554,7 @@ static class PlayerSaveCloud
         Debug.LogWarning($"[PlayerSaveCloud] {_message}");
     }
 
-    // 부트 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
+    // 초기화 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
     static void Fail(string _message)
     {
         LastError = _message;

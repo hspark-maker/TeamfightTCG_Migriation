@@ -140,7 +140,7 @@ Assets/Scripts/
 │   │             MatchRandom.cs ··········· 결정론 RNG + commit-reveal
 │   │             HealerEffect.cs ·········· 힐러 (TurnEvents 구독자)
 │   │
-│   └── [부트]    GameInitializer.cs ······· BattleScene 부트스트랩
+│   └── [초기화]    GameInitializer.cs ······· BattleScene 초기화
 │                 BattleIntro.cs ··········· 인트로 연출
 │                 BattleCleanup.cs ········· static 상태 정리
 │                 DeckConfig.cs ············ 선택 덱 + 멀티 플래그
@@ -218,14 +218,14 @@ Assets/Scripts/
                            │                  │
                            ▼                  ▼
       ┌────────────────── BattleScene ──────────────────┐
-      │   부트스트랩 ──▶ 턴 루프 ──▶ 승패 판정          │
+      │   초기화 ──▶ 턴 루프 ──▶ 승패 판정          │
       └────────────────────┬────────────────────────────┘
                            │ BattleCleanup.LoadScene
                            ▼
                         MainMenu
 ```
 
-### 4.2 BattleScene 부트스트랩 — `GameInitializer.StartBattleAsync()`
+### 4.2 BattleScene 초기화 — `GameInitializer.StartBattleAsync()`
 
 ```
   ┌───────────────────────────────────────────────────────────────┐

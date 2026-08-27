@@ -13,7 +13,7 @@ public class TutorialSaveData
     [FirestoreProperty("chapterStepIndex")] public int ChapterStepIndex { get; set; }
 
     // 서 있는 스텝의 불변 번호(TutorialStepDef.stepId). 0 = 앵커 없음(그때는 위 좌표가 정본이다).
-    // 좌표만으로는 저작이 바뀌면 다른 스텝을 가리키게 된다 — 부트에서 이 번호로 좌표를 되찾는다.
+    // 좌표만으로는 저작이 바뀌면 다른 스텝을 가리키게 된다 — 초기화에서 이 번호로 좌표를 되찾는다.
     [FirestoreProperty("stepId")] public int StepId { get; set; }
 
     // 직전 부팅 때의 진행 좌표와 그 좌표가 이어진 부팅 횟수 — 진행이 막혔는지 판정하는 데만 쓴다.

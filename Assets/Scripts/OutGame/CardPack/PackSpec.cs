@@ -11,7 +11,7 @@ public static class PackSpec
     static readonly Dictionary<string, CardPack> s_packs = new Dictionary<string, CardPack>();
     static readonly Dictionary<string, List<CardPackDrop>> s_drops = new Dictionary<string, List<CardPackDrop>>();
 
-    // 부트에서 1회. 지연 로드도 되지만 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
+    // 초기화에서 1회. 지연 로드도 되지만 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
     public static bool TryGetPack(string _packId, out CardPack _row)
@@ -46,7 +46,7 @@ public static class PackSpec
             if (!s_warnedCatalogNotReady)
             {
                 s_warnedCatalogNotReady = true;
-                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 부팅에서는 InitializationInstaller가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
+                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 부팅에서는 부트 초기화(InitializationRunner)가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
             }
             return t_result;
         }

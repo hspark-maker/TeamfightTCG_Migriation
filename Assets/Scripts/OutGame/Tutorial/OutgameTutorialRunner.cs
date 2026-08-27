@@ -63,8 +63,8 @@ public static class OutgameTutorialRunner
         WarnOnMisauthoredChapters();
     }
 
-    /// <summary>부트가 1회 부르는 재개 정정(EnsureData 이후). 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데
-    /// TutorialConfig가 꺼져 있으면 그 전제를 다시 세울 길이 없다 — 시나리오는 휘발성이라 부트에 사라지고
+    /// <summary>초기화가 1회 부르는 재개 정정(EnsureData 이후). 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데
+    /// TutorialConfig가 꺼져 있으면 그 전제를 다시 세울 길이 없다 — 시나리오는 휘발성이라 초기화에 사라지고
     /// 복원 지점이 없다. 그 자리에 남으면 안내 앵커가 등록되지 않아 영구 정지고, 억지로 이어 붙여도 대본 아닌
     /// 일반 전투가 된다. 그래서 좌표를 전투 진입 스텝으로 되감아 저작된 경로를 처음부터 다시 태운다
     /// (Begin은 그 스텝의 실행자가 부른다). 스캔은 <b>같은 챕터 안</b>으로 한정한다 — 게이트 구간은 그 진입
@@ -93,10 +93,10 @@ public static class OutgameTutorialRunner
 
             Debug.LogWarning($"[OutgameTutorialRunner] 대본 전투 전에 앱이 닫혔습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 진입 스텝 {t_chapter}-{t_i}로 되감습니다.");
 
-            // 부트에서 UI 구독보다 먼저 도는 자리라 OnStepChanged는 쏘지 않는다(들을 구독자가 아직 없다).
+            // 초기화에서 UI 구독보다 먼저 도는 자리라 OnStepChanged는 쏘지 않는다(들을 구독자가 아직 없다).
             OutgameTutorialProgress.CommitStep(t_chapter, t_i);
 
-            // 매 부트 복구가 도는 좌표는 막힌 좌표가 아니다 — 정지 판정을 새 좌표에서 다시 세지 않으면
+            // 매 초기화 복구가 도는 좌표는 막힌 좌표가 아니다 — 정지 판정을 새 좌표에서 다시 세지 않으면
             // 게이트 구간에서 세 번 껐다 켜는 것만으로 fail-open이 오발동한다.
             // 낙인까지 함께 걷는다: 카운터만 0으로 돌리면 이미 선 s_stalled가 남아 이번 세션은 전 기능이 열린 채다.
             OutgameTutorialProgress.ResetStallWatch();
@@ -106,11 +106,11 @@ public static class OutgameTutorialRunner
         }
     }
 
-    /// <summary>세이브가 붙잡아 둔 스텝 번호로 진행 좌표를 되찾는다. 부트에서 <b>EnsureData 직후,
+    /// <summary>세이브가 붙잡아 둔 스텝 번호로 진행 좌표를 되찾는다. 초기화에서 <b>EnsureData 직후,
     /// RewindToPendingBattleEntry 직전</b>에 1회 부른다 — 되감기는 현재 좌표에서 같은 챕터를
     /// 역방향으로 훑으므로, 좌표가 낡은 채로 그쪽이 먼저 돌면 엉뚱한 챕터를 뒤진다.
     ///
-    /// 세션 가드를 두지 않는 이유는 필요가 없어서다 — 호출처가 부트 1곳뿐이고, 좌표가 이미 맞으면
+    /// 세션 가드를 두지 않는 이유는 필요가 없어서다 — 호출처가 초기화 1곳뿐이고, 좌표가 이미 맞으면
     /// 조기 반환이라 어디서 다시 불려도 무해하다.</summary>
     public static void ResolveProgressAnchor()
     {
@@ -159,7 +159,7 @@ public static class OutgameTutorialRunner
         OutgameTutorialProgress.CommitStep(t_chapter, t_step);   // 좌표는 그대로, 앵커만 채워진다
     }
 
-    // 번호로 좌표 찾기. 33칸을 부트에 한 번 훑을 뿐이라 사전도 캐시도 만들지 않는다.
+    // 번호로 좌표 찾기. 33칸을 초기화에 한 번 훑을 뿐이라 사전도 캐시도 만들지 않는다.
     // 번호가 겹치면 먼저 나온 칸이 이긴다(CardCatalog.SetSource와 같은 규칙).
     static bool TryFindStepId(int _id, out int _chapter, out int _step)
     {
@@ -418,13 +418,13 @@ public static class OutgameTutorialRunner
             }
 
             // Halt는 좌표를 되돌려 재시도를 노리는 정책인데, 앵커도 완료 신호도 없는 스텝은
-            // 되돌려 봐야 이 부트에서 다시 세울 수단이 없다 — 그 자리에서 안내가 끝난다.
+            // 되돌려 봐야 이 초기화에서 다시 세울 수단이 없다 — 그 자리에서 안내가 끝난다.
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
             {
                 if (!t_chapter.TryGetStep(t_s, out var t_def) || t_def.OnFailure != EOutgameTutorialFailure.Halt) continue;
                 if (t_def.Anchor != EOutgameTutorialAnchor.None || t_def.Completion != EOutgameTutorialCompletion.Auto) continue;
 
-                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {i}-{t_s}({t_def.Action})가 Halt인데 앵커도 완료 신호도 없습니다 — 되돌려도 이 부트에서 재개할 수단이 없습니다.");
+                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {i}-{t_s}({t_def.Action})가 Halt인데 앵커도 완료 신호도 없습니다 — 되돌려도 이 초기화에서 재개할 수단이 없습니다.");
             }
 
             // 마지막 챕터는 면제한다 — 그 끝은 다음 챕터로의 인계가 아니라 졸업이라 씬을 떠날 이유가 없다.
@@ -439,7 +439,7 @@ public static class OutgameTutorialRunner
     }
 
 #if UNITY_EDITOR
-    // 세이브 앵커가 성립하지 않는 저작을 부트에서 소리내어 잡는다. 부여 도구는 사람이 눌러야 도는데,
+    // 세이브 앵커가 성립하지 않는 저작을 초기화에서 소리내어 잡는다. 부여 도구는 사람이 눌러야 도는데,
     // 안 누른 채로 두면 복제본에 서 있던 세이브가 앞 원본으로 되감겨 지급이 다시 실행된다.
     static void WarnOnBadStepIds()
     {

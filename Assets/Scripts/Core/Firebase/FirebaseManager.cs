@@ -102,10 +102,11 @@ public static class FirebaseManager
     static FirebaseFirestore GetFirestore()
     {
         if (s_firestore != null) return s_firestore;
+        // 기본 DB가 아니라 이름 있는 DB(FirebaseRootPath.DatabaseId)를 잡는다.
         s_firestore = FirebaseFirestore.GetInstance(FirebaseApp.DefaultInstance, FirebaseRootPath.DatabaseId);
 
-        // 설정 대입은 프로세스당 1회다 — GetInstance가 돌려주는 인스턴스는 프로세스 전역 싱글턴이라 한 번 적용하면
-        // 그대로인데, 이미 네트워크 작업을 시작한 클라이언트에 Settings를 다시 대입하면 SDK가 던진다.
+        // 설정 대입은 프로세스당 1회다 — 인스턴스는 프로세스 전역 싱글턴이라 한 번 적용하면 그대로인데,
+        // 이미 네트워크 작업을 시작한 클라이언트에 Settings를 다시 대입하면 SDK가 던져 재시도가 원리상 못 고친다.
         // (그래서 Shutdown에서도 이 플래그는 리셋하지 않는다.)
         if (!s_settingsApplied)
         {

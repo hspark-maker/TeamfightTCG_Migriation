@@ -20,7 +20,7 @@ public class VfxDebugWindow : MonoBehaviour
     [SerializeField] BattleFieldView enemyFieldView;
 
     [Header("라이브러리 (비우면 이미 주입된 것 사용)")]
-    // 테스트 씬은 GameInitializer/DataLibrary 부트스트랩이 없을 수 있다 → 그때 여기 값으로 직접 주입.
+    // 테스트 씬은 GameInitializer/DataLibrary 초기화이 없을 수 있다 → 그때 여기 값으로 직접 주입.
     // 이미 주입돼 있으면 건드리지 않는다.
     [SerializeField] BattleVfxLibrary library;
 

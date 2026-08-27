@@ -141,7 +141,7 @@ public class GameManager : MonoBehaviour
     // 그때 잔액 flush까지 멈추면 이미 번 재화가 업로드 대기열에도 못 들어간다.
     void FlushLocal()
     {
-        if (InitializationInstaller.IsSaveDependentInstalled)
+        if (SaveDependentManagersStep.IsInstalled)
             CurrencyManager.Save();
     }
 }

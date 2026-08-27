@@ -47,7 +47,7 @@ public static partial class CardGrowthManager
     // Init()으로 세이브를 캐싱했는지(false면 Save가 no-op)
     public static bool IsReady => s_initialized;
 
-    // 부트스트랩에서 실제 애셋 주입. null이면 이전 설정을 버리고 미주입 상태로 되돌린다.
+    // 초기화에서 실제 애셋 주입. null이면 이전 설정을 버리고 미주입 상태로 되돌린다.
     public static void SetConfig(CardGrowthConfig _config)
     {
         s_config              = _config;
@@ -55,7 +55,7 @@ public static partial class CardGrowthManager
         s_missingConfigLogged = false;
     }
 
-    // 부트에서 클라우드 세이브 채택 이후 1회 호출
+    // 초기화에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
     {
         s_growth.Clear();

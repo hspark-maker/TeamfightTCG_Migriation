@@ -97,7 +97,7 @@ public class PackAcquireController : MonoBehaviour
 
         if (!PackHandoff.HasPending)
         {
-            // 정상 진입은 상점/부트가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
+            // 정상 진입은 상점/초기화가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
             Debug.LogWarning("[PackAcquireController] PackHandoff 없음 — 정상 진입이 아님(열 팩 없음).");
             return false;
         }
@@ -352,7 +352,7 @@ public class PackAcquireController : MonoBehaviour
     }
 
     // 획득 클릭: 튜토리얼이면 시작 → 목적지 씬으로 이동(1회 가드).
-    // 개봉 카드로 덱을 만들지 않는다 — 첫 덱은 부트의 StarterDeck이 보장하고, 이후 편성은 유저 몫이다.
+    // 개봉 카드로 덱을 만들지 않는다 — 첫 덱은 초기화의 StarterDeck이 보장하고, 이후 편성은 유저 몫이다.
     void OnAcquirePressed()
     {
         // 재구매가 화면을 덮는 중이면 나갈 수 없다 — 방금 산 팩이 캐리어에 갇힌 채 로비로 돌아간다.

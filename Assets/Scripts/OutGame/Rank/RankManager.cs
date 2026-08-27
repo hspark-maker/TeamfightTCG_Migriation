@@ -257,7 +257,7 @@ public static class RankManager
         return true;
     }
 
-    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
         if (_config == null) return;

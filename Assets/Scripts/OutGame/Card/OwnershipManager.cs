@@ -29,7 +29,7 @@ public static class OwnershipManager
         return false;
     }
 
-    // 부트에서 클라우드 세이브 채택·CardCatalog.SetSource() 이후 1회 호출
+    // 초기화에서 클라우드 세이브 채택·CardCatalog.SetSource() 이후 1회 호출
     public static void Init()
     {
         s_owned.Clear();
@@ -98,7 +98,7 @@ public static class OwnershipManager
     {
         if (!CardCatalog.IsReady)
         {
-            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 부트(InitializationInstaller)를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
+            UnityEngine.Debug.LogWarning("[Ownership] CardCatalog 미초기화 — 초기화(부트 초기화(InitializationRunner))를 거치지 않은 씬에서는 전체 해금이 동작하지 않는다.");
             return 0;
         }
 

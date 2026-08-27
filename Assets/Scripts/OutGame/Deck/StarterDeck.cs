@@ -13,7 +13,7 @@ public static class StarterDeck
 
         if (_starter == null)
         {
-            Debug.LogWarning("[StarterDeck] 스타터덱 SO 미배선 — 지급 생략(InitializationInstaller 확인).");
+            Debug.LogWarning("[StarterDeck] 스타터덱 SO 미배선 — 지급 생략(부트 초기화(InitializationRunner) 확인).");
             return;
         }
 

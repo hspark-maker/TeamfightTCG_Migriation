@@ -26,7 +26,7 @@ public class GameInitializer : MonoBehaviour
     static System.Func<int> s_enemyTierProvider;
     EMatchEndReason multiplayerFieldFailureReason = EMatchEndReason.Timeout;
 
-    /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **부트/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
+    /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **초기화/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
     /// 순수 주입점이라 set만 둔다(읽는 쪽은 이 클래스 내부뿐 — 밖으로 새면 성장값 조회 창구가 둘로 갈린다).</summary>
     public static System.Func<int, CardGrowth> GrowthProvider
@@ -34,7 +34,7 @@ public class GameInitializer : MonoBehaviour
         set => s_growthProvider = value;
     }
 
-    /// <summary>**싱글 AI 적**의 성장값 주입점. 랭크 티어가 정하는 난이도라 값 생산자를 상위(부트)가 꽂는다.
+    /// <summary>**싱글 AI 적**의 성장값 주입점. 랭크 티어가 정하는 난이도라 값 생산자를 상위(초기화)가 꽂는다.
     /// 미세팅(null)이면 마스터 데이터 스탯 그대로 = 종전 동작.
     ///
     /// **멀티·튜토리얼에는 넘기지 않는다.** 멀티는 IMatchGrowthSource가 확정한 최종 스냅샷을 원자 교환하고,
@@ -119,7 +119,7 @@ public class GameInitializer : MonoBehaviour
 
         InitializeViews();
 
-        // 튜토리얼: 순차 안내 오버레이 부트스트랩(연출 전용, 규칙 무접촉).
+        // 튜토리얼: 순차 안내 오버레이 초기화(연출 전용, 규칙 무접촉).
         if (TutorialConfig.IsActive) TutorialOverlayUI.Ensure(this.tutorialOverlayPrefab);
 
         if (DeckConfig.IsMultiplayer && MultiplayerTurnRunner.Instance != null)

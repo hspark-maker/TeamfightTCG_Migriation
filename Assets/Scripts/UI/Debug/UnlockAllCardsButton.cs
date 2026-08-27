@@ -30,7 +30,7 @@ public class UnlockAllCardsButton : MonoBehaviour
     {
         if (targetButton == null) return;
 
-        // 카탈로그 미준비(부트 미경유 씬)면 장수를 알 수 없으므로 잠그지 않는다 — 눌러보면 경고 로그가 원인을 알려준다.
+        // 카탈로그 미준비(초기화 미경유 씬)면 장수를 알 수 없으므로 잠그지 않는다 — 눌러보면 경고 로그가 원인을 알려준다.
         targetButton.interactable = !CardCatalog.IsReady || OwnershipManager.OwnedCount < CardCatalog.Count;
     }
 }

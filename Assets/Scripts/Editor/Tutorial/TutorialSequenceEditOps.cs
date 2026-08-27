@@ -9,7 +9,7 @@ using UnityEngine;
 /// 진행이 따라온다), 추가·복제는 <see cref="OutgameTutorialData.TakeNextStepIdForEditor"/>로만 번호를 받고,
 /// 삭제한 번호는 영구 소각한다(재발급하면 지워진 스텝에 서 있던 세이브가 무관한 스텝으로 조용히 옮겨간다).
 /// <b>되감기 예약 무효화</b> — <see cref="OutgameTutorialRewind"/>의 예약은 (챕터, 스텝) <b>인덱스</b>라,
-/// 구조가 바뀌면 그 좌표가 다른 스텝을 가리키게 되고 다음 부트가 세이브를 밀고 엉뚱한 지점까지 지급을 재생한다.
+/// 구조가 바뀌면 그 좌표가 다른 스텝을 가리키게 되고 다음 초기화가 세이브를 밀고 엉뚱한 지점까지 지급을 재생한다.
 ///
 /// 모든 메서드의 반환값은 "편집이 실제로 일어났는가"다 — 호출자는 참일 때만 캐시를 무효화한다.</summary>
 public static class TutorialSequenceEditOps
@@ -73,7 +73,7 @@ public static class TutorialSequenceEditOps
             "스텝 삭제",
             $"{_chapter}-{_index}  {t_action}  (stepId {t_id})\n\n"
           + "이 스텝을 지웁니다.\n"
-          + $"stepId {t_id}는 영구 소각되어 다시 쓰이지 않습니다 — 이 스텝에 서 있던 세이브는 다음 부트에 다음 칸으로 밀려납니다.",
+          + $"stepId {t_id}는 영구 소각되어 다시 쓰이지 않습니다 — 이 스텝에 서 있던 세이브는 다음 초기화에 다음 칸으로 밀려납니다.",
             "삭제", "취소");
 
         if (!t_ok) return false;
@@ -370,7 +370,7 @@ public static class TutorialSequenceEditOps
 
     /// <summary>구조를 바꿨으니 되감기 예약을 걷는다.
     /// 예약은 (챕터, 스텝) 인덱스라 저작이 밀리면 다른 스텝을 가리키게 되고,
-    /// 다음 부트가 세이브를 민 뒤 엉뚱한 지점까지 지급을 재생한다 — 되돌릴 수 없는 사고다.</summary>
+    /// 다음 초기화가 세이브를 민 뒤 엉뚱한 지점까지 지급을 재생한다 — 되돌릴 수 없는 사고다.</summary>
     static void CancelRewindForStructureChange(string _reason)
     {
         if (!OutgameTutorialRewind.TryGetScheduled(out int t_chapter, out int t_step, out bool t_wipePending)) return;

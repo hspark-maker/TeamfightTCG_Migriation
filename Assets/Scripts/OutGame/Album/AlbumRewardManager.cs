@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-// 앨범 3단(페이지·테마·앨범) 완성 보상의 static 수령 창구 — 캐시·Init 없이 세이브 슬롯 직독(부트 무접촉)
+// 앨범 3단(페이지·테마·앨범) 완성 보상의 static 수령 창구 — 캐시·Init 없이 세이브 슬롯 직독(초기화 무접촉)
 public static class AlbumRewardManager
 {
     // 앨범 전체 보상의 낙인 키 — 계층 낙인 키의 유일한 예외 상수(그 외 조립은 AlbumSection 파생만)
@@ -10,7 +10,7 @@ public static class AlbumRewardManager
     // 수령 통지 — 패널이 보상 상태를 다시 그리는 트리거
     public static event Action OnChanged;
 
-    // 세이브 슬롯 직독 — 캐시를 두면 부트를 안 거친 씬에서 빈 낙인이 기존 기록을 덮어쓴다
+    // 세이브 슬롯 직독 — 캐시를 두면 초기화를 안 거친 씬에서 빈 낙인이 기존 기록을 덮어쓴다
     static AlbumRewardSaveData Slot
     {
         get

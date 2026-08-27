@@ -101,7 +101,7 @@ public static class CardVisualRules
 
     static System.Func<int, CardKeyword> s_unlockedKeywords;
 
-    /// <summary>강화로 **지금 실제 열려 있는** 카드 키워드 공급자. 부트가 OutGame의 성장값을 꽂는다 —
+    /// <summary>강화로 **지금 실제 열려 있는** 카드 키워드 공급자. 초기화가 OutGame의 성장값을 꽂는다 —
     /// 표시 규칙(여기)이 OutGame을 직접 참조하지 않게 값 생산자를 상위에서 밀어넣는 기존 규약과 같다.
     ///
     /// 미주입(null)이면 마스터 데이터 그대로 = 성장 없는 경로(전투 씬 단독 실행)의 종전 동작.</summary>

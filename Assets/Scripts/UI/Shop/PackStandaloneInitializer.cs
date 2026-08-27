@@ -5,7 +5,7 @@ using UnityEngine;
 // CardPack 테스트 씬 단독 실행용 더미 개봉 세션 주입 + 오버레이 열기(테스트 씬 전용).
 // 로비를 거치지 않고 개봉 연출을 검증하는 루프를 지킨다 — 상점의 구매 경로를 껍데기로 재현한 것.
 // 개봉 1회로 끝난다(획득 후 다시 보려면 Play를 다시 누른다) — 재개봉 트리거는 두지 않는다.
-// 정상 진입(상점/부트가 PackHandoff를 채운 상태)이면 주입은 건너뛴다 — 실제 세션이 항상 우선.
+// 정상 진입(상점/초기화가 PackHandoff를 채운 상태)이면 주입은 건너뛴다 — 실제 세션이 항상 우선.
 // 구매·차감·소유 부여는 하지 않는다(연출 배선 검증용 껍데기 결과). 경제 계약은 CardPackOpener만 건드린다.
 public class PackStandaloneInitializer : MonoBehaviour
 {

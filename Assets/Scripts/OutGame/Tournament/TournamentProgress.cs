@@ -94,7 +94,7 @@ public static class TournamentProgress
     static TournamentConfig Config
         => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<TournamentConfig>());
 
-    // 세이브 슬롯 직독 — 캐시를 두면 부트를 안 거친 씬에서 빈 낙인이 기존 기록을 덮어쓴다
+    // 세이브 슬롯 직독 — 캐시를 두면 초기화를 안 거친 씬에서 빈 낙인이 기존 기록을 덮어쓴다
     static TournamentSaveData Slot
     {
         get
@@ -116,7 +116,7 @@ public static class TournamentProgress
         }
     }
 
-    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(TournamentConfig _config)
     {
         if (_config != null) s_config = _config;

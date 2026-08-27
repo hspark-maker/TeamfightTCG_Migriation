@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>InitializationInstaller가 없는 독립 테스트 씬에서 성장 매니저를 준비한다.
+/// <summary>부트 초기화(InitializationRunner)가 없는 독립 테스트 씬에서 성장 매니저를 준비한다.
 /// 설치기의 배선 순서를 그대로 따른다 — 곡선 조회가 Config를 쓰므로 SetConfig가 Init보다 먼저다.</summary>
 public static class GrowthStandaloneInitializer
 {

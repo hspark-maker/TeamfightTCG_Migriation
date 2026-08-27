@@ -38,7 +38,7 @@ public static class GameTiming
         }
     }
 
-    /// <summary>DataLibrary 등 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
+    /// <summary>DataLibrary 등 초기화에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
     public static void SetConfig(BattleTimingConfig _battle)
     {
         if (_battle == null) return;
