@@ -62,6 +62,11 @@ public class MultiplayerTurnRunner : MonoBehaviour
         // 파괴 시에도 초기화 구독이 남지 않도록 대칭 해제(예외/조기 파괴 안전장치).
         UnsubscribeInitAbort();
         this.matchGrowthSource = null;
+
+        // 파괴된 인스턴스를 static에 남겨두면 재매치 때 늦게 도착한 RPC가 죽은 컴포넌트를 건드려
+        // MissingReferenceException이 난다. `Instance == this`는 Unity fake-null 비교라
+        // 이미 파괴된 참조를 걸러내지 못하므로 참조 동일성으로 판단한다.
+        if (ReferenceEquals(Instance, this)) Instance = null;
     }
 
     void InitializeRuntimeState()
@@ -243,8 +248,11 @@ public class MultiplayerTurnRunner : MonoBehaviour
         ReleaseInitWaits();
     }
 
-    public void OnContentMismatchReceived()
-        => AbortInitialDeck(EMatchEndReason.Desync, "상대와 전투 데이터 스냅샷이 달라 매치를 중단합니다.");
+    /// <summary>상대와 콘텐츠(스펙 스냅샷) 버전이 다르다. <b>손상 패킷은 여기로 오지 않는다</b> —
+    /// 그쪽은 NetworkGameController가 RejectMessage로 따로 끊는다. 두 원인을 뭉치면
+    /// 회선 문제가 "데이터가 다르다"로 보고돼 원인 추적이 막힌다.</summary>
+    public void OnContentMismatchReceived(string _detail)
+        => AbortInitialDeck(EMatchEndReason.Desync, $"상대와 전투 데이터 스냅샷이 달라 매치를 중단합니다 — {_detail}");
 
     public void OnSeedCommitReceived(byte[] _hash)
     {
@@ -364,8 +372,15 @@ public class MultiplayerTurnRunner : MonoBehaviour
         await AwaitInitStep(WaitOpponentReveal(), "시드 reveal");
         if (InitAborted) return false;
 
+        // 검증 실패 = commit과 다른 nonce가 공개됐다는 뜻이고, 그건 상대가 내 nonce를 보고 나서
+        // 원하는 시드가 나오도록 자기 nonce를 역산했다는 뜻이다. 여기서 그 nonce를 그대로 쓰면
+        // commit-reveal이 존재만 하고 방어 효과는 0이 된다 — 시드를 확정하지 말고 매치를 중단한다.
         if (!MatchRandom.VerifyCommit(this.opponentNonce, this.opponentCommit))
-            Debug.LogError("[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심");
+        {
+            AbortInitialDeck(EMatchEndReason.Desync,
+                "[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심. 시드를 확정하지 않고 매치를 중단한다.");
+            return false;
+        }
 
         ulong t_seed = MatchRandom.ReadU64(t_myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
         MatchRandom.Seed(t_seed);

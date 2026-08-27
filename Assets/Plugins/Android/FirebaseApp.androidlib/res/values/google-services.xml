@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@string/gcm_defaultSenderId,@string/google_storage_bucket,@string/project_id,@string/google_api_key,@string/google_crash_reporting_api_key,@string/google_app_id">
-  <string name="gcm_defaultSenderId" translatable="false">379856980102</string>
-  <string name="google_storage_bucket" translatable="false">cardbattle-d94f7.firebasestorage.app</string>
-  <string name="project_id" translatable="false">cardbattle-d94f7</string>
-  <string name="google_api_key" translatable="false">AIzaSyD1Rw4Q36w1nCchH_jEEp7kqwd2c_mEfDk</string>
-  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyD1Rw4Q36w1nCchH_jEEp7kqwd2c_mEfDk</string>
-  <string name="google_app_id" translatable="false">1:379856980102:android:17aae10fbad865a6582907</string>
+  <string name="gcm_defaultSenderId" translatable="false">1054077753954</string>
+  <string name="google_storage_bucket" translatable="false">bm-cardbattle.firebasestorage.app</string>
+  <string name="project_id" translatable="false">bm-cardbattle</string>
+  <string name="google_api_key" translatable="false">AIzaSyBU7pZwbRF_M3EJJym1ZFctyY6DzxdPcxs</string>
+  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBU7pZwbRF_M3EJJym1ZFctyY6DzxdPcxs</string>
+  <string name="google_app_id" translatable="false">1:1054077753954:android:d4b0d8cb25ef1611ae0f3b</string>
 </resources>

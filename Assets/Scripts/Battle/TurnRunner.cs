@@ -425,60 +425,12 @@ public class TurnRunner : MonoBehaviour
         }
     }
 
+    /// <summary>턴 끝 보드 지문을 로그로 남긴다. 계산은 <see cref="BattleStateHash"/> 단독 —
+    /// 여기서 접는 방식을 따로 두면 로그 해시와 실제로 교환하는 해시가 갈려 대조가 무의미해진다.</summary>
     void LogDeterminismHash(int _actingOwner)
     {
-        BattleField t_ownerZero = this.playerField.OwnerIndex == 0 ? this.playerField : this.enemyField;
-        BattleField t_ownerOne  = this.playerField.OwnerIndex == 1 ? this.playerField : this.enemyField;
-
-        ulong t_hash = 14695981039346656037UL;
-        FoldField(ref t_hash, t_ownerZero);
-        FoldField(ref t_hash, t_ownerOne);
+        ulong t_hash = BattleStateHash.Compute(this.playerField, this.enemyField);
         Debug.Log($"[Hash] turn={TurnCount} owner={_actingOwner} board=0x{t_hash:X16} draws={MatchRandom.DrawCount}");
-    }
-
-    static void FoldField(ref ulong _hash, BattleField _field)
-    {
-        FoldInt(ref _hash, _field?.OwnerIndex ?? -1);
-        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
-            FoldCard(ref _hash, _field?.GetSlot(i));
-
-        FoldInt(ref _hash, _field?.WaitingCount ?? -1);
-        if (_field == null) return;
-        foreach (CardInstance t_card in _field.GetWaitingCards())
-            FoldCard(ref _hash, t_card);
-    }
-
-    static void FoldCard(ref ulong _hash, CardInstance _card)
-    {
-        if (_card == null)
-        {
-            FoldInt(ref _hash, -1);
-            return;
-        }
-
-        FoldInt(ref _hash, _card.cardId);
-        FoldInt(ref _hash, _card.maxHp);
-        FoldInt(ref _hash, _card.hp);
-        FoldInt(ref _hash, _card.bonusHp);
-        FoldInt(ref _hash, _card.hasShield ? 1 : 0);
-        FoldInt(ref _hash, _card.evolutionStage);
-        FoldInt(ref _hash, (int)_card.unlockedKeywords);
-        FoldInt(ref _hash, _card.synergyEnabled ? 1 : 0);
-        FoldInt(ref _hash, (int)_card.runtimeKeywords);
-        FoldInt(ref _hash, (int)_card.synergyKeywords);
-    }
-
-    static void FoldInt(ref ulong _hash, int _value)
-    {
-        unchecked
-        {
-            uint t_value = (uint)_value;
-            for (int i = 0; i < 4; i++)
-            {
-                _hash ^= (byte)(t_value >> (i * 8));
-                _hash *= 1099511628211UL;
-            }
-        }
     }
 
     /// <summary>ownerIndex 0이 선공인가. 튜토리얼만 스크립트 전제로 owner 0 고정,

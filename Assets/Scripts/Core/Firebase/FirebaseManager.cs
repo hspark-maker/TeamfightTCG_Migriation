@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using Firebase;
 using Firebase.Firestore;
 using UnityEngine;
 
@@ -92,21 +93,13 @@ public static class FirebaseManager
         s_initialized = false;
     }
 
-    // Initialize의 "already initialized" 가드를 넘는 유일한 합법 경로.
-    // Shutdown이 s_modules는 비우지 않으므로 모듈 재등록 없이 그대로 다시 태울 수 있다.
-    internal static void Reinitialize(string _envId)
-    {
-        Shutdown();
-        Initialize(_envId);
-    }
-
     static FirebaseFirestore GetFirestore()
     {
         if (s_firestore != null) return s_firestore;
-        s_firestore = FirebaseFirestore.DefaultInstance;
+        s_firestore = FirebaseFirestore.GetInstance(FirebaseApp.DefaultInstance, FirebaseRootPath.DatabaseId);
 
-        // 설정 대입은 프로세스당 1회다 — DefaultInstance는 프로세스 전역 싱글턴이라 한 번 적용하면 그대로인데,
-        // 이미 네트워크 작업을 시작한 클라이언트에 Settings를 다시 대입하면 SDK가 던져 재시도가 원리상 못 고친다.
+        // 설정 대입은 프로세스당 1회다 — GetInstance가 돌려주는 인스턴스는 프로세스 전역 싱글턴이라 한 번 적용하면
+        // 그대로인데, 이미 네트워크 작업을 시작한 클라이언트에 Settings를 다시 대입하면 SDK가 던진다.
         // (그래서 Shutdown에서도 이 플래그는 리셋하지 않는다.)
         if (!s_settingsApplied)
         {
