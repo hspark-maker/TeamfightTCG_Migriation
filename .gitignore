@@ -117,3 +117,6 @@ Assets/Firebase/Plugins/x86_64/*.so.meta
 
 # 에이전트 워크트리 (gitlink 실수 커밋 방지)
 .claude/worktrees/
+
+# Firebase CLI 배포·에뮬레이터 캐시
+.firebase/
