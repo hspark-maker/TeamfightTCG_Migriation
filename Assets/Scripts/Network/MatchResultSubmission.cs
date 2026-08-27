@@ -124,7 +124,7 @@ static class MatchResultSubmission
         try
         {
             // 콜러블은 로그인 토큰이 붙어야만 통과한다(서버가 uid 없으면 unauthenticated).
-            // 부트의 로그인은 대기 없이 시작되므로 여기서 완료를 확인한다 — 미완료면 큐를 유지한 채
+            // 초기화의 로그인은 대기 없이 시작되므로 여기서 완료를 확인한다 — 미완료면 큐를 유지한 채
             // 물러나고 아래 finally가 재시도를 건다. PlayerSaveCloud·BattleContentSync와 같은 관문이다.
             if (!await EnsureSignedIn())
             {

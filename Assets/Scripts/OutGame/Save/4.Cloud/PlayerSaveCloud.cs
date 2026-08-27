@@ -5,8 +5,8 @@ using Cysharp.Threading.Tasks;
 using Firebase.Firestore;
 using UnityEngine;
 
-// 아웃게임 세이브의 클라우드 창구. 부트 채택(원격 → 캐시 폴백)과 업로드를 모두 여기서 한다.
-// 채택은 부트당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
+// 아웃게임 세이브의 클라우드 창구. 초기화 채택(원격 → 캐시 폴백)과 업로드를 모두 여기서 한다.
+// 채택은 초기화당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
 static class PlayerSaveCloud
 {
     const string OWNER_UID_KEY = "firebase.playerSave.ownerUid";
@@ -43,7 +43,7 @@ static class PlayerSaveCloud
     internal static bool IsOffline { get; private set; }
     internal static string LastError { get; private set; } = string.Empty;
 
-    // 부트 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
+    // 초기화 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
     internal static bool IsGateComplete => s_gateComplete;
 
     // 원격 문서가 없어 이번 세션이 첫 문서를 만든다. 스타터 지급의 유일한 근거다.
@@ -431,7 +431,7 @@ static class PlayerSaveCloud
                s_ownerUid != _userId;
     }
 
-    // 부트 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
+    // 초기화 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
     static void Fail(string _message)
     {
         LastError = _message;
@@ -443,7 +443,7 @@ static class PlayerSaveCloud
     }
 
     // 이미 게이트를 통과한 뒤라 MarkRecoveryRequired가 화면을 바꾸지 못한다(유저 표면은 P3 몫).
-    // 클라우드 업로드만 끊고 로컬 캐시 기록은 살려 둔다 — 진행분이 다음 부트에 복구될 유일한 통로다.
+    // 클라우드 업로드만 끊고 로컬 캐시 기록은 살려 둔다 — 진행분이 다음 초기화에 복구될 유일한 통로다.
     static void BlockSession(string _message)
     {
         LastError = _message;

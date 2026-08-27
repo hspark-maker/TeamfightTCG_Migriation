@@ -2,10 +2,9 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-// 전역 부트 프리팹의 루트. 사본이 LoadingScene·LobbyScene 둘이라 먼저 깬 쪽이 부트를 선점한다
-// (정상 경로는 로딩 씬이, 로비 단독 Play는 로비 사본이 맡는다).
-// 세이브 로드·재화 캐싱 등 씬 오브젝트가 필요 없는 부트는 GameManager가 앱 시작 시 먼저 처리한다.
-[DefaultExecutionOrder(-200)]
+// 이관 중인 초기화 잔여분. 실행 주체는 InitializationRunner이고 여기는 LegacyInstallerStep이 부른다 —
+// 스텝을 하나씩 떼어낼수록 이 파일이 얇아지고, 다 떼면 사라진다.
+// 세이브 로드·재화 캐싱 등 씬 오브젝트가 필요 없는 초기화는 GameManager가 앱 시작 시 먼저 처리한다.
 public class InitializationInstaller : MonoBehaviour
 {
     // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 부팅 시 구성한다.
@@ -14,7 +13,7 @@ public class InitializationInstaller : MonoBehaviour
     [SerializeField] CardAlbumConfig albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선(null)이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
     [SerializeField] CurrencyLook currencyLook;
-    // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 부트 시점에 주입돼 있어야 한다.
+    // 튜토리얼 스텝 시퀀스 SO. 로딩 씬이 첫 목적지를 판정하려면 초기화 시점에 주입돼 있어야 한다.
     [SerializeField] OutgameTutorialData tutorialData;
     // 트리거 발화 튜토리얼 목록 SO(탭 첫 진입 등). 미배선(null)이면 트리거는 조용히 발화하지 않는다.
     [SerializeField] TriggeredTutorialData triggeredTutorialData;
@@ -32,19 +31,11 @@ public class InitializationInstaller : MonoBehaviour
     [SerializeField] ProfileConfig profileConfig;
     [FormerlySerializedAs("runtimeUiPrefabs")]
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
-    // 아래 넷은 전역 static의 단일 주입 창구다. DataLibrary가 아니라 여기 있는 이유는 순서다 —
-    // 실행 순서가 보장되는 컴포넌트는 [DefaultExecutionOrder(-200)]인 이 클래스뿐이라,
-    // 다른 Awake보다 먼저 꽂히는 자리가 여기밖에 없다.
-    // 미배선(null)이면 각 static이 코드 기본값으로 동작하고 IsConfigured가 false로 남아 경고를 낸다.
-    [SerializeField] BattleTimingConfig battleTimingConfig;
-    [SerializeField] BattleReward battleRewardConfig;
-    // 티어 테이블과 랭크 보상 표는 같은 SO를 읽는다 — 둘로 나누면 승급 기준과 보상 기준이 갈린다.
-    [SerializeField] RankConfig rankConfig;
-    [SerializeField] BattleVfxLibrary battleVfxLibrary;
-
     static bool s_initialized;
     static bool s_saveDependentInstalled;
 
+    // 루트 수명 판정은 RootLifecycleStep이 읽는다. 카탈로그 구성이 스텝으로 떨어져 나오면 소유도 같이 옮긴다.
+    internal static bool IsInitialized => s_initialized;
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -54,25 +45,13 @@ public class InitializationInstaller : MonoBehaviour
         s_saveDependentInstalled = false;
     }
 
-    void Awake()
+    // 즉시 주입 단계. 실행 주체는 InitializationRunner(LegacyInstallerStep)다 —
+    // 이 클래스는 더 이상 Awake/Start 메시지로 스스로 돌지 않는다.
+    // 반환값 false는 "이 사본은 여기서 끝"(중복 사본이거나 카탈로그 구성 실패로 루트를 파괴함)이다.
+    internal bool InstallImmediate()
     {
-        // 두 번째 사본은 자식 매니저가 각자 자폭하기 전에 루트째로 걷어낸다(빈 루트가 씬에 남지 않게).
-        if (s_initialized)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        DontDestroyOnLoad(gameObject);
-
-        // 전역 static 주입. 전부 null이면 무시하는 시그니처라 미배선이 예외가 되지는 않는다
-        // (대신 각 static이 기본값을 처음 꺼내 쓸 때 세션당 1회 경고한다).
-        GameTiming.SetConfig(battleTimingConfig);
-        RewardService.SetConfig(battleRewardConfig);
-        RankManager.SetConfig(rankConfig);
-        RankRewardManager.SetConfig(rankConfig);
-        BattleVfx.SetLibrary(battleVfxLibrary);
-
+        // 루트 수명(중복 사본 정리·DontDestroyOnLoad)과 전투 SO 주입은
+        // RootLifecycleStep·BattleConfigStep이 이 스텝보다 먼저 끝낸다.
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
         // 카드 마스터 단일 창구 주입 — 도감·소유권·덱 등 아웃게임 소비자가 안정 키로 조회.
@@ -88,7 +67,7 @@ public class InitializationInstaller : MonoBehaviour
             GameInitialization.MarkRecoveryRequired();
             Debug.LogException(t_exception);
             Destroy(gameObject);
-            return;
+            return false;
         }
 
         s_initialized = true;
@@ -131,7 +110,7 @@ public class InitializationInstaller : MonoBehaviour
         KeywordGrowthManager.SetConfig(keywordGrowthConfig);
         CardGrowthManager.SetConfig(growthConfig);
 
-        // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
+        // 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 초기화가 꽂는다
         // (GameInitializer.GrowthProvider 주석이 지정한 자리). 캐시가 준비된 Init 뒤여야 첫 전투부터 반영된다.
         GameInitializer.GrowthProvider = CardGrowthManager.GrowthOf;
         // Firebase 구현이 먼저 주입되지 않은 개발/오프라인 환경에서만 로컬 세이브를 사용한다.
@@ -145,7 +124,7 @@ public class InitializationInstaller : MonoBehaviour
 
         // 싱글 AI 난이도. 랭크 티어가 정한 레벨을 같은 성장 곡선에 태운다 —
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
-        // 레벨은 전투 시작 시점에 읽어야 한다(부트 때 굳히면 랭크가 올라도 난이도가 안 따라온다).
+        // 레벨은 전투 시작 시점에 읽어야 한다(초기화 때 굳히면 랭크가 올라도 난이도가 안 따라온다).
         // 레벨은 카드마다 다르다(티어 레벨이 기준값).
         // 토너먼트 정점은 난이도가 저작 고정이라 랭크 티어를 타지 않는다. 만렙 클램프를 여기서 다시 거는 이유:
         // 그 클램프가 RankManager.AiCardLevelOf 안에 있어서 이 우회로에는 따라오지 않는다(곡선 밖 레벨은 보너스가 멈춘다).
@@ -174,15 +153,18 @@ public class InitializationInstaller : MonoBehaviour
         // 세이브가 붙잡아 둔 스텝 번호로 좌표를 되찾는다 — 저작이 스텝을 끼워 넣거나 옮겼어도 같은 스텝에 선다.
         // 시퀀스를 읽어야 하므로 EnsureData 뒤, 좌표를 쓰는 아래 둘보다는 반드시 앞이다.
 
-        // 대본 전투가 연 화면 안에서 앱이 닫혔으면 좌표를 그 전투 진입 스텝으로 되감는다(부트당 1회는 여기가 유일).
+        // 대본 전투가 연 화면 안에서 앱이 닫혔으면 좌표를 그 전투 진입 스텝으로 되감는다(초기화당 1회는 여기가 유일).
         // 디버그 되감기보다 앞이다 — 디버그가 찍은 좌표는 그대로 서야 한다.
 
         // 디버그 되감기 예약 소비(2단) — 좌표까지의 지급 재생. 시퀀스를 읽어야 하므로 EnsureData 뒤,
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
+
+        return true;
     }
 
-    // 이번 전투에서 적 카드 한 장이 쓸 레벨. 토너먼트면 정점 저작값(만렙 클램프), 아니면 랭크 티어값.
-    System.Collections.IEnumerator Start()
+    // 세이브 게이트·에셋 로드를 기다린 뒤 세이브 의존 매니저를 설치하는 지연 단계.
+    // 호출자는 LegacyInstallerStep 하나뿐이다(InstallImmediate가 true를 돌려준 사본에서만).
+    internal System.Collections.IEnumerator RunDeferred()
     {
         while (!PlayerSaveCloud.IsGateComplete && !GameInitialization.IsTerminated)
         {
@@ -252,7 +234,7 @@ public class InitializationInstaller : MonoBehaviour
         s_saveDependentInstalled = true;
 
         // 신규 계정의 첫 문서를 여기서 한 번에 만든다. 이 업로드가 실패하면 원격 문서는 여전히 없으므로
-        // 다음 부트도 신규로 판정되고 지급이 정확히 한 번만 남는다(멱등).
+        // 다음 초기화도 신규로 판정되고 지급이 정확히 한 번만 남는다(멱등).
         DataSaveManager.SaveImmediate();
         GameInitialization.MarkReady();
     }

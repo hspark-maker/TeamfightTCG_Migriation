@@ -49,7 +49,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
         if (!CardCatalog.IsReady)
         {
-            Debug.LogError("[DeckEditCollectionGrid] CardCatalog 미초기화 — 부트(InitializationInstaller)를 거치지 않았다.");
+            Debug.LogError("[DeckEditCollectionGrid] CardCatalog 미초기화 — 초기화(InitializationInstaller)를 거치지 않았다.");
             return;
         }
 

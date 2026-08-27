@@ -52,7 +52,7 @@ public class GameManager : MonoBehaviour
         FirebaseManager.RetryPending();
     }
 
-    // 종료 콜백에는 await 창이 없다 — 킥만 하고, 못 올라간 잔여 변경분은 로컬 캐시가 다음 부트에 살린다.
+    // 종료 콜백에는 await 창이 없다 — 킥만 하고, 못 올라간 잔여 변경분은 로컬 캐시가 다음 초기화에 살린다.
     void OnApplicationQuit()
     {
         FlushLocal();

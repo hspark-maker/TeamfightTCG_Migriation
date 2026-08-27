@@ -7,13 +7,13 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
-//  - 부트: StartScene(빌드 0번)에 저작된 인스턴스. DataLibrary의 Addressables UI 로드를 기다렸다가
+//  - 초기화: StartScene(빌드 0번)에 저작된 인스턴스. DataLibrary의 Addressables UI 로드를 기다렸다가
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
-//  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 부트가 이미 끝난
+//  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 초기화가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
 // 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
 //
-// 커버를 제자리에서 페이드아웃하지 않는 이유: 부트 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
+// 커버를 제자리에서 페이드아웃하지 않는 이유: 초기화 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
 // 알파를 내리면 다음 씬이 오기 전에 검은 화면이 드러난다. 그래서 순서를 뒤집는다 —
 // 커버를 DontDestroyOnLoad로 들고 씬을 넘어간 뒤 다음 씬 위에서 걷어야 로딩 아트가 그대로 다음 화면에 녹는다.
 // 그 대가로 커버는 씬과 함께 죽지 않으므로, 걷은 뒤 반드시 Destroy해야 이후 모든 씬에 남지 않는다.
@@ -48,7 +48,7 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("다음 씬 위에서 커버를 걷는 시간(초).")]
     [SerializeField] float fadeDuration = 0.4f;
 
-    [Tooltip("전환 모드에서 커버가 이전 화면을 덮는 시간(초). 부트 모드는 덮을 화면이 없어 무시한다.")]
+    [Tooltip("전환 모드에서 커버가 이전 화면을 덮는 시간(초). 초기화 모드는 덮을 화면이 없어 무시한다.")]
     [SerializeField] float fadeInDuration = 0.15f;
 
     // 지금 화면을 덮고 있는 커버(없으면 null). 커버는 DontDestroyOnLoad로 다음 씬 위까지 살아남으므로
@@ -61,7 +61,7 @@ public class LoadingCoverView : MonoBehaviour
     // 커버 루트의 페이드 대상. Canvas·CanvasGroup·이 스크립트가 모두 같은 오브젝트라 배선 없이 잡는다.
     CanvasGroup m_group;
 
-    // 전환 모드의 목적지. null이면 부트 모드 — 목적지를 스스로 판정한다.
+    // 전환 모드의 목적지. null이면 초기화 모드 — 목적지를 스스로 판정한다.
     string m_targetScene;
 
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
@@ -71,7 +71,7 @@ public class LoadingCoverView : MonoBehaviour
     const float BgmFadeOutSeconds = 0.5f;
 
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
-    /// 부트가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
+    /// 초기화가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
     /// 반드시 여기로 넘긴다 — 커버는 1초 넘게 도는데, 그 전에 정리하면 이전 씬이 파괴된 오브젝트를 붙잡은 채
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
@@ -121,7 +121,7 @@ public class LoadingCoverView : MonoBehaviour
         StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
     }
 
-    // ── 부트 모드 ─────────────────────────────────────────────────────────────
+    // ── 초기화 모드 ─────────────────────────────────────────────────────────────
 
     IEnumerator CoRunInitialize()
     {
@@ -210,7 +210,7 @@ public class LoadingCoverView : MonoBehaviour
 
     IEnumerator CoRunSceneLoad()
     {
-        // 덮을 이전 화면이 있는 쪽이라 등장도 연출한다(부트는 검은 배경뿐이라 페이드인할 것이 없다).
+        // 덮을 이전 화면이 있는 쪽이라 등장도 연출한다(초기화는 검은 배경뿐이라 페이드인할 것이 없다).
         // blocksRaycasts는 프리팹에서 켜진 채 유지 — 반쯤 비치는 이전 화면을 오조작하지 않게.
         if (fadeInDuration > 0f && m_group != null)
         {
@@ -221,12 +221,12 @@ public class LoadingCoverView : MonoBehaviour
         // 로드보다 반드시 먼저 — 씬이 갈려도 커버가 살아남아 전환 순간을 덮는다.
         DontDestroyOnLoad(gameObject);
 
-        // 여기서 걸리는 씬은 부트가 이미 데워둔 상태라 로드가 한두 프레임에 끝난다. 활성화를 붙잡지 않으면
+        // 여기서 걸리는 씬은 초기화가 이미 데워둔 상태라 로드가 한두 프레임에 끝난다. 활성화를 붙잡지 않으면
         // 바가 차기도 전에 씬이 갈려 커버가 한 프레임만 번쩍인다 — 노출 길이를 정하는 건 로드 시간이 아니라 minDuration이다.
         var t_op = SceneManager.LoadSceneAsync(m_targetScene);
         t_op.allowSceneActivation = false;
 
-        // 부트 경로와 같은 이유로 finally에 건다 — 커버를 남기면 이후 모든 씬이 입력 불가가 된다.
+        // 초기화 경로와 같은 이유로 finally에 건다 — 커버를 남기면 이후 모든 씬이 입력 불가가 된다.
         try
         {
             // 활성화를 막아둔 동안 progress는 0.9에서 멈춘다 — 그 구간을 0~1로 편다.

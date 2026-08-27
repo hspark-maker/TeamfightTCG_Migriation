@@ -22,7 +22,7 @@ public static class RewardService
         }
     }
 
-    /// <summary>부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
+    /// <summary>초기화에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
     public static void SetConfig(BattleReward _config)
     {
         if (_config == null) return;

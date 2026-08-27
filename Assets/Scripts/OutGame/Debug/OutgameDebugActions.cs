@@ -86,7 +86,7 @@ public static class OutgameDebugActions
 
         if (t_changed == 0)
         {
-            Debug.LogWarning("[OutgameDebug] 최대 강화 대상 없음 — 이미 전부 만렙이거나 성장 시스템이 아직 초기화되지 않았다(부트 경유 필요).");
+            Debug.LogWarning("[OutgameDebug] 최대 강화 대상 없음 — 이미 전부 만렙이거나 성장 시스템이 아직 초기화되지 않았다(초기화 경유 필요).");
             return;
         }
 

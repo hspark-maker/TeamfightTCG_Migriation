@@ -279,7 +279,7 @@ public class DeckEditController : PooledUIBase
     }
 
     /// <summary>덱 편집을 여는 유일한 창구. 두 호스트가 같은 한 인스턴스를 쓴다.
-    /// 풀이 없으면(부트 미초기화) null — 호스트는 진입 자체를 포기해야 한다(빈 화면으로 갇히지 않게).</summary>
+    /// 풀이 없으면(초기화 미초기화) null — 호스트는 진입 자체를 포기해야 한다(빈 화면으로 갇히지 않게).</summary>
     public static DeckEditController OpenPooled(DeckEditData _data)
     {
         if (UIPoolManager.Instance == null)

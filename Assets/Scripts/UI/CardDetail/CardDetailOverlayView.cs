@@ -1445,9 +1445,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         EnhanceResult t_result = CardGrowthManager.TryEnhance(t_card);
 
-        // 저작 실수(부트 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
+        // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
         if (t_result.Outcome == EEnhanceOutcome.NotReady && !CardGrowthManager.IsReady)
-            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 부트에서 호출되지 않았다.");
+            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 초기화에서 호출되지 않았다.");
 
         bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
 

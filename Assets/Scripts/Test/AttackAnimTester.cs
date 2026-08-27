@@ -84,7 +84,7 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] VfxSlot hitVfx    = new VfxSlot { localOffset = new Vector3(0f, 0f, -0.5f), lifetime = 1.5f };
 
     [Header("타이밍 SO (주입 전용 — 값은 SO 인스펙터에서 고친다)")]
-    // 부트스트랩이 없는 씬이라 아무도 GameTiming에 SO를 안 넣어준다 → 그대로 두면 GameTiming.Battle이
+    // 초기화이 없는 씬이라 아무도 GameTiming에 SO를 안 넣어준다 → 그대로 두면 GameTiming.Battle이
     // 코드 기본값짜리 임시 인스턴스를 만들어 쓰고, 그걸 읽는 연출은 SO를 고쳐도 반응이 없다.
     [SerializeField] BattleTimingConfig timingConfig;
 
@@ -168,7 +168,7 @@ public class AttackAnimTester : MonoBehaviour
         ResolveConfig();
         ResolveSynergyAssets();
 
-        // 부트스트랩(GameInitializer) off라 애니메이터 캐시 초기화가 안 됨 → 첫 연출 누락 방지로 직접 호출.
+        // 초기화(GameInitializer) off라 애니메이터 캐시 초기화가 안 됨 → 첫 연출 누락 방지로 직접 호출.
         this.playerFieldView.InitializeAnimators();
         this.enemyFieldView.InitializeAnimators();
 

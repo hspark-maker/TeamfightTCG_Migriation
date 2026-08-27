@@ -215,8 +215,8 @@ public static class DeckSaveManager
 
         if (Compact()) SaveAll();
 
-        // 부트 전에 그려진 UI는 빈 덱으로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다.
-        // 부트 한복판이라 구독자 예외를 여기서 흘리면 스타터 덱 지급·튜토 되감기가 통째로 스킵된다.
+        // 초기화 전에 그려진 UI는 빈 덱으로 굳는다 — 로드 완료도 변경으로 통지해야 따라온다.
+        // 초기화 한복판이라 구독자 예외를 여기서 흘리면 스타터 덱 지급·튜토 되감기가 통째로 스킵된다.
         try { OnDeckChanged?.Invoke(); }
         catch (Exception t_exception) { Debug.LogException(t_exception); }
     }
@@ -236,7 +236,7 @@ public static class DeckSaveManager
     {
         if (s_loaded && CardCatalog.IsReady) return true;
 
-        Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 또는 카드 레지스트리 미주입 — 순서 변경 거부(메모리·세이브 어긋남 방지). 부트 프리팹이 있는 씬에서 실행할 것.");
+        Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 또는 카드 레지스트리 미주입 — 순서 변경 거부(메모리·세이브 어긋남 방지). 초기화 프리팹이 있는 씬에서 실행할 것.");
         return false;
     }
 
@@ -247,7 +247,7 @@ public static class DeckSaveManager
     {
         if (!s_loaded)
         {
-            Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 — 전량 저장 거부(세이브 덱 전체 소실 방지). 부트 프리팹이 있는 씬에서 실행할 것.");
+            Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 — 전량 저장 거부(세이브 덱 전체 소실 방지). 초기화 프리팹이 있는 씬에서 실행할 것.");
             return;
         }
 

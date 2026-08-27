@@ -1,0 +1,19 @@
+using UnityEngine;
+
+public sealed class InitializationContext
+{
+    public InitializationRunner Runner { get; }
+    public GameObject Root { get; }
+
+    /// <summary>이 루트는 초기화를 맡지 않는다는 표시. 실패가 아니라 정상 종료다 —
+    /// 사본 두 벌 중 늦게 깬 쪽이 여기 걸린다(복구 요구를 띄우지 않는다).</summary>
+    public bool IsAborted { get; private set; }
+
+    public void Abort() => IsAborted = true;
+
+    internal InitializationContext(InitializationRunner _runner)
+    {
+        Runner = _runner;
+        Root = _runner.gameObject;
+    }
+}

@@ -50,7 +50,7 @@ public class DeckListController : MonoBehaviour
         // 목록이 켜진 채 튜토리얼이 진행되면 "신규 생성" 칸의 잠금이 그때 풀린다 — 재빌드가 유일한 반영 경로다.
         OutgameFeatureLock.OnChanged += Build;
 
-        // 부트를 안 거친 씬 진입에서는 이 목록이 세이브 로드보다 먼저 그려진다 — 빈 목록이 고착되지 않게.
+        // 초기화를 안 거친 씬 진입에서는 이 목록이 세이브 로드보다 먼저 그려진다 — 빈 목록이 고착되지 않게.
         DeckSaveManager.OnDeckChanged += Build;
     }
 

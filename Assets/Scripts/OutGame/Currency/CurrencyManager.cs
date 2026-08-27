@@ -21,7 +21,7 @@ public static class CurrencyManager
 
     public static bool CanAfford(ECurrencyType _type, long _cost) => s_currencies[(int)_type] >= _cost;
 
-    // 부트에서 클라우드 세이브 채택 이후 1회 호출 — 세이브를 메모리에 캐싱한다.
+    // 초기화에서 클라우드 세이브 채택 이후 1회 호출 — 세이브를 메모리에 캐싱한다.
     // _freshAccount는 "원격 문서가 없는 신규 계정"이다. 오프라인 폴백 세션은 false로 들어온다.
     public static void Init(bool _freshAccount)
     {

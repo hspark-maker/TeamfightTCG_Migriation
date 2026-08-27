@@ -31,7 +31,7 @@ public readonly struct MatchGrowthOpponent
     }
 }
 
-/// <summary>부트 계층이 공급자를 교체하는 단일 슬롯. Firebase가 먼저 주입되면 로컬 폴백이 덮어쓰지 않는다.</summary>
+/// <summary>초기화 계층이 공급자를 교체하는 단일 슬롯. Firebase가 먼저 주입되면 로컬 폴백이 덮어쓰지 않는다.</summary>
 public static class MatchGrowthSource
 {
     public static IMatchGrowthSource Current { get; private set; }

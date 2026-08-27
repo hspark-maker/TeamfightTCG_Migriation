@@ -42,7 +42,7 @@ public readonly struct TutorialIssue
 /// <summary>튜토리얼 저작을 플레이 없이 정적으로 판정한다.
 ///
 /// 이 도구가 필요한 이유: 저작 실수는 런타임에 조용히 삼켜지거나(TutorialStepExecutor.Fail — 기본 Skip이면
-/// 경고 한 줄 뒤 그냥 전진) 부트 로그에만 뜬다. 게다가 진행이 막히면 fail-open이 남은 기능을 전부 열어
+/// 경고 한 줄 뒤 그냥 전진) 초기화 로그에만 뜬다. 게다가 진행이 막히면 fail-open이 남은 기능을 전부 열어
 /// (OutgameFeatureLock.NotifyStalled) 증상 자체가 "정상처럼" 보인다. 그래서 사람 눈으로는 잡히지 않는다.</summary>
 public static class TutorialValidator
 {
@@ -318,7 +318,7 @@ public static class TutorialValidator
          && _def.Anchor == EOutgameTutorialAnchor.None)
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "재개 불가 Halt",
                 $"{t_action}가 Halt인데 앵커도 완료 신호도 없습니다 — " + (_onboarding
-                    ? "되돌려도 이 부트에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 부팅뿐입니다)."
+                    ? "되돌려도 이 초기화에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 부팅뿐입니다)."
                     : "트리거 좌표는 메모리 전용이라 되돌린 자리에서 이 안내가 그대로 끝납니다."),
                 "onFailure를 Skip으로 바꾸거나, 되돌아왔을 때 진행을 다시 세울 앵커를 주세요.");
 

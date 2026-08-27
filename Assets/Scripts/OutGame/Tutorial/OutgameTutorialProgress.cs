@@ -30,7 +30,7 @@ public static class OutgameTutorialProgress
         }
     }
 
-    // 부트에서 클라우드 세이브 채택 이후 1회 호출 — 진행 정지 판정
+    // 초기화에서 클라우드 세이브 채택 이후 1회 호출 — 진행 정지 판정
     public static void Init()
     {
         DetectStall();
@@ -49,13 +49,13 @@ public static class OutgameTutorialProgress
         t_slot.ChapterStepIndex = _step;
 
         // 좌표가 움직이는 모든 런타임 경로가 이 창구를 지나므로, 앵커도 여기서만 갱신하면 된다.
-        // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 부트가 좌표에서 다시 채운다.
+        // 시퀀스가 아직 주입되기 전이면 0이 들어가는데, 그러면 다음 초기화가 좌표에서 다시 채운다.
         t_slot.StepId = OutgameTutorialRunner.StepIdAt(_chapter, _step);
 
         Save();
     }
 
-    // 정지 판정을 지금 좌표에서 다시 세기 시작한다 — 부트마다 자가 복구가 도는 좌표는 "막힌 좌표"가 아니다.
+    // 정지 판정을 지금 좌표에서 다시 세기 시작한다 — 초기화마다 자가 복구가 도는 좌표는 "막힌 좌표"가 아니다.
     public static void ResetStallWatch()
     {
         var t_slot = Slot;
@@ -124,7 +124,7 @@ public static class OutgameTutorialProgress
         t_slot.OutgameCompleted = false;
         Save();
 
-        // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 부트 만에 오탐 정지가 뜬다.
+        // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 초기화 만에 오탐 정지가 뜬다.
         // 이미 선 판정도 함께 걷어야 잠금이 실제로 돌아온다(둘을 갈라 두면 한쪽만 풀려 검증이 오염된다).
         ResetStallWatch();
         OutgameFeatureLock.ClearStall();

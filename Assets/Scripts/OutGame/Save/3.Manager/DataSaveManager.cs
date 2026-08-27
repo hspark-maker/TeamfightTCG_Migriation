@@ -76,7 +76,7 @@ public static class DataSaveManager
         return JsonConvert.SerializeObject(Normalize(_data), s_serializerSettings);
     }
 
-    /// <summary>부트에서 채택한 세이브를 메모리에 세우고 캐시 봉투를 갱신한다. 채택은 부트당 1회다.</summary>
+    /// <summary>초기화에서 채택한 세이브를 메모리에 세우고 캐시 봉투를 갱신한다. 채택은 초기화당 1회다.</summary>
     internal static void AdoptRemote(UserSaveData _data, long _revision)
     {
         Data = Normalize(_data);
@@ -109,7 +109,7 @@ public static class DataSaveManager
         }
         catch (Exception t_exception)
         {
-            // 원본을 백업하고 캐시를 걷는다 — 남겨 두면 매 부트 같은 LogError가 반복된다.
+            // 원본을 백업하고 캐시를 걷는다 — 남겨 두면 매 초기화 같은 LogError가 반복된다.
             Debug.LogError($"[DataSaveManager] Local cache is corrupt. Backing up the source: {t_exception}");
             s_repository.Save(CORRUPT_KEY, t_json);
             s_repository.Delete(SAVE_KEY);

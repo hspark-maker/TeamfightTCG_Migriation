@@ -42,7 +42,7 @@ public static class UiPrefabCache
         s_failed = false;
     }
 
-    /// <summary>라벨 로드 1회. 두 번째 호출은 아무 일도 하지 않는다(부트 사본이 둘이라 멱등이어야 한다).</summary>
+    /// <summary>라벨 로드 1회. 두 번째 호출은 아무 일도 하지 않는다(초기화 사본이 둘이라 멱등이어야 한다).</summary>
     public static async UniTask Preload()
     {
         if (s_started) return;

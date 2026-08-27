@@ -14,7 +14,7 @@
 |---|---|
 | 문서 구조 | 도메인별 필드 맵. `payload` 통짜 문자열 폐기 |
 | 진실원 | 클라우드. 로컬 파일은 캐시로 강등 |
-| 오프라인 | **불가**. 부트 시 Firestore 읽기 실패 = 게임 진입 불가 |
+| 오프라인 | **불가**. 초기화 시 Firestore 읽기 실패 = 게임 진입 불가 |
 | 기존 v6 세이브 | 리셋. 마이그레이션 코드 없음 |
 | 스키마 버전 | `UserSaveData.VERSION = 7` |
 
@@ -84,7 +84,7 @@
 
 ### P2 — 필드맵 전환 ⬜
 
-- [ ] `PlayerSaveCloud` 신설 — 비동기 부트 로드, `AdoptRemote`, 디바운스 업로드, 캐시 봉투
+- [ ] `PlayerSaveCloud` 신설 — 비동기 초기화 로드, `AdoptRemote`, 디바운스 업로드, 캐시 봉투
 - [ ] `DataSaveManager` 재설계 — `Load()` 제거, 원격 채택 경로로 교체
 - [ ] `GameManager.Boot` 수정 — 동기 `Load()` 와 `IsSaveBlocked` 분기 삭제
 - [ ] 구 `PlayerSaveSync`(896줄) 삭제, 살릴 관용구만 이식
@@ -96,7 +96,7 @@
 - [ ] **중첩 컬렉션 null 정규화** — `Parse` 가 최상위 슬롯만 채우고 중첩 컬렉션은 안 본다. 콘솔에서 사람이 `null` 을 넣으면 `TournamentProgress.ClearedNodeIds` · `AlbumRewardManager.ClaimedKeys` · `RankRewardManager.ClaimedTiers` 에서 NRE. `Parse` 에서 한 번에 정규화
 - [ ] **KeywordGrowth 키 규약 통일** — Currency는 enum 이름(`"Gold"`), KeywordGrowth는 enum 정수값(`"1"`,`"2"`). 콘솔 가독성이 목적이었으므로 이름 쪽으로 맞출 것
 - [ ] 데드코드 `OwnershipManager.HasAnyOwnedSaved()` — 유일한 소비자였던 `MigrateLegacyCompletion` 제거로 호출자 0
-- [ ] 구 세이브 파싱 실패 시 `SAVE_KEY` 원본이 남아 첫 `Save()` 전까지 매 부트 LogError 반복 (실측 확인됨)
+- [ ] 구 세이브 파싱 실패 시 `SAVE_KEY` 원본이 남아 첫 `Save()` 전까지 매 초기화 LogError 반복 (실측 확인됨)
 
 **완료 판정 (이번 작업의 핵심 수용 기준)**:
 콘솔에서 `currency.Gold` 를 손으로 고친다(타입 integer 유지) → 앱 재시작 → 로비 상단바에 그 값이 뜬다.
@@ -109,7 +109,7 @@
 - [ ] `RecoveryRequired` 재시도 버튼 — **현재 `LoadingCoverView` 에 재시도 버튼이 없다. 신규 작업**
 - [ ] 업로드 실패 배너 (3회 연속 실패부터)
 - [ ] pause/quit flush 재검증
-- [ ] 부트 타임아웃 대소관계 정리 — auth+read 재시도 총합(~13초)이 `LoadingCoverView` 대기 타임아웃보다 길면 재시도가 끝나기 전에 실패 화면으로 튄다
+- [ ] 초기화 타임아웃 대소관계 정리 — auth+read 재시도 총합(~13초)이 `LoadingCoverView` 대기 타임아웃보다 길면 재시도가 끝나기 전에 실패 화면으로 튄다
 
 **완료 판정**: 비행기 모드 부팅 → 재시도 화면 → 네트워크 복구 후 재시도 → 정상 진입.
 플레이 중 비행기 모드 → 배너 → 복귀 시 자동 업로드 → 콘솔 `revision` 증가.
@@ -186,6 +186,6 @@
 
 1. **콘솔 수동 편집이 타입을 깨뜨린다** — 숫자 편집 시 타입 드롭다운을 `number`(double)로 두면 int64가 아니라 double로 저장되어 역직렬화가 실패한다. 도메인 단위 try/catch로 깨진 도메인만 기본값 복구하도록 방어한다
 2. **익명 uid 분실 = 세이브 분실** — 앱 삭제/키체인 초기화로 uid가 바뀌면 기존 문서가 고아가 된다
-3. **부트 지연이 곧 진입 지연** — 오프라인 폴백이 없어 느린 네트워크가 그대로 노출된다
+3. **초기화 지연이 곧 진입 지연** — 오프라인 폴백이 없어 느린 네트워크가 그대로 노출된다
 4. **매 저장 = 전체 문서 재작성** — Firestore 과금은 쓰기 횟수 기준이라 요금엔 영향 없으나 모바일 트래픽에는 영향. 3초 디바운스가 최악을 초당 1/3회로 묶는다
 5. **`JsonUtility` 잔존 위험** — 프로퍼티 전환 후 어딘가에 `JsonUtility` 가 남아 세이브 타입을 다루면 조용히 `{}` 를 뱉는다. 컴파일러가 못 잡는다
