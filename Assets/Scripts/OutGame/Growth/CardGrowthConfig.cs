@@ -5,7 +5,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "CardGrowthConfig", menuName = "Card Battle/Card Growth Config")]
 public class CardGrowthConfig : ScriptableObject
 {
-    [Header("전역 기본식 (레벨 오버라이드가 없을 때 적용)")]
+    [Header("전역 기본식 (시트·레벨 오버라이드가 모두 없을 때 적용)")]
     [Tooltip("강화 상한 레벨. 미강화가 Lv1이므로 강화 횟수는 이 값 - 1이다.")]
     [Min(CardGrowth.BaseLevel)] [SerializeField] int maxLevel = 4;
     [Min(0)] [SerializeField] int hpPerLevel = 4;
@@ -28,7 +28,10 @@ public class CardGrowthConfig : ScriptableObject
     [Min(CardGrowth.BaseLevel)] [SerializeField] int secondEvolutionLevel = 4;
 
     [Header("레벨별 상세 (비어 있는 레벨은 위 기본식으로 계산)")]
-    [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. 레벨당 체력을 다르게 주려면 여기에 행을 채운다.")]
+    [Tooltip("레벨 하나하나의 체력 증가·비용·성공률. " +
+             "비용·재화·성공률의 진실원은 CardEnhance 시트다 — 시트에 그 레벨 행이 있으면 여기 값은 무시된다. " +
+             "여기는 시트를 못 읽었거나 시트에 없는 레벨의 폴백이다. " +
+             "체력은 Card 시트의 hp2~hp4가 이긴다. 여기 hpGain은 그 세 칸이 전부 0인 카드에만 쓰인다.")]
     [SerializeField] List<GrowthLevelStep> levelSteps = new List<GrowthLevelStep>();
 
     // 한계돌파는 강화와 별개 축의 **덤**이다 — 단계당 +1로 얕게 둔다(주 성장 수단은 강화 곡선).
@@ -143,6 +146,14 @@ public class CardGrowthConfig : ScriptableObject
             t_currency = t_row.costCurrency;
             if (t_row.cost        > 0)    t_cost = t_row.cost;
             if (t_row.successRate >= 0f)  t_rate = t_row.successRate;
+        }
+
+        // 비용·성공률의 진실원은 시트다 — 위 저작값은 시트에 없는 레벨의 폴백으로만 남는다.
+        if (EnhanceSpec.TryGetStep(_level, out EnhanceStepSpec t_sheet))
+        {
+            t_currency = t_sheet.Currency;
+            t_cost     = t_sheet.Cost;
+            t_rate     = t_sheet.SuccessRate;
         }
 
         if (_cardId > 0 && CardCatalog.RequireSpec(_cardId).TryGetHpGain(_level, out int t_cardHp))

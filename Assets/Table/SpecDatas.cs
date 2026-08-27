@@ -152,3 +152,19 @@ public partial class AlbumReward
     /// 지급량(0 이하는 지급도 표시도 되지 않는다)
     public long amount;
 }
+
+[GeneratorSpecData]
+public partial class CardEnhance
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 대상 레벨(2 = 첫 강화). 1 이하는 강화로 도달하는 레벨이 아니라 무시된다
+    public int level;
+    /// 소모 재화(Gold/Diamond/Energy/Shard)
+    public string costCurrency;
+    /// 이 레벨업 비용. 0 이하면 무료
+    public long cost;
+    /// 성공률 1000분율(1000 = 100%). 범위 밖은 0~1000으로 조인다
+    public int successPermille;
+}

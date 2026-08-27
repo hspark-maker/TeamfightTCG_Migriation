@@ -19,7 +19,7 @@ public static class SpecPayloadCodec
     public const int SchemaVersion = 3;
     public static readonly string[] TableNames =
     {
-        "Card", "Card_Test", "CardPack", "CardPackDrop", "TournamentReward", "AlbumReward",
+        "Card", "Card_Test", "CardPack", "CardPackDrop", "TournamentReward", "AlbumReward", "CardEnhance",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -162,7 +162,7 @@ public static class SpecPayloadCodec
     {
         "Card" => typeof(Card), "Card_Test" => typeof(Card_Test), "CardPack" => typeof(CardPack),
         "CardPackDrop" => typeof(CardPackDrop), "TournamentReward" => typeof(TournamentReward),
-        "AlbumReward" => typeof(AlbumReward), _ => null,
+        "AlbumReward" => typeof(AlbumReward), "CardEnhance" => typeof(CardEnhance), _ => null,
     };
 
     static bool TryText(object _value, Type _type, out string _text)

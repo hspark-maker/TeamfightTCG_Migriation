@@ -133,6 +133,9 @@ public class InitializationInstaller : MonoBehaviour
         TournamentSpec.Init();
         AlbumSpec.Init();
 
+        // 강화 스펙시트 선로드 — 강화 비용·성공률의 진실원. 상한·진화 레벨은 여전히 CardGrowthConfig가 소유한다.
+        EnhanceSpec.Init();
+
         // 카드 앨범 주입 — lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog의 카드 번호를 읽는다).
         CardAlbum.SetSource(albumConfig);
 
