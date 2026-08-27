@@ -46,20 +46,20 @@ public class SoundManager : MonoBehaviour
     {
         this.bgmCeiling = _vol;
         ApplyBgmVolume();
-        PlayerPrefs.SetFloat(PREFS_BGM, _vol);
+        LocalPrefs.SetFloat(PREFS_BGM, _vol);
     }
 
     public void SetSFXVolume(float _vol)
     {
         this.sfxCeiling = _vol;
         ApplySfxVolume();
-        PlayerPrefs.SetFloat(PREFS_SFX, _vol);
+        LocalPrefs.SetFloat(PREFS_SFX, _vol);
     }
 
     void BuildSources()
     {
-        this.bgmCeiling = PlayerPrefs.GetFloat(PREFS_BGM, 1f);
-        this.sfxCeiling = PlayerPrefs.GetFloat(PREFS_SFX, 1f);
+        this.bgmCeiling = LocalPrefs.GetFloat(PREFS_BGM, 1f);
+        this.sfxCeiling = LocalPrefs.GetFloat(PREFS_SFX, 1f);
 
         bgmSource = gameObject.AddComponent<AudioSource>();
         bgmSource.loop = true;

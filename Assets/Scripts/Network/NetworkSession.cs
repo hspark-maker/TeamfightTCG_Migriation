@@ -27,6 +27,46 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         DontDestroyOnLoad(gameObject);
     }
 
+    // 앱 종료·에디터 Play 정지에는 await 창이 없다 — 러너 종료를 킥만 하고 나간다.
+    // 통보 없이 프로세스가 사라지면 Photon 세션이 타임아웃까지 살아 있어,
+    // 다시 켰을 때 유령 플레이어가 낀 방에 들어가거나 정원이 차서 못 들어간다.
+    void OnApplicationQuit() => ShutdownRunnerImmediate();
+
+    void OnDestroy()
+    {
+        if (Instance != this) return;
+
+        ShutdownRunnerImmediate();
+        Instance = null;
+    }
+
+    void ShutdownRunnerImmediate()
+    {
+        NetworkRunner t_runner = this.Runner;
+        this.Runner = null;
+        if (t_runner == null) return;
+
+        ShutdownAsync(t_runner).Forget();
+    }
+
+    static async UniTaskVoid ShutdownAsync(NetworkRunner _runner)
+    {
+        try { await _runner.Shutdown(); }
+        catch (Exception t_exception) { Debug.LogWarning($"[Net] 러너 종료 실패: {t_exception.Message}"); }
+    }
+
+#if UNITY_EDITOR
+    // 러너가 살아 있는 채로 어셈블리 리로드에 들어가면 소켓 스레드가 남아 "Reloading Domain"이 멈춘다.
+    [UnityEditor.InitializeOnLoadMethod]
+    static void InstallEditorTeardown()
+    {
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= ShutdownForEditor;
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ShutdownForEditor;
+    }
+
+    static void ShutdownForEditor() => Instance?.ShutdownRunnerImmediate();
+#endif
+
     public async UniTask<bool> JoinOrCreateRoom(string _roomName)
     {
         await ShutdownRunner();

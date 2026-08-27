@@ -43,6 +43,17 @@ public static class DataSaveManager
         if (_repository != null) s_repository = _repository;
     }
 
+    /// <summary>로컬 캐시를 통째로 버리고 메모리 세이브도 빈 값으로 되돌린다.
+    /// 계정을 갈아탈 때 남의 진행도를 물고 가지 않게 하는 유일한 통로다 —
+    /// 캐시 소유자가 어긋난 채로 부팅하면 클라우드가 세션을 차단한다.</summary>
+    internal static void ClearLocalCache()
+    {
+        s_repository.Delete(SAVE_KEY);
+        s_repository.Delete(BACKUP_KEY);
+        s_cachedRevision = 0;
+        Data = new UserSaveData();
+    }
+
     // 클라우드 계층이 꽂는다. 3계층이 4계층을 직접 참조하지 않게 하는 배선(OnSaved와 대칭).
     public static void SetImmediateUploadHandler(Action _handler)
     {

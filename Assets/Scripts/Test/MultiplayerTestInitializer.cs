@@ -12,8 +12,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
     const int REQUIRED_PLAYERS = 2;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    const string TEST_ACCOUNT_ARGUMENT = "-testAccountId=";
-    const string PARRELSYNC_ARGUMENT_FILE = ".parrelsyncarg";
 
     static bool s_commandLineSwitchConsumed;
 
@@ -164,7 +162,9 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            PlayerSaveCloud.DisableForTestAccountSession();
+            // 새 uid는 이 기기 캐시의 주인이 아니다 — 캐시를 버려야 소유자 충돌로 세션이 차단되지 않는다.
+            // 클라우드 세이브는 켠 채로 둔다(꺼면 원격 문서가 없어 서버 덱 검증을 못 통과한다).
+            PlayerSaveCloud.ResetForAccountSwitch();
             FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
@@ -206,9 +206,8 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            // 다른 uid로 갈아탄 이상 로컬 캐시 소유자와 어긋난다 — 클라우드 세이브를 끄지 않으면
-            // 다음 부팅이 복구 화면에 갇힌다.
-            PlayerSaveCloud.DisableForTestAccountSession();
+            // 다른 uid로 갈아탄 이상 로컬 캐시 소유자와 어긋난다 — 캐시를 버려 새 계정이 빈 기기에서 시작하게 한다.
+            PlayerSaveCloud.ResetForAccountSwitch();
             FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
             SetStatus($"테스트 계정 '{_accountId}' 로그인 완료.");
         }
@@ -240,44 +239,15 @@ public class MultiplayerTestInitializer : MonoBehaviour
     // 우선순위: 실행 인자 > ParrelSync 클론 인자 > 인스펙터 필드.
     // ParrelSync 클론은 Assets를 심링크로 공유해 씬의 인스펙터 값이 원본과 같아진다 —
     // 클론마다 다른 계정을 쓰려면 클론별 인자 파일이 있어야 한다.
+    // 계정 id와 저장 스코프는 같은 출처여야 한다 — 갈라지면 계정만 다르고 세이브 폴더는 공유되는 상태가 된다.
     string ResolveTestAccountId()
     {
-        string t_fromCommandLine = CommandLineValue(TEST_ACCOUNT_ARGUMENT);
-        if (!string.IsNullOrWhiteSpace(t_fromCommandLine)) return t_fromCommandLine.Trim();
-
-        string t_fromClone = ParrelSyncArgument();
-        if (!string.IsNullOrWhiteSpace(t_fromClone)) return t_fromClone.Trim();
+        if (DevAccountScope.IsActive) return DevAccountScope.Id;
 
         return string.IsNullOrWhiteSpace(this.testAccountId) ? string.Empty : this.testAccountId.Trim();
     }
 
-    static string CommandLineValue(string _prefix)
-    {
-        string[] t_arguments = System.Environment.GetCommandLineArgs();
-        for (int i = 0; i < t_arguments.Length; i++)
-            if (t_arguments[i].StartsWith(_prefix, System.StringComparison.OrdinalIgnoreCase))
-                return t_arguments[i].Substring(_prefix.Length);
-        return string.Empty;
-    }
 
-    static string ParrelSyncArgument()
-    {
-#if UNITY_EDITOR
-        // ParrelSync의 ClonesManager는 Editor 전용 어셈블리라 런타임 코드에서 참조할 수 없다 — 같은 파일을 직접 읽는다.
-        try
-        {
-            string t_path = System.IO.Path.Combine(Application.dataPath, "..", PARRELSYNC_ARGUMENT_FILE);
-            return System.IO.File.Exists(t_path) ? System.IO.File.ReadAllText(t_path) : string.Empty;
-        }
-        catch (System.Exception _exception)
-        {
-            Debug.LogWarning($"[MpTest] ParrelSync 인자 파일을 읽지 못했다: {_exception.GetBaseException().Message}");
-            return string.Empty;
-        }
-#else
-        return string.Empty;
-#endif
-    }
 #endif
 
     bool TryResolveDeck(out List<int> _deck, out string _error)
@@ -421,14 +391,11 @@ public class MultiplayerTestInitializer : MonoBehaviour
             : t_auth.UserId.Substring(0, Mathf.Min(8, t_auth.UserId.Length));
         GUILayout.Label($"Firebase: {t_auth.State} / UID {t_uid}");
         GUILayout.Label($"테스트 계정 id: {(string.IsNullOrEmpty(this.resolvedAccountId) ? "-(기기 기본 계정)" : this.resolvedAccountId)}");
-        if (PlayerSaveCloud.IsTestAccountModeActive)
+        GUILayout.Label($"클라우드 세이브: {PlayerSaveCloud.State} (rev {PlayerSaveCloud.Revision})");
+        if (GUILayout.Button("로컬 세이브 버리고 재시작(계정 전환용)", GUILayout.Height(26f)))
         {
-            GUILayout.Label("테스트 계정 모드 ON — 클라우드 세이브 비활성");
-            if (GUILayout.Button("테스트 계정 모드 해제", GUILayout.Height(26f)))
-            {
-                PlayerSaveCloud.ClearTestAccountSession();
-                SetStatus("테스트 계정 모드 해제. 재시작 후 클라우드 세이브가 복귀하며 현재 UID가 캐시의 새 소유자가 됩니다.");
-            }
+            PlayerSaveCloud.ResetForAccountSwitch();
+            SetStatus("로컬 캐시를 버렸다. 재시작하면 현재 UID가 이 기기의 새 소유자가 된다.");
         }
 #endif
 

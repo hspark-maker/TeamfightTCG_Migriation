@@ -66,20 +66,21 @@ public class GameManager : MonoBehaviour
         GameInitialization.SetState(EGameInitState.Initializing);
 
         // 모바일 60프레임: 기본 30이라 명시 지정. vSync가 targetFrameRate를 덮어쓰지 않게 끔.
-        int t_savedFrameRate = PlayerPrefs.GetInt(FrameRatePrefsKey, DefaultFrameRate);
+        int t_savedFrameRate = LocalPrefs.GetInt(FrameRatePrefsKey, DefaultFrameRate);
         SetTargetFrameRate(t_savedFrameRate, false);
         if (t_savedFrameRate != CurrentFrameRate)
         {
-            PlayerPrefs.SetInt(FrameRatePrefsKey, CurrentFrameRate);
-            PlayerPrefs.Save();
+            LocalPrefs.SetInt(FrameRatePrefsKey, CurrentFrameRate);
+            LocalPrefs.Save();
         }
 
         // 저장된 흔들림 설정 복원(미저장이면 켬). 전투가 열리기 전에 확정돼 있어야 한다.
-        SetScreenShake(PlayerPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
+        SetScreenShake(LocalPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
 
         // 세이브의 진실원은 클라우드 문서다 — 여기서는 캐시 매체만 꽂고, 채택은 PlayerSaveCloud가 비동기로 한다.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;
-        DataSaveManager.SetRepository(new JsonFileRepository(t_profile.SaveFolder));
+        // 같은 PC의 두 클라이언트가 세이브 폴더를 공유하지 않게 개발 스코프를 붙인다(라이브에서는 무변화).
+        DataSaveManager.SetRepository(new JsonFileRepository(DevAccountScope.Folder(t_profile.SaveFolder)));
 
         try
         {
@@ -122,8 +123,8 @@ public class GameManager : MonoBehaviour
 
         if (!_save) return;
 
-        PlayerPrefs.SetInt(FrameRatePrefsKey, _frameRate);
-        PlayerPrefs.Save();
+        LocalPrefs.SetInt(FrameRatePrefsKey, _frameRate);
+        LocalPrefs.Save();
     }
 
     public static void SetScreenShake(bool _on, bool _save = true)
@@ -132,8 +133,8 @@ public class GameManager : MonoBehaviour
 
         if (!_save) return;
 
-        PlayerPrefs.SetInt(ScreenShakePrefsKey, _on ? 1 : 0);
-        PlayerPrefs.Save();
+        LocalPrefs.SetInt(ScreenShakePrefsKey, _on ? 1 : 0);
+        LocalPrefs.Save();
     }
 
     // 앱이 백그라운드로 갈 때 영속화를 flush. 업로드 완료까지 기다린다(안드로이드는 프로세스가 살아 PlayerLoop이 돈다).

@@ -94,12 +94,12 @@ static class PlayerSaveDocument
     {
         if (!string.IsNullOrEmpty(s_deviceId)) return s_deviceId;
 
-        string t_deviceId = PlayerPrefs.GetString(DEVICE_ID_KEY, string.Empty);
+        string t_deviceId = LocalPrefs.GetString(DEVICE_ID_KEY, string.Empty);
         if (string.IsNullOrEmpty(t_deviceId))
         {
             t_deviceId = Guid.NewGuid().ToString("N");
-            PlayerPrefs.SetString(DEVICE_ID_KEY, t_deviceId);
-            PlayerPrefs.Save();
+            LocalPrefs.SetString(DEVICE_ID_KEY, t_deviceId);
+            LocalPrefs.Save();
         }
 
         s_deviceId = t_deviceId;

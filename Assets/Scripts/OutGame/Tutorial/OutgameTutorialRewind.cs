@@ -35,7 +35,7 @@ public static class OutgameTutorialRewind
         _chapter = 0;
         _step    = 0;
 
-        string t_raw = PlayerPrefs.GetString(_key, string.Empty);
+        string t_raw = LocalPrefs.GetString(_key, string.Empty);
         if (string.IsNullOrEmpty(t_raw)) return false;
 
         string[] t_parts = t_raw.Split(',');
@@ -50,15 +50,15 @@ public static class OutgameTutorialRewind
         int t_chapter = Mathf.Max(0, _chapter);
         int t_step    = Mathf.Max(0, _step);
 
-        PlayerPrefs.SetString(PREF_KEY, $"{t_chapter},{t_step}");
-        PlayerPrefs.Save();
+        LocalPrefs.SetString(PREF_KEY, $"{t_chapter},{t_step}");
+        LocalPrefs.Save();
     }
 
     public static void Cancel()
     {
-        PlayerPrefs.DeleteKey(PREF_KEY);
-        PlayerPrefs.DeleteKey(PREF_REPLAY_KEY);
-        PlayerPrefs.Save();
+        LocalPrefs.DeleteKey(PREF_KEY);
+        LocalPrefs.DeleteKey(PREF_REPLAY_KEY);
+        LocalPrefs.Save();
     }
 
     /// <summary>1단 — 아웃게임 세이브를 첫실행으로 밀고 예약 좌표를 심는다.
@@ -91,9 +91,9 @@ public static class OutgameTutorialRewind
         DataSaveManager.Save();
 
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 초기화가 세이브를 다시 밀지 않게 한다.
-        PlayerPrefs.DeleteKey(PREF_KEY);
-        PlayerPrefs.SetString(PREF_REPLAY_KEY, $"{t_chapter},{t_step}");
-        PlayerPrefs.Save();
+        LocalPrefs.DeleteKey(PREF_KEY);
+        LocalPrefs.SetString(PREF_REPLAY_KEY, $"{t_chapter},{t_step}");
+        LocalPrefs.Save();
 
         // 정지 판정은 세이브 밖(static)이라 슬롯을 갈아도 남는다. 보통은 다음 초기화의 도메인 리로드가
         // 알아서 내리므로 no-op이고, 리로드를 끈 에디터 세션에서만 실효가 있다 — 그 한 경우를 위한 방어다.

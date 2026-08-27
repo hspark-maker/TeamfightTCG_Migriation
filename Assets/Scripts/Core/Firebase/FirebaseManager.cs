@@ -131,4 +131,47 @@ public static class FirebaseManager
         Shutdown();
         s_modules.Clear();
     }
+
+#if UNITY_EDITOR
+    // 에디터 전용 정리. Firestore 리스너·Auth 콜백이 살아 있는 채로 도메인 리로드에 들어가면
+    // Unity가 "Reloading Domain"에서 네이티브 스레드를 기다리다 멈춘다 —
+    // Play 종료와 어셈블리 리로드 직전에 먼저 내린다.
+    [UnityEditor.InitializeOnLoadMethod]
+    static void InstallEditorTeardown()
+    {
+        UnityEditor.EditorApplication.playModeStateChanged -= HandlePlayModeChanged;
+        UnityEditor.EditorApplication.playModeStateChanged += HandlePlayModeChanged;
+
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= ShutdownForEditor;
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ShutdownForEditor;
+    }
+
+    static void HandlePlayModeChanged(UnityEditor.PlayModeStateChange _state)
+    {
+        if (_state == UnityEditor.PlayModeStateChange.ExitingPlayMode) ShutdownForEditor();
+    }
+
+    static void ShutdownForEditor()
+    {
+        // Firestore는 gRPC 네이티브 채널·스레드를 들고 있다. 참조만 버리면(s_firestore = null)
+        // 그 스레드가 남아 도메인 리로드가 "Reloading Domain"에서 멈춘다 — 명시적으로 종료시킨다.
+        FirebaseFirestore t_firestore = s_firestore;
+
+        try { Shutdown(); }
+        catch (Exception t_exception) { Debug.LogWarning($"[Firebase] 에디터 정리 실패: {t_exception.Message}"); }
+
+        if (t_firestore == null) return;
+
+        try
+        {
+            // 리로드 콜백에는 await 창이 없다 — 짧게만 기다리고 넘어간다(무한 대기가 곧 hang이다).
+            if (!t_firestore.TerminateAsync().Wait(TimeSpan.FromSeconds(3)))
+                Debug.LogWarning("[Firebase] Firestore 종료가 3초 안에 끝나지 않았다.");
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[Firebase] Firestore 종료 실패: {t_exception.Message}");
+        }
+    }
+#endif
 }

@@ -177,9 +177,16 @@ public sealed class FirebaseAuthService
         }
     }
 
-    // 처음 쓰는 id면 계정이 없다 — 없을 때만 만들고, 그 외 실패는 그대로 올린다.
+    // 처음 쓰는 id면 계정이 없다 — 없을 때만 만든다.
+    //
+    // "없다"를 에러 코드로 못 가른다는 게 이 메서드의 전제다. 프로젝트에 이메일 열거 방지가 켜져 있으면
+    // 서버가 계정 없음과 비밀번호 불일치를 INVALID_LOGIN_CREDENTIALS 하나로 합쳐 돌려주고,
+    // Unity SDK는 그걸 AuthError.Failure로 뭉갠다 — UserNotFound만 보면 생성 분기가 영영 안 선다.
+    // 그래서 순서를 뒤집는다: 비밀번호 불일치가 확실한 경우만 빼고 일단 만들어 보고,
+    // 이미 있는 계정이면(EmailAlreadyInUse) 그때 원래 로그인 실패를 그대로 올린다.
     async UniTask<FirebaseUser> SignInOrCreateTestUserAsync(string _email, string _password)
     {
+        Exception t_signInFailure;
         try
         {
             AuthResult t_result = await this.auth.SignInWithEmailAndPasswordAsync(_email, _password);
@@ -187,15 +194,27 @@ public sealed class FirebaseAuthService
         }
         catch (Exception t_exception)
         {
-            if (!IsUserNotFound(t_exception)) throw;
+            if (IsWrongPassword(t_exception)) throw;
+            t_signInFailure = t_exception;
         }
 
-        AuthResult t_created = await this.auth.CreateUserWithEmailAndPasswordAsync(_email, _password);
-        return t_created.User;
+        try
+        {
+            AuthResult t_created = await this.auth.CreateUserWithEmailAndPasswordAsync(_email, _password);
+            return t_created.User;
+        }
+        catch (Exception t_exception) when (IsEmailAlreadyInUse(t_exception))
+        {
+            // 계정은 있는데 로그인이 안 됐다 = 자격 증명 문제. 생성 실패가 아니라 로그인 실패를 보여줘야 원인이 보인다.
+            throw t_signInFailure;
+        }
     }
 
-    static bool IsUserNotFound(Exception _exception)
-        => TryAuthError(_exception, out AuthError t_error) && t_error == AuthError.UserNotFound;
+    static bool IsWrongPassword(Exception _exception)
+        => TryAuthError(_exception, out AuthError t_error) && t_error == AuthError.WrongPassword;
+
+    static bool IsEmailAlreadyInUse(Exception _exception)
+        => TryAuthError(_exception, out AuthError t_error) && t_error == AuthError.EmailAlreadyInUse;
 
     // Firebase는 실제 원인을 AggregateException 안쪽에 넣어 던진다 — 사슬을 끝까지 훑어야 코드가 나온다.
     static bool TryAuthError(Exception _exception, out AuthError _error)

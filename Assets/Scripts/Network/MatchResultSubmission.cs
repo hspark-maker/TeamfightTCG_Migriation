@@ -314,7 +314,7 @@ static class MatchResultSubmission
     static void LoadPending()
     {
         s_pending.Clear();
-        string t_json = PlayerPrefs.GetString(PendingKey, string.Empty);
+        string t_json = LocalPrefs.GetString(PendingKey, string.Empty);
         if (string.IsNullOrEmpty(t_json)) return;
         PendingStore t_store = JsonUtility.FromJson<PendingStore>(t_json);
         if (t_store?.items != null) s_pending.AddRange(t_store.items);
@@ -322,9 +322,9 @@ static class MatchResultSubmission
 
     static void SavePending()
     {
-        if (s_pending.Count == 0) PlayerPrefs.DeleteKey(PendingKey);
-        else PlayerPrefs.SetString(PendingKey, JsonUtility.ToJson(new PendingStore { items = new List<PendingSubmission>(s_pending) }));
-        PlayerPrefs.Save();
+        if (s_pending.Count == 0) LocalPrefs.DeleteKey(PendingKey);
+        else LocalPrefs.SetString(PendingKey, JsonUtility.ToJson(new PendingStore { items = new List<PendingSubmission>(s_pending) }));
+        LocalPrefs.Save();
     }
 }
 

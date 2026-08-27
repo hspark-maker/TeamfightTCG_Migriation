@@ -259,6 +259,8 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       ...approvals,
       [uid]: {
         deckHash: data.deckHash,
+        // 멱등 판정이 이 필드를 읽는다 — 빠지면 같은 uid의 재호출(폴링)이 전부 already-exists로 떨어진다.
+        contentFingerprint: data.contentFingerprint,
         myNonce: data.myNonce,
         opponentNonce: data.opponentNonce,
         saveRevision: revision,

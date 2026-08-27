@@ -9,10 +9,8 @@ using UnityEngine;
 // 채택은 초기화당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
 static class PlayerSaveCloud
 {
+    // 저장 위치는 LocalPrefs가 개발 스코프별로 갈라 준다 — 키 자체는 전 인스턴스 공통이다.
     const string OWNER_UID_KEY = "firebase.playerSave.ownerUid";
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    const string TEST_DISABLED_KEY = "firebase.playerSave.testDisabled";
-#endif
     const int UPLOAD_DEBOUNCE_MS = 1000;
     const int READ_ATTEMPT_COUNT = 3;
     const int READ_BACKOFF_MS = 500;
@@ -35,9 +33,6 @@ static class PlayerSaveCloud
     static bool s_uploading;
     static bool s_gateComplete;
     static bool s_uploadApproved;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    static bool s_disabledForTestAccountSession;
-#endif
 
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
     internal static string LastError { get; private set; } = string.Empty;
@@ -66,22 +61,6 @@ static class PlayerSaveCloud
         if (!_context.IsValid) throw new ArgumentException("FirebaseContext is not initialized.", nameof(_context));
         Shutdown();
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (IsTestAccountSessionDisabled())
-        {
-            s_hasCacheAtBoot = DataSaveManager.TryLoadCache(out UserSaveData t_cacheData, out long t_cacheRevision);
-            if (s_hasCacheAtBoot)
-            {
-                Revision = t_cacheRevision;
-                DataSaveManager.AdoptRemote(t_cacheData, t_cacheRevision);
-            }
-
-            State = EPlayerSaveCloudState.Disabled;
-            s_gateComplete = true;
-            return;
-        }
-#endif
-
         s_context = _context;
         s_envId = _context.EnvId;
         s_initialized = true;
@@ -95,7 +74,7 @@ static class PlayerSaveCloud
         SetState(EPlayerSaveCloudState.Loading);
 
         PlayerSaveDocument.CacheDeviceInfo();
-        s_ownerUid = PlayerPrefs.GetString(OWNER_UID_KEY, string.Empty);
+        s_ownerUid = LocalPrefs.GetString(OWNER_UID_KEY, string.Empty);
 
         DataSaveManager.SetImmediateUploadHandler(RequestImmediateUpload);
         DataSaveManager.OnSaved += MarkDirty;
@@ -211,36 +190,18 @@ static class PlayerSaveCloud
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    internal static bool IsTestAccountModeActive => IsTestAccountSessionDisabled();
-
-    static bool IsTestAccountSessionDisabled()
+    /// <summary>계정을 갈아타기 직전에 부른다 — 로컬 캐시와 소유자 표식을 버려 새 UID가 빈 기기에서 시작하게 한다.
+    /// 예전에는 여기서 클라우드 세이브를 통째로 껐는데, 그러면 그 세션은 원격 문서를 못 만들어
+    /// 서버 덱 검증(lockDeck)이 통과할 수 없다 — 테스트 경로가 프로덕션과 갈리지 않게 캐시만 버린다.</summary>
+    internal static void ResetForAccountSwitch()
     {
-        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test) return false;
-        return s_disabledForTestAccountSession || PlayerPrefs.GetInt(TEST_DISABLED_KEY, 0) == 1;
-    }
-
-    internal static void DisableForTestAccountSession()
-    {
-        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
-            throw new InvalidOperationException("Test save cloud can only be disabled in Test run mode.");
-        s_disabledForTestAccountSession = true;
-        PlayerPrefs.SetInt(TEST_DISABLED_KEY, 1);
-        PlayerPrefs.DeleteKey(OWNER_UID_KEY);
-        PlayerPrefs.Save();
+        Shutdown();
+        DataSaveManager.ClearLocalCache();
+        LocalPrefs.DeleteKey(OWNER_UID_KEY);
+        LocalPrefs.Save();
         s_ownerUid = string.Empty;
+        s_hasCacheAtBoot = false;
     }
-
-    internal static void ClearTestAccountSession()
-    {
-        s_disabledForTestAccountSession = false;
-        PlayerPrefs.DeleteKey(TEST_DISABLED_KEY);
-        PlayerPrefs.DeleteKey(OWNER_UID_KEY);
-        PlayerPrefs.Save();
-        s_ownerUid = string.Empty;
-    }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetTestRuntimeState() => s_disabledForTestAccountSession = false;
 #endif
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
@@ -446,8 +407,8 @@ static class PlayerSaveCloud
         if (!string.IsNullOrEmpty(s_activeUserId))
         {
             s_ownerUid = s_activeUserId;
-            PlayerPrefs.SetString(OWNER_UID_KEY, s_activeUserId);
-            PlayerPrefs.Save();
+            LocalPrefs.SetString(OWNER_UID_KEY, s_activeUserId);
+            LocalPrefs.Save();
         }
 
         s_uploadApproved = true;
@@ -719,8 +680,8 @@ static class PlayerSaveCloud
 
             s_activeUserId = t_userId;
             s_ownerUid = t_userId;
-            PlayerPrefs.SetString(OWNER_UID_KEY, t_userId);
-            PlayerPrefs.Save();
+            LocalPrefs.SetString(OWNER_UID_KEY, t_userId);
+            LocalPrefs.Save();
             return;
         }
 
