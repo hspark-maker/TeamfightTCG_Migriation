@@ -38,13 +38,13 @@
 - `FirebaseRootPath.DatabaseId = "cardbattle"` — 기본 `(default)` 아님
 - Firebase 스킬 묶음 — `firebase-security-rules-auditor`, `firebase-firestore/references/**/security_rules.md`
 
-아직 안 된 것:
+층별 실태:
 
 | 층 | 상태 |
 |---|---|
 | functions | ✅ R0: 의존성 설치·`tsc` 빌드·lint 통과. 배포는 로그인 후 1회 남음 |
 | 클라 Functions SDK | ✅ R0: `ICallableService`/`FunctionsCallableService` 신설. 접점은 이 하나뿐(미결 #12) |
-| 규칙 | `firestore.rules` = `allow read, write: if true` **전면 개방**. `.prod` 는 P2 이전 `payload` 통짜 스키마라 실효 상실 |
+| 규칙 | `.prod` 는 커밋 `809d040d3` 에서 신 스키마(메타 5 + 슬롯 10) 기준으로 교정됨. 전면 개방인 것은 루트 `firestore.rules`(= `allow read, write: if true`) 하나뿐 |
 | 세이브 쓰기 | `PlayerSaveCloud.PushAsync` **한 곳**. 트랜잭션 + revision 낙관적 잠금 + 문서 전체 `SetOptions.Overwrite` |
 | 스펙 | 6표만 서버에: `Card` `Card_Test` `CardPack` `CardPackDrop` `TournamentReward` `AlbumReward` |
 | 스펙 업로더 | `SpecFirestoreUploader` 가 **웹 API key로 REST 직접 write** → 규칙을 닫는 순간 죽는다 |
@@ -58,8 +58,11 @@
 ```javascript
 // 클라가 바꿔도 되는 슬롯만 화이트리스트
 request.resource.data.diff(resource.data).affectedKeys()
-  .hasOnly(['revision','updatedAt','deviceId','appVersion', 'deck','tutorial','profile'])
+  .hasOnly(['schemaVersion','revision','updatedAt','deviceId','appVersion', 'deck','tutorial','profile'])
 ```
+
+> **`schemaVersion` 을 빠뜨리면 전 유저 쓰기가 막힌다.** 클라는 항상 15키(메타 5 + 슬롯 10)를 통째로
+> 실어 보내므로 `schemaVersion` 이 화이트리스트에 없으면 `hasOnly` 가 매 저장마다 거부한다.
 
 - 클라는 **지금처럼 문서 전체를 Overwrite** 한다. 서버 권위 슬롯은 읽은 값을 그대로 실어 보내므로
   `diff()` 에 안 잡혀 통과한다 → **클라 쓰기 코드를 고칠 필요가 없다**
@@ -91,9 +94,9 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 
 | Phase | 상태 | 목표 | 선행 |
 |---|---|---|---|
-| **R0** 기반 배선 | ⬜ 대기 | functions 배포·에뮬레이터, 클라 Callable 서비스, 왕복 1회 | — |
-| **R1** 룰 1차 배포 | ⬜ 대기 | 소유권·형식·revision 뼈대. 슬롯 동결은 아직 없음 | R0 |
-| **R2** 로컬 캐시 제거 | ⬜ 대기 | 캐시 4계층 삭제, 상태머신 정리 | — (병행 가능) |
+| **R0** 기반 배선 | 🟡 진행중 | 코드·설정 완료(에뮬레이터 블록, 클라 Callable 서비스, `ping` onCall, 채택 계약, 오류 분류기). **배포 1회 + 실왕복 검증 남음** | — |
+| **R1** 룰 1차 배포 | 🟡 진행중 | 소유권·형식·revision 뼈대(슬롯 동결은 아직 없음). 룰 본문 + 회귀 24케이스 완료, **배포 3단계 남음** | R0 |
+| **R2** 로컬 캐시 제거 | ✅ 완료 | 캐시 4계층 삭제, 상태머신 정리 — 커밋 `d19590e2b` | — (병행 가능) |
 | **R3** 스펙 서버화 | ⬜ 대기 | 업로더 권한 이관 + 미업로드 SO 7종 승격 | R1 |
 | **R4** 계정 생성·스타터 | ⬜ 대기 | 신규 문서 생성을 서버가 소유 | R1 |
 | **R5** 카드팩 | ⬜ 대기 | 추첨 난수·소유·간식·차감 | R3 |
@@ -104,24 +107,33 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 
 ---
 
-### R0 — 기반 배선 ⬜
+### R0 — 기반 배선 🟡
 
 **목표**: 클라에서 서버 함수를 한 번 왕복시키고, 배포·로컬 반복 루프를 만든다.
 
-- [ ] `npm install` → `npm run build` → `firebase deploy --only functions` 1회 성공
-- [ ] `firebase.json` 에 `emulators` 블록 추가 (functions + firestore + auth). 지금 없다
-- [ ] 클라 Callable 접점 신설 — `Assets/Scripts/Core/Firebase/`
+- [x] `npm install` → `npm run build` — `functions/node_modules` 존재, `functions/lib/` 산출물이 `src` 보다 최신
+- [ ] `firebase deploy --only functions` 1회 성공 — **미배포**. `firebase login:list` 가
+      `No authorized accounts` 라 CLI 로그인이 없어 배포 자체를 시도할 수 없다
+- [x] `firebase.json` 에 `emulators` 블록 추가 — auth 9099 / functions 5001 / firestore 8080 /
+      ui 4000 / `singleProjectMode`
+- [x] 클라 Callable 접점 신설 — `Assets/Scripts/Core/Firebase/ICallableService.cs` +
+      `FunctionsCallableService.cs`
   - `ICallableService` + `FunctionsCallableService`.
     **CLAUDE.local.md 규약**: 외부 시스템 접점(Service)은 반드시 인터페이스 추상화
-  - `FirebaseFunctions.GetInstance(app, "asia-northeast3")` —
+  - 리전 `asia-northeast3` 로 인스턴스를 잡는다 —
     `DefaultInstance` 는 us-central1이라 그대로 쓰면 404
-  - 에뮬레이터 스위치 `UseFunctionsEmulator(origin)` 를 `ContentProfileConfig` 런모드에 물린다
-  - 타임아웃은 기존 `FirebaseTimeouts` 옆에
-- [ ] `ping` 을 `onCall` 로 교체 (`request.auth` 확인용)
-- [ ] **응답 채택 계약 구현** — `{ revision, updatedSlots }` 를 받아
-      `DataSaveManager`/`PlayerSaveCloud.Revision` 에 반영하는 단일 창구
-- [ ] 오류 규약 확정: `HttpsError` code ↔ 클라 `FunctionsErrorCodes` ↔
-      기존 UX 표면 3분할(`Failed` 재시도 / `Blocked` 재시작 / `Offline` 배너)
+  - 에뮬레이터 스위치 `UseFunctionsEmulator(origin)` 배선 완료
+  - 타임아웃은 `FirebaseTimeouts.CallableMilliseconds`
+- [x] `ping` 을 `onCall` 로 교체 — `functions/src/commands/ping.ts` (v2 `onCall`)
+- [x] **응답 채택 계약 구현** — `ServerSaveCommands.InvokeAsync` → `PlayerSaveCloud.AdoptServerResult`
+      → `DataSaveManager.AdoptServerSlots` + `OnServerSlotsAdopted` 단일 창구
+- [x] 오류 규약 확정 — `Core/Firebase/CloudFailureClassifier.cs` 가 `ECloudFailureKind` 로
+      `Transient`/`Rejected`/`Unusable` 3분할
+
+**남은 미완 2건**
+
+1. `firebase deploy --only functions` 1회 (CLI 로그인 선행)
+2. **클라 Firestore 에뮬레이터 스위치** — 지금은 함수만 로컬로 가고 Firestore는 프로덕션에 붙는다
 
 **완료 판정**: 게임 실행 → 익명 로그인 → `ping` onCall → uid가 서버 로그에 찍히고 클라가 응답 수신.
 에뮬레이터로도 같은 왕복.
@@ -132,60 +144,141 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 
 **목표**: 전면 개방을 끝낸다. **아직 슬롯은 동결하지 않는다** — 게임이 지금 그대로 돌아야 한다.
 
-`firestore.rules` 재작성. 현재 `.prod` 는 `payload` 스키마 시절 것이라 폐기하고 새로 쓴다.
+**R1은 재작성이 아니다.** `.prod` 는 커밋 `809d040d3` 에서 메타 5 + 슬롯 10 키로 이미 교정됐다 —
+`firestore.rules.prod` 를 출발점으로 보강하고, 회귀 테스트로 고정하는 일이다.
 
-- [ ] `envs/{env}/users/{uid}/save/{doc}`
+**슬롯 *내부* 필드는 검증하지 않는다** — `ProfileSaveData` 의 `nickname`/`avatarId`/`frameId` 는
+초기값이 없어 신규 계정 첫 업로드에서 null 로 실린다. `profile.nickname is string` 을 요구하면
+신규 유저가 막힌다.
+
+- [x] `envs/{env}/users/{uid}/save/{doc}`
   - `isOwner()` · `env in ['live','test']` · `doc == 'current'`
   - `keys().hasOnly([메타 5 + 슬롯 10])` — 알 수 없는 필드 차단
   - 메타 타입·크기: `schemaVersion is int > 0` · `revision is int` ·
     `deviceId.size() == 32` · `appVersion.size() <= 64` · `updatedAt == request.time`
   - `create`: `revision == 1` / `update`: `revision == resource.data.revision + 1` 이고
     `schemaVersion >= resource.data.schemaVersion` / `delete: if false`
-  - 슬롯별 형식 검증(각 슬롯이 map/list인지, 크기 상한)
-- [ ] `envs/{env}/specs/{table}` 및 `rows/{id}` —
-      `allow read: if request.auth != null`(클라 `BattleContentSync` 가 읽는다), `write: if false`
-- [ ] 그 외 전부 거부
-- [ ] `firebase-security-rules-auditor` 스킬로 감사 1회
-- [ ] rules 에뮬레이터 회귀 3종: 남의 uid 읽기 거부 / revision 건너뛰기 거부 / 정상 왕복 통과
+  - 슬롯별 형식 검증 — **각 슬롯이 있으면 `is map`, 없으면 통과**까지만 한다.
+    슬롯 안쪽은 안 본다(위 `ProfileSaveData` null 이유). 크기 상한은 룰에서 문서 크기를
+    잴 수 없어 못 넣는다 — 클라의 `DOCUMENT_MAX_BYTES` 가 계속 갖는다
+- [x] `envs/{env}/specs/{table}` 및 `rows/{id}` —
+      `allow read: if request.auth != null`, `write: if false`.
+      read 를 여는 이유는 `Assets/Scripts/OutGame/Spec/BattleContentSync.cs` 가
+      **클라이언트 SDK로 이 경로를 직접 읽기** 때문이다.
+      현재 `.prod` 는 read 도 `if false` 라 **그대로 배포하면 클라 부트의 스펙 동기화까지 죽는다**.
+      `write` 는 R3(a) 까지 임시 개방한다 — 미결 #6 결정 참조
+- [x] 그 외 전부 거부 — `match /{document=**}` catch-all deny 를 글자로 남겼다
+- [x] `firebase-security-rules-auditor` 스킬로 감사 1회 — **Major 2건을 잡아 고쳤다**
+  - **슬롯 10개가 전부 optional 이라 세이브를 통째로 비울 수 있었다.** `hasAll` 이 메타 5키만
+    요구하고 슬롯 검사도 "없으면 통과" 라, 메타 5키 + `revision+1` 만 보내면 소유·재화·랭크가
+    사라진다. `delete: if false` 로 막으려던 세이브 소멸이 **필드 생략으로 우회**됐다.
+    → `hasAll` 을 15키로. `ToFieldMap` 은 Overwrite 와 짝이라 언제나 15키를 실어 회귀 없음
+  - **`create` 에 schemaVersion 상한이 없었다.** `update` 는 `>=` 라 못 내리므로, 첫 문서를
+    `999999` 로 만들면 영구 고착되고 룰 층에 복구 경로가 없다 → `create` 는 현재 버전과
+    정확히 같을 것을 요구. **`UserSaveData.VERSION` 을 올리면 이 줄도 같이 올려야 한다**
+    (안 올리면 신규 계정만 못 만들어지는 부분 고장 — 회귀 테스트 `8b` 가 잡는다)
+- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **29케이스**, 전부 통과.
+      요구된 3종(남의 uid 읽기 / revision 건너뛰기 / 정상 왕복) 포함.
+      포트 8081 · 프로젝트 `tcg-rules-test` 로 갈라 루트 에뮬레이터(8080)와 안 부딪힌다.
+      룰은 `initializeTestEnvironment` 가 `.prod` 를 직접 주입하므로 `firebase.json` 포인터와 무관하다.
+      **뮤테이션 검증 3회**: `hasOnly` 에서 슬롯 키를 빼면 통과 케이스 4개가 깨지고,
+      감사 이전 룰 상태를 재현하면 `7c`·`7d`(세이브 비우기)가, `create` 의 버전 고정을 지우면
+      `8b` 가 깨진다 — 테스트가 룰을 실제로 물고 있다
 
 **같이 처리해야 하는 것**
 
-- **`SpecFirestoreUploader` 가 죽는다** — API key로 REST write를 한다.
-  R3에서 이관할 때까지의 임시 통로를 정하거나(관리자 uid 예외), R3를 R1과 붙여서 진행한다(미결 #6)
+- **`SpecFirestoreUploader`** — API key로 REST write를 한다. **결정(미결 #6): specs `write` 를
+  R3(a) 까지 임시 개방으로 둔다.** 로드맵이 적어 둔 "관리자 uid 예외"안은 성립하지 않는다 —
+  이 업로더는 인증 토큰 자체가 없어 `request.auth` 가 null 이라 uid 로 걸러낼 대상이 아니다
+**감사에서 나왔지만 지금 안 고친 것 — R9로 넘긴다**
+
+- **중첩 크기 무제한** — `keys()` 는 top-level만 본다. 슬롯 안을 1MiB까지 채워 revision마다
+  갱신하면 쓰기·스토리지 비용이 유저 한 명으로 팽창한다. `ownership.cardIds.size()` 류
+  개수 상한 3줄로 완화할 수 있으나, **슬롯 안쪽을 보기 시작하는 순간 `ProfileSaveData` null
+  같은 사고가 다시 열린다.** 근본 해법은 R9의 서버 쓰기 이관이다
+- **`deviceId` hex 미검증 · `appVersion` 문자셋 무검증** — 자기 문서·로그 오염 수준. R9
+- **익명 인증이라 `request.auth != null` 은 앱에 박힌 API key만 있으면 누구나 얻는다** —
+  `specs` 읽기는 사실상 공개다. 마스터데이터라 피해는 낮지만, **"인증됨"을 신뢰 신호로 쓰는
+  규칙을 앞으로 추가하지 마라**
+- **`specs` 임시 개방의 진짜 위험은 변조가 아니라 무제한 문서 생성**이다 — `{envId}`·`{table}`
+  둘 다 와일드카드라 미인증자가 임의 경로에 문서를 찍어낼 수 있다. R3(a) 이관이 유일한 완화책
+
+**낙관적 잠금은 룰 층에서 실제로 막힌다** — 룰의 `resource` 읽기가 커밋과 원자적이라
+같은 rev N에서 출발한 두 쓰기가 둘 다 N+1로 착지할 수 없다. 클라 `RunTransactionAsync` 는
+필수가 아니라 오류 품질용이다. 다만 막는 것은 **인터리브지 lost update 가 아니다** —
+`SetOptions.Overwrite` 라 충돌 후 원격을 재채택해 다시 밀면 상대 기기 변경분이 통째로 사라진다.
+`PlayerSaveCloud` 가 충돌 시 재시도 대신 `BlockSession(RemoteAhead)` 로 세션을 접는 건 맞는 선택이다.
+
 - **디버그 경로 점검** — R1 단계에선 살아 있지만 R9 동결 때 전부 죽는다:
   `OutgameDebugActions.GrantCurrency`(**`#if UNITY_EDITOR` 가드 없음**) · `CardGrowthManager.DebugMaxAll` ·
   `OwnershipManager.GrantEntireCatalog` · `RankManager.SetTierForDebug` ·
   `TournamentProgress.ResetForDebug` · `UnlockAllCardsButton`
 
+**남은 것 — 배포 3단계.** 룰 본문과 회귀 테스트는 끝났고 아래는 사람 승인이 필요하다:
+
+1. `firebase.json` 의 `firestore.rules` 포인터를 `.prod` 로 스왑 — **R0 판정 세션의 에뮬레이터
+   왕복이 열린 룰을 전제**하므로 그쪽이 통과한 뒤에 옮긴다
+2. `firebase login` → `firebase deploy --only firestore:rules`
+   (`firestore.indexes.json` 이 없으므로 `--only firestore` 를 그냥 치면 안 된다)
+3. 배포 후 정상 플레이 왕복 + 타 uid 접근 차단 실측
+
+**순서 제약**: callable 경로의 `Rejected`/`Unusable` UX 표면이 서기 전에 룰을 닫으면
+룰 거부가 유저에게 아무 표면 없이 삼켜진다. 배포는 그 뒤여야 한다.
+
 **완료 판정**: 규칙 배포 후 정상 플레이 왕복이 되고, 다른 uid 문서 접근이 막힌다.
 
 ---
 
-### R2 — 로컬 캐시 제거 ⬜
+### R2 — 로컬 캐시 제거 ✅
+
+**커밋 `d19590e2b` 에서 완료.** 단 **미결 #4(쓰기 실패 시 클라 메모리)는 여전히 미결이다** —
+아래 분류기 하이브리드는 R2가 채택한 방침일 뿐 결정 항목이 닫힌 것은 아니다.
 
 **목표**: 진실원이 서버 문서인 이상 캐시 봉투는 순수 부채다. **R0/R1과 독립이라 병행 가능.**
 
-사라지는 것:
+본체는 커밋 `d19590e2b`(온라인 전용 부트 — 재시도 경로·오프라인 폴백·로컬 캐시 폐기)에서 처리됐다.
+아래 삭제 목록은 전수 grep 0건으로 확인(2026-08-27): `OutGame/Save/1.Repository/` 폴더 자체가 없고,
+`PlayerSaveCacheEnvelope`·`FallbackToCache`·`IsCacheOwnedByOther`·PlayerPrefs `ownerUid` 전역 참조 0건,
+`GameManager` 의 `SetRepository` 도 없다. `CreateSnapshot` 만 dirty 대조용으로 의도대로 남았다.
 
-- [ ] `OutGame/Save/1.Repository/` 전체 — `IRepository` · `IAtomicRepository` ·
-      `JsonFileRepository` · `PlayerPrefsRepository`(이미 dead)
-- [ ] `2.Domain/PlayerSaveCacheEnvelope`
-- [ ] `DataSaveManager` — `SetRepository` · `TryLoadCache` · `WriteCache` ·
+사라진 것:
+
+- [x] `OutGame/Save/1.Repository/` 전체 — `IRepository` · `IAtomicRepository` ·
+      `JsonFileRepository` · `PlayerPrefsRepository`(이미 dead). 디렉터리째 없다
+- [x] `2.Domain/PlayerSaveCacheEnvelope`
+- [x] `DataSaveManager` — `SetRepository` · `TryLoadCache` · `WriteCache` ·
       `MarkUploadedRevision` · `HasLocalSave`(dead)
-- [ ] `PlayerSaveCloud` — `AdoptUnsyncedCache` · `FallbackToCache` · `IsCacheOwnedByOther` ·
+- [x] `PlayerSaveCloud` — `AdoptUnsyncedCache` · `FallbackToCache` · `IsCacheOwnedByOther` ·
       PlayerPrefs `ownerUid`
-- [ ] `GameManager.Initialize` 의 `SetRepository(new JsonFileRepository(...))`
+- [x] `GameManager.Initialize` 의 `SetRepository(new JsonFileRepository(...))`
 
-남기는 것: `CreateSnapshot`/`SnapshotOf` — dirty 판정과 "값이 안 바뀌었으면 revision 안 올림" 최적화가 여기 걸려 있다.
+남긴 것: `DataSaveManager.CreateSnapshot` — dirty 판정과 "값이 안 바뀌었으면 revision 안 올림"
+최적화가 여기 걸려 있다. `PlayerSaveCloud` 3곳에서 쓴다. (`SnapshotOf` 는 통합돼 사라졌다)
 
-**상태머신이 바뀐다**: 캐시 폴백이 없으므로 부트 실패는 `Failed` 하나.
-`Offline` 은 "부트 후 쓰기 실패 중"만 남는다.
+**상태머신**: 의도대로 갈렸고, P3에서 `Blocked` 가 더해져 3분할이 됐다.
 
-**이 Phase에서 결정할 것(미결 #4)**: 쓰기 실패 시 클라 메모리와 서버가 갈린다 →
-(a) 메모리 재시도 큐 (b) 실패 즉시 세션 차단
+| 상태 | 사건 | 표면 |
+|---|---|---|
+| `Failed` | 부트 채택 실패 | 복구 화면(`LoadingCoverView`) |
+| `Offline` | 부트 후 쓰기 실패 중 | 배너(`CloudSyncBannerView`) |
+| `Blocked` | 이 클라로는 더 못 쓴다 (`ECloudBlockReason` 3종) | 재시작 모달 |
 
-**완료 판정**: `persistentDataPath/Save/` 에 파일이 생기지 않고, 정상 부팅·저장 왕복이 된다.
-비행기 모드 부팅은 재시도 화면.
+**미결 #4 방침(항목은 아직 열려 있다) = (a)+(b) 하이브리드, 분류기가 가른다.** `CloudFailureClassifier.Classify` 가
+`Transient` 면 메모리 재시도(`Offline` + `PlayerSaveCloud.RetryPending` — 못 올린 변경분만
+다시 태우고 재-pull 은 하지 않는다. 복귀 훅은 `GameManager` → `FirebaseManager.RetryPending`),
+`Rejected`/`Unusable` 이면 `BlockSession` 으로 세션 차단.
+도메인 거절(재화 부족 등) 한 번에 재시작을 요구하지 않기 위한 갈림이다.
+
+**`SpecSnapshotCache` 는 R2 범위 밖이다** — `persistentDataPath/spec-cache/{env}.json` (+ `.bak` 회전)에
+지금도 로컬 파일을 쓴다. 이건 **세이브 캐시가 아니라 스펙 캐시**라 삭제 대상이 아니었다.
+아래 완료 판정을 볼 때 이 파일을 보고 오판하지 말 것 — 판정 대상은 `Save/` 폴더다.
+스펙 캐시의 존폐는 R3에서 다룬다.
+
+**완료 판정(미실행 — 사람이 1회 돌려야 한다)**:
+
+- [ ] `persistentDataPath/Save/` 에 파일이 생기지 않는다
+- [ ] 정상 부팅·저장 왕복
+- [ ] 비행기 모드 부팅 → 재시도 화면 (도구는 준비됨: 커밋 `933e0c14c` 방화벽 토글 + 에디터 메뉴)
 
 ---
 
@@ -365,12 +458,12 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 
 | # | 항목 | 언제까지 | 선택지 |
 |---|---|---|---|
-| 1 | **App Check** | R1 착수 전 | callable은 인증만으로 남용을 못 막는다. (a) 강제 (b) 프로토 동안 미도입 + `maxInstances` 상한만 |
+| 1 | **App Check** | R1 착수 전 | callable은 인증만으로 남용을 못 막는다. (a) 강제 (b) 프로토 동안 미도입 + `maxInstances` 상한만 · **결정(2026-08-27): (b) 프로토 동안 미도입.** `setGlobalOptions` 의 `maxInstances: 10` 상한만 유지한다. App Check 는 룰이 아니라 callable 남용 방지용이라 R1과 독립이고, 도입하면 Unity 클라 배선 + 에뮬레이터 디버그 토큰 배선이 따라붙는다 |
 | 2 | **관리자 판별** | R3 착수 전 | (a) custom claim(`admin: true`) + 부여 스크립트 (b) 서비스 계정 + 별도 CLI |
 | 3 | **중첩 스펙 업로드** | R3 첫 판단 | 업로더가 `int`/`long`/`string` 만 지원. (a) 평탄한 행 재저작 (b) 타입 지원 확장 |
-| 4 | **쓰기 실패 시 클라 메모리** | R2 | 캐시가 없어지면 실패 시 서버와 갈린다. (a) 메모리 재시도 큐 (b) 즉시 세션 차단 |
+| 4 | **쓰기 실패 시 클라 메모리** | 미결 | (a)+(b) 하이브리드 — `CloudFailureClassifier` 가 `Transient` 는 메모리 재시도 큐(`RetryPending`), `Rejected`/`Unusable` 은 즉시 세션 차단(`BlockSession`) · **R2가 완료됐음에도 이 항목은 여전히 미결이다**(2026-08-27) |
 | 5 | **튜토 무료 한 방 상태** | R6 | 정적 필드라 서버가 못 본다. `tutorial` 은 클라 소유라 거기 못 둔다 → 서버 소유 키 신설 |
-| 6 | **R1 ↔ R3 순서** | R1 착수 전 | 룰을 닫으면 `SpecFirestoreUploader`(API key)가 죽는다. (a) R3를 R1에 붙여 진행 (b) 관리자 uid 임시 예외 |
+| 6 | **R1 ↔ R3 순서** | R1 착수 전 | 룰을 닫으면 `SpecFirestoreUploader`(API key)가 죽는다. (a) R3를 R1에 붙여 진행 (b) 관리자 uid 임시 예외 · **결정(2026-08-27): (c) specs 는 `read: request.auth != null` / `write` 는 임시 개방.** R3(a) 에서 `specUpload` callable 이관과 함께 닫는다. **(b)안은 성립하지 않는다** — `SpecFirestoreUploader` 는 웹 API key + REST 라 `request.auth` 가 아예 null 이어서 uid 화이트리스트로 통과시킬 수 없다 |
 | 7 | **호출량·요금** | R5 이후 실측 | 행위 단위 callable로 바뀌면 오히려 줄 수 있다 — 실측 후 판단 |
 | 8 | **계정 연동** | 백로그 | 익명 uid 분실 = 세이브 분실. 캐시까지 없어지면 치명도가 더 오른다 |
 | 9 | **멀티 결과 서버 대조** | 백로그 | 양쪽 티켓 결과 + `BattleStateHash` 를 서버가 대조하는 확장점 |

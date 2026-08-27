@@ -1,0 +1,14 @@
+{
+  "name": "firestore-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "firestore.rules.prod 회귀 테스트. 루트 firebase.json 과 무관하게 자체 에뮬레이터(8081)를 띄운다.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project tcg-rules-test \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.2"
+  }
+}

@@ -1,7 +1,13 @@
 rules_version = '2';
 
+// 운영용 세이브 규칙. 루트 firestore.rules(전면 개방)를 이 파일로 교체해 배포한다.
+//
+// 이 파일이 실제 문서 스키마와 어긋나면 저장이 통째로 거부되는데, 개방 규칙을 배포해 둔
+// 동안에는 증상이 안 보인다(커밋 809d040d3). 그래서 Tools/firestore-rules-tests 의
+// 회귀 테스트가 이 파일과 PlayerSaveDocument.ToFieldMap 을 묶어 둔다 — 룰을 고치면 거기도 돌려라.
 service cloud.firestore {
   match /databases/{database}/documents {
+
     match /envs/{envId}/users/{userId}/save/{docId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId;
@@ -15,6 +21,24 @@ service cloud.firestore {
         return docId == 'current';
       }
 
+      // 슬롯 '안쪽'은 일부러 보지 않는다 — ProfileSaveData 의 nickname/avatarId/frameId 는
+      // 초기값이 없어 신규 계정 첫 업로드에 null 로 실린다. 여기서 문자열을 요구하면
+      // 신규 유저가 첫 저장부터 막힌다. 슬롯 내용 검증은 서버 슬롯을 동결하는 R9의 몫이다.
+      // (부재 검사는 없다 — isValidSave 의 hasAll 이 10슬롯 전부를 이미 보장하고,
+      //  slotsAreMaps 는 그 뒤에 평가된다.)
+      function slotsAreMaps() {
+        return request.resource.data.currency is map &&
+               request.resource.data.ownership is map &&
+               request.resource.data.deck is map &&
+               request.resource.data.cardGrowth is map &&
+               request.resource.data.keywordGrowth is map &&
+               request.resource.data.rank is map &&
+               request.resource.data.albumReward is map &&
+               request.resource.data.tournament is map &&
+               request.resource.data.tutorial is map &&
+               request.resource.data.profile is map;
+      }
+
       // 키 목록은 PlayerSaveDocument 의 메타 5 + 슬롯 10 과 같아야 한다.
       // 클라 쓰기는 SetOptions.Overwrite 라 문서 전체가 매번 이 목록으로 갈린다.
       function isValidSave() {
@@ -23,21 +47,36 @@ service cloud.firestore {
           'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
           'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
         ]) &&
+        // hasOnly 와 같은 15키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
+        // 메타 5키 + revision+1 만 보내 소유·재화·랭크를 통째로 날릴 수 있고,
+        // delete: if false 로 막으려던 세이브 소멸이 '필드 생략'으로 우회된다.
+        // ToFieldMap 은 Overwrite 와 짝이라 언제나 15키를 싣는다 — 회귀 없음.
         request.resource.data.keys().hasAll([
-          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion'
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
+          'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
         ]) &&
         request.resource.data.schemaVersion is int &&
         request.resource.data.schemaVersion > 0 &&
         request.resource.data.revision is int &&
+        // revision 0 인 문서는 존재하지 않는다 — AdoptFreshAccount 가 0으로 두고 첫 트랜잭션이 1을 쓴다.
+        request.resource.data.revision > 0 &&
         request.resource.data.deviceId is string &&
         request.resource.data.deviceId.size() == 32 &&
         request.resource.data.appVersion is string &&
         request.resource.data.appVersion.size() <= 64 &&
-        request.resource.data.updatedAt == request.time;
+        request.resource.data.updatedAt == request.time &&
+        slotsAreMaps();
       }
 
       allow read: if isOwner() && isKnownEnv() && isKnownDoc();
+      // 문서를 만드는 순간의 schemaVersion 은 딱 하나여야 한다.
+      // update 는 >= 라 단조 증가만 막으므로, 999999 로 create 하면 그 값이 영구 고착되고
+      // delete: if false 라 룰 층에 복구 경로가 없다(Admin SDK 개입이 필요해진다).
+      // 값은 UserSaveData.VERSION / functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 과
+      // 같아야 한다 — VERSION 을 올리려면 이 줄도 같이 올려라(회귀 테스트가 잡는다).
       allow create: if isOwner() && isKnownEnv() && isKnownDoc() && isValidSave() &&
+                    request.resource.data.schemaVersion == 7 &&
                     request.resource.data.revision == 1;
       allow update: if isOwner() && isKnownEnv() && isKnownDoc() && isValidSave() &&
                     request.resource.data.schemaVersion >= resource.data.schemaVersion &&
@@ -45,16 +84,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // 스펙 데이터는 서버/Admin SDK 전용이다. Admin SDK는 Security Rules를 우회한다.
-    // API key만 쓰는 에디터 업로더는 임시 개방 규칙에서만 동작한다.
+    // 스펙 표는 게임 데이터다. 읽는 쪽은 Admin SDK 가 아니라 클라 본인이다 —
+    // OutGame/Spec/BattleContentSync 가 메타 문서와 rows 컬렉션을 클라이언트 SDK 로 직접 읽는다.
     match /envs/{envId}/specs/{table} {
-      allow read: if false;
-      allow write: if false;
+      allow read: if request.auth != null;
+
+      // TODO(R3a): specUpload callable(Admin SDK) 로 이관하면서 write: if false 로 닫는다.
+      // 지금 Editor/SpecFirestoreUploader 는 웹 API key + REST 라 request.auth 가 아예 null 이다.
+      // 그래서 "관리자 uid 화이트리스트" 로는 통과시킬 수 없고, 임시 개방 말고는 길이 없다.
+      allow write: if true;
 
       match /rows/{rowId} {
-        allow read: if false;
-        allow write: if false;
+        allow read: if request.auth != null;
+        allow write: if true;  // TODO(R3a): 위와 같이 닫는다.
       }
+    }
+
+    // 그 외 전부 거부. Firestore 기본값과 같지만 글자로 남긴다
+    // (더 구체적인 match 의 allow 가 이겨서 위 규칙들에는 영향이 없다).
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

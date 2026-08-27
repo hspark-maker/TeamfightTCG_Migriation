@@ -91,7 +91,7 @@
 
 **진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`) 하나다. 로컬 캐시도 오프라인 부트도 없다 — 원격에 닿지 못하면 게임이 진행되지 않는다. 3계층 구조.
 
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
 - 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(부트 채택이 대신한다)
 - 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
 - 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면(안내 + 재시도·종료 2버튼) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
