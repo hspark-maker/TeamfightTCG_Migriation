@@ -160,15 +160,26 @@ static class PlayerSaveCloud
         DataSaveManager.AdoptServerSlots(_updatedSlots);
         Revision = _revision;
 
-        if (s_dirtySerial == s_suspendBaselineSerial)
+        // 이 창구가 세운 Offline은 성공 업로드로만 풀렸다 — 호출 뒤 로컬 변경이 없으면 업로드가 예약되지 않아
+        // 배너가 세션 끝까지 남았다. 단, 못 올린 변경이 남아 있으면 "동기화됨"이 아니다 — 판정은 업로드에 맡긴다.
+        if (State == EPlayerSaveCloudState.Offline && s_dirtySerial == s_uploadedSerial)
         {
-            // 통화 중 로컬 변경 없음 → 지금 Data가 곧 서버 문서다. 정확히 재기준화한다.
+            LastError = string.Empty;
+            SetUploadFailures(0);
+            SetState(EPlayerSaveCloudState.Ready);
+        }
+
+        // 재기준화는 "로컬 = 마지막 업로드 = 방금 서버가 쓴 문서"일 때만 성립한다. baseline 비교만으로는 못 거른다 —
+        // 통화 중 변경이 없으면 dirty == baseline이 항상 참이라, 아직 못 올린 변경이 "서버에 있다"고 기록되고
+        // 서버 트랜잭션은 updatedSlots만 쓰므로 그 변경분이 영구 유실된다.
+        if (s_dirtySerial == s_uploadedSerial && s_dirtySerial == s_suspendBaselineSerial)
+        {
             s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
             s_uploadedSerial = s_dirtySerial;
         }
         else
         {
-            // 통화 중 로컬이 움직였다 → 서버 문서 내용을 복원할 수 없으니 업로드 1회를 강제해 맞춘다.
+            // 통화 중 로컬이 움직였거나 못 올린 변경이 남아 있다 → 서버 문서 내용을 복원할 수 없으니 업로드 1회를 강제해 맞춘다.
             // 여기서 스냅샷을 찍으면 그 변경분이 "서버에 이미 있다"고 거짓 기록되어 영원히 안 올라간다.
             MarkUploadPending();
         }
@@ -186,20 +197,38 @@ static class PlayerSaveCloud
         ScheduleUpload();
     }
 
-    /// <summary>서버 호출 실패를 클라우드 상태에 반영한다. 로컬 세이브가 위태로운 경우에만 상태를 바꾼다.</summary>
-    internal static void ReportServerCommandFailure(Exception _exception)
+    /// <summary>서버 호출 실패를 클라우드 상태에 반영하고 판정한 갈래를 돌려준다.
+    /// 도메인이 거절당한 것(세션은 산다)과 세션이 못 쓰게 된 것을 여기서 가른다.</summary>
+    internal static ECloudFailureKind ReportServerCommandFailure(Exception _exception)
     {
-        if (_exception == null) return;
-        if (!s_initialized || s_serverCommandGeneration != s_generation) return;
+        ECloudFailureKind t_kind = CloudFailureClassifier.Classify(_exception);
+        if (_exception == null) return t_kind;
+        if (!s_initialized || s_serverCommandGeneration != s_generation) return t_kind;
 
-        // 서버가 쓰기 전에 거절했으면(Rejected·Unusable) 로컬 세이브는 멀쩡하다 — 상태를 건드리지 않는다.
-        // 여기서 세션을 끊으면 "재화 부족" 같은 정상적인 도메인 거절 한 번에 게임이 재시작을 요구한다.
-        // Transient만 위험하다: 요청이 닿아 문서가 바뀌었는데 응답을 못 받았을 수 있다.
-        LastError = _exception.GetBaseException().Message;
-        if (CloudFailureClassifier.Classify(_exception) != ECloudFailureKind.Transient) return;
+        string t_message =
+            $"Server command failed [{CloudFailureClassifier.Describe(_exception)}]: " +
+            _exception.GetBaseException().Message;
 
-        SetUploadFailures(ConsecutiveUploadFailures + 1);
-        SetState(EPlayerSaveCloudState.Offline);
+        switch (t_kind)
+        {
+            // 도메인 거절의 표면은 세션이 아니라 예외를 되받는 호출한 도메인이다(ServerCommandRejectedException).
+            case ECloudFailureKind.Rejected:
+                Debug.LogWarning($"[PlayerSaveCloud] {t_message}");
+                return t_kind;
+
+            // 미배포·리전 오타·인증 붕괴·스키마 드리프트·직렬화 오류. 다음 명령도 같은 답이라 표면 없이 두면 아무 일도 안 일어난다.
+            case ECloudFailureKind.Unusable:
+                BlockSession(ECloudBlockReason.SessionUnusable, t_message);
+                return t_kind;
+
+            // 요청이 닿아 문서가 이미 바뀌었는데 응답만 못 받았을 수 있다 — 로컬이 서버보다 뒤처졌을 위험이 있다.
+            default:
+                LastError = t_message;
+                SetUploadFailures(ConsecutiveUploadFailures + 1);
+                SetState(EPlayerSaveCloudState.Offline);
+                LogTransient(t_message, _exception);
+                return t_kind;
+        }
     }
 
     /// <summary>복구 화면의 재시도. 채택이 실패로 끝난 경우에만 인증·원격 읽기를 다시 태운다.</summary>
@@ -445,19 +474,38 @@ static class PlayerSaveCloud
 
     // 업로드 실패 전용 매핑. Fail/BlockSession이 private이라 분류기는 값만 돌려주고 매핑은 여기서 한다.
     // 게이트 갈래를 두지 않는 이유: UploadAsync는 s_uploadApproved를 전제하고, 그건 게이트 완료와 함께 선다.
-    static void ApplyUploadFailure(ECloudFailureKind _kind, string _message)
+    static void ApplyUploadFailure(Exception _exception)
     {
-        if (_kind == ECloudFailureKind.Transient)
+        string t_message =
+            $"Upload failed [{CloudFailureClassifier.Describe(_exception)}]: " +
+            _exception.GetBaseException().Message;
+
+        if (CloudFailureClassifier.Classify(_exception) == ECloudFailureKind.Transient)
         {
-            LastError = _message;
+            LastError = t_message;
             SetUploadFailures(ConsecutiveUploadFailures + 1);
             SetState(EPlayerSaveCloudState.Offline);
-            Debug.LogWarning($"[PlayerSaveCloud] {_message}");
+            LogTransient(t_message, _exception);
             return;
         }
 
-        // 룰 거부(Rejected)·배선 오류(Unusable)는 다시 태워도 같은 답이라 이 세션의 업로드는 여기서 끝이다.
-        BlockSession(ECloudBlockReason.SessionUnusable, _message);
+        // 여긴 클라가 문서를 직접 쓰는 경로라 Rejected가 곧 룰 거부다 — callable의 도메인 거절과 성질이 다르다.
+        // 배선 오류(Unusable)와 마찬가지로 다시 태워도 같은 답이니 이 세션의 업로드는 여기서 끝이다.
+        BlockSession(ECloudBlockReason.SessionUnusable, t_message);
+    }
+
+    // Transient 로그 한 곳. 갈래는 그대로 두되 결정적 서버 버그가 "동기화 지연"으로 위장하지 않게 등급을 가른다.
+    static void LogTransient(string _message, Exception _exception)
+    {
+        if (CloudFailureClassifier.IsUnhandledServerFault(_exception))
+        {
+            Debug.LogError(
+                $"[PlayerSaveCloud] {_message} This is most likely an unhandled exception inside the function. " +
+                "Retrying will not fix it — check the function logs.");
+            return;
+        }
+
+        Debug.LogWarning($"[PlayerSaveCloud] {_message}");
     }
 
     // 부트 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
@@ -602,9 +650,7 @@ static class PlayerSaveCloud
 
             // 오류 코드를 보지 않고 전부 Offline으로 접으면, 룰이 닫힌 뒤의 PermissionDenied가
             // "동기화 지연" 배너로 위장한 채 영원히 재시도만 돈다.
-            ApplyUploadFailure(
-                CloudFailureClassifier.Classify(t_exception),
-                $"Upload failed: {t_exception.GetBaseException().Message}");
+            ApplyUploadFailure(t_exception);
         }
         finally
         {

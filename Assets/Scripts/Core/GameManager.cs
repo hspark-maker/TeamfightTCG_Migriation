@@ -81,12 +81,21 @@ public class GameManager : MonoBehaviour
 
         try
         {
+            // 에뮬레이터 설정을 한 번만 읽어 세 백엔드에 같은 값을 흘린다 — 창구가 갈리면 함수만 로컬로 가는 상태가 재발한다.
+            FirebaseEmulatorConfig t_emulators = t_profile.FirebaseEmulators;
+
+            // 켜기로 저작했는데 주소가 틀렸다면 끈 것이 아니라 못 켠 것이다 — 폴백으로 넘기면
+            // 에뮬레이터를 켠 줄 알고 프로덕션 문서에 진짜 쓰기가 나간다.
+            if (t_emulators.IsMisconfigured)
+                throw new System.InvalidOperationException(
+                    "Firebase 에뮬레이터 설정이 잘못됐습니다: " + t_emulators.Error);
+
             // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 부트 시점부터 산다.
-            FirebaseManager.Register(new CallableFirebaseModule(t_profile.FunctionsEmulatorOrigin));
+            FirebaseManager.Register(new CallableFirebaseModule(t_emulators.FunctionsOrigin));
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);
-            FirebaseManager.Initialize(t_profile.CloudEnvId);
+            FirebaseManager.Initialize(t_profile.CloudEnvId, t_emulators);
         }
         catch (System.Exception ex)
         {

@@ -117,6 +117,11 @@ public static class OutgameDebugActions
                 $"[OutgameDebug] devBumpRevision revision {t_before} → {t_result.Revision} " +
                 $"(채택 후 {PlayerSaveCloud.Revision}), state={PlayerSaveCloud.State}");
         }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            // 거절은 세션 사고가 아니라 이 호출의 결과다 — 도메인이 표면을 진다는 계약의 첫 준수 지점.
+            Debug.LogWarning($"[OutgameDebug] devBumpRevision 거절 — {t_rejected.Message}");
+        }
         catch (System.Exception t_exception)
         {
             Debug.LogError($"[OutgameDebug] devBumpRevision 실패 — {t_exception.GetBaseException().Message}");

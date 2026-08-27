@@ -50,7 +50,11 @@ internal static class ServerSaveCommands
         }
         catch (Exception t_exception)
         {
-            PlayerSaveCloud.ReportServerCommandFailure(t_exception);
+            // 거절은 세션이 아니라 이 호출의 결과다 — 전용 타입으로 갈아 던져야 호출부가 catch(Exception) 한 줄로
+            // 삼키는 게 눈에 보인다. 표면을 지는 주체가 호출한 도메인이라는 계약의 집행 지점.
+            if (PlayerSaveCloud.ReportServerCommandFailure(t_exception) == ECloudFailureKind.Rejected)
+                throw new ServerCommandRejectedException(_commandName, t_exception);
+
             throw;
         }
         finally
@@ -83,4 +87,17 @@ internal static class ServerSaveCommands
 internal sealed class ServerAdoptionException : Exception
 {
     internal ServerAdoptionException(string _message) : base(_message) { }
+}
+
+/// <summary>서버가 요청을 판정해 거절했다. 세션은 멀쩡하므로 유저 표면을 그리는 책임은 호출한 도메인에 있다.</summary>
+internal sealed class ServerCommandRejectedException : Exception
+{
+    /// <summary>거절당한 명령 이름.</summary>
+    internal string CommandName { get; }
+
+    internal ServerCommandRejectedException(string _commandName, Exception _inner)
+        : base($"Server command '{_commandName}' was rejected: {_inner.GetBaseException().Message}", _inner)
+    {
+        this.CommandName = _commandName;
+    }
 }

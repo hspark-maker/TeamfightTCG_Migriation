@@ -45,7 +45,7 @@ export const ping = onCall(async (request) => {
 
   // 진단 도구가 "정상"이라 답하면 안 되는 경우까지 ok 에 담는다.
   return {
-    ok: envKnown && readError === null,
+    ok: uid !== null && envKnown && readError === null,
     envKnown,
     uid,
     env,

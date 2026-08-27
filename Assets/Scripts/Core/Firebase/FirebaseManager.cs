@@ -9,6 +9,7 @@ public static class FirebaseManager
 {
     static readonly List<IFirebaseModule> s_modules = new();
     static FirebaseFirestore s_firestore;
+    static FirebaseEmulatorConfig s_emulators = FirebaseEmulatorConfig.Disabled;
     static bool s_initialized;
     static bool s_settingsApplied;
 
@@ -24,15 +25,20 @@ public static class FirebaseManager
         s_modules.Add(_module);
     }
 
-    internal static void Initialize(string _envId)
+    internal static void Initialize(string _envId, in FirebaseEmulatorConfig _emulators)
     {
         if (s_initialized) throw new InvalidOperationException("FirebaseManager is already initialized.");
         FirebaseRootPath.Environment(_envId);
+
+        // 어느 백엔드에 붙었는지 부트 로그 첫 줄에서 읽히지 않으면, 왕복 판정이 "어디를 상대로 성공했는지" 모른 채 내려진다.
+        s_emulators = _emulators;
+        Debug.Log($"[FirebaseManager] backend={_emulators} env={_envId} database={FirebaseRootPath.DatabaseId}");
 
         var t_context = new FirebaseContext(_envId, GetFirestore);
         int t_initializedCount = 0;
         try
         {
+            FirebaseAuthService.Instance.UseEmulator(_emulators.AuthHost, _emulators.AuthPort);
             FirebaseAuthService.Instance.InitializeAsync().Forget();
             for (; t_initializedCount < s_modules.Count; t_initializedCount++)
             {
@@ -104,6 +110,15 @@ public static class FirebaseManager
         if (!s_settingsApplied)
         {
             s_firestore.Settings.PersistenceEnabled = false;
+
+            // Host/SslEnabled도 같은 1회 창이라 여기서만 바꿀 수 있다 — 첫 읽기·쓰기가 나간 뒤에는 SDK가 던진다.
+            if (s_emulators.IsEnabled)
+            {
+                s_firestore.Settings.Host = s_emulators.FirestoreHost;
+                s_firestore.Settings.SslEnabled = false;
+                Debug.LogWarning($"[FirebaseManager] Firestore is pointed at the emulator: {s_emulators.FirestoreHost}");
+            }
+
             s_settingsApplied = true;
         }
 

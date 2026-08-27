@@ -10,6 +10,8 @@ public class UserSaveData
     // 여기 적을 것은 하나뿐이다: 무중단으로 올리는 순서가 없다.
     // 서버 선행이면 문서 v7 < 서버 v8이라 전 유저 callable이 failed-precondition이고,
     // 클라 선행이면 부트 게이트가 remote < VERSION으로 Fail이라 아무도 못 들어온다.
+    // 올린다면 firestore.rules.prod의 allow create가 박아 둔 schemaVersion 값도 같이 올린다 —
+    // 안 올리면 기존 계정은 멀쩡한데 신규 계정만 안 만들어지는 부분 고장이 된다.
     public const int VERSION = 7;
 
     [FirestoreProperty("currency")] public CurrencySaveData Currency { get; set; } = new CurrencySaveData();
