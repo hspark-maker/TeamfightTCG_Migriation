@@ -243,6 +243,15 @@ test('16. 화이트리스트 밖 경로는 거부', async () => {
   await assertFails(getDoc(doc(authed(), 'anything/else')));
 });
 
+// 매치 문서는 서버(Admin SDK)만 쓴다. 클라가 여기 손대면 결과 대조가 무의미해진다.
+test('16c. 매치 결과 문서는 클라가 읽지도 쓰지도 못한다', async () => {
+  await testEnv.withSecurityRulesDisabled(async (_ctx) => {
+    await setDoc(doc(_ctx.firestore(), 'envs/test/matches/m1'), { status: 'pending' });
+  });
+  await assertFails(getDoc(doc(authed(), 'envs/test/matches/m1')));
+  await assertFails(setDoc(doc(authed(), 'envs/test/matches/m1'), { status: 'confirmed' }));
+});
+
 test('16b. save/current 하위 서브컬렉션은 거부', async () => {
   await assertFails(setDoc(doc(authed(), `${savePath()}/shadow/x`), { a: 1 }));
   await assertFails(getDoc(doc(authed(), `${savePath()}/shadow/x`)));

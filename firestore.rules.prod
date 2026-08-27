@@ -100,6 +100,15 @@ service cloud.firestore {
       }
     }
 
+    // 멀티 매치 결과 대조 문서. 서버(Admin SDK)만 쓴다 — origin/박형석작업용 의
+    // submitMatchResult callable 이 두 플레이어 제출을 여기 모아 대조·판정한다.
+    // 클라는 callable 응답으로 결과를 받으므로 직접 읽을 일이 없다.
+    // 아래 catch-all 로도 막히지만, 경로가 존재한다는 걸 글자로 남긴다 —
+    // 안 그러면 나중에 클라 읽기가 막혔을 때 원인을 못 찾는다. 필요해지면 여기를 연다.
+    match /envs/{envId}/matches/{matchId} {
+      allow read, write: if false;
+    }
+
     // 그 외 전부 거부. Firestore 기본값과 같지만 글자로 남긴다
     // (더 구체적인 match 의 allow 가 이겨서 위 규칙들에는 영향이 없다).
     match /{document=**} {

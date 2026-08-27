@@ -177,7 +177,7 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
     `999999` 로 만들면 영구 고착되고 룰 층에 복구 경로가 없다 → `create` 는 현재 버전과
     정확히 같을 것을 요구. **`UserSaveData.VERSION` 을 올리면 이 줄도 같이 올려야 한다**
     (안 올리면 신규 계정만 못 만들어지는 부분 고장 — 회귀 테스트 `8b` 가 잡는다)
-- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **29케이스**, 전부 통과.
+- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **30케이스**, 전부 통과.
       요구된 3종(남의 uid 읽기 / revision 건너뛰기 / 정상 왕복) 포함.
       포트 8081 · 프로젝트 `tcg-rules-test` 로 갈라 루트 에뮬레이터(8080)와 안 부딪힌다.
       룰은 `initializeTestEnvironment` 가 `.prod` 를 직접 주입하므로 `firebase.json` 포인터와 무관하다.
@@ -402,6 +402,31 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 ### R8 — 전투 출구 (매치 티켓) ⬜
 
 **목표**: 전투 결과가 아웃게임에 반영되는 유일한 출구(`TurnRunner.CaptureResult`)를 서버 판정으로.
+
+> ⚠️ **백지에서 설계하지 마라 — 이미 상당 부분이 `origin/박형석작업용`(hspark-maker)에 있다.**
+>
+> | 있는 것 | 위치 |
+> |---|---|
+> | `submitMatchResult` onCall (배포되어 실사용 중) | `functions/src/index.ts` |
+> | 양쪽 제출 대조 판정 (순수 모듈) | `functions/src/matchResult.ts` |
+> | 클라 제출 + 재시도 큐 | `Assets/Scripts/Network/MatchResultSubmission.cs` |
+>
+> 설계가 아래 티켓 방식과 **다르다**. 매치 문서 `envs/{env}/matches/{matchId}` 에 두 플레이어가
+> 각자 제출하고, 서버가 **양쪽을 대조**해 `pending`/`flagged`/`confirmed` 를 정한다
+> (nonce 교차 · deckHash 교차 · `finalStateHash` 일치 · state chain 이 1스텝 차이까지 허용 ·
+> `remaining` 교차 · `contentFingerprint`). 즉 **미결 #9(멀티 결과 서버 대조)가 이미 구현돼 있다.**
+>
+> 다만 **보상 지급은 아직 없다** — 매치 문서에 판정만 쓰고 세이브 문서는 안 건드린다.
+> R8이 할 일은 "티켓을 새로 설계"가 아니라 **이 판정 결과를 지급으로 잇는 것**일 수 있다. 먼저 읽어라.
+>
+> **합류 시 충돌 3건**: (a) `functions/src/index.ts` 가 양쪽에서 갈린다(우리 `ping`·`devBumpRevision`
+> ↔ 그쪽 `submitMatchResult` + 구 `onRequest` ping) (b) `MatchResultSubmission.cs` 가
+> `Firebase.Functions` 를 직접 참조해 **미결 #12를 어긴다**(우리 브랜치 규약을 모르고 짠 것이다)
+> (c) 그쪽은 실패분을 **PlayerPrefs 큐**에 쌓는다 — R2가 로컬 저장을 걷어낸 것과 방향이 반대이고,
+> **미결 #4의 세 번째 선택지**(영속 재시도 큐)를 사실상 구현한 것이다
+>
+> **R1 룰과는 충돌하지 않는다** — 매치 문서는 Admin SDK 로만 쓰이고 클라는 callable 응답으로
+> 결과를 받는다. 룰에 `envs/{envId}/matches/{matchId}` 를 명시적 거부로 적어 두었다(테스트 `16c`).
 
 > **명시적 비스코프**: 전투 시뮬 전체를 서버에서 재현하지 않는다.
 > `Battle/` 8,129줄을 TS로 포팅하는 일이고 프로토 단계의 비용 대비가 맞지 않는다.
