@@ -174,7 +174,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
             }
 
             PlayerSaveCloud.DisableForTestAccountSession();
-            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
+            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
         catch (System.Exception _exception)
@@ -215,10 +215,10 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            // 다른 uid로 갈아탄 이상 로컬 캐시 소유자와 어긋난다 — 클라우드 세이브를 끄지 않으면
-            // 다음 부팅이 복구 화면에 갇힌다.
+            // 다른 uid로 갈아타면 이 세션의 세이브는 남의 것이 된다 — 클라우드 세이브를 꺼서
+            // 부트 채택 자체를 건너뛴다.
             PlayerSaveCloud.DisableForTestAccountSession();
-            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
+            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SetStatus($"테스트 계정 '{_accountId}' 로그인 완료.");
         }
         catch (System.Exception _exception)
@@ -239,7 +239,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
     static void RestoreFirebase()
     {
         if (FirebaseManager.IsInitialized) return;
-        try { FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId); }
+        try { FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators); }
         catch (System.Exception _exception)
         {
             Debug.LogWarning($"[MpTest] Firebase 복구 실패(재시작 필요): {_exception.GetBaseException().Message}");

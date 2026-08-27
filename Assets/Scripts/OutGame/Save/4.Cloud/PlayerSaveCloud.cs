@@ -78,13 +78,8 @@ static class PlayerSaveCloud
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (IsTestAccountSessionDisabled())
         {
-            s_hasCacheAtBoot = DataSaveManager.TryLoadCache(out UserSaveData t_cacheData, out long t_cacheRevision);
-            if (s_hasCacheAtBoot)
-            {
-                Revision = t_cacheRevision;
-                DataSaveManager.AdoptRemote(t_cacheData, t_cacheRevision);
-            }
-
+            // 채택할 것이 없다 — 로컬 캐시는 R2 에서 사라졌고 원격은 일부러 끄는 중이다.
+            // 세이브 없이 기본값으로 진행한다(멀티 테스트 세션 전용).
             State = EPlayerSaveCloudState.Disabled;
             s_gateComplete = true;
             return;
