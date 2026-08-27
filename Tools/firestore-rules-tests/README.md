@@ -41,7 +41,7 @@ npm test
 거부 케이스 로그에 `evaluation error at L66:24` 처럼 룰 줄번호를 가리키는 줄이 섞인다.
 `FieldValue.ServerTimestamp` 가 붙은 쓰기는 룰이 두 번 평가되는데, 값이 아직 안 풀린
 첫 패스에서 `updatedAt == request.time` 이 에러가 된다. 최종 판정은 두 번째 패스가 낸다.
-통과 케이스(1·2·9c·14)가 실제로 통과하므로 룰은 정상이다.
+통과 케이스(2·9c·14)가 실제로 통과하므로 룰은 정상이다.
 
 ## 픽스처는 반드시 클라 실제 산출물이어야 한다
 
@@ -50,17 +50,39 @@ npm test
 오판을 냈다. 실제로는 `CurrencySaveData.Normalize` 가 4재화를 다 채운다.
 의심스러우면 에뮬레이터에 클라를 붙여 만들어진 문서를 그대로 떠 와라.
 
+## create 는 서버만 한다 (R4~)
+
+문서 생성은 `functions/src/commands/ensureAccount.ts`(Admin SDK)가 하고 룰은 `allow create: if false` 다.
+**Admin SDK 는 룰을 안 타므로 이 하네스는 서버 쓰기 자체를 볼 수 없다.** 여기서 고정하는 것은 셋뿐이다:
+
+1. 클라 create 는 어떤 페이로드로도 거부 — `1` · `6` · `8b` · `14d`
+2. 서버가 만든 문서 위에서 클라 update 가 통과 — `14` · `14c` · `9c`
+3. update 계약 전수 검증 — 나머지
+
+서버 산출물이 실제로 그 모양인지는 반대편에서 `functions/scripts/test-fresh-account.js` 가
+`fixtures/saveDocument.js` 의 `serverFreshAccountDocument()` 와 필드 단위로 대조해 못박는다.
+**두 파일은 쌍둥이다 — 한쪽을 고치면 다른 쪽도 고쳐야 한다.**
+
+> **create 를 닫으면 페이로드 검증이 공허해질 수 있다.** 거부 케이스를 seed 없이 create 로 쓰면
+> "create 라서" 실패해 통과한다 — `isValidSave()` 를 통째로 지워도 초록이 된다.
+> 그래서 페이로드 검증 케이스는 전부 `seed(1)` + `saveDocument(2, {위반})` 의 **update 기반**이다.
+> 새 거부 케이스를 추가할 때도 이 규칙을 지켜라.
+
 ## 룰을 고쳤으면
 
-1. `npm test` 로 33개 전부 통과 확인
-2. **일부러 깨보기** — 셋 다 해보면 테스트가 룰을 실제로 물고 있는지 확인된다:
-   - `hasOnly` 목록에서 슬롯 키 하나 제거 → **1·2·9c·14** 가 깨져야 한다
-   - `allow create` 의 `schemaVersion == 7` 줄 제거 → **8b** 가 깨져야 한다
+1. `npm test` 로 33개 전부 통과 확인 — 판정은 종료코드가 아니라 **`# pass 33`** 줄로 한다
+2. **일부러 깨보기** — 테스트가 룰을 실제로 물고 있는지 확인한다:
+   - `isValidSave()` 를 `return true` 로 무력화 → **7 · 7b · 7c · 7d · 10 · 11 · 11b · 13 · 13b · 14b**
+     열 개가 깨져야 한다. 안 깨지면 그 케이스가 create 기반으로 되돌아간 것이다
    - 재화 4키 검증 중 `balances.Diamond is int` 줄 제거 → **13b** 가 깨져야 한다
+   - `allow create` 를 `if true` 로 되돌리기 → **1 · 6 · 8b · 14d** 가 깨져야 한다
+
+   원본을 안 건드리고 검증하려면 훼손본을 만들어 `RULES_FILE=<경로> npm test` 로 겨눈다.
 
    `hasAll` 15키와 `revision > 0` 은 빼도 안 깨진다 — 슬롯별 검증이 같은 구멍을 이미 막는다.
    명시성·방어 겹으로 남겨 둔 것이지 단독으로 뭘 막고 있지는 않다.
 3. 세이브 도메인(`OutGame/Save/2.Domain/*SaveData.cs`)이 바뀌었으면
    `fixtures/saveDocument.js` 를 먼저 맞춘다
-4. **`UserSaveData.VERSION` 을 올렸으면 룰의 `allow create` 안 `schemaVersion == 7` 도 같이 올려라.**
-   안 올리면 기존 계정은 멀쩡한데 신규 계정만 안 만들어지는 부분 고장이 된다 — `8b` 가 잡는다
+4. **`UserSaveData.VERSION` 을 올렸으면 `functions/src/save/saveDocument.ts` 의 `SCHEMA_VERSION` 도
+   같이 올려라.** R4 부터 새 문서의 버전 앵커는 룰이 아니라 그 상수다 — 룰의 `allow update` 는
+   `>=` 라 단조 증가만 막을 뿐 새 문서의 값을 고정하지 못한다.

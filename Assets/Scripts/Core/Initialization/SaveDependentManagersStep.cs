@@ -41,8 +41,9 @@ public sealed class SaveDependentManagersStep : MainInitializer
         // 클라우드 채택이 끝난 뒤여야 한다 — 채택 전에 슬롯을 갈아엎으면 채택이 그대로 덮어써 무효가 된다.
         OutgameTutorialRewind.ApplyWipeIfScheduled();
 
-        // 스타터 지급의 유일한 근거는 "원격 문서가 없다"이다. 오프라인 폴백 세션은 IsFreshAccount가 false다.
-        CurrencyManager.Init(PlayerSaveCloud.IsFreshAccount);
+        // 정상 부팅의 스타터는 서버(ensureAccount)가 이미 문서에 넣어 왔다.
+        // 아래 Init과 GrantIfNoDeck은 위 되감기가 슬롯을 비웠을 때만 서는 안전망이다.
+        CurrencyManager.Init();
         ProfileManager.Init();
         OwnershipManager.Init();
         OutgameTutorialProgress.Init();
@@ -54,11 +55,12 @@ public sealed class SaveDependentManagersStep : MainInitializer
         OutgameTutorialRunner.ResolveProgressAnchor();
         OutgameTutorialRunner.RewindToPendingBattleEntry();
         OutgameTutorialRewind.ApplyReplayIfScheduled();
+        ServerSlotRehydrator.Install();
 
         s_installed = true;
 
-        // 신규 계정의 첫 문서를 여기서 한 번에 만든다. 이 업로드가 실패하면 원격 문서는 여전히 없으므로
-        // 다음 부트도 신규로 판정되고 지급이 정확히 한 번만 남는다(멱등).
+        // 문서는 이미 서버(ensureAccount)가 만들어 뒀다 — 여기 업로드는 설치 중 생긴 변경분을 올린다.
+        // 지급의 멱등은 그 callable이 진다(문서가 있으면 쓰지 않는다).
         DataSaveManager.SaveImmediate();
     }
 }

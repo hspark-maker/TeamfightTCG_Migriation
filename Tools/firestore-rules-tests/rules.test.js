@@ -1,4 +1,4 @@
-// firestore.rules.prod 회귀 테스트.
+// firestore.rules 회귀 테스트.
 //
 // 룰을 에뮬레이터에 명시 주입하므로 루트 firebase.json 이 어떤 룰을 가리키든 무관하다.
 // 포트도 8081 로 갈라 놓아, 루트 설정(8080)으로 띄운 다른 에뮬레이터와 부딪히지 않는다.
@@ -11,7 +11,12 @@ import {
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { saveDocument, freshAccountDocument, SCHEMA_VERSION } from './fixtures/saveDocument.js';
+import {
+  saveDocument,
+  freshAccountDocument,
+  serverFreshAccountDocument,
+  SCHEMA_VERSION,
+} from './fixtures/saveDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 const PROJECT_ID = 'tcg-rules-test';
@@ -26,10 +31,16 @@ const savePath = (_uid = UID, _env = 'test', _docId = 'current') =>
 const authed = (_uid = UID) => testEnv.authenticatedContext(_uid).firestore();
 const unauthed = () => testEnv.unauthenticatedContext().firestore();
 
-async function seed(_revision = 1, _overrides = {}, _uid = UID) {
+// 룰을 끄고 심는다 = Admin SDK(서버)가 쓴 상태의 재현이다.
+// R4 이후 클라 create 가 막혀, 문서가 이미 있는 상태를 만드는 유일한 방법이기도 하다.
+async function seedRaw(_path, _document) {
   await testEnv.withSecurityRulesDisabled(async (_ctx) => {
-    await setDoc(doc(_ctx.firestore(), savePath(_uid)), saveDocument(_revision, _overrides));
+    await setDoc(doc(_ctx.firestore(), _path), _document);
   });
+}
+
+async function seed(_revision = 1, _overrides = {}, _uid = UID) {
+  await seedRaw(savePath(_uid), saveDocument(_revision, _overrides));
 }
 
 before(async () => {
@@ -50,8 +61,10 @@ after(async () => {
 
 // --- 1·2. 실제 클라가 보내는 문서가 통과하는가 (핵심 회귀) -------------------
 
-test('1. 실제 15키 문서로 create (revision 1)', async () => {
-  await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(1)));
+// R4 부터 문서 생성은 서버(ensureAccount)만 한다. 페이로드를 실클라 그대로 두는 이유는
+// "거부 이유가 문서 모양이 아니라 create 라는 행위 자체"임을 남기기 위해서다.
+test('1. 실클라 15키 문서여도 클라 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1)));
 });
 
 test('2. 이어서 update (revision 2)', async () => {
@@ -72,7 +85,8 @@ test('3. 남의 uid 문서 읽기는 거부', async () => {
 });
 
 test('3b. 남의 uid 문서 쓰기는 거부', async () => {
-  await assertFails(setDoc(doc(authed(UID), savePath(OTHER_UID)), saveDocument(1)));
+  await seed(1, {}, OTHER_UID);
+  await assertFails(setDoc(doc(authed(UID), savePath(OTHER_UID)), saveDocument(2)));
 });
 
 test('4. 미인증 읽기·쓰기는 거부', async () => {
@@ -94,21 +108,25 @@ test('5b. revision 감소·정체는 거부', async () => {
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });
 
-test('6. create 시 revision 이 1이 아니면 거부', async () => {
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2)));
+// create 가 닫힌 뒤로는 revision 값을 고르는 문제가 아니다 — 어떤 값이든 클라는 문서를 못 만든다.
+test('6. 클라 create 는 어떤 revision 으로도 거부', async () => {
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(0)));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1)));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });
 
 // --- 7·8. 필드 목록 / 삭제 --------------------------------------------------
 
 test('7. 알 수 없는 top-level 필드는 거부', async () => {
+  await seed(1);
   await assertFails(
-    setDoc(doc(authed(), savePath()), saveDocument(1, { serverSecret: 'x' })),
+    setDoc(doc(authed(), savePath()), saveDocument(2, { serverSecret: 'x' })),
   );
 });
 
 test('7b. 메타 필드 누락은 거부', async () => {
-  const t_doc = saveDocument(1);
+  await seed(1);
+  const t_doc = saveDocument(2);
   delete t_doc.deviceId;
   await assertFails(setDoc(doc(authed(), savePath()), t_doc));
 });
@@ -138,51 +156,63 @@ test('8. delete 는 거부', async () => {
 
 // --- 9. 경로 화이트리스트 ---------------------------------------------------
 
-// 감사에서 나온 구멍 — create 에 상한이 없으면 큰 값이 영구 고착된다(update 는 >= 라 못 내린다).
-test('8b. create 시 schemaVersion 이 현재 버전이 아니면 거부', async () => {
+// 감사가 잡았던 구멍(999999 로 create 하면 영구 고착)은 create 를 닫아 원천 봉쇄됐다.
+// 이제 새 문서의 schemaVersion 앵커는 functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 이다.
+test('8b. 클라 create 는 어떤 schemaVersion 으로도 거부', async () => {
   await assertFails(
     setDoc(doc(authed(), savePath()), saveDocument(1, { schemaVersion: 999999 })),
   );
   await assertFails(
     setDoc(doc(authed(), savePath()), saveDocument(1, { schemaVersion: 1 })),
   );
+  await assertFails(
+    setDoc(doc(authed(), savePath()), saveDocument(1, { schemaVersion: SCHEMA_VERSION })),
+  );
 });
 
 test('9. 알 수 없는 envId 는 거부', async () => {
+  await seedRaw(savePath(UID, 'dev'), saveDocument(1));
   await assertFails(
-    setDoc(doc(authed(), savePath(UID, 'dev')), saveDocument(1)),
+    setDoc(doc(authed(), savePath(UID, 'dev')), saveDocument(2)),
   );
 });
 
 test('9b. 알 수 없는 docId 는 거부', async () => {
+  await seedRaw(savePath(UID, 'test', 'backup'), saveDocument(1));
   await assertFails(
-    setDoc(doc(authed(), savePath(UID, 'test', 'backup')), saveDocument(1)),
+    setDoc(doc(authed(), savePath(UID, 'test', 'backup')), saveDocument(2)),
   );
 });
 
 test('9c. live 환경은 통과', async () => {
+  await seedRaw(savePath(UID, 'live'), saveDocument(1));
   await assertSucceeds(
-    setDoc(doc(authed(), savePath(UID, 'live')), saveDocument(1)),
+    setDoc(doc(authed(), savePath(UID, 'live')), saveDocument(2)),
   );
 });
 
 // --- 10~13. 메타 형식 -------------------------------------------------------
 
+// 10~13b 는 전부 update 로 검증한다. create 로 두면 "create 라서" 거부되는 통에
+// isValidSave 를 통째로 지워도 전부 통과해 버린다 — 룰의 실질 방어력을 못 보게 된다.
 test('10. updatedAt 을 클라 시각으로 넣으면 거부', async () => {
+  await seed(1);
   await assertFails(
-    setDoc(doc(authed(), savePath()), saveDocument(1, { updatedAt: Timestamp.fromDate(new Date()) })),
+    setDoc(doc(authed(), savePath()), saveDocument(2, { updatedAt: Timestamp.fromDate(new Date()) })),
   );
 });
 
 test('11. deviceId 길이가 32가 아니면 거부', async () => {
+  await seed(1);
   await assertFails(
-    setDoc(doc(authed(), savePath()), saveDocument(1, { deviceId: '0123456789abcdef0123456789abcde' })),
+    setDoc(doc(authed(), savePath()), saveDocument(2, { deviceId: '0123456789abcdef0123456789abcde' })),
   );
 });
 
 test('11b. appVersion 이 64자를 넘으면 거부', async () => {
+  await seed(1);
   await assertFails(
-    setDoc(doc(authed(), savePath()), saveDocument(1, { appVersion: 'v'.repeat(65) })),
+    setDoc(doc(authed(), savePath()), saveDocument(2, { appVersion: 'v'.repeat(65) })),
   );
 });
 
@@ -194,50 +224,55 @@ test('12. schemaVersion 하향은 거부', async () => {
 });
 
 test('13. 슬롯 타입 위반은 거부', async () => {
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1, { currency: 'x' })));
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1, { ownership: [1, 2] })));
+  await seed(1);
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: 'x' })));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { ownership: [1, 2] })));
 });
 
 // 클라는 CurrencySaveData.Normalize 덕에 언제나 4재화를 싣는다. 그래서 룰이 4키를
 // 전부 요구하는 게 맞다. 키를 빼거나 타입을 바꾸는 조작은 거부돼야 한다.
 test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 거부', async () => {
+  await seed(1);
   await assertFails(setDoc(doc(authed(), savePath()),
-    saveDocument(1, { currency: { balances: { Gold: 100 } } })));
+    saveDocument(2, { currency: { balances: { Gold: 100 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
-    saveDocument(1, { currency: { balances: { Gold: '100', Diamond: 0, Energy: 0, Shard: 0 } } })));
+    saveDocument(2, { currency: { balances: { Gold: '100', Diamond: 0, Energy: 0, Shard: 0 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
-    saveDocument(1, { currency: { balances: { Gold: -1, Diamond: 0, Energy: 0, Shard: 0 } } })));
+    saveDocument(2, { currency: { balances: { Gold: -1, Diamond: 0, Energy: 0, Shard: 0 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
-    saveDocument(1, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
+    saveDocument(2, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
 });
 
 // --- 14. 신규 계정 방어 -----------------------------------------------------
 
-// 신규 계정의 첫 문서(create 경로). 픽스처는 에뮬레이터에 Unity 클라를 붙여 캡처한 모양이다.
+// R4 이후 신규 계정의 첫 문서는 서버(ensureAccount, Admin SDK)가 만든다. Admin 은 룰을 안 타므로
+// 하네스가 서버 쓰기 자체는 볼 수 없다 — 여기서 봐야 하는 것은 그 산출물 위에서 클라의 다음
+// 저장이 통과하는가다. 서버가 isValidSave 를 깨는 문서를 만들면 그 계정은 이후 모든 저장이
+// 영구 거부되고 delete: if false 라 룰 층에 복구 경로가 없다.
 //
-// 이 경로는 실클라로 검증하지 못했다 — 문서를 지우고 재부트하면 Unity Firestore 네이티브
-// 클라이언트가 에디터 2회차 Play 에서 "client is offline" 을 뱉어(도메인 리로드를 넘어
-// 살아남는다) 부트가 룰까지 가지도 못한다. 에디터 완전 재시작이 필요하다.
-// 그래서 create 는 여기가 유일한 방어선이다.
+// 서버 산출물의 모양 자체는 반대편에서 functions/scripts/test-fresh-account.js 가 못박는다.
 //
 // ProfileSaveData 의 nickname/avatarId/frameId 가 null 인 건 실수가 아니라 설계다 —
 // 기본 id 를 세이브에 굳히지 않으려는 것이고, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다.
 // 룰에서 'profile.nickname is string' 으로 조이면 신규 유저가 첫 저장부터 막힌다.
-test('14. 신규 계정 첫 문서로 create 가 통과한다 (profile 3필드 null)', async () => {
-  await assertSucceeds(setDoc(doc(authed(), savePath()), freshAccountDocument()));
+test('14. 서버가 만든 신규 계정 문서 위에서 클라 update 가 통과한다 (profile 3필드 null)', async () => {
+  await seedRaw(savePath(), serverFreshAccountDocument());
+  await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });
 
-// 신규 계정은 성장 항목이 아직 없다 — 기본값 이하 항목은 저장에서 빠져 빈 map 으로 나간다.
-// 룰이 'cardGrowth is map' 만 보므로 통과해야 한다. 여기가 막히면 신규 계정이 전부 막힌다.
-test('14c. 빈 성장 map · 빈 덱 슬롯도 통과', async () => {
-  const t_doc = freshAccountDocument();
+// 신규 계정은 성장 항목이 아직 없고 덱은 빈 슬롯까지 실린다. 룰이 'cardGrowth is map' 만
+// 보므로 통과해야 한다 — 여기가 막히면 신규 계정의 첫 저장이 전부 막힌다.
+test('14c. 빈 성장 map · 6칸 덱 슬롯을 그대로 되쓰는 update 도 통과', async () => {
+  await seedRaw(savePath(), serverFreshAccountDocument());
+  const t_doc = serverFreshAccountDocument({ revision: 2 });
   await assertSucceeds(setDoc(doc(authed(), savePath()), t_doc));
 });
 
-// create 로 들어온 문서가 이어서 update 되는지까지 봐야 신규 계정 한 바퀴가 닫힌다.
-test('14d. 신규 계정 create 직후 update 가 이어진다', async () => {
-  await assertSucceeds(setDoc(doc(authed(), savePath()), freshAccountDocument()));
-  await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(2)));
+// R4 의 핵심 회귀 — 서버가 만드는 것과 똑같은 모양이어도 클라가 만들면 거부다.
+// 이게 뚫리면 스타터 지급을 클라가 정하게 되고 골드·소유 카드가 위조된 채 첫 문서에 굳는다.
+test('14d. 서버 문서와 같은 모양이어도 클라 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), savePath()), serverFreshAccountDocument()));
+  await assertFails(setDoc(doc(authed(), savePath()), freshAccountDocument()));
 });
 
 // 슬롯 '안쪽'의 null 은 허용하고(위 14), 슬롯 '자체'의 null 은 거부한다.
@@ -246,8 +281,9 @@ test('14d. 신규 계정 create 직후 update 가 이어진다', async () => {
 // 프로퍼티 이니셜라이저로 non-null 이다. 그러니 이게 오면 조작이거나 콘솔 수작업이다.
 // (DataSaveManager.Normalize 가 읽기 쪽에서 복구해 주긴 하지만 그건 안전망이지 계약이 아니다.)
 test('14b. 슬롯 자체가 null 이면 거부', async () => {
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1, { profile: null })));
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1, { currency: null })));
+  await seed(1);
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { profile: null })));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: null })));
 });
 
 // --- 15. 스펙 표 ------------------------------------------------------------

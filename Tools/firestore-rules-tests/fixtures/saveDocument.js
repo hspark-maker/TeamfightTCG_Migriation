@@ -50,9 +50,11 @@ export function saveDocument(_revision, _overrides = {}) {
 }
 
 /**
- * 신규 계정이 실제로 만드는 첫 문서. 에뮬레이터에 Unity 클라를 붙여 캡처한 모양이다.
+ * R4 이전에 Unity 클라가 직접 만들던 첫 문서(에뮬레이터에 붙여 캡처한 모양).
+ * 지금은 서버가 문서를 만들므로 이 모양은 더 이상 생기지 않는다 — 남겨 둔 이유는
+ * "옛 클라가 보내던 그대로여도 create 는 거부된다"를 14d 가 못박기 때문이다.
  *
- * 위 saveDocument 와 세 군데가 다르고, 셋 다 create 경로에서만 나타난다:
+ * 위 saveDocument 와 세 군데가 다르다:
  * - cardGrowth.entries / keywordGrowth.levels 가 빈 map (기본값 이하 항목은 저장에서 빠진다)
  * - deck.slots 는 고정 길이라 빈 슬롯도 원소로 들어간다 (빈 배열·빈 문자열)
  * - profile 3필드가 전부 null (기본 id 를 세이브에 굳히지 않는 설계)
@@ -73,5 +75,48 @@ export function freshAccountDocument() {
     albumReward: { claimedKeys: [] },
     tournament: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
     profile: { nickname: null, avatarId: null, frameId: null },
+  });
+}
+
+/**
+ * ensureAccount 가 만드는 첫 문서. functions/src/save/freshAccount.ts 의 buildFreshAccountSlots 쌍둥이다 —
+ * 저기가 바뀌면 여기도 바꾼다(서버 쪽은 scripts/test-fresh-account.js 가 같은 값을 반대편에서 못박는다).
+ *
+ * R4 이후 create 는 룰이 막으므로 이 문서는 Admin SDK 로만 생긴다. 하네스가 여기서 봐야 하는 것은
+ * "서버가 만든 문서 위에서 클라의 다음 update 가 통과하는가" 다 — 서버 산출물이 isValidSave 를 깨면
+ * 그 계정은 이후 모든 저장이 영구 거부되고 delete: if false 라 룰 층에 복구 경로가 없다.
+ */
+export const STARTER_CARD_IDS = [1, 28, 20, 6, 11, 30];
+
+/** 클라 DeckSaveManager.SLOT_COUNT. NormalizedSlots 가 항상 이 길이로 패딩한다. */
+export const DECK_SLOT_COUNT = 6;
+
+export function serverFreshAccountDocument(_overrides = {}) {
+  const t_slots = [{ name: '스타터 덱', cardIds: [...STARTER_CARD_IDS], imageKey: '' }];
+  while (t_slots.length < DECK_SLOT_COUNT) t_slots.push({ name: '', cardIds: [], imageKey: '' });
+
+  return saveDocument(1, {
+    currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0 } },
+    ownership: { cardIds: [...STARTER_CARD_IDS] },
+    deck: { slots: t_slots },
+    cardGrowth: { entries: {} },
+    keywordGrowth: { levels: {} },
+    rank: { points: 0, claimedTiers: [] },
+    albumReward: { claimedKeys: [] },
+    tournament: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
+    // 베이스에서 물려받지 않고 명시한다 — 여기 lastBoot* = -1 은 서버와 맞춰야 하는 계약이라,
+    // 기존 계정 픽스처를 손댔을 때 "서버 쌍둥이"가 조용히 따라 바뀌면 안 된다.
+    tutorial: {
+      outgameCompleted: false,
+      chapterIndex: 0,
+      chapterStepIndex: 0,
+      stepId: 0,
+      lastBootChapterIndex: -1,
+      lastBootStepIndex: -1,
+      sameCoordBootCount: 0,
+      completedTriggers: [],
+    },
+    profile: { nickname: null, avatarId: null, frameId: null },
+    ..._overrides,
   });
 }

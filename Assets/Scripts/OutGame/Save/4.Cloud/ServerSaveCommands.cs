@@ -65,6 +65,20 @@ internal static class ServerSaveCommands
         }
     }
 
+    /// <summary>부트 채택 중의 서버 호출. 게이트가 서기 전이라 봉인·채택이 없고,
+    /// 응답 대신 호출부가 문서를 다시 읽어 정상 채택 경로로 합류한다.</summary>
+    // Loading을 단언하는 이유는 오용 차단이다 — 게이트가 선 뒤에 이 창구로 세이브를 쓰면
+    // 업로드 봉인도 revision 채택도 건너뛰어 다음 저장이 세션을 끊는다.
+    internal static async UniTask<TResponse> InvokeBootAsync<TResponse>(string _commandName, object _request)
+        where TResponse : class
+    {
+        if (PlayerSaveCloud.State != EPlayerSaveCloudState.Loading)
+            throw new InvalidOperationException(
+                $"Boot command '{_commandName}' is not allowed while the save cloud is {PlayerSaveCloud.State}.");
+
+        return await RequireService(_commandName).InvokeAsync<TResponse>(_commandName, _request);
+    }
+
     /// <summary>세이브를 바꾸지 않는 서버 호출. 봉인·채택 없이 서비스만 태운다.</summary>
     // 클라우드 상태를 묻지도, 직렬화 대기열에 서지도 않는다 — 채택이 실패한 상태를 진단하는 것이 이 경로의 용도다.
     internal static async UniTask<TResponse> InvokeReadOnlyAsync<TResponse>(string _commandName, object _request)

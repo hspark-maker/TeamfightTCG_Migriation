@@ -64,7 +64,7 @@ service cloud.firestore {
         request.resource.data.schemaVersion is int &&
         request.resource.data.schemaVersion > 0 &&
         request.resource.data.revision is int &&
-        // revision 0 인 문서는 존재하지 않는다 — AdoptFreshAccount 가 0으로 두고 첫 트랜잭션이 1을 쓴다.
+        // revision 0 인 문서는 존재하지 않는다 — ensureSaveDocument 가 문서를 revision 1 로 만든다.
         request.resource.data.revision > 0 &&
         request.resource.data.deviceId is string &&
         request.resource.data.deviceId.size() == 32 &&
@@ -111,14 +111,13 @@ service cloud.firestore {
       }
 
       allow read: if isOwner() && isKnownEnv(envId) && isKnownDoc();
-      // 문서를 만드는 순간의 schemaVersion 은 딱 하나여야 한다.
-      // update 는 >= 라 단조 증가만 막으므로, 999999 로 create 하면 그 값이 영구 고착되고
-      // delete: if false 라 룰 층에 복구 경로가 없다(Admin SDK 개입이 필요해진다).
-      // 값은 UserSaveData.VERSION / functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 과
-      // 같아야 한다 — VERSION 을 올리려면 이 줄도 같이 올려라(회귀 테스트 8b 가 잡는다).
-      allow create: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
-                    request.resource.data.schemaVersion == 7 &&
-                    request.resource.data.revision == 1;
+      // 문서 생성은 서버만 한다 — functions/src/commands/ensureAccount.ts (Admin SDK 라 룰을 우회한다).
+      // 클라가 만들 수 있으면 스타터 지급을 클라가 정하게 되고, 골드·소유 카드가 위조된 채 첫 문서에 굳는다.
+      //
+      // 새 문서의 schemaVersion 앵커는 이제 functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 이다
+      // (여기서 == 7 을 강제하던 자리가 사라졌다). UserSaveData.VERSION 을 올릴 때는 그 상수를 같이 올려라 —
+      // 아래 update 의 >= 는 단조 증가만 막을 뿐 새 문서의 값을 고정하지 못한다.
+      allow create: if false;
       // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
       allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
                     request.resource.data.schemaVersion >= resource.data.schemaVersion &&

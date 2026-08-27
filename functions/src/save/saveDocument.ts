@@ -165,3 +165,53 @@ export async function mutateSave(
     return {revision, updatedSlots};
   });
 }
+
+/** 계정 확보 결과. created 가 false 면 문서가 이미 있었고 이 호출은 아무것도 쓰지 않았다. */
+export interface EnsureAccountOutcome {
+  revision: number;
+  created: boolean;
+}
+
+/**
+ * 세이브 문서를 확보한다 — 없으면 만들고, 있으면 그대로 둔 채 현재 revision 만 돌려준다.
+ *
+ * mutateSave 와 갈라 두는 이유: 저쪽은 "callable 1회 = 문서 쓰기 1회, revision +1" 이 계약이고
+ * R5~R8 이 전부 그 위에 선다. 생성 분기를 섞으면 그 불변식이 흐려진다.
+ *
+ * 이미 있는 문서에는 스키마 검사를 하지 않는다 — 드리프트는 클라 부트가 다시 읽으며
+ * MarkUpdateRequired / Fail 로 훨씬 나은 표면을 만든다. 여기서 던지면 그 갈래를 못 밟는다.
+ * @param {string} env 환경 id
+ * @param {string} uid 유저 uid
+ * @param {string} deviceId 클라 기기 id (32자 hex)
+ * @param {string} appVersion 클라 앱 버전
+ * @param {Function} buildSlots 새 문서에 실을 슬롯 10개
+ * @return {Promise<EnsureAccountOutcome>} 새 revision 과 생성 여부
+ */
+export async function ensureSaveDocument(
+  env: string,
+  uid: string,
+  deviceId: string,
+  appVersion: string,
+  buildSlots: () => SlotPatch,
+): Promise<EnsureAccountOutcome> {
+  const reference = saveDocument(env, uid);
+
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (snapshot.exists) {
+      return {revision: Number(snapshot.data()?.revision ?? 0), created: false};
+    }
+
+    // set 이 아니라 create 다 — 트랜잭션 밖에서 누가 먼저 만들었으면 재실행되어 덮어쓰기가 막힌다.
+    transaction.create(reference, {
+      ...buildSlots(),
+      schemaVersion: SCHEMA_VERSION,
+      revision: 1,
+      updatedAt: FieldValue.serverTimestamp(),
+      deviceId,
+      appVersion,
+    });
+
+    return {revision: 1, created: true};
+  });
+}

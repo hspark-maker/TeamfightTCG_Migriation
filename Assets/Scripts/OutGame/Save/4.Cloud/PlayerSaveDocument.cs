@@ -106,6 +106,9 @@ static class PlayerSaveDocument
         }
     }
 
+    /// <summary>이번 실행의 앱 버전. 문서에 싣는 값과 서버 요청에 싣는 값이 갈리지 않게 캐시본을 쓴다.</summary>
+    internal static string AppVersion() => s_appVersion;
+
     /// <summary>기기 식별자(PlayerPrefs에 심는 GUID). 어느 기기가 마지막으로 썼는지 콘솔에서 읽기 위한 것이다.</summary>
     internal static string DeviceId()
     {

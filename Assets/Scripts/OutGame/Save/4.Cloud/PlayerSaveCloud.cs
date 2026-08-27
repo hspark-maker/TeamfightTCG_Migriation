@@ -54,8 +54,6 @@ static class PlayerSaveCloud
     // 부트 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
     internal static bool IsGateComplete => s_gateComplete;
 
-    // 원격 문서가 없어 이번 세션이 첫 문서를 만든다. 스타터 지급의 유일한 근거다.
-    internal static bool IsFreshAccount { get; private set; }
 
     internal static long Revision { get; private set; }
 
@@ -92,7 +90,6 @@ static class PlayerSaveCloud
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
         s_uploadedSnapshot = string.Empty;
-        IsFreshAccount = false;
         Revision = 0;
         LastError = string.Empty;
         BlockReason = ECloudBlockReason.None;
@@ -289,7 +286,6 @@ static class PlayerSaveCloud
         s_activeUserId = string.Empty;
         s_envId = string.Empty;
         s_context = default;
-        IsFreshAccount = false;
         Revision = 0;
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Disabled);
@@ -428,8 +424,28 @@ static class PlayerSaveCloud
 
         if (!t_document.Exists)
         {
-            AdoptFreshAccount(t_userId);
-            return;
+            // 문서 생성은 서버만 한다(firestore.rules의 allow create: if false). 스타터 지급도 거기서 난다.
+            if (!await TryEnsureAccountAsync(_generation)) return;
+
+            try
+            {
+                t_document = await ReadAsync(_generation, t_userId);
+            }
+            catch (Exception t_exception)
+            {
+                if (_generation != s_generation) return;
+                Fail($"Save read after account creation failed ({t_exception.GetBaseException().Message}).");
+                return;
+            }
+
+            if (_generation != s_generation) return;
+
+            // 재귀하지 않는다 — 서버가 만들었다고 답했는데 없으면 우리가 모르는 일이 벌어진 것이다.
+            if (t_document == null || !t_document.Exists)
+            {
+                Fail("Account creation reported success but the save document is still missing.");
+                return;
+            }
         }
 
         if (!PlayerSaveDocument.TryReadMeta(t_document, out long t_schemaVersion, out long t_revision))
@@ -485,7 +501,6 @@ static class PlayerSaveCloud
 
     static void AdoptRemote(string _userId, UserSaveData _data, long _revision)
     {
-        IsFreshAccount = false;
         Revision = _revision;
         DataSaveManager.AdoptRemote(_data);
         s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
@@ -494,14 +509,40 @@ static class PlayerSaveCloud
         Debug.Log($"[PlayerSaveCloud] Adopted the remote save. env={s_envId}, revision={_revision}");
     }
 
-    static void AdoptFreshAccount(string _userId)
+    // 원격 문서가 없을 때 서버에게 만들어 달라고 한다. 실패하면 여기서 Fail까지 마치고 false를 준다.
+    static async UniTask<bool> TryEnsureAccountAsync(int _generation)
     {
-        IsFreshAccount = true;
-        Revision = 0;
-        DataSaveManager.AdoptRemote(new UserSaveData());
-        MarkUploadPending();
-        CompleteAdoption(_userId);
-        Debug.Log($"[PlayerSaveCloud] No remote save found. Starting a fresh account. env={s_envId}");
+        try
+        {
+            EnsureAccountResult t_result = await ServerSaveCommands.InvokeBootAsync<EnsureAccountResult>(
+                "ensureAccount",
+                new
+                {
+                    env = s_envId,
+                    deviceId = PlayerSaveDocument.DeviceId(),
+                    appVersion = PlayerSaveDocument.AppVersion(),
+                });
+
+            if (_generation != s_generation) return false;
+            if (t_result == null)
+            {
+                Fail("Account creation returned nothing.");
+                return false;
+            }
+
+            Debug.Log($"[PlayerSaveCloud] ensureAccount created={t_result.Created} " +
+                      $"revision={t_result.Revision} starter={t_result.StarterSource} env={s_envId}");
+            return true;
+        }
+        catch (Exception t_exception)
+        {
+            if (_generation != s_generation) return false;
+
+            // 분류로 갈래를 두지 않는다 — 부트에는 오프라인 폴백이 없어 Transient든 아니든 결론이 복구 화면 하나다.
+            Fail($"Account creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
+                 t_exception.GetBaseException().Message);
+            return false;
+        }
     }
 
     static void MarkUploadPending()
@@ -719,13 +760,15 @@ static class PlayerSaveCloud
         Task<long> t_transactionTask = Firestore().RunTransactionAsync<long>(async t_transaction =>
         {
             DocumentSnapshot t_snapshot = await t_transaction.GetSnapshotAsync(t_document);
-            long t_currentRevision = 0;
-            if (t_snapshot.Exists)
-            {
-                if (!PlayerSaveDocument.TryReadMeta(t_snapshot, out long t_schemaVersion, out t_currentRevision) ||
-                    t_schemaVersion != UserSaveData.VERSION)
-                    throw new RevisionConflictException("Remote save metadata is not writable by this client.");
-            }
+
+            // 문서 생성은 서버(ensureAccount)만 한다 — 채택을 통과한 세션에서 문서가 사라졌다면
+            // 콘솔에서 지웠거나 계정이 바뀐 것이다. "다른 기기가 먼저 씀"으로 뭉뚱그리면 원인을 잃는다.
+            if (!t_snapshot.Exists)
+                throw new RevisionConflictException("Remote save document no longer exists.");
+
+            if (!PlayerSaveDocument.TryReadMeta(t_snapshot, out long t_schemaVersion, out long t_currentRevision) ||
+                t_schemaVersion != UserSaveData.VERSION)
+                throw new RevisionConflictException("Remote save metadata is not writable by this client.");
 
             if (t_currentRevision != _expectedRevision)
                 throw new RevisionConflictException(
