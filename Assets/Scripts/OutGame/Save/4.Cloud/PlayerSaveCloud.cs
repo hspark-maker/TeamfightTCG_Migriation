@@ -10,8 +10,6 @@ using UnityEngine;
 static class PlayerSaveCloud
 {
     const int UPLOAD_DEBOUNCE_MS = 1000;
-    const int READ_ATTEMPT_COUNT = 3;
-    const int READ_BACKOFF_MS = 500;
     const int DOCUMENT_WARNING_BYTES = 256 * 1024;
     const int DOCUMENT_MAX_BYTES = 300000;
     const int BANNER_FAILURE_THRESHOLD = 3;
@@ -199,6 +197,21 @@ static class PlayerSaveCloud
         SetUploadFailures(ConsecutiveUploadFailures + 1);
         SetState(EPlayerSaveCloudState.Offline);
     }
+
+    /// <summary>복구 화면의 재시도. 채택이 실패로 끝난 경우에만 인증·원격 읽기를 다시 태운다.</summary>
+    internal static void ResetForRetry()
+    {
+        if (!s_initialized || State != EPlayerSaveCloudState.Failed) return;
+
+        // Initialize를 다시 부르지 않는다 — 훅·구독이 살아 있어 재배선하면 이중으로 걸린다.
+        s_generation++;
+        s_gateComplete = false;
+        LastError = string.Empty;
+        SetState(EPlayerSaveCloudState.Loading);
+
+        LoadAsync(s_generation).Forget();
+    }
+
     /// <summary>복귀 시 재시도. 못 올린 변경분만 다시 태운다 — 재-pull은 하지 않는다.</summary>
     internal static void RetryPending()
     {
@@ -289,6 +302,13 @@ static class PlayerSaveCloud
 
     static async UniTask LoadCoreAsync(int _generation)
     {
+        // 망이 끊긴 게 확실하면 auth 5초를 태울 이유가 없다 — 기다려도 답은 정해져 있다.
+        if (Application.internetReachability == NetworkReachability.NotReachable)
+        {
+            Fail("Network is unreachable.");
+            return;
+        }
+
         string t_userId;
         try
         {
@@ -311,7 +331,7 @@ static class PlayerSaveCloud
         DocumentSnapshot t_document;
         try
         {
-            t_document = await ReadWithRetryAsync(_generation, t_userId);
+            t_document = await ReadAsync(_generation, t_userId);
         }
         catch (Exception t_exception)
         {
@@ -475,52 +495,17 @@ static class PlayerSaveCloud
             : string.Empty;
     }
 
-    static async UniTask<DocumentSnapshot> ReadWithRetryAsync(int _generation, string _userId)
+    // 자동 재시도를 두지 않는다 — 재시도의 주체는 복구 화면의 사람이다.
+    static async UniTask<DocumentSnapshot> ReadAsync(int _generation, string _userId)
     {
-        Exception t_lastException = null;
+        Task<DocumentSnapshot> t_readTask = Document(_userId).GetSnapshotAsync(Source.Server);
+        (bool t_hasResult, DocumentSnapshot t_document) = await UniTask.WhenAny(
+            t_readTask.AsUniTask(),
+            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+        if (_generation != s_generation) return null;
+        if (!t_hasResult) throw new TimeoutException("Firestore read timed out.");
 
-        for (int t_attempt = 0; t_attempt < READ_ATTEMPT_COUNT; t_attempt++)
-        {
-            if (t_attempt > 0)
-            {
-                await UniTask.Delay(READ_BACKOFF_MS, DelayType.Realtime);
-                if (_generation != s_generation) return null;
-            }
-
-            try
-            {
-                Task<DocumentSnapshot> t_readTask = Document(_userId).GetSnapshotAsync(Source.Server);
-                (bool t_hasResult, DocumentSnapshot t_document) = await UniTask.WhenAny(
-                    t_readTask.AsUniTask(),
-                    UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
-                if (!t_hasResult)
-                {
-                    t_lastException = new TimeoutException("Firestore read timed out.");
-                    continue;
-                }
-
-                return t_document;
-            }
-            catch (Exception t_exception)
-            {
-                t_lastException = t_exception;
-                if (!IsRetryableRead(t_exception)) break;
-            }
-        }
-
-        throw t_lastException ?? new InvalidOperationException("Firestore read failed.");
-    }
-
-    // 권한·인증 실패는 다시 시도해도 같은 답이라 즉시 실패로 보낸다.
-    static bool IsRetryableRead(Exception _exception)
-    {
-        if (_exception.GetBaseException() is FirestoreException t_firestoreException)
-        {
-            return t_firestoreException.ErrorCode != FirestoreError.PermissionDenied &&
-                   t_firestoreException.ErrorCode != FirestoreError.Unauthenticated;
-        }
-
-        return true;
+        return t_document;
     }
 
     static void ScheduleUpload()

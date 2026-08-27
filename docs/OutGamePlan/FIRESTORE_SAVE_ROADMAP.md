@@ -1,7 +1,11 @@
 # Firestore 세이브 이관 로드맵
 
-> 최종 갱신: 2026-08-26 · 브랜치 `feature_Firestore`
+> 최종 갱신: 2026-08-27 · 브랜치 `feature_Firestore`
 > 이 문서는 **진행 상태 추적**용이다. 설계 근거와 구현 세부는 각 Phase 담당이 갖는다.
+>
+> ⚠️ **P4 이후는 [SERVER_VALIDATION_ROADMAP.md](SERVER_VALIDATION_ROADMAP.md) 로 이관됐다.**
+> 요금제가 Blaze로 바뀌며 Cloud Functions가 열려, 판정을 서버로 옮기고 로컬 캐시를 걷어내는 쪽으로
+> 방향이 바뀌었다. 이 문서는 P0~P3 기록으로 남는다.
 
 ## 목표
 
@@ -28,7 +32,7 @@
 | **P1** 도메인 정리 | 🟡 코드 완료 · 검증 대기 | 레거시 제거, 프로퍼티 전환, 직렬화기 교체 |
 | **P2** 필드맵 전환 | 🟡 코드 완료 · 잔가지 6건 | 클라우드 계층 재작성 |
 | **P3** 실패 UX | 🟡 코드 완료 · 검증 대기 | 재시도 화면, 업로드 배너 |
-| **P4** 규칙·운영 | ⬜ 대기 | 보안 규칙, 실기 검증, 문서 |
+| **P4** 규칙·운영 | ➡️ 이관 | [SERVER_VALIDATION_ROADMAP.md](SERVER_VALIDATION_ROADMAP.md) R1/R3/R9 로 흡수 |
 
 ---
 
@@ -114,29 +118,93 @@
 ### P3 — 실패 UX 🟡
 
 - [x] `4.Sync` 잔재 삭제 — 코드에 없다. P2 커밋에서 `4.Cloud` 로 재편되며 함께 사라졌다
-- [x] ~~`RecoveryRequired` 재시도 버튼 — **인플레이스 재시도**(씬 재로드 없음)~~
-      → **2026-08-27 폐기**. 온라인 전용 부트로 전환하며 재시도 경로를 걷고 종료 버튼으로 교체했다
+- [x] `RecoveryRequired` 재시도 버튼 — **인플레이스 재시도**(씬 재로드 없음).
+      2026-08-27 한 번 폐기됐다가 같은 날 모바일 표준 패턴으로 되살렸다(아래)
 - [x] 업로드 실패 배너 (3회 연속 실패부터)
 - [x] 차단 세션(`Blocked`) 재시작 요구 모달 — 오프라인 배너와 표면 분리
 - [x] pause/quit flush 재검증 — **실기능 버그 1건 발견·수정**(아래)
-- [x] 부트 타임아웃 대소관계 정리 — `LoadingCoverView.initializeWaitTimeout = 45f` 가
-      최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)를 덮는다
+- [x] 부트 타임아웃 대소관계 정리 — `LoadingCoverView.initializeWaitTimeout = 20f` 가
+      최악 10초(auth 5s + 읽기 5s)를 덮는다
 - [ ] 런타임 검증 (아래 완료 판정)
 
-**부트 실패 — 안내 + 종료** (2026-08-27, 위 재시도 계약을 대체)
+**부트 실패 — 대기 없이 재시도/종료** (2026-08-27, 같은 날의 "안내 + 종료" 계약을 대체)
 
-부트가 실패하면 진행하지 않는다. 인플레이스 재시도는 폐기됐고 `GameInitialization.ResetForRetry` ·
-`GameManager.RetryInitialize` · `FirebaseManager.Reinitialize` · `InitializationInstaller.RestartGate`
-네 심볼은 코드에 없다. 로컬 캐시 폴백도 함께 사라져 원격에 닿지 못하면 게임이 열리지 않는다.
+모바일 표준 패턴이다 — **짧은 타임아웃으로 실패를 빨리 확정하고, 곧장 2버튼 패널을 띄우고,
+재시도는 실패한 단계부터 재개한다.** 로컬 캐시 폴백은 여전히 없다(진실원은 Firestore 문서 하나).
 
-`LoadingCoverView.ShowRecovery()` 는 안내 문구와 종료 버튼(`quitButton`)만 띄운다. 문구는 세 갈래 —
-업데이트 필요 / 게임 데이터 로드 실패 / 서버 연결 실패. 종료는 어느 실패에서도 유효하므로 버튼을 숨기지 않는다.
+*실패 확정까지의 예산*
+
+| | 이전 | 지금 |
+|---|---|---|
+| 망 끊김이 확실할 때 | 21초 | **0초** — `LoadCoreAsync` 가 `Application.internetReachability` 로 선체크해 auth를 시도하지 않는다 |
+| 그 외 | 최악 21초 | 최악 **10초** — auth 5초 + 읽기 5초 |
+
+읽기 자동 재시도(`READ_ATTEMPT_COUNT` 3회 + 500ms 백오프)를 걷었다. **재시도의 주체는 사람**이다 —
+`ReadWithRetryAsync` 는 단일 시도 `ReadAsync` 로, `IsRetryableRead` 는 함께 삭제됐다.
+`InitializationInstaller.CoRunGate` 의 애셋 대기 루프에는 `CardArtCache.HasFailed` 탈출이 없어
+Addressables가 완료도 실패도 못 하면 무한 대기였다 — 탈출 조건을 채웠다.
+
+*재시도 경로 (씬 재로드도 Firebase 재초기화도 없다)*
+
+`Fail()` 이 `Shutdown()` 을 부르지 않아 `s_context` · `s_initialized` 가 살아 있고,
+`GameInitialization.WhenReady` 구독자가 코드 전체에 0건이며, 부트 게이트 소비자가 `CoRunGate` ·
+`CoRunInitialize` 둘뿐이라 **재시도 범위를 실패한 단계로만 좁힐 수 있었다**. 8월 27일 오전에 걷어낸
+`GameManager.RetryInitialize` · `FirebaseManager.Reinitialize` 는 되살리지 않았다.
+
+순서 계약의 주인은 **부트 소유자인 `InitializationInstaller.RestartBoot()`** 하나다.
+`LoadingCoverView.Retry()` 는 화면만 로딩 상태로 되돌리고 이걸 부른 뒤 `CoRunInitialize` 를 다시 건다.
+
+1. 실패한 캐시만 되돌리기 — `CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`
+   (성공한 쪽까지 Release하면 재적재 비용만 확정으로 늘어난다. 되돌리기만 하고 다시 걸지는 않는다)
+2. `GameInitialization.ResetForRetry()` — `RecoveryRequired` → `SyncingSave`
+3. `PlayerSaveCloud.ResetForRetry()` — `s_generation++` · `s_gateComplete=false` 후 `LoadAsync` 재기동.
+   `Initialize` 를 다시 부르지 않는다 — 훅·구독이 살아 있어 재배선하면 이중으로 걸린다
+4. 게이트 재기동 — 게이트 첫 줄의 `StartAssetLoads()` 가 재적재까지 함께 건다
+
+2가 4보다 **먼저**여야 한다 — 순서가 뒤집히면 다시 건 게이트가 `IsTerminated` 를 보고 그 자리에서 끝난다.
+
+*재시도 전용 코드 경로를 두지 않는다* (2026-08-27 리팩터)
+
+애셋 선로드를 `Awake` 에서 게이트 첫 줄(`InitializationInstaller.StartAssetLoads`)로 옮겼다.
+두 캐시 모두 "이미 시작한 적재는 스스로 건너뛴다"라 게이트가 매번 무조건 걸어도 안전하고,
+**게이트를 다시 걸면 재적재가 저절로 따라온다.** 재시도만을 위한 재적재 메서드(`RestartFailedAssetLoads`)와
+`CardCatalog.AllSpecs` 의 이중 진실원이 함께 사라졌다. 세이브 채택 대기보다 앞줄이라 병렬성도 그대로다.
+
+*재진입이 부수는 것을 막는 장치 2개*
+
+- **게이트 사본 1개** — `RunGate()` 가 `m_gate` 를 들고 있다가 다시 걸기 전에 `StopCoroutine` 한다.
+  둘이 되면 `InstallSaveDependent` 가 두 번 돌아 스타터 지급이 겹친다
+- ~~**설치 재시도 금지**~~ — 2026-08-27 삭제. `InstallSaveDependent` 안 11개 호출이 전부 재실행 안전이라
+  막을 이유가 없었다(`CurrencyManager.Init` 은 초기 골드를 **대입**, `StarterDeck.GrantIfNoDeck` 은 덱이 있으면 return,
+  `RankManager.TryEnterFirstTier` 는 `IsRanked` 면 return, 되감기 예약 둘은 1회 소비). 오히려 설치 도중 예외 한 번이
+  그 세션의 재시도를 영구히 막는 막다른 길이었다. 계약("여기 들어가는 모든 호출은 재실행 안전")은
+  `InstallSaveDependent` 주석으로 남는다
+- **`UiPrefabCache` generation 토큰** — `CardArtCache` 와 같은 모양. 이게 없으면 살아 있던 옛 `Preload`
+  continuation이 **새 핸들**의 상태를 읽어 `s_failed` 를 세우고, 옛 `Register` 콜백이 비운 색인에
+  Release된 프리팹을 다시 꽂는다(검수에서 잡힌 유일한 높음 등급)
+
+*버튼 노출* — **업데이트 필요만 재시도가 없다.** 나머지는 전부 재시도를 준다.
+
+| 실패 | 버튼 |
+|---|---|
+| 업데이트 필요 | 종료만 (다시 태워도 같은 답) |
+| 애셋 로드 실패 | 재시도(Addressables 재적재) + 종료 |
+| 서버 연결 실패 | 재시도 + 종료 |
+| 초기화 대기 타임아웃(느린 적재) | 재시도 + 종료 |
+
+마지막 줄이 재시도를 조건부로 두지 않은 이유다 — 이 경로는 `PlayerSaveCloud` 가 아직 `Loading` 이라
+"재시도 가능한 실패"로 판정되지 않는데, 여기서 재시도를 감추면 느린 부트가 막다른 길이 된다.
+이때 `PlayerSaveCloud.ResetForRetry()` 는 스스로 no-op이 되고 게이트 재기동만 일어난다.
+판정의 주인은 `GameInitialization.CanRetry`(= `State == RecoveryRequired`) 하나이고 뷰는 묻기만 한다.
+
+프리팹 `LoadingCover.prefab` 의 `RecoveryPanel` 에 `Button_Quit` 을 추가하고 좌우로 벌렸다
+(재시도 x=-240 / 종료 x=+240). 기존 `retryButton` 직렬화 키가 그대로 재시도 버튼에 붙는다.
 
 **표면 3분할**
 
 | 상태 | 진입 | 표면 |
 |---|---|---|
-| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 종료 버튼(재시도 없음) |
+| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 + 재시도·종료 |
 | `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달(`SimpleYNPopup`) 1회 |
 | `Offline` | 업로드 3회 연속 실패 | 상시 배너(`CloudSyncBannerView`, 층 940) |
 
@@ -162,17 +230,20 @@
 
 ---
 
-### P4 — 규칙·운영 ⬜
+### P4 — 규칙·운영 ➡️ 이관됨
 
-- [ ] `firestore.rules.prod` 새 스키마로 재작성 (최상위 전수 검증 + 도메인 맵은 깊이 1까지)
-- [ ] `revision == resource.data.revision + 1` 이 `FieldValue.Increment` 적용 후 값으로 평가되는지 rules 에뮬레이터로 실증
-- [ ] 개방 규칙(`allow read, write: if true`) 제거하고 배포
-- [ ] 스펙 업로더 권한 대안 결정 — **미결** (아래 참조)
-- [ ] Android IL2CPP 실기 1회 검증
-- [ ] `docs/OutGamePlan/FIRESTORE_SAVE.md` 신입 개발자용 문서 작성
-- [ ] `docs/OutGamePlan/STRUCTURE.md` 세이브 절 갱신
+**[SERVER_VALIDATION_ROADMAP.md](SERVER_VALIDATION_ROADMAP.md) 로 통째로 넘어갔다.** 대응표:
 
-**완료 판정**: 다른 uid 문서 읽기가 `PERMISSION_DENIED`, 정상 왕복은 통과. 실기 빌드 세이브 왕복 성공.
+| 원래 항목 | 간 곳 |
+|---|---|
+| `firestore.rules.prod` 재작성 · 개방 규칙 제거 | R1 (뼈대) · R5~R9 (슬롯 동결) |
+| `revision + 1` rules 에뮬레이터 실증 | R1 회귀 3종 |
+| 스펙 업로더 권한 대안 (미결 #2) | R3(a) — 관리자 callable + custom claim 으로 확정 |
+| Android IL2CPP 실기 1회 | R9 |
+| `STRUCTURE.md` 세이브 절 갱신 | R9 |
+| 신입 개발자용 `FIRESTORE_SAVE.md` | R9 (범위가 서버까지 넓어져 재작성) |
+
+`.prod` 파일 자체는 P2 이전의 `payload` 통짜 스키마라 이미 실효를 잃었다 — R1에서 폐기하고 새로 쓴다.
 
 ---
 
@@ -181,7 +252,7 @@
 | # | 항목 | 언제까지 | 선택지 |
 |---|---|---|---|
 | 1 | **저장 API 비동기 축** | P2 착수 전 | (a) `Save()` void 유지 + `FlushAsync()` 추가 (b) 전면 `SaveAsync` 전환 (c) (a) + `IRepository` 까지 비동기화. `Save()` 와 `IRepository` 시그니처는 한 덩어리 결정이다 |
-| 2 | **스펙 업로더 권한** | P4 착수 전 | `Editor/SpecFirestoreUploader` 가 API key로 `specs/**` 에 쓴다. 운영 규칙은 이 경로를 차단하므로 배포 즉시 죽는다. (a) 툴 전용 계정 uid에만 쓰기 허용 (b) 서비스 계정 + Admin SDK CLI로 이전 |
+| 2 | ~~**스펙 업로더 권한**~~ ➡️ R3(a)로 이관 · 관리자 callable(Admin SDK) + custom claim 으로 확정 | — | `Editor/SpecFirestoreUploader` 가 API key로 `specs/**` 에 쓴다. 운영 규칙은 이 경로를 차단하므로 배포 즉시 죽는다. (a) 툴 전용 계정 uid에만 쓰기 허용 (b) 서비스 계정 + Admin SDK CLI로 이전 |
 | 3 | **계정 연동** | 별도 백로그 | 익명 uid 분실 = 세이브 분실. 클라우드가 진실원이 된 이상 치명도가 올라간다 |
 | 4 | **부분 업데이트** | 실측 후 | 지금은 매 저장이 전체 문서 재작성. 도입하려면 도메인별 dirty 추적이 필요한데 타입 B 매니저가 `Data.*` 를 직접 변형해 신호 지점이 없다 |
 
@@ -212,7 +283,7 @@
 
 ## 콘솔 작업 체크리스트
 
-프로젝트 `cardbattle-d94f7`
+프로젝트 `bm-cardbattle` (커밋 `8e63e8c` 에서 이관. `.firebaserc` · `Assets/google-services.json` 과 같다)
 
 - [x] `빌드 > Authentication > Sign-in method > 익명` 사용 설정
 - [x] `빌드 > Firestore Database > 데이터베이스 만들기` (asia-northeast3 Seoul)
@@ -224,7 +295,7 @@
 `Authentication > Users` 에서 UID 복사 → `Firestore Database > 데이터` → `envs` → `test` → `users` → UID → `save` → `current`
 
 > ⚠️ 현재 `firestore.rules` 는 전면 개방 상태다(`allow read, write: if true`). 누구나 남의 세이브를 읽고 쓸 수 있다.
-> 운영 배포 전 반드시 P4를 끝낼 것.
+> 운영 배포 전 반드시 [SERVER_VALIDATION_ROADMAP.md](SERVER_VALIDATION_ROADMAP.md) 의 R1(룰 1차 배포)을 끝낼 것.
 
 ---
 

@@ -45,6 +45,12 @@ public class InitializationInstaller : MonoBehaviour
     static bool s_initialized;
     static bool s_saveDependentInstalled;
 
+    // 재시도가 게이트를 다시 걸 대상(씬 탐색 금지 규약상 유일한 통로).
+    static InitializationInstaller s_instance;
+
+    // 게이트는 하나여야 한다 — 대기 루프가 IsTerminated 탈출을 빠뜨리면 둘이 된다.
+    Coroutine m_gate;
+
     internal static bool IsSaveDependentInstalled => s_saveDependentInstalled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -52,6 +58,26 @@ public class InitializationInstaller : MonoBehaviour
     {
         s_initialized = false;
         s_saveDependentInstalled = false;
+        s_instance = null;
+    }
+
+    /// <summary>복구 화면의 재시도. 실패한 단계만 다시 태운다(씬 재로드도 Firebase 재초기화도 없다).</summary>
+    internal static void RestartBoot()
+    {
+        if (s_instance == null)
+        {
+            Debug.LogError("[InitializationInstaller] 부트 사본이 없어 재시도할 수 없습니다.");
+            return;
+        }
+
+        CardArtCache.ResetIfFailed();
+        UiPrefabCache.ResetIfFailed();
+
+        // 종료 상태 해제가 게이트 재기동보다 먼저다 — 아니면 다시 건 게이트가 그 자리에서 끝난다.
+        GameInitialization.ResetForRetry();
+        PlayerSaveCloud.ResetForRetry();
+
+        s_instance.RunGate();
     }
 
     void Awake()
@@ -93,15 +119,10 @@ public class InitializationInstaller : MonoBehaviour
 
         s_initialized = true;
 
-        // 카드 아트 선로드. 아트는 이제 CardData가 직접 물지 않고 Addressables로 따로 온다
-        // (CardArtCache) — 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
-        // 지금은 전 카드를 받는다: 이관 전과 같은 "언제든 다 그려진다" 동작을 유지하기 위함이다.
-        // 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다(좁히는 순간 미스 경고가 진단이 된다).
-        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        // 자폭 분기 뒤여야 한다 — 파괴된 사본에 코루틴을 걸게 된다.
+        s_instance = this;
 
-        // UI 프리팹 라벨 로드. 시작을 여기서 거는 이유는 CardArtCache와 같다 — 시작 시점이
-        // 컴포넌트 실행 순서에 끌려다니지 않게 초기화 소유자가 명시적으로 건다.
-        UiPrefabCache.Preload().Forget();
+        // 애셋 선로드는 게이트가 건다(StartAssetLoads).
 
         // 카드팩 스펙시트 선로드 — 팩 값(가격·장수·드롭)의 진실원. 지연 로드도 되지만 상점 진입 프레임에
         // 파싱이 걸리지 않게 여기서 당긴다. 드롭 조회가 CardCatalog를 읽으므로 SetSource 이후여야 한다.
@@ -181,10 +202,27 @@ public class InitializationInstaller : MonoBehaviour
         // 덱·소유·카탈로그를 쓰므로 위 배선이 전부 끝난 이 자리다. 예약이 없으면 아무 일도 없다.
     }
 
-    void Start() => StartCoroutine(CoRunGate());
+    void Start() => RunGate();
+
+    void RunGate()
+    {
+        if (m_gate != null) StopCoroutine(m_gate);
+
+        m_gate = StartCoroutine(CoRunGate());
+    }
+
+    // 전 카드를 미리 받는다 — 그리는 코드가 동기라 화면에 나가기 전에 캐시가 차 있어야 한다.
+    // 게이트 안에 있는 이유는 재시도다: 게이트를 다시 걸면 재적재가 따라온다(중복 호출은 둘 다 안전).
+    void StartAssetLoads()
+    {
+        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        UiPrefabCache.Preload().Forget();
+    }
 
     System.Collections.IEnumerator CoRunGate()
     {
+        StartAssetLoads();
+
         while (!PlayerSaveCloud.IsGateComplete && !GameInitialization.IsTerminated)
         {
             yield return null;
@@ -201,7 +239,7 @@ public class InitializationInstaller : MonoBehaviour
         }
 
         GameInitialization.SetState(EGameInitState.LoadingAssets);
-        while ((!CardArtCache.IsComplete ||
+        while (((!CardArtCache.IsComplete && !CardArtCache.HasFailed) ||
                 (!UiPrefabCache.IsComplete && !UiPrefabCache.HasFailed)) &&
                !GameInitialization.IsTerminated)
         {
@@ -229,6 +267,7 @@ public class InitializationInstaller : MonoBehaviour
         }
     }
 
+    // 여기 들어가는 호출은 전부 재실행 안전이어야 한다 — 재시도가 설치를 그대로 다시 태운다.
     void InstallSaveDependent()
     {
         // 클라우드 채택이 끝난 뒤여야 한다 — 채택 전에 슬롯을 갈아엎으면 채택이 그대로 덮어써 무효가 된다.

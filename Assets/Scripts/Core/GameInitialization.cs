@@ -11,6 +11,9 @@ public static class GameInitialization
     public static bool IsTerminated =>
         State == EGameInitState.UpdateRequired || State == EGameInitState.RecoveryRequired;
 
+    /// <summary>다시 태우면 답이 달라질 수 있는 실패인가(업데이트 필요는 아니다).</summary>
+    public static bool CanRetry => State == EGameInitState.RecoveryRequired;
+
     public static float Progress
     {
         get
@@ -97,6 +100,14 @@ public static class GameInitialization
     internal static void MarkUpdateRequired()
     {
         SetState(EGameInitState.UpdateRequired);
+    }
+
+    /// <summary>재시도가 종료 상태만 되돌린다. 종료 때 지워진 WhenReady 구독은 복원되지 않는다.</summary>
+    internal static void ResetForRetry()
+    {
+        if (!IsTerminated) return;
+
+        SetState(EGameInitState.SyncingSave);
     }
 
     sealed class ReadySubscription : IDisposable
