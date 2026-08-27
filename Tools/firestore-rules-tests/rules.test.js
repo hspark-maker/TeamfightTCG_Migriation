@@ -13,7 +13,7 @@ import {
 import { doc, setDoc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { saveDocument, freshAccountDocument, SCHEMA_VERSION } from './fixtures/saveDocument.js';
 
-const RULES_PATH = fileURLToPath(new URL('../../firestore.rules.prod', import.meta.url));
+const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 const PROJECT_ID = 'tcg-rules-test';
 const UID = 'player-a';
 const OTHER_UID = 'player-b';
@@ -198,6 +198,19 @@ test('13. 슬롯 타입 위반은 거부', async () => {
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1, { ownership: [1, 2] })));
 });
 
+// 클라는 CurrencySaveData.Normalize 덕에 언제나 4재화를 싣는다. 그래서 룰이 4키를
+// 전부 요구하는 게 맞다. 키를 빼거나 타입을 바꾸는 조작은 거부돼야 한다.
+test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), savePath()),
+    saveDocument(1, { currency: { balances: { Gold: 100 } } })));
+  await assertFails(setDoc(doc(authed(), savePath()),
+    saveDocument(1, { currency: { balances: { Gold: '100', Diamond: 0, Energy: 0, Shard: 0 } } })));
+  await assertFails(setDoc(doc(authed(), savePath()),
+    saveDocument(1, { currency: { balances: { Gold: -1, Diamond: 0, Energy: 0, Shard: 0 } } })));
+  await assertFails(setDoc(doc(authed(), savePath()),
+    saveDocument(1, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
+});
+
 // --- 14. 신규 계정 방어 -----------------------------------------------------
 
 // ProfileSaveData 의 nickname/avatarId/frameId 가 null 인 건 실수가 아니라 설계다 —
@@ -231,9 +244,14 @@ test('15. specs 는 인증되면 읽히고, 미인증은 거부', async () => {
   await assertFails(getDoc(doc(unauthed(), 'envs/test/specs/Card/rows/1')));
 });
 
-// TODO(R3a): specUpload callable 이관 후 이 테스트는 assertFails 로 뒤집힌다.
-test('15b. specs 쓰기는 지금 임시 개방 상태다 (R3a 에서 닫는다)', async () => {
-  await assertSucceeds(setDoc(doc(unauthed(), 'envs/test/specs/Card'), { rowCount: 2 }));
+// specs 쓰기는 admin 커스텀 클레임 전용이다. 익명 플레이어는 이 클레임을 절대 못 갖는다.
+// 에디터 업로더(SpecFirestoreUploader)는 ID 토큰을 실어야 통과한다 — functions/scripts/grant-admin.js 참조.
+test('15b. specs 쓰기는 admin 클레임만 통과', async () => {
+  await assertFails(setDoc(doc(unauthed(), 'envs/test/specs/Card'), { rowCount: 2 }));
+  await assertFails(setDoc(doc(authed(), 'envs/test/specs/Card'), { rowCount: 2 }));
+  const t_admin = testEnv.authenticatedContext('deployer', { admin: true }).firestore();
+  await assertSucceeds(setDoc(doc(t_admin, 'envs/test/specs/Card'), { rowCount: 2 }));
+  await assertSucceeds(setDoc(doc(t_admin, 'envs/test/specs/Card/rows/1'), { id: 1 }));
 });
 
 // --- 그 외 경로 -------------------------------------------------------------

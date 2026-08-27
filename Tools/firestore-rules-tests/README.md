@@ -1,6 +1,6 @@
-# firestore.rules.prod 회귀 테스트
+# firestore.rules 회귀 테스트
 
-`firestore.rules.prod` 가 실제 세이브 문서 스키마와 어긋나지 않았는지 검증한다.
+`firestore.rules` 가 실제 세이브 문서 스키마와 어긋나지 않았는지 검증한다.
 
 룰이 조용히 낡으면 배포하는 날 전 유저 저장이 거부된다 — 커밋 `809d040d3` 이 그 사고였고,
 그때는 운영에 전면 개방 룰이 올라가 있어서 증상이 안 보였다. 이 테스트가 룰과
@@ -31,8 +31,9 @@ npm test
 - hub·logging 포트는 CLI 가 알아서 비켜 잡는다
 
 `emulator-bootstrap.rules` 는 자리채움일 뿐이다(전부 거부). 진짜 검증 대상은
-`rules.test.js` 의 `initializeTestEnvironment` 가 `../../firestore.rules.prod` 를 읽어
-에뮬레이터에 **직접 주입**하는 쪽이다. 루트 `firebase.json` 이 어떤 룰을 가리키든 무관하다.
+`rules.test.js` 의 `initializeTestEnvironment` 가 `../../firestore.rules` 를 읽어
+에뮬레이터에 **직접 주입**하는 쪽이다(`RULES_FILE` 환경변수로 다른 파일을 겨눌 수도 있다 —
+다른 브랜치 룰을 대조할 때 쓴다).
 (firebase-tools 가 프로젝트 디렉터리 밖 경로를 `rules` 로 안 받아서 자리채움이 필요했다.)
 
 ## 로그의 `evaluation error` 는 정상이다
@@ -42,14 +43,23 @@ npm test
 첫 패스에서 `updatedAt == request.time` 이 에러가 된다. 최종 판정은 두 번째 패스가 낸다.
 통과 케이스(1·2·9c·14)가 실제로 통과하므로 룰은 정상이다.
 
+## 픽스처는 반드시 클라 실제 산출물이어야 한다
+
+`fixtures/saveDocument.js` 를 손으로 그럴듯하게 지어내면 **옳은 룰을 틀렸다고 판정**한다.
+한 번 데였다 — 재화를 `{ Gold: 100 }` 으로 뒀다가 "기준 룰이 신규 계정을 전부 막는다"는
+오판을 냈다. 실제로는 `CurrencySaveData.Normalize` 가 4재화를 다 채운다.
+의심스러우면 에뮬레이터에 클라를 붙여 만들어진 문서를 그대로 떠 와라.
+
 ## 룰을 고쳤으면
 
 1. `npm test` 로 30개 전부 통과 확인
 2. **일부러 깨보기** — 셋 다 해보면 테스트가 룰을 실제로 물고 있는지 확인된다:
    - `hasOnly` 목록에서 슬롯 키 하나 제거 → **1·2·9c·14** 가 깨져야 한다
-   - `hasAll` 을 메타 5키로 줄이고 슬롯 검사를 `!('x' in ...) ||` 형태로 되돌림
-     (= 감사 이전 상태) → **7c·7d**(세이브 비우기 우회) 가 깨져야 한다
    - `allow create` 의 `schemaVersion == 7` 줄 제거 → **8b** 가 깨져야 한다
+   - 재화 4키 검증 중 `balances.Diamond is int` 줄 제거 → **13b** 가 깨져야 한다
+
+   `hasAll` 15키와 `revision > 0` 은 빼도 안 깨진다 — 슬롯별 검증이 같은 구멍을 이미 막는다.
+   명시성·방어 겹으로 남겨 둔 것이지 단독으로 뭘 막고 있지는 않다.
 3. 세이브 도메인(`OutGame/Save/2.Domain/*SaveData.cs`)이 바뀌었으면
    `fixtures/saveDocument.js` 를 먼저 맞춘다
 4. **`UserSaveData.VERSION` 을 올렸으면 룰의 `allow create` 안 `schemaVersion == 7` 도 같이 올려라.**

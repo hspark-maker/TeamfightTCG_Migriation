@@ -177,7 +177,7 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
     `999999` 로 만들면 영구 고착되고 룰 층에 복구 경로가 없다 → `create` 는 현재 버전과
     정확히 같을 것을 요구. **`UserSaveData.VERSION` 을 올리면 이 줄도 같이 올려야 한다**
     (안 올리면 신규 계정만 못 만들어지는 부분 고장 — 회귀 테스트 `8b` 가 잡는다)
-- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **30케이스**, 전부 통과.
+- [x] rules 회귀 테스트 — `Tools/firestore-rules-tests/` 에 **31케이스**, 전부 통과.
       요구된 3종(남의 uid 읽기 / revision 건너뛰기 / 정상 왕복) 포함.
       포트 8081 · 프로젝트 `tcg-rules-test` 로 갈라 루트 에뮬레이터(8080)와 안 부딪힌다.
       룰은 `initializeTestEnvironment` 가 `.prod` 를 직접 주입하므로 `firebase.json` 포인터와 무관하다.
@@ -190,6 +190,17 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 - **`SpecFirestoreUploader`** — API key로 REST write를 한다. **결정(미결 #6): specs `write` 를
   R3(a) 까지 임시 개방으로 둔다.** 로드맵이 적어 둔 "관리자 uid 예외"안은 성립하지 않는다 —
   이 업로더는 인증 토큰 자체가 없어 `request.auth` 가 null 이라 uid 로 걸러낼 대상이 아니다
+**하네스 픽스처는 반드시 클라 실제 산출물이어야 한다 — 한 번 데였다**
+
+기준 룰의 재화 검증(`balances.Diamond is int` 등 4키 전부 요구)을 "클라는 Gold 하나만 넣으니
+신규 계정이 전부 막힌다"고 판정했는데 **틀렸다**. `CurrencySaveData.Normalize` 가
+`ECurrencyType.Count` 까지 순회하며 없는 키를 0으로 채우고, `CurrencyManager` 가 Init·Save
+양쪽에서 그걸 먼저 부른다. 클라 문서는 언제나 4재화를 싣는다.
+
+원인은 픽스처가 손으로 만든 `{ Gold: 100 }` 이었다는 것이다. **합성 페이로드는 옳은 룰을
+틀렸다고 판정하게 만들고, 그 판정을 믿으면 룰을 약하게 고치게 된다** — 실제로 존재 검사를
+끼워 넣어 키 삭제·타입 변조를 열 뻔했다. 테스트 `13b` 가 이 계약을 반대 방향에서 못박는다.
+
 **감사에서 나왔지만 지금 안 고친 것 — R9로 넘긴다**
 
 - **중첩 크기 무제한** — `keys()` 는 top-level만 본다. 슬롯 안을 1MiB까지 채워 revision마다
@@ -214,10 +225,24 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
   `OwnershipManager.GrantEntireCatalog` · `RankManager.SetTierForDebug` ·
   `TournamentProgress.ResetForDebug` · `UnlockAllCardsButton`
 
+**룰 진실원이 `firestore.rules` 하나로 통일됐다(2026-08-27).** `firestore.rules.prod` 는 삭제했다.
+
+통합처인 `origin/박형석작업용` 이 이미 그 구조로 가 있었고, 그쪽 룰이 우리 것보다 앞서 있었다 —
+`.prod` 이원화 폐기 · `specs` 를 `admin` 커스텀 클레임으로 폐쇄 · `matches` 중첩 거부 ·
+슬롯 크기 상한(감사가 R9로 미룬 항목). 그래서 **그 파일을 베이스로 삼고 우리 감사분을 얹는
+합집합**으로 갔다. 덮어쓰기가 아니다.
+
+우리가 얹은 것 중 실제로 커버리지를 더한 건 **`create` 의 `schemaVersion` 고정 하나**다.
+`hasAll` 15키와 `revision > 0` 은 기준 룰의 슬롯별 검증이 이미 같은 구멍을 막고 있어
+잉여였다(뮤테이션으로 확인 — 빼도 8b 만 깨진다). 명시성·방어 겹으로 남겨 뒀다.
+
+**`specs` 결정이 바뀌었다(미결 #6 갱신)**: 임시 개방 → **`admin` 클레임 전용**.
+기준 브랜치에 `functions/scripts/grant-admin.js` 가 있어 R3(a) 의 절반이 이미 있다.
+대가로 **`SpecFirestoreUploader` 는 ID 토큰을 실기 전까지 죽는다** — 룰 주석에도 적혀 있다.
+
 **남은 것 — 배포 3단계.** 룰 본문과 회귀 테스트는 끝났고 아래는 사람 승인이 필요하다:
 
-1. `firebase.json` 의 `firestore.rules` 포인터를 `.prod` 로 스왑 — **R0 판정 세션의 에뮬레이터
-   왕복이 열린 룰을 전제**하므로 그쪽이 통과한 뒤에 옮긴다
+1. ~~포인터 스왑~~ — 불필요해졌다. `firestore.rules` 가 곧 진짜 룰이고 `firebase.json` 은 이미 그걸 가리킨다
 2. `firebase login` → `firebase deploy --only firestore:rules`
    (`firestore.indexes.json` 이 없으므로 `--only firestore` 를 그냥 치면 안 된다)
 3. 배포 후 정상 플레이 왕복 + 타 uid 접근 차단 실측
@@ -421,7 +446,9 @@ callable이 서버 권위 슬롯을 쓰면 `revision` 이 오른다. 클라가 �
 >
 > **합류 시 충돌 3건**: (a) `functions/src/index.ts` 가 양쪽에서 갈린다(우리 `ping`·`devBumpRevision`
 > ↔ 그쪽 `submitMatchResult` + 구 `onRequest` ping) (b) `MatchResultSubmission.cs` 가
-> `Firebase.Functions` 를 직접 참조해 **미결 #12를 어긴다**(우리 브랜치 규약을 모르고 짠 것이다)
+> `Firebase.Functions` 를 직접 참조한다 — 우리 미결 #12(접점 단일화)와 **관용구가 갈린다**.
+> 어느 쪽이 위반인지는 정해진 바 없다. 합류 방향은 (a) 우리가 그쪽으로 들어가는 것으로 정해졌지만,
+> 그건 방향이지 관용구 우선순위가 아니다 — 건별로 합류 시점에 정한다
 > (c) 그쪽은 실패분을 **PlayerPrefs 큐**에 쌓는다 — R2가 로컬 저장을 걷어낸 것과 방향이 반대이고,
 > **미결 #4의 세 번째 선택지**(영속 재시도 큐)를 사실상 구현한 것이다
 >

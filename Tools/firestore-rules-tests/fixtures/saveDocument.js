@@ -21,7 +21,11 @@ export function saveDocument(_revision, _overrides = {}) {
     deviceId: DEVICE_ID,
     appVersion: '0.1.0',
 
-    currency: { balances: { Gold: 100 } },
+    // 4재화가 전부 실린다. CurrencySaveData.Normalize 가 ECurrencyType.Count 까지
+    // 순회하며 없는 키를 0으로 채우고, CurrencyManager 가 Init·Save 양쪽에서 그걸 부른다.
+    // 에뮬레이터에 클라가 실제로 만든 신규 계정 문서도 이 모양이다.
+    // Gold 하나만 넣으면 합성 페이로드가 되어 룰을 틀렸다고 오판하게 된다.
+    currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0 } },
     ownership: { cardIds: [1, 2, 3] },
     deck: { slots: [{ name: '기본 덱', cardIds: [1, 2, 3], imageKey: '' }] },
     cardGrowth: { entries: { 1: { level: 1, snack: 0, limitBreak: 0 } } },
