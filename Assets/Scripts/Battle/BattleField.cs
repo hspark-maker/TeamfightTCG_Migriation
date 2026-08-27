@@ -415,7 +415,11 @@ public class BattleField : MonoBehaviour
         }
     }
 
-    public CardInstance GetSlot(int _index) => this.slots[_index];
+    /// <summary>슬롯 조회. 범위 밖은 예외가 아니라 null이다 — 이 함수는 와이어에서 온 raw int가
+    /// 그대로 흘러드는 경로(수신 공격/스폰 미러)에 노출돼 있어서, 범위를 안 보면 손상·조작 패킷 하나가
+    /// 수신 클라를 IndexOutOfRangeException으로 세운다. 호출부는 이미 전부 null 분기를 갖고 있다.</summary>
+    public CardInstance GetSlot(int _index)
+        => _index >= 0 && _index < SLOT_COUNT ? this.slots[_index] : null;
     public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;
 
     /// <summary>슬롯을 점유한 카드 수(hp 0으로 아직 정리 전인 카드 포함 — <see cref="GetActiveCards"/>와 같은 집합).

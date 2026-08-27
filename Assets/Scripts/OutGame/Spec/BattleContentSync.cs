@@ -20,11 +20,16 @@ public enum EBattleContentGateResult
 public static class BattleContentSync
 {
     static readonly TimeSpan CheckTtl = TimeSpan.FromSeconds(60);
+
+    /// <summary>시간 초과로 놓아준 조회를 "아직 도는 중"으로 인정하는 상한. 이걸 넘기면 버려진 것으로 본다.</summary>
+    static readonly TimeSpan LateTaskGrace = TimeSpan.FromSeconds(30);
+
     static FirebaseContext s_context;
     static bool s_initialized;
     static DateTime s_lastCheckUtc;
     static string s_lastLocalFingerprint;
     static Task s_lateTask;
+    static DateTime s_lateTaskStartedUtc;
 
     public static void Initialize(in FirebaseContext _context)
     {
@@ -39,6 +44,7 @@ public static class BattleContentSync
         s_lastCheckUtc = default;
         s_lastLocalFingerprint = null;
         s_lateTask = null;
+        s_lateTaskStartedUtc = default;
     }
 
     public static async UniTask<EBattleContentGateResult> CheckBeforeBattleAsync(bool _multiplayer, CancellationToken _ct)
@@ -59,7 +65,7 @@ public static class BattleContentSync
             => Verdict(_multiplayer ? EBattleContentGateResult.Blocked : EBattleContentGateResult.OfflineAllowed, _reason);
 
         if (!s_initialized) return Fallback("Firebase 모듈 미초기화");
-        if (s_lateTask != null && !s_lateTask.IsCompleted) return Fallback("직전 조회가 아직 진행 중");
+        if (IsLateTaskBlocking(out string t_lateReason)) return Fallback(t_lateReason);
         try
         {
             string t_envId = s_context.EnvId;
@@ -203,11 +209,32 @@ public static class BattleContentSync
     static void TrackLate(Task _task)
     {
         s_lateTask = _task;
+        s_lateTaskStartedUtc = DateTime.UtcNow;
         _task.ContinueWith(t =>
         {
             _ = t.Exception;
             if (ReferenceEquals(s_lateTask, t)) s_lateTask = null;
         });
+    }
+
+    /// <summary>직전에 시간 초과로 놓아준 조회가 아직 도는 중인가. 중복 조회를 막는 장치지만
+    /// <b>영원히 막으면 안 된다</b> — Firestore 호출이 응답 없이 매달리면 s_lateTask가 끝나지 않아
+    /// 멀티 진입이 그 세션 내내 Blocked로 고정된다. 유예를 넘긴 작업은 버려진 것으로 보고 새로 시도한다.</summary>
+    static bool IsLateTaskBlocking(out string _reason)
+    {
+        _reason = null;
+        if (s_lateTask == null || s_lateTask.IsCompleted) return false;
+
+        TimeSpan t_elapsed = DateTime.UtcNow - s_lateTaskStartedUtc;
+        if (t_elapsed >= LateTaskGrace)
+        {
+            Debug.LogWarning($"[BattleContent] 직전 조회가 {(int)t_elapsed.TotalSeconds}초째 응답 없음 — " +
+                             "버려진 것으로 보고 새로 조회한다.");
+            s_lateTask = null;
+            return false;
+        }
+        _reason = $"직전 조회가 아직 진행 중({(int)t_elapsed.TotalSeconds}초)";
+        return true;
     }
 
     static async Task<SpecTablePayload> FetchTableAsync(string _envId, string _table)
@@ -243,6 +270,6 @@ sealed class BattleContentFirebaseModule : IFirebaseModule
 {
     public void Initialize(in FirebaseContext _context) => BattleContentSync.Initialize(in _context);
     public void RetryPending() { }
-    public void FlushPending() { }
+    public UniTask FlushPendingAsync() => UniTask.CompletedTask;
     public void Shutdown() => BattleContentSync.Shutdown();
 }

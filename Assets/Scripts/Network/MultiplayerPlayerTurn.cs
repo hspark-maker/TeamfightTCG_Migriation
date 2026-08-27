@@ -193,6 +193,13 @@ public class MultiplayerPlayerTurn : TurnBase
         this.ctx.enemyDeckUI?.Refresh();
         await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
 
+        // divergence 카나리아 스냅샷. **공격 해결 직후가 아니라 여기다.**
+        // 상대 CardSpawn은 수신 즉시 enemyField에 반영되므로(PlaceCardDirectly), 보충 전에 뜨면
+        // "상대 보충분이 도착했는가"가 회선 속도에 좌우돼 정상 경기에서도 지문이 갈린다.
+        // 배리어를 통과하고 양쪽 보충이 모두 끝난 이 지점은 두 클라가 반드시 같은 보드다.
+        // 이 지문은 **다음 배리어**에 실려 나간다(순번도 그때 것으로 맞춰진다).
+        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
+
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {
             this.forcedAttacker     = null;

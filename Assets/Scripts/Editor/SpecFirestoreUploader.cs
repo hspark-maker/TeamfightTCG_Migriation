@@ -548,7 +548,7 @@ public static class SpecFirestoreUploader
 
     static string ApiRoot(string _projectId) =>
         "https://firestore.googleapis.com/v1/projects/" + Uri.EscapeDataString(_projectId) +
-        "/databases/(default)";
+        "/databases/" + Uri.EscapeDataString(FirebaseRootPath.DatabaseId);
 
     static string DocumentUrl(string _projectId, string _envId, string _table) =>
         ApiRoot(_projectId) + "/documents/" + EscapedEnvironmentPath(_envId) +
@@ -561,7 +561,7 @@ public static class SpecFirestoreUploader
     }
 
     static string ResourceName(string _projectId, string _envId, string _table) =>
-        "projects/" + _projectId + "/databases/(default)/documents/" + FirebaseRootPath.Environment(_envId) +
+        "projects/" + _projectId + "/databases/" + FirebaseRootPath.DatabaseId + "/documents/" + FirebaseRootPath.Environment(_envId) +
         "/" + SPEC_COLLECTION + "/" + _table;
 
     static bool TryReadFirebaseConfig(out string _projectId, out string _apiKey, out string _error)

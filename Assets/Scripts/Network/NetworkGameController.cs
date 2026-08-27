@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -12,6 +13,12 @@ using UnityEngine;
 public class NetworkGameController : MonoBehaviour
 {
     const int CONTENT_FINGERPRINT_BYTES = 32;
+
+    /// <summary>AnimReady 페이로드 = [0]타입 + [1..4]핸드셰이크 순번(int) + [5..12]상태해시(ulong).
+    /// 새 MsgType을 만들지 않고 기존 배리어 메시지에 실어 보낸다 — 메시지 왕복 횟수를 늘리지 않고
+    /// "이 배리어 시점의 두 보드가 같은가"를 정확히 짝지어 비교할 수 있는 유일한 지점이기 때문이다.</summary>
+    const int ANIM_READY_BYTES = 13;
+
     public static NetworkGameController Instance { get; private set; }
 
     // Firebase 연동층이 Fusion PlayerRef를 계정의 안정 UserId로 해석하는 자리.
@@ -33,7 +40,7 @@ public class NetworkGameController : MonoBehaviour
     }
 
     UniTaskCompletionSource opponentReadyTcs;
-    bool opponentReadyReceived;
+    readonly HashSet<int> opponentReadySeqs = new HashSet<int>();
     bool opponentReadyForced;
     bool waitingForOpponentReady;
     UniTaskCompletionSource<int> opponentMulliganTcs;
@@ -42,6 +49,18 @@ public class NetworkGameController : MonoBehaviour
     bool waitingForOpponentMulligan;
     int opponentMulliganChoice = -1;
     CancellationToken destroyCt;
+
+    // ── divergence 카나리아 상태 ────────────────────────────────────────────
+    // 핸드셰이크 순번은 AnimReady 교환 1회당 1 증가한다. 양 클라가 공격 1회당 정확히 한 번씩
+    // 이 배리어를 통과하므로 정상 진행에서는 항상 같은 값이다. 값이 어긋났다는 것 자체가 발견거리라
+    // 비교를 생략하고 경고만 남긴다(어긋난 시점끼리 비교하면 무의미한 오탐이 난다).
+    int   handshakeSeq;
+    ulong stagedStateHash;
+    string stagedStateDump;
+    int   stagedStateHashSeq;
+    ulong remoteStateHash;
+    bool  hasRemoteStateHash;
+    int   remoteStateHashSeq;
 
     void Awake()
     {
@@ -117,16 +136,25 @@ public class NetworkGameController : MonoBehaviour
                     break;
                 }
                 case MsgType.AnimReady:
-                    if (!RequireLength(_data, 1, t_type)) return;
-                    OnOpponentReadyReceived();
+                    if (!RequireLength(_data, ANIM_READY_BYTES, t_type)) return;
+                    int t_readySeq = ReadInt(t_buf, t_offset + 1);
+                    if (t_readySeq < this.handshakeSeq) break;
+                    if ((long)t_readySeq > (long)this.handshakeSeq + 1)
+                    {
+                        RejectMessage($"AnimReady 순번 오류(current={this.handshakeSeq}, received={t_readySeq})");
+                        return;
+                    }
+                    OnOpponentStateHashReceived(t_readySeq, ReadULong(t_buf, t_offset + 5));
+                    OnOpponentReadyReceived(t_readySeq);
                     break;
 
                 case MsgType.InitialDeck:
                 {
+                    // 길이 오류는 손상 패킷이고 지문 불일치는 콘텐츠 버전 차이다. 둘을 같은 사유로 뭉치면
+                    // "상대와 데이터가 다르다"는 안내가 실제로는 회선 문제인 경우에도 나가 원인 추적이 막힌다.
                     if (_data.Count < 9 + CONTENT_FINGERPRINT_BYTES)
                     {
-                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
-                        RejectMessage($"InitialDeck 길이 부족({_data.Count})");
+                        RejectMessage($"InitialDeck 길이 부족({_data.Count}) — 손상 패킷");
                         return;
                     }
                     int t_ownerIdx = ReadInt(t_buf, t_offset + 1);
@@ -138,18 +166,23 @@ public class NetworkGameController : MonoBehaviour
                     }
                     if (_data.Count != 9 + CONTENT_FINGERPRINT_BYTES + t_count * 24)
                     {
-                        Debug.LogWarning($"[Net] InitialDeck 길이 불일치 수신={_data.Count} 기대={9 + CONTENT_FINGERPRINT_BYTES + t_count * 24}" +
-                                         $" (count={t_count}) — 구버전 클라이언트이거나 손상 패킷이다.");
-                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
+                        // 지문 32바이트만 빠진 길이 = 지문을 안 싣던 구버전 클라 → 콘텐츠 버전 불일치.
+                        // 그 외의 길이는 손상 패킷이다.
+                        if (_data.Count == 9 + t_count * 24)
+                            MultiplayerTurnRunner.Instance?.OnContentMismatchReceived(
+                                $"상대가 전투 데이터 지문을 싣지 않았다(구버전 클라이언트, count={t_count})");
+                        else
+                            RejectMessage($"InitialDeck 길이 불일치 수신={_data.Count} " +
+                                          $"기대={9 + CONTENT_FINGERPRINT_BYTES + t_count * 24} (count={t_count}) — 손상 패킷");
                         return;
                     }
                     byte[] t_remoteFingerprint = new byte[CONTENT_FINGERPRINT_BYTES];
                     Array.Copy(t_buf, t_offset + 9, t_remoteFingerprint, 0, CONTENT_FINGERPRINT_BYTES);
                     if (!ContentFingerprintMatches(t_remoteFingerprint))
                     {
-                        Debug.LogWarning($"[Net] 전투 데이터 지문 대조 실패\n  로컬={SpecSource.BattleFingerprint}" +
-                                         $"\n  상대={FingerprintHex(t_remoteFingerprint)}");
-                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived();
+                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived(
+                            $"전투 데이터 지문 대조 실패 로컬={SpecSource.BattleFingerprint} " +
+                            $"상대={FingerprintHex(t_remoteFingerprint)}");
                         return;
                     }
                     Debug.Log($"[Net] 전투 데이터 지문 일치 {SpecSource.BattleFingerprint} (owner={t_ownerIdx}, count={t_count})");
@@ -440,11 +473,13 @@ public class NetworkGameController : MonoBehaviour
             return false;
         }
 
-        SendToOpponents(new byte[] { (byte)MsgType.AnimReady });
+        int t_seq = this.handshakeSeq;
+        SendAnimReady(t_seq);
+        TryCompareStateHash();
 
-        if (this.opponentReadyReceived)
+        if (this.opponentReadySeqs.Remove(t_seq))
         {
-            this.opponentReadyReceived = false;
+            EndHandshake(t_seq);
             return true;
         }
 
@@ -465,7 +500,84 @@ public class NetworkGameController : MonoBehaviour
             this.opponentReadyTcs = null;
         }
         this.opponentReadyForced = false;
+        EndHandshake(t_seq);
         return t_succeeded;
+    }
+
+    // ── divergence 카나리아 ────────────────────────────────────────────────
+
+    /// <summary>다음 배리어에서 대조할 보드 지문을 맡긴다. <b>호출 시점이 계약이다</b> —
+    /// 현재 배리어 통과 후 양쪽의 <c>FillEmptySlots</c>가 모두 반영된 시점에 불러야 한다.
+    /// 그보다 이르면 상대 보충분의 수신 시점에 따라 정상 경기에서도 지문이 어긋날 수 있다.
+    ///
+    /// <para>계산이 실패해도 전투는 그대로 간다 — 카나리아가 게임을 죽이면 안 된다.
+    /// 지문을 못 맡기면 센티널(0)이 나가고 상대는 비교를 생략한다.</para></summary>
+    public void StageStateHash(BattleField _a, BattleField _b)
+    {
+        try
+        {
+            this.stagedStateHash    = BattleStateHash.Compute(_a, _b);
+            this.stagedStateDump    = BattleStateHash.Dump(_a, _b);
+            this.stagedStateHashSeq = this.handshakeSeq;
+        }
+        catch (Exception t_e)
+        {
+            this.stagedStateHash = 0UL;
+            this.stagedStateDump = null;
+            Debug.LogWarning($"[Hash] 상태 지문 계산 실패 — 이번 배리어는 대조를 생략한다: {t_e.Message}");
+        }
+        TryCompareStateHash();
+    }
+
+    void SendAnimReady(int _seq)
+    {
+        byte[] t_msg = new byte[ANIM_READY_BYTES];
+        t_msg[0] = (byte)MsgType.AnimReady;
+        WriteInt(t_msg, 1, _seq);
+        WriteULong(t_msg, 5, this.stagedStateHashSeq == _seq ? this.stagedStateHash : 0UL);
+        SendToOpponents(t_msg);
+    }
+
+    void OnOpponentStateHashReceived(int _seq, ulong _hash)
+    {
+        this.remoteStateHashSeq = _seq;
+        this.remoteStateHash    = _hash;
+        this.hasRemoteStateHash = true;
+        TryCompareStateHash();
+    }
+
+    /// <summary>양쪽 지문이 같은 순번으로 모였을 때만 대조한다. 일치하면 **무로그** — 매 공격마다
+    /// 로그를 남기면 정작 불일치 한 줄이 묻힌다.</summary>
+    void TryCompareStateHash()
+    {
+        if (!this.hasRemoteStateHash) return;
+        if (this.stagedStateHash == 0UL || this.stagedStateHashSeq != this.handshakeSeq) return;
+
+        if (this.remoteStateHashSeq != this.stagedStateHashSeq)
+        {
+            Debug.LogWarning($"[Hash] 핸드셰이크 순번 불일치 local={this.stagedStateHashSeq} " +
+                             $"remote={this.remoteStateHashSeq} — 이번 대조는 생략한다.");
+            return;
+        }
+        if (this.remoteStateHash == 0UL) return;   // 상대가 지문을 못 맡겼다(센티널)
+
+        this.hasRemoteStateHash = false;
+        if (this.remoteStateHash == this.stagedStateHash) return;
+
+        Debug.LogError($"[Hash] **상태 불일치** seq={this.stagedStateHashSeq} " +
+                       $"local=0x{this.stagedStateHash:X16} remote=0x{this.remoteStateHash:X16}\n" +
+                       $"  로컬 상태: {this.stagedStateDump}");
+    }
+
+    /// <summary>이번 배리어를 닫는다. 다음 배리어의 지문이 이미 도착해 있을 수 있으므로
+    /// **이번 순번 이하**의 상대 지문만 버린다 — 앞선 것까지 버리면 다음 대조를 통째로 놓친다.</summary>
+    void EndHandshake(int _seq)
+    {
+        this.stagedStateHash = 0UL;
+        this.stagedStateDump = null;
+        if (this.hasRemoteStateHash && this.remoteStateHashSeq <= _seq) this.hasRemoteStateHash = false;
+        this.opponentReadySeqs.RemoveWhere(t_readySeq => t_readySeq <= _seq);
+        this.handshakeSeq = _seq + 1;
     }
 
     async UniTask WaitForReadyDeadline()
@@ -491,9 +603,11 @@ public class NetworkGameController : MonoBehaviour
 
     // ── 내부 ────────────────────────────────────────────────────────────────
 
-    void OnOpponentReadyReceived()
+    void OnOpponentReadyReceived(int _seq)
     {
-        if (this.waitingForOpponentReady && this.opponentReadyTcs != null)
+        if (_seq < this.handshakeSeq) return;
+
+        if (_seq == this.handshakeSeq && this.waitingForOpponentReady && this.opponentReadyTcs != null)
         {
             this.waitingForOpponentReady = false;
             UniTaskCompletionSource t_tcs = this.opponentReadyTcs;
@@ -502,7 +616,7 @@ public class NetworkGameController : MonoBehaviour
             return;
         }
 
-        this.opponentReadyReceived = true;
+        this.opponentReadySeqs.Add(_seq);
     }
 
     void OnOpponentMulliganChoiceReceived(int _slot)
@@ -523,7 +637,12 @@ public class NetworkGameController : MonoBehaviour
     public void ForceOpponentReady()
     {
         this.opponentReadyForced = true;
-        this.opponentReadyReceived = false;
+        this.opponentReadySeqs.Clear();
+        // 강제 해제(이탈·AI 인수·무효 종료) 경로에서는 대조하지 않는다 — 짝이 맞지 않는 지문끼리
+        // 비교해 "불일치"를 찍으면 진짜 divergence 로그와 구분이 안 된다.
+        this.stagedStateHash = 0UL;
+        this.stagedStateDump = null;
+        this.hasRemoteStateHash = false;
         if (this.waitingForOpponentReady && this.opponentReadyTcs != null)
         {
             this.waitingForOpponentReady = false;
@@ -567,4 +686,18 @@ public class NetworkGameController : MonoBehaviour
 
     static int ReadInt(byte[] _buf, int _offset)
         => (_buf[_offset] << 24) | (_buf[_offset + 1] << 16) | (_buf[_offset + 2] << 8) | _buf[_offset + 3];
+
+    // big-endian. WriteInt/ReadInt와 같은 바이트 순서를 쓴다 — 한 메시지 안에서 순서가 갈리면
+    // 플랫폼이 다른 두 클라가 같은 바이트를 다르게 읽는다.
+    static void WriteULong(byte[] _buf, int _offset, ulong _value)
+    {
+        for (int i = 0; i < 8; i++) _buf[_offset + i] = (byte)(_value >> (56 - i * 8));
+    }
+
+    static ulong ReadULong(byte[] _buf, int _offset)
+    {
+        ulong t_value = 0;
+        for (int i = 0; i < 8; i++) t_value = (t_value << 8) | _buf[_offset + i];
+        return t_value;
+    }
 }

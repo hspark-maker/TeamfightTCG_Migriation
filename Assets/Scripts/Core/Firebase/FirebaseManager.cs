@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using Firebase;
 using Firebase.Firestore;
 using UnityEngine;
 
@@ -80,7 +81,7 @@ public static class FirebaseManager
     static FirebaseFirestore GetFirestore()
     {
         if (s_firestore != null) return s_firestore;
-        s_firestore = FirebaseFirestore.DefaultInstance;
+        s_firestore = FirebaseFirestore.GetInstance(FirebaseApp.DefaultInstance, FirebaseRootPath.DatabaseId);
         s_firestore.Settings.PersistenceEnabled = false;
         return s_firestore;
     }

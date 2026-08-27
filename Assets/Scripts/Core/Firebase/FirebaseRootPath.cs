@@ -2,6 +2,9 @@ using System;
 
 public static class FirebaseRootPath
 {
+    /// <summary>Firestore 데이터베이스 ID 단일 진실원. 기본 DB "(default)"가 아니라 명명 DB를 쓴다.</summary>
+    public const string DatabaseId = "cardbattle";
+
     public const string EnvironmentCollection = "envs";
 
     public static string Environment(string _envId)
