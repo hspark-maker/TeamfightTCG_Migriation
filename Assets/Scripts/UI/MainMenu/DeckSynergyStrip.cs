@@ -110,12 +110,11 @@ public class DeckSynergyStrip : MonoBehaviour
     {
         if (_icon == null || _icon.Progress?.Synergy == null) return;
 
-        UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
-        {
-            synergy    = _icon.Progress.Synergy,
-            iconRect   = (RectTransform)_icon.transform,
-            ownedCount = _icon.Progress.Count,
-        });
+        ExplainPopupData t_data = ExplainPopupData.ForSynergy(_icon.Progress.Synergy, _icon.Progress.Count);
+        if (t_data == null) return;
+
+        t_data.iconRect = (RectTransform)_icon.transform;
+        UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(t_data);
 
         this.m_explainOpen = true;
         LockScroll(true);
@@ -129,7 +128,7 @@ public class DeckSynergyStrip : MonoBehaviour
 
         this.m_explainOpen = false;
         LockScroll(false);
-        UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+        UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
         this.onFocusChanged?.Invoke(null);
     }
 

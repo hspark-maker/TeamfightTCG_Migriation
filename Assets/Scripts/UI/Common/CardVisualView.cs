@@ -538,7 +538,7 @@ public class CardVisualView : MonoBehaviour
 
     static void ShowKeywordExplain(KeywordIconConfig.Entry _entry, RectTransform _iconRect)
     {
-        UIPoolManager.Instance?.AddOrUpdateUI<KeywordExplainPopupUI>(new KeywordExplainData
+        UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(new ExplainPopupData
         {
             icon        = _entry.icon,
             displayName = _entry.displayName,
@@ -547,7 +547,7 @@ public class CardVisualView : MonoBehaviour
         });
     }
 
-    static void HideKeywordExplain() => UIPoolManager.Instance?.HideUI<KeywordExplainPopupUI>();
+    static void HideKeywordExplain() => UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
 
     // 인게임은 keywordIconStart에서 keywordIconStep만큼 밀며 아이콘을 직접 찍는다. uGUI 미러도 LayoutGroup에
     // 맡기지 않고 같은 좌표를 정규화 앵커로 옮긴다 — LayoutGroup은 간격·크기를 픽셀로 잡아서 카드 셀 크기가

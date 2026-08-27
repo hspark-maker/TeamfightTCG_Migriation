@@ -52,7 +52,7 @@ GameObject:
   - component: {fileID: 3204699513890155702}
   - component: {fileID: 3204699513890155701}
   m_Layer: 0
-  m_Name: KeywordIcon
+  m_Name: Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -127,7 +127,7 @@ GameObject:
   - component: {fileID: 3204699513971943731}
   - component: {fileID: 3204699513971943730}
   m_Layer: 0
-  m_Name: KeywordName
+  m_Name: NameText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -264,7 +264,7 @@ GameObject:
   - component: {fileID: 7572511478008894707}
   - component: {fileID: -1295038493996436774}
   m_Layer: 0
-  m_Name: KeywordExplain
+  m_Name: ExplainPopup
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -458,7 +458,7 @@ GameObject:
   - component: {fileID: 3204699515746464547}
   - component: {fileID: 3204699515746464546}
   m_Layer: 0
-  m_Name: KeywordExplain
+  m_Name: ExplainText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -595,7 +595,6 @@ GameObject:
   - component: {fileID: 3146704231580852986}
   - component: {fileID: 6889207744113086857}
   - component: {fileID: 2474667400796824033}
-  - component: {fileID: 4984223434232296123}
   - component: {fileID: 5952416591511645185}
   m_Layer: 0
   m_Name: BG
@@ -661,25 +660,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &4984223434232296123
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4676974414260512588}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f5f4c86b21c107741b1af80a8aab4d00, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  animator: {fileID: 5952416591511645185}
-  contents: {fileID: 0}
-  isShow: 0
-  iconImage: {fileID: 0}
-  nameText: {fileID: 0}
-  explainText: {fileID: 0}
-  iconGap: 8
 --- !u!114 &5952416591511645185
 MonoBehaviour:
   m_ObjectHideFlags: 0
