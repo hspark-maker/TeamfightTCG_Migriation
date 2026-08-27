@@ -23,6 +23,10 @@ internal sealed class PingResult
 
     [JsonProperty("schemaVersion")] public long SchemaVersion { get; set; }
 
+    // 서버 상수가 아니라 문서에 실제로 적힌 값이다. 문서를 읽지 못했으면 null이라 nullable이어야 한다.
+    // SchemaVersion과 어긋나면 쓰기 callable이 전부 거부되므로, 쓰기 전에 드리프트를 보는 자리가 여기다.
+    [JsonProperty("documentSchemaVersion")] public long? DocumentSchemaVersion { get; set; }
+
     [JsonProperty("exists")] public bool Exists { get; set; }
 
     [JsonProperty("revision")] public long Revision { get; set; }

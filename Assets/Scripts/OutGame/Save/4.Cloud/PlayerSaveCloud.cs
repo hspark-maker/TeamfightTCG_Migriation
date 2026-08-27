@@ -53,6 +53,9 @@ static class PlayerSaveCloud
 
     internal static long Revision { get; private set; }
 
+    // LastError는 서버 원문이라 유저에게 못 보여 준다 — 재시작 모달이 문구를 고르려면 분류된 값이 따로 필요하다.
+    internal static ECloudBlockReason BlockReason { get; private set; } = ECloudBlockReason.None;
+
     // 부트 게이트를 통과했고, 문서를 쓸 수 있는 상태다. Failed/Blocked/Loading에서 서버를 부르면
     // 응답의 revision을 채택할 기준선 자체가 없다.
     internal static bool CanRunServerCommand =>
@@ -75,6 +78,7 @@ static class PlayerSaveCloud
         IsFreshAccount = false;
         Revision = 0;
         LastError = string.Empty;
+        BlockReason = ECloudBlockReason.None;
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Loading);
 
@@ -147,7 +151,7 @@ static class PlayerSaveCloud
         if (_revision != Revision + 1)
         {
             string t_message = $"Server revision {_revision} does not follow the local revision {Revision}.";
-            BlockSession(t_message);
+            BlockSession(ECloudBlockReason.RemoteAhead, t_message);
 
             // 예외로 끊지 않으면 세션은 죽었는데 호출한 도메인은 응답을 성공으로 받아 보상 지급을 이어간다.
             throw new ServerAdoptionException(t_message);
@@ -372,6 +376,7 @@ static class PlayerSaveCloud
 
         if (t_schemaVersion < UserSaveData.VERSION)
         {
+            // 승급 코드가 없어 변환 대신 Fail이다. UserSaveData.VERSION이 동결인 한 이 갈래는 서지 않는다.
             Fail($"Remote schema v{t_schemaVersion} is older than client v{UserSaveData.VERSION}.");
             return;
         }
@@ -452,7 +457,7 @@ static class PlayerSaveCloud
         }
 
         // 룰 거부(Rejected)·배선 오류(Unusable)는 다시 태워도 같은 답이라 이 세션의 업로드는 여기서 끝이다.
-        BlockSession(_message);
+        BlockSession(ECloudBlockReason.SessionUnusable, _message);
     }
 
     // 부트 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
@@ -469,9 +474,10 @@ static class PlayerSaveCloud
     // 게이트를 통과한 뒤라 MarkRecoveryRequired는 화면을 바꾸지 못한 채 IsReady만 떨어뜨렸다 — 그래서 부르지 않는다.
     // 유저 표면은 Blocked를 보고 뜨는 재시작 모달(CloudSyncStatusWatcher)이 맡는다.
     // 로컬 복구선이 없으므로 여기서부터의 진행분은 재시작과 함께 버려진다 — 그래서 표면이 재시작을 강제해야 한다.
-    static void BlockSession(string _message)
+    static void BlockSession(ECloudBlockReason _reason, string _message)
     {
         LastError = _message;
+        BlockReason = _reason;
         s_uploadApproved = false;
         SetState(EPlayerSaveCloudState.Blocked);
         Debug.LogError(
@@ -545,9 +551,10 @@ static class PlayerSaveCloud
         int t_bytes = Encoding.UTF8.GetByteCount(t_snapshot);
         if (t_bytes > DOCUMENT_MAX_BYTES)
         {
-            LastError = $"Save document is too large: {t_bytes} bytes.";
-            SetState(EPlayerSaveCloudState.Failed);
-            Debug.LogError($"[PlayerSaveCloud] {LastError}");
+            // 다시 태워도 같은 스냅샷이라 같은 바이트 수다 — Offline 재시도로 두면 표면 없이 영원히 돈다.
+            BlockSession(
+                ECloudBlockReason.DocumentTooLarge,
+                $"Save document is too large: {t_bytes} bytes (limit {DOCUMENT_MAX_BYTES}).");
             return;
         }
 
@@ -589,7 +596,7 @@ static class PlayerSaveCloud
             if (t_exception.GetBaseException() is RevisionConflictException t_conflict)
             {
                 // 다른 기기가 먼저 썼다. 재시작하면 원격을 다시 채택하므로 이 세션은 여기서 접는다.
-                BlockSession($"Upload rejected: {t_conflict.Message}");
+                BlockSession(ECloudBlockReason.RemoteAhead, $"Upload rejected: {t_conflict.Message}");
                 return;
             }
 
@@ -670,7 +677,7 @@ static class PlayerSaveCloud
         // 채택 전에 오는 통지는 부트 중의 최초 로그인이다 — s_activeUserId는 채택이 세운다.
         if (string.IsNullOrEmpty(s_activeUserId)) return;
 
-        BlockSession("Firebase account changed during the session.");
+        BlockSession(ECloudBlockReason.SessionUnusable, "Firebase account changed during the session.");
     }
 
     static FirebaseFirestore Firestore()

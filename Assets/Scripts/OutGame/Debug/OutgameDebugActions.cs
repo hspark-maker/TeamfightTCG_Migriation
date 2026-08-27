@@ -95,6 +95,7 @@ public static class OutgameDebugActions
                 $"[OutgameDebug] ping ok={t_result.Ok} envKnown={t_result.EnvKnown} " +
                 $"uid={t_result.Uid} env={t_result.Env} " +
                 $"database={t_result.Database} schemaVersion={t_result.SchemaVersion} " +
+                $"documentSchemaVersion={t_result.DocumentSchemaVersion} " +
                 $"exists={t_result.Exists} revision={t_result.Revision} readError={t_result.ReadError}");
         }
         catch (System.Exception t_exception)

@@ -1,4 +1,5 @@
 import {HttpsError} from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
 import {
   DocumentData,
   FieldValue,
@@ -6,7 +7,14 @@ import {
 } from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 
-/** 클라 UserSaveData.VERSION 과 같아야 한다. */
+/**
+ * 세이브 문서 스키마 버전. 클라 쪽 쌍둥이 상수와 **항상 같은 값**이어야 한다.
+ *   Assets/Scripts/OutGame/Save/2.Domain/UserSaveData.cs
+ *   -> UserSaveData.VERSION
+ * TS와 C#이 상수를 공유할 방법이 없으니, 이 줄을 고치는 커밋은 반드시 저
+ * 파일도 같이 고친다. 정책: 필드·슬롯 추가는 버전을 올리지 않고 흡수하고,
+ * 파괴적 변경일 때만 서버·클라를 동시에 올린 뒤 기존 문서를 삭제·재생성한다.
+ */
 export const SCHEMA_VERSION = 7;
 
 const ENVIRONMENTS = ["live", "test"];
@@ -58,6 +66,64 @@ export function requireUid(auth?: {uid: string}): string {
 }
 
 /**
+ * 문서 스키마 버전이 이 서버가 쓸 수 있는 값인지 판정한다. 같지 않을 때
+ * 낮음/높음을 다른 오류 코드로 가른다 — 원인도 조치도 다르기 때문이다.
+ * 클라 PlayerSaveCloud 의 부트 게이트가 remote>client / remote<client 를
+ * 가르는 것과 같은 축이다.
+ * @param {unknown} rawVersion 문서에 적힌 schemaVersion 원본 값
+ * @param {string} env 환경 id
+ * @param {string} uid 유저 uid
+ */
+function assertWritableSchema(
+  rawVersion: unknown,
+  env: string,
+  uid: string,
+): void {
+  const documentVersion =
+    typeof rawVersion === "number" ? rawVersion : Number.NaN;
+  if (documentVersion === SCHEMA_VERSION) return;
+
+  // 로그와 에러 메시지 양쪽에 기대값·실제값을 모두 남긴다 — 드리프트는
+  // 전 callable을 한꺼번에 죽이므로 "왜"가 남지 않으면 원인 추적이 막힌다.
+  const drift = {
+    uid,
+    env,
+    serverSchemaVersion: SCHEMA_VERSION,
+    documentSchemaVersion: rawVersion ?? null,
+  };
+  const seen = `document v${String(rawVersion)} vs server v${SCHEMA_VERSION}`;
+
+  if (!Number.isFinite(documentVersion)) {
+    logger.error("save schema unreadable", drift);
+    throw new HttpsError(
+      "failed-precondition",
+      `Save schema is unreadable (${seen}): the document's schemaVersion ` +
+      "is missing or is not a number.",
+      drift,
+    );
+  }
+
+  if (documentVersion > SCHEMA_VERSION) {
+    logger.error("save schema drift: server is behind the document", drift);
+    throw new HttpsError(
+      "out-of-range",
+      `Save schema drift (${seen}): the document is newer than this ` +
+      "server. Deploy functions built from the same commit as the client " +
+      "(UserSaveData.VERSION); retrying will not help.",
+      drift,
+    );
+  }
+
+  logger.error("save schema drift: document is stale", drift);
+  throw new HttpsError(
+    "failed-precondition",
+    `Save schema drift (${seen}): the document is older than this server. ` +
+    "It must be migrated or deleted and recreated before it is writable.",
+    drift,
+  );
+}
+
+/**
  * 세이브 문서를 트랜잭션 1회로 읽고 고친다. revision +1 과 updatedAt 은
  * 여기서만 움직인다 — callable 하나당 문서 쓰기 1회라는 계약의 집행 지점.
  * @param {string} env 환경 id
@@ -85,13 +151,7 @@ export async function mutateSave(
     }
 
     const current = snapshot.data() ?? {};
-    const schemaVersion = Number(current.schemaVersion ?? 0);
-    if (schemaVersion !== SCHEMA_VERSION) {
-      throw new HttpsError(
-        "failed-precondition",
-        `Save schema v${schemaVersion} is not writable by this server.`,
-      );
-    }
+    assertWritableSchema(current.schemaVersion, env, uid);
 
     const revision = Number(current.revision ?? 0) + 1;
     const updatedSlots = await mutate(current, transaction);

@@ -17,6 +17,7 @@ export const ping = onCall(async (request) => {
 
   let exists = false;
   let revision = 0;
+  let documentSchemaVersion: unknown = null;
   let readError: string | null = null;
 
   const envKnown = isKnownEnv(env);
@@ -26,12 +27,21 @@ export const ping = onCall(async (request) => {
       const snapshot = await saveDocument(env, uid).get();
       exists = snapshot.exists;
       revision = Number(snapshot.data()?.revision ?? 0);
+      documentSchemaVersion = snapshot.data()?.schemaVersion ?? null;
     } catch (error) {
       readError = error instanceof Error ? error.message : String(error);
     }
   }
 
-  logger.info("ping", {uid, env, envKnown, exists, revision});
+  logger.info("ping", {
+    uid,
+    env,
+    envKnown,
+    exists,
+    revision,
+    serverSchemaVersion: SCHEMA_VERSION,
+    documentSchemaVersion,
+  });
 
   // 진단 도구가 "정상"이라 답하면 안 되는 경우까지 ok 에 담는다.
   return {
@@ -41,6 +51,8 @@ export const ping = onCall(async (request) => {
     env,
     database: DATABASE_ID,
     schemaVersion: SCHEMA_VERSION,
+    // 서버 기대값 옆에 문서의 실제 값을 나란히 둔다 — 쓰기 전에 드리프트를 본다.
+    documentSchemaVersion,
     exists,
     revision,
     readError,
