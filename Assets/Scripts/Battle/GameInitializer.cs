@@ -25,6 +25,7 @@ public class GameInitializer : MonoBehaviour
     static System.Func<int, int, CardGrowth> s_growthAtLevelProvider;
     static System.Func<int> s_enemyTierProvider;
     EMatchEndReason multiplayerFieldFailureReason = EMatchEndReason.Timeout;
+    bool multiplayerPreSynced;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **초기화/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
@@ -119,10 +120,25 @@ public class GameInitializer : MonoBehaviour
 
         InitializeViews();
 
+        if (this.multiplayerPreSynced)
+        {
+            NetworkGameController t_network = NetworkGameController.Instance;
+            (bool t_ready, EMatchEndReason t_failureReason) = t_network != null
+                ? await t_network.SendSceneReadyAndWaitAsync(this.GetCancellationTokenOnDestroy())
+                : (false, EMatchEndReason.InitError);
+            if (!t_ready)
+            {
+                if (t_failureReason == EMatchEndReason.Timeout)
+                    t_network?.SendMatchAbort(t_failureReason);
+                AbortInit(t_failureReason);
+                return;
+            }
+        }
+
         // 튜토리얼: 순차 안내 오버레이 초기화(연출 전용, 규칙 무접촉).
         if (TutorialConfig.IsActive) TutorialOverlayUI.Ensure(this.tutorialOverlayPrefab);
 
-        if (DeckConfig.IsMultiplayer && MultiplayerTurnRunner.Instance != null)
+        if (DeckConfig.IsMultiplayer && !this.multiplayerPreSynced && MultiplayerTurnRunner.Instance != null)
         {
             // false = 초기화 중 상대 이탈 → 전투 시작 없이 부전승 처리 후 조기 종료
             bool t_synced = await MultiplayerTurnRunner.Instance.SyncInitialDecks();
@@ -219,6 +235,9 @@ public class GameInitializer : MonoBehaviour
     /// 상한이 없으면 러너가 죽었거나 스테일인 경우 여기서 영원히 멈춘다(전투가 시작조차 안 됨).</summary>
     async UniTask<bool> InitializeMultiplayerFields()
     {
+        if (PreBattleMatchHandoff.TryConsume(out PreBattleMatchData t_preSynced))
+            return InitializePreSyncedMultiplayerFields(t_preSynced);
+
         this.multiplayerFieldFailureReason = EMatchEndReason.Timeout;
         // WhenAny로 진 쪽 WaitUntil은 저절로 멈추지 않는다. 이 predicate는 부작용이 있어서
         // (TrySetOwnerIndexFromRunner가 TurnState.LocalOwnerIndex를 쓴다) 살려두면 다음 싱글 전투에서
@@ -324,6 +343,48 @@ public class GameInitializer : MonoBehaviour
         return true;
     }
 
+    bool InitializePreSyncedMultiplayerFields(PreBattleMatchData _data)
+    {
+        if (_data == null || MultiplayerTurnRunner.Instance == null ||
+            _data.LocalCardIds == null || _data.LocalGrowth == null ||
+            _data.OpponentCardIds == null || _data.OpponentGrowth == null ||
+            _data.LocalCardIds.Length != _data.LocalGrowth.Length ||
+            _data.OpponentCardIds.Length != _data.OpponentGrowth.Length)
+        {
+            this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
+            return false;
+        }
+        if (!MatchRandom.IsSeeded || MatchRandom.InitialSeed != _data.Seed)
+            MatchRandom.Seed(_data.Seed);
+
+        int t_myIndex = _data.LocalOwnerIndex;
+        int t_opponentIndex = t_myIndex == 0 ? 1 : 0;
+        TurnState.LocalOwnerIndex = t_myIndex;
+
+        var t_localGrowth = new System.Collections.Generic.Dictionary<int, CardGrowth>();
+        for (int i = 0; i < _data.LocalCardIds.Length; i++)
+            t_localGrowth[_data.LocalCardIds[i]] = _data.LocalGrowth[i];
+        var t_opponentGrowth = new System.Collections.Generic.Dictionary<int, CardGrowth>();
+        for (int i = 0; i < _data.OpponentCardIds.Length; i++)
+            t_opponentGrowth[_data.OpponentCardIds[i]] = _data.OpponentGrowth[i];
+
+        MultiplayerTurnRunner.Instance.AdoptPreBattleHandoff(_data, MatchGrowthSource.Current);
+        this.playerField.Initialize(
+            new System.Collections.Generic.List<int>(_data.LocalCardIds),
+            t_myIndex,
+            ShufflePolicy.DerivedMatch,
+            _cardId => t_localGrowth[_cardId]);
+        this.enemyField.Initialize(
+            new System.Collections.Generic.List<int>(_data.OpponentCardIds),
+            t_opponentIndex,
+            ShufflePolicy.DerivedMatch,
+            _cardId => t_opponentGrowth[_cardId]);
+        this.playerField.ApplyDeckSynergy();
+        this.enemyField.ApplyDeckSynergy();
+        this.multiplayerPreSynced = true;
+        return true;
+    }
+
     void InitializeSinglePlayerFields()
     {
         // 싱글은 로컬이 항상 0번. 기본값에 기대지 않고 명시한다 — MultiplayerTurnRunner가 씬 오브젝트라
@@ -391,7 +452,7 @@ public class GameInitializer : MonoBehaviour
         this.enemyFieldView.InitializeAnimators();
         this.playerFieldView.Refresh();
 
-        if (!DeckConfig.IsMultiplayer)
+        if (!DeckConfig.IsMultiplayer || this.multiplayerPreSynced)
             this.enemyFieldView.Refresh();
     }
     

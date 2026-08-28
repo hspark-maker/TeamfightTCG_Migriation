@@ -117,7 +117,8 @@ public class MultiplayerOpponentTurn : TurnBase
 
             AttackResult t_result = default;
             Action t_onEffect = () => t_result = AttackProcessor.Execute(
-                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash, t_cunningSwap);
+                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                t_preSelectedSplash, t_cunningSwap, t_ruleBackstopOff);
 
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 

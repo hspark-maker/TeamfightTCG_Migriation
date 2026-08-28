@@ -31,14 +31,26 @@ public class MultiplayerTurnRunner : MonoBehaviour
     // 시드 commit-reveal 상태
     UniTaskCompletionSource seedCommitTcs;
     UniTaskCompletionSource seedRevealTcs;
+    UniTaskCompletionSource serverSeedCapabilityTcs;
     bool   seedCommitReceived;
     bool   seedRevealReceived;
+    bool   serverSeedCapabilityReceived;
     byte[] opponentCommit;
     byte[] myNonce;
     byte[] opponentNonce;
+    byte[] myPairingNonce;
+    byte[] opponentPairingNonce;
+    string matchId;
+    string seedSource = "commit_reveal";
+    string seedHex;
+    int rulesetVersion;
 
     public byte[] MyNonce => this.myNonce;
     public byte[] OpponentNonce => this.opponentNonce;
+    public string MatchId => this.matchId;
+    public string SeedSource => this.seedSource;
+    public string SeedHex => this.seedHex;
+    public int RulesetVersion => this.rulesetVersion;
 
     // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
     // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
@@ -111,6 +123,22 @@ public class MultiplayerTurnRunner : MonoBehaviour
 
     /// <summary>한 경기의 로컬 조회와 상대 검증이 반드시 같은 공급자를 쓰도록 시작 시점에 고정한다.</summary>
     public void SetMatchGrowthSource(IMatchGrowthSource _source) => this.matchGrowthSource = _source;
+
+    public void AdoptPreBattleHandoff(PreBattleMatchData _data, IMatchGrowthSource _source)
+    {
+        if (_data == null) return;
+        this.MyOwnerIndex = _data.LocalOwnerIndex;
+        TurnState.LocalOwnerIndex = this.MyOwnerIndex;
+        this.matchId = _data.MatchId;
+        this.seedSource = "server";
+        this.seedHex = _data.SeedHex;
+        this.rulesetVersion = _data.RulesetVersion;
+        this.myNonce = null;
+        this.opponentNonce = null;
+        this.matchGrowthSource = _source;
+        SetLocalGrowthProfiles(_data.LocalCardIds, _data.LocalGrowth);
+        this.enemyDeckReceived = true;
+    }
 
     // ── RPC 수신 콜백 ──────────────────────────────────────────────────────
 
@@ -286,6 +314,19 @@ public class MultiplayerTurnRunner : MonoBehaviour
         else this.seedRevealReceived = true;
     }
 
+    public void OnServerSeedCapabilityReceived(byte[] _pairingNonce)
+    {
+        if (DeckConfig.AiTakeover) return;
+        this.opponentPairingNonce = _pairingNonce;
+        if (this.serverSeedCapabilityTcs != null)
+        {
+            UniTaskCompletionSource t_tcs = this.serverSeedCapabilityTcs;
+            this.serverSeedCapabilityTcs = null;
+            t_tcs.TrySetResult();
+        }
+        else this.serverSeedCapabilityReceived = true;
+    }
+
     // ── 초기화 동기화 ─────────────────────────────────────────────────────
 
     /// <summary>
@@ -305,6 +346,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
                 AbortInitialDeck(EMatchEndReason.InitError, "셔플된 내 덱의 성장 스냅샷을 찾을 수 없다");
                 return false;
             }
+            this.myPairingNonce = NewPairingNonce();
+            NetworkGameController.Instance?.SendServerSeedCapability(this.myPairingNonce);
             if (NetworkGameController.Instance == null
                 || !NetworkGameController.Instance.SendInitialDeck(t_myIds, t_myGrowth, this.MyOwnerIndex))
             {
@@ -330,11 +373,13 @@ public class MultiplayerTurnRunner : MonoBehaviour
         }
         DeckLockResult t_lockResult = await DeckLockSubmission.TryLockAsync(
             ContentProfileConfig.Active.CloudEnvId,
-            MatchResultSubmission.MatchId(this.myNonce, this.opponentNonce),
+            this.matchId,
+            this.seedSource,
+            this.seedHex,
+            this.rulesetVersion,
             this.myNonce,
             this.opponentNonce,
             SpecSource.BattleFingerprint.ToLowerInvariant(),
-            t_network.LocalDeckHash,
             t_myIds,
             t_myGrowth);
         if (InitAborted) return false;
@@ -389,6 +434,86 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// </summary>
     async UniTask<bool> SyncMatchSeed()
     {
+        int t_capabilityWinner;
+        try
+        {
+            t_capabilityWinner = await UniTask.WhenAny(
+                WaitOpponentServerSeedCapability(),
+                UniTask.Delay(System.TimeSpan.FromSeconds(5), cancellationToken: this.destroyCt));
+        }
+        catch (System.OperationCanceledException)
+        {
+            return false;
+        }
+        if (InitAborted) return false;
+
+        if (t_capabilityWinner != 0)
+            return await SyncCommitRevealSeed();
+
+        (ServerMatchSeedStatus status, ServerMatchSeed match) t_result =
+            await ServerMatchSeedSubmission.TryAcquireAsync(
+                ContentProfileConfig.Active.CloudEnvId,
+                BuildServerPairingKey(NetworkSession.Instance?.PairingKey),
+                SpecSource.BattleFingerprint.ToLowerInvariant());
+        if (InitAborted) return false;
+        if (t_result.status != ServerMatchSeedStatus.Paired || t_result.match == null)
+        {
+            EMatchEndReason t_reason = t_result.status == ServerMatchSeedStatus.Rejected
+                ? EMatchEndReason.Desync
+                : EMatchEndReason.InitError;
+            NetworkGameController.Instance?.SendMatchAbort(t_reason);
+            AbortInitialDeck(
+                t_reason,
+                "서버 매치 시드를 확정하지 못했습니다.");
+            return false;
+        }
+
+        this.matchId = t_result.match.MatchId;
+        this.seedSource = "server";
+        this.seedHex = t_result.match.SeedHex;
+        this.rulesetVersion = t_result.match.RulesetVersion;
+        MatchRandom.Seed(t_result.match.Seed);
+        Debug.Log($"[MatchSeed] 서버 시드 확정 matchId={this.matchId}, slot={t_result.match.Slot}");
+        return true;
+    }
+
+    static byte[] NewPairingNonce()
+    {
+        byte[] t_nonce = new byte[16];
+        using (System.Security.Cryptography.RandomNumberGenerator t_rng =
+               System.Security.Cryptography.RandomNumberGenerator.Create())
+            t_rng.GetBytes(t_nonce);
+        return t_nonce;
+    }
+
+    string BuildServerPairingKey(string _roomName)
+    {
+        if (string.IsNullOrEmpty(_roomName) || this.myPairingNonce == null || this.opponentPairingNonce == null)
+            return null;
+        byte[] t_first = this.myPairingNonce;
+        byte[] t_second = this.opponentPairingNonce;
+        for (int i = 0; i < t_first.Length; i++)
+        {
+            if (t_first[i] == t_second[i]) continue;
+            if (t_first[i] > t_second[i])
+            {
+                t_first = this.opponentPairingNonce;
+                t_second = this.myPairingNonce;
+            }
+            break;
+        }
+
+        byte[] t_room = System.Text.Encoding.UTF8.GetBytes(_roomName);
+        byte[] t_input = new byte[t_room.Length + t_first.Length + t_second.Length];
+        System.Array.Copy(t_room, 0, t_input, 0, t_room.Length);
+        System.Array.Copy(t_first, 0, t_input, t_room.Length, t_first.Length);
+        System.Array.Copy(t_second, 0, t_input, t_room.Length + t_first.Length, t_second.Length);
+        using (System.Security.Cryptography.SHA256 t_sha = System.Security.Cryptography.SHA256.Create())
+            return MatchResultSubmission.Hex(t_sha.ComputeHash(t_input));
+    }
+
+    async UniTask<bool> SyncCommitRevealSeed()
+    {
         this.myNonce = MatchRandom.NewNonce();
         byte[] t_myCommit = MatchRandom.Hash(this.myNonce);
 
@@ -412,8 +537,23 @@ public class MultiplayerTurnRunner : MonoBehaviour
         }
 
         ulong t_seed = MatchRandom.ReadU64(this.myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
+        this.matchId = MatchResultSubmission.MatchId(this.myNonce, this.opponentNonce);
+        this.seedSource = "commit_reveal";
+        this.seedHex = null;
+        this.rulesetVersion = 0;
         MatchRandom.Seed(t_seed);
         return true;
+    }
+
+    UniTask WaitOpponentServerSeedCapability()
+    {
+        if (this.serverSeedCapabilityReceived)
+        {
+            this.serverSeedCapabilityReceived = false;
+            return UniTask.CompletedTask;
+        }
+        this.serverSeedCapabilityTcs = new UniTaskCompletionSource();
+        return this.serverSeedCapabilityTcs.Task;
     }
 
     UniTask WaitOpponentCommit()
@@ -439,6 +579,14 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.opponentCommit     = null;
         this.myNonce            = null;
         this.opponentNonce      = null;
+        this.myPairingNonce     = null;
+        this.opponentPairingNonce = null;
+        this.serverSeedCapabilityTcs = null;
+        this.serverSeedCapabilityReceived = false;
+        this.matchId            = null;
+        this.seedSource         = "commit_reveal";
+        this.seedHex            = null;
+        this.rulesetVersion     = 0;
     }
 
     // ── 초기화 단계 이탈 감지 ─────────────────────────────────────────────
@@ -520,6 +668,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
         UniTaskCompletionSource t_reveal = this.seedRevealTcs;
         this.seedRevealTcs = null;
         t_reveal?.TrySetResult();
+
+        UniTaskCompletionSource t_capability = this.serverSeedCapabilityTcs;
+        this.serverSeedCapabilityTcs = null;
+        t_capability?.TrySetResult();
     }
 
     // ── 대기 API ───────────────────────────────────────────────────────────

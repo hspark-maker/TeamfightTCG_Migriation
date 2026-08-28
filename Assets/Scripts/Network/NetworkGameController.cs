@@ -21,6 +21,7 @@ public class NetworkGameController : MonoBehaviour
     const int ANIM_READY_BYTES = 13;
 
     public static NetworkGameController Instance { get; private set; }
+    static IPreBattleNetworkReceiver preBattleReceiver;
 
     // Firebase 연동층이 Fusion PlayerRef를 계정의 안정 UserId로 해석하는 자리.
     // 미주입(로컬/오프라인) 시 빈 값이며, 성장 스냅샷 자체는 그대로 교환한다.
@@ -38,6 +39,9 @@ public class NetworkGameController : MonoBehaviour
         SeedCommit  = 6,   // commit-reveal: SHA256(nonce) 32바이트
         SeedReveal  = 7,   // commit-reveal: nonce 8바이트
         MulliganChoice = 8,
+        ServerSeedCapability = 9,
+        SceneReady = 10,
+        Surrender = 11,
     }
 
     UniTaskCompletionSource opponentReadyTcs;
@@ -66,6 +70,15 @@ public class NetworkGameController : MonoBehaviour
     ulong stateHashChain = 14695981039346656037UL;
     ulong stateHashChainPrev = 14695981039346656037UL;
     int stateHashChainLength;
+    UniTaskCompletionSource sceneReadyTcs;
+    bool sceneReadyReceived;
+    bool awaitingSceneReady;
+    bool hasBufferedInitialDeck;
+    MatchGrowthOpponent bufferedOpponent;
+    int[] bufferedCardIds;
+    CardGrowth[] bufferedGrowth;
+    byte[] bufferedPairingNonce;
+    EMatchEndReason? bufferedAbortReason;
 
     public string LocalDeckHash { get; private set; }
     public string OpponentDeckHash { get; private set; }
@@ -76,6 +89,11 @@ public class NetworkGameController : MonoBehaviour
 
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this);
+            return;
+        }
         this.destroyCt = this.GetCancellationTokenOnDestroy();
         InitializeInstance();
         ResolveLocalOwnerIndex();
@@ -109,7 +127,7 @@ public class NetworkGameController : MonoBehaviour
     public void HandleMessage(PlayerRef _sender, ArraySegment<byte> _data)
     {
         // AI 인수 뒤에는 돌아온 상대 상태를 현재 판에 합치지 않는다. 재접속은 인수 전 유예 창에서만 처리한다.
-        if (DeckConfig.AiTakeover) return;
+        if (DeckConfig.AiTakeover && preBattleReceiver == null) return;
 
         try
         {
@@ -187,7 +205,7 @@ public class NetworkGameController : MonoBehaviour
                         // 지문 32바이트만 빠진 길이 = 지문을 안 싣던 구버전 클라 → 콘텐츠 버전 불일치.
                         // 그 외의 길이는 손상 패킷이다.
                         if (_data.Count == 9 + t_count * 24)
-                            MultiplayerTurnRunner.Instance?.OnContentMismatchReceived(
+                            ReportContentMismatch(
                                 $"상대가 전투 데이터 지문을 싣지 않았다(구버전 클라이언트, count={t_count})");
                         else
                             RejectMessage($"InitialDeck 길이 불일치 수신={_data.Count} " +
@@ -198,7 +216,7 @@ public class NetworkGameController : MonoBehaviour
                     Array.Copy(t_buf, t_offset + 9, t_remoteFingerprint, 0, CONTENT_FINGERPRINT_BYTES);
                     if (!ContentFingerprintMatches(t_remoteFingerprint))
                     {
-                        MultiplayerTurnRunner.Instance?.OnContentMismatchReceived(
+                        ReportContentMismatch(
                             $"전투 데이터 지문 대조 실패 로컬={SpecSource.BattleFingerprint} " +
                             $"상대={FingerprintHex(t_remoteFingerprint)}");
                         return;
@@ -229,7 +247,17 @@ public class NetworkGameController : MonoBehaviour
                     this.OpponentDeckHash = ComputeDeckHash(t_ids, t_growth);
                     var t_opponent = new MatchGrowthOpponent(
                         t_ownerIdx, _sender.ToString(), ResolveStablePlayerId(_sender));
-                    MultiplayerTurnRunner.Instance?.OnInitialDeckReceived(t_opponent, t_ids, t_growth);
+                    if (preBattleReceiver != null)
+                        preBattleReceiver.OnInitialDeckReceived(t_opponent, t_ids, t_growth);
+                    else if (MultiplayerTurnRunner.Instance != null)
+                        MultiplayerTurnRunner.Instance?.OnInitialDeckReceived(t_opponent, t_ids, t_growth);
+                    else
+                    {
+                        this.hasBufferedInitialDeck = true;
+                        this.bufferedOpponent = t_opponent;
+                        this.bufferedCardIds = t_ids;
+                        this.bufferedGrowth = t_growth;
+                    }
                     break;
                 }
                 case MsgType.MatchAbort:
@@ -241,7 +269,26 @@ public class NetworkGameController : MonoBehaviour
                         RejectMessage($"MatchAbort 사유 오류({t_buf[t_offset + 1]})");
                         return;
                     }
-                    TurnRunner.Instance?.HandleMatchAbort(t_reason);
+                    if (preBattleReceiver != null) preBattleReceiver.OnMatchAbort(t_reason);
+                    else if (this.awaitingSceneReady)
+                    {
+                        this.bufferedAbortReason = t_reason;
+                        this.sceneReadyTcs?.TrySetResult();
+                    }
+                    else if (TurnRunner.Instance != null) TurnRunner.Instance.HandleMatchAbort(t_reason);
+                    else this.bufferedAbortReason = t_reason;
+                    break;
+                }
+                case MsgType.Surrender:
+                {
+                    if (!RequireLength(_data, 2, t_type)) return;
+                    int t_actorOwner = t_buf[t_offset + 1];
+                    if (!IsRemoteOwner(t_actorOwner))
+                    {
+                        RejectMessage($"Surrender owner 오류({t_actorOwner})");
+                        return;
+                    }
+                    TurnRunner.Instance?.HandleRemoteSurrender(t_actorOwner);
                     break;
                 }
                 case MsgType.SeedCommit:
@@ -260,6 +307,22 @@ public class NetworkGameController : MonoBehaviour
                     MultiplayerTurnRunner.Instance?.OnSeedRevealReceived(t_nonce);
                     break;
                 }
+
+                case MsgType.ServerSeedCapability:
+                    if (!RequireLength(_data, 17, t_type)) return;
+                    byte[] t_pairingNonce = new byte[16];
+                    Array.Copy(t_buf, t_offset + 1, t_pairingNonce, 0, t_pairingNonce.Length);
+                    if (preBattleReceiver != null)
+                        preBattleReceiver.OnServerSeedCapabilityReceived(t_pairingNonce);
+                    else if (MultiplayerTurnRunner.Instance != null)
+                        MultiplayerTurnRunner.Instance?.OnServerSeedCapabilityReceived(t_pairingNonce);
+                    else
+                        this.bufferedPairingNonce = t_pairingNonce;
+                    break;
+                case MsgType.SceneReady:
+                    if (!RequireLength(_data, 1, t_type)) return;
+                    OnSceneReadyReceived();
+                    break;
                 case MsgType.MulliganChoice:
                 {
                     if (!RequireLength(_data, 5, t_type)) return;
@@ -286,6 +349,44 @@ public class NetworkGameController : MonoBehaviour
     public static void SetStablePlayerIdProvider(System.Func<PlayerRef, string> _provider)
         => stablePlayerIdProvider = _provider;
 
+    internal static void SetPreBattleReceiver(IPreBattleNetworkReceiver _receiver)
+    {
+        preBattleReceiver = _receiver;
+        Instance?.ReplayBufferedPreBattleMessages();
+    }
+
+    internal static void ClearPreBattleReceiver(IPreBattleNetworkReceiver _expected)
+    {
+        if (ReferenceEquals(preBattleReceiver, _expected)) preBattleReceiver = null;
+    }
+
+    void ReplayBufferedPreBattleMessages()
+    {
+        IPreBattleNetworkReceiver t_receiver = preBattleReceiver;
+        if (t_receiver == null) return;
+        if (this.bufferedPairingNonce != null)
+        {
+            byte[] t_nonce = this.bufferedPairingNonce;
+            this.bufferedPairingNonce = null;
+            t_receiver.OnServerSeedCapabilityReceived(t_nonce);
+        }
+        if (this.hasBufferedInitialDeck)
+        {
+            this.hasBufferedInitialDeck = false;
+            int[] t_ids = this.bufferedCardIds;
+            CardGrowth[] t_growth = this.bufferedGrowth;
+            this.bufferedCardIds = null;
+            this.bufferedGrowth = null;
+            t_receiver.OnInitialDeckReceived(this.bufferedOpponent, t_ids, t_growth);
+        }
+        if (this.bufferedAbortReason.HasValue)
+        {
+            EMatchEndReason t_reason = this.bufferedAbortReason.Value;
+            this.bufferedAbortReason = null;
+            t_receiver.OnMatchAbort(t_reason);
+        }
+    }
+
     static string ResolveStablePlayerId(PlayerRef _player)
     {
         try
@@ -309,7 +410,14 @@ public class NetworkGameController : MonoBehaviour
     void RejectMessage(string _reason)
     {
         Debug.LogError($"[Net] 수신 패킷 거부 — {_reason}");
-        TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+        if (preBattleReceiver != null) preBattleReceiver.OnProtocolError(_reason);
+        else TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+    }
+
+    static void ReportContentMismatch(string _detail)
+    {
+        if (preBattleReceiver != null) preBattleReceiver.OnContentMismatch(_detail);
+        else MultiplayerTurnRunner.Instance?.OnContentMismatchReceived(_detail);
     }
 
     static bool IsValidSlot(int _slot) => _slot >= 0 && _slot < BattleField.SLOT_COUNT;
@@ -317,7 +425,17 @@ public class NetworkGameController : MonoBehaviour
 
     static bool IsRemoteOwner(int _owner)
     {
+        if (preBattleReceiver != null)
+            return IsValidOwner(_owner) && IsValidOwner(preBattleReceiver.LocalOwnerIndex) &&
+                   _owner != preBattleReceiver.LocalOwnerIndex;
         MultiplayerTurnRunner t_runner = MultiplayerTurnRunner.Instance;
+        if (t_runner == null)
+        {
+            NetworkRunner t_networkRunner = NetworkSession.Instance?.Runner;
+            if (t_networkRunner == null || !t_networkRunner.IsRunning) return false;
+            int t_localOwner = t_networkRunner.IsSharedModeMasterClient ? 0 : 1;
+            return IsValidOwner(_owner) && _owner != t_localOwner;
+        }
         return IsValidOwner(_owner)
             && t_runner != null
             && IsValidOwner(t_runner.MyOwnerIndex)
@@ -411,7 +529,10 @@ public class NetworkGameController : MonoBehaviour
         return t_builder.ToString();
     }
 
-    static string ComputeDeckHash(int[] _cardIds, CardGrowth[] _growth)
+    /// <summary>덱 스냅샷 해시. 배열 순서를 그대로 직렬화하므로 <b>호출 전에 cardId 오름차순으로
+    /// 정규화</b>돼 있어야 한다 — 서버 functions/src/deckValidation.ts의 computeDeckHash와
+    /// 바이트 레이아웃(4 + n*24, 빅엔디안)·순서 규약이 같아야 lockDeck이 통과한다.</summary>
+    internal static string ComputeDeckHash(int[] _cardIds, CardGrowth[] _growth)
     {
         int t_count = _cardIds?.Length ?? 0;
         byte[] t_bytes = new byte[4 + t_count * 24];
@@ -455,9 +576,98 @@ public class NetworkGameController : MonoBehaviour
         SendToOpponents(t_msg);
     }
 
+    public void SendServerSeedCapability(byte[] _pairingNonce)
+    {
+        byte[] t_msg = new byte[1 + _pairingNonce.Length];
+        t_msg[0] = (byte)MsgType.ServerSeedCapability;
+        Array.Copy(_pairingNonce, 0, t_msg, 1, _pairingNonce.Length);
+        SendToOpponents(t_msg);
+    }
+
     public void SendMatchAbort(EMatchEndReason _reason)
     {
         SendToOpponents(new[] { (byte)MsgType.MatchAbort, (byte)_reason });
+    }
+
+    public void SendSurrender(int _actorOwner)
+    {
+        SendToOpponents(new[] { (byte)MsgType.Surrender, checked((byte)_actorOwner) });
+    }
+
+    public void ResetMatchState()
+    {
+        this.LocalDeckHash = string.Empty;
+        this.OpponentDeckHash = string.Empty;
+        this.handshakeSeq = 0;
+        this.stagedStateHash = 0UL;
+        this.stagedStateDump = null;
+        this.stagedStateHashSeq = 0;
+        this.remoteStateHash = 0UL;
+        this.hasRemoteStateHash = false;
+        this.remoteStateHashSeq = 0;
+        this.lastAgreedStateHash = 0UL;
+        this.stateHashChain = 14695981039346656037UL;
+        this.stateHashChainPrev = 14695981039346656037UL;
+        this.stateHashChainLength = 0;
+        this.sceneReadyTcs = null;
+        this.sceneReadyReceived = false;
+        this.awaitingSceneReady = false;
+        this.hasBufferedInitialDeck = false;
+        this.bufferedCardIds = null;
+        this.bufferedGrowth = null;
+        this.bufferedPairingNonce = null;
+        this.bufferedAbortReason = null;
+    }
+
+    public async UniTask<(bool ready, EMatchEndReason failureReason)> SendSceneReadyAndWaitAsync(
+        CancellationToken _ct)
+    {
+        this.awaitingSceneReady = true;
+        SendToOpponents(new[] { (byte)MsgType.SceneReady });
+        if (TryConsumeBufferedAbort(out EMatchEndReason t_earlyAbort))
+        {
+            this.awaitingSceneReady = false;
+            return (false, t_earlyAbort);
+        }
+        if (this.sceneReadyReceived)
+        {
+            this.sceneReadyReceived = false;
+            this.awaitingSceneReady = false;
+            return (true, default);
+        }
+        this.sceneReadyTcs = new UniTaskCompletionSource();
+        int t_completed = await UniTask.WhenAny(
+            this.sceneReadyTcs.Task,
+            UniTask.Delay(TimeSpan.FromSeconds(NetTimeouts.InitSyncSec),
+                          ignoreTimeScale: true, cancellationToken: _ct));
+        this.sceneReadyTcs = null;
+        this.awaitingSceneReady = false;
+        if (TryConsumeBufferedAbort(out EMatchEndReason t_abort)) return (false, t_abort);
+        bool t_ready = t_completed == 0 && !_ct.IsCancellationRequested;
+        return (t_ready, t_ready ? default : EMatchEndReason.Timeout);
+    }
+
+    bool TryConsumeBufferedAbort(out EMatchEndReason _reason)
+    {
+        if (!this.bufferedAbortReason.HasValue)
+        {
+            _reason = default;
+            return false;
+        }
+        _reason = this.bufferedAbortReason.Value;
+        this.bufferedAbortReason = null;
+        return true;
+    }
+
+    void OnSceneReadyReceived()
+    {
+        if (this.sceneReadyTcs != null)
+        {
+            UniTaskCompletionSource t_tcs = this.sceneReadyTcs;
+            this.sceneReadyTcs = null;
+            t_tcs.TrySetResult();
+        }
+        else this.sceneReadyReceived = true;
     }
 
     public void SendMulliganChoice(int _slot)

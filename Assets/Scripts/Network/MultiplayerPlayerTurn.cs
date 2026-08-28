@@ -129,8 +129,10 @@ public class MultiplayerPlayerTurn : TurnBase
             _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
 
         AttackResult t_result = default;
+        bool t_derivedCommand = BattleUxFlags.ExecutionRandomTarget && ReferenceEquals(this.forcedAttacker, _attacker);
         Action t_onEffect = () => t_result = AttackProcessor.Execute(
-            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash, t_cunningSwap);
+            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+            t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
 
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 

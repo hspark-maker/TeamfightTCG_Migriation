@@ -17,19 +17,26 @@ internal enum DeckLockResult
 internal static class DeckLockSubmission
 {
     const string Region = "asia-northeast3";
-    static readonly TimeSpan FlushTimeout = TimeSpan.FromSeconds(15);
-    static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>호출자가 데드라인을 안 준 경우에만 쓰는 <b>폴백</b> 상한(레거시 씬 내 경로).
+    /// 씬 전 경로는 <see cref="NetTimeouts.PreBattleSyncSec"/> 하나로 잘린다 — 두 상한이 겹치면
+    /// 합이 단일 데드라인을 넘어(20+15+30 &gt; 45) 여기 값이 완주 불가능한 죽은 값이 된다.</summary>
+    static readonly TimeSpan FlushFallbackTimeout = TimeSpan.FromSeconds(15);
+    static readonly TimeSpan LockFallbackTimeout = TimeSpan.FromSeconds(30);
     static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
 
     internal static async UniTask<DeckLockResult> TryLockAsync(
         string _env,
         string _matchId,
+        string _seedSource,
+        string _seedHex,
+        int _rulesetVersion,
         byte[] _myNonce,
         byte[] _opponentNonce,
         string _contentFingerprint,
-        string _deckHash,
         int[] _cardIds,
-        CardGrowth[] _growth)
+        CardGrowth[] _growth,
+        CancellationToken _ct = default)
     {
         if (_cardIds == null || _growth == null || _cardIds.Length == 0
             || _cardIds.Length != _growth.Length)
@@ -38,13 +45,27 @@ internal static class DeckLockSubmission
             return DeckLockResult.Rejected;
         }
 
-        var t_cards = new List<object>(_cardIds.Length);
-        for (int i = 0; i < _cardIds.Length; i++)
+        // 덱 스냅샷 순서 규약: cardId 오름차순. 서버 validateDeckShape가 이 순서를 강제하고
+        // computeDeckHash가 배열 순서를 그대로 직렬화하므로, 여기서 정규화한 배열로
+        // deckHash까지 같이 계산해야 한다(전송 순서가 다른 레거시 경로 포함).
+        int[] t_ids = (int[])_cardIds.Clone();
+        CardGrowth[] t_growths = (CardGrowth[])_growth.Clone();
+        Array.Sort(t_ids, t_growths);
+        for (int i = 1; i < t_ids.Length; i++)
         {
-            CardGrowth t_growth = _growth[i];
+            if (t_ids[i - 1] != t_ids[i]) continue;
+            Debug.LogError($"[LockDeck] 덱에 중복 카드가 있습니다(cardId={t_ids[i]}).");
+            return DeckLockResult.Rejected;
+        }
+        string t_deckHash = NetworkGameController.ComputeDeckHash(t_ids, t_growths);
+
+        var t_cards = new List<object>(t_ids.Length);
+        for (int i = 0; i < t_ids.Length; i++)
+        {
+            CardGrowth t_growth = t_growths[i];
             t_cards.Add(new Dictionary<string, object>
             {
-                ["cardId"] = _cardIds[i],
+                ["cardId"] = t_ids[i],
                 ["level"] = t_growth.Level,
                 ["hpBonus"] = t_growth.HpBonus,
                 ["evolutionStage"] = t_growth.EvolutionStage,
@@ -57,12 +78,22 @@ internal static class DeckLockSubmission
         {
             ["env"] = _env,
             ["matchId"] = _matchId,
-            ["myNonce"] = MatchResultSubmission.Hex(_myNonce),
-            ["opponentNonce"] = MatchResultSubmission.Hex(_opponentNonce),
+            ["seedSource"] = _seedSource,
             ["contentFingerprint"] = _contentFingerprint,
-            ["deckHash"] = _deckHash,
+            ["cardDataVersion"] = _contentFingerprint,
+            ["deckHash"] = t_deckHash,
             ["cardSnapshots"] = t_cards,
         };
+        if (_seedSource == "server")
+        {
+            t_payload["seedHex"] = _seedHex;
+            t_payload["rulesetVersion"] = _rulesetVersion;
+        }
+        else
+        {
+            t_payload["myNonce"] = MatchResultSubmission.Hex(_myNonce);
+            t_payload["opponentNonce"] = MatchResultSubmission.Hex(_opponentNonce);
+        }
 
         if (!await MatchResultSubmission.EnsureSignedIn())
         {
@@ -82,8 +113,9 @@ internal static class DeckLockSubmission
         DataSaveManager.SaveImmediate();
         try
         {
-            using (var t_flushTimeout = new CancellationTokenSource(FlushTimeout))
+            using (var t_flushTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct))
             {
+                if (!_ct.CanBeCanceled) t_flushTimeout.CancelAfter(FlushFallbackTimeout);
                 await FirebaseManager.FlushPendingAsync()
                     .AttachExternalCancellation(t_flushTimeout.Token);
             }
@@ -110,8 +142,9 @@ internal static class DeckLockSubmission
             HttpsCallableReference t_callable = FirebaseFunctions
                 .GetInstance(FirebaseApp.DefaultInstance, Region)
                 .GetHttpsCallable("lockDeck");
-            using (var t_lockTimeout = new CancellationTokenSource(LockTimeout))
+            using (var t_lockTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct))
             {
+                if (!_ct.CanBeCanceled) t_lockTimeout.CancelAfter(LockFallbackTimeout);
                 while (true)
                 {
                     HttpsCallableResult t_response = await t_callable.CallAsync(t_payload)

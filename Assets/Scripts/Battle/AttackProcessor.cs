@@ -26,9 +26,12 @@ public static class AttackProcessor
     public static AttackResult Execute(CardInstance _attacker, CardInstance _defender,
         BattleField _attackerField, BattleField _defenderField,
         CardInstance _preSelectedSplash = null,
-        bool? _forceCunningSwap = null)
+        bool? _forceCunningSwap = null,
+        bool _derivedCommand = false)
     {
         // ---- Snapshot: 전부 피해 적용 '전' 값. 이후 단계는 읽기만 한다(반격 동시해결 규칙). ----
+        int t_commandAttackerSlot = _attacker.slotIndex;
+        int t_commandDefenderSlot = _defender.slotIndex;
         int t_atkDmg = _attacker.AttackDamage();
         int t_ctrDmg = _defender.AttackDamage(); // 동시 해결: 공격 전 수치로 반격 (도발 시 50%)
         bool t_takesCounter = _attacker.TakesCounterFrom(_defender); // 반격 자격(단일 진실원): 원거리/표식 무반격
@@ -133,6 +136,8 @@ public static class AttackProcessor
         // 표식은 '표식 덕에 반격이 면제됐을 때'만 발동 표시. 원거리는 표식과 무관하게 이미 무반격이므로 제외
         // (TakesCounterFrom = !Ranged && !Mark — 원거리면 Mark가 아무 일도 안 한 것).
         if (t_markedCounter && !t_ranged) t_result.defenderKeywords |= CardKeyword.Mark;
+        BattleCommandLog.RecordAttack(_attackerField.OwnerIndex, t_commandAttackerSlot,
+            t_commandDefenderSlot, t_result.attackerSwapped, _derivedCommand);
         return t_result;
     }
 

@@ -7,11 +7,15 @@ using UnityEngine;
 
 public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 {
+    const string ProtocolSuffix = "-p3";
     public static NetworkSession Instance { get; private set; }
 
     public string BattleSceneName = "BattleScene";
 
     public NetworkRunner Runner { get; private set; }
+    public string PairingKey => this.Runner != null && this.Runner.SessionInfo.IsValid
+        ? this.Runner.SessionInfo.Name
+        : null;
 
     GameObject sceneManagerGo;
 
@@ -25,6 +29,8 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        if (GetComponent<NetworkGameController>() == null)
+            gameObject.AddComponent<NetworkGameController>();
     }
 
     // 앱 종료·에디터 Play 정지에는 await 창이 없다 — 러너 종료를 킥만 하고 나간다.
@@ -71,6 +77,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     {
         await ShutdownRunner();
         DestroySceneManager();
+        NetworkGameController.Instance?.ResetMatchState();
 
         NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
         CreateRunner();
@@ -83,6 +90,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     {
         await ShutdownRunner();
         DestroySceneManager();
+        NetworkGameController.Instance?.ResetMatchState();
 
         NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
         CreateRunner();
@@ -92,7 +100,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             GameMode     = GameMode.Shared,
             SessionName  = null,
             PlayerCount  = 2,
-            CustomLobbyName  = "RandomMatch",
+            CustomLobbyName  = "RandomMatchP3",
             SceneManager = t_sceneManager,
         };
 
@@ -142,12 +150,17 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         return new StartGameArgs
         {
             GameMode     = GameMode.Shared,
-            SessionName  = _roomName,
+            SessionName  = ProtocolRoomName(_roomName),
             PlayerCount  = 2,
             CustomLobbyName  = "CodeMatch",
             SceneManager = _sceneManager,
         };
     }
+
+    static string ProtocolRoomName(string _roomName)
+        => string.IsNullOrEmpty(_roomName) || _roomName.EndsWith(ProtocolSuffix, StringComparison.Ordinal)
+            ? _roomName
+            : _roomName + ProtocolSuffix;
 
     // ── INetworkRunnerCallbacks ───────────────────────────────────────────
 

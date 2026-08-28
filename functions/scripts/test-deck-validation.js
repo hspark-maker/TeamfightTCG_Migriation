@@ -79,4 +79,10 @@ assert.equal(validateDeckShape(sixCards), null);
 assert.match(validateDeckShape(sixCards.slice(0, 5)), /^deck_size:/);
 assert.match(validateDeckShape([...sixCards.slice(0, 5), sixCards[0]]), /^duplicate_card:/);
 
+// cardId 오름차순 규약: 순서만 다른 같은 덱은 거절한다.
+const swapped = [...sixCards];
+[swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+assert.match(validateDeckShape(swapped), /^deck_order:/);
+assert.equal(validateDeckShape([...swapped].sort((a, b) => a.cardId - b.cardId)), null);
+
 console.log("deck-validation tests passed");

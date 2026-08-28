@@ -108,6 +108,14 @@ export function validateDeckShape(snapshots: readonly CardSnapshot[]): string | 
     if (cardIds.has(snapshot.cardId)) return `duplicate_card:${snapshot.cardId}`;
     cardIds.add(snapshot.cardId);
   }
+  // 덱 스냅샷 순서 규약: cardId 오름차순.
+  // computeDeckHash는 배열 순서를 그대로 직렬화하므로 정규화가 없으면
+  // 같은 덱이 순서만 달라도 다른 해시가 되고, 클라가 임의 순서를 제출할 수 있다.
+  for (let i = 1; i < snapshots.length; i++) {
+    if (snapshots[i - 1].cardId >= snapshots[i].cardId) {
+      return `deck_order:index=${i},cardId=${snapshots[i].cardId}`;
+    }
+  }
   return null;
 }
 
@@ -204,6 +212,9 @@ export function validateDeckSnapshots(
   return {ok: true};
 }
 
+// 배열 순서를 그대로 직렬화한다. 호출 전에 validateDeckShape로
+// cardId 오름차순을 강제해야 한다 — 클라(NetworkGameController.ComputeDeckHash)와
+// 바이트 레이아웃(4 + n*24, 빅엔디안)이 일치해야 하고 순서도 같은 규약을 따른다.
 export function computeDeckHash(snapshots: readonly CardSnapshot[]): string {
   const buffer = Buffer.alloc(4 + snapshots.length * 24);
   buffer.writeInt32BE(snapshots.length, 0);

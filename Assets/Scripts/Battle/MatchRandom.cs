@@ -13,6 +13,24 @@ using System.Security.Cryptography;
 /// </summary>
 public static class MatchRandom
 {
+    public struct DerivedStream
+    {
+        ulong state;
+
+        internal DerivedStream(ulong _seed)
+            => this.state = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;
+
+        public int Range(int _maxExclusive)
+        {
+            if (_maxExclusive <= 1) return 0;
+            this.state += 0x9E3779B97F4A7C15UL;
+            ulong t_z = this.state;
+            t_z = (t_z ^ (t_z >> 30)) * 0xBF58476D1CE4E5B9UL;
+            t_z = (t_z ^ (t_z >> 27)) * 0x94D049BB133111EBUL;
+            return (int)((t_z ^ (t_z >> 31)) % (ulong)_maxExclusive);
+        }
+    }
+
     static ulong s_state;
     static ulong s_initialSeed;
     static bool  s_seeded;
@@ -42,6 +60,18 @@ public static class MatchRandom
         s_initialSeed = 0;
         s_seeded  = false;
         DrawCount = 0;
+    }
+
+    /// <summary>공유 전투 RNG의 DrawCount를 소비하지 않는 owner별 독립 셔플 스트림.</summary>
+    public static DerivedStream DeriveDeckStream(int _ownerIndex)
+    {
+        if (!s_seeded) throw new InvalidOperationException("MatchRandom seed is not initialized.");
+        ulong t_seed = s_initialSeed ^ (0xD1B54A32D192ED03UL * (ulong)(_ownerIndex + 1));
+        t_seed += 0x9E3779B97F4A7C15UL;
+        ulong t_z = t_seed;
+        t_z = (t_z ^ (t_z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        t_z = (t_z ^ (t_z >> 27)) * 0x94D049BB133111EBUL;
+        return new DerivedStream(t_z ^ (t_z >> 31));
     }
 
     // splitmix64

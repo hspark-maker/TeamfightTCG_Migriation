@@ -28,6 +28,9 @@ assert.equal(submissionsAgree(a, {...b, stateHashChain: a.stateHashChainPrev,
   stateHashChainPrev: "0".repeat(16), stateHashChainLength: 3}), "state_chain_mismatch");
 assert.equal(submissionsAgree(a, {...b, stateHashChain: "9".repeat(16),
   stateHashChainPrev: "8".repeat(16)}), "state_chain_mismatch");
+assert.equal(submissionsAgree({...a, seedSource: "server"},
+  {...b, seedSource: "server", myNonce: "", opponentNonce: ""}), null);
+assert.equal(submissionsAgree({...a, seedSource: "server"}, b), "seed_source_mismatch");
 
 assert.deepEqual(decideMatch([a], 0, 120, 120), {status: "pending"});
 assert.deepEqual(decideMatch([a], 0, 121, 120), {status: "flagged", reason: "single_submission"});

@@ -222,6 +222,46 @@ public static class RankManager
     /// <summary>티어를 _index로 바로 옮긴다(디버그 전용). 포인트를 그 티어의 진입 임계치에 맞춘다 —
     /// 티어는 points의 순수 파생이라 티어를 직접 쓸 곳이 없고, 임계치에 세워야 표시·보상이 다 맞는다.
     /// 범위 밖은 양끝으로 클램프. 반환값 = 실제로 도달한 티어 인덱스.</summary>
+    /// <summary>서버 확정 멀티 결과 화면용 미리보기. 세이브와 이벤트를 변경하지 않는다.</summary>
+    public static RankApplyResult PreviewBattleResult(bool _won, bool _tutorial = false)
+    {
+        var t_config = Config;
+        long t_points = Points;
+        int t_index = t_config.ResolveTierIndex(t_points);
+
+        if (!_tutorial && PromoPendingAt(t_points))
+        {
+            long t_ceiling = t_config.GradeCeilingPoints(t_points);
+            long t_floor = t_config.DivisionFloorPoints(t_points);
+            long t_after = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
+            return new RankApplyResult(t_after - t_points, t_index,
+                t_config.ResolveTierIndex(t_after), true, PromoPendingAt(t_after));
+        }
+
+        long t_floorPoints = t_points >= t_config.FirstTierPoints ? t_config.DivisionFloorPoints(t_points) : 0;
+        long t_ceilingPoints = t_config.GradeCeilingPoints(t_points) - 1;
+        if (_tutorial)
+            t_ceilingPoints = Math.Min(t_ceilingPoints, Math.Max(t_config.FirstTierPoints - 1, t_points));
+        long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
+        long t_afterPoints = Math.Min(Math.Max(t_points + t_delta, t_floorPoints), t_ceilingPoints);
+        return new RankApplyResult(t_afterPoints - t_points, t_index,
+            t_config.ResolveTierIndex(t_afterPoints), false, PromoPendingAt(t_afterPoints));
+    }
+
+    /// <summary>서버 payout 원장이 확정한 절대 포인트를 적용한다.</summary>
+    public static RankApplyResult ApplyServerPayout(long _before, long _after)
+    {
+        if (_before < 0 || _after < 0) throw new ArgumentOutOfRangeException();
+        if (Slot.Points != _before)
+            Debug.LogWarning($"[Payout] 로컬 랭크 기준이 서버 원장과 다르다(local={Slot.Points}, server={_before}). 서버 값을 채택한다.");
+
+        int t_beforeTier = Config.ResolveTierIndex(_before);
+        Slot.Points = _after;
+        Save();
+        return new RankApplyResult(_after - _before, t_beforeTier, Config.ResolveTierIndex(_after),
+            PromoPendingAt(_before), PromoPendingAt(_after));
+    }
+
     public static int SetTierForDebug(int _index)
     {
         var t_config = Config;

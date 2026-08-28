@@ -72,6 +72,8 @@ public static class MulliganPhase
             // 상대(AI)가 멀리건을 쓴다는 사실을 잠깐 보여준다 — 안 그러면 카드가 이유 없이 바뀐 것처럼 보인다.
             if (t_slot >= 0) await ShowAiNotice(t_field, t_slot, _ctx, _ct);
         }
+        if (DeckConfig.IsMultiplayer)
+            BattleCommandLog.RecordMulligan(t_secondOwner, t_slot);
         if (t_slot < 0) return;   // 스킵/취소/무효 — 교환 없음(draw 미소비).
 
         // 나가는 카드의 뷰는 **스왑 전에** 잡아 둔다 — 스왑이 끝나면 그 슬롯의 카드가 바뀌어

@@ -12,6 +12,10 @@ public static class NetTimeouts
     /// 소비: MultiplayerTurnRunner.InitSyncTimeoutSec(별칭), GameInitializer의 ownerIndex 확보 대기.</summary>
     public const float InitSyncSec = 20f;
 
+    /// <summary>로비에서 서버 시드·원본 덱 교환·덱 잠금을 모두 끝내는 단일 상한.</summary>
+    public const float PreBattleSyncSec = 45f;
+    public const float BattleSceneEntrySec = 60f;
+
     /// <summary>상대의 공격 결정 RPC를 기다리는 상한. 상대는 생각시간(30초) 초과 시 자동 공격하므로
     /// 정상적으로는 그 안에 온다 — 이 값은 자동 공격조차 못 나가는 경우(유효 대상 없음·프리즈)를 막는 벽이다.
     /// MultiplayerTurnRunner.WaitForOpponentAttack이 사용한다.</summary>
@@ -21,6 +25,11 @@ public static class NetTimeouts
     /// 한쪽이 멈추면 상대가 영원히 잠긴다.
     /// NetworkGameController.WaitForOpponentReady가 사용한다.</summary>
     public const float AnimHandshakeSec = 20f;
+
+    /// <summary>항복 메시지를 보낸 뒤 러너를 내리기까지의 유예. 신뢰 전송이 플러시될 시간을 준다.
+    /// 이 창이 짧으면 상대가 Surrender 대신 이탈 경로를 타 명령 로그가 한 개 어긋나고,
+    /// 서버가 command_log_mismatch로 양쪽 지급을 막는다. TurnRunner.DisconnectAfterSurrender가 쓴다.</summary>
+    public const float SurrenderFlushSec = 2f;
 
     /// <summary>후공 플레이어의 멀리건 선택 상한. 초과 시 스킵(-1)을 전송해 양쪽 RNG를 소비하지 않는다.</summary>
     public const float MulliganPickSec = 20f;

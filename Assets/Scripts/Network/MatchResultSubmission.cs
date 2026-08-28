@@ -12,7 +12,7 @@ static class MatchResultSubmission
     const string PendingKey = "firebase.matchResult.pending.v2";
     const string Region = "asia-northeast3";
 
-    /// <summary>한 매치당 제출 시도 상한. 넘으면 큐에서 내려 무한 재시도를 끊는다.</summary>
+    /// <summary>재시도 지수의 상한. 서버 확정 지급 전에는 큐를 버리지 않는다.</summary>
     const int MaxAttempts = 8;
 
     /// <summary>재시도 간격(초). 시도 횟수가 쌓일수록 뒤쪽 값을 쓴다.</summary>
@@ -23,6 +23,7 @@ static class MatchResultSubmission
     {
         public string env;
         public string matchId;
+        public string seedSource;
         public string myNonce;
         public string opponentNonce;
         public string myDeckHash;
@@ -35,6 +36,12 @@ static class MatchResultSubmission
         public bool won;
         public int myRemaining;
         public int opponentRemaining;
+        public long rankPointsBefore;
+        public string commandLog;
+        public string commandLogHash;
+        public int commandCount;
+        public bool commandLogTruncated;
+        public int commandLogVersion;
         public int attempts;
     }
 
@@ -70,11 +77,14 @@ static class MatchResultSubmission
         SavePending();
     }
 
-    internal static bool TryEnqueue(bool _won, int _myRemaining, int _opponentRemaining)
+    internal static bool TryEnqueue(bool _won, int _myRemaining, int _opponentRemaining, long _rankPointsBefore)
     {
         MultiplayerTurnRunner t_turn = MultiplayerTurnRunner.Instance;
         NetworkGameController t_net = NetworkGameController.Instance;
-        if (t_turn == null || t_net == null || t_turn.MyNonce == null || t_turn.OpponentNonce == null ||
+        bool t_hasSeedIdentity = t_turn != null && !string.IsNullOrEmpty(t_turn.MatchId) &&
+            (t_turn.SeedSource == "server" ||
+             (t_turn.MyNonce != null && t_turn.OpponentNonce != null));
+        if (!t_hasSeedIdentity || t_net == null ||
             string.IsNullOrEmpty(t_net.LocalDeckHash) || string.IsNullOrEmpty(t_net.OpponentDeckHash) ||
             string.IsNullOrEmpty(s_envId))
         {
@@ -82,7 +92,7 @@ static class MatchResultSubmission
             return false;
         }
 
-        string t_matchId = MatchId(t_turn.MyNonce, t_turn.OpponentNonce);
+        string t_matchId = t_turn.MatchId;
         for (int i = 0; i < s_pending.Count; i++)
             if (s_pending[i].matchId == t_matchId) return true;
 
@@ -90,8 +100,9 @@ static class MatchResultSubmission
         {
             env = s_envId,
             matchId = t_matchId,
-            myNonce = Hex(t_turn.MyNonce),
-            opponentNonce = Hex(t_turn.OpponentNonce),
+            seedSource = t_turn.SeedSource,
+            myNonce = t_turn.MyNonce == null ? string.Empty : Hex(t_turn.MyNonce),
+            opponentNonce = t_turn.OpponentNonce == null ? string.Empty : Hex(t_turn.OpponentNonce),
             myDeckHash = t_net.LocalDeckHash,
             opponentDeckHash = t_net.OpponentDeckHash,
             finalStateHash = t_net.FinalStateHash.ToString("x16"),
@@ -102,6 +113,12 @@ static class MatchResultSubmission
             won = _won,
             myRemaining = _myRemaining,
             opponentRemaining = _opponentRemaining,
+            rankPointsBefore = _rankPointsBefore,
+            commandLog = BattleCommandLog.SerializeBase64(),
+            commandLogHash = BattleCommandLog.HashHex(),
+            commandCount = BattleCommandLog.Count,
+            commandLogTruncated = BattleCommandLog.IsTruncated,
+            commandLogVersion = 1,
         });
         SavePending();
         RetryPending();
@@ -145,7 +162,10 @@ static class MatchResultSubmission
                     HttpsCallableResult t_response = await t_callable.CallAsync(ToPayload(t_item));
                     if (t_generation != s_generation) return;
                     if (TryHandleResponse(t_response.Data, t_item.matchId, out bool t_complete) && t_complete)
+                    {
                         t_drop = true;
+                        PayoutInbox.RetryPending();
+                    }
                 }
                 catch (Exception t_exception)
                 {
@@ -164,13 +184,9 @@ static class MatchResultSubmission
                     }
                 }
 
-                // 일시 실패든 서버 pending이든 상한을 넘기면 내린다. 이 단계는 수집 전용이라
-                // 로컬 보상·랭크는 이미 확정돼 있고, 큐를 비워도 플레이어가 잃는 것은 없다.
+                // 멀티 보상·랭크는 서버 payout이 진실원이다. 일시 실패나 pending 제출은 버리면 안 된다.
                 if (!t_drop && t_item.attempts >= MaxAttempts)
-                {
-                    Debug.LogError($"[MatchResult] 재시도 상한({MaxAttempts}회)에 걸려 제출을 포기했다(match={t_item.matchId}).");
-                    t_drop = true;
-                }
+                    t_item.attempts = MaxAttempts;
                 if (t_drop) s_pending.RemoveAt(i);
             }
         }
@@ -196,18 +212,14 @@ static class MatchResultSubmission
                _code == FunctionsErrorCode.PermissionDenied;
     }
 
-    /// <summary>큐 전체에 시도 1회를 계상하고 상한을 넘긴 항목을 내린다. 전송 루프 앞에서 물러나는 경로용 —
-    /// 여기서 계상하지 않으면 attempts가 숫자 0에 멈춰 MaxAttempts가 영원히 걸리지 않는다.</summary>
+    /// <summary>전송 루프 앞에서 물러나는 경로의 재시도 지수를 올린다.</summary>
     static void ChargeAttemptAndDropExhausted(string _reason)
     {
         for (int i = s_pending.Count - 1; i >= 0; i--)
         {
             PendingSubmission t_item = s_pending[i];
             t_item.attempts++;
-            if (t_item.attempts < MaxAttempts) continue;
-            Debug.LogError($"[MatchResult] 재시도 상한({MaxAttempts}회)에 걸려 제출을 포기했다" +
-                           $"(match={t_item.matchId}, 사유={_reason}).");
-            s_pending.RemoveAt(i);
+            if (t_item.attempts > MaxAttempts) t_item.attempts = MaxAttempts;
         }
     }
 
@@ -244,6 +256,7 @@ static class MatchResultSubmission
     {
         ["env"] = _item.env,
         ["matchId"] = _item.matchId,
+        ["seedSource"] = string.IsNullOrEmpty(_item.seedSource) ? "commit_reveal" : _item.seedSource,
         ["myNonce"] = _item.myNonce,
         ["opponentNonce"] = _item.opponentNonce,
         ["myDeckHash"] = _item.myDeckHash,
@@ -256,6 +269,12 @@ static class MatchResultSubmission
         ["won"] = _item.won,
         ["myRemaining"] = _item.myRemaining,
         ["opponentRemaining"] = _item.opponentRemaining,
+        ["rankPointsBefore"] = _item.rankPointsBefore,
+        ["commandLog"] = _item.commandLog,
+        ["commandLogHash"] = _item.commandLogHash,
+        ["commandCount"] = _item.commandCount,
+        ["commandLogTruncated"] = _item.commandLogTruncated,
+        ["commandLogVersion"] = _item.commandLogVersion,
     };
 
     static bool TryHandleResponse(object _raw, string _matchId, out bool _complete)
@@ -272,10 +291,10 @@ static class MatchResultSubmission
         }
         if (t_status != "confirmed") return false;
 
-        // 수집 전용 단계다 — 서버는 대조 결과만 돌려주고, 보상·랭크는 로컬이 이미 확정했다.
-        // 세이브를 건드리지 않으므로 여기서 할 일은 큐에서 항목을 내리는 것뿐이다.
+        // confirmed 트랜잭션이 양쪽 payout을 함께 만들었고 별도 inbox가 적용·ack한다.
+        // 제출 큐를 내린 뒤 PayoutInbox가 서버 원장을 로컬 세이브에 반영한다.
         _complete = true;
-        Debug.Log($"[MatchResult] 서버 대조 일치(match={_matchId}).");
+        Debug.Log($"[MatchResult] 서버 대조 일치, payout 회수를 시작한다(match={_matchId}).");
         return true;
     }
 
@@ -330,8 +349,27 @@ static class MatchResultSubmission
 
 sealed class MatchResultFirebaseModule : IFirebaseModule
 {
-    public void Initialize(in FirebaseContext _context) => MatchResultSubmission.Initialize(_context.EnvId);
-    public void RetryPending() => MatchResultSubmission.RetryPending();
-    public UniTask FlushPendingAsync() => MatchResultSubmission.FlushAsync();
-    public void Shutdown() => MatchResultSubmission.Shutdown();
+    public void Initialize(in FirebaseContext _context)
+    {
+        MatchResultSubmission.Initialize(_context.EnvId);
+        PayoutInbox.Initialize(_context.EnvId);
+    }
+
+    public void RetryPending()
+    {
+        MatchResultSubmission.RetryPending();
+        PayoutInbox.RetryPending();
+    }
+
+    public async UniTask FlushPendingAsync()
+    {
+        await MatchResultSubmission.FlushAsync();
+        await PayoutInbox.FlushAsync();
+    }
+
+    public void Shutdown()
+    {
+        PayoutInbox.Shutdown();
+        MatchResultSubmission.Shutdown();
+    }
 }

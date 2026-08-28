@@ -61,9 +61,55 @@ public class TurnRunner : MonoBehaviour
     }
 
     /// <summary>항복 = 즉시 패배 확정. 보상·랭크는 정상 패배와 같은 경로(CaptureResult)를 탄다.
-    /// 멀티는 러너를 내려 상대에게 <b>기존 이탈-부전승 경로</b>(OnPlayerLeftRoom)로 승리를 준다 —
-    /// 항복 전용 와이어 메시지를 새로 만들지 않는다(프로토콜 추가 0, 결과 동일).</summary>
-    public void Surrender() => ForceEnd(false, EMatchEndReason.Surrender);
+    /// 멀티는 <see cref="EMatchEndReason.Surrender"/> 메시지로 상대에게 승리를 알린 뒤 러너를 내린다 —
+    /// 명령 로그를 도입하면서 이탈-부전승 경로에 기대던 방식을 버렸다. 양쪽이 <b>같은 Surrender 명령</b>을
+    /// 기록해야 로그가 일치하는데, 이탈 경로로 넘어가면 항복자만 명령 1개를 더 갖게 되기 때문이다.</summary>
+    public void Surrender()
+    {
+        if (this.resultFinalized) return;
+        int t_actorOwner = ResolveLocalOwnerForCommand();
+        BattleCommandLog.RecordSurrender(t_actorOwner);
+        if (DeckConfig.IsMultiplayer)
+        {
+            NetworkGameController.Instance?.SendSurrender(t_actorOwner);
+            DisconnectAfterSurrender().Forget();
+        }
+        ForceEnd(false, EMatchEndReason.Surrender);
+    }
+
+    /// <summary>명령 로그에 실을 로컬 ownerIndex. 멀티 초기화가 덜 끝나 <c>MyOwnerIndex</c>가 -1인
+    /// 상태를 그대로 흘리면 양쪽 로그가 갈리므로 여기서 한 번 걸러낸다.</summary>
+    int ResolveLocalOwnerForCommand()
+    {
+        int t_owner = MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? -1;
+        if (t_owner < 0) t_owner = TurnState.LocalOwnerIndex;
+        return t_owner;
+    }
+
+    public void HandleRemoteSurrender(int _actorOwner)
+    {
+        if (this.resultFinalized) return;
+        BattleCommandLog.RecordSurrender(_actorOwner);
+        ForceEnd(true, EMatchEndReason.Surrender);
+    }
+
+    /// <summary>항복 메시지가 신뢰 전송으로 빠져나갈 시간을 준 뒤 러너를 내린다.
+    /// 한 프레임으로는 부족하다 — 플러시 전에 끊기면 상대가 Surrender 대신 이탈 경로를 타고
+    /// <see cref="HandleRemoteSurrender"/>를 부르지 않아 명령 로그가 한 개 어긋난다
+    /// (그러면 서버가 command_log_mismatch로 양쪽 지급을 막는다).</summary>
+    async UniTaskVoid DisconnectAfterSurrender()
+    {
+        try
+        {
+            await UniTask.Delay(
+                TimeSpan.FromSeconds(NetTimeouts.SurrenderFlushSec),
+                ignoreTimeScale: true,
+                cancellationToken: this.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException) { /* 씬이 먼저 내려갔다 — 러너는 씬 정리가 내린다 */ return; }
+
+        NetworkSession.Instance?.Disconnect().Forget();
+    }
 
 #if UNITY_EDITOR
     /// <summary>디버그 강제 승리. 에디터 전용 — 빌드에는 이 심볼 자체가 없다.
@@ -79,7 +125,7 @@ public class TurnRunner : MonoBehaviour
         // 강제 종료에는 여운을 붙이지 않는다 — 항복·디버그 승리는 화면에 강조할 "결정타"가 없다.
         FinalizeResult(_won, _reason);
 
-        if (!_won && DeckConfig.IsMultiplayer)
+        if (!_won && DeckConfig.IsMultiplayer && _reason != EMatchEndReason.Surrender)
             NetworkSession.Instance?.Disconnect().Forget();
     }
 
@@ -261,6 +307,7 @@ public class TurnRunner : MonoBehaviour
     /// → (4) 턴 루프(선공 배너는 이미 재생했으므로 첫 턴 배너 스킵). 코인은 싱글 AI전 전용(멀티 스킵).</summary>
     public async UniTask PlayIntroAndStart(System.Func<UniTask> _dealCards)
     {
+        BattleCommandLog.Reset();
         TurnCount = 1;
         SetTurnCountLabel();
         // 정상 경로의 시드 지점은 GameInitializer(덱 셔플이 MatchRandom을 소비하므로 필드 초기화 직전).
@@ -479,27 +526,33 @@ public class TurnRunner : MonoBehaviour
             return;
         }
 
-        this.lastReward = RewardService.GrantBattleReward(_won, t_remaining);
+        long t_rankPointsBefore = RankManager.Points;
+        bool t_serverPayout = DeckConfig.IsMultiplayer;
+        this.lastReward = t_serverPayout
+            ? RewardService.CalculateReward(_won, t_remaining)
+            : RewardService.GrantBattleReward(_won, t_remaining);
 
         // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
-        BattleRewardHandoff.Set(this.lastReward);
+        if (!t_serverPayout) BattleRewardHandoff.Set(this.lastReward);
 
         // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
         // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
         // 다만 튜토 전투는 첫 티어를 넘지 못한다(랭크 진입은 졸업만이 결정한다) — 그 판정을 랭크가 스스로 할 수 없어 여기서 넘긴다.
-        var t_rank = RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
+        var t_rank = t_serverPayout
+            ? RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive)
+            : RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
         this.lastRankDelta = t_rank.Delta;
 
         // 승패 무관하게 싣는다 — 로비 랭크 배지가 포인트 증감에 반응한다(보여줄 것이 없는 결과는 캐리어가 스스로 거른다).
-        RankResultHandoff.Set(t_rank);
+        if (!t_serverPayout) RankResultHandoff.Set(t_rank);
 
-        SubmitMatchEvidence(_won, t_remaining, _reason);
+        SubmitMatchEvidence(_won, t_remaining, t_rankPointsBefore, _reason);
     }
 
-    /// <summary>멀티 매치의 대조 증거를 서버로 제출한다 — <b>수집 전용</b>이다.
+    /// <summary>멀티 매치 대조 증거와 지급 전 랭크 기준점을 서버로 제출한다.
     /// 보상·랭크는 위에서 이미 로컬로 확정했고, 이 제출은 그 값에 관여하지 않는다.
     /// 실패해도 무시한다(제출 모듈이 재시도 큐로 들고 간다).</summary>
-    void SubmitMatchEvidence(bool _won, int _remaining, EMatchEndReason _reason)
+    void SubmitMatchEvidence(bool _won, int _remaining, long _rankPointsBefore, EMatchEndReason _reason)
     {
         if (!DeckConfig.IsMultiplayer) return;
 
@@ -510,7 +563,7 @@ public class TurnRunner : MonoBehaviour
         if (DeckConfig.AiTakeover) return;
 
         int t_opponentRemaining = this.enemyField.GetActiveCards().Count + this.enemyField.WaitingCount;
-        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining);
+        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining, _rankPointsBefore);
     }
 
     // 슬롯 → 대기 순. 데이터가 빈 카드도 자리를 지킨다 — 빼면 보상 계단의 분모가 카드 수와 어긋난다.
@@ -532,6 +585,7 @@ public class TurnRunner : MonoBehaviour
     {
         TurnEvents.Reset();
         MatchRandom.Reset();
+        BattleCommandLog.Reset();    // 명령 로그도 같은 자리에서 수명을 끊는다(제출은 이미 값을 복사해 갔다).
         TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
         TournamentRun.End();         // 토너먼트 정점도 같은 수명 — 남으면 다음 판 AI 레벨·랭크 정산이 정점 규칙으로 굳는다.
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
@@ -572,6 +626,12 @@ public class TurnRunner : MonoBehaviour
         this.aiTakeoverPending = false;
         DeckConfig.SetAiTakeover(true);
         if (!DeckConfig.AiTakeover) return;
+
+        int t_myOwner = MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? TurnState.LocalOwnerIndex;
+        BattleCommandLog.RecordAiTakeover(1 - t_myOwner);
+        // 인수 뒤 AI가 두는 수는 목격자가 하나뿐이라 대조에 쓸 수 없다. 여기서 기록을 멈춰
+        // 로그가 무의미하게 커지는 것을 막는다(쌓인 로그 자체는 유효하게 남는다).
+        BattleCommandLog.Freeze();
 
         TurnState.InputAllowed = false;
         this.aiTakeoverFillPending = true;

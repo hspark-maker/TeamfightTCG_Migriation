@@ -12,7 +12,8 @@ public enum ShufflePolicy
 {
     None,
     Match,
-    Local
+    Local,
+    DerivedMatch,
 }
 
 public class BattleField : MonoBehaviour
@@ -71,7 +72,7 @@ public class BattleField : MonoBehaviour
         // 에셋 참조가 끊기면 그 칸이 null로 들어오는데, 그대로 CardInstance를 만들면 NRE로 초기화가
         // 통째로 죽어 "아무것도 안 나오는 전투"가 된다. 한 장 빠진 채로라도 전투는 열려야 한다.
         List<int> t_shuffled = Compact(_deckData, _ownerIndex);
-        Shuffle(t_shuffled, _shuffle);
+        Shuffle(t_shuffled, _shuffle, _ownerIndex);
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {
@@ -473,15 +474,21 @@ public class BattleField : MonoBehaviour
     /// <summary>Fisher-Yates. 난수원은 정책이 정한다 — 필드가 모드 플래그를 읽지 않는다.
     /// Match면 MatchRandom(결정론 스트림)을 소비하므로 **양측 소비 횟수가 같아야 한다**:
     /// 지금 Match를 쓰는 건 싱글/튜토리얼뿐이라 스트림 공유 상대가 없다.</summary>
-    static void Shuffle(List<int> _list, ShufflePolicy _policy)
+    static void Shuffle(List<int> _list, ShufflePolicy _policy, int _ownerIndex)
     {
         if (_policy == ShufflePolicy.None) return;
+
+        MatchRandom.DerivedStream t_derived = default;
+        if (_policy == ShufflePolicy.DerivedMatch)
+            t_derived = MatchRandom.DeriveDeckStream(_ownerIndex);
 
         for (int i = _list.Count - 1; i > 0; i--)
         {
             int t_j = _policy == ShufflePolicy.Match
                 ? MatchRandom.Range(i + 1)
-                : Random.Range(0, i + 1);
+                : _policy == ShufflePolicy.DerivedMatch
+                    ? t_derived.Range(i + 1)
+                    : Random.Range(0, i + 1);
             (_list[i], _list[t_j]) = (_list[t_j], _list[i]);
         }
     }
