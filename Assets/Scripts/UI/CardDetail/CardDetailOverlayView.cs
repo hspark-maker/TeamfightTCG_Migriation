@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Coffee.UIEffects;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -232,7 +233,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     float       m_slideBaseX;
     bool        m_slideBaseCaptured;
 
-    // 강화 연출 중에는 값 갱신을 미룬다 — TryEnhance가 판정·세이브·통지를 동기로 끝내므로,
+    // 강화 연출 중에는 값 갱신을 미룬다 — 서버 왕복이 끝나는 순간 성장 통지가 오므로,
     // 그대로 두면 연출이 시작하기도 전에 Lv·HP가 새 값으로 튀어 공개할 것이 남지 않는다.
     // 결과판이 떠 있는 동안까지 켜져 있다(연출 → 결과판 → 복귀 전체가 한 덩이의 "연출 중"이다).
     bool m_ritualPlaying;
@@ -1432,6 +1433,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             return;
         }
 
+        // 유예를 먼저 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
+        // 이 플래그 하나가 재입력 가드이자 값 갱신 유예다(막힌 갈래는 AbortEnhance가 반드시 되돌린다).
+        this.m_ritualPlaying = true;
+
+        EnhanceAsync(t_card).Forget();
+    }
+
+    // 서버 왕복 강화. 잡아 둘 값도 고를 연출도 전부 왕복 "전"이다 — 레벨이 오르고 나면 다른 답이 된다.
+    async UniTaskVoid EnhanceAsync(int _card)
+    {
+        int t_card = _card;
+
         // 시도 **전에** 잡아둔다 — 결과에는 오른 폭도 이전 값도 없다.
         int t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
         int t_fromHp    = DeckPower.MaxHpOf(t_card);
@@ -1440,16 +1453,25 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         CardGrowthRitualView t_ritual = RitualFor(t_card);
         bool                 t_evolve = t_ritual == this.evolveRitual && this.evolveRitual != null;
 
-        // 유예를 먼저 세운다 — TryEnhance가 그 안에서 OnGrowthChanged를 동기로 발화한다.
-        this.m_ritualPlaying = true;
+        EnhanceResult t_result = await CardGrowthManager.TryEnhanceAsync(t_card);
 
-        EnhanceResult t_result = CardGrowthManager.TryEnhance(t_card);
+        // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 태울 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
+        if (this == null) return;
 
         // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
         if (t_result.Outcome == EEnhanceOutcome.NotReady && !CardGrowthManager.IsReady)
             Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 초기화에서 호출되지 않았다.");
 
         bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
+
+        // 왕복 중 창이 닫혔으면 세울 무대가 없다. 성립한 강화는 그래도 알린다 —
+        // 기다리던 안내가 "화면이 닫혔다"는 이유로 영영 깨어나지 못하면 진행이 막힌다.
+        if (!this.isActiveAndEnabled)
+        {
+            this.m_ritualPlaying = false;
+            if (t_played) NotifyEnhanceSettled(t_result);
+            return;
+        }
 
         // 결제 전에 막힌 경우(잔액 부족·최고 레벨·미초기화)엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
         if (!t_played || t_ritual == null)
@@ -1465,7 +1487,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_activeRitual = t_ritual;
 
         // 이번 진화로 새로 열리는 프레임 문양을 연출에 넘긴다. 이 자리가 유일한 시점이다 —
-        // 레벨은 이미 올랐고(TryEnhance) 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나온다.
+        // 레벨은 이미 올랐고(TryEnhanceAsync) 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나온다.
         // 넘길 것이 없어도 부른다(앞 판의 문양이 남으면 이번 판에 이유 없이 다시 새겨진다).
         if (t_evolve && this.cardView != null)
         {
@@ -1473,7 +1495,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.evolveRitual.SetEmblems(this.m_emblemBuffer);
         }
 
-        // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhance는 이미 끝난 거래라
+        // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhanceAsync는 이미 끝난 거래라
         // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
         LockControls();
 
@@ -1528,7 +1550,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
                 // "한 번 더"는 여기서 이어간다 — 그 경로의 무대는 걷힌 채라(EndAwaitForChain) 다음 연출이 곧장 물려받는다.
                 // 재입력 가드(m_ritualPlaying)가 풀렸다 다시 서기까지 한 프레임도 벌어지지 않으므로 그 사이에 손이 낄 자리가 없고,
-                // 잔액 부족·만렙은 TryEnhance가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
+                // 잔액 부족·만렙은 TryEnhanceAsync가 알아서 되돌린다(AbortEnhance가 걷힌 무대를 되돌린다).
                 // 결과를 다 읽고 무대가 돌아온 지금이 "강화가 끝났다"이다 — 바깥은 이 시점에야 화면을 넘겨받아도 된다.
                 // "한 번 더"로 이어가는 중이어도 알린다: 체인의 끝을 기다리면 그 끝이 실패·만렙으로 맺힐 때
                 // 성공 신호가 통째로 사라져, 기다리던 쪽(튜토리얼)이 영영 깨어나지 못한다.

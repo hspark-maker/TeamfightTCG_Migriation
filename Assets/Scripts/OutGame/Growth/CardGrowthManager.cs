@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 카드 성장(강화 레벨)의 static 단일 창구. 간식은 같은 세이브 항목을 써서 partial 조각(.Snack.cs)이 맡는다.
 public static partial class CardGrowthManager
 {
     static readonly Dictionary<int, CardGrowthEntry> s_growth = new Dictionary<int, CardGrowthEntry>();
-
-    static readonly System.Random s_rng = new System.Random();
 
     static bool s_initialized;
 
@@ -115,48 +114,45 @@ public static partial class CardGrowthManager
     /// 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
     public static void NotifyCostRuleChanged() => OnGrowthChanged?.Invoke();
 
-    // 강화 1회 시도(실패해도 비용은 소모, 레벨 하락 없음)
-    public static EnhanceResult TryEnhance(int _cardId)
+    /// <summary>강화 1회를 서버에 요청한다(실패해도 비용은 소모, 레벨 하락 없음).
+    /// 성공률·차감·레벨의 진실원은 서버 enhanceCard 다 — 아래 선검사는 왕복을 아끼는 낙관 검사일 뿐이라
+    /// 서버가 다른 답을 주면 그쪽이 이긴다.</summary>
+    public static async UniTask<EnhanceResult> TryEnhanceAsync(int _cardId)
     {
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
         int t_id = _cardId;
         if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
-        CardGrowth t_growth = GrowthOf(t_id);
-        int        t_level  = t_growth.Level;
+        int t_level = GrowthOf(t_id).Level;
 
         if (t_level >= GrowthRules.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!TryGetStepAt(t_id, t_level + 1, out var t_step))
+        if (!TryGetStepAt(t_id, t_level + 1, out _))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        // 재화는 스텝이 들고 온다 — 성급별로 무엇을 무는지 여기 적으면 곡선과 이중 진실원이 된다.
-        if (!CurrencyManager.CanAfford(t_step.Currency, t_step.Cost))
-            return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
+        // 무료 한 방의 조건은 클라 안내가 쥐고 있어 요청에 실어 보낸다 — 실제로 먹였는지는 응답이 답한다.
+        bool t_freeShot = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance);
 
-        if (!CurrencyManager.Spend(t_step.Currency, t_step.Cost))
-            return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
+        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot);
 
-        bool t_success = s_rng.NextDouble() < t_step.SuccessRate;
-        if (t_success)
-        {
-            t_level = t_growth.Level + 1;
-            Entry(t_id).Level = t_level;
-            Save();
+        // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
+        if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(t_id));
 
-            // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
-            if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
-                OutgameTutorialGuide.ConsumeFreeShot();
-        }
+        // 레벨·잔액은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
+        // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
+        t_level = ClampLevel(t_command.Level);
 
-        CurrencyManager.Save();
+        // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
+        // 그 판정은 서버 몫이다(무료를 실제로 먹였는지는 차감한 쪽이 안다).
+        if (t_command.FreeShotUsed) OutgameTutorialGuide.ConsumeFreeShot();
+
         OnGrowthChanged?.Invoke();
 
-        return new EnhanceResult(t_success ? EEnhanceOutcome.Success : EEnhanceOutcome.Failed, t_level);
+        return new EnhanceResult(t_command.Outcome, t_level);
     }
 
     /// <summary>전 카드를 만렙으로 올린다(디버그 전용). 반환값은 실제로 레벨이 오른 카드 수.
-    /// TryEnhance를 안 타는 이유는 재화·성공률에 걸려 "전부 만렙"을 못 채우기 때문이다.</summary>
+    /// TryEnhanceAsync를 안 타는 이유는 재화·성공률에 걸려 "전부 만렙"을 못 채우기 때문이다.</summary>
     public static int DebugMaxAll()
     {
         if (!s_initialized) return 0;

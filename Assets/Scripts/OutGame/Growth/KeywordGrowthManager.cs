@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 키워드 강화(키워드 한 종류의 레벨)의 static 단일 창구. 그 키워드를 가진 모든 카드에 체력으로 얹힌다.
@@ -99,29 +100,34 @@ public static class KeywordGrowthManager
     /// 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
     public static void NotifyCostRuleChanged() => OnChanged?.Invoke();
 
-    // 키워드 강화 1회(카드 강화와 달리 확률 실패가 없다 — 결제되면 반드시 오른다)
-    public static EnhanceResult TryEnhance(CardKeyword _keyword)
+    /// <summary>키워드 강화 1회를 서버에 요청한다(카드 강화와 달리 확률 실패가 없다 — 결제되면 반드시 오른다).
+    /// 비용·차감·레벨의 진실원은 서버 enhanceKeyword 다 — 아래 선검사는 왕복을 아끼는 낙관 검사일 뿐이다.</summary>
+    public static async UniTask<EnhanceResult> TryEnhanceAsync(CardKeyword _keyword)
     {
         int t_level = LevelOf(_keyword);
         if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, t_level);
-        if (!TryGetStepAt(_keyword, t_level, out var t_step))
+        if (!TryGetStepAt(_keyword, t_level, out _))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
-        if (!CurrencyManager.Spend(t_step.Currency, t_step.Cost))
-            return new EnhanceResult(EEnhanceOutcome.NotAffordable, t_level);
 
-        t_level++;
-        s_growth[_keyword] = t_level;
-        SyncSaveData();
+        // 무료 한 방의 조건은 클라 안내가 쥐고 있어 요청에 실어 보낸다 — 실제로 먹였는지는 응답이 답한다.
+        bool t_freeShot = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance);
 
-        // OnEnhanced보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
-        if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitKeywordEnhance))
-            OutgameTutorialGuide.ConsumeFreeShot();
+        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceKeywordAsync(_keyword, t_freeShot);
 
-        CurrencyManager.Save();
+        // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다.
+        if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(_keyword));
+
+        // 레벨은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
+        // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
+        t_level = Mathf.Clamp(t_command.Level, 0, KeywordGrowthRules.MaxLevel);
+
+        // OnChanged보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
+        if (t_command.FreeShotUsed) OutgameTutorialGuide.ConsumeFreeShot();
+
         OnChanged?.Invoke();
         OnEnhanced?.Invoke(_keyword);
 
-        return new EnhanceResult(EEnhanceOutcome.Success, t_level);
+        return new EnhanceResult(t_command.Outcome, t_level);
     }
 
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.

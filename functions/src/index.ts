@@ -7,3 +7,5 @@ export {createMatch} from "./commands/createMatch";
 export {lockDeck} from "./commands/lockDeck";
 export {submitMatchResult} from "./commands/submitMatchResult";
 export {claimPayout} from "./commands/claimPayout";
+export {enhanceCard} from "./commands/enhanceCard";
+export {enhanceKeyword} from "./commands/enhanceKeyword";

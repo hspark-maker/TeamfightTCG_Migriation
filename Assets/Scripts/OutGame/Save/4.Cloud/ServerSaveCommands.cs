@@ -109,9 +109,28 @@ internal sealed class ServerCommandRejectedException : Exception
     /// <summary>거절당한 명령 이름.</summary>
     internal string CommandName { get; }
 
+    /// <summary>서버가 붙인 거절 사유 코드(rejectDomain 의 reason). 못 읽으면 빈 문자열이다.</summary>
+    internal string Reason { get; }
+
     internal ServerCommandRejectedException(string _commandName, Exception _inner)
         : base($"Server command '{_commandName}' was rejected: {_inner.GetBaseException().Message}", _inner)
     {
         this.CommandName = _commandName;
+        this.Reason      = ParseReason(_inner.GetBaseException().Message);
+    }
+
+    // 사유 코드는 서버가 message 앞머리에 "Reason: 설명" 으로 싣는다 — details 로 보내면
+    // Unity SDK 의 FunctionsErrorParser 가 status 와 message 만 남기고 버린다.
+    static string ParseReason(string _message)
+    {
+        if (string.IsNullOrEmpty(_message)) return string.Empty;
+
+        int t_colon = _message.IndexOf(':');
+        if (t_colon <= 0) return string.Empty;
+
+        string t_head = _message.Substring(0, t_colon).Trim();
+
+        // 사유 코드는 공백 없는 한 낱말이다. 접두어가 없는 옛 메시지를 사유로 오독하지 않으려는 관문이다.
+        return t_head.Length > 0 && t_head.IndexOf(' ') < 0 ? t_head : string.Empty;
     }
 }

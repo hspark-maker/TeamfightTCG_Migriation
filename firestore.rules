@@ -144,6 +144,21 @@ service cloud.firestore {
       }
     }
 
+    // ── 튜토리얼 무료 한 방 ────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /grants/current
+    //
+    // 축(enhanceCard·enhanceKeyword)마다 계정당 1회를 서버가 소유한다. 클라 정적 필드가 들고 있으면
+    // 앱 재시작으로 되살아나므로 소진 낙인이 문서로 남아야 한다.
+    //
+    // 세이브 문서와 별도 경로다 — isValidSave 의 15키 계약과 무관하고, 그래서 세이브 스키마 버전을
+    // 올리지 않고 붙일 수 있다. 값 검증은 없다(지갑과 같은 이유: 클라 쓰기가 아예 없다).
+    match /envs/{envId}/users/{userId}/grants/{docId} {
+      // 읽기는 연다 — 화면이 "무료" 표시를 그리려면 남았는지 알아야 한다.
+      allow read: if isSignedIn() && request.auth.uid == userId &&
+                  isKnownEnv(envId) && docId == 'current';
+      allow write: if false;
+    }
+
     // ── 마스터 데이터(스펙) ────────────────────────────────────────────
     // 읽기: 런타임 클라이언트가 BattleContentSync 로 메타·행을 내려받는다.
     // 쓰기: 배포자(admin 클레임)만. 에디터 업로더는 ID 토큰을 실어야 한다.

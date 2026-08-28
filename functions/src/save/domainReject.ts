@@ -12,6 +12,10 @@ import * as logger from "firebase-functions/logger";
  * (카드팩 "InsufficientGold" ↔ EPackOpenResult · 강화 "NotAffordable" ↔ EEnhanceOutcome).
  * 사유 목록은 도메인마다 다르므로 여기서 정하지 않는다. 각 command 가 자기 union 을 갖는다.
  *
+ * 그 사유를 **message 앞머리에 "Reason: 설명" 으로도 싣는다.** details 만으로는 클라에 닿지 않는다 —
+ * Unity SDK 의 FunctionsErrorParser 가 응답에서 status 와 message 만 살리고 details 를 버린다.
+ * 읽는 쪽은 ServerCommandRejectedException.Reason 하나뿐이니 이 접두어 모양을 바꾸지 마라.
+ *
  * 거절은 **무조건 로그를 남긴다** — 잔액 부족이냐 자격 미달이냐를 응답만 보고는 가를 수 없고,
  * 아무것도 안 남기면 functions:log 가 3~4분 늦는 것과 겹쳐 "호출이 안 왔다"로 오진하게 된다.
  * @param {string} reason 사유 코드
@@ -24,5 +28,5 @@ export function rejectDomain(
   context: Record<string, unknown> = {},
 ): never {
   logger.warn("domain rejected", {reason, ...context});
-  throw new HttpsError("permission-denied", message, {reason});
+  throw new HttpsError("permission-denied", `${reason}: ${message}`, {reason});
 }

@@ -18,6 +18,7 @@ import {
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
 import { walletDocument, ledgerDocument } from './fixtures/walletDocument.js';
+import { grantsDocument } from './fixtures/grantsDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 const PROJECT_ID = 'tcg-rules-test';
@@ -31,6 +32,9 @@ const savePath = (_uid = UID, _env = 'test', _docId = 'current') =>
 
 const walletPath = (_uid = UID, _env = 'test', _docId = 'current') =>
   `envs/${_env}/users/${_uid}/wallet/${_docId}`;
+
+const grantsPath = (_uid = UID, _env = 'test', _docId = 'current') =>
+  `envs/${_env}/users/${_uid}/grants/${_docId}`;
 
 const authed = (_uid = UID) => testEnv.authenticatedContext(_uid).firestore();
 const unauthed = () => testEnv.unauthenticatedContext().firestore();
@@ -395,4 +399,54 @@ test('19b. 소유자도 원장 쓰기는 거부', async () => {
   await seedWallet();
   await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
   await assertFails(setDoc(doc(authed(), `${walletPath()}/ledger/tx1`), ledgerDocument({ rev: 3 })));
+});
+
+
+// --- 20·21. 튜토리얼 무료 한 방 (envs/{env}/users/{uid}/grants/current) ------
+
+// 축(카드 강화·키워드 강화)마다 계정당 1회를 서버가 소유한다. 지갑과 문서 모양은 같지만
+// 읽기를 여는 이유가 다르다 — 화면이 "무료" 표시를 그리려면 남았는지 알아야 한다.
+async function seedGrants(_uid = UID, _env = 'test', _docId = 'current') {
+  await seedRaw(grantsPath(_uid, _env, _docId), grantsDocument());
+}
+
+test('20. 소유자는 자기 무료 한 방 문서를 읽는다', async () => {
+  await seedGrants();
+  await assertSucceeds(getDoc(doc(authed(), grantsPath())));
+});
+
+test('20b. 남의 uid 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(OTHER_UID);
+  await assertFails(getDoc(doc(authed(UID), grantsPath(OTHER_UID))));
+});
+
+test('20c. 미인증 무료 한 방 읽기는 거부', async () => {
+  await seedGrants();
+  await assertFails(getDoc(doc(unauthed(), grantsPath())));
+});
+
+test('20d. 알 수 없는 envId 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(UID, 'dev');
+  await assertFails(getDoc(doc(authed(), grantsPath(UID, 'dev'))));
+});
+
+test('20e. 알 수 없는 docId 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(UID, 'test', 'other');
+  await assertFails(getDoc(doc(authed(), grantsPath(UID, 'test', 'other'))));
+});
+
+// 소진 낙인을 클라가 지울 수 있으면 무료 한 방이 무한이 된다 — 앱 재시작으로 되살아나던
+// 정적 필드를 문서로 옮긴 이유가 그것이라 create·update·delete 셋 다 막혀야 한다.
+test('21. 소유자도 무료 한 방 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), grantsPath()), grantsDocument()));
+});
+
+test('21b. 소유자도 무료 한 방 update 는 거부', async () => {
+  await seedGrants();
+  await assertFails(setDoc(doc(authed(), grantsPath()), grantsDocument({ enhanceCard: false })));
+});
+
+test('21c. 소유자도 무료 한 방 delete 는 거부', async () => {
+  await seedGrants();
+  await assertFails(deleteDoc(doc(authed(), grantsPath())));
 });
