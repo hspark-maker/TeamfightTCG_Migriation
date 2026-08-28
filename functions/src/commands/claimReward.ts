@@ -394,7 +394,11 @@ export const claimReward = onCall(async (request) => {
 
   const result = await mutateSave(env, uid, (current, _transaction, wallet): SaveMutation => {
     // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
-    const paid = nextWallet(wallet, grant(wallet.balances, gains));
+    // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
+    // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
+    const paid = gains.length === 0 ?
+      undefined :
+      nextWallet(wallet, grant(wallet.balances, gains));
 
     if (ownerType === "Rank") {
       const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);

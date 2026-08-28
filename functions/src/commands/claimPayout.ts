@@ -58,6 +58,13 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     });
     return {payouts};
   }
+  // 아무것도 요청하지 않은 ack 는 트랜잭션을 열지 않는다. 열면 지갑이 없는 계정에서
+  // failed-precondition 이 나가고 클라가 그것을 세션 문제로 읽어 부트를 끊는다 —
+  // 낙인할 것도 크레딧할 것도 없는 호출이 만들 표면이 아니다.
+  // wallet 을 null 로 접는 것은 "쓴 지갑을 싣는다"는 계약과 어긋나지 않는다. 읽을 이유가
+  // 없어 읽지 않았다는 뜻이고, 클라 ServerSaveCommands 는 wallet 이 비면 채택을 건너뛴다.
+  if (data.matchIds.length === 0) return {acked: [], wallet: null};
+
   const reference = walletRef(db, data.env, uid);
   // 낙인(ready → claimed)과 크레딧은 한 트랜잭션 안이어야 한다 — 갈라 놓으면 낙인만 성공해
   // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.

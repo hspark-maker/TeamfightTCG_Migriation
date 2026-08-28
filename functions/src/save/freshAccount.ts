@@ -2,8 +2,8 @@ import {SlotPatch} from "./saveDocument";
 import {Balances, grant} from "../currency/wallet";
 
 /**
- * 신규 계정 최초 지급 골드. 클라 CurrencyManager.STARTING_GOLD 의 쌍둥이 —
- * 그쪽은 이제 튜토리얼 되감기 전용 안전망이고, 정상 부팅의 진실원은 여기다.
+ * 신규 계정 최초 지급 골드. 이 상수 하나가 진실원이다 — 클라 쪽 쌍둥이였던
+ * CurrencyManager.STARTING_GOLD 는 C6.4 에서 삭제됐고, 잔액은 서버 지갑만 정한다.
  */
 export const STARTER_GOLD = 100;
 

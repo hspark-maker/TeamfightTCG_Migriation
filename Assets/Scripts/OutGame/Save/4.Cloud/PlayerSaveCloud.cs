@@ -78,6 +78,8 @@ static class PlayerSaveCloud
         {
             // 채택할 것이 없다 — 로컬 캐시는 R2 에서 사라졌고 원격은 일부러 끄는 중이다.
             // 세이브 없이 기본값으로 진행한다(멀티 테스트 세션 전용).
+            // 지갑도 함께 끈다 — 잔액의 진실원이 서버 문서 하나뿐이라, 원격을 안 읽는 이 세션은 잔액 0으로 돈다.
+            // 버그가 아니다: 여기서 지갑만 살리려면 auth·읽기·ensureWallet(서버 쓰기)이 되살아나 분기의 목적이 사라진다.
             State = EPlayerSaveCloudState.Disabled;
             s_gateComplete = true;
             return;
@@ -498,6 +500,37 @@ static class PlayerSaveCloud
             }
 
             WalletCloud.Adopt(t_wallet.Wallet);
+
+            // 다른 기기가 방금 승급을 커밋했다 — 지갑이 이미 있어 서버는 세이브를 쓰지 않았고(revision 미탑재가 맞다),
+            // 우리 손의 스냅샷만 승급 전이라 아래 스키마 판정이 그대로면 멀쩡한 계정이 복구 화면을 본다.
+            // 드문 경로라 왕복 1회를 더 태워 판정을 이어간다.
+            if (!t_wallet.Created && t_schemaVersion < UserSaveData.VERSION)
+            {
+                try
+                {
+                    t_document = await ReadAsync(_generation, t_userId);
+                }
+                catch (Exception t_exception)
+                {
+                    if (_generation != s_generation) return;
+                    Fail($"Save re-read after wallet creation failed ({t_exception.GetBaseException().Message}).");
+                    return;
+                }
+
+                if (_generation != s_generation) return;
+                if (t_document == null || !t_document.Exists)
+                {
+                    Fail("Save document is missing after wallet creation.");
+                    return;
+                }
+
+                if (!PlayerSaveDocument.TryReadMeta(t_document, out t_schemaVersion, out t_revision))
+                {
+                    Fail("Remote save metadata is missing or has a broken type after wallet creation. " +
+                         $"[{PlayerSaveDocument.DescribeMeta(t_document)}]");
+                    return;
+                }
+            }
         }
 
         if (t_schemaVersion < UserSaveData.VERSION)

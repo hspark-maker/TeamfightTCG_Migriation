@@ -1,26 +1,31 @@
 import {HttpsError} from "firebase-functions/v2/https";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
-import {isKnownEnv} from "../save/environments";
-import {readWallet, walletRef, WalletPatch, WalletState, writeWallet} from "./walletStore";
+import {isKnownEnv} from "../generated/save/environments";
+import {
+  readWallet,
+  walletRef,
+  WalletPatch,
+  WalletState,
+  writeWallet,
+} from "../generated/currency/walletStore";
 
 /**
- * 지갑 문서만 여닫는 트랜잭션. 세이브 문서를 **아예 건드리지 않는** 명령이 쓴다
- * (전투 보상처럼 진행도가 아니라 잔액만 움직이는 것들).
+ * 지갑 문서만 여닫는 트랜잭션. 이 codebase 의 명령이 잔액을 쓰는 유일한 통로다.
  *
- * walletStore 는 functions-currency 로 미러되는 순수 파일이라 db 를 import 할 수 없다.
- * 이 파일은 미러 대상이 아니므로(scripts/shared-files.js 에 넣지 마라) 앱 핸들을 직접 쓴다.
+ * functions(default) 의 `src/currency/walletTransaction.ts` 와 **일부러 두 벌이다**
+ * — firebaseApp.ts 가 두 벌인 것과 같은 이유다. `db` 는 codebase 마다 자기 앱 인스턴스라
+ * 미러(`src/generated`)에 넣을 수 없고, 미러 파일은 `HttpsError` 도 지지 않기로 돼 있다.
  *
- * functions-currency 에 **같은 이름의 쌍둥이**가 있다(`functions-currency/src/currency/walletTransaction.ts`).
- * firebaseApp.ts 와 같은 이유로 일부러 두 벌이다 — 이 파일에 남은 것은 codebase 자기 db 핸들에
- * 묶인 트랜잭션 배관뿐이고, 재화 산술·문서 직렬화·키 목록·환경 목록·응답 모양은 전부
- * 미러되는 원본 한 벌(wallet·walletStore·currencyKeys·environments)에 있다.
- * 여기 재화 규칙을 새로 적기 시작하면 그 순간 두 codebase 가 갈린다.
+ * 그래서 여기 남는 것은 **자기 db 핸들에 묶인 트랜잭션 배관과 거절 코드**뿐이다.
+ * 재화 산술·문서 직렬화·rev 승급·키 목록·환경 목록·응답 모양은 전부 미러되는 원본 한 벌
+ * (`wallet` · `walletStore` · `currencyKeys` · `environments`)이 갖는다.
+ * 이 파일에 재화 규칙을 새로 적기 시작하면 그 순간 두 codebase 가 갈린다 — 적지 마라.
  */
 
 /**
  * 지갑을 트랜잭션 1회로 읽고 고친다. 반환은 WalletPatch 뿐이다
- * — revision·updatedSlots 는 세이브 문서의 것이고 여기선 아무것도 오르지 않는다.
+ * — revision·updatedSlots 는 세이브 문서의 것이고 이 codebase 는 세이브를 아예 열지 않는다.
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {Function} mutate 현재 지갑을 받아 다음 지갑(nextWallet 산물)을 돌려준다

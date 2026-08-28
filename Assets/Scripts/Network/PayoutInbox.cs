@@ -70,6 +70,7 @@ static class PayoutInbox
                 : a.SettledAtMs.CompareTo(b.SettledAtMs));
 
             var t_ackIds = new List<string>();
+            var t_gains = new Dictionary<string, CurrencyGain>();
             foreach (PayoutEntry t_payout in t_payouts)
             {
                 if (!TryReadGain(t_payout, out CurrencyGain t_gain)) continue;
@@ -79,12 +80,12 @@ static class PayoutInbox
                     // 잔액은 건드리지 않는다 — 크레딧의 진실원은 아래 ack 응답의 지갑이다.
                     RankApplyResult t_rank = RankManager.ApplyServerPayout(t_payout.Rank.Before, t_payout.Rank.After);
                     DataSaveManager.SaveImmediate();
-                    BattleRewardHandoff.Set(t_gain);
                     RankResultHandoff.Set(t_rank);
                     s_applied.Add(t_payout.MatchId);
                     SaveApplied();
                 }
 
+                t_gains[t_payout.MatchId] = t_gain;
                 t_ackIds.Add(t_payout.MatchId);
             }
 
@@ -96,7 +97,14 @@ static class PayoutInbox
                 new { env = s_envId, action = "ack", matchIds = t_ackIds });
             if (t_ack?.Acked == null) return;
 
-            foreach (string t_matchId in t_ack.Acked) s_applied.Remove(t_matchId);
+            foreach (string t_matchId in t_ack.Acked)
+            {
+                s_applied.Remove(t_matchId);
+
+                // 표시량은 크레딧이 확정된 뒤에 싣는다 — ack 전에 실으면 결과 화면이 "+N" 을 띄우는 동안 지갑은 그대로다.
+                // 여러 건이 한 번에 acked 되면 그만큼 누적된다(핸드오프가 합산 홀더다).
+                if (t_gains.TryGetValue(t_matchId, out CurrencyGain t_credited)) BattleRewardHandoff.Set(t_credited);
+            }
             SaveApplied();
         }
         catch (Exception t_exception)

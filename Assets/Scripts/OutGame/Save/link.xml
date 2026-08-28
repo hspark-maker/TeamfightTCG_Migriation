@@ -23,6 +23,7 @@
     <type fullname="ServerSlotPatch" preserve="all"/>
     <type fullname="ServerCommandResult" preserve="all"/>
     <type fullname="WalletPatch" preserve="all"/>
+    <type fullname="EnsureAccountResult" preserve="all"/>
     <type fullname="EnsureWalletResult" preserve="all"/>
     <type fullname="PayoutAckResult" preserve="all"/>
     <type fullname="PayoutListResult" preserve="all"/>

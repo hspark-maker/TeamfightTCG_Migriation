@@ -40,6 +40,18 @@ export interface WalletState {
 }
 
 /**
+ * 클라 응답에 싣는 지갑. **paidBalances 는 절대 싣지 않는다** — 유상분은 서버 정책의
+ * 내부 상태라 클라가 알 이유가 없고, 한 번 내보내면 와이어 계약이 되어 되돌릴 수 없다.
+ *
+ * 지갑을 쓰는 codebase 가 둘(default·currency)이라 선언을 여기 둔다 — 응답 모양이
+ * codebase 마다 갈리면 클라가 같은 지갑을 두 가지로 읽는다.
+ */
+export interface WalletPatch {
+  rev: number;
+  balances: Balances;
+}
+
+/**
  * 유상분을 잔액 이하로 자른다. **이 클램프가 "무상 먼저 소진" 정책 전부다**
  * — 잔액이 줄면 유상분이 새 잔액까지 따라 깎이므로, 감소분은 무상분에서 먼저 나간 셈이 된다.
  * 0 이하인 키는 아예 뺀다(빈 맵 = 전부 무상).
@@ -110,11 +122,8 @@ export function readWallet(snapshot: DocumentSnapshot): WalletState {
 }
 
 /**
- * 지갑을 쓴다. **rev 를 올리는 유일한 지점**이다.
- *
- * rev 는 단조 증가만 보장한다(세이브 revision 과 달리 "정확히 +1" 이 아니다) — 지갑은 두 codebase 가
- * 쓰고, 장차 결제 웹훅처럼 클라가 모르는 정당한 쓰기가 생긴다. 거기에 +1 을 강제하면
- * 첫 결제에서 전 유저 세션이 끊긴다.
+ * 지갑을 쓴다. **받은 값을 그대로 싣는 직렬화기다** — rev 를 올리는 것은 nextWallet 이다.
+ * 여기서 또 올리면 두 번 오르고, 여기서만 올리면 호출부가 상태를 손으로 조립하게 된다.
  * @param {Transaction} transaction 진행 중인 트랜잭션
  * @param {DocumentReference} ref 지갑 문서 참조
  * @param {WalletState} next 쓸 상태(rev 는 갱신 후 값)

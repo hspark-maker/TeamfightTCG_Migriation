@@ -41,7 +41,6 @@ public class CurrencyHud : MonoBehaviour
     bool m_held;
     long m_displayedValue;
     int m_displayRevision;
-    Tween m_spendMotion;
 
     /// <summary>수치 텍스트의 RectTransform. 코인이 날아와 꽂히는 **도착 지점**이다.</summary>
     public RectTransform TextRect => this.valueText != null ? (RectTransform)this.valueText.transform : null;
@@ -140,7 +139,7 @@ public class CurrencyHud : MonoBehaviour
         // 돌고 있던 연출은 옛 재화의 것이다 — 걷지 않으면 새 재화 숫자 위에서 롤다운이 계속된다.
         m_displayRevision++;
         m_held = false;
-        this.KillSpendMotion();
+        this.ResetPunchScale();
 
         // 대표 자리도 함께 옮긴다. 안 옮기면 옛 재화의 코인이 이제 다른 재화를 띄우는 칸으로 날아온다.
         if (s_huds.TryGetValue(this.type, out var t_cur) && t_cur == this) s_huds.Remove(this.type);
@@ -175,8 +174,10 @@ public class CurrencyHud : MonoBehaviour
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
 
         m_displayRevision++;
-        this.KillSpendMotion();
+        // 리셋이 DOComplete보다 뒤여야 한다 — 완료는 트윈이 시작할 때 잡아 둔 배율로 되돌리는데,
+        // 펄스가 겹친 채 꺼졌으면 그 값이 기준 배율이 아니다.
         if (this.PunchRect != null) this.PunchRect.DOComplete();
+        this.ResetPunchScale();
         // 연출 도중 꺼지면 해제 호출이 오지 않는다 — 고정을 여기서 풀어 다음 활성화가 잔액을 못 따라가는 상태를 막는다.
         m_held = false;
     }
@@ -189,16 +190,9 @@ public class CurrencyHud : MonoBehaviour
         this.Render(_balance);
     }
 
-    // 배율 연출을 걷는다. 기본은 기준 배율 복귀 — 확대·눌림이 겹쳐도 크기가 그 상태로 굳지 않게.
-    // 이어서 지금 크기부터 트윈할 때만 _resetScale을 꺼서 출발점을 남긴다.
-    void KillSpendMotion(bool _resetScale = true)
+    // 배율을 기준으로 되돌린다 — 확대·눌림이 겹친 채 끊겨도 크기가 그 상태로 굳지 않게.
+    void ResetPunchScale()
     {
-        Tween t_motion = m_spendMotion;
-        m_spendMotion = null;
-        if (t_motion != null && t_motion.IsActive()) t_motion.Kill();
-
-        if (!_resetScale) return;
-
         RectTransform t_rect = this.PunchRect;
         if (t_rect != null) t_rect.localScale = Vector3.one;
     }

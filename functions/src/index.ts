@@ -11,4 +11,3 @@ export {claimPayout} from "./commands/claimPayout";
 export {enhanceCard} from "./commands/enhanceCard";
 export {enhanceKeyword} from "./commands/enhanceKeyword";
 export {claimBattleReward} from "./commands/claimBattleReward";
-export {devGrantCurrency} from "./commands/devGrantCurrency";

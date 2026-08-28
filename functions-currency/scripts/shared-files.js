@@ -12,6 +12,7 @@ const SHARED_FILES = [
   "currency/currencyKeys.ts",
   "currency/wallet.ts",
   "currency/walletStore.ts",
+  "save/environments.ts",
   "save/saveValues.ts",
 ];
 

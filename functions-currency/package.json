@@ -6,7 +6,7 @@
     "prebuild": "npm run sync:shared",
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "test": "npm run build",
+    "test": "npm run build && node scripts/test-wallet-mirror.js",
     "logs": "firebase functions:log"
   },
   "engines": {

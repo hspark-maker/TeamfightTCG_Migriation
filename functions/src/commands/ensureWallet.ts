@@ -3,7 +3,6 @@ import * as logger from "firebase-functions/logger";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {
-  assertWritableSchema,
   isKnownEnv,
   requireUid,
   saveDocument,
@@ -13,11 +12,76 @@ import {
 import {migrateFromSaveSlot} from "../currency/walletMigration";
 import {createWallet, readWallet, walletRef} from "../currency/walletStore";
 
+/** 이 명령이 승급시킬 수 있는 가장 낮은 세이브 스키마 버전. 이관 직전 판인 v7 이다. */
+export const MIGRATABLE_SCHEMA_VERSION = SCHEMA_VERSION - 1;
+
 /** 트랜잭션이 돌려주는 것. created 가 false 면 아무것도 쓰지 않았고 revision 은 뜻이 없다. */
 interface EnsureWalletOutcome {
   created: boolean;
   revision: number;
   wallet: WalletPatch;
+}
+
+/**
+ * 승급 대상 문서인지 판정한다. save/saveDocument 의 assertWritableSchema 를 쓰지 않는다 —
+ * 저쪽은 "이미 v8 인 문서만 쓴다"가 계약이고, 이 명령은 그 v8 로 **올리는** 유일한 자리라
+ * 판정이 정반대다. v7(이관 대상)과 v8(이미 이관됨, 지갑만 세우는 멱등 경로)만 받는다.
+ *
+ * export 인 것은 순수 회귀(scripts/test-schema-window.js)가 이 판정을 못박기 때문이다.
+ * @param {unknown} rawVersion 문서에 적힌 schemaVersion 원본 값
+ * @param {string} env 환경 id
+ * @param {string} uid 유저 uid
+ */
+export function assertMigratableSchema(
+  rawVersion: unknown,
+  env: string,
+  uid: string,
+): void {
+  const documentVersion =
+    typeof rawVersion === "number" ? rawVersion : Number.NaN;
+  if (documentVersion === MIGRATABLE_SCHEMA_VERSION ||
+      documentVersion === SCHEMA_VERSION) {
+    return;
+  }
+
+  const drift = {
+    uid,
+    env,
+    serverSchemaVersion: SCHEMA_VERSION,
+    migratableSchemaVersion: MIGRATABLE_SCHEMA_VERSION,
+    documentSchemaVersion: rawVersion ?? null,
+  };
+  const seen = `document v${String(rawVersion)} vs server v${SCHEMA_VERSION}`;
+
+  if (!Number.isFinite(documentVersion)) {
+    logger.error("wallet migration: save schema unreadable", drift);
+    throw new HttpsError(
+      "failed-precondition",
+      `Save schema is unreadable (${seen}): the document's schemaVersion ` +
+      "is missing or is not a number.",
+      drift,
+    );
+  }
+
+  if (documentVersion > SCHEMA_VERSION) {
+    logger.error("wallet migration: server is behind the document", drift);
+    throw new HttpsError(
+      "out-of-range",
+      `Save schema drift (${seen}): the document is newer than this ` +
+      "server. Deploy functions built from the same commit as the client " +
+      "(UserSaveData.VERSION); retrying will not help.",
+      drift,
+    );
+  }
+
+  logger.error("wallet migration: document is too old to migrate", drift);
+  throw new HttpsError(
+    "failed-precondition",
+    `Save schema drift (${seen}): the document is older than the oldest ` +
+    `schema this server can migrate (v${MIGRATABLE_SCHEMA_VERSION}). ` +
+    "It must be deleted and recreated before it is writable.",
+    drift,
+  );
 }
 
 /**
@@ -60,9 +124,11 @@ export const ensureWallet = onCall(async (request) => {
       }
 
       const current = saveSnapshot.data() ?? {};
-      assertWritableSchema(current.schemaVersion, env, uid);
+      assertMigratableSchema(current.schemaVersion, env, uid);
 
       const now = FieldValue.serverTimestamp();
+      // 패치의 schemaVersion 은 항상 SCHEMA_VERSION 이다 — 이 트랜잭션을 통과한 문서는
+      // v7 이었든 v8 이었든 반드시 v8 로 남는다.
       const migration = migrateFromSaveSlot(
         current, FieldValue.delete(), SCHEMA_VERSION);
       const created = createWallet(
