@@ -1,4 +1,5 @@
 import {SlotPatch} from "./saveDocument";
+import {currencySlot, grant} from "../currency/wallet";
 
 /**
  * 신규 계정 최초 지급 골드. 클라 CurrencyManager.STARTING_GOLD 의 쌍둥이 —
@@ -15,9 +16,6 @@ export const STARTER_DECK_SIZE = 6;
 /** 스타터 덱 이름. 클라 StarterDeck.DECK_NAME. */
 export const STARTER_DECK_NAME = "스타터 덱";
 
-/** 재화 4종. firestore.rules 의 isValidSave 가 이 4키를 정확히 요구한다 — 하나라도 빠지면 이후 저장이 영구 거부된다. */
-const CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard"];
-
 /**
  * 신규 계정 문서의 슬롯 10개. 메타 5키(schemaVersion/revision/updatedAt/deviceId/appVersion)는
  * ensureSaveDocument 가 얹는다.
@@ -28,10 +26,6 @@ const CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard"];
  * @return {SlotPatch} 슬롯 10개
  */
 export function buildFreshAccountSlots(starterCardIds: number[]): SlotPatch {
-  const balances: Record<string, number> = {};
-  for (const key of CURRENCY_KEYS) balances[key] = 0;
-  balances.Gold = STARTER_GOLD;
-
   const slots = [];
   for (let i = 0; i < DECK_SLOT_COUNT; i++) {
     slots.push(i === 0 ?
@@ -42,7 +36,7 @@ export function buildFreshAccountSlots(starterCardIds: number[]): SlotPatch {
   }
 
   return {
-    currency: {balances},
+    currency: currencySlot(grant({}, [{currency: "Gold", amount: STARTER_GOLD}])),
     ownership: {cardIds: [...starterCardIds]},
     deck: {slots},
     cardGrowth: {entries: {}},

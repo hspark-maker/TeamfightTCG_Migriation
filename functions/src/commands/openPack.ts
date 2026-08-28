@@ -9,14 +9,10 @@ import {
 } from "../save/saveDocument";
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
-import {
-  buildCardGrowthSlot,
-  buildCurrencySlot,
-  buildOwnershipSlot,
-  readBalances,
-  readGrowthEntries,
-  readOwnedIds,
-} from "../packs/packSlots";
+import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
+import {canAfford, currencySlot, readBalances, spend} from "../currency/wallet";
+import {addSnack, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
+import {rejectDomain} from "../save/domainReject";
 import {
   readCardPackRow,
   readDropRows,
@@ -37,16 +33,13 @@ import {
 type PackReject = "PackNotFound" | "RankLocked" | "EmptyPool" | "InsufficientGold";
 
 /**
- * 도메인 거절. **반드시 permission-denied 여야 한다.**
- *
- * 클라 CloudFailureClassifier 는 permission-denied·already-exists 만 "거절"로 보고,
- * failed-precondition·invalid-argument 는 "이 세션은 못 쓴다"로 보아 BlockSession 을 건다.
- * 잔액 부족으로 세션을 끊을 수는 없다.
+ * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
  * @param {PackReject} reason 사유 코드
  * @param {string} message 로그용 설명
+ * @param {Record<string, unknown>} context 어느 값에 막혔는지
  */
-function reject(reason: PackReject, message: string): never {
-  throw new HttpsError("permission-denied", message, {reason});
+function reject(reason: PackReject, message: string, context: Record<string, unknown>): never {
+  rejectDomain(reason, message, context);
 }
 
 /**
@@ -73,7 +66,7 @@ export const openPack = onCall(async (request) => {
     // 클라는 시트에 행이 없으면 SO 인스펙터 값으로 폴백하지만 서버는 SO 를 못 본다.
     // 이 로그가 뜨면 시트 저작이 빠진 것이고, 그 팩은 서버에서 영영 못 연다.
     logger.error("pack row missing from the CardPack spec", {uid, env, packId});
-    reject("PackNotFound", `Pack '${packId}' is not authored in the CardPack spec.`);
+    reject("PackNotFound", `Pack '${packId}' is not authored in the CardPack spec.`, {uid, env, packId});
   }
   if (pack.refundAmount > 0) {
     // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
@@ -105,32 +98,37 @@ export const openPack = onCall(async (request) => {
 
     const required = parseRequiredGrade(pack.minRankGrade);
     if (required !== null && (!isRanked(thresholds, points) || grade < required)) {
-      reject("RankLocked", `Pack '${packId}' requires rank grade ${required}.`);
+      reject("RankLocked", `Pack '${packId}' requires rank grade ${required}.`,
+        {uid, env, packId, points, grade, required});
     }
 
     const pool = resolveDropPool(dropRows, grade, catalogIds);
     if (pool.length === 0) {
-      reject("EmptyPool", `Pack '${packId}' has no drawable card at grade ${grade}.`);
+      reject("EmptyPool", `Pack '${packId}' has no drawable card at grade ${grade}.`,
+        {uid, env, packId, grade, dropRowCount: dropRows.length, catalogSize: catalogIds.size});
     }
     poolSize = pool.length;
 
     const balances = readBalances(current.currency);
-    if (balances[pack.priceType] < pack.price) {
-      reject("InsufficientGold", `Not enough ${pack.priceType} for pack '${packId}'.`);
+    if (!canAfford(balances, pack.priceType, pack.price)) {
+      reject("InsufficientGold", `Not enough ${pack.priceType} for pack '${packId}'.`,
+        {uid, env, packId, priceType: pack.priceType, price: pack.price, balance: balances[pack.priceType]});
     }
 
     const owned = readOwnedIds(current.ownership);
     const ownedSet = new Set(owned);
     drawn = drawPack(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, randomInt);
 
-    const currency = buildCurrencySlot(balances, pack.priceType, pack.price);
+    const currency = currencySlot(spend(balances, pack.priceType, pack.price));
     goldBefore = balances[pack.priceType];
     goldAfter = currency.balances[pack.priceType];
 
     return {
       currency,
       ownership: buildOwnershipSlot(owned, drawn),
-      cardGrowth: buildCardGrowthSlot(readGrowthEntries(current.cardGrowth), drawn),
+      cardGrowth: growthSlot(drawn.reduce(
+        (entries, card) => addSnack(entries, card.cardId, card.snack),
+        readGrowthEntries(current.cardGrowth))),
     };
   });
 

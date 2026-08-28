@@ -12,6 +12,7 @@ import * as logger from "firebase-functions/logger";
 import {db} from "../firebaseApp";
 import {DropRow} from "./packDraw";
 import {RankGradeRow} from "./rankGrade";
+import {CurrencyKey, parseCurrency} from "../currency/currencyKeys";
 
 /** 캐시 수명. 스펙 업로드가 반영되기까지 최대 이만큼 늦는다. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -58,28 +59,13 @@ export function clearSpecCache(): void {
 /** CardPack 표의 한 행. 클라 CardPackData 가 시트 우선으로 읽는 값과 같은 열이다. */
 export interface CardPackRow {
   packId: string;
-  priceType: string;
+  priceType: CurrencyKey;
   price: number;
   drawCount: number;
   uniqueDraw: boolean;
-  refundType: string;
+  refundType: CurrencyKey;
   refundAmount: number;
   minRankGrade: string;
-}
-
-/** 클라 ECurrencyType 의 이름. CurrencyCode.TryParse 가 통과시키는 값이 이 넷뿐이다. */
-export const CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard"] as const;
-
-/**
- * 재화 이름을 정규화한다. 클라 CardPackData.ParseCurrency 재현이다
- * — 대소문자를 안 가리고, 못 읽으면 Gold 로 떨어진다(팩 가격은 오타여도 화면이 서야 한다).
- * @param {string} value priceType·refundType 열 값
- * @return {string} 재화 키
- */
-export function parseCurrency(value: string): string {
-  const lowered = value.trim().toLowerCase();
-  const key = (CURRENCY_KEYS as readonly string[]).find((k) => k.toLowerCase() === lowered);
-  return key ?? "Gold";
 }
 
 /**

@@ -8,8 +8,7 @@ const path = require("node:path");
 const {resolveDropPool, drawPack, SNACK_PER_DUPLICATE} = require("../lib/packs/packDraw.js");
 const {gradeOf, isRanked, entryPointsFromRows, parsePoolGrade, parseRequiredGrade,
   FALLBACK_ENTRY_POINTS, GRADE_KEYS} = require("../lib/packs/rankGrade.js");
-const {readBalances, readOwnedIds, readGrowthEntries, buildCurrencySlot,
-  buildOwnershipSlot, buildCardGrowthSlot, BASE_LEVEL} = require("../lib/packs/packSlots.js");
+const {readOwnedIds, buildOwnershipSlot} = require("../lib/packs/packSlots.js");
 
 const drop = (id, minGrade, cardId, weight) => ({id, packId: "P", minGrade, cardId, weight});
 const catalog = (...ids) => new Set(ids);
@@ -156,17 +155,7 @@ assert.deepEqual(dirtyDrawn.map((c) => c.cardId), [1], "미포함 카드는 장�
 // ── 빈 풀 ────────────────────────────────────────────────────────────────────
 assert.deepEqual(drawPack([], 3, false, all, new Set(), scriptedRoll([])), []);
 
-// ── 슬롯 빌더 ────────────────────────────────────────────────────────────────
-// 룰 isValidSave 가 재화 4키를 정확히 요구한다 — 모르는 키를 남기면 이후 저장이 영구 거부된다.
-assert.deepEqual(Object.keys(readBalances({balances: {Gold: 500, Junk: 7}})).sort(),
-  ["Diamond", "Energy", "Gold", "Shard"]);
-assert.equal(readBalances({balances: {Gold: 500}}).Gold, 500);
-assert.equal(readBalances({balances: {Gold: -5}}).Gold, 0);
-assert.equal(readBalances(undefined).Gold, 0, "슬롯이 없어도 4키가 선다");
-
-assert.deepEqual(buildCurrencySlot({Gold: 500, Diamond: 0, Energy: 0, Shard: 0}, "Gold", 120),
-  {balances: {Gold: 380, Diamond: 0, Energy: 0, Shard: 0}});
-
+// ── 소유 슬롯 ───────────────────────────────────────────────────────────────
 // 소유는 기존 순서를 유지하고 신규만 뒤에 붙인다(중복 지급은 안 붙는다).
 assert.deepEqual(readOwnedIds({cardIds: [3, 1, 3, 0, -2, 1]}), [3, 1]);
 assert.deepEqual(
@@ -177,21 +166,6 @@ assert.deepEqual(
   ]),
   {cardIds: [3, 1, 9]});
 
-// 간식은 중복에만 쌓이고, 항목이 없으면 level = BASE_LEVEL 로 신설된다.
-// level 0 으로 만들면 클라 FlushToData 가 다음 저장에서 그 항목을 통째로 날린다.
-const growth = buildCardGrowthSlot({}, [{cardId: 5, isNew: false, snack: 1}]);
-assert.deepEqual(growth, {entries: {5: {level: BASE_LEVEL, snack: 1, limitBreak: 0}}});
-
-// 기존 항목에는 더하고, 음수 간식은 0에서 시작한다(클라 AddSnack 과 같다).
-assert.deepEqual(
-  buildCardGrowthSlot({5: {level: 3, snack: -4, limitBreak: 1}}, [{cardId: 5, isNew: false, snack: 1}]),
-  {entries: {5: {level: 3, snack: 1, limitBreak: 1}}});
-
-// 기본값뿐인 항목은 버린다 — 클라 FlushToData 의 가지치기와 같아야 문서가 안 흔들린다.
-assert.deepEqual(buildCardGrowthSlot({7: {level: BASE_LEVEL, snack: 0, limitBreak: 0}}, []), {entries: {}});
-assert.deepEqual(readGrowthEntries({entries: {8: {level: 2}}}), {8: {level: 2, snack: 0, limitBreak: 0}});
-
-// 신규 카드에는 간식이 안 붙는다.
-assert.deepEqual(buildCardGrowthSlot({}, [{cardId: 5, isNew: true, snack: 0}]), {entries: {}});
+// 재화는 scripts/test-currency.js, 카드 성장·먹이는 scripts/test-growth.js 가 맡는다.
 
 console.log("test-open-pack: ok");

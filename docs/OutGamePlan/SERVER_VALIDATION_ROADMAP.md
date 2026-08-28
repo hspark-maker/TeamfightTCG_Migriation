@@ -1,6 +1,6 @@
 # 서버 검증 전환 로드맵
 
-> 최종 갱신: 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `bb60d4252`
+> 최종 갱신: 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `60b292a1a`
 > 진행 상태 추적용. 설계 근거·구현 세부는 각 Phase 담당이 갖는다.
 > 선행 문서(P0~P3)는 삭제됨 — `git show 8a494e06b:docs/OutGamePlan/FIRESTORE_SAVE_ROADMAP.md`
 
@@ -43,6 +43,17 @@
 > → 권한 → `allUsers` + `Cloud Run 호출자` 로 수동 부여해 풀었다.
 > 판정은 배포 로그가 아니라 **함수 URL 에 POST 해서 403 인지 401 인지**로 한다(401 = 정상).
 >
+> **`firebase deploy --only functions` 를 그냥 치면 멈춘다(2026-08-28).** 프로젝트에 `lockDeck(asia-northeast3)`
+> 가 배포돼 있는데 이 브랜치 소스엔 없어서 CLI 가 "삭제할까" 를 묻고 non-interactive 라 **Abort** 한다.
+> `lockDeck` 은 `박형석작업용` 브랜치(hspark, `5dbafa48a`)가 올린 **남의 함수다 — 지우지 마라.**
+> 배포는 함수를 지정해서 한다:
+> `firebase deploy --only functions:ping,functions:devBumpRevision,functions:submitMatchResult,functions:ensureAccount,functions:openPack`
+>
+> **`devBumpRevision` 은 URL POST 가 403 이다(2026-08-28 실측).** Cloud Run 호출자 바인딩이 없다 —
+> 바인딩은 create 때만 걸리므로 이 함수는 처음부터 그랬을 가능성이 크고, R1 실측표의 `BUMP` 가
+> 아직 한 번도 안 돌아본 것과 앞뒤가 맞는다. 고치려면 openPack 때와 같이 Cloud Console →
+> Cloud Run → **소문자** `devbumprevision` → 권한 → `allUsers` + `Cloud Run 호출자`.
+>
 > **`firebase functions:log` 는 3~4분 늦는다.** 방금 한 왕복이 안 보인다고 "호출이 없었다" 로 읽으면
 > 멀쩡한 코드를 뒤지게 된다. 감사(audit) 줄이 섞이므로 `| grep drawn` 으로 걸러 보는 게 빠르다.
 
@@ -59,23 +70,27 @@
 - 프로젝트 `bm-cardbattle` 하나. DB는 `databases/cardbattle` 하나뿐 (`(default)` 없음)
 - `functions/scripts/` — `grant-admin.js`(admin 클레임 부여·회수, 부여 후 `revokeRefreshTokens`) ·
   `check-pack-spec.js`(시트 사전 점검, 자격증명 불필요) · `test-firestore-rules.js`.
-  `npm test` 에 물린 순수 회귀 3종: `test-match-result.js` · `test-fresh-account.js` · `test-open-pack.js`.
+  `npm test` 에 물린 순수 회귀 5종: `test-match-result.js` · `test-fresh-account.js` ·
+  `test-currency.js` · `test-growth.js` · `test-open-pack.js`.
   에뮬레이터 회귀는 `test-ensure-account.js`(`npm run test:emulator`)로 따로 선다
 
-#### 모듈 지도 (`functions/src/`, 17파일 1,619줄)
+#### 모듈 지도 (`functions/src/`, 22파일 1,808줄)
 
 | 폴더 | 파일 | 성격 |
 |---|---|---|
 | (루트) | `index.ts` `firebaseApp.ts` | 배럴 · 전역 옵션 |
 | `commands/` | `ping` `devBumpRevision` `submitMatchResult` `ensureAccount` `openPack` | `onCall` 진입점. **여기만 `HttpsError` 를 던진다** |
-| `save/` | `saveDocument`(Firestore) · `freshAccount`(순수) · `starterPool`(순수) · `starterCards`(Firestore) | 문서 쓰기 창구 · 신규 계정 |
-| `packs/` | `packDraw` `rankGrade` `packSlots` `cardCatalog`(순수) · `packSpecReader`(Firestore + TTL 5분 캐시) | R5 카드팩 |
+| `save/` | `saveDocument`(Firestore) · `freshAccount`(순수) · `starterPool`(순수) · `starterCards`(Firestore) · `saveValues`(순수) · `domainReject`(**HttpsError 를 진다**) | 문서 쓰기 창구 · 신규 계정 · 값 읽기 · 거절 계약 |
+| `currency/` | `currencyKeys` `wallet`(둘 다 순수) | 전역 재화 지갑. R6~R8 공용 |
+| `growth/` | `cardGrowth`(순수) | 카드 성장 슬롯 코덱 + 먹이 소비. R6 |
+| `packs/` | `packDraw` `rankGrade` `packSlots`(소유 코덱만) `cardCatalog`(순수) · `packSpecReader`(Firestore + TTL 5분 캐시) | R5 카드팩 |
 | — | `matchResult.ts`(순수, Firestore 접촉 0) | R8 멀티 대조 |
 
 **"순수"는 계약이다** — `scripts/` 회귀가 에뮬레이터 없이 `lib/` 를 직접 `require` 하는 근거다.
 순수 모듈에 `firebase-admin`·`HttpsError` 를 들이면 그 회귀가 통째로 죽는다.
 
-**재화 코드가 아직 도메인 폴더에 흩어져 있다** — R6 선행으로 걷어낼 대상. 아래 「R6 · 선행」 참조.
+거절을 던지는 곳은 `commands/` 와 `save/domainReject`·`save/saveDocument` 뿐이다.
+`currency/`·`growth/`·`packs/` 는 판정만 하고 던지지 않는다 — 그래야 `scripts/` 회귀가 산다.
 
 ### 클라 접점
 
@@ -216,7 +231,7 @@ callable이 서버 권위 슬롯을 쓰면 revision이 오른다. 클라가 모�
 | **R3** 스펙 서버화 | ⬜ 대기 | (a) 권한 이관 사실상 완료. 본체는 (b) 미업로드 SO 7종 승격 | R1 |
 | **R4** 계정 생성·스타터 | ✅ 완료 | 신규 문서 생성을 서버가 소유 | R1 |
 | **R5** 카드팩 | 🟡 진행중 | 추첨 난수·소유·간식·차감을 `openPack` 이 소유. 배포·정상 왕복 검증 완료, **거절·비복원 경로 미검증**. 룰 동결은 R9로 미룸 | — |
-| **R6** 성장·강화 | ⬜ 대기 | 성공 판정·비용·한계돌파·키워드. **선행으로 `currency/` 모듈 분리** | R3 |
+| **R6** 성장·강화 | 🟡 진행중 | **선행(`currency/`·`growth/` 자원 모듈 분리) 완료 — 미배포.** 본체(성공 판정·비용·한계돌파·키워드)는 대기 | R3 |
 | **R7** 보상 수령 4종 | ⬜ 대기 | 랭크티어·도감·토너먼트 정점/챕터 | R3 |
 | **R8** 전투 출구 | ⬜ 대기 | 이미 있는 매치 대조에 **지급을 잇는다** | R3 |
 | **R9** 룰 최종 동결·정리 | ⬜ 대기 | 서버 슬롯 7종 동결, 디버그·데드코드 정리 | R4~R8 |
@@ -474,86 +489,113 @@ Firebase Auth 토큰은 Google IAM 토큰이 아니라 그 게이트를 못 지�
 
 ### R6 — 성장 · 강화 ⬜
 
-#### 선행 — 재화 모듈 분리 `functions/src/currency/` ⬜
+#### 선행 — 자원 모듈 분리 `currency/` · `growth/` ✅
 
-재화 연산(잔액 읽기 → 여력 판정 → 차감/가산 → 슬롯 조립)이 R5 가 만든 카드팩 폴더에 있다.
-R6 강화비용 · R7 보상수령 · R8 전투골드가 같은 연산을 쓴다.
+소비 판정이 붙는 자원 두 종이 R5 가 만든 카드팩 폴더에 갇혀 있던 것을 걷어냈다.
+R6 강화비용·한계돌파 · R7 보상수령 · R8 전투골드가 같은 연산을 쓴다.
+**동작 무변경 리팩터링**이고 callable 은 늘지 않았다.
 
-4재화 키 목록은 이미 두 벌이다 — `packs/packSpecReader.ts:71` 과 `save/freshAccount.ts:19`.
-이 목록은 룰의 `balances.hasOnly([4키])` 와 맞아야 하고, 갈리면 그 계정의 이후 모든 클라 저장이
-영구 거부된다(`delete: if false` — 룰 층에 복구 경로 없음).
+| 자원 | 저장 위치 | 버는 곳 | 쓰는 곳 |
+|---|---|---|---|
+| 전역 재화(`ECurrencyType` 4종) | `currency.balances` 평면 맵 | 여러 곳 | 강화·키워드강화 |
+| 먹이(간식) — 카드별 재료 | `cardGrowth.entries[*].snack` | 팩 중복 하나 | 한계돌파 하나 |
 
-**현재 흩어진 자리**
+**둘을 한 원장으로 합치지 않았다** — 키 집합(룰이 `hasOnly` 로 못박은 고정 4키 ↔ 카드 id 동적),
+상한(`1e12` ↔ `int.MaxValue`), 슬롯 모양(평면 맵 ↔ `level`·`limitBreak` 가 붙은 항목 + 가지치기),
+원자성(한계돌파는 차감과 단계 증가가 한 몸)이 전부 다르다. 공유하는 것은 `intOf` 와 거절 계약뿐이다.
 
-| 위치 | 재화 코드 |
-|---|---|
-| `packs/packSlots.ts:18` | `CURRENCY_MAX = 1e12` (private) |
-| `packs/packSlots.ts:43` | `readBalances` — 4키 정규화 + `[0, MAX]` 클램프 |
-| `packs/packSlots.ts:102` | `buildCurrencySlot(balances, priceCurrency, price)` — 차감과 슬롯 조립이 한 함수라 지급에 재사용 불가 |
-| `packs/packSpecReader.ts:71,80` | `CURRENCY_KEYS`(1차 사본) · `parseCurrency`(대소문자 무시, 실패 시 `Gold`) |
-| `save/freshAccount.ts:19` | `CURRENCY_KEYS`(2차 사본) |
-| `commands/openPack.ts:117~128` | 잔액 검사 + `InsufficientGold` 거절이 인라인 |
-
-**목표 구조**
+**결과 구조**
 
 ```
-functions/src/currency/
-  currencyKeys.ts     CURRENCY_KEYS · CurrencyKey · CURRENCY_MAX · parseCurrency
-  currencyLedger.ts   readBalances · canAfford · applyDeltas · spend · grant · currencySlot
-functions/src/save/
-  saveValues.ts       intOf         (신설 — packSlots 와 currencyLedger 공용)
-  domainReject.ts     rejectDomain  (신설 — permission-denied 계약 단일 지점)
+functions/src/
+  currency/
+    currencyKeys.ts   CURRENCY_KEYS · CurrencyKey · CURRENCY_MAX · parseCurrency
+    wallet.ts         readBalances · canAfford · spend · grant · currencySlot
+  growth/
+    cardGrowth.ts     GrowthEntry · BASE_LEVEL · SNACK_MAX · readGrowthEntries · growthSlot
+                      addSnack · canAffordSnack · spendSnack · applyLimitBreak
+  packs/packSlots.ts  readOwnedIds · buildOwnershipSlot (소유 코덱만 남았다)
+  save/
+    saveValues.ts     intOf        (packSlots · wallet · cardGrowth 공용)
+    domainReject.ts   rejectDomain (permission-denied 계약 단일 지점)
 ```
 
-재화 두 파일은 순수다(Firestore·`HttpsError` 모름) — 「모듈 지도」의 계약을 따른다.
+`currency/`·`growth/`·`saveValues` 는 순수다 — 「모듈 지도」의 계약을 따른다.
+의존 방향은 `packs/ → growth/`·`currency/` 한 방향뿐이다.
 
-- `applyDeltas(balances, deltas[])` 가 유일한 산술 지점이고 `spend`/`grant` 는 그 위의 얇은 래퍼다.
-  R7 의 다건 수령(`AlbumRewardManager.Payout` 이 보상 리스트를 순회)이 호출 한 번으로 끝난다
-- 클램프는 `applyDeltas` 안에 둔다. 서버는 Admin SDK 라 룰을 우회하므로 지급이 `CURRENCY_MAX` 를 넘긴
-  문서를 쓰면 그 계정의 이후 클라 저장이 전부 `PERMISSION_DENIED` 다.
-  하한 0 클램프는 현행 `buildCurrencySlot:109` 동작과 같다
-- `currencySlot(balances)` 는 받은 객체를 펴지 않고 `CURRENCY_KEYS` 를 순회해 다시 짓는다 —
-  룰이 4키를 전부 요구하므로 부분 객체가 들어와도 빠진 키가 0 으로 서야 한다. 모르는 키는 버린다.
-  회귀에 "부분 입력 → 4키 산출" assert 를 박는다
-- `freshAccount` 는 `currencySlot(grant(...))` 로 조립한다 — 4키 모양을 아는 곳이 한 군데가 된다
+- 재화 산술은 `wallet.ts` 의 private `changeBalances` 하나뿐이고 공개 API 는 도메인 동사만 남겼다.
+  `grant(balances, gains[])` 가 다건이라 R7 의 보상 수령(`AlbumRewardManager.Payout`)이 호출 한 번으로 끝난다
+- 클램프는 `changeBalances` 안이다. 서버는 Admin SDK 라 룰을 우회하므로 지급이 `CURRENCY_MAX` 를 넘긴
+  문서를 쓰면 그 계정의 이후 클라 저장이 전부 `PERMISSION_DENIED` 다
+- `currencySlot`·`readBalances` 는 `CURRENCY_KEYS` 를 순회해 4키를 **다시 짓는다** — 부분 객체가 들어와도
+  빠진 키가 0 으로 서고 모르는 키는 버린다. 회귀에 "부분 입력 → 4키 산출" assert 가 박혀 있다
+- `freshAccount` 는 `currencySlot(grant({}, [{currency:"Gold", amount: STARTER_GOLD}]))` 로 조립한다
+  — 4키 모양을 아는 곳이 한 군데가 됐다
+- `applyLimitBreak(entries, cardId, stage, snackCost)` 는 **차감과 단계 증가를 한 원자로** 낸다.
+  클라 `TryLimitBreak` 의 쌍둥이 — 갈라 두면 호출부마다 반쪽 문서가 생긴다
 
-**거절 사유는 재화 모듈이 정하지 않는다** — 도메인마다 클라가 파싱하는 코드가 다르다:
+**거절 사유는 자원 모듈이 정하지 않는다** — 도메인마다 클라가 파싱하는 코드가 다르다:
 
 | 도메인 | 클라 enum | 사유 문자열 |
 |---|---|---|
 | 카드팩 (R5) | `EPackOpenResult.InsufficientGold` (`OpenedPack.cs:8`) | `"InsufficientGold"` |
 | 강화 (R6) | `EEnhanceOutcome.NotAffordable` (`EnhanceResult.cs:21`) | `"NotAffordable"` |
 
-`save/domainReject.ts` 에 `rejectDomain(reason, message): never` 하나를 세운다 — `openPack.ts:48` 의
-local `reject` 를 들어올린 것이고, 「거절 코드 계약」의 집행 지점이 된다.
+`save/domainReject.ts` 의 `rejectDomain(reason, message, context): never` 가 유일한 던지기 지점이고,
+`openPack.ts` 는 사유 오타를 막는 타입 관문(`PackReject` union)만 남겨 여기로 위임한다.
+
+**거절은 무조건 구조화 로그를 남긴다** — `logger.warn("domain rejected", {reason, …context})`.
+분리 전에는 4갈래 중 `PackNotFound` 하나만 로그가 있었고 **잔액 부족은 아무것도 안 남겼다** —
+`functions:log` 가 3~4분 늦는 것과 겹치면 "호출이 안 왔다"로 오진한다. 이제 한 곳이 전부 덮고
+R6 본체의 `enhanceCard`·`limitBreak` 도 공짜로 따라온다. 맥락 필드는 **어느 값에 막혔는지**를 싣는다:
+
+| 사유 | 맥락 |
+|---|---|
+| `PackNotFound` | `uid env packId` (+ 저작 누락 알람용 `logger.error` 를 따로 남긴다 — 레벨이 필터 축이다) |
+| `RankLocked` | `points grade required` |
+| `EmptyPool` | `grade dropRowCount catalogSize` |
+| `InsufficientGold` | `priceType price balance` |
+
+와이어 계약(`details.reason`)은 무변화다. **클라가 그 `reason` 을 안 읽는 것은 그대로 남은 숙제다**
+— 잔액 부족에도 `CardPackOpener` 의 "시트/SO 드리프트" 경고가 뜬다(R5 실측 · 미결).
 
 **함정**
 
 - `"InsufficientGold"` 는 와이어 계약이다. 클라가 문자열을 그대로 enum 이름에 대조하므로 다듬으면 안 된다
-- 잔액 검사를 옮길 때 던지는 코드가 `permission-denied` 에서 바뀌면 잔액 부족으로 세션이 끊긴다
-  (`failed-precondition`·`invalid-argument` 는 `Unusable` → `BlockSession`). 분리 후 R5 의 거절 실측을
-  다시 재현해 `Ready` 유지를 확인할 것
-- `packs/rankGrade.ts:11` 의 `GRADE_KEYS` 에도 `"Gold"`·`"Diamond"` 가 있다 — 랭크 등급 축이라 다른 것이다
-- `packSlots.ts:32` 의 private `intOf` 를 `readBalances` 와 `readOwnedIds`/`readGrowthEntries` 가 같이 쓴다.
-  갈라지면 복사가 또 생기므로 `save/saveValues.ts` 로 뺀다
-- `test-open-pack.js:11~12,161~168` 이 재화 함수를 직접 require 한다. 회귀는 `scripts/test-currency.js` 로
-  분리해 `npm test` 에 문다
+- 거절이 `permission-denied` 에서 바뀌면 잔액 부족으로 세션이 끊긴다
+  (`failed-precondition`·`invalid-argument` 는 `Unusable` → `BlockSession`)
+- `packs/rankGrade.ts` 의 `GRADE_KEYS` 에도 `"Gold"`·`"Diamond"` 가 있다 — 랭크 등급 축이라 다른 것이다
+- **`reject` 를 화살표 const 로 만들면 안 된다** — TS 는 함수 선언(또는 명시 타입 주석)일 때만
+  `never` 호출을 제어흐름 narrowing 으로 인정한다. 화살표로 바꾸면 이후 `pack` 이 전부
+  `possibly null` 로 터진다(실제로 밟았다)
+
+**의도된 동작 변경 1건**: `addSnack` 에 `SNACK_MAX = 2147483647` 클램프를 넣었다.
+클라 `CardGrowthEntry.Snack` 이 `int` 이고 `AddSnack` 이 long 으로 더한 뒤 `int.MaxValue` 에서 자른다.
+실도달은 불가능하지만 클라 필드와 대칭을 맞춘 것이다.
+
+`canAffordSnack`/`spendSnack`/`applyLimitBreak` 는 **아직 호출자가 없다** — R6 본체의 `limitBreak`
+callable 이 첫 호출자다. 의도된 선행이고, `test-growth.js` 가 클라 `TryLimitBreak` 과의 대칭을 붙든다.
 
 **대상 밖**
 
-- 한계돌파 — `LimitBreakStep.SnackCost` 는 재화가 아니라 `cardGrowth.entries[*].snack` 을 쓴다
 - 범용 `spendCurrency` callable — 클라가 임의 차감을 지시하게 되어 「행위 단위 callable」 방향과 반대다.
-  재화 모듈은 callable 이 아니라 순수 라이브러리다
-- 클라 — `CurrencyManager.Spend` 호출자 2곳(`CardGrowthManager.cs:173`·`KeywordGrowthManager.cs:118`)은
-  R6 본체가 걷어낸다
+  자원 모듈은 callable 이 아니라 순수 라이브러리다
+- 클라 — `CurrencyManager.Spend` 호출자 2곳(`CardGrowthManager.cs:173`·`KeywordGrowthManager.cs:118`)과
+  `TryLimitBreak` 은 R6 본체가 걷어낸다
 
-**착수 조건**: R5 커밋 후. `packs/*.ts`·`openPack.ts` 가 실왕복 검증 중이라 동결이다.
-신규 4파일 + 기존 4파일 수정이라 `bb60d4252` 처럼 일부만 커밋되면 없는 모듈을 export 하는 HEAD 가 된다.
+**완료 판정(전부 실행함, 2026-08-28)**
 
-**완료 판정**: `npm run build`(`noUnusedLocals` 가 잔여 import 를 잡는다) · `npm run lint` ·
-`npm test` 4종 통과. `buildCurrencySlot({Gold:500,…},"Gold",120) → {Gold:380,…}` 을
-`currencySlot(spend(…))` 가 그대로 낸다는 assert 로 동작 무변경을 못박는다.
-`openPack` 이 이미 배포됐으므로 재배포를 동반한다.
+- [x] `npm run build` · `npm run lint`
+- [x] `npm test` 5종 — `match-result` · `fresh-account` · **`currency`** · **`growth`** · `open-pack`
+- [x] `npm run test:emulator` — `test-ensure-account: ok` (`freshAccount` 를 고쳤으므로 필수였다)
+- [x] `Tools/firestore-rules-tests` **`# pass 33`**
+      — 이 하네스는 `node_modules` 가 없어 `npm install` 을 먼저 해야 돌았다
+- [x] `currencySlot(spend({Gold:500,…},"Gold",120))` → `{Gold:380,…}` assert 로 동작 무변경을 못박음
+- [x] **재배포 완료(2026-08-28)** — 5함수 전부 `Successful update operation`.
+      (거절 로그 보강으로 `openPack` 만 한 번 더 배포. `openPack` 재확인 401)
+      함수 URL POST 판정: `openPack` `ensureAccount` `submitMatchResult` **401**(정상) ·
+      `ping` 200(무인증 진단이라 설계대로) · `devBumpRevision` **403**(아래 함정)
+- [ ] 배포 후 R5 의 거절 실측(잔액 부족 → 경고만, 세션 `Ready` 유지)을 한 번 재현할 것 — 사람 1회
 
 #### 본체
 
@@ -563,9 +605,10 @@ local `reject` 를 들어올린 것이고, 「거절 코드 계약」의 집행 
 2. `s_rng.NextDouble() < t_step.SuccessRate` — 무시드 `System.Random`, 클라가 성공을 정한다
 3. `CurrencyManager.Save()` 는 성공/실패 공통 — **실패해도 차감이 영속되고 환급 코드는 없다**
 
-- [ ] **선행** — `functions/src/currency/` 분리(위 블록). 비용 차감은 `currencyLedger` 재사용,
-      거절은 `rejectDomain("NotAffordable", …)`
+- [x] **선행** — `currency/`·`growth/` 분리(위 블록). 비용 차감은 `wallet.spend`,
+      먹이 차감은 `cardGrowth.applyLimitBreak`, 거절은 `rejectDomain("NotAffordable", …)` 재사용
 - [ ] `enhanceCard(cardId)` / `limitBreak(cardId)` / `enhanceKeyword(keyword)` callable
+      — `limitBreak` 이 쓸 원장은 이미 섰다(`growth/cardGrowth.ts`). 남은 것은 스펙 근거와 callable 껍데기다
 - [ ] 근거: R3에서 올린 `CardGrowthConfig`(`baseEnhanceCost=25` · `costGrowthPerLevel=50` ·
       `baseSuccessRate=1` · `rateDropPerLevel` + 레벨별 오버라이드 행) · `KeywordGrowthConfig` ·
       `CardSpec.KeywordUnlockLevel`
