@@ -9,12 +9,14 @@ import {
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
 import {
+  appendClaimedTier,
+  judgeRewardClaim,
+  MAX_CLAIMED_TIERS,
   parseRankGradeRows,
   parseRewardRows,
   RankGradeRow,
   rankTierCount,
   requiredPointsForTier,
-  resolveRewards,
 } from "../payout";
 import {currencySlot, grant, readBalances} from "../currency/wallet";
 
@@ -67,8 +69,8 @@ function readIdList(value: unknown): string[] {
 }
 
 /**
- * 수령한 티어 목록. 룰이 claimedTiers 를 size() <= 20 으로 막으므로 티어 범위 밖 값을 걸러
- * 길이를 티어 수 이하로 묶는다 — 넘긴 문서를 쓰면 그 계정의 이후 클라 저장이 전부 거부된다.
+ * 수령한 티어 목록. 티어 범위 밖 값을 걸러 낸다. 룰 상한(MAX_CLAIMED_TIERS)은 여기가 아니라
+ * 쓰기 직전 appendClaimedTier 가 건다 — 읽기에서 잘라 내면 낙인이 조용히 사라진다.
  * @param {unknown} rank 문서의 rank 슬롯
  * @param {number} tierCount 전체 티어 수
  * @return {number[]} 오름차순 티어 인덱스
@@ -143,7 +145,18 @@ function claimRankTier(
     reject("NotEligible", `Rank tier ${tier} requires ${required} points.`, {...context, tier, points, required});
   }
 
-  return {points, claimedTiers: [...claimed, tier].sort((a, b) => a - b)};
+  const claimedTiers = appendClaimedTier(claimed, tier);
+  if (claimedTiers === null) {
+    // "표를 늘렸는데 firestore.rules 를 안 늘렸다"는 운영 사고다. 넘긴 문서를 쓰면 그 계정의 이후 클라 저장이
+    // 전부 PERMISSION_DENIED 가 되고 delete 도 룰에 막혀 복구 경로가 없다 — 수령 하나를 거부하는 편이 낫다.
+    logger.error("claimedTiers would exceed the firestore.rules limit", {
+      ...context, tier, claimedCount: claimed.length, limit: MAX_CLAIMED_TIERS,
+    });
+    reject("NotEligible", `Rank claim would exceed the claimedTiers limit of ${MAX_CLAIMED_TIERS}.`,
+      {...context, tier, claimedCount: claimed.length, limit: MAX_CLAIMED_TIERS});
+  }
+
+  return {points, claimedTiers};
 }
 
 /**
@@ -225,20 +238,28 @@ export const claimReward = onCall(async (request) => {
   // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
   const specOwnerId = ownerType === "Rank" ? String(tierIndex) : ownerId;
   const rewardRows = parseRewardRows(await readSpecRows(env, "Reward"));
-  const {gains, dropped} = resolveRewards(rewardRows, ownerType, specOwnerId);
+  const judgement = judgeRewardClaim(rewardRows, ownerType, specOwnerId);
+  const {gains, dropped} = judgement;
 
   if (dropped.length > 0) {
     // 저작 실수를 조용히 삼키지 않는다 — 카드 보상이 저작되면 UnknownRewardType 으로 여기 뜬다.
     logger.warn("reward rows dropped", {...context, specOwnerId, dropped});
   }
-  if (gains.length === 0) {
-    // 토너먼트는 지급이 0건이어도 거절하지 않는다. "보상 미저작 정점은 해금만 넘긴다"가 저작 규약인데
-    // 여기서 막으면 그 정점이 영영 RewardPending 으로 굳어 진행이 끊긴다 — 클리어 낙인은 남기고 지급만 비운다.
-    // 랭크는 다르다: 미저작 티어를 수령해도 넘길 진행이 없으므로 거절이 맞다.
-    if (ownerType === "Rank") {
-      reject("RewardNotFound", `No reward is authored for Rank/${specOwnerId}.`,
-        {...context, specOwnerId, droppedCount: dropped.length});
+  if (!judgement.allow) {
+    if (judgement.specEmpty) {
+      // 표를 통째로 못 읽은 것은 저작이 없는 것과 다르다 — 배포/업로드 사고이고 유저 잘못이 아니다.
+      // 여기서 토너먼트를 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
+      logger.error("Reward spec is empty — refusing every claim until it is uploaded",
+        {...context, specOwnerId, specRowCount: rewardRows.length});
     }
+    reject(judgement.reason,
+      judgement.specEmpty ?
+        "Reward spec is unreadable." :
+        `No reward is authored for ${ownerType}/${specOwnerId}.`,
+      {...context, specOwnerId, specEmpty: judgement.specEmpty, droppedCount: dropped.length});
+  }
+  if (!judgement.authored) {
+    // "보상 미저작 정점은 해금만 넘긴다"가 저작 규약이다 — 여기서 막으면 그 정점이 영영 RewardPending 으로 굳는다.
     logger.warn("clearing a node with no authored reward", {...context, specOwnerId, droppedCount: dropped.length});
   }
 

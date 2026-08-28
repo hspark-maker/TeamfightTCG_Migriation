@@ -13,6 +13,9 @@ const {
   resolveRewards,
   requiredPointsForTier,
   rankTierCount,
+  judgeRewardClaim,
+  appendClaimedTier,
+  MAX_CLAIMED_TIERS,
   computeCurrencyPayout,
   computeRankPayout,
   DIVISIONS_PER_GRADE,
@@ -119,6 +122,58 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
 
   // Battle 행은 ownerType 축이 달라 정적 보상 해석에 절대 섞이지 않는다.
   assert.deepEqual(resolveRewards(battle, "Rank", "win.perCard").gains, []);
+}
+
+// ── 표를 못 읽음 vs 그 행만 없음 ────────────────────────────────────────────
+{
+  // Reward 표가 통째로 비었다 = 업로드/배포 사고. 어떤 소유자에게도 자격을 잴 수 없다.
+  // 여기서 토너먼트를 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
+  const empty = parseRewardRows([]);
+
+  const rank = judgeRewardClaim(empty, "Rank", "3");
+  assert.equal(rank.allow, false, "표가 비면 랭크도 거절");
+  assert.equal(rank.specEmpty, true);
+  assert.equal(rank.reason, "NotEligible");
+
+  const tournament = judgeRewardClaim(empty, "Tournament", "node_01");
+  assert.equal(tournament.allow, false, "표가 비면 토너먼트도 거절 — 클리어 낙인을 남기지 않는다");
+  assert.equal(tournament.specEmpty, true);
+  assert.equal(tournament.reason, "NotEligible");
+  assert.deepEqual(tournament.gains, []);
+}
+{
+  // 표는 읽혔고 그 ownerId 행만 없다 = 저작 규약. 토너먼트는 지급 0건으로 통과해 해금만 넘긴다
+  // (막으면 그 정점이 영영 RewardPending 으로 굳는다). 랭크는 넘길 진행이 없어 거절이 맞다.
+  const rows = parseRewardRows([row(1, "Tournament", "node_01", 1, "Gold", 200)]);
+
+  const unauthored = judgeRewardClaim(rows, "Tournament", "node_09");
+  assert.equal(unauthored.allow, true, "미저작 정점은 여전히 통과한다");
+  assert.equal(unauthored.authored, false);
+  assert.deepEqual(unauthored.gains, []);
+
+  const authored = judgeRewardClaim(rows, "Tournament", "node_01");
+  assert.equal(authored.allow, true);
+  assert.equal(authored.authored, true);
+  assert.deepEqual(authored.gains, [{currency: "Gold", amount: 200}]);
+
+  const rank = judgeRewardClaim(rows, "Rank", "3");
+  assert.equal(rank.allow, false);
+  assert.equal(rank.specEmpty, false, "표는 읽혔다 — 사고가 아니라 미저작이다");
+  assert.equal(rank.reason, "RewardNotFound");
+}
+
+// ── claimedTiers 상한: 룰(firestore.rules:98, size() <= 20)과 같이 움직인다 ──
+{
+  assert.equal(MAX_CLAIMED_TIERS, 20, "firestore.rules:98 의 claimedTiers.size() <= 20 과 같은 값이어야 한다");
+
+  const filled = Array.from({length: MAX_CLAIMED_TIERS - 1}, (_, i) => i);
+  assert.deepEqual(appendClaimedTier(filled, MAX_CLAIMED_TIERS - 1), [...filled, MAX_CLAIMED_TIERS - 1],
+    "상한까지는 쓴다");
+
+  // 상한에 도달한 뒤의 수령은 문서를 쓰지 않는다 — 21칸 문서를 쓰면 그 계정의 이후 클라 저장이 전부
+  // PERMISSION_DENIED 가 되고 delete 도 룰에 막혀 복구 경로가 없다.
+  const full = Array.from({length: MAX_CLAIMED_TIERS}, (_, i) => i);
+  assert.equal(appendClaimedTier(full, MAX_CLAIMED_TIERS), null, "상한 초과는 null — 부르는 쪽이 거절한다");
 }
 
 // ── 티어 요구점수 유도 ──────────────────────────────────────────────────────

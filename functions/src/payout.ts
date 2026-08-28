@@ -136,6 +136,61 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
   return {gains, dropped};
 }
 
+/** 보상 수령 거절 사유. claimReward 의 ClaimReject 부분집합이다 — 클라가 그대로 대조하는 와이어 문자열이라 늘리지 않는다. */
+export type RewardClaimReject = "RewardNotFound" | "NotEligible";
+
+/**
+ * 보상 수령 자격 판정. allow 가 false 면 **문서를 쓰지 않는다** — 낙인도 남지 않는다.
+ * specEmpty 는 "표를 통째로 못 읽음"이고, authored 는 "표는 읽혔고 그 소유자 행이 있다"이다. 둘은 다른 사건이다.
+ */
+export type RewardClaimJudgement =
+  | {allow: true; authored: boolean; gains: RewardGain[]; dropped: DroppedReward[]}
+  | {allow: false; reason: RewardClaimReject; specEmpty: boolean; gains: RewardGain[]; dropped: DroppedReward[]};
+
+/**
+ * 수령을 허용할지 판정한다. **표가 비었으면 소유자 축과 무관하게 거절**한다 —
+ * 표를 못 읽은 것과 저작이 없는 것을 함께 삼키면 토너먼트는 클리어 낙인만 남고
+ * 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
+ *
+ * 표는 읽혔는데 그 ownerId 행만 없는 경우는 저작 규약이다 — 토너먼트는 통과시켜 해금만 넘기고
+ * (미저작 정점이 RewardPending 으로 굳으면 진행이 끊긴다), 랭크는 넘길 진행이 없으므로 거절한다.
+ * @param {RewardRow[]} rows Reward 표 전량
+ * @param {string} ownerType Tournament | Rank
+ * @param {string} ownerId 소유자 키
+ * @return {RewardClaimJudgement} 허용 여부와 지급 목록
+ */
+export function judgeRewardClaim(rows: RewardRow[], ownerType: string, ownerId: string): RewardClaimJudgement {
+  const {gains, dropped} = resolveRewards(rows, ownerType, ownerId);
+
+  if (rows.length === 0) {
+    return {allow: false, reason: "NotEligible", specEmpty: true, gains: [], dropped};
+  }
+  if (gains.length === 0 && ownerType === "Rank") {
+    return {allow: false, reason: "RewardNotFound", specEmpty: false, gains, dropped};
+  }
+  return {allow: true, authored: gains.length > 0, gains, dropped};
+}
+
+/**
+ * 룰이 claimedTiers 에 거는 상한. **firestore.rules:98 의
+ * `request.resource.data.rank.claimedTiers.size() <= 20` 과 같이 움직여야 한다.**
+ * 여기만 늘리면 서버가 룰이 거부하는 문서를 쓰고, 그 순간부터 그 계정의 모든 클라 저장이
+ * PERMISSION_DENIED 로 막힌다(delete 도 룰에 막혀 복구 경로가 없다).
+ */
+export const MAX_CLAIMED_TIERS = 20;
+
+/**
+ * 수령 낙인에 티어 하나를 더한다. 상한을 넘기면 null — 부르는 쪽은 문서를 쓰지 말고 거절해야 한다.
+ * 계정이 벽돌이 되는 것보다 수령 하나가 거부되는 편이 낫다.
+ * @param {number[]} claimed 이미 수령한 티어
+ * @param {number} tier 새로 수령하는 티어
+ * @return {number[] | null} 오름차순 낙인 목록, 상한 초과면 null
+ */
+export function appendClaimedTier(claimed: number[], tier: number): number[] | null {
+  const next = [...claimed, tier].sort((a, b) => a - b);
+  return next.length > MAX_CLAIMED_TIERS ? null : next;
+}
+
 export function parseRankGradeRows(rows: Record<string, unknown>[]): RankGradeRow[] {
   return rows.map((row) => ({
     id: finiteInteger(row.id, "RankGrade.id"),
