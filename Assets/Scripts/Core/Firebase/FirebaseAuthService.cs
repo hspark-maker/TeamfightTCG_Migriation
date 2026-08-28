@@ -13,6 +13,11 @@ public sealed class FirebaseAuthService
     // 백엔드별로 마지막 익명 uid를 남긴다. 되로그인은 불가하지만 콘솔에서 그 계정의 문서를 찾을 수는 있다.
     const string UidPrefsKeyPrefix = "firebase.authUid.";
 
+    // 기기에 남은 계정의 복원을 기다리는 창(50ms x 30 = 1.5초). 부트 인증 예산
+    // (FirebaseTimeouts.AuthAndReadMilliseconds) 안에서 끝나야 하므로 늘릴 때는 그쪽을 함께 본다.
+    const int RestorePollIntervalMilliseconds = 50;
+    const int RestorePollAttempts = 30;
+
     public static FirebaseAuthService Instance { get; } = new FirebaseAuthService();
 
     public event Action OnStateChanged;
@@ -273,14 +278,21 @@ public sealed class FirebaseAuthService
             }
 
             this.auth = FirebaseAuth.DefaultInstance;
-            ApplyBackend();
+            bool t_abandonedAccount = ApplyBackend();
             SubscribeStateChanged();
-            FirebaseUser t_user = this.auth.CurrentUser;
+
+            FirebaseUser t_user = t_abandonedAccount
+                ? null
+                : await WaitForPersistedUserAsync(_generation);
+            if (_generation != this.generation) return;
+
+            bool t_mintedAccount = false;
             if (t_user == null)
             {
                 AuthResult t_result = await this.auth.SignInAnonymouslyAsync();
                 if (_generation != this.generation) return;
                 t_user = t_result.User;
+                t_mintedAccount = true;
             }
 
             if (t_user == null || string.IsNullOrEmpty(t_user.UserId))
@@ -294,6 +306,14 @@ public sealed class FirebaseAuthService
 
             this.UserId = t_user.UserId;
             this.LastError = string.Empty;
+
+            // 계정이 새로 생긴 순간이 곧 이전 진행도가 끊긴 순간이다. 부트 경로는 uid를 어디에도 남기지
+            // 않아, 이 두 줄이 없으면 콘솔의 익명 계정이 왜 늘었는지 사후에 가릴 방법이 없다.
+            if (t_mintedAccount)
+                Debug.LogWarning($"[FirebaseAuth] 복원할 계정이 없어 새 익명 계정을 발급했습니다(uid={this.UserId}).");
+            else
+                Debug.Log($"[FirebaseAuth] 기기에 남은 익명 계정으로 복원했습니다(uid={this.UserId}).");
+
             SetState(EFirebaseAuthState.SignedIn);
         }
         catch (Exception _exception)
@@ -301,6 +321,23 @@ public sealed class FirebaseAuthService
             if (_generation != this.generation) return;
             SetFailure(EFirebaseAuthState.Failed, _exception.GetBaseException().Message);
         }
+    }
+
+    // 기기에 남은 계정의 복원은 비동기다 — DefaultInstance 직후의 CurrentUser 한 번만 보고 판정하면
+    // 아직 올라오지 않은 계정을 "없다"로 읽어 새 익명 계정을 발급하고, 그 순간 이전 진행도가 끊긴다.
+    // 창을 다 쓰고도 비어 있을 때만 이 기기에 계정이 없는 것으로 본다.
+    async UniTask<FirebaseUser> WaitForPersistedUserAsync(int _generation)
+    {
+        for (int t_attempt = 0; t_attempt < RestorePollAttempts; t_attempt++)
+        {
+            FirebaseUser t_user = this.auth?.CurrentUser;
+            if (t_user != null && !string.IsNullOrEmpty(t_user.UserId)) return t_user;
+
+            await UniTask.Delay(RestorePollIntervalMilliseconds, DelayType.Realtime);
+            if (_generation != this.generation) return null;
+        }
+
+        return this.auth?.CurrentUser;
     }
 
     internal void Shutdown()
@@ -321,7 +358,8 @@ public sealed class FirebaseAuthService
     }
 
     // 에뮬레이터 배선 + 백엔드 전환 정리. 구독 전에 불려야 여기서 나는 로그아웃이 세션 종료로 오인되지 않는다.
-    void ApplyBackend()
+    // 백엔드가 바뀌어 계정을 버렸으면 true — 그때는 기기에 복원할 계정이 없는 게 확정이라 기다리지 않는다.
+    bool ApplyBackend()
     {
         string t_backend = string.IsNullOrEmpty(this.emulatorHost)
             ? LiveBackendName
@@ -336,7 +374,7 @@ public sealed class FirebaseAuthService
         // 기기에 남은 익명 계정은 그 계정을 발급한 백엔드에서만 유효하다 — 에뮬레이터와 실서버를 오가면
         // 반대 축의 uid가 되살아나 토큰 검증부터 실패한다. 백엔드가 바뀐 첫 부트에서만 비우고, 같은 축이면 uid를 유지한다.
         string t_previous = PlayerPrefs.GetString(AuthBackendPrefsKey, LiveBackendName);
-        if (t_previous == t_backend) return;
+        if (t_previous == t_backend) return false;
 
         // 익명 uid는 로그아웃하면 다시 로그인할 방법이 없다 — 그 계정의 세이브 문서를 콘솔에서 찾아낼
         // 마지막 단서가 이 로그와 prefs 한 줄뿐이다.
@@ -353,6 +391,7 @@ public sealed class FirebaseAuthService
         this.auth.SignOut();
         PlayerPrefs.SetString(AuthBackendPrefsKey, t_backend);
         PlayerPrefs.Save();
+        return true;
     }
 
     void SetFailure(EFirebaseAuthState _state, string _error)
