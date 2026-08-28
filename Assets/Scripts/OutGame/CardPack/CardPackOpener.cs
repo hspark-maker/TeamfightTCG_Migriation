@@ -1,97 +1,95 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
 
-// 카드팩 구매·즉시 개봉의 static 파사드
+// 카드팩 구매·개봉의 static 파사드.
+// 판정 진실원은 서버 openPack 이다. Precheck는 왕복을 아끼려는 낙관 검사일 뿐이고,
+// 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다 — 서버 거절이 나오는 것이 정상 동작이다.
 public static class CardPackOpener
 {
-    static readonly System.Random s_rng = new System.Random();
-
-    // 중복 1장이 주는 간식 수. 1:1로 묶어야 "한계돌파 N회 = 중복 몇 장"이 그대로 읽힌다.
+    // 중복 1장이 주는 간식 수. 실제 적립은 서버가 하고, 이 값은 표시·검증 기준선이다.
     public const int SnackPerDuplicate = 1;
 
-    // 팩 구매·즉시 개봉 — 차감 → 드로우 → 소유 부여 → 중복 간식 적립, 실패 시 차감 없이 사유 반환
-    public static OpenedPack TryPurchase(CardPackData _pack)
+    /// <summary>구매 가능 여부의 낙관 검사. 차감·지급은 하지 않는다.</summary>
+    public static EPackOpenResult Precheck(CardPackData _pack)
     {
-        if (_pack == null) return OpenedPack.CreateFailure(EPackOpenResult.PackNotFound);
-        if (!PackUnlockRules.IsUnlocked(_pack))
-            return OpenedPack.CreateFailure(EPackOpenResult.RankLocked);
-        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady)
-            return OpenedPack.CreateFailure(EPackOpenResult.NotReady);
+        if (_pack == null) return EPackOpenResult.PackNotFound;
+        if (!PackUnlockRules.IsUnlocked(_pack)) return EPackOpenResult.RankLocked;
+        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady) return EPackOpenResult.NotReady;
 
         IReadOnlyList<WeightedCard> t_resolvedPool = _pack.ResolvePool(RankManager.CurrentGrade);
-        var t_pool = new List<WeightedCard>(t_resolvedPool.Count);
+        bool t_hasCandidate = false;
         for (int t_i = 0; t_i < t_resolvedPool.Count; t_i++)
         {
             WeightedCard t_entry = t_resolvedPool[t_i];
-            if (t_entry.cardId > 0 && CardCatalog.Contains(t_entry.cardId))
-                t_pool.Add(t_entry);
+            if (t_entry.cardId <= 0 || !CardCatalog.Contains(t_entry.cardId)) continue;
+
+            t_hasCandidate = true;
+            break;
         }
-        if (t_pool.Count == 0) return OpenedPack.CreateFailure(EPackOpenResult.EmptyPool);
+        if (!t_hasCandidate) return EPackOpenResult.EmptyPool;
 
-        ECurrencyType t_priceCurrency = _pack.PriceType;
-        long t_price = _pack.Price;
+        if (!CurrencyManager.CanAfford(_pack.PriceType, _pack.Price)) return EPackOpenResult.InsufficientGold;
 
-        if (!CurrencyManager.CanAfford(t_priceCurrency, t_price))
-            return OpenedPack.CreateFailure(EPackOpenResult.InsufficientGold);
+        return EPackOpenResult.Success;
+    }
 
-        if (!CurrencyManager.Spend(t_priceCurrency, t_price))
+    /// <summary>팩 구매·개봉을 서버에 요청한다. 응답 채택으로 재화·소유·성장 슬롯이 갈아끼워진다.</summary>
+    public static async UniTask<OpenedPack> PurchaseAsync(CardPackData _pack)
+    {
+        EPackOpenResult t_precheck = Precheck(_pack);
+        if (t_precheck != EPackOpenResult.Success) return OpenedPack.CreateFailure(t_precheck);
+
+        // 클라만 SO 폴백을 볼 수 있다 — 시트에 없는 팩은 서버가 아예 모르는 팩이라 반드시 거절된다.
+        if (!PackSpec.TryGetPack(_pack.PackId, out _))
+            Debug.LogError($"[CardPackOpener] '{_pack.PackId}' 가 CardPack 시트에 없다 — 클라는 SO 로 폴백하지만 서버는 SO 를 못 본다");
+
+        try
+        {
+            var t_result = await ServerSaveCommands.InvokeAsync<OpenPackResult>(
+                "openPack", new { env = ContentProfileConfig.Active.CloudEnvId, packId = _pack.PackId });
+
+            return BuildOpenedPack(t_result);
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[CardPackOpener] 사전검사는 통과했으나 서버가 거절했다 — 시트/SO 폴백 드리프트를 점검할 것: {t_rejected.Message}");
+
+            // 거절 사유는 details 로만 오고 안전하게 꺼낼 경로가 없다. 메시지 파싱 대신 사전검사를 다시 물어 사유를 좁힌다.
+            EPackOpenResult t_reason = Precheck(_pack);
+            if (t_reason == EPackOpenResult.Success) t_reason = EPackOpenResult.SpendFailed;
+
+            return OpenedPack.CreateFailure(t_reason);
+        }
+        catch (ServerAdoptionException t_adoption)
+        {
+            // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
+            Debug.LogWarning($"[CardPackOpener] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
             return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
-
-        // 재화 환급은 나가지 않는다(중복 보상 = 간식). 팩의 환급 저작값은 되돌릴 여지를 두려고 남긴다.
-        ECurrencyType t_refundType = _pack.RefundType;
-        List<DrawnCard> t_drawn = Draw(_pack, t_pool);
-
-        // 간식은 반영만 하고 디스크 쓰기는 아래 재화 저장에 얹는다.
-        CardGrowthManager.FlushToData();
-        CurrencyManager.Save();
-
-        return OpenedPack.CreateSuccess(t_drawn, t_refundType);
-    }
-
-    static List<DrawnCard> Draw(CardPackData _pack, IReadOnlyList<WeightedCard> _pool)
-    {
-        bool t_unique = _pack.UniqueDraw;
-        int t_drawCount = _pack.DrawCount;
-        if (t_unique && t_drawCount > _pool.Count) t_drawCount = _pool.Count;
-
-        var t_candidates = new List<int>(_pool.Count);
-        for (int t_i = 0; t_i < _pool.Count; t_i++) t_candidates.Add(t_i);
-
-        var t_drawn = new List<DrawnCard>(t_drawCount);
-        for (int t_i = 0; t_i < t_drawCount; t_i++)
-        {
-            int t_pick = PickWeightedCandidate(_pool, t_candidates);
-            int t_cardId = _pool[t_candidates[t_pick]].cardId;
-            if (t_unique) t_candidates.RemoveAt(t_pick);
-
-            // null 풀 항목은 건너뛴다 — Grant(null)=false가 중복으로 오판돼 간식이 새어나간다
-            if (!CardCatalog.Contains(t_cardId)) continue;
-
-            t_drawn.Add(GrantAndReward(t_cardId));
         }
-        return t_drawn;
-    }
-
-    // 신규면 소유만, 중복이면 간식 적립. 중복 판정이 Grant 반환값 하나뿐이라 호출 전에 null을 걸러야 한다.
-    static DrawnCard GrantAndReward(int _cardId)
-    {
-        if (OwnershipManager.Grant(_cardId)) return new DrawnCard(_cardId, true);
-
-        bool t_added = CardGrowthManager.AddSnack(_cardId, SnackPerDuplicate);
-        return new DrawnCard(_cardId, false, t_added ? SnackPerDuplicate : 0);
-    }
-
-    static int PickWeightedCandidate(IReadOnlyList<WeightedCard> _pool, List<int> _candidates)
-    {
-        int t_sum = 0;
-        for (int t_i = 0; t_i < _candidates.Count; t_i++)
-            t_sum += _pool[_candidates[t_i]].EffectiveWeight;
-
-        int t_roll = s_rng.Next(t_sum);
-        for (int t_i = 0; t_i < _candidates.Count; t_i++)
+        catch (System.Exception t_exception)
         {
-            t_roll -= _pool[_candidates[t_i]].EffectiveWeight;
-            if (t_roll < 0) return t_i;
+            Debug.LogError($"[CardPackOpener] openPack 실패 — {t_exception.GetBaseException().Message}");
+            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
         }
-        return _candidates.Count - 1;
+    }
+
+    static OpenedPack BuildOpenedPack(OpenPackResult _result)
+    {
+        List<OpenPackCard> t_cards = _result.Cards;
+        var t_drawn = new List<DrawnCard>(t_cards != null ? t_cards.Count : 0);
+
+        if (t_cards != null)
+        {
+            for (int t_i = 0; t_i < t_cards.Count; t_i++)
+            {
+                OpenPackCard t_card = t_cards[t_i];
+                if (t_card == null || t_card.CardId <= 0) continue;
+
+                t_drawn.Add(new DrawnCard(t_card.CardId, t_card.IsNew, t_card.Snack));
+            }
+        }
+
+        return OpenedPack.CreateSuccess(t_drawn, _result.ResolveRefundType());
     }
 }

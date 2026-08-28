@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 // Tab_Pack의 카드팩 쇼케이스 컨트롤러. 진열할 팩들을 인스펙터에서 직접 받아 캐러셀에 그림을 공급하고,
-// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 TryPurchase → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
+// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 PurchaseAsync → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
-// 경계: 구매·소유·차감은 TryPurchase가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
+// 경계: 구매·소유·차감은 PurchaseAsync(서버)가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 목록(packs)은 이 뷰가 직접 소유한다 — 상점 SO 미개입(목록이 비면 구매 잠금).
 //   가격·중복 환급은 팩 SO가 쥐므로 이 뷰는 아무것도 넘기지 않는다.
 // 제스처·스냅은 PackCarouselView가 쥔다. 그쪽은 팩을 모르고 "그림 N장 중 몇 번째"만 안다 —
@@ -315,14 +316,33 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        var t_opened = CardPackOpener.TryPurchase(t_pack);
+        BuyAsync(t_pack).Forget();
+    }
+
+    // 서버 왕복 구매. 잠금은 호출 "전"에 세운다 — 왕복이 도는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
+    // 실패로 끝나는 모든 갈래에서 반드시 되돌릴 것(안 풀면 상점이 이 세션 내내 잠긴 채로 남는다).
+    async UniTaskVoid BuyAsync(CardPackData _pack)
+    {
+        s_transitioning = true;
+
+        var t_opened = await CardPackOpener.PurchaseAsync(_pack);
+
+        // 왕복 중 이 뷰가 사라졌다면 태울 화면이 없다 — 잠금만 풀고 물러난다.
+        // 캐리어에 싣지 않는 것은 의도적이다: 다음에 열리는 개봉이 남의 결과를 물려받는 편이 더 나쁘다.
+        if (this == null)
+        {
+            s_transitioning = false;
+            if (t_opened != null && t_opened.Success)
+                Debug.LogWarning("[PackShowcaseController] 구매 성립 후 진열이 사라짐 — 카드는 지급됐으나 연출 생략.");
+            return;
+        }
+
         if (t_opened != null && t_opened.Success)
         {
-            s_transitioning = true;
             // 구독자가 개봉 화면이 뜨기 전에 결과를 처리할 수 있도록 먼저 알린다(튜토리얼이 이 순서를 센다).
             OnAnyPurchased?.Invoke();
             // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
-            PackHandoff.Set(t_opened, t_pack, SceneManager.GetActiveScene().name, false);
+            PackHandoff.Set(t_opened, _pack, SceneManager.GetActiveScene().name, false);
 
             // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
             // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
@@ -332,7 +352,8 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        // 실패는 차감 없이 반환됨(TryPurchase 보장) — 사유만 안내하고 진열은 그대로 둔다.
+        // 실패는 차감 없이 반환됨(PurchaseAsync 보장) — 사유만 안내하고 진열은 그대로 둔다.
+        s_transitioning = false;
         ShowFailPopup(t_opened != null ? t_opened.Result : (EPackOpenResult?)null);
     }
 

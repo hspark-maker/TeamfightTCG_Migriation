@@ -59,6 +59,7 @@
 
 - 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
 - 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(부트 채택이 대신한다)
+- 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `CurrencyManager.Init` · `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 부트와 같은 순서로 다시 태운다
 - 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
 - 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면(안내 + 재시도·종료 2버튼) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
 - 부트 재시도(씬 재로드 없음): 단일 진입점 `InitializationInstaller.RestartBoot` — 실패한 캐시 되돌리기(`CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`) → `GameInitialization.ResetForRetry` → `PlayerSaveCloud.ResetForRetry` → 게이트 재기동 순서를 여기서 소유한다. 재적재 자체는 게이트가 매번 거는 `InitializationInstaller.StartAssetLoads` 가 맡아 재시도 전용 적재 경로가 없다. 재시도 가능 판정은 `GameInitialization.CanRetry`. `LoadingCoverView.Retry` 는 화면만 되돌리고 이 하나를 부른다
@@ -73,7 +74,8 @@
 
 ## 카드팩 (`OutGame/CardPack/`, `UI/Shop/`)
 
-- 추첨 로직: `CardPackOpener.TryPurchase` / `CardPackOpener.PickWeighted` · `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack`
+- 추첨 로직: **서버가 판정한다** — callable `openPack` (`functions/src/commands/openPack.ts`, 추첨은 `functions/src/packs/packDraw.ts`, 지도 범위 밖). 클라는 `CardPackOpener.PurchaseAsync` 로 요청하고 `CardPackOpener.Precheck` 는 왕복을 아끼는 낙관 검사일 뿐이다 — 응답 DTO `OpenPackResult` (`OpenPackCard`)
+- 표시·데이터: `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack` · 잠금 `PackUnlockRules`
 - 결과 전달: `PackHandoff` · `CardPackRewardHandoff`
 - 연출 UI: `UI/Shop/PackRevealView` (`PackRevealView.BeginOpen` 이후 Entering→Swipe→Shifting→Tearing→Pulling→Flicking→Summary 상태 진행) · `PackCardView` · `PackCardStack` · `PackResultGrid`
 - 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`

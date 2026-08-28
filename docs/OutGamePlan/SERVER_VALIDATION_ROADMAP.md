@@ -1,6 +1,6 @@
 # 서버 검증 전환 로드맵
 
-> 최종 갱신: 2026-08-27 · 브랜치 `feature_Firestore` · HEAD `7e54b40d9`
+> 최종 갱신: 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `bb60d4252`
 > 진행 상태 추적용. 설계 근거·구현 세부는 각 Phase 담당이 갖는다.
 > 선행 문서(P0~P3)는 삭제됨 — `git show 8a494e06b:docs/OutGamePlan/FIRESTORE_SAVE_ROADMAP.md`
 
@@ -34,9 +34,20 @@
 | `ping` | callable (v2) | asia-northeast3 | nodejs24 |
 | `devBumpRevision` | callable (v2) | asia-northeast3 | nodejs24 |
 | `submitMatchResult` | callable (v2) | asia-northeast3 | nodejs24 |
+| `ensureAccount` | callable (v2) | asia-northeast3 | nodejs24 | 배포·실왕복 완료(R4) |
+| `openPack` | callable (v2) | asia-northeast3 | nodejs24 | 배포·실왕복 완료(2026-08-28) |
+
+> **배포 로그는 호출 가능을 증명하지 못한다.** `openPack` 첫 배포는 함수는 만들어졌는데
+> `Failed to set the IAM Policy` 로 끝났고, 재배포는 **update 경로로 들어가 `Deploy complete!` 를 찍으면서도
+> 403 그대로**였다(바인딩은 create 때만 걸린다). Cloud Console → Cloud Run → 서비스(**소문자** `openpack`)
+> → 권한 → `allUsers` + `Cloud Run 호출자` 로 수동 부여해 풀었다.
+> 판정은 배포 로그가 아니라 **함수 URL 에 POST 해서 403 인지 401 인지**로 한다(401 = 정상).
+>
+> **`firebase functions:log` 는 3~4분 늦는다.** 방금 한 왕복이 안 보인다고 "호출이 없었다" 로 읽으면
+> 멀쩡한 코드를 뒤지게 된다. 감사(audit) 줄이 섞이므로 `| grep drawn` 으로 걸러 보는 게 빠르다.
 
 - `functions/package.json` — node 24 · firebase-functions ^7 · firebase-admin ^13.6
-- `functions/src/index.ts` — 3줄 배럴. `onRequest` 없음
+- `functions/src/index.ts` — 5줄 배럴(`ping` `devBumpRevision` `submitMatchResult` `ensureAccount` `openPack`). `onRequest` 없음
 - `functions/src/firebaseApp.ts` — `setGlobalOptions({maxInstances:10, region:"asia-northeast3"})` 가
   **import 최상단**에 있어야 한다(`onCall` 은 import 시점 평가). 같은 파일이 `DATABASE_ID="cardbattle"` 로
   `getFirestore(app, DATABASE_ID)` 싱글턴 생성
@@ -47,7 +58,24 @@
 - `SCHEMA_VERSION = 7` ↔ `UserSaveData.VERSION = 7` — **수동 동기화**
 - 프로젝트 `bm-cardbattle` 하나. DB는 `databases/cardbattle` 하나뿐 (`(default)` 없음)
 - `functions/scripts/` — `grant-admin.js`(admin 클레임 부여·회수, 부여 후 `revokeRefreshTokens`) ·
-  `test-firestore-rules.js` · `test-match-result.js`
+  `check-pack-spec.js`(시트 사전 점검, 자격증명 불필요) · `test-firestore-rules.js`.
+  `npm test` 에 물린 순수 회귀 3종: `test-match-result.js` · `test-fresh-account.js` · `test-open-pack.js`.
+  에뮬레이터 회귀는 `test-ensure-account.js`(`npm run test:emulator`)로 따로 선다
+
+#### 모듈 지도 (`functions/src/`, 17파일 1,619줄)
+
+| 폴더 | 파일 | 성격 |
+|---|---|---|
+| (루트) | `index.ts` `firebaseApp.ts` | 배럴 · 전역 옵션 |
+| `commands/` | `ping` `devBumpRevision` `submitMatchResult` `ensureAccount` `openPack` | `onCall` 진입점. **여기만 `HttpsError` 를 던진다** |
+| `save/` | `saveDocument`(Firestore) · `freshAccount`(순수) · `starterPool`(순수) · `starterCards`(Firestore) | 문서 쓰기 창구 · 신규 계정 |
+| `packs/` | `packDraw` `rankGrade` `packSlots` `cardCatalog`(순수) · `packSpecReader`(Firestore + TTL 5분 캐시) | R5 카드팩 |
+| — | `matchResult.ts`(순수, Firestore 접촉 0) | R8 멀티 대조 |
+
+**"순수"는 계약이다** — `scripts/` 회귀가 에뮬레이터 없이 `lib/` 를 직접 `require` 하는 근거다.
+순수 모듈에 `firebase-admin`·`HttpsError` 를 들이면 그 회귀가 통째로 죽는다.
+
+**재화 코드가 아직 도메인 폴더에 흩어져 있다** — R6 선행으로 걷어낼 대상. 아래 「R6 · 선행」 참조.
 
 ### 클라 접점
 
@@ -186,9 +214,9 @@ callable이 서버 권위 슬롯을 쓰면 revision이 오른다. 클라가 모�
 | **R1** 룰 1차 배포 | 🟡 진행중 | 룰 본문·회귀 33·실배포 완료. **실플레이 왕복 실측(사람 1회)만 남음** | R0 |
 | **R2** 로컬 캐시 제거 | ✅ 완료 | 커밋 `d19590e2b`. 완료 판정 3건은 미실행 | — |
 | **R3** 스펙 서버화 | ⬜ 대기 | (a) 권한 이관 사실상 완료. 본체는 (b) 미업로드 SO 7종 승격 | R1 |
-| **R4** 계정 생성·스타터 | ⬜ 대기 | 신규 문서 생성을 서버가 소유 | R1 |
-| **R5** 카드팩 | ⬜ 대기 | 추첨 난수·소유·간식·차감 | R3 |
-| **R6** 성장·강화 | ⬜ 대기 | 성공 판정·비용·한계돌파·키워드 | R3 |
+| **R4** 계정 생성·스타터 | ✅ 완료 | 신규 문서 생성을 서버가 소유 | R1 |
+| **R5** 카드팩 | 🟡 진행중 | 추첨 난수·소유·간식·차감을 `openPack` 이 소유. 배포·정상 왕복 검증 완료, **거절·비복원 경로 미검증**. 룰 동결은 R9로 미룸 | — |
+| **R6** 성장·강화 | ⬜ 대기 | 성공 판정·비용·한계돌파·키워드. **선행으로 `currency/` 모듈 분리** | R3 |
 | **R7** 보상 수령 4종 | ⬜ 대기 | 랭크티어·도감·토너먼트 정점/챕터 | R3 |
 | **R8** 전투 출구 | ⬜ 대기 | 이미 있는 매치 대조에 **지급을 잇는다** | R3 |
 | **R9** 룰 최종 동결·정리 | ⬜ 대기 | 서버 슬롯 7종 동결, 디버그·데드코드 정리 | R4~R8 |
@@ -307,58 +335,227 @@ R2가 채택한 방침(미결 #4는 여전히 열림): `Transient` → 메모리
 
 ---
 
-### R4 — 계정 생성 · 스타터 ⬜
+### R4 — 계정 생성 · 스타터 ✅
 
 **목표**: "신규 계정" 판정과 최초 지급을 서버가 소유한다. **슬롯 승격 규약을 여기서 확립한다.**
 
-현행 사슬 (`Core/Initialization/SaveDependentManagersStep`):
-`PlayerSaveCloud.IsFreshAccount` → `CurrencyManager.Init(IsFreshAccount)` → `StarterDeck.GrantIfNoDeck`
+- [x] `ensureAccount` callable — 문서 없으면 서버가 생성, 있으면 **쓰지 않고** 현재 revision 만 반환
+- [x] 부트가 문서를 먼저 읽고 **없을 때만** `ensureAccount` → **재-읽기** → 기존 채택 경로 합류
+- [x] `IsFreshAccount` 제거, `CurrencyManager.Init()` 무인자
+- [x] 룰 `allow create: if false` — **배포 완료**
+- [x] 회귀 하네스 전환 33/33 유지
 
-> **지급 조건이 `IsFreshAccount` 하나가 아니다.** `CurrencyManager.Init` 은 `_freshAccount || Balances 가 비었음`
-> 이면 첫실행으로 보고 `STARTING_GOLD = 100`. `StarterDeck` 은 `IsFreshAccount` 를 아예 안 보고
-> `DeckSaveManager.HasAnySavedDeck()` 기준이다. **이 두 갈래를 하나로 합치는 것이 실제 작업량이다.**
+**신설**: `functions/src/save/freshAccount.ts`(순수 · 슬롯 조립) · `starterPool.ts`(순수 · 풀 해석) ·
+`starterCards.ts`(Firestore 접촉) · `commands/ensureAccount.ts` · `scripts/test-fresh-account.js` ·
+`scripts/test-ensure-account.js`(에뮬레이터, `npm run test:emulator`) ·
+`OutGame/Save/2.Domain/EnsureAccountResult.cs`
+**수정**: `saveDocument.ts`(`ensureSaveDocument` 추가) · `PlayerSaveCloud`(`LoadCoreAsync` 갈래 · `TryEnsureAccountAsync`) ·
+`ServerSaveCommands`(`InvokeBootAsync`) · `PlayerSaveDocument`(`AppVersion()`) · `SaveDependentManagersStep` · `CurrencyManager`
 
-- [ ] `ensureAccount` callable — 문서 없으면 서버가 생성(스타터 골드·초기 소유·초기 덱), 있으면 그대로 반환.
-      `mutateSave` 는 "문서 없으면 `failed-precondition`" 이라 **생성 경로를 새로 열어야 한다**
-- [ ] 부트를 "읽기 → 없으면 로컬 생성"에서 "`ensureAccount` 1회 → 반환 문서 채택"으로
-- [ ] `IsFreshAccount` 플래그와 `CurrencyManager.Init(_freshAccount)` 인자 제거,
-      `StarterDeck.GrantIfNoDeck` 의 덱-부재 판정도 회수
-- [ ] 룰: `allow create: if false`. 회귀 `14`·`14b`·`14c`·`14d` 가 이때 뒤집힌다
+**`mutateSave` 를 건드리지 않았다.** "callable 1회 = 문서 쓰기 1회, revision +1" 이 R5~R8 전체에 걸린 계약이라
+생성 분기를 섞으면 흐려진다 → 형제 함수 `ensureSaveDocument`(트랜잭션 + `transaction.create`)를 팠다.
 
-**완료 판정**: 콘솔에서 문서 삭제 → 재부팅 → 골드 100·스타터 덱이 서버 로그의 지급 기록과 함께 생성된다.
+**응답 채택 계약의 유일한 예외다.** `ensureAccount` 는 게이트 **전**이라 `{revision, updatedSlots}` 를 쓰지 않는다
+(`AdoptServerSlots` 는 기존 `Data` 위 병합인데 부트 시점 `Data` 는 기준선이 아니다). 대신 **문서를 다시 읽어**
+`TryReadMeta` → `ConvertTo<UserSaveData>` → `AdoptRemote` 로 합류한다 — 검증·변환 경로를 하나로 유지하는 값이
+읽기 1회(신규 계정 첫 부팅 한정)보다 크다. 부트 중에는 `InvokeAsync`(게이트 완료를 요구)를 못 쓰므로
+`ServerSaveCommands.InvokeBootAsync` 가 `State == Loading` 을 단언하고 봉인·채택 없이 태운다.
+
+**`StarterDeck.GrantIfNoDeck` 은 회수하지 않았다(로드맵 계획 정정).** 회수하면 튜토리얼 되감기가 죽는다 —
+`OutgameTutorialRewind.ApplyWipeIfScheduled` 가 슬롯을 새 인스턴스로 갈아엎어 `Balances.Count == 0` 과
+`HasAnySavedDeck() == false` 를 만들고, 그 두 갈래가 골드·덱을 재지급한다. 용도를 **되감기 전용 안전망**으로
+좁히고 주석으로 못박았다. 정상 부팅에서는 서버가 이미 넣어 둬 조기 반환한다(무해).
+
+**스타터 카드 근거는 `CardPackDrop` 표**(`packId="StarterPack"`), 0건·해석 실패·카탈로그 미해석이면
+서버 상수 `[1,28,20,6,11,30]` 폴백. `starterSource`(`spec`/`fallback`/`specError`)로 로그·응답에 갈래를 남긴다.
+클라 `PackSpec.ResolveDrops` 재현에서 놓치기 쉬운 것 셋: **행 정렬은 문서 id 의 정수 오름차순**(문자열이면 "10"<"2"),
+**등급은 만족하는 것 중 최고 하나만**(하위 합산 없음), **`CardCatalog.Contains` 대응 필터**(빠뜨리면 카탈로그 밖
+카드가 덱에 굳어 `IsSlotValid` 실패 → 덱 0개로 부팅되고 클라 층에 복구 경로가 없다 — 검수가 잡았다).
+`parseGrade` 는 이름과 숫자 문자열을 모두 받는다(클라 `Enum.TryParse` 와 같은 축).
+
+**서버 생성 문서는 룰의 `isValidSave()` 를 정확히 만족해야 한다** — 어긋나면 그 계정의 **이후 모든 저장이 영구 거부**되고
+`delete: if false` 라 룰 층에 복구 경로가 없다. 그래서 진실원을 두 층에 묶었다:
+`Tools/firestore-rules-tests/fixtures/saveDocument.js` 의 `serverFreshAccountDocument()` ↔ `freshAccount.ts`.
+놓치기 쉬운 세 값 — `deck.slots` 길이 **6**(`NormalizedSlots` 가 항상 패딩) · `tutorial.lastBoot*` = **-1** ·
+`profile` 3필드 **null**. `deviceId`·`appVersion` 은 클라만 아는 값이라 요청에 실린다.
+
+**회귀 하네스에서 create 를 닫으면 페이로드 검증이 공허해진다 — 이 Phase 최대의 함정.**
+거부 케이스를 seed 없이 create 로 두면 "create 라서" 실패해 통과하므로, `isValidSave()` 를 통째로 지워도 초록이 된다.
+`7 7b 7c 7d 10 11 11b 13 13b 14b` 를 **update 기반으로 전환**했고, `1`·`6`·`8b`·`14d` 는 "클라 create 거부"로 재조준,
+`14`·`14c` 는 "서버가 만든 문서 위에서 클라 update 통과"로 의미를 바꿨다. 총수 33 유지.
+**깨진 것은 `1`·`9c`·`14`·`14c`·`14d` 다**(이 문서가 적었던 `14b` 는 fail 기대라 영향 없음 — 실측 정정).
+훼손본 검증 2회로 실효성을 확인했다: `isValidSave()` 무력화 → 정확히 10개, `create: if true` → 정확히 4개.
+
+**⚠️ 새 callable 은 Cloud Run invoker 바인딩이 없으면 403 이다 — R5~R8 이 매번 밟는다.**
+Functions 2세대는 `onCall`/`onRequest` 모두 Cloud Run 위에 서고, IAM 게이트가 **함수 코드 앞**에 있다.
+Firebase Auth 토큰은 Google IAM 토큰이 아니라 그 게이트를 못 지난다(응답이 JSON 이 아닌 **HTML 403**).
+바인딩은 **서비스를 새로 만들 때만** 걸리므로 기존 함수 재배포는 권한 없이도 성공한다 — 그래서 새 함수만 막힌다.
+`allUsers` + `roles/run.invoker` 가 정상이며 실제 인증은 함수 안 `requireUid` 가 한다(통과하면 403 → **401**).
+남용 방지는 이 축이 아니라 App Check(미결 #1)다. **`devBumpRevision` 은 지금도 403 이다** — R0 이 적어 둔
+"BUMP 버튼으로 채택 계약 실증"은 실제로 통과한 적이 없을 가능성이 높다.
+
+**완료 판정 — 실서버 왕복 통과(2026-08-27).** 문서 삭제 → Unity 완전 재시작 → 골드 100·스타터 덱 6장 생성,
+`+G` 로 이어지는 클라 저장이 `rev +1` 로 통과(= 서버 산출물이 클라 update 계약을 만족한다는 증명),
+문서를 둔 채 재부팅하면 `ensureAccount` 를 부르지 않는다.
+신규 계정의 첫 부팅 후 최종 revision 은 **1이 아니라 2**다(서버 1 + 클라 `SaveImmediate` 2).
 
 ---
 
-### R5 — 카드팩 ⬜
+### R5 — 카드팩 🟡
 
 **목표**: 취약도 1위를 끊는다.
 
-현행 `OutGame/CardPack/CardPackOpener`: `static readonly System.Random s_rng = new System.Random()` —
-시드 인자가 없어 시간 기반이고 서버가 재현할 수 없다. 차감(`CurrencyManager.Spend`) ·
-지급(`OwnershipManager.Grant`) · 간식(`CardGrowthManager.AddSnack`) · flush 가 전부 같은 메서드 안에서
-클라 로컬로 확정된다.
+- [x] `openPack(packId)` callable — `functions/src/commands/openPack.ts`
+  - 잠금·풀·잔액 판정과 추첨을 **`mutateSave` 트랜잭션 안**에서 한다. 재실행되면 추첨도 다시 한다
+    (뽑은 결과를 들고 재실행하면 잔액·소유와 어긋난다)
+  - 순수 모듈 `functions/src/packs/` 5개 — `packDraw`(추첨) · `rankGrade`(등급) ·
+    `packSpecReader`(스펙 읽기 + env·표 단위 TTL 5분 캐시) · `cardCatalog` · `packSlots`(슬롯 전체 값)
+  - 회귀 `functions/scripts/test-open-pack.js` (`npm test` 에 물려 있다)
+- [x] 클라 `CardPackOpener` 축소 — `Precheck`(동기 낙관 검사) + `PurchaseAsync`(서버 왕복).
+      `TryPurchase`·`s_rng`·`PickWeightedCandidate` 삭제. 호출자 3곳 비동기화
+- [x] **미결 #11 첫 구독자** — `OutGame/Save/3.Manager/ServerSlotRehydrator`
+- [ ] **실왕복 미검증** — 에뮬레이터·실서버 왕복을 사람이 1회 돌려야 한다(완료 판정 참조)
+- [x] 시트 사전 점검 — `functions/scripts/check-pack-spec.js <test|live>`.
+      **자격증명이 필요 없다**(룰의 스펙 읽기가 `isSignedIn()` 뿐이라 `Assets/google-services.json` 의 웹 key 로
+      익명 로그인 후 Firestore REST 로 읽는다). 서버가 쓰는 순수 모듈을 그대로 불러 판정하므로
+      여기서 통과하면 서버도 같게 본다. 시트에 없는 팩은 클라만 SO 로 폴백하고
+      **서버는 영영 못 연다**(`PackNotFound`) — SO 역방향 대조까지 한다
+  - `test` **통과**(2026-08-27): 팩 11 · 드롭 320 · `Card_Test` 40 · `RankGrade` 5.
+    모든 팩이 잠금 해제 등급부터 풀이 차 있고, `RankGrade` 임계치가 `[100,260,420,580,740]` 로
+    `RankConfig.asset` 과 일치한다(= 서버가 폴백 상수가 아니라 시트를 읽는다)
+  - `RangePack` 은 SO 에만 있고 시트에 없다. **참조 0건인 죽은 저작**이라 무해하다
+    (튜토 덱 정본은 시나리오 `playerDeck` 이다)
+  - ⚠ `live` **는 스펙 표가 통째로 비어 있다**(4표 모두 0행). 카드팩만이 아니라 `BattleContentSync` ·
+    R4 스타터까지 전부 `live` 에서 못 선다 — 릴리즈 전에 업로드가 필요하다(R3 몫)
 
-- [ ] `openPack(packId, count)` callable
-  - 잠금 규칙(`PackUnlockRules.IsUnlocked` + `CardPackData.TryGetMinRankGrade` + 유저 `rank.points`).
-    `minRankGrade` 는 **시트 문자열 우선, 실패 시 SO 폴백** — 서버도 같은 우선순위여야 한다
-  - `CardPackDrop` 풀 해석 — 랭크별 **최고 만족 등급 하나만**, 하위 합산 없음 (`PackSpec`)
-  - `CardCatalog` 포함 필터 → 잔액 차감 → 가중치 추첨(`PickWeightedCandidate`) → 신규/중복 판정
-  - 중복은 `cardGrowth.entries[*].snack += 1`
-  - `uniqueDraw`(비복원)는 뽑을 때마다 잔여 풀에서 합을 다시 계산하는 순서까지 그대로
-  - 응답: 뽑힌 카드 + 신규 여부 + `{revision, updatedSlots}`
-- [ ] 클라 `CardPackOpener` 를 **연출 데이터 소비자**로 축소 (`PackRevealView` 는 이미 `OpenedPack`/`DrawnCard` 를 받는다)
-- [ ] `PackOdds`(고지 확률)가 서버와 같은 표를 보게
-- [ ] **룰 동결**: `ownership` · `cardGrowth` · `currency`
-- [ ] **미결 #11 착수** — `DataSaveManager.OnServerSlotsAdopted` 는 R0에서 파뒀지만 구독자 0건. 여기서 첫 구독자
+**룰 동결은 R9로 미뤘다** — `currency` 쓰기 지점이 카드팩 말고도 8곳(`RewardService` · `AlbumRewardManager` ·
+`RankRewardManager` · `TournamentProgress`×2 · `CardGrowthManager` · `KeywordGrowthManager` · 디버그),
+`ownership` 이 `TutorialStepExecutor` 5곳 + `OutgameTutorialRewind` 3곳, `cardGrowth` 가 강화·한계돌파다.
+지금 동결하면 R6~R8이 끝날 때까지 이들이 전부 `PERMISSION_DENIED` → `BlockSession(Rejected)` 로 죽는다.
+**슬롯 동결은 "그 슬롯의 마지막 클라 writer 가 사라진 Phase"에 건다** — cardGrowth=R6 끝 / currency=R8 끝 / ownership=R9.
 
-**연출이 왕복을 흡수한다** — Entering→Swipe→Tearing 구간에 응답이 도착하면 지연이 안 보인다.
-응답 실패 시 되돌릴 지점을 미리 정할 것.
+> **거절 코드 계약**: 도메인 거절(`PackNotFound`·`RankLocked`·`EmptyPool`·`InsufficientGold`)은 **반드시
+> `permission-denied`** 로 던진다. `CloudFailureClassifier` 는 `permission-denied`·`already-exists` 만
+> 거절로 보고 `failed-precondition`·`invalid-argument` 는 `Unusable` → `BlockSession` 이다 —
+> 잔액 부족으로 세션을 끊을 수는 없다. R6~R8 의 도메인 callable 도 이 계약을 따른다.
 
-**완료 판정**: 팩 구매 → 서버 로그의 추첨·차감과 콘솔 문서가 일치. 클라에서 잔액·소유 직접 쓰기는 룰이 거부.
+**연출이 왕복을 흡수하는 작업은 하지 않았다(뷰 제외 결정)** — 호출자는 최소 await 배선뿐이다.
+`PackPurchaseImpact` 의 덮개는 `rise 0.04 + hold 0.03 + fall 0.35` 라 완전히 덮이는 구간이 0.03초뿐이고,
+정상 왕복은 안 보이지만 **콜드스타트에서는 상점 화면이 그대로 드러난다.** 후속 선택지 둘:
+(a) `PackPurchaseImpact` 에 「응답까지 덮개 유지」 오버로드, (b) 오버레이 선개봉 후 Tearing 직전 `await`
+(= `PackHandoff` 가 `UniTask<OpenedPack>` 를 싣는 계약 변경).
+
+**남는 이중 진실원 2건** — 둘 다 로그로만 드러난다. 승격은 R7 몫:
+1. 팩이 시트에 없으면 클라는 SO 폴백, 서버는 거절 (`CardPackOpener` 가 `LogError`)
+2. 클라 등급은 `RankConfig.asset` SO, 서버는 `RankGrade` 시트.
+   `test-open-pack.js` 가 `.asset` 을 긁어 서버 폴백 상수와 대조한다(시트 자체와의 대조는 아니다)
+
+**완료 판정(사람이 1회)**
+
+- [x] 팩 구매 → 서버 `logger.info("openPack", …)` 의 `drawn`·`goldBefore/After` 가 콘솔 문서의
+      `currency.balances` · `ownership.cardIds` · `cardGrowth.entries[*].snack` 과 일치, `revision` 정확히 +1
+      — 2026-08-28 실서버(env=test) 왕복. `NormalPack_TEST` · `1840→1730`(price 110) ·
+      `drawn 29=,30=,29=,17=,1=,17=`(6장 전부 중복) · `poolSize 10` · `revision 26` · `specSource=spec`.
+      **`specSource=spec` 이 `RankGrade` 폴백 상수 갈래가 안 섰다는 증거다.**
+- [x] 잔액 부족 상태로 서버를 직접 호출 → `permission-denied` 이고 **세션은 `Ready` 유지**(`Blocked` 면 실패)
+      — 2026-08-28. 콘솔로 골드를 낮추고 재시작 없이 2회 구매 → 두 번 다
+      `Server command failed [functions/PermissionDenied]` **경고만**(Unity 에러 0, 차단 모달 없음, 로비 유지).
+      **`CloudFailureClassifier` 의 `Rejected` 갈래가 실측으로 확인된 첫 사례다** — R6~R8 도메인 거절은
+      전부 `permission-denied` 를 써야 한다
+      - 알려진 잡음: `CardPackOpener` 의 "시트/SO 드리프트 점검" 경고가 **잔액 부족에도 뜬다**.
+        거절 사유가 `details` 로만 와서 클라가 갈래를 못 가른다(메시지 파싱은 금지). 다른 기기가 골드를
+        먼저 쓴 정상 경합도 같은 경고를 낸다 — 이 경고를 드리프트 알람으로 읽을 때 감안할 것
+- [ ] 구매 후 재화·소유 표시가 즉시 갱신(= `ServerSlotRehydrator` 가 붙었다)
+- [~] `uniqueDraw` 팩에서 같은 카드가 두 번 안 나온다 — **실기 검증 제외(2026-08-28 사용자 판단)**.
+      순수 회귀(`test-open-pack.js`)가 비복원 잔여합 재계산·풀보다 큰 `drawCount` clamp 를 덮고 있다.
+      실기로 처음 밟는 것은 해당 팩이 실제로 쓰이기 시작할 때다
 
 ---
 
 ### R6 — 성장 · 강화 ⬜
+
+#### 선행 — 재화 모듈 분리 `functions/src/currency/` ⬜
+
+재화 연산(잔액 읽기 → 여력 판정 → 차감/가산 → 슬롯 조립)이 R5 가 만든 카드팩 폴더에 있다.
+R6 강화비용 · R7 보상수령 · R8 전투골드가 같은 연산을 쓴다.
+
+4재화 키 목록은 이미 두 벌이다 — `packs/packSpecReader.ts:71` 과 `save/freshAccount.ts:19`.
+이 목록은 룰의 `balances.hasOnly([4키])` 와 맞아야 하고, 갈리면 그 계정의 이후 모든 클라 저장이
+영구 거부된다(`delete: if false` — 룰 층에 복구 경로 없음).
+
+**현재 흩어진 자리**
+
+| 위치 | 재화 코드 |
+|---|---|
+| `packs/packSlots.ts:18` | `CURRENCY_MAX = 1e12` (private) |
+| `packs/packSlots.ts:43` | `readBalances` — 4키 정규화 + `[0, MAX]` 클램프 |
+| `packs/packSlots.ts:102` | `buildCurrencySlot(balances, priceCurrency, price)` — 차감과 슬롯 조립이 한 함수라 지급에 재사용 불가 |
+| `packs/packSpecReader.ts:71,80` | `CURRENCY_KEYS`(1차 사본) · `parseCurrency`(대소문자 무시, 실패 시 `Gold`) |
+| `save/freshAccount.ts:19` | `CURRENCY_KEYS`(2차 사본) |
+| `commands/openPack.ts:117~128` | 잔액 검사 + `InsufficientGold` 거절이 인라인 |
+
+**목표 구조**
+
+```
+functions/src/currency/
+  currencyKeys.ts     CURRENCY_KEYS · CurrencyKey · CURRENCY_MAX · parseCurrency
+  currencyLedger.ts   readBalances · canAfford · applyDeltas · spend · grant · currencySlot
+functions/src/save/
+  saveValues.ts       intOf         (신설 — packSlots 와 currencyLedger 공용)
+  domainReject.ts     rejectDomain  (신설 — permission-denied 계약 단일 지점)
+```
+
+재화 두 파일은 순수다(Firestore·`HttpsError` 모름) — 「모듈 지도」의 계약을 따른다.
+
+- `applyDeltas(balances, deltas[])` 가 유일한 산술 지점이고 `spend`/`grant` 는 그 위의 얇은 래퍼다.
+  R7 의 다건 수령(`AlbumRewardManager.Payout` 이 보상 리스트를 순회)이 호출 한 번으로 끝난다
+- 클램프는 `applyDeltas` 안에 둔다. 서버는 Admin SDK 라 룰을 우회하므로 지급이 `CURRENCY_MAX` 를 넘긴
+  문서를 쓰면 그 계정의 이후 클라 저장이 전부 `PERMISSION_DENIED` 다.
+  하한 0 클램프는 현행 `buildCurrencySlot:109` 동작과 같다
+- `currencySlot(balances)` 는 받은 객체를 펴지 않고 `CURRENCY_KEYS` 를 순회해 다시 짓는다 —
+  룰이 4키를 전부 요구하므로 부분 객체가 들어와도 빠진 키가 0 으로 서야 한다. 모르는 키는 버린다.
+  회귀에 "부분 입력 → 4키 산출" assert 를 박는다
+- `freshAccount` 는 `currencySlot(grant(...))` 로 조립한다 — 4키 모양을 아는 곳이 한 군데가 된다
+
+**거절 사유는 재화 모듈이 정하지 않는다** — 도메인마다 클라가 파싱하는 코드가 다르다:
+
+| 도메인 | 클라 enum | 사유 문자열 |
+|---|---|---|
+| 카드팩 (R5) | `EPackOpenResult.InsufficientGold` (`OpenedPack.cs:8`) | `"InsufficientGold"` |
+| 강화 (R6) | `EEnhanceOutcome.NotAffordable` (`EnhanceResult.cs:21`) | `"NotAffordable"` |
+
+`save/domainReject.ts` 에 `rejectDomain(reason, message): never` 하나를 세운다 — `openPack.ts:48` 의
+local `reject` 를 들어올린 것이고, 「거절 코드 계약」의 집행 지점이 된다.
+
+**함정**
+
+- `"InsufficientGold"` 는 와이어 계약이다. 클라가 문자열을 그대로 enum 이름에 대조하므로 다듬으면 안 된다
+- 잔액 검사를 옮길 때 던지는 코드가 `permission-denied` 에서 바뀌면 잔액 부족으로 세션이 끊긴다
+  (`failed-precondition`·`invalid-argument` 는 `Unusable` → `BlockSession`). 분리 후 R5 의 거절 실측을
+  다시 재현해 `Ready` 유지를 확인할 것
+- `packs/rankGrade.ts:11` 의 `GRADE_KEYS` 에도 `"Gold"`·`"Diamond"` 가 있다 — 랭크 등급 축이라 다른 것이다
+- `packSlots.ts:32` 의 private `intOf` 를 `readBalances` 와 `readOwnedIds`/`readGrowthEntries` 가 같이 쓴다.
+  갈라지면 복사가 또 생기므로 `save/saveValues.ts` 로 뺀다
+- `test-open-pack.js:11~12,161~168` 이 재화 함수를 직접 require 한다. 회귀는 `scripts/test-currency.js` 로
+  분리해 `npm test` 에 문다
+
+**대상 밖**
+
+- 한계돌파 — `LimitBreakStep.SnackCost` 는 재화가 아니라 `cardGrowth.entries[*].snack` 을 쓴다
+- 범용 `spendCurrency` callable — 클라가 임의 차감을 지시하게 되어 「행위 단위 callable」 방향과 반대다.
+  재화 모듈은 callable 이 아니라 순수 라이브러리다
+- 클라 — `CurrencyManager.Spend` 호출자 2곳(`CardGrowthManager.cs:173`·`KeywordGrowthManager.cs:118`)은
+  R6 본체가 걷어낸다
+
+**착수 조건**: R5 커밋 후. `packs/*.ts`·`openPack.ts` 가 실왕복 검증 중이라 동결이다.
+신규 4파일 + 기존 4파일 수정이라 `bb60d4252` 처럼 일부만 커밋되면 없는 모듈을 export 하는 HEAD 가 된다.
+
+**완료 판정**: `npm run build`(`noUnusedLocals` 가 잔여 import 를 잡는다) · `npm run lint` ·
+`npm test` 4종 통과. `buildCurrencySlot({Gold:500,…},"Gold",120) → {Gold:380,…}` 을
+`currencySlot(spend(…))` 가 그대로 낸다는 assert 로 동작 무변경을 못박는다.
+`openPack` 이 이미 배포됐으므로 재배포를 동반한다.
+
+#### 본체
 
 현행 `CardGrowthManager.TryEnhance`:
 
@@ -366,6 +563,8 @@ R2가 채택한 방침(미결 #4는 여전히 열림): `Transient` → 메모리
 2. `s_rng.NextDouble() < t_step.SuccessRate` — 무시드 `System.Random`, 클라가 성공을 정한다
 3. `CurrencyManager.Save()` 는 성공/실패 공통 — **실패해도 차감이 영속되고 환급 코드는 없다**
 
+- [ ] **선행** — `functions/src/currency/` 분리(위 블록). 비용 차감은 `currencyLedger` 재사용,
+      거절은 `rejectDomain("NotAffordable", …)`
 - [ ] `enhanceCard(cardId)` / `limitBreak(cardId)` / `enhanceKeyword(keyword)` callable
 - [ ] 근거: R3에서 올린 `CardGrowthConfig`(`baseEnhanceCost=25` · `costGrowthPerLevel=50` ·
       `baseSuccessRate=1` · `rateDropPerLevel` + 레벨별 오버라이드 행) · `KeywordGrowthConfig` ·
@@ -468,7 +667,14 @@ R2가 채택한 방침(미결 #4는 여전히 열림): `Transient` → 메모리
 
 ### R9 — 룰 최종 동결 · 정리 ⬜
 
-- [ ] 서버 소유 슬롯 7종이 전부 `affectedKeys` 화이트리스트 밖
+- [ ] 서버 소유 슬롯 7종이 전부 `affectedKeys` 화이트리스트 밖.
+      **R5가 동결을 여기로 미뤘다** — 슬롯마다 마지막 클라 writer 가 사라지는 Phase 끝에 하나씩 뺀다
+      (cardGrowth=R6 / currency=R8 / ownership=R9). 첫 동결 커밋은 `isValidSave()` 에
+      `request.resource.data.diff(resource.data).affectedKeys().hasOnly([메타 5키 + 남은 슬롯])` 한 줄을 얹는 것이고,
+      **메타 5키를 빼면 전 유저 쓰기가 막힌다**
+- [ ] `ownership` 을 뺄 때 `OwnershipManager.Init()` 의 `t_dirty → Save()` 갈래도 같이 제거할 것 —
+      카탈로그가 모르는 id를 만나면 저장이 튀고, 동결 후 그 저장은 `PERMISSION_DENIED` 다
+      (`ServerSlotRehydrator` 가 재수화 전후 `OwnedCount` 를 비교해 미리 드러낸다)
 - [ ] 클라 소유 3종(`deck` `profile` `tutorial`) 형식 검증 마무리 —
       `profile` 안쪽은 R4가 서버 생성으로 초기값을 채운 **뒤에야** 열 수 있다(null 실림)
 - [ ] `deviceId` hex 검증 · `appVersion` 문자셋 검증 (R1 감사 이월분)
@@ -508,9 +714,10 @@ R2가 채택한 방침(미결 #4는 여전히 열림): `Transient` → 메모리
 | 5 | 튜토 무료 한 방 상태 | R6 | 정적 필드라 서버가 못 보고 앱 재시작으로 되살아난다. `tutorial` 은 클라 소유라 거기 못 둔다 → 서버 소유 키 신설 |
 | 7 | 호출량·요금 | R5 이후 실측 | 행위 단위 callable로 바뀌면 오히려 줄 수 있다 |
 | 8 | 계정 연동 | 백로그 | 익명 uid 분실 = 세이브 분실. 로컬 캐시까지 없어져 치명도가 올랐다. `Editor/GoogleOAuthSignIn` 은 스펙 업로더용 |
-| 10 | 타임아웃 ≠ 미실행 | R4 | `FunctionsCallableService` 는 `UniTask.WhenAny` 로 15초에 끊지만 **요청 취소 수단이 없다**. 서버는 revision을 올렸는데 클라는 모른다 → 다음 업로드 충돌 → `Blocked`. (a) 요청 멱등키 (b) 타임아웃 후 문서 재-읽기로 revision 복구 |
-| 11 | 매니저 캐시 재수화 | R5 첫 작업 | `CurrencyManager`·`OwnershipManager`·`CardGrowthManager`·`DeckSaveManager` 가 `Init()` 에서 파생 상태를 캐싱. 서버가 슬롯을 갈아끼워도 캐시는 옛 값. `OnServerSlotsAdopted` 구독자 0건 |
+| 10 | 타임아웃 ≠ 미실행 | ~~R4~~ **R6 전** | `FunctionsCallableService` 는 `UniTask.WhenAny` 로 15초에 끊지만 **요청 취소 수단이 없다**. 서버는 revision을 올렸는데 클라는 모른다 → 다음 업로드 충돌 → `Blocked`. (a) 요청 멱등키 (b) 타임아웃 후 문서 재-읽기로 revision 복구. **R5의 `openPack` 이 이 갈래를 처음 실사용으로 밟는다** — 팩이 실제로 열렸는데 클라는 실패로 보고, 카드는 다음 부팅에 나타나며 개봉 연출만 유실된다 |
+| 11 | 매니저 캐시 재수화 | ~~R5~~ 부분 닫힘 | `ServerSlotRehydrator` 가 `Currency`·`Ownership`·`KeywordGrowth`·`CardGrowth` 를 재수화한다. **`Deck` 은 미구독** — `DeckSaveManager.LoadFromSave` 가 `Compact()` 후 `SaveAll()` 을 타서 채택 도중 저장이 튄다. `deck` 을 서버가 쓰기 시작하기 전에 저장 없는 재구축 경로부터 만들 것. `Rank`·`AlbumReward`·`Tournament`·`Tutorial`·`Profile` 은 R7·R9 |
 | 12 | `Firebase.Functions` 직접 참조 금지 | R8 | 위반 1건 — `Network/MatchResultSubmission.cs`. `CallablePayload.ToPrimitiveMap` 을 우회하면 enum·POCO에서 `ArgumentException` |
+| 13 | **스타터 카드 4중 쌍둥이** | R3 이후 | R4가 만들었다. 같은 목록이 `StarterPack.asset:poolIds`(SO 폴백) · `functions/src/save/starterPool.ts:FALLBACK_STARTER_CARD_IDS`(서버 폴백) · 시트 `CardPackDrop.packId="StarterPack"`(실제 근거) · 되감기 경로(에디터 전용, SO 를 본다)에 흩어져 있다. 갈리면 계정마다 다른 스타터가 나가고 `starterSource` 로만 사후 판별된다. 시트가 진실원으로 굳은 뒤 SO 폴백을 걷어낼 것 — R3 스펙 승격 목록에 "스타터 지급" 추가 |
 
 **닫힌 것**: #1 App Check(프로토 동안 미도입, `submitMatchResult` 는 `enforceAppCheck: false`) ·
 #2 관리자 판별(custom claim `admin`) · #6 R1↔R3 순서(임시 개방 없이 `isAdmin()` 으로 닫음) ·
