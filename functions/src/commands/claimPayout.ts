@@ -1,7 +1,11 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {HEX_32} from "../match/payloadGuards";
+import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
+import {CurrencyGain, grant} from "../currency/wallet";
+import {nextWallet, readWallet, walletRef, writeWallet} from "../currency/walletStore";
 
 type ClaimPayoutData = {env: "live" | "test"; action: "list" | "ack"; matchIds: string[]};
 
@@ -16,6 +20,22 @@ function parseClaimPayoutData(raw: unknown): ClaimPayoutData {
     throw new HttpsError("invalid-argument", "invalid payout claim payload");
   }
   return {env, action, matchIds: [...new Set(rawIds as string[])]};
+}
+
+/**
+ * payout 문서에 **이미 적혀 있는** 지급액을 CurrencyGain 으로 읽는다. 다시 계산하지 않는다
+ * — 금액의 근거는 submitMatchResult 가 확정 시점에 computeCurrencyPayout 으로 넣어 둔 값이고,
+ * 여기서 표를 다시 읽으면 확정 뒤 표가 바뀐 만큼 지급이 갈린다.
+ * 재화가 4키 밖이거나 수량이 0 이하면 null 이다(그 payout 은 낙인만 되고 크레딧이 없다).
+ * @param {unknown} payout payout 문서 값
+ * @return {CurrencyGain | null} 지급 한 건, 읽을 수 없으면 null
+ */
+function readPayoutGain(payout: unknown): CurrencyGain | null {
+  const source = (payout as {currency?: {currency?: unknown; amount?: unknown}} | undefined)?.currency;
+  const currency: CurrencyKey | undefined = CURRENCY_KEYS.find((key) => key === source?.currency);
+  const amount = Number(source?.amount);
+  if (currency === undefined || !Number.isSafeInteger(amount) || amount <= 0) return null;
+  return {currency, amount};
 }
 
 export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
@@ -38,19 +58,52 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     });
     return {payouts};
   }
-  if (data.matchIds.length === 0) return {acked: []};
-  const acked = await db.runTransaction(async (tx) => {
+  const reference = walletRef(db, data.env, uid);
+  // 낙인(ready → claimed)과 크레딧은 한 트랜잭션 안이어야 한다 — 갈라 놓으면 낙인만 성공해
+  // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
+  const result = await db.runTransaction(async (tx) => {
     const refs = data.matchIds.map((matchId) => collection.doc(matchId));
+    // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상과 지갑을 먼저 다 읽는다.
     const snapshots = [];
     for (const ref of refs) snapshots.push(await tx.get(ref));
+    const walletSnapshot = await tx.get(reference);
+    if (!walletSnapshot.exists) {
+      // 도메인 거절이 아니라 세션 문제다 — 부트의 ensureWallet 이 돌지 않았다는 뜻이라
+      // 클라가 다시 부트하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).
+      throw new HttpsError(
+        "failed-precondition",
+        "Wallet document does not exist. Boot must call ensureWallet first.",
+      );
+    }
+
     const accepted: string[] = [];
+    const gains: CurrencyGain[] = [];
     for (let i = 0; i < refs.length; i++) {
       const payout = snapshots[i].data();
       if (payout?.uid !== uid || payout?.matchId !== data.matchIds[i] || payout?.status !== "ready") continue;
+      const gain = readPayoutGain(payout);
+      if (gain === null) {
+        // 확정 시점의 산출 사고라 유저가 지금 할 수 있는 것이 없다. 그래도 낙인은 한다 —
+        // ready 로 남기면 클라가 부트마다 같은 문서를 다시 집어 영원히 되돈다.
+        logger.error("payout amount is unusable", {
+          uid, env: data.env, matchId: data.matchIds[i], currency: payout?.currency,
+        });
+      } else {
+        gains.push(gain);
+      }
       tx.set(refs[i], {status: "claimed", claimedAt: FieldValue.serverTimestamp()}, {merge: true});
       accepted.push(data.matchIds[i]);
     }
-    return accepted;
+
+    const current = readWallet(walletSnapshot);
+    // 크레딧할 것이 없으면 지갑을 쓰지 않는다 — 빈 지급으로 rev 만 올리면 클라가 달라진 것
+    // 없는 잔액을 채택하고 사고를 못 알아챈다. 응답에는 현재 잔액을 그대로 싣는다.
+    if (gains.length === 0) return {acked: accepted, wallet: {rev: current.rev, balances: current.balances}};
+
+    const next = nextWallet(current, grant(current.balances, gains));
+    writeWallet(tx, reference, next, FieldValue.serverTimestamp());
+    return {acked: accepted, wallet: {rev: next.rev, balances: next.balances}};
   });
-  return {acked};
+  logger.info("claimPayout ack", {uid, env: data.env, acked: result.acked, rev: result.wallet.rev});
+  return result;
 });

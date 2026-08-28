@@ -40,7 +40,14 @@ internal static class ServerSaveCommands
             if (t_result == null)
                 throw new InvalidOperationException($"Server command '{_commandName}' returned nothing.");
 
-            PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots);
+            // 지갑이 먼저다 — 단조 판정이라 절대 던지지 않으므로, 뒤의 세이브 채택이 세션을 접어도 잔액은 이미 맞다.
+            if (t_result.Wallet != null) WalletCloud.Adopt(t_result.Wallet);
+
+            // revision 0/누락 = 이 명령은 세이브를 쓰지 않았다. 그대로 채택에 넘기면 "정확히 +1" 단언이
+            // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
+            if (t_result.Revision > 0)
+                PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots);
+
             return t_result;
         }
         catch (ServerAdoptionException)

@@ -17,7 +17,6 @@ internal static class ServerSlotRehydrator
     // 순서는 SaveDependentManagersStep.InstallOnce와 같다 — CardGrowth가 KeywordGrowth 통지를 구독하므로 뒤집으면 안 된다.
     static void Rehydrate(ESaveSlot _slots)
     {
-        if ((_slots & ESaveSlot.Currency) != 0) RehydrateCurrency();
         if ((_slots & ESaveSlot.Ownership) != 0) RehydrateOwnership();
         if ((_slots & ESaveSlot.KeywordGrowth) != 0) KeywordGrowthManager.Init();
         if ((_slots & ESaveSlot.CardGrowth) != 0) CardGrowthManager.Init();
@@ -25,14 +24,6 @@ internal static class ServerSlotRehydrator
         // TODO(R5+): Deck은 구독하지 않는다 — DeckSaveManager.LoadFromSave가 Compact 후 SaveAll을 타서
         // 채택 도중 저장이 튄다. deck 슬롯을 서버가 쓰기 시작하면 저장 없는 재구축 경로부터 만들 것.
         // TODO(R7·R9): Rank·AlbumReward·Tournament·Tutorial·Profile 재수화.
-    }
-
-    // Normalize를 먼저 부른다 — CurrencyManager.Init은 Balances가 비어 있으면 첫실행으로 보고 골드를 재지급한다.
-    // 4키를 0으로 채워 두면 그 갈래가 서지 않는다.
-    static void RehydrateCurrency()
-    {
-        DataSaveManager.Data.Currency.Normalize();
-        CurrencyManager.Init();
     }
 
     // Init은 카탈로그가 모르는 id를 만나면 스스로 Save()를 부른다. 슬롯 동결 뒤엔 그 저장이 거부되므로 줄어들면 드러낸다.

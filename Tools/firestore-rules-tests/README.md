@@ -96,8 +96,10 @@ npm test
 
    원본을 안 건드리고 검증하려면 훼손본을 만들어 `RULES_FILE=<경로> npm test` 로 겨눈다.
 
-   `hasAll` 15키와 `revision > 0` 은 빼도 안 깨진다 — 슬롯별 검증이 같은 구멍을 이미 막는다.
+   `hasAll` 14키와 `revision > 0` 은 빼도 안 깨진다 — 슬롯별 검증이 같은 구멍을 이미 막는다.
    명시성·방어 겹으로 남겨 둔 것이지 단독으로 뭘 막고 있지는 않다.
+   (C6 부터 `hasAll` 은 14키다. `currency` 만 빠졌다 — 잔액이 `wallet/current` 로 갔고,
+   승급 전 구 클라가 아직 그 필드를 실어 보내므로 `hasOnly` 쪽 15키는 그대로 남겨 뒀다.)
 3. 세이브 도메인(`OutGame/Save/2.Domain/*SaveData.cs`)이 바뀌었으면
    `fixtures/saveDocument.js` 를 먼저 맞춘다
 4. **`UserSaveData.VERSION` 을 올렸으면 `functions/src/save/saveDocument.ts` 의 `SCHEMA_VERSION` 도

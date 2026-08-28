@@ -43,7 +43,6 @@ public sealed class SaveDependentManagersStep : MainInitializer
 
         // 정상 부팅의 스타터는 서버(ensureAccount)가 이미 문서에 넣어 왔다.
         // 아래 Init과 GrantIfNoDeck은 위 되감기가 슬롯을 비웠을 때만 서는 안전망이다.
-        CurrencyManager.Init();
         ProfileManager.Init();
         OwnershipManager.Init();
         OutgameTutorialProgress.Init();

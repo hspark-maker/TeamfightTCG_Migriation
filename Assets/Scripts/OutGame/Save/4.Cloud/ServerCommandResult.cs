@@ -1,11 +1,19 @@
 using Newtonsoft.Json;
 
-// 세이브를 쓰는 callable 응답의 공통 머리. R5~R8의 도메인 응답이 이걸 상속해 자기 필드를 덧붙이는 확장점이다.
+// 세이브·지갑을 쓰는 callable 응답의 공통 머리. R5~R8의 도메인 응답이 이걸 상속해 자기 필드를 덧붙이는 확장점이다.
+//
+// 두 문서는 따로 채택된다 — 지갑만 쓰는 명령(claimBattleReward·devGrantCurrency·claimPayout ack)은
+// revision·updatedSlots 키를 아예 싣지 않는다.
 internal class ServerCommandResult
 {
+    /// <summary>0/누락은 <b>이 명령이 세이브 문서를 쓰지 않았다</b>는 센티널이다.
+    /// 세이브는 ensureSaveDocument가 revision 1로 만들고 증가만 하므로 0은 다른 뜻을 가질 수 없다.</summary>
     [JsonProperty("revision")] public long Revision { get; set; }
 
     [JsonProperty("updatedSlots")] public ServerSlotPatch UpdatedSlots { get; set; }
+
+    /// <summary>null이면 이 명령은 지갑을 쓰지 않았다.</summary>
+    [JsonProperty("wallet")] public WalletPatch Wallet { get; set; }
 }
 
 // 세이브를 쓰지 않는 진단용 callable(ping) 응답.

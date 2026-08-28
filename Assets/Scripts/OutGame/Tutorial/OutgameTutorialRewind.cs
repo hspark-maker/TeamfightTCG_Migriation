@@ -71,10 +71,11 @@ public static class OutgameTutorialRewind
 
         var t_data = DataSaveManager.Data;
 
-        // 슬롯을 통째로 새 인스턴스로 — 잔액 맵이 빈 세이브를 CurrencyManager.Init이 신규 유저로 보고 초기 골드를 다시 지급한다.
-        // UserSaveData의 슬롯 전부를 여기서 센다 — 하나라도 빠지면 그 축만 이전 세션 값으로 남아,
-        // 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
-        t_data.Currency      = new CurrencySaveData();
+        // 슬롯을 통째로 새 인스턴스로 — UserSaveData의 슬롯 전부를 여기서 센다. 하나라도 빠지면 그 축만
+        // 이전 세션 값으로 남아, 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
+        //
+        // 재화는 없다 — 잔액은 세이브를 떠나 서버 지갑 문서로 갔고 클라는 그 문서를 쓰지 못한다.
+        // 되감기 뒤에도 잔액이 그대로 남는다는 뜻이다. test env 디버그 경로라 그 차이를 수용한다.
         t_data.Ownership     = new OwnershipSaveData();
         t_data.Deck          = new DeckSaveData();
         t_data.Rank          = new RankSaveData();
