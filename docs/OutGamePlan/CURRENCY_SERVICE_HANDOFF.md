@@ -1,6 +1,6 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `d2a4fdc3c`
+> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `84f53288f`
 > 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
@@ -20,13 +20,14 @@
 
 ## 지금 상태
 
-**커밋 5개**
+**커밋 6개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
 - `120110833` 스펙시트 `Reward` 표 복구 — 머지가 옛 굽기본을 택해 부팅이 막혔다
 - `6f6a8885c` `link.xml` 에 팩 개봉 응답 DTO — IL2CPP 스트리핑 방어
 - `d2a4fdc3c` `claimReward` 의 보상 영구 손실·계정 영구 잠김 경로 2건
+- `84f53288f` C4 — `enhanceCard`·`enhanceKeyword` + 튜토 무료 한 방 서버 이전 + 거절 사유 전달 경로 교정
 
 **배포 상태 (실측 2026-08-28)**
 
@@ -35,6 +36,8 @@
 | `currencyPing` (codebase `currency`) | 배포됨 · URL POST **401**(정상) |
 | `claimReward` (codebase `default`) | **배포됨** · URL POST **401**(정상) · 실기 왕복 통과 |
 | `firestore.rules` 지갑 블록 | **배포됨** |
+| `enhanceCard`·`enhanceKeyword` (codebase `default`) | **미배포 — 404.** 클라만 올리면 강화가 `not-found` 로 떨어진다 |
+| `firestore.rules` 무료 한 방(`grants`) 블록 | **미배포.** 서버 동작은 Admin SDK 라 무관하지만, 클라가 그 문서를 읽게 되면 필수 |
 
 **주의 — "재화 로직이 currency codebase 로 갔다"가 아니다.** 지금 그 codebase 에 있는 것은 진단용 `currencyPing` 뿐이다. `walletStore.ts` 는 callable 이 아니라 라이브러리라 배포 대상이 아니고, 실제로 재화를 움직이는 `claimReward`·`openPack` 은 세이브 슬롯도 함께 만져서 default codebase 에 있다(결정 4). 지갑만 만지는 명령은 C6 에서 이사한다.
 
@@ -85,16 +88,40 @@ C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로
 - `UI/Tournament/TournamentMapOverlayView.cs:562` — 폴백 경로(보상 0건·팝업 미배선)가 `TournamentRewardFlow.Open` 이 false 를 돌린 그 자리에서 `PlayClaimSequence` 를 부른다. `ClearNodeAsync` 가 비동기가 되면서 그 시점엔 `IsCleared` 가 아직 false 라 `:579` 의 가드가 걸려 **점등·해금 연출이 통째로 빠진다**
 - `OutGame/Reward/ClaimRewardResult.cs:4` — `granted` 를 "무엇이 지급됐는지의 진실원" 이라 주석해 놓고 실제로는 `RewardClaimCommand.cs:28` 의 `Debug.Log` 로만 쓴다. 분출·롤업(`UI/HUD/CurrencyHud.BeginGainRollUp` · `UI/HUD/CurrencyHud.cs:107` 의 클라 잔액 읽기)은 여전히 클라 스펙 캐시를 본다 — **표가 갈리면 숫자가 튄다.** 연출 입력을 `granted` 로 갈아야 한다
 
-### C4 — 성장 2종
+### C4 — 성장 2종 ✅ (`84f53288f`)
 
-`enhanceCard` · `enhanceKeyword`. 클라 `CardGrowthManager.cs:137` · `KeywordGrowthManager.cs:109` 의 `CurrencyManager.Spend` 를 걷어낸다.
+`enhanceCard` · `enhanceKeyword` 가 섰다. 클라 `CardGrowthManager.TryEnhanceAsync` · `KeywordGrowthManager.TryEnhanceAsync` 는
+왕복을 아끼는 낙관 선검사(미초기화·만렙)만 남기고 차감·성공률·레벨을 전부 서버에 넘겼다. **클라 재화 writer 2곳이 사라졌다.**
 
-근거 표 전부 확보됨: `CardEnhanceRule`(단일 행 — `baseEnhanceCost 25` · `costGrowthPerLevel 50` · `baseSuccessPermille 1000` · `rateDropPerLevelPermille 0` · `maxLevel 4` · `maxLimitBreak 3` · `hpPerLevel 4`) · `CardEnhance`(레벨별 오버라이드 3행, 비용 재화 **Shard**) · `KeywordEnhance`(키워드 6종, 비용 재화 **Energy**).
+- 곡선 근거는 스펙 표다 — `CardEnhanceRule`(전역 1행) · `CardEnhance`(레벨 2·3·4 오버라이드 25/75/150 Shard) · `KeywordEnhance`(6종 · Energy `5 + 5×(N−1)` · maxLevel 10). 순수 파서는 `functions/src/growth/enhanceRules.ts`
+- 성공률 RNG 경로는 만들었으나 **지금은 발화하지 않는다**(표가 전 행 `successPermille 1000`). 실패해도 비용은 나가고 레벨은 안 내려가는 기존 규칙 그대로다
+- `GrowthRules.MaxLevel` = `CardSpec.MaxHpCurveLevel` = **4** 로 서버 `CARD_MAX_LEVEL_CEILING` 과 일치(드리프트 없음)
+- 응답 채택 뒤 캐시 재구축은 기존 `ServerSlotRehydrator` 가 이미 `CardGrowth`·`KeywordGrowth` 를 덮고 있어 추가 배선이 없었다
 
-- 성공률 RNG 를 서버로 옮긴다(`openPack` 의 `randomInt` 관용구). 현재 `successPermille` 이 전 행 1000이라 **강화는 항상 성공** — RNG 경로는 만들되 지금은 발화하지 않는다
-- 현행 클라는 **실패해도 차감이 영속되고 환급이 없다**. 서버로 옮기면 이 갈래를 한 트랜잭션으로 정리할 수 있다
-- 거절 사유는 `NotAffordable`(클라 `EEnhanceOutcome`)
-- **한계돌파(Snack) 축이 이 범위에 안 잡혀 있다.** `CardLimitBreak` 표가 `envs/test/specs` 에 실재하고(3행 · 컬럼 `stage | hpGain | snackCost`) 서버에도 `canAffordSnack`·`spendSnack`·`applyLimitBreak` 가 이미 `functions/src/growth/cardGrowth.ts` 에 있는데 **클라는 한계돌파를 로컬로 처리한다.** Snack 은 `CurrencyManager` 축이 아니라 카드에 붙은 자원이라 "재화 writer" 집계에는 안 잡히지만 **성장 판정을 서버가 소유한다는 목표에는 같이 걸린다.** C4 안에 넣을지 별도 단계로 뺄지는 **미결**
+**튜토리얼 무료 한 방을 같이 옮겼다(로드맵 미결 #5 해소).** 안 옮기면 C4 가 온보딩을 그 자리에서 세운다 —
+신규 계정 지급은 `STARTER_GOLD` 뿐이라 Shard·Energy 가 0인데 온보딩이 카드 강화(25)·키워드 강화(5)를 시킨다.
+
+- 새 문서 `envs/{env}/users/{uid}/grants/current` — 축별(`enhanceCard`·`enhanceKeyword`) **계정당 1회**. 서버 전용 쓰기(룰 `write: if false`), 소유자 읽기만 연다
+- **세이브 스키마와 무관하다** — 별도 경로라 15키 계약도 `SCHEMA_VERSION` 도 안 건드린다. C6 의 v7→v8 승급과 부딪히지 않는다
+- 읽기·쓰기 모두 `mutateSave` 콜백 **안**이다(트랜잭션). 동시 호출 둘이 같은 "미사용"을 보는 갈래가 막힌다
+- 무료는 **비용만 0** 으로 만들고 성공률은 안 건드린다. 소진 낙인은 **성공했을 때만** 찍는다 — 실패로 닫으면 안내가 시킨 성장을 유저 돈으로 다시 해야 한다
+- 클라는 여전히 `OutgameTutorialGuide.HasFreeShot` 으로 **요청 시점**을 정하고, 실제 소진은 응답 `freeShotUsed` 를 보고 찍는다. 진실원은 서버다
+
+**거절 사유 전달 경로를 고쳤다(계약 파손 발견).** `rejectDomain` 은 사유를 `details.reason` 으로 보냈는데
+**Unity SDK 가 그것을 버린다** — `Assets/Firebase/FirebaseFunctions/Internal/FunctionsErrorParser.ParseError` 가
+`status` 와 `message` 만 살리고 `FunctionsException` 에 details 프로퍼티 자체가 없다. 즉 `openPack` 의
+`InsufficientGold` 도 지금껏 클라에 닿은 적이 없다(`CardPackOpener` 가 `Precheck` 재실행으로 사유를 되짚어 가려 온 것).
+
+- `rejectDomain` 이 message 를 `"Reason: 설명"` 으로 만든다. 떼어 내는 자리는 `ServerCommandRejectedException.Reason` **하나**다
+- `ServerCommandRejectedException.Message` 는 명령 이름으로 한 번 감싸므로 앞머리 파싱은 **내부 예외 기준**이어야 한다. 이미 그렇게 돼 있다
+- 이 경로가 열렸으니 `CardPackOpener` 의 `Precheck` 재실행도 사유 직독으로 갈아탈 수 있다(별건)
+
+**남은 것**
+
+- **배포·실기 왕복이 아직이다.** 위 "배포·판정 절차" 를 그대로 탄다
+- **한계돌파(Snack) 는 여전히 클라 판정이다.** `CardLimitBreak` 표(3행 · `stage | hpGain | snackCost`)도 서버 `canAffordSnack`·`spendSnack`·`applyLimitBreak` 도 이미 있는데 callable 이 없다. 재화 축이 아니라 "재화 writer 0" 집계엔 안 잡히지만 성장 판정 소유권 목표에는 걸린다 — **미결**
+- `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
+- `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
 ### C5 — 전투·디버그 2종
 
