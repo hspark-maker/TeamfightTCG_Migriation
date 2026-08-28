@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -82,15 +83,18 @@ public class AlbumThemeCellView : MonoBehaviour
         else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.AlbumThemeCell, t_rect);
     }
 
-    void ClaimReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimReward() => ClaimRewardAsync().Forget();
+
+    async UniTaskVoid ClaimRewardAsync()
     {
         if (m_theme == null) return;
 
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
         if (!AlbumRewardManager.CanClaimTheme(m_theme)) return;
 
-        AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} 완성!",
-                                  m_theme.Rewards,
-                                  () => AlbumRewardManager.ClaimTheme(m_theme));
+        await AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} 완성!",
+                                        m_theme.Rewards,
+                                        () => AlbumRewardManager.ClaimTheme(m_theme));
     }
 }

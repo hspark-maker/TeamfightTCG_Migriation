@@ -16,10 +16,23 @@ import {
 } from "../payout";
 import {
   appendClaimedTier,
+  isChapterOwnerId,
   judgeRewardClaim,
   MAX_CLAIMED_TIERS,
   parseRewardRows,
 } from "../rewardTable";
+import {
+  AlbumEntryRow,
+  albumScopeCardIds,
+  ChapterNodeRow,
+  chapterNodeIds,
+  isCompleted,
+  missingCount,
+  parseAlbumEntryRows,
+  parseAlbumScope,
+  parseChapterNodeRows,
+} from "../completionTable";
+import {readOwnedIds} from "../packs/packSlots";
 import {currencySlot, grant, readBalances} from "../currency/wallet";
 
 /**
@@ -28,10 +41,13 @@ import {currencySlot, grant, readBalances} from "../currency/wallet";
  */
 type ClaimReject = "AlreadyClaimed" | "NotEligible" | "RewardNotFound";
 
-/** 수령 가능한 보상 소유자 축. 앨범 완성과 토너먼트 **챕터** 완주는 서버가 잴 근거가 없어 여기 없다. */
-type ClaimOwnerType = "Rank" | "Tournament";
+/**
+ * 수령 가능한 보상 소유자 축. 토너먼트는 **정점과 챕터 완주가 같은 축**이고 ownerId 의
+ * chapter_ 접두사로만 갈린다(Reward 표의 ownerType 열을 나누지 않으려는 계약이다).
+ */
+type ClaimOwnerType = "Rank" | "Tournament" | "Album";
 
-/** 소유자 키 하나의 최대 길이. 저작 키는 node_01 처럼 짧다. */
+/** 소유자 키 하나의 최대 길이. 저작 키는 node_01 · p:Theme_Nature/P1 처럼 짧다. */
 const MAX_OWNER_ID_LENGTH = 64;
 
 /** 판정·거절 로그가 공통으로 싣는 요청 맥락. */
@@ -110,6 +126,37 @@ async function loadRankGrades(context: ClaimContext): Promise<RankGradeRow[]> {
     reject("NotEligible", "Rank grade spec is empty.", {...context, specRowCount: rows.length});
   }
   return grades;
+}
+
+/**
+ * 도감 칸 표. 못 읽으면 완성 여부를 잴 수 없으므로 NotEligible 로 떨어뜨린다
+ * — 여기서 통과시키면 모수 0 이 "다 모았다"로 읽혀 보상이 통째로 샌다.
+ * @param {ClaimContext} context 요청 맥락
+ * @return {Promise<AlbumEntryRow[]>} 칸 목록
+ */
+async function loadAlbumEntries(context: ClaimContext): Promise<AlbumEntryRow[]> {
+  const rows = await readSpecRows(context.env, "AlbumEntry");
+  const entries = parseAlbumEntryRows(rows);
+  if (entries.length === 0) {
+    logger.error("AlbumEntry spec is empty or unreadable", {...context, rowCount: rows.length});
+    reject("NotEligible", "Album entry spec is unreadable.", {...context, specRowCount: rows.length});
+  }
+  return entries;
+}
+
+/**
+ * 챕터↔정점 대응 표. 못 읽으면 완주를 잴 수 없으므로 NotEligible 로 떨어뜨린다.
+ * @param {ClaimContext} context 요청 맥락
+ * @return {Promise<ChapterNodeRow[]>} 대응 목록
+ */
+async function loadChapterNodes(context: ClaimContext): Promise<ChapterNodeRow[]> {
+  const rows = await readSpecRows(context.env, "TournamentChapter");
+  const entries = parseChapterNodeRows(rows);
+  if (entries.length === 0) {
+    logger.error("TournamentChapter spec is empty or unreadable", {...context, rowCount: rows.length});
+    reject("NotEligible", "Tournament chapter spec is unreadable.", {...context, specRowCount: rows.length});
+  }
+  return entries;
 }
 
 /**
@@ -192,11 +239,83 @@ function clearTournamentNode(
 }
 
 /**
+ * 챕터 완주 수령 — 낙인은 claimedChapterIds 다. tournament 슬롯 **전체 값**을 돌려준다.
+ *
+ * 정점 진행(clearedNodeIds)과 미수령 정점(pendingRewardNodeId)은 이 명령의 소관이 아니지만
+ * 슬롯 단위 덮어쓰기라 그대로 실어 보내야 지워지지 않는다 — 특히 pendingRewardNodeId 는
+ * 다음 챕터의 미수령 정점을 가리킬 수 있어 비우면 그 정점의 보상이 사라진다.
+ * @param {Record<string, unknown>} current 현재 문서
+ * @param {ChapterNodeRow[]} chapterRows 챕터↔정점 대응 표
+ * @param {ClaimContext} context 요청 맥락
+ * @return {object} tournament 슬롯 전체 값
+ */
+function claimTournamentChapter(
+  current: Record<string, unknown>,
+  chapterRows: ChapterNodeRow[],
+  context: ClaimContext,
+): {clearedNodeIds: string[]; claimedChapterIds: string[]; pendingRewardNodeId: string} {
+  const tournament = current.tournament as Record<string, unknown> | undefined;
+  const claimedChapters = readIdList(tournament?.claimedChapterIds);
+
+  // Claimed 검사가 완주 검사보다 먼저다 — 저작에서 정점이 늘어 완주가 풀려도 기수령은 유지된다.
+  if (claimedChapters.includes(context.ownerId)) {
+    reject("AlreadyClaimed", `Tournament chapter '${context.ownerId}' is already claimed.`, {...context});
+  }
+
+  const required = chapterNodeIds(chapterRows, context.ownerId);
+  const cleared = readIdList(tournament?.clearedNodeIds);
+  if (!isCompleted(required, new Set(cleared))) {
+    reject("NotEligible", `Tournament chapter '${context.ownerId}' is not complete.`,
+      {...context, requiredCount: required.length, missingCount: missingCount(required, new Set(cleared))});
+  }
+
+  return {
+    clearedNodeIds: cleared,
+    claimedChapterIds: [...claimedChapters, context.ownerId],
+    pendingRewardNodeId: typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "",
+  };
+}
+
+/**
+ * 도감 완성 수령 — 낙인은 claimedKeys 다. albumReward 슬롯 **전체 값**을 돌려준다.
+ *
+ * 진행도는 저장하지 않는다(클라 AlbumRewardSaveData 와 같은 축) — 자격은 소유 카드로
+ * 서버가 매번 다시 잰다. 표에 그 범위 행이 하나도 없으면 완성이 아니라 미저작이다.
+ * @param {Record<string, unknown>} current 현재 문서
+ * @param {AlbumEntryRow[]} entryRows 도감 칸 표
+ * @param {ClaimContext} context 요청 맥락
+ * @return {object} albumReward 슬롯 전체 값
+ */
+function claimAlbumReward(
+  current: Record<string, unknown>,
+  entryRows: AlbumEntryRow[],
+  context: ClaimContext,
+): {claimedKeys: string[]} {
+  const album = current.albumReward as Record<string, unknown> | undefined;
+  const claimedKeys = readIdList(album?.claimedKeys);
+
+  // Claimed 검사가 완성 검사보다 먼저다(클라 AlbumRewardManager.StateOf 와 같은 순서).
+  if (claimedKeys.includes(context.ownerId)) {
+    reject("AlreadyClaimed", `Album reward '${context.ownerId}' is already claimed.`, {...context});
+  }
+
+  const scope = parseAlbumScope(context.ownerId);
+  const required = scope === null ? [] : albumScopeCardIds(entryRows, scope);
+  const owned = new Set(readOwnedIds(current.ownership));
+  if (!isCompleted(required, owned)) {
+    reject("NotEligible", `Album reward '${context.ownerId}' is not complete.`,
+      {...context, requiredCount: required.length, missingCount: missingCount(required, owned)});
+  }
+
+  return {claimedKeys: [...claimedKeys, context.ownerId]};
+}
+
+/**
  * 정적 보상 수령. 자격 판정·지급·낙인을 서버가 소유한다.
  *
- * 범위는 랭크 티어와 토너먼트 **정점** 둘뿐이다. 앨범 완성과 챕터 완주는 판정 근거
- * (도감 완성 조건 · 챕터↔정점 대응)가 스펙 표에 없어 서버가 잴 수 없다.
- * 재화는 지갑 문서가 아니라 세이브의 currency 슬롯에 쓴다.
+ * 범위는 네 갈래다 — 랭크 티어 · 토너먼트 정점 · 토너먼트 챕터 완주 · 도감 완성.
+ * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry) 표가 비면
+ * fail-closed 로 거절한다. 재화는 지갑 문서가 아니라 세이브의 currency 슬롯에 쓴다.
  */
 export const claimReward = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -207,25 +326,23 @@ export const claimReward = onCall(async (request) => {
   if (!isKnownEnv(env)) {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
   }
-  if (ownerType !== "Rank" && ownerType !== "Tournament") {
-    throw new HttpsError("invalid-argument", `ownerType must be Rank or Tournament, got '${ownerType}'.`);
+  if (ownerType !== "Rank" && ownerType !== "Tournament" && ownerType !== "Album") {
+    throw new HttpsError("invalid-argument",
+      `ownerType must be Rank, Tournament or Album, got '${ownerType}'.`);
   }
   if (ownerId.length === 0 || ownerId.length > MAX_OWNER_ID_LENGTH) {
     throw new HttpsError("invalid-argument", "ownerId must be a non-empty string.");
   }
 
   const context: ClaimContext = {uid, env, ownerType, ownerId};
-
-  // 챕터 완주는 챕터↔정점 대응이 TournamentConfig SO 에만 있어 서버가 완주를 못 잰다.
-  // 자격 근거가 없는 요청은 지급 경로에 들이지 않는다.
-  if (ownerType === "Tournament" && ownerId.startsWith("chapter_")) {
-    reject("RewardNotFound", "Chapter completion rewards are not claimable on the server.", {...context});
-  }
+  const isChapter = ownerType === "Tournament" && isChapterOwnerId(ownerId);
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
   let tierIndex = -1;
   let tierCount = 0;
   let requiredPoints = 0;
+  let albumEntries: AlbumEntryRow[] = [];
+  let chapterNodes: ChapterNodeRow[] = [];
   if (ownerType === "Rank") {
     const grades = await loadRankGrades(context);
     tierCount = rankTierCount(grades);
@@ -235,6 +352,14 @@ export const claimReward = onCall(async (request) => {
       reject("RewardNotFound", `Rank tier '${ownerId}' is out of range.`, {...context, tierCount});
     }
     requiredPoints = required;
+  } else if (ownerType === "Album") {
+    // 낙인 키 모양이 아니면 잴 범위 자체가 없다 — 표를 읽기 전에 끊는다.
+    if (parseAlbumScope(ownerId) === null) {
+      reject("RewardNotFound", `Album owner '${ownerId}' is not a reward key.`, {...context});
+    }
+    albumEntries = await loadAlbumEntries(context);
+  } else if (isChapter) {
+    chapterNodes = await loadChapterNodes(context);
   }
 
   // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
@@ -262,6 +387,7 @@ export const claimReward = onCall(async (request) => {
   }
   if (!judgement.authored) {
     // "보상 미저작 정점은 해금만 넘긴다"가 저작 규약이다 — 여기서 막으면 그 정점이 영영 RewardPending 으로 굳는다.
+    // 랭크·도감·챕터는 여기까지 오지 않는다(judgeRewardClaim 이 RewardNotFound 로 끊었다).
     logger.warn("clearing a node with no authored reward", {...context, specOwnerId, droppedCount: dropped.length});
   }
 
@@ -270,6 +396,12 @@ export const claimReward = onCall(async (request) => {
 
     if (ownerType === "Rank") {
       return {currency, rank: claimRankTier(current, tierIndex, requiredPoints, tierCount, context)};
+    }
+    if (ownerType === "Album") {
+      return {currency, albumReward: claimAlbumReward(current, albumEntries, context)};
+    }
+    if (isChapter) {
+      return {currency, tournament: claimTournamentChapter(current, chapterNodes, context)};
     }
     return {currency, tournament: clearTournamentNode(current, context)};
   });

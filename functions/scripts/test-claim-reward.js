@@ -20,8 +20,18 @@ const {
   resolveRewards,
   judgeRewardClaim,
   appendClaimedTier,
+  isChapterOwnerId,
   MAX_CLAIMED_TIERS,
 } = require("../lib/rewardTable.js");
+const {
+  parseAlbumEntryRows,
+  parseChapterNodeRows,
+  parseAlbumScope,
+  albumScopeCardIds,
+  chapterNodeIds,
+  isCompleted,
+  missingCount,
+} = require("../lib/completionTable.js");
 
 // 표 한 줄. 실제 Reward 시트의 컬럼 이름 그대로다(id | ownerType | ownerId | order | rewardType | rewardId | amount).
 const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Currency") =>
@@ -41,6 +51,43 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   // ownerId 는 문자열 그대로 대조한다 — "1" 과 "01" 은 다른 소유자다.
   assert.deepEqual(resolveRewards(rows, "Rank", "01").gains, []);
   assert.deepEqual(resolveRewards(rows, "Rank", "").gains, []);
+}
+
+// ── 도감 3단 키: 콜론·슬래시는 뜻이 없다, 순수 문자열 비교다 ─────────────────
+{
+  // 클라 AlbumSection.RewardKey 세 모양이 그대로 ownerId 다("b" · "t:테마" · "p:테마/페이지").
+  const rows = parseRewardRows([
+    row(1, "Album", "b", 1, "Diamond", 50),
+    row(2, "Album", "t:Theme_Nature", 1, "Gold", 300),
+    row(3, "Album", "p:Theme_Nature/P1", 1, "Gold", 100),
+    row(4, "Album", "p:Theme_Nature/P2", 1, "Gold", 100),
+  ]);
+  assert.deepEqual(resolveRewards(rows, "Album", "b").gains, [{currency: "Diamond", amount: 50}]);
+  assert.deepEqual(resolveRewards(rows, "Album", "t:Theme_Nature").gains, [{currency: "Gold", amount: 300}]);
+  assert.deepEqual(resolveRewards(rows, "Album", "p:Theme_Nature/P1").gains, [{currency: "Gold", amount: 100}]);
+
+  // 접두사·구분자를 빼거나 바꾸면 남남이다 — 테마 키가 페이지 보상을 먹지 않는다.
+  assert.deepEqual(resolveRewards(rows, "Album", "Theme_Nature").gains, []);
+  assert.deepEqual(resolveRewards(rows, "Album", "t:Theme_Nature/P1").gains, []);
+  assert.deepEqual(resolveRewards(rows, "Album", "p:Theme_Nature").gains, []);
+  assert.deepEqual(resolveRewards(rows, "Album", "P:Theme_Nature/P1").gains, [], "대소문자도 그대로 대조한다");
+
+  // 도감 키는 토너먼트·랭크 축과 절대 섞이지 않는다.
+  assert.deepEqual(resolveRewards(rows, "Tournament", "b").gains, []);
+}
+
+// ── 챕터는 ownerType 을 정점과 공유하고 chapter_ 접두사로만 갈린다 ───────────
+{
+  const rows = parseRewardRows([
+    row(1, "Tournament", "node_01", 1, "Gold", 200),
+    row(2, "Tournament", "chapter_01", 1, "Diamond", 30),
+  ]);
+  assert.deepEqual(resolveRewards(rows, "Tournament", "chapter_01").gains, [{currency: "Diamond", amount: 30}]);
+  assert.deepEqual(resolveRewards(rows, "Tournament", "node_01").gains, [{currency: "Gold", amount: 200}]);
+
+  assert.equal(isChapterOwnerId("chapter_01"), true);
+  assert.equal(isChapterOwnerId("node_01"), false);
+  assert.equal(isChapterOwnerId("Chapter_01"), false, "접두사는 대소문자를 가린다");
 }
 
 // ── 순서: order 오름차순, 동률은 id ──────────────────────────────────────────
@@ -142,6 +189,13 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.equal(tournament.specEmpty, true);
   assert.equal(tournament.reason, "NotEligible");
   assert.deepEqual(tournament.gains, []);
+
+  for (const [ownerType, ownerId] of [["Album", "p:Theme_Nature/P1"], ["Tournament", "chapter_01"]]) {
+    const judged = judgeRewardClaim(empty, ownerType, ownerId);
+    assert.equal(judged.allow, false, `표가 비면 ${ownerType}/${ownerId} 도 거절`);
+    assert.equal(judged.specEmpty, true);
+    assert.equal(judged.reason, "NotEligible");
+  }
 }
 {
   // 표는 읽혔고 그 ownerId 행만 없다 = 저작 규약. 토너먼트는 지급 0건으로 통과해 해금만 넘긴다
@@ -162,6 +216,85 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.equal(rank.allow, false);
   assert.equal(rank.specEmpty, false, "표는 읽혔다 — 사고가 아니라 미저작이다");
   assert.equal(rank.reason, "RewardNotFound");
+
+  // 도감·챕터는 랭크 편이다 — 넘길 진행이 없고 낙인만 남아 나중에 저작해도 AlreadyClaimed 로 막힌다.
+  for (const [ownerType, ownerId] of [["Album", "b"], ["Album", "t:Theme_Nature"], ["Tournament", "chapter_01"]]) {
+    const judged = judgeRewardClaim(rows, ownerType, ownerId);
+    assert.equal(judged.allow, false, `미저작 ${ownerType}/${ownerId} 은 거절이다`);
+    assert.equal(judged.specEmpty, false);
+    assert.equal(judged.reason, "RewardNotFound");
+  }
+
+  // 정점은 접두사가 chapter_ 가 아니라서 통과 편에 남는다 — 챕터를 가르며 정점을 같이 막지 않았는지 본다.
+  assert.equal(judgeRewardClaim(rows, "Tournament", "node_24").allow, true, "미저작 정점은 여전히 통과한다");
+  assert.equal(judgeRewardClaim(rows, "Tournament", "chapter_01").allow, false);
+}
+
+// ── 도감 낙인 키 해석: 못 읽는 모양은 추측하지 않는다 ───────────────────────
+{
+  assert.deepEqual(parseAlbumScope("b"), {kind: "album"});
+  assert.deepEqual(parseAlbumScope("t:Theme_Nature"), {kind: "theme", themeId: "Theme_Nature"});
+  assert.deepEqual(parseAlbumScope("p:Theme_Nature/P1"),
+    {kind: "page", themeId: "Theme_Nature", pageId: "P1"});
+
+  // 모양이 아니면 null — claimReward 가 이걸 보고 RewardNotFound 로 떨어뜨린다.
+  for (const bad of ["", "B", "Theme_Nature", "t:", "p:", "p:/P1", "p:Theme_Nature/", "p:A/B/C", "x:A", "bb"]) {
+    assert.equal(parseAlbumScope(bad), null, `'${bad}' 는 도감 낙인 키가 아니다`);
+  }
+}
+
+// ── 도감 완성 모수: 소유로 매번 다시 잰다 ───────────────────────────────────
+{
+  // AlbumEntry 실제 컬럼 그대로(id | themeId | pageId | cardId | order).
+  const entries = parseAlbumEntryRows([
+    {id: 1, themeId: "Theme_Nature", pageId: "P1", cardId: 11, order: 1},
+    {id: 2, themeId: "Theme_Nature", pageId: "P1", cardId: 12, order: 2},
+    {id: 3, themeId: "Theme_Nature", pageId: "P2", cardId: 13, order: 1},
+    {id: 4, themeId: "Theme_Fire", pageId: "P1", cardId: 14, order: 1},
+    // 못 읽는 줄은 모수에서 빠진다 — 넣으면 영영 완성되지 않는 페이지가 생긴다.
+    {id: 5, themeId: "", pageId: "P1", cardId: 15, order: 1},
+    {id: 6, themeId: "Theme_Fire", pageId: "P2", cardId: 0, order: 1},
+  ]);
+  assert.equal(entries.length, 4, "빈 키·0 이하 카드 id 줄은 버린다");
+
+  const page = albumScopeCardIds(entries, parseAlbumScope("p:Theme_Nature/P1"));
+  const theme = albumScopeCardIds(entries, parseAlbumScope("t:Theme_Nature"));
+  const album = albumScopeCardIds(entries, parseAlbumScope("b"));
+  assert.deepEqual(page, [11, 12]);
+  assert.deepEqual(theme, [11, 12, 13]);
+  assert.deepEqual(album, [11, 12, 13, 14]);
+
+  assert.equal(isCompleted(page, new Set([11, 12, 99])), true, "여분 소유는 완성을 막지 않는다");
+  assert.equal(isCompleted(page, new Set([11])), false);
+  assert.equal(missingCount(page, new Set([11])), 1);
+  assert.equal(isCompleted(theme, new Set([11, 12])), false, "페이지만 채운 것은 테마 완성이 아니다");
+  assert.equal(isCompleted(album, new Set([11, 12, 13, 14])), true);
+
+  // 표에 없는 범위는 모수 0 이고, 모수 0 은 완성이 아니다 — 빈 집합을 "다 모았다"로 읽으면 보상이 샌다.
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Void")), []);
+  assert.equal(isCompleted([], new Set([11, 12, 13, 14])), false, "모수 0 은 완성이 아니다");
+  assert.equal(isCompleted([], new Set()), false);
+}
+
+// ── 챕터 완주 모수: 클리어 정점으로 잰다 ────────────────────────────────────
+{
+  const chapters = parseChapterNodeRows([
+    {id: 1, chapterId: "chapter_01", nodeId: "node_01", order: 1},
+    {id: 2, chapterId: "chapter_01", nodeId: "node_02", order: 2},
+    {id: 3, chapterId: "chapter_02", nodeId: "node_03", order: 1},
+    {id: 4, chapterId: "chapter_02", nodeId: "", order: 2},
+  ]);
+  assert.equal(chapters.length, 3, "빈 정점 키 줄은 버린다");
+
+  const first = chapterNodeIds(chapters, "chapter_01");
+  assert.deepEqual(first, ["node_01", "node_02"]);
+  assert.equal(isCompleted(first, new Set(["node_01"])), false);
+  assert.equal(isCompleted(first, new Set(["node_01", "node_02"])), true);
+  assert.equal(isCompleted(first, new Set(["node_02", "node_01", "node_03"])), true, "순서는 상관없다");
+
+  // 저작되지 않은 챕터는 모수 0 이라 완주가 아니다.
+  assert.deepEqual(chapterNodeIds(chapters, "chapter_09"), []);
+  assert.equal(isCompleted(chapterNodeIds(chapters, "chapter_09"), new Set(["node_01"])), false);
 }
 
 // ── claimedTiers 상한: 룰(firestore.rules:98, size() <= 20)과 같이 움직인다 ──

@@ -263,15 +263,20 @@ public static class TournamentProgress
         return s_chapterProbe.Count > 0;
     }
 
-    // 챕터 완주 보상 수령(자격 = 완주 && 미수령). 지급·낙인·영속·통지가 한 트랜잭션이다
-    public static bool ClaimChapterReward(string _chapterId)
+    /// <summary>챕터 완주 보상 수령 — 자격 판정 · 지급 · 낙인을 서버가 한 트랜잭션으로 끝낸다.
+    /// 지급 성공 여부를 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    // 앞의 세 검사는 왕복을 아끼는 낙관 검사다 — 정점 수령과 같이 이기는 쪽은 언제나 서버다.
+    public static async UniTask<bool> ClaimChapterRewardAsync(string _chapterId)
     {
         int t_index = Config.ChapterIndexOf(_chapterId);
         if (t_index < 0) return false;
         if (!IsChapterComplete(t_index)) return false;
         if (ClaimedChapters.Contains(_chapterId)) return false;
 
-        PayoutChapter(_chapterId);
+        // 챕터 id 를 그대로 ownerId 로 보낸다 — 서버가 chapter_ 접두사를 보고 정점과 가른다.
+        if (!await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId)) return false;
+
+        OnChanged?.Invoke();
         return true;
     }
 
@@ -296,22 +301,6 @@ public static class TournamentProgress
         ClaimedChapters.Clear();
         Slot.PendingRewardNodeId = "";
         DataSaveManager.Save();
-        OnChanged?.Invoke();
-    }
-
-    // 챕터 완주 보상 지급 → 낙인 → 즉시 영속 → 통지.
-    // 정점과 달리 여전히 로컬 지급이다 — 챕터↔정점 대응이 TournamentConfig SO에만 있어 서버가 완주를 못 잰다.
-    static void PayoutChapter(string _chapterId)
-    {
-        var t_rewards = new List<RewardLine>();
-        Config.FillChapterRewards(_chapterId, t_rewards);
-
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
-
-        ClaimedChapters.Add(_chapterId);
-
-        CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 }

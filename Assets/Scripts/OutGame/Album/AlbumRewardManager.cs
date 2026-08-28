@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 
 // 앨범 3단(페이지·테마·앨범) 완성 보상의 static 수령 창구 — 캐시·Init 없이 세이브 슬롯 직독(초기화 무접촉)
 public static class AlbumRewardManager
@@ -41,16 +41,18 @@ public static class AlbumRewardManager
 
     public static bool CanClaimAlbum() => AlbumState() == EAlbumRewardState.Claimable;
 
-    public static bool ClaimPage(AlbumPage _page) => Claim(_page);
+    /// <summary>페이지 완성 보상 수령을 서버에 요청한다. 지급 성공 여부를 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    public static UniTask<bool> ClaimPage(AlbumPage _page) => Claim(_page);
 
-    public static bool ClaimTheme(AlbumTheme _theme) => Claim(_theme);
+    /// <summary>테마 완성 보상 수령을 서버에 요청한다.</summary>
+    public static UniTask<bool> ClaimTheme(AlbumTheme _theme) => Claim(_theme);
 
-    public static bool ClaimAlbum()
+    /// <summary>앨범 전체 완성 보상 수령을 서버에 요청한다.</summary>
+    public static UniTask<bool> ClaimAlbum()
     {
-        if (!CanClaimAlbum()) return false;
+        if (!CanClaimAlbum()) return UniTask.FromResult(false);
 
-        Payout(AlbumRewardKey, CardAlbum.AlbumRewards);
-        return true;
+        return RequestClaim(AlbumRewardKey);
     }
 
     static AlbumRewardInfo InfoOf(AlbumSection _section)
@@ -63,27 +65,22 @@ public static class AlbumRewardManager
             StateOf(_section));
     }
 
-    static bool Claim(AlbumSection _section)
+    // StateOf 선검사는 왕복을 아끼는 낙관 검사다 — 자격의 진실원은 서버이고, 여기서 통과해도 거절될 수 있다.
+    static UniTask<bool> Claim(AlbumSection _section)
     {
-        if (StateOf(_section) != EAlbumRewardState.Claimable) return false;
+        if (StateOf(_section) != EAlbumRewardState.Claimable) return UniTask.FromResult(false);
 
-        Payout(_section.RewardKey, _section.Rewards);
-        return true;
+        return RequestClaim(_section.RewardKey);
     }
 
-    // 보상 지급(리스트 전량) → 낙인 → 즉시 영속 → 통지
-    static void Payout(string _rewardKey, IReadOnlyList<AlbumRewardDef> _rewards)
+    // 지급·낙인·영속은 서버가 한 트랜잭션으로 끝낸다 — 응답 채택이 재화·앨범 보상 슬롯을 통째로 갈아끼우므로
+    // 클라가 여기서 더 쓸 것이 없다(낙인 키가 곧 서버 Reward.ownerId 라 변환도 없다).
+    static async UniTask<bool> RequestClaim(string _rewardKey)
     {
-        for (int t_i = 0; t_i < _rewards.Count; t_i++)
-        {
-            if (_rewards[t_i].amount <= 0) continue;
-            CurrencyManager.Earn(_rewards[t_i].currency, _rewards[t_i].amount);
-        }
-        Slot.ClaimedKeys.Add(_rewardKey);
+        if (!await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerAlbum, _rewardKey)) return false;
 
-        // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
-        CurrencyManager.Save();
         OnChanged?.Invoke();
+        return true;
     }
 
     static EAlbumRewardState StateOf(AlbumSection _section)

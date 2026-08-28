@@ -126,6 +126,22 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
 export type RewardClaimReject = "RewardNotFound" | "NotEligible";
 
 /**
+ * 챕터 완주 보상의 ownerId 접두사. 챕터는 ownerType 을 정점과 공유하고(둘 다 "Tournament")
+ * 이 접두사로만 갈린다 — 새 ownerType 을 만들면 Reward 표의 챕터 행까지 다시 저작해야 한다.
+ */
+export const CHAPTER_OWNER_PREFIX = "chapter_";
+
+/**
+ * ownerType "Tournament" 안에서 챕터 완주인가(아니면 정점이다). 판정 표와 명령이 같은
+ * 술어를 봐야 두 쪽이 다른 분기로 갈리지 않는다.
+ * @param {string} ownerId 소유자 키
+ * @return {boolean} 챕터 완주 키면 true
+ */
+export function isChapterOwnerId(ownerId: string): boolean {
+  return ownerId.startsWith(CHAPTER_OWNER_PREFIX);
+}
+
+/**
  * 보상 수령 자격 판정. allow 가 false 면 **문서를 쓰지 않는다** — 낙인도 남지 않는다.
  * specEmpty 는 "표를 통째로 못 읽음"이고, authored 는 "표는 읽혔고 그 소유자 행이 있다"이다. 둘은 다른 사건이다.
  */
@@ -138,10 +154,11 @@ export type RewardClaimJudgement =
  * 표를 못 읽은 것과 저작이 없는 것을 함께 삼키면 토너먼트는 클리어 낙인만 남고
  * 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
  *
- * 표는 읽혔는데 그 ownerId 행만 없는 경우는 저작 규약이다 — 토너먼트는 통과시켜 해금만 넘기고
- * (미저작 정점이 RewardPending 으로 굳으면 진행이 끊긴다), 랭크는 넘길 진행이 없으므로 거절한다.
+ * 표는 읽혔는데 그 ownerId 행만 없는 경우는 저작 규약이다 — **토너먼트 정점만** 통과시켜 해금을
+ * 넘긴다(미저작 정점이 RewardPending 으로 굳으면 진행이 끊긴다). 랭크 티어 · 도감 완성 · 챕터 완주는
+ * 넘길 진행이 없고 낙인만 남으므로 거절한다 — 통과시키면 나중에 보상을 저작해도 AlreadyClaimed 로 막힌다.
  * @param {RewardRow[]} rows Reward 표 전량
- * @param {string} ownerType Tournament | Rank
+ * @param {string} ownerType Tournament | Rank | Album
  * @param {string} ownerId 소유자 키
  * @return {RewardClaimJudgement} 허용 여부와 지급 목록
  */
@@ -151,7 +168,9 @@ export function judgeRewardClaim(rows: RewardRow[], ownerType: string, ownerId: 
   if (rows.length === 0) {
     return {allow: false, reason: "NotEligible", specEmpty: true, gains: [], dropped};
   }
-  if (gains.length === 0 && ownerType === "Rank") {
+
+  const carriesProgress = ownerType === "Tournament" && !isChapterOwnerId(ownerId);
+  if (gains.length === 0 && !carriesProgress) {
     return {allow: false, reason: "RewardNotFound", specEmpty: false, gains, dropped};
   }
   return {allow: true, authored: gains.length > 0, gains, dropped};

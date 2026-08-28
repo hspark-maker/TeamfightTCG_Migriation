@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -127,11 +128,14 @@ public class TournamentChapterBandView : MonoBehaviour
 
     // 수령은 흐름이 소유한다 — 자격 판정 · 팝업 · 지급이 한 자리에 있어야 띠와 판정이 갈리지 않는다.
     // 지급이 끝나면 OnChanged가 돌아 맵이 이 띠를 다시 그린다(여기서 직접 Refresh하지 않는 이유).
-    void OnClaimTapped()
+    // 버튼 리스너는 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 [획득]과 같은 형태).
+    void OnClaimTapped() => this.OpenClaimAsync().Forget();
+
+    async UniTaskVoid OpenClaimAsync()
     {
         if (this.m_index < 0) return;
 
-        TournamentChapterRewardFlow.Open(this.m_index);
+        await TournamentChapterRewardFlow.Open(this.m_index);
     }
 
     void BindRewardSlots()
