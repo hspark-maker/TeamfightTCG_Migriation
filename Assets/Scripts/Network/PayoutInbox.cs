@@ -71,7 +71,7 @@ static class PayoutInbox
             if (!await MatchResultSubmission.EnsureSignedIn() || t_generation != s_generation) return;
             HttpsCallableReference t_callable = FirebaseFunctions.GetInstance(FirebaseApp.DefaultInstance, Region)
                 .GetHttpsCallable("claimPayout");
-            HttpsCallableResult t_listResponse = await t_callable.CallAsync(new Dictionary<string, object>
+            HttpsCallableResult t_listResponse = await CallAsync(t_callable, new Dictionary<string, object>
             {
                 ["env"] = s_envId,
                 ["action"] = "list",
@@ -107,7 +107,7 @@ static class PayoutInbox
             }
 
             if (t_ackIds.Count == 0) return;
-            HttpsCallableResult t_ackResponse = await t_callable.CallAsync(new Dictionary<string, object>
+            HttpsCallableResult t_ackResponse = await CallAsync(t_callable, new Dictionary<string, object>
             {
                 ["env"] = s_envId,
                 ["action"] = "ack",
@@ -213,4 +213,11 @@ static class PayoutInbox
             JsonUtility.ToJson(new AppliedStore { matchIds = new List<string>(s_applied) }));
         LocalPrefs.Save();
     }
+
+    /// <summary>콜러블 왕복을 Firebase 세션 수명에 묶는다. 안 묶으면 에디터 정리가
+    /// Firestore <c>TerminateAsync</c> 에서 이 왕복을 기다리다 못 끝내고,
+    /// gRPC 네이티브 스레드가 남아 Unity가 "Reloading Domain"에서 멈춘다.</summary>
+    static UniTask<HttpsCallableResult> CallAsync(
+        HttpsCallableReference _callable, Dictionary<string, object> _payload)
+        => _callable.CallAsync(_payload).AsUniTask().AttachExternalCancellation(FirebaseManager.Lifetime);
 }

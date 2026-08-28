@@ -45,7 +45,16 @@ export const ensureAccount = onCall(async (request) => {
     env, uid, deviceId, appVersion, () => buildFreshAccountSlots(starter.cardIds),
   );
 
-  if (outcome.created) {
+  if (outcome.repaired) {
+    // 스키마 밖 문서를 버리고 다시 만들었다. 원인 추적이 되도록 버린 필드 이름을 남긴다.
+    logger.warn("ensureAccount repaired", {
+      uid,
+      env,
+      discardedFields: outcome.discardedFields,
+      starterCardIds: starter.cardIds,
+      starterSource: starter.source,
+    });
+  } else if (outcome.created) {
     logger.info("ensureAccount granted", {
       uid,
       env,

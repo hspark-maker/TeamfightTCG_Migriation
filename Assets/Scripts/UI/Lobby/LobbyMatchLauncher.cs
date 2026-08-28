@@ -232,6 +232,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         }
 
         TournamentRun.End();
+        m_matchShell?.Close();
         m_running = false;
         bool t_updated = t_result == EBattleContentGateResult.UpdatedRestartRequired;
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
@@ -269,17 +270,53 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (t_confirmed) EnterBattle();
     }
 
-    // 매칭 연출 → 상대 확정 → 출전 덱 확정. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
+    // 일반전은 출전 덱 확정 → 매칭 연출 → 상대 확정 순서다. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
+    // 고정 상대(토너먼트)와 튜토리얼은 상대가 이미 정해져 있으므로 기존처럼 상대를 먼저 확정한다.
     async UniTask<bool> RunEntryChainAsync(CancellationToken _ct, MatchOpponent? _preset = null)
     {
-        // 고정 상대(토너먼트 정점)는 뽑을 것이 없다 — 매칭 단계를 통째로 건너뛴다.
-        MatchOpponent? t_opponent = _preset;
         if (!_preset.HasValue && UseMatchmaking)
         {
-            t_opponent = await MatchShell.RunMatchAsync(Matchmaker, _ct);
-            if (t_opponent == null) return false;   // 취소 = 로비로 되돌아간다
+            // 덱 화면에는 아직 정해지지 않은 상대를 빈 칸으로 보인다. 직전 전투의 캐리어가 남아 있으면
+            // 새 상대처럼 보이므로 선택 화면을 열기 전에 명시적으로 비운다.
+            MatchOpponentHandoff.Clear();
+            DeckConfig.ClearEnemyDeck();
+
+            bool t_selected;
+            if (DeckShell == null)
+            {
+                Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
+                t_selected = TryApplyFirstValidDeck();
+            }
+            else
+            {
+                t_selected = await DeckShell.RunSelectionAsync(_ct);
+            }
+
+            if (!t_selected || _ct.IsCancellationRequested) return false;
+
+            // 매칭 화면을 먼저 세운 뒤 덱 화면을 내린다 — 두 오버레이 사이로 로비가 한 프레임 비치지 않게 한다.
+            MatchmakingShell t_matchShell = MatchShell;
+            if (t_matchShell == null)
+            {
+                DeckShell?.Close();
+                return false;
+            }
+
+            UniTask<MatchOpponent?> t_match = t_matchShell.RunMatchAsync(Matchmaker, _ct);
+            DeckShell?.Close();
+
+            // 아래 고정 상대 경로의 t_opponent와 이름을 나눈다 — 같은 이름은 메서드 선언 공간이 겹쳐 컴파일되지 않는다.
+            MatchOpponent? t_matched = await t_match;
+            if (t_matched == null) return false;   // 취소 = 로비로 되돌아간다
+
+            ConfirmOpponent(t_matched);
+
+            // 성공한 매칭 화면은 곧 시작될 씬 전환이 덮는다. 여기서 닫으면 콘텐츠 확인 동안 로비가 드러난다.
+            return true;
         }
 
+        // 고정 상대(토너먼트 정점)와 튜토리얼은 매칭을 타지 않는다.
+        MatchOpponent? t_opponent = _preset;
         ConfirmOpponent(t_opponent, _preset.HasValue);
 
         if (DeckShell == null)
@@ -305,9 +342,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         }
 
         // 앞세울 화면이 없는 경로(튜토리얼·셸 미배선)는 옮겨 앉힐 이전 화면도 없다 — 덱 화면이 곧장 뜬다.
-        if (_preset.HasValue || t_opponent == null) return await DeckShell.RunSelectionAsync(_ct);
-
-        return await RunSelectionWithHandoffAsync(_ct);
+        return await DeckShell.RunSelectionAsync(_ct);
     }
 
     // 대치 인트로 → 덱 화면. 매칭 경로(RunSelectionWithHandoffAsync)와 같은 규약이되 앞자리 화면만 다르다.
@@ -341,21 +376,6 @@ public class LobbyMatchLauncher : MonoBehaviour
 
             throw;
         }
-    }
-
-    // 매칭 화면 → 덱 화면. 덱 화면을 매칭 화면 "밑에" 먼저 세운 뒤, 매칭의 세 부품(내 카드·상대 카드·VS)이
-    // 새 화면의 제자리로 옮겨 앉는다. 커튼으로 덮지 않는 이유는 두 화면의 축이 이미 같기 때문이다 —
-    // 가리면 같은 무대라는 사실이 오히려 지워진다(자세한 규약은 MatchHandoffFx 참고).
-    async UniTask<bool> RunSelectionWithHandoffAsync(CancellationToken _ct)
-    {
-        MatchHandoffTargets t_targets = DeckShell.PrepareForHandoff();
-
-        // 선택 게이트는 전환이 도는 동안 시작해 첫 대기에서 멈춘다 — 전환이 끝난 프레임엔 이미 서 있어야 한다.
-        UniTask<bool> t_selection = DeckShell.RunSelectionAsync(_ct);
-
-        await m_matchShell.PlayHandoffAsync(t_targets, _ct);
-
-        return await t_selection;
     }
 
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.

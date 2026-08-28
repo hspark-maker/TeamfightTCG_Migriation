@@ -18,35 +18,31 @@ public enum ShufflePolicy
 
 public class BattleField : MonoBehaviour
 {
-    public const int SLOT_COUNT = 3;
+    // 슬롯 수의 진실원은 코어다 — 서버 재시뮬이 같은 값을 써야 하는데 코어는 이 어셈블리를 참조할 수 없다.
+    public const int SLOT_COUNT = TeamfightTCG.BattleCore.BattleState.SlotCount;
 
-    CardInstance[] slots = new CardInstance[SLOT_COUNT];
-    Queue<CardInstance> waitingQueue = new Queue<CardInstance>();
-    int ownerIndex;
+    readonly BattleFieldState state = new BattleFieldState();
 
     HealerEffect healerEffect;
 
     // 카드 영구 성장값 조회원. 인덱스 배열이 아니라 델리게이트인 이유는 셔플이 이 클래스 안에서 일어나기 때문 —
     // 카드로 조회하면 셔플 순서와 무관하게 맞는다. null이면 성장 미적용(= 기존 동작).
-    System.Func<int, CardGrowth> growthOf;
-
     // 이번 판에 확정 사망한 카드(슬롯에서 빠진 순서). 필드는 시체를 남기지 않으므로 —
     // RemoveCard가 슬롯을 null로 만들고 나면 그 CardInstance를 아무도 붙잡지 않는다 —
     // 빠지는 그 자리에서 적어두지 않으면 판이 끝난 뒤에는 "무엇을 잃었는가"를 복원할 방법이 없다.
-    readonly List<int> fallenCards = new List<int>();
-
-    public int OwnerIndex => this.ownerIndex;
-    public int WaitingCount => this.waitingQueue.Count;
-    public bool IsEmpty => !HasAnyCard();
+    internal BattleFieldState State => this.state;
+    public int OwnerIndex => this.state.OwnerIndex;
+    public int WaitingCount => this.state.WaitingCount;
+    public bool IsEmpty => this.state.IsEmpty;
 
     /// <summary>이번 판에 잃은 카드(사망 순서). 결과 화면이 "몇 장 중 몇 장을 지켰는가"를 그리는 출처다.
     /// <b>소비자는 플레이어 필드 하나뿐이다</b> — 상대 필드에도 똑같이 쌓이지만 읽는 곳이 없다
     /// (원격 미러는 상대 전사 목록의 정본이 아니다. 필요해지면 그때 경로를 확인하고 열 것).</summary>
-    public IReadOnlyList<int> FallenCards => this.fallenCards;
+    public IReadOnlyList<int> FallenCards => this.state.FallenCards;
 
     /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifyEntered)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
     /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
-    public int FlowStack { get; private set; }
+    public int FlowStack => this.state.FlowStack;
 
     /// <summary>이 덱으로 산출된 시너지 상태. 배틀 시작 시 1회 확정, 전투 중 불변. UI(SynergyPanelUI) 참조용.</summary>
     public SynergyState Synergy { get; private set; }
@@ -58,12 +54,7 @@ public class BattleField : MonoBehaviour
     public void Initialize(List<int> _deckData, int _ownerIndex, ShufflePolicy _shuffle,
         System.Func<int, CardGrowth> _growthOf = null)
     {
-        this.ownerIndex = _ownerIndex;
-        this.growthOf = _growthOf;
-        this.slots = new CardInstance[SLOT_COUNT];
-        this.waitingQueue.Clear();
-        this.fallenCards.Clear(); // 리매치로 인스턴스를 재사용하면 직전 판의 전사자가 결과 화면에 얹힌다
-        this.FlowStack = 0;
+        this.state.Reset(_ownerIndex, _growthOf);
         this.Synergy = null; // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
@@ -76,19 +67,19 @@ public class BattleField : MonoBehaviour
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {
-            var t_card = new CardInstance(t_shuffled[i], this.ownerIndex, GrowthOf(t_shuffled[i]));
+            var t_card = new CardInstance(t_shuffled[i], this.OwnerIndex, GrowthOf(t_shuffled[i]));
             if (i < SLOT_COUNT)
             {
                 t_card.isRevealed = true;
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
-                this.slots[i] = t_card;
+                this.state.SetSlot(i, t_card);
                 NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
             {
-                this.waitingQueue.Enqueue(t_card);
+                this.state.Enqueue(t_card);
             }
         }
     }
@@ -124,7 +115,7 @@ public class BattleField : MonoBehaviour
     }
 
     // 성장값 조회 단일 지점(미주입이면 default = 미적용). 카드 생성 경로가 늘어도 여기만 통과시킨다.
-    CardGrowth GrowthOf(int _cardId) => this.growthOf != null ? this.growthOf(_cardId) : default;
+    CardGrowth GrowthOf(int _cardId) => this.state.GrowthOf(_cardId);
 
     // 빈 슬롯에 대기 카드 순서대로 배치. 채운 카드 목록 반환.
     public List<CardInstance> FillEmptySlots()
@@ -132,15 +123,8 @@ public class BattleField : MonoBehaviour
         var t_placed = new List<CardInstance>();
         for (int i = 0; i < SLOT_COUNT; i++)
         {
-            if (this.slots[i] == null && this.waitingQueue.Count > 0)
+            if (this.state.TryFillSlot(i, out CardInstance t_card, out bool t_cunningReturn))
             {
-                var t_card = this.waitingQueue.Dequeue();
-                bool t_cunningReturn = t_card.returnedFromField && t_card.HasKeyword(CardKeyword.Cunning);
-                t_card.returnedFromField = false;
-                t_card.isRevealed = true;
-                t_card.wasEverRevealed = true;
-                t_card.slotIndex = i;
-                this.slots[i] = t_card;
                 NotifyEntered(t_card); // [Entered] 런타임 등장(패시브+시너지). justSpawned 판정 전 — 패시브가 무적 부여 가능.
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
                 t_placed.Add(t_card);
@@ -152,26 +136,14 @@ public class BattleField : MonoBehaviour
 
     public CardInstance SwapWithWaiting(CardInstance _card)
     {
-        if (this.waitingQueue.Count == 0) return null;
-
-        int t_slot = _card.slotIndex;
-        if (t_slot < 0 || t_slot >= SLOT_COUNT) return null;
-
-        CardInstance t_next = this.waitingQueue.Dequeue();
-        bool t_cunningReturn = t_next.returnedFromField && t_next.HasKeyword(CardKeyword.Cunning);
-        t_next.returnedFromField = false;
-        t_next.isRevealed = true;
-        t_next.wasEverRevealed = true;
-        t_next.slotIndex = t_slot;
-        this.slots[t_slot] = t_next;
+        if (!this.state.TryBeginSwapWithWaiting(_card, out CardInstance t_next,
+                out bool t_cunningReturn))
+            return null;
         NotifyEntered(t_next); // [Entered] 런타임 등장(패시브+시너지).
         t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
 
         // 재등장 턴의 TurnBegan 스킵 판정용. 현재 hp/bonusHp는 인스턴스에 그대로 유지한다.
-        _card.returnedFromField = true;
-        _card.slotIndex = -1;
-        _card.isRevealed = false;
-        this.waitingQueue.Enqueue(_card);
+        this.state.CompleteSwapWithWaiting(_card);
         return t_next;
     }
 
@@ -182,29 +154,14 @@ public class BattleField : MonoBehaviour
     /// _deckIndex는 호출부가 MatchRandom으로 산출(결정론, 멀티 확장 대비). 반환: 새로 슬롯에 들어온 카드(실패 시 null).</summary>
     public CardInstance MulliganSwap(int _slotIndex, int _deckIndex)
     {
-        if (_slotIndex < 0 || _slotIndex >= SLOT_COUNT) return null;
-        if (this.waitingQueue.Count == 0) return null;
-        CardInstance t_out = this.slots[_slotIndex];
-        if (t_out == null) return null;
+        CardInstance t_in = this.state.MulliganSwap(_slotIndex, _deckIndex);
+        if (t_in == null) return null;
 
         // 대기열에서 _deckIndex 카드 추출. Queue는 임의 위치 제거가 없어 리스트(FIFO 순서) 경유로 재구성 — 양측 동일 알고리즘이라 결정론.
-        int t_idx = Mathf.Clamp(_deckIndex, 0, this.waitingQueue.Count - 1);
-        var t_list = new List<CardInstance>(this.waitingQueue);
-        CardInstance t_in = t_list[t_idx];
-        t_list.RemoveAt(t_idx);
 
         // 스왑-인 배치(오프닝 슬롯 카드와 동형). 시너지 재적용 없음.
-        t_in.isRevealed = true;
-        t_in.wasEverRevealed = true;
-        t_in.slotIndex = _slotIndex;
-        this.slots[_slotIndex] = t_in;
 
         // 스왑-아웃 카드 → 대기열 뒤로. 전투 시작 전 멀리건이므로 교활 복귀 플래그는 설정하지 않는다.
-        t_out.slotIndex = -1;
-        t_out.isRevealed = false;
-        t_list.Add(t_out);
-
-        this.waitingQueue = new Queue<CardInstance>(t_list);
 
         NotifyPlaced(t_in); // [Placed] 오프닝 배치 경로(패시브 OnPlaced + 시너지 Placed). Initialize+ApplyDeckSynergy가 슬롯 카드에 준 것과 동형.
         t_in.justSpawned = t_in.HasKeyword(CardKeyword.Invincible);
@@ -214,9 +171,7 @@ public class BattleField : MonoBehaviour
 
     public bool CanSwapWithWaiting(CardInstance _card)
     {
-        if (this.waitingQueue.Count == 0) return false;
-        int t_slot = _card?.slotIndex ?? -1;
-        return t_slot >= 0 && t_slot < SLOT_COUNT;
+        return this.state.CanSwapWithWaiting(_card);
     }
 
     /// <summary>슬롯 하나를 비운다. <b>사망 정리 전용</b>이라 여기서 전사 기록을 남긴다 —
@@ -225,49 +180,29 @@ public class BattleField : MonoBehaviour
     /// 사망 외 용도로 이걸 부르기 시작하면 결과 화면의 전사 목록이 조용히 오염된다.</summary>
     public void RemoveCard(int _slotIndex)
     {
-        CardInstance t_card = this.slots[_slotIndex];
-        if (t_card != null)
-        {
-            t_card.slotIndex = -1;
-            this.fallenCards.Add(t_card.cardId);
-        }
-
-        this.slots[_slotIndex] = null;
+        this.state.RemoveCard(_slotIndex);
         NotifyBoardChanged(); // 보드 구성 변화 → 라이브 카운트 파생 상태 재동기
     }
 
     /// <summary>셔플된 카드 ID 배열 반환. 배틀 초기화 후 broadcast용.</summary>
     public int[] GetShuffledIds()
     {
-        var t_ids = new System.Collections.Generic.List<int>();
-        for (int i = 0; i < SLOT_COUNT; i++)
-        {
-            if (this.slots[i] != null)
-                t_ids.Add(this.slots[i].cardId);
-        }
-
-        foreach (CardInstance t_c in this.waitingQueue)
-            t_ids.Add(t_c.cardId);
-        return t_ids.ToArray();
+        return this.state.GetOrderedCardIds();
     }
 
     /// <summary>상대방에게 받은 카드 ID와 최종 성장 스냅샷으로 enemyField를 재구성한다.</summary>
     public void InitializeFromRemote(int[] _ids, CardGrowth[] _growth, int _ownerIndex)
     {
-        this.ownerIndex = _ownerIndex;
         var t_growthById = new Dictionary<int, CardGrowth>(_ids?.Length ?? 0);
         if (_ids != null && _growth != null)
         {
             for (int i = 0; i < _ids.Length && i < _growth.Length; i++)
                 t_growthById[_ids[i]] = _growth[i];
         }
-        this.growthOf = _cardId => t_growthById.TryGetValue(_cardId, out CardGrowth t_value)
+        System.Func<int, CardGrowth> t_growthOf = _cardId => t_growthById.TryGetValue(_cardId, out CardGrowth t_value)
             ? t_value
             : default;
-        this.slots = new CardInstance[SLOT_COUNT];
-        this.waitingQueue.Clear();
-        this.fallenCards.Clear();
-        this.FlowStack = 0;
+        this.state.Reset(_ownerIndex, t_growthOf);
         this.Synergy = null; // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
@@ -282,13 +217,13 @@ public class BattleField : MonoBehaviour
                 t_card.slotIndex = i;
                 t_card.isRevealed = true;
                 t_card.wasEverRevealed = true;
-                this.slots[i] = t_card;
+                this.state.SetSlot(i, t_card);
                 NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
             {
-                this.waitingQueue.Enqueue(t_card);
+                this.state.Enqueue(t_card);
             }
         }
     }
@@ -306,27 +241,18 @@ public class BattleField : MonoBehaviour
         // 미러 대기 인스턴스 dequeue (소유 클라 FillEmptySlots 소비와 lockstep: SwapWithWaiting은 양측이
         // 동일 순서로 큐를 변형, FillEmptySlots dequeue를 이 dequeue가 미러). cardId(참조 동일성)로 정합 검증.
         CardInstance t_card;
-        if (this.waitingQueue.Count > 0 && this.waitingQueue.Peek().cardId == _cardId)
-        {
-            t_card = this.waitingQueue.Dequeue();
-        }
-        else
+        if (!this.state.TryTakeMatchingWaiting(_cardId, out t_card))
         {
             // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
             Debug.LogError($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
-                             $"(slot={_slot}, cardId={_cardId}, waiting={this.waitingQueue.Count})");
-            t_card = new CardInstance(_cardId, this.ownerIndex, GrowthOf(_cardId)); // 성장원도 Initialize와 같은 소스로
+                             $"(slot={_slot}, cardId={_cardId}, waiting={this.state.WaitingCount})");
+            t_card = new CardInstance(_cardId, this.OwnerIndex, GrowthOf(_cardId)); // 성장원도 Initialize와 같은 소스로
             if (this.Synergy != null)
                 SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });
         }
 
         // FillEmptySlots와 동형: 교활 복귀 플래그 소비 + 슬롯 세팅 + justSpawned 판정.
-        bool t_cunningReturn = t_card.returnedFromField && t_card.HasKeyword(CardKeyword.Cunning);
-        t_card.returnedFromField = false;
-        t_card.slotIndex = _slot;
-        t_card.isRevealed = true;
-        t_card.wasEverRevealed = true;
-        this.slots[_slot] = t_card;
+        this.state.PlaceIncoming(_slot, t_card, out bool t_cunningReturn);
         NotifyEntered(t_card); // [Entered] 런타임 등장. 원격 미러도 소유 클라와 동형 발화.
         t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
         return t_card;
@@ -340,7 +266,7 @@ public class BattleField : MonoBehaviour
     public void ApplyDeckSynergy()
     {
         var t_cards = new List<CardInstance>(GetActiveCards());
-        t_cards.AddRange(this.waitingQueue);
+        t_cards.AddRange(this.state.GetWaitingCards());
 
         // 성장 카드의 시너지는 1차 진화부터 카운트한다. CardData만 넘기기 전에 인스턴스에서
         // 필터해야 Resolver가 성장 계층을 알지 않아도 되고 기존 순수 집계 계약도 유지된다.
@@ -354,8 +280,10 @@ public class BattleField : MonoBehaviour
         // (패시브 Placed만 Initialize에서 발화 — justSpawned 판정에 무적 부여를 반영해야 하므로).
         // 그래서 시너지 Placed는 스냅샷이 확정된 여기서 슬롯 카드에 대해 발화한다.
         for (int i = 0; i < SLOT_COUNT; i++)
-            if (this.slots[i] != null)
-                SynergyTriggers.Placed(new SpawnCtx(this.slots[i], this));
+        {
+            CardInstance t_placed = this.state.GetSlot(i);
+            if (t_placed != null) SynergyTriggers.Placed(new SpawnCtx(t_placed, this));
+        }
 
         NotifyBoardChanged(); // 오프닝 배치분에도 라이브 카운트 파생 상태를 깔아준다(Entered는 오프닝에 미발화)
     }
@@ -370,7 +298,7 @@ public class BattleField : MonoBehaviour
         // 파생 보드 상태를 쓰는 효과도 IsAlive로 거르므로 "라이브"의 정의를 양쪽 일치시킨다.
         for (int i = 0; i < SLOT_COUNT; i++)
         {
-            CardInstance t_c = this.slots[i];
+            CardInstance t_c = this.state.GetSlot(i);
             if (t_c == null || !t_c.IsAlive) continue;
         }
 
@@ -386,7 +314,7 @@ public class BattleField : MonoBehaviour
     }
 
     /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
-    public void AddFlowStack(int _amount) => this.FlowStack += _amount;
+    public void AddFlowStack(int _amount) => this.state.AddFlowStack(_amount);
 
     // [Entered] 런타임 등장 공통 후처리(패시브 → 시너지 순서 고정).
     // Placed(오프닝 배치)와 혼동 금지 — 오프닝은 시너지 미발화가 의도(등장=런타임 스폰만).
@@ -402,52 +330,27 @@ public class BattleField : MonoBehaviour
     /// bonusHp 제거. data.maxHp(공유 에셋)는 건드리지 않음 — 인스턴스 hp만.</summary>
     public void OverrideAllHp(int _hp)
     {
-        if (_hp <= 0) return;
-        foreach (CardInstance t_c in GetActiveCards())
-        {
-            t_c.hp = Mathf.Min(t_c.hp, _hp);
-            t_c.bonusHp = 0;
-        }
-
-        foreach (CardInstance t_c in this.waitingQueue)
-        {
-            t_c.hp = Mathf.Min(t_c.hp, _hp);
-            t_c.bonusHp = 0;
-        }
+        this.state.OverrideAllHp(_hp);
     }
 
     /// <summary>슬롯 조회. 범위 밖은 예외가 아니라 null이다 — 이 함수는 와이어에서 온 raw int가
     /// 그대로 흘러드는 경로(수신 공격/스폰 미러)에 노출돼 있어서, 범위를 안 보면 손상·조작 패킷 하나가
     /// 수신 클라를 IndexOutOfRangeException으로 세운다. 호출부는 이미 전부 null 분기를 갖고 있다.</summary>
     public CardInstance GetSlot(int _index)
-        => _index >= 0 && _index < SLOT_COUNT ? this.slots[_index] : null;
-    public IEnumerable<CardInstance> GetWaitingCards() => this.waitingQueue;
+        => this.state.GetSlot(_index);
+    public IEnumerable<CardInstance> GetWaitingCards() => this.state.GetWaitingCards();
 
     /// <summary>슬롯을 점유한 카드 수(hp 0으로 아직 정리 전인 카드 포함 — <see cref="GetActiveCards"/>와 같은 집합).
     /// GetActiveCards()는 부를 때마다 리스트를 새로 만든다. 개수만 필요한 판정
     /// (전투 종료 예측의 사전 게이트 등)은 이쪽을 써서 매 공격 할당을 만들지 않는다.</summary>
     public int ActiveCount
     {
-        get
-        {
-            int t_count = 0;
-            for (int i = 0; i < SLOT_COUNT; i++)
-                if (this.slots[i] != null)
-                    t_count++;
-            return t_count;
-        }
+        get => this.state.ActiveCount;
     }
 
     public List<CardInstance> GetActiveCards()
     {
-        var t_result = new List<CardInstance>();
-        for (int i = 0; i < SLOT_COUNT; i++)
-        {
-            if (this.slots[i] != null)
-                t_result.Add(this.slots[i]);
-        }
-
-        return t_result;
+        return this.state.GetActiveCards();
     }
 
     // 이 필드를 공격할 때 유효한 타깃. 필터 규칙(지정 타깃 > 도발 > 전체)은 BattleRules.ValidTargets 단독 —
@@ -460,16 +363,6 @@ public class BattleField : MonoBehaviour
     /// <summary>이 필드를 향한 공격이 규칙상 허용되는가. 턴 로직의 백스톱 진입점.</summary>
     public bool CanAttack(CardInstance _attacker, CardInstance _target)
         => BattleRules.CanAttack(_attacker, _target, GetActiveCards(), TurnState.ForcedTargetFor(_attacker));
-
-    bool HasAnyCard()
-    {
-        for (int i = 0; i < SLOT_COUNT; i++)
-        {
-            if (this.slots[i] != null) return true;
-        }
-
-        return this.waitingQueue.Count > 0;
-    }
 
     /// <summary>Fisher-Yates. 난수원은 정책이 정한다 — 필드가 모드 플래그를 읽지 않는다.
     /// Match면 MatchRandom(결정론 스트림)을 소비하므로 **양측 소비 횟수가 같아야 한다**:

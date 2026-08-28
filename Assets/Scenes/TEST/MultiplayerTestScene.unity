@@ -350,8 +350,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   roomName: TestRoom
   useRandomMatch: 0
-  autoConnectOnStart: 1
-  deckCardIds: 010000000200000003000000040000000500000006000000
+  deckCardIds: 
+  testAccountId: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

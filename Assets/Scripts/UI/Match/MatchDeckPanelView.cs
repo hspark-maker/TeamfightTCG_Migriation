@@ -10,8 +10,8 @@ using UnityEngine.UI;
 // 어떤 저장 슬롯이 선택됐는지는 이 뷰가 아니라 셸(MatchDeckShell)이 안다 — 여기는 상태를 들지 않는 순수 렌더러다.
 // 덱 데이터의 진실원은 내 쪽이 DeckSaveManager, 상대 쪽이 DeckConfig.EnemyDeck이고
 // 이 뷰는 매 Render마다 거기서 다시 읽는다(사본을 캐시하지 않는다).
-// 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다 — 게이트를 열기 전에
-// LobbyMatchLauncher.ConfirmOpponent가 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
+// 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다. 고정 상대·튜토리얼은 호스트가 미리 싣고,
+// 일반전은 매칭 전이라 비어 있다. 확정 뒤에는 전투가 같은 캐리어를 소비한다.
 public class MatchDeckPanelView : MonoBehaviour
 {
     [SerializeField] MatchDeckShell   shell;
@@ -85,7 +85,7 @@ public class MatchDeckPanelView : MonoBehaviour
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
-    // 캐리어가 비어 있으면(=호스트가 확정하지 못한 경우) 전 칸이 빈 칸으로 접힌다.
+    // 캐리어가 비어 있으면(=일반전 매칭 전) 전 칸이 빈 칸으로 접힌다.
     // 멀티는 상대 덱이 이 화면보다 늦게(배틀 씬의 SyncInitialDecks) 도착하므로 애초에 이 화면을 열지 않는다.
     void RenderEnemySlots()
     {

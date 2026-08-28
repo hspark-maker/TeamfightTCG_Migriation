@@ -7,7 +7,7 @@ using UnityEngine;
 // 전용 카메라가 이 무대를 RenderTexture에 그리고, 해금 인트로의 RawImage가 그 텍스처를 받는다 —
 // 파티클은 월드 스페이스라 Screen Space Overlay 캔버스에 직접 얹히지 않기 때문이다.
 //
-// ⚠ 규칙을 돌리지 않는다. AttackSequence는 _onEffect 하나로 연출과 규칙이 갈려 있어,
+// ⚠ 규칙을 돌리지 않는다. 빈 BattleEvent 목록은 피해 0으로 읽혀 모션과 파티클만 재생한다.
 //   거기에 null을 넘기면 체력이 안 깎이고 모션·파티클만 돈다(피해 = 콜백 전후 HpTotal 차).
 //   RNG·세이브·전투 상태 어디에도 닿지 않는다.
 //
@@ -288,7 +288,7 @@ public class KeywordDemoStage : SingletonOverlayBase
         }
     }
 
-    // 공격 한 번. _onEffect를 넘기지 않는 것이 이 무대의 규약이다 — 넘기는 순간 체력이 깎인다.
+    // 공격 한 번. 빈 이벤트 목록을 넘기는 것이 이 무대의 규약이다 — 체력은 바꾸지 않는다.
     // _forceSpecial: false로 시네마를 끈다(3단계 진화 카드가 첫 공격에 클로즈업으로 튀는 것을 막는다).
     UniTask Swing(CardView _atk, CardView _def, CardView _splash, CancellationToken _token)
     {
@@ -299,7 +299,7 @@ public class KeywordDemoStage : SingletonOverlayBase
         CardView t_splashView = _splash != null && _splash.gameObject.activeSelf ? _splash : null;
 
         return AttackSequence.PlaySplash(_atk, _def,
-                                         _onEffect: null, _splashView: t_splashView,
+                                         _events: System.Array.Empty<TeamfightTCG.BattleCore.BattleEvent>(), _splashView: t_splashView,
                                          _preEffectKw: t_preKw, _atEffectKw: t_atKw,
                                          _forceSpecial: false);
     }

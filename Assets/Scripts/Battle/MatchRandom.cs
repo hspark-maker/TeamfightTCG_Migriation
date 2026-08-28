@@ -1,5 +1,6 @@
 using System;
 using System.Security.Cryptography;
+using TeamfightTCG.BattleCore;
 
 /// <summary>
 /// 멀티플레이어 결정론 RNG. 양 클라이언트가 동일 시드 + 동일 소비 순서로 같은 결과 재현.
@@ -15,40 +16,32 @@ public static class MatchRandom
 {
     public struct DerivedStream
     {
-        ulong state;
+        DeterministicRandom stream;
 
         internal DerivedStream(ulong _seed)
-            => this.state = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;
-
-        public int Range(int _maxExclusive)
         {
-            if (_maxExclusive <= 1) return 0;
-            this.state += 0x9E3779B97F4A7C15UL;
-            ulong t_z = this.state;
-            t_z = (t_z ^ (t_z >> 30)) * 0xBF58476D1CE4E5B9UL;
-            t_z = (t_z ^ (t_z >> 27)) * 0x94D049BB133111EBUL;
-            return (int)((t_z ^ (t_z >> 31)) % (ulong)_maxExclusive);
+            this.stream = default;
+            this.stream.Seed(_seed);
         }
+
+        public int Range(int _maxExclusive) => this.stream.Range(_maxExclusive);
     }
 
-    static ulong s_state;
+    static DeterministicRandom s_stream;
     static ulong s_initialSeed;
-    static bool  s_seeded;
 
-    public static bool IsSeeded => s_seeded;
+    public static bool IsSeeded => s_stream.IsSeeded;
     public static ulong InitialSeed => s_initialSeed;
 
     /// <summary>스트림 전진 횟수. Range(n)은 n&lt;=1이면 전진하지 않으므로 이 값이 곧 '실제 소비 횟수'.
     /// 양 클라가 같은 시점에 같은 값이어야 함 — 어긋나면 그 순간부터 영구 divergence.
     /// 테스트 assert용 + 멀티 desync 카나리아용(현재 divergence 탐지 수단이 이것뿐).</summary>
-    public static int DrawCount { get; private set; }
+    public static int DrawCount => s_stream.DrawCount;
 
     public static void Seed(ulong _seed)
     {
         s_initialSeed = _seed;
-        s_state   = _seed == 0 ? 0x9E3779B97F4A7C15UL : _seed;  // 0-state 회피
-        s_seeded  = true;
-        DrawCount = 0;
+        s_stream.Seed(_seed);
     }
 
     /// <summary>싱글플레이용 로컬 랜덤 시드.</summary>
@@ -56,22 +49,15 @@ public static class MatchRandom
 
     public static void Reset()
     {
-        s_state   = 0;
+        s_stream.Reset();
         s_initialSeed = 0;
-        s_seeded  = false;
-        DrawCount = 0;
     }
 
     /// <summary>공유 전투 RNG의 DrawCount를 소비하지 않는 owner별 독립 셔플 스트림.</summary>
     public static DerivedStream DeriveDeckStream(int _ownerIndex)
     {
-        if (!s_seeded) throw new InvalidOperationException("MatchRandom seed is not initialized.");
-        ulong t_seed = s_initialSeed ^ (0xD1B54A32D192ED03UL * (ulong)(_ownerIndex + 1));
-        t_seed += 0x9E3779B97F4A7C15UL;
-        ulong t_z = t_seed;
-        t_z = (t_z ^ (t_z >> 30)) * 0xBF58476D1CE4E5B9UL;
-        t_z = (t_z ^ (t_z >> 27)) * 0x94D049BB133111EBUL;
-        return new DerivedStream(t_z ^ (t_z >> 31));
+        if (!IsSeeded) throw new InvalidOperationException("MatchRandom seed is not initialized.");
+        return new DerivedStream(DeterministicRandom.DeriveDeckSeed(s_initialSeed, _ownerIndex));
     }
 
     // splitmix64
@@ -79,15 +65,9 @@ public static class MatchRandom
     {
         // 시드 전 소비 = 0-state 회피값으로 시작하는 고정 시퀀스가 나가고, 뒤늦은 Seed가 스트림을 리셋해
         // 소비 순서가 어긋난다(멀티면 그 순간부터 영구 divergence). 컴파일러가 못 잡으니 런타임 카나리아.
-        if (!s_seeded)
+        if (!IsSeeded)
             UnityEngine.Debug.LogError("[MatchRandom] 시드 전 소비 — 시드 지점(GameInitializer/SyncInitialDecks)보다 앞선 호출이 있다.");
-
-        DrawCount++;
-        s_state += 0x9E3779B97F4A7C15UL;
-        ulong z = s_state;
-        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-        return z ^ (z >> 31);
+        return s_stream.NextU64();
     }
 
     /// <summary>[0, _maxExclusive) 균등. UnityEngine.Random.Range(0, n) 대체.</summary>

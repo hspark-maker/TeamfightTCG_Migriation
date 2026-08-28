@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 /// <summary>
@@ -10,7 +11,7 @@ using UnityEngine;
 /// - 내 field FillEmptySlots 후 스폰 브로드캐스트
 /// - WaitForOpponentReady 이후 상대 스폰 반영 + fill anim
 /// </summary>
-public class MultiplayerPlayerTurn : TurnBase
+public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 {
     CardInstance forcedAttacker;
     bool turnDone;
@@ -128,19 +129,23 @@ public class MultiplayerPlayerTurn : TurnBase
         var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
             _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
 
-        AttackResult t_result = default;
         bool t_derivedCommand = BattleUxFlags.ExecutionRandomTarget && ReferenceEquals(this.forcedAttacker, _attacker);
-        Action t_onEffect = () => t_result = AttackProcessor.Execute(
-            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
-            t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
-
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
         await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
                                          t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
+        AttackResult t_result;
+        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
+        {
+            t_result = AttackProcessor.Execute(
+                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+                t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
+            t_result.events = t_events.ToArray();
+        }
+
         await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            t_onEffect, t_preKw, t_atKw,
+            t_result.events, t_preKw, t_atKw,
             () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.

@@ -21,8 +21,41 @@ import {
   validateBattleCommands,
 } from "../battleCommand";
 import {HEX_16, HEX_32, HEX_64} from "../match/payloadGuards";
+import {simulateBattle, BattleSimulationResult} from "../battleSimulation";
+import {CardSnapshot, CardSpecForValidation, parseCardSpecRow} from "../deckValidation";
+import {readSpecRows} from "../specs/specBlobReader";
+import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
+
+// 서버 재시뮬레이션 권위 스위치. 골든 벡터 검증 전까지 섀도(false)로 둔다.
+// 켜기 전 확인할 것: (1) C#/TS finalStateHash 일치 벡터, (2) Card 표에 maxHp·synergies·
+// defaultEvolutionStage 업로드 완료, (3) clientDivergence 실측률.
+const SERVER_SIMULATION_AUTHORITATIVE = false;
+
+// 턴별 체크포인트는 골든 대조용 진단 데이터다 — 매치 문서에 영속할 이유가 없다.
+// 명령 상한이 1024라 수백 엔트리가 붙을 수 있고, 같은 문서에 이미 두 클라의 base64 명령 로그가 들어 있다.
+function persistableSimulation(_result: BattleSimulationResult | null): unknown {
+  if (_result == null) return null;
+  const rest: Record<string, unknown> = {..._result};
+  delete rest.checkpoints;
+  return rest;
+}
 
 const SUBMISSION_DEADLINE_MS = 120_000;
+
+function authoritativeInputsAgree(a: Submission, b: Submission): string | null {
+  if (a.uid === b.uid) return "same_uid";
+  const seedSource = a.seedSource ?? "commit_reveal";
+  if (seedSource !== (b.seedSource ?? "commit_reveal")) return "seed_source_mismatch";
+  if (seedSource === "commit_reveal" &&
+      (a.myNonce !== b.opponentNonce || a.opponentNonce !== b.myNonce)) return "nonce_mismatch";
+  if (a.myDeckHash !== b.opponentDeckHash || a.opponentDeckHash !== b.myDeckHash) return "deck_mismatch";
+  if (a.contentFingerprint !== b.contentFingerprint) return "content_mismatch";
+  if ((a.commandLogVersion ?? 0) !== 1 || b.commandLogVersion !== 1) return "command_log_required";
+  if (a.commandLogTruncated || b.commandLogTruncated) return "command_log_truncated";
+  if (a.commandCount !== b.commandCount || a.commandLogHash !== b.commandLogHash ||
+      a.commandLog !== b.commandLog) return "command_log_mismatch";
+  return null;
+}
 
 type SubmitData = Omit<Submission, "uid" | "submittedAt"> & {
   env: "live" | "test";
@@ -114,16 +147,28 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseSubmitData(request.data);
+  if (data.seedSource !== "server") {
+    throw new HttpsError("failed-precondition", "legacy match results are not authoritative");
+  }
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
-  const [rewardSnapshot, rankSnapshot] = await Promise.all([
-    db.collection(`envs/${data.env}/specs/Reward/rows`).get(),
-    db.collection(`envs/${data.env}/specs/RankGrade/rows`).get(),
+  const cardTable = data.env === "test" ? "Card_Test" : "Card";
+  // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
+  const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
+    readSpecRows(data.env, "Reward"),
+    readSpecRows(data.env, "RankGrade"),
+    readSpecRows(data.env, cardTable),
   ]);
   let rewardRows;
   let rankRows;
+  const cardSpecs = new Map<number, CardSpecForValidation>();
   try {
-    rewardRows = parseRewardRows(rewardSnapshot.docs.map((doc) => doc.data()));
-    rankRows = parseRankGradeRows(rankSnapshot.docs.map((doc) => doc.data()));
+    rewardRows = parseRewardRows(rewardSpecRows as Record<string, unknown>[]);
+    rankRows = parseRankGradeRows(rankSpecRows as Record<string, unknown>[]);
+    for (const row of cardSpecRows) {
+      const spec = parseCardSpecRow(row);
+      if (spec == null) throw new Error(`invalid card spec:${cardTable}/${row.id}`);
+      cardSpecs.set(spec.id, spec);
+    }
   } catch (error) {
     logger.error("payout_spec_invalid", {env: data.env, error});
     throw new HttpsError("failed-precondition", "payout specs are unavailable");
@@ -157,7 +202,25 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     const createdAt = match?.createdAt instanceof Timestamp ? match.createdAt : Timestamp.now();
     const expiresAt = Timestamp.fromMillis(createdAt.toMillis() + 7 * 24 * 60 * 60 * 1000);
 
-    const decision = decideMatch(entries, createdAt.toMillis(), Timestamp.now().toMillis(), SUBMISSION_DEADLINE_MS);
+    const rawRulesetVersion = match?.rulesetVersion;
+    const rulesetVersion = Number.isInteger(rawRulesetVersion) ? rawRulesetVersion as number : 0;
+    // 서버 재시뮬레이션은 ruleset 2부터 **돌지만**, 그 결과로 정산할지는 이 스위치가 정한다.
+    // false = 섀도: 결과를 문서에 기록만 하고 승패·지급은 기존 두 클라 합의(decideMatch)가 소유한다.
+    // C#/TS 골든 벡터로 finalStateHash 일치가 증명되기 전에는 true 로 올리지 마라 —
+    // 리졸버가 한 곳만 틀려도 실제 승자가 패배 정산(골드 flat + 랭크 감점)을 받는다.
+    const simulateRules = rulesetVersion >= SERVER_AUTHORITATIVE_RULESET_VERSION;
+    const authoritativeRules = SERVER_SIMULATION_AUTHORITATIVE && simulateRules;
+    const nowMs = Timestamp.now().toMillis();
+    const decision = authoritativeRules ?
+      entries.length < 2 ?
+        (nowMs - createdAt.toMillis() > SUBMISSION_DEADLINE_MS ?
+          {status: "flagged" as const, reason: "single_submission"} : {status: "pending" as const}) :
+        entries.length > 2 ? {status: "flagged" as const, reason: "too_many_submissions"} :
+          (() => {
+            const reason = authoritativeInputsAgree(entries[0], entries[1]);
+            return reason ? {status: "flagged" as const, reason} : {status: "confirmed" as const};
+          })() :
+      decideMatch(entries, createdAt.toMillis(), nowMs, SUBMISSION_DEADLINE_MS);
     if (decision.status === "pending") {
       tx.set(matchRef, {status: "pending", submissions, createdAt, expiresAt,
         deadlineAt: Timestamp.fromMillis(createdAt.toMillis() + SUBMISSION_DEADLINE_MS)}, {merge: true});
@@ -167,6 +230,68 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       tx.set(matchRef, {status: "flagged", reason: decision.reason, submissions,
         settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
       return {status: "flagged", reason: decision.reason};
+    }
+
+    let serverSimulation: BattleSimulationResult | null = null;
+    let clientDivergence: Record<string, unknown> | null = null;
+    let ownerIndexByUid: Record<string, number> | null = null;
+    if (simulateRules) {
+      const participantUids = match?.participantUids;
+      const approvals = match?.approvals as Record<string, Record<string, unknown>> | undefined;
+      const seedHex = match?.seedHex;
+      if (!Array.isArray(participantUids) || participantUids.length !== 2 ||
+          typeof seedHex !== "string" || approvals == null) {
+        serverSimulation = {ok: false, reason: "server_match_contract_missing"};
+      } else {
+        const decks: unknown[] = [null, null];
+        ownerIndexByUid = {};
+        for (const participant of participantUids as string[]) {
+          const approval = approvals[participant];
+          const ownerIndex = approval?.ownerIndex;
+          if ((ownerIndex !== 0 && ownerIndex !== 1) || decks[ownerIndex] != null) continue;
+          decks[ownerIndex] = approval.cardSnapshots;
+          ownerIndexByUid[participant] = ownerIndex;
+        }
+        const commandLog = entries[0].commandLog ?? "";
+        if (!Array.isArray(decks[0]) || !Array.isArray(decks[1]) ||
+            (entries[0].commandLogVersion ?? 0) !== 1 || entries[0].commandLogTruncated) {
+          serverSimulation = {ok: false, reason: "server_replay_input_missing"};
+        } else {
+          serverSimulation = simulateBattle({
+            seedHex,
+            decks: [decks[0] as CardSnapshot[], decks[1] as CardSnapshot[]],
+            specs: cardSpecs,
+            commandLog,
+          });
+        }
+      }
+      const simulationReason = serverSimulation.ok ? null : serverSimulation.reason ?? "unknown";
+      // 섀도에서는 재생 실패가 정산을 막지 않는다 — 기록만 하고 기존 합의 경로로 계속 간다.
+      if (simulationReason != null && authoritativeRules) {
+        const reason = `server_simulation_${simulationReason}`;
+        tx.set(matchRef, {status: "flagged", reason, submissions,
+          serverSimulation: persistableSimulation(serverSimulation),
+          settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
+        return {status: "flagged", reason};
+      }
+      const outcomeMismatches: string[] = [];
+      if (serverSimulation.ok) {
+        for (const entry of entries) {
+          const owner = ownerIndexByUid?.[entry.uid] ?? -1;
+          if (owner < 0 || entry.won !== (serverSimulation.winnerOwner === owner) ||
+            entry.myRemaining !== serverSimulation.remaining?.[owner] ||
+            entry.opponentRemaining !== serverSimulation.remaining?.[1 - owner]) {
+            outcomeMismatches.push(entry.uid);
+          }
+        }
+      }
+      if (serverSimulation.finalStateHash !== entries[0].finalStateHash || outcomeMismatches.length > 0) {
+        clientDivergence = {
+          submittedStateHash: entries[0].finalStateHash,
+          serverStateHash: serverSimulation.finalStateHash,
+          outcomeMismatchUids: outcomeMismatches,
+        };
+      }
     }
 
     const rankStateRefs = entries.map((entry) =>
@@ -194,11 +319,15 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       if (!rankStateSnapshots[i].exists && entry.rankPointsBefore !== rankBefore) {
         throw new HttpsError("failed-precondition", "rank baseline does not match server save");
       }
+      const owner = ownerIndexByUid?.[entry.uid] ?? -1;
+      const authoritative = authoritativeRules && serverSimulation?.ok === true && owner >= 0;
+      const won = authoritative ? serverSimulation?.winnerOwner === owner : entry.won;
+      const survivorCount = authoritative ? serverSimulation?.remaining?.[owner] ?? entry.myRemaining : entry.myRemaining;
       let currency;
       let rank;
       try {
-        currency = computeCurrencyPayout(entry.won, entry.myRemaining, rewardRows);
-        rank = computeRankPayout(rankBefore as number, entry.won, rankRows);
+        currency = computeCurrencyPayout(won, survivorCount, rewardRows);
+        rank = computeRankPayout(rankBefore as number, won, rankRows);
       } catch (error) {
         logger.error("payout_calculation_failed", {matchId: data.matchId, uid: entry.uid, error});
         throw new HttpsError("failed-precondition", "payout calculation failed");
@@ -208,7 +337,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
         env: data.env,
         matchId: data.matchId,
         uid: entry.uid,
-        won: entry.won,
+        won,
         currency,
         rank,
         rankSequence,
@@ -222,18 +351,18 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
         lastMatchId: data.matchId,
         updatedAt: settledAt,
       }, {merge: true});
-      payoutSummary[entry.uid] = {currency, rank, won: entry.won};
+      payoutSummary[entry.uid] = {currency, rank, won};
     }
 
-    // 수집 단계다 — 서버는 두 제출이 서로 맞는지만 기록한다.
-    // 랭크·보상은 클라이언트가 로컬에서 확정하며, 여기서 세이브를 읽지도 쓰지도 않는다.
+    // 정산은 서버가 한다(보상·랭크 계산 + payout 문서 작성). 다만 승패 판정의 진실원은
+    // 아직 두 클라 합의다 — 재시뮬 결과는 SERVER_SIMULATION_AUTHORITATIVE 가 켜질 때만 승격된다.
     logger.info("match_settled", {
       matchId: data.matchId, env: data.env, status: "confirmed",
       uids: entries.map((entry) => entry.uid),
     });
     tx.set(matchRef, {status: "confirmed", submissions, payouts: payoutSummary,
+      serverSimulation: persistableSimulation(serverSimulation), clientDivergence,
       settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
     return {status: "confirmed"};
   });
 });
-

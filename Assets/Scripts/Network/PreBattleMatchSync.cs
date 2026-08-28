@@ -143,7 +143,7 @@ public static class PreBattleMatchSync
 
         int t_ownerIndex = t_session.Runner.IsSharedModeMasterClient ? 0 : 1;
         var t_receiver = new Receiver(t_ownerIndex);
-        using var t_deadline = CancellationTokenSource.CreateLinkedTokenSource(_ct);
+        using var t_deadline = CancellationTokenSource.CreateLinkedTokenSource(_ct, FirebaseManager.Lifetime);
         t_deadline.CancelAfter(TimeSpan.FromSeconds(NetTimeouts.PreBattleSyncSec));
         CancellationToken t_token = t_deadline.Token;
 
@@ -193,6 +193,7 @@ public static class PreBattleMatchSync
                     ContentProfileConfig.Active.CloudEnvId,
                     t_pairingKey,
                     SpecSource.BattleFingerprint.ToLowerInvariant(),
+                    t_ownerIndex,
                     t_token);
             if (t_seedResult.status != ServerMatchSeedStatus.Paired || t_seedResult.match == null)
             {
@@ -208,6 +209,7 @@ public static class PreBattleMatchSync
                 "server",
                 t_seedResult.match.SeedHex,
                 t_seedResult.match.RulesetVersion,
+                t_ownerIndex,
                 null,
                 null,
                 SpecSource.BattleFingerprint.ToLowerInvariant(),

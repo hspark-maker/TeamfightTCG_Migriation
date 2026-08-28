@@ -11,6 +11,7 @@ import {
 } from "../deckValidation";
 import {expectedMatchId} from "../matchResult";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
+import {readSpecRows} from "../specs/specBlobReader";
 
 const MAX_LOCK_DECK_PAYLOAD_CARDS = 64;
 const LOCK_TTL_MS = 60 * 60 * 1000;
@@ -21,6 +22,7 @@ type LockDeckData = {
   seedSource: "server" | "commit_reveal";
   seedHex: string | null;
   rulesetVersion: number | null;
+  ownerIndex: number;
   cardDataVersion: string;
   myNonce: string | null;
   opponentNonce: string | null;
@@ -37,6 +39,7 @@ function parseLockDeckData(raw: unknown): LockDeckData {
   const seedSource = data.seedSource == null ? "commit_reveal" : data.seedSource;
   const seedHex = data.seedHex;
   const rulesetVersion = data.rulesetVersion;
+  const ownerIndex = safeInteger(data.ownerIndex);
   const cardDataVersion = data.cardDataVersion ?? data.contentFingerprint;
   const myNonce = data.myNonce;
   const opponentNonce = data.opponentNonce;
@@ -47,7 +50,8 @@ function parseLockDeckData(raw: unknown): LockDeckData {
       typeof contentFingerprint !== "string" || typeof deckHash !== "string" ||
       typeof cardDataVersion !== "string" ||
       !HEX_32.test(matchId) || !HEX_64.test(contentFingerprint) ||
-      !HEX_64.test(cardDataVersion) || !HEX_64.test(deckHash)) {
+      !HEX_64.test(cardDataVersion) || !HEX_64.test(deckHash) ||
+      (ownerIndex !== 0 && ownerIndex !== 1)) {
     throw new HttpsError("invalid-argument", "invalid deck lock identity");
   }
   if (seedSource === "server") {
@@ -95,6 +99,7 @@ function parseLockDeckData(raw: unknown): LockDeckData {
     seedSource,
     seedHex: seedSource === "server" ? seedHex as string : null,
     rulesetVersion: seedSource === "server" ? rulesetVersion as number : null,
+    ownerIndex: ownerIndex as number,
     cardDataVersion,
     myNonce: typeof myNonce === "string" ? myNonce : null,
     opponentNonce: typeof opponentNonce === "string" ? opponentNonce : null,
@@ -109,15 +114,19 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseLockDeckData(request.data);
+  if (data.seedSource !== "server") {
+    throw new HttpsError("failed-precondition", "legacy deck locks are not authoritative");
+  }
   const table = data.env === "test" ? "Card_Test" : "Card";
-  const rowRoot = `envs/${data.env}/specs/${table}/rows`;
   const shapeError = validateDeckShape(data.cardSnapshots);
-  const cardIds = [...new Set(data.cardSnapshots.map((card) => card.cardId))];
-  const specSnapshots = shapeError == null ? await (async () => {
+  const cardIds = new Set(data.cardSnapshots.map((card) => card.cardId));
+  // 덱에 든 카드만 골라 읽던 자리다. 블롭은 표 전체가 문서 1개라 6장을 개별로 집는 것보다 싸고,
+  // 무결성 대조(payloadHash)를 거친 표를 보게 된다 — 예전 경로는 메타 존재 여부만 봤다.
+  const specRows = shapeError == null ? await (async () => {
     try {
-      const meta = await db.doc(`envs/${data.env}/specs/${table}`).get();
-      if (!meta.exists) throw new HttpsError("unavailable", "card spec table is unavailable");
-      return await db.getAll(...cardIds.map((id) => db.doc(`${rowRoot}/${id}`)));
+      const rows = await readSpecRows(data.env, table);
+      if (rows.length === 0) throw new HttpsError("unavailable", "card spec table is unavailable");
+      return rows;
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       logger.error("lockDeck spec read failed", {env: data.env, table, error});
@@ -125,37 +134,38 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
     }
   })() : [];
   const specs = new Map();
-  for (const snapshot of specSnapshots) {
-    if (!snapshot.exists) continue;
-    const spec = parseCardSpecRow(snapshot.data());
+  for (const row of specRows) {
+    // 덱에 없는 카드는 파싱하지 않는다 — 표의 다른 행이 깨졌다고 잠금을 막을 이유가 없다.
+    if (!cardIds.has(Number(row.id))) continue;
+    const spec = parseCardSpecRow(row);
     if (spec == null) {
-      logger.error("lockDeck spec row is invalid", {path: snapshot.ref.path});
+      logger.error("lockDeck spec row is invalid", {table, id: row.id});
       throw new HttpsError("unavailable", "card spec row is invalid");
     }
     specs.set(spec.id, spec);
   }
 
-  const lockRef = db.doc(`envs/${data.env}/matchLocks/${data.matchId}`);
   const saveRef = db.doc(`envs/${data.env}/users/${uid}/save/current`);
+  // 덱 잠금은 매치 문서 안에 산다 — 별도 matchLocks 컬렉션을 두면 같은 matchId 로 문서가 둘이 되고
+  // seedHex·rulesetVersion·cardDataVersion 이 양쪽에 중복된다.
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
   return db.runTransaction(async (tx) => {
-    const lockSnapshot = await tx.get(lockRef);
-    const matchSnapshot = data.seedSource === "server" ? await tx.get(matchRef) : null;
+    const matchSnapshot = await tx.get(matchRef);
     const saveSnapshot = await tx.get(saveRef);
-    const lock = lockSnapshot.data();
-    if (lock?.status === "rejected") {
+    const lock = matchSnapshot.data();
+    if (lock?.lockStatus === "rejected") {
       return {status: "rejected", reason: "match_rejected"};
     }
     const approvals = objectRecord(lock?.approvals) ?? {};
     const rejectLock = (reason: string, cardId?: number) => {
       const now = Timestamp.now();
-      tx.set(lockRef, {
+      tx.set(matchRef, {
         matchId: data.matchId,
         env: data.env,
-        status: "rejected",
-        reason,
-        rejectedBy: uid,
-        rejectedAt: now,
+        lockStatus: "rejected",
+        lockReason: reason,
+        lockRejectedBy: uid,
+        lockRejectedAt: now,
         expiresAt: Timestamp.fromMillis(now.toMillis() + LOCK_TTL_MS),
         updatedAt: FieldValue.serverTimestamp(),
       }, {merge: true});
@@ -164,12 +174,38 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         {status: "rejected", reason, cardId};
     };
     if (data.seedSource === "server") {
-      const match = matchSnapshot?.data();
+      const match = lock;
       const participantUids = match?.participantUids;
-      if (!Array.isArray(participantUids) || !participantUids.includes(uid) ||
-          match?.seedSource !== "server" || match?.seedHex !== data.seedHex ||
-          match?.rulesetVersion !== data.rulesetVersion ||
-          match?.cardDataVersion !== data.cardDataVersion) {
+      const ownerIndexByUid = objectRecord(match?.ownerIndexByUid);
+      // 다섯 조건이 한 메시지로 합쳐져 있으면 거절 원인을 밖에서 알 수 없다.
+      // 클라에는 계속 일반화된 메시지를 주되(신원 정보 노출 방지), 어느 항목이 어긋났는지는 로그에 남긴다.
+      const identityMismatch: string[] = [];
+      if (!Array.isArray(participantUids)) identityMismatch.push("participant_uids_missing");
+      else if (!participantUids.includes(uid)) identityMismatch.push("uid_not_participant");
+      if (ownerIndexByUid?.[uid] !== data.ownerIndex) identityMismatch.push("owner_index");
+      if (match?.seedSource !== "server") identityMismatch.push("seed_source");
+      if (match?.seedHex !== data.seedHex) identityMismatch.push("seed_hex");
+      if (match?.rulesetVersion !== data.rulesetVersion) identityMismatch.push("ruleset_version");
+      if (match?.cardDataVersion !== data.cardDataVersion) identityMismatch.push("card_data_version");
+      if (identityMismatch.length > 0) {
+        logger.error("lockDeck identity mismatch", {
+          matchId: data.matchId, env: data.env, uid, mismatch: identityMismatch,
+          expected: {
+            ownerIndex: ownerIndexByUid?.[uid] ?? null,
+            seedSource: match?.seedSource ?? null,
+            seedHex: match?.seedHex ?? null,
+            rulesetVersion: match?.rulesetVersion ?? null,
+            cardDataVersion: match?.cardDataVersion ?? null,
+            participantUids: Array.isArray(participantUids) ? participantUids : null,
+          },
+          received: {
+            ownerIndex: data.ownerIndex,
+            seedSource: data.seedSource,
+            seedHex: data.seedHex,
+            rulesetVersion: data.rulesetVersion,
+            cardDataVersion: data.cardDataVersion,
+          },
+        });
         throw new HttpsError("permission-denied", "server match identity is not registered");
       }
     }
@@ -183,6 +219,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
     if (priorApproval != null) {
       if (priorApproval.deckHash === data.deckHash &&
           priorApproval.contentFingerprint === data.contentFingerprint &&
+          priorApproval.ownerIndex === data.ownerIndex &&
           (priorApproval.seedSource ?? "commit_reveal") === data.seedSource) {
         const status = Object.keys(approvals).length >= 2 ? "approved" : "pending";
         return {status, idempotent: true};
@@ -192,8 +229,14 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
     if (Object.keys(approvals).length >= 2) {
       throw new HttpsError("permission-denied", "match already has two participants");
     }
-    if (typeof lock?.contentFingerprint === "string" &&
-        lock.contentFingerprint !== data.contentFingerprint) {
+    for (const [approvedUid, rawApproval] of Object.entries(approvals)) {
+      const approval = objectRecord(rawApproval);
+      if (approvedUid !== uid && approval?.ownerIndex === data.ownerIndex) {
+        return rejectLock("owner_index_conflict");
+      }
+    }
+    if (typeof lock?.cardDataVersion === "string" &&
+        lock.cardDataVersion !== data.contentFingerprint) {
       return rejectLock("content_fingerprint_mismatch");
     }
     if (typeof lock?.seedSource === "string" && lock.seedSource !== data.seedSource) {
@@ -232,6 +275,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         seedHex: data.seedHex,
         rulesetVersion: data.rulesetVersion,
         cardDataVersion: data.cardDataVersion,
+        ownerIndex: data.ownerIndex,
         myNonce: data.myNonce,
         opponentNonce: data.opponentNonce,
         cardSnapshots: data.cardSnapshots,
@@ -240,11 +284,12 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       },
     };
     const status = Object.keys(nextApprovals).length >= 2 ? "approved" : "pending";
-    tx.set(lockRef, {
+    tx.set(matchRef, {
       matchId: data.matchId,
       env: data.env,
-      status,
-      contentFingerprint: data.contentFingerprint,
+      // 페어링 단계로 되돌아가지 못하게 하는 단조 표식. createMatch 가 이 값을 보고 키 재사용을 막는다.
+      phase: "locked",
+      lockStatus: status,
       seedSource: data.seedSource,
       seedHex: data.seedHex,
       rulesetVersion: data.rulesetVersion,
@@ -256,4 +301,3 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
     return {status, idempotent: false};
   });
 });
-

@@ -11,8 +11,11 @@ export type CardSnapshot = {
 
 export type CardSpecForValidation = {
   id: number;
+  maxHp: number;
   keywords: number;
   keywordUnlockLevel: number;
+  defaultEvolutionStage: number;
+  synergies: string[];
   hp2: number;
   hp3: number;
   hp4: number;
@@ -85,6 +88,21 @@ function keywordFlags(value: unknown): number | null {
   return flags;
 }
 
+function stringList(value: unknown): string[] | null {
+  if (value === "") return [];
+  if (value == null) return null;
+  if (typeof value !== "string") return null;
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of value.split(/[|/]/)) {
+    const item = raw.trim();
+    if (item === "" || seen.has(item)) continue;
+    seen.add(item);
+    result.push(item);
+  }
+  return result;
+}
+
 export function parseCardSpecRow(raw: unknown): CardSpecForValidation | null {
   const row = record(raw);
   if (row == null) return null;
@@ -94,9 +112,20 @@ export function parseCardSpecRow(raw: unknown): CardSpecForValidation | null {
   const hp2 = integer(row.hp2);
   const hp3 = integer(row.hp3);
   const hp4 = integer(row.hp4);
-  if (id == null || id <= 0 || keywords == null || keywordUnlockLevel == null ||
+  if (id == null || id <= 0 || keywords == null ||
+      keywordUnlockLevel == null ||
       hp2 == null || hp3 == null || hp4 == null) return null;
-  return {id, keywords, keywordUnlockLevel, hp2, hp3, hp4};
+
+  // 아래 셋은 서버 재시뮬레이션용으로 나중에 추가된 열이다. 아직 업로드되지 않은 표가 있으므로
+  // **없어도 덱 잠금은 통과시킨다** — 여기서 막으면 구 데이터로는 매치 자체가 성립하지 않는다.
+  // 대신 값이 없으면 0 / [] 로 떨어지고, 시뮬레이터가 그걸 보고 재생을 포기한다(makeField).
+  const maxHp = row.maxHp === undefined ? 0 : integer(row.maxHp);
+  const defaultEvolutionStage = row.defaultEvolutionStage === undefined ? 0 : integer(row.defaultEvolutionStage);
+  const synergies = row.synergies === undefined ? [] : stringList(row.synergies);
+  if (maxHp == null || maxHp < 0 || defaultEvolutionStage == null ||
+      defaultEvolutionStage < 0 || defaultEvolutionStage > 3 || synergies == null) return null;
+  return {id, maxHp, keywords, keywordUnlockLevel, defaultEvolutionStage,
+    synergies, hp2, hp3, hp4};
 }
 
 export function validateDeckShape(snapshots: readonly CardSnapshot[]): string | null {

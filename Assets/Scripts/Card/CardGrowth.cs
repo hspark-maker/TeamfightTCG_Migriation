@@ -24,7 +24,7 @@ public static class GrowthStar
 public readonly struct CardGrowth
 {
     /// <summary>미강화 카드의 레벨. 레벨은 1부터 세고 강화가 여기서부터 올린다 — 강화 횟수는 (Level - BaseLevel)이다.</summary>
-    public const int BaseLevel = 1;
+    public const int BaseLevel = CardSpec.BaseGrowthLevel;
 
     /// <summary>강화 레벨. BaseLevel = 미강화.</summary>
     public readonly int Level;

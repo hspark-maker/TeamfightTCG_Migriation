@@ -159,7 +159,9 @@ static class MatchResultSubmission
                 bool t_drop = false;
                 try
                 {
-                    HttpsCallableResult t_response = await t_callable.CallAsync(ToPayload(t_item));
+                    HttpsCallableResult t_response = await t_callable.CallAsync(ToPayload(t_item))
+                        .AsUniTask()
+                        .AttachExternalCancellation(FirebaseManager.Lifetime);
                     if (t_generation != s_generation) return;
                     if (TryHandleResponse(t_response.Data, t_item.matchId, out bool t_complete) && t_complete)
                     {

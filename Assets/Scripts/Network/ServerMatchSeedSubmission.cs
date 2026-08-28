@@ -38,9 +38,11 @@ internal static class ServerMatchSeedSubmission
         string _env,
         string _pairingKey,
         string _contentFingerprint,
+        int _ownerIndex,
         CancellationToken _ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_pairingKey) || string.IsNullOrWhiteSpace(_contentFingerprint))
+        if (string.IsNullOrWhiteSpace(_pairingKey) || string.IsNullOrWhiteSpace(_contentFingerprint)
+            || _ownerIndex < 0 || _ownerIndex > 1)
             return (ServerMatchSeedStatus.Unavailable, null);
         if (!await MatchResultSubmission.EnsureSignedIn())
             return (ServerMatchSeedStatus.Unavailable, null);
@@ -50,6 +52,7 @@ internal static class ServerMatchSeedSubmission
             ["env"] = _env,
             ["pairingKey"] = _pairingKey,
             ["contentFingerprint"] = _contentFingerprint,
+            ["ownerIndex"] = _ownerIndex,
         };
 
         try
@@ -57,7 +60,7 @@ internal static class ServerMatchSeedSubmission
             HttpsCallableReference t_callable = FirebaseFunctions
                 .GetInstance(FirebaseApp.DefaultInstance, Region)
                 .GetHttpsCallable("createMatch");
-            using (var t_timeout = CancellationTokenSource.CreateLinkedTokenSource(_ct))
+            using (var t_timeout = CancellationTokenSource.CreateLinkedTokenSource(_ct, FirebaseManager.Lifetime))
             {
                 if (!_ct.CanBeCanceled) t_timeout.CancelAfter(PairingFallbackTimeout);
                 while (true)
