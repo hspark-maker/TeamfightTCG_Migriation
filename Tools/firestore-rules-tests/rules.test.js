@@ -251,6 +251,30 @@ test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 �
     saveDocument(2, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
 });
 
+// C6 — 잔액이 wallet/current 로 이사하면서 신 클라(v8)는 currency 를 아예 안 싣는다.
+// 승급 전 구 클라(v7)는 계속 싣는다. 룰은 그 사이 구간 동안 둘 다 받아야 한다.
+// 조이는 것(14키 전용)은 구 클라가 사라진 뒤 C7 이다.
+test('13c. currency 없는 14키 update 는 통과 (승급 후 신 클라)', async () => {
+  await seed(1);
+  const t_doc = saveDocument(2);
+  delete t_doc.currency;
+  await assertSucceeds(setDoc(doc(authed(), savePath()), t_doc));
+});
+
+// currency 를 optional 로 만든 것이 "슬롯 생략으로 세이브 비우기"를 열어 주면 안 된다.
+test('13d. currency 를 빼도 다른 슬롯 누락은 여전히 거부', async () => {
+  await seed(1);
+  const t_doc = saveDocument(2);
+  delete t_doc.currency;
+  delete t_doc.ownership;
+  await assertFails(setDoc(doc(authed(), savePath()), t_doc));
+});
+
+test('13e. currency 가 map 이 아니면 거부 (실려 있으면 검증은 그대로)', async () => {
+  await seed(1);
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: null })));
+});
+
 // --- 14. 신규 계정 방어 -----------------------------------------------------
 
 // R4 이후 신규 계정의 첫 문서는 서버(ensureAccount, Admin SDK)가 만든다. Admin 은 룰을 안 타므로

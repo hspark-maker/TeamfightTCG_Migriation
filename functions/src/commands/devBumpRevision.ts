@@ -1,6 +1,6 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {mutateSave, requireUid, SlotPatch} from "../save/saveDocument";
+import {mutateSave, requireUid, SaveMutation} from "../save/saveDocument";
 
 /**
  * R0 채택 계약 실증용. 서버가 실제로 문서를 쓰고 revision 을 올린 뒤
@@ -23,12 +23,12 @@ export const devBumpRevision = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "nickname must be a string.");
   }
 
-  const result = await mutateSave(env, uid, (current): SlotPatch => {
-    if (nickname === undefined) return {};
+  const result = await mutateSave(env, uid, (current): SaveMutation => {
+    if (nickname === undefined) return {slots: {}};
 
     // 갱신 후 슬롯 **전체**를 돌려준다 — 클라는 슬롯을 통째로 갈아끼운다.
     const profile = (current.profile ?? {}) as Record<string, unknown>;
-    return {profile: {...profile, nickname}};
+    return {slots: {profile: {...profile, nickname}}};
   });
 
   logger.info("devBumpRevision", {uid, env, revision: result.revision});

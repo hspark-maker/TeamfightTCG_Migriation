@@ -52,13 +52,18 @@ service cloud.firestore {
           'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
           'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
         ]) &&
-        // hasOnly 와 같은 15키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
-        // 메타 5키 + revision+1 만 보내 소유·재화·랭크를 통째로 날릴 수 있고,
+        // hasOnly 와 같은 키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
+        // 메타 5키 + revision+1 만 보내 소유·랭크를 통째로 날릴 수 있고,
         // delete: if false 로 막으려던 세이브 소멸이 '필드 생략'으로 우회된다.
-        // ToFieldMap 은 SetOptions.Overwrite 와 짝이라 언제나 15키를 싣는다 — 회귀 없음.
+        // ToFieldMap 은 SetOptions.Overwrite 와 짝이라 언제나 전 슬롯을 싣는다 — 회귀 없음.
+        //
+        // C6 — currency 만 hasAll 에서 뺐다. 잔액이 wallet/current 로 이사하면서
+        // 신 클라(v8)는 14키를, 아직 승급 안 한 구 클라(v7)는 15키를 보낸다. hasOnly 는
+        // 15키를 그대로 둬 둘 다 통과시킨다(공존). 14키 전용으로 조이는 것은 구 클라가
+        // 사라진 뒤 C7 이 한다 — 지금 조이면 승급 전 클라의 저장이 전부 거부된다.
         request.resource.data.keys().hasAll([
           'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
-          'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
           'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
         ]) &&
         request.resource.data.schemaVersion is int &&
@@ -70,26 +75,31 @@ service cloud.firestore {
         request.resource.data.deviceId.size() == 32 &&
         request.resource.data.appVersion is string &&
         request.resource.data.appVersion.size() <= 64 &&
-        request.resource.data.currency is map &&
-        request.resource.data.currency.keys().hasOnly(['balances']) &&
-        request.resource.data.currency.balances is map &&
-        request.resource.data.currency.balances.keys().hasOnly(['Gold', 'Diamond', 'Energy', 'Shard']) &&
-        // 4재화 전부를 요구하는 건 클라 실동작과 일치한다 — CurrencySaveData.Normalize 가
-        // ECurrencyType.Count 까지 순회하며 없는 키를 0으로 채우고, CurrencyManager 는
-        // Init·Save 양쪽에서 그걸 먼저 부른다. '가진 것만 실린다'로 오해해 존재 검사를
-        // 끼워 넣지 마라 — 키 삭제·타입 변조가 열린다(회귀 테스트 13b 가 이 계약을 지킨다).
-        request.resource.data.currency.balances.Gold is int &&
-        request.resource.data.currency.balances.Gold >= 0 &&
-        request.resource.data.currency.balances.Gold <= 1000000000000 &&
-        request.resource.data.currency.balances.Diamond is int &&
-        request.resource.data.currency.balances.Diamond >= 0 &&
-        request.resource.data.currency.balances.Diamond <= 1000000000000 &&
-        request.resource.data.currency.balances.Energy is int &&
-        request.resource.data.currency.balances.Energy >= 0 &&
-        request.resource.data.currency.balances.Energy <= 1000000000000 &&
-        request.resource.data.currency.balances.Shard is int &&
-        request.resource.data.currency.balances.Shard >= 0 &&
-        request.resource.data.currency.balances.Shard <= 1000000000000 &&
+        // C6 — currency 는 이제 optional 이다. 있으면 예전 그대로 전수 검증하고,
+        // 없으면(신 클라 v8) 그냥 통과한다. 검증을 통째로 빼지 않은 이유는 승급 전
+        // 구 클라가 여전히 이 필드를 싣기 때문이다 — 그 구간에 값 위조가 열리면 안 된다.
+        (!request.resource.data.keys().hasAny(['currency']) || (
+          request.resource.data.currency is map &&
+          request.resource.data.currency.keys().hasOnly(['balances']) &&
+          request.resource.data.currency.balances is map &&
+          request.resource.data.currency.balances.keys().hasOnly(['Gold', 'Diamond', 'Energy', 'Shard']) &&
+          // 4재화 전부를 요구하는 건 구 클라 실동작과 일치한다 — CurrencySaveData.Normalize 가
+          // ECurrencyType.Count 까지 순회하며 없는 키를 0으로 채우고, CurrencyManager 는
+          // Init·Save 양쪽에서 그걸 먼저 부른다. '가진 것만 실린다'로 오해해 존재 검사를
+          // 끼워 넣지 마라 — 키 삭제·타입 변조가 열린다(회귀 테스트 13b 가 이 계약을 지킨다).
+          request.resource.data.currency.balances.Gold is int &&
+          request.resource.data.currency.balances.Gold >= 0 &&
+          request.resource.data.currency.balances.Gold <= 1000000000000 &&
+          request.resource.data.currency.balances.Diamond is int &&
+          request.resource.data.currency.balances.Diamond >= 0 &&
+          request.resource.data.currency.balances.Diamond <= 1000000000000 &&
+          request.resource.data.currency.balances.Energy is int &&
+          request.resource.data.currency.balances.Energy >= 0 &&
+          request.resource.data.currency.balances.Energy <= 1000000000000 &&
+          request.resource.data.currency.balances.Shard is int &&
+          request.resource.data.currency.balances.Shard >= 0 &&
+          request.resource.data.currency.balances.Shard <= 1000000000000
+        )) &&
         request.resource.data.rank is map &&
         request.resource.data.rank.keys().hasOnly(['points', 'claimedTiers']) &&
         request.resource.data.rank.points is int &&

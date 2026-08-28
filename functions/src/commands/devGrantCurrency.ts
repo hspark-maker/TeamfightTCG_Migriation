@@ -1,6 +1,6 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {mutateSave, requireUid, SlotPatch} from "../save/saveDocument";
+import {mutateSave, requireUid, SaveMutation} from "../save/saveDocument";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {currencySlot, grant, readBalances} from "../currency/wallet";
 
@@ -34,8 +34,10 @@ export const devGrantCurrency = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "amount must be a positive safe integer.");
   }
 
-  const result = await mutateSave(env, uid, (current): SlotPatch => ({
-    currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
+  const result = await mutateSave(env, uid, (current): SaveMutation => ({
+    slots: {
+      currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
+    },
   }));
 
   logger.info("devGrantCurrency", {uid, env, currency, amount, revision: result.revision});

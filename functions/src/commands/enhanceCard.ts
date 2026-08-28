@@ -7,7 +7,7 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -90,7 +90,7 @@ export const enhanceCard = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction): Promise<SlotPatch> => {
+  const result = await mutateSave(env, uid, async (current, transaction): Promise<SaveMutation> => {
     // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
     const entries = readGrowthEntries(current.cardGrowth);
     const currentLevel = levelOfCard(entries, cardId);
@@ -130,8 +130,10 @@ export const enhanceCard = onCall(async (request) => {
     freeShotUsed = succeeded && freeShot !== null;
 
     return {
-      currency: currencySlot(spend(balances, step.currency, charged)),
-      cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
+      slots: {
+        currency: currencySlot(spend(balances, step.currency, charged)),
+        cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
+      },
     };
   });
 

@@ -4,7 +4,7 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -391,19 +391,19 @@ export const claimReward = onCall(async (request) => {
     logger.warn("clearing a node with no authored reward", {...context, specOwnerId, droppedCount: dropped.length});
   }
 
-  const result = await mutateSave(env, uid, (current): SlotPatch => {
+  const result = await mutateSave(env, uid, (current): SaveMutation => {
     const currency = currencySlot(grant(readBalances(current.currency), gains));
 
     if (ownerType === "Rank") {
-      return {currency, rank: claimRankTier(current, tierIndex, requiredPoints, tierCount, context)};
+      return {slots: {currency, rank: claimRankTier(current, tierIndex, requiredPoints, tierCount, context)}};
     }
     if (ownerType === "Album") {
-      return {currency, albumReward: claimAlbumReward(current, albumEntries, context)};
+      return {slots: {currency, albumReward: claimAlbumReward(current, albumEntries, context)}};
     }
     if (isChapter) {
-      return {currency, tournament: claimTournamentChapter(current, chapterNodes, context)};
+      return {slots: {currency, tournament: claimTournamentChapter(current, chapterNodes, context)}};
     }
-    return {currency, tournament: clearTournamentNode(current, context)};
+    return {slots: {currency, tournament: clearTournamentNode(current, context)}};
   });
 
   logger.info("claimReward", {

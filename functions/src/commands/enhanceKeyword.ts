@@ -6,7 +6,7 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -84,7 +84,7 @@ export const enhanceKeyword = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction): Promise<SlotPatch> => {
+  const result = await mutateSave(env, uid, async (current, transaction): Promise<SaveMutation> => {
     const levels = readKeywordLevels(current.keywordGrowth);
     const currentLevel = levelOfKeyword(levels, keyword);
 
@@ -121,8 +121,10 @@ export const enhanceKeyword = onCall(async (request) => {
     freeShotUsed = freeShot !== null;
 
     return {
-      currency: currencySlot(spend(balances, step.currency, charged)),
-      keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
+      slots: {
+        currency: currencySlot(spend(balances, step.currency, charged)),
+        keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
+      },
     };
   });
 

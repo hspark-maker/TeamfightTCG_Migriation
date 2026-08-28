@@ -5,7 +5,7 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
@@ -91,7 +91,7 @@ export const openPack = onCall(async (request) => {
   let goldAfter = 0;
   let poolSize = 0;
 
-  const result = await mutateSave(env, uid, (current): SlotPatch => {
+  const result = await mutateSave(env, uid, (current): SaveMutation => {
     // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
     const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
     const grade = gradeOf(thresholds, points);
@@ -124,11 +124,13 @@ export const openPack = onCall(async (request) => {
     goldAfter = currency.balances[pack.priceType];
 
     return {
-      currency,
-      ownership: buildOwnershipSlot(owned, drawn),
-      cardGrowth: growthSlot(drawn.reduce(
-        (entries, card) => addSnack(entries, card.cardId, card.snack),
-        readGrowthEntries(current.cardGrowth))),
+      slots: {
+        currency,
+        ownership: buildOwnershipSlot(owned, drawn),
+        cardGrowth: growthSlot(drawn.reduce(
+          (entries, card) => addSnack(entries, card.cardId, card.snack),
+          readGrowthEntries(current.cardGrowth))),
+      },
     };
   });
 

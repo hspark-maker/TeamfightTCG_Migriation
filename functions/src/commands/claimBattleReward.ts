@@ -4,7 +4,7 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -113,8 +113,10 @@ export const claimBattleReward = onCall(async (request) => {
   }
 
   const amount = payout.amount;
-  const result = await mutateSave(env, uid, (current): SlotPatch => ({
-    currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
+  const result = await mutateSave(env, uid, (current): SaveMutation => ({
+    slots: {
+      currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
+    },
   }));
 
   logger.info("claimBattleReward", {uid, env, won, remaining, currency, amount, revision: result.revision});
