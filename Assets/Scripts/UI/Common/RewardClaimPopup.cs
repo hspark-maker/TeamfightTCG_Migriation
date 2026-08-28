@@ -44,15 +44,13 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 등장 안무. 수령·닫기가 등장 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
 
-    // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
-    // 서버가 지급을 판정하는 도메인(랭크 티어·토너먼트 정점)이 있어 대기 가능한 형태 하나로 모았다 —
-    // 로컬 지급 도메인(앨범·챕터)은 완료된 UniTask로 감싸 들어온다.
-    Func<UniTask<bool>> m_onConfirm;
+    // 확인 콜백. 서버가 실제로 준 목록을 돌려받아 연출 여부와 분출량을 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
+    Func<UniTask<RewardClaimOutcome>> m_onConfirm;
 
     // 닫힘 콜백. 연 쪽이 팝업 뒤에 연출을 이을 때만 쓴다(공용 팝업이라 static 이벤트로 두면 다른 소비처에 샌다).
     Action m_onClosed;
 
-    // 표시 중인 행의 보상. 재화가 갈리면 각자의 HUD로 각자의 빛이 흘러가므로 종류별로 담아 둔다.
+    // 분출할 실지급량(서버 응답으로 수령 직후 채워진다). 재화가 갈리면 각자의 HUD로 각자의 빛이 흘러가므로 종류별로 담아 둔다.
     readonly CurrencyGainBucket m_rewards = new CurrencyGainBucket();
 
     // 재화별로 빛이 피어날 자리(그 재화가 걸린 보상 아이콘). 아이콘 자리에서 피어야 "그것이 빛이 됐다"로 읽힌다.
@@ -69,22 +67,11 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         => TryGetExisting(out _popup);
 
     /// <summary>
-    /// 보상을 띄운다. _onConfirm은 [획득]에서 불리고 <b>지급 성공 여부</b>를 돌려줘야 한다 —
-    /// 실패(팝업이 뜬 사이 상태가 바뀜)면 분출 없이 닫는다.
-    /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm,
-                     bool _claimOnDim = false, Action _onClosed = null)
-    {
-        this.Show(_title, _rewards,
-                  _onConfirm == null ? null : new Func<UniTask<bool>>(() => UniTask.FromResult(_onConfirm())),
-                  _claimOnDim, _onClosed);
-    }
-
-    /// <summary>
-    /// 지급을 서버에 묻는 도메인용 표시. _onConfirm이 끝난 시점에 잔액은 이미 최종값이어야 한다 —
+    /// 보상을 띄운다. _onConfirm이 끝난 시점에 잔액은 이미 최종값이어야 한다 —
     /// 분출·수치 롤업이 그 전제 위에 서 있어서, 응답을 기다리지 않고 연출을 태우면 숫자가 뒤로 튄다.
+    /// <para>_rewards는 <b>수령 전 예고</b>다(클라 스펙). 분출·롤업은 _onConfirm이 돌려준 실지급 목록으로 선다.</para>
     /// </summary>
-    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<UniTask<bool>> _onConfirm,
+    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<UniTask<RewardClaimOutcome>> _onConfirm,
                      bool _claimOnDim = false, Action _onClosed = null)
     {
         this.m_onConfirm = _onConfirm;
@@ -98,8 +85,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         var t_rewards = _rewards ?? Array.Empty<RewardLine>();
 
+        // 분출량은 여기서 정하지 않는다 — 수령 응답이 오면 AdoptGranted가 채운다(표시는 예고일 뿐).
         this.m_rewards.Clear();
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++) this.m_rewards.Add(t_rewards[t_i].Gain);
 
         if (this.titleText != null) this.titleText.text = _title;
         this.BindRewardSlots(t_rewards);
@@ -171,16 +158,16 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
         // 서버 지급이면 여기서 왕복을 기다린다 — 잔액이 최종값이 된 뒤에야 연출이 서야 숫자가 뒤로 튀지 않는다.
-        bool t_granted = t_callback != null && await t_callback.Invoke();
+        RewardClaimOutcome t_outcome = t_callback != null ? await t_callback.Invoke() : default;
 
         // 대기 중에 씬이 바뀌었을 수 있다 — 죽은 팝업에 연출을 태우지 않는다.
         if (this == null) return;
 
         // 가드에 걸려 되돌아간 클릭에는 줄 것이 없다 — 소리도 없다.
-        if (t_granted) SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
+        if (t_outcome.Succeeded) SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
 
         // 실패(팝업이 뜬 사이 상태가 바뀌어 가드에 걸림)면 줄 것이 없으니 연출도 없다.
-        if (!t_granted || !CurrencyGainEffectPlayer.TryGet(this, out var t_player))
+        if (!t_outcome.Succeeded || !CurrencyGainEffectPlayer.TryGet(this, out var t_player))
         {
             this.Hide();
             return;
@@ -195,6 +182,9 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         // 등장이 아직 돌고 있으면 걷어 저작 상태로 되돌린다 — 중간값에서 퇴장을 이어 받으면 아이콘이 튄다.
         this.RestoreReveal();
+
+        // 분출·롤업은 서버가 실제로 준 것으로 선다 — 표시 목록은 수령 전 예고라, 표가 갈리면 롤업 시작값이 틀린다.
+        this.AdoptGranted(t_outcome.Granted);
 
         // 재화가 갈리면 줄기도 갈려야 한다 — 공용 재생기가 종류별 시퀀스를 조립하고 수치 고정 해제 안전망까지 붙여 온다.
         var t_gain = t_player.BuildLightGain(this.m_rewards, this.m_origins, this.reveal.LightSprite);
@@ -253,6 +243,21 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         this.m_burst = null;
         this.Hide();
+    }
+
+    // 분출 버킷을 실지급으로 다시 세운다. 표시 슬롯(m_origins)은 건드리지 않는다 —
+    // 예고에 없던 재화가 오면 그 줄기는 기존 폴백대로 HUD 자리에서 핀다.
+    void AdoptGranted(IReadOnlyList<CurrencyGain> _granted)
+    {
+        this.m_rewards.Clear();
+        if (_granted == null || _granted.Count == 0)
+        {
+            // 잔액이 안 늘었는데 예고량으로 롤업을 태우면 시작값이 최종값보다 커져 숫자가 뒤로 뛴다 — 연출을 접는다.
+            Debug.LogWarning("[RewardClaimPopup] 수령은 성사됐는데 서버 지급 목록이 비어 있다 — 분출을 생략한다.");
+            return;
+        }
+
+        for (int t_i = 0; t_i < _granted.Count; t_i++) this.m_rewards.Add(_granted[t_i]);
     }
 
     void BindRewardSlots(IReadOnlyList<RewardLine> _rewards)

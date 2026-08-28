@@ -151,7 +151,7 @@ public class RankRewardPanel : PooledUIBase
     // 판정·지급·낙인은 서버가 하고 응답 채택 후 매니저의 OnChanged가 RefreshRows를 유발한다.
     // 팝업 닫기는 여기서 하지 않는다 — 팝업이 이 반환값을 보고 연출 여부를 정한 뒤 스스로 닫는다.
     // 반환값을 버리면 서버가 거절했을 때 안 준 골드를 준 것처럼 연출한다.
-    UniTask<bool> ClaimAsync(int _tierIndex)
+    UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
     {
         return RankRewardManager.ClaimAsync(_tierIndex);
     }

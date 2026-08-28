@@ -41,16 +41,16 @@ public static class AlbumRewardManager
 
     public static bool CanClaimAlbum() => AlbumState() == EAlbumRewardState.Claimable;
 
-    /// <summary>페이지 완성 보상 수령을 서버에 요청한다. 지급 성공 여부를 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
-    public static UniTask<bool> ClaimPage(AlbumPage _page) => Claim(_page);
+    /// <summary>페이지 완성 보상 수령을 서버에 요청한다. 서버가 준 목록째로 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    public static UniTask<RewardClaimOutcome> ClaimPage(AlbumPage _page) => Claim(_page);
 
     /// <summary>테마 완성 보상 수령을 서버에 요청한다.</summary>
-    public static UniTask<bool> ClaimTheme(AlbumTheme _theme) => Claim(_theme);
+    public static UniTask<RewardClaimOutcome> ClaimTheme(AlbumTheme _theme) => Claim(_theme);
 
     /// <summary>앨범 전체 완성 보상 수령을 서버에 요청한다.</summary>
-    public static UniTask<bool> ClaimAlbum()
+    public static UniTask<RewardClaimOutcome> ClaimAlbum()
     {
-        if (!CanClaimAlbum()) return UniTask.FromResult(false);
+        if (!CanClaimAlbum()) return UniTask.FromResult(default(RewardClaimOutcome));
 
         return RequestClaim(AlbumRewardKey);
     }
@@ -66,21 +66,22 @@ public static class AlbumRewardManager
     }
 
     // StateOf 선검사는 왕복을 아끼는 낙관 검사다 — 자격의 진실원은 서버이고, 여기서 통과해도 거절될 수 있다.
-    static UniTask<bool> Claim(AlbumSection _section)
+    static UniTask<RewardClaimOutcome> Claim(AlbumSection _section)
     {
-        if (StateOf(_section) != EAlbumRewardState.Claimable) return UniTask.FromResult(false);
+        if (StateOf(_section) != EAlbumRewardState.Claimable) return UniTask.FromResult(default(RewardClaimOutcome));
 
         return RequestClaim(_section.RewardKey);
     }
 
     // 지급·낙인·영속은 서버가 한 트랜잭션으로 끝낸다 — 응답 채택이 재화·앨범 보상 슬롯을 통째로 갈아끼우므로
     // 클라가 여기서 더 쓸 것이 없다(낙인 키가 곧 서버 Reward.ownerId 라 변환도 없다).
-    static async UniTask<bool> RequestClaim(string _rewardKey)
+    static async UniTask<RewardClaimOutcome> RequestClaim(string _rewardKey)
     {
-        if (!await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerAlbum, _rewardKey)) return false;
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerAlbum, _rewardKey);
+        if (!t_outcome.Succeeded) return default;
 
         OnChanged?.Invoke();
-        return true;
+        return t_outcome;
     }
 
     static EAlbumRewardState StateOf(AlbumSection _section)

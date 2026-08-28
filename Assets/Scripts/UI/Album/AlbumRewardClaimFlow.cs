@@ -10,7 +10,7 @@ public static class AlbumRewardClaimFlow
 {
     /// <summary>보상 팝업을 연다. 폴백(팝업 미배선)으로 수령만 끝나는 경우가 있어 완료를 기다릴 수 있게 대기를 돌려준다.</summary>
     public static async UniTask Open(string _title, IReadOnlyList<AlbumRewardDef> _rewards,
-                                     Func<UniTask<bool>> _onConfirm)
+                                     Func<UniTask<RewardClaimOutcome>> _onConfirm)
     {
         // 팝업이 씬에 없으면 확인 없이 바로 수령한다(랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
         if (!RewardClaimPopup.TryGet(out var t_popup))

@@ -101,17 +101,18 @@ public static class RankRewardManager
     public static bool CanClaim(int _tierIndex) => StateOf(_tierIndex) == ERankRewardState.Claimable;
 
     /// <summary>보상 수령을 서버에 요청한다. 지급과 낙인(claimedTiers)을 서버가 한 트랜잭션으로 끝내고,
-    /// 응답 채택이 재화·랭크 슬롯을 갈아끼운다. 지급 성공 여부를 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    /// 응답 채택이 재화·랭크 슬롯을 갈아끼운다. 서버가 준 목록째로 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
     // CanClaim은 왕복을 아끼는 낙관 검사다 — 자격의 진실원은 서버이고, 여기서 통과해도 거절될 수 있다.
-    public static async UniTask<bool> ClaimAsync(int _tierIndex)
+    public static async UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
     {
-        if (!CanClaim(_tierIndex)) return false;
+        if (!CanClaim(_tierIndex)) return default;
 
         // 티어 인덱스 문자열이 스펙시트 Reward.ownerId 와 같은 키다(RankConfig.FillRewards와 같은 표기).
-        if (!await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString())) return false;
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString());
+        if (!t_outcome.Succeeded) return default;
 
         OnChanged?.Invoke();
-        return true;
+        return t_outcome;
     }
 
     // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)
