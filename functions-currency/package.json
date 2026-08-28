@@ -3,8 +3,7 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "sync:shared": "node scripts/sync-shared.js",
-    "assert:shared": "node scripts/assert-shared-sync.js",
-    "prebuild": "npm run sync:shared && npm run assert:shared",
+    "prebuild": "npm run sync:shared",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "npm run build",

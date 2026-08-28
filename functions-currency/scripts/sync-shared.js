@@ -1,5 +1,5 @@
 // 원본(functions/src) 을 미러(functions-currency/src/generated) 로 복사한다.
-// prebuild 에서 자동으로 돈다. 미러 파일에는 배너 주석을 넣지 않는다 - 바이트가 갈리면 assert 가 무의미해진다.
+// prebuild 에서 자동으로 돈다. 미러는 커밋하지 않으므로 이 복사가 빌드를 성립시키는 유일한 장치다.
 "use strict";
 
 const fs = require("fs");
