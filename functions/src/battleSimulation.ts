@@ -27,6 +27,8 @@ type Field = {owner: number; slots: Array<Card | null>; waiting: Card[];
   fallen: number[]; flow: number; active: ActiveSynergy[]};
 
 export type BattleSimulationInput = {
+  /** 골든 재생 전용. 소유자별 실제 보드 순서(슬롯 0..2 → 대기열). 주면 자체 셔플을 건너뛴다. */
+  boardOrders?: readonly (readonly number[])[];
   seedHex: string;
   decks: readonly [readonly CardSnapshot[], readonly CardSnapshot[]];
   specs: ReadonlyMap<number, CardSpecForValidation>;
@@ -34,6 +36,8 @@ export type BattleSimulationInput = {
 };
 
 export type BattleSimulationResult = {
+  /** 동시 전멸. true면 winnerOwner 는 -1 이다. */
+  draw?: boolean;
   ok: boolean; reason?: string; finalStateHash?: string; winnerOwner?: number;
   remaining?: readonly [number, number]; drawCount?: number;
   checkpoints?: readonly BattleSimulationCheckpoint[];
@@ -97,14 +101,25 @@ function has(card: Card, keyword: Keyword): boolean {
   return ((card.unlocked | card.runtime | card.synergyKeywords) & keyword) !== 0;
 }
 
+// boardOrder = 클라가 실제로 셔플한 뒤의 보드 순서(슬롯 0..2 → 대기열). 골든 재생에서 이걸 주면
+// 자체 셔플 대신 그 순서를 그대로 놓는다. 셔플 차이와 규칙 차이를 분리해서 보기 위한 것이다 —
+// 라이브 정산 경로는 이 값이 없으므로 종전대로 시드에서 셔플한다.
 function makeField(owner: number, deck: readonly CardSnapshot[],
-  specs: ReadonlyMap<number, CardSpecForValidation>, seed: bigint): Field | null {
+  specs: ReadonlyMap<number, CardSpecForValidation>, seed: bigint,
+  boardOrder?: readonly number[], _fail?: {reason: string}): Field | null {
   const cards: Card[] = [];
   for (const snapshot of deck) {
     const spec = specs.get(snapshot.cardId);
-    // maxHp 는 서버 재시뮬용으로 나중에 추가된 열이다. 아직 안 올라온 표면 0 이 오는데,
-    // 그 상태로 돌리면 전 카드가 체력 0 인 전투를 "성공"으로 계산한다. 재생을 포기하는 게 맞다.
-    if (spec == null || spec.maxHp <= 0) return null;
+    // 두 실패를 갈라야 다음 작업이 정해진다 — 표에 카드가 없는 것과, 있는데 maxHp 열이 비어 있는 것은
+    // 원인도 고칠 곳도 다르다.
+    if (spec == null) {
+      if (_fail != null) _fail.reason = `card_spec_missing:${snapshot.cardId}`;
+      return null;
+    }
+    if (!(spec.maxHp > 0)) {
+      if (_fail != null) _fail.reason = `card_spec_max_hp_missing:${snapshot.cardId}`;
+      return null;
+    }
     const maxHp = spec.maxHp + snapshot.hpBonus;
     cards.push({cardId: snapshot.cardId, owner, slot: -1, hp: maxHp, maxHp, baseMaxHp: spec.maxHp,
       bonusHp: 0, evolution: Math.max(spec.defaultEvolutionStage, snapshot.evolutionStage),
@@ -114,10 +129,38 @@ function makeField(owner: number, deck: readonly CardSnapshot[],
       justSpawned: false, returned: false, revealed: false, everRevealed: false,
       synergies: spec.synergies.map(synergyName), specKeywords: spec.keywords});
   }
-  const shuffle = new Rng(Rng.deckSeed(seed, owner));
-  for (let i = cards.length - 1; i > 0; i--) {
-    const j = shuffle.range(i + 1);
-    [cards[i], cards[j]] = [cards[j], cards[i]];
+  if (boardOrder != null) {
+    // 빈 배열 = 클라가 보드 순서를 기록하지 못했다. 여기서 시드 셔플로 떨어뜨리면
+    // 확실히 다른 보드가 나오고, 그게 "규칙이 갈렸다"로 보고된다. 명시적으로 실패시킨다.
+    if (boardOrder.length === 0) {
+      if (_fail != null) _fail.reason = `board_order_empty:owner${owner}`;
+      return null;
+    }
+    if (boardOrder.length !== cards.length) {
+      if (_fail != null) {
+        _fail.reason = `board_order_size:owner${owner}:${boardOrder.length}/${cards.length}`;
+      }
+      return null;
+    }
+    const pool = cards.slice();
+    const ordered: Card[] = [];
+    for (const cardId of boardOrder) {
+      const index = pool.findIndex((card) => card.cardId === cardId);
+      if (index < 0) {
+        if (_fail != null) _fail.reason = `board_order_card:owner${owner}:${cardId}`;
+        return null;
+      }
+      ordered.push(pool[index]);
+      pool.splice(index, 1);
+    }
+    cards.length = 0;
+    cards.push(...ordered);
+  } else {
+    const shuffle = new Rng(Rng.deckSeed(seed, owner));
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = shuffle.range(i + 1);
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
   }
   const field: Field = {owner, slots: [null, null, null], waiting: [], fallen: [], flow: 0, active: []};
   cards.forEach((card, index) => {
@@ -336,9 +379,12 @@ export function simulateBattle(input: BattleSimulationInput): BattleSimulationRe
   try {
     const seed = BigInt(`0x${input.seedHex}`);
     const rng = new Rng(seed);
-    const a = makeField(0, input.decks[0], input.specs, seed);
-    const b = makeField(1, input.decks[1], input.specs, seed);
-    if (a == null || b == null) return {ok: false, reason: "card_spec_missing"};
+    // 기본값은 "어디서 실패했는지 못 밝혔다"는 뜻이어야 한다. 특정 사유를 기본값으로 두면
+    // 사유를 안 채운 실패 경로가 전부 그 이름을 뒤집어써서 원인 추적이 엉뚱한 데로 간다.
+    const fail = {reason: "field_build_failed"};
+    const a = makeField(0, input.decks[0], input.specs, seed, input.boardOrders?.[0], fail);
+    const b = makeField(1, input.decks[1], input.specs, seed, input.boardOrders?.[1], fail);
+    if (a == null || b == null) return {ok: false, reason: fail.reason};
     const fields: [Field, Field] = [a, b];
     const firstOwner = rng.range(2);
     const commands = decodeBattleCommands(Buffer.from(input.commandLog, "base64"));
@@ -385,7 +431,20 @@ export function simulateBattle(input: BattleSimulationInput): BattleSimulationRe
       }
       if (derived && command.b !== expectedDerivedTarget) return {ok: false, reason: "derived_target_mismatch"};
       const resolved = attack(command, fields, rng);
-      if (resolved.error != null) return {ok: false, reason: resolved.error};
+      if (resolved.error != null) {
+        // 실패해도 여기까지 모은 체크포인트를 함께 돌려준다 — 규칙 위반이 첫 발산이 아니라
+        // 앞선 턴에서 이미 갈린 상태의 증상일 수 있고, 그건 해시 체인으로만 구분된다.
+        // 어느 명령에서 규칙이 갈렸는지 없으면 골든 대조가 "실패했다"까지만 알려준다.
+        // 양쪽 보드를 같이 실어야 C# 로그와 눈으로 맞출 수 있다.
+        const dump = (field: Field) => field.slots
+          .map((card, slot) => card == null ? `${slot}:-` :
+            `${slot}:id${card.cardId}hp${card.hp}kw${card.unlocked | card.runtime | card.synergyKeywords}`)
+          .join(",");
+        return {ok: false, checkpoints, reason: `${resolved.error}@seq${command.seq}` +
+          `(turn=${command.turn} actor=${command.actorOwner} a=${command.a} b=${command.b}` +
+          ` flags=${command.flags} own=[${dump(fields[command.actorOwner])}]` +
+          ` enemy=[${dump(fields[1 - command.actorOwner])}])`};
+      }
       expectedDerived = resolved.again;
       expectedDerivedTarget = -1;
       if (expectedDerived) {
@@ -402,8 +461,10 @@ export function simulateBattle(input: BattleSimulationInput): BattleSimulationRe
       if (remaining(a) === 0 || remaining(b) === 0) break;
     }
     if (remaining(a) > 0 && remaining(b) > 0) return {ok: false, reason: "command_log_incomplete"};
-    const winnerOwner = remaining(a) > 0 ? 0 : 1;
-    return {ok: true, winnerOwner, remaining: [remaining(a), remaining(b)],
+    // 동시 전멸이면 승자가 없다. 여기서 한쪽을 고르면 클라(EBattleLoopEnd.Draw)와 판정이 갈린다.
+    const drawn = remaining(a) === 0 && remaining(b) === 0;
+    const winnerOwner = drawn ? -1 : remaining(a) > 0 ? 0 : 1;
+    return {ok: true, winnerOwner, draw: drawn, remaining: [remaining(a), remaining(b)],
       finalStateHash: stateHash(fields, rng.draws), drawCount: rng.draws, checkpoints};
   } catch (error) {
     // 예외 메시지를 그대로 reason 에 담으면 매치 문서(클라가 읽는다)에 내부 경로·스택 조각이 남는다.

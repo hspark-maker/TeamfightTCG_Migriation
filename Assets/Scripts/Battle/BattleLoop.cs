@@ -6,6 +6,10 @@ public enum EBattleLoopEnd : byte
     Forced = 0,
     PlayerWon = 1,
     PlayerLost = 2,
+
+    /// <summary>양쪽 보드가 같은 순간에 비었다. 이걸 따로 두지 않으면 두 클라가 각자
+    /// "내가 이겼다"로 판정해(각자 enemyField 를 먼저 본다) 서버에서 winner_conflict 로 튕긴다.</summary>
+    Draw = 3,
 }
 
 /// <summary>
@@ -53,8 +57,12 @@ public sealed class BattleLoop
             _afterTurnResolved?.Invoke(currentOwner);
 
             if (_forcedEnd != null && _forcedEnd()) return EBattleLoopEnd.Forced;
-            if (rules.enemyField.IsEmpty) return EBattleLoopEnd.PlayerWon;
-            if (rules.playerField.IsEmpty) return EBattleLoopEnd.PlayerLost;
+            // 동시 전멸을 **먼저** 본다. 개별 판정을 앞에 두면 양 클라가 서로 다른 답을 낸다.
+            bool t_enemyEmpty = rules.enemyField.IsEmpty;
+            bool t_mineEmpty = rules.playerField.IsEmpty;
+            if (t_enemyEmpty && t_mineEmpty) return EBattleLoopEnd.Draw;
+            if (t_enemyEmpty) return EBattleLoopEnd.PlayerWon;
+            if (t_mineEmpty) return EBattleLoopEnd.PlayerLost;
 
             _beforeContinue?.Invoke();
 

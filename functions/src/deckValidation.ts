@@ -119,8 +119,12 @@ export function parseCardSpecRow(raw: unknown): CardSpecForValidation | null {
   // 아래 셋은 서버 재시뮬레이션용으로 나중에 추가된 열이다. 아직 업로드되지 않은 표가 있으므로
   // **없어도 덱 잠금은 통과시킨다** — 여기서 막으면 구 데이터로는 매치 자체가 성립하지 않는다.
   // 대신 값이 없으면 0 / [] 로 떨어지고, 시뮬레이터가 그걸 보고 재생을 포기한다(makeField).
-  const maxHp = row.maxHp === undefined ? 0 : integer(row.maxHp);
-  const defaultEvolutionStage = row.defaultEvolutionStage === undefined ? 0 : integer(row.defaultEvolutionStage);
+  // 업로더가 모든 값을 문자열로 쓰고 null 은 빈 문자열이 된다 — 나중에 추가된 열에서 ""를
+  // 파싱 실패로 보면 카드 전체가 표에서 사라지고, 원인이 "카드가 없다"로 잘못 보고된다.
+  // 여기서는 "" 를 "값 없음"으로 읽고, 정말 필요한지는 소비처(시뮬레이터)가 판정한다.
+  const absent = (value: unknown) => value === undefined || value === "";
+  const maxHp = absent(row.maxHp) ? 0 : integer(row.maxHp);
+  const defaultEvolutionStage = absent(row.defaultEvolutionStage) ? 0 : integer(row.defaultEvolutionStage);
   const synergies = row.synergies === undefined ? [] : stringList(row.synergies);
   if (maxHp == null || maxHp < 0 || defaultEvolutionStage == null ||
       defaultEvolutionStage < 0 || defaultEvolutionStage > 3 || synergies == null) return null;

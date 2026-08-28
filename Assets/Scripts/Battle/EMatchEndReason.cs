@@ -30,6 +30,10 @@ public enum EMatchEndReason
     /// 보고되면 원인 추적이 막힌다. 결과 처리는 Timeout과 동일(무효).</summary>
     InitError,
 
+    /// <summary>양쪽 보드가 동시에 비었다. 무효 경기가 아니다 — 골드는 양쪽 다 받고 랭크만 그대로 둔다.
+    /// 승패가 안 갈렸으므로 랭크를 움직일 근거가 없고, 판은 끝까지 진행됐으므로 무보상도 아니다.</summary>
+    Draw,
+
     /// <summary>에디터 디버그 강제 승리. 보상을 실제로 지급한다(종전 동작 보존).</summary>
     DebugForceWin,
 }
@@ -46,6 +50,7 @@ public static class MatchEndReasonExtensions
     {
         return _reason == EMatchEndReason.Normal
             || _reason == EMatchEndReason.Surrender
+            || _reason == EMatchEndReason.Draw
             || _reason == EMatchEndReason.DebugForceWin;
     }
 

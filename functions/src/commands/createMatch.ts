@@ -95,7 +95,28 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
     // 되돌리면 진행 중인 매치를 덮어쓴다 — 클라가 nonce 를 새로 뽑아 다시 오게 한다.
     if (raw != null && (raw.phase === "locked" || raw.phase === "settled" ||
         raw.status === "confirmed" || raw.status === "flagged")) {
-      throw new HttpsError("already-exists", "pairing_key_reused");
+      // 이 가드는 **다른 짝**이 같은 pairingKey 로 진행 중인 매치를 덮어쓰는 걸 막는 것이다.
+      // 이미 참가자로 등록된 본인이 자기 매치를 다시 읽는 건 막으면 안 된다 —
+      // 두 클라가 동시에 페어링하면 빠른 쪽이 lockDeck 으로 phase 를 "locked" 로 올린 뒤에
+      // 느린 쪽의 마지막 폴이 도착하고, 그 정상 흐름이 여기서 already-exists 로 튕겼다.
+      const participants = raw.participantUids;
+      const owners = objectRecord(raw.ownerIndexByUid);
+      const isParticipant = Array.isArray(participants) && participants.includes(uid) &&
+        safeInteger(owners?.[uid]) === data.ownerIndex;
+      if (!isParticipant) throw new HttpsError("already-exists", "pairing_key_reused");
+
+      // 본인 확인됨. 문서를 건드리지 않고 이미 확정된 신원을 그대로 돌려준다(멱등).
+      if (typeof raw.matchId !== "string" || typeof raw.seedHex !== "string" ||
+          !Number.isInteger(raw.rulesetVersion)) {
+        throw new HttpsError("failed-precondition", "match identity is incomplete");
+      }
+      return {
+        matchId: raw.matchId,
+        seedHex: raw.seedHex,
+        rulesetVersion: raw.rulesetVersion as number,
+        slot: data.ownerIndex,
+        status: "paired",
+      };
     }
     const priorRecord = readPairingRecord(raw);
     let decision;

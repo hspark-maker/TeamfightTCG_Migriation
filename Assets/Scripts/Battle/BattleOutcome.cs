@@ -21,6 +21,10 @@ public sealed class BattleOutcome
         if (IsCaptured) return false;
         IsCaptured = true;
 
+        // 무승부: 승자가 없으므로 랭크를 움직일 근거가 없다. 골드는 패배와 같은 정액분을 준다
+        // (판은 끝까지 진행됐으니 무보상은 아니다). _won 은 false 로 흘러 보상 계산이 정액 경로를 탄다.
+        bool t_draw = _reason == EMatchEndReason.Draw;
+
         List<CardInstance> t_active = rules.playerField.GetActiveCards();
         int t_remaining = t_active.Count + rules.playerField.WaitingCount;
         SurvivorCards = CollectSurvivorCards(t_active);
@@ -43,11 +47,19 @@ public sealed class BattleOutcome
 
         if (!t_serverPayout) BattleRewardHandoff.Set(Reward);
 
-        RankApplyResult t_rank = t_serverPayout
-            ? RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive)
-            : RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
-        RankDelta = t_rank.Delta;
-        if (!t_serverPayout) RankResultHandoff.Set(t_rank);
+        if (t_draw)
+        {
+            // 랭크는 조회도 적용도 하지 않는다 — 승패 인자를 넘기는 순간 어느 쪽으로든 움직인다.
+            RankDelta = 0;
+        }
+        else
+        {
+            RankApplyResult t_rank = t_serverPayout
+                ? RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive)
+                : RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
+            RankDelta = t_rank.Delta;
+            if (!t_serverPayout) RankResultHandoff.Set(t_rank);
+        }
 
         SubmitMatchEvidence(_won, t_remaining, t_rankPointsBefore, _reason);
         return true;
@@ -68,6 +80,10 @@ public sealed class BattleOutcome
             return;
 
         int t_opponentRemaining = rules.enemyField.GetActiveCards().Count + rules.enemyField.WaitingCount;
-        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining, _rankPointsBefore);
+        // 서버 재시뮬이 대조할 종료 시점 해시. 골든 레코더와 **같은 계산·같은 시점**이어야 한다 —
+        // 다르면 규칙이 맞아도 발산으로 보고된다(실제로 그랬다).
+        ulong t_endStateHash = BattleStateHash.Compute(rules.playerField, rules.enemyField);
+        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining, _rankPointsBefore,
+            _reason == EMatchEndReason.Draw, t_endStateHash);
     }
 }

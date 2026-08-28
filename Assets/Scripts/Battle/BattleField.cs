@@ -64,6 +64,9 @@ public class BattleField : MonoBehaviour
         // 통째로 죽어 "아무것도 안 나오는 전투"가 된다. 한 장 빠진 채로라도 전투는 열려야 한다.
         List<int> t_shuffled = Compact(_deckData, _ownerIndex);
         Shuffle(t_shuffled, _shuffle, _ownerIndex);
+        // 서버 재시뮬은 이 순서를 시드로 산출할 수 없다(경로에 따라 Local 셔플이 섞인다) — 기록해서 제출한다.
+        // 초기화 경로가 여럿이라 호출부가 아니라 여기 한 곳에서 잡는다.
+        BattleBoardOrder.Capture(_ownerIndex, t_shuffled);
 
         for (int i = 0; i < t_shuffled.Count; i++)
         {
@@ -207,10 +210,15 @@ public class BattleField : MonoBehaviour
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
+        // 원격 필드도 보드 순서를 기록해야 서버가 재시뮬할 수 있다. 여기는 셔플이 없고
+        // 받은 순서가 곧 배치 순서다 — 카탈로그에서 걸러진 카드는 실제로 안 놓이므로 제외한 순서를 남긴다.
+        var t_boardOrder = new List<int>(_ids?.Length ?? 0);
+
         for (int i = 0; i < _ids.Length; i++)
         {
             int t_cardId = _ids[i];
             if (!CardCatalog.Contains(t_cardId)) continue;
+            t_boardOrder.Add(t_cardId);
             var t_card = new CardInstance(t_cardId, _ownerIndex, GrowthOf(t_cardId));
             if (i < SLOT_COUNT)
             {
@@ -226,6 +234,8 @@ public class BattleField : MonoBehaviour
                 this.state.Enqueue(t_card);
             }
         }
+
+        BattleBoardOrder.Capture(_ownerIndex, t_boardOrder);
     }
 
     /// <summary>

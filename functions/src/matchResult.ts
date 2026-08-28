@@ -22,6 +22,15 @@ export type Submission = {
   commandLogHash?: string;
   commandCount?: number;
   commandLogTruncated?: boolean;
+  /** 셔플 후 초기 보드 순서. 서버가 시드로 산출할 수 없어 클라가 실어 보낸다 —
+   *  신뢰는 양쪽 제출이 같은지로만 세운다(sameBoardOrder).
+   *  **Firestore 는 중첩 배열을 저장하지 못한다** — 그래서 [][] 가 아니라 소유자별 맵이다. */
+  boardOrder?: {owner0: number[]; owner1: number[]};
+  /** 무승부(양쪽 동시 전멸). true면 양쪽 won 이 모두 false 이므로 승자 대조를 건너뛴다. */
+  draw?: boolean;
+  /** 전투 종료 시점 보드 해시. finalStateHash(= 마지막 합의 해시)와 다르다 —
+   *  마지막 턴은 상대와 교환할 기회가 없어 합의 목록에 없다. 서버 재시뮬 대조는 이 값과 한다. */
+  endStateHash?: string;
   submittedAt: Timestamp;
 };
 
@@ -50,9 +59,32 @@ export function expectedMatchId(myNonce: string, opponentNonce: string): string 
   return createHash("sha256").update(seed).digest("hex").slice(0, 32);
 }
 
+/**
+ * 두 제출의 보드 순서가 같은가. 한쪽이라도 없으면 대조 자체를 못 하므로 불일치로 본다.
+ * @param {Submission} a 한쪽 제출.
+ * @param {Submission} b 다른 쪽 제출.
+ * @return {boolean} 두 제출의 보드 순서가 완전히 같으면 true.
+ */
+export function sameBoardOrder(a: Submission, b: Submission): boolean {
+  const x = a.boardOrder;
+  const y = b.boardOrder;
+  if (x == null || y == null) return false;
+  for (const side of ["owner0", "owner1"] as const) {
+    const left = x[side];
+    const right = y[side];
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
 export function submissionsAgree(a: Submission, b: Submission): string | null {
   if (a.uid === b.uid) return "same_uid";
-  if (a.won === b.won) return "winner_conflict";
+  // 무승부는 양쪽 won 이 모두 false 다 — 승자 대조를 그대로 돌리면 winner_conflict 로 튕긴다.
+  // 한쪽만 무승부를 주장하면 판정이 갈린 것이므로 불일치다.
+  if ((a.draw ?? false) !== (b.draw ?? false)) return "draw_conflict";
+  if (!(a.draw ?? false) && a.won === b.won) return "winner_conflict";
+  if ((a.draw ?? false) && (a.won || b.won)) return "draw_conflict";
   const seedSource = a.seedSource ?? "commit_reveal";
   if (seedSource !== (b.seedSource ?? "commit_reveal")) return "seed_source_mismatch";
   if (seedSource === "commit_reveal" &&

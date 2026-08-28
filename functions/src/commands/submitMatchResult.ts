@@ -6,11 +6,13 @@ import {db} from "../firebaseApp";
 import {
   decideMatch,
   expectedMatchId,
+  sameBoardOrder,
   sameSubmission,
   Submission,
 } from "../matchResult";
 import {
   computeCurrencyPayout,
+  computeDrawRankPayout,
   computeRankPayout,
   parseRankGradeRows,
   parseRewardRows,
@@ -37,6 +39,9 @@ function persistableSimulation(_result: BattleSimulationResult | null): unknown 
   if (_result == null) return null;
   const rest: Record<string, unknown> = {..._result};
   delete rest.checkpoints;
+  // 재생 실패면 winnerOwner/remaining/finalStateHash/drawCount 가 undefined 다.
+  // Firestore 는 undefined 를 거부하므로(문서 쓰기 전체가 실패한다) 아예 키를 뺀다.
+  for (const key of Object.keys(rest)) if (rest[key] === undefined) delete rest[key];
   return rest;
 }
 
@@ -54,6 +59,10 @@ function authoritativeInputsAgree(a: Submission, b: Submission): string | null {
   if (a.commandLogTruncated || b.commandLogTruncated) return "command_log_truncated";
   if (a.commandCount !== b.commandCount || a.commandLogHash !== b.commandLogHash ||
       a.commandLog !== b.commandLog) return "command_log_mismatch";
+  if ((a.draw ?? false) !== (b.draw ?? false)) return "draw_conflict";
+  // 보드 순서는 서버가 재현할 수 없다(클라 경로에 시드 무관 셔플이 섞인다). 그래서 재시뮬 입력으로
+  // 받아 쓰되, 두 클라가 같은 값을 냈을 때만 신뢰한다 — 이게 이 값의 유일한 검증 수단이다.
+  if (!sameBoardOrder(a, b)) return "board_order_mismatch";
   return null;
 }
 
@@ -102,6 +111,50 @@ function parseSubmitData(raw: unknown): SubmitData {
       !Number.isSafeInteger(rankPointsBefore) || (rankPointsBefore as number) < 0) {
     throw new HttpsError("invalid-argument", "invalid match result payload");
   }
+  // 무승부 플래그. 구 클라는 안 보내므로 없으면 false 다.
+  const rawDraw = (raw as Record<string, unknown>).draw;
+  if (rawDraw !== undefined && typeof rawDraw !== "boolean") {
+    throw new HttpsError("invalid-argument", "invalid draw flag");
+  }
+  const draw = rawDraw === true;
+
+  // 종료 시점 해시. 구 클라는 안 보내므로 없으면 undefined 다(그 경우 대조를 건너뛴다).
+  const rawEndStateHash = (raw as Record<string, unknown>).endStateHash;
+  let endStateHash: string | undefined;
+  if (rawEndStateHash !== undefined && rawEndStateHash !== "") {
+    if (typeof rawEndStateHash !== "string" || !HEX_16.test(rawEndStateHash)) {
+      throw new HttpsError("invalid-argument", "invalid end state hash");
+    }
+    endStateHash = rawEndStateHash;
+  }
+  // 무승부인데 이겼다고 주장하면 앞뒤가 안 맞는다 — 형식 단계에서 거른다.
+  if (draw && won === true) {
+    throw new HttpsError("invalid-argument", "draw cannot be a win");
+  }
+
+  // 보드 순서: 소유자 2개 × 덱 장수. 값 자체는 서버가 검증할 수 없고(시드로 재현 불가) 형식만 본다.
+  // 진위는 두 클라 제출 대조(sameBoardOrder)가 가른다. 구 클라는 안 보내므로 없어도 통과시킨다.
+  const rawBoardOrder = (raw as Record<string, unknown>).boardOrder;
+  // 와이어는 [owner0[], owner1[]] 로 오지만 저장은 맵으로 접는다 —
+  // Firestore 가 중첩 배열을 거절한다("Property submissions contains an invalid nested entity").
+  let boardOrder: {owner0: number[]; owner1: number[]} | undefined;
+  if (rawBoardOrder !== undefined) {
+    if (!Array.isArray(rawBoardOrder) || rawBoardOrder.length !== 2) {
+      throw new HttpsError("invalid-argument", "invalid board order");
+    }
+    const sides = rawBoardOrder.map((side) => {
+      if (!Array.isArray(side) || side.length > 12) {
+        throw new HttpsError("invalid-argument", "invalid board order");
+      }
+      return side.map((value) => {
+        if (!Number.isInteger(value) || (value as number) <= 0) {
+          throw new HttpsError("invalid-argument", "invalid board order");
+        }
+        return value as number;
+      });
+    });
+    boardOrder = {owner0: sides[0], owner1: sides[1]};
+  }
   if (!Number.isInteger(commandLogVersion) || (commandLogVersion !== 0 && commandLogVersion !== 1) ||
       typeof commandLog !== "string" || typeof commandLogHash !== "string" ||
       !Number.isInteger(commandCount) || (commandCount as number) < 0 ||
@@ -139,7 +192,8 @@ function parseSubmitData(raw: unknown): SubmitData {
     myRemaining: myRemaining as number, opponentRemaining: opponentRemaining as number,
     rankPointsBefore: rankPointsBefore as number,
     commandLogVersion: commandLogVersion as number,
-    commandLog, commandLogHash, commandCount: commandCount as number, commandLogTruncated};
+    commandLog, commandLogHash, commandCount: commandCount as number, commandLogTruncated,
+    boardOrder, draw, endStateHash};
 }
 
 
@@ -257,11 +311,15 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
             (entries[0].commandLogVersion ?? 0) !== 1 || entries[0].commandLogTruncated) {
           serverSimulation = {ok: false, reason: "server_replay_input_missing"};
         } else {
+          // 보드 순서는 클라가 실어 보낸 값이다 — 서버는 시드로 재현할 수 없다.
+          // 두 제출이 같은 값을 냈는지는 authoritativeInputsAgree(board_order_mismatch)가 이미 걸렀다.
           serverSimulation = simulateBattle({
             seedHex,
             decks: [decks[0] as CardSnapshot[], decks[1] as CardSnapshot[]],
             specs: cardSpecs,
             commandLog,
+            boardOrders: entries[0].boardOrder == null ? undefined :
+              [entries[0].boardOrder.owner0, entries[0].boardOrder.owner1],
           });
         }
       }
@@ -285,12 +343,31 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
           }
         }
       }
-      if (serverSimulation.finalStateHash !== entries[0].finalStateHash || outcomeMismatches.length > 0) {
+      // 재생이 실패했으면 "클라와 다르다"가 아니라 "대조를 못 했다"다. 둘을 섞으면 섀도 실측이
+      // 실패율과 발산율을 구분하지 못한다. Firestore 는 undefined 를 거부하므로 전부 null 로 접는다.
+      if (!serverSimulation.ok) {
         clientDivergence = {
-          submittedStateHash: entries[0].finalStateHash,
-          serverStateHash: serverSimulation.finalStateHash,
-          outcomeMismatchUids: outcomeMismatches,
+          compared: false,
+          reason: simulationReason ?? "unknown",
+          submittedStateHash: entries[0].finalStateHash ?? null,
+          serverStateHash: null,
+          outcomeMismatchUids: [],
         };
+      } else {
+        // **finalStateHash 와 비교하면 안 된다** — 그건 마지막으로 두 클라가 합의한 해시라
+        // 전투가 끝난 턴의 상태를 담지 못한다(끝 턴은 교환 기회가 없다).
+        // endStateHash 가 서버 재시뮬과 같은 시점·같은 계산이다. 없으면(구 클라) 해시 대조를 건너뛴다.
+        const clientEnd = entries[0].endStateHash ?? null;
+        const hashDiffers = clientEnd != null && serverSimulation.finalStateHash !== clientEnd;
+        if (hashDiffers || outcomeMismatches.length > 0) {
+          clientDivergence = {
+            compared: true,
+            reason: clientEnd == null ? "end_state_hash_absent" : null,
+            submittedStateHash: clientEnd,
+            serverStateHash: serverSimulation.finalStateHash ?? null,
+            outcomeMismatchUids: outcomeMismatches,
+          };
+        }
       }
     }
 
@@ -321,13 +398,20 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       }
       const owner = ownerIndexByUid?.[entry.uid] ?? -1;
       const authoritative = authoritativeRules && serverSimulation?.ok === true && owner >= 0;
-      const won = authoritative ? serverSimulation?.winnerOwner === owner : entry.won;
+      // 권위 모드에서는 서버 시뮬의 판정을 쓰고, 섀도에서는 클라 신고를 쓴다.
+      const draw = authoritative ? serverSimulation?.draw === true : entry.draw ?? false;
+      const won = draw ? false :
+        authoritative ? serverSimulation?.winnerOwner === owner : entry.won;
       const survivorCount = authoritative ? serverSimulation?.remaining?.[owner] ?? entry.myRemaining : entry.myRemaining;
       let currency;
       let rank;
       try {
+        // 무승부: 골드는 패배와 같은 정액분을 주고 랭크는 건드리지 않는다.
+        // computeRankPayout 은 승패 인자를 요구해서 어느 쪽으로든 점수를 움직인다 — 아예 부르지 않는다.
         currency = computeCurrencyPayout(won, survivorCount, rewardRows);
-        rank = computeRankPayout(rankBefore as number, won, rankRows);
+        rank = draw ?
+          computeDrawRankPayout(rankBefore as number, rankRows) :
+          computeRankPayout(rankBefore as number, won, rankRows);
       } catch (error) {
         logger.error("payout_calculation_failed", {matchId: data.matchId, uid: entry.uid, error});
         throw new HttpsError("failed-precondition", "payout calculation failed");
@@ -356,6 +440,20 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
 
     // 정산은 서버가 한다(보상·랭크 계산 + payout 문서 작성). 다만 승패 판정의 진실원은
     // 아직 두 클라 합의다 — 재시뮬 결과는 SERVER_SIMULATION_AUTHORITATIVE 가 켜질 때만 승격된다.
+    // 섀도 실측의 유일한 조회 수단이다. 문서에만 쌓으면 발산율을 집계할 방법이 없어
+    // 권위 전환(SERVER_SIMULATION_AUTHORITATIVE) 시점을 정할 근거가 생기지 않는다.
+    // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재시뮬이 실패했다"와
+    // "재시뮬 대상이 아니었다"를 구분할 수 없고, 그 둘은 원인도 조치도 다르다.
+    logger.info("shadow_compare", {
+      matchId: data.matchId,
+      env: data.env,
+      rulesetVersion,
+      simulateRules,
+      simulated: serverSimulation?.ok === true,
+      reason: serverSimulation?.ok === true ? null : serverSimulation?.reason ?? "not_run",
+      divergent: clientDivergence != null,
+      divergence: clientDivergence,
+    });
     logger.info("match_settled", {
       matchId: data.matchId, env: data.env, status: "confirmed",
       uids: entries.map((entry) => entry.uid),

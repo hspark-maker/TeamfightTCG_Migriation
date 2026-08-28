@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography;
@@ -42,6 +42,20 @@ static class MatchResultSubmission
         public int commandCount;
         public bool commandLogTruncated;
         public int commandLogVersion;
+
+        /// <summary>셔플 후 초기 보드 순서(owner0, owner1). 서버가 시드로 산출할 수 없어 실어 보낸다 —
+        /// 신뢰는 양쪽 제출이 같은지로만 세운다.</summary>
+        public int[] boardOrder0;
+        public int[] boardOrder1;
+
+        /// <summary>무승부(양쪽 동시 전멸). true면 won 은 양쪽 다 false 이고, 서버는 승자 대조를
+        /// 건너뛴 뒤 골드만 지급하고 랭크는 건드리지 않는다.</summary>
+        public bool draw;
+
+        /// <summary>전투가 끝난 시점의 보드 해시. <see cref="finalStateHash"/>(= 마지막으로 양쪽이
+        /// **합의한** 해시)와 다르다 — 마지막 턴은 상대와 교환할 기회가 없어 합의 목록에 없다.
+        /// 서버 재시뮬 대조는 이 값과 해야 한다. 합의 해시는 두 클라가 같은 지점까지 같았는지 보는 용도다.</summary>
+        public string endStateHash;
         public int attempts;
     }
 
@@ -77,7 +91,8 @@ static class MatchResultSubmission
         SavePending();
     }
 
-    internal static bool TryEnqueue(bool _won, int _myRemaining, int _opponentRemaining, long _rankPointsBefore)
+    internal static bool TryEnqueue(bool _won, int _myRemaining, int _opponentRemaining, long _rankPointsBefore,
+        bool _draw = false, ulong _endStateHash = 0)
     {
         MultiplayerTurnRunner t_turn = MultiplayerTurnRunner.Instance;
         NetworkGameController t_net = NetworkGameController.Instance;
@@ -119,6 +134,10 @@ static class MatchResultSubmission
             commandCount = BattleCommandLog.Count,
             commandLogTruncated = BattleCommandLog.IsTruncated,
             commandLogVersion = 1,
+            boardOrder0 = BattleBoardOrder.For(0),
+            boardOrder1 = BattleBoardOrder.For(1),
+            draw = _draw,
+            endStateHash = _endStateHash.ToString("x16"),
         });
         SavePending();
         RetryPending();
@@ -277,6 +296,9 @@ static class MatchResultSubmission
         ["commandCount"] = _item.commandCount,
         ["commandLogTruncated"] = _item.commandLogTruncated,
         ["commandLogVersion"] = _item.commandLogVersion,
+        ["boardOrder"] = new List<object> { ToObjectList(_item.boardOrder0), ToObjectList(_item.boardOrder1) },
+        ["draw"] = _item.draw,
+        ["endStateHash"] = _item.endStateHash ?? "",
     };
 
     static bool TryHandleResponse(object _raw, string _matchId, out bool _complete)
@@ -347,6 +369,16 @@ static class MatchResultSubmission
         else LocalPrefs.SetString(PendingKey, JsonUtility.ToJson(new PendingStore { items = new List<PendingSubmission>(s_pending) }));
         LocalPrefs.Save();
     }
+
+    // Firebase callable 페이로드는 List<object> 만 안전하게 넘어간다. int[] 를 그대로 넣으면
+    // 플랫폼에 따라 직렬화가 갈린다.
+    static List<object> ToObjectList(int[] _values)
+    {
+        var t_list = new List<object>(_values?.Length ?? 0);
+        if (_values == null) return t_list;
+        for (int i = 0; i < _values.Length; i++) t_list.Add(_values[i]);
+        return t_list;
+    }
 }
 
 sealed class MatchResultFirebaseModule : IFirebaseModule
@@ -374,4 +406,5 @@ sealed class MatchResultFirebaseModule : IFirebaseModule
         PayoutInbox.Shutdown();
         MatchResultSubmission.Shutdown();
     }
+
 }

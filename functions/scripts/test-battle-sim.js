@@ -98,10 +98,11 @@ const SEED = BigInt("0x0123456789ABCDEF");
   const files = fs.existsSync(goldenRoot) ? fs.readdirSync(goldenRoot)
     .filter((name) => name.endsWith(".json")).sort() : [];
   let eligibleCount = 0;
+  const shuffleMismatches = [];
   for (const file of files) {
     const fullPath = path.join(goldenRoot, file);
     const golden = JSON.parse(fs.readFileSync(fullPath, "utf8"));
-    assert.equal(golden.schemaVersion, 1, `${file}: schemaVersion`);
+    assert.ok(golden.schemaVersion === 1 || golden.schemaVersion === 2, `${file}: schemaVersion`);
     assert.ok(Number.isInteger(golden.rulesetVersion) && golden.rulesetVersion > 0,
       `${file}: rulesetVersion`);
     assert.match(golden.contentFingerprint, /^[0-9a-f]{64}$/, `${file}: contentFingerprint`);
@@ -117,6 +118,15 @@ const SEED = BigInt("0x0123456789ABCDEF");
       continue;
     }
 
+    // boardOrder 는 셔플이 끝난 실제 보드 순서다. 없으면(구 골든) 재생기가 자기 셔플을 돌려야 하는데,
+    // decks[].cards 가 cardId 로 정렬돼 있어 셔플 입력 순서를 복원할 수 없다 — 결과가 갈려도
+    // "셔플이 다른가 규칙이 다른가"를 구분하지 못하므로 검증 대상에서 뺀다.
+    const boardOrders = golden.decks.map((deck) => deck.boardOrder);
+    if (boardOrders.some((order) => !Array.isArray(order) || order.length === 0)) {
+      console.log(`  skip ${file}: boardOrder 없음(구 스키마) — 재캡처 필요`);
+      continue;
+    }
+
     eligibleCount++;
     const specs = new Map(golden.cardSpecs.map((spec) => [spec.id, spec]));
     const result = simulateBattle({
@@ -124,15 +134,37 @@ const SEED = BigInt("0x0123456789ABCDEF");
       decks: golden.decks.map((deck) => deck.cards),
       specs,
       commandLog: golden.commandLog,
+      boardOrders,
     });
     assert.equal(result.ok, true, `${file}: replay failed (${result.reason})`);
     assert.equal(result.finalStateHash, golden.finalStateHash, `${file}: finalStateHash`);
     assert.equal(result.drawCount, golden.finalDrawCount, `${file}: finalDrawCount`);
     assert.deepEqual(result.remaining, golden.remaining, `${file}: remaining`);
+
+    // 셔플 등가성은 규칙 등가성과 따로 본다. 여기가 틀리면 재생기의 Fisher-Yates 나 파생 시드가
+    // 클라와 다르다는 뜻이고, 위 해시 대조가 통과했더라도 라이브 재시뮬은 틀린 보드로 돈다.
+    const seedValue = BigInt(`0x${golden.seedHex}`);
+    for (const deck of golden.decks) {
+      const ids = deck.cards.map((card) => card.cardId);
+      const rng = new Rng(Rng.deckSeed(seedValue, deck.ownerIndex));
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = rng.range(i + 1);
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      if (JSON.stringify(ids) !== JSON.stringify(deck.boardOrder)) {
+        shuffleMismatches.push(`${file} owner${deck.ownerIndex}: ` +
+          `replay=${JSON.stringify(ids)} client=${JSON.stringify(deck.boardOrder)}`);
+      }
+    }
     // 승자 판정 자체의 등가성. remaining 만 맞아도 승자 산출식이 갈릴 수 있다.
-    // winnerOwner 는 schemaVersion 1 후반에 추가돼 옛 골든에는 없다(-1).
-    if (Number.isInteger(golden.winnerOwner) && golden.winnerOwner >= 0) {
+    // schemaVersion 1 은 무승부를 모르던 클라가 찍은 것이라(동시 전멸을 승리로 기록했다)
+    // 승자 비교를 걸 수 없다 — 재캡처 대상이다.
+    if (golden.schemaVersion >= 2) {
+      assert.equal(result.draw === true, golden.draw === true, `${file}: draw`);
       assert.equal(result.winnerOwner, golden.winnerOwner, `${file}: winnerOwner`);
+    } else if (Number.isInteger(golden.winnerOwner) && golden.winnerOwner >= 0 &&
+        result.winnerOwner !== golden.winnerOwner) {
+      console.log(`  note ${file}: 승자 비교 생략(schemaVersion 1, 무승부 미지원 캡처)`);
     }
 
     // 체크포인트는 (turn, actingOwner) 로 맞춘다. 명령 로그에 턴 경계 레코드가 없어서,
@@ -152,6 +184,13 @@ const SEED = BigInt("0x0123456789ABCDEF");
       "명령 없이 닫힌 턴이면 명령 로그에 턴 경계 레코드가 필요하다.");
     assert.equal(replayed.size, 0,
       `${file}: 재생기가 골든에 없는 체크포인트를 만들었다 (turn:owner = ${[...replayed.keys()].join(", ")})`);
+  }
+  // 참고 정보다. 클라 초기화 경로 일부가 ShufflePolicy.Local(UnityEngine.Random)로 섞어
+  // 보드가 매치 시드에서 나오지 않는다 — 그래서 보드 순서를 제출에 실어 보내는 쪽으로 정했다.
+  // 여기 불일치는 그 설계의 결과이지 결함이 아니다. 언젠가 셔플을 결정론으로 통일하면 0이 된다.
+  if (shuffleMismatches.length > 0) {
+    console.log(`참고: 시드 파생 셔플과 클라 보드가 다르다 (${shuffleMismatches.length}건). ` +
+      "보드 순서는 제출값을 쓴다.");
   }
   if (process.env.REQUIRE_BATTLE_GOLDENS === "1") {
     assert.ok(eligibleCount >= 12, `expected at least 12 eligible goldens, got ${eligibleCount}`);

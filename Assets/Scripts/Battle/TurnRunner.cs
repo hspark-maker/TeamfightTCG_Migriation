@@ -154,7 +154,7 @@ public class TurnRunner : MonoBehaviour
 
         if (_reason.GrantsReward())
             CaptureResult(_won, _reason);
-        BattleGoldenRecorder.Finish(_won);
+        BattleGoldenRecorder.Finish(_won, _reason == EMatchEndReason.Draw);
         ShowResult(_won, _reason.PlaysBeat()).Forget();
     }
 
@@ -451,6 +451,8 @@ public class TurnRunner : MonoBehaviour
             FinalizeResult(true, EMatchEndReason.Normal);
         else if (t_end == EBattleLoopEnd.PlayerLost)
             FinalizeResult(false, EMatchEndReason.Normal);
+        else if (t_end == EBattleLoopEnd.Draw)
+            FinalizeResult(false, EMatchEndReason.Draw);   // 승자 없음 — 골드만, 랭크는 그대로
     }
     /// <summary>턴 끝 보드 지문을 로그로 남긴다. 계산은 <see cref="BattleStateHash"/> 단독 —
     /// 여기서 접는 방식을 따로 두면 로그 해시와 실제로 교환하는 해시가 갈려 대조가 무의미해진다.</summary>
