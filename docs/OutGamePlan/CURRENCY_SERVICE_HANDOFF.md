@@ -1,6 +1,6 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `84f53288f`
+> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `3f522a2e3`
 > 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
@@ -20,7 +20,7 @@
 
 ## 지금 상태
 
-**커밋 6개**
+**커밋 8개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
@@ -28,15 +28,18 @@
 - `6f6a8885c` `link.xml` 에 팩 개봉 응답 DTO — IL2CPP 스트리핑 방어
 - `d2a4fdc3c` `claimReward` 의 보상 영구 손실·계정 영구 잠김 경로 2건
 - `84f53288f` C4 — `enhanceCard`·`enhanceKeyword` + 튜토 무료 한 방 서버 이전 + 거절 사유 전달 경로 교정
+- `fe4fe954d` C5.5 — 도감·챕터 **구성**을 스펙 표로 승격(`AlbumEntry` 40행 · `TournamentChapter` 24행) + 업로더 오버로드
+- `3f522a2e3` C5.6 — 도감·챕터 **수령**을 `claimReward` 로 이전(ownerType `Album` 추가 · 챕터는 `chapter_` 접두사 분기)
 
-**배포 상태 (실측 2026-08-28)**
+**배포 상태 (실측 2026-08-28, URL POST 로 확인)**
 
 | 함수 | 상태 |
 |---|---|
-| `currencyPing` (codebase `currency`) | 배포됨 · URL POST **401**(정상) |
-| `claimReward` (codebase `default`) | **배포됨** · URL POST **401**(정상) · 실기 왕복 통과 |
+| `currencyPing` (codebase `currency`) | 배포됨 · **401**(정상) |
+| `claimReward` (codebase `default`) | **배포됨** · **401**(정상) · C3·C5.6 실기 왕복 통과 |
+| `enhanceCard`·`enhanceKeyword` (codebase `default`) | **배포됨** · **401**(정상) |
+| `openPack` (codebase `default`) | 배포됨 · **401**(정상) |
 | `firestore.rules` 지갑 블록 | **배포됨** |
-| `enhanceCard`·`enhanceKeyword` (codebase `default`) | **미배포 — 404.** 클라만 올리면 강화가 `not-found` 로 떨어진다 |
 | `firestore.rules` 무료 한 방(`grants`) 블록 | **미배포.** 서버 동작은 Admin SDK 라 무관하지만, 클라가 그 문서를 읽게 되면 필수 |
 
 **주의 — "재화 로직이 currency codebase 로 갔다"가 아니다.** 지금 그 codebase 에 있는 것은 진단용 `currencyPing` 뿐이다. `walletStore.ts` 는 callable 이 아니라 라이브러리라 배포 대상이 아니고, 실제로 재화를 움직이는 `claimReward`·`openPack` 은 세이브 슬롯도 함께 만져서 default codebase 에 있다(결정 4). 지갑만 만지는 명령은 C6 에서 이사한다.
@@ -80,9 +83,11 @@ C3 왕복은 **통과했다**(2026-08-28). 항목 형태는 C4 이후에도 그�
 
 ## 남은 작업
 
-### C3.5 — 검수 미해결 3건 (심각도 중, C4 앞)
+### C3.5 — 검수 미해결 3건 (심각도 중, **여전히 미해결**)
 
-C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로 안에서** 어긋나 있어 C4 를 얹기 전에 정리한다.
+C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로 안에서** 어긋나 있다.
+
+**"C4 앞" 이라고 적어 뒀지만 C4·C5.5·C5.6 이 그냥 지나갔다**(2026-08-28 재확인 — 세 파일 모두 최신 커밋이 C3 시절 그대로다). 세 번 미뤄졌으니 다음 단계에 섞지 말고 **독립 커밋으로 먼저 닫을 것.**
 
 - `OutGame/Tournament/TournamentProgress.cs:202` — `MarkRewardPending` 이 디바운스 `DataSaveManager.Save()` 다. 격파 직후 바로 수령하면 낙인이 원격에 아직 없어 서버가 `NotEligible` 로 튕긴다. **`SaveImmediate` 여야 한다**
 - `UI/Tournament/TournamentMapOverlayView.cs:562` — 폴백 경로(보상 0건·팝업 미배선)가 `TournamentRewardFlow.Open` 이 false 를 돌린 그 자리에서 `PlayClaimSequence` 를 부른다. `ClearNodeAsync` 가 비동기가 되면서 그 시점엔 `IsCleared` 가 아직 false 라 `:579` 의 가드가 걸려 **점등·해금 연출이 통째로 빠진다**
@@ -123,9 +128,19 @@ C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로
 - `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
 - `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
-### C5 — 전투·디버그 2종
+### C5 — 전투·디버그 2종 (**건너뛰었다 · 미결**)
+
+C5.5·C5.6 을 먼저 했다. 이 단계는 아직 그대로다.
 
 `RewardService.cs:61`(전투 보상) · `OutgameDebugActions.cs:179`(디버그 지급).
+
+**착수 전에 답해야 할 것 셋** — 조사는 끝났고 판단만 남았다.
+
+1. **`TurnRunner.CaptureResult`(`:498-550`)가 동기 `void` 다.** 실지급 호출부는 `:533` 하나뿐이지만 서버 왕복을 끼우려면 이 메서드가 async 가 되고 결과 팝업이 `lastReward` 를 읽는 시점과 얽힌다. `.Forget()` 으로 던지면 낙인 전에 연출이 붙는 그 버그를 되풀이한다
+2. **이겼는데 왕복이 실패하면 무엇을 보여줄 것인가.** 지금까지의 지급과 달리 처음으로 "실패할 수 있는 지급" 이 된다
+3. **멱등 축이 없다.** 랭크 티어·정점과 달리 싱글 전투에는 낙인이 없어 같은 요청을 두 번 보내면 두 번 지급된다. 서버가 `won`·`remaining` 을 검증할 수단도 없다(싱글 전투는 클라에서만 돈다)
+
+**C8 이 서면 3번이 저절로 닫힌다** — 원장 `txId` 가 멱등 키다. 순서를 다시 볼 것.
 
 **전투 골드 공식은 이미 있다** — `functions/src/payout.ts` 의 `computeCurrencyPayout(won, remaining, rows)` 가 `max(remaining × win.perCard, win.floor)` / 패배 `lose.flat` 을 낸다. 새로 쓰지 마라. 배선만 남는다.
 
@@ -141,27 +156,35 @@ C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로
 
 **`CurrencyManager.Earn/Spend/Save` 삭제는 C5 가 아니다.** 남은 3곳이 그 API 를 붙들고 있어 여기서 지우면 컴파일이 깨진다. **클라 재화 writer 0 이 실제로 성립하는 시점은 C6 완료 후**다. (`Core/GameManager.cs:145` 의 `CurrencyManager.Save()` 는 flush 일 뿐 잔액을 만들지 않는다 — C6 에서 currency 슬롯과 함께 사라진다.)
 
-### C5.5 — 앨범 구성 스펙 표 승격 (C6 선행, 사용자 승인됨)
+### C5.5 — 도감·챕터 구성 표 승격 ✅ (`fe4fe954d`)
 
-서버가 "도감 페이지 완성" 을 판정할 근거가 **어느 표에도 없다**. `Card` 표에 테마·페이지 컬럼이 없고 `AlbumSpec.cs` 도 보상만 감싼다. `CardAlbumConfig` 는 SO 전용이다.
+서버가 판정할 근거가 SO 에만 있었다. 두 표로 올렸고 `envs/test` 에 rev 1 로 서 있다.
 
-- 데이터는 평탄화 가능: `CardAlbumConfig.themes[].pages[].cardIds` → 행 `themeId | pageId | cardId | order`
-- **디자이너 시트가 필요 없다.** `SpecFirestoreUploader.Upload` 는 SpecData 매니저에 묶여 있지만 그 **뒤의 커밋 기계(메타 `updateTime` precondition · 원자 커밋 · 500writes/10MiB 가드)는 `TableSnapshot` 만 받는다** — `CardAlbumConfig.asset` 에서 스냅샷을 직접 지어 넣는 오버로드 + 메뉴 항목이면 재사용된다
-- **클라는 손대지 않는다.** `SpecPayloadCodec.TableNames` 에 넣을 이유가 없다 — 서버 전용 판정 근거이고, 넣으면 부팅 왕복만 는다
-- Unity 에서 사람이 1회 실행(admin 클레임 로그인 필요)
+- **`AlbumEntry`** (`id | themeId | pageId | cardId | order`) — **40행.** `Theme_Nature` · `P1`~`P5`(9/9/9/9/4) · cardId 1~40 유니크
+- **`TournamentChapter`** (`id | chapterId | nodeId | order`) — **24행.** `chapter_01`~`04` 각 6정점
 
-**토너먼트 챕터 수령도 같은 구멍이다**(챕터↔정점 대응이 `TournamentConfig` SO 에만 있다). 같이 올릴 것.
+**업로드는 기존 커밋 기계를 그대로 쓴다.** `SpecFirestoreUploader.Upload` 에서 SpecData 매니저에 묶인 두 줄과 그 뒤를 갈라 `UploadSnapshot`·`TryBuildSnapshotFrom` 으로 뺐고, 새 경로가 같은 함수를 부른다 — 해시·정렬·문서 ID·`updateTime` precondition·500writes/10MiB 가드가 한 벌이다. 진입점은 릴리즈 관리 창의 "구성 표" 칸이고 **사람이 1회 실행**한다(admin 클레임 필요).
 
-**이 단계는 표만 올린다 — `claimReward` 는 손대지 않는다.** callable 의 ownerType 확장은 C5.6 이다. 근거(표)와 소유권 이전(callable)을 한 커밋에 섞으면 업로드 1회가 실패했을 때 원인을 못 가린다.
+**클라는 손대지 않았다.** `SpecPayloadCodec.TableNames` 에 넣을 이유가 없다 — 서버 전용 근거이고 넣으면 부팅 왕복만 는다.
 
-### C5.6 — 앨범·챕터 수령 이전 (C5.5 뒤, C6 앞)
+**함정 — `Assets/Table/SpecDatas.cs` 에 이 두 표의 `[GeneratorSpecData]` 클래스를 만들지 마라.** 한 번 들어갔다가 되돌렸다. 그게 있으면 `ListTables` 에 두 표가 떠서, 디자이너 시트에 해당 탭이 없는 채로 **일반 표 업로드를 돌리면 0행으로 덮고 stale 삭제까지 돌아 판정 표가 사라진다.** 서버가 fail-closed 라 그 순간 도감·챕터 수령이 전부 막힌다. 원본은 SO 하나여야 한다.
 
-C5 가 남긴 `Earn` 2곳을 서버로 넘긴다. `claimReward` 의 **ownerType 확장**이지 새 callable 이 아니다 — 낙인·지급·저장이 한 트랜잭션이라는 C3 의 형태를 그대로 쓴다.
+행을 짓는 단계에서 저작 결함을 막는다 — `cardId <= 0` · `Card` 표 미존재/비Live · 페이지 내 중복은 칸을 빼고 보고하며, `themeId`·`chapterId` 중복과 **모수 0**(페이지 0개 테마 · 유효 칸 0개 페이지 · 정점 0개 챕터)은 업로드를 중단한다.
 
-- `OutGame/Album/AlbumRewardManager.cs:80` — 도감 페이지·테마 수령. 서버가 "페이지 완성" 을 판정할 근거는 **C5.5 가 올린 표**다
-- `OutGame/Tournament/TournamentProgress.cs:310` — 챕터 완주 보상. 챕터↔정점 대응 역시 **C5.5 가 올린 표**를 본다
-- 보상값 자체는 이미 `Reward` 표에 있다(앨범 `t:`/`p:`/`b` · 챕터 `chapter_01`~`chapter_04`) — 새로 저작할 것 없다
-- 순서가 뒤집히면 안 된다: C5.5 없이 이 단계를 하면 서버가 판정 근거 없이 클라 주장을 그대로 믿게 된다
+### C5.6 — 도감·챕터 수령 이전 ✅ (`3f522a2e3`)
+
+`claimReward` 의 **ownerType 확장**이다. 새 callable 이 아니다.
+
+- 도감 → ownerType **`"Album"`**, ownerId 는 `b` / `t:{theme}` / `p:{theme}/{page}`. **이 문자열이 이미 세 곳에서 같다** — `AlbumSpec.OwnerIdOf` 가 만드는 값 · 세이브 `claimedKeys` · `Reward` 표 `ownerId`. 그래서 스키마 변경이 없었다
+- 챕터 → ownerType **`"Tournament"` 유지** + `chapter_` 접두사로 분기. 새 ownerType 을 만들면 `Reward` 표의 챕터 행까지 고쳐 표를 다시 올려야 한다
+- 자격은 서버가 **`ownership.cardIds`·`clearedNodeIds` 로 재계산**한다. 판정은 순수 모듈 `functions/src/completionTable.ts` 로 떼어 회귀가 `lib` 를 직접 부른다
+- **모수 0 은 완성이 아니다.** 표에 그 페이지·챕터 행이 없으면 `NotEligible`. 표를 못 읽어도 fail-closed
+- `judgeRewardClaim` 의 미저작 통과는 **정점만** 남는다. 판정을 `node_` 접두사가 아니라 **`chapter_` 부정**으로 한 이유: nodeId 는 저작 자유값이라 접두사를 강제하면 미저작 정점이 소급해 막힌다
+- 클라는 로컬 지급·낙인·`Save` 를 지우고 `ClaimAsync` 한 줄로. 수령 3종과 챕터가 `UniTask` 가 되면서 흐름 2개와 호출부 4곳이 따라갔다 — **폴백도 `await` 로 낙인을 기다린다**(같은 프레임에 연출을 붙이면 `TournamentMapOverlayView` 의 스킵 버그를 되풀이한다)
+
+**`CurrencyManager.Earn` 호출부가 5 → 3 이 됐다.** 남은 셋은 전투 보상 · 디버그 지급(C5) · 멀티 payout(C6).
+
+**이 판정이 지금 서 있는 지반** — 서버가 완성을 재계산하지만 그 입력인 `ownership.cardIds` 의 진실원은 **아직 클라다.** 서버가 소유를 쓰는 곳은 `openPack`·`freshAccount` 둘뿐이고 스타터 덱·튜토 지급·되감기·디버그 해금까지 12개 호출부가 클라에서 직접 쓴다. `firestore.rules:99` 도 `ownership` 은 `is map && size() <= 2000` 만 본다(`currency.balances` 가 타입·범위까지 조여지는 것과 대조적). **지금은 자기신고 집계 위에 선 판정이고, 튜토 지급이 callable 로 넘어오는 순간 진짜가 된다.** 그 선행 조건이 아래 "튜토리얼 지급 표" 다.
 
 ### C6 — 저장소 전환
 
@@ -180,6 +203,86 @@ C5 가 남긴 `Earn` 2곳을 서버로 넘긴다. `claimReward` 의 **ownerType 
 룰을 14키 전용으로 조이고 `MIN_WRITABLE_SCHEMA_VERSION` 제거. 하네스의 15키 케이스를 `assertFails` 로 뒤집는다.
 
 ---
+
+### C8 — 재화 원장 (C7 뒤 · **IAP 착수 앞**)
+
+재화가 움직인 기록이 **한 줄도 없다.** 잔액 숫자만 있고 그 숫자가 어떻게 됐는지는 아무도 모른다.
+그리고 그 기록이 없어서 **재시도 중복 과금이 열려 있다** — 원장 한 장치가 둘을 같이 닫는다.
+
+**지금 열려 있는 것**
+
+- `mutateSave`(`save/saveDocument.ts:134`)는 **클라의 기대 revision 을 받지 않는다.** 현재값을 읽어 +1 할 뿐이다.
+  응답을 놓친 클라가 재시도하면 `openPack` 이 **다시 뽑고 다시 과금**한다. 강화도 다시 차감된다.
+  `claimReward` 만 낙인(`claimedTiers`·정점 Cleared) 덕에 우연히 안전하다 — 설계가 아니라 부작용이다
+- `logger.info` 의 `goldBefore`/`goldAfter` 는 원장이 **아니다.** `functions:log` 는 3~4분 늦고 보존기간이 있고
+  무엇보다 **코드가 되읽을 수 없다.** 로그는 사람이 사후에 보는 것, 원장은 시스템이 읽고 판단하는 데이터다
+
+**무엇을 만드나**
+
+`envs/{env}/users/{uid}/wallet/current/ledger/{txId}` — 재화 이동 한 건이 한 줄. append-only, 수정·삭제 없다.
+
+```
+트랜잭션 안에서
+  ① ledger/{txId} 읽기 → 있으면 재시도다. 기록된 결과 그대로 반환 (재과금·재추첨 없음)
+                       → 없으면 처음이다
+  ② 판정·차감 (기존 그대로)
+  ③ 잔액 · 도메인 상태 · 원장 줄을 한 번에 쓴다
+```
+
+**문서 존재 자체가 중복 판정이다.** 멱등 장부를 따로 두지 않는다.
+
+**반드시 같은 트랜잭션 안이어야 한다.** 별도 callable 로 빼면 (a) 차감은 됐는데 기록 호출이 실패해 구멍 뚫린 원장이 되고
+(b) ① 의 조회가 트랜잭션 밖이라 동시 요청 둘이 같은 "처음" 을 보는 갈래가 열린다. **원장은 거래의 일부지 사후 기록이 아니다.**
+
+**왜 여기 놓았나 (순서 근거)**
+
+- **C6 뒤라 호출부를 한 번만 만진다.** 앞에 두면 세이브 슬롯 기준으로 배선한 뒤 C6 에서 같은 자리를 지갑 기준으로 다시 고친다
+- 출시 전이라(`envs/live` 0표) 기록 공백 구간에 실유저 데이터가 없다
+- **IAP 보다는 반드시 앞.** 스토어 거래 id 가 곧 멱등 키다. 원장 없이는 결제 재시도도 환불 회수도 다룰 수 없다
+
+**이미 있는 것 — 새로 만들지 마라**
+
+- `currency/walletStore.ts` 의 `ledgerEntry`·`writeWallet`·`createWallet`·`readWallet`·`walletRef` — **호출부 0건.** 코덱은 이미 써 있다
+- 룰 배포됨: `ledger/{txId}` 는 `read, write: if false`(`firestore.rules:142`) — Admin SDK 전용. 클라에 보이면 잔액 추론 표면만 넓어진다
+- txId 규약이 `walletStore.ts:114` 주석에 있다 — **결제는 스토어 주문 id, 도메인은 `{command}:{seed}`**
+
+**배선 대상** (재화가 움직이는 자리 — `currencySlot(spend/grant(...))` 로 전수 조회한 결과)
+
+`commands/openPack.ts:122` · `enhanceCard.ts:133` · `enhanceKeyword.ts:124` · `claimReward.ts:269` · `save/freshAccount.ts:39`
+그리고 C5·C5.6·C6 이 늘리는 것(`claimBattleReward` · `devGrantCurrency` · `claimPayout.ack`).
+
+**강제 방법 — 이게 핵심이다**
+
+지금은 command 가 `currencySlot(spend(...))` 로 슬롯을 **직접 조립해 반환**한다. 모듈은 계산기일 뿐이라
+"차감했으면 기록도 남긴다" 를 강제하는 자리가 없다. 새 command 를 쓰는 사람이 `spend` 를 안 부르고 잔액을 직접 만들어도 아무것도 안 막는다.
+
+**재화를 움직이는 출구를 하나로 만들고 `(갱신된 잔액, 원장 줄)` 한 쌍을 반환하게 한다.**
+둘이 같은 반환값이라 잔액만 쓰고 원장을 빠뜨리는 경로가 타입 수준에서 사라진다.
+
+**원장 줄에 담을 것**
+
+`txId` · `reason`(열거형 — `openPack`·`enhanceCard`·`claimReward:rank`…) · 재화별 증감 · 전/후 잔액 · `createdAt` · 결과 요약(재시도가 그대로 반환할 값).
+**평탄하게 잡는다** — 중첩을 넣으면 나중에 웨어하우스로 내보낼 때 값을 치른다.
+
+**되돌리기는 반대 줄로 한다.** 잘못 지급했어도 잔액을 손으로 고치지 않는다. 그래야 감사가 성립한다.
+
+**C6 착수 시 같이 판단할 것 — 유상/무상 버킷**
+
+Diamond 가 언젠가 판매 대상이면, 같은 다이아라도 **돈 주고 산 것과 게임에서 얻은 것을 별도 버킷**으로 나눠야 한다.
+환불 시 유상분만 회수해야 하고, 미사용 유상 재화는 회계상 **선수수익(부채)** 이며, 일부 국가는 환불 의무가 있다.
+
+**출시 후에는 소급 분류할 근거가 없어 사실상 불가능하다.** C6 이 어차피 v7→v8 승급과 지갑 신설을 하므로
+그 순간의 한계비용이 거의 0 이다 — 이 항목은 C8 이 아니라 **C6 착수 시점에 결정한다.**
+(소비 정책은 무상 먼저 소진을 권한다 — 부채를 늦게 털고 환불 회수분이 남는다.)
+
+**하지 않을 것**
+
+- **예약/확정(hold·capture)** — 지갑이 같은 트랜잭션에 참여하는 라이브러리인 지금 구조가 이 규모의 정답이다. 미아 hold 청소만 는다
+- **원장을 진실원으로(이벤트 소싱)** — 잔액 문서가 권위, 원장은 감사 기록이다. 재생은 복구 도구로만 쓴다
+- **복식부기** — `reason` 열거형 + 전/후 잔액이면 수도꼭지·배수구 집계까지 선다
+- **웨어하우스 스트리밍** — 나중. 위의 "평탄하게" 만 지키면 그때 공짜다
+
+**남은 미결과 겹친다** — 한계돌파(Snack)는 여전히 클라 판정이라 callable 이 없다(C4 항목). 그것이 서면 배선 대상이 하나 는다.
 
 ## 통합처(`origin/박형석작업용`)와 겹치는 것 — 새로 만들지 마라
 
@@ -201,7 +304,7 @@ C6 에서 `claimPayout` 의 `ack` 가 지갑에 크레딧하는 자리가 된다
 
 ## 스펙 표 실태 (실측 2026-08-28)
 
-`envs/test/specs` **12표**, **`envs/live/specs` 0표** — 이 작업의 모든 검증은 `test` 에서만 성립한다. 릴리즈 전 `live` 업로드는 별건(R3 몫).
+`envs/test/specs` **14표**(C5.5 가 `AlbumEntry`·`TournamentChapter` 를 더했다), **`envs/live/specs` 0표** — 이 작업의 모든 검증은 `test` 에서만 성립한다. 릴리즈 전 `live` 업로드는 별건(R3 몫).
 
 **`Reward` 표(84행)가 통합 진실원**이다. 컬럼 `id | ownerType | ownerId | order | rewardType | rewardId | amount`. 이 브랜치의 세이브 키와 정확히 일치한다 — 앨범 `t:Theme_Nature`/`p:Theme_Nature/P1`/`b` · 정점 `node_01`~`node_24` · 챕터 `chapter_01`~`chapter_04` · 랭크 티어 인덱스 `0`~`19` · 전투 `win.perCard`=Gold 10 / `win.floor`=Gold 10 / `lose.flat`=Gold 5. **24정점 전부 보상이 저작돼 있다.**
 
@@ -226,5 +329,15 @@ C6 에서 `claimPayout` 의 `ack` 가 지갑에 크레딧하는 자리가 된다
 ## 별건으로 남은 것
 
 `envs/live/specs` **0표 업로드**(R3 몫). 그 전까지 live 는 수령이 전부 fail-closed 로 막힌다.
+
+**SO 저작 중 아직 서버 근거가 없는 것 — 하나뿐이다.** `Assets/SO/` 69개를 전수로 갈랐다(C5.5 착수 시 실측).
+
+- **튜토리얼 카드 지급 표** (`OutgameTutorial.asset` + `TutorialScenario*.asset` 의 `playerDeckIds`) — `RewardSpec` 이 못 덮는 **유일한** 지급 축이다. 재화 지급은 랭크·앨범·챕터·정점·전투가 전부 `Reward` 표 84행 안에 있는데, 카드 소유권만 클라가 저작값을 읽어 직접 쓴다(`TutorialStepExecutor.cs:203`·`:245`·`:296`, 되감기 `OutgameTutorialRewind.cs:140`·`:164`·`:172`). **C5.6 의 앨범 판정이 자기신고 위에 서 있는 뿌리가 여기다**
+- 나머지는 올릴 필요가 없다 — 14개는 이미 표가 덮었고(그중 `RewardConfig.asset` 은 읽는 코드가 0이라 **삭제 후보**), 47개는 연출·사운드·아트 배선이라 서버와 무관하다
+
+**표는 있는데 아무도 안 읽는 것 2건** (표 신설이 아니라 배선 문제)
+
+- **`CardLimitBreak`** — `envs/test` 에 3행이 올라와 있는데(`stage | hpGain | snackCost`) 읽는 코드가 클라에도 서버에도 없다. 실제 판정은 `OutGame/Growth/GrowthRules.cs:71-77` 이 하드코딩한다(`hpGain = 1` 고정 · `snackCost = stage`). 간식 적립은 이미 서버인데(`OpenPackResult.snack`) 소비만 클라에 남았다 — 한계돌파 callable 미결과 같은 항목이다
+- **`RankGrade`** — 서버는 읽는데 **클라만 `RankConfig.asset` 의 임계치를 본다**(`RankConfig.cs:60`). 랭크 판정이 더 넘어가면 이 드리프트가 "수령 가능한데 서버가 거절" 로 나타난다
 
 **닫힘** — `link.xml` 의 팩 개봉 응답 DTO 누락은 `6f6a8885c` 에서 해결됐다(`OutGame/Save/link.xml:29-30`). 새 callable 응답 DTO 를 만들 때마다 같은 자리에 추가할 것.
