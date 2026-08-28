@@ -528,14 +528,14 @@ public class TurnRunner : MonoBehaviour
 
         long t_rankPointsBefore = RankManager.Points;
         bool t_serverPayout = DeckConfig.IsMultiplayer;
-        this.lastReward = t_serverPayout
-            ? RewardService.CalculateReward(_won, t_remaining)
-            : RewardService.GrantBattleReward(_won, t_remaining);
 
-        // 지급·영속은 위에서 끝났다 — 캐리어에는 로비 획득 연출이 쓸 표시량만 싣는다.
-        if (!t_serverPayout) BattleRewardHandoff.Set(this.lastReward);
+        // 결과 팝업이 읽을 예상액이다 — 싱글·멀티 모두 확정 액수의 진실원은 서버 쪽이다.
+        this.lastReward = RewardService.CalculateReward(_won, t_remaining);
 
-        // 표시용 랭크: 전투 결과로 포인트 가감. 보상 영속 뒤라 랭크가 실패해도 골드 안전.
+        // 싱글 지급은 여기서 띄우기만 한다(기다리지 않는다) — 캐리어는 응답이 도착한 시점에 지급 경로가 세운다.
+        if (!t_serverPayout) RewardService.GrantBattleRewardAsync(_won, t_remaining);
+
+        // 표시용 랭크: 전투 결과로 포인트 가감.
         // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
         // 다만 튜토 전투는 첫 티어를 넘지 못한다(랭크 진입은 졸업만이 결정한다) — 그 판정을 랭크가 스스로 할 수 없어 여기서 넘긴다.
         var t_rank = t_serverPayout

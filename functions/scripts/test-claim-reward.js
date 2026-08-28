@@ -173,6 +173,53 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.deepEqual(resolveRewards(battle, "Rank", "win.perCard").gains, []);
 }
 
+// ── Battle 지급 경계: 생존 0·6 · 패배 · 표 사고 ─────────────────────────────
+{
+  const battle = parseRewardRows([
+    row(81, "Battle", "win.perCard", 1, "Gold", 20),
+    row(82, "Battle", "win.floor", 1, "Gold", 50),
+    row(83, "Battle", "lose.flat", 1, "Gold", 30),
+  ]);
+
+  // 전멸승은 perCard 가 0 이라 바닥이 유일한 지급원이다 — 여기가 0 이 되면 지급 없는 승리가 생긴다.
+  assert.deepEqual(computeCurrencyPayout(true, 0, battle), {currency: "Gold", amount: 50}, "생존 0 승리는 바닥이 이긴다");
+
+  // 잠금 덱 전원 생존(6장)이 claimBattleReward 클램프의 상한과 같은 수다.
+  assert.deepEqual(computeCurrencyPayout(true, 6, battle), {currency: "Gold", amount: 120}, "생존 6 = 6 x 20");
+
+  // 패배는 생존 수를 보지 않는다 — 정액이다.
+  for (const remaining of [0, 1, 6]) {
+    assert.deepEqual(computeCurrencyPayout(false, remaining, battle), {currency: "Gold", amount: 30},
+      `패배 지급은 생존 ${remaining} 과 무관하다`);
+  }
+
+  // 음수·소수는 순수 모듈이 던진다. 클램프는 command 몫이라 여기서 관대해지면 안 된다.
+  assert.throws(() => computeCurrencyPayout(true, -1, battle), /invalid remaining cards/);
+  assert.throws(() => computeCurrencyPayout(true, 1.5, battle), /invalid remaining cards/);
+}
+{
+  // 표 사고 3종. 전부 던져야 claimBattleReward 가 RewardUnavailable 거절로 바꾼다 —
+  // 조용히 0 을 돌려주면 지급 없는 문서 쓰기로 revision 만 오른다.
+  assert.throws(() => computeCurrencyPayout(true, 3, parseRewardRows([])), /invalid Battle reward row/,
+    "표가 비면 던진다");
+
+  const noFloor = parseRewardRows([
+    row(81, "Battle", "win.perCard", 1, "Gold", 20),
+    row(83, "Battle", "lose.flat", 1, "Gold", 30),
+  ]);
+  assert.throws(() => computeCurrencyPayout(true, 3, noFloor), /invalid Battle reward row: win\.floor/,
+    "win.floor 행이 없으면 던진다");
+  assert.deepEqual(computeCurrencyPayout(false, 3, noFloor), {currency: "Gold", amount: 30},
+    "패배는 승리 행을 보지 않는다");
+
+  // 승리 두 줄의 재화가 갈리면 어느 쪽으로 줘도 틀린다 — 섞지 말고 던진다.
+  const mixed = parseRewardRows([
+    row(81, "Battle", "win.perCard", 1, "Gold", 20),
+    row(82, "Battle", "win.floor", 1, "Diamond", 50),
+  ]);
+  assert.throws(() => computeCurrencyPayout(true, 3, mixed), /Battle win reward currency mismatch/);
+}
+
 // ── 표를 못 읽음 vs 그 행만 없음 ────────────────────────────────────────────
 {
   // Reward 표가 통째로 비었다 = 업로드/배포 사고. 어떤 소유자에게도 자격을 잴 수 없다.

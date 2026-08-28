@@ -39,6 +39,7 @@
 | `claimReward` (codebase `default`) | **배포됨** · **401**(정상) · C3·C5.6 실기 왕복 통과 |
 | `enhanceCard`·`enhanceKeyword` (codebase `default`) | **배포됨** · **401**(정상) |
 | `openPack` (codebase `default`) | 배포됨 · **401**(정상) |
+| `claimBattleReward`·`devGrantCurrency` (codebase `default`) | **미배포 — 404.** C5 가 세운 것들이다. 안 올리면 싱글 전투 보상이 매판 0이 되고 디버그 재화 버튼이 죽는다 |
 | `firestore.rules` 지갑 블록 | **배포됨** |
 | `firestore.rules` 무료 한 방(`grants`) 블록 | **미배포.** 서버 동작은 Admin SDK 라 무관하지만, 클라가 그 문서를 읽게 되면 필수 |
 
@@ -145,33 +146,42 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
 - `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
-### C5 — 전투·디버그 2종 (**건너뛰었다 · 미결**)
+### C5 — 전투·디버그 2종 ✅ (미커밋 · **미배포**)
 
-C5.5·C5.6 을 먼저 했다. 이 단계는 아직 그대로다.
+`claimBattleReward` · `devGrantCurrency` 가 섰다. 클라 `Earn` 호출부가 2곳 사라져 **남은 것은 `PayoutInbox` 하나**다.
 
-`RewardService.cs:61`(전투 보상) · `OutgameDebugActions.cs:179`(디버그 지급).
+**금액 공식은 새로 쓰지 않았다** — `functions/src/payout.ts` 의 `computeCurrencyPayout(won, remaining, rows)` 를 그대로 배선했다. `functions/scripts/test-claim-reward.js` 에 Battle 경계 회귀(생존 0=floor · 생존 6 · 패배는 생존 무관 · 표 결손 3종 throw)를 보강했다.
 
-**착수 전에 답해야 할 것 셋** — 조사는 끝났고 판단만 남았다.
+**착수 전 미결 셋을 이렇게 답했다.**
 
-1. **`TurnRunner.CaptureResult`(`:498-550`)가 동기 `void` 다.** 실지급 호출부는 `:533` 하나뿐이지만 서버 왕복을 끼우려면 이 메서드가 async 가 되고 결과 팝업이 `lastReward` 를 읽는 시점과 얽힌다. `.Forget()` 으로 던지면 낙인 전에 연출이 붙는 그 버그를 되풀이한다
-2. **이겼는데 왕복이 실패하면 무엇을 보여줄 것인가.** 지금까지의 지급과 달리 처음으로 "실패할 수 있는 지급" 이 된다
-3. **멱등 축이 없다.** 랭크 티어·정점과 달리 싱글 전투에는 낙인이 없어 같은 요청을 두 번 보내면 두 번 지급된다. 서버가 `won`·`remaining` 을 검증할 수단도 없다(싱글 전투는 클라에서만 돈다)
+1. **`TurnRunner.CaptureResult` 는 동기 `void` 로 남겼다.** 팝업은 왕복을 기다리지 않는다 — `lastReward` 는 승패·싱글/멀티 무관하게 `RewardService.CalculateReward` **예상액**이고, 싱글이면 그 자리에서 지급 호출만 띄운다. `resultCaptured`·`resultFinalized` 게이트는 무변경
+2. **실패하면 아무것도 보여주지 않는다** — `BattleRewardHandoff` 를 세우지 않아 로비 획득 연출이 아예 안 돈다. 들어오지도 않은 재화의 연출을 도는 것보다 낫다. **재시도하지 않는다**(서버가 멱등이 아니라 두 번째 호출이 그대로 이중 지급)
+3. **멱등 축은 여전히 없다.** C8 원장 `txId` 가 닫는다 — 순서 그대로 둔다
 
-**C8 이 서면 3번이 저절로 닫힌다** — 원장 `txId` 가 멱등 키다. 순서를 다시 볼 것.
+**멀티가 이미 갖고 있던 모양에 싱글을 합류시켰다.** `submitMatchResult` 는 양쪽 제출을 대조해야 `payouts/{matchId}` 를 세우므로 결과 팝업 시점에 서버 확정액이 존재할 수 없다. 그래서 멀티는 **팝업=예상액(전투 씬) · 지급=서버 · 연출=캐리어(로비)** 로 나뉘어 있었다. 싱글도 같은 세 박자다 — C6 에서 고칠 자리가 하나로 준다.
 
-**전투 골드 공식은 이미 있다** — `functions/src/payout.ts` 의 `computeCurrencyPayout(won, remaining, rows)` 가 `max(remaining × win.perCard, win.floor)` / 패배 `lose.flat` 을 낸다. 새로 쓰지 마라. 배선만 남는다.
+**늦게 도착하는 연출 구멍을 같이 닫았다.** `LobbyGainEffectDirector` 는 캐리어를 `Start` 와 팩 오버레이 닫힘에서만 소비해, 응답이 로비 진입보다 늦으면 잔액만 조용히 올랐다(**멀티는 상대 제출이 늦을 때마다 이미 그랬다**). `BattleRewardHandoff.OnGainAdded` 를 **네 번째 진입점**으로 붙였다.
 
-**이 커밋이 닿는 것은 `CurrencyManager.Spend` 0 까지다.** `Earn` 호출부는 5곳이고 그중 여기서 옮기는 것은 2곳뿐이다(실측).
+- 이 경로는 **`OnAnyFinished` 를 내지 않는다**(`Play(_silent: true)`). 내면 그 신호를 기다리던 튜토리얼 `CardGain` 스텝과 `TournamentReturnFlow` 의 선물 등장이 자기 차례로 오인해 조기 통과한다 — 튜토리얼 전투도 전투 골드를 받으므로 실재하는 갈래다
+- 돌고 있는 연출(`m_master.IsActive()`)·도감 삽입(`AlbumInsertSession`/`Queue`)·튜토 러너 2종 중 하나라도 살아 있으면 **비켜선다**. 캐리어는 남아 다음 `Start` 가 집는다(`PlayWhenReady` 가 `m_master.Complete(true)` 로 진행 중인 카드 비행을 잘라 버리기 때문)
 
-| `CurrencyManager.Earn` 호출부 | 옮기는 단계 |
+| `CurrencyManager.Earn` 호출부 | 상태 |
 |---|---|
-| `Utils/RewardService.cs:61` (전투 보상) | C5 |
-| `OutGame/Debug/OutgameDebugActions.cs:179` (디버그 지급) | C5 |
-| `OutGame/Album/AlbumRewardManager.cs:80` (도감 페이지·테마 수령) | **C5.6** |
-| `OutGame/Tournament/TournamentProgress.cs:310` (챕터 완주 보상) | **C5.6** |
-| `Network/PayoutInbox.cs:97` (멀티 payout ack) | **C6** |
+| ~~`Utils/RewardService.cs:61` (전투 보상)~~ | **C5 완료** — `BattleRewardCommand.ClaimAsync` |
+| ~~`OutGame/Debug/OutgameDebugActions.cs:179` (디버그 지급)~~ | **C5 완료** — `devGrantCurrency` |
+| ~~`OutGame/Album/AlbumRewardManager.cs:80`~~ · ~~`OutGame/Tournament/TournamentProgress.cs:310`~~ | C5.6 완료 |
+| `Network/PayoutInbox.cs:97` (멀티 payout ack) | **C6 — 마지막 하나** |
 
-**`CurrencyManager.Earn/Spend/Save` 삭제는 C5 가 아니다.** 남은 3곳이 그 API 를 붙들고 있어 여기서 지우면 컴파일이 깨진다. **클라 재화 writer 0 이 실제로 성립하는 시점은 C6 완료 후**다. (`Core/GameManager.cs:145` 의 `CurrencyManager.Save()` 는 flush 일 뿐 잔액을 만들지 않는다 — C6 에서 currency 슬롯과 함께 사라진다.)
+**`CurrencyManager.Earn/Spend/Save` 는 아직 지우지 않았다.** `PayoutInbox` 가 붙들고 있어 지우면 컴파일이 깨진다. **클라 재화 writer 0 은 C6 완료 후**다(`Core/GameManager.cs:145` 의 `Save()` 는 flush 일 뿐 잔액을 만들지 않는다).
+
+**알려진 위험 4건 — 전부 이번 구조가 만든 것이고, 닫는 자리는 C6·C8 이다.**
+
+- **에디터 멀티 테스트 세션에서 싱글 전투 보상이 0이 된다.** `PlayerSaveCloud.Initialize` 의 `IsTestAccountSessionDisabled` 갈래가 `State=Disabled` 로 세워 `CanRunServerCommand` 가 false 다. 예전엔 로컬 `Earn` 이라 보였다 — QA 가 반드시 밟는 자리
+- **응답만 유실되면(타임아웃) 세션이 끊긴다.** 서버는 revision 을 올렸는데 클라가 못 받으면 `ResumeUploads` 가 태운 업로드가 `RevisionConflictException` → `BlockSession(RemoteAhead)`. **매판 도는 자리라 다른 명령과 빈도가 다르다**
+- **오프라인은 거절도 차단도 아니다.** `Offline` 은 `CanRunServerCommand` 를 통과해 호출이 나갔다 죽고, 보상은 그대로 소실된다. 유저에겐 "골드가 안 늘었다" 로만 보인다
+- **결과 팝업 숫자와 로비 롤업 숫자가 갈릴 수 있다.** 팝업은 클라 `RewardSpec` 예상액, 캐리어는 서버 확정액이다 — 표가 드리프트하면 팝업만 틀린다(롤업은 맞는다)
+
+**남은 것 — 배포와 실기 왕복.** 위 "배포·판정 절차" 를 그대로 탄다. 신규 함수라 **Cloud Run invoker 바인딩(소문자 `claimbattlereward`·`devgrantcurrency`)을 또 밟는다.**
 
 ### C5.5 — 도감·챕터 구성 표 승격 ✅ (`fe4fe954d`)
 

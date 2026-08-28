@@ -26,6 +26,7 @@
     <type fullname="PingResult" preserve="all"/>
     <type fullname="ClaimRewardResult" preserve="all"/>
     <type fullname="ClaimRewardGain" preserve="all"/>
+    <type fullname="BattleRewardResult" preserve="all"/>
     <type fullname="OpenPackResult" preserve="all"/>
     <type fullname="OpenPackCard" preserve="all"/>
     <type fullname="EnhanceCardResult" preserve="all"/>

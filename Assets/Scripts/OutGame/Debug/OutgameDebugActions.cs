@@ -173,13 +173,37 @@ public static class OutgameDebugActions
     }
 #endif
 
-    // 재화 즉시 지급 + 즉시 영속
+    // 재화 지급을 서버에 맡긴다(잔액·영속의 진실원은 서버 문서다).
+    // 반환형은 void를 지켜야 한다 — 이걸 감싸는 GrantGold/GrantDiamond/GrantEnergy/GrantShard 넷이
+    // DebugCurrencyButton의 Button OnClick(void)에 직결돼 있다.
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {
-        CurrencyManager.Earn(_type, _amount);
-        CurrencyManager.Save();
+        GrantCurrencyAsync(_type, _amount).Forget();
+    }
 
-        Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
+    static async UniTaskVoid GrantCurrencyAsync(ECurrencyType _type, long _amount)
+    {
+        try
+        {
+            await ServerSaveCommands.InvokeAsync<ServerCommandResult>(
+                "devGrantCurrency",
+                new { env = ContentProfileConfig.Active.CloudEnvId, currency = _type.ToString(), amount = _amount });
+
+            Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[OutgameDebug] devGrantCurrency 거절 — {t_rejected.Message}");
+        }
+        catch (ServerAdoptionException t_adoption)
+        {
+            // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
+            Debug.LogWarning($"[OutgameDebug] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] devGrantCurrency 실패 — {t_exception.GetBaseException().Message}");
+        }
     }
 
     // 전 카드 만렙 (재화·성공률 무시 — 진화 단계·키워드 해금도 레벨에서 파생돼 같이 열린다)
