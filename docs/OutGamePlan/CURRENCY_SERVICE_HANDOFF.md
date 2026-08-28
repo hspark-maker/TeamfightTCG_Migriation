@@ -1,6 +1,6 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `3f522a2e3`
+> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `cd1027476`
 > 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
@@ -20,7 +20,7 @@
 
 ## 지금 상태
 
-**커밋 8개**
+**커밋 15개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
@@ -30,20 +30,40 @@
 - `84f53288f` C4 — `enhanceCard`·`enhanceKeyword` + 튜토 무료 한 방 서버 이전 + 거절 사유 전달 경로 교정
 - `fe4fe954d` C5.5 — 도감·챕터 **구성**을 스펙 표로 승격(`AlbumEntry` 40행 · `TournamentChapter` 24행) + 업로더 오버로드
 - `3f522a2e3` C5.6 — 도감·챕터 **수령**을 `claimReward` 로 이전(ownerType `Album` 추가 · 챕터는 `chapter_` 접두사 분기)
+- `c7ab0c290` C3.5 — 수령 경로의 낙인 즉시 업로드 · 폴백 콜백 계약 · `granted` 연출 입력
+- `660963744` C5 — `claimBattleReward` · `devGrantCurrency`
+- `c099173c6` C6.1 — 지갑 `paidBalances` 사이드카 · `nextWallet` 단일 출구 · `walletMigration`
+- `0b2b6b3d6` C6.2 — `SCHEMA_VERSION 8` · `mutateSave` 가 지갑을 데리고 트랜잭션에 들어간다 · `ensureWallet` · 룰 `currency` optional
+- `1416c4031` C6.3 — 명령의 재화 접점이 전부 지갑으로 · `currencySlot` 삭제
+- `8edb278f2` C6.4·C6.5 — 클라 `UserSaveData.VERSION 8`(슬롯 9) · `WalletCloud` · `claimPayout.ack` 크레딧 → **클라 재화 writer 0**
+- `cd1027476` C6.6 + 검수 — 승급 창 철회 · `devGrantCurrency` 를 `currency` codebase 로
 
-**배포 상태 (실측 2026-08-28, URL POST 로 확인)**
+**배포 상태 (실측 2026-08-28 · C6 전량 배포 완료)**
 
-| 함수 | 상태 |
+| 함수 · 규칙 | 상태 |
 |---|---|
+| `firestore.rules` C6.2 완화분(`currency` optional · `hasAll` 14키) | **배포됨** · 컴파일 통과 후 릴리즈 |
+| `ensureWallet` (codebase `default`) | **배포됨 · 신규 create** · **401**(정상) |
+| `claimReward` · `enhanceCard` · `enhanceKeyword` · `openPack` · `ensureAccount` · `claimBattleReward` · `claimPayout` (codebase `default`) | **배포됨**(C6 코드) · **401**(정상) |
+| `ping` · `devBumpRevision` · `createMatch` · `lockDeck` · `submitMatchResult` | 함께 갱신됨(동작 변화 없음) |
+| `devGrantCurrency` (codebase **`currency`**) | **이사 완료 · 배포됨** · **401**(정상) |
 | `currencyPing` (codebase `currency`) | 배포됨 · **401**(정상) |
-| `claimReward` (codebase `default`) | **배포됨** · **401**(정상) · C3·C5.6 실기 왕복 통과 |
-| `enhanceCard`·`enhanceKeyword` (codebase `default`) | **배포됨** · **401**(정상) |
-| `openPack` (codebase `default`) | 배포됨 · **401**(정상) |
-| `claimBattleReward`·`devGrantCurrency` (codebase `default`) | **배포됨**(2026-08-28 신규 생성) · **401**(정상). invoker 바인딩은 이번엔 안 밟았다 — 403 이 아니었다 |
-| `firestore.rules` 지갑 블록 | **배포됨** |
-| `firestore.rules` 무료 한 방(`grants`) 블록 | **미배포.** 서버 동작은 Admin SDK 라 무관하지만, 클라가 그 문서를 읽게 되면 필수 |
+| `firestore.rules` 지갑 블록 · 무료 한 방(`grants`) 블록 | **배포됨** — 룰은 파일 통째로 릴리즈되므로 C6 완화분과 같이 올라갔다 |
 
-**주의 — "재화 로직이 currency codebase 로 갔다"가 아니다.** 지금 그 codebase 에 있는 것은 진단용 `currencyPing` 뿐이다. `walletStore.ts` 는 callable 이 아니라 라이브러리라 배포 대상이 아니고, 실제로 재화를 움직이는 `claimReward`·`openPack` 은 세이브 슬롯도 함께 만져서 default codebase 에 있다(결정 4). 지갑만 만지는 명령은 C6 에서 이사한다.
+전 함수 10종을 URL POST 로 찔러 **403 이 하나도 없었다** — 신규 생성된 `ensureWallet` 조차 invoker 바인딩을 상속해 그 함정을 밟지 않았다.
+
+**함정이 하나 사라졌다 — codebase 이동에 `functions:delete` 가 필요 없다.**
+"함수 id 는 project+region 에서 유일하니 `default` 소유권을 먼저 풀어야 한다" 고 예상했으나, `firebase deploy --only functions:currency` 가 기존 `devGrantCurrency` 를 그대로 **update** 로 처리했다(CLI 15.28.1 실측). 삭제부터 했다면 되돌릴 수 없는 공백만 만들 뻔했다. **이사는 시도부터 하고, 충돌이 실제로 날 때만 삭제해라.**
+
+**배포 순서 — 여기만은 순서가 계약이다**
+
+서버 `SCHEMA_VERSION 8`(`functions/src/save/saveDocument.ts:33`)과 클라 `UserSaveData.VERSION 8`(`UserSaveData.cs:17`)은 **반드시 함께 나간다.**
+
+- **서버만 먼저 올리면** 기존 계정이 첫 왕복에서 v8 로 승급되고, v7 클라는 부트가 `remote > VERSION` 을 보고 **강제 업데이트 화면**에 갇힌다(`PlayerSaveCloud` → `MarkUpdateRequired`). 첫 피해자는 에디터에서 도는 개발자 본인 클라다
+- 그리고 이제 v7 클라의 callable 은 **첫 명령에서 `failed-precondition`** 으로 막힌다(`assertWritableSchema` 가 정확히 `== SCHEMA_VERSION`). 사고가 아니라 의도다 — 근거는 아래 C6 절의 "승급 창 철회"
+- **`ensureWallet` 이 먼저 서야 한다.** 그게 없는데 v8 클라가 나가면 승급을 수행할 함수가 없어 부트가 통째로 막힌다
+
+**주의 — 재화 codebase 는 더 이상 진단용이 아니다.** `devGrantCurrency` 가 C6.6 에서 `functions-currency/` 로 이사해, 그 codebase 가 `currencyPing` 너머로 **실제 지갑 쓰기를 왕복으로 증명**한다. 나머지는 여전히 `default` 다 — `openPack`·`enhanceCard`·`enhanceKeyword`·`claimReward` 는 세이브 슬롯도 함께 써서(결정 4), `claimBattleReward` 는 `Reward` 스펙 표 리더에 의존해서, `claimPayout` 은 `payouts` 낙인과 크레딧을 한 트랜잭션에 묶어야 해서다.
 
 ---
 
@@ -58,8 +78,9 @@ firebase deploy --only firestore:rules --project bm-cardbattle
 firebase deploy --only functions:claimReward --project bm-cardbattle
 ```
 
-- **`--only functions` 를 그냥 치면 abort 한다.** 남의 함수 `lockDeck` 삭제 여부를 묻고 non-interactive 라 멈춘다. 함수를 지정해라
-- `--only functions:currency` 는 codebase 라벨이 조회 범위를 갈라 abort 하지 않는다(실측)
+- **`--only functions` 를 그냥 치면 abort 한다.** 남의 함수 `lockDeck` 삭제 여부를 묻고 non-interactive 라 멈춘다
+- **함수 이름을 나열하지 말고 codebase 라벨로 겨눠라** — `--only functions:default` · `--only functions:currency`. 라벨이 조회 범위를 갈라 삭제 프롬프트 자체가 안 뜬다(실측). C6 전량 배포를 이 두 줄로 끝냈다
+- codebase 를 옮긴 함수도 그냥 그 codebase 를 배포하면 된다. `functions:delete` 선행은 불필요하다(위 "함정이 하나 사라졌다")
 
 ### 2) 배포 직후 판정 — 배포 로그는 근거가 아니다
 
@@ -146,9 +167,9 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
 - `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
-### C5 — 전투·디버그 2종 ✅ (`660963744` · **배포됨**)
+### C5 — 전투·디버그 2종 ✅ (`660963744` · 배포됨)
 
-`claimBattleReward` · `devGrantCurrency` 가 섰다. 클라 `Earn` 호출부가 2곳 사라져 **남은 것은 `PayoutInbox` 하나**다.
+`claimBattleReward` · `devGrantCurrency` 가 섰다. 클라 `Earn` 호출부가 2곳 사라져 그때 남은 것은 `PayoutInbox` 하나였고, **C6.5 가 그것마저 닫았다.**
 
 **금액 공식은 새로 쓰지 않았다** — `functions/src/payout.ts` 의 `computeCurrencyPayout(won, remaining, rows)` 를 그대로 배선했다. `functions/scripts/test-claim-reward.js` 에 Battle 경계 회귀(생존 0=floor · 생존 6 · 패배는 생존 무관 · 표 결손 3종 throw)를 보강했다.
 
@@ -165,23 +186,16 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - 이 경로는 **`OnAnyFinished` 를 내지 않는다**(`Play(_silent: true)`). 내면 그 신호를 기다리던 튜토리얼 `CardGain` 스텝과 `TournamentReturnFlow` 의 선물 등장이 자기 차례로 오인해 조기 통과한다 — 튜토리얼 전투도 전투 골드를 받으므로 실재하는 갈래다
 - 돌고 있는 연출(`m_master.IsActive()`)·도감 삽입(`AlbumInsertSession`/`Queue`)·튜토 러너 2종 중 하나라도 살아 있으면 **비켜선다**. 캐리어는 남아 다음 `Start` 가 집는다(`PlayWhenReady` 가 `m_master.Complete(true)` 로 진행 중인 카드 비행을 잘라 버리기 때문)
 
-| `CurrencyManager.Earn` 호출부 | 상태 |
-|---|---|
-| ~~`Utils/RewardService.cs:61` (전투 보상)~~ | **C5 완료** — `BattleRewardCommand.ClaimAsync` |
-| ~~`OutGame/Debug/OutgameDebugActions.cs:179` (디버그 지급)~~ | **C5 완료** — `devGrantCurrency` |
-| ~~`OutGame/Album/AlbumRewardManager.cs:80`~~ · ~~`OutGame/Tournament/TournamentProgress.cs:310`~~ | C5.6 완료 |
-| `Network/PayoutInbox.cs:97` (멀티 payout ack) | **C6 — 마지막 하나** |
-
-**`CurrencyManager.Earn/Spend/Save` 는 아직 지우지 않았다.** `PayoutInbox` 가 붙들고 있어 지우면 컴파일이 깨진다. **클라 재화 writer 0 은 C6 완료 후**다(`Core/GameManager.cs:145` 의 `Save()` 는 flush 일 뿐 잔액을 만들지 않는다).
+**이 표는 닫혔다 — `CurrencyManager.Earn`/`Spend`/`Save` 는 C6.4 에서 삭제됐고 호출부는 0 이다.** 이력만 남긴다: 전투 보상 `Utils/RewardService`(C5) · 디버그 지급 `OutGame/Debug/OutgameDebugActions`(C5) · 도감·정점 `AlbumRewardManager`·`TournamentProgress`(C5.6) · 멀티 payout `Network/PayoutInbox`(C6.5). 지금 잔액을 세우는 클라 코드는 `CurrencyManager.Adopt` 하나이고 그 호출부는 `WalletCloud` 하나다.
 
 **알려진 위험 4건 — 전부 이번 구조가 만든 것이고, 닫는 자리는 C6·C8 이다.**
 
-- **에디터 멀티 테스트 세션에서 싱글 전투 보상이 0이 된다.** `PlayerSaveCloud.Initialize` 의 `IsTestAccountSessionDisabled` 갈래가 `State=Disabled` 로 세워 `CanRunServerCommand` 가 false 다. 예전엔 로컬 `Earn` 이라 보였다 — QA 가 반드시 밟는 자리
+- **에디터 멀티 테스트 세션은 잔액이 0 으로 고정된다.** `PlayerSaveCloud.Initialize` 의 `IsTestAccountSessionDisabled` 갈래가 `State=Disabled` 로 세워 `CanRunServerCommand` 가 false 다. C6 이후엔 그 갈래가 **지갑 읽기까지 함께 끈다** — 잔액의 진실원이 서버 문서 하나뿐이라 전투 보상만이 아니라 표시되는 재화 전부가 0 이다. 버그가 아니다: 여기서 지갑만 살리려면 auth·읽기·`ensureWallet`(서버 쓰기)이 되살아나 그 분기의 목적이 사라진다. QA 가 반드시 밟는 자리
 - **응답만 유실되면(타임아웃) 세션이 끊긴다.** 서버는 revision 을 올렸는데 클라가 못 받으면 `ResumeUploads` 가 태운 업로드가 `RevisionConflictException` → `BlockSession(RemoteAhead)`. **매판 도는 자리라 다른 명령과 빈도가 다르다**
 - **오프라인은 거절도 차단도 아니다.** `Offline` 은 `CanRunServerCommand` 를 통과해 호출이 나갔다 죽고, 보상은 그대로 소실된다. 유저에겐 "골드가 안 늘었다" 로만 보인다
 - **결과 팝업 숫자와 로비 롤업 숫자가 갈릴 수 있다.** 팝업은 클라 `RewardSpec` 예상액, 캐리어는 서버 확정액이다 — 표가 드리프트하면 팝업만 틀린다(롤업은 맞는다)
 
-**배포 완료 (2026-08-28).** `firebase deploy --only functions:claimBattleReward,functions:devGrantCurrency` 로 둘 다 신규 생성됐고 URL POST 가 **401** 이다. 신규 함수마다 밟던 Cloud Run invoker 바인딩(403)은 이번엔 안 걸렸다 — 그래도 다음 신규 함수에서 다시 볼 것.
+**배포됐다.** `firebase functions:list` 로 둘 다 서 있는 것을 확인했고(2026-08-28), 이후 C6 코드로 재배포되면서 `devGrantCurrency` 는 `currency` codebase 로 옮겨 갔다. Cloud Run invoker 바인딩(403)은 이 둘에도, 신규 `ensureWallet` 에도 걸리지 않았다.
 
 **남은 것 — 실기 왕복 (사람).**
 
@@ -222,22 +236,90 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 **이 판정이 지금 서 있는 지반** — 서버가 완성을 재계산하지만 그 입력인 `ownership.cardIds` 의 진실원은 **아직 클라다.** 서버가 소유를 쓰는 곳은 `openPack`·`freshAccount` 둘뿐이고 스타터 덱·튜토 지급·되감기·디버그 해금까지 12개 호출부가 클라에서 직접 쓴다. `firestore.rules:99` 도 `ownership` 은 `is map && size() <= 2000` 만 본다(`currency.balances` 가 타입·범위까지 조여지는 것과 대조적). **지금은 자기신고 집계 위에 선 판정이고, 튜토 지급이 callable 로 넘어오는 순간 진짜가 된다.** 그 선행 조건이 아래 "튜토리얼 지급 표" 다.
 
-### C6 — 저장소 전환
+### C6 — 저장소 전환 ✅ (`c099173c6` `0b2b6b3d6` `1416c4031` `8edb278f2` `cd1027476` · **룰·서버 배포 완료 · 실기 왕복 미확인**)
 
-- `ensureWallet` callable(**default codebase**. 지갑 생성과 세이브 v7→v8 승급이 **같은 트랜잭션**이어야 잔액을 안 잃는다)
-- `SCHEMA_VERSION 8` + **전환 전용 `MIN_WRITABLE_SCHEMA_VERSION = 7`**. 없으면 v7 문서를 가진 구 클라의 `openPack` 이 `failed-precondition` → `Unusable` → `BlockSession` 으로 전부 끊긴다
-- 룰: `isValidSave()` 를 `hasOnly(15키)` + `hasAll(currency 뺀 14키)` 로 바꾸고 currency 검증을 `(!hasAny(['currency']) || 기존 검증)` 으로 감싼다 → **구/신 클라 공존이 성립한다**
-- 모든 callable 을 슬롯에서 지갑으로. `mutateSave` 에 지갑 참여 옵션 추가(**읽기는 콜백 진입 전에** — Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 하고 `openPack` 처럼 mutate 가 재실행되면 순서가 깨진다)
-- 클라: `WalletCloud`·`WalletCommands`·`WalletPatch` 신설. **`PlayerSaveCloud.AdoptServerResult` 의 revision+1 단언은 손대지 않는다** — 지갑 응답을 그 경로로 안 보내는 것이 답이다
-- **`wallet.rev` 는 단조 증가만 보장한다**(세이브 revision 과 달리 "정확히 +1" 이 아니다). 지갑은 두 codebase 가 쓰고 장차 결제 웹훅처럼 클라가 모르는 정당한 쓰기가 생긴다 — +1 을 강제하면 첫 결제에서 전 유저 세션이 끊긴다
-- 지갑만 만지는 명령(`claimBattleReward`·`devGrantCurrency`)을 `functions-currency/` 로 이사
-- **`Network/PayoutInbox.cs:97` 의 크레딧이 여기서 사라진다.** `claimPayout.ack` 가 지갑에 직접 크레딧하게 되면서 클라의 마지막 `Earn` 이 없어진다 — **클라 재화 writer 0 은 이 항목이 닫히는 순간 성립한다**
-- `SetOptions.Overwrite` 를 이용한다 — v8 클라의 `ToFieldMap` 에서 `FIELD_CURRENCY` 를 빼면 다음 업로드가 원격 잔여 필드를 알아서 지운다. **반대로 승급 전에 v8 클라가 저장하면 잔액 원본이 사라진다** → 부트에서 `ensureWallet` 이 첫 업로드보다 반드시 앞
+잔액이 세이브 `currency` 슬롯을 떠나 `envs/{env}/users/{uid}/wallet/current` 로 갔다.
+**클라 재화 writer 0 이 성립했다** — `CurrencyManager` 는 읽기 전용 캐시고, 잔액을 바꾸는 자리는 `CurrencyManager.Adopt` 하나이며 그 호출부는 `WalletCloud` 하나다. `Earn`·`Spend`·`Save` 는 삭제됐다.
 
+| 축 | 진실원 |
+|---|---|
+| 잔액 | `wallet/current` 의 `balances` |
+| 상태 전이 | **`nextWallet` — 지갑 상태를 만드는 유일한 출구. `rev` 도 여기서만 오른다** |
+| 직렬화 | `writeWallet` — 받은 값을 그대로 싣는 직렬화기다. 호출부가 `rev+1` 을 손으로 얹게 두면 빠뜨린 명령의 쓰기가 앞선 쓰기를 덮는다 |
+| 승급(v7→v8) | `commands/ensureWallet` **하나** |
+| 클라 채택 | `WalletCloud.Adopt` — 뒤처진 rev 는 조용히 무시하고 **절대 세션을 끊지 않는다** |
+
+`wallet.rev` 가 보장하는 것은 **단조 증가뿐이다**(세이브 revision 과 달리 "정확히 +1" 이 아니다). 지갑은 두 codebase 가 쓰고, 장차 결제 웹훅처럼 클라가 모르는 정당한 쓰기가 생긴다 — +1 을 강제하면 첫 결제에서 전 유저 세션이 끊긴다.
+
+**`MIN_WRITABLE_SCHEMA_VERSION = 7` 은 넣었다가 걷어냈다(`cd1027476`). 전제가 틀렸다.**
+
+이 상수는 "구 클라의 callable 을 살려 둔다" 는 목적이었는데 실동작이 정반대였다. v7 클라가 v7 문서로 부팅에 성공한 뒤 `openPack` 을 부르면 서버가 v7 을 받아 승급 낙인을 걸고 **지갑에서** 차감한다. 그런데 v7 클라는 `wallet` 응답 필드를 모른다 — 골드가 한 푼도 줄지 않은 채 카드만 받는다. 이어지는 디바운스 업로드가 `schemaVersion 7` 을 싣고, 룰의 `schemaVersion >= resource` 가 `7 >= 8` 로 false 라 거부된다. 누적되면 `BlockSession` 이고 그 세션의 덱·튜토·랭크 진행이 유실된다. **구 클라를 살리려던 장치가 구 클라로 하여금 정확히 한 번 성공한 뒤 스스로를 벽돌로 만들게 했다.**
+
+지갑을 모르는 클라는 v8 서버와 **원리상 공존할 수 없다** — 잔액을 바꾸는 명령이 하나라도 성공하면 그 순간 desync 다. 구 클라는 상태가 갈라지기 **전에** 멈춰야 한다. 그래서 `assertWritableSchema` 는 정확히 `== SCHEMA_VERSION` 이고, v7 을 받는 곳은 승급을 수행하는 `ensureWallet` **하나**뿐이다(자기 판정 `assertMigratableSchema` — `saveDocument` 의 것을 일부러 안 쓴다).
+
+**유상/무상 버킷 — 결정했다. 자리만 만들고 비워 뒀다.**
+
+- `balances` 와 **같은 평면**의 `paidBalances` 사이드카다. 재화별 `{free, paid}` 중첩을 쓰면 `Balances = Record<string, number>` 가 깨져 순수 산술도 룰도 클라도 전부 유니온을 다뤄야 한다
+- 지금은 **항상 비어 있다.** 결제가 처음으로 채운다
+- **`clampPaid` 한 줄이 "무상 먼저 소진" 정책 전부다** — 잔액이 줄면 유상분이 새 잔액까지 따라 깎이므로, 감소분은 무상분에서 먼저 나간 셈이 된다. 별도의 소비 순서 코드는 없다
+- 출시 후에는 소급 분류할 근거가 없다. 지갑을 신설하는 그 순간이 한계비용 0 인 유일한 지점이었다
+
+**채택을 둘로 갈랐다 — `PlayerSaveCloud.AdoptServerResult` 의 revision+1 단언은 그대로다.**
+
+`ServerSaveCommands` 가 응답의 `wallet` 을 **먼저** 채택하고, **`Revision > 0` 일 때만** 세이브를 채택한다. 지갑만 쓰는 명령은 응답에 `revision` 키를 **싣지 않는다** — `revision > 0` 이 곧 "이 명령이 세이브를 썼다" 의 센티널이고, 안 쓴 명령을 세이브 채택 경로로 보내면 그 자리에서 "+1" 단언이 걸려 전 세션이 끊긴다. 지갑을 먼저 채택하는 것은 단조 판정이라 손해가 없고, 뒤의 세이브 채택이 던져도 잔액은 이미 맞다.
+
+**`mutateSave` 는 지갑을 항상 읽지만 승급하지 않는다.**
+
+- 참여 옵션 플래그를 두지 않았다 — 잊었을 때 조용히 깨지는 축을 만들지 않는다
+- 지갑 읽기는 콜백 진입 **전**에 끝낸다. Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 하고 `openPack` 은 재실행된다
+- 승급 낙인은 `cd1027476` 에서 사라졌고 **지갑 부재 안전망(`createWallet`)만 남는다.** v8 문서는 `currency` 가 없으니 지갑이 사라진 계정은 잔액을 주장하는 곳이 어디에도 없다 — 0 으로 세우는 것이 그 상태의 정답이고, 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다. `set` 이 아니라 `create` 인 것은 트랜잭션 밖에서 `ensureWallet` 이 먼저 세운 이관 잔액을 0 으로 덮지 않기 위해서다
+- **`transaction.create` 는 콜백 뒤다.** 앞에 두면 그건 쓰기고, `enhanceCard`·`enhanceKeyword` 가 **콜백 안에서 거는 무료 한 방(`grants/current`) 읽기가 쓰기 뒤로 밀려 트랜잭션이 통째로 거부된다.** 읽기·이관 계산·콜백 노출은 앞, 문서 쓰기만 뒤다
+- 세이브를 아예 안 만지는 명령용으로 `mutateWallet` 이 따로 있다. 지갑이 없으면 `failed-precondition` — 부트가 안 돌았다는 뜻이라 도메인 거절이 아니라 세션 문제다
+
+**신규 계정의 스타터 골드는 세이브 create 와 같은 트랜잭션에서 지갑 create 로 들어간다.** 두 문서가 갈라지면 "세이브는 있는데 지갑이 없는" 계정이 생기고, 부트의 `ensureWallet` 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다. `ensureSaveDocument` 가 지갑을 `create` 가 아니라 **`get` 으로 먼저 묻는** 이유는, 세이브만 지워지고 지갑이 남은 계정에서 `ALREADY_EXISTS` 로 터지면 그 계정이 세이브를 영영 못 만들기 때문이다.
+
+**codebase 배치 — 이사한 것은 `devGrantCurrency` 하나다(C6.6).**
+
+- 순수 지갑 쓰기라 깨끗하게 옮겨지고, `currencyPing` 너머로 그 codebase 가 실제 지갑 쓰기를 왕복으로 증명한다
+- **`claimBattleReward` 는 `default` 에 남겼다.** `Reward` 스펙 표 리더(`packs/packSpecReader`·`rewardTable`)에 의존해서, 재화 codebase 로 끌고 가면 격리하려던 의존성이 그대로 따라온다
+- **`walletTransaction` 은 일부러 두 벌이다.** 거기 남은 것은 재화 로직이 아니라 codebase 자기 `db` 핸들에 묶인 배관이고, 미러하려면 `HttpsError` 를 미러 파일에 넣어야 하는데 그건 **순수 회귀가 `lib/` 를 직접 require 하는 계약**을 깬다
+- **환경 화이트리스트 `save/environments.ts` 는 단일 원본으로 올렸다.** 유틸이 아니라 지갑을 열지 말지 정하는 **데이터**라, 목록이 갈리면 같은 uid 의 지갑을 codebase 마다 다르게 거절한다
+- **`WalletPatch` 선언도 `walletStore` 로 올렸다.** 응답 모양이 갈리면 클라가 같은 지갑을 두 가지로 읽는다
+
+**룰은 완화만 했다 — 조이는 것은 C7 이다.**
+
+`hasOnly` **15키는 그대로 두고**, `hasAll` 에서 `currency` **만** 뺐으며, currency 검증 블록을 `(!hasAny(['currency']) || 기존 전수 검증)` 으로 감쌌다. 검증을 통째로 빼지 않은 이유는 승급 전 구 클라가 여전히 그 필드를 싣기 때문이다 — 그 구간에 값 위조가 열리면 안 된다. 그래서 지금 룰은 15키(구)와 14키(신)를 **둘 다** 받는다.
+
+**클라**
+
+- 세이브 슬롯 10 → **9**, `UserSaveData.VERSION` **8**, `CurrencySaveData` 삭제. 같은 목록을 손으로 나열하던 7곳이 함께 움직였다
+- `CurrencyManager` 의 첫실행 골드 100 지급을 지웠다 — 서버 `freshAccount.STARTER_GOLD` 가 이미 진실원이라 남겨두면 이중 진실원이고, 지갑을 못 읽은 부트에서 공짜 골드가 생긴다
+- 부트가 세이브와 지갑을 **겹쳐 읽고**, 세이브가 v7 이거나 지갑이 없으면 `ensureWallet` 으로 승급한다. **이것이 첫 업로드보다 반드시 앞**이다 — 업로드가 `SetOptions.Overwrite` 라, v8 `ToFieldMap` 이 `currency` 를 빼고 나면 다음 업로드가 원격 잔액 원본을 지운다
+- 승급 응답이 `Created=false` 인데 손에 든 스냅샷이 아직 v7 이면(다른 기기가 방금 승급을 커밋한 경우) **세이브를 한 번 다시 읽는다.** 안 그러면 멀쩡한 계정이 복구 화면을 본다
+- `link.xml` 에 새 응답 DTO 를 넣었다. 빠뜨리면 **에디터는 통과하고 기기에서만 값이 빈다**
+
+**C6.5 — `claimPayout.ack` 이 낙인과 같은 트랜잭션에서 지갑에 크레딧한다.** 갈라 놓으면 낙인만 성공해 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다. `PayoutInbox` 는 로컬 크레딧을 놓고 공통 창구로 편입됐다 — **이것이 클라의 마지막 재화 writer 였다.** 재화 핸드오프는 `ack` **성공 뒤**로 옮겼다(그전에는 ack 가 실패해도 결과 화면이 "+N 골드" 를 띄우는 동안 잔액은 그대로여서 화면이 거짓말을 했다).
+
+**같이 걷힌 것**
+
+- **`currencySlot` 삭제** — 호출부 0 이 됐다. `readBalances` 는 `walletMigration` 이 이관 때 계속 쓰므로 남는다
+- `claimReward` 가 지급 0 일 때 `rev` 를 올리던 것을 다른 명령과 맞췄다. 빈 지급으로 rev 만 오르면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다
+- `claimPayout` 의 **빈 `matchIds` 단락 회로**를 되살렸다 — 아무것도 요청하지 않은 호출이 지갑 부재로 세션을 끊는 모양이었다
+- **되감기의 재화 와이프가 사라졌다**(`OutgameTutorialRewind`). 클라가 지갑을 못 쓰기 때문이고, `test` env 디버그 경로라 수용한 **의도된 동작 변화**다
+- `UI/HUD/CurrencyHud` 의 죽은 소모 연출 필드, `link.xml` 의 `EnsureAccountResult` 누락
+
+**남은 것 — 배포와 실기 왕복 전부.** 위 "배포 순서" 를 지킨 뒤, 최소 확인은 ① v7 계정 부트 → `ensureWallet` 이 승급하고 잔액이 그대로인가 ② 신규 계정 → 스타터 골드 100 이 지갑에 서는가 ③ `openPack`·강화 → 차감이 지갑에서 일어나고 세이브 `revision` 은 정확히 +1 인가 ④ `claimBattleReward`·`devGrantCurrency` → `revision` 없이 잔액만 오르고 세션이 안 끊기는가 ⑤ 멀티 payout `ack` → 크레딧이 한 번만인가.
 ### C7 — 조이기 (구 클라 소멸 후)
 
-룰을 14키 전용으로 조이고 `MIN_WRITABLE_SCHEMA_VERSION` 제거. 하네스의 15키 케이스를 `assertFails` 로 뒤집는다.
+C6 이 **완화만** 해 둔 자리를 되돌린다. 할 일이 셋으로 구체화됐다.
 
+1. `firestore.rules` `isValidSave()` 의 `hasOnly` **15키 → 14키**(`currency` 제거)
+2. 같은 함수의 `(!request.resource.data.keys().hasAny(['currency']) || …)` **currency 검증 블록 통째 제거**
+3. 하네스 `Tools/firestore-rules-tests/rules.test.js` 의 **`13c. currency 를 실은 15키 update 도 통과 (승급 전 구 클라)`** 케이스를 `assertFails` 로 **뒤집는다**
+
+`MIN_WRITABLE_SCHEMA_VERSION` 은 여기서 걷을 것이 없다 — C6.6 이 이미 되돌렸다.
+
+**착수 판정은 "v7 문서가 없는가" 가 아니라 "v7 클라가 없는가" 다.** 룰의 `update` 는 클라 직접 쓰기만 본다(승급은 Admin SDK 라 룰을 우회한다). v7 클라는 callable 이 이미 `failed-precondition` 으로 막히지만 **세이브 업로드는 여전히 15키로 나가므로**, 그 클라가 남아 있는 동안 조이면 그쪽 저장이 전부 거부된다.
 ---
 
 ### C8 — 재화 원장 (C7 뒤 · **IAP 착수 앞**)
@@ -282,19 +364,28 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - 룰 배포됨: `ledger/{txId}` 는 `read, write: if false`(`firestore.rules:142`) — Admin SDK 전용. 클라에 보이면 잔액 추론 표면만 넓어진다
 - txId 규약이 `walletStore.ts:114` 주석에 있다 — **결제는 스토어 주문 id, 도메인은 `{command}:{seed}`**
 
-**배선 대상** (재화가 움직이는 자리 — `currencySlot(spend/grant(...))` 로 전수 조회한 결과)
+**배선 대상** (재화가 움직이는 자리 — `nextWallet` 호출부 전수, 실측 `cd1027476`)
 
-`commands/openPack.ts:122` · `enhanceCard.ts:133` · `enhanceKeyword.ts:124` · `claimReward.ts:269` · `save/freshAccount.ts:39`
-그리고 C5·C5.6·C6 이 늘리는 것(`claimBattleReward` · `devGrantCurrency` · `claimPayout.ack`).
+| 파일:줄 | codebase |
+|---|---|
+| `functions/src/commands/openPack.ts:134` | default |
+| `functions/src/commands/enhanceCard.ts:137` | default |
+| `functions/src/commands/enhanceKeyword.ts:128` | default |
+| `functions/src/commands/claimReward.ts:401` | default |
+| `functions/src/commands/claimBattleReward.ts:115` | default |
+| `functions/src/commands/claimPayout.ts:110` | default |
+| `functions-currency/src/commands/devGrantCurrency.ts:49` | currency |
 
-**강제 방법 — 이게 핵심이다**
+**`currencySlot(spend/grant(...))` 로 조회하던 방식은 더 이상 안 통한다 — 그 함수는 C6.3 에서 삭제됐다.** 지금 조회 축은 `nextWallet` 이고, 미러(`functions-currency/src/generated/`)는 생성물이니 세지 마라.
 
-지금은 command 가 `currencySlot(spend(...))` 로 슬롯을 **직접 조립해 반환**한다. 모듈은 계산기일 뿐이라
-"차감했으면 기록도 남긴다" 를 강제하는 자리가 없다. 새 command 를 쓰는 사람이 `spend` 를 안 부르고 잔액을 직접 만들어도 아무것도 안 막는다.
+지갑이 **처음 서는** 자리는 축이 다르다(잔액 이동이 아니라 개설이다). 셋 다 `createWallet` 이다 — `functions/src/commands/ensureWallet.ts:134`(v7 이관) · `functions/src/save/saveDocument.ts:294`(신규 계정 스타터 골드, 세이브 create 와 같은 트랜잭션) · `functions/src/save/saveDocument.ts:213`(`mutateSave` 의 지갑 부재 안전망, 잔액 0). 이 셋을 원장에 남길지는 C8 착수 때 정한다.
 
-**재화를 움직이는 출구를 하나로 만들고 `(갱신된 잔액, 원장 줄)` 한 쌍을 반환하게 한다.**
-둘이 같은 반환값이라 잔액만 쓰고 원장을 빠뜨리는 경로가 타입 수준에서 사라진다.
+한계돌파(Snack) callable 이 서면 배선 대상이 하나 는다.
+**강제 방법 — 절반은 C6.1 이 이미 세웠다**
 
+C6.1 이 `nextWallet` 을 **지갑 상태를 만드는 유일한 출구**로 만들었다(명령이 `{rev, balances, paidBalances}` 를 손으로 조립하면 유상분 불변식이 명령마다 갈리기 때문이다). 덕분에 "재화를 움직이는 자리" 를 위 표처럼 한 줄 grep 으로 셀 수 있다 — 예전 `currencySlot` 시절에 없던 성질이다.
+
+남은 것은 **원장을 그 반환값에 묶는 것**이다. `nextWallet` 이 `(다음 지갑, 원장 줄)` 한 쌍을 내고 `writeWallet` 이 그 쌍을 받아 지갑과 `ledger/{txId}` 를 같은 트랜잭션에 실으면, 잔액만 쓰고 원장을 빠뜨리는 경로가 타입 수준에서 사라진다.
 **원장 줄에 담을 것**
 
 `txId` · `reason`(열거형 — `openPack`·`enhanceCard`·`claimReward:rank`…) · 재화별 증감 · 전/후 잔액 · `createdAt` · 결과 요약(재시도가 그대로 반환할 값).
@@ -302,15 +393,9 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 **되돌리기는 반대 줄로 한다.** 잘못 지급했어도 잔액을 손으로 고치지 않는다. 그래야 감사가 성립한다.
 
-**C6 착수 시 같이 판단할 것 — 유상/무상 버킷**
+**유상/무상 버킷 — C6.1 이 답했다(재론 불필요)**
 
-Diamond 가 언젠가 판매 대상이면, 같은 다이아라도 **돈 주고 산 것과 게임에서 얻은 것을 별도 버킷**으로 나눠야 한다.
-환불 시 유상분만 회수해야 하고, 미사용 유상 재화는 회계상 **선수수익(부채)** 이며, 일부 국가는 환불 의무가 있다.
-
-**출시 후에는 소급 분류할 근거가 없어 사실상 불가능하다.** C6 이 어차피 v7→v8 승급과 지갑 신설을 하므로
-그 순간의 한계비용이 거의 0 이다 — 이 항목은 C8 이 아니라 **C6 착수 시점에 결정한다.**
-(소비 정책은 무상 먼저 소진을 권한다 — 부채를 늦게 털고 환불 회수분이 남는다.)
-
+`balances` 와 같은 평면의 `paidBalances` 사이드카 + `clampPaid`(무상 먼저 소진). 근거와 함정은 위 C6 절에 있다. 원장 줄에 유상/무상 구분을 실을지는 결제가 실제로 `paidBalances` 를 채우기 시작할 때 정한다 — 지금은 항상 비어 있다.
 **하지 않을 것**
 
 - **예약/확정(hold·capture)** — 지갑이 같은 트랜잭션에 참여하는 라이브러리인 지금 구조가 이 규모의 정답이다. 미아 hold 청소만 는다
@@ -330,11 +415,11 @@ Diamond 가 언젠가 판매 대상이면, 같은 다이아라도 **돈 주고 �
 | `commands/submitMatchResult.ts` | 멀티 대조 확정 시 `envs/{env}/users/{uid}/payouts/{matchId}` 에 지급 예정액을 쓴다 |
 | `commands/claimPayout.ts` | 클라가 그 우편함을 `list`/`ack` |
 
-**`payouts` 는 "줄 것의 기록"이지 지급이 아니다.** `ack` 는 `status: "claimed"` 만 찍고 잔액을 안 건드린다 — 실제 크레딧은 여전히 클라가 한다. 이 작업이 닫으려는 구멍이 거기다. 그리고 그 경로는 **멀티 전용**이라 싱글 전투 보상은 아직 `RewardService.GrantBattleReward` 가 클라에서 준다.
+**`ack` 는 이제 지급이다.** C6.5 가 `claimPayout` 의 `ack` 안에서 낙인(`status: "claimed"`)과 지갑 크레딧을 **한 트랜잭션**으로 묶었다(`claimPayout.ts:110`). 싱글 전투 보상도 C5 에서 `claimBattleReward` 로 갔으니 클라가 재화를 만드는 경로는 남아 있지 않다.
 
 **랭크 축이 둘이라는 것을 혼동하지 마라** — `computeRankPayout` 은 전투로 인한 **점수 변동**, `claimReward(Rank, tier)` 는 **티어 보상 수령**(`claimedTiers` 낙인)이다.
 
-C6 에서 `claimPayout` 의 `ack` 가 지갑에 크레딧하는 자리가 된다. **저쪽 소유 코드라 착수 전 조율이 필요하다.**
+**저쪽 소유 파일(`claimPayout.ts`)을 이 작업이 고쳤다는 사실 자체가 합류 시 부딪히는 지점이다.** 크레딧 블록은 `ack` 트랜잭션 안에 있고, 빈 `matchIds` 단락 회로도 거기서 복원됐다.
 
 ---
 
@@ -352,12 +437,13 @@ C6 에서 `claimPayout` 의 `ack` 가 지갑에 크레딧하는 자리가 된다
 
 - **배포 로그는 호출 가능을 증명하지 않는다.** `Deploy complete!` 를 찍고도 403인 전례가 있다(`openPack`). 판정은 URL POST 의 401/403 으로만
 - **`firebase functions:log` 는 3~4분 늦는다.** 방금 한 왕복이 안 보인다고 "호출이 안 갔다" 로 읽으면 멀쩡한 코드를 뒤진다
-- **룰 하네스는 종료코드가 거짓말한다.** JDK 가 없으면 실패해도 exit 0 이다 — `# pass N` 출력 줄로만 판정
+- **룰 하네스는 종료코드가 거짓말한다.** JDK 가 없으면 실패해도 exit 0 이다. 러너는 `cd Tools/firestore-rules-tests && npm test`(자체 에뮬레이터 8081 · Java 21+ 필요 · `firebase login` 불필요)이고, **판정 줄은 `# pass N` 이 아니라 `ℹ pass N` / `ℹ fail 0`** 이다(`node --test` 출력). `fail` 이 0 인지를 봐라
+- **`functions/scripts/test-firestore-rules.js` 는 잔재다.** 어떤 `npm test` 에도 안 물려 있다(`SERVER_VALIDATION_ROADMAP.md` 에 이름만 남았다). 룰을 고친 뒤 그 파일을 손봐서 초록을 봤다면 아무것도 검증하지 않은 것이다 — **고치지 마라**
 - **Unity 빈 콘솔은 "통과" 가 아니다.** 컴파일이 아직 안 돈 것일 수 있다 — `Library/ScriptAssemblies/Assembly-CSharp.dll` mtime 이 최근 `.cs` 수정보다 뒤인지 함께 본다. 강제 재컴파일은 MCP `Unity_RunCommand` 로 `AssetDatabase.Refresh()` + `UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation()`(**전체 한정 필수** — 샌드박스가 자체 네임스페이스로 감싸 `CompilationPipeline` 이 충돌한다)
 - **거절은 무조건 `permission-denied`.** `failed-precondition`·`invalid-argument` 는 `CloudFailureClassifier` 가 `Unusable` → `BlockSession` 으로 본다. 잔액 부족·중복 수령으로 세션을 끊으면 안 된다
 - **순수 모듈에 `firebase-admin`·`HttpsError` 금지.** `functions/scripts/` 회귀가 `lib/` 를 직접 require 한다
-- **미러를 손으로 고치지 마라.** 원본은 `functions/src/currency/`, 미러는 `functions-currency/src/generated/`. `npm test` 끝의 `assert-shared-sync` 가 드리프트를 잡는다(줄끝 정규화 후 비교 — `core.autocrlf=true` 라 바이트 비교가 못 선다)
-- **`SCHEMA_VERSION` 2중 동기화**(클라 `UserSaveData.VERSION` · `functions/src/save/saveDocument.ts:18`). 하나만 올리면 조용히 막힌다. **룰은 3번째 축이 아니다** — `firestore.rules` 에서 `== 7` 을 강제하던 자리는 이미 빠졌고(`:117-118` 주석) 지금은 `:123` 의 단조 증가만 본다
+- **미러는 커밋되지 않는다.** 원본은 `functions/src/`(공유 목록은 `functions-currency/scripts/shared-files.js` — 지금 5파일: `currencyKeys`·`wallet`·`walletStore`·`environments`·`saveValues`), 미러 `functions-currency/src/generated/` 는 `.gitignore` 대상이고 `prebuild` 의 `sync:shared` 가 빌드마다 새로 만든다(`364c6c538` 이후). 손으로 고칠 대상 자체가 없어졌다 — 대신 `functions-currency` 의 `npm test`(`scripts/test-wallet-mirror.js`)가 **미러 순수성**(`firebase-admin`·`firebase-functions` 미적재)과 **환경·재화 키 화이트리스트 일치**를 지킨다
+- **`SCHEMA_VERSION` 2중 동기화**(클라 `UserSaveData.VERSION:17` · `functions/src/save/saveDocument.ts:33` — 지금 둘 다 **8**). 하나만 올리면 조용히 막히고, **하나만 배포해도 막힌다**(위 "배포 순서"). **룰은 3번째 축이 아니다** — `firestore.rules` 에서 `== 7` 을 강제하던 자리는 이미 빠졌고 지금은 단조 증가(`>=`)만 본다
 - **`Assets/Resources/SpecData.bytes` 는 암호화 바이너리라 머지가 조용히 한쪽을 삼킨다.** 2026-08-28 머지 `04170beb5` 가 `SpecDatas.cs` 는 박형석작업용 것을, `.bytes` 는 feature_Firestore 것을 택해 **코드와 데이터의 짝이 갈렸다**. 증상은 "게임 진입 불가" 로만 보인다(`Core/Initialization/SpecSheetPreloadStep.cs:19` → `GameInitialization.MarkRecoveryRequired`). 판정은 표 복호화로만 — AES-128-CBC · key `cRM1fuNZDwvqnjzY` · IV = key 바이트 역순. 그리고 `OutGame/Spec/SpecSource`·`RewardSpec` 은 **정적 캐시**라(`s_loaded`) 파일을 바꿔도 도메인 리로드 전엔 옛 값을 보고한다
 - **`envs/live` 는 여전히 0표다.** `d2a4fdc3c` 이후 `Reward` 표가 비면 수령이 **fail-closed 로 거절**된다 — live 는 R3 업로드 전까지 수령이 전부 막힌다. 의도한 동작이지만 릴리즈 순서에 걸린다
 - **미커밋으로 오래 두지 마라.** 2026-08-28 에 C1~C3 미커밋분이 브랜치 전환 + 머지로 통째로 날아갔고, GitHub Desktop 자동 stash 는 `.gitignore` 대상(`node_modules`·`lib`)만 담고 untracked 소스를 안 담았다. **각 단계는 검증이 초록으로 뜬 그 순간 커밋한다**
