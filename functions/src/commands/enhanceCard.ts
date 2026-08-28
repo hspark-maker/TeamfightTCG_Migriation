@@ -11,7 +11,8 @@ import {
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
-import {canAfford, currencySlot, readBalances, spend} from "../currency/wallet";
+import {canAfford, spend} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
 import {
   applyEnhanceLevel,
   growthSlot,
@@ -90,7 +91,7 @@ export const enhanceCard = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction): Promise<SaveMutation> => {
+  const result = await mutateSave(env, uid, async (current, transaction, wallet): Promise<SaveMutation> => {
     // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
     const entries = readGrowthEntries(current.cardGrowth);
     const currentLevel = levelOfCard(entries, cardId);
@@ -111,7 +112,7 @@ export const enhanceCard = onCall(async (request) => {
     }
 
     const charged = freeShot === null ? step.cost : 0;
-    const balances = readBalances(current.currency);
+    const balances = wallet.balances;
     if (!canAfford(balances, step.currency, charged)) {
       reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`,
         {uid, env, cardId, level: currentLevel, currency: step.currency, cost: charged,
@@ -131,9 +132,9 @@ export const enhanceCard = onCall(async (request) => {
 
     return {
       slots: {
-        currency: currencySlot(spend(balances, step.currency, charged)),
         cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
       },
+      wallet: nextWallet(wallet, spend(balances, step.currency, charged)),
     };
   });
 

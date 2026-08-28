@@ -1,11 +1,14 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {mutateSave, requireUid, SaveMutation} from "../save/saveDocument";
+import {requireUid} from "../save/saveDocument";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
-import {currencySlot, grant, readBalances} from "../currency/wallet";
+import {grant} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
+import {mutateWallet} from "../currency/walletTransaction";
 
 /**
  * 디버그 재화 지급. 클라 디버그 오버레이가 부르는 test env 전용 통로다.
+ * 지갑 문서만 쓴다 — 세이브 진행도와는 무관하다.
  *
  * 여기서는 invalid-argument 를 던진다 — 도메인 명령이었다면 클라 CloudFailureClassifier 가
  * 세션을 끊어 문제였겠지만, 이 함수는 라이브에서 아예 닿지 않는 디버그 경로라
@@ -34,12 +37,9 @@ export const devGrantCurrency = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "amount must be a positive safe integer.");
   }
 
-  const result = await mutateSave(env, uid, (current): SaveMutation => ({
-    slots: {
-      currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
-    },
-  }));
+  const wallet = await mutateWallet(env, uid, (current) =>
+    nextWallet(current, grant(current.balances, [{currency, amount}])));
 
-  logger.info("devGrantCurrency", {uid, env, currency, amount, revision: result.revision});
-  return result;
+  logger.info("devGrantCurrency", {uid, env, currency, amount, rev: wallet.rev});
+  return {wallet};
 });

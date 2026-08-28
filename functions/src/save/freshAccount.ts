@@ -1,5 +1,5 @@
 import {SlotPatch} from "./saveDocument";
-import {currencySlot, grant} from "../currency/wallet";
+import {Balances, grant} from "../currency/wallet";
 
 /**
  * 신규 계정 최초 지급 골드. 클라 CurrencyManager.STARTING_GOLD 의 쌍둥이 —
@@ -17,13 +17,23 @@ export const STARTER_DECK_SIZE = 6;
 export const STARTER_DECK_NAME = "스타터 덱";
 
 /**
- * 신규 계정 문서의 슬롯 10개. 메타 5키(schemaVersion/revision/updatedAt/deviceId/appVersion)는
- * ensureSaveDocument 가 얹는다.
+ * 신규 계정 지갑의 최초 잔액. 세이브 문서를 만드는 **그 트랜잭션**에서 같이 서야 한다
+ * — 갈라지면 부트의 ensureWallet 이 0 잔액 지갑을 먼저 세워 스타터 골드가 영영 사라진다.
+ * @return {Balances} 4키 잔액
+ */
+export function buildFreshAccountBalances(): Balances {
+  return grant({}, [{currency: "Gold", amount: STARTER_GOLD}]);
+}
+
+/**
+ * 신규 계정 문서의 슬롯 9개. 메타 5키(schemaVersion/revision/updatedAt/deviceId/appVersion)는
+ * ensureSaveDocument 가 얹는다. 재화는 여기 없다 — v8 부터 잔액은 지갑 문서의 것이고,
+ * 최초 지급은 buildFreshAccountBalances 가 같은 트랜잭션에서 낸다.
  *
  * 모양의 진실원은 Tools/firestore-rules-tests/fixtures/saveDocument.js 의
  * serverFreshAccountDocument() 다 — 저기와 갈리면 신규 계정의 첫 클라 저장이 룰에 막힌다.
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
- * @return {SlotPatch} 슬롯 10개
+ * @return {SlotPatch} 슬롯 9개
  */
 export function buildFreshAccountSlots(starterCardIds: number[]): SlotPatch {
   const slots = [];
@@ -36,7 +46,6 @@ export function buildFreshAccountSlots(starterCardIds: number[]): SlotPatch {
   }
 
   return {
-    currency: currencySlot(grant({}, [{currency: "Gold", amount: STARTER_GOLD}])),
     ownership: {cardIds: [...starterCardIds]},
     deck: {slots},
     cardGrowth: {entries: {}},

@@ -33,7 +33,8 @@ import {
   parseChapterNodeRows,
 } from "../completionTable";
 import {readOwnedIds} from "../packs/packSlots";
-import {currencySlot, grant, readBalances} from "../currency/wallet";
+import {grant} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
 
 /**
  * 도메인 거절 사유. **와이어 계약**이다 — 클라가 이 문자열을 그대로 대조한다.
@@ -315,7 +316,7 @@ function claimAlbumReward(
  *
  * 범위는 네 갈래다 — 랭크 티어 · 토너먼트 정점 · 토너먼트 챕터 완주 · 도감 완성.
  * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry) 표가 비면
- * fail-closed 로 거절한다. 재화는 지갑 문서가 아니라 세이브의 currency 슬롯에 쓴다.
+ * fail-closed 로 거절한다. 지급은 지갑 문서로 나가고 세이브에는 낙인 슬롯만 남는다.
  */
 export const claimReward = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -391,19 +392,21 @@ export const claimReward = onCall(async (request) => {
     logger.warn("clearing a node with no authored reward", {...context, specOwnerId, droppedCount: dropped.length});
   }
 
-  const result = await mutateSave(env, uid, (current): SaveMutation => {
-    const currency = currencySlot(grant(readBalances(current.currency), gains));
+  const result = await mutateSave(env, uid, (current, _transaction, wallet): SaveMutation => {
+    // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
+    const paid = nextWallet(wallet, grant(wallet.balances, gains));
 
     if (ownerType === "Rank") {
-      return {slots: {currency, rank: claimRankTier(current, tierIndex, requiredPoints, tierCount, context)}};
+      const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
+      return {slots: {rank}, wallet: paid};
     }
     if (ownerType === "Album") {
-      return {slots: {currency, albumReward: claimAlbumReward(current, albumEntries, context)}};
+      return {slots: {albumReward: claimAlbumReward(current, albumEntries, context)}, wallet: paid};
     }
     if (isChapter) {
-      return {slots: {currency, tournament: claimTournamentChapter(current, chapterNodes, context)}};
+      return {slots: {tournament: claimTournamentChapter(current, chapterNodes, context)}, wallet: paid};
     }
-    return {slots: {currency, tournament: clearTournamentNode(current, context)}};
+    return {slots: {tournament: clearTournamentNode(current, context)}, wallet: paid};
   });
 
   logger.info("claimReward", {

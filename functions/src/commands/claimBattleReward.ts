@@ -1,17 +1,14 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {
-  isKnownEnv,
-  mutateSave,
-  requireUid,
-  SaveMutation,
-} from "../save/saveDocument";
+import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
 import {computeCurrencyPayout, CurrencyPayout} from "../payout";
 import {parseRewardRows, RewardRow} from "../rewardTable";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
-import {currencySlot, grant, readBalances} from "../currency/wallet";
+import {grant} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
+import {mutateWallet} from "../currency/walletTransaction";
 import {LOCKED_DECK_SIZE} from "../deckValidation";
 
 /**
@@ -69,8 +66,9 @@ function resolvePayout(
  * 싱글 전투 1판의 보상 지급. 금액 공식(perCard × 생존 수 vs floor · 패배는 flat)은 payout.ts 가 갖고,
  * 여기서는 표 읽기 · 클램프 · 지급만 한다.
  *
- * 지급량이 0 이하로 나오면 **문서를 쓰지 않는다** — 빈 지급으로 revision 만 올리면
- * 클라가 슬롯을 갈아끼우고도 달라진 것이 없어 사고를 못 알아챈다.
+ * 세이브 문서는 건드리지 않는다 — 이 명령이 움직이는 것은 잔액뿐이라 진행도 슬롯도 revision 도 오를 이유가 없다.
+ * 지급량이 0 이하로 나오면 **아무것도 쓰지 않는다** — 빈 지급으로 지갑 rev 만 올리면
+ * 클라가 잔액을 갈아끼우고도 달라진 것이 없어 사고를 못 알아챈다.
  */
 export const claimBattleReward = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -106,20 +104,17 @@ export const claimBattleReward = onCall(async (request) => {
   }
   if (payout.amount <= 0) {
     // error 가 아니라 warn 이다 — 표가 깨진 것이 아니라 "이번엔 줄 것이 없다" 일 수 있다(예: lose.flat 0 저작).
-    // 그래도 거절로 접는다: 지급 0으로 문서를 쓰면 revision 만 오르고 클라는 달라진 것 없는 슬롯을 채택한다.
+    // 그래도 거절로 접는다: 지급 0으로 지갑을 쓰면 rev 만 오르고 클라는 달라진 것 없는 잔액을 채택한다.
     // 클라는 이 거절을 경고 한 줄로 삼키고 캐리어를 세우지 않는다(획득 연출 없음) — 0 지급의 옳은 표면이다.
     logger.warn("Battle reward amount is not positive", {...context, amount: payout.amount});
     reject("RewardUnavailable", `Battle reward amount is not positive: ${payout.amount}`, context);
   }
 
   const amount = payout.amount;
-  const result = await mutateSave(env, uid, (current): SaveMutation => ({
-    slots: {
-      currency: currencySlot(grant(readBalances(current.currency), [{currency, amount}])),
-    },
-  }));
+  const wallet = await mutateWallet(env, uid, (current) =>
+    nextWallet(current, grant(current.balances, [{currency, amount}])));
 
-  logger.info("claimBattleReward", {uid, env, won, remaining, currency, amount, revision: result.revision});
+  logger.info("claimBattleReward", {uid, env, won, remaining, currency, amount, rev: wallet.rev});
 
-  return {...result, granted: {currency, amount}};
+  return {wallet, granted: {currency, amount}};
 });

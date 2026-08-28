@@ -10,7 +10,8 @@ import {
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
-import {canAfford, currencySlot, readBalances, spend} from "../currency/wallet";
+import {canAfford, spend} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
 import {
   isSupportedKeyword,
   keywordGrowthSlot,
@@ -84,7 +85,7 @@ export const enhanceKeyword = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction): Promise<SaveMutation> => {
+  const result = await mutateSave(env, uid, async (current, transaction, wallet): Promise<SaveMutation> => {
     const levels = readKeywordLevels(current.keywordGrowth);
     const currentLevel = levelOfKeyword(levels, keyword);
 
@@ -104,7 +105,7 @@ export const enhanceKeyword = onCall(async (request) => {
     }
 
     const charged = freeShot === null ? step.cost : 0;
-    const balances = readBalances(current.currency);
+    const balances = wallet.balances;
     if (!canAfford(balances, step.currency, charged)) {
       reject("NotAffordable", `Not enough ${step.currency} to enhance keyword ${keyword}.`,
         {uid, env, keyword, level: currentLevel, currency: step.currency, cost: charged,
@@ -122,9 +123,9 @@ export const enhanceKeyword = onCall(async (request) => {
 
     return {
       slots: {
-        currency: currencySlot(spend(balances, step.currency, charged)),
         keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
       },
+      wallet: nextWallet(wallet, spend(balances, step.currency, charged)),
     };
   });
 

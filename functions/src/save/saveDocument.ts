@@ -219,8 +219,8 @@ export async function mutateSave(
     const migrationPatch: SaveMigrationPatch = migration.slotPatch;
 
     // 잔액 이관은 지갑이 없을 때만이다. 조건이 "세이브가 v7 일 때" 가 아닌 이유는
-    // SCHEMA_VERSION 이 8 이 된 뒤 만들어진 계정도 C6.3 전까지는 currency 슬롯을 갖고
-    // 태어나기 때문이다 — 버전으로 가르면 그 계정들이 지갑 없이 남는다.
+    // SCHEMA_VERSION 이 8 이 된 뒤 C6.3 전에 만들어진 계정도 currency 슬롯을 갖고
+    // 태어났기 때문이다 — 버전으로 가르면 그 계정들이 지갑 없이 남는다.
     const creatingWallet = !walletSnapshot.exists;
     if (creatingWallet) {
       // 아직 없는 지갑(rev 0) 위에 이관 잔액만 얹어 콜백에 보인다. 문서 쓰기와 rev 는
@@ -267,6 +267,7 @@ export async function mutateSave(
 export interface EnsureAccountOutcome {
   revision: number;
   created: boolean;
+  walletCreated: boolean;
 }
 
 /**
@@ -277,11 +278,15 @@ export interface EnsureAccountOutcome {
  *
  * 이미 있는 문서에는 스키마 검사를 하지 않는다 — 드리프트는 클라 부트가 다시 읽으며
  * MarkUpdateRequired / Fail 로 훨씬 나은 표면을 만든다. 여기서 던지면 그 갈래를 못 밟는다.
+ *
+ * 지갑도 **같은 트랜잭션**에서 만든다. 두 문서가 갈라지면 세이브만 있는 계정이 생기고,
+ * 그 계정은 부트의 ensureWallet 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다.
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {string} deviceId 클라 기기 id (32자 hex)
  * @param {string} appVersion 클라 앱 버전
- * @param {Function} buildSlots 새 문서에 실을 슬롯 10개
+ * @param {Function} buildSlots 새 문서에 실을 슬롯 9개
+ * @param {Balances} starterBalances 같은 트랜잭션에서 세울 지갑의 최초 잔액
  * @return {Promise<EnsureAccountOutcome>} 새 revision 과 생성 여부
  */
 export async function ensureSaveDocument(
@@ -290,14 +295,21 @@ export async function ensureSaveDocument(
   deviceId: string,
   appVersion: string,
   buildSlots: () => SlotPatch,
+  starterBalances: Balances,
 ): Promise<EnsureAccountOutcome> {
   const reference = saveDocument(env, uid);
+  const walletReference = walletRef(db, env, uid);
 
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (snapshot.exists) {
-      return {revision: Number(snapshot.data()?.revision ?? 0), created: false};
+      return {revision: Number(snapshot.data()?.revision ?? 0), created: false, walletCreated: false};
     }
+
+    // 지갑 존재를 먼저 **묻는다**. 세이브만 지워지고 지갑이 남은 계정에서 createWallet 의 create 가
+    // ALREADY_EXISTS 로 터지면 그 계정은 세이브를 영영 다시 만들지 못한다.
+    // 읽기는 전부 쓰기보다 앞서야 하므로 이 자리가 마지막 읽기다.
+    const walletSnapshot = await transaction.get(walletReference);
 
     // set 이 아니라 create 다 — 트랜잭션 밖에서 누가 먼저 만들었으면 재실행되어 덮어쓰기가 막힌다.
     transaction.create(reference, {
@@ -309,6 +321,11 @@ export async function ensureSaveDocument(
       appVersion,
     });
 
-    return {revision: 1, created: true};
+    const walletCreated = !walletSnapshot.exists;
+    if (walletCreated) {
+      createWallet(transaction, walletReference, starterBalances, FieldValue.serverTimestamp());
+    }
+
+    return {revision: 1, created: true, walletCreated};
   });
 }

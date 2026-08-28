@@ -5,7 +5,11 @@ import {
   isKnownEnv,
   requireUid,
 } from "../save/saveDocument";
-import {buildFreshAccountSlots, STARTER_GOLD} from "../save/freshAccount";
+import {
+  buildFreshAccountBalances,
+  buildFreshAccountSlots,
+  STARTER_GOLD,
+} from "../save/freshAccount";
 import {resolveStarterCardIds} from "../save/starterCards";
 
 /** 클라 PlayerSaveDocument 가 만드는 기기 id 모양(Guid "N" 포맷). 룰이 정확히 32자를 요구한다. */
@@ -14,7 +18,8 @@ const DEVICE_ID_PATTERN = /^[0-9a-f]{32}$/;
 const APP_VERSION_MAX_LENGTH = 64;
 
 /**
- * 신규 계정의 세이브 문서를 서버가 만든다. 이미 있으면 아무것도 쓰지 않고 현재 revision 만 돌려준다.
+ * 신규 계정의 세이브 문서와 지갑을 서버가 **한 트랜잭션**에 만든다. 이미 있으면 아무것도 쓰지 않고
+ * 현재 revision 만 돌려준다.
  *
  * 클라는 문서를 먼저 읽고 **없을 때만** 부른다 — 매 부팅 호출이면 cold start 가 모든 유저의
  * 부트에 얹힌다. 응답은 채택하지 않고 클라가 문서를 다시 읽어 정상 부트 경로로 합류한다.
@@ -42,7 +47,9 @@ export const ensureAccount = onCall(async (request) => {
 
   const starter = await resolveStarterCardIds(env);
   const outcome = await ensureSaveDocument(
-    env, uid, deviceId, appVersion, () => buildFreshAccountSlots(starter.cardIds),
+    env, uid, deviceId, appVersion,
+    () => buildFreshAccountSlots(starter.cardIds),
+    buildFreshAccountBalances(),
   );
 
   if (outcome.created) {
@@ -50,7 +57,9 @@ export const ensureAccount = onCall(async (request) => {
       uid,
       env,
       revision: outcome.revision,
-      gold: STARTER_GOLD,
+      // 지갑이 이미 있었다면 스타터 골드는 나가지 않았다 — 로그가 그것을 숨기면 안 된다.
+      gold: outcome.walletCreated ? STARTER_GOLD : 0,
+      walletCreated: outcome.walletCreated,
       starterCardIds: starter.cardIds,
       starterSource: starter.source,
     });
