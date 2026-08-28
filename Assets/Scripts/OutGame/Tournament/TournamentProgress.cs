@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 보상 토너먼트 진행도의 static 단일 창구(정점 해금 판정 · 클리어 지급 · 챕터 완주 보상 · 낙인)
@@ -203,13 +204,18 @@ public static class TournamentProgress
         return true;
     }
 
-    // 정점 클리어 확정 — 보상 지급까지 여기서 한다(수령 팝업의 onConfirm이 이 메서드를 부른다)
-    public static bool ClearNode(string _nodeId)
+    /// <summary>정점 클리어 확정 — 보상 지급까지 서버에 맡긴다(수령 팝업의 onConfirm이 이 메서드를 부른다).
+    /// 이 도메인은 "수령 = 클리어 확정"이라 지급·클리어 낙인·미수령 해제가 한 트랜잭션이어야 한다.</summary>
+    public static async UniTask<bool> ClearNodeAsync(string _nodeId)
     {
         if (string.IsNullOrEmpty(_nodeId)) return false;
         if (Slot.ClearedNodeIds.Contains(_nodeId)) return false;
 
-        Payout(_nodeId);
+        // 보상 미저작 정점도 서버를 거친다 — 클라가 "받을 게 없다"고 판정해 스스로 낙인을 남기면
+        // 변조된 클라가 정점을 마음대로 열 수 있다. 서버가 지급 0건이어도 클리어를 확정해 준다.
+        if (!await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId)) return false;
+
+        OnChanged?.Invoke();
         return true;
     }
 
@@ -293,26 +299,8 @@ public static class TournamentProgress
         OnChanged?.Invoke();
     }
 
-    // 보상 지급(리스트 전량) → 낙인 → 즉시 영속 → 통지
-    static void Payout(string _nodeId)
-    {
-        var t_rewards = new List<RewardLine>();
-        Config.FillRewards(_nodeId, t_rewards);
-
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
-
-        Slot.ClearedNodeIds.Add(_nodeId);
-
-        // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
-        if (Slot.PendingRewardNodeId == _nodeId) Slot.PendingRewardNodeId = "";
-
-        // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
-        CurrencyManager.Save();
-        OnChanged?.Invoke();
-    }
-
-    // 챕터 완주 보상 지급 → 낙인 → 즉시 영속 → 통지(정점 Payout과 같은 순서)
+    // 챕터 완주 보상 지급 → 낙인 → 즉시 영속 → 통지.
+    // 정점과 달리 여전히 로컬 지급이다 — 챕터↔정점 대응이 TournamentConfig SO에만 있어 서버가 완주를 못 잰다.
     static void PayoutChapter(string _chapterId)
     {
         var t_rewards = new List<RewardLine>();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;   // 분출 시퀀스의 OnComplete·Play 확장 메서드
 using UnityEngine;
 using UnityEngine.UI;
@@ -44,7 +45,9 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     Sequence m_intro;
 
     // 확인 콜백. 지급 성공 여부를 돌려받아 연출 여부를 정한다. 중복 클릭 방지를 위해 한 번 쓰면 비운다.
-    Func<bool> m_onConfirm;
+    // 서버가 지급을 판정하는 도메인(랭크 티어·토너먼트 정점)이 있어 대기 가능한 형태 하나로 모았다 —
+    // 로컬 지급 도메인(앨범·챕터)은 완료된 UniTask로 감싸 들어온다.
+    Func<UniTask<bool>> m_onConfirm;
 
     // 닫힘 콜백. 연 쪽이 팝업 뒤에 연출을 이을 때만 쓴다(공용 팝업이라 static 이벤트로 두면 다른 소비처에 샌다).
     Action m_onClosed;
@@ -72,6 +75,18 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<bool> _onConfirm,
                      bool _claimOnDim = false, Action _onClosed = null)
     {
+        this.Show(_title, _rewards,
+                  _onConfirm == null ? null : new Func<UniTask<bool>>(() => UniTask.FromResult(_onConfirm())),
+                  _claimOnDim, _onClosed);
+    }
+
+    /// <summary>
+    /// 지급을 서버에 묻는 도메인용 표시. _onConfirm이 끝난 시점에 잔액은 이미 최종값이어야 한다 —
+    /// 분출·수치 롤업이 그 전제 위에 서 있어서, 응답을 기다리지 않고 연출을 태우면 숫자가 뒤로 튄다.
+    /// </summary>
+    public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<UniTask<bool>> _onConfirm,
+                     bool _claimOnDim = false, Action _onClosed = null)
+    {
         this.m_onConfirm = _onConfirm;
         this.m_onClosed = _onClosed;
 
@@ -93,13 +108,13 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         {
             this.claimButton.gameObject.SetActive(!_claimOnDim);
             this.claimButton.onClick.RemoveAllListeners(); // 재표시마다 중복 등록 방지
-            this.claimButton.onClick.AddListener(this.OnClaimClicked);
+            this.claimButton.onClick.AddListener(this.ClaimClicked);
         }
 
         if (this.dimButton != null)
         {
             this.dimButton.onClick.RemoveAllListeners();
-            if (_claimOnDim) this.dimButton.onClick.AddListener(this.OnClaimClicked);
+            if (_claimOnDim) this.dimButton.onClick.AddListener(this.ClaimClicked);
             else this.dimButton.onClick.AddListener(this.Hide);
         }
 
@@ -143,7 +158,10 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.RestoreReveal();
     }
 
-    void OnClaimClicked()
+    // 버튼 리스너는 동기 델리게이트라 대기를 여기서 끊는다. 예외는 OnClaimClicked 안에서 이미 다 잡힌다.
+    void ClaimClicked() => this.OnClaimClicked().Forget();
+
+    async UniTaskVoid OnClaimClicked()
     {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
         var t_callback = this.m_onConfirm;
@@ -152,7 +170,12 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.SetInputEnabled(false);
 
         // 지급·영속은 이 호출에서 끝난다. 아래 분출은 확정된 결과를 보여주기만 한다.
-        bool t_granted = t_callback != null && t_callback.Invoke();
+        // 서버 지급이면 여기서 왕복을 기다린다 — 잔액이 최종값이 된 뒤에야 연출이 서야 숫자가 뒤로 튀지 않는다.
+        bool t_granted = t_callback != null && await t_callback.Invoke();
+
+        // 대기 중에 씬이 바뀌었을 수 있다 — 죽은 팝업에 연출을 태우지 않는다.
+        if (this == null) return;
+
         // 가드에 걸려 되돌아간 클릭에는 줄 것이 없다 — 소리도 없다.
         if (t_granted) SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
 

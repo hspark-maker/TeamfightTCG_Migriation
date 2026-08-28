@@ -24,6 +24,8 @@
     <type fullname="ServerSlotPatch" preserve="all"/>
     <type fullname="ServerCommandResult" preserve="all"/>
     <type fullname="PingResult" preserve="all"/>
+    <type fullname="ClaimRewardResult" preserve="all"/>
+    <type fullname="ClaimRewardGain" preserve="all"/>
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>
 </linker>

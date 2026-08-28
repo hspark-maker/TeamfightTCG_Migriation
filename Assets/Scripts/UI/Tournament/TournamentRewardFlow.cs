@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 
 // 정점 클리어 보상의 수령 흐름(앨범 3단 수령과 같은 순서를 따른다).
 //
-// 지급은 하지 않는다 — 팝업의 확인이 _onConfirm을 부르고 그 안에서 TournamentProgress.ClearNode가
-// 자격 판정 · 지급 · 낙인 · 영속을 한 트랜잭션으로 끝낸다. 팝업은 그 반환값을 보고 연출 여부를 정한다.
+// 지급은 하지 않는다 — 팝업의 확인이 _onConfirm을 부르고 그 안에서 TournamentProgress.ClearNodeAsync가
+// 자격 판정 · 지급 · 낙인을 서버 한 트랜잭션으로 끝낸다. 팝업은 그 반환값을 보고 연출 여부를 정한다.
 public static class TournamentRewardFlow
 {
     const string TITLE_SUFFIX   = " 격파";
@@ -32,12 +33,13 @@ public static class TournamentRewardFlow
         // 팝업이 씬에 없을 때도 같은 자리로 떨어진다(앨범·랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
         if (t_lines.Count == 0 || !RewardClaimPopup.TryGet(out var t_popup))
         {
-            TournamentProgress.ClearNode(_nodeId);
+            // 보여줄 팝업이 없으면 연출도 없다 — 결과를 기다릴 이유가 없어 대기를 여기서 끊는다.
+            TournamentProgress.ClearNodeAsync(_nodeId).Forget();
             return false;
         }
 
         // 랭크·앨범과 같은 규약 — [획득] 버튼 없이 배경을 눌러 받는다.
-        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNode(_nodeId),
+        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNodeAsync(_nodeId),
                      _claimOnDim: true, _onClosed: _onClosed);
         return true;
     }

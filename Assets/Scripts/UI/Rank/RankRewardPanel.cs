@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -132,12 +133,13 @@ public class RankRewardPanel : PooledUIBase
 
         if (!RewardClaimPopup.TryGet(out var t_popup))
         {
-            this.Claim(_tierIndex);
+            // 팝업이 없으면 연출도 없다 — 지급 결과를 볼 곳이 없으니 결과를 기다릴 이유도 없다.
+            this.ClaimAsync(_tierIndex).Forget();
             return;
         }
 
         var t_info = RankRewardManager.GetInfo(_tierIndex);
-        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.Claim(_tierIndex), true);
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.ClaimAsync(_tierIndex), true);
     }
 
     // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
@@ -146,12 +148,12 @@ public class RankRewardPanel : PooledUIBase
         if (RewardClaimPopup.TryGet(out var t_popup)) t_popup.Hide();
     }
 
-    // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshRows를 유발한다.
+    // 판정·지급·낙인은 서버가 하고 응답 채택 후 매니저의 OnChanged가 RefreshRows를 유발한다.
     // 팝업 닫기는 여기서 하지 않는다 — 팝업이 이 반환값을 보고 연출 여부를 정한 뒤 스스로 닫는다.
-    // 반환값을 버리면 팝업이 뜬 사이 상태가 바뀌어 가드에 걸렸을 때 안 준 골드를 준 것처럼 연출한다.
-    bool Claim(int _tierIndex)
+    // 반환값을 버리면 서버가 거절했을 때 안 준 골드를 준 것처럼 연출한다.
+    UniTask<bool> ClaimAsync(int _tierIndex)
     {
-        return RankRewardManager.Claim(_tierIndex);
+        return RankRewardManager.ClaimAsync(_tierIndex);
     }
 
     // 지정한 행으로 스크롤. 레이아웃이 확정되기 전에 세팅하면 무시되므로 강제 리빌드 후 적용한다.
