@@ -18,15 +18,65 @@ import type {
   Firestore,
   Transaction,
 } from "firebase-admin/firestore";
+import {CURRENCY_KEYS} from "./currencyKeys";
 import {Balances, CurrencyGain, normalizeBalances} from "./wallet";
+import {intOf} from "../save/saveValues";
 
 /** 지갑 문서의 스키마 축. 세이브 SCHEMA_VERSION 과 별개로 승급한다. */
 export const WALLET_SCHEMA_VERSION = 1;
 
-/** 지갑 문서 한 벌. */
+/**
+ * 지갑 문서 한 벌.
+ *
+ * paidBalances 는 balances 안에서 실화폐로 산 몫이다 — balances 와 **같은 평면**에 둔다.
+ * 재화별로 {free, paid} 로 중첩하면 `Balances = Record<string, number>` 가 깨져
+ * 순수 산술(wallet.ts)·룰·클라가 전부 유니온을 다뤄야 한다.
+ * 불변식: 모든 키에서 paidBalances[k] <= balances[k]. 빈 맵이 "전부 무상"의 정규형이다.
+ */
 export interface WalletState {
   rev: number;
   balances: Balances;
+  paidBalances: Balances;
+}
+
+/**
+ * 유상분을 잔액 이하로 자른다. **이 클램프가 "무상 먼저 소진" 정책 전부다**
+ * — 잔액이 줄면 유상분이 새 잔액까지 따라 깎이므로, 감소분은 무상분에서 먼저 나간 셈이 된다.
+ * 0 이하인 키는 아예 뺀다(빈 맵 = 전부 무상).
+ * @param {Balances} paid 유상 잔액(부분·오염 가능)
+ * @param {Balances} balances 정규화된 전체 잔액
+ * @return {Balances} 잘린 유상 잔액
+ */
+function clampPaid(paid: Balances, balances: Balances): Balances {
+  const source = paid ?? {};
+  const next: Balances = {};
+  for (const key of CURRENCY_KEYS) {
+    const value = Math.min(intOf(source[key]), intOf(balances[key]));
+    if (value > 0) next[key] = value;
+  }
+  return next;
+}
+
+/**
+ * 다음 지갑 상태를 만드는 **유일한 출구**. 명령이 {rev, balances, paidBalances} 를 손으로
+ * 조립하기 시작하면 유상분 불변식이 명령마다 갈린다.
+ *
+ * rev 도 여기서 올린다 — writeWallet 은 받은 값을 그대로 싣는 직렬화기일 뿐이라,
+ * 호출부가 rev+1 을 손으로 얹게 두면 빠뜨린 명령의 쓰기가 앞선 쓰기를 덮는다.
+ * 세이브 revision 과 달리 "정확히 +1" 은 계약이 아니다(결제 웹훅처럼 클라가 모르는
+ * 정당한 쓰기가 생긴다) — 여기서 보장하는 것은 단조 증가뿐이다.
+ * @param {WalletState} current 현재 상태
+ * @param {Balances} balances 반영 후 잔액
+ * @return {WalletState} 다음 상태
+ */
+export function nextWallet(current: WalletState, balances: Balances): WalletState {
+  const nextBalances = normalizeBalances(balances);
+
+  return {
+    rev: current.rev + 1,
+    balances: nextBalances,
+    paidBalances: clampPaid(current.paidBalances, nextBalances),
+  };
 }
 
 /**
@@ -49,10 +99,13 @@ export function walletRef(db: Firestore, env: string, uid: string): DocumentRefe
 export function readWallet(snapshot: DocumentSnapshot): WalletState {
   const data = snapshot.exists ? snapshot.data() : undefined;
   const rev = Number(data?.rev);
+  const balances = normalizeBalances((data?.balances ?? {}) as Balances);
 
   return {
     rev: Number.isFinite(rev) && rev > 0 ? Math.trunc(rev) : 0,
-    balances: normalizeBalances((data?.balances ?? {}) as Balances),
+    balances,
+    // paidBalances 가 없는 문서는 유상 지급 이전의 지갑이라 전부 무상이다.
+    paidBalances: clampPaid((data?.paidBalances ?? {}) as Balances, balances),
   };
 }
 
@@ -74,10 +127,13 @@ export function writeWallet(
   next: WalletState,
   now: unknown,
 ): void {
+  const balances = normalizeBalances(next.balances);
+
   transaction.set(ref, {
     schemaVersion: WALLET_SCHEMA_VERSION,
     rev: next.rev,
-    balances: normalizeBalances(next.balances),
+    balances,
+    paidBalances: clampPaid(next.paidBalances, balances),
     updatedAt: now,
   });
 }
@@ -97,12 +153,18 @@ export function createWallet(
   balances: Balances,
   now: unknown,
 ): WalletState {
-  const created: WalletState = {rev: 1, balances: normalizeBalances(balances)};
+  // 이관으로 선 지갑은 전부 무상이다 — 유상분은 결제가 처음으로 채운다.
+  const created: WalletState = {
+    rev: 1,
+    balances: normalizeBalances(balances),
+    paidBalances: {},
+  };
 
   transaction.create(ref, {
     schemaVersion: WALLET_SCHEMA_VERSION,
     rev: created.rev,
     balances: created.balances,
+    paidBalances: created.paidBalances,
     updatedAt: now,
   });
 
