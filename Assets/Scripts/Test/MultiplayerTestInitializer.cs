@@ -162,10 +162,8 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            // 새 uid는 이 기기 캐시의 주인이 아니다 — 캐시를 버려야 소유자 충돌로 세션이 차단되지 않는다.
-            // 클라우드 세이브는 켠 채로 둔다(꺼면 원격 문서가 없어 서버 덱 검증을 못 통과한다).
-            PlayerSaveCloud.ResetForAccountSwitch();
-            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
+            PlayerSaveCloud.DisableForTestAccountSession();
+            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
         catch (System.Exception _exception)
@@ -206,9 +204,10 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            // 다른 uid로 갈아탄 이상 로컬 캐시 소유자와 어긋난다 — 캐시를 버려 새 계정이 빈 기기에서 시작하게 한다.
-            PlayerSaveCloud.ResetForAccountSwitch();
-            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId);
+            // 다른 uid로 갈아타면 이 세션의 세이브는 남의 것이 된다 — 클라우드 세이브를 꺼서
+            // 부트 채택 자체를 건너뛴다.
+            PlayerSaveCloud.DisableForTestAccountSession();
+            FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SetStatus($"테스트 계정 '{_accountId}' 로그인 완료.");
         }
         catch (System.Exception _exception)
@@ -229,7 +228,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
     static void RestoreFirebase()
     {
         if (FirebaseManager.IsInitialized) return;
-        try { FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId); }
+        try { FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators); }
         catch (System.Exception _exception)
         {
             Debug.LogWarning($"[MpTest] Firebase 복구 실패(재시작 필요): {_exception.GetBaseException().Message}");
@@ -394,7 +393,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
         GUILayout.Label($"클라우드 세이브: {PlayerSaveCloud.State} (rev {PlayerSaveCloud.Revision})");
         if (GUILayout.Button("로컬 세이브 버리고 재시작(계정 전환용)", GUILayout.Height(26f)))
         {
-            PlayerSaveCloud.ResetForAccountSwitch();
+            PlayerSaveCloud.ClearTestAccountSession();
             SetStatus("로컬 캐시를 버렸다. 재시작하면 현재 UID가 이 기기의 새 소유자가 된다.");
         }
 #endif

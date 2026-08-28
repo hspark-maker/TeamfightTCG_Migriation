@@ -11,6 +11,9 @@ public static class GameInitialization
     public static bool IsTerminated =>
         State == EGameInitState.UpdateRequired || State == EGameInitState.RecoveryRequired;
 
+    /// <summary>다시 태우면 답이 달라질 수 있는 실패인가(업데이트 필요는 아니다).</summary>
+    public static bool CanRetry => State == EGameInitState.RecoveryRequired;
+
     public static float Progress
     {
         get
@@ -99,9 +102,7 @@ public static class GameInitialization
         SetState(EGameInitState.UpdateRequired);
     }
 
-    // 씬 재로드 없이 부트를 다시 태우기 위해 종료 상태만 되돌린다.
-    // WhenReady 구독은 종료 시점에 Dispose+Clear로 이미 콜백까지 지워져 복원할 수단이 없다 —
-    // 재시도 이후 구독은 새로 걸어야 한다.
+    /// <summary>재시도가 종료 상태만 되돌린다. 종료 때 지워진 WhenReady 구독은 복원되지 않는다.</summary>
     internal static void ResetForRetry()
     {
         if (!IsTerminated) return;

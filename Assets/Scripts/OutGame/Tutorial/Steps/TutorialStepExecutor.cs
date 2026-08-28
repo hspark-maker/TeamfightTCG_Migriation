@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -153,24 +154,39 @@ public static class TutorialStepExecutor
         if (PackOpenOverlay.Instance == null)
             return Fail(_step, _context, "개봉 오버레이 미배치(로비 씬 배선 확인)");
 
-        _context.CommitAdvance();
+        // 결제는 서버 왕복이라 이 동기 상태머신이 결과를 기다릴 수 없다 — 살 수 있는지만 먼저 묻고
+        // 그 답으로 저작된 실패 정책을 태운다(여기까지가 되돌릴 수 있는 마지막 지점).
+        var t_precheck = CardPackOpener.Precheck(_step.Pack);
+        if (t_precheck != EPackOpenResult.Success)
+            return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_precheck})");
 
-        var t_opened = CardPackOpener.TryPurchase(_step.Pack);
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+
+        PurchaseAndOpenAsync(_step.Pack, Where(_context)).Forget();
+
+        return EOutgameTutorialStepResult.Advanced;
+    }
+
+    // 자동 구매의 서버 왕복. 좌표는 이미 전진한 뒤라 되돌릴 수 없다.
+    // ⚠ 서버 왕복이 실패하면 다음 게이트에서 정지한다. 되돌릴 신호가 없어 fail-open(sameCoordBootCount)에 맡긴다.
+    static async UniTaskVoid PurchaseAndOpenAsync(CardPackData _pack, string _where)
+    {
+        var t_opened = await CardPackOpener.PurchaseAsync(_pack);
+        string t_packId = _pack != null ? _pack.PackId : "null";
+
         if (t_opened == null || !t_opened.Success)
         {
             string t_result = t_opened != null ? t_opened.Result.ToString() : "null";
-            return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_result})");
+            Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}, result={t_result}) — 이미 전진해 되돌리지 못한다.");
+            return;
         }
 
-        _context.CompleteIfLast();
-
-        PackHandoff.Set(t_opened, _step.Pack, null, false);
+        PackHandoff.Set(t_opened, _pack, null, false);
 
         // 구매는 이미 성공했다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
         if (!PackOpenOverlay.TryOpen())
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 개봉 오버레이 열기 실패(pack={PackIdOf(_step)}) — 구매는 유지, 개봉 연출만 생략.");
-
-        return EOutgameTutorialStepResult.Advanced;
+            Debug.LogWarning($"[TutorialStepExecutor] {_where} 개봉 오버레이 열기 실패(pack={t_packId}) — 구매는 유지, 개봉 연출만 생략.");
     }
 
     static EOutgameTutorialStepResult EnterDeckGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)

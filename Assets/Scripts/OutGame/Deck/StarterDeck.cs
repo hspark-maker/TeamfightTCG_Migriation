@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 신규 유저 최초 지급 창구(스타터덱 + 카드 소유권)
+// 스타터덱 + 카드 소유권 지급 창구.
+// 신규 계정의 정본은 서버 ensureAccount다 — 여기 남은 경로는 튜토리얼 되감기가 덱 슬롯을 비웠을 때만 선다.
+// 그때 지급되는 카드는 여전히 SO(poolIds) 기준이라 서버 목록과 갈릴 수 있다(에디터 전용이라 허용).
 public static class StarterDeck
 {
     const string DECK_NAME = "스타터 덱";

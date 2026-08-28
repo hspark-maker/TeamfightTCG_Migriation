@@ -29,10 +29,13 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] TMP_Text statusText;
 
     // 복구 문구를 statusText로 못 쓰는 이유: statusText가 진행바(Slider) 하위라 진행바를 끄는 순간 같이 사라진다.
-    [Tooltip("부트 실패 시 띄우는 안내·재시도 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
+    [Tooltip("부트 실패 시 띄우는 안내·재시도·종료 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
     [SerializeField] GameObject recoveryPanel;
     [SerializeField] TMP_Text   recoveryText;
+
+    [Tooltip("실패한 단계만 다시 태운다. 업데이트 필요에서는 자동으로 숨는다.")]
     [SerializeField] Button     retryButton;
+    [SerializeField] Button     quitButton;
 
     [Tooltip("로딩이 즉시 끝나도 이 시간(초)만큼은 노출한다 — 한 프레임 깜빡임 방지.")]
     [SerializeField] float minDuration = 1f;
@@ -45,8 +48,8 @@ public class LoadingCoverView : MonoBehaviour
 
     // 초기화 대기는 진행바 연출과 다른 축이다. maxDuration을 같이 쓰면 CoFillBar가 그 예산을 먼저
     // 소진한 뒤 초기화 대기가 0초로 시작해, 조금만 느려도 곧장 복구 화면으로 떨어진다.
-    // 세이브 채택만으로도 최악 21초(auth 5s + 읽기 5s×3 + 백오프 0.5s×2)라 넉넉히 잡는다.
-    [SerializeField] float initializeWaitTimeout = 45f;
+    // 세이브 채택의 최악값은 10초(auth 5s + 읽기 5s)다 — 그 두 배를 백스톱으로 잡는다.
+    [SerializeField] float initializeWaitTimeout = 20f;
 
     [Tooltip("진행바가 100%에 닿은 뒤 씬을 넘기기 전 유지 시간(초).")]
     [SerializeField] float holdBeforeLoad = 0.15f;
@@ -173,52 +176,66 @@ public class LoadingCoverView : MonoBehaviour
         bool t_updateRequired = GameInitialization.State == EGameInitState.UpdateRequired;
         bool t_assetFailed   = CardArtCache.HasFailed || UiPrefabCache.HasFailed;
 
-        if (progressBar != null)
-            progressBar.gameObject.SetActive(false);
-
-        if (recoveryPanel != null)
-            recoveryPanel.SetActive(true);
+        SetRecoveryVisible(true);
 
         if (recoveryText != null)
         {
             recoveryText.text = t_updateRequired
                 ? "새 버전으로 업데이트가 필요합니다."
                 : t_assetFailed
-                    ? "게임 데이터를 불러오지 못했습니다.\n앱을 다시 시작해 주세요."
-                    : "저장 데이터를 복구하지 못했습니다.";
+                    ? "게임 데이터를 불러오지 못했습니다.\n다시 시도해 주세요."
+                    : "서버에 연결하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
         }
 
-        if (retryButton == null) return;
+        bool t_canRetry = GameInitialization.CanRetry;
 
-        // 원격 스키마가 더 높은 건 재시도로 풀리지 않는다 — 업데이트 요구에는 버튼 자체를 띄우지 않는다.
-        // 에셋 캐시 실패도 마찬가지다 — 재시도가 되살리는 것은 Firebase 채택뿐이고 프리로드는 Awake에서 한 번뿐이라,
-        // 다시 눌러도 같은 실패 플래그를 그대로 다시 본다.
-        retryButton.gameObject.SetActive(!t_updateRequired && !t_assetFailed);
-        retryButton.interactable = true;
-        retryButton.onClick.RemoveAllListeners();
-        retryButton.onClick.AddListener(() => StartCoroutine(CoRetry()));
+        if (retryButton != null)
+        {
+            retryButton.gameObject.SetActive(t_canRetry);
+            retryButton.interactable = t_canRetry;
+            retryButton.onClick.RemoveAllListeners();
+            if (t_canRetry) retryButton.onClick.AddListener(Retry);
+        }
+
+        if (quitButton == null) return;
+
+        quitButton.gameObject.SetActive(true);
+        quitButton.interactable = true;
+        quitButton.onClick.RemoveAllListeners();
+        quitButton.onClick.AddListener(QuitApp);
     }
 
-    // 씬 재로드 없이 부트를 되돌려 다시 태운다. 아래 순서는 계약이다.
-    IEnumerator CoRetry()
+    void Retry()
     {
         if (retryButton != null) retryButton.interactable = false;
-        if (recoveryText != null) recoveryText.text = "다시 시도하는 중입니다.";
 
-        // 뒤 단계가 동기적으로 다시 실패해 MarkRecoveryRequired()를 부를 수 있어, 종료 상태를 먼저 걷어낸다.
-        GameInitialization.ResetForRetry();
+        SetRecoveryVisible(false);
 
-        // 반드시 게이트 재시작보다 앞이다 — 여기서 PlayerSaveCloud.Initialize가 Shutdown을 태워
-        // 게이트 완료 플래그를 내린다. 뒤로 가면 게이트가 직전 실패의 완료 플래그를 보고 그대로 통과한다.
-        GameManager.RetryInitialize();
-
+        // TODO(부트 재시작): 실패한 캐시·클라우드 상태를 되돌리는 체인이 아직 없다
+        // — 지금은 게이트만 다시 걸어 같은 실패를 그대로 다시 볼 수 있다.
         InitializationRunner.RestartGate();
 
-        if (recoveryPanel != null) recoveryPanel.SetActive(false);
-        if (progressBar != null) progressBar.gameObject.SetActive(true);
+        StartCoroutine(CoRunInitialize());
+    }
 
-        // 대기·타임아웃 예산·성공 시 씬 전환까지 부트 코루틴을 그대로 재사용한다(대기 로직을 두 벌로 만들지 않는다).
-        yield return CoRunInitialize();
+    // 커버는 로딩 내내 interactable=false다(프리팹 저작값) — 복구 화면일 때만 버튼이 눌린다.
+    void SetRecoveryVisible(bool _visible)
+    {
+        if (m_group != null) m_group.interactable = _visible;
+        if (recoveryPanel != null) recoveryPanel.SetActive(_visible);
+        if (progressBar == null) return;
+
+        progressBar.gameObject.SetActive(!_visible);
+        if (!_visible) progressBar.normalizedValue = 0f;
+    }
+
+    static void QuitApp()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     // 첫 스텝이 전투 직행이면 로비를 거치지 않는다. 다른 자동 스텝(AutoPurchase)까지 여기서 실행하지 않는 이유는
@@ -321,6 +338,10 @@ public class LoadingCoverView : MonoBehaviour
 
             if (t_shown >= 1f) break;
 
+            // 부트가 이미 실패를 확정했으면 바를 끝까지 태우지 않는다 — Progress는 매니저 미설치 구간에서
+            // 0.833을 넘지 못해 1f에 닿을 수 없고, 그대로 두면 복구 화면이 maxDuration만큼 늦게 뜬다.
+            if (GameInitialization.IsTerminated) break;
+
             if (t_elapsed >= maxDuration)
             {
                 Debug.LogWarning($"[LoadingCoverView] 로딩이 {maxDuration}초 안에 끝나지 않아 그대로 진행합니다.");
@@ -330,7 +351,8 @@ public class LoadingCoverView : MonoBehaviour
             yield return null;
         }
 
-        if (progressBar != null) progressBar.normalizedValue = 1f;
+        // 즉시 실패(오프라인 선체크)에서 0→100%가 한 번 번쩍이지 않게.
+        if (progressBar != null && !GameInitialization.IsTerminated) progressBar.normalizedValue = 1f;
     }
 
     // 다음 씬 위에서 커버를 걷고 자신을 파괴한다. DDOL로 살아남은 오브젝트라 비활성화로는 부족하다.

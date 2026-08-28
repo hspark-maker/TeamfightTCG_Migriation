@@ -49,7 +49,7 @@ internal static class CloudSyncStatusWatcher
 
         SimpleYNPopup t_popup = t_pool.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
-            titleText = "다른 기기에서 저장했습니다.\n앱을 다시 시작해 주세요.",
+            titleText = BlockedNotice(),
             yesText   = "종료",
             yesAction = QuitApp,
             noText    = "계속",
@@ -66,7 +66,25 @@ internal static class CloudSyncStatusWatcher
         s_blockedShown = true;
     }
 
-    // "계속"을 남겨 두는 이유: 로컬 캐시 기록은 계속 살아 있어 다음 부트에 AdoptUnsyncedCache로 복구된다.
+    // 차단 사유가 셋(먼저 저장됨 / 용량 초과 / 세션 불가)인데 문구가 하나면, 나머지 둘을 뒤집어쓴 유저는
+    // 재시작만 반복하다 원인에 못 닿는다. 유저가 다음에 할 일이 사유마다 다르므로 문구도 갈라야 한다.
+    static string BlockedNotice()
+    {
+        switch (PlayerSaveCloud.BlockReason)
+        {
+            case ECloudBlockReason.RemoteAhead:
+                return "다른 기기에서 먼저 저장했습니다.\n앱을 다시 시작하면 최신 기록으로 이어집니다.";
+
+            case ECloudBlockReason.DocumentTooLarge:
+                return "저장할 기록이 너무 많아 더 이상 저장하지 못합니다.\n" +
+                       "지금부터의 진행은 남지 않으니 고객센터로 문의해 주세요.";
+
+            default:
+                return "저장을 계속할 수 없습니다.\n앱을 다시 시작해 주세요.";
+        }
+    }
+
+    // "계속"을 남겨 두는 이유: 이번 세션을 마저 보게 해 줄 뿐이다 — 이 뒤의 진행분은 서버에 올라가지 않는다.
     static void QuitApp()
     {
 #if UNITY_EDITOR

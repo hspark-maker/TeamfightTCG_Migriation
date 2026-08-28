@@ -67,7 +67,7 @@ public sealed class PackGradeFxPalette
 //   결과 UI(RevealPanel)·스킵 버튼은 PackStage보다 뒤 sibling으로 두어 팩에 묻히지 않게 한다.
 //
 // 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
-// 연출은 이미 끝난 거래(TryPurchase가 원자 영속)를 보여줄 뿐, 경제를 건드리지 않는다.
+// 연출은 이미 끝난 거래(서버 openPack이 트랜잭션 1회로 확정)를 보여줄 뿐, 경제를 건드리지 않는다.
 public class PackRevealView : MonoBehaviour
 {
     // 요약 도달 시 1회 발화(스킵으로 건너뛰어도 반드시 발화 — 획득 버튼 데드락 방지).

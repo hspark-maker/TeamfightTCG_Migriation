@@ -89,6 +89,26 @@ static class PlayerSaveDocument
         }
     }
 
+    /// <summary>메타를 못 읽은 문서가 실제로 무엇을 담고 있었는지 한 줄로 설명한다. 실패 로그 전용.</summary>
+    internal static string DescribeMeta(DocumentSnapshot _snapshot)
+    {
+        if (_snapshot == null) return "snapshot=null";
+        if (!_snapshot.Exists) return "document=missing";
+
+        try
+        {
+            Dictionary<string, object> t_raw = _snapshot.ToDictionary();
+            return DescribeField(t_raw, FIELD_SCHEMA_VERSION) + ", " + DescribeField(t_raw, FIELD_REVISION);
+        }
+        catch (Exception t_exception)
+        {
+            return $"document could not be read ({t_exception.GetBaseException().Message})";
+        }
+    }
+
+    /// <summary>이번 실행의 앱 버전. 문서에 싣는 값과 서버 요청에 싣는 값이 갈리지 않게 캐시본을 쓴다.</summary>
+    internal static string AppVersion() => s_appVersion;
+
     /// <summary>기기 식별자(PlayerPrefs에 심는 GUID). 어느 기기가 마지막으로 썼는지 콘솔에서 읽기 위한 것이다.</summary>
     internal static string DeviceId()
     {
@@ -104,5 +124,12 @@ static class PlayerSaveDocument
 
         s_deviceId = t_deviceId;
         return t_deviceId;
+    }
+
+    static string DescribeField(Dictionary<string, object> _raw, string _field)
+    {
+        if (!_raw.TryGetValue(_field, out object t_value)) return $"{_field}=absent";
+        if (t_value == null) return $"{_field}=null";
+        return $"{_field}={t_value} ({t_value.GetType().Name})";
     }
 }

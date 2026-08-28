@@ -17,6 +17,9 @@ public static class UiPrefabCache
     static bool s_complete;
     static bool s_failed;
 
+    // 옛 적재의 continuation·Register 콜백을 잘라내는 토큰(CardArtCache와 같은 모양).
+    static int s_generation;
+
     public static bool IsComplete => s_complete;
     public static bool HasFailed => s_failed;
 
@@ -32,8 +35,19 @@ public static class UiPrefabCache
 
     // 도메인 리로드를 끈 세션에서 이전 Play의 색인·핸들이 남지 않게 되돌린다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetRuntimeState()
+    static void ResetRuntimeState() => Reset();
+
+    /// <summary>실패한 적재만 처음 상태로 되돌린다(부트 재시도용).</summary>
+    public static void ResetIfFailed()
     {
+        if (!s_failed) return;
+
+        Reset();
+    }
+
+    static void Reset()
+    {
+        s_generation++;
         if (s_handle.IsValid()) Addressables.Release(s_handle);
         s_handle = default;
         s_prefabs.Clear();
@@ -48,11 +62,17 @@ public static class UiPrefabCache
         if (s_started) return;
         s_started = true;
 
+        int t_generation = s_generation;
         try
         {
-            s_handle = Addressables.LoadAssetsAsync<GameObject>("UIPrefab", Register);
-            await s_handle.ToUniTask();
-            if (s_handle.Status != AsyncOperationStatus.Succeeded)
+            AsyncOperationHandle<IList<GameObject>> t_handle =
+                Addressables.LoadAssetsAsync<GameObject>("UIPrefab", _prefab => Register(t_generation, _prefab));
+            s_handle = t_handle;
+
+            await t_handle.ToUniTask();
+            if (t_generation != s_generation) return;
+
+            if (t_handle.Status != AsyncOperationStatus.Succeeded)
                 throw new InvalidOperationException("UIPrefab Addressables load failed.");
 
             s_complete = true;
@@ -60,6 +80,8 @@ public static class UiPrefabCache
         }
         catch (Exception t_exception)
         {
+            if (t_generation != s_generation) return;
+
             s_failed = true;
             Debug.LogException(t_exception);
         }
@@ -77,6 +99,13 @@ public static class UiPrefabCache
     {
         _prefab = null;
         return _type != null && s_prefabs.TryGetValue(_type, out _prefab) && _prefab != null;
+    }
+
+    static void Register(int _generation, GameObject _prefab)
+    {
+        if (_generation != s_generation) return;
+
+        Register(_prefab);
     }
 
     // 라벨에 걸린 프리팹 중 풀 UI·상시 오버레이만 타입 키로 색인한다.

@@ -22,14 +22,14 @@ public static class CurrencyManager
     public static bool CanAfford(ECurrencyType _type, long _cost) => s_currencies[(int)_type] >= _cost;
 
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출 — 세이브를 메모리에 캐싱한다.
-    // _freshAccount는 "원격 문서가 없는 신규 계정"이다. 오프라인 폴백 세션은 false로 들어온다.
-    public static void Init(bool _freshAccount)
+    public static void Init()
     {
         var t_data = DataSaveManager.Data.Currency;
 
-        // 잔액 맵이 비어 있는 세이브도 첫실행으로 본다 — 튜토리얼 되감기가 슬롯을 갈아 끼웠거나
+        // 잔액 맵이 빈 세이브를 첫실행으로 본다 — 튜토리얼 되감기가 슬롯을 갈아 끼웠거나
         // 콘솔에서 currency 맵을 통째로 지운 문서가 여기 걸린다. Normalize가 0을 채우기 전에 판정해야 한다.
-        bool t_firstRun = _freshAccount || t_data.Balances == null || t_data.Balances.Count == 0;
+        // 신규 계정은 서버가 이미 골드를 넣어 오므로 이 갈래에 걸리지 않는다.
+        bool t_firstRun = t_data.Balances == null || t_data.Balances.Count == 0;
         t_data.Normalize();
 
         if (t_firstRun) t_data.Balances[KeyOf(ECurrencyType.Gold)] = STARTING_GOLD;

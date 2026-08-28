@@ -53,7 +53,7 @@ public class GameManager : MonoBehaviour
     }
 
     // 종료 콜백에는 await 창이 없어 이 킥의 Firestore 트랜잭션은 착지하지 못한다.
-    // 실질 복구선은 FlushLocal()이 남긴 로컬 캐시와, 다음 부트의 AdoptUnsyncedCache다.
+    // 로컬 캐시가 없어 복구선도 없다 — 미업로드분은 여기서 유실된다.
     void OnApplicationQuit()
     {
         FlushLocal();
@@ -77,37 +77,30 @@ public class GameManager : MonoBehaviour
         // 저장된 흔들림 설정 복원(미저장이면 켬). 전투가 열리기 전에 확정돼 있어야 한다.
         SetScreenShake(LocalPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
 
-        // 세이브의 진실원은 클라우드 문서다 — 여기서는 캐시 매체만 꽂고, 채택은 PlayerSaveCloud가 비동기로 한다.
         ContentProfileConfig t_profile = ContentProfileConfig.Active;
-        // 같은 PC의 두 클라이언트가 세이브 폴더를 공유하지 않게 개발 스코프를 붙인다(라이브에서는 무변화).
-        DataSaveManager.SetRepository(new JsonFileRepository(DevAccountScope.Folder(t_profile.SaveFolder)));
 
         try
         {
+            // 에뮬레이터 설정을 한 번만 읽어 세 백엔드에 같은 값을 흘린다 — 창구가 갈리면 함수만 로컬로 가는 상태가 재발한다.
+            FirebaseEmulatorConfig t_emulators = t_profile.FirebaseEmulators;
+
+            // 켜기로 저작했는데 주소가 틀렸다면 끈 것이 아니라 못 켠 것이다 — 폴백으로 넘기면
+            // 에뮬레이터를 켠 줄 알고 프로덕션 문서에 진짜 쓰기가 나간다.
+            if (t_emulators.IsMisconfigured)
+                throw new System.InvalidOperationException(
+                    "Firebase 에뮬레이터 설정이 잘못됐습니다: " + t_emulators.Error);
+
+            // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 부트 시점부터 산다.
+            FirebaseManager.Register(new CallableFirebaseModule(t_emulators.FunctionsOrigin));
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
             FirebaseManager.Register(new MatchResultFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);
-            FirebaseManager.Initialize(t_profile.CloudEnvId);
+            FirebaseManager.Initialize(t_profile.CloudEnvId, t_emulators);
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"[GameManager] FirebaseManager.Initialize failed: {ex.Message}\n{ex.StackTrace}");
-            GameInitialization.MarkRecoveryRequired();
-        }
-    }
-
-    /// <summary>부트가 복구 화면에서 멈췄을 때 Firebase를 처음부터 다시 태운다(씬 재로드 없음).</summary>
-    // 여기에 두는 이유는 envId다 — 콘텐츠 프로필을 아는 곳이 이 클래스뿐이라, UI가 프로필을 직접 읽지 않게 한다.
-    public static void RetryInitialize()
-    {
-        try
-        {
-            FirebaseManager.Reinitialize(ContentProfileConfig.Active.CloudEnvId);
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[GameManager] FirebaseManager.Reinitialize failed: {ex.Message}\n{ex.StackTrace}");
             GameInitialization.MarkRecoveryRequired();
         }
     }
@@ -145,7 +138,7 @@ public class GameManager : MonoBehaviour
     }
 
     // 게이트가 아니라 매니저 설치 여부로 판정한다 — 세션 중 복구 요구가 뜨면 IsReady가 false로 떨어지는데,
-    // 그때 잔액 flush까지 멈추면 이미 번 재화가 로컬 캐시에도 안 남는다.
+    // 그때 잔액 flush까지 멈추면 이미 번 재화가 업로드 대기열에도 못 들어간다.
     void FlushLocal()
     {
         if (SaveDependentManagersStep.IsInstalled)

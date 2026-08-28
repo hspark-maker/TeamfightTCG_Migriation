@@ -80,6 +80,9 @@ public class OutgameDebugOverlay : MonoBehaviour
     // 패널이 화면보다 길어졌을 때의 스크롤 위치.
     Vector2 m_scroll;
 
+    // 이번 실행이 붙은 Firebase 백엔드 표시. 첫 그리기에서 한 번만 해석한다.
+    string m_backendLabel;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Initialize()
     {
@@ -145,6 +148,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
         if (GUILayout.Button("TOURNAMENT NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentTournamentNode();
 
+        DrawServerProbes();
         DrawRarityPackControls();
         DrawCurrencyGrants();
         DrawTierControls();
@@ -168,19 +172,40 @@ public class OutgameDebugOverlay : MonoBehaviour
         OutgameDebugActions.OpenRarityTestPack(t_grade);
     }
 
-    // 티어는 AI 카드 레벨의 입력이라 난이도 확인용으로 위아래 이동을 같이 둔다.
+    // 티어 이동(디버그). 표시·보상 확인용이다.
     void DrawTierControls()
     {
         RankInfo t_info = RankManager.GetInfo();
 
         string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
-        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}  (AI {GrowthStar.Label(RankManager.AiCardLevel)})");
+        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}");
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
         if (GUILayout.Button("TIER +", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RaiseTier();
         if (GUILayout.Button("PROMO", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.JumpToPromoStandby();
         if (GUILayout.Button("RESET", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.ResetTier();
+        GUILayout.EndHorizontal();
+    }
+
+    // 서버 왕복 판정용. 어느 백엔드를 상대로 성공했는지 화면에서 같이 읽히지 않으면 왕복 결과를 해석할 수 없다.
+    void DrawServerProbes()
+    {
+        // 백엔드 판정은 한 번만 — 주소가 잘못 저작돼 있으면 해석기가 에러를 뱉는데 OnGUI에서 매 프레임 부르면 콘솔이 잠긴다.
+        if (m_backendLabel == null)
+            m_backendLabel = ContentProfileConfig.Active.FirebaseEmulators.IsEnabled ? "EMU" : "LIVE";
+
+        string t_uid = FirebaseAuthService.Instance.UserId;
+        if (string.IsNullOrEmpty(t_uid)) t_uid = "-";
+        else if (t_uid.Length > 10) t_uid = t_uid.Substring(0, 10);
+
+        GUILayout.Label($"CLOUD {m_backendLabel} / {PlayerSaveCloud.State} / rev {PlayerSaveCloud.Revision}");
+        GUILayout.Label($"UID {t_uid} / {FirebaseAuthService.Instance.State}");
+
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("PING",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.PingServer();
+        if (GUILayout.Button("BUMP",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.BumpServerRevision();
+        if (GUILayout.Button("DENY?", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ProbeRuleDenials();
         GUILayout.EndHorizontal();
     }
 

@@ -2,6 +2,9 @@
   IL2CPP 스트리핑 방어. stripEngineCode가 켜져 있어 [FirestoreProperty] 접근자가
   리플렉션으로만 호출되는 세이브 도메인은 코드 참조가 없는 것으로 보여 잘려 나갈 수 있다.
   세이브 도메인 클래스를 추가하면 여기에도 넣어야 한다 — 빠지면 에디터는 통과하고 기기에서만 값이 빈다.
+  기준은 폴더가 아니라 "Newtonsoft·Firestore가 리플렉션으로만 읽는 타입"이다 —
+  세이브 슬롯(2.Domain)뿐 아니라 callable 응답 DTO(4.Cloud/ServerCommandResult)도 여기 들어온다.
+  슬롯이나 응답 필드를 늘렸다면 그 타입이 이 목록에 있는지 먼저 확인한다.
 -->
 <linker>
   <assembly fullname="Assembly-CSharp">
@@ -18,7 +21,9 @@
     <type fullname="TournamentSaveData" preserve="all"/>
     <type fullname="TutorialSaveData" preserve="all"/>
     <type fullname="ProfileSaveData" preserve="all"/>
-    <type fullname="PlayerSaveCacheEnvelope" preserve="all"/>
+    <type fullname="ServerSlotPatch" preserve="all"/>
+    <type fullname="ServerCommandResult" preserve="all"/>
+    <type fullname="PingResult" preserve="all"/>
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>
 </linker>

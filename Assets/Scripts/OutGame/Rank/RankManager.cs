@@ -49,23 +49,6 @@ public static class RankManager
     // 현재 티어의 등급. 등급만 필요한 호출부가 GetInfo() 체인을 늘어놓지 않게 하는 단일 창구.
     public static ERankGrade CurrentGrade => GetInfo().Grade;
 
-    /// <summary>현재 티어의 AI 카드 레벨. **티어 기준값이지 실제 카드 레벨이 아니다**(카드별 값은 <see cref="AiCardLevelOf"/>).
-    /// 난이도 축의 유일한 조회 지점 — 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
-    public static int AiCardLevel => Config.AiCardLevelAt(TierIndex);
-
-    /// <summary>현재 티어에서 카드 _card 한 장이 쓸 AI 레벨. 티어 기준 레벨 주변으로 카드마다 흩어지되,
-    /// 강화 곡선 만렙을 넘지 않는다(넘으면 곡선에 없는 레벨이라 보너스가 멈춘 것처럼 보인다).</summary>
-    public static int AiCardLevelOf(int _cardId)
-    {
-        int t_base  = Config.AiCardLevelAt(TierIndex);
-        int t_level = _cardId <= 0
-            ? t_base
-            : KeepUnlocks(_cardId, Config.AiCardLevelForCard(TierIndex, _cardId), t_base);
-
-        int t_max = CardGrowthManager.MaxLevel;
-        return t_max > 0 && t_level > t_max ? t_max : t_level;
-    }
-
     /// <summary>티어 스냅샷 하나를 얻는다. 설정(RankConfig)을 밖으로 내보내지 않으면서
     /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
     public static bool TryGetTier(int _index, out RankTier _tier) => Config.TryGetTier(_index, out _tier);
@@ -353,23 +336,6 @@ public static class RankManager
     // _points가 승급전 대기선(다음 등급 진입선 - 1)인가. 최고 등급은 천장이 long.MaxValue라 늘 false.
     static bool PromoPendingAt(long _points)
         => _points >= Config.FirstTierPoints && _points == Config.GradeCeilingPoints(_points) - 1;
-
-    /// <summary>하향 편차는 체력만 깎는다 — 기준 레벨이 이미 연 시너지·키워드를 도로 잠그면 카드 정체성이 사라진다
-    /// (시너지가 꺼진 카드는 집계에서 빠져 3장 요구 시너지가 성립조차 못 한다). 해금이 기준과 같아지는 가장 낮은 레벨까지만 내린다.</summary>
-    static int KeepUnlocks(int _cardId, int _level, int _base)
-    {
-        if (_level >= _base) return _level;
-
-        bool        t_synergy  = GrowthRules.SynergyUnlockedAt(_base);
-        CardKeyword t_keywords = GrowthRules.UnlockedKeywordsAt(_cardId, _base);
-
-        for (int t_lv = _level; t_lv < _base; t_lv++)
-        {
-            if (GrowthRules.SynergyUnlockedAt(t_lv) == t_synergy && GrowthRules.UnlockedKeywordsAt(_cardId, t_lv) == t_keywords)
-                return t_lv;
-        }
-        return _base;
-    }
 
     static void Save()
     {

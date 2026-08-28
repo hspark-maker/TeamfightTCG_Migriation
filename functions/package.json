@@ -3,13 +3,14 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
-    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js",
+    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-growth.js && node scripts/test-open-pack.js",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test:emulator": "npm run build && firebase emulators:exec --only firestore \"node scripts/test-ensure-account.js\""
   },
   "engines": {
     "node": "24"

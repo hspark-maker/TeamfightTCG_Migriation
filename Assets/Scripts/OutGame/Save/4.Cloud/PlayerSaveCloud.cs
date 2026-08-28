@@ -9,11 +9,10 @@ using UnityEngine;
 // 채택은 초기화당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
 static class PlayerSaveCloud
 {
-    // 저장 위치는 LocalPrefs가 개발 스코프별로 갈라 준다 — 키 자체는 전 인스턴스 공통이다.
-    const string OWNER_UID_KEY = "firebase.playerSave.ownerUid";
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    const string TEST_DISABLED_KEY = "firebase.playerSave.testDisabled";
+#endif
     const int UPLOAD_DEBOUNCE_MS = 1000;
-    const int READ_ATTEMPT_COUNT = 3;
-    const int READ_BACKOFF_MS = 500;
     const int DOCUMENT_WARNING_BYTES = 256 * 1024;
     const int DOCUMENT_MAX_BYTES = 300000;
     const int BANNER_FAILURE_THRESHOLD = 3;
@@ -21,18 +20,22 @@ static class PlayerSaveCloud
     static FirebaseContext s_context;
     static string s_envId = string.Empty;
     static string s_activeUserId = string.Empty;
-    static string s_ownerUid = string.Empty;
     static string s_uploadedSnapshot = string.Empty;
     static UniTaskCompletionSource s_uploadCompletion;
     static int s_dirtySerial;
     static int s_uploadedSerial;
     static int s_pendingVersion;
     static int s_generation;
+    static int s_serverCommandDepth;
+    static int s_suspendBaselineSerial;
+    static int s_serverCommandGeneration;
     static bool s_initialized;
-    static bool s_hasCacheAtBoot;
     static bool s_uploading;
     static bool s_gateComplete;
     static bool s_uploadApproved;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    static bool s_disabledForTestAccountSession;
+#endif
 
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
     internal static string LastError { get; private set; } = string.Empty;
@@ -41,7 +44,7 @@ static class PlayerSaveCloud
     // — 실패 3회째 전이, 성공 시 리셋, Blocked 모달의 정확히 1회 오픈.
     internal static event Action OnStateChanged;
 
-    // 카운터가 배너가 아니라 여기 있는 이유: 오프라인 부트는 업로드를 한 번도 시도하지 않고 Offline이 된다
+    // 카운터가 배너가 아니라 여기 있는 이유: 인증이 끊긴 업로드는 요청을 띄우지도 못하고 Offline이 된다
     // — "시도했으나 실패"와 "애초에 못 올림"을 가릴 수 있는 건 UploadAsync 내부뿐이다.
     internal static int ConsecutiveUploadFailures { get; private set; }
 
@@ -51,15 +54,35 @@ static class PlayerSaveCloud
     // 부트 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
     internal static bool IsGateComplete => s_gateComplete;
 
-    // 원격 문서가 없어 이번 세션이 첫 문서를 만든다. 스타터 지급의 유일한 근거다.
-    internal static bool IsFreshAccount { get; private set; }
 
     internal static long Revision { get; private set; }
+
+    // LastError는 서버 원문이라 유저에게 못 보여 준다 — 재시작 모달이 문구를 고르려면 분류된 값이 따로 필요하다.
+    internal static ECloudBlockReason BlockReason { get; private set; } = ECloudBlockReason.None;
+
+    // 부트 게이트를 통과했고, 문서를 쓸 수 있는 상태다. Failed/Blocked/Loading에서 서버를 부르면
+    // 응답의 revision을 채택할 기준선 자체가 없다.
+    internal static bool CanRunServerCommand =>
+        s_gateComplete &&
+        (State == EPlayerSaveCloudState.Ready ||
+         State == EPlayerSaveCloudState.Offline ||
+         State == EPlayerSaveCloudState.Uploading);
 
     internal static void Initialize(in FirebaseContext _context)
     {
         if (!_context.IsValid) throw new ArgumentException("FirebaseContext is not initialized.", nameof(_context));
         Shutdown();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (IsTestAccountSessionDisabled())
+        {
+            // 채택할 것이 없다 — 로컬 캐시는 R2 에서 사라졌고 원격은 일부러 끄는 중이다.
+            // 세이브 없이 기본값으로 진행한다(멀티 테스트 세션 전용).
+            State = EPlayerSaveCloudState.Disabled;
+            s_gateComplete = true;
+            return;
+        }
+#endif
 
         s_context = _context;
         s_envId = _context.EnvId;
@@ -67,14 +90,13 @@ static class PlayerSaveCloud
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
         s_uploadedSnapshot = string.Empty;
-        IsFreshAccount = false;
         Revision = 0;
         LastError = string.Empty;
+        BlockReason = ECloudBlockReason.None;
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Loading);
 
         PlayerSaveDocument.CacheDeviceInfo();
-        s_ownerUid = LocalPrefs.GetString(OWNER_UID_KEY, string.Empty);
 
         DataSaveManager.SetImmediateUploadHandler(RequestImmediateUpload);
         DataSaveManager.OnSaved += MarkDirty;
@@ -83,7 +105,7 @@ static class PlayerSaveCloud
         LoadAsync(s_generation).Forget();
     }
 
-    /// <summary>로컬 저장이 일어났다 — 업로드를 디바운스 예약한다.</summary>
+    /// <summary>메모리 세이브가 바뀌었다 — 업로드를 디바운스 예약한다.</summary>
     internal static void MarkDirty()
     {
         if (!s_initialized) return;
@@ -117,7 +139,127 @@ static class PlayerSaveCloud
         await UploadAsync(s_generation);
     }
 
-    /// <summary>복귀 시 재시도. 오프라인 세션이라도 업로드만 다시 시도한다 — 재-pull은 하지 않는다.</summary>
+    /// <summary>서버 호출이 끝날 때까지 업로드를 봉인한다. 진행 중이던 업로드는 끝날 때까지 기다린다.</summary>
+    internal static async UniTask SuspendUploadsAsync()
+    {
+        // 봉인이 await보다 먼저다 — 뒤집으면 기다리는 사이 디바운스 타이머가 새 업로드를 띄우고,
+        // 그 업로드가 올린 revision을 서버가 모른 채 응답을 만들어 다음 트랜잭션이 충돌한다.
+        s_serverCommandDepth++;
+        s_serverCommandGeneration = s_generation;
+
+        UniTaskCompletionSource t_inFlight = s_uploadCompletion;
+        if (t_inFlight != null) await t_inFlight.Task;
+
+        s_suspendBaselineSerial = s_dirtySerial;
+    }
+
+    /// <summary>서버가 쓴 문서를 채택한다 — 슬롯을 갈아끼우고 revision과 업로드 기준선을 맞춘다.</summary>
+    internal static void AdoptServerResult(long _revision, ServerSlotPatch _updatedSlots)
+    {
+        // 통화 도중 Shutdown → Initialize가 끼면 여기 기준선은 남의 세션 것이다. 채택도 성공 반환도 하지 않는다.
+        if (!s_initialized || s_serverCommandGeneration != s_generation)
+            throw new ServerAdoptionException("The save session was replaced while the server command was in flight.");
+
+        // 서버 계약: callable 하나당 문서 쓰기는 정확히 1회다. 어긋났다면 우리가 모르는 쓰기가 끼어든 것이라
+        // 로컬 세이브를 원격과 맞출 방법이 없다.
+        if (_revision != Revision + 1)
+        {
+            string t_message = $"Server revision {_revision} does not follow the local revision {Revision}.";
+            BlockSession(ECloudBlockReason.RemoteAhead, t_message);
+
+            // 예외로 끊지 않으면 세션은 죽었는데 호출한 도메인은 응답을 성공으로 받아 보상 지급을 이어간다.
+            throw new ServerAdoptionException(t_message);
+        }
+
+        DataSaveManager.AdoptServerSlots(_updatedSlots);
+        Revision = _revision;
+
+        // 이 창구가 세운 Offline은 성공 업로드로만 풀렸다 — 호출 뒤 로컬 변경이 없으면 업로드가 예약되지 않아
+        // 배너가 세션 끝까지 남았다. 단, 못 올린 변경이 남아 있으면 "동기화됨"이 아니다 — 판정은 업로드에 맡긴다.
+        if (State == EPlayerSaveCloudState.Offline && s_dirtySerial == s_uploadedSerial)
+        {
+            LastError = string.Empty;
+            SetUploadFailures(0);
+            SetState(EPlayerSaveCloudState.Ready);
+        }
+
+        // 재기준화는 "로컬 = 마지막 업로드 = 방금 서버가 쓴 문서"일 때만 성립한다. baseline 비교만으로는 못 거른다 —
+        // 통화 중 변경이 없으면 dirty == baseline이 항상 참이라, 아직 못 올린 변경이 "서버에 있다"고 기록되고
+        // 서버 트랜잭션은 updatedSlots만 쓰므로 그 변경분이 영구 유실된다.
+        if (s_dirtySerial == s_uploadedSerial && s_dirtySerial == s_suspendBaselineSerial)
+        {
+            s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
+            s_uploadedSerial = s_dirtySerial;
+        }
+        else
+        {
+            // 통화 중 로컬이 움직였거나 못 올린 변경이 남아 있다 → 서버 문서 내용을 복원할 수 없으니 업로드 1회를 강제해 맞춘다.
+            // 여기서 스냅샷을 찍으면 그 변경분이 "서버에 이미 있다"고 거짓 기록되어 영원히 안 올라간다.
+            MarkUploadPending();
+        }
+    }
+
+    /// <summary>서버 호출이 끝났다 — 봉인을 풀고 밀린 변경분이 있으면 업로드를 예약한다.</summary>
+    internal static void ResumeUploads()
+    {
+        if (s_serverCommandDepth > 0) s_serverCommandDepth--;
+        if (s_serverCommandDepth != 0) return;
+        if (!s_initialized || !s_uploadApproved) return;
+        if (s_serverCommandGeneration != s_generation) return;
+        if (s_dirtySerial == s_uploadedSerial) return;
+
+        ScheduleUpload();
+    }
+
+    /// <summary>서버 호출 실패를 클라우드 상태에 반영하고 판정한 갈래를 돌려준다.
+    /// 도메인이 거절당한 것(세션은 산다)과 세션이 못 쓰게 된 것을 여기서 가른다.</summary>
+    internal static ECloudFailureKind ReportServerCommandFailure(Exception _exception)
+    {
+        ECloudFailureKind t_kind = CloudFailureClassifier.Classify(_exception);
+        if (_exception == null) return t_kind;
+        if (!s_initialized || s_serverCommandGeneration != s_generation) return t_kind;
+
+        string t_message =
+            $"Server command failed [{CloudFailureClassifier.Describe(_exception)}]: " +
+            _exception.GetBaseException().Message;
+
+        switch (t_kind)
+        {
+            // 도메인 거절의 표면은 세션이 아니라 예외를 되받는 호출한 도메인이다(ServerCommandRejectedException).
+            case ECloudFailureKind.Rejected:
+                Debug.LogWarning($"[PlayerSaveCloud] {t_message}");
+                return t_kind;
+
+            // 미배포·리전 오타·인증 붕괴·스키마 드리프트·직렬화 오류. 다음 명령도 같은 답이라 표면 없이 두면 아무 일도 안 일어난다.
+            case ECloudFailureKind.Unusable:
+                BlockSession(ECloudBlockReason.SessionUnusable, t_message);
+                return t_kind;
+
+            // 요청이 닿아 문서가 이미 바뀌었는데 응답만 못 받았을 수 있다 — 로컬이 서버보다 뒤처졌을 위험이 있다.
+            default:
+                LastError = t_message;
+                SetUploadFailures(ConsecutiveUploadFailures + 1);
+                SetState(EPlayerSaveCloudState.Offline);
+                LogTransient(t_message, _exception);
+                return t_kind;
+        }
+    }
+
+    /// <summary>복구 화면의 재시도. 채택이 실패로 끝난 경우에만 인증·원격 읽기를 다시 태운다.</summary>
+    internal static void ResetForRetry()
+    {
+        if (!s_initialized || State != EPlayerSaveCloudState.Failed) return;
+
+        // Initialize를 다시 부르지 않는다 — 훅·구독이 살아 있어 재배선하면 이중으로 걸린다.
+        s_generation++;
+        s_gateComplete = false;
+        LastError = string.Empty;
+        SetState(EPlayerSaveCloudState.Loading);
+
+        LoadAsync(s_generation).Forget();
+    }
+
+    /// <summary>복귀 시 재시도. 못 올린 변경분만 다시 태운다 — 재-pull은 하지 않는다.</summary>
     internal static void RetryPending()
     {
         if (!s_initialized || !s_uploadApproved) return;
@@ -135,15 +277,15 @@ static class PlayerSaveCloud
         s_generation++;
         s_pendingVersion++;
         s_initialized = false;
-        s_hasCacheAtBoot = false;
         s_uploading = false;
         s_gateComplete = false;
         s_uploadApproved = false;
+        s_serverCommandDepth = 0;
+        s_suspendBaselineSerial = 0;
+        s_serverCommandGeneration = 0;
         s_activeUserId = string.Empty;
-        s_ownerUid = string.Empty;
         s_envId = string.Empty;
         s_context = default;
-        IsFreshAccount = false;
         Revision = 0;
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Disabled);
@@ -190,18 +332,32 @@ static class PlayerSaveCloud
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    /// <summary>계정을 갈아타기 직전에 부른다 — 로컬 캐시와 소유자 표식을 버려 새 UID가 빈 기기에서 시작하게 한다.
-    /// 예전에는 여기서 클라우드 세이브를 통째로 껐는데, 그러면 그 세션은 원격 문서를 못 만들어
-    /// 서버 덱 검증(lockDeck)이 통과할 수 없다 — 테스트 경로가 프로덕션과 갈리지 않게 캐시만 버린다.</summary>
-    internal static void ResetForAccountSwitch()
+    internal static bool IsTestAccountModeActive => IsTestAccountSessionDisabled();
+
+    static bool IsTestAccountSessionDisabled()
     {
-        Shutdown();
-        DataSaveManager.ClearLocalCache();
-        LocalPrefs.DeleteKey(OWNER_UID_KEY);
-        LocalPrefs.Save();
-        s_ownerUid = string.Empty;
-        s_hasCacheAtBoot = false;
+        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test) return false;
+        return s_disabledForTestAccountSession || PlayerPrefs.GetInt(TEST_DISABLED_KEY, 0) == 1;
     }
+
+    internal static void DisableForTestAccountSession()
+    {
+        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
+            throw new InvalidOperationException("Test save cloud can only be disabled in Test run mode.");
+        s_disabledForTestAccountSession = true;
+        PlayerPrefs.SetInt(TEST_DISABLED_KEY, 1);
+        PlayerPrefs.Save();
+    }
+
+    internal static void ClearTestAccountSession()
+    {
+        s_disabledForTestAccountSession = false;
+        PlayerPrefs.DeleteKey(TEST_DISABLED_KEY);
+        PlayerPrefs.Save();
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetTestRuntimeState() => s_disabledForTestAccountSession = false;
 #endif
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
@@ -221,8 +377,12 @@ static class PlayerSaveCloud
 
     static async UniTask LoadCoreAsync(int _generation)
     {
-        // 캐시는 원격보다 먼저 읽는다 — 못 올린 잔여 변경분이 남아 있는지 원격과 대조해야 하기 때문이다.
-        s_hasCacheAtBoot = DataSaveManager.TryLoadCache(out UserSaveData t_cacheData, out long t_cacheRevision);
+        // 망이 끊긴 게 확실하면 auth 5초를 태울 이유가 없다 — 기다려도 답은 정해져 있다.
+        if (Application.internetReachability == NetworkReachability.NotReachable)
+        {
+            Fail("Network is unreachable.");
+            return;
+        }
 
         string t_userId;
         try
@@ -232,57 +392,66 @@ static class PlayerSaveCloud
         catch (Exception t_exception)
         {
             if (_generation != s_generation) return;
-            FallbackToCache(
-                $"authentication failed ({t_exception.GetBaseException().Message})",
-                t_cacheData,
-                t_cacheRevision);
+            Fail($"Firebase authentication failed ({t_exception.GetBaseException().Message}).");
             return;
         }
 
         if (_generation != s_generation) return;
         if (string.IsNullOrEmpty(t_userId))
         {
-            FallbackToCache("authentication unavailable", t_cacheData, t_cacheRevision);
-            return;
-        }
-
-        if (IsCacheOwnedByOther(t_userId))
-        {
-            Fail("Local cache belongs to a different Firebase UID.");
+            Fail("Firebase authentication is unavailable.");
             return;
         }
 
         DocumentSnapshot t_document;
         try
         {
-            t_document = await ReadWithRetryAsync(_generation, t_userId);
+            t_document = await ReadAsync(_generation, t_userId);
         }
         catch (Exception t_exception)
         {
             if (_generation != s_generation) return;
-            FallbackToCache(
-                $"remote read failed ({t_exception.GetBaseException().Message})",
-                t_cacheData,
-                t_cacheRevision);
+            Fail($"Remote save read failed ({t_exception.GetBaseException().Message}).");
             return;
         }
 
         if (_generation != s_generation) return;
         if (t_document == null)
         {
-            FallbackToCache("remote read was cancelled", t_cacheData, t_cacheRevision);
+            Fail("Remote save read was cancelled.");
             return;
         }
 
         if (!t_document.Exists)
         {
-            AdoptFreshAccount(t_userId);
-            return;
+            // 문서 생성은 서버만 한다(firestore.rules의 allow create: if false). 스타터 지급도 거기서 난다.
+            if (!await TryEnsureAccountAsync(_generation)) return;
+
+            try
+            {
+                t_document = await ReadAsync(_generation, t_userId);
+            }
+            catch (Exception t_exception)
+            {
+                if (_generation != s_generation) return;
+                Fail($"Save read after account creation failed ({t_exception.GetBaseException().Message}).");
+                return;
+            }
+
+            if (_generation != s_generation) return;
+
+            // 재귀하지 않는다 — 서버가 만들었다고 답했는데 없으면 우리가 모르는 일이 벌어진 것이다.
+            if (t_document == null || !t_document.Exists)
+            {
+                Fail("Account creation reported success but the save document is still missing.");
+                return;
+            }
         }
 
         if (!PlayerSaveDocument.TryReadMeta(t_document, out long t_schemaVersion, out long t_revision))
         {
-            Fail("Remote save metadata is missing or has a broken type.");
+            Fail("Remote save metadata is missing or has a broken type. " +
+                 $"[{PlayerSaveDocument.DescribeMeta(t_document)}]");
             return;
         }
 
@@ -298,6 +467,7 @@ static class PlayerSaveCloud
 
         if (t_schemaVersion < UserSaveData.VERSION)
         {
+            // 승급 코드가 없어 변환 대신 Fail이다. UserSaveData.VERSION이 동결인 한 이 갈래는 서지 않는다.
             Fail($"Remote schema v{t_schemaVersion} is older than client v{UserSaveData.VERSION}.");
             return;
         }
@@ -315,7 +485,7 @@ static class PlayerSaveCloud
         }
         catch (Exception t_exception)
         {
-            // 읽기는 됐는데 내용이 깨진 것이다 — 캐시로 되돌리면 사람이 고치던 문서를 덮는다. 폴백 금지.
+            // 읽기는 됐는데 내용이 깨진 것이다 — 빈 세이브로 이어 가면 사람이 고치던 문서를 다음 업로드가 덮는다.
             Fail($"Remote save could not be converted ({t_exception.GetBaseException().Message}).");
             return;
         }
@@ -326,73 +496,53 @@ static class PlayerSaveCloud
             return;
         }
 
-        // 같은 revision 위에서 저장했는데 못 올린 변경분이 캐시에 남아 있다 — 원격으로 덮으면 영구 소실이다.
-        // revision이 다르면 다른 기기가 그 뒤에 썼다는 뜻이라 원격이 이긴다.
-        if (t_cacheData != null &&
-            t_cacheRevision == t_revision &&
-            DataSaveManager.SnapshotOf(t_cacheData) != DataSaveManager.SnapshotOf(t_remote))
-        {
-            AdoptUnsyncedCache(t_userId, t_cacheData, t_cacheRevision);
-            return;
-        }
-
         AdoptRemote(t_userId, t_remote, t_revision);
     }
 
     static void AdoptRemote(string _userId, UserSaveData _data, long _revision)
     {
-        IsFreshAccount = false;
         Revision = _revision;
-        DataSaveManager.AdoptRemote(_data, _revision);
+        DataSaveManager.AdoptRemote(_data);
         s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
         s_uploadedSerial = s_dirtySerial;
-        CompleteAdoption(_userId, EPlayerSaveCloudState.Ready);
+        CompleteAdoption(_userId);
         Debug.Log($"[PlayerSaveCloud] Adopted the remote save. env={s_envId}, revision={_revision}");
     }
 
-    static void AdoptUnsyncedCache(string _userId, UserSaveData _data, long _revision)
+    // 원격 문서가 없을 때 서버에게 만들어 달라고 한다. 실패하면 여기서 Fail까지 마치고 false를 준다.
+    static async UniTask<bool> TryEnsureAccountAsync(int _generation)
     {
-        IsFreshAccount = false;
-        Revision = _revision;
-        DataSaveManager.AdoptRemote(_data, _revision);
-        MarkUploadPending();
-        CompleteAdoption(_userId, EPlayerSaveCloudState.Ready);
-        RequestImmediateUpload();
-        Debug.LogWarning(
-            "[PlayerSaveCloud] Local cache holds changes that never reached the cloud. " +
-            $"Adopted the cache and re-uploading. env={s_envId}, revision={_revision}");
-    }
-
-    static void AdoptFreshAccount(string _userId)
-    {
-        IsFreshAccount = true;
-        Revision = 0;
-        DataSaveManager.AdoptRemote(new UserSaveData(), 0);
-        MarkUploadPending();
-        CompleteAdoption(_userId, EPlayerSaveCloudState.Ready);
-        Debug.Log($"[PlayerSaveCloud] No remote save found. Starting a fresh account. env={s_envId}");
-    }
-
-    static void FallbackToCache(string _reason, UserSaveData _cacheData, long _cacheRevision)
-    {
-        if (_cacheData == null)
+        try
         {
-            Fail($"Remote save is unreachable and there is no usable local cache — {_reason}.");
-            return;
+            EnsureAccountResult t_result = await ServerSaveCommands.InvokeBootAsync<EnsureAccountResult>(
+                "ensureAccount",
+                new
+                {
+                    env = s_envId,
+                    deviceId = PlayerSaveDocument.DeviceId(),
+                    appVersion = PlayerSaveDocument.AppVersion(),
+                });
+
+            if (_generation != s_generation) return false;
+            if (t_result == null)
+            {
+                Fail("Account creation returned nothing.");
+                return false;
+            }
+
+            Debug.Log($"[PlayerSaveCloud] ensureAccount created={t_result.Created} " +
+                      $"revision={t_result.Revision} starter={t_result.StarterSource} env={s_envId}");
+            return true;
         }
+        catch (Exception t_exception)
+        {
+            if (_generation != s_generation) return false;
 
-        // 캐시가 있다는 건 계정이 이미 있다는 뜻이다. 원격을 못 읽었다는 이유로 신규 판정이 나면 스타터가 재지급된다.
-        IsFreshAccount = false;
-        Revision = _cacheRevision;
-        DataSaveManager.AdoptRemote(_cacheData, _cacheRevision);
-
-        // 이 캐시 자체가 아직 원격에 못 올라간 진행분일 수 있다 — 올릴 것이 있는 상태로 세워야 복귀 재시도가 돈다.
-        MarkUploadPending();
-        LastError = _reason;
-        CompleteAdoption(s_activeUserId, EPlayerSaveCloudState.Offline);
-        Debug.LogWarning(
-            $"[PlayerSaveCloud] Offline boot — adopted the local cache. reason={_reason}, revision={_cacheRevision}. " +
-            "Saves from this session are uploaded when the connection returns.");
+            // 분류로 갈래를 두지 않는다 — 부트에는 오프라인 폴백이 없어 Transient든 아니든 결론이 복구 화면 하나다.
+            Fail($"Account creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
+                 t_exception.GetBaseException().Message);
+            return false;
+        }
     }
 
     static void MarkUploadPending()
@@ -401,27 +551,48 @@ static class PlayerSaveCloud
         s_uploadedSerial = s_dirtySerial - 1;
     }
 
-    static void CompleteAdoption(string _userId, EPlayerSaveCloudState _state)
+    static void CompleteAdoption(string _userId)
     {
         s_activeUserId = string.IsNullOrEmpty(_userId) ? string.Empty : _userId;
-        if (!string.IsNullOrEmpty(s_activeUserId))
-        {
-            s_ownerUid = s_activeUserId;
-            LocalPrefs.SetString(OWNER_UID_KEY, s_activeUserId);
-            LocalPrefs.Save();
-        }
-
         s_uploadApproved = true;
         s_gateComplete = true;
-        SetState(_state);
+        SetState(EPlayerSaveCloudState.Ready);
     }
 
-    // 캐시가 없으면 소유권도 없다 — 재설치로 PlayerPrefs만 복원된 기기가 여기 걸리면 안 된다.
-    static bool IsCacheOwnedByOther(string _userId)
+    // 업로드 실패 전용 매핑. Fail/BlockSession이 private이라 분류기는 값만 돌려주고 매핑은 여기서 한다.
+    // 게이트 갈래를 두지 않는 이유: UploadAsync는 s_uploadApproved를 전제하고, 그건 게이트 완료와 함께 선다.
+    static void ApplyUploadFailure(Exception _exception)
     {
-        return s_hasCacheAtBoot &&
-               !string.IsNullOrEmpty(s_ownerUid) &&
-               s_ownerUid != _userId;
+        string t_message =
+            $"Upload failed [{CloudFailureClassifier.Describe(_exception)}]: " +
+            _exception.GetBaseException().Message;
+
+        if (CloudFailureClassifier.Classify(_exception) == ECloudFailureKind.Transient)
+        {
+            LastError = t_message;
+            SetUploadFailures(ConsecutiveUploadFailures + 1);
+            SetState(EPlayerSaveCloudState.Offline);
+            LogTransient(t_message, _exception);
+            return;
+        }
+
+        // 여긴 클라가 문서를 직접 쓰는 경로라 Rejected가 곧 룰 거부다 — callable의 도메인 거절과 성질이 다르다.
+        // 배선 오류(Unusable)와 마찬가지로 다시 태워도 같은 답이니 이 세션의 업로드는 여기서 끝이다.
+        BlockSession(ECloudBlockReason.SessionUnusable, t_message);
+    }
+
+    // Transient 로그 한 곳. 갈래는 그대로 두되 결정적 서버 버그가 "동기화 지연"으로 위장하지 않게 등급을 가른다.
+    static void LogTransient(string _message, Exception _exception)
+    {
+        if (CloudFailureClassifier.IsUnhandledServerFault(_exception))
+        {
+            Debug.LogError(
+                $"[PlayerSaveCloud] {_message} This is most likely an unhandled exception inside the function. " +
+                "Retrying will not fix it — check the function logs.");
+            return;
+        }
+
+        Debug.LogWarning($"[PlayerSaveCloud] {_message}");
     }
 
     // 초기화 게이트를 못 연 채 끝났다 — 로딩 화면이 복구 화면으로 넘어간다.
@@ -437,15 +608,16 @@ static class PlayerSaveCloud
 
     // 게이트를 통과한 뒤라 MarkRecoveryRequired는 화면을 바꾸지 못한 채 IsReady만 떨어뜨렸다 — 그래서 부르지 않는다.
     // 유저 표면은 Blocked를 보고 뜨는 재시작 모달(CloudSyncStatusWatcher)이 맡는다.
-    // 클라우드 업로드만 끊고 로컬 캐시 기록은 살려 둔다 — 진행분이 다음 부트에 복구될 유일한 통로다.
-    static void BlockSession(string _message)
+    // 로컬 복구선이 없으므로 여기서부터의 진행분은 재시작과 함께 버려진다 — 그래서 표면이 재시작을 강제해야 한다.
+    static void BlockSession(ECloudBlockReason _reason, string _message)
     {
         LastError = _message;
+        BlockReason = _reason;
         s_uploadApproved = false;
         SetState(EPlayerSaveCloudState.Blocked);
         Debug.LogError(
             $"[PlayerSaveCloud] {_message} Cloud uploads are stopped for this session; " +
-            "the local cache keeps recording and the next boot recovers it. Restart is required.");
+            "progress made from here is discarded. Restart is required.");
     }
 
     static async UniTask<string> AuthenticateAsync(int _generation)
@@ -464,52 +636,17 @@ static class PlayerSaveCloud
             : string.Empty;
     }
 
-    static async UniTask<DocumentSnapshot> ReadWithRetryAsync(int _generation, string _userId)
+    // 자동 재시도를 두지 않는다 — 재시도의 주체는 복구 화면의 사람이다.
+    static async UniTask<DocumentSnapshot> ReadAsync(int _generation, string _userId)
     {
-        Exception t_lastException = null;
+        Task<DocumentSnapshot> t_readTask = Document(_userId).GetSnapshotAsync(Source.Server);
+        (bool t_hasResult, DocumentSnapshot t_document) = await UniTask.WhenAny(
+            t_readTask.AsUniTask(),
+            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+        if (_generation != s_generation) return null;
+        if (!t_hasResult) throw new TimeoutException("Firestore read timed out.");
 
-        for (int t_attempt = 0; t_attempt < READ_ATTEMPT_COUNT; t_attempt++)
-        {
-            if (t_attempt > 0)
-            {
-                await UniTask.Delay(READ_BACKOFF_MS, DelayType.Realtime);
-                if (_generation != s_generation) return null;
-            }
-
-            try
-            {
-                Task<DocumentSnapshot> t_readTask = Document(_userId).GetSnapshotAsync(Source.Server);
-                (bool t_hasResult, DocumentSnapshot t_document) = await UniTask.WhenAny(
-                    t_readTask.AsUniTask(),
-                    UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
-                if (!t_hasResult)
-                {
-                    t_lastException = new TimeoutException("Firestore read timed out.");
-                    continue;
-                }
-
-                return t_document;
-            }
-            catch (Exception t_exception)
-            {
-                t_lastException = t_exception;
-                if (!IsRetryableRead(t_exception)) break;
-            }
-        }
-
-        throw t_lastException ?? new InvalidOperationException("Firestore read failed.");
-    }
-
-    // 권한·인증 실패는 다시 시도해도 같은 답이라 즉시 캐시 폴백으로 보낸다.
-    static bool IsRetryableRead(Exception _exception)
-    {
-        if (_exception.GetBaseException() is FirestoreException t_firestoreException)
-        {
-            return t_firestoreException.ErrorCode != FirestoreError.PermissionDenied &&
-                   t_firestoreException.ErrorCode != FirestoreError.Unauthenticated;
-        }
-
-        return true;
+        return t_document;
     }
 
     static void ScheduleUpload()
@@ -528,6 +665,8 @@ static class PlayerSaveCloud
 
     static async UniTask UploadAsync(int _generation)
     {
+        // 서버 호출 중에는 문서의 주인이 서버다. dirty는 s_dirtySerial에 그대로 쌓여 ResumeUploads가 태운다.
+        if (s_serverCommandDepth > 0) return;
         if (!s_initialized || !s_uploadApproved || s_uploading) return;
         if (_generation != s_generation) return;
 
@@ -547,9 +686,10 @@ static class PlayerSaveCloud
         int t_bytes = Encoding.UTF8.GetByteCount(t_snapshot);
         if (t_bytes > DOCUMENT_MAX_BYTES)
         {
-            LastError = $"Save document is too large: {t_bytes} bytes.";
-            SetState(EPlayerSaveCloudState.Failed);
-            Debug.LogError($"[PlayerSaveCloud] {LastError}");
+            // 다시 태워도 같은 스냅샷이라 같은 바이트 수다 — Offline 재시도로 두면 표면 없이 영원히 돈다.
+            BlockSession(
+                ECloudBlockReason.DocumentTooLarge,
+                $"Save document is too large: {t_bytes} bytes (limit {DOCUMENT_MAX_BYTES}).");
             return;
         }
 
@@ -582,7 +722,6 @@ static class PlayerSaveCloud
             LastError = string.Empty;
             SetUploadFailures(0);
             SetState(EPlayerSaveCloudState.Ready);
-            DataSaveManager.MarkUploadedRevision(t_newRevision);
             t_uploaded = true;
         }
         catch (Exception t_exception)
@@ -592,14 +731,13 @@ static class PlayerSaveCloud
             if (t_exception.GetBaseException() is RevisionConflictException t_conflict)
             {
                 // 다른 기기가 먼저 썼다. 재시작하면 원격을 다시 채택하므로 이 세션은 여기서 접는다.
-                BlockSession($"Upload rejected: {t_conflict.Message}");
+                BlockSession(ECloudBlockReason.RemoteAhead, $"Upload rejected: {t_conflict.Message}");
                 return;
             }
 
-            LastError = t_exception.GetBaseException().Message;
-            SetUploadFailures(ConsecutiveUploadFailures + 1);
-            SetState(EPlayerSaveCloudState.Offline);
-            Debug.LogWarning($"[PlayerSaveCloud] Upload failed: {LastError}");
+            // 오류 코드를 보지 않고 전부 Offline으로 접으면, 룰이 닫힌 뒤의 PermissionDenied가
+            // "동기화 지연" 배너로 위장한 채 영원히 재시도만 돈다.
+            ApplyUploadFailure(t_exception);
         }
         finally
         {
@@ -622,13 +760,15 @@ static class PlayerSaveCloud
         Task<long> t_transactionTask = Firestore().RunTransactionAsync<long>(async t_transaction =>
         {
             DocumentSnapshot t_snapshot = await t_transaction.GetSnapshotAsync(t_document);
-            long t_currentRevision = 0;
-            if (t_snapshot.Exists)
-            {
-                if (!PlayerSaveDocument.TryReadMeta(t_snapshot, out long t_schemaVersion, out t_currentRevision) ||
-                    t_schemaVersion != UserSaveData.VERSION)
-                    throw new RevisionConflictException("Remote save metadata is not writable by this client.");
-            }
+
+            // 문서 생성은 서버(ensureAccount)만 한다 — 채택을 통과한 세션에서 문서가 사라졌다면
+            // 콘솔에서 지웠거나 계정이 바뀐 것이다. "다른 기기가 먼저 씀"으로 뭉뚱그리면 원인을 잃는다.
+            if (!t_snapshot.Exists)
+                throw new RevisionConflictException("Remote save document no longer exists.");
+
+            if (!PlayerSaveDocument.TryReadMeta(t_snapshot, out long t_schemaVersion, out long t_currentRevision) ||
+                t_schemaVersion != UserSaveData.VERSION)
+                throw new RevisionConflictException("Remote save metadata is not writable by this client.");
 
             if (t_currentRevision != _expectedRevision)
                 throw new RevisionConflictException(
@@ -652,7 +792,7 @@ static class PlayerSaveCloud
         return t_revision;
     }
 
-    // Firebase Auth 콜백의 스레드가 보장되지 않는다 — PlayerPrefs·GameInitialization을 만지기 전에 메인으로 올린다.
+    // Firebase Auth 콜백의 스레드가 보장되지 않는다 — GameInitialization을 만지기 전에 메인으로 올린다.
     static void HandleAuthStateChanged()
     {
         if (!s_initialized) return;
@@ -669,23 +809,10 @@ static class PlayerSaveCloud
             : string.Empty;
         if (string.IsNullOrEmpty(t_userId) || t_userId == s_activeUserId) return;
 
-        // 오프라인 폴백으로 진입한 세션이 뒤늦게 로그인된 경우 — 캐시 주인이 같을 때만 이어 붙인다.
-        if (string.IsNullOrEmpty(s_activeUserId))
-        {
-            if (IsCacheOwnedByOther(t_userId))
-            {
-                BlockSession("Signed in as a different Firebase UID than the local cache owner.");
-                return;
-            }
+        // 채택 전에 오는 통지는 부트 중의 최초 로그인이다 — s_activeUserId는 채택이 세운다.
+        if (string.IsNullOrEmpty(s_activeUserId)) return;
 
-            s_activeUserId = t_userId;
-            s_ownerUid = t_userId;
-            LocalPrefs.SetString(OWNER_UID_KEY, t_userId);
-            LocalPrefs.Save();
-            return;
-        }
-
-        BlockSession("Firebase account changed during the session.");
+        BlockSession(ECloudBlockReason.SessionUnusable, "Firebase account changed during the session.");
     }
 
     static FirebaseFirestore Firestore()
@@ -697,6 +824,50 @@ static class PlayerSaveCloud
     {
         return Firestore().Document(PlayerSaveFirestorePaths.Current(s_envId, _userId));
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>배포된 보안 규칙이 경로 하나의 읽기를 실제로 막는지 잰 결과.</summary>
+    internal readonly struct RuleProbe
+    {
+        /// <summary>규칙이 읽기를 거부했다 — 진단이 기대하는 결과다.</summary>
+        internal bool Denied { get; }
+
+        /// <summary>판정 근거. 거부면 오류 코드, 통과했으면 문서 존재 여부다.</summary>
+        internal string Detail { get; }
+
+        internal RuleProbe(bool _denied, string _detail)
+        {
+            this.Denied = _denied;
+            this.Detail = _detail;
+        }
+    }
+
+    /// <summary>임의 경로를 한 번 읽어 배포된 규칙의 차단 여부를 잰다. 세이브 상태는 건드리지 않는다.</summary>
+    // 캐시에서 답이 나오면 규칙을 거치지 않아 진단이 성립하지 않는다 — Source.Server는 필수다.
+    internal static async UniTask<RuleProbe> ProbeReadDeniedAsync(string _documentPath)
+    {
+        if (!s_context.IsValid) return new RuleProbe(false, "firebase 미초기화");
+
+        try
+        {
+            Task<DocumentSnapshot> t_readTask =
+                Firestore().Document(_documentPath).GetSnapshotAsync(Source.Server);
+            (bool t_hasResult, DocumentSnapshot t_snapshot) = await UniTask.WhenAny(
+                t_readTask.AsUniTask(),
+                UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+
+            if (!t_hasResult) return new RuleProbe(false, "시간 초과");
+
+            return new RuleProbe(false, t_snapshot.Exists ? "문서 있음" : "문서 없음");
+        }
+        catch (Exception t_exception)
+        {
+            bool t_denied = t_exception.GetBaseException() is FirestoreException t_firestore &&
+                            t_firestore.ErrorCode == FirestoreError.PermissionDenied;
+            return new RuleProbe(t_denied, CloudFailureClassifier.Describe(t_exception));
+        }
+    }
+#endif
 
     sealed class RevisionConflictException : Exception
     {

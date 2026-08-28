@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// 자리채움. 실제 검증 대상은 이 파일이 아니라 ../../firestore.rules.prod 이고,
+// rules.test.js 의 initializeTestEnvironment 가 그 파일을 에뮬레이터에 직접 주입한다.
+// firebase-tools 가 프로젝트 디렉터리 밖 경로를 rules 로 받지 않아서 이 파일이 필요하다.
+// 전부 거부로 둔다 — 주입이 실패하면 테스트가 조용히 통과하는 대신 전부 깨지도록.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

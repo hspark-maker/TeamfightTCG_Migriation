@@ -27,6 +27,8 @@ module.exports = {
     "import",
   ],
   rules: {
+    // core.autocrlf=true 라 체크아웃마다 CRLF가 된다 - 줄끝은 판정하지 않는다.
+    "linebreak-style": 0,
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2],
