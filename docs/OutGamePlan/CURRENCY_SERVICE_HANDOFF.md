@@ -83,15 +83,32 @@ C3 왕복은 **통과했다**(2026-08-28). 항목 형태는 C4 이후에도 그�
 
 ## 남은 작업
 
-### C3.5 — 검수 미해결 3건 (심각도 중, **여전히 미해결**)
+### C3.5 — 검수 미해결 3건 ✅ (`c7ab0c290`)
 
-C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로 안에서** 어긋나 있다.
+C3 리뷰가 남긴 것들이다. 셋 다 **이미 서버로 옮긴 수령 경로 안에서** 어긋나 있었다 —
+지급 판정은 서버가 가져갔는데 그 앞뒤의 영속·연출 배관이 옛 로컬 지급 시절 형태로 남아 있었다.
+C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계에 섞지 않고 독립 커밋으로 닫았다. **서버 무변경 · 클라 전용.**
 
-**"C4 앞" 이라고 적어 뒀지만 C4·C5.5·C5.6 이 그냥 지나갔다**(2026-08-28 재확인 — 세 파일 모두 최신 커밋이 C3 시절 그대로다). 세 번 미뤄졌으니 다음 단계에 섞지 말고 **독립 커밋으로 먼저 닫을 것.**
+- `TournamentProgress.MarkRewardPending` 의 디바운스 `DataSaveManager.Save()` → **`SaveImmediate()`**.
+  자격을 재는 쪽이 서버라, 격파 직후 바로 수령하면 낙인이 원격에 없어 `NotEligible` 로 튕겼다
+- `TournamentRewardFlow.Open` 의 폴백(보상 0건·팝업 미배선)이 `ClearNodeAsync` 를 던져 두고 false 를 돌려,
+  호출부가 그 자리에서 부른 `PlayClaimSequence` 가 아직 false 인 `IsCleared` 가드에 걸려 **점등·해금이 통째로 빠졌다**.
+  **`Open` 의 반환값 의미를 "팝업이 떴는가" → "`_onClosed` 가 오는가" 로 바꿨다** — 폴백은 `ClaimThenNotify` 가
+  왕복 뒤에(거절돼도) 콜백을 부르고, false 는 시작조차 못 한 경우(빈 id·이미 클리어)뿐이라 호출부는 `AbortClaimSequence` 로 억제만 푼다
+- **연출 입력이 `granted` 로 갈렸다.** `CurrencyHud` 는 롤업 시작값을 `(최종 잔액 − 지급량)` 으로 **역산**하고,
+  응답 채택은 `await m_onConfirm()` 안에서 이미 끝나 잔액이 최종값이다 — 지급량이 서버와 다르면 시작 숫자가 틀려 눈에 보이게 튄다
 
-- `OutGame/Tournament/TournamentProgress.cs:202` — `MarkRewardPending` 이 디바운스 `DataSaveManager.Save()` 다. 격파 직후 바로 수령하면 낙인이 원격에 아직 없어 서버가 `NotEligible` 로 튕긴다. **`SaveImmediate` 여야 한다**
-- `UI/Tournament/TournamentMapOverlayView.cs:562` — 폴백 경로(보상 0건·팝업 미배선)가 `TournamentRewardFlow.Open` 이 false 를 돌린 그 자리에서 `PlayClaimSequence` 를 부른다. `ClearNodeAsync` 가 비동기가 되면서 그 시점엔 `IsCleared` 가 아직 false 라 `:579` 의 가드가 걸려 **점등·해금 연출이 통째로 빠진다**
-- `OutGame/Reward/ClaimRewardResult.cs:4` — `granted` 를 "무엇이 지급됐는지의 진실원" 이라 주석해 놓고 실제로는 `RewardClaimCommand.cs:28` 의 `Debug.Log` 로만 쓴다. 분출·롤업(`UI/HUD/CurrencyHud.BeginGainRollUp` · `UI/HUD/CurrencyHud.cs:107` 의 클라 잔액 읽기)은 여전히 클라 스펙 캐시를 본다 — **표가 갈리면 숫자가 튄다.** 연출 입력을 `granted` 로 갈아야 한다
+**배관 (수령 4도메인이 공유)** — `RewardClaimCommand.ClaimAsync` 가 `UniTask<bool>` → **`UniTask<RewardClaimOutcome>`**
+(`Succeeded` + `IReadOnlyList<CurrencyGain> Granted`. 변환은 기존 `CurrencyCode.TryParse`, 못 읽는 표기·0 이하는 버린다).
+`RankRewardManager.ClaimAsync` · `AlbumRewardManager.Claim*` · `TournamentProgress.ClearNodeAsync` · `ClaimChapterRewardAsync` 가 그대로 흘리고,
+`RewardClaimPopup` 이 `BuildLightGain` 직전에 `AdoptGranted` 로 분출 버킷을 실지급으로 세운다.
+
+- **표시 슬롯은 여전히 클라 스펙이다 — 표시는 예고, 분출·롤업만 서버가 이긴다.** 수령 전엔 서버 값이 없다
+- 버킷의 유일한 writer 가 `AdoptGranted` 다(`Show` 시점 채우기는 제거 — 이중 진실원이었다)
+- `Succeeded` 인데 `Granted` 가 비면 **경고 + 분출 생략**. 잔액이 안 늘었는데 예고량으로 롤업하면 숫자가 뒤로 뛴다
+- 호출부가 0건이던 동기 `Show(… Func<bool> …)` 오버로드는 삭제했다
+
+**남은 확인** — 실기 왕복 3건. ① 정점 격파 후 로비에서 **곧바로** 수령(낙인 즉시 업로드) ② 보상 미저작 정점 수령 시 팝업 없이도 점등·해금 ③ 롤업 시작 숫자가 `(최종 − 서버지급)` 인지
 
 ### C4 — 성장 2종 ✅ (`84f53288f`)
 
