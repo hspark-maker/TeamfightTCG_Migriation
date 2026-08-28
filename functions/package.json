@@ -3,7 +3,7 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
-    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-growth.js && node scripts/test-open-pack.js",
+    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-wallet-store.js && node scripts/test-growth.js && node scripts/test-open-pack.js && node ../functions-currency/scripts/assert-shared-sync.js",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

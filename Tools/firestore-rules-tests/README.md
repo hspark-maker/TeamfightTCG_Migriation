@@ -68,14 +68,31 @@ npm test
 > 그래서 페이로드 검증 케이스는 전부 `seed(1)` + `saveDocument(2, {위반})` 의 **update 기반**이다.
 > 새 거부 케이스를 추가할 때도 이 규칙을 지켜라.
 
+## 지갑은 서버 전용이다
+
+지갑(`envs/{env}/users/{uid}/wallet/current`)은 `allow write: if false` 라 클라 쓰기가 없다.
+그래서 룰에 값 검증 블록이 없고, 세이브 쪽 함정("서버가 룰을 어긴 문서를 써서 그 계정이 영구 거부")도
+성립하지 않는다. 여기서 고정하는 것은 **소유자 읽기만 열리고 나머지는 전부 닫힌다** 하나다 — `17`~`19b`.
+
+픽스처 `fixtures/walletDocument.js` 의 진실원은 `functions/src/currency/walletStore.ts`
+(`WALLET_SCHEMA_VERSION` · `createWallet` · `writeWallet` · `ledgerEntry`)다.
+세이브 픽스처와 **쌍둥이 대상이 다르다** — 저쪽은 클라 `PlayerSaveDocument.ToFieldMap` 이다.
+
+> 지갑 거부 케이스는 전부 `withSecurityRulesDisabled` 로 문서를 먼저 심는다.
+> 안 심으면 룰이 아니라 '문서가 없어서' 실패해 통과처럼 보이고, allow 를 통째로 열어도 초록이 된다.
+
 ## 룰을 고쳤으면
 
-1. `npm test` 로 33개 전부 통과 확인 — 판정은 종료코드가 아니라 **`# pass 33`** 줄로 한다
+1. `npm test` 로 43개 전부 통과 확인 — 판정은 종료코드가 아니라 **`# pass 43`** 줄로 한다
 2. **일부러 깨보기** — 테스트가 룰을 실제로 물고 있는지 확인한다:
    - `isValidSave()` 를 `return true` 로 무력화 → **7 · 7b · 7c · 7d · 10 · 11 · 11b · 13 · 13b · 14b**
      열 개가 깨져야 한다. 안 깨지면 그 케이스가 create 기반으로 되돌아간 것이다
    - 재화 4키 검증 중 `balances.Diamond is int` 줄 제거 → **13b** 가 깨져야 한다
    - `allow create` 를 `if true` 로 되돌리기 → **1 · 6 · 8b · 14d** 가 깨져야 한다
+   - 지갑 `allow write` 를 `if true` 로 → **18 · 18b · 18c** 셋이 깨져야 한다
+   - 지갑 `allow read` 를 `if true` 로 → **17b · 17c · 17d · 17e** 넷이 깨져야 한다
+     (17 은 통과 케이스라 안 깨진다)
+   - 원장 `allow read, write` 를 `if true` 로 → **19 · 19b** 가 깨져야 한다
 
    원본을 안 건드리고 검증하려면 훼손본을 만들어 `RULES_FILE=<경로> npm test` 로 겨눈다.
 

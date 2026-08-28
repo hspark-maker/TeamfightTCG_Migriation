@@ -17,6 +17,7 @@ import {
   serverFreshAccountDocument,
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
+import { walletDocument, ledgerDocument } from './fixtures/walletDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 const PROJECT_ID = 'tcg-rules-test';
@@ -27,6 +28,9 @@ let testEnv;
 
 const savePath = (_uid = UID, _env = 'test', _docId = 'current') =>
   `envs/${_env}/users/${_uid}/save/${_docId}`;
+
+const walletPath = (_uid = UID, _env = 'test', _docId = 'current') =>
+  `envs/${_env}/users/${_uid}/wallet/${_docId}`;
 
 const authed = (_uid = UID) => testEnv.authenticatedContext(_uid).firestore();
 const unauthed = () => testEnv.unauthenticatedContext().firestore();
@@ -329,4 +333,66 @@ test('16c. 매치 결과 문서는 클라가 읽지도 쓰지도 못한다', asy
 test('16b. save/current 하위 서브컬렉션은 거부', async () => {
   await assertFails(setDoc(doc(authed(), `${savePath()}/shadow/x`), { a: 1 }));
   await assertFails(getDoc(doc(authed(), `${savePath()}/shadow/x`)));
+});
+
+// --- 17~19. 지갑(재화) ------------------------------------------------------
+
+// 지갑은 서버(Admin SDK) 전용 쓰기다 — 잔액을 바꾸는 것은 Callable 뿐이고 클라는 읽기만 한다.
+// 거부 케이스는 전부 withSecurityRulesDisabled 로 문서를 먼저 심는다. 안 심으면 룰이 아니라
+// '문서가 없어서' 실패해 통과처럼 보이고, allow 를 통째로 열어도 초록이 된다.
+async function seedWallet(_uid = UID, _env = 'test', _docId = 'current') {
+  await seedRaw(walletPath(_uid, _env, _docId), walletDocument());
+}
+
+test('17. 소유자는 자기 지갑을 읽는다', async () => {
+  await seedWallet();
+  await assertSucceeds(getDoc(doc(authed(), walletPath())));
+});
+
+test('17b. 남의 uid 지갑 읽기는 거부', async () => {
+  await seedWallet(OTHER_UID);
+  await assertFails(getDoc(doc(authed(UID), walletPath(OTHER_UID))));
+});
+
+test('17c. 미인증 지갑 읽기는 거부', async () => {
+  await seedWallet();
+  await assertFails(getDoc(doc(unauthed(), walletPath())));
+});
+
+test('17d. 알 수 없는 envId 지갑 읽기는 거부', async () => {
+  await seedWallet(UID, 'dev');
+  await assertFails(getDoc(doc(authed(), walletPath(UID, 'dev'))));
+});
+
+test('17e. 알 수 없는 docId 지갑 읽기는 거부', async () => {
+  await seedWallet(UID, 'test', 'other');
+  await assertFails(getDoc(doc(authed(), walletPath(UID, 'test', 'other'))));
+});
+
+// 잔액을 클라가 만들 수 있으면 재화 발행권이 클라로 넘어간다. create·update·delete 셋 다 막혀야 한다.
+test('18. 소유자도 지갑 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), walletPath()), walletDocument()));
+});
+
+test('18b. 소유자도 지갑 update 는 거부', async () => {
+  await seedWallet();
+  await assertFails(setDoc(doc(authed(), walletPath()), walletDocument({ rev: 2 })));
+});
+
+test('18c. 소유자도 지갑 delete 는 거부', async () => {
+  await seedWallet();
+  await assertFails(deleteDoc(doc(authed(), walletPath())));
+});
+
+// 원장은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
+test('19. 소유자도 원장 읽기는 거부', async () => {
+  await seedWallet();
+  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
+  await assertFails(getDoc(doc(authed(), `${walletPath()}/ledger/tx1`)));
+});
+
+test('19b. 소유자도 원장 쓰기는 거부', async () => {
+  await seedWallet();
+  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
+  await assertFails(setDoc(doc(authed(), `${walletPath()}/ledger/tx1`), ledgerDocument({ rev: 3 })));
 });

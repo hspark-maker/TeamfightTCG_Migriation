@@ -125,6 +125,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── 지갑(재화) ─────────────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /wallet/current
+    //
+    // 세이브 문서와 달리 여기엔 값 검증이 없다 — 클라 쓰기가 아예 없기 때문이다.
+    // 서버(Admin SDK)는 룰을 우회하므로, 세이브 쪽을 괴롭히던 "서버가 룰을 어긴 문서를 써서
+    // 그 계정의 이후 저장이 영구 거부된다"는 함정이 지갑에는 성립하지 않는다.
+    //
+    // 재화가 실화폐와 이어지므로 클라는 읽기만 한다. 잔액을 바꾸는 것은 Callable 뿐이다.
+    match /envs/{envId}/users/{userId}/wallet/{docId} {
+      allow read: if isSignedIn() && request.auth.uid == userId &&
+                  isKnownEnv(envId) && docId == 'current';
+      allow write: if false;
+
+      // 원장은 감사 기록이다 — 클라에 보여줄 이유가 없고, 보이면 잔액 추론 표면만 넓어진다.
+      match /ledger/{txId} {
+        allow read, write: if false;
+      }
+    }
+
     // ── 마스터 데이터(스펙) ────────────────────────────────────────────
     // 읽기: 런타임 클라이언트가 BattleContentSync 로 메타·행을 내려받는다.
     // 쓰기: 배포자(admin 클레임)만. 에디터 업로더는 ID 토큰을 실어야 한다.
