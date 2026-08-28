@@ -39,7 +39,7 @@
 | `claimReward` (codebase `default`) | **배포됨** · **401**(정상) · C3·C5.6 실기 왕복 통과 |
 | `enhanceCard`·`enhanceKeyword` (codebase `default`) | **배포됨** · **401**(정상) |
 | `openPack` (codebase `default`) | 배포됨 · **401**(정상) |
-| `claimBattleReward`·`devGrantCurrency` (codebase `default`) | **미배포 — 404.** C5 가 세운 것들이다. 안 올리면 싱글 전투 보상이 매판 0이 되고 디버그 재화 버튼이 죽는다 |
+| `claimBattleReward`·`devGrantCurrency` (codebase `default`) | **배포됨**(2026-08-28 신규 생성) · **401**(정상). invoker 바인딩은 이번엔 안 밟았다 — 403 이 아니었다 |
 | `firestore.rules` 지갑 블록 | **배포됨** |
 | `firestore.rules` 무료 한 방(`grants`) 블록 | **미배포.** 서버 동작은 Admin SDK 라 무관하지만, 클라가 그 문서를 읽게 되면 필수 |
 
@@ -146,7 +146,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
 - `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
-### C5 — 전투·디버그 2종 ✅ (미커밋 · **미배포**)
+### C5 — 전투·디버그 2종 ✅ (`660963744` · **배포됨**)
 
 `claimBattleReward` · `devGrantCurrency` 가 섰다. 클라 `Earn` 호출부가 2곳 사라져 **남은 것은 `PayoutInbox` 하나**다.
 
@@ -181,7 +181,16 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - **오프라인은 거절도 차단도 아니다.** `Offline` 은 `CanRunServerCommand` 를 통과해 호출이 나갔다 죽고, 보상은 그대로 소실된다. 유저에겐 "골드가 안 늘었다" 로만 보인다
 - **결과 팝업 숫자와 로비 롤업 숫자가 갈릴 수 있다.** 팝업은 클라 `RewardSpec` 예상액, 캐리어는 서버 확정액이다 — 표가 드리프트하면 팝업만 틀린다(롤업은 맞는다)
 
-**남은 것 — 배포와 실기 왕복.** 위 "배포·판정 절차" 를 그대로 탄다. 신규 함수라 **Cloud Run invoker 바인딩(소문자 `claimbattlereward`·`devgrantcurrency`)을 또 밟는다.**
+**배포 완료 (2026-08-28).** `firebase deploy --only functions:claimBattleReward,functions:devGrantCurrency` 로 둘 다 신규 생성됐고 URL POST 가 **401** 이다. 신규 함수마다 밟던 Cloud Run invoker 바인딩(403)은 이번엔 안 걸렸다 — 그래도 다음 신규 함수에서 다시 볼 것.
+
+**남은 것 — 실기 왕복 (사람).**
+
+1. 싱글 **승리** → 결과 팝업 금액이 `max(생존 × win.perCard, win.floor)` 와 일치하고, 로비 도착 시 획득 연출이 돌며 잔액이 그만큼 증가 · `revision` 정확히 +1
+2. 싱글 **패배** → `lose.flat` 만큼 증가(생존 수 무관)
+3. **토너먼트 전투** → 전투 골드가 붙지 않는다(정점 보상만)
+4. **멀티 전투** → 기존 `PayoutInbox` 경로 그대로, 이중 지급 없음
+5. **튜토리얼 전투 직후** → 로비 안내(`CardGain` 스텝)가 조기 통과하지 않는다
+6. 디버그 오버레이 재화 버튼 → `test` env 에서 +1000 반영
 
 ### C5.5 — 도감·챕터 구성 표 승격 ✅ (`fe4fe954d`)
 
