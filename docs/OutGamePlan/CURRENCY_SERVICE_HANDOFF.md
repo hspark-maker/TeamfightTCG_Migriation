@@ -1,6 +1,6 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `1d0d1aa31`
+> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `d2a4fdc3c`
 > 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
@@ -20,24 +20,29 @@
 
 ## 지금 상태
 
-**커밋 2개**
+**커밋 5개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
+- `120110833` 스펙시트 `Reward` 표 복구 — 머지가 옛 굽기본을 택해 부팅이 막혔다
+- `6f6a8885c` `link.xml` 에 팩 개봉 응답 DTO — IL2CPP 스트리핑 방어
+- `d2a4fdc3c` `claimReward` 의 보상 영구 손실·계정 영구 잠김 경로 2건
 
 **배포 상태 (실측 2026-08-28)**
 
 | 함수 | 상태 |
 |---|---|
 | `currencyPing` (codebase `currency`) | 배포됨 · URL POST **401**(정상) |
-| `claimReward` (codebase `default`) | **미배포 — 404.** 클라만 올리면 수령이 `not-found` 로 떨어진다 |
-| `firestore.rules` 지갑 블록 | **미배포.** 지금은 무해(아무도 지갑을 안 씀), C6 전엔 필수 |
+| `claimReward` (codebase `default`) | **배포됨** · URL POST **401**(정상) · 실기 왕복 통과 |
+| `firestore.rules` 지갑 블록 | **배포됨** |
 
 **주의 — "재화 로직이 currency codebase 로 갔다"가 아니다.** 지금 그 codebase 에 있는 것은 진단용 `currencyPing` 뿐이다. `walletStore.ts` 는 callable 이 아니라 라이브러리라 배포 대상이 아니고, 실제로 재화를 움직이는 `claimReward`·`openPack` 은 세이브 슬롯도 함께 만져서 default codebase 에 있다(결정 4). 지갑만 만지는 명령은 C6 에서 이사한다.
 
 ---
 
-## 즉시 할 일
+## 배포·판정 절차 — 새 callable 마다 그대로 반복
+
+C3 분(룰 · `claimReward` · 실기 왕복)은 2026-08-28 에 셋 다 닫혔다. 아래는 **C4 이후 새 callable 을 올릴 때마다 다시 타는 절차**다.
 
 ### 1) 배포
 
@@ -61,6 +66,8 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 
 ### 3) 실기 왕복 (사람 1회) — 앞이 실패하면 뒤는 볼 필요 없다
 
+C3 왕복은 **통과했다**(2026-08-28). 항목 형태는 C4 이후에도 그대로 쓴다 — 명령 이름과 낙인 필드만 갈아끼운다.
+
 1. 랭크 티어 수령 → 잔액이 `Reward` 표 값만큼 늘고 `revision` 정확히 +1
 2. 토너먼트 정점 격파 → 수령 → 잔액 증가 **그리고** 그 정점이 Cleared 로 굳고 `pendingRewardNodeId` 가 빈다(콘솔 문서 확인)
 3. **이미 받은 티어를 다시 수령 → 경고만, 로비 유지.** 재시작 모달이 뜨면 실패다(거절이 `permission-denied` 가 아니라는 뜻)
@@ -70,23 +77,42 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 
 ## 남은 작업
 
+### C3.5 — 검수 미해결 3건 (심각도 중, C4 앞)
+
+C3 리뷰가 남긴 것들이다. 전부 **이미 서버로 옮긴 수령 경로 안에서** 어긋나 있어 C4 를 얹기 전에 정리한다.
+
+- `OutGame/Tournament/TournamentProgress.cs:202` — `MarkRewardPending` 이 디바운스 `DataSaveManager.Save()` 다. 격파 직후 바로 수령하면 낙인이 원격에 아직 없어 서버가 `NotEligible` 로 튕긴다. **`SaveImmediate` 여야 한다**
+- `UI/Tournament/TournamentMapOverlayView.cs:562` — 폴백 경로(보상 0건·팝업 미배선)가 `TournamentRewardFlow.Open` 이 false 를 돌린 그 자리에서 `PlayClaimSequence` 를 부른다. `ClearNodeAsync` 가 비동기가 되면서 그 시점엔 `IsCleared` 가 아직 false 라 `:579` 의 가드가 걸려 **점등·해금 연출이 통째로 빠진다**
+- `OutGame/Reward/ClaimRewardResult.cs:4` — `granted` 를 "무엇이 지급됐는지의 진실원" 이라 주석해 놓고 실제로는 `RewardClaimCommand.cs:28` 의 `Debug.Log` 로만 쓴다. 분출·롤업(`UI/HUD/CurrencyHud.BeginGainRollUp` · `UI/HUD/CurrencyHud.cs:107` 의 클라 잔액 읽기)은 여전히 클라 스펙 캐시를 본다 — **표가 갈리면 숫자가 튄다.** 연출 입력을 `granted` 로 갈아야 한다
+
 ### C4 — 성장 2종
 
-`enhanceCard` · `enhanceKeyword`. 클라 `CardGrowthManager.cs:173` · `KeywordGrowthManager.cs:118` 의 `CurrencyManager.Spend` 를 걷어낸다.
+`enhanceCard` · `enhanceKeyword`. 클라 `CardGrowthManager.cs:137` · `KeywordGrowthManager.cs:109` 의 `CurrencyManager.Spend` 를 걷어낸다.
 
 근거 표 전부 확보됨: `CardEnhanceRule`(단일 행 — `baseEnhanceCost 25` · `costGrowthPerLevel 50` · `baseSuccessPermille 1000` · `rateDropPerLevelPermille 0` · `maxLevel 4` · `maxLimitBreak 3` · `hpPerLevel 4`) · `CardEnhance`(레벨별 오버라이드 3행, 비용 재화 **Shard**) · `KeywordEnhance`(키워드 6종, 비용 재화 **Energy**).
 
 - 성공률 RNG 를 서버로 옮긴다(`openPack` 의 `randomInt` 관용구). 현재 `successPermille` 이 전 행 1000이라 **강화는 항상 성공** — RNG 경로는 만들되 지금은 발화하지 않는다
 - 현행 클라는 **실패해도 차감이 영속되고 환급이 없다**. 서버로 옮기면 이 갈래를 한 트랜잭션으로 정리할 수 있다
 - 거절 사유는 `NotAffordable`(클라 `EEnhanceOutcome`)
+- **한계돌파(Snack) 축이 이 범위에 안 잡혀 있다.** `CardLimitBreak` 표가 `envs/test/specs` 에 실재하고(3행 · 컬럼 `stage | hpGain | snackCost`) 서버에도 `canAffordSnack`·`spendSnack`·`applyLimitBreak` 가 이미 `functions/src/growth/cardGrowth.ts` 에 있는데 **클라는 한계돌파를 로컬로 처리한다.** Snack 은 `CurrencyManager` 축이 아니라 카드에 붙은 자원이라 "재화 writer" 집계에는 안 잡히지만 **성장 판정을 서버가 소유한다는 목표에는 같이 걸린다.** C4 안에 넣을지 별도 단계로 뺄지는 **미결**
 
 ### C5 — 전투·디버그 2종
 
-`RewardService.cs:72`(전투 보상) · `OutgameDebugActions.cs:179`(디버그 지급).
+`RewardService.cs:61`(전투 보상) · `OutgameDebugActions.cs:179`(디버그 지급).
 
 **전투 골드 공식은 이미 있다** — `functions/src/payout.ts` 의 `computeCurrencyPayout(won, remaining, rows)` 가 `max(remaining × win.perCard, win.floor)` / 패배 `lose.flat` 을 낸다. 새로 쓰지 마라. 배선만 남는다.
 
-이 커밋에서 `CurrencyManager.Earn/Spend/Save` 를 삭제한다 → **클라 재화 writer 0**.
+**이 커밋이 닿는 것은 `CurrencyManager.Spend` 0 까지다.** `Earn` 호출부는 5곳이고 그중 여기서 옮기는 것은 2곳뿐이다(실측).
+
+| `CurrencyManager.Earn` 호출부 | 옮기는 단계 |
+|---|---|
+| `Utils/RewardService.cs:61` (전투 보상) | C5 |
+| `OutGame/Debug/OutgameDebugActions.cs:179` (디버그 지급) | C5 |
+| `OutGame/Album/AlbumRewardManager.cs:80` (도감 페이지·테마 수령) | **C5.6** |
+| `OutGame/Tournament/TournamentProgress.cs:310` (챕터 완주 보상) | **C5.6** |
+| `Network/PayoutInbox.cs:97` (멀티 payout ack) | **C6** |
+
+**`CurrencyManager.Earn/Spend/Save` 삭제는 C5 가 아니다.** 남은 3곳이 그 API 를 붙들고 있어 여기서 지우면 컴파일이 깨진다. **클라 재화 writer 0 이 실제로 성립하는 시점은 C6 완료 후**다. (`Core/GameManager.cs:145` 의 `CurrencyManager.Save()` 는 flush 일 뿐 잔액을 만들지 않는다 — C6 에서 currency 슬롯과 함께 사라진다.)
 
 ### C5.5 — 앨범 구성 스펙 표 승격 (C6 선행, 사용자 승인됨)
 
@@ -97,7 +123,18 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 - **클라는 손대지 않는다.** `SpecPayloadCodec.TableNames` 에 넣을 이유가 없다 — 서버 전용 판정 근거이고, 넣으면 부팅 왕복만 는다
 - Unity 에서 사람이 1회 실행(admin 클레임 로그인 필요)
 
-**토너먼트 챕터 수령도 같은 구멍이다**(챕터↔정점 대응이 `TournamentConfig` SO 에만 있다). 같이 풀 것.
+**토너먼트 챕터 수령도 같은 구멍이다**(챕터↔정점 대응이 `TournamentConfig` SO 에만 있다). 같이 올릴 것.
+
+**이 단계는 표만 올린다 — `claimReward` 는 손대지 않는다.** callable 의 ownerType 확장은 C5.6 이다. 근거(표)와 소유권 이전(callable)을 한 커밋에 섞으면 업로드 1회가 실패했을 때 원인을 못 가린다.
+
+### C5.6 — 앨범·챕터 수령 이전 (C5.5 뒤, C6 앞)
+
+C5 가 남긴 `Earn` 2곳을 서버로 넘긴다. `claimReward` 의 **ownerType 확장**이지 새 callable 이 아니다 — 낙인·지급·저장이 한 트랜잭션이라는 C3 의 형태를 그대로 쓴다.
+
+- `OutGame/Album/AlbumRewardManager.cs:80` — 도감 페이지·테마 수령. 서버가 "페이지 완성" 을 판정할 근거는 **C5.5 가 올린 표**다
+- `OutGame/Tournament/TournamentProgress.cs:310` — 챕터 완주 보상. 챕터↔정점 대응 역시 **C5.5 가 올린 표**를 본다
+- 보상값 자체는 이미 `Reward` 표에 있다(앨범 `t:`/`p:`/`b` · 챕터 `chapter_01`~`chapter_04`) — 새로 저작할 것 없다
+- 순서가 뒤집히면 안 된다: C5.5 없이 이 단계를 하면 서버가 판정 근거 없이 클라 주장을 그대로 믿게 된다
 
 ### C6 — 저장소 전환
 
@@ -108,6 +145,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 - 클라: `WalletCloud`·`WalletCommands`·`WalletPatch` 신설. **`PlayerSaveCloud.AdoptServerResult` 의 revision+1 단언은 손대지 않는다** — 지갑 응답을 그 경로로 안 보내는 것이 답이다
 - **`wallet.rev` 는 단조 증가만 보장한다**(세이브 revision 과 달리 "정확히 +1" 이 아니다). 지갑은 두 codebase 가 쓰고 장차 결제 웹훅처럼 클라가 모르는 정당한 쓰기가 생긴다 — +1 을 강제하면 첫 결제에서 전 유저 세션이 끊긴다
 - 지갑만 만지는 명령(`claimBattleReward`·`devGrantCurrency`)을 `functions-currency/` 로 이사
+- **`Network/PayoutInbox.cs:97` 의 크레딧이 여기서 사라진다.** `claimPayout.ack` 가 지갑에 직접 크레딧하게 되면서 클라의 마지막 `Earn` 이 없어진다 — **클라 재화 writer 0 은 이 항목이 닫히는 순간 성립한다**
 - `SetOptions.Overwrite` 를 이용한다 — v8 클라의 `ToFieldMap` 에서 `FIELD_CURRENCY` 를 빼면 다음 업로드가 원격 잔여 필드를 알아서 지운다. **반대로 승급 전에 v8 클라가 저장하면 잔액 원본이 사라진다** → 부트에서 `ensureWallet` 이 첫 업로드보다 반드시 앞
 
 ### C7 — 조이기 (구 클라 소멸 후)
@@ -153,9 +191,13 @@ C6 에서 `claimPayout` 의 `ack` 가 지갑에 크레딧하는 자리가 된다
 - **거절은 무조건 `permission-denied`.** `failed-precondition`·`invalid-argument` 는 `CloudFailureClassifier` 가 `Unusable` → `BlockSession` 으로 본다. 잔액 부족·중복 수령으로 세션을 끊으면 안 된다
 - **순수 모듈에 `firebase-admin`·`HttpsError` 금지.** `functions/scripts/` 회귀가 `lib/` 를 직접 require 한다
 - **미러를 손으로 고치지 마라.** 원본은 `functions/src/currency/`, 미러는 `functions-currency/src/generated/`. `npm test` 끝의 `assert-shared-sync` 가 드리프트를 잡는다(줄끝 정규화 후 비교 — `core.autocrlf=true` 라 바이트 비교가 못 선다)
-- **`SCHEMA_VERSION` 3중 동기화**(클라 `UserSaveData.VERSION` · `saveDocument.ts` · 룰). 하나만 올리면 조용히 막힌다
+- **`SCHEMA_VERSION` 2중 동기화**(클라 `UserSaveData.VERSION` · `functions/src/save/saveDocument.ts:18`). 하나만 올리면 조용히 막힌다. **룰은 3번째 축이 아니다** — `firestore.rules` 에서 `== 7` 을 강제하던 자리는 이미 빠졌고(`:117-118` 주석) 지금은 `:123` 의 단조 증가만 본다
+- **`Assets/Resources/SpecData.bytes` 는 암호화 바이너리라 머지가 조용히 한쪽을 삼킨다.** 2026-08-28 머지 `04170beb5` 가 `SpecDatas.cs` 는 박형석작업용 것을, `.bytes` 는 feature_Firestore 것을 택해 **코드와 데이터의 짝이 갈렸다**. 증상은 "게임 진입 불가" 로만 보인다(`Core/Initialization/SpecSheetPreloadStep.cs:19` → `GameInitialization.MarkRecoveryRequired`). 판정은 표 복호화로만 — AES-128-CBC · key `cRM1fuNZDwvqnjzY` · IV = key 바이트 역순. 그리고 `OutGame/Spec/SpecSource`·`RewardSpec` 은 **정적 캐시**라(`s_loaded`) 파일을 바꿔도 도메인 리로드 전엔 옛 값을 보고한다
+- **`envs/live` 는 여전히 0표다.** `d2a4fdc3c` 이후 `Reward` 표가 비면 수령이 **fail-closed 로 거절**된다 — live 는 R3 업로드 전까지 수령이 전부 막힌다. 의도한 동작이지만 릴리즈 순서에 걸린다
 - **미커밋으로 오래 두지 마라.** 2026-08-28 에 C1~C3 미커밋분이 브랜치 전환 + 머지로 통째로 날아갔고, GitHub Desktop 자동 stash 는 `.gitignore` 대상(`node_modules`·`lib`)만 담고 untracked 소스를 안 담았다. **각 단계는 검증이 초록으로 뜬 그 순간 커밋한다**
 
 ## 별건으로 남은 것
 
-`Assets/Scripts/OutGame/Save/link.xml` 에 `OpenPackResult`·`OpenPackCard` 가 빠져 있다(R5 때부터). 그 파일 주석이 callable 응답 DTO 도 넣으라고 못박고 있어 **IL2CPP 빌드에서 팩 개봉 결과가 빌 수 있다** — 에디터에선 안 드러나고 실기에서만 터진다.
+`envs/live/specs` **0표 업로드**(R3 몫). 그 전까지 live 는 수령이 전부 fail-closed 로 막힌다.
+
+**닫힘** — `link.xml` 의 팩 개봉 응답 DTO 누락은 `6f6a8885c` 에서 해결됐다(`OutGame/Save/link.xml:29-30`). 새 callable 응답 DTO 를 만들 때마다 같은 자리에 추가할 것.
