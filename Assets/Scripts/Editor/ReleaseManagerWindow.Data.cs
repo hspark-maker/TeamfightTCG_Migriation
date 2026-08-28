@@ -81,6 +81,9 @@ public partial class ReleaseManagerWindow
                 RunDataUpload(t_envId, t_modeMismatch);
         }
 
+        EditorGUILayout.Space(10);
+        DrawCompositionUpload(t_hasEnv, t_envId, t_envError, t_modeMismatch);
+
         if (!string.IsNullOrEmpty(this.dataReport))
         {
             EditorGUILayout.Space(10);
@@ -89,6 +92,28 @@ public partial class ReleaseManagerWindow
         }
 
         EditorGUILayout.EndScrollView();
+    }
+
+    /// <summary>SO 저작에서 만드는 구성 표 업로드 칸. 스펙시트 표가 아니라 위 목록에는 뜨지 않는다.</summary>
+    void DrawCompositionUpload(bool _hasEnv, string _envId, string _envError, bool _modeMismatch)
+    {
+        EditorGUILayout.LabelField("구성 표 (SO 저작 → 스펙)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            $"{SpecFirestoreUploader.ALBUM_ENTRY_TABLE}(도감 테마·페이지·칸)와 " +
+            $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE}(챕터·정점)를 CardAlbumConfig·TournamentConfig 저작에서 만들어 올린다. " +
+            "서버가 페이지 완성·챕터 완주를 판정할 근거 표다. " +
+            "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 도감·토너먼트 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다.",
+            MessageType.Info);
+
+        string t_blocker = CompositionUploadBlocker(_hasEnv, _envError);
+        if (!string.IsNullOrEmpty(t_blocker))
+            EditorGUILayout.HelpBox(t_blocker, MessageType.Error);
+
+        using (new EditorGUI.DisabledScope(t_blocker != null))
+        {
+            if (GUILayout.Button($"{_envId} 환경으로 구성 표 업로드 (2개)", GUILayout.Height(28)))
+                RunCompositionUpload(_envId, _modeMismatch);
+        }
     }
 
     /// <summary>관리자 로그인 칸. 운영 규칙이 스펙 쓰기를 admin 클레임에만 허용하므로
@@ -266,6 +291,87 @@ public partial class ReleaseManagerWindow
         if (this.issues == null) return "콘텐츠 검증을 먼저 실행해야 한다.";
         if (this.issues.Count > 0) return $"콘텐츠 검증 문제 {this.issues.Count}건을 먼저 해결해야 한다.";
         return null;
+    }
+
+    // 스펙시트 선택·적재와 무관한 경로라 표 선택과 SpecData 적재 실패는 여기서 보지 않는다
+    string CompositionUploadBlocker(bool _hasEnv, string _envError)
+    {
+        if (!_hasEnv) return _envError;
+        if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요하다.";
+        if (!SpecAdminAuth.HasAdminClaim) return "로그인한 계정에 admin 클레임이 없어 스펙을 쓸 수 없다.";
+        if (this.issues == null) return "콘텐츠 프로필·카드 표 검증을 먼저 실행해야 한다.";
+        if (this.issues.Count > 0) return $"콘텐츠 프로필·카드 표 검증 문제 {this.issues.Count}건을 먼저 해결해야 한다.";
+        return null;
+    }
+
+    void RunCompositionUpload(string _envId, bool _modeMismatch)
+    {
+        Revalidate();
+        string t_blocker = CompositionUploadBlocker(true, null);
+        if (t_blocker != null)
+        {
+            EditorUtility.DisplayDialog("업로드 차단", t_blocker, "확인");
+            return;
+        }
+
+        if (_modeMismatch && !EditorUtility.DisplayDialog(
+                "실행 모드와 다른 환경",
+                $"현재 빌드 실행 모드와 다른 '{_envId}' 환경에 업로드한다. 계속할까?",
+                "계속", "취소"))
+            return;
+
+        if (!EditorUtility.DisplayDialog(
+                "구성 표 업로드",
+                $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 " +
+                $"{SpecFirestoreUploader.ALBUM_ENTRY_TABLE}·{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} 표를 배포한다.\n" +
+                "SO 저작을 그대로 옮기며, 표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
+                "업로드", "취소"))
+            return;
+
+        var t_report = new StringBuilder();
+        int t_done = 0;
+        int t_failed = 0;
+
+        try
+        {
+            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.ALBUM_ENTRY_TABLE} …", 0f);
+            string t_albumLine = SpecFirestoreUploader.UploadAlbumEntries(_envId, out string t_albumError);
+            AppendUploadResult(t_report, SpecFirestoreUploader.ALBUM_ENTRY_TABLE, t_albumLine, t_albumError,
+                               ref t_done, ref t_failed);
+
+            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} …", 0.5f);
+            string t_chapterLine = SpecFirestoreUploader.UploadTournamentChapters(_envId, out string t_chapterError);
+            AppendUploadResult(t_report, SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE, t_chapterLine, t_chapterError,
+                               ref t_done, ref t_failed);
+        }
+        catch (Exception t_exception)
+        {
+            t_report.AppendLine($"FAIL {t_exception.Message}");
+            Debug.LogException(t_exception);
+            t_failed++;
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        this.dataReport = $"성공 {t_done} / 실패 {t_failed}\n\n{t_report}";
+        Debug.Log($"[SpecFirestore] 구성 표 env={_envId}, 성공={t_done}, 실패={t_failed}");
+    }
+
+    static void AppendUploadResult(
+        StringBuilder _report, string _table, string _line, string _error, ref int _done, ref int _failed)
+    {
+        if (string.IsNullOrEmpty(_error))
+        {
+            _report.AppendLine($"OK   {_line}");
+            _done++;
+            return;
+        }
+
+        _report.AppendLine($"FAIL {_table}: {_error}");
+        Debug.LogError($"[SpecFirestore] {_table} 업로드 실패: {_error}");
+        _failed++;
     }
 
     void RunDataUpload(string _envId, bool _modeMismatch)
