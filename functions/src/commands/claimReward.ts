@@ -9,15 +9,17 @@ import {
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
 import {
-  appendClaimedTier,
-  judgeRewardClaim,
-  MAX_CLAIMED_TIERS,
   parseRankGradeRows,
-  parseRewardRows,
   RankGradeRow,
   rankTierCount,
   requiredPointsForTier,
 } from "../payout";
+import {
+  appendClaimedTier,
+  judgeRewardClaim,
+  MAX_CLAIMED_TIERS,
+  parseRewardRows,
+} from "../rewardTable";
 import {currencySlot, grant, readBalances} from "../currency/wallet";
 
 /**

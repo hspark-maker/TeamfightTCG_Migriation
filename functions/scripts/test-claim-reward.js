@@ -8,18 +8,20 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
-  parseRewardRows,
   parseRankGradeRows,
-  resolveRewards,
   requiredPointsForTier,
   rankTierCount,
-  judgeRewardClaim,
-  appendClaimedTier,
-  MAX_CLAIMED_TIERS,
   computeCurrencyPayout,
   computeRankPayout,
   DIVISIONS_PER_GRADE,
 } = require("../lib/payout.js");
+const {
+  parseRewardRows,
+  resolveRewards,
+  judgeRewardClaim,
+  appendClaimedTier,
+  MAX_CLAIMED_TIERS,
+} = require("../lib/rewardTable.js");
 
 // 표 한 줄. 실제 Reward 시트의 컬럼 이름 그대로다(id | ownerType | ownerId | order | rewardType | rewardId | amount).
 const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Currency") =>
