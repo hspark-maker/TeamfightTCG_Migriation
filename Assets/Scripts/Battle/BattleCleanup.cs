@@ -18,6 +18,8 @@ public static class BattleCleanup
 
         CardView.Cleanup();
         LegacyCrownVfx.Clear();   // 왕관은 카드·씬 수명 밖 월드 오브젝트다 — 참조를 놓지 않으면 다음 판까지 남는다
+        BattleBoardOrder.Reset();        // 초기 배치 기록은 판마다 새로 잡는다
+        BattlePresentationQueue.Clear();   // 접촉 프레임을 못 만난 표시가 다음 판으로 넘어가지 않게
         TurnState.Reset();
         TurnRunner.Cleanup();
     }

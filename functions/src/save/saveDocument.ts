@@ -236,6 +236,23 @@ export interface EnsureAccountOutcome {
   revision: number;
   created: boolean;
   walletCreated: boolean;
+  /** 메타가 깨진 기존 문서를 버리고 다시 만들었는가. 복구 경로를 로그로 남기기 위한 표시다. */
+  repaired: boolean;
+  /** 복구 시 버려진 문서의 최상위 필드 이름들. 원인 추적용이며 값은 남기지 않는다. */
+  discardedFields: string[];
+}
+
+/**
+ * 클라 PlayerSaveDocument.TryReadMeta 와 같은 판정이다 — 여기서 통과시킨 문서만 클라가 부트할 수 있다.
+ * @param {FirebaseFirestore.DocumentData | undefined} data 문서 본문
+ * @return {boolean} 메타가 온전한가
+ */
+function hasUsableMeta(data: FirebaseFirestore.DocumentData | undefined): boolean {
+  if (data == null) return false;
+  const schemaVersion = data.schemaVersion;
+  const revision = data.revision;
+  return Number.isInteger(schemaVersion) && (schemaVersion as number) > 0 &&
+         Number.isInteger(revision) && (revision as number) >= 0;
 }
 
 /**
@@ -270,8 +287,16 @@ export async function ensureSaveDocument(
 
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
-    if (snapshot.exists) {
-      return {revision: Number(snapshot.data()?.revision ?? 0), created: false, walletCreated: false};
+    const data = snapshot.exists ? snapshot.data() : undefined;
+
+    if (snapshot.exists && hasUsableMeta(data)) {
+      return {
+        revision: Number(data?.revision ?? 0),
+        created: false,
+        walletCreated: false,
+        repaired: false,
+        discardedFields: [],
+      };
     }
 
     // 지갑 존재를 먼저 **묻는다**. 세이브만 지워지고 지갑이 남은 계정에서 createWallet 의 create 가
@@ -279,21 +304,32 @@ export async function ensureSaveDocument(
     // 읽기는 전부 쓰기보다 앞서야 하므로 이 자리가 마지막 읽기다.
     const walletSnapshot = await transaction.get(walletReference);
 
-    // set 이 아니라 create 다 — 트랜잭션 밖에서 누가 먼저 만들었으면 재실행되어 덮어쓰기가 막힌다.
-    transaction.create(reference, {
+    const fresh = {
       ...buildSlots(),
       schemaVersion: SCHEMA_VERSION,
       revision: 1,
       updatedAt: FieldValue.serverTimestamp(),
       deviceId,
       appVersion,
-    });
+    };
 
     const walletCreated = !walletSnapshot.exists;
     if (walletCreated) {
       createWallet(transaction, walletReference, starterBalances, FieldValue.serverTimestamp());
     }
 
-    return {revision: 1, created: true, walletCreated};
+    // 메타가 없거나 깨진 문서는 클라가 부트조차 못 하는데(TryReadMeta 실패 → Fail),
+    // 그대로 두면 여기서도 noop 이라 계정이 영구 잠긴다 — 룰에 delete 경로도 없다.
+    // 스키마 밖 문서는 유효한 세이브였던 적이 없으므로 버리고 새로 만드는 것이 유일한 복구다.
+    if (snapshot.exists) {
+      const discardedFields = Object.keys(data ?? {}).sort();
+      transaction.set(reference, fresh);
+      return {revision: 1, created: true, walletCreated, repaired: true, discardedFields};
+    }
+
+    // set 이 아니라 create 다 — 트랜잭션 밖에서 누가 먼저 만들었으면 재실행되어 덮어쓰기가 막힌다.
+    transaction.create(reference, fresh);
+
+    return {revision: 1, created: true, walletCreated, repaired: false, discardedFields: []};
   });
 }

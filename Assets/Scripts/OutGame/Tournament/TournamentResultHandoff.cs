@@ -5,7 +5,7 @@ public static class TournamentResultHandoff
     static bool   s_won;
     static bool   s_pending;
 
-    // 결과 싣기(TurnRunner.CaptureResult 한 곳에서만). 정점 키가 없으면 낙인할 대상이 없어 버린다.
+    // 결과 싣기(BattleOutcome.TryCapture 한 곳에서만). 정점 키가 없으면 낙인할 대상이 없어 버린다.
     public static void Set(string _nodeId, bool _won)
     {
         if (string.IsNullOrEmpty(_nodeId)) return;

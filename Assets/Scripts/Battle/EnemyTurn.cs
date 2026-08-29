@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 public class EnemyTurn : TurnBase
@@ -115,17 +116,21 @@ public class EnemyTurn : TurnBase
             var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
                 t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
 
-            AttackResult t_result = default;
-            Action t_onEffect = () => t_result = AttackProcessor.Execute(
-                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
-
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
                                              t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
+            AttackResult t_result;
+            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
+            {
+                t_result = AttackProcessor.Execute(
+                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
+                t_result.events = t_events.ToArray();
+            }
+
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_onEffect, t_preKw, t_atKw,
+                t_result.events, t_preKw, t_atKw,
                 () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.

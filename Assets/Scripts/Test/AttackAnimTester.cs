@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 /// <summary>연출 확인 전용 테스트 씬 컨트롤러.
@@ -243,6 +244,7 @@ public class AttackAnimTester : MonoBehaviour
 
     async UniTask AttackCore(CardView _attacker, CardView _defender)
     {
+        if (_attacker?.BoundCard == null || _defender?.BoundCard == null) return;
         // 적(비로컬) 공격이면 오프셋/회전 반전 — AttackSequence의 t_flip 규칙과 동일.
         bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
 
@@ -253,7 +255,7 @@ public class AttackAnimTester : MonoBehaviour
 
         // 무장 VFX는 무장 시점에 켜진다. 버튼 공격은 무장 단계를 안 거치므로 여기서 대신 켜준다
         // (탭/드래그 공격은 FocusWeapon에서 이미 켜져 있고, SetArmedVfx는 중복 호출에 안전).
-        // _onEffect = 접촉 시점. 체력이 낮은 쪽만 사망시키고(체력은 안 깎는다) 피격 VFX를 띄운다.
+        // 규칙 상태를 먼저 확정한다. 체력이 낮은 쪽만 사망시키고 피격 이벤트를 만들어 연출에 넘긴다.
         void OnEffect()
         {
             if (this.killWeakerSide)
@@ -271,9 +273,21 @@ public class AttackAnimTester : MonoBehaviour
         // 필드 모델이 없는 테스터에서도 매치포인트 접근 줌·국소 감속을 함께 확인한다.
         BattleFinisher.ArmApproachPreview();
 
+        int t_defenderHpBefore = _defender.BoundCard.hp + _defender.BoundCard.bonusHp;
+        int t_attackerHpBefore = _attacker.BoundCard.hp + _attacker.BoundCard.bonusHp;
+        int t_splashHpBefore = t_splash?.BoundCard != null
+            ? t_splash.BoundCard.hp + t_splash.BoundCard.bonusHp : 0;
+        OnEffect();
+
+        var t_events = new List<BattleEvent>();
+        AddTesterDamage(t_events, _defender, _attacker, t_defenderHpBefore, BattleEventFlags.None);
+        AddTesterDamage(t_events, _attacker, _defender, t_attackerHpBefore, BattleEventFlags.Counter);
+        if (t_splash != null)
+            AddTesterDamage(t_events, t_splash, _attacker, t_splashHpBefore, BattleEventFlags.Splash);
+
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
         await AttackSequence.PlaySplash(_attacker, _defender,
-            _onEffect: OnEffect, _splashView: t_splash,
+            _events: t_events, _splashView: t_splash,
             _preEffectKw: t_preKw, _atEffectKw: t_atKw,
             _forceSpecial: this.useSpecialCinema);
 
@@ -831,6 +845,22 @@ public class AttackAnimTester : MonoBehaviour
         if (t_a.hp + t_a.bonusHp >= t_b.hp + t_b.bonusHp) return;
         t_a.bonusHp = 0;
         t_a.hp      = 0;
+    }
+
+    static void AddTesterDamage(List<BattleEvent> _events, CardView _target, CardView _source,
+        int _hpBefore, BattleEventFlags _flags)
+    {
+        CardInstance t_target = _target?.BoundCard;
+        CardInstance t_source = _source?.BoundCard;
+        if (t_target == null) return;
+        int t_damage = _hpBefore - (t_target.hp + t_target.bonusHp);
+        if (t_damage <= 0) return;
+        _events.Add(new BattleEvent(BattleEventKind.Damage,
+            t_target.ownerIndex, t_target.slotIndex, t_damage,
+            t_source?.ownerIndex ?? -1, t_source?.slotIndex ?? -1, _flags));
+        if (!t_target.IsAlive)
+            _events.Add(new BattleEvent(BattleEventKind.Death,
+                t_target.ownerIndex, t_target.slotIndex));
     }
 
     void Respawn(CardView _cv)

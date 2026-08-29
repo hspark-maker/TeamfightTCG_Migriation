@@ -70,7 +70,26 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ShutdownForEditor;
     }
 
-    static void ShutdownForEditor() => Instance?.ShutdownRunnerImmediate();
+    // 여기서는 ShutdownRunnerImmediate만으로 부족하다 — 그쪽은 종료를 Forget으로 킥만 하는데,
+    // 어셈블리 리로드 콜백 뒤에는 플레이어 루프가 더 돌지 않아 그 continuation이 영영 실행되지 않는다.
+    // 러너가 소켓 스레드를 든 채로 남으면 Unity가 "Reloading Domain"에서 그 스레드를 기다리며 멈춘다
+    // (매칭 중 Play를 끄면 재현된다 — 그때는 러너가 반드시 살아 있다).
+    // 그래서 종료를 킥한 뒤 러너 오브젝트를 즉시 파괴해 네이티브 자원을 그 자리에서 놓게 한다.
+    static void ShutdownForEditor()
+    {
+        NetworkRunner t_runner = Instance?.Runner;
+        Instance?.ShutdownRunnerImmediate();
+        if (t_runner == null) return;
+
+        try
+        {
+            if (t_runner.gameObject != null) UnityEngine.Object.DestroyImmediate(t_runner.gameObject);
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[Net] 에디터 러너 파괴 실패: {t_exception.Message}");
+        }
+    }
 #endif
 
     public async UniTask<bool> JoinOrCreateRoom(string _roomName)

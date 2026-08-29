@@ -26,6 +26,17 @@ public static class BattleBoardView
         return null;
     }
 
+    public static CardView GetView(int _ownerIndex, int _slotIndex)
+    {
+        if (_slotIndex < 0) return null;
+        foreach (CardView t_cv in views)
+        {
+            if (t_cv != null && t_cv.RenderedOwnerIndex == _ownerIndex && t_cv.RenderedSlotIndex == _slotIndex)
+                return t_cv;
+        }
+        return null;
+    }
+
     static bool IsAliveView(CardView _cv)
         => _cv != null && _cv.BoundCard != null && _cv.BoundCard.IsAlive;
 
@@ -48,11 +59,14 @@ public static class BattleBoardView
         }
     }
 
+    // 호출부가 뷰를 직접 지목한 경우다 — 생사 게이트를 걸지 않는다.
+    // resolve/present 뒤집기 이후 공격 연출이 시작될 때 이번 타격의 피해자는 이미 IsAlive=false다.
+    // 여기서 걸러내면 암전(FadeAll)만 먹고 복구를 못 받아 죽는 카드가 어두운 채로 사망 연출을 탄다.
     public static void FadeCards(float _alpha, params CardView[] _cards)
     {
         foreach (CardView t_cv in _cards)
         {
-            if (!IsAliveView(t_cv)) continue;
+            if (t_cv == null || t_cv.BoundCard == null) continue;
             t_cv.FadeView(_alpha, GameTiming.Battle.FadeViewDuration);
         }
     }

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // 스펙시트(SpecData.bytes) 파싱 결과 한 벌. 시트를 읽는 축이 여럿이라 복호화·파싱을 여기서 1회만 한다.
@@ -38,6 +40,107 @@ public static class SpecSource
 
     // 초기화에서 1회. 지연 로드도 되지만 첫 조회 프레임에 복호화·파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
+
+    /// <summary>현재 콘텐츠 모드의 표 데이터를 순수 <see cref="CardSpec"/> 값으로 변환한다.</summary>
+    public static Dictionary<int, CardSpec> LoadCards(EContentRunMode _mode)
+    {
+        SpecDataManager t_manager = Manager;
+        if (t_manager == null)
+            throw new InvalidOperationException("[SpecSource] SpecData를 읽지 못해 카드 정의를 만들 수 없다.");
+
+        var t_specs = new Dictionary<int, CardSpec>();
+        if (_mode == EContentRunMode.Test)
+        {
+            IReadOnlyList<Card_Test> t_rows = t_manager.Card_Test?.All;
+            if (t_rows == null || t_rows.Count == 0)
+                throw new InvalidOperationException("[SpecSource] Card_Test 표가 비었다.");
+            foreach (Card_Test t_row in t_rows) AddCard(t_specs, From(t_row));
+        }
+        else
+        {
+            IReadOnlyList<Card> t_rows = t_manager.Card?.All;
+            if (t_rows == null || t_rows.Count == 0)
+                throw new InvalidOperationException("[SpecSource] Card 표가 비었다.");
+            foreach (Card t_row in t_rows) AddCard(t_specs, From(t_row));
+        }
+        return t_specs;
+    }
+
+    static CardSpec From(Card _row)
+    {
+        if (_row == null) throw new InvalidOperationException("Card 표에 null 행이 있다.");
+        return CreateCard(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
+            _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
+            _row.cardExplain, _row.grade, _row.synergies);
+    }
+
+    static CardSpec From(Card_Test _row)
+    {
+        if (_row == null) throw new InvalidOperationException("Card_Test 표에 null 행이 있다.");
+        return CreateCard(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
+            _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
+            _row.cardExplain, _row.grade, _row.synergies);
+    }
+
+    static CardSpec CreateCard(
+        int _id, string _assetName, string _displayName, string _channel, int _maxHp,
+        string _keywords, int _keywordUnlockLevel, int _defaultEvolutionStage,
+        int _hp2, int _hp3, int _hp4, string _cardExplain, string _grade, string _synergies)
+        => new CardSpec(_id, _assetName, _displayName,
+            ParseEnum<ECardChannel>(_channel, _id, _assetName, "channel"), _maxHp,
+            ParseKeywords(_keywords, _id, _assetName), _keywordUnlockLevel, _defaultEvolutionStage,
+            _hp2, _hp3, _hp4, _cardExplain,
+            ParseEnum<ECardGrade>(_grade, _id, _assetName, "grade"),
+            ParseSynergies(_synergies, _id, _assetName));
+
+    static void AddCard(Dictionary<int, CardSpec> _specs, CardSpec _spec)
+    {
+        if (_specs.ContainsKey(_spec.Id))
+            throw new InvalidOperationException($"카드 ID {_spec.Id}가 중복이다.");
+        _specs.Add(_spec.Id, _spec);
+    }
+
+    static T ParseEnum<T>(string _value, int _id, string _name, string _field) where T : struct
+    {
+        if (string.IsNullOrWhiteSpace(_value) || char.IsDigit(_value.Trim()[0]) ||
+            !Enum.TryParse(_value.Trim(), true, out T t_value) || !Enum.IsDefined(typeof(T), t_value))
+            throw new InvalidOperationException($"카드 {_id}({_name}).{_field} 값 '{_value}'을 해석할 수 없다.");
+        return t_value;
+    }
+
+    static CardKeyword ParseKeywords(string _value, int _id, string _name)
+    {
+        CardKeyword t_result = CardKeyword.None;
+        if (string.IsNullOrWhiteSpace(_value)) return t_result;
+
+        foreach (string t_raw in _value.Split(new[] { '|', '/' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string t_token = t_raw.Trim();
+            if (t_token.Length == 0) continue;
+            if (char.IsDigit(t_token[0]) || !Enum.TryParse(t_token, true, out CardKeyword t_keyword) ||
+                !Enum.IsDefined(typeof(CardKeyword), t_keyword) || t_keyword == CardKeyword.None)
+                throw new InvalidOperationException($"카드 {_id}({_name}).keywords 값 '{t_token}'을 해석할 수 없다.");
+            t_result |= t_keyword;
+        }
+        return t_result;
+    }
+
+    static IReadOnlyList<string> ParseSynergies(string _value, int _id, string _name)
+    {
+        var t_result = new List<string>();
+        var t_seen = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(_value)) return t_result.AsReadOnly();
+
+        foreach (string t_raw in _value.Split(new[] { '|', '/' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string t_token = SynergyRegistry.NormalizeName(t_raw);
+            if (t_token.Length == 0) continue;
+            if (!t_seen.Add(t_token))
+                throw new InvalidOperationException($"카드 {_id}({_name}).synergies에 '{t_token}'이 중복이다.");
+            t_result.Add(t_token);
+        }
+        return t_result.AsReadOnly();
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()

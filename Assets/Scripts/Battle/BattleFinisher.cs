@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>승부를 가른 한 방을 <b>그 타격 순간에</b> 강조하는 연출.
 ///
-/// <para>승패 확정(TurnRunner.CheckGameOver)은 그 턴의 공격·사망 연출과 충원까지 다 끝난 뒤에 일어난다.
+/// <para>승패 확정(BattleLoop.Run의 턴 끝 종료 판정)은 그 턴의 공격·사망 연출과 충원까지 다 끝난 뒤에 일어난다.
 /// 그래서 결과 시점에는 강조할 공격자도 피격자도 남아 있지 않다 — 죽은 카드 View는 이미 페이드됐고,
 /// 슬롯은 새 카드에 재바인딩됐을 수 있다. 결정타를 보여주려면 <b>피해가 적용된 그 자리</b>에서 잡아야 한다.</para>
 ///
@@ -96,7 +96,7 @@ public static class BattleFinisher
     /// (끝내지 않았으면 해제) — 안 그러면 지난 공격의 판정이 다음 타격에 새어 나온다.
     ///
     /// <para><see cref="BattleField.IsEmpty"/>는 필드뿐 아니라 대기열까지 본다. 그래서 이 시점의 판정이
-    /// 나중에 충원까지 끝난 뒤의 TurnRunner.CheckGameOver와 같은 답을 낸다 — 충원은 대기열에서 꺼내
+    /// 나중에 충원까지 끝난 뒤의 BattleLoop.Run 종료 판정과 같은 답을 낸다 — 충원은 대기열에서 꺼내
     /// 옮기는 것이라 "비었는가"를 바꾸지 않는다. 부활(언데드)도 RemoveDead 안에서 이미 반영됐다.</para></summary>
     public static void Arm(BattleField _attackerField, BattleField _defenderField)
     {
@@ -106,7 +106,7 @@ public static class BattleFinisher
         bool t_defEmpty = _defenderField != null && _defenderField.IsEmpty;
         if (!t_atkEmpty && !t_defEmpty) return;
 
-        // 동시 전멸: 로컬 기준 **상대 편을 패자로** 잡는다 — TurnRunner.CheckGameOver가 적 필드를 먼저 보고
+        // 동시 전멸: 로컬 기준 **상대 편을 패자로** 잡는다 — BattleLoop.Run의 종료 판정이 적 필드를 먼저 보고
         // 로컬 승리로 판정하므로, 여기서 다르게 고르면 피니시 색감과 실제 결과 팝업이 어긋난다.
         // (동시 전멸 정책 자체가 확정되면 그때 양쪽을 같이 고쳐야 한다.)
         if (t_atkEmpty && t_defEmpty)

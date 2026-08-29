@@ -2,15 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
-
-public enum EBattleCommandKind : byte
-{
-    Attack = 1,
-    Mulligan = 2,
-    Surrender = 3,
-    AiTakeover = 4,
-}
 
 /// <summary>재시뮬에 필요한 플레이어 입력만 고정 8바이트 레코드로 보관한다.
 ///
@@ -20,7 +13,7 @@ public enum EBattleCommandKind : byte
 /// 기록은 남기되(양쪽 로그 대조용) 입력으로 먹이지 않는다.</para></summary>
 public static class BattleCommandLog
 {
-    public const int RecordSize = 8;
+    public const int RecordSize = BattleCommand.RecordSize;
 
     /// <summary>초과하면 로그를 통째로 버리고 서버가 그 매치를 무효 처리한다(= 보상 차단).
     /// 정상 플레이가 여기 닿으면 안 되므로 도달 시 LogError로 관측한다.</summary>
@@ -50,19 +43,19 @@ public static class BattleCommandLog
         byte t_flags = 0;
         if (_cunningSwap) t_flags |= 1;
         if (_derived) t_flags |= 2;   // 재생 금지 표식 — 위 재생 계약 참조
-        Record(_actorOwner, EBattleCommandKind.Attack, _attackerSlot, _defenderSlot, t_flags);
+        Record(_actorOwner, BattleCommandKind.Attack, _attackerSlot, _defenderSlot, t_flags);
     }
 
     public static void RecordMulligan(int _actorOwner, int _chosenSlot)
-        => Record(_actorOwner, EBattleCommandKind.Mulligan, _chosenSlot, 0, 0);
+        => Record(_actorOwner, BattleCommandKind.Mulligan, _chosenSlot, 0, 0);
 
     public static void RecordSurrender(int _actorOwner)
-        => Record(_actorOwner, EBattleCommandKind.Surrender, 0, 0, 0);
+        => Record(_actorOwner, BattleCommandKind.Surrender, 0, 0, 0);
 
     public static void RecordAiTakeover(int _actorOwner)
-        => Record(_actorOwner, EBattleCommandKind.AiTakeover, 0, 0, 0);
+        => Record(_actorOwner, BattleCommandKind.AiTakeover, 0, 0, 0);
 
-    static void Record(int _actorOwner, EBattleCommandKind _kind, int _a, int _b, byte _flags)
+    static void Record(int _actorOwner, BattleCommandKind _kind, int _a, int _b, byte _flags)
     {
         if (!DeckConfig.IsMultiplayer || IsTruncated || IsFrozen) return;
 
@@ -83,16 +76,15 @@ public static class BattleCommandLog
             return;
         }
 
-        ushort t_seq = (ushort)Count;
-        ushort t_turn = (ushort)Math.Max(0, Math.Min(ushort.MaxValue, TurnRunner.TurnCount));
-        s_bytes.Add((byte)(t_seq & 0xff));
-        s_bytes.Add((byte)(t_seq >> 8));
-        s_bytes.Add((byte)(t_turn & 0xff));
-        s_bytes.Add((byte)(t_turn >> 8));
-        s_bytes.Add((byte)_actorOwner);
-        s_bytes.Add((byte)_kind);
-        s_bytes.Add(unchecked((byte)(sbyte)_a));
-        s_bytes.Add((byte)(unchecked((byte)(sbyte)_b) & 0x0f | ((_flags & 0x0f) << 4)));
+        var t_command = new BattleCommand(
+            (ushort)Count,
+            (ushort)Math.Max(0, Math.Min(ushort.MaxValue, TurnRunner.TurnCount)),
+            (byte)_actorOwner,
+            _kind,
+            unchecked((sbyte)_a),
+            unchecked((sbyte)_b),
+            _flags);
+        t_command.AppendTo(s_bytes);
     }
 
     public static string SerializeBase64() => IsTruncated ? string.Empty : Convert.ToBase64String(s_bytes.ToArray());

@@ -31,11 +31,11 @@ public class MultiplayerTestInitializer : MonoBehaviour
     [SerializeField] string roomName = "TestRoom";
     [Tooltip("켜면 방 이름 대신 랜덤 매칭(JoinRandomRoom)을 쓴다.")]
     [SerializeField] bool useRandomMatch;
-    [Tooltip("켜면 Play 누르는 즉시 접속한다. 끄면 화면의 접속 버튼을 눌러야 한다.")]
-    [SerializeField] bool autoConnectOnStart = true;
 
     [Header("덱")]
-    [Tooltip("비워두면 저장된 덱 슬롯 0 → 그것도 없으면 카탈로그 앞에서 6장을 자동으로 채운다.")]
+    [Tooltip("저장된 덱 슬롯 0 이 유효하면 그쪽이 우선한다. 슬롯 0 이 비었을 때만 이 목록을 쓰고, " +
+             "그것도 비면 카탈로그 앞에서 6장을 채운다. 서버 lockDeck 이 소유·성장을 세이브와 대조하므로 " +
+             "임의 번호로 들어가면 card_not_owned 로 거절된다.")]
     [SerializeField] List<int> deckCardIds = new List<int>();
 
     [Header("테스트 계정")]
@@ -98,8 +98,8 @@ public class MultiplayerTestInitializer : MonoBehaviour
             return;
         }
 
-        SetStatus($"덱 준비 완료: {string.Join(", ", this.resolvedDeck)}");
-        if (this.autoConnectOnStart) Connect();
+        // 자동 접속하지 않는다 — 두 클라이언트의 진입 시점을 손으로 맞춰야 서버 페어링을 관찰할 수 있다.
+        SetStatus($"덱 준비 완료(슬롯 0): {string.Join(", ", this.resolvedDeck)} — [접속]을 눌러라.");
     }
 
     void OnDestroy()
@@ -162,7 +162,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            PlayerSaveCloud.DisableForTestAccountSession();
             FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
@@ -204,9 +203,8 @@ public class MultiplayerTestInitializer : MonoBehaviour
                 return;
             }
 
-            // 다른 uid로 갈아타면 이 세션의 세이브는 남의 것이 된다 — 클라우드 세이브를 꺼서
-            // 부트 채택 자체를 건너뛴다.
-            PlayerSaveCloud.DisableForTestAccountSession();
+            // 계정만 갈아탄다 — 클라우드 세이브는 켠 채로 둔다.
+            // 끄면 원격 세이브 문서가 안 생겨 lockDeck 이 대조할 진실원을 잃는다(= 매치 진입 불가).
             FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
             SetStatus($"테스트 계정 '{_accountId}' 로그인 완료.");
         }
@@ -253,17 +251,18 @@ public class MultiplayerTestInitializer : MonoBehaviour
     {
         _error = null;
 
+        // 슬롯 0 이 정본이다 — 서버 lockDeck 이 이 덱의 소유·성장을 세이브 문서와 대조한다.
+        if (DeckSaveManager.IsSlotValid(0))
+        {
+            _deck = new List<int>(DeckSaveManager.Load(0));
+            return true;
+        }
+
         if (this.deckCardIds != null && this.deckCardIds.Count > 0)
         {
             if (DeckSaveManager.TryBuildDeck(this.deckCardIds, out _deck)) return true;
             _error = $"인스펙터 덱이 {DeckSaveManager.DECK_SIZE}장을 못 채웠다(중복·미등록 번호 제외 후 부족).";
             return false;
-        }
-
-        if (DeckSaveManager.IsSlotValid(0))
-        {
-            _deck = new List<int>(DeckSaveManager.Load(0));
-            return true;
         }
 
         if (DeckSaveManager.TryBuildDeck(CardCatalog.AllIds, out _deck)) return true;
@@ -373,10 +372,18 @@ public class MultiplayerTestInitializer : MonoBehaviour
     // ── 디버그 화면 ───────────────────────────────────────────────────────
     // 테스트 전용이라 UI 프리팹을 만들지 않고 OnGUI로 끝낸다.
 
+    // 기준 높이. 이보다 큰 화면에서는 같은 비율로 키운다 — 고해상도에서 IMGUI 기본 크기는 읽기 어렵다.
+    const float GUI_REFERENCE_HEIGHT = 720f;
+
     void OnGUI()
     {
         const float WIDTH = 420f;
-        GUILayout.BeginArea(new Rect(20f, 20f, WIDTH, 400f), GUI.skin.box);
+
+        Matrix4x4 t_previousMatrix = GUI.matrix;
+        float t_scale = Mathf.Max(1f, Screen.height / GUI_REFERENCE_HEIGHT);
+        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(t_scale, t_scale, 1f));
+
+        GUILayout.BeginArea(new Rect(20f, 20f, WIDTH, 460f), GUI.skin.box);
 
         GUILayout.Label("멀티플레이 테스트");
         GUILayout.Label($"방: {(this.useRandomMatch ? "(랜덤 매칭)" : this.roomName)}");
@@ -391,11 +398,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         GUILayout.Label($"Firebase: {t_auth.State} / UID {t_uid}");
         GUILayout.Label($"테스트 계정 id: {(string.IsNullOrEmpty(this.resolvedAccountId) ? "-(기기 기본 계정)" : this.resolvedAccountId)}");
         GUILayout.Label($"클라우드 세이브: {PlayerSaveCloud.State} (rev {PlayerSaveCloud.Revision})");
-        if (GUILayout.Button("로컬 세이브 버리고 재시작(계정 전환용)", GUILayout.Height(26f)))
-        {
-            PlayerSaveCloud.ClearTestAccountSession();
-            SetStatus("로컬 캐시를 버렸다. 재시작하면 현재 UID가 이 기기의 새 소유자가 된다.");
-        }
 #endif
 
         GUILayout.Space(8f);
@@ -411,5 +413,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
 #endif
 
         GUILayout.EndArea();
+        GUI.matrix = t_previousMatrix;
     }
 }

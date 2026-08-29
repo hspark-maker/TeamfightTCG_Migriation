@@ -1,5 +1,5 @@
 import * as logger from "firebase-functions/logger";
-import {db} from "../firebaseApp";
+import {readSpecRows} from "../specs/specBlobReader";
 import {
   DropRow,
   FALLBACK_STARTER_CARD_IDS,
@@ -24,9 +24,8 @@ async function readKnownCardIds(env: string): Promise<Set<number>> {
   const ids = new Set<number>();
 
   for (const table of CARD_TABLES) {
-    const snapshot = await db.collection(`envs/${env}/specs/${table}/rows`).get();
-    for (const document of snapshot.docs) {
-      const id = Number(document.id);
+    for (const row of await readSpecRows(env, table)) {
+      const id = Number(row.id);
       if (Number.isInteger(id) && id > 0) ids.add(id);
     }
   }
@@ -48,21 +47,15 @@ export async function resolveStarterCardIds(
   env: string,
 ): Promise<{cardIds: number[]; source: StarterSource}> {
   try {
-    // where 단독이라 자동 인덱스로 충분하다. orderBy 를 붙이면 복합 인덱스가 필요해지는데
-    // 이 프로젝트에는 firestore.indexes.json 이 없다 — 정렬은 해석기가 메모리로 한다.
-    const snapshot = await db
-      .collection(`envs/${env}/specs/CardPackDrop/rows`)
-      .where("packId", "==", STARTER_PACK_ID)
-      .get();
-
-    const rows: DropRow[] = snapshot.docs.map((document) => {
-      const data = document.data();
-      return {
-        id: Number(data.id),
-        minGrade: String(data.minGrade ?? ""),
-        cardId: Number(data.cardId),
-      };
-    });
+    // 표를 블롭으로 통째 읽고 packId 는 메모리에서 거른다 — where 질의도 맞는 행 수만큼 과금되고,
+    // CardPackDrop 은 300행이 넘어 계정 생성 1건이 수백 읽기가 됐다. 정렬은 리더가 id 숫자로 한다.
+    const rows: DropRow[] = (await readSpecRows(env, "CardPackDrop"))
+      .filter((row) => String(row.packId ?? "") === STARTER_PACK_ID)
+      .map((row) => ({
+        id: Number(row.id),
+        minGrade: String(row.minGrade ?? ""),
+        cardId: Number(row.cardId),
+      }));
 
     // 카탈로그를 못 읽으면 존재 검사 없이 뽑는 대신 폴백으로 간다 — 검증 없이 지급하면
     // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 부팅되고 복구 경로가 없다.

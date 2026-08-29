@@ -55,7 +55,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             var t_liveIds = new HashSet<int>();
             try
             {
-                foreach (CardSpec t_spec in CardSpec.Load(EContentRunMode.Live).Values)
+                foreach (CardSpec t_spec in SpecSource.LoadCards(EContentRunMode.Live).Values)
                     if (t_spec.Channel == ECardChannel.Live) t_liveIds.Add(t_spec.Id);
             }
             catch (Exception t_exception)
@@ -101,7 +101,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             List<string> t_issues = !_mode.HasValue || _mode.Value == t_mode ? _errors : _warnings;
             try
             {
-                foreach (CardSpec t_spec in CardSpec.Load(t_mode).Values)
+                foreach (CardSpec t_spec in SpecSource.LoadCards(t_mode).Values)
                     foreach (string t_name in t_spec.SynergyNames)
                         t_registry.Require(t_name);
             }
@@ -143,7 +143,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         {
             List<string> t_issues = !_mode.HasValue || _mode.Value == t_mode ? _errors : _warnings;
             Dictionary<int, CardSpec> t_specs;
-            try { t_specs = CardSpec.Load(t_mode); }
+            try { t_specs = SpecSource.LoadCards(t_mode); }
             catch (Exception t_exception)
             {
                 t_issues?.Add($"카드 아트 주소 검증용 {t_mode} 표 로드 실패: {t_exception.Message}");

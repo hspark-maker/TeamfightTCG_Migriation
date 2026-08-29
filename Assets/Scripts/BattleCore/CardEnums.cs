@@ -5,10 +5,7 @@ public enum ECardChannel
     Live = 1,
 }
 
-/// <summary>
-/// 카드 희소 등급. 플레이어 랭크 등급(<see cref="ERankGrade"/>)과는 다른 축이다.
-/// 직렬화·스펙 호환을 위해 기존 숫자값을 유지한다.
-/// </summary>
+/// <summary>카드 희소 등급.</summary>
 public enum ECardGrade
 {
     Unknown = 0,

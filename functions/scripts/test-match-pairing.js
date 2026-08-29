@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   joinPairing,
+  matchIdFromPairingKey,
   pairingDocumentId,
   SERVER_RULESET_VERSION,
 } = require("../lib/matchPairing.js");
@@ -34,5 +35,16 @@ const replacement = joinPairing(first.record, "uid-c", fingerprint,
   first.record.expiresAtMs, {matchId: "5".repeat(32), seedHex: "6".repeat(16)});
 assert.equal(replacement.record.matchId, "5".repeat(32));
 assert.deepEqual(replacement.record.participantUids, ["uid-c"]);
+
+// matchId 는 pairingKey 해시의 앞 32자다 — 두 클라가 같은 문서를 집어야 페어링이 성립한다.
+{
+  const key = "room-abc_deadbeef_cafebabe";
+  const derived = matchIdFromPairingKey(key);
+  assert.equal(derived.length, 32);
+  assert.match(derived, /^[0-9a-f]{32}$/);
+  assert.equal(derived, pairingDocumentId(key).slice(0, 32));
+  assert.equal(derived, matchIdFromPairingKey(key));               // 결정론
+  assert.notEqual(derived, matchIdFromPairingKey(key + "x"));      // 키가 다르면 문서도 다르다
+}
 
 console.log("match-pairing tests: pass");

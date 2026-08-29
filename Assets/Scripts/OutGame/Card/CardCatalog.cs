@@ -25,7 +25,7 @@ public static class CardCatalog
         Clear();
         if (_synergyRegistry == null) throw new InvalidOperationException("[CardCatalog] SynergyRegistry가 배선되지 않았다.");
         _synergyRegistry.ValidateOrThrow();
-        Dictionary<int, CardSpec> t_specs = CardSpec.Load(_mode);
+        Dictionary<int, CardSpec> t_specs = SpecSource.LoadCards(_mode);
 
         foreach (KeyValuePair<int, CardSpec> t_pair in t_specs)
         {

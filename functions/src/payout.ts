@@ -85,6 +85,22 @@ function gradeCeiling(points: number, grades: RankGradeRow[]): number | null {
   return nextGrade < grades.length ? grades[nextGrade].entryPoints : null;
 }
 
+/**
+ * 무승부 랭크 정산. 점수를 움직이지 않는다 — 승자가 없으므로 올리거나 내릴 근거가 없다.
+ * computeRankPayout 은 승패 인자를 요구해 어느 쪽으로든 점수를 바꾸므로 여기서 따로 만든다.
+ * @param {number} before 정산 전 랭크 점수.
+ * @param {RankGradeRow[]} grades 등급 표.
+ * @return {RankPayout} 점수·티어가 그대로이고 delta 가 0인 정산 결과.
+ */
+export function computeDrawRankPayout(before: number, grades: RankGradeRow[]): RankPayout {
+  if (!Number.isSafeInteger(before) || before < 0 || grades.length === 0) {
+    throw new Error("invalid rank payout input");
+  }
+  const tierIndex = resolveTierIndex(before, grades);
+  return {before, after: before, delta: 0,
+    beforeTierIndex: tierIndex, afterTierIndex: tierIndex, promoBattle: false};
+}
+
 export function computeRankPayout(before: number, won: boolean, grades: RankGradeRow[]): RankPayout {
   if (!Number.isSafeInteger(before) || before < 0 || grades.length === 0) throw new Error("invalid rank payout input");
   const beforeTierIndex = resolveTierIndex(before, grades);

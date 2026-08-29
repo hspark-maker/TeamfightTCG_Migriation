@@ -209,6 +209,8 @@ public class CardView : MonoBehaviour
     bool     shieldIndicatorCached;
 
     public CardInstance BoundCard => this.boundCard;
+    public int RenderedOwnerIndex { get; private set; } = -1;
+    public int RenderedSlotIndex { get; private set; } = -1;
     #endregion
 
     #region Unity Lifecycle
@@ -318,6 +320,8 @@ public class CardView : MonoBehaviour
         }
 
         this.boundCard = _card;
+        this.RenderedOwnerIndex = _card?.ownerIndex ?? -1;
+        this.RenderedSlotIndex = _card?.slotIndex ?? -1;
         this.cardAnim.SetBoundCard(_card);
         bool t_isEmpty = _card == null;
 

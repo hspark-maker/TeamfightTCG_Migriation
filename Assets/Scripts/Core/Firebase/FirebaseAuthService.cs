@@ -7,6 +7,8 @@ using UnityEngine;
 
 public sealed class FirebaseAuthService
 {
+    // 인증 부기는 LocalPrefs 에 둔다 — PlayerPrefs 는 ParrelSync 클론과 원본이 공유하므로
+    // 한쪽의 백엔드 전환이 다른 쪽 익명 계정까지 버리게 만든다. LocalPrefs 는 DevAccountScope 폴더로 갈린다.
     const string AuthBackendPrefsKey = "firebase.authBackend";
     const string LiveBackendName = "live";
 
@@ -373,7 +375,7 @@ public sealed class FirebaseAuthService
 
         // 기기에 남은 익명 계정은 그 계정을 발급한 백엔드에서만 유효하다 — 에뮬레이터와 실서버를 오가면
         // 반대 축의 uid가 되살아나 토큰 검증부터 실패한다. 백엔드가 바뀐 첫 부트에서만 비우고, 같은 축이면 uid를 유지한다.
-        string t_previous = PlayerPrefs.GetString(AuthBackendPrefsKey, LiveBackendName);
+        string t_previous = LocalPrefs.GetString(AuthBackendPrefsKey, LiveBackendName);
         if (t_previous == t_backend) return false;
 
         // 익명 uid는 로그아웃하면 다시 로그인할 방법이 없다 — 그 계정의 세이브 문서를 콘솔에서 찾아낼
@@ -381,16 +383,16 @@ public sealed class FirebaseAuthService
         string t_abandoned = this.auth.CurrentUser != null ? this.auth.CurrentUser.UserId : string.Empty;
         if (!string.IsNullOrEmpty(t_abandoned))
         {
-            PlayerPrefs.SetString(UidPrefsKeyPrefix + t_previous, t_abandoned);
+            LocalPrefs.SetString(UidPrefsKeyPrefix + t_previous, t_abandoned);
             Debug.LogWarning(
                 $"[FirebaseAuth] Backend changed '{t_previous}' -> '{t_backend}'. " +
                 $"Abandoning the anonymous account {t_abandoned}; it can never be signed in again. " +
-                $"Recorded at PlayerPrefs[{UidPrefsKeyPrefix}{t_previous}].");
+                $"Recorded at LocalPrefs[{UidPrefsKeyPrefix}{t_previous}].");
         }
 
         this.auth.SignOut();
-        PlayerPrefs.SetString(AuthBackendPrefsKey, t_backend);
-        PlayerPrefs.Save();
+        LocalPrefs.SetString(AuthBackendPrefsKey, t_backend);
+        LocalPrefs.Save();
         return true;
     }
 

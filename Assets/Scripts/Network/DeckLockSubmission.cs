@@ -31,6 +31,7 @@ internal static class DeckLockSubmission
         string _seedSource,
         string _seedHex,
         int _rulesetVersion,
+        int _ownerIndex,
         byte[] _myNonce,
         byte[] _opponentNonce,
         string _contentFingerprint,
@@ -39,7 +40,7 @@ internal static class DeckLockSubmission
         CancellationToken _ct = default)
     {
         if (_cardIds == null || _growth == null || _cardIds.Length == 0
-            || _cardIds.Length != _growth.Length)
+            || _cardIds.Length != _growth.Length || _ownerIndex < 0 || _ownerIndex > 1)
         {
             Debug.LogError("[LockDeck] 덱 성장 스냅샷이 유효하지 않습니다.");
             return DeckLockResult.Rejected;
@@ -83,6 +84,7 @@ internal static class DeckLockSubmission
             ["cardDataVersion"] = _contentFingerprint,
             ["deckHash"] = t_deckHash,
             ["cardSnapshots"] = t_cards,
+            ["ownerIndex"] = _ownerIndex,
         };
         if (_seedSource == "server")
         {
@@ -113,7 +115,7 @@ internal static class DeckLockSubmission
         DataSaveManager.SaveImmediate();
         try
         {
-            using (var t_flushTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct))
+            using (var t_flushTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct, FirebaseManager.Lifetime))
             {
                 if (!_ct.CanBeCanceled) t_flushTimeout.CancelAfter(FlushFallbackTimeout);
                 await FirebaseManager.FlushPendingAsync()
@@ -142,7 +144,7 @@ internal static class DeckLockSubmission
             HttpsCallableReference t_callable = FirebaseFunctions
                 .GetInstance(FirebaseApp.DefaultInstance, Region)
                 .GetHttpsCallable("lockDeck");
-            using (var t_lockTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct))
+            using (var t_lockTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct, FirebaseManager.Lifetime))
             {
                 if (!_ct.CanBeCanceled) t_lockTimeout.CancelAfter(LockFallbackTimeout);
                 while (true)
@@ -182,7 +184,11 @@ internal static class DeckLockSubmission
                     t_exception,
                     out FunctionsErrorCode t_errorCode))
             {
-                Debug.LogError($"[LockDeck] 서버가 덱 잠금을 영구 거절했습니다(code={t_errorCode}).");
+                // 거절 원인은 서버 신원 대조 5개 항목 중 하나다. 클라가 무엇을 보냈는지 같이 찍어야
+                // Functions 로그의 expected 와 눈으로 맞출 수 있다.
+                Debug.LogError($"[LockDeck] 서버가 덱 잠금을 영구 거절했습니다(code={t_errorCode}). " +
+                    $"matchId={_matchId} owner={_ownerIndex} seedSource={_seedSource} " +
+                    $"seedHex={_seedHex} ruleset={_rulesetVersion} fingerprint={_contentFingerprint}");
                 return DeckLockResult.Rejected;
             }
             Debug.LogError($"[LockDeck] 서버 호출 실패: {t_exception.Message}");

@@ -9,9 +9,6 @@ using UnityEngine;
 // 채택은 초기화당 1회뿐이다 — 세션 중 재-pull 경로는 만들지 않는다(매니저들이 이미 슬롯을 캐싱했다).
 static class PlayerSaveCloud
 {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    const string TEST_DISABLED_KEY = "firebase.playerSave.testDisabled";
-#endif
     const int UPLOAD_DEBOUNCE_MS = 1000;
     const int DOCUMENT_WARNING_BYTES = 256 * 1024;
     const int DOCUMENT_MAX_BYTES = 300000;
@@ -33,9 +30,6 @@ static class PlayerSaveCloud
     static bool s_uploading;
     static bool s_gateComplete;
     static bool s_uploadApproved;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    static bool s_disabledForTestAccountSession;
-#endif
 
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
     internal static string LastError { get; private set; } = string.Empty;
@@ -72,19 +66,6 @@ static class PlayerSaveCloud
     {
         if (!_context.IsValid) throw new ArgumentException("FirebaseContext is not initialized.", nameof(_context));
         Shutdown();
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (IsTestAccountSessionDisabled())
-        {
-            // 채택할 것이 없다 — 로컬 캐시는 R2 에서 사라졌고 원격은 일부러 끄는 중이다.
-            // 세이브 없이 기본값으로 진행한다(멀티 테스트 세션 전용).
-            // 지갑도 함께 끈다 — 잔액의 진실원이 서버 문서 하나뿐이라, 원격을 안 읽는 이 세션은 잔액 0으로 돈다.
-            // 버그가 아니다: 여기서 지갑만 살리려면 auth·읽기·ensureWallet(서버 쓰기)이 되살아나 분기의 목적이 사라진다.
-            State = EPlayerSaveCloudState.Disabled;
-            s_gateComplete = true;
-            return;
-        }
-#endif
 
         s_context = _context;
         s_envId = _context.EnvId;
@@ -336,34 +317,6 @@ static class PlayerSaveCloud
         OnStateChanged?.Invoke();
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    internal static bool IsTestAccountModeActive => IsTestAccountSessionDisabled();
-
-    static bool IsTestAccountSessionDisabled()
-    {
-        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test) return false;
-        return s_disabledForTestAccountSession || PlayerPrefs.GetInt(TEST_DISABLED_KEY, 0) == 1;
-    }
-
-    internal static void DisableForTestAccountSession()
-    {
-        if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
-            throw new InvalidOperationException("Test save cloud can only be disabled in Test run mode.");
-        s_disabledForTestAccountSession = true;
-        PlayerPrefs.SetInt(TEST_DISABLED_KEY, 1);
-        PlayerPrefs.Save();
-    }
-
-    internal static void ClearTestAccountSession()
-    {
-        s_disabledForTestAccountSession = false;
-        PlayerPrefs.DeleteKey(TEST_DISABLED_KEY);
-        PlayerPrefs.Save();
-    }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetTestRuntimeState() => s_disabledForTestAccountSession = false;
-#endif
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
     // 부트 초기화(InitializationRunner)가 로딩 화면에서 타임아웃까지 돈다.

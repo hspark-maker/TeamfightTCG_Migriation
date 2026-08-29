@@ -29,11 +29,13 @@ public class TurnRunner : MonoBehaviour
     public static TurnRunner Instance { get; private set; }
 
     TurnContext ctx;
-    TurnBase activeTurn;
+    TurnRuleContext ruleCtx;
+    TurnViewContext viewCtx;
+    BattleLoop battleLoop;
+    BattleOutcome battleOutcome;
     bool aiTakeoverPending;
     bool aiTakeoverFillPending;
     bool forcedEnd;      // 항복/디버그로 결과를 강제 확정했는가. 턴 루프를 다음 경계에서 끊는다.
-    bool resultCaptured; // 이번 전투 결과 확정 여부. 최초 승패만 보상 지급하고 이후 덮어쓰기 차단.
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
@@ -143,7 +145,7 @@ public class TurnRunner : MonoBehaviour
         {
             // 무효 경기는 씬 전환이 커버 연출을 태우느라 1초 넘게 걸린다. 그동안 전투 씬은 살아 있으므로
             // 턴 루프를 여기서 끊지 않으면 커버 아래에서 공격이 더 나간다(멀티는 그게 그대로 상대에게 간다).
-            // 강제 종료와 같은 플래그를 쓴다 — RunTurns의 탈출 조건은 이 하나만 본다.
+            // 강제 종료와 같은 플래그를 쓴다 — BattleLoop의 탈출 조건은 이 하나만 본다.
             this.forcedEnd = true;
             if (_delayVoidExit) LoadVoidResultNextFrame().Forget();
             else                BattleCleanup.LoadScene(LobbySceneName);
@@ -152,6 +154,7 @@ public class TurnRunner : MonoBehaviour
 
         if (_reason.GrantsReward())
             CaptureResult(_won, _reason);
+        BattleGoldenRecorder.Finish(_won, _reason == EMatchEndReason.Draw);
         ShowResult(_won, _reason.PlaysBeat()).Forget();
     }
 
@@ -308,6 +311,7 @@ public class TurnRunner : MonoBehaviour
     public async UniTask PlayIntroAndStart(System.Func<UniTask> _dealCards)
     {
         BattleCommandLog.Reset();
+        BattleGoldenRecorder.Reset();
         TurnCount = 1;
         SetTurnCountLabel();
         // 정상 경로의 시드 지점은 GameInitializer(덱 셔플이 MatchRandom을 소비하므로 필드 초기화 직전).
@@ -317,10 +321,13 @@ public class TurnRunner : MonoBehaviour
         MatchSeeding.EnsureSeeded();
         if (DeckConfig.IsMultiplayer && NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom += HandlePlayerLeft;
-        this.ctx = new TurnContext
+        this.ruleCtx = new TurnRuleContext
         {
             playerField     = this.playerField,
             enemyField      = this.enemyField,
+        };
+        this.viewCtx = new TurnViewContext
+        {
             playerFieldView = this.playerFieldView,
             enemyFieldView  = this.enemyFieldView,
             turnLabel       = this.turnLabel,
@@ -329,10 +336,15 @@ public class TurnRunner : MonoBehaviour
             turnBanner       = this.turnBanner,
             mulliganOverlay  = this.mulliganOverlay,
         };
+        this.ctx = new TurnContext(this.ruleCtx, this.viewCtx);
+        // 이미 있으면 그대로 둔다 — 여기서 새로 만들면 확정 게이트(IsCaptured)가 지워진다.
+        // 초기화 중 설정창 항복처럼 인트로보다 먼저 결과가 확정되는 경로가 있다(CaptureResult의 lazy 폴백).
+        // resultFinalized도 같은 걸 막지만, 두 게이트가 각각 한 번씩 막는 게 원래 구조다.
+        if (this.battleOutcome == null) this.battleOutcome = new BattleOutcome(this.ruleCtx);
 
         // 선/후공은 owner 기준이다. 멀티 양쪽은 같은 합의 시드에서 같은 RNG 1회를 소비한다.
-        bool t_ownerZeroFirst = DecideFirstPlayer();
-        int  t_first = t_ownerZeroFirst ? 0 : 1;
+        int t_first = BattleLoop.DecideFirstOwner(TutorialConfig.IsActive);
+        BattleGoldenRecorder.Begin(this.playerField, this.enemyField, t_first);
 
         // 코인 토스 전에는 턴 정보(배경+레이블) 숨김(선/후공 미정 상태). 배너 GO에 배경 스프라이트+WhosTurn 라벨이 함께 있음.
         GameObject t_turnInfo = this.turnBanner != null ? this.turnBanner.gameObject
@@ -371,121 +383,84 @@ public class TurnRunner : MonoBehaviour
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || this.forcedEnd) return;
 
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
-        RunTurns(t_first, _skipFirstBanner: true).Forget();
+        RunBattleLoop(t_first, _skipFirstBanner: true).Forget();
     }
 
     // 해당 t_current가 로컬(내) 턴인가. 멀티에서 P2는 t_current=1이 내 턴.
     // 판정은 TurnState.LocalOwnerIndex 하나 — 멀티는 GameInitializer가 MyOwnerIndex로 채우고 싱글은 0이다.
     static bool IsMyTurn(int _current) => TurnState.IsLocalTurn(_current);
 
-    async UniTask RunTurns(int _startCurrent, bool _skipFirstBanner)
+    async UniTask RunBattleLoop(int _startCurrent, bool _skipFirstBanner)
     {
-        int  t_current    = _startCurrent;
         bool t_skipBanner = _skipFirstBanner;
+        this.battleLoop = new BattleLoop(this.ruleCtx, _startCurrent);
 
-        while (true)
-        {
-            // playerField/enemyField는 멀티에서 기기마다 ownerIndex가 다르므로 ownerIndex로 조회한다.
-            // 싱글도 playerField.OwnerIndex가 0이라 같은 식이 그대로 맞는다 — 모드 분기 불필요.
-            BattleField t_field = this.playerField.OwnerIndex == t_current ? this.playerField : this.enemyField;
-
-            TurnEvents.RaiseTurnStarted(t_field);
-            foreach (var t_c in t_field.GetActiveCards())
+        EBattleLoopEnd t_end = await this.battleLoop.Run(
+            async t_current =>
             {
-                if (t_c.justSpawned) { t_c.justSpawned = false; continue; }
-                // [TurnBegan] 카드 단위. 패시브 → 시너지 순.
-                var t_beganCtx = new TurnCtx(t_c, t_field);
-                await SynergyTriggers.TurnBegan(t_beganCtx);
-            }
-            this.ctx.RefreshViews();
+                this.viewCtx.RefreshViews();
 
-            // 내 턴인지 기준으로 배너 선택 (멀티에서 P2는 t_current=1이 내 턴)
-            bool t_isMyTurn = IsMyTurn(t_current);
-            // 선공 배너는 인트로(PlayIntroAndStart)에서 이미 재생 → 첫 턴만 스킵.
-            if (!t_skipBanner && this.ctx.turnBanner != null)
+                bool t_isMyTurn = IsMyTurn(t_current);
+                if (!t_skipBanner && this.viewCtx.turnBanner != null)
+                {
+                    SoundManager.Instance?.PlayTurnChange();
+                    await this.viewCtx.turnBanner.Play(t_isMyTurn);
+                }
+                t_skipBanner = false;
+
+                if (this.aiTakeoverFillPending)
+                {
+                    this.aiTakeoverFillPending = false;
+                    TurnFillResult t_filled = this.ruleCtx.FillSlots();
+                    await this.viewCtx.AnimateFilled(t_filled);
+                }
+
+                TurnBase t_turn;
+                if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)
+                {
+                    t_turn = t_isMyTurn
+                        ? (TurnBase)new MultiplayerPlayerTurn(this.ctx)
+                        : new MultiplayerOpponentTurn(this.ctx);
+                }
+                else
+                {
+                    t_turn = t_isMyTurn
+                        ? (TurnBase)new PlayerTurn(this.ctx)
+                        : new EnemyTurn(this.ctx);
+                }
+
+                this.battleLoop.ActiveTurn = t_turn as IAiTakeoverContinuable;
+                t_turn.OnEnter();
+                await t_turn.Execute();
+                t_turn.OnExit();
+                this.battleLoop.ActiveTurn = null;
+            },
+            () => this.forcedEnd,
+            t_owner =>
             {
-                SoundManager.Instance?.PlayTurnChange();
-                await this.ctx.turnBanner.Play(t_isMyTurn);
-            }
-            t_skipBanner = false;
-
-            if (this.aiTakeoverFillPending)
+                if (DeckConfig.IsMultiplayer) LogDeterminismHash(t_owner);
+            },
+            BattleResultBeat.AbortFinish,
+            t_count =>
             {
-                this.aiTakeoverFillPending = false;
-                await this.ctx.FillAndAnimate();
-            }
-
-            TurnBase t_turn;
-            if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)
-            {
-                t_turn = t_isMyTurn
-                    ? (TurnBase)new MultiplayerPlayerTurn(this.ctx)
-                    : new MultiplayerOpponentTurn(this.ctx);
-            }
-            else
-            {
-                t_turn = t_isMyTurn
-                    ? (TurnBase)new PlayerTurn(this.ctx)
-                    : (TurnBase)new EnemyTurn(this.ctx);
-            }
-
-            this.activeTurn = t_turn;
-            t_turn.OnEnter();
-            await t_turn.Execute();
-            t_turn.OnExit();
-            this.activeTurn = null;
-
-            // [TurnEnded] 이번 턴 필드의 라이브 카드마다 패시브 → 시너지 순(유산 legacyStack++ 등).
-            // 동기 void, RNG 미소비. CheckGameOver 전에 인라인 완결.
-            foreach (var t_c in t_field.GetActiveCards())
-            {
-                var t_endedCtx = new TurnCtx(t_c, t_field);
-                SynergyTriggers.TurnEnded(t_endedCtx);
-            }
-
-            // 보호막은 받은 뒤 상대의 공격 턴 하나를 버티는 상태다.
-            // 현재 행동 진영의 반대 필드 전체에서 지워야 부여 대상과 무관하게 보호막이 함께 만료된다.
-            BattleField t_oppositeField = t_field == this.playerField ? this.enemyField : this.playerField;
-            foreach (var t_c in t_oppositeField.GetActiveCards())
-                t_c.ClearShield();
-            foreach (var t_c in t_oppositeField.GetWaitingCards())
-                t_c.ClearShield();
-
-            if (DeckConfig.IsMultiplayer)
-                LogDeterminismHash(t_current);
-
-            if (this.forcedEnd || CheckGameOver()) break;
-
-            // 여기 왔다 = 판이 안 끝났다. 결정타 강조가 돌았었다면 그 판정이 틀린 것이므로 화면을 되돌린다
-            // (흐림·클로즈업이 남은 채로 다음 턴이 시작되면 먹통으로 보인다). 안 돌았으면 무동작.
-            BattleResultBeat.AbortFinish();
-
-            // 한 라운드는 선공 owner → 후공 owner 순서다. 선공이 1이어도 실제 후공 턴 뒤에만 증가한다.
-            if (t_current == 1 - _startCurrent)
-            {
-                TurnCount++;
-                TurnEvents.RaiseTurnCountChanged(TurnCount);
+                TurnCount = t_count;
                 SetTurnCountLabel();
-            }
+            });
 
-            t_current = 1 - t_current;
-        }
+        if (t_end == EBattleLoopEnd.PlayerWon)
+            FinalizeResult(true, EMatchEndReason.Normal);
+        else if (t_end == EBattleLoopEnd.PlayerLost)
+            FinalizeResult(false, EMatchEndReason.Normal);
+        else if (t_end == EBattleLoopEnd.Draw)
+            FinalizeResult(false, EMatchEndReason.Draw);   // 승자 없음 — 골드만, 랭크는 그대로
     }
-
     /// <summary>턴 끝 보드 지문을 로그로 남긴다. 계산은 <see cref="BattleStateHash"/> 단독 —
     /// 여기서 접는 방식을 따로 두면 로그 해시와 실제로 교환하는 해시가 갈려 대조가 무의미해진다.</summary>
     void LogDeterminismHash(int _actingOwner)
     {
         ulong t_hash = BattleStateHash.Compute(this.playerField, this.enemyField);
+        BattleGoldenRecorder.RecordCheckpoint(TurnCount, _actingOwner, t_hash);
         Debug.Log($"[Hash] turn={TurnCount} owner={_actingOwner} board=0x{t_hash:X16} draws={MatchRandom.DrawCount}");
-    }
-
-    /// <summary>ownerIndex 0이 선공인가. 튜토리얼만 스크립트 전제로 owner 0 고정,
-    /// 일반 싱글과 멀티는 시드된 MatchRandom 코인으로 결정한다.</summary>
-    bool DecideFirstPlayer()
-    {
-        if (TutorialConfig.IsActive)  return true;   // 튜토리얼: 플레이어 선공 고정(스크립트 순서 전제)
-        return MatchRandom.Range(2) == 0;
     }
 
     void SetTurnCountLabel()
@@ -494,91 +469,25 @@ public class TurnRunner : MonoBehaviour
             this.turnCountLabel.text = $"{TurnCount} 턴";
     }
 
-    // 승패 확정 시점에 보상 지급
+    // 승패 확정 시점의 보상·랭크·제출은 BattleOutcome이 한 번만 수행한다.
     void CaptureResult(bool _won, EMatchEndReason _reason)
     {
-        // 이미 승패가 확정된 뒤에는 이탈-부전승 등 후속 콜백이 결과를 덮어쓰지 못하게 한다.
-        if (this.resultCaptured) return;
-        
-        this.resultCaptured = true;
-
-        var t_active = this.playerField.GetActiveCards();
-        int t_remaining = t_active.Count + this.playerField.WaitingCount;
-
-        // 보상을 만든 그 카드들을 그대로 팝업에 넘긴다 — 목록과 금액이 갈라지면 계단이 어긋난다.
-        this.lastSurvivorCards = CollectSurvivorCards(t_active);
-
-        // 잃은 카드는 필드가 사망 시점에 적어 둔 것을 값으로 복사한다(리매치가 원본을 비운다).
-        this.lastFallenCards = new List<int>(this.playerField.FallenCards);
-
-        // 토너먼트 전투는 전투 보상도 랭크도 없다 — 정점의 상은 맵에서 받는 그 보상 하나뿐이다.
-        // (전투 골드까지 주면 클리어 정점 재도전이 그대로 파밍이 되고, 상이 둘로 갈려 무엇을 받았는지도 흐려진다.)
-        // ApplyBattleResult의 튜토리얼 인자는 승급전만 스킵하고 포인트는 그대로 주므로 여기 쓸 수 없다.
-        if (TournamentRun.IsActive)
+        if (this.battleOutcome == null)
         {
-            // 승리 낙인은 여기서 영속한다 — 로비까지 미루면 로딩 중 종료가 승리를 삼킨다. 지급은 수령 시점 한 곳뿐이다.
-            if (_won) TournamentProgress.MarkRewardPending(TournamentRun.NodeId);
-
-            TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
-
-            this.lastReward = default;   // 결과 팝업의 골드 줄이 직전 판 값을 물려받지 않게
-            this.lastRankDelta = 0;      // 포인트 줄도 같은 이유로 0
-            return;
+            this.ruleCtx = this.ruleCtx ?? new TurnRuleContext
+            {
+                playerField = this.playerField,
+                enemyField = this.enemyField,
+            };
+            this.battleOutcome = new BattleOutcome(this.ruleCtx);
         }
 
-        long t_rankPointsBefore = RankManager.Points;
-        bool t_serverPayout = DeckConfig.IsMultiplayer;
+        if (!this.battleOutcome.TryCapture(_won, _reason)) return;
 
-        // 결과 팝업이 읽을 예상액이다 — 싱글·멀티 모두 확정 액수의 진실원은 서버 쪽이다.
-        this.lastReward = RewardService.CalculateReward(_won, t_remaining);
-
-        // 싱글 지급은 여기서 띄우기만 한다(기다리지 않는다) — 캐리어는 응답이 도착한 시점에 지급 경로가 세운다.
-        if (!t_serverPayout) RewardService.GrantBattleRewardAsync(_won, t_remaining);
-
-        // 표시용 랭크: 전투 결과로 포인트 가감.
-        // 튜토리얼 전투도 똑같이 정산한다 — 포인트 획득 연출은 첫 전투부터 보여준다.
-        // 다만 튜토 전투는 첫 티어를 넘지 못한다(랭크 진입은 졸업만이 결정한다) — 그 판정을 랭크가 스스로 할 수 없어 여기서 넘긴다.
-        var t_rank = t_serverPayout
-            ? RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive)
-            : RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
-        this.lastRankDelta = t_rank.Delta;
-
-        // 승패 무관하게 싣는다 — 로비 랭크 배지가 포인트 증감에 반응한다(보여줄 것이 없는 결과는 캐리어가 스스로 거른다).
-        if (!t_serverPayout) RankResultHandoff.Set(t_rank);
-
-        SubmitMatchEvidence(_won, t_remaining, t_rankPointsBefore, _reason);
-    }
-
-    /// <summary>멀티 매치 대조 증거와 지급 전 랭크 기준점을 서버로 제출한다.
-    /// 보상·랭크는 위에서 이미 로컬로 확정했고, 이 제출은 그 값에 관여하지 않는다.
-    /// 실패해도 무시한다(제출 모듈이 재시도 큐로 들고 간다).</summary>
-    void SubmitMatchEvidence(bool _won, int _remaining, long _rankPointsBefore, EMatchEndReason _reason)
-    {
-        if (!DeckConfig.IsMultiplayer) return;
-
-        // 에디터 강제 승리는 이쪽 화면만 끝난다 — 상대는 계속 두고 있어 짝이 될 제출이 없다.
-        if (_reason == EMatchEndReason.DebugForceWin) return;
-
-        // 상대 이탈 후 AI가 인수한 판은 목격자가 하나뿐이라 대조가 성립하지 않는다.
-        if (DeckConfig.AiTakeover) return;
-
-        int t_opponentRemaining = this.enemyField.GetActiveCards().Count + this.enemyField.WaitingCount;
-        MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining, _rankPointsBefore);
-    }
-
-    // 슬롯 → 대기 순. 데이터가 빈 카드도 자리를 지킨다 — 빼면 보상 계단의 분모가 카드 수와 어긋난다.
-    // 그리는 일(진화 아트·프레임)은 넘겨받은 쪽(SurvivorGoldFlight → CardVisualView)이 한다.
-    List<int> CollectSurvivorCards(List<CardInstance> _active)
-    {
-        var t_cards = new List<int>(_active.Count + this.playerField.WaitingCount);
-
-        for (int t_i = 0; t_i < _active.Count; t_i++)
-            t_cards.Add(_active[t_i]?.cardId ?? 0);
-
-        foreach (CardInstance t_card in this.playerField.GetWaitingCards())
-            t_cards.Add(t_card?.cardId ?? 0);
-
-        return t_cards;
+        this.lastReward = this.battleOutcome.Reward;
+        this.lastRankDelta = this.battleOutcome.RankDelta;
+        this.lastSurvivorCards = this.battleOutcome.SurvivorCards;
+        this.lastFallenCards = this.battleOutcome.FallenCards;
     }
 
     public static void Cleanup()
@@ -586,6 +495,7 @@ public class TurnRunner : MonoBehaviour
         TurnEvents.Reset();
         MatchRandom.Reset();
         BattleCommandLog.Reset();    // 명령 로그도 같은 자리에서 수명을 끊는다(제출은 이미 값을 복사해 갔다).
+        BattleGoldenRecorder.Reset();
         TutorialConfig.End();        // 씬 종료 시 튜토리얼 해제(다음 일반 전투로 누수 방지)
         TournamentRun.End();         // 토너먼트 정점도 같은 수명 — 남으면 다음 판 AI 레벨·랭크 정산이 정점 규칙으로 굳는다.
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
@@ -640,7 +550,7 @@ public class TurnRunner : MonoBehaviour
         MultiplayerTurnRunner.Instance?.PrepareAiTakeover();
         NetworkGameController.Instance?.ForceOpponentReady();
         NetworkGameController.Instance?.ForceOpponentMulliganChoice();
-        (this.activeTurn as MultiplayerPlayerTurn)?.ContinueAfterAiTakeover();
+        this.battleLoop?.ActiveTurn?.ContinueAfterAiTakeover();
 
         Debug.Log("[Net] 상대 이탈 — 기존 보드 상태를 유지한 채 AI가 전투를 인수한다.");
     }
@@ -657,20 +567,4 @@ public class TurnRunner : MonoBehaviour
 
     const string LobbySceneName = "LobbyScene";
 
-    bool CheckGameOver()
-    {
-        // 정상 종료만 여운을 탄다. 여기까지 왔다는 건 이번 턴의 공격·사망 연출과 충원이 모두 끝났다는 뜻이라,
-        // 여운은 "정리된 보드를 한 박자 붙잡았다가" 팝업을 여는 연출이 된다.
-        if (this.enemyField.IsEmpty)
-        {
-            FinalizeResult(true, EMatchEndReason.Normal);
-            return true;
-        }
-        if (this.playerField.IsEmpty)
-        {
-            FinalizeResult(false, EMatchEndReason.Normal);
-            return true;
-        }
-        return false;
-    }
 }

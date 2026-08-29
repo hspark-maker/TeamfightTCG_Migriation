@@ -377,6 +377,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
             this.seedSource,
             this.seedHex,
             this.rulesetVersion,
+            this.MyOwnerIndex,
             this.myNonce,
             this.opponentNonce,
             SpecSource.BattleFingerprint.ToLowerInvariant(),
@@ -454,7 +455,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
             await ServerMatchSeedSubmission.TryAcquireAsync(
                 ContentProfileConfig.Active.CloudEnvId,
                 BuildServerPairingKey(NetworkSession.Instance?.PairingKey),
-                SpecSource.BattleFingerprint.ToLowerInvariant());
+                SpecSource.BattleFingerprint.ToLowerInvariant(),
+                this.MyOwnerIndex);
         if (InitAborted) return false;
         if (t_result.status != ServerMatchSeedStatus.Paired || t_result.match == null)
         {

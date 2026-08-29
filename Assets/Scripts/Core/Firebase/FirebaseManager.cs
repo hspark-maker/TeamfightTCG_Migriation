@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Firebase;
 using Firebase.Firestore;
@@ -12,8 +13,16 @@ public static class FirebaseManager
     static FirebaseEmulatorConfig s_emulators = FirebaseEmulatorConfig.Disabled;
     static bool s_initialized;
     static bool s_settingsApplied;
+    static CancellationTokenSource s_lifetime = new CancellationTokenSource();
 
     public static bool IsInitialized => s_initialized;
+
+    /// <summary>이번 Firebase 세션의 수명 토큰. <see cref="Shutdown"/> 에서 취소된다.
+    ///
+    /// <para>Firestore·Functions 호출을 도는 폴링 루프는 반드시 여기에 묶어야 한다. 안 묶으면
+    /// 에디터 정리(ShutdownForEditor)가 <c>TerminateAsync</c> 로 넘어갈 때 진행 중인 호출이 남아
+    /// 종료가 끝나지 않고, gRPC 네이티브 스레드가 살아남아 Unity가 "Reloading Domain"에서 멈춘다.</para></summary>
+    public static CancellationToken Lifetime => s_lifetime.Token;
 
     internal static void Register(IFirebaseModule _module)
     {
@@ -93,10 +102,22 @@ public static class FirebaseManager
 
     internal static void Shutdown()
     {
+        // 모듈보다 먼저 끊는다 — 진행 중인 콜러블·Firestore 왕복이 살아 있으면 종료가 그것들을 기다린다.
+        CancelLifetime();
+
         for (int i = s_modules.Count - 1; i >= 0; i--) SafeShutdown(s_modules[i]);
         FirebaseAuthService.Instance.Shutdown();
         s_firestore = null;
         s_initialized = false;
+    }
+
+    static void CancelLifetime()
+    {
+        CancellationTokenSource t_previous = s_lifetime;
+        s_lifetime = new CancellationTokenSource();
+        try { t_previous.Cancel(); }
+        catch (ObjectDisposedException) { }
+        t_previous.Dispose();
     }
 
     static FirebaseFirestore GetFirestore()
@@ -167,17 +188,30 @@ public static class FirebaseManager
         try { Shutdown(); }
         catch (Exception t_exception) { Debug.LogWarning($"[Firebase] 에디터 정리 실패: {t_exception.Message}"); }
 
-        if (t_firestore == null) return;
+        // 여기서 TerminateAsync를 await하거나 .Wait()로 막으면 안 된다.
+        // Firebase는 완료 콜백을 UnitySynchronizationContext로 메인 스레드에 넘기는데,
+        // 리로드 콜백은 그 메인 스레드에서 돈다 — 막는 순간 콜백이 실행될 유일한 경로를 스스로 끊어
+        // 종료가 영영 끝나지 않고, 남은 gRPC 스레드 때문에 "Reloading Domain"이 멈춘다.
+        // 그래서 종료는 킥만 하고, 네이티브 자원은 아래 앱 Dispose가 동기로 내린다.
+        if (t_firestore != null)
+        {
+            try { t_firestore.TerminateAsync(); }
+            catch (Exception t_exception)
+            {
+                Debug.LogWarning($"[Firebase] Firestore 종료 요청 실패: {t_exception.Message}");
+            }
+        }
 
+        // C++ SDK의 앱 소멸자가 Firestore·Auth·Functions의 네이티브 스레드를 동기로 내린다 —
+        // 메인 스레드 펌핑에 의존하지 않는 유일한 경로다. 참조만 버리면 스레드가 남는다.
+        // 다음 플레이에서는 FirebaseApp.DefaultInstance가 다시 만들어진다(정적 상태는 리로드가 비운다).
         try
         {
-            // 리로드 콜백에는 await 창이 없다 — 짧게만 기다리고 넘어간다(무한 대기가 곧 hang이다).
-            if (!t_firestore.TerminateAsync().Wait(TimeSpan.FromSeconds(3)))
-                Debug.LogWarning("[Firebase] Firestore 종료가 3초 안에 끝나지 않았다.");
+            FirebaseApp.DefaultInstance?.Dispose();
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[Firebase] Firestore 종료 실패: {t_exception.Message}");
+            Debug.LogWarning($"[Firebase] 앱 정리 실패: {t_exception.Message}");
         }
     }
 #endif
