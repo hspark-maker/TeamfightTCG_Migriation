@@ -15,6 +15,7 @@ const {
   writeReceiptOnly,
   readReceipt,
 } = require("../lib/currency/walletStore.js");
+const {cacheableResponse} = require("../lib/save/receiptCache.js");
 
 const KEYS_SORTED = ["Diamond", "Energy", "Gold", "Shard"];
 const NOW = "<serverTimestamp>";
@@ -218,5 +219,36 @@ assert.deepEqual(readReceipt(snapshotOf({source: "mutateSave", result: null})),
 
 assert.throws(() => readReceipt(snapshotOf({source: "openPack", result: "{not json"})),
   "깨진 result 는 던진다 — 미스로 강등하면 재집행이 열려 이중 과금이 된다");
+
+// ── 캐시본의 모양: 슬롯 **값**은 영수증에 실리지 않는다 ───────────────
+// mutateSave 가 영수증에 넣는 것은 응답 그대로가 아니라 updatedSlots 를 빼고 slotKeys 만
+// 남긴 캐시본이다. openPack 의 ownership 은 슬롯 전체 값이라 계정이 자랄수록 커지고,
+// 영수증이 1MiB 상한을 치면 트랜잭션이 통째로 실패해 정상 명령이 죽는다.
+{
+  const response = {
+    revision: 12,
+    updatedSlots: {ownership: {ownedIds: [1, 2, 3]}},
+    wallet: {rev: 9, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0}},
+    packId: "Pack_Basic",
+  };
+  const cached = cacheableResponse(response, response.updatedSlots);
+
+  const tx = fakeTransaction();
+  writeReceiptOnly(tx, fakeRef("wallet"), "openPack",
+    {rev: 9, balances: {Gold: 100}, paidBalances: {}}, CLIENT_RECEIPT, cached, NOW);
+
+  const stored = receiptWrite(tx).value.result;
+  assert.equal(stored.includes("ownedIds"), false, "슬롯 값은 영수증에 실리지 않는다");
+  assert.equal(stored.includes("updatedSlots"), false,
+    "JSON.stringify 가 undefined 필드를 버린다 — 키 자체가 남지 않는다");
+
+  const replayed = readReceipt(snapshotOf({source: "openPack", result: stored}));
+  assert.equal(replayed.hit, true);
+  assert.deepEqual(replayed.result.slotKeys, ["ownership"],
+    "재시도는 슬롯 이름만 받아 현재 세이브 문서에서 값을 다시 짓는다");
+  assert.equal(replayed.result.revision, 12, "revision 은 첫 시도 때의 값이다");
+  assert.equal(replayed.result.packId, "Pack_Basic", "명령별 필드도 그대로 되살아난다");
+  assert.equal("updatedSlots" in replayed.result, false);
+}
 
 console.log("test-wallet-store: ok");

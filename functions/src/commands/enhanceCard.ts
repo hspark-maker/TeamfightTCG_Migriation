@@ -1,6 +1,6 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {randomInt} from "node:crypto";
+import {randomInt, randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {
@@ -10,6 +10,7 @@ import {
   SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {readSpecRows} from "../packs/packSpecReader";
 import {canAfford, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
@@ -90,59 +91,75 @@ export const enhanceCard = onCall(async (request) => {
   let currency = "";
   let cost = 0;
   let freeShotUsed = false;
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
 
-  const result = await mutateSave(env, uid, "enhanceCard", async (current, transaction, wallet): Promise<SaveMutation> => {
-    // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
-    const entries = readGrowthEntries(current.cardGrowth);
-    const currentLevel = levelOfCard(entries, cardId);
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-    const step = cardEnhanceStep(rule, overrides, currentLevel + 1);
-    if (step === null) {
-      reject("MaxLevel", `Card ${cardId} is already at the max level.`,
-        {uid, env, cardId, level: currentLevel, maxLevel: rule.maxLevel});
-    }
+  const result = await mutateSave(env, uid, "enhanceCard", {kind: "client", txId},
+    async (current, transaction, wallet): Promise<SaveMutation> => {
+      // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
+      const entries = readGrowthEntries(current.cardGrowth);
+      const currentLevel = levelOfCard(entries, cardId);
 
-    // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
-    // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
-    const grantsReference = freeShotRequested ? grantsRef(db, env, uid) : null;
-    let freeShot: TutorialGrants | null = null;
-    if (grantsReference !== null) {
-      const grants = readGrants(await transaction.get(grantsReference));
-      if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
-    }
+      const step = cardEnhanceStep(rule, overrides, currentLevel + 1);
+      if (step === null) {
+        reject("MaxLevel", `Card ${cardId} is already at the max level.`,
+          {uid, env, cardId, level: currentLevel, maxLevel: rule.maxLevel});
+      }
 
-    const charged = freeShot === null ? step.cost : 0;
-    const balances = wallet.balances;
-    if (!canAfford(balances, step.currency, charged)) {
-      reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`,
-        {uid, env, cardId, level: currentLevel, currency: step.currency, cost: charged,
-          balance: balances[step.currency]});
-    }
+      // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
+      // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
+      const grantsReference = freeShotRequested ? grantsRef(db, env, uid) : null;
+      let freeShot: TutorialGrants | null = null;
+      if (grantsReference !== null) {
+        const grants = readGrants(await transaction.get(grantsReference));
+        if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
+      }
 
-    const succeeded = rollSucceeded(step.successPermille, randomInt);
-    if (succeeded && grantsReference !== null && freeShot !== null) {
-      writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
-    }
+      const charged = freeShot === null ? step.cost : 0;
+      const balances = wallet.balances;
+      if (!canAfford(balances, step.currency, charged)) {
+        reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`,
+          {uid, env, cardId, level: currentLevel, currency: step.currency, cost: charged,
+            balance: balances[step.currency]});
+      }
 
-    outcome = succeeded ? "Success" : "Failed";
-    level = succeeded ? step.level : currentLevel;
-    currency = step.currency;
-    cost = charged;
-    freeShotUsed = succeeded && freeShot !== null;
+      const succeeded = rollSucceeded(step.successPermille, randomInt);
+      if (succeeded && grantsReference !== null && freeShot !== null) {
+        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
+      }
 
-    return {
-      slots: {
-        cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
-      },
-      wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceCard"),
-    };
-  });
+      outcome = succeeded ? "Success" : "Failed";
+      level = succeeded ? step.level : currentLevel;
+      currency = step.currency;
+      cost = charged;
+      freeShotUsed = succeeded && freeShot !== null;
 
-  logger.info("enhanceCard", {
-    uid, env, cardId, outcome, level, currency, cost,
-    freeShotRequested, freeShotUsed,
-    revision: result.revision,
-  });
+      return {
+        slots: {
+          cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
+        },
+        wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceCard"),
+      };
+    },
+    (adopted) => {
+      replayed = false;
+      return {...adopted, outcome, level, currency, cost, freeShotUsed};
+    });
 
-  return {...result, outcome, level, currency, cost, freeShotUsed};
+  if (replayed) {
+    logger.info("receipt replay", {uid, env, source: "enhanceCard", txId, revision: result.revision});
+  } else {
+    logger.info("enhanceCard", {
+      uid, env, cardId, outcome, level, currency, cost,
+      freeShotRequested, freeShotUsed,
+      revision: result.revision,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+
+  return result;
 });

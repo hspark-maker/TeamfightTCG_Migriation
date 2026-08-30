@@ -1,5 +1,6 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {
@@ -9,6 +10,7 @@ import {
   SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {readSpecRows} from "../packs/packSpecReader";
 import {canAfford, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
@@ -84,56 +86,72 @@ export const enhanceKeyword = onCall(async (request) => {
   let currency = "";
   let cost = 0;
   let freeShotUsed = false;
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
 
-  const result = await mutateSave(env, uid, "enhanceKeyword", async (current, transaction, wallet): Promise<SaveMutation> => {
-    const levels = readKeywordLevels(current.keywordGrowth);
-    const currentLevel = levelOfKeyword(levels, keyword);
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-    const step = keywordEnhanceStep(rule, currentLevel);
-    if (step === null) {
-      reject("MaxLevel", `Keyword ${keyword} is already at the max level.`,
-        {uid, env, keyword, level: currentLevel, maxLevel: rule.maxLevel});
-    }
+  const result = await mutateSave(env, uid, "enhanceKeyword", {kind: "client", txId},
+    async (current, transaction, wallet): Promise<SaveMutation> => {
+      const levels = readKeywordLevels(current.keywordGrowth);
+      const currentLevel = levelOfKeyword(levels, keyword);
 
-    // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
-    // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
-    const grantsReference = freeShotRequested ? grantsRef(db, env, uid) : null;
-    let freeShot: TutorialGrants | null = null;
-    if (grantsReference !== null) {
-      const grants = readGrants(await transaction.get(grantsReference));
-      if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
-    }
+      const step = keywordEnhanceStep(rule, currentLevel);
+      if (step === null) {
+        reject("MaxLevel", `Keyword ${keyword} is already at the max level.`,
+          {uid, env, keyword, level: currentLevel, maxLevel: rule.maxLevel});
+      }
 
-    const charged = freeShot === null ? step.cost : 0;
-    const balances = wallet.balances;
-    if (!canAfford(balances, step.currency, charged)) {
-      reject("NotAffordable", `Not enough ${step.currency} to enhance keyword ${keyword}.`,
-        {uid, env, keyword, level: currentLevel, currency: step.currency, cost: charged,
-          balance: balances[step.currency]});
-    }
+      // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
+      // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
+      const grantsReference = freeShotRequested ? grantsRef(db, env, uid) : null;
+      let freeShot: TutorialGrants | null = null;
+      if (grantsReference !== null) {
+        const grants = readGrants(await transaction.get(grantsReference));
+        if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
+      }
 
-    if (grantsReference !== null && freeShot !== null) {
-      writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
-    }
+      const charged = freeShot === null ? step.cost : 0;
+      const balances = wallet.balances;
+      if (!canAfford(balances, step.currency, charged)) {
+        reject("NotAffordable", `Not enough ${step.currency} to enhance keyword ${keyword}.`,
+          {uid, env, keyword, level: currentLevel, currency: step.currency, cost: charged,
+            balance: balances[step.currency]});
+      }
 
-    level = step.level;
-    currency = step.currency;
-    cost = charged;
-    freeShotUsed = freeShot !== null;
+      if (grantsReference !== null && freeShot !== null) {
+        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
+      }
 
-    return {
-      slots: {
-        keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
-      },
-      wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceKeyword"),
-    };
-  });
+      level = step.level;
+      currency = step.currency;
+      cost = charged;
+      freeShotUsed = freeShot !== null;
 
-  logger.info("enhanceKeyword", {
-    uid, env, keyword, level, currency, cost,
-    freeShotRequested, freeShotUsed,
-    revision: result.revision,
-  });
+      return {
+        slots: {
+          keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
+        },
+        wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceKeyword"),
+      };
+    },
+    (adopted) => {
+      replayed = false;
+      return {...adopted, outcome: "Success", level, currency, cost, freeShotUsed};
+    });
 
-  return {...result, outcome: "Success", level, currency, cost, freeShotUsed};
+  if (replayed) {
+    logger.info("receipt replay", {uid, env, source: "enhanceKeyword", txId, revision: result.revision});
+  } else {
+    logger.info("enhanceKeyword", {
+      uid, env, keyword, level, currency, cost,
+      freeShotRequested, freeShotUsed,
+      revision: result.revision,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+
+  return result;
 });

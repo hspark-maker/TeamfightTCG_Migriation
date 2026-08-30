@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -7,6 +8,7 @@ import {
   SaveMutation,
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {readSpecRows} from "../packs/packSpecReader";
 import {
   parseRankGradeRows,
@@ -392,33 +394,50 @@ export const claimReward = onCall(async (request) => {
     logger.warn("clearing a node with no authored reward", {...context, specOwnerId, droppedCount: dropped.length});
   }
 
-  const result = await mutateSave(env, uid, "claimReward", (current, _transaction, wallet): SaveMutation => {
-    // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
-    // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
-    // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
-    const paid = gains.length === 0 ?
-      undefined :
-      nextWallet(wallet, grant(wallet.balances, gains), "claimReward");
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-    if (ownerType === "Rank") {
-      const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
-      return {slots: {rank}, wallet: paid};
-    }
-    if (ownerType === "Album") {
-      return {slots: {albumReward: claimAlbumReward(current, albumEntries, context)}, wallet: paid};
-    }
-    if (isChapter) {
-      return {slots: {tournament: claimTournamentChapter(current, chapterNodes, context)}, wallet: paid};
-    }
-    return {slots: {tournament: clearTournamentNode(current, context)}, wallet: paid};
-  });
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
 
-  logger.info("claimReward", {
-    uid, env, ownerType, ownerId: specOwnerId,
-    granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
-    droppedCount: dropped.length,
-    revision: result.revision,
-  });
+  const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
+    (current, _transaction, wallet): SaveMutation => {
+      // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
+      // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
+      // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
+      const paid = gains.length === 0 ?
+        undefined :
+        nextWallet(wallet, grant(wallet.balances, gains), "claimReward");
 
-  return {...result, granted: gains};
+      if (ownerType === "Rank") {
+        const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
+        return {slots: {rank}, wallet: paid};
+      }
+      if (ownerType === "Album") {
+        return {slots: {albumReward: claimAlbumReward(current, albumEntries, context)}, wallet: paid};
+      }
+      if (isChapter) {
+        return {slots: {tournament: claimTournamentChapter(current, chapterNodes, context)}, wallet: paid};
+      }
+      return {slots: {tournament: clearTournamentNode(current, context)}, wallet: paid};
+    },
+    (adopted) => {
+      replayed = false;
+      return {...adopted, granted: gains};
+    });
+
+  if (replayed) {
+    logger.info("receipt replay", {uid, env, source: "claimReward", txId, revision: result.revision});
+  } else {
+    logger.info("claimReward", {
+      uid, env, ownerType, ownerId: specOwnerId,
+      granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
+      droppedCount: dropped.length,
+      revision: result.revision,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+
+  return result;
 });

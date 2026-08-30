@@ -8,12 +8,16 @@ import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {CurrencyGain, grant} from "../currency/wallet";
 import {
   nextWallet,
+  readReceipt,
   readWallet,
   ReceiptKey,
+  receiptRef,
   walletRef,
   writeReceiptOnly,
   writeWallet,
 } from "../currency/walletStore";
+import {rejectDomain} from "../save/domainReject";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 
 type ClaimPayoutData = {env: "live" | "test"; action: "list" | "ack"; matchIds: string[]};
 
@@ -74,6 +78,12 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
   if (data.matchIds.length === 0) return {acked: [], wallet: null};
 
   const reference = walletRef(db, data.env, uid);
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const receipt: ReceiptKey = {kind: "client", txId: clientReceiptId(request.data?.txId, randomUUID())};
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // 응답을 짓는 자리에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
+
   // 낙인(ready → claimed)과 크레딧은 한 트랜잭션 안이어야 한다 — 갈라 놓으면 낙인만 성공해
   // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
   const result = await db.runTransaction(async (tx) => {
@@ -89,6 +99,18 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
         "failed-precondition",
         "Wallet document does not exist. Boot must call ensureWallet first.",
       );
+    }
+
+    // 영수증이 마지막 읽기다 — 아래 낙인(claimed)이 첫 쓰기라 여기보다 뒤로 밀 수 없다.
+    // 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
+    const lookup = readReceipt(await tx.get(receiptRef(reference, receipt.txId)));
+    if (lookup.hit) {
+      if (lookup.source !== "claimPayout") {
+        rejectDomain("TxIdReused",
+          `txId '${receipt.txId}' was already used by another command.`,
+          {uid, env: data.env, source: "claimPayout", receiptSource: lookup.source, txId: receipt.txId});
+      }
+      return lookup.result as {acked: string[]; wallet: {rev: number; balances: Record<string, number>}};
     }
 
     const accepted: string[] = [];
@@ -111,22 +133,33 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     }
 
     const current = readWallet(walletSnapshot);
-    // C8-2 에서 요청 txId 로 갈아끼운다 — 지금은 서버 발급이라 멱등이 아니고 영수증만 쌓인다.
-    const receipt: ReceiptKey = {kind: "client", txId: randomUUID()};
 
     // 크레딧할 것이 없으면 지갑을 쓰지 않는다 — 빈 지급으로 rev 만 올리면 클라가 달라진 것
     // 없는 잔액을 채택하고 사고를 못 알아챈다. 응답에는 현재 잔액을 그대로 싣는다.
     // 그래도 영수증은 끊는다 — 위에서 이미 claimed 낙인을 썼고, 그 낙인이 지급을 대신한다.
+    // 응답은 쓰기 전에 짓는다 — 그것 그대로가 영수증에 담겨야 재시도가 같은 답을 받는다.
     if (gains.length === 0) {
+      replayed = false;
+      const response = {acked: accepted, wallet: {rev: current.rev, balances: current.balances}};
       writeReceiptOnly(
-        tx, reference, "claimPayout", current, receipt, undefined, FieldValue.serverTimestamp());
-      return {acked: accepted, wallet: {rev: current.rev, balances: current.balances}};
+        tx, reference, "claimPayout", current, receipt, response, FieldValue.serverTimestamp());
+      return response;
     }
 
+    replayed = false;
     const update = nextWallet(current, grant(current.balances, gains), "claimPayout");
-    const credited = writeWallet(tx, reference, update, receipt, undefined, FieldValue.serverTimestamp());
-    return {acked: accepted, wallet: {rev: credited.rev, balances: credited.balances}};
+    const response = {acked: accepted, wallet: {rev: update.next.rev, balances: update.next.balances}};
+    writeWallet(tx, reference, update, receipt, response, FieldValue.serverTimestamp());
+    return response;
   });
-  logger.info("claimPayout ack", {uid, env: data.env, acked: result.acked, rev: result.wallet.rev});
+  if (replayed) {
+    logger.info("receipt replay",
+      {uid, env: data.env, source: "claimPayout", txId: receipt.txId, rev: result.wallet.rev});
+  } else {
+    logger.info("claimPayout ack", {
+      uid, env: data.env, acked: result.acked, rev: result.wallet.rev,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
   return result;
 });

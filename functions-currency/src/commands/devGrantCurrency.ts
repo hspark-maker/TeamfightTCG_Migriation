@@ -1,9 +1,11 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {CURRENCY_KEYS, CurrencyKey} from "../generated/currency/currencyKeys";
 import {grant} from "../generated/currency/wallet";
 import {nextWallet} from "../generated/currency/walletStore";
 import {mutateWallet} from "../currency/walletTransaction";
+import {clientReceiptId, isClientReceiptId} from "../generated/save/receiptId";
 
 /**
  * 디버그 재화 지급. 클라 디버그 오버레이가 부르는 test env 전용 통로다.
@@ -45,9 +47,27 @@ export const devGrantCurrency = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "amount must be a positive safe integer.");
   }
 
-  const wallet = await mutateWallet(env, uid, (current) =>
-    nextWallet(current, grant(current.balances, [{currency, amount}]), "devGrantCurrency"));
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
 
-  logger.info("devGrantCurrency", {uid, env, currency, amount, rev: wallet.rev});
-  return {wallet};
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
+
+  const result = await mutateWallet(env, uid, "devGrantCurrency", {kind: "client", txId},
+    (current) => nextWallet(current, grant(current.balances, [{currency, amount}]), "devGrantCurrency"),
+    (wallet) => {
+      replayed = false;
+      return {wallet};
+    });
+
+  if (replayed) {
+    logger.info("receipt replay", {uid, env, source: "devGrantCurrency", txId, rev: result.wallet.rev});
+  } else {
+    logger.info("devGrantCurrency", {
+      uid, env, currency, amount, rev: result.wallet.rev,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+  return result;
 });

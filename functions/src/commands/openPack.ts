@@ -1,6 +1,6 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {randomInt} from "node:crypto";
+import {randomInt, randomUUID} from "node:crypto";
 import {
   isKnownEnv,
   mutateSave,
@@ -14,6 +14,7 @@ import {canAfford, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {addSnack, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
 import {rejectDomain} from "../save/domainReject";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {
   readCardPackRow,
   readDropRows,
@@ -91,64 +92,75 @@ export const openPack = onCall(async (request) => {
   let goldBefore = 0;
   let goldAfter = 0;
   let poolSize = 0;
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
 
-  const result = await mutateSave(env, uid, "openPack", (current, _transaction, wallet): SaveMutation => {
-    // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
-    const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
-    const grade = gradeOf(thresholds, points);
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-    const required = parseRequiredGrade(pack.minRankGrade);
-    if (required !== null && (!isRanked(thresholds, points) || grade < required)) {
-      reject("RankLocked", `Pack '${packId}' requires rank grade ${required}.`,
-        {uid, env, packId, points, grade, required});
-    }
+  const result = await mutateSave(env, uid, "openPack", {kind: "client", txId},
+    (current, _transaction, wallet): SaveMutation => {
+      // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
+      const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
+      const grade = gradeOf(thresholds, points);
 
-    const pool = resolveDropPool(dropRows, grade, catalogIds);
-    if (pool.length === 0) {
-      reject("EmptyPool", `Pack '${packId}' has no drawable card at grade ${grade}.`,
-        {uid, env, packId, grade, dropRowCount: dropRows.length, catalogSize: catalogIds.size});
-    }
-    poolSize = pool.length;
+      const required = parseRequiredGrade(pack.minRankGrade);
+      if (required !== null && (!isRanked(thresholds, points) || grade < required)) {
+        reject("RankLocked", `Pack '${packId}' requires rank grade ${required}.`,
+          {uid, env, packId, points, grade, required});
+      }
 
-    const balances = wallet.balances;
-    if (!canAfford(balances, pack.priceType, pack.price)) {
-      reject("InsufficientGold", `Not enough ${pack.priceType} for pack '${packId}'.`,
-        {uid, env, packId, priceType: pack.priceType, price: pack.price, balance: balances[pack.priceType]});
-    }
+      const pool = resolveDropPool(dropRows, grade, catalogIds);
+      if (pool.length === 0) {
+        reject("EmptyPool", `Pack '${packId}' has no drawable card at grade ${grade}.`,
+          {uid, env, packId, grade, dropRowCount: dropRows.length, catalogSize: catalogIds.size});
+      }
+      poolSize = pool.length;
 
-    const owned = readOwnedIds(current.ownership);
-    const ownedSet = new Set(owned);
-    drawn = drawPack(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, randomInt);
+      const balances = wallet.balances;
+      if (!canAfford(balances, pack.priceType, pack.price)) {
+        reject("InsufficientGold", `Not enough ${pack.priceType} for pack '${packId}'.`,
+          {uid, env, packId, priceType: pack.priceType, price: pack.price, balance: balances[pack.priceType]});
+      }
 
-    const paid = spend(balances, pack.priceType, pack.price);
-    goldBefore = balances[pack.priceType];
-    goldAfter = paid[pack.priceType];
+      const owned = readOwnedIds(current.ownership);
+      const ownedSet = new Set(owned);
+      drawn = drawPack(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, randomInt);
 
-    return {
-      slots: {
-        ownership: buildOwnershipSlot(owned, drawn),
-        cardGrowth: growthSlot(drawn.reduce(
-          (entries, card) => addSnack(entries, card.cardId, card.snack),
-          readGrowthEntries(current.cardGrowth))),
-      },
-      wallet: nextWallet(wallet, paid, "openPack"),
-    };
-  });
+      const paid = spend(balances, pack.priceType, pack.price);
+      goldBefore = balances[pack.priceType];
+      goldAfter = paid[pack.priceType];
 
-  logger.info("openPack", {
-    uid, env, packId,
-    priceType: pack.priceType, price: pack.price,
-    drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
-    drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),
-    goldBefore, goldAfter,
-    specSource: entryPoints === null ? "rankFallback" : "spec",
-    revision: result.revision,
-  });
+      return {
+        slots: {
+          ownership: buildOwnershipSlot(owned, drawn),
+          cardGrowth: growthSlot(drawn.reduce(
+            (entries, card) => addSnack(entries, card.cardId, card.snack),
+            readGrowthEntries(current.cardGrowth))),
+        },
+        wallet: nextWallet(wallet, paid, "openPack"),
+      };
+    },
+    (adopted) => {
+      replayed = false;
+      return {...adopted, packId, cards: drawn, refundType: pack.refundType};
+    });
 
-  return {
-    ...result,
-    packId,
-    cards: drawn,
-    refundType: pack.refundType,
-  };
+  if (replayed) {
+    logger.info("receipt replay", {uid, env, source: "openPack", txId, revision: result.revision});
+  } else {
+    logger.info("openPack", {
+      uid, env, packId,
+      priceType: pack.priceType, price: pack.price,
+      drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
+      drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),
+      goldBefore, goldAfter,
+      specSource: entryPoints === null ? "rankFallback" : "spec",
+      revision: result.revision,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+
+  return result;
 });
