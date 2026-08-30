@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
@@ -683,9 +683,18 @@ static class PlayerSaveCloud
         // 이 파일의 대기는 전부 DelayType.Realtime이다 — ignoreTimeScale(=UnscaledDeltaTime)은 Time.unscaledDeltaTime을
         // 프레임마다 더하는데, BeforeSceneLoad에서 시작한 이 타임아웃의 첫 프레임 델타에 씬 로드 정지 구간이 통째로
         // 실려 5초 예산이 1프레임 만에 소진된다(실측 705ms). 네트워크 시간은 실시간으로만 재야 한다.
+        //
+        // 예산은 두 갈래다. 이 대기에는 네이티브 SDK의 첫 적재(CheckAndFixDependencies)가 같이 실려 있는데,
+        // 그건 왕복이 아니라 프로세스 1회성 비용이라 5초로 재면 에디터 첫 Play가 통째로 실패한다
+        // (두 번째 Play부터 멀쩡했던 이유가 이것 — 네이티브가 이미 프로세스에 남아 즉시 끝난다).
+        // 한 번 데워진 뒤부터는 남는 게 실제 왕복뿐이라 원래 예산으로 돌아온다.
+        int t_budget = FirebaseAuthService.DependenciesReady
+            ? FirebaseTimeouts.AuthAndReadMilliseconds
+            : FirebaseTimeouts.SdkColdStartMilliseconds;
+
         int t_winner = await UniTask.WhenAny(
             FirebaseAuthService.Instance.InitializeAsync(),
-            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+            UniTask.Delay(t_budget, DelayType.Realtime));
         if (t_winner != 0) throw new TimeoutException("Firebase authentication timed out.");
         if (_generation != s_generation) return string.Empty;
 
