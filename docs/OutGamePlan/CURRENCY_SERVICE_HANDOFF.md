@@ -1,6 +1,6 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-28 · 브랜치 `feature_Firestore` · HEAD `cd1027476`
+> 최종 갱신 2026-08-30 · 브랜치 `feature_Firestore` · HEAD `eea13ea13`
 > 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
@@ -20,7 +20,7 @@
 
 ## 지금 상태
 
-**커밋 15개**
+**커밋 16개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
@@ -37,12 +37,14 @@
 - `1416c4031` C6.3 — 명령의 재화 접점이 전부 지갑으로 · `currencySlot` 삭제
 - `8edb278f2` C6.4·C6.5 — 클라 `UserSaveData.VERSION 8`(슬롯 9) · `WalletCloud` · `claimPayout.ack` 크레딧 → **클라 재화 writer 0**
 - `cd1027476` C6.6 + 검수 — 승급 창 철회 · `devGrantCurrency` 를 `currency` codebase 로
+- `eea13ea13` C7 — 룰 `hasOnly` 14키 · currency 검증 블록 제거 · 하네스 13b·13c·13e 를 13c 하나로
 
 **배포 상태 (실측 2026-08-28 · C6 전량 배포 완료)**
 
 | 함수 · 규칙 | 상태 |
 |---|---|
 | `firestore.rules` C6.2 완화분(`currency` optional · `hasAll` 14키) | **배포됨** · 컴파일 통과 후 릴리즈 |
+| `firestore.rules` C7 조인분(`hasOnly` 14키 · currency 금지) | **미배포** — 하네스 초록, 릴리즈는 사람이 1회 |
 | `ensureWallet` (codebase `default`) | **배포됨 · 신규 create** · **401**(정상) |
 | `claimReward` · `enhanceCard` · `enhanceKeyword` · `openPack` · `ensureAccount` · `claimBattleReward` · `claimPayout` (codebase `default`) | **배포됨**(C6 코드) · **401**(정상) |
 | `ping` · `devBumpRevision` · `createMatch` · `lockDeck` · `submitMatchResult` | 함께 갱신됨(동작 변화 없음) |
@@ -286,9 +288,9 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - **환경 화이트리스트 `save/environments.ts` 는 단일 원본으로 올렸다.** 유틸이 아니라 지갑을 열지 말지 정하는 **데이터**라, 목록이 갈리면 같은 uid 의 지갑을 codebase 마다 다르게 거절한다
 - **`WalletPatch` 선언도 `walletStore` 로 올렸다.** 응답 모양이 갈리면 클라가 같은 지갑을 두 가지로 읽는다
 
-**룰은 완화만 했다 — 조이는 것은 C7 이다.**
+**룰은 완화만 했다 — 조인 것은 C7 이다(`eea13ea13`).**
 
-`hasOnly` **15키는 그대로 두고**, `hasAll` 에서 `currency` **만** 뺐으며, currency 검증 블록을 `(!hasAny(['currency']) || 기존 전수 검증)` 으로 감쌌다. 검증을 통째로 빼지 않은 이유는 승급 전 구 클라가 여전히 그 필드를 싣기 때문이다 — 그 구간에 값 위조가 열리면 안 된다. 그래서 지금 룰은 15키(구)와 14키(신)를 **둘 다** 받는다.
+C6 은 `hasOnly` **15키를 그대로 두고**, `hasAll` 에서 `currency` **만** 뺐으며, currency 검증 블록을 `(!hasAny(['currency']) || 기존 전수 검증)` 으로 감쌌다. 검증을 통째로 빼지 않은 이유는 승급 전 구 클라가 여전히 그 필드를 싣기 때문이었다 — 그 구간에 값 위조가 열리면 안 됐다. 그 공존(15키 구 · 14키 신)은 **C7 이 닫았다.**
 
 **클라**
 
@@ -309,17 +311,23 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - `UI/HUD/CurrencyHud` 의 죽은 소모 연출 필드, `link.xml` 의 `EnsureAccountResult` 누락
 
 **남은 것 — 배포와 실기 왕복 전부.** 위 "배포 순서" 를 지킨 뒤, 최소 확인은 ① v7 계정 부트 → `ensureWallet` 이 승급하고 잔액이 그대로인가 ② 신규 계정 → 스타터 골드 100 이 지갑에 서는가 ③ `openPack`·강화 → 차감이 지갑에서 일어나고 세이브 `revision` 은 정확히 +1 인가 ④ `claimBattleReward`·`devGrantCurrency` → `revision` 없이 잔액만 오르고 세션이 안 끊기는가 ⑤ 멀티 payout `ack` → 크레딧이 한 번만인가.
-### C7 — 조이기 (구 클라 소멸 후)
+### C7 — 조이기 ✅ (`eea13ea13` · **룰 배포 미실행**)
 
-C6 이 **완화만** 해 둔 자리를 되돌린다. 할 일이 셋으로 구체화됐다.
+C6 이 **완화만** 해 둔 자리를 되돌렸다. `isValidSave()` 의 `hasOnly` 가 **14키**가 되어 위아래 두 목록이 같아졌고, 그로써 도달 불가가 된 `(!hasAny(['currency']) || 전수 검증)` 블록을 통째로 걷었다. **세이브에 `currency` 가 실리면 모양과 무관하게 거부된다** — 잔액의 진실원은 `wallet/current` 하나다.
 
-1. `firestore.rules` `isValidSave()` 의 `hasOnly` **15키 → 14키**(`currency` 제거)
-2. 같은 함수의 `(!request.resource.data.keys().hasAny(['currency']) || …)` **currency 검증 블록 통째 제거**
-3. 하네스 `Tools/firestore-rules-tests/rules.test.js` 의 **`13c. currency 를 실은 15키 update 도 통과 (승급 전 구 클라)`** 케이스를 `assertFails` 로 **뒤집는다**
+`MIN_WRITABLE_SCHEMA_VERSION` 은 걷을 것이 없었다 — C6.6 이 이미 되돌렸다. 서버 함수·클라는 무변경이다.
 
-`MIN_WRITABLE_SCHEMA_VERSION` 은 여기서 걷을 것이 없다 — C6.6 이 이미 되돌렸다.
+**착수 판정은 "v7 문서가 없는가" 가 아니라 "v7 클라가 없는가" 였다.** 룰의 `update` 는 클라 직접 쓰기만 본다(승급은 Admin SDK 라 룰을 우회한다). v7 클라는 callable 이 이미 `failed-precondition` 으로 막히지만 **세이브 업로드는 여전히 15키로 나가서**, 그 클라가 남아 있는 동안 조이면 그쪽 저장이 전부 거부된다. **게이트는 "이전 유저의 세이브를 전량 제거한다" 는 결정(2026-08-30)으로 성립했다** — 판정 근거는 이 줄 하나다.
 
-**착수 판정은 "v7 문서가 없는가" 가 아니라 "v7 클라가 없는가" 다.** 룰의 `update` 는 클라 직접 쓰기만 본다(승급은 Admin SDK 라 룰을 우회한다). v7 클라는 callable 이 이미 `failed-precondition` 으로 막히지만 **세이브 업로드는 여전히 15키로 나가므로**, 그 클라가 남아 있는 동안 조이면 그쪽 저장이 전부 거부된다.
+**하네스는 셋을 하나로 접었다.** 조인 뒤 13b·13c·13e 는 같은 사실(키 자체가 금지)을 세 번 주장한다 — 통과는 하지만 통과 이유가 값 검증이 아니게 되고 주석은 사라진 계약을 말한다.
+
+- `13c` 를 `assertFails` 로 뒤집고 이름을 **"currency 가 실리면 모양과 무관하게 거부"** 로 바꿔, 13b·13e 가 보던 모양(정상 4재화 · 키 누락 · 타입 변조 · 미지 재화 `Ruby` · 문자열 · `null`)을 그 안에 모았다. `13b`·`13e` 삭제
+- `13d` 의 `t_old` 갈래와 `13` 의 `currency: 'x'` 줄은 슬롯 누락·타입 이전에 **currency 로 먼저 거부돼 아무것도 못박지 못한다** — 제거
+- `legacyCurrencySlot()` 은 **남긴다.** `freshAccountDocument` 화석이 쓰고 그것을 `14d` 가 본다. 주석만 "이제 룰이 거부하는 모양" 으로 갱신
+
+**검증 실측(2026-08-30)** — `cd Tools/firestore-rules-tests && npm test` 로 **pass 52 · fail 0**. 뒤집기가 실제 룰을 보는지까지 봤다: `RULES_FILE` 로 조이기 전 룰(`git show HEAD:firestore.rules`)을 물리면 **13c 만 실패**한다(pass 51 · fail 1). 이 머신에는 firebase CLI 가 없어 `npm i -g firebase-tools`(15.28.2)를 먼저 깔아야 했다.
+
+**남은 것 — 룰 배포 1회.** `firebase deploy --only firestore:rules --project bm-cardbattle`. 함수 배포는 없다. 배포 뒤 신 클라(v8) 부트로 세이브 업로드가 통과하고 `revision` 이 정상적으로 오르는지 본다 — 여기서 막히면 14키 목록을 잘못 줄인 것이다.
 ---
 
 ### C8 — 재화 원장 (C7 뒤 · **IAP 착수 앞**)
