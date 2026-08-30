@@ -19,10 +19,8 @@ export const DEVICE_ID = '0123456789abcdef0123456789abcdef';
  * envs/{env}/users/{uid}/wallet/current 로 이사했고, 그쪽 모양은 walletDocument.js 가 맡는다.
  * 승급 후 클라(PlayerSaveDocument.ToFieldMap)가 실제로 보내는 모양이 이 14키다.
  *
- * 승급 전 구 클라(v7)는 아직 15키(= 여기에 currency 를 얹은 모양)를 보내고 룰이 그것도 받는다.
- * 그 공존 구간을 못박는 자리는 rules.test.js 의 13b·13c 이고, 거기서만 currency 를
- * 오버라이드로 되살린다. 4재화 전수(Gold/Diamond/Energy/Shard)가 실려야 실클라 모양이다 —
- * CurrencySaveData.Normalize 가 ECurrencyType.Count 까지 순회하며 없는 키를 0으로 채우기 때문이다.
+ * C7 부터 currency 는 optional 이 아니라 금지 필드다 — 이 14키가 룰이 받는 유일한 모양이고,
+ * 여기에 currency 를 얹은 15키는 rules.test.js 의 13c 가 거부를 못박는다.
  */
 export function saveDocument(_revision, _overrides = {}) {
   return {
@@ -56,14 +54,12 @@ export function saveDocument(_revision, _overrides = {}) {
 }
 
 /**
- * 승급 전 구 클라(v7)가 싣던 재화 슬롯. 베이스 saveDocument 에서 빠진 뒤로도
- * 룰은 이게 실린 15키를 계속 받아야 한다(hasOnly 는 15키, hasAll 에서만 currency 를 뺐다).
- * 그 공존을 보는 자리들이 여기 한 모양을 같이 쓰도록 내보낸다 — C7 이 공존을 닫을 때
- * 이 상수를 지우면 딸린 케이스가 전부 드러난다.
+ * 구 클라(v7)가 싣던 재화 슬롯. C7 이 공존을 닫아 룰은 이제 이게 실린 15키를 거부한다 —
+ * 남은 용도는 둘뿐이다: 13c 의 거부 픽스처와, freshAccountDocument 화석(14d).
  *
  * 4재화가 전부 실린다: CurrencySaveData.Normalize 가 ECurrencyType.Count 까지 순회하며
  * 없는 키를 0으로 채우고, CurrencyManager 가 Init·Save 양쪽에서 그걸 불렀다.
- * Gold 하나만 넣으면 합성 페이로드가 되어 룰을 틀렸다고 오판하게 된다.
+ * Gold 하나만 넣으면 합성 페이로드가 되어 구 클라 모양을 잘못 본뜨게 된다.
  */
 export function legacyCurrencySlot() {
   return { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0 } };
