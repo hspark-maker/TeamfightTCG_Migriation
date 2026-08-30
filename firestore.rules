@@ -122,8 +122,8 @@ service cloud.firestore {
                   isKnownEnv(envId) && docId == 'current';
       allow write: if false;
 
-      // 원장은 감사 기록이다 — 클라에 보여줄 이유가 없고, 보이면 잔액 추론 표면만 넓어진다.
-      match /ledger/{txId} {
+      // 영수증은 감사 기록이다 — 클라에 보여줄 이유가 없고, 보이면 잔액 추론 표면만 넓어진다.
+      match /receipts/{txId} {
         allow read, write: if false;
       }
     }

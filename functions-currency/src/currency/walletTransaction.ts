@@ -1,12 +1,15 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError} from "firebase-functions/v2/https";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {isKnownEnv} from "../generated/save/environments";
 import {
   readWallet,
+  ReceiptKey,
   walletRef,
   WalletPatch,
   WalletState,
+  WalletUpdate,
   writeWallet,
 } from "../generated/currency/walletStore";
 
@@ -34,7 +37,7 @@ import {
 export async function mutateWallet(
   env: string,
   uid: string,
-  mutate: (wallet: WalletState) => WalletState,
+  mutate: (wallet: WalletState) => WalletUpdate,
 ): Promise<WalletPatch> {
   if (!isKnownEnv(env)) {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
@@ -54,9 +57,12 @@ export async function mutateWallet(
       );
     }
 
-    const next = mutate(readWallet(snapshot));
-    writeWallet(transaction, reference, next, FieldValue.serverTimestamp());
+    const update = mutate(readWallet(snapshot));
+    // C8-2 에서 요청 txId 로 갈아끼운다 — 지금은 서버 발급이라 멱등이 아니고 영수증만 쌓인다.
+    const receipt: ReceiptKey = {kind: "client", txId: randomUUID()};
+    const credited = writeWallet(
+      transaction, reference, update, receipt, undefined, FieldValue.serverTimestamp());
 
-    return {rev: next.rev, balances: next.balances};
+    return {rev: credited.rev, balances: credited.balances};
   });
 }

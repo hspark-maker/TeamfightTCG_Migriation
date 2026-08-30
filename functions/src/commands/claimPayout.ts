@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
@@ -5,7 +6,14 @@ import {db} from "../firebaseApp";
 import {HEX_32} from "../match/payloadGuards";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {CurrencyGain, grant} from "../currency/wallet";
-import {nextWallet, readWallet, walletRef, writeWallet} from "../currency/walletStore";
+import {
+  nextWallet,
+  readWallet,
+  ReceiptKey,
+  walletRef,
+  writeReceiptOnly,
+  writeWallet,
+} from "../currency/walletStore";
 
 type ClaimPayoutData = {env: "live" | "test"; action: "list" | "ack"; matchIds: string[]};
 
@@ -103,13 +111,21 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     }
 
     const current = readWallet(walletSnapshot);
+    // C8-2 에서 요청 txId 로 갈아끼운다 — 지금은 서버 발급이라 멱등이 아니고 영수증만 쌓인다.
+    const receipt: ReceiptKey = {kind: "client", txId: randomUUID()};
+
     // 크레딧할 것이 없으면 지갑을 쓰지 않는다 — 빈 지급으로 rev 만 올리면 클라가 달라진 것
     // 없는 잔액을 채택하고 사고를 못 알아챈다. 응답에는 현재 잔액을 그대로 싣는다.
-    if (gains.length === 0) return {acked: accepted, wallet: {rev: current.rev, balances: current.balances}};
+    // 그래도 영수증은 끊는다 — 위에서 이미 claimed 낙인을 썼고, 그 낙인이 지급을 대신한다.
+    if (gains.length === 0) {
+      writeReceiptOnly(
+        tx, reference, "claimPayout", current, receipt, undefined, FieldValue.serverTimestamp());
+      return {acked: accepted, wallet: {rev: current.rev, balances: current.balances}};
+    }
 
-    const next = nextWallet(current, grant(current.balances, gains));
-    writeWallet(tx, reference, next, FieldValue.serverTimestamp());
-    return {acked: accepted, wallet: {rev: next.rev, balances: next.balances}};
+    const update = nextWallet(current, grant(current.balances, gains), "claimPayout");
+    const credited = writeWallet(tx, reference, update, receipt, undefined, FieldValue.serverTimestamp());
+    return {acked: accepted, wallet: {rev: credited.rev, balances: credited.balances}};
   });
   logger.info("claimPayout ack", {uid, env: data.env, acked: result.acked, rev: result.wallet.rev});
   return result;

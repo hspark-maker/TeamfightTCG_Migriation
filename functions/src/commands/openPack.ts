@@ -92,7 +92,7 @@ export const openPack = onCall(async (request) => {
   let goldAfter = 0;
   let poolSize = 0;
 
-  const result = await mutateSave(env, uid, (current, _transaction, wallet): SaveMutation => {
+  const result = await mutateSave(env, uid, "openPack", (current, _transaction, wallet): SaveMutation => {
     // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
     const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
     const grade = gradeOf(thresholds, points);
@@ -131,7 +131,7 @@ export const openPack = onCall(async (request) => {
           (entries, card) => addSnack(entries, card.cardId, card.snack),
           readGrowthEntries(current.cardGrowth))),
       },
-      wallet: nextWallet(wallet, paid),
+      wallet: nextWallet(wallet, paid, "openPack"),
     };
   });
 

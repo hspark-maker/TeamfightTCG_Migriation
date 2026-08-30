@@ -33,14 +33,14 @@ assert.equal(readBalances({balances: {Gold: "x"}}).Gold, 0, "못 읽는 값은 0
 
 // 부분 잔액을 넣어도 빠진 키가 0 으로 선다 — 그 모양을 세우는 출구가 nextWallet 이다.
 {
-  const seeded = nextWallet(EMPTY_WALLET, {Gold: 10});
+  const seeded = nextWallet(EMPTY_WALLET, {Gold: 10}, "claimReward").next;
   assert.deepEqual(seeded.balances, {Gold: 10, Diamond: 0, Energy: 0, Shard: 0});
   assert.equal(seeded.rev, 1, "지갑에 실리는 순간 rev 가 오른다 — 안 오르면 뒤 쓰기가 앞 쓰기를 덮는다");
 }
 
 // ── 차감: 구 currency 슬롯에 쓰던 값이 그대로 지갑 잔액이 된다 ──────────────
 {
-  const paid = nextWallet({rev: 7, balances: FULL, paidBalances: {}}, spend(FULL, "Gold", 120));
+  const paid = nextWallet({rev: 7, balances: FULL, paidBalances: {}}, spend(FULL, "Gold", 120), "openPack").next;
   assert.deepEqual(paid.balances, {Gold: 380, Diamond: 0, Energy: 0, Shard: 0});
   assert.equal(paid.rev, 8, "차감도 rev 를 올린다");
 }

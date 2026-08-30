@@ -46,7 +46,7 @@ export const devGrantCurrency = onCall(async (request) => {
   }
 
   const wallet = await mutateWallet(env, uid, (current) =>
-    nextWallet(current, grant(current.balances, [{currency, amount}])));
+    nextWallet(current, grant(current.balances, [{currency, amount}]), "devGrantCurrency"));
 
   logger.info("devGrantCurrency", {uid, env, currency, amount, rev: wallet.rev});
   return {wallet};

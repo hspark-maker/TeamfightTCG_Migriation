@@ -85,7 +85,7 @@ export const enhanceKeyword = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction, wallet): Promise<SaveMutation> => {
+  const result = await mutateSave(env, uid, "enhanceKeyword", async (current, transaction, wallet): Promise<SaveMutation> => {
     const levels = readKeywordLevels(current.keywordGrowth);
     const currentLevel = levelOfKeyword(levels, keyword);
 
@@ -125,7 +125,7 @@ export const enhanceKeyword = onCall(async (request) => {
       slots: {
         keywordGrowth: keywordGrowthSlot(setKeywordLevel(levels, keyword, step.level)),
       },
-      wallet: nextWallet(wallet, spend(balances, step.currency, charged)),
+      wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceKeyword"),
     };
   });
 

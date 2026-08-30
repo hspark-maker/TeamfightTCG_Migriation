@@ -91,7 +91,7 @@ export const enhanceCard = onCall(async (request) => {
   let cost = 0;
   let freeShotUsed = false;
 
-  const result = await mutateSave(env, uid, async (current, transaction, wallet): Promise<SaveMutation> => {
+  const result = await mutateSave(env, uid, "enhanceCard", async (current, transaction, wallet): Promise<SaveMutation> => {
     // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
     const entries = readGrowthEntries(current.cardGrowth);
     const currentLevel = levelOfCard(entries, cardId);
@@ -134,7 +134,7 @@ export const enhanceCard = onCall(async (request) => {
       slots: {
         cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
       },
-      wallet: nextWallet(wallet, spend(balances, step.currency, charged)),
+      wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceCard"),
     };
   });
 

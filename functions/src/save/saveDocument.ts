@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -11,9 +12,12 @@ import {Balances} from "../currency/wallet";
 import {
   createWallet,
   readWallet,
+  ReceiptKey,
   walletRef,
   WalletPatch,
   WalletState,
+  WalletUpdate,
+  writeReceiptOnly,
   writeWallet,
 } from "../currency/walletStore";
 
@@ -38,7 +42,7 @@ export type SlotPatch = Record<string, Record<string, unknown>>;
 /** mutate 콜백이 돌려주는 것. wallet 은 지갑을 바꾼 명령만 채운다. */
 export interface SaveMutation {
   slots: SlotPatch;
-  wallet?: WalletState;
+  wallet?: WalletUpdate;
 }
 
 // WalletPatch 선언은 walletStore(미러 대상)로 옮겼다 — 재화 codebase 도 같은 응답 모양을 쓴다.
@@ -151,19 +155,22 @@ export function assertWritableSchema(
 
 /**
  * 세이브 문서를 트랜잭션 1회로 읽고 고친다. revision +1 과 updatedAt 은
- * 여기서만 움직인다 — callable 하나당 문서 쓰기 1회라는 계약의 집행 지점.
+ * 여기서만 움직인다 — callable 하나당 세이브 revision 정확히 +1 이라는 계약의 집행 지점.
+ * (문서 쓰기 자체는 세이브 1회 + 영수증 1회이고, 지갑이 움직이면 거기에 지갑 1회가 더 붙는다.)
  *
  * 지갑 문서도 **항상 함께 읽어** 콜백에 넘기고 응답에 싣는다(옵션 플래그를 두지 않는다).
  * 바뀌지 않은 지갑을 매번 내보내는 것은 클라 채택이 단조·멱등이라 무해하고,
  * 클라가 어떤 이유로든 드리프트했을 때 다음 명령이 스스로 맞춰 준다.
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
+ * @param {string} source 명령 이름. 영수증에 그대로 실린다
  * @param {Function} mutate 현재 문서·트랜잭션·지갑을 받아 갱신할 슬롯 전체 값을 돌려준다
  * @return {Promise<SaveMutationResult>} 새 revision · 갱신된 슬롯 · 지갑
  */
 export async function mutateSave(
   env: string,
   uid: string,
+  source: string,
   mutate: (
     current: DocumentData,
     transaction: Transaction,
@@ -198,6 +205,9 @@ export async function mutateSave(
     // 잃는 것이 없다. 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다.
     const creatingWallet = !walletSnapshot.exists;
 
+    // C8-2 에서 요청 txId 로 갈아끼운다 — 지금은 서버 발급이라 멱등이 아니고 영수증만 쌓인다.
+    const receipt: ReceiptKey = {kind: "client", txId: randomUUID()};
+
     const revision = Number(current.revision ?? 0) + 1;
     const outcome = await mutate(current, transaction, wallet);
 
@@ -210,17 +220,27 @@ export async function mutateSave(
     if (creatingWallet) {
       // set 이 아니라 create 다 — 이 트랜잭션 밖에서 ensureWallet 이 먼저 지갑을 세웠으면
       // 재실행되어 그쪽 이관 잔액을 0 으로 덮어쓰는 것을 막는다.
+      // 지갑이 없어 개설과 이동이 한 트랜잭션에 겹쳤다 — 영수증은 돈을 움직인 명령을 적는다.
+      // 개설 사실은 rev 1 · before 4키 0 으로 읽힌다.
       wallet = createWallet(
         transaction,
         walletReference,
-        outcome.wallet?.balances ?? wallet.balances,
+        outcome.wallet?.next.balances ?? wallet.balances,
+        source,
+        receipt,
+        undefined,
         FieldValue.serverTimestamp(),
       );
     } else if (outcome.wallet !== undefined) {
-      writeWallet(
-        transaction, walletReference, outcome.wallet,
+      wallet = writeWallet(
+        transaction, walletReference, outcome.wallet, receipt, undefined,
         FieldValue.serverTimestamp());
-      wallet = outcome.wallet;
+    } else {
+      // 세이브만 쓴 갈래도 영수증을 끊는다 — 그 세이브 쓰기가 재화 이동을 대신하기 때문이다.
+      // C8-2 가 이 source 를 재시도 판정에 쓴다 — 명령마다 달라야 한다.
+      writeReceiptOnly(
+        transaction, walletReference, source, wallet, receipt, undefined,
+        FieldValue.serverTimestamp());
     }
 
     return {
@@ -315,7 +335,10 @@ export async function ensureSaveDocument(
 
     const walletCreated = !walletSnapshot.exists;
     if (walletCreated) {
-      createWallet(transaction, walletReference, starterBalances, FieldValue.serverTimestamp());
+      createWallet(
+        transaction, walletReference, starterBalances, "walletCreate:freshAccount",
+        {kind: "boot", txId: "walletCreate:freshAccount"}, undefined,
+        FieldValue.serverTimestamp());
     }
 
     // 메타가 없거나 깨진 문서는 클라가 부트조차 못 하는데(TryReadMeta 실패 → Fail),

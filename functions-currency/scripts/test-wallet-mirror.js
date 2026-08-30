@@ -33,7 +33,7 @@ assert.deepEqual([...CURRENCY_KEYS].sort(), ["Diamond", "Energy", "Gold", "Shard
 // 명령 본문이 하는 일은 grant → nextWallet 두 줄이 전부다. 그 결과가 응답 {rev, balances} 다.
 {
   const empty = {rev: 0, balances: {}, paidBalances: {}};
-  const next = nextWallet(empty, grant(empty.balances, [{currency: "Gold", amount: 500}]));
+  const next = nextWallet(empty, grant(empty.balances, [{currency: "Gold", amount: 500}]), "devGrantCurrency").next;
 
   assert.equal(next.rev, 1, "지갑 rev 는 쓰기마다 오른다");
   assert.deepEqual(Object.keys(next.balances).sort(), ["Diamond", "Energy", "Gold", "Shard"],
@@ -45,7 +45,7 @@ assert.deepEqual([...CURRENCY_KEYS].sort(), ["Diamond", "Energy", "Gold", "Shard
 // 두 번째 지급이 쌓이는지 — 클라 디버그 오버레이가 연타하는 경로다.
 {
   const current = {rev: 7, balances: {Gold: 500, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {}};
-  const next = nextWallet(current, grant(current.balances, [{currency: "Diamond", amount: 3}]));
+  const next = nextWallet(current, grant(current.balances, [{currency: "Diamond", amount: 3}]), "devGrantCurrency").next;
 
   assert.equal(next.rev, 8);
   assert.equal(next.balances.Gold, 500, "다른 재화는 그대로다");

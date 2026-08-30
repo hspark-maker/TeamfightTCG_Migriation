@@ -18,7 +18,7 @@ import {
   legacyCurrencySlot,
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
-import { walletDocument, ledgerDocument } from './fixtures/walletDocument.js';
+import { walletDocument, receiptDocument } from './fixtures/walletDocument.js';
 import { grantsDocument } from './fixtures/grantsDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
@@ -405,17 +405,17 @@ test('18c. 소유자도 지갑 delete 는 거부', async () => {
   await assertFails(deleteDoc(doc(authed(), walletPath())));
 });
 
-// 원장은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
-test('19. 소유자도 원장 읽기는 거부', async () => {
+// 영수증은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
+test('19. 소유자도 영수증 읽기는 거부', async () => {
   await seedWallet();
-  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
-  await assertFails(getDoc(doc(authed(), `${walletPath()}/ledger/tx1`)));
+  await seedRaw(`${walletPath()}/receipts/tx1`, receiptDocument());
+  await assertFails(getDoc(doc(authed(), `${walletPath()}/receipts/tx1`)));
 });
 
-test('19b. 소유자도 원장 쓰기는 거부', async () => {
+test('19b. 소유자도 영수증 쓰기는 거부', async () => {
   await seedWallet();
-  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
-  await assertFails(setDoc(doc(authed(), `${walletPath()}/ledger/tx1`), ledgerDocument({ rev: 3 })));
+  await seedRaw(`${walletPath()}/receipts/tx1`, receiptDocument());
+  await assertFails(setDoc(doc(authed(), `${walletPath()}/receipts/tx1`), receiptDocument({ rev: 3 })));
 });
 
 
