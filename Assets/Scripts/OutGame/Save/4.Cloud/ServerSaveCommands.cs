@@ -1,11 +1,16 @@
 using System;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 // 세이브를 건드리는 서버 호출의 유일한 창구.
 // 도메인 코드가 ICallableService를 직접 잡으면 "봉인 → 응답 채택 → 해제" 순서를 각자 구현하게 되고,
 // 한 곳이라도 채택을 빠뜨리면 문서 revision이 어긋나 그 다음 업로드가 세션을 끊는다. R5~R8이 전부 여기로 들어온다.
 internal static class ServerSaveCommands
 {
+    // 서버가 영수증 번호를 읽는 필드 이름(functions/src/save/receiptId.ts)과 같아야 한다.
+    const string TX_ID_FIELD = "txId";
+
     static ICallableService s_service;
     static UniTaskCompletionSource s_inFlight;
 
@@ -21,8 +26,18 @@ internal static class ServerSaveCommands
     {
         ICallableService t_service = RequireService(_commandName);
 
+        // 게이트를 잡기 **전**에 짓는다 — s_inFlight를 세운 뒤 여기서 던지면 finally가 없어 게이트가
+        // 영영 안 풀리고, 이후 모든 명령이 예외도 없이 무한 대기한다.
+        //
+        // 영수증 번호는 호출 하나당 하나다. 화면·세션 단위로 재사용하면 인자가 다른 요청이 첫 응답을
+        // 그대로 받는다 — 서버 대조는 명령 이름만 가르고 인자는 가르지 않는다.
+        Dictionary<string, object> t_payload = CallablePayload.ToPrimitiveMap(_request);
+        t_payload[TX_ID_FIELD] = $"{_commandName}:{Guid.NewGuid():N}";
+
         // 명령을 직렬화한다 — 겹치면 나중 명령의 SuspendUploadsAsync가 앞선 명령의 기준선을 덮어써,
         // 통화 중에 생긴 로컬 변경이 "이미 서버에 있다"고 잘못 기록되고 영영 업로드되지 않는다.
+        // 아래 재시도의 영수증 재생도 이 직렬화에 기댄다: 두 시도 사이에 다른 세이브 쓰기가 끼면
+        // 서버가 revision 어긋남을 보고 failed-precondition으로 세션을 되돌린다.
         while (s_inFlight != null)
             await s_inFlight.Task;
 
@@ -36,7 +51,7 @@ internal static class ServerSaveCommands
         await PlayerSaveCloud.SuspendUploadsAsync();
         try
         {
-            TResponse t_result = await t_service.InvokeAsync<TResponse>(_commandName, _request);
+            TResponse t_result = await SendAsync<TResponse>(t_service, _commandName, t_payload);
             if (t_result == null)
                 throw new InvalidOperationException($"Server command '{_commandName}' returned nothing.");
 
@@ -92,6 +107,31 @@ internal static class ServerSaveCommands
         where TResponse : class
     {
         return await RequireService(_commandName).InvokeAsync<TResponse>(_commandName, _request);
+    }
+
+    // 같은 txId로 딱 한 번 다시 태운다. 요청은 서버에 닿았는데 응답만 잃은 갈래가 있고, 그때 서버는
+    // 영수증에 기록된 첫 응답을 그대로 돌려준다(재추첨·재차감 없음). 이 안전망이 성립하는 이유가
+    // 위에서 payload에 얹은 txId다 — 그것을 빼면 재시도가 곧장 이중 과금이 된다.
+    //
+    // 대가는 봉인 시간이다: 한 시도가 CallableMilliseconds(15초)에 더해 재인증 1회를 쓸 수 있어
+    // 최악이면 유저가 1분 가까이 응답을 기다린다. 그래도 재시도를 없애는 쪽이 이중 과금이라 받는다.
+    static async UniTask<TResponse> SendAsync<TResponse>(
+        ICallableService _service, string _commandName, Dictionary<string, object> _payload)
+        where TResponse : class
+    {
+        try
+        {
+            return await _service.InvokeAsync<TResponse>(_commandName, _payload);
+        }
+        catch (Exception t_exception) when (CloudFailureClassifier.IsLostResponse(t_exception))
+        {
+            // 여기서 PlayerSaveCloud에 실패를 알리지 않는다 — 알리면 상태가 Offline으로 넘어가고
+            // 실패 카운터가 올라, 곧 성공할 재시도가 장애 흔적을 남긴다.
+            Debug.LogWarning(
+                $"[ServerSaveCommands] '{_commandName}' lost its response — retrying once with the same txId.");
+
+            return await _service.InvokeAsync<TResponse>(_commandName, _payload);
+        }
     }
 
     static ICallableService RequireService(string _commandName)
