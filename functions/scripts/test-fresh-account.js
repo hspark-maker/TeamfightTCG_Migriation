@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const {buildFreshAccountSlots, STARTER_GOLD, DECK_SLOT_COUNT,
+const {buildFreshAccountSlots, buildFreshAccountBalances, STARTER_GOLD, DECK_SLOT_COUNT,
   STARTER_DECK_NAME, STARTER_DECK_SIZE} = require("../lib/save/freshAccount.js");
 const {resolveStarterCardsFromRows, FALLBACK_STARTER_CARD_IDS,
   parseGrade} = require("../lib/save/starterPool.js");
@@ -12,15 +12,21 @@ const drop = (id, minGrade, cardId) =>
 const slots = buildFreshAccountSlots(STARTER);
 
 assert.deepEqual(Object.keys(slots).sort(), [
-  "albumReward", "cardGrowth", "currency", "deck", "keywordGrowth",
+  "albumReward", "cardGrowth", "deck", "keywordGrowth",
   "ownership", "profile", "rank", "tournament", "tutorial"].sort());
 
-// 룰의 isValidSave 가 재화 4키를 정확히 요구한다 — 하나라도 어긋나면 이후 저장이 영구 거부된다.
-assert.deepEqual(Object.keys(slots.currency.balances).sort(), ["Diamond", "Energy", "Gold", "Shard"]);
-assert.equal(slots.currency.balances.Gold, STARTER_GOLD);
-assert.equal(slots.currency.balances.Diamond, 0);
-assert.equal(slots.currency.balances.Energy, 0);
-assert.equal(slots.currency.balances.Shard, 0);
+// v8 부터 재화는 세이브를 떠났다 — 슬롯이 남으면 지갑과 세이브가 둘 다 잔액을 주장한다.
+assert.equal(slots.currency, undefined, "currency 슬롯은 지갑 문서로 갔다");
+
+// 스타터 골드는 세이브와 같은 트랜잭션에서 서는 지갑의 최초 잔액이다.
+// 두 문서가 갈라지면 부트의 ensureWallet 이 0 잔액 지갑을 세워 이 골드가 영영 사라진다.
+const balances = buildFreshAccountBalances();
+assert.deepEqual(Object.keys(balances).sort(), ["Diamond", "Energy", "Gold", "Shard"],
+  "룰이 재화 4키를 정확히 요구한다");
+assert.equal(balances.Gold, STARTER_GOLD);
+assert.equal(balances.Diamond, 0);
+assert.equal(balances.Energy, 0);
+assert.equal(balances.Shard, 0);
 
 assert.deepEqual(slots.ownership.cardIds, STARTER);
 

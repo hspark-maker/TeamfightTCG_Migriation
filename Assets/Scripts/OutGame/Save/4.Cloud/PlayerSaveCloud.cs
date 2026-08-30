@@ -79,6 +79,7 @@ static class PlayerSaveCloud
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Loading);
 
+        WalletCloud.Initialize(in _context);
         PlayerSaveDocument.CacheDeviceInfo();
 
         DataSaveManager.SetImmediateUploadHandler(RequestImmediateUpload);
@@ -237,6 +238,7 @@ static class PlayerSaveCloud
         s_generation++;
         s_gateComplete = false;
         LastError = string.Empty;
+        WalletCloud.ResetForRetry();
         SetState(EPlayerSaveCloudState.Loading);
 
         LoadAsync(s_generation).Forget();
@@ -270,6 +272,7 @@ static class PlayerSaveCloud
         s_envId = string.Empty;
         s_context = default;
         Revision = 0;
+        WalletCloud.Shutdown();
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Disabled);
 
@@ -358,6 +361,10 @@ static class PlayerSaveCloud
             return;
         }
 
+        // 지갑 읽기를 세이브 읽기 왕복에 얹는다 — 부트 예산에 문서 하나치 지연을 더하지 않으려는 것이다.
+        // TryReadAsync는 던지지 않는다(세이브 쪽이 먼저 실패해도 관측되지 않는 예외가 남지 않게).
+        UniTask<bool> t_walletRead = WalletCloud.TryReadAsync(t_userId);
+
         DocumentSnapshot t_document;
         try
         {
@@ -365,11 +372,13 @@ static class PlayerSaveCloud
         }
         catch (Exception t_exception)
         {
+            await t_walletRead;
             if (_generation != s_generation) return;
             Fail($"Remote save read failed ({t_exception.GetBaseException().Message}).");
             return;
         }
 
+        bool t_walletReadOk = await t_walletRead;
         if (_generation != s_generation) return;
         if (t_document == null)
         {
@@ -393,6 +402,8 @@ static class PlayerSaveCloud
                 return;
             }
 
+            // ensureAccount는 세이브와 지갑을 한 트랜잭션에 만들지만 응답에 지갑을 싣지 않는다 — 다시 읽어 채택한다.
+            t_walletReadOk = await WalletCloud.TryReadAsync(t_userId);
             if (_generation != s_generation) return;
 
             // 재귀하지 않는다 — 서버가 만들었다고 답했는데 없으면 우리가 모르는 일이 벌어진 것이다.
@@ -401,6 +412,12 @@ static class PlayerSaveCloud
                 Fail("Account creation reported success but the save document is still missing.");
                 return;
             }
+        }
+
+        if (!t_walletReadOk)
+        {
+            Fail($"Remote wallet read failed ({WalletCloud.LastError}).");
+            return;
         }
 
         if (!PlayerSaveDocument.TryReadMeta(t_document, out long t_schemaVersion, out long t_revision))
@@ -420,10 +437,65 @@ static class PlayerSaveCloud
             return;
         }
 
+        // 지갑 확보 — v7 문서의 currency 삭제와 지갑 생성이 서버에서 한 트랜잭션이다.
+        // 반드시 첫 업로드보다 앞이어야 한다: 업로드는 Overwrite이고 v8 ToFieldMap에는 currency가 없어,
+        // 승급 전에 업로드가 먼저 나가면 원격의 잔액 원본이 그대로 지워진다.
+        if (t_schemaVersion < UserSaveData.VERSION || !WalletCloud.HasDocument)
+        {
+            EnsureWalletResult t_wallet = await EnsureWalletAsync(_generation);
+            if (t_wallet == null) return;
+
+            // revision > 0 = 이 호출이 세이브를 썼다(승급). 그때만 기준 revision과 스키마가 함께 올라간다.
+            if (t_wallet.Revision > 0)
+            {
+                t_revision = t_wallet.Revision;
+                t_schemaVersion = UserSaveData.VERSION;
+            }
+
+            WalletCloud.Adopt(t_wallet.Wallet);
+
+            // 다른 기기가 방금 승급을 커밋했다 — 지갑이 이미 있어 서버는 세이브를 쓰지 않았고(revision 미탑재가 맞다),
+            // 우리 손의 스냅샷만 승급 전이라 아래 스키마 판정이 그대로면 멀쩡한 계정이 복구 화면을 본다.
+            // 드문 경로라 왕복 1회를 더 태워 판정을 이어간다.
+            if (!t_wallet.Created && t_schemaVersion < UserSaveData.VERSION)
+            {
+                try
+                {
+                    t_document = await ReadAsync(_generation, t_userId);
+                }
+                catch (Exception t_exception)
+                {
+                    if (_generation != s_generation) return;
+                    Fail($"Save re-read after wallet creation failed ({t_exception.GetBaseException().Message}).");
+                    return;
+                }
+
+                if (_generation != s_generation) return;
+                if (t_document == null || !t_document.Exists)
+                {
+                    Fail("Save document is missing after wallet creation.");
+                    return;
+                }
+
+                if (!PlayerSaveDocument.TryReadMeta(t_document, out t_schemaVersion, out t_revision))
+                {
+                    Fail("Remote save metadata is missing or has a broken type after wallet creation. " +
+                         $"[{PlayerSaveDocument.DescribeMeta(t_document)}]");
+                    return;
+                }
+            }
+        }
+
         if (t_schemaVersion < UserSaveData.VERSION)
         {
-            // 승급 코드가 없어 변환 대신 Fail이다. UserSaveData.VERSION이 동결인 한 이 갈래는 서지 않는다.
+            // 승급은 지갑 이관(v7 → v8)까지만 있다. 그보다 오래된 문서는 변환할 코드가 없다.
             Fail($"Remote schema v{t_schemaVersion} is older than client v{UserSaveData.VERSION}.");
+            return;
+        }
+
+        if (!WalletCloud.HasDocument)
+        {
+            Fail("Wallet document is still missing after ensureWallet.");
             return;
         }
 
@@ -497,6 +569,37 @@ static class PlayerSaveCloud
             Fail($"Account creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
                  t_exception.GetBaseException().Message);
             return false;
+        }
+    }
+
+    // 지갑을 확보하고 세이브 v7 승급분을 받아 온다. 실패하면 여기서 Fail까지 마치고 null을 준다.
+    static async UniTask<EnsureWalletResult> EnsureWalletAsync(int _generation)
+    {
+        try
+        {
+            EnsureWalletResult t_result = await ServerSaveCommands.InvokeBootAsync<EnsureWalletResult>(
+                "ensureWallet",
+                new { env = s_envId });
+
+            if (_generation != s_generation) return null;
+            if (t_result?.Wallet == null)
+            {
+                Fail("Wallet creation returned nothing.");
+                return null;
+            }
+
+            Debug.Log($"[PlayerSaveCloud] ensureWallet created={t_result.Created} " +
+                      $"revision={t_result.Revision} rev={t_result.Wallet.Rev} env={s_envId}");
+            return t_result;
+        }
+        catch (Exception t_exception)
+        {
+            if (_generation != s_generation) return null;
+
+            // ensureAccount와 같은 이유로 분류 갈래를 두지 않는다 — 부트에는 오프라인 폴백이 없다.
+            Fail($"Wallet creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
+                 t_exception.GetBaseException().Message);
+            return null;
         }
     }
 

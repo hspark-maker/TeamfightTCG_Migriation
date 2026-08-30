@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 보상 토너먼트 진행도의 static 단일 창구(정점 해금 판정 · 클리어 지급 · 챕터 완주 보상 · 낙인)
@@ -190,6 +191,7 @@ public static class TournamentProgress
 
     // 승리 낙인 — 지급은 하지 않는다. 수령(ClearNode)이 지급·해금·낙인 해제를 마저 한다.
     // 전투 씬에서 불린다: 로비까지 미루면 로딩 중 종료가 승리를 삼킨다.
+    // 디바운스가 아니라 즉시 업로드다 — 자격을 재는 쪽이 서버라, 낙인이 원격에 닿기 전에 수령이 가면 튕긴다.
     public static bool MarkRewardPending(string _nodeId)
     {
         if (string.IsNullOrEmpty(_nodeId)) return false;
@@ -198,19 +200,25 @@ public static class TournamentProgress
 
         Slot.PendingRewardNodeId = _nodeId;
 
-        DataSaveManager.Save();
+        DataSaveManager.SaveImmediate();
         OnChanged?.Invoke();
         return true;
     }
 
-    // 정점 클리어 확정 — 보상 지급까지 여기서 한다(수령 팝업의 onConfirm이 이 메서드를 부른다)
-    public static bool ClearNode(string _nodeId)
+    /// <summary>정점 클리어 확정 — 보상 지급까지 서버에 맡긴다(수령 팝업의 onConfirm이 이 메서드를 부른다).
+    /// 이 도메인은 "수령 = 클리어 확정"이라 지급·클리어 낙인·미수령 해제가 한 트랜잭션이어야 한다.</summary>
+    public static async UniTask<RewardClaimOutcome> ClearNodeAsync(string _nodeId)
     {
-        if (string.IsNullOrEmpty(_nodeId)) return false;
-        if (Slot.ClearedNodeIds.Contains(_nodeId)) return false;
+        if (string.IsNullOrEmpty(_nodeId)) return default;
+        if (Slot.ClearedNodeIds.Contains(_nodeId)) return default;
 
-        Payout(_nodeId);
-        return true;
+        // 보상 미저작 정점도 서버를 거친다 — 클라가 "받을 게 없다"고 판정해 스스로 낙인을 남기면
+        // 변조된 클라가 정점을 마음대로 열 수 있다. 서버가 지급 0건이어도 클리어를 확정해 준다.
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId);
+        if (!t_outcome.Succeeded) return default;
+
+        OnChanged?.Invoke();
+        return t_outcome;
     }
 
     // 챕터의 모든 정점이 Cleared인가. 정점 0개 챕터는 완주로 통과시킨다 — 저작 실수로 진행이 영영 막히지 않게
@@ -257,16 +265,22 @@ public static class TournamentProgress
         return s_chapterProbe.Count > 0;
     }
 
-    // 챕터 완주 보상 수령(자격 = 완주 && 미수령). 지급·낙인·영속·통지가 한 트랜잭션이다
-    public static bool ClaimChapterReward(string _chapterId)
+    /// <summary>챕터 완주 보상 수령 — 자격 판정 · 지급 · 낙인을 서버가 한 트랜잭션으로 끝낸다.
+    /// 서버가 준 목록째로 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    // 앞의 세 검사는 왕복을 아끼는 낙관 검사다 — 정점 수령과 같이 이기는 쪽은 언제나 서버다.
+    public static async UniTask<RewardClaimOutcome> ClaimChapterRewardAsync(string _chapterId)
     {
         int t_index = Config.ChapterIndexOf(_chapterId);
-        if (t_index < 0) return false;
-        if (!IsChapterComplete(t_index)) return false;
-        if (ClaimedChapters.Contains(_chapterId)) return false;
+        if (t_index < 0) return default;
+        if (!IsChapterComplete(t_index)) return default;
+        if (ClaimedChapters.Contains(_chapterId)) return default;
 
-        PayoutChapter(_chapterId);
-        return true;
+        // 챕터 id 를 그대로 ownerId 로 보낸다 — 서버가 chapter_ 접두사를 보고 정점과 가른다.
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId);
+        if (!t_outcome.Succeeded) return default;
+
+        OnChanged?.Invoke();
+        return t_outcome;
     }
 
     // 정점 _index의 보상 스냅샷(범위 밖·미저작이면 빈 목록)
@@ -290,40 +304,6 @@ public static class TournamentProgress
         ClaimedChapters.Clear();
         Slot.PendingRewardNodeId = "";
         DataSaveManager.Save();
-        OnChanged?.Invoke();
-    }
-
-    // 보상 지급(리스트 전량) → 낙인 → 즉시 영속 → 통지
-    static void Payout(string _nodeId)
-    {
-        var t_rewards = new List<RewardLine>();
-        Config.FillRewards(_nodeId, t_rewards);
-
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
-
-        Slot.ClearedNodeIds.Add(_nodeId);
-
-        // 미수령 낙인 해제도 같은 트랜잭션이다 — 따로 떼면 지급됐는데 선물이 남는 상태가 저장될 수 있다
-        if (Slot.PendingRewardNodeId == _nodeId) Slot.PendingRewardNodeId = "";
-
-        // CurrencyManager.Save()가 재화 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 재화 미반영 상태가 기록된다)
-        CurrencyManager.Save();
-        OnChanged?.Invoke();
-    }
-
-    // 챕터 완주 보상 지급 → 낙인 → 즉시 영속 → 통지(정점 Payout과 같은 순서)
-    static void PayoutChapter(string _chapterId)
-    {
-        var t_rewards = new List<RewardLine>();
-        Config.FillChapterRewards(_chapterId, t_rewards);
-
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
-
-        ClaimedChapters.Add(_chapterId);
-
-        CurrencyManager.Save();
         OnChanged?.Invoke();
     }
 }

@@ -1,10 +1,8 @@
-export type RewardRow = {
-  ownerType: string;
-  ownerId: string;
-  rewardType: string;
-  rewardId: string;
-  amount: number;
-};
+// 랭크 점수·전투 지급량 계산. **멀티 축 전용**이다 - Reward 표 해석은 rewardTable.ts 가 갖는다.
+//
+// 순수 모듈 제약: firebase-admin · HttpsError 를 들이지 마라. functions/scripts 의 회귀가
+// lib/ 를 직접 require 하고 돈다.
+import {RewardRow} from "./rewardTable";
 
 export type RankGradeRow = {
   id: number;
@@ -30,16 +28,6 @@ function finiteInteger(value: unknown, field: string): number {
   return value;
 }
 
-export function parseRewardRows(rows: Record<string, unknown>[]): RewardRow[] {
-  return rows.map((row) => ({
-    ownerType: String(row.ownerType ?? ""),
-    ownerId: String(row.ownerId ?? ""),
-    rewardType: String(row.rewardType ?? ""),
-    rewardId: String(row.rewardId ?? ""),
-    amount: finiteInteger(row.amount, "Reward.amount"),
-  }));
-}
-
 export function parseRankGradeRows(rows: Record<string, unknown>[]): RankGradeRow[] {
   return rows.map((row) => ({
     id: finiteInteger(row.id, "RankGrade.id"),
@@ -48,6 +36,32 @@ export function parseRankGradeRows(rows: Record<string, unknown>[]): RankGradeRo
     winPoints: finiteInteger(row.winPoints, "RankGrade.winPoints"),
     losePoints: finiteInteger(row.losePoints, "RankGrade.losePoints"),
   })).sort((a, b) => a.id - b.id);
+}
+
+/** 등급 하나를 나누는 단계 수. 클라 RankConfig.DivisionsPerGrade 와 같은 값이어야 한다. */
+export const DIVISIONS_PER_GRADE = 4;
+
+/**
+ * 전체 티어 수(등급 수 x 단계 수). 클라 RankConfig.TierCount 와 같은 파생이다.
+ * @param {RankGradeRow[]} grades 등급 표
+ * @return {number} 티어 수
+ */
+export function rankTierCount(grades: RankGradeRow[]): number {
+  return grades.length * DIVISIONS_PER_GRADE;
+}
+
+/**
+ * 티어 하나의 요구 점수. 클라 RankConfig.TryGetTier 의 RequiredPoints 와 같은 식이다
+ * (entryPoints + 단계 * pointsPerDivision). resolveTierIndex 가 이 식의 역함수다.
+ * @param {number} tierIndex 티어 인덱스
+ * @param {RankGradeRow[]} grades 등급 표
+ * @return {number | null} 요구 점수, 범위 밖이면 null
+ */
+export function requiredPointsForTier(tierIndex: number, grades: RankGradeRow[]): number | null {
+  if (!Number.isInteger(tierIndex) || tierIndex < 0 || tierIndex >= rankTierCount(grades)) return null;
+
+  const grade = grades[Math.floor(tierIndex / DIVISIONS_PER_GRADE)];
+  return grade.entryPoints + (tierIndex % DIVISIONS_PER_GRADE) * grade.pointsPerDivision;
 }
 
 function resolveTierIndex(points: number, grades: RankGradeRow[]): number {

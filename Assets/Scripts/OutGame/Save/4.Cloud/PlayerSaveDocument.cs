@@ -17,8 +17,8 @@ static class PlayerSaveDocument
     internal const string FIELD_DEVICE_ID = "deviceId";
     internal const string FIELD_APP_VERSION = "appVersion";
 
-    // 슬롯 10 — UserSaveData의 [FirestoreProperty] 이름과 반드시 같다(읽기는 ConvertTo가, 쓰기는 이 표가 한다).
-    internal const string FIELD_CURRENCY = "currency";
+    // 슬롯 9 — UserSaveData의 [FirestoreProperty] 이름과 반드시 같다(읽기는 ConvertTo가, 쓰기는 이 표가 한다).
+    // currency는 여기 없다 — 지갑 문서로 갔다. Overwrite라 이 표에서 빠지는 순간 원격 필드도 함께 지워진다.
     internal const string FIELD_OWNERSHIP = "ownership";
     internal const string FIELD_DECK = "deck";
     internal const string FIELD_CARD_GROWTH = "cardGrowth";
@@ -40,7 +40,7 @@ static class PlayerSaveDocument
         s_appVersion = Application.version;
     }
 
-    /// <summary>문서 전체를 덮어쓸 필드 맵. Overwrite와 짝이라 슬롯 10개가 빠짐없이 들어가야 한다.</summary>
+    /// <summary>문서 전체를 덮어쓸 필드 맵. Overwrite와 짝이라 슬롯 9개가 빠짐없이 들어가야 한다.</summary>
     internal static Dictionary<string, object> ToFieldMap(UserSaveData _data, long _revision)
     {
         if (_data == null) throw new ArgumentNullException(nameof(_data));
@@ -53,7 +53,6 @@ static class PlayerSaveDocument
             [FIELD_DEVICE_ID] = s_deviceId,
             [FIELD_APP_VERSION] = s_appVersion,
 
-            [FIELD_CURRENCY] = _data.Currency,
             [FIELD_OWNERSHIP] = _data.Ownership,
             [FIELD_DECK] = _data.Deck,
             [FIELD_CARD_GROWTH] = _data.CardGrowth,

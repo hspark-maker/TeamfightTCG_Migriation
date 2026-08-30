@@ -74,7 +74,6 @@ public static class DataSaveManager
 
         ESaveSlot t_touched = ESaveSlot.None;
 
-        if (_slots.Currency != null) { Data.Currency = _slots.Currency; t_touched |= ESaveSlot.Currency; }
         if (_slots.Ownership != null) { Data.Ownership = _slots.Ownership; t_touched |= ESaveSlot.Ownership; }
         if (_slots.Deck != null) { Data.Deck = _slots.Deck; t_touched |= ESaveSlot.Deck; }
         if (_slots.CardGrowth != null) { Data.CardGrowth = _slots.CardGrowth; t_touched |= ESaveSlot.CardGrowth; }
@@ -108,7 +107,6 @@ public static class DataSaveManager
     {
         UserSaveData t_data = _data ?? new UserSaveData();
 
-        if (t_data.Currency == null) t_data.Currency = new CurrencySaveData();
         if (t_data.Ownership == null) t_data.Ownership = new OwnershipSaveData();
         if (t_data.Deck == null) t_data.Deck = new DeckSaveData();
         if (t_data.CardGrowth == null) t_data.CardGrowth = new CardGrowthSaveData();

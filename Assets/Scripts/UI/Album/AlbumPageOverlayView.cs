@@ -921,7 +921,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         SetFlipLocked(false);
     }
 
-    void ClaimPageReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimPageReward() => ClaimPageRewardAsync().Forget();
+
+    async UniTaskVoid ClaimPageRewardAsync()
     {
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
@@ -930,8 +933,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어나므로 여기서 걸러야 못 받을 보상이 축하받지 않는다.
         if (!AlbumRewardManager.CanClaimPage(t_page)) return;
 
-        AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} {t_page.Index + 1}페이지 완성!",
-                                  t_page.Rewards,
-                                  () => AlbumRewardManager.ClaimPage(t_page));
+        await AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} {t_page.Index + 1}페이지 완성!",
+                                        t_page.Rewards,
+                                        () => AlbumRewardManager.ClaimPage(t_page));
     }
 }

@@ -41,11 +41,11 @@ public sealed class BattleOutcome
 
         long t_rankPointsBefore = RankManager.Points;
         bool t_serverPayout = DeckConfig.IsMultiplayer;
-        Reward = t_serverPayout
-            ? RewardService.CalculateReward(_won, t_remaining)
-            : RewardService.GrantBattleReward(_won, t_remaining);
+        // 결과 팝업이 읽을 예상액이다 — 싱글·멀티 모두 확정 액수의 진실원은 서버 쪽이다.
+        Reward = RewardService.CalculateReward(_won, t_remaining);
 
-        if (!t_serverPayout) BattleRewardHandoff.Set(Reward);
+        // 싱글 지급은 여기서 띄우기만 한다(기다리지 않는다) — 캐리어는 응답이 도착한 시점에 지급 경로가 세운다.
+        if (!t_serverPayout) RewardService.GrantBattleRewardAsync(_won, t_remaining);
 
         if (t_draw)
         {

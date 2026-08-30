@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 랭크 티어 달성 보상의 static 단일 창구(도달한 보상은 순서 무관하게 수령)
@@ -99,23 +100,19 @@ public static class RankRewardManager
 
     public static bool CanClaim(int _tierIndex) => StateOf(_tierIndex) == ERankRewardState.Claimable;
 
-    // 보상 수령 — 지급 → 낙인 → 즉시 영속 → 통지
-    public static bool Claim(int _tierIndex)
+    /// <summary>보상 수령을 서버에 요청한다. 지급과 낙인(claimedTiers)을 서버가 한 트랜잭션으로 끝내고,
+    /// 응답 채택이 재화·랭크 슬롯을 갈아끼운다. 서버가 준 목록째로 돌려준다(팝업이 이 값으로 연출을 정한다).</summary>
+    // CanClaim은 왕복을 아끼는 낙관 검사다 — 자격의 진실원은 서버이고, 여기서 통과해도 거절될 수 있다.
+    public static async UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
     {
-        if (!CanClaim(_tierIndex)) return false;
+        if (!CanClaim(_tierIndex)) return default;
 
-        var t_rewards = new List<RewardLine>();
-        Config.FillRewards(_tierIndex, t_rewards);
+        // 티어 인덱스 문자열이 스펙시트 Reward.ownerId 와 같은 키다(RankConfig.FillRewards와 같은 표기).
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString());
+        if (!t_outcome.Succeeded) return default;
 
-        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
-            CurrencyManager.Earn(t_rewards[t_i].Gain.Type, t_rewards[t_i].Gain.Amount);
-
-        Slot.ClaimedTiers.Add(_tierIndex);
-
-        // CurrencyManager.Save()가 골드 flush 후 DataSaveManager.Save()까지 부른다(순서 뒤집으면 골드 미반영 상태가 기록된다)
-        CurrencyManager.Save();
         OnChanged?.Invoke();
-        return true;
+        return t_outcome;
     }
 
     // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)

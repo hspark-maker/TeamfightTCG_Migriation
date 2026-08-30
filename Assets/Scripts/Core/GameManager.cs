@@ -56,7 +56,6 @@ public class GameManager : MonoBehaviour
     // 로컬 캐시가 없어 복구선도 없다 — 미업로드분은 여기서 유실된다.
     void OnApplicationQuit()
     {
-        FlushLocal();
         FirebaseManager.FlushPendingAsync().Forget();
     }
 
@@ -131,17 +130,9 @@ public class GameManager : MonoBehaviour
     }
 
     // 앱이 백그라운드로 갈 때 영속화를 flush. 업로드 완료까지 기다린다(안드로이드는 프로세스가 살아 PlayerLoop이 돈다).
+    // 재화는 지갑 문서로 갔고 클라는 그 문서를 쓰지 못한다 — 여기서 따로 flush할 로컬 잔액이 없다.
     async UniTaskVoid FlushAsync()
     {
-        FlushLocal();
         await FirebaseManager.FlushPendingAsync();
-    }
-
-    // 게이트가 아니라 매니저 설치 여부로 판정한다 — 세션 중 복구 요구가 뜨면 IsReady가 false로 떨어지는데,
-    // 그때 잔액 flush까지 멈추면 이미 번 재화가 업로드 대기열에도 못 들어간다.
-    void FlushLocal()
-    {
-        if (SaveDependentManagersStep.IsInstalled)
-            CurrencyManager.Save();
     }
 }

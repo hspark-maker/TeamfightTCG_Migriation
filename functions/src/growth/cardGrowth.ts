@@ -71,6 +71,32 @@ function withEntry(
 }
 
 /**
+ * 이 카드의 현재 강화 레벨(기록이 없으면 미강화). 바닥 아래 값은 미강화로 읽는다
+ * — 레벨을 0부터 세던 시절의 세이브가 그렇다(클라 CardGrowthManager.LevelOf 와 같은 정규화).
+ * @param {GrowthEntries} entries 성장 항목
+ * @param {number} cardId 카드 id
+ * @return {number} 강화 레벨
+ */
+export function levelOfCard(entries: GrowthEntries, cardId: number): number {
+  const level = entries[String(cardId)]?.level ?? BASE_LEVEL;
+  return level < BASE_LEVEL ? BASE_LEVEL : level;
+}
+
+/**
+ * 강화 성공을 반영한다. 먹이·한계돌파는 그대로 둔다 — 슬롯 **전체 값**을 되쓰므로
+ * 여기서 흘리면 그 카드의 나머지 진행도가 지워진다.
+ * @param {GrowthEntries} entries 기존 항목
+ * @param {number} cardId 카드 id
+ * @param {number} level 도달 레벨
+ * @return {GrowthEntries} 갱신된 항목
+ */
+export function applyEnhanceLevel(entries: GrowthEntries, cardId: number, level: number): GrowthEntries {
+  return withEntry(entries, cardId, (entry) => {
+    entry.level = level < BASE_LEVEL ? BASE_LEVEL : level;
+  });
+}
+
+/**
  * 보유 먹이. 음수 세이브는 0으로 읽는다(클라 SnackOf 와 같다).
  * @param {GrowthEntries} entries 성장 항목
  * @param {number} cardId 카드 id

@@ -4,10 +4,9 @@ using Newtonsoft.Json;
 //
 // 불변식: null == 서버가 그 슬롯을 건드리지 않았다.
 // 그래서 프로퍼티 이니셜라이저를 하나도 두지 않는다 — UserSaveData처럼 = new Xxx()를 달면
-// 한 슬롯만 담긴 응답을 역직렬화해도 나머지 9개가 non-null이 되어 로컬 진행도를 기본값으로 덮는다.
+// 한 슬롯만 담긴 응답을 역직렬화해도 나머지 8개가 non-null이 되어 로컬 진행도를 기본값으로 덮는다.
 public class ServerSlotPatch
 {
-    [JsonProperty("currency")] public CurrencySaveData Currency { get; set; }
     [JsonProperty("ownership")] public OwnershipSaveData Ownership { get; set; }
     [JsonProperty("deck")] public DeckSaveData Deck { get; set; }
     [JsonProperty("cardGrowth")] public CardGrowthSaveData CardGrowth { get; set; }

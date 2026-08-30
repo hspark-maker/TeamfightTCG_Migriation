@@ -1,0 +1,13 @@
+# Compiled JavaScript files
+lib/**/*.js
+lib/**/*.js.map
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+*.local
+
+# functions/src 의 미러. prebuild(sync:shared) 가 매번 새로 만든다 - 커밋하지 않는다.
+src/generated/

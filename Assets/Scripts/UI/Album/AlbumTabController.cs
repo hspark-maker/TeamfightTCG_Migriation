@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 카드 앨범 탭 표면(Tab_Collection_New 루트 부착) — 전체 보상 요약 + 테마 갤러리
@@ -272,13 +273,16 @@ public class AlbumTabController : LobbyTabPanel
         }
     }
 
-    void ClaimAlbumReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimAlbumReward() => ClaimAlbumRewardAsync().Forget();
+
+    async UniTaskVoid ClaimAlbumRewardAsync()
     {
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
         if (!AlbumRewardManager.CanClaimAlbum()) return;
 
-        AlbumRewardClaimFlow.Open("앨범 완성!",
-                                  CardAlbum.AlbumRewards,
-                                  () => AlbumRewardManager.ClaimAlbum());
+        await AlbumRewardClaimFlow.Open("앨범 완성!",
+                                        CardAlbum.AlbumRewards,
+                                        () => AlbumRewardManager.ClaimAlbum());
     }
 }

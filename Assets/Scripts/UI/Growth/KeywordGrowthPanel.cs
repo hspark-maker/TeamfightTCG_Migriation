@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -177,27 +178,39 @@ public class KeywordGrowthPanel : PooledUIBase
 
         if (!KeywordGrowthManager.TryGetNextStep(this.m_selected, out GrowthStep t_step)) return;
 
-        KeywordGrowthCellView t_cell = null;
-        for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
-            if (this.m_cells[t_i] != null && this.m_cells[t_i].Keyword == this.m_selected)
-            {
-                t_cell = this.m_cells[t_i];
-                break;
-            }
-
         // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshAll을 유발한다.
+        // 잠금은 왕복 "전"에 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
         this.m_fxPlaying = true;
         this.RefreshAction();
 
-        EnhanceResult t_result = KeywordGrowthManager.TryEnhance(this.m_selected);
-        if (t_result.Outcome != EEnhanceOutcome.Success)
+        this.UpgradeAsync(this.m_selected, t_step.Cost).Forget();
+    }
+
+    // 서버 왕복 강화. 실패로 끝나는 모든 갈래에서 잠금을 반드시 되돌린다(안 풀면 이 패널이 통째로 굳는다).
+    async UniTaskVoid UpgradeAsync(CardKeyword _keyword, long _cost)
+    {
+        EnhanceResult t_result = await KeywordGrowthManager.TryEnhanceAsync(_keyword);
+
+        // 왕복 중 패널이 사라졌으면 태울 연출이 없다(레벨·잔액은 서버가 이미 확정했다).
+        if (this == null) return;
+
+        // 닫힌 뒤에 돌아온 응답도 같다 — 무대가 없는 곳에서 연출을 세우지 않고 잠금만 되돌린다.
+        if (!this.m_visible || t_result.Outcome != EEnhanceOutcome.Success)
         {
             this.m_fxPlaying = false;
             this.RefreshAction();
             return;
         }
 
-        this.PlayUpgradeFx(t_step.Cost, t_cell);
+        KeywordGrowthCellView t_cell = null;
+        for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
+            if (this.m_cells[t_i] != null && this.m_cells[t_i].Keyword == _keyword)
+            {
+                t_cell = this.m_cells[t_i];
+                break;
+            }
+
+        this.PlayUpgradeFx(_cost, t_cell);
     }
 
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)

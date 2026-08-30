@@ -1,5 +1,5 @@
 /**
- * 전역 재화 지갑 — 잔액 읽기·여력 판정·차감·지급·슬롯 조립. 순수(Firestore·HttpsError 모름).
+ * 전역 재화 지갑 — 잔액 읽기·여력 판정·차감·지급. 순수(Firestore·HttpsError 모름).
  *
  * 재화가 오가는 산술은 changeBalances 하나뿐이다. 거기서 [0, CURRENCY_MAX] 로 자르는 것이 핵심인데,
  * 서버는 Admin SDK 라 룰을 우회하므로 상한을 넘긴 문서를 쓰면 그 계정의 이후 클라 저장이
@@ -19,6 +19,16 @@ export type Balances = Record<string, number>;
 export interface CurrencyGain {
   currency: CurrencyKey;
   amount: number;
+}
+
+/**
+ * 4키로 다시 짓는다. 부분 입력이면 빠진 키가 0 이고 모르는 키는 버린다.
+ * 지갑 문서 코덱(currency/walletStore)이 슬롯 밖에서도 같은 정규화를 써야 해서 공개한다.
+ * @param {Balances} balances 잔액(부분·오염 가능)
+ * @return {Balances} 4키 잔액
+ */
+export function normalizeBalances(balances: Balances): Balances {
+  return normalize(balances);
 }
 
 /**
@@ -52,7 +62,8 @@ function changeBalances(balances: Balances, changes: CurrencyGain[]): Balances {
 }
 
 /**
- * 문서의 currency 슬롯에서 잔액을 읽는다. 클라 CurrencySaveData.Normalize 와 같은 자리다.
+ * 세이브 문서의 currency 슬롯에서 잔액을 읽는다. v8 부터 잔액의 진실원은 지갑 문서라
+ * 남은 호출자는 이관(currency/walletMigration) 하나뿐이다.
  * @param {unknown} currency 문서의 currency 슬롯
  * @return {Balances} 4키 잔액
  */
@@ -91,13 +102,4 @@ export function spend(balances: Balances, currency: CurrencyKey, amount: number)
  */
 export function grant(balances: Balances, gains: CurrencyGain[]): Balances {
   return changeBalances(balances, gains.filter((gain) => gain.amount > 0));
-}
-
-/**
- * 세이브의 currency 슬롯 **전체 값**. 4키를 다시 세우므로 부분 잔액을 넣어도 모양이 선다.
- * @param {Balances} balances 잔액
- * @return {object} currency 슬롯
- */
-export function currencySlot(balances: Balances): {balances: Balances} {
-  return {balances: normalize(balances)};
 }

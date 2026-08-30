@@ -1,8 +1,9 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>
-/// 전투 결과를 보상 재화로 환산
+/// 전투 결과를 보상 재화로 환산(표시용 예상액)하고, 실제 지급은 서버에 맡기는 창구
 /// </summary>
 public static class RewardService
 {
@@ -51,17 +52,23 @@ public static class RewardService
     }
 
     /// <summary>
-    /// 전투 종료 시점에 보상을 직접 지급한다. 환산 → Earn → 즉시 Save(영속화) 순으로 처리하고
-    /// 지급분을 반환한다. 반환값은 F-20 보상 팝업이 그대로 소비할 수 있다.
+    /// 전투 종료 시점에 서버 지급을 띄운다(응답을 기다리지 않는다). 서버가 확정한 액수가 도착하면
+    /// 그때 로비 획득 연출용 캐리어가 선다 — 실패하면 캐리어를 세우지 않는다.
     /// </summary>
-    public static CurrencyGain GrantBattleReward(bool _won, int _remainingCards)
+    public static void GrantBattleRewardAsync(bool _won, int _remainingCards)
     {
-        CurrencyGain t_reward = CalculateReward(_won, _remainingCards);
+        ClaimBattleRewardAsync(_won, _remainingCards).Forget();
+    }
 
-        CurrencyManager.Earn(t_reward.Type, t_reward.Amount);
-        // Earn은 flush하지 않으므로 지급 직후 즉시 영속화(앱 강제 종료에도 보상 유실 방지).
-        CurrencyManager.Save();
+    // static이라 전투 씬이 언로드돼도 이 호출은 계속 산다(취소 토큰을 붙이지 않는 이유).
+    // 실패해도 재시도하지 않는다 — 서버가 멱등이 아니라 두 번째 호출은 그대로 이중 지급이다.
+    static async UniTaskVoid ClaimBattleRewardAsync(bool _won, int _remainingCards)
+    {
+        CurrencyGain t_granted = await BattleRewardCommand.ClaimAsync(_won, _remainingCards);
 
-        return t_reward;
+        // 들어오지도 않은 재화의 획득 연출을 로비에서 돌리지 않는다.
+        if (!t_granted.HasAmount) return;
+
+        BattleRewardHandoff.Set(t_granted);
     }
 }

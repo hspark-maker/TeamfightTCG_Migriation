@@ -15,7 +15,7 @@ using UnityEngine;
 /// SpecData 표를 Firestore의 메타 문서와 행 문서로 업로드한다.
 /// 표 하나의 메타 갱신, 행 upsert, 사라진 행 삭제는 documents:commit 한 번으로 원자 반영한다.
 /// </summary>
-public static class SpecFirestoreUploader
+public static partial class SpecFirestoreUploader
 {
     const string GOOGLE_SERVICES_PATH = "Assets/google-services.json";
     const string SPEC_COLLECTION = "specs";
@@ -113,17 +113,26 @@ public static class SpecFirestoreUploader
         if (!TryLoadManager(out object t_manager, out _error)) return null;
         if (!TryBuildSnapshot(t_manager, _table, out TableSnapshot t_snapshot, out _error)) return null;
 
+        return UploadSnapshot(t_projectId, t_apiKey, _envId, _table, t_snapshot, out _error);
+    }
+
+    /// <summary>표 스냅샷 하나를 메타·행·블롭 문서로 원자 반영한다(자격 검사와 설정 읽기는 호출자 몫).</summary>
+    static string UploadSnapshot(
+        string _projectId, string _apiKey, string _envId, string _table, TableSnapshot _snapshot, out string _error)
+    {
+        _error = null;
+
         using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(FirebaseTimeouts.RestRequestSeconds) };
 
-        if (!TryReadMeta(t_client, t_projectId, t_apiKey, _envId, _table,
+        if (!TryReadMeta(t_client, _projectId, _apiKey, _envId, _table,
                          out long t_currentRevision, out string t_updateTime, out string t_remoteHash,
                          out bool t_metaExists, out _error))
             return null;
 
         // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 행 목록을 조회할 이유도 없다.
         // 여기서 끊지 않으면 안 바뀐 표마다 행 수만큼 read + 행 수만큼 write를 그대로 지불한다.
-        if (t_metaExists && string.Equals(t_remoteHash, t_snapshot.PayloadHash, StringComparison.Ordinal))
-            return $"{_table}: 변경 없음 — 건너뜀 (rev {t_currentRevision}, {t_snapshot.Rows.Count}행, hash {t_snapshot.PayloadHash})";
+        if (t_metaExists && string.Equals(t_remoteHash, _snapshot.PayloadHash, StringComparison.Ordinal))
+            return $"{_table}: 변경 없음 — 건너뜀 (rev {t_currentRevision}, {_snapshot.Rows.Count}행, hash {_snapshot.PayloadHash})";
 
         if (t_currentRevision == long.MaxValue)
         {
@@ -131,22 +140,22 @@ public static class SpecFirestoreUploader
             return null;
         }
 
-        if (!TryListRemoteRowIds(t_client, t_projectId, t_apiKey, _envId, _table,
+        if (!TryListRemoteRowIds(t_client, _projectId, _apiKey, _envId, _table,
                                  out HashSet<string> t_remoteIds, out _error))
             return null;
 
         var t_localIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (TableRow t_row in t_snapshot.Rows) t_localIds.Add(t_row.Id);
+        foreach (TableRow t_row in _snapshot.Rows) t_localIds.Add(t_row.Id);
         t_remoteIds.ExceptWith(t_localIds);
 
-        if (t_snapshot.PayloadBytes > MAX_FIELD_BYTES)
+        if (_snapshot.PayloadBytes > MAX_FIELD_BYTES)
         {
-            _error = $"{_table} 블롭 payload가 {t_snapshot.PayloadBytes:N0}B로 Firestore 필드 한도 " +
+            _error = $"{_table} 블롭 payload가 {_snapshot.PayloadBytes:N0}B로 Firestore 필드 한도 " +
                      $"{MAX_FIELD_BYTES:N0}B를 넘는다. 압축하거나 필드를 분할해야 한다.";
             return null;
         }
 
-        int t_writeCount = 2 + t_snapshot.Rows.Count + t_remoteIds.Count;
+        int t_writeCount = 2 + _snapshot.Rows.Count + t_remoteIds.Count;
         if (t_writeCount > MAX_COMMIT_WRITES)
         {
             _error = $"{_table} 원자 커밋이 {t_writeCount} writes다. Firestore 한도 {MAX_COMMIT_WRITES}을 넘으므로 " +
@@ -156,7 +165,7 @@ public static class SpecFirestoreUploader
 
         long t_revision = t_currentRevision + 1;
         string t_body = BuildCommitJson(
-            t_projectId, _envId, _table, t_snapshot, t_remoteIds, t_revision, t_updateTime, t_metaExists);
+            _projectId, _envId, _table, _snapshot, t_remoteIds, t_revision, t_updateTime, t_metaExists);
         int t_commitBytes = Encoding.UTF8.GetByteCount(t_body);
         if (t_commitBytes > MAX_COMMIT_BYTES)
         {
@@ -164,10 +173,10 @@ public static class SpecFirestoreUploader
             return null;
         }
 
-        if (!TryCommit(t_client, t_projectId, t_apiKey, t_body, out _error)) return null;
+        if (!TryCommit(t_client, _projectId, _apiKey, t_body, out _error)) return null;
 
-        return $"{_table}: rev {t_revision}, {t_snapshot.Rows.Count}행, 삭제 {t_remoteIds.Count}, " +
-               $"{t_snapshot.PayloadBytes:N0}B → {FirebaseRootPath.Environment(_envId)}/{SPEC_COLLECTION}/{_table}";
+        return $"{_table}: rev {t_revision}, {_snapshot.Rows.Count}행, 삭제 {t_remoteIds.Count}, " +
+               $"{_snapshot.PayloadBytes:N0}B → {FirebaseRootPath.Environment(_envId)}/{SPEC_COLLECTION}/{_table}";
     }
 
     static bool TryLoadManager(out object _manager, out string _error)
@@ -229,6 +238,15 @@ public static class SpecFirestoreUploader
             return false;
         }
 
+        return TryBuildSnapshotFrom(t_source, _table, out _snapshot, out _error);
+    }
+
+    /// <summary>행 객체 열거를 표 스냅샷(열 목록·행·정규화 payload·해시)으로 만든다.</summary>
+    static bool TryBuildSnapshotFrom(IEnumerable _source, string _table, out TableSnapshot _snapshot, out string _error)
+    {
+        _snapshot = null;
+        _error = null;
+
         FieldInfo[] t_fields = null;
         FieldInfo t_idField = null;
         var t_columns = new List<string>();
@@ -236,7 +254,7 @@ public static class SpecFirestoreUploader
         var t_ids = new HashSet<string>(StringComparer.Ordinal);
         var t_payload = new StringBuilder(4096);
 
-        foreach (object t_sourceRow in t_source)
+        foreach (object t_sourceRow in _source)
         {
             if (t_sourceRow == null)
             {

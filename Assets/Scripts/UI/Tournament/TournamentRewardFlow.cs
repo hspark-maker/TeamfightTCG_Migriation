@@ -1,18 +1,19 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 
 // 정점 클리어 보상의 수령 흐름(앨범 3단 수령과 같은 순서를 따른다).
 //
-// 지급은 하지 않는다 — 팝업의 확인이 _onConfirm을 부르고 그 안에서 TournamentProgress.ClearNode가
-// 자격 판정 · 지급 · 낙인 · 영속을 한 트랜잭션으로 끝낸다. 팝업은 그 반환값을 보고 연출 여부를 정한다.
+// 지급은 하지 않는다 — 팝업의 확인이 _onConfirm을 부르고 그 안에서 TournamentProgress.ClearNodeAsync가
+// 자격 판정 · 지급 · 낙인을 서버 한 트랜잭션으로 끝낸다. 팝업은 그 반환값을 보고 연출 여부를 정한다.
 public static class TournamentRewardFlow
 {
     const string TITLE_SUFFIX   = " 격파";
     const string TITLE_FALLBACK = "정점 클리어";
 
     /// <summary>
-    /// 보상 팝업을 연다. <b>팝업이 실제로 떴는지</b>를 돌려준다 —
-    /// 폴백(보상 0건·팝업 미배선)으로 지급만 끝난 경우 _onClosed가 영영 오지 않으므로 호출부가 알아야 한다.
+    /// 정점 보상 수령을 시작한다. <b>_onClosed가 오는지</b>를 돌려준다 —
+    /// false는 시작조차 하지 않은 경우(빈 정점 id · 이미 클리어)뿐이라 호출부가 뒷정리를 해야 한다.
     /// </summary>
     public static bool Open(string _nodeId, Action _onClosed = null)
     {
@@ -32,14 +33,23 @@ public static class TournamentRewardFlow
         // 팝업이 씬에 없을 때도 같은 자리로 떨어진다(앨범·랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
         if (t_lines.Count == 0 || !RewardClaimPopup.TryGet(out var t_popup))
         {
-            TournamentProgress.ClearNode(_nodeId);
-            return false;
+            // 팝업만 없는 것이지 결말까지 없는 것은 아니다 — 점등·해금은 서버 왕복이 끝난 뒤 이어 붙인다.
+            ClaimThenNotify(_nodeId, _onClosed).Forget();
+            return true;
         }
 
         // 랭크·앨범과 같은 규약 — [획득] 버튼 없이 배경을 눌러 받는다.
-        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNode(_nodeId),
+        t_popup.Show(TitleOf(t_index), t_lines, () => TournamentProgress.ClearNodeAsync(_nodeId),
                      _claimOnDim: true, _onClosed: _onClosed);
         return true;
+    }
+
+    // 팝업 없는 수령. 왕복이 끝난 뒤에 알려야 호출부가 클리어를 본다 — 던져 두면 그 자리엔 아직 RewardPending이다.
+    // 거절돼도 부른다: 호출부가 걸어 둔 갱신 억제를 푸는 자리가 이 콜백뿐이다.
+    static async UniTaskVoid ClaimThenNotify(string _nodeId, Action _onClosed)
+    {
+        await TournamentProgress.ClearNodeAsync(_nodeId);
+        _onClosed?.Invoke();
     }
 
     // 표시명이 비었거나 저작에서 사라진 정점이면 상대를 특정하지 않는 문구로 내려간다(빈 제목으로 새지 않게).

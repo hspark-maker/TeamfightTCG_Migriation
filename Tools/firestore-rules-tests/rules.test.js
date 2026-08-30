@@ -15,8 +15,11 @@ import {
   saveDocument,
   freshAccountDocument,
   serverFreshAccountDocument,
+  legacyCurrencySlot,
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
+import { walletDocument, ledgerDocument } from './fixtures/walletDocument.js';
+import { grantsDocument } from './fixtures/grantsDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
 const PROJECT_ID = 'tcg-rules-test';
@@ -27,6 +30,12 @@ let testEnv;
 
 const savePath = (_uid = UID, _env = 'test', _docId = 'current') =>
   `envs/${_env}/users/${_uid}/save/${_docId}`;
+
+const walletPath = (_uid = UID, _env = 'test', _docId = 'current') =>
+  `envs/${_env}/users/${_uid}/wallet/${_docId}`;
+
+const grantsPath = (_uid = UID, _env = 'test', _docId = 'current') =>
+  `envs/${_env}/users/${_uid}/grants/${_docId}`;
 
 const authed = (_uid = UID) => testEnv.authenticatedContext(_uid).firestore();
 const unauthed = () => testEnv.unauthenticatedContext().firestore();
@@ -63,7 +72,7 @@ after(async () => {
 
 // R4 부터 문서 생성은 서버(ensureAccount)만 한다. 페이로드를 실클라 그대로 두는 이유는
 // "거부 이유가 문서 모양이 아니라 create 라는 행위 자체"임을 남기기 위해서다.
-test('1. 실클라 15키 문서여도 클라 create 는 거부', async () => {
+test('1. 실클라 14키 문서여도 클라 create 는 거부', async () => {
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1)));
 });
 
@@ -135,7 +144,7 @@ test('7b. 메타 필드 누락은 거부', async () => {
 test('7c. 슬롯 누락 update 는 거부 (세이브 비우기 우회)', async () => {
   await seed(1);
   const t_meta = saveDocument(2);
-  for (const t_slot of ['currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+  for (const t_slot of ['ownership', 'deck', 'cardGrowth', 'keywordGrowth',
     'rank', 'albumReward', 'tournament', 'tutorial', 'profile']) {
     delete t_meta[t_slot];
   }
@@ -229,9 +238,11 @@ test('13. 슬롯 타입 위반은 거부', async () => {
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { ownership: [1, 2] })));
 });
 
-// 클라는 CurrencySaveData.Normalize 덕에 언제나 4재화를 싣는다. 그래서 룰이 4키를
-// 전부 요구하는 게 맞다. 키를 빼거나 타입을 바꾸는 조작은 거부돼야 한다.
-test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 거부', async () => {
+// C6 이후 currency 는 optional 이지만 "실렸을 때"의 계약은 예전 그대로다.
+// 승급 전 구 클라(v7)는 CurrencySaveData.Normalize 덕에 언제나 4재화를 싣는다 —
+// 그래서 룰이 4키를 전부 요구하는 게 맞고, 키를 빼거나 타입을 바꾸는 조작은 거부돼야 한다.
+// currency 를 optional 로 만든 것이 "실으면 아무 모양이나 된다"로 새면 안 된다.
+test('13b. 구 클라가 실은 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 거부', async () => {
   await seed(1);
   await assertFails(setDoc(doc(authed(), savePath()),
     saveDocument(2, { currency: { balances: { Gold: 100 } } })));
@@ -241,6 +252,35 @@ test('13b. 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 �
     saveDocument(2, { currency: { balances: { Gold: -1, Diamond: 0, Energy: 0, Shard: 0 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
     saveDocument(2, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
+});
+
+// C6 — 잔액이 wallet/current 로 이사하면서 신 클라(v8)는 currency 를 아예 안 싣는다(= 기본 픽스처 14키,
+// 2 가 이미 그걸 본다). 승급 전 구 클라(v7)는 계속 15키를 싣고, 룰은 그 사이 구간 동안 둘 다 받아야 한다.
+// 여기서 막히면 스토어 심사가 끝나기 전 구 클라의 저장이 전부 거부된다.
+// 조이는 것(14키 전용)은 구 클라가 사라진 뒤 C7 이고, 그때 이 케이스가 뒤집힐 자리다.
+test('13c. currency 를 실은 15키 update 도 통과 (승급 전 구 클라)', async () => {
+  await seed(1);
+  await assertSucceeds(
+    setDoc(doc(authed(), savePath()), saveDocument(2, { currency: legacyCurrencySlot() })),
+  );
+});
+
+// currency 를 optional 로 만든 것이 "슬롯 생략으로 세이브 비우기"를 열어 주면 안 된다.
+// 신·구 두 모양 모두에서 나머지 9슬롯은 여전히 필수다.
+test('13d. currency 유무와 무관하게 다른 슬롯 누락은 거부', async () => {
+  await seed(1);
+  const t_new = saveDocument(2);
+  delete t_new.ownership;
+  await assertFails(setDoc(doc(authed(), savePath()), t_new));
+
+  const t_old = saveDocument(2, { currency: legacyCurrencySlot() });
+  delete t_old.ownership;
+  await assertFails(setDoc(doc(authed(), savePath()), t_old));
+});
+
+test('13e. currency 가 map 이 아니면 거부 (실려 있으면 검증은 그대로)', async () => {
+  await seed(1);
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: null })));
 });
 
 // --- 14. 신규 계정 방어 -----------------------------------------------------
@@ -277,9 +317,11 @@ test('14d. 서버 문서와 같은 모양이어도 클라 create 는 거부', as
 
 // 슬롯 '안쪽'의 null 은 허용하고(위 14), 슬롯 '자체'의 null 은 거부한다.
 // 이 경계가 흐려지면 14를 통과시키려다 슬롯 통째 null 까지 열어주게 된다.
-// 클라는 슬롯 통째 null 을 절대 안 보낸다 — UserSaveData 의 슬롯 10개가 전부
+// 클라는 슬롯 통째 null 을 절대 안 보낸다 — UserSaveData 의 슬롯 9개가 전부
 // 프로퍼티 이니셜라이저로 non-null 이다. 그러니 이게 오면 조작이거나 콘솔 수작업이다.
 // (DataSaveManager.Normalize 가 읽기 쪽에서 복구해 주긴 하지만 그건 안전망이지 계약이 아니다.)
+// 두 줄로 보는 이유: 필수 슬롯(profile)과 optional 슬롯(구 클라 currency)은 룰에서 검증을 타는
+// 경로가 갈린다 — optional 쪽은 hasAny 게이트 안이라 한쪽만 보면 반쪽이 빈다.
 test('14b. 슬롯 자체가 null 이면 거부', async () => {
   await seed(1);
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { profile: null })));
@@ -329,4 +371,116 @@ test('16c. 매치 결과 문서는 클라가 읽지도 쓰지도 못한다', asy
 test('16b. save/current 하위 서브컬렉션은 거부', async () => {
   await assertFails(setDoc(doc(authed(), `${savePath()}/shadow/x`), { a: 1 }));
   await assertFails(getDoc(doc(authed(), `${savePath()}/shadow/x`)));
+});
+
+// --- 17~19. 지갑(재화) ------------------------------------------------------
+
+// 지갑은 서버(Admin SDK) 전용 쓰기다 — 잔액을 바꾸는 것은 Callable 뿐이고 클라는 읽기만 한다.
+// 거부 케이스는 전부 withSecurityRulesDisabled 로 문서를 먼저 심는다. 안 심으면 룰이 아니라
+// '문서가 없어서' 실패해 통과처럼 보이고, allow 를 통째로 열어도 초록이 된다.
+async function seedWallet(_uid = UID, _env = 'test', _docId = 'current') {
+  await seedRaw(walletPath(_uid, _env, _docId), walletDocument());
+}
+
+test('17. 소유자는 자기 지갑을 읽는다', async () => {
+  await seedWallet();
+  await assertSucceeds(getDoc(doc(authed(), walletPath())));
+});
+
+test('17b. 남의 uid 지갑 읽기는 거부', async () => {
+  await seedWallet(OTHER_UID);
+  await assertFails(getDoc(doc(authed(UID), walletPath(OTHER_UID))));
+});
+
+test('17c. 미인증 지갑 읽기는 거부', async () => {
+  await seedWallet();
+  await assertFails(getDoc(doc(unauthed(), walletPath())));
+});
+
+test('17d. 알 수 없는 envId 지갑 읽기는 거부', async () => {
+  await seedWallet(UID, 'dev');
+  await assertFails(getDoc(doc(authed(), walletPath(UID, 'dev'))));
+});
+
+test('17e. 알 수 없는 docId 지갑 읽기는 거부', async () => {
+  await seedWallet(UID, 'test', 'other');
+  await assertFails(getDoc(doc(authed(), walletPath(UID, 'test', 'other'))));
+});
+
+// 잔액을 클라가 만들 수 있으면 재화 발행권이 클라로 넘어간다. create·update·delete 셋 다 막혀야 한다.
+test('18. 소유자도 지갑 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), walletPath()), walletDocument()));
+});
+
+test('18b. 소유자도 지갑 update 는 거부', async () => {
+  await seedWallet();
+  await assertFails(setDoc(doc(authed(), walletPath()), walletDocument({ rev: 2 })));
+});
+
+test('18c. 소유자도 지갑 delete 는 거부', async () => {
+  await seedWallet();
+  await assertFails(deleteDoc(doc(authed(), walletPath())));
+});
+
+// 원장은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
+test('19. 소유자도 원장 읽기는 거부', async () => {
+  await seedWallet();
+  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
+  await assertFails(getDoc(doc(authed(), `${walletPath()}/ledger/tx1`)));
+});
+
+test('19b. 소유자도 원장 쓰기는 거부', async () => {
+  await seedWallet();
+  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
+  await assertFails(setDoc(doc(authed(), `${walletPath()}/ledger/tx1`), ledgerDocument({ rev: 3 })));
+});
+
+
+// --- 20·21. 튜토리얼 무료 한 방 (envs/{env}/users/{uid}/grants/current) ------
+
+// 축(카드 강화·키워드 강화)마다 계정당 1회를 서버가 소유한다. 지갑과 문서 모양은 같지만
+// 읽기를 여는 이유가 다르다 — 화면이 "무료" 표시를 그리려면 남았는지 알아야 한다.
+async function seedGrants(_uid = UID, _env = 'test', _docId = 'current') {
+  await seedRaw(grantsPath(_uid, _env, _docId), grantsDocument());
+}
+
+test('20. 소유자는 자기 무료 한 방 문서를 읽는다', async () => {
+  await seedGrants();
+  await assertSucceeds(getDoc(doc(authed(), grantsPath())));
+});
+
+test('20b. 남의 uid 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(OTHER_UID);
+  await assertFails(getDoc(doc(authed(UID), grantsPath(OTHER_UID))));
+});
+
+test('20c. 미인증 무료 한 방 읽기는 거부', async () => {
+  await seedGrants();
+  await assertFails(getDoc(doc(unauthed(), grantsPath())));
+});
+
+test('20d. 알 수 없는 envId 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(UID, 'dev');
+  await assertFails(getDoc(doc(authed(), grantsPath(UID, 'dev'))));
+});
+
+test('20e. 알 수 없는 docId 무료 한 방 읽기는 거부', async () => {
+  await seedGrants(UID, 'test', 'other');
+  await assertFails(getDoc(doc(authed(), grantsPath(UID, 'test', 'other'))));
+});
+
+// 소진 낙인을 클라가 지울 수 있으면 무료 한 방이 무한이 된다 — 앱 재시작으로 되살아나던
+// 정적 필드를 문서로 옮긴 이유가 그것이라 create·update·delete 셋 다 막혀야 한다.
+test('21. 소유자도 무료 한 방 create 는 거부', async () => {
+  await assertFails(setDoc(doc(authed(), grantsPath()), grantsDocument()));
+});
+
+test('21b. 소유자도 무료 한 방 update 는 거부', async () => {
+  await seedGrants();
+  await assertFails(setDoc(doc(authed(), grantsPath()), grantsDocument({ enhanceCard: false })));
+});
+
+test('21c. 소유자도 무료 한 방 delete 는 거부', async () => {
+  await seedGrants();
+  await assertFails(deleteDoc(doc(authed(), grantsPath())));
 });

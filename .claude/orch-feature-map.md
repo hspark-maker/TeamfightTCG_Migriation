@@ -18,7 +18,7 @@
 - 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
 - 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
 - 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
-- 재화 변동이 저장으로: `Utils/RewardService` 가 `CurrencyManager.Save` 를 부르고 그 뒤 `DataSaveManager.Save` 로 영속화된다 — 순서가 뒤집히면 반영 전 상태가 기록된다
+- 재화 변동이 화면으로: 잔액의 진실원은 서버 지갑 문서다 — callable 응답의 `wallet` 을 `OutGame/Save/4.Cloud/ServerSaveCommands` 가 `WalletCloud.Adopt` 에 넘기고, 그것이 `CurrencyManager.Adopt` 로 메모리 잔액을 갈아끼운다. 클라에 잔액을 쓰는 경로는 없다
 - 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
 
 ## 사운드 (`Audio/`)
@@ -75,9 +75,9 @@
 
 **진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`) 하나다. 로컬 캐시도 오프라인 부트도 없다 — 원격에 닿지 못하면 게임이 진행되지 않는다. 3계층 구조.
 
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
 - 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(부트 채택이 대신한다)
-- 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `CurrencyManager.Init` · `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 부트와 같은 순서로 다시 태운다
+- 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 부트와 같은 순서로 다시 태운다(재화는 세이브 슬롯이 아니라 자기 채택 경로를 갖는다)
 - 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (부트 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
 - 실패 표면(P3): 부트 실패 `UI/Common/LoadingCoverView` 복구 화면(안내 + 재시도·종료 2버튼) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
 - 부트 재시도(씬 재로드 없음): 단일 진입점 `InitializationInstaller.RestartBoot` — 실패한 캐시 되돌리기(`CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`) → `GameInitialization.ResetForRetry` → `PlayerSaveCloud.ResetForRetry` → 게이트 재기동 순서를 여기서 소유한다. 재적재 자체는 게이트가 매번 거는 `InitializationInstaller.StartAssetLoads` 가 맡아 재시도 전용 적재 경로가 없다. 재시도 가능 판정은 `GameInitialization.CanRetry`. `LoadingCoverView.Retry` 는 화면만 되돌리고 이 하나를 부른다
@@ -85,7 +85,7 @@
 
 ## 재화·보상 (`OutGame/Currency/`, `OutGame/Reward/`, `Utils/`)
 
-- 재화: `CurrencyManager.Init` / `CurrencyManager.Save` · `ECurrencyType` · `CurrencyGainBucket` (`CurrencyGain`) · `RewardLine`
+- 재화: 지갑 문서(`envs/{env}/users/{uid}/wallet/current`) 창구 `OutGame/Currency/Cloud/WalletCloud` (`WalletCloud.TryReadAsync` · `WalletCloud.Adopt` · `WalletPatch` · `EnsureWalletResult`) · 읽기 전용 캐시 `CurrencyManager.Adopt` / `CurrencyManager.GetBalance` / `CurrencyManager.CanAfford` · `ECurrencyType` · `CurrencyGainBucket` (`CurrencyGain`) · `RewardLine`
 - 전투 보상: `BattleReward` · `BattleRewardHandoff`
 - 지급 서비스: `Utils/RewardService`
 - UI: `UI/HUD/CurrencyHud` · `ContextCurrencySlot` · `CurrencyLook` · `UI/Common/CurrencyGainEffectPlayer` · `UI/Common/CurrencyRewardSlotView` · `UI/Common/RewardClaimPopup` · `UI/Common/CoinBurstEffect`

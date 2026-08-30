@@ -5,12 +5,13 @@ import {
   isKnownEnv,
   mutateSave,
   requireUid,
-  SlotPatch,
+  SaveMutation,
 } from "../save/saveDocument";
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
-import {canAfford, currencySlot, readBalances, spend} from "../currency/wallet";
+import {canAfford, spend} from "../currency/wallet";
+import {nextWallet} from "../currency/walletStore";
 import {addSnack, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
 import {rejectDomain} from "../save/domainReject";
 import {
@@ -91,7 +92,7 @@ export const openPack = onCall(async (request) => {
   let goldAfter = 0;
   let poolSize = 0;
 
-  const result = await mutateSave(env, uid, (current): SlotPatch => {
+  const result = await mutateSave(env, uid, (current, _transaction, wallet): SaveMutation => {
     // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
     const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
     const grade = gradeOf(thresholds, points);
@@ -109,7 +110,7 @@ export const openPack = onCall(async (request) => {
     }
     poolSize = pool.length;
 
-    const balances = readBalances(current.currency);
+    const balances = wallet.balances;
     if (!canAfford(balances, pack.priceType, pack.price)) {
       reject("InsufficientGold", `Not enough ${pack.priceType} for pack '${packId}'.`,
         {uid, env, packId, priceType: pack.priceType, price: pack.price, balance: balances[pack.priceType]});
@@ -119,16 +120,18 @@ export const openPack = onCall(async (request) => {
     const ownedSet = new Set(owned);
     drawn = drawPack(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, randomInt);
 
-    const currency = currencySlot(spend(balances, pack.priceType, pack.price));
+    const paid = spend(balances, pack.priceType, pack.price);
     goldBefore = balances[pack.priceType];
-    goldAfter = currency.balances[pack.priceType];
+    goldAfter = paid[pack.priceType];
 
     return {
-      currency,
-      ownership: buildOwnershipSlot(owned, drawn),
-      cardGrowth: growthSlot(drawn.reduce(
-        (entries, card) => addSnack(entries, card.cardId, card.snack),
-        readGrowthEntries(current.cardGrowth))),
+      slots: {
+        ownership: buildOwnershipSlot(owned, drawn),
+        cardGrowth: growthSlot(drawn.reduce(
+          (entries, card) => addSnack(entries, card.cardId, card.snack),
+          readGrowthEntries(current.cardGrowth))),
+      },
+      wallet: nextWallet(wallet, paid),
     };
   });
 

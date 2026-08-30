@@ -21,6 +21,23 @@
         "npm --prefix \"$RESOURCE_DIR\" run lint",
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
+    },
+    {
+      "source": "functions-currency",
+      "codebase": "currency",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        "scripts",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
     }
   ],
   "emulators": {

@@ -15,8 +15,8 @@ import {
   computeDrawRankPayout,
   computeRankPayout,
   parseRankGradeRows,
-  parseRewardRows,
 } from "../payout";
+import {parseRewardRows} from "../rewardTable";
 import {
   BATTLE_COMMAND_RECORD_BYTES,
   MAX_BATTLE_COMMANDS,
