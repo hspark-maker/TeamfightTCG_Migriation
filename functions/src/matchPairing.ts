@@ -13,6 +13,8 @@ export type PairingRecord = MatchIdentity & {
   contentFingerprint: string;
   rulesetVersion: number;
   participantUids: string[];
+  /** 이 매치가 몇 명을 모아야 성립하는가. AI 대전은 1, 대인전은 2. */
+  expectedParticipants: number;
   createdAtMs: number;
   expiresAtMs: number;
 };
@@ -48,8 +50,12 @@ export function joinPairing(
   uid: string,
   contentFingerprint: string,
   nowMs: number,
-  newIdentity: MatchIdentity
+  newIdentity: MatchIdentity,
+  expectedParticipants = 2
 ): PairingDecision {
+  const filled = (record: PairingRecord): "waiting" | "paired" =>
+    record.participantUids.length >= record.expectedParticipants ? "paired" : "waiting";
+
   let record = existing;
   if (record == null || record.expiresAtMs <= nowMs) {
     record = {
@@ -57,27 +63,30 @@ export function joinPairing(
       contentFingerprint,
       rulesetVersion: SERVER_RULESET_VERSION,
       participantUids: [uid],
+      expectedParticipants,
       createdAtMs: nowMs,
       expiresAtMs: nowMs + MATCH_PAIRING_TTL_MS,
     };
-    return {record, slot: 0, status: "waiting"};
+    // AI 대전은 정원이 1이라 이 자리에서 곧장 성립한다 — 기다릴 상대가 없다.
+    return {record, slot: 0, status: filled(record)};
   }
 
   if (record.contentFingerprint !== contentFingerprint) {
     throw new Error("content_fingerprint_mismatch");
   }
+  // 정원이 다른 매치에 끼어드는 것을 막는다 — 1인 문서에 둘째가 붙으면
+  // lockDeck 이 한 명의 승인만으로 "approved" 를 내주고 대인전이 검증 없이 시작된다.
+  if (record.expectedParticipants !== expectedParticipants) {
+    throw new Error("match_mode_mismatch");
+  }
   const priorSlot = record.participantUids.indexOf(uid);
   if (priorSlot >= 0) {
-    return {
-      record,
-      slot: priorSlot,
-      status: record.participantUids.length >= 2 ? "paired" : "waiting",
-    };
+    return {record, slot: priorSlot, status: filled(record)};
   }
-  if (record.participantUids.length >= 2) {
+  if (record.participantUids.length >= record.expectedParticipants) {
     throw new Error("match_pairing_full");
   }
 
   record = {...record, participantUids: [...record.participantUids, uid]};
-  return {record, slot: 1, status: "paired"};
+  return {record, slot: record.participantUids.length - 1, status: filled(record)};
 }

@@ -157,6 +157,8 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       return {status: "rejected", reason: "match_rejected"};
     }
     const approvals = objectRecord(lock?.approvals) ?? {};
+    // 승인 정원. 이 필드가 없던 시절의 문서는 전부 대인전이다.
+    const expectedParticipants = safeInteger(lock?.expectedParticipants) ?? 2;
     const rejectLock = (reason: string, cardId?: number) => {
       const now = Timestamp.now();
       tx.set(matchRef, {
@@ -221,13 +223,13 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
           priorApproval.contentFingerprint === data.contentFingerprint &&
           priorApproval.ownerIndex === data.ownerIndex &&
           (priorApproval.seedSource ?? "commit_reveal") === data.seedSource) {
-        const status = Object.keys(approvals).length >= 2 ? "approved" : "pending";
+        const status = Object.keys(approvals).length >= expectedParticipants ? "approved" : "pending";
         return {status, idempotent: true};
       }
       throw new HttpsError("already-exists", "a different deck is already locked");
     }
-    if (Object.keys(approvals).length >= 2) {
-      throw new HttpsError("permission-denied", "match already has two participants");
+    if (Object.keys(approvals).length >= expectedParticipants) {
+      throw new HttpsError("permission-denied", "match already has all participants");
     }
     for (const [approvedUid, rawApproval] of Object.entries(approvals)) {
       const approval = objectRecord(rawApproval);
@@ -283,7 +285,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         approvedAt: now,
       },
     };
-    const status = Object.keys(nextApprovals).length >= 2 ? "approved" : "pending";
+    const status = Object.keys(nextApprovals).length >= expectedParticipants ? "approved" : "pending";
     tx.set(matchRef, {
       matchId: data.matchId,
       env: data.env,

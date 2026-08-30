@@ -313,7 +313,7 @@ public class DeckEditDragController : MonoBehaviour
             return;
         }
 
-        _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Both 라 레거시 Input 사용 가능
+        _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Input Manager(Old)
         _held = Input.GetMouseButton(0);
     }
 
