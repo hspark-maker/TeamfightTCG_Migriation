@@ -58,6 +58,7 @@ const KEYWORD_FLAGS: Readonly<Record<string, number>> = {
   Healer: 64,
   Invincible: 128,
   BonusHp: 256,
+  Immortal: 512,
 };
 
 const GROWABLE_KEYWORDS = [

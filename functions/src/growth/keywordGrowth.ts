@@ -25,6 +25,7 @@ const KEYWORD_FLAGS: Record<string, number> = {
   healer: 64,
   invincible: 128,
   bonushp: 256,
+  immortal: 512,
 };
 
 /**
