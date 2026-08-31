@@ -1,4 +1,6 @@
 import {createHash} from "node:crypto";
+import {LIMIT_BREAK_STAGE_CEILING} from "./growth/enhanceRules";
+import {LimitBreakCurve, limitBreakHpBonus} from "./growth/limitBreakTable";
 
 export type CardSnapshot = {
   cardId: number;
@@ -31,11 +33,19 @@ export type DeckValidationResult = {ok: true} | DeckValidationFailure;
 
 export const LOCKED_DECK_SIZE = 6;
 
+/**
+ * 저장된 한계돌파 단계가 **코드 천장 이하인데 곡선만 넘을 때**의 실패 코드.
+ *
+ * 위조가 아니라 표 사고다 — 서버가 이미 지급한 단계를 곡선 축소·행 결손이 뒤늦게 부정한 것이라,
+ * 호출부는 이 코드만 rejectLock 이 아닌 unavailable 로 접어야 한다(매치 문서에 rejected 를 박으면
+ * 아무 잘못 없는 상대 몫까지 그 매치가 통째로 탄다).
+ */
+export const LIMIT_BREAK_CURVE_SHRUNK = "limit_break_curve_shrunk";
+
 const BASE_LEVEL = 1;
 const MAX_LEVEL = 4;
 const FIRST_EVOLUTION_LEVEL = 3;
 const SECOND_EVOLUTION_LEVEL = 4;
-const MAX_LIMIT_BREAK = 3;
 const MAX_KEYWORD_GROWTH = 10;
 
 const KEYWORD_FLAGS: Readonly<Record<string, number>> = {
@@ -177,6 +187,7 @@ function expectedHpBonus(
   spec: CardSpecForValidation,
   level: number,
   limitBreak: number,
+  curve: LimitBreakCurve,
   unlockedKeywords: number,
   levels: Record<string, unknown>
 ): number | null {
@@ -185,7 +196,8 @@ function expectedHpBonus(
   for (let current = BASE_LEVEL + 1; current <= Math.min(level, MAX_LEVEL); current++) {
     result += gains[current];
   }
-  result += limitBreak;
+  // 한계돌파 가산도 누적이다 — 위 레벨 루프와 같은 성격이라 곡선의 1..stage 합을 쓴다.
+  result += limitBreakHpBonus(curve, limitBreak);
 
   for (const name of GROWABLE_KEYWORDS) {
     if ((unlockedKeywords & KEYWORD_FLAGS[name]) === 0) continue;
@@ -197,10 +209,13 @@ function expectedHpBonus(
   return result;
 }
 
+// 한계돌파 곡선은 **필수 인자**다. 선택 인자에 하드코딩 폴백을 두면 곡선의 진실원이 다시 둘이 된다
+// — 순수 모듈이라 표를 스스로 못 읽으므로 호출부(lockDeck)가 읽어 주입한다.
 export function validateDeckSnapshots(
   snapshots: readonly CardSnapshot[],
   specs: ReadonlyMap<number, CardSpecForValidation>,
-  rawSave: unknown
+  rawSave: unknown,
+  limitBreak: LimitBreakCurve
 ): DeckValidationResult {
   const save = record(rawSave);
   if (save == null) return fail("save_shape_invalid", 0);
@@ -223,14 +238,19 @@ export function validateDeckSnapshots(
 
     const growth = savedGrowth(save, snapshot.cardId);
     if (growth == null) return fail("card_growth_shape_invalid", snapshot.cardId);
+    // 천장 초과는 **위조**다. 어떤 표로도 그 값이 나올 수 없으므로 지금처럼 덱을 거절한다.
     if (growth.level < BASE_LEVEL || growth.level > MAX_LEVEL ||
-        growth.limitBreak < 0 || growth.limitBreak > MAX_LIMIT_BREAK) {
+        growth.limitBreak < 0 || growth.limitBreak > LIMIT_BREAK_STAGE_CEILING) {
       return fail("saved_growth_out_of_range", snapshot.cardId);
+    }
+    // 천장 이하인데 곡선만 넘었다 = 표가 깎인 것이다. 갈래를 나눠 호출부가 거절과 표 사고를 구별한다.
+    if (growth.limitBreak > limitBreak.maxStage) {
+      return fail(LIMIT_BREAK_CURVE_SHRUNK, snapshot.cardId);
     }
     if (snapshot.level !== growth.level) return fail("level_mismatch", snapshot.cardId);
 
     const unlocked = snapshot.level >= spec.keywordUnlockLevel ? spec.keywords : 0;
-    const hpBonus = expectedHpBonus(spec, snapshot.level, growth.limitBreak, unlocked, levels);
+    const hpBonus = expectedHpBonus(spec, snapshot.level, growth.limitBreak, limitBreak, unlocked, levels);
     if (hpBonus == null) return fail("keyword_growth_out_of_range", snapshot.cardId);
     if (snapshot.hpBonus !== hpBonus) return fail("hp_bonus_mismatch", snapshot.cardId);
 

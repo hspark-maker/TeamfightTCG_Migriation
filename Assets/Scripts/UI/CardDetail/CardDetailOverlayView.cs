@@ -648,7 +648,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 카드 그림 위 탭과 배경 탭이 같은 답을 봐야 해서 판정을 여기 하나로 둔다.</summary>
     bool SkipPlayingFx()
     {
-        if (this.m_ritualPlaying)   { SkipRitual();   return true; }
+        // 당길 무대가 실제로 없으면(한계돌파처럼 유예만 선 왕복) 탭을 삼키지 않는다 — 대기 상한이 네트워크라
+        // 여기서 먹어 버리면 나가는 문이 최대 예산+재시도 동안 막힌다. 창이 닫혀도 안전하다:
+        // LimitBreakAsync·EnhanceAsync가 this == null / isActiveAndEnabled 2단으로 받아 유예를 반드시 푼다.
+        if (this.m_ritualPlaying && this.m_activeRitual != null) { SkipRitual(); return true; }
         if (this.m_unlockFxPlaying) { SkipUnlockFx(); return true; }
 
         return false;
@@ -1400,17 +1403,48 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 여기서는 강화 연출·결과판·튜토리얼 통지(OnAnyEnhanceStarted / NotifyEnhanceSettled)를 타지 않는다.
     /// 그것들을 함께 태우면 "강화하세요" 안내가 간식으로 통과되고 무료 강화권도 함께 소모된다.
     ///
-    /// 게이트는 전부 <see cref="CardGrowthManager.TryLimitBreak"/>가 쥔다 — 화면은 눌린 사실만 넘긴다.</summary>
+    /// 게이트는 전부 <see cref="CardGrowthManager.TryLimitBreakAsync"/>가 쥔다 — 화면은 눌린 사실만 넘긴다.</summary>
     void OnLimitBreakPressed()
     {
         if (this.m_ritualPlaying) return;
 
         int t_card = CardAt(this.m_index);
         if (t_card <= 0) return;
-        if (!CardGrowthManager.TryLimitBreak(t_card)) return;
+
+        // 유예를 먼저 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 차감이 여러 번 나간다.
+        // 강화와 같은 플래그를 쓴다: 버튼 활성 판정도 카드 넘김 가드도 이미 이것 하나에 걸려 있다.
+        this.m_ritualPlaying = true;
+
+        // 이 유예에는 무대가 없다. 앞선 강화가 남긴 연출 참조를 그대로 두면 SkipPlayingFx가 그것을
+        // "지금 도는 연출"로 읽어 왕복 내내 탭을 삼킨다(그 연출은 이미 끝났으므로 끊어도 잃을 것이 없다).
+        this.m_activeRitual = null;
 
         RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
-        if (this.cardView != null) this.cardView.FlashGrowth();
+
+        LimitBreakAsync(t_card).Forget();
+    }
+
+    // 서버 왕복 한계돌파. 세운 무대가 없어 되돌릴 것도 없다 — 어느 갈래로 빠져도 유예만 반드시 푼다.
+    async UniTaskVoid LimitBreakAsync(int _card)
+    {
+        ELimitBreakOutcome t_outcome = await CardGrowthManager.TryLimitBreakAsync(_card);
+
+        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(단계·간식은 서버가 이미 확정했다).
+        if (this == null) return;
+
+        this.m_ritualPlaying = false;
+
+        // 창이 닫혔으면 그릴 것도 깨울 안내도 없다 — 한계돌파는 튜토리얼 통지를 타지 않는다.
+        if (!this.isActiveAndEnabled) return;
+
+        // 거절 사유는 화면에 그리지 않는다. 버튼이 애초에 간식 잔량으로 잠겨 있어 거절이 왔다는 것은
+        // 곧 이 화면이 낡았다는 뜻이고, 그 답은 문구가 아니라 갱신이다(성공·실패가 같은 길로 지난다).
+        int t_now = CardAt(this.m_index);
+        if (t_now > 0) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
+
+        if (t_outcome == ELimitBreakOutcome.Success && t_now == _card && this.cardView != null)
+            this.cardView.FlashGrowth();
+
         RefreshArrows();
     }
 

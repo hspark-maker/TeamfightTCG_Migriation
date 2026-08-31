@@ -64,6 +64,7 @@ const MARK = 32;
   const overrides = parseCardEnhanceOverrides(CARD_ENHANCE_ROWS);
 
   assert.equal(rule.maxLevel, 4);
+  assert.equal(rule.maxLimitBreak, 3, "한계돌파 상한의 진실원은 CardEnhanceRule 이지 CardLimitBreak 표가 아니다");
   assert.deepEqual(cardEnhanceStep(rule, overrides, 2),
     {level: 2, currency: "Shard", cost: 25, successPermille: 1000});
   assert.equal(cardEnhanceStep(rule, overrides, 3).cost, 75);
@@ -90,6 +91,9 @@ const MARK = 32;
 assert.equal(parseCardEnhanceRule([]), null);
 assert.equal(parseCardEnhanceRule([{maxLevel: 1}]), null, "바닥 이하 상한은 강화가 없는 것이다");
 assert.equal(parseCardEnhanceRule([{maxLevel: "x"}]), null);
+
+// 한계돌파 열이 비어도 **rule 자체는 null 이 아니다** — 열 하나 때문에 카드 강화 전체가 죽으면 안 된다.
+assert.equal(parseCardEnhanceRule([{maxLevel: 4, baseEnhanceCost: 25}]).maxLimitBreak, 0);
 
 // 표가 천장보다 큰 상한을 말해도 잘라 읽는다 — 클라 체력 곡선이 거기까지만 저작돼 있다.
 assert.equal(parseCardEnhanceRule([{maxLevel: 99, baseEnhanceCost: 25}]).maxLevel, CARD_MAX_LEVEL_CEILING);
