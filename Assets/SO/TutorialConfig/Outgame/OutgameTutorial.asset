@@ -48,7 +48,7 @@ MonoBehaviour:
       unlocksAll: 0
       locks:
       useDim: 0
-      pack: {fileID: 0}
+      pack: {fileID: 11400000, guid: 1f440673cf944951c10d1bee973084f4, type: 2}
       packPriceLabel:
       anchorCardId: 0
       freeOfCharge: 0
@@ -70,7 +70,7 @@ MonoBehaviour:
       unlocksAll: 0
       locks:
       useDim: 0
-      pack: {fileID: 0}
+      pack: {fileID: 11400000, guid: ff848414dcaa271e1db8538b0c45cbb2, type: 2}
       packPriceLabel:
       anchorCardId: 0
       freeOfCharge: 0
@@ -92,7 +92,7 @@ MonoBehaviour:
       unlocksAll: 0
       locks:
       useDim: 0
-      pack: {fileID: 0}
+      pack: {fileID: 11400000, guid: 3af71dbdb3f6f6247aaabb4de41155db, type: 2}
       packPriceLabel:
       anchorCardId: 0
       freeOfCharge: 0
@@ -337,7 +337,7 @@ MonoBehaviour:
       unlocksAll: 0
       locks:
       useDim: 0
-      pack: {fileID: 0}
+      pack: {fileID: 11400000, guid: 646e0517c8c3e984c856938152fe578e, type: 2}
       packPriceLabel:
       anchorCardId: 0
       freeOfCharge: 0

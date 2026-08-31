@@ -323,8 +323,7 @@ public partial class ReleaseManagerWindow
         if (!EditorUtility.DisplayDialog(
                 "구성 표 업로드",
                 $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 " +
-                $"{SpecFirestoreUploader.ALBUM_ENTRY_TABLE}·{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE}" +
-                $"·{SpecFirestoreUploader.TUTORIAL_GRANT_TABLE} 표를 배포한다.\n" +
+                $"{SpecFirestoreUploader.ALBUM_ENTRY_TABLE}·{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} 표를 배포한다.\n" +
                 "SO 저작을 그대로 옮기며, 표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
                 "업로드", "취소"))
             return;
@@ -340,14 +339,9 @@ public partial class ReleaseManagerWindow
             AppendUploadResult(t_report, SpecFirestoreUploader.ALBUM_ENTRY_TABLE, t_albumLine, t_albumError,
                                ref t_done, ref t_failed);
 
-            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} …", 0.34f);
+            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} …", 0.5f);
             string t_chapterLine = SpecFirestoreUploader.UploadTournamentChapters(_envId, out string t_chapterError);
             AppendUploadResult(t_report, SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE, t_chapterLine, t_chapterError,
-                               ref t_done, ref t_failed);
-
-            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.TUTORIAL_GRANT_TABLE} …", 0.67f);
-            string t_grantLine = SpecFirestoreUploader.UploadTutorialGrants(_envId, out string t_grantError);
-            AppendUploadResult(t_report, SpecFirestoreUploader.TUTORIAL_GRANT_TABLE, t_grantLine, t_grantError,
                                ref t_done, ref t_failed);
         }
         catch (Exception t_exception)

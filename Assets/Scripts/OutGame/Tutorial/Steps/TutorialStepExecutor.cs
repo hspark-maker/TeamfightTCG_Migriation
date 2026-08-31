@@ -207,7 +207,7 @@ public static class TutorialStepExecutor
             !DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out _))
             Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 덱 삽입 실패 — 목록이 가득 찼거나 세이브 미로드(DeckSaveManager 로그 확인).");
 
-        TutorialGrantCommand.GrantAsync(_step.StepId).Forget();
+        RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
         return EOutgameTutorialStepResult.Advanced;
     }
@@ -230,17 +230,17 @@ public static class TutorialStepExecutor
         // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
         var t_origin = t_overlay.CardAnchor;
         bool t_parallel = _step.ParallelGain;
-        int t_stepId = _step.StepId;
-        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_stepId, t_card, t_origin, t_parallel));
+        string t_packId = GrantPackIdOf(_step, Where(_context));
+        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_packId, t_card, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [획득]이 눌린 순간. 지급을 서버에 맡기고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(int _stepId, int _cardId, RectTransform _origin, bool _parallel)
+    static bool AcquireCard(string _packId, int _cardId, RectTransform _origin, bool _parallel)
     {
         // 연출은 왕복을 기다리지 않는다 — [획득]의 반응성을 네트워크에 묶지 않는다(소유는 응답 채택이 뒤따라 맞춘다).
-        TutorialGrantCommand.GrantAsync(_stepId).Forget();
+        RequestGrant(_packId);
 
         CardPackRewardHandoff.Set(CurrencyGain.None, new List<int> { _cardId });
         if (LobbyGainEffectDirector.PlayNow(_origin))
@@ -264,8 +264,8 @@ public static class TutorialStepExecutor
     // 서버 이관 후 "화면을 못 세워도 소유는 준다"는 보장은 best-effort 로 격하됐다(왕복이 실패하면 안 들어온다).
     static EOutgameTutorialStepResult FailAfterGrant(TutorialStepDef _step, OutgameTutorialStepContext _context, string _reason)
     {
-        // 무엇을 주는지는 서버가 스텝 번호로 정한다 — 저작 카드 ID가 아니라 번호 유무가 요청을 보낼 수 있는지의 기준이다.
-        if (_step.StepId > 0) TutorialGrantCommand.GrantAsync(_step.StepId).Forget();
+        // 무엇을 주는지는 서버가 팩 ID로 정한다 — 저작 카드 ID가 아니라 팩 배선 여부가 요청을 보낼 수 있는지의 기준이다.
+        RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
         return Fail(_step, _context, _reason);
     }
@@ -285,16 +285,16 @@ public static class TutorialStepExecutor
 
         var t_origin = t_overlay.CardAnchor;
         bool t_parallel = _step.ParallelGain;
-        int t_stepId = _step.StepId;
-        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_stepId, t_cards, t_origin, t_parallel));
+        string t_packId = GrantPackIdOf(_step, Where(_context));
+        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_packId, t_cards, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
     // [받기]가 눌린 순간. 지급을 서버에 맡기고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
-    static void AcquireCards(int _stepId, IReadOnlyList<int> _cards, RectTransform _origin, bool _parallel)
+    static void AcquireCards(string _packId, IReadOnlyList<int> _cards, RectTransform _origin, bool _parallel)
     {
         // 연출은 왕복을 기다리지 않는다 — [받기]의 반응성을 네트워크에 묶지 않는다(소유는 응답 채택이 뒤따라 맞춘다).
-        TutorialGrantCommand.GrantAsync(_stepId).Forget();
+        RequestGrant(_packId);
 
         CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
         if (LobbyGainEffectDirector.PlayNow(_origin))
@@ -356,7 +356,7 @@ public static class TutorialStepExecutor
     // FailAfterGrant와 같은 규약 — 소유 보장은 서버 이관 후 best-effort 다.
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context, string _reason)
     {
-        if (_step.StepId > 0) TutorialGrantCommand.GrantAsync(_step.StepId).Forget();
+        RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
         return Fail(_step, _context, _reason);
     }
@@ -371,4 +371,22 @@ public static class TutorialStepExecutor
     static string Where(OutgameTutorialStepContext _context) => $"스텝 {_context.ChapterIndex}-{_context.StepIndex}";
 
     static string PackIdOf(TutorialStepDef _step) => _step.Pack != null ? _step.Pack.PackId : "null";
+
+    // 지급 왕복에 실을 팩 ID(미배선이면 null). 서버는 이 값으로 CardPackDrop 표를 찾아 줄 카드를 정한다 —
+    // 저작이 비면 보낼 키가 없어 화면만 서고 소유는 늘지 않으므로 그 자리에서 소리내어 남긴다.
+    static string GrantPackIdOf(TutorialStepDef _step, string _where)
+    {
+        string t_packId = _step.Pack != null ? _step.Pack.PackId : null;
+
+        if (string.IsNullOrEmpty(t_packId))
+            Debug.LogError($"[TutorialStepExecutor] {_where} {_step.Action}에 지급 팩이 미배선 — 지급 요청을 보내지 않습니다(스텝 저작의 pack 확인).");
+
+        return t_packId;
+    }
+
+    // 결손은 GrantPackIdOf가 이미 알렸다 — 여기서는 보낼 키가 없는 요청만 조용히 접는다.
+    static void RequestGrant(string _packId)
+    {
+        if (!string.IsNullOrEmpty(_packId)) TutorialGrantCommand.GrantAsync(_packId).Forget();
+    }
 }

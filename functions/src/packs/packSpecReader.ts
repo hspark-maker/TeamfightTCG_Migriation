@@ -12,6 +12,7 @@ import {DropRow} from "./packDraw";
 import {RankGradeRow} from "./rankGrade";
 import {CurrencyKey, parseCurrency} from "../currency/currencyKeys";
 import {readSpecRows} from "../specs/specBlobReader";
+import {isPriceAuthored} from "./tutorialGrantPack";
 
 export {clearSpecCache, readSpecRows, SpecRow} from "../specs/specBlobReader";
 
@@ -20,6 +21,11 @@ export interface CardPackRow {
   packId: string;
   priceType: CurrencyKey;
   price: number;
+  /**
+   * price 셀을 실제로 읽었는가. `price` 는 못 읽어도 0 이 되므로(기존 openPack 거동) 결손과 무료가
+   * 구별되지 않는다 — 무료를 권한으로 쓰는 쪽(grantTutorialCards)은 이 값을 함께 봐야 한다.
+   */
+  priceAuthored: boolean;
   drawCount: number;
   uniqueDraw: boolean;
   refundType: CurrencyKey;
@@ -42,6 +48,7 @@ export async function readCardPackRow(env: string, packId: string): Promise<Card
     packId,
     priceType: parseCurrency(String(row.priceType ?? "")),
     price: Number(row.price ?? 0),
+    priceAuthored: isPriceAuthored(row.price),
     // 클라 CardPackData.DrawCount 가 Mathf.Max(1, …) 로 조인다.
     drawCount: Math.max(1, Number(row.drawCount ?? 0)),
     uniqueDraw: Number(row.uniqueDraw ?? 0) !== 0,
