@@ -13,8 +13,9 @@ public static partial class CardGrowthManager
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 곡선·관문은 GrowthRules(코드 상수 + 카드 스펙)가 소유한다 — 주입 대상이 없어 항상 준비 상태다.
-    public static bool IsConfigReady => true;
+    /// <summary>곡선·비용이 실제로 실렸는가. 스펙시트(CardEnhanceRule)가 진실원이 된 뒤로 "항상 준비"가 아니다 —
+    /// 표를 못 읽으면 상한도 스텝도 비어 성장값이 통째로 어긋난 스냅샷이 나간다.</summary>
+    public static bool IsConfigReady => GrowthSpec.CardMaxLevel > 0;
 
     public static int MaxLevel => GrowthRules.MaxLevel;
     public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
@@ -98,8 +99,10 @@ public static partial class CardGrowthManager
         return ClampLevel(t_entry.Level);
     }
 
+    // 저장값은 저작 상한이 아니라 코드 천장으로 조인다 — 표가 상한을 낮춘 순간 클라만 레벨을 깎으면
+    // 서버 덱 검증(고정 천장)과 갈려 lockDeck이 덱을 통째로 거절한다.
     static int ClampLevel(int _level)
-        => Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
+        => Mathf.Clamp(_level, CardGrowth.BaseLevel, GrowthSpec.CardMaxLevelCeiling);
 
     public static int HpBonusOf(int _cardId) => GrowthOf(_cardId).HpBonus;
 

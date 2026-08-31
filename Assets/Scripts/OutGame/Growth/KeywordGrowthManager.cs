@@ -52,7 +52,7 @@ public static class KeywordGrowthManager
                 var t_keyword = (CardKeyword)t_raw;
                 if (!KeywordGrowthRules.Supports(t_keyword) || s_growth.ContainsKey(t_keyword)) continue;
 
-                int t_level = Mathf.Clamp(t_pair.Value, 0, KeywordGrowthRules.MaxLevel);
+                int t_level = KeywordGrowthRules.ClampSavedLevel(t_keyword, t_pair.Value);
                 if (t_level > 0) s_growth[t_keyword] = t_level;
             }
         }
@@ -114,7 +114,7 @@ public static class KeywordGrowthManager
 
         // 레벨은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
         // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
-        t_level = Mathf.Clamp(t_command.Level, 0, KeywordGrowthRules.MaxLevel);
+        t_level = KeywordGrowthRules.ClampSavedLevel(_keyword, t_command.Level);
 
         // OnChanged보다 앞이어야 한다 — 뒤로 밀면 안내가 이미 다음 스텝에 들어서 소진 표식이 엉뚱한 곳에 찍힌다.
         if (t_command.FreeShotUsed) OutgameTutorialGuide.ConsumeFreeShot();

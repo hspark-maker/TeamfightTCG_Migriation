@@ -1,11 +1,10 @@
-// 성장 규칙 상수. 예전에는 CardGrowthConfig(SO)가 들고 있었는데, 카드별 곡선이 스펙시트(hp2~hp4)로
-// 옮겨간 뒤로 SO에 남은 건 카드와 무관한 상수뿐이라 코드로 내렸다.
-// 서버(매치 검증)가 같은 값을 재계산해야 하므로, 인스펙터에서 흔들릴 수 있는 자리에 두면 안 된다 —
-// 값이 갈리는 순간 정상 플레이가 검증 실패로 뜬다.
+// 성장 규칙. 수치의 진실원은 스펙시트(CardEnhanceRule / CardEnhance / CardLimitBreak)고 GrowthSpec이 읽는다 —
+// 서버 functions/src/growth 가 같은 표를 재계산하므로 코드에 값을 박으면 저작이 바뀌는 순간 조용히 갈린다.
+// 표를 못 읽으면 상한은 0, TryGet 계열은 false다(임의 기본값으로 버튼을 열어 주지 않는다).
 public static class GrowthRules
 {
-    /// <summary>강화 상한 레벨. 카드 곡선(CardSpec.hp2~hp4)이 여기까지만 저작된다.</summary>
-    public const int MaxLevel = CardSpec.MaxHpCurveLevel;
+    /// <summary>강화 상한 레벨. 카드 곡선(CardSpec.hp2~hp4)이 저작된 데까지만 열린다.</summary>
+    public static int MaxLevel => GrowthSpec.CardMaxLevel;
 
     /// <summary>1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.</summary>
     public const int FirstEvolutionLevel = 3;
@@ -13,13 +12,8 @@ public static class GrowthRules
     /// <summary>2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화가 열린다.</summary>
     public const int SecondEvolutionLevel = 4;
 
-    /// <summary>한계돌파 최대 단계. 강화와 별개 축의 덤이라 단계당 체력 +1로 얕게 둔다.</summary>
-    public const int MaxLimitBreak = 3;
-
-    const int LimitBreakHpPerStage = 1;
-
-    // 강화 비용(레벨 N으로 올릴 때). 재화는 조각이고 성공률은 1이다.
-    const int EnhanceCostStep = 25;
+    /// <summary>한계돌파 최대 단계. 표의 곡선이 단계 1부터 이어지는 데까지만 연다.</summary>
+    public static int MaxLimitBreak => GrowthSpec.MaxLimitBreak;
 
     /// <summary>레벨 _level에서의 진화 단계(0 = 미진화).</summary>
     public static int EvolutionStageAt(int _level)
@@ -52,7 +46,9 @@ public static class GrowthRules
     {
         if (_level <= CardGrowth.BaseLevel) return 0;
 
-        int t_top = _level > MaxLevel ? MaxLevel : _level;
+        // 저작 상한이 아니라 코드 천장에서 자른다 — 서버 expectedHpBonus가 min(레벨, 천장)까지 합산하므로
+        // 여기서 저작값으로 자르면 저장된 레벨과 체력이 서로 어긋난 스냅샷이 나온다.
+        int t_top = _level > GrowthSpec.CardMaxLevelCeiling ? GrowthSpec.CardMaxLevelCeiling : _level;
         int t_sum = 0;
         for (int t_i = CardGrowth.BaseLevel + 1; t_i <= t_top; t_i++)
             t_sum += HpGainAt(_cardId, t_i);
@@ -62,51 +58,31 @@ public static class GrowthRules
 
     /// <summary>한계돌파 _stage까지의 누적 체력 가산분.</summary>
     public static int LimitBreakHpBonusAt(int _stage)
-    {
-        int t_top = _stage < 0 ? 0 : _stage > MaxLimitBreak ? MaxLimitBreak : _stage;
-        return t_top * LimitBreakHpPerStage;
-    }
+        => _stage < 0 ? 0 : GrowthSpec.LimitBreakHpBonusAt(_stage);
 
-    /// <summary>한계돌파 한 단계의 비용·가산분. 간식 비용은 단계 수와 같다.</summary>
+    /// <summary>한계돌파 한 단계의 비용·가산분(곡선 밖이면 false).</summary>
     public static bool TryGetLimitBreakStep(int _stage, out LimitBreakStep _step)
-    {
-        _step = default;
-        if (_stage <= 0 || _stage > MaxLimitBreak) return false;
-
-        _step = new LimitBreakStep(_stage, LimitBreakHpPerStage, _stage);
-        return true;
-    }
+        => GrowthSpec.TryGetLimitBreakStep(_stage, out _step);
 
     /// <summary>레벨 _level로 올리는 한 스텝(범위 밖이면 false). 바닥 레벨은 강화로 도달하는 레벨이 아니다.</summary>
     public static bool TryGetStep(int _cardId, int _level, out GrowthStep _step)
     {
         _step = default;
-        if (_level <= CardGrowth.BaseLevel || _level > MaxLevel) return false;
+        if (!GrowthSpec.TryGetCardEnhanceCost(_level, out EnhanceCost t_cost)) return false;
 
-        _step = new GrowthStep(_level, HpGainAt(_cardId, _level), ECurrencyType.Shard, CostAt(_level), 1f);
+        _step = new GrowthStep(_level, HpGainAt(_cardId, _level), t_cost.Currency, t_cost.Cost, t_cost.SuccessRate);
         return true;
-    }
-
-    // 레벨 N으로 올리는 비용: 25 / 75 / 150 (= 25 × 1·3·6, 계단 누적)
-    static long CostAt(int _level)
-    {
-        int t_step = _level - CardGrowth.BaseLevel;      // 1부터
-        int t_units = t_step * (t_step + 1) / 2;         // 1, 3, 6 …
-        return (long)EnhanceCostStep * t_units;
     }
 
     static int HpGainAt(int _cardId, int _level)
         => _cardId > 0 && CardCatalog.RequireSpec(_cardId).TryGetHpGain(_level, out int t_hp) ? t_hp : 0;
 }
 
-// 키워드 강화 규칙. 레벨당 체력 +1 고정이라 표가 필요 없다(재화는 에너지).
+// 키워드 강화 규칙. 상한·비용·재화는 스펙시트(KeywordEnhance)가 답하고 GrowthSpec이 읽는다.
+// 레벨당 체력만 코드에 남는다 — 서버 덱 검증이 레벨당 1로 하드코딩돼 있어 표로 옮기면 그 계약까지 같이 바뀐다.
 public static class KeywordGrowthRules
 {
-    public const int MaxLevel = 10;
     public const int HpPerLevel = 1;
-
-    const long BaseCost = 5;
-    const long CostGrowthPerLevel = 5;
 
     static readonly CardKeyword[] s_supported =
     {
@@ -130,16 +106,27 @@ public static class KeywordGrowthRules
         return false;
     }
 
+    /// <summary>키워드 _keyword의 강화 상한 레벨(행이 없으면 0 — 그 키워드는 강화가 열리지 않는다).</summary>
+    public static int MaxLevelOf(CardKeyword _keyword)
+        => Supports(_keyword) ? GrowthSpec.KeywordMaxLevelOf(_keyword) : 0;
+
+    /// <summary>세이브·서버 응답에서 읽은 레벨을 캐시에 담기 전에 조인다. 저작 상한이 아니라 늘 코덱 천장으로만
+    /// 조인다 — 서버 readKeywordLevels도 같은 자리에서 표를 보지 않는다. 저작이 상한을 낮췄다고 클라만 레벨을
+    /// 깎으면 서버가 아는 진행도와 갈린다.</summary>
+    public static int ClampSavedLevel(CardKeyword _keyword, int _level)
+    {
+        if (_level <= 0 || !Supports(_keyword)) return 0;
+
+        return _level > GrowthSpec.KeywordMaxLevelCeiling ? GrowthSpec.KeywordMaxLevelCeiling : _level;
+    }
+
     public static bool TryGetNextStep(CardKeyword _keyword, int _level, out GrowthStep _step)
     {
         _step = default;
-        if (!Supports(_keyword) || _level < 0 || _level >= MaxLevel) return false;
+        if (!Supports(_keyword) || !GrowthSpec.TryGetKeywordEnhanceCost(_keyword, _level, out EnhanceCost t_cost))
+            return false;
 
-        int t_nextLevel = _level + 1;
-        long t_cost = BaseCost + CostGrowthPerLevel * (t_nextLevel - 1);
-        if (t_cost < 0) t_cost = 0;
-
-        _step = new GrowthStep(t_nextLevel, HpPerLevel, ECurrencyType.Energy, t_cost, 1f);
+        _step = new GrowthStep(_level + 1, HpPerLevel, t_cost.Currency, t_cost.Cost, t_cost.SuccessRate);
         return true;
     }
 
