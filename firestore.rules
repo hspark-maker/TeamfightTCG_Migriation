@@ -1,0 +1,211 @@
+rules_version = '2';
+
+// =====================================================================
+// 운영 규칙. 이 파일이 단일 진실원이다 — 개발용 개방판을 여기에 덮어쓰지 말 것.
+// 임시로 열어야 하면 별도 파일에 두고 firebase.json 의 rules 경로를 바꿔라.
+//
+// 기본은 전면 거부다. 아래 match 에 명시된 경로만 열린다.
+//
+// Assumed data model:
+// - envs/{env}/users/{uid}/save/current: 메타 5개 + 도메인 map 10개
+// - envs/{env}/matches/{matchId}: 양측 제출/대조 결과 (서버 전용, 클라이언트 접근 불가)
+//
+// 이 파일이 실제 문서 스키마와 어긋나면 저장이 통째로 거부되는데, 개방 규칙이 배포돼 있는
+// 동안에는 증상이 안 보인다(커밋 809d040d3). Tools/firestore-rules-tests 의 회귀 테스트가
+// 이 파일과 PlayerSaveDocument.ToFieldMap 을 묶어 둔다 — 룰을 고치면 반드시 거기도 돌려라.
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 공통 판정 ──────────────────────────────────────────────────────
+    // envId 는 ContentProfileConfig.CloudEnvId 가 내는 두 값뿐이다.
+    function isKnownEnv(envId) {
+      return envId == 'live' || envId == 'test';
+    }
+
+    // 클라이언트는 익명 로그인(FirebaseAuthService)만 쓴다.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 마스터 데이터 배포자. 커스텀 클레임 admin=true 를 Admin SDK 로 부여한다.
+    // 일반 플레이어는 익명 계정이라 이 클레임을 절대 갖지 못한다.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // ── 유저 세이브 ────────────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /save/current
+    match /envs/{envId}/users/{userId}/save/{docId} {
+      function isOwner() {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isKnownDoc() {
+        return docId == 'current';
+      }
+
+      // 최상위 필드 전수 검증. 모르는 필드가 하나라도 있으면 거부한다.
+      function isValidSave() {
+        return request.resource.data.keys().hasOnly([
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
+          'currency', 'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+        ]) &&
+        // hasOnly 와 같은 키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
+        // 메타 5키 + revision+1 만 보내 소유·랭크를 통째로 날릴 수 있고,
+        // delete: if false 로 막으려던 세이브 소멸이 '필드 생략'으로 우회된다.
+        // update 에서는 request.resource.data 가 기존 문서와 부분 update 를 합친 최종 상태다.
+        // 클라는 dirty 최상위 슬롯만 보내지만, 이 검사는 합쳐진 문서의 전 슬롯 존재를 보장한다.
+        //
+        // C6 — currency 만 hasAll 에서 뺐다. 잔액이 wallet/current 로 이사하면서
+        // 신 클라(v8)는 14키를, 아직 승급 안 한 구 클라(v7)는 15키를 보낸다. hasOnly 는
+        // 15키를 그대로 둬 둘 다 통과시킨다(공존). 14키 전용으로 조이는 것은 구 클라가
+        // 사라진 뒤 C7 이 한다 — 지금 조이면 승급 전 클라의 저장이 전부 거부된다.
+        request.resource.data.keys().hasAll([
+          'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
+          'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
+          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+        ]) &&
+        request.resource.data.schemaVersion is int &&
+        request.resource.data.schemaVersion > 0 &&
+        request.resource.data.revision is int &&
+        // revision 0 인 문서는 존재하지 않는다 — ensureSaveDocument 가 문서를 revision 1 로 만든다.
+        request.resource.data.revision > 0 &&
+        request.resource.data.deviceId is string &&
+        request.resource.data.deviceId.size() == 32 &&
+        request.resource.data.appVersion is string &&
+        request.resource.data.appVersion.size() <= 64 &&
+        // C6 — currency 는 이제 optional 이다. 있으면 예전 그대로 전수 검증하고,
+        // 없으면(신 클라 v8) 그냥 통과한다. 검증을 통째로 빼지 않은 이유는 승급 전
+        // 구 클라가 여전히 이 필드를 싣기 때문이다 — 그 구간에 값 위조가 열리면 안 된다.
+        (!request.resource.data.keys().hasAny(['currency']) || (
+          request.resource.data.currency is map &&
+          request.resource.data.currency.keys().hasOnly(['balances']) &&
+          request.resource.data.currency.balances is map &&
+          request.resource.data.currency.balances.keys().hasOnly(['Gold', 'Diamond', 'Energy', 'Shard']) &&
+          // 4재화 전부를 요구하는 건 구 클라 실동작과 일치한다 — CurrencySaveData.Normalize 가
+          // ECurrencyType.Count 까지 순회하며 없는 키를 0으로 채우고, CurrencyManager 는
+          // Init·Save 양쪽에서 그걸 먼저 부른다. '가진 것만 실린다'로 오해해 존재 검사를
+          // 끼워 넣지 마라 — 키 삭제·타입 변조가 열린다(회귀 테스트 13b 가 이 계약을 지킨다).
+          request.resource.data.currency.balances.Gold is int &&
+          request.resource.data.currency.balances.Gold >= 0 &&
+          request.resource.data.currency.balances.Gold <= 1000000000000 &&
+          request.resource.data.currency.balances.Diamond is int &&
+          request.resource.data.currency.balances.Diamond >= 0 &&
+          request.resource.data.currency.balances.Diamond <= 1000000000000 &&
+          request.resource.data.currency.balances.Energy is int &&
+          request.resource.data.currency.balances.Energy >= 0 &&
+          request.resource.data.currency.balances.Energy <= 1000000000000 &&
+          request.resource.data.currency.balances.Shard is int &&
+          request.resource.data.currency.balances.Shard >= 0 &&
+          request.resource.data.currency.balances.Shard <= 1000000000000
+        )) &&
+        request.resource.data.rank is map &&
+        request.resource.data.rank.keys().hasOnly(['points', 'claimedTiers']) &&
+        request.resource.data.rank.points is int &&
+        request.resource.data.rank.points >= 0 &&
+        request.resource.data.rank.claimedTiers is list &&
+        request.resource.data.rank.claimedTiers.size() <= 20 &&
+        request.resource.data.ownership is map && request.resource.data.ownership.size() <= 2000 &&
+        request.resource.data.deck is map && request.resource.data.deck.size() <= 32 &&
+        request.resource.data.cardGrowth is map && request.resource.data.cardGrowth.size() <= 2000 &&
+        request.resource.data.keywordGrowth is map && request.resource.data.keywordGrowth.size() <= 64 &&
+        request.resource.data.albumReward is map && request.resource.data.albumReward.size() <= 128 &&
+        request.resource.data.tournament is map && request.resource.data.tournament.size() <= 128 &&
+        request.resource.data.tutorial is map && request.resource.data.tutorial.size() <= 128 &&
+        // profile 안쪽은 보지 않는다 — ProfileSaveData 의 nickname/avatarId/frameId 는
+        // 초기값이 없어 신규 계정 첫 업로드에 null 로 실린다(기본 id 를 세이브에 굳히지
+        // 않으려는 설계, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다).
+        request.resource.data.profile is map && request.resource.data.profile.size() <= 64 &&
+        request.resource.data.updatedAt == request.time;
+      }
+
+      allow read: if isOwner() && isKnownEnv(envId) && isKnownDoc();
+      // 문서 생성은 서버만 한다 — functions/src/commands/ensureAccount.ts (Admin SDK 라 룰을 우회한다).
+      // 클라가 만들 수 있으면 스타터 지급을 클라가 정하게 되고, 골드·소유 카드가 위조된 채 첫 문서에 굳는다.
+      //
+      // 새 문서의 schemaVersion 앵커는 이제 functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 이다
+      // (여기서 == 7 을 강제하던 자리가 사라졌다). UserSaveData.VERSION 을 올릴 때는 그 상수를 같이 올려라 —
+      // 아래 update 는 기존 문서와 같은 schemaVersion 만 허용한다.
+      allow create: if false;
+      // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
+      allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
+                    request.resource.data.schemaVersion == resource.data.schemaVersion &&
+                    request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+
+    // ── 지갑(재화) ─────────────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /wallet/current
+    //
+    // 세이브 문서와 달리 여기엔 값 검증이 없다 — 클라 쓰기가 아예 없기 때문이다.
+    // 서버(Admin SDK)는 룰을 우회하므로, 세이브 쪽을 괴롭히던 "서버가 룰을 어긴 문서를 써서
+    // 그 계정의 이후 저장이 영구 거부된다"는 함정이 지갑에는 성립하지 않는다.
+    //
+    // 재화가 실화폐와 이어지므로 클라는 읽기만 한다. 잔액을 바꾸는 것은 Callable 뿐이다.
+    match /envs/{envId}/users/{userId}/wallet/{docId} {
+      allow read: if isSignedIn() && request.auth.uid == userId &&
+                  isKnownEnv(envId) && docId == 'current';
+      allow write: if false;
+
+      // 원장은 감사 기록이다 — 클라에 보여줄 이유가 없고, 보이면 잔액 추론 표면만 넓어진다.
+      match /ledger/{txId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── 튜토리얼 무료 한 방 ────────────────────────────────────────────
+    // 경로: FirebaseRootPath.User(envId, uid) + /grants/current
+    //
+    // 축(enhanceCard·enhanceKeyword)마다 계정당 1회를 서버가 소유한다. 클라 정적 필드가 들고 있으면
+    // 앱 재시작으로 되살아나므로 소진 낙인이 문서로 남아야 한다.
+    //
+    // 세이브 문서와 별도 경로다 — isValidSave 의 15키 계약과 무관하고, 그래서 세이브 스키마 버전을
+    // 올리지 않고 붙일 수 있다. 값 검증은 없다(지갑과 같은 이유: 클라 쓰기가 아예 없다).
+    match /envs/{envId}/users/{userId}/grants/{docId} {
+      // 읽기는 연다 — 화면이 "무료" 표시를 그리려면 남았는지 알아야 한다.
+      allow read: if isSignedIn() && request.auth.uid == userId &&
+                  isKnownEnv(envId) && docId == 'current';
+      allow write: if false;
+    }
+
+    // ── 마스터 데이터(스펙) ────────────────────────────────────────────
+    // 읽기: 런타임 클라이언트가 BattleContentSync 로 메타·행을 내려받는다.
+    // 쓰기: 배포자(admin 클레임)만. 에디터 업로더는 ID 토큰을 실어야 한다.
+    match /envs/{envId}/specs/{table} {
+      allow read: if isSignedIn() && isKnownEnv(envId);
+      allow write: if isAdmin() && isKnownEnv(envId);
+
+      // 런타임(BattleContentSync)이 실제로 읽는 경로. 표 하나가 문서 하나다.
+      match /blob/{blobId} {
+        allow read: if isSignedIn() && isKnownEnv(envId);
+        allow write: if isAdmin() && isKnownEnv(envId);
+      }
+
+      // 콘솔 열람용 미러. 업로더가 blob 과 같은 commit 에 함께 쓰지만, 런타임은 읽지 않는다 —
+      // 여기를 손으로 고쳐도 blob 해시만 검증되므로 게임에 반영되지 않는다.
+      match /rows/{rowId} {
+        allow read: if isSignedIn() && isKnownEnv(envId);
+        allow write: if isAdmin() && isKnownEnv(envId);
+      }
+    }
+
+    // ── 매치 결과 ──────────────────────────────────────────────────────
+    // 서버(Admin SDK)만 쓴다. Admin SDK 는 이 규칙을 우회하므로 여기서는 전면 거부가 맞다.
+    // 클라이언트는 결과를 직접 쓰지 못하고 Callable 을 거쳐야 한다.
+    match /envs/{envId}/matches/{matchId} {
+      allow read, write: if false;
+
+      match /{sub=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── 그 외 전부 거부 ────────────────────────────────────────────────
+    // Firestore 기본값이 거부라 없어도 되지만, 새 경로가 조용히 열리지 않는다는 의도를 명시한다.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

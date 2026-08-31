@@ -1,0 +1,91 @@
+using System.Collections.Generic;
+using System.Text;
+using Cysharp.Threading.Tasks;
+using UnityEngine;
+
+// 정적 보상 수령을 서버에 묻는 단일 창구.
+// 자격 판정·지급·낙인의 진실원은 서버 claimReward 다 — 각 도메인의 CanClaim 은 왕복을 아끼는 낙관 검사일 뿐이고,
+// 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다. 랭크 티어와 토너먼트 정점이 같은 계약을 쓰므로 여기 하나로 모은다.
+internal static class RewardClaimCommand
+{
+    // 서버 ClaimOwnerType 과 같은 문자열이어야 한다(스펙시트 Reward.ownerType 열 값).
+    internal const string OwnerRank = "Rank";
+    internal const string OwnerTournament = "Tournament";
+    internal const string OwnerAlbum = "Album";
+
+    const string COMMAND_NAME = "claimReward";
+
+    /// <summary>보상 수령을 요청한다. 성공하면 응답 채택으로 재화·해당 도메인 슬롯이 갈아끼워진 뒤
+    /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다(연출은 그 값으로 서야 숫자가 안 튄다).</summary>
+    // 거절(자격 미달·이미 수령·보상 미저작)은 세션이 아니라 이 호출의 결과다 — 표면은 부른 도메인이 진다.
+    internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId)
+    {
+        if (string.IsNullOrEmpty(_ownerId)) return default;
+
+        try
+        {
+            var t_result = await ServerSaveCommands.InvokeAsync<ClaimRewardResult>(
+                COMMAND_NAME,
+                new { env = ContentProfileConfig.Active.CloudEnvId, ownerType = _ownerType, ownerId = _ownerId });
+
+            Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} 수령 — {Describe(t_result)}");
+            return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId));
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            // 사전검사를 통과했는데 여기 왔다면 클라 스펙 캐시와 서버 표가 갈렸거나, 다른 기기가 먼저 받은 것이다.
+            Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId} 를 서버가 거절했다 — {t_rejected.Message}");
+            return default;
+        }
+        catch (ServerAdoptionException t_adoption)
+        {
+            // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
+            Debug.LogWarning($"[RewardClaimCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            return default;
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[RewardClaimCommand] {COMMAND_NAME} 실패 — {t_exception.GetBaseException().Message}");
+            return default;
+        }
+    }
+
+    // 응답의 재화 표기를 클라 열거형으로 옮긴다. 못 읽는 표기·0 이하는 버린다(스펙 로더와 같은 규약).
+    static List<CurrencyGain> ToGains(ClaimRewardResult _result, string _ownerType, string _ownerId)
+    {
+        var t_gains = new List<CurrencyGain>();
+        var t_granted = _result?.Granted;
+        if (t_granted == null) return t_gains;
+
+        for (int t_i = 0; t_i < t_granted.Count; t_i++)
+        {
+            var t_line = t_granted[t_i];
+            if (t_line == null || t_line.Amount <= 0) continue;
+
+            if (!CurrencyCode.TryParse(t_line.Currency, out ECurrencyType t_type))
+            {
+                Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId}: 알 수 없는 재화 '{t_line.Currency}' 를 건너뛴다.");
+                continue;
+            }
+
+            t_gains.Add(new CurrencyGain(t_type, t_line.Amount));
+        }
+
+        return t_gains;
+    }
+
+    static string Describe(ClaimRewardResult _result)
+    {
+        var t_granted = _result.Granted;
+        if (t_granted == null || t_granted.Count == 0) return "지급 없음";
+
+        var t_text = new StringBuilder();
+        for (int t_i = 0; t_i < t_granted.Count; t_i++)
+        {
+            if (t_granted[t_i] == null) continue;
+            if (t_text.Length > 0) t_text.Append(", ");
+            t_text.Append(t_granted[t_i].Currency).Append(' ').Append(t_granted[t_i].Amount);
+        }
+        return t_text.ToString();
+    }
+}

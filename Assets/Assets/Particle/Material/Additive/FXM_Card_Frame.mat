@@ -1,0 +1,81 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: FXM_Card_Frame
+  m_Shader: {fileID: 4800000, guid: 99ce1473e9a20b84a9836e057bc8404f, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _RECEIVE_SHADOWS_OFF
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses:
+  - Picking
+  - DepthNormalsOnly
+  - UniversalGBuffer
+  - SceneSelectionPass
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Dissovle_Tex:
+        m_Texture: {fileID: 2800000, guid: 3ca43113611e8be408ad544dd02eddf8, type: 3}
+        m_Scale: {x: 1, y: 3.09}
+        m_Offset: {x: 0, y: 0}
+    - _Main_Tex:
+        m_Texture: {fileID: 2800000, guid: 1fa88064ce73d9348839ee966548150b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 2800000, guid: a851c2062a736834097997e369e361bc, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Normal_Tex:
+        m_Texture: {fileID: 2800000, guid: 2666899ff4f4907428a3bf2c565acae9, type: 3}
+        m_Scale: {x: 0.5, y: -0.5}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AddPrecomputedVelocity: 1
+    - _Dissovle: 2
+    - _Dissovle_Upanner: 0
+    - _Dissovle_Vpanner: 0
+    - _Main_Ins: 1.68
+    - _Main_Power: 1
+    - _Noise_Ins: 1
+    - _Noise_UPanner: 0
+    - _Noise_VPanner: 0.1
+    - _Normal_Upanner: 0
+    - _Normal_Vpanner: 0.1
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _ReceiveShadows: 0
+    - _USE_Dissovle: 0
+    - _XRMotionVectorsPass: 1
+    - _distortion: 0.225
+    m_Colors:
+    - _Main_Color: {r: 1.6436743, g: 1.6436743, b: 1.6436743, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
