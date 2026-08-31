@@ -83,21 +83,25 @@ public static class CardVisualRules
     // 컴파일 에러 없이 값을 오해석시키고, 표시 파이프(아이콘/글로우/배너/AttackResult)는 단일 어휘를 요구한다.
     // 대신 "무엇을 띄울지"만 여기서 판정한다 — 전투 규칙은 이 파일을 보지 않는다.
     //
-    // 제외 기준은 두 축이다:
-    //  1) 출처 — 같은 표식(Mark)이라도 카드 스펙의 keywords에 박힌 것은 그 카드의 특성이라 띄우고,
-    //     패시브가 전투 중 붙인 runtimeKeywords는 걸린 디버프라 안 띄운다.
-    //  2) 키워드 자체 — 무적/추가 체력은 어느 필드에서 오든 항상 상태다(AlwaysStatus).
+    // 제외 기준은 **키워드 자체** 하나다 — 무적/추가 체력은 어느 필드에서 오든 항상 상태다(AlwaysStatus).
+    //
+    // 출처(unlocked / synergy / runtime)로는 가르지 않는다. 전에는 runtimeKeywords를 통째로 뺐는데,
+    // 추적 시너지가 적에게 표식을 걸면서 "규칙은 걸렸는데 화면엔 아무 흔적이 없는" 상태가 생겼다.
+    // 지금 runtimeKeywords에 들어가는 것은 무적(AlwaysStatus로 어차피 빠진다)과 표식뿐이고,
+    // 표식은 아이콘 줄이 아니라 프레임 장식으로 나간다(IconRowExcluded) — 아이콘 줄이 디버프로
+    // 오염되지 않는다는 원래 의도는 그 상수가 대신 지킨다.
 
     /// <summary>출처와 무관하게 아이콘을 띄우지 않는 키워드. 카드 정체성이 아니라 걸렸다 풀리는 것들.
     /// Invincible=피해 1회 면역(TakeDamage에서 소모), BonusHp=수치가 붙어 있는 임시 체력(HP 옆 "+N"으로 이미 보인다).</summary>
     public const CardKeyword AlwaysStatus = CardKeyword.Invincible | CardKeyword.BonusHp;
 
-    /// <summary>아이콘으로 띄울 키워드 = 해금된 카드 키워드 + 시너지 부여(전투 내내 불변) − 항상상태.
+    /// <summary>띄울 키워드 = 그 인스턴스가 지금 가진 것 전부 − 항상상태.
     /// data.keywords가 아니라 인스턴스의 unlockedKeywords를 보는 이유: 아직 해금 안 된 키워드를 띄우면
-    /// 표시와 규칙이 갈라진다. runtimeKeywords(패시브가 전투 중 부여/해제)는 통째로 빠진다.</summary>
+    /// 표시와 규칙이 갈라진다. 같은 이유로 runtimeKeywords(전투 중 부여/해제)도 포함한다 —
+    /// <see cref="CardInstance.HasKeyword"/>가 보는 세 필드와 여기가 어긋나면 표시가 규칙을 속인다.</summary>
     public static CardKeyword TraitKeywords(CardInstance _card)
         => _card == null ? CardKeyword.None
-         : (_card.unlockedKeywords | _card.synergyKeywords) & ~AlwaysStatus;
+         : (_card.unlockedKeywords | _card.runtimeKeywords | _card.synergyKeywords) & ~AlwaysStatus;
 
     static System.Func<int, CardKeyword> s_unlockedKeywords;
 
@@ -149,7 +153,7 @@ public static class CardVisualRules
     /// 적 카드에 내 성장을 얹지 않으려면 공급자(내 강화값)가 아니라 그 인스턴스의 값을 봐야 한다.</summary>
     public static CardKeyword InfoKeywords(CardInstance _card)
         => _card == null ? CardKeyword.None
-         : _card.unlockedKeywords | _card.synergyKeywords;
+         : _card.unlockedKeywords | _card.runtimeKeywords | _card.synergyKeywords;
 
     /// <summary>아이콘 줄에서만 빼는 키워드. 프레임 장식으로는 그대로 보여준다.
     /// Mark(표식)=반격을 못 주는 대가라 프레임 테두리로 알리는 편이 맞고, 아이콘 줄에 넣으면
