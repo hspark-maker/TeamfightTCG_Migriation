@@ -17,6 +17,7 @@
 - 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
 - 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
 - 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
+- 토너먼트 정점이 대치 화면으로: `UI/Tournament/TournamentNodeView` 클릭 → `UI/Lobby/LobbyMatchLauncher.StartTournamentBattle` 이 `MatchProfile.OfTournamentNode` 로 고정 상대를 만들고 `LobbyMatchLauncher.RunEntryChainAsync` 에 프리셋으로 넘긴다 · 대치 연출 `UI/Match/MatchmakingShell.PlayVersusAsync` · 덱 화면 인계 `MatchmakingShell.PlayHandoffAsync` → `MatchDeckShell.PrepareForHandoff`. 랭크전은 같은 셸의 `MatchmakingShell.RunMatchAsync` 를 타고 덱 화면을 거치지 않는다
 - 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
 - 재화 변동이 화면으로: 잔액의 진실원은 서버 지갑 문서다 — callable 응답의 `wallet` 을 `OutGame/Save/4.Cloud/ServerSaveCommands` 가 `WalletCloud.Adopt` 에 넘기고, 그것이 `CurrencyManager.Adopt` 로 메모리 잔액을 갈아끼운다. 클라에 잔액을 쓰는 경로는 없다
 - 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
@@ -123,7 +124,8 @@
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
 - 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `UI/Common/LobbyEntryAlertDot` (`EAlertDotTarget`) · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
-- 매칭 UI: `UI/Match/MatchmakingShell` · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
+- 매칭 UI: `UI/Match/MatchmakingShell` (진입점 둘 — 랭크전 `MatchmakingShell.RunMatchAsync` · 토너먼트 대치 `MatchmakingShell.PlayVersusAsync`, 프리팹은 MatchmakingRoot.prefab 하나) · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchmakingEntryFx` · `MatchmakingBgFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
+- 매치 연출 튜닝: 두 모드가 부품 한 벌을 공유하고 저작값 14개만 갈아끼운다 — `MatchmakingFx.ClashTuning` · `MatchmakingEntryFx.EntranceTuning` · `MatchmakingBgFx.SeamTuning` (각 부품에 `Capture*` / `Apply*` 짝). 랭크전 값은 프리팹 저작을 `Awake` 가 캡처하고, 대치 값은 셸의 `versusIntro*` 필드다
 
 ## 보상 토너먼트 (`OutGame/Tournament/`, `UI/Tournament/`)
 
