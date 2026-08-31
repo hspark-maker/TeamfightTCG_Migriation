@@ -10,6 +10,13 @@ public static class CardPackOpener
     // 중복 1장이 주는 간식 수. 실제 적립은 서버가 하고, 이 값은 표시·검증 기준선이다.
     public const int SnackPerDuplicate = 1;
 
+    // 거절 사유의 계약 코드. 서버 rejectDomain 이 message 앞머리에 실어 보내고
+    // ServerCommandRejectedException.Reason 이 그것을 떼어 준다.
+    const string REASON_PACK_NOT_FOUND    = "PackNotFound";
+    const string REASON_RANK_LOCKED       = "RankLocked";
+    const string REASON_EMPTY_POOL        = "EmptyPool";
+    const string REASON_INSUFFICIENT_GOLD = "InsufficientGold";
+
     /// <summary>구매 가능 여부의 낙관 검사. 차감·지급은 하지 않는다.</summary>
     public static EPackOpenResult Precheck(CardPackData _pack)
     {
@@ -54,12 +61,7 @@ public static class CardPackOpener
         catch (ServerCommandRejectedException t_rejected)
         {
             Debug.LogWarning($"[CardPackOpener] 사전검사는 통과했으나 서버가 거절했다 — 시트/SO 폴백 드리프트를 점검할 것: {t_rejected.Message}");
-
-            // 거절 사유는 details 로만 오고 안전하게 꺼낼 경로가 없다. 메시지 파싱 대신 사전검사를 다시 물어 사유를 좁힌다.
-            EPackOpenResult t_reason = Precheck(_pack);
-            if (t_reason == EPackOpenResult.Success) t_reason = EPackOpenResult.SpendFailed;
-
-            return OpenedPack.CreateFailure(t_reason);
+            return OpenedPack.CreateFailure(Blocked(t_rejected));
         }
         catch (ServerAdoptionException t_adoption)
         {
@@ -69,9 +71,29 @@ public static class CardPackOpener
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[CardPackOpener] openPack 실패 — {t_exception.GetBaseException().Message}");
-            return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
+            // 망 문제만 갈라낸다 — 판정은 클라우드 분류기 하나에 맡긴다(여기서 예외 목록을 다시 짜면 기준이 둘이 된다).
+            // Transient가 아닌 나머지(배선·배포·직렬화)는 유저가 손쓸 수 없으니 예전대로 팩 실패로 접는다.
+            bool t_transient = CloudFailureClassifier.Classify(t_exception) == ECloudFailureKind.Transient;
+
+            Debug.LogError($"[CardPackOpener] openPack 실패({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
+            return OpenedPack.CreateFailure(t_transient ? EPackOpenResult.NetworkFailed : EPackOpenResult.SpendFailed);
         }
+    }
+
+    // 거절을 화면이 읽을 실패 코드로 접는다. 사전검사를 다시 묻지 않는다 — 개봉 연출이 서버 왕복보다 먼저 시작하면
+    // 재검사 시점의 상태가 요청 시점과 달라 틀린 사유를 만든다. 서버가 모르는 사유는 SpendFailed 다.
+    static EPackOpenResult Blocked(ServerCommandRejectedException _rejected)
+    {
+        switch (_rejected.Reason)
+        {
+            case REASON_PACK_NOT_FOUND:    return EPackOpenResult.PackNotFound;
+            case REASON_RANK_LOCKED:       return EPackOpenResult.RankLocked;
+            case REASON_EMPTY_POOL:        return EPackOpenResult.EmptyPool;
+            case REASON_INSUFFICIENT_GOLD: return EPackOpenResult.InsufficientGold;
+        }
+
+        Debug.LogWarning($"[CardPackOpener] openPack 거절 사유를 읽지 못했다 — '{_rejected.Reason}'");
+        return EPackOpenResult.SpendFailed;
     }
 
     static OpenedPack BuildOpenedPack(OpenPackResult _result)

@@ -10,6 +10,9 @@ public enum EPackOpenResult
     SpendFailed,
     NotReady,
     RankLocked,
+
+    // 서버에 닿지 못해 결과를 알 수 없다. 팩·재화 사정이 아니라 연결 문제라 안내 표면이 갈린다.
+    NetworkFailed,
 }
 
 // 개봉으로 뽑힌 카드 1장의 스냅샷(불변)
