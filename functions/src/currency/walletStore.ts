@@ -149,7 +149,7 @@ export function writeWallet(
 
 /**
  * 지갑을 새로 만든다. `set` 이 아니라 `create` 라 경합하면 트랜잭션이 재실행된다
- * — 두 부트가 겹쳐 잔액이 두 번 이관되는 것을 막는다.
+ * — 두 초기화가 겹쳐 잔액이 두 번 이관되는 것을 막는다.
  * @param {Transaction} transaction 진행 중인 트랜잭션
  * @param {DocumentReference} ref 지갑 문서 참조
  * @param {Balances} balances 최초 잔액

@@ -7,7 +7,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 
 /// <summary>Addressables "UIPrefab" 라벨의 UI 프리팹 색인. 진행도·완료·실패의 단일 진실원이다.
 /// static인 이유는 순서다 — 컴포넌트(DataLibrary)의 Awake에 로드가 붙어 있으면 시작 시점이
-/// 실행 순서에 끌려다닌다. 시작은 부트 초기화(InitializationRunner)가 명시적으로 건다(CardArtCache와 같은 모양).</summary>
+/// 실행 순서에 끌려다닌다. 시작은 초기화(InitializationRunner)가 명시적으로 건다(CardArtCache와 같은 모양).</summary>
 public static class UiPrefabCache
 {
     static readonly Dictionary<Type, GameObject> s_prefabs = new();
@@ -37,7 +37,7 @@ public static class UiPrefabCache
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState() => Reset();
 
-    /// <summary>실패한 적재만 처음 상태로 되돌린다(부트 재시도용).</summary>
+    /// <summary>실패한 적재만 처음 상태로 되돌린다(초기화 재시도용).</summary>
     public static void ResetIfFailed()
     {
         if (!s_failed) return;

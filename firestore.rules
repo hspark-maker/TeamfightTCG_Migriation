@@ -55,7 +55,8 @@ service cloud.firestore {
         // hasOnly 와 같은 키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
         // 메타 5키 + revision+1 만 보내 소유·랭크를 통째로 날릴 수 있고,
         // delete: if false 로 막으려던 세이브 소멸이 '필드 생략'으로 우회된다.
-        // ToFieldMap 은 SetOptions.Overwrite 와 짝이라 언제나 전 슬롯을 싣는다 — 회귀 없음.
+        // update 에서는 request.resource.data 가 기존 문서와 부분 update 를 합친 최종 상태다.
+        // 클라는 dirty 최상위 슬롯만 보내지만, 이 검사는 합쳐진 문서의 전 슬롯 존재를 보장한다.
         //
         // C6 — currency 만 hasAll 에서 뺐다. 잔액이 wallet/current 로 이사하면서
         // 신 클라(v8)는 14키를, 아직 승급 안 한 구 클라(v7)는 15키를 보낸다. hasOnly 는
@@ -126,11 +127,11 @@ service cloud.firestore {
       //
       // 새 문서의 schemaVersion 앵커는 이제 functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 이다
       // (여기서 == 7 을 강제하던 자리가 사라졌다). UserSaveData.VERSION 을 올릴 때는 그 상수를 같이 올려라 —
-      // 아래 update 의 >= 는 단조 증가만 막을 뿐 새 문서의 값을 고정하지 못한다.
+      // 아래 update 는 기존 문서와 같은 schemaVersion 만 허용한다.
       allow create: if false;
       // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
       allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
-                    request.resource.data.schemaVersion >= resource.data.schemaVersion &&
+                    request.resource.data.schemaVersion == resource.data.schemaVersion &&
                     request.resource.data.revision == resource.data.revision + 1;
       allow delete: if false;
     }

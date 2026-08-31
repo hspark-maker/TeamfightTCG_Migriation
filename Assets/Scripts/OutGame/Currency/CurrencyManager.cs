@@ -25,7 +25,7 @@ public static class CurrencyManager
     {
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
         {
-            // 서버는 4키를 다 보내지만, 빠진 키가 예외가 되면 잔액 하나 때문에 부트가 끊긴다.
+            // 서버는 4키를 다 보내지만, 빠진 키가 예외가 되면 잔액 하나 때문에 초기화가 끊긴다.
             long t_balance = 0;
             if (_balances != null) _balances.TryGetValue(KeyOf((ECurrencyType)t_i), out t_balance);
 

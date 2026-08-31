@@ -1,7 +1,7 @@
 using System;
 using Cysharp.Threading.Tasks;
 
-// 이번 부트가 쓸 콘텐츠 프로필을 확정하고 스펙시트 원본을 파싱한다.
+// 이번 초기화가 쓸 콘텐츠 프로필을 확정하고 스펙시트 원본을 파싱한다.
 // 프로필은 카탈로그·팩·클라우드 환경이 전부 읽는 전역 스위치라 제일 앞에서 한 번 세운다 —
 // 미배선·손상이면 뒤 스텝의 낯선 예외가 아니라 이 스텝 이름으로 잡힌다.
 public sealed class ContentProfileStep : MainInitializer

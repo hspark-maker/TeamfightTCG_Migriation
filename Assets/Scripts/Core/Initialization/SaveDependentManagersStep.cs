@@ -1,7 +1,7 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 세이브가 채택된 뒤에야 설 수 있는 매니저들. 부트의 마지막 단계이고, 여기 끝이 Ready다.
+// 세이브가 채택된 뒤에야 설 수 있는 매니저들. 초기화의 마지막 단계이고, 여기 끝이 Ready다.
 public sealed class SaveDependentManagersStep : MainInitializer
 {
     // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선이면 지급을 건너뛴다.
@@ -9,7 +9,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
 
     static bool s_installed;
 
-    /// <summary>재화 flush·진행도 표시가 "부트가 끝났는가"를 이 값으로 본다.
+    /// <summary>재화 flush·진행도 표시가 "초기화가 끝났는가"를 이 값으로 본다.
     /// 게이트가 아니라 설치 여부로 판정한다 — 세션 중 복구 요구가 뜨면 IsReady가 false로 떨어지는데,
     /// 그때 잔액 flush까지 멈추면 이미 번 재화가 로컬 캐시에도 안 남는다.</summary>
     internal static bool IsInstalled => s_installed;

@@ -19,7 +19,7 @@ assert.deepEqual(Object.keys(slots).sort(), [
 assert.equal(slots.currency, undefined, "currency 슬롯은 지갑 문서로 갔다");
 
 // 스타터 골드는 세이브와 같은 트랜잭션에서 서는 지갑의 최초 잔액이다.
-// 두 문서가 갈라지면 부트의 ensureWallet 이 0 잔액 지갑을 세워 이 골드가 영영 사라진다.
+// 두 문서가 갈라지면 초기화의 ensureWallet 이 0 잔액 지갑을 세워 이 골드가 영영 사라진다.
 const balances = buildFreshAccountBalances();
 assert.deepEqual(Object.keys(balances).sort(), ["Diamond", "Energy", "Gold", "Shard"],
   "룰이 재화 4키를 정확히 요구한다");

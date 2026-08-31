@@ -29,7 +29,7 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] TMP_Text statusText;
 
     // 복구 문구를 statusText로 못 쓰는 이유: statusText가 진행바(Slider) 하위라 진행바를 끄는 순간 같이 사라진다.
-    [Tooltip("부트 실패 시 띄우는 안내·재시도·종료 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
+    [Tooltip("초기화 실패 시 띄우는 안내·재시도·종료 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
     [SerializeField] GameObject recoveryPanel;
     [SerializeField] TMP_Text   recoveryText;
 
@@ -38,7 +38,7 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] Button     quitButton;
 
     [Header("계정")]
-    [Tooltip("로그인 화면. 미배선이면 계정 버튼이 뜨지 않는다(부트는 그대로 진행).")]
+    [Tooltip("로그인 화면. 미배선이면 계정 버튼이 뜨지 않는다(초기화는 그대로 진행).")]
     [SerializeField] LoginEmailPanel loginPanel;
 
     [Tooltip("로그인 화면을 여는 버튼. 이미 계정이 정해진 기기에서만 보인다.")]
@@ -130,7 +130,7 @@ public class LoadingCoverView : MonoBehaviour
 
         // 로그인 화면의 표시 여부는 여기서 정한다 — 화면 자신에게 맡기면 비활성으로 저작된 순간
         // Awake 가 돌지 않아 관문에 아무도 나타나지 않고, 관문은 상한 뒤 익명으로 넘어가 버린다.
-        // 전환 모드(m_targetScene != null)의 커버는 부트가 아니므로 손대지 않는다.
+        // 전환 모드(m_targetScene != null)의 커버는 초기화가 아니므로 손대지 않는다.
         if (m_targetScene == null && loginPanel != null && SignInGate.StoredMethod == ESignInMethod.None)
             loginPanel.Open();
     }
@@ -146,7 +146,7 @@ public class LoadingCoverView : MonoBehaviour
         StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
     }
 
-    /// <summary>계정 전환으로 부트를 다시 태울 때 로딩 화면도 되돌린다.
+    /// <summary>계정 전환으로 초기화를 다시 태울 때 로딩 화면도 되돌린다.
     /// 커버가 이미 걷혔으면(전투·로비로 넘어간 뒤) 할 일이 없다.</summary>
     public static void RestartLoadingForAccountChange()
     {
@@ -258,7 +258,7 @@ public class LoadingCoverView : MonoBehaviour
         loginPanel.Open();
     }
 
-    // 부트가 끝난 상태(UpdateRequired / RecoveryRequired)의 유일한 출구 화면.
+    // 초기화가 끝난 상태(UpdateRequired / RecoveryRequired)의 유일한 출구 화면.
     void ShowRecovery()
     {
         bool t_updateRequired = GameInitialization.State == EGameInitState.UpdateRequired;
@@ -299,7 +299,7 @@ public class LoadingCoverView : MonoBehaviour
 
         SetRecoveryVisible(false);
 
-        // TODO(부트 재시작): 실패한 캐시·클라우드 상태를 되돌리는 체인이 아직 없다
+        // TODO(초기화 재시작): 실패한 캐시·클라우드 상태를 되돌리는 체인이 아직 없다
         // — 지금은 게이트만 다시 걸어 같은 실패를 그대로 다시 볼 수 있다.
         InitializationRunner.RestartGate();
 
@@ -426,7 +426,7 @@ public class LoadingCoverView : MonoBehaviour
 
             if (t_shown >= 1f) break;
 
-            // 부트가 이미 실패를 확정했으면 바를 끝까지 태우지 않는다 — Progress는 매니저 미설치 구간에서
+            // 초기화가 이미 실패를 확정했으면 바를 끝까지 태우지 않는다 — Progress는 매니저 미설치 구간에서
             // 0.833을 넘지 못해 1f에 닿을 수 없고, 그대로 두면 복구 화면이 maxDuration만큼 늦게 뜬다.
             if (GameInitialization.IsTerminated) break;
 

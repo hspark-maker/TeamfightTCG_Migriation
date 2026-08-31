@@ -40,9 +40,9 @@ export async function mutateWallet(
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) {
-      // 도메인 거절(permission-denied)이 아니라 세션 문제다 — 부트의 ensureWallet 이
-      // 돌지 않았다는 뜻이라 클라가 다시 부트하는 것이 옳은 조치다. rejectDomain 으로
-      // 감싸면 클라가 "잔액이 모자란다" 류의 도메인 사유로 오해하고 부트를 다시 걸지 않는다.
+      // 도메인 거절(permission-denied)이 아니라 세션 문제다 — 초기화의 ensureWallet 이
+      // 돌지 않았다는 뜻이라 클라가 다시 초기화하는 것이 옳은 조치다. rejectDomain 으로
+      // 감싸면 클라가 "잔액이 모자란다" 류의 도메인 사유로 오해하고 초기화를 다시 걸지 않는다.
       throw new HttpsError(
         "failed-precondition",
         "Wallet document does not exist. Boot must call ensureWallet first.",

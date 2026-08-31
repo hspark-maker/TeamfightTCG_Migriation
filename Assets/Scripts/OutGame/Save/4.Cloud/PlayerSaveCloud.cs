@@ -42,7 +42,9 @@ static class PlayerSaveCloud
     static int s_sessionUploadSuccesses;
     static int s_sessionRevisionConflicts;
     static int s_sessionImmediateRequests;
-    static int s_sessionTransactionAttempts;
+    static int s_sessionWriteAttempts;
+    static int s_sessionReclassificationReads;
+    static int s_sessionSelfHealedWrites;
 
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
     internal static string LastError { get; private set; } = string.Empty;
@@ -58,7 +60,7 @@ static class PlayerSaveCloud
     // 임계값을 UI로 새게 두지 않는다.
     internal static bool ShouldShowSyncBanner => ConsecutiveUploadFailures >= BANNER_FAILURE_THRESHOLD;
 
-    // 부트 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
+    // 초기화 게이트 해제 — 채택이 끝났거나 진입 불가 판정이 났다.
     internal static bool IsGateComplete => s_gateComplete;
 
 
@@ -71,7 +73,7 @@ static class PlayerSaveCloud
     // LastError는 서버 원문이라 유저에게 못 보여 준다 — 재시작 모달이 문구를 고르려면 분류된 값이 따로 필요하다.
     internal static ECloudBlockReason BlockReason { get; private set; } = ECloudBlockReason.None;
 
-    // 부트 게이트를 통과했고, 문서를 쓸 수 있는 상태다. Failed/Blocked/Loading에서 서버를 부르면
+    // 초기화 게이트를 통과했고, 문서를 쓸 수 있는 상태다. Failed/Blocked/Loading에서 서버를 부르면
     // 응답의 revision을 채택할 기준선 자체가 없다.
     internal static bool CanRunServerCommand =>
         s_gateComplete &&
@@ -345,7 +347,7 @@ static class PlayerSaveCloud
 
 
     // 채택 경로의 파일 IO·PlayerPrefs까지 전부 감싼다 — 여기서 예외가 새면 게이트가 열리지 않아
-    // 부트 초기화(InitializationRunner)가 로딩 화면에서 타임아웃까지 돈다.
+    // 초기화(InitializationRunner)가 로딩 화면에서 타임아웃까지 돈다.
     static async UniTaskVoid LoadAsync(int _generation)
     {
         try
@@ -387,7 +389,7 @@ static class PlayerSaveCloud
             return;
         }
 
-        // 지갑 읽기를 세이브 읽기 왕복에 얹는다 — 부트 예산에 문서 하나치 지연을 더하지 않으려는 것이다.
+        // 지갑 읽기를 세이브 읽기 왕복에 얹는다 — 초기화 예산에 문서 하나치 지연을 더하지 않으려는 것이다.
         // TryReadAsync는 던지지 않는다(세이브 쪽이 먼저 실패해도 관측되지 않는 예외가 남지 않게).
         UniTask<bool> t_walletRead = WalletCloud.TryReadAsync(t_userId);
 
@@ -591,7 +593,7 @@ static class PlayerSaveCloud
         {
             if (_generation != s_generation) return false;
 
-            // 분류로 갈래를 두지 않는다 — 부트에는 오프라인 폴백이 없어 Transient든 아니든 결론이 복구 화면 하나다.
+            // 분류로 갈래를 두지 않는다 — 초기화에는 오프라인 폴백이 없어 Transient든 아니든 결론이 복구 화면 하나다.
             Fail($"Account creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
                  t_exception.GetBaseException().Message);
             return false;
@@ -622,7 +624,7 @@ static class PlayerSaveCloud
         {
             if (_generation != s_generation) return null;
 
-            // ensureAccount와 같은 이유로 분류 갈래를 두지 않는다 — 부트에는 오프라인 폴백이 없다.
+            // ensureAccount와 같은 이유로 분류 갈래를 두지 않는다 — 초기화에는 오프라인 폴백이 없다.
             Fail($"Wallet creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
                  t_exception.GetBaseException().Message);
             return null;
@@ -850,13 +852,22 @@ static class PlayerSaveCloud
             if (_generation != s_generation) return;
 
             Revision = t_result.Revision;
-            for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
+
+            // self-heal은 "원격 revision이 방금 우리가 쓰려던 값이고 deviceId도 우리 것"이라는 정황 증거다 —
+            // 내용까지 대조한 것이 아니다. deviceId는 PlayerPrefs GUID라 기기 백업 복원으로 복제될 수 있고,
+            // 그 복제본이 같은 revision을 먼저 썼다면 우리 슬롯을 "올렸다"고 기록하는 순간 조용히 유실된다.
+            // 그래서 revision만 맞추고 기준선은 그대로 둔다 — 아래 재예약이 같은 내용을 한 번 더 올려 확정한다.
+            if (!t_result.SelfHealed)
             {
-                ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
-                if ((t_dirtySlots & t_slot) != 0)
-                    s_uploadedSlotSnapshots[i] = t_slotSnapshots[i];
+                for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
+                {
+                    ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
+                    if ((t_dirtySlots & t_slot) != 0)
+                        s_uploadedSlotSnapshots[i] = t_slotSnapshots[i];
+                }
+                s_uploadedSerial = t_serial;
             }
-            s_uploadedSerial = t_serial;
+
             LastError = string.Empty;
             SetUploadFailures(0);
             SetState(EPlayerSaveCloudState.Ready);
@@ -866,13 +877,21 @@ static class PlayerSaveCloud
                 $"[PlayerSaveCloudMetrics] upload={t_uploadNumber} success={s_sessionUploadSuccesses} " +
                 $"mode={(_isImmediate ? "immediate" : "debounce")} dirty=0x{(int)t_dirtySlots:X} " +
                 $"slotPayloadBytes={t_slotPayloadBytes} documentBytes={t_bytes} " +
-                $"transactionAttempts={t_result.TransactionAttempts} revision={Revision} " +
-                $"sessionTransactionAttempts={s_sessionTransactionAttempts} " +
+                $"writeAttempts={s_sessionWriteAttempts} revision={Revision} " +
+                $"reclassificationReads={s_sessionReclassificationReads} " +
+                $"selfHealed={t_result.SelfHealed} selfHealedWrites={s_sessionSelfHealedWrites} " +
                 $"immediateRequests={s_sessionImmediateRequests}");
         }
         catch (Exception t_exception)
         {
             if (_generation != s_generation) return;
+
+            if (t_exception.GetBaseException() is SaveSchemaMismatchException t_schemaMismatch)
+            {
+                GameInitialization.MarkUpdateRequired();
+                BlockSession(ECloudBlockReason.SessionUnusable, $"Upload rejected: {t_schemaMismatch.Message}");
+                return;
+            }
 
             if (t_exception.GetBaseException() is RevisionConflictException t_conflict)
             {
@@ -880,7 +899,8 @@ static class PlayerSaveCloud
                 Debug.LogWarning(
                     $"[PlayerSaveCloudMetrics] revisionConflict={s_sessionRevisionConflicts} " +
                     $"upload={t_uploadNumber} dirty=0x{(int)t_dirtySlots:X} " +
-                    $"sessionTransactionAttempts={s_sessionTransactionAttempts}");
+                    $"writeAttempts={s_sessionWriteAttempts} " +
+                    $"reclassificationReads={s_sessionReclassificationReads}");
                 // 다른 기기가 먼저 썼다. 재시작하면 원격을 다시 채택하므로 이 세션은 여기서 접는다.
                 BlockSession(ECloudBlockReason.RemoteAhead, $"Upload rejected: {t_conflict.Message}");
                 return;
@@ -910,44 +930,110 @@ static class PlayerSaveCloud
     {
         DocumentReference t_document = Document(_userId);
         UserSaveData t_data = DataSaveManager.Data;
-        int t_transactionAttempts = 0;
+        long t_nextRevision = _expectedRevision + 1;
+        s_sessionWriteAttempts++;
 
-        Task<PushResult> t_transactionTask = Firestore().RunTransactionAsync<PushResult>(async t_transaction =>
+        try
         {
-            t_transactionAttempts++;
-            System.Threading.Interlocked.Increment(ref s_sessionTransactionAttempts);
-            DocumentSnapshot t_snapshot = await t_transaction.GetSnapshotAsync(t_document);
-
-            // 문서 생성은 서버(ensureAccount)만 한다 — 채택을 통과한 세션에서 문서가 사라졌다면
-            // 콘솔에서 지웠거나 계정이 바뀐 것이다. "다른 기기가 먼저 씀"으로 뭉뚱그리면 원인을 잃는다.
-            if (!t_snapshot.Exists)
-                throw new RevisionConflictException("Remote save document no longer exists.");
-
-            if (!PlayerSaveDocument.TryReadMeta(t_snapshot, out long t_schemaVersion, out long t_currentRevision) ||
-                t_schemaVersion != UserSaveData.VERSION)
-                throw new RevisionConflictException("Remote save metadata is not writable by this client.");
-
-            if (t_currentRevision != _expectedRevision)
-                throw new RevisionConflictException(
-                    $"Remote revision {t_currentRevision} does not match the expected {_expectedRevision}.");
-
-            long t_nextRevision = t_currentRevision + 1;
-
-            // 키는 반드시 "ownership" 같은 최상위 한 칸이어야 한다. 최상위 필드에 맵을 통째로 주면 그 필드는 교체돼
-            // 삭제가 전파되지만, "ownership.someCard" 같은 중첩 경로를 쓰는 순간 지운 항목이 원격에 영원히 남는다.
-            // (같은 이유로 SetOptions.MergeAll도 쓸 수 없다.)
-            t_transaction.Update(
+            UniTask<long> t_writeTask = UpdateDocumentAsync(
                 t_document,
-                PlayerSaveDocument.ToSlotFieldMap(t_data, _dirtySlots, t_nextRevision));
-            return new PushResult(t_nextRevision, t_transactionAttempts);
-        });
+                t_data,
+                _dirtySlots,
+                t_nextRevision);
+            (bool t_hasResult, long t_revision) = await UniTask.WhenAny(
+                t_writeTask,
+                UniTask.Delay(FirebaseTimeouts.TransactionMilliseconds, DelayType.Realtime));
+            if (!t_hasResult) throw new TimeoutException("Firestore save update timed out.");
 
-        (bool t_hasResult, PushResult t_result) = await UniTask.WhenAny(
-            t_transactionTask.AsUniTask(),
-            UniTask.Delay(FirebaseTimeouts.TransactionMilliseconds, DelayType.Realtime));
-        if (!t_hasResult) throw new TimeoutException("Firestore save transaction timed out.");
+            return new PushResult(t_revision, false);
+        }
+        catch (Exception t_exception)
+        {
+            if (CloudFailureClassifier.Classify(t_exception) != ECloudFailureKind.Rejected)
+                throw;
 
-        return t_result;
+            return await ReclassifyRejectedWriteAsync(
+                t_document,
+                _expectedRevision,
+                t_nextRevision,
+                t_exception);
+        }
+    }
+
+    static async UniTask<long> UpdateDocumentAsync(
+        DocumentReference _document,
+        UserSaveData _data,
+        ESaveSlot _dirtySlots,
+        long _nextRevision)
+    {
+        // 키는 반드시 "ownership" 같은 최상위 한 칸이어야 한다. 최상위 필드에 맵을 통째로 주면 그 필드는 교체돼
+        // 삭제가 전파되지만, "ownership.someCard" 같은 중첩 경로를 쓰는 순간 지운 항목이 원격에 영원히 남는다.
+        // (같은 이유로 SetOptions.MergeAll도 쓸 수 없다.)
+        //
+        // revision CAS는 여기서 읽어 확인하지 않는다 — firestore.rules 의 update 조건
+        // (revision == resource.data.revision + 1, schemaVersion 일치)이 서버에서 강제한다.
+        // 규칙이 거절하면 ReclassifyRejectedWriteAsync 가 그때 한 번만 읽어 원인을 가른다.
+        await _document.UpdateAsync(
+            PlayerSaveDocument.ToSlotFieldMap(_data, _dirtySlots, _nextRevision));
+        return _nextRevision;
+    }
+
+    static async UniTask<PushResult> ReclassifyRejectedWriteAsync(
+        DocumentReference _document,
+        long _expectedRevision,
+        long _attemptedRevision,
+        Exception _writeException)
+    {
+        s_sessionReclassificationReads++;
+        Task<DocumentSnapshot> t_readTask = _document.GetSnapshotAsync(Source.Server);
+        (bool t_hasResult, DocumentSnapshot t_snapshot) = await UniTask.WhenAny(
+            t_readTask.AsUniTask(),
+            UniTask.Delay(FirebaseTimeouts.AuthAndReadMilliseconds, DelayType.Realtime));
+        if (!t_hasResult) throw _writeException;
+
+        if (t_snapshot == null || !t_snapshot.Exists)
+            throw new RevisionConflictException("Remote save document no longer exists.");
+
+        if (!PlayerSaveDocument.TryReadMeta(
+                t_snapshot,
+                out long t_schemaVersion,
+                out long t_remoteRevision))
+            throw new SaveSchemaMismatchException("Remote save metadata is unreadable.");
+
+        if (t_schemaVersion != UserSaveData.VERSION)
+            throw new SaveSchemaMismatchException(
+                $"Remote schema {t_schemaVersion} does not match client schema {UserSaveData.VERSION}.");
+
+        string t_remoteDeviceId = string.Empty;
+        try
+        {
+            t_snapshot.TryGetValue(PlayerSaveDocument.FIELD_DEVICE_ID, out t_remoteDeviceId);
+        }
+        catch (Exception)
+        {
+            t_remoteDeviceId = string.Empty;
+        }
+
+        if (t_remoteRevision == _attemptedRevision &&
+            t_remoteDeviceId == PlayerSaveDocument.DeviceId())
+        {
+            s_sessionSelfHealedWrites++;
+            Debug.LogWarning(
+                $"[PlayerSaveCloudMetrics] selfHealedWrite revision={t_remoteRevision} " +
+                $"reclassificationReads={s_sessionReclassificationReads}");
+            return new PushResult(t_remoteRevision, true);
+        }
+
+        if (t_remoteRevision > _expectedRevision)
+            throw new RevisionConflictException(
+                $"Remote revision {t_remoteRevision} is ahead of expected {_expectedRevision}.");
+
+        Debug.LogWarning(
+            $"[PlayerSaveCloudMetrics] rejectedWriteUnclassified " +
+            $"expectedRevision={_expectedRevision} attemptedRevision={_attemptedRevision} " +
+            $"remoteRevision={t_remoteRevision} remoteDeviceMatches=" +
+            $"{t_remoteDeviceId == PlayerSaveDocument.DeviceId()}");
+        throw _writeException;
     }
 
     // Firebase Auth 콜백의 스레드가 보장되지 않는다 — GameInitialization을 만지기 전에 메인으로 올린다.
@@ -967,18 +1053,20 @@ static class PlayerSaveCloud
         s_sessionUploadSuccesses = 0;
         s_sessionRevisionConflicts = 0;
         s_sessionImmediateRequests = 0;
-        s_sessionTransactionAttempts = 0;
+        s_sessionWriteAttempts = 0;
+        s_sessionReclassificationReads = 0;
+        s_sessionSelfHealedWrites = 0;
     }
 
     readonly struct PushResult
     {
         internal readonly long Revision;
-        internal readonly int TransactionAttempts;
+        internal readonly bool SelfHealed;
 
-        internal PushResult(long _revision, int _transactionAttempts)
+        internal PushResult(long _revision, bool _selfHealed)
         {
             Revision = _revision;
-            TransactionAttempts = _transactionAttempts;
+            SelfHealed = _selfHealed;
         }
     }
 
@@ -998,7 +1086,7 @@ static class PlayerSaveCloud
             : string.Empty;
         if (string.IsNullOrEmpty(t_userId) || t_userId == s_activeUserId) return;
 
-        // 채택 전에 오는 통지는 부트 중의 최초 로그인이다 — s_activeUserId는 채택이 세운다.
+        // 채택 전에 오는 통지는 초기화 중의 최초 로그인이다 — s_activeUserId는 채택이 세운다.
         if (string.IsNullOrEmpty(s_activeUserId)) return;
 
         BlockSession(ECloudBlockReason.SessionUnusable, "Firebase account changed during the session.");
@@ -1061,5 +1149,10 @@ static class PlayerSaveCloud
     sealed class RevisionConflictException : Exception
     {
         internal RevisionConflictException(string _message) : base(_message) { }
+    }
+
+    sealed class SaveSchemaMismatchException : Exception
+    {
+        internal SaveSchemaMismatchException(string _message) : base(_message) { }
     }
 }

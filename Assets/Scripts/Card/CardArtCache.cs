@@ -207,7 +207,7 @@ public static class CardArtCache
         };
     }
 
-    /// <summary>실패한 적재만 처음 상태로 되돌린다(부트 재시도용).</summary>
+    /// <summary>실패한 적재만 처음 상태로 되돌린다(초기화 재시도용).</summary>
     public static void ResetIfFailed()
     {
         if (!HasFailed) return;

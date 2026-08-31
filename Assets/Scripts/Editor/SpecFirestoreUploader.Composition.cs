@@ -116,7 +116,7 @@ public static partial class SpecFirestoreUploader
         return true;
     }
 
-    // 도감 칸 대조 기준. CardCatalog는 부트에서만 채워져 에디터 창에서는 비어 있으므로
+    // 도감 칸 대조 기준. CardCatalog는 초기화에서만 채워져 에디터 창에서는 비어 있으므로
     // 같은 원본(스펙시트 Card 표 · Live 채널)을 여기서 직접 읽어 같은 기준을 만든다
     static bool TryLoadLiveCardIds(out HashSet<int> _ids, out string _error)
     {

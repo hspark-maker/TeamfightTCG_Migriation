@@ -22,7 +22,7 @@ public readonly struct FirebaseEmulatorConfig
     /// <summary>세 주소가 모두 유효해 로컬로 향하는 상태다.</summary>
     public bool IsEnabled => !string.IsNullOrEmpty(this.FunctionsOrigin);
 
-    /// <summary>켜기로 저작했는데 주소가 틀렸다. 끈 것이 아니라 못 켠 것이므로 부트를 진행시키면 안 된다.</summary>
+    /// <summary>켜기로 저작했는데 주소가 틀렸다. 끈 것이 아니라 못 켠 것이므로 초기화를 진행시키면 안 된다.</summary>
     public bool IsMisconfigured => !string.IsNullOrEmpty(this.Error);
 
     /// <summary>꺼진 설정. 배포된 함수와 실서버 Firestore·Auth로 간다.</summary>
@@ -61,7 +61,7 @@ public readonly struct FirebaseEmulatorConfig
         return new FirebaseEmulatorConfig(t_functions, t_firestore, t_authHost, t_authPort, string.Empty);
     }
 
-    /// <summary>부트 로그 한 줄. 이번 실행이 어느 백엔드에 붙었는지 여기서 읽힌다.</summary>
+    /// <summary>초기화 로그 한 줄. 이번 실행이 어느 백엔드에 붙었는지 여기서 읽힌다.</summary>
     public override string ToString()
     {
         if (this.IsMisconfigured) return $"MISCONFIGURED({this.Error})";

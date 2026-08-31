@@ -147,7 +147,7 @@ public static class DataSaveManager
         }
     }
 
-    /// <summary>부트에서 채택한 세이브를 메모리에 세운다. 채택은 부트당 1회다.</summary>
+    /// <summary>초기화에서 채택한 세이브를 메모리에 세운다. 채택은 초기화당 1회다.</summary>
     internal static void AdoptRemote(UserSaveData _data)
     {
         Data = Normalize(_data);

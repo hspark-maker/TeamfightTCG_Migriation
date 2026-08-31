@@ -18,7 +18,7 @@ export const STARTER_DECK_NAME = "스타터 덱";
 
 /**
  * 신규 계정 지갑의 최초 잔액. 세이브 문서를 만드는 **그 트랜잭션**에서 같이 서야 한다
- * — 갈라지면 부트의 ensureWallet 이 0 잔액 지갑을 먼저 세워 스타터 골드가 영영 사라진다.
+ * — 갈라지면 초기화의 ensureWallet 이 0 잔액 지갑을 먼저 세워 스타터 골드가 영영 사라진다.
  * @return {Balances} 4키 잔액
  */
 export function buildFreshAccountBalances(): Balances {

@@ -220,12 +220,12 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 {CardGrowthManager.MaxStar}성");
     }
 
-    // 강화 레벨·진화 단계 초기화 (소유·재화는 유지)
+    // 강화 레벨·진화 단계 재설정 (소유·재화는 유지)
     public static void ResetCardGrowth()
     {
         CardGrowthManager.DebugResetAll();
 
-        Debug.Log("[OutgameDebug] 카드 성장 초기화 — 전 카드 0성 · 미진화");
+        Debug.Log("[OutgameDebug] 카드 성장 재설정 — 전 카드 0성 · 미진화");
     }
 
     // 카탈로그 전량 지급
@@ -256,7 +256,7 @@ public static class OutgameDebugActions
         Debug.Log("[OutgameDebug] 튜토리얼 완료 처리 — 게이트 해제");
     }
 
-    // 튜토리얼 진행도만 초기화 (소유는 유지)
+    // 튜토리얼 진행도만 재설정 (소유는 유지)
     public static void ResetTutorial()
     {
         OutgameTutorialProgress.ResetForDebug();
@@ -264,7 +264,7 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
     }
 
-    // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 초기화
+    // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 재설정
     public static void ResetTriggeredTutorials()
     {
         // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
@@ -272,7 +272,7 @@ public static class OutgameDebugActions
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 초기화 — 탭에 다시 들어가면 재생됩니다");
+        Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 재설정 — 탭에 다시 들어가면 재생됩니다");
     }
 
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
@@ -331,13 +331,13 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 승급전 대기 — {t_info.DisplayName} / 포인트 {t_info.Points} — 씬 재진입 시 연출 재생");
     }
 
-    // 랭크 포인트 초기화(브론즈 1로)
+    // 랭크 포인트 재설정(브론즈 1로)
     public static void ResetTier()
     {
         RankManager.ResetForDebug();
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 랭크 초기화 — {t_info.DisplayName}");
+        Debug.Log($"[OutgameDebug] 랭크 재설정 — {t_info.DisplayName}");
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)

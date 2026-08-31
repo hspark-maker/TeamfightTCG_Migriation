@@ -3,6 +3,7 @@
 // 룰을 에뮬레이터에 명시 주입하므로 루트 firebase.json 이 어떤 룰을 가리키든 무관하다.
 // 포트도 8081 로 갈라 놓아, 루트 설정(8080)으로 띄운 다른 에뮬레이터와 부딪히지 않는다.
 import { test, before, beforeEach, after } from 'node:test';
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
@@ -10,7 +11,7 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import {
   saveDocument,
   freshAccountDocument,
@@ -81,6 +82,26 @@ test('2. 이어서 update (revision 2)', async () => {
   await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });
 
+// PlayerSaveCloud.UpdateDocumentAsync 가 기대는 계약 두 개를 한 번에 못 박는다.
+// (1) 부분 update 라도 request.resource.data 는 병합 후 문서라 hasAll 검사를 통과한다.
+// (2) 최상위 슬롯에 맵을 통째로 주면 그 슬롯은 교체된다 — 슬롯 내부 삭제가 원격까지 전파된다.
+// 둘 중 하나라도 깨지면 전 유저 저장이 거부되거나 지운 항목이 원격에 영원히 남는다.
+test('2c. dirty 최상위 슬롯 부분 update 와 내부 삭제가 통과', async () => {
+  await seed(1, { ownership: { cardIds: [1, 2], legacyMarker: true } });
+  const t_next = saveDocument(2, { ownership: { cardIds: [1] } });
+  const t_ref = doc(authed(), savePath());
+  await assertSucceeds(updateDoc(t_ref, {
+    schemaVersion: t_next.schemaVersion,
+    revision: t_next.revision,
+    updatedAt: t_next.updatedAt,
+    deviceId: t_next.deviceId,
+    appVersion: t_next.appVersion,
+    ownership: t_next.ownership,
+  }));
+  const t_saved = await getDoc(t_ref);
+  assert.deepEqual(t_saved.data().ownership, { cardIds: [1] });
+});
+
 test('2b. 본인 문서 읽기', async () => {
   await seed(1);
   await assertSucceeds(getDoc(doc(authed(), savePath())));
@@ -115,6 +136,25 @@ test('5b. revision 감소·정체는 거부', async () => {
   await seed(2);
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(1)));
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2)));
+});
+
+test('5c. 기존 문서와 다른 schemaVersion update 는 거부', async () => {
+  await seed(1, { schemaVersion: SCHEMA_VERSION - 1 });
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2)));
+});
+
+// 클라 업로드가 트랜잭션 read 를 버린 뒤, "문서가 사라졌다"를 알아채는 경로는 규칙 거절뿐이다.
+// 규칙이 resource.data.revision 을 보므로 문서가 없으면 permission-denied 가 나야 한다.
+// 여기서 not-found 가 나오면 CloudFailureClassifier 가 Unusable 로 접어 재분류 read 를 건너뛴다
+// — PlayerSaveCloud 의 RemoteAhead 복구 화면이 그 순간 사라진다.
+test('5d. 문서가 없으면 update 는 permission-denied 로 거부', async () => {
+  let t_code = 'none';
+  try {
+    await updateDoc(doc(authed(), savePath()), { revision: 2 });
+  } catch (_error) {
+    t_code = _error.code ?? 'unknown';
+  }
+  assert.equal(t_code, 'permission-denied');
 });
 
 // create 가 닫힌 뒤로는 revision 값을 고르는 문제가 아니다 — 어떤 값이든 클라는 문서를 못 만든다.

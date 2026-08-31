@@ -72,7 +72,7 @@ const TOP_LEVEL_KEYS = [
   assert.deepEqual(again.ownership.cardIds, STARTER);
   assert.equal(again.revision, 1, "revision 이 오르지 않는다");
 
-  // 클라가 저장을 이어간 뒤에도 현재 revision 을 그대로 돌려줘야 한다(부트 재시도 경로).
+  // 클라가 저장을 이어간 뒤에도 현재 revision 을 그대로 돌려줘야 한다(초기화 재시도 경로).
   await reference.update({revision: 2});
   const third = await ensureSaveDocument(
     ENV, UID, DEVICE, APP_VERSION, () => buildFreshAccountSlots(STARTER));

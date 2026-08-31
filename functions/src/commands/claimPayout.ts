@@ -59,7 +59,7 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     return {payouts};
   }
   // 아무것도 요청하지 않은 ack 는 트랜잭션을 열지 않는다. 열면 지갑이 없는 계정에서
-  // failed-precondition 이 나가고 클라가 그것을 세션 문제로 읽어 부트를 끊는다 —
+  // failed-precondition 이 나가고 클라가 그것을 세션 문제로 읽어 초기화를 끊는다 —
   // 낙인할 것도 크레딧할 것도 없는 호출이 만들 표면이 아니다.
   // wallet 을 null 로 접는 것은 "쓴 지갑을 싣는다"는 계약과 어긋나지 않는다. 읽을 이유가
   // 없어 읽지 않았다는 뜻이고, 클라 ServerSaveCommands 는 wallet 이 비면 채택을 건너뛴다.
@@ -75,8 +75,8 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     for (const ref of refs) snapshots.push(await tx.get(ref));
     const walletSnapshot = await tx.get(reference);
     if (!walletSnapshot.exists) {
-      // 도메인 거절이 아니라 세션 문제다 — 부트의 ensureWallet 이 돌지 않았다는 뜻이라
-      // 클라가 다시 부트하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).
+      // 도메인 거절이 아니라 세션 문제다 — 초기화의 ensureWallet 이 돌지 않았다는 뜻이라
+      // 클라가 다시 초기화하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).
       throw new HttpsError(
         "failed-precondition",
         "Wallet document does not exist. Boot must call ensureWallet first.",
@@ -91,7 +91,7 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
       const gain = readPayoutGain(payout);
       if (gain === null) {
         // 확정 시점의 산출 사고라 유저가 지금 할 수 있는 것이 없다. 그래도 낙인은 한다 —
-        // ready 로 남기면 클라가 부트마다 같은 문서를 다시 집어 영원히 되돈다.
+        // ready 로 남기면 클라가 초기화마다 같은 문서를 다시 집어 영원히 되돈다.
         logger.error("payout amount is unusable", {
           uid, env: data.env, matchId: data.matchIds[i], currency: payout?.currency,
         });

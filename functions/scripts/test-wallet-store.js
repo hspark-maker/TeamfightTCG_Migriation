@@ -80,7 +80,7 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
     {rev: 1, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {}},
     "이관으로 선 지갑은 전부 무상이다");
   assert.equal(tx.calls.length, 1);
-  assert.equal(tx.calls[0].op, "create", "set 이면 두 부트가 겹칠 때 잔액이 두 번 이관된다");
+  assert.equal(tx.calls[0].op, "create", "set 이면 두 초기화가 겹칠 때 잔액이 두 번 이관된다");
   assert.equal(tx.calls[0].value.schemaVersion, WALLET_SCHEMA_VERSION);
   assert.equal(tx.calls[0].value.rev, 1);
   assert.equal(tx.calls[0].value.updatedAt, NOW, "서버 시각은 호출부가 넘긴다");

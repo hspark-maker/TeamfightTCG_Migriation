@@ -59,9 +59,9 @@
 
 서버 `SCHEMA_VERSION 8`(`functions/src/save/saveDocument.ts:33`)과 클라 `UserSaveData.VERSION 8`(`UserSaveData.cs:17`)은 **반드시 함께 나간다.**
 
-- **서버만 먼저 올리면** 기존 계정이 첫 왕복에서 v8 로 승급되고, v7 클라는 부트가 `remote > VERSION` 을 보고 **강제 업데이트 화면**에 갇힌다(`PlayerSaveCloud` → `MarkUpdateRequired`). 첫 피해자는 에디터에서 도는 개발자 본인 클라다
+- **서버만 먼저 올리면** 기존 계정이 첫 왕복에서 v8 로 승급되고, v7 클라는 초기화가 `remote > VERSION` 을 보고 **강제 업데이트 화면**에 갇힌다(`PlayerSaveCloud` → `MarkUpdateRequired`). 첫 피해자는 에디터에서 도는 개발자 본인 클라다
 - 그리고 이제 v7 클라의 callable 은 **첫 명령에서 `failed-precondition`** 으로 막힌다(`assertWritableSchema` 가 정확히 `== SCHEMA_VERSION`). 사고가 아니라 의도다 — 근거는 아래 C6 절의 "승급 창 철회"
-- **`ensureWallet` 이 먼저 서야 한다.** 그게 없는데 v8 클라가 나가면 승급을 수행할 함수가 없어 부트가 통째로 막힌다
+- **`ensureWallet` 이 먼저 서야 한다.** 그게 없는데 v8 클라가 나가면 승급을 수행할 함수가 없어 초기화가 통째로 막힌다
 
 **주의 — 재화 codebase 는 더 이상 진단용이 아니다.** `devGrantCurrency` 가 C6.6 에서 `functions-currency/` 로 이사해, 그 codebase 가 `currencyPing` 너머로 **실제 지갑 쓰기를 왕복으로 증명**한다. 나머지는 여전히 `default` 다 — `openPack`·`enhanceCard`·`enhanceKeyword`·`claimReward` 는 세이브 슬롯도 함께 써서(결정 4), `claimBattleReward` 는 `Reward` 스펙 표 리더에 의존해서, `claimPayout` 은 `payouts` 낙인과 크레딧을 한 트랜잭션에 묶어야 해서다.
 
@@ -274,9 +274,9 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - 지갑 읽기는 콜백 진입 **전**에 끝낸다. Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 하고 `openPack` 은 재실행된다
 - 승급 낙인은 `cd1027476` 에서 사라졌고 **지갑 부재 안전망(`createWallet`)만 남는다.** v8 문서는 `currency` 가 없으니 지갑이 사라진 계정은 잔액을 주장하는 곳이 어디에도 없다 — 0 으로 세우는 것이 그 상태의 정답이고, 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다. `set` 이 아니라 `create` 인 것은 트랜잭션 밖에서 `ensureWallet` 이 먼저 세운 이관 잔액을 0 으로 덮지 않기 위해서다
 - **`transaction.create` 는 콜백 뒤다.** 앞에 두면 그건 쓰기고, `enhanceCard`·`enhanceKeyword` 가 **콜백 안에서 거는 무료 한 방(`grants/current`) 읽기가 쓰기 뒤로 밀려 트랜잭션이 통째로 거부된다.** 읽기·이관 계산·콜백 노출은 앞, 문서 쓰기만 뒤다
-- 세이브를 아예 안 만지는 명령용으로 `mutateWallet` 이 따로 있다. 지갑이 없으면 `failed-precondition` — 부트가 안 돌았다는 뜻이라 도메인 거절이 아니라 세션 문제다
+- 세이브를 아예 안 만지는 명령용으로 `mutateWallet` 이 따로 있다. 지갑이 없으면 `failed-precondition` — 초기화가 안 돌았다는 뜻이라 도메인 거절이 아니라 세션 문제다
 
-**신규 계정의 스타터 골드는 세이브 create 와 같은 트랜잭션에서 지갑 create 로 들어간다.** 두 문서가 갈라지면 "세이브는 있는데 지갑이 없는" 계정이 생기고, 부트의 `ensureWallet` 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다. `ensureSaveDocument` 가 지갑을 `create` 가 아니라 **`get` 으로 먼저 묻는** 이유는, 세이브만 지워지고 지갑이 남은 계정에서 `ALREADY_EXISTS` 로 터지면 그 계정이 세이브를 영영 못 만들기 때문이다.
+**신규 계정의 스타터 골드는 세이브 create 와 같은 트랜잭션에서 지갑 create 로 들어간다.** 두 문서가 갈라지면 "세이브는 있는데 지갑이 없는" 계정이 생기고, 초기화의 `ensureWallet` 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다. `ensureSaveDocument` 가 지갑을 `create` 가 아니라 **`get` 으로 먼저 묻는** 이유는, 세이브만 지워지고 지갑이 남은 계정에서 `ALREADY_EXISTS` 로 터지면 그 계정이 세이브를 영영 못 만들기 때문이다.
 
 **codebase 배치 — 이사한 것은 `devGrantCurrency` 하나다(C6.6).**
 
@@ -293,8 +293,8 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 **클라**
 
 - 세이브 슬롯 10 → **9**, `UserSaveData.VERSION` **8**, `CurrencySaveData` 삭제. 같은 목록을 손으로 나열하던 7곳이 함께 움직였다
-- `CurrencyManager` 의 첫실행 골드 100 지급을 지웠다 — 서버 `freshAccount.STARTER_GOLD` 가 이미 진실원이라 남겨두면 이중 진실원이고, 지갑을 못 읽은 부트에서 공짜 골드가 생긴다
-- 부트가 세이브와 지갑을 **겹쳐 읽고**, 세이브가 v7 이거나 지갑이 없으면 `ensureWallet` 으로 승급한다. **이것이 첫 업로드보다 반드시 앞**이다 — 업로드가 `SetOptions.Overwrite` 라, v8 `ToFieldMap` 이 `currency` 를 빼고 나면 다음 업로드가 원격 잔액 원본을 지운다
+- `CurrencyManager` 의 첫실행 골드 100 지급을 지웠다 — 서버 `freshAccount.STARTER_GOLD` 가 이미 진실원이라 남겨두면 이중 진실원이고, 지갑을 못 읽은 초기화에서 공짜 골드가 생긴다
+- 초기화가 세이브와 지갑을 **겹쳐 읽고**, 세이브가 v7 이거나 지갑이 없으면 `ensureWallet` 으로 승급한다. **이것이 첫 업로드보다 반드시 앞**이다 — 업로드가 `SetOptions.Overwrite` 라, v8 `ToFieldMap` 이 `currency` 를 빼고 나면 다음 업로드가 원격 잔액 원본을 지운다
 - 승급 응답이 `Created=false` 인데 손에 든 스냅샷이 아직 v7 이면(다른 기기가 방금 승급을 커밋한 경우) **세이브를 한 번 다시 읽는다.** 안 그러면 멀쩡한 계정이 복구 화면을 본다
 - `link.xml` 에 새 응답 DTO 를 넣었다. 빠뜨리면 **에디터는 통과하고 기기에서만 값이 빈다**
 
@@ -308,7 +308,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 - **되감기의 재화 와이프가 사라졌다**(`OutgameTutorialRewind`). 클라가 지갑을 못 쓰기 때문이고, `test` env 디버그 경로라 수용한 **의도된 동작 변화**다
 - `UI/HUD/CurrencyHud` 의 죽은 소모 연출 필드, `link.xml` 의 `EnsureAccountResult` 누락
 
-**남은 것 — 배포와 실기 왕복 전부.** 위 "배포 순서" 를 지킨 뒤, 최소 확인은 ① v7 계정 부트 → `ensureWallet` 이 승급하고 잔액이 그대로인가 ② 신규 계정 → 스타터 골드 100 이 지갑에 서는가 ③ `openPack`·강화 → 차감이 지갑에서 일어나고 세이브 `revision` 은 정확히 +1 인가 ④ `claimBattleReward`·`devGrantCurrency` → `revision` 없이 잔액만 오르고 세션이 안 끊기는가 ⑤ 멀티 payout `ack` → 크레딧이 한 번만인가.
+**남은 것 — 배포와 실기 왕복 전부.** 위 "배포 순서" 를 지킨 뒤, 최소 확인은 ① v7 계정 초기화 → `ensureWallet` 이 승급하고 잔액이 그대로인가 ② 신규 계정 → 스타터 골드 100 이 지갑에 서는가 ③ `openPack`·강화 → 차감이 지갑에서 일어나고 세이브 `revision` 은 정확히 +1 인가 ④ `claimBattleReward`·`devGrantCurrency` → `revision` 없이 잔액만 오르고 세션이 안 끊기는가 ⑤ 멀티 payout `ack` → 크레딧이 한 번만인가.
 ### C7 — 조이기 (구 클라 소멸 후)
 
 C6 이 **완화만** 해 둔 자리를 되돌린다. 할 일이 셋으로 구체화됐다.

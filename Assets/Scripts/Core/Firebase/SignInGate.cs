@@ -8,21 +8,21 @@ public enum ESignInMethod
     Email,
 }
 
-/// <summary>부트가 Firebase 를 세우기 전에 "이 기기가 어떤 계정으로 들어가는가"를 확정하는 관문.
+/// <summary>초기화가 Firebase 를 세우기 전에 "이 기기가 어떤 계정으로 들어가는가"를 확정하는 관문.
 ///
-/// <para>판정은 기기에 저장한 키 하나다. 키가 있으면 화면을 띄우지 않고 그대로 부트한다 —
+/// <para>판정은 기기에 저장한 키 하나다. 키가 있으면 화면을 띄우지 않고 그대로 초기화한다 —
 /// 익명 계정의 자격증명은 Firebase SDK 가 이미 기기에 들고 있어서
 /// <c>FirebaseAuthService</c> 의 복원 경로가 같은 uid 를 되살린다.</para>
 ///
-/// <para>키가 없을 때만(=첫 실행) 로그인 화면이 서고, 유저가 고를 때까지 부트가 멈춘다.
+/// <para>키가 없을 때만(=첫 실행) 로그인 화면이 서고, 유저가 고를 때까지 초기화가 멈춘다.
 /// <b>Firebase 기동보다 앞</b>이어야 하는 이유: <c>PlayerSaveCloud.AuthenticateAsync</c> 가
-/// 인증을 5초 상한으로 기다리므로, 그 뒤에서 사람을 기다리면 부트가 타임아웃으로 죽는다.</para></summary>
+/// 인증을 5초 상한으로 기다리므로, 그 뒤에서 사람을 기다리면 초기화가 타임아웃으로 죽는다.</para></summary>
 public static class SignInGate
 {
     const string MethodKey = "auth.signIn.method";
 
     // 화면이 뜨기를 기다리는 상한. 이 안에 아무 화면도 등록하지 않으면 익명으로 진행한다 —
-    // 로그인 화면이 없는 씬(테스트·단독 실행)에서 부트가 영원히 멈추지 않게 하는 것이 목적이다.
+    // 로그인 화면이 없는 씬(테스트·단독 실행)에서 초기화가 영원히 멈추지 않게 하는 것이 목적이다.
     const int PanelWaitMilliseconds = 2000;
 
     static UniTaskCompletionSource<ESignInMethod> s_choice;
@@ -73,7 +73,7 @@ public static class SignInGate
         LocalPrefs.Save();
     }
 
-    /// <summary>계정이 정해질 때까지 부트를 멈춘다. 이미 정해져 있으면 그 자리에서 끝난다.</summary>
+    /// <summary>계정이 정해질 때까지 초기화를 멈춘다. 이미 정해져 있으면 그 자리에서 끝난다.</summary>
     public static async UniTask<ESignInMethod> WaitAsync()
     {
         ESignInMethod t_stored = StoredMethod;

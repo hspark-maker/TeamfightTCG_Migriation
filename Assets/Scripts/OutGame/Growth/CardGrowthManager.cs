@@ -179,7 +179,7 @@ public static partial class CardGrowthManager
         return t_changed;
     }
 
-    // 성장 전체 초기화(디버그 전용, 진행도 손실)
+    // 성장 전체 재설정(디버그 전용, 진행도 손실)
     public static void DebugResetAll()
     {
         s_growth.Clear();

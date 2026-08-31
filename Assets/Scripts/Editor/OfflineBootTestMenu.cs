@@ -5,11 +5,11 @@ using System.Text;
 using UnityEditor;
 using Debug = UnityEngine.Debug;
 
-// 온라인 전용 부트 검증용 메뉴. 판정·규칙 조작은 tools/OfflineBootTest.ps1 이 단독으로 갖는다 —
+// 온라인 전용 초기화 검증용 메뉴. 판정·규칙 조작은 tools/OfflineBootTest.ps1 이 단독으로 갖는다 —
 // 여기서 방화벽을 직접 만지면 배치 파일과 진실원이 갈린다.
 public static class OfflineBootTestMenu
 {
-    const string ROOT = "Tools/Card Battle/오프라인 부트 검증/";
+    const string ROOT = "Tools/Card Battle/오프라인 초기화 검증/";
     const string BLOCK_MENU = ROOT + "차단 켜기 (관리자)";
     const string UNBLOCK_MENU = ROOT + "차단 해제 (관리자)";
     const string STATUS_MENU = ROOT + "상태 확인";
@@ -26,7 +26,7 @@ public static class OfflineBootTestMenu
         if (!TryGetScript(out string t_script)) return;
 
         string t_output = Capture(t_script, "status");
-        if (t_output != null) Debug.Log($"[오프라인 부트 검증]\n{t_output.TrimEnd()}");
+        if (t_output != null) Debug.Log($"[오프라인 초기화 검증]\n{t_output.TrimEnd()}");
     }
 
     // UAC 창을 띄워야 하므로 출력을 되받지 못한다 — -NoExit 로 창을 남겨 확인 항목을 그 자리에서 읽게 한다.
@@ -49,7 +49,7 @@ public static class OfflineBootTestMenu
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            Debug.LogWarning("[오프라인 부트 검증] 관리자 권한 요청이 취소됐습니다.");
+            Debug.LogWarning("[오프라인 초기화 검증] 관리자 권한 요청이 취소됐습니다.");
         }
     }
 
@@ -78,7 +78,7 @@ public static class OfflineBootTestMenu
 
             if (!string.IsNullOrEmpty(t_stderr))
             {
-                Debug.LogError($"[오프라인 부트 검증] {t_stderr.TrimEnd()}");
+                Debug.LogError($"[오프라인 초기화 검증] {t_stderr.TrimEnd()}");
                 return null;
             }
 
@@ -91,7 +91,7 @@ public static class OfflineBootTestMenu
         _script = ToolPath("OfflineBootTest.ps1");
         if (File.Exists(_script)) return true;
 
-        Debug.LogError($"[오프라인 부트 검증] 스크립트가 없습니다: {_script}");
+        Debug.LogError($"[오프라인 초기화 검증] 스크립트가 없습니다: {_script}");
         return false;
     }
 

@@ -17,7 +17,7 @@ public sealed class FirebaseAuthService
     // 이메일 로그인으로 버려진 익명 uid 자리. 백엔드 전환 기록과 같은 접두사를 쓴다.
     const string AbandonedOnSignInKey = "abandonedOnEmailSignIn";
 
-    // 기기에 남은 계정의 복원을 기다리는 창(50ms x 30 = 1.5초). 부트 인증 예산
+    // 기기에 남은 계정의 복원을 기다리는 창(50ms x 30 = 1.5초). 초기화 인증 예산
     // (FirebaseTimeouts.AuthAndReadMilliseconds) 안에서 끝나야 하므로 늘릴 때는 그쪽을 함께 본다.
     const int RestorePollIntervalMilliseconds = 50;
     const int RestorePollAttempts = 30;
@@ -79,7 +79,7 @@ public sealed class FirebaseAuthService
     public UniTask<bool> CreateAccountWithEmailAndPasswordAsync(string _email, string _password)
         => SwitchToEmailAccountAsync(_email, _password, true);
 
-    // 로그인과 가입은 마지막 한 호출만 다르고 나머지(세대 증가·세션 uid 초기화·익명 폐기 기록·
+    // 로그인과 가입은 마지막 한 호출만 다르고 나머지(세대 증가·세션 uid 재설정·익명 폐기 기록·
     // 상태 억제)가 전부 같다. 절차를 두 벌로 두면 한쪽만 고쳐 어긋난다 — 실제로 그렇게 어긋난 적이 있다.
     async UniTask<bool> SwitchToEmailAccountAsync(string _email, string _password, bool _createAccount)
     {
@@ -404,12 +404,12 @@ public sealed class FirebaseAuthService
 
     /// <summary>Firebase Auth SDK 를 쓸 수 있는 상태까지만 만든다 — <b>로그인은 하지 않는다.</b>
     ///
-    /// <para>부트(<see cref="InitializeCoreAsync"/>)와 계정 전환 경로가 공유한다. 전환 경로가
+    /// <para>초기화(<see cref="InitializeCoreAsync"/>)와 계정 전환 경로가 공유한다. 전환 경로가
     /// <see cref="InitializeAsync"/> 를 타면 복원할 계정이 없을 때 익명 계정을 발급하고,
     /// 곧이어 SignOut 이 그것을 버려 다시 로그인할 수 없는 계정만 콘솔에 쌓인다.</para>
     ///
     /// <para>abandonedAccount = 백엔드가 바뀌어 기기의 익명 계정을 버렸다. 그때는 복원할 것이 없는 게
-    /// 확정이라 부트가 기다리지 않는다.</para></summary>
+    /// 확정이라 초기화가 기다리지 않는다.</para></summary>
     async UniTask<(bool ok, bool abandonedAccount)> PrepareAuthAsync(int _generation)
     {
         if (this.auth != null) return (true, false);
@@ -461,7 +461,7 @@ public sealed class FirebaseAuthService
             this.UserId = t_user.UserId;
             this.LastError = string.Empty;
 
-            // 계정이 새로 생긴 순간이 곧 이전 진행도가 끊긴 순간이다. 부트 경로는 uid를 어디에도 남기지
+            // 계정이 새로 생긴 순간이 곧 이전 진행도가 끊긴 순간이다. 초기화 경로는 uid를 어디에도 남기지
             // 않아, 이 두 줄이 없으면 콘솔의 익명 계정이 왜 늘었는지 사후에 가릴 방법이 없다.
             if (t_mintedAccount)
                 Debug.LogWarning($"[FirebaseAuth] 복원할 계정이 없어 새 익명 계정을 발급했습니다(uid={this.UserId}).");
@@ -526,7 +526,7 @@ public sealed class FirebaseAuthService
         }
 
         // 기기에 남은 익명 계정은 그 계정을 발급한 백엔드에서만 유효하다 — 에뮬레이터와 실서버를 오가면
-        // 반대 축의 uid가 되살아나 토큰 검증부터 실패한다. 백엔드가 바뀐 첫 부트에서만 비우고, 같은 축이면 uid를 유지한다.
+        // 반대 축의 uid가 되살아나 토큰 검증부터 실패한다. 백엔드가 바뀐 첫 초기화에서만 비우고, 같은 축이면 uid를 유지한다.
         string t_previous = LocalPrefs.GetString(AuthBackendPrefsKey, LiveBackendName);
         if (t_previous == t_backend) return false;
 

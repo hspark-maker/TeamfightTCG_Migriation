@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 서버가 갈아끼운 슬롯을 매니저 캐시에 다시 태우는 창구.
-// 매니저들은 부트 때 세이브를 static 캐시로 떠 놓으므로, 슬롯만 바뀌면 화면은 옛 값을 계속 보여준다.
+// 매니저들은 초기화 때 세이브를 static 캐시로 떠 놓으므로, 슬롯만 바뀌면 화면은 옛 값을 계속 보여준다.
 // 여기서 부르는 것은 Init 계열(캐시 재구축)뿐이다 — 재수화가 DataSaveManager.Save()를 튀기면
 // PlayerSaveCloud.AdoptServerResult가 방금 세운 업로드 기준선이 그 자리에서 깨진다
 // (근거: DataSaveManager.AdoptServerSlots가 스스로 Save()·OnSaved를 발화하지 않는 이유와 같다).

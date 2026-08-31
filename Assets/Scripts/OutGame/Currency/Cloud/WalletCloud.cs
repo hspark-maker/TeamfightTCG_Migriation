@@ -54,8 +54,8 @@ static class WalletCloud
         LastError = string.Empty;
     }
 
-    /// <summary>부트 읽기. 문서가 없으면 true를 주고 <see cref="HasDocument"/>만 false로 남긴다 —
-    /// "못 읽었다"와 "아직 없다"를 가려야 부트가 ensureWallet을 부를지 실패로 접을지 정할 수 있다.</summary>
+    /// <summary>초기화 읽기. 문서가 없으면 true를 주고 <see cref="HasDocument"/>만 false로 남긴다 —
+    /// "못 읽었다"와 "아직 없다"를 가려야 초기화가 ensureWallet을 부를지 실패로 접을지 정할 수 있다.</summary>
     // 던지지 않는다 — 세이브 읽기와 병렬로 띄워 두는 호출이라, 던지면 세이브 쪽이 먼저 실패했을 때 관측되지 않는다.
     internal static async UniTask<bool> TryReadAsync(string _userId)
     {

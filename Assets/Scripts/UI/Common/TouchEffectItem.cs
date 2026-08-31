@@ -2,64 +2,57 @@ using DG.Tweening;
 using UnityEngine;
 
 /// <summary>터치 이펙트 한 발. 프리팹에 저작해 두고 <see cref="TouchEffectOverlay"/>가 돌려 쓴다 —
-/// 런타임에 만들지 않으므로 그림·색·크기는 전부 인스펙터 저작값이다.</summary>
+/// 런타임에 만들지 않으므로 파티클 저작값(색·수명·크기)은 전부 인스펙터에 있다.
+///
+/// 파티클이 월드 시뮬레이션이라(FX_Common_Touch의 moveWithTransform=0) 이미 튄 알갱이는 발이 옮겨 가도 제자리에 남는다 —
+/// 연타를 겹쳐 보이게 하는 것이 발을 여럿 두는 이유다.</summary>
 public sealed class TouchEffectItem : MonoBehaviour
 {
-    [SerializeField] RectTransform  body;
-    [SerializeField] CanvasGroup    group;
-    [SerializeField] ParticleSystem burst;      // 없어도 된다(스프라이트만 쓰는 저작)
+    [SerializeField] RectTransform    body;
+    [SerializeField] ParticleSystem[] particles;
 
-    [SerializeField] float duration  = 0.35f;
-    [SerializeField] float fromScale = 0.4f;
-    [SerializeField] float toScale   = 1.4f;
+    /// <summary>이 시간이 지나면 발을 꺼서 되돌린다. 알갱이 수명보다 짧으면 꺼지는 순간 잘려 보인다 —
+    /// 파티클을 고쳤으면 이 값도 같이 본다.</summary>
+    [SerializeField] float lifetime = 1.2f;   // FX_Common_Touch 기준: 알갱이 수명 0.4초 + 여유
 
-    Sequence sequence;
+    Tween hideTimer;
 
-    void Reset()
-    {
-        this.body  = transform as RectTransform;
-        this.group = GetComponent<CanvasGroup>();
-    }
+    void Reset() => this.body = transform as RectTransform;
 
-    /// <summary>_anchoredPos(오버레이 루트 기준)에서 한 번 재생한다.
-    /// 연타로 같은 발이 재사용돼도 배율·알파가 누적되지 않게 이전 트윈을 먼저 죽인다.</summary>
+    /// <summary>_anchoredPos(오버레이 Stage 기준)에서 한 번 재생한다.</summary>
     public void Play(Vector2 _anchoredPos)
     {
         if (this.body == null) this.body = transform as RectTransform;
         if (this.body == null) return;
 
-        this.sequence?.Kill();
+        this.hideTimer?.Kill();
 
         this.body.anchoredPosition = _anchoredPos;
-        this.body.localScale       = Vector3.one * this.fromScale;
         gameObject.SetActive(true);
 
-        if (this.group != null) this.group.alpha = 1f;
-
-        if (this.burst != null)
+        // 위치를 옮긴 프레임에 바로 터뜨린다 — Clear를 먼저 하는 이유는 발을 뺏겼을 때
+        // 이전 탭의 알갱이가 새 자리로 끌려오지 않게 하기 위해서다(월드 공간이라 남아 있으면 그대로 튄다).
+        for (int i = 0; i < (this.particles?.Length ?? 0); i++)
         {
-            this.burst.Clear(true);
-            this.burst.Play(true);
+            ParticleSystem t_ps = this.particles[i];
+            if (t_ps == null) continue;
+
+            t_ps.Clear(true);
+            t_ps.Play(true);
         }
 
-        this.sequence = DOTween.Sequence()
-            .Append(this.body.DOScale(this.toScale, this.duration).SetEase(Ease.OutQuad))
-            .SetLink(gameObject)
-            .OnComplete(Hide);
-
-        if (this.group != null)
-            this.sequence.Join(this.group.DOFade(0f, this.duration).SetEase(Ease.InQuad));
+        this.hideTimer = DOVirtual.DelayedCall(this.lifetime, Hide).SetLink(gameObject);
     }
 
     void Hide()
     {
-        this.sequence = null;
+        this.hideTimer = null;
         gameObject.SetActive(false);
     }
 
     void OnDestroy()
     {
-        this.sequence?.Kill();
-        this.sequence = null;
+        this.hideTimer?.Kill();
+        this.hideTimer = null;
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-/// <summary>부트 초기화(InitializationRunner)가 없는 독립 테스트 씬에서 표 기반 카드 카탈로그를 준비한다.</summary>
+/// <summary>초기화(InitializationRunner)가 없는 독립 테스트 씬에서 표 기반 카드 카탈로그를 준비한다.</summary>
 public static class CardStandaloneInitializer
 {
     public static bool Ensure(SynergyRegistry _synergyRegistry = null)

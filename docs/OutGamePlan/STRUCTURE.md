@@ -11,7 +11,7 @@ Firestore 문서 `envs/{envId}/users/{uid}/save/current`가 **유일한 진실�
 ```mermaid
 flowchart TD
     subgraph L4["OutGame/Save/4.Cloud — 클라우드 창구"]
-        CLOUD["PlayerSaveCloud<br/>static · 부트 채택 · 디바운스 업로드 · Revision 소유"]
+        CLOUD["PlayerSaveCloud<br/>static · 초기화 채택 · 디바운스 업로드 · Revision 소유"]
         DOC["PlayerSaveDocument<br/>필드맵 10슬롯+메타 5 · TryReadMeta"]
         MOD["PlayerSaveFirebaseModule<br/>IFirebaseModule 어댑터"]
     end
@@ -43,7 +43,7 @@ flowchart TD
 - 문서 쓰기는 항상 `SetOptions.Overwrite` — MergeAll이면 삭제가 전파되지 않는다.
 - `FlushPendingAsync`는 모듈마다 있다: 세이브는 `PlayerSaveCloud.FlushAsync`, 스펙 동기화(`BattleContentFirebaseModule`)는 원격 쓰기가 없어 `UniTask.CompletedTask`. 한 모듈이 동기 throw하면 `WhenAll` 이전에 터져 나머지 모듈의 flush까지 죽는다(2026-08-26 수정).
 
-### 부트 채택 — 원격만
+### 초기화 채택 — 원격만
 
 ```mermaid
 sequenceDiagram
@@ -111,7 +111,7 @@ sequenceDiagram
 
 | 클라우드 상태 | 진입 | 표면 | 소유 |
 |---|---|---|---|
-| `Failed` | `PlayerSaveCloud.Fail()` — 부트 게이트 **전** | 복구 화면 — 안내 문구 + 재시도·종료 2버튼 | `LoadingCoverView.ShowRecovery` |
+| `Failed` | `PlayerSaveCloud.Fail()` — 초기화 게이트 **전** | 복구 화면 — 안내 문구 + 재시도·종료 2버튼 | `LoadingCoverView.ShowRecovery` |
 | `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달 1회 (`SimpleYNPopup`) | `CloudSyncStatusWatcher` |
 | `Offline` | 업로드 3회 연속 실패 | 상시 배너 (`UiSortingOrder.CloudSyncBanner` = 940) | `CloudSyncBannerView` |
 
@@ -121,7 +121,7 @@ flowchart LR
     W["CloudSyncStatusWatcher<br/>static · 유일 구독자"]
     B["CloudSyncBannerView<br/>SingletonOverlayBase · DDOL"]
     M["SimpleYNPopup<br/>UIPoolManager"]
-    LC["LoadingCoverView<br/>부트 커버"]
+    LC["LoadingCoverView<br/>초기화 커버"]
 
     PC -->|OnStateChanged| W
     W -->|ShouldShowSyncBanner| B
@@ -130,16 +130,16 @@ flowchart LR
 ```
 
 - **판정은 MonoBehaviour 밖(`CloudSyncStatusWatcher`)에 둔다** — 배너 프리팹 로드가 실패해도 차단 모달은 떠야 한다.
-- `Offline` 은 **업로드 실패 축으로만** 남는다. 채택 경로에는 `Offline` 이 없다 — 부트에서 원격에 못 닿으면 `Failed` 다.
+- `Offline` 은 **업로드 실패 축으로만** 남는다. 채택 경로에는 `Offline` 이 없다 — 초기화에서 원격에 못 닿으면 `Failed` 다.
 - **임계값(3)은 `PlayerSaveCloud` 가 쥔다**(`ShouldShowSyncBanner`). UI가 세면 오탐한다 — 인증이 끊긴 업로드는
   요청을 띄우지도 못하고 `Offline` 이 되는데, "시도했으나 실패"와 "애초에 못 올림"은 `UploadAsync` 안에서만 구분된다.
 - `BlockSession` 은 `MarkRecoveryRequired()` 를 부르지 않는다 — 게이트 뒤라 화면을 못 바꾸면서 `IsReady` 만
-  false로 떨어뜨렸다. `IsReady`/`IsTerminated` 소비자는 부트 경로 둘뿐이다.
+  false로 떨어뜨렸다. `IsReady`/`IsTerminated` 소비자는 초기화 경로 둘뿐이다.
 - 모달의 "계속"은 이번 세션을 마저 보게 해 줄 뿐이다 — 로컬 복구선이 없어 그 뒤 진행분은 서버에 올라가지 않는다.
 
-### 부트 실패 — 대기 없이 재시도 / 종료
+### 초기화 실패 — 대기 없이 재시도 / 종료
 
-부트가 실패하면 **기다리지 않고** 안내 + 재시도·종료 2버튼 패널로 전환한다(모바일 표준).
+초기화가 실패하면 **기다리지 않고** 안내 + 재시도·종료 2버튼 패널로 전환한다(모바일 표준).
 재시도는 **실패한 단계만** 다시 태운다 — 씬 재로드도 Firebase 재초기화도 없다.
 `GameManager.RetryInitialize` · `FirebaseManager.Reinitialize` 는 삭제된 채로 둔다(되살리지 않았다).
 
@@ -148,7 +148,7 @@ flowchart LR
   읽기 자동 재시도는 없다 — 재시도의 주체는 사람이다.
 - `LoadingCoverView.ShowRecovery` 는 `UpdateRequired` · `RecoveryRequired` 두 종점의 유일한 출구 화면이다.
   재시도(`retryButton`)는 **`UpdateRequired` 일 때만 숨는다** — 판정은 `GameInitialization.CanRetry` 가 갖고 뷰는 묻기만 한다.
-  초기화 대기 타임아웃(느린 적재)도 포함이다: 감추면 느린 부트가 막다른 길이 된다.
+  초기화 대기 타임아웃(느린 적재)도 포함이다: 감추면 느린 초기화가 막다른 길이 된다.
 - 문구는 세 갈래다: 업데이트 필요 / 에셋 로드 실패(`CardArtCache.HasFailed` · `UiPrefabCache.HasFailed`) / 그 외 서버 연결 실패.
 - 복구 문구는 진행바(`Slider_LoadingBar_Green`) **밖**의 `RecoveryPanel/Text_Recovery` 다.
   안에 두면 `progressBar.SetActive(false)` 가 문구까지 함께 끈다(2026-08-26 수정).
@@ -169,7 +169,7 @@ flowchart LR
 | 중복 억제 | `s_pendingVersion`(디바운스 세대) · `s_dirtySerial`/`s_uploadedSerial`(변경 유무) · `s_uploadedSnapshot`(내용 동일) | 3중 게이트 |
 | 직렬화(업로드) | `s_uploading` 플래그 + `UniTaskCompletionSource`로 진행 중 업로드 대기 | `FlushAsync` |
 | 스레드 | Firebase 콜백은 스레드 미보장 → `UniTask.SwitchToMainThread()` 후 상태 전이 | `HandleAuthStateChangedAsync` |
-| 재시도 | 부트 읽기·업로드 모두 내부 재시도 없음 — 부트는 복구 화면의 재시도 버튼(`InitializationInstaller.RestartBoot`)이 받는다 | `OnApplicationPause(false)` → `RetryPending`, `OnApplicationQuit` → `FlushPendingAsync().Forget()` |
+| 재시도 | 초기화 읽기·업로드 모두 내부 재시도 없음 — 초기화는 복구 화면의 재시도 버튼(`InitializationInstaller.RestartBoot`)이 받는다 | `OnApplicationPause(false)` → `RetryPending`, `OnApplicationQuit` → `FlushPendingAsync().Forget()` |
 
 `OnApplicationPause(true)`는 `CurrencyManager.Save()`(잔액을 메모리 세이브에 flush)를 먼저 하고 `FirebaseManager.FlushPendingAsync()`를 await한다. 종료 콜백에는 await 창이 없어 킥만 하고, 로컬 복구선이 없으므로 못 올린 변경분은 그대로 유실된다.
 

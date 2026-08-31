@@ -39,7 +39,7 @@ public static class FirebaseManager
         if (s_initialized) throw new InvalidOperationException("FirebaseManager is already initialized.");
         FirebaseRootPath.Environment(_envId);
 
-        // 어느 백엔드에 붙었는지 부트 로그 첫 줄에서 읽히지 않으면, 왕복 판정이 "어디를 상대로 성공했는지" 모른 채 내려진다.
+        // 어느 백엔드에 붙었는지 초기화 로그 첫 줄에서 읽히지 않으면, 왕복 판정이 "어디를 상대로 성공했는지" 모른 채 내려진다.
         s_emulators = _emulators;
         Debug.Log($"[FirebaseManager] backend={_emulators} env={_envId} database={FirebaseRootPath.DatabaseId}");
 

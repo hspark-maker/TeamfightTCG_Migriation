@@ -65,7 +65,7 @@ function readPairingRecord(raw: Record<string, unknown> | undefined): PairingRec
       typeof raw.seedHex !== "string" || !HEX_16.test(raw.seedHex) ||
       // 매치 문서는 이 값을 cardDataVersion 으로 들고 있다 — contentFingerprint 라는 이름은
       // 클라 페이로드 쪽 이름이다. 여기서 이름을 잘못 읽으면 레코드가 항상 null 이 되어
-      // 매 호출이 페어링을 초기화하고 두 클라가 영원히 만나지 못한다.
+      // 매 호출이 페어링을 재설정하고 두 클라가 영원히 만나지 못한다.
       typeof raw.cardDataVersion !== "string" || !HEX_64.test(raw.cardDataVersion) ||
       !Number.isInteger(raw.rulesetVersion) ||
       !Array.isArray(raw.participantUids) ||

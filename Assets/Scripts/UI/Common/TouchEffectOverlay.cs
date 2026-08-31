@@ -31,7 +31,7 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
         Enabled    = true;
     }
 
-    /// <summary>부트에서 한 번 세운다. 멱등이라 재시도로 다시 들어와도 사본이 늘지 않는다.</summary>
+    /// <summary>초기화에서 한 번 세운다. 멱등이라 재시도로 다시 들어와도 사본이 늘지 않는다.</summary>
     public static void Install()
     {
         if (s_instance != null) return;

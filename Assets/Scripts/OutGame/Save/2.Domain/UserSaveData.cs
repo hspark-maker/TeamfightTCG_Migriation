@@ -10,8 +10,8 @@ public class UserSaveData
     // 승급 정책 본문은 쌍둥이 상수 쪽 하나에 있다 — functions/src/save/saveDocument.ts의 SCHEMA_VERSION 주석.
     // 여기 적을 것은 하나뿐이다: 무중단으로 올리는 순서가 없다.
     // 서버 선행이면 문서가 서버 상수보다 낮아 전 유저 callable이 failed-precondition이고,
-    // 클라 선행이면 부트 게이트가 remote < VERSION으로 Fail이라 아무도 못 들어온다.
-    // v8은 그 예외다 — ensureWallet이 부트 안에서 v7 문서를 승급시켜 준다.
+    // 클라 선행이면 초기화 게이트가 remote < VERSION으로 Fail이라 아무도 못 들어온다.
+    // v8은 그 예외다 — ensureWallet이 초기화 안에서 v7 문서를 승급시켜 준다.
     // 올린다면 firestore.rules.prod의 allow create가 박아 둔 schemaVersion 값도 같이 올린다 —
     // 안 올리면 기존 계정은 멀쩡한데 신규 계정만 안 만들어지는 부분 고장이 된다.
     public const int VERSION = 8;

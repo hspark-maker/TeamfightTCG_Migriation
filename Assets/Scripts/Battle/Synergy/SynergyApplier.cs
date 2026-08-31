@@ -13,7 +13,7 @@ public static class SynergyApplier
         foreach (var t_card in cards)
         {
             if (t_card == null) continue;
-            t_card.ClearSynergy();  // 재적용해도 누적되지 않도록 초기화
+            t_card.ClearSynergy();  // 재적용해도 누적되지 않도록 재설정
             t_cards.Add(t_card);
         }
 

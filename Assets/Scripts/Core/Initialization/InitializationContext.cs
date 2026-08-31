@@ -11,7 +11,7 @@ public sealed class InitializationContext
 
     public void Abort() => IsAborted = true;
 
-    /// <summary>이번 부트가 쓰는 콘텐츠 프로필. ContentProfileStep이 세우고 뒤 스텝이 읽는다 —
+    /// <summary>이번 초기화가 쓰는 콘텐츠 프로필. ContentProfileStep이 세우고 뒤 스텝이 읽는다 —
     /// 각자 ContentProfileConfig.Active를 다시 뒤지면 스텝 순서가 코드에서 안 보인다.</summary>
     public ContentProfileConfig Profile { get; private set; }
 

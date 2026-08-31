@@ -1,6 +1,6 @@
 using Cysharp.Threading.Tasks;
 
-// 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 부트가 꽂는다
+// 전투에 성장값을 흘리는 유일한 배선. Battle이 OutGame을 참조하지 않도록 값 생산자를 초기화가 꽂는다
 // (GameInitializer.GrowthProvider 주석이 지정한 자리). 곡선 조회가 Config를 쓰므로 OutgameConfigStep 뒤다.
 public sealed class BattleGrowthBridgeStep : MainInitializer
 {
@@ -19,7 +19,7 @@ public sealed class BattleGrowthBridgeStep : MainInitializer
 
         // 싱글 AI 레벨. 토너먼트 정점 저작값만 남았고(랭크 티어로 적을 강화하던 축은 제거) 같은 성장 곡선에 태운다 —
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
-        // 레벨은 전투 시작 시점에 읽어야 한다(부트에서 굳히면 진행 중 바뀐 정점 값이 안 따라온다).
+        // 레벨은 전투 시작 시점에 읽어야 한다(초기화에서 굳히면 진행 중 바뀐 정점 값이 안 따라온다).
         GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevel());
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 

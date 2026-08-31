@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 
-// ensureAccount 응답. ServerCommandResult를 상속하지 않는다 — 부트 게이트 전이라 슬롯 채택 계약 밖이고,
-// 클라는 이 응답 대신 문서를 다시 읽어 정상 부트 경로로 합류한다.
+// ensureAccount 응답. ServerCommandResult를 상속하지 않는다 — 초기화 게이트 전이라 슬롯 채택 계약 밖이고,
+// 클라는 이 응답 대신 문서를 다시 읽어 정상 초기화 경로로 합류한다.
 internal sealed class EnsureAccountResult
 {
     /// <summary>확보된 문서의 revision. 방금 만들었으면 1이다.</summary>

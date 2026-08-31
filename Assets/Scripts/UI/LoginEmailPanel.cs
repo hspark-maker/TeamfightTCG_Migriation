@@ -39,7 +39,7 @@ public sealed class LoginEmailPanel : MonoBehaviour
     void Awake()
     {
         // 정렬 층(UiSortingOrder.SignIn)과 GraphicRaycaster 는 프리팹에 저작돼 있다 —
-        // 부트 로딩 커버(1000)보다 위여야 하고, 레이캐스터가 없으면 보이기만 하고 탭이 안 먹는다.
+        // 초기화 로딩 커버(1000)보다 위여야 하고, 레이캐스터가 없으면 보이기만 하고 탭이 안 먹는다.
 
         // 배선은 숨길 때도 반드시 한다 — 계정 버튼으로 나중에 다시 열리는데,
         // 그때는 Awake 가 이미 지나가서 여기서 걸지 않으면 죽은 화면이 뜬다.
@@ -81,7 +81,7 @@ public sealed class LoginEmailPanel : MonoBehaviour
         if (this.signUpButton != null) this.signUpButton.onClick.RemoveListener(ToggleSignUpMode);
     }
 
-    /// <summary>게스트로 시작. 계정을 여기서 만들지 않는다 — 관문이 열리면 부트의 인증 경로가
+    /// <summary>게스트로 시작. 계정을 여기서 만들지 않는다 — 관문이 열리면 초기화의 인증 경로가
     /// 기기에 남은 익명 계정을 복원하고, 없을 때만 새로 발급한다. 그 자격증명은 Firebase SDK 가
     /// 기기에 들고 있으므로 다음 실행에도 같은 계정으로 들어온다.</summary>
     void ContinueAsGuest()
@@ -106,7 +106,7 @@ public sealed class LoginEmailPanel : MonoBehaviour
 
     void Submit() => RunEmailFlowAsync(this.signUpMode).Forget();
 
-    // 로그인과 가입은 부르는 API 와 문구만 다르다. 성공 후 처리(비번 비우기·관문 확정·부트 재기동)가
+    // 로그인과 가입은 부르는 API 와 문구만 다르다. 성공 후 처리(비번 비우기·관문 확정·초기화 재기동)가
     // 같으므로 한 자리에 둔다 — 나뉘어 있으면 한쪽만 고쳐 어긋난다.
     async UniTaskVoid RunEmailFlowAsync(bool _createAccount)
     {
@@ -147,8 +147,8 @@ public sealed class LoginEmailPanel : MonoBehaviour
         SignInGate.Complete(ESignInMethod.Email);
         gameObject.SetActive(false);
 
-        // 이미 다른 계정으로 세이브를 채택한 세션이면 갈아끼울 수 없다 — 부트를 처음부터 다시 태운다.
-        // 관문이 아직 안 열린 첫 실행에서는 아무 일도 하지 않는다(그쪽은 부트가 이어서 돈다).
+        // 이미 다른 계정으로 세이브를 채택한 세션이면 갈아끼울 수 없다 — 초기화를 처음부터 다시 태운다.
+        // 관문이 아직 안 열린 첫 실행에서는 아무 일도 하지 않는다(그쪽은 초기화가 이어서 돈다).
         GameManager.RestartForAccountChange();
     }
 

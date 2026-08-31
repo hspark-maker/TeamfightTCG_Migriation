@@ -83,7 +83,7 @@ export function requireUid(auth?: {uid: string}): string {
 /**
  * 문서 스키마 버전이 이 서버가 쓸 수 있는 값인지 판정한다. **정확히 SCHEMA_VERSION** 만
  * 통과시키고, 벗어날 때 낮음/높음을 다른 오류 코드로 가른다 — 원인도 조치도 다르기 때문이다.
- * 클라 PlayerSaveCloud 의 부트 게이트가 remote>client / remote<client 를
+ * 클라 PlayerSaveCloud 의 초기화 게이트가 remote>client / remote<client 를
  * 가르는 것과 같은 축이다.
  *
  * 낡은 문서에 승급 창을 열어 두지 않는 이유: 지갑을 모르는 클라는 v8 서버와 원리상 공존할 수
@@ -243,7 +243,7 @@ export interface EnsureAccountOutcome {
 }
 
 /**
- * 클라 PlayerSaveDocument.TryReadMeta 와 같은 판정이다 — 여기서 통과시킨 문서만 클라가 부트할 수 있다.
+ * 클라 PlayerSaveDocument.TryReadMeta 와 같은 판정이다 — 여기서 통과시킨 문서만 클라가 초기화할 수 있다.
  * @param {FirebaseFirestore.DocumentData | undefined} data 문서 본문
  * @return {boolean} 메타가 온전한가
  */
@@ -261,11 +261,11 @@ function hasUsableMeta(data: FirebaseFirestore.DocumentData | undefined): boolea
  * mutateSave 와 갈라 두는 이유: 저쪽은 "callable 1회 = 문서 쓰기 1회, revision +1" 이 계약이고
  * R5~R8 이 전부 그 위에 선다. 생성 분기를 섞으면 그 불변식이 흐려진다.
  *
- * 이미 있는 문서에는 스키마 검사를 하지 않는다 — 드리프트는 클라 부트가 다시 읽으며
+ * 이미 있는 문서에는 스키마 검사를 하지 않는다 — 드리프트는 클라 초기화가 다시 읽으며
  * MarkUpdateRequired / Fail 로 훨씬 나은 표면을 만든다. 여기서 던지면 그 갈래를 못 밟는다.
  *
  * 지갑도 **같은 트랜잭션**에서 만든다. 두 문서가 갈라지면 세이브만 있는 계정이 생기고,
- * 그 계정은 부트의 ensureWallet 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다.
+ * 그 계정은 초기화의 ensureWallet 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다.
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {string} deviceId 클라 기기 id (32자 hex)
@@ -318,7 +318,7 @@ export async function ensureSaveDocument(
       createWallet(transaction, walletReference, starterBalances, FieldValue.serverTimestamp());
     }
 
-    // 메타가 없거나 깨진 문서는 클라가 부트조차 못 하는데(TryReadMeta 실패 → Fail),
+    // 메타가 없거나 깨진 문서는 클라가 초기화조차 못 하는데(TryReadMeta 실패 → Fail),
     // 그대로 두면 여기서도 noop 이라 계정이 영구 잠긴다 — 룰에 delete 경로도 없다.
     // 스키마 밖 문서는 유효한 세이브였던 적이 없으므로 버리고 새로 만드는 것이 유일한 복구다.
     if (snapshot.exists) {

@@ -1,7 +1,7 @@
 using Cysharp.Threading.Tasks;
 
 // 아트·UI 프리팹 선로드를 건다(완료는 기다리지 않는다 — 대기는 WaitAssetPreloadStep 몫).
-// 시작 시점이 컴포넌트 실행 순서에 끌려다니지 않게 부트 소유자가 명시적으로 건다.
+// 시작 시점이 컴포넌트 실행 순서에 끌려다니지 않게 초기화 소유자가 명시적으로 건다.
 public sealed class AssetPreloadKickStep : MainInitializer
 {
     public override UniTask Initialize(InitializationContext _context)

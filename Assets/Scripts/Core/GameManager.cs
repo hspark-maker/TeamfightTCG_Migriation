@@ -85,7 +85,7 @@ public class GameManager : MonoBehaviour
     /// <summary>계정이 정해진 뒤에 Firebase 를 세운다.
     ///
     /// <para>관문이 <b>여기</b>여야 하는 이유: <c>PlayerSaveCloud.AuthenticateAsync</c> 가 인증을
-    /// 5초 상한으로 기다린다 — Firebase 를 먼저 세우고 그 안에서 사람을 기다리면 부트가 타임아웃으로 죽고,
+    /// 5초 상한으로 기다린다 — Firebase 를 먼저 세우고 그 안에서 사람을 기다리면 초기화가 타임아웃으로 죽고,
     /// 자동 익명 로그인이 이미 끝나 로그인 화면이 고를 것도 남지 않는다.</para></summary>
     async UniTaskVoid BootFirebaseAsync(ContentProfileConfig _profile)
     {
@@ -103,7 +103,7 @@ public class GameManager : MonoBehaviour
                 throw new System.InvalidOperationException(
                     "Firebase 에뮬레이터 설정이 잘못됐습니다: " + t_emulators.Error);
 
-            // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 부트 시점부터 산다.
+            // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 초기화 시점부터 산다.
             FirebaseManager.Register(new CallableFirebaseModule(t_emulators.FunctionsOrigin));
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
@@ -118,7 +118,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>계정이 바뀐 뒤 부트를 다시 태운다. 로그인 화면이 성공 직후 부르는 유일한 자리다.
+    /// <summary>계정이 바뀐 뒤 초기화를 다시 태운다. 로그인 화면이 성공 직후 부르는 유일한 자리다.
     ///
     /// <para>세이브 채택이 끝난 세션에서 uid 가 바뀌면 <c>PlayerSaveCloud</c> 가 세션을 Blocked 로 끊는다
     /// — 그래서 갈아끼우는 대신 <b>처음부터 다시</b> 태운다. Firebase SDK 는 방금 로그인한 계정을 그대로
@@ -128,7 +128,7 @@ public class GameManager : MonoBehaviour
     /// 등록 목록은 유지한다(다시 등록하면 중복으로 던진다).</para></summary>
     public static void RestartForAccountChange()
     {
-        // 아직 부트가 Firebase 를 세우기 전이면 관문이 알아서 이어 태운다 — 여기서 손대면 두 번 돈다.
+        // 아직 초기화가 Firebase 를 세우기 전이면 관문이 알아서 이어 태운다 — 여기서 손대면 두 번 돈다.
         if (!FirebaseManager.IsInitialized) return;
 
         FirebaseManager.Shutdown();

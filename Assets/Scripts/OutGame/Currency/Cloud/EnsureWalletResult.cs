@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-// ensureWallet 응답. ServerCommandResult를 상속하지 않는다 — 부트 게이트 전이라 슬롯 채택 계약 밖이고,
+// ensureWallet 응답. ServerCommandResult를 상속하지 않는다 — 초기화 게이트 전이라 슬롯 채택 계약 밖이고,
 // 세이브 승급분(revision)은 호출부가 직접 기준선에 반영한다.
 internal sealed class EnsureWalletResult
 {

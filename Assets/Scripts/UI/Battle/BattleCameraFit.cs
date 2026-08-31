@@ -81,7 +81,7 @@ public class BattleCameraFit : MonoBehaviour
     {
         this.cam = GetComponent<Camera>();
         this.lastAspect = -1f;   // 다음 갱신에서 무조건 다시 계산
-        ClearExternalControl();  // 이전 씬에서 Begin/End 짝이 어긋난 채 넘어와도 여기서 초기화
+        ClearExternalControl();  // 이전 씬에서 Begin/End 짝이 어긋난 채 넘어와도 여기서 재설정
         Fit();
     }
 

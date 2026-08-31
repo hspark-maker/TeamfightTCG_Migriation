@@ -77,7 +77,7 @@ public static class UiSortingOrder
     /// <summary>로딩 커버(LoadingCover.prefab).</summary>
     public const int LoadingCover = 1000;
 
-    /// <summary>부트 로그인 관문(Popup_LoginEmail). 계정이 정해지기 전에는 부트가 멈춰 있으므로
+    /// <summary>초기화 로그인 관문(Popup_LoginEmail). 계정이 정해지기 전에는 초기화가 멈춰 있으므로
     /// 로딩 커버(<see cref="LoadingCover"/>) <b>위</b>다 — 아래에 두면 커버에 가려 아무것도 고를 수 없다.</summary>
     public const int SignIn = 1100;
 

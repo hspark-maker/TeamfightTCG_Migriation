@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 부트 실행 주체. 저작된 스텝 목록을 순서대로 돌린다 — 순서는 코드가 아니라 이 리스트가 정한다.
+// 초기화 실행 주체. 저작된 스텝 목록을 순서대로 돌린다 — 순서는 코드가 아니라 이 리스트가 정한다.
 [DefaultExecutionOrder(-210)]
 public sealed class InitializationRunner : MonoBehaviour
 {
@@ -16,7 +16,7 @@ public sealed class InitializationRunner : MonoBehaviour
 
     public IReadOnlyList<MainInitializer> Initializers => initializers;
 
-    // 부트를 선점한 사본이 카드 카탈로그 구성까지 마쳤는가. 프리팹 사본이 둘이라 하나만 참이 된다.
+    // 초기화를 선점한 사본이 카드 카탈로그 구성까지 마쳤는가. 프리팹 사본이 둘이라 하나만 참이 된다.
     // 실패한 사본은 루트째 걷히므로 false로 남고, 늦게 깬 사본이 처음부터 다시 시도한다.
     internal static bool BootClaimed { get; private set; }
 
@@ -44,20 +44,20 @@ public sealed class InitializationRunner : MonoBehaviour
             return;
         }
 
-        // 부트를 선점한 러너. 재시도가 다시 걸 대상을 찾는 유일한 통로다(씬 탐색 금지).
+        // 초기화를 선점한 러너. 재시도가 다시 걸 대상을 찾는 유일한 통로다(씬 탐색 금지).
         s_instance = this;
         m_context = new InitializationContext(this);
 
         await RunFrom(0);
     }
 
-    /// <summary>복구 화면의 재시도가 부트를 대기 지점부터 다시 태운다(씬 재로드 없음).
+    /// <summary>복구 화면의 재시도가 초기화를 대기 지점부터 다시 태운다(씬 재로드 없음).
     /// 어디서 다시 시작할지는 코드가 아니라 스텝의 retryEntry 저작값이 정한다.</summary>
     internal static void RestartGate()
     {
         if (s_instance == null)
         {
-            Debug.LogError("[InitializationRunner] 부트 러너가 없어 재시도를 걸 수 없습니다.");
+            Debug.LogError("[InitializationRunner] 초기화 러너가 없어 재시도를 걸 수 없습니다.");
             return;
         }
 

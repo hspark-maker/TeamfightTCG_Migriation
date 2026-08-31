@@ -58,7 +58,7 @@ function Show-SaveCache {
     if (-not (Test-Path $base)) { return }
 
     Write-Host ''
-    Write-Host '[세이브 캐시 파일 — 부트 후 수정 시각이 그대로여야 정상]' -ForegroundColor Cyan
+    Write-Host '[세이브 캐시 파일 — 초기화 후 수정 시각이 그대로여야 정상]' -ForegroundColor Cyan
     $found = Get-ChildItem $base -Recurse -Filter 'outgame_save.json' -ErrorAction SilentlyContinue
     if (-not $found) {
         Write-Host '  (없음) 캐시가 생성되지 않은 상태입니다 — 기대한 동작입니다.'
@@ -99,7 +99,7 @@ function Enable-Block {
 
     foreach ($exe in $paths) {
         New-NetFirewallRule -DisplayName $RuleName `
-            -Description 'TeamfightTCG 온라인 전용 부트 검증용 임시 아웃바운드 차단' `
+            -Description 'TeamfightTCG 온라인 전용 초기화 검증용 임시 아웃바운드 차단' `
             -Direction Outbound -Program $exe -Action Block -Profile Any | Out-Null
         Write-Host ("  차단 추가: {0}" -f $exe)
     }
@@ -130,7 +130,7 @@ function Disable-Block {
 }
 
 if ($Action -ne 'status' -and -not (Test-Admin)) {
-    throw '방화벽 규칙 변경에는 관리자 권한이 필요합니다. OfflineBootTest.bat 또는 Unity 메뉴 Tools/Card Battle/오프라인 부트 검증 으로 실행하세요.'
+    throw '방화벽 규칙 변경에는 관리자 권한이 필요합니다. OfflineBootTest.bat 또는 Unity 메뉴 Tools/Card Battle/오프라인 초기화 검증 으로 실행하세요.'
 }
 
 switch ($Action) {

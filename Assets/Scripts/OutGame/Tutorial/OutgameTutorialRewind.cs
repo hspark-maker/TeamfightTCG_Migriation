@@ -7,7 +7,7 @@ using UnityEngine;
 /// EditorPrefs는 런타임이 못 읽고, 세이브 스키마에 디버그 필드를 넣는 것은 오염이다.
 ///
 /// 적용이 2단인 이유: 밀기는 클라우드 채택 뒤이면서 매니저들이 슬롯을 캐싱하기 <b>전</b>(InstallSaveDependent 맨 앞)이어야 하고,
-/// 지급 재생은 카탈로그·덱·시퀀스가 전부 준비된 <b>뒤</b>(부트 초기화(InitializationRunner) 끝)여야 한다.
+/// 지급 재생은 카탈로그·덱·시퀀스가 전부 준비된 <b>뒤</b>(초기화(InitializationRunner) 끝)여야 한다.
 /// </summary>
 public static class OutgameTutorialRewind
 {
@@ -104,7 +104,7 @@ public static class OutgameTutorialRewind
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.
-    /// <b>부트 즉시 단계 끝(TutorialDataStep 뒤)</b>에서 호출한다(카탈로그·덱·성장·시퀀스가 모두 준비된 자리).
+    /// <b>초기화 즉시 단계 끝(TutorialDataStep 뒤)</b>에서 호출한다(카탈로그·덱·성장·시퀀스가 모두 준비된 자리).
     ///
     /// 씬을 뺏는 액션(AutoBattle·AutoPurchase·BattleEntry)은 실행하지 않는다 — 초기화 중에 화면을 넘겨받는다.
     /// 팩 드로우는 랜덤이라 재현할 수 없어 풀 전량을 준다.</summary>

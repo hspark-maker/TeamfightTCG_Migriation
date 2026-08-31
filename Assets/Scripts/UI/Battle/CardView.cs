@@ -310,7 +310,7 @@ public class CardView : MonoBehaviour
     #region Visual State
     public void Render(CardInstance _card, SynergyState _synergy = null)
     {
-        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 초기화한다.
+        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 재설정한다.
         if (this.boundCard != _card)
         {
             this.cardAnim.ResetHitEffect();
