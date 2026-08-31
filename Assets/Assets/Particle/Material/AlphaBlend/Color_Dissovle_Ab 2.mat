@@ -92,7 +92,7 @@ Material:
     - _distortion: 0
     m_Colors:
     - _Color0: {r: 1, g: 0.1462264, b: 0.1462264, a: 1}
-    - _Main_Color: {r: 3.4570942, g: 0.50452614, b: 6.8831816, a: 1}
+    - _Main_Color: {r: 0.9145711, g: 3.8889248, b: 34.936626, a: 1}
     - _Main_color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
