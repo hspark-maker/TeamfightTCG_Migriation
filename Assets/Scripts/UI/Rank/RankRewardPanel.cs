@@ -175,10 +175,13 @@ public class RankRewardPanel : PooledUIBase
         this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - t_ratio);
     }
 
-    // 오버레이는 항상 활성이고 root만 토글되므로 이 뷰의 OnDisable은 열고 닫아도 오지 않는다 —
+    // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 여기서 켜 주지 않으면
+    // 하위 Root만 토글돼 화면에 아무것도 뜨지 않는다. 켠 뒤로는 root만 토글되므로 이 뷰의 OnDisable은 열고 닫아도 오지 않는다 —
     // 재진입마다 트윈을 걷고 시작값을 다시 잡는 PopupTransition 쪽 처리가 실질 방어선이다.
     void SetVisible(bool _visible)
     {
+        if (_visible && !this.gameObject.activeSelf) this.gameObject.SetActive(true);
+
         // 암막은 공용 ScreenDim(Full)이 그린다 — 오버레이마다 딤 한 장씩 들고 있던 것을 걷었다.
         // Root/Dim 오브젝트는 알파 0으로 남아 "바깥 눌러 닫기" 판정만 맡는다.
         if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);

@@ -76,8 +76,6 @@ public class AlbumTabController : LobbyTabPanel
 
         Refresh();
 
-        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
-
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
         TryBeginInsert();
     }
@@ -87,8 +85,6 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
-
-        ContextCurrencySlot.Release(this);
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;
@@ -209,7 +205,7 @@ public class AlbumTabController : LobbyTabPanel
     /// <summary>안내가 가리킬 테마 칸(빈 갤러리면 -1). 저작이 카드를 지목했으면 그 카드가 든 테마다.
     ///
     /// 폴백(저작이 비었거나 그 카드가 도감에 없을 때)은 종전 규칙 그대로 — 아직 안 꽂은 카드가 있는 첫 테마,
-    /// 꽂을 것이 하나도 없으면 첫 테마. 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
+    /// 꽂을 것이 하나도 없으면 첫 열린 테마다(준비 중 테마는 지목하지 않는다). 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
     static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
     {
         if (OutgameTutorialGuide.TryGetAnchorCard(out int t_card))

@@ -60,6 +60,7 @@ public static class TutorialValidator
         var t_axes = new (EStepField Field, string Name, string Label)[]
         {
             (EStepField.Anchor,           "anchor",           "앵커"),
+            (EStepField.Spotlight,        "spotlight",        "함께 밝힐 영역"),
             (EStepField.GuideMessage,     "guideMessage",     "안내 문구"),
             (EStepField.MessagePlacement, "messageAtBottom",  "문구 하단 배치"),
             (EStepField.FreeOfCharge,     "freeOfCharge",     "무료 지급"),
@@ -369,6 +370,9 @@ public static class TutorialValidator
                 $"앵커 {_def.Anchor}를 등록하는 위젯이 프로젝트 어디에도 없습니다 — 게이트가 등록 통지를 무기한 기다립니다.",
                 "그 위젯에 TutorialAnchor를 붙여 키를 배선하거나, 앵커를 등록된 것으로 바꾸세요.");
 
+        // (12-b) 함께 밝힐 영역은 없어도 진행을 막지 않는다(강조 없이 흐른다) — 그래서 켠 저작만 조용히 무효가 된다
+        ValidateSpotlight(_def, _chapter, _index, _issues);
+
         // (13) 비면 하드코딩 폴백이 대신 서기 때문에 미저작이 화면상 정상으로 보인다(TutorialStepExecutor.TitleOf)
         if (TutorialStepDef.UsesRewardTitle(t_action) && string.IsNullOrEmpty(_def.RewardTitle))
             Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "보상 제목 없음",
@@ -420,6 +424,26 @@ public static class TutorialValidator
             Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "편성 풀 비었음",
                 $"팩 '{_def.Pack.PackId}'의 기본 풀이 비어 있습니다 — 자동 편성이 지정 없는 것으로 보고 일반 편성 규칙으로 조용히 떨어집니다.",
                 "그 팩의 pool을 채우거나, 풀이 있는 팩으로 바꾸세요.");
+    }
+
+    // 타깃과 함께 딤 위로 올릴 영역의 저작 점검. 둘 다 안내를 멈추지 않는 실수라 런타임 로그로는 드러나지 않는다.
+    static void ValidateSpotlight(TutorialStepDef _def, int _chapter, int _index, List<TutorialIssue> _issues)
+    {
+        var t_spotlight = _def.Spotlight;
+        if (t_spotlight == EOutgameTutorialAnchor.None) return;
+
+        if (t_spotlight == _def.Anchor)
+        {
+            Add(_issues, ETutorialIssueLevel.Info, _def, _chapter, _index, "강조 영역 중복",
+                $"함께 밝힐 영역이 앵커({t_spotlight})와 같습니다 — 타깃은 이미 딤 위로 올라가므로 아무 차이가 없습니다.",
+                "다른 영역을 고르거나 비우세요.");
+            return;
+        }
+
+        if (!TutorialAnchorMeta.Of(t_spotlight).IsRegistered)
+            Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "강조 영역 미등록",
+                $"함께 밝힐 영역 {t_spotlight}를 등록하는 위젯이 프로젝트 어디에도 없습니다 — 강조 없이 그대로 흘러 저작이 조용히 무효가 됩니다.",
+                "그 위젯에 TutorialAnchor를 붙여 키를 배선하거나, 등록된 영역으로 바꾸세요.");
     }
 
     // (16) 런타임이 무시하는 값이라 무해하지만, 읽는 사람은 그 값이 동작에 관여한다고 믿는다.

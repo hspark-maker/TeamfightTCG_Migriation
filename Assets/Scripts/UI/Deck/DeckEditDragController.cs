@@ -76,6 +76,9 @@ public class DeckEditDragController : MonoBehaviour
         _data.dragging    = false;
         _data.pointerDrag = null;
 
+        // 되돌리기 비행이 돌고 있으면 손끝이 이긴다 — 같은 고스트 한 벌이라 겹치면 비행이 손끝으로 순간이동한다.
+        KillFly();
+
         // 3) 고스트 확보(4)에 실패하면 드래그가 성립하지 않으므로, 목록을 세우는 것은 그 뒤에 한다 —
         //    여기서 잠그면 아래 early return 경로에서 목록이 잠긴 채 영영 풀리지 않는다.
 
@@ -113,6 +116,75 @@ public class DeckEditDragController : MonoBehaviour
     public void Cancel()
     {
         Finish(-1);
+    }
+
+    /// <summary>교체로 밀려난 카드를 목적지 쪽으로 짧게 날려 보낸다(덱 편집의 교체 확정 연출).
+    /// 드래그와 고스트 인스턴스가 하나뿐이라 드래그 중에는 아무것도 하지 않는다.</summary>
+    public void FlyOut(int _card, RectTransform _from, RectTransform _to, Vector2 _cellSize)
+    {
+        if (m_dragging || _card <= 0 || _from == null || _to == null) return;
+
+        EnsureGhost();
+        if (m_ghostRect == null || dragLayer == null) return;
+
+        KillFly();
+
+        Vector2 t_endSize = _cellSize.x > 0f && _cellSize.y > 0f ? _cellSize : ghostSize;
+
+        // 편성 칸과 컬렉션 타일은 칸 크기가 다르다 — 도착 크기로 시작하면 떠나는 첫 프레임에 카드가 튄다.
+        Vector2 t_startSize = _from.rect.size;
+        if (t_startSize.x <= 0f || t_startSize.y <= 0f) t_startSize = t_endSize;
+
+        m_ghostRect.sizeDelta  = t_startSize;
+        m_ghostRect.localScale = Vector3.one * ghostScale;
+
+        if (m_ghostView  != null) m_ghostView.Bind(_card, true);
+        if (m_ghostGroup != null) m_ghostGroup.alpha = ghostAlpha;
+
+        m_ghostRect.anchoredPosition = ToLayerPoint(_from);
+        m_ghostRect.gameObject.SetActive(true);
+
+        Sequence t_seq = DOTween.Sequence();
+        t_seq.Append(m_ghostRect.DOAnchorPos(ToLayerPoint(_to), FLY_TIME).SetEase(Ease.InQuad));
+        t_seq.Join(m_ghostRect.DOSizeDelta(t_endSize, FLY_TIME).SetEase(Ease.InQuad));
+        t_seq.Join(m_ghostRect.DOScale(ghostScale * FLY_END_SCALE, FLY_TIME).SetEase(Ease.InQuad));
+        if (m_ghostGroup != null) t_seq.Join(m_ghostGroup.DOFade(0f, FLY_TIME).SetEase(Ease.InQuad));
+
+        m_flyTween = t_seq.OnComplete(ResetGhostLook).SetLink(gameObject);
+    }
+
+    void KillFly()
+    {
+        if (m_flyTween == null) return;
+
+        Tween t_fly = m_flyTween;
+        m_flyTween = null;
+        t_fly.Kill();
+
+        ResetGhostLook();
+    }
+
+    // 비행이 남긴 축소·페이드를 걷어 다음 드래그가 온전한 고스트를 쓰게 한다.
+    void ResetGhostLook()
+    {
+        m_flyTween = null;
+
+        if (m_ghostRect != null)
+        {
+            m_ghostRect.gameObject.SetActive(false);
+            m_ghostRect.localScale = Vector3.one * ghostScale;
+        }
+
+        if (m_ghostGroup != null) m_ghostGroup.alpha = ghostAlpha;
+    }
+
+    // 캔버스 렌더 모드와 무관하게 드래그 레이어 기준 좌표로 환산한다(피벗이 어디에 있든 사각형 한가운데를 잡는다).
+    Vector2 ToLayerPoint(RectTransform _rect)
+    {
+        Vector2 t_screen = RectTransformUtility.WorldToScreenPoint(EventCam, _rect.TransformPoint(_rect.rect.center));
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(dragLayer, t_screen, EventCam, out Vector2 t_local);
+
+        return t_local;
     }
 
     void OnDisable()
@@ -155,6 +227,8 @@ public class DeckEditDragController : MonoBehaviour
     {
         int              t_card = m_card;
         PointerEventData t_data = m_data;
+
+        KillFly();   // 화면을 떠나는 경로(Cancel)도 여기로 모인다 — 비행만 남아 떠 있지 않게
 
         if (m_ghostRect != null) m_ghostRect.gameObject.SetActive(false);
         ClearHighlight();

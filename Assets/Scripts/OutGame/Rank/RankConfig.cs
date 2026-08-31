@@ -144,6 +144,7 @@ public class RankConfig : ScriptableObject
         {
             AlbumRewardDef t_def = t_rewards[t_i];
             if (t_def.amount <= 0) continue;
+
             _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
         }
     }
@@ -199,17 +200,14 @@ public class RankGradeConfig
     public List<RankRewardDef> rewards = new List<RankRewardDef>();
 }
 
-// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다)
+// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다).
+// 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이다.
 [Serializable]
 public struct RankRewardDef
 {
     // 지급할 재화 종류
-    [Tooltip("지급할 재화 종류.")]
+    [Tooltip("지급할 재화 종류. 슬롯 그림은 이 값으로 CurrencyLook 표에서 정해진다 — 여기서 따로 저작하지 않는다.")]
     public ECurrencyType currency;
-
-    // 보상 슬롯 아이콘(선택)
-    [Tooltip("보상 슬롯 아이콘. 비워두면 슬롯 프리팹에 저작된 스프라이트를 그대로 쓴다.")]
-    public Sprite icon;
 
     // 이 등급 1단계 지급액
     [Tooltip("이 등급 1단계 지급액. 0 이하면 이 항목은 4단계 전부에서 표시도 지급도 되지 않는다(단계 증가분이 있어도 마찬가지) — " +

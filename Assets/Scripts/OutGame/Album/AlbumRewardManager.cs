@@ -25,13 +25,13 @@ public static class AlbumRewardManager
 
     public static AlbumRewardInfo GetThemeInfo(AlbumTheme _theme) => InfoOf(_theme);
 
-    // 앨범 진행도는 완성 테마 수 기준(n/N = 완성 테마/전체 테마)
+    // 앨범 진행도는 완성 테마 수 기준(n/N = 완성 테마/열린 테마)
     public static AlbumRewardInfo GetAlbumInfo()
     {
         var t_rewards = CardAlbum.AlbumRewards;
         return new AlbumRewardInfo(
             t_rewards,
-            CardAlbum.CompletedThemeCount, CardAlbum.ThemeCount,
+            CardAlbum.CompletedThemeCount, CardAlbum.UnlockedThemeCount,
             AlbumState());
     }
 

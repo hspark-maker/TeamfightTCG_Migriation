@@ -457,8 +457,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // (아래에 깔린 페이지 오버레이가 둘 다 걷어둔 상태여도 이 요청이 가장 위라 상단바가 다시 나온다.)
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
-        ContextCurrencySlot.Request(this, ECurrencyType.Shard);
-
         // 이 오버레이의 배경판은 상단바 **아래**에서 시작한다(바를 덮으면 재화가 안 보인다).
         // 그래서 바의 둥근 좌우 모서리 틈으로 로비가 그대로 비친다 — 그 뒤를 Content 딤이 메운다.
         // Content 딤은 로비 셸 안에서 바보다 아래에 깔려 있어 **바 자체는 덮지 않고 뒤만** 어둡게 한다.
@@ -510,7 +508,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         // 요청을 물리면 아래에 깔린 화면(페이지 오버레이)의 범위가 다시 적용된다.
         LobbyShellBars.Show(this);
-        ContextCurrencySlot.Release(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
 

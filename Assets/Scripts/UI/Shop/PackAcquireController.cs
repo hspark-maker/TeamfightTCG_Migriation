@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Coffee.UIEffects;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
@@ -32,10 +33,7 @@ public class PackAcquireController : MonoBehaviour
     [SerializeField] TMP_Text retryPriceText;
     [Tooltip("가격 옆 재화 아이콘. 팩의 결제 재화를 따라 CurrencyLook 표의 그림으로 갈린다 — 표가 비면 프리팹 그림 그대로다.")]
     [SerializeField] Image retryPriceIcon;
-    [Tooltip("못 누르는 동안 버튼 밑판에 까는 무채색 그림. 이걸 쓰려면 Button의 Disabled Color를 불투명 흰색으로 " +
-             "둘 것 — 틴트가 남아 있으면 무채색 위에 한 번 더 곱해진다. 미배선이면 그림은 건드리지 않는다.")]
-    [SerializeField] Sprite disabledPlate;
-    [Tooltip("모자란 가격 숫자의 색. 무채색 밑판이 '못 누른다'를 말하고 이 색이 '어디가 모자란가'를 말한다.")]
+    [Tooltip("모자란 가격 숫자의 색. 흑백이 '못 누른다'를 말하고 이 색이 '어디가 모자란가'를 말한다.")]
     [SerializeField] Color shortPriceColor  = new Color(0.95f, 0.30f, 0.28f, 1f);
     [SerializeField] Color normalPriceColor = Color.white;
     [Header("재화 상단바")]
@@ -75,8 +73,9 @@ public class PackAcquireController : MonoBehaviour
     // 획득이 2회 이상 눌려도 씬 전이는 1회만.
     bool m_left;
 
-    // 저작된 유채색 밑판. 무채색으로 갈아끼우기 전에 한 번만 잡아 둔다 — 안 그러면 되돌아갈 자리를 잃는다.
-    Sprite m_retryPlate;
+    // 버튼 밑판의 흑백 효과. 자식(라벨·가격 숫자·재화 아이콘)은 UIEffectReplica로 이걸 따라오므로
+    // 코드가 쥐는 것은 이 하나뿐이다. 없으면 조작 여부만 바뀐다.
+    UIEffect m_retryTone;
 
     // 결제는 끝났고 화면만 아직 안 갈아치운 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다
     // (상점의 m_openPending과 같은 자리 — 그쪽은 오버레이를 열고, 여기는 세션을 갈아끼운다).
@@ -127,10 +126,10 @@ public class PackAcquireController : MonoBehaviour
 
     void OnEnable()
     {
-        // 저작된 밑판은 갈아끼우기 전에 잡는다. Awake에 두지 않는 이유 — 오버레이가 시작하자마자 content를
+        // 흑백 효과는 여기서 잡는다. Awake에 두지 않는 이유 — 오버레이가 시작하자마자 content를
         // 끄므로 이 컴포넌트의 Awake는 돌지 않을 수 있다. 열릴 때 반드시 도는 곳은 여기다.
-        if (m_retryPlate == null && retryButton != null && retryButton.image != null)
-            m_retryPlate = retryButton.image.sprite;
+        if (m_retryTone == null && retryButton != null)
+            m_retryTone = retryButton.GetComponent<UIEffect>();
 
         if (view != null) view.OnRevealComplete += OnRevealComplete;
         if (acquireButton != null) acquireButton.onClick.AddListener(OnAcquirePressed);
@@ -261,10 +260,10 @@ public class PackAcquireController : MonoBehaviour
 
         retryButton.interactable = t_allowed && t_afford;
 
-        // 못 누르는 동안은 무채색 밑판이 깔린다 — 알파를 낮추면 어두운 개봉 화면에선 그냥 사라진 것으로 읽힌다.
-        // 밑판 둘 중 하나라도 없으면 그림은 건드리지 않는다(되돌아갈 자리를 잃느니 틴트만 남는 편이 낫다).
-        if (retryButton.image != null && disabledPlate != null && m_retryPlate != null)
-            retryButton.image.sprite = retryButton.interactable ? m_retryPlate : disabledPlate;
+        // 못 누르는 동안 버튼이 **통째로** 흑백이 된다. 밑판만 무채색으로 갈아끼우면 자식(라벨·가격·동전)이
+        // 원색 그대로 남아 오히려 어수선해진다 — 색이 빠지는 일은 버튼 전체에 한 번에 걸려야 한다.
+        // 알파를 낮추지 않는 이유: 개봉 화면이 어두워 반투명은 곧 사라짐이 된다.
+        if (m_retryTone != null) m_retryTone.toneIntensity = retryButton.interactable ? 0f : 1f;
 
         // 빨강은 "여기가 모자란다" 한 축에만 쓴다 — 튜토리얼·기능잠금은 모자란 것이 아니다.
         if (retryPriceText != null)
