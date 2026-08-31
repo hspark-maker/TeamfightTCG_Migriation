@@ -35,7 +35,7 @@
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
 | 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
 | 4 | 한계돌파 | `CardGrowthManager.Snack.cs:TryLimitBreak` | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3** |
-| 5 | 토너먼트 해금·낙인 | `TournamentProgress.StateOf` · `MarkRewardPending` | 챕터 건너뛰고 정점 보상 수령 | **P4** |
+| 5 | ~~토너먼트 해금·낙인~~ | ~~`TournamentProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
 | 6 | 싱글 랭크 `rank.points` | `RankManager.ApplyBattleResult` | 팩 잠금·티어 보상·챕터 잠금 자격 | **범위 밖** |
 | 7 | 세이브 슬롯 무동결 | `firestore.rules` `affectedKeys` 0건 | 위 3·4·5를 룰 층에서 못 막는다 | **P6** |
 
@@ -116,15 +116,28 @@
 
 ---
 
-### P4 — 토너먼트 진행 서버화 (범위 허용분)
+### P4 — 토너먼트 진행 서버화 — **구현 완료**
 
-지금 지급만 서버(`claimReward(ownerType="Tournament"` / `chapter_` 접두사))이고 **해금 사슬 판정·클리어 확정·낙인이 전부 클라**다. `tournament.pendingRewardNodeId` 를 임의 노드 id 로 직접 써 넣으면 전투 없이 수령 자격이 서고, 순차 사슬 검사(`TournamentProgress.StateOf`)도 클라라 챕터 전체를 건너뛴다.
+착수 시 실측하니 문안보다 실태가 앞서 있었다. `ClearNodeAsync` · `ClaimChapterRewardAsync` 는 이미 서버 `RewardClaimCommand` 로 위임되어 있었고, 클라가 세이브를 직접 쓰는 자리는 **`MarkRewardPending` 하나**였다(`ResetForDebug` 는 P0 몫). 그래서 이번 작업의 본체는 "낙인을 서버가 소유하게 만드는 것"이 됐다.
 
-1. **callable `clearTournamentNode(nodeId, won)` 신설** — 서버가 선행 정점 클리어 사슬과 `requiredGrade` 잠금을 재계산하고, 통과하면 `tournament` 슬롯에 클리어·낙인을 쓴다. 판정 표는 `TournamentChapter`(24행, C5.5 에 이미 업로드)를 읽는다. 판정부는 `completionTable.ts` 옆에 `tournamentTable.ts` 로 둔다 — `claimReward.ts` 가 지금 같은 판정을 자기 안에서 하고 있어 **이중 진실원**이니 그것을 이쪽으로 흡수한다.
-2. **클라 전환** — `TournamentProgress.MarkRewardPending`(호출부 `Battle/BattleOutcome.cs:35`) · `MarkCleared` · `ClearPendingReward` 가 세이브를 쓰지 않는다. `StateOf`/`CanEnter`/`IsChapterComplete` 는 **표시용 낙관 판정**으로 격하(`CardPackOpener.Precheck` 와 같은 성격).
-3. **재수화** — P5 가 `Tournament` 슬롯을 `ServerSlotRehydrator` 에 추가한다.
+1. **callable `reportTournamentWin(nodeId)` 신설**(`functions/src/commands/reportTournamentWin.ts`). 이름을 `clearTournamentNode` 로 하지 않은 것은 이 명령이 하는 일이 클리어 확정이 아니라 **격파 신고**이기 때문이다(확정은 여전히 `claimReward` 다). `claimReward.ts` 안의 동명 내부 함수는 `claimTournamentNode` 로 바꿔 이름 공간을 비웠다.
+   **`won` 을 받지 않는다** — 서버가 검증할 방법이 없어 "항상 true 인 인자"가 되고, 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 호출하지 않는 것이 계약이다.
+2. **사슬의 진실원은 새 `prevNodeId` 열이다.** 당초 문안은 `TournamentChapter` 표(24행)를 그대로 읽으라 했지만, 그 표의 `order` 는 챕터 **안**의 순서라 경계를 넘지 못하고 `id` 는 저작 순회 위치라 앞에 행 하나만 끼워도 밀린다. 클라 진실원(`StateOf` 의 `_index - 1` 인접)을 그대로 표에 새겨 정렬 의미론에 기대지 않게 했다. **뿌리(`prevNodeId` 가 빈 행)가 하나가 아니면 그 열이 없던 구 블롭**이라는 뜻이라 fail-closed 로 막는다(`ChainUnreadable`).
+3. **랭크 잠금의 축은 등급이 아니라 점수(`requiredPoints` 열)다.** 서버에는 `ERankGrade` 가 없고 `RankGrade` 표의 `id` 채번과 `RankConfig.grades` 리스트 순서를 맞춰 줄 코드도 없어서, 등급 인덱스를 축으로 쓰면 두 진실원이 조용히 갈린다. **첫 등급은 0 으로 낮춘다** — `RankConfig.ResolveTierIndex` 가 첫 등급 진입 점수에 못 미쳐도 인덱스 0 을 돌려주므로, `entryPoints` 를 그대로 쓰면 `points` 0 인 신규 계정을 서버만 잠근다. 등가성이 기대는 두 불변식(`entryPoints` 오름차순 · 등급 오름차순)은 업로더가 검증한다.
+4. **`claimReward` 에 사슬 검사를 겹치지 않았다.** `pending !== ownerId` 검사가 이미 서버 낙인을 통과한 정점만 받으므로, 낙인을 서버가 소유하는 순간 사슬 검증을 상속한다. 대신 방어선 하나를 더했다 — **낙인이 표 밖 정점을 가리키면 거절**한다(구 클라가 스스로 찍어 둔 임의 낙인이 신규 서버에서 그대로 수령되는 창구).
+5. **표 파서를 `completionTable.ts` → `tournamentTable.ts` 로 이사**했다. 표 하나에 파서 하나가 기존 불변식이고(`rewardTable`↔Reward · `tutorialGrantTable`↔TutorialGrant), 이쪽은 완주 모수뿐 아니라 해금 사슬까지 잰다. `completionTable` 에는 도감과 공용 `isCompleted` 가 남는다.
+6. **클라는 두 곳에서 신고한다.** 전투 씬(`BattleOutcome`, `Forget`)이 먼저인 것은 기존 낙인이 거기 있던 이유와 같다 — 캐리어가 메모리라 로비까지 미루면 씬 로딩 중 종료가 승리를 삼킨다. 로비 복귀(`TournamentReturnFlow`)가 한 번 더 쏘는 것은 그 순간 네트워크가 없었을 때를 메운다. 서버가 재신고를 `AlreadyPending` 으로 성공 처리하고 창구(`TournamentWinCommand`)가 겹친 왕복을 합치므로 비용은 왕복 1회다.
+   **선물 등장은 신고가 끝난 뒤로 미뤘다** — 낙인이 서기 전에 내면 눌러도 수령이 튕긴다. 실패해도 신호는 조건 없이 낸다: 그것이 맵의 등장 예약(정점을 재워 두는 것)을 푸는 유일한 열쇠다.
+   전투 씬 호출에 **취소 토큰을 물리지 않는다** — 씬 파괴가 업로드 봉인 해제(`InvokeAsync` 의 `finally`) 전에 취소를 던지면 이후 저장이 통째로 막힌다.
+7. **재수화는 `Tournament` 슬롯만** 넣었다(P5 에서 당겨옴, `AlbumReward` 는 P5 에 남는다). 다른 슬롯과 달리 `Init` 계열이 아니라 **통지뿐**이다 — `TournamentProgress` 가 세이브를 직독하고 캐시를 두지 않아 채택 시점에 값은 이미 새것이고 모르는 것은 화면뿐이다.
 
-**한계를 문서에 명시한다.** 서버가 막는 것은 "순서 건너뛰기"와 "중복 클리어"이지 **"전투 없이 이겼다고 주장하는 것"이 아니다**(`won` 은 여전히 클라 신고, 전투는 범위 밖). `requiredGrade` 자격도 `rank.points` 가 클라 소유로 남는 한 자기신고 위에 선다. 그래도 사슬 판정이 서버로 가면 **한 번의 거짓 신고로 한 정점만** 넘어가고 챕터 전체를 건너뛸 수는 없다.
+**결과: `tournament` 슬롯에 클라가 쓰는 경로는 `ResetForDebug` 하나만 남았다**(P0 가 닫는다). `UserSaveData.VERSION` 은 8 그대로 — 세이브 필드 변화가 0이다.
+
+**선행 블로커였던 것.** 머지 `30f849809` 가 `saveDocument.ts` 를 C8-2 이전으로 되돌려 `mutateSave` 가 구 3인자로 남아 있었고, callable 6개가 신 5인자로 부르는 바람에 `functions` 전체가 컴파일되지 않았다(`TS2554` 2건, `predeploy` 도 같이 죽어 있었다). C8-2 본에 박형석 작업분이 이미 들어 있어 3자 병합이 아니라 그 버전으로의 복원이 정답이었다(`0ed2c830a`).
+
+**한계(문안 그대로 남는다).** 서버가 막는 것은 "순서 건너뛰기"와 "중복 클리어"이지 **"전투 없이 이겼다고 주장하는 것"이 아니다**. `requiredGrade` 자격도 `rank.points` 가 클라 소유로 남는 한 자기신고 위에 선다. 그래도 한 번의 거짓 신고로 **한 정점만** 넘어가고 챕터 전체를 건너뛸 수는 없다. `pendingRewardNodeId` 직접 조작은 P6 슬롯 동결이 닫는다.
+
+**배포보다 표 업로드가 먼저다.** 두 열이 없는 블롭에서는 해금이 전부 `ChainUnreadable` 로 막힌다.
 
 ---
 
@@ -132,7 +145,7 @@
 
 `ServerSlotRehydrator.Rehydrate` 는 `Ownership`·`KeywordGrowth`·`CardGrowth` 세 슬롯만 재수화한다(파일 안 `TODO(R5+)`·`TODO(R7·R9)`).
 
-- **`AlbumReward` · `Tournament` 추가.** P4 가 `tournament` 슬롯을 서버가 쓰게 만드는 순간 필요해진다. 두 매니저는 지금 `DataSaveManager.Data` 를 매번 읽어 우연히 맞지만, static 캐시를 도입하는 순간 깨진다.
+- **`AlbumReward` 추가.** `Tournament` 는 P4 가 당겨가 이미 붙었다(통지만 — `TournamentProgress` 는 세이브 직독이라 재구축할 캐시가 없다). `AlbumRewardManager` 도 지금은 `DataSaveManager.Data` 를 매번 읽어 우연히 맞지만, static 캐시를 도입하는 순간 깨진다.
 - **`Deck` 은 손대지 않는다** — 동결 제외 슬롯이고, TODO 가 지적한 "`DeckSaveManager.LoadFromSave` 가 Compact 후 SaveAll 을 타 채택 중 저장이 튄다"는 문제를 건드릴 이유가 없어졌다.
 - `Rank`·`Tutorial`·`Profile` 도 동결 제외라 재수화 대상이 아니다.
 
@@ -200,7 +213,7 @@
 | P1 | `functions/scripts/test-wallet-store.js` 확장(원장 줄 생성·재시도 반환) · 같은 `txId` 2회 호출 후 잔액 1회분만 오르는지 실기 · `ledger/{txId}` 문서 생성 확인 |
 | P2 | `functions/scripts/test-fresh-account.js` 옆에 튜토리얼 지급 회귀 추가 · 튜토리얼 완주 실기 왕복(카드가 서버 표대로 들어오는가 · 재호출이 낙인에 막히는가) |
 | P3 | `functions/scripts/test-growth.js` 에 한계돌파 케이스 추가(간식 부족 거절 · 최대 단계 거절 · 표 결손 fail-closed) · 실기: 카드 상세에서 한계돌파 → `cardGrowth` 재수화 확인 |
-| P4 | 정점 순서 건너뛰기 거절 · 중복 클리어 거절 회귀 · 실기: 정점 격파 후 로비에서 곧바로 수령(낙인 즉시 업로드 경로) |
+| P4 | **완료** — `functions/scripts/test-tournament-progress.js`(챕터 경계 건너뛰기 · 구 블롭 fail-closed · 점수 경계값 · 표 밖 낙인 대조) · Unity 컴파일 0건. **남은 것은 실기**: ① 정점 격파 후 로비에서 곧바로 수령 ② 격파 직후 기내모드 → 복귀 재시도, 두 번 다 실패하면 `Playable` 로 남는가 ③ 챕터 2 첫 정점을 디버그로 진입해 승리 → `ChainBlocked` ④ 등급 미달 챕터 ⑤ 다른 기기 수령 후 → `AlreadyClaimed` + 맵 즉시 갱신 |
 | P5 | 서버가 `tournament`/`albumReward` 를 쓴 직후 매니저 캐시가 갱신되는지 — 재수화 없이 옛 값이 남으면 즉시 드러나게 로그 |
 | P6 | `Tools/firestore-rules-tests` 하네스(`firebase emulators:exec`, **Java 21+ 필요** — Unity 번들 JDK 17 불가). 신규 케이스 3군 전부 통과 후 룰 릴리즈 |
 
