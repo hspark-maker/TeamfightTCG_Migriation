@@ -1,7 +1,7 @@
 # 재화 독립 서비스 분리 — 인계 문서
 
-> 최종 갱신 2026-08-30 · 브랜치 `feature_Firestore` · HEAD `eea13ea13`
-> 상위 문서: `SERVER_VALIDATION_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
+> 최종 갱신 2026-08-31 · 브랜치 `feature_Firestore` · HEAD `86abe584c`
+> 상위 문서: `SERVER_AUTHORITY_ROADMAP.md` (이 작업은 그 R6~R9를 재화 축으로 앞당긴 것)
 
 ## 왜 하는가
 
@@ -13,14 +13,14 @@
 | # | 결정 |
 |---|---|
 | 1 | **배포 단위 분리.** `firebase.json` 에 codebase `currency` 추가 |
-| 2 | **저장소 분리.** `envs/{env}/users/{uid}/wallet/current` + `ledger/{txId}`. 세이브에서 `currency` 슬롯 제거(15키→14키) |
-| 3 | **IAP 는 구조·자리만.** 원장 스키마와 진입점 자리만. 기록·멱등·영수증 검증은 IAP 착수 때 |
+| 2 | **저장소 분리.** `envs/{env}/users/{uid}/wallet/current` + `receipts/{txId}`(C8 에서 `ledger`→`receipts` 로 개명). 세이브에서 `currency` 슬롯 제거(15키→14키) |
+| 3 | **IAP 는 구조·자리만.** 영수증 스키마와 진입점 자리만. 기록·멱등·영수증 검증은 IAP 착수 때 |
 | 4 | **원자성 우선.** 지갑 문서를 쓰는 코드는 단일 원본. 복합 명령은 default codebase 에서 save+wallet 두 문서를 한 트랜잭션에 쓴다. Firestore 트랜잭션은 문서는 걸쳐도 **프로세스 경계는 못 넘는다** — 독립 functions 가 보장하는 것은 배포·의존성·IAP 진입점 격리이지 쓰기 배타성이 아니다 |
 | 5 | **소유권 이전 먼저, 저장소 전환 나중.** 도메인 callable 이 당분간 기존 `currency` 슬롯에 쓴다. 그래야 모든 단계가 플레이 가능하다 |
 
 ## 지금 상태
 
-**커밋 16개**
+**커밋 19개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
 - `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
@@ -38,6 +38,9 @@
 - `8edb278f2` C6.4·C6.5 — 클라 `UserSaveData.VERSION 8`(슬롯 9) · `WalletCloud` · `claimPayout.ack` 크레딧 → **클라 재화 writer 0**
 - `cd1027476` C6.6 + 검수 — 승급 창 철회 · `devGrantCurrency` 를 `currency` codebase 로
 - `eea13ea13` C7 — 룰 `hasOnly` 14키 · currency 검증 블록 제거 · 하네스 13b·13c·13e 를 13c 하나로
+- `98042b94b` C8-1 — 영수증(receipt) 코덱 · `nextWallet` 이 브랜드 타입을 낸다 · 룰 `ledger`→`receipts`
+- `52138f910` C8-2 — 영수증 pre-read · `finalize` · `slotKeys` 캐시 · 코히런스 가드 · `TxIdReused`
+- `86abe584c` C8-4 — 클라 txId 스탬프 + 1회 재시도 → **멱등이 켜졌다**
 
 **배포 상태 (실측 2026-08-28 · C6 전량 배포 완료)**
 
@@ -51,6 +54,7 @@
 | `devGrantCurrency` (codebase **`currency`**) | **이사 완료 · 배포됨** · **401**(정상) |
 | `currencyPing` (codebase `currency`) | 배포됨 · **401**(정상) |
 | `firestore.rules` 지갑 블록 · 무료 한 방(`grants`) 블록 | **배포됨** — 룰은 파일 통째로 릴리즈되므로 C6 완화분과 같이 올라갔다 |
+| **C8 전량**(영수증 코덱·멱등 게이트·클라 txId) | **미배포** — 함수 2 codebase + 룰 1회. 배포 순서 제약 없음(txId 폴백) |
 
 전 함수 10종을 URL POST 로 찔러 **403 이 하나도 없었다** — 신규 생성된 `ensureWallet` 조차 invoker 바인딩을 상속해 그 함정을 밟지 않았다.
 
@@ -179,7 +183,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 1. **`TurnRunner.CaptureResult` 는 동기 `void` 로 남겼다.** 팝업은 왕복을 기다리지 않는다 — `lastReward` 는 승패·싱글/멀티 무관하게 `RewardService.CalculateReward` **예상액**이고, 싱글이면 그 자리에서 지급 호출만 띄운다. `resultCaptured`·`resultFinalized` 게이트는 무변경
 2. **실패하면 아무것도 보여주지 않는다** — `BattleRewardHandoff` 를 세우지 않아 로비 획득 연출이 아예 안 돈다. 들어오지도 않은 재화의 연출을 도는 것보다 낫다. **재시도하지 않는다**(서버가 멱등이 아니라 두 번째 호출이 그대로 이중 지급)
-3. **멱등 축은 여전히 없다.** C8 원장 `txId` 가 닫는다 — 순서 그대로 둔다
+3. **멱등 축은 여전히 없다.** C8 영수증 `txId` 가 닫는다(닫혔다) — 순서 그대로 둔다
 
 **멀티가 이미 갖고 있던 모양에 싱글을 합류시켰다.** `submitMatchResult` 는 양쪽 제출을 대조해야 `payouts/{matchId}` 를 세우므로 결과 팝업 시점에 서버 확정액이 존재할 수 없다. 그래서 멀티는 **팝업=예상액(전투 씬) · 지급=서버 · 연출=캐리어(로비)** 로 나뉘어 있었다. 싱글도 같은 세 박자다 — C6 에서 고칠 자리가 하나로 준다.
 
@@ -330,88 +334,134 @@ C6 이 **완화만** 해 둔 자리를 되돌렸다. `isValidSave()` 의 `hasOnl
 **남은 것 — 룰 배포 1회.** `firebase deploy --only firestore:rules --project bm-cardbattle`. 함수 배포는 없다. 배포 뒤 신 클라(v8) 부트로 세이브 업로드가 통과하고 `revision` 이 정상적으로 오르는지 본다 — 여기서 막히면 14키 목록을 잘못 줄인 것이다.
 ---
 
-### C8 — 재화 원장 (C7 뒤 · **IAP 착수 앞**)
+### C8 — 재화 영수증 ✅ (`98042b94b` `52138f910` `86abe584c` · **미배포**)
 
-재화가 움직인 기록이 **한 줄도 없다.** 잔액 숫자만 있고 그 숫자가 어떻게 됐는지는 아무도 모른다.
-그리고 그 기록이 없어서 **재시도 중복 과금이 열려 있다** — 원장 한 장치가 둘을 같이 닫는다.
+재화가 움직인 기록이 한 줄도 없었고, 그 기록이 없어서 재시도 중복 과금이 열려 있었다.
+영수증 한 장치가 둘을 같이 닫았다.
 
-**지금 열려 있는 것**
+**이름을 `ledger`(원장) → `receipt`(영수증)으로 바꿨다.** 회계 용어보다 게임 도메인 용어를 쓰는
+프로젝트 컨벤션이고, txId 가 곧 영수증 번호이며 재시도가 "같은 영수증을 다시 내미는 것"으로 읽혀
+멱등 역할이 이름만으로 드러난다. IAP 예약 필드 `receipt: null` 은 `storeReceipt` 로 개명했다.
 
-- `mutateSave`(`save/saveDocument.ts:134`)는 **클라의 기대 revision 을 받지 않는다.** 현재값을 읽어 +1 할 뿐이다.
-  응답을 놓친 클라가 재시도하면 `openPack` 이 **다시 뽑고 다시 과금**한다. 강화도 다시 차감된다.
-  `claimReward` 만 낙인(`claimedTiers`·정점 Cleared) 덕에 우연히 안전하다 — 설계가 아니라 부작용이다
-- `logger.info` 의 `goldBefore`/`goldAfter` 는 원장이 **아니다.** `functions:log` 는 3~4분 늦고 보존기간이 있고
-  무엇보다 **코드가 되읽을 수 없다.** 로그는 사람이 사후에 보는 것, 원장은 시스템이 읽고 판단하는 데이터다
+경로는 `envs/{env}/users/{uid}/wallet/current/receipts/{txId}` 다.
 
-**무엇을 만드나**
-
-`envs/{env}/users/{uid}/wallet/current/ledger/{txId}` — 재화 이동 한 건이 한 줄. append-only, 수정·삭제 없다.
-
-```
-트랜잭션 안에서
-  ① ledger/{txId} 읽기 → 있으면 재시도다. 기록된 결과 그대로 반환 (재과금·재추첨 없음)
-                       → 없으면 처음이다
-  ② 판정·차감 (기존 그대로)
-  ③ 잔액 · 도메인 상태 · 원장 줄을 한 번에 쓴다
-```
-
-**문서 존재 자체가 중복 판정이다.** 멱등 장부를 따로 두지 않는다.
-
-**반드시 같은 트랜잭션 안이어야 한다.** 별도 callable 로 빼면 (a) 차감은 됐는데 기록 호출이 실패해 구멍 뚫린 원장이 되고
-(b) ① 의 조회가 트랜잭션 밖이라 동시 요청 둘이 같은 "처음" 을 보는 갈래가 열린다. **원장은 거래의 일부지 사후 기록이 아니다.**
-
-**왜 여기 놓았나 (순서 근거)**
-
-- **C6 뒤라 호출부를 한 번만 만진다.** 앞에 두면 세이브 슬롯 기준으로 배선한 뒤 C6 에서 같은 자리를 지갑 기준으로 다시 고친다
-- 출시 전이라(`envs/live` 0표) 기록 공백 구간에 실유저 데이터가 없다
-- **IAP 보다는 반드시 앞.** 스토어 거래 id 가 곧 멱등 키다. 원장 없이는 결제 재시도도 환불 회수도 다룰 수 없다
-
-**이미 있는 것 — 새로 만들지 마라**
-
-- `currency/walletStore.ts` 의 `ledgerEntry`·`writeWallet`·`createWallet`·`readWallet`·`walletRef` — **호출부 0건.** 코덱은 이미 써 있다
-- 룰 배포됨: `ledger/{txId}` 는 `read, write: if false`(`firestore.rules:142`) — Admin SDK 전용. 클라에 보이면 잔액 추론 표면만 넓어진다
-- txId 규약이 `walletStore.ts:114` 주석에 있다 — **결제는 스토어 주문 id, 도메인은 `{command}:{seed}`**
-
-**배선 대상** (재화가 움직이는 자리 — `nextWallet` 호출부 전수, 실측 `cd1027476`)
-
-| 파일:줄 | codebase |
+| 축 | 진실원 |
 |---|---|
-| `functions/src/commands/openPack.ts:134` | default |
-| `functions/src/commands/enhanceCard.ts:137` | default |
-| `functions/src/commands/enhanceKeyword.ts:128` | default |
-| `functions/src/commands/claimReward.ts:401` | default |
-| `functions/src/commands/claimBattleReward.ts:115` | default |
-| `functions/src/commands/claimPayout.ts:110` | default |
-| `functions-currency/src/commands/devGrantCurrency.ts:49` | currency |
+| 영수증 발급 | `nextWallet` 이 내는 **브랜드 타입 `WalletUpdate`** — `writeWallet` 이 그것만 받는다 |
+| 증감(`changes`) | before/after **차분**. 호출부가 넘기지 않는다 |
+| 캐시 반환 | `mutateSave` / `mutateWallet` / `claimPayout` 의 영수증 pre-read |
+| 영수증 번호 | 클라 `ServerSaveCommands.InvokeAsync` 가 `{명령이름}:{Guid:N}` 으로 발급 |
 
-**`currencySlot(spend/grant(...))` 로 조회하던 방식은 더 이상 안 통한다 — 그 함수는 C6.3 에서 삭제됐다.** 지금 조회 축은 `nextWallet` 이고, 미러(`functions-currency/src/generated/`)는 생성물이니 세지 마라.
+**잔액만 쓰고 영수증을 빠뜨리는 경로가 타입 수준에서 없다.** `nextWallet` 이 `WalletState` 대신
+브랜드 타입을 내고 `writeWallet` 이 `WalletState` 를 더는 받지 않는다. 앞으로 재화 명령을 추가해도
+영수증 없는 잔액 쓰기를 쓸 수 없다.
 
-지갑이 **처음 서는** 자리는 축이 다르다(잔액 이동이 아니라 개설이다). 셋 다 `createWallet` 이다 — `functions/src/commands/ensureWallet.ts:134`(v7 이관) · `functions/src/save/saveDocument.ts:294`(신규 계정 스타터 골드, 세이브 create 와 같은 트랜잭션) · `functions/src/save/saveDocument.ts:213`(`mutateSave` 의 지갑 부재 안전망, 잔액 0). 이 셋을 원장에 남길지는 C8 착수 때 정한다.
+**`changes` 를 호출부가 넘기지 않는 이유.** `spend`/`grant` 가 `[0, CURRENCY_MAX]` 에서 자르므로
+"의도한 증감"과 "실제 증감"이 다를 수 있고, 손으로 넘기게 두면 그것이 **영수증이 거짓말할 수 있는
+유일한 축**이 된다. 실측: 상한 근처에서 +1004 를 요청해도 영수증에는 실제인 +5 가 남는다.
 
-한계돌파(Snack) callable 이 서면 배선 대상이 하나 는다.
-**강제 방법 — 절반은 C6.1 이 이미 세웠다**
+**트랜잭션 순서** — `get(save)` → `get(wallet)` → **`get(receipt)`** → (히트면 반환) → `mutate` →
+`finalize` → `update(save)` → `writeWallet`/`createWallet`/`writeReceiptOnly`.
+영수증 조회가 마지막 무조건 읽기인 것은 콜백이 자기 문서를 더 읽기 때문이고(`enhanceCard` 의
+`grants`), **히트는 콜백 진입 전에 반환해 쓰기가 0회**다.
 
-C6.1 이 `nextWallet` 을 **지갑 상태를 만드는 유일한 출구**로 만들었다(명령이 `{rev, balances, paidBalances}` 를 손으로 조립하면 유상분 불변식이 명령마다 갈리기 때문이다). 덕분에 "재화를 움직이는 자리" 를 위 표처럼 한 줄 grep 으로 셀 수 있다 — 예전 `currencySlot` 시절에 없던 성질이다.
+**응답 조립을 `finalize` 로 트랜잭션 안에 들였다.** 명령들이 클로저 변수로 응답을 나르는 구조라
+히트로 콜백을 건너뛰면 그 변수가 빈 채로 남는다.
 
-남은 것은 **원장을 그 반환값에 묶는 것**이다. `nextWallet` 이 `(다음 지갑, 원장 줄)` 한 쌍을 내고 `writeWallet` 이 그 쌍을 받아 지갑과 `ledger/{txId}` 를 같은 트랜잭션에 실으면, 잔액만 쓰고 원장을 빠뜨리는 경로가 타입 수준에서 사라진다.
-**원장 줄에 담을 것**
+**캐시본에 `updatedSlots` 를 넣지 않는다.** `openPack` 의 `ownership` 은 슬롯 전체 값이라 계정이
+자랄수록 커지고, 영수증이 **1MiB 상한을 칠 수 있는 유일한 축**이다. 넘으면 트랜잭션이 통째로
+실패해 정상 명령이 죽는다. `slotKeys` 만 담고 히트 시 이미 읽은 세이브 스냅샷에서 재구성한다.
 
-`txId` · `reason`(열거형 — `openPack`·`enhanceCard`·`claimReward:rank`…) · 재화별 증감 · 전/후 잔액 · `createdAt` · 결과 요약(재시도가 그대로 반환할 값).
-**평탄하게 잡는다** — 중첩을 넣으면 나중에 웨어하우스로 내보낼 때 값을 치른다.
+**그 재구성이 만드는 비대칭을 코히런스 가드로 막는다.** 슬롯은 현재 문서에서, `revision`·지갑은
+첫 시도 값에서 온다. **정상 재시도에서는 `current.revision` 이 캐시본 revision 과 정확히 같다**
+— 첫 시도가 그 revision 을 커밋했기 때문이다. 다르면 세상이 움직인 것이라 `failed-precondition`
+으로 내보내 클라가 다시 부트하게 한다(`RemoteAhead` 와 같은 축). revision 이 아예 없는 캐시본도
+같은 갈래다 — **조용한 오답보다 되풀이되는 실패가 낫다.** `readReceipt` 가 깨진 JSON 에서 던지는
+것도 같은 자세다(미스로 강등하면 재집행이 열려 이 장치의 목적이 무너진다).
 
-**되돌리기는 반대 줄로 한다.** 잘못 지급했어도 잔액을 손으로 고치지 않는다. 그래야 감사가 성립한다.
+**낙인과 축이 다르다.** 낙인은 **도메인** 1회성(랭크 티어·챕터·payout 문서)이고 영수증은 **전송**
+1회성(txId)이다. 영수증 읽기가 낙인 판정보다 앞이라, 타임아웃 뒤 같은 txId 는 낙인 함수를 타지
+않고 캐시된 성공 응답을 받는다(`AlreadyClaimed` 가 나올 수 없다 — 개선이다). 유저가 다시 눌러
+새 txId 로 오면 낙인이 정상 거절한다.
 
-**유상/무상 버킷 — C6.1 이 답했다(재론 불필요)**
+**규칙: 재화를 움직였거나 재화 이동을 대신하는 낙인을 썼으면 그 txId 로 영수증을 끊는다.**
+`mutateSave` 는 세이브를 항상 쓰므로 자동이고, 손으로 지켜야 하는 곳은 `claimPayout` 하나다
+(지급 0건 ack 는 낙인만 쓰고 나가던 자리라 `writeReceiptOnly` 로 봉합했다 — 없으면 재시도가
+`acked: []` 를 돌려줘 클라 `PayoutInbox` 가 수령을 놓친다).
+**`ensureSaveDocument` 의 계정 복구는 제외한다** — 재화 이동이 아니라 재화 영수증에 적으면
+감사 축이 오염된다(그쪽은 이미 `discardedFields` 를 로그로 남긴다).
 
-`balances` 와 같은 평면의 `paidBalances` 사이드카 + `clampPaid`(무상 먼저 소진). 근거와 함정은 위 C6 절에 있다. 원장 줄에 유상/무상 구분을 실을지는 결제가 실제로 `paidBalances` 를 채우기 시작할 때 정한다 — 지금은 항상 비어 있다.
-**하지 않을 것**
+**`createWallet` 3곳도 영수증을 남긴다** — 안 남기면 영수증 합계 ≠ 잔액이라 감사가 성립하지 않는다.
+부트 둘(`walletCreate:migration`·`:freshAccount`)은 `{kind:"boot"}` 라 **`set`** 이다. `create` 로 두면
+**지갑만 지워지고 영수증이 남은 계정**이 재생성에서 `ALREADY_EXISTS` 로 영구 실패한다 — 감사 기록
+한 줄 때문에 계정을 굳힐 수 없다. 지갑 개설과 잔액 이동이 한 트랜잭션에 겹친 갈래는 영수증에
+**돈을 움직인 명령 이름**을 적는다(개설 사실은 `rev 1` · `before` 4키 0 으로 읽힌다).
 
-- **예약/확정(hold·capture)** — 지갑이 같은 트랜잭션에 참여하는 라이브러리인 지금 구조가 이 규모의 정답이다. 미아 hold 청소만 는다
-- **원장을 진실원으로(이벤트 소싱)** — 잔액 문서가 권위, 원장은 감사 기록이다. 재생은 복구 도구로만 쓴다
-- **복식부기** — `reason` 열거형 + 전/후 잔액이면 수도꼭지·배수구 집계까지 선다
-- **웨어하우스 스트리밍** — 나중. 위의 "평탄하게" 만 지키면 그때 공짜다
+**클라 (C8-4)** — `ServerSaveCommands.InvokeAsync` **한 곳**만 고쳤다. 도메인 호출부 7곳은 무변경이다.
+응답만 잃은 갈래면 **같은 txId 로 한 번** 다시 태운다.
 
-**남은 미결과 겹친다** — 한계돌파(Snack)는 여전히 클라 판정이라 callable 이 없다(C4 항목). 그것이 서면 배선 대상이 하나 는다.
+- **재시도 판정은 `CloudFailureClassifier.IsLostResponse` 다.** 처음에 `TimeoutException`·
+  `HttpRequestException`·`IOException` 만 보는 판정을 뒀는데, 실제로 SDK 는 네트워크 단절을
+  **`FunctionsException(Unavailable·DeadlineExceeded)`** 로 감싸 던진다 — 그대로 뒀으면 가장 흔한
+  유실 갈래에서 안전망이 발화하지 않았다. `Cancelled`(의도한 취소) · `ResourceExhausted`(다시
+  태우면 더 나빠진다) · `Internal`(서버 로직이 깨진 것이라 같은 답) 은 뺐다
+- `GetBaseException()` 한 번으로 끝내지 않는다 — `AggregateException` 은 inner 가 둘 이상이면
+  자기 자신을 돌려줘서 판정이 통째로 빗나간다
+- payload 는 게이트(`s_inFlight`) 잡기 **전**에 짓는다. 세운 뒤 `ToPrimitiveMap` 이 던지면 `finally`
+  가 없어 게이트가 영영 안 풀리고 이후 모든 명령이 예외도 없이 무한 대기한다
+- **영수증 재생은 이 창구의 명령 직렬화에 기댄다** — 두 시도 사이에 다른 세이브 쓰기가 끼면 위
+  코히런스 가드가 세션을 되돌린다. 병렬 호출을 허용하는 순간 깨진다
+
+**txId 가 없으면 서버가 발급한다.** `invalid-argument` 로 거절하면 `CloudFailureClassifier` 가
+`Unusable` → `BlockSession` 으로 읽어 세션이 끊긴다. 이 폴백 덕에 **서버·클라 배포 순서 제약이 없다**
+(구 클라는 오늘과 똑같이 돌고 멱등만 못 받는다). 신 클라 → 구 서버도 여분 필드가 무시돼 안전하다.
+
+**새 로그 축** — `receipt replay`(히트) · `txIdSource: client|server`. 캐시 히트에서 `finalize` 가 안 돌아
+`drawn:""`·`goldBefore:0` 이 찍히던 것을 가른 결과다(카드 5장을 돌려준 재시도가 "0장 뽑았다"로
+남았다). 중복 과금이 몇 건 막혔는지를 프로덕션에서 셀 수 있는 유일한 축이기도 하다.
+
+**받아들인 대가**
+
+- **명령당 Firestore 쓰기가 1건 는다** — `mutateWallet` 계열 1→2, `mutateSave` 계열 2→3. 읽기도 +1
+- **영수증이 유저당 무한 증가한다.** TTL·아카이빙 정책이 없다 — 감사 목적과 상충하므로 결제 착수
+  때 재검토한다
+- **재시도가 봉인 시간을 늘린다.** 한 시도가 15초 예산에 재인증 1회를 더 쓸 수 있어 최악이면 유저가
+  1분 가까이 기다린다. 재시도를 없애는 쪽이 이중 과금이라 받았다
+- **같은 txId + 다른 인자**는 첫 응답을 그대로 받는다. `source` 대조는 명령만 가르고 인자는 가르지
+  않는다 — 그래서 **클라는 txId 를 요청 하나당 하나** 발급해야 한다(코드 주석에 못박았다)
+- `writeReceiptOnly` 는 타입이 강제하지 못한다(`claimPayout` 손코드 1곳). 직접 트랜잭션이 하나 더
+  생기면 같은 구멍이 다시 열린다
+
+**하지 않은 것** — 예약/확정(hold·capture) · 영수증을 진실원으로(이벤트 소싱) · 복식부기 ·
+웨어하우스 스트리밍. 근거는 이 문서 이전 판에 적힌 그대로다(평탄한 필드만 지키면 나중에 공짜다).
+
+**멱등의 핵심은 손이 아니라 회귀가 지킨다 (C8-3).**
+
+`functions/scripts/test-receipt-replay.js` — `npm run test:emulator` 로 돈다(에뮬레이터 전용).
+**"같은 txId 로 다시 오면 쓰기가 0회"** 라는 이 장치의 핵심 주장은 순수 회귀로는 증명할 수 없어
+여기서만 잰다. 9케이스가 문서를 **다시 읽어** 대조한다 — `revision`·지갑 `rev`·잔액·영수증 개수,
+그리고 결정적으로 **`mutate` 콜백 미호출**(재추첨·재차감 부재의 직접 증거). `TxIdReused` 가
+`permission-denied` 인 것과 revision 드리프트가 `failed-precondition` 인 것도 여기서 갈린다.
+뒤집기 확인 완료 — 히트 갈래를 무력화하면 재집행이 `ALREADY_EXISTS` 로 터진다.
+
+**함정: 에뮬레이터 스위트는 기본 `npm test` 에 없다.** 그래서 `test-ensure-account.js` 가
+C6.2(`0b2b6b3d6`, 지갑을 트랜잭션에 들인 판)부터 **나흘간 빨간 채로 방치**돼 있었다(6번째 인자
+`starterBalances` 누락 · 최상위 15키 · 반환값 2키). C8-3 에서 최신 계약으로 맞췄다. **재화·세이브
+계약을 고쳤으면 `npm test` 초록만 보지 말고 `npm run test:emulator` 를 함께 돌려라.**
+
+**남은 것**
+
+- **배포와 실기 왕복.** 함수 2 codebase + 룰 1회(`ledger`→`receipts` 개명분). 룰은 함수와 독립이다
+  — 매칭 규칙이 없으면 기본 거부라 `receipts` 블록이 없어도 클라는 못 읽고, 서버는 Admin SDK 라 우회한다
+- **사람이 볼 것은 회귀가 못 덮는 것뿐이다.** 위 에뮬레이터 회귀가 멱등 자체(같은 txId 재호출 ·
+  부트 영수증 · 거절 코드)를 이미 덮으므로 손으로 다시 하지 마라. 실기로만 잴 수 있는 것은
+  ① `openPack` 1회 → 실서버 영수증에 `changes.Gold` 음수 · `after` == 잔액 · `result` 에 뽑힌 카드
+  ② `devGrantCurrency` → **currency codebase** 에서도 영수증이 선다(미러 경로는 회귀 밖이다)
+  ③ 멀티 payout **지급 0건** ack 재시도가 `acked` 를 그대로 돌려준다(`submitMatchResult` 가 필요해
+  회귀로 못 세운다) ④ **기내모드로 타임아웃 유발 → 복구 후 클라 자동 재시도가 이중 지급 없이 통과**
+  (C8-4 의 재시도는 클라 코드라 서버 회귀 밖이다)
+- **한계돌파(Snack) callable 이 서면 배선 대상이 하나 는다** — 여전히 클라 판정이다(C4 미결)
+
 
 ## 통합처(`origin/박형석작업용`)와 겹치는 것 — 새로 만들지 마라
 
@@ -446,11 +496,12 @@ C6.1 이 `nextWallet` 을 **지갑 상태를 만드는 유일한 출구**로 만
 - **배포 로그는 호출 가능을 증명하지 않는다.** `Deploy complete!` 를 찍고도 403인 전례가 있다(`openPack`). 판정은 URL POST 의 401/403 으로만
 - **`firebase functions:log` 는 3~4분 늦는다.** 방금 한 왕복이 안 보인다고 "호출이 안 갔다" 로 읽으면 멀쩡한 코드를 뒤진다
 - **룰 하네스는 종료코드가 거짓말한다.** JDK 가 없으면 실패해도 exit 0 이다. 러너는 `cd Tools/firestore-rules-tests && npm test`(자체 에뮬레이터 8081 · Java 21+ 필요 · `firebase login` 불필요)이고, **판정 줄은 `# pass N` 이 아니라 `ℹ pass N` / `ℹ fail 0`** 이다(`node --test` 출력). `fail` 이 0 인지를 봐라
+- **`npm test` 초록은 절반이다 — 에뮬레이터 스위트가 그 체인 밖이다.** `functions` 의 `test` 는 순수 회귀만 잇고, 문서 조립·트랜잭션·영수증 멱등은 `npm run test:emulator`(`test-ensure-account` · `test-receipt-replay`)에만 있다. 그래서 `test-ensure-account.js` 가 C6.2 부터 나흘간 빨간 채로 아무도 모르게 방치됐다. **세이브·지갑 계약을 고쳤으면 반드시 둘 다 돌려라.** 포트 8080 이 막혀 있으면 남의 실행이 아니라 부모가 죽은 고아일 때가 많다(`emulators:exec` 는 늘 자기 것을 새로 띄운다) — 활성 연결이 없으면 정리하고 다시 돌려라
 - **`functions/scripts/test-firestore-rules.js` 는 잔재다.** 어떤 `npm test` 에도 안 물려 있다(`SERVER_VALIDATION_ROADMAP.md` 에 이름만 남았다). 룰을 고친 뒤 그 파일을 손봐서 초록을 봤다면 아무것도 검증하지 않은 것이다 — **고치지 마라**
 - **Unity 빈 콘솔은 "통과" 가 아니다.** 컴파일이 아직 안 돈 것일 수 있다 — `Library/ScriptAssemblies/Assembly-CSharp.dll` mtime 이 최근 `.cs` 수정보다 뒤인지 함께 본다. 강제 재컴파일은 MCP `Unity_RunCommand` 로 `AssetDatabase.Refresh()` + `UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation()`(**전체 한정 필수** — 샌드박스가 자체 네임스페이스로 감싸 `CompilationPipeline` 이 충돌한다)
 - **거절은 무조건 `permission-denied`.** `failed-precondition`·`invalid-argument` 는 `CloudFailureClassifier` 가 `Unusable` → `BlockSession` 으로 본다. 잔액 부족·중복 수령으로 세션을 끊으면 안 된다
 - **순수 모듈에 `firebase-admin`·`HttpsError` 금지.** `functions/scripts/` 회귀가 `lib/` 를 직접 require 한다
-- **미러는 커밋되지 않는다.** 원본은 `functions/src/`(공유 목록은 `functions-currency/scripts/shared-files.js` — 지금 5파일: `currencyKeys`·`wallet`·`walletStore`·`environments`·`saveValues`), 미러 `functions-currency/src/generated/` 는 `.gitignore` 대상이고 `prebuild` 의 `sync:shared` 가 빌드마다 새로 만든다(`364c6c538` 이후). 손으로 고칠 대상 자체가 없어졌다 — 대신 `functions-currency` 의 `npm test`(`scripts/test-wallet-mirror.js`)가 **미러 순수성**(`firebase-admin`·`firebase-functions` 미적재)과 **환경·재화 키 화이트리스트 일치**를 지킨다
+- **미러는 커밋되지 않는다.** 원본은 `functions/src/`(공유 목록은 `functions-currency/scripts/shared-files.js` — 지금 6파일: `currencyKeys`·`wallet`·`walletStore`·`environments`·`saveValues`·`receiptId`), 미러 `functions-currency/src/generated/` 는 `.gitignore` 대상이고 `prebuild` 의 `sync:shared` 가 빌드마다 새로 만든다(`364c6c538` 이후). 손으로 고칠 대상 자체가 없어졌다 — 대신 `functions-currency` 의 `npm test`(`scripts/test-wallet-mirror.js`)가 **미러 순수성**(`firebase-admin`·`firebase-functions` 미적재)과 **환경·재화 키 화이트리스트 일치**를 지킨다
 - **`SCHEMA_VERSION` 2중 동기화**(클라 `UserSaveData.VERSION:17` · `functions/src/save/saveDocument.ts:33` — 지금 둘 다 **8**). 하나만 올리면 조용히 막히고, **하나만 배포해도 막힌다**(위 "배포 순서"). **룰은 3번째 축이 아니다** — `firestore.rules` 에서 `== 7` 을 강제하던 자리는 이미 빠졌고 지금은 단조 증가(`>=`)만 본다
 - **`Assets/Resources/SpecData.bytes` 는 암호화 바이너리라 머지가 조용히 한쪽을 삼킨다.** 2026-08-28 머지 `04170beb5` 가 `SpecDatas.cs` 는 박형석작업용 것을, `.bytes` 는 feature_Firestore 것을 택해 **코드와 데이터의 짝이 갈렸다**. 증상은 "게임 진입 불가" 로만 보인다(`Core/Initialization/SpecSheetPreloadStep.cs:19` → `GameInitialization.MarkRecoveryRequired`). 판정은 표 복호화로만 — AES-128-CBC · key `cRM1fuNZDwvqnjzY` · IV = key 바이트 역순. 그리고 `OutGame/Spec/SpecSource`·`RewardSpec` 은 **정적 캐시**라(`s_loaded`) 파일을 바꿔도 도메인 리로드 전엔 옛 값을 보고한다
 - **`envs/live` 는 여전히 0표다.** `d2a4fdc3c` 이후 `Reward` 표가 비면 수령이 **fail-closed 로 거절**된다 — live 는 R3 업로드 전까지 수령이 전부 막힌다. 의도한 동작이지만 릴리즈 순서에 걸린다

@@ -11,7 +11,7 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test:emulator": "npm run build && firebase emulators:exec --only firestore \"node scripts/test-ensure-account.js\""
+    "test:emulator": "npm run build && firebase emulators:exec --only firestore \"node scripts/test-ensure-account.js && node scripts/test-receipt-replay.js\""
   },
   "engines": {
     "node": "24"
