@@ -4,8 +4,8 @@ using Firebase.Firestore;
 using UnityEngine;
 
 // Firestore 세이브 문서의 필드명·변환 단일 창구. 문서 구조를 아는 코드는 여기뿐이다.
-// 클라이언트가 문서 전체를 소유한다(쓰기는 SetOptions.Overwrite) — 서버가 소유할 필드가 생기면
-// 같은 문서가 아니라 형제 문서 ".../save/server"로 분리한다.
+// 클라이언트가 문서 전체를 소유한다(쓰기는 변경된 최상위 슬롯만 담은 Transaction.Update) — 서버가 소유할
+// 필드가 생기면 같은 문서가 아니라 형제 문서 ".../save/server"로 분리한다.
 static class PlayerSaveDocument
 {
     const string DEVICE_ID_KEY = "firebase.playerSave.deviceId";
@@ -18,7 +18,8 @@ static class PlayerSaveDocument
     internal const string FIELD_APP_VERSION = "appVersion";
 
     // 슬롯 9 — UserSaveData의 [FirestoreProperty] 이름과 반드시 같다(읽기는 ConvertTo가, 쓰기는 이 표가 한다).
-    // currency는 여기 없다 — 지갑 문서로 갔다. Overwrite라 이 표에서 빠지는 순간 원격 필드도 함께 지워진다.
+    // currency는 여기 없다 — 지갑 문서로 갔다. Update라 이 표에서 빠진 필드는 지워지는 게 아니라
+    // 원격에 그대로 남는다 — 슬롯을 표에서 누락시키면 그 슬롯이 조용히 영원히 stale이 된다.
     internal const string FIELD_OWNERSHIP = "ownership";
     internal const string FIELD_DECK = "deck";
     internal const string FIELD_CARD_GROWTH = "cardGrowth";
@@ -40,29 +41,51 @@ static class PlayerSaveDocument
         s_appVersion = Application.version;
     }
 
-    /// <summary>문서 전체를 덮어쓸 필드 맵. Overwrite와 짝이라 슬롯 9개가 빠짐없이 들어가야 한다.</summary>
-    internal static Dictionary<string, object> ToFieldMap(UserSaveData _data, long _revision)
+    /// <summary>메타 5개와 dirty 최상위 슬롯만 담은 Update용 필드 맵. 슬롯 9개를 전부 넘기면
+    /// 예전 전체 덮어쓰기와 같은 맵이 나온다 — 전체 재전송에 별도 경로가 필요 없는 이유다.</summary>
+    internal static Dictionary<string, object> ToSlotFieldMap(
+        UserSaveData _data,
+        ESaveSlot _dirtySlots,
+        long _revision)
     {
         if (_data == null) throw new ArgumentNullException(nameof(_data));
+        if (_dirtySlots == ESaveSlot.None)
+            throw new ArgumentException("At least one save slot must be dirty.", nameof(_dirtySlots));
 
-        return new Dictionary<string, object>
+        var t_fields = new Dictionary<string, object>
         {
             [FIELD_SCHEMA_VERSION] = (long)UserSaveData.VERSION,
             [FIELD_REVISION] = _revision,
             [FIELD_UPDATED_AT] = FieldValue.ServerTimestamp,
             [FIELD_DEVICE_ID] = s_deviceId,
             [FIELD_APP_VERSION] = s_appVersion,
-
-            [FIELD_OWNERSHIP] = _data.Ownership,
-            [FIELD_DECK] = _data.Deck,
-            [FIELD_CARD_GROWTH] = _data.CardGrowth,
-            [FIELD_KEYWORD_GROWTH] = _data.KeywordGrowth,
-            [FIELD_RANK] = _data.Rank,
-            [FIELD_ALBUM_REWARD] = _data.AlbumReward,
-            [FIELD_TOURNAMENT] = _data.Tournament,
-            [FIELD_TUTORIAL] = _data.Tutorial,
-            [FIELD_PROFILE] = _data.Profile,
         };
+
+        for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
+        {
+            ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
+            if ((_dirtySlots & t_slot) == 0) continue;
+            t_fields[FieldNameForSlot(t_slot)] = DataSaveManager.GetSlotValue(_data, t_slot);
+        }
+
+        return t_fields;
+    }
+
+    static string FieldNameForSlot(ESaveSlot _slot)
+    {
+        switch (_slot)
+        {
+            case ESaveSlot.Ownership: return FIELD_OWNERSHIP;
+            case ESaveSlot.Deck: return FIELD_DECK;
+            case ESaveSlot.CardGrowth: return FIELD_CARD_GROWTH;
+            case ESaveSlot.KeywordGrowth: return FIELD_KEYWORD_GROWTH;
+            case ESaveSlot.Rank: return FIELD_RANK;
+            case ESaveSlot.AlbumReward: return FIELD_ALBUM_REWARD;
+            case ESaveSlot.Tournament: return FIELD_TOURNAMENT;
+            case ESaveSlot.Tutorial: return FIELD_TUTORIAL;
+            case ESaveSlot.Profile: return FIELD_PROFILE;
+            default: throw new ArgumentOutOfRangeException(nameof(_slot), _slot, "Unknown save slot.");
+        }
     }
 
     /// <summary>문서의 클라우드 부기 메타를 읽는다. 손편집으로 타입이 깨졌으면 false.</summary>

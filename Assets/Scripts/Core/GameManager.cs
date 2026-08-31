@@ -56,6 +56,9 @@ public class GameManager : MonoBehaviour
     // 로컬 캐시가 없어 복구선도 없다 — 미업로드분은 여기서 유실된다.
     void OnApplicationQuit()
     {
+        Debug.Log(
+            $"[PlayerSaveCloudMetrics] quit pendingDirty={PlayerSaveCloud.HasPendingUpload} " +
+            $"dirty={PlayerSaveCloud.DirtySerialForMetrics} uploaded={PlayerSaveCloud.UploadedSerialForMetrics}");
         FirebaseManager.FlushPendingAsync().Forget();
     }
 
@@ -168,6 +171,12 @@ public class GameManager : MonoBehaviour
     // 재화는 지갑 문서로 갔고 클라는 그 문서를 쓰지 못한다 — 여기서 따로 flush할 로컬 잔액이 없다.
     async UniTaskVoid FlushAsync()
     {
+        Debug.Log(
+            $"[PlayerSaveCloudMetrics] pauseFlushStart pendingDirty={PlayerSaveCloud.HasPendingUpload} " +
+            $"dirty={PlayerSaveCloud.DirtySerialForMetrics} uploaded={PlayerSaveCloud.UploadedSerialForMetrics}");
         await FirebaseManager.FlushPendingAsync();
+        Debug.Log(
+            $"[PlayerSaveCloudMetrics] pauseFlushComplete pendingDirty={PlayerSaveCloud.HasPendingUpload} " +
+            $"dirty={PlayerSaveCloud.DirtySerialForMetrics} uploaded={PlayerSaveCloud.UploadedSerialForMetrics}");
     }
 }

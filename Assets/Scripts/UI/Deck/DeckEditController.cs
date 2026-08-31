@@ -33,6 +33,10 @@ public sealed class DeckEditData : UIData
     /// <summary>덱 전투력 표시. 매치 화면은 끈다(덱 확인 패널이 그 자리를 쥔다).</summary>
     public bool showDeckPower = true;
 
+    /// <summary>하단 덱 선택 바. 편집 중에 다른 덱으로 갈아타는 축이라 로비 탭만 켠다
+    /// (매치 화면은 같은 자리를 전투 시작 버튼이 쓴다).</summary>
+    public bool showDeckStrip;
+
     /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
     /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
     /// 로비 탭은 미주입 → 버튼이 꺼진다.
@@ -83,6 +87,9 @@ public class DeckEditController : PooledUIBase
     [Tooltip("전투 시작 버튼. DeckEditData.onPlay가 주입됐을 때만 켜진다 —\n"
            + "로비 탭에서는 여기서 전투로 갈 곳이 없다. 미배선이면 그 축을 통째로 건너뛴다.")]
     [SerializeField] Button playButton;
+
+    [Tooltip("하단 덱 선택 바. 호스트가 DeckEditData.showDeckStrip로 켜고 끈다.")]
+    [SerializeField] DeckStripView deckStrip;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -256,6 +263,9 @@ public class DeckEditController : PooledUIBase
 
         // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
         if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
+
+        // 하단 바와 전투 시작 버튼은 같은 자리를 쓴다 — 두 호스트가 배타적이라 축을 따로 두어도 겹치지 않는다.
+        if (this.deckStrip != null) this.deckStrip.gameObject.SetActive(this.m_request.showDeckStrip);
     }
 
     /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
@@ -269,6 +279,7 @@ public class DeckEditController : PooledUIBase
 
         // 그리드 Clear의 Destroy는 프레임 끝이라 등록이 한 프레임 더 살아 있다 — 여기서 명시로 걷는다.
         if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(0);
+        if (this.deckStrip      != null) this.deckStrip.Clear();
         this.m_holdout = 0;
 
         this.data = null;
@@ -386,7 +397,13 @@ public class DeckEditController : PooledUIBase
 
     void OnFeatureLockChanged()
     {
-        if (IsOpen) RefreshAll();
+        if (!IsOpen) return;
+
+        RefreshAll();
+
+        // ⊕ 칸의 interactable·클릭 콜백은 Build 시점 값으로 굳는다 — FeatureLockView는 흑백만 걷어서,
+        // 재빌드하지 않으면 잠김 룩은 풀렸는데 눌리지 않는 칸이 남는다(autoEquipButton과 같은 이유).
+        RebuildDeckStrip();
     }
 
     // 편집 중 소유가 바뀌면(디버그 전체 해금 등) 컬렉션을 다시 그린다.
@@ -418,6 +435,7 @@ public class DeckEditController : PooledUIBase
 
         if (dragController != null) dragController.Cancel();
         if (synergyStrip   != null) synergyStrip.Clear();
+        if (deckStrip      != null) deckStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
     }
 
@@ -471,7 +489,64 @@ public class DeckEditController : PooledUIBase
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
 
         RefreshAll();
+        RebuildDeckStrip();
         ScrollToHoldout();
+    }
+
+    // 하단 덱 선택 바를 세운다. 저장으로 슬롯 좌표가 밀릴 수 있어(TryInsertFront는 항상 맨 앞에 꽂는다)
+    // 선택 표시만 옮기지 않고 통째로 다시 그린다.
+    void RebuildDeckStrip()
+    {
+        if (this.deckStrip == null || this.m_request == null || !this.m_request.showDeckStrip) return;
+
+        this.deckStrip.Build(this.m_slotIndex,
+                             this.m_mode == EDeckEditMode.Create,
+                             OnDeckStripSlotClicked,
+                             OnDeckStripCreateClicked);
+    }
+
+    // 하단 바에서 다른 덱을 골랐다. 이탈 판정은 뒤로가기와 같은 창구를 탄다 —
+    // 바꾼 게 있으면 저장 확인을 받고, 허가가 떨어져야 그 덱으로 재바인딩된다.
+    void OnDeckStripSlotClicked(int _slotIndex)
+    {
+        if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex) return;   // 이미 이 덱을 편집 중
+
+        // 확인 팝업 응답을 기다리는 사이 "저장"으로 신규 덱이 맨 앞에 꽂히면 뒤 덱 좌표가 전부 밀린다
+        // (TryInsertFront). 좌표를 그대로 들고 가면 엉뚱한 덱이 열리므로, 카드 구성으로 대상을 되찾는다.
+        List<int> t_target = _slotIndex >= 0 && _slotIndex < DeckSaveManager.SLOT_COUNT
+            ? DeckSaveManager.GetSlot(_slotIndex)
+            : null;
+
+        RequestLeave(() =>
+        {
+            int t_slot = _slotIndex;
+            if (t_target != null && DeckSaveManager.TryFindSlot(t_target, out int t_found)) t_slot = t_found;
+
+            ConsumeHoldout();
+            Open(t_slot);
+        });
+    }
+
+    // 하단 바의 신규 생성 칸. 만석은 칸 자체가 비활성이지만, 확인 팝업이 떠 있는 사이 만석이 될 수 있다.
+    void OnDeckStripCreateClicked()
+    {
+        if (this.m_mode == EDeckEditMode.Create) return;   // 이미 신규 편집 중
+
+        RequestLeave(() =>
+        {
+            if (DeckSaveManager.IsFull) return;
+
+            ConsumeHoldout();
+            OpenNew();
+        });
+    }
+
+    // 빼 둘 카드는 이번 "진입"의 요청이다 — 덱을 갈아탄 뒤에도 남아 있으면 새 덱에서 엉뚱한 칸이 비거나
+    // 그 카드가 없다는 경고만 남는다(ApplyHoldout). 화면 안에서 덱이 바뀌는 순간 요청을 소비한다.
+    void ConsumeHoldout()
+    {
+        if (this.m_request != null) this.m_request.holdoutCard = 0;
+        this.m_holdout = 0;
     }
 
     // 지목된 타일이 목록 밖에 있으면 게이트가 승격했을 때 클리핑이 끊겨 화면에 샌다 — 그리기 직후 안으로 들여놓는다.
@@ -844,6 +919,9 @@ public class DeckEditController : PooledUIBase
         m_savedName = ResolveName();
 
         RefreshAll();
+
+        // 저장이 목록을 바꾼다 — 신규는 맨 앞에 꽂혀 뒤 덱의 좌표를 전부 밀고, 이름 변경은 칸 라벨을 바꾼다.
+        RebuildDeckStrip();
     }
 
     // 신규 덱은 rename·dirty 판정이 없다 — 6/6이 채워졌으면 항상 저장 대상이다.

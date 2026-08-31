@@ -4,8 +4,47 @@ using Newtonsoft.Json.Serialization;
 using UnityEngine;
 
 // 아웃게임 세이브 매니저. 진실원은 Firestore 문서 하나다.
+public enum ESaveUploadTiming
+{
+    Default,
+    Coalesced,
+}
+
 public static class DataSaveManager
 {
+    internal const int SaveSlotCount = 9;
+
+    static readonly ESaveSlot[] s_saveSlots =
+    {
+        ESaveSlot.Ownership,
+        ESaveSlot.Deck,
+        ESaveSlot.CardGrowth,
+        ESaveSlot.KeywordGrowth,
+        ESaveSlot.Rank,
+        ESaveSlot.AlbumReward,
+        ESaveSlot.Tournament,
+        ESaveSlot.Tutorial,
+        ESaveSlot.Profile,
+    };
+
+    static DataSaveManager()
+    {
+        if (s_saveSlots.Length != SaveSlotCount)
+            throw new InvalidOperationException("Save slot catalog length does not match SaveSlotCount.");
+
+        ESaveSlot t_catalogMask = ESaveSlot.None;
+        for (int i = 0; i < s_saveSlots.Length; i++)
+            t_catalogMask |= s_saveSlots[i];
+
+        ESaveSlot t_enumMask = ESaveSlot.None;
+        foreach (ESaveSlot t_slot in Enum.GetValues(typeof(ESaveSlot)))
+            t_enumMask |= t_slot;
+
+        if (t_catalogMask != t_enumMask)
+            throw new InvalidOperationException(
+                $"Save slot catalog is incomplete. catalog=0x{(int)t_catalogMask:X}, enum=0x{(int)t_enumMask:X}");
+    }
+
     // JsonUtility는 auto-property를 직렬화하지 못한다 — Firestore 매핑용 프로퍼티 모델과 같은 모양을 쓰려면 Newtonsoft여야 한다.
     static readonly JsonSerializerSettings s_serializerSettings = new JsonSerializerSettings
     {
@@ -25,7 +64,7 @@ public static class DataSaveManager
 
     static Action s_immediateUploadHandler;
 
-    public static event Action OnSaved;
+    public static event Action<ESaveUploadTiming> OnSaved;
 
     /// <summary>서버가 슬롯을 갈아끼웠다 — 슬롯을 캐싱한 매니저는 여기서 재수화한다.</summary>
     public static event Action<ESaveSlot> OnServerSlotsAdopted;
@@ -44,7 +83,13 @@ public static class DataSaveManager
     /// <summary>메모리 세이브가 바뀌었음을 통지한다(업로드는 클라우드 계층이 디바운스해서 한다).</summary>
     public static void Save()
     {
-        OnSaved?.Invoke();
+        OnSaved?.Invoke(ESaveUploadTiming.Default);
+    }
+
+    /// <summary>Requests a longer debounce for repeatable UI changes.</summary>
+    public static void SaveCoalesced()
+    {
+        OnSaved?.Invoke(ESaveUploadTiming.Coalesced);
     }
 
     /// <summary>디바운스를 기다리지 않고 업로드까지 요청하는 저장. 유실되면 안 되는 지점에서만 쓴다.</summary>
@@ -59,6 +104,47 @@ public static class DataSaveManager
     {
         // 정규화 후에 찍는다 — 슬롯이 비어 있으면 내용이 같아도 다른 스냅샷이 나온다.
         return JsonConvert.SerializeObject(Normalize(Data), s_serializerSettings);
+    }
+
+    internal static void WriteSlotSnapshots(string[] _destination)
+    {
+        if (_destination == null) throw new ArgumentNullException(nameof(_destination));
+        if (_destination.Length != SaveSlotCount)
+            throw new ArgumentException($"Expected {SaveSlotCount} save slot snapshots.", nameof(_destination));
+
+        UserSaveData t_data = Normalize(Data);
+        for (int i = 0; i < SaveSlotCount; i++)
+        {
+            _destination[i] = JsonConvert.SerializeObject(
+                GetSlotValue(t_data, s_saveSlots[i]),
+                s_serializerSettings);
+        }
+    }
+
+    internal static ESaveSlot SaveSlotAt(int _index)
+    {
+        if (_index < 0 || _index >= SaveSlotCount)
+            throw new ArgumentOutOfRangeException(nameof(_index));
+        return s_saveSlots[_index];
+    }
+
+    internal static object GetSlotValue(UserSaveData _data, ESaveSlot _slot)
+    {
+        if (_data == null) throw new ArgumentNullException(nameof(_data));
+
+        switch (_slot)
+        {
+            case ESaveSlot.Ownership: return _data.Ownership;
+            case ESaveSlot.Deck: return _data.Deck;
+            case ESaveSlot.CardGrowth: return _data.CardGrowth;
+            case ESaveSlot.KeywordGrowth: return _data.KeywordGrowth;
+            case ESaveSlot.Rank: return _data.Rank;
+            case ESaveSlot.AlbumReward: return _data.AlbumReward;
+            case ESaveSlot.Tournament: return _data.Tournament;
+            case ESaveSlot.Tutorial: return _data.Tutorial;
+            case ESaveSlot.Profile: return _data.Profile;
+            default: throw new ArgumentOutOfRangeException(nameof(_slot), _slot, "Unknown save slot.");
+        }
     }
 
     /// <summary>부트에서 채택한 세이브를 메모리에 세운다. 채택은 부트당 1회다.</summary>

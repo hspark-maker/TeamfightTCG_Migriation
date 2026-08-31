@@ -65,7 +65,7 @@ public static class KeywordGrowthManager
         if (!s_initialized) return;
 
         SyncSaveData();
-        DataSaveManager.Save();
+        DataSaveManager.SaveCoalesced();
     }
 
     public static int LevelOf(CardKeyword _keyword)

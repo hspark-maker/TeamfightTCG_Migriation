@@ -123,6 +123,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f95d3da55cfb6f44f84adfc2fbdc308d
+    m_Address: TouchEffectOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fb2856c6be5c5864b80e81dca6d06777
     m_Address: PackRewardOverlay
     m_ReadOnly: 0

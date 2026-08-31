@@ -54,7 +54,7 @@ public static class OwnershipManager
     {
         var t_data = DataSaveManager.Data.Ownership;
         t_data.CardIds = new List<int>(s_owned);
-        DataSaveManager.Save();
+        DataSaveManager.SaveCoalesced();
     }
 
     public static bool IsOwned(int _id)

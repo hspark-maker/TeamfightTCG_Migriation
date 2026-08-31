@@ -141,6 +141,7 @@ public class DeckTabController : LobbyTabPanel
             slotIndex      = _slotIndex,
             onExit         = CloseEditor,
             dragController = m_dragController,
+            showDeckStrip  = true,
         });
     }
 
@@ -154,6 +155,7 @@ public class DeckTabController : LobbyTabPanel
             isNew          = true,
             onExit         = CloseEditor,
             dragController = m_dragController,
+            showDeckStrip  = true,
         });
     }
 

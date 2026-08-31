@@ -317,7 +317,9 @@ static class MatchResultSubmission
         // confirmed 트랜잭션이 양쪽 payout을 함께 만들었고 별도 inbox가 적용·ack한다.
         // 제출 큐를 내린 뒤 PayoutInbox가 서버 원장을 로컬 세이브에 반영한다.
         _complete = true;
-        Debug.Log($"[MatchResult] 서버 대조 일치, payout 회수를 시작한다(match={_matchId}).");
+        Debug.Log(
+            $"[MatchResult] 서버 대조 일치, payout 회수를 시작한다(match={_matchId}, " +
+            $"saveUploadsThisSession={PlayerSaveCloud.UploadCountThisSession}).");
         return true;
     }
 

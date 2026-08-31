@@ -77,7 +77,7 @@ public static partial class CardGrowthManager
         if (!s_initialized) return;
 
         FlushToData();
-        DataSaveManager.Save();
+        DataSaveManager.SaveCoalesced();
     }
 
     public static CardGrowth GrowthAtLevel(int _id, int _level)

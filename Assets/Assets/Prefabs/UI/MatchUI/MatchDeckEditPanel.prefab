@@ -745,7 +745,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f306fed744016ef43ae0d24eb4e5a608, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MatchDeckStripController
+  m_EditorClassIdentifier: Assembly-CSharp::DeckStripView
   content: {fileID: 1046293185869531028}
   slotPrefab: {fileID: 8285255677979854738, guid: 8835f7accd0834b43b358ad0cb37485b, type: 3}
   scroll: {fileID: 2615598227084007706}

@@ -228,7 +228,7 @@ public static class DeckSaveManager
 
         Save(_index, _deck);
         WriteSlot(NormalizedSlots(), _index);
-        DataSaveManager.Save();
+        DataSaveManager.SaveCoalesced();
         OnDeckChanged?.Invoke();
     }
 
@@ -255,7 +255,7 @@ public static class DeckSaveManager
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
             WriteSlot(t_slots, t_i);
 
-        DataSaveManager.Save();
+        DataSaveManager.SaveCoalesced();
     }
 
     // 원본을 지우지 않는 순수 복사(연쇄 이동에서 다음 이동의 원본이 살아 있어야 한다)

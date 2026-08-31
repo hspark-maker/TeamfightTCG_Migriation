@@ -10,6 +10,11 @@ using UnityEngine;
 static class PlayerSaveCloud
 {
     const int UPLOAD_DEBOUNCE_MS = 1000;
+    const int COALESCED_UPLOAD_DEBOUNCE_MS = 3000;
+
+    // 슬라이딩 디바운스의 기아 방지선. 편집이 끊이지 않아도 첫 변경으로부터 이 안에는 올린다.
+    // 앱이 언제 백그라운드로 갈지 모르므로 미업로드분이 머무는 시간에 상한이 있어야 한다.
+    const int MAX_UPLOAD_DELAY_MS = 5000;
     const int DOCUMENT_WARNING_BYTES = 256 * 1024;
     const int DOCUMENT_MAX_BYTES = 300000;
     const int BANNER_FAILURE_THRESHOLD = 3;
@@ -17,11 +22,14 @@ static class PlayerSaveCloud
     static FirebaseContext s_context;
     static string s_envId = string.Empty;
     static string s_activeUserId = string.Empty;
-    static string s_uploadedSnapshot = string.Empty;
+    static readonly string[] s_uploadedSlotSnapshots = new string[DataSaveManager.SaveSlotCount];
     static UniTaskCompletionSource s_uploadCompletion;
     static int s_dirtySerial;
     static int s_uploadedSerial;
     static int s_pendingVersion;
+    static long s_pendingUploadDeadlineTicks;
+    static long s_pendingBatchStartTicks;
+    static int s_pendingDelayMs;
     static int s_generation;
     static int s_serverCommandDepth;
     static int s_suspendBaselineSerial;
@@ -30,6 +38,11 @@ static class PlayerSaveCloud
     static bool s_uploading;
     static bool s_gateComplete;
     static bool s_uploadApproved;
+    static int s_sessionUploadAttempts;
+    static int s_sessionUploadSuccesses;
+    static int s_sessionRevisionConflicts;
+    static int s_sessionImmediateRequests;
+    static int s_sessionTransactionAttempts;
 
     internal static EPlayerSaveCloudState State { get; private set; } = EPlayerSaveCloudState.Disabled;
     internal static string LastError { get; private set; } = string.Empty;
@@ -50,6 +63,10 @@ static class PlayerSaveCloud
 
 
     internal static long Revision { get; private set; }
+    internal static int UploadCountThisSession => s_sessionUploadSuccesses;
+    internal static bool HasPendingUpload => s_dirtySerial != s_uploadedSerial;
+    internal static int DirtySerialForMetrics => s_dirtySerial;
+    internal static int UploadedSerialForMetrics => s_uploadedSerial;
 
     // LastError는 서버 원문이라 유저에게 못 보여 준다 — 재시작 모달이 문구를 고르려면 분류된 값이 따로 필요하다.
     internal static ECloudBlockReason BlockReason { get; private set; } = ECloudBlockReason.None;
@@ -72,7 +89,9 @@ static class PlayerSaveCloud
         s_initialized = true;
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
-        s_uploadedSnapshot = string.Empty;
+        s_pendingUploadDeadlineTicks = 0;
+        ClearUploadedSlotSnapshots();
+        ResetUploadMetrics();
         Revision = 0;
         LastError = string.Empty;
         BlockReason = ECloudBlockReason.None;
@@ -90,13 +109,15 @@ static class PlayerSaveCloud
     }
 
     /// <summary>메모리 세이브가 바뀌었다 — 업로드를 디바운스 예약한다.</summary>
-    internal static void MarkDirty()
+    internal static void MarkDirty(ESaveUploadTiming _timing)
     {
         if (!s_initialized) return;
 
         s_dirtySerial++;
         if (!s_uploadApproved) return;
-        ScheduleUpload();
+        ScheduleUpload(_timing == ESaveUploadTiming.Coalesced
+            ? COALESCED_UPLOAD_DEBOUNCE_MS
+            : UPLOAD_DEBOUNCE_MS);
     }
 
     /// <summary>디바운스를 건너뛰고 지금 업로드한다(결과를 기다리지 않는다).</summary>
@@ -105,7 +126,9 @@ static class PlayerSaveCloud
         if (!s_initialized || !s_uploadApproved) return;
 
         s_pendingVersion++;
-        UploadAsync(s_generation).Forget();
+        s_pendingUploadDeadlineTicks = 0;
+        s_sessionImmediateRequests++;
+        UploadAsync(s_generation, true).Forget();
     }
 
     /// <summary>대기 중인 업로드를 즉시 태우고 끝날 때까지 기다린다. 내부 재시도는 없다 —
@@ -115,12 +138,14 @@ static class PlayerSaveCloud
         if (!s_initialized || !s_uploadApproved) return;
 
         s_pendingVersion++;
+        s_pendingUploadDeadlineTicks = 0;
 
         // 진행 중인 업로드가 있으면 그것부터 끝나야 이번 변경분을 태울 수 있다.
         UniTaskCompletionSource t_inFlight = s_uploadCompletion;
         if (t_inFlight != null) await t_inFlight.Task;
 
-        await UploadAsync(s_generation);
+        s_sessionImmediateRequests++;
+        await UploadAsync(s_generation, true);
     }
 
     /// <summary>서버 호출이 끝날 때까지 업로드를 봉인한다. 진행 중이던 업로드는 끝날 때까지 기다린다.</summary>
@@ -172,7 +197,7 @@ static class PlayerSaveCloud
         // 서버 트랜잭션은 updatedSlots만 쓰므로 그 변경분이 영구 유실된다.
         if (s_dirtySerial == s_uploadedSerial && s_dirtySerial == s_suspendBaselineSerial)
         {
-            s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
+            CaptureUploadedSlotSnapshots();
             s_uploadedSerial = s_dirtySerial;
         }
         else
@@ -261,6 +286,7 @@ static class PlayerSaveCloud
 
         s_generation++;
         s_pendingVersion++;
+        s_pendingUploadDeadlineTicks = 0;
         s_initialized = false;
         s_uploading = false;
         s_gateComplete = false;
@@ -289,7 +315,7 @@ static class PlayerSaveCloud
         Shutdown();
         s_dirtySerial = 0;
         s_uploadedSerial = 0;
-        s_uploadedSnapshot = string.Empty;
+        ClearUploadedSlotSnapshots();
         LastError = string.Empty;
         ConsecutiveUploadFailures = 0;
     }
@@ -438,8 +464,8 @@ static class PlayerSaveCloud
         }
 
         // 지갑 확보 — v7 문서의 currency 삭제와 지갑 생성이 서버에서 한 트랜잭션이다.
-        // 반드시 첫 업로드보다 앞이어야 한다: 업로드는 Overwrite이고 v8 ToFieldMap에는 currency가 없어,
-        // 승급 전에 업로드가 먼저 나가면 원격의 잔액 원본이 그대로 지워진다.
+        // 반드시 첫 업로드보다 앞이어야 한다: 업로드는 원격 schemaVersion이 클라 버전과 같을 때만 커밋되므로
+        // 승급 전에 업로드가 먼저 나가면 RevisionConflict로 세션이 접힌다.
         if (t_schemaVersion < UserSaveData.VERSION || !WalletCloud.HasDocument)
         {
             EnsureWalletResult t_wallet = await EnsureWalletAsync(_generation);
@@ -530,7 +556,7 @@ static class PlayerSaveCloud
     {
         Revision = _revision;
         DataSaveManager.AdoptRemote(_data);
-        s_uploadedSnapshot = DataSaveManager.CreateSnapshot();
+        CaptureUploadedSlotSnapshots();
         s_uploadedSerial = s_dirtySerial;
         CompleteAdoption(_userId);
         Debug.Log($"[PlayerSaveCloud] Adopted the remote save. env={s_envId}, revision={_revision}");
@@ -605,7 +631,7 @@ static class PlayerSaveCloud
 
     static void MarkUploadPending()
     {
-        s_uploadedSnapshot = string.Empty;
+        ClearUploadedSlotSnapshots();
         s_uploadedSerial = s_dirtySerial - 1;
     }
 
@@ -707,21 +733,48 @@ static class PlayerSaveCloud
         return t_document;
     }
 
-    static void ScheduleUpload()
+    static void ScheduleUpload(int _delayMs = UPLOAD_DEBOUNCE_MS)
     {
+        long t_now = DateTime.UtcNow.Ticks;
+
+        if (s_pendingUploadDeadlineTicks == 0)
+        {
+            // 새 배치다 — 기아 상한의 기준점을 여기서 잡는다.
+            s_pendingBatchStartTicks = t_now;
+            s_pendingDelayMs = _delayMs;
+        }
+        else
+        {
+            // 급한 쪽이 이긴다. coalesced 저장이 이미 예약된 기본 저장의 마감을 뒤로 밀면 안 된다.
+            s_pendingDelayMs = Math.Min(s_pendingDelayMs, _delayMs);
+        }
+
+        // 마감은 저장이 올 때마다 미룬다(슬라이딩) — 이래야 연속 편집이 업로드 1회로 합쳐진다.
+        // 고정 창으로 두면 편집이 이어지는 동안 창이 끝날 때마다 업로드가 나가 합치는 의미가 사라진다.
+        // 다만 편집이 멈추지 않으면 영원히 안 올라가므로 배치 시작 기준 상한을 함께 건다.
+        long t_slidingDeadline = t_now + s_pendingDelayMs * TimeSpan.TicksPerMillisecond;
+        long t_hardDeadline = s_pendingBatchStartTicks + MAX_UPLOAD_DELAY_MS * TimeSpan.TicksPerMillisecond;
+        s_pendingUploadDeadlineTicks = Math.Min(t_slidingDeadline, t_hardDeadline);
+
         int t_version = ++s_pendingVersion;
-        DebounceUploadAsync(t_version, s_generation).Forget();
+        DebounceUploadAsync(t_version, s_generation, s_pendingUploadDeadlineTicks).Forget();
     }
 
-    static async UniTaskVoid DebounceUploadAsync(int _version, int _generation)
+    static async UniTaskVoid DebounceUploadAsync(int _version, int _generation, long _deadlineTicks)
     {
-        await UniTask.Delay(UPLOAD_DEBOUNCE_MS, DelayType.Realtime);
+        long t_remainingTicks = _deadlineTicks - DateTime.UtcNow.Ticks;
+        if (t_remainingTicks > 0)
+        {
+            int t_delayMs = Math.Max(1, (int)Math.Ceiling(t_remainingTicks / (double)TimeSpan.TicksPerMillisecond));
+            await UniTask.Delay(t_delayMs, DelayType.Realtime);
+        }
         if (_generation != s_generation || _version != s_pendingVersion) return;
 
-        await UploadAsync(_generation);
+        s_pendingUploadDeadlineTicks = 0;
+        await UploadAsync(_generation, false);
     }
 
-    static async UniTask UploadAsync(int _generation)
+    static async UniTask UploadAsync(int _generation, bool _isImmediate)
     {
         // 서버 호출 중에는 문서의 주인이 서버다. dirty는 s_dirtySerial에 그대로 쌓여 ResumeUploads가 태운다.
         if (s_serverCommandDepth > 0) return;
@@ -732,27 +785,48 @@ static class PlayerSaveCloud
         if (s_dirtySerial == s_uploadedSerial) return;
 
         int t_serial = s_dirtySerial;
-        string t_snapshot = DataSaveManager.CreateSnapshot();
+        string[] t_slotSnapshots = new string[DataSaveManager.SaveSlotCount];
+        DataSaveManager.WriteSlotSnapshots(t_slotSnapshots);
+
+        ESaveSlot t_dirtySlots = ESaveSlot.None;
+        int t_slotPayloadBytes = 0;
+        int t_allSlotBytes = 0;
+        for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
+        {
+            int t_slotBytes = Encoding.UTF8.GetByteCount(t_slotSnapshots[i]);
+            t_allSlotBytes += t_slotBytes;
+
+            if (t_slotSnapshots[i] == s_uploadedSlotSnapshots[i]) continue;
+
+            t_dirtySlots |= DataSaveManager.SaveSlotAt(i);
+            t_slotPayloadBytes += t_slotBytes;
+        }
 
         // 내용이 직전 업로드와 같으면 revision을 올리지 않는다.
-        if (t_snapshot == s_uploadedSnapshot)
+        if (t_dirtySlots == ESaveSlot.None)
         {
             s_uploadedSerial = t_serial;
             return;
         }
 
-        int t_bytes = Encoding.UTF8.GetByteCount(t_snapshot);
-        if (t_bytes > DOCUMENT_MAX_BYTES)
+        // 부분 쓰기라도 가드는 문서 전체 크기다 — payload 기준으로 재면 문서가 상한을 넘게 자라도 아무도 못 본다.
+        // 슬롯 합계는 문서 스냅샷보다 항상 작다(빠진 것은 키 이름과 구분자뿐). 경고선 아래면 상한과는 3만 바이트 넘게 벌어져
+        // 정확한 값이 필요 없다 — 그때만 문서를 한 번 더 직렬화해 정확히 잰다.
+        int t_bytes = t_allSlotBytes;
+        if (t_allSlotBytes > DOCUMENT_WARNING_BYTES)
         {
-            // 다시 태워도 같은 스냅샷이라 같은 바이트 수다 — Offline 재시도로 두면 표면 없이 영원히 돈다.
-            BlockSession(
-                ECloudBlockReason.DocumentTooLarge,
-                $"Save document is too large: {t_bytes} bytes (limit {DOCUMENT_MAX_BYTES}).");
-            return;
-        }
+            t_bytes = Encoding.UTF8.GetByteCount(DataSaveManager.CreateSnapshot());
+            if (t_bytes > DOCUMENT_MAX_BYTES)
+            {
+                // 다시 태워도 같은 스냅샷이라 같은 바이트 수다 — Offline 재시도로 두면 표면 없이 영원히 돈다.
+                BlockSession(
+                    ECloudBlockReason.DocumentTooLarge,
+                    $"Save document is too large: {t_bytes} bytes (limit {DOCUMENT_MAX_BYTES}).");
+                return;
+            }
 
-        if (t_bytes > DOCUMENT_WARNING_BYTES)
             Debug.LogWarning($"[PlayerSaveCloud] Save document is {t_bytes} bytes.");
+        }
 
         if (!FirebaseAuthService.Instance.IsCurrentUserActive ||
             string.IsNullOrEmpty(FirebaseAuthService.Instance.UserId))
@@ -768,19 +842,33 @@ static class PlayerSaveCloud
         s_uploadCompletion = new UniTaskCompletionSource();
         SetState(EPlayerSaveCloudState.Uploading);
         bool t_uploaded = false;
+        int t_uploadNumber = ++s_sessionUploadAttempts;
 
         try
         {
-            long t_newRevision = await PushAsync(t_userId, Revision);
+            PushResult t_result = await PushAsync(t_userId, Revision, t_dirtySlots);
             if (_generation != s_generation) return;
 
-            Revision = t_newRevision;
-            s_uploadedSnapshot = t_snapshot;
+            Revision = t_result.Revision;
+            for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
+            {
+                ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
+                if ((t_dirtySlots & t_slot) != 0)
+                    s_uploadedSlotSnapshots[i] = t_slotSnapshots[i];
+            }
             s_uploadedSerial = t_serial;
             LastError = string.Empty;
             SetUploadFailures(0);
             SetState(EPlayerSaveCloudState.Ready);
             t_uploaded = true;
+            s_sessionUploadSuccesses++;
+            Debug.Log(
+                $"[PlayerSaveCloudMetrics] upload={t_uploadNumber} success={s_sessionUploadSuccesses} " +
+                $"mode={(_isImmediate ? "immediate" : "debounce")} dirty=0x{(int)t_dirtySlots:X} " +
+                $"slotPayloadBytes={t_slotPayloadBytes} documentBytes={t_bytes} " +
+                $"transactionAttempts={t_result.TransactionAttempts} revision={Revision} " +
+                $"sessionTransactionAttempts={s_sessionTransactionAttempts} " +
+                $"immediateRequests={s_sessionImmediateRequests}");
         }
         catch (Exception t_exception)
         {
@@ -788,6 +876,11 @@ static class PlayerSaveCloud
 
             if (t_exception.GetBaseException() is RevisionConflictException t_conflict)
             {
+                s_sessionRevisionConflicts++;
+                Debug.LogWarning(
+                    $"[PlayerSaveCloudMetrics] revisionConflict={s_sessionRevisionConflicts} " +
+                    $"upload={t_uploadNumber} dirty=0x{(int)t_dirtySlots:X} " +
+                    $"sessionTransactionAttempts={s_sessionTransactionAttempts}");
                 // 다른 기기가 먼저 썼다. 재시작하면 원격을 다시 채택하므로 이 세션은 여기서 접는다.
                 BlockSession(ECloudBlockReason.RemoteAhead, $"Upload rejected: {t_conflict.Message}");
                 return;
@@ -810,13 +903,19 @@ static class PlayerSaveCloud
             ScheduleUpload();
     }
 
-    static async UniTask<long> PushAsync(string _userId, long _expectedRevision)
+    static async UniTask<PushResult> PushAsync(
+        string _userId,
+        long _expectedRevision,
+        ESaveSlot _dirtySlots)
     {
         DocumentReference t_document = Document(_userId);
         UserSaveData t_data = DataSaveManager.Data;
+        int t_transactionAttempts = 0;
 
-        Task<long> t_transactionTask = Firestore().RunTransactionAsync<long>(async t_transaction =>
+        Task<PushResult> t_transactionTask = Firestore().RunTransactionAsync<PushResult>(async t_transaction =>
         {
+            t_transactionAttempts++;
+            System.Threading.Interlocked.Increment(ref s_sessionTransactionAttempts);
             DocumentSnapshot t_snapshot = await t_transaction.GetSnapshotAsync(t_document);
 
             // 문서 생성은 서버(ensureAccount)만 한다 — 채택을 통과한 세션에서 문서가 사라졌다면
@@ -834,23 +933,55 @@ static class PlayerSaveCloud
 
             long t_nextRevision = t_currentRevision + 1;
 
-            // Overwrite여야 삭제가 전파된다. MergeAll은 중첩 맵을 재귀 병합해 지운 항목이 원격에 영원히 남는다.
-            t_transaction.Set(
+            // 키는 반드시 "ownership" 같은 최상위 한 칸이어야 한다. 최상위 필드에 맵을 통째로 주면 그 필드는 교체돼
+            // 삭제가 전파되지만, "ownership.someCard" 같은 중첩 경로를 쓰는 순간 지운 항목이 원격에 영원히 남는다.
+            // (같은 이유로 SetOptions.MergeAll도 쓸 수 없다.)
+            t_transaction.Update(
                 t_document,
-                PlayerSaveDocument.ToFieldMap(t_data, t_nextRevision),
-                SetOptions.Overwrite);
-            return t_nextRevision;
+                PlayerSaveDocument.ToSlotFieldMap(t_data, _dirtySlots, t_nextRevision));
+            return new PushResult(t_nextRevision, t_transactionAttempts);
         });
 
-        (bool t_hasResult, long t_revision) = await UniTask.WhenAny(
+        (bool t_hasResult, PushResult t_result) = await UniTask.WhenAny(
             t_transactionTask.AsUniTask(),
             UniTask.Delay(FirebaseTimeouts.TransactionMilliseconds, DelayType.Realtime));
         if (!t_hasResult) throw new TimeoutException("Firestore save transaction timed out.");
 
-        return t_revision;
+        return t_result;
     }
 
     // Firebase Auth 콜백의 스레드가 보장되지 않는다 — GameInitialization을 만지기 전에 메인으로 올린다.
+    static void CaptureUploadedSlotSnapshots()
+    {
+        DataSaveManager.WriteSlotSnapshots(s_uploadedSlotSnapshots);
+    }
+
+    static void ClearUploadedSlotSnapshots()
+    {
+        Array.Clear(s_uploadedSlotSnapshots, 0, s_uploadedSlotSnapshots.Length);
+    }
+
+    static void ResetUploadMetrics()
+    {
+        s_sessionUploadAttempts = 0;
+        s_sessionUploadSuccesses = 0;
+        s_sessionRevisionConflicts = 0;
+        s_sessionImmediateRequests = 0;
+        s_sessionTransactionAttempts = 0;
+    }
+
+    readonly struct PushResult
+    {
+        internal readonly long Revision;
+        internal readonly int TransactionAttempts;
+
+        internal PushResult(long _revision, int _transactionAttempts)
+        {
+            Revision = _revision;
+            TransactionAttempts = _transactionAttempts;
+        }
+    }
+
     static void HandleAuthStateChanged()
     {
         if (!s_initialized) return;

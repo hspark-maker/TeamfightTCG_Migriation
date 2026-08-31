@@ -81,6 +81,11 @@ public static class UiSortingOrder
     /// 로딩 커버(<see cref="LoadingCover"/>) <b>위</b>다 — 아래에 두면 커버에 가려 아무것도 고를 수 없다.</summary>
     public const int SignIn = 1100;
 
+    /// <summary>전역 터치 이펙트(TouchEffectOverlay.prefab). 어느 화면 위에서 눌러도 손끝에 보여야 하므로
+    /// 로딩 커버·로그인 관문(<see cref="SignIn"/>)보다 위다. 대신 입력은 먹지 않는다 —
+    /// 이 층은 GraphicRaycaster 없이 그리기만 한다.</summary>
+    public const int TouchEffect = 31000;
+
     /// <summary>화면 전체를 덮는 번쩍임(ScreenFlash). 그 밑에서 화면을 갈아치우는 것이 목적이라 무엇보다 위다.</summary>
     public const int ScreenFlash = 32000;
 

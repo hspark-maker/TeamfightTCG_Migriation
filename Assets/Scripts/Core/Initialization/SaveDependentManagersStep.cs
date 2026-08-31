@@ -30,6 +30,10 @@ public sealed class SaveDependentManagersStep : MainInitializer
         // 워처는 미설치로 남아, 재시도가 조기 return하는 순간 그 세션은 배너도 차단 모달도 영영 못 띄운다.
         // (Install 자체가 멱등이라 무조건 호출이 안전하다.)
         CloudSyncStatusWatcher.Install();
+
+        // 전역 터치 이펙트도 워처와 같은 상시 오버레이다 — 자체 멱등이라 재시도 경로에서도 무조건 호출한다.
+        TouchEffectOverlay.Install();
+
         GameInitialization.MarkReady();
         return UniTask.CompletedTask;
     }
