@@ -94,7 +94,6 @@ export type ReceiptKey =
   | {kind: "boot"; txId: string};
 
 /**
- * 아직 호출자가 없다 — C8-2 의 영수증 pre-read 가 붙는 자리다.
  * 영수증 조회 결과. hit 이면 그 요청은 이미 처리됐다.
  */
 export type ReceiptLookup =
@@ -178,7 +177,6 @@ export function walletRef(db: Firestore, env: string, uid: string): DocumentRefe
 }
 
 /**
- * 아직 프로덕션 호출자가 없다 — C8-2 의 영수증 pre-read 가 붙는 자리다(내부 writeReceipt 는 이미 쓴다).
  * 영수증 문서 참조. 지갑 아래에 두므로 호출부는 지갑 ref 만 알면 된다.
  * @param {DocumentReference} wallet 지갑 문서 참조
  * @param {string} txId 영수증 번호
@@ -208,7 +206,6 @@ export function readWallet(snapshot: DocumentSnapshot): WalletState {
 }
 
 /**
- * 아직 호출자가 없다 — C8-2 의 영수증 pre-read 가 붙는 자리다.
  * 영수증을 읽는다. 있으면 그 요청은 이미 처리됐고, 기록된 result 를 그대로 돌려주면 된다.
  *
  * **깨진 result 는 던진다.** 미스로 강등하면 재집행이 열려 이 장치의 목적이 통째로 무너진다

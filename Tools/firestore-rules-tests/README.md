@@ -75,7 +75,7 @@ npm test
 성립하지 않는다. 여기서 고정하는 것은 **소유자 읽기만 열리고 나머지는 전부 닫힌다** 하나다 — `17`~`19b`.
 
 픽스처 `fixtures/walletDocument.js` 의 진실원은 `functions/src/currency/walletStore.ts`
-(`WALLET_SCHEMA_VERSION` · `createWallet` · `writeWallet` · `ledgerEntry`)다.
+(`WALLET_SCHEMA_VERSION` · `createWallet` · `writeWallet` · `writeReceipt`)다.
 세이브 픽스처와 **쌍둥이 대상이 다르다** — 저쪽은 클라 `PlayerSaveDocument.ToFieldMap` 이다.
 
 > 지갑 거부 케이스는 전부 `withSecurityRulesDisabled` 로 문서를 먼저 심는다.

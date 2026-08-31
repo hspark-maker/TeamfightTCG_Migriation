@@ -1,6 +1,6 @@
 # 서버 권위 이관 로드맵 — 아웃게임
 
-> 실측 2026-08-31 · 브랜치 `feature_Firestore` · HEAD `87b493891`
+> 실측 2026-08-31 · 브랜치 `feature_Firestore` · HEAD `2df116ca9` (당초 작성 시점 `87b493891`)
 > 실태 기록은 `SERVER_AUTHORITY_AUDIT.md`, 재화 축 정본은 `CURRENCY_SERVICE_HANDOFF.md`.
 > 이 문서는 **무엇을 어떤 순서로 할지**만 정한다. `c9f7d71d2` 가 지운
 > `SERVER_VALIDATION_ROADMAP.md` 자리를 대신한다.
@@ -19,7 +19,7 @@
 - 룰 슬롯 동결에서 **`deck` · `profile` · `tutorial` 은 제외**(클라가 계속 쓴다). `rank` 는 싱글 전투 판정이 범위 밖이라 자동 제외.
 - 순서는 **구멍 크기 순**.
 
-**의도한 결말** — 세이브 9슬롯 중 **5슬롯(`ownership` · `cardGrowth` · `keywordGrowth` · `albumReward` · `tournament`)이 서버 전용**이 되고, 재화가 움직인 모든 기록이 원장에 남으며 재시도가 재과금이 되지 않는다.
+**의도한 결말** — 세이브 9슬롯 중 **5슬롯(`ownership` · `cardGrowth` · `keywordGrowth` · `albumReward` · `tournament`)이 서버 전용**이 되고, 재화가 움직인 모든 기록이 영수증에 남으며 재시도가 재과금이 되지 않는다.
 
 ---
 
@@ -31,7 +31,7 @@
 
 | # | 항목 | 위치 | 이득 | 이번 범위 |
 |---|---|---|---|---|
-| 1 | `claimBattleReward` 멱등 없음 | `functions/src/commands/claimBattleReward.ts` | 같은 페이로드 반복 → **무한 골드** | **P1** (멱등만) |
+| 1 | ~~`claimBattleReward` 멱등 없음~~ | ~~`functions/src/commands/claimBattleReward.ts`~~ | 같은 페이로드 반복 → **무한 골드** | **P1 완료** · 잔여는 전투 범위 |
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
 | 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
 | 4 | ~~한계돌파~~ | ~~`CardGrowthManager.Snack.cs:TryLimitBreak`~~ | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3 완료** · 잔여는 P0 |
@@ -57,28 +57,23 @@
 
 ---
 
-### P1 — 재화 원장 + 멱등 (C8) · 가장 큰 수치 구멍
+### P1 — 재화 원장 + 멱등 (C8) — **구현 완료** (`98042b94b` `52138f910` `86abe584c` `a6f0aaa7d` `0ed2c830a` · **배포됨** 2026-08-31)
 
-감사 문서 §4-(2)와 `CURRENCY_SERVICE_HANDOFF.md` 의 C8 을 그대로 집행한다. 지금 `walletStore.ts:193` 의 `ledgerEntry` 는 **정의만 있고 호출부가 0건**이라 재화가 움직인 기록이 한 줄도 없다.
+착수하려고 실측하니 이 단계는 이미 끝나 있었다. 문안이 지목한 `walletStore.ts` 의 `ledgerEntry` 는 정의째 사라졌고, 같은 장치가 **`receipt`(영수증)** 라는 이름으로 서 있다. 원장과 멱등이라는 두 축을 한 장치가 함께 닫았다. 아래에는 문안과 실태가 갈린 자리만 적는다 — 설계 정본은 `CURRENCY_SERVICE_HANDOFF.md` 의 C8 절이 갖는다.
 
-**저장소** — `envs/{env}/users/{uid}/wallet/current/ledger/{txId}`, append-only. 룰은 이미 read/write 전부 `if false`(Admin SDK 전용)라 손댈 것이 없다.
+1. **이름이 `ledger` → `receipt` 로 바뀌었다.** 회계 용어보다 게임 도메인 용어를 쓰는 프로젝트 컨벤션이고, txId 가 곧 영수증 번호라 재시도가 "같은 영수증을 다시 내미는 것"으로 읽혀 멱등 역할이 이름만으로 드러난다. 경로는 `envs/{env}/users/{uid}/wallet/current/receipts/{txId}` 이고, 룰은 `firestore.rules:126` 이 `read, write: if false` 로 닫아 뒀다(감사 기록이라 클라에 아예 열지 않는다).
+2. **타입 수준 강제는 문안이 그린 것보다 강하게 섰다.** 쌍(tuple)이 아니라 **손으로 조립할 수 없는 브랜드 타입 `WalletUpdate`**(`walletStore.ts:59-73`)를 `nextWallet` 이 내고 `writeWallet`(`:243`)이 그것만 받는다. 증감 `changes` 는 호출부가 넘기지 않고 `diffBalances`(`:130`)가 before/after 를 차분해 만든다 — 상한 클램프 때문에 "의도한 증감"과 "실제 증감"이 갈릴 수 있어서, 손으로 넘기게 두면 그 자리가 영수증이 거짓말할 수 있는 유일한 축이 된다.
+3. **배선 7곳 전수 완료** — `openPack.ts:142` · `enhanceCard.ts:145` · `enhanceKeyword.ts:137` · `claimReward.ts:418` · `claimBattleReward.ts:123` · `claimPayout.ts:150` · `functions-currency/src/commands/devGrantCurrency.ts:58`. 지갑을 쓰지 않고 낙인만 쓰는 자리(`claimPayout` 의 지급 0건 ack)를 위해 `writeReceiptOnly`(`walletStore.ts:335`)가 따로 있다.
+4. **트랜잭션 순서는 문안대로다.** 영수증 조회가 콜백 진입 **전**에 서서, 히트면 쓰기 0회로 첫 응답을 그대로 돌려준다(`saveDocument.ts:221` · `walletTransaction.ts:73`). `source` 가 어긋나면 `TxIdReused`(`permission-denied`)로 거절한다. `mutateSave` 시그니처는 문안이 예측한 그대로 바꾸지 않았다.
+5. **클라도 한 곳만 고쳤다.** `ServerSaveCommands.cs:35` 가 `{명령이름}:{Guid:N}` 으로 발급하고, `SendAsync`(`:118-134`)가 **같은 payload 참조를 재사용**해 다시 태우므로 재시도가 txId 를 유지한다. 재시도 판정은 `CloudFailureClassifier.IsLostResponse` 다. txId 가 없으면 서버가 발급하는 폴백이 있어 서버·클라 배포 순서에 제약이 없다.
+6. **`createWallet` 3곳도 영수증을 남긴다**(문안이 "착수 시 정한다"로 열어 뒀던 자리). 남기지 않으면 영수증 합계와 잔액이 어긋나 감사가 성립하지 않는다. 부트 둘은 `create` 가 아니라 `set` 이다 — `create` 로 두면 지갑만 지워지고 영수증이 남은 계정이 재생성에서 영구 실패한다.
+7. **회귀** — `functions/scripts/test-wallet-store.js`(원장 줄 생성 · `readReceipt` 히트/미스 · 캐시본 왕복)와 에뮬레이터 전용 `functions/scripts/test-receipt-replay.js` 9케이스가 지킨다. 후자는 같은 txId 재호출에서 **`mutate` 콜백이 아예 불리지 않는다**는 것을 직접 증거로 잡는다(재추첨·재차감 부재). 미러 목록(`functions-currency/scripts/shared-files.js`)에는 `currency/walletStore.ts` 와 `save/receiptId.ts` 가 둘 다 등재돼 있다.
 
-**강제 방법(타입 수준)** — `nextWallet` 이 `(다음 지갑, 원장 줄)` 한 쌍을 내고 `writeWallet` 이 그 쌍을 받게 한다. 잔액만 쓰고 원장을 빠뜨리는 경로가 컴파일 단계에서 사라진다.
+**결과: 재화가 움직인 기록이 전부 남고, 응답만 잃은 재시도가 재과금이 되지 않는다.**
 
-**트랜잭션 순서** — ① `ledger/{txId}` 읽기 → 있으면 **기록된 결과를 그대로 반환**(재추첨·재과금 없음) → 없으면 처음 ② 판정·차감(기존 그대로) ③ 잔액 · 도메인 슬롯 · 원장 줄을 한 번에 쓴다. **문서 존재 자체가 중복 판정**이라 별도 멱등 장부를 두지 않는다. 반드시 같은 트랜잭션 안이어야 한다 — 밖으로 빼면 구멍 뚫린 원장이 생기고 동시 요청 둘이 같은 "처음"을 본다.
+**남는 구멍(문안 그대로 남는다)** — `claimBattleReward` 는 txId 로 **중복**은 막히지만 **전투를 하지 않고 1회 호출**하는 것은 여전히 통과한다. `won`·`remaining` 을 증명할 매치 문서 대조는 전투 범위라 다음 로드맵 몫이다. 영수증에 TTL·아카이빙 정책이 없어 유저당 무한히 쌓이는 것도 그대로다 — 결제 착수 시점에 재검토한다.
 
-**배선 대상 = `nextWallet` 호출부 7곳** (grep 한 줄로 전수가 잡힌다):
-`openPack.ts:134` · `enhanceCard.ts:137` · `enhanceKeyword.ts:128` · `claimReward.ts:401` · `claimBattleReward.ts:115` · `claimPayout.ts:110` · `functions-currency/src/commands/devGrantCurrency.ts:49`
-
-**클라 변경 한 곳** — `OutGame/Save/4.Cloud/ServerSaveCommands.InvokeAsync` 가 호출마다 `txId`(UUID)를 만들어 payload 에 싣고, **재시도 시 같은 값을 유지**한다. 여기가 단일 창구라 도메인 호출부는 손대지 않는다. `claimBattleReward` 는 이것만으로 멱등이 선다.
-
-**`mutateSave` 도 같이 본다** — `saveDocument.ts:164` 가 기대 revision 을 받지 않고 현재값 +1 만 한다. 원장 조회가 그 앞에 서면 재시도가 걸러지므로 `mutateSave` 시그니처는 바꾸지 않아도 된다. 다만 원장을 안 타는 경로가 남으면 그 자리는 여전히 열려 있다 — 배선 7곳 전수를 지킨다.
-
-**남는 구멍(명시)** — `claimBattleReward` 는 txId 로 **중복**은 막히지만 **전투를 하지 않고 1회 호출**하는 것은 여전히 통과한다. `won`·`remaining` 을 증명할 매치 문서 대조는 전투 범위라 다음 로드맵 몫이다.
-
-`createWallet` 3곳(`ensureWallet.ts:134` · `saveDocument.ts:213` · `:318`)은 잔액 이동이 아니라 지갑 개설이다 — 원장에 남길지는 착수 시 정한다.
-
-**하지 않을 것** — hold/capture, 이벤트 소싱, 복식부기, 웨어하우스 스트리밍.
+**하지 않은 것** — hold/capture, 이벤트 소싱, 복식부기, 웨어하우스 스트리밍.
 
 ---
 
@@ -214,7 +209,7 @@
 - **`envs/test` 는 4표가 블롭 없이 `rows/` 만 있다.** 블롭으로 선 8표(`Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3 · `TournamentChapter` 24 · `AlbumEntry` 40)와 달리 `Card` · `Card_Test` · `CardPack` · `CardPackDrop` 은 서버가 행 폴백 경로로 읽어 표 크기에 비례한 읽기 과금이 붙는다(320행짜리 `CardPackDrop` 이 특히 그렇다). 블롭을 다시 구워 올린다
 - **튜토리얼 지급용 무료 팩 행 저작.** P2 가 `TutorialGrant` 표를 걷어내면서 이 선결 조건이 `CardPack`/`CardPackDrop` 시트로 옮겨왔다 — 지금 시트에 선 무료 팩(`price` 0)은 `StarterPack`(드롭 6행) · `KeywordDeck`(6행) · `SynergyPack`(6행) 셋뿐이고, `RangePack` 은 SO(`Assets/SO/CardPack/TutorialPack/RangePack.asset`)에만 있고 시트에는 없다. step 2(7장) · step 3(1장) 지급을 덮을 팩도 아직 없어, 그 스텝들은 저작이 설 때까지 `GrantNotFound` 로 떨어진다. **시트와 SO 가 이미 한 곳에서 갈려 있다** — `docs/SpecData/CardPackDrop_sheet.csv` 의 `KeywordDeck` 풀은 `2·3·20·11·4·37` 인데 `KeywordPack.asset` 의 `poolIds` 는 첫 장이 26 이라, 서버가 주는 카드와 클라 저작이 한 장 어긋난다
 - **`link.xml` 갱신.** 새 callable 응답 DTO 를 만들 때마다 `OutGame/Save/link.xml` 에 추가한다(IL2CPP 스트리핑 방어, `6f6a8885c` 가 팩 DTO 로 한 번 겪었다)
-- **`functions-currency` 미러.** `devGrantCurrency` 가 P1 배선 대상이므로 `functions-currency/scripts/shared-files.js` 의 미러 5파일(`walletStore.ts` 포함)이 같이 움직인다. `npm test`(`test-wallet-mirror.js`)가 미러 순수성을 지킨다 — `walletStore` 에 `HttpsError` 를 넣으면 그 계약이 깨진다
+- **`functions-currency` 미러.** P1 이 `devGrantCurrency` 를 배선하면서 `functions-currency/scripts/shared-files.js` 의 미러 목록에 `currency/walletStore.ts` 와 `save/receiptId.ts` 가 함께 들어갔다. `npm test`(`test-wallet-mirror.js`)가 미러 순수성을 지킨다 — `walletStore` 에 `HttpsError` 를 넣으면 그 계약이 깨진다
 
 ---
 
@@ -225,7 +220,7 @@
 | 단계 | 검증 |
 |---|---|
 | P0 | 리테일 빌드 컴파일 통과(`Unity_ReadConsole`) + 릴리스 빌드에서 디버그 오버레이·버튼 부재 육안 확인 |
-| P1 | `functions/scripts/test-wallet-store.js` 확장(원장 줄 생성·재시도 반환) · 같은 `txId` 2회 호출 후 잔액 1회분만 오르는지 실기 · `ledger/{txId}` 문서 생성 확인 |
+| P1 | **완료** — 회귀는 `functions/scripts/test-wallet-store.js`(영수증 줄 생성 · `readReceipt` 히트/미스 · 캐시본 왕복)와 에뮬레이터 전용 `functions/scripts/test-receipt-replay.js` 9케이스(같은 txId 재호출에서 `mutate` 콜백 미호출)다. **남은 것은 실기 4건**: ① `openPack` 1회 후 실서버 영수증에 `changes.Gold` 음수 · `after` 가 잔액과 일치 · `result` 에 뽑힌 카드 ② `devGrantCurrency` 로 **currency codebase** 에서도 영수증이 서는가(미러 경로는 회귀 밖이다) ③ 멀티 payout **지급 0건** ack 재시도가 `acked` 를 그대로 돌려주는가 ④ 기내모드로 타임아웃을 유발한 뒤 복구 → 클라 자동 재시도가 이중 지급 없이 통과하는가 |
 | P2 | `functions/scripts/test-tutorial-grant.js`(드롭 풀 전량 지급 · `drawCount`/`weight` 무관 · 유료·price 결손 팩 거절 · 카탈로그 밖 cardId 탈락 · 재호출 멱등) · 튜토리얼 완주 실기 왕복(카드가 시트의 팩 풀대로 들어오는가 · 재호출이 소유를 늘리지 않는가) |
 | P3 | **완료** — 회귀는 `test-growth.js` 가 아니라 **신규 `functions/scripts/test-limit-break.js`** 다(표 파서가 들어와 파일 성격이 갈렸다). 파서 11케이스(id≠stage 정렬 · 중복 stage · `snackCost` 하한 1 · `hpGain` 누적 합 · 상한 초과 행 무시 · 결손 fail-closed · 천장 클램프) + `test-deck-validation.js` 에 위조/표사고 3케이스 · `test-enhance.js` 에 `maxLimitBreak` 2케이스. 배포 후 전 함수 401 확인(403 없음 — 신규 `limitBreakCard` 도 invoker 바인딩 상속). **실기 합격선은 ⑤** — ① 한계돌파 1회 후 `revision` +1 · 지갑 무변경 ② 간식·단계·HP·`DeckPower` 재수화 ③ 왕복 중 연타·화살표 잠금·오버레이 재진입 ④ 최대 단계에서 `MaxStage` 거절이 세션을 안 끊는다 ⑤ **한계돌파한 카드가 든 덱으로 매치 잠금이 `hp_bonus_mismatch` 없이 통과** |
 | P4 | **완료** — `functions/scripts/test-tournament-progress.js`(챕터 경계 건너뛰기 · 구 블롭 fail-closed · 점수 경계값 · 표 밖 낙인 대조) · Unity 컴파일 0건. **남은 것은 실기**: ① 정점 격파 후 로비에서 곧바로 수령 ② 격파 직후 기내모드 → 복귀 재시도, 두 번 다 실패하면 `Playable` 로 남는가 ③ 챕터 2 첫 정점을 디버그로 진입해 승리 → `ChainBlocked` ④ 등급 미달 챕터 ⑤ 다른 기기 수령 후 → `AlreadyClaimed` + 맵 즉시 갱신 |
@@ -241,7 +236,7 @@
 1. `Assets/Scripts/` 에서 `SetAsync|UpdateAsync|DeleteAsync|RunTransactionAsync` — `OutGame/Save/4.Cloud/` 바깥은 0이어야 한다
 2. 같은 범위 `InvokeAsync|InvokeReadOnlyAsync|CallAsync` — 어느 도메인이 서버로 갔는지 그대로 나온다
 3. `firestore.rules` 에서 `affectedKeys` — P6 후에는 5슬롯이 잡혀야 한다
-4. 서버에서 `nextWallet` 호출부 — 지갑 상태의 유일한 출구. **P1 후에는 전부 원장 줄을 반환해야 한다**
+4. 서버에서 `nextWallet` 호출부 — 지갑 상태의 유일한 출구. **P1 이 끝나 전부 영수증(브랜드 타입 `WalletUpdate`)을 낸다.** `ledger` 로 grep 하면 0건이다 — 이름이 `receipt`/`receipts` 로 바뀌었다
 5. **`devGrantCurrency` 를 `functions/src` 에서만 찾으면 오판한다** — C6.6 이 `functions-currency/` 로 옮겼다
 
 **함정** (인계 문서에서) — 배포 로그는 호출 가능을 증명하지 않는다(URL POST 401 이 정상, 403 이 미바인딩) · `functions:log` 는 3~4분 늦는다 · 룰 하네스는 종료코드가 거짓말한다 · 배포는 `--only functions:default` / `functions:currency` 라벨로만(이름 나열은 삭제 프롬프트로 abort) · 서버 `SCHEMA_VERSION` 과 클라 `UserSaveData.VERSION` 은 반드시 함께 나간다
@@ -252,4 +247,6 @@
 
 - `SERVER_AUTHORITY_AUDIT.md` 에 정정 두 건을 반영한다(C7 currency 분 완료 · 서버 재시뮬 도입, 섀도 모드)
 - `CURRENCY_SERVICE_HANDOFF.md` 의 C7 절에서 이미 끝난 항목 3개를 완료 표시하고, 남은 C7 을 "슬롯 동결"(= P6)로 다시 정의한다
+- **P1 실측 반영(2026-08-31)** — 이 로드맵이 서기 전에 C8 이 이미 착지해 있었다. `ledgerEntry`/`ledger` 라는 옛 이름을 좇던 자리를 `receipt`/`receipts` 로 고쳤고, 같은 낡은 이름을 `Tools/firestore-rules-tests/README.md` 와 `functions/src/currency/walletStore.ts` 주석 세 곳("아직 호출자가 없다")에서도 걷어냈다. `CURRENCY_SERVICE_HANDOFF.md` 의 C8 절 머리는 본문과 어긋난 "미배포" 표시를 배포일로 고쳤다
+- **남은 정정 한 줄** — `SERVER_AUTHORITY_AUDIT.md` §4-(2) 끝의 "남은 것을 닫는 자리는 P1(`claimBattleReward` 멱등)이다" 는 이제 틀렸다. txId 멱등은 이미 섰고, 남은 것은 "전투 없이 1회 호출"이라 **전투 범위**다. 이 문서를 다른 세션이 동시에 고치고 있어 손대지 않았다
 - 이 로드맵을 `docs/OutGamePlan/SERVER_AUTHORITY_ROADMAP.md` 로 앉힌다 — `c9f7d71d2` 가 지운 `SERVER_VALIDATION_ROADMAP.md` 자리를 대신한다
