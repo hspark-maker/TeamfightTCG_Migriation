@@ -25,13 +25,16 @@ const {
 } = require("../lib/rewardTable.js");
 const {
   parseAlbumEntryRows,
-  parseChapterNodeRows,
   parseAlbumScope,
   albumScopeCardIds,
-  chapterNodeIds,
   isCompleted,
   missingCount,
 } = require("../lib/completionTable.js");
+// TournamentChapter 표는 tournamentTable 로 이사했다(표 하나에 파서 하나).
+const {
+  parseChapterNodeRows,
+  chapterNodeIds,
+} = require("../lib/tournamentTable.js");
 
 // 표 한 줄. 실제 Reward 시트의 컬럼 이름 그대로다(id | ownerType | ownerId | order | rewardType | rewardId | amount).
 const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Currency") =>

@@ -1,5 +1,8 @@
-// 도감 완성 · 챕터 완주의 **판정 근거 표** 해석. 보상 해석(rewardTable.ts)과 소유를 나눈다 —
+// 도감 완성의 **판정 근거 표** 해석과, 완성 판정 자체. 보상 해석(rewardTable.ts)과 소유를 나눈다 —
 // 저쪽은 "무엇을 주는가", 여기는 "다 모았는가" 다.
+//
+// TournamentChapter 표는 tournamentTable.ts 가 읽는다(표 하나에 파서 하나) — 저쪽은 완주 모수뿐
+// 아니라 해금 사슬까지 재므로 도감과 나눠 둔다. isCompleted 는 두 도메인이 함께 쓴다.
 //
 // 순수 모듈 제약: firebase-admin · HttpsError 를 들이지 마라. functions/scripts 의 회귀가
 // lib/ 를 직접 require 하고 돈다.
@@ -10,14 +13,6 @@ export type AlbumEntryRow = {
   themeId: string;
   pageId: string;
   cardId: number;
-  order: number;
-};
-
-/** TournamentChapter 시트 한 줄. 컬럼 이름을 그대로 쓴다(id | chapterId | nodeId | order). */
-export type ChapterNodeRow = {
-  id: number;
-  chapterId: string;
-  nodeId: string;
   order: number;
 };
 
@@ -60,22 +55,6 @@ export function parseAlbumEntryRows(rows: Record<string, unknown>[]): AlbumEntry
       order: looseInteger(row.order),
     }))
     .filter((row) => row.themeId.length > 0 && row.pageId.length > 0 && row.cardId > 0);
-}
-
-/**
- * TournamentChapter 표를 읽는다. 챕터·정점 키가 빈 줄은 버린다.
- * @param {Record<string, unknown>[]} rows 표 전량
- * @return {ChapterNodeRow[]} 읽힌 줄만
- */
-export function parseChapterNodeRows(rows: Record<string, unknown>[]): ChapterNodeRow[] {
-  return rows
-    .map((row) => ({
-      id: looseInteger(row.id),
-      chapterId: String(row.chapterId ?? "").trim(),
-      nodeId: String(row.nodeId ?? "").trim(),
-      order: looseInteger(row.order),
-    }))
-    .filter((row) => row.chapterId.length > 0 && row.nodeId.length > 0);
 }
 
 /**
@@ -122,17 +101,6 @@ export function albumScopeCardIds(rows: AlbumEntryRow[], scope: AlbumScope): num
   });
 
   return [...new Set(matched.map((row) => row.cardId))];
-}
-
-/**
- * 그 챕터가 요구하는 정점 id(중복 제거, 표 순서 유지). 빈 배열은 "모수 없음"이다.
- * @param {ChapterNodeRow[]} rows TournamentChapter 표 전량
- * @param {string} chapterId 챕터 키
- * @return {string[]} 요구 정점 id
- */
-export function chapterNodeIds(rows: ChapterNodeRow[], chapterId: string): string[] {
-  const matched = rows.filter((row) => row.chapterId === chapterId);
-  return [...new Set(matched.map((row) => row.nodeId))];
 }
 
 /**

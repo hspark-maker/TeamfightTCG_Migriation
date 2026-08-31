@@ -26,14 +26,17 @@ import {
 import {
   AlbumEntryRow,
   albumScopeCardIds,
-  ChapterNodeRow,
-  chapterNodeIds,
   isCompleted,
   missingCount,
   parseAlbumEntryRows,
   parseAlbumScope,
-  parseChapterNodeRows,
 } from "../completionTable";
+import {
+  ChapterNodeRow,
+  chapterNodeIds,
+  hasNode,
+  parseChapterNodeRows,
+} from "../tournamentTable";
 import {readOwnedIds} from "../packs/packSlots";
 import {grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
@@ -213,13 +216,17 @@ function claimRankTier(
 
 /**
  * 정점 수령 — 이 도메인은 "수령 = 클리어 확정"이라 낙인이 clearedNodeIds 하나다(별도 claimed 목록이 없다).
+ * 해금 사슬은 여기서 재지 않는다 — reportTournamentWin 이 낙인을 세울 때 이미 쟀고,
+ * 여기서 다시 재면 같은 판정이 두 곳에 생긴다. 이 자리가 보는 것은 그 낙인의 존재다.
  * 지급·클리어 낙인·미수령 해제가 한 트랜잭션이어야 지급됐는데 선물이 남는 상태가 저장되지 않는다.
  * @param {Record<string, unknown>} current 현재 문서
+ * @param {ChapterNodeRow[]} chapterRows 챕터↔정점 대응 표
  * @param {ClaimContext} context 요청 맥락
  * @return {object} tournament 슬롯 전체 값
  */
-function clearTournamentNode(
+function claimTournamentNode(
   current: Record<string, unknown>,
+  chapterRows: ChapterNodeRow[],
   context: ClaimContext,
 ): {clearedNodeIds: string[]; claimedChapterIds: string[]; pendingRewardNodeId: string} {
   const tournament = current.tournament as Record<string, unknown> | undefined;
@@ -231,6 +238,12 @@ function clearTournamentNode(
   }
   if (pending !== context.ownerId) {
     reject("NotEligible", `Tournament node '${context.ownerId}' has no pending reward.`, {...context, pending});
+  }
+  // 낙인이 표 밖 정점을 가리키면 거절한다 — 해금 판정이 서버로 오기 전(reportTournamentWin 이전)
+  // 클라가 스스로 찍어 둔 임의 낙인이 그대로 수령되는 창구를 막는다.
+  if (!hasNode(chapterRows, context.ownerId)) {
+    reject("NotEligible", `Tournament node '${context.ownerId}' is not in the chapter spec.`,
+      {...context, pending, specRowCount: chapterRows.length});
   }
 
   return {
@@ -361,7 +374,8 @@ export const claimReward = onCall(async (request) => {
       reject("RewardNotFound", `Album owner '${ownerId}' is not a reward key.`, {...context});
     }
     albumEntries = await loadAlbumEntries(context);
-  } else if (isChapter) {
+  } else if (ownerType === "Tournament") {
+    // 챕터뿐 아니라 정점 수령도 읽는다 — 낙인이 표에 없는 정점을 가리키는지 대조하는 데 쓴다.
     chapterNodes = await loadChapterNodes(context);
   }
 
@@ -420,7 +434,7 @@ export const claimReward = onCall(async (request) => {
       if (isChapter) {
         return {slots: {tournament: claimTournamentChapter(current, chapterNodes, context)}, wallet: paid};
       }
-      return {slots: {tournament: clearTournamentNode(current, context)}, wallet: paid};
+      return {slots: {tournament: claimTournamentNode(current, chapterNodes, context)}, wallet: paid};
     },
     (adopted) => {
       replayed = false;
