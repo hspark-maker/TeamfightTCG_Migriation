@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 
 // 덱·카드의 파워(전력) 환산 단일 지점
+// 여기서 나오는 수는 전부 화면에 그릴 값이다 — 그래서 내 카드의 성장은 CardGrowthManager.DisplayGrowthOf 로 읽는다
+// (서버가 아직 확정하지 않은 한계돌파까지 얹힌 값이라, 서버로 나가는 스냅샷은 이 창구를 지나지 않는다).
 public static class DeckPower
 {
     /// <summary>상대 카드 _card가 서 있는 레벨. 늘 바닥이다 — 적을 랭크로 강화하던 축은 제거됐고,
@@ -13,7 +15,7 @@ public static class DeckPower
     {
         if (_cardId <= 0) return CardGrowth.BaseLevel;
 
-        return _mine ? CardGrowthManager.GrowthOf(_cardId).Level : OpponentLevelOf(_cardId);
+        return _mine ? CardGrowthManager.DisplayGrowthOf(_cardId).Level : OpponentLevelOf(_cardId);
     }
 
     public static int EvolutionStageOf(int _cardId, bool _mine = true)
@@ -31,7 +33,7 @@ public static class DeckPower
         if (_cardId <= 0) return 0;
 
         CardGrowth t_growth = _mine
-            ? CardGrowthManager.GrowthOf(_cardId)
+            ? CardGrowthManager.DisplayGrowthOf(_cardId)
             : CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId, false));
         return CardCatalog.RequireSpec(_cardId).MaxHp + t_growth.HpBonus;
     }

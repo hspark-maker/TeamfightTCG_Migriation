@@ -173,6 +173,13 @@ public class CardEvolveRitualView : CardGrowthRitualView
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
 
+    // 답을 기다리는 동안의 제자리 숨(담금질과 같은 결·같은 길이 — 두 연출은 같은 빛의 언어를 쓴다).
+    const float WaitBreath = 0.45f;
+
+    // 그 숨이 미는 폭. 백열과 후광이 살짝 내려앉았다 돌아온다 — 크게 밀면 정적의 무게가 흔들린다.
+    const float WaitBlindDip = 0.9f;
+    const float WaitHaloDip  = 0.9f;
+
     // 공개 뒤 숨 한 번이 결과 구간 안에 들어가도록 확보하는 여유. 없으면 결과판이 뜬 뒤에도 후광이 뛴다.
     const float BreathRoom = 0.2f;
 
@@ -253,6 +260,21 @@ public class CardEvolveRitualView : CardGrowthRitualView
         }
     }
 
+    // 구간 길이. 저작값이 0이나 음수여도 구간이 서로를 넘지 않게 한 곳에서 정리한다 —
+    // 앞 토막(BuildLead)과 결말(BuildFinale)이 **같은 값을 봐야** 절단면을 넘는 회전이 이어진다.
+    float EnterDur  => Mathf.Max(0.01f, this.enterDuration);
+    float ChargeDur => Mathf.Max(0.06f, this.chargeDuration);
+    float BlazeDur  => Mathf.Max(0.05f, this.blazeDuration);
+    float HoldDur   => Mathf.Max(BlindRise, this.holdDuration);
+    float RevealOut => Mathf.Max(0.05f, this.revealDuration);
+
+    // 줄기 회전이 도는 총 길이(백열 → 정적 → 공개 60%). 절단면이 이 한복판을 지나는 유일한 축이다 —
+    // 백열 안에서 끝내면 백지라 아무도 못 보고, 공개까지 물어야 각도 변화가 읽힌다.
+    float SpinSpan => BlazeDur + HoldDur + RevealOut * 0.6f;
+
+    // 앞 구간이 도는 몫. 길이 비율대로 갈라야 이음매에서 각속도가 튀지 않는다(나머지는 결말이 이어 받는다).
+    float LeadSpinDeg => this.raySpinDeg * (BlazeDur / SpinSpan);
+
     // 두 줄기는 순차다(판이 한 장이라 겹칠 수 없다) — 그래서 길이가 더해진다.
     float GleamSpan => this.shading.HasGleam
                            ? Mathf.Max(0f, this.gleamDelay) + Mathf.Max(0.05f, this.gleamSweep)
@@ -323,8 +345,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     void OnDestroy() => this.shading.Release();
 
-    /// <summary>이번 진화로 새로 열리는 프레임 문양들. <see cref="CardGrowthRitualView.Play"/> **직전에** 넘긴다 —
-    /// 시퀀스는 Play에서 한 번에 짜이므로 그 뒤에 주면 이번 판에는 반영되지 않는다.
+    /// <summary>이번 진화로 새로 열리는 프레임 문양들. <see cref="CardGrowthRitualView.Commit"/> **직전에** 넘긴다 —
+    /// 문양이 실제로 쓰이는 자리는 결말의 InsertSeed이고 그 시퀀스는 Commit에서 한 번에 짜이므로,
+    /// 그 뒤에 주면 이번 판에는 반영되지 않는다(앞 구간에는 문양을 쓰는 곳이 없어 이 시점으로 충분하다).
     /// 넘길 것이 없으면 빈 목록(또는 null)을 줘야 앞 판의 문양이 남지 않는다.</summary>
     public void SetEmblems(IReadOnlyList<Graphic> _emblems) => this.emblems.SetTargets(_emblems);
 
@@ -336,37 +359,74 @@ public class CardEvolveRitualView : CardGrowthRitualView
         if (this.stageFitter != null) this.stageFitter.enabled = false;
     }
 
-    /// <summary>재탄생 한 판. _outcome은 언제나 Success다 — 진화 레벨의 성공률은 1이고,
-    /// 실패가 생긴다면 그때는 담금질이 그 얼굴을 맡아야 한다(여기에 실패의 얼굴을 덧대지 말 것).</summary>
-    protected override float BuildStage(Sequence _seq, EEnhanceOutcome _outcome, bool _chained)
+    /// <summary>재탄생의 앞 절반 — 떠오르며 금빛을 머금고(충전) 백열이 카드를 통째로 삼킨다(백열).
+    ///
+    /// 진화는 성패를 아예 읽지 않지만(성공률 1) 그래도 두 토막으로 가른다 —
+    /// 서버가 거절할 수는 있고, 그 왕복은 담금질과 같은 자리에서 덮여야 두 연출이 같은 문법으로 남는다.
+    ///
+    /// 절단면은 카드가 완전히 덮인 시각(정적의 문턱)이다.</summary>
+    protected override float BuildLead(Sequence _seq, bool _chained)
     {
-        // 저작값이 0이나 음수여도 구간이 서로를 넘지 않게 여기서 한 번 정리한다.
-        float t_enterDur  = Mathf.Max(0.01f, this.enterDuration);
-        float t_chargeDur = Mathf.Max(0.06f, this.chargeDuration);
-        float t_blazeDur  = Mathf.Max(0.05f, this.blazeDuration);
-        float t_holdDur   = Mathf.Max(BlindRise, this.holdDuration);
-        float t_revealOut = Mathf.Max(0.05f, this.revealDuration);
-        float t_resultDur = Mathf.Max(t_revealOut + BreathRoom, Mathf.Max(this.resultHold, RevealSettle));
+        float t_enterDur  = EnterDur;
+        float t_chargeDur = ChargeDur;
+        float t_blazeDur  = BlazeDur;
 
         float t_charge = t_enterDur;
         float t_blaze  = t_charge + t_chargeDur;
         float t_hold   = t_blaze + t_blazeDur;
-        float t_reveal = t_hold + t_holdDur;
 
         BuildEnter(_seq, 0f, t_enterDur, _chained);
         BuildCharge(_seq, t_charge, t_chargeDur);
 
         // 진동은 충전 끝을 넘어 백열까지 이어진다 — 그래서 충전이 아니라 여기서 짠다.
+        // (백열의 80% 자리에서 멎으므로 절단면을 넘지는 않는다.)
         BuildTremor(_seq, t_charge, t_chargeDur, t_blaze, t_blazeDur);
 
-        // 줄기 회전은 백열(blaze·hold)을 지나 공개까지 물고 이어진다 — hold 안에서 끝나면 백지라 아무도 못 본다.
-        BuildBlaze(_seq, t_blaze, t_blazeDur, t_blazeDur + t_holdDur + t_revealOut * 0.6f);
+        BuildBlaze(_seq, t_blaze, t_blazeDur);
 
-        BuildHold(_seq, t_hold, t_holdDur);
+        return t_hold;
+    }
+
+    /// <summary>재탄생의 뒤 절반 — 덮인 채 머물다(정적) 화면이 훅 꺼지고, 빛이 돌아오며 새 모습이 드러난다(공개).
+    /// _outcome은 언제나 Success다 — 진화 레벨의 성공률은 1이고,
+    /// 실패가 생긴다면 그때는 담금질이 그 얼굴을 맡아야 한다(여기에 실패의 얼굴을 덧대지 말 것).</summary>
+    protected override float BuildFinale(Sequence _seq, EEnhanceOutcome _outcome, float _at)
+    {
+        float t_holdDur   = HoldDur;
+        float t_revealOut = RevealOut;
+        float t_resultDur = Mathf.Max(t_revealOut + BreathRoom, Mathf.Max(this.resultHold, RevealSettle));
+
+        float t_reveal = _at + t_holdDur;
+
+        // 잘린 회전의 나머지 몫. 절대 목표가 아니라 **지금 각도에서 이어** 돈다 —
+        // 대기가 얼마나 끼었든 줄기는 한 획으로 계속 돌고, 첫 프레임에 되감기지 않는다.
+        // (0으로 클램프하지 않는다 — 반대로 돌리는 저작값이면 남은 몫도 같은 부호로 나와야 한다.)
+        if (this.rays.HasRays)
+            this.rays.InsertSpinFrom(_seq, _at, t_holdDur + t_revealOut * 0.6f, this.raySpinDeg - LeadSpinDeg);
+
+        BuildHold(_seq, _at, t_holdDur);
         BuildReveal(_seq, t_reveal);
 
         // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리.
         return t_reveal + t_resultDur;
+    }
+
+    /// <summary>답을 기다리는 동안의 제자리 숨. 완전히 덮인 백열이 아주 얕게 오르내린다.
+    ///
+    /// 담금질과 만지는 축이 갈리는 이유: 결말이 <b>첫 몇 프레임에 절대값으로 다시 잡는 축</b>만 밀 수 있는데,
+    /// 이쪽은 정적이 blind를 못 박고 암전이 후광 <b>알파</b>를 곧바로 절대 트윈으로 가져간다
+    /// (후광 크기는 공개까지 손대지 않으므로 여기서 밀면 대기 길이가 자세로 새어 나온다).
+    /// 좌표(부양·진동)와 덮개(Cover)는 어느 쪽에서도 만지지 않는다.</summary>
+    protected override Sequence BuildWaitLoop()
+    {
+        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+
+        t_seq.Insert(0f, this.shading.TweenBlind(this.blindPeak * WaitBlindDip, WaitBreath).SetEase(Ease.InOutSine));
+        t_seq.Insert(0f, this.halo.TweenAlpha(WaitHaloDip, WaitBreath).SetEase(Ease.InOutSine));
+
+        t_seq.SetLoops(-1, LoopType.Yoyo);
+
+        return t_seq;
     }
 
     protected override void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
@@ -567,7 +627,9 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     // 백열. 남은 면을 마저 삼키고 배경까지 빛이 찬다. 카드는 멎지 않고 완만히 커진다 —
     // 담금질이 여기서 한 뼘 더 눌리는 자리에서, 이쪽은 계속 펼쳐진다.
-    void BuildBlaze(Sequence _seq, float _at, float _dur, float _spinSpan)
+    //
+    // 줄기 회전은 이 구간의 몫(LeadSpinDeg)만 돈다 — 절단면 뒤의 나머지는 결말이 상대 회전으로 이어 받는다.
+    void BuildBlaze(Sequence _seq, float _at, float _dur)
     {
         _seq.Insert(_at, this.cardStage.DOScale(this.blazeScale, _dur).SetEase(Ease.InOutSine));
 
@@ -584,7 +646,10 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
         // 회전보다 **먼저** 꽂는다 — 같은 시각이면 삽입 순서대로 처리되므로 자세 못 박기가 회전 시작보다 앞서야 한다.
         this.rays.InsertFlare(_seq, _at, _dur * 0.6f, RayCues.Length);
-        this.rays.InsertSpin(_seq, _at, _spinSpan, this.raySpinDeg);
+
+        // 이 토막은 절대 목표로 돈다 — 자세를 방금 못 박았으므로 출발 각도가 확정돼 있고,
+        // 그래야 잘린 판에서 반복해도 각도가 밀리지 않는다(이어지는 몫만 상대 회전이다).
+        this.rays.InsertSpin(_seq, _at, _dur, LeadSpinDeg);
     }
 
     // 정적. 완전히 덮인 채 머문다 — 이 한 박이 진화의 무게다(담금질은 0.05초만 덮이고 곧 터진다).

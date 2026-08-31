@@ -181,6 +181,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 유저를 무한 재강화로 이끈다(결과판을 닫아야 오는 완료 신호에는 영영 닿지 못한다).</summary>
     public static event Action OnAnyEnhanceStarted;
 
+    /// <summary>앞 구간만 돌다 접힌 강화(서버 거절·연출 미배선). 재화도 레벨도 움직이지 않았으므로
+    /// <see cref="OnAnyEnhanceStarted"/>를 듣고 제 표시를 접었던 쪽이 그것을 그대로 되세울 자리다.
+    ///
+    /// 시작 신호가 왕복 "앞"으로 옮겨 오면서 생긴 축이다 — 낙관 검사를 통과하고도 서버가 거절하는 갈래는
+    /// 정상 동작인데, 그때는 완료 통지(<see cref="OnAnyEnhanceSettled"/>)가 흐르지 않아
+    /// 접은 표시를 되세울 신호가 하나도 없다(안내가 영영 돌아오지 않는다).</summary>
+    public static event Action OnAnyEnhanceAborted;
+
     /// <summary>강화 한 방이 **연출·결과판까지 끝나 상세로 돌아온** 순간(성공·실패 모두). 강화를 기다리는
     /// 바깥(튜토리얼 안내)이 듣는 신호다 — 성장 통지(CardGrowthManager.OnGrowthChanged)는 판정 그 프레임에 오므로,
     /// 그걸로 화면을 넘겨받으면 방금 쓴 비용의 결과를 보지 못한 채 연출이 잘린다.</summary>
@@ -244,6 +252,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 지금 무대를 쥔 연출(강화 = 담금질, 진화 = 탈각). 누른 순간에 골라 고정한다 —
     // 레벨은 그 직후 올라가므로, 나중에 다시 고르면 방금 시작한 것과 다른 연출을 붙들게 된다.
     CardGrowthRitualView m_activeRitual;
+
+    // 강화 한 방마다 오르는 표식. 앞 구간의 접힘 예약은 창이 닫히는 경로에서 흘러나가지 못한 채 남고
+    // 그것을 흘리는 자리가 다음 판의 PlayLead라, 묵은 콜백이 방금 시작한 강화의 잠금을 대신 푸는 길이 있다.
+    int m_enhanceTicket;
 
     // 프레임·아트만 보는 열람 모드. 창이 열려 있는 동안만 유지한다(OnDisable에서 내린다).
     bool m_artOnly;
@@ -633,10 +645,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>강화 연출 스킵. 닫기와 갈라 둔다 — 방금 쓴 골드의 결과를 못 보고 화면이 사라지면 안 된다.
     /// "연출 중"의 진실원은 m_ritualPlaying 하나다 — ritual.IsPlaying은 유예를 세운 뒤 Play 전까지,
-    /// 그리고 OnKill 콜백 구간에서 어긋난다.</summary>
-    void SkipRitual()
+    /// 그리고 OnKill 콜백 구간에서 어긋난다.
+    ///
+    /// 끌어당길 것이 실제로 있었을 때만 true. 답을 기다리는 구간(앞 구간은 끝났는데 서버가 아직 말이 없다)에서는
+    /// 당길 것이 서버에 있지 탭에 있지 않아 <b>false</b>가 나온다 — 그 탭은 닫기로 흘러야
+    /// 왕복이 길어질 때 화면에서 나가는 문이 생긴다(대기 상한이 네트워크다).</summary>
+    bool SkipRitual()
     {
-        if (this.m_ritualPlaying) this.m_activeRitual?.RequestSkip();
+        if (!this.m_ritualPlaying) return false;
+
+        return this.m_activeRitual != null && this.m_activeRitual.RequestSkip();
     }
 
     /// <summary>지금 도는 연출을 한 박 당긴다. 당길 것이 있었으면 true —
@@ -648,7 +666,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 당길 무대가 실제로 없으면(한계돌파처럼 유예만 선 왕복) 탭을 삼키지 않는다 — 대기 상한이 네트워크라
         // 여기서 먹어 버리면 나가는 문이 최대 예산+재시도 동안 막힌다. 창이 닫혀도 안전하다:
         // LimitBreakAsync·EnhanceAsync가 this == null / isActiveAndEnabled 2단으로 받아 유예를 반드시 푼다.
-        if (this.m_ritualPlaying && this.m_activeRitual != null) { SkipRitual(); return true; }
+        if (this.m_ritualPlaying && this.m_activeRitual != null) return SkipRitual();
         if (this.m_unlockFxPlaying) { SkipUnlockFx(); return true; }
 
         return false;
@@ -1416,17 +1434,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // "지금 도는 연출"로 읽어 왕복 내내 탭을 삼킨다(그 연출은 이미 끝났으므로 끊어도 잃을 것이 없다).
         this.m_activeRitual = null;
 
-        RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
-
         LimitBreakAsync(t_card).Forget();
     }
 
-    // 서버 왕복 한계돌파. 세운 무대가 없어 되돌릴 것도 없다 — 어느 갈래로 빠져도 유예만 반드시 푼다.
+    // 서버 왕복 한계돌파. 결말이 성공 하나뿐이라(거절은 선검사에 걸린 낡은 화면뿐) 오른 단계·줄어든 간식을
+    // 누른 프레임에 미리 그리고, 응답은 그것을 확정하거나 되돌린다.
     async UniTaskVoid LimitBreakAsync(int _card)
     {
-        ELimitBreakOutcome t_outcome = await CardGrowthManager.TryLimitBreakAsync(_card);
+        // 앞세운 표시는 예약 통지로만 그린다 — 매니저가 간식·단계를 실제로 얹은 갈래에서만 불리므로,
+        // 선검사에 걸려 요청이 나가지 않은 프레스에 섬광이 터지지 않는다.
+        await CardGrowthManager.TryLimitBreakAsync(_card, () => ShowLimitBreakReserved(_card));
 
-        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(단계·간식은 서버가 이미 확정했다).
+        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(간식·단계는 매니저가 스스로 걷는다).
         if (this == null) return;
 
         this.m_ritualPlaying = false;
@@ -1436,13 +1455,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 거절 사유는 화면에 그리지 않는다. 버튼이 애초에 간식 잔량으로 잠겨 있어 거절이 왔다는 것은
         // 곧 이 화면이 낡았다는 뜻이고, 그 답은 문구가 아니라 갱신이다(성공·실패가 같은 길로 지난다).
+        // 성공 갈래에서 이 갱신이 그리는 값은 앞세운 것과 같다 — 강조(FlashGrowth)는 이미 누른 프레임에 지나갔다.
         int t_now = CardAt(this.m_index);
         if (t_now > 0) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
 
-        if (t_outcome == ELimitBreakOutcome.Success && t_now == _card && this.cardView != null)
-            this.cardView.FlashGrowth();
-
         RefreshArrows();
+    }
+
+    // 서버가 확정하기 전의 단계·간식이 이미 캐시에 서 있는 프레임. 오른 체력과 다음 단계 비용을 여기서 그린다.
+    void ShowLimitBreakReserved(int _card)
+    {
+        RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
+
+        if (this.cardView != null) this.cardView.FlashGrowth();
     }
 
     void OnEnhancePressed()
@@ -1472,9 +1497,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     // 서버 왕복 강화. 잡아 둘 값도 고를 연출도 전부 왕복 "전"이다 — 레벨이 오르고 나면 다른 답이 된다.
+    //
+    // 연출은 두 토막이다. 앞 구간(PlayLead)은 성패를 모르는 채 누른 프레임에 돌고, 결말(Commit)만이 답을 필요로 한다 —
+    // 성패는 서버 주사위라 앞당길 수 없으므로 그 왕복을 카드가 빛에 덮이는 구간이 덮는다. 그래서 선검사·잠금·통지·연출이
+    // 전부 await "앞"에 서고, await 뒤에 남는 일은 이을지(Commit) 접을지(AbortLead)의 판정 하나뿐이다.
     async UniTaskVoid EnhanceAsync(int _card)
     {
         int t_card = _card;
+
+        // 이 판의 표식. 접힘 예약은 창이 닫히는 경로에서 흘러나가지 못한 채 남고, 그것을 흘리는 자리가
+        // 다음 판의 PlayLead다 — 표식이 없으면 묵은 콜백이 방금 시작한 강화의 잠금을 대신 풀어 이중 결제가 열린다.
+        int t_ticket = ++this.m_enhanceTicket;
 
         // 시도 **전에** 잡아둔다 — 결과에는 오른 폭도 이전 값도 없다.
         int t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
@@ -1484,9 +1517,52 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         CardGrowthRitualView t_ritual = RitualFor(t_card);
         bool                 t_evolve = t_ritual == this.evolveRitual && this.evolveRitual != null;
 
+        // 앞 구간을 태우기 전의 문지기. 잔액 부족·만렙·미초기화는 왕복도 연출도 없이 여기서 끝난다 —
+        // 되감기는 "서버가 거절했다"의 답이지 "애초에 성립하지 않는다"의 답이 아니다(눌러도 아무 일 없는 편이 정직하다).
+        // 진실원은 여전히 서버라 이 검사는 낙관일 뿐이고, 통과한 뒤 거절이 오는 갈래는 버그가 아니라 정상 동작이다.
+        if (CardGrowthManager.Precheck(t_card) != EEnhanceOutcome.Success)
+        {
+            // 통지는 없다 — 결제도 판정도 없었고 시작 신호조차 아직 안 나갔으므로 바깥이 접은 것이 없다.
+            AbortEnhance(t_card);
+            return;
+        }
+
+        this.m_activeRitual = t_ritual;
+
+        // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — 앞 구간이 상세 패널을 걷는 0.15초 동안
+        // 새 Lv·HP가 그대로 비쳐 백열 아래에서 공개할 것이 남지 않는다.
+        LockControls();
+
+        // 무대를 쥐기 직전에 알린다 — 바깥의 안내가 결과판 위에 남지 않게(OnAnyEnhanceStarted 주석 참고).
+        // 왕복 "뒤"가 아니라 여기인 이유: 안내를 왕복 내내 버튼 위에 띄워 두면 이미 나간 요청을 다시 누르라고 시킨다.
+        OnAnyEnhanceStarted?.Invoke();
+
+        // 앞 구간을 지금 태운다. 미배선이면 태울 것이 없고(아래에서 무대 없이 마무리한다), 그것이 소프트락이 되면 안 된다.
+        t_ritual?.PlayLead(() =>
+        {
+            // 되감기가 끝난 자리. 화면 복구와 통지를 여기 한 곳에 모아야 잘려도·무대가 없어도 정확히 한 번 흐른다.
+            if (this == null) return;
+            if (t_ticket != this.m_enhanceTicket) return;   // 다음 판이 이미 섰다 — 남의 잠금을 풀지 않는다
+
+            // 되감기가 도는 사이 창이 닫혔다(OnDisable의 CancelRituals가 이 콜백을 흘려보낸 길).
+            // 화면은 되돌리지 않는다 — 닫는 쪽이 이미 안내 타깃을 내렸는데 여기서 값을 다시 그리면
+            // RefreshGrowth가 죽은 버튼을 앵커로 재등록하고, 곧이어 흐르는 접힘 통지가 그 등록을 찾아
+            // 닫힌 창 위에 손가락을 띄운다. 잠금 해제와 통지만은 반드시 흘린다 — 접어 둔 안내를 되세울 못이 여기 말고 없다.
+            if (!this.isActiveAndEnabled)
+            {
+                this.m_ritualPlaying = false;
+                OnAnyEnhanceAborted?.Invoke();
+                return;
+            }
+
+            // 지금 보이는 카드로 되돌린다(_onFinished와 같은 결) — 되감기가 도는 사이 목록이 갈렸으면
+            // 강화하려던 카드는 이미 무대 밖이라, 그 값을 다시 찍으면 화면과 숫자가 어긋난다.
+            FinishAbortedEnhance(CardAt(this.m_index));
+        });
+
         EnhanceResult t_result = await CardGrowthManager.TryEnhanceAsync(t_card);
 
-        // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 태울 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
+        // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 이을 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
         if (this == null) return;
 
         // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
@@ -1495,30 +1571,46 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
 
-        // 왕복 중 창이 닫혔으면 세울 무대가 없다. 성립한 강화는 그래도 알린다 —
-        // 기다리던 안내가 "화면이 닫혔다"는 이유로 영영 깨어나지 못하면 진행이 막힌다.
+        // 왕복 중 창이 닫혔으면 이을 무대가 없다. 앞 구간이 남긴 자세·재질을 여기서 확실히 걷는다(닫힘 경로가 이미 잘랐어도 멱등).
+        // 성립한 강화는 그래도 알린다 — 기다리던 안내가 "화면이 닫혔다"는 이유로 영영 깨어나지 못하면 진행이 막힌다.
+        // 접힘도 알린다: 화면은 사라졌어도 시작 신호를 듣고 접어 둔 안내는 남아 있고, 그것을 되세울 신호가 여기 말고 없다.
         if (!this.isActiveAndEnabled)
         {
+            t_ritual?.CancelImmediate();
+
             this.m_ritualPlaying = false;
+
             if (t_played) NotifyEnhanceSettled(t_result);
+            else          OnAnyEnhanceAborted?.Invoke();
             return;
         }
 
-        // 결제 전에 막힌 경우(잔액 부족·최고 레벨·미초기화)엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
-        if (!t_played || t_ritual == null)
+        // 무대가 미배선이라 앞 구간이 아예 돌지 않은 길. 흘러나올 접힘 콜백도 없으므로 마무리를 여기서 짓는다.
+        if (t_ritual == null)
         {
-            AbortEnhance(t_card);
-
             // 강화가 실제로 일어났는데 보여줄 연출만 없는 길이면 여기가 곧 "다 끝난" 시점이다.
-            // 결제 전에 막힌 경우(잔액 부족·만렙)는 아무 일도 없었으므로 알리지 않는다.
-            if (t_played) NotifyEnhanceSettled(t_result);
+            if (t_played)
+            {
+                AbortEnhance(t_card);
+                NotifyEnhanceSettled(t_result);
+                return;
+            }
+
+            FinishAbortedEnhance(t_card);
             return;
         }
 
-        this.m_activeRitual = t_ritual;
+        // 서버가 거절했다 — 앞 구간만 돈 무대를 조용히 되감는다. 사유는 문구로 그리지 않는다(한계돌파와 같은 규약).
+        // 조작 복구·통지를 여기서 부르지 않는 이유: 되감기가 끝나는 자리에서 접힘 콜백이 한 번에 짓는다.
+        if (!t_played)
+        {
+            t_ritual.AbortLead();
+            return;
+        }
 
         // 이번 진화로 새로 열리는 프레임 문양을 연출에 넘긴다. 이 자리가 유일한 시점이다 —
         // 레벨은 이미 올랐고(TryEnhanceAsync) 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나온다.
+        // 앞 구간보다 늦어도 되는 근거: 문양이 실제로 쓰이는 곳은 결말이라 Commit 직전이면 늦지 않다.
         // 넘길 것이 없어도 부른다(앞 판의 문양이 남으면 이번 판에 이유 없이 다시 새겨진다).
         if (t_evolve && this.cardView != null)
         {
@@ -1526,14 +1618,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.evolveRitual.SetEmblems(this.m_emblemBuffer);
         }
 
-        // 누른 순간엔 조작만 잠근다. 여기서 값을 다시 그리면 안 된다 — TryEnhanceAsync는 이미 끝난 거래라
-        // RefreshGrowth가 곧바로 새 Lv·HP를 찍고, 그것이 상세 패널이 걷히는 0.15초 동안 그대로 비친다.
-        LockControls();
-
-        // 무대를 쥐기 직전에 알린다 — 바깥의 안내가 결과판 위에 남지 않게(OnAnyEnhanceStarted 주석 참고).
-        OnAnyEnhanceStarted?.Invoke();
-
-        t_ritual.Play(
+        // 답을 넘긴다. 앞 구간이 아직 도는 중이면 예약만 서고 절단면에 닿을 때 이어진다 —
+        // 여기서 결말로 점프하면 카드가 반쯤 덮인 채 값이 바뀐다(빠른 네트워크일수록 더 크게 보인다).
+        bool t_committed = t_ritual.Commit(
             t_result.Outcome, _awaitReturn: this.resultPanel != null,
             _onReveal: () =>
             {
@@ -1593,6 +1680,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+
+        if (t_committed) return;
+
+        // 앞 구간이 이미 잘려 나간 뒤였다(대기 중에 창이 닫혔거나 목록이 갈린 길) — 이어붙일 무대가 없으니
+        // 여기서 무대 없이 짓는다. 이 못이 빠지면 재화만 나가고 조작이 잠긴 채 화면이 굳는다.
+        AbortEnhance(t_card);
+        NotifyEnhanceSettled(t_result);
     }
 
     /// <summary>안내 타깃을 지금 서 있는 성장 버튼으로 옮긴다(_button이 null이면 내린다). 창이 닫히면 반드시 내린다 —
@@ -1621,6 +1715,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     static void NotifyEnhanceSettled(EnhanceResult _result)
     {
         OnAnyEnhanceSettled?.Invoke(_result);
+    }
+
+    // 앞 구간만 돌다 접힌 강화의 마무리. 값도 재화도 움직이지 않았으므로 되돌릴 것은 화면과 접어 둔 안내뿐이다.
+    // 완료 통지(NotifyEnhanceSettled)와는 배타적이다 — 한 번의 프레스는 반드시 둘 중 하나로만 맺힌다.
+    void FinishAbortedEnhance(int _card)
+    {
+        AbortEnhance(_card);
+
+        OnAnyEnhanceAborted?.Invoke();
     }
 
     // 보여줄 것 없이 끝난 강화(잔액 부족·최고 레벨·미초기화·연출 미배선). 잠금을 풀고 조작을 되살린다.

@@ -400,6 +400,24 @@ public class OutgameTutorialBridge : MonoBehaviour
         HideGuide();
     }
 
+    // 앞 구간만 돌다 접힌 강화(서버 거절·연출 미배선) — 재화도 레벨도 움직이지 않았으므로 접었던 안내만 되세운다.
+    // 시작 신호가 왕복 앞으로 옮겨 오면서 필요해진 짝이다: 이 신호가 없으면 거절 한 번에 m_enhancing이 켜진 채 굳어
+    // 손가락이 영영 돌아오지 않는다(완료 통지는 성립한 강화에만 흐른다). 실패 갈래의 OnEnhanceSettled 꼬리와 같은 처방이다.
+    void OnEnhanceAborted()
+    {
+        if (!OwnsEnhanceSignal) return;
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance)
+        {
+            // 강화를 기다리던 스텝이 아니다 — 접어 둔 안내가 애초에 없으므로 되세울 것도 없다.
+            // 여기서 게이트를 열면 남의 스텝 안내가 이유 없이 되살아난다(다른 흐름이 접어 둔 손가락까지 함께).
+            m_enhancing = false;
+            return;
+        }
+
+        m_enhancing = false;
+        TryOpenGate();
+    }
+
     // 결과판에 읽을 것이 다 떠올랐다. 성공이면 판을 걷지 않고 여기서 다음 안내로 넘긴다 —
     // 결과를 읽고 있는 그 화면이 마지막 말을 얹을 자리이고, 판은 그 말을 받은 다음 스텝이 닫는다.
     // 해금 연출을 기다리는 스텝만은 성공도 넘기지 않는다 — 결과판을 실패와 같이 대신 걷어
@@ -576,6 +594,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
         DeckEditController.OnAnyCardEquipped  += OnDeckCardEquipped;
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceAborted     += OnEnhanceAborted;
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   += OnUnlockFxFinished;
@@ -603,6 +622,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
         DeckEditController.OnAnyCardEquipped  -= OnDeckCardEquipped;
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
+        CardDetailOverlayView.OnAnyEnhanceAborted     -= OnEnhanceAborted;
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;

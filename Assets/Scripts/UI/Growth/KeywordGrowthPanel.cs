@@ -58,6 +58,13 @@ public class KeywordGrowthPanel : PooledUIBase
     Sequence m_upgradeFx;
     bool m_fxPlaying;
 
+    // 연출이 끝나는(또는 걷히는) 자리. 서버 응답을 여기에 합류시킨다.
+    UniTaskCompletionSource m_upgradeFxDone;
+
+    // 서버 응답을 아직 기다리는 중. 연출을 걷는 자리가 잠금까지 풀어 버리면 왕복이 떠 있는 동안
+    // 버튼이 되살아나 같은 결제가 두 번 나간다.
+    bool m_upgradePending;
+
     // 업그레이드 버튼이 안내 타깃으로 등록된 상태(자기 것만 해제하려고 들고 있다)
     bool m_upgradeAnchored;
 
@@ -178,37 +185,58 @@ public class KeywordGrowthPanel : PooledUIBase
 
         // 지급·영속·통지는 매니저가 처리하고 OnChanged가 RefreshAll을 유발한다.
         // 잠금은 왕복 "전"에 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
-        this.m_fxPlaying = true;
+        this.m_fxPlaying      = true;
+        this.m_upgradePending = true;
         this.RefreshAction();
 
         this.UpgradeAsync(this.m_selected, t_step.Cost).Forget();
     }
 
-    // 서버 왕복 강화. 실패로 끝나는 모든 갈래에서 잠금을 반드시 되돌린다(안 풀면 이 패널이 통째로 굳는다).
+    // 누른 프레임에 연출을 태우고 서버 응답을 그 끝자리에 합류시킨다 — 키워드 강화는 결말이 성공 하나뿐이라
+    // 앞세운 그림을 되돌릴 일이 원리상 거의 없다(거절은 잔액 부족·최고 레벨 같은 사전 조건 위반뿐).
+    // 실패로 끝나는 모든 갈래에서 잠금을 반드시 되돌린다(안 풀면 이 패널이 통째로 굳는다).
     async UniTaskVoid UpgradeAsync(CardKeyword _keyword, long _cost)
     {
-        EnhanceResult t_result = await KeywordGrowthManager.TryEnhanceAsync(_keyword);
+        // 연출 대상은 누른 시점의 키워드로 굳힌다 — 늦게 온 응답이 그 사이 바뀐 선택을 건드리지 않게.
+        KeywordGrowthCellView t_cell = this.FindCell(_keyword);
 
-        // 왕복 중 패널이 사라졌으면 태울 연출이 없다(레벨·잔액은 서버가 이미 확정했다).
+        // 아래 두 줄은 첫 await 앞이라 누른 프레임에 함께 선다(요청 쪽 낙관 차감도 같은 프레임에 걸린다).
+        UniTask                t_fxDone  = this.PlayUpgradeFx(_cost);
+        UniTask<EnhanceResult> t_request = KeywordGrowthManager.TryEnhanceAsync(_keyword);
+
+        EnhanceResult t_result = await t_request;
+
+        // 왕복 중 패널이 사라졌으면 맺을 무대가 없다(레벨·잔액은 서버가 이미 확정했다).
         if (this == null) return;
 
-        // 닫힌 뒤에 돌아온 응답도 같다 — 무대가 없는 곳에서 연출을 세우지 않고 잠금만 되돌린다.
+        this.m_upgradePending = false;
+
+        // 닫힌 뒤에 돌아온 응답도, 서버가 거절한 응답도 같다 — 앞세운 연출을 콜백 없이 걷고 잠금만 되돌린다.
         if (!this.m_visible || t_result.Outcome != EEnhanceOutcome.Success)
         {
-            this.m_fxPlaying = false;
+            this.KillUpgradeFx();
             this.RefreshAction();
             return;
         }
 
-        KeywordGrowthCellView t_cell = null;
+        await t_fxDone;
+
+        if (this == null) return;
+
+        // 왕복이 연출보다 빨랐다면 이 자리가 곧 코인이 닿는 순간이고, 늦었다면 연출 끝에서 기다렸다 여기서 맺는다.
+        if (this.m_visible) t_cell?.PlayUpgradePop();
+
+        this.m_fxPlaying = false;
+        this.RefreshAction();
+    }
+
+    KeywordGrowthCellView FindCell(CardKeyword _keyword)
+    {
         for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
             if (this.m_cells[t_i] != null && this.m_cells[t_i].Keyword == _keyword)
-            {
-                t_cell = this.m_cells[t_i];
-                break;
-            }
+                return this.m_cells[t_i];
 
-        this.PlayUpgradeFx(_cost, t_cell);
+        return null;
     }
 
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
@@ -268,7 +296,8 @@ public class KeywordGrowthPanel : PooledUIBase
         if (this.upgradeGroup != null) this.upgradeGroup.alpha = t_interactive ? 1f : this.disabledAlpha;
     }
 
-    void PlayUpgradeFx(long _cost, KeywordGrowthCellView _cell)
+    // 에너지가 빨려 나가는 연출을 세우고, 코인이 다 닿거나 연출이 걷히면 끝나는 대기를 돌려준다.
+    UniTask PlayUpgradeFx(long _cost)
     {
         CoinBurstEffect t_burst = this.EnsureUpgradeBurst();
         int t_count = (int)System.Math.Min(_cost, 50L);
@@ -279,14 +308,21 @@ public class KeywordGrowthPanel : PooledUIBase
                           _coinSize: 54f, _coinInterval: 0.02f,
                           _scatterDuration: 0.05f, _arcHeight: 70f);
 
-        Sequence t_sequence = t_burst.BuildBurst((_arrived, _total) =>
-        {
-            if (_arrived == _total) _cell?.PlayUpgradePop();
-        });
+        var t_done = new UniTaskCompletionSource();
+        this.m_upgradeFxDone = t_done;
+
+        // 칸 팝은 여기서 태우지 않는다 — 성립을 확인하기 전에 튀기면 거절당한 강화를 축하하게 된다.
+        Sequence t_sequence = t_burst.BuildBurst(null);
         this.m_upgradeFx = t_sequence;
         t_sequence.SetLink(this.ResolveTarget(), LinkBehaviour.KillOnDisable);
+
+        // 종료와 걷힘에 모두 건다 — OnKill 하나에 기대면 DOTween 전역 defaultAutoKill이 꺼지는 순간
+        // 정상 종료에서 대기가 맺히지 않아 잠금이 선 채로 남는다(CompleteUpgradeFxWait는 멱등이라 둘 다 불려도 안전).
+        t_sequence.OnComplete(() => this.HandleUpgradeFxSettled(t_sequence));
         t_sequence.OnKill(() => this.HandleUpgradeFxKilled(t_sequence));
         t_sequence.Play();
+
+        return t_done.Task;
     }
 
     CoinBurstEffect EnsureUpgradeBurst()
@@ -313,16 +349,36 @@ public class KeywordGrowthPanel : PooledUIBase
         // Kill은 BuildBurst 마지막의 ClearCoins 콜백을 건너뛴다. 연출 노드까지 걷어 취소 중이던 아이콘을 남기지 않는다.
         if (this.m_upgradeBurst != null) Destroy(this.m_upgradeBurst.gameObject);
         this.m_upgradeBurst = null;
-        this.m_fxPlaying = false;
+
+        // 왕복이 아직 떠 있으면 잠금은 응답이 맺는다 — 여기서 풀면 닫았다 다시 연 유저가 같은 결제를 두 번 낸다.
+        if (!this.m_upgradePending) this.m_fxPlaying = false;
+
+        this.CompleteUpgradeFxWait();
     }
 
+    // 정상 종료. 핸들은 남겨 둔다 — autoKill이 꺼진 설정에서는 이 시퀀스가 아직 살아 있어 걷을 대상이다.
+    void HandleUpgradeFxSettled(Sequence _sequence)
+    {
+        if (this.m_upgradeFx != _sequence) return;
+
+        this.CompleteUpgradeFxWait();
+    }
+
+    // 잠금은 UpgradeAsync가 쥔다 — 연출이 왕복보다 먼저 끝나는 것은 흔한 일이라 여기서 풀면 응답 전에 버튼이 되살아난다.
     void HandleUpgradeFxKilled(Sequence _sequence)
     {
         if (this.m_upgradeFx != _sequence) return;
 
         this.m_upgradeFx = null;
-        this.m_fxPlaying = false;
-        if (this.isActiveAndEnabled) this.RefreshAction();
+        this.CompleteUpgradeFxWait();
+    }
+
+    // 정상 종료든 걷힘이든 대기를 반드시 맺는다 — 안 맺으면 응답을 기다리던 흐름이 영영 서 있다.
+    void CompleteUpgradeFxWait()
+    {
+        UniTaskCompletionSource t_done = this.m_upgradeFxDone;
+        this.m_upgradeFxDone = null;
+        t_done?.TrySetResult();
     }
 
     void SetVisible(bool _visible)

@@ -78,6 +78,14 @@ public class CardEnhanceRitualView : CardGrowthRitualView
     // 삼켜지는 동안 후광이 카드 밖으로 번지는 크기. 실루엣에 딱 맞으면 빛이 판때기처럼 잘려 보인다.
     const float GlowFloodScale = 1.25f;
 
+    // 답을 기다리는 동안의 제자리 숨. 한 결이 짧으면 깜빡임이 되고, 길면 멈춘 화면으로 읽힌다.
+    const float WaitBreath = 0.45f;
+
+    // 그 숨이 미는 폭. 백열은 살짝 내려앉고 후광은 살짝 부푼다 — 불이 살아 있다는 것만 말하면 되므로
+    // 눈에 띌 만큼 밀면 "무언가 더 일어나는 중"으로 읽혀 결말의 폭발과 다툰다.
+    const float WaitBlindDip  = 0.9f;
+    const float WaitHaloSwell = 1.04f;
+
     // 균열이 폭발보다 늦게 붙는 만큼. 첫 두 프레임이 성공과 같아야 BuildBurst의 계약("몸짓은 결과를 모른다")이 산다 —
     // 그 사이 백열이 이미 죽기 시작해 표면이 먼저 답을 낸다.
     const float FractureDelay = 0.03f;
@@ -110,32 +118,48 @@ public class CardEnhanceRitualView : CardGrowthRitualView
 
     protected override void AttachLayers() => this.shading.Attach();
 
-    /// <summary>담금질 한 판. 몸짓 먼저, 그 위에 표면 —
-    /// 폭발은 결과를 모르고, 결과는 그 폭발이 드러내는 얼굴로만 갈린다.
+    /// <summary>담금질의 앞 절반 — 움츠러들며 달아오르고(고조) 그 빛이 카드를 통째로 삼킨다(정적).
     ///
-    /// 값 반영(Reveal)은 카드가 빛에 완전히 덮인 프레임이다 — 눈이 숫자가 바뀌는 과정을 보지 못한다.</summary>
-    protected override float BuildStage(Sequence _seq, EEnhanceOutcome _outcome, bool _chained)
+    /// 성패를 읽는 것이 하나도 없다. 그래서 누른 프레임에 바로 태울 수 있고,
+    /// 서버 주사위(rollSucceeded)의 왕복이 이 1.6초 안에 들어간다 —
+    /// "이 마지막 한 겹이 덮이는 동안이 결과를 기다리는 시간이 된다"는 BuildStill의 말이 그 자리다.
+    ///
+    /// 절단면은 카드가 완전히 덮인 시각이다. 이 앞의 모든 트윈은 자기 박자 안에서 끝나므로
+    /// 대기가 얼마나 끼든 결말이 이어받을 것은 '덮인 자세' 하나뿐이다.</summary>
+    protected override float BuildLead(Sequence _seq, bool _chained)
     {
-        bool t_success = _outcome == EEnhanceOutcome.Success;
-
         // 저작값이 0이나 음수여도 구간이 서로를 넘지 않게 여기서 한 번 정리한다.
         float t_enterDur = Mathf.Max(0.01f, this.enterDuration);
         float t_riseDur  = Mathf.Max(0.06f, this.buildUpDuration);
         float t_stillDur = Mathf.Max(0.02f, this.holdDuration);
 
-        // 결과 구간은 공통 몸짓(폭발 회수)과 결과별 표면 중 긴 쪽을 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
-        float t_burst     = Mathf.Max(0.05f, this.burstSettle);
-        float t_resultDur = Mathf.Max(this.resultHold, Mathf.Max(t_burst, t_success ? SuccessSettle : FailSettle));
-
         float t_rise   = t_enterDur;
         float t_still  = t_rise + t_riseDur;
         float t_reveal = t_still + t_stillDur;
-        float t_result = t_reveal + BlindRise;
 
         BuildEnter(_seq, t_enterDur, _chained);
         BuildRise(_seq, t_rise, t_riseDur);
         BuildStill(_seq, t_still, t_stillDur);
-        BuildReveal(_seq, t_reveal);
+
+        return t_reveal;
+    }
+
+    /// <summary>담금질의 뒤 절반 — 백열이 걷히며 터지고, 그 폭발이 드러내는 얼굴로 성패가 갈린다.
+    /// 몸짓 먼저, 그 위에 표면 — 폭발은 결과를 모른다.
+    ///
+    /// 값 반영(Reveal)은 카드가 빛에 완전히 덮인 프레임이다 — 눈이 숫자가 바뀌는 과정을 보지 못한다.
+    /// 성패를 읽는 두 곳(결과 구간 길이·표면 분기)이 전부 이 토막 안에 있다.</summary>
+    protected override float BuildFinale(Sequence _seq, EEnhanceOutcome _outcome, float _at)
+    {
+        bool t_success = _outcome == EEnhanceOutcome.Success;
+
+        // 결과 구간은 공통 몸짓(폭발 회수)과 결과별 표면 중 긴 쪽을 담아야 한다 — 짧으면 복귀가 그 위를 덮친다.
+        float t_burst     = Mathf.Max(0.05f, this.burstSettle);
+        float t_resultDur = Mathf.Max(this.resultHold, Mathf.Max(t_burst, t_success ? SuccessSettle : FailSettle));
+
+        float t_result = _at + BlindRise;
+
+        BuildReveal(_seq, _at);
         BuildBurst(_seq, t_result);
 
         if (t_success) BuildSuccessSurface(_seq, t_result, t_resultDur);
@@ -143,6 +167,24 @@ public class CardEnhanceRitualView : CardGrowthRitualView
 
         // 카드 위 연출이 다 끝난 자리 = 결과판이 뜰 자리. 터지는 카드 위에 글자를 얹으면 둘 다 안 읽힌다.
         return t_result + t_resultDur;
+    }
+
+    /// <summary>답을 기다리는 동안의 제자리 숨. 완전히 덮인 백열이 아주 얕게 오르내린다 —
+    /// 얼어붙은 화면은 "멈췄다"로 읽히고, 그 순간 유저는 조작이 씹혔다고 생각한다.
+    ///
+    /// 만지는 축이 둘뿐인 것이 계약이다. 결말의 첫 BlindRise(BuildReveal)가 blind와 halo 크기를 모두
+    /// 절대값으로 다시 못 박으므로, 어느 프레임에 답이 오든 결말의 출발 자세가 같다.
+    /// 좌표와 덮개(Cover)를 여기서 밀면 그 보장이 깨진다.</summary>
+    protected override Sequence BuildWaitLoop()
+    {
+        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+
+        t_seq.Insert(0f, this.shading.TweenBlind(this.blindPeak * WaitBlindDip, WaitBreath).SetEase(Ease.InOutSine));
+        t_seq.Insert(0f, this.halo.TweenScale(GlowFloodScale * WaitHaloSwell, WaitBreath).SetEase(Ease.InOutSine));
+
+        t_seq.SetLoops(-1, LoopType.Yoyo);
+
+        return t_seq;
     }
 
     // 재질 **사본**은 여기서 미리 만든다(강화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
@@ -268,6 +310,10 @@ public class CardEnhanceRitualView : CardGrowthRitualView
         // 앞 구간이 짧게 잘려 덜 덮인 채 도착했더라도 여기서 못 박는다 — 반쯤 덮인 카드 위에서 숫자가 바뀌면 다 보인다.
         _seq.Insert(_at, this.shading.TweenBlind(this.blindPeak, BlindRise));
         _seq.Insert(_at, this.shading.TweenCover(1f, BlindRise));
+
+        // 대기 루프가 미는 축은 여기서 전부 절대값으로 되잡는다(BuildWaitLoop 주석의 계약).
+        // 후광 크기도 그 축이다 — 표면이 후광을 남기도록 저작이 바뀌면 기다린 길이가 자세로 새어 나온다.
+        _seq.Insert(_at, this.halo.TweenScale(GlowFloodScale, BlindRise));
 
         _seq.InsertCallback(_at + BlindRise, this.m_handoff.Reveal);
     }

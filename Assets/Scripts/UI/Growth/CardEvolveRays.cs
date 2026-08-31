@@ -128,6 +128,29 @@ public class CardEvolveRays
         }
     }
 
+    /// <summary>이어 도는 회전. 지금 각도에서 _deg만큼 더 — 대기가 길었어도 한 획으로 이어진다.</summary>
+    /// <remarks>회전이 절단면(앞 구간 ↔ 결말)을 넘는 유일한 축이라 이 상대 회전이 필요하다.
+    /// <see cref="InsertSpin"/>의 절대 목표는 authoring 각도 기준이라 "지금까지 얼마나 돌았는가"를 표현하지 못한다 —
+    /// 결말이 남은 몫을 절대값으로 잡으면 앞 구간이 어디서 끊겼느냐에 따라 첫 프레임에 되감기거나 그대로 멈춘다.
+    /// 목표가 360을 넘어가는 저작(예: 저작 각도 350 + 20)에서는 <b>최단 경로가 반대 방향</b>이라 더 크게 튄다.
+    ///
+    /// 반대로 한 줄기 안에서 다 도는 회전은 절대 목표를 쓴다 — 잘린 판에서 반복해도 각도가 밀리지 않는다.</remarks>
+    public void InsertSpinFrom(Sequence _seq, float _at, float _dur, float _deg)
+    {
+        if (this.rays == null || this.m_poses == null) return;
+
+        float t_dur = Mathf.Max(0.05f, _dur);
+
+        for (int t_i = 0; t_i < this.rays.Length; t_i++)
+        {
+            if (!TryGet(t_i, out Graphic t_ray, out RayPose _)) continue;
+
+            _seq.Insert(_at, t_ray.rectTransform
+                                 .DOLocalRotate(new Vector3(0f, 0f, _deg), t_dur, RotateMode.LocalAxisAdd)
+                                 .SetEase(Ease.InOutSine));
+        }
+    }
+
     /// <summary>충격파. 씨앗에서 저작 길이를 **넘어** 밖으로 터졌다가 그 자리에서 죽는다 —
     /// 회수(<see cref="InsertRetract"/>)와 정확히 반대 벡터이므로, 하나가 응축이고 하나가 방출이다.
     /// 길이·밝기만 못 박고 출발하므로 앞 구간이 줄기를 어떻게 남겼든(꺼졌든 회수됐든) 같은 폭발이 된다.</summary>
