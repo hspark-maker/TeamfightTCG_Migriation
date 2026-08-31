@@ -2,6 +2,7 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {HEX_32} from "../match/payloadGuards";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {CurrencyGain, grant} from "../currency/wallet";
@@ -44,7 +45,19 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
   const data = parseClaimPayoutData(request.data);
   const collection = db.collection(`envs/${data.env}/users/${uid}/payouts`);
   if (data.action === "list") {
+    const queryStartedAtMs = Date.now();
+    // 서버 전체에서 유일한 쿼리다. 나머지 경로는 전부 문서 키로 직독한다.
+    // 그 전제로 firestore.indexes.json 이 save 슬롯 9개 · matches 대형 필드 · payouts 의
+    // status 외 필드를 자동 색인에서 뺐다 — 쿼리를 새로 추가하려면 그 파일부터 보고,
+    // 면제된 필드로는 where·orderBy 를 걸 수 없다는 것을 전제로 설계해라.
     const snapshot = await collection.where("status", "==", "ready").limit(20).get();
+    logger.info("firestore_query_cost", {
+      command: "claimPayout.list",
+      env: data.env,
+      returnedDocuments: snapshot.size,
+      billedReadsEstimate: Math.max(1, snapshot.size),
+      durationMs: Date.now() - queryStartedAtMs,
+    });
     const payouts = snapshot.docs.map((doc) => doc.data()).sort((a, b) => {
       const left = a.settledAt instanceof Timestamp ? a.settledAt.toMillis() : 0;
       const right = b.settledAt instanceof Timestamp ? b.settledAt.toMillis() : 0;
@@ -68,12 +81,14 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
   const reference = walletRef(db, data.env, uid);
   // 낙인(ready → claimed)과 크레딧은 한 트랜잭션 안이어야 한다 — 갈라 놓으면 낙인만 성공해
   // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
-  const result = await db.runTransaction(async (tx) => {
+  const result = await withCountedTransaction("claimPayout", async (tx) => {
     const refs = data.matchIds.map((matchId) => collection.doc(matchId));
     // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상과 지갑을 먼저 다 읽는다.
-    const snapshots = [];
-    for (const ref of refs) snapshots.push(await tx.get(ref));
-    const walletSnapshot = await tx.get(reference);
+    // getAll 로 묶는 이유는 과금이 아니라 체류시간이다. 순차 await 는 문서 수만큼 왕복해
+    // 트랜잭션이 길어지고, 길어진 만큼 경합 재시도(= 읽기·쓰기 전부 재실행)를 더 맞는다.
+    const allSnapshots = await tx.getAll(...refs, reference);
+    const snapshots = allSnapshots.slice(0, refs.length);
+    const walletSnapshot = allSnapshots[refs.length];
     if (!walletSnapshot.exists) {
       // 도메인 거절이 아니라 세션 문제다 — 초기화의 ensureWallet 이 돌지 않았다는 뜻이라
       // 클라가 다시 초기화하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).

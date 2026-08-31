@@ -23,7 +23,7 @@ export const devBumpRevision = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "nickname must be a string.");
   }
 
-  const result = await mutateSave(env, uid, (current): SaveMutation => {
+  const result = await mutateSave("devBumpRevision", env, uid, (current): SaveMutation => {
     if (nickname === undefined) return {slots: {}};
 
     // 갱신 후 슬롯 **전체**를 돌려준다 — 클라는 슬롯을 통째로 갈아끼운다.

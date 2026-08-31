@@ -111,7 +111,7 @@ export const claimBattleReward = onCall(async (request) => {
   }
 
   const amount = payout.amount;
-  const wallet = await mutateWallet(env, uid, (current) =>
+  const wallet = await mutateWallet("claimBattleReward", env, uid, (current) =>
     nextWallet(current, grant(current.balances, [{currency, amount}])));
 
   logger.info("claimBattleReward", {uid, env, won, remaining, currency, amount, rev: wallet.rev});

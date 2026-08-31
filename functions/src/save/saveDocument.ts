@@ -6,6 +6,7 @@ import {
   Transaction,
 } from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {ENVIRONMENTS, isKnownEnv} from "./environments";
 import {Balances} from "../currency/wallet";
 import {
@@ -162,6 +163,7 @@ export function assertWritableSchema(
  * @return {Promise<SaveMutationResult>} 새 revision · 갱신된 슬롯 · 지갑
  */
 export async function mutateSave(
+  command: string,
   env: string,
   uid: string,
   mutate: (
@@ -173,7 +175,7 @@ export async function mutateSave(
   const reference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
 
-  return db.runTransaction(async (transaction) => {
+  return withCountedTransaction(command, async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) {
       throw new HttpsError(
@@ -275,6 +277,7 @@ function hasUsableMeta(data: FirebaseFirestore.DocumentData | undefined): boolea
  * @return {Promise<EnsureAccountOutcome>} 새 revision 과 생성 여부
  */
 export async function ensureSaveDocument(
+  command: string,
   env: string,
   uid: string,
   deviceId: string,
@@ -285,7 +288,7 @@ export async function ensureSaveDocument(
   const reference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
 
-  return db.runTransaction(async (transaction) => {
+  return withCountedTransaction(command, async (transaction) => {
     const snapshot = await transaction.get(reference);
     const data = snapshot.exists ? snapshot.data() : undefined;
 

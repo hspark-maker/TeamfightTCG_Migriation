@@ -2,6 +2,7 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {
   CardSnapshot,
   computeDeckHash,
@@ -149,7 +150,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
   // 덱 잠금은 매치 문서 안에 산다 — 별도 matchLocks 컬렉션을 두면 같은 matchId 로 문서가 둘이 되고
   // seedHex·rulesetVersion·cardDataVersion 이 양쪽에 중복된다.
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
-  return db.runTransaction(async (tx) => {
+  return withCountedTransaction("lockDeck", async (tx) => {
     const matchSnapshot = await tx.get(matchRef);
     const saveSnapshot = await tx.get(saveRef);
     const lock = matchSnapshot.data();

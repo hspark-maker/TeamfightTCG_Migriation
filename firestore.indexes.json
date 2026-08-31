@@ -5,6 +5,91 @@
       "collectionGroup": "blob",
       "fieldPath": "payload",
       "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "ownership",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "deck",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "cardGrowth",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "keywordGrowth",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "rank",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "albumReward",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "tournament",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "tutorial",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "save",
+      "fieldPath": "profile",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "submissions",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "serverSimulation",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "clientDivergence",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "payouts",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "approvals",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "ownerIndexByUid",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "payouts",
+      "fieldPath": "currency",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "payouts",
+      "fieldPath": "rank",
+      "indexes": []
     }
   ]
 }

@@ -1,6 +1,7 @@
 import {HttpsError} from "firebase-functions/v2/https";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {isKnownEnv} from "../save/environments";
 import {readWallet, walletRef, WalletPatch, WalletState, writeWallet} from "./walletStore";
 
@@ -27,6 +28,7 @@ import {readWallet, walletRef, WalletPatch, WalletState, writeWallet} from "./wa
  * @return {Promise<WalletPatch>} 갱신된 지갑
  */
 export async function mutateWallet(
+  command: string,
   env: string,
   uid: string,
   mutate: (wallet: WalletState) => WalletState,
@@ -37,7 +39,7 @@ export async function mutateWallet(
 
   const reference = walletRef(db, env, uid);
 
-  return db.runTransaction(async (transaction) => {
+  return withCountedTransaction(command, async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) {
       // 도메인 거절(permission-denied)이 아니라 세션 문제다 — 초기화의 ensureWallet 이

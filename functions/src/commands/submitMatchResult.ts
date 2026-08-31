@@ -8,6 +8,7 @@ import {
   Timestamp,
 } from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {
   decideMatch,
   expectedMatchId,
@@ -51,54 +52,6 @@ function persistableSimulation(_result: BattleSimulationResult | null): unknown 
 }
 
 const SUBMISSION_DEADLINE_MS = 120_000;
-// 스펙 표는 불변 콘텐츠라 warm 인스턴스에서 재사용한다 — 제출 1건당 read 3회가 0이 된다.
-// 대가는 배포 반영 지연이다: 표를 고쳐 올려도 이 시간만큼은 옛 값으로 정산될 수 있다.
-// 밸런스 수정이 즉시 반영돼야 하면 이 값을 줄이지 말고 무효화 신호(버전 문서)를 따로 둬라.
-const SPEC_CACHE_TTL_MS = 5 * 60_000;
-
-type MatchSpecBundle = {
-  rewardSpecRows: Record<string, unknown>[];
-  rankSpecRows: Record<string, unknown>[];
-  cardSpecRows: Record<string, unknown>[];
-};
-
-type MatchSpecCacheEntry = {
-  expiresAtMs: number;
-  promise: Promise<MatchSpecBundle>;
-};
-
-const matchSpecCache = new Map<string, MatchSpecCacheEntry>();
-
-async function readMatchSpecs(
-  env: string,
-  cardTable: string,
-): Promise<{bundle: MatchSpecBundle; cacheHit: boolean}> {
-  const key = `${env}:${cardTable}`;
-  const nowMs = Date.now();
-  const cached = matchSpecCache.get(key);
-  if (cached != null && cached.expiresAtMs > nowMs) {
-    return {bundle: await cached.promise, cacheHit: true};
-  }
-
-  const promise = Promise.all([
-    readSpecRows(env, "Reward"),
-    readSpecRows(env, "RankGrade"),
-    readSpecRows(env, cardTable),
-  ]).then(([rewardSpecRows, rankSpecRows, cardSpecRows]) => ({
-    rewardSpecRows: rewardSpecRows as Record<string, unknown>[],
-    rankSpecRows: rankSpecRows as Record<string, unknown>[],
-    cardSpecRows: cardSpecRows as Record<string, unknown>[],
-  }));
-
-  const entry = {expiresAtMs: nowMs + SPEC_CACHE_TTL_MS, promise};
-  matchSpecCache.set(key, entry);
-  try {
-    return {bundle: await promise, cacheHit: false};
-  } catch (error) {
-    if (matchSpecCache.get(key) === entry) matchSpecCache.delete(key);
-    throw error;
-  }
-}
 
 function authoritativeInputsAgree(a: Submission, b: Submission): string | null {
   if (a.uid === b.uid) return "same_uid";
@@ -260,9 +213,13 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
   const cardTable = data.env === "test" ? "Card_Test" : "Card";
   // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
-  const {bundle: matchSpecs, cacheHit: specCacheHit} =
-    await readMatchSpecs(data.env, cardTable);
-  const {rewardSpecRows, rankSpecRows, cardSpecRows} = matchSpecs;
+  // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
+  // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.
+  const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
+    readSpecRows(data.env, "Reward"),
+    readSpecRows(data.env, "RankGrade"),
+    readSpecRows(data.env, cardTable),
+  ]);
   let rewardRows;
   let rankRows;
   const cardSpecs = new Map<number, CardSpecForValidation>();
@@ -279,23 +236,8 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     throw new HttpsError("failed-precondition", "payout specs are unavailable");
   }
 
-  const transactionStartedAtMs = Date.now();
-  let transactionAttempts = 0;
-  let totalObservedReads = 0;
-  let committedAttemptReads = 0;
-  let committedAttemptWrites = 0;
-  const result = await db.runTransaction(async (tx) => {
-    transactionAttempts++;
-    let attemptReads = 0;
-    let attemptWrites = 0;
-    const complete = <T>(value: T): T => {
-      committedAttemptReads = attemptReads;
-      committedAttemptWrites = attemptWrites;
-      return value;
-    };
+  const result = await withCountedTransaction("submitMatchResult", async (tx) => {
     const matchSnapshot = await tx.get(matchRef);
-    attemptReads++;
-    totalObservedReads++;
     const match = matchSnapshot.data() as Record<string, unknown> | undefined;
     if (data.seedSource === "server") {
       const participantUids = match?.participantUids;
@@ -306,7 +248,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     }
     const status = typeof match?.status === "string" ? match.status : "pending";
     if (status !== "pending") {
-      return complete({status, reason: match?.reason ?? null});
+      return {status, reason: match?.reason ?? null};
     }
 
     const submissions = {...(match?.submissions as Record<string, Submission> | undefined)};
@@ -344,14 +286,12 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     if (decision.status === "pending") {
       tx.set(matchRef, {status: "pending", submissions, createdAt, expiresAt,
         deadlineAt: Timestamp.fromMillis(createdAt.toMillis() + SUBMISSION_DEADLINE_MS)}, {merge: true});
-      attemptWrites++;
-      return complete({status: "pending"});
+      return {status: "pending"};
     }
     if (decision.status === "flagged") {
       tx.set(matchRef, {status: "flagged", reason: decision.reason, submissions,
         settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-      attemptWrites++;
-      return complete({status: "flagged", reason: decision.reason});
+      return {status: "flagged", reason: decision.reason};
     }
 
     let serverSimulation: BattleSimulationResult | null = null;
@@ -398,8 +338,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
         tx.set(matchRef, {status: "flagged", reason, submissions,
           serverSimulation: persistableSimulation(serverSimulation),
           settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-        attemptWrites++;
-        return complete({status: "flagged", reason});
+        return {status: "flagged", reason};
       }
       const outcomeMismatches: string[] = [];
       if (serverSimulation.ok) {
@@ -445,8 +384,6 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     const saveRefs = entries.map((entry) =>
       db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
     const rankStateSnapshots = await tx.getAll(...rankStateRefs);
-    attemptReads += rankStateRefs.length;
-    totalObservedReads += rankStateRefs.length;
 
     const missingRankStateIndexes: number[] = [];
     const missingSaveRefs: DocumentReference[] = [];
@@ -458,8 +395,6 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
 
     const missingSaveSnapshots = missingSaveRefs.length === 0 ? [] :
       await tx.getAll(...missingSaveRefs);
-    attemptReads += missingSaveRefs.length;
-    totalObservedReads += missingSaveRefs.length;
 
     // payoutState가 있는 사용자는 save 폴백을 쓰지 않으므로 그 칸은 비워 둔다.
     // rankState 스냅샷으로 메우면 폴백이 실제로 걸릴 때(문서는 있는데 currentPoints가 깨진 경우)
@@ -523,7 +458,6 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
         lastMatchId: data.matchId,
         updatedAt: settledAt,
       }, {merge: true});
-      attemptWrites += 2;
       payoutSummary[entry.uid] = {currency, rank, won};
     }
 
@@ -550,20 +484,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     tx.set(matchRef, {status: "confirmed", submissions, payouts: payoutSummary,
       serverSimulation: persistableSimulation(serverSimulation), clientDivergence,
       settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-    attemptWrites++;
-    return complete({status: "confirmed"});
-  });
-  logger.info("submit_match_result_cost", {
-    matchId: data.matchId,
-    env: data.env,
-    status: result.status,
-    specCacheHit,
-    specReads: specCacheHit ? 0 : 3,
-    transactionAttempts,
-    committedAttemptReads,
-    committedAttemptWrites,
-    totalObservedReads,
-    durationMs: Date.now() - transactionStartedAtMs,
+    return {status: "confirmed"};
   });
   return result;
 });

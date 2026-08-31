@@ -2,6 +2,7 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {randomBytes} from "node:crypto";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {
   joinPairing,
   MatchIdentity,
@@ -100,7 +101,7 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
     seedHex: randomBytes(8).toString("hex"),
   };
 
-  return db.runTransaction(async (tx) => {
+  return withCountedTransaction("createMatch", async (tx) => {
     const matchSnapshot = await tx.get(matchRef);
     const raw = matchSnapshot.data();
     const priorOwners = objectRecord(raw?.ownerIndexByUid) ?? {};

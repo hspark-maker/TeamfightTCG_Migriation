@@ -2,6 +2,7 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {
   isKnownEnv,
   requireUid,
@@ -102,8 +103,8 @@ export const ensureWallet = onCall(async (request) => {
   const saveReference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
 
-  const outcome = await db.runTransaction<EnsureWalletOutcome>(
-    async (transaction) => {
+  const outcome = await withCountedTransaction<EnsureWalletOutcome>(
+    "ensureWallet", async (transaction) => {
       const walletSnapshot = await transaction.get(walletReference);
       if (walletSnapshot.exists) {
         const existing = readWallet(walletSnapshot);
