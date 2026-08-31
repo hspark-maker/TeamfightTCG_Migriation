@@ -19,15 +19,19 @@ using UnityEngine.UI;
 public class MatchmakingBgFx
 {
     [Tooltip("위 판(상대색). 아랫변이 이음매다.\n"
-           + "저작해서 쓰는 값: 색·스프라이트 / 기울기(회전 Z) / 이음매 세로 위치(앵커 Y) / 홈 좌표(Pos).\n"
-           + "⚠ 크기와 배율은 런타임이 화면에 맞춰 다시 잡는다 — 프리팹의 Width·Height·Scale은 편집 중 미리보기일 뿐 무시된다.\n"
+           + "저작해서 쓰는 값: 색·스프라이트 / 크기(Width·Height) / 배율(Scale) / 기울기(회전 Z) / "
+           + "이음매 세로 위치(앵커 Y) / 홈 좌표(Pos). 전부 저작값 그대로 쓰인다 — 런타임이 다시 잡지 않는다.\n"
+           + "⚠ 판 하나가 화면을 혼자 덮어야 한다. 기울어져 있어서 화면 대각선보다 더 여유가 필요하다 — "
+           + "실제로 덮는 크기는 Width·Height × Scale이고, 1080×1920 기준으로 대략 1382×1062는 되어야 한다. "
+           + "모자라면 좌우 끝에서 판 귀퉁이 뒤의 로비가 드러나고, 진입 때 한 번 경고가 뜬다.\n"
            + "⚠ pivot은 반드시 (0.5, 0) — 회전이 pivot을 중심으로 돌기 때문에, 이음매가 될 변 위에 pivot이 있어야 "
            + "해상도와 무관하게 아래 판의 변과 정확히 겹친다. 이 규약이 깨지면 대각선에 틈이 생긴다.\n"
            + "미배선이면 배경 축이 통째로 빠지고 배경은 지금처럼 정적으로 남는다.")]
     [SerializeField] RectTransform top;
 
-    [Tooltip("아래 판(내색). 윗변이 이음매다. 크기·배율은 위 판과 같이 런타임이 잡는다.\n"
-           + "⚠ pivot은 반드시 (0.5, 1). 앵커·회전은 위 판과 같은 값이어야 한다(다르면 진입 시 경고가 뜬다).")]
+    [Tooltip("아래 판(내색). 윗변이 이음매다. 크기·배율도 위 판과 같은 저작 규약이다.\n"
+           + "⚠ pivot은 반드시 (0.5, 1). 앵커·회전·배율은 위 판과 같은 값이어야 한다(다르면 진입 시 경고가 뜬다) — "
+           + "이음매 선의 길이를 위 판에서만 읽기 때문이다.")]
     [SerializeField] RectTransform bottom;
 
     [Header("맞물림 — 진입")]
@@ -163,7 +167,7 @@ public class MatchmakingBgFx
         this.top.DOKill();
         this.bottom.DOKill();
 
-        this.ApplyPanelSize(t_size);
+        this.WarnOnUndersizedPanels(t_size);
 
         this.top.anchoredPosition    = this.m_topHome    + new Vector2(0f, t_up);
         this.bottom.anchoredPosition = this.m_bottomHome - new Vector2(0f, t_down);
@@ -172,7 +176,7 @@ public class MatchmakingBgFx
         t_seq.Insert(0f, this.bottom.DOAnchorPos(this.m_bottomHome, this.closeDuration).SetEase(this.closeEase));
 
         // 맞물리는 프레임에 터진다 — 닫힘이 끝나는 자리다.
-        this.StageSeam(t_seq, this.closeDuration, t_size.x);
+        this.StageSeam(t_seq, this.closeDuration);
 
         return t_seq;
     }
@@ -185,12 +189,10 @@ public class MatchmakingBgFx
         if (!this.HasPanels) return t_seq;
 
         this.Capture();
-        this.Solve(_screen, out Vector2 t_size, out float t_up, out float t_down);
+        this.Solve(_screen, out _, out float t_up, out float t_down);
 
         this.top.DOKill();
         this.bottom.DOKill();
-
-        this.ApplyPanelSize(t_size);
 
         // 시작 자리를 못 박지 않는다 — 진입이 끝난 자리에서 그대로 이어받는다.
         t_seq.Insert(0f, this.top.DOAnchorPos(this.m_topHome + new Vector2(0f, t_up),
@@ -199,7 +201,7 @@ public class MatchmakingBgFx
                                                  this.partDuration).SetEase(this.partEase));
 
         // 갈라지기 시작하는 프레임에 한 번 — 맞물릴 때와 같은 선이 갈라짐의 신호가 된다.
-        this.StageSeam(t_seq, 0f, t_size.x);
+        this.StageSeam(t_seq, 0f);
 
         return t_seq;
     }
@@ -232,8 +234,8 @@ public class MatchmakingBgFx
         return t_seq;
     }
 
-    /// <summary>안무가 옮긴 <b>위치와 색</b>만 저작 자리로 되돌린다. 잘려도 배경이 화면 밖으로 나간 채 굳지 않게.
-    /// 크기·배율은 코드 소유라 되돌리지 않는다 — 다음 열기의 BuildClose가 화면에서 다시 푼다.</summary>
+    /// <summary>안무가 옮긴 <b>위치와 색</b>을 저작 자리로 되돌린다. 잘려도 배경이 화면 밖으로 나간 채 굳지 않게.
+    /// 크기·배율은 안무가 손대지 않으므로 되돌릴 것도 없다 — 판의 저작값이 그대로 남아 있다.</summary>
     /// <param name="_tint">밝기 축. 확정이 옮겨 놓은 기준 색을 저작값으로 되돌리려면 이쪽을 거쳐야 한다.</param>
     public void Reset(ScreenDimTint _tint)
     {
@@ -266,19 +268,7 @@ public class MatchmakingBgFx
         this.m_bottomBaseColor = this.m_bottomImage.color;
     }
 
-    // 판의 크기는 화면에서 푼 값이 진실원이다 — 저작 크기·배율에 기대면 가로가 넓은 기기에서 기울어진 귀퉁이가 화면 안으로 들어온다.
-    // 씬 커튼(CurtainView.ApplyGeometry)과 같은 규약이라, 두 커튼이 같은 판 조립을 나눠 쓸 수 있다.
-    void ApplyPanelSize(in Vector2 _size)
-    {
-        this.top.sizeDelta    = _size;
-        this.bottom.sizeDelta = _size;
-
-        // 크기를 코드가 정하므로 배율이 1이 아니면 계산한 만큼 덮이지 않는다(이동은 anchoredPosition이라 배율과 무관하다).
-        this.top.localScale    = Vector3.one;
-        this.bottom.localScale = Vector3.one;
-    }
-
-    // 판의 크기와 판이 화면을 완전히 비우는 거리. 진실원을 둘로 만들지 않으려 CurtainView.Solve를 그대로 부른다 —
+    // 판이 화면을 덮는 데 필요한 크기와 판이 화면을 완전히 비우는 거리. 진실원을 둘로 만들지 않으려 CurtainView.Solve를 그대로 부른다 —
     // 이음매의 세로 위치·기울기도 씬 커튼과 같이 프리팹 저작값에서 읽는다(두 커튼이 같은 판 조립을 나눠 쓴다).
     void Solve(RectTransform _screen, out Vector2 _size, out float _up, out float _down)
     {
@@ -307,9 +297,12 @@ public class MatchmakingBgFx
     }
 
     // 이음매 선. 프리팹에 배선할 자리를 만들지 않는다 — 스캔 띠·조임 빛·빛줄기와 같은 자가설치 규약이다.
-    void StageSeam(Sequence _seq, float _at, float _span)
+    void StageSeam(Sequence _seq, float _at)
     {
         if (this.seamThickness <= 0f || this.top == null || this.top.parent == null) return;
+
+        // 선은 판의 형제라 배율이 1인데 판은 배율이 걸린 채 저작된다 — rect는 배율 이전 값이라 곱하지 않으면 선이 판보다 길어진다.
+        float t_span = this.top.rect.width * Mathf.Abs(this.top.localScale.x);
 
         var t_go = new GameObject("SeamFlash", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         var t_rt = (RectTransform)t_go.transform;
@@ -325,7 +318,7 @@ public class MatchmakingBgFx
         t_rt.anchoredPosition = this.m_topHome;
 
         // 판과 같은 길이로 눕는다 — 기울어진 선이라 화면 폭보다 길어야 좌우 끝이 비지 않고, 판 폭이 이미 그 몫이다.
-        t_rt.sizeDelta     = new Vector2(_span, this.seamThickness);
+        t_rt.sizeDelta     = new Vector2(t_span, this.seamThickness);
         t_rt.localRotation = Quaternion.Euler(0f, 0f, this.SeamAngle);
 
         var t_image = t_go.GetComponent<Image>();
@@ -367,6 +360,25 @@ public class MatchmakingBgFx
 
         if (!Mathf.Approximately(this.top.pivot.y, 0f) || !Mathf.Approximately(this.bottom.pivot.y, 1f))
             Debug.LogWarning($"[MatchmakingBgFx] pivot 규약 위반(위 {this.top.pivot} 은 y=0, 아래 {this.bottom.pivot} 은 y=1이어야 함) — 이음매가 어긋납니다.");
+
+        if (!Mathf.Approximately(this.top.localScale.x, this.bottom.localScale.x))
+            Debug.LogWarning($"[MatchmakingBgFx] 두 판의 배율이 다릅니다(위 {this.top.localScale.x} ≠ 아래 {this.bottom.localScale.x}) — 이음매 길이는 위 판에서만 읽습니다.");
+#endif
+    }
+
+    // 판 크기는 저작값이 이긴다. 그래서 이 화면에서만 판이 화면보다 작게 저작될 수 있고, 그러면 기울어진 귀퉁이 뒤로 로비가 드러난다 —
+    // 좁은 편집 화면에서는 멀쩡해 보여서 눈으로 못 잡으므로 필요 크기와 견줘 알린다(맞물릴 때 한 번, 즉 연출당 한 번).
+    void WarnOnUndersizedPanels(in Vector2 _needed)
+    {
+#if UNITY_EDITOR
+        float t_scale = Mathf.Abs(this.top.localScale.x);
+        float t_w     = this.top.rect.width  * t_scale;
+        float t_h     = this.top.rect.height * Mathf.Abs(this.top.localScale.y);
+
+        if (t_w <= 0f || t_h <= 0f) return;
+
+        if (t_w + 0.5f < _needed.x || t_h + 0.5f < _needed.y)
+            Debug.LogWarning($"[MatchmakingBgFx] 판이 화면을 덮기에 모자랍니다(저작 {t_w:F0}×{t_h:F0} < 필요 {_needed.x:F0}×{_needed.y:F0}) — 기울어진 귀퉁이 뒤로 로비가 드러납니다. 판의 Width·Height 또는 Scale을 키우세요.");
 #endif
     }
 }
