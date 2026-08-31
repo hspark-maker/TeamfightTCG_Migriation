@@ -1,15 +1,27 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
-# Unity YAML(프리팹·씬·에셋)은 텍스트 3-way 머지로 합치면 중첩 프리팹 오버라이드가
-# 뒤섞여 조용히 깨진다. UnityYAMLMerge(SmartMerge)가 fileID 단위로 합치게 한다.
+# 프리팹은 자동 병합하지 않는다(-merge = 바이너리 취급).
 #
-# ⚠ merge=unityyamlmerge도 드라이버 등록이 있어야 동작한다. 클론한 사람마다 1회:
+# 왜: SmartMerge(UnityYAMLMerge)는 fileID 단위로 "합쳐 놓고" 성공한 것처럼 끝난다 —
+# 마커가 남지 않아 리뷰에서 안 보이고, 중첩 프리팹 오버라이드가 조용히 다른 값으로 굳는다.
+# 실제로 Label_Skip 의 폰트 색·크기가 그렇게 밀려 런타임에서 글자가 사라졌다.
+#
+# 이제 프리팹이 양쪽에서 바뀌면 git 이 충돌로 세우고 워킹트리에는 ours 가 남는다.
+# 해결은 손으로: 둘 중 하나를 고르거나(`git checkout --ours/--theirs <파일>`),
+# 필요하면 SmartMerge 를 그 파일에만 직접 돌린다.
+#     "<Unity>/Editor/Data/Tools/UnityYAMLMerge.exe" merge -p <BASE> <OURS> <THEIRS> <OUT>
+# 어느 쪽을 골랐든 Unity 로 열어 눈으로 확인하고 커밋할 것.
+*.prefab -merge
+
+# 씬·에셋은 계속 SmartMerge 를 태운다 — 프리팹과 달리 중첩 오버라이드 구조가 없어
+# fileID 단위 병합이 비교적 안전하고, 씬은 통째 채택 시 잃는 것이 너무 크다.
+#
+# ⚠ merge=unityyamlmerge 는 드라이버 등록이 있어야 동작한다. 클론한 사람마다 1회:
 #     git config merge.unityyamlmerge.name "Unity SmartMerge"
 #     git config merge.unityyamlmerge.driver '"C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Data/Tools/UnityYAMLMerge.exe" merge -p %O %B %A %A'
 #     git config merge.unityyamlmerge.recursive binary
-#   등록 안 하면 예전처럼 텍스트 머지로 처리될 뿐 즉시 손상되지는 않는다.
-*.prefab merge=unityyamlmerge
+#   등록 안 하면 텍스트 머지로 처리될 뿐 즉시 손상되지는 않는다.
 *.unity  merge=unityyamlmerge
 *.asset  merge=unityyamlmerge
 
@@ -27,9 +39,6 @@
 # ⚠ 이 두 줄은 위의 *.asset 규칙보다 뒤에 있어야 한다 — gitattributes는 마지막 일치가 이긴다.
 Assets/Fonts/**/*.asset          -text merge=ours
 Assets/Resources/Fonts/*.asset   -text merge=ours
-
-# Unity prefab YAML must use Smart Merge to keep nested-prefab edits reviewable.
-*.prefab merge=unityyamlmerge
 
 # Cloud Functions 소스는 ESLint linebreak-style(LF)을 강제한다 —
 # Windows 체크아웃에서 CRLF로 떨어지면 predeploy lint가 전 파일에서 터진다.
