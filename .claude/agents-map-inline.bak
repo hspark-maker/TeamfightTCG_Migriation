@@ -158,7 +158,7 @@
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
 - 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `UI/Common/LobbyEntryAlertDot` (`EAlertDotTarget`) · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
-- 매칭 UI: `UI/Match/MatchmakingShell` (진입점 둘 — 랭크전 `MatchmakingShell.RunMatchAsync` · 토너먼트 대치 `MatchmakingShell.PlayVersusAsync`, 프리팹은 `MatchmakingRoot.prefab` 하나) · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchmakingEntryFx` · `MatchmakingBgFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
+- 매칭 UI: `UI/Match/MatchmakingShell` (진입점 둘 — 랭크전 `MatchmakingShell.RunMatchAsync` · 토너먼트 대치 `MatchmakingShell.PlayVersusAsync`, 프리팹은 MatchmakingRoot.prefab 하나) · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchmakingEntryFx` · `MatchmakingBgFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
 - 매치 연출 튜닝: 두 모드가 부품 한 벌을 공유하고 저작값 14개만 갈아끼운다 — `MatchmakingFx.ClashTuning` · `MatchmakingEntryFx.EntranceTuning` · `MatchmakingBgFx.SeamTuning` (각 부품에 `Capture*` / `Apply*` 짝). 랭크전 값은 프리팹 저작을 `Awake` 가 캡처하고, 대치 값은 셸의 `versusIntro*` 필드다
 
 ## 보상 토너먼트 (`OutGame/Tournament/`, `UI/Tournament/`)
