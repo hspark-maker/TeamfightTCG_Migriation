@@ -264,14 +264,14 @@ public class MatchmakingFx
     /// <summary>격돌 세기를 통째로 갈아끼운다. 안무를 짓기 전에 불러야 그 판의 값으로 지어진다.</summary>
     public void ApplyClash(in ClashTuning _tuning)
     {
-        this.chargeShake    = _tuning.chargeShake;
-        this.chargeGlowFrom = _tuning.chargeGlowFrom;
-        this.releaseKick    = _tuning.releaseKick;
-        this.windUpDistance = _tuning.windUpDistance;
-
-        // 0이면 돌진이 길이 없는 구간이 되어 HitAt이 앞당겨진다 — 저작 하한(Min)을 코드에서도 지킨다.
+        // 인스펙터로는 못 넣는 값이라도 코드가 만든 묶음은 그냥 들어온다 — 선언된 하한(Min)을 여기서도 지킨다.
+        // 특히 windUpDuration이 0이면 돌진이 길이 없는 구간이 되어 HitAt이 앞당겨진다.
+        this.chargeShake    = Mathf.Max(0f,    _tuning.chargeShake);
+        this.chargeGlowFrom = Mathf.Max(0f,    _tuning.chargeGlowFrom);
+        this.releaseKick    = Mathf.Max(0f,    _tuning.releaseKick);
+        this.windUpDistance = Mathf.Max(0f,    _tuning.windUpDistance);
         this.windUpDuration = Mathf.Max(0.01f, _tuning.windUpDuration);
-        this.windUpHold     = _tuning.windUpHold;
+        this.windUpHold     = Mathf.Max(0f,    _tuning.windUpHold);
     }
 
     /// <summary>

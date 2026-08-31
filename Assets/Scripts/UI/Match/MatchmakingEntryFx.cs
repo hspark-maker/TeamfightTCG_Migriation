@@ -103,11 +103,11 @@ public class MatchmakingEntryFx
     /// <summary>등장 박자를 통째로 갈아끼운다. 안무를 짓기 전에 불러야 그 판의 값으로 지어진다.</summary>
     public void ApplyEntrance(in EntranceTuning _tuning)
     {
-        this.bannerAt       = _tuning.bannerAt;
-        this.bannerDistance = _tuning.bannerDistance;
-        this.riderAt        = _tuning.riderAt;
-
-        // 길이 0짜리 트윈은 Duration을 앞당겨 착지 시각까지 흔든다 — 저작 하한(Min)을 코드에서도 지킨다.
+        // 인스펙터로는 못 넣는 값이라도 코드가 만든 묶음은 그냥 들어온다 — 선언된 하한(Min)을 여기서도 지킨다.
+        // 특히 길이 0짜리 트윈은 Duration을 앞당겨 착지 시각까지 흔든다.
+        this.bannerAt       = Mathf.Max(0f,    _tuning.bannerAt);
+        this.bannerDistance = Mathf.Max(0f,    _tuning.bannerDistance);
+        this.riderAt        = Mathf.Max(0f,    _tuning.riderAt);
         this.rootDuration   = Mathf.Max(0.01f, _tuning.rootDuration);
         this.bannerDuration = Mathf.Max(0.01f, _tuning.bannerDuration);
         this.riderDuration  = Mathf.Max(0.01f, _tuning.riderDuration);

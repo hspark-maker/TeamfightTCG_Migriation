@@ -55,8 +55,15 @@ public class MatchmakingShell : MonoBehaviour
              "예비동작이 있지만 여기는 낙하가 그 몫을 대신하고 곧바로 관성으로 박힌다.")]
     [SerializeField] float versusIntroApproach = 90f;
 
+    // ⚠ 아래 세 묶음(격돌·등장·이음매)의 이니셜라이저 숫자는 진실원이 아니다 — 런타임은 프리팹 저작값이 이긴다.
+    //   지우면 프리팹에 저작되지 않은 새 인스턴스에서 연출이 0으로 죽으므로 씨앗으로 남겨 둔다.
+    const string TUNING_SOURCE_NOTE =
+        "\n\n[진실원] 런타임에 도는 값은 프리팹(MatchmakingRoot)에 저작된 이 인스펙터 값이다. " +
+        "코드 이니셜라이저의 숫자는 프리팹에 저작되지 않은 새 인스턴스가 0으로 죽지 않게 두는 씨앗일 뿐이라 " +
+        "여기 값과 다를 수 있다 — 튜닝은 이 인스펙터에서 한다.";
+
     [Tooltip("대치의 격돌 세기. 예비동작 거리·시간을 0에 가깝게 두는 것이 이 모드의 핵심이다 — " +
-             "낙하가 이미 예비동작이라 물러났다 치면 사건이 두 번이 된다.")]
+             "낙하가 이미 예비동작이라 물러났다 치면 사건이 두 번이 된다." + TUNING_SOURCE_NOTE)]
     [SerializeField] MatchmakingFx.ClashTuning versusIntroClash = new MatchmakingFx.ClashTuning
     {
         chargeShake = 3.6f, chargeGlowFrom = 0.3f, releaseKick = 0.12f,
@@ -64,14 +71,14 @@ public class MatchmakingShell : MonoBehaviour
     };
 
     [Tooltip("대치의 등장 박자. 프로필은 판에 실려 떨어지므로 banner* 는 사실상 꺼 둔다 — " +
-             "여기 남는 것은 화면 배율과 제목뿐이다.")]
+             "여기 남는 것은 화면 배율과 제목뿐이다." + TUNING_SOURCE_NOTE)]
     [SerializeField] MatchmakingEntryFx.EntranceTuning versusIntroEntrance = new MatchmakingEntryFx.EntranceTuning
     {
         rootDuration = 0.2f, bannerAt = 0f, bannerDuration = 0.01f, bannerDistance = 0f,
         riderAt = 0f, riderDuration = 0.2f,
     };
 
-    [Tooltip("대치의 이음매 굵기. 이 모드는 두 판이 맞물리는 것 자체가 사건이라 랭크전보다 굵다.")]
+    [Tooltip("대치의 이음매 굵기. 이 모드는 두 판이 맞물리는 것 자체가 사건이라 랭크전보다 굵다." + TUNING_SOURCE_NOTE)]
     [SerializeField] MatchmakingBgFx.SeamTuning versusIntroSeam = new MatchmakingBgFx.SeamTuning
     {
         seamThickness = 10f,
@@ -433,7 +440,9 @@ public class MatchmakingShell : MonoBehaviour
 
         t_rect.anchoredPosition = _home + new Vector2(0f, _offsetY);
 
-        _seq.Insert(0f, t_rect.DOAnchorPos(_home, bgFx.CloseDuration).SetEase(bgFx.CloseEase));
+        // 길이는 착지 시각 하나만 읽는다 — 판보다 등장이 길면 프로필이 먼저 착지해 굳었다가 뒤늦게 돌진한다.
+        // 이징은 판을 그대로 따른다(같은 가속으로 내려와야 실려 있는 것으로 읽힌다).
+        _seq.Insert(0f, t_rect.DOAnchorPos(_home, m_landAt).SetEase(bgFx.CloseEase));
     }
 
     void ShowVersus()
@@ -582,7 +591,7 @@ public class MatchmakingShell : MonoBehaviour
     void PlayVersus()
     {
         var t_vs = VersusRect;
-        if (versusRoot != null) versusRoot.SetActive(true);
+        ShowVersus();
 
         // 짓기 전에 먼저 걷는다. PlayStage도 걷지만 그건 인자를 다 만든 뒤라,
         // 안무를 짓는 동안 조임이 아직 살아 있어 같은 카드를 두 시퀀스가 붙들고 있는 순간이 생긴다.

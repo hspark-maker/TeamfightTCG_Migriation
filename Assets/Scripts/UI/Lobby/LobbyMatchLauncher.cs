@@ -383,10 +383,11 @@ public class LobbyMatchLauncher : MonoBehaviour
         return await DeckShell.RunSelectionAsync(_ct);
     }
 
-    // 대치 인트로 → 덱 화면. 매칭 경로(RunSelectionWithHandoffAsync)와 같은 규약이되 앞자리 화면만 다르다.
+    // 대치 인트로 → 갈라짐 → 덱 화면. 덱 화면을 앞세우는 경로는 지금 이것 하나뿐이다 —
+    // 랭크전(RunEntryChainAsync의 매칭 갈래)은 로비 대표 덱으로 곧장 전투에 들어가 덱 화면을 거치지 않는다.
     //
-    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 매칭은 상대를 기다리는 동안 세울 시간이 있지만
-    // 여기는 상대가 이미 정해져 있어 대기가 없다. 미리 세워 두면 그 레이아웃 비용이 진입 안무 첫 프레임에 얹힌다.
+    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 상대가 이미 정해져 있어 미리 세울 시간을 벌어 줄 대기가 없다.
+    // 진입 안무 앞에 세우면 그 레이아웃 비용이 첫 프레임에 그대로 얹힌다.
     async UniTask<bool> RunSelectionWithVersusAsync(MatchmakingShell _versus, MatchOpponent _opponent,
                                                     CancellationToken _ct)
     {
