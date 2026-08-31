@@ -27,6 +27,11 @@ public sealed class FirebaseAuthService
     public event Action OnStateChanged;
 
     public EFirebaseAuthState State { get; private set; } = EFirebaseAuthState.Uninitialized;
+
+    /// <summary>Firebase 네이티브 SDK 적재가 이 프로세스에서 이미 끝났는가. 소비자는 이걸로 콜드 부트와
+    /// 데워진 뒤를 갈라 인증 대기 예산을 고른다(<see cref="FirebaseTimeouts.SdkColdStartMilliseconds"/>).</summary>
+    public static bool DependenciesReady { get; private set; }
+
     public string UserId { get; private set; } = string.Empty;
     public string LastError { get; private set; } = string.Empty;
     public bool IsCurrentUserActive => this.auth?.CurrentUser != null &&
@@ -414,13 +419,19 @@ public sealed class FirebaseAuthService
     {
         if (this.auth != null) return (true, false);
 
+        var t_watch = System.Diagnostics.Stopwatch.StartNew();
         DependencyStatus t_dependencyStatus = await FirebaseApp.CheckAndFixDependenciesAsync();
+        long t_dependencyMilliseconds = t_watch.ElapsedMilliseconds;
         if (_generation != this.generation) return (false, false);
         if (t_dependencyStatus != DependencyStatus.Available)
         {
             SetFailure(EFirebaseAuthState.Unavailable, $"Firebase dependencies unavailable: {t_dependencyStatus}");
             return (false, false);
         }
+
+        // 콜드 적재가 얼마나 걸렸는지 남기지 않으면, 인증 타임아웃이 네트워크 탓인지 SDK 적재 탓인지 사후에 못 가른다.
+        DependenciesReady = true;
+        Debug.Log($"[FirebaseAuth] SDK dependencies ready in {t_dependencyMilliseconds}ms.");
 
         this.auth = FirebaseAuth.DefaultInstance;
         bool t_abandoned = ApplyBackend();
