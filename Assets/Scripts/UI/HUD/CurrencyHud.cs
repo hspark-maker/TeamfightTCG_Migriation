@@ -145,23 +145,16 @@ public class CurrencyHud : MonoBehaviour
     /// 획득 연출용 숫자 롤업을 시작하고, 코인 도착 콜백(도착 장수, 전체 장수)에 물릴 진행 핸들러를 돌려준다.
     /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다(획득분만큼 되돌렸다가 도착에 맞춰 다시 올린다).
     /// 연출이 끊겨도 고정이 풀리도록 호출부는 반환된 해제 콜백을 시퀀스 OnKill에 걸어둘 것.
-    /// <para>_optimistic은 그 전제를 뒤집는다 — 지급이 아직 서버에서 끝나지 않은 상태에서 부른다는 뜻이라,
-    /// 현재 잔액에 획득분을 <b>더한</b> 값을 목표로 삼는다. 이 플래그 없이 지급 전에 부르면 목표가 옛 잔액이라
-    /// 숫자가 획득분만큼 내려갔다 제자리로 돌아온다. 고정이 풀릴 때 실제 잔액이 아직 도착하지 않았으면
-    /// 그 옛값이 렌더되므로, 왕복보다 긴 연출에만 쓸 것.</para>
+    /// <para>목표는 언제나 표시 잔액(<see cref="CurrencyManager.GetBalance"/>)이다 — 그 값이 서버 잔액에
+    /// 미해소 낙관분을 더한 금액이라, 서버 왕복이 끝나기 전에 불러도 이미 최종 금액을 가리킨다.</para>
     /// </summary>
     public Action<int, int> BeginGainRollUp(long _gain, out Action _release,
-                                            float _punch = UiPunch.DEFAULT_SCALE,
-                                            bool _optimistic = false)
+                                            float _punch = UiPunch.DEFAULT_SCALE)
     {
-        long t_balance = CurrencyManager.GetBalance(this.type);
-        long t_target = _optimistic ? t_balance + _gain : t_balance;
+        long t_target = CurrencyManager.GetBalance(this.type);
         long t_start = m_held ? m_displayedValue : t_target - _gain;
 
         this.KillSpendTween();
-
-        // 앞 획득이 아직 고정 중인데 그 잔액이 도착하지 않았으면 낙관 목표가 표시값보다 작아진다 — 숫자가 역주행한다.
-        if (_optimistic && t_target < t_start) t_target = t_start;
 
         int t_revision = ++m_displayRevision;
         this.HoldDisplay(t_start);
@@ -304,8 +297,9 @@ public class CurrencyHud : MonoBehaviour
         this.ApplyIcon();
 
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
-        // 소비 통지(OnCurrencySpent)는 아직 붙일 곳이 없다 — 잔액의 진실원이 서버 지갑으로 가면서
-        // 클라 소비 경로가 사라졌다. 서버 응답이 '얼마 빠졌는가'를 내주면 그때 여기서 구독한다.
+        // 소비 통지(OnCurrencySpent)는 서버 응답이 아니라 낙관 차감을 거는 순간 온다 — 왕복을 기다리지 않고
+        // 그 프레임에 롤다운을 시작하고, 뒤이어 오는 잔액 통지가 목표만 갈아끼운다.
+        CurrencyManager.OnCurrencySpent += this.HandleCurrencySpent;
         this.Render(CurrencyManager.GetBalance(this.type));
     }
 
@@ -315,6 +309,7 @@ public class CurrencyHud : MonoBehaviour
         if (s_huds.TryGetValue(this.type, out var t_cur) && t_cur == this) s_huds.Remove(this.type);
 
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
+        CurrencyManager.OnCurrencySpent -= this.HandleCurrencySpent;
 
         m_displayRevision++;
         this.KillSpendTween();
@@ -333,7 +328,7 @@ public class CurrencyHud : MonoBehaviour
         this.type = m_defaultType;
     }
 
-    // 소비 연출 진입점. 지금은 부르는 곳이 없다(위 OnEnable 주석 참조) — 서버가 소비량을 통지하면 그대로 재사용한다.
+    // 소비 연출 진입점. 낙관 차감이 걸리는 순간 불린다(위 OnEnable 주석 참조).
     void HandleCurrencySpent(ECurrencyType _type, long _cost, long _balance)
     {
         if (_type != this.type) return;

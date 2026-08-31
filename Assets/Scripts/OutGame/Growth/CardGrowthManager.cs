@@ -129,13 +129,16 @@ public static partial class CardGrowthManager
 
         if (t_level >= GrowthRules.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
-        if (!TryGetStepAt(t_id, t_level + 1, out _))
+        if (!TryGetStepAt(t_id, t_level + 1, out GrowthStep t_step))
             return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
 
         // 무료 한 방의 조건은 클라 안내가 쥐고 있어 요청에 실어 보낸다 — 실제로 먹였는지는 응답이 답한다.
         bool t_freeShot = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance);
 
-        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot);
+        // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
+        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(t_step.Currency, -t_step.Cost);
+
+        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot, t_pending);
 
         // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
         if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(t_id));

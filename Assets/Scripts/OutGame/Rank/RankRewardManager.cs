@@ -107,8 +107,13 @@ public static class RankRewardManager
     {
         if (!CanClaim(_tierIndex)) return default;
 
+        // 첫 await 이전에 걸어야 한다 — 뒤로 밀리면 팝업의 숫자 롤업이 옛 잔액을 목표로 잡아 역주행한다.
+        var t_rewards = new List<RewardLine>();
+        Config.FillRewards(_tierIndex, t_rewards);
+        var t_pending = CurrencyPendingTicket.Hold(t_rewards);
+
         // 티어 인덱스 문자열이 스펙시트 Reward.ownerId 와 같은 키다(RankConfig.FillRewards와 같은 표기).
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString());
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString(), t_pending);
         if (!t_outcome.Succeeded) return default;
 
         OnChanged?.Invoke();

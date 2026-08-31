@@ -20,8 +20,26 @@ internal static class ServerSaveCommands
         s_service = _service;
     }
 
-    /// <summary>세이브를 쓰는 서버 호출. 업로드를 봉인하고 응답의 revision·슬롯을 채택한 뒤 봉인을 푼다.</summary>
-    internal static async UniTask<TResponse> InvokeAsync<TResponse>(string _commandName, object _request)
+    /// <summary>세이브를 쓰는 서버 호출. 업로드를 봉인하고 응답의 revision·슬롯을 채택한 뒤 봉인을 푼다.
+    /// <paramref name="_pending"/> 를 넘기면 서버 잔액을 채택하기 직전에 낙관 델타를 걷는다.</summary>
+    internal static async UniTask<TResponse> InvokeAsync<TResponse>(
+        string _commandName, object _request, CurrencyPendingTicket _pending = null)
+        where TResponse : ServerCommandResult
+    {
+        try
+        {
+            return await RunAsync<TResponse>(_commandName, _request, _pending);
+        }
+        finally
+        {
+            // 게이트를 잡기 전에 던지는 갈래(서비스 미배선·상태 불가·페이로드 오류)는 아래 finally에 닿지 않는다.
+            // 걷지 못한 델타는 세션이 끝날 때까지 표시 잔액을 어긋나게 두므로 회수를 가장 바깥에 둔다.
+            _pending?.Settle();
+        }
+    }
+
+    static async UniTask<TResponse> RunAsync<TResponse>(
+        string _commandName, object _request, CurrencyPendingTicket _pending)
         where TResponse : ServerCommandResult
     {
         ICallableService t_service = RequireService(_commandName);
@@ -56,7 +74,18 @@ internal static class ServerSaveCommands
                 throw new InvalidOperationException($"Server command '{_commandName}' returned nothing.");
 
             // 지갑이 먼저다 — 단조 판정이라 절대 던지지 않으므로, 뒤의 세이브 채택이 세션을 접어도 잔액은 이미 맞다.
-            if (t_result.Wallet != null) WalletCloud.Adopt(t_result.Wallet);
+            // 걷기와 채택 사이에 아무 줄도 두지 않는다 — 채택이 먼저 서면 낙관 델타가 서버 잔액 위에 한 번 더 얹혀 이중 계상된다.
+            // 그리고 걷기는 무음이어야 한다: 걷은 직후의 잔액은 "변동 전"이라, 그것이 화면에 닿으면 숫자가 되돌아갔다 다시 간다.
+            if (t_result.Wallet != null)
+            {
+                _pending?.Settle(_notify: false);
+                WalletCloud.Adopt(t_result.Wallet);
+            }
+            else
+            {
+                // 뒤따를 채택이 없으니 이 걷기가 화면을 되돌리는 유일한 통지다.
+                _pending?.Settle();
+            }
 
             // revision 0/누락 = 이 명령은 세이브를 쓰지 않았다. 그대로 채택에 넘기면 "정확히 +1" 단언이
             // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
