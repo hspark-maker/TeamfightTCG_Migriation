@@ -462,12 +462,27 @@ public class OutgameTutorialBridge : MonoBehaviour
     }
 
     // 구매 성공 신호. 곧바로 개봉 오버레이가 열리므로 커밋만 하고, 다음 스텝은 OnPackOverlayOpened가 재개한다.
+    // 이 신호는 왕복 성립이 아니라 결제 개시다 — 서버가 뒤늦게 거절하면 OnPurchaseRejected가 이 커밋을 되돌린다.
     void OnPurchased()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Purchase) return;
 
         OutgameTutorialRunner.NotifyStepSatisfied();
         CloseGate();
+    }
+
+    // 구매 거절 신호. 커밋을 되돌리기만 한다 — 되감긴 스텝의 안내는 곧 이어지는 오버레이 닫힘이 다시 세운다.
+    // 여기서 직접 다시 세우면 아직 떠 있는 개봉 화면 위에 로비 안내가 한 번 그려진다.
+    void OnPurchaseRejected(EPackOpenResult _reason)
+    {
+        if (OutgameTutorialRunner.RewindToPendingPurchase()) return;
+
+        // 되돌릴 구매 스텝이 없는 갈래(자동 구매)다 — 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없으므로
+        // 부팅을 세 번 거듭하기 전에 여기서 문을 연다(진입 실패와 같은 처분).
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.PackOpen) return;
+
+        Debug.LogWarning($"[OutgameTutorialBridge] 구매가 거절돼({_reason}) 개봉 신호가 오지 않습니다 — 기능 잠금을 해제합니다.");
+        OutgameFeatureLock.NotifyStalled();
     }
 
     // 개봉 오버레이 열림/닫힘. 씬이 바뀌지 않으므로 재개해 줄 새 브리지가 없다 — 이 브리지가 직접 이어간다.
@@ -555,6 +570,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnChanged     += OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
+        PackAcquireController.OnAnyPurchaseRejected += OnPurchaseRejected;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
@@ -581,6 +597,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.OnChanged     -= OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
+        PackAcquireController.OnAnyPurchaseRejected -= OnPurchaseRejected;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;

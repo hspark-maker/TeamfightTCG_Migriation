@@ -143,16 +143,26 @@ public class CurrencyHud : MonoBehaviour
 
     /// <summary>
     /// 획득 연출용 숫자 롤업을 시작하고, 코인 도착 콜백(도착 장수, 전체 장수)에 물릴 진행 핸들러를 돌려준다.
-    /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다.
-    /// 호출부는 반환된 해제 콜백을 시퀀스 OnKill에 걸어 둘 것(연출이 끊겨도 고정이 풀리도록).
+    /// 잔액이 이미 최종값이라는 전제 — 지급·저장이 끝난 뒤에 부른다(획득분만큼 되돌렸다가 도착에 맞춰 다시 올린다).
+    /// 연출이 끊겨도 고정이 풀리도록 호출부는 반환된 해제 콜백을 시퀀스 OnKill에 걸어둘 것.
+    /// <para>_optimistic은 그 전제를 뒤집는다 — 지급이 아직 서버에서 끝나지 않은 상태에서 부른다는 뜻이라,
+    /// 현재 잔액에 획득분을 <b>더한</b> 값을 목표로 삼는다. 이 플래그 없이 지급 전에 부르면 목표가 옛 잔액이라
+    /// 숫자가 획득분만큼 내려갔다 제자리로 돌아온다. 고정이 풀릴 때 실제 잔액이 아직 도착하지 않았으면
+    /// 그 옛값이 렌더되므로, 왕복보다 긴 연출에만 쓸 것.</para>
     /// </summary>
     public Action<int, int> BeginGainRollUp(long _gain, out Action _release,
-                                            float _punch = UiPunch.DEFAULT_SCALE)
+                                            float _punch = UiPunch.DEFAULT_SCALE,
+                                            bool _optimistic = false)
     {
-        long t_target = CurrencyManager.GetBalance(this.type);
+        long t_balance = CurrencyManager.GetBalance(this.type);
+        long t_target = _optimistic ? t_balance + _gain : t_balance;
         long t_start = m_held ? m_displayedValue : t_target - _gain;
 
         this.KillSpendTween();
+
+        // 앞 획득이 아직 고정 중인데 그 잔액이 도착하지 않았으면 낙관 목표가 표시값보다 작아진다 — 숫자가 역주행한다.
+        if (_optimistic && t_target < t_start) t_target = t_start;
+
         int t_revision = ++m_displayRevision;
         this.HoldDisplay(t_start);
 
@@ -277,7 +287,7 @@ public class CurrencyHud : MonoBehaviour
         // 연출 도중에 잡으면 소비 색이 기준색으로 굳는다.
         if (this.valueText != null) m_baseTextColor = this.valueText.color;
 
-        // 게이트에 IsLendable을 쓰지 않는다 — 그 판정이 CurrencyLook을 읽어 부트 주입 순서에 매인다.
+        // 게이트에 IsLendable을 쓰지 않는다 — 그 판정이 CurrencyLook을 읽어 초기화 주입 순서에 매인다.
         if (this.registerAsPrimary && this.iconImage != null && this.valueText != null)
             m_roll.Bind(transform as RectTransform, this.iconImage, this.valueText);
     }

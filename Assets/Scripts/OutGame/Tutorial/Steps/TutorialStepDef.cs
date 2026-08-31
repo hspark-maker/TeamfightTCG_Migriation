@@ -55,7 +55,10 @@ public class TutorialStepDef
     [SerializeField] bool useDim = true;
 
     [Tooltip("WaitPurchase: 상점 진열·판매 대상 / AutoPurchase: 자동 구매할 팩 / DeckAutoEquip: 자동 편성이 채울 풀 / "
-           + "PackNotice: 예고 팝업에 세울 팩(아트·이름만 읽는다 — 지급도 구매도 하지 않는다)")]
+           + "PackNotice: 예고 팝업에 세울 팩(아트·이름만 읽는다 — 지급도 구매도 하지 않는다) / "
+           + "DeckGrant·CardGrant·CardSetGrant: 무엇을 줄지의 정본. 서버가 이 팩의 카드 전량을 확정 지급한다.\n"
+           + "⚠ 지급 팩은 가격이 0이어야 한다 — 값이 붙은 팩은 서버가 거절해 화면만 서고 소유는 늘지 않는다.\n"
+           + "⚠ 아래 카드 저작(cardId·cardIds)과 시나리오 덱은 화면에 무엇을 그릴지만 정한다 — 실지급은 이 팩이 정한다")]
     [SerializeField] CardPackData pack;
 
     [Tooltip("이 스텝 동안 상점 가격 자리에 대신 띄울 문구(예: \"무료\"). 비우면 팩의 실제 가격이 숫자로 나온다.\n"
@@ -262,7 +265,7 @@ public class TutorialStepDef
     // 이 액션이 획득 연출을 트는가(그 연출을 기다릴지 말지를 저작받는 자리)
     public static bool UsesParallelGain(EOutgameTutorialAction _action) => Uses(_action, EStepField.ParallelGain);
 
-    // 이 액션이 팩을 쓰는가(진열 고정·자동 구매·자동 편성 풀·예고)
+    // 이 액션이 팩을 쓰는가(진열 고정·자동 구매·자동 편성 풀·예고·지급 목록의 정본)
     public static bool UsesPack(EOutgameTutorialAction _action) => Uses(_action, EStepField.Pack);
 
     // 이 액션이 가격 표기 문구를 쓰는가(상점 진열을 덮어쓰는 액션만 — 화면에 가격 자리가 있는 경우다)

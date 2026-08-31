@@ -133,7 +133,8 @@ export const ensureWallet = onCall(async (request) => {
       const migration = migrateFromSaveSlot(
         current, FieldValue.delete(), SCHEMA_VERSION);
       const created = createWallet(
-        transaction, walletReference, migration.balances, now);
+        transaction, walletReference, migration.balances, "walletCreate:migration",
+        {kind: "boot", txId: "walletCreate:migration"}, undefined, now);
 
       const revision = Number(current.revision ?? 0) + 1;
       transaction.update(saveReference, {

@@ -27,12 +27,18 @@ public static partial class SpecFirestoreUploader
         public int order;
     }
 
+    // 서버 tournamentTable.MAX_NODE_ID_LENGTH 와 같은 값이어야 한다 — 넘는 키는 서버 정제가
+    // 조용히 버려서, 그 정점이 clearedNodeIds 에 있으면 슬롯 전체 쓰기가 기록을 지운다.
+    const int MAX_TOURNAMENT_ID_LENGTH = 64;
+
     sealed class TournamentChapterRow
     {
         public int id;
         public string chapterId;
         public string nodeId;
         public int order;
+        public string prevNodeId;
+        public long requiredPoints;
     }
 
     /// <summary>CardAlbumConfig 저작을 AlbumEntry 표로 올린다. 성공하면 보고 줄을, 실패하면 null과 _error를 준다.</summary>
@@ -55,7 +61,8 @@ public static partial class SpecFirestoreUploader
     {
         if (!TryBeginCompositionUpload(out string t_projectId, out string t_apiKey, out _error)) return null;
         if (!TryLoadAuthoringAsset<TournamentConfig>(out TournamentConfig t_config, out _error)) return null;
-        if (!TryBuildTournamentChapterRows(t_config, out List<TournamentChapterRow> t_rows, out _error)) return null;
+        if (!TryLoadAuthoringAsset<RankConfig>(out RankConfig t_rankConfig, out _error)) return null;
+        if (!TryBuildTournamentChapterRows(t_config, t_rankConfig, out List<TournamentChapterRow> t_rows, out _error)) return null;
         if (!TryBuildSnapshotFrom(t_rows, TOURNAMENT_CHAPTER_TABLE, out TableSnapshot t_snapshot, out _error)) return null;
 
         return UploadSnapshot(t_projectId, t_apiKey, _envId, TOURNAMENT_CHAPTER_TABLE, t_snapshot, out _error);
@@ -247,15 +254,75 @@ public static partial class SpecFirestoreUploader
         return true;
     }
 
+    // 챕터 랭크 잠금을 서버가 재는 축은 등급이 아니라 점수다 — 서버에는 ERankGrade 가 없고
+    // rank.points 만 있어서, 등급 순서를 서버·클라가 따로 들면 조용히 갈린다.
+    //
+    // 첫 등급은 0 으로 낮춘다: RankConfig.ResolveTierIndex 가 첫 등급 진입 점수에 못 미쳐도 0 을
+    // 돌려주므로 points 0 인 신규 계정도 클라에선 첫 등급으로 읽힌다. entryPoints 를 그대로 쓰면
+    // 서버만 그 계정을 잠근다.
+    static bool TryBuildGradeEntryPoints(
+        RankConfig _config, out Dictionary<ERankGrade, long> _entryPoints, out string _error)
+    {
+        _entryPoints = new Dictionary<ERankGrade, long>();
+        _error = null;
+
+        List<RankGradeConfig> t_grades = _config.grades;
+        if (t_grades == null || t_grades.Count == 0)
+        {
+            _error = "RankConfig.grades 가 비어 있다 — 챕터 잠금을 잴 기준이 없다.";
+            return false;
+        }
+
+        for (int t_g = 0; t_g < t_grades.Count; t_g++)
+        {
+            RankGradeConfig t_grade = t_grades[t_g];
+            if (t_grade == null)
+            {
+                _error = $"RankConfig.grades[{t_g}] 가 비었다.";
+                return false;
+            }
+
+            // points 비교가 등급 비교와 등가이려면 두 축이 함께 오름차순이어야 한다.
+            // 하나라도 뒤집히면 클라는 통과시키고 서버는 막는 챕터가 생긴다.
+            if (t_g > 0)
+            {
+                RankGradeConfig t_prev = t_grades[t_g - 1];
+                if (t_grade.entryPoints <= t_prev.entryPoints)
+                {
+                    _error = $"RankConfig.grades 의 entryPoints 가 오름차순이 아니다" +
+                             $"({t_prev.grade} {t_prev.entryPoints} → {t_grade.grade} {t_grade.entryPoints}).";
+                    return false;
+                }
+                if (t_grade.grade <= t_prev.grade)
+                {
+                    _error = $"RankConfig.grades 의 등급이 오름차순이 아니다" +
+                             $"({t_prev.grade} → {t_grade.grade}).";
+                    return false;
+                }
+            }
+
+            if (!_entryPoints.ContainsKey(t_grade.grade))
+                _entryPoints.Add(t_grade.grade, t_g == 0 ? 0 : t_grade.entryPoints);
+        }
+
+        return true;
+    }
+
     static bool TryBuildTournamentChapterRows(
-        TournamentConfig _config, out List<TournamentChapterRow> _rows, out string _error)
+        TournamentConfig _config, RankConfig _rankConfig,
+        out List<TournamentChapterRow> _rows, out string _error)
     {
         _rows = new List<TournamentChapterRow>();
-        _error = null;
+
+        if (!TryBuildGradeEntryPoints(_rankConfig, out Dictionary<ERankGrade, long> t_entryPoints, out _error))
+            return false;
 
         var t_chapterIds = new HashSet<string>(StringComparer.Ordinal);
         var t_nodeIds = new HashSet<string>(StringComparer.Ordinal);
         int t_nextId = 1;
+
+        // 사슬은 챕터 경계를 넘는다 — 클라 StateOf 가 평탄 인덱스로 직전 하나만 보기 때문이다.
+        string t_prevNodeId = string.Empty;
 
         IReadOnlyList<TournamentChapterDef> t_chapters = _config.Chapters;
         for (int t_c = 0; t_c < t_chapters.Count; t_c++)
@@ -273,10 +340,24 @@ public static partial class SpecFirestoreUploader
                 return false;
             }
 
+            if (t_chapter.chapterId.Length > MAX_TOURNAMENT_ID_LENGTH)
+            {
+                _error = $"chapterId '{t_chapter.chapterId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                         "서버 정제가 이 키를 버려 완주 수령이 막힌다.";
+                return false;
+            }
+
             int t_nodeCount = t_chapter.NodeCount;
             if (t_nodeCount == 0)
             {
                 _error = $"정점 0개 챕터 '{t_chapter.chapterId}' — 모수가 없어 즉시 완주로 읽힌다(완주 보상 누수).";
+                return false;
+            }
+
+            if (!t_entryPoints.TryGetValue(t_chapter.requiredGrade, out long t_requiredPoints))
+            {
+                _error = $"챕터 '{t_chapter.chapterId}' 의 requiredGrade '{t_chapter.requiredGrade}' 가 " +
+                         "RankConfig.grades 에 없다 — 서버가 잠금을 잴 점수를 만들 수 없다.";
                 return false;
             }
 
@@ -295,13 +376,24 @@ public static partial class SpecFirestoreUploader
                     return false;
                 }
 
+                if (t_node.nodeId.Length > MAX_TOURNAMENT_ID_LENGTH)
+                {
+                    _error = $"nodeId '{t_node.nodeId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                             "서버 정제가 이 키를 버려 격파 신고가 막히고 클리어 기록도 지워진다.";
+                    return false;
+                }
+
                 _rows.Add(new TournamentChapterRow
                 {
                     id = t_nextId++,
                     chapterId = t_chapter.chapterId,
                     nodeId = t_node.nodeId,
                     order = t_n,
+                    prevNodeId = t_prevNodeId,
+                    requiredPoints = t_requiredPoints,
                 });
+
+                t_prevNodeId = t_node.nodeId;
             }
         }
 

@@ -15,12 +15,22 @@ internal static class RewardClaimCommand
 
     const string COMMAND_NAME = "claimReward";
 
+    // 날아가 있는 수령의 키(ownerType:ownerId). 팝업은 응답을 기다리지 않고 1초 안에 닫히는데,
+    // 도메인의 낙관 검사(CanClaim·StateOf)는 응답 채택 전까지 여전히 "받을 수 있음"으로 답한다 —
+    // 그 틈에 같은 보상을 다시 누르면 두 번째 요청이 나가고 가짜 롤업이 한 번 더 뜬다.
+    static readonly HashSet<string> s_inFlight = new HashSet<string>();
+
     /// <summary>보상 수령을 요청한다. 성공하면 응답 채택으로 재화·해당 도메인 슬롯이 갈아끼워진 뒤
-    /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다(연출은 그 값으로 서야 숫자가 안 튄다).</summary>
+    /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다.</summary>
     // 거절(자격 미달·이미 수령·보상 미저작)은 세션이 아니라 이 호출의 결과다 — 표면은 부른 도메인이 진다.
     internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId)
     {
         if (string.IsNullOrEmpty(_ownerId)) return default;
+
+        string t_key = _ownerType + ":" + _ownerId;
+
+        // 같은 보상이 아직 왕복 중이다. 여기서 즉시 돌려줘야 부른 쪽이 같은 프레임에 거절을 알고 연출을 접는다.
+        if (!s_inFlight.Add(t_key)) return default;
 
         try
         {
@@ -47,6 +57,10 @@ internal static class RewardClaimCommand
         {
             Debug.LogError($"[RewardClaimCommand] {COMMAND_NAME} 실패 — {t_exception.GetBaseException().Message}");
             return default;
+        }
+        finally
+        {
+            s_inFlight.Remove(t_key);
         }
     }
 

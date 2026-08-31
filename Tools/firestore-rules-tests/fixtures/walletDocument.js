@@ -1,7 +1,7 @@
 // 지갑 문서 픽스처.
 //
 // 진실원: functions/src/currency/walletStore.ts 의 WALLET_SCHEMA_VERSION · createWallet ·
-//         writeWallet · ledgerEntry (필드 이름·모양) + currency/wallet.ts 의 normalizeBalances(4키).
+//         writeWallet · writeReceipt (필드 이름·모양) + currency/wallet.ts 의 normalizeBalances(4키).
 // 세이브 픽스처(fixtures/saveDocument.js)와 쌍둥이 대상이 다르다 — 저쪽은 클라
 // PlayerSaveDocument.ToFieldMap, 이쪽은 서버 walletStore 다. 한쪽을 고쳐도 다른 쪽은 안 따라간다.
 //
@@ -28,18 +28,21 @@ export function walletDocument(_overrides = {}) {
 }
 
 /**
- * ledgerEntry 가 만드는 원장 한 줄. changes 는 부호 있는 증감 map 으로 접힌 뒤,
- * after 는 반영 후 4키 잔액, rev 는 이 기록 직후의 지갑 rev 다.
- * receipt 는 인앱결제가 붙기 전까지 null 자리다.
+ * writeReceipt 가 만드는 영수증 한 장. changes 는 부호 있는 증감 map, before·after 는
+ * 이동 전후 4키 잔액, rev 는 이 기록 직후의 지갑 rev 다.
+ * storeReceipt 는 인앱결제가 붙기 전까지 null 자리다.
  */
-export function ledgerDocument(_overrides = {}) {
+export function receiptDocument(_overrides = {}) {
   return {
+    txId: 'tx1',
     source: 'openPack',
-    changes: { Gold: -110 },
+    changes: { Gold: -110, Diamond: 0, Energy: 0, Shard: 0 },
+    before: { Gold: 110, Diamond: 0, Energy: 0, Shard: 0 },
     after: { Gold: 0, Diamond: 0, Energy: 0, Shard: 0 },
     rev: 2,
+    result: null,
+    storeReceipt: null,
     createdAt: serverTimestamp(),
-    receipt: null,
     ..._overrides,
   };
 }

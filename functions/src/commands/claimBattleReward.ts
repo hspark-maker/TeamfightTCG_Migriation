@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
@@ -9,6 +10,7 @@ import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {mutateWallet} from "../currency/walletTransaction";
+import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {LOCKED_DECK_SIZE} from "../deckValidation";
 
 /**
@@ -111,10 +113,28 @@ export const claimBattleReward = onCall(async (request) => {
   }
 
   const amount = payout.amount;
-  const wallet = await mutateWallet("claimBattleReward", env, uid, (current) =>
-    nextWallet(current, grant(current.balances, [{currency, amount}])));
+  // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+  // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+  let replayed = true;
+  // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+  const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-  logger.info("claimBattleReward", {uid, env, won, remaining, currency, amount, rev: wallet.rev});
+  const result = await mutateWallet(env, uid, "claimBattleReward", {kind: "client", txId},
+    (current) => nextWallet(current, grant(current.balances, [{currency, amount}]), "claimBattleReward"),
+    (wallet) => {
+      replayed = false;
+      return {wallet, granted: {currency, amount}};
+    });
 
-  return {wallet, granted: {currency, amount}};
+  if (replayed) {
+    logger.info("receipt replay",
+      {uid, env, source: "claimBattleReward", txId, rev: result.wallet.rev});
+  } else {
+    logger.info("claimBattleReward", {
+      uid, env, won, remaining, currency, amount, rev: result.wallet.rev,
+      txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
+    });
+  }
+
+  return result;
 });

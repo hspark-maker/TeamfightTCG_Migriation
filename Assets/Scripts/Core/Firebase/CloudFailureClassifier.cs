@@ -28,6 +28,48 @@ public static class CloudFailureClassifier
         return ECloudFailureKind.Unusable;
     }
 
+    /// <summary>요청이 서버에 닿았을 수 있는데 응답만 잃은 갈래인가. 같은 멱등 키로 한 번 더 태울 수 있다.</summary>
+    // Classify와 달리 GetBaseException 한 번으로 끝내지 않는다 — AggregateException은 inner가 둘 이상이면
+    // 자기 자신을 돌려줘서 판정이 통째로 빗나간다.
+    internal static bool IsLostResponse(Exception _exception)
+    {
+        if (_exception == null) return false;
+
+        if (_exception is AggregateException t_aggregate)
+        {
+            foreach (Exception t_inner in t_aggregate.Flatten().InnerExceptions)
+                if (IsLostResponse(t_inner)) return true;
+
+            return false;
+        }
+
+        if (_exception.InnerException != null && IsLostResponse(_exception.InnerException)) return true;
+
+        if (_exception is FunctionsException t_functionsException)
+            return IsLostResponseCode(t_functionsException.ErrorCode);
+
+        return _exception is TimeoutException ||
+               _exception is System.Net.Http.HttpRequestException ||
+               _exception is System.IO.IOException;
+    }
+
+    // Transient보다 좁다. Cancelled는 의도한 취소고, ResourceExhausted는 곧장 다시 태우면 더 나빠지며,
+    // Internal은 서버 로직이 깨진 것이라 같은 요청이 같은 답을 낸다 — 셋 다 되살릴 응답이 없다.
+    static bool IsLostResponseCode(FunctionsErrorCode _code)
+    {
+        switch (_code)
+        {
+            case FunctionsErrorCode.Unavailable:
+            case FunctionsErrorCode.DeadlineExceeded:
+            case FunctionsErrorCode.Aborted:
+            case FunctionsErrorCode.Unknown:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
     /// <summary>로그에 남길 오류 코드 문자열. 한 갈래로 접힌 원인들을 사후에 가르는 유일한 단서다.</summary>
     internal static string Describe(Exception _exception)
     {

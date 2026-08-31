@@ -60,14 +60,6 @@ public static class KeywordGrowthManager
         s_initialized = true;
     }
 
-    public static void Save()
-    {
-        if (!s_initialized) return;
-
-        SyncSaveData();
-        DataSaveManager.SaveCoalesced();
-    }
-
     public static int LevelOf(CardKeyword _keyword)
     {
         if (!KeywordGrowthRules.Supports(_keyword)) return 0;
@@ -139,17 +131,5 @@ public static class KeywordGrowthManager
             _step = new GrowthStep(_step.Level, _step.HpGain, _step.Currency, 0, _step.SuccessRate);
 
         return true;
-    }
-
-    static void SyncSaveData()
-    {
-        var t_data = DataSaveManager.Data.KeywordGrowth ??
-                     (DataSaveManager.Data.KeywordGrowth = new KeywordGrowthSaveData());
-
-        var t_levels = new Dictionary<string, int>(s_growth.Count);
-        foreach (var t_pair in s_growth)
-            t_levels[((int)t_pair.Key).ToString()] = t_pair.Value;
-
-        t_data.Levels = t_levels;
     }
 }

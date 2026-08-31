@@ -26,6 +26,13 @@ export const PERMILLE = 1000;
  */
 export const CARD_MAX_LEVEL_CEILING = 4;
 
+/**
+ * 한계돌파 단계의 천장. 클라 GrowthRules.MaxLimitBreak 과 같다 —
+ * 클라 LimitBreakOf 가 3 에서 클램프하므로 표가 더 큰 값을 말하면 서버만 단계를 열어 주고
+ * 화면·DeckPower·덱 잠금이 어긋난다.
+ */
+export const LIMIT_BREAK_STAGE_CEILING = 3;
+
 /** 카드 강화 기본 결제 재화. CardEnhanceRule 표에는 재화 열이 없다(클라는 ECurrencyType.Shard 고정). */
 const CARD_DEFAULT_CURRENCY: CurrencyKey = "Shard";
 
@@ -46,6 +53,8 @@ export interface EnhanceStep {
 /** CardEnhanceRule 표의 전역 1행. */
 export interface CardEnhanceRule {
   maxLevel: number;
+  /** 한계돌파 상한. 0 은 그 축이 닫혀 있다는 뜻이고 카드 강화 자체는 그대로 선다. */
+  maxLimitBreak: number;
   baseEnhanceCost: number;
   costGrowthPerLevel: number;
   baseSuccessPermille: number;
@@ -95,13 +104,30 @@ export function parseCardEnhanceRule(rows: Record<string, unknown>[]): CardEnhan
   const maxLevel = intOf(row.maxLevel);
   if (maxLevel <= BASE_LEVEL) return null;
 
+  // maxLimitBreak <= 0 이어도 null 을 내지 않는다 — 한계돌파 열 하나가 비었다는 이유로
+  // 카드 강화 전체가 RuleUnavailable 로 죽는다. 0 은 "축이 닫혀 있다"이고 거절은 호출부가 한다.
+  const maxLimitBreak = Math.max(0, intOf(row.maxLimitBreak));
+
   return {
     maxLevel: maxLevel > CARD_MAX_LEVEL_CEILING ? CARD_MAX_LEVEL_CEILING : maxLevel,
+    maxLimitBreak: maxLimitBreak > LIMIT_BREAK_STAGE_CEILING ? LIMIT_BREAK_STAGE_CEILING : maxLimitBreak,
     baseEnhanceCost: intOf(row.baseEnhanceCost),
     costGrowthPerLevel: intOf(row.costGrowthPerLevel),
     baseSuccessPermille: clampPermille(intOf(row.baseSuccessPermille)),
     rateDropPerLevelPermille: intOf(row.rateDropPerLevelPermille),
   };
+}
+
+/**
+ * 표가 저작한 한계돌파 상한의 **원본**. parseCardEnhanceRule 이 이 값을 천장에서 자르는데
+ * 순수 모듈이라 잘린 사실을 스스로 알릴 수 없다 — 호출부가 둘을 대조해 로그를 남긴다.
+ * @param {Record<string, unknown>[]} rows CardEnhanceRule 표(id 오름차순)
+ * @return {number | null} 저작값(행이 없으면 null)
+ */
+export function authoredMaxLimitBreak(rows: Record<string, unknown>[]): number | null {
+  const row = rows[0];
+  if (row === undefined) return null;
+  return Math.max(0, intOf(row.maxLimitBreak));
 }
 
 /**

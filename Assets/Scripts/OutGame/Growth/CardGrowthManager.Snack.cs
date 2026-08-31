@@ -1,8 +1,9 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 카드별 간식(카드팩 중복 보상)의 조회·적립과 한계돌파.
+// 카드별 간식(카드팩 중복 보상)의 조회와 한계돌파.
 // 간식은 그 카드에만 쓰는 재화라 전역 잔액이 아니라 cardId로 갈린 CardGrowthEntry에 얹혀 있다.
-// 적립 지점은 CardPackOpener 하나다 — OwnershipManager.Grant에 넣으면 스타터덱·디버그 해금까지 간식이 딸려 온다.
+// 적립은 서버 openPack이 한다 — 클라에는 간식을 늘리는 경로가 없다.
 public static partial class CardGrowthManager
 {
     // 카드 번호의 간식 보유량(기록 없으면 0). 음수 세이브는 0으로 읽는다.
@@ -12,26 +13,6 @@ public static partial class CardGrowthManager
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
         return t_entry.Snack > 0 ? t_entry.Snack : 0;
-    }
-
-
-    /// <summary>간식을 적립한다(적립됐으면 true). <b>디스크에 쓰지 않는다</b> — 한 번 개봉에 중복이 여러 장
-    /// 나올 수 있어, 호출부가 흐름 끝에 <see cref="FlushToData"/>나 <see cref="Save"/>로 한 번만 반영한다.</summary>
-    public static bool AddSnack(int _id, int _amount)
-    {
-        if (!s_initialized) return false;
-        if (!CardCatalog.Contains(_id)) return false;
-        if (_amount <= 0) return false;
-
-        CardGrowthEntry t_entry = Entry(_id);
-        int t_current = t_entry.Snack > 0 ? t_entry.Snack : 0;
-
-        // long으로 더한 뒤 상한에서 자른다 — int 넘침 방지.
-        long t_next = (long)t_current + _amount;
-        t_entry.Snack = t_next > int.MaxValue ? int.MaxValue : (int)t_next;
-
-        OnGrowthChanged?.Invoke();
-        return true;
     }
 
 
@@ -55,20 +36,29 @@ public static partial class CardGrowthManager
         return GrowthRules.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
     }
 
-    // 간식 차감과 단계 증가는 반드시 함께 저장한다.
-    public static bool TryLimitBreak(int _cardId)
+    /// <summary>한계돌파 1회를 서버에 요청한다(간식 차감과 단계 증가는 서버에서 한 몸이다).
+    /// 곡선·차감·단계의 진실원은 서버 limitBreakCard 다 — 아래 선검사는 왕복을 아끼는 낙관 검사일 뿐이라
+    /// 서버가 다른 답을 주면 그쪽이 이긴다.</summary>
+    public static async UniTask<ELimitBreakOutcome> TryLimitBreakAsync(int _cardId)
     {
-        if (!TryGetNextLimitBreakStep(_cardId, out LimitBreakStep t_step)) return false;
-
         int t_id = _cardId;
-        CardGrowthEntry t_entry = Entry(t_id);
-        int t_snack = t_entry.Snack > 0 ? t_entry.Snack : 0;
-        if (t_snack < t_step.SnackCost) return false;
 
-        t_entry.Snack = t_snack - t_step.SnackCost;
-        t_entry.LimitBreak = t_step.Stage;
-        Save();
+        // 미초기화·미소유를 먼저 갈라내야 TryGetNextLimitBreakStep이 낸 false를 "최대 단계"로 읽을 수 있다.
+        if (!s_initialized || t_id <= 0) return ELimitBreakOutcome.NotReady;
+        if (!OwnershipManager.IsOwned(t_id)) return ELimitBreakOutcome.NotReady;
+
+        if (!TryGetNextLimitBreakStep(t_id, out LimitBreakStep t_step)) return ELimitBreakOutcome.MaxStage;
+        if (SnackOf(t_id) < t_step.SnackCost) return ELimitBreakOutcome.NotEnoughSnack;
+
+        ELimitBreakOutcome t_outcome = await LimitBreakCommand.LimitBreakAsync(t_id);
+
+        // 막힌 결말은 간식도 단계도 그대로다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
+        if (t_outcome != ELimitBreakOutcome.Success) return t_outcome;
+
+        // 단계·간식은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
+        // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
         OnGrowthChanged?.Invoke();
-        return true;
+
+        return ELimitBreakOutcome.Success;
     }
 }

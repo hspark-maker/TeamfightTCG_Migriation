@@ -19,7 +19,7 @@ import {
   legacyCurrencySlot,
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
-import { walletDocument, ledgerDocument } from './fixtures/walletDocument.js';
+import { walletDocument, receiptDocument } from './fixtures/walletDocument.js';
 import { grantsDocument } from './fixtures/grantsDocument.js';
 
 const RULES_PATH = process.env.RULES_FILE ?? fileURLToPath(new URL('../../firestore.rules', import.meta.url));
@@ -274,16 +274,18 @@ test('12. schemaVersion 하향은 거부', async () => {
 
 test('13. 슬롯 타입 위반은 거부', async () => {
   await seed(1);
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: 'x' })));
   await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { ownership: [1, 2] })));
 });
 
-// C6 이후 currency 는 optional 이지만 "실렸을 때"의 계약은 예전 그대로다.
-// 승급 전 구 클라(v7)는 CurrencySaveData.Normalize 덕에 언제나 4재화를 싣는다 —
-// 그래서 룰이 4키를 전부 요구하는 게 맞고, 키를 빼거나 타입을 바꾸는 조작은 거부돼야 한다.
-// currency 를 optional 로 만든 것이 "실으면 아무 모양이나 된다"로 새면 안 된다.
-test('13b. 구 클라가 실은 재화 4키 계약 — 키 누락·타입 변조·미지 재화는 거부', async () => {
+// C7 — 공존이 닫혔다. 잔액의 진실원은 wallet/current 하나이고 세이브의 currency 슬롯은
+// 금지 필드다(hasOnly 14키). 값 검증 블록은 도달 불가라 룰에서 걷어냈으므로, 모양별
+// 계약을 따로 볼 자리가 없다 — 어떤 모양이든 키가 실렸다는 사실만으로 거부돼야 한다.
+// 여기가 초록인 동안 클라가 15키를 보내면 그 클라의 저장은 전부 거부된다(의도된 벽).
+test('13c. currency 가 실리면 모양과 무관하게 거부', async () => {
   await seed(1);
+  // 구 클라(v7)가 실제로 보내던 정상 4재화 모양
+  await assertFails(setDoc(doc(authed(), savePath()),
+    saveDocument(2, { currency: legacyCurrencySlot() })));
   await assertFails(setDoc(doc(authed(), savePath()),
     saveDocument(2, { currency: { balances: { Gold: 100 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
@@ -292,35 +294,16 @@ test('13b. 구 클라가 실은 재화 4키 계약 — 키 누락·타입 변조
     saveDocument(2, { currency: { balances: { Gold: -1, Diamond: 0, Energy: 0, Shard: 0 } } })));
   await assertFails(setDoc(doc(authed(), savePath()),
     saveDocument(2, { currency: { balances: { Gold: 100, Diamond: 0, Energy: 0, Shard: 0, Ruby: 1 } } })));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: 'x' })));
+  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: null })));
 });
 
-// C6 — 잔액이 wallet/current 로 이사하면서 신 클라(v8)는 currency 를 아예 안 싣는다(= 기본 픽스처 14키,
-// 2 가 이미 그걸 본다). 승급 전 구 클라(v7)는 계속 15키를 싣고, 룰은 그 사이 구간 동안 둘 다 받아야 한다.
-// 여기서 막히면 스토어 심사가 끝나기 전 구 클라의 저장이 전부 거부된다.
-// 조이는 것(14키 전용)은 구 클라가 사라진 뒤 C7 이고, 그때 이 케이스가 뒤집힐 자리다.
-test('13c. currency 를 실은 15키 update 도 통과 (승급 전 구 클라)', async () => {
-  await seed(1);
-  await assertSucceeds(
-    setDoc(doc(authed(), savePath()), saveDocument(2, { currency: legacyCurrencySlot() })),
-  );
-});
-
-// currency 를 optional 로 만든 것이 "슬롯 생략으로 세이브 비우기"를 열어 주면 안 된다.
-// 신·구 두 모양 모두에서 나머지 9슬롯은 여전히 필수다.
-test('13d. currency 유무와 무관하게 다른 슬롯 누락은 거부', async () => {
+// 14키가 전부 필수라는 계약. 슬롯 생략으로 세이브를 비우는 우회를 막는다.
+test('13d. 슬롯 누락은 거부', async () => {
   await seed(1);
   const t_new = saveDocument(2);
   delete t_new.ownership;
   await assertFails(setDoc(doc(authed(), savePath()), t_new));
-
-  const t_old = saveDocument(2, { currency: legacyCurrencySlot() });
-  delete t_old.ownership;
-  await assertFails(setDoc(doc(authed(), savePath()), t_old));
-});
-
-test('13e. currency 가 map 이 아니면 거부 (실려 있으면 검증은 그대로)', async () => {
-  await seed(1);
-  await assertFails(setDoc(doc(authed(), savePath()), saveDocument(2, { currency: null })));
 });
 
 // --- 14. 신규 계정 방어 -----------------------------------------------------
@@ -462,17 +445,17 @@ test('18c. 소유자도 지갑 delete 는 거부', async () => {
   await assertFails(deleteDoc(doc(authed(), walletPath())));
 });
 
-// 원장은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
-test('19. 소유자도 원장 읽기는 거부', async () => {
+// 영수증은 감사 기록이다 — 읽히면 잔액 추론 표면만 넓어진다.
+test('19. 소유자도 영수증 읽기는 거부', async () => {
   await seedWallet();
-  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
-  await assertFails(getDoc(doc(authed(), `${walletPath()}/ledger/tx1`)));
+  await seedRaw(`${walletPath()}/receipts/tx1`, receiptDocument());
+  await assertFails(getDoc(doc(authed(), `${walletPath()}/receipts/tx1`)));
 });
 
-test('19b. 소유자도 원장 쓰기는 거부', async () => {
+test('19b. 소유자도 영수증 쓰기는 거부', async () => {
   await seedWallet();
-  await seedRaw(`${walletPath()}/ledger/tx1`, ledgerDocument());
-  await assertFails(setDoc(doc(authed(), `${walletPath()}/ledger/tx1`), ledgerDocument({ rev: 3 })));
+  await seedRaw(`${walletPath()}/receipts/tx1`, receiptDocument());
+  await assertFails(setDoc(doc(authed(), `${walletPath()}/receipts/tx1`), receiptDocument({ rev: 3 })));
 });
 
 

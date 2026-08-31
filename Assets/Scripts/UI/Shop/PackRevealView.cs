@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -57,7 +58,7 @@ public sealed class PackGradeFxPalette
 // 그 사이(자리잡기 → 씰 찢기 → 뽑기)는 손을 떼는 순간 끊기지 않고 자동으로 이어진다.
 //
 // 이 연출의 전제는 단 하나 — 카드는 처음부터 팩 속에 들어 있다.
-//   BeginOpen 시점에 더미를 만들어 팩 앞뒷면 사이에 끼워 두고(PlaceInsidePack), 그 뒤로는 아무것도 "등장"시키지 않는다.
+//   씰이 찢기기 전에 더미를 만들어 팩 앞뒷면 사이에 끼워 두고(PlaceInsidePack), 그 뒤로는 아무것도 "등장"시키지 않는다.
 //   찢으면 구멍 너머로 카드 끝이 저절로 드러나고, 뽑으면 그 구멍에서 빠져나온다.
 //   카드를 따로 페이드인하거나 패널을 띄우면 그 순간 "팩에서 꺼냈다"가 깨진다 — 옛 연출이 실패한 지점이 정확히 여기였다.
 //
@@ -66,8 +67,11 @@ public sealed class PackGradeFxPalette
 //   화면을 덮는 어둠(Dim)은 PackStage보다 앞 sibling이어야 한다 — 뒤에 두면 팩 속 카드를 덮어버린다.
 //   결과 UI(RevealPanel)·스킵 버튼은 PackStage보다 뒤 sibling으로 두어 팩에 묻히지 않게 한다.
 //
-// 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
-// 연출은 이미 끝난 거래(서버 openPack이 트랜잭션 1회로 확정)를 보여줄 뿐, 경제를 건드리지 않는다.
+// 진입은 컨트롤러가 넘기는 PackPurchaseTicket(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
+// 연출은 서버 거래(openPack 트랜잭션 1회)의 결과를 보여줄 뿐, 경제를 건드리지 않는다.
+//
+// 카드는 구매 왕복이 끝나야 도착하므로 연출보다 늦을 수 있다. 관문은 "뜯기 시작"(EnterTearing) 한 곳뿐이라
+//   씰은 찢겼는데 팩이 비어 있는 구간이 생기지 않는다 — 그 앞의 입장·자리잡기는 고정 시간이라 왕복 대부분을 이미 먹는다.
 public class PackRevealView : MonoBehaviour
 {
     // 요약 도달 시 1회 발화(스킵으로 건너뛰어도 반드시 발화 — 획득 버튼 데드락 방지).
@@ -76,6 +80,12 @@ public class PackRevealView : MonoBehaviour
     // 어느 씬의 어느 뷰든 팩이 열린 순간 발화(구독자는 씬 참조 없이 개봉 시점을 알 수 있다).
     // 발화 시점은 "팩이 열린 순간" = 스와이프 확정. 튜토리얼이 물려 있어 의미를 옮기지 않는다.
     public static event Action OnAnyPackOpened;
+
+    // 카드가 팩 속에 채워진 순간 발화(세션당 1회).
+    public event Action<OpenedPack> OnCardsSupplied;
+
+    // 서버가 구매를 거절해 연출이 중단됐다. 이 뒤로 스테이지는 더 나아가지 않는다.
+    public event Action<EPackOpenResult> OnRevealAborted;
 
     [Header("팩")]
     [SerializeField] PackTearHandle tearHandle;    // 개봉을 여는 스와이프 제스처
@@ -181,6 +191,12 @@ public class PackRevealView : MonoBehaviour
     [SerializeField] CanvasGroup tearHint;         // RevealPanel 바깥에 두어야 한다 — 그 패널은 입력을 막고 있다
     [SerializeField] float tearHintFade = 0.2f;
 
+    [Tooltip("카드가 늦게 도착할 때 뜯기 관문에서만 잠깐 보이는 표시. 부유하는 팩 자체가 이미 " +
+             "손에 쥔 팩을 들여다보는 장면으로 읽히므로, 병적으로 느린 망에서만 켜진다. 미배선이면 표시 없음.")]
+    [SerializeField] GameObject waitingIndicator;
+    [Tooltip("관문에서 이만큼 더 기다려도 카드가 없으면 위 표시를 켠다. 0이면 관문에 닿는 즉시.")]
+    [Min(0f)] [SerializeField] float waitHintDelay = 0.6f;
+
     // Idle → Entering(팩 등장) → Shifting(팩이 화면 아래로 자리잡기)
     // → Tearing(손가락 이동량만큼 찢김) → Pulling(뭉치째 뽑기) → Flicking(넘기기) → Summary.
     // Tearing만 유저 입력을 기다린다. 부분 찢김은 손을 떼도 유지되어 다음 드래그에서 이어진다.
@@ -188,9 +204,18 @@ public class PackRevealView : MonoBehaviour
 
     EStage m_stage = EStage.Idle;
 
-    // 이번 개봉 세션 결과.
+    // 이번 개봉 세션 결과. 티켓이 아직 답하지 않았으면 한동안 null이다.
     OpenedPack m_pending;
     ECardGrade m_topGrade = ECardGrade.Unknown;
+
+    // 이번 세션의 구매 약속.
+    PackPurchaseTicket m_ticket;
+
+    // 세션 일련번호. "한 번 더"가 세션을 갈아끼운 뒤 도착한 이전 응답이 새 세션에 남의 카드를 주입하는 것을 막는다.
+    int m_sessionId;
+
+    // 더미를 이미 세웠는지. 관문과 늦은 도착 두 경로가 같은 카드로 두 번 세우지 않게 한다.
+    bool m_materialized;
 
     // 현재 스테이지의 시간 기반 연출. 스킵은 이걸 Complete로 밀어 다음 단계로 넘긴다.
     Sequence m_stageSeq;
@@ -214,58 +239,56 @@ public class PackRevealView : MonoBehaviour
     // 이번 세션에서 개봉 신호를 이미 쐈는지. 뜯김과 스킵 어느 쪽으로 열려도 정확히 1회여야 한다.
     bool m_announced;
 
-    /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
-    /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
-    public void BeginOpen(OpenedPack _opened, CardPackData _pack)
+    /// <summary>개봉 세션 시작: 결과를 기다리지 않고 팩부터 등장시키고, 카드는 티켓이 답하는 대로 팩 속에 채운다.
+    /// _pack은 이 개봉의 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
+    public void BeginOpen(PackPurchaseTicket _ticket, CardPackData _pack)
     {
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
-        if (_opened == null || !_opened.Success)
+        if (_ticket == null)
         {
-            Debug.LogWarning("[PackRevealView] BeginOpen에 유효하지 않은 OpenedPack — 개봉 취소.");
+            Debug.LogWarning("[PackRevealView] BeginOpen에 티켓이 없다 — 개봉 취소.");
             return;
         }
 
         SoundManager.Instance?.PlayCue(EOutgameSound.PackOpenBegin);
 
-        m_pending = _opened;
+        m_ticket = _ticket;
+        m_sessionId++;
+        m_pending = null;
+        m_topGrade = ECardGrade.Unknown;
+        m_materialized = false;
         m_skips = 0;
         m_announced = false;
-        ECardGrade t_topGrade = TopGrade(_opened.Cards);
-        m_topGrade = t_topGrade;
 
         GateInput(false);
         SetTearHint(false, true);
+        ShowWaitingIndicator(false);
 
         if (shellRig != null)
         {
             shellRig.ShowShells();
             shellRig.ResetPose();
-            shellRig.SetRingGrade(t_topGrade, gradeFxPalette);
         }
         if (tearSkin != null)
         {
             // 그림을 먼저 갈고 상태를 되돌린다 — 진행도·조각 자리는 그림과 무관하지만 순서를 고정해 둔다.
+            // 등급 빛은 여기서 물리지 않는다: 카드가 아직 없을 수 있고, 그 정보는 씰이 찢길 때 처음 읽힌다.
             tearSkin.ApplyPackArt(_pack != null ? _pack.PackArt : null);
             tearSkin.ResetTear();
-            // 되돌린 **뒤에** 등급을 물린다(ResetTear가 세기를 0으로 내린다).
-            // 찢는 동안 새는 빛이 곧 "무엇이 나오는가"의 예고다.
-            tearSkin.SetGlowGrade(t_topGrade, gradeFxPalette);
         }
 
         if (resultGrid != null) resultGrid.Hide();
         if (summaryGroup != null) summaryGroup.SetActive(false);
         if (skipButton != null) skipButton.gameObject.SetActive(false);
 
+        // 지난 세션의 카드가 남아 있으면 빈 팩이어야 할 등장 구간에 그대로 비친다.
+        if (cardStack != null) cardStack.Clear();
+        else Debug.LogWarning("[PackRevealView] cardStack 미배선 → 카드 표시 생략.");
+
         // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
         KillTotalRefundTween();
 
-        // 카드는 여기서 단 한 번 세워 팩 속에 넣는다. 이후 어느 단계도 카드를 "등장"시키지 않는다.
-        if (cardStack != null)
-        {
-            cardStack.Build(m_pending.Cards);
-            cardStack.PlaceInsidePack(cardInPackCenter, cardInPackScale);
-        }
-        else Debug.LogWarning("[PackRevealView] cardStack 미배선 → 카드 표시 생략.");
+        AwaitTicketAsync(m_sessionId).Forget();
 
         EnterEntering();
     }
@@ -285,10 +308,117 @@ public class PackRevealView : MonoBehaviour
         return t_top;
     }
 
+    // 티켓 결과를 이 세션에 주입한다. 파괴 토큰과 세션 번호를 함께 걸어야
+    // 재개봉으로 세션이 갈린 뒤 도착한 이전 응답이 새 세션에 남의 카드를 흘리지 않는다.
+    async UniTaskVoid AwaitTicketAsync(int _sessionId)
+    {
+        PackPurchaseTicket t_ticket = m_ticket;
+        if (t_ticket == null) return;
+
+        OpenedPack t_opened;
+        try
+        {
+            // 티켓이 동기 완료된 갈래(인증 미초기화 즉시 실패 등)에서는 아래 await가 동기 재개해
+            // BeginOpen 안에서 중단·오버레이 닫기까지 흘러 OnClosed가 OnOpened보다 먼저 나간다.
+            // 한 박을 미뤄 항상 비동기 경계를 거치게 한다 — 세션 가드는 이 박 "뒤"의 상태로 봐야 한다.
+            await UniTask.NextFrame(this.GetCancellationTokenOnDestroy());
+            if (_sessionId != m_sessionId || m_ticket != t_ticket) return;
+
+            t_opened = await t_ticket.Await().AttachExternalCancellation(this.GetCancellationTokenOnDestroy());
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (_sessionId != m_sessionId || m_ticket != t_ticket) return;
+
+        if (t_opened == null || !t_opened.Success)
+        {
+            AbortReveal(t_opened != null ? t_opened.Result : EPackOpenResult.SpendFailed);
+            return;
+        }
+
+        SupplyCards(t_opened);
+    }
+
+    // 도착한 결과를 보관한다. 관문에서 기다리는 중이었다면 그 자리에서 더미를 세우고 뜯기를 이어 연다.
+    void SupplyCards(OpenedPack _opened)
+    {
+        m_pending = _opened;
+        m_topGrade = TopGrade(_opened.Cards);
+
+        ShowWaitingIndicator(false);
+
+        if (m_stage == EStage.Tearing)
+        {
+            MaterializePending();
+            ArmTearing();
+        }
+
+        OnCardsSupplied?.Invoke(_opened);
+    }
+
+    // 등급 빛과 팩 속 더미를 실제로 세운다. Build는 프리팹을 여러 개 Instantiate하므로
+    // 트윈이 도는 중에 부르면 히치가 보인다 — 팩이 막 멈춘 찢기 진입만이 안전한 자리다.
+    void MaterializePending()
+    {
+        if (m_pending == null || m_materialized) return;
+        m_materialized = true;
+
+        ShowWaitingIndicator(false);
+
+        if (shellRig != null) shellRig.SetRingGrade(m_topGrade, gradeFxPalette);
+        // ResetTear가 세기를 0으로 내린 **뒤**라야 등급 빛이 남는다.
+        // 찢는 동안 새는 빛이 곧 "무엇이 나오는가"의 예고다.
+        if (tearSkin != null) tearSkin.SetGlowGrade(m_topGrade, gradeFxPalette);
+
+        if (cardStack == null) return;
+
+        // 카드는 여기서 단 한 번 세워 팩 속에 넣는다. 이후 어느 단계도 카드를 "등장"시키지 않는다.
+        cardStack.Build(m_pending.Cards);
+        cardStack.PlaceInsidePack(cardInPackCenter, cardInPackScale);
+    }
+
+    // 서버가 거절했다 — 팩은 끝내 비어 있으므로 여기서 멈춘다(계속 굴리면 카드 0장 요약에 도달한다).
+    // 뒷정리를 ResetSession과 같은 자리에 맡긴다: 구독자가 오버레이를 닫지 않아도 팩이 어중간한 자세로 남지 않는다.
+    void AbortReveal(EPackOpenResult _reason)
+    {
+        ClearSession();
+
+        OnRevealAborted?.Invoke(_reason);
+    }
+
+    // 관문에서 붙잡힌 시간이 길어질 때만 대기 표시를 켠다.
+    async UniTaskVoid ShowWaitHintAsync(int _sessionId)
+    {
+        if (waitingIndicator == null) return;
+
+        if (waitHintDelay > 0f)
+        {
+            bool t_canceled = await UniTask.Delay((int)(waitHintDelay * 1000f), ignoreTimeScale: true,
+                                                  cancellationToken: this.GetCancellationTokenOnDestroy())
+                                           .SuppressCancellationThrow();
+            if (t_canceled) return;
+        }
+
+        if (_sessionId != m_sessionId || m_stage != EStage.Tearing || m_pending != null) return;
+
+        ShowWaitingIndicator(true);
+    }
+
+    void ShowWaitingIndicator(bool _show)
+    {
+        if (waitingIndicator == null) return;
+        if (waitingIndicator.activeSelf != _show) waitingIndicator.SetActive(_show);
+    }
+
     /// <summary>건너뛰기. 첫 요청은 현재 단계를 즉시 끝내고, 이후 요청은 요약까지 단번에 간다.</summary>
     public void RequestSkip()
     {
         if (m_stage == EStage.Idle || m_stage == EStage.Summary) return;
+        // 카드가 없는 채로 뽑기에 들어가면 빈 더미가 요약까지 굴러 카드 0장 결과에 도달한다.
+        if (m_pending == null && m_stage <= EStage.Tearing) return;
 
         m_skips++;
         if (m_skips == 1) SkipCurrentStage();
@@ -299,6 +429,13 @@ public class PackRevealView : MonoBehaviour
     /// OnDisable은 요약 도달분을 일부러 남기므로(중복 발화 방지), 오버레이가 닫힐 때는 이쪽이 필요하다.</summary>
     public void ResetSession()
     {
+        ClearSession();
+    }
+
+    // 세션 하나를 통째로 걷는 단일 자리. 중단(AbortReveal)과 초기화(ResetSession)가 같은 정리를 쓰게 해
+    // 한쪽만 얕게 남는 일을 막는다 — 정리가 갈리면 닫히지 않은 화면에 팩 자세·입력 개폐가 그대로 남는다.
+    void ClearSession()
+    {
         KillStageSeq();
         KillTotalRefundTween();
 
@@ -306,6 +443,7 @@ public class PackRevealView : MonoBehaviour
         if (shellRig != null) shellRig.ResetPose();
 
         SetTearHint(false, true);
+        ShowWaitingIndicator(false);
         GateInput(false);
 
         if (resultGrid != null) resultGrid.Hide();
@@ -315,6 +453,9 @@ public class PackRevealView : MonoBehaviour
         m_stage = EStage.Idle;
         m_pending = null;
         m_topGrade = ECardGrade.Unknown;
+        m_ticket = null;
+        m_sessionId++;
+        m_materialized = false;
         m_announced = false;
         m_skips = 0;
     }
@@ -354,6 +495,11 @@ public class PackRevealView : MonoBehaviour
         KillStageSeq();
         if (shellRig != null) shellRig.ResetPose();
         SetTearHint(false, true);
+        ShowWaitingIndicator(false);
+
+        // 티켓은 어느 단계에서 꺼지든 여기서 끊는다 — 화면이 없는 사이 도착한 응답이 카드를 세우면 안 된다.
+        m_ticket = null;
+        m_sessionId++;
 
         // 이미 끝난 세션은 끝난 채로 둔다. Idle로 되돌리면 BeginOpen 재진입 가드가 풀려
         // 같은 OpenedPack이 한 번 더 열리고 OnAnyPackOpened가 두 번 발화한다(튜토리얼이 이 신호를 센다).
@@ -363,6 +509,7 @@ public class PackRevealView : MonoBehaviour
         m_stage = EStage.Idle;
         m_pending = null;
         m_topGrade = ECardGrade.Unknown;
+        m_materialized = false;
         m_announced = false;
     }
 
@@ -442,6 +589,24 @@ public class PackRevealView : MonoBehaviour
 
         KillStageSeq();
 
+        MaterializePending();
+
+        // 카드가 아직 없으면 뜯기를 열지 않는다 — 여는 순간 "씰은 뜯겼는데 팩이 비었다"가 성립한다.
+        // 늦게 도착하면 SupplyCards가 이 자리를 이어받는다.
+        if (m_pending == null)
+        {
+            ShowWaitHintAsync(m_sessionId).Forget();
+            return;
+        }
+
+        ArmTearing();
+    }
+
+    // 뜯기 입력을 연다. 손잡이가 미배선이면 다 찢긴 상태를 만들어 뽑기로 잇는다.
+    void ArmTearing()
+    {
+        if (m_stage != EStage.Tearing) return;
+
         if (tearSkin == null || tearHandle == null)
         {
             Debug.LogWarning("[PackRevealView] tearSkin/tearHandle 미배선 → 직접 찢기 생략.");
@@ -467,6 +632,7 @@ public class PackRevealView : MonoBehaviour
 
         if (tearHandle != null) tearHandle.Disarm();
         SetTearHint(false);
+        ShowWaitingIndicator(false);
 
         // 다 찢은 순간 팩 뒤 방사광이 원형으로 팍 퍼진다. 여기서 부르는 이유는
         // 찢기 완료의 세 경로(손가락 완주·스킵·미배선 폴백)가 모두 이 문을 지나기 때문이다.

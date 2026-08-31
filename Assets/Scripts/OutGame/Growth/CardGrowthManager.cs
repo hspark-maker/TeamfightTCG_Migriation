@@ -71,7 +71,9 @@ public static partial class CardGrowthManager
         t_data.Entries = t_entries;
     }
 
-    // 메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op)
+    /// <summary>메모리 캐시를 세이브 슬롯에 flush 후 영속화(미초기화면 no-op).
+    /// <b>정상 플레이 호출부 0 — 디버그 전용이다.</b> cardGrowth 슬롯을 쓰는 쪽은 서버뿐이라,
+    /// 정상 경로에서 부르면 응답 채택이 세운 업로드 기준선을 클라 값으로 덮는다.</summary>
     public static void Save()
     {
         if (!s_initialized) return;

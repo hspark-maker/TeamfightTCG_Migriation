@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 // Tab_Pack의 카드팩 쇼케이스 컨트롤러. 진열할 팩들을 인스펙터에서 직접 받아 캐러셀에 그림을 공급하고,
-// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 PurchaseAsync → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
+// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 낙관 검사 → 캐리어(PackHandoff)에 구매 티켓 적재 → 개봉 오버레이 열기를 수행한다.
+// 서버 왕복은 기다리지 않는다 — 티켓이 왕복을 쥐고 개봉 화면이 그 사이를 덮는다(클릭 뒤 아무것도 안 변하는 구간 제거).
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 PurchaseAsync(서버)가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 목록(packs)은 이 뷰가 직접 소유한다 — 상점 SO 미개입(목록이 비면 구매 잠금).
@@ -20,7 +20,7 @@ using UnityEngine.SceneManagement;
 //   목록으로 흡수하면 그림·이름·가격·결제가 전부 한 곳에서 나오므로 갈릴 여지가 구조적으로 없다.
 public class PackShowcaseController : MonoBehaviour
 {
-    // 구매가 실제로 성립한 순간 발화(클릭이 아니라 결과). 구독자는 모른다 — "일어난 일"만 알린다.
+    // 구매를 확정한 순간 발화(왕복 성립이 아니라 결제 개시). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
@@ -300,7 +300,7 @@ public class PackShowcaseController : MonoBehaviour
         UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
     }
 
-    // 구매 클릭: 성공이면 캐리어에 실어 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
+    // 구매 클릭: 낙관 검사를 통과하면 티켓을 캐리어에 실어 곧바로 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
     void OnBuyPressed()
     {
         if (s_transitioning) return;
@@ -316,45 +316,39 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        BuyAsync(t_pack).Forget();
+        // 유저가 실제로 맞닥뜨리는 거절(잔액 부족·랭크 잠금·미준비)은 전부 여기서 걸린다 —
+        // 그래서 오버레이를 열었다가 되돌리는 장면은 시트·SO 드리프트라는 저작 사고에서만 남는다.
+        // 여기서 끊는 갈래는 잠금도 걸지 않는다(전환이 시작되지 않았으므로 풀 것도 없다).
+        var t_precheck = CardPackOpener.Precheck(t_pack);
+        if (t_precheck != EPackOpenResult.Success)
+        {
+            ShowFailPopup(t_precheck);
+            return;
+        }
+
+        Buy(t_pack);
     }
 
-    // 서버 왕복 구매. 잠금은 호출 "전"에 세운다 — 왕복이 도는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
-    // 실패로 끝나는 모든 갈래에서 반드시 되돌릴 것(안 풀면 상점이 이 세션 내내 잠긴 채로 남는다).
-    async UniTaskVoid BuyAsync(CardPackData _pack)
+    // 구매 확정. 서버 왕복은 티켓에 맡기고 기다리지 않는다 — 개봉 화면이 그 사이를 덮고, 서버 거절이 나오면
+    // 개봉 화면이 스스로 안내하고 닫는다(거절 표면은 오버레이 한 곳뿐 — 상점은 그 뒤를 모른다).
+    // 튜토리얼 좌표도 그쪽 거절 신호가 되감으므로, 여기서 미리 커밋해도 전진한 채 멈추지 않는다.
+    // 잠금은 티켓을 띄우기 "전"에 세운다 — 같은 프레임 멀티탭이 결제를 여러 번 내보내는 것을 막는다.
+    void Buy(CardPackData _pack)
     {
         s_transitioning = true;
 
-        var t_opened = await CardPackOpener.PurchaseAsync(_pack);
+        // 오버레이보다 반드시 먼저 울린다 — 튜토리얼 브리지가 이 신호로 게이트를 닫고
+        // 오버레이 열림 신호가 스텝을 다시 적용한다. 뒤집으면 개봉 화면 위에 구식 스텝의 게이트가 한 번 그려진다.
+        OnAnyPurchased?.Invoke();
 
-        // 왕복 중 이 뷰가 사라졌다면 태울 화면이 없다 — 잠금만 풀고 물러난다.
-        // 캐리어에 싣지 않는 것은 의도적이다: 다음에 열리는 개봉이 남의 결과를 물려받는 편이 더 나쁘다.
-        if (this == null)
-        {
-            s_transitioning = false;
-            if (t_opened != null && t_opened.Success)
-                Debug.LogWarning("[PackShowcaseController] 구매 성립 후 진열이 사라짐 — 카드는 지급됐으나 연출 생략.");
-            return;
-        }
+        // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
+        PackHandoff.Set(PackPurchaseTicket.Begin(_pack), _pack, SceneManager.GetActiveScene().name, false);
 
-        if (t_opened != null && t_opened.Success)
-        {
-            // 구독자가 개봉 화면이 뜨기 전에 결과를 처리할 수 있도록 먼저 알린다(튜토리얼이 이 순서를 센다).
-            OnAnyPurchased?.Invoke();
-            // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
-            PackHandoff.Set(t_opened, _pack, SceneManager.GetActiveScene().name, false);
-
-            // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
-            // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
-            m_openPending = true;
-            if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), purchaseFlash, OpenOverlay);
-            else OpenOverlay();
-            return;
-        }
-
-        // 실패는 차감 없이 반환됨(PurchaseAsync 보장) — 사유만 안내하고 진열은 그대로 둔다.
-        s_transitioning = false;
-        ShowFailPopup(t_opened != null ? t_opened.Result : (EPackOpenResult?)null);
+        // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
+        // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
+        m_openPending = true;
+        if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), purchaseFlash, OpenOverlay);
+        else OpenOverlay();
     }
 
     // 개봉 화면을 연다. 임팩트가 화면을 덮은 순간 불리고, 그 전에 탭이 꺼지면 OnDisable이 대신 부른다 — 어느 쪽이든 1회.
@@ -381,24 +375,6 @@ public class PackShowcaseController : MonoBehaviour
         return buyButton != null ? (RectTransform)buyButton.transform : null;
     }
 
-    // 실패 사유를 사용자 메시지로 갈라 SimpleYNPopup 표시(LobbyMatchLauncher 팝업 관용구).
-    void ShowFailPopup(EPackOpenResult? _result)
-    {
-        // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
-        var t_pack = ResolvePack();
-        string t_currency = CurrencyLook.NameOf(t_pack != null ? t_pack.PriceType : ECurrencyType.Gold);
-
-        string t_message = _result == EPackOpenResult.RankLocked
-            ? PackUnlockRules.UnlockLabel(t_pack)
-            : _result == EPackOpenResult.InsufficientGold
-                ? $"{t_currency}{KoreanText.Subject(t_currency)} 부족합니다."
-                : "구매할 수 없습니다.";
-
-        UIPoolManager.instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
-        {
-            titleText = t_message,
-            yesText   = "확인",
-            noText    = "닫기",
-        });
-    }
+    // 낙관 검사에서 걸린 거절 안내. 지금 진열 중인 그 팩의 것이므로 대상을 그대로 넘긴다.
+    void ShowFailPopup(EPackOpenResult _result) => PackPurchaseFailurePopup.Show(ResolvePack(), _result);
 }

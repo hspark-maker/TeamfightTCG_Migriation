@@ -1,7 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Coffee.UIEffects;
-using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -18,6 +18,10 @@ using UnityEngine.SceneManagement;
 //   Battle 참조는 TutorialConfig.Begin 한 줄뿐(TutorialSetupUI 선례와 동일 방향, 전투 지식 격리).
 public class PackAcquireController : MonoBehaviour
 {
+    // 결제가 거절돼 이번 개봉이 없던 일이 된 순간 발화(사유만 알린다 — 구독자가 무엇을 되돌릴지는 그쪽 사정).
+    // 유일한 구독자는 튜토리얼 브리지다: 구매 신호가 왕복 "전"에 울리는 탓에 전진해 둔 좌표를 여기서 되감는다.
+    public static event Action<EPackOpenResult> OnAnyPurchaseRejected;
+
     [Header("참조")]
     [Tooltip("카드팩 개봉 뷰. BeginOpen으로 세션을 태우고 OnRevealComplete를 수신.")]
     [SerializeField] PackRevealView view;
@@ -111,8 +115,11 @@ public class PackAcquireController : MonoBehaviour
         m_nextScene = PackHandoff.NextScene;
         m_startTutorial = PackHandoff.StartTutorial;
         m_pack = PackHandoff.Pack;
-        var t_opened = PackHandoff.Consume();
-        CacheCards(t_opened);
+        var t_ticket = PackHandoff.Consume();
+
+        // 카드는 아직 오지 않았다(서버 왕복 중) — 도착은 view.OnCardsSupplied가 알린다.
+        // 그래도 여기서 한 번 비운다: 직전 세션 캐시가 남으면 재개봉이 남의 신규 카드를 물려받는다.
+        CacheCards(null);
         m_refundShown = false;
         BindRetryPrice();
 
@@ -120,7 +127,7 @@ public class PackAcquireController : MonoBehaviour
         // 덮개가 이미 화면을 가린 뒤라(차감 롤다운도 그 앞에서 끝난다) 걷히는 프레임이 드러나지 않는다.
         HideBar();
 
-        view.BeginOpen(t_opened, m_pack);
+        view.BeginOpen(t_ticket, m_pack);
         return true;
     }
 
@@ -131,14 +138,26 @@ public class PackAcquireController : MonoBehaviour
         if (m_retryTone == null && retryButton != null)
             m_retryTone = retryButton.GetComponent<UIEffect>();
 
-        if (view != null) view.OnRevealComplete += OnRevealComplete;
+        // 세션이 아니라 화면 수명에 맞춘다 — 재개봉은 OnEnable을 다시 돌리지 않으므로
+        // 세션마다 붙였다 떼면 두 번째 세션의 카드 도착·거절 신호를 아무도 받지 못한다.
+        if (view != null)
+        {
+            view.OnRevealComplete += OnRevealComplete;
+            view.OnCardsSupplied  += OnCardsSupplied;
+            view.OnRevealAborted  += OnRevealAborted;
+        }
         if (acquireButton != null) acquireButton.onClick.AddListener(OnAcquirePressed);
         if (retryButton != null) retryButton.onClick.AddListener(OnRetryPressed);
     }
 
     void OnDisable()
     {
-        if (view != null) view.OnRevealComplete -= OnRevealComplete;
+        if (view != null)
+        {
+            view.OnRevealComplete -= OnRevealComplete;
+            view.OnCardsSupplied  -= OnCardsSupplied;
+            view.OnRevealAborted  -= OnRevealAborted;
+        }
         if (acquireButton != null) acquireButton.onClick.RemoveListener(OnAcquirePressed);
         if (retryButton != null) retryButton.onClick.RemoveListener(OnRetryPressed);
 
@@ -153,6 +172,28 @@ public class PackAcquireController : MonoBehaviour
     IEnumerator CloseNextFrame()
     {
         yield return null;
+
+        if (PackOpenOverlay.Instance != null) PackOpenOverlay.Instance.Close();
+    }
+
+    // 서버 응답이 실제로 도착한 순간. 개봉 연출은 이미 돌고 있고 여기서는 결과만 받아 캐시한다
+    // — 로비로 넘길 신규 카드·환급이 이 시점 이후에야 존재한다.
+    void OnCardsSupplied(OpenedPack _opened)
+    {
+        CacheCards(_opened);
+    }
+
+    // 서버가 구매를 거절했을 때. 안내는 이 화면이 직접 띄우고 오버레이째 물러난다 —
+    // 사유를 상점까지 실어 나르던 시절엔 상점 탭이 꺼져 있으면(튜토리얼 자동구매 등) 아무도 꺼내지 않아
+    // 안내 없이 화면만 증발했고, 남은 사유가 나중의 멀쩡한 개봉 뒤에 엉뚱하게 튀어나왔다.
+    // 거절은 언제나 이 화면이 떠 있는 동안 일어나므로, 팝업을 여기 한 곳에 두면 두 번 뜰 경로 자체가 없다.
+    void OnRevealAborted(EPackOpenResult _reason)
+    {
+        PackPurchaseFailurePopup.Show(m_pack, _reason);
+
+        // 오버레이를 닫기 "전"에 알린다 — 튜토리얼이 좌표를 되감은 뒤라야 닫힘 신호가 되감긴 스텝을 다시 세운다.
+        // 뒤집으면 옛 좌표의 안내가 로비에 한 번 그려졌다가 갈아치워진다(구매 신호를 앞에 두는 이유와 같은 축).
+        OnAnyPurchaseRejected?.Invoke(_reason);
 
         if (PackOpenOverlay.Instance != null) PackOpenOverlay.Instance.Close();
     }
@@ -300,40 +341,38 @@ public class PackAcquireController : MonoBehaviour
     {
         if (m_left || m_retrying || m_pack == null || view == null) return;
 
-        RetryAsync().Forget();
+        Retry();
     }
 
-    // 서버 왕복 재구매. 잠금은 호출 "전"에 세운다 — 왕복이 도는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
-    // 실패로 끝나면 반드시 되돌릴 것(안 풀면 이 화면에서 재개봉도 획득도 못 하고 갇힌다).
-    async UniTaskVoid RetryAsync()
+    // 재구매. 첫 구매와 같이 서버 왕복을 기다리지 않고 티켓을 실어 세션만 갈아끼운다 —
+    // 응답은 새 세션의 개봉 화면이 받고, 서버 거절이면 OnRevealAborted가 오버레이를 닫는다.
+    // 잠금은 티켓을 띄우기 "전"에 세운다(안 세우면 같은 결제가 여러 번 나간다).
+    void Retry()
     {
-        // 결제는 곧 시작되고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다
-        // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
-        m_retrying = true;
-
         var t_pack = m_pack;
 
-        // 차감·소유·환급은 여기 한 곳에서만 일어난다(첫 구매와 같은 길). 실패면 차감 없이 돌아온다.
-        var t_opened = await CardPackOpener.PurchaseAsync(t_pack);
-
-        // 왕복 중 오버레이가 사라졌다면 갈아끼울 세션도, 되돌릴 화면도 없다.
-        if (this == null) return;
-
-        if (t_opened == null || !t_opened.Success)
+        // 잔액 부족·랭크 잠금은 버튼이 이미 잠가 두지만, 화면을 갈아끼우기 전 마지막으로 한 번 더 묻는다.
+        // 같은 거절을 서버가 답하면 팝업이 뜨는데 여기서 걸릴 때만 조용히 지나가면, 유저가 보는 결과가
+        // 왕복 타이밍에 따라 갈린다 — 안내는 같은 자리로 모으고 세션만 그대로 둔다(버튼은 다시 판정).
+        var t_precheck = CardPackOpener.Precheck(t_pack);
+        if (t_precheck != EPackOpenResult.Success)
         {
-            m_retrying = false;
-            // 잔액 부족은 버튼이 이미 잠가 두므로 여기 오는 것은 팩 데이터 이상·서버 거절뿐 — 유저에게 물을 것이 없다.
-            Debug.LogWarning($"[PackAcquireController] 재개봉 실패({(t_opened != null ? t_opened.Result.ToString() : "null")}) — 팩 데이터 확인.");
+            Debug.LogWarning($"[PackAcquireController] 재개봉 불가({t_precheck}) — 팩 데이터 확인.");
+            PackPurchaseFailurePopup.Show(t_pack, t_precheck);
             RefreshRetryLock();
             return;
         }
+
+        // 결제는 곧 시작되고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다
+        // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
+        m_retrying = true;
 
         // 이번 세션 몫을 먼저 싣는다 — 곧 BeginSession이 캐시를 덮으므로, 여기서 놓치면
         // 직전 개봉의 신규 카드·환급이 로비 연출에서 통째로 사라진다(캐리어는 누적이라 겹쳐 실어도 된다).
         CardPackRewardHandoff.Set(PendingRefund(), m_newCards);
 
         // 목적지 컨텍스트는 그대로 물려준다 — 어느 세션에서 획득을 누르든 나가는 곳은 같아야 한다.
-        PackHandoff.Set(t_opened, t_pack, m_nextScene, m_startTutorial);
+        PackHandoff.Set(PackPurchaseTicket.Begin(t_pack), t_pack, m_nextScene, m_startTutorial);
 
         // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
         // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.

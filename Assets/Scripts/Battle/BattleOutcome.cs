@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 
 /// <summary>전투 결과의 1회 확정, 보상·랭크 적용, 서버 증거 제출을 소유한다.</summary>
 public sealed class BattleOutcome
@@ -32,7 +33,11 @@ public sealed class BattleOutcome
 
         if (TournamentRun.IsActive)
         {
-            if (_won) TournamentProgress.MarkRewardPending(TournamentRun.NodeId);
+            // 로비까지 미루지 않는다: 캐리어는 메모리라 씬 로딩 중 종료가 승리를 삼킨다.
+            // 기다리지도 않는다 — 낙인은 로비 복귀가 한 번 더 신고해 메운다(TournamentReturnFlow).
+            // 취소 토큰을 물리지 않는다: 씬 파괴가 업로드 봉인 해제(InvokeAsync 의 finally) 전에
+            // 취소를 던지면 이후 저장이 통째로 막힌다.
+            if (_won) TournamentWinCommand.ReportWinAsync(TournamentRun.NodeId).Forget();
             TournamentResultHandoff.Set(TournamentRun.NodeId, _won);
             Reward = default;
             RankDelta = 0;

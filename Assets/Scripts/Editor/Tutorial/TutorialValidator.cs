@@ -398,8 +398,9 @@ public static class TutorialValidator
             "cards에 지급할 카드를 넣으세요(중간의 빈 칸은 그대로 두어도 됩니다).");
     }
 
-    // (7)(경미) 팩. 실제로 실패하는 것은 둘뿐이다 — AutoPurchase는 null 팩을 물고 구매가 깨지고(EnterAutoPurchase),
-    // PackNotice는 진입 즉시 null 검사로 Fail한다(EnterPackNotice). 나머지 둘은 문서화된 폴백이라 문제 삼지 않는다:
+    // (7)(경미) 팩. 미배선이 실제로 아프게 끝나는 것은 셋이다 — AutoPurchase는 null 팩을 물고 구매가 깨지고(EnterAutoPurchase),
+    // PackNotice는 진입 즉시 null 검사로 Fail하며(EnterPackNotice), 지급 3액션은 서버에 보낼 키가 없어
+    // 화면만 서고 소유가 늘지 않는다(TutorialStepExecutor.GrantPackIdOf). 나머지 둘은 문서화된 폴백이라 문제 삼지 않는다:
     // WaitPurchase는 진열을 덮어쓰지 않고 상점 기본 진열이 서며 완료는 구매 신호가 그대로 주고,
     // DeckAutoEquip은 "미지정이면 일반 편성 규칙"이다(OutgameTutorialRunner.TryGetForcedDeck).
     static void ValidatePack(TutorialStepDef _def, EOutgameTutorialAction _action, int _chapter, int _index,
@@ -409,13 +410,24 @@ public static class TutorialValidator
 
         if (_def.Pack == null)
         {
-            if (_action == EOutgameTutorialAction.AutoPurchase || _action == EOutgameTutorialAction.PackNotice)
+            if (IsCardGrant(_action))
+                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "지급 팩 미배선",
+                    $"{_action}가 무엇을 줄지 정하는 팩이 비어 있습니다 — 서버에 보낼 키가 없어 화면만 서고 소유는 늘지 않습니다.",
+                    "pack에 그 스텝이 지급할 무료 팩(price 0)을 배선하세요.");
+            else if (_action == EOutgameTutorialAction.AutoPurchase || _action == EOutgameTutorialAction.PackNotice)
                 Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "팩 미배선",
                     $"{_action}가 팩을 요구하는데 비어 있습니다 — 실패 분기로 빠집니다(기본 Skip이면 경고 한 줄뿐입니다).",
                     "pack에 CardPackData를 배선하세요.");
 
             return;
         }
+
+        // 값이 붙은 팩을 지급으로 보내면 서버가 거절한다 — 화면은 그대로 서므로 증상이 "받았는데 안 늘었다"로만 보인다.
+        // 가격의 진실원은 시트라 에디터가 읽는 값이 배포본과 다를 수 있어 Error까지 올리지 않는다.
+        if (IsCardGrant(_action) && _def.Pack.Price != 0)
+            Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "지급 팩이 유료",
+                $"팩 '{_def.Pack.PackId}'의 가격이 {_def.Pack.Price}입니다 — 서버는 가격이 붙은 팩의 튜토리얼 지급을 거절합니다.",
+                "그 팩의 price를 0으로 두거나, 무료 팩으로 바꾸세요(가격 진실원은 CardPack 시트입니다).");
 
         // 자동 편성만 pack.Pool을 직독한다(TutorialStepDef.TryGetForcedDeck) — 풀이 0이면 미지정과 똑같이
         // 일반 편성으로 조용히 떨어져, 저작한 덱이 아닌 덱이 서도 아무 신호가 없다.
@@ -479,6 +491,12 @@ public static class TutorialValidator
                     int _chapter, int _index, string _rule, string _message, string _fix)
         => _issues.Add(new TutorialIssue(_level, _chapter, _index, _def != null ? _def.StepId : 0,
                                          _rule, _message, _fix));
+
+    // 팩을 지급 목록의 정본으로 읽는 액션(서버가 그 팩의 카드 전량을 준다)
+    static bool IsCardGrant(EOutgameTutorialAction _action)
+        => _action == EOutgameTutorialAction.DeckGrant
+        || _action == EOutgameTutorialAction.CardGrant
+        || _action == EOutgameTutorialAction.CardSetGrant;
 
     // 진입만으로 소유·재화를 움직이는 액션(되풀이되면 그만큼 다시 지급된다)
     static bool IsGrantOnEnter(EOutgameTutorialAction _action)
