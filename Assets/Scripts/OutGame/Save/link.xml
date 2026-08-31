@@ -39,6 +39,7 @@
     <type fullname="EnhanceCardResult" preserve="all"/>
     <type fullname="EnhanceKeywordResult" preserve="all"/>
     <type fullname="GrantTutorialCardsResult" preserve="all"/>
+    <type fullname="ReportTournamentWinResult" preserve="all" />
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>
 </linker>

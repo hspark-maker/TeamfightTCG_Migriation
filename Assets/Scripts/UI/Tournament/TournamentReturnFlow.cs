@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 
 // 정점 전투 결과를 로비에서 소비해 "떠났던 화면으로 돌아간다"로 잇는 진입점.
 //
@@ -35,6 +36,10 @@ public static class TournamentReturnFlow
 
         s_giftNodeId = t_won ? t_nodeId : null;
 
+        // 전투 씬이 이미 한 번 쐈다 — 그때 네트워크가 없었으면 이 두 번째가 낙인을 세운다.
+        // 서버가 재신고를 성공으로 답하고(AlreadyPending) 겹친 왕복은 창구가 합쳐 준다.
+        if (t_won) TournamentWinCommand.ReportWinAsync(t_nodeId).Forget();
+
         ReturnRequested?.Invoke(t_nodeId, t_won);
     }
 
@@ -46,7 +51,17 @@ public static class TournamentReturnFlow
         string t_nodeId = s_giftNodeId;
         s_giftNodeId = null;   // 남기면 다음 팩 개봉의 신호에 엉뚱하게 터진다
 
-        // 조건 없이 낸다 — 이 신호가 맵의 등장 예약을 푸는 유일한 열쇠라, 걸러 버리면 선물이 감춰진 채 남는다.
-        GiftRevealRequested?.Invoke(t_nodeId);
+        RevealWhenReported(t_nodeId).Forget();
+    }
+
+    // 낙인이 서기 전에 선물을 내면 눌러도 수령이 튕긴다 — 자격을 재는 쪽이 서버라
+    // 신고 왕복이 끝난 뒤에 낸다.
+    static async UniTaskVoid RevealWhenReported(string _nodeId)
+    {
+        await TournamentWinCommand.ReportWinAsync(_nodeId);
+
+        // 실패해도 조건 없이 낸다 — 이 신호가 맵의 등장 예약을 푸는 유일한 열쇠라,
+        // 걸러 버리면 선물이 감춰진 채 남는다. 낙인이 안 선 정점은 도전 대상으로 그려진다.
+        GiftRevealRequested?.Invoke(_nodeId);
     }
 }

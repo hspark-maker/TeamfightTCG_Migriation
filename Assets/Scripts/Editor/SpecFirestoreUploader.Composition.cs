@@ -34,7 +34,7 @@ public static partial class SpecFirestoreUploader
         public string nodeId;
         public int order;
         public string prevNodeId;
-        public int requiredPoints;
+        public long requiredPoints;
     }
 
     /// <summary>CardAlbumConfig 저작을 AlbumEntry 표로 올린다. 성공하면 보고 줄을, 실패하면 null과 _error를 준다.</summary>
@@ -257,9 +257,9 @@ public static partial class SpecFirestoreUploader
     // 돌려주므로 points 0 인 신규 계정도 클라에선 첫 등급으로 읽힌다. entryPoints 를 그대로 쓰면
     // 서버만 그 계정을 잠근다.
     static bool TryBuildGradeEntryPoints(
-        RankConfig _config, out Dictionary<ERankGrade, int> _entryPoints, out string _error)
+        RankConfig _config, out Dictionary<ERankGrade, long> _entryPoints, out string _error)
     {
-        _entryPoints = new Dictionary<ERankGrade, int>();
+        _entryPoints = new Dictionary<ERankGrade, long>();
         _error = null;
 
         List<RankGradeConfig> t_grades = _config.grades;
@@ -310,7 +310,7 @@ public static partial class SpecFirestoreUploader
     {
         _rows = new List<TournamentChapterRow>();
 
-        if (!TryBuildGradeEntryPoints(_rankConfig, out Dictionary<ERankGrade, int> t_entryPoints, out _error))
+        if (!TryBuildGradeEntryPoints(_rankConfig, out Dictionary<ERankGrade, long> t_entryPoints, out _error))
             return false;
 
         var t_chapterIds = new HashSet<string>(StringComparer.Ordinal);
@@ -343,7 +343,7 @@ public static partial class SpecFirestoreUploader
                 return false;
             }
 
-            if (!t_entryPoints.TryGetValue(t_chapter.requiredGrade, out int t_requiredPoints))
+            if (!t_entryPoints.TryGetValue(t_chapter.requiredGrade, out long t_requiredPoints))
             {
                 _error = $"챕터 '{t_chapter.chapterId}' 의 requiredGrade '{t_chapter.requiredGrade}' 가 " +
                          "RankConfig.grades 에 없다 — 서버가 잠금을 잴 점수를 만들 수 없다.";

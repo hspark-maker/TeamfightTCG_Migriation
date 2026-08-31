@@ -152,6 +152,8 @@ public static class TournamentProgress
     }
 
     // 정점 상태(4종 배타). 클리어 검사가 해금 검사보다 먼저다 — 앞 정점 키를 고쳐 사슬이 끊겨도 기클리어는 유지된다
+    // 표시용 낙관 판정이다 — 해금의 진실원은 서버 reportTournamentWin 이고 여기와 엇갈리면 서버가 이긴다
+    // (CardPackOpener.Precheck 와 같은 성격). 이 값으로 낙인을 만들지 않는다.
     public static ETournamentNodeState StateOf(int _index)
     {
         if (!Config.TryGetNode(_index, out TournamentNodeDef t_node) || !t_node.HasStableKey)
@@ -175,6 +177,7 @@ public static class TournamentProgress
     // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다).
     // 미수령 정점은 진입이 아니라 수령이 남은 자리라 제외한다.
     // 랭크 잠금을 여기서 곱한다 — 진입 게이트가 맵과 로비 둘로 갈려 있어 상태 판정에 섞는 것보다 여기가 단일 지점이다.
+    // 진입을 여기서 막는 것은 헛걸음을 줄이려는 것뿐이다 — 뚫고 들어가 이겨도 서버가 신고를 거절한다.
     public static bool CanEnter(int _index)
     {
         if (IsRankLocked(_index)) return false;
@@ -189,20 +192,11 @@ public static class TournamentProgress
     public static bool IsRewardPending(int _index)
         => StateOf(_index) == ETournamentNodeState.RewardPending;
 
-    // 승리 낙인 — 지급은 하지 않는다. 수령(ClearNode)이 지급·해금·낙인 해제를 마저 한다.
-    // 전투 씬에서 불린다: 로비까지 미루면 로딩 중 종료가 승리를 삼킨다.
-    // 디바운스가 아니라 즉시 업로드다 — 자격을 재는 쪽이 서버라, 낙인이 원격에 닿기 전에 수령이 가면 튕긴다.
-    public static bool MarkRewardPending(string _nodeId)
+    // 서버가 낙인을 갈아끼운 뒤 화면에 알린다. 값을 다시 만들지 않는다 — Slot 이 세이브 직독이라
+    // 채택이 끝난 시점에 이미 새 값이다(ServerSlotRehydrator 의 다른 슬롯들과 다른 이유).
+    internal static void NotifyRehydrated()
     {
-        if (string.IsNullOrEmpty(_nodeId)) return false;
-        if (IsCleared(_nodeId)) return false;
-        if (Slot.PendingRewardNodeId == _nodeId) return false;
-
-        Slot.PendingRewardNodeId = _nodeId;
-
-        DataSaveManager.SaveImmediate();
         OnChanged?.Invoke();
-        return true;
     }
 
     /// <summary>정점 클리어 확정 — 보상 지급까지 서버에 맡긴다(수령 팝업의 onConfirm이 이 메서드를 부른다).
@@ -223,6 +217,7 @@ public static class TournamentProgress
 
     // 챕터의 모든 정점이 Cleared인가. 정점 0개 챕터는 완주로 통과시킨다 — 저작 실수로 진행이 영영 막히지 않게
     // (검증기가 Error로 잡는 몫이다).
+    // 표시용 낙관 판정 — 완주 자격의 진실원은 서버 claimReward(TournamentChapter 표 모수)다.
     public static bool IsChapterComplete(int _chapterIndex)
     {
         if (!Config.TryGetNodeRange(_chapterIndex, out int t_start, out int t_count)) return false;
