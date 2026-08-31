@@ -33,6 +33,10 @@ public class MatchDeckShell : MonoBehaviour
 
     bool m_editing;
 
+    // 매칭 전환을 타고 들어온 진입인가. 상대 덱이 캐리어에 실리기 전에 화면이 먼저 서기 때문에
+    // "지금 상대가 있나"를 캐리어로만 판정하면 전환 경로에서 상대 자리를 접어 버린다.
+    bool m_forHandoff;
+
     // 전투 시작 응답 한 박이 도는 중인가. 커튼이 걸린 뒤에도 되돌리지 않는다 — 이 화면 밑에서 씬이 갈리기 때문이다.
     // 되돌리는 곳은 진입(Open) 한 곳뿐이라, 전투로 닫히지 않은 화면이 다시 열릴 때만 풀린다.
     bool m_launching;
@@ -124,7 +128,7 @@ public class MatchDeckShell : MonoBehaviour
     /// </summary>
     public MatchHandoffTargets PrepareForHandoff()
     {
-        Open();
+        Open(_forHandoff: true);
         m_prepared = true;
 
         return panelView != null ? panelView.BuildHandoffTargets() : default;
@@ -132,8 +136,11 @@ public class MatchDeckShell : MonoBehaviour
 
     // 덱 화면 진입. 게이트를 쓰지 않고 직접 열 때(디버그·후속 진입점)의 창구다.
     // _slotIndex가 음수면 이전 선택 → 첫 유효 슬롯 순으로 알아서 고른다.
-    public void Open(int _slotIndex = -1)
+    public void Open(int _slotIndex = -1, bool _forHandoff = false)
     {
+        // 전환을 타고 들어오는 길은 상대가 곧 실린다 — 이 순간의 캐리어는 아직 비어 있으니 믿지 않는다.
+        m_forHandoff = _forHandoff;
+
         // 루트를 켜기 전에 편집 패널을 내린다 — 비활성 부모 아래에선 OnEnable이 돌지 않으므로,
         // 편집 패널의 튜토리얼 앵커(로비 덱 편집과 키를 공유한다)가 켜졌다 꺼지며 로비 쪽 등록을 지우는 일이 없다.
         HideEditorIfOpen();
@@ -238,6 +245,9 @@ public class MatchDeckShell : MonoBehaviour
 
         // 전환을 타고 들어온 직전 표시가 칸을 감춘 채 끝났을 수 있다 — 전환을 타지 않는 경로는 반드시 여기서 되돌린다.
         panelView.ResetIntro();
+
+        // 상대 자리·버튼 라벨은 ResetIntro 뒤에 정한다 — 저작 상태로 되돌린 다음이라야 덮어쓴 값이 남는다.
+        panelView.ApplyOpponentPresence(m_forHandoff || DeckConfig.HasEnemyDeck);
     }
 
     // 표시할 슬롯 결정. 요청값 → 직전 선택 유지 → (튜토리얼 덱을 뺀) 첫 유효 슬롯 → 없음(-1).

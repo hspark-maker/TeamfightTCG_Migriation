@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimPayout = void 0;
+const node_crypto_1 = require("node:crypto");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const firestore_1 = require("firebase-admin/firestore");
@@ -43,6 +44,8 @@ const payloadGuards_1 = require("../match/payloadGuards");
 const currencyKeys_1 = require("../currency/currencyKeys");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
+const domainReject_1 = require("../save/domainReject");
+const receiptId_1 = require("../save/receiptId");
 function parseClaimPayoutData(raw) {
     if (raw == null || typeof raw !== "object")
         throw new https_1.HttpsError("invalid-argument", "payload required");
@@ -113,6 +116,11 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
     if (data.matchIds.length === 0)
         return { acked: [], wallet: null };
     const reference = (0, walletStore_1.walletRef)(firebaseApp_1.db, data.env, uid);
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const receipt = { kind: "client", txId: (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)()) };
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // 응답을 짓는 자리에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
     // 낙인(ready → claimed)과 크레딧은 한 트랜잭션 안이어야 한다 — 갈라 놓으면 낙인만 성공해
     // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
     const result = await (0, countedTransaction_1.withCountedTransaction)("claimPayout", async (tx) => {
@@ -127,6 +135,15 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             // 도메인 거절이 아니라 세션 문제다 — 초기화의 ensureWallet 이 돌지 않았다는 뜻이라
             // 클라가 다시 초기화하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).
             throw new https_1.HttpsError("failed-precondition", "Wallet document does not exist. Boot must call ensureWallet first.");
+        }
+        // 영수증이 마지막 읽기다 — 아래 낙인(claimed)이 첫 쓰기라 여기보다 뒤로 밀 수 없다.
+        // 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
+        const lookup = (0, walletStore_1.readReceipt)(await tx.get((0, walletStore_1.receiptRef)(reference, receipt.txId)));
+        if (lookup.hit) {
+            if (lookup.source !== "claimPayout") {
+                (0, domainReject_1.rejectDomain)("TxIdReused", `txId '${receipt.txId}' was already used by another command.`, { uid, env: data.env, source: "claimPayout", receiptSource: lookup.source, txId: receipt.txId });
+            }
+            return lookup.result;
         }
         const accepted = [];
         const gains = [];
@@ -151,13 +168,29 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
         const current = (0, walletStore_1.readWallet)(walletSnapshot);
         // 크레딧할 것이 없으면 지갑을 쓰지 않는다 — 빈 지급으로 rev 만 올리면 클라가 달라진 것
         // 없는 잔액을 채택하고 사고를 못 알아챈다. 응답에는 현재 잔액을 그대로 싣는다.
-        if (gains.length === 0)
-            return { acked: accepted, wallet: { rev: current.rev, balances: current.balances } };
-        const next = (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, gains));
-        (0, walletStore_1.writeWallet)(tx, reference, next, firestore_1.FieldValue.serverTimestamp());
-        return { acked: accepted, wallet: { rev: next.rev, balances: next.balances } };
+        // 그래도 영수증은 끊는다 — 위에서 이미 claimed 낙인을 썼고, 그 낙인이 지급을 대신한다.
+        // 응답은 쓰기 전에 짓는다 — 그것 그대로가 영수증에 담겨야 재시도가 같은 답을 받는다.
+        if (gains.length === 0) {
+            replayed = false;
+            const response = { acked: accepted, wallet: { rev: current.rev, balances: current.balances } };
+            (0, walletStore_1.writeReceiptOnly)(tx, reference, "claimPayout", current, receipt, response, firestore_1.FieldValue.serverTimestamp());
+            return response;
+        }
+        replayed = false;
+        const update = (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, gains), "claimPayout");
+        const response = { acked: accepted, wallet: { rev: update.next.rev, balances: update.next.balances } };
+        (0, walletStore_1.writeWallet)(tx, reference, update, receipt, response, firestore_1.FieldValue.serverTimestamp());
+        return response;
     });
-    logger.info("claimPayout ack", { uid, env: data.env, acked: result.acked, rev: result.wallet.rev });
+    if (replayed) {
+        logger.info("receipt replay", { uid, env: data.env, source: "claimPayout", txId: receipt.txId, rev: result.wallet.rev });
+    }
+    else {
+        logger.info("claimPayout ack", {
+            uid, env: data.env, acked: result.acked, rev: result.wallet.rev,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
     return result;
 });
 //# sourceMappingURL=claimPayout.js.map

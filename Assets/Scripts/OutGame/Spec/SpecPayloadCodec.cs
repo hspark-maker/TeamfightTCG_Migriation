@@ -21,6 +21,7 @@ public static class SpecPayloadCodec
     {
         "Card", "Card_Test", "CardPack", "CardPackDrop", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
+        "SynergyDef", "SynergyTierDef", "SynergyEffectDef", "SynergyEffectParamDef",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -155,8 +156,9 @@ public static class SpecPayloadCodec
     }
 
     /// <summary><see cref="AppendStringArray"/>가 만든 형태만 받는다 — 공백도 중첩도 없는 2단 문자열 배열.
-    /// 관대한 JSON 파서가 아니다. 형태가 어긋나면 조용히 넘기지 않고 실패시킨다.</summary>
-    static bool TryParseStringMatrix(string _text, out List<string[]> _matrix, out string _error)
+    /// 관대한 JSON 파서가 아니다. 형태가 어긋나면 조용히 넘기지 않고 실패시킨다.
+    /// 표 타입을 모르는 호출부(에디터 업로더의 행 대조)도 쓰므로 public이다 — payload 형식을 아는 곳은 여기 하나다.</summary>
+    public static bool TryParseStringMatrix(string _text, out List<string[]> _matrix, out string _error)
     {
         _matrix = new List<string[]>();
         _error = null;
@@ -256,7 +258,10 @@ public static class SpecPayloadCodec
         "CardPackDrop" => typeof(CardPackDrop), "Reward" => typeof(Reward),
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
-        "CardLimitBreak" => typeof(CardLimitBreak), _ => null,
+        "CardLimitBreak" => typeof(CardLimitBreak),
+        "SynergyDef" => typeof(SynergyDef), "SynergyTierDef" => typeof(SynergyTierDef),
+        "SynergyEffectDef" => typeof(SynergyEffectDef), "SynergyEffectParamDef" => typeof(SynergyEffectParamDef),
+        _ => null,
     };
 
     static string Text(object _value) => _value switch

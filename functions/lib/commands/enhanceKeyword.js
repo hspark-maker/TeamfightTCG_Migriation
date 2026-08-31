@@ -36,10 +36,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.enhanceKeyword = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
+const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
+const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
@@ -91,7 +93,12 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
     let currency = "";
     let cost = 0;
     let freeShotUsed = false;
-    const result = await (0, saveDocument_1.mutateSave)("enhanceKeyword", env, uid, async (current, transaction, wallet) => {
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceKeyword", { kind: "client", txId }, async (current, transaction, wallet) => {
         const levels = (0, keywordGrowth_1.readKeywordLevels)(current.keywordGrowth);
         const currentLevel = (0, keywordGrowth_1.levelOfKeyword)(levels, keyword);
         const step = (0, enhanceRules_1.keywordEnhanceStep)(rule, currentLevel);
@@ -124,14 +131,23 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
             slots: {
                 keywordGrowth: (0, keywordGrowth_1.keywordGrowthSlot)((0, keywordGrowth_1.setKeywordLevel)(levels, keyword, step.level)),
             },
-            wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged)),
+            wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged), "enhanceKeyword"),
         };
+    }, (adopted) => {
+        replayed = false;
+        return { ...adopted, outcome: "Success", level, currency, cost, freeShotUsed };
     });
-    logger.info("enhanceKeyword", {
-        uid, env, keyword, level, currency, cost,
-        freeShotRequested, freeShotUsed,
-        revision: result.revision,
-    });
-    return { ...result, outcome: "Success", level, currency, cost, freeShotUsed };
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "enhanceKeyword", txId, revision: result.revision });
+    }
+    else {
+        logger.info("enhanceKeyword", {
+            uid, env, keyword, level, currency, cost,
+            freeShotRequested, freeShotUsed,
+            revision: result.revision,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=enhanceKeyword.js.map

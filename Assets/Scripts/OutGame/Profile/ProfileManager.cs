@@ -57,6 +57,8 @@ public static class ProfileManager
     {
         ProfileSaveData t_slot = Slot;
 
+        // 닉네임은 서버가 계정 문서를 만들 때 낱말표에서 뽑아 굳힌다(functions/src/profile/generateNickname.ts).
+        // 여기 DEFAULT_NICKNAME 폴백은 그 전에 만들어진 옛 계정(nickname=null)만 받는 안전망이다.
         Nickname = string.IsNullOrEmpty(t_slot.Nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.Nickname);
         AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
         FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;

@@ -8,6 +8,11 @@ using UnityEngine;
 public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 {
     const string ProtocolSuffix = "-p3";
+    const string RankedLobbyName = "RankedMatchP3";
+    const string TierProperty = "t";
+    const string NicknameProperty = "n";
+    const string AvatarProperty = "a";
+    const string FrameProperty = "f";
     public static NetworkSession Instance { get; private set; }
 
     public string BattleSceneName = "BattleScene";
@@ -18,11 +23,20 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         : null;
 
     GameObject sceneManagerGo;
+    readonly List<SessionInfo> rankedSessions = new List<SessionInfo>();
+
+    public IReadOnlyList<SessionInfo> RankedSessions => this.rankedSessions;
+    public bool HasRankedSessionList { get; private set; }
+
+    /// <summary>마지막으로 세운 랭크 방 이름. 내려도 서버 목록에는 잠시 남기 때문에
+    /// 매처가 자기 유령 방을 후보로 집지 않으려면 이 이름을 알아야 한다.</summary>
+    public string CurrentSessionName { get; private set; }
 
     public event Action            OnConnected;
     public event Action<PlayerRef> OnPlayerJoinedRoom;
     public event Action<PlayerRef> OnPlayerLeftRoom;
     public event Action<string>    OnConnectionFailed;
+    public event Action            OnRankedSessionListChanged;
 
     void Awake()
     {
@@ -127,6 +141,76 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         return t_result.Ok;
     }
 
+    public async UniTask<bool> JoinRankedLobby()
+    {
+        await ShutdownRunner();
+        DestroySceneManager();
+        NetworkGameController.Instance?.ResetMatchState();
+        this.rankedSessions.Clear();
+        this.HasRankedSessionList = false;
+
+        CreateSceneManager();
+        CreateRunner();
+        var t_result = await this.Runner.JoinSessionLobby(SessionLobby.Custom, RankedLobbyName);
+        return t_result.Ok;
+    }
+
+    public UniTask<bool> JoinRankedRoom(string _sessionName)
+        => StartRankedRoom(_sessionName, default, false);
+
+    public UniTask<bool> CreateRankedRoom(MatchmakingProfile _profile)
+        => StartRankedRoom($"ranked-{Guid.NewGuid():N}{ProtocolSuffix}", _profile, true);
+
+    async UniTask<bool> StartRankedRoom(string _sessionName, MatchmakingProfile _profile, bool _create)
+    {
+        if (this.Runner == null || string.IsNullOrEmpty(_sessionName)) return false;
+
+        var t_args = new StartGameArgs
+        {
+            GameMode = GameMode.Shared,
+            SessionName = _sessionName,
+            PlayerCount = 2,
+            CustomLobbyName = RankedLobbyName,
+            SceneManager = this.sceneManagerGo != null
+                ? this.sceneManagerGo.GetComponent<NetworkSceneManagerDefault>()
+                : null,
+            IsOpen = true,
+            IsVisible = true,
+            EnableClientSessionCreation = _create,
+        };
+        if (_create)
+        {
+            t_args.SessionProperties = new Dictionary<string, SessionProperty>
+            {
+                [TierProperty] = _profile.TierIndex,
+                [NicknameProperty] = _profile.Nickname,
+                [AvatarProperty] = _profile.AvatarId,
+                [FrameProperty] = _profile.FrameId,
+            };
+        }
+
+        StartGameResult t_result = await this.Runner.StartGame(t_args);
+        if (t_result.Ok && _create) this.CurrentSessionName = _sessionName;
+        return t_result.Ok;
+    }
+
+    public static bool TryGetRankedProfile(SessionInfo _session, out MatchmakingProfile _profile)
+    {
+        _profile = default;
+        if (_session.Properties == null
+            || !_session.Properties.TryGetValue(TierProperty, out SessionProperty t_tier)
+            || !_session.Properties.TryGetValue(NicknameProperty, out SessionProperty t_name)
+            || !t_tier.IsInt || !t_name.IsString)
+            return false;
+
+        string t_avatar = _session.Properties.TryGetValue(AvatarProperty, out SessionProperty t_avatarProp)
+                          && t_avatarProp.IsString ? (string)t_avatarProp : string.Empty;
+        string t_frame = _session.Properties.TryGetValue(FrameProperty, out SessionProperty t_frameProp)
+                         && t_frameProp.IsString ? (string)t_frameProp : string.Empty;
+        _profile = new MatchmakingProfile((string)t_name, (int)t_tier, t_avatar, t_frame);
+        return _profile.IsValid;
+    }
+
     public async UniTask Disconnect()
     {
         var t_target = this.Runner;
@@ -135,6 +219,8 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         // JoinOrCreateRoom이 새 Runner를 먼저 할당했으면 덮어쓰지 않음
         if (this.Runner == t_target)
             this.Runner = null;
+        this.rankedSessions.Clear();
+        this.HasRankedSessionList = false;
     }
 
     async UniTask ShutdownRunner()
@@ -201,7 +287,14 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         => NetworkGameController.Instance?.HandleMessage(_p, _data.ToArray());
     public void OnSceneLoadDone(NetworkRunner _r) { }
     public void OnSceneLoadStart(NetworkRunner _r) { }
-    public void OnSessionListUpdated(NetworkRunner _r, List<SessionInfo> _list) { }
+    public void OnSessionListUpdated(NetworkRunner _r, List<SessionInfo> _list)
+    {
+        if (_r != this.Runner) return;
+        this.rankedSessions.Clear();
+        if (_list != null) this.rankedSessions.AddRange(_list);
+        this.HasRankedSessionList = true;
+        this.OnRankedSessionListChanged?.Invoke();
+    }
     public void OnShutdown(NetworkRunner _r, ShutdownReason _reason) { }
 #pragma warning disable CS0618 
     // SimulationMessagePtr는 Fusion에서 obsolete지만 INetworkRunnerCallbacks 구현상 시그니처 유지 필수

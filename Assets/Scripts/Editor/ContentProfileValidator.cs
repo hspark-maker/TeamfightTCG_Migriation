@@ -38,6 +38,10 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     /// 비차단 경고를 별도로 담아준다.</summary>
     public static List<string> Collect(List<string> _warnings = null, EContentRunMode? _mode = null)
     {
+        // 시트를 새로 생성한 직후에도 검사가 낡은 스냅샷을 보지 않게 매번 다시 읽는다.
+        // SpecSource의 자동 리셋은 플레이 진입 훅뿐이라 에디터 세션에서는 안 돈다.
+        SpecSource.Reload();
+
         var t_errors = new List<string>();
         ContentProfileConfig t_live = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(LIVE_PROFILE_PATH);
         ContentProfileConfig t_test = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(TEST_PROFILE_PATH);

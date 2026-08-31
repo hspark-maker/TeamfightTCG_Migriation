@@ -6,6 +6,8 @@ export {openPack} from "./commands/openPack";
 export {claimReward} from "./commands/claimReward";
 export {createMatch} from "./commands/createMatch";
 export {lockDeck} from "./commands/lockDeck";
+export {getRankSnapshot} from "./commands/getRankSnapshot";
+export {verifyMatchTicket} from "./commands/verifyMatchTicket";
 export {submitMatchResult} from "./commands/submitMatchResult";
 export {claimPayout} from "./commands/claimPayout";
 export {enhanceCard} from "./commands/enhanceCard";

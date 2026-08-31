@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -41,6 +42,7 @@ public class NetworkGameController : MonoBehaviour
         ServerSeedCapability = 9,
         SceneReady = 10,
         Surrender = 11,
+        MatchmakingProfile = 12,
     }
 
     UniTaskCompletionSource opponentReadyTcs;
@@ -78,6 +80,7 @@ public class NetworkGameController : MonoBehaviour
     CardGrowth[] bufferedGrowth;
     byte[] bufferedPairingNonce;
     EMatchEndReason? bufferedAbortReason;
+    MatchmakingProfile? bufferedMatchmakingProfile;
 
     public string LocalDeckHash { get; private set; }
     public string OpponentDeckHash { get; private set; }
@@ -288,6 +291,41 @@ public class NetworkGameController : MonoBehaviour
                         return;
                     }
                     TurnRunner.Instance?.HandleRemoteSurrender(t_actorOwner);
+                    break;
+                }
+                case MsgType.MatchmakingProfile:
+                {
+                    if (_data.Count < 9) { RejectMessage("MatchmakingProfile 길이 오류"); return; }
+                    int t_tier = ReadInt(t_buf, t_offset + 1);
+                    int t_nameBytes = t_buf[t_offset + 5];
+                    int t_avatarBytes = t_buf[t_offset + 6];
+                    int t_frameBytes = t_buf[t_offset + 7];
+                    int t_ticketBytes = t_buf[t_offset + 8];
+                    int t_expected = 9 + t_nameBytes + t_avatarBytes + t_frameBytes + t_ticketBytes;
+                    if (_data.Count != t_expected)
+                    {
+                        RejectMessage($"MatchmakingProfile 길이 불일치(expected={t_expected}, actual={_data.Count})");
+                        return;
+                    }
+
+                    int t_read = t_offset + 9;
+                    string t_name = Encoding.UTF8.GetString(t_buf, t_read, t_nameBytes);
+                    t_read += t_nameBytes;
+                    string t_avatar = Encoding.UTF8.GetString(t_buf, t_read, t_avatarBytes);
+                    t_read += t_avatarBytes;
+                    string t_frame = Encoding.UTF8.GetString(t_buf, t_read, t_frameBytes);
+                    t_read += t_frameBytes;
+                    string t_ticket = Encoding.UTF8.GetString(t_buf, t_read, t_ticketBytes);
+
+                    // 여기 실린 티어는 상대의 자기신고다 — 티켓 검증(verifyMatchTicket)이 성공하면
+                    // 그 값으로 덮인다. 검증 전 표시에 새지 않게 표 밖 값은 무효(-1)로 눌러 둔다.
+                    if (!RankManager.TryGetTier(t_tier, out _))
+                    {
+                        Debug.LogWarning($"[Net] MatchmakingProfile 티어가 범위를 벗어났다({t_tier}) — 랭크 표시를 비운다.");
+                        t_tier = -1;
+                    }
+                    this.bufferedMatchmakingProfile =
+                        new MatchmakingProfile(t_name, t_tier, t_avatar, t_frame, t_ticket);
                     break;
                 }
                 case MsgType.ServerSeedCapability:
@@ -560,10 +598,54 @@ public class NetworkGameController : MonoBehaviour
         SendToOpponents(new[] { (byte)MsgType.Surrender, checked((byte)_actorOwner) });
     }
 
+    public bool SendMatchmakingProfile(MatchmakingProfile _profile)
+    {
+        byte[] t_name = Encoding.UTF8.GetBytes(_profile.Nickname ?? string.Empty);
+        byte[] t_avatar = Encoding.UTF8.GetBytes(_profile.AvatarId ?? string.Empty);
+        byte[] t_frame = Encoding.UTF8.GetBytes(_profile.FrameId ?? string.Empty);
+        byte[] t_ticket = Encoding.UTF8.GetBytes(_profile.Ticket ?? string.Empty);
+        if (t_name.Length > byte.MaxValue || t_avatar.Length > byte.MaxValue
+            || t_frame.Length > byte.MaxValue || t_ticket.Length > byte.MaxValue)
+        {
+            Debug.LogError("[Net] 매칭 프로필 문자열이 255바이트를 초과했다.");
+            return false;
+        }
+
+        byte[] t_msg = new byte[9 + t_name.Length + t_avatar.Length + t_frame.Length + t_ticket.Length];
+        t_msg[0] = (byte)MsgType.MatchmakingProfile;
+        WriteInt(t_msg, 1, _profile.TierIndex);
+        t_msg[5] = (byte)t_name.Length;
+        t_msg[6] = (byte)t_avatar.Length;
+        t_msg[7] = (byte)t_frame.Length;
+        t_msg[8] = (byte)t_ticket.Length;
+        int t_write = 9;
+        Array.Copy(t_name, 0, t_msg, t_write, t_name.Length);
+        t_write += t_name.Length;
+        Array.Copy(t_avatar, 0, t_msg, t_write, t_avatar.Length);
+        t_write += t_avatar.Length;
+        Array.Copy(t_frame, 0, t_msg, t_write, t_frame.Length);
+        t_write += t_frame.Length;
+        Array.Copy(t_ticket, 0, t_msg, t_write, t_ticket.Length);
+        SendToOpponents(t_msg);
+        return true;
+    }
+
+    public bool TryGetMatchmakingProfile(out MatchmakingProfile _profile)
+    {
+        if (this.bufferedMatchmakingProfile.HasValue)
+        {
+            _profile = this.bufferedMatchmakingProfile.Value;
+            return _profile.IsValid;
+        }
+        _profile = default;
+        return false;
+    }
+
     public void ResetMatchState()
     {
         this.LocalDeckHash = string.Empty;
         this.OpponentDeckHash = string.Empty;
+        this.bufferedMatchmakingProfile = null;
         this.handshakeSeq = 0;
         this.stagedStateHash = 0UL;
         this.stagedStateDump = null;

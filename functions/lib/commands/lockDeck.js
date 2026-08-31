@@ -40,6 +40,8 @@ const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
 const countedTransaction_1 = require("../observability/countedTransaction");
 const deckValidation_1 = require("../deckValidation");
+const enhanceRules_1 = require("../growth/enhanceRules");
+const limitBreakTable_1 = require("../growth/limitBreakTable");
 const matchResult_1 = require("../matchResult");
 const payloadGuards_1 = require("../match/payloadGuards");
 const specBlobReader_1 = require("../specs/specBlobReader");
@@ -137,20 +139,63 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
     const cardIds = new Set(data.cardSnapshots.map((card) => card.cardId));
     // 덱에 든 카드만 골라 읽던 자리다. 블롭은 표 전체가 문서 1개라 6장을 개별로 집는 것보다 싸고,
     // 무결성 대조(payloadHash)를 거친 표를 보게 된다 — 예전 경로는 메타 존재 여부만 봤다.
-    const specRows = shapeError == null ? await (async () => {
-        try {
-            const rows = await (0, specBlobReader_1.readSpecRows)(data.env, table);
-            if (rows.length === 0)
-                throw new https_1.HttpsError("unavailable", "card spec table is unavailable");
-            return rows;
-        }
-        catch (error) {
-            if (error instanceof https_1.HttpsError)
-                throw error;
-            logger.error("lockDeck spec read failed", { env: data.env, table, error });
-            throw new https_1.HttpsError("unavailable", "card spec read failed");
-        }
-    })() : [];
+    //
+    // 한계돌파 곡선의 진실원도 표다 — 검증기가 순수 모듈이라 여기서 읽어 주입한다.
+    // 두 표를 나란히 읽는다: 직렬로 두면 캐시 미스마다 왕복이 하나씩 더 붙는다.
+    const [specRows, limitBreakCurve] = await Promise.all([
+        (async () => {
+            if (shapeError != null)
+                return [];
+            try {
+                const rows = await (0, specBlobReader_1.readSpecRows)(data.env, table);
+                if (rows.length === 0)
+                    throw new https_1.HttpsError("unavailable", "card spec table is unavailable");
+                return rows;
+            }
+            catch (error) {
+                if (error instanceof https_1.HttpsError)
+                    throw error;
+                logger.error("lockDeck spec read failed", { env: data.env, table, error });
+                throw new https_1.HttpsError("unavailable", "card spec read failed");
+            }
+        })(),
+        (async () => {
+            if (shapeError != null)
+                return null;
+            try {
+                const [ruleRows, curveRows] = await Promise.all([
+                    (0, specBlobReader_1.readSpecRows)(data.env, "CardEnhanceRule"),
+                    (0, specBlobReader_1.readSpecRows)(data.env, "CardLimitBreak"),
+                ]);
+                const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
+                if (rule == null || rule.maxLimitBreak <= 0) {
+                    logger.error("lockDeck limit break rule is unusable", {
+                        env: data.env,
+                        ruleRowCount: ruleRows.length,
+                        maxLimitBreak: rule == null ? null : rule.maxLimitBreak,
+                    });
+                    throw new https_1.HttpsError("unavailable", "limit break rule is unavailable");
+                }
+                // 천장 클램프는 조용하다 — 표가 더 큰 상한을 말했다는 사실은 여기서만 드러난다.
+                const authored = (0, enhanceRules_1.authoredMaxLimitBreak)(ruleRows);
+                if (authored != null && authored > rule.maxLimitBreak) {
+                    logger.warn("lockDeck limit break max stage was clamped to the code ceiling", { env: data.env, authored, clamped: rule.maxLimitBreak });
+                }
+                const curve = (0, limitBreakTable_1.parseLimitBreakCurve)(curveRows, rule.maxLimitBreak);
+                if (curve == null) {
+                    logger.error("lockDeck limit break curve is unusable", { env: data.env, rowCount: curveRows.length, maxLimitBreak: rule.maxLimitBreak });
+                    throw new https_1.HttpsError("unavailable", "limit break spec table is unavailable");
+                }
+                return curve;
+            }
+            catch (error) {
+                if (error instanceof https_1.HttpsError)
+                    throw error;
+                logger.error("lockDeck limit break spec read failed", { env: data.env, error });
+                throw new https_1.HttpsError("unavailable", "limit break spec read failed");
+            }
+        })(),
+    ]);
     const specs = new Map();
     for (const row of specRows) {
         // 덱에 없는 카드는 파싱하지 않는다 — 표의 다른 행이 깨졌다고 잠금을 막을 이유가 없다.
@@ -238,6 +283,10 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
         }
         if (shapeError != null)
             return rejectLock(shapeError);
+        // shapeError 가 없을 때만 곡선을 읽으므로 여기 도달하면 서 있다 — 못 읽었으면 위에서 이미 던졌다.
+        if (limitBreakCurve == null) {
+            throw new https_1.HttpsError("unavailable", "limit break spec table is unavailable");
+        }
         if (!saveSnapshot.exists) {
             throw new https_1.HttpsError("failed-precondition", "player save is not available");
         }
@@ -277,8 +326,21 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
         if ((0, deckValidation_1.computeDeckHash)(data.cardSnapshots) !== data.deckHash) {
             return rejectLock("deck_hash_mismatch");
         }
-        const validation = (0, deckValidation_1.validateDeckSnapshots)(data.cardSnapshots, specs, saveSnapshot.data());
+        const validation = (0, deckValidation_1.validateDeckSnapshots)(data.cardSnapshots, specs, saveSnapshot.data(), limitBreakCurve);
         if (!validation.ok) {
+            // 표 사고 갈래. 서버가 이미 지급한 단계를 곡선 축소가 부정한 것이라 유저 잘못이 아니다 —
+            // rejectLock 으로 접으면 매치 문서에 rejected 가 박혀 아무 잘못 없는 상대 몫까지 탄다.
+            if (validation.code === deckValidation_1.LIMIT_BREAK_CURVE_SHRUNK) {
+                logger.error("lockDeck limit break curve is shorter than the saved stage", {
+                    uid,
+                    matchId: data.matchId,
+                    env: data.env,
+                    cardId: validation.cardId,
+                    maxStage: limitBreakCurve.maxStage,
+                });
+                throw new https_1.HttpsError("unavailable", "limit break spec table is out of date");
+            }
+            // 여기부터는 전부 유저 덱이 규칙과 어긋난 갈래다 — 매치를 거절한다.
             logger.warn("lockDeck rejected", {
                 uid,
                 matchId: data.matchId,

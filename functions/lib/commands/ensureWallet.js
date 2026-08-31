@@ -121,7 +121,7 @@ exports.ensureWallet = (0, https_1.onCall)(async (request) => {
         // 패치의 schemaVersion 은 항상 SCHEMA_VERSION 이다 — 이 트랜잭션을 통과한 문서는
         // v7 이었든 v8 이었든 반드시 v8 로 남는다.
         const migration = (0, walletMigration_1.migrateFromSaveSlot)(current, firestore_1.FieldValue.delete(), saveDocument_1.SCHEMA_VERSION);
-        const created = (0, walletStore_1.createWallet)(transaction, walletReference, migration.balances, now);
+        const created = (0, walletStore_1.createWallet)(transaction, walletReference, migration.balances, "walletCreate:migration", { kind: "boot", txId: "walletCreate:migration" }, undefined, now);
         const revision = Number(current.revision ?? 0) + 1;
         transaction.update(saveReference, {
             ...migration.slotPatch,

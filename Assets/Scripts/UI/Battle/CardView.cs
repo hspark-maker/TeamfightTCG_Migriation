@@ -41,6 +41,9 @@ public class CardView : MonoBehaviour
     [Header("UI")]
     [SerializeField] TMP_Text hpText;
     [SerializeField] TMP_Text bonusHpText;
+    // 추가 생명력 숫자 뒤에 깔리는 판. 숫자만 끄면 판이 남아 "+0짜리 빈 배지"가 보인다.
+    // 미배선이면 지금까지처럼 숫자만 끈다.
+    [SerializeField] GameObject bonusHpBackground;
     // 체력 변동 연출에서 커졌다 작아지는 아이콘. 미배선이면 HP 숫자 자체를 대신 부풀린다
     // (연출이 아예 없는 것보단 숫자라도 들썩이는 편이 변동을 읽게 해준다).
     [SerializeField] Transform hpIcon;
@@ -737,10 +740,16 @@ public class CardView : MonoBehaviour
     void SetHpDisplay(string _hp, string _bonus)
     {
         if (this.hpText != null) this.hpText.text = _hp;
+
+        bool t_hasBonus = _bonus.Length > 0;
+
+        // 판이 숫자의 부모라 판을 먼저 켜야 그 아래 숫자를 켤 수 있다(꺼진 부모 밑에서는 SetActive가 묻힌다).
+        if (this.bonusHpBackground != null) this.bonusHpBackground.SetActive(t_hasBonus);
+
         if (this.bonusHpText != null)
         {
             this.bonusHpText.text = _bonus;
-            this.bonusHpText.gameObject.SetActive(_bonus.Length > 0);
+            this.bonusHpText.gameObject.SetActive(t_hasBonus);
         }
     }
 

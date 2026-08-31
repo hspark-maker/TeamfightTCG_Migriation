@@ -16,6 +16,17 @@ public class TrackingSynergyEffect : SynergyEffect
     [SerializeField] bool grantMarkOnAttack = true;
     [SerializeField, Min(0)] int bonusHpOnMarkedKill;
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        switch (_key)
+        {
+            case nameof(grantMarkOnAttack):     this.grantMarkOnAttack = ParseBool(_value); return true;
+            case nameof(bonusHpOnMarkedKill):   this.bonusHpOnMarkedKill = ParseInt(_value); return true;
+            default: return false;
+        }
+    }
+
+
     public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
         // self는 트리거가 IsAlive까지 걸러 준다. target은 아무도 안 보므로 여기서 막는다.

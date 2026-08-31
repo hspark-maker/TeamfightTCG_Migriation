@@ -10,6 +10,14 @@ public class CaretakerSynergyEffect : SynergyEffect
 {
     [SerializeField] private int amount = 1;   // 스폰 시 돌보미 1인당 Heal량 + bonusHp 부여량
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        if (_key != nameof(amount)) return false;
+        this.amount = ParseInt(_value);
+        return true;
+    }
+
+
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환(디스패처 .Forget이라도 즉시 확정).
     public override UniTask OnEntered(SpawnCtx _ctx)
     {

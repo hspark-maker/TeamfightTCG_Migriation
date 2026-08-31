@@ -25,6 +25,9 @@ public static class CardCatalog
         Clear();
         if (_synergyRegistry == null) throw new InvalidOperationException("[CardCatalog] SynergyRegistry가 배선되지 않았다.");
         _synergyRegistry.ValidateOrThrow();
+        // 카드가 시너지를 참조하기 전에 규칙을 먼저 꽂는다 — 티어가 빈 SynergyData로 전투에 들어가면
+        // 예외 없이 시너지만 사라져 무증상 회귀가 된다.
+        SynergySpecSource.Apply(_synergyRegistry);
         Dictionary<int, CardSpec> t_specs = SpecSource.LoadCards(_mode);
 
         foreach (KeyValuePair<int, CardSpec> t_pair in t_specs)

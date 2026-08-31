@@ -64,7 +64,7 @@ export function requiredPointsForTier(tierIndex: number, grades: RankGradeRow[])
   return grade.entryPoints + (tierIndex % DIVISIONS_PER_GRADE) * grade.pointsPerDivision;
 }
 
-function resolveTierIndex(points: number, grades: RankGradeRow[]): number {
+export function resolveTierIndex(points: number, grades: RankGradeRow[]): number {
   for (let gradeIndex = grades.length - 1; gradeIndex >= 0; gradeIndex--) {
     const grade = grades[gradeIndex];
     for (let division = 3; division >= 0; division--) {

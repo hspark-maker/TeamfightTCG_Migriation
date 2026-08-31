@@ -11,6 +11,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readOwnedIds = readOwnedIds;
+exports.buildOwnershipSlotFromIds = buildOwnershipSlotFromIds;
 exports.buildOwnershipSlot = buildOwnershipSlot;
 const saveValues_1 = require("../save/saveValues");
 /**
@@ -34,20 +35,30 @@ function readOwnedIds(ownership) {
     return ids;
 }
 /**
- * 지급 후 소유 슬롯. 신규 카드를 뽑힌 순서로 뒤에 붙인다.
+ * 지급 후 소유 슬롯. 이미 가진 카드는 조용히 건너뛰고 신규만 받은 순서로 뒤에 붙인다
+ * — 소유는 집합이라 같은 목록을 두 번 넣어도 결과가 같다.
+ * @param {number[]} owned 기존 소유 id(순서 유지)
+ * @param {number[]} granted 지급 카드 id
+ * @return {object} ownership 슬롯 전체 값
+ */
+function buildOwnershipSlotFromIds(owned, granted) {
+    const seen = new Set(owned);
+    const cardIds = [...owned];
+    for (const cardId of granted) {
+        if (cardId <= 0 || seen.has(cardId))
+            continue;
+        seen.add(cardId);
+        cardIds.push(cardId);
+    }
+    return { cardIds };
+}
+/**
+ * 카드팩 개봉 후 소유 슬롯. 신규로 뽑힌 카드만 지급 목록으로 넘긴다.
  * @param {number[]} owned 기존 소유 id(순서 유지)
  * @param {DrawnCard[]} drawn 뽑힌 카드
  * @return {object} ownership 슬롯 전체 값
  */
 function buildOwnershipSlot(owned, drawn) {
-    const seen = new Set(owned);
-    const cardIds = [...owned];
-    for (const card of drawn) {
-        if (!card.isNew || seen.has(card.cardId))
-            continue;
-        seen.add(card.cardId);
-        cardIds.push(card.cardId);
-    }
-    return { cardIds };
+    return buildOwnershipSlotFromIds(owned, drawn.filter((card) => card.isNew).map((card) => card.cardId));
 }
 //# sourceMappingURL=packSlots.js.map

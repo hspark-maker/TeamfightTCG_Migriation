@@ -315,10 +315,10 @@ test('13d. 슬롯 누락은 거부', async () => {
 //
 // 서버 산출물의 모양 자체는 반대편에서 functions/scripts/test-fresh-account.js 가 못박는다.
 //
-// ProfileSaveData 의 nickname/avatarId/frameId 가 null 인 건 실수가 아니라 설계다 —
-// 기본 id 를 세이브에 굳히지 않으려는 것이고, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다.
-// 룰에서 'profile.nickname is string' 으로 조이면 신규 유저가 첫 저장부터 막힌다.
-test('14. 서버가 만든 신규 계정 문서 위에서 클라 update 가 통과한다 (profile 3필드 null)', async () => {
+// ProfileSaveData 의 avatarId/frameId 가 null 인 건 실수가 아니라 설계다 — 기본 id 를 세이브에
+// 굳히지 않으려는 것이고, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다. nickname 만 서버가
+// 계정 생성 시 값으로 굳힌다. 룰이 profile 안쪽 타입을 조이면 어느 쪽이든 첫 저장부터 막힌다.
+test('14. 서버가 만든 신규 계정 문서 위에서 클라 update 가 통과한다 (nickname 값 · 그림 2필드 null)', async () => {
   await seedRaw(savePath(), serverFreshAccountDocument());
   await assertSucceeds(setDoc(doc(authed(), savePath()), saveDocument(2)));
 });

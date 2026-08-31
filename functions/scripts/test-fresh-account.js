@@ -3,6 +3,9 @@ const {buildFreshAccountSlots, buildFreshAccountBalances, STARTER_GOLD, DECK_SLO
   STARTER_DECK_NAME, STARTER_DECK_SIZE} = require("../lib/save/freshAccount.js");
 const {resolveStarterCardsFromRows, FALLBACK_STARTER_CARD_IDS,
   parseGrade} = require("../lib/save/starterPool.js");
+const {generateNickname} = require("../lib/profile/generateNickname.js");
+const {NICKNAME_MAX_LENGTH, NICKNAME_MODIFIERS,
+  NICKNAME_NOUNS} = require("../lib/profile/nicknameWords.js");
 
 const STARTER = [1, 28, 20, 6, 11, 30];
 const drop = (id, minGrade, cardId) =>
@@ -55,8 +58,30 @@ assert.deepEqual(slots.tutorial, {
   completedTriggers: [],
 });
 
-// null 이 설계다 — ProfileManager 가 IsNullOrEmpty 폴백으로 기본 아바타를 고른다.
-assert.deepEqual(slots.profile, {nickname: null, avatarId: null, frameId: null});
+// 닉네임은 계정이 생기는 이 자리에서 굳는다 — 클라는 뽑지 않고 문서 값을 읽는다.
+// 아바타·프레임만 null 이 설계다(ProfileManager 가 IsNullOrEmpty 폴백으로 기본 id 를 고른다).
+assert.equal(slots.profile.avatarId, null);
+assert.equal(slots.profile.frameId, null);
+assert.equal(typeof slots.profile.nickname, "string");
+assert.ok(slots.profile.nickname.length > 0 &&
+  slots.profile.nickname.length <= NICKNAME_MAX_LENGTH,
+"닉네임은 1..12 자 — 넘으면 클라 SanitizeNickname 이 저장값을 잘라 표시한다");
+
+// 낱말표 추첨은 주입 축이라 값이 고정된다 — 문서에 그대로 실리는지만 본다.
+assert.equal(buildFreshAccountSlots(STARTER, "푸른 여우").profile.nickname,
+  "푸른 여우");
+
+// 표는 100x100 이고 어떤 조합도 상한을 넘지 않아야 한다 — 넘는 낱말이 들어오면 재추첨이 늘고
+// 최악에는 명사 하나로 떨어진다. 표를 늘릴 때 여기서 잡힌다.
+for (const modifier of NICKNAME_MODIFIERS) {
+  for (const noun of NICKNAME_NOUNS) {
+    assert.ok(modifier.length + 1 + noun.length <= NICKNAME_MAX_LENGTH,
+      `낱말 조합이 길다: ${modifier} ${noun}`);
+  }
+}
+
+// 추첨기는 주입 가능하다 — 0 고정이면 표의 첫 낱말 한 벌이 나온다.
+assert.equal(generateNickname(() => 0), `${NICKNAME_MODIFIERS[0]} ${NICKNAME_NOUNS[0]}`);
 
 // 입력 배열을 그대로 물지 않는다(호출부가 나중에 고쳐도 문서가 안 바뀐다).
 const mutable = [...STARTER];

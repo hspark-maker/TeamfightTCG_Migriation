@@ -23,6 +23,18 @@ public class MatchDeckPanelView : MonoBehaviour
     [SerializeField] Button           backButton;
     [SerializeField] Button           battleButton;
 
+    [Header("상대가 아직 없을 때(랭크전 매칭 전)")]
+    [Tooltip("상대 6칸을 담은 섹션. 상대가 없으면 통째로 감춘다.")]
+    [SerializeField] RectTransform enemySection;
+    [Tooltip("내 6칸을 담은 섹션. 상대가 없을 때 mySoloAnchoredPos 자리로 옮긴다.")]
+    [SerializeField] RectTransform mySection;
+    [Tooltip("상대가 없을 때 내 섹션이 앉을 자리(화면 가운데). 좌표는 저작값이고 코드는 고르기만 한다.")]
+    [SerializeField] Vector2 mySoloAnchoredPos;
+    [Tooltip("시작 버튼 라벨. 비우면 battleButton 자식에서 찾는다.")]
+    [SerializeField] TMP_Text battleLabel;
+    [Tooltip("상대가 없을 때 쓸 라벨. 상대가 있으면 프리팹 저작값(\"전투\")으로 되돌린다.")]
+    [SerializeField] string soloLabelText = "매칭 시작!";
+
     [Header("연출")]
     [Tooltip("매칭에서 넘어올 때만 도는 등장 안무. 직접 열 때(디버그·튜토리얼)는 지금처럼 그냥 뜬다.")]
     [SerializeField] MatchDeckIntroFx introFx = new MatchDeckIntroFx();
@@ -35,8 +47,19 @@ public class MatchDeckPanelView : MonoBehaviour
     // 안무가 도는 동안 손을 막는다. 저작에 없어도 되게 런타임에 붙인다.
     CanvasGroup m_group;
 
+    // 상대가 있을 때 쓰는 저작 자리·저작 라벨. 처음 한 번만 읽어 둔다(ApplyOpponentPresence 주석 참고).
+    Vector2 m_myHomeAnchoredPos;
+    bool    m_homeCaptured;
+    string  m_homeLabelText;
+
     void Awake()
     {
+        // 셸은 부모 프리팹(MatchDeckRoot)에 있어 이 프리팹 안에서는 저작으로 물릴 수 없다 —
+        // 인스턴스 오버라이드로만 배선되는데 그게 비어 있으면 세 버튼이 전부 무동작으로 조용히 죽는다.
+        // 패널은 언제나 셸 아래에 서므로 부모에서 찾아 메운다.
+        if (shell == null) shell = GetComponentInParent<MatchDeckShell>(true);
+        if (shell == null) Debug.LogWarning("[MatchDeckPanelView] MatchDeckShell을 찾지 못했다 — 하단 버튼이 동작하지 않는다.");
+
         // 미배선 필드는 조용히 건너뛴다 — 이 프로젝트의 UI는 부분 배선으로 축소 화면을 만드는 게 관례다.
         if (editButton != null)
         {
@@ -150,6 +173,42 @@ public class MatchDeckPanelView : MonoBehaviour
         t_seq.InsertCallback(introFx.LaunchGateAt, OpenGate);
         t_seq.OnKill(OpenGate);
         t_seq.Play();
+    }
+
+    /// <summary>상대 자리를 세울지 접을지 정한다. 랭크전은 매칭 전에 이 화면을 여니
+    /// 상대 칸이 빈 채로 위쪽을 차지하고, 버튼도 아직 전투가 아니라 매칭을 시작하는 자리다.
+    ///
+    /// 저작 자리(홈)는 처음 한 번만 읽어 둔다 — 상대 없이 열렸다 닫힌 뒤에 홈을 다시 읽으면
+    /// 가운데 자리를 홈으로 오인해 상대가 생겨도 제자리로 못 돌아온다.
+    /// <paramref name="_hasOpponent"/>를 인자로 받는 이유는 전환 경로(PrepareForHandoff)가
+    /// 상대 덱이 캐리어에 실리기 전에 이 화면을 먼저 세우기 때문이다 — 그 순간의 캐리어를 믿으면 안 된다.</summary>
+    public void ApplyOpponentPresence(bool _hasOpponent)
+    {
+        if (mySection != null)
+        {
+            if (!m_homeCaptured)
+            {
+                m_myHomeAnchoredPos = mySection.anchoredPosition;
+                m_homeCaptured      = true;
+            }
+            mySection.anchoredPosition = _hasOpponent ? m_myHomeAnchoredPos : mySoloAnchoredPos;
+        }
+
+        if (enemySection != null) enemySection.gameObject.SetActive(_hasOpponent);
+
+        TMP_Text t_label = ResolveBattleLabel();
+        if (t_label == null) return;
+
+        if (m_homeLabelText == null) m_homeLabelText = t_label.text;
+        t_label.text = _hasOpponent ? m_homeLabelText : soloLabelText;
+    }
+
+    TMP_Text ResolveBattleLabel()
+    {
+        if (battleLabel != null) return battleLabel;
+        if (battleButton == null) return null;
+        battleLabel = battleButton.GetComponentInChildren<TMP_Text>(true);
+        return battleLabel;
     }
 
     /// <summary>안무가 세운 중간값을 저작 상태로 되돌린다. 전환을 타지 않고 열리는 경로가 반쯤 없는 화면을 물려받지 않게.</summary>

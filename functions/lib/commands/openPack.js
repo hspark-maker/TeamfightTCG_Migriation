@@ -45,6 +45,7 @@ const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
 const domainReject_1 = require("../save/domainReject");
+const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
 const rankGrade_1 = require("../packs/rankGrade");
 /**
@@ -99,7 +100,12 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
     let goldBefore = 0;
     let goldAfter = 0;
     let poolSize = 0;
-    const result = await (0, saveDocument_1.mutateSave)("openPack", env, uid, (current, _transaction, wallet) => {
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId }, (current, _transaction, wallet) => {
         // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
         const points = Number(current.rank?.points ?? 0);
         const grade = (0, rankGrade_1.gradeOf)(thresholds, points);
@@ -127,23 +133,27 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
                 ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
                 cardGrowth: (0, cardGrowth_1.growthSlot)(drawn.reduce((entries, card) => (0, cardGrowth_1.addSnack)(entries, card.cardId, card.snack), (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth))),
             },
-            wallet: (0, walletStore_1.nextWallet)(wallet, paid),
+            wallet: (0, walletStore_1.nextWallet)(wallet, paid, "openPack"),
         };
+    }, (adopted) => {
+        replayed = false;
+        return { ...adopted, packId, cards: drawn, refundType: pack.refundType };
     });
-    logger.info("openPack", {
-        uid, env, packId,
-        priceType: pack.priceType, price: pack.price,
-        drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
-        drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),
-        goldBefore, goldAfter,
-        specSource: entryPoints === null ? "rankFallback" : "spec",
-        revision: result.revision,
-    });
-    return {
-        ...result,
-        packId,
-        cards: drawn,
-        refundType: pack.refundType,
-    };
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "openPack", txId, revision: result.revision });
+    }
+    else {
+        logger.info("openPack", {
+            uid, env, packId,
+            priceType: pack.priceType, price: pack.price,
+            drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
+            drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),
+            goldBefore, goldAfter,
+            specSource: entryPoints === null ? "rankFallback" : "spec",
+            revision: result.revision,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=openPack.js.map

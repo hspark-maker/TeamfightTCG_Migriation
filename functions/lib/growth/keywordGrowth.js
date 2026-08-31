@@ -31,6 +31,7 @@ const KEYWORD_FLAGS = {
     healer: 64,
     invincible: 128,
     bonushp: 256,
+    immortal: 512,
 };
 /**
  * 강화가 열려 있는 키워드. 클라 KeywordGrowthRules.SupportedKeywords 의 쌍둥이다.

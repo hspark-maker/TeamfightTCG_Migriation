@@ -21,9 +21,10 @@ public static class CunningVfx
     /// <summary>필드의 카드가 덱으로 물러나는 그림. 교활 교대 말고 <b>멀리건 교체</b>도 같은 연출을 쓴다 —
     /// "필드 카드가 덱으로 돌아간다"는 사건은 하나뿐이라 그림도 하나여야 한다.
     ///
-    /// <paramref name="_withFog"/>는 교활 표식인 안개를 띄울지다. 멀리건은 끄고 부른다 —
-    /// 안개가 같이 뜨면 교활이 발동한 것으로 읽힌다.</summary>
-    public static async UniTask PlayExit(CardView _view, bool _withFog = true)
+    /// <paramref name="_exitVfx"/>만 경로마다 다르다. <b>안개(CunningFog)는 교활 전용 표식</b>이고,
+    /// 그냥 교체(멀리건)는 반짝임(CardAppear)을 쓴다 — 물러나는 그림은 같아도 "왜 물러나는가"는 달라서
+    /// 안개를 같이 띄우면 교활이 발동한 것으로 읽힌다. <see cref="BattleVfxId.None"/>이면 연출 없이 물러난다.</summary>
+    public static async UniTask PlayExit(CardView _view, BattleVfxId _exitVfx = BattleVfxId.CunningFog)
     {
         if (_view == null) return;
 
@@ -32,9 +33,11 @@ public static class CunningVfx
         Quaternion t_rot0  = t_tr.localRotation;
         Vector3    t_scale = t_tr.localScale;
 
-        if (_withFog) BattleVfx.Play(BattleVfxId.CunningFog, t_tr.position, _view.VfxSortingLayerId);
+        if (_exitVfx != BattleVfxId.None)
+            BattleVfx.Play(_exitVfx, t_tr.position, _view.VfxSortingLayerId);
 
-        float t_lead = _withFog ? GameTiming.Battle.CunningFogLead : 0f;   // 안개가 없으면 기다릴 이유도 없다
+        // 리드 타임은 안개가 깔리는 시간이라 교활 전용이다 — 반짝임은 회전과 같이 터져야 교체 순간으로 읽힌다.
+        float t_lead = _exitVfx == BattleVfxId.CunningFog ? GameTiming.Battle.CunningFogLead : 0f;
         if (t_lead > 0f) await UniTask.Delay((int)(t_lead * 1000));
         if (_view == null) return;
 

@@ -12,6 +12,14 @@ public class FlowSynergyEffect : SynergyEffect
 {
     [SerializeField] int amount = 1;
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        if (_key != nameof(amount)) return false;
+        this.amount = ParseInt(_value);
+        return true;
+    }
+
+
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
     public override UniTask OnEntered(SpawnCtx _ctx)
     {

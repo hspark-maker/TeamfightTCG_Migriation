@@ -66,7 +66,7 @@ exports.ensureAccount = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("invalid-argument", `appVersion must be 1..${APP_VERSION_MAX_LENGTH} characters.`);
     }
     const starter = await (0, starterCards_1.resolveStarterCardIds)(env);
-    const outcome = await (0, saveDocument_1.ensureSaveDocument)("ensureAccount", env, uid, deviceId, appVersion, () => (0, freshAccount_1.buildFreshAccountSlots)(starter.cardIds), (0, freshAccount_1.buildFreshAccountBalances)());
+    const outcome = await (0, saveDocument_1.ensureSaveDocument)(env, uid, deviceId, appVersion, () => (0, freshAccount_1.buildFreshAccountSlots)(starter.cardIds), (0, freshAccount_1.buildFreshAccountBalances)());
     if (outcome.repaired) {
         // 스키마 밖 문서를 버리고 다시 만들었다. 원인 추적이 되도록 버린 필드 이름을 남긴다.
         logger.warn("ensureAccount repaired", {

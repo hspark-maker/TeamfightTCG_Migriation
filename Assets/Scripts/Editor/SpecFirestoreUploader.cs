@@ -27,6 +27,7 @@ public static partial class SpecFirestoreUploader
 
     const int SCHEMA_VERSION = SpecPayloadCodec.SchemaVersion;
     const int LIST_PAGE_SIZE = 300;
+    const string MIRROR_ROWS_PREF = "SpecFirestoreUploader.MirrorRows";
     const int MAX_COMMIT_WRITES = 500;
     const int MAX_COMMIT_BYTES = 10 * 1024 * 1024;
     const int MAX_ROW_DOCUMENT_WARN_BYTES = 900 * 1024;
@@ -56,12 +57,15 @@ public static partial class SpecFirestoreUploader
     {
         public FirestoreIntegerValue revision;
         public FirestoreStringValue payloadHash;
+        public FirestoreIntegerValue rowsRevision;
     }
     [Serializable] sealed class MetaDocument
     {
         public MetaFields fields;
         public string updateTime;
     }
+    [Serializable] sealed class BlobFields { public FirestoreStringValue payload; }
+    [Serializable] sealed class BlobDocument { public BlobFields fields; }
     [Serializable] sealed class ListedDocument { public string name; }
     [Serializable] sealed class ListDocumentsResponse
     {
@@ -73,6 +77,16 @@ public static partial class SpecFirestoreUploader
     [Serializable] sealed class GsApiKey { public string current_key; }
     [Serializable] sealed class GsClient { public GsApiKey[] api_key; }
     [Serializable] sealed class GsRoot { public GsProjectInfo project_info; public GsClient[] client; }
+
+    /// <summary>rows/ 미러를 계속 쓸지. 런타임(클라·서버)은 블롭만 읽으므로 미러는 콘솔 열람용이다 —
+    /// 끄면 업로드 write가 "메타 1 + 블롭 1"로 떨어지고 행 비교용 블롭 read도 생략된다.
+    /// 대신 rows/ 는 그 시점 내용에 멈춘다. 어디까지 미러됐는지는 메타의 rowsRevision이 들고 있고,
+    /// 서버 폴백(specBlobReader)은 그 값이 revision과 다르면 낡은 미러를 읽지 않고 실패한다.</summary>
+    public static bool MirrorRows
+    {
+        get => EditorPrefs.GetBool(MIRROR_ROWS_PREF, true);
+        set => EditorPrefs.SetBool(MIRROR_ROWS_PREF, value);
+    }
 
     public static List<string> ListTables(out string _error)
     {
@@ -124,14 +138,19 @@ public static partial class SpecFirestoreUploader
 
         using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(FirebaseTimeouts.RestRequestSeconds) };
 
+        bool t_mirrorRows = MirrorRows;
+
         if (!TryReadMeta(t_client, _projectId, _apiKey, _envId, _table,
                          out long t_currentRevision, out string t_updateTime, out string t_remoteHash,
-                         out bool t_metaExists, out _error))
+                         out long t_rowsRevision, out bool t_metaExists, out _error))
             return null;
 
-        // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 행 목록을 조회할 이유도 없다.
-        // 여기서 끊지 않으면 안 바뀐 표마다 행 수만큼 read + 행 수만큼 write를 그대로 지불한다.
-        if (t_metaExists && string.Equals(t_remoteHash, _snapshot.PayloadHash, StringComparison.Ordinal))
+        // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 블롭을 받아 볼 이유도 없다.
+        // 여기서 끊지 않으면 안 바뀐 표마다 read·write를 그대로 지불한다.
+        // 단 미러를 켠 채로 rows/ 가 뒤처져 있으면(미러를 껐던 업로드가 있었다) 내용이 같아도 한 번은 밀어야 한다.
+        bool t_mirrorBehind = t_mirrorRows && t_rowsRevision != t_currentRevision;
+        if (t_metaExists && !t_mirrorBehind &&
+            string.Equals(t_remoteHash, _snapshot.PayloadHash, StringComparison.Ordinal))
             return $"{_table}: 변경 없음 — 건너뜀 (rev {t_currentRevision}, {_snapshot.Rows.Count}행, hash {_snapshot.PayloadHash})";
 
         if (t_currentRevision == long.MaxValue)
@@ -140,13 +159,16 @@ public static partial class SpecFirestoreUploader
             return null;
         }
 
-        if (!TryListRemoteRowIds(t_client, _projectId, _apiKey, _envId, _table,
-                                 out HashSet<string> t_remoteIds, out _error))
+        // 쓸 행과 지울 행을 고른다. 미러를 끄면 둘 다 비고, 켜면 원격 블롭과 비교해 바뀐 행만 남는다
+        // (블롭 1건 read = 행 목록 조회 R건 read 를 대신한다).
+        var t_rowsToWrite = new List<TableRow>();
+        var t_staleIds = new HashSet<string>(StringComparer.Ordinal);
+        string t_diffNote = "미러 끔";
+        if (t_mirrorRows &&
+            !TryPlanRowWrites(t_client, _projectId, _apiKey, _envId, _table, _snapshot,
+                              t_metaExists && t_rowsRevision == t_currentRevision,
+                              t_rowsToWrite, t_staleIds, out t_diffNote, out _error))
             return null;
-
-        var t_localIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (TableRow t_row in _snapshot.Rows) t_localIds.Add(t_row.Id);
-        t_remoteIds.ExceptWith(t_localIds);
 
         if (_snapshot.PayloadBytes > MAX_FIELD_BYTES)
         {
@@ -155,7 +177,7 @@ public static partial class SpecFirestoreUploader
             return null;
         }
 
-        int t_writeCount = 2 + _snapshot.Rows.Count + t_remoteIds.Count;
+        int t_writeCount = 2 + t_rowsToWrite.Count + t_staleIds.Count;
         if (t_writeCount > MAX_COMMIT_WRITES)
         {
             _error = $"{_table} 원자 커밋이 {t_writeCount} writes다. Firestore 한도 {MAX_COMMIT_WRITES}을 넘으므로 " +
@@ -164,8 +186,14 @@ public static partial class SpecFirestoreUploader
         }
 
         long t_revision = t_currentRevision + 1;
+
+        // 미러를 껐으면 rows/ 는 이번 revision을 못 따라간다 — 그 사실을 메타에 남겨야
+        // 서버 폴백이 낡은 미러를 정상 데이터로 오인하지 않는다.
+        long t_nextRowsRevision = t_mirrorRows ? t_revision : t_rowsRevision;
+
         string t_body = BuildCommitJson(
-            _projectId, _envId, _table, _snapshot, t_remoteIds, t_revision, t_updateTime, t_metaExists);
+            _projectId, _envId, _table, _snapshot, t_rowsToWrite, t_staleIds, t_revision,
+            t_nextRowsRevision, t_updateTime, t_metaExists);
         int t_commitBytes = Encoding.UTF8.GetByteCount(t_body);
         if (t_commitBytes > MAX_COMMIT_BYTES)
         {
@@ -175,8 +203,112 @@ public static partial class SpecFirestoreUploader
 
         if (!TryCommit(t_client, _projectId, _apiKey, t_body, out _error)) return null;
 
-        return $"{_table}: rev {t_revision}, {_snapshot.Rows.Count}행, 삭제 {t_remoteIds.Count}, " +
-               $"{_snapshot.PayloadBytes:N0}B → {FirebaseRootPath.Environment(_envId)}/{SPEC_COLLECTION}/{_table}";
+        return $"{_table}: rev {t_revision}, {_snapshot.Rows.Count}행, 미러 {t_diffNote}, " +
+               $"쓰기 {t_writeCount}, {_snapshot.PayloadBytes:N0}B → {FirebaseRootPath.Environment(_envId)}/{SPEC_COLLECTION}/{_table}";
+    }
+
+    /// <summary>이번 commit에 실을 행 update·delete 목록을 정한다.
+    /// 미러가 blob과 발맞춰 있을 때(rowsRevision == revision)만 블롭(문서 1건)을 rows/ 의 사본으로 믿고
+    /// 로컬과 대조해 바뀐 행만 고른다 — 행 목록 조회(행 수만큼 read)와 행 전량 재기록이 둘 다 사라진다.
+    /// 미러가 뒤처졌거나(미러를 껐던 업로드가 있다) 블롭을 못 읽으면(첫 업로드·열 교체) 전량 기록 +
+    /// 행 목록 조회로 되돌아간다 — 이때 블롭은 rows/ 의 실제 내용이 아니라 대조 근거가 될 수 없다.</summary>
+    static bool TryPlanRowWrites(
+        HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
+        TableSnapshot _snapshot, bool _mirrorInSync, List<TableRow> _rowsToWrite, HashSet<string> _staleIds,
+        out string _note, out string _error)
+    {
+        _note = null;
+        _error = null;
+        Dictionary<string, string[]> t_remoteRows = null;
+
+        if (_mirrorInSync &&
+            !TryReadBlobRows(_client, _projectId, _apiKey, _envId, _table, _snapshot.Columns,
+                             out t_remoteRows, out _error))
+            return false;
+
+        if (t_remoteRows == null)
+        {
+            // 원격 내용을 모른다 — 행 전량을 다시 쓰고, 지울 행은 목록 조회로 찾는다(옛 경로).
+            if (!TryListRemoteRowIds(_client, _projectId, _apiKey, _envId, _table,
+                                     out HashSet<string> t_remoteIds, out _error))
+                return false;
+
+            _rowsToWrite.AddRange(_snapshot.Rows);
+            foreach (TableRow t_row in _snapshot.Rows) t_remoteIds.Remove(t_row.Id);
+            _staleIds.UnionWith(t_remoteIds);
+            _note = $"전량 {_rowsToWrite.Count}, 삭제 {_staleIds.Count} (대조 근거 없음)";
+            return true;
+        }
+
+        foreach (TableRow t_row in _snapshot.Rows)
+        {
+            if (!t_remoteRows.TryGetValue(t_row.Id, out string[] t_remoteValues) ||
+                !SameValues(t_remoteValues, t_row.Values))
+                _rowsToWrite.Add(t_row);
+
+            t_remoteRows.Remove(t_row.Id);
+        }
+
+        foreach (string t_id in t_remoteRows.Keys) _staleIds.Add(t_id);
+        _note = $"변경 {_rowsToWrite.Count}, 삭제 {_staleIds.Count}";
+        return true;
+    }
+
+    static bool SameValues(string[] _remote, object[] _local)
+    {
+        if (_remote == null || _remote.Length != _local.Length) return false;
+
+        for (int i = 0; i < _local.Length; i++)
+            if (!string.Equals(_remote[i], Text(_local[i]), StringComparison.Ordinal)) return false;
+
+        return true;
+    }
+
+    /// <summary>원격 블롭의 payload를 id → 열 값으로 되읽는다. 문서가 없거나 열 구성이 지금과 다르면
+    /// null을 돌려 호출부가 전량 기록으로 되돌아가게 한다(이 경우만 행 목록 조회 비용이 든다).</summary>
+    static bool TryReadBlobRows(
+        HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
+        List<string> _columns, out Dictionary<string, string[]> _rows, out string _error)
+    {
+        _rows = null;
+        _error = null;
+
+        string t_url = DocumentUrl(_projectId, _envId, _table) +
+                       "/" + BLOB_COLLECTION + "/" + BLOB_DOCUMENT + "?key=" + Uri.EscapeDataString(_apiKey);
+        if (!TrySend(_client, HttpMethod.Get, t_url, null, out HttpStatusCode t_status, out string t_text, out _error))
+            return false;
+
+        if (t_status == HttpStatusCode.NotFound) return true;
+        if ((int)t_status < 200 || (int)t_status >= 300)
+        {
+            _error = $"블롭 조회 실패 {(int)t_status}: {Shorten(t_text)}";
+            return false;
+        }
+
+        string t_payload;
+        try { t_payload = JsonUtility.FromJson<BlobDocument>(t_text)?.fields?.payload?.stringValue; }
+        catch (Exception) { return true; }
+
+        if (string.IsNullOrEmpty(t_payload)) return true;
+        if (!SpecPayloadCodec.TryParseStringMatrix(t_payload, out List<string[]> t_matrix, out _)) return true;
+        if (t_matrix.Count < 1) return true;
+
+        // 열이 바뀌었으면 행 단위 비교가 성립하지 않는다 — 전량 기록으로 되돌아간다.
+        string[] t_remoteColumns = t_matrix[0];
+        if (t_remoteColumns.Length != _columns.Count) return true;
+        for (int i = 0; i < _columns.Count; i++)
+            if (!string.Equals(t_remoteColumns[i], _columns[i], StringComparison.Ordinal)) return true;
+
+        var t_rows = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        for (int r = 1; r < t_matrix.Count; r++)
+        {
+            string[] t_values = t_matrix[r];
+            if (t_values.Length != t_remoteColumns.Length || t_values.Length == 0) return true;
+            t_rows[t_values[0]] = t_values;
+        }
+
+        _rows = t_rows;
+        return true;
     }
 
     static bool TryLoadManager(out object _manager, out string _error)
@@ -359,11 +491,13 @@ public static partial class SpecFirestoreUploader
 
     static bool TryReadMeta(
         HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
-        out long _revision, out string _updateTime, out string _payloadHash, out bool _exists, out string _error)
+        out long _revision, out string _updateTime, out string _payloadHash, out long _rowsRevision,
+        out bool _exists, out string _error)
     {
         _revision = 0;
         _updateTime = null;
         _payloadHash = null;
+        _rowsRevision = 0;
         _exists = false;
         _error = null;
 
@@ -394,6 +528,18 @@ public static partial class SpecFirestoreUploader
             !long.TryParse(t_revision, NumberStyles.Integer, CultureInfo.InvariantCulture, out _revision))
         {
             _error = $"기존 메타 revision '{t_revision}'을 읽을 수 없다.";
+            return false;
+        }
+
+        // rowsRevision은 미러 토글보다 나중에 생긴 필드다. 없으면 revision과 같다고 본다 —
+        // 옛 업로더는 미러를 끌 수 없어 항상 행 전량을 같은 commit에 썼으므로 rows/ 는 그때 이미 최신이었다.
+        // (여기서 0으로 두면 이 변경 직후 모든 표가 한 번씩 행 전량 재기록을 치른다.)
+        _rowsRevision = _revision;
+        string t_rowsRevision = t_document?.fields?.rowsRevision?.integerValue;
+        if (!string.IsNullOrEmpty(t_rowsRevision) &&
+            !long.TryParse(t_rowsRevision, NumberStyles.Integer, CultureInfo.InvariantCulture, out _rowsRevision))
+        {
+            _error = $"기존 메타 rowsRevision '{t_rowsRevision}'을 읽을 수 없다.";
             return false;
         }
 
@@ -466,7 +612,8 @@ public static partial class SpecFirestoreUploader
 
     static string BuildCommitJson(
         string _projectId, string _envId, string _table, TableSnapshot _snapshot,
-        HashSet<string> _staleIds, long _revision, string _updateTime, bool _metaExists)
+        List<TableRow> _rowsToWrite, HashSet<string> _staleIds, long _revision, long _rowsRevision,
+        string _updateTime, bool _metaExists)
     {
         string t_metaName = ResourceName(_projectId, _envId, _table);
         var t_builder = new StringBuilder(Math.Max(4096, _snapshot.PayloadBytes * 2));
@@ -475,7 +622,7 @@ public static partial class SpecFirestoreUploader
         t_builder.Append("{\"update\":{\"name\":");
         AppendJsonString(t_builder, t_metaName);
         t_builder.Append(",\"fields\":");
-        AppendMetaFields(t_builder, _table, _snapshot, _revision);
+        AppendMetaFields(t_builder, _table, _snapshot, _revision, _rowsRevision);
         t_builder.Append("},\"currentDocument\":{");
         if (_metaExists)
         {
@@ -495,7 +642,7 @@ public static partial class SpecFirestoreUploader
         AppendBlobFields(t_builder, _snapshot, _revision);
         t_builder.Append("}}");
 
-        foreach (TableRow t_row in _snapshot.Rows)
+        foreach (TableRow t_row in _rowsToWrite)
         {
             t_builder.Append(",{");
             t_builder.Append("\"update\":{\"name\":");
@@ -519,12 +666,16 @@ public static partial class SpecFirestoreUploader
     }
 
     static void AppendMetaFields(
-        StringBuilder _builder, string _table, TableSnapshot _snapshot, long _revision)
+        StringBuilder _builder, string _table, TableSnapshot _snapshot, long _revision, long _rowsRevision)
     {
         _builder.Append('{');
         AppendStringField(_builder, "table", _table);
         _builder.Append(",\"schemaVersion\":{\"integerValue\":\"").Append(SCHEMA_VERSION).Append("\"}");
         _builder.Append(",\"revision\":{\"integerValue\":\"").Append(_revision).Append("\"}");
+
+        // rows/ 미러가 어느 revision까지 따라왔는지. revision과 다르면 미러는 낡은 것이고,
+        // 서버 폴백(specBlobReader)이 그걸 보고 낡은 행을 읽는 대신 실패한다.
+        _builder.Append(",\"rowsRevision\":{\"integerValue\":\"").Append(_rowsRevision).Append("\"}");
         _builder.Append(",\"rowCount\":{\"integerValue\":\"").Append(_snapshot.Rows.Count).Append("\"}");
         _builder.Append(",\"columns\":{\"arrayValue\":{\"values\":[");
         for (int i = 0; i < _snapshot.Columns.Count; i++)

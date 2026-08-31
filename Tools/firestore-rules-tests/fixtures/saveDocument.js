@@ -138,7 +138,9 @@ export function serverFreshAccountDocument(_overrides = {}) {
       sameCoordBootCount: 0,
       completedTriggers: [],
     },
-    profile: { nickname: null, avatarId: null, frameId: null },
+    // 닉네임은 서버가 계정 생성 시 낱말표에서 뽑아 굳힌다(functions/src/profile/generateNickname.ts) —
+    // 값 자체는 아무 12자 이하 문자열이면 되고, 룰은 profile 안쪽을 보지 않는다.
+    profile: { nickname: '푸른 여우', avatarId: null, frameId: null },
     ..._overrides,
   });
 }
