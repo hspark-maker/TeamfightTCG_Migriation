@@ -27,6 +27,10 @@ public static partial class SpecFirestoreUploader
         public int order;
     }
 
+    // 서버 tournamentTable.MAX_NODE_ID_LENGTH 와 같은 값이어야 한다 — 넘는 키는 서버 정제가
+    // 조용히 버려서, 그 정점이 clearedNodeIds 에 있으면 슬롯 전체 쓰기가 기록을 지운다.
+    const int MAX_TOURNAMENT_ID_LENGTH = 64;
+
     sealed class TournamentChapterRow
     {
         public int id;
@@ -336,6 +340,13 @@ public static partial class SpecFirestoreUploader
                 return false;
             }
 
+            if (t_chapter.chapterId.Length > MAX_TOURNAMENT_ID_LENGTH)
+            {
+                _error = $"chapterId '{t_chapter.chapterId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                         "서버 정제가 이 키를 버려 완주 수령이 막힌다.";
+                return false;
+            }
+
             int t_nodeCount = t_chapter.NodeCount;
             if (t_nodeCount == 0)
             {
@@ -362,6 +373,13 @@ public static partial class SpecFirestoreUploader
                 if (!t_nodeIds.Add(t_node.nodeId))
                 {
                     _error = $"nodeId 중복 '{t_node.nodeId}' — 완주 판정 모수가 어긋난다.";
+                    return false;
+                }
+
+                if (t_node.nodeId.Length > MAX_TOURNAMENT_ID_LENGTH)
+                {
+                    _error = $"nodeId '{t_node.nodeId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                             "서버 정제가 이 키를 버려 격파 신고가 막히고 클리어 기록도 지워진다.";
                     return false;
                 }
 

@@ -24,6 +24,7 @@ import {
 type ReportReject =
   | "NodeNotFound"
   | "ChainBlocked"
+  | "RewardPending"
   | "RankLocked"
   | "ChainUnreadable"
   | "AlreadyCleared"
@@ -95,7 +96,9 @@ export const reportTournamentWin = onCall(async (request) => {
       // 다른 정점이 미수령으로 남아 있으면 덮지 않는다 — 덮는 순간 그 보상이 소리 없이 사라진다.
       // 수령이 낙인을 비우므로, 유저는 앞의 선물을 받고 다시 신고하면 된다.
       if (pending.length > 0) {
-        reject("ChainBlocked", `Tournament node '${pending}' still has an unclaimed reward.`,
+        // ChainBlocked 와 가른다 — 저쪽은 "더 깨야 한다"이고 이쪽은 "앞의 선물을 받으면 된다"라,
+        // 유저가 할 일이 다르고 로그에서도 섞이면 안 된다.
+        reject("RewardPending", `Tournament node '${pending}' still has an unclaimed reward.`,
           {...context, pending});
       }
 

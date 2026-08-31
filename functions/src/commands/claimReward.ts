@@ -35,7 +35,9 @@ import {
   ChapterNodeRow,
   chapterNodeIds,
   hasNode,
+  MAX_NODE_ID_LENGTH,
   parseChapterNodeRows,
+  readNodeIdList,
 } from "../tournamentTable";
 import {readOwnedIds} from "../packs/packSlots";
 import {grant} from "../currency/wallet";
@@ -54,7 +56,7 @@ type ClaimReject = "AlreadyClaimed" | "NotEligible" | "RewardNotFound";
 type ClaimOwnerType = "Rank" | "Tournament" | "Album";
 
 /** 소유자 키 하나의 최대 길이. 저작 키는 node_01 · p:Theme_Nature/P1 처럼 짧다. */
-const MAX_OWNER_ID_LENGTH = 64;
+const MAX_OWNER_ID_LENGTH = MAX_NODE_ID_LENGTH;
 
 /** 판정·거절 로그가 공통으로 싣는 요청 맥락. */
 interface ClaimContext {
@@ -80,17 +82,8 @@ function reject(reason: ClaimReject, message: string, context: Record<string, un
  * @param {unknown} value 문서의 리스트 값
  * @return {string[]} 정리된 키 목록
  */
-function readIdList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-
-  const seen = new Set<string>();
-  for (const entry of value) {
-    if (typeof entry !== "string") continue;
-    if (entry.length === 0 || entry.length > MAX_OWNER_ID_LENGTH) continue;
-    seen.add(entry);
-  }
-  return [...seen];
-}
+// 정제 규약은 tournamentTable 이 소유한다 — 상한을 한쪽만 고치면 갈린다.
+const readIdList = readNodeIdList;
 
 /**
  * 수령한 티어 목록. 티어 범위 밖 값을 걸러 낸다. 룰 상한(MAX_CLAIMED_TIERS)은 여기가 아니라
