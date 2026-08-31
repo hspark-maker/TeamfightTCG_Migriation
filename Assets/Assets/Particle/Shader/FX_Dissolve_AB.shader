@@ -2131,7 +2131,7 @@ Version=19912
 {"type":"AmplifyShaderEditor.RangedFloatNode, AmplifyShaderEditor","id":70,"pos":[-2000,-808],"params":["Inherit","False","Property","_Color_Range","Color_Range","10","0","Create","True","0","0","0","False","0","False","Object","-1","","1","1","0","0","0","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SimpleAddOpNode, AmplifyShaderEditor","id":43,"pos":[-2632,520],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":69,"pos":[-1784,-1000],"params":["Inherit","True","2","2","0","FLOAT","0","False","1","FLOAT","0","False","1","FLOAT","0"]}
-{"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":44,"pos":[-1280,304],"params":["Inherit","True","2","2","0","FLOAT3","0,0,0","False","1","FLOAT","0","False","1","FLOAT3","0"]}
+{"type":"AmplifyShaderEditor.SimpleMultiplyOpNode, AmplifyShaderEditor","id":44,"pos":[-1320,256],"params":["Inherit","True","2","2","0","FLOAT3","0,0,0","False","1","FLOAT","0","False","1","FLOAT3","0"]}
 {"type":"AmplifyShaderEditor.SaturateNode, AmplifyShaderEditor","id":71,"pos":[-1600,-768],"params":["Inherit","False","1","0","FLOAT","0","False","1","FLOAT","0"]}
 {"type":"AmplifyShaderEditor.ColorNode, AmplifyShaderEditor","id":63,"pos":[-1576,-1024],"params":["Inherit","False","Property","_Color_B","Color_B","8","1","[HDR]","Create","True","0","0","0","False","0","False","Object","-1","","1,0,0,1","0,0,0,0","True","True","0","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
 {"type":"AmplifyShaderEditor.ColorNode, AmplifyShaderEditor","id":62,"pos":[-1640,-1248],"params":["Inherit","False","Property","_Color_A","Color_A","7","1","[HDR]","Create","True","0","0","0","False","0","False","Object","-1","","1,0.4764151,0.4764151,1","0,0,0,0","True","True","0","6","COLOR","0","FLOAT","1","FLOAT","2","FLOAT","3","FLOAT","4","FLOAT3","5"]}
@@ -2206,4 +2206,4 @@ Version=19912
 {"wire":[23,2,52,0]}
 {"wire":[23,3,56,0]}
 ASEEND*/
-//CHKSM=0298B09620377A0B820F40C183CAA04722A60D7F
+//CHKSM=686B46D93E57A536587DC88014A8B9D7CB832993
