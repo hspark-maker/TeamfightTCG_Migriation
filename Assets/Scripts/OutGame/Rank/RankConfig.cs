@@ -41,7 +41,7 @@ public class RankConfig : ScriptableObject
 
     // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다. " +
-             "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다 — 등급마다 난이도를 다르게 주는 축은 aiCardLevels 하나다.")]
+             "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
         new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 40, rewards = GoldOnly(100,  50) },
@@ -51,60 +51,12 @@ public class RankConfig : ScriptableObject
         new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 740, pointsPerDivision = 40, rewards = GoldOnly(1400, 200) },
     };
 
-    /// <summary>티어별 AI 카드 레벨(index = 티어 인덱스). 난이도 곡선의 단일 진실원.
-    /// **브론즈~실버 중반은 플레이어보다 낮게, 실버 끝에서 동급, 골드부터 높게** 저작한다 —
-    /// 그래야 강화가 체감되면서도 후반에 도전이 남는다.
-    /// 목록이 티어 수보다 짧으면 마지막 값이 이어진다(비면 전부 바닥 레벨 = 성장 없음).</summary>
-    [Tooltip("티어별 AI 카드 레벨. index = 티어 인덱스(등급×4 + 단계-1). 짧으면 마지막 값이 이어진다.")]
-    public List<int> aiCardLevels = new List<int>
-    {
-        1, 1, 1, 2,
-        2, 2, 2, 3,
-        3, 3, 3, 3,
-        3, 4, 4, 4,
-        4, 4, 4, 4,
-    };
-
-    [Tooltip("AI 카드 레벨 하향 편차. 티어 레벨보다 최대 이만큼 낮은 카드가 섞인다. 0이면 하향 없음.")]
-    public int aiLevelSpreadDown = 0;
-
-    [Tooltip("AI 카드 레벨 상향 편차. 티어 레벨보다 최대 이만큼 높은 카드가 섞인다. 0이면 상향 없음.")]
-    public int aiLevelSpreadUp = 0;
-
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
     public int TierCount => grades != null ? grades.Count * DivisionsPerGrade : 0;
 
     /// <summary>첫 티어(1등급 1단계) 진입 임계치 = 랭크 도달 여부의 단일 기준.
     /// ResolveTierIndex는 미도달도 0으로 폴백하므로 "인덱스 0"만으로는 도달을 판정할 수 없다.</summary>
     public long FirstTierPoints => grades != null && grades.Count > 0 && grades[0] != null ? grades[0].entryPoints : 0;
-
-    /// <summary>티어 _index에서 AI가 쓸 카드 레벨. 미저작이면 바닥 레벨(성장 없음 = 종전 동작).</summary>
-    public int AiCardLevelAt(int _index)
-    {
-        if (aiCardLevels == null || aiCardLevels.Count == 0) return CardGrowth.BaseLevel;
-
-        int t_i = _index < 0 ? 0 : (_index >= aiCardLevels.Count ? aiCardLevels.Count - 1 : _index);
-        int t_level = aiCardLevels[t_i];
-        return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
-    }
-
-    /// <summary>티어 _tierIndex에서 카드 _cardId 한 장이 쓸 레벨. 기준 레벨(<see cref="AiCardLevelAt(int)"/>) 주변에
-    /// 카드 번호에서 파생한 고정 편차를 얹는다 — 난수가 아니라 파생값이라 덱 미리보기와 전투가 갈리지 않는다.
-    /// 편차는 카드 고유값이라 티어가 올라도 순서가 뒤집히지 않는다(기준이 오르면 그 카드 레벨도 같이 오른다).
-    /// 바닥(BaseLevel)에서 잘리므로 저티어에서는 평균이 기준보다 살짝 위다.</summary>
-    public int AiCardLevelForCard(int _tierIndex, int _cardId)
-    {
-        int t_base = AiCardLevelAt(_tierIndex);
-
-        int t_down = Mathf.Max(0, aiLevelSpreadDown);
-        int t_up   = Mathf.Max(0, aiLevelSpreadUp);
-        int t_span = t_down + t_up + 1;
-        if (t_span <= 1 || _cardId <= 0) return t_base;
-
-        int t_offset = (int)(Mix((uint)_cardId) % (uint)t_span) - t_down;
-        int t_level  = t_base + t_offset;
-        return t_level < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : t_level;
-    }
 
     // 임계치 <= _points를 만족하는 최대 티어 인덱스(없으면 0)
     public int ResolveTierIndex(long _points)
@@ -185,21 +137,15 @@ public class RankConfig : ScriptableObject
         if (_sink == null) return;
         _sink.Clear();
 
-        if (grades == null || _index < 0 || _index >= TierCount) return;
+        if (_index < 0 || _index >= TierCount) return;
+        if (!RewardSpec.TryGetRewards(ERewardOwnerType.Rank, _index.ToString(), out List<AlbumRewardDef> t_rewards)) return;
 
-        RankGradeConfig t_grade = grades[_index / DivisionsPerGrade];
-        if (t_grade == null || t_grade.rewards == null) return;
-
-        long t_step = _index % DivisionsPerGrade;
-
-        for (int t_i = 0; t_i < t_grade.rewards.Count; t_i++)
+        for (int t_i = 0; t_i < t_rewards.Count; t_i++)
         {
-            RankRewardDef t_def = t_grade.rewards[t_i];
+            AlbumRewardDef t_def = t_rewards[t_i];
             if (t_def.amount <= 0) continue;
 
-            _sink.Add(new RewardLine(
-                new CurrencyGain(t_def.currency, t_def.amount + t_step * t_def.amountPerDivision),
-                t_def.icon));
+            _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
         }
     }
 
@@ -208,15 +154,6 @@ public class RankConfig : ScriptableObject
         {
             new RankRewardDef { currency = ECurrencyType.Gold, amount = _amount, amountPerDivision = _amountPerDivision },
         };
-
-    // 카드 번호를 고정 규칙으로 흩는다(플랫폼·런타임 무관). 난수원이 아니라 파생 해시다.
-    static uint Mix(uint _a)
-    {
-        uint t_h = _a * 2654435761u;
-        t_h ^= t_h >> 15; t_h *= 2246822519u;
-        t_h ^= t_h >> 13; t_h *= 3266489917u;
-        return t_h ^ (t_h >> 16);
-    }
 }
 
 // 랭크 등급(단계와 무관한 상위 구분)
@@ -263,17 +200,14 @@ public class RankGradeConfig
     public List<RankRewardDef> rewards = new List<RankRewardDef>();
 }
 
-// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다)
+// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다).
+// 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이다.
 [Serializable]
 public struct RankRewardDef
 {
     // 지급할 재화 종류
-    [Tooltip("지급할 재화 종류.")]
+    [Tooltip("지급할 재화 종류. 슬롯 그림은 이 값으로 CurrencyLook 표에서 정해진다 — 여기서 따로 저작하지 않는다.")]
     public ECurrencyType currency;
-
-    // 보상 슬롯 아이콘(선택)
-    [Tooltip("보상 슬롯 아이콘. 비워두면 슬롯 프리팹에 저작된 스프라이트를 그대로 쓴다.")]
-    public Sprite icon;
 
     // 이 등급 1단계 지급액
     [Tooltip("이 등급 1단계 지급액. 0 이하면 이 항목은 4단계 전부에서 표시도 지급도 되지 않는다(단계 증가분이 있어도 마찬가지) — " +

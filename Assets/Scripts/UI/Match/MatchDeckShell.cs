@@ -144,9 +144,8 @@ public class MatchDeckShell : MonoBehaviour
 
         SelectedSlot = ResolveSlot(_slotIndex);
 
-        // 상대 덱은 여기서 뽑지 않는다 — 호스트(LobbyMatchLauncher.ConfirmOpponent)가 이 화면을 열기 전에
-        // 확정해 DeckConfig에 실어둔다. 이 화면이 다시 뽑으면 확정 지점이 두 곳이 되고,
-        // 전투가 소비하는 값과 화면에 그린 값이 갈린다. 뷰는 캐리어를 읽기만 한다.
+        // 상대 덱은 여기서 뽑지 않는다. 고정 상대·튜토리얼은 호스트가 미리 확정하고,
+        // 일반전은 매칭 전이므로 비어 있다. 어느 경우든 뷰는 DeckConfig 캐리어를 읽기만 한다.
         ShowMatchPanel();
     }
 
@@ -177,7 +176,7 @@ public class MatchDeckShell : MonoBehaviour
             slotIndex = SelectedSlot,
             onExit = OnEditorExit,
             showDeckPower = false,
-            holdoutCard = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : null,
+            holdoutCard = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : 0,
             onPlay = OnEditorPlay,
         });
         if (t_editor == null) return;
@@ -267,7 +266,8 @@ public class MatchDeckShell : MonoBehaviour
     {
         if (!TutorialConfig.IsActive) return -1;
 
-        if (DeckSaveManager.TryFindSlot(TutorialConfig.PlayerDeck, out int t_index)) return t_index;
+        var t_cards = TutorialConfig.PlayerDeck;
+        if (DeckSaveManager.TryFindSlot(t_cards, out int t_index)) return t_index;
 
         // 앞선 DeckGrant 스텝이 건너뛰어져 그 덱이 세이브에 없다 — 첫 유효 슬롯으로 떨어뜨려 화면을 세운다
         // (지목 실패 시 화면이 대신 고르는 AlbumTabController.FindAnchorThemeIndex와 같은 관용구).

@@ -7,11 +7,15 @@ using UnityEngine;
 
 public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 {
+    const string ProtocolSuffix = "-p3";
     public static NetworkSession Instance { get; private set; }
 
     public string BattleSceneName = "BattleScene";
 
     public NetworkRunner Runner { get; private set; }
+    public string PairingKey => this.Runner != null && this.Runner.SessionInfo.IsValid
+        ? this.Runner.SessionInfo.Name
+        : null;
 
     GameObject sceneManagerGo;
 
@@ -25,12 +29,74 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        if (GetComponent<NetworkGameController>() == null)
+            gameObject.AddComponent<NetworkGameController>();
     }
+
+    // 앱 종료·에디터 Play 정지에는 await 창이 없다 — 러너 종료를 킥만 하고 나간다.
+    // 통보 없이 프로세스가 사라지면 Photon 세션이 타임아웃까지 살아 있어,
+    // 다시 켰을 때 유령 플레이어가 낀 방에 들어가거나 정원이 차서 못 들어간다.
+    void OnApplicationQuit() => ShutdownRunnerImmediate();
+
+    void OnDestroy()
+    {
+        if (Instance != this) return;
+
+        ShutdownRunnerImmediate();
+        Instance = null;
+    }
+
+    void ShutdownRunnerImmediate()
+    {
+        NetworkRunner t_runner = this.Runner;
+        this.Runner = null;
+        if (t_runner == null) return;
+
+        ShutdownAsync(t_runner).Forget();
+    }
+
+    static async UniTaskVoid ShutdownAsync(NetworkRunner _runner)
+    {
+        try { await _runner.Shutdown(); }
+        catch (Exception t_exception) { Debug.LogWarning($"[Net] 러너 종료 실패: {t_exception.Message}"); }
+    }
+
+#if UNITY_EDITOR
+    // 러너가 살아 있는 채로 어셈블리 리로드에 들어가면 소켓 스레드가 남아 "Reloading Domain"이 멈춘다.
+    [UnityEditor.InitializeOnLoadMethod]
+    static void InstallEditorTeardown()
+    {
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= ShutdownForEditor;
+        UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ShutdownForEditor;
+    }
+
+    // 여기서는 ShutdownRunnerImmediate만으로 부족하다 — 그쪽은 종료를 Forget으로 킥만 하는데,
+    // 어셈블리 리로드 콜백 뒤에는 플레이어 루프가 더 돌지 않아 그 continuation이 영영 실행되지 않는다.
+    // 러너가 소켓 스레드를 든 채로 남으면 Unity가 "Reloading Domain"에서 그 스레드를 기다리며 멈춘다
+    // (매칭 중 Play를 끄면 재현된다 — 그때는 러너가 반드시 살아 있다).
+    // 그래서 종료를 킥한 뒤 러너 오브젝트를 즉시 파괴해 네이티브 자원을 그 자리에서 놓게 한다.
+    static void ShutdownForEditor()
+    {
+        NetworkRunner t_runner = Instance?.Runner;
+        Instance?.ShutdownRunnerImmediate();
+        if (t_runner == null) return;
+
+        try
+        {
+            if (t_runner.gameObject != null) UnityEngine.Object.DestroyImmediate(t_runner.gameObject);
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[Net] 에디터 러너 파괴 실패: {t_exception.Message}");
+        }
+    }
+#endif
 
     public async UniTask<bool> JoinOrCreateRoom(string _roomName)
     {
         await ShutdownRunner();
         DestroySceneManager();
+        NetworkGameController.Instance?.ResetMatchState();
 
         NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
         CreateRunner();
@@ -43,6 +109,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     {
         await ShutdownRunner();
         DestroySceneManager();
+        NetworkGameController.Instance?.ResetMatchState();
 
         NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
         CreateRunner();
@@ -52,7 +119,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             GameMode     = GameMode.Shared,
             SessionName  = null,
             PlayerCount  = 2,
-            CustomLobbyName  = "RandomMatch",
+            CustomLobbyName  = "RandomMatchP3",
             SceneManager = t_sceneManager,
         };
 
@@ -102,12 +169,17 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         return new StartGameArgs
         {
             GameMode     = GameMode.Shared,
-            SessionName  = _roomName,
+            SessionName  = ProtocolRoomName(_roomName),
             PlayerCount  = 2,
             CustomLobbyName  = "CodeMatch",
             SceneManager = _sceneManager,
         };
     }
+
+    static string ProtocolRoomName(string _roomName)
+        => string.IsNullOrEmpty(_roomName) || _roomName.EndsWith(ProtocolSuffix, StringComparison.Ordinal)
+            ? _roomName
+            : _roomName + ProtocolSuffix;
 
     // ── INetworkRunnerCallbacks ───────────────────────────────────────────
 

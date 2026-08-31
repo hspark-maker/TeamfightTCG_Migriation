@@ -1,9 +1,10 @@
 {
   "dependencies": {
-    "com.coffee.ui-effect": "https://github.com/mob-sakai/UIEffect.git?path=Packages/src",
+    "com.coffee.ui-effect": "https://github.com/mob-sakai/UIEffect.git?path=Packages/src#5.11.5",
     "com.coffee.ui-particle": "5.0.0-preview.21",
+    "com.cookapps.platform.auth": "1.2.4",
     "com.cookapps.specdatamanager": "1.0.31",
-    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#ceac8d6946b1125fe782cd171fbcb245b567dbf9",
     "com.unity.addressables": "2.9.1",
     "com.unity.ai.assistant": "2.15.0-pre.2",
     "com.unity.ai.navigation": "2.0.10",
@@ -27,7 +28,7 @@
     "com.unity.timeline": "1.8.10",
     "com.unity.ugui": "2.0.0",
     "com.unity.visualscripting": "1.9.9",
-    "com.veriorpies.parrelsync": "https://github.com/VeriorPies/ParrelSync.git?path=/ParrelSync",
+    "com.veriorpies.parrelsync": "https://github.com/VeriorPies/ParrelSync.git?path=/ParrelSync#a122dc90cbe2d4cc2669ddad00b12b3917ef934b",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",

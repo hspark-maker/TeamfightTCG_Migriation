@@ -7,7 +7,7 @@ using UnityEngine;
 // 전용 카메라가 이 무대를 RenderTexture에 그리고, 해금 인트로의 RawImage가 그 텍스처를 받는다 —
 // 파티클은 월드 스페이스라 Screen Space Overlay 캔버스에 직접 얹히지 않기 때문이다.
 //
-// ⚠ 규칙을 돌리지 않는다. AttackSequence는 _onEffect 하나로 연출과 규칙이 갈려 있어,
+// ⚠ 규칙을 돌리지 않는다. 빈 BattleEvent 목록은 피해 0으로 읽혀 모션과 파티클만 재생한다.
 //   거기에 null을 넘기면 체력이 안 깎이고 모션·파티클만 돈다(피해 = 콜백 전후 HpTotal 차).
 //   RNG·세이브·전투 상태 어디에도 닿지 않는다.
 //
@@ -111,9 +111,9 @@ public class KeywordDemoStage : SingletonOverlayBase
 
     /// <summary>_card가 _keyword를 쓰는 모습을 반복 재생하고, 그 그림이 담긴 텍스처를 돌려준다.
     /// 세울 수 없으면 null — 부른 쪽은 띠를 끄고 글자만 보여주면 된다.</summary>
-    public Texture Begin(CardData _card, CardKeyword _keyword)
+    public Texture Begin(int _card, CardKeyword _keyword)
     {
-        if (_card == null || this.demoCamera == null || this.slotAttacker == null) return null;
+        if (_card <= 0 || this.demoCamera == null || this.slotAttacker == null) return null;
 
         Stop();
 
@@ -181,13 +181,13 @@ public class KeywordDemoStage : SingletonOverlayBase
     // 카드를 세운다. 앞자리는 언제나 그 카드, 나머지는 저작(KeywordDemoConfig)이 정한다.
     // 진영은 대본마다 갈린다 — 회복은 적에게 쏘지 않고, 도발은 아군을 대신 맞아주는 것이라
     // 곁자리가 적이면 "누구를 지켰나"가 성립하지 않는다.
-    bool BindRoles(CardData _card, CardKeyword _keyword)
+    bool BindRoles(int _card, CardKeyword _keyword)
     {
-        CardData t_opponent = null;
-        CardData t_neighbor = null;
+        int t_opponent = 0;
+        int t_neighbor = 0;
         this.config?.Roles(_keyword, out t_opponent, out t_neighbor);
 
-        if (t_opponent == null)
+        if (t_opponent <= 0)
         {
             Debug.LogWarning($"[KeywordDemoStage] {_keyword} 데모의 상대 카드가 저작되지 않았습니다(KeywordDemoConfig 확인).");
             return false;
@@ -209,18 +209,18 @@ public class KeywordDemoStage : SingletonOverlayBase
 
         if (this.slotNeighbor != null)
         {
-            this.slotNeighbor.gameObject.SetActive(t_useNeighbor && t_neighbor != null);
-            if (t_useNeighbor && t_neighbor != null) Render(this.slotNeighbor, t_neighbor, t_neighborOwner, 2);
+            this.slotNeighbor.gameObject.SetActive(t_useNeighbor && t_neighbor > 0);
+            if (t_useNeighbor && t_neighbor > 0) Render(this.slotNeighbor, t_neighbor, t_neighborOwner, 2);
         }
 
         return true;
     }
 
-    static void Render(CardView _view, CardData _data, int _owner, int _slot)
+    static void Render(CardView _view, int _data, int _owner, int _slot)
     {
         if (_view == null) return;
 
-        _view.InitializeAnimator();   // 부트스트랩(GameInitializer)이 없는 씬이라 직접 깨운다
+        _view.InitializeAnimator();   // 초기화(GameInitializer)이 없는 씬이라 직접 깨운다
         _view.Render(new CardInstance(_data, _owner) { isRevealed = true, slotIndex = _slot });
     }
 
@@ -288,22 +288,18 @@ public class KeywordDemoStage : SingletonOverlayBase
         }
     }
 
-    // 공격 한 번. _onEffect를 넘기지 않는 것이 이 무대의 규약이다 — 넘기는 순간 체력이 깎인다.
+    // 공격 한 번. 빈 이벤트 목록을 넘기는 것이 이 무대의 규약이다 — 체력은 바꾸지 않는다.
     // _forceSpecial: false로 시네마를 끈다(3단계 진화 카드가 첫 공격에 클로즈업으로 튀는 것을 막는다).
     UniTask Swing(CardView _atk, CardView _def, CardView _splash, CancellationToken _token)
     {
         if (_token.IsCancellationRequested) return UniTask.CompletedTask;
 
-        AttackEffect t_effect = _atk.BoundCard?.data?.attackEffect;
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_atk.BoundCard);
-
-        // 무장 이펙트는 무장(탭) 단계에서 켜진다. 여기엔 그 단계가 없어 대신 켜준다(AttackAnimTester와 같은 이유).
-        _atk.SetArmedVfx(true);
 
         CardView t_splashView = _splash != null && _splash.gameObject.activeSelf ? _splash : null;
 
-        return AttackSequence.PlaySplash(_atk, _def, t_effect,
-                                         _onEffect: null, _splashView: t_splashView,
+        return AttackSequence.PlaySplash(_atk, _def,
+                                         _events: System.Array.Empty<TeamfightTCG.BattleCore.BattleEvent>(), _splashView: t_splashView,
                                          _preEffectKw: t_preKw, _atEffectKw: t_atKw,
                                          _forceSpecial: false);
     }

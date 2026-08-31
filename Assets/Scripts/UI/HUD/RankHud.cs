@@ -144,7 +144,7 @@ public class RankHud : MonoBehaviour
     // 활성 인스턴스(연출 호출자가 찾는 창구). 로비에 하나뿐이지만 탭 토글로 꺼지므로 활성분만 든다.
     static RankHud s_instance;
 
-    // 최초 렌더를 Start로 미루기 위한 표식 — RankConfig 주입(DataLibrary.Awake)보다 OnEnable이 먼저 돌 수 있다.
+    // 최초 렌더를 Start로 미루기 위한 표식 — RankConfig 주입(BattleConfigStep)보다 OnEnable이 먼저 돌 수 있다.
     bool m_started;
 
     // 진행 중 티어 변화 연출. 살아있는 동안 Render가 표시를 최종값으로 덮지 않는다(연출이 과거 상태에서 출발한다).

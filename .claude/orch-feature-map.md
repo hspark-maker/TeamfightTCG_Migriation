@@ -9,6 +9,24 @@
 <!-- orch:emptied-bullets=0 -->
 <!-- orch:feature-map-sync:end -->
 
+## 가로지르는 흐름
+
+폴더별 목록만으로는 "A 가 어디를 거쳐 B 로 가는지" 를 알 수 없어 경계를 넘는 경로만 따로 적는다. 각 줄은 코드에서 확인한 호출·대입 순서다.
+
+- 저장한 덱이 전투 필드로: 진실원 `OutGame/Save/3.Manager/DataSaveManager.Data` 의 `DeckSaveData` · 메모리 캐시 `OutGame/Deck/DeckSaveManager.GetSlot` / `DeckSaveManager.Load` · 전투 씬 진입 전 확정 `Battle/DeckConfig.Set` (호출부 `UI/Lobby/LobbyMatchLauncher` · `UI/Match/MatchDeckShell` · `UI/DeckSelectPopup`) · 배치 `Battle/GameInitializer` 가 `Battle/BattleField.Initialize` 에 `DeckConfig.PlayerDeck` 을 넘긴다
+- 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
+- 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
+- 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
+- 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
+- 재화 변동이 화면으로: 잔액의 진실원은 서버 지갑 문서다 — callable 응답의 `wallet` 을 `OutGame/Save/4.Cloud/ServerSaveCommands` 가 `WalletCloud.Adopt` 에 넘기고, 그것이 `CurrencyManager.Adopt` 로 메모리 잔액을 갈아끼운다. 클라에 잔액을 쓰는 경로는 없다
+- 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
+
+## 사운드 (`Audio/`)
+
+- 재생 진입점: 싱글턴 `Audio/SoundManager.Instance` — BGM `SoundManager.PlayBGM` · `SoundManager.StopBGM` · `SoundManager.SetBGMPitch` · `SoundManager.SetBGMVolume` · 효과음 `SoundManager.PlaySFX` · `SoundManager.PlayRandom` · `SoundManager.PlayCue` · `SoundManager.SetSFXVolume`
+- 전투 훅: `SoundManager.PlayHit` · `SoundManager.PlayDeath` · `SoundManager.PlayTurnChange` · `SoundManager.PlayCinemaEnter` · `SoundManager.PlayPassive` · `SoundManager.PlayDealCard`
+- 데이터·식별자: `SoundConfig` · `SoundBank` (`SoundCueEntry`) · 아웃게임 사운드 열거 `EOutgameSound` · UI 클릭 `UIClickSound` (`SoundManager.PlayUIClick`)
+
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
 
 - 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` (`EnemyAi`) · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
@@ -17,11 +35,11 @@
 - 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
 - 보드·대상: `BattleField` · `TargetFilter` · `BattleResultBeat` · 공격 튜닝 `NormalTuning` · `PeerlessTuning`
 - 규칙·판정: `BattleRules` · `ExecutionRule` · `BattleOverForecast` · `BattleFinisher` · `BattleCleanup`
-- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `Core/BootInstaller` 가 주입한다 — 실제 레벨은 `RankManager.AiCardLevelOf` / `RankConfig.AiCardLevelAt`, 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`. 밴드 검증 `Editor/AIDeckBandValidator`
+- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `Core/InitializationInstaller` 가 주입한다 — 실제 레벨은 토너먼트 정점 저작값(`TournamentNodeDef.aiCardLevel` · `TournamentRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
 - 초기화·셔플: `GameInitializer` · `ShufflePolicy` · `MulliganPhase` · `MatchSeeding` · `MatchRandom` · `DeckConfig` · `AIDeckConfig` (`DeckEntry`)
 - 타이밍: `Battle/Timing/BattleTimingConfig` · `Battle/Timing/GameTiming` · `BattleTimings`
-- 사망·처형 연출: 길이 단일 지점 `Battle/Timing/BattleTimingConfig.DeathDuration` (내부 박자는 전부 이 값 안에서 끝난다) · 애니 `UI/Battle/CardAnimator.PlayDeathAnim` · 시퀀스 `AttackSequence.PlayVictimDeaths` · 처형 `ExecutionRule` · `ExecutionVfx` · 사운드 `Audio/SoundManager.PlayDeath` · `SoundManager.PlayDeathVoice` · 미리보기 플래그 `UI/Battle/BattleUxFlags.DeathPreview` · 사망 트리거 `SynergyTriggers.Lethal` · `SynergyTriggers.Removed`
-- 연출: `BattleIntro` · `BattleVfx` · `BattleVfxId` · `CardAppearVfx` · `CardAppearSequence` · `HitImpact` · `HealVfx` · `ExecutionVfx` · `Battle/Cinematic/CardCinematicRules` (`CinemaAttackStyle`) · 에너지 구체 돌진 `AttackSequence.EnergyOrbDash` (프리팹은 `BattleVfxLibrary` 의 `BattleVfxId.CinemaEnergyOrb`, 등장 연출 `CardAppearVfx` 와 구체를 공유 — `CardData.cinemaAttackStyle` 한 축으로 묶여 따로 못 끈다) · 재생 `UI/Cinematic/CardCinematicPlayer`
+- 사망·처형 연출: 길이 단일 지점 `Battle/Timing/BattleTimingConfig.DeathDuration` (내부 박자는 전부 이 값 안에서 끝난다) · 애니 `UI/Battle/CardAnimator.PlayDeathAnim` · 시퀀스 `AttackSequence.PlayVictimDeaths` · 처형 `ExecutionRule` · `ExecutionVfx` · 사운드 `Audio/SoundManager.PlayDeath` · 미리보기 플래그 `UI/Battle/BattleUxFlags.DeathPreview` · 사망 트리거 `SynergyTriggers.Lethal` · `SynergyTriggers.Removed`
+- 연출: `BattleIntro` · `BattleVfx` · `BattleVfxId` · `CardAppearVfx` · `CardAppearSequence` · `HitImpact` · `HealVfx` · `ExecutionVfx` · `Battle/Cinematic/CardCinematicRules` (`CinemaAttackStyle`) · 에너지 구체 돌진 `AttackSequence.EnergyOrbDash` (구현은 보존, 현재 카드별 선택 데이터는 폐기) · 재생 `UI/Cinematic/CardCinematicPlayer`
 
 ## 시너지 (`Battle/Synergy/`, 15파일 995줄)
 
@@ -42,39 +60,43 @@
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
 - 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 등급: `ECardGrade`
-- 데이터 원본: `CardData` (`CardData.MaxEvolutionStage` · `CardData.evolvedArts` · `CardData.defaultEvolutionStage`) · `CardArtSet` · 진화 단계는 `CardGrowth.EvolutionStage`
-- 공격 이펙트 데이터: `AttackEffect` 안 `ParticleEntry` · `ParticleTiming` · `ParticleSpawnTarget` · `ProjectileData`
+- 데이터 원본: 표 기반 `CardSpec` (진화 최대 단계 상수 포함) · 주소 기반 아트 로드 `CardArtCache` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
-- 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `AttackEffect` · `ECardChannel` · `SynergyEmblemTiming`
+- 성장·표시 규칙: `CardGrowth` · `CardVisualRules` (`GlowSpec`) · `ECardChannel` · `ECardGrade` · `SynergyEmblemTiming`
 
 ## 멀티플레이 (`Network/`, 6파일 1,137줄)
 
-- 세션·제어: `NetworkSession` · `NetworkGameController` · `CardRegistry`
+- 세션·제어: `NetworkSession` · `NetworkGameController`
 - 턴 동기화: `MultiplayerTurnRunner` · `MultiplayerPlayerTurn` · `MultiplayerOpponentTurn`
 - 메시지 처리: `NetworkGameController.HandleMessage` — `NetworkSession` 이 Photon 콜백을 여기로 넘긴다
 - 서드파티 Photon Fusion 은 `Assets/Photon/` (지도 범위 밖)
 
-## 아웃게임 세이브 (`OutGame/Save/`, 14파일)
+## 아웃게임 세이브 (`OutGame/Save/`)
 
-3계층 구조다.
+**진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`) 하나다. 로컬 캐시도 오프라인 초기화도 없다 — 원격에 닿지 못하면 게임이 진행되지 않는다. 3계층 구조.
 
-- 저장소: `OutGame/Save/1.Repository/IRepository` · `JsonFileRepository` · `PlayerPrefsRepository`
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트) 아래 `CurrencySaveData` · `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` (`KeywordGrowthEntry`) · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData`
-- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Load` / `DataSaveManager.Save` / `DataSaveManager.Data`) — 각 기능 매니저가 여기로 flush 한다
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
+- 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(초기화 채택이 대신한다)
+- 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 초기화와 같은 순서로 다시 태운다(재화는 세이브 슬롯이 아니라 자기 채택 경로를 갖는다)
+- 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (초기화 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
+- 실패 표면(P3): 초기화 실패 `UI/Common/LoadingCoverView` 복구 화면(안내 + 재시도·종료 2버튼) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
+- 초기화 재시도(씬 재로드 없음): 단일 진입점 `InitializationInstaller.RestartBoot` — 실패한 캐시 되돌리기(`CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`) → `GameInitialization.ResetForRetry` → `PlayerSaveCloud.ResetForRetry` → 게이트 재기동 순서를 여기서 소유한다. 재적재 자체는 게이트가 매번 거는 `InitializationInstaller.StartAssetLoads` 가 맡아 재시도 전용 적재 경로가 없다. 재시도 가능 판정은 `GameInitialization.CanRetry`. `LoadingCoverView.Retry` 는 화면만 되돌리고 이 하나를 부른다
+- Firebase 코어: `Core/Firebase/FirebaseManager` · `FirebaseAuthService` · `FirebaseContext` · `FirebaseTimeouts` · `IFirebaseModule` · `FirebaseRootPath` · `EFirebaseAuthState`
 
 ## 재화·보상 (`OutGame/Currency/`, `OutGame/Reward/`, `Utils/`)
 
-- 재화: `CurrencyManager.Init` / `CurrencyManager.Save` · `ECurrencyType` · `CurrencyGainBucket` (`CurrencyGain`) · `RewardLine`
+- 재화: 지갑 문서(`envs/{env}/users/{uid}/wallet/current`) 창구 `OutGame/Currency/Cloud/WalletCloud` (`WalletCloud.TryReadAsync` · `WalletCloud.Adopt` · `WalletPatch` · `EnsureWalletResult`) · 읽기 전용 캐시 `CurrencyManager.Adopt` / `CurrencyManager.GetBalance` / `CurrencyManager.CanAfford` · `ECurrencyType` · `CurrencyGainBucket` (`CurrencyGain`) · `RewardLine`
 - 전투 보상: `BattleReward` · `BattleRewardHandoff`
 - 지급 서비스: `Utils/RewardService`
 - UI: `UI/HUD/CurrencyHud` · `ContextCurrencySlot` · `CurrencyLook` · `UI/Common/CurrencyGainEffectPlayer` · `UI/Common/CurrencyRewardSlotView` · `UI/Common/RewardClaimPopup` · `UI/Common/CoinBurstEffect`
 
 ## 카드팩 (`OutGame/CardPack/`, `UI/Shop/`)
 
-- 추첨 로직: `CardPackOpener.TryPurchase` / `CardPackOpener.PickWeighted` · `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack`
+- 추첨 로직: **서버가 판정한다** — callable `openPack` (`functions/src/commands/openPack.ts`, 추첨은 `functions/src/packs/packDraw.ts`, 지도 범위 밖). 클라는 `CardPackOpener.PurchaseAsync` 로 요청하고 `CardPackOpener.Precheck` 는 왕복을 아끼는 낙관 검사일 뿐이다 — 응답 DTO `OpenPackResult` (`OpenPackCard`)
+- 표시·데이터: `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack` · 잠금 `PackUnlockRules`
 - 결과 전달: `PackHandoff` · `CardPackRewardHandoff`
 - 연출 UI: `UI/Shop/PackRevealView` (`PackRevealView.BeginOpen` 이후 Entering→Swipe→Shifting→Tearing→Pulling→Flicking→Summary 상태 진행) · `PackCardView` · `PackCardStack` · `PackResultGrid`
-- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneBoot`
+- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`
 - 연출 소품: `PackTearSkin` · `PackTearHandle` · `PackShellRig` · `PackIdleMotion` · `PackScreenFlash` · `PackSpecularSweep` · `PackPurchaseImpact`
 
 ## 컬렉션·소유·도감 (`OutGame/Card/`, `OutGame/Album/`)
@@ -121,7 +143,7 @@
 
 ## 전투 UI (`UI/Battle/`, 29파일 6,965줄)
 
-- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `CardWeaponView` · `CardArmedVfx` · `CardFadeAlpha`
+- 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `WeaponAnimSpec` · `CardFadeAlpha`
 - 보드·카메라: `BattleBoardView` · `BattleFieldView` · `BattleCamera` · `BattleCameraFit` · `BattleSelection`
 - 턴 표시: `TurnBannerUI` · `TurnTimerUI` · `TurnSideTint` · `ActionPanel` · `CoinFlipUI` · `MulliganOverlayUI`
 - 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`
@@ -138,16 +160,16 @@
 - 로비: `UI/Lobby/LobbyTabController` · `LobbyTabServices` · `LobbyTabBarView` · `LobbyTabPanel` (`Tab`) · `LobbyMatchTabPanel` · `LobbyOverlayHost` · `LobbyShellBars` (`EShellBars`) · `LobbySettingsButton` · `ScrollingUvBackground` · `TabButtonView` · `LobbyMatchLauncher` · `LobbyGainEffectDirector` · `LobbyRankEffectDirector` · `CardRewardOverlay` · `CardSetRewardOverlay` · `PackRewardOverlay` · `EPromoteKind`
 - 입력 제스처: `UI/Input/HorizontalSwipeDetector` · `LongPressDetector` · `SwipeThroughScrollRect` · `SwipeGuide` · `HintArrow`
 
-## 부트·코어·유틸
+## 초기화·코어·유틸
 
-- 기동: `Core/BootInstaller` · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
+- 기동: `Core/InitializationInstaller` · `Core/GameInitialization` (`EGameInitState`) · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
 - 데이터·풀: `Utils/DataLibrary` · `ObjectPooler` · `ParticlePooler` · `PooledParticle` · `LogUtil` · `CameraUtil` · `KoreanText` · `EdgeShadeSprite` · `ShineBandSprite`
 - 사운드: `Audio/SoundManager` · `SoundConfig` · `UIClickSound`
 - 디버그: `OutGame/Debug/OutgameDebugOverlay` · `OutgameDebugActions` · `UI/Debug/DebugCurrencyButton` · `UnlockAllCardsButton` · `Test/BattleDebugKill` · `Test/VfxDebugWindow` (`VfxSlot`) · `Test/AttackAnimTester` (`AttackStep`) · `SynergyPreviewKind` · `KeywordPreviewKind`
 
 ## 에디터 도구 (`Editor/`, 19파일 3,585줄)
 
-`CardTableTool` · `CardAuthoringWindow` · `CardSpecImporter` · `CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `AIDeckBandValidator` · `OutgameTutorialStepWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `SafeAreaInstaller` · `UiSpriteAnimationClipCreator` · `UiSpriteAnimationClipWriter`
+`CardDetailChipBaker` · `ReleaseManagerWindow` · `ContentProfileValidator` · `ContentProfileMenu` · `TutorialAuthoringWindow` · `TutorialStepDefDrawer` · `AttackAnimTesterEditor` · `ContentRunModeEditor` · `FlowWavePrefabBuilder` · `WaveMeshBuilder` · `SafeAreaInstaller` · `UiSpriteAnimationClipCreator` · `UiSpriteAnimationClipWriter`
 
 <!-- orch:auto-draft:start -->
 ## 미분류 자동 초안 (섹션으로 옮기면 다음 동기화에서 빠집니다)

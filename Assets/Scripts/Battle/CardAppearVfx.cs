@@ -7,7 +7,7 @@ using UnityEngine;
 /// 화면 중앙에서 구체가 태어나 살짝 커브를 그리며 슬롯으로 날아가고 → 도착 지점에서 구체가 사라지며 카드가 튀어나온다.
 ///
 /// 프리팹 = BattleVfxLibrary(BattleVfxId.CinemaEnergyOrb) — **시네마 돌진과 똑같은 구체를 공유한다**.
-/// 어느 카드가 이 연출인지 = CardData.cinemaAttackStyle(EnergyOrbDash) — 공격과 등장이 한 축이라 따로 켜고 끌 수 없다.
+/// 카드별 선택 데이터는 폐기됐으며, 공용 등장 연출만 담당한다.
 /// 여기엔 둘 다 두지 않는다.
 ///
 /// **순수 연출이다** — 카드 배치(슬롯 상태)는 호출 전에 이미 끝나 있고 여기선 보여주기만 늦춘다.
@@ -40,7 +40,6 @@ public static class CardAppearVfx
         {
             // 소리는 "덱에서 나오는 순간"에 한 번. 변신 경로는 앞 토막(PlayDealToMid)이 이미 냈으므로 여기선 안 낸다.
             SoundManager.Instance?.PlayDealCard();
-            SoundManager.Instance?.PlaySpawnVoice(_view.BoundCard?.data?.spawnVoices);
 
             // 카드는 아직 화면 밖(호출부가 미리 치워둔 상태)이다. 여기서 자세를 미리 정리해 둔다 —
             // **알파 복원이 특히 중요**: 죽은 카드가 있던 슬롯은 알파 0으로 남아 있고,

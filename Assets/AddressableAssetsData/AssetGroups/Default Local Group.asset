@@ -34,10 +34,21 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
-    m_Address: Assets/Prefabs/UI/SimpleYNPopup.prefab
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/SimpleYNPopup.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4124b08d48d20e947a8ce81242bc1032
+    m_Address: KeywordGrowthOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 433bc64ee546c684e85071d606a25a87
+    m_Address: SyncUiPrefabCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 61430c10ca6949a798ec10b366fae820
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab
@@ -46,7 +57,7 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8134ddc58443c3348a644266ea3669ec
-    m_Address: Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -56,6 +67,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+    m_Address: RankRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 900576455767af6468c2f5dfdb5ff54b
+    m_Address: RewardClaimPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8ffda38cc32cce4390406846a163820
+    m_Address: MalgunGothic_TMP
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bab0c173e1415bd49a7b0ffd3bb1567c
     m_Address: UnlockIntroOverlay
@@ -87,6 +115,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6b465e52d99e8b4b9cc9eb742fbc1ac
+    m_Address: CloudSyncBannerView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1b37da6ebdd20e48954602bec574405
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab
     m_ReadOnly: 0
@@ -94,7 +128,13 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
-    m_Address: Assets/Assets/Prefabs/PooledCardElement.prefab
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f95d3da55cfb6f44f84adfc2fbdc308d
+    m_Address: TouchEffectOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

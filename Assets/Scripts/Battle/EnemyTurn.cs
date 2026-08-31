@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 public class EnemyTurn : TurnBase
@@ -50,9 +51,10 @@ public class EnemyTurn : TurnBase
                 t_bannerAnchor = t_step.bannerAnchor;
                 if (IsFreeStep(t_step))
                 {
-                    // 자유공격: 슬롯 무지정 → AI가 결정론으로 공격자·타깃 선택(규칙은 EnemyAi 단독).
+                    // 자유공격: 슬롯 무지정 → AI가 결정론으로 공격자·타깃 선택.
+                    // 공격자 규칙은 EnemyAi, 처형 재공격 대상 규칙은 ExecutionRule(PickTargetFor 참조).
                     t_atk = t_forcedAttacker != null ? t_forcedAttacker : EnemyAi.PickAttacker(t_attackers);
-                    t_def = EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_atk));
+                    t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
                 }
                 else
                 {
@@ -81,13 +83,13 @@ public class EnemyTurn : TurnBase
             }
             else
             {
-                // 일반 AI 공격. 선택 규칙(공격자 가중치 룰렛 / 타깃 최저 체력)의 진실원은 EnemyAi 하나다 —
+                // 일반 AI 공격. 공격자 선택(가중치 룰렛)의 진실원은 EnemyAi, 타깃은 PickTargetFor가 정한다 —
                 // 튜토리얼 자유공격 스텝도 같은 함수를 부른다. 룰렛이 쓰는 랜덤은 MatchRandom뿐이고,
                 // 시드는 GameInitializer가 전투 시작 전에 건다.
                 t_atk = t_forcedAttacker != null
                     ? t_forcedAttacker
                     : EnemyAi.PickAttacker(t_attackers);
-                t_def = EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_atk));
+                t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
             }
 
             // 타깃은 공격자 확정 후 다시 뽑는다(GetValidTargets(t_atk) = 지정 타깃·도발이 이 공격자 기준).
@@ -114,17 +116,21 @@ public class EnemyTurn : TurnBase
             var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
                 t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
 
-            AttackResult t_result = default;
-            Action t_onEffect = () => t_result = AttackProcessor.Execute(
-                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
-
             var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
                                              t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
+            AttackResult t_result;
+            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
+            {
+                t_result = AttackProcessor.Execute(
+                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
+                t_result.events = t_events.ToArray();
+            }
+
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_atk.data.attackEffect, t_onEffect, t_preKw, t_atKw,
+                t_result.events, t_preKw, t_atKw,
                 () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
@@ -150,6 +156,16 @@ public class EnemyTurn : TurnBase
             }
         }
     }
+
+    /// <summary>이 공격자가 칠 대상. <b>처형 재공격이면 대상 선택의 단일 진실원은 <see cref="ExecutionRule"/>다</b> —
+    /// 도발을 무시하고 살아 있는 적 전부에서 뽑는 그 규칙을 AI도 그대로 따른다(사람 쪽 PlayerTurn과 동형).
+    /// 첫 공격만 <see cref="EnemyAi"/>의 최저 체력 우선 규칙을 쓴다.
+    /// <paramref name="_executionChain"/>이 false거나 <see cref="BattleUxFlags.ExecutionRandomTarget"/>가
+    /// 꺼져 있으면(=대상을 직접 고르던 구 경로) AI는 고를 주체가 없으므로 EnemyAi로 폴백한다.</summary>
+    CardInstance PickTargetFor(CardInstance _attacker, bool _executionChain)
+        => _executionChain && BattleUxFlags.ExecutionRandomTarget
+            ? ExecutionRule.PickRandomTarget(_attacker, this.ctx.playerField)
+            : EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(_attacker));
 
     public override void OnExit()
     {

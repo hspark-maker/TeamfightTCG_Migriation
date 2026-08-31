@@ -103,7 +103,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
             tournamentButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament);
     }
 
-    /// <summary>랭크 보상 목록. 풀이 없으면(부트 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
+    /// <summary>랭크 보상 목록. 풀이 없으면(초기화 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
     public void OpenRankRewards() => OpenPooled<RankRewardPanel>();
 
     public void OpenKeywordGrowth()
@@ -118,7 +118,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         if (UIPoolManager.Instance == null)
         {
-            Debug.LogError($"[LobbyMatchTabPanel] UIPoolManager가 없어 {typeof(T).Name}을 열 수 없다 — Boot 초기화를 확인할 것.");
+            Debug.LogError($"[LobbyMatchTabPanel] UIPoolManager가 없어 {typeof(T).Name}을 열 수 없다 — 초기화(InitializationRunner) 초기화를 확인할 것.");
             return;
         }
 

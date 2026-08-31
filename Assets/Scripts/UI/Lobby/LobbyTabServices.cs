@@ -12,11 +12,16 @@
 /// </summary>
 public sealed class LobbyTabServices
 {
-    public LobbyTabServices(DeckEditDragController _dragController)
+    public LobbyTabServices(DeckEditDragController _dragController, LobbyTabController _shell)
     {
         DragController = _dragController;
+        Shell          = _shell;
     }
 
     /// <summary>덱 편집 드래그. 로비 캔버스의 DragLayer가 소유한다(미배선이면 null — 소비측이 판단).</summary>
     public DeckEditDragController DragController { get; }
+
+    /// <summary>탭 셸. 자기 화면을 스스로 떠나야 하는 탭(덱 탭의 뒤로가기)이 기본 탭으로 돌아갈 때 쓴다 —
+    /// 계층을 거슬러 올라가 찾지 않게 하는 것이 이 묶음의 존재 이유다.</summary>
+    public LobbyTabController Shell { get; }
 }

@@ -78,7 +78,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     ///
     /// _card는 데모 무대의 공격자로 선다(<see cref="KeywordDemoStage"/>). null이면 데모 없이 글자만 —
     /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.</summary>
-    public void Show(IReadOnlyList<UnlockIntro> _intros, CardData _card, Action _onClose)
+    public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
     {
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
@@ -231,9 +231,9 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     /// 맨 위 키워드 행에만 띠가 뜨고 나머지는 글자로 남는다 — 무대를 행 수만큼 복제하면
     /// 카메라와 RenderTexture가 그만큼 늘어나는데, 정작 눈은 한 번에 하나만 본다.
     /// 시너지는 Keyword가 None이라 자연히 건너뛴다(덱 편성 규칙이라 보여줄 대본이 없다).</summary>
-    void BeginDemo(IReadOnlyList<UnlockIntro> _intros, CardData _card)
+    void BeginDemo(IReadOnlyList<UnlockIntro> _intros, int _card)
     {
-        if (_card == null || this.rowRoot == null) return;
+        if (_card <= 0 || this.rowRoot == null) return;
 
         for (int t_i = 0; t_i < this.m_shownRows && t_i < _intros.Count; t_i++)
         {

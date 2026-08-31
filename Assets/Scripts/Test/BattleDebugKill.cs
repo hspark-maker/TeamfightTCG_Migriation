@@ -117,6 +117,6 @@ public class BattleDebugKill : MonoBehaviour
         && NetworkSession.Instance.Runner != null
         && NetworkSession.Instance.Runner.IsRunning;
 
-    static string Name(CardInstance _card) => _card.data != null ? _card.data.name : "?";
+    static string Name(CardInstance _card) => _card != null ? CardCatalog.RequireSpec(_card.cardId).DisplayName : "?";
 }
 #endif

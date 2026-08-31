@@ -1,6 +1,5 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Video;
 
 /// <summary>
 /// 카드 한 장이 덱에서 나와 슬롯에 앉기까지의 **단일 시퀀스**.
@@ -23,8 +22,7 @@ public static class CardAppearSequence
     {
         if (_view == null) return;
 
-        VideoClip t_clip = CardCinematicRules.Resolve(_card);
-        if (t_clip == null && !_playSwapVfx)
+        if (!_playSwapVfx)
         {
             await _view.PlayDealAnim(_from, _mid, _dest, _duration);
             return;
@@ -37,15 +35,10 @@ public static class CardAppearSequence
         if (_playSwapVfx)
             BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
 
-        if (t_clip != null)
-            await CardCinematicPlayer.Play(t_clip);
-        else
-        {
-            bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
-                    cancellationToken: _view.GetCancellationTokenOnDestroy())
-                .SuppressCancellationThrow();
-            if (t_cancelled) return;
-        }
+        bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
+                cancellationToken: _view.GetCancellationTokenOnDestroy())
+            .SuppressCancellationThrow();
+        if (t_cancelled) return;
 
         if (_view == null) return;
         await _view.PlayDealToSlot(_mid, _dest, _duration);

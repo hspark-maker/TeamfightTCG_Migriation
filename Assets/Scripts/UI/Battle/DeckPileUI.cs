@@ -342,10 +342,10 @@ public class DeckPileUI : MonoBehaviour
     /// 시너지 활성 여부는 이 필드의 확정 스냅샷을 그대로 넘긴다(재계산 금지).</summary>
     void ShowCardDetail(CardInstance _card)
     {
-        if (_card?.data == null) return;
+        if (_card == null || _card.cardId <= 0) return;
         UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
         {
-            card     = _card.data,
+            cardId   = _card.cardId,
             instance = _card,   // 대기 카드도 전투 인스턴스다 — 체력·키워드의 진실원을 넘긴다
             synergy  = this.field != null ? this.field.Synergy : null,
         });

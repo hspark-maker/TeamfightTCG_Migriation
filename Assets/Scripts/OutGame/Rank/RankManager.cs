@@ -7,9 +7,13 @@ public static class RankManager
     public static event Action OnChanged;
 
     static RankConfig s_config;
+    static bool s_configured;
+    static bool s_warnedDefault;
+
+    public static bool IsConfigured => s_configured;
 
     // 현재 랭크 포인트
-    public static long Points => Slot.points;
+    public static long Points => Slot.Points;
 
     /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
@@ -20,15 +24,22 @@ public static class RankManager
     public static bool IsPromoPending => PromoPendingAt(Points);
 
     static RankConfig Config
-        => s_config != null ? s_config : (s_config = ScriptableObject.CreateInstance<RankConfig>());
+    {
+        get
+        {
+            if (s_config != null) return s_config;
+            WarnDefaultConfig();
+            return s_config = ScriptableObject.CreateInstance<RankConfig>();
+        }
+    }
 
     static RankSaveData Slot
     {
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.rank == null) t_data.rank = new RankSaveData();
-            return t_data.rank;
+            if (t_data.Rank == null) t_data.Rank = new RankSaveData();
+            return t_data.Rank;
         }
     }
 
@@ -37,23 +48,6 @@ public static class RankManager
 
     // 현재 티어의 등급. 등급만 필요한 호출부가 GetInfo() 체인을 늘어놓지 않게 하는 단일 창구.
     public static ERankGrade CurrentGrade => GetInfo().Grade;
-
-    /// <summary>현재 티어의 AI 카드 레벨. **티어 기준값이지 실제 카드 레벨이 아니다**(카드별 값은 <see cref="AiCardLevelOf"/>).
-    /// 난이도 축의 유일한 조회 지점 — 설정(RankConfig)을 밖으로 내보내지 않으려고 여기서 파생해 준다.</summary>
-    public static int AiCardLevel => Config.AiCardLevelAt(TierIndex);
-
-    /// <summary>현재 티어에서 카드 _card 한 장이 쓸 AI 레벨. 티어 기준 레벨 주변으로 카드마다 흩어지되,
-    /// 강화 곡선 만렙을 넘지 않는다(넘으면 곡선에 없는 레벨이라 보너스가 멈춘 것처럼 보인다).</summary>
-    public static int AiCardLevelOf(CardData _card)
-    {
-        int t_base  = Config.AiCardLevelAt(TierIndex);
-        int t_level = _card == null
-            ? t_base
-            : KeepUnlocks(_card, Config.AiCardLevelForCard(TierIndex, CardCatalog.IdOf(_card)), t_base);
-
-        int t_max = CardGrowthManager.MaxLevel;
-        return t_max > 0 && t_level > t_max ? t_max : t_level;
-    }
 
     /// <summary>티어 스냅샷 하나를 얻는다. 설정(RankConfig)을 밖으로 내보내지 않으면서
     /// 연출이 "도달한 등급"의 배지·표시명을 물을 수 있는 유일한 창구다.</summary>
@@ -153,17 +147,17 @@ public static class RankManager
         if (IsRanked) return false;
 
         var t_slot = Slot;
-        long t_points = t_slot.points;
+        long t_points = t_slot.Points;
 
-        t_slot.points = Config.FirstTierPoints;
+        t_slot.Points = Config.FirstTierPoints;
         Save();
 
         _result = new RankApplyResult(
-            t_slot.points - t_points,
+            t_slot.Points - t_points,
             -1,
-            Config.ResolveTierIndex(t_slot.points),
+            Config.ResolveTierIndex(t_slot.Points),
             false,
-            PromoPendingAt(t_slot.points));
+            PromoPendingAt(t_slot.Points));
         return true;
     }
 
@@ -174,7 +168,7 @@ public static class RankManager
         var t_config = Config;
         var t_slot = Slot;
 
-        long t_points = t_slot.points;
+        long t_points = t_slot.Points;
         long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
 
         int t_index = t_config.ResolveTierIndex(t_points);
@@ -197,20 +191,60 @@ public static class RankManager
         // 고정 천장이 곧 강등이 된다.
         if (_tutorial) t_ceiling = Math.Min(t_ceiling, Math.Max(t_config.FirstTierPoints - 1, t_points));
 
-        t_slot.points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
+        t_slot.Points = Math.Min(Math.Max(t_points + t_delta, t_floor), t_ceiling);
         Save();
 
         return new RankApplyResult(
-            t_slot.points - t_points,
+            t_slot.Points - t_points,
             t_index,
-            t_config.ResolveTierIndex(t_slot.points),
+            t_config.ResolveTierIndex(t_slot.Points),
             false,
-            PromoPendingAt(t_slot.points));
+            PromoPendingAt(t_slot.Points));
     }
 
     /// <summary>티어를 _index로 바로 옮긴다(디버그 전용). 포인트를 그 티어의 진입 임계치에 맞춘다 —
     /// 티어는 points의 순수 파생이라 티어를 직접 쓸 곳이 없고, 임계치에 세워야 표시·보상이 다 맞는다.
     /// 범위 밖은 양끝으로 클램프. 반환값 = 실제로 도달한 티어 인덱스.</summary>
+    /// <summary>서버 확정 멀티 결과 화면용 미리보기. 세이브와 이벤트를 변경하지 않는다.</summary>
+    public static RankApplyResult PreviewBattleResult(bool _won, bool _tutorial = false)
+    {
+        var t_config = Config;
+        long t_points = Points;
+        int t_index = t_config.ResolveTierIndex(t_points);
+
+        if (!_tutorial && PromoPendingAt(t_points))
+        {
+            long t_ceiling = t_config.GradeCeilingPoints(t_points);
+            long t_floor = t_config.DivisionFloorPoints(t_points);
+            long t_after = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
+            return new RankApplyResult(t_after - t_points, t_index,
+                t_config.ResolveTierIndex(t_after), true, PromoPendingAt(t_after));
+        }
+
+        long t_floorPoints = t_points >= t_config.FirstTierPoints ? t_config.DivisionFloorPoints(t_points) : 0;
+        long t_ceilingPoints = t_config.GradeCeilingPoints(t_points) - 1;
+        if (_tutorial)
+            t_ceilingPoints = Math.Min(t_ceilingPoints, Math.Max(t_config.FirstTierPoints - 1, t_points));
+        long t_delta = _won ? t_config.winPoints : -t_config.losePoints;
+        long t_afterPoints = Math.Min(Math.Max(t_points + t_delta, t_floorPoints), t_ceilingPoints);
+        return new RankApplyResult(t_afterPoints - t_points, t_index,
+            t_config.ResolveTierIndex(t_afterPoints), false, PromoPendingAt(t_afterPoints));
+    }
+
+    /// <summary>서버 payout 원장이 확정한 절대 포인트를 적용한다.</summary>
+    public static RankApplyResult ApplyServerPayout(long _before, long _after)
+    {
+        if (_before < 0 || _after < 0) throw new ArgumentOutOfRangeException();
+        if (Slot.Points != _before)
+            Debug.LogWarning($"[Payout] 로컬 랭크 기준이 서버 원장과 다르다(local={Slot.Points}, server={_before}). 서버 값을 채택한다.");
+
+        int t_beforeTier = Config.ResolveTierIndex(_before);
+        Slot.Points = _after;
+        Save();
+        return new RankApplyResult(_after - _before, t_beforeTier, Config.ResolveTierIndex(_after),
+            PromoPendingAt(_before), PromoPendingAt(_after));
+    }
+
     public static int SetTierForDebug(int _index)
     {
         var t_config = Config;
@@ -220,10 +254,10 @@ public static class RankManager
         int t_target = _index < 0 ? 0 : (_index > t_last ? t_last : _index);
         if (!t_config.TryGetTier(t_target, out RankTier t_tier)) return t_config.ResolveTierIndex(Points);
 
-        Slot.points = t_tier.RequiredPoints;
+        Slot.Points = t_tier.RequiredPoints;
         Save();
 
-        return t_config.ResolveTierIndex(Slot.points);
+        return t_config.ResolveTierIndex(Slot.Points);
     }
 
     /// <summary>티어를 _step만큼 올린다(음수면 내린다). 디버그 전용.</summary>
@@ -240,22 +274,40 @@ public static class RankManager
         long t_ceiling = Config.GradeCeilingPoints(Points);
         if (t_ceiling == long.MaxValue) return false;
 
-        Slot.points = t_ceiling - 1;
+        Slot.Points = t_ceiling - 1;
         Save();
 
         return true;
     }
 
-    // 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
-        if (_config != null) s_config = _config;
+        if (_config == null) return;
+        s_config = _config;
+        s_configured = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_config = null;
+        s_configured = false;
+        s_warnedDefault = false;
+        OnChanged = null;
+    }
+
+    static void WarnDefaultConfig()
+    {
+        if (s_warnedDefault) return;
+        s_warnedDefault = true;
+        Debug.LogWarning("[RankManager] RankConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     // 포인트만 0으로 되돌린다(디버그 전용)
     public static void ResetForDebug()
     {
-        Slot.points = 0;
+        Slot.Points = 0;
         Save();
     }
 
@@ -270,38 +322,20 @@ public static class RankManager
         long t_floor   = t_config.DivisionFloorPoints(_points);
 
         // 승급전은 등급 마지막 단계에서만 서므로 천장 - 바닥 = 그 등급의 pointsPerDivision이다.
-        _slot.points = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
+        _slot.Points = _won ? t_ceiling : t_floor + (t_ceiling - t_floor) / 2;
         Save();
 
         return new RankApplyResult(
-            _slot.points - _points,
+            _slot.Points - _points,
             _index,
-            t_config.ResolveTierIndex(_slot.points),
+            t_config.ResolveTierIndex(_slot.Points),
             true,
-            PromoPendingAt(_slot.points));
+            PromoPendingAt(_slot.Points));
     }
 
     // _points가 승급전 대기선(다음 등급 진입선 - 1)인가. 최고 등급은 천장이 long.MaxValue라 늘 false.
     static bool PromoPendingAt(long _points)
         => _points >= Config.FirstTierPoints && _points == Config.GradeCeilingPoints(_points) - 1;
-
-    /// <summary>하향 편차는 체력만 깎는다 — 기준 레벨이 이미 연 시너지·키워드를 도로 잠그면 카드 정체성이 사라진다
-    /// (시너지가 꺼진 카드는 집계에서 빠져 3장 요구 시너지가 성립조차 못 한다). 해금이 기준과 같아지는 가장 낮은 레벨까지만 내린다.</summary>
-    static int KeepUnlocks(CardData _card, int _level, int _base)
-    {
-        if (_level >= _base) return _level;
-
-        CardGrowthConfig t_growth = CardGrowthManager.Config;
-        bool             t_synergy  = t_growth.SynergyUnlockedAt(_base);
-        CardKeyword      t_keywords = t_growth.UnlockedKeywordsAt(_card, _base);
-
-        for (int t_lv = _level; t_lv < _base; t_lv++)
-        {
-            if (t_growth.SynergyUnlockedAt(t_lv) == t_synergy && t_growth.UnlockedKeywordsAt(_card, t_lv) == t_keywords)
-                return t_lv;
-        }
-        return _base;
-    }
 
     static void Save()
     {

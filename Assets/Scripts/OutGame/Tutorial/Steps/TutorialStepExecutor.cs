@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -153,41 +154,53 @@ public static class TutorialStepExecutor
         if (PackOpenOverlay.Instance == null)
             return Fail(_step, _context, "개봉 오버레이 미배치(로비 씬 배선 확인)");
 
-        _context.CommitAdvance();
+        // 결제는 서버 왕복이라 이 동기 상태머신이 결과를 기다릴 수 없다 — 살 수 있는지만 먼저 묻고
+        // 그 답으로 저작된 실패 정책을 태운다(여기까지가 되돌릴 수 있는 마지막 지점).
+        var t_precheck = CardPackOpener.Precheck(_step.Pack);
+        if (t_precheck != EPackOpenResult.Success)
+            return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_precheck})");
 
-        var t_opened = CardPackOpener.TryPurchase(_step.Pack);
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+
+        PurchaseAndOpenAsync(_step.Pack, Where(_context)).Forget();
+
+        return EOutgameTutorialStepResult.Advanced;
+    }
+
+    // 자동 구매의 서버 왕복. 좌표는 이미 전진한 뒤라 되돌릴 수 없다.
+    // ⚠ 서버 왕복이 실패하면 다음 게이트에서 정지한다. 되돌릴 신호가 없어 fail-open(sameCoordBootCount)에 맡긴다.
+    static async UniTaskVoid PurchaseAndOpenAsync(CardPackData _pack, string _where)
+    {
+        var t_opened = await CardPackOpener.PurchaseAsync(_pack);
+        string t_packId = _pack != null ? _pack.PackId : "null";
+
         if (t_opened == null || !t_opened.Success)
         {
             string t_result = t_opened != null ? t_opened.Result.ToString() : "null";
-            return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_result})");
+            Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}, result={t_result}) — 이미 전진해 되돌리지 못한다.");
+            return;
         }
 
-        _context.CompleteIfLast();
-
-        PackHandoff.Set(t_opened, _step.Pack, null, false);
+        PackHandoff.Set(t_opened, _pack, null, false);
 
         // 구매는 이미 성공했다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
         if (!PackOpenOverlay.TryOpen())
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 개봉 오버레이 열기 실패(pack={PackIdOf(_step)}) — 구매는 유지, 개봉 연출만 생략.");
-
-        return EOutgameTutorialStepResult.Advanced;
+            Debug.LogWarning($"[TutorialStepExecutor] {_where} 개봉 오버레이 열기 실패(pack={t_packId}) — 구매는 유지, 개봉 연출만 생략.");
     }
 
     static EOutgameTutorialStepResult EnterDeckGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
         _context.CommitAdvance();
 
-        // ⚠ 이 스텝은 앵커가 없어 되돌리면(Halt) 이 부트에서 다시 세울 신호가 없다 —
+        // ⚠ 이 스텝은 앵커가 없어 되돌리면(Halt) 이 초기화에서 다시 세울 신호가 없다 —
         //   덱은 유저가 직접 만들 수 있으니 저작은 Skip으로 두는 편이 낫다.
-        if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.playerDeck, out List<CardData> t_cards))
+        if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.PlayerDeckIds, out List<int> t_cards))
             return Fail(_step, _context, $"시나리오 미배선 또는 덱이 {DeckSaveManager.DECK_SIZE}장을 이루지 못함");
-
-        if (DeckSaveManager.LegacyMigrationPending)
-            return Fail(_step, _context, "레거시 덱 이관 미완료");
 
         // 저장 덱과 소유권은 별도 데이터다. 둘이 어긋난 세이브라도
         // 가이드 진입 전 실제 카드 소유를 먼저 보장한다.
-        OwnershipManager.GrantAll(ToIds(t_cards));
+        OwnershipManager.GrantAll(t_cards);
 
         if (DeckSaveManager.TryFindSlot(t_cards, out _))
         {
@@ -208,15 +221,15 @@ public static class TutorialStepExecutor
     // 완료는 획득 뒤에 이어지는 로비 획득 연출이 끝나는 신호가 확정한다.
     static EOutgameTutorialStepResult EnterCardGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
-        if (_step.Card == null)
-            return FailAfterGrant(_step, _context, null, "CardGrant에 카드가 미배선");
+        if (_step.CardId <= 0)
+            return FailAfterGrant(_step, _context, 0, "CardGrant에 카드 ID가 미배선");
 
         // 보여 줄 화면도 연출을 틀 디렉터도 없으면 기다릴 신호가 없다 — 화면 없이 지급만 하고 지나간다.
         // 캐리어를 싣지 않는 것이 중요하다: 소비되지 못한 채 살아남으면 다음 로비 진입의 획득 연출에 섞인다.
         if (!CardRewardOverlay.TryGet(out var t_overlay) || !LobbyGainEffectDirector.Exists)
-            return FailAfterGrant(_step, _context, _step.Card, "보상 오버레이·획득 연출 없음(로비 씬 배선 확인)");
+            return FailAfterGrant(_step, _context, _step.CardId, "보상 오버레이·획득 연출 없음(로비 씬 배선 확인)");
 
-        var t_card = _step.Card;
+        int t_card = _step.CardId;
 
         // 카드가 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 보상 화면과 획득 연출이 한 줄로 이어진다.
         var t_origin = t_overlay.CardAnchor;
@@ -227,11 +240,11 @@ public static class TutorialStepExecutor
 
     // [획득]이 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(CardData _card, RectTransform _origin, bool _parallel)
+    static bool AcquireCard(int _cardId, RectTransform _origin, bool _parallel)
     {
-        OwnershipManager.Grant(CardCatalog.IdOf(_card));
+        OwnershipManager.Grant(_cardId);
 
-        CardPackRewardHandoff.Set(CurrencyGain.None, new List<CardData> { _card });
+        CardPackRewardHandoff.Set(CurrencyGain.None, new List<int> { _cardId });
         if (LobbyGainEffectDirector.PlayNow(_origin))
         {
             // 저작이 병렬을 시켰으면 비행이 끝나기를 기다리지 않는다 — 다음 안내가 그 비행과 나란히 선다.
@@ -251,9 +264,9 @@ public static class TutorialStepExecutor
 
     // 화면을 세우지 못한 경로의 마무리. 연출은 접더라도 소유권은 맞춰 두고 결말은 저작에 맡긴다.
     static EOutgameTutorialStepResult FailAfterGrant(TutorialStepDef _step, OutgameTutorialStepContext _context,
-                                                    CardData _card, string _reason)
+                                                    int _cardId, string _reason)
     {
-        if (_card != null) OwnershipManager.Grant(CardCatalog.IdOf(_card));
+        if (_cardId > 0) OwnershipManager.Grant(_cardId);
 
         return Fail(_step, _context, _reason);
     }
@@ -262,7 +275,7 @@ public static class TutorialStepExecutor
     // 세트는 낱장 보상과 다른 오버레이(격자)를 쓰고, 지급도 한 장이 아니라 목록 단위로 한다.
     static EOutgameTutorialStepResult EnterCardSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
-        var t_cards = _step.Cards;
+        var t_cards = _step.CardIds;
 
         if (t_cards == null || t_cards.Count == 0)
             return FailAfterSetGrant(_step, _context, null, "CardSetGrant에 카드가 미배선");
@@ -278,9 +291,9 @@ public static class TutorialStepExecutor
     }
 
     // [받기]가 눌린 순간. 지급을 끝내고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
-    static void AcquireCards(IReadOnlyList<CardData> _cards, RectTransform _origin, bool _parallel)
+    static void AcquireCards(IReadOnlyList<int> _cards, RectTransform _origin, bool _parallel)
     {
-        OwnershipManager.GrantAll(ToIds(_cards));
+        OwnershipManager.GrantAll(_cards);
 
         CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
         if (LobbyGainEffectDirector.PlayNow(_origin))
@@ -340,25 +353,11 @@ public static class TutorialStepExecutor
     }
 
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context,
-                                                       IReadOnlyList<CardData> _cards, string _reason)
+                                                       IReadOnlyList<int> _cards, string _reason)
     {
-        if (_cards != null) OwnershipManager.GrantAll(ToIds(_cards));
+        if (_cards != null) OwnershipManager.GrantAll(_cards);
 
         return Fail(_step, _context, _reason);
-    }
-
-    // null 원소는 건너뛴다 — 저작이 빈 칸을 남긴 세트도 그대로 지급되어야 한다.
-    static List<int> ToIds(IReadOnlyList<CardData> _cards)
-    {
-        var t_ids = new List<int>(_cards.Count);
-        for (int t_i = 0; t_i < _cards.Count; t_i++)
-        {
-            if (_cards[t_i] == null) continue;
-
-            t_ids.Add(CardCatalog.IdOf(_cards[t_i]));
-        }
-
-        return t_ids;
     }
 
     static string TitleOf(TutorialStepDef _step, string _fallback)

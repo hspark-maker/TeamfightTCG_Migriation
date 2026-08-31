@@ -103,7 +103,7 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] int  synergyMaxBadges = CardVisualRules.MaxSynergyBadges;
 
     // 전투 인스턴스로 바인딩됐다면 그쪽이 값의 진실원이다(현재 체력·인스턴스 키워드·전투 아트).
-    // CardData로 바인딩하면 null로 돌아가 아웃게임(내 성장) 기준을 탄다 — 적 카드에 내 강화를 얹지 않기 위함.
+    // 카드 ID로 바인딩하면 null로 돌아가 아웃게임(내 성장) 기준을 탄다 — 적 카드에 내 강화를 얹지 않기 위함.
     CardInstance m_instance;
 
     // 프레임과 아트만 남기는 런타임 마스크(도감 "일러스트만 보기"). 프리팹 스위치(show*)를 끄지 않고 **그 위에 얹는다** —
@@ -166,10 +166,10 @@ public class CardVisualView : MonoBehaviour
     // 유일한 예외가 매치 화면의 상대 덱 6칸(MatchDeckPanelView.enemySlots).
     // **false는 "성장 없음"이 아니라 "상대 기준"이다** — 내 강화분을 얹지 않되, 상대가 서 있는
     // 레벨(랭크 티어가 정한 AI 레벨)로 체력·레벨을 그린다. 둘을 같게 두면 상대가 실제보다 약해 보인다.
-    public void Bind(CardData _card, bool _owned, bool _mine = true)
+    public void Bind(int _cardId, bool _owned, bool _mine = true)
     {
-        this.m_instance = null;   // CardData 바인딩 = 아웃게임(내 성장) 기준으로 되돌린다
-        BindInternal(_card, _owned, _mine);
+        this.m_instance = null;   // 카드 ID 바인딩 = 아웃게임(내 성장) 기준으로 되돌린다
+        BindInternal(_cardId, _owned, _mine);
     }
 
     /// <summary>전투 인스턴스로 바인딩(전투 덱 목록·카드 정보창). 값의 출처가 아웃게임 경로와 갈린다:
@@ -179,12 +179,12 @@ public class CardVisualView : MonoBehaviour
     public void Bind(CardInstance _instance)
     {
         this.m_instance = _instance;
-        BindInternal(_instance?.data, _owned: true, _mine: true);
+        BindInternal(_instance?.cardId ?? 0, _owned: true, _mine: true);
     }
 
-    void BindInternal(CardData _card, bool _owned, bool _mine)
+    void BindInternal(int _card, bool _owned, bool _mine)
     {
-        if (_card == null)
+        if (_card <= 0)
         {
             gameObject.SetActive(false);
             return;
@@ -206,7 +206,7 @@ public class CardVisualView : MonoBehaviour
             if (this.nameText != null)
             {
                 this.nameText.gameObject.SetActive(t_showName);
-                if (t_showName) this.nameText.text = _card.displayName;   // 표시명 정본은 displayName(에셋 name 아님)
+                if (t_showName) this.nameText.text = CardCatalog.RequireSpec(_card).DisplayName;
             }
         }
 
@@ -229,18 +229,18 @@ public class CardVisualView : MonoBehaviour
     /// hpText를 쓰는 곳은 SetHpDisplay 하나뿐이라 호출부가 텍스트를 직접 만지면 진실원이 갈린다.
     ///
     /// 카드·소유여부를 캐싱하지 않고 인자로 받는 이유: 바인딩 상태의 진실원을 호출부와 여기 둘로 만들지 않기 위함.</summary>
-    public void RefreshHp(CardData _card, bool _owned, bool _mine = true)
+    public void RefreshHp(int _card, bool _owned, bool _mine = true)
     {
-        if (_card == null) return;
+        if (_card <= 0) return;
 
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
     }
 
     /// <summary>현재 표시 주체의 레벨에 맞는 진화 아트만 다시 그린다.</summary>
-    public void RefreshArt(CardData _card, bool _mine = true)
+    public void RefreshArt(int _card, bool _mine = true)
     {
-        if (_card == null || this.portrait == null) return;
+        if (_card <= 0 || this.portrait == null) return;
 
         // 인스턴스가 있으면 진화 단계도 그 인스턴스의 값이다 — 적 카드에 내 진화 단계를 얹지 않는다.
         Sprite t_art = this.m_instance != null
@@ -255,9 +255,9 @@ public class CardVisualView : MonoBehaviour
     ///
     /// <see cref="RefreshHp"/>처럼 값만 고칠 수 없는 갱신이다(아이콘은 Destroy + Instantiate) →
     /// 호출부는 **키워드가 실제로 바뀐 프레임에만** 부른다. 성장 통지마다 부르면 매번 다시 짓는다.</summary>
-    public void RefreshKeywords(CardData _card, bool _owned)
+    public void RefreshKeywords(int _card, bool _owned)
     {
-        if (_card == null) return;
+        if (_card <= 0) return;
 
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
@@ -272,12 +272,12 @@ public class CardVisualView : MonoBehaviour
     ///
     /// 판정은 <see cref="RefreshKeywordFrames"/>와 같은 CardVisualRules 호출 하나다 — 기준이 갈리면
     /// 연출이 새기는 문양과 실제로 켜지는 문양이 어긋난다. 일러스트만 보기 모드면 자연히 빈 목록이다.</summary>
-    public void CollectPendingKeywordFrames(CardData _card, bool _owned, List<Graphic> _into)
+    public void CollectPendingKeywordFrames(int _card, bool _owned, List<Graphic> _into)
     {
         if (_into == null) return;
         _into.Clear();
 
-        if (_card == null || this.keywordFrames == null) return;
+        if (_card <= 0 || this.keywordFrames == null) return;
 
         CardKeyword t_keywords = _owned && this.ShowKeywords ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
 
@@ -398,7 +398,7 @@ public class CardVisualView : MonoBehaviour
     // 반대로 상대 카드(_mine=false)는 내 진행도가 아니라 상대 레벨 기준이다.
     /// <summary>강화 레벨 표시. 상대 덱도 띄운다 — 상대가 몇 레벨 카드로 나오는지가 트레이드 판단의 핵심이다.
     /// 값의 기준만 갈린다(내 카드=내 진행도, 상대=랭크 티어 AI 레벨). 판정은 DeckPower가 소유.</summary>
-    void SetLevelDisplay(CardData _card, bool _show, bool _mine)
+    void SetLevelDisplay(int _card, bool _show, bool _mine)
     {
         int t_level = DeckPower.LevelOf(_card, _mine);
         if (this.levelText != null)
@@ -422,7 +422,7 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    void SetHpDisplay(CardData _card, bool _show, bool _mine)
+    void SetHpDisplay(int _card, bool _show, bool _mine)
     {
         if (this.hpPanel != null) this.hpPanel.SetActive(_show);
 
@@ -437,7 +437,7 @@ public class CardVisualView : MonoBehaviour
 
         if (this.bonusHpText != null)
         {
-            int t_bonus = this.m_instance != null ? this.m_instance.bonusHp : _card.bonusHp;
+            int t_bonus = this.m_instance != null ? this.m_instance.bonusHp : 0;
             bool t_hasBonus = _show && t_bonus > 0;
             this.bonusHpText.gameObject.SetActive(t_hasBonus);
             if (t_hasBonus) this.bonusHpText.text = $"+{t_bonus}";
@@ -446,7 +446,7 @@ public class CardVisualView : MonoBehaviour
 
     // 키워드 아이콘 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
     // 아웃게임엔 런타임 부여 키워드(CardInstance.runtimeKeywords)가 없으므로 마스터 데이터의 keywords만 넘긴다.
-    void RefreshKeywordIcons(CardData _card, bool _show)
+    void RefreshKeywordIcons(int _card, bool _show)
     {
         if (HasWiredSlot(this.keywordIconSlots))
         {
@@ -500,7 +500,7 @@ public class CardVisualView : MonoBehaviour
     /// 키워드 유무는 판을 바꾸지 않는다: 키워드 아이콘은 두 판 모두 같은 자리에 얹힌다.
     /// 판정은 배지를 그리는 <see cref="SynergyBadges"/>와 같은 호출이라 "배지는 없는데 자리만 넓은" 카드가 생기지 않는다.
     /// 배선이 없는 프리팹(고스트·작은 타일)은 조용히 건너뛴다.</summary>
-    void RefreshKeywordBg(CardData _card, bool _show, bool _mine)
+    void RefreshKeywordBg(int _card, bool _show, bool _mine)
     {
         bool t_synergy = _show && SynergyBadges(_card, _mine).Count > 0;
 
@@ -511,7 +511,7 @@ public class CardVisualView : MonoBehaviour
     /// <summary>아이콘 줄에 띄울 키워드 집합. 네 갈래가 여기 한 곳에서만 갈린다 —
     /// 인스턴스 유무(적 카드에 내 성장 금지) × 잠긴 키워드 표시 여부(정보창만).
     /// 인스턴스 경로에는 잠김 표시가 없다: 그 카드가 지금 실제로 가진 것이 곧 정답이다.</summary>
-    CardKeyword KeywordIconSet(CardData _card)
+    CardKeyword KeywordIconSet(int _card)
     {
         if (this.m_instance != null)
             return this.showLockedKeywords
@@ -569,7 +569,7 @@ public class CardVisualView : MonoBehaviour
 
     // 프레임 키워드 장식(처형·도발·힐러·원거리·교활·무쌍·표식). 인게임 CardView.RefreshKeywordFrames와 같은 규약:
     // 기준은 TraitKeywords(아이콘 줄만 IconKeywords로 표식을 더 뺀다), 미소유/빈 카드는 전부 끈다(정보 은닉).
-    void RefreshKeywordFrames(CardData _card, bool _show)
+    void RefreshKeywordFrames(int _card, bool _show)
     {
         if (this.keywordFrames == null) return;
 
@@ -593,9 +593,9 @@ public class CardVisualView : MonoBehaviour
     /// 튜토리얼 미도입 구간(<see cref="TutorialConfig.SynergyVisible"/>)과 시너지 해금 레벨.
     /// 해금 전 카드는 실제로 시너지에 참여하지 않으므로 띄우면 오정보다.
     /// 해금 판정의 출처는 전투 인스턴스면 그 인스턴스(적 카드에 내 진행도 금지), 아니면 표시 대상의 레벨이다.</summary>
-    List<SynergyData> SynergyBadges(CardData _card, bool _mine)
+    List<SynergyData> SynergyBadges(int _card, bool _mine)
     {
-        if (_card == null || !TutorialConfig.SynergyVisible) return EmptySynergies;
+        if (_card <= 0 || !TutorialConfig.SynergyVisible) return EmptySynergies;
 
         bool t_open = this.m_instance != null
             ? this.m_instance.synergyEnabled
@@ -605,13 +605,13 @@ public class CardVisualView : MonoBehaviour
         // 아웃게임엔 전투 스냅샷(SynergyState)이 없어 활성 판정의 진실원이 없다 → null을 넘긴다.
         // 활성 판정은 전부 false가 되지만 requiredCount 내림차순 정렬은 그대로 성립한다
         // (GetBadgeRequiredCount가 스냅샷이 없으면 tiers 최고값으로 폴백) → 배지 세로 순서가 전투와 일치한다.
-        return CardVisualRules.CollectSynergyBadges(_card.synergies, null, this.synergyMaxBadges);
+        return CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card), null, this.synergyMaxBadges);
     }
 
     static readonly List<SynergyData> EmptySynergies = new List<SynergyData>();
 
     // 시너지 배지 갱신. 표시 대상·순서는 인게임과 같은 CardVisualRules 호출로 얻는다.
-    void RefreshSynergyBadges(CardData _card, bool _show, bool _mine)
+    void RefreshSynergyBadges(int _card, bool _show, bool _mine)
     {
         if (HasWiredSlot(this.synergyBadgeSlots))
         {

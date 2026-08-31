@@ -20,8 +20,8 @@ public class VfxDebugWindow : MonoBehaviour
     [SerializeField] BattleFieldView enemyFieldView;
 
     [Header("라이브러리 (비우면 이미 주입된 것 사용)")]
-    // 테스트 씬은 GameInitializer/DataLibrary 부트스트랩이 없을 수 있다 → 그때 여기 값으로 직접 주입.
-    // 이미 주입돼 있으면 건드리지 않는다(BattleVfx.SetLibrary가 null 무시 + 먼저 주입한 쪽 유지).
+    // 테스트 씬은 GameInitializer/DataLibrary 초기화이 없을 수 있다 → 그때 여기 값으로 직접 주입.
+    // 이미 주입돼 있으면 건드리지 않는다.
     [SerializeField] BattleVfxLibrary library;
 
     [Header("Window")]
@@ -46,7 +46,7 @@ public class VfxDebugWindow : MonoBehaviour
         this.open = this.openOnStart;
 
         if (this.playerFieldView == null || this.enemyFieldView == null) AutoFindFields();
-        if (this.library != null) BattleVfx.SetLibrary(this.library);
+        if (!BattleVfx.HasLibrary && this.library != null) BattleVfx.SetLibrary(this.library);
     }
 
     /// <summary>필드 뷰 미배선 시 씬에서 찾는다. owner 0=플레이어 기준으로 갈라 담고,

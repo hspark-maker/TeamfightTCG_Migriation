@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 카드 앨범 탭 표면(Tab_Collection_New 루트 부착) — 전체 보상 요약 + 테마 갤러리
@@ -75,8 +76,6 @@ public class AlbumTabController : LobbyTabPanel
 
         Refresh();
 
-        ContextCurrencySlot.Request(this, ECurrencyType.Energy);
-
         // 유저가 직접 탭을 눌러 들어온 경우 — 획득 연출은 이미 큐만 채워두고 물러났다
         TryBeginInsert();
     }
@@ -86,8 +85,6 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
-
-        ContextCurrencySlot.Release(this);
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;
@@ -179,7 +176,7 @@ public class AlbumTabController : LobbyTabPanel
                 m_cells[t_i].transform.SetSiblingIndex(t_i);
                 m_cells[t_i].gameObject.SetActive(true);
 
-                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_i == t_anchorIndex);
+                m_cells[t_i].Bind(t_themes[t_i], t_i + 1, OpenTheme, t_i == t_anchorIndex);
             }
 
             for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)
@@ -191,6 +188,8 @@ public class AlbumTabController : LobbyTabPanel
         int t_total = 0;
         for (int t_i = 0; t_i < t_themes.Count; t_i++)
         {
+            if (t_themes[t_i].IsLocked) continue;
+
             t_owned += CardAlbum.OwnedCountOf(t_themes[t_i]);
             t_owned -= AlbumInsertMask.HiddenCountIn(t_themes[t_i]);   // 아직 안 꽂은 몫은 화면에서 뺀다
             t_total += CardAlbum.TotalCountOf(t_themes[t_i]);
@@ -206,28 +205,32 @@ public class AlbumTabController : LobbyTabPanel
     /// <summary>안내가 가리킬 테마 칸(빈 갤러리면 -1). 저작이 카드를 지목했으면 그 카드가 든 테마다.
     ///
     /// 폴백(저작이 비었거나 그 카드가 도감에 없을 때)은 종전 규칙 그대로 — 아직 안 꽂은 카드가 있는 첫 테마,
-    /// 꽂을 것이 하나도 없으면 첫 테마. 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
+    /// 꽂을 것이 하나도 없으면 첫 열린 테마다(준비 중 테마는 지목하지 않는다). 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
     static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
     {
-        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_card))
+        if (OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
         {
             for (int t_i = 0; t_i < _themes.Count; t_i++)
-                if (Contains(_themes[t_i], t_card)) return t_i;
+                if (!_themes[t_i].IsLocked && Contains(_themes[t_i], t_card)) return t_i;
         }
 
         for (int t_i = 0; t_i < _themes.Count; t_i++)
-            if (AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
+            if (!_themes[t_i].IsLocked && AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
 
-        return _themes.Count > 0 ? 0 : -1;
+        // 꽂을 것이 하나도 없으면 첫 '열린' 테마 — 준비 중 테마는 지목하지 않는다.
+        for (int t_i = 0; t_i < _themes.Count; t_i++)
+            if (!_themes[t_i].IsLocked) return t_i;
+
+        return -1;
     }
 
-    static bool Contains(AlbumTheme _theme, CardData _card)
+    static bool Contains(AlbumTheme _theme, int _cardId)
     {
-        var t_cards = _theme != null ? _theme.Cards : null;
+        var t_cards = _theme != null ? _theme.CardIds : null;
         if (t_cards == null) return false;
 
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
-            if (t_cards[t_i] == _card) return true;
+            if (t_cards[t_i] == _cardId) return true;
 
         return false;
     }
@@ -272,13 +275,16 @@ public class AlbumTabController : LobbyTabPanel
         }
     }
 
-    void ClaimAlbumReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimAlbumReward() => ClaimAlbumRewardAsync().Forget();
+
+    async UniTaskVoid ClaimAlbumRewardAsync()
     {
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
         if (!AlbumRewardManager.CanClaimAlbum()) return;
 
-        AlbumRewardClaimFlow.Open("앨범 완성!",
-                                  CardAlbum.AlbumRewards,
-                                  () => AlbumRewardManager.ClaimAlbum());
+        await AlbumRewardClaimFlow.Open("앨범 완성!",
+                                        CardAlbum.AlbumRewards,
+                                        () => AlbumRewardManager.ClaimAlbum());
     }
 }

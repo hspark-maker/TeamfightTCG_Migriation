@@ -49,25 +49,25 @@ public static class TutorialConfig
     public static bool ScriptDerailed { get; private set; }
 
     /// <summary>고정 플레이어 덱(순서 = 등장 순서). 셔플 없음.</summary>
-    public static List<CardData> PlayerDeck { get; private set; }
+    public static List<int> PlayerDeck { get; private set; }
     /// <summary>고정 적 덱(순서 = 등장 순서). 셔플 없음.</summary>
-    public static List<CardData> EnemyDeck { get; private set; }
+    public static List<int> EnemyDeck { get; private set; }
 
     static Queue<ScriptedAttack> playerScript;
     static Queue<ScriptedAttack> enemyScript;
 
-    // 스크립트 기준선 = "이 슬롯엔 이 카드가 있을 것"이라는 스크립트의 기대(진영별 슬롯 점유 CardData).
+    // 스크립트 기준선 = "이 슬롯엔 이 카드가 있을 것"이라는 스크립트의 기대(진영별 슬롯 카드 ID).
     // 스텝이 슬롯 인덱스로만 저작되므로, 카드가 죽고 그 자리를 대기 카드가 채우면 슬롯 지정이 엉뚱한
     // 카드에 붙는다. 이를 막는 유일한 식별 수단. 재동기 지점은 SyncBoardBaseline 주석 참조.
-    static CardData[] playerBaseline;
-    static CardData[] enemyBaseline;
+    static int[] playerBaseline;
+    static int[] enemyBaseline;
 
     /// <summary>시나리오로 시작. <paramref name="_showDeckGate"/>는 시나리오가 아니라 <b>스텝</b>의 저작값이다 —
     /// 같은 시나리오를 게이트 있는 자리와 없는 자리에 다시 쓸 수 있어야 하므로 SO에 두지 않는다.</summary>
     public static void Begin(TutorialScenarioData _scenario, bool _showDeckGate = false)
     {
         if (_scenario == null) { End(); return; }
-        Begin(_scenario.playerDeck, _scenario.enemyDeck, _scenario.playerScript, _scenario.enemyScript,
+        Begin(_scenario.playerDeckIds, _scenario.enemyDeckIds, _scenario.playerScript, _scenario.enemyScript,
               _scenario.enableSynergy, _scenario.freePlayAfterScript,
               _scenario.PlayerCardLevel, _scenario.EnemyCardLevel);
         EnemyMaxHpOverride = _scenario.enemyMaxHpOverride;   // 리스트 Begin이 0으로 리셋한 뒤 시나리오 값 반영.
@@ -75,7 +75,7 @@ public static class TutorialConfig
     }
 
     /// <summary>SO 없이 리스트로 직접 시작(셋업 씬 인스펙터 저작용).</summary>
-    public static void Begin(List<CardData> _playerDeck, List<CardData> _enemyDeck,
+    public static void Begin(List<int> _playerDeck, List<int> _enemyDeck,
                              List<ScriptedAttack> _playerScript, List<ScriptedAttack> _enemyScript,
                              bool _enableSynergy = false, bool _freePlayAfterScript = false,
                              int _playerCardLevel = CardGrowth.BaseLevel, int _enemyCardLevel = CardGrowth.BaseLevel)
@@ -91,8 +91,8 @@ public static class TutorialConfig
         playerBaseline = null;
         enemyBaseline  = null;
         DeckConfig.SetMultiplayer(false);   // 튜토리얼은 항상 싱글 경로
-        PlayerDeck   = new List<CardData>(_playerDeck ?? new List<CardData>());
-        EnemyDeck    = new List<CardData>(_enemyDeck  ?? new List<CardData>());
+        PlayerDeck   = new List<int>(_playerDeck ?? new List<int>());
+        EnemyDeck    = new List<int>(_enemyDeck  ?? new List<int>());
         playerScript = new Queue<ScriptedAttack>(_playerScript ?? new List<ScriptedAttack>());
         enemyScript  = new Queue<ScriptedAttack>(_enemyScript  ?? new List<ScriptedAttack>());
     }
@@ -211,25 +211,25 @@ public static class TutorialConfig
         return false;
     }
 
-    static CardData[] CaptureBaseline(BattleField _field)
+    static int[] CaptureBaseline(BattleField _field)
     {
-        var t_slots = new CardData[BattleField.SLOT_COUNT];
+        var t_slots = new int[BattleField.SLOT_COUNT];
         if (_field == null) return t_slots;
 
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardInstance t_card = _field.GetSlot(i);
-            t_slots[i] = t_card != null && t_card.IsAlive ? t_card.data : null;
+            t_slots[i] = t_card != null && t_card.IsAlive ? t_card.cardId : 0;
         }
         return t_slots;
     }
 
-    // 인스턴스가 아닌 CardData로 대조한다 — 같은 카드가 다시 등장한 경우(덱 중복)는 안내 문구가
+    // 인스턴스가 아닌 카드 ID로 대조한다 — 같은 카드가 다시 등장한 경우(덱 중복)는 안내 문구가
     // 여전히 맞으므로 통과시키고, 다른 카드가 자리를 채운 경우만 걸러낸다.
-    static bool MatchesBaseline(CardData[] _baseline, int _slot, CardInstance _card)
+    static bool MatchesBaseline(int[] _baseline, int _slot, CardInstance _card)
     {
         if (_baseline == null || _slot < 0 || _slot >= _baseline.Length) return true;
-        if (_baseline[_slot] == null) return true;   // 기대 카드 미상 = 판정 보류
-        return _card != null && _card.data == _baseline[_slot];
+        if (_baseline[_slot] <= 0) return true;   // 기대 카드 미상 = 판정 보류
+        return _card != null && _card.cardId == _baseline[_slot];
     }
 }

@@ -23,7 +23,9 @@ public struct TournamentNodeDef
     public ETournamentNodeKind kind;
 
     [Tooltip("이 정점의 고정 상대 덱. 비면 전투를 열 수 없다(검증기가 보고한다).")]
-    public List<CardData> enemyDeck;
+    [CardId] public List<int> enemyDeckIds;
+
+    public IReadOnlyList<int> EnemyDeckIds => enemyDeckIds;
 
     [Tooltip("상대 카드 레벨. 0 이하면 미강화(1)로 떨어진다.")]
     public int aiCardLevel;

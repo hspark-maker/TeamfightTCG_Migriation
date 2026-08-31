@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: KeywordDeck
   displayName: "\uD0A4\uC6CC\uB4DC\uB371"
+  rankLocked: 0
+  minRankGrade: 0
   packArt: {fileID: 21300000, guid: 68419dc4956c8c64d9a94cd15bf69507, type: 3}
   priceType: 0
   price: 0
@@ -21,11 +23,5 @@ MonoBehaviour:
   uniqueDraw: 1
   refundType: 3
   refundAmount: 3
-  pool:
-  - {fileID: 11400000, guid: 0872d44c4ea2ab5816259fa1f61765fe, type: 2}
-  - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-  - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-  - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
+  poolIds: 250000000200000003000000140000000b00000004000000
   rankPools: []

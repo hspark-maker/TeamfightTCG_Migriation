@@ -29,6 +29,27 @@ public static class SynergyTriggers
     public static bool Fire(CardInstance self, SynergyData synergy, BattleField field = null)
     {
         if (self == null || synergy == null) return false;
+
+        // resolve/present 뒤집기 이후 이 메서드는 Execute 안(= 공격 모션 시작 전)에서 불릴 수 있다.
+        // 그대로 재생하면 소리·배너·배지·엠블럼이 부딪히기도 전에 터진다. 캡처 중이면 접촉 프레임까지 미룬다.
+        // 엠블럼 반환값은 이때 false로 떨어지는데, 반환을 보는 유일한 호출부(낙인 선피해)는
+        // [BeforeAttack] = 캡처 밖이라 영향이 없다.
+        if (BattlePresentationQueue.IsDeferring)
+        {
+            CardInstance t_self = self;
+            SynergyData t_synergy = synergy;
+            BattleField t_field = field;
+            BattlePresentationQueue.Run(() => Present(t_self, t_synergy, t_field));
+            return false;
+        }
+
+        return Present(self, synergy, field);
+    }
+
+    // 순수 표시. 캡처 중이면 지연 재생되고, 아니면 즉시 재생된다.
+    static bool Present(CardInstance self, SynergyData synergy, BattleField field)
+    {
+        if (self == null || synergy == null) return false;
         // 배너 그림은 카드 초상화가 아니라 시너지 아이콘 — 어느 시너지가 터졌는지가 핵심 정보다.
         // (icon 미배정이면 null 전달 = 기존대로 카드 초상화 폴백)
         CardPassive.Notify(self, synergy.effectDescription, synergy.activeIcon);

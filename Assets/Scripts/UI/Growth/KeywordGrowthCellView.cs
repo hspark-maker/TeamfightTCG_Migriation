@@ -47,7 +47,7 @@ public class KeywordGrowthCellView : MonoBehaviour
         if (this.m_keyword == CardKeyword.None) return;
 
         int t_level = KeywordGrowthManager.LevelOf(this.m_keyword);
-        int t_bonus = t_level * KeywordGrowthManager.Config.HpPerLevel;
+        int t_bonus = t_level * KeywordGrowthRules.HpPerLevel;
 
         if (this.levelText != null) this.levelText.text = $"Lv {t_level}";
         if (this.bonusText != null)

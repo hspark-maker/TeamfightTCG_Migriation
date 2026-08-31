@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using TeamfightTCG.BattleCore;
 
 /// <summary>
 /// 공격 해결의 유일한 시퀀스 소유자. 순서는 데이터가 아니라 코드로 고정한다(결정론).
@@ -26,9 +27,12 @@ public static class AttackProcessor
     public static AttackResult Execute(CardInstance _attacker, CardInstance _defender,
         BattleField _attackerField, BattleField _defenderField,
         CardInstance _preSelectedSplash = null,
-        bool? _forceCunningSwap = null)
+        bool? _forceCunningSwap = null,
+        bool _derivedCommand = false)
     {
         // ---- Snapshot: 전부 피해 적용 '전' 값. 이후 단계는 읽기만 한다(반격 동시해결 규칙). ----
+        int t_commandAttackerSlot = _attacker.slotIndex;
+        int t_commandDefenderSlot = _defender.slotIndex;
         int t_atkDmg = _attacker.AttackDamage();
         int t_ctrDmg = _defender.AttackDamage(); // 동시 해결: 공격 전 수치로 반격 (도발 시 50%)
         bool t_takesCounter = _attacker.TakesCounterFrom(_defender); // 반격 자격(단일 진실원): 원거리/표식 무반격
@@ -46,6 +50,10 @@ public static class AttackProcessor
         int t_defenderHpBefore = _defender.hp + _defender.bonusHp;
         _defender.TakeDamage(t_atkDmg);
         int t_actualAtkDmg = t_defenderHpBefore - (_defender.hp + _defender.bonusHp);
+        if (t_actualAtkDmg > 0)
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
+                _defender.ownerIndex, t_commandDefenderSlot, t_actualAtkDmg,
+                _attacker.ownerIndex, t_commandAttackerSlot));
 
         int t_attackerHpBefore = _attacker.hp + _attacker.bonusHp;
         if (t_takesCounter)
@@ -53,6 +61,10 @@ public static class AttackProcessor
         int t_actualCtrDmg = t_takesCounter
             ? t_attackerHpBefore - (_attacker.hp + _attacker.bonusHp)
             : 0;
+        if (t_actualCtrDmg > 0)
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
+                _attacker.ownerIndex, t_commandAttackerSlot, t_actualCtrDmg,
+                _defender.ownerIndex, t_commandDefenderSlot, BattleEventFlags.Counter));
 
         // ---- seam 2: ExtraTargets — 추가 대상 피해 ----
         CardInstance t_splash = null;
@@ -62,7 +74,16 @@ public static class AttackProcessor
             t_splash = _preSelectedSplash ?? PickSplash(_defender.slotIndex, _defenderField);
             t_splashHit = t_splash != null && t_splashDmg > 0; // 0 데미지로 무적 태우지 않기
             if (t_splashHit)
+            {
+                int t_splashSlot = t_splash.slotIndex;
+                int t_splashBefore = t_splash.hp + t_splash.bonusHp;
                 t_splash.TakeDamage(t_splashDmg);
+                int t_actualSplashDmg = t_splashBefore - (t_splash.hp + t_splash.bonusHp);
+                if (t_actualSplashDmg > 0)
+                    BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
+                        t_splash.ownerIndex, t_splashSlot, t_actualSplashDmg,
+                        _attacker.ownerIndex, t_commandAttackerSlot, BattleEventFlags.Splash));
+            }
         }
 
         AttackFlow.RunAttacked(_defender, _attacker, _defenderField, _attackerField); // 패시브/시너지 Attacked(동기)
@@ -73,14 +94,16 @@ public static class AttackProcessor
         if (t_takesCounter)
         {
             var t_ctrCtx = new DamageDealtCtx(_defender, _defenderField, t_actualCtrDmg, true);
-            _defender.data.passive?.OnDamageDealt(t_ctrCtx).Forget();
             SynergyTriggers.DamageDealt(t_ctrCtx);
         }
         var t_atkCtx = new DamageDealtCtx(_attacker, _attackerField, t_actualAtkDmg, false);
-        _attacker.data.passive?.OnDamageDealt(t_atkCtx).Forget();
         SynergyTriggers.DamageDealt(t_atkCtx);
+        // 배너·사운드는 표시라 접촉 프레임으로 미룬다(Execute는 공격 모션보다 앞이다).
         if (t_ranged)
-            CardPassive.Notify(_attacker, CardKeyword.Ranged);
+        {
+            CardInstance t_ranger = _attacker;
+            BattlePresentationQueue.Run(() => CardPassive.Notify(t_ranger, CardKeyword.Ranged));
+        }
 
         // ---- 강화(일반): "공격한 후, 원래 체력의 50%만큼 추가 피해" ----
         // 자리가 여기인 이유:
@@ -98,6 +121,10 @@ public static class AttackProcessor
             int t_before = _defender.hp + _defender.bonusHp;
             _defender.TakeDamage(t_enhanceRaw);
             t_enhanceDmg = t_before - (_defender.hp + _defender.bonusHp);
+            if (t_enhanceDmg > 0)
+                BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
+                    _defender.ownerIndex, t_commandDefenderSlot, t_enhanceDmg,
+                    _attacker.ownerIndex, t_commandAttackerSlot, BattleEventFlags.Enhanced));
         }
 
         // ★ 치사 래치는 반드시 RemoveDead 전. 언데드 부활이 RemoveDead 안에서 일어나므로
@@ -111,9 +138,11 @@ public static class AttackProcessor
         bool t_swapped = t_incoming != null;
         if (t_swapped)
         {
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.Swap,
+                _attacker.ownerIndex, t_commandAttackerSlot, _sourceOwnerIndex: t_incoming.ownerIndex,
+                _sourceSlotIndex: t_incoming.slotIndex));
             // [SwappedOut] 패시브 → 시너지 순.
             var t_swapCtx = new SwapOutCtx(_attacker, t_incoming, _attackerField);
-            _attacker.data.passive?.OnSwappedOut(t_swapCtx).Forget();
             SynergyTriggers.SwappedOut(t_swapCtx);
         }
 
@@ -136,6 +165,8 @@ public static class AttackProcessor
         // 표식은 '표식 덕에 반격이 면제됐을 때'만 발동 표시. 원거리는 표식과 무관하게 이미 무반격이므로 제외
         // (TakesCounterFrom = !Ranged && !Mark — 원거리면 Mark가 아무 일도 안 한 것).
         if (t_markedCounter && !t_ranged) t_result.defenderKeywords |= CardKeyword.Mark;
+        BattleCommandLog.RecordAttack(_attackerField.OwnerIndex, t_commandAttackerSlot,
+            t_commandDefenderSlot, t_result.attackerSwapped, _derivedCommand);
         return t_result;
     }
 
@@ -181,12 +212,12 @@ public static class AttackProcessor
                 // [Lethal] 치사 트리거 먼저(언데드 부활 / 유산 아군 회복). 패시브 → 시너지 순.
                 // 둘 다 동기 완결 — 부활은 제자리 hp 복구이므로 아래 IsAlive 게이트가 양쪽 결과를 함께 본다.
                 var t_deathCtx = new DeathCtx(t_c, _field);
-                t_c.data.passive?.OnLethal(t_deathCtx);
                 SynergyTriggers.Lethal(t_deathCtx);
                 // 부활(언데드)했으면 슬롯 유지 → Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
                 if (t_c.IsAlive) continue;
+                BattleEventStream.Emit(new BattleEvent(BattleEventKind.Death,
+                    t_c.ownerIndex, t_c.slotIndex));
                 // [Removed] 제거 직전. 취소 불가. 패시브 → 시너지 순.
-                t_c.data.passive?.OnRemoved(t_deathCtx).Forget();
                 SynergyTriggers.Removed(t_deathCtx);
                 _field.RemoveCard(i);
             }

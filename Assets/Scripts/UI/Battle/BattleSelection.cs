@@ -67,7 +67,6 @@ public static class BattleSelection
         t_prev.SetHighlight(false);
         t_prev.SetTargetFocus(false, _instant);
         t_prev.FocusWeapon(false);
-        t_prev.SetArmedVfx(false);   // 무장 해제 = 이펙트도 끝(공격으로 이어지는 경우는 HandleEnemyTap이 다시 켠다)
         BattleBoardView.RestoreAllFades();
 
         if (_notify) NotifyArmed(null);

@@ -15,3 +15,7 @@ MonoBehaviour:
   runMode: 0
   includeTestCards: 0
   saveFolder: Save
+  useLocalEmulators: 0
+  functionsEmulatorOrigin: http://127.0.0.1:5001
+  firestoreEmulatorHost: 127.0.0.1:8080
+  authEmulatorHost: 127.0.0.1:9099

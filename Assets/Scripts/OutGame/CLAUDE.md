@@ -14,7 +14,7 @@
 
 - 클래스/메서드는 **게임 도메인 동사·명사**로. 기술 용어는 인프라 레이어에만.
   - 예: `CardPackOpener.TryPurchase`, `OwnershipManager.Grant`/`Revoke`, `AlbumRewardManager.ClaimPage`
-  - 인프라 예외: `JsonFileRepository`, `IRepository`
+  - 인프라 예외: `PlayerSaveDocument`, `PlayerSaveFirestorePaths`
 - enum 접두사 `E` (`ECurrencyType`). 실패 가능 조회는 `Try*` + `out`.
 - 필드 접두사: `s_`(static) · `m_`(인스턴스) · `t_`(지역) · `_`(파라미터).
   get-only 프로퍼티는 PascalCase, `[SerializeField]`는 camelCase.

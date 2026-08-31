@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>전역(규칙 기반) 연출 식별자. **카드 고유 연출은 여기 넣지 않는다** — 그쪽 축은 CardData.attackEffect.
+/// <summary>전역(규칙 기반) 연출 식별자. **카드 고유 연출은 여기 넣지 않는다** — 그쪽 축은 Addressables의 AttackEffect다.
 /// 값은 직렬화되므로 재사용/재정렬 금지(추가만).</summary>
 public enum BattleVfxId
 {
@@ -29,7 +29,7 @@ public enum BattleVfxId
     DeathStardust    = 15,  // (사용 안 함) 사망 별가루 — 바닥 파동(DeathNova)만 남겼다. 값은 재사용 금지.
     DeathNova        = 16,  // 사망: 카드가 사라진 자리에 남는 바닥 빛 파동. 별가루보다 늦게 1회
     RangedProjectile = 17,  // 원거리 기본 투사체. **카드가 자기 투사체를 안 가졌을 때만** 쓰인다
-                            // (CardData.attackEffect.projectile이 우선). 원거리는 카드가 아니라 키워드가
+                            // (카드 고유 AttackEffect.projectile이 우선). 원거리는 카드가 아니라 키워드가
                             // 만드는 연출이라, 카드마다 배선을 빠뜨리면 "발사체가 아예 안 나온다"가 된다
     TauntBlocked     = 18,  // 도발에 막힌 **공격자** 카드 위에 서는 표식
     TauntGuard       = 21,  // 도발 보유자 **본인**에게 나는 연출. 18과 짝이다 —
@@ -83,7 +83,7 @@ public struct VfxEntry
 /// 키워드·시너지·전투 이벤트처럼 **규칙이 발동시키는** 연출의 프리팹 배선 단일 지점.
 /// 연출이 하나 늘어도 씬/프리팹 수정 없이 이 에셋의 목록만 늘어난다(씬 배선 증식 차단).
 ///
-/// 축 구분: 카드 고유 연출 = CardData.attackEffect / 규칙 기반 연출 = 이 라이브러리 /
+/// 축 구분: 카드 고유 연출 = AttackEffect(Addressables) / 규칙 기반 연출 = 이 라이브러리 /
 /// **시간 값 = BattleTimingConfig**(여기엔 시간을 두지 않는다 — 배속 배율 우회 방지).
 /// </summary>
 [CreateAssetMenu(fileName = "BattleVfxLibrary", menuName = "Card Battle/Battle Vfx Library")]

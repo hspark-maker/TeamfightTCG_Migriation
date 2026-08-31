@@ -19,6 +19,7 @@ MonoBehaviour:
     - stepId: 0
       action: 1
       anchor: 0
+      spotlight: 0
       guideMessage: "\uC774\uACF3\uC5D0\uC11C \uD0A4\uC6CC\uB4DC\uB97C \uC601\uAD6C\uC801\uC73C\uB85C
         \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
       messageAtBottom: 1
@@ -42,6 +43,7 @@ MonoBehaviour:
     - stepId: 0
       action: 0
       anchor: 22
+      spotlight: 0
       guideMessage: "'\uC6D0\uAC70\uB9AC' \uD0A4\uC6CC\uB4DC\uB97C \uAC15\uD654\uD558\uC138\uC694"
       messageAtBottom: 0
       unlocks: 
@@ -64,6 +66,7 @@ MonoBehaviour:
     - stepId: 0
       action: 18
       anchor: 23
+      spotlight: 0
       guideMessage: 
       messageAtBottom: 0
       unlocks: 
@@ -86,6 +89,7 @@ MonoBehaviour:
     - stepId: 0
       action: 1
       anchor: 0
+      spotlight: 0
       guideMessage: "\uD574\uB2F9 \uD0A4\uC6CC\uB4DC\uB97C \uAC00\uC9C4 \uCE74\uB4DC\uAC00
         \uAC15\uB825\uD574\uC84C\uC2B5\uB2C8\uB2E4!.\n\uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
       messageAtBottom: 1
@@ -112,6 +116,7 @@ MonoBehaviour:
     - stepId: 0
       action: 1
       anchor: 0
+      spotlight: 0
       guideMessage: "\uB7AD\uD06C \uB2E8\uACC4\uAC00 \uC62C\uB790\uC2B5\uB2C8\uB2E4!"
       messageAtBottom: 0
       unlocks: 
@@ -137,6 +142,7 @@ MonoBehaviour:
     - stepId: 0
       action: 1
       anchor: 0
+      spotlight: 0
       guideMessage: "\uC0C8\uB85C\uC6B4 \uB4F1\uAE09\uC5D0 \uC62C\uB790\uC2B5\uB2C8\uB2E4!"
       messageAtBottom: 0
       unlocks: 

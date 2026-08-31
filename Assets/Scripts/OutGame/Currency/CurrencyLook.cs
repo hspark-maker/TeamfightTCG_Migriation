@@ -16,6 +16,12 @@ public class CurrencyLook : ScriptableObject
         [Tooltip("비워두면(None) 아이콘을 바꾸지 않는다 — 프리팹에 저작된 그림이 그대로 남는다.")]
         public Sprite icon;
 
+        [Tooltip("상단바 재화 칸에 들어갈 그림. 상단바 아트는 보상 슬롯과 결이 달라 위 icon과 다른 파일을 쓴다 — " +
+                 "그래서 폴백 없이 이 칸만 본다.\n\n" +
+                 "비워두면(None) 그 재화는 상단바에 뜰 수 없다. 칸을 빌리지도, 빌려주지도 않는다 " +
+                 "— 그림과 숫자가 어긋나느니 그 재화의 획득 연출을 건너뛴다.")]
+        public Sprite barIcon;
+
         [Tooltip("비워두면 코드 기본 이름(골드/다이아/에너지/강화 조각)으로 떨어진다.")]
         public string displayName;
     }
@@ -25,7 +31,7 @@ public class CurrencyLook : ScriptableObject
 
     [SerializeField] List<Entry> entries = new List<Entry>();
 
-    // 부트에서 1회 주입. 미배선(null)이면 전부 폴백으로 동작한다
+    // 초기화에서 1회 주입. 미배선(null)이면 전부 폴백으로 동작한다
     public static void SetActive(CurrencyLook _look)
     {
         s_active = _look;
@@ -37,6 +43,14 @@ public class CurrencyLook : ScriptableObject
     {
         Entry t_entry = EntryOf(_type);
         return t_entry != null ? t_entry.icon : null;
+    }
+
+    /// <summary>상단바 재화 칸에 쓸 그림. 미저작이면 null — 그 재화는 상단바 칸을 받지 못한다.
+    /// icon으로 폴백하지 않는다(보상 슬롯 그림이 상단바에 섞이는 것이 정확히 막으려는 것이다).</summary>
+    public static Sprite BarIconOf(ECurrencyType _type)
+    {
+        Entry t_entry = EntryOf(_type);
+        return t_entry != null ? t_entry.barIcon : null;
     }
 
     // 문장이 깨지지 않게 null 폴백을 쓰지 않는다 — 미배선이면 코드 기본 이름

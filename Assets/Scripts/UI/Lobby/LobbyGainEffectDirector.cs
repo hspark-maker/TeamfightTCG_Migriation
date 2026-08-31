@@ -5,8 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 로비에서 "방금 무엇을 얻었는지"를 한 번 보여주는 연출 브레인.
-// 진입점은 셋이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed,
-//   로비에 머문 채 지급하는 쪽(튜토리얼 보상)은 PlayNow.
+// 진입점은 넷이다 — 씬 로드(전투 복귀)는 Start, 씬이 유지되는 카드팩 오버레이는 PackOpenOverlay.OnClosed,
+//   로비에 머문 채 지급하는 쪽(튜토리얼 보상)은 PlayNow,
+//   로비 진입 뒤에 늦게 도착하는 전투 보상 응답은 BattleRewardHandoff.OnGainAdded(이 경로만 종료 통지를 삼킨다).
 // 전투(BattleRewardHandoff)와 카드팩(CardPackRewardHandoff) 캐리어를 소비해
 //   재화 → 각 재화 텍스트로 코인이 빨려들며 숫자가 오르고 튄다(CurrencyGainEffectPlayer에 위임)
 //   카드 → 도감 탭으로 카드가 빨려들며 탭이 튄다
@@ -58,6 +59,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
     // 이번 재생분 식별자. 앞 연출을 강제 마무리(Complete)하면 그 시퀀스의 완료 콜백도 함께 터지는데,
     // 그것을 이번 재생의 종료로 오인하면 기다리던 안내가 카드가 날기도 전에 다음으로 넘어간다.
     int m_runId;
+
+    // 마지막으로 종료를 알린 재생분. m_runId와 다르면 아직 끝나지 않은 재생이 있다.
+    // m_master는 코루틴이 한 프레임 양보한 뒤에야 생겨서 "재생 중인가"의 기준이 못 된다.
+    int m_finishedRunId;
 
     static LobbyGainEffectDirector s_instance;
 
@@ -122,12 +127,14 @@ public class LobbyGainEffectDirector : MonoBehaviour
     void OnEnable()
     {
         PackOpenOverlay.OnClosed += OnPackOpenClosed;
+        BattleRewardHandoff.OnGainAdded += OnBattleRewardArrived;
     }
 
     void OnDisable()
     {
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         PackOpenOverlay.OnClosed -= OnPackOpenClosed;
+        BattleRewardHandoff.OnGainAdded -= OnBattleRewardArrived;
 
         // 카드 비행 도중 씬이 바뀌면 m_master가 Kill되고 OnComplete는 영영 안 온다 —
         // 세션에 아직 인계 못 한 위장은 여기서 되돌린다(안 그러면 그 카드가 도감에서 영영 빈 칸이다).
@@ -145,16 +152,41 @@ public class LobbyGainEffectDirector : MonoBehaviour
         Play();
     }
 
+    // 전투 보상 응답은 로비 Start 뒤에 도착할 수 있다 — 그때는 캐리어만 실리고 아무도 재생하지 않아 이 자리가 필요하다.
+    void OnBattleRewardArrived()
+    {
+        // 돌고 있는 재생이 있으면 비켜선다 — 재생에 들어가면 PlayWhenReady가 m_master를 Complete해
+        // 진행 중인 카드 비행·삽입을 중간에 잘라 버린다. 캐리어는 그대로 남아 다음 진입점(Start)이 집는다.
+        //
+        // 기준이 m_master가 아니라 run 식별자인 이유: 코루틴은 yield return null로 시작해 m_master가
+        // 그 다음 프레임에야 생긴다. m_master로 재면 로비 Start와 같은 프레임에 도착한 응답이 가드를 뚫고
+        // 두 번째 재생을 띄우는데, 그러면 앞 재생은 m_runId가 밀려 삼켜지고 이번 재생은 _silent라 삼켜져
+        // OnAnyFinished가 한 번도 안 나간다 — 그 신호를 기다리던 튜토리얼 CardGain 스텝이 그 자리에 선다.
+        if (m_runId != m_finishedRunId) return;
+        if (AlbumInsertSession.IsRunning || AlbumInsertQueue.HasPending) return;
+
+        // 팩 캐리어가 차 있으면 비켜선다 — 재생은 두 캐리어를 한꺼번에 소비하므로, 무음 재생이 그 카드까지
+        // 날려 버리고 종료 통지를 삼킨다. 카드 획득 통지를 기다리는 쪽이 그 자리에 선다.
+        if (CardPackRewardHandoff.HasPending) return;
+
+        // 안내 중에도 비켜선다 — 늦게 오는 보상이 안내가 짠 순서에 끼어든다.
+        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
+
+        // 이 경로의 종료는 아무도 기다리지 않는다 — OnAnyFinished를 내면 그 신호를 기다리던 다른 스텝
+        // (튜토리얼 CardGain · 토너먼트 선물 등장)이 자기 차례로 오인해 조기 통과한다.
+        Play(true);
+    }
+
     // 식별자는 코루틴 안이 아니라 여기서 발급한다 — 재개까지 한 프레임이 비어,
     // 그 사이에 앞 재생분이 자연 종료하면 그 통지가 이번 재생의 종료로 오인된다.
-    void Play()
+    void Play(bool _silent = false)
     {
-        StartCoroutine(PlayWhenReady(++m_runId));
+        StartCoroutine(PlayWhenReady(++m_runId, _silent));
     }
 
     // 레이아웃 그룹이 x좌표를 정하고 LobbyTabController.Start가 탭을 고르기 전에는 목적지 좌표가 확정되지 않는다.
     // 한 프레임 양보 + 캔버스 강제 갱신 후에 위치를 읽는다(RankRewardPanel과 같은 이유).
-    IEnumerator PlayWhenReady(int _run)
+    IEnumerator PlayWhenReady(int _run, bool _silent)
     {
         yield return null;
         Canvas.ForceUpdateCanvases();
@@ -170,13 +202,13 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_gains = new CurrencyGainBucket();
         BattleRewardHandoff.TryConsume(t_gains);
 
-        IReadOnlyList<CardData> t_cards = null;
+        IReadOnlyList<int> t_cards = null;
         if (CardPackRewardHandoff.TryConsume(t_gains, out var t_packCards)) t_cards = t_packCards;
 
         int t_cardCount = t_cards != null ? t_cards.Count : 0;
         if (t_gains.IsEmpty && t_cardCount <= 0)
         {
-            NotifyFinished(_run);
+            NotifyFinished(_run, _silent);
             yield break;
         }
 
@@ -196,7 +228,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         {
             Debug.LogWarning("[LobbyGainEffectDirector] RectTransform이 아닌 오브젝트에 붙어 있어 연출을 건너뛴다.");
             if (t_cardCount > 0) CancelInsertSession();
-            NotifyFinished(_run);
+            NotifyFinished(_run, _silent);
             yield break;
         }
 
@@ -211,7 +243,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 카드 연출이 안 붙었으면 착지 콜백도 없다 — 위장을 여기서 되돌리지 않으면 카드가 영영 빈 칸이다.
         // 재화만 온 경우까지 Clear하면 돌고 있는 세션의 위장을 벗긴다 — 이번에 건 위장이 있을 때만 되돌린다.
         // OnComplete는 하나뿐이라 삽입 세션 시작과 완료 통지를 한 콜백에 담는다.
-        if (t_cardStaged) m_master.OnComplete(() => { StartInsertSession(); NotifyFinished(_run); });
+        if (t_cardStaged) m_master.OnComplete(() => { StartInsertSession(); NotifyFinished(_run, _silent); });
         else if (t_cardCount > 0) CancelInsertSession();
 
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
@@ -219,18 +251,25 @@ public class LobbyGainEffectDirector : MonoBehaviour
         {
             m_master.Kill();
             m_master = null;
-            NotifyFinished(_run);
+            NotifyFinished(_run, _silent);
             yield break;
         }
 
         // 재화만 붙은 경우도 알려야 한다 — 카드 콜백이 없으니 여기서 시퀀스 끝에 매단다.
-        if (!t_cardStaged) m_master.OnComplete(() => NotifyFinished(_run));
+        if (!t_cardStaged) m_master.OnComplete(() => NotifyFinished(_run, _silent));
     }
 
     // 최신 재생분만 알린다 — 뒤늦게 터지는 옛 시퀀스의 콜백은 삼킨다.
-    void NotifyFinished(int _run)
+    // _silent인 재생은 아무도 기다리지 않는 경로다(늦게 도착한 전투 보상) — 그 종료를 남의 차례로 오인시키지 않는다.
+    void NotifyFinished(int _run, bool _silent)
     {
         if (_run != m_runId) return;
+
+        // 삼키는 것은 통지뿐이다 — 재생이 끝났다는 사실 자체는 _silent와 무관하게 기록해야
+        // 네 번째 진입점이 "아직 도는 재생이 있다"로 영영 막히지 않는다.
+        m_finishedRunId = _run;
+
+        if (_silent) return;
 
         OnAnyFinished?.Invoke();
     }
@@ -302,7 +341,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         return true;
     }
 
-    bool TryStageCards(Sequence _master, IReadOnlyList<CardData> _cards, RectTransform _origin)
+    bool TryStageCards(Sequence _master, IReadOnlyList<int> _cards, RectTransform _origin)
     {
         m_collectionTarget = tabBar != null ? tabBar.GetVisualAnchor(collectionTabIndex) : null;
         if (m_collectionTarget == null)
@@ -366,7 +405,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         t_seq.OnComplete(() =>
         {
             if (t_flyer != null) Destroy(t_flyer);
-            NotifyFinished(t_run);
+            NotifyFinished(t_run, false);
         });
         t_seq.Play();
 

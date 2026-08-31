@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardPackData
   packId: SynergyPack
   displayName: "\uC2DC\uB108\uC9C0\uD329"
+  rankLocked: 0
+  minRankGrade: 0
   packArt: {fileID: 21300000, guid: 3056f3fc00667944ba8bb3a369d731b1, type: 3}
   priceType: 0
   price: 0
@@ -21,11 +23,5 @@ MonoBehaviour:
   uniqueDraw: 1
   refundType: 3
   refundAmount: 0
-  pool:
-  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-  - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-  - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-  - {fileID: 11400000, guid: 294b7250ef57dfa94e13fc54ac0fc763, type: 2}
-  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  poolIds: 14000000120000001100000013000000230000001e000000
   rankPools: []

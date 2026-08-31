@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using UnityEngine;
@@ -11,7 +12,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
 {
     public static MultiplayerTurnRunner Instance { get; private set; }
 
-    [SerializeField] CardRegistry    cardRegistry;
     [SerializeField] BattleField     playerField;
     [SerializeField] BattleField     enemyField;
     [SerializeField] BattleFieldView playerFieldView;
@@ -23,30 +23,44 @@ public class MultiplayerTurnRunner : MonoBehaviour
     UniTaskCompletionSource<(int attackerSlot, int defenderSlot, bool cunningSwap)> attackTcs;
     UniTaskCompletionSource initSyncTcs;
     bool enemyDeckReceived;
+    bool enemyDeckProcessing;
+    bool attackWaitForced;
     bool waitingForAttackRpc;
+    CancellationToken destroyCt;
 
-    // 시드 commit-reveal 상태
-    UniTaskCompletionSource seedCommitTcs;
-    UniTaskCompletionSource seedRevealTcs;
-    bool   seedCommitReceived;
-    bool   seedRevealReceived;
-    byte[] opponentCommit;
-    byte[] opponentNonce;
+    // 시드 확정 상태. 시드의 진실원은 서버 하나다 — 로컬 합의 경로는 없다.
+    UniTaskCompletionSource serverSeedCapabilityTcs;
+    bool   serverSeedCapabilityReceived;
+    byte[] myPairingNonce;
+    byte[] opponentPairingNonce;
+    string matchId;
+    string seedSource;
+    string seedHex;
+    int rulesetVersion;
+
+    public string MatchId => this.matchId;
+    public string SeedSource => this.seedSource;
+    public string SeedHex => this.seedHex;
+    public int RulesetVersion => this.rulesetVersion;
 
     // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
-    // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
+    // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 대기 TCS를 강제 해제.
     bool opponentLeftDuringInit;
+    bool networkAbortRequested;
 
     /// <summary>초기화를 계속할 수 없는 상태(이탈이든 상한 초과든). 결과 처리는 둘을 구분한다 —
     /// <see cref="InitTimedOut"/> 참조.</summary>
-    bool InitAborted => this.opponentLeftDuringInit || this.InitTimedOut;
+    bool InitAborted => this.opponentLeftDuringInit || this.InitTimedOut || this.networkAbortRequested;
 
     // 상대 카드 스폰 버퍼 — RPC 순서 보장으로 WaitForOpponentReady 이후 전부 수신됨
     readonly Queue<(int attackerSlot, int defenderSlot, bool cunningSwap)> attackBuffer = new Queue<(int, int, bool)>();
     readonly Queue<CardInstance> enemySpawnBuffer = new Queue<CardInstance>();
+    readonly Dictionary<int, CardGrowth> localGrowthByCardId = new Dictionary<int, CardGrowth>();
+    IMatchGrowthSource matchGrowthSource;
 
     void Awake()
     {
+        this.destroyCt = this.GetCancellationTokenOnDestroy();
         InitializeRuntimeState();
     }
 
@@ -54,6 +68,12 @@ public class MultiplayerTurnRunner : MonoBehaviour
     {
         // 파괴 시에도 초기화 구독이 남지 않도록 대칭 해제(예외/조기 파괴 안전장치).
         UnsubscribeInitAbort();
+        this.matchGrowthSource = null;
+
+        // 파괴된 인스턴스를 static에 남겨두면 재매치 때 늦게 도착한 RPC가 죽은 컴포넌트를 건드려
+        // MissingReferenceException이 난다. `Instance == this`는 Unity fake-null 비교라
+        // 이미 파괴된 참조를 걸러내지 못하므로 참조 동일성으로 판단한다.
+        if (ReferenceEquals(Instance, this)) Instance = null;
     }
 
     void InitializeRuntimeState()
@@ -62,8 +82,11 @@ public class MultiplayerTurnRunner : MonoBehaviour
         ResetDeckSyncState();
         ResetAttackSyncState();
         ResetSeedSyncState();
+        this.networkAbortRequested = false;
+        this.InitAbortReason = EMatchEndReason.OpponentLeftDuringInit;
         this.enemySpawnBuffer.Clear();
-        this.cardRegistry?.Initialize();
+        this.localGrowthByCardId.Clear();
+        this.matchGrowthSource = null;
         TrySetOwnerIndexFromRunner();
     }
 
@@ -78,10 +101,40 @@ public class MultiplayerTurnRunner : MonoBehaviour
         return true;
     }
 
+    public void SetLocalGrowthProfiles(IReadOnlyList<int> _cards, IReadOnlyList<CardGrowth> _growth)
+    {
+        this.localGrowthByCardId.Clear();
+        if (_cards == null || _growth == null || _cards.Count != _growth.Count) return;
+        for (int i = 0; i < _cards.Count; i++)
+        {
+            int t_cardId = _cards[i];
+            if (CardCatalog.Contains(t_cardId)) this.localGrowthByCardId[t_cardId] = _growth[i];
+        }
+    }
+
+    /// <summary>한 경기의 로컬 조회와 상대 검증이 반드시 같은 공급자를 쓰도록 시작 시점에 고정한다.</summary>
+    public void SetMatchGrowthSource(IMatchGrowthSource _source) => this.matchGrowthSource = _source;
+
+    public void AdoptPreBattleHandoff(PreBattleMatchData _data, IMatchGrowthSource _source)
+    {
+        if (_data == null) return;
+        this.MyOwnerIndex = _data.LocalOwnerIndex;
+        TurnState.LocalOwnerIndex = this.MyOwnerIndex;
+        this.matchId = _data.MatchId;
+        this.seedSource = "server";
+        this.seedHex = _data.SeedHex;
+        this.rulesetVersion = _data.RulesetVersion;
+        this.matchGrowthSource = _source;
+        SetLocalGrowthProfiles(_data.LocalCardIds, _data.LocalGrowth);
+        this.enemyDeckReceived = true;
+    }
+
     // ── RPC 수신 콜백 ──────────────────────────────────────────────────────
 
     public void OnAttackReceived(PlayerRef _sender, int _attackerSlot, int _defenderSlot, bool _cunningSwap)
     {
+        if (DeckConfig.AiTakeover) return;
+
         var t_attack = (_attackerSlot, _defenderSlot, _cunningSwap);
         if (this.waitingForAttackRpc && this.attackTcs != null)
         {
@@ -97,43 +150,142 @@ public class MultiplayerTurnRunner : MonoBehaviour
 
     public void OnCardSpawnReceived(int _slot, int _cardId, int _ownerIndex)
     {
+        if (DeckConfig.AiTakeover) return;
+
         // 상대방 카드만 처리 (내 카드는 이미 로컬에서 채움)
-        if (_ownerIndex == this.MyOwnerIndex) return;
-
-        CardData t_data = this.cardRegistry?.GetData(_cardId);
-        CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, t_data);
-        if (t_card != null) this.enemySpawnBuffer.Enqueue(t_card);
-    }
-
-    public void OnInitialDeckReceived(int[] _cardIds, int _ownerIndex)
-    {
-        this.enemyField?.InitializeFromRemote(_cardIds, _ownerIndex, this.cardRegistry);
-        this.enemyDeckReceived = true;
-        this.initSyncTcs?.TrySetResult();
-    }
-
-    public void OnSeedCommitReceived(byte[] _hash)
-    {
-        this.opponentCommit = _hash;
-        if (this.seedCommitTcs != null)
+        if (_ownerIndex == this.MyOwnerIndex)
         {
-            UniTaskCompletionSource t_tcs = this.seedCommitTcs;
-            this.seedCommitTcs = null;
+            Debug.LogError($"[Net] CardSpawn owner가 로컬 소유자로 들어왔다 — owner={_ownerIndex}");
+            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+            return;
+        }
+
+        if (this.enemyField?.GetSlot(_slot) != null)
+        {
+            Debug.LogError($"[Net] CardSpawn 대상 슬롯이 이미 차 있다 — slot={_slot}, owner={_ownerIndex}");
+            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+            return;
+        }
+
+        if (!CardCatalog.Contains(_cardId))
+        {
+            Debug.LogError($"[Net] CardSpawn 미상 카드 ID — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
+            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+            return;
+        }
+
+        CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, _cardId);
+        if (t_card == null)
+        {
+            Debug.LogError($"[Net] CardSpawn 미러 배치 실패 — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
+            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+            return;
+        }
+        this.enemySpawnBuffer.Enqueue(t_card);
+    }
+
+    public void OnInitialDeckReceived(MatchGrowthOpponent _opponent, int[] _cardIds, CardGrowth[] _growth)
+    {
+        if (DeckConfig.AiTakeover) return;
+        if (this.enemyDeckReceived || this.enemyDeckProcessing)
+        {
+            AbortInitialDeck(EMatchEndReason.Desync, "InitialDeck 중복 수신");
+            return;
+        }
+        if (_cardIds == null || _growth == null || _cardIds.Length != _growth.Length)
+        {
+            AbortInitialDeck(EMatchEndReason.Desync,
+                $"InitialDeck 배열 길이 불일치(ids={_cardIds?.Length ?? -1}, growth={_growth?.Length ?? -1})");
+            return;
+        }
+
+        var t_seenIds = new HashSet<int>();
+        for (int i = 0; i < _cardIds.Length; i++)
+        {
+            if (!t_seenIds.Add(_cardIds[i]))
+            {
+                AbortInitialDeck(EMatchEndReason.Desync,
+                    $"InitialDeck 중복 카드 ID — index={i}, id={_cardIds[i]}");
+                return;
+            }
+            if (!CardCatalog.Contains(_cardIds[i]))
+            {
+                AbortInitialDeck(EMatchEndReason.Desync,
+                    $"InitialDeck 미상 카드 ID — index={i}, id={_cardIds[i]}");
+                return;
+            }
+            if (!MatchGrowthValidation.IsValid(_cardIds[i], _growth[i], out string t_error))
+            {
+                AbortInitialDeck(EMatchEndReason.Desync,
+                    $"InitialDeck 성장값 오류 — index={i}, id={_cardIds[i]}, {t_error}");
+                return;
+            }
+        }
+
+        this.enemyDeckProcessing = true;
+        VerifyAndInitializeRemoteDeck(_opponent, _cardIds, _growth).Forget();
+    }
+
+    async UniTask VerifyAndInitializeRemoteDeck(MatchGrowthOpponent _opponent, int[] _cardIds, CardGrowth[] _growth)
+    {
+        try
+        {
+            IMatchGrowthSource t_source = this.matchGrowthSource;
+            if (t_source == null)
+            {
+                AbortInitialDeck(EMatchEndReason.InitError, "매치 성장 공급자 미주입");
+                return;
+            }
+
+            bool t_verified = await t_source.VerifyOpponentGrowth(
+                _opponent, _cardIds, _growth, this.destroyCt);
+            if (this.destroyCt.IsCancellationRequested || InitAborted || !this.enemyDeckProcessing) return;
+            if (!t_verified)
+            {
+                AbortInitialDeck(EMatchEndReason.Desync, "상대 성장값이 공급자 정본과 일치하지 않는다");
+                return;
+            }
+
+            this.enemyField?.InitializeFromRemote(_cardIds, _growth, _opponent.OwnerIndex);
+            this.enemyDeckReceived = true;
+            this.initSyncTcs?.TrySetResult();
+        }
+        catch (System.Exception t_e)
+        {
+            AbortInitialDeck(EMatchEndReason.InitError, $"상대 성장값 검증 예외: {t_e}");
+        }
+        finally
+        {
+            this.enemyDeckProcessing = false;
+        }
+    }
+
+    void AbortInitialDeck(EMatchEndReason _reason, string _message)
+    {
+        Debug.LogError($"[MatchGrowth] {_message}");
+        this.InitAbortReason = _reason;
+        this.networkAbortRequested = true;
+        TurnRunner.Instance?.AbortMatch(_reason);
+        ReleaseInitWaits();
+    }
+
+    /// <summary>상대와 콘텐츠(스펙 스냅샷) 버전이 다르다. <b>손상 패킷은 여기로 오지 않는다</b> —
+    /// 그쪽은 NetworkGameController가 RejectMessage로 따로 끊는다. 두 원인을 뭉치면
+    /// 회선 문제가 "데이터가 다르다"로 보고돼 원인 추적이 막힌다.</summary>
+    public void OnContentMismatchReceived(string _detail)
+        => AbortInitialDeck(EMatchEndReason.Desync, $"상대와 전투 데이터 스냅샷이 달라 매치를 중단합니다 — {_detail}");
+
+    public void OnServerSeedCapabilityReceived(byte[] _pairingNonce)
+    {
+        if (DeckConfig.AiTakeover) return;
+        this.opponentPairingNonce = _pairingNonce;
+        if (this.serverSeedCapabilityTcs != null)
+        {
+            UniTaskCompletionSource t_tcs = this.serverSeedCapabilityTcs;
+            this.serverSeedCapabilityTcs = null;
             t_tcs.TrySetResult();
         }
-        else this.seedCommitReceived = true;
-    }
-
-    public void OnSeedRevealReceived(byte[] _nonce)
-    {
-        this.opponentNonce = _nonce;
-        if (this.seedRevealTcs != null)
-        {
-            UniTaskCompletionSource t_tcs = this.seedRevealTcs;
-            this.seedRevealTcs = null;
-            t_tcs.TrySetResult();
-        }
-        else this.seedRevealReceived = true;
+        else this.serverSeedCapabilityReceived = true;
     }
 
     // ── 초기화 동기화 ─────────────────────────────────────────────────────
@@ -148,19 +300,59 @@ public class MultiplayerTurnRunner : MonoBehaviour
         SubscribeInitAbort();
         try
         {
-            int[] t_myIds = this.playerField?.GetShuffledIds(this.cardRegistry);
-            NetworkGameController.Instance?.SendInitialDeck(t_myIds ?? System.Array.Empty<int>(), this.MyOwnerIndex);
+            int[] t_myIds = this.playerField?.GetShuffledIds();
+            if (t_myIds == null) t_myIds = System.Array.Empty<int>();
+            if (!TryBuildGrowthForIds(t_myIds, out CardGrowth[] t_myGrowth))
+            {
+                AbortInitialDeck(EMatchEndReason.InitError, "셔플된 내 덱의 성장 스냅샷을 찾을 수 없다");
+                return false;
+            }
+            this.myPairingNonce = NewPairingNonce();
+            NetworkGameController.Instance?.SendServerSeedCapability(this.myPairingNonce);
+            if (NetworkGameController.Instance == null
+                || !NetworkGameController.Instance.SendInitialDeck(t_myIds, t_myGrowth, this.MyOwnerIndex))
+            {
+                AbortInitialDeck(EMatchEndReason.InitError, "InitialDeck 송신 실패");
+                return false;
+            }
 
             if (!this.enemyDeckReceived)
                 await AwaitInitStep(this.initSyncTcs.Task, "상대 덱 수신");
             if (InitAborted) return false;
 
-            ResetDeckSyncState();
+            // 같은 경기에서 InitialDeck은 한 번만 허용한다. 완료 플래그를 유지해 지연/중복 패킷을 거부한다.
+            this.initSyncTcs = null;
 
-            // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
-            if (!await SyncMatchSeed()) return false;
+        // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
+        if (!await SyncMatchSeed()) return false;
 
-            // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
+        NetworkGameController t_network = NetworkGameController.Instance;
+        if (t_network == null)
+        {
+            AbortInitialDeck(EMatchEndReason.InitError, "서버 덱 검증 전 네트워크 컨트롤러 유실");
+            return false;
+        }
+        DeckLockResult t_lockResult = await DeckLockSubmission.TryLockAsync(
+            ContentProfileConfig.Active.CloudEnvId,
+            this.matchId,
+            this.seedSource,
+            this.seedHex,
+            this.rulesetVersion,
+            this.MyOwnerIndex,
+            SpecSource.BattleFingerprint.ToLowerInvariant(),
+            t_myIds,
+            t_myGrowth);
+        if (InitAborted) return false;
+        if (t_lockResult != DeckLockResult.Approved)
+        {
+            EMatchEndReason t_reason = t_lockResult == DeckLockResult.Rejected
+                ? EMatchEndReason.Desync
+                : EMatchEndReason.InitError;
+            AbortInitialDeck(t_reason, "서버 덱 검증 실패");
+            return false;
+        }
+
+        // 시너지: 양 필드 덱 확정 후 각각 1회 적용.
             // 대칭성: 내 playerField(내 덱) / enemyField(상대 덱 원격 재구성) 각각을 그 덱으로 Resolve →
             // 상대 클라도 동일 두 덱으로 동일 산출 → 결과 일치, 전투 중 재계산 없음.
             // 오프닝 배치는 Placed만 발화하고 시너지 Entered는 미발화 — 등장 트리거(돌보미/흐름)는 런타임 등장(FillEmptySlots/Swap/PlaceDirect)에서만.
@@ -180,62 +372,136 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void ResetDeckSyncState()
     {
         this.enemyDeckReceived = false;
+        this.enemyDeckProcessing = false;
         this.initSyncTcs = new UniTaskCompletionSource();
     }
 
-    /// <summary>
-    /// commit-reveal로 양쪽이 조작 못 하는 공유 시드 합의.
-    /// 1) H(nonce) 교환(commit) 2) nonce 교환(reveal) 3) 검증 4) seed = 내nonce XOR 상대nonce.
-    /// 반환 false = 대기 중 상대 이탈(시드 미확정, opponentNonce 접근 금지).
-    /// </summary>
-    async UniTask<bool> SyncMatchSeed()
+    bool TryBuildGrowthForIds(int[] _ids, out CardGrowth[] _growth)
     {
-        byte[] t_myNonce  = MatchRandom.NewNonce();
-        byte[] t_myCommit = MatchRandom.Hash(t_myNonce);
-
-        NetworkGameController.Instance?.SendSeedCommit(t_myCommit);
-        await AwaitInitStep(WaitOpponentCommit(), "시드 commit");
-        if (InitAborted) return false;
-
-        // 상대 commit 확보 후에야 내 nonce 공개
-        NetworkGameController.Instance?.SendSeedReveal(t_myNonce);
-        await AwaitInitStep(WaitOpponentReveal(), "시드 reveal");
-        if (InitAborted) return false;
-
-        if (!MatchRandom.VerifyCommit(this.opponentNonce, this.opponentCommit))
-            Debug.LogError("[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심");
-
-        ulong t_seed = MatchRandom.ReadU64(t_myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
-        MatchRandom.Seed(t_seed);
+        _growth = new CardGrowth[_ids?.Length ?? 0];
+        if (_ids == null) return false;
+        for (int i = 0; i < _ids.Length; i++)
+        {
+            if (!this.localGrowthByCardId.TryGetValue(_ids[i], out _growth[i])) return false;
+        }
         return true;
     }
 
-    UniTask WaitOpponentCommit()
+    /// <summary>서버가 발급한 시드를 양쪽이 같이 받아 확정한다.
+    /// 반환 false = 상대 이탈·서버 실패로 시드 미확정(호출부가 이탈 처리).</summary>
+    async UniTask<bool> SyncMatchSeed()
     {
-        if (this.seedCommitReceived) { this.seedCommitReceived = false; return UniTask.CompletedTask; }
-        this.seedCommitTcs = new UniTaskCompletionSource();
-        return this.seedCommitTcs.Task;
+        int t_capabilityWinner;
+        try
+        {
+            t_capabilityWinner = await UniTask.WhenAny(
+                WaitOpponentServerSeedCapability(),
+                UniTask.Delay(System.TimeSpan.FromSeconds(5), cancellationToken: this.destroyCt));
+        }
+        catch (System.OperationCanceledException)
+        {
+            return false;
+        }
+        if (InitAborted) return false;
+
+        // 시드의 진실원은 서버 하나다 — 상대가 서버 시드 능력을 알리지 않으면 합의할 방법이 없다.
+        // 예전에는 여기서 commit-reveal 로 내려갔지만 서버 lockDeck·submitMatchResult 가 그 시드를
+        // 무조건 거절해, 매치가 "서버 덱 검증 실패"라는 엉뚱한 사유로 죽었다. 원인 그대로 끊는다.
+        if (t_capabilityWinner != 0)
+        {
+            NetworkGameController.Instance?.SendMatchAbort(EMatchEndReason.InitError);
+            AbortInitialDeck(EMatchEndReason.InitError, "상대가 서버 시드 합의에 응답하지 않았습니다.");
+            return false;
+        }
+
+        (ServerMatchSeedStatus status, ServerMatchSeed match) t_result =
+            await ServerMatchSeedSubmission.TryAcquireAsync(
+                ContentProfileConfig.Active.CloudEnvId,
+                BuildServerPairingKey(NetworkSession.Instance?.PairingKey),
+                SpecSource.BattleFingerprint.ToLowerInvariant(),
+                this.MyOwnerIndex);
+        if (InitAborted) return false;
+        if (t_result.status != ServerMatchSeedStatus.Paired || t_result.match == null)
+        {
+            EMatchEndReason t_reason = t_result.status == ServerMatchSeedStatus.Rejected
+                ? EMatchEndReason.Desync
+                : EMatchEndReason.InitError;
+            NetworkGameController.Instance?.SendMatchAbort(t_reason);
+            AbortInitialDeck(
+                t_reason,
+                "서버 매치 시드를 확정하지 못했습니다.");
+            return false;
+        }
+
+        this.matchId = t_result.match.MatchId;
+        this.seedSource = "server";
+        this.seedHex = t_result.match.SeedHex;
+        this.rulesetVersion = t_result.match.RulesetVersion;
+        MatchRandom.Seed(t_result.match.Seed);
+        Debug.Log($"[MatchSeed] 서버 시드 확정 matchId={this.matchId}, slot={t_result.match.Slot}");
+        return true;
     }
 
-    UniTask WaitOpponentReveal()
+    static byte[] NewPairingNonce()
     {
-        if (this.seedRevealReceived) { this.seedRevealReceived = false; return UniTask.CompletedTask; }
-        this.seedRevealTcs = new UniTaskCompletionSource();
-        return this.seedRevealTcs.Task;
+        byte[] t_nonce = new byte[16];
+        using (System.Security.Cryptography.RandomNumberGenerator t_rng =
+               System.Security.Cryptography.RandomNumberGenerator.Create())
+            t_rng.GetBytes(t_nonce);
+        return t_nonce;
+    }
+
+    string BuildServerPairingKey(string _roomName)
+    {
+        if (string.IsNullOrEmpty(_roomName) || this.myPairingNonce == null || this.opponentPairingNonce == null)
+            return null;
+        byte[] t_first = this.myPairingNonce;
+        byte[] t_second = this.opponentPairingNonce;
+        for (int i = 0; i < t_first.Length; i++)
+        {
+            if (t_first[i] == t_second[i]) continue;
+            if (t_first[i] > t_second[i])
+            {
+                t_first = this.opponentPairingNonce;
+                t_second = this.myPairingNonce;
+            }
+            break;
+        }
+
+        byte[] t_room = System.Text.Encoding.UTF8.GetBytes(_roomName);
+        byte[] t_input = new byte[t_room.Length + t_first.Length + t_second.Length];
+        System.Array.Copy(t_room, 0, t_input, 0, t_room.Length);
+        System.Array.Copy(t_first, 0, t_input, t_room.Length, t_first.Length);
+        System.Array.Copy(t_second, 0, t_input, t_room.Length + t_first.Length, t_second.Length);
+        using (System.Security.Cryptography.SHA256 t_sha = System.Security.Cryptography.SHA256.Create())
+            return MatchResultSubmission.Hex(t_sha.ComputeHash(t_input));
+    }
+
+    UniTask WaitOpponentServerSeedCapability()
+    {
+        if (this.serverSeedCapabilityReceived)
+        {
+            this.serverSeedCapabilityReceived = false;
+            return UniTask.CompletedTask;
+        }
+        this.serverSeedCapabilityTcs = new UniTaskCompletionSource();
+        return this.serverSeedCapabilityTcs.Task;
     }
 
     void ResetSeedSyncState()
     {
-        this.seedCommitTcs      = null;
-        this.seedRevealTcs      = null;
-        this.seedCommitReceived = false;
-        this.seedRevealReceived = false;
-        this.opponentCommit     = null;
-        this.opponentNonce      = null;
+        this.myPairingNonce     = null;
+        this.opponentPairingNonce = null;
+        this.serverSeedCapabilityTcs = null;
+        this.serverSeedCapabilityReceived = false;
+        this.matchId            = null;
+        this.seedSource         = null;
+        this.seedHex            = null;
+        this.rulesetVersion     = 0;
     }
 
     // ── 초기화 단계 이탈 감지 ─────────────────────────────────────────────
-    // StartBattle 이전(덱교환·시드 commit-reveal) 구간에서 상대 이탈 시 3 TCS가
+    // StartBattle 이전(덱교환·서버 시드 확정) 구간에서 상대 이탈 시 대기 TCS가
     // 아무도 해제 안 해 StartBattleAsync가 영구 정지되는 것을 방지.
 
     void SubscribeInitAbort()
@@ -261,7 +527,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// <summary>초기화 대기 상한. 이탈·연결실패 콜백은 <see cref="HandleInitAbort"/>가 잡지만,
     /// 콜백이 아예 오지 않는 경우(스테일 러너로 멀티 오진입, 상대가 조용히 멈춤, 패킷 유실)는
     /// 아무도 TCS를 풀어주지 않아 전투가 영원히 시작되지 않는다. 그 마지막 구멍을 막는 벽시계 상한이다.</summary>
-    public const float InitSyncTimeoutSec = 20f;
+    public const float InitSyncTimeoutSec = NetTimeouts.InitSyncSec;
 
     /// <summary>초기화 전체(덱 교환 + 시드 commit-reveal)에 걸리는 **하나의** 데드라인.
     /// 단계마다 상한을 따로 걸면 최악 대기가 단계 수만큼 곱해져 사용자가 잠긴 화면에 몇 분씩 갇힌다.</summary>
@@ -271,6 +537,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// 이탈은 부전승(보상 지급)이지만 타임아웃은 내 쪽 문제일 수 있어 보상을 주면 안 된다.
     /// 양쪽이 동시에 타임아웃 나면 둘 다 승리+보상이 되어 랭크·골드가 부풀어 오른다.</summary>
     public bool InitTimedOut { get; private set; }
+    public EMatchEndReason InitAbortReason { get; private set; } = EMatchEndReason.OpponentLeftDuringInit;
 
     /// <summary>초기화 단계 대기 + 공용 데드라인. 초과하면 대기를 깨우고 타임아웃으로 표시한다.</summary>
     async UniTask AwaitInitStep(UniTask _wait, string _what)
@@ -286,6 +553,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
 
         Debug.LogError($"[MultiInit] {_what} 대기가 초기화 상한({InitSyncTimeoutSec}초)을 넘겼다. 초기화 중단.");
         this.InitTimedOut = true;
+        this.InitAbortReason = EMatchEndReason.Timeout;
         ReleaseInitWaits();
     }
 
@@ -293,47 +561,87 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void HandleInitAbort()
     {
         this.opponentLeftDuringInit = true;
+        this.InitAbortReason = EMatchEndReason.OpponentLeftDuringInit;
         ReleaseInitWaits();
     }
 
     /// <summary>3 TCS를 멱등 해제해 각 await를 즉시 깨운다.
     /// 해제한 TCS는 비운다 — 안 비우면 뒤늦게 도착한 RPC가 이미 완료된 TCS를 풀며
-    /// "TCS냐 플래그냐" 분기(OnSeedCommitReceived)와 상태가 어긋난다.</summary>
+    /// "TCS냐 플래그냐" 분기(OnServerSeedCapabilityReceived)와 상태가 어긋난다.</summary>
     void ReleaseInitWaits()
     {
         this.initSyncTcs?.TrySetResult();
 
-        UniTaskCompletionSource t_commit = this.seedCommitTcs;
-        this.seedCommitTcs = null;
-        t_commit?.TrySetResult();
-
-        UniTaskCompletionSource t_reveal = this.seedRevealTcs;
-        this.seedRevealTcs = null;
-        t_reveal?.TrySetResult();
+        UniTaskCompletionSource t_capability = this.serverSeedCapabilityTcs;
+        this.serverSeedCapabilityTcs = null;
+        t_capability?.TrySetResult();
     }
 
     // ── 대기 API ───────────────────────────────────────────────────────────
 
     /// <summary>상대 공격 RPC 올 때까지 대기.</summary>
-    public UniTask<(int attackerSlot, int defenderSlot, bool cunningSwap)> WaitForOpponentAttack()
+    public async UniTask<(bool received, int attackerSlot, int defenderSlot, bool cunningSwap)> WaitForOpponentAttack()
     {
-        if (this.attackBuffer.Count > 0)
-            return UniTask.FromResult(this.attackBuffer.Dequeue());
+        if (this.attackWaitForced)
+        {
+            this.attackWaitForced = false;
+            return (false, 0, 0, false);
+        }
 
-        this.attackTcs = new UniTaskCompletionSource<(int, int, bool)>();
+        if (this.attackBuffer.Count > 0)
+        {
+            var t_buffered = this.attackBuffer.Dequeue();
+            return (true, t_buffered.attackerSlot, t_buffered.defenderSlot, t_buffered.cunningSwap);
+        }
+
+        UniTaskCompletionSource<(int attackerSlot, int defenderSlot, bool cunningSwap)> t_tcs
+            = new UniTaskCompletionSource<(int, int, bool)>();
+        this.attackTcs = t_tcs;
         this.waitingForAttackRpc = true;
-        return this.attackTcs.Task;
+
+        int t_completed = await UniTask.WhenAny(WaitForAttackSignal(t_tcs.Task), WaitForAttackDeadline());
+        bool t_received = t_completed == 0
+                       && !this.attackWaitForced
+                       && !this.destroyCt.IsCancellationRequested;
+        if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
+            Debug.LogError($"[Net] 상대 공격 대기가 {NetTimeouts.TurnActionSec}초를 넘겼다.");
+
+        if (ReferenceEquals(this.attackTcs, t_tcs))
+        {
+            this.waitingForAttackRpc = false;
+            this.attackTcs = null;
+        }
+        this.attackWaitForced = false;
+        if (!t_received) return (false, 0, 0, false);
+
+        var t_attack = await t_tcs.Task;
+        return (true, t_attack.attackerSlot, t_attack.defenderSlot, t_attack.cunningSwap);
+    }
+
+    async UniTask WaitForAttackDeadline()
+    {
+        await UniTask.Delay(System.TimeSpan.FromSeconds(NetTimeouts.TurnActionSec),
+                            ignoreTimeScale: true,
+                            cancellationToken: this.destroyCt)
+                     .SuppressCancellationThrow();
+    }
+
+    async UniTask WaitForAttackSignal(UniTask<(int attackerSlot, int defenderSlot, bool cunningSwap)> _wait)
+    {
+        await _wait;
     }
 
     void ResetAttackSyncState()
     {
         this.waitingForAttackRpc = false;
         this.attackTcs = null;
+        this.attackWaitForced = false;
         this.attackBuffer.Clear();
     }
 
     public void ForceOpponentAttackResolve()
     {
+        this.attackWaitForced = true;
         var t_dummy = (0, 0, false);
         if (this.waitingForAttackRpc && this.attackTcs != null)
         {
@@ -342,10 +650,22 @@ public class MultiplayerTurnRunner : MonoBehaviour
             this.attackTcs = null;
             t_tcs.TrySetResult(t_dummy);
         }
-        else
-        {
-            this.attackBuffer.Enqueue(t_dummy);
-        }
+    }
+
+    public void AbortNetworkWaits()
+    {
+        this.networkAbortRequested = true;
+        ReleaseInitWaits();
+        ForceOpponentAttackResolve();
+    }
+
+    /// <summary>상대 이탈 뒤 네트워크 턴을 끝내고 현재 미러를 로컬 AI에 넘긴다.
+    /// 이미 배치된 스폰은 유지하고, 재생 대기 중인 RPC/연출 버퍼만 버린다.</summary>
+    public void PrepareAiTakeover()
+    {
+        this.attackBuffer.Clear();
+        this.enemySpawnBuffer.Clear();
+        ForceOpponentAttackResolve();
     }
 
     /// <summary>WaitForOpponentReady 이후 호출 → 수신된 상대 스폰 카드 반환 및 버퍼 비움.</summary>
@@ -368,7 +688,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         if (_placed == null) return;
         foreach (CardInstance t_card in _placed)
         {
-            int t_id = this.cardRegistry?.GetId(t_card?.data) ?? -1;
+            int t_id = t_card?.cardId ?? -1;
             NetworkGameController.Instance?.SendCardSpawn(t_card.slotIndex, t_id, this.MyOwnerIndex);
         }
     }

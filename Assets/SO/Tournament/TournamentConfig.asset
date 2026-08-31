@@ -14,7 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TournamentConfig
   chapters:
   - chapterId: chapter_01
-    requiredGrade: 0
     title: "\uC81C1\uC7A5 \xB7 \uC548\uAC1C \uC232"
     tilePrefab: {fileID: 8869288645222550817, guid: 6bbd58836419ece4a8496d321a477357, type: 3}
     nodes:
@@ -22,13 +21,7 @@ MonoBehaviour:
       displayName: "\uC232\uC758 \uD30C\uC218\uAFBC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-      - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-      - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-      - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
+      enemyDeckIds: 110000001200000013000000140000000d0000000e000000
       aiCardLevel: 1
       rewards:
       - currency: 0
@@ -37,13 +30,7 @@ MonoBehaviour:
       displayName: "\uB2AA\uC9C0\uC758 \uCD94\uC801\uC790"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-      - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-      - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-      - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+      enemyDeckIds: 110000001200000013000000140000001500000016000000
       aiCardLevel: 1
       rewards:
       - currency: 3
@@ -52,13 +39,7 @@ MonoBehaviour:
       displayName: "\uBC14\uC704\uAD74 \uAD11\uBD80"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-      - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-      - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-      - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
+      enemyDeckIds: 010000000200000003000000040000000b0000000c000000
       aiCardLevel: 2
       rewards:
       - currency: 2
@@ -67,13 +48,7 @@ MonoBehaviour:
       displayName: "\uC124\uC6D0\uC758 \uAD70\uC8FC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-      - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-      - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-      - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
+      enemyDeckIds: 010000000200000003000000040000001700000018000000
       aiCardLevel: 2
       rewards:
       - currency: 0
@@ -82,13 +57,7 @@ MonoBehaviour:
       displayName: "\uC7BF\uBE5B \uB300\uC7A5\uC7A5\uC774"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-      - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-      - {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
-      - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
+      enemyDeckIds: 0f00000010000000190000001a0000001500000016000000
       aiCardLevel: 2
       rewards:
       - currency: 3
@@ -97,13 +66,7 @@ MonoBehaviour:
       displayName: "\uBB3C\uACB0\uC758 \uBB34\uD76C"
       avatar: {fileID: 0}
       kind: 1
-      enemyDeck:
-      - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-      - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-      - {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
-      - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
+      enemyDeckIds: 0f00000010000000190000001a0000001700000018000000
       aiCardLevel: 2
       rewards:
       - currency: 1
@@ -113,8 +76,8 @@ MonoBehaviour:
       amount: 250
     - currency: 3
       amount: 60
+    requiredGrade: 0
   - chapterId: chapter_02
-    requiredGrade: 1
     title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
     tilePrefab: {fileID: 6468447428658967276, guid: f1351b2ef4a274a4f83cb6d9c6801545, type: 3}
     nodes:
@@ -122,13 +85,7 @@ MonoBehaviour:
       displayName: "\uCC9C\uB465\uBC8C\uD310 \uAE30\uC218"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-      - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
-      - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+      enemyDeckIds: 08000000090000000a000000050000000600000007000000
       aiCardLevel: 2
       rewards:
       - currency: 0
@@ -137,13 +94,7 @@ MonoBehaviour:
       displayName: "\uD669\uAE08\uAC00\uC9C0 \uC0AC\uC81C"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-      - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
+      enemyDeckIds: 0500000006000000070000000b0000000c0000000a000000
       aiCardLevel: 2
       rewards:
       - currency: 3
@@ -152,13 +103,7 @@ MonoBehaviour:
       displayName: "\uC2EC\uC5F0\uC758 \uAD00\uCE21\uC790"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
+      enemyDeckIds: 150000001600000017000000180000000d0000000e000000
       aiCardLevel: 3
       rewards:
       - currency: 2
@@ -167,13 +112,7 @@ MonoBehaviour:
       displayName: "\uD3D0\uD5C8\uC758 \uC218\uC9D1\uAC00"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
-      - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-      - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-      - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
-      - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-      - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+      enemyDeckIds: 1d000000140000001e0000001c000000060000001b000000
       aiCardLevel: 3
       rewards:
       - currency: 0
@@ -182,13 +121,7 @@ MonoBehaviour:
       displayName: "\uC7BF\uBD88\uC758 \uC804\uC870"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
-      - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
-      - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-      - {fileID: 11400000, guid: f0e1d2c3b4a5968778695a4b3c2d1e0f, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-      - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
+      enemyDeckIds: 1d000000040000001e0000001c0000000b0000001a000000
       aiCardLevel: 3
       rewards:
       - currency: 3
@@ -197,13 +130,7 @@ MonoBehaviour:
       displayName: "\uC655\uAD00 \uC5C6\uB294 \uC655"
       avatar: {fileID: 0}
       kind: 1
-      enemyDeck:
-      - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-      - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-      - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-      - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-      - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
-      - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+      enemyDeckIds: 1100000012000000020000001e000000060000001b000000
       aiCardLevel: 3
       rewards:
       - currency: 1
@@ -213,8 +140,8 @@ MonoBehaviour:
       amount: 350
     - currency: 3
       amount: 150
+    requiredGrade: 1
   - chapterId: chapter_03
-    requiredGrade: 2
     title: "\uC81C3\uC7A5 \xB7 \uC5BC\uC5B4\uBD99\uC740 \uC124\uC6D0"
     tilePrefab: {fileID: 668995502536726736, guid: 246083bed930b714c9d233dfe489ceba, type: 3}
     nodes:
@@ -222,13 +149,7 @@ MonoBehaviour:
       displayName: "\uC11C\uB9AC\uADF8\uB298 \uD30C\uC218"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
-      - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-      - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-      - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+      enemyDeckIds: 040000000100000003000000020000000e0000000d000000
       aiCardLevel: 3
       rewards:
       - currency: 0
@@ -237,13 +158,7 @@ MonoBehaviour:
       displayName: "\uB208\uBCF4\uB77C \uBB34\uB9AC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-      - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-      - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-      - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+      enemyDeckIds: 110000001200000014000000130000000500000007000000
       aiCardLevel: 3
       rewards:
       - currency: 3
@@ -252,13 +167,7 @@ MonoBehaviour:
       displayName: "\uC5BC\uC74C\uBB3C\uACB0 \uC220\uC0AC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-      - {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
-      - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-      - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
+      enemyDeckIds: 10000000190000001a0000000f0000000500000007000000
       aiCardLevel: 3
       rewards:
       - currency: 2
@@ -267,13 +176,7 @@ MonoBehaviour:
       displayName: "\uC11C\uB9AC\uBB34\uB364 \uC8FC\uC778"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: caa736112507975438e1965498e8f086, type: 2}
-      - {fileID: 11400000, guid: 8b6d562eaff71204fa89713403d2acce, type: 2}
-      - {fileID: 11400000, guid: bd45ce87e1bb2064399918c19b8a03bf, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
+      enemyDeckIds: 0a000000090000000800000018000000170000001b000000
       aiCardLevel: 4
       rewards:
       - currency: 0
@@ -282,13 +185,7 @@ MonoBehaviour:
       displayName: "\uC138\uAC08\uB798 \uC720\uBB3C\uAE30\uC0AC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+      enemyDeckIds: 0c0000000b00000016000000150000000e0000000d000000
       aiCardLevel: 4
       rewards:
       - currency: 3
@@ -297,13 +194,7 @@ MonoBehaviour:
       displayName: "\uC124\uC6D0\uC758 \uC131\uC8FC"
       avatar: {fileID: 0}
       kind: 1
-      enemyDeck:
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+      enemyDeckIds: 050000000700000018000000170000000c0000000b000000
       aiCardLevel: 4
       rewards:
       - currency: 1
@@ -313,8 +204,8 @@ MonoBehaviour:
       amount: 380
     - currency: 3
       amount: 160
+    requiredGrade: 2
   - chapterId: chapter_04
-    requiredGrade: 3
     title: "\uC81C4\uC7A5 \xB7 \uC7BF\uBD88\uC758 \uD654\uC0B0"
     tilePrefab: {fileID: 9106813324675404984, guid: 25c79d556422e184fb2a0f4db1f7dba4, type: 3}
     nodes:
@@ -322,13 +213,7 @@ MonoBehaviour:
       displayName: "\uC7BF\uBC14\uB78C \uC18C\uC6A9\uB3CC\uC774"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 60fc3414c9db3504da9512df26e09c1b, type: 2}
-      - {fileID: 11400000, guid: 23b19316545684949b7cfbe0b45b710e, type: 2}
-      - {fileID: 11400000, guid: 6ac185a03b471024a929d05d57ff3257, type: 2}
-      - {fileID: 11400000, guid: cc526d656ba20e7479b875214496369b, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+      enemyDeckIds: 10000000190000001a0000000f0000000e0000000d000000
       aiCardLevel: 4
       rewards:
       - currency: 0
@@ -337,13 +222,7 @@ MonoBehaviour:
       displayName: "\uBD88\uD2F0 \uB5BC"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-      - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-      - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-      - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
+      enemyDeckIds: 110000001200000014000000130000000c0000000b000000
       aiCardLevel: 4
       rewards:
       - currency: 3
@@ -352,13 +231,7 @@ MonoBehaviour:
       displayName: "\uD751\uC694\uC11D \uBC29\uBCBD\uB300"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
-      - {fileID: 11400000, guid: 50978cecebd80934f8cd32eccff08371, type: 2}
-      - {fileID: 11400000, guid: c62abaa4d045b3c49aaae43a17b6d943, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+      enemyDeckIds: 05000000070000000c0000000b0000001600000015000000
       aiCardLevel: 4
       rewards:
       - currency: 2
@@ -367,13 +240,7 @@ MonoBehaviour:
       displayName: "\uC628\uCC9C\uC758 \uC218\uD638\uC790"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: ce0a5e42a8b9f1047b673643e0a2811e, type: 2}
-      - {fileID: 11400000, guid: 193e18bd3b742be4da0eaa7142ba279d, type: 2}
-      - {fileID: 11400000, guid: 0b5011e0519ea9d4c8d60963804e0475, type: 2}
-      - {fileID: 11400000, guid: aed619ad3c0bf034ba945e5dcb9b346a, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
+      enemyDeckIds: 040000000100000003000000020000001600000015000000
       aiCardLevel: 4
       rewards:
       - currency: 0
@@ -382,13 +249,7 @@ MonoBehaviour:
       displayName: "\uC7BF\uB354\uBBF8 \uAC70\uC778\uB300"
       avatar: {fileID: 0}
       kind: 0
-      enemyDeck:
-      - {fileID: 11400000, guid: d9168d008093f5744ade5ed55354b2d9, type: 2}
-      - {fileID: 11400000, guid: ada0959f8c1a4054c9d5803cbd9d18a7, type: 2}
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 7be8b0dd314722748b4a4ea9476df64c, type: 2}
-      - {fileID: 11400000, guid: 22e6c2e3f9c659f4f92877741fa7d29d, type: 2}
+      enemyDeckIds: 050000000700000018000000170000000e0000000d000000
       aiCardLevel: 4
       rewards:
       - currency: 3
@@ -397,13 +258,7 @@ MonoBehaviour:
       displayName: "\uC7BF\uBD88\uC758 \uC655"
       avatar: {fileID: 0}
       kind: 1
-      enemyDeck:
-      - {fileID: 11400000, guid: 372e400ce5a3ec1499830a41fa0b64df, type: 2}
-      - {fileID: 11400000, guid: a1b93191a33da8d439f84be802ba1da9, type: 2}
-      - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-      - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-      - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
-      - {fileID: 11400000, guid: 036742cff2ca40e4b97950f6762fb705, type: 2}
+      enemyDeckIds: 180000001700000016000000150000001b00000006000000
       aiCardLevel: 4
       rewards:
       - currency: 1
@@ -413,3 +268,4 @@ MonoBehaviour:
       amount: 420
     - currency: 3
       amount: 170
+    requiredGrade: 3

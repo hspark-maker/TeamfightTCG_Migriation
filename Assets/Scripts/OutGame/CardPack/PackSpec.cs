@@ -11,7 +11,7 @@ public static class PackSpec
     static readonly Dictionary<string, CardPack> s_packs = new Dictionary<string, CardPack>();
     static readonly Dictionary<string, List<CardPackDrop>> s_drops = new Dictionary<string, List<CardPackDrop>>();
 
-    // 부트에서 1회. 지연 로드도 되지만 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
+    // 초기화에서 1회. 지연 로드도 되지만 상점 진입 프레임에 파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
     public static bool TryGetPack(string _packId, out CardPack _row)
@@ -46,7 +46,7 @@ public static class PackSpec
             if (!s_warnedCatalogNotReady)
             {
                 s_warnedCatalogNotReady = true;
-                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 부팅에서는 BootInstaller가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
+                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 부팅에서는 초기화(InitializationRunner)가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
             }
             return t_result;
         }
@@ -56,15 +56,15 @@ public static class PackSpec
         {
             if (ParseGrade(t_row.minGrade) != t_best) continue;
             t_selectedRowCount++;
-            if (!CardCatalog.TryGet(t_row.cardId, out CardData t_card)) continue;
+            if (!CardCatalog.Contains(t_row.cardId)) continue;
 
-            t_result.Add(new WeightedCard { card = t_card, weight = Mathf.Max(1, t_row.weight) });
+            t_result.Add(new WeightedCard { cardId = t_row.cardId, weight = Mathf.Max(1, t_row.weight) });
         }
 
         if (t_result.Count != t_selectedRowCount && !s_warnedUnresolvedDrops)
         {
             s_warnedUnresolvedDrops = true;
-            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 CardRegistry/CardPackDrop을 맞춰야 한다.");
+            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 Card/CardPackDrop 표를 맞춰야 한다.");
         }
         return t_result;
     }

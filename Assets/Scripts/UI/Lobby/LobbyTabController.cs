@@ -44,7 +44,7 @@ public class LobbyTabController : MonoBehaviour
         LobbyClickSoundBinder.Bind(transform.root, tabBar != null ? tabBar.transform : null);
 
         // 서비스 주입은 첫 Select(Start)보다 먼저 끝나야 한다 — OnEnter에서 이미 쓸 수 있어야 하므로.
-        var t_services = new LobbyTabServices(dragController);
+        var t_services = new LobbyTabServices(dragController, this);
 
         for (int i = 0; i < tabs.Count; i++)
         {
@@ -73,6 +73,10 @@ public class LobbyTabController : MonoBehaviour
 
         Select(defaultIndex, false);
     }
+
+    /// <summary>기본 탭으로 되돌린다. 자기 화면을 스스로 떠나는 탭(덱 탭의 뒤로가기)의 복귀 지점이다.
+    /// 잠금 검사를 건너뛰는 이유: 기본 탭이 아직 잠긴 온보딩 구간이면 Select가 조용히 물러나 유저가 갇힌다.</summary>
+    public void SelectDefault() => Select(defaultIndex, false);
 
     void HandleTabSelected(int _index) => Select(_index);
 

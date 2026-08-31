@@ -1,87 +1,79 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 카드 마스터의 읽기 전용 단일 창구
+/// <summary>표 기반 카드 정의와 ID 조회의 단일 창구.</summary>
 public static class CardCatalog
 {
-    static readonly List<CardData> s_all = new List<CardData>();
-    static readonly IReadOnlyList<CardData> s_allReadonly = s_all.AsReadOnly();
-
-    // 카드 식별의 단일 축 — 세이브·도감 행·덱이 전부 이 번호를 쓴다.
-    static readonly Dictionary<int, CardData> s_byId = new Dictionary<int, CardData>();
-
-    // 구 세이브(에셋 이름 키) 이관 전용 역인덱스. 평상시 조회에 쓰지 마라 —
-    // 이름은 리네임으로 갈리는 축이고, 그걸 끊으려고 번호를 도입했다.
-    static readonly Dictionary<string, int> s_legacyNameToId = new Dictionary<string, int>();
+    static readonly List<int> s_allIds = new List<int>();
+    static readonly List<CardSpec> s_allSpecs = new List<CardSpec>();
+    static readonly HashSet<int> s_includedIds = new HashSet<int>();
+    static readonly Dictionary<int, CardSpec> s_specById = new Dictionary<int, CardSpec>();
+    static readonly Dictionary<int, IReadOnlyList<SynergyData>> s_synergiesById = new Dictionary<int, IReadOnlyList<SynergyData>>();
+    static readonly Dictionary<string, int> s_legacyNameToId = new Dictionary<string, int>(StringComparer.Ordinal);
 
     public static bool IsReady { get; private set; }
+    public static IReadOnlyList<int> AllIds => s_allIds;
+    public static IReadOnlyList<CardSpec> AllSpecs => s_allSpecs;
+    public static int Count => s_allSpecs.Count;
 
-    public static IReadOnlyList<CardData> All => s_allReadonly;
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => Clear();
 
-    public static int Count => s_all.Count;
-
-    // 부트 주입 — 내부 인덱스 재구성
-    public static void SetSource(IEnumerable<CardData> _cards)
+    public static void SetSource(SynergyRegistry _synergyRegistry, EContentRunMode _mode, bool _includeTestCards)
     {
-        s_all.Clear();
-        s_byId.Clear();
-        s_legacyNameToId.Clear();
+        Clear();
+        if (_synergyRegistry == null) throw new InvalidOperationException("[CardCatalog] SynergyRegistry가 배선되지 않았다.");
+        _synergyRegistry.ValidateOrThrow();
+        Dictionary<int, CardSpec> t_specs = SpecSource.LoadCards(_mode);
 
-        if (_cards != null)
+        foreach (KeyValuePair<int, CardSpec> t_pair in t_specs)
         {
-            foreach (var t_card in _cards)
-            {
-                if (t_card == null) continue;
-
-                int t_id = IdOf(t_card);
-                if (t_id <= 0)
-                {
-                    Debug.LogError($"[CardCatalog] 카드 '{t_card.name}'에 번호가 없어 제외한다. 카드 표(Excel) 가져오기로 번호를 부여할 것.");
-                    continue;
-                }
-                if (s_byId.ContainsKey(t_id))
-                {
-                    Debug.LogError($"[CardCatalog] 카드 번호 {t_id} 중복 — '{s_byId[t_id].name}' 유지, '{t_card.name}' 제외. 표에서 번호를 고칠 것.");
-                    continue;
-                }
-
-                s_byId.Add(t_id, t_card);
-                s_all.Add(t_card);
-
-                // 이름 충돌은 이관 정확도만 떨어뜨린다(구 세이브가 어느 쪽인지 모름) — 첫 항목만 잡고 경고.
-                if (!string.IsNullOrEmpty(t_card.name) && !s_legacyNameToId.ContainsKey(t_card.name))
-                    s_legacyNameToId.Add(t_card.name, t_id);
-            }
+            CardSpec t_spec = t_pair.Value;
+            var t_synergies = new List<SynergyData>(t_spec.SynergyNames.Count);
+            foreach (string t_name in t_spec.SynergyNames) t_synergies.Add(_synergyRegistry.Require(t_name));
+            s_specById.Add(t_spec.Id, t_spec);
+            s_synergiesById.Add(t_spec.Id, t_synergies.AsReadOnly());
+            if (!s_legacyNameToId.ContainsKey(t_spec.AssetName)) s_legacyNameToId.Add(t_spec.AssetName, t_spec.Id);
+            if (!_includeTestCards && t_spec.Channel != ECardChannel.Live) continue;
+            s_includedIds.Add(t_spec.Id);
+            s_allIds.Add(t_spec.Id);
+            s_allSpecs.Add(t_spec);
         }
-
         IsReady = true;
     }
 
-    // 카드 식별 번호 산출의 유일한 지점(0 이하 = 미부여)
-    public static int IdOf(CardData _card) => _card != null ? _card.id : 0;
-
-    // 번호로 카드 조회 — 없거나 미부여면 null
-    public static CardData Get(int _id)
+    static void Clear()
     {
-        if (_id <= 0) return null;
-
-        return s_byId.TryGetValue(_id, out var t_card) ? t_card : null;
+        s_allIds.Clear();
+        s_allSpecs.Clear();
+        s_includedIds.Clear();
+        s_specById.Clear();
+        s_synergiesById.Clear();
+        s_legacyNameToId.Clear();
+        IsReady = false;
     }
 
-    public static bool Contains(int _id) => _id > 0 && s_byId.ContainsKey(_id);
-
-    public static bool TryGet(int _id, out CardData _card)
+    public static bool Contains(int _id) => _id > 0 && s_includedIds.Contains(_id);
+    public static bool TryGetSpec(int _id, out CardSpec _spec)
     {
-        _card = Get(_id);
-        return _card != null;
+        _spec = null;
+        return IsReady && _id > 0 && s_specById.TryGetValue(_id, out _spec);
     }
-
-    /// <summary>구 세이브의 에셋 이름 키를 번호로 옮긴다. **세이브 이관 코드에서만 부를 것.**
-    /// 카탈로그에 없는 이름(삭제·리네임된 카드)이면 0 — 호출부가 그 항목을 버려야 한다.</summary>
+    public static CardSpec RequireSpec(int _id)
+    {
+        if (!IsReady) throw new InvalidOperationException("[CardCatalog] 초기화 전에 CardSpec을 조회했다.");
+        if (_id <= 0 || !s_specById.TryGetValue(_id, out CardSpec t_spec))
+            throw new InvalidOperationException($"[CardCatalog] 카드 ID {_id}의 CardSpec이 없다.");
+        return t_spec;
+    }
+    public static IReadOnlyList<SynergyData> RequireSynergies(int _id)
+    {
+        if (!IsReady) throw new InvalidOperationException("[CardCatalog] 초기화 전에 시너지를 조회했다.");
+        if (_id <= 0 || !s_synergiesById.TryGetValue(_id, out IReadOnlyList<SynergyData> t_synergies))
+            throw new InvalidOperationException($"[CardCatalog] 카드 ID {_id}의 시너지 매핑이 없다.");
+        return t_synergies;
+    }
     public static int LegacyIdOfName(string _name)
-    {
-        if (string.IsNullOrEmpty(_name)) return 0;
-
-        return s_legacyNameToId.TryGetValue(_name, out int t_id) ? t_id : 0;
-    }
+        => !string.IsNullOrEmpty(_name) && s_legacyNameToId.TryGetValue(_name, out int t_id) ? t_id : 0;
 }

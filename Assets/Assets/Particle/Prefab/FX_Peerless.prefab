@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 8338271271942541056}
   - component: {fileID: 4840741466293438018}
   - component: {fileID: 1405109414756592689}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Slash_High
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4905,7 +4905,7 @@ GameObject:
   - component: {fileID: 7287213229352479395}
   - component: {fileID: 2072206537542962929}
   - component: {fileID: 377261945091845707}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: root
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -9745,7 +9745,7 @@ GameObject:
   - component: {fileID: 8703843296892769857}
   - component: {fileID: 8234584499478820256}
   - component: {fileID: 4535995063720507342}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: FX_Peerless
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -14595,7 +14595,7 @@ GameObject:
   - component: {fileID: 1472248195127325805}
   - component: {fileID: 8348922537477972617}
   - component: {fileID: 5829360623281057719}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Slash_Back
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -19489,7 +19489,7 @@ GameObject:
   - component: {fileID: 1104509026297076452}
   - component: {fileID: 693792213849107244}
   - component: {fileID: 1845341304370491534}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Slash_Mid
   m_TagString: Untagged
   m_Icon: {fileID: 0}
