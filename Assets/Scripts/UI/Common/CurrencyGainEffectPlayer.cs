@@ -213,8 +213,11 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     /// HUD로 흘러든다(이동체가 하나여야 눈이 따라갈 대상이 정해진다).
     /// 잔액이 이미 최종값이라는 전제는 BuildGain과 같다 — 지급·저장이 끝난 뒤에 부른다.
     /// _origins[재화]는 그 재화의 빛이 피어날 자리, _lightSprite는 빛 그림(둘 다 호출부가 공급한다).
+    /// <para>_optimistic이면 그 전제를 뒤집고 예고량을 목표로 롤업한다 —
+    /// 자세한 규약은 <see cref="CurrencyHud.BeginGainRollUp"/>에 적혀 있다.</para>
     /// </summary>
-    public Sequence BuildLightGain(CurrencyGainBucket _gains, RectTransform[] _origins, Sprite _lightSprite)
+    public Sequence BuildLightGain(CurrencyGainBucket _gains, RectTransform[] _origins, Sprite _lightSprite,
+                                   bool _optimistic = false)
     {
         if (_gains == null || _gains.IsEmpty) return null;
 
@@ -224,7 +227,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
             var t_type   = (ECurrencyType)t_i;
             var t_origin = _origins != null && t_i < _origins.Length ? _origins[t_i] : null;
 
-            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, null, _lightSprite, t_i);
+            var t_seq = this.BuildLightStreak(t_type, _gains[t_type], t_origin, null, _lightSprite, t_i, _optimistic);
             if (t_seq == null) continue;
 
             t_master ??= DOTween.Sequence().SetLink(gameObject);
@@ -244,7 +247,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     /// </summary>
     public Sequence BuildLightGain(CurrencyGain _gain, RectTransform _origin, CurrencyHud _hud, Sprite _lightSprite)
     {
-        var t_seq = this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type);
+        var t_seq = this.BuildLightStreak(_gain.Type, _gain.Amount, _origin, _hud, _lightSprite, (int)_gain.Type, false);
 
         // 묶음판과 같은 규약 — 재화가 들어오는 사건은 어느 경로로 오든 같은 소리가 난다.
         t_seq?.InsertCallback(0f, () => SoundManager.Instance?.PlayCue(EOutgameSound.CurrencyGain));
@@ -255,7 +258,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
     // 종류 하나치 빛 줄기. 배선을 못 찾거나 줄 것이 없으면 null —
     // 판정은 전부 BeginGainRollUp보다 앞에 둔다(고정만 걸고 빠져나가면 수치가 영영 안 풀린다).
     Sequence BuildLightStreak(ECurrencyType _type, long _amount, RectTransform _origin,
-                              CurrencyHud _hud, Sprite _lightSprite, int _lane)
+                              CurrencyHud _hud, Sprite _lightSprite, int _lane, bool _optimistic)
     {
         if (_amount <= 0) return null;
 
@@ -291,7 +294,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
                                                     this.lightTailCount, this.lightTailInterval,
                                                     this.lightBow, this.lightTint);
 
-        var t_onArrived = t_hud.BeginGainRollUp(_amount, out var t_releaseDisplay, this.punchScale);
+        var t_onArrived = t_hud.BeginGainRollUp(_amount, out var t_releaseDisplay, this.punchScale, _optimistic);
 
         // 조각 목록은 이 줄기 것만 담는다 — 재화별로 갈라 두지 않으면 먼저 끝난 쪽이 남의 빛까지 걷어간다.
         var t_lights = new List<Graphic>();
