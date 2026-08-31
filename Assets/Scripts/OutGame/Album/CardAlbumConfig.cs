@@ -35,6 +35,12 @@ public struct AlbumThemeDef
     [Tooltip("테마 안정 키 — 리네임·순서 변경에도 불변. 비우면 보상이 영구 잠긴다.")]
     public string themeId;
     public string displayName;
+
+    [Tooltip("셀에 한 줄로 붙는 테마 소개. 비우면 셀의 설명 줄이 빈다.")]
+    public string description;
+
+    [Tooltip("준비 중 테마. 켜면 갤러리에 흑백+자물쇠로만 그려지고 열리지 않으며, 앨범 진행도·완성 보상 모수에서도 빠진다.")]
+    public bool locked;
     public Sprite icon;
     [Tooltip("셀 썸네일 프레임. 비우면 셀 프리팹에 저작된 스프라이트를 그대로 쓴다(테마마다 색을 달리하려면 저작할 것).")]
     public Sprite frame;

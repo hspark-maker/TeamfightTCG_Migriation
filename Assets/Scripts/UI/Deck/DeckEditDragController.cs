@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -20,8 +21,16 @@ public class DeckEditDragController : MonoBehaviour
 
     Func<IReadOnlyList<DeckEditSlotView>> m_slotProvider;
     Action<int, int>                      m_onDropped;
+    Action                                m_onEnded;
 
     RectTransform  m_ghostRect;
+    CanvasGroup    m_ghostGroup;
+
+    // 교체로 밀려난 카드를 돌려보내는 비행. 드래그와 고스트 한 벌을 나눠 쓰므로 둘은 배타다.
+    Tween m_flyTween;
+
+    const float FLY_TIME      = 0.26f;
+    const float FLY_END_SCALE = 0.5f;
     CardVisualView m_ghostView;
 
     bool             m_dragging;
@@ -42,10 +51,13 @@ public class DeckEditDragController : MonoBehaviour
                        ? rootCanvas.worldCamera
                        : null;
 
-    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, int> _onDropped)
+    /// <summary>_onEnded는 드롭 성사 여부와 무관하게 드래그가 끝날 때마다 발화한다(취소·화면 이탈 포함).
+    /// 드래그 동안 켜 둔 화면 신호를 끄는 자리다.</summary>
+    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, int> _onDropped, Action _onEnded = null)
     {
         m_slotProvider = _slotProvider;
         m_onDropped    = _onDropped;
+        m_onEnded      = _onEnded;
     }
 
     // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
@@ -158,6 +170,9 @@ public class DeckEditDragController : MonoBehaviour
         if (t_data != null) t_data.eligibleForClick = false;
 
         // 콜백은 정리 이후에 부른다 — 콜백이 그리드를 재빌드하며 Cancel을 되부를 수 있어 재진입에 안전해야 한다.
+        // 종료 통지가 드롭보다 먼저다 — 드롭 콜백이 칸을 재바인딩하며 새로 칠한 표시를 뒤늦은 통지가 지우면 안 된다.
+        m_onEnded?.Invoke();
+
         if (_slotIndex >= 0 && t_card > 0) m_onDropped?.Invoke(_slotIndex, t_card);
     }
 
@@ -215,6 +230,7 @@ public class DeckEditDragController : MonoBehaviour
         if (t_group == null) t_group = t_go.AddComponent<CanvasGroup>();
         t_group.blocksRaycasts = false;   // 고스트가 자기 밑의 슬롯 레이캐스트를 가리면 안 된다
         t_group.alpha          = ghostAlpha;
+        m_ghostGroup           = t_group;
 
         m_ghostRect = (RectTransform)t_go.transform;
 

@@ -23,7 +23,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     [SerializeField] CanvasGroup        canvasGroup;
 
     const float IN_DECK_ALPHA = 0.45f;   // 이미 편성된 카드(클릭 대상 아님)
-    const float FOCUS_DIM_ALPHA = 0.2f;  // 시너지 강조 중 해당 없는 카드
+    const float FOCUS_DIM_ALPHA = 0.2f;  // 강조 중 대상이 아닌 카드
 
     // 시너지 강조 대상 카드를 살짝 띄우는 확대. 여기서만 localScale을 쓴다 —
     // 표시 크기를 영구히 바꾸는 게 아니라 눌린 동안만 도는 연출이고, 그리드 배치는 rect 기준이라
@@ -74,9 +74,9 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         if (longPress != null) longPress.enabled = !_on;
     }
 
-    // 시너지 아이콘 롱프레스 중 호출. 해당 시너지가 없는 카드를 눌러 대상 카드만 남기고,
-    // 대상 카드는 살짝 키워 띄운다.
-    public void SetSynergyFocus(bool _focusing, bool _match)
+    // 대상이 아닌 카드를 눌러 강조 대상만 남기고, 대상 카드는 살짝 키워 띄운다.
+    // 시너지 아이콘 롱프레스와 슬롯 선택 모드가 함께 쓴다 — 두 강조는 배타라 알파 축(m_focusDimmed)을 공유해도 안전하다.
+    public void SetFocus(bool _focusing, bool _match)
     {
         m_focusDimmed = _focusing && !_match;
         ApplyAlpha();

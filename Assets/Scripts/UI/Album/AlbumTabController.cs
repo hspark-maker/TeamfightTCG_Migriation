@@ -180,7 +180,7 @@ public class AlbumTabController : LobbyTabPanel
                 m_cells[t_i].transform.SetSiblingIndex(t_i);
                 m_cells[t_i].gameObject.SetActive(true);
 
-                m_cells[t_i].Bind(t_themes[t_i], OpenTheme, t_i == t_anchorIndex);
+                m_cells[t_i].Bind(t_themes[t_i], t_i + 1, OpenTheme, t_i == t_anchorIndex);
             }
 
             for (int t_i = t_themes.Count; t_i < m_cells.Count; t_i++)
@@ -192,6 +192,8 @@ public class AlbumTabController : LobbyTabPanel
         int t_total = 0;
         for (int t_i = 0; t_i < t_themes.Count; t_i++)
         {
+            if (t_themes[t_i].IsLocked) continue;
+
             t_owned += CardAlbum.OwnedCountOf(t_themes[t_i]);
             t_owned -= AlbumInsertMask.HiddenCountIn(t_themes[t_i]);   // 아직 안 꽂은 몫은 화면에서 뺀다
             t_total += CardAlbum.TotalCountOf(t_themes[t_i]);
@@ -213,13 +215,17 @@ public class AlbumTabController : LobbyTabPanel
         if (OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
         {
             for (int t_i = 0; t_i < _themes.Count; t_i++)
-                if (Contains(_themes[t_i], t_card)) return t_i;
+                if (!_themes[t_i].IsLocked && Contains(_themes[t_i], t_card)) return t_i;
         }
 
         for (int t_i = 0; t_i < _themes.Count; t_i++)
-            if (AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
+            if (!_themes[t_i].IsLocked && AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
 
-        return _themes.Count > 0 ? 0 : -1;
+        // 꽂을 것이 하나도 없으면 첫 '열린' 테마 — 준비 중 테마는 지목하지 않는다.
+        for (int t_i = 0; t_i < _themes.Count; t_i++)
+            if (!_themes[t_i].IsLocked) return t_i;
+
+        return -1;
     }
 
     static bool Contains(AlbumTheme _theme, int _cardId)

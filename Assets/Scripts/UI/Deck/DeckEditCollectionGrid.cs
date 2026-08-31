@@ -29,6 +29,12 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     public ScrollRect Scroll => scrollRect;
 
+    /// <summary>목록이 차지한 화면 영역. 카드를 목록으로 돌려보내는 연출이 겨누는 지점이다 —
+    /// 개별 타일은 스크롤 밖에 있을 수 있어(뷰포트 마스크에 잘린다) 목적지로 쓸 수 없다.</summary>
+    public RectTransform ListArea => scrollRect != null && scrollRect.viewport != null
+                                     ? scrollRect.viewport
+                                     : (RectTransform)transform;
+
     // 드래그 고스트를 타일과 같은 크기로 띄우기 위한 값. 저작 시점 값을 쓸 수 없다 —
     // 매치 편집 패널은 GridRatioFitter가 cellSize를 컨테이너 폭에서 런타임에 다시 정한다.
     // 그리드를 못 찾으면 zero를 주고, 호출측이 자기 폴백을 쓰게 한다.
@@ -92,7 +98,20 @@ public class DeckEditCollectionGrid : MonoBehaviour
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
 
-            t_tile.SetSynergyFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+            t_tile.SetFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
+        }
+    }
+
+    /// <summary>슬롯 선택 모드에서 고른 카드 한 장만 남기고 나머지를 흐리게 한다. 0이면 전부 해제.</summary>
+    // SetSynergyFocus와 같은 알파 축을 쓴다 — 두 강조는 배타라(컨트롤러가 보장) 서로 덮어써도 흐린 채 굳지 않는다.
+    public void SetPickedCard(int _card)
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        {
+            var t_tile = m_tiles[t_i];
+            if (t_tile == null) continue;
+
+            t_tile.SetFocus(_card > 0, t_tile.Card == _card);
         }
     }
 

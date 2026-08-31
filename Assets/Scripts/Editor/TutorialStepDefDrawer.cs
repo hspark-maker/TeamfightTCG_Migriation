@@ -124,6 +124,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
     static readonly (EStepField Field, string Name)[] s_order =
     {
         (EStepField.Anchor,           "anchor"),
+        (EStepField.Spotlight,        "spotlight"),
         (EStepField.GuideMessage,     "guideMessage"),
         (EStepField.MessagePlacement, "messageAtBottom"),
         (EStepField.FreeOfCharge,     "freeOfCharge"),

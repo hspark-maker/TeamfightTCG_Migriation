@@ -44,7 +44,7 @@ internal static class AlbumBuilder
         }
 
         return new AlbumTheme(
-            _def.themeId, _def.displayName, _def.icon, _def.frame, _def.namePlate, _def.cellPrefab,
+            _def.themeId, _def.displayName, _def.description, _def.locked, _def.icon, _def.frame, _def.namePlate, _def.cellPrefab,
             ResolveRewards(_def.themeId, null, _def.rewards), t_pages.AsReadOnly(), t_ids.AsReadOnly(), t_stable);
     }
 

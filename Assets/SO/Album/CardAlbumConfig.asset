@@ -15,9 +15,11 @@ MonoBehaviour:
   themes:
   - themeId: Theme_Nature
     displayName: "\uB369\uAD74\uC232"
-    icon: {fileID: 0}
-    frame: {fileID: 0}
-    namePlate: {fileID: 0}
+    description: "\uB369\uAD74 \uC0AC\uC774\uC5D0 \uC228\uC740 \uC232\uC758 \uCE5C\uAD6C\uB4E4"
+    locked: 0
+    icon: {fileID: 21300000, guid: 9091a358ab806bf44a32e91f5f6e6a07, type: 3}
+    frame: {fileID: 21300000, guid: 7292e4a47471d4f458c030c775ff3d3a, type: 3}
+    namePlate: {fileID: 21300000, guid: c3631c9cc0b34454c9a5a895af17fd81, type: 3}
     cellPrefab: {fileID: 0}
     rewards:
     - currency: 1
@@ -50,6 +52,26 @@ MonoBehaviour:
       - currency: 2
         amount: 50
       cardIds: 28000000270000002000000024000000
+  - themeId: Theme_Ocean
+    displayName: "\uD478\uB978\uBC14\uB2E4"
+    description: "\uD30C\uB3C4 \uC544\uB798\uC5D0\uC11C \uD5E4\uC5C4\uCE58\uB294 \uCE5C\uAD6C\uB4E4"
+    locked: 1
+    icon: {fileID: 0}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
+    cellPrefab: {fileID: 0}
+    rewards: []
+    pages: []
+  - themeId: Theme_Snow
+    displayName: "\uB208\uAF43\uC124\uC6D0"
+    description: "\uB208\uBCF4\uB77C \uB108\uBA38\uC5D0\uC11C \uAE30\uB2E4\uB9AC\uB294 \uCE5C\uAD6C\uB4E4"
+    locked: 1
+    icon: {fileID: 0}
+    frame: {fileID: 0}
+    namePlate: {fileID: 0}
+    cellPrefab: {fileID: 0}
+    rewards: []
+    pages: []
   albumRewards:
   - currency: 0
     amount: 1000

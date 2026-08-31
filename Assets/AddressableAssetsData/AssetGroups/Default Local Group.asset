@@ -45,6 +45,11 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 433bc64ee546c684e85071d606a25a87
+    m_Address: SyncUiPrefabCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 61430c10ca6949a798ec10b366fae820
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab
     m_ReadOnly: 0
@@ -74,6 +79,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8ffda38cc32cce4390406846a163820
+    m_Address: MalgunGothic_TMP
+    m_ReadOnly: 0
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bab0c173e1415bd49a7b0ffd3bb1567c
     m_Address: UnlockIntroOverlay

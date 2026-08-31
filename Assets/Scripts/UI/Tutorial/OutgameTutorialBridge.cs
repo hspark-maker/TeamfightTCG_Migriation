@@ -267,7 +267,16 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim);
+        OutgameTutorialGateUI.Ensure(this.gatePrefab)
+            .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect());
+    }
+
+    // 타깃과 함께 밝힐 영역. 아직 등록되지 않았으면 강조 없이 진행한다 — 이 축이 진행을 막을 이유가 없다.
+    RectTransform SpotlightRect()
+    {
+        if (m_step == null || m_step.Spotlight == EOutgameTutorialAnchor.None) return null;
+
+        return TutorialAnchorRegistry.TryGet(m_step.Spotlight, out var t_rect, out _) ? t_rect : null;
     }
 
     // 딤 없이 클릭만 듣는다. onSatisfied가 null인 스텝(구매 대기)은 딤이 유일한 표시였으므로 걸 것이 없다
@@ -302,7 +311,10 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (StageTakenByTriggered) return;   // 트리거가 무대를 쥔 동안 내 안내를 그 위에 덮어 세우지 않는다
         if (m_enhancing || m_awaitingUnlockFx) return;
-        if (m_step == null || _key != m_step.Anchor) return;
+        if (m_step == null) return;
+
+        // 함께 밝힐 영역이 늦게 등록되는 경우도 다시 세운다 — 안 그러면 그 스텝은 강조 없이 굳는다.
+        if (_key != m_step.Anchor && _key != m_step.Spotlight) return;
 
         TryOpenGate();
     }

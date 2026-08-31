@@ -6,6 +6,12 @@ public sealed class AlbumTheme : AlbumSection
 {
     public string DisplayName { get; }
 
+    // 셀에 붙는 한 줄 소개. 미저작이면 빈 문자열
+    public string Description { get; }
+
+    // 준비 중 테마 — 갤러리가 흑백+자물쇠로 그리고, 완성 판정·진행도 모수에서도 빠진다
+    public bool IsLocked { get; }
+
     public Sprite Icon { get; }
 
     // 셀 스킨 — null이면 셀 프리팹에 저작된 스프라이트를 그대로 둔다
@@ -22,6 +28,8 @@ public sealed class AlbumTheme : AlbumSection
     internal AlbumTheme(
         string _key,
         string _displayName,
+        string _description,
+        bool _locked,
         Sprite _icon,
         Sprite _frame,
         Sprite _namePlate,
@@ -33,6 +41,8 @@ public sealed class AlbumTheme : AlbumSection
         : base(_key, _rewards, _cardIds, _hasStableKey ? "t:" + _key : null)
     {
         DisplayName = _displayName;
+        Description = _description ?? string.Empty;
+        IsLocked    = _locked;
         Icon = _icon;
         Frame = _frame;
         NamePlate = _namePlate;
