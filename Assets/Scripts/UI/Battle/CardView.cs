@@ -70,13 +70,6 @@ public class CardView : MonoBehaviour
     [SerializeField] float targetFocusScale = 1.15f;   // 드래그 조준 시 타겟 적 카드 확대 배율.
     [SerializeField] float targetFocusDur   = 0.15f;
 
-    [Header("Weapon")]
-    [SerializeField] Transform weaponAnchor;
-
-    [Header("Armed VFX")]
-    // 무장 이펙트를 카드 아트 위로 올릴 정렬 order(레이어는 카드와 동일하게 맞춘다).
-    [SerializeField] int armedVfxSortingOrder = 20;
-
     [Header("Keywords")]
     [SerializeField] Transform keywordIconRoot;
     [SerializeField] GameObject keywordIconPrefab;
@@ -133,30 +126,6 @@ public class CardView : MonoBehaviour
     [SerializeField] LineRenderer dragLine;
 
     CardInstance boundCard;
-
-    // 무기 수명(Instantiate/Destroy)과 무장 이펙트 풀 대여/반납은 각각 아래 두 객체가 소유한다.
-    // MonoBehaviour가 아니라 순수 C# 객체 — 인스펙터 배선은 위 SerializeField에 그대로 남고 값만 주입한다.
-    // 지연 생성인 이유: 비활성 상태로 Instantiate된 뷰는 Awake 전에 Render가 올 수 있다(주입값은 역직렬화 후에야 유효).
-    CardWeaponView weaponView;
-    CardArmedVfx   armedVfxView;
-
-    CardWeaponView WeaponView
-    {
-        get
-        {
-            if (this.weaponView == null) this.weaponView = new CardWeaponView(transform, this.weaponAnchor);
-            return this.weaponView;
-        }
-    }
-
-    CardArmedVfx ArmedVfxView
-    {
-        get
-        {
-            if (this.armedVfxView == null) this.armedVfxView = new CardArmedVfx(transform, this.armedVfxSortingOrder);
-            return this.armedVfxView;
-        }
-    }
 
     // 입력 제스처 상태머신(탭/드래그/롱프레스/조준/타깃 추적)은 CardInputController가 통째로 소유한다.
     // 여기 남는 건 Unity 메시지(OnMouse*/Update/OnDrawGizmos)를 그대로 넘기는 전달 스텁뿐이다 —
@@ -240,6 +209,8 @@ public class CardView : MonoBehaviour
     bool     shieldIndicatorCached;
 
     public CardInstance BoundCard => this.boundCard;
+    public int RenderedOwnerIndex { get; private set; } = -1;
+    public int RenderedSlotIndex { get; private set; } = -1;
     #endregion
 
     #region Unity Lifecycle
@@ -274,8 +245,6 @@ public class CardView : MonoBehaviour
     void OnDestroy()
     {
         BattleBoardView.Unregister(this);
-        this.armedVfxView?.Hide();   // 풀 대여분을 물고 죽으면 풀이 파괴된 오브젝트를 들고 있게 된다
-        this.weaponView?.Cleanup();  // 무기 인스턴스는 자식이라 Unity가 함께 파괴 — 참조만 끊는다
         this.decorView?.Cleanup();   // 아이콘/배지 트윈 끊기(파괴 전 DOKill 규약) + 스냅샷 참조 해제
         KillHpRoll();
         KillShieldTween();
@@ -341,17 +310,18 @@ public class CardView : MonoBehaviour
     #region Visual State
     public void Render(CardInstance _card, SynergyState _synergy = null)
     {
-        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 초기화한다.
+        // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 재설정한다.
         if (this.boundCard != _card)
         {
             this.cardAnim.ResetHitEffect();
-            this.armedVfxView?.Hide();   // 이전 카드의 무장 이펙트가 새 카드에 남지 않게
             // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
             KillHpRoll();
             this.hpPendingHeal = 0;
         }
 
         this.boundCard = _card;
+        this.RenderedOwnerIndex = _card?.ownerIndex ?? -1;
+        this.RenderedSlotIndex = _card?.slotIndex ?? -1;
         this.cardAnim.SetBoundCard(_card);
         bool t_isEmpty = _card == null;
 
@@ -361,8 +331,7 @@ public class CardView : MonoBehaviour
         if (t_isEmpty)
         {
             SetShieldVisible(false);
-            SetFaceDownLook(false);
-            SetupWeapon(null);
+            SetFaceDownLook(false, null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
             return;
         }
@@ -379,21 +348,17 @@ public class CardView : MonoBehaviour
         else if (this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
             WriteHpDisplay(this.shownHp, this.shownBonusHp);
         else SnapHpDisplay(_card);
-        this.nameText.text = t_isFaceDown ? "???" : _card.data.displayName;
+        this.nameText.text = t_isFaceDown ? "???" : _card.spec.DisplayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
         Sprite t_art = CardVisualRules.PickBattleArt(_card);
-        if (this.illustration != null && !t_isFaceDown && t_art != null)
-            this.illustration.sprite = t_art;
-
-        SetFaceDownLook(t_isFaceDown);
+        SetFaceDownLook(t_isFaceDown, t_art);
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
         this.activeSynergyState = _synergy;
 
-        SetupWeapon(_card.data);
         Decor.Refresh(_card, _synergy);   // 뒷면 은닉·표시 대상 판정은 CardDecorView 안에서.
     }
 
@@ -402,12 +367,13 @@ public class CardView : MonoBehaviour
 
     Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
     bool    illustrationScaleCached;
+    bool    missingCardBackWarned;
 
     /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
     ///
     /// 뒷면 그림은 카드 아트와 원본 크기가 달라(덱 더미용 이미지) 그대로 넣으면 카드 밖으로 삐져나온다.
     /// 그래서 **테두리 높이에 맞춰 스케일을 계산**한다 — 매직넘버를 두면 뒷면 이미지를 교체할 때마다 어긋난다.</summary>
-    void SetFaceDownLook(bool _faceDown)
+    void SetFaceDownLook(bool _faceDown, Sprite _frontArt)
     {
         if (!this.illustrationScaleCached && this.illustration != null)
         {
@@ -420,13 +386,29 @@ public class CardView : MonoBehaviour
 
         if (this.illustration == null) return;
 
-        if (!_faceDown || this.cardBackSprite == null)
+        if (!_faceDown)
         {
+            this.illustration.sprite = _frontArt;
+            this.illustration.enabled = _frontArt != null;
             this.illustration.transform.localScale = this.illustrationBaseScale;
             return;
         }
 
+        if (this.cardBackSprite == null)
+        {
+            this.illustration.sprite = null;
+            this.illustration.enabled = false;
+            this.illustration.transform.localScale = this.illustrationBaseScale;
+            if (!this.missingCardBackWarned)
+            {
+                this.missingCardBackWarned = true;
+                Debug.LogWarning($"[CardView] cardBackSprite가 없어 뒷면을 숨깁니다: {name}", this);
+            }
+            return;
+        }
+
         this.illustration.sprite = this.cardBackSprite;
+        this.illustration.enabled = true;
         this.illustration.transform.localScale = FitBackScale();
     }
 
@@ -499,12 +481,9 @@ public class CardView : MonoBehaviour
         return new Vector3(t_k, t_k, this.illustrationBaseScale.z);
     }
 
-    // ── 무기 / 무장 이펙트 위임 셰임 ──────────────────────────────────────
-    // 실제 구현은 CardWeaponView(무기 수명)와 CardArmedVfx(풀 대여/반납)가 소유한다.
+    // ── 무장 이펙트 위임 셰임 ────────────────────────────────────────────
+    // 실제 구현은 공용 BattleVfx 경로가 소유한다.
     // 아래는 기존 호출부(AttackSequence / AttackAnimTester / BattleSelection)를 위한 전달일 뿐이다.
-
-    // TODO: 호출부 이관 후 삭제
-    void SetupWeapon(CardData _data) => WeaponView.Setup(_data, this.boundCard);
 
     // 무장 이펙트는 여기 얹지 않는다 — ResolveHits가 접촉 직후 FocusWeapon(false)를 부르기 때문에
     // 같이 묶으면 반동이 끝나기도 전에 이펙트가 꺼진다. 무장/해제 시점에서 SetArmedVfx를 직접 부른다.
@@ -512,7 +491,7 @@ public class CardView : MonoBehaviour
     public void FocusWeapon(bool _active)
     {
         // 무기 애니메이션은 프레임에 얹힌 장식(WeaponAnimSpec)이 소유한다 — 무장에서 당기고 해제에서 되돌린다.
-        // CardData.weaponPrefab으로 무기를 따로 띄우던 경로(CardWeaponView)는 더 이상 타지 않는다:
+        // 무기를 카드마다 따로 Instantiate하던 구 경로는 삭제됐다:
         // 그 프리팹을 가진 카드가 하나도 없고, 두 경로가 같은 신호를 나눠 가지면 어느 쪽이 그렸는지 흐려진다.
         if (FrameWeaponAnim == null)
             Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': WeaponAnimSpec 없음", this);
@@ -542,16 +521,10 @@ public class CardView : MonoBehaviour
     /// 켜지는 시점 = 무장(FocusWeapon(true)), 꺼지는 시점 = 적에 닿는 순간(AttackSequence가 false로 호출).
     /// 중복 호출은 무시한다 — 드래그 중 여러 경로에서 불린다.</summary>
     // TODO: 호출부 이관 후 삭제
-    public void SetArmedVfx(bool _active)
-        => ArmedVfxView.SetActive(_active, this.boundCard, IsEnemySide, VfxSortingLayerId);
-
     /// <summary>무장 이펙트 프리팹을 갈아끼운다(null이면 카드의 AttackEffect가 정의한 Armed 항목 사용).
     /// AttackAnimTester가 후보를 넘겨보며 고를 때 쓴다 — 카드 에셋을 건드리지 않는 런타임 오버라이드.
     /// 켜져 있는 상태에서 바꾸면 즉시 교체된다.</summary>
     // TODO: 호출부 이관 후 삭제
-    public void SetArmedVfxPrefab(GameObject _prefab)
-        => ArmedVfxView.SetPrefabOverride(_prefab, this.boundCard, IsEnemySide, VfxSortingLayerId);
-
     public void SetHighlight(bool _active)
     {
         if (this.selectedHighlight != null)
@@ -917,7 +890,7 @@ public class CardView : MonoBehaviour
         this.cardAnim.FadeView(0f, 0.3f);
     }
 
-    /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardData.cinemaAttackStyle 하나로,
+    /// <summary>슬롯 배치 연출. 카드별 등장 연출 분기점 — 판정은 CardSpec.CinemaAttackStyle 하나로,
     /// **공격 시네마와 같은 축을 쓴다**(같은 에너지 구체를 공유하는 한 몸 연출이라 배선을 갈라두지 않는다).
     /// 호출부(BattleFieldView·BattleIntro)는 분기를 몰라도 되도록 여기 한 곳에서만 갈린다.</summary>
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = 0.6f)
@@ -965,8 +938,8 @@ public class CardView : MonoBehaviour
     void PlayPlacedEmblems()
         => SynergyEmblemVfx.PlayPlaced(this, this.boundCard, this.activeSynergyState);
 
-    bool UsesOrbAppear => this.boundCard?.data != null
-                       && this.boundCard.data.cinemaAttackStyle == CinemaAttackStyle.EnergyOrbDash;
+    // 카드별 시네마 스타일 축 폐기(데이터 0/40). 표에 열이 생기면 여기서 다시 판정한다.
+    bool UsesOrbAppear => false;
 
     public UniTask RestoreAfterAttack() => this.cardAnim.MoveToSlot();
     public void InitializeAnimator()    => this.cardAnim.Initialize();
@@ -1049,7 +1022,7 @@ public class CardView : MonoBehaviour
     // TODO: 호출부 이관 후 삭제
     public void PlayAttackAnim()
     {
-        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 weaponPrefab 경로의 배선)에 기대지 않는다 —
+        // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 무기 프리팹 경로의 배선)에 기대지 않는다 —
         // 어느 상태를 트는지는 그 장식의 WeaponAnimSpec이 스스로 안다.
         if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': WeaponAnimSpec 없음", this);
         else                         FrameWeaponAnim.Fire();

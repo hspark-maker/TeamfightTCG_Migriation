@@ -41,7 +41,6 @@ public struct AlbumThemeDef
 
     [Tooltip("준비 중 테마. 켜면 갤러리에 흑백+자물쇠로만 그려지고 열리지 않으며, 앨범 진행도·완성 보상 모수에서도 빠진다.")]
     public bool locked;
-
     public Sprite icon;
     [Tooltip("셀 썸네일 프레임. 비우면 셀 프리팹에 저작된 스프라이트를 그대로 쓴다(테마마다 색을 달리하려면 저작할 것).")]
     public Sprite frame;
@@ -61,7 +60,9 @@ public struct AlbumPageDef
     public string pageId;
     public List<AlbumRewardDef> rewards;
     [Tooltip("칸 순서 = 리스트 순서. null 칸 허용(완성 판정 모수에서 제외).")]
-    public List<CardData> cards;
+    [CardId] public List<int> cardIds;
+
+    public IReadOnlyList<int> CardIds => cardIds;
 }
 
 // 보상 1건 저작값. 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이고,

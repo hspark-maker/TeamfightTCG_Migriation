@@ -1,5 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 /// <summary>연출 확인 전용 테스트 씬 컨트롤러.
@@ -56,8 +58,8 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] BattleFieldView enemyFieldView;
 
     [Header("세울 카드 (슬롯 순서대로, 비우면 빈 슬롯)")]
-    [SerializeField] CardData[] playerCards = new CardData[3];
-    [SerializeField] CardData[] enemyCards  = new CardData[3];
+    [SerializeField, CardId] int[] playerCardIds = new int[3];
+    [SerializeField, CardId] int[] enemyCardIds  = new int[3];
 
     [Header("공격 연출 옵션")]
     // 연출 분기(원거리·무쌍·교활)는 **공격자 카드의 키워드**가 정한다 — 슬롯이 0으로 고정돼 있으면
@@ -79,12 +81,11 @@ public class AttackAnimTester : MonoBehaviour
     [Header("무장 VFX (공격자 기준, 무장~접촉까지 부착 유지)")]
     // 스폰/해제 시점은 CardView가 쥔다(무장=FocusWeapon(true), 해제=AttackSequence 접촉 시점).
     // 여기선 "어떤 프리팹을 쓸지"만 넘긴다 → localOffset/lifetime 같은 VfxSlot 자체 배치값은 안 쓰인다.
-    [SerializeField] VfxSlot attackVfx = new VfxSlot { localOffset = new Vector3(0f, 0f, -0.5f), lifetime = 2f };
     [Header("피격 VFX (방어자 기준, 접촉 시점)")]
     [SerializeField] VfxSlot hitVfx    = new VfxSlot { localOffset = new Vector3(0f, 0f, -0.5f), lifetime = 1.5f };
 
     [Header("타이밍 SO (주입 전용 — 값은 SO 인스펙터에서 고친다)")]
-    // 부트스트랩이 없는 씬이라 아무도 GameTiming에 SO를 안 넣어준다 → 그대로 두면 GameTiming.Battle이
+    // 초기화이 없는 씬이라 아무도 GameTiming에 SO를 안 넣어준다 → 그대로 두면 GameTiming.Battle이
     // 코드 기본값짜리 임시 인스턴스를 만들어 쓰고, 그걸 읽는 연출은 SO를 고쳐도 반응이 없다.
     [SerializeField] BattleTimingConfig timingConfig;
 
@@ -136,7 +137,6 @@ public class AttackAnimTester : MonoBehaviour
     [SerializeField] FlowSynergyVfxConfig  flowVfx;
 
     bool busy;
-    bool armedPreview;
 
     /// <summary>지금 연출이 도는 중인가. 인스펙터 버튼을 잠그는 기준.</summary>
     public bool Busy => this.busy;
@@ -149,25 +149,31 @@ public class AttackAnimTester : MonoBehaviour
             SynergyData t_syn = CurrentEmblemSynergy;
             return $"{(t_syn != null ? t_syn.name : "시너지 없음")} · {this.synergyPreview}"
                  + $" · vfx {(t_syn?.vfx != null ? t_syn.vfx.name : "미배선")}\n"
-                 + $"무장VFX {this.attackVfx.Index + 1}/{this.attackVfx.Count} {this.attackVfx.CurrentName}"
-                 + $"   피격VFX {this.hitVfx.Index + 1}/{this.hitVfx.Count} {this.hitVfx.CurrentName}";
+                 + $"피격VFX {this.hitVfx.Index + 1}/{this.hitVfx.Count} {this.hitVfx.CurrentName}";
         }
     }
 
-    void Start()
+    IEnumerator Start()
     {
+        if (!CardStandaloneInitializer.Ensure()) yield break;
+        yield return CardArtCache.Preload(CardCatalog.AllSpecs);
+        if (!CardArtCache.IsReady)
+        {
+            Debug.LogError("[AttackAnimTester] 카드 연출 에셋 준비 실패.");
+            yield break;
+        }
+
         TurnState.LocalOwnerIndex = 0;   // 플레이어(owner 0)가 로컬 → 탭 무장 대상.
         TurnState.InputAllowed    = true;
 
         ResolveConfig();
         ResolveSynergyAssets();
 
-        // 부트스트랩(GameInitializer) off라 애니메이터 캐시 초기화가 안 됨 → 첫 연출 누락 방지로 직접 호출.
+        // 초기화(GameInitializer) off라 애니메이터 캐시 초기화가 안 됨 → 첫 연출 누락 방지로 직접 호출.
         this.playerFieldView.InitializeAnimators();
         this.enemyFieldView.InitializeAnimators();
 
         RefreshField();
-        PushArmedVfx();
 
         CardView.OnAttack += HandleAttack;
     }
@@ -181,11 +187,11 @@ public class AttackAnimTester : MonoBehaviour
     /// <summary>인스펙터의 카드 배열대로 양쪽 필드를 다시 그린다. 카드를 바꾼 뒤 누르면 된다.</summary>
     public void RefreshField()
     {
-        RenderField(this.playerFieldView, this.playerCards, 0);
-        RenderField(this.enemyFieldView,  this.enemyCards,  1);
+        RenderField(this.playerFieldView, this.playerCardIds, 0);
+        RenderField(this.enemyFieldView,  this.enemyCardIds,  1);
     }
 
-    void RenderField(BattleFieldView _fv, CardData[] _cards, int _owner)
+    void RenderField(BattleFieldView _fv, int[] _cardIds, int _owner)
     {
         if (_fv == null) return;
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
@@ -193,10 +199,10 @@ public class AttackAnimTester : MonoBehaviour
             CardView t_cv = _fv.GetSlotView(i);
             if (t_cv == null) continue;
 
-            CardData t_data = (_cards != null && i < _cards.Length) ? _cards[i] : null;
-            if (t_data == null) { t_cv.Render(null); continue; }
+            int t_cardId = _cardIds != null && i < _cardIds.Length ? _cardIds[i] : 0;
+            if (t_cardId <= 0) { t_cv.Render(null); continue; }
 
-            var t_inst = new CardInstance(t_data, _owner) { isRevealed = true, slotIndex = i };
+            var t_inst = new CardInstance(t_cardId, _owner) { isRevealed = true, slotIndex = i };
             t_cv.Render(t_inst);
         }
     }
@@ -238,8 +244,7 @@ public class AttackAnimTester : MonoBehaviour
 
     async UniTask AttackCore(CardView _attacker, CardView _defender)
     {
-        AttackEffect t_effect = _attacker.BoundCard?.data?.attackEffect;
-
+        if (_attacker?.BoundCard == null || _defender?.BoundCard == null) return;
         // 적(비로컬) 공격이면 오프셋/회전 반전 — AttackSequence의 t_flip 규칙과 동일.
         bool t_flip = _attacker.BoundCard?.ownerIndex != TurnState.LocalOwnerIndex;
 
@@ -250,9 +255,7 @@ public class AttackAnimTester : MonoBehaviour
 
         // 무장 VFX는 무장 시점에 켜진다. 버튼 공격은 무장 단계를 안 거치므로 여기서 대신 켜준다
         // (탭/드래그 공격은 FocusWeapon에서 이미 켜져 있고, SetArmedVfx는 중복 호출에 안전).
-        _attacker.SetArmedVfx(true);
-
-        // _onEffect = 접촉 시점. 체력이 낮은 쪽만 사망시키고(체력은 안 깎는다) 피격 VFX를 띄운다.
+        // 규칙 상태를 먼저 확정한다. 체력이 낮은 쪽만 사망시키고 피격 이벤트를 만들어 연출에 넘긴다.
         void OnEffect()
         {
             if (this.killWeakerSide)
@@ -270,9 +273,21 @@ public class AttackAnimTester : MonoBehaviour
         // 필드 모델이 없는 테스터에서도 매치포인트 접근 줌·국소 감속을 함께 확인한다.
         BattleFinisher.ArmApproachPreview();
 
+        int t_defenderHpBefore = _defender.BoundCard.hp + _defender.BoundCard.bonusHp;
+        int t_attackerHpBefore = _attacker.BoundCard.hp + _attacker.BoundCard.bonusHp;
+        int t_splashHpBefore = t_splash?.BoundCard != null
+            ? t_splash.BoundCard.hp + t_splash.BoundCard.bonusHp : 0;
+        OnEffect();
+
+        var t_events = new List<BattleEvent>();
+        AddTesterDamage(t_events, _defender, _attacker, t_defenderHpBefore, BattleEventFlags.None);
+        AddTesterDamage(t_events, _attacker, _defender, t_attackerHpBefore, BattleEventFlags.Counter);
+        if (t_splash != null)
+            AddTesterDamage(t_events, t_splash, _attacker, t_splashHpBefore, BattleEventFlags.Splash);
+
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
-        await AttackSequence.PlaySplash(_attacker, _defender, t_effect,
-            _onEffect: OnEffect, _splashView: t_splash,
+        await AttackSequence.PlaySplash(_attacker, _defender,
+            _events: t_events, _splashView: t_splash,
             _preEffectKw: t_preKw, _atEffectKw: t_atKw,
             _forceSpecial: this.useSpecialCinema);
 
@@ -690,47 +705,22 @@ public class AttackAnimTester : MonoBehaviour
 
     // ── VFX 후보 넘기기 ──────────────────────────────────────────────────
 
-    public void CycleAttackVfx(int _step) { this.attackVfx.Cycle(_step); PushArmedVfx(); }
     public void CycleHitVfx(int _step)    => this.hitVfx.Cycle(_step);
 
     public void RescanVfx()
     {
-        this.attackVfx.Rescan();
         this.hitVfx.Rescan();
-        PushArmedVfx();
     }
 
     /// <summary>무장 없이 슬롯0에 무장 VFX를 강제로 켜본다(다시 누르면 끔).</summary>
-    public void ToggleArmedPreview()
-    {
-        this.armedPreview = !this.armedPreview;
-        this.playerFieldView?.GetSlotView(0)?.SetArmedVfx(this.armedPreview);
-    }
-
-    public bool ArmedPreview => this.armedPreview;
-
     /// <summary>피격 VFX만 적 슬롯0 위치에 한 번 띄운다.</summary>
     public void SpawnHitVfxPreview() => this.hitVfx.Spawn(this.enemyFieldView?.GetSlotView(0)?.transform);
 
     public void LogVfxPaths()
-        => Debug.Log($"[AttackTest] 무장VFX = {this.attackVfx.CurrentPath}\n          피격VFX = {this.hitVfx.CurrentPath}");
+        => Debug.Log($"[AttackTest] 피격VFX = {this.hitVfx.CurrentPath}");
 
     /// <summary>지금 고른 후보를 모든 슬롯의 무장 VFX 프리팹으로 밀어넣는다.
     /// 스폰 시점은 CardView가 쥐고 있으므로(무장~접촉) 테스터는 "무엇을 쓸지"만 정한다.</summary>
-    void PushArmedVfx()
-    {
-        GameObject t_prefab = this.attackVfx.Current;
-        PushArmedVfx(this.playerFieldView, t_prefab);
-        PushArmedVfx(this.enemyFieldView,  t_prefab);
-    }
-
-    static void PushArmedVfx(BattleFieldView _fv, GameObject _prefab)
-    {
-        if (_fv == null) return;
-        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
-            _fv.GetSlotView(i)?.SetArmedVfxPrefab(_prefab);
-    }
-
     // ── 내부 ────────────────────────────────────────────────────────────
 
     /// <summary>연출 SO 자동 배선(에디터 전용). 씬에 꽂힌 값이 있으면 그걸 존중하고, **비어 있을 때만** 채운다.
@@ -769,6 +759,8 @@ public class AttackAnimTester : MonoBehaviour
     /// 필드가 비어 있으면 프로젝트에서 찾아 쓴다(에디터 전용).</summary>
     void ResolveConfig()
     {
+        if (GameTiming.IsConfigured) return;
+
 #if UNITY_EDITOR
         if (this.timingConfig == null)
         {
@@ -855,11 +847,27 @@ public class AttackAnimTester : MonoBehaviour
         t_a.hp      = 0;
     }
 
+    static void AddTesterDamage(List<BattleEvent> _events, CardView _target, CardView _source,
+        int _hpBefore, BattleEventFlags _flags)
+    {
+        CardInstance t_target = _target?.BoundCard;
+        CardInstance t_source = _source?.BoundCard;
+        if (t_target == null) return;
+        int t_damage = _hpBefore - (t_target.hp + t_target.bonusHp);
+        if (t_damage <= 0) return;
+        _events.Add(new BattleEvent(BattleEventKind.Damage,
+            t_target.ownerIndex, t_target.slotIndex, t_damage,
+            t_source?.ownerIndex ?? -1, t_source?.slotIndex ?? -1, _flags));
+        if (!t_target.IsAlive)
+            _events.Add(new BattleEvent(BattleEventKind.Death,
+                t_target.ownerIndex, t_target.slotIndex));
+    }
+
     void Respawn(CardView _cv)
     {
         CardInstance t_old = _cv.BoundCard;
         if (t_old == null) return;
-        var t_fresh = new CardInstance(t_old.data, t_old.ownerIndex) { isRevealed = true, slotIndex = t_old.slotIndex };
+        var t_fresh = new CardInstance(t_old.cardId, t_old.ownerIndex) { isRevealed = true, slotIndex = t_old.slotIndex };
         _cv.Render(t_fresh);
     }
 }

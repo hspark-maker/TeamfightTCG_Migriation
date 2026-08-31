@@ -33,7 +33,7 @@ public readonly struct AttackPreview
         int  t_atkRaw       = _attacker.AttackDamage();
         bool t_hasCounter   = _attacker.TakesCounterFrom(_defender);
         int  t_counterRaw   = t_hasCounter ? _defender.AttackDamage() : 0;
-        int  t_thornRaw     = _defender.data?.passive?.ThornDamage ?? 0;
+        int  t_thornRaw     = 0;
 
         // 실제 순서가 기본타 → 반격 → [Attacked](가시) → 강화 추가타이므로,
         // 공격자가 반격/가시에 쓰러지는지 먼저 계산해야 추가타를 정확히 켜고 끌 수 있다.

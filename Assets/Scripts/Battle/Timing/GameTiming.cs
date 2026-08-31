@@ -13,6 +13,11 @@ public static class GameTiming
     const float MAX_SPEED = 5f;
 
     static float s_speed = 1f;
+    static BattleTimingConfig s_battle;
+    static bool s_configured;
+    static bool s_warnedDefault;
+
+    public static bool IsConfigured => s_configured;
 
     public static float Speed
     {
@@ -23,14 +28,37 @@ public static class GameTiming
     /// <summary>지속시간에 곱하는 계수. Speed 2배 = Factor 0.5배(절반 시간).</summary>
     public static float Factor => 1f / s_speed;
 
-    static BattleTimingConfig s_battle;
-
     public static BattleTimingConfig Battle
-        => s_battle != null ? s_battle : (s_battle = ScriptableObject.CreateInstance<BattleTimingConfig>());
+    {
+        get
+        {
+            if (s_battle != null) return s_battle;
+            WarnDefaultConfig();
+            return s_battle = ScriptableObject.CreateInstance<BattleTimingConfig>();
+        }
+    }
 
-    /// <summary>DataLibrary 등 부트스트랩에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
+    /// <summary>DataLibrary 등 초기화에서 실제 애셋 주입(선택). null이면 기본 유지.</summary>
     public static void SetConfig(BattleTimingConfig _battle)
     {
-        if (_battle != null) s_battle = _battle;
+        if (_battle == null) return;
+        s_battle = _battle;
+        s_configured = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_speed = 1f;
+        s_battle = null;
+        s_configured = false;
+        s_warnedDefault = false;
+    }
+
+    static void WarnDefaultConfig()
+    {
+        if (s_warnedDefault) return;
+        s_warnedDefault = true;
+        Debug.LogWarning("[GameTiming] BattleTimingConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 }

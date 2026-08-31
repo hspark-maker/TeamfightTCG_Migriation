@@ -10,8 +10,8 @@ using UnityEngine.UI;
 // 어떤 저장 슬롯이 선택됐는지는 이 뷰가 아니라 셸(MatchDeckShell)이 안다 — 여기는 상태를 들지 않는 순수 렌더러다.
 // 덱 데이터의 진실원은 내 쪽이 DeckSaveManager, 상대 쪽이 DeckConfig.EnemyDeck이고
 // 이 뷰는 매 Render마다 거기서 다시 읽는다(사본을 캐시하지 않는다).
-// 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다 — 게이트를 열기 전에
-// LobbyMatchLauncher.ConfirmOpponent가 확정해 캐리어에 실어둔다(전투가 소비하는 값과 동일).
+// 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다. 고정 상대·튜토리얼은 호스트가 미리 싣고,
+// 일반전은 매칭 전이라 비어 있다. 확정 뒤에는 전투가 같은 캐리어를 소비한다.
 public class MatchDeckPanelView : MonoBehaviour
 {
     [SerializeField] MatchDeckShell   shell;
@@ -77,7 +77,7 @@ public class MatchDeckPanelView : MonoBehaviour
         // 칸이 미배선이어도 이 판정만은 해야 한다 → 버튼 갱신을 칸 렌더보다 앞에 둔다.
         if (battleButton != null) battleButton.interactable = t_valid;
 
-        List<CardData> t_deck = t_valid ? DeckSaveManager.GetSlot(_slotIndex) : null;
+        List<int> t_deck = t_valid ? DeckSaveManager.GetSlot(_slotIndex) : null;
 
         // _owned는 항상 true다. 매치 화면에 올라오는 건 이미 편성된 소유 카드뿐이라 잠금 표시가 뜨면 안 된다.
         BindSlots(mySlots, t_deck, _mine: true);   // 내 덱이라 강화 반영 체력으로 그린다
@@ -85,15 +85,16 @@ public class MatchDeckPanelView : MonoBehaviour
     }
 
     // 상대 덱을 EnemySection 6칸에 그린다. 상대는 저장 슬롯이 아니라 씬 캐리어에서 온다.
-    // 캐리어가 비어 있으면(=호스트가 확정하지 못한 경우) 전 칸이 빈 칸으로 접힌다.
+    // 캐리어가 비어 있으면(=일반전 매칭 전) 전 칸이 빈 칸으로 접힌다.
     // 멀티는 상대 덱이 이 화면보다 늦게(배틀 씬의 SyncInitialDecks) 도착하므로 애초에 이 화면을 열지 않는다.
     void RenderEnemySlots()
     {
         // 표시용 공개이므로 _owned는 내 쪽과 같은 true — 상대 카드를 잠금 실루엣으로 가리지 않는다.
         // 내 강화는 안 붙인다 — _mine:false는 상대(AI) 레벨 기준으로 그린다(DeckPower.OpponentLevelOf).
-        BindSlots(enemySlots, DeckConfig.EnemyDeck, _mine: false);
+        List<int> t_enemyCards = DeckConfig.EnemyDeck;
+        BindSlots(enemySlots, t_enemyCards, _mine: false);
         // 파워 합도 같은 기준이어야 한다 — 칸은 상대 레벨, 배지만 내 강화 합이면 6칸 합계와 배지가 어긋난다.
-        m_enemyPowerValue = SetPower(enemyPowerText, DeckConfig.EnemyDeck, _mine: false);
+        m_enemyPowerValue = SetPower(enemyPowerText, t_enemyCards, _mine: false);
     }
 
     /// <summary>
@@ -177,7 +178,7 @@ public class MatchDeckPanelView : MonoBehaviour
 
     // 덱 파워 표기. 환산식은 DeckPower가 단일 진실원이다(편성 화면의 자동 편성 정렬과 같은 식).
     // 덱이 null이면 0이 찍힌다 — 미선택·불완전 덱을 빈칸이 아니라 0으로 보이게 하는 게 의도다.
-    static int SetPower(TMP_Text _text, List<CardData> _deck, bool _mine)
+    static int SetPower(TMP_Text _text, List<int> _deck, bool _mine)
     {
         int t_power = DeckPower.Of(_deck, _mine);
 
@@ -187,7 +188,7 @@ public class MatchDeckPanelView : MonoBehaviour
     }
 
     // 칸 배열 하나를 덱으로 채운다. 덱이 짧거나 null이면 남는 칸은 빈 칸이 된다.
-    static void BindSlots(CardVisualView[] _slots, List<CardData> _deck, bool _mine)
+    static void BindSlots(CardVisualView[] _slots, List<int> _deck, bool _mine)
     {
         // 미배선 배열은 조용히 건너뛴다 — 부분 배선으로 축소 화면을 만드는 게 이 프로젝트 UI의 관례다.
         if (_slots == null) return;
@@ -201,7 +202,7 @@ public class MatchDeckPanelView : MonoBehaviour
             // Bind(null, ...)이면 CardVisualView가 스스로 gameObject.SetActive(false)로 빈 칸을 숨긴다
             // (CardVisualView.Bind 진입부) → 여기서 빈 칸 숨김/복구를 따로 처리하지 않는다.
             // 카드를 다시 넘기면 같은 자리에서 SetActive(true)로 되살아난다.
-            _slots[t_i].Bind(t_i < t_count ? _deck[t_i] : null, true, _mine);
+            _slots[t_i].Bind(t_i < t_count ? _deck[t_i] : 0, true, _mine);
         }
     }
 

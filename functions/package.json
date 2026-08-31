@@ -1,0 +1,36 @@
+{
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-battle-sim.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-wallet-store.js && node scripts/test-wallet-migration.js && node scripts/test-schema-window.js && node scripts/test-growth.js && node scripts/test-open-pack.js && node scripts/test-claim-reward.js && node scripts/test-enhance.js && node scripts/test-spec-blob.js",
+    "test:battle-golden": "npm run build && node scripts/test-battle-sim.js",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "test:emulator": "npm run build && firebase emulators:exec --only firestore \"node scripts/test-ensure-account.js\""
+  },
+  "engines": {
+    "node": "24"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^7.0.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.25.4",
+    "firebase": "^12.18.0",
+    "firebase-functions-test": "^3.4.1",
+    "typescript": "^6.0.0"
+  },
+  "private": true
+}

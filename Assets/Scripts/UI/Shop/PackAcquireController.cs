@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Coffee.UIEffects;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -65,7 +66,7 @@ public class PackAcquireController : MonoBehaviour
 
     // 이번 개봉에서 처음 얻은 카드만(로비 도감 연출 대상). Consume은 1회뿐이라 여기 캐시한다.
     // 중복은 팩 결제 재화로 환급돼 코인 연출로 나가므로 도감 연출거리가 없다.
-    readonly List<CardData> m_newCards = new List<CardData>();
+    readonly List<int> m_newCards = new List<int>();
     // 이번 개봉의 중복 환급 합계(연출 표시용). 카드와 같은 시점에 캐시해야 짝이 갈라지지 않는다.
     CurrencyGain m_refund;
 
@@ -96,7 +97,7 @@ public class PackAcquireController : MonoBehaviour
 
         if (!PackHandoff.HasPending)
         {
-            // 정상 진입은 상점/부트가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
+            // 정상 진입은 상점/초기화가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
             Debug.LogWarning("[PackAcquireController] PackHandoff 없음 — 정상 진입이 아님(열 팩 없음).");
             return false;
         }
@@ -167,8 +168,8 @@ public class PackAcquireController : MonoBehaviour
 
         for (int t_i = 0; t_i < t_drawn.Count; t_i++)
         {
-            var t_card = t_drawn[t_i].Card;
-            if (t_card == null || !t_drawn[t_i].IsNew) continue;
+            int t_card = t_drawn[t_i].CardId;
+            if (t_card <= 0 || !t_drawn[t_i].IsNew) continue;
 
             m_newCards.Add(t_card);
         }
@@ -206,7 +207,7 @@ public class PackAcquireController : MonoBehaviour
         var t_hud = ActiveShardHud(m_refund.Type);
         if (t_hud == null) return;
 
-        // 잔액이 이미 최종값이라는 전제(TryPurchase가 환급까지 끝냈다) — 재생기가 그만큼 되돌렸다 올린다.
+        // 잔액이 이미 최종값이라는 전제(PurchaseAsync가 환급까지 끝냈다) — 재생기가 그만큼 되돌렸다 올린다.
         var t_light = refundEffect.BuildLightGain(m_refund, view.RefundCoinRect, t_hud, refundLightSprite);
         if (t_light == null) return;
 
@@ -244,7 +245,7 @@ public class PackAcquireController : MonoBehaviour
     // 살 수 없으면 잠근다(잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없다 — 상점 RefreshBuyLock과 같은 방침).
     // 튜토리얼 중에도 잠근다: 재개봉은 PackRevealView.OnAnyPackOpened를 한 번 더 쏘므로,
     //   "오버레이 1회 열림 : 개봉신호 1회"를 전제로 세는 튜토리얼 스텝이 어긋난다. 이 잠금이 그 유일한 방어다.
-    // 잔액 변동을 구독하지 않는 이유 — 환급까지 TryPurchase 안에서 이미 끝나 있고, 결과 화면이 떠 있는 동안
+    // 잔액 변동을 구독하지 않는 이유 — 환급까지 PurchaseAsync 안에서 이미 끝나 있고, 결과 화면이 떠 있는 동안
     //   잔액을 움직이는 것은 이 버튼 자신뿐이다. 그 직후 새 세션의 이 함수가 다시 판정한다.
     void RefreshRetryLock()
     {
@@ -299,11 +300,29 @@ public class PackAcquireController : MonoBehaviour
     {
         if (m_left || m_retrying || m_pack == null || view == null) return;
 
+        RetryAsync().Forget();
+    }
+
+    // 서버 왕복 재구매. 잠금은 호출 "전"에 세운다 — 왕복이 도는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
+    // 실패로 끝나면 반드시 되돌릴 것(안 풀면 이 화면에서 재개봉도 획득도 못 하고 갇힌다).
+    async UniTaskVoid RetryAsync()
+    {
+        // 결제는 곧 시작되고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다
+        // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
+        m_retrying = true;
+
+        var t_pack = m_pack;
+
         // 차감·소유·환급은 여기 한 곳에서만 일어난다(첫 구매와 같은 길). 실패면 차감 없이 돌아온다.
-        var t_opened = CardPackOpener.TryPurchase(m_pack);
+        var t_opened = await CardPackOpener.PurchaseAsync(t_pack);
+
+        // 왕복 중 오버레이가 사라졌다면 갈아끼울 세션도, 되돌릴 화면도 없다.
+        if (this == null) return;
+
         if (t_opened == null || !t_opened.Success)
         {
-            // 잔액 부족은 버튼이 이미 잠가 두므로 여기 오는 것은 팩 데이터 이상뿐 — 유저에게 물을 것이 없다.
+            m_retrying = false;
+            // 잔액 부족은 버튼이 이미 잠가 두므로 여기 오는 것은 팩 데이터 이상·서버 거절뿐 — 유저에게 물을 것이 없다.
             Debug.LogWarning($"[PackAcquireController] 재개봉 실패({(t_opened != null ? t_opened.Result.ToString() : "null")}) — 팩 데이터 확인.");
             RefreshRetryLock();
             return;
@@ -314,11 +333,7 @@ public class PackAcquireController : MonoBehaviour
         CardPackRewardHandoff.Set(PendingRefund(), m_newCards);
 
         // 목적지 컨텍스트는 그대로 물려준다 — 어느 세션에서 획득을 누르든 나가는 곳은 같아야 한다.
-        PackHandoff.Set(t_opened, m_pack, m_nextScene, m_startTutorial);
-
-        // 결제는 끝났고 화면만 아직 옛것이다. 이 구간의 이탈 차단은 이 플래그 하나로 한다
-        // (첫 구매도 s_transitioning 플래그로만 막는다 — 같은 사건이 여기서만 달리 보이지 않게).
-        m_retrying = true;
+        PackHandoff.Set(t_opened, t_pack, m_nextScene, m_startTutorial);
 
         // 첫 구매와 같은 임팩트를 같은 순서로 태운다(PackShowcaseController.OnBuyPressed 관용구).
         // 반응할 팩이 화면에 없으므로 눌린 버튼 자신이 그 자리를 대신한다 — 결제의 주체가 곧 버튼이다.
@@ -351,7 +366,7 @@ public class PackAcquireController : MonoBehaviour
     }
 
     // 획득 클릭: 튜토리얼이면 시작 → 목적지 씬으로 이동(1회 가드).
-    // 개봉 카드로 덱을 만들지 않는다 — 첫 덱은 부트의 StarterDeck이 보장하고, 이후 편성은 유저 몫이다.
+    // 개봉 카드로 덱을 만들지 않는다 — 첫 덱은 초기화의 StarterDeck이 보장하고, 이후 편성은 유저 몫이다.
     void OnAcquirePressed()
     {
         // 재구매가 화면을 덮는 중이면 나갈 수 없다 — 방금 산 팩이 캐리어에 갇힌 채 로비로 돌아간다.

@@ -28,9 +28,18 @@ MonoBehaviour:
   - sprite: {fileID: -433437760, guid: ca481716380744f43a87fac7b0387aeb, type: 3}
     clip: {fileID: 7400000, guid: ccdaf067d6e5ee54e92775b2d1a0febc, type: 2}
     label: Angry
+  - sprite: {fileID: 21300000, guid: 27caff0c89cb558458639efe0b9d0695, type: 3}
+    clip: {fileID: 0}
+    label: weirdCat
   - sprite: {fileID: 1416332904, guid: 1a8f5653cf1705244a204951bfa824fc, type: 3}
     clip: {fileID: 7400000, guid: ada22603774e241408fe6c06838629aa, type: 2}
     label: laugh
+  - sprite: {fileID: 21300000, guid: 45a42ab40de2220469b8c5c77227f35d, type: 3}
+    clip: {fileID: 0}
+    label: Pepe
+  - sprite: {fileID: 21300000, guid: de97b403d646b4c48a7d7386397f1aa9, type: 3}
+    clip: {fileID: 0}
+    label: KKang
   showDuration: 2.5
   fadeDuration: 0.3
   popScale: 1.25

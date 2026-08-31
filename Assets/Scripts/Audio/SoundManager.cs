@@ -10,12 +10,7 @@ public class SoundManager : MonoBehaviour
     [SerializeField] SoundBank outgameSoundBank;
     [SerializeField] int sfxPoolSize = 8;
 
-    [Header("Voice Pity")]
-    [SerializeField, Range(0f, 1f)] float voiceBaseChance = 0.4f;
-    [SerializeField, Range(0f, 1f)] float voiceChanceIncrement = 0.25f;
-
     AudioSource bgmSource;
-    AudioSource voiceSource;
     AudioSource[] sfxPool;
     int sfxIndex;
 
@@ -27,19 +22,12 @@ public class SoundManager : MonoBehaviour
 
     CancellationTokenSource bgmFadeCts;
 
-    float spawnVoiceChance;
-    float attackVoiceChance;
-    float killVoiceChance;
-    float deathVoiceChance;
-    float effectVoiceChance;
-
     void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
-        DontDestroyOnLoad(transform.root.gameObject);   // 부트 프리팹의 자식이라 루트 기준(단독 배치면 자기 자신)
+        DontDestroyOnLoad(transform.root.gameObject);   // 초기화 프리팹의 자식이라 루트 기준(단독 배치면 자기 자신)
         BuildSources();
-        ResetVoiceChances();
         if (config?.bgm != null) PlayBGM(config.bgm);
     }
 
@@ -58,25 +46,23 @@ public class SoundManager : MonoBehaviour
     {
         this.bgmCeiling = _vol;
         ApplyBgmVolume();
-        PlayerPrefs.SetFloat(PREFS_BGM, _vol);
+        LocalPrefs.SetFloat(PREFS_BGM, _vol);
     }
 
     public void SetSFXVolume(float _vol)
     {
         this.sfxCeiling = _vol;
         ApplySfxVolume();
-        PlayerPrefs.SetFloat(PREFS_SFX, _vol);
+        LocalPrefs.SetFloat(PREFS_SFX, _vol);
     }
 
     void BuildSources()
     {
-        this.bgmCeiling = PlayerPrefs.GetFloat(PREFS_BGM, 1f);
-        this.sfxCeiling = PlayerPrefs.GetFloat(PREFS_SFX, 1f);
+        this.bgmCeiling = LocalPrefs.GetFloat(PREFS_BGM, 1f);
+        this.sfxCeiling = LocalPrefs.GetFloat(PREFS_SFX, 1f);
 
         bgmSource = gameObject.AddComponent<AudioSource>();
         bgmSource.loop = true;
-
-        voiceSource = gameObject.AddComponent<AudioSource>();
 
         sfxPool = new AudioSource[sfxPoolSize];
         for (int i = 0; i < sfxPoolSize; i++)
@@ -94,22 +80,12 @@ public class SoundManager : MonoBehaviour
     void ApplySfxVolume()
     {
         float t_vol = SfxVolumeFor(1f);
-        if (this.voiceSource != null) this.voiceSource.volume = t_vol;
         if (this.sfxPool == null) return;
         foreach (AudioSource t_src in this.sfxPool)
             if (t_src != null) t_src.volume = t_vol;
     }
 
     float SfxVolumeFor(float _scale) => this.sfxCeiling * (this.config != null ? this.config.sfxVolume : 1f) * _scale;
-
-    void ResetVoiceChances()
-    {
-        spawnVoiceChance = voiceBaseChance;
-        attackVoiceChance = voiceBaseChance;
-        killVoiceChance = voiceBaseChance;
-        deathVoiceChance = voiceBaseChance;
-        effectVoiceChance = voiceBaseChance;
-    }
 
     // ── BGM ───────────────────────────────────────────────────────────────
 
@@ -244,31 +220,4 @@ public class SoundManager : MonoBehaviour
 
     // ── Voice (Pity) ──────────────────────────────────────────────────────
 
-    public void PlaySpawnVoice(AudioClip[] _clips) => TryVoice(_clips, ref spawnVoiceChance);
-    public void PlayAttackVoice(AudioClip[] _clips) => TryVoice(_clips, ref attackVoiceChance);
-    public void PlayKillVoice(AudioClip[] _clips) => TryVoice(_clips, ref killVoiceChance);
-    public void PlayDeathVoice(AudioClip[] _clips) => TryVoice(_clips, ref deathVoiceChance);
-    public void PlayEffectVoice(AudioClip[] _clips) => TryVoice(_clips, ref effectVoiceChance);
-
-    void TryVoice(AudioClip[] _clips, ref float _chance)
-    {
-        if (_clips == null || _clips.Length == 0) return;
-        if (voiceSource.isPlaying)
-        {
-            _chance = Mathf.Min(1f, _chance + voiceChanceIncrement);
-            return;
-        }
-
-        if (Random.value > _chance)
-        {
-            _chance = Mathf.Min(1f, _chance + voiceChanceIncrement);
-            return;
-        }
-        AudioClip t_clip = _clips[Random.Range(0, _clips.Length)];
-        if (t_clip == null) return;
-        voiceSource.Stop();
-        voiceSource.clip = t_clip;
-        voiceSource.Play();
-        _chance = voiceBaseChance;
-    }
 }

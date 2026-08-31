@@ -61,7 +61,7 @@ Material:
     - _AddPrecomputedVelocity: 1
     - _Dissovle: -0.093
     - _Distortion: 0
-    - _Emi_ins: 1
+    - _Emi_ins: 8.96
     - _Float0: 0
     - _Main_Ins: 1
     - _Main_Power: 1

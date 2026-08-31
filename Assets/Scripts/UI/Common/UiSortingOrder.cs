@@ -56,7 +56,7 @@ public static class UiSortingOrder
     /// 밑에서 끌리게 된다. 그래서 고스트만 게이트 위로 따로 올린다.</summary>
     public const int DragGhost = 360;
 
-    /// <summary>UIPoolManager의 UI 컨테이너(Boot.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
+    /// <summary>UIPoolManager의 UI 컨테이너(Initialize.prefab). 무대가 아니라 풀린 UI가 담기는 자리라
     /// 비어 있어도 항상 켜져 있다 — 이 표가 생긴 이유다.</summary>
     public const int Pool = 400;
 
@@ -66,11 +66,25 @@ public static class UiSortingOrder
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>
     public const int Setting = 900;
 
+    /// <summary>클라우드 세이브 동기화 지연 배너(CloudSyncBanner.prefab). 어떤 화면에서도 보여야 하므로 설정(<see cref="Setting"/>) 위다.
+    /// 다만 커튼(<see cref="Curtain"/>)·로딩 커버(<see cref="LoadingCover"/>)보다는 아래에 둔다 —
+    /// 화면을 갈아 끼우는 동안은 아무 것도 새면 안 되고, 배너는 갈아 끼운 뒤에도 그대로 떠 있다.</summary>
+    public const int CloudSyncBanner = 940;
+
     /// <summary>씬을 갈아 끼우는 커튼(SceneCurtain.prefab).</summary>
     public const int Curtain = 950;
 
     /// <summary>로딩 커버(LoadingCover.prefab).</summary>
     public const int LoadingCover = 1000;
+
+    /// <summary>초기화 로그인 관문(Popup_LoginEmail). 계정이 정해지기 전에는 초기화가 멈춰 있으므로
+    /// 로딩 커버(<see cref="LoadingCover"/>) <b>위</b>다 — 아래에 두면 커버에 가려 아무것도 고를 수 없다.</summary>
+    public const int SignIn = 1100;
+
+    /// <summary>전역 터치 이펙트(TouchEffectOverlay.prefab). 어느 화면 위에서 눌러도 손끝에 보여야 하므로
+    /// 로딩 커버·로그인 관문(<see cref="SignIn"/>)보다 위다. 대신 입력은 먹지 않는다 —
+    /// 이 층은 GraphicRaycaster 없이 그리기만 한다.</summary>
+    public const int TouchEffect = 31000;
 
     /// <summary>화면 전체를 덮는 번쩍임(ScreenFlash). 그 밑에서 화면을 갈아치우는 것이 목적이라 무엇보다 위다.</summary>
     public const int ScreenFlash = 32000;

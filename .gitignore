@@ -69,6 +69,7 @@ crashlytics-build.properties
 
 # Packed Addressables
 /[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+/[Ss]erver[Dd]ata/
 
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
@@ -105,3 +106,17 @@ Assets/Fonts/MalgunGothic_TMP.asset
 Assets/Fonts/MalgunGothic_OutlinfFont.asset
 
 .mcp.json
+
+# Firebase 데스크톱 네이티브 — FirebaseCppApp .bundle 이 106MB 라 GitHub 100MB 한도를 넘는다.
+# .bundle=macOS 에디터, .so=Linux 에디터 전용이라 Windows 개발/Android·iOS 빌드에는 안 쓰인다.
+# 해당 플랫폼에서 에디터를 돌려야 하면 같은 버전 Firebase Unity SDK 를 임포트해 복원한다.
+Assets/Firebase/Plugins/x86_64/*.bundle
+Assets/Firebase/Plugins/x86_64/*.bundle.meta
+Assets/Firebase/Plugins/x86_64/*.so
+Assets/Firebase/Plugins/x86_64/*.so.meta
+
+# 에이전트 워크트리 (gitlink 실수 커밋 방지)
+.claude/worktrees/
+
+# Firebase CLI 배포·에뮬레이터 캐시
+.firebase/

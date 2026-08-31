@@ -42,7 +42,7 @@ public readonly struct TutorialIssue
 /// <summary>튜토리얼 저작을 플레이 없이 정적으로 판정한다.
 ///
 /// 이 도구가 필요한 이유: 저작 실수는 런타임에 조용히 삼켜지거나(TutorialStepExecutor.Fail — 기본 Skip이면
-/// 경고 한 줄 뒤 그냥 전진) 부트 로그에만 뜬다. 게다가 진행이 막히면 fail-open이 남은 기능을 전부 열어
+/// 경고 한 줄 뒤 그냥 전진) 초기화 로그에만 뜬다. 게다가 진행이 막히면 fail-open이 남은 기능을 전부 열어
 /// (OutgameFeatureLock.NotifyStalled) 증상 자체가 "정상처럼" 보인다. 그래서 사람 눈으로는 잡히지 않는다.</summary>
 public static class TutorialValidator
 {
@@ -73,8 +73,8 @@ public static class TutorialValidator
             (EStepField.ShowDeckGate,     "showDeckGate",     "덱 게이트"),
             (EStepField.DeckName,         "deckName",         "덱 이름"),
             (EStepField.FailurePolicy,    "onFailure",        "실패 정책"),
-            (EStepField.Card,             "card",             "카드"),
-            (EStepField.Cards,            "cards",            "카드 묶음"),
+            (EStepField.Card,             "cardId",           "카드 ID"),
+            (EStepField.Cards,            "cardIds",          "카드 ID 묶음"),
         };
 
         var t_probes = new List<(EStepField, FieldInfo, string)>(t_axes.Length);
@@ -85,7 +85,7 @@ public static class TutorialValidator
         }
 
         s_probes     = t_probes.ToArray();
-        s_anchorCard = FieldOf("anchorCard");
+        s_anchorCard = FieldOf("anchorCardId");
     }
 
     /// <summary>온보딩 시퀀스 점검. 좌표 순서로 돌려준다(심각도 정렬은 창이 한다).</summary>
@@ -319,17 +319,17 @@ public static class TutorialValidator
          && _def.Anchor == EOutgameTutorialAnchor.None)
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "재개 불가 Halt",
                 $"{t_action}가 Halt인데 앵커도 완료 신호도 없습니다 — " + (_onboarding
-                    ? "되돌려도 이 부트에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 부팅뿐입니다)."
+                    ? "되돌려도 이 초기화에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 부팅뿐입니다)."
                     : "트리거 좌표는 메모리 전용이라 되돌린 자리에서 이 안내가 그대로 끝납니다."),
                 "onFailure를 Skip으로 바꾸거나, 되돌아왔을 때 진행을 다시 세울 앵커를 주세요.");
 
         // (7) 액션이 요구하는 참조가 비면 실행기가 실패 분기로 빠진다 — 기본 Skip이면 경고 한 줄 남기고 그냥 전진한다
         ValidatePack(_def, t_action, _chapter, _index, _issues);
 
-        if (TutorialStepDef.UsesCard(t_action) && _def.Card == null)
+        if (TutorialStepDef.UsesCard(t_action) && _def.CardId <= 0)
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "카드 미배선",
                 $"{t_action}가 지급할 카드가 비어 있습니다.",
-                "card에 CardData를 배선하세요.");
+                "cardId에 카드 ID를 배선하세요.");
 
         if (TutorialStepDef.UsesCards(t_action)) ValidateCards(_def, _chapter, _index, _issues);
 
@@ -387,11 +387,11 @@ public static class TutorialValidator
     // 실제로 무의미한 것은 지급이 0장이 되는 경우뿐이다 — 목록이 비었거나 전부 빈 칸일 때.
     static void ValidateCards(TutorialStepDef _def, int _chapter, int _index, List<TutorialIssue> _issues)
     {
-        var t_cards = _def.Cards;
+        var t_cards = _def.CardIds;
 
         if (t_cards != null)
             for (int t_i = 0; t_i < t_cards.Count; t_i++)
-                if (t_cards[t_i] != null) return;
+                if (t_cards[t_i] > 0) return;
 
         Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "카드 묶음 비었음",
             $"{_def.Action}가 지급할 카드가 한 장도 없습니다 — 보상 화면만 서고 아무 것도 지급되지 않습니다.",

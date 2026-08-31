@@ -1,7 +1,7 @@
 /// <summary>이 판의 MatchRandom 시드를 거는 **정책의 단일 진실원**.
 ///
-/// 규칙은 하나다: 멀티는 건드리지 않고(SyncInitialDecks의 commit-reveal이 시드한다),
-/// 튜토리얼이면 고정 시드, 아니면 로컬 랜덤.
+/// 규칙은 하나다: 멀티는 건드리지 않고(씬 전 동기화가 서버 시드를 이미 걸었다),
+/// 튜토리얼이면 고정 시드, AI 대전이면 진입 검증이 받아 온 서버 시드, 그것도 없으면 로컬 랜덤.
 ///
 /// 이 정책이 GameInitializer와 TurnRunner 두 곳에 복사돼 있었다 — 튜토리얼 시드 규칙을
 /// 한쪽만 고치면 우회 진입 경로가 다른 시드를 내는 구조였다. 호출 시점만 두 종류이고
@@ -16,7 +16,7 @@ public static class MatchSeeding
         if (DeckConfig.IsMultiplayer)
         {
             // 정상 경로에선 도달 불가. 조용히 넘기면 미시드로 진행하는 사고를 숨기므로 로그를 남긴다.
-            UnityEngine.Debug.LogError("[Seed] 멀티 경로에서 SeedForNewMatch 호출 — commit-reveal과 충돌한다.");
+            UnityEngine.Debug.LogError("[Seed] 멀티 경로에서 SeedForNewMatch 호출 — 서버 시드와 충돌한다.");
             return;
         }
         Apply();
@@ -33,7 +33,23 @@ public static class MatchSeeding
 
     static void Apply()
     {
-        if (TutorialConfig.IsActive) MatchRandom.Seed(TutorialConfig.FixedSeed);
-        else                         MatchRandom.SeedRandomLocal();
+        // 튜토리얼이 먼저다 — 시나리오는 매 실행 같은 판이어야 하고, 진입 검증도 타지 않아 서버 시드가 없다.
+        if (TutorialConfig.IsActive)
+        {
+            MatchRandom.Seed(TutorialConfig.FixedSeed);
+            return;
+        }
+
+        // 로비 진입 검증(SoloMatchSync)이 받아 온 서버 시드. 이 값으로 돌아야 서버가 같은 판을 재현할 수 있다.
+        if (SoloMatchHandoff.TryConsumeSeed(out ulong t_serverSeed))
+        {
+            MatchRandom.Seed(t_serverSeed);
+            return;
+        }
+
+        // 로비를 거치지 않은 진입(배틀 씬 직접 재생·테스트 씬)뿐이어야 한다.
+        // 정상 경로에서 여기 오면 그 판은 서버가 재현할 수 없으므로 조용히 넘기지 않는다.
+        UnityEngine.Debug.LogWarning("[Seed] 서버 시드가 없어 로컬 난수로 진행한다 — 이 판은 서버가 재현할 수 없다.");
+        MatchRandom.SeedRandomLocal();
     }
 }

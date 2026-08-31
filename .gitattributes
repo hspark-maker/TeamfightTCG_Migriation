@@ -27,3 +27,10 @@
 # ⚠ 이 두 줄은 위의 *.asset 규칙보다 뒤에 있어야 한다 — gitattributes는 마지막 일치가 이긴다.
 Assets/Fonts/**/*.asset          -text merge=ours
 Assets/Resources/Fonts/*.asset   -text merge=ours
+
+# Unity prefab YAML must use Smart Merge to keep nested-prefab edits reviewable.
+*.prefab merge=unityyamlmerge
+
+# Cloud Functions 소스는 ESLint linebreak-style(LF)을 강제한다 —
+# Windows 체크아웃에서 CRLF로 떨어지면 predeploy lint가 전 파일에서 터진다.
+functions/** text eol=lf

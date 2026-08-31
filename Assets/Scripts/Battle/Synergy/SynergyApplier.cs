@@ -13,7 +13,7 @@ public static class SynergyApplier
         foreach (var t_card in cards)
         {
             if (t_card == null) continue;
-            t_card.ClearSynergy();  // 재적용해도 누적되지 않도록 초기화
+            t_card.ClearSynergy();  // 재적용해도 누적되지 않도록 재설정
             t_cards.Add(t_card);
         }
 
@@ -41,7 +41,10 @@ public static class SynergyApplier
     // 배열에 중복 나열돼도 존재 여부만 보므로 카드당 1회 판정 → effect 이중적용 없음.
     public static bool BelongsTo(CardInstance _card, SynergyData _synergy)
     {
-        if (_card == null || !_card.synergyEnabled || _card.data?.synergies == null || _synergy == null) return false;
-        return System.Array.IndexOf(_card.data.synergies, _synergy) >= 0;
+        if (_card == null || !_card.synergyEnabled || !CardCatalog.Contains(_card.cardId) || _synergy == null) return false;
+        IReadOnlyList<SynergyData> t_synergies = CardCatalog.RequireSynergies(_card.cardId);
+        for (int i = 0; i < t_synergies.Count; i++)
+            if (t_synergies[i] == _synergy) return true;
+        return false;
     }
 }

@@ -15,20 +15,8 @@ MonoBehaviour:
   enableSynergy: 1
   playerCardLevel: 3
   enemyCardLevel: 3
-  playerDeck:
-  - {fileID: 11400000, guid: 36745bec5e9c1f544b5965c8faf65fb8, type: 2}
-  - {fileID: 11400000, guid: 825c6972f2caec54e9301110361dcdaf, type: 2}
-  - {fileID: 11400000, guid: 4c49414ab639d5c4e83d5d5d7af945cb, type: 2}
-  - {fileID: 11400000, guid: 4d1aba428ef74f2469117b1bd542bea4, type: 2}
-  - {fileID: 11400000, guid: e1a2b3c4d5e6f7081920314253647586, type: 2}
-  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-  enemyDeck:
-  - {fileID: 11400000, guid: 06a290ad1d4489a48b06f3d423941aa4, type: 2}
-  - {fileID: 11400000, guid: 75b26e88605fc0441946a724f55d19a2, type: 2}
-  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
-  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
-  - {fileID: 11400000, guid: 0a1b2c3d4e5f60718293a4b5c6d7e8f9, type: 2}
-  - {fileID: 11400000, guid: 9f8e7d6c5b4a39281706f5e4d3c2b1a0, type: 2}
+  playerDeckIds: 140000001200000011000000130000001b0000001e000000
+  enemyDeckIds: 15000000160000001d0000001e0000001d0000001e000000
   playerScript:
   - kind: 1
     attackerSlot: -1

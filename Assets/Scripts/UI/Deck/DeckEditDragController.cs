@@ -20,11 +20,10 @@ public class DeckEditDragController : MonoBehaviour
     [SerializeField] float            ghostAlpha = 0.85f;
 
     Func<IReadOnlyList<DeckEditSlotView>> m_slotProvider;
-    Action<int, CardData>                 m_onDropped;
+    Action<int, int>                      m_onDropped;
     Action                                m_onEnded;
 
     RectTransform  m_ghostRect;
-    CardVisualView m_ghostView;
     CanvasGroup    m_ghostGroup;
 
     // 교체로 밀려난 카드를 돌려보내는 비행. 드래그와 고스트 한 벌을 나눠 쓰므로 둘은 배타다.
@@ -32,9 +31,10 @@ public class DeckEditDragController : MonoBehaviour
 
     const float FLY_TIME      = 0.26f;
     const float FLY_END_SCALE = 0.5f;
+    CardVisualView m_ghostView;
 
     bool             m_dragging;
-    CardData         m_card;
+    int              m_card;
     PointerEventData m_data;
     int              m_finger = -1;   // 추적 중인 레거시 Input 터치의 fingerId. -1 = 마우스(터치 없음)
 
@@ -53,7 +53,7 @@ public class DeckEditDragController : MonoBehaviour
 
     /// <summary>_onEnded는 드롭 성사 여부와 무관하게 드래그가 끝날 때마다 발화한다(취소·화면 이탈 포함).
     /// 드래그 동안 켜 둔 화면 신호를 끄는 자리다.</summary>
-    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, CardData> _onDropped, Action _onEnded = null)
+    public void Setup(Func<IReadOnlyList<DeckEditSlotView>> _slotProvider, Action<int, int> _onDropped, Action _onEnded = null)
     {
         m_slotProvider = _slotProvider;
         m_onDropped    = _onDropped;
@@ -61,9 +61,9 @@ public class DeckEditDragController : MonoBehaviour
     }
 
     // _cellSize는 카드가 뽑혀 나온 그리드의 실제 칸 크기. zero면 인스펙터 폴백(ghostSize)을 쓴다.
-    public void Begin(CardData _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
+    public void Begin(int _card, PointerEventData _data, ScrollRect _ownerScroll, Vector2 _cellSize)
     {
-        if (m_dragging || _card == null || _data == null) return;
+        if (m_dragging || _card <= 0 || _data == null) return;
 
         // 1) ScrollRect가 이미 드래그 중이면 정상 종료 이벤트를 먹여서 끝낸다.
         //    pointerDrag만 null로 만들면 ScrollRect가 OnEndDrag를 못 받아
@@ -120,9 +120,9 @@ public class DeckEditDragController : MonoBehaviour
 
     /// <summary>교체로 밀려난 카드를 목적지 쪽으로 짧게 날려 보낸다(덱 편집의 교체 확정 연출).
     /// 드래그와 고스트 인스턴스가 하나뿐이라 드래그 중에는 아무것도 하지 않는다.</summary>
-    public void FlyOut(CardData _card, RectTransform _from, RectTransform _to, Vector2 _cellSize)
+    public void FlyOut(int _card, RectTransform _from, RectTransform _to, Vector2 _cellSize)
     {
-        if (m_dragging || _card == null || _from == null || _to == null) return;
+        if (m_dragging || _card <= 0 || _from == null || _to == null) return;
 
         EnsureGhost();
         if (m_ghostRect == null || dragLayer == null) return;
@@ -225,7 +225,7 @@ public class DeckEditDragController : MonoBehaviour
     // _slotIndex >= 0이면 드롭 성사. 성사 여부와 무관하게 드래그 상태는 항상 여기서 정리된다.
     void Finish(int _slotIndex)
     {
-        CardData         t_card = m_card;
+        int              t_card = m_card;
         PointerEventData t_data = m_data;
 
         KillFly();   // 화면을 떠나는 경로(Cancel)도 여기로 모인다 — 비행만 남아 떠 있지 않게
@@ -235,7 +235,7 @@ public class DeckEditDragController : MonoBehaviour
         UnlockScroll();
 
         m_dragging = false;
-        m_card     = null;
+        m_card     = 0;
         m_data     = null;
         m_finger   = -1;
 
@@ -247,7 +247,7 @@ public class DeckEditDragController : MonoBehaviour
         // 종료 통지가 드롭보다 먼저다 — 드롭 콜백이 칸을 재바인딩하며 새로 칠한 표시를 뒤늦은 통지가 지우면 안 된다.
         m_onEnded?.Invoke();
 
-        if (_slotIndex >= 0 && t_card != null) m_onDropped?.Invoke(_slotIndex, t_card);
+        if (_slotIndex >= 0 && t_card > 0) m_onDropped?.Invoke(_slotIndex, t_card);
     }
 
     // ScrollRect를 통째로 끄지 않는다(enabled=false) — 드래그 도중 꺼지면 OnEndDrag를 못 받아
@@ -403,7 +403,7 @@ public class DeckEditDragController : MonoBehaviour
             return;
         }
 
-        _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Both 라 레거시 Input 사용 가능
+        _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Input Manager(Old)
         _held = Input.GetMouseButton(0);
     }
 

@@ -55,15 +55,15 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
         if (!CardCatalog.IsReady)
         {
-            Debug.LogError("[DeckEditCollectionGrid] CardCatalog 미초기화 — 부트(BootInstaller)를 거치지 않았다.");
+            Debug.LogError("[DeckEditCollectionGrid] CardCatalog 미초기화 — 초기화(InitializationRunner)를 거치지 않았다.");
             return;
         }
 
-        var t_cards = CardCatalog.All;
+        var t_cards = CardCatalog.AllIds;
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
         {
             var t_card = t_cards[t_i];
-            if (t_card == null) continue;                    // CardRegistry의 ID 보존용 빈 칸
+            if (t_card <= 0) continue;
             if (!OwnershipManager.IsOwned(t_card)) continue;  // 소유 카드만 편성 가능
 
             var t_tile = Instantiate(tilePrefab, content);
@@ -79,7 +79,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     }
 
     // _deck에 들어있는 카드 타일만 딤 처리. _deck이 null이면 전부 해제.
-    public void RefreshInDeck(CardData[] _deck)
+    public void RefreshInDeck(int[] _deck)
     {
         for (int t_i = 0; t_i < m_tiles.Count; t_i++)
         {
@@ -102,16 +102,16 @@ public class DeckEditCollectionGrid : MonoBehaviour
         }
     }
 
-    /// <summary>슬롯 선택 모드에서 고른 카드 한 장만 남기고 나머지를 흐리게 한다. null이면 전부 해제.</summary>
+    /// <summary>슬롯 선택 모드에서 고른 카드 한 장만 남기고 나머지를 흐리게 한다. 0이면 전부 해제.</summary>
     // SetSynergyFocus와 같은 알파 축을 쓴다 — 두 강조는 배타라(컨트롤러가 보장) 서로 덮어써도 흐린 채 굳지 않는다.
-    public void SetPickedCard(CardData _card)
+    public void SetPickedCard(int _card)
     {
         for (int t_i = 0; t_i < m_tiles.Count; t_i++)
         {
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
 
-            t_tile.SetFocus(_card != null, t_tile.Card == _card);
+            t_tile.SetFocus(_card > 0, t_tile.Card == _card);
         }
     }
 
@@ -146,9 +146,9 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     /// <summary>튜토리얼이 지목한 카드의 타일에만 앵커를 건다(null이면 해제).
     /// 타일이 런타임 생성이라 프리팹에 TutorialAnchor를 저작할 수 없다 — AlbumCardSlotView와 같은 관용구다.</summary>
-    public void ApplyTutorialAnchor(CardData _card)
+    public void ApplyTutorialAnchor(int _card)
     {
-        var t_tile = _card != null ? FindTile(_card) : null;
+        var t_tile = _card > 0 ? FindTile(_card) : null;
         if (t_tile == null)
         {
             TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
@@ -163,9 +163,9 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     /// <summary>지목된 타일이 뷰포트 안에 오도록 스크롤한다. 게이트가 타깃을 승격하면 RectMask2D 클리핑이 끊겨
     /// 목록 밖 카드가 화면에 그대로 새므로, 가리키기 전에 반드시 안으로 들여놔야 한다.</summary>
-    public void EnsureVisible(CardData _card)
+    public void EnsureVisible(int _card)
     {
-        if (scrollRect == null || content == null || _card == null) return;
+        if (scrollRect == null || content == null || _card <= 0) return;
 
         var t_tile = FindTile(_card);
         if (t_tile == null) return;
@@ -192,7 +192,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
         scrollRect.verticalNormalizedPosition = 1f - t_offset / t_range;
     }
 
-    DeckEditCardTile FindTile(CardData _card)
+    DeckEditCardTile FindTile(int _card)
     {
         for (int t_i = 0; t_i < m_tiles.Count; t_i++)
             if (m_tiles[t_i] != null && m_tiles[t_i].Card == _card) return m_tiles[t_i];
@@ -219,9 +219,9 @@ public class DeckEditCollectionGrid : MonoBehaviour
         m_tiles.Clear();
     }
 
-    static bool Contains(CardData[] _deck, CardData _card)
+    static bool Contains(int[] _deck, int _card)
     {
-        if (_card == null) return false;
+        if (_card <= 0) return false;
 
         for (int t_i = 0; t_i < _deck.Length; t_i++)
             if (_deck[t_i] == _card) return true;

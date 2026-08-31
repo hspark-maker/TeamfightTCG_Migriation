@@ -67,7 +67,7 @@ public class TutorialStepDef
            + "이 카드가 든 테마·칸을 화면이 찾아 지목한다.\n"
            + "비우면 화면이 대신 고른다 — 아직 안 꽂은 카드가 있는 첫 테마 / 그 페이지의 첫 소유 칸.\n"
            + "⚠ 유저가 그 카드를 아직 소유하지 않았으면 가리킬 칸이 없어 폴백으로 떨어진다(안내는 멈추지 않는다)")]
-    [SerializeField] CardData anchorCard;
+    [SerializeField, CardId] int anchorCardId;
 
     [Tooltip("이 스텝이 시키는 성장 한 방을 안내가 대신 내준다(값 0).\n"
            + "표시·활성 판정·실제 소모가 모두 이 값을 함께 본다 — 화면엔 100골드가 뜨는데 0이 나가는 일은 없다.\n"
@@ -94,13 +94,13 @@ public class TutorialStepDef
     [SerializeField] TutorialScenarioData scenario;
 
     [Tooltip("CardGrant: 지급할 카드 한 장. 이미 소유한 카드를 꽂아도 안전하지만 획득 연출은 그대로 돈다")]
-    [SerializeField] CardData card;
+    [SerializeField, CardId] int cardId;
 
     [Tooltip("CardSetGrant: 한 묶음으로 지급할 카드들. 순서 = 패널 격자에 놓이는 순서.\n"
            + "· 이미 소유한 카드를 넣어도 안전하다. 다만 획득 연출은 그대로 돈다(중복 표시 없이 새 카드처럼 보인다).\n"
            + "· 빈 칸(None)은 건너뛴다 — 격자 자리도 차지하지 않는다.\n"
            + "· 소유권만 준다. 덱에는 편성되지 않는다(덱 저작은 DeckGrant 몫이다).")]
-    [SerializeField] List<CardData> cards = new List<CardData>();
+    [SerializeField, CardId] List<int> cardIds = new List<int>();
 
     [Tooltip("전투 전 덱 확인/편집 화면(MatchDeckRoot)을 띄운다. 전투 덱은 켜든 끄든 시나리오 고정이다.\n"
            + "저장된 유효 덱이 없으면 이 화면에서 전투를 시작할 수 없으니, 덱이 생긴 뒤 챕터에만 켠다.\n"
@@ -155,10 +155,10 @@ public class TutorialStepDef
 
     public TutorialScenarioData Scenario => scenario;
 
-    public CardData Card => card;
+    public int CardId => cardId;
 
     // 안내가 지목한 카드(그 자리를 카드로 고르는 앵커에서만 — 아니면 저작값이 남아 있어도 없는 것으로 본다)
-    public CardData AnchorCard => UsesAnchorCard(Anchor) ? anchorCard : null;
+    public int AnchorCardId => UsesAnchorCard(Anchor) ? anchorCardId : 0;
 
     // 이 스텝이 시키는 성장 한 방이 무료인가(값 저작이 없는 액션은 저작값이 남아 있어도 유료로 본다)
     public bool FreeOfCharge => UsesFreeOfCharge(action) && freeOfCharge;
@@ -172,7 +172,7 @@ public class TutorialStepDef
     // 획득 연출의 종료를 기다리지 않고 넘어가는가(지급 액션이 아니면 저작값이 남아 있어도 없는 것으로 본다)
     public bool ParallelGain => UsesParallelGain(action) && parallelGain;
 
-    public IReadOnlyList<CardData> Cards => cards;
+    public IReadOnlyList<int> CardIds => cardIds;
 
     public bool ShowDeckGate => showDeckGate;
 
@@ -213,13 +213,13 @@ public class TutorialStepDef
 
     // 이 스텝이 덱 자동 편성으로 채울 카드를 지정하면 true(풀 전체를 넘긴다 — 덱 크기는 편성 쪽이 정의)
     // 기본 pool 직독: 튜토리얼 팩은 rankPools 미저작 전제(저작 시 실제 드로우 ResolvePool과 어긋남)
-    public bool TryGetForcedDeck(out IReadOnlyList<CardData> _cards)
+    public bool TryGetForcedDeck(out IReadOnlyList<int> _cardIds)
     {
-        _cards = action == EOutgameTutorialAction.DeckAutoEquip && pack != null && pack.PoolCount > 0
+        _cardIds = action == EOutgameTutorialAction.DeckAutoEquip && pack != null && pack.PoolCount > 0
             ? pack.Pool
             : null;
 
-        return _cards != null;
+        return _cardIds != null;
     }
 
     // ── 액션별 저작 필드 ────────────────────────────────────────────────────

@@ -1,5 +1,178 @@
 # 아웃게임 구조도 (STRUCTURE)
 
+## 유저 세이브 — 클라우드 단일 진실원 (2026-08-27 갱신)
+
+Firestore 문서 `envs/{envId}/users/{uid}/save/current`가 **유일한 진실원**이다. 로컬 캐시도, 오프라인 폴백도 없다 — 원격에 닿지 못하면 게임이 진행되지 않는다.
+(2026-08-25판 "쓰기 전용 미러 / PlayerSaveSync" 서술은 폐기 — `PlayerSaveSync` · `4.Sync/` · `BootInstaller`는 코드에 없다.
+2026-08-26판 "로컬 캐시 봉투" 서술도 폐기 — `PlayerSaveCacheEnvelope` · `1.Repository/` 는 삭제됐다.)
+
+### 계층 지도
+
+```mermaid
+flowchart TD
+    subgraph L4["OutGame/Save/4.Cloud — 클라우드 창구"]
+        CLOUD["PlayerSaveCloud<br/>static · 초기화 채택 · 디바운스 업로드 · Revision 소유"]
+        DOC["PlayerSaveDocument<br/>필드맵 10슬롯+메타 5 · TryReadMeta"]
+        MOD["PlayerSaveFirebaseModule<br/>IFirebaseModule 어댑터"]
+    end
+    subgraph L3["OutGame/Save/3.Manager"]
+        DSM["DataSaveManager<br/>static · Data / Save / SaveImmediate<br/>Newtonsoft camelCase 스냅샷"]
+    end
+    subgraph L2["OutGame/Save/2.Domain"]
+        USD["UserSaveData VERSION=7<br/>FirestoreProperty 슬롯 10"]
+    end
+    subgraph CORE["Core/Firebase"]
+        FBM["FirebaseManager<br/>모듈 등록 · Initialize · Flush · Retry"]
+        AUTH["FirebaseAuthService<br/>익명 로그인 · OnStateChanged"]
+    end
+    FS[("Firestore<br/>envs/{env}/users/{uid}/save/current")]
+
+    FBM -->|"Initialize(in FirebaseContext)"| MOD --> CLOUD
+    FBM --> AUTH
+    CLOUD -->|"OnSaved 구독 · SetImmediateUploadHandler"| DSM
+    CLOUD -->|"ToFieldMap · TryReadMeta"| DOC
+    CLOUD -->|"GetSnapshotAsync · RunTransactionAsync"| FS
+    DSM --> USD
+    AUTH -.->|UserId| CLOUD
+```
+
+- 세이브는 **3계층**(2.Domain / 3.Manager / 4.Cloud)이다. 폴더 번호는 리넘버링하지 않아 1번만 비어 있다.
+- 3계층은 4계층을 **참조하지 않는다**. 배선은 `DataSaveManager.OnSaved`(이벤트)와 `SetImmediateUploadHandler`(콜백) 두 개뿐이다.
+- `DataSaveManager.Save()` 는 디스크를 만지지 않는다 — 메모리 세이브가 바뀌었음을 `OnSaved` 로 통지할 뿐이고, 착지는 전부 업로드다.
+- 스냅샷과 원격 문서가 같은 키를 내야 대조가 되므로 Newtonsoft는 camelCase(`ProcessDictionaryKeys=false`)로 `[FirestoreProperty]` 이름과 맞춰 둔다.
+- 문서 쓰기는 항상 `SetOptions.Overwrite` — MergeAll이면 삭제가 전파되지 않는다.
+- `FlushPendingAsync`는 모듈마다 있다: 세이브는 `PlayerSaveCloud.FlushAsync`, 스펙 동기화(`BattleContentFirebaseModule`)는 원격 쓰기가 없어 `UniTask.CompletedTask`. 한 모듈이 동기 throw하면 `WhenAll` 이전에 터져 나머지 모듈의 flush까지 죽는다(2026-08-26 수정).
+
+### 초기화 채택 — 원격만
+
+```mermaid
+sequenceDiagram
+    participant GM as GameManager(BeforeSceneLoad)
+    participant PC as PlayerSaveCloud
+    participant DSM as DataSaveManager(메모리 세이브)
+    participant AU as FirebaseAuthService
+    participant FS as Firestore
+
+    GM->>PC: FirebaseManager.Initialize → Module.Initialize
+    PC->>PC: LoadAsync(generation).Forget()
+    PC->>AU: InitializeAsync ⨯ Delay(5s, Realtime) → WhenAny
+    alt 인증 실패 · 타임아웃 · UserId 없음
+        PC->>PC: Fail → MarkRecoveryRequired
+    else 인증 성공
+        PC->>FS: GetSnapshotAsync(Source.Server) ⨯ Delay(5s, Realtime) → WhenAny (재시도 없음)
+        alt 읽기 실패 · 읽기 취소
+            PC->>PC: Fail → MarkRecoveryRequired
+        else 문서 없음
+            PC->>DSM: AdoptRemote(new UserSaveData()) · IsFreshAccount=true
+        else 스키마 v > 7
+            PC->>PC: MarkUpdateRequired (게이트만 해제)
+        else 스키마 v < 7 · revision<1 · 변환 실패
+            PC->>PC: Fail → MarkRecoveryRequired
+        else 정상
+            PC->>DSM: AdoptRemote(원격) · Revision = 원격 revision
+        end
+    end
+    PC->>PC: s_gateComplete = true (채택 성공은 CompleteAdoption → 항상 Ready)
+```
+
+`InitializationInstaller.Start`가 `PlayerSaveCloud.IsGateComplete`를 폴링해 기다리고, 게이트 통과 후 `InstallSaveDependent()` 한 곳에서 세이브 의존 매니저(`CurrencyManager.Init` 등)를 전부 설치한다. 스타터 지급의 유일한 근거는 `IsFreshAccount`(= 원격 문서 부재)이며, 설치 끝에 `DataSaveManager.SaveImmediate()`로 첫 문서를 만든다.
+
+### 저장 → 업로드
+
+```mermaid
+sequenceDiagram
+    participant MGR as 도메인 매니저(CurrencyManager 등)
+    participant DSM as DataSaveManager
+    participant PC as PlayerSaveCloud
+    participant FS as Firestore
+
+    MGR->>DSM: Save() / SaveImmediate()
+    DSM-->>PC: OnSaved → MarkDirty (s_dirtySerial++)
+    alt SaveImmediate
+        PC->>PC: RequestImmediateUpload (디바운스 생략)
+    else 일반 Save
+        PC->>PC: Delay(1000ms, Realtime) — 최신 version만 생존
+    end
+    PC->>PC: dirty==uploaded면 중단 / 스냅샷 동일하면 revision 미증가
+    PC->>PC: 300000B 초과 시 업로드 거부
+    PC->>FS: RunTransactionAsync — revision CAS(현재==기대 → +1) + Overwrite
+    alt 성공
+        PC->>PC: Revision = new · s_uploadedSnapshot/Serial 갱신 · Ready
+    else RevisionConflict(다른 기기가 먼저 씀)
+        PC->>PC: BlockSession — 이 세션 업로드 중단, 이후 진행분은 재시작과 함께 버려진다
+    else 네트워크 실패
+        PC->>PC: Offline — 재시도는 다음 저장·복귀·flush 때
+    end
+```
+
+### 실패 표면 — 3분할 (2026-08-26 P3)
+
+세이브 진실원이 클라우드고 로컬 복구선이 없다. 실패의 **성질**이 다르면 표면도 갈라야 한다.
+
+| 클라우드 상태 | 진입 | 표면 | 소유 |
+|---|---|---|---|
+| `Failed` | `PlayerSaveCloud.Fail()` — 초기화 게이트 **전** | 복구 화면 — 안내 문구 + 재시도·종료 2버튼 | `LoadingCoverView.ShowRecovery` |
+| `Blocked` | `PlayerSaveCloud.BlockSession()` — 게이트 **후** | 재시작 요구 모달 1회 (`SimpleYNPopup`) | `CloudSyncStatusWatcher` |
+| `Offline` | 업로드 3회 연속 실패 | 상시 배너 (`UiSortingOrder.CloudSyncBanner` = 940) | `CloudSyncBannerView` |
+
+```mermaid
+flowchart LR
+    PC["PlayerSaveCloud<br/>SetState — State 대입의 유일 창구<br/>OnStateChanged · ConsecutiveUploadFailures"]
+    W["CloudSyncStatusWatcher<br/>static · 유일 구독자"]
+    B["CloudSyncBannerView<br/>SingletonOverlayBase · DDOL"]
+    M["SimpleYNPopup<br/>UIPoolManager"]
+    LC["LoadingCoverView<br/>초기화 커버"]
+
+    PC -->|OnStateChanged| W
+    W -->|ShouldShowSyncBanner| B
+    W -->|Blocked 1회| M
+    PC -->|"Fail → MarkRecoveryRequired"| LC
+```
+
+- **판정은 MonoBehaviour 밖(`CloudSyncStatusWatcher`)에 둔다** — 배너 프리팹 로드가 실패해도 차단 모달은 떠야 한다.
+- `Offline` 은 **업로드 실패 축으로만** 남는다. 채택 경로에는 `Offline` 이 없다 — 초기화에서 원격에 못 닿으면 `Failed` 다.
+- **임계값(3)은 `PlayerSaveCloud` 가 쥔다**(`ShouldShowSyncBanner`). UI가 세면 오탐한다 — 인증이 끊긴 업로드는
+  요청을 띄우지도 못하고 `Offline` 이 되는데, "시도했으나 실패"와 "애초에 못 올림"은 `UploadAsync` 안에서만 구분된다.
+- `BlockSession` 은 `MarkRecoveryRequired()` 를 부르지 않는다 — 게이트 뒤라 화면을 못 바꾸면서 `IsReady` 만
+  false로 떨어뜨렸다. `IsReady`/`IsTerminated` 소비자는 초기화 경로 둘뿐이다.
+- 모달의 "계속"은 이번 세션을 마저 보게 해 줄 뿐이다 — 로컬 복구선이 없어 그 뒤 진행분은 서버에 올라가지 않는다.
+
+### 초기화 실패 — 대기 없이 재시도 / 종료
+
+초기화가 실패하면 **기다리지 않고** 안내 + 재시도·종료 2버튼 패널로 전환한다(모바일 표준).
+재시도는 **실패한 단계만** 다시 태운다 — 씬 재로드도 Firebase 재초기화도 없다.
+`GameManager.RetryInitialize` · `FirebaseManager.Reinitialize` 는 삭제된 채로 둔다(되살리지 않았다).
+
+- 실패 확정 예산: 망 끊김이 확실하면 **0초**(`PlayerSaveCloud.LoadCoreAsync` 가
+  `Application.internetReachability` 로 선체크), 그 외 최악 **10초**(auth 5s + 읽기 5s).
+  읽기 자동 재시도는 없다 — 재시도의 주체는 사람이다.
+- `LoadingCoverView.ShowRecovery` 는 `UpdateRequired` · `RecoveryRequired` 두 종점의 유일한 출구 화면이다.
+  재시도(`retryButton`)는 **`UpdateRequired` 일 때만 숨는다** — 판정은 `GameInitialization.CanRetry` 가 갖고 뷰는 묻기만 한다.
+  초기화 대기 타임아웃(느린 적재)도 포함이다: 감추면 느린 초기화가 막다른 길이 된다.
+- 문구는 세 갈래다: 업데이트 필요 / 에셋 로드 실패(`CardArtCache.HasFailed` · `UiPrefabCache.HasFailed`) / 그 외 서버 연결 실패.
+- 복구 문구는 진행바(`Slider_LoadingBar_Green`) **밖**의 `RecoveryPanel/Text_Recovery` 다.
+  안에 두면 `progressBar.SetActive(false)` 가 문구까지 함께 끈다(2026-08-26 수정).
+- **순서 계약의 주인은 `InitializationInstaller.RestartBoot()` 하나다** — 실패한 캐시 되돌리기
+  (`CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`) → `GameInitialization.ResetForRetry`
+  → `PlayerSaveCloud.ResetForRetry` → 게이트 재기동. 뷰는 화면만 되돌리고 이 하나를 부른다.
+- **재시도 전용 적재 경로는 없다** — 애셋 선로드를 게이트 첫 줄(`StartAssetLoads`)에서 걸어,
+  게이트를 다시 걸면 재적재가 따라온다. 재진입 방어 2개(게이트 사본 1개 강제 ·
+  `UiPrefabCache` generation 토큰)는 [FIRESTORE_SAVE_ROADMAP.md](FIRESTORE_SAVE_ROADMAP.md) P3 참조.
+
+### 비동기 관용구
+
+| 축 | 방식 | 근거 |
+|---|---|---|
+| 실행 | UniTask 단일 (`UniTaskVoid` + `.Forget()`), 코루틴은 게이트 폴링뿐 | `PlayerSaveCloud.LoadAsync`, `InitializationInstaller.Start` |
+| 타임아웃 | `UniTask.WhenAny(작업, UniTask.Delay(ms, DelayType.Realtime))` | auth·read 5s / 트랜잭션 10s. `ignoreTimeScale`은 씬 로드 정지가 첫 델타에 실려 5초가 1프레임에 소진된다(실측 705ms) |
+| 취소 | `s_generation` 카운터 대조 (CancellationToken 미사용) | 매 await 뒤 `_generation != s_generation` 확인 |
+| 중복 억제 | `s_pendingVersion`(디바운스 세대) · `s_dirtySerial`/`s_uploadedSerial`(변경 유무) · `s_uploadedSnapshot`(내용 동일) | 3중 게이트 |
+| 직렬화(업로드) | `s_uploading` 플래그 + `UniTaskCompletionSource`로 진행 중 업로드 대기 | `FlushAsync` |
+| 스레드 | Firebase 콜백은 스레드 미보장 → `UniTask.SwitchToMainThread()` 후 상태 전이 | `HandleAuthStateChangedAsync` |
+| 재시도 | 초기화 읽기·업로드 모두 내부 재시도 없음 — 초기화는 복구 화면의 재시도 버튼(`InitializationInstaller.RestartBoot`)이 받는다 | `OnApplicationPause(false)` → `RetryPending`, `OnApplicationQuit` → `FlushPendingAsync().Forget()` |
+
+`OnApplicationPause(true)`는 `CurrencyManager.Save()`(잔액을 메모리 세이브에 flush)를 먼저 하고 `FirebaseManager.FlushPendingAsync()`를 await한다. 종료 콜백에는 await 창이 없어 킥만 하고, 로컬 복구선이 없으므로 못 올린 변경분은 그대로 유실된다.
+
 > 사용자의 설계 승인과 구조 파악의 기준 문서.
 > 도메인 설계 확정 시, 구조 변경 시마다 갱신한다 (CLAUDE.md 아웃게임 운영 정책).
 > 갱신 주체: outgame-engineer 또는 메인. 근거 없는 노드 금지 — 실제 파일이 있거나 승인된 설계여야 한다.
@@ -329,7 +502,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph boot["부트 (BeforeSceneLoad)"]
+    subgraph boot["초기화 (BeforeSceneLoad)"]
         GM["GameManager.Boot()<br/>Load → TutorialProgress.Init → CurrencyInit"]:::chg
     end
 
@@ -406,7 +579,7 @@ flowchart TD
     GATE -.->|"잠금이 원인이면 경고로 지목"| FLV
     DBGS["TutorialAuthoringWindow (에디터 창, 플레이 전용 아님)<br/>Tools > Card Battle > 튜토리얼 저작 도구<br/><b>왼쪽 목록(스텝당 한 줄) / 오른쪽 상세</b> — 값·상태·문제·되감기를 고른 하나에 모은다<br/>온보딩·트리거를 같은 목록 코드로 그린다. 구 OutgameTutorialStepWindow를 흡수했다"]:::new
     VSTATE["TutorialSequenceState (에디터)<br/>OutgameFeatureLock.Recalculate의 거울 — 스텝마다 누적 해금·일시 잠금을 미리 굽는다<br/>fail-open 3종(stalled·디버그·미실행)은 일부러 모델링하지 않는다"]:::new
-    VLD["TutorialValidator (에디터)<br/>저작 규칙 정적 판정 — 부트 LogWarning으로만 있던 규약을 창으로 승격<br/>앵커 잠김 · stepId 중복 · 덱게이트 미폐쇄 · 필수 참조 미배선 …"]:::new
+    VLD["TutorialValidator (에디터)<br/>저작 규칙 정적 판정 — 초기화 LogWarning으로만 있던 규약을 창으로 승격<br/>앵커 잠김 · stepId 중복 · 덱게이트 미폐쇄 · 필수 참조 미배선 …"]:::new
     AMETA["TutorialAnchorMeta (에디터)<br/>앵커 한 줄 = 잠금 기능 · 화면 · 등록처<br/>TutorialActionMeta와 같은 관용구(인덱스=enum, static 생성자 검증)"]:::new
     EOPS["TutorialSequenceEditOps (에디터)<br/>추가·복제·삭제·순서·<b>편 간 이동</b>·챕터 조작의 단일 창구<br/>stepId 계약(추가·복제=부여 · 이동=유지 · 삭제=소각)과 Undo가 여기 산다<br/>구조를 바꾸면 되감기 예약을 걷는다(예약은 좌표라 밀리면 엉뚱한 곳까지 재생한다)"]:::new
     DBGS -->|"편집 모드(지연 실행)"| EOPS
@@ -417,7 +590,7 @@ flowchart TD
     VLD --> AMETA
     VSTATE -.->|"규칙을 베낀 정본(어긋나면 오탐)"| FLOCK
     AMETA -.->|"Gate 근거 = Attach 호출부·탭 짝"| FLV
-    RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 부트가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
+    RWD["OutgameTutorialRewind (static)<br/>Schedule/Cancel = PlayerPrefs 좌표 1줄(에디터가 쓰고 초기화가 읽는다)<br/>ApplyWipeIfScheduled = 세이브 슬롯 전량 첫실행 + 좌표 심기<br/>ApplyReplayIfScheduled = 좌표 직전까지 DeckGrant·팩 풀 재생 후 예약 소비"]:::new
     BOOT2["GameManager.Boot: Load → <b>Wipe</b> → CurrencyManager.Init (매니저 캐싱 전)<br/>BootInstaller.Install 끝: EnsureData → <b>Replay</b> (배선 완료 후)"]:::chg
     DBGS -->|"Schedule(좌표)"| RWD
     RWD --- BOOT2
@@ -429,7 +602,7 @@ flowchart TD
     classDef dead fill:#5a1f1f,stroke:#e57373,color:#fff;
 ```
 
-#### 흐름 시퀀스 — 1편~3편 머리 (부트 → 첫 전투 직행 → 로비 복귀 → 상점 [구매])
+#### 흐름 시퀀스 — 1편~3편 머리 (초기화 → 첫 전투 직행 → 로비 복귀 → 상점 [구매])
 
 ```mermaid
 sequenceDiagram
@@ -492,7 +665,7 @@ sequenceDiagram
 
 | 축 | 온보딩(G-TUT) | 트리거(G-TUT2) |
 |---|---|---|
-| 발화 | 부트 시 좌표 재개 (pull) | `TriggeredTutorialRunner.Fire(trigger)` (push) |
+| 발화 | 초기화 시 좌표 재개 (pull) | `TriggeredTutorialRunner.Fire(trigger)` (push) |
 | 진행 좌표 | 세이브 영속 `(챕터, 스텝)` | **메모리만** — 앱 종료 시 처음부터 |
 | 1회 낙인 | `outgameCompleted` 스칼라 | `completedTriggers`에 **완주 시점** 키 1개 |
 | 스텝 SO | 공유 | 공유 (단 커밋 대상이 메모리 싱크) |
@@ -1240,7 +1413,7 @@ flowchart TD
         VALID["AlbumValidator (internal static)<br/>저작↔카탈로그 드리프트 진단<br/>#if UNITY_EDITOR · ContextMenu 전용"]:::new
     end
     subgraph CLAIM["보상 수령 (유일한 저장 축)"]
-        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 부트 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>공용 판정 InfoOf/StateOf(AlbumSection) · OnChanged"]:::chg
+        RMGR["AlbumRewardManager (static)<br/>3단 보상 수령 창구<br/>캐시·Init 없음 = 초기화 무접촉<br/>GetPage/Theme/AlbumInfo · CanClaim* · Claim*<br/>공용 판정 InfoOf/StateOf(AlbumSection) · OnChanged"]:::chg
         RINFO["AlbumRewardInfo (readonly struct)<br/>보상 UI 스냅샷<br/>Rewards[] (복수)<br/>Owned/Total · State"]:::chg
         SAVE["AlbumRewardSaveData<br/>수령 낙인 슬롯<br/>List&lt;string&gt; claimedKeys<br/>(UserSaveData.albumReward · VERSION 1 유지)"]:::new
     end
@@ -1328,7 +1501,7 @@ flowchart TD
 | 1 | **페이지는 명시 저작**(`List<AlbumPageDef>` + `pageId`). 자동 9청크 금지 | 자동 청크 + 인덱스 키면 카드 1장 삽입에 페이지 내용이 밀려 **이미 준 보상이 다시 Claimable**이 된다(재화 복제). 첫-카드-키로 만들면 삽입 지점 이후 **모든 페이지 키가 새 키**가 되어 낙인이 전멸한다. `CollectionThemes.BuildEmpty()`가 세운 "저작물성 데이터는 자동 생성 금지"의 연장 — 보상이 붙은 페이지는 테마보다 더 강한 저작물이다 |
 | 2 | **진행도는 저장하지 않는다** — `OwnershipManager.IsOwned`의 순수 파생. 저장하는 건 **수령 낙인**뿐 | 진행도를 저장하면 기존 생산 축이 겪은 "완성/미완성 전이마다 정산 시각을 당기는" 보정 로직과 세이브 마이그레이션 부채를 그대로 물려받는다 |
 | 3 | **수령 낙인 = 접두 네임스페이스 문자열 리스트**(`p:테마/페이지` · `t:테마` · `b`). 랭크의 `claimedCount` 단조 커서 **사용 불가** | 도감 완성은 소유 집합의 함수라 **부분순서**다(3테마를 먼저 완성하고 1테마를 나중에 완성 가능, 카드 추가로 완성이 **취소**되기도 한다). 커서로 표현하면 "3테마 수령"이 "1·2테마 수령"으로 해석된다. 비트마스크는 비트 위치=인덱스라 세이브 규약(인덱스 금지) 정면 위반 |
-| 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **부트에 줄이 0개 추가** | 캐시를 두면 "부트를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
+| 4 | **수령 창구는 캐시·`Init` 없이 세이브 슬롯 직독**(`RankRewardManager` 패턴) → **초기화에 줄이 0개 추가** | 캐시를 두면 "초기화를 안 거친 씬에서 도감이 열림 → 빈 캐시 → 첫 수령 `Save()` → 기존 낙인 전멸 → 전량 재수령"이 열린다. 기존 매니저들이 `if (!s_initialized) return;`으로 막고 있는 그 경로를 **구조로 없앤다** |
 | 5 | **`StateOf`는 `Claimed`를 최우선 검사**, 3종 배타(`Locked`/`Claimable`/`Claimed`) | 완성 후 카드가 추가돼 미완성으로 되돌아간 뒤 다시 완성되면 **재수령이 뚫린다**. 랭크가 같은 이유로 같은 순서를 쓴다 |
 
 #### 병존 경계 (2026-08-06 착수 당시) — **병존은 2026-08-14 구 도감 삭제로 끝났다**
@@ -1735,3 +1908,22 @@ UI에 손댈 것이 없는 이유:
 - **내 닉네임·아바타·프레임**은 `ProfileManager`가 진실원이고 **`UserSaveData.profile` 슬롯에 영속화된다**(2026-08-25). `MatchProfile.OfLocalPlayer`가 그 값을 읽는다 — 옛 `MatchProfile.LOCAL_NICKNAME = "나"` 상수는 없어졌다. 슬롯 추가라 **`VERSION`은 6 유지**(위 규약과 같다). 세이브에 남은 id가 `ProfileConfig`에서 사라졌으면 `Default*Id`로 폴백한다.
 - **`MatchOpponentHandoff`는 아직 write-only**다. 덱 화면 `EnemyInfoBar`에 상대 닉네임을 붙일 때가 첫 소비처이고, 비소비형으로 만든 이유가 그 화면이다(`MatchDeckPanelView.Render`가 편집 화면을 오갈 때마다 다시 그려서 1회 소비면 두 번째 렌더에 이름이 사라진다).
 - **상대 동상**(`OpponentProfilePool.avatars`) 미저작. 지금은 프리팹 저작 이미지가 모든 상대에 공통으로 나간다.
+# (폐기) Firestore save migration T0~T3 (2026-08-25)
+
+아래 T0~T3 노트가 서술하는 `PlayerSaveSync` · `PlayerSaveSyncMetadata` · `BootInstaller` · `GameManager.BootState`는 2026-08-26 기준 코드에 존재하지 않는다. 현행 구조는 문서 상단 "유저 세이브 — 클라우드 단일 진실원"을 본다. 기록용으로만 남긴다.
+
+# Firestore save migration T0 (2026-08-25)
+
+- `GameManager.BootState` is the boot gate. `UpdateRequired` prevents `BootInstaller` initialization and keeps `LoadingCoverView` visible with an update message.
+- Failed Firestore uploads keep the latest pending payload but do not self-reschedule. Retry occurs only after a new local save, authentication recovery, or application resume.
+- `PlayerSaveSyncMetadata` is a profile-local sidecar containing UID, profile ID, confirmed full SHA-256, remote revision, and schema version. T0 records it but does not use it to skip startup uploads until T1 verifies the remote document.
+# Firestore save migration T1 dry-run (2026-08-25)
+
+- `PlayerSaveSync` reads `users/{uid}/save/{current|test}` from the server with a finite five-second timeout before allowing any remote write.
+- T1 validates schema, revision, payload size, JSON completeness, and the 16-character wire hash, then classifies local/remote/base as `InSync`, `LocalAhead`, `RemoteAhead`, `Diverged`, or a guarded failure.
+- T1 is deliberately read-only: it never replaces local data, updates remote data, or trusts metadata to skip startup inspection. Pending local payload remains available for the later transactional migration stage.
+# Firestore save migration T2/T3 (2026-08-25)
+
+- `BootInstaller` now installs infrastructure in `Awake`, waits for `PlayerSaveSync`, then installs all save-dependent managers exactly once before `GameManager` becomes `Ready`.
+- Reconciliation is active: `RemoteAhead` uses backup plus atomic local replacement, `RemoteMissing` and `LocalAhead` use revision/hash transactions, `InSync` skips the startup write, and conflicts are preserved as local sidecars with remote writes disabled.
+- Authentication, timeout, invalid remote data, future schema, stale sessions, and account ownership mismatches never overwrite local or remote data.

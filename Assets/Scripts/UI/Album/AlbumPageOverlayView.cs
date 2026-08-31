@@ -78,7 +78,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     // 상세에서 넘겨볼 목록 = 이 테마의 **소유** 카드 전체(페이지 순). 미소유를 담지 않으므로 잠김 상세로 새지 않고,
     // 페이지 경계에서도 끊기지 않는다. CardDetailOverlayView가 참조로 쥔다 — 인스턴스를 유지하고 Clear+재충전만 한다
-    readonly List<CardData> m_order = new List<CardData>();
+    readonly List<int> m_order = new List<int>();
 
     // 삽입 세션이 켜는 잠금 — 탈출로를 세션의 건너뛰기 하나로 좁힌다
     bool m_sessionLocked;
@@ -421,7 +421,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     {
         int t_max = Mathf.Max(0, this.pageSlotCount);   // 빈 칸 채움분까지 미리 확보한다
         for (int t_i = 0; t_i < _theme.Pages.Count; t_i++)
-            t_max = Mathf.Max(t_max, _theme.Pages[t_i].Cards.Count);
+            t_max = Mathf.Max(t_max, _theme.Pages[t_i].CardIds.Count);
 
         EnsureSlotCapacity(m_slots, slotRoot, t_max);
         EnsureSlotCapacity(m_underSlots, underSlotRoot, t_max);
@@ -437,7 +437,7 @@ public class AlbumPageOverlayView : MonoBehaviour
                    AlbumTheme _theme, int _pageIndex, bool _interactive)
     {
         int t_pageIndex = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
-        var t_cards = _theme.Pages[t_pageIndex].Cards;
+        var t_cards = _theme.Pages[t_pageIndex].CardIds;
 
         // 저작 칸이 모자란 페이지도 격자를 다 채운다 — 채움 칸은 카드도 번호도 없는 순수 빈 포켓이다
         int t_shown = Mathf.Max(t_cards.Count, Mathf.Max(0, this.pageSlotCount));
@@ -447,7 +447,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 페이지마다 1로 되돌아가면 번호가 자리를 못 가리킨다
         int t_baseNumber = 0;
         for (int t_p = 0; t_p < t_pageIndex; t_p++)
-            t_baseNumber += _theme.Pages[t_p].Cards.Count;
+            t_baseNumber += _theme.Pages[t_p].CardIds.Count;
 
         // 상세 목록은 확정된 current만 소유한다. under가 목록을 다시 만들면 보이는 버튼의 index가 틀어진다.
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
@@ -471,7 +471,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             {
                 t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(true);
-                t_slot.Bind(null, false, 0);
+                t_slot.Bind(0, false, 0);
                 if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
                 continue;
             }
@@ -532,9 +532,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     /// <summary>안내가 가리킬 칸의 순번. 저작(anchorCard)이 지목한 카드의 칸이고, 그 카드가 이 페이지에 없거나
     /// 아직 빈 칸으로 보이면 폴백으로 첫 꽂힌 칸이다 — 없는 칸을 가리켜 안내가 멎는 것보다 낫다.</summary>
-    static int FindAnchorSlotIndex(IReadOnlyList<CardData> _cards)
+    static int FindAnchorSlotIndex(IReadOnlyList<int> _cards)
     {
-        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_target))
+        if (OutgameTutorialGuide.TryGetAnchorCard(out int t_target))
         {
             for (int t_i = 0; t_i < _cards.Count; t_i++)
                 if (_cards[t_i] == t_target && ShownAsOwned(t_target)) return t_i;
@@ -548,8 +548,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     // 삽입 연출 중에는 아직 안 꽂은 카드를 빈 칸으로 위장한다. 소유는 이미 확정됐지만 화면상 꽂기 전이다.
     // 상세 목록(BuildOwnedOrder)도 같은 함수를 타야 한다 — 아니면 빈 칸인 카드가 상세로 샌다.
-    static bool ShownAsOwned(CardData _card)
-        => _card != null && OwnershipManager.IsOwned(_card) && !AlbumInsertMask.IsHidden(_card);
+    static bool ShownAsOwned(int _cardId)
+        => _cardId > 0 && OwnershipManager.IsOwned(_cardId) && !AlbumInsertMask.IsHidden(_cardId);
 
     // m_order를 테마의 소유 카드로 다시 채우고, 지금 페이지의 카드들이 시작되는 자리를 돌려준다.
     // 소유가 바뀌면 RefreshPage가 다시 돌아 목록과 배선이 같은 프레임에 함께 갱신된다.
@@ -562,7 +562,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         {
             if (t_p == m_pageIndex) t_offset = m_order.Count;
 
-            var t_cards = m_theme.Pages[t_p].Cards;
+            var t_cards = m_theme.Pages[t_p].CardIds;
             for (int t_i = 0; t_i < t_cards.Count; t_i++)
             {
                 var t_card = t_cards[t_i];
@@ -921,7 +921,10 @@ public class AlbumPageOverlayView : MonoBehaviour
         SetFlipLocked(false);
     }
 
-    void ClaimPageReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimPageReward() => ClaimPageRewardAsync().Forget();
+
+    async UniTaskVoid ClaimPageRewardAsync()
     {
         if (m_theme == null || m_theme.Pages.Count == 0) return;
 
@@ -930,8 +933,8 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어나므로 여기서 걸러야 못 받을 보상이 축하받지 않는다.
         if (!AlbumRewardManager.CanClaimPage(t_page)) return;
 
-        AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} {t_page.Index + 1}페이지 완성!",
-                                  t_page.Rewards,
-                                  () => AlbumRewardManager.ClaimPage(t_page));
+        await AlbumRewardClaimFlow.Open($"{m_theme.DisplayName} {t_page.Index + 1}페이지 완성!",
+                                        t_page.Rewards,
+                                        () => AlbumRewardManager.ClaimPage(t_page));
     }
 }

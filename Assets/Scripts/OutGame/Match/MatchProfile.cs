@@ -47,7 +47,7 @@ public readonly struct MatchProfile
     }
 
     // 페이크 매칭의 상대. 랭크 표시를 내 것에서 그대로 가져오는 이유: 상대의 덱과 카드 레벨이 실제로
-    // 내 티어 기준으로 뽑히므로(AIDeckConfig·AiCardLevelOf), 표시만 티어표에서 따로 읽으면
+    // 내 티어 기준으로 뽑히므로(AIDeckConfig), 표시만 티어표에서 따로 읽으면
     // 언랭크 유저에게 "나=언랭크 / 상대=브론즈 1"로 짝짝이가 된다.
     public static MatchProfile OfOpponent(string _nickname, Sprite _avatar)
     {

@@ -10,7 +10,7 @@ using UnityEngine;
 /// 키 입력으로 하나씩 넘겨보며 공격/피격 이펙트를 눈으로 고르기 위한 도구.
 /// 에디터에서만 폴더 스캔(AssetDatabase). 빌드에서는 prefabs 배열만 사용.
 /// 프리팹은 넘길 때 지연 로드 → 폴더에 1000개가 있어도 시작이 무겁지 않다.
-/// 프로덕션 경로(AttackEffect/AttackSequence)는 건드리지 않는다. 테스트 전용.
+/// 프로덕션 경로(AttackSequence)는 건드리지 않는다. 테스트 전용.
 /// </summary>
 [System.Serializable]
 public class VfxSlot

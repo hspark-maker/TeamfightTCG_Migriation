@@ -42,7 +42,7 @@ public class DeckEditSlotView : MonoBehaviour
     const float EQUIP_PUNCH_TIME  = 0.22f;
 
     int         m_index = -1;
-    CardData    m_card;
+    int         m_card;
     Action<int> m_onClick;
     Tween       m_focusTween;
     Tween       m_swapTween;
@@ -51,11 +51,11 @@ public class DeckEditSlotView : MonoBehaviour
     bool        m_swapGlowResolved;
 
     public int           Index => m_index;
-    public CardData      Card  => m_card;
+    public int           Card  => m_card;
     public RectTransform Rect  => (RectTransform)transform;
 
     // _card가 null이면 빈 칸 모드. 편집 중 매 변경마다 전량 재바인딩되는 전제라 상태를 남기지 않는다.
-    public void Bind(int _index, CardData _card, Action<int> _onClick)
+    public void Bind(int _index, int _card, Action<int> _onClick)
     {
         m_index   = _index;
         m_card    = _card;
@@ -67,7 +67,7 @@ public class DeckEditSlotView : MonoBehaviour
             clickButton.onClick.AddListener(() => m_onClick?.Invoke(m_index));
         }
 
-        bool t_has = _card != null;
+        bool t_has = _card > 0;
 
         // 편성 칸에는 소유한 카드만 올라간다(컬렉션 목록 자체가 소유분만 노출) → _owned는 true 고정.
         // 여기서 소유여부를 다시 계산하면 편성 배열과 소유 세이브라는 두 진실원이 생긴다.
@@ -113,7 +113,7 @@ public class DeckEditSlotView : MonoBehaviour
         }
 
         // 판은 카드 위에 얹히는 표식이라 빈 칸에서는 뜻이 없다 — 카드가 있을 때만 켠다.
-        if (swapMark != null) swapMark.SetActive(_on && m_card != null);
+        if (swapMark != null) swapMark.SetActive(_on && m_card > 0);
 
         ApplySwapScale(_on, _instant);
     }
@@ -122,7 +122,7 @@ public class DeckEditSlotView : MonoBehaviour
     /// 칸 루트가 아니라 카드 비주얼에 건다 — 루트 스케일은 시너지 강조 트윈이 쥐고 있다.</summary>
     public void PlayEquipPunch()
     {
-        if (cardVisual == null || m_card == null) return;
+        if (cardVisual == null || m_card <= 0) return;
 
         m_punchTween?.Kill();
         m_punchTween = UiPunch.Play(cardVisual.transform, EQUIP_PUNCH_SCALE, EQUIP_PUNCH_TIME);

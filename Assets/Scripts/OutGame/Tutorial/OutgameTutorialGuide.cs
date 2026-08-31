@@ -18,11 +18,11 @@ public static class OutgameTutorialGuide
 
     /// <summary>지금 안내가 지목한 카드. 도감처럼 같은 종류의 자리가 여럿인 화면이 "어느 칸인가"를 여기서 받는다.
     /// 저작이 비었으면 false — 그때는 화면이 스스로 고른다(안내가 멈추지 않게).</summary>
-    public static bool TryGetAnchorCard(out CardData _card)
+    public static bool TryGetAnchorCard(out int _cardId)
     {
-        _card = TryGetCurrentStep(out var t_step) ? t_step.AnchorCard : null;
+        _cardId = TryGetCurrentStep(out var t_step) ? t_step.AnchorCardId : 0;
 
-        return _card != null;
+        return _cardId > 0;
     }
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.

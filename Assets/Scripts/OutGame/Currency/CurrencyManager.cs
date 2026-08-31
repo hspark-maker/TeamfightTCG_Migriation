@@ -1,13 +1,14 @@
 using System;
+using System.Collections.Generic;
 
-// 재화 잔액 변경의 단일 창구 (static)
+// 재화 잔액의 읽기 창구 (static)
+// 잔액을 바꾸는 코드는 이 레이어에 없다 — 진실원은 서버 지갑 문서이고, 클라는 WalletCloud가 채택한 값을 비출 뿐이다.
 public static class CurrencyManager
 {
     static readonly long[] s_currencies = new long[(int)ECurrencyType.Count];
 
     // 잔액 변경 통지 (종류, 변경 후 금액)
     public static event Action<ECurrencyType, long> OnCurrencyChanged;
-    public static event Action<ECurrencyType, long, long> OnCurrencySpent;
 
     public static long Gold    => s_currencies[(int)ECurrencyType.Gold];
     public static long Diamond => s_currencies[(int)ECurrencyType.Diamond];
@@ -18,48 +19,22 @@ public static class CurrencyManager
 
     public static bool CanAfford(ECurrencyType _type, long _cost) => s_currencies[(int)_type] >= _cost;
 
-    // 부트에서 DataSaveManager.Load() 이후 1회 호출 — 세이브를 메모리에 캐싱
-    public static void Init()
+    /// <summary>서버 지갑 잔액을 메모리에 세운다. 부르는 곳은 <see cref="WalletCloud"/> 하나다.</summary>
+    // 첫실행 지급은 여기 없다 — 스타터 골드의 진실원은 서버(freshAccount.ts)다.
+    public static void Adopt(IReadOnlyDictionary<string, long> _balances)
     {
-        var t_data = DataSaveManager.Data.currency;
-        t_data.Normalize();
+        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
+        {
+            // 서버는 4키를 다 보내지만, 빠진 키가 예외가 되면 잔액 하나 때문에 초기화가 끊긴다.
+            long t_balance = 0;
+            if (_balances != null) _balances.TryGetValue(KeyOf((ECurrencyType)t_i), out t_balance);
+
+            s_currencies[t_i] = t_balance;
+        }
 
         for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-            s_currencies[t_i] = t_data.balances[t_i];
+            OnCurrencyChanged?.Invoke((ECurrencyType)t_i, s_currencies[t_i]);
     }
 
-    // 메모리 금액을 세이브 슬롯에 flush 후 영속화
-    public static void Save()
-    {
-        var t_data = DataSaveManager.Data.currency;
-        t_data.Normalize();
-
-        for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
-            t_data.balances[t_i] = s_currencies[t_i];
-
-        DataSaveManager.Save();
-    }
-
-    // 적립 (음수는 무시)
-    public static void Earn(ECurrencyType _type, long _amount)
-    {
-        if (_amount <= 0) return;
-
-        s_currencies[(int)_type] += _amount;
-        OnCurrencyChanged?.Invoke(_type, s_currencies[(int)_type]);
-    }
-
-    // 사용 — 잔액 부족이면 변경 없이 false (비용 0은 무료 결제로 성공)
-    public static bool Spend(ECurrencyType _type, long _cost)
-    {
-        if (_cost < 0) return false;
-        if (_cost == 0) return true;
-        if (s_currencies[(int)_type] < _cost) return false;
-
-        s_currencies[(int)_type] -= _cost;
-        long t_balance = s_currencies[(int)_type];
-        OnCurrencySpent?.Invoke(_type, _cost, t_balance);
-        OnCurrencyChanged?.Invoke(_type, t_balance);
-        return true;
-    }
+    static string KeyOf(ECurrencyType _type) => _type.ToString();
 }

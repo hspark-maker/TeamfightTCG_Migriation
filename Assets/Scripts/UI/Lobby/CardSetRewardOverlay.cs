@@ -59,7 +59,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
 
     /// <summary>카드 묶음을 띄운다. _onClaim은 [받기]를 누른 <b>즉시</b> 불린다 —
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
-    public void Show(string _title, IReadOnlyList<CardData> _cards, Action _onClaim)
+    public void Show(string _title, IReadOnlyList<int> _cards, Action _onClaim)
     {
         this.m_onClaim = _onClaim;
         this.KillIntro();
@@ -70,7 +70,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         this.m_drawn.Clear();
         if (_cards != null)
             for (int t_i = 0; t_i < _cards.Count; t_i++)
-                if (_cards[t_i] != null) this.m_drawn.Add(new DrawnCard(_cards[t_i], true));
+                if (_cards[t_i] > 0) this.m_drawn.Add(new DrawnCard(_cards[t_i], true));
 
         if (this.claimButton != null)
         {

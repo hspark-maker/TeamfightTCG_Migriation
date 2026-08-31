@@ -2,49 +2,92 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TMPro;
 
-public class TurnContext
+public readonly struct TurnFillResult
+{
+    public readonly List<CardInstance> PlayerPlaced;
+    public readonly List<CardInstance> EnemyPlaced;
+
+    public TurnFillResult(List<CardInstance> _playerPlaced, List<CardInstance> _enemyPlaced)
+    {
+        PlayerPlaced = _playerPlaced;
+        EnemyPlaced = _enemyPlaced;
+    }
+}
+
+/// <summary>턴 규칙이 소비하는 가변 전투 상태.</summary>
+public sealed class TurnRuleContext
 {
     public BattleField playerField;
     public BattleField enemyField;
+
+    public TurnFillResult FillSlots() => new TurnFillResult(
+        playerField.FillEmptySlots(), enemyField.FillEmptySlots());
+}
+
+/// <summary>턴 상태를 Unity UI에 표시하는 프레젠테이션 컨텍스트.</summary>
+public sealed class TurnViewContext
+{
     public BattleFieldView playerFieldView;
     public BattleFieldView enemyFieldView;
     public TMP_Text turnLabel;
     public DeckPileUI playerDeckUI;
     public DeckPileUI enemyDeckUI;
     public TurnBannerUI turnBanner;
-
-    /// <summary>멀리건 안내 오버레이(씬 저작 프리팹 인스턴스). 비어 있으면 안내 없이 진행한다.</summary>
     public MulliganOverlayUI mulliganOverlay;
 
     public void RefreshViews()
     {
-        this.playerFieldView.Refresh();
-        this.enemyFieldView.Refresh();
-        this.playerDeckUI?.Refresh();
-        this.enemyDeckUI?.Refresh();
+        playerFieldView.Refresh();
+        enemyFieldView.Refresh();
+        playerDeckUI?.Refresh();
+        enemyDeckUI?.Refresh();
     }
 
-    /// <summary>빈 슬롯 보충 + 등장 연출.
-    ///
-    /// **상태 변경(FillEmptySlots)은 기존 순서 그대로 둘 다 먼저** 처리한다 — 이 순서는
-    /// 스폰 트리거·큐 소비 순서라 바꾸면 안 된다. 바뀐 건 연출 순서뿐이다.
-    ///
-    /// 연출은 **순차**다. PlayFillAnim이 새 카드를 화면 중앙(_mid)을 거쳐 날리는데,
-    /// 예전엔 양쪽을 WhenAll로 동시에 돌려서 동시 사망 시 두 진영 카드가 중앙에서 겹쳐 안 보였다.
-    /// 멀티(MultiplayerPlayerTurn/OpponentTurn)는 원래 순차라 이 문제가 없었다 — 싱글만 어긋나 있었다.</summary>
-    public async UniTask FillAndAnimate()
+    public async UniTask AnimateFilled(TurnFillResult _filled)
     {
-        List<CardInstance> t_playerPlaced = this.playerField.FillEmptySlots();
-        List<CardInstance> t_enemyPlaced  = this.enemyField.FillEmptySlots();
         RefreshViews();
-
-        await this.playerFieldView.PlayFillAnim(t_playerPlaced);
-        await this.enemyFieldView.PlayFillAnim(t_enemyPlaced);
+        await playerFieldView.PlayFillAnim(_filled.PlayerPlaced);
+        await enemyFieldView.PlayFillAnim(_filled.EnemyPlaced);
     }
 
     public void ClearAllHighlights()
     {
-        this.playerFieldView.ClearAllHighlights();
-        this.enemyFieldView.ClearAllHighlights();
+        playerFieldView.ClearAllHighlights();
+        enemyFieldView.ClearAllHighlights();
+    }
+}
+
+/// <summary>
+/// 규칙과 연출을 함께 수행하는 기존 TurnBase 구현용 호환 facade.
+/// 순수 루프는 이 타입 대신 TurnRuleContext만 소비한다.
+/// </summary>
+public sealed class TurnContext
+{
+    public readonly TurnRuleContext Rules;
+    public readonly TurnViewContext Views;
+
+    public TurnContext(TurnRuleContext _rules, TurnViewContext _views)
+    {
+        Rules = _rules;
+        Views = _views;
+    }
+
+    public BattleField playerField => Rules.playerField;
+    public BattleField enemyField => Rules.enemyField;
+    public BattleFieldView playerFieldView => Views.playerFieldView;
+    public BattleFieldView enemyFieldView => Views.enemyFieldView;
+    public TMP_Text turnLabel => Views.turnLabel;
+    public DeckPileUI playerDeckUI => Views.playerDeckUI;
+    public DeckPileUI enemyDeckUI => Views.enemyDeckUI;
+    public TurnBannerUI turnBanner => Views.turnBanner;
+    public MulliganOverlayUI mulliganOverlay => Views.mulliganOverlay;
+
+    public void RefreshViews() => Views.RefreshViews();
+    public void ClearAllHighlights() => Views.ClearAllHighlights();
+
+    public async UniTask FillAndAnimate()
+    {
+        TurnFillResult t_filled = Rules.FillSlots();
+        await Views.AnimateFilled(t_filled);
     }
 }

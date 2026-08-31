@@ -133,12 +133,7 @@ public class TournamentConfig : ScriptableObject
         if (_sink == null) return;
         _sink.Clear();
 
-        if (TournamentSpec.TryGetRewards(_nodeId, out List<AlbumRewardDef> t_spec)) { FillFrom(t_spec, _sink); return; }
-
-        int t_index = IndexOf(_nodeId);
-        if (t_index < 0) return;
-
-        FillFrom(m_nodes[t_index].rewards, _sink);
+        if (TournamentSpec.TryGetRewards(_nodeId, out List<AlbumRewardDef> t_spec)) FillFrom(t_spec, _sink);
     }
 
     // 챕터 _chapterId의 완주 보상을 _sink에 담는다(변환 규약은 FillRewards와 동일)
@@ -147,12 +142,7 @@ public class TournamentConfig : ScriptableObject
         if (_sink == null) return;
         _sink.Clear();
 
-        if (TournamentSpec.TryGetRewards(_chapterId, out List<AlbumRewardDef> t_spec)) { FillFrom(t_spec, _sink); return; }
-
-        int t_index = ChapterIndexOf(_chapterId);
-        if (t_index < 0) return;
-
-        FillFrom(m_chapters[t_index].completionRewards, _sink);
+        if (TournamentSpec.TryGetRewards(_chapterId, out List<AlbumRewardDef> t_spec)) FillFrom(t_spec, _sink);
     }
 
     // 저작 변경 즉시 반영 — 평탄화 캐시는 스스로 갱신하지 않는다

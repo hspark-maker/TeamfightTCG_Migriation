@@ -34,7 +34,7 @@ public class TutorialAuthoringWindow : EditorWindow
     const float DetailMaxWidth = 560f;
 
     // 도메인 리로드를 건너뛰고 살아남아야 한다 — 되살아날 때마다 FindAsset이 첫 GUID로 되돌리면
-    // 같은 타입 SO가 둘 이상일 때 부트가 쓰는 것과 다른 에셋을 검증하게 된다.
+    // 같은 타입 SO가 둘 이상일 때 초기화가 쓰는 것과 다른 에셋을 검증하게 된다.
     [SerializeField] OutgameTutorialData   data;
     [SerializeField] TriggeredTutorialData triggeredData;
 
@@ -322,10 +322,10 @@ public class TutorialAuthoringWindow : EditorWindow
 
         if (EditorGUI.EndChangeCheck()) Invalidate();
 
-        // 부트는 자기가 찾은 한 벌을 재생한다 — 여러 벌이면 여기서 검증한 것과 다를 수 있다.
+        // 초기화는 자기가 찾은 한 벌을 재생한다 — 여러 벌이면 여기서 검증한 것과 다를 수 있다.
         if (this.dataAssetCount > 1 || this.triggeredAssetCount > 1)
             EditorGUILayout.HelpBox($"같은 타입의 SO가 여러 벌이다(온보딩 {this.dataAssetCount} · 트리거 {this.triggeredAssetCount}) — "
-                                  + "부트가 실제로 재생하는 에셋을 직접 지정할 것.", MessageType.Warning);
+                                  + "초기화가 실제로 재생하는 에셋을 직접 지정할 것.", MessageType.Warning);
 
         EditorGUILayout.Space(2);
     }
@@ -752,8 +752,8 @@ public class TutorialAuthoringWindow : EditorWindow
         if (GUILayout.Button("취소", EditorStyles.miniButton, GUILayout.Width(44))) OutgameTutorialRewind.Cancel();
         EditorGUILayout.EndHorizontal();
 
-        // 밀기만 돌고 지급 재생 전에 부트가 끊긴 상태(BootInstaller 없는 씬에서 Play 등).
-        // 이 자리에 드러내지 않으면 취소할 방법이 없어, 한참 진행한 세이브 위에 다음 부트가 지급을 덧씌운다.
+        // 밀기만 돌고 지급 재생 전에 초기화가 끊긴 상태(초기화(InitializationRunner) 없는 씬에서 Play 등).
+        // 이 자리에 드러내지 않으면 취소할 방법이 없어, 한참 진행한 세이브 위에 다음 초기화가 지급을 덧씌운다.
         if (!t_wipePending)
             EditorGUILayout.HelpBox("세이브 밀기는 끝났고 지급 재생만 남았다 — 그 사이에 진행했다면 [취소]로 걷어라.", MessageType.Warning);
     }

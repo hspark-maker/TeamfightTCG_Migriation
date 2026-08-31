@@ -4,7 +4,7 @@
 /// <see cref="CardInstance"/> 생성자와 <see cref="BattleField"/> 공급 경로의 시그니처는 그대로다.
 ///
 /// Battle과 OutGame 양쪽이 함께 쓰므로 어느 한쪽 폴더에 두지 않는다(경계: Battle은 OutGame을 참조하지 않는다).
-/// 성장값을 만드는 쪽은 OutGame(CardGrowthManager), 소비하는 쪽은 Battle이며, 전달은 상위 부트/초기화가 한다.</summary>
+/// 성장값을 만드는 쪽은 OutGame(CardGrowthManager), 소비하는 쪽은 Battle이며, 전달은 상위 초기화가 한다.</summary>
 public static class GrowthStar
 {
     public const int MinStar = 0;
@@ -24,22 +24,22 @@ public static class GrowthStar
 public readonly struct CardGrowth
 {
     /// <summary>미강화 카드의 레벨. 레벨은 1부터 세고 강화가 여기서부터 올린다 — 강화 횟수는 (Level - BaseLevel)이다.</summary>
-    public const int BaseLevel = 1;
+    public const int BaseLevel = CardSpec.BaseGrowthLevel;
 
     /// <summary>강화 레벨. BaseLevel = 미강화.</summary>
     public readonly int Level;
 
     /// <summary>강화로 얻은 최대 체력 가산분. 레벨에서 재계산하지 않고 값으로 들고 다닌다 —
-    /// 곡선(CardGrowthConfig)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
+    /// 곡선(GrowthRules·카드 스펙)을 아는 것은 OutGame뿐이고 전투는 결과만 받으면 되기 때문.</summary>
     public readonly int HpBonus;
 
-    /// <summary>강화로 도달한 진화 단계(0 = 미진화). 관문 레벨은 CardGrowthConfig가 소유하고 여기엔 결과만 담긴다 —
+    /// <summary>강화로 도달한 진화 단계(0 = 미진화). 관문 레벨은 GrowthRules가 소유하고 여기엔 결과만 담긴다 —
     /// 전투가 곡선을 알 필요가 없다는 <see cref="HpBonus"/>와 같은 규약.</summary>
     public readonly int EvolutionStage;
 
     /// <summary>이 레벨에서 **실제로 켜져 있는** 카드 키워드. 기본 키워드에 더하는 값이 아니라 **대체하는** 값이다 —
     /// 키워드는 해금 레벨 전까지 아예 없는 것으로 친다. 소비측은 <see cref="Applied"/>가 true일 때만 이 값을 쓰고,
-    /// 미주입(default)이면 CardData.keywords를 그대로 써야 한다(AI·원격 미러의 기존 동작 보존).</summary>
+    /// 미주입(default)이면 카드 스펙 keywords를 그대로 써야 한다(AI·원격 미러의 기존 동작 보존).</summary>
     public readonly CardKeyword UnlockedKeywords;
 
     /// <summary>성장원이 실제로 주입됐는가. default(Level 0)는 "성장 미적용"이고 <see cref="Fresh"/>(Level 1)는

@@ -37,7 +37,7 @@ internal static class TournamentValidator
                 Debug.LogError($"[Tournament] nodeId 중복 '{t_node.nodeId}' (정점 #{t_i}) — 낙인이 한 정점으로 합쳐진다.");
             }
 
-            if (CountCards(t_node.enemyDeck) == 0)
+            if (CountCards(t_node.EnemyDeckIds) == 0)
             {
                 t_emptyDeck++;
                 Debug.LogError($"[Tournament] 상대 덱 비었음 (정점 #{t_i} '{t_node.displayName}') — 전투를 열 수 없다.");
@@ -121,13 +121,13 @@ internal static class TournamentValidator
         return t_fault;
     }
 
-    static int CountCards(List<CardData> _cards)
+    static int CountCards(IReadOnlyList<int> _cards)
     {
         if (_cards == null) return 0;
 
         int t_count = 0;
         for (int t_i = 0; t_i < _cards.Count; t_i++)
-            if (_cards[t_i] != null) t_count++;
+            if (_cards[t_i] > 0) t_count++;
 
         return t_count;
     }

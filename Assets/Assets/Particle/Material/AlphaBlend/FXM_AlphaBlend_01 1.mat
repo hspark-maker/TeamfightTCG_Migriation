@@ -75,7 +75,7 @@ Material:
     m_Floats:
     - _AddPrecomputedVelocity: 1
     - _Main_Ins: 2.55
-    - _Main_Ins1: 3
+    - _Main_Ins1: 1
     - _Main_Power: 0.65
     - _Main_Power1: 1
     - _Noise_Ins: 2.04

@@ -13,11 +13,19 @@ using UnityEngine;
 /// 현재 에디터 프로필이 곧 빌드 실행 모드다. 테스트 프로필은 개발 빌드로, 라이브 프로필은
 /// 릴리즈 빌드로 만들며, 에셋에 실린 표가 그 프로필과 다르면 빌드를 막는다.
 /// </summary>
-public class ReleaseManagerWindow : EditorWindow
+public partial class ReleaseManagerWindow : EditorWindow
 {
     const string PREF_BUILD_DIR = "Release.BuildDir";
+    const string PREF_TAB       = "Release.Tab";
+
+    enum Tab
+    {
+        Release,
+        Data,
+    }
 
     string buildDir;
+    Tab selectedTab;
 
     Vector2 scroll;
     string  lastReport;
@@ -38,12 +46,16 @@ public class ReleaseManagerWindow : EditorWindow
     void OnEnable()
     {
         this.buildDir = EditorPrefs.GetString(PREF_BUILD_DIR, "Builds");
+        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
         Revalidate();
+        EnableDataTab();
     }
 
     void OnDisable()
     {
         EditorPrefs.SetString(PREF_BUILD_DIR, this.buildDir);
+        EditorPrefs.SetInt(PREF_TAB, (int)this.selectedTab);
+        DisableDataTab();
     }
 
     void OnGUI()
@@ -54,14 +66,22 @@ public class ReleaseManagerWindow : EditorWindow
             return;
         }
 
-        this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
+        this.selectedTab = (Tab)GUILayout.Toolbar(
+            (int)this.selectedTab,
+            new[] { "릴리즈", "데이터 · Firestore" },
+            GUILayout.Height(26));
 
+        if (this.selectedTab == Tab.Data)
+        {
+            DrawDataTab();
+            return;
+        }
+
+        this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
         DrawModeSection();
-        DrawTableSection();
         DrawValidationSection();
         DrawBuildSection();
         DrawReport();
-
         EditorGUILayout.EndScrollView();
     }
 
@@ -88,7 +108,7 @@ public class ReleaseManagerWindow : EditorWindow
 
         EditorGUILayout.LabelField("세이브 폴더", t_profile != null ? t_profile.SaveFolder : "(프로필 에셋 없음)");
         EditorGUILayout.LabelField("테스트 카드", t_mode == EContentRunMode.Test ? "포함" : "제외");
-        EditorGUILayout.LabelField("적용 대상 시트", CardSpecImporter.SheetNameOf(t_mode));
+        EditorGUILayout.LabelField("적용 대상 시트", ContentRunModeEditor.SheetNameOf(t_mode));
     }
 
     void SwitchMode(EContentRunMode _target)
@@ -97,8 +117,8 @@ public class ReleaseManagerWindow : EditorWindow
 
         // 시트가 소스라 미리 볼 파일이 없다 — 못 읽는 경우는 SwitchTo가 사유를 담아 돌려준다.
         if (!EditorUtility.DisplayDialog($"{t_label}로 전환",
-                $"실행 모드를 {t_label}로 바꾸고 {CardSpecImporter.SheetNameOf(_target)} 시트를 카드 에셋에 덮어쓴다.\n\n" +
-                "두 시트는 같은 CardData를 공유하므로 지금 에셋에 있는 수치는 사라진다.", "전환", "취소"))
+                $"실행 모드를 {t_label}로 바꾸고 {ContentRunModeEditor.SheetNameOf(_target)} SpecData를 사용한다.\n\n" +
+                "두 시트는 같은 카드 ID를 공유하므로 지금 에셋에 있는 수치는 사라진다.", "전환", "취소"))
             return;
 
         string t_report = ContentRunModeEditor.SwitchTo(_target, out string t_error);
@@ -114,26 +134,16 @@ public class ReleaseManagerWindow : EditorWindow
 
         Header("② 카드 스펙시트");
 
-        ContentRunModeEditor.CardRoot = EditorGUILayout.TextField("카드 에셋 위치", ContentRunModeEditor.CardRoot);
+        EditorGUILayout.LabelField("카드 값의 진실원", ContentRunModeEditor.SheetNameOf(t_mode) + " SpecData");
 
         EditorGUILayout.Space(4);
-        if (ContentRunModeEditor.IsDesynced)
-        {
-            EditorGUILayout.HelpBox(
-                $"에셋에 실린 표는 '{ContentRunModeEditor.Label(ContentRunModeEditor.Applied)}'인데 실행 모드는 " +
-                $"'{t_label}'다 — 수치가 어긋나 있다.", MessageType.Warning);
-        }
-        else
-        {
-            EditorGUILayout.LabelField("에셋에 실린 표", ContentRunModeEditor.Label(ContentRunModeEditor.Applied));
-        }
+        EditorGUILayout.LabelField("런타임 표", ContentRunModeEditor.SheetNameOf(t_mode));
 
         // 값이 들어오는 문은 스펙시트 하나뿐이다. 값 변화의 기록은 카드 .asset 자체가 git에 추적되므로
         // 별도 CSV 스냅샷을 두지 않는다 — 두면 어느 쪽이 진짜인지가 다시 흐려진다.
-        if (GUILayout.Button($"스펙시트({CardSpecImporter.SheetNameOf(t_mode)}) → 카드 적용", GUILayout.Height(26)))
+        if (GUILayout.Button($"{ContentRunModeEditor.SheetNameOf(t_mode)} SpecData 사용 중", GUILayout.Height(26)))
         {
-            string t_report = CardSpecImporter.ImportToAssets(t_mode, out string t_error);
-            Finish(t_report, t_error);
+            Finish("카드 수치는 SO에 굽지 않습니다. SpecData 도구에서 표를 갱신하세요.", null);
         }
 
         EditorGUILayout.HelpBox(
@@ -145,7 +155,7 @@ public class ReleaseManagerWindow : EditorWindow
             MessageType.Info);
 
         this.showColumnHelp = EditorGUILayout.Foldout(this.showColumnHelp, "열 설명", true);
-        if (this.showColumnHelp) EditorGUILayout.HelpBox(CardTableTool.ColumnHelp, MessageType.None);
+        if (this.showColumnHelp) EditorGUILayout.HelpBox("카드 값은 Card/Card_Test SpecData가 소유하며 런타임은 int ID로 참조합니다.", MessageType.None);
     }
 
     // ── ③ 검증 ─────────────────────────────────────────────────────────────
@@ -175,7 +185,7 @@ public class ReleaseManagerWindow : EditorWindow
     void Revalidate()
     {
         this.validationWarnings = new List<string>();
-        this.issues     = ContentProfileValidator.Collect(this.validationWarnings);
+        this.issues     = ContentProfileValidator.Collect(this.validationWarnings, ContentRunModeEditor.Current);
         this.driftValid = false;   // 표를 갈았거나 에셋이 움직였다 — 대조 결과도 같이 낡는다
     }
 
@@ -187,7 +197,8 @@ public class ReleaseManagerWindow : EditorWindow
     {
         if (this.driftValid && this.driftMode == _mode) return;
 
-        this.drift      = ContentRunModeEditor.DiffTable(_mode, out this.driftError);
+        this.drift      = new List<string>();
+        this.driftError = null;
         this.driftMode  = _mode;
         this.driftValid = true;
     }
@@ -215,7 +226,7 @@ public class ReleaseManagerWindow : EditorWindow
 
         EditorGUILayout.HelpBox(
             $"이 빌드에 실리는 값은 표가 아니라 카드 에셋이다 — 둘이 다르다.\n" +
-            CardTableTool.DriftSummary(this.drift) + "\n\n" +
+            string.Join("\n", this.drift) + "\n\n" +
             $"표가 맞다면 ②에서 '{t_label} 표 → 카드 적용', 에셋이 맞다면 '카드 → {t_label} 표 내보내기'.",
             MessageType.Warning);
     }
@@ -238,9 +249,6 @@ public class ReleaseManagerWindow : EditorWindow
         EditorGUILayout.LabelField("포함 씬", $"{t_scenes}개 (Build Settings 기준)");
 
         EditorGUILayout.Space(4);
-        EnsureDrift(t_runtimeMode);
-        DrawDriftBox(t_runtimeMode);
-        EditorGUILayout.Space(4);
 
         string t_block = BuildBlocker(t_runtimeMode, t_scenes);
         if (t_block != null) EditorGUILayout.HelpBox(t_block, MessageType.Error);
@@ -259,11 +267,6 @@ public class ReleaseManagerWindow : EditorWindow
         if (string.IsNullOrWhiteSpace(this.buildDir)) return "출력 폴더를 입력할 것.";
         if (this.issues == null) return "검증을 먼저 돌릴 것(③ 다시 검사).";
         if (this.issues.Count > 0) return $"검증 문제 {this.issues.Count}건을 먼저 해결할 것.";
-
-        if (ContentRunModeEditor.Applied != _runtimeMode)
-            return $"이 빌드는 {ContentRunModeEditor.Label(_runtimeMode)} 프로필로 돌지만 " +
-                   $"카드 에셋에는 {ContentRunModeEditor.Label(ContentRunModeEditor.Applied)} 표가 실려 있다.\n" +
-                   $"①에서 {ContentRunModeEditor.Label(_runtimeMode)}로 전환하거나 ②에서 그 표를 적용할 것.";
 
         return null;
     }

@@ -107,7 +107,6 @@ public class CardInputController
             ClearTargetPreview();
             BattleBoardView.RestoreAllFades();
             this.owner.FocusWeapon(false);
-            this.owner.SetArmedVfx(false);   // 입력이 닫혀 무장 해제 — 공격으로 이어지지 않으므로 여기서 정리
             ResetAimTilt();
             this.owner.MoveToSlot().Forget();
         }
@@ -155,7 +154,6 @@ public class CardInputController
         if (!BattleUxFlags.DragAimAttack) return;
 
         this.owner.FocusWeapon(true);
-        this.owner.SetArmedVfx(true);   // 무장(드래그) 시작
     }
 
     public void OnMouseDrag()
@@ -286,7 +284,6 @@ public class CardInputController
                 if (BattleSelection.SelectedAttacker != this.owner)
                 {
                     this.owner.FocusWeapon(false);
-                    this.owner.SetArmedVfx(false);   // 공격 없이 손 뗌
                     BattleBoardView.RestoreAllFades();
                     this.owner.MoveToSlot().Forget();
                 }
@@ -346,7 +343,6 @@ public class CardInputController
             {
                 BattleBoardView.RestoreAllFades();
                 this.owner.FocusWeapon(false);
-                this.owner.SetArmedVfx(false);   // 조준만 하다 놓음
                 this.owner.MoveToSlot().Forget();
             }
             // 공격으로 이어진 경우 무장 이펙트는 끄지 않는다 — 반동 끝에서 AttackSequence가 끈다.
@@ -354,7 +350,6 @@ public class CardInputController
         else
         {
             this.owner.FocusWeapon(false);
-            this.owner.SetArmedVfx(false);
             ResetAimTilt();
             this.owner.MoveToSlot().Forget();
         }
@@ -528,14 +523,13 @@ public class CardInputController
             SynergyBadgeView t_badge = FindBadgeAt(this.touchStartScreenPos);
             if (t_badge != null && t_badge.Synergy != null)
             {
-                UIPoolManager.Instance?.AddOrUpdateUI<SynergyExplainPopupUI>(new SynergyExplainData
-                {
-                    synergy        = t_badge.Synergy,
-                    hasWorldAnchor = true,                       // 배지는 월드 스페이스라 RectTransform이 없다
-                    worldAnchor    = t_badge.transform.position,
-                    worldHalfWidth = BadgeHalfWidth(t_badge),
-                    ownedCount     = OwnedCountOf(t_badge.Synergy),
-                });
+                ExplainPopupData t_data = ExplainPopupData.ForSynergy(
+                    t_badge.Synergy, OwnedCountOf(t_badge.Synergy));
+                t_data.hasWorldAnchor = true;                    // 배지는 월드 스페이스라 RectTransform이 없다
+                t_data.worldAnchor    = t_badge.transform.position;
+                t_data.worldHalfWidth = BadgeHalfWidth(t_badge);
+
+                UIPoolManager.Instance?.AddOrUpdateUI<ExplainPopupUI>(t_data);
                 this.longPressSynergyShown = true;
             }
             else
@@ -545,7 +539,7 @@ public class CardInputController
                 UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(
                     new PooledCardElementData
                     {
-                        card     = this.owner.BoundCard.data,
+                        cardId   = this.owner.BoundCard.cardId,
                         instance = this.owner.BoundCard,
                         synergy  = this.owner.LastBadgeState,
                     });
@@ -578,7 +572,7 @@ public class CardInputController
     {
         UIPoolManager.Instance?.AddOrUpdateUI<PooledCardElement>(new PooledCardElementData
         {
-            card        = this.owner.BoundCard?.data,
+            cardId      = this.owner.BoundCard?.cardId ?? 0,
             dimOnly     = true,
             dimProgress = 1f,
         });
@@ -635,7 +629,7 @@ public class CardInputController
     {
         // 카드 정보 / 시너지 설명 중 실제로 띄운 쪽을 닫는다.
         if (this.longPressFired && this.longPressSynergyShown)
-            UIPoolManager.Instance?.HideUI<SynergyExplainPopupUI>();
+            UIPoolManager.Instance?.HideUI<ExplainPopupUI>();
 
         // 팝업이 뜨기 전에 취소돼도(= 다 누르지 못하고 뗌·드래그) 차오르던 배경은 반드시 지운다.
         if (this.longPressDimShown || (this.longPressFired && !this.longPressSynergyShown))
@@ -700,7 +694,6 @@ public class CardInputController
         this.owner.SetHighlight(true);
         this.owner.SetTargetFocus(true);   // 무장된 내 카드 살짝 확대 — 지금 누가 공격자인지 즉시 보이게.
         this.owner.FocusWeapon(true);
-        this.owner.SetArmedVfx(true);      // 무장(탭) — 해제 또는 공격 반동 끝까지 유지
 
         var t_targets = GetValidEnemyViews(this.owner);   // 지정 타깃이면 그 하나, 아니면 도발 있을 때 도발 카드만.
         BattleBoardView.FadeAll(BattleBoardView.ForcedDimAlpha);
@@ -767,7 +760,6 @@ public class CardInputController
         BattleSelection.Clear(_instant: true);   // 확대 즉시 원복 — 공격 연출의 DOKill에 트윈이 잘려 커진 채 굳는 것 방지.
         // 위 해제가 무장 이펙트도 끈다. 탭 공격은 여기서 바로 공격이 이어지므로 다시 켜서
         // 반동이 끝나는 지점(AttackSequence)까지 유지한다 — 드래그 공격 경로와 수명을 맞춘다.
-        t_attacker.SetArmedVfx(true);
         t_attacker.ResetAimTilt();
         BattleSelection.NotifyAttack(t_attacker, this.owner);
     }
@@ -800,14 +792,14 @@ public class CardInputController
     static void ShowTauntBlockedNotice(CardInstance _tauntCard)
     {
         if (!BattleUxFlags.EffectNotifyBanner) return;
-        if (_tauntCard?.data == null) return;
+        if (_tauntCard == null || !CardCatalog.Contains(_tauntCard.cardId)) return;
 
         Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
         UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
         {
-            portrait       = t_icon != null ? t_icon : CardVisualRules.PickCardArt(_tauntCard.data),
+            portrait       = t_icon != null ? t_icon : CardVisualRules.PickCardArt(_tauntCard.cardId, _tauntCard.evolutionStage),
             preserveAspect = t_icon != null,
-            cardName       = _tauntCard.data.displayName,
+            cardName       = _tauntCard.spec.DisplayName,
             effectLabel    = TAUNT_BLOCKED_TEXT,
         });
     }

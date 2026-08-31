@@ -11,10 +11,9 @@ public static partial class CardGrowthManager
         if (_id <= 0) return 0;
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
-        return t_entry.snack > 0 ? t_entry.snack : 0;
+        return t_entry.Snack > 0 ? t_entry.Snack : 0;
     }
 
-    public static int SnackOf(CardData _card) => SnackOf(CardCatalog.IdOf(_card));
 
     /// <summary>간식을 적립한다(적립됐으면 true). <b>디스크에 쓰지 않는다</b> — 한 번 개봉에 중복이 여러 장
     /// 나올 수 있어, 호출부가 흐름 끝에 <see cref="FlushToData"/>나 <see cref="Save"/>로 한 번만 반영한다.</summary>
@@ -25,52 +24,49 @@ public static partial class CardGrowthManager
         if (_amount <= 0) return false;
 
         CardGrowthEntry t_entry = Entry(_id);
-        int t_current = t_entry.snack > 0 ? t_entry.snack : 0;
+        int t_current = t_entry.Snack > 0 ? t_entry.Snack : 0;
 
         // long으로 더한 뒤 상한에서 자른다 — int 넘침 방지.
         long t_next = (long)t_current + _amount;
-        t_entry.snack = t_next > int.MaxValue ? int.MaxValue : (int)t_next;
+        t_entry.Snack = t_next > int.MaxValue ? int.MaxValue : (int)t_next;
 
         OnGrowthChanged?.Invoke();
         return true;
     }
 
-    public static bool AddSnack(CardData _card, int _amount) => AddSnack(CardCatalog.IdOf(_card), _amount);
 
     public static int LimitBreakOf(int _id)
     {
         if (_id <= 0) return 0;
         if (!s_growth.TryGetValue(_id, out var t_entry) || t_entry == null) return 0;
 
-        return Mathf.Clamp(t_entry.limitBreak, 0, Config.MaxLimitBreak);
+        return Mathf.Clamp(t_entry.LimitBreak, 0, GrowthRules.MaxLimitBreak);
     }
 
-    public static int LimitBreakOf(CardData _card) => LimitBreakOf(CardCatalog.IdOf(_card));
-
-    public static bool TryGetNextLimitBreakStep(CardData _card, out LimitBreakStep _step)
+    public static bool TryGetNextLimitBreakStep(int _cardId, out LimitBreakStep _step)
     {
         _step = default;
-        if (!s_initialized || !s_configInjected || _card == null) return false;
+        if (!s_initialized || _cardId <= 0) return false;
 
         // 강화 레벨을 보지 않는다 — 한계돌파는 간식으로만 무는 별개 축이라 0성부터 열려 있다.
-        int t_id = CardCatalog.IdOf(_card);
+        int t_id = _cardId;
         if (!OwnershipManager.IsOwned(t_id)) return false;
 
-        return Config.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
+        return GrowthRules.TryGetLimitBreakStep(LimitBreakOf(t_id) + 1, out _step);
     }
 
     // 간식 차감과 단계 증가는 반드시 함께 저장한다.
-    public static bool TryLimitBreak(CardData _card)
+    public static bool TryLimitBreak(int _cardId)
     {
-        if (!TryGetNextLimitBreakStep(_card, out LimitBreakStep t_step)) return false;
+        if (!TryGetNextLimitBreakStep(_cardId, out LimitBreakStep t_step)) return false;
 
-        int t_id = CardCatalog.IdOf(_card);
+        int t_id = _cardId;
         CardGrowthEntry t_entry = Entry(t_id);
-        int t_snack = t_entry.snack > 0 ? t_entry.snack : 0;
+        int t_snack = t_entry.Snack > 0 ? t_entry.Snack : 0;
         if (t_snack < t_step.SnackCost) return false;
 
-        t_entry.snack = t_snack - t_step.SnackCost;
-        t_entry.limitBreak = t_step.Stage;
+        t_entry.Snack = t_snack - t_step.SnackCost;
+        t_entry.LimitBreak = t_step.Stage;
         Save();
         OnGrowthChanged?.Invoke();
         return true;

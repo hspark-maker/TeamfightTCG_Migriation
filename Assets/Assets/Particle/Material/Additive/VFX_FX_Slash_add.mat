@@ -109,6 +109,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 0
+    - _USE_X_Offset: 0
     - _USE_Y_Offset: 0
     - _XRMotionVectorsPass: 1
     - __dirty: 1

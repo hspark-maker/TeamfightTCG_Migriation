@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054077753954",
+    "project_id": "bm-cardbattle",
+    "storage_bucket": "bm-cardbattle.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054077753954:android:d4b0d8cb25ef1611ae0f3b",
+        "android_client_info": {
+          "package_name": "com.BurgerMonster.CardBattlee"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBU7pZwbRF_M3EJJym1ZFctyY6DzxdPcxs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

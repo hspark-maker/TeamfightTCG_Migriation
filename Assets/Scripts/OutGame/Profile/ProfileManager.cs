@@ -36,30 +36,35 @@ public static class ProfileManager
         get
         {
             var t_data = DataSaveManager.Data;
-            if (t_data.profile == null) t_data.profile = new ProfileSaveData();
-            return t_data.profile;
+            if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
+            return t_data.Profile;
         }
     }
 
     static string DefaultAvatarId => Config != null ? Config.DefaultAvatarId : string.Empty;
     static string DefaultFrameId  => Config != null ? Config.DefaultFrameId  : string.Empty;
 
-    // 부트에서 1회 주입. 미배선(null)이면 그림이 전부 null로 떨어진다(화면은 저작값 유지).
+    // 초기화에서 1회 주입. 미배선(null)이면 그림이 전부 null로 떨어진다(화면은 저작값 유지).
     public static void SetConfig(ProfileConfig _config)
     {
         Config = _config;
     }
 
-    // 부트에서 SetConfig 이후 1회 호출. DataSaveManager.Load() 뒤여야 세이브가 반영된다.
+    // 초기화에서 SetConfig 이후 1회 호출. 클라우드 세이브 채택 뒤여야 세이브가 반영된다.
     // 세이브가 비었거나 Config에서 사라진 id면 기본값으로 떨어진다 — 폴백 결과를 슬롯에 되쓰지는
-    // 않는다(부트마다 디스크 쓰기가 생긴다). 다음 Apply()가 정리한다.
+    // 않는다(초기화마다 디스크 쓰기가 생긴다). 다음 Apply()가 정리한다.
     public static void Init()
     {
         ProfileSaveData t_slot = Slot;
 
-        Nickname = string.IsNullOrEmpty(t_slot.nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.nickname);
-        AvatarId = IsKnownAvatar(t_slot.avatarId) ? t_slot.avatarId : DefaultAvatarId;
-        FrameId  = IsKnownFrame(t_slot.frameId)   ? t_slot.frameId  : DefaultFrameId;
+        Nickname = string.IsNullOrEmpty(t_slot.Nickname) ? DEFAULT_NICKNAME : SanitizeNickname(t_slot.Nickname);
+        AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
+        FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
+
+        // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
+        // 초기화 한복판이라 구독자 예외를 여기서 흘리면 나머지 설치가 통째로 중단된다.
+        try { OnChanged?.Invoke(); }
+        catch (Exception t_exception) { Debug.LogException(t_exception); }
     }
 
     // 프로필 3값 일괄 반영. 모르는 아바타·프레임 ID는 무시하고 기존값을 남긴다.
@@ -105,9 +110,9 @@ public static class ProfileManager
     static void Persist()
     {
         ProfileSaveData t_slot = Slot;
-        t_slot.nickname = Nickname;
-        t_slot.avatarId = AvatarId;
-        t_slot.frameId  = FrameId;
+        t_slot.Nickname = Nickname;
+        t_slot.AvatarId = AvatarId;
+        t_slot.FrameId  = FrameId;
 
         DataSaveManager.Save();
     }

@@ -7,17 +7,17 @@ public readonly struct AlbumInsertStep
     public readonly AlbumTheme Theme;
     public readonly int PageIndex;
     public readonly int SlotIndex;
-    public readonly CardData Card;
+    public readonly int CardId;
 
     // 빈 칸에 찍히는 도감 번호(테마 내 통번호). 삽입 씰도 같은 번호를 보여야 대상 칸과 같은 그림이다.
     public readonly int Number;
 
-    public AlbumInsertStep(AlbumTheme _theme, int _pageIndex, int _slotIndex, CardData _card, int _number)
+    public AlbumInsertStep(AlbumTheme _theme, int _pageIndex, int _slotIndex, int _cardId, int _number)
     {
         Theme = _theme;
         PageIndex = _pageIndex;
         SlotIndex = _slotIndex;
-        Card = _card;
+        CardId = _cardId;
         Number = _number;
     }
 }
@@ -28,10 +28,10 @@ public readonly struct AlbumInsertStep
 public static class AlbumInsertPlan
 {
     // _unplaced: 앨범 어느 칸에도 없는 카드(저작 드리프트). 호출자가 위장을 즉시 풀어야 한다.
-    public static List<AlbumInsertStep> Build(IReadOnlyList<CardData> _cards, out List<CardData> _unplaced)
+    public static List<AlbumInsertStep> Build(IReadOnlyList<int> _cards, out List<int> _unplaced)
     {
         var t_steps = new List<AlbumInsertStep>();
-        _unplaced = new List<CardData>();
+        _unplaced = new List<int>();
 
         if (_cards == null || _cards.Count == 0) return t_steps;
 
@@ -39,7 +39,7 @@ public static class AlbumInsertPlan
         var t_want = new HashSet<int>();
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
-            int t_id = CardCatalog.IdOf(_cards[t_i]);
+            int t_id = _cards[t_i];
             if (t_id > 0) t_want.Add(t_id);
         }
 
@@ -53,11 +53,11 @@ public static class AlbumInsertPlan
             int t_base = 0;
             for (int t_p = 0; t_p < t_theme.Pages.Count; t_p++)
             {
-                var t_pageCards = t_theme.Pages[t_p].Cards;
+                var t_pageCards = t_theme.Pages[t_p].CardIds;
                 for (int t_s = 0; t_s < t_pageCards.Count; t_s++)
                 {
                     var t_card = t_pageCards[t_s];
-                    int t_id = CardCatalog.IdOf(t_card);
+                    int t_id = t_card;
                     if (t_id <= 0 || !t_want.Remove(t_id)) continue;
 
                     t_steps.Add(new AlbumInsertStep(t_theme, t_p, t_s, t_card, t_base + t_s + 1));
@@ -72,7 +72,7 @@ public static class AlbumInsertPlan
         for (int t_i = 0; t_i < _cards.Count; t_i++)
         {
             var t_card = _cards[t_i];
-            int t_id = CardCatalog.IdOf(t_card);
+            int t_id = t_card;
             if (t_id > 0 && t_want.Contains(t_id)) _unplaced.Add(t_card);
         }
         Debug.LogWarning($"[AlbumInsertPlan] 앨범에 배치되지 않은 카드 {_unplaced.Count}장 — 삽입에서 제외한다(CardAlbumConfig 저작 확인).");

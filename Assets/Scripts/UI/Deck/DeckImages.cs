@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 덱 대표 이미지 조회 창구. 카탈로그(SO) 주입은 BootInstaller가 한 번만 한다.
+/// 덱 대표 이미지 조회 창구. 카탈로그(SO) 주입은 초기화(InitializationRunner)가 한 번만 한다.
 /// 세이브는 키 문자열만 알고 스프라이트는 모른다 — 그 사이 변환을 여기 한 곳에 가둔다.
 /// </summary>
 public static class DeckImages
@@ -59,16 +59,16 @@ public static class DeckImages
         return false;
     }
 
-    // 덱 첫 카드의 deckPreview → 없으면 일반 카드 아트 → 둘 다 없으면 null.
+    // 덱 첫 카드의 아트 → 없으면 null.
     // 폴백을 CardVisualRules에 맡기는 건 여기서 카드 아트를 직접 적으면
     // 같은 카드가 덱 목록에서만 다른 그림으로 뜨는 드리프트가 생기기 때문이다.
-    static Sprite ResolveFromFirstCard(List<CardData> _deck)
+    static Sprite ResolveFromFirstCard(List<int> _deck)
     {
         if (_deck == null || _deck.Count == 0) return null;
 
         var t_first = _deck[0];
-        if (t_first == null) return null;
+        if (t_first <= 0) return null;
 
-        return t_first.deckPreview != null ? t_first.deckPreview : CardVisualRules.PickCardArt(t_first);
+        return CardVisualRules.PickCardArt(t_first);
     }
 }

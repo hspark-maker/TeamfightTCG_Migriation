@@ -68,7 +68,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         Subscribe();          // 타깃이 나중에 등장하는 경우를 기다린다(구독은 스텝 진입 전에).
 
-        // 부트 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
+        // 초기화 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
         ApplyCurrentStep();
     }
 
@@ -337,10 +337,10 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     // 지목한 카드가 덱에 들어갔는가. anchorCard가 있으면 그 카드만 인정한다 — 아무 카드나 끼워도 넘어가면
     // "이 카드를 골라라"라는 안내가 거짓말이 된다.
-    void OnDeckCardEquipped(CardData _card)
+    void OnDeckCardEquipped(int _cardId)
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckEquip) return;
-        if (m_step.AnchorCard != null && _card != m_step.AnchorCard) return;
+        if (m_step.AnchorCardId > 0 && _cardId != m_step.AnchorCardId) return;
 
         OnGateSatisfied();
     }

@@ -31,7 +31,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     const float FOCUS_SCALE      = 1.08f;
     const float FOCUS_SCALE_TIME = 0.12f;
 
-    CardData                                       m_card;
+    int                                            m_card;
     bool                                           m_inDeck;
     bool                                           m_focusDimmed;
     Tween                                          m_focusTween;
@@ -39,10 +39,10 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     Action<DeckEditCardTile, PointerEventData>     m_onDragRequest;
     Action<DeckEditCardTile>                       m_onClick;
 
-    public CardData Card   => m_card;
+    public int Card   => m_card;
     public bool     InDeck => m_inDeck;
 
-    public void Bind(CardData _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
+    public void Bind(int _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
         m_card          = _card;
         m_onDragRequest = _onDragRequest;
@@ -129,7 +129,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     {
         // 입력 모듈은 우클릭·휠클릭에도 클릭 핸들러를 태운다 — 에디터/PC에서 오배치가 나지 않게 좌클릭만 받는다.
         if (_data != null && _data.button != PointerEventData.InputButton.Left) return;
-        if (m_inDeck || m_card == null) return;   // 이미 편성된 카드(딤 상태)는 클릭 대상이 아니다
+        if (m_inDeck || m_card <= 0) return;   // 이미 편성된 카드(딤 상태)는 클릭 대상이 아니다
 
         m_onClick?.Invoke(this);
     }
@@ -145,7 +145,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
 
     void OnLongPressFired()
     {
-        if (m_inDeck || m_card == null || m_pointerData == null) return;
+        if (m_inDeck || m_card <= 0 || m_pointerData == null) return;
 
         m_onDragRequest?.Invoke(this, m_pointerData);
     }

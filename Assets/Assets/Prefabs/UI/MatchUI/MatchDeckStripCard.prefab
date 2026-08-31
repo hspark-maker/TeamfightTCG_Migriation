@@ -131,22 +131,6 @@ PrefabInstance:
       propertyPath: selectedFrame
       value: 
       objectReference: {fileID: 7202608997049631828}
-    - target: {fileID: 2408904539825643120, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
-      propertyPath: m_fontSize
-      value: 88.880005
-      objectReference: {fileID: 0}
-    - target: {fileID: 2408904539825643120, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
-      propertyPath: m_fontSizeMax
-      value: 29.088001
-      objectReference: {fileID: 0}
-    - target: {fileID: 2408904539825643120, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
-      propertyPath: m_fontSizeMin
-      value: 7.2720003
-      objectReference: {fileID: 0}
-    - target: {fileID: 2408904539825643120, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
-      propertyPath: m_fontSizeBase
-      value: 88.880005
-      objectReference: {fileID: 0}
     - target: {fileID: 2810858644483735295, guid: 7a9b4d899b9227a4283f99783f9ce2e9, type: 3}
       propertyPath: m_PixelsPerUnitMultiplier
       value: 2.4752474

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 public class PlayerTurn : TurnBase
@@ -417,7 +418,6 @@ public class PlayerTurn : TurnBase
         {
             // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
             // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
-            CardView.GetView(t_attCard)?.SetArmedVfx(false);
             return;
         }
 
@@ -501,17 +501,21 @@ public class PlayerTurn : TurnBase
         var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
             _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
 
-        AttackResult t_result = default;
-        Action t_onEffect = () => t_result = AttackProcessor.Execute(
-            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash);
-
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
         await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
                                          t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
+        AttackResult t_result;
+        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
+        {
+            t_result = AttackProcessor.Execute(
+                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash);
+            t_result.events = t_events.ToArray();
+        }
+
         await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw,
+            t_result.events, t_preKw, t_atKw,
             () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.

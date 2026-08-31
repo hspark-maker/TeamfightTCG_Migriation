@@ -294,7 +294,8 @@ public class CurrencyHud : MonoBehaviour
         this.ApplyIcon();
 
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
-        CurrencyManager.OnCurrencySpent += this.HandleCurrencySpent;
+        // 소비 통지(OnCurrencySpent)는 아직 붙일 곳이 없다 — 잔액의 진실원이 서버 지갑으로 가면서
+        // 클라 소비 경로가 사라졌다. 서버 응답이 '얼마 빠졌는가'를 내주면 그때 여기서 구독한다.
         this.Render(CurrencyManager.GetBalance(this.type));
     }
 
@@ -304,7 +305,6 @@ public class CurrencyHud : MonoBehaviour
         if (s_huds.TryGetValue(this.type, out var t_cur) && t_cur == this) s_huds.Remove(this.type);
 
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
-        CurrencyManager.OnCurrencySpent -= this.HandleCurrencySpent;
 
         m_displayRevision++;
         this.KillSpendTween();
@@ -323,6 +323,7 @@ public class CurrencyHud : MonoBehaviour
         this.type = m_defaultType;
     }
 
+    // 소비 연출 진입점. 지금은 부르는 곳이 없다(위 OnEnable 주석 참조) — 서버가 소비량을 통지하면 그대로 재사용한다.
     void HandleCurrencySpent(ECurrencyType _type, long _cost, long _balance)
     {
         if (_type != this.type) return;

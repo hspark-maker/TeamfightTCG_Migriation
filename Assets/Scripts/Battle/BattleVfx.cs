@@ -17,15 +17,26 @@ public static class BattleVfx
 
     static BattleVfxLibrary s_library;
 
-    /// <summary>부트스트랩(GameInitializer/DataLibrary)에서 주입. null이면 기존 값 유지 —
-    /// 어느 씬에서 시작해도 먼저 주입한 쪽이 이긴다.</summary>
+    public static bool HasLibrary => s_library != null;
+
+    /// <summary>초기화 경로에서 실제 애셋을 주입한다. null이면 기존 값을 유지한다.</summary>
     public static void SetLibrary(BattleVfxLibrary _library)
     {
-        if (_library != null) s_library = _library;
+        if (_library == null) return;
+        if (s_library != null && s_library != _library)
+            Debug.LogWarning($"[BattleVfx] 이미 주입된 라이브러리를 교체합니다: {s_library.name} -> {_library.name}");
+        s_library = _library;
     }
 
     /// <summary>형태값(힐러 커브 등) 접근용. 미배선이면 null — 호출부가 폴백을 정한다.</summary>
     public static BattleVfxLibrary Library => s_library;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState()
+    {
+        s_library = null;
+        s_collectBuffer.Clear();
+    }
 
     public static bool TryGetEntry(BattleVfxId _id, out VfxEntry _entry)
     {
@@ -101,7 +112,7 @@ public static class BattleVfx
     }
 
     /// <summary>라이브러리를 거치지 않고 **프리팹을 직접** 빌려 쓰는 스폰. 카드마다 다른 연출처럼
-    /// 배선 지점이 CardData 쪽인 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
+    /// 카드 데이터에 별도 배선된 경우에만 쓴다 — 규칙 기반 연출은 여전히 id(Spawn)로만 간다.
     /// 풀·정렬 규약은 Spawn과 동일하고, 수명은 호출부가 쥔다.</summary>
     public static VfxHandle SpawnPrefab(GameObject _prefab, Vector3 _pos, int _sortingLayerId, int _sortingOrder = 30)
     {

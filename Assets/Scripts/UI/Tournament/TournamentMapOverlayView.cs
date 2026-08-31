@@ -558,9 +558,10 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         this.m_suspendRefresh = true;
 
-        // 폴백(보상 0건·팝업 미배선)은 팝업 없이 지급만 끝난다 — 닫힘 콜백이 오지 않으니 곧바로 점등으로 잇는다.
+        // 폴백(보상 0건·팝업 미배선)도 흐름이 콜백을 책임진다 — 여기서 곧바로 이으면 서버 왕복 전이라 클리어가 아직 없다.
+        // false는 수령을 시작조차 못 한 경우뿐이라 걸어 둔 억제만 푼다.
         if (!TournamentRewardFlow.Open(t_node.nodeId, () => this.PlayClaimSequence(_index)))
-            this.PlayClaimSequence(_index);
+            this.AbortClaimSequence();
     }
 
     // 팝업이 걷히는 프레임에 결말을 그리고, 길이 차오르는 것은 그 위에 얹는다.

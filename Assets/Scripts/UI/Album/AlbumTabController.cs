@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 카드 앨범 탭 표면(Tab_Collection_New 루트 부착) — 전체 보상 요약 + 테마 갤러리
@@ -207,7 +208,7 @@ public class AlbumTabController : LobbyTabPanel
     /// 꽂을 것이 하나도 없으면 첫 열린 테마다(준비 중 테마는 지목하지 않는다). 삽입이 끝난 뒤의 안내(강화 유도)도 도감을 거쳐 가기 때문이다.</summary>
     static int FindAnchorThemeIndex(IReadOnlyList<AlbumTheme> _themes)
     {
-        if (OutgameTutorialGuide.TryGetAnchorCard(out CardData t_card))
+        if (OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
         {
             for (int t_i = 0; t_i < _themes.Count; t_i++)
                 if (!_themes[t_i].IsLocked && Contains(_themes[t_i], t_card)) return t_i;
@@ -216,19 +217,20 @@ public class AlbumTabController : LobbyTabPanel
         for (int t_i = 0; t_i < _themes.Count; t_i++)
             if (!_themes[t_i].IsLocked && AlbumInsertMask.HiddenCountIn(_themes[t_i]) > 0) return t_i;
 
+        // 꽂을 것이 하나도 없으면 첫 '열린' 테마 — 준비 중 테마는 지목하지 않는다.
         for (int t_i = 0; t_i < _themes.Count; t_i++)
             if (!_themes[t_i].IsLocked) return t_i;
 
         return -1;
     }
 
-    static bool Contains(AlbumTheme _theme, CardData _card)
+    static bool Contains(AlbumTheme _theme, int _cardId)
     {
-        var t_cards = _theme != null ? _theme.Cards : null;
+        var t_cards = _theme != null ? _theme.CardIds : null;
         if (t_cards == null) return false;
 
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
-            if (t_cards[t_i] == _card) return true;
+            if (t_cards[t_i] == _cardId) return true;
 
         return false;
     }
@@ -273,13 +275,16 @@ public class AlbumTabController : LobbyTabPanel
         }
     }
 
-    void ClaimAlbumReward()
+    // 상자 콜백은 동기 델리게이트라 대기를 여기서 끊는다(RewardClaimPopup의 버튼 핸들러와 같은 형태).
+    void ClaimAlbumReward() => ClaimAlbumRewardAsync().Forget();
+
+    async UniTaskVoid ClaimAlbumRewardAsync()
     {
         // 팝업을 띄우기 전에 막는다 — 지급은 [획득]에서 일어난다.
         if (!AlbumRewardManager.CanClaimAlbum()) return;
 
-        AlbumRewardClaimFlow.Open("앨범 완성!",
-                                  CardAlbum.AlbumRewards,
-                                  () => AlbumRewardManager.ClaimAlbum());
+        await AlbumRewardClaimFlow.Open("앨범 완성!",
+                                        CardAlbum.AlbumRewards,
+                                        () => AlbumRewardManager.ClaimAlbum());
     }
 }

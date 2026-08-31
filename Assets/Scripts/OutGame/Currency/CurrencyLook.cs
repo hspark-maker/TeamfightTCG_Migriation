@@ -31,7 +31,7 @@ public class CurrencyLook : ScriptableObject
 
     [SerializeField] List<Entry> entries = new List<Entry>();
 
-    // 부트에서 1회 주입. 미배선(null)이면 전부 폴백으로 동작한다
+    // 초기화에서 1회 주입. 미배선(null)이면 전부 폴백으로 동작한다
     public static void SetActive(CurrencyLook _look)
     {
         s_active = _look;

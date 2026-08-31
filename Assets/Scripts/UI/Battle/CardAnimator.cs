@@ -391,7 +391,6 @@ public class CardAnimator : MonoBehaviour
         }
 
         SoundManager.Instance?.PlayDeath();
-        SoundManager.Instance?.PlayDeathVoice(this.boundCard?.data?.deathVoices);
 
         // 팝의 정점 = 바닥 파동이 터지는 시각. 그 뒤 남은 시간의 일부만 써서 확 줄인다.
         float t_popDur    = Mathf.Clamp(GameTiming.Battle.DeathNovaAt, 0.01f, _duration);
@@ -468,7 +467,6 @@ public class CardAnimator : MonoBehaviour
         RefreshVisualCache();
 
         SoundManager.Instance?.PlayDealCard();
-        SoundManager.Instance?.PlaySpawnVoice(this.boundCard?.data?.spawnVoices);
         var t_ct = this.GetCancellationTokenOnDestroy();
 
         float t_half   = _duration * 0.5f;

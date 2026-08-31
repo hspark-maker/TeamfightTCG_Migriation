@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
+using TeamfightTCG.BattleCore;
 using UnityEngine;
 
 /// <summary>
@@ -10,10 +11,11 @@ using UnityEngine;
 /// - 내 field FillEmptySlots 후 스폰 브로드캐스트
 /// - WaitForOpponentReady 이후 상대 스폰 반영 + fill anim
 /// </summary>
-public class MultiplayerPlayerTurn : TurnBase
+public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 {
     CardInstance forcedAttacker;
     bool turnDone;
+    bool attackRunning;
 
     public MultiplayerPlayerTurn(TurnContext _ctx) : base(_ctx) { }
 
@@ -38,10 +40,21 @@ public class MultiplayerPlayerTurn : TurnBase
     {
         TurnState.InputAllowed   = false;
         TurnState.ForcedAttacker = null;
+        TurnState.ForcedTarget   = null;
+        TurnState.AllowedGesture = InputGesture.Any;
+        CardView.ForcedDimAlpha  = 0.3f;
         CardView.RestoreAllFades();
         CardView.OnAttack      -= HandleCardViewAttack;
         this.ctx.ClearAllHighlights();
         this.forcedAttacker = null;
+        this.attackRunning = false;
+    }
+
+    /// <summary>내 입력을 기다리던 중 상대가 이탈했다면 현재 턴은 그대로 플레이하게 한다.</summary>
+    public void ContinueAfterAiTakeover()
+    {
+        if (this.turnDone || this.attackRunning) return;
+        TurnState.InputAllowed = true;
     }
 
     void HandleCardViewAttack(CardView _attacker, CardView _target)
@@ -60,7 +73,6 @@ public class MultiplayerPlayerTurn : TurnBase
         {
             // 뷰는 이미 무장을 풀고 공격 연출용으로 VFX만 다시 켠 상태다. 여기서 거절하면
             // 그 VFX를 끌 주체(AttackSequence)가 안 돌아 공격자에 이펙트가 고착된다.
-            CardView.GetView(t_attCard)?.SetArmedVfx(false);
             return;
         }
 
@@ -102,6 +114,7 @@ public class MultiplayerPlayerTurn : TurnBase
 
     async UniTask ExecuteAttackAsync(CardInstance _attacker, CardInstance _defender)
     {
+        this.attackRunning = true;
         TurnState.InputAllowed = false;
 
         bool t_cunningSwap = _attacker.HasKeyword(CardKeyword.Cunning)
@@ -116,17 +129,23 @@ public class MultiplayerPlayerTurn : TurnBase
         var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
             _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
 
-        AttackResult t_result = default;
-        Action t_onEffect = () => t_result = AttackProcessor.Execute(
-            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash, t_cunningSwap);
-
+        bool t_derivedCommand = BattleUxFlags.ExecutionRandomTarget && ReferenceEquals(this.forcedAttacker, _attacker);
         var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
         await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
                                          t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
 
+        AttackResult t_result;
+        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
+        {
+            t_result = AttackProcessor.Execute(
+                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+                t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
+            t_result.events = t_events.ToArray();
+        }
+
         await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            _attacker.data.attackEffect, t_onEffect, t_preKw, t_atKw,
+            t_result.events, t_preKw, t_atKw,
             () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
@@ -148,15 +167,45 @@ public class MultiplayerPlayerTurn : TurnBase
         if (t_preSelectedSplash != null && !t_preSelectedSplash.IsAlive) t_splashView.HideSlot();
 
         // 연출 완료 신호 → 상대 완료 + 상대 스폰 RPC 전부 수신까지 대기
-        if (NetworkGameController.Instance != null)
-            await NetworkGameController.Instance.WaitForOpponentReady();
+        List<CardInstance> t_takeoverPlaced = null;
+        if (DeckConfig.AiTakeover)
+        {
+            t_takeoverPlaced = FillEnemyAfterTakeover();
+        }
+        else if (NetworkGameController.Instance != null)
+        {
+            bool t_ready = await NetworkGameController.Instance.WaitForOpponentReady();
+            if (!t_ready)
+            {
+                if (DeckConfig.AiTakeover)
+                {
+                    // 대기를 깨운 이탈 콜백은 동기 continuation을 실행한다. 이미 계산된
+                    // 처형 연속 공격을 버리지 말고, 이 안전 경계에서 상대 필드만 보충한 뒤 계속한다.
+                    t_takeoverPlaced = FillEnemyAfterTakeover();
+                }
+                else
+                {
+                    this.turnDone = true;
+                    TurnRunner.Instance?.AbortMatch(EMatchEndReason.Timeout);
+                    return;
+                }
+            }
+        }
 
         // 상대 스폰 반영 (OnCardSpawnReceived로 이미 enemyField에 배치됨)
-        List<CardInstance> t_enemyPlaced = MultiplayerTurnRunner.Instance?.FlushEnemySpawns()
+        List<CardInstance> t_enemyPlaced = t_takeoverPlaced
+                                           ?? MultiplayerTurnRunner.Instance?.FlushEnemySpawns()
                                            ?? new List<CardInstance>();
         this.ctx.enemyFieldView.Refresh();
         this.ctx.enemyDeckUI?.Refresh();
         await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
+
+        // divergence 카나리아 스냅샷. **공격 해결 직후가 아니라 여기다.**
+        // 상대 CardSpawn은 수신 즉시 enemyField에 반영되므로(PlaceCardDirectly), 보충 전에 뜨면
+        // "상대 보충분이 도착했는가"가 회선 속도에 좌우돼 정상 경기에서도 지문이 갈린다.
+        // 배리어를 통과하고 양쪽 보충이 모두 끝난 이 지점은 두 클라가 반드시 같은 보드다.
+        // 이 지문은 **다음 배리어**에 실려 나간다(순번도 그때 것으로 맞춰진다).
+        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {
@@ -196,6 +245,7 @@ public class MultiplayerPlayerTurn : TurnBase
             }
 
             TurnState.InputAllowed = true;
+            this.attackRunning = false;
             return;
         }
 
@@ -204,4 +254,10 @@ public class MultiplayerPlayerTurn : TurnBase
         CardView.RestoreAllFades();
         this.turnDone = true;
     }
+
+    /// <summary>AI 인수 후 상대 필드 보충. 원래 이 자리는 상대 클라가 채워 CardSpawn RPC로 알려주던 곳이다 —
+    /// 상대가 사라지면 그 보충 권한이 이쪽으로 넘어온다. 배치한 카드를 그대로 돌려주는 이유는
+    /// 아래 공통 경로가 PlayFillAnim으로 등장 연출을 태우기 때문이다(원격이 채웠을 때와 화면이 같아야 한다).
+    /// Refresh는 공통 경로가 바로 뒤에서 하므로 여기서 다시 하지 않는다.</summary>
+    List<CardInstance> FillEnemyAfterTakeover() => this.ctx.enemyField.FillEmptySlots();
 }

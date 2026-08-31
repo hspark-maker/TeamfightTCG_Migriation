@@ -1,6 +1,13 @@
+using TeamfightTCG.BattleCore;
+
 public class CardInstance
 {
-    public CardData data;
+    public readonly int cardId;
+    // Step 3 호환 다리: 잔여 UI가 ID API로 이관될 때까지 읽기 전용 역조회를 제공한다.
+    public readonly CardSpec spec;
+
+    /// <summary>진입 시 확정된 영구 성장 레벨. 규칙에는 안 쓰이고 서버 재시뮬 입력(골든·덱 스냅샷)에만 실린다.</summary>
+    public readonly int growthLevel;
     public int hp;
     // 이 인스턴스의 최대 체력(= data.maxHp + 영구 강화분). 회복 상한·부활 기준은 전부 이 값이다 —
     // data.maxHp는 공유 에셋이라 강화값을 담을 수 없다. 강화분은 bonusHp(시너지 임시 채널)에 섞지 않는다.
@@ -39,7 +46,7 @@ public class CardInstance
     // 스폰 직후 TurnBegan 1회 스킵용 (피즈·그웬 무적 즉시 소멸 방지)
     public bool justSpawned;
 
-    // 런타임 진화 단계. 0=미진화, 1~CardData.MaxEvolutionStage. 주입원은 마스터 데이터(defaultEvolutionStage).
+    // 런타임 진화 단계. 0=미진화, 1~CardSpec.MaxEvolutionStage. 주입원은 CardSpec.DefaultEvolutionStage.
     public int evolutionStage;
     // 등장 컷씬 1회성 래치. 스왑으로 대기열에 갔다가 다시 필드로 돌아오는 등 같은 인스턴스가
     // 여러 번 "등장"할 수 있어, 매 등장마다 컷씬이 다시 뜨는 것을 막는다.
@@ -56,11 +63,11 @@ public class CardInstance
     // ── 전투 규칙 (단일 진실원: 공격 해결부·프리뷰 공용) ──
     /// <summary>이 카드가 가하는 기본 공격력. 도발이면 현재 체력의 절반(최소 1).</summary>
     public int AttackDamage() =>
-        (HasKeyword(CardKeyword.Taunt) ? UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.hp * 0.5f)) : this.hp)
+        (HasKeyword(CardKeyword.Taunt) ? BattleMath.Max(1, BattleMath.FloorToInt(this.hp * 0.5f)) : this.hp)
         + this.flowBonus;   // 가산(흐름 스택)은 도발 반감 뒤에 더함(보너스는 반감 안 받음)
 
     /// <summary>무쌍 광역 피해량. AttackDamage()와 별개 규칙 — 도발/시너지 보정 없는 순수 hp 기준(v1 시맨틱 보존).</summary>
-    public int SplashDamage() => UnityEngine.Mathf.FloorToInt(this.hp * 0.5f);
+    public int SplashDamage() => BattleMath.FloorToInt(this.hp * 0.5f);
 
     // ── 강화 키워드(2차 진화 = Lv10 해금) ──
     /// <summary>강화 효과가 열린 단계. 성장 곡선의 <c>secondEvolutionLevel</c>(기본 Lv10)에 도달하면
@@ -72,7 +79,7 @@ public class CardInstance
     /// 판정을 <see cref="HasKeyword"/>가 아니라 <c>data.keywords</c>로 하는 이유: 시너지가 얹어 준 키워드나
     /// 전투 중 걸린 표식·무적 때문에 "일반 카드"라는 정체성이 중간에 바뀌면 안 된다. 강화는 카드 원본의 속성이다.</summary>
     public bool HasVanillaEnhance =>
-        this.evolutionStage >= EnhanceStage && this.data != null && this.data.keywords == CardKeyword.None;
+        this.evolutionStage >= EnhanceStage && this.spec.Keywords == CardKeyword.None;
 
     /// <summary>일반 강화 추가 피해 = <b>원래 체력</b>의 절반(버림).
     ///
@@ -80,7 +87,7 @@ public class CardInstance
     /// 현재 hp 기준이면 맞을수록 약해지는 도발과 같은 축이 되어 "강화"로 읽히지 않는다.
     /// 성장 HP·덩치(bonusHp)·시너지 공격력도 섞지 않는다 — 카드마다 고정된 값이라야 예측이 선다.</summary>
     public int VanillaEnhanceDamage() =>
-        this.data != null ? UnityEngine.Mathf.FloorToInt(this.data.maxHp * 0.5f) : 0;
+        BattleMath.FloorToInt(this.spec.MaxHp * 0.5f);
 
     /// <summary>같은 공격 안에서 연달아 들어오는 두 직격(기본타 → 강화 추가타)의 누적 결과를 <b>부작용 없이</b> 계산.
     /// 돌려주는 값 = (실제 들어갈 총 피해, 이 공격으로 죽는가).
@@ -131,7 +138,7 @@ public class CardInstance
         if (_raw <= 0) return 0;
 
         int t_cut = this.synergyDmgReduction;
-        return t_cut > 0 ? UnityEngine.Mathf.Max(MinReducedDamage, _raw - t_cut) : _raw;
+        return t_cut > 0 ? BattleMath.Max(MinReducedDamage, _raw - t_cut) : _raw;
     }
 
     readonly struct DamageResolution
@@ -165,10 +172,10 @@ public class CardInstance
             return new DamageResolution(_hp, _bonusHp, false, _hasInvincible, 0);
 
         int t_effective  = EffectiveDamage(_raw);
-        int t_applied    = UnityEngine.Mathf.Min(t_effective, _hp + _bonusHp);
-        int t_bonusDrain = UnityEngine.Mathf.Min(_bonusHp, t_effective);
+        int t_applied    = BattleMath.Min(t_effective, _hp + _bonusHp);
+        int t_bonusDrain = BattleMath.Min(_bonusHp, t_effective);
         int t_bonusAfter = _bonusHp - t_bonusDrain;
-        int t_hpAfter    = UnityEngine.Mathf.Max(0, _hp - (t_effective - t_bonusDrain));
+        int t_hpAfter    = BattleMath.Max(0, _hp - (t_effective - t_bonusDrain));
         return new DamageResolution(t_hpAfter, t_bonusAfter, _hasShield, _hasInvincible, t_applied);
     }
 
@@ -193,22 +200,27 @@ public class CardInstance
 
     /// <summary>_growth = 카드 영구 성장값(강화 체력). 기본값(default)이면 성장 미적용 —
     /// 성장을 태우지 않는 경로(AI 적 필드·멀티 원격 미러)는 인자를 생략한다.</summary>
-    public CardInstance(CardData _data, int _ownerIndex, CardGrowth _growth = default)
+    public CardInstance(int _cardId, int _ownerIndex, CardGrowth _growth = default)
     {
-        this.data    = _data;
+        if (_cardId <= 0) throw new System.ArgumentOutOfRangeException(nameof(_cardId));
+        this.cardId  = _cardId;
+        this.spec    = CardCatalog.RequireSpec(_cardId);
         // 강화분은 최대 체력에 흡수(bonusHp는 데미지로 소진되는 시너지 채널이라 영구값을 담으면 안 된다).
-        this.maxHp   = _data.maxHp + _growth.HpBonus;
+        this.maxHp   = this.spec.MaxHp + _growth.HpBonus;
         this.hp      = this.maxHp;
-        this.bonusHp = _data.bonusHp;
+        this.bonusHp = 0;
         this.slotIndex   = -1;
         this.isRevealed  = false;
         this.ownerIndex  = _ownerIndex;
         // 성장값 주입은 이 한 지점뿐(모든 생성 경로가 이 ctor를 통과).
         // 진화 단계는 마스터 데이터(임시 입력)와 강화 해금 중 높은 쪽 — 성장 미주입이면 후자가 0이라 기존 동작 그대로.
-        this.evolutionStage = UnityEngine.Mathf.Max(_data.defaultEvolutionStage, _growth.EvolutionStage);
-        // 성장을 태우는 경로만 해금 게이트를 받는다. 미주입(AI 적 필드·멀티 원격 미러)은 마스터 데이터 그대로 —
-        // 한쪽만 키워드가 사라지면 밸런스 기준선이 무너지고 멀티는 즉시 divergence다.
-        this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : _data.keywords;
+        this.evolutionStage = BattleMath.Max(this.spec.DefaultEvolutionStage, _growth.EvolutionStage);
+        // 성장을 태우는 경로만 해금 게이트를 받는다. 멀티 양 필드는 교환된 최종 성장 스냅샷을 주입한다.
+        // 미주입 폴백은 성장 공급자가 없는 레거시/디버그 생성 경로만 마스터 데이터를 그대로 쓴다.
+        // 서버 재시뮬레이션 입력(골든·덱 스냅샷)에 실제 성장 레벨이 필요한데 파생값으로는 복원되지 않는다.
+        // 전투 중 변하지 않는다 — 성장은 진입 시 확정이다.
+        this.growthLevel = _growth.Applied ? _growth.Level : CardSpec.BaseGrowthLevel;
+        this.unlockedKeywords = _growth.Applied ? _growth.UnlockedKeywords : this.spec.Keywords;
         this.synergyEnabled   = !_growth.Applied || _growth.SynergyUnlocked;
     }
 
@@ -244,15 +256,15 @@ public class CardInstance
         int t_before = this.hp;
         this.hp = _allowOverheal
             ? this.hp + _amount
-            : UnityEngine.Mathf.Min(this.hp + _amount, this.maxHp);
+            : BattleMath.Min(this.hp + _amount, this.maxHp);
         int t_healed = this.hp - t_before;
         // 실제 회복량으로 연출 1회(힐러/돌보미/유산/포식자 모두 이 경로). 순수 연출 — RNG/게임상태 무관.
         // 표기를 미루는 호출부(_showEffect:false)는 **미룬다는 사실 자체를 뷰에 알린다** — 그러지 않으면
         // 그 사이 화면 갱신(Render)이 최신 hp를 먼저 찍어, 투사체는 나중에 오는데 숫자는 이미 올라가 있다.
         if (t_healed > 0)
         {
-            if (_showEffect) CardView.GetView(this)?.PlayHealEffect(t_healed);
-            else             CardView.GetView(this)?.DeferHpDisplay(t_healed);
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.Heal, this.ownerIndex, this.slotIndex,
+                t_healed, _flags: _showEffect ? BattleEventFlags.None : BattleEventFlags.Deferred));
         }
         return t_healed;
     }
@@ -266,13 +278,14 @@ public class CardInstance
     public void GrantShield()
     {
         this.hasShield = true;
-        CardView.GetView(this)?.SetShieldVisible(this.isRevealed);
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.ShieldChanged, this.ownerIndex, this.slotIndex,
+            _flags: this.isRevealed ? BattleEventFlags.Visible : BattleEventFlags.None));
     }
 
     public void ClearShield()
     {
         this.hasShield = false;
-        CardView.GetView(this)?.SetShieldVisible(false);
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.ShieldChanged, this.ownerIndex, this.slotIndex));
     }
 
     /// <summary>언데드: 파괴 순간 체력 50%(최소 1)로 게임당 1회 부활. 성공 시 true(제자리 hp 복구).
@@ -281,8 +294,8 @@ public class CardInstance
     {
         if (this.reviveUsed || IsAlive) return false;
         this.reviveUsed = true;
-        this.hp = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.FloorToInt(this.maxHp * 0.5f));
-        CardView.GetView(this)?.PlayHealEffect(this.hp);   // 언데드 부활도 회복 연출(복구된 hp만큼). 순수 연출.
+        this.hp = BattleMath.Max(1, BattleMath.FloorToInt(this.maxHp * 0.5f));
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.Heal, this.ownerIndex, this.slotIndex, this.hp));
         return true;
     }
 
@@ -299,6 +312,6 @@ public class CardInstance
         this.hp        = t_result.hp;
         this.bonusHp   = t_result.bonusHp;
         if (t_hadShield && !t_result.hasShield)
-            CardView.GetView(this)?.PlayShieldBreakEffect();
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.ShieldBroken, this.ownerIndex, this.slotIndex));
     }
 }
