@@ -169,26 +169,30 @@ public static class TutorialStepExecutor
     }
 
     // 자동 구매의 서버 왕복. 좌표는 이미 전진한 뒤라 되돌릴 수 없다.
-    // 왕복을 기다리지 않고 티켓만 실어 개봉 화면을 먼저 띄운다 — 수동 구매와 같은 지연 흡수를 받는다.
-    // await은 진단 로그를 남기기 위해서만 남아 있다(스텝 진행은 이 함수 밖에서 이미 끝났다).
-    // ⚠ 서버 왕복이 실패하면 다음 게이트에서 정지한다. 되돌릴 신호가 없어 fail-open(sameCoordBootCount)에 맡긴다.
+    // 대기 표시와 거절 안내는 PackPurchaseFlow가 맡는다 — 이 자리는 결과로 개봉을 열지 말지만 가른다.
+    // ⚠ 서버 왕복이 실패하면 좌표는 개봉 신호를 기다리는 칸에 남는다 — 되돌릴 수 없으므로 그 자리에서 문을 연다.
     static async UniTaskVoid PurchaseAndOpenAsync(CardPackData _pack, string _where)
     {
         string t_packId = _pack != null ? _pack.PackId : "null";
-        var t_ticket = PackPurchaseTicket.Begin(_pack);
 
-        PackHandoff.Set(t_ticket, _pack, null, false);
+        // 대기 표시의 임자로 쓸 인스턴스가 없는 static 경로다 — 타입 자체를 안정된 키로 넘긴다.
+        var t_opened = await PackPurchaseFlow.PurchaseAsync(_pack, typeof(TutorialStepExecutor));
+        if (t_opened == null)
+        {
+            // 안내는 PackPurchaseFlow가 이미 띄웠다 — 좌표는 이미 전진해 되돌리지 못한다.
+            Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}) — 이미 전진해 되돌리지 못한다.");
+
+            // 되감을 구매 스텝이 없는 갈래라, 오지 않을 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없다.
+            // 망 오류 한 번에 부팅 3회(SameCoordBootCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
+            OutgameFeatureLock.NotifyStalled();
+            return;
+        }
+
+        PackHandoff.Set(t_opened, _pack, null, false);
 
         // 열지 못해도 결제는 이미 나갔다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
         if (!PackOpenOverlay.TryOpen())
             Debug.LogWarning($"[TutorialStepExecutor] {_where} 개봉 오버레이 열기 실패(pack={t_packId}) — 구매는 유지, 개봉 연출만 생략.");
-
-        var t_opened = await t_ticket.Await();
-        if (t_opened == null || !t_opened.Success)
-        {
-            string t_result = t_opened != null ? t_opened.Result.ToString() : "null";
-            Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}, result={t_result}) — 이미 전진해 되돌리지 못한다.");
-        }
     }
 
     static EOutgameTutorialStepResult EnterDeckGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)

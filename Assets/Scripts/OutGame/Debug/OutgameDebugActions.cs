@@ -64,8 +64,7 @@ public static class OutgameDebugActions
         for (int t_i = 0; t_i < 6; t_i++)
             t_drawn.Add(new DrawnCard(t_cards[t_i % t_cards.Count], false));
 
-        // 왕복이 없는 경로라 이미 끝난 결과를 티켓으로 감싼다(개봉 화면은 기다릴 것이 없다).
-        PackHandoff.Set(PackPurchaseTicket.Completed(OpenedPack.CreateSuccess(t_drawn, ECurrencyType.Gold)), null, null, false);
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, ECurrencyType.Gold), null, null, false);
         if (PackOpenOverlay.TryOpen()) return;
 
         PackHandoff.Consume();

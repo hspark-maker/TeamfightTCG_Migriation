@@ -129,9 +129,10 @@
 
 - 추첨 로직: **서버가 판정한다** — callable `openPack` (`functions/src/commands/openPack.ts`, 추첨은 `functions/src/packs/packDraw.ts`, 지도 범위 밖). 클라는 `CardPackOpener.PurchaseAsync` 로 요청하고 `CardPackOpener.Precheck` 는 왕복을 아끼는 낙관 검사일 뿐이다 — 응답 DTO `OpenPackResult` (`OpenPackCard`)
 - 표시·데이터: `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack` · 잠금 `PackUnlockRules`
-- 결과 전달: `PackHandoff` · `CardPackRewardHandoff`
+- 구매 왕복의 단일 진입점: `UI/Shop/PackPurchaseFlow.PurchaseAsync` — 상점 진열 · 재개봉 · 튜토리얼 자동구매 셋이 모두 여기를 지난다. 왕복 동안의 대기는 `UI/Common/ServerWaitOverlay` 가 덮고(입력 차단은 즉시 · 딤과 스피너는 임계 뒤에만), 거절 안내도 이 자리가 띄운다(`UI/Shop/PackPurchaseFailurePopup` → 망 문제는 `UI/Common/NetworkFailurePopup`). 개봉 화면은 이미 도착한 결과만 받으므로 지연을 견디는 장치가 없다
+- 결과 전달: `PackHandoff` (결과 `OpenedPack` 을 나른다) · `CardPackRewardHandoff`
 - 연출 UI: `UI/Shop/PackRevealView` (`PackRevealView.BeginOpen` 이후 Entering→Swipe→Shifting→Tearing→Pulling→Flicking→Summary 상태 진행) · `PackCardView` · `PackCardStack` · `PackResultGrid`
-- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`
+- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackPurchaseFlow` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`
 - 연출 소품: `PackTearSkin` · `PackTearHandle` · `PackShellRig` · `PackIdleMotion` · `PackScreenFlash` · `PackSpecularSweep` · `PackPurchaseImpact`
 
 ## 컬렉션·소유·도감 (`OutGame/Card/`, `OutGame/Album/`)
@@ -190,6 +191,7 @@
 
 - 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
 - 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `UI/ScreenCoverBackground` · `ScreenFillRect` · `StickerPeelGraphic` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
+- 서버 응답 대기: `ServerWaitOverlay.Hold` · `ServerWaitOverlay.Release` (PooledUI/ServerWaitOverlay.prefab, 풀 UI라 컨테이너 층 `UiSortingOrder.Pool` 을 따른다) — owner 스택이라 왕복이 겹쳐도 안전하다. 입력 차단은 요청 즉시 걸리고 딤·스피너는 임계 뒤에만 뜬다(빠른 왕복에서 한 프레임 깜빡이면 결함으로 읽힌다). 자기 캔버스가 없으므로 **실패 팝업(`SimpleYNPopup`)과 같은 판에서 형제 순서로만 위아래가 갈린다** — 안내가 대기에 묻히지 않는 것은 소비자가 `ServerWaitOverlay.Release` 를 먼저 하고 팝업을 띄우는 순서 하나로만 보장된다. 씬에 저작된 `UI/Battle/ScreenDim` 과 씬 로드 전용 `LoadingCoverView` 로는 대신할 수 없어 따로 있다. 소비자는 `UI/Shop/PackPurchaseFlow` 와 `UI/CardDetail/CardDetailOverlayView` 의 강화 왕복
 - 커튼 판은 두 화면이 공유한다: 씬 전환 `CurtainView`(SceneCurtain.prefab)와 매치 배경 `UI/Match/MatchmakingBgFx`(MatchmakingRoot.prefab 의 BG)가 같은 CurtainBoards.prefab 인스턴스를 하나씩 갖는다. 기하 식도 `CurtainView.Solve` 하나다. 기울기·피벗·앵커 Y·홈 좌표·색은 양쪽 다 저작이지만 **크기와 배율의 주인은 두 화면이 다르다** — 씬 커튼은 `CurtainView.ApplyGeometry` 가 매번 덮고, 매치는 저작값을 그대로 쓴다(한때 매치도 계산으로 통일했다 되돌렸다). 매치 쪽 오저작은 `MatchmakingBgFx` 의 에디터 경고 셋이 잡는다 — 피벗·앵커·기울기 위반, 두 판의 배율 불일치, 그리고 판이 화면을 덮기에 모자란 경우. 아래 판 색은 씬 커튼이 덱 화면 색을 쓰고 매치만 시작색을 오버라이드하므로 **통일하면 안 된다**
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
 - 정렬 층(무엇이 무엇 위에 뜨는가): `UiSortingOrder` — 프리팹 저작값·코드 상수 모두 이 표를 따른다. 순서를 런타임에 재지 않는다

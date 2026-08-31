@@ -3,7 +3,6 @@ using System.Collections.Generic;
 /// <summary>
 /// 서버가 아직 확정하지 않은 재화 변동을 화면에만 미리 세워두는 한 장. 발행하는 순간 표시 잔액이 오르고(내리고),
 /// <see cref="Settle"/> 이 자기가 건 만큼만 되돌린다 — 서버 잔액 채택 직전에 걷어야 이중 계상도 역주행도 없다.
-/// 진행 중인 약속을 값이 아니라 표로 나르는 방식은 <see cref="PackPurchaseTicket"/> 과 같다.
 /// </summary>
 public sealed class CurrencyPendingTicket
 {

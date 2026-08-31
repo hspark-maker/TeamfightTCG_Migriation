@@ -106,48 +106,6 @@ public static class OutgameTutorialRunner
         }
     }
 
-    /// <summary>서버가 구매를 거절했다 — 개봉을 기다리는 좌표를 그 구매 스텝으로 되감는다.
-    ///
-    /// 구매 성공 신호는 왕복 <b>전</b>(클릭 시점)에 울린다 — 개봉 화면이 왕복을 덮는 구조라 그 순서를 뒤집을 수 없다.
-    /// 그래서 거절이 나면 좌표만 다음 칸(개봉 대기)으로 전진한 채 만족될 신호가 영영 오지 않는다.
-    /// 되감기는 <b>개봉 대기 칸에 서 있을 때만</b> 한다 — 그 밖의 좌표에서 온 거절은 이 안내의 구매가 아니다.
-    /// 자동 구매 스텝(AutoPurchase)은 여기 걸리지 않는다: 되감으면 진입만으로 결제가 다시 나가 거절이 반복된다.
-    /// 그 갈래는 false를 받은 호출부가 fail-open으로 처분한다.</summary>
-    /// <returns>좌표를 되감았으면 true(되감을 구매 스텝이 없으면 false).</returns>
-    public static bool RewindToPendingPurchase()
-    {
-        if (!IsRunning) return false;
-
-        int t_chapter = OutgameTutorialProgress.ChapterIndex;
-        int t_step    = OutgameTutorialProgress.StepIndex;
-
-        if (!TryGetStepAt(t_chapter, t_step, out var t_current)) return false;
-        if (t_current.Completion != EOutgameTutorialCompletion.PackOpen) return false;
-
-        for (int t_i = t_step - 1; t_i >= 0; t_i--)
-        {
-            if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
-
-            // 같은 개봉을 가리키는 칸은 건너뛰고, 구매도 개봉도 아닌 칸을 만나면 되감을 자리가 없다.
-            if (t_def.Completion == EOutgameTutorialCompletion.PackOpen) continue;
-            if (t_def.Completion != EOutgameTutorialCompletion.Purchase) return false;
-
-            Debug.LogWarning($"[OutgameTutorialRunner] 구매가 거절됐습니다 — 좌표 {t_chapter}-{t_step}을(를) 구매 스텝 {t_chapter}-{t_i}로 되감습니다.");
-
-            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
-
-            // 해금은 좌표에서 파생되므로 되돌린 칸 기준으로 다시 판정한다.
-            // 정지 감시는 건드리지 않는다 — 좌표가 이번 부팅의 출발점으로 되돌아온 것뿐이라 카운터가 그대로 맞고,
-            // 여기서 걷으면 매번 거절당하는 유저의 정지가 부팅을 거듭해도 fail-open으로 풀리지 않는다.
-            OutgameFeatureLock.Refresh();
-
-            OnStepChanged?.Invoke();
-            return true;
-        }
-
-        return false;
-    }
-
     /// <summary>세이브가 붙잡아 둔 스텝 번호로 진행 좌표를 되찾는다. 초기화에서 <b>EnsureData 직후,
     /// RewindToPendingBattleEntry 직전</b>에 1회 부른다 — 되감기는 현재 좌표에서 같은 챕터를
     /// 역방향으로 훑으므로, 좌표가 낡은 채로 그쪽이 먼저 돌면 엉뚱한 챕터를 뒤진다.
