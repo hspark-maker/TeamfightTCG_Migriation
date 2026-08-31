@@ -34,7 +34,7 @@
 | 1 | `claimBattleReward` 멱등 없음 | `functions/src/commands/claimBattleReward.ts` | 같은 페이로드 반복 → **무한 골드** | **P1** (멱등만) |
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
 | 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
-| 4 | 한계돌파 | `CardGrowthManager.Snack.cs:TryLimitBreak` | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3** |
+| 4 | ~~한계돌파~~ | ~~`CardGrowthManager.Snack.cs:TryLimitBreak`~~ | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3 완료** · 잔여는 P0 |
 | 5 | ~~토너먼트 해금·낙인~~ | ~~`TournamentProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
 | 6 | 싱글 랭크 `rank.points` | `RankManager.ApplyBattleResult` | 팩 잠금·티어 보상·챕터 잠금 자격 | **범위 밖** |
 | 7 | 세이브 슬롯 무동결 | `firestore.rules` `affectedKeys` 0건 | 위 3·4·5를 룰 층에서 못 막는다 | **P6** |
@@ -103,16 +103,27 @@
 
 ---
 
-### P3 — 한계돌파 callable
+### P3 — 한계돌파 callable — **구현 완료** (`b956f5cda` · **배포됨**)
 
-**서버 코드가 이미 다 있는데 callable 이 없어 호출부가 0건이다.** `functions/src/growth/cardGrowth.ts` 의 `applyLimitBreak`/`spendSnack`/`canAffordSnack` 이 전 레포 유일 참조가 정의부다. 적립만 서버(`openPack.ts:131 addSnack`)고 소비·단계증가가 클라로 갈려 있다.
+서버 순수 로직(`functions/src/growth/cardGrowth.ts` 의 `applyLimitBreak`/`spendSnack`/`canAffordSnack`)은 이미 다 있었고 callable 이 없어 호출부가 0건이었다. 적립만 서버(`openPack`)고 소비·단계증가가 클라에 남아, 간식 0으로도 HP 보너스를 최대까지 올린 값이 `lockDeck` 의 덱 검증까지 통과했다.
 
-1. **callable `limitBreakCard(cardId)` 신설** — `enhanceCard` 를 형틀로 삼는다(같은 `mutateSave` + 지갑 트랜잭션 구조, P1 원장 배선 포함).
-2. **`CardLimitBreak` 스펙 표 배선.** 표(3행 `stage | hpGain | snackCost`)가 `envs/test` 에 이미 올라와 있는데 읽는 코드가 클라에도 서버에도 없다. 실제 판정은 `OutGame/Growth/GrowthRules.cs:71-77` 이 하드코딩한다(`hpGain = 1` 고정 · `snackCost = stage`). 서버가 표를 읽게 하고 클라 하드코딩을 표시용으로 격하한다.
-3. **클라 전환** — `CardGrowthManager.Snack.cs:TryLimitBreak` 가 세이브를 쓰지 않고 `ServerSaveCommands.InvokeAsync` 로 보낸다. 응답 채택은 `ServerSlotRehydrator` 의 `CardGrowth` 경로가 이미 있다(강화 2종과 같은 자리).
-4. **죽은 코드 삭제** — `CardGrowthManager.AddSnack`(호출자 0건). 주석의 "적립 지점은 `CardPackOpener` 하나"도 사실과 다르니 같이 고친다.
+1. **callable `limitBreakCard(cardId)` 신설**(`functions/src/commands/limitBreakCard.ts`). 형틀은 `enhanceCard` 가 아니라 **`grantTutorialCards`** 다 — 한계돌파는 지갑을 쓰지 않으므로 `SaveMutation` 에 `wallet` 키를 싣지 않는다(간식은 전역 잔액이 아니라 `cardGrowth` 슬롯 안 카드별 값이다). 멱등은 C8 영수증이 `mutateSave` 안에서 그대로 세워 준다. 거절 사유 4종 `RuleUnavailable`·`CardNotOwned`·`MaxStage`·`NotEnoughSnack`.
+2. **`CardLimitBreak` 스펙 표 배선 — 진실원을 하나로 모았다.** 표를 새 callable 에만 물리면 곡선의 진실원이 **셋**이 된다(클라 `GrowthRules` · 서버 `deckValidation.ts:38,188` 도 같은 곡선을 따로 하드코딩하고 있었다). 새 순수 파서 `functions/src/growth/limitBreakTable.ts` 를 **새 callable 과 `deckValidation` 이 공유**하고, 순수 모듈이라 표를 못 읽는 `deckValidation` 에는 `lockDeck` 이 곡선을 **필수 인자**로 주입한다(선택 인자 + 폴백을 남기면 둘로 되돌아간다). 클라 `GrowthRules` 는 표시·낙관 선판정용으로 남는다.
+   - **저작 규약 3건**(`Assets/Table/SpecDatas.cs:216-232` 필드 주석): 상한의 진실원은 `CardLimitBreak` 가 아니라 **`CardEnhanceRule.maxLimitBreak`** 인데 파서가 그 열을 버리고 있어 함께 읽게 했다 · **`hpGain` 은 누적**이다(지금까지 `result += limitBreak` 가 맞아떨어진 것은 단계당 1이 우연히 누적합과 같아서다) · **`snackCost` 는 1 미만이면 1** 로 올린다(공란이 공짜 한계돌파가 되지 않게).
+   - `maxLimitBreak` 이 0이어도 `parseCardEnhanceRule` 은 `null` 을 내지 않는다 — 한계돌파 열 하나가 비었다고 카드 강화 전체를 죽일 이유가 없다. 코드 천장은 `LIMIT_BREAK_STAGE_CEILING = 3`(`CARD_MAX_LEVEL_CEILING` 형틀).
+3. **클라 전환** — `TryLimitBreak` → `TryLimitBreakAsync`. 세이브에 대입하지도 `Save()` 하지도 않는다(응답 채택 → `ServerSlotRehydrator` → `CardGrowthManager.Init()`). 창구는 `OutGame/Growth/LimitBreakCommand` · 응답 DTO `LimitBreakCardResult`(`link.xml` 등록) · 결과 열거 `ELimitBreakOutcome`.
+4. **죽은 코드 삭제** — `CardGrowthManager.AddSnack`(호출자 0, 적립은 서버가 한다) · **`KeywordGrowthManager.Save`/`SyncSaveData`**(호출자 0 — 채택 경로가 아니라 죽은 코드였다. 남으면 누가 부르는 순간 서버 채택이 세운 업로드 기준선을 깬다). `CardGrowthManager.Save` 는 디버그 둘이 여전히 부르므로 남기고 주석으로 못박았다.
 
-**결과: `cardGrowth` 슬롯 클라 writer 0**(강화 2종은 이미 서버). `keywordGrowth` 는 `KeywordGrowthManager.cs:68` 의 `Save()` 하나가 남는데 이것이 채택 경로인지 확인하고 아니면 같이 걷는다.
+**시공 중 갈린 판단 2건.**
+
+- **표 사고가 유저 매치를 태우지 않게 갈랐다.** 곡선이 결손으로 깎이면 **서버가 이미 지급한** 단계가 범위를 벗어나는데, 그것을 `rejectLock` 으로 접으면 매치 문서에 낙인이 박혀 상대까지 탄다. 코드 천장(3) 초과는 위조라 종전대로 `saved_growth_out_of_range` 로 거절하고, 천장 이하인데 곡선만 넘으면 표가 깎인 것이라 새 코드 `limit_break_curve_shrunk` → `HttpsError("unavailable")` 로 내보낸다.
+- **왕복 중 창이 잠기던 것을 풀었다.** `SkipPlayingFx` 가 `m_ritualPlaying` 만 보고 뒤로가기를 삼켰는데, 한계돌파는 스킵할 연출이 없고 대기가 네트워크라 상한이 없다. 재생 중인 연출이 실제로 있을 때(`m_activeRitual != null`)만 삼킨다 — 창을 연 뒤 **첫 강화의 왕복 구간도 같은 무한 대기**였고 함께 풀렸다.
+
+**착수 게이트(표 실값 대조) 통과.** `SpecData.bytes` 가 암호화라 리포에서 못 읽어 유니티에서 덤프하고 Firestore 업로드분도 REST 로 직접 조회했다 — **test·live 양쪽** `maxLimitBreak = 3`, stage 1/2/3 이 `hpGain` 1/1/1 · `snackCost` 1/2/3 으로 **클라 하드코딩과 완전히 일치**한다. 그래서 `deckValidation` 전환을 미루지 않고 서버 전량을 한 번에 배포했다(불일치였다면 `hp_bonus_mismatch` 로 한계돌파한 카드가 든 덱이 전부 잠금 거절됐다).
+
+**결과: `cardGrowth` 슬롯의 클라 writer 가 정상 플레이 경로에서 0이 됐다**(강화 2종은 이미 서버, 디버그 2건은 P0 몫). `keywordGrowth` 도 같이 0이 됐다.
+
+**회귀** — 신규 `functions/scripts/test-limit-break.js`(파서 11케이스: id≠stage 정렬 · 중복 stage · `snackCost` 하한 · 누적 합 · 상한 초과 행 무시 · 결손 fail-closed · 천장 클램프) + `test-deck-validation.js` 에 위조/표사고 3케이스. `package.json` 의 `test` 에 배선했다.
 
 ---
 
@@ -216,7 +227,7 @@
 | P0 | 리테일 빌드 컴파일 통과(`Unity_ReadConsole`) + 릴리스 빌드에서 디버그 오버레이·버튼 부재 육안 확인 |
 | P1 | `functions/scripts/test-wallet-store.js` 확장(원장 줄 생성·재시도 반환) · 같은 `txId` 2회 호출 후 잔액 1회분만 오르는지 실기 · `ledger/{txId}` 문서 생성 확인 |
 | P2 | `functions/scripts/test-tutorial-grant.js`(드롭 풀 전량 지급 · `drawCount`/`weight` 무관 · 유료·price 결손 팩 거절 · 카탈로그 밖 cardId 탈락 · 재호출 멱등) · 튜토리얼 완주 실기 왕복(카드가 시트의 팩 풀대로 들어오는가 · 재호출이 소유를 늘리지 않는가) |
-| P3 | `functions/scripts/test-growth.js` 에 한계돌파 케이스 추가(간식 부족 거절 · 최대 단계 거절 · 표 결손 fail-closed) · 실기: 카드 상세에서 한계돌파 → `cardGrowth` 재수화 확인 |
+| P3 | **완료** — 회귀는 `test-growth.js` 가 아니라 **신규 `functions/scripts/test-limit-break.js`** 다(표 파서가 들어와 파일 성격이 갈렸다). 파서 11케이스(id≠stage 정렬 · 중복 stage · `snackCost` 하한 1 · `hpGain` 누적 합 · 상한 초과 행 무시 · 결손 fail-closed · 천장 클램프) + `test-deck-validation.js` 에 위조/표사고 3케이스 · `test-enhance.js` 에 `maxLimitBreak` 2케이스. 배포 후 전 함수 401 확인(403 없음 — 신규 `limitBreakCard` 도 invoker 바인딩 상속). **실기 합격선은 ⑤** — ① 한계돌파 1회 후 `revision` +1 · 지갑 무변경 ② 간식·단계·HP·`DeckPower` 재수화 ③ 왕복 중 연타·화살표 잠금·오버레이 재진입 ④ 최대 단계에서 `MaxStage` 거절이 세션을 안 끊는다 ⑤ **한계돌파한 카드가 든 덱으로 매치 잠금이 `hp_bonus_mismatch` 없이 통과** |
 | P4 | **완료** — `functions/scripts/test-tournament-progress.js`(챕터 경계 건너뛰기 · 구 블롭 fail-closed · 점수 경계값 · 표 밖 낙인 대조) · Unity 컴파일 0건. **남은 것은 실기**: ① 정점 격파 후 로비에서 곧바로 수령 ② 격파 직후 기내모드 → 복귀 재시도, 두 번 다 실패하면 `Playable` 로 남는가 ③ 챕터 2 첫 정점을 디버그로 진입해 승리 → `ChainBlocked` ④ 등급 미달 챕터 ⑤ 다른 기기 수령 후 → `AlreadyClaimed` + 맵 즉시 갱신 |
 | P5 | 서버가 `tournament`/`albumReward` 를 쓴 직후 매니저 캐시가 갱신되는지 — 재수화 없이 옛 값이 남으면 즉시 드러나게 로그 |
 | P6 | `Tools/firestore-rules-tests` 하네스(`firebase emulators:exec`, **Java 21+ 필요** — Unity 번들 JDK 17 불가). 신규 케이스 3군 전부 통과 후 룰 릴리즈 |

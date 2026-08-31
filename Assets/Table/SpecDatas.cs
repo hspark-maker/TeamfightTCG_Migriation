@@ -230,3 +230,37 @@ public partial class CardLimitBreak
     /// 이 단계에 드는 간식 수(카드마다 따로 쌓이는 중복 카드 간식). 1 미만은 1로 올라간다
     public int snackCost;
 }
+
+[GeneratorSpecData]
+public partial class AlbumEntry
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// AlbumTheme.themeId 참조 — 테마 안정 키
+    public string themeId;
+    /// 같은 테마 안에서 유일한 페이지 키
+    public string pageId;
+    /// Card.id 참조 — 이 칸을 채우는 카드
+    public int cardId;
+    /// 페이지 안 칸 순서(0부터)
+    public int order;
+}
+
+[GeneratorSpecData]
+public partial class TournamentChapter
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 챕터 안정 키 — 완주 판정과 완주 보상 낙인 키
+    public string chapterId;
+    /// 정점 안정 키 — 클리어 낙인 키. 전체에서 유일
+    public string nodeId;
+    /// 챕터 안 정점 순서(0부터)
+    public int order;
+    /// 전역 직전 정점 — 해금 사슬. 첫 정점만 비우고 챕터 경계를 넘어 이어진다(비운 행이 둘이면 서버가 전면 차단)
+    public string prevNodeId;
+    /// 이 챕터에 들어갈 수 있는 rank.points 하한. 첫 등급 챕터는 0(신규 계정도 첫 등급으로 읽힌다)
+    public long requiredPoints;
+}

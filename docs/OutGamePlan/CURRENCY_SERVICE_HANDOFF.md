@@ -54,7 +54,11 @@
 | `devGrantCurrency` (codebase **`currency`**) | **이사 완료 · 배포됨** · **401**(정상) |
 | `currencyPing` (codebase `currency`) | 배포됨 · **401**(정상) |
 | `firestore.rules` 지갑 블록 · 무료 한 방(`grants`) 블록 | **배포됨** — 룰은 파일 통째로 릴리즈되므로 C6 완화분과 같이 올라갔다 |
-| **C8 전량**(영수증 코덱·멱등 게이트·클라 txId) | **미배포** — 함수 2 codebase + 룰 1회. 배포 순서 제약 없음(txId 폴백) |
+| **C8 전량**(영수증 코덱·멱등 게이트·클라 txId) | **배포됨**(2026-08-31) — 아래 참조 |
+
+**2026-08-31 배포 — C8 이후가 한 번에 나갔다.** `functions:default` 16함수 · `functions:currency` 2함수 · `firestore.rules` 1회. 누적으로 올라간 것은 **C8**(영수증 코덱·멱등 게이트·클라 txId) · **P2**(튜토리얼 지급을 CardPack 시트로) · **P4**(토너먼트 해금 사슬) · **P3**(한계돌파 `limitBreakCard` 신설)이다. 위 표의 `firestore.rules` 미배포 항목도 이때 함께 릴리즈됐다(룰은 파일 통째로 나간다).
+
+배포 후 URL POST 로 다시 찔러 **403 이 하나도 없었다** — 신규 생성된 `limitBreakCard` 도 invoker 바인딩을 상속했다(`ensureWallet` 때와 같다). `functions-currency` 는 `node_modules` 가 깨져 있어(`.bin` 비어 `eslint` 없음) predeploy 가 `ENOENT` 로 죽었고, `npm ci` 로 복구한 뒤에야 나갔다 — **미러 codebase 는 오래 안 건드리면 이 함정을 밟는다.**
 
 전 함수 10종을 URL POST 로 찔러 **403 이 하나도 없었다** — 신규 생성된 `ensureWallet` 조차 invoker 바인딩을 상속해 그 함정을 밟지 않았다.
 
@@ -169,7 +173,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 **남은 것**
 
 - **배포·실기 왕복이 아직이다.** 위 "배포·판정 절차" 를 그대로 탄다
-- **한계돌파(Snack) 는 여전히 클라 판정이다.** `CardLimitBreak` 표(3행 · `stage | hpGain | snackCost`)도 서버 `canAffordSnack`·`spendSnack`·`applyLimitBreak` 도 이미 있는데 callable 이 없다. 재화 축이 아니라 "재화 writer 0" 집계엔 안 잡히지만 성장 판정 소유권 목표에는 걸린다 — **미결**
+- ~~**한계돌파(Snack) 는 여전히 클라 판정이다.**~~ → **해결**(로드맵 P3, `b956f5cda` · 배포됨). callable `limitBreakCard` 가 서고 `CardLimitBreak` 표가 곡선의 단일 진실원이 됐다(`deckValidation` 의 하드코딩도 같은 파서로 흡수). 간식은 재화 축이 아니라 `cardGrowth` 슬롯 안 카드별 값이라 지갑을 건드리지 않는다 — 멱등은 C8 영수증이 `mutateSave` 안에서 세운다
 - `enhanceCard` 는 **카드 소유 여부를 안 본다.** 미보유 카드도 조각을 내고 강화된다. 덱 편성이 소유 필터를 걸고 덱 검증도 서버에 있어 이득 없는 자해 경로라 막지 않았다
 - `KeywordGrowthManager.Save()` 는 호출부가 없어졌다. 누가 부르면 이중 진실원이 되므로 제거 후보
 
@@ -460,7 +464,7 @@ C6.2(`0b2b6b3d6`, 지갑을 트랜잭션에 들인 판)부터 **나흘간 빨간
   ③ 멀티 payout **지급 0건** ack 재시도가 `acked` 를 그대로 돌려준다(`submitMatchResult` 가 필요해
   회귀로 못 세운다) ④ **기내모드로 타임아웃 유발 → 복구 후 클라 자동 재시도가 이중 지급 없이 통과**
   (C8-4 의 재시도는 클라 코드라 서버 회귀 밖이다)
-- **한계돌파(Snack) callable 이 서면 배선 대상이 하나 는다** — 여전히 클라 판정이다(C4 미결)
+- ~~**한계돌파(Snack) callable 이 서면 배선 대상이 하나 는다**~~ → **섰다**(P3, `b956f5cda`). 다만 `limitBreakCard` 는 지갑을 쓰지 않아 `nextWallet` 호출부가 늘지 않는다 — 영수증은 `mutateSave` 가 세이브 쓰기와 함께 자동으로 끊는다
 
 
 ## 통합처(`origin/박형석작업용`)와 겹치는 것 — 새로 만들지 마라
@@ -518,7 +522,7 @@ C6.2(`0b2b6b3d6`, 지갑을 트랜잭션에 들인 판)부터 **나흘간 빨간
 
 **표는 있는데 아무도 안 읽는 것 2건** (표 신설이 아니라 배선 문제)
 
-- **`CardLimitBreak`** — `envs/test` 에 3행이 올라와 있는데(`stage | hpGain | snackCost`) 읽는 코드가 클라에도 서버에도 없다. 실제 판정은 `OutGame/Growth/GrowthRules.cs:71-77` 이 하드코딩한다(`hpGain = 1` 고정 · `snackCost = stage`). 간식 적립은 이미 서버인데(`OpenPackResult.snack`) 소비만 클라에 남았다 — 한계돌파 callable 미결과 같은 항목이다
+- ~~**`CardLimitBreak`** — 읽는 코드가 클라에도 서버에도 없다~~ → **읽는다**(P3). 서버 파서 `functions/src/growth/limitBreakTable.ts` 를 `limitBreakCard` 와 `deckValidation` 이 공유한다. 상한은 이 표가 아니라 **`CardEnhanceRule.maxLimitBreak`** 이 정하고(파서가 그 열을 버리고 있어 함께 읽게 했다), **`hpGain` 은 누적**이다. 실측(2026-08-31) 저작값은 test·live 양쪽 `maxLimitBreak = 3` · stage 1/2/3 → `hpGain` 1/1/1 · `snackCost` 1/2/3 으로 클라 `GrowthRules` 하드코딩과 일치한다 — 클라 쪽은 표시·낙관 선판정용으로 남겼다
 - **`RankGrade`** — 서버는 읽는데 **클라만 `RankConfig.asset` 의 임계치를 본다**(`RankConfig.cs:60`). 랭크 판정이 더 넘어가면 이 드리프트가 "수령 가능한데 서버가 거절" 로 나타난다
 
 **닫힘** — `link.xml` 의 팩 개봉 응답 DTO 누락은 `6f6a8885c` 에서 해결됐다(`OutGame/Save/link.xml:29-30`). 새 callable 응답 DTO 를 만들 때마다 같은 자리에 추가할 것.
