@@ -190,6 +190,7 @@
 
 - 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
 - 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `UI/ScreenCoverBackground` · `ScreenFillRect` · `StickerPeelGraphic` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
+- 커튼 판은 두 화면이 공유한다: 씬 전환 `CurtainView`(SceneCurtain.prefab)와 매치 배경 `UI/Match/MatchmakingBgFx`(MatchmakingRoot.prefab 의 BG)가 같은 CurtainBoards.prefab 인스턴스를 하나씩 갖는다. 기하 식도 `CurtainView.Solve` 하나다. **저작은 기울기·피벗·앵커 Y·홈 좌표·색까지고 크기와 배율은 코드가 소유한다**(인스턴스에서 크기를 만져도 무시된다 — `CurtainView.WarnOnMisauthoredPanels` · `MatchmakingBgFx.WarnOnMisauthoredPanels` 가 오저작을 잡는다). 아래 판 색은 씬 커튼이 덱 화면 색을 쓰고 매치만 시작색을 오버라이드하므로 **통일하면 안 된다**
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
 - 정렬 층(무엇이 무엇 위에 뜨는가): `UiSortingOrder` — 프리팹 저작값·코드 상수 모두 이 표를 따른다. 순서를 런타임에 재지 않는다
 - 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` () · `UI/SettingsPanel`
