@@ -16,8 +16,45 @@ public static class DeckSaveManager
 
     static bool s_loaded;
 
+    // 대표 덱(전투에 내보낼 덱)의 슬롯 좌표. 압축 불변식 때문에 삽입·삭제가 좌표를 밀어내므로
+    // 그 세 경로가 이 값을 반드시 함께 옮긴다 — 안 옮기면 유저가 고른 덱이 아닌 이웃 덱이 출전한다.
+    static int s_selectedSlot;
+
     // 덱 변경 통지 — 구성·이름·이미지키를 바꾸는 모든 경로가 여기로 모인다(구독자가 직접 재빌드를 걸 필요 없다)
     public static event Action OnDeckChanged;
+
+    // 대표 덱 변경 통지. 덱 구성이 아니라 "어느 덱으로 싸우는가"만 바뀌는 사건이라 축을 나눈다.
+    public static event Action OnSelectedSlotChanged;
+
+    /// <summary>전투에 내보낼 대표 덱의 슬롯 좌표. 저장값이 무효해졌으면 첫 유효 덱으로 물러나고,
+    /// 유효 덱이 하나도 없으면 -1이다.</summary>
+    public static int SelectedSlot
+    {
+        get
+        {
+            if (IsValidSlot(s_selectedSlot)) return s_selectedSlot;
+
+            for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
+                if (IsSlotValid(t_i)) return t_i;
+
+            return -1;
+        }
+    }
+
+    /// <summary>대표 덱을 지정한다. 유효하지 않은 슬롯은 거부한다 —
+    /// 잘못된 좌표를 세이브에 굳히면 다음 부팅의 출전 덱이 통째로 어긋난다.</summary>
+    public static bool TrySelectSlot(int _index)
+    {
+        if (!IsValidSlot(_index)) return false;
+        if (s_selectedSlot == _index) return true;
+
+        s_selectedSlot = _index;
+        WriteSelectedSlot();
+        DataSaveManager.SaveCoalesced();
+        OnSelectedSlotChanged?.Invoke();
+
+        return true;
+    }
 
     // 첫 무효 슬롯 앞까지의 덱 개수
     public static int DeckCount
@@ -156,6 +193,9 @@ public static class DeckSaveManager
         s_names[0]     = _name ?? "";
         s_imageKeys[0] = _imageKey ?? "";
 
+        // 기존 덱이 통째로 한 칸 뒤로 밀렸다 — 대표 좌표도 같이 밀지 않으면 이웃 덱이 출전한다.
+        ShiftSelectedSlot(s_selectedSlot + 1);
+
         SaveAll();
         _index = 0;
         OnDeckChanged?.Invoke();
@@ -176,6 +216,12 @@ public static class DeckSaveManager
             CopySlot(t_i + 1, t_i);
 
         ClearSlot(t_count - 1);
+
+        // 지워진 덱이 곧 대표였다면 맨 앞으로 물러난다(SelectedSlot 프로퍼티가 다시 정규화한다).
+        // 대표가 뒤쪽이었다면 당겨진 만큼 함께 당긴다.
+        ShiftSelectedSlot(s_selectedSlot == _index ? 0
+                        : s_selectedSlot >  _index ? s_selectedSlot - 1
+                                                   : s_selectedSlot);
 
         SaveAll();
         OnDeckChanged?.Invoke();
@@ -212,6 +258,9 @@ public static class DeckSaveManager
                 .Where(CardCatalog.Contains)
                 .ToList();
         }
+
+        // 압축보다 앞에 읽는다 — 압축이 좌표를 당기면 그 이동을 이 값에도 그대로 먹여야 한다.
+        s_selectedSlot = DeckNode().SelectedSlot;
 
         if (Compact()) SaveAll();
 
@@ -254,6 +303,9 @@ public static class DeckSaveManager
         var t_slots = NormalizedSlots();
         for (int t_i = 0; t_i < SLOT_COUNT; t_i++)
             WriteSlot(t_slots, t_i);
+
+        // 삽입·삭제·압축이 대표 좌표를 옮겨 놓은 뒤라, 슬롯만 쓰고 나가면 메모리와 세이브가 갈린다.
+        WriteSelectedSlot();
 
         DataSaveManager.SaveCoalesced();
     }
@@ -302,6 +354,11 @@ public static class DeckSaveManager
                 CopySlot(t_read, t_write);
                 t_changed = true;
             }
+
+            // 압축이 옮긴 좌표를 대표 덱에도 그대로 먹인다 — 이 한 줄이 없으면 세이브에서 막 읽은
+            // 대표 좌표가 압축 전 자리를 가리킨 채 굳어, 다음 전투가 엉뚱한 덱으로 시작한다.
+            if (s_selectedSlot == t_read) s_selectedSlot = t_write;
+
             t_write++;
         }
 
@@ -319,8 +376,31 @@ public static class DeckSaveManager
         return t_changed;
     }
 
+    // 슬롯 이동 뒤 대표 좌표를 다시 앉힌다. 저장은 호출부의 SaveAll이 이어서 하므로 여기서 걸지 않는다.
+    //
+    // 옮겨 간 자리가 빈 칸이면 0으로 접는다 — 첫 스타터 덱처럼 "밀려날 덱이 아직 없는" 삽입에서
+    // 좌표가 빈 슬롯을 가리킨 채 세이브에 굳는 것을 막는다(읽을 때 SelectedSlot이 폴백하긴 하지만,
+    // 세이브에 남은 값과 실제로 쓰이는 덱이 갈리면 다음 사람이 그 둘을 대조하다 헤맨다).
+    static void ShiftSelectedSlot(int _index)
+    {
+        int t_before = s_selectedSlot;
+
+        s_selectedSlot = IsValidSlot(_index) ? _index : 0;
+
+        if (t_before != s_selectedSlot) OnSelectedSlotChanged?.Invoke();
+    }
+
+    static void WriteSelectedSlot() => DeckNode().SelectedSlot = s_selectedSlot;
+
+    // "선택 없음"을 -1로 표현하는 호출부가 있어 범위 검사를 IsSlotValid 앞에 둔다
+    // (IsSlotValid는 범위 가드 없이 슬롯 배열을 직접 인덱싱한다).
+    static bool IsValidSlot(int _index)
+        => _index >= 0 && _index < SLOT_COUNT && IsSlotValid(_index);
+
     // 세이브 인스턴스를 제자리에서 정규화해 반환하므로 읽기·쓰기가 같은 목록을 본다
-    static List<DeckSlotSaveData> NormalizedSlots()
+    static List<DeckSlotSaveData> NormalizedSlots() => DeckNode().Slots;
+
+    static DeckSaveData DeckNode()
     {
         var t_deck = DataSaveManager.Data.Deck;
         if (t_deck == null)
@@ -344,7 +424,7 @@ public static class DeckSaveManager
             if (t_slot.ImageKey == null) t_slot.ImageKey = "";
         }
 
-        return t_deck.Slots;
+        return t_deck;
     }
 
     static void WriteSlot(List<DeckSlotSaveData> _slots, int _index)

@@ -297,7 +297,7 @@ public class AlbumInsertSession : MonoBehaviour
         // 카드를 번호 위·비닐 아래(InsertDock)로 들여보낸다 — 밀어 넣을수록 번호를 덮고 비닐 뒤로 잠긴다.
         sleeve.AlignTo(m_slotRect, t_slot.InsertDock);
         sleeve.SetProgress(0f);
-        dragger.TravelPixels = sleeve.CardHeight;
+        dragger.TravelPixels = sleeve.PushDistance;
         dragger.ResetProgress();   // 카드가 실제로 시작 자리에 놓인 지금이 리셋 시점이다
 
         cardVisual.Bind(_step.CardId, true);

@@ -1777,6 +1777,7 @@ MonoBehaviour:
   maxTilt: 11
   minTiltAmount: 0.3
   flipChance: 0.7
+  flipFromDepth: 0.5
   tiltBlendDepth: 0.12
   shiftRatio: 0.5
   slipStep: 0.12
@@ -1787,6 +1788,7 @@ MonoBehaviour:
   shakeAngle: 0.2
   shakeShift: 0.12
   shakeSpeed: 5
+  startSunk: 0.1
   mouthClearance: 0.12
   uprightFrom: 0.75
   resistanceMax: 0.4
