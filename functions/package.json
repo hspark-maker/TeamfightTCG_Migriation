@@ -3,7 +3,7 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
-    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-battle-sim.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-wallet-store.js && node scripts/test-receipt-idempotency.js && node scripts/test-wallet-migration.js && node scripts/test-schema-window.js && node scripts/test-growth.js && node scripts/test-open-pack.js && node scripts/test-spec-blob.js && node scripts/test-claim-reward.js && node scripts/test-enhance.js",
+    "test": "npm run build && node scripts/test-match-result.js && node scripts/test-deck-validation.js && node scripts/test-match-pairing.js && node scripts/test-battle-command.js && node scripts/test-battle-sim.js && node scripts/test-fresh-account.js && node scripts/test-currency.js && node scripts/test-wallet-store.js && node scripts/test-receipt-idempotency.js && node scripts/test-wallet-migration.js && node scripts/test-schema-window.js && node scripts/test-growth.js && node scripts/test-open-pack.js && node scripts/test-spec-blob.js && node scripts/test-claim-reward.js && node scripts/test-tutorial-grant.js && node scripts/test-enhance.js",
     "test:battle-golden": "npm run build && node scripts/test-battle-sim.js",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",

@@ -38,6 +38,7 @@
     <type fullname="OpenPackCard" preserve="all"/>
     <type fullname="EnhanceCardResult" preserve="all"/>
     <type fullname="EnhanceKeywordResult" preserve="all"/>
+    <type fullname="GrantTutorialCardsResult" preserve="all"/>
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>
 </linker>

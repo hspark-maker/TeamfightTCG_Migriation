@@ -15,6 +15,9 @@ public static partial class SpecFirestoreUploader
     /// <summary>토너먼트 구성 표 이름(챕터 → 정점).</summary>
     public const string TOURNAMENT_CHAPTER_TABLE = "TournamentChapter";
 
+    /// <summary>튜토리얼 지급 표 이름(스텝 → 지급 카드).</summary>
+    public const string TUTORIAL_GRANT_TABLE = "TutorialGrant";
+
     // 열 순서 = 필드 선언 순서다(TryBuildSnapshotFrom이 GetFields로 읽는다). 첫 열은 반드시 int id.
     // id는 순회 위치에서 파생하는 일련번호라 안정 키가 아니다 — 소비는 blob payload뿐이고
     // rows/{id} 문서 경로를 참조 키로 쓰면 앞에 행 하나만 끼워도 가리키는 대상이 바뀐다
@@ -32,6 +35,14 @@ public static partial class SpecFirestoreUploader
         public int id;
         public string chapterId;
         public string nodeId;
+        public int order;
+    }
+
+    sealed class TutorialGrantRow
+    {
+        public int id;
+        public int stepId;
+        public int cardId;
         public int order;
     }
 
@@ -59,6 +70,19 @@ public static partial class SpecFirestoreUploader
         if (!TryBuildSnapshotFrom(t_rows, TOURNAMENT_CHAPTER_TABLE, out TableSnapshot t_snapshot, out _error)) return null;
 
         return UploadSnapshot(t_projectId, t_apiKey, _envId, TOURNAMENT_CHAPTER_TABLE, t_snapshot, out _error);
+    }
+
+    /// <summary>OutgameTutorialData 저작을 TutorialGrant 표로 올린다. 성공하면 보고 줄을, 실패하면 null과 _error를 준다.</summary>
+    public static string UploadTutorialGrants(string _envId, out string _error)
+    {
+        if (!TryBeginCompositionUpload(out string t_projectId, out string t_apiKey, out _error)) return null;
+        if (!TryLoadAuthoringAsset<OutgameTutorialData>(out OutgameTutorialData t_data, out _error)) return null;
+        if (!TryLoadLiveCardIds(out HashSet<int> t_liveCardIds, out _error)) return null;
+        if (!TryBuildTutorialGrantRows(t_data, t_liveCardIds, out List<TutorialGrantRow> t_rows, out _error))
+            return null;
+        if (!TryBuildSnapshotFrom(t_rows, TUTORIAL_GRANT_TABLE, out TableSnapshot t_snapshot, out _error)) return null;
+
+        return UploadSnapshot(t_projectId, t_apiKey, _envId, TUTORIAL_GRANT_TABLE, t_snapshot, out _error);
     }
 
     // 자격·설정을 SpecData 업로드와 같은 순서로 본다 — 준비를 다 하고 첫 요청에서 403으로 죽지 않게 먼저 막는다
@@ -311,5 +335,118 @@ public static partial class SpecFirestoreUploader
             return false;
         }
         return true;
+    }
+
+    // 서버는 stepId로 지급 목록을 찾는다 — 번호 없는 스텝은 지목할 키가 없고, 번호가 겹치면 두 스텝의 지급이 합쳐진다.
+    // 카드 쪽 결함(id 미부여 · 카드 표에 없음 · 같은 스텝 안 중복)은 "그 장만 못 받는" 결과가 같으므로
+    // 도감 칸과 같은 등급으로 다룬다 — 행을 빼고 경고로 알린다
+    // 지급 목록이 표에서 빠지는 것은 저작 실수다 — 화면은 SO(CardId/CardIds)로 그리는데 실지급은 이 표가 정하므로,
+    // 한 장이라도 빠지면 유저가 받지 못할 카드의 획득 연출을 본다(클라는 GrantNotFound를 경고로만 흘린다).
+    // 그래서 stepId 중복과 같은 등급으로 업로드를 멈춘다
+    static bool TryBuildTutorialGrantRows(
+        OutgameTutorialData _data, HashSet<int> _liveCardIds,
+        out List<TutorialGrantRow> _rows, out string _error)
+    {
+        _rows = new List<TutorialGrantRow>();
+        _error = null;
+
+        var t_stepIds = new HashSet<int>();
+        int t_nextId = 1;
+
+        List<OutgameTutorialChapter> t_chapters = _data.chapters;
+        int t_chapterCount = t_chapters != null ? t_chapters.Count : 0;
+        for (int t_c = 0; t_c < t_chapterCount; t_c++)
+        {
+            OutgameTutorialChapter t_chapter = t_chapters[t_c];
+            if (t_chapter == null) continue;
+
+            int t_stepCount = t_chapter.StepCount;
+            for (int t_s = 0; t_s < t_stepCount; t_s++)
+            {
+                if (!t_chapter.TryGetStep(t_s, out TutorialStepDef t_step)) continue;
+                if (!TryReadGrantCardIds(t_step, out IReadOnlyList<int> t_cardIds)) continue;
+
+                string t_coord = $"챕터 '{t_chapter.Label}' 스텝 {t_s}({t_step.Action})";
+                int t_cardCount = t_cardIds != null ? t_cardIds.Count : 0;
+
+                if (t_step.StepId <= 0)
+                {
+                    _error = $"stepId 미부여 지급 스텝 ({t_coord}, 카드 {t_cardCount}장) — 서버가 지목할 키가 없어 " +
+                             "그 스텝의 지급이 통째로 막힌다. 시퀀스 SO의 [스텝 ID 부여]를 돌릴 것.";
+                    return false;
+                }
+
+                // 등록은 카드 0장 판정보다 앞이다 — 빈 지급 스텝이 실지급 스텝과 같은 stepId를 써도 잡아야 한다
+                if (!t_stepIds.Add(t_step.StepId))
+                {
+                    _error = $"stepId 중복 #{t_step.StepId}({t_coord}) — 두 스텝의 지급 목록이 하나로 합쳐진다.";
+                    return false;
+                }
+
+                if (t_cardCount == 0)
+                {
+                    Debug.LogWarning(
+                        $"[SpecFirestore] {TUTORIAL_GRANT_TABLE}: 지급 카드가 하나도 없는 지급 스텝 — {t_coord}. " +
+                        "저작이 비어 서버가 줄 것을 찾지 못한다(DeckGrant면 시나리오 배선을 확인할 것).");
+                    continue;
+                }
+
+                var t_stepCards = new HashSet<int>();
+                int t_order = 0;
+                for (int t_i = 0; t_i < t_cardCount; t_i++)
+                {
+                    int t_cardId = t_cardIds[t_i];
+                    string t_defect = null;
+                    if (t_cardId <= 0) t_defect = "id 미부여";
+                    else if (!_liveCardIds.Contains(t_cardId)) t_defect = "카드 표에 없거나 Live 채널이 아님";
+                    else if (!t_stepCards.Add(t_cardId)) t_defect = "같은 스텝 안 중복";
+
+                    if (t_defect != null)
+                    {
+                        _error = $"지급 불가 카드 — {t_defect} (카드 {t_cardId}, {t_coord} #{t_step.StepId} 칸 {t_i}). " +
+                                 "표에서 빠지면 화면에는 뜨는데 소유는 늘지 않는다 — 저작을 고칠 것.";
+                        return false;
+                    }
+
+                    _rows.Add(new TutorialGrantRow
+                    {
+                        id = t_nextId++,
+                        stepId = t_step.StepId,
+                        cardId = t_cardId,
+                        order = t_order++,
+                    });
+                }
+            }
+        }
+
+        if (_rows.Count == 0)
+        {
+            _error = "튜토리얼 저작에서 올릴 지급 카드를 하나도 찾지 못했다(지급 스텝·시나리오 덱 저작 확인).";
+            return false;
+        }
+        return true;
+    }
+
+    // 지급 액션만 표에 담는다 — 나머지 스텝은 서버가 카드를 줄 일이 없다
+    static bool TryReadGrantCardIds(TutorialStepDef _step, out IReadOnlyList<int> _cardIds)
+    {
+        switch (_step.Action)
+        {
+            case EOutgameTutorialAction.DeckGrant:
+                _cardIds = _step.Scenario != null ? _step.Scenario.PlayerDeckIds : null;
+                return true;
+
+            case EOutgameTutorialAction.CardGrant:
+                _cardIds = new int[] { _step.CardId };
+                return true;
+
+            case EOutgameTutorialAction.CardSetGrant:
+                _cardIds = _step.CardIds;
+                return true;
+
+            default:
+                _cardIds = null;
+                return false;
+        }
     }
 }

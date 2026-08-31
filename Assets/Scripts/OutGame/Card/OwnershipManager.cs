@@ -1,33 +1,24 @@
 using System;
 using System.Collections.Generic;
 
-// 카드 소유권의 static 단일 창구
+/// <summary>카드 소유권의 static 단일 창구.
+///
+/// 지급의 진실원은 서버다 — 튜토리얼 이관 후 남은 쓰기 호출부는 디버그와 되감기(OutgameTutorialRewind)뿐이고,
+/// 그 둘은 P0에서 닫는다.</summary>
 public static class OwnershipManager
 {
     static readonly HashSet<int> s_owned = new HashSet<int>();
 
-    // 소유 변경 통지 — UI 갱신용
+    /// <summary>소유 변경 통지 — UI 갱신용.
+    ///
+    /// 서버 응답 채택 경로(ServerSaveCommands.InvokeAsync → ServerSlotRehydrator → Init)에서도 발화한다.
+    /// 그 구간은 업로드가 봉인돼 있고 채택이 업로드 기준선을 세우는 중이므로, <b>구독자는 세이브를 쓰지 마라</b>(화면 갱신만).</summary>
     public static event Action OnOwnershipChanged;
 
     public static int OwnedCount => s_owned.Count;
 
     // 외부 변조 차단용 스냅샷(라이브 뷰 아님)
     public static IReadOnlyCollection<int> OwnedIds => new List<int>(s_owned);
-
-    // 메모리 캐시(Init) 없이 세이브의 소유 여부만 조회 — 첫실행 판정용
-    public static bool HasAnyOwnedSaved()
-    {
-        var t_data = DataSaveManager.Data.Ownership;
-
-        if (t_data.CardIds != null)
-        {
-            foreach (var t_id in t_data.CardIds)
-            {
-                if (t_id > 0) return true;
-            }
-        }
-        return false;
-    }
 
     // 초기화에서 클라우드 세이브 채택·CardCatalog.SetSource() 이후 1회 호출
     public static void Init()
@@ -47,6 +38,10 @@ public static class OwnershipManager
         }
 
         if (t_dirty) Save();
+
+        // 서버 채택 경로(ServerSlotRehydrator)도 이 Init을 다시 태운다 — 통지가 없으면
+        // 도감·덱편집을 열어 둔 채 소유가 늘었을 때 화면이 옛 집합에 머문다.
+        OnOwnershipChanged?.Invoke();
     }
 
     // 메모리 소유 집합을 세이브 슬롯에 flush 후 영속화

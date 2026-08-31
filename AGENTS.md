@@ -171,6 +171,7 @@
 
 - 실행: `OutgameTutorialRunner` · `TriggeredTutorialRunner` · `OutGame/Tutorial/Steps/TutorialStepExecutor` · `TutorialStepDef` · `EOutgameTutorialAction` · `EOutgameTutorialCompletion` · `EOutgameTutorialFailure` · `EOutgameTutorialStepResult` · `OutgameTutorialStepContext`
 - 진행·잠금: `OutgameTutorialProgress` · `OutgameFeatureLock` · `EOutgameFeature` · `ITutorialProgressSink` · `OutgameTutorialRewind`
+- 카드 지급은 **서버가 판정한다** — callable `grantTutorialCards(stepId)` (`functions/src/commands/grantTutorialCards.ts`, 표 파서 `functions/src/tutorialGrantTable.ts`, 지도 범위 밖). 클라 창구 `TutorialGrantCommand.GrantAsync` · 응답 DTO `GrantTutorialCardsResult` · 저작 진실원은 스펙 표 TutorialGrant (업로더 `Editor/SpecFirestoreUploader.UploadTutorialGrants`). 소유 반영은 채택 배관(`ServerSlotRehydrator`)이 하고 `TutorialStepExecutor` 는 소유를 직접 만지지 않는다
 - 앵커·데이터: `TutorialAnchorRegistry` · `TutorialAnchor` · `EOutgameTutorialAnchor` · `OutgameTutorialData` · `OutgameTutorialChapter` · `OutgameTutorialGuide` · `EOutgameTutorialTrigger` · `TriggeredTutorialData` (`TriggeredTutorialEntry`)
 - UI: `UI/Tutorial/OutgameTutorialGateUI` · `OutgameTutorialBridge` · `TriggeredTutorialBridge` · `UI/TutorialOverlayUI` · `UI/TutorialSetupUI` · `UI/TutorialUIStyle` · `UI/Tutorial/TutorialAlertDot` · `UI/Input/TutorialTapCatcher`
 - 전투 내 튜토리얼: `Battle/TutorialConfig` · `TutorialScenarioData` (`StepKind` · `BannerAnchor` · `CardFocusSide` · `ScriptedAttack`) · `TutorialStepGate` (`Side`)

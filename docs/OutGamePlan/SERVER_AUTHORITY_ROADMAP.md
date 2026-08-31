@@ -33,7 +33,7 @@
 |---|---|---|---|---|
 | 1 | `claimBattleReward` 멱등 없음 | `functions/src/commands/claimBattleReward.ts` | 같은 페이로드 반복 → **무한 골드** | **P1** (멱등만) |
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
-| 3 | 소유 `ownership` | `OwnershipManager.Grant*` 6경로 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2** |
+| 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
 | 4 | 한계돌파 | `CardGrowthManager.Snack.cs:TryLimitBreak` | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3** |
 | 5 | 토너먼트 해금·낙인 | `TournamentProgress.StateOf` · `MarkRewardPending` | 챕터 건너뛰고 정점 보상 수령 | **P4** |
 | 6 | 싱글 랭크 `rank.points` | `RankManager.ApplyBattleResult` | 팩 잠금·티어 보상·챕터 잠금 자격 | **범위 밖** |
@@ -82,18 +82,24 @@
 
 ---
 
-### P2 — 소유(`ownership`) 서버 이관
+### P2 — 소유(`ownership`) 서버 이관 — **구현 완료**
 
-서버가 소유를 주는 경로는 `openPack` 과 `ensureAccount`(`functions/src/save/starterCards.ts`) 뿐이고, 클라 6경로가 세이브를 직접 쓴다.
+서버가 소유를 주는 경로는 `openPack` 과 `ensureAccount`(`functions/src/save/starterCards.ts`) 뿐이었고, 클라 12경로가 세이브를 직접 썼다. 그중 **실질적인 권위 생성은 튜토리얼 지급 5건**이고 나머지는 되감기 3 · 스타터덱 1 · 디버그 3 이다.
 
-1. **튜토리얼 카드 지급을 스펙 표로 승격.** 인계 문서가 "SO 저작 중 아직 서버 근거가 없는 **유일한** 지급 축"이라 지목한 자리다. 진실원이 `OutgameTutorial.asset`/`TutorialScenario*.asset` 의 `playerDeckIds` 다. `AlbumEntry`(40행)·`TournamentChapter`(24행)를 올린 C5.5 의 업로더 오버로드를 그대로 재사용해 `TutorialGrant` 표(스텝 id → cardIds)를 만든다.
-2. **callable `grantTutorialCards(stepId)` 신설.** 서버가 표를 보고 지급하고 재지급을 낙인으로 막는다. 낙인 자리는 `grants/current`(이미 룰이 `write: if false`, 강화 무료 한 방이 쓰는 원장) 확장이 자연스럽다 — `tutorial` 슬롯은 동결 제외라 낙인을 거기 두면 위조된다.
-3. **클라 호출부 전환** — `Tutorial/Steps/TutorialStepExecutor.cs:203`·`:245`(`AcquireCard`)·`:269`·`:296`·`:358`.
-4. **`OutgameTutorialRewind.cs:141`/`:165`/`:173`** 은 `test` env 디버그 경로다. P0 가드 안으로 넣고 서버 왕복을 붙이지 않는다.
-5. **`StarterDeck.GrantIfNoDeck`**(`Deck/StarterDeck.cs:29`, 호출부 `Core/Initialization/SaveDependentManagersStep.cs:53`) — 파일 주석대로 신규 계정 정본은 이미 서버 `ensureAccount` 이고 이 경로는 "튜토리얼 되감기가 덱 슬롯을 비웠을 때만" 선다. **에디터 전용 가드로 격리**한다(카드는 서버가 이미 줬으므로 덱 삽입만 남긴다).
-6. **`OwnershipManager.Grant`/`GrantAll`/`GrantEntireCatalog`/`RevokeAll` 을 채택 전용으로 축소** — `Init`(서버 슬롯 재수화) 외 진입점을 없앤다.
+배관은 이미 서 있었다 — 팩 개봉이 `slots.ownership` → `AdoptServerSlots` → `ServerSlotRehydrator.RehydrateOwnership()` → `OwnershipManager.Init()` 로 채택형이라, 이번 작업은 **배관이 아니라 지급 판정만** 옮겼다.
 
-**결과: `ownership` 슬롯 클라 writer 0.** 도감 완성 판정(`claimReward(Album)` + `completionTable.ts`)이 이 슬롯을 읽으므로 도감 보상의 자기신고 뿌리도 같이 닫힌다.
+1. **`TutorialGrant` 스펙 표 신설.** 열 `id | stepId | cardId | order`, 4스텝 20행. 저작 진실원은 `OutgameTutorial.asset`(CardGrant `cardId` · CardSetGrant `cardIds`)과 `TutorialScenario*.asset`(DeckGrant `playerDeckIds`)이고, `stepId` 는 그 에셋 안에서 전역 유일이라 좌표로 쓸 수 있다. 업로더는 `Editor/SpecFirestoreUploader.Composition.cs` 의 `UploadTutorialGrants`(라이브 카드 대조 포함, `UploadAlbumEntries` 형틀).
+2. **callable `grantTutorialCards(stepId)` 신설**(`functions/src/commands/grantTutorialCards.ts`, 표 파서 `functions/src/tutorialGrantTable.ts`). 표에서 stepId 행을 모아 기존 소유와 합집합한 `ownership` 슬롯 전체 값을 쓴다. 행 0개면 `rejectDomain("GrantNotFound")` — 표 전량이 비었을 때만 `logger.error` 를 먼저 남겨 배포 사고와 미저작 stepId 를 로그에서 가른다. 지갑은 채우지 않는다.
+3. **낙인을 두지 않는다**(당초 문안에서 변경). 소유는 집합이고 `buildOwnershipSlotFromIds` 가 이미 가진 카드를 skip 하므로 같은 stepId 재호출의 델타가 0이다. 서버가 줄 수 있는 총량 상한은 표에 저작된 13종으로 이미 닫혀 있고, `grants/current` 는 `readGrants` 가 **fail-open**(못 읽으면 미사용)이라 지급 낙인으로 쓰면 방어 가치가 0이면서 `GRANT_SCHEMA_VERSION` 승급 비용만 진다. **표가 좌표이고 표의 총합이 곧 상한이다.**
+4. **클라 호출부 전환** — `Tutorial/Steps/TutorialStepExecutor.cs` 의 5곳이 `TutorialGrantCommand.GrantAsync(stepId)` 로 간다. **왕복을 기다리지 않는다**(선커밋 후 `Forget()`, `EnterAutoPurchase` 관용구). 예외는 `EnterDeckGrant` 하나 — 왕복이 **끝난 뒤에** `TryInsertFront` 를 부른다. `ServerSaveCommands.InvokeAsync` 의 `finally` 가 `ResumeUploads()` 하므로, 봉인 구간 안에서 `DataSaveManager.Save()` 를 태우면 `AdoptServerResult` 가 세운 업로드 기준선과 경합한다.
+5. **`StarterDeck.GrantIfNoDeck`** — 에디터 격리(당초 문안) 대신 **지급만 벗겼다**. 실측 결과 이 경로는 리테일에서도 선다: `freshAccount.ts:50` 이 `deck.slots[0]` 을 채워 신규 계정에선 서지 않지만, `DeckListController:182 → TryDeleteAt` 에 최소 덱 수 가드가 없어 유저가 덱을 전량 삭제할 수 있고 그때 이 안전망이 실제로 선다. 이제 6장이 전부 `IsOwned` 일 때만 삽입한다.
+6. **`OwnershipManager` 는 축소하지 않았다** — 되감기·디버그가 P0 몫으로 남아 `Grant`/`GrantAll`/`GrantEntireCatalog`/`RevokeAll` 을 여전히 호출한다. 대신 `Init()` 끝에 `OnOwnershipChanged` 발화를 넣어 **기존 잠복 결함**을 메웠다(서버 채택 경로에 UI 갱신 통지가 아예 없어 도감·덱편집을 연 채 소유가 늘면 화면이 안 바뀌었다). 호출부 0건이던 `HasAnyOwnedSaved()` 는 삭제.
+
+**결과: 튜토리얼 지급의 진실원이 서버 표가 됐고, 클라가 임의 cardId 를 소유에 밀어 넣는 리테일 경로가 사라졌다.** 도감 완성 판정(`claimReward(Album)` + `completionTable.ts`)이 이 슬롯을 읽으므로 도감 보상의 자기신고 뿌리도 같이 좁혀진다.
+
+**아직 writer 0 이 아니다.** 디버그 3건(`OutgameDebugActions:234`·`:240`, `UnlockAllCardsButton:25`)과 되감기(`OutgameTutorialRewind` 의 와이프 `:79` + 재생 3건)가 남는다 — **P0 가 닫는다. P6 착수의 선행조건이다.**
+
+**서버가 막는 것 / 못 막는 것.** 막는 것은 표 밖 카드 지급(임의 cardId 주입 불가) · 총량 상한 · 중복 지급 무효화다. **못 막는 것은 순서·시점**이다 — 튜토리얼을 하지 않고 4개 stepId 를 바로 호출하면 저작분이 그대로 들어온다. `tutorial` 슬롯이 동결 제외라 서버가 믿을 진행도가 없어 P6 이후에도 못 막는다. 다만 그 카드는 어차피 모든 유저가 튜토리얼에서 받으므로 실질 이득이 0에 수렴한다. P4 토너먼트와 같은 성격의 한계다.
 
 ---
 
@@ -152,6 +158,8 @@
 - 동결 슬롯 5종 각각을 바꾼 update → `assertFails`
 - `deck`·`profile`·`tutorial`·`rank` 만 바뀐 update → `assertSucceeds`
 - 동결 슬롯을 서버가 준 값 그대로 다시 실은 update → `assertSucceeds` (Overwrite 정상 경로 회귀)
+
+**선행 블로커 — `devResetSave` (test env 전용).** 룰을 조이는 순간 되감기(`OutgameTutorialRewind:79` 의 `ownership` 와이프)와 디버그 해금이 **에디터에서도** 업로드 거부로 죽는다. P0 의 `#if UNITY_EDITOR` 가드는 리테일만 정리할 뿐 개발 워크플로를 살려 주지 않는다. `devGrantCurrency`(`env !== "test"` 거부) 형틀의 서버 리셋 callable 이 P6 착수 전에 서 있어야 한다.
 
 **착수 판정은 "구 클라가 없는가" 다.** P2·P3·P4 가 배포되고 그 클라가 소멸한 뒤여야 한다 — 조이는 순간 옛 클라의 세이브 저장이 전부 거부된다. C7 currency 조이기 때와 같은 판정 기준이다.
 
