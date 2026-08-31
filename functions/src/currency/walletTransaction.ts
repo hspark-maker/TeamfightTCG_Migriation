@@ -22,6 +22,7 @@ import {readWallet, walletRef, WalletPatch, WalletState, writeWallet} from "./wa
 /**
  * 지갑을 트랜잭션 1회로 읽고 고친다. 반환은 WalletPatch 뿐이다
  * — revision·updatedSlots 는 세이브 문서의 것이고 여기선 아무것도 오르지 않는다.
+ * @param {string} command 로그에 찍을 호출 커맨드 이름
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {Function} mutate 현재 지갑을 받아 다음 지갑(nextWallet 산물)을 돌려준다

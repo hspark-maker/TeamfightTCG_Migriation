@@ -14,8 +14,7 @@ function createCountedTransaction(
   attempt: AttemptMetrics,
   onRead: (count: number) => void,
 ): Transaction {
-  let proxy: Transaction;
-  proxy = new Proxy(raw, {
+  const proxy: Transaction = new Proxy(raw, {
     get(target, property) {
       if (property === "get") {
         return async (...args: unknown[]) => {
@@ -84,7 +83,9 @@ export async function withCountedTransaction<T>(
       const transaction = createCountedTransaction(
         raw,
         attempt,
-        (count) => { totalObservedReads += count; },
+        (count) => {
+          totalObservedReads += count;
+        },
       );
       const value = await run(transaction);
       return value;

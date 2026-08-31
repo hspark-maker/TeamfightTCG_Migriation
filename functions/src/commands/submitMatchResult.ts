@@ -400,8 +400,9 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     // rankState 스냅샷으로 메우면 폴백이 실제로 걸릴 때(문서는 있는데 currentPoints가 깨진 경우)
     // save가 아니라 payoutState에서 rank.points를 찾게 되어 멀쩡한 계정이 정산 실패로 튕긴다.
     const saveSnapshots: (DocumentSnapshot | undefined)[] = entries.map(() => undefined);
-    for (let i = 0; i < missingRankStateIndexes.length; i++)
+    for (let i = 0; i < missingRankStateIndexes.length; i++) {
       saveSnapshots[missingRankStateIndexes[i]] = missingSaveSnapshots[i];
+    }
     const settledAt = Timestamp.now();
     const payoutExpiresAt = Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
     const payoutSummary: Record<string, unknown> = {};

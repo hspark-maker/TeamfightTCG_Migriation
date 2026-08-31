@@ -157,6 +157,7 @@ export function assertWritableSchema(
  * 지갑 문서도 **항상 함께 읽어** 콜백에 넘기고 응답에 싣는다(옵션 플래그를 두지 않는다).
  * 바뀌지 않은 지갑을 매번 내보내는 것은 클라 채택이 단조·멱등이라 무해하고,
  * 클라가 어떤 이유로든 드리프트했을 때 다음 명령이 스스로 맞춰 준다.
+ * @param {string} command 로그에 찍을 호출 커맨드 이름
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {Function} mutate 현재 문서·트랜잭션·지갑을 받아 갱신할 슬롯 전체 값을 돌려준다
@@ -268,6 +269,7 @@ function hasUsableMeta(data: FirebaseFirestore.DocumentData | undefined): boolea
  *
  * 지갑도 **같은 트랜잭션**에서 만든다. 두 문서가 갈라지면 세이브만 있는 계정이 생기고,
  * 그 계정은 초기화의 ensureWallet 이 0 잔액 지갑을 세워 스타터 골드를 영영 잃는다.
+ * @param {string} command 로그에 찍을 호출 커맨드 이름
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
  * @param {string} deviceId 클라 기기 id (32자 hex)
