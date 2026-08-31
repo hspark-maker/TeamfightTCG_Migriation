@@ -120,7 +120,7 @@ public class MatchmakingBgFx
 
         if (!this.HasPanels) return;
 
-        this.Solve(_screen, out _up, out _down);
+        this.Solve(_screen, out _, out _up, out _down);
     }
 
     /// <summary>
@@ -153,10 +153,12 @@ public class MatchmakingBgFx
         if (!this.HasPanels) return t_seq;
 
         this.Capture();
-        this.Solve(_screen, out float t_up, out float t_down);
+        this.Solve(_screen, out Vector2 t_size, out float t_up, out float t_down);
 
         this.top.DOKill();
         this.bottom.DOKill();
+
+        this.ApplyPanelSize(t_size);
 
         this.top.anchoredPosition    = this.m_topHome    + new Vector2(0f, t_up);
         this.bottom.anchoredPosition = this.m_bottomHome - new Vector2(0f, t_down);
@@ -165,7 +167,7 @@ public class MatchmakingBgFx
         t_seq.Insert(0f, this.bottom.DOAnchorPos(this.m_bottomHome, this.closeDuration).SetEase(this.closeEase));
 
         // 맞물리는 프레임에 터진다 — 닫힘이 끝나는 자리다.
-        this.StageSeam(t_seq, this.closeDuration, _screen);
+        this.StageSeam(t_seq, this.closeDuration, t_size.x);
 
         return t_seq;
     }
@@ -178,10 +180,12 @@ public class MatchmakingBgFx
         if (!this.HasPanels) return t_seq;
 
         this.Capture();
-        this.Solve(_screen, out float t_up, out float t_down);
+        this.Solve(_screen, out Vector2 t_size, out float t_up, out float t_down);
 
         this.top.DOKill();
         this.bottom.DOKill();
+
+        this.ApplyPanelSize(t_size);
 
         // 시작 자리를 못 박지 않는다 — 진입이 끝난 자리에서 그대로 이어받는다.
         t_seq.Insert(0f, this.top.DOAnchorPos(this.m_topHome + new Vector2(0f, t_up),
@@ -190,7 +194,7 @@ public class MatchmakingBgFx
                                                  this.partDuration).SetEase(this.partEase));
 
         // 갈라지기 시작하는 프레임에 한 번 — 맞물릴 때와 같은 선이 갈라짐의 신호가 된다.
-        this.StageSeam(t_seq, 0f, _screen);
+        this.StageSeam(t_seq, 0f, t_size.x);
 
         return t_seq;
     }
@@ -256,9 +260,21 @@ public class MatchmakingBgFx
         this.m_bottomBaseColor = this.m_bottomImage.color;
     }
 
-    // 판이 화면을 완전히 비우는 거리. 이음매가 화면 중앙(0.5)에 있는 기하라 커튼과 같은 식이 그대로 성립한다 —
-    // 진실원을 둘로 만들지 않으려 CurtainView.Solve를 그대로 부른다(판 크기는 저작값이라 쓰지 않는다).
-    void Solve(RectTransform _screen, out float _up, out float _down)
+    // 판의 크기는 화면에서 푼 값이 진실원이다 — 저작 크기·배율에 기대면 가로가 넓은 기기에서 기울어진 귀퉁이가 화면 안으로 들어온다.
+    // 씬 커튼(CurtainView.ApplyGeometry)과 같은 규약이라, 두 커튼이 같은 판 조립을 나눠 쓸 수 있다.
+    void ApplyPanelSize(in Vector2 _size)
+    {
+        this.top.sizeDelta    = _size;
+        this.bottom.sizeDelta = _size;
+
+        // 크기를 코드가 정하므로 배율이 1이 아니면 계산한 만큼 덮이지 않는다(이동은 anchoredPosition이라 배율과 무관하다).
+        this.top.localScale    = Vector3.one;
+        this.bottom.localScale = Vector3.one;
+    }
+
+    // 판의 크기와 판이 화면을 완전히 비우는 거리. 이음매가 화면 중앙(0.5)에 있는 기하라 커튼과 같은 식이 그대로 성립한다 —
+    // 진실원을 둘로 만들지 않으려 CurtainView.Solve를 그대로 부른다.
+    void Solve(RectTransform _screen, out Vector2 _size, out float _up, out float _down)
     {
         float t_w = _screen != null ? _screen.rect.width  : 0f;
         float t_h = _screen != null ? _screen.rect.height : 0f;
@@ -267,15 +283,13 @@ public class MatchmakingBgFx
         if (t_w <= 0f) t_w = Screen.width;
         if (t_h <= 0f) t_h = Screen.height;
 
-        CurtainView.Solve(t_w, t_h, 0.5f, this.SeamAngle, this.pad, out _, out _up, out _down);
+        CurtainView.Solve(t_w, t_h, 0.5f, this.SeamAngle, this.pad, out _size, out _up, out _down);
     }
 
     // 이음매 선. 프리팹에 배선할 자리를 만들지 않는다 — 스캔 띠·조임 빛·빛줄기와 같은 자가설치 규약이다.
-    void StageSeam(Sequence _seq, float _at, RectTransform _screen)
+    void StageSeam(Sequence _seq, float _at, float _span)
     {
         if (this.seamThickness <= 0f || this.top == null || this.top.parent == null) return;
-
-        float t_w = _screen != null && _screen.rect.width > 0f ? _screen.rect.width : Screen.width;
 
         var t_go = new GameObject("SeamFlash", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         var t_rt = (RectTransform)t_go.transform;
@@ -290,8 +304,8 @@ public class MatchmakingBgFx
         // 이음매는 두 판의 pivot이 만나는 자리 — 판의 홈이 곧 그 자리다.
         t_rt.anchoredPosition = this.m_topHome;
 
-        // 기울어진 선이라 화면 폭보다 길어야 좌우 끝이 비지 않는다.
-        t_rt.sizeDelta     = new Vector2(t_w * 1.6f, this.seamThickness);
+        // 판과 같은 길이로 눕는다 — 기울어진 선이라 화면 폭보다 길어야 좌우 끝이 비고, 판 폭이 이미 그 몫이다.
+        t_rt.sizeDelta     = new Vector2(_span, this.seamThickness);
         t_rt.localRotation = Quaternion.Euler(0f, 0f, this.SeamAngle);
 
         var t_image = t_go.GetComponent<Image>();
