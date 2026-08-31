@@ -82,22 +82,38 @@ internal sealed class FunctionsCallableService : ICallableService
         HttpsCallableReference t_reference = ResolveCallable(_commandName);
         Task<HttpsCallableResult> t_callTask = t_reference.CallAsync(_payload);
 
-        // SDK 내장 HttpClient 타임아웃(70초)까지 기다리면 유저 표면이 죽는다 — 여기서 먼저 끊는다.
-        (bool t_hasResult, HttpsCallableResult t_result) = await UniTask.WhenAny(
-            t_callTask.AsUniTask(),
-            UniTask.Delay(_timeoutMilliseconds, DelayType.Realtime));
+        bool t_hasResult;
+        HttpsCallableResult t_result;
+        try
+        {
+            // SDK 내장 HttpClient 타임아웃(70초)까지 기다리면 유저 표면이 죽는다 — 여기서 먼저 끊는다.
+            // 세션 수명에도 묶는다 — 안 묶으면 에디터 정리가 Firestore TerminateAsync 에서 이 왕복을
+            // 기다리다 못 끝내고, gRPC 네이티브 스레드가 남아 Unity가 "Reloading Domain"에서 멈춘다.
+            (t_hasResult, t_result) = await UniTask.WhenAny(
+                t_callTask.AsUniTask(),
+                UniTask.Delay(_timeoutMilliseconds, DelayType.Realtime))
+                .AttachExternalCancellation(FirebaseManager.Lifetime);
+        }
+        catch (OperationCanceledException)
+        {
+            Abandon(t_callTask);
+            throw;
+        }
 
         if (!t_hasResult)
         {
-            // CallAsync가 CancellationToken을 받지 않아 버려진 호출을 취소할 수단이 없다 — 취소 대신 관측만 붙여
-            // 나중에 faulted로 끝나도 UnobservedTaskException으로 새지 않게 한다.
-            t_callTask.ContinueWith(
-                _abandoned => { _ = _abandoned.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            Abandon(t_callTask);
             throw new TimeoutException($"Callable '{_commandName}' timed out.");
         }
 
         return t_result?.Data;
     }
+
+    /// <summary>CallAsync가 CancellationToken을 받지 않아 버려진 호출을 취소할 수단이 없다 — 취소 대신
+    /// 관측만 붙여 나중에 faulted로 끝나도 UnobservedTaskException으로 새지 않게 한다.</summary>
+    static void Abandon(Task _callTask)
+        => _callTask.ContinueWith(
+            _abandoned => { _ = _abandoned.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
 
     HttpsCallableReference ResolveCallable(string _commandName)
     {

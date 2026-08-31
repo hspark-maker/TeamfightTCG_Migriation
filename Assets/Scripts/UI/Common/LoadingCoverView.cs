@@ -37,6 +37,13 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] Button     retryButton;
     [SerializeField] Button     quitButton;
 
+    [Header("계정")]
+    [Tooltip("로그인 화면. 미배선이면 계정 버튼이 뜨지 않는다(부트는 그대로 진행).")]
+    [SerializeField] LoginEmailPanel loginPanel;
+
+    [Tooltip("로그인 화면을 여는 버튼. 이미 계정이 정해진 기기에서만 보인다.")]
+    [SerializeField] Button accountButton;
+
     [Tooltip("로딩이 즉시 끝나도 이 시간(초)만큼은 노출한다 — 한 프레임 깜빡임 방지.")]
     [SerializeField] float minDuration = 1f;
 
@@ -72,6 +79,9 @@ public class LoadingCoverView : MonoBehaviour
 
     // 전환 모드의 목적지. null이면 초기화 모드 — 목적지를 스스로 판정한다.
     string m_targetScene;
+
+    // 이 프레임 수만큼 "시작" 탭을 무시한다. 로그인 화면을 여닫는 클릭이 새어 들어오는 것을 막는다.
+    int m_ignoreTapFrames;
 
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
     Action m_beforeLoad;
@@ -117,6 +127,12 @@ public class LoadingCoverView : MonoBehaviour
         m_group = GetComponent<CanvasGroup>();
 
         if (progressBar != null) progressBar.normalizedValue = 0f;
+
+        // 로그인 화면의 표시 여부는 여기서 정한다 — 화면 자신에게 맡기면 비활성으로 저작된 순간
+        // Awake 가 돌지 않아 관문에 아무도 나타나지 않고, 관문은 상한 뒤 익명으로 넘어가 버린다.
+        // 전환 모드(m_targetScene != null)의 커버는 부트가 아니므로 손대지 않는다.
+        if (m_targetScene == null && loginPanel != null && SignInGate.StoredMethod == ESignInMethod.None)
+            loginPanel.Open();
     }
 
     // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
@@ -130,6 +146,17 @@ public class LoadingCoverView : MonoBehaviour
         StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
     }
 
+    /// <summary>계정 전환으로 부트를 다시 태울 때 로딩 화면도 되돌린다.
+    /// 커버가 이미 걷혔으면(전투·로비로 넘어간 뒤) 할 일이 없다.</summary>
+    public static void RestartLoadingForAccountChange()
+    {
+        if (s_active == null || s_active.m_targetScene != null) return;
+
+        s_active.StopAllCoroutines();
+        s_active.SetRecoveryVisible(false);
+        s_active.StartCoroutine(s_active.CoRunInitialize());
+    }
+
     // ── 초기화 모드 ─────────────────────────────────────────────────────────────
 
     IEnumerator CoRunInitialize()
@@ -140,6 +167,16 @@ public class LoadingCoverView : MonoBehaviour
             yield break;
         }
 
+        // (1) 계정 인증 대기. 사람이 고르는 구간이라 initializeWaitTimeout 예산에 넣지 않는다 —
+        //     넣으면 로그인 화면을 20초 넘게 보고 있다는 이유로 복구 화면이 뜬다.
+        SetAccountButtonVisible(SignInGate.StoredMethod != ESignInMethod.None);
+        if (!SignInGate.IsResolved)
+        {
+            if (statusText != null) statusText.text = "계정을 선택해 주세요.";
+            while (!SignInGate.IsResolved) yield return null;
+        }
+
+        // (2) 계정 로딩
         if (statusText != null)
             statusText.text = "플레이어 데이터를 동기화하는 중입니다.";
 
@@ -167,7 +204,58 @@ public class LoadingCoverView : MonoBehaviour
             yield break;
         }
 
+        // (3) 조작 대기. 여기부터는 로딩이 아니라 사람을 기다리는 구간이다.
+        yield return CoWaitForTap();
+
+        SetAccountButtonVisible(false);
         yield return CoGoNext();
+    }
+
+    // 화면을 한 번 만질 때까지 기다린다. 로그인 화면이 떠 있는 동안의 입력은 그쪽 것이라 세지 않는다 —
+    // 안 거르면 계정 버튼을 누른 그 클릭이 그대로 "시작"으로 읽혀 로비로 넘어간다.
+    IEnumerator CoWaitForTap()
+    {
+        if (statusText != null) statusText.text = "화면을 터치해 시작하세요.";
+
+        while (true)
+        {
+            // 로그인 화면이 떠 있는 동안의 입력은 그쪽 것이다. 닫힌 뒤에도 한 프레임 더 흘린다 —
+            // 닫은 그 클릭이 같은 프레임에 여기로 읽히면 화면만 닫고 곧장 로비로 넘어간다.
+            if (loginPanel != null && loginPanel.gameObject.activeSelf) m_ignoreTapFrames = 2;
+
+            if (m_ignoreTapFrames > 0) m_ignoreTapFrames--;
+            else if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.touchCount > 0) yield break;
+
+            yield return null;
+        }
+    }
+
+    // 계정 버튼. 이미 계정이 정해진 기기에서만 뜬다 — 첫 실행은 로그인 화면이 이미 앞에 서 있다.
+    void SetAccountButtonVisible(bool _visible)
+    {
+        if (accountButton == null) return;
+
+        bool t_show = _visible && loginPanel != null;
+        accountButton.gameObject.SetActive(t_show);
+
+        // 커버는 로딩 내내 interactable=false다(프리팹 저작값) — 풀지 않으면 버튼이 보이기만 하고 안 눌린다.
+        // 복구 화면이 떠 있는 동안에는 그쪽이 소유권을 가지므로 건드리지 않는다.
+        if (m_group != null && !IsRecoveryVisible) m_group.interactable = t_show;
+
+        if (!t_show) return;
+
+        accountButton.onClick.RemoveAllListeners();
+        accountButton.onClick.AddListener(OpenLoginPanel);
+    }
+
+    bool IsRecoveryVisible => recoveryPanel != null && recoveryPanel.activeSelf;
+
+    // 이 클릭이 "시작" 탭으로도 읽히지 않게 같은 자리에서 막는다 — 화면이 열리는 것은 다음 프레임이라
+    // CoWaitForTap의 activeSelf 검사만으로는 이 프레임을 못 거른다.
+    void OpenLoginPanel()
+    {
+        m_ignoreTapFrames = 2;
+        loginPanel.Open();
     }
 
     // 부트가 끝난 상태(UpdateRequired / RecoveryRequired)의 유일한 출구 화면.

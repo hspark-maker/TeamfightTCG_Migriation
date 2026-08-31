@@ -28,32 +28,23 @@ public class MultiplayerTurnRunner : MonoBehaviour
     bool waitingForAttackRpc;
     CancellationToken destroyCt;
 
-    // 시드 commit-reveal 상태
-    UniTaskCompletionSource seedCommitTcs;
-    UniTaskCompletionSource seedRevealTcs;
+    // 시드 확정 상태. 시드의 진실원은 서버 하나다 — 로컬 합의 경로는 없다.
     UniTaskCompletionSource serverSeedCapabilityTcs;
-    bool   seedCommitReceived;
-    bool   seedRevealReceived;
     bool   serverSeedCapabilityReceived;
-    byte[] opponentCommit;
-    byte[] myNonce;
-    byte[] opponentNonce;
     byte[] myPairingNonce;
     byte[] opponentPairingNonce;
     string matchId;
-    string seedSource = "commit_reveal";
+    string seedSource;
     string seedHex;
     int rulesetVersion;
 
-    public byte[] MyNonce => this.myNonce;
-    public byte[] OpponentNonce => this.opponentNonce;
     public string MatchId => this.matchId;
     public string SeedSource => this.seedSource;
     public string SeedHex => this.seedHex;
     public int RulesetVersion => this.rulesetVersion;
 
     // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
-    // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 3 TCS를 강제 해제.
+    // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 대기 TCS를 강제 해제.
     bool opponentLeftDuringInit;
     bool networkAbortRequested;
 
@@ -133,8 +124,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.seedSource = "server";
         this.seedHex = _data.SeedHex;
         this.rulesetVersion = _data.RulesetVersion;
-        this.myNonce = null;
-        this.opponentNonce = null;
         this.matchGrowthSource = _source;
         SetLocalGrowthProfiles(_data.LocalCardIds, _data.LocalGrowth);
         this.enemyDeckReceived = true;
@@ -286,34 +275,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
     public void OnContentMismatchReceived(string _detail)
         => AbortInitialDeck(EMatchEndReason.Desync, $"상대와 전투 데이터 스냅샷이 달라 매치를 중단합니다 — {_detail}");
 
-    public void OnSeedCommitReceived(byte[] _hash)
-    {
-        if (DeckConfig.AiTakeover) return;
-
-        this.opponentCommit = _hash;
-        if (this.seedCommitTcs != null)
-        {
-            UniTaskCompletionSource t_tcs = this.seedCommitTcs;
-            this.seedCommitTcs = null;
-            t_tcs.TrySetResult();
-        }
-        else this.seedCommitReceived = true;
-    }
-
-    public void OnSeedRevealReceived(byte[] _nonce)
-    {
-        if (DeckConfig.AiTakeover) return;
-
-        this.opponentNonce = _nonce;
-        if (this.seedRevealTcs != null)
-        {
-            UniTaskCompletionSource t_tcs = this.seedRevealTcs;
-            this.seedRevealTcs = null;
-            t_tcs.TrySetResult();
-        }
-        else this.seedRevealReceived = true;
-    }
-
     public void OnServerSeedCapabilityReceived(byte[] _pairingNonce)
     {
         if (DeckConfig.AiTakeover) return;
@@ -378,8 +339,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
             this.seedHex,
             this.rulesetVersion,
             this.MyOwnerIndex,
-            this.myNonce,
-            this.opponentNonce,
             SpecSource.BattleFingerprint.ToLowerInvariant(),
             t_myIds,
             t_myGrowth);
@@ -428,11 +387,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// commit-reveal로 양쪽이 조작 못 하는 공유 시드 합의.
-    /// 1) H(nonce) 교환(commit) 2) nonce 교환(reveal) 3) 검증 4) seed = 내nonce XOR 상대nonce.
-    /// 반환 false = 대기 중 상대 이탈(시드 미확정, opponentNonce 접근 금지).
-    /// </summary>
+    /// <summary>서버가 발급한 시드를 양쪽이 같이 받아 확정한다.
+    /// 반환 false = 상대 이탈·서버 실패로 시드 미확정(호출부가 이탈 처리).</summary>
     async UniTask<bool> SyncMatchSeed()
     {
         int t_capabilityWinner;
@@ -448,8 +404,15 @@ public class MultiplayerTurnRunner : MonoBehaviour
         }
         if (InitAborted) return false;
 
+        // 시드의 진실원은 서버 하나다 — 상대가 서버 시드 능력을 알리지 않으면 합의할 방법이 없다.
+        // 예전에는 여기서 commit-reveal 로 내려갔지만 서버 lockDeck·submitMatchResult 가 그 시드를
+        // 무조건 거절해, 매치가 "서버 덱 검증 실패"라는 엉뚱한 사유로 죽었다. 원인 그대로 끊는다.
         if (t_capabilityWinner != 0)
-            return await SyncCommitRevealSeed();
+        {
+            NetworkGameController.Instance?.SendMatchAbort(EMatchEndReason.InitError);
+            AbortInitialDeck(EMatchEndReason.InitError, "상대가 서버 시드 합의에 응답하지 않았습니다.");
+            return false;
+        }
 
         (ServerMatchSeedStatus status, ServerMatchSeed match) t_result =
             await ServerMatchSeedSubmission.TryAcquireAsync(
@@ -514,39 +477,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
             return MatchResultSubmission.Hex(t_sha.ComputeHash(t_input));
     }
 
-    async UniTask<bool> SyncCommitRevealSeed()
-    {
-        this.myNonce = MatchRandom.NewNonce();
-        byte[] t_myCommit = MatchRandom.Hash(this.myNonce);
-
-        NetworkGameController.Instance?.SendSeedCommit(t_myCommit);
-        await AwaitInitStep(WaitOpponentCommit(), "시드 commit");
-        if (InitAborted) return false;
-
-        // 상대 commit 확보 후에야 내 nonce 공개
-        NetworkGameController.Instance?.SendSeedReveal(this.myNonce);
-        await AwaitInitStep(WaitOpponentReveal(), "시드 reveal");
-        if (InitAborted) return false;
-
-        // 검증 실패 = commit과 다른 nonce가 공개됐다는 뜻이고, 그건 상대가 내 nonce를 보고 나서
-        // 원하는 시드가 나오도록 자기 nonce를 역산했다는 뜻이다. 여기서 그 nonce를 그대로 쓰면
-        // commit-reveal이 존재만 하고 방어 효과는 0이 된다 — 시드를 확정하지 말고 매치를 중단한다.
-        if (!MatchRandom.VerifyCommit(this.opponentNonce, this.opponentCommit))
-        {
-            AbortInitialDeck(EMatchEndReason.Desync,
-                "[MatchSeed] commit-reveal 검증 실패 — 시드 조작 의심. 시드를 확정하지 않고 매치를 중단한다.");
-            return false;
-        }
-
-        ulong t_seed = MatchRandom.ReadU64(this.myNonce) ^ MatchRandom.ReadU64(this.opponentNonce);
-        this.matchId = MatchResultSubmission.MatchId(this.myNonce, this.opponentNonce);
-        this.seedSource = "commit_reveal";
-        this.seedHex = null;
-        this.rulesetVersion = 0;
-        MatchRandom.Seed(t_seed);
-        return true;
-    }
-
     UniTask WaitOpponentServerSeedCapability()
     {
         if (this.serverSeedCapabilityReceived)
@@ -558,41 +488,20 @@ public class MultiplayerTurnRunner : MonoBehaviour
         return this.serverSeedCapabilityTcs.Task;
     }
 
-    UniTask WaitOpponentCommit()
-    {
-        if (this.seedCommitReceived) { this.seedCommitReceived = false; return UniTask.CompletedTask; }
-        this.seedCommitTcs = new UniTaskCompletionSource();
-        return this.seedCommitTcs.Task;
-    }
-
-    UniTask WaitOpponentReveal()
-    {
-        if (this.seedRevealReceived) { this.seedRevealReceived = false; return UniTask.CompletedTask; }
-        this.seedRevealTcs = new UniTaskCompletionSource();
-        return this.seedRevealTcs.Task;
-    }
-
     void ResetSeedSyncState()
     {
-        this.seedCommitTcs      = null;
-        this.seedRevealTcs      = null;
-        this.seedCommitReceived = false;
-        this.seedRevealReceived = false;
-        this.opponentCommit     = null;
-        this.myNonce            = null;
-        this.opponentNonce      = null;
         this.myPairingNonce     = null;
         this.opponentPairingNonce = null;
         this.serverSeedCapabilityTcs = null;
         this.serverSeedCapabilityReceived = false;
         this.matchId            = null;
-        this.seedSource         = "commit_reveal";
+        this.seedSource         = null;
         this.seedHex            = null;
         this.rulesetVersion     = 0;
     }
 
     // ── 초기화 단계 이탈 감지 ─────────────────────────────────────────────
-    // StartBattle 이전(덱교환·시드 commit-reveal) 구간에서 상대 이탈 시 3 TCS가
+    // StartBattle 이전(덱교환·서버 시드 확정) 구간에서 상대 이탈 시 대기 TCS가
     // 아무도 해제 안 해 StartBattleAsync가 영구 정지되는 것을 방지.
 
     void SubscribeInitAbort()
@@ -658,18 +567,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
 
     /// <summary>3 TCS를 멱등 해제해 각 await를 즉시 깨운다.
     /// 해제한 TCS는 비운다 — 안 비우면 뒤늦게 도착한 RPC가 이미 완료된 TCS를 풀며
-    /// "TCS냐 플래그냐" 분기(OnSeedCommitReceived)와 상태가 어긋난다.</summary>
+    /// "TCS냐 플래그냐" 분기(OnServerSeedCapabilityReceived)와 상태가 어긋난다.</summary>
     void ReleaseInitWaits()
     {
         this.initSyncTcs?.TrySetResult();
-
-        UniTaskCompletionSource t_commit = this.seedCommitTcs;
-        this.seedCommitTcs = null;
-        t_commit?.TrySetResult();
-
-        UniTaskCompletionSource t_reveal = this.seedRevealTcs;
-        this.seedRevealTcs = null;
-        t_reveal?.TrySetResult();
 
         UniTaskCompletionSource t_capability = this.serverSeedCapabilityTcs;
         this.serverSeedCapabilityTcs = null;

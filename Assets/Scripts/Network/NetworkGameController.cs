@@ -36,8 +36,7 @@ public class NetworkGameController : MonoBehaviour
         AnimReady   = 3,
         InitialDeck = 4,
         MatchAbort  = 5,
-        SeedCommit  = 6,   // commit-reveal: SHA256(nonce) 32바이트
-        SeedReveal  = 7,   // commit-reveal: nonce 8바이트
+        // 6·7 은 폐기된 commit-reveal 시드(SeedCommit/SeedReveal) 자리다. 번호를 재사용하지 않는다.
         MulliganChoice = 8,
         ServerSeedCapability = 9,
         SceneReady = 10,
@@ -291,23 +290,6 @@ public class NetworkGameController : MonoBehaviour
                     TurnRunner.Instance?.HandleRemoteSurrender(t_actorOwner);
                     break;
                 }
-                case MsgType.SeedCommit:
-                {
-                    if (!RequireLength(_data, 33, t_type)) return;
-                    byte[] t_hash = new byte[32];
-                    Array.Copy(t_buf, t_offset + 1, t_hash, 0, 32);
-                    MultiplayerTurnRunner.Instance?.OnSeedCommitReceived(t_hash);
-                    break;
-                }
-                case MsgType.SeedReveal:
-                {
-                    if (!RequireLength(_data, 9, t_type)) return;
-                    byte[] t_nonce = new byte[8];
-                    Array.Copy(t_buf, t_offset + 1, t_nonce, 0, 8);
-                    MultiplayerTurnRunner.Instance?.OnSeedRevealReceived(t_nonce);
-                    break;
-                }
-
                 case MsgType.ServerSeedCapability:
                     if (!RequireLength(_data, 17, t_type)) return;
                     byte[] t_pairingNonce = new byte[16];
@@ -558,22 +540,6 @@ public class NetworkGameController : MonoBehaviour
         int t_diff = 0;
         for (int i = 0; i < t_local.Length; i++) t_diff |= t_local[i] ^ _remote[i];
         return t_diff == 0;
-    }
-
-    public void SendSeedCommit(byte[] _hash)
-    {
-        byte[] t_msg = new byte[1 + _hash.Length];
-        t_msg[0] = (byte)MsgType.SeedCommit;
-        Array.Copy(_hash, 0, t_msg, 1, _hash.Length);
-        SendToOpponents(t_msg);
-    }
-
-    public void SendSeedReveal(byte[] _nonce)
-    {
-        byte[] t_msg = new byte[1 + _nonce.Length];
-        t_msg[0] = (byte)MsgType.SeedReveal;
-        Array.Copy(_nonce, 0, t_msg, 1, _nonce.Length);
-        SendToOpponents(t_msg);
     }
 
     public void SendServerSeedCapability(byte[] _pairingNonce)

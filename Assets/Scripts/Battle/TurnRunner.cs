@@ -501,6 +501,7 @@ public class TurnRunner : MonoBehaviour
         DeckConfig.ResetMode();      // 멀티 플래그도 같은 자리에서 해제 — 두 모드 플래그의 수명 규율을 하나로.
         DeckConfig.ClearEnemyDeck(); // 상대 덱을 확정하지 않는 진입점이 직전 판의 상대를 물려받지 않게(같은 규율).
         MatchOpponentHandoff.Clear();// 매칭 상대 표시도 같은 수명 — 덱만 비우면 다음 판 화면에 직전 상대 이름이 남는다.
+        SoloMatchHandoff.Clear();    // 서버 시드도 한 판짜리다 — 남으면 검증을 건너뛴 다음 판이 같은 보드로 선다.
         TurnCount = 1;
     }
 

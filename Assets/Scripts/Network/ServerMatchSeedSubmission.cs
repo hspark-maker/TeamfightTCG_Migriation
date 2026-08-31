@@ -39,7 +39,9 @@ internal static class ServerMatchSeedSubmission
         string _pairingKey,
         string _contentFingerprint,
         int _ownerIndex,
-        CancellationToken _ct = default)
+        CancellationToken _ct = default,
+        // "solo" = AI 대전(정원 1). 생략하면 대인전이다 — 서버도 같은 기본값을 쓴다.
+        string _mode = "pvp")
     {
         if (string.IsNullOrWhiteSpace(_pairingKey) || string.IsNullOrWhiteSpace(_contentFingerprint)
             || _ownerIndex < 0 || _ownerIndex > 1)
@@ -53,6 +55,7 @@ internal static class ServerMatchSeedSubmission
             ["pairingKey"] = _pairingKey,
             ["contentFingerprint"] = _contentFingerprint,
             ["ownerIndex"] = _ownerIndex,
+            ["mode"] = _mode,
         };
 
         try
@@ -74,6 +77,16 @@ internal static class ServerMatchSeedSubmission
                     string t_status = t_data["status"] as string;
                     if (t_status == "waiting")
                     {
+                        // AI 대전은 기다릴 상대가 없다. 정원 1이면 서버가 첫 요청에서 곧장 paired 를 준다 —
+                        // 여기서 waiting 이 온다는 건 서버가 이 매치를 2인으로 잡았다는 뜻이고, 폴링해도
+                        // 영원히 바뀌지 않는다(실제로 그렇게 무한 대기했다). 그 자리에서 끊는다.
+                        if (_mode == "solo")
+                        {
+                            Debug.LogError(
+                                "[MatchSeed] 서버가 solo 매치를 정원 1로 처리하지 않았다 — functions 배포 상태를 확인해라.");
+                            return (ServerMatchSeedStatus.Unavailable, null);
+                        }
+
                         await UniTask.Delay(PollInterval, cancellationToken: t_timeout.Token);
                         continue;
                     }

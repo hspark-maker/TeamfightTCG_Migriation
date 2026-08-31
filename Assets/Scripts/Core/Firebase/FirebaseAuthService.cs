@@ -14,6 +14,8 @@ public sealed class FirebaseAuthService
 
     // 백엔드별로 마지막 익명 uid를 남긴다. 되로그인은 불가하지만 콘솔에서 그 계정의 문서를 찾을 수는 있다.
     const string UidPrefsKeyPrefix = "firebase.authUid.";
+    // 이메일 로그인으로 버려진 익명 uid 자리. 백엔드 전환 기록과 같은 접두사를 쓴다.
+    const string AbandonedOnSignInKey = "abandonedOnEmailSignIn";
 
     // 기기에 남은 계정의 복원을 기다리는 창(50ms x 30 = 1.5초). 부트 인증 예산
     // (FirebaseTimeouts.AuthAndReadMilliseconds) 안에서 끝나야 하므로 늘릴 때는 그쪽을 함께 본다.
@@ -25,11 +27,6 @@ public sealed class FirebaseAuthService
     public event Action OnStateChanged;
 
     public EFirebaseAuthState State { get; private set; } = EFirebaseAuthState.Uninitialized;
-
-    /// <summary>Firebase 네이티브 SDK 적재가 이 프로세스에서 이미 끝났는가. 소비자는 이걸로 콜드 부트와
-    /// 데워진 뒤를 갈라 인증 대기 예산을 고른다(<see cref="FirebaseTimeouts.SdkColdStartMilliseconds"/>).</summary>
-    public static bool DependenciesReady { get; private set; }
-
     public string UserId { get; private set; } = string.Empty;
     public string LastError { get; private set; } = string.Empty;
     public bool IsCurrentUserActive => this.auth?.CurrentUser != null &&
@@ -71,6 +68,154 @@ public sealed class FirebaseAuthService
         SetState(EFirebaseAuthState.Initializing);
         this.initializationTask = InitializeCoreAsync(this.generation);
         return this.initializationTask.AsUniTask();
+    }
+
+    /// <summary>이미 있는 이메일 계정으로 로그인한다.</summary>
+    public UniTask<bool> SignInWithEmailAndPasswordAsync(string _email, string _password)
+        => SwitchToEmailAccountAsync(_email, _password, false);
+
+    /// <summary>이메일 계정을 새로 만들고 그 계정으로 들어간다.
+    /// 이미 있는 이메일이면 실패한다 — 그 경우는 로그인이 맞는 동작이라 조용히 갈아타지 않는다.</summary>
+    public UniTask<bool> CreateAccountWithEmailAndPasswordAsync(string _email, string _password)
+        => SwitchToEmailAccountAsync(_email, _password, true);
+
+    // 로그인과 가입은 마지막 한 호출만 다르고 나머지(세대 증가·세션 uid 초기화·익명 폐기 기록·
+    // 상태 억제)가 전부 같다. 절차를 두 벌로 두면 한쪽만 고쳐 어긋난다 — 실제로 그렇게 어긋난 적이 있다.
+    async UniTask<bool> SwitchToEmailAccountAsync(string _email, string _password, bool _createAccount)
+    {
+        if (this.changingAnonymousAccount) return false;
+
+        // 빈 입력은 인증 실패가 아니라 화면의 문제다. 여기서 State 를 Failed 로 내리면
+        // OnStateChanged 를 타고 PlayerSaveCloud·CloudSyncStatusWatcher 가 세션 사고로 읽는다.
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrEmpty(_password)) return false;
+
+        this.changingAnonymousAccount = true;
+        this.suppressAuthStateChanges = true;
+        try
+        {
+            this.generation++;
+            this.initializationTask = null;
+            this.sessionUserId = string.Empty;
+            this.UserId = string.Empty;
+            this.LastError = string.Empty;
+
+            // SDK만 세운다. InitializeAsync 를 타면 복원할 계정이 없을 때 익명 계정을 발급하는데,
+            // 바로 아래 SignOut 이 그것을 버려 콘솔에 주인 없는 계정만 남는다.
+            if (!(await PrepareAuthAsync(this.generation)).ok) return false;
+
+            RecordAbandonedAnonymousAccount();
+            this.auth.SignOut();
+
+            string t_trimmed = _email.Trim();
+            AuthResult t_result = _createAccount
+                ? await this.auth.CreateUserWithEmailAndPasswordAsync(t_trimmed, _password)
+                : await this.auth.SignInWithEmailAndPasswordAsync(t_trimmed, _password);
+
+            FirebaseUser t_user = t_result.User;
+            if (t_user == null || string.IsNullOrEmpty(t_user.UserId))
+            {
+                SetFailure(EFirebaseAuthState.Failed,
+                    _createAccount ? "Firebase account creation returned no user."
+                                   : "Firebase email sign-in returned no user.");
+                return false;
+            }
+
+            if (!CanAcceptUser(t_user.UserId)) return false;
+
+            this.UserId = t_user.UserId;
+            this.LastError = string.Empty;
+            SetState(EFirebaseAuthState.SignedIn);
+            Debug.Log(_createAccount
+                ? $"[FirebaseAuth] 이메일 계정을 새로 만들었습니다(uid={this.UserId})."
+                : $"[FirebaseAuth] 이메일 계정으로 로그인했습니다(uid={this.UserId}).");
+            return true;
+        }
+        catch (Exception _exception)
+        {
+            bool t_known = TryAuthError(_exception, out AuthError t_authError);
+            string t_code = t_known ? t_authError.ToString() : "Unknown";
+
+            SetFailure(
+                EFirebaseAuthState.Failed,
+                $"{(_createAccount ? "이메일 가입" : "이메일 로그인")} 실패(code={t_code}): " +
+                $"{DescribeEmailFailure(t_authError, _createAccount)} " +
+                $"[{_exception.GetBaseException().Message}]");
+            return false;
+        }
+        finally
+        {
+            this.suppressAuthStateChanges = false;
+            this.changingAnonymousAccount = false;
+        }
+    }
+
+    // ── 이메일 계정 전환의 공용 헬퍼 ─────────────────────────────────────
+    // 개발 전용 블록(#if) **밖**에 있어야 한다 — 이메일 로그인·가입은 프로덕션 경로이고,
+    // 안에 두면 에디터에서는 멀쩡한데 릴리스 플레이어 빌드만 CS0103 으로 깨진다(실제로 그랬다).
+
+    /// <summary>익명 계정을 버리기 직전에 그 uid 를 남긴다.
+    ///
+    /// <para>익명 uid 는 로그아웃하면 다시 로그인할 방법이 없다 — 이 계정의 세이브 문서를 콘솔에서
+    /// 찾아낼 마지막 단서가 이 로그와 prefs 한 줄뿐이다. 계정 <b>연결</b>(LinkWithCredential)이 아니라
+    /// 전환이라 진행도가 그대로 끊기므로, 흔적 없이 버리지 않는다.</para></summary>
+    void RecordAbandonedAnonymousAccount()
+    {
+        FirebaseUser t_current = this.auth?.CurrentUser;
+        if (t_current == null || !t_current.IsAnonymous || string.IsNullOrEmpty(t_current.UserId)) return;
+
+        LocalPrefs.SetString(UidPrefsKeyPrefix + AbandonedOnSignInKey, t_current.UserId);
+        LocalPrefs.Save();
+        Debug.LogWarning(
+            $"[FirebaseAuth] 이메일 로그인을 위해 익명 계정 {t_current.UserId} 를 버린다 — 다시 로그인할 수 없다. " +
+            $"기록 위치 LocalPrefs[{UidPrefsKeyPrefix}{AbandonedOnSignInKey}].");
+    }
+
+    /// <summary>SDK 코드를 사람이 고칠 수 있는 문장으로 바꾼다.
+    ///
+    /// <para><see cref="AuthError.Failure"/> 를 따로 잡는 이유: 프로젝트에 이메일 열거 방지가 켜져 있으면
+    /// 서버가 <i>계정 없음</i>과 <i>비밀번호 불일치</i>를 INVALID_LOGIN_CREDENTIALS 하나로 합쳐 돌려주고,
+    /// Unity SDK 는 그걸 Failure + "An internal error has occurred." 로 뭉갠다 —
+    /// 그대로 두면 화면이 원인을 한 글자도 말하지 못한다.</para></summary>
+    static string DescribeEmailFailure(AuthError _error, bool _createAccount)
+    {
+        switch (_error)
+        {
+            case AuthError.EmailAlreadyInUse:
+                return "이미 가입된 이메일입니다 — 로그인으로 들어가세요.";
+            case AuthError.WrongPassword:
+                return "비밀번호가 맞지 않습니다.";
+            case AuthError.UserNotFound:
+                return "가입되지 않은 이메일입니다 — 먼저 가입하세요.";
+            case AuthError.InvalidEmail:
+                return "이메일 형식이 올바르지 않습니다.";
+            case AuthError.WeakPassword:
+                return "비밀번호가 너무 짧습니다(6자 이상).";
+            case AuthError.OperationNotAllowed:
+                return "Firebase 콘솔에서 Authentication > Sign-in method > 이메일/비밀번호를 켜야 합니다.";
+            case AuthError.NetworkRequestFailed:
+                return "네트워크에 연결하지 못했습니다.";
+            case AuthError.Failure:
+                return _createAccount
+                    ? "계정을 만들지 못했습니다 — 이메일/비밀번호 로그인이 켜져 있는지 확인하세요."
+                    : "가입되지 않은 이메일이거나 비밀번호가 틀렸습니다.";
+            default:
+                return string.Empty;
+        }
+    }
+
+    // Firebase는 실제 원인을 AggregateException 안쪽에 넣어 던진다 — 사슬을 끝까지 훑어야 코드가 나온다.
+    static bool TryAuthError(Exception _exception, out AuthError _error)
+    {
+        _error = AuthError.Failure;
+        for (Exception t_current = _exception; t_current != null; t_current = t_current.InnerException)
+        {
+            if (t_current is FirebaseException t_firebase)
+            {
+                _error = (AuthError)t_firebase.ErrorCode;
+                return true;
+            }
+        }
+        return false;
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -147,12 +292,6 @@ public sealed class FirebaseAuthService
         }
 
         // 익명 전환과 달리 현재 로그인 상태를 요구하지 않는다 — auth 객체만 서 있으면 갈아탈 수 있다.
-        if (this.auth == null)
-        {
-            await InitializeAsync();
-            if (this.auth == null) return false;
-        }
-
         string t_slug = TestAccountSlug(_accountId);
         string t_email = $"{TEST_ACCOUNT_EMAIL_PREFIX}{t_slug}@{TEST_ACCOUNT_EMAIL_DOMAIN}";
         string t_password = $"{TEST_ACCOUNT_PASSWORD_PREFIX}{t_slug}";
@@ -166,6 +305,9 @@ public sealed class FirebaseAuthService
             this.sessionUserId = string.Empty;
             this.UserId = string.Empty;
             this.LastError = string.Empty;
+
+            // 이메일 경로와 같은 이유로 SDK만 세운다(아래 SignOut 이 버릴 익명 계정을 만들지 않는다).
+            if (!(await PrepareAuthAsync(this.generation)).ok) return false;
 
             this.auth.SignOut();
 
@@ -205,6 +347,7 @@ public sealed class FirebaseAuthService
         }
     }
 
+
     // 처음 쓰는 id면 계정이 없다 — 없을 때만 만든다.
     //
     // "없다"를 에러 코드로 못 가른다는 게 이 메서드의 전제다. 프로젝트에 이메일 열거 방지가 켜져 있으면
@@ -238,26 +381,13 @@ public sealed class FirebaseAuthService
         }
     }
 
+
     static bool IsWrongPassword(Exception _exception)
         => TryAuthError(_exception, out AuthError t_error) && t_error == AuthError.WrongPassword;
 
     static bool IsEmailAlreadyInUse(Exception _exception)
         => TryAuthError(_exception, out AuthError t_error) && t_error == AuthError.EmailAlreadyInUse;
 
-    // Firebase는 실제 원인을 AggregateException 안쪽에 넣어 던진다 — 사슬을 끝까지 훑어야 코드가 나온다.
-    static bool TryAuthError(Exception _exception, out AuthError _error)
-    {
-        _error = AuthError.Failure;
-        for (Exception t_current = _exception; t_current != null; t_current = t_current.InnerException)
-        {
-            if (t_current is FirebaseException t_firebase)
-            {
-                _error = (AuthError)t_firebase.ErrorCode;
-                return true;
-            }
-        }
-        return false;
-    }
 
     // 이메일 주소로 쓸 수 있는 문자만 남긴다 — id에 공백·한글이 들어와도 로그인이 깨지지 않게.
     static string TestAccountSlug(string _accountId)
@@ -272,27 +402,38 @@ public sealed class FirebaseAuthService
     }
 #endif
 
+    /// <summary>Firebase Auth SDK 를 쓸 수 있는 상태까지만 만든다 — <b>로그인은 하지 않는다.</b>
+    ///
+    /// <para>부트(<see cref="InitializeCoreAsync"/>)와 계정 전환 경로가 공유한다. 전환 경로가
+    /// <see cref="InitializeAsync"/> 를 타면 복원할 계정이 없을 때 익명 계정을 발급하고,
+    /// 곧이어 SignOut 이 그것을 버려 다시 로그인할 수 없는 계정만 콘솔에 쌓인다.</para>
+    ///
+    /// <para>abandonedAccount = 백엔드가 바뀌어 기기의 익명 계정을 버렸다. 그때는 복원할 것이 없는 게
+    /// 확정이라 부트가 기다리지 않는다.</para></summary>
+    async UniTask<(bool ok, bool abandonedAccount)> PrepareAuthAsync(int _generation)
+    {
+        if (this.auth != null) return (true, false);
+
+        DependencyStatus t_dependencyStatus = await FirebaseApp.CheckAndFixDependenciesAsync();
+        if (_generation != this.generation) return (false, false);
+        if (t_dependencyStatus != DependencyStatus.Available)
+        {
+            SetFailure(EFirebaseAuthState.Unavailable, $"Firebase dependencies unavailable: {t_dependencyStatus}");
+            return (false, false);
+        }
+
+        this.auth = FirebaseAuth.DefaultInstance;
+        bool t_abandoned = ApplyBackend();
+        SubscribeStateChanged();
+        return (true, t_abandoned);
+    }
+
     async Task InitializeCoreAsync(int _generation)
     {
         try
         {
-            var t_watch = System.Diagnostics.Stopwatch.StartNew();
-            DependencyStatus t_dependencyStatus = await FirebaseApp.CheckAndFixDependenciesAsync();
-            long t_dependencyMilliseconds = t_watch.ElapsedMilliseconds;
-            if (_generation != this.generation) return;
-            if (t_dependencyStatus != DependencyStatus.Available)
-            {
-                SetFailure(EFirebaseAuthState.Unavailable, $"Firebase dependencies unavailable: {t_dependencyStatus}");
-                return;
-            }
-
-            // 콜드 적재가 얼마나 걸렸는지 남기지 않으면, 인증 타임아웃이 네트워크 탓인지 SDK 적재 탓인지 사후에 못 가른다.
-            DependenciesReady = true;
-            Debug.Log($"[FirebaseAuth] SDK dependencies ready in {t_dependencyMilliseconds}ms.");
-
-            this.auth = FirebaseAuth.DefaultInstance;
-            bool t_abandonedAccount = ApplyBackend();
-            SubscribeStateChanged();
+            (bool t_ready, bool t_abandonedAccount) = await PrepareAuthAsync(_generation);
+            if (!t_ready) return;
 
             FirebaseUser t_user = t_abandonedAccount
                 ? null
@@ -328,7 +469,6 @@ public sealed class FirebaseAuthService
                 Debug.Log($"[FirebaseAuth] 기기에 남은 익명 계정으로 복원했습니다(uid={this.UserId}).");
 
             SetState(EFirebaseAuthState.SignedIn);
-            Debug.Log($"[FirebaseAuth] Sign-in completed in {t_watch.ElapsedMilliseconds}ms total.");
         }
         catch (Exception _exception)
         {

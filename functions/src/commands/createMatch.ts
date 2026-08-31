@@ -18,25 +18,45 @@ type CreateMatchData = {
   pairingKey: string;
   contentFingerprint: string;
   ownerIndex: number;
+  /** "solo" = AI 대전(정원 1). 생략하면 대인전이다 — 구 클라의 페이로드가 그대로 대인전으로 읽힌다. */
+  mode: "solo" | "pvp";
 };
+
+/**
+ * 매치 정원. 검증 규칙(lockDeck)을 두 벌로 만들지 않으려고 AI 대전도 같은 매치 문서를 쓰고,
+ * 다른 것은 "몇 명을 모아야 성립하는가" 하나뿐이다.
+ * @param {"solo" | "pvp"} mode 매치 종류
+ * @return {number} 정원
+ */
+export function expectedParticipantsOf(mode: "solo" | "pvp"): number {
+  return mode === "solo" ? 1 : 2;
+}
 
 function parseCreateMatchData(raw: unknown): CreateMatchData {
   const data = objectRecord(raw);
   if (data == null) throw new HttpsError("invalid-argument", "payload required");
   const ownerIndex = safeInteger(data.ownerIndex);
+  const mode = data.mode == null ? "pvp" : data.mode;
   if ((data.env !== "live" && data.env !== "test") ||
       typeof data.pairingKey !== "string" || !PAIRING_KEY.test(data.pairingKey) ||
-      typeof data.contentFingerprint !== "string" || !HEX_64.test(data.contentFingerprint)) {
+      typeof data.contentFingerprint !== "string" || !HEX_64.test(data.contentFingerprint) ||
+      (mode !== "solo" && mode !== "pvp")) {
     throw new HttpsError("invalid-argument", "invalid match pairing payload");
   }
   if (ownerIndex !== 0 && ownerIndex !== 1) {
     throw new HttpsError("invalid-argument", "invalid owner index");
+  }
+  // AI 대전에 상대 슬롯은 없다. 1을 받아 주면 ownerIndexByUid 가 비어 있는 0번 자리를 남긴 채
+  // lockDeck 의 owner 대조를 통과해, 어느 쪽이 플레이어인지 문서만 봐서는 알 수 없게 된다.
+  if (mode === "solo" && ownerIndex !== 0) {
+    throw new HttpsError("invalid-argument", "solo match owner index must be 0");
   }
   return {
     env: data.env,
     pairingKey: data.pairingKey,
     contentFingerprint: data.contentFingerprint,
     ownerIndex,
+    mode,
   };
 }
 
@@ -58,6 +78,9 @@ function readPairingRecord(raw: Record<string, unknown> | undefined): PairingRec
     contentFingerprint: raw.cardDataVersion,
     rulesetVersion: raw.rulesetVersion as number,
     participantUids: raw.participantUids as string[],
+    // 이 필드가 없던 시절의 문서는 전부 대인전이다.
+    expectedParticipants: Number.isInteger(raw.expectedParticipants) ?
+      raw.expectedParticipants as number : 2,
     createdAtMs: raw.pairingCreatedAt.toMillis(),
     expiresAtMs: raw.expiresAt.toMillis(),
   };
@@ -126,7 +149,8 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
         uid,
         data.contentFingerprint,
         Date.now(),
-        candidate
+        candidate,
+        expectedParticipantsOf(data.mode)
       );
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -134,6 +158,7 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
         throw new HttpsError("failed-precondition", reason);
       }
       if (reason === "match_pairing_full") throw new HttpsError("permission-denied", reason);
+      if (reason === "match_mode_mismatch") throw new HttpsError("failed-precondition", reason);
       throw error;
     }
 
@@ -163,6 +188,8 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
       rulesetVersion: record.rulesetVersion,
       cardDataVersion: record.contentFingerprint,
       participantUids: record.participantUids,
+      expectedParticipants: record.expectedParticipants,
+      mode: data.mode,
       ownerIndexByUid,
       pairingKeyHash: pairingId,
       // 페어링 시각. 결과 제출 마감(createdAt + 120초)의 기준인 createdAt 과 섞으면

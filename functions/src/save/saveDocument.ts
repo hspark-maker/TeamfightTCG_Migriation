@@ -7,20 +7,13 @@ import {
 } from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {ENVIRONMENTS, isKnownEnv} from "./environments";
-import {rejectDomain} from "./domainReject";
-import {cacheableResponse, replayCached} from "./receiptCache";
-import {Balances, normalizeBalances} from "../currency/wallet";
+import {Balances} from "../currency/wallet";
 import {
   createWallet,
-  readReceipt,
   readWallet,
-  ReceiptKey,
-  receiptRef,
   walletRef,
   WalletPatch,
   WalletState,
-  WalletUpdate,
-  writeReceiptOnly,
   writeWallet,
 } from "../currency/walletStore";
 
@@ -45,7 +38,7 @@ export type SlotPatch = Record<string, Record<string, unknown>>;
 /** mutate 콜백이 돌려주는 것. wallet 은 지갑을 바꾼 명령만 채운다. */
 export interface SaveMutation {
   slots: SlotPatch;
-  wallet?: WalletUpdate;
+  wallet?: WalletState;
 }
 
 // WalletPatch 선언은 walletStore(미러 대상)로 옮겼다 — 재화 codebase 도 같은 응답 모양을 쓴다.
@@ -158,35 +151,25 @@ export function assertWritableSchema(
 
 /**
  * 세이브 문서를 트랜잭션 1회로 읽고 고친다. revision +1 과 updatedAt 은
- * 여기서만 움직인다 — callable 하나당 세이브 revision 정확히 +1 이라는 계약의 집행 지점.
- * (문서 쓰기 자체는 세이브 1회 + 영수증 1회이고, 지갑이 움직이면 거기에 지갑 1회가 더 붙는다.)
+ * 여기서만 움직인다 — callable 하나당 문서 쓰기 1회라는 계약의 집행 지점.
  *
  * 지갑 문서도 **항상 함께 읽어** 콜백에 넘기고 응답에 싣는다(옵션 플래그를 두지 않는다).
  * 바뀌지 않은 지갑을 매번 내보내는 것은 클라 채택이 단조·멱등이라 무해하고,
  * 클라가 어떤 이유로든 드리프트했을 때 다음 명령이 스스로 맞춰 준다.
- * 같은 txId 로 다시 온 요청은 **콜백에 들어가기도 전에** 첫 응답을 되돌려준다(쓰기 0회).
- * 응답 조립을 finalize 콜백으로 받는 것이 그 때문이다 — 트랜잭션 밖에서 조립하면
- * 캐시할 응답이 아직 없어서 영수증에 실을 것이 없다.
  * @param {string} env 환경 id
  * @param {string} uid 유저 uid
- * @param {string} source 명령 이름. 영수증에 그대로 실리고 재시도 판정의 대조축이다
- * @param {ReceiptKey} receipt 영수증 번호(요청 txId 또는 서버 발급)
  * @param {Function} mutate 현재 문서·트랜잭션·지갑을 받아 갱신할 슬롯 전체 값을 돌려준다
- * @param {Function} finalize 채택 계약에 명령별 필드를 얹어 최종 응답을 만든다. 트랜잭션 안에서 돈다
- * @return {Promise<TResponse>} finalize 가 만든 응답
+ * @return {Promise<SaveMutationResult>} 새 revision · 갱신된 슬롯 · 지갑
  */
-export async function mutateSave<TResponse extends SaveMutationResult>(
+export async function mutateSave(
   env: string,
   uid: string,
-  source: string,
-  receipt: ReceiptKey,
   mutate: (
     current: DocumentData,
     transaction: Transaction,
     wallet: WalletState,
   ) => Promise<SaveMutation> | SaveMutation,
-  finalize: (result: SaveMutationResult) => TResponse,
-): Promise<TResponse> {
+): Promise<SaveMutationResult> {
   const reference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
 
@@ -205,7 +188,7 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     // 지갑 읽기는 콜백 진입 **전에** 끝낸다 — Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다
     // 앞서야 하는데, openPack 처럼 재실행되는 명령 안에서 읽으면 그 순서가 깨진다.
     const walletSnapshot = await transaction.get(walletReference);
-    const wallet = readWallet(walletSnapshot);
+    let wallet = readWallet(walletSnapshot);
 
     // 여기서 승급하지 않는다 — 위 판정을 통과한 문서는 이미 v8 이고, v7 이관은
     // 그것만을 위해 있는 commands/ensureWallet 의 일이다.
@@ -215,50 +198,8 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     // 잃는 것이 없다. 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다.
     const creatingWallet = !walletSnapshot.exists;
 
-    // 영수증 조회가 **마지막 무조건 읽기**다 — 콜백이 자기 문서를 더 읽을 수 있으므로
-    // (enhanceCard 의 grants) 여기보다 뒤로 밀 수 없고, 쓰기는 아직 하나도 없다.
-    const lookup = readReceipt(
-      await transaction.get(receiptRef(walletReference, receipt.txId)));
-    if (lookup.hit) {
-      if (lookup.source !== source) {
-        // 같은 txId 를 다른 명령이 재사용했다. 첫 명령의 응답을 다른 명령에 돌려주면
-        // 클라가 엉뚱한 결과를 채택하므로, 집행하지 않고 거절한다.
-        rejectDomain(
-          "TxIdReused",
-          `txId '${receipt.txId}' was already used by another command.`,
-          {uid, env, source, receiptSource: lookup.source, txId: receipt.txId});
-      }
-      try {
-        // 문서 revision 을 넘겨 코히런스를 검사한다 — 캐시본은 첫 시도의 revision·지갑을,
-        // updatedSlots 는 지금 문서를 실으므로 둘이 어긋나면 섞인 상태가 나간다.
-        return replayCached(
-          lookup.result, current, Number(current.revision ?? 0)) as unknown as TResponse;
-      } catch (error) {
-        // 도메인 거절이 아니라 permission-denied 를 쓰지 않는다 — 이 응답으로 로컬 상태를
-        // 맞출 방법이 없으니 클라가 다시 부트하는 것이 옳다(RemoteAhead 와 같은 축).
-        logger.error("receipt replay is unusable", {
-          uid, env, source, txId: receipt.txId, error: String(error),
-        });
-        throw new HttpsError(
-          "failed-precondition", `Receipt replay is unusable: ${String(error)}`);
-      }
-    }
-
     const revision = Number(current.revision ?? 0) + 1;
     const outcome = await mutate(current, transaction, wallet);
-
-    // 응답에 실을 지갑은 **쓰기 전에** 확정한다 — finalize 가 만든 응답 그대로가 영수증에
-    // 담겨야 재시도가 같은 답을 받는데, 그 답은 갱신된 잔액을 실어야 하기 때문이다.
-    // 개설 갈래의 rev 1 은 createWallet 이 세우는 값과 같은 축이다.
-    const credited: WalletPatch = {
-      rev: creatingWallet ? 1 : outcome.wallet?.next.rev ?? wallet.rev,
-      balances: normalizeBalances(outcome.wallet?.next.balances ?? wallet.balances),
-    };
-    const response = finalize({
-      revision,
-      updatedSlots: outcome.slots,
-      wallet: credited,
-    });
 
     transaction.update(reference, {
       ...outcome.slots,
@@ -266,36 +207,27 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // 영수증에 실리는 것은 응답 그대로가 아니라 슬롯 값을 뷘 캐시본이다(근거는 receiptCache).
-    const cached = cacheableResponse(response, outcome.slots);
-
     if (creatingWallet) {
       // set 이 아니라 create 다 — 이 트랜잭션 밖에서 ensureWallet 이 먼저 지갑을 세웠으면
       // 재실행되어 그쪽 이관 잔액을 0 으로 덮어쓰는 것을 막는다.
-      // 지갑이 없어 개설과 이동이 한 트랜잭션에 겹쳤다 — 영수증은 돈을 움직인 명령을 적는다.
-      // 개설 사실은 rev 1 · before 4키 0 으로 읽힌다.
-      createWallet(
+      wallet = createWallet(
         transaction,
         walletReference,
-        outcome.wallet?.next.balances ?? wallet.balances,
-        source,
-        receipt,
-        cached,
+        outcome.wallet?.balances ?? wallet.balances,
         FieldValue.serverTimestamp(),
       );
     } else if (outcome.wallet !== undefined) {
       writeWallet(
-        transaction, walletReference, outcome.wallet, receipt, cached,
+        transaction, walletReference, outcome.wallet,
         FieldValue.serverTimestamp());
-    } else {
-      // 세이브만 쓴 갈래도 영수증을 끊는다 — 그 세이브 쓰기가 재화 이동을 대신하기 때문이다.
-      // 재시도 판정이 이 source 를 대조한다 — 명령마다 달라야 한다.
-      writeReceiptOnly(
-        transaction, walletReference, source, wallet, receipt, cached,
-        FieldValue.serverTimestamp());
+      wallet = outcome.wallet;
     }
 
-    return response;
+    return {
+      revision,
+      updatedSlots: outcome.slots,
+      wallet: {rev: wallet.rev, balances: wallet.balances},
+    };
   });
 }
 
@@ -383,10 +315,7 @@ export async function ensureSaveDocument(
 
     const walletCreated = !walletSnapshot.exists;
     if (walletCreated) {
-      createWallet(
-        transaction, walletReference, starterBalances, "walletCreate:freshAccount",
-        {kind: "boot", txId: "walletCreate:freshAccount"}, undefined,
-        FieldValue.serverTimestamp());
+      createWallet(transaction, walletReference, starterBalances, FieldValue.serverTimestamp());
     }
 
     // 메타가 없거나 깨진 문서는 클라가 부트조차 못 하는데(TryReadMeta 실패 → Fail),

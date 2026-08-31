@@ -7,8 +7,7 @@ using TeamfightTCG.BattleCore;
 /// 게임 로직 랜덤(스플래시 대상, 패시브 등)만 사용. 연출 랜덤(오디오/파티클)은
 /// UnityEngine.Random 그대로 둔다 — 전역 시퀀스 오염 방지가 결정론의 핵심.
 ///
-/// 시드는 commit-reveal로 합의(<see cref="MultiplayerTurnRunner"/>): 양쪽 nonce XOR.
-/// 어느 클라도 상대 nonce를 보기 전 commit(해시)하므로 시드 조작 불가.
+/// 시드는 서버가 발급한다(<see cref="MultiplayerTurnRunner"/>) — 양 클라가 같은 값을 받아 확정한다.
 ///
 /// 알고리즘은 splitmix64 — 플랫폼/런타임 무관하게 동일 결과(System.Random 구현 의존 회피).
 /// </summary>
@@ -92,20 +91,6 @@ public static class MatchRandom
         return t_b;
     }
 
-    /// <summary>nonce의 SHA256 (32바이트 commit).</summary>
-    public static byte[] Hash(byte[] _nonce)
-    {
-        using (var t_sha = SHA256.Create())
-            return t_sha.ComputeHash(_nonce);
-    }
-
-    /// <summary>공개된 nonce가 앞서 받은 commit과 일치하는지 검증.</summary>
-    public static bool VerifyCommit(byte[] _nonce, byte[] _commit)
-    {
-        if (_nonce == null || _commit == null) return false;
-        return BytesEqual(Hash(_nonce), _commit);
-    }
-
     /// <summary>8바이트를 big-endian ulong으로. 양 클라 동일 변환 보장.</summary>
     public static ulong ReadU64(byte[] _b)
     {
@@ -115,12 +100,4 @@ public static class MatchRandom
         return t_v;
     }
 
-    static bool BytesEqual(byte[] _a, byte[] _b)
-    {
-        if (_a == null || _b == null || _a.Length != _b.Length) return false;
-        int t_diff = 0;
-        for (int i = 0; i < _a.Length; i++)
-            t_diff |= _a[i] ^ _b[i];
-        return t_diff == 0;
-    }
 }

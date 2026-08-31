@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Fusion;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-/// 로비 PlayBtn → 출전 덱 확정 → AI 대전 진입.
+/// 로비 PlayBtn → 출전 덱 확정 → 매칭(실 상대 20초 탐색, 없으면 AI) → 전투 진입.
 /// 전투가 소비하는 DeckConfig.PlayerDeck을 채우는 지점은 이 진입점이 여는 덱 화면(MatchDeckShell) 하나뿐이다.
 /// 배틀 씬은 확정된 값을 읽기만 한다 — 확정 지점이 씬을 넘어 둘로 갈리지 않게.
 public class LobbyMatchLauncher : MonoBehaviour
@@ -69,8 +71,10 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     MatchDeckShell DeckShell => OverlayHost != null ? OverlayHost.MatchDeckShell : null;
 
-    // 페이크 → 실제 Photon 매칭 교체는 이 한 줄이 전부다.
-    IMatchmaker Matchmaker => m_matchmaker ??= new FakeMatchmaker(aiDeckConfig, profilePool);
+    // 실 상대를 먼저 찾고, 못 만나면 안쪽 AI 매칭으로 내려간다. 멀티/싱글 판정은 이 결과가 소유한다 —
+    // 여기서 갈리는 것이 DeckConfig.IsMultiplayer 이고, 씬 로드·랭크 정산·보상 경로가 전부 그 값을 따른다.
+    IMatchmaker Matchmaker => m_matchmaker ??=
+        new PhotonRankedMatchmaker(new FakeMatchmaker(aiDeckConfig, profilePool));
 
     // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄운다 — 로비 프리팹을 저장할 때마다 SafeArea가
     // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋된다. 부모는 덱 화면과 같은 SafeArea다.
@@ -145,6 +149,8 @@ public class LobbyMatchLauncher : MonoBehaviour
         TournamentReturnFlow.Restore();
     }
 
+    /// <summary>PlayBtn 진입점. 이름은 인스펙터 배선 호환을 위해 유지한다 —
+    /// 실제로는 매칭 결과에 따라 실 멀티로도 간다(<see cref="PhotonRankedMatchmaker"/>).</summary>
     public void StartAiBattle()
     {
         if (m_running) return;
@@ -227,21 +233,85 @@ public class LobbyMatchLauncher : MonoBehaviour
         {
             if (t_result == EBattleContentGateResult.OfflineAllowed)
                 Debug.LogWarning("[BattleContent] Server comparison unavailable. Single-player battle continues with the current snapshot.");
+
+            // 대인전은 매칭 단계(PreBattleMatchSync)가 이미 서버 검증을 끝냈다 — 여기서 또 태우지 않는다.
+            if (DeckConfig.IsMultiplayer)
+            {
+                LoadBattleSceneOverNetwork();
+                return;
+            }
+
+            bool t_deckValidated = await RunSoloValidationAsync();
+
+            // 파괴 검사가 먼저다 — 씬이 내려가는 중에 팝업을 세우면 이미 죽은 오브젝트를 만진다.
+            if (this == null) return;
+            if (!t_deckValidated)
+            {
+                ShowEntryBlocked("덱을 확인하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+                return;
+            }
+
             CurtainView.LoadScene(BATTLE_SCENE);
             return;
         }
 
+        ShowEntryBlocked(t_result == EBattleContentGateResult.UpdatedRestartRequired
+            ? "새 전투 데이터를 받았습니다.\n게임을 다시 시작한 뒤 전투를 시작해 주세요."
+            : "전투 데이터를 확인할 수 없습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+    }
+
+    /// <summary>AI 대전도 서버가 덱을 검증한 뒤에만 씬으로 넘어간다 — 대인전과 같은 규율이다.
+    ///
+    /// <para>튜토리얼은 제외한다. 상대도 덱도 시나리오 저작값이라 세이브에 없는 카드가 들어가고,
+    /// 서버 대조는 그것을 정상적으로 card_not_owned 로 거절한다 — 통과할 수 없는 검사다.</para></summary>
+    async UniTask<bool> RunSoloValidationAsync()
+    {
+        if (TutorialConfig.IsActive) return true;
+
+        ESoloMatchSyncResult t_result = await SoloMatchSync.RunAsync(this.GetCancellationTokenOnDestroy());
+
+        // 씬이 내려가는 중이면 화면을 세우지 않는다 — 호출부가 this == null 로 걸러 준다.
+        return t_result == ESoloMatchSyncResult.Success;
+    }
+
+    // 진입을 접고 로비를 되돌린다. 진입 게이트가 여럿이라 되돌리는 자리는 하나여야 한다 —
+    // m_running 을 안 내리면 PlayBtn 이 영영 안 먹고, TournamentRun 을 안 끊으면
+    // 다음 일반 전투의 AI 레벨이 정점 레벨로 굳는다.
+    void ShowEntryBlocked(string _message)
+    {
         TournamentRun.End();
         m_matchShell?.Close();
         m_running = false;
-        bool t_updated = t_result == EBattleContentGateResult.UpdatedRestartRequired;
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
-            titleText = t_updated
-                ? "새 전투 데이터를 받았습니다.\n게임을 다시 시작한 뒤 전투를 시작해 주세요."
-                : "전투 데이터를 확인할 수 없습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+            titleText = _message,
             yesText = "확인",
         });
+    }
+
+    // 멀티는 두 클라가 같은 씬으로 함께 넘어가야 한다 — 마스터가 러너로 태우고 나머지는 따라 들어간다.
+    // 커튼(CurtainView)을 쓰지 않는 이유: 그건 이쪽 화면만 덮는 로컬 전환이라, 러너가 씬을 바꾸는
+    // 시점과 어긋나면 한쪽만 로비에 남는다.
+    void LoadBattleSceneOverNetwork()
+    {
+        NetworkRunner t_runner = NetworkSession.Instance?.Runner;
+        if (t_runner == null)
+        {
+            // 여기까지 왔는데 러너가 없으면 매칭이 세운 멀티 플래그가 거짓이다 — 싱글로 되돌려 전투는 살린다.
+            Debug.LogError("[LobbyMatchLauncher] 멀티 진입인데 러너가 없다 — 싱글 경로로 전투를 연다.");
+            DeckConfig.ResetMode();
+            CurtainView.LoadScene(BATTLE_SCENE);
+            return;
+        }
+
+        SceneTransitionVideo.Instance?.PlayOverlay();
+
+        // 마스터가 아니면 부르지 않는다. 러너가 씬을 바꾸면 이쪽도 함께 넘어간다.
+        if (!t_runner.IsSharedModeMasterClient) return;
+
+        int t_buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{BATTLE_SCENE}.unity");
+        if (t_buildIndex < 0) t_buildIndex = SceneUtility.GetBuildIndexByScenePath(BATTLE_SCENE);
+        t_runner.LoadScene(SceneRef.FromIndex(t_buildIndex));
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.

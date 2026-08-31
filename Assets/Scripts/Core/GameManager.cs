@@ -76,12 +76,23 @@ public class GameManager : MonoBehaviour
         // 저장된 흔들림 설정 복원(미저장이면 켬). 전투가 열리기 전에 확정돼 있어야 한다.
         SetScreenShake(LocalPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
 
-        ContentProfileConfig t_profile = ContentProfileConfig.Active;
+        BootFirebaseAsync(ContentProfileConfig.Active).Forget();
+    }
+
+    /// <summary>계정이 정해진 뒤에 Firebase 를 세운다.
+    ///
+    /// <para>관문이 <b>여기</b>여야 하는 이유: <c>PlayerSaveCloud.AuthenticateAsync</c> 가 인증을
+    /// 5초 상한으로 기다린다 — Firebase 를 먼저 세우고 그 안에서 사람을 기다리면 부트가 타임아웃으로 죽고,
+    /// 자동 익명 로그인이 이미 끝나 로그인 화면이 고를 것도 남지 않는다.</para></summary>
+    async UniTaskVoid BootFirebaseAsync(ContentProfileConfig _profile)
+    {
+        await SignInGate.WaitAsync();
+        if (this == null) return;
 
         try
         {
             // 에뮬레이터 설정을 한 번만 읽어 세 백엔드에 같은 값을 흘린다 — 창구가 갈리면 함수만 로컬로 가는 상태가 재발한다.
-            FirebaseEmulatorConfig t_emulators = t_profile.FirebaseEmulators;
+            FirebaseEmulatorConfig t_emulators = _profile.FirebaseEmulators;
 
             // 켜기로 저작했는데 주소가 틀렸다면 끈 것이 아니라 못 켠 것이다 — 폴백으로 넘기면
             // 에뮬레이터를 켠 줄 알고 프로덕션 문서에 진짜 쓰기가 나간다.
@@ -95,13 +106,37 @@ public class GameManager : MonoBehaviour
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
             FirebaseManager.Register(new MatchResultFirebaseModule());
             GameInitialization.SetState(EGameInitState.SyncingSave);
-            FirebaseManager.Initialize(t_profile.CloudEnvId, t_emulators);
+            FirebaseManager.Initialize(_profile.CloudEnvId, t_emulators);
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"[GameManager] FirebaseManager.Initialize failed: {ex.Message}\n{ex.StackTrace}");
             GameInitialization.MarkRecoveryRequired();
         }
+    }
+
+    /// <summary>계정이 바뀐 뒤 부트를 다시 태운다. 로그인 화면이 성공 직후 부르는 유일한 자리다.
+    ///
+    /// <para>세이브 채택이 끝난 세션에서 uid 가 바뀌면 <c>PlayerSaveCloud</c> 가 세션을 Blocked 로 끊는다
+    /// — 그래서 갈아끼우는 대신 <b>처음부터 다시</b> 태운다. Firebase SDK 는 방금 로그인한 계정을 그대로
+    /// 들고 있으므로, 재초기화의 복원 경로가 새 uid 로 붙는다.</para>
+    ///
+    /// <para>모듈은 다시 등록하지 않는다 — <c>FirebaseManager.Shutdown</c> 은 s_initialized 만 내리고
+    /// 등록 목록은 유지한다(다시 등록하면 중복으로 던진다).</para></summary>
+    public static void RestartForAccountChange()
+    {
+        // 아직 부트가 Firebase 를 세우기 전이면 관문이 알아서 이어 태운다 — 여기서 손대면 두 번 돈다.
+        if (!FirebaseManager.IsInitialized) return;
+
+        FirebaseManager.Shutdown();
+        GameInitialization.SetState(EGameInitState.SyncingSave);
+
+        ContentProfileConfig t_profile = ContentProfileConfig.Active;
+        FirebaseManager.Initialize(t_profile.CloudEnvId, t_profile.FirebaseEmulators);
+
+        // 로딩 커버가 이미 끝났으면 다시 로딩 단계로 되돌린다(안 되돌리면 재적재 중에 로비로 넘어간다).
+        LoadingCoverView.RestartLoadingForAccountChange();
+        InitializationRunner.RestartGate();
     }
 
     public static void SetTargetFrameRate(int _frameRate, bool _save = true)

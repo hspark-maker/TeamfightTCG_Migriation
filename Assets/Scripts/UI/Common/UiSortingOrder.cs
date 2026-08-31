@@ -77,6 +77,10 @@ public static class UiSortingOrder
     /// <summary>로딩 커버(LoadingCover.prefab).</summary>
     public const int LoadingCover = 1000;
 
+    /// <summary>부트 로그인 관문(Popup_LoginEmail). 계정이 정해지기 전에는 부트가 멈춰 있으므로
+    /// 로딩 커버(<see cref="LoadingCover"/>) <b>위</b>다 — 아래에 두면 커버에 가려 아무것도 고를 수 없다.</summary>
+    public const int SignIn = 1100;
+
     /// <summary>화면 전체를 덮는 번쩍임(ScreenFlash). 그 밑에서 화면을 갈아치우는 것이 목적이라 무엇보다 위다.</summary>
     public const int ScreenFlash = 32000;
 

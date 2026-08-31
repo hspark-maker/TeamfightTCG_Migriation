@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using Cysharp.Threading.Tasks;
 using Firebase;
 using Firebase.Functions;
@@ -97,8 +96,7 @@ static class MatchResultSubmission
         MultiplayerTurnRunner t_turn = MultiplayerTurnRunner.Instance;
         NetworkGameController t_net = NetworkGameController.Instance;
         bool t_hasSeedIdentity = t_turn != null && !string.IsNullOrEmpty(t_turn.MatchId) &&
-            (t_turn.SeedSource == "server" ||
-             (t_turn.MyNonce != null && t_turn.OpponentNonce != null));
+            t_turn.SeedSource == "server";
         if (!t_hasSeedIdentity || t_net == null ||
             string.IsNullOrEmpty(t_net.LocalDeckHash) || string.IsNullOrEmpty(t_net.OpponentDeckHash) ||
             string.IsNullOrEmpty(s_envId))
@@ -116,8 +114,9 @@ static class MatchResultSubmission
             env = s_envId,
             matchId = t_matchId,
             seedSource = t_turn.SeedSource,
-            myNonce = t_turn.MyNonce == null ? string.Empty : Hex(t_turn.MyNonce),
-            opponentNonce = t_turn.OpponentNonce == null ? string.Empty : Hex(t_turn.OpponentNonce),
+            // 서버 시드에는 nonce 가 없다. 서버도 seedSource=="server" 면 빈 문자열로 정규화한다.
+            myNonce = string.Empty,
+            opponentNonce = string.Empty,
             myDeckHash = t_net.LocalDeckHash,
             opponentDeckHash = t_net.OpponentDeckHash,
             finalStateHash = t_net.FinalStateHash.ToString("x16"),
@@ -277,7 +276,7 @@ static class MatchResultSubmission
     {
         ["env"] = _item.env,
         ["matchId"] = _item.matchId,
-        ["seedSource"] = string.IsNullOrEmpty(_item.seedSource) ? "commit_reveal" : _item.seedSource,
+        ["seedSource"] = string.IsNullOrEmpty(_item.seedSource) ? "server" : _item.seedSource,
         ["myNonce"] = _item.myNonce,
         ["opponentNonce"] = _item.opponentNonce,
         ["myDeckHash"] = _item.myDeckHash,
@@ -332,19 +331,6 @@ static class MatchResultSubmission
     {
         _value = _map.Contains(_key) ? _map[_key] as string : null;
         return _value != null;
-    }
-
-    internal static string MatchId(byte[] _myNonce, byte[] _opponentNonce)
-    {
-        byte[] t_seed = new byte[8];
-        for (int i = 0; i < t_seed.Length; i++) t_seed[i] = (byte)(_myNonce[i] ^ _opponentNonce[i]);
-        using (SHA256 t_sha = SHA256.Create())
-        {
-            byte[] t_hash = t_sha.ComputeHash(t_seed);
-            var t_builder = new System.Text.StringBuilder(32);
-            for (int i = 0; i < 16; i++) t_builder.Append(t_hash[i].ToString("x2"));
-            return t_builder.ToString();
-        }
     }
 
     internal static string Hex(byte[] _bytes)

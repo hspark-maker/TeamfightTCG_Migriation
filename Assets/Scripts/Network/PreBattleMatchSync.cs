@@ -117,10 +117,14 @@ public static class PreBattleMatchSync
 
         public async UniTask<bool> WaitForPeerAsync(CancellationToken _ct)
         {
+            // 세 번째 갈래는 "취소될 때까지 끝나지 않는" 대기다.
+            // Task.Delay 와 달리 UniTask.Delay 는 음수(Timeout.InfiniteTimeSpan = -1ms)를 받지 않고
+            // ArgumentOutOfRangeException 을 던진다 — 그러면 상대를 만난 그 순간 준비가 통째로 깨진다.
+            // WaitUntilCanceled 는 취소 시 예외 없이 완료되므로 아래 false 반환 규약이 그대로 산다.
             int t_completed = await UniTask.WhenAny(
                 UniTask.WhenAll(capabilityTcs.Task, deckTcs.Task),
                 abortTcs.Task,
-                UniTask.Delay(Timeout.InfiniteTimeSpan, cancellationToken: _ct));
+                UniTask.WaitUntilCanceled(_ct));
             return t_completed == 0 && !Failed;
         }
 
@@ -210,8 +214,6 @@ public static class PreBattleMatchSync
                 t_seedResult.match.SeedHex,
                 t_seedResult.match.RulesetVersion,
                 t_ownerIndex,
-                null,
-                null,
                 SpecSource.BattleFingerprint.ToLowerInvariant(),
                 t_cardIds,
                 t_growth,
@@ -257,7 +259,9 @@ public static class PreBattleMatchSync
         }
     }
 
-    static async UniTask<(bool ok, int[] cardIds, CardGrowth[] growth)> TryGetCanonicalLocalDeckAsync(
+    /// <summary>서버에 보낼 정규 덱 스냅샷(cardId 오름차순 + 성장). AI 대전도 같은 것을 보내야
+    /// 서버가 한 벌의 규칙으로 검증한다 — <see cref="SoloMatchSync"/> 가 이 메서드를 함께 쓴다.</summary>
+    internal static async UniTask<(bool ok, int[] cardIds, CardGrowth[] growth)> TryGetCanonicalLocalDeckAsync(
         CancellationToken _ct)
     {
         int[] t_cardIds = DeckConfig.PlayerDeck?.ToArray() ?? Array.Empty<int>();

@@ -32,8 +32,6 @@ internal static class DeckLockSubmission
         string _seedHex,
         int _rulesetVersion,
         int _ownerIndex,
-        byte[] _myNonce,
-        byte[] _opponentNonce,
         string _contentFingerprint,
         int[] _cardIds,
         CardGrowth[] _growth,
@@ -86,16 +84,9 @@ internal static class DeckLockSubmission
             ["cardSnapshots"] = t_cards,
             ["ownerIndex"] = _ownerIndex,
         };
-        if (_seedSource == "server")
-        {
-            t_payload["seedHex"] = _seedHex;
-            t_payload["rulesetVersion"] = _rulesetVersion;
-        }
-        else
-        {
-            t_payload["myNonce"] = MatchResultSubmission.Hex(_myNonce);
-            t_payload["opponentNonce"] = MatchResultSubmission.Hex(_opponentNonce);
-        }
+        // 서버 시드만 권위다 — seedHex·rulesetVersion 은 lockDeck 의 필수 항목이다.
+        t_payload["seedHex"] = _seedHex;
+        t_payload["rulesetVersion"] = _rulesetVersion;
 
         if (!await MatchResultSubmission.EnsureSignedIn())
         {
