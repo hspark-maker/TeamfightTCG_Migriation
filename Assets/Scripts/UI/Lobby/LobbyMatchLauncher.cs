@@ -16,7 +16,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
-    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭 없이 구 동작
+    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭도 대치 인트로도 없이 구 동작
     [SerializeField] OpponentProfilePool profilePool;
 
     [Header("유효 덱 없음 안내")]
@@ -32,9 +32,6 @@ public class LobbyMatchLauncher : MonoBehaviour
     [Tooltip("토너먼트 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
     [SerializeField] TournamentMapOverlayView tournamentPanel;
 
-    [Tooltip("정점 도전의 대치 인트로. 미배선이면 예전처럼 덱 화면이 곧장 뜬다 — 연출 때문에 전투가 막히지 않는다.")]
-    [SerializeField] VersusIntroShell versusShellPrefab;
-
     const string BATTLE_SCENE = "BattleScene";
 
     // 게이트가 열려 있는 동안 PlayBtn 재클릭을 막는다 — 두 번째 진입이 셸의 선택 상태를 덮고,
@@ -43,7 +40,6 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
-    VersusIntroShell m_versusShell;
     LobbyOverlayHost m_overlayHost;
 
     /// <summary>
@@ -88,19 +84,6 @@ public class LobbyMatchLauncher : MonoBehaviour
                 m_matchShell = Instantiate(matchShellPrefab, transform.parent);
 
             return m_matchShell;
-        }
-    }
-
-    // 매칭 셸과 같은 이유로 첫 도전 때 띄운다. 부모도 같다 — 나중에 생성돼 마지막 형제가 되므로
-    // 맵 오버레이 위에 선다(이 화면은 맵을 덮어야 한다).
-    VersusIntroShell VersusShell
-    {
-        get
-        {
-            if (m_versusShell == null && versusShellPrefab != null)
-                m_versusShell = Instantiate(versusShellPrefab, transform.parent);
-
-            return m_versusShell;
         }
     }
 
@@ -386,11 +369,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 고정 상대는 매칭 대신 대치 인트로를 앞세운다 — 정점을 누른 것과 덱을 짜는 것 사이가
         // 비어 있으면 상대가 누구인지 화면이 한 번도 말하지 않는다.
         //
-        // 셸을 여기서 붙잡아 넘긴다 — VersusShell은 비어 있으면 새로 만드는 프로퍼티라,
+        // 셸을 여기서 붙잡아 넘긴다 — MatchShell은 비어 있으면 새로 만드는 프로퍼티라,
         // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
+        // 셸이 미배선(matchShellPrefab 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
         if (_preset.HasValue)
         {
-            VersusIntroShell t_versus = VersusShell;
+            MatchmakingShell t_versus = MatchShell;
 
             if (t_versus != null) return await RunSelectionWithVersusAsync(t_versus, _preset.Value, _ct);
         }
@@ -403,7 +387,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     //
     // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 매칭은 상대를 기다리는 동안 세울 시간이 있지만
     // 여기는 상대가 이미 정해져 있어 대기가 없다. 미리 세워 두면 그 레이아웃 비용이 진입 안무 첫 프레임에 얹힌다.
-    async UniTask<bool> RunSelectionWithVersusAsync(VersusIntroShell _versus, MatchOpponent _opponent,
+    async UniTask<bool> RunSelectionWithVersusAsync(MatchmakingShell _versus, MatchOpponent _opponent,
                                                     CancellationToken _ct)
     {
         await _versus.PlayVersusAsync(_opponent, _ct);

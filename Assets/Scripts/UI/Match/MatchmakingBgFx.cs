@@ -92,6 +92,23 @@ public class MatchmakingBgFx
     /// <summary>맞물림의 이징. 실려 오는 쪽이 값을 복제하면 다음 튜닝에 판만 바뀌고 실린 것이 남는다.</summary>
     public Ease CloseEase => this.closeEase;
 
+    /// <summary>한 연출 몫의 이음매 굵기. 매칭과 대치가 같은 두 판을 쓰고 이 값만 갈아끼운다.</summary>
+    // readonly로 잠그지 못한다 — Unity는 readonly 필드를 직렬화하지 않아 인스펙터로 저작할 수 없다.
+    [Serializable]
+    public struct SeamTuning
+    {
+        [Min(0f)] public float seamThickness;
+    }
+
+    /// <summary>지금 저작된 이음매 굵기를 한 묶음으로 꺼낸다. 갈아끼우기 전에 한 번만 잡아야 저작값이 진실원으로 남는다.</summary>
+    public SeamTuning CaptureSeam() => new SeamTuning { seamThickness = this.seamThickness };
+
+    /// <summary>이음매 굵기를 갈아끼운다. 이음매 선은 맞물림을 지을 때마다 새로 세워지므로 그 전에 부르면 된다.</summary>
+    public void ApplySeam(in SeamTuning _tuning)
+    {
+        this.seamThickness = Mathf.Max(0f, _tuning.seamThickness);
+    }
+
     /// <summary>
     /// 두 판이 화면을 비우는 거리(위·아래). 판에 실려 함께 떨어질 것이 <b>같은 거리</b>를 쓰게 하려고 연다 —
     /// 이음매 각도와 여유는 이 클래스만 알고 있어서, 실어 오는 쪽이 직접 풀면 기하 진실원이 둘이 된다.

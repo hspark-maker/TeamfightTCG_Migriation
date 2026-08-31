@@ -12,6 +12,14 @@ using UnityEngine.UI;
 // 페이크(로컬 AI)든 실제(Photon)든 이 화면은 달라지지 않는다. 대기 시간의 주인이 매치메이커이기 때문이다.
 //
 // 무엇을 어떻게 움직일지는 전부 MatchmakingFx·MatchHandoffFx가 쥔다. 셸은 "언제"만 정한다.
+//
+// 진입점은 둘이다. RunMatchAsync는 랭크전(상대를 기다린다)이고, PlayVersusAsync는 토너먼트 정점 대치
+// (상대가 이미 정해져 있다)다. 대치는 상대를 구하지 않으므로 탐색 문구·점(...)·스캔 띠·취소 버튼·
+// 발견 슬램이 전부 없고, 배경 두 판에 두 프로필이 실려 떨어져 이음매에서 한 번 부딪히는 것이 전부다 —
+// 찾지 않은 상대를 찾은 척하면 그 자리에서 매칭 문법이 거짓이 된다.
+//
+// 부품은 한 벌뿐이고 두 모드가 갈리는 것은 튜닝 묶음 셋(ClashTuning·EntranceTuning·SeamTuning)이다.
+// 진입할 때마다 그 판의 값을 통째로 갈아끼워, 한 인스턴스가 두 모드를 번갈아 타도 항상 결정적이다.
 public class MatchmakingShell : MonoBehaviour
 {
     [SerializeField] MatchProfileView myProfile;
@@ -36,8 +44,38 @@ public class MatchmakingShell : MonoBehaviour
     [Tooltip("충돌·정착이 끝난 뒤 갈라짐까지의 여운(초). 마지막 한 박은 완전 정지여야 다음 사건이 새 사건으로 읽힌다.")]
     [Min(0f)] [SerializeField] float afterglowHold = 0.34f;
 
-    [Tooltip("대치할 때 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
+    [Tooltip("랭크전에서 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
     [SerializeField] float versusApproach = 60f;
+
+    [Header("대치 인트로(토너먼트) — 랭크전과 갈리는 값만")]
+    [Tooltip("대치 문구. 이 진입점은 상대를 찾지 않으므로 탐색 문구가 없다 — 열리는 순간부터 이 한 줄이다.")]
+    [SerializeField] string versusTitle = "도전";
+
+    [Tooltip("대치에서 두 프로필이 서로에게 다가가는 거리(px). 랭크전보다 크게 잡는다 — 그쪽은 물러났다 치는 " +
+             "예비동작이 있지만 여기는 낙하가 그 몫을 대신하고 곧바로 관성으로 박힌다.")]
+    [SerializeField] float versusIntroApproach = 90f;
+
+    [Tooltip("대치의 격돌 세기. 예비동작 거리·시간을 0에 가깝게 두는 것이 이 모드의 핵심이다 — " +
+             "낙하가 이미 예비동작이라 물러났다 치면 사건이 두 번이 된다.")]
+    [SerializeField] MatchmakingFx.ClashTuning versusIntroClash = new MatchmakingFx.ClashTuning
+    {
+        chargeShake = 3.6f, chargeGlowFrom = 0.3f, releaseKick = 0.12f,
+        windUpDistance = 0f, windUpDuration = 0.01f, windUpHold = 0f,
+    };
+
+    [Tooltip("대치의 등장 박자. 프로필은 판에 실려 떨어지므로 banner* 는 사실상 꺼 둔다 — " +
+             "여기 남는 것은 화면 배율과 제목뿐이다.")]
+    [SerializeField] MatchmakingEntryFx.EntranceTuning versusIntroEntrance = new MatchmakingEntryFx.EntranceTuning
+    {
+        rootDuration = 0.2f, bannerAt = 0f, bannerDuration = 0.01f, bannerDistance = 0f,
+        riderAt = 0f, riderDuration = 0.2f,
+    };
+
+    [Tooltip("대치의 이음매 굵기. 이 모드는 두 판이 맞물리는 것 자체가 사건이라 랭크전보다 굵다.")]
+    [SerializeField] MatchmakingBgFx.SeamTuning versusIntroSeam = new MatchmakingBgFx.SeamTuning
+    {
+        seamThickness = 10f,
+    };
 
     [Header("연출")]
     [SerializeField] MatchmakingFx fx = new MatchmakingFx();
@@ -72,6 +110,24 @@ public class MatchmakingShell : MonoBehaviour
     RectTransform[] m_riders;
     Vector2[]       m_riderHomes;
 
+    // 대치가 태울 라이더(제목만). 취소가 없는 모드라 랭크전 배열과 갈린다 — 홈 좌표는 위 배열이 소유한다.
+    RectTransform[] m_versusRiders;
+
+    // 조임의 떨림이 밀어 놓을 화면 자리. 떨리는 중에 다시 잡으면 어긋난 자리가 홈이 되므로 Awake에서만 잡는다.
+    Vector2 m_rootHome;
+
+    // 판이 맞물리는 시각 = 프로필이 부딪히는 시각. 대치의 모든 박자가 이 한 값을 기준으로 붙는다.
+    float m_landAt;
+
+    // 랭크전 튜닝의 진실원. 프리팹 저작값을 Awake에서 한 번 잡아 두고 랭크전에 진입할 때마다 되돌린다.
+    MatchmakingFx.ClashTuning         m_rankedClash;
+    MatchmakingEntryFx.EntranceTuning m_rankedEntrance;
+    MatchmakingBgFx.SeamTuning        m_rankedSeam;
+
+    // 이번 판이 대치인가. 라이더 구성과 대치 걸음이 여기서 갈린다.
+    bool  m_versusMode;
+    float m_approach;
+
     // 지금 화면에 떠 있는 안무. 화면이 내려갈 때 함께 걷지 않으면 파괴된 대상 위에서 계속 돈다.
     Sequence m_stage;
 
@@ -80,9 +136,18 @@ public class MatchmakingShell : MonoBehaviour
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
 
+        m_rootHome = ((RectTransform)transform).anchoredPosition;
+
         CaptureRiderHomes();
 
         fx.Capture();
+
+        // 지금 프리팹에 저작된 값이 곧 랭크전 튜닝이다 — 대치가 갈아끼운 뒤 되돌아올 자리다.
+        m_rankedClash    = fx.CaptureClash();
+        m_rankedEntrance = entryFx.CaptureEntrance();
+        m_rankedSeam     = bgFx.CaptureSeam();
+
+        m_approach = versusApproach;
 
         EnsureWired();
     }
@@ -138,6 +203,8 @@ public class MatchmakingShell : MonoBehaviour
         m_running = true;
         m_cts     = CancellationTokenSource.CreateLinkedTokenSource(_ct);
 
+        ApplyRankedTuning();
+
         MatchOpponent? t_result = null;
         try
         {
@@ -171,7 +238,7 @@ public class MatchmakingShell : MonoBehaviour
         var t_root = (RectTransform)transform;
 
         m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
-                                  t_root, Riders, fx.RaySprite, in _targets);
+                                  t_root, ActiveRiders, fx.RaySprite, in _targets);
         m_stage.SetLink(gameObject);
 
         // 배경 두 판이 갈라지며 덱 화면이 드러난다. 이 축이 없으면 판(alpha 0.94)이 덱을 가린 채
@@ -189,6 +256,196 @@ public class MatchmakingShell : MonoBehaviour
         if (_ct.IsCancellationRequested) return;
 
         Close();   // 안무가 중간에 잘렸을 수 있다(SetActive는 멱등).
+    }
+
+    /// <summary>
+    /// 대치 게이트(토너먼트 정점). 호스트가 덱 화면을 세우기 "전에" 이걸 await 한다. 취소 버튼이 없으므로
+    /// 끝은 하나뿐이다 — 끝까지 돌거나 씬이 내려간다. 물러나는 자리는 다음 화면(덱)의 취소 버튼이다.
+    /// </summary>
+    public async UniTask PlayVersusAsync(MatchOpponent _opponent, CancellationToken _ct)
+    {
+        // 이미 진행 중인데 다시 부르면 두 await가 같은 화면을 두고 경쟁한다.
+        if (m_running)
+        {
+            Debug.LogWarning("[MatchmakingShell] 대치가 이미 진행 중이다 — 중복 진입을 무시한다.");
+
+            return;
+        }
+
+        m_running = true;
+
+        ApplyVersusTuning();
+
+        // 끝까지 돈 경우에만 화면을 남긴다 — 그때만 갈라짐(PlayHandoffAsync)이 이어받아 내려 준다.
+        bool t_handedOn = false;
+        try
+        {
+            OpenVersus(_opponent);
+
+            // 낙하 → 충돌 → 여운이 한 무대에서 이어 돈다. 무대를 갈아타지 않으므로 기다림도 한 번뿐이다.
+            if (await WaitAsync(m_landAt + fx.VersusDuration
+                              + Mathf.Max(fx.AfterglowDuration, afterglowHold), _ct))
+                return;
+
+            t_handedOn = true;
+        }
+        finally
+        {
+            m_running = false;
+
+            // 취소·예외로 빠지면 넘겨받을 화면이 없다. 화면만 끄면 안무는 계속 돌아 프리팹 밖 전역 섬광이
+            // 로비 위에 터지고, 고여 있던 빛은 시퀀스가 아니라 fx가 소유해 무대만 걷으면 노드가 남는다.
+            if (!t_handedOn)
+            {
+                KillStage();
+                fx.ClearCharge();
+                Close();
+            }
+        }
+    }
+
+    // 랭크전 한 벌로 되돌린다. 한 인스턴스가 두 모드를 번갈아 타므로 진입할 때마다 통째로 갈아끼운다 —
+    // 지난 판의 튜닝이 남으면 같은 버튼이 매번 다른 연출을 낸다.
+    void ApplyRankedTuning()
+    {
+        m_versusMode = false;
+        m_approach   = versusApproach;
+
+        fx.ApplyClash(in m_rankedClash);
+        entryFx.ApplyEntrance(in m_rankedEntrance);
+        bgFx.ApplySeam(in m_rankedSeam);
+
+        if (cancelButton != null) cancelButton.gameObject.SetActive(true);
+    }
+
+    // 대치 한 벌로 갈아끼운다. 취소 버튼은 여기서 내린다 — 이 모드엔 물러나는 개념이 없다.
+    void ApplyVersusTuning()
+    {
+        m_versusMode = true;
+        m_approach   = versusIntroApproach;
+
+        fx.ApplyClash(in versusIntroClash);
+        entryFx.ApplyEntrance(in versusIntroEntrance);
+        bgFx.ApplySeam(in versusIntroSeam);
+
+        if (cancelButton != null) cancelButton.gameObject.SetActive(false);
+    }
+
+    // 대치의 진입 = 낙하 = 충돌. 셋이 한 무대에서 이어 돈다.
+    //
+    // ⚠ 짓는 순서가 계약이다. 부품들이 "짓는 순간" 대상을 DOKill 하거나 자가설치 노드를 세우기 때문에,
+    //   순서를 바꾸면 방금 지은 축이 그 자리에서 지워지거나 아직 없는 것을 참조하게 된다.
+    //     ① entryFx — StageZoom이 화면을 DOKill 한다
+    //     ② 조임     — 여기서 VS 자리의 빛(ChargeGlow)이 실제로 세워진다
+    //     ③ 충돌     — 짓는 시점에 ②의 빛을 읽어 폭발을 예약하고, 두 프로필을 DOKill 한다
+    //     ④ 낙하     — ③의 DOKill 뒤에 지어야 살아남는다
+    void OpenVersus(in MatchOpponent _opponent)
+    {
+        gameObject.SetActive(true);
+
+        // 직전 전환이 프로필을 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
+        KillStage();
+
+        // 배경을 먼저 되돌린다 — 지난 전환이 판을 화면 밖으로 밀어 놓았고, 지난 확정이 밝기 축의 기준 색을
+        // 덱 색으로 옮겨 놓았다. 기준을 저작값으로 돌린 뒤라야 이어지는 fx.Reset이 옳은 색으로 칠한다.
+        bgFx.Reset(fx.Dim);
+
+        fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
+        handoffFx.Reset((RectTransform)transform, VersusRect);
+
+        RestoreHome(myProfile,       m_myHome);
+        RestoreHome(opponentProfile, m_opponentHome);
+        RestoreRiders();
+        RestoreRootHome();
+
+        if (titleText  != null) titleText.text = versusTitle;
+        if (versusRoot != null) versusRoot.SetActive(false);
+
+        if (myProfile       != null) myProfile.Render(MatchProfile.OfLocalPlayer());
+        if (opponentProfile != null) opponentProfile.Render(_opponent.Profile);
+
+        var t_root = (RectTransform)transform;
+
+        // 낙하 거리는 판이 푼다. 실린 것이 판과 같은 거리를 써야 이음매 위에 얹혀 있는 것으로 읽힌다.
+        bgFx.SolveTravel(t_root, out float t_up, out float t_down);
+
+        // 판이 맞물리는 시각이 곧 부딪히는 시각이다. 낙하와 충돌이 서로 다른 식을 쓰면 프로필이 착지 자세로
+        // 멈췄다가 뒤늦게 돌진한다 — 아래 축들은 전부 이 한 값만 읽는다.
+        m_landAt = Mathf.Max(entryFx.Duration, bgFx.CloseDuration);
+
+        // 프로필을 entryFx에 태우지 않는다 — 바깥에서 따로 꽂히는 축과 판에 실려 떨어지는 축은 배타적이다.
+        // 남는 것은 화면 배율과 제목뿐이다.
+        Sequence t_enter = entryFx.Build(null, null, VersusRect,
+                                         fx.Dim.Target, t_root, ActiveRiders, bgFx.EnterNormal);
+
+        // 판 두 장이 맞물려 로비를 덮는다. 이게 이 화면의 등장이다.
+        t_enter.Insert(0f, bgFx.BuildClose(t_root));
+
+        // 낙하 위에 압력이 함께 차오른다. 프로필 인자를 비우는 것은 서로에게 끌리는 축(드리프트)만 빼기 위해서다.
+        // ⚠ 통째로 빼면 안 된다 — 여기서 세워지는 빛이 없으면 아래 충돌의 빛 폭발이 함께 사라진다.
+        t_enter.Insert(0f, fx.BuildCharge(null, default, null, default,
+                                          VersusStep, t_root, VersusAnchored, m_landAt));
+
+        // 관성 그대로 박힌다. 예비동작 거리를 0으로 저작해 두면 낙하 자체가 그 몫을 한다.
+        Sequence t_clash = fx.BuildVersus(myProfile != null ? myProfile.Rect : null, m_myHome,
+                                          opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
+                                          VersusStep, VersusRect, t_root);
+
+        // 충돌이 프로필을 DOKill 한 뒤에 얹는다 — 순서를 뒤집으면 낙하가 그 자리에서 지워져
+        // 두 프로필이 t=0부터 제자리에 붙은 채 판만 떨어진다.
+        StageRide(t_enter, t_up, t_down);
+
+        // 떨림은 진폭이 t²라 착지 프레임에 가장 크다. 무대를 갈아타지 않아 조임의 자체 복구(OnKill)가
+        // 여기서 안 돌므로, 부딪힌 자리에서 화면을 직접 제자리로 돌려놓는다.
+        t_enter.InsertCallback(m_landAt, RestoreRootHome);
+
+        // 색이 덱 색으로 옮겨 앉는 것은 부딪힘의 결과다 — 착지 뒤에 시작해야 원인과 결과가 갈린다.
+        t_enter.Insert(m_landAt, bgFx.BuildConfirm(fx.Dim));
+
+        // VS는 부딪히는 그 프레임에 켜진다. 미리 켜면 슬램의 출발 배율(1 + vsOvershoot)이 먼저 보여
+        // 튀어나온 것이 아니라 줄어든 것이 된다.
+        t_enter.InsertCallback(m_landAt + fx.HitAt, ShowVersus);
+
+        t_enter.Insert(m_landAt, t_clash);
+
+        PlayStage(t_enter);
+    }
+
+    // 두 프로필이 판에 실려 함께 떨어진다.
+    //
+    // 부모를 판으로 갈아끼우지 않는다 — 판은 기울어 있고 배율도 1이 아니라, 자식으로 옮기면 프로필이
+    // 함께 기울고 줄어든다. 게다가 두 프로필의 좌표계가 서로 갈려 대치 걸음(VersusStep)도
+    // 갈라짐의 밀어내기도 전부 무의미해진다.
+    // 실려 있다는 말은 부모가 같다는 뜻이 아니라 거리·시간·이징이 같다는 뜻이다.
+    void StageRide(Sequence _seq, float _up, float _down)
+    {
+        // 방향은 순수 수직이다 — 판도 (0, ±travel)로만 움직인다. 이음매 법선을 태우면 프로필이
+        // 판 위에서 가로로 미끄러져 실려 있음이 깨진다(법선은 바깥에서 들어오는 제목 몫으로 남는다).
+        StageRideOne(_seq, opponentProfile, m_opponentHome,  _up);
+        StageRideOne(_seq, myProfile,       m_myHome,       -_down);
+    }
+
+    void StageRideOne(Sequence _seq, MatchProfileView _view, Vector2 _home, float _offsetY)
+    {
+        if (_view == null || Mathf.Approximately(_offsetY, 0f)) return;
+
+        RectTransform t_rect = _view.Rect;
+
+        t_rect.anchoredPosition = _home + new Vector2(0f, _offsetY);
+
+        _seq.Insert(0f, t_rect.DOAnchorPos(_home, bgFx.CloseDuration).SetEase(bgFx.CloseEase));
+    }
+
+    void ShowVersus()
+    {
+        if (versusRoot != null) versusRoot.SetActive(true);
+    }
+
+    // 떨림이 밀어 놓은 화면을 제자리로. 조임이 자체 복구(OnKill)를 갖고 있지만 대치는 무대를 갈아타지 않아
+    // 그것이 안무가 다 끝난 뒤에야 돈다 — 부딪힌 자리에서 셸이 직접 되돌린다.
+    void RestoreRootHome()
+    {
+        ((RectTransform)transform).anchoredPosition = m_rootHome;
     }
 
     // 탐색중 → 발견 → 대치 → 진입. 어느 단계에서 끊겨도 null로 빠져나온다.
@@ -259,7 +516,7 @@ public class MatchmakingShell : MonoBehaviour
         var t_root = (RectTransform)transform;
 
         var t_enter = entryFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
-                                    t_root, Riders, bgFx.EnterNormal);
+                                    t_root, ActiveRiders, bgFx.EnterNormal);
 
         // 배경 두 판이 맞물려 로비를 덮는 것이 곧 이 화면의 등장이다 — 배너는 그 뒤에 들어온다(entryFx.bannerAt).
         t_enter.Insert(0f, bgFx.BuildClose(t_root));
@@ -340,13 +597,14 @@ public class MatchmakingShell : MonoBehaviour
 
     // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
     // 조임과 충돌이 같은 걸음을 써야 끌린 방향 그대로 부딪힌다.
+    // 걸음 크기는 이번 판의 모드가 정한다(랭크전 versusApproach · 대치 versusIntroApproach).
     Vector2 VersusStep
     {
         get
         {
             Vector2 t_gap = m_opponentHome - m_myHome;
 
-            return (t_gap.sqrMagnitude > 0.01f ? t_gap.normalized : Vector2.right) * versusApproach;
+            return (t_gap.sqrMagnitude > 0.01f ? t_gap.normalized : Vector2.right) * m_approach;
         }
     }
 
@@ -360,6 +618,15 @@ public class MatchmakingShell : MonoBehaviour
         titleText    != null ? (RectTransform)titleText.transform    : null,
         cancelButton != null ? (RectTransform)cancelButton.transform : null,
     };
+
+    // 대치가 태우는 것은 제목 하나뿐이다 — 이 모드엔 취소가 없어 랭크전보다 한 칸 짧다.
+    RectTransform[] VersusRiders => m_versusRiders ??= new[]
+    {
+        titleText != null ? (RectTransform)titleText.transform : null,
+    };
+
+    // 이번 판이 태울 것들. 홈 좌표(m_riderHomes)는 랭크전 배열 기준이라 되돌리는 쪽은 항상 Riders를 본다.
+    RectTransform[] ActiveRiders => m_versusMode ? VersusRiders : Riders;
 
     // 취소 버튼. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
     public void Cancel()

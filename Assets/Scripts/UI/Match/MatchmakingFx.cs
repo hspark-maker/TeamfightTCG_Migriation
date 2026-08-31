@@ -237,6 +237,43 @@ public class MatchmakingFx
         this.dim.Capture();
     }
 
+    /// <summary>한 연출 몫의 격돌 세기(예비동작·떨림·고인 빛·킥). 매칭과 대치가 같은 부품을 쓰고 이 여섯 값만 갈아끼운다.</summary>
+    // readonly로 잠그지 못한다 — Unity는 readonly 필드를 직렬화하지 않아 인스펙터로 저작할 수 없다.
+    [Serializable]
+    public struct ClashTuning
+    {
+        [Min(0f)]    public float chargeShake;
+        [Min(0f)]    public float chargeGlowFrom;
+        [Min(0f)]    public float releaseKick;
+        [Min(0f)]    public float windUpDistance;
+        [Min(0.01f)] public float windUpDuration;
+        [Min(0f)]    public float windUpHold;
+    }
+
+    /// <summary>지금 저작된 격돌 세기를 한 묶음으로 꺼낸다. 갈아끼우기 전에 한 번만 잡아야 저작값이 진실원으로 남는다.</summary>
+    public ClashTuning CaptureClash() => new ClashTuning
+    {
+        chargeShake    = this.chargeShake,
+        chargeGlowFrom = this.chargeGlowFrom,
+        releaseKick    = this.releaseKick,
+        windUpDistance = this.windUpDistance,
+        windUpDuration = this.windUpDuration,
+        windUpHold     = this.windUpHold,
+    };
+
+    /// <summary>격돌 세기를 통째로 갈아끼운다. 안무를 짓기 전에 불러야 그 판의 값으로 지어진다.</summary>
+    public void ApplyClash(in ClashTuning _tuning)
+    {
+        this.chargeShake    = _tuning.chargeShake;
+        this.chargeGlowFrom = _tuning.chargeGlowFrom;
+        this.releaseKick    = _tuning.releaseKick;
+        this.windUpDistance = _tuning.windUpDistance;
+
+        // 0이면 돌진이 길이 없는 구간이 되어 HitAt이 앞당겨진다 — 저작 하한(Min)을 코드에서도 지킨다.
+        this.windUpDuration = Mathf.Max(0.01f, _tuning.windUpDuration);
+        this.windUpHold     = _tuning.windUpHold;
+    }
+
     /// <summary>
     /// 기다리는 동안 두 프로필 틀이 쉬는 호흡을 건다. 스캔과 같은 이유로 무한 반복이다 — 길이의 주인은 매치메이커다.
     /// 무는 것은 <b>틀</b>이지 배너가 아니다(배너를 부풀리면 화면이 커졌다 작아진 것으로 읽힌다).

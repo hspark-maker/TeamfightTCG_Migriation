@@ -565,6 +565,24 @@ MonoBehaviour:
   chargeHold: 0.62
   afterglowHold: 0.34
   versusApproach: 60
+  versusTitle: "\uB3C4\uC804"
+  versusIntroApproach: 90
+  versusIntroClash:
+    chargeShake: 3.6
+    chargeGlowFrom: 0.3
+    releaseKick: 0.12
+    windUpDistance: 0
+    windUpDuration: 0.01
+    windUpHold: 0
+  versusIntroEntrance:
+    rootDuration: 0.2
+    bannerAt: 0
+    bannerDuration: 0.01
+    bannerDistance: 0
+    riderAt: 0
+    riderDuration: 0.2
+  versusIntroSeam:
+    seamThickness: 10
   fx:
     scanSprite: {fileID: 21300000, guid: 29a2639f9ff43cc4da83be452017f0c2, type: 3}
     scanColor: {r: 0.55, g: 0.85, b: 1, a: 1}

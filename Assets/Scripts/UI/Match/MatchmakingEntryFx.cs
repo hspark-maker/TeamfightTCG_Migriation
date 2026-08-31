@@ -76,6 +76,43 @@ public class MatchmakingEntryFx
                                        Mathf.Max(this.bannerAt + this.bannerDuration,
                                                  this.riderAt  + this.riderDuration));
 
+    /// <summary>한 연출 몫의 등장 박자(화면 배율·배너·따라 들어오는 것들). 매칭과 대치가 같은 부품을 쓰고 이 여섯 값만 갈아끼운다.</summary>
+    // readonly로 잠그지 못한다 — Unity는 readonly 필드를 직렬화하지 않아 인스펙터로 저작할 수 없다.
+    [Serializable]
+    public struct EntranceTuning
+    {
+        [Min(0.01f)] public float rootDuration;
+        [Min(0f)]    public float bannerAt;
+        [Min(0.01f)] public float bannerDuration;
+        [Min(0f)]    public float bannerDistance;
+        [Min(0f)]    public float riderAt;
+        [Min(0.01f)] public float riderDuration;
+    }
+
+    /// <summary>지금 저작된 등장 박자를 한 묶음으로 꺼낸다. 갈아끼우기 전에 한 번만 잡아야 저작값이 진실원으로 남는다.</summary>
+    public EntranceTuning CaptureEntrance() => new EntranceTuning
+    {
+        rootDuration   = this.rootDuration,
+        bannerAt       = this.bannerAt,
+        bannerDuration = this.bannerDuration,
+        bannerDistance = this.bannerDistance,
+        riderAt        = this.riderAt,
+        riderDuration  = this.riderDuration,
+    };
+
+    /// <summary>등장 박자를 통째로 갈아끼운다. 안무를 짓기 전에 불러야 그 판의 값으로 지어진다.</summary>
+    public void ApplyEntrance(in EntranceTuning _tuning)
+    {
+        this.bannerAt       = _tuning.bannerAt;
+        this.bannerDistance = _tuning.bannerDistance;
+        this.riderAt        = _tuning.riderAt;
+
+        // 길이 0짜리 트윈은 Duration을 앞당겨 착지 시각까지 흔든다 — 저작 하한(Min)을 코드에서도 지킨다.
+        this.rootDuration   = Mathf.Max(0.01f, _tuning.rootDuration);
+        this.bannerDuration = Mathf.Max(0.01f, _tuning.bannerDuration);
+        this.riderDuration  = Mathf.Max(0.01f, _tuning.riderDuration);
+    }
+
     /// <summary>진입 안무를 만들어 돌려준다(재생은 호출자).</summary>
     /// <param name="_riders">배너에 실리지 않은 것들(제목·취소 버튼). 방향은 각자의 y가 VS의 어느 쪽인지가 정한다 —
     /// 갈라짐(MatchHandoffFx.StageRiders)과 같은 규약이라 나간 자리에서 되돌아 들어온다.</param>
