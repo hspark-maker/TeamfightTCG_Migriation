@@ -237,8 +237,13 @@ public static class SpecSource
             else
                 Debug.LogError($"[SpecSource] 전투 지문 계산 실패 table={t_battleTable}: {t_battleError} — 멀티플레이가 차단된다.");
 
-            Debug.Log($"[SpecSource] 스펙 로드 완료 원본={s_origin} env={t_envId} 전투표={t_battleTable} " +
-                      $"지문={s_fingerprint ?? "(없음)"} 전투지문={s_battleFingerprint ?? "(없음)"}");
+            // 에디터에서는 안 찍는다. 이 스냅샷은 static이라 도메인 리로드마다(=컴파일마다) 다시 서고,
+            // 인스펙터 드로어(CardIdDrawer)가 첫 리페인트에 로드를 깨워 컴파일할 때마다 같은 줄이 쌓였다.
+            // 이 로그의 값어치는 멀티가 "스펙 스냅샷 다름"으로 끊겼을 때 어느 원본을 물었는지 보는 것뿐이라
+            // 플레이 중에만 필요하다. 실패 로그(LogError)는 에디터에서도 그대로 나간다.
+            if (Application.isPlaying)
+                Debug.Log($"[SpecSource] 스펙 로드 완료 원본={s_origin} env={t_envId} 전투표={t_battleTable} " +
+                          $"지문={s_fingerprint ?? "(없음)"} 전투지문={s_battleFingerprint ?? "(없음)"}");
         }
     }
 

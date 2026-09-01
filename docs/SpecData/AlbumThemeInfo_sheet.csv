@@ -1,0 +1,5 @@
+﻿id,themeId,order,locked,displayName,description
+int,string,int,int,string,string
+1,Theme_Nature,0,0,덩굴숲,덩굴 사이에 숨은 숲의 친구들
+2,Theme_Ocean,1,1,푸른바다,파도 아래에서 헤엄치는 친구들
+3,Theme_Snow,2,1,눈꽃설원,눈보라 너머에서 기다리는 친구들

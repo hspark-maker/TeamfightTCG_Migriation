@@ -110,6 +110,14 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float predatorTrailStagger   = 0.06f; // 줄기별 출발 간격(0이면 한 덩어리로 나가 개수가 안 읽힌다)
     [SerializeField] float predatorArriveHold    = 0.08f;  // 도착 후 공격자 쪽에 남는 여운
 
+    [Header("Immortal Vfx (불사 부활 — 사망 연출 → 디졸브 → 등장)")]
+    // 사망 연출 길이는 여기 없다(DeathDuration 하나가 진실원). 부활은 그 뒤 구간만 쥔다.
+    [SerializeField] float immortalDissolveDuration = 1.1f;  // 디졸브가 아래에서 위로 훑는 시간
+    // 등장 연출은 디졸브가 **다 끝나기 전에** 터진다 — 완전히 사라진 뒤 터뜨리면 빈 자리에서 뜬금없이 나온다.
+    [SerializeField] float immortalReviveLead       = 0.3f;  // 디졸브 종료 이만큼 전에 등장 파티클을 터뜨린다
+    [SerializeField] float immortalReviveHold       = 0.15f; // 디졸브 끝 → 카드 복귀 사이 정적
+    [SerializeField] float immortalRestoreDuration  = 0.25f; // 카드가 다시 보이기까지의 페이드
+
     // 시너지 엠블럼 길이는 여기 없다 — 몸짓/시너지마다 달라서 그 시너지의 연출 에셋
     // (SynergyEmblemSpec.duration, raw 초)이 쥔다. 배속은 Scaled()를 통과해 적용된다.
 
@@ -213,6 +221,10 @@ public class BattleTimingConfig : ScriptableObject
     public float PredatorTravelDuration => predatorTravelDuration * SpeedFactor;
     public float PredatorTrailStagger    => predatorTrailStagger    * SpeedFactor;
     public float PredatorArriveHold     => predatorArriveHold     * SpeedFactor;
+    public float ImmortalDissolveDuration => immortalDissolveDuration * SpeedFactor;
+    public float ImmortalReviveLead       => immortalReviveLead       * SpeedFactor;
+    public float ImmortalReviveHold       => immortalReviveHold       * SpeedFactor;
+    public float ImmortalRestoreDuration  => immortalRestoreDuration  * SpeedFactor;
     public float RangedFlightMin     => Mathf.Max(0f, rangedFlightMin) * SpeedFactor;
     public float RangedSpeedMul      => rangedSpeedMul > 0f ? rangedSpeedMul : 1f;
     public float CunningFogLead      => cunFogLead          * SpeedFactor;

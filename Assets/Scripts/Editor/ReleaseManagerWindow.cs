@@ -68,7 +68,7 @@ public partial class ReleaseManagerWindow : EditorWindow
 
         this.selectedTab = (Tab)GUILayout.Toolbar(
             (int)this.selectedTab,
-            new[] { "릴리즈", "데이터 · Firestore" },
+            new[] { "릴리즈", "데이터" },
             GUILayout.Height(26));
 
         if (this.selectedTab == Tab.Data)

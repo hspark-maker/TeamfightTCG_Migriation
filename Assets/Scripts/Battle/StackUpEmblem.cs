@@ -2,7 +2,7 @@ using System;
 using DG.Tweening;
 using UnityEngine;
 
-/// <summary>여러 단으로 잘린 그림이 **아래에서부터 한 단씩 쌓여 올라가는** 몸짓(수호자).
+/// <summary>여러 단으로 잘린 그림이 **아래에서부터 한 단씩 쌓여 올라가는** 몸짓.
 ///
 /// 다른 몸짓과 달리 그림이 하나가 아니다 — 그래서 베이스의 <see cref="SynergyEmblemSpec.Create"/>
 /// (스프라이트 하나짜리 루트)를 쓰지 않고, 빈 루트 아래에 단마다 렌더러를 하나씩 깐다.
@@ -37,7 +37,7 @@ public class StackUpEmblem : SynergyEmblemSpec
 
     [Header("구간 비율 (합 1, 나머지가 소멸 구간)")]
     [Range(0f, 1f)] public float buildRatio = 0.62f;   // 단이 전부 쌓이는 구간
-    [Range(0f, 1f)] public float holdRatio  = 0.18f;   // 다 쌓인 수호자 엠블럼을 보여주는 정지 구간
+    [Range(0f, 1f)] public float holdRatio  = 0.18f;   // 다 쌓인 엠블럼을 보여주는 정지 구간
 
     [Header("형태")]
     public float riseHeightRatio = 0.9f;    // 각 단이 아래에서 올라오는 거리(그 단 높이 대비)

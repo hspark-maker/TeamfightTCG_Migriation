@@ -39,6 +39,9 @@ public enum KeywordPreviewKind
     Glow,
     Attack,
     Vfx,
+
+    // **새 값은 끝에만 추가한다** — keywordPreview가 씬에 int로 저장돼 있어 중간에 끼우면 선택이 밀린다.
+    Revive,   // 불사: 대기 표식 → 사망 → 디졸브 → 등장까지 한 호흡
 }
 
 /// <summary>이어 붙여 재생할 수 있는 한 마디. 인게임 <c>AttackFlow</c>가 실제로 도는 순서
@@ -463,6 +466,7 @@ public class AttackAnimTester : MonoBehaviour
         CardKeyword.Taunt,
         CardKeyword.Cunning,
         CardKeyword.Healer,
+        CardKeyword.Immortal,
     };
 
     static readonly KeywordPreviewKind[] k_glowOnly = { KeywordPreviewKind.Glow };
@@ -470,6 +474,8 @@ public class AttackAnimTester : MonoBehaviour
         { KeywordPreviewKind.Glow, KeywordPreviewKind.Attack };
     static readonly KeywordPreviewKind[] k_glowVfx =
         { KeywordPreviewKind.Glow, KeywordPreviewKind.Vfx };
+    static readonly KeywordPreviewKind[] k_glowRevive =
+        { KeywordPreviewKind.Glow, KeywordPreviewKind.Revive };
 
     public CardKeyword[] PreviewableKeywords() => k_previewableKeywords;
 
@@ -489,6 +495,8 @@ public class AttackAnimTester : MonoBehaviour
             case CardKeyword.Cunning:
             case CardKeyword.Healer:
                 return k_glowVfx;
+            case CardKeyword.Immortal:
+                return k_glowRevive;
             default:
                 return k_glowOnly;
         }
@@ -501,6 +509,22 @@ public class AttackAnimTester : MonoBehaviour
         foreach (KeywordPreviewKind t_kind in t_available)
             if (t_kind == this.keywordPreview) return;
         this.keywordPreview = t_available[0];
+    }
+
+    /// <summary>불사 한 호흡: 대기 표식이 켜진 상태를 잠깐 보여 준 뒤 발동 연출(사망 → 디졸브 → 등장)까지.
+    ///
+    /// 테스터는 규칙 계층을 안 돌리므로 <c>reviveUsed</c>를 직접 세우지 않는다 —
+    /// 대신 표식을 코드로 켜고 끄며 게임과 **같은 진입점**(ImmortalVfx)만 태운다.</summary>
+    async UniTask PreviewImmortalRevive(CardView _view, CardInstance _card)
+    {
+        if (_view == null || _card == null) return;
+
+        // ① 대기: 부활을 아직 안 쓴 상태의 그림.
+        ImmortalVfx.SetAura(_view, true);
+        await Hold(this.untimedStepHold);
+
+        // ② 발동: 표식이 꺼지고 사망 → 디졸브 → 등장까지 게임과 같은 순서로 돈다.
+        await ImmortalVfx.PlayRevive(_card);
     }
 
     public void PlaySelectedKeyword() => PreviewSelectedKeyword().Forget();
@@ -523,7 +547,8 @@ public class AttackAnimTester : MonoBehaviour
             // 아이콘과 글로우가 같은 키워드를 보도록 해금 키워드로 임시 부여하고 다시 그린다.
             t_card.unlockedKeywords = (t_card.unlockedKeywords
                                      & ~(CardKeyword.Ranged | CardKeyword.Peerless | CardKeyword.Execution
-                                       | CardKeyword.Taunt | CardKeyword.Cunning | CardKeyword.Healer))
+                                       | CardKeyword.Taunt | CardKeyword.Cunning | CardKeyword.Healer
+                                       | CardKeyword.Immortal))
                                      | t_keyword;
             t_view.Render(t_card);
 
@@ -542,6 +567,9 @@ public class AttackAnimTester : MonoBehaviour
                     if (t_keyword == CardKeyword.Execution) ExecutionVfx.Play(t_view);
                     else if (t_keyword == CardKeyword.Cunning) await CunningCore();
                     else if (t_keyword == CardKeyword.Healer) PlayCaretakerHeal();
+                    break;
+                case KeywordPreviewKind.Revive:
+                    await PreviewImmortalRevive(t_view, t_card);
                     break;
             }
         }

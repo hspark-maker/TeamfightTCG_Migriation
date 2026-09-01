@@ -73,7 +73,7 @@ Material:
     - _AddPrecomputedVelocity: 1
     - _AddTex_Ins: 0
     - _Dissolve: 1
-    - _Edge: -1.37
+    - _Edge: 1.16
     - _Mask_Ins: 0
     - _Mask_Y_Offset: 0
     - _QueueControl: 0

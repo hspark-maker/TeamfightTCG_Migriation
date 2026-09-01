@@ -600,7 +600,6 @@ MonoBehaviour:
   stepGap: 0.25
   untimedStepHold: 0.9
   emblemSynergies:
-  - {fileID: 11400000, guid: 63b612a11a7b10b48a25d5832d4d3801, type: 2}
   - {fileID: 11400000, guid: dee4791a461125448898b01d9b781ae5, type: 2}
   - {fileID: 11400000, guid: fcb84e498c66194468fe9a236338aa3e, type: 2}
   - {fileID: 11400000, guid: f7ab12f62bfb6934581309d59e27d0aa, type: 2}

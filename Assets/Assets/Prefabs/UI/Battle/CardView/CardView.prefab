@@ -2632,6 +2632,37 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!1 &6324481928867156500
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3242344529736856600}
+  m_Layer: 0
+  m_Name: SynergyBadgeRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3242344529736856600
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6324481928867156500}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2466445677904607665}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6324481928867156522
 GameObject:
   m_ObjectHideFlags: 0
@@ -4083,6 +4114,53 @@ MonoBehaviour:
   hintArrow: {fileID: 560874983196405025}
   swipeGuide: {fileID: 8938337104574230937}
   dragLine: {fileID: 1804318811369308941}
+  immortalDissolveMaterial: {fileID: 2100000, guid: 4528e1e4fe9e46840b467a042b35524c, type: 2}
+  immortalDissolveProperty: _Dissolve
+  immortalDissolveEdgeProperty: _Edge
+  immortalDissolveFrom: -0.014
+  immortalDissolveTo: 1
+  immortalDissolveCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0.06904
+      outSlope: 0.06904
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.5
+      value: 0.03452
+      inSlope: 0.06904
+      outSlope: 1.34966
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.85
+      value: 0.5069
+      inSlope: 1.34966
+      outSlope: 3.28733
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 3.28733
+      outSlope: 3.28733
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!114 &7580946599242575258
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4635,34 +4713,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4639026693308955753, guid: 54491c579fc1c4b41858c46a28206e8c, type: 3}
   m_PrefabInstance: {fileID: 1216983047104972784}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &6324481928867156500
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 3242344529736856600}
-  m_Layer: 0
-  m_Name: SynergyBadgeRoot
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &3242344529736856600
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6324481928867156500}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 2466445677904607665}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

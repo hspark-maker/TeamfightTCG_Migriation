@@ -40,7 +40,7 @@ public abstract class SynergyEmblemSpec
     public int sortingOrder = 2;
 
     /// <summary>띄울 그림이 있는가. 배선 판정(<see cref="SynergyEmblemEntry.Covers"/>)이 이걸 본다.
-    /// 그림을 여러 장 쓰는 몸짓(수호자 StackUpEmblem)은 자기 목록으로 다시 답한다 —
+    /// 그림을 여러 장 쓰는 몸짓(StackUpEmblem)은 자기 목록으로 다시 답한다 —
     /// 여기서 <c>sprite</c> 하나만 보면 그런 몸짓이 배선돼도 줄 전체가 꺼진다.</summary>
     public virtual bool HasArt => this.sprite != null;
 

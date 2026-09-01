@@ -9,7 +9,6 @@ int,string,int,int,string
 6,Caretaker,1,5,돌보미
 7,Flow,0,3,흐름
 8,Flow,1,5,흐름
-9,Guardian,0,2,수호자
 10,Legacy,0,2,유산
 11,Legacy,1,4,유산
 12,Predator,0,2,포식자

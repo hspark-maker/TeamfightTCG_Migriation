@@ -46,7 +46,6 @@ public sealed class SynergyRegistry : ScriptableObject
             "덩치" => "Data_Synergy_Bulk",
             "돌보미" => "Data_Synergy_Caretaker",
             "흐름" => "Data_Synergy_Flow",
-            "수호자" => "Data_Synergy_Guardian",
             "유산" => "Data_Synergy_Legacy",
             "포식자" => "Data_Synergy_Predator",
             "비늘" => "Data_Synergy_Scale",

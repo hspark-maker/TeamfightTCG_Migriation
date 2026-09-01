@@ -23,6 +23,7 @@ public partial class ReleaseManagerWindow
     string adminAuthError;
     bool adminOAuthOpen;
     bool adminPasswordOpen;
+    bool specCsvOpen;
 
     void EnableDataTab()
     {
@@ -40,6 +41,8 @@ public partial class ReleaseManagerWindow
     void DrawDataTab()
     {
         this.dataScroll = EditorGUILayout.BeginScrollView(this.dataScroll);
+
+        DrawSpecCsvSection();
 
         Header("Firestore 데이터 관리");
         DrawRulesState();
@@ -219,6 +222,68 @@ public partial class ReleaseManagerWindow
         {
             EditorGUILayout.HelpBox("로컬 firestore.rules에서 전면 개방 규칙을 찾지 못했다.", MessageType.Info);
         }
+    }
+
+    // ── SpecData ↔ docs CSV ────────────────────────────────────────────────
+    // 예전에는 CookApps 메뉴에 항목 4개로 흩어져 있었다. 이름만 봐서는 무엇이 무엇을 덮는지
+    // (bytes → CSV 인지 CSV → bytes 인지) 알 수 없어 아무도 손대지 못했다.
+    // 여기 모아 방향과 위험을 글로 적는다 — 되돌리기 어려운 쪽(CSV → bytes)은 아래에 따로 뺐다.
+
+    void DrawSpecCsvSection()
+    {
+        Header("SpecData ↔ docs CSV");
+
+        EditorGUILayout.HelpBox(
+            "저장소의 docs/SpecData/{표}_sheet.csv 는 '지금 앱에 실린 SpecData'를 사람이 읽을 수 있게 떠 둔 사본이다.\n" +
+            "값의 진실원은 구글 스펙시트 → SpecData.bytes 순서이고, 이 CSV 는 그 결과를 따라 적는 문서다.",
+            MessageType.Info);
+
+        this.specCsvOpen = EditorGUILayout.Foldout(this.specCsvOpen, "내보내기 · 되돌려 넣기", true);
+        if (!this.specCsvOpen) return;
+
+        EditorGUI.indentLevel++;
+
+        // ① 정방향: bytes → CSV. 문서를 최신으로 맞추는 쪽이라 위험이 낮다.
+        EditorGUILayout.LabelField("SpecData → docs CSV (문서 갱신)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "지금 앱에 실린 SpecData 값으로 docs CSV 를 덮어쓴다. 시트를 받은 지 오래됐으면 문서가 과거로 되돌아간다.",
+            EditorStyles.wordWrappedMiniLabel);
+
+        bool t_auto = SpecDocsCsvExporter.AutoExport;
+        bool t_next = EditorGUILayout.ToggleLeft(
+            "시트 적용 직후 자동으로 내보내기", t_auto);
+        if (t_next != t_auto) SpecDocsCsvExporter.AutoExport = t_next;
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("지금 내보내기", GUILayout.Height(24)))
+                SpecDocsCsvExporter.RunExportInteractive(false);
+
+            // CSV 에서 행이 사라지는 건 표가 줄었다는 뜻이라 기본은 막는다. 시트에서 실제로 지운 경우에만 쓴다.
+            if (GUILayout.Button("내보내기 (행 삭제 허용)", GUILayout.Height(24)))
+                SpecDocsCsvExporter.RunExportInteractive(true);
+        }
+
+        EditorGUILayout.Space(6);
+
+        // ② 역방향: CSV → bytes. 진실원을 우회하므로 경고를 먼저 세운다.
+        EditorGUILayout.LabelField("docs CSV → SpecData (로컬 실험본)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "시트를 거치지 않고 CSV 를 고쳐 바로 돌려 보고 싶을 때만 쓴다.\n" +
+            "여기서 만든 SpecData.bytes 는 로컬 실험본이라, 시트에 반영하지 않으면 다음 '시트 적용 & CS 생성'에서 사라진다.",
+            MessageType.Warning);
+
+        if (GUILayout.Button("docs CSV 로 SpecData 덮어쓰기", GUILayout.Height(24))
+            && EditorUtility.DisplayDialog(
+                "로컬 실험본 만들기",
+                "docs/SpecData CSV 내용으로 Assets/Resources/SpecData.bytes 를 다시 쓴다.\n" +
+                "진실원(스펙시트)을 우회하는 임시 경로다. 계속할까?",
+                "덮어쓰기", "취소"))
+        {
+            SpecLocalCsvImporter.RunImportInteractive();
+        }
+
+        EditorGUI.indentLevel--;
     }
 
     void DrawDataTableSelection()

@@ -4,9 +4,9 @@ int,string,string,string,int,string,int,string,int,int,int,int,string,string
 2,Data_Card_Waveri,파도리,Live,4,Ranged,0,Data_Synergy_Caretaker,0,5,4,3,파도 위를 누구보다 빠르게 달리는 구조대원. 구조가 끝나면 꼭 한 번은 멋진 턴을 보여줘야 직성이 풀린다.,Common
 3,Data_Card_Startori,별토리,Live,4,Healer,0,Data_Synergy_Caretaker,0,5,4,4,별빛으로 아군의 사기를 올리는 토끼. 응원은 눈부시지만 밤에 몰래 다가가는 임무에는 절대 못 쓴다.,Common
 4,Data_Card_Cloudmong,솜구름몽,Live,4,,0,Data_Synergy_Caretaker,0,5,4,3,"무거운 짐도 구름처럼 가볍게 나른다. 단, 바람 센 날에는 배송지가 조금 달라질 수 있다.",Common
-5,Data_Card_IronMongchi,철갑몽치,Live,5,Taunt,0,Data_Synergy_Guardian,0,5,4,6,철갑 등껍질로 모두를 지키는 든든한 탱커. 문이 좁으면 전투보다 입장이 더 오래 걸린다.,Rare
+5,Data_Card_IronMongchi,철갑몽치,Live,5,Taunt,0,,0,5,4,6,철갑 등껍질로 모두를 지키는 든든한 탱커. 문이 좁으면 전투보다 입장이 더 오래 걸린다.,Rare
 6,Data_Card_Rockbean,바위콩,Live,5,,0,,0,5,4,3,위험하면 동그랗게 말아 완벽한 돌이 된다. 너무 완벽해서 동료들이 가끔 광물로 착각한다.,Rare
-7,Data_Card_KingChestnutHedgehog,왕밤도치,Live,6,Taunt,2,Data_Synergy_Guardian,0,3,4,6,밤송이 갑옷을 입고 농장을 지키는 거대한 고슴도치. 구르기 한 번이면 적도 수확물도 함께 사라진다.,Rare
+7,Data_Card_KingChestnutHedgehog,왕밤도치,Live,6,Taunt,2,,0,3,4,6,밤송이 갑옷을 입고 농장을 지키는 거대한 고슴도치. 구르기 한 번이면 적도 수확물도 함께 사라진다.,Rare
 8,Data_Card_Nightchestnut,깜밤이,Live,5,Taunt,2,,0,3,4,6,밤길 안내를 맡은 올빼미 정찰병. 정작 낮 회의에서는 망토 속에서 꾸벅꾸벅 졸고 있다.,Rare
 9,Data_Card_MushroomCat,버섯냥,Live,4,Ranged,2,,0,4,4,4,등의 버섯으로 만능 약을 만든다는 고양이. 효과는 확실하지만 설명서를 읽으면 조금 불안해진다.,Common
 10,Data_Card_Dreameater,꿈먹이,Live,5,Execution,2,,0,4,3,7,나쁜 꿈과 스트레스를 먹어주는 다정한 맥. 너무 많이 먹은 날에는 본인이 월요일 출근 꿈을 꾼다.,Rare

@@ -178,5 +178,27 @@ MonoBehaviour:
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
+  - id: 22
+    prefab: {fileID: 6726364820659964944, guid: 15b91188ec37e4041acae73ce2be34e0, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 0
+    sortingOrder: 33
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  - id: 23
+    prefab: {fileID: 3576091127512397641, guid: 55be18416068727459ed4f9a967e3c32, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 2
+    sortingOrder: 33
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   healCurveHeight: 0.8
   healAlternateCurve: 1

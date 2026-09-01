@@ -38,6 +38,10 @@ public enum BattleVfxId
     HealerArrival    = 20,  // 힐러 투사체가 대상에 닿는 순간의 임팩트. **힐러 경로 전용**이라
                             // 모든 회복이 공통으로 내는 Heal(5)과 겹쳐 난다 — 둘을 합치면
                             // 돌보미·포식자처럼 투사체가 없는 회복에서도 도착 임팩트가 터진다.
+
+    ImmortalAura     = 22,  // 불사 **대기**: 부활을 아직 안 쓴 카드 위에 계속 떠 있는 표식.
+                            // 다른 항목과 달리 1회성이 아니다 — 켜고 끄는 주체는 ImmortalVfx다.
+    ImmortalRevive   = 23,  // 불사 **발동**: 사망 연출 → 디졸브가 끝난 뒤 되살아나는 순간 1회.
 }
 
 /// <summary>연출 1건의 배치 스펙. AttackEffect의 ParticleEntry와 필드가 겹치지만 재사용하지 않는다 —

@@ -334,6 +334,7 @@ public class CardView : MonoBehaviour
         if (t_isEmpty)
         {
             SetShieldVisible(false);
+            ImmortalVfx.SetAura(this, false);   // 빈 슬롯에 지난 카드의 표식이 남지 않게
             SetFaceDownLook(false, null);
             Decor.Refresh(null, null);   // 빈 슬롯: 아이콘·프레임 장식·배지 전부 없음.
             return;
@@ -357,6 +358,8 @@ public class CardView : MonoBehaviour
         Sprite t_art = CardVisualRules.PickBattleArt(_card);
         SetFaceDownLook(t_isFaceDown, t_art);
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
+        // 불사 대기 표식: **아직 안 쓴 부활이 있을 때만**. 진실원은 reviveUsed 하나다.
+        ImmortalVfx.SetAura(this, !t_isFaceDown && _card.HasKeyword(CardKeyword.Immortal) && !_card.reviveUsed);
 
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
@@ -827,7 +830,8 @@ public class CardView : MonoBehaviour
     /// <summary>사망 연출. **HP 굴림이 끝난 뒤에** 시작한다 — 카드가 줄어들며 사라지는 도중에 숫자가
     /// 0까지 굴러가면 얼마를 맞고 죽었는지가 안 읽히고, 페이드로 흐려진 숫자 위에서 굴림만 헛돈다.
     /// 순수 연출 대기다 — 규칙(hp·사망 판정)은 이미 확정된 뒤라 이 대기가 게임 판정을 미루지 않는다.</summary>
-    public async UniTask PlayDeathAnim(float _d = -1f)
+    public async UniTask PlayDeathAnim(float _d = -1f, float _fadeTo = 0f, bool _keepEndPose = false,
+                                       bool _keepPopScale = false)
     {
         await WaitHpRollSettled();
         float t_duration = _d < 0f ? GameTiming.Battle.DeathDuration : _d;
@@ -844,7 +848,7 @@ public class CardView : MonoBehaviour
         // 원래 자리에 남아야 "여기서 사라졌다"로 읽힌다.
         Vector3 t_deathPosition = transform.position;
 
-        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration);
+        UniTask t_cardAnim = this.cardAnim.PlayDeathAnim(t_duration, _fadeTo, _keepEndPose, _keepPopScale);
 
         // 파동은 사망 트윈과 **병렬**로 늦게 터진다 — 순차로 붙이면 사망 길이가 늘어나고
         // 결정타 구간에서 그 초과분에 슬로우 배율이 곱해진다.
@@ -857,6 +861,95 @@ public class CardView : MonoBehaviour
             BattleVfx.Play(BattleVfxId.DeathNova, t_deathPosition, VfxSortingLayerId);
 
         await t_cardAnim;
+    }
+
+    // ── 불사 디졸브 ───────────────────────────────────────────────────────
+
+    // 디졸브 재료는 **프리팹 저작**이다(코드가 셰이더/텍스처를 만들지 않는다). 미배선이면 디졸브만 생략된다.
+    [SerializeField] Material immortalDissolveMaterial;
+    // 셰이더의 진행 축. 재료 저작에 따라 방향이 갈리므로 값도 저작으로 받는다 — 코드가 "아래에서 위"를 못 정한다.
+    [SerializeField] string immortalDissolveProperty = "_Dissolve";
+    // 경계선도 같은 값으로 함께 움직인다 — 디졸브 면만 올라가고 경계가 제자리면 훑는 선이 안 따라온다.
+    // 비워 두면 경계는 재료 저작값 그대로 둔다.
+    [SerializeField] string immortalDissolveEdgeProperty = "_Edge";
+    [SerializeField] float  immortalDissolveFrom     = -0.014f;
+    [SerializeField] float  immortalDissolveTo       = 1f;
+    // 진행 완급. 가로 0~1(시간 비율) → 세로 0~1(from→to 비율). 기울기가 곧 훑는 속도다 —
+    // 앞을 눕히면 갈라지기 시작하는 지점이 느려지고, 끝을 세우면 마무리가 몰아친다.
+    // **키가 2개 미만이면 직선으로 본다** — 새 필드라 기존 프리팹은 빈 곡선으로 역직렬화되고,
+    // 그대로 Evaluate하면 항상 0이라 디졸브가 아예 안 움직인다.
+    [SerializeField] AnimationCurve immortalDissolveCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+
+    Material immortalDissolveInstance;   // 공유 재료를 건드리면 같은 재료를 쓰는 카드 전부가 녹는다
+    Material illustrationBaseMaterial;
+
+    /// <summary>작아진 자세를 원래 크기·슬롯으로 되돌린다(0이면 즉시).</summary>
+    public void RestoreSlotPose(float _duration = 0f) => this.cardAnim.ResetToSlotPose(_duration);
+
+    /// <summary>불사 발동: 일러스트를 디졸브 재료로 바꾸고 진행값을 from→to로 훑는다.
+    /// 재료가 미배선이면 즉시 반환한다(부활 자체는 그대로 진행된다).</summary>
+    public async UniTask PlayImmortalDissolve()
+    {
+        if (this.illustration == null || this.immortalDissolveMaterial == null) return;
+
+        if (this.immortalDissolveInstance == null)
+            this.immortalDissolveInstance = new Material(this.immortalDissolveMaterial);
+
+        this.illustrationBaseMaterial = this.illustration.sharedMaterial;
+        this.illustration.material    = this.immortalDissolveInstance;
+
+        // **알파를 건드리지 않는다.** 사망 페이드가 남긴 반투명 상태를 그대로 이어받아 디졸브가 마저 지운다 —
+        // 여기서 1로 되돌리면 방금 흐려진 카드가 다시 또렷해져 페이드가 없었던 것처럼 보인다.
+        this.immortalDissolveInstance.SetFloat(this.immortalDissolveProperty, this.immortalDissolveFrom);
+        if (!string.IsNullOrEmpty(this.immortalDissolveEdgeProperty))
+            this.immortalDissolveInstance.SetFloat(this.immortalDissolveEdgeProperty, this.immortalDissolveFrom);
+
+        float t_duration = Mathf.Max(0.01f, GameTiming.Battle.ImmortalDissolveDuration);
+        float t_time     = 0f;
+        var   t_ct       = this.GetCancellationTokenOnDestroy();
+
+        while (t_time < t_duration)
+        {
+            if (this == null || this.immortalDissolveInstance == null) return;
+
+            t_time += Time.deltaTime;
+            float t_value = ImmortalDissolveValue(Mathf.Clamp01(t_time / t_duration));
+
+            this.immortalDissolveInstance.SetFloat(this.immortalDissolveProperty, t_value);
+            if (!string.IsNullOrEmpty(this.immortalDissolveEdgeProperty))
+                this.immortalDissolveInstance.SetFloat(this.immortalDissolveEdgeProperty, t_value);
+
+            bool t_cancelled = await UniTask.Yield(PlayerLoopTiming.Update, t_ct).SuppressCancellationThrow();
+            if (t_cancelled) return;
+        }
+    }
+
+    /// <summary>시간 비율(0~1)을 디졸브 값으로 바꾼다. 완급은 곡선이 쥐고 여기선 from→to로 펴기만 한다.</summary>
+    float ImmortalDissolveValue(float _t)
+    {
+        float t_eased = this.immortalDissolveCurve != null && this.immortalDissolveCurve.length >= 2
+            ? this.immortalDissolveCurve.Evaluate(_t)
+            : _t;   // 미저작(빈 곡선) = 직선
+        return Mathf.Lerp(this.immortalDissolveFrom, this.immortalDissolveTo, t_eased);
+    }
+
+    /// <summary>디졸브를 되돌리고 카드를 다시 보이게 한다. 재료를 원래대로 돌려놓지 않으면
+    /// 그 카드는 남은 판 내내 디졸브 재료로 그려진다(풀 재사용분까지 따라간다).</summary>
+    public async UniTask RestoreFromImmortalDissolve()
+    {
+        if (this.illustration != null && this.illustrationBaseMaterial != null)
+        {
+            this.illustration.material = this.illustrationBaseMaterial;
+            this.illustrationBaseMaterial = null;
+        }
+
+        // 사망 연출이 자세를 남겨 뒀다(작아진 채) — 복귀는 여기서 맡는다.
+        this.cardAnim.ResetToSlotPose();   // 남은 어긋남이 있으면 여기서 확정한다
+
+        float t_duration = GameTiming.Battle.ImmortalRestoreDuration;
+        this.cardAnim.FadeView(1f, t_duration);
+        if (t_duration > 0f)
+            await UniTask.Delay((int)(t_duration * 1000)).SuppressCancellationThrow();
     }
 
     /// <summary>진행 중인 HP 굴림이 끝날 때까지 기다린다(없으면 즉시 반환).
