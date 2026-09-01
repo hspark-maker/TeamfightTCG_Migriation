@@ -19708,7 +19708,7 @@ GameObject:
   - component: {fileID: 5097864840669591596}
   - component: {fileID: 9054704765481620280}
   m_Layer: 6
-  m_Name: FX_Stigma
+  m_Name: FX_Swarm
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
