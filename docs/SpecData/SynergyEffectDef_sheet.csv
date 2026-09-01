@@ -1,5 +1,4 @@
-﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,SynergyTierDef.tierIndex 참조,같은 티어 안 적용 순서(0부터),효과 타입(코드 SynergyEffect 서브클래스와 1:1),파라미터(키=값, 여러 개는 ; 로 구분 · 키는 효과 클래스 필드명 · bool은 0/1 · 키워드는 이름 · 비우면 클래스 기본값)
-id,synergyId,tierIndex,effectOrder,effectType,parameters
+﻿id,synergyId,tierIndex,effectOrder,effectType,parameters
 int,string,int,int,string,string
 1,Brand,0,0,Brand,damagePerMember=1
 2,Brand,1,0,Brand,damagePerMember=2
@@ -9,7 +8,6 @@ int,string,int,int,string,string
 6,Caretaker,1,0,Caretaker,amount=2
 7,Flow,0,0,Flow,amount=1
 8,Flow,1,0,Flow,amount=2
-9,Guardian,0,0,Guardian,
 10,Legacy,0,0,Legacy,amount=1
 11,Legacy,1,0,Legacy,amount=2
 12,Predator,0,0,Predator,lifestealPercent=50

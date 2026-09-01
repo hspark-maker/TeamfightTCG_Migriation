@@ -41,12 +41,14 @@ public class AlbumInsertHintView : MonoBehaviour
 
     RectTransform m_rect;
     Vector2       m_fingerHome;   // 손가락 왕복의 기준점. 미는 트윈이 도는 중에 다시 잡으면 자리가 밀린다
+    Vector2       m_fingerOffset; // 프리팹 저작 위치. 카드 중심에 그대로 얹으면 손 그림이 카드를 덮는다
     Tween         m_moveTween;
     Tween         m_pulseTween;
     CanvasGroup   m_skipGroup;
     bool          m_skipShown;    // 이미 떠 있는 버튼을 다시 페이드인하면 장마다 깜빡인다
 
-    /// <summary>안내를 켠다. <paramref name="_anchor"/>는 지금 밀어야 할 카드(홀더) rect.
+    /// <summary>안내를 켠다. <paramref name="_anchor"/>는 지금 밀어야 할 카드(홀더) rect —
+    /// 손가락은 그 중심에서 <b>프리팹 저작 위치만큼 비켜</b> 선다.
     /// <b>건너뛰기는 건드리지 않는다</b> — 자동 진행 중에는 안내만 꺼지고 버튼은 남아야 한다.</summary>
     public void Show(string _message, RectTransform _anchor)
     {
@@ -150,7 +152,7 @@ public class AlbumInsertHintView : MonoBehaviour
             if (this.m_skipGroup == null) this.m_skipGroup = this.skipButton.gameObject.AddComponent<CanvasGroup>();
         }
 
-        if (this.finger != null) this.m_fingerHome = this.finger.anchoredPosition;
+        if (this.finger != null) this.m_fingerHome = this.m_fingerOffset = this.finger.anchoredPosition;
 
         this.Hide();
         this.HideSkip();
@@ -180,12 +182,15 @@ public class AlbumInsertHintView : MonoBehaviour
     }
 
     // 손가락은 밀어야 할 카드 위에 선다 — 허공을 미는 그림이 되지 않게.
+    // 카드(홀더)는 슬롯마다 자리를 옮기므로 어느 카드인지는 앵커가 정하고, 그 카드의 어디를 미는지는
+    // 프리팹 저작이 정한다 — 변환값만 쓰면 손 그림 한가운데가 카드 정중앙에 얹혀 카드가 가려진다.
     void PlaceFinger(RectTransform _anchor)
     {
         if (this.finger == null) return;
 
-        if (_anchor != null && this.m_rect != null)
-            this.m_fingerHome = UiGainBurst.ToLayerLocal(this.m_rect, _anchor);
+        this.m_fingerHome = _anchor != null && this.m_rect != null
+                          ? UiGainBurst.ToLayerLocal(this.m_rect, _anchor) + this.m_fingerOffset
+                          : this.m_fingerOffset;
 
         this.finger.anchoredPosition = this.m_fingerHome;
     }

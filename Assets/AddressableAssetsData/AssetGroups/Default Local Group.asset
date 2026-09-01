@@ -63,7 +63,7 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 846d825ba21303740ae41a6a317b231e
-    m_Address: KeywordDemoStage
+    m_Address: UnlockDemoStage
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

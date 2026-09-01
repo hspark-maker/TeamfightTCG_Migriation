@@ -46,7 +46,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 08ec9e965eb22a94a84dddfdb7c124d4
-    m_Address: Image_Card_CrystalRhino_Stage2
+    m_Address: Image_Card_Crystalhorn_Stage2
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -122,6 +122,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2644fb62a8b387a4e99510306ddf5d8b
+    m_Address: UltraPack
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Packs
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 26fc67884e02e5e459d6fdfc70b990ec
     m_Address: Image_Card_Sandmong_Stage2
@@ -303,6 +309,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 68419dc4956c8c64d9a94cd15bf69507
+    m_Address: TutorialPack
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Packs
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 69a0be68c11962d4ca3b0a7721da9300
     m_Address: Image_Card_Phoenixia_Stage2
     m_ReadOnly: 0
@@ -340,7 +352,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6ed138516e2b9fda82fcf82ea1569014
-    m_Address: Image_Card_Crystalhorn_Stage1
+    m_Address: Image_Card_Crystahorn_Stage1
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -400,7 +412,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7437d2e3730f5a7469ac19fd023054e3
-    m_Address: Image_Card_Crystalhorn_Stage2
+    m_Address: Image_Card_Crystahorn_Stage2
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -466,7 +478,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 93940ea1ba9ccea45b1a4a525ebefce0
-    m_Address: Image_Card_CrystalRhino_Stage1
+    m_Address: Image_Card_Crystalhorn_Stage1
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -532,7 +544,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ae322aa4e09c3d84097854d63e9a6f70
-    m_Address: Image_Card_Crystalhorn_Stage3
+    m_Address: Image_Card_Crystahorn_Stage3
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -615,6 +627,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c5b5bf8342347bb48bd20eb2691b4ae9
+    m_Address: NormalPack
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Packs
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c6a615355510b4f418707cf37c193c3d
     m_Address: Image_Card_Lumielk_Stage2
     m_ReadOnly: 0
@@ -628,7 +646,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c7f9f74e17ae58148aeb88fb95465173
-    m_Address: Image_Card_CrystalRhino_Stage3
+    m_Address: Image_Card_Crystalhorn_Stage3
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -674,6 +692,12 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e5e13fef52632004e9c760769cf60a1e
+    m_Address: SpecialPack
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Packs
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e821ae558fb22b445b015b57690ed6c6
     m_Address: Image_Card_Magmole_Stage2
@@ -734,30 +758,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c5b5bf8342347bb48bd20eb2691b4ae9
-    m_Address: NormalPack
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Packs
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e5e13fef52632004e9c760769cf60a1e
-    m_Address: SpecialPack
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Packs
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 68419dc4956c8c64d9a94cd15bf69507
-    m_Address: TutorialPack
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Packs
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2644fb62a8b387a4e99510306ddf5d8b
-    m_Address: UltraPack
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Packs
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
