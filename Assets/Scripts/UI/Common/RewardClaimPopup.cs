@@ -195,9 +195,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.RestoreReveal();
 
         // 재화가 갈리면 줄기도 갈려야 한다 — 공용 재생기가 종류별 시퀀스를 조립하고 수치 고정 해제 안전망까지 붙여 온다.
-        // 잔액은 아직 오르지 않았으므로 롤업 목표를 예고량으로 세운다(_optimistic) — 안 그러면 숫자가 내려갔다 제자리로 온다.
-        var t_gain = t_player.BuildLightGain(this.m_rewards, this.m_origins, this.reveal.LightSprite,
-                                             _optimistic: true);
+        // 표시 잔액에는 낙관분이 이미 서 있으므로 롤업 목표를 따로 세우지 않는다.
+        var t_gain = t_player.BuildLightGain(this.m_rewards, this.m_origins, this.reveal.LightSprite);
         if (t_gain == null)
         {
             this.Hide();

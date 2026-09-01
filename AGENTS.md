@@ -51,6 +51,7 @@
 - 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
 - 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
 - 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
+- 토너먼트 정점이 대치 화면으로: `UI/Tournament/TournamentNodeView` 클릭 → `UI/Lobby/LobbyMatchLauncher.StartTournamentBattle` 이 `MatchProfile.OfTournamentNode` 로 고정 상대를 만들고 `LobbyMatchLauncher.RunEntryChainAsync` 에 프리셋으로 넘긴다 · 대치 연출 `UI/Match/MatchmakingShell.PlayVersusAsync` · 덱 화면 인계 `MatchmakingShell.PlayHandoffAsync` → `MatchDeckShell.PrepareForHandoff`. 랭크전은 같은 셸의 `MatchmakingShell.RunMatchAsync` 를 타고 덱 화면을 거치지 않는다
 - 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
 - 재화 변동이 화면으로: 잔액의 진실원은 서버 지갑 문서다 — callable 응답의 `wallet` 을 `OutGame/Save/4.Cloud/ServerSaveCommands` 가 `WalletCloud.Adopt` 에 넘기고, 그것이 `CurrencyManager.Adopt` 로 메모리 잔액을 갈아끼운다. 클라에 잔액을 쓰는 경로는 없다
 - 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
@@ -128,9 +129,10 @@
 
 - 추첨 로직: **서버가 판정한다** — callable `openPack` (`functions/src/commands/openPack.ts`, 추첨은 `functions/src/packs/packDraw.ts`, 지도 범위 밖). 클라는 `CardPackOpener.PurchaseAsync` 로 요청하고 `CardPackOpener.Precheck` 는 왕복을 아끼는 낙관 검사일 뿐이다 — 응답 DTO `OpenPackResult` (`OpenPackCard`)
 - 표시·데이터: `CardPackData.ResolvePool` · `PackOdds` (`PackOddsEntry`) · `PackSpec` · `EPackOpenResult` · `WeightedCard` · `RankPackPool` · `DrawnCard` · `OpenedPack` · 잠금 `PackUnlockRules`
-- 결과 전달: `PackHandoff` · `CardPackRewardHandoff`
+- 구매 왕복의 단일 진입점: `UI/Shop/PackPurchaseFlow.PurchaseAsync` — 상점 진열 · 재개봉 · 튜토리얼 자동구매 셋이 모두 여기를 지난다. 왕복 동안의 대기는 `UI/Common/ServerWaitOverlay` 가 덮고(입력 차단은 즉시 · 딤과 스피너는 임계 뒤에만), 거절 안내도 이 자리가 띄운다(`UI/Shop/PackPurchaseFailurePopup` → 망 문제는 `UI/Common/NetworkFailurePopup`). 개봉 화면은 이미 도착한 결과만 받으므로 지연을 견디는 장치가 없다
+- 결과 전달: `PackHandoff` (결과 `OpenedPack` 을 나른다) · `CardPackRewardHandoff`
 - 연출 UI: `UI/Shop/PackRevealView` (`PackRevealView.BeginOpen` 이후 Entering→Swipe→Shifting→Tearing→Pulling→Flicking→Summary 상태 진행) · `PackCardView` · `PackCardStack` · `PackResultGrid`
-- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`
+- 진입·제어: `UI/Shop/PackAcquireController` · `PackOpenOverlay` · `PackShowcaseController` · `PackPurchaseFlow` · `PackCarouselView` · `PackCarouselDotsView` · `PackOddsPopup` (`PackOddsData` · `PackOddsRow`) · `PackStandaloneInitializer`
 - 연출 소품: `PackTearSkin` · `PackTearHandle` · `PackShellRig` · `PackIdleMotion` · `PackScreenFlash` · `PackSpecularSweep` · `PackPurchaseImpact`
 
 ## 컬렉션·소유·도감 (`OutGame/Card/`, `OutGame/Album/`)
@@ -157,7 +159,8 @@
 - 랭크 데이터: `ERankGrade` · `RankGradeConfig` · `RankTier` · `RankInfo` · `RankApplyResult` · `RankRewardDef` · `ERankRewardState` · `RankRewardInfo`
 - 랭크: `RankManager` · `RankConfig` · `RankRewardManager` · `RankResultHandoff` · UI `UI/HUD/RankHud` · `UI/Rank/RankRewardPanel` · `RankRewardRowView` · `UI/Common/LobbyEntryAlertDot` (`EAlertDotTarget`) · `UI/HUD/RankStarGauge` (`Star`) · `RankPromoStandby` · `UI/Lobby/RankPromoteOverlay` · `RankProgressGauge`
 - 매칭: `IMatchmaker` · `FakeMatchmaker` · `MatchProfile` · `MatchOpponent` · `OpponentProfilePool` · `MatchOpponentHandoff`
-- 매칭 UI: `UI/Match/MatchmakingShell` · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
+- 매칭 UI: `UI/Match/MatchmakingShell` (진입점 둘 — 랭크전 `MatchmakingShell.RunMatchAsync` · 토너먼트 대치 `MatchmakingShell.PlayVersusAsync`, 프리팹은 MatchmakingRoot.prefab 하나) · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchmakingEntryFx` · `MatchmakingBgFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
+- 매치 연출 튜닝: 두 모드가 부품 한 벌을 공유하고 저작값 14개만 갈아끼운다 — `MatchmakingFx.ClashTuning` · `MatchmakingEntryFx.EntranceTuning` · `MatchmakingBgFx.SeamTuning` (각 부품에 `Capture*` / `Apply*` 짝). 랭크전 값은 프리팹 저작을 `Awake` 가 캡처하고, 대치 값은 셸의 `versusIntro*` 필드다
 
 ## 보상 토너먼트 (`OutGame/Tournament/`, `UI/Tournament/`)
 
@@ -188,6 +191,8 @@
 
 - 공통 뷰: `CardVisualView` · `CardSynergyBadgeView` · `CardKeywordIconView` · `CardPressRelay` · `FeatureLockView` · `AlertDotView`
 - 전환·커버: `CurtainView` · `ICurtainSwap` · `LoadingCoverView` · `ScreenFlashCover` · `ScreenDimTint` · `UI/ScreenCoverBackground` · `ScreenFillRect` · `StickerPeelGraphic` · `PopupTransition` · `RetractingPanels` · `SceneLoadSwap` · `ScreenFlash` · `PageRollGraphic` (`RollFace`)
+- 서버 응답 대기: `ServerWaitOverlay.Hold` · `ServerWaitOverlay.Release` (PooledUI/ServerWaitOverlay.prefab, 풀 UI라 컨테이너 층 `UiSortingOrder.Pool` 을 따른다) — owner 스택이라 왕복이 겹쳐도 안전하다. 입력 차단은 요청 즉시 걸리고 딤·스피너는 임계 뒤에만 뜬다(빠른 왕복에서 한 프레임 깜빡이면 결함으로 읽힌다). 자기 캔버스가 없으므로 **실패 팝업(`SimpleYNPopup`)과 같은 판에서 형제 순서로만 위아래가 갈린다** — 안내가 대기에 묻히지 않는 것은 소비자가 `ServerWaitOverlay.Release` 를 먼저 하고 팝업을 띄우는 순서 하나로만 보장된다. 씬에 저작된 `UI/Battle/ScreenDim` 과 씬 로드 전용 `LoadingCoverView` 로는 대신할 수 없어 따로 있다. 소비자는 `UI/Shop/PackPurchaseFlow` 와 `UI/CardDetail/CardDetailOverlayView` 의 강화 왕복
+- 커튼 판은 두 화면이 공유한다: 씬 전환 `CurtainView`(SceneCurtain.prefab)와 매치 배경 `UI/Match/MatchmakingBgFx`(MatchmakingRoot.prefab 의 BG)가 같은 CurtainBoards.prefab 인스턴스를 하나씩 갖는다. 기하 식도 `CurtainView.Solve` 하나다. 기울기·피벗·앵커 Y·홈 좌표·색은 양쪽 다 저작이지만 **크기와 배율의 주인은 두 화면이 다르다** — 씬 커튼은 `CurtainView.ApplyGeometry` 가 매번 덮고, 매치는 저작값을 그대로 쓴다(한때 매치도 계산으로 통일했다 되돌렸다). 매치 쪽 오저작은 `MatchmakingBgFx` 의 에디터 경고 셋이 잡는다 — 피벗·앵커·기울기 위반, 두 판의 배율 불일치, 그리고 판이 화면을 덮기에 모자란 경우. 아래 판 색은 씬 커튼이 덱 화면 색을 쓰고 매치만 시작색을 오버라이드하므로 **통일하면 안 된다**
 - 이펙트: `RewardRevealFx` · `CardGainFlightEffect` · `UiGainBurst` · `UiConfettiBurst` · `UiLightStreak` · `UiPunch` · `UiCrumble` · `UiAdditive` · `UiGrayscale` (`Toned`) · `UiRectCapture` · `UiConfettiBurst.Settings`
 - 정렬 층(무엇이 무엇 위에 뜨는가): `UiSortingOrder` — 프리팹 저작값·코드 상수 모두 이 표를 따른다. 순서를 런타임에 재지 않는다
 - 레이아웃: `SafeAreaFitter` · `PopupPlacer` · `GridRatioFitter` · `UniformFitContent` · `CardAutoScale` () · `UI/SettingsPanel`

@@ -49,16 +49,24 @@ public class AlbumSleeveView : MonoBehaviour
     [SerializeField] float maxTilt = 11f;
     [Tooltip("스와이프마다 뽑는 기울기 진폭의 하한(봉투 대비). 0이면 가끔 똑바로 들어가 까딱거림이 끊긴다.")]
     [Range(0f, 1f)] [SerializeField] float minTiltAmount = 0.3f;
-    [Tooltip("직전과 반대쪽으로 기울 확률. 1이면 좌우가 규칙적으로 번갈아 보인다.")]
+    [Tooltip("직전과 반대쪽으로 기울 확률. 1이면 좌우가 규칙적으로 번갈아 보인다.\n" +
+             "얕은 구간에서는 아래 flipFromDepth가 이 확률을 0으로 눌러 방향이 유지된다.")]
     [Range(0f, 1f)] [SerializeField] float flipChance = 0.7f;
-    [Tooltip("새 각도로 갈아타는 데 걸리는 삽입 깊이(카드 높이 대비). 0이면 손을 대는 순간 각도가 튄다.")]
+    [Tooltip("이 깊이(미는 거리 대비)를 지나야 스와이프가 기울기 **방향**을 뒤집는다. 그 전에는 같은 쪽으로 진폭만 새로 뽑는다.\n" +
+             "⚠ 0으로 내리지 말 것 — 방향을 뒤집으려면 각도가 반드시 0을 지난다(SeedAt이 이전 값에서 새 값으로 잇는다).\n" +
+             "  그 순간 카드가 정확히 수직으로 서는데, 격자의 세로 피치가 카드 높이와 거의 같아 바로 위 칸에 포개지므로\n" +
+             "  그 칸에 꽂힌 카드로 읽힌다. 얕을수록 카드가 위 칸을 넓게 덮어 더 심하다.\n" +
+             "깊이 들어갈수록 봉투(AllowedTilt)가 각도를 조여 어차피 수직에 가까워지므로, 그 뒤로는 뒤집어도 티가 나지 않는다.\n" +
+             "올릴수록 좌우가 번갈아 걸리는 손맛이 뒤로 밀린다 — 진폭은 계속 새로 뽑히므로 까딱거림 자체는 남는다.")]
+    [Range(0f, 1f)] [SerializeField] float flipFromDepth = 0.5f;
+    [Tooltip("새 각도로 갈아타는 데 걸리는 삽입 깊이(미는 거리 대비). 0이면 손을 대는 순간 각도가 튄다.")]
     [Range(0.01f, 0.4f)] [SerializeField] float tiltBlendDepth = 0.12f;
     [Tooltip("기울어진 만큼 옆으로도 밀린다 — 단위는 카드 폭이 아니라 **남은 입구 여유(slack)의 비율**이다.\n" +
              "1이어도 씰을 넘지 않는다(각도가 이미 쓴 폭을 뺀 나머지만 쓰므로). 0이면 입구가 항상 칸 정중앙.")]
     [Range(0f, 1f)] [SerializeField] float shiftRatio = 0.5f;
 
     [Header("덜덜거림 (stick-slip)")]
-    [Tooltip("한 번에 미끄러져 들어가는 단위(카드 높이 대비). 손가락은 연속으로 움직여도 카드는 이 단위로 툭툭 들어간다.\n" +
+    [Tooltip("한 번에 미끄러져 들어가는 단위(미는 거리 대비). 손가락은 연속으로 움직여도 카드는 이 단위로 툭툭 들어간다.\n" +
              "작을수록 눈금이 잦아 잔진동처럼 읽히고, 클수록 한 번에 크게 미끄러진다.")]
     [Range(0.02f, 0.2f)] [SerializeField] float slipStep = 0.12f;
     [Tooltip("한 눈금 중 실제로 미끄러지는 구간의 비율. 나머지는 버티는(평평한) 구간이다.\n" +
@@ -84,6 +92,11 @@ public class AlbumSleeveView : MonoBehaviour
     [SerializeField] float shakeSpeed = 5f;
 
     [Header("씰 입구")]
+    [Tooltip("진행도 0에서 카드 하단이 이미 씰에 잠겨 있는 깊이(카드 높이 대비). 0이면 칸 위에 통째로 떠 있는 자리에서 출발한다.\n" +
+             "0.1이면 하단 10%가 물린 채 시작해 '입구에 걸쳐 놓고 미는' 그림이 된다.\n" +
+             "올릴수록 밀어 넣을 거리(PushDistance)가 짧아진다 — 손가락 이동량도 함께 줄어 카드가 손을 계속 따라온다.")]
+    [Range(0f, 0.5f)] [SerializeField] float startSunk = 0.1f;
+
     [Tooltip("입구가 카드보다 이만큼 넓다고 본다(카드 폭 대비). 클수록 헐겁게, 작을수록 빡빡하게 끼워진다.")]
     [Range(0.02f, 0.4f)] [SerializeField] float mouthClearance = 0.12f;
     [Tooltip("이 진행도부터 남은 기울기를 마저 편다 — 안착 순간 각도가 정확히 0이어야 바꿔치기가 안 보인다.")]
@@ -99,7 +112,8 @@ public class AlbumSleeveView : MonoBehaviour
     float     m_cardHeight;   // = 정렬된 슬롯 높이. 진행도 1의 이동 거리
     float     m_cardWidth;    // = 정렬된 슬롯 폭. 입구 제약 계산의 기준
     float     m_homeX;
-    float     m_homeY;        // 진행도 0의 카드 y(슬롯 바로 위에 통째로 떠 있는 자리)
+    float     m_homeY;        // 깊이 0의 카드 y(칸 위에 통째로 떠 있는 자리). 출발은 여기서 m_startDepth만큼 내려온 자리다
+    float     m_startDepth;   // 진행도 0의 삽입 깊이 — 여기부터 m_cardHeight까지가 실제로 밀어 넣는 구간이다
     float     m_seedFrom;     // 직전 스와이프의 기울기 계수(-1~1)
     float     m_seedTo;       // 이번 스와이프의 기울기 계수
     float     m_seedDepth;    // 갈아타기가 시작된 깊이 — 여기부터 tiltBlendDepth만큼 밀면 새 각도가 된다
@@ -119,8 +133,9 @@ public class AlbumSleeveView : MonoBehaviour
     bool      m_layerWarned;  // 배선 누락 경고는 카드마다 쏟지 않고 한 번만
     Transform m_dockHome;     // cardHolder의 원래 부모(= 패널). 옮기기 전에 한 번만 기억한다
 
-    /// <summary>진행도 1이 이동하는 거리(캔버스 단위). 드래그 임계의 기준이 된다.</summary>
-    public float CardHeight => this.m_cardHeight;
+    /// <summary>진행도 1이 이동하는 거리(캔버스 단위). 드래그 임계의 기준이 된다.
+    /// 카드 높이가 아니라 **출발 자리에서 안착까지의 거리**다 — startSunk만큼은 이미 잠겨 있어 밀 필요가 없다.</summary>
+    public float PushDistance => this.m_cardHeight - this.m_startDepth;
 
     /// <summary>마지막으로 반영된 진행도. 안착·되밀림 트윈의 시작값이다.</summary>
     public float Progress => this.m_progress;
@@ -172,7 +187,7 @@ public class AlbumSleeveView : MonoBehaviour
         float t_depth = this.DepthAt(this.m_progress);
 
         this.m_seedFrom  = this.SeedAt(t_depth);
-        this.m_seedTo    = RollSeed(this.m_seedFrom, this.minTiltAmount, this.flipChance);
+        this.m_seedTo    = RollSeed(this.m_seedFrom, this.minTiltAmount, this.FlipChanceAt(t_depth));
         this.m_seedDepth = t_depth;
     }
 
@@ -221,15 +236,18 @@ public class AlbumSleeveView : MonoBehaviour
         // ■ stick-slip — 손가락은 연속으로 움직이지만 카드는 slipStep 단위로 **툭툭** 들어간다.
         //   한 눈금 안에서 앞쪽은 버티고(평평) 뒤쪽 slipSharpness 구간에서만 미끄러진다 — 계단이되 연속이다.
         //   ⚠ Floor로 끊으면 눈금 경계에서 손가락 미세 떨림이 그대로 각도 진동이 된다(개편 전 지직거림).
-        float t_unit = Mathf.Max(0.001f, this.m_cardHeight * this.slipStep);
-        float t_u    = t_raw / t_unit;
+        //   ⚠ 눈금의 원점은 0이 아니라 **출발 깊이**다. 원점이 어긋나면 진행도 0에서 그림이 한 눈금 뒤로 물러나
+        //     카드가 잠긴 채로 출발하지 못하고 칸 위로 도로 떠오른다.
+        float t_unit = Mathf.Max(0.001f, this.PushDistance * this.slipStep);
+        float t_push = t_raw - this.m_startDepth;
+        float t_u    = t_push / t_unit;
         int   t_i    = Mathf.FloorToInt(t_u);
         float t_slip = this.SlipCurve(Mathf.InverseLerp(1f - this.slipSharpness, 1f, t_u - t_i));
 
         // 마지막 구간에선 계단을 편다 — 각도를 마저 펴는 그 구간이다. 계단이 남으면 진행도 1에서
         // 깊이가 한 눈금 모자라 "완전 삽입"이 안 되고, 바꿔치기가 그만큼 어긋나 보인다.
         float t_flat  = SmootherStep(Mathf.InverseLerp(this.uprightFrom, 1f, this.DepthRatio(t_raw)));
-        float t_depth = Mathf.Lerp((t_i + t_slip) * t_unit, t_raw, t_flat);
+        float t_depth = this.m_startDepth + Mathf.Lerp((t_i + t_slip) * t_unit, t_push, t_flat);
 
         // 각도 킥을 같은 미끄러짐에 실어 보낸다 — 이웃 눈금끼리 보간하므로 카드가 미끄러지는 그 순간에만 튄다.
         // (눈금 번호로만 뽑으면 인접값이 무상관이라 경계에서 최대 진폭으로 튄다.)
@@ -374,7 +392,8 @@ public class AlbumSleeveView : MonoBehaviour
         this.m_cardHeight = Mathf.Max(1f, _size.y);
         this.m_cardWidth  = Mathf.Max(1f, _size.x);
         this.m_homeX      = _center.x;
-        this.m_homeY      = _center.y + this.m_cardHeight;   // 진행도 0 = 칸 바로 위, 겹침 0
+        this.m_homeY      = _center.y + this.m_cardHeight;   // 깊이 0의 자리. 실제 출발은 startSunk가 정한다
+        this.m_startDepth = this.m_cardHeight * Mathf.Clamp01(this.startSunk);
         this.m_progress   = 0f;
 
         // 첫 각도도 스와이프와 같은 방식으로 뽑는다 — 카드마다 다른 각도로 떠 있어야 규칙성이 안 읽힌다.
@@ -384,7 +403,7 @@ public class AlbumSleeveView : MonoBehaviour
 
         this.BakeResistance();
 
-        Fit(this.cardHolder, _size, new Vector2(this.m_homeX, this.m_homeY));
+        Fit(this.cardHolder, _size, new Vector2(this.m_homeX, this.m_homeY - this.m_startDepth));
         this.SetProgress(0f);
         this.Snap();   // 새 카드가 이전 카드의 깊이에서 미끄러져 오면 안 된다 — 시작 자리에 즉시 선다
     }
@@ -418,7 +437,13 @@ public class AlbumSleeveView : MonoBehaviour
         return t_abs * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(this.uprightFrom, 1f, this.DepthRatio(_depth))));
     }
 
-    float DepthRatio(float _depth) => this.m_cardHeight > 0f ? _depth / this.m_cardHeight : 0f;
+    // 진행도와 같은 축의 0~1이다 — 출발 깊이가 0, 안착이 1. uprightFrom·봉투 페이드·flipFromDepth가 모두
+    // 이걸 기준으로 하므로, 출발을 잠근 채 시작해도 각도가 펴지고 방향이 풀리는 지점이 진행도상 같은 자리에 남는다.
+    float DepthRatio(float _depth)
+    {
+        float t_push = this.PushDistance;
+        return t_push > 0f ? Mathf.Clamp01((_depth - this.m_startDepth) / t_push) : 0f;
+    }
 
     // 봉투를 천장 대비 0~1로. 깊을수록 0에 수렴하므로 "각도를 따라 사라져야 하는 것"의 공통 스위치다.
     float TiltFade(float _env) => this.maxTilt > 0f ? Mathf.Clamp01(_env / this.maxTilt) : 0f;
@@ -426,15 +451,21 @@ public class AlbumSleeveView : MonoBehaviour
     // 이번 스와이프의 기울기 계수(-1~1). 깊이로 갈아타므로 **되감아도 같은 값이 나온다**(시간을 쓰지 않는다).
     float SeedAt(float _depth)
     {
-        if (this.tiltBlendDepth <= 0f || this.m_cardHeight <= 0f) return this.m_seedTo;
+        if (this.tiltBlendDepth <= 0f || this.PushDistance <= 0f) return this.m_seedTo;
 
-        float t_span = this.m_cardHeight * this.tiltBlendDepth;
+        float t_span = this.PushDistance * this.tiltBlendDepth;
         float t_t    = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_depth - this.m_seedDepth) / t_span));
 
         return Mathf.Lerp(this.m_seedFrom, this.m_seedTo, t_t);
     }
 
+    // 이 깊이에서 방향을 뒤집어도 되는가. 뒤집기는 각도 0을 지나는 일이라 얕은 구간에서는 금지한다
+    // — 수직이 되는 순간 카드가 바로 위 칸에 포개진다(flipFromDepth 참고).
+    float FlipChanceAt(float _depth)
+        => this.DepthRatio(_depth) < this.flipFromDepth ? 0f : this.flipChance;
+
     // 직전과 반대쪽으로, 눈에 보일 만큼의 진폭으로. 봉투가 곱해지므로 깊을수록 실제 각도는 작아진다.
+    // _flip이 0이면 방향은 직전 그대로 남고 진폭만 새로 뽑힌다.
     static float RollSeed(float _prev, float _min, float _flip)
     {
         float t_amount = Random.Range(Mathf.Clamp01(_min), 1f);
@@ -455,21 +486,21 @@ public class AlbumSleeveView : MonoBehaviour
     //   봉투는 깊이만의 함수라 표가 카드 한 장 동안 고정된다.
     void BakeResistance()
     {
-        float t_step = this.m_cardHeight / (RESIST_SAMPLES - 1);
+        float t_step = this.PushDistance / (RESIST_SAMPLES - 1);
         float t_sum  = 0f;
 
         this.m_effort[0] = 0f;
         for (int t_i = 1; t_i < RESIST_SAMPLES; t_i++)
         {
             // 구간 중앙의 저항으로 그 구간의 수고를 잰다(끝점만 쓰면 첫 구간의 걸림이 통째로 빠진다).
-            float t_mid = t_step * (t_i - 0.5f);
+            float t_mid = this.m_startDepth + t_step * (t_i - 0.5f);
             float t_r   = this.maxTilt > 0f ? this.resistanceMax * (this.AllowedTilt(t_mid) / this.maxTilt) : 0f;
 
             t_sum += t_step / Mathf.Max(0.15f, 1f - t_r);   // 하한 — 저항이 1에 닿으면 영영 안 들어간다
             this.m_effort[t_i] = t_sum;
         }
 
-        // 총 수고를 1로 정규화한다 — 진행도 1 = 카드 높이만큼 민 순간이라는 드래그 계약을 유지하려고.
+        // 총 수고를 1로 정규화한다 — 진행도 1 = PushDistance만큼 민 순간이라는 드래그 계약을 유지하려고.
         if (t_sum <= 0f) return;
         for (int t_i = 1; t_i < RESIST_SAMPLES; t_i++) this.m_effort[t_i] /= t_sum;
     }
@@ -477,10 +508,10 @@ public class AlbumSleeveView : MonoBehaviour
     // 진행도(=정규화된 수고) → 실제 삽입 깊이. 표를 훑어 선형 보간한다.
     float DepthAt(float _p)
     {
-        if (_p <= 0f) return 0f;
+        if (_p <= 0f) return this.m_startDepth;
         if (_p >= 1f) return this.m_cardHeight;
 
-        float t_step = this.m_cardHeight / (RESIST_SAMPLES - 1);
+        float t_step = this.PushDistance / (RESIST_SAMPLES - 1);
 
         for (int t_i = 1; t_i < RESIST_SAMPLES; t_i++)
         {
@@ -488,7 +519,7 @@ public class AlbumSleeveView : MonoBehaviour
 
             float t_span = this.m_effort[t_i] - this.m_effort[t_i - 1];
             float t_frac = t_span > 0f ? (_p - this.m_effort[t_i - 1]) / t_span : 0f;
-            return t_step * (t_i - 1 + t_frac);
+            return this.m_startDepth + t_step * (t_i - 1 + t_frac);
         }
 
         return this.m_cardHeight;

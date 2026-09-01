@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 // Tab_Pack의 카드팩 쇼케이스 컨트롤러. 진열할 팩들을 인스펙터에서 직접 받아 캐러셀에 그림을 공급하고,
-// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 낙관 검사 → 캐리어(PackHandoff)에 구매 티켓 적재 → 개봉 오버레이 열기를 수행한다.
-// 서버 왕복은 기다리지 않는다 — 티켓이 왕복을 쥐고 개봉 화면이 그 사이를 덮는다(클릭 뒤 아무것도 안 변하는 구간 제거).
+// 중앙에 놓인 팩의 이름·가격을 채우고, 구매 버튼 클릭 시 낙관 검사 → 서버 왕복(PackPurchaseFlow) → 캐리어(PackHandoff) → 개봉 오버레이 열기를 수행한다.
+// 왕복 동안의 대기는 PackPurchaseFlow가 띄우는 로딩 오버레이가 전담한다 — 개봉 화면은 이미 도착한 결과만 보여준다.
 // 이 흐름은 튜토리얼 자동 구매 스텝(OutgameTutorialRunner)이 쓰는 경로와 동일하며, 버튼 트리거로 재현한 것.
 // 경계: 구매·소유·차감은 PurchaseAsync(서버)가 원자 영속하고, 뷰는 표시·결과 분기·전환만 담당한다.
 // 진열 목록(packs)은 이 뷰가 직접 소유한다 — 상점 SO 미개입(목록이 비면 구매 잠금).
@@ -20,7 +21,7 @@ using UnityEngine.SceneManagement;
 //   목록으로 흡수하면 그림·이름·가격·결제가 전부 한 곳에서 나오므로 갈릴 여지가 구조적으로 없다.
 public class PackShowcaseController : MonoBehaviour
 {
-    // 구매를 확정한 순간 발화(왕복 성립이 아니라 결제 개시). 구독자는 모른다 — "일어난 일"만 알린다.
+    // 구매가 실제로 성립한 순간 발화(클릭이 아니라 서버 응답). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
 
     [SerializeField] Button buyButton;              // 구매 → 개봉 오버레이 열기 트리거.
@@ -47,8 +48,9 @@ public class PackShowcaseController : MonoBehaviour
              "빛 스프라이트를 비우면 예전처럼 단색 판만 남는다(전환 은폐 기능은 그대로).")]
     [SerializeField] ScreenFlashCover purchaseFlash = new ScreenFlashCover();
 
-    // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 개봉 오버레이가 닫힐 때 해제된다 —
-    // 씬을 떠나지 않으므로 OnEnable만으로는 영영 잠긴 채로 남는다(탭이 계속 활성이라 다시 돌지 않는다).
+    // 전환은 1회만(같은 프레임 멀티탭 이중결제 차단). 구매 클릭에 서고 개봉 오버레이가 닫힐 때 풀리는데,
+    // 그 사이 어디서 끊기든 반드시 풀어야 해서 해제 지점이 넷이다 — 정상 닫힘(OnOverlayClosed),
+    // 왕복 실패·진열 소멸(BuyAsync), 오버레이 열기 실패(OpenOverlay), 그리고 굳은 잠금을 푸는 탭 재진입(OnEnable).
     static bool s_transitioning;
 
     readonly List<CardPackData> m_display = new List<CardPackData>();   // 실제 진열 목록(해석 결과).
@@ -64,7 +66,9 @@ public class PackShowcaseController : MonoBehaviour
 
     void OnEnable()
     {
-        s_transitioning = false;
+        // 굳은 잠금을 푸는 복구 장치다 — 다만 결제 왕복이 도는 중이라면 그 잠금은 굳은 것이 아니라 일하는 중이다.
+        // 지우면 대기 오버레이가 서지 못한 상태(UIPrefab 항목 누락)에서 탭을 여닫는 것만으로 같은 결제가 두 번 나간다.
+        if (!PackPurchaseFlow.IsPurchasing) s_transitioning = false;
 
         if (buyButton != null)
         {
@@ -300,7 +304,7 @@ public class PackShowcaseController : MonoBehaviour
         UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
     }
 
-    // 구매 클릭: 낙관 검사를 통과하면 티켓을 캐리어에 실어 곧바로 개봉 오버레이로, 실패면 사유별 팝업(전역 1회 가드).
+    // 구매 클릭: 낙관 검사를 통과하면 서버 왕복을 태우고, 성립하면 캐리어에 실어 개봉 오버레이로. 실패면 사유별 팝업(전역 1회 가드).
     void OnBuyPressed()
     {
         if (s_transitioning) return;
@@ -326,25 +330,52 @@ public class PackShowcaseController : MonoBehaviour
             return;
         }
 
-        Buy(t_pack);
+        BuyAsync(t_pack).Forget();
     }
 
-    // 구매 확정. 서버 왕복은 티켓에 맡기고 기다리지 않는다 — 개봉 화면이 그 사이를 덮고, 서버 거절이 나오면
-    // 개봉 화면이 스스로 안내하고 닫는다(거절 표면은 오버레이 한 곳뿐 — 상점은 그 뒤를 모른다).
-    // 튜토리얼 좌표도 그쪽 거절 신호가 되감으므로, 여기서 미리 커밋해도 전진한 채 멈추지 않는다.
-    // 잠금은 티켓을 띄우기 "전"에 세운다 — 같은 프레임 멀티탭이 결제를 여러 번 내보내는 것을 막는다.
-    void Buy(CardPackData _pack)
+    // 서버 왕복 구매. 잠금은 왕복 "전"에 세운다 — 대기 화면이 떠 있어도 같은 결제가 두 번 나갈 여지를 남기지 않는다.
+    // 실패로 끝나는 갈래에서 반드시 되돌릴 것: 개봉 오버레이가 열리지 않으므로 잠금을 풀어 줄 닫힘 신호가 오지 않는다
+    // (안 풀면 이 세션 내내 진열이 굳는다 — OpenOverlay 실패 갈래와 같은 처방).
+    async UniTaskVoid BuyAsync(CardPackData _pack)
     {
         s_transitioning = true;
 
-        // 오버레이보다 반드시 먼저 울린다 — 튜토리얼 브리지가 이 신호로 게이트를 닫고
+        var t_opened = await PackPurchaseFlow.PurchaseAsync(_pack, this);
+
+        // 왕복 중 이 뷰가 사라졌다면 태울 화면이 없다 — 캐리어에 싣지 않는 것은 의도적이다:
+        // 다음에 열리는 개봉이 남의 결과를 물려받는 편이 더 나쁘다.
+        if (this == null)
+        {
+            s_transitioning = false;
+            if (t_opened != null)
+                Debug.LogWarning("[PackShowcaseController] 구매 성립 후 진열이 사라짐 — 카드는 지급됐으나 연출 생략.");
+            return;
+        }
+
+        if (t_opened == null)
+        {
+            // 안내는 PackPurchaseFlow가 이미 띄웠다 — 여기서는 얼려 둔 진열만 되돌린다.
+            s_transitioning = false;
+            Refresh();
+            return;
+        }
+
+        // 개봉 오버레이보다 반드시 먼저 울린다 — 튜토리얼 브리지가 이 신호로 게이트를 닫고
         // 오버레이 열림 신호가 스텝을 다시 적용한다. 뒤집으면 개봉 화면 위에 구식 스텝의 게이트가 한 번 그려진다.
-        OnAnyPurchased?.Invoke();
+        //
+        // 구독자가 던지면 async UniTaskVoid 안이라 조용히 삼켜지고 잠금이 굳은 채 개봉도 열리지 않는다
+        // (동기 Buy() 시절엔 Button 핸들러로 드러나던 자리다). 결제는 이미 성립했으므로 신호를 잃더라도 개봉은 이어간다.
+        try { OnAnyPurchased?.Invoke(); }
+        catch (Exception t_exception)
+        {
+            Debug.LogError($"[PackShowcaseController] 구매 성립 신호의 구독자가 끊겼습니다 — 개봉은 그대로 이어갑니다.\n{t_exception}");
+        }
 
         // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
-        PackHandoff.Set(PackPurchaseTicket.Begin(_pack), _pack, SceneManager.GetActiveScene().name, false);
+        PackHandoff.Set(t_opened, _pack, SceneManager.GetActiveScene().name, false);
 
         // 개봉 화면은 구매 임팩트가 화면을 플래시로 덮은 순간에 연다 — 그래야 전환 프레임이 드러나지 않는다.
+        // 임팩트는 응답이 온 뒤에 재생한다: 왕복 앞에 두면 플래시가 걷힌 자리에 아직 아무것도 없다.
         // 연출을 세우지 못하면 예전처럼 즉시 연다(연출은 있으면 좋은 것이지, 개봉의 조건이 아니다).
         m_openPending = true;
         if (PackPurchaseImpact.TryGet(this, out var t_impact)) t_impact.Play(ResolvePackRect(), purchaseFlash, OpenOverlay);

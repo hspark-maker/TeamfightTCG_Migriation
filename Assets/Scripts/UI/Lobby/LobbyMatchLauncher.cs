@@ -5,16 +5,18 @@ using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// 로비 PlayBtn → 출전 덱 확정 → 매칭(실 상대 20초 탐색, 없으면 AI) → 전투 진입.
-/// 전투가 소비하는 DeckConfig.PlayerDeck을 채우는 지점은 이 진입점이 여는 덱 화면(MatchDeckShell) 하나뿐이다.
-/// 배틀 씬은 확정된 값을 읽기만 한다 — 확정 지점이 씬을 넘어 둘로 갈리지 않게.
+/// 로비 PlayBtn → 매칭(실 상대 20초 탐색, 없으면 AI) → 전투 진입. 일반전은 덱 확인 화면을 거치지 않는다.
+///
+/// 전투가 소비하는 DeckConfig.PlayerDeck은 씬 로드 전에 여기서 확정된다 — 일반전은 대표 덱
+/// (DeckSaveManager.SelectedSlot)을 싣고, 덱 화면이 남아 있는 두 경로(토너먼트 정점·튜토리얼 덱 게이트)는
+/// 그 화면(MatchDeckShell)이 싣는다. 배틀 씬은 확정된 값을 읽기만 한다.
 public class LobbyMatchLauncher : MonoBehaviour
 {
     [SerializeField] LobbyOverlayHost overlayHost;
     [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
-    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭 없이 구 동작
+    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭도 대치 인트로도 없이 구 동작
     [SerializeField] OpponentProfilePool profilePool;
 
     [Header("유효 덱 없음 안내")]
@@ -30,9 +32,6 @@ public class LobbyMatchLauncher : MonoBehaviour
     [Tooltip("토너먼트 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
     [SerializeField] TournamentMapOverlayView tournamentPanel;
 
-    [Tooltip("정점 도전의 대치 인트로. 미배선이면 예전처럼 덱 화면이 곧장 뜬다 — 연출 때문에 전투가 막히지 않는다.")]
-    [SerializeField] VersusIntroShell versusShellPrefab;
-
     const string BATTLE_SCENE = "BattleScene";
 
     // 게이트가 열려 있는 동안 PlayBtn 재클릭을 막는다 — 두 번째 진입이 셸의 선택 상태를 덮고,
@@ -41,7 +40,6 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
-    VersusIntroShell m_versusShell;
     LobbyOverlayHost m_overlayHost;
 
     /// <summary>
@@ -86,19 +84,6 @@ public class LobbyMatchLauncher : MonoBehaviour
                 m_matchShell = Instantiate(matchShellPrefab, transform.parent);
 
             return m_matchShell;
-        }
-    }
-
-    // 매칭 셸과 같은 이유로 첫 도전 때 띄운다. 부모도 같다 — 나중에 생성돼 마지막 형제가 되므로
-    // 맵 오버레이 위에 선다(이 화면은 맵을 덮어야 한다).
-    VersusIntroShell VersusShell
-    {
-        get
-        {
-            if (m_versusShell == null && versusShellPrefab != null)
-                m_versusShell = Instantiate(versusShellPrefab, transform.parent);
-
-            return m_versusShell;
         }
     }
 
@@ -346,37 +331,19 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (!_preset.HasValue && UseMatchmaking)
         {
-            // 덱 화면에는 아직 정해지지 않은 상대를 빈 칸으로 보인다. 직전 전투의 캐리어가 남아 있으면
-            // 새 상대처럼 보이므로 선택 화면을 열기 전에 명시적으로 비운다.
+            // 직전 전투의 캐리어가 남아 있으면 새 상대처럼 읽힌다 — 매칭을 열기 전에 명시적으로 비운다.
             MatchOpponentHandoff.Clear();
             DeckConfig.ClearEnemyDeck();
 
-            bool t_selected;
-            if (DeckShell == null)
-            {
-                Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
-                t_selected = TryApplyFirstValidDeck();
-            }
-            else
-            {
-                t_selected = await DeckShell.RunSelectionAsync(_ct);
-            }
+            // 출전 덱은 유저가 로비 덱 탭에서 정해 둔 대표 덱이다. 덱 확인 화면을 거치지 않으므로
+            // 여기가 일반전에서 DeckConfig.PlayerDeck을 채우는 유일한 지점이다.
+            if (!TryApplySelectedDeck()) return false;
 
-            if (!t_selected || _ct.IsCancellationRequested) return false;
-
-            // 매칭 화면을 먼저 세운 뒤 덱 화면을 내린다 — 두 오버레이 사이로 로비가 한 프레임 비치지 않게 한다.
             MatchmakingShell t_matchShell = MatchShell;
-            if (t_matchShell == null)
-            {
-                DeckShell?.Close();
-                return false;
-            }
-
-            UniTask<MatchOpponent?> t_match = t_matchShell.RunMatchAsync(Matchmaker, _ct);
-            DeckShell?.Close();
+            if (t_matchShell == null) return false;
 
             // 아래 고정 상대 경로의 t_opponent와 이름을 나눈다 — 같은 이름은 메서드 선언 공간이 겹쳐 컴파일되지 않는다.
-            MatchOpponent? t_matched = await t_match;
+            MatchOpponent? t_matched = await t_matchShell.RunMatchAsync(Matchmaker, _ct);
             if (t_matched == null) return false;   // 취소 = 로비로 되돌아간다
 
             ConfirmOpponent(t_matched);
@@ -391,22 +358,23 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (DeckShell == null)
         {
-            Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 첫 유효 덱으로 전투에 진입한다.");
+            Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 대표 덱으로 전투에 진입한다.");
 
             // 넘어갈 화면이 없으니 매칭 화면은 여기서 스스로 내려간다(전환이 내려 줄 기회가 없다).
             m_matchShell?.Close();
 
-            return TryApplyFirstValidDeck();
+            return TryApplySelectedDeck();
         }
 
         // 고정 상대는 매칭 대신 대치 인트로를 앞세운다 — 정점을 누른 것과 덱을 짜는 것 사이가
         // 비어 있으면 상대가 누구인지 화면이 한 번도 말하지 않는다.
         //
-        // 셸을 여기서 붙잡아 넘긴다 — VersusShell은 비어 있으면 새로 만드는 프로퍼티라,
+        // 셸을 여기서 붙잡아 넘긴다 — MatchShell은 비어 있으면 새로 만드는 프로퍼티라,
         // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
+        // 셸이 미배선(matchShellPrefab 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
         if (_preset.HasValue)
         {
-            VersusIntroShell t_versus = VersusShell;
+            MatchmakingShell t_versus = MatchShell;
 
             if (t_versus != null) return await RunSelectionWithVersusAsync(t_versus, _preset.Value, _ct);
         }
@@ -415,11 +383,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         return await DeckShell.RunSelectionAsync(_ct);
     }
 
-    // 대치 인트로 → 덱 화면. 매칭 경로(RunSelectionWithHandoffAsync)와 같은 규약이되 앞자리 화면만 다르다.
+    // 대치 인트로 → 갈라짐 → 덱 화면. 덱 화면을 앞세우는 경로는 지금 이것 하나뿐이다 —
+    // 랭크전(RunEntryChainAsync의 매칭 갈래)은 로비 대표 덱으로 곧장 전투에 들어가 덱 화면을 거치지 않는다.
     //
-    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 매칭은 상대를 기다리는 동안 세울 시간이 있지만
-    // 여기는 상대가 이미 정해져 있어 대기가 없다. 미리 세워 두면 그 레이아웃 비용이 진입 안무 첫 프레임에 얹힌다.
-    async UniTask<bool> RunSelectionWithVersusAsync(VersusIntroShell _versus, MatchOpponent _opponent,
+    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 상대가 이미 정해져 있어 미리 세울 시간을 벌어 줄 대기가 없다.
+    // 진입 안무 앞에 세우면 그 레이아웃 비용이 첫 프레임에 그대로 얹힌다.
+    async UniTask<bool> RunSelectionWithVersusAsync(MatchmakingShell _versus, MatchOpponent _opponent,
                                                     CancellationToken _ct)
     {
         await _versus.PlayVersusAsync(_opponent, _ct);
@@ -534,16 +503,20 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 선물이 감춰진 채 남지 않는다.
     void HandleGiftReveal(string _nodeId) => tournamentPanel?.PlayGiftReveal(_nodeId);
 
-    // 셸 미배선 폴백 전용. 저장된 슬롯 중 첫 유효 덱을 DeckConfig에 적용하고, 없으면 false.
-    static bool TryApplyFirstValidDeck()
+    // 유저가 로비 덱 탭에서 정해 둔 대표 덱을 씬 전환 캐리어에 싣는다. 유효 덱이 하나도 없으면 false —
+    // 진입 앞단(StartAiBattle)이 이미 걸러 내므로 여기까지 오는 일은 세이브가 도중에 비었을 때뿐이다.
+    static bool TryApplySelectedDeck()
     {
-        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+        int t_slot = DeckSaveManager.SelectedSlot;
+        if (t_slot < 0)
         {
-            if (!DeckSaveManager.IsSlotValid(t_i)) continue;
+            Debug.LogWarning("[LobbyMatchLauncher] 출전할 유효 덱이 없다 — 전투를 시작하지 않는다.");
 
-            DeckConfig.Set(DeckSaveManager.Load(t_i));
-            return true;
+            return false;
         }
-        return false;
+
+        DeckConfig.Set(DeckSaveManager.GetSlot(t_slot));
+
+        return true;
     }
 }

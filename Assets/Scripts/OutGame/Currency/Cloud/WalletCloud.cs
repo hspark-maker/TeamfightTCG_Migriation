@@ -40,6 +40,9 @@ static class WalletCloud
     /// <summary>복구 화면의 재시도. 문서를 다시 읽을 것이므로 채택분만 되돌린다(PlayerSaveCloud.ResetForRetry와 같은 축).</summary>
     internal static void ResetForRetry()
     {
+        // 서버 잔액을 처음부터 다시 세우는 자리다 — 임자가 사라진 낙관 델타가 남아 있으면 재기동 뒤 잔액이 부풀어 보인다.
+        CurrencyManager.ClearPending();
+
         s_hasDocument = false;
         Rev = 0;
         LastError = string.Empty;
@@ -47,6 +50,8 @@ static class WalletCloud
 
     internal static void Shutdown()
     {
+        CurrencyManager.ClearPending();
+
         s_context = default;
         s_envId = string.Empty;
         s_hasDocument = false;

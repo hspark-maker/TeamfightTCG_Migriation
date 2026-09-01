@@ -77,14 +77,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] Image      enhanceCostIcon;
     [SerializeField] TMP_Text   successRateText;    // 다음 레벨 성공률(%)
 
-    [Header("진화 조작 (선택 — 미배선이면 진화 구간에도 강화 버튼이 그대로 선다)")]
-    [Tooltip("진화 관문 레벨(GrowthRules의 1·2차 진화 레벨)에서 강화 버튼 대신 서는 버튼. " +
-             "누르는 결과는 강화와 같은 레벨업 1회다 — 갈리는 것은 얼굴(라벨·연출)뿐이다.")]
-    [SerializeField] Button   evolveButton;
-    [SerializeField] TMP_Text evolveLabelText;
-    [SerializeField] TMP_Text evolveCostText;
-    [SerializeField] Image    evolveCostIcon;
-    [SerializeField] string   evolveLabel = "진화";
+    [Header("진화 얼굴 (선택 — 미배선이면 진화 관문에도 강화 얼굴이 그대로 선다)")]
+    [Tooltip("진화 관문 레벨(GrowthRules의 1·2차 진화 레벨)에서 강화 버튼이 갈아입는 글자와 그림. " +
+             "버튼은 하나뿐이라 누르는 결과는 언제나 같은 레벨업 1회다 — 갈리는 것은 얼굴뿐이다.")]
+    [SerializeField] TMP_Text   evolveLabelText;
+    [SerializeField] GameObject evolveIcon;
+    [Tooltip("강화 구간의 그림. 진화 얼굴이 설 때 이쪽이 물러난다(미배선이면 두 그림이 겹쳐 보인다).")]
+    [SerializeField] GameObject enhanceIcon;
+    [SerializeField] string     evolveLabel = "진화";
 
     [Header("한계돌파 조작 (선택 — 미배선이면 만렙 카드에 강화 버튼이 그대로 선다)")]
     [Tooltip("3성 만렙 뒤에 강화 버튼 대신 서는 버튼. 무는 것은 재화가 아니라 그 카드 전용 간식이다.")]
@@ -284,7 +284,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 각 버튼 밑판의 흑백 효과. 자식(라벨·아이콘·숫자)은 UIEffectReplica로 이걸 따라오므로
     // 코드가 쥐는 것은 버튼당 이 하나뿐이다. 없으면 조작 여부만 바뀐다.
     UIEffect m_enhanceTone;
-    UIEffect m_evolveTone;
     UIEffect m_limitBreakTone;
 
     // 지금 화면에 지어 둔 키워드 줄의 잠김 상태. 해금 순간을 잡으려면 마스크만으로는 부족하다 —
@@ -430,13 +429,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         s_instance = this;
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
-        if (this.evolveButton  != null) this.m_evolveTone  = this.evolveButton.GetComponent<UIEffect>();
         if (this.limitBreakButton != null) this.m_limitBreakTone = this.limitBreakButton.GetComponent<UIEffect>();
 
-        // 강화는 안내가 그 챕터에 닿기 전까지 잠긴다. 두 버튼은 같은 한 방이 자리를 번갈아 쓰는 것이라 키도 하나다.
+        // 강화는 안내가 그 챕터에 닿기 전까지 잠긴다. 진화도 같은 버튼이 얼굴만 갈아입은 것이라 키가 하나다.
         // 룩만 얹는 부착이다 — 차단은 아래 RefreshGrowthActions의 계산식이 진다.
         if (this.enhanceButton != null) FeatureLockView.Attach(this.enhanceButton.gameObject, EOutgameFeature.CardEnhance);
-        if (this.evolveButton  != null) FeatureLockView.Attach(this.evolveButton.gameObject,  EOutgameFeature.CardEnhance);
         if (this.limitBreakButton != null) FeatureLockView.Attach(this.limitBreakButton.gameObject, EOutgameFeature.CardEnhance);
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다 —
@@ -466,13 +463,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         {
             this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
             this.enhanceButton.onClick.AddListener(OnEnhancePressed);
-        }
-
-        // 진화 버튼도 같은 핸들러다 — 겉모습만 갈릴 뿐 누르는 결과는 같은 레벨업 1회다.
-        if (this.evolveButton != null)
-        {
-            this.evolveButton.onClick.RemoveListener(OnEnhancePressed);
-            this.evolveButton.onClick.AddListener(OnEnhancePressed);
         }
 
         // 한계돌파는 핸들러가 따로다 — 연출도 결과판도 무는 것도 강화와 다르다.
@@ -514,7 +504,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
-        if (this.evolveButton  != null) this.evolveButton.onClick.RemoveListener(OnEnhancePressed);
         if (this.limitBreakButton != null) this.limitBreakButton.onClick.RemoveListener(OnLimitBreakPressed);
 
         if (this.artOnlyButton != null) this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
@@ -1221,25 +1210,25 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                             && CardGrowthManager.TryGetNextLimitBreakStep(_card, out t_lbStep);
         int t_snack = _owned ? CardGrowthManager.SnackOf(_card) : 0;
 
-        // 다음 한 방이 진화 관문이면 진화 버튼이 대신 선다. 만렙(다음 단계 없음)이면 강화 버튼이 남는다 —
-        // 어느 쪽이든 바가 비지 않는다.
-        bool t_evolve = this.evolveButton != null && t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
+        // 다음 한 방이 진화 관문이면 같은 버튼이 진화 얼굴로 갈아입는다. 만렙(다음 단계 없음)이면 강화 얼굴이 남는다 —
+        // 어느 쪽이든 버튼이 자리를 옮기지 않는다.
+        bool t_evolve = t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
 
         // 미소유 카드에는 조작을 숨긴다(버튼만 — 바는 켜둔 채로 높이를 지킨다).
         // 열람 전용도 같은 길로 내린다: 바 자체는 이미 걷혀 있지만, 그 안에서 살아 있는 버튼을 남겨 두면
         // 알파만 0인 채로 탭을 먹는다(blocksRaycasts는 창을 여는 순서에 따라 늦게 내려갈 수 있다).
         bool t_limit = this.limitBreakButton != null && t_hasLimitBreak;
 
-        // 강화·진화는 여전히 한 자리를 번갈아 쓰지만, 한계돌파는 그 옆에 따로 선다(ActionRow가 가로로 정렬).
+        // 강화·진화는 한 버튼이 얼굴만 갈아입고, 한계돌파는 그 옆에 따로 선다(ActionRow가 가로로 정렬).
         bool t_actions = _owned && !this.m_readOnly;
-        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions && !t_evolve);
-        if (this.evolveButton  != null) this.evolveButton.gameObject.SetActive(t_actions &&  t_evolve);
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions);
         if (this.limitBreakButton != null) this.limitBreakButton.gameObject.SetActive(t_actions && t_limit);
 
-        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서고 버튼이 자리를 번갈아 쓰므로
-        // 프리팹 표식(TutorialAnchor)으로는 잡을 수 없다. 강화 축이 남아 있으면 그쪽이 안내의 주인공이다.
+        ApplyGrowthFace(t_evolve);
+
+        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 창이 열릴 때마다 새로 서므로 프리팹 표식(TutorialAnchor)
+        // 으로는 잡을 수 없다. 강화 축이 남아 있으면 그쪽이 안내의 주인공이다.
         ApplyGrowthAnchor(!t_actions ? null
-                        : t_evolve ? this.evolveButton
                         : t_hasStep ? this.enhanceButton
                         : t_limit  ? this.limitBreakButton
                         : this.enhanceButton);
@@ -1330,21 +1319,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     /// 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹에 저작된 그림을 그대로 둔다.</summary>
     static Sprite CostIconOf(ECurrencyType _currency) => CurrencyLook.IconOf(_currency);
 
-    /// <summary>비용 숫자·아이콘을 두 버튼 **모두**에 채운다. 보이는 것은 서 있는 쪽뿐이지만,
-    /// 물러나 있는 쪽에 옛 값을 남겨두면 교체되는 프레임에 그 값이 그대로 비친다.</summary>
+    /// <summary>비용 숫자·아이콘. 강화와 진화가 버튼 하나를 나눠 쓰므로 비용을 적는 칸도 하나뿐이다.</summary>
     void ApplyCost(bool _hasStep, GrowthStep _step)
     {
         string t_cost = CostLabel(_hasStep, _step.Cost);
 
         if (this.enhanceCostText != null) this.enhanceCostText.text = t_cost;
-        if (this.evolveCostText  != null) this.evolveCostText.text  = t_cost;
 
         // 무료 한 방에는 재화 그림도 걷는다 — 값을 치르는 물건이 아니라고 말하는 자리이기 때문이다
         // (상점이 튜토리얼 가격 문구에서 아이콘을 숨기는 것과 같은 규약).
         bool t_charged = _hasStep && _step.Cost > 0;
 
         ApplyCostIcon(this.enhanceCostIcon, t_charged, _step.Currency);
-        ApplyCostIcon(this.evolveCostIcon,  t_charged, _step.Currency);
     }
 
     // 한계돌파 버튼의 글자와 비용. 아이콘 칸을 두지 않는다 — 간식은 재화 enum이 아니라
@@ -1367,11 +1353,22 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_icon != null) _target.sprite = t_icon;
     }
 
-    /// <summary>두 버튼의 조작 가능 여부. 서 있는 쪽이 어느 것이든 판정은 하나라(같은 레벨업 1회) 함께 건다.</summary>
+    /// <summary>성장 버튼의 조작 가능 여부. 강화든 진화든 무는 것도 결과도 같은 한 방이라 판정이 하나다.</summary>
     void SetActionsEnabled(bool _interactable)
     {
         SetActionEnabled(this.enhanceButton, this.m_enhanceTone, _interactable);
-        SetActionEnabled(this.evolveButton,  this.m_evolveTone,  _interactable);
+    }
+
+    // 한 버튼이 두 얼굴을 갈아입는다 — 강화 구간에는 강화 글자·그림, 진화 관문에는 진화 글자·그림.
+    // 진화를 옆자리 버튼으로 두지 않는 이유는 두 가지다. 같은 한 방이 버튼 둘로 읽히고,
+    // 그 옆자리는 이미 한계돌파가 쓴다.
+    void ApplyGrowthFace(bool _evolve)
+    {
+        if (this.enhanceLabelText != null) this.enhanceLabelText.gameObject.SetActive(!_evolve);
+        if (this.enhanceIcon      != null) this.enhanceIcon.SetActive(!_evolve);
+
+        if (this.evolveLabelText != null) this.evolveLabelText.gameObject.SetActive(_evolve);
+        if (this.evolveIcon      != null) this.evolveIcon.SetActive(_evolve);
     }
 
     // 못 누르는 동안 버튼이 **통째로** 흑백이 된다. 밑판만 무채색으로 바꾸면 자식(라벨·불 아이콘·동전·숫자)이
@@ -1416,17 +1413,18 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // "지금 도는 연출"로 읽어 왕복 내내 탭을 삼킨다(그 연출은 이미 끝났으므로 끊어도 잃을 것이 없다).
         this.m_activeRitual = null;
 
-        RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
-
         LimitBreakAsync(t_card).Forget();
     }
 
-    // 서버 왕복 한계돌파. 세운 무대가 없어 되돌릴 것도 없다 — 어느 갈래로 빠져도 유예만 반드시 푼다.
+    // 서버 왕복 한계돌파. 결말이 성공 하나뿐이라(거절은 선검사에 걸린 낡은 화면뿐) 오른 단계·줄어든 간식을
+    // 누른 프레임에 미리 그리고, 응답은 그것을 확정하거나 되돌린다.
     async UniTaskVoid LimitBreakAsync(int _card)
     {
-        ELimitBreakOutcome t_outcome = await CardGrowthManager.TryLimitBreakAsync(_card);
+        // 앞세운 표시는 예약 통지로만 그린다 — 매니저가 간식·단계를 실제로 얹은 갈래에서만 불리므로,
+        // 선검사에 걸려 요청이 나가지 않은 프레스에 섬광이 터지지 않는다.
+        await CardGrowthManager.TryLimitBreakAsync(_card, () => ShowLimitBreakReserved(_card));
 
-        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(단계·간식은 서버가 이미 확정했다).
+        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(간식·단계는 매니저가 스스로 걷는다).
         if (this == null) return;
 
         this.m_ritualPlaying = false;
@@ -1436,13 +1434,19 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 거절 사유는 화면에 그리지 않는다. 버튼이 애초에 간식 잔량으로 잠겨 있어 거절이 왔다는 것은
         // 곧 이 화면이 낡았다는 뜻이고, 그 답은 문구가 아니라 갱신이다(성공·실패가 같은 길로 지난다).
+        // 성공 갈래에서 이 갱신이 그리는 값은 앞세운 것과 같다 — 강조(FlashGrowth)는 이미 누른 프레임에 지나갔다.
         int t_now = CardAt(this.m_index);
         if (t_now > 0) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
 
-        if (t_outcome == ELimitBreakOutcome.Success && t_now == _card && this.cardView != null)
-            this.cardView.FlashGrowth();
-
         RefreshArrows();
+    }
+
+    // 서버가 확정하기 전의 단계·간식이 이미 캐시에 서 있는 프레임. 오른 체력과 다음 단계 비용을 여기서 그린다.
+    void ShowLimitBreakReserved(int _card)
+    {
+        RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
+
+        if (this.cardView != null) this.cardView.FlashGrowth();
     }
 
     void OnEnhancePressed()
@@ -1484,7 +1488,30 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         CardGrowthRitualView t_ritual = RitualFor(t_card);
         bool                 t_evolve = t_ritual == this.evolveRitual && this.evolveRitual != null;
 
-        EnhanceResult t_result = await CardGrowthManager.TryEnhanceAsync(t_card);
+        // 왕복 전의 문지기. 잔액 부족·만렙·미초기화는 요청도 대기 표시도 없이 여기서 끝난다 —
+        // 성립하지 않을 프레스에 화면을 덮으면 "눌렀더니 잠깐 굳었다가 아무 일도 없었다"로 읽힌다.
+        // 진실원은 여전히 서버라 이 검사는 낙관일 뿐이고, 통과한 뒤 거절이 오는 갈래는 버그가 아니라 정상 동작이다.
+        if (CardGrowthManager.Precheck(t_card) != EEnhanceOutcome.Success)
+        {
+            AbortEnhance(t_card);
+            return;
+        }
+
+        EnhanceResult t_result;
+
+        // 왕복 구간은 대기 오버레이가 덮는다. 연출로 덮지 않는 이유: 강화는 성패가 서버 주사위라 미리 태울 결말이 없고,
+        // 앞 구간만 앞당겨 봐야 거절이 왔을 때 되감을 무대가 남아 덮으려던 지연이 되감기 시간으로 되돌아온다.
+        // 여기까지 오는 한 프레임은 재입력 가드(m_ritualPlaying)가 막는다 — 오버레이는 프리팹을 세운 뒤에야 입력을 먹는다.
+        // Release는 반드시 finally에서 — 예외나 조기 반환으로 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
+        ServerWaitOverlay.Hold(this);
+        try
+        {
+            t_result = await CardGrowthManager.TryEnhanceAsync(t_card);
+        }
+        finally
+        {
+            ServerWaitOverlay.Release(this);
+        }
 
         // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 태울 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
         if (this == null) return;
@@ -1648,7 +1675,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         RefreshArrows();   // 연출 중에 카드가 넘어가면 무대에 선 카드와 결과가 어긋난다.
     }
 
-    // 결과를 읽는 중엔 강화 버튼만 "한 번 더"가 된다. 진화 버튼은 결과판 위에서도 "진화"다 —
+    // 결과를 읽는 중엔 강화 얼굴만 "한 번 더"가 된다. 진화 얼굴은 결과판 위에서도 "진화"다 —
     // 그 한 방은 방금 한 일의 반복이 아니라 단계가 바뀌는 사건이라 이름이 흔들리면 안 된다.
     void SetActionLabel(bool _retry)
     {

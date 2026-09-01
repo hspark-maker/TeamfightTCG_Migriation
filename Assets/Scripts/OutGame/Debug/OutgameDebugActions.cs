@@ -64,8 +64,7 @@ public static class OutgameDebugActions
         for (int t_i = 0; t_i < 6; t_i++)
             t_drawn.Add(new DrawnCard(t_cards[t_i % t_cards.Count], false));
 
-        // 왕복이 없는 경로라 이미 끝난 결과를 티켓으로 감싼다(개봉 화면은 기다릴 것이 없다).
-        PackHandoff.Set(PackPurchaseTicket.Completed(OpenedPack.CreateSuccess(t_drawn, ECurrencyType.Gold)), null, null, false);
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, ECurrencyType.Gold), null, null, false);
         if (PackOpenOverlay.TryOpen()) return;
 
         PackHandoff.Consume();
@@ -190,7 +189,8 @@ public static class OutgameDebugActions
                 "devGrantCurrency",
                 new { env = ContentProfileConfig.Active.CloudEnvId, currency = _type.ToString(), amount = _amount });
 
-            Debug.Log($"[OutgameDebug] {_type} +{_amount} — 잔액 {CurrencyManager.GetBalance(_type)}");
+            // 서버가 확정한 값을 찍는다 — 표시 잔액에는 다른 요청의 낙관분이 섞여 있어 지급 결과를 대조할 수 없다.
+            Debug.Log($"[OutgameDebug] {_type} +{_amount} — 서버 잔액 {CurrencyManager.GetServerBalance(_type)}");
         }
         catch (ServerCommandRejectedException t_rejected)
         {

@@ -151,6 +151,10 @@ public class DeckTabController : LobbyTabPanel
 
         m_lastSlot = _slotIndex;
 
+        // 덱 탭에서 열어 둔 덱이 곧 출전 덱이다 — 매치 탭이 덱 확인 화면을 거치지 않게 되면서
+        // "어느 덱으로 싸우는가"를 정하는 자리가 여기 하나로 남았다(별도 지정 버튼을 두지 않는 이유).
+        DeckSaveManager.TrySelectSlot(_slotIndex);
+
         ShowEditor(new DeckEditData
         {
             slotIndex      = _slotIndex,
@@ -225,7 +229,7 @@ public class DeckTabController : LobbyTabPanel
         });
     }
 
-    // 이 탭이 열 덱을 정한다: 마지막으로 보던 덱 → 첫 유효 덱 → 하나도 없으면 신규 생성.
+    // 이 탭이 열 덱을 정한다: 마지막으로 보던 덱 → 출전 중인 대표 덱 → 첫 유효 덱 → 하나도 없으면 신규 생성.
     // DeckEditController.Open(-1)은 에러만 남기고 화면을 안 세우므로 좌표 없는 상태를 여기서 걸러야 한다.
     void OpenEditorForResolvedSlot()
     {
@@ -235,9 +239,14 @@ public class DeckTabController : LobbyTabPanel
         else             OpenNewDeckEditor();
     }
 
+    // 대표 덱을 첫 유효 덱보다 앞에 둔다 — 앱을 다시 켠 첫 진입에서 첫 유효 덱을 열면
+    // 그 순간 OpenEditor가 그것을 대표로 굳혀, 유저가 골라 둔 출전 덱이 조용히 뒤바뀐다.
     static int ResolveSlot(int _requested)
     {
         if (IsValidSlot(_requested)) return _requested;
+
+        int t_selected = DeckSaveManager.SelectedSlot;
+        if (IsValidSlot(t_selected)) return t_selected;
 
         for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
             if (DeckSaveManager.IsSlotValid(t_i)) return t_i;
@@ -269,8 +278,13 @@ public class DeckTabController : LobbyTabPanel
         m_editing = false;
 
         // 내리기 직전의 편집 대상을 회수한다 — 하단 바로 덱을 갈아탄 것은 편집기만 알고 있다.
+        // 그 갈아탄 덱이 곧 출전 덱이므로 대표 좌표도 여기서 함께 따라간다.
         DeckEditController t_editor = DeckEditController.Pooled();
-        if (t_editor != null && t_editor.CurrentSlot >= 0) m_lastSlot = t_editor.CurrentSlot;
+        if (t_editor != null && t_editor.CurrentSlot >= 0)
+        {
+            m_lastSlot = t_editor.CurrentSlot;
+            DeckSaveManager.TrySelectSlot(m_lastSlot);
+        }
 
         DeckEditController.HidePooled();
     }
