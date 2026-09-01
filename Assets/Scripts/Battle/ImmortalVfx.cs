@@ -17,10 +17,6 @@ using UnityEngine;
 /// 여기서는 그 값을 읽어 표식을 켜고 끌 뿐이다.</summary>
 public static class ImmortalVfx
 {
-    // 사망 페이드가 내려가는 바닥 알파. 0이면 완전히 사라져 뒤따르는 디졸브를 보여줄 수 없고,
-    // 너무 높으면 죽은 것처럼 안 보인다 — 흐려진 게 읽히면서 디졸브도 보이는 지점.
-    const float DEATH_FADE_FLOOR = 0.35f;
-
     // 작아진 카드를 원래 크기로 펴는 시간. 디졸브 시작과 겹쳐 돌아 별도 정적을 만들지 않는다.
     const float SCALE_BACK_DURATION = 0.18f;
 
@@ -60,11 +56,9 @@ public static class ImmortalVfx
         // 표식은 발동과 동시에 사라진다 — 부활을 다 쓴 카드에 대기 표식이 남으면 한 번 더 살아날 것처럼 읽힌다.
         Retire(t_view);
 
-        // ① 평소와 같은 사망 연출(팝 → 축소 → 페이드). 길이의 진실원은 DeathDuration 하나다.
-        //    단 **알파 0까지 가지 않고** 자세도 되돌리지 않는다 — 작아지고 흐려진 그 상태를
-        //    뒤이은 디졸브가 그대로 이어받아 마저 지운다. 0까지 가면 사라진 카드를 다시 켜야 해서
-        //    페이드가 없었던 것처럼 보이고, 자세를 되돌리면 "작아졌다 갑자기 커짐"이 된다.
-        await t_view.PlayDeathAnim(_fadeTo: DEATH_FADE_FLOOR, _keepEndPose: true);
+        // ① 평소와 같은 사망 연출(팝 → 축소하며 알파 0까지 페이드). 길이의 진실원은 DeathDuration 하나다.
+        //    자세만 되돌리지 않는다 — 작아진 크기를 아래 ②'가 트윈으로 펴야 스냅이 안 보인다.
+        await t_view.PlayDeathAnim(_keepEndPose: true);
 
         // ②' 디졸브는 **원래 크기**에서 돈다 — 작아진 카드 위에서 훑으면 그림이 안 읽힌다.
         //    즉시 되돌리면 "갑자기 커짐"이라 짧게 트윈으로 편다(디졸브와 겹쳐 진행된다).
@@ -74,16 +68,14 @@ public static class ImmortalVfx
         //    **기다리지 않고 시작한다** — ③이 디졸브가 끝나기 전에 터져야 해서다.
         UniTask t_dissolve = t_view.PlayImmortalDissolve();
 
-        // ③ 되살아나는 순간. 디졸브 종료보다 ImmortalReviveLead 만큼 **앞서** 터진다 —
-        //    다 사라진 뒤에 터뜨리면 빈 자리에서 뜬금없이 나와 두 그림이 이어지지 않는다.
-        float t_wait = Mathf.Max(0f, GameTiming.Battle.ImmortalDissolveDuration
-                                   - GameTiming.Battle.ImmortalReviveLead);
+        // ③ 되살아나는 순간. **디졸브 시작과 함께** 터진다 — 녹기 시작하는 그 순간이 발동 지점이라
+        //    둘이 붙어야 "터지면서 녹는다"로 읽힌다. ImmortalReviveLead 는 시작 기준 지연이고 0이면 동시다.
+        float t_wait = Mathf.Max(0f, GameTiming.Battle.ImmortalReviveLead);
         if (t_wait > 0f)
             await UniTask.Delay((int)(t_wait * 1000)).SuppressCancellationThrow();
 
         BattleVfx.Play(BattleVfxId.ImmortalRevive, t_view.SlotPosition, t_view.VfxSortingLayerId);
 
-        // 리드가 길이보다 크면 이미 끝나 있어 즉시 통과한다.
         await t_dissolve;
 
         float t_hold = GameTiming.Battle.ImmortalReviveHold;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -881,7 +882,10 @@ public class CardView : MonoBehaviour
     [SerializeField] AnimationCurve immortalDissolveCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
     Material immortalDissolveInstance;   // 공유 재료를 건드리면 같은 재료를 쓰는 카드 전부가 녹는다
-    Material illustrationBaseMaterial;
+    // 디졸브에 태운 렌더러와 그 원래 재료. 되돌리지 않으면 그 카드는 남은 판 내내 디졸브 재료로 그려진다
+    // (풀 재사용분까지 따라간다). 여러 장을 태우므로 짝으로 들고 있는다.
+    readonly List<(SpriteRenderer renderer, Material material)> immortalDissolveTargets
+        = new List<(SpriteRenderer, Material)>();
 
     /// <summary>작아진 자세를 원래 크기·슬롯으로 되돌린다(0이면 즉시).</summary>
     public void RestoreSlotPose(float _duration = 0f) => this.cardAnim.ResetToSlotPose(_duration);
@@ -895,11 +899,14 @@ public class CardView : MonoBehaviour
         if (this.immortalDissolveInstance == null)
             this.immortalDissolveInstance = new Material(this.immortalDissolveMaterial);
 
-        this.illustrationBaseMaterial = this.illustration.sharedMaterial;
-        this.illustration.material    = this.immortalDissolveInstance;
+        // 그림과 테두리를 **같이** 태운다. 한 장만 태우면 나머지가 알파 0으로 이미 사라져 있어
+        // 카드가 반쪽만 녹는 그림이 된다. 재료 인스턴스는 하나를 공유한다 — 같은 값으로 함께 훑기 때문.
+        this.immortalDissolveTargets.Clear();
+        AddImmortalDissolveTarget(this.illustration);
+        AddImmortalDissolveTarget(this.frameRoot != null ? this.frameRoot.GetComponent<SpriteRenderer>() : null);
+        if (this.immortalDissolveTargets.Count == 0) return;
 
-        // **알파를 건드리지 않는다.** 사망 페이드가 남긴 반투명 상태를 그대로 이어받아 디졸브가 마저 지운다 —
-        // 여기서 1로 되돌리면 방금 흐려진 카드가 다시 또렷해져 페이드가 없었던 것처럼 보인다.
+        // 재료 값은 먼저 시작값으로 찍어 둔다(지난 재생의 끝값이 한 프레임 비치지 않게).
         this.immortalDissolveInstance.SetFloat(this.immortalDissolveProperty, this.immortalDissolveFrom);
         if (!string.IsNullOrEmpty(this.immortalDissolveEdgeProperty))
             this.immortalDissolveInstance.SetFloat(this.immortalDissolveEdgeProperty, this.immortalDissolveFrom);
@@ -924,6 +931,20 @@ public class CardView : MonoBehaviour
         }
     }
 
+    /// <summary>렌더러 하나를 디졸브에 태운다. 원래 재료를 짝으로 기록하고,
+    /// 사망 페이드가 내려놓은 알파를 되돌린다 — 안 그러면 재료만 바뀐 투명한 판이 훑린다.</summary>
+    void AddImmortalDissolveTarget(SpriteRenderer _renderer)
+    {
+        if (_renderer == null) return;
+
+        this.immortalDissolveTargets.Add((_renderer, _renderer.sharedMaterial));
+        _renderer.material = this.immortalDissolveInstance;
+
+        Color t_color = _renderer.color;
+        t_color.a = CardFadeAlpha.Of(_renderer);
+        _renderer.color = t_color;
+    }
+
     /// <summary>시간 비율(0~1)을 디졸브 값으로 바꾼다. 완급은 곡선이 쥐고 여기선 from→to로 펴기만 한다.</summary>
     float ImmortalDissolveValue(float _t)
     {
@@ -937,11 +958,9 @@ public class CardView : MonoBehaviour
     /// 그 카드는 남은 판 내내 디졸브 재료로 그려진다(풀 재사용분까지 따라간다).</summary>
     public async UniTask RestoreFromImmortalDissolve()
     {
-        if (this.illustration != null && this.illustrationBaseMaterial != null)
-        {
-            this.illustration.material = this.illustrationBaseMaterial;
-            this.illustrationBaseMaterial = null;
-        }
+        foreach ((SpriteRenderer t_renderer, Material t_material) in this.immortalDissolveTargets)
+            if (t_renderer != null && t_material != null) t_renderer.material = t_material;
+        this.immortalDissolveTargets.Clear();
 
         // 사망 연출이 자세를 남겨 뒀다(작아진 채) — 복귀는 여기서 맡는다.
         this.cardAnim.ResetToSlotPose();   // 남은 어긋남이 있으면 여기서 확정한다
