@@ -649,14 +649,51 @@ public class OutgameTutorialGateUI : MonoBehaviour
     }
 
     // localScale만 건드린다 — sizeDelta·anchoredPosition은 Layout이 매 프레임 덮어써 트윈이 조용히 사라진다.
+    //
+    // 안무는 1.0 ↔ pulseScale을 오가는 숨쉬기다. Yoyo 한 줄 대신 스트로크를 둘로 펴 둔 이유는
+    // 손끝이 제자리로 돌아온 박에 콜백을 걸 자리가 필요해서지, 움직임을 바꾸려는 것이 아니다 —
+    // InOutSine이 ease(1-t) = 1-ease(t)를 만족하는 대칭 이징이라 Yoyo 역주행과 결과가 정확히 같다.
+    // 되돌아오는 쪽 이징을 비대칭(InQuad 등)으로 바꾸면 그 등가가 깨져 안무 자체가 달라진다.
     void StartPulse()
     {
         if (this.pulseDuration <= 0f) return;
 
         // 숨겨 둔 손가락(메시지 모드)까지 돌릴 이유가 없다 — SetPointerActive가 먼저 활성 여부를 확정한다.
-        if (this.hand != null && this.hand.gameObject.activeSelf && m_handTween == null)
-            m_handTween = this.hand.DOScale(this.pulseScale, this.pulseDuration)
-                .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo).SetLink(this.hand.gameObject);
+        if (this.hand == null || !this.hand.gameObject.activeSelf || m_handTween != null) return;
+
+        m_handTween = DOTween.Sequence()
+            .Append(this.hand.DOScale(this.pulseScale, this.pulseDuration).SetEase(Ease.InOutSine))
+            .Append(this.hand.DOScale(1f, this.pulseDuration).SetEase(Ease.InOutSine))
+            .AppendCallback(EmitHandTouchFx)
+            .SetLoops(-1)
+            .SetLink(this.hand.gameObject);
+    }
+
+    // 손끝이 화면에 닿는 박에 전역 터치 이펙트를 한 발 얹어 "여기를 누르라"를 눈으로 보여 준다.
+    // 첫 박을 StartPulse 시점으로 당기지 않는 이유: 트윈 콜백은 Update, Layout은 LateUpdate라
+    // 게이트를 막 연 프레임에는 손이 아직 이전 스텝 자리(또는 프리팹 원점)에 있다.
+    void EmitHandTouchFx()
+    {
+        if (!TryGetHandScreenPos(out Vector2 t_screen)) return;
+
+        TouchEffectOverlay.PlayAt(t_screen);
+    }
+
+    // Hand는 손끝을 원점에 맞춰 저작한 빈 기준점이라 그 월드 좌표가 곧 손끝이다(펄스 스케일은 피벗 기준이라 무관).
+    // 캔버스를 hand에서 거슬러 찾으면 안 된다 — LiftOrnaments가 손가락에 승격용 중첩 Canvas를 붙여 둬서
+    // 그쪽이 잡힌다. 렌더 모드를 묻는 주인은 언제나 게이트 루트 캔버스다.
+    bool TryGetHandScreenPos(out Vector2 _screen)
+    {
+        _screen = default;
+
+        if (this.hand == null || !this.hand.gameObject.activeInHierarchy) return false;
+
+        Camera t_camera = (m_gateCanvas != null && m_gateCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            ? m_gateCanvas.worldCamera
+            : null;
+
+        _screen = RectTransformUtility.WorldToScreenPoint(t_camera, this.hand.position);
+        return true;
     }
 
     // SetLink는 파괴에만 반응하고 비활성화에는 반응하지 않는다 → 숨길 때 직접 죽이고 스케일을 되돌린다.
