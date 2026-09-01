@@ -105,6 +105,7 @@ MonoBehaviour:
     m_LabelNames:
     - default
     - Cards
+    - Packs
     - UIElements
     - UIPrefab
   m_SchemaTemplates: []

@@ -67,7 +67,7 @@ public static class TutorialValidator
             (EStepField.WaitUnlockIntro,  "waitUnlockIntro",  "해금 연출 대기"),
             (EStepField.RewardTitle,      "rewardTitle",      "보상 제목"),
             (EStepField.ParallelGain,     "parallelGain",     "획득 연출 병행"),
-            (EStepField.Pack,             "pack",             "팩"),
+            (EStepField.Pack,             "packId",           "팩 ID"),
             (EStepField.PackPriceLabel,   "packPriceLabel",   "가격 표기"),
             (EStepField.Scenario,         "scenario",         "시나리오"),
             (EStepField.ShowDeckGate,     "showDeckGate",     "덱 게이트"),
@@ -408,7 +408,7 @@ public static class TutorialValidator
     {
         if (!TutorialStepDef.UsesPack(_action)) return;
 
-        if (_def.Pack == null)
+        if (string.IsNullOrEmpty(_def.PackId))
         {
             if (IsCardGrant(_action))
                 Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "지급 팩 미배선",
@@ -424,17 +424,24 @@ public static class TutorialValidator
 
         // 값이 붙은 팩을 지급으로 보내면 서버가 거절한다 — 화면은 그대로 서므로 증상이 "받았는데 안 늘었다"로만 보인다.
         // 가격의 진실원은 시트라 에디터가 읽는 값이 배포본과 다를 수 있어 Error까지 올리지 않는다.
-        if (IsCardGrant(_action) && _def.Pack.Price != 0)
+        if (!PackSpec.TryGetPack(_def.PackId, out CardPack t_pack))
+        {
+            Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "팩 ID 오류",
+                $"CardPack 표에 '{_def.PackId}'가 없습니다.", "packId를 CardPack.packId와 맞추세요.");
+            return;
+        }
+
+        if (IsCardGrant(_action) && t_pack.price != 0)
             Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "지급 팩이 유료",
-                $"팩 '{_def.Pack.PackId}'의 가격이 {_def.Pack.Price}입니다 — 서버는 가격이 붙은 팩의 튜토리얼 지급을 거절합니다.",
+                $"팩 '{_def.PackId}'의 가격이 {t_pack.price}입니다 — 서버는 가격이 붙은 팩의 튜토리얼 지급을 거절합니다.",
                 "그 팩의 price를 0으로 두거나, 무료 팩으로 바꾸세요(가격 진실원은 CardPack 시트입니다).");
 
         // 자동 편성만 pack.Pool을 직독한다(TutorialStepDef.TryGetForcedDeck) — 풀이 0이면 미지정과 똑같이
         // 일반 편성으로 조용히 떨어져, 저작한 덱이 아닌 덱이 서도 아무 신호가 없다.
         // 다른 팩 액션은 실제 드로우가 rankPools까지 보므로 여기서 묻지 않는다(오탐이 된다).
-        if (_action == EOutgameTutorialAction.DeckAutoEquip && _def.Pack.PoolCount == 0)
+        if (_action == EOutgameTutorialAction.DeckAutoEquip && PackSpec.ResolveDrops(_def.PackId, ERankGrade.Bronze).Count == 0)
             Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "편성 풀 비었음",
-                $"팩 '{_def.Pack.PackId}'의 기본 풀이 비어 있습니다 — 자동 편성이 지정 없는 것으로 보고 일반 편성 규칙으로 조용히 떨어집니다.",
+                $"팩 '{_def.PackId}'의 기본 풀이 비어 있습니다 — 자동 편성이 지정 없는 것으로 보고 일반 편성 규칙으로 조용히 떨어집니다.",
                 "그 팩의 pool을 채우거나, 풀이 있는 팩으로 바꾸세요.");
     }
 

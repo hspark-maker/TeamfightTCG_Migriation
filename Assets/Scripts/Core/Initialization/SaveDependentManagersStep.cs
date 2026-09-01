@@ -4,8 +4,8 @@ using UnityEngine;
 // 세이브가 채택된 뒤에야 설 수 있는 매니저들. 초기화의 마지막 단계이고, 여기 끝이 Ready다.
 public sealed class SaveDependentManagersStep : MainInitializer
 {
-    // 신규 유저에게 기본 지급할 스타터덱(CardPackData의 pool 6장을 고정 순서로 쓴다). 미배선이면 지급을 건너뛴다.
-    [SerializeField] CardPackData starterDeck;
+    // 신규 유저 스타터덱의 CardPack.packId. CardPackDrop 앞 6장을 고정 순서로 쓴다.
+    [SerializeField] string starterDeckPackId = "StarterPack";
 
     static bool s_installed;
 
@@ -54,7 +54,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
         KeywordGrowthManager.Init();
         CardGrowthManager.Init();
         DeckSaveManager.LoadFromSave();
-        StarterDeck.GrantIfNoDeck(starterDeck);
+        StarterDeck.GrantIfNoDeck(starterDeckPackId);
         OutgameTutorialRunner.ResolveProgressAnchor();
         OutgameTutorialRunner.RewindToPendingBattleEntry();
         OutgameTutorialRewind.ApplyReplayIfScheduled();

@@ -12,18 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
   m_Name: Data_Synergy_Legacy
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  displayName: "\uC720\uC0B0"
-  effectDescription: "턴 시작마다 스택 +1/+2. 사망 시 다른 아군 캐릭터를 스택만큼 회복"
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 295750674e1f14e40ba97825527be08d, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 99ce4ddd989c1514488f30738ee7b26b, type: 3}
   vfx: {fileID: 11400000, guid: 7c1d5ab3e9f04c24b8a6d3e517f2c9a1, type: 2}
-  tiers:
-  - requiredCount: 2
-    label: "\uC720\uC0B0"
-    effects:
-    - {fileID: 11400000, guid: 1e5efc108928d354c81febdcd1d78e48, type: 2}
-  - requiredCount: 4
-    label: "유산"
-    effects:
-    - {fileID: 11400000, guid: a5e879db02174006a9f0a042053a98c5, type: 2}
+  synergyId: 

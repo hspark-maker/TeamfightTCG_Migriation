@@ -5,7 +5,7 @@ public static class PackPurchaseFailurePopup
 {
     /// <summary>거절 사유를 사용자 문구로 갈라 띄운다. 문구는 거절된 <b>그 팩</b>에서 만든다 —
     /// 진열이 그 사이 다른 팩을 가리키고 있어도 재화 이름·해금 안내가 어긋나지 않는다.</summary>
-    public static void Show(CardPackData _pack, EPackOpenResult _result)
+    public static void Show(string _packId, EPackOpenResult _result)
     {
         // 망 문제는 팩 사정이 아니므로 전역 창구가 받는다. 갈래를 호출부에 두면 진입점마다 각자 판정하게 되고,
         // 한 곳만 빠뜨려도 연결 문제가 "구매할 수 없습니다"로 뭉개진다 — 여기서 돌려보내면 팝업이 두 번 뜰 경로도 없다.
@@ -16,10 +16,10 @@ public static class PackPurchaseFailurePopup
         }
 
         // 잔액 부족 문구는 그 팩의 결제 재화를 따라간다(팩마다 다를 수 있다).
-        string t_currency = CurrencyLook.NameOf(_pack != null ? _pack.PriceType : ECurrencyType.Gold);
+        string t_currency = CurrencyLook.NameOf(PackSpec.PriceType(_packId));
 
         string t_message = _result == EPackOpenResult.RankLocked
-            ? PackUnlockRules.UnlockLabel(_pack)
+            ? PackUnlockRules.UnlockLabel(_packId)
             : _result == EPackOpenResult.InsufficientGold
                 ? $"{t_currency}{KoreanText.Subject(t_currency)} 부족합니다."
                 : "구매할 수 없습니다.";

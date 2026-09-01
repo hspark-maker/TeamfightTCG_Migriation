@@ -34,12 +34,14 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.devGrantCurrency = void 0;
+const node_crypto_1 = require("node:crypto");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const currencyKeys_1 = require("../generated/currency/currencyKeys");
 const wallet_1 = require("../generated/currency/wallet");
 const walletStore_1 = require("../generated/currency/walletStore");
 const walletTransaction_1 = require("../currency/walletTransaction");
+const receiptId_1 = require("../generated/save/receiptId");
 /**
  * 디버그 재화 지급. 클라 디버그 오버레이가 부르는 test env 전용 통로다.
  * 지갑 문서만 쓴다 — 세이브 진행도와는 무관하다.
@@ -52,7 +54,7 @@ const walletTransaction_1 = require("../currency/walletTransaction");
  * — 클라 계약이라 codebase 이사로 바뀌면 안 된다.
  */
 exports.devGrantCurrency = (0, https_1.onCall)(async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     // requireUid(save/saveDocument)는 firebase-admin·세이브 문서를 물고 있어 이 codebase 로 넘어오지 않는다.
     // 인증 관문은 currencyPing 과 같은 3줄짜리 지역 관용구로 둔다 — 코드·메시지는 옛 requireUid 그대로다.
     const uid = (_a = request.auth) === null || _a === void 0 ? void 0 : _a.uid;
@@ -73,8 +75,24 @@ exports.devGrantCurrency = (0, https_1.onCall)(async (request) => {
     if (!Number.isSafeInteger(amount) || amount <= 0) {
         throw new https_1.HttpsError("invalid-argument", "amount must be a positive safe integer.");
     }
-    const wallet = await (0, walletTransaction_1.mutateWallet)(env, uid, (current) => (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, [{ currency, amount }])));
-    logger.info("devGrantCurrency", { uid, env, currency, amount, rev: wallet.rev });
-    return { wallet };
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)((_h = request.data) === null || _h === void 0 ? void 0 : _h.txId, (0, node_crypto_1.randomUUID)());
+    const result = await (0, walletTransaction_1.mutateWallet)(env, uid, "devGrantCurrency", { kind: "client", txId }, (current) => (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, [{ currency, amount }]), "devGrantCurrency"), (wallet) => {
+        replayed = false;
+        return { wallet };
+    });
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "devGrantCurrency", txId, rev: result.wallet.rev });
+    }
+    else {
+        logger.info("devGrantCurrency", {
+            uid, env, currency, amount, rev: result.wallet.rev,
+            txIdSource: (0, receiptId_1.isClientReceiptId)((_j = request.data) === null || _j === void 0 ? void 0 : _j.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=devGrantCurrency.js.map

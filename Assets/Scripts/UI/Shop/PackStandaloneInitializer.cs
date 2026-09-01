@@ -11,7 +11,7 @@ public class PackStandaloneInitializer : MonoBehaviour
 {
     [Header("더미 개봉 (PackHandoff 미배선일 때만)")]
     [Tooltip("더미 카드의 출처 팩. 풀 앞에서 DrawCount장을 순서대로 집는다(랜덤 아님 — 재현 가능).")]
-    [SerializeField] CardPackData dummyPack;
+    [SerializeField] string dummyPackId = "UltraPack";
     [Tooltip("팩 미배선 시 쓸 카드 목록. 팩이 있으면 무시된다.")]
     [SerializeField, CardId] List<int> dummyCardIds = new List<int>();
 
@@ -41,7 +41,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         }
 
         // 소유 세이브를 읽지 않으므로 신규 여부는 사후 판정이 불가하다 — 여기서 저작한 값을 그대로 태운다.
-        var t_refundType = dummyPack != null ? dummyPack.RefundType : ECurrencyType.Gold;
+        var t_refundType = PackSpec.RefundType(dummyPackId);
 
         var t_drawn = new List<DrawnCard>(t_cards.Count);
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
@@ -51,8 +51,8 @@ public class PackStandaloneInitializer : MonoBehaviour
             else         t_drawn.Add(new DrawnCard(t_cards[t_i], false, dummyRefund, t_refundType));
         }
 
-        var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
-        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
+        var t_packId = !string.IsNullOrEmpty(dummyPackId) ? dummyPackId : "DummyPack";
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPackId, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneInitializer] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
     }
@@ -63,6 +63,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         if (!PackHandoff.HasPending) yield break;   // 주입이 생략됐으면 열 팩이 없다.
 
         yield return CardArtCache.Preload(CardCatalog.AllSpecs);
+        yield return PackArtCache.Preload();
         if (!CardArtCache.IsReady)
         {
             Debug.LogError("[PackStandaloneInitializer] 카드 연출 에셋 준비 실패.");
@@ -77,7 +78,8 @@ public class PackStandaloneInitializer : MonoBehaviour
     {
         var t_result = new List<int>();
 
-        if (dummyPack == null || dummyPack.PoolCount == 0)
+        IReadOnlyList<int> t_pool = PackSpec.ResolveCardIds(dummyPackId, RankManager.CurrentGrade);
+        if (t_pool.Count == 0)
         {
             for (int t_i = 0; t_i < dummyCardIds.Count; t_i++)
             {
@@ -87,8 +89,7 @@ public class PackStandaloneInitializer : MonoBehaviour
             return t_result;
         }
 
-        var t_pool = dummyPack.Pool;
-        for (int t_i = 0; t_i < dummyPack.DrawCount; t_i++)
+        for (int t_i = 0; t_i < PackSpec.DrawCount(dummyPackId); t_i++)
         {
             int t_cardId = t_pool[t_i % t_pool.Count];
             if (t_cardId > 0) t_result.Add(t_cardId);

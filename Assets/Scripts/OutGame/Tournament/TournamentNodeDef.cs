@@ -30,9 +30,6 @@ public struct TournamentNodeDef
     [Tooltip("상대 카드 레벨. 0 이하면 미강화(1)로 떨어진다.")]
     public int aiCardLevel;
 
-    [Tooltip("승리 보상(복수). 비워두면 클리어해도 지급이 없다(해금만 넘어간다).")]
-    public List<AlbumRewardDef> rewards;
-
     // 거짓이면 이 정점은 영구 Locked다 — 낙인을 남길 키가 없다
     public bool HasStableKey => !string.IsNullOrEmpty(this.nodeId);
 

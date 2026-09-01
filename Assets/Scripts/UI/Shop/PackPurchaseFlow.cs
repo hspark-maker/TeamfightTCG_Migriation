@@ -13,7 +13,7 @@ public static class PackPurchaseFlow
     public static bool IsPurchasing => s_inFlight > 0;
 
     /// <summary>대기 표시를 켠 채 구매 왕복을 태우고, 실패는 그 자리에서 안내한 뒤 null 을 돌려준다.</summary>
-    public static async UniTask<OpenedPack> PurchaseAsync(CardPackData _pack, object _owner)
+    public static async UniTask<OpenedPack> PurchaseAsync(string _packId, object _owner)
     {
         OpenedPack t_opened;
 
@@ -21,7 +21,7 @@ public static class PackPurchaseFlow
         ServerWaitOverlay.Hold(_owner);
         try
         {
-            t_opened = await CardPackOpener.PurchaseAsync(_pack);
+            t_opened = await CardPackOpener.PurchaseAsync(_packId);
         }
         finally
         {
@@ -34,7 +34,7 @@ public static class PackPurchaseFlow
         // 안내는 대기 표시를 걷은 "뒤"에 띄운다. 이 순서 하나가 유일한 보장이다 —
         // 대기 표시도 실패 팝업도 같은 풀 컨테이너에 담겨 형제 순서로만 위아래가 갈리므로(정렬 층이 갈라주지 않는다),
         // 순서를 뒤집으면 안내가 대기 화면에 묻힌다. Release는 위 finally에서 이미 끝나 있어야 한다.
-        PackPurchaseFailurePopup.Show(_pack, t_opened.Result);
+        PackPurchaseFailurePopup.Show(_packId, t_opened.Result);
         return null;
     }
 

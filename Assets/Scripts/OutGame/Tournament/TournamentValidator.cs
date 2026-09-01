@@ -43,7 +43,7 @@ internal static class TournamentValidator
                 Debug.LogError($"[Tournament] 상대 덱 비었음 (정점 #{t_i} '{t_node.displayName}') — 전투를 열 수 없다.");
             }
 
-            if (CountRewards(t_node.rewards) == 0)
+            if (SpecRewardCount(t_node.nodeId) == 0)
             {
                 t_noReward++;
                 Debug.LogWarning($"[Tournament] 보상 미저작 (정점 #{t_i} '{t_node.displayName}') — 클리어해도 지급이 없다.");
@@ -90,7 +90,7 @@ internal static class TournamentValidator
                 Debug.LogError($"[Tournament] 정점 0개 (챕터 #{t_i} '{t_chapter.title}') — 완주 판정 모수가 없다.");
             }
 
-            if (CountRewards(t_chapter.completionRewards) == 0)
+            if (SpecRewardCount(t_chapter.chapterId) == 0)
             {
                 t_fault++;
                 Debug.LogWarning($"[Tournament] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
@@ -111,10 +111,11 @@ internal static class TournamentValidator
             t_prevGrade = t_chapter.requiredGrade;
 
             // 챕터 띠의 보상 슬롯이 2칸이라 3줄부터는 앞칸만 뜬다(지급은 되지만 표시가 잘린다)
-            if (CountRewards(t_chapter.completionRewards) > 2)
+            int t_chapterRewards = SpecRewardCount(t_chapter.chapterId);
+            if (t_chapterRewards > 2)
             {
                 t_fault++;
-                Debug.LogWarning($"[Tournament] 완주 보상 {CountRewards(t_chapter.completionRewards)}줄 (챕터 #{t_i} '{t_chapter.title}') — 띠 슬롯 2칸을 넘어 뒷줄이 표시되지 않는다.");
+                Debug.LogWarning($"[Tournament] 완주 보상 {t_chapterRewards}줄 (챕터 #{t_i} '{t_chapter.title}') — 띠 슬롯 2칸을 넘어 뒷줄이 표시되지 않는다.");
             }
         }
 
@@ -131,6 +132,12 @@ internal static class TournamentValidator
 
         return t_count;
     }
+
+    // 보상의 진실원은 Reward 표다 — SO에는 더 이상 저작값이 없으므로 시트를 직접 읽어 센다
+    static int SpecRewardCount(string _ownerKey)
+        => TournamentSpec.TryGetRewards(_ownerKey, out List<AlbumRewardDef> t_rewards)
+            ? CountRewards(t_rewards)
+            : 0;
 
     // 액수 0 이하는 지급도 표시도 되지 않으므로 보상으로 세지 않는다
     static int CountRewards(List<AlbumRewardDef> _rewards)

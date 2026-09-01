@@ -216,7 +216,7 @@ public class PackRevealView : MonoBehaviour
 
     /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
     /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
-    public void BeginOpen(OpenedPack _opened, CardPackData _pack)
+    public void BeginOpen(OpenedPack _opened, string _packId)
     {
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
         if (_opened == null || !_opened.Success)
@@ -244,7 +244,7 @@ public class PackRevealView : MonoBehaviour
         {
             // 그림을 먼저 갈고 상태를 되돌린다 — 진행도·조각 자리는 그림과 무관하지만 순서를 고정해 둔다.
             // 등급 빛은 여기서 물리지 않는다: ResetTear가 세기를 0으로 내리므로 뜯기 진입에서 한꺼번에 물린다.
-            tearSkin.ApplyPackArt(_pack != null ? _pack.PackArt : null);
+            tearSkin.ApplyPackArt(PackSpec.Art(_packId));
             tearSkin.ResetTear();
         }
 

@@ -1,17 +1,17 @@
-﻿팩 고유 번호(부여 후 변경 금지),안정 키(코드/SO 참조용," 변경 금지)",화면 표시 이름,Live=실행 노출 / TestOnly=테스트만,결제 재화(Gold/Diamond/Energy/Shard),가격,한 팩에서 뽑는 장수,1=한 팩 안 중복 없음(비복원 추출),중복 환급 재화,중복 1장당 환급량(0=환급 없음)
-id,packId,displayName,channel,priceType,price,drawCount,uniqueDraw,refundType,refundAmount,minRankGrade
-int,string,string,string,string,long,int,int,string,long,string
-1,NormalPack_TEST,일반 팩,Live,Gold,110,6,0,Shard,0,
-2,SpecialPack,스페셜 팩,Live,Gold,140,6,0,Shard,0,
-3,UltraPack,울트라 팩,Live,Diamond,30,6,1,Shard,0,
-4,KeywordDeck,키워드덱,Live,Gold,0,6,1,Shard,0,
-5,StarterPack,스타터팩,Live,Gold,0,6,1,Shard,0,
-6,SynergyPack,시너지팩,Live,Gold,0,6,1,Shard,0,
-7,HuntingBrandPack,낙인의 비늘,Live,Diamond,30,6,0,Shard,0,Platinum
-8,ImmortalLegacyPack,불멸의 유산,Live,Diamond,30,6,0,Shard,0,Diamond
-9,IronArmorPack,수호의 정원,Live,Diamond,30,6,0,Shard,0,Silver
-10,GiantsGardenPack,거인의 사냥,Live,Diamond,30,6,0,Shard,0,Gold
-11,ElementalFlowPack,원소의 흐름,Live,Diamond,30,6,0,Shard,0,Bronze
-12,RangePack,원거리덱,Live,Gold,0,6,1,Shard,0,
-13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,7,1,Shard,0,
-14,TutorialFirstCard,튜토리얼 첫 카드,Live,Gold,0,1,1,Shard,0,
+﻿팩 고유 번호(부여 후 변경 금지),"안정 키(코드 참조용, 변경 금지)",화면 표시 이름,Live=실행 노출 / TestOnly=테스트만,결제 재화(Gold/Diamond/Energy/Shard),가격,한 팩에서 뽑는 장수,1=한 팩 안 중복 없음(비복원 추출),중복 환급 재화,중복 1장당 환급량(0=환급 없음),이 랭크 이상에서만 구매 가능(빈칸=제한 없음),상점 진열 순서(1부터. 0=진열 안 함),팩 이미지 Addressables 주소(Packs 라벨)
+id,packId,displayName,channel,priceType,price,drawCount,uniqueDraw,refundType,refundAmount,minRankGrade,sortOrder,artKey
+int,string,string,string,string,long,int,int,string,long,string,int,string
+1,NormalPack_TEST,일반 팩,Live,Gold,110,6,0,Shard,0,,1,NormalPack
+2,SpecialPack,스페셜 팩,Live,Gold,140,6,0,Shard,0,,2,SpecialPack
+3,UltraPack,울트라 팩,Live,Diamond,30,6,1,Shard,0,,0,UltraPack
+4,KeywordDeck,키워드덱,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
+5,StarterPack,스타터팩,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
+6,SynergyPack,시너지팩,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
+7,HuntingBrandPack,낙인의 비늘,Live,Diamond,30,6,0,Shard,0,Platinum,3,UltraPack
+8,ImmortalLegacyPack,불멸의 유산,Live,Diamond,30,6,0,Shard,0,Diamond,4,UltraPack
+9,IronArmorPack,수호의 정원,Live,Diamond,30,6,0,Shard,0,Silver,5,UltraPack
+10,GiantsGardenPack,거인의 사냥,Live,Diamond,30,6,0,Shard,0,Gold,6,UltraPack
+11,ElementalFlowPack,원소의 흐름,Live,Diamond,30,6,0,Shard,0,Bronze,7,UltraPack
+12,RangePack,원거리덱,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
+13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,7,1,Shard,0,,0,TutorialPack
+14,TutorialFirstCard,튜토리얼 첫 카드,Live,Gold,0,1,1,Shard,0,,0,TutorialPack

@@ -249,7 +249,7 @@ MonoBehaviour:
   requiredIds: 
   - WaitCloudSaveGate
   retryEntry: 0
-  starterDeck: {fileID: 11400000, guid: a99f58da6586a3348b41523a0a92e788, type: 2}
+  starterDeckPackId: StarterPack
 --- !u!114 &1581884920793774144
 MonoBehaviour:
   m_ObjectHideFlags: 0

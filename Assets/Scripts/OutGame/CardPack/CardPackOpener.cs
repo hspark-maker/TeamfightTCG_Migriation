@@ -18,13 +18,13 @@ public static class CardPackOpener
     const string REASON_INSUFFICIENT_GOLD = "InsufficientGold";
 
     /// <summary>구매 가능 여부의 낙관 검사. 차감·지급은 하지 않는다.</summary>
-    public static EPackOpenResult Precheck(CardPackData _pack)
+    public static EPackOpenResult Precheck(string _packId)
     {
-        if (_pack == null) return EPackOpenResult.PackNotFound;
-        if (!PackUnlockRules.IsUnlocked(_pack)) return EPackOpenResult.RankLocked;
+        if (!PackSpec.TryGetPack(_packId, out _)) return EPackOpenResult.PackNotFound;
+        if (!PackUnlockRules.IsUnlocked(_packId)) return EPackOpenResult.RankLocked;
         if (!CardCatalog.IsReady || !CardGrowthManager.IsReady) return EPackOpenResult.NotReady;
 
-        IReadOnlyList<WeightedCard> t_resolvedPool = _pack.ResolvePool(RankManager.CurrentGrade);
+        IReadOnlyList<WeightedCard> t_resolvedPool = PackSpec.ResolveDrops(_packId, RankManager.CurrentGrade);
         bool t_hasCandidate = false;
         for (int t_i = 0; t_i < t_resolvedPool.Count; t_i++)
         {
@@ -36,28 +36,28 @@ public static class CardPackOpener
         }
         if (!t_hasCandidate) return EPackOpenResult.EmptyPool;
 
-        if (!CurrencyManager.CanAfford(_pack.PriceType, _pack.Price)) return EPackOpenResult.InsufficientGold;
+        if (!CurrencyManager.CanAfford(PackSpec.PriceType(_packId), PackSpec.Price(_packId))) return EPackOpenResult.InsufficientGold;
 
         return EPackOpenResult.Success;
     }
 
     /// <summary>팩 구매·개봉을 서버에 요청한다. 응답 채택으로 재화·소유·성장 슬롯이 갈아끼워진다.</summary>
-    public static async UniTask<OpenedPack> PurchaseAsync(CardPackData _pack)
+    public static async UniTask<OpenedPack> PurchaseAsync(string _packId)
     {
-        EPackOpenResult t_precheck = Precheck(_pack);
+        EPackOpenResult t_precheck = Precheck(_packId);
         if (t_precheck != EPackOpenResult.Success) return OpenedPack.CreateFailure(t_precheck);
 
         // 클라만 SO 폴백을 볼 수 있다 — 시트에 없는 팩은 서버가 아예 모르는 팩이라 반드시 거절된다.
-        if (!PackSpec.TryGetPack(_pack.PackId, out _))
-            Debug.LogError($"[CardPackOpener] '{_pack.PackId}' 가 CardPack 시트에 없다 — 클라는 SO 로 폴백하지만 서버는 SO 를 못 본다");
+        if (!PackSpec.TryGetPack(_packId, out _))
+            Debug.LogError($"[CardPackOpener] '{_packId}'가 CardPack 표에 없습니다.");
 
         // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
-        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(_pack.PriceType, -_pack.Price);
+        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(PackSpec.PriceType(_packId), -PackSpec.Price(_packId));
 
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<OpenPackResult>(
-                "openPack", new { env = ContentProfileConfig.Active.CloudEnvId, packId = _pack.PackId }, t_pending);
+                "openPack", new { env = ContentProfileConfig.Active.CloudEnvId, packId = _packId }, t_pending);
 
             return BuildOpenedPack(t_result);
         }

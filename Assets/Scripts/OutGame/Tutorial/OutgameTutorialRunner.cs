@@ -226,12 +226,12 @@ public static class OutgameTutorialRunner
 
     // 이번 스텝이 상점 진열·판매 대상을 지정했으면 true(미지정이면 상점 기본 진열)
     // 가격 자리에 띄울 문구도 함께 준다 — 저작이 비면 null이고, 그러면 팩의 실제 가격을 쓴다
-    public static bool TryGetForcedPack(out CardPackData _pack, out string _priceLabel)
+    public static bool TryGetForcedPack(out string _packId, out string _priceLabel)
     {
-        _pack       = null;
+        _packId     = null;
         _priceLabel = null;
 
-        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _pack, out _priceLabel);
+        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _packId, out _priceLabel);
     }
 
     // 이번 스텝이 자동 편성으로 채울 카드를 지정했으면 true(미지정이면 일반 편성 규칙)

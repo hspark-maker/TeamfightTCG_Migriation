@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -156,14 +156,14 @@ public static class TutorialStepExecutor
 
         // 결제는 서버 왕복이라 이 동기 상태머신이 결과를 기다릴 수 없다 — 살 수 있는지만 먼저 묻고
         // 그 답으로 저작된 실패 정책을 태운다(여기까지가 되돌릴 수 있는 마지막 지점).
-        var t_precheck = CardPackOpener.Precheck(_step.Pack);
+        var t_precheck = CardPackOpener.Precheck(_step.PackId);
         if (t_precheck != EPackOpenResult.Success)
             return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_precheck})");
 
         _context.CommitAdvance();
         _context.CompleteIfLast();
 
-        PurchaseAndOpenAsync(_step.Pack, Where(_context)).Forget();
+        PurchaseAndOpenAsync(_step.PackId, Where(_context)).Forget();
 
         return EOutgameTutorialStepResult.Advanced;
     }
@@ -171,12 +171,12 @@ public static class TutorialStepExecutor
     // 자동 구매의 서버 왕복. 좌표는 이미 전진한 뒤라 되돌릴 수 없다.
     // 대기 표시와 거절 안내는 PackPurchaseFlow가 맡는다 — 이 자리는 결과로 개봉을 열지 말지만 가른다.
     // ⚠ 서버 왕복이 실패하면 좌표는 개봉 신호를 기다리는 칸에 남는다 — 되돌릴 수 없으므로 그 자리에서 문을 연다.
-    static async UniTaskVoid PurchaseAndOpenAsync(CardPackData _pack, string _where)
+    static async UniTaskVoid PurchaseAndOpenAsync(string _packId, string _where)
     {
-        string t_packId = _pack != null ? _pack.PackId : "null";
+        string t_packId = !string.IsNullOrEmpty(_packId) ? _packId : "null";
 
         // 대기 표시의 임자로 쓸 인스턴스가 없는 static 경로다 — 타입 자체를 안정된 키로 넘긴다.
-        var t_opened = await PackPurchaseFlow.PurchaseAsync(_pack, typeof(TutorialStepExecutor));
+        var t_opened = await PackPurchaseFlow.PurchaseAsync(_packId, typeof(TutorialStepExecutor));
         if (t_opened == null)
         {
             // 안내는 PackPurchaseFlow가 이미 띄웠다 — 좌표는 이미 전진해 되돌리지 못한다.
@@ -188,7 +188,7 @@ public static class TutorialStepExecutor
             return;
         }
 
-        PackHandoff.Set(t_opened, _pack, null, false);
+        PackHandoff.Set(t_opened, _packId, null, false);
 
         // 열지 못해도 결제는 이미 나갔다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
         if (!PackOpenOverlay.TryOpen())
@@ -326,7 +326,7 @@ public static class TutorialStepExecutor
     // 진입에 성공하면 완료를 넘기지 않는다(EnterCardGrant와 같은 규약) — 완료는 그 비행의 종료 신호가 확정한다.
     static EOutgameTutorialStepResult EnterPackNotice(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
-        if (_step.Pack == null)
+        if (string.IsNullOrEmpty(_step.PackId))
             return Fail(_step, _context, "PackNotice에 팩이 미배선");
 
         // 디렉터를 오버레이보다 먼저 본다 — 순서를 뒤집으면 로비가 아닌 씬에서도 팝업이 세워져 그 씬에 남는다.
@@ -335,10 +335,10 @@ public static class TutorialStepExecutor
 
         // 팩이 서 있던 자리를 함께 넘긴다 — 비행이 그 자리에서 출발해야 팝업과 탭이 한 줄로 이어진다.
         var t_origin   = t_overlay.PackAnchor;
-        var t_art      = _step.Pack.PackArt;
+        var t_art      = PackSpec.Art(_step.PackId);
         bool t_parallel = _step.ParallelGain;
 
-        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.Pack, () => FlyPackToTab(t_art, t_origin, t_parallel));
+        t_overlay.Show(TitleOf(_step, DefaultPackNoticeTitle), _step.PackId, () => FlyPackToTab(t_art, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
@@ -376,13 +376,13 @@ public static class TutorialStepExecutor
 
     static string Where(OutgameTutorialStepContext _context) => $"스텝 {_context.ChapterIndex}-{_context.StepIndex}";
 
-    static string PackIdOf(TutorialStepDef _step) => _step.Pack != null ? _step.Pack.PackId : "null";
+    static string PackIdOf(TutorialStepDef _step) => !string.IsNullOrEmpty(_step.PackId) ? _step.PackId : "null";
 
     // 지급 왕복에 실을 팩 ID(미배선이면 null). 서버는 이 값으로 CardPackDrop 표를 찾아 줄 카드를 정한다 —
     // 저작이 비면 보낼 키가 없어 화면만 서고 소유는 늘지 않으므로 그 자리에서 소리내어 남긴다.
     static string GrantPackIdOf(TutorialStepDef _step, string _where)
     {
-        string t_packId = _step.Pack != null ? _step.Pack.PackId : null;
+        string t_packId = _step.PackId;
 
         if (string.IsNullOrEmpty(t_packId))
             Debug.LogError($"[TutorialStepExecutor] {_where} {_step.Action}에 지급 팩이 미배선 — 지급 요청을 보내지 않습니다(스텝 저작의 pack 확인).");

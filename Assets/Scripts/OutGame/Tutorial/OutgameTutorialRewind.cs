@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -152,8 +153,8 @@ public static class OutgameTutorialRewind
                 // 조건은 "팩 필드를 저작하는가"(UsesPack)가 아니라 "실제로 소유가 생기는가"다 — PackNotice는 팩을
                 // 가리키기만 하고 아무것도 주지 않는데, 전자로 물으면 그 풀 전량이 딸려 와 열지도 않은 팩의 카드를
                 // 이미 가진 채 개봉 스텝에 들어선다. 답은 액션 테이블이 갖고 있다.
-                if (t_row.Pack != null && TutorialActionMeta.Of(t_row.Action).GrantsPackPool)
-                    t_cards += GrantPackPool(t_row.Pack);
+                if (!string.IsNullOrEmpty(t_row.PackId) && TutorialActionMeta.Of(t_row.Action).GrantsPackPool)
+                    t_cards += GrantPackPool(t_row.PackId);
             }
         }
 
@@ -165,9 +166,9 @@ public static class OutgameTutorialRewind
         return _cardIds == null ? 0 : OwnershipManager.GrantAll(_cardIds);
     }
 
-    static int GrantPackPool(CardPackData _pack)
+    static int GrantPackPool(string _packId)
     {
-        var t_pool = _pack.Pool;
+        var t_pool = PackSpec.ResolveCardIds(_packId, RankManager.CurrentGrade);
         if (t_pool == null || t_pool.Count == 0) return 0;
 
         return OwnershipManager.GrantAll(t_pool);

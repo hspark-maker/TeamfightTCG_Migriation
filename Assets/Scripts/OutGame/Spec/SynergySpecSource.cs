@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 
-/// <summary>시너지 **규칙**(티어 조건·효과·수치)을 스펙시트에서 읽어 <see cref="SynergyData"/>에 꽂는다.
+/// <summary>시너지 **규칙**(티어 조건·효과·수치)과 **문구**(이름·설명문)를 스펙시트에서 읽어 <see cref="SynergyData"/>에 꽂는다.
 ///
-/// 규칙은 시트가, 표현(색·아이콘·VFX)은 SO가 갖는다. 그래서 이 클래스는 SO의 표현 필드를 건드리지 않고
-/// <see cref="SynergyData.tiers"/>만 채운다 — 그 필드는 직렬화하지 않으므로 에셋에 남는 값이 없다.
+/// 규칙·문구는 시트가, 표현(색·아이콘·VFX)은 SO가 갖는다. 그래서 이 클래스는 SO의 표현 필드를 건드리지 않고
+/// <see cref="SynergyData.tiers"/>·<see cref="SynergyData.displayName"/>·<see cref="SynergyData.effectDescription"/>만
+/// 채운다 — 셋 다 직렬화하지 않으므로 에셋에 남는 값이 없다.
 ///
 /// 표 4개(SynergyDef · SynergyTierDef · SynergyEffectDef · SynergyEffectParamDef)를
 /// synergyId → tierIndex → effectOrder 로 조인한다. 어긋난 참조·모르는 타입·모르는 파라미터 키는
@@ -21,6 +22,7 @@ public static class SynergySpecSource
             throw new InvalidOperationException("[SynergySpec] SpecData를 읽지 못해 시너지 규칙을 만들 수 없다.");
 
         Dictionary<string, List<SynergyTier>> t_byId = BuildTiers(t_manager);
+        Dictionary<string, SynergyDef> t_defs = BuildDefs(t_manager);
 
         foreach (SynergyData t_synergy in _registry.Entries)
         {
@@ -29,8 +31,29 @@ public static class SynergySpecSource
             if (!t_byId.TryGetValue(t_id, out List<SynergyTier> t_tiers))
                 throw new InvalidOperationException(
                     $"[SynergySpec] SynergyTierDef 표에 '{t_id}' 티어가 없다. 시트와 SynergyRegistry가 어긋났다.");
-            t_synergy.tiers = t_tiers.ToArray();
+            if (!t_defs.TryGetValue(t_id, out SynergyDef t_def))
+                throw new InvalidOperationException(
+                    $"[SynergySpec] SynergyDef 표에 '{t_id}' 행이 없다. 시트와 SynergyRegistry가 어긋났다.");
+
+            t_synergy.displayName       = t_def.displayName;
+            t_synergy.effectDescription = t_def.effectDescription;
+            t_synergy.tiers             = t_tiers.ToArray();
         }
+    }
+
+    /// <summary>이름·설명문 행을 synergyId로 색인한다. 중복 id는 어느 쪽이 이겼는지 알 수 없어 던진다.</summary>
+    static Dictionary<string, SynergyDef> BuildDefs(SpecDataManager _manager)
+    {
+        IReadOnlyList<SynergyDef> t_rows = Rows(_manager.SynergyDef?.All, "SynergyDef");
+
+        var t_result = new Dictionary<string, SynergyDef>(StringComparer.Ordinal);
+        foreach (SynergyDef t_row in t_rows)
+        {
+            if (t_result.ContainsKey(t_row.synergyId))
+                throw new InvalidOperationException($"[SynergySpec] SynergyDef 행 중복: '{t_row.synergyId}'");
+            t_result.Add(t_row.synergyId, t_row);
+        }
+        return t_result;
     }
 
     static Dictionary<string, List<SynergyTier>> BuildTiers(SpecDataManager _manager)

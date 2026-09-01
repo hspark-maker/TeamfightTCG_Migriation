@@ -59,7 +59,7 @@ public class TutorialStepDef
            + "DeckGrant·CardGrant·CardSetGrant: 무엇을 줄지의 정본. 서버가 이 팩의 카드 전량을 확정 지급한다.\n"
            + "⚠ 지급 팩은 가격이 0이어야 한다 — 값이 붙은 팩은 서버가 거절해 화면만 서고 소유는 늘지 않는다.\n"
            + "⚠ 아래 카드 저작(cardId·cardIds)과 시나리오 덱은 화면에 무엇을 그릴지만 정한다 — 실지급은 이 팩이 정한다")]
-    [SerializeField] CardPackData pack;
+    [SerializeField] string packId;
 
     [Tooltip("이 스텝 동안 상점 가격 자리에 대신 띄울 문구(예: \"무료\"). 비우면 팩의 실제 가격이 숫자로 나온다.\n"
            + "문구를 넣으면 재화 아이콘도 함께 숨는다 — 값을 치르는 물건이 아니라고 말하는 자리이기 때문이다.\n"
@@ -154,7 +154,7 @@ public class TutorialStepDef
     // 딤으로 타깃 외 입력을 막는가(false면 차단은 잠금에 맡긴다)
     public bool UseDim => useDim;
 
-    public CardPackData Pack => pack;
+    public string PackId => packId;
 
     public TutorialScenarioData Scenario => scenario;
 
@@ -204,25 +204,25 @@ public class TutorialStepDef
 
 
     // 이 스텝이 상점 진열·판매 대상을 덮어쓰면 true(가격 자리 문구도 함께 — 비었으면 실제 가격을 쓰라는 뜻)
-    public bool TryGetForcedPack(out CardPackData _pack, out string _priceLabel)
+    public bool TryGetForcedPack(out string _packId, out string _priceLabel)
     {
         bool t_forces = action == EOutgameTutorialAction.WaitPurchase;
 
-        _pack       = t_forces ? pack : null;
+        _packId     = t_forces ? packId : null;
         _priceLabel = t_forces ? packPriceLabel : null;
 
-        return _pack != null;
+        return !string.IsNullOrEmpty(_packId);
     }
 
     // 이 스텝이 덱 자동 편성으로 채울 카드를 지정하면 true(풀 전체를 넘긴다 — 덱 크기는 편성 쪽이 정의)
     // 기본 pool 직독: 튜토리얼 팩은 rankPools 미저작 전제(저작 시 실제 드로우 ResolvePool과 어긋남)
     public bool TryGetForcedDeck(out IReadOnlyList<int> _cardIds)
     {
-        _cardIds = action == EOutgameTutorialAction.DeckAutoEquip && pack != null && pack.PoolCount > 0
-            ? pack.Pool
+        _cardIds = action == EOutgameTutorialAction.DeckAutoEquip && !string.IsNullOrEmpty(packId)
+            ? PackSpec.ResolveCardIds(packId, RankManager.CurrentGrade)
             : null;
 
-        return _cardIds != null;
+        return _cardIds != null && _cardIds.Count > 0;
     }
 
     // ── 액션별 저작 필드 ────────────────────────────────────────────────────

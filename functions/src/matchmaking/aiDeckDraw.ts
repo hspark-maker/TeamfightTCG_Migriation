@@ -23,33 +23,58 @@ function integer(value: unknown, field: string): number {
   return value;
 }
 
-export function parseAiDeckRows(rows: Record<string, unknown>[]): AiDeckRow[] {
+export type AiDeckParse = {
+  rows: AiDeckRow[];
+  /** 저작이 깨져 후보에서 뺀 행의 사유. 호출부가 로그로 남긴다. */
+  skipped: string[];
+};
+
+/**
+ * 오저작 행은 후보에서 빼고 나머지로 진행한다 — 한 행이 깨졌다고 전부 던지면
+ * 시트 오타 하나가 AI 매칭 전체를 멈춘다(서버에는 클라 같은 SO 폴백이 없다).
+ * 남은 행이 하나도 없을 때만 호출부가 실패로 접는다.
+ * @param {Record<string, unknown>[]} rows AIDeck 표의 행들
+ * @return {AiDeckParse} 유효 행과 제외 사유
+ */
+export function parseAiDeckRows(rows: Record<string, unknown>[]): AiDeckParse {
   const seen = new Set<string>();
-  return rows.map((row) => {
+  const parsed: AiDeckRow[] = [];
+  const skipped: string[] = [];
+
+  for (const row of rows) {
     const deckId = String(row.deckId ?? "");
-    if (deckId.length === 0 || seen.has(deckId)) throw new Error("invalid AIDeck.deckId");
+    if (deckId.length === 0 || seen.has(deckId)) {
+      skipped.push(`empty or duplicate deckId: '${deckId}'`);
+      continue;
+    }
     seen.add(deckId);
 
-    const fromTier = integer(row.fromTier, `${deckId}.fromTier`);
-    const toTier = integer(row.toTier, `${deckId}.toTier`);
-    if (fromTier < 0 || (toTier !== 0 && toTier < fromTier)) {
-      throw new Error(`invalid ${deckId} tier range`);
+    try {
+      const fromTier = integer(row.fromTier, `${deckId}.fromTier`);
+      const toTier = integer(row.toTier, `${deckId}.toTier`);
+      if (fromTier < 0 || (toTier !== 0 && toTier < fromTier)) {
+        throw new Error(`invalid ${deckId} tier range`);
+      }
+
+      const cardIds = [1, 2, 3, 4, 5, 6].map((slot) =>
+        integer(row[`card${slot}`], `${deckId}.card${slot}`));
+      if (cardIds.some((cardId) => cardId <= 0)) throw new Error(`invalid ${deckId} cards`);
+
+      parsed.push({
+        deckId,
+        fromTier,
+        toTier,
+        weight: integer(row.weight, `${deckId}.weight`),
+        fromLevel: integer(row.fromLevel, `${deckId}.fromLevel`),
+        toLevel: integer(row.toLevel, `${deckId}.toLevel`),
+        cardIds,
+      });
+    } catch (error) {
+      skipped.push(error instanceof Error ? error.message : String(error));
     }
+  }
 
-    const cardIds = [1, 2, 3, 4, 5, 6].map((slot) =>
-      integer(row[`card${slot}`], `${deckId}.card${slot}`));
-    if (cardIds.some((cardId) => cardId <= 0)) throw new Error(`invalid ${deckId} cards`);
-
-    return {
-      deckId,
-      fromTier,
-      toTier,
-      weight: integer(row.weight, `${deckId}.weight`),
-      fromLevel: integer(row.fromLevel, `${deckId}.fromLevel`),
-      toLevel: integer(row.toLevel, `${deckId}.toLevel`),
-      cardIds,
-    };
-  });
+  return {rows: parsed, skipped};
 }
 
 function pickWeighted(rows: AiDeckRow[], tier: number, roll: Roll): AiDeckRow | null {

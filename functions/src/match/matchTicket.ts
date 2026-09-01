@@ -12,7 +12,7 @@ export type MatchTicketPayload = {
   uid: string;
   tier: number;
   env: string;
-  exp: number;   // epoch seconds
+  exp: number; // epoch seconds
 };
 
 export const TICKET_TTL_SECONDS = 120;

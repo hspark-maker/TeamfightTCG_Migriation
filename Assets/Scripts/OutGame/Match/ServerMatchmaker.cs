@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
@@ -39,9 +40,22 @@ public sealed class ServerMatchmaker : IMatchmaker
 
         try
         {
-            FindAiMatchResult t_result = await t_request;
+            // 취소를 함께 본다 — 그러지 않으면 유저가 취소한 뒤에도 callable 예산(최대 15초 + 재인증 1회)이
+            // 끝날 때까지 매칭 화면이 남고, 그 다음 상대를 정상 확정해 취소한 전투가 시작된다.
+            FindAiMatchResult t_result = await t_request.AttachExternalCancellation(_ct);
             if (t_result?.Deck == null || t_result.Deck.Count != DeckSaveManager.DECK_SIZE)
                 throw new InvalidOperationException("Server returned an invalid AI deck.");
+            if (string.IsNullOrEmpty(t_result.MatchId) ||
+                !ulong.TryParse(t_result.SeedHex, NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out ulong t_seed) ||
+                t_result.RulesetVersion <= 0 ||
+                !SameCards(t_result.PlayerBoardOrder, DeckConfig.PlayerDeck) ||
+                !SameCards(t_result.EnemyBoardOrder, t_result.Deck))
+                throw new InvalidOperationException("Server returned an invalid solo match identity.");
+
+            SoloMatchHandoff.Set(
+                t_result.MatchId, t_result.SeedHex, t_seed, t_result.RulesetVersion,
+                t_result.PlayerBoardOrder, t_result.EnemyBoardOrder);
 
             MatchProfile t_profile = MatchProfile.OfOpponent(
                 this.m_pool != null ? this.m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
@@ -52,7 +66,7 @@ public sealed class ServerMatchmaker : IMatchmaker
         {
             if (_ct.IsCancellationRequested) return null;
             Debug.LogError($"[ServerMatchmaker] AI 상대 확정 실패: {t_exception.GetBaseException().Message}");
-            NetworkFailurePopup.Show("AI 상대를 준비하지 못했습니다.");
+            ShowFailureNextFrameAsync().Forget();
             return null;
         }
     }
@@ -65,8 +79,33 @@ public sealed class ServerMatchmaker : IMatchmaker
         if (string.IsNullOrEmpty(t_env))
             throw new InvalidOperationException("Content profile has no cloud environment.");
 
-        return await ServerSaveCommands.InvokeReadOnlyAsync<FindAiMatchResult>(
-            CommandName, new { env = t_env });
+        return await ServerSaveCommands.InvokeAsync<FindAiMatchResult>(CommandName, new
+        {
+            env = t_env,
+            contentFingerprint = SpecSource.BattleFingerprint.ToLowerInvariant(),
+            playerDeck = DeckConfig.PlayerDeck,
+        });
+    }
+
+    static bool SameCards(IReadOnlyList<int> _left, IReadOnlyList<int> _right)
+    {
+        if (_left == null || _right == null || _left.Count != _right.Count) return false;
+        var t_left = new List<int>(_left);
+        var t_right = new List<int>(_right);
+        t_left.Sort();
+        t_right.Sort();
+        for (int i = 0; i < t_left.Count; i++)
+            if (t_left[i] != t_right[i]) return false;
+        return true;
+    }
+
+    /// <summary>매칭 화면이 내려간 뒤에 안내를 올린다.</summary>
+    // 셸은 이 메서드가 null을 돌려준 뒤 같은 프레임에 스스로 닫는다(MatchmakingShell.RunMatchAsync의 finally).
+    // 그 자리에서 바로 띄우면 안내가 아직 떠 있는 매칭 화면에 묻힌다 — 둘은 자기 캔버스가 없어 형제 순서로만 갈린다.
+    static async UniTaskVoid ShowFailureNextFrameAsync()
+    {
+        await UniTask.Yield();
+        NetworkFailurePopup.Show("AI 상대를 준비하지 못했습니다.");
     }
 
     static async UniTaskVoid ObserveCanceledRequestAsync(UniTask<FindAiMatchResult> _request)
@@ -80,8 +119,13 @@ public sealed class ServerMatchmaker : IMatchmaker
     }
 }
 
-internal sealed class FindAiMatchResult
+internal sealed class FindAiMatchResult : ServerCommandResult
 {
+    [JsonProperty("matchId")] public string MatchId { get; set; }
+    [JsonProperty("seedHex")] public string SeedHex { get; set; }
+    [JsonProperty("rulesetVersion")] public int RulesetVersion { get; set; }
     [JsonProperty("deck")] public List<int> Deck { get; set; }
     [JsonProperty("cardLevel")] public int CardLevel { get; set; }
+    [JsonProperty("playerBoardOrder")] public List<int> PlayerBoardOrder { get; set; }
+    [JsonProperty("enemyBoardOrder")] public List<int> EnemyBoardOrder { get; set; }
 }

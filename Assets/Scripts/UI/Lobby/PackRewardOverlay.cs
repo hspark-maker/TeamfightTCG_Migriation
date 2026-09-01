@@ -26,7 +26,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     [SerializeField] TMP_Text titleText;
     [SerializeField] Button confirmButton;
 
-    [Tooltip("팩 그림. CardPackData.PackArt를 그대로 얹는다.")]
+    [Tooltip("CardPack.artKey로 프리로드한 팩 그림.")]
     [SerializeField] Image packImage;
 
     [Tooltip("팩 이름(옵션). 미배선이면 제목만 뜬다.")]
@@ -85,7 +85,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     /// <summary>팩 하나를 띄운다. 나가는 문은 [확인] 하나뿐이다.
     /// <paramref name="_onClosed"/>는 화면이 걷힌 <b>뒤</b>에 불린다 — 그쪽이 이어지는 비행을 튼다
     /// (화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
-    public void Show(string _title, CardPackData _pack, Action _onClosed)
+    public void Show(string _title, string _packId, Action _onClosed)
     {
         this.m_onClosed = _onClosed;
         this.KillIntro();
@@ -94,12 +94,12 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
         if (this.packImage != null)
         {
-            Sprite t_art = _pack != null ? _pack.PackArt : null;
+            Sprite t_art = PackSpec.Art(_packId);
             this.packImage.sprite  = t_art;
             this.packImage.enabled = t_art != null;
         }
 
-        if (this.packNameText != null) this.packNameText.text = _pack != null ? _pack.DisplayName : string.Empty;
+        if (this.packNameText != null) this.packNameText.text = PackSpec.DisplayName(_packId);
 
         if (this.confirmButton != null)
         {

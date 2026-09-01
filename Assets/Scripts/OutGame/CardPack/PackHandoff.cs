@@ -2,17 +2,17 @@
 public static class PackHandoff
 {
     public static OpenedPack Opened { get; private set; }
-    public static CardPackData Pack { get; private set; }
+    public static string PackId { get; private set; }
     public static string NextScene { get; private set; }
     public static bool StartTutorial { get; private set; }
 
     public static bool HasPending => Opened != null;
 
     // 개봉 세션 컨텍스트를 싣는다 (구매 성공한 호출자만)
-    public static void Set(OpenedPack _opened, CardPackData _pack, string _nextScene, bool _startTutorial)
+    public static void Set(OpenedPack _opened, string _packId, string _nextScene, bool _startTutorial)
     {
         Opened = _opened;
-        Pack = _pack;
+        PackId = _packId;
         NextScene = _nextScene;
         StartTutorial = _startTutorial;
     }
@@ -22,7 +22,7 @@ public static class PackHandoff
     {
         var t_opened = Opened;
         Opened = null;
-        Pack = null;
+        PackId = null;
         NextScene = null;
         StartTutorial = false;
         return t_opened;

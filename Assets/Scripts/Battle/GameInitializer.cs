@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
 
@@ -396,6 +396,25 @@ public class GameInitializer : MonoBehaviour
         // (구: TurnRunner.PlayIntroAndStart에서 시드 → 셔플이 시드 밖 UnityEngine.Random으로 새어나갔다.)
         MatchSeeding.SeedForNewMatch();
 
+        // 일반 AI전은 서버가 슬롯 0..2→대기열 순서까지 봉인한다. 클라에서 다시 셔플하면
+        // 재시뮬의 출발점이 달라지므로 받은 순서를 ShufflePolicy.None으로 그대로 놓는다.
+        // out 변수를 밖에 선언한다 — 단축평가로 TryConsume이 안 불릴 수 있어 인라인 out은 미확정으로 남는다(CS0165).
+        int[] t_playerBoardOrder = null;
+        int[] t_enemyBoardOrder = null;
+        bool t_hasServerBoardOrders = !TutorialConfig.IsActive &&
+            SoloMatchHandoff.TryConsumeBoardOrders(out t_playerBoardOrder, out t_enemyBoardOrder);
+
+        // 받은 순서가 **이 전투의 덱**인지 확인한다. 서버 순서는 덱을 통째로 갈아끼우므로, 남아 있던
+        // 다른 매치의 순서를 그대로 놓으면 화면에서 고른 덱과 다른 덱으로 싸우게 된다(조용히).
+        if (t_hasServerBoardOrders &&
+            (!SameCardMultiset(t_playerBoardOrder, DeckConfig.PlayerDeck) ||
+             !SameCardMultiset(t_enemyBoardOrder, DeckConfig.EnemyDeck)))
+        {
+            Debug.LogError("[GameInitializer] 서버 보드 순서가 이 전투의 덱과 다르다 — 로컬 셔플로 되돌린다. " +
+                           "서버 검증은 이 판을 통과시키지 않는다.");
+            t_hasServerBoardOrders = false;
+        }
+
         // 성장값은 **싱글 전투에만** 넘긴다. 플레이어는 자기 강화 진행도(s_growthProvider),
         // AI 적은 랭크 티어가 정한 고정 레벨(s_enemyGrowthProvider)을 쓴다.
 
@@ -420,12 +439,19 @@ public class GameInitializer : MonoBehaviour
         }
         else
         {
-            this.playerField.Initialize(DeckConfig.PlayerDeck, 0, ShufflePolicy.Match, s_growthProvider);
+            var t_playerDeck = t_hasServerBoardOrders
+                ? new System.Collections.Generic.List<int>(t_playerBoardOrder)
+                : DeckConfig.PlayerDeck;
+            this.playerField.Initialize(t_playerDeck, 0,
+                t_hasServerBoardOrders ? ShufflePolicy.None : ShufflePolicy.Match, s_growthProvider);
             // 상대 덱은 게이트보다 앞선 ConfirmEnemyDeck이 확정해 뒀다(로비가 넘긴 값이면 그대로 유지된다).
             // 여기서 다시 뽑지 않는 게 핵심 — 뽑으면 게이트 화면에서 본 상대와 실제 상대가 갈린다.
-            var t_enemyDeck = DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<int>();
+            var t_enemyDeck = t_hasServerBoardOrders
+                ? new System.Collections.Generic.List<int>(t_enemyBoardOrder)
+                : DeckConfig.EnemyDeck ?? new System.Collections.Generic.List<int>();
             // AI도 티어 레벨을 받는다 — 체력뿐 아니라 키워드·시너지 해금까지 같은 곡선으로 정해진다.
-            this.enemyField.Initialize(t_enemyDeck, 1, ShufflePolicy.Match, s_enemyGrowthProvider);
+            this.enemyField.Initialize(t_enemyDeck, 1,
+                t_hasServerBoardOrders ? ShufflePolicy.None : ShufflePolicy.Match, s_enemyGrowthProvider);
         }
 
 
@@ -445,6 +471,22 @@ public class GameInitializer : MonoBehaviour
         // 튜토리얼: 스크립트 기준선 최초 스냅샷. 이후 슬롯 지정 스텝은 "그때 그 카드"인지 여기 기준으로 대조된다.
         if (TutorialConfig.IsActive)
             TutorialConfig.SyncBoardBaseline(this.playerField, this.enemyField);
+    }
+
+    /// <summary>같은 카드 묶음인가(순서는 보지 않는다 — 순서를 정하는 것이 서버 보드 순서의 일이다).</summary>
+    static bool SameCardMultiset(
+        System.Collections.Generic.IReadOnlyList<int> _left,
+        System.Collections.Generic.IReadOnlyList<int> _right)
+    {
+        if (_left == null || _right == null || _left.Count != _right.Count) return false;
+
+        var t_left  = new System.Collections.Generic.List<int>(_left);
+        var t_right = new System.Collections.Generic.List<int>(_right);
+        t_left.Sort();
+        t_right.Sort();
+        for (int i = 0; i < t_left.Count; i++)
+            if (t_left[i] != t_right[i]) return false;
+        return true;
     }
 
     void InitializeViews()

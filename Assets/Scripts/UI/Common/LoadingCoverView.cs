@@ -262,7 +262,7 @@ public class LoadingCoverView : MonoBehaviour
     void ShowRecovery()
     {
         bool t_updateRequired = GameInitialization.State == EGameInitState.UpdateRequired;
-        bool t_assetFailed   = CardArtCache.HasFailed || UiPrefabCache.HasFailed;
+        bool t_assetFailed   = CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed;
 
         SetRecoveryVisible(true);
 

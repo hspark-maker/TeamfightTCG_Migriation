@@ -1,18 +1,18 @@
 public static class PackUnlockRules
 {
-    public static bool IsUnlocked(CardPackData _pack)
-        => IsUnlocked(_pack, RankManager.IsRanked, RankManager.CurrentGrade);
+    public static bool IsUnlocked(string _packId)
+        => IsUnlocked(_packId, RankManager.IsRanked, RankManager.CurrentGrade);
 
-    public static bool IsUnlocked(CardPackData _pack, bool _isRanked, ERankGrade _currentGrade)
+    public static bool IsUnlocked(string _packId, bool _isRanked, ERankGrade _currentGrade)
     {
-        if (_pack == null) return false;
-        if (!_pack.TryGetMinRankGrade(out ERankGrade t_required)) return true;
+        if (!PackSpec.TryGetPack(_packId, out _)) return false;
+        if (!PackSpec.TryGetMinRankGrade(_packId, out ERankGrade t_required)) return true;
         return _isRanked && _currentGrade >= t_required;
     }
 
-    public static string UnlockLabel(CardPackData _pack)
+    public static string UnlockLabel(string _packId)
     {
-        if (_pack == null || !_pack.TryGetMinRankGrade(out ERankGrade t_required)) return string.Empty;
+        if (!PackSpec.TryGetMinRankGrade(_packId, out ERankGrade t_required)) return string.Empty;
         return $"{GradeLabel(t_required)} 랭크에서 해금";
     }
 
