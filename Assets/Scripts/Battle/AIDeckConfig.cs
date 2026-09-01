@@ -26,10 +26,16 @@ public class AIDeckConfig : ScriptableObject
 
     public List<int> GetRandomDeck()
     {
-        if (this.decks == null || this.decks.Count == 0) return new List<int>();
+        IReadOnlyList<DeckEntry> t_decks = ResolveDecks();
+        return PickRandom(t_decks);
+    }
+
+    List<int> PickRandom(IReadOnlyList<DeckEntry> _decks)
+    {
+        if (_decks == null || _decks.Count == 0) return new List<int>();
 
         var t_candidates = new List<DeckEntry>();
-        foreach (DeckEntry t_entry in this.decks)
+        foreach (DeckEntry t_entry in _decks)
             if (HasValidCards(t_entry)) t_candidates.Add(t_entry);
 
         if (t_candidates.Count == 0) return new List<int>();
@@ -38,21 +44,25 @@ public class AIDeckConfig : ScriptableObject
 
     public List<int> GetDeckForTier(int _tier)
     {
-        if (this.decks == null || this.decks.Count == 0) return new List<int>();
+        IReadOnlyList<DeckEntry> t_decks = ResolveDecks();
+        if (t_decks == null || t_decks.Count == 0) return new List<int>();
 
         for (int t_tier = Mathf.Max(0, _tier); t_tier >= 0; t_tier--)
         {
-            List<int> t_deck = PickWeighted(t_tier);
+            List<int> t_deck = PickWeighted(t_decks, t_tier);
             if (t_deck != null) return t_deck;
         }
 
-        return GetRandomDeck();
+        return PickRandom(t_decks);
     }
 
-    List<int> PickWeighted(int _tier)
+    IReadOnlyList<DeckEntry> ResolveDecks()
+        => AIDeckSpec.TryGetDecks(out IReadOnlyList<DeckEntry> t_spec) ? t_spec : this.decks;
+
+    static List<int> PickWeighted(IReadOnlyList<DeckEntry> _decks, int _tier)
     {
         int t_totalWeight = 0;
-        foreach (DeckEntry t_entry in this.decks)
+        foreach (DeckEntry t_entry in _decks)
         {
             if (!IsAvailableAt(t_entry, _tier)) continue;
             t_totalWeight += t_entry.WeightOrOne;
@@ -61,7 +71,7 @@ public class AIDeckConfig : ScriptableObject
         if (t_totalWeight <= 0) return null;
 
         int t_roll = Random.Range(0, t_totalWeight);
-        foreach (DeckEntry t_entry in this.decks)
+        foreach (DeckEntry t_entry in _decks)
         {
             if (!IsAvailableAt(t_entry, _tier)) continue;
 

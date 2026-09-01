@@ -9,6 +9,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
     public override UniTask Initialize(InitializationContext _context)
     {
         PackSpec.Init();
+        AIDeckSpec.Init();
         RewardSpec.Init();
 
         // 보상 표가 비면 앨범·토너먼트·랭크는 조용히 0을 표시하고, 전투는 매판 0을 지급한다.

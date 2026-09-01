@@ -19,7 +19,7 @@ public static class SpecPayloadCodec
     public const int SchemaVersion = 3;
     public static readonly string[] TableNames =
     {
-        "Card", "Card_Test", "CardPack", "CardPackDrop", "Reward",
+        "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "AIDeckCard", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
         "SynergyDef", "SynergyTierDef", "SynergyEffectDef", "SynergyEffectParamDef",
     };
@@ -255,7 +255,8 @@ public static class SpecPayloadCodec
     static Type RowTypeOf(string _table) => _table switch
     {
         "Card" => typeof(Card), "Card_Test" => typeof(Card_Test), "CardPack" => typeof(CardPack),
-        "CardPackDrop" => typeof(CardPackDrop), "Reward" => typeof(Reward),
+        "CardPackDrop" => typeof(CardPackDrop), "AIDeck" => typeof(AIDeck),
+        "AIDeckCard" => typeof(AIDeckCard), "Reward" => typeof(Reward),
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
         "CardLimitBreak" => typeof(CardLimitBreak),

@@ -199,15 +199,98 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
                 CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _liveIds, _errors);
         }
 
-        foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
-            if (t_ai.decks != null)
-                foreach (AIDeckConfig.DeckEntry t_deck in t_ai.decks)
-                    CheckCards(t_deck?.CardIds, $"{t_ai.name}/{t_deck?.deckName}", _liveIds, _errors);
+        ValidateAIDeckSpec(_liveIds, _errors);
 
         foreach (TutorialScenarioData t_scenario in LoadBuildDependencies<TutorialScenarioData>())
         {
             CheckCards(t_scenario.PlayerDeckIds, $"{t_scenario.name}/player", _liveIds, _errors);
             CheckCards(t_scenario.EnemyDeckIds, $"{t_scenario.name}/enemy", _liveIds, _errors);
+        }
+    }
+
+    static void ValidateAIDeckSpec(HashSet<int> _liveIds, List<string> _errors)
+    {
+        IReadOnlyList<AIDeck> t_decks = SpecSource.Manager?.AIDeck?.All;
+        IReadOnlyList<AIDeckCard> t_cards = SpecSource.Manager?.AIDeckCard?.All;
+        if (t_decks == null || t_decks.Count == 0 || t_cards == null || t_cards.Count == 0)
+        {
+            _errors.Add("AIDeck/AIDeckCard 표가 비어 있음");
+            return;
+        }
+
+        if (t_decks.Count != 22) _errors.Add($"AIDeck 행 수가 22가 아님: {t_decks.Count}");
+        if (t_cards.Count != 22 * DeckSaveManager.DECK_SIZE)
+            _errors.Add($"AIDeckCard 행 수가 132가 아님: {t_cards.Count}");
+
+        var t_byId = new Dictionary<string, AIDeck>(StringComparer.Ordinal);
+        var t_slots = new Dictionary<string, bool[]>(StringComparer.Ordinal);
+        var t_invalid = new HashSet<string>(StringComparer.Ordinal);
+        foreach (AIDeck t_deck in t_decks)
+        {
+            if (t_deck == null || string.IsNullOrEmpty(t_deck.deckId))
+            {
+                _errors.Add("AIDeck에 빈 deckId가 있음");
+                continue;
+            }
+            if (t_byId.ContainsKey(t_deck.deckId))
+            {
+                _errors.Add($"AIDeck deckId 중복: {t_deck.deckId}");
+                t_invalid.Add(t_deck.deckId);
+                continue;
+            }
+            t_byId.Add(t_deck.deckId, t_deck);
+            t_slots.Add(t_deck.deckId, new bool[DeckSaveManager.DECK_SIZE]);
+        }
+
+        foreach (AIDeckCard t_card in t_cards)
+        {
+            if (t_card == null || !t_byId.ContainsKey(t_card.deckId))
+            {
+                _errors.Add($"AIDeckCard가 없는 deckId 참조: {t_card?.deckId}");
+                continue;
+            }
+
+            bool[] t_deckSlots = t_slots[t_card.deckId];
+            if (t_card.slot < 0 || t_card.slot >= DeckSaveManager.DECK_SIZE)
+            {
+                _errors.Add($"{t_card.deckId} slot 범위 밖: {t_card.slot}");
+                t_invalid.Add(t_card.deckId);
+            }
+            else if (t_deckSlots[t_card.slot])
+            {
+                _errors.Add($"{t_card.deckId} slot 중복: {t_card.slot}");
+                t_invalid.Add(t_card.deckId);
+            }
+            else t_deckSlots[t_card.slot] = true;
+
+            if (t_card.cardId <= 0 || !_liveIds.Contains(t_card.cardId))
+            {
+                _errors.Add($"{t_card.deckId}가 TestOnly/미존재 카드 ID '{t_card.cardId}' 참조");
+                t_invalid.Add(t_card.deckId);
+            }
+        }
+
+        foreach (KeyValuePair<string, bool[]> t_pair in t_slots)
+            for (int t_slot = 0; t_slot < t_pair.Value.Length; t_slot++)
+                if (!t_pair.Value[t_slot])
+                {
+                    _errors.Add($"{t_pair.Key} slot 누락: {t_slot}");
+                    t_invalid.Add(t_pair.Key);
+                }
+
+        for (int t_tier = 0; t_tier < 20; t_tier++)
+        {
+            bool t_covered = false;
+            foreach (AIDeck t_deck in t_byId.Values)
+            {
+                int t_toTier = t_deck.toTier == 0 ? int.MaxValue : t_deck.toTier;
+                if (!t_invalid.Contains(t_deck.deckId) && t_deck.fromTier <= t_tier && t_tier <= t_toTier)
+                {
+                    t_covered = true;
+                    break;
+                }
+            }
+            if (!t_covered) _errors.Add($"AI 덱 티어 커버리지 누락: {t_tier}");
         }
     }
 
