@@ -111,7 +111,8 @@ public readonly struct TutorialAnchorMeta
         new(A.AlbumCardSlot,              F.None,               "도감 페이지 오버레이",    "UI/Album/AlbumCardSlotView.cs:56"),
 
         // 21 UI/CardDetail/CardDetailOverlayView.cs:1522가 지금 서 있는 성장 버튼에 등록하고,
-        //    :446/:447이 그 강화·진화 버튼 GameObject에 FeatureLockView.Attach(CardEnhance) — 같은 오브젝트
+        //    Awake가 그 강화 버튼 GameObject에 FeatureLockView.Attach(CardEnhance) — 같은 오브젝트
+        //    (진화는 이 버튼이 얼굴만 갈아입은 것이라 등록 대상이 하나뿐이다)
         new(A.CardDetailEnhanceButton,    F.CardEnhance,        "카드 상세 오버레이",      "UI/CardDetail/CardDetailOverlayView.cs:1522"),
 
         // 22 UI/Growth/KeywordGrowthCellView.cs:77. UI/Growth/ 전체에 EOutgameFeature 사용 0건 → 잠금 없음

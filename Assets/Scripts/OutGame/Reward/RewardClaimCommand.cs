@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Cysharp.Threading.Tasks;
@@ -20,23 +21,36 @@ internal static class RewardClaimCommand
     // 그 틈에 같은 보상을 다시 누르면 두 번째 요청이 나가고 가짜 롤업이 한 번 더 뜬다.
     static readonly HashSet<string> s_inFlight = new HashSet<string>();
 
+    /// <summary>서버가 수령을 명시적으로 거절했을 때 한 번 울린다. 표면(팝업)은 UI 쪽 구독자가 그린다.</summary>
+    internal static event Action OnRejected;
+
     /// <summary>보상 수령을 요청한다. 성공하면 응답 채택으로 재화·해당 도메인 슬롯이 갈아끼워진 뒤
     /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다.</summary>
     // 거절(자격 미달·이미 수령·보상 미저작)은 세션이 아니라 이 호출의 결과다 — 표면은 부른 도메인이 진다.
-    internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId)
+    internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId, CurrencyPendingTicket _pending = null)
     {
-        if (string.IsNullOrEmpty(_ownerId)) return default;
+        // InvokeAsync 에 닿지 못하는 갈래엔 걷어 줄 finally 가 없다 — 낙관분을 여기서 직접 되돌린다.
+        if (string.IsNullOrEmpty(_ownerId))
+        {
+            _pending?.Settle();
+            return default;
+        }
 
         string t_key = _ownerType + ":" + _ownerId;
 
         // 같은 보상이 아직 왕복 중이다. 여기서 즉시 돌려줘야 부른 쪽이 같은 프레임에 거절을 알고 연출을 접는다.
-        if (!s_inFlight.Add(t_key)) return default;
+        if (!s_inFlight.Add(t_key))
+        {
+            _pending?.Settle();
+            return default;
+        }
 
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<ClaimRewardResult>(
                 COMMAND_NAME,
-                new { env = ContentProfileConfig.Active.CloudEnvId, ownerType = _ownerType, ownerId = _ownerId });
+                new { env = ContentProfileConfig.Active.CloudEnvId, ownerType = _ownerType, ownerId = _ownerId },
+                _pending);
 
             Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} 수령 — {Describe(t_result)}");
             return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId));
@@ -45,6 +59,7 @@ internal static class RewardClaimCommand
         {
             // 사전검사를 통과했는데 여기 왔다면 클라 스펙 캐시와 서버 표가 갈렸거나, 다른 기기가 먼저 받은 것이다.
             Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId} 를 서버가 거절했다 — {t_rejected.Message}");
+            OnRejected?.Invoke();
             return default;
         }
         catch (ServerAdoptionException t_adoption)

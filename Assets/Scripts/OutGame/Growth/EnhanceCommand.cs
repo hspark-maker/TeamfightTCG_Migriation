@@ -17,13 +17,15 @@ internal static class EnhanceCommand
     const string REASON_MAX_LEVEL      = "MaxLevel";
 
     /// <summary>카드 강화 1회를 서버에 요청한다. 성공·확률실패는 결제가 끝난 것이고, 그 밖의 결말은 재화 소모가 없다.</summary>
-    internal static async UniTask<EnhanceCommandResult> EnhanceCardAsync(int _cardId, bool _freeShot)
+    internal static async UniTask<EnhanceCommandResult> EnhanceCardAsync(
+        int _cardId, bool _freeShot, CurrencyPendingTicket _pending = null)
     {
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<EnhanceCardResult>(
                 CARD_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, cardId = _cardId, freeShot = _freeShot });
+                new { env = ContentProfileConfig.Active.CloudEnvId, cardId = _cardId, freeShot = _freeShot },
+                _pending);
 
             return new EnhanceCommandResult(t_result.ResolveOutcome(), t_result.Level, t_result.FreeShotUsed);
         }
@@ -42,16 +44,23 @@ internal static class EnhanceCommand
             Debug.LogError($"[EnhanceCommand] {CARD_COMMAND} 실패 — {t_exception.GetBaseException().Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
+        finally
+        {
+            // 요청 인자를 짓다 던지면 InvokeAsync 에 닿지 못해 그쪽 회수가 돌지 않는다. 멱등이라 정상 갈래와 겹쳐도 안전하다.
+            _pending?.Settle();
+        }
     }
 
     /// <summary>키워드 강화 1회를 서버에 요청한다. 확률 실패가 없어 성립하면 반드시 오른다.</summary>
-    internal static async UniTask<EnhanceCommandResult> EnhanceKeywordAsync(CardKeyword _keyword, bool _freeShot)
+    internal static async UniTask<EnhanceCommandResult> EnhanceKeywordAsync(
+        CardKeyword _keyword, bool _freeShot, CurrencyPendingTicket _pending = null)
     {
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<EnhanceKeywordResult>(
                 KEYWORD_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, keyword = (int)_keyword, freeShot = _freeShot });
+                new { env = ContentProfileConfig.Active.CloudEnvId, keyword = (int)_keyword, freeShot = _freeShot },
+                _pending);
 
             return new EnhanceCommandResult(t_result.ResolveOutcome(), t_result.Level, t_result.FreeShotUsed);
         }
@@ -68,6 +77,11 @@ internal static class EnhanceCommand
         {
             Debug.LogError($"[EnhanceCommand] {KEYWORD_COMMAND} 실패 — {t_exception.GetBaseException().Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
+        }
+        finally
+        {
+            // 요청 인자를 짓다 던지면 InvokeAsync 에 닿지 못해 그쪽 회수가 돌지 않는다. 멱등이라 정상 갈래와 겹쳐도 안전하다.
+            _pending?.Settle();
         }
     }
 

@@ -52,9 +52,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         }
 
         var t_packId = dummyPack != null ? dummyPack.PackId : "DummyPack";
-        // 왕복이 없는 경로라 이미 끝난 결과를 티켓으로 감싼다(개봉 화면은 기다릴 것이 없다).
-        PackHandoff.Set(PackPurchaseTicket.Completed(OpenedPack.CreateSuccess(t_drawn, t_refundType)),
-                        dummyPack, nextScene, startTutorial);
+        PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPack, nextScene, startTutorial);
 
         Debug.Log($"[PackStandaloneInitializer] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
     }

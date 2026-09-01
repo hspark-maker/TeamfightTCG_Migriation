@@ -986,7 +986,6 @@ MonoBehaviour:
   deckPanel: {fileID: 3228001466242478929}
   matchPanel: {fileID: 5258775699516550056}
   tournamentPanel: {fileID: 6741009150353787377}
-  versusShellPrefab: {fileID: 6346514855679779509, guid: 3b8d6f27c04e1a5497d2e08b6fa1c539, type: 3}
 --- !u!1 &1244772157711284030
 GameObject:
   m_ObjectHideFlags: 0

@@ -13,8 +13,9 @@ public static partial class CardGrowthManager
     // 성장 변경 통지(강화 실패도 통지 — 재화가 줄었다)
     public static event Action OnGrowthChanged;
 
-    // 곡선·관문은 GrowthRules(코드 상수 + 카드 스펙)가 소유한다 — 주입 대상이 없어 항상 준비 상태다.
-    public static bool IsConfigReady => true;
+    /// <summary>곡선·비용이 실제로 실렸는가. 스펙시트(CardEnhanceRule)가 진실원이 된 뒤로 "항상 준비"가 아니다 —
+    /// 표를 못 읽으면 상한도 스텝도 비어 성장값이 통째로 어긋난 스냅샷이 나간다.</summary>
+    public static bool IsConfigReady => GrowthSpec.CardMaxLevel > 0;
 
     public static int MaxLevel => GrowthRules.MaxLevel;
     public static int MaxStar => GrowthStar.FromLevel(MaxLevel);
@@ -28,6 +29,9 @@ public static partial class CardGrowthManager
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
     {
+        // 서버값을 세우기 바로 앞줄이다 — 여기서 낙관분을 버려야 앞세운 간식·단계가 서버값 위에 한 번 더 얹히지 않는다.
+        ClearPendingLimitBreak();
+
         s_growth.Clear();
 
         KeywordGrowthManager.OnChanged -= NotifyGrowthChanged;
@@ -83,10 +87,17 @@ public static partial class CardGrowthManager
     }
 
     public static CardGrowth GrowthAtLevel(int _id, int _level)
-        => Snapshot(_id, ClampLevel(_level), false);
+        => Snapshot(_id, ClampLevel(_level), false, 0);
 
-    // 카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생
-    public static CardGrowth GrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true);
+    /// <summary>카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생된다.
+    /// <b>서버가 확정한 값만</b> 담는다 — 전투 스탯과 서버 제출(lockDeck)이 이 길로 지나므로,
+    /// 아직 왕복 중인 한계돌파를 여기 얹으면 서버가 모르는 체력이 실려 덱 잠금이 거절된다.
+    /// 화면에 그릴 값은 <see cref="DisplayGrowthOf"/> 가 답한다.</summary>
+    public static CardGrowth GrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true, LimitBreakOf(_id));
+
+    /// <summary>화면에 그릴 성장 스냅샷. 서버가 아직 확정하지 않은 한계돌파까지 얹혀 있어
+    /// 유저가 누른 프레임에 체력이 오른다 — 표시 창구(<see cref="DeckPower"/>) 밖에서는 쓰지 않는다.</summary>
+    public static CardGrowth DisplayGrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true, DisplayLimitBreakOf(_id));
 
     // 카드의 현재 강화 레벨(기록 없음 = 미강화)
     public static int LevelOf(int _id)
@@ -98,10 +109,10 @@ public static partial class CardGrowthManager
         return ClampLevel(t_entry.Level);
     }
 
+    // 저장값은 저작 상한이 아니라 코드 천장으로 조인다 — 표가 상한을 낮춘 순간 클라만 레벨을 깎으면
+    // 서버 덱 검증(고정 천장)과 갈려 lockDeck이 덱을 통째로 거절한다.
     static int ClampLevel(int _level)
-        => Mathf.Clamp(_level, CardGrowth.BaseLevel, MaxLevel);
-
-    public static int HpBonusOf(int _cardId) => GrowthOf(_cardId).HpBonus;
+        => Mathf.Clamp(_level, CardGrowth.BaseLevel, GrowthSpec.CardMaxLevelCeiling);
 
     // 다음 레벨의 비용·성공률·HP 증가분(만렙이면 false)
     public static bool TryGetNextStep(int _cardId, out GrowthStep _step)
@@ -116,33 +127,33 @@ public static partial class CardGrowthManager
     /// 이미 그려 둔 화면이 비용을 다시 읽어야 한다.</summary>
     public static void NotifyCostRuleChanged() => OnGrowthChanged?.Invoke();
 
+    /// <summary>강화 한 방이 지금 성립하는가의 낙관 검사. 차감도 요청도 하지 않는다.</summary>
+    public static EEnhanceOutcome Precheck(int _cardId) => Precheck(_cardId, out _);
+
     /// <summary>강화 1회를 서버에 요청한다(실패해도 비용은 소모, 레벨 하락 없음).
-    /// 성공률·차감·레벨의 진실원은 서버 enhanceCard 다 — 아래 선검사는 왕복을 아끼는 낙관 검사일 뿐이라
+    /// 성공률·차감·레벨의 진실원은 서버 enhanceCard 다 — <see cref="Precheck"/> 는 왕복을 아끼는 낙관 검사일 뿐이라
     /// 서버가 다른 답을 주면 그쪽이 이긴다.</summary>
     public static async UniTask<EnhanceResult> TryEnhanceAsync(int _cardId)
     {
-        if (!s_initialized) return new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowth.BaseLevel);
         int t_id = _cardId;
-        if (t_id <= 0) return new EnhanceResult(EEnhanceOutcome.MaxLevel, CardGrowth.BaseLevel);
 
-        int t_level = GrowthOf(t_id).Level;
-
-        if (t_level >= GrowthRules.MaxLevel) return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
-
-        if (!TryGetStepAt(t_id, t_level + 1, out _))
-            return new EnhanceResult(EEnhanceOutcome.MaxLevel, t_level);
+        EEnhanceOutcome t_precheck = Precheck(t_id, out GrowthStep t_step);
+        if (t_precheck != EEnhanceOutcome.Success) return new EnhanceResult(t_precheck, LevelOf(t_id));
 
         // 무료 한 방의 조건은 클라 안내가 쥐고 있어 요청에 실어 보낸다 — 실제로 먹였는지는 응답이 답한다.
         bool t_freeShot = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance);
 
-        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot);
+        // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
+        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(t_step.Currency, -t_step.Cost);
+
+        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot, t_pending);
 
         // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
         if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(t_id));
 
         // 레벨·잔액은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
         // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
-        t_level = ClampLevel(t_command.Level);
+        int t_level = ClampLevel(t_command.Level);
 
         // 실패에는 걸지 않는다 — 닫아 버리면 안내가 시키는 강화를 유저 돈으로 다시 해야 한다.
         // 그 판정은 서버 몫이다(무료를 실제로 먹였는지는 차감한 쪽이 안다).
@@ -190,6 +201,25 @@ public static partial class CardGrowthManager
         OnGrowthChanged?.Invoke();
     }
 
+    // 사유의 순서가 곧 계약이다 — 호출부가 NotReady로 로그를 가르므로 초기화 판정이 만렙·비용보다 앞선다.
+    static EEnhanceOutcome Precheck(int _cardId, out GrowthStep _step)
+    {
+        _step = default;
+
+        if (!s_initialized) return EEnhanceOutcome.NotReady;
+        if (_cardId <= 0) return EEnhanceOutcome.MaxLevel;
+
+        int t_level = GrowthOf(_cardId).Level;
+        if (t_level >= GrowthRules.MaxLevel) return EEnhanceOutcome.MaxLevel;
+
+        if (!TryGetStepAt(_cardId, t_level + 1, out _step)) return EEnhanceOutcome.MaxLevel;
+
+        // 낙관 델타가 얹힌 표시 잔액을 본다 — 연속 강화에서 아직 안 걷힌 차감분이 이중 결제로 통과하지 않는다.
+        if (!CurrencyManager.CanAfford(_step.Currency, _step.Cost)) return EEnhanceOutcome.NotAffordable;
+
+        return EEnhanceOutcome.Success;
+    }
+
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.
     static bool TryGetStepAt(int _cardId, int _level, out GrowthStep _step)
     {
@@ -202,14 +232,16 @@ public static partial class CardGrowthManager
     }
 
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 레벨까지 잃지 않는다.
-    static CardGrowth Snapshot(int _cardId, int _level, bool _includeKeywordGrowth)
+    // 한계돌파 단계는 부르는 쪽이 골라 넘긴다 — 저장값과 표시값(낙관분 포함)이 갈리는 축이라
+    // 여기서 직접 읽으면 어느 스냅샷이든 같은 값을 담게 되고, 그 순간 서버 제출에 확정 전 체력이 섞인다.
+    static CardGrowth Snapshot(int _cardId, int _level, bool _includeKeywordGrowth, int _limitBreakStage)
     {
         CardKeyword t_unlockedKeywords = GrowthRules.UnlockedKeywordsAt(_cardId, _level);
         int t_hpBonus = GrowthRules.HpBonusAt(_cardId, _level);
         if (_includeKeywordGrowth)
         {
             t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
-            t_hpBonus += GrowthRules.LimitBreakHpBonusAt(LimitBreakOf(_cardId));
+            t_hpBonus += GrowthRules.LimitBreakHpBonusAt(_limitBreakStage);
         }
 
         return new CardGrowth(

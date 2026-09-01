@@ -109,6 +109,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d70eb0251677e1e469c2fd8e9f864c2f
+    m_Address: Assets/Assets/Prefabs/UI/PooledUI/ServerWaitOverlay.prefab
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dee8a2231ae459847a16e01635c0f514
     m_Address: Assets/Assets/Prefabs/UI/PooledUI/TournamentNodePopup.prefab
     m_ReadOnly: 0

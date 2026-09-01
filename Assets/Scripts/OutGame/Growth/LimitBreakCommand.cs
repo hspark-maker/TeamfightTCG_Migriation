@@ -47,8 +47,8 @@ internal static class LimitBreakCommand
         }
     }
 
-    // 서버 확정값과 클라 하드코딩(GrowthRules)을 나란히 남긴다 — 화면은 슬롯에서 다시 읽으므로
-    // 표 저작이 클라와 갈렸는지 실기에서 알아낼 창구가 이 로그뿐이다.
+    // 서버 확정값과 클라가 표에서 읽은 값을 나란히 남긴다 — 화면은 슬롯에서 다시 읽으므로
+    // 양쪽이 같은 표를 다르게 읽었는지 실기에서 알아낼 창구가 이 로그뿐이다.
     static void LogSettled(int _cardId, LimitBreakCardResult _result)
     {
         if (_result == null) return;

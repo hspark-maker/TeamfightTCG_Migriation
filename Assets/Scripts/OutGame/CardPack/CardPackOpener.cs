@@ -51,10 +51,13 @@ public static class CardPackOpener
         if (!PackSpec.TryGetPack(_pack.PackId, out _))
             Debug.LogError($"[CardPackOpener] '{_pack.PackId}' 가 CardPack 시트에 없다 — 클라는 SO 로 폴백하지만 서버는 SO 를 못 본다");
 
+        // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
+        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(_pack.PriceType, -_pack.Price);
+
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<OpenPackResult>(
-                "openPack", new { env = ContentProfileConfig.Active.CloudEnvId, packId = _pack.PackId });
+                "openPack", new { env = ContentProfileConfig.Active.CloudEnvId, packId = _pack.PackId }, t_pending);
 
             return BuildOpenedPack(t_result);
         }
@@ -77,6 +80,11 @@ public static class CardPackOpener
 
             Debug.LogError($"[CardPackOpener] openPack 실패({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
             return OpenedPack.CreateFailure(t_transient ? EPackOpenResult.NetworkFailed : EPackOpenResult.SpendFailed);
+        }
+        finally
+        {
+            // 요청 인자를 짓다 던지면 InvokeAsync 에 닿지 못해 그쪽 회수가 돌지 않는다. 멱등이라 정상 갈래와 겹쳐도 안전하다.
+            t_pending?.Settle();
         }
     }
 

@@ -206,9 +206,14 @@ public static class TournamentProgress
         if (string.IsNullOrEmpty(_nodeId)) return default;
         if (Slot.ClearedNodeIds.Contains(_nodeId)) return default;
 
+        // 첫 await 이전에 걸어야 한다 — 뒤로 밀리면 팝업의 숫자 롤업이 옛 잔액을 목표로 잡아 역주행한다.
+        var t_rewards = new List<RewardLine>();
+        Config.FillRewards(_nodeId, t_rewards);
+        var t_pending = CurrencyPendingTicket.Hold(t_rewards);
+
         // 보상 미저작 정점도 서버를 거친다 — 클라가 "받을 게 없다"고 판정해 스스로 낙인을 남기면
         // 변조된 클라가 정점을 마음대로 열 수 있다. 서버가 지급 0건이어도 클리어를 확정해 준다.
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId);
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId, t_pending);
         if (!t_outcome.Succeeded) return default;
 
         OnChanged?.Invoke();
@@ -270,8 +275,13 @@ public static class TournamentProgress
         if (!IsChapterComplete(t_index)) return default;
         if (ClaimedChapters.Contains(_chapterId)) return default;
 
+        // 첫 await 이전에 걸어야 한다 — 뒤로 밀리면 팝업의 숫자 롤업이 옛 잔액을 목표로 잡아 역주행한다.
+        var t_rewards = new List<RewardLine>();
+        Config.FillChapterRewards(_chapterId, t_rewards);
+        var t_pending = CurrencyPendingTicket.Hold(t_rewards);
+
         // 챕터 id 를 그대로 ownerId 로 보낸다 — 서버가 chapter_ 접두사를 보고 정점과 가른다.
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId);
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId, t_pending);
         if (!t_outcome.Succeeded) return default;
 
         OnChanged?.Invoke();

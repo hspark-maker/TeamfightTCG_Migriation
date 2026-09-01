@@ -6,6 +6,10 @@ using Firebase.Firestore;
 public class DeckSaveData
 {
     [FirestoreProperty("slots")] public List<DeckSlotSaveData> Slots { get; set; } = new List<DeckSlotSaveData>();
+
+    // 전투에 내보낼 덱의 슬롯 좌표. 신규 계정은 슬롯 0이 스타터 덱이라 기본값 0이 곧 정답이다 —
+    // 서버 신규 문서(freshAccount.ts)가 이 필드를 싣지 않아도 되는 이유.
+    [FirestoreProperty("selectedSlot")] public int SelectedSlot { get; set; }
 }
 
 // 덱 슬롯 하나의 저장 내용
