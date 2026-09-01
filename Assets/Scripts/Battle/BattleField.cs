@@ -5,14 +5,11 @@ using UnityEngine;
 /// <summary>덱 셔플에 어떤 난수를 쓸지 호출부가 정하는 정책. 필드 안에서 모드 플래그를 읽지 않는다.
 /// - None : 셔플 안 함. 리스트 순서 = 등장 순서(튜토리얼 저작 순서 보존).
 /// - Match: <see cref="MatchRandom"/>(시드 고정 결정론). 호출 전에 시드가 걸려 있어야 한다.
-/// - Local: <see cref="UnityEngine.Random"/>. 결과를 와이어로 broadcast하는 멀티 전용 —
-///          멀티는 시드 합의(commit-reveal)가 필드 Initialize **뒤**라 Match를 쓸 수 없다.
-///          대신 MatchRandom 스트림을 건드리지 않으므로 소비 순서가 어긋나지 않는다.</summary>
+/// - DerivedMatch: 매치 시드에서 소유자별 독립 스트림을 파생한다. 공용 MatchRandom 소비 순서에 영향을 주지 않는다.</summary>
 public enum ShufflePolicy
 {
     None,
     Match,
-    Local,
     DerivedMatch,
 }
 
@@ -64,7 +61,7 @@ public class BattleField : MonoBehaviour
         // 통째로 죽어 "아무것도 안 나오는 전투"가 된다. 한 장 빠진 채로라도 전투는 열려야 한다.
         List<int> t_shuffled = Compact(_deckData, _ownerIndex);
         Shuffle(t_shuffled, _shuffle, _ownerIndex);
-        // 서버 재시뮬은 이 순서를 시드로 산출할 수 없다(경로에 따라 Local 셔플이 섞인다) — 기록해서 제출한다.
+        // 서버 재시뮬은 이 순서를 시드로 산출할 수 없다(싱글·튜토리얼은 서버가 모르는 로컬 시드다) — 기록해서 제출한다.
         // 초기화 경로가 여럿이라 호출부가 아니라 여기 한 곳에서 잡는다.
         BattleBoardOrder.Capture(_ownerIndex, t_shuffled);
 
@@ -379,19 +376,26 @@ public class BattleField : MonoBehaviour
     /// 지금 Match를 쓰는 건 싱글/튜토리얼뿐이라 스트림 공유 상대가 없다.</summary>
     static void Shuffle(List<int> _list, ShufflePolicy _policy, int _ownerIndex)
     {
-        if (_policy == ShufflePolicy.None) return;
-
-        MatchRandom.DerivedStream t_derived = default;
-        if (_policy == ShufflePolicy.DerivedMatch)
-            t_derived = MatchRandom.DeriveDeckStream(_ownerIndex);
+        // 정책을 한 자리에서 남김없이 가른다 — else로 접으면 새 정책이 조용히 남의 분기를 타고
+        // 컴파일러가 못 잡는다. DerivedMatch 는 DeckOrder 가 단일 구현을 소유하므로 위임한다.
+        switch (_policy)
+        {
+            case ShufflePolicy.None:
+                return;
+            case ShufflePolicy.DerivedMatch:
+                List<int> t_derivedOrder = DeckOrder.Derive(_list, _ownerIndex);
+                _list.Clear();
+                _list.AddRange(t_derivedOrder);
+                return;
+            case ShufflePolicy.Match:
+                break;
+            default:
+                throw new System.InvalidOperationException($"Unhandled ShufflePolicy: {_policy}");
+        }
 
         for (int i = _list.Count - 1; i > 0; i--)
         {
-            int t_j = _policy == ShufflePolicy.Match
-                ? MatchRandom.Range(i + 1)
-                : _policy == ShufflePolicy.DerivedMatch
-                    ? t_derived.Range(i + 1)
-                    : Random.Range(0, i + 1);
+            int t_j = MatchRandom.Range(i + 1);
             (_list[i], _list[t_j]) = (_list[t_j], _list[i]);
         }
     }

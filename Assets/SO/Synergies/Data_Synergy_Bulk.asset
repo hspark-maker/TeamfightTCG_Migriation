@@ -16,4 +16,4 @@ MonoBehaviour:
   activeIcon: {fileID: 21300000, guid: 931801dee12b9f14792db4faae2680cd, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 26e499ad1ca6e0a4aae82616afb7f8bc, type: 3}
   vfx: {fileID: 11400000, guid: 3f8a41d2c9b7e5f4a8d6c02b17e9f5a3, type: 2}
-  synergyId: 
+  synergyId: Bulk

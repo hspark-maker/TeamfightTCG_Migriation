@@ -338,35 +338,19 @@ public partial class SynergyDef
 [GeneratorSpecData]
 public partial class SynergyEffectDef
 {
-    /// 행 고유 번호(부여 후 변경 금지)DeD
+    /// 행 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// Synergy.synergyId 참조
+    /// SynergyDef.synergyId 참조
     public string synergyId;
-    /// SynergyTier.tierIndex 참조
+    /// SynergyTierDef.tierIndex 참조
     public int tierIndex;
     /// 같은 티어 안 적용 순서(0부터)
     public int effectOrder;
     /// 효과 타입(코드 SynergyEffect 서브클래스와 1:1)
     public string effectType;
-}
-
-[GeneratorSpecData]
-public partial class SynergyEffectParamDef
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// Synergy.synergyId 참조
-    public string synergyId;
-    /// SynergyTier.tierIndex 참조
-    public int tierIndex;
-    /// SynergyEffect.effectOrder 참조
-    public int effectOrder;
-    /// 파라미터 키(효과 클래스 필드명과 동일)
-    public string paramKey;
-    /// 파라미터 값(정수 · bool은 0/1 · 키워드는 이름)
-    public string paramValue;
+    /// 파라미터(키=값
+    public string parameters;
 }
 
 [GeneratorSpecData]
@@ -375,7 +359,7 @@ public partial class SynergyTierDef
     /// 행 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// Synergy.synergyId 참조
+    /// SynergyDef.synergyId 참조
     public string synergyId;
     /// 티어 인덱스(0부터 · 오름차순 저작)
     public int tierIndex;

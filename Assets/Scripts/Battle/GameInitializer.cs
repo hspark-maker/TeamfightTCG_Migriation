@@ -26,6 +26,7 @@ public class GameInitializer : MonoBehaviour
     static System.Func<int> s_enemyTierProvider;
     EMatchEndReason multiplayerFieldFailureReason = EMatchEndReason.Timeout;
     bool multiplayerPreSynced;
+    MultiplayerTurnRunner multiplayerInitScopeRunner;
 
     /// <summary>카드 영구 성장값(강화 체력·진화 단계) 주입점. **초기화/로비가 OutGame의 CardGrowthManager.GrowthOf를 꽂는다** —
     /// Battle이 OutGame을 참조하지 않게 값 생산자를 상위에서 밀어넣는 구조다. 미세팅(null)이면 성장 미적용 = 기존 동작.
@@ -85,6 +86,10 @@ public class GameInitializer : MonoBehaviour
         {
             Debug.LogError($"[GameInitializer] 전투 초기화 실패 — 전투를 열지 못했다: {t_e}");
             AbortInit(EMatchEndReason.InitError);
+        }
+        finally
+        {
+            ReleaseMultiplayerInitScope();
         }
     }
 
@@ -148,6 +153,7 @@ public class GameInitializer : MonoBehaviour
                 return;
             }
         }
+        ReleaseMultiplayerInitScope();
 
         SoundManager.Instance?.PlayBGM(this.battleBGM, BattleBgmFadeInSeconds);
 
@@ -268,8 +274,8 @@ public class GameInitializer : MonoBehaviour
 
         int t_myIndex = MultiplayerTurnRunner.Instance.MyOwnerIndex;
         TurnState.LocalOwnerIndex = t_myIndex;
-        // 멀티 셔플은 Local 고정: 시드 합의(SyncInitialDecks의 commit-reveal)가 이 호출보다 뒤라
-        // MatchRandom을 쓸 수 없고, 쓸 필요도 없다 — 셔플 결과는 GetShuffledIds로 상대에게 그대로 전송된다.
+        this.multiplayerInitScopeRunner = MultiplayerTurnRunner.Instance;
+        this.multiplayerInitScopeRunner.BeginInitialSyncScope();
         IMatchGrowthSource t_source = MatchGrowthSource.Current;
         if (t_source == null)
         {
@@ -279,7 +285,17 @@ public class GameInitializer : MonoBehaviour
         }
         MultiplayerTurnRunner.Instance.SetMatchGrowthSource(t_source);
 
-        var t_deck = DeckConfig.PlayerDeck ?? new System.Collections.Generic.List<int>();
+        // 보드 순서는 서버 시드에서 소유자별로 파생한다. 필드를 세우기 전에 시드가 확정돼야 한다.
+        if (!await MultiplayerTurnRunner.Instance.AcquireMatchSeedAsync())
+        {
+            this.multiplayerFieldFailureReason = MultiplayerTurnRunner.Instance.InitAbortReason;
+            return false;
+        }
+
+        var t_deck = DeckConfig.PlayerDeck != null
+            ? new System.Collections.Generic.List<int>(DeckConfig.PlayerDeck)
+            : new System.Collections.Generic.List<int>();
+        DeckOrder.SortInPlace(t_deck);
         CardGrowth[] t_growth;
         CancellationToken t_destroyCt = this.GetCancellationTokenOnDestroy();
         using var t_growthCts = CancellationTokenSource.CreateLinkedTokenSource(t_destroyCt);
@@ -339,9 +355,16 @@ public class GameInitializer : MonoBehaviour
         }
 
         MultiplayerTurnRunner.Instance.SetLocalGrowthProfiles(t_deck, t_growth);
-        this.playerField.Initialize(t_deck, t_myIndex, ShufflePolicy.Local,
+        this.playerField.Initialize(t_deck, t_myIndex, ShufflePolicy.DerivedMatch,
             _cardId => t_growthByCard[_cardId]);
         return true;
+    }
+
+    void ReleaseMultiplayerInitScope()
+    {
+        if (this.multiplayerInitScopeRunner == null) return;
+        this.multiplayerInitScopeRunner.EndInitialSyncScope();
+        this.multiplayerInitScopeRunner = null;
     }
 
     bool InitializePreSyncedMultiplayerFields(PreBattleMatchData _data)

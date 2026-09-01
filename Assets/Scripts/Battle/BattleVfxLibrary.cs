@@ -22,7 +22,7 @@ public enum BattleVfxId
     // 12·13은 (사용 안 함) 시너지 고유 연출이라 그 시너지의 SynergyVfxConfig로 옮겼다 —
     // 여기 남기면 시너지가 늘 때마다 이 enum이 같이 늘고, 값은 직렬화라 되돌릴 수도 없다.
     // 값 자체는 재사용 금지(기존 에셋에 남아 있을 수 있다).
-    SwarmProjectile  = 12,  // (사용 안 함) → SwarmSynergyVfxConfig.projectile
+    BrandProjectile  = 12,  // (사용 안 함) → BrandSynergyVfxConfig.projectile
     FlowWind         = 13,  // (사용 안 함) → FlowSynergyVfxConfig.wind
     FinishImpact     = 14,  // 승부를 가른 타격: 죽는 카드 자리에 1회. alignToDirection을 켜면 "때린 쪽 → 죽는 쪽"
                             // 방향으로 눕는다 — 반격사면 방향이 저절로 뒤집히므로 항목을 따로 만들 필요가 없다

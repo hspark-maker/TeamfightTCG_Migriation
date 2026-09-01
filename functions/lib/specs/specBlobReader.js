@@ -56,7 +56,7 @@ const node_crypto_1 = require("node:crypto");
 const logger = __importStar(require("firebase-functions/logger"));
 const firebaseApp_1 = require("../firebaseApp");
 /** 업로더 `SpecPayloadCodec.SchemaVersion` 과 맞물린 값. 어긋나면 블롭을 믿지 않고 폴백한다. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 /** 캐시 수명. 스펙 업로드가 반영되기까지 최대 이만큼 늦는다. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map();

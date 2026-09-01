@@ -50,7 +50,7 @@ public sealed class SynergyRegistry : ScriptableObject
             "유산" => "Data_Synergy_Legacy",
             "포식자" => "Data_Synergy_Predator",
             "비늘" => "Data_Synergy_Scale",
-            "추적" => "Data_Synergy_Tracking",
+            "추적" => "Data_Synergy_Trace",
             _ => t_name,
         };
     }

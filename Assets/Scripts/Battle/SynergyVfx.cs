@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 시너지 발동 연출 중 **전용 배관이 필요 없는 1회성 스폰**만 모아 둔다.
-/// (투사체 다발처럼 순서·수명 관리가 필요한 건 각자 파일 — HealVfx / SwarmVfx.)
+/// (투사체 다발처럼 순서·수명 관리가 필요한 건 각자 파일 — HealVfx / BrandVolleyVfx.)
 ///
 /// 프리팹·수명·정렬 스펙은 그 시너지의 연출 에셋(SynergyVfxConfig 자식)이 소유하고,
 /// 스폰/반납 규약은 BattleVfx가 소유한다. 여기엔 "어디에 띄우나"만 있다.
@@ -10,32 +10,16 @@ using UnityEngine;
 /// </summary>
 public static class SynergyVfx
 {
-    /// <summary>흐름 발동: 그 진영 필드 위로 바람이 지나간다.
+    /// <summary>흐름 발동: <b>발동한 그 카드 자리</b>에서 바람이 인다.
     ///
-    /// 스폰 위치는 <b>슬롯 좌표의 평균</b>이다. 효과 SO는 BattleField만 알고 BattleFieldView를 찾아올
-    /// 배관이 없어서(그 배관을 새로 뚫으면 시너지가 뷰 계층을 알게 된다) 카드 뷰의 자리로 중앙을 대신 잡는다.
-    /// transform.position이 아니라 SlotPosition을 쓰는 이유: 카드가 공격 연출로 나가 있어도 바람이 딸려가지 않게.</summary>
-    public static void PlayFlowWind(BattleField _field, FlowSynergyVfxConfig _vfx)
+    /// 필드 중앙이 아닌 이유 — 흐름은 "그 카드가 등장했다 / 그 카드가 때린다"가 발동 사유라,
+    /// 중앙에 띄우면 어느 카드 때문에 떴는지 화면에서 읽히지 않는다(스택만 커 보인다).
+    ///
+    /// 스택은 필드가 세는 값을 그대로 쓴다(연출이 따로 세지 않는다) — 쌓일수록 바람이 커진다.</summary>
+    public static void PlayFlowWind(CardInstance _card, BattleField _field, FlowSynergyVfxConfig _vfx)
     {
-        if (_field == null || _vfx == null || _vfx.wind.prefab == null) return;   // 미배선 = 연출 생략
-
-        Vector3 t_sum   = Vector3.zero;
-        int     t_count = 0;
-        int     t_layer = 0;
-
-        foreach (CardInstance t_card in _field.GetActiveCards())
-        {
-            CardView t_view = CardView.GetView(t_card);
-            if (t_view == null) continue;
-            t_sum  += t_view.SlotPosition;
-            t_layer = t_view.VfxSortingLayerId;
-            t_count++;
-        }
-
-        if (t_count == 0) return;   // 띄울 자리가 없다(빈 필드)
-
-        // 스택이 쌓일수록 바람이 커진다 — 스택은 이 필드가 세는 값 그대로 쓴다(연출이 따로 세지 않는다).
-        ApplyScale(BattleVfx.Play(_vfx.wind, t_sum / t_count, t_layer), _vfx.WindScaleFor(_field.FlowStack));
+        if (_card == null || _field == null) return;
+        PlayFlowWind(CardView.GetView(_card), _vfx, _field.FlowStack);
     }
 
     /// <summary>스폰된 연출 인스턴스의 크기 배율. 풀에서 빌려온 오브젝트라 **스폰할 때마다 반드시 세팅**한다 —
@@ -46,15 +30,15 @@ public static class SynergyVfx
         _handle.Go.transform.localScale = Vector3.one * _scale;
     }
 
-    /// <summary>뷰를 직접 아는 호출부(연출 테스터)용. 중앙 판정은 BattleFieldView.FieldCenter —
-    /// 슬롯 격자 기준이라 카드가 죽어 비어 있어도 자리가 흔들리지 않는다(게임 경로보다 정확하다).
-    /// 게임 경로가 이걸 못 쓰는 이유는 시너지 효과 SO가 뷰 계층을 모르기 때문이다.</summary>
-    public static void PlayFlowWind(BattleFieldView _view, FlowSynergyVfxConfig _vfx, int _stack = 1)
+    /// <summary>뷰를 직접 아는 호출부(연출 테스터)용. 게임 경로와 **같은 자리·같은 규칙**이다.
+    ///
+    /// transform.position이 아니라 SlotPosition을 쓰는 이유: 카드가 공격 연출로 나가 있어도
+    /// 바람이 카드를 따라 딸려가지 않고 그 슬롯에 남는다.</summary>
+    public static void PlayFlowWind(CardView _view, FlowSynergyVfxConfig _vfx, int _stack = 1)
     {
-        if (_view == null || _vfx == null || _vfx.wind.prefab == null) return;
+        if (_view == null || _vfx == null || _vfx.wind.prefab == null) return;   // 미배선 = 연출 생략
 
-        CardView t_any = _view.GetSlotView(BattleField.SLOT_COUNT / 2);
-        ApplyScale(BattleVfx.Play(_vfx.wind, _view.FieldCenter, t_any != null ? t_any.VfxSortingLayerId : 0),
+        ApplyScale(BattleVfx.Play(_vfx.wind, _view.SlotPosition, _view.VfxSortingLayerId),
                    _vfx.WindScaleFor(_stack));
     }
 }

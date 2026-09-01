@@ -7,9 +7,10 @@ public class BattleCamera : MonoBehaviour
 {
     public static BattleCamera Instance { get; private set; }
 
-    // 시네마 진입 시 카메라가 뒤로 빠지는 거리 = **기준 거리 대비 비율**.
-    // 절대값으로 두면 화면 비율에 따라 카메라 거리가 달라졌을 때(BattleCameraFit) 확대감이 기기마다 어긋난다.
-    // (구 cinemaZoom = DOOrthoSize 트윈은 제거 — 이 카메라는 퍼스펙티브라 아무 효과가 없었다.)
+    // 시네마 진입 시 카메라가 뒤로 빠지는 양 = **기준 대비 비율**.
+    // 절대값으로 두면 화면 비율에 따라 기준이 달라졌을 때(BattleCameraFit) 확대감이 기기마다 어긋난다.
+    // 이 비율이 실제로 무엇을 움직이는지는 투영이 정한다 — 퍼스펙티브는 z, 오쏘는 orthographicSize.
+    // 그 변환은 ZoomValue/TweenZoom 한 곳이 소유한다(아래 참조).
     [SerializeField, Range(0f, 0.6f)] float cinemaZMoveRatio = 0.18f;   // 기준 거리 11 기준 약 2
 
     [Header("롱프레스(카드 정보) 카메라 뒤로 빼기")]
@@ -46,6 +47,7 @@ public class BattleCamera : MonoBehaviour
     Camera cam;
     BattleCameraFit fit;
     float fallbackBaseZ;
+    float fallbackBaseOrthoSize = 6.351f;
     bool  liftActive;
     bool  liftOwnsExternalControl;
     Tween liftTween;
@@ -81,6 +83,65 @@ public class BattleCamera : MonoBehaviour
     /// 화면이 좁아 카메라가 멀어져도 같은 화면 비중으로 보이게 한다.</summary>
     public static float DepthScale => Instance != null && Instance.fit != null ? Instance.fit.DistanceScale : 1f;
 
+    // ── 줌 축 ────────────────────────────────────────────────────────────
+    // 이 클래스의 모든 확대/축소는 **화면에 담기는 세로 범위 배율**(extentScale) 하나로 표현한다.
+    //   1 = 기준, <1 = 다가감(줌 인), >1 = 물러남(줌 아웃).
+    // 그 배율을 실제 카메라 값으로 옮기는 곳은 ZoomValue 하나다 — 퍼스펙티브는 z(거리에 비례),
+    // 오쏘는 orthographicSize. 예전에는 각 연출이 z를 직접 계산해서, 투영을 오쏘로 바꾸자
+    // 컴파일 에러 없이 다섯 연출이 통째로 무효가 됐다. 축을 하나로 모아 그 재발을 막는다.
+
+    /// <summary>줌을 orthographicSize로 거는가(오쏘) z로 거는가(퍼스펙티브).</summary>
+    bool UsesOrthoZoom => this.cam != null && this.cam.orthographic;
+
+    /// <summary>오쏘 기준 size. fit이 있으면 화면 비율에 맞춰 계산된 값, 없으면 씬 배치값.</summary>
+    float BaseOrthoSize => this.fit != null ? this.fit.BaseOrthoSize : this.fallbackBaseOrthoSize;
+
+    /// <summary>비율을 절대 거리로 환산할 때 쓰는 기준 거리. 오쏘에서도 fit이 기준값을 돌려주므로
+    /// 절대 단위로 저작된 값(롱프레스 뒤로 빼기 등)이 두 모드에서 같은 화면 비중이 된다.</summary>
+    float ZoomReferenceDistance => this.fit != null
+        ? Mathf.Max(0.01f, this.fit.BaseDistance)
+        : Mathf.Max(0.01f, Mathf.Abs(this.fallbackBaseZ));
+
+    /// <summary>지금 투영에서 "기준 상태"에 해당하는 줌 값.</summary>
+    float ZoomBase => UsesOrthoZoom ? BaseOrthoSize : BaseZ;
+
+    /// <summary>가시 범위 배율 → 카메라 값. BaseZ가 음수라 퍼스펙티브도 그냥 곱하면 맞는다
+    /// (거리 = |BaseZ| * scale). 부호를 손으로 다루지 않는 게 이 함수의 존재 이유다 —
+    /// 예전엔 <c>BaseZ - x</c>(뒤로)와 <c>BaseZ * (1-r)</c>(앞으로)가 섞여 줌 인이 줌 아웃으로 뒤집힌 적이 있다.</summary>
+    float ZoomValue(float _extentScale) => ZoomBase * Mathf.Max(0.01f, _extentScale);
+
+    /// <summary>절대 월드 단위로 저작된 "뒤로 빼기"를 가시 범위 배율로 바꾼다.</summary>
+    float PullBackScale(float _worldPullBack) => 1f + _worldPullBack / ZoomReferenceDistance;
+
+    /// <summary>줌 트윈을 건다. 대상이 모드마다 다르므로(Transform vs Camera) 생성도 여기 한 곳에서만 한다.</summary>
+    Tween TweenZoom(float _extentScale, float _duration, Ease _ease, bool _unscaled)
+    {
+        float t_to       = ZoomValue(_extentScale);
+        float t_duration = Mathf.Max(0.01f, _duration);
+        Tween t_tween    = UsesOrthoZoom
+            ? this.cam.DOOrthoSize(t_to, t_duration)
+            : transform.DOMoveZ(t_to, t_duration);
+        t_tween.SetEase(_ease).SetLink(gameObject);
+        if (_unscaled) t_tween.SetUpdate(true);
+        return t_tween;
+    }
+
+    /// <summary>진행 중인 줌 트윈을 끊는다. <b>transform.DOKill() 하나로는 부족하다</b> —
+    /// 오쏘 줌은 Camera를 대상으로 돌기 때문에 트랜스폼만 죽이면 트윈이 살아남아 다음 연출과 싸운다.</summary>
+    void KillZoomTweens()
+    {
+        transform.DOKill();
+        if (this.cam != null) this.cam.DOKill();
+    }
+
+    /// <summary>줌을 기준 상태로 즉시 되돌린다(트윈 없음).</summary>
+    void SnapZoomToBase()
+    {
+        if (this.cam == null) return;
+        if (UsesOrthoZoom) { this.cam.orthographicSize = BaseOrthoSize; return; }
+        transform.position = new Vector3(transform.position.x, transform.position.y, BaseZ);
+    }
+
     void Awake()
     {
         Instance = this;
@@ -88,6 +149,7 @@ public class BattleCamera : MonoBehaviour
         this.fit = GetComponent<BattleCameraFit>();
         if (this.cam == null) return;
         this.fallbackBaseZ = transform.position.z;
+        this.fallbackBaseOrthoSize = Mathf.Max(0.01f, this.cam.orthographicSize);
         this.homeXY = transform.position;
     }
 
@@ -108,7 +170,7 @@ public class BattleCamera : MonoBehaviour
         this.liftActive  = false;
         this.liftTween?.Kill();
         this.liftTween   = null;
-        transform.DOKill();
+        KillZoomTweens();
         this.focusTween?.Kill();
         this.focusTween  = null;
         this.focusA      = null;
@@ -117,8 +179,7 @@ public class BattleCamera : MonoBehaviour
         this.focusOffset = Vector2.zero;
         this.focusActive = false;
         WriteXY(Vector2.zero);
-        if (this.cam != null)
-            transform.position = new Vector3(transform.position.x, transform.position.y, BaseZ);
+        SnapZoomToBase();
         InCinema = false;
         ReleaseLiftExternalControl();
     }
@@ -219,19 +280,17 @@ public class BattleCamera : MonoBehaviour
 
         if (_on)
         {
-            // 시네마가 z를 몰고 있을 때는 상태와 외부 제어권도 잡지 않는다.
+            // 시네마가 줌 축을 몰고 있을 때는 상태와 외부 제어권도 잡지 않는다.
             if (InCinema) return;
 
             // 진행 중인 복귀가 있다면 그쪽 OnKill이 제어권을 먼저 반환한 뒤 새로 획득한다.
-            transform.DOKill();
+            KillZoomTweens();
             this.liftTween = null;
             this.liftActive = true;
             AcquireLiftExternalControl();
 
-            this.liftTween = transform.DOMoveZ(BaseZ - this.longPressPullBackZ,
-                                                Mathf.Max(0.01f, this.longPressLiftDuration))
-                .SetEase(Ease.InOutSine)
-                .SetLink(gameObject);
+            this.liftTween = TweenZoom(PullBackScale(this.longPressPullBackZ),
+                                       this.longPressLiftDuration, Ease.InOutSine, false);
             return;
         }
 
@@ -248,22 +307,18 @@ public class BattleCamera : MonoBehaviour
             return;
         }
 
-        transform.DOKill();
+        KillZoomTweens();
         this.liftTween = null;
 
-        // 확정 전 잠깐 출발했다 취소된 카메라는 복귀 트윈 없이 기준 위치로 스냅한다.
+        // 확정 전 잠깐 출발했다 취소된 카메라는 복귀 트윈 없이 기준 상태로 스냅한다.
         if (t_snapBack)
         {
-            Vector3 t_pos = transform.position;
-            t_pos.z = BaseZ;
-            transform.position = t_pos;
+            SnapZoomToBase();
             ReleaseLiftExternalControl();
             return;
         }
 
-        this.liftTween = transform.DOMoveZ(BaseZ, Mathf.Max(0.01f, this.longPressLiftDuration))
-            .SetEase(Ease.InOutSine)
-            .SetLink(gameObject)
+        this.liftTween = TweenZoom(1f, this.longPressLiftDuration, Ease.InOutSine, false)
             .OnKill(ReleaseLiftExternalControl);
     }
 
@@ -281,13 +336,10 @@ public class BattleCamera : MonoBehaviour
         BattleCameraFit.EndExternalControl();
     }
 
-    /// <summary>기준 거리에서 콘텐츠 쪽으로 <paramref name="_ratio"/>만큼 <b>다가간</b> z(줌 인).
-    ///
-    /// <para><b>부호 함정.</b> 이 카메라는 BaseZ가 음수라 "다가간다"는 z를 0 쪽으로 당기는 것이다.
-    /// 바로 옆의 시네마·롱프레스는 <c>BaseZ - x</c>를 쓰는데 그건 <b>뒤로 빼는</b> 연출이라 그렇다 —
-    /// 식이 비슷해 보여서 그대로 베끼면 줌 인이 줌 아웃이 된다(실제로 그렇게 났다).
-    /// 줌 인 계산은 여기 하나만 쓴다.</para></summary>
-    float ZoomInZ(float _ratio) => BaseZ * (1f - Mathf.Clamp01(_ratio));
+    /// <summary>비율만큼 <b>다가간</b> 가시 범위 배율(줌 인). 0.32면 화면에 담기는 범위가 68%로 줄어든다.
+    /// 물러나는 연출은 <see cref="PullBackScale"/>이나 <c>1 + ratio</c>를 쓴다 — 두 방향을 섞어
+    /// 손으로 부호를 다루면 줌 인이 줌 아웃으로 뒤집힌다(실제로 그렇게 났다).</summary>
+    static float ZoomInScale(float _ratio) => 1f - Mathf.Clamp01(_ratio);
 
     /// <summary>승패 확정 여운용 미세 줌. <paramref name="_depth01"/>은 0~1(패배는 승리보다 얕게 준다).
     /// 시네마와 같은 z 축을 쓰므로 <see cref="InCinema"/>를 세워 fit이 z를 덮지 않게 한다 —
@@ -305,11 +357,8 @@ public class BattleCamera : MonoBehaviour
         if (t_ratio <= 0f) return;
 
         InCinema = true;
-        transform.DOKill();
-        transform.DOMoveZ(ZoomInZ(t_ratio), Mathf.Max(0.01f, _duration))
-            .SetEase(Ease.OutCubic)
-            .SetUpdate(true)
-            .SetLink(gameObject);
+        KillZoomTweens();
+        TweenZoom(ZoomInScale(t_ratio), _duration, Ease.OutCubic, true);
     }
 
     // 첫 박에 들어가는 비율. 나머지는 사망 연출이 도는 내내 천천히 마저 붙는다 —
@@ -333,11 +382,8 @@ public class BattleCamera : MonoBehaviour
         this.focusTween?.Kill();
         this.focusTween = TweenFocusWeight(1f, t_duration, Ease.InOutSine);
 
-        transform.DOKill();
-        transform.DOMoveZ(ZoomInZ(this.approachZMoveRatio), t_duration)
-            .SetEase(Ease.InOutSine)
-            .SetUpdate(true)
-            .SetLink(gameObject);
+        KillZoomTweens();
+        TweenZoom(ZoomInScale(this.approachZMoveRatio), t_duration, Ease.InOutSine, true);
     }
 
     // 추적 대상 교체. 진행 중인 밀기(focusWeight)는 그대로 두고 목표만 바꾼다 —
@@ -375,13 +421,13 @@ public class BattleCamera : MonoBehaviour
     {
         if (this.cam == null) return;
 
-        InCinema = true;   // fit이 z를 덮지 않게(시네마와 같은 축을 쓴다)
+        InCinema = true;   // fit이 줌 축을 덮지 않게(시네마와 같은 축을 쓴다)
 
         // 접근 줌에서 넘어온 경우 focusWeight는 이미 1 근처다 — 대상만 죽는 카드로 갈아타고
         // 비율(얕게 → 깊게)이 올라가면서 자연스럽게 더 파고든다.
         BeginFocus(_victimA, _victimB, this.finishFollowXY);
 
-        float t_z     = ZoomInZ(this.finishZMoveRatio);
+        float t_scale = ZoomInScale(this.finishZMoveRatio);
         float t_punch = Mathf.Max(0.01f, _punch);
         float t_creep = Mathf.Max(0.01f, _creep);
 
@@ -397,19 +443,20 @@ public class BattleCamera : MonoBehaviour
             .SetUpdate(true)
             .SetLink(gameObject);
 
-        // z도 같은 리듬 — 첫 박에 대부분 당기고 나머지를 천천히 마저 당긴다.
-        float t_punchZ = Mathf.Lerp(BaseZ, t_z, FinishPunchRatio);
-        transform.DOKill();
+        // 줌도 같은 리듬 — 첫 박에 대부분 당기고 나머지를 천천히 마저 당긴다.
+        // 중간값을 배율에서 보간하므로 두 투영에서 같은 리듬이 나온다(z를 보간하면 오쏘에서 무효였다).
+        float t_punchScale = Mathf.Lerp(1f, t_scale, FinishPunchRatio);
+        KillZoomTweens();
         DOTween.Sequence()
-            .Append(transform.DOMoveZ(t_punchZ, t_punch).SetEase(Ease.OutCubic))
-            .Append(transform.DOMoveZ(t_z, t_creep).SetEase(Ease.InOutSine))
+            .Append(TweenZoom(t_punchScale, t_punch, Ease.OutCubic, false))
+            .Append(TweenZoom(t_scale, t_creep, Ease.InOutSine, false))
             .SetUpdate(true)
             .SetLink(gameObject);
     }
 
-    /// <summary>접근·피니시 줌을 통째로 되돌린다 — XY·거리·시네마 소유권까지.
-    /// <b>줌을 푸는 공개 경로는 이것 하나다.</b> XY만 놓고 거리를 남기는 변형이 있었는데,
-    /// 그러면 그 뒤로 z를 되돌릴 지점이 씬 종료밖에 없어 카메라가 당겨진 채로 굳었다.</summary>
+    /// <summary>접근·피니시 줌을 통째로 되돌린다 — XY·줌·시네마 소유권까지.
+    /// <b>줌을 푸는 공개 경로는 이것 하나다.</b> XY만 놓고 줌을 남기는 변형이 있었는데,
+    /// 그러면 그 뒤로 줌을 되돌릴 지점이 씬 종료밖에 없어 카메라가 당겨진 채로 굳었다.</summary>
     public static void RestoreFromFinish(float _duration) => Instance?.ApplyRestoreFromFinish(_duration);
 
     void ApplyRestoreFromFinish(float _duration)
@@ -418,11 +465,8 @@ public class BattleCamera : MonoBehaviour
 
         ApplyReleaseFocus(_duration);
 
-        transform.DOKill();
-        transform.DOMoveZ(BaseZ, Mathf.Max(0.01f, _duration))
-            .SetEase(Ease.InOutSine)
-            .SetUpdate(true)
-            .SetLink(gameObject)
+        KillZoomTweens();
+        TweenZoom(1f, _duration, Ease.InOutSine, true)
             .OnComplete(() => InCinema = false);
     }
 
@@ -446,11 +490,11 @@ public class BattleCamera : MonoBehaviour
         if (this.cam == null) return UniTask.CompletedTask;
 
         InCinema = true;
-        float t_move = Mathf.Abs(BaseZ) * this.cinemaZMoveRatio;   // 거리 비례 — 어느 화면에서나 같은 확대감
 
         var t_tcs = new UniTaskCompletionSource();
-        transform.DOKill();
-        transform.DOMoveZ(BaseZ - t_move, CinemaDuration)
+        KillZoomTweens();
+        // 뒤로 빠지는 연출 — 담기는 범위가 (1 + 비율)배로 넓어진다. 기준 대비 비율이라 어느 화면에서나 같다.
+        TweenZoom(1f + this.cinemaZMoveRatio, CinemaDuration, Ease.OutQuad, false)
             .OnComplete(() => t_tcs.TrySetResult());
         return t_tcs.Task;
     }
@@ -459,8 +503,8 @@ public class BattleCamera : MonoBehaviour
     {
         if (this.cam == null) return;
 
-        transform.DOKill();
-        transform.DOMoveZ(BaseZ, CinemaDuration)
+        KillZoomTweens();
+        TweenZoom(1f, CinemaDuration, Ease.OutQuad, false)
             .OnComplete(() => InCinema = false);
     }
 }

@@ -12,8 +12,12 @@ public class BattleIntro : MonoBehaviour
     // 인트로 줌은 **fit이 계산한 기준 거리 기준의 상대값**이다. 절대 z로 두면 화면 비율에 따라
     // 카메라 거리가 달라졌을 때(BattleCameraFit) 인트로가 끝나는 위치가 기준과 어긋나 카드가 잘린다.
     [SerializeField] float introBackDistance = 9f;    // 시작 시 기준보다 얼마나 더 뒤에서 출발하는가(구 -20 → -11)
+    // 오쏘그래픽에서는 카메라를 뒤로 빼도 화면이 그대로다 — 확대감의 주인이 orthographicSize다.
+    // 기준 size의 몇 배에서 출발할지로 같은 연출을 만든다(퍼스펙티브 기본값 (11+9)/11 ≈ 1.82와 맞춘 값).
+    [SerializeField] float introBackOrthoScale = 1.82f;
     // fit이 없는 씬(테스트 등) 폴백. fit이 있으면 무시된다.
     [SerializeField] float fallbackTargetZ = -11f;
+    [SerializeField] float fallbackTargetOrthoSize = 6.351f;
 
     // 타이밍은 BattleTimingConfig 단일 진실원(배율 적용). 아래 프로퍼티로 위임.
     float cardDealDelay    => GameTiming.Battle.CardDealDelay;
@@ -43,14 +47,47 @@ public class BattleIntro : MonoBehaviour
     Vector3[] m_playerDests;
     Vector3[] m_enemyDests;
 
+    BattleCameraFit Fit => Camera.main != null ? Camera.main.GetComponent<BattleCameraFit>() : null;
+
+    /// <summary>카메라가 오쏘그래픽인가. 확대 연출의 축이 z냐 orthographicSize냐를 가른다.</summary>
+    bool IsOrtho => Camera.main != null && Camera.main.orthographic;
+
     /// <summary>인트로가 끝나며 카메라가 돌아갈 기준 z. fit이 있으면 화면 비율에 맞춰 계산된 값.</summary>
     float TargetZ
     {
         get
         {
-            BattleCameraFit t_fit = Camera.main != null ? Camera.main.GetComponent<BattleCameraFit>() : null;
+            BattleCameraFit t_fit = Fit;
             return t_fit != null ? t_fit.BaseCameraZ : this.fallbackTargetZ;
         }
+    }
+
+    /// <summary>인트로가 끝나며 수렴할 기준 orthographicSize(오쏘 전용).</summary>
+    float TargetOrthoSize
+    {
+        get
+        {
+            BattleCameraFit t_fit = Fit;
+            return t_fit != null ? t_fit.BaseOrthoSize : this.fallbackTargetOrthoSize;
+        }
+    }
+
+    /// <summary>인트로 시작 상태로 카메라를 세운다. 퍼스펙티브는 뒤로 물러난 z, 오쏘는 넓어진 size.
+    /// 두 모드가 같은 "멀리서 시작해 다가온다"를 만든다.</summary>
+    void ApplyIntroStart()
+    {
+        if (Camera.main == null) return;
+
+        if (IsOrtho)
+        {
+            // z는 건드리지 않는다 — 오쏘에서 z 이동은 화면에 아무 변화를 못 만들고 정렬만 흔든다.
+            Vector3 t_ortho = Camera.main.transform.position;
+            Camera.main.transform.position = new Vector3(0f, 0f, t_ortho.z);
+            Camera.main.orthographicSize = TargetOrthoSize * Mathf.Max(1f, this.introBackOrthoScale);
+            return;
+        }
+
+        Camera.main.transform.position = new Vector3(0f, 0f, TargetZ - this.introBackDistance);
     }
 
     public void Await()
@@ -60,7 +97,7 @@ public class BattleIntro : MonoBehaviour
         // 인트로가 카메라를 몰기 시작 — fit이 매 프레임 z를 되돌리지 않게 잠근다(PlayCameraIntro 끝에서 해제).
         BattleCameraFit.BeginExternalControl();
 
-        Camera.main.transform.position = new Vector3(0f, 0f, TargetZ - this.introBackDistance);
+        ApplyIntroStart();
         Vector3 t_playerFrom = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 2f, 0f, 10f));
         Vector3 t_enemyFrom = Camera.main.ScreenToWorldPoint(new Vector3(-Screen.width, Screen.height, 10f));
 
@@ -77,14 +114,19 @@ public class BattleIntro : MonoBehaviour
     {
         if (Camera.main == null) return;
 
-        float t_target = TargetZ;   // 잠금 해제 전에 읽는다(해제 후엔 fit이 곧바로 덮을 수 있음)
-        Vector3 t_pos = Camera.main.transform.position;
-        t_pos.z = t_target - this.introBackDistance;
-        Camera.main.transform.position = t_pos;
+        // 도착값은 잠금 해제 전에 읽는다(해제 후엔 fit이 곧바로 덮을 수 있음).
+        bool  t_ortho      = IsOrtho;
+        float t_targetZ    = TargetZ;
+        float t_targetSize = TargetOrthoSize;
+
+        ApplyIntroStart();
 
         try
         {
-            await Camera.main.transform.DOMoveZ(t_target, this.cameraDuration).ToUniTask();
+            if (t_ortho)
+                await Camera.main.DOOrthoSize(t_targetSize, this.cameraDuration).ToUniTask();
+            else
+                await Camera.main.transform.DOMoveZ(t_targetZ, this.cameraDuration).ToUniTask();
         }
         finally
         {

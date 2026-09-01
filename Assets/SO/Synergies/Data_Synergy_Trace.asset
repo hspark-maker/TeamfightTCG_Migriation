@@ -15,5 +15,5 @@ MonoBehaviour:
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 446fe3b6a53368a409492d9e03fce9aa, type: 3}
   inactiveIcon: {fileID: 21300000, guid: df536d235c30e2544a7f3a52e47d851f, type: 3}
-  vfx: {fileID: 11400000, guid: 364810c587e49d84daee2863739f98e6, type: 2}
-  synergyId: 
+  vfx: {fileID: 11400000, guid: 0ae442e2ce4d5f443a1f4080e1ed3a25, type: 2}
+  synergyId: Trace

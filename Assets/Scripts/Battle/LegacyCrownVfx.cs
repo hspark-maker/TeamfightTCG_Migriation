@@ -9,7 +9,7 @@ using UnityEngine;
 /// 그 카드가 죽는 순간 같은 수의 왕관을 회복받을 아군에게 날려 보낸다(<see cref="Fly"/>).
 ///
 /// 프리팹/형태 = <see cref="LegacySynergyVfxConfig"/>, 스폰·정렬·풀 반납 = <see cref="BattleVfx"/>.
-/// 여기엔 어느 것도 두지 않는다(SwarmVfx·HealVfx와 같은 규약).
+/// 여기엔 어느 것도 두지 않는다(BrandVolleyVfx·HealVfx와 같은 규약).
 ///
 /// <b>순수 연출이다 — 상태/RNG 무접촉.</b> 개수의 진실원은 <c>CardInstance.legacyStack</c> 하나이고
 /// 여기서는 그 값을 매번 읽어 그린다. 그림 쪽에 스택을 따로 들고 있지 않기 때문에
@@ -34,11 +34,15 @@ public static class LegacyCrownVfx
     /// <summary>턴 시작: 지금 스택 수만큼 왕관을 띄웠다 거둔다. 스택 0이거나 배선이 없으면 무동작.
     /// 기다리지 않는다 — 턴 진행을 붙잡으면 스택이 쌓일수록 턴 시작이 느려진다.</summary>
     public static void Show(CardInstance _card, SynergyData _synergy)
+        => Show(_card, _synergy, -1);
+
+    /// <summary>게임 상태를 바꾸지 않고 명시한 개수의 왕관을 재생하는 미리보기 진입점.</summary>
+    public static void Show(CardInstance _card, SynergyData _synergy, int _visibleCount)
     {
         LegacySynergyVfxConfig t_cfg = ConfigOf(_synergy);
         if (t_cfg == null || t_cfg.crown.prefab == null || _card == null) return;
 
-        int t_count = VisibleCount(_card, t_cfg);
+        int t_count = _visibleCount >= 0 ? VisibleCount(_visibleCount, t_cfg) : VisibleCount(_card, t_cfg);
         if (t_count <= 0) return;
 
         CardView t_view = CardView.GetView(_card);
@@ -58,12 +62,17 @@ public static class LegacyCrownVfx
     /// 유예된 숫자(DeferHpDisplay)를 아무도 안 풀면 그 카드의 체력 표기가 영영 안 오른다.</summary>
     public static void Fly(CardInstance _from, IReadOnlyList<CardInstance> _targets, int _healAmount,
                            SynergyData _synergy)
+        => Fly(_from, _targets, _healAmount, _synergy, -1);
+
+    /// <summary>게임 상태를 바꾸지 않고 명시한 개수의 왕관 비행을 재생하는 미리보기 진입점.</summary>
+    public static void Fly(CardInstance _from, IReadOnlyList<CardInstance> _targets, int _healAmount,
+                           SynergyData _synergy, int _visibleCount)
     {
         LegacySynergyVfxConfig t_cfg = ConfigOf(_synergy);
         if (t_cfg == null || t_cfg.crown.prefab == null || _from == null) return;
         if (_targets == null || _targets.Count == 0) return;
 
-        int t_count = VisibleCount(_from, t_cfg);
+        int t_count = _visibleCount >= 0 ? VisibleCount(_visibleCount, t_cfg) : VisibleCount(_from, t_cfg);
         if (t_count <= 0) return;
 
         CardView t_view = CardView.GetView(_from);
@@ -109,9 +118,11 @@ public static class LegacyCrownVfx
     /// 상한을 넘겨도 규칙(회복량)은 스택 그대로다.</summary>
     static int VisibleCount(CardInstance _card, LegacySynergyVfxConfig _cfg)
     {
-        int t_stack = Mathf.Max(0, _card.legacyStack);
-        return _cfg.maxVisible > 0 ? Mathf.Min(t_stack, _cfg.maxVisible) : t_stack;
+        return VisibleCount(Mathf.Max(0, _card.legacyStack), _cfg);
     }
+
+    static int VisibleCount(int _count, LegacySynergyVfxConfig _cfg)
+        => _cfg.maxVisible > 0 ? Mathf.Min(Mathf.Max(0, _count), _cfg.maxVisible) : Mathf.Max(0, _count);
 
     /// <summary>개수에 따른 축소 배율. 한 개 늘 때마다 falloff를 곱하고 하한에서 멈춘다 —
     /// 크기가 개수를 대신 말해 주므로 왕관이 늘수록 줄 전체가 조밀해진다.</summary>
@@ -352,7 +363,7 @@ public static class LegacyCrownVfx
             .SetLink(_go);
     }
 
-    /// <summary>베지어 경로 비행. 트윈이 아니라 프레임 보간인 이유는 SwarmVfx.Travel과 같다 —
+    /// <summary>베지어 경로 비행. 트윈이 아니라 프레임 보간인 이유는 BrandVolleyVfx.Travel과 같다 —
     /// 카드 쪽 DOKill에 조용히 잘리지 않게 트윈 밖에 둔다.</summary>
     static async UniTask Travel(GameObject _go, Vector3 _start, Vector3 _end, int _index,
                                 LegacySynergyVfxConfig _cfg)

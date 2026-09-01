@@ -15,5 +15,5 @@ MonoBehaviour:
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 41b8d69778c346a438e8234a9d55d548, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 3a4c16d21cdc99a4fbefbf03f3bf3f35, type: 3}
-  vfx: {fileID: 0}
-  synergyId: 
+  vfx: {fileID: 11400000, guid: c936b924711f9454da2d9f10aedae691, type: 2}
+  synergyId: Caretaker
