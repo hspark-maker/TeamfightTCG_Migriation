@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 보상 토너먼트 저작 데이터 — 챕터 → 정점 2계층의 단일 진실원.
+// 모험 저작 데이터 — 챕터 → 정점 2계층의 단일 진실원.
 // 소비처가 쓰는 평탄 정점 인덱스는 전부 여기서 파생한다(챕터 경계는 이 애셋만 안다).
 [CreateAssetMenu(fileName = "TournamentConfig", menuName = "Card Battle/Tournament Config")]
 public class TournamentConfig : ScriptableObject
@@ -209,7 +209,7 @@ public class TournamentConfig : ScriptableObject
     }
 
 #if UNITY_EDITOR
-    [ContextMenu("토너먼트 저작 검증")]
+    [ContextMenu("모험 저작 검증")]
     void ValidateTournament() => TournamentValidator.Validate(this);
 #endif
 }

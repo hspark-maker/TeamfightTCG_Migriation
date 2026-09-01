@@ -41,7 +41,8 @@ public static class SynergyEmblemVfx
             SynergyData t_synergy = t_active?.Synergy;
             if (t_synergy == null) continue;
             if (!SynergyApplier.BelongsTo(_card, t_synergy)) continue;
-            Play(_view, t_synergy, SynergyEmblemTiming.Placed);
+            // 무엇을 띄울지는 연출 에셋이 답한다(기본 = 엠블럼 줄, 흐름 = 바람). 여기 타입 분기를 두지 마라.
+            if (t_synergy.vfx != null) t_synergy.vfx.PlayPlaced(_view, _card, t_synergy);
         }
     }
 

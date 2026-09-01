@@ -14,7 +14,7 @@
 
 **이 로드맵의 범위 결정(사용자 확정)**
 
-- **전투 관련은 제외** — 싱글 전투 결과 서버화, 멀티 시뮬 권위 전환, 랭크 점수 판정 이관은 다루지 않는다. 단 **토너먼트 관련은 허용**.
+- **전투 관련은 제외** — 싱글 전투 결과 서버화, 멀티 시뮬 권위 전환, 랭크 점수 판정 이관은 다루지 않는다. 단 **모험 관련은 허용**.
 - 예외 하나: `claimBattleReward` 의 **멱등 낙인만** 넣는다. 전투 판정이 아니라 지급 callable 쪽 결함이고, C8 재화 원장 작업에 곱어 가는 것이라 추가 비용이 거의 없다.
 - 룰 슬롯 동결에서 **`deck` · `profile` · `tutorial` 은 제외**(클라가 계속 쓴다). `rank` 는 싱글 전투 판정이 범위 밖이라 자동 제외.
 - 순서는 **구멍 크기 순**.
@@ -35,7 +35,7 @@
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
 | 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
 | 4 | ~~한계돌파~~ | ~~`CardGrowthManager.Snack.cs:TryLimitBreak`~~ | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3 완료** · 잔여는 P0 |
-| 5 | ~~토너먼트 해금·낙인~~ | ~~`TournamentProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
+| 5 | ~~모험 해금·낙인~~ | ~~`TournamentProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
 | 6 | 싱글 랭크 `rank.points` | `RankManager.ApplyBattleResult` | 팩 잠금·티어 보상·챕터 잠금 자격 | **범위 밖** |
 | 7 | 세이브 슬롯 무동결 | `firestore.rules` `affectedKeys` 0건 | 위 3·4·5를 룰 층에서 못 막는다 | **P6** |
 
@@ -94,7 +94,7 @@
 
 **아직 writer 0 이 아니다.** 디버그 3건(`OutgameDebugActions:234`·`:240`, `UnlockAllCardsButton:25`)과 되감기(`OutgameTutorialRewind` 의 와이프 `:79` + 재생 3건)가 남는다 — **P0 가 닫는다. P6 착수의 선행조건이다.**
 
-**서버가 막는 것 / 못 막는 것.** 막는 것은 드롭 풀 밖 카드 지급(임의 cardId 주입 불가) · 유료 팩 무상 취득 · 총량 상한 · 중복 지급 무효화다. **못 막는 것은 순서·시점**이다 — 튜토리얼을 하지 않고 무료 팩 packId 를 바로 호출하면 그 팩 저작분이 그대로 들어온다. `tutorial` 슬롯이 동결 제외라 서버가 믿을 진행도가 없어 P6 이후에도 못 막는다. 다만 그 카드는 어차피 모든 유저가 튜토리얼에서 받으므로 실질 이득이 0에 수렴한다. P4 토너먼트와 같은 성격의 한계다.
+**서버가 막는 것 / 못 막는 것.** 막는 것은 드롭 풀 밖 카드 지급(임의 cardId 주입 불가) · 유료 팩 무상 취득 · 총량 상한 · 중복 지급 무효화다. **못 막는 것은 순서·시점**이다 — 튜토리얼을 하지 않고 무료 팩 packId 를 바로 호출하면 그 팩 저작분이 그대로 들어온다. `tutorial` 슬롯이 동결 제외라 서버가 믿을 진행도가 없어 P6 이후에도 못 막는다. 다만 그 카드는 어차피 모든 유저가 튜토리얼에서 받으므로 실질 이득이 0에 수렴한다. P4 모험와 같은 성격의 한계다.
 
 ---
 
@@ -122,7 +122,7 @@
 
 ---
 
-### P4 — 토너먼트 진행 서버화 — **구현 완료**
+### P4 — 모험 진행 서버화 — **구현 완료**
 
 착수 시 실측하니 문안보다 실태가 앞서 있었다. `ClearNodeAsync` · `ClaimChapterRewardAsync` 는 이미 서버 `RewardClaimCommand` 로 위임되어 있었고, 클라가 세이브를 직접 쓰는 자리는 **`MarkRewardPending` 하나**였다(`ResetForDebug` 는 P0 몫). 그래서 이번 작업의 본체는 "낙인을 서버가 소유하게 만드는 것"이 됐다.
 
@@ -195,7 +195,7 @@
 | **`deck` 슬롯** | 멀티 진입을 `lockDeck` 이 이미 전량 재검증한다(소유·레벨 1~4·limitBreak·`expectedHpBonus`·진화·키워드·시너지·6장·중복·정렬·`computeDeckHash` 대조). 덱 배열 위조 단독으로는 이득이 없고, 동결하면 덱 저장마다 서버 왕복이 붙어 편집 UI 응답성이 죽는다 |
 | **`profile` 슬롯** | `IsAvatarOwned`/`IsFrameOwned` 가 무조건 `true` 라 소유 개념 자체가 없고 유상 아이템도 없다 — 현재 이득 0. **아바타·프레임이 유상화되는 시점에 재검토**(그때는 소유 판정이 곧 결제 검증이다). 닉네임 금칙어·길이 검사가 클라에만 있는 것은 별건 백로그 |
 | **`tutorial` 진행 낙인** | 완주 낙인은 기능 잠금 해제만 하고 경제에 닿지 않는다. **단 튜토리얼 카드 지급은 `ownership` 슬롯이라 P2 로 이관한다** |
-| **싱글 랭크 `rank.points`** | 전투 범위 밖(사용자 확정). **이 로드맵이 끝나도 남는 가장 큰 자기신고 축**이다 — `openPack` 랭크 잠금 · `claimReward(Rank)` 티어 자격 · 토너먼트 `requiredGrade` 가 전부 이 값을 읽는다 |
+| **싱글 랭크 `rank.points`** | 전투 범위 밖(사용자 확정). **이 로드맵이 끝나도 남는 가장 큰 자기신고 축**이다 — `openPack` 랭크 잠금 · `claimReward(Rank)` 티어 자격 · 모험 `requiredGrade` 가 전부 이 값을 읽는다 |
 | **멀티 시뮬 권위 전환** | 전투 범위 밖. 섀도 로그(`shadow_compare`)는 계속 쌓이므로 다음 로드맵 착수 시 발산율 실측이 준비돼 있다 |
 | **매치메이킹** | `FakeMatchmaker` 가 상대를 고르지만 실 PvP 자격 산정이 아니다 |
 | **`RankManager.PreviewBattleResult` 이중구현** | 권위 문제가 아니라 중복 코드. `refactor-backlog` 로 |
@@ -205,7 +205,7 @@
 
 ## 병행 선결 — 어느 단계든 막을 수 있다
 
-- **`envs/live/specs` 에 두 표가 없다.** 2026-08-31 실측 기준 `live` 는 10표다(`Card` 40 · `Card_Test` 40 · `CardPack` 11 · `CardPackDrop` 320 · `Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3). 0표였던 당초 실측보다는 나아졌지만 **`TournamentChapter` 와 `AlbumEntry` 가 빠져 있어** `claimReward` 의 도감·토너먼트 수령이 live 에서 fail-closed 로 막힌다. 서버는 표를 못 읽으면 거절하므로 이 두 표 업로드가 P4·P5 배포의 선행조건이다
+- **`envs/live/specs` 에 두 표가 없다.** 2026-08-31 실측 기준 `live` 는 10표다(`Card` 40 · `Card_Test` 40 · `CardPack` 11 · `CardPackDrop` 320 · `Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3). 0표였던 당초 실측보다는 나아졌지만 **`TournamentChapter` 와 `AlbumEntry` 가 빠져 있어** `claimReward` 의 도감·모험 수령이 live 에서 fail-closed 로 막힌다. 서버는 표를 못 읽으면 거절하므로 이 두 표 업로드가 P4·P5 배포의 선행조건이다
 - **`envs/test` 는 4표가 블롭 없이 `rows/` 만 있다.** 블롭으로 선 8표(`Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3 · `TournamentChapter` 24 · `AlbumEntry` 40)와 달리 `Card` · `Card_Test` · `CardPack` · `CardPackDrop` 은 서버가 행 폴백 경로로 읽어 표 크기에 비례한 읽기 과금이 붙는다(320행짜리 `CardPackDrop` 이 특히 그렇다). 블롭을 다시 구워 올린다
 - **튜토리얼 지급용 무료 팩 행 저작.** P2 가 `TutorialGrant` 표를 걷어내면서 이 선결 조건이 `CardPack`/`CardPackDrop` 시트로 옮겨왔다 — 지금 시트에 선 무료 팩(`price` 0)은 `StarterPack`(드롭 6행) · `KeywordDeck`(6행) · `SynergyPack`(6행) 셋뿐이고, `RangePack` 은 SO(`Assets/SO/CardPack/TutorialPack/RangePack.asset`)에만 있고 시트에는 없다. step 2(7장) · step 3(1장) 지급을 덮을 팩도 아직 없어, 그 스텝들은 저작이 설 때까지 `GrantNotFound` 로 떨어진다. **시트와 SO 가 이미 한 곳에서 갈려 있다** — `docs/SpecData/CardPackDrop_sheet.csv` 의 `KeywordDeck` 풀은 `2·3·20·11·4·37` 인데 `KeywordPack.asset` 의 `poolIds` 는 첫 장이 26 이라, 서버가 주는 카드와 클라 저작이 한 장 어긋난다
 - **`link.xml` 갱신.** 새 callable 응답 DTO 를 만들 때마다 `OutGame/Save/link.xml` 에 추가한다(IL2CPP 스트리핑 방어, `6f6a8885c` 가 팩 DTO 로 한 번 겪었다)
@@ -229,7 +229,7 @@
 
 **전체 왕복 (P6 배포 후)**
 
-신규 계정 → 튜토리얼 완주(P2) → 팩 개봉 → 강화·한계돌파(P3) → 토너먼트 정점 격파·수령(P4) → 도감 보상 수령 → 재로그인. 각 지점에서 세이브 `revision` 이 정확히 +1 인지, 지갑 잔액이 원장과 일치하는지 확인.
+신규 계정 → 튜토리얼 완주(P2) → 팩 개봉 → 강화·한계돌파(P3) → 모험 정점 격파·수령(P4) → 도감 보상 수령 → 재로그인. 각 지점에서 세이브 `revision` 이 정확히 +1 인지, 지갑 잔액이 원장과 일치하는지 확인.
 
 **판정을 다시 내리는 방법** (감사 문서 §6 의 넷 + 하나)
 

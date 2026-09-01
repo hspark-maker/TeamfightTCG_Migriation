@@ -104,7 +104,7 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.HelpBox(
             $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE}(챕터·정점)를 TournamentConfig 저작에서 만들어 올린다. " +
             "서버가 챕터 완주를 판정할 근거 표다. " +
-            "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 토너먼트 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다. " +
+            "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 모험 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다. " +
             "도감 구성(AlbumEntry·AlbumThemeInfo)은 스펙시트가 진실원이라 위 표 목록에서 올린다.",
             MessageType.Info);
 

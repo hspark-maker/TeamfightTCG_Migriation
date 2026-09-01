@@ -812,20 +812,19 @@ public class AttackAnimTester : MonoBehaviour
         SynergyVfx.PlayFlowWind(t_view, t_cfg, _stack);
     }
 
-    /// <summary>돌보미: 힐러와 같은 연출(HealVfx)을 아군 전원에게. 발사 주체는 슬롯0.</summary>
+    /// <summary>돌보미: 투사체 없이 아군 전원 자리에서 회복 표기가 동시에 터진다(게임 경로와 같은 그림 —
+    /// CaretakerSynergyEffect는 엠블럼과 같은 순간에 각 카드의 PlayHealEffect를 낸다).
+    /// 엠블럼은 별도 미리보기(SynergyPreviewKind.Emblem)라 여기선 회복 표기만 낸다.</summary>
     public void PlayCaretakerHeal()
     {
-        CardView t_src = this.playerFieldView?.GetSlotView(0);
-        if (t_src == null) return;
-
-        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardView t_v = this.playerFieldView?.GetSlotView(i);
-            if (t_v != null && t_v.BoundCard != null)
-                t_targets.Add((t_v, t_v.BoundCard, Mathf.Max(0, this.caretakerHeal)));
+            if (t_v == null || t_v.BoundCard == null) continue;
+
+            // 테스터엔 유예된 표기가 없다 — _consumeDeferred:true로 부르면 소비할 몫이 0이라 숫자가 안 뜬다.
+            t_v.PlayHealEffect(Mathf.Max(0, this.caretakerHeal));
         }
-        if (t_targets.Count > 0) HealVfx.PlayHealBurst(t_src, t_targets);
     }
 
     /// <summary>지금 고른 시너지의 그 타이밍 엠블럼 1회. 게임과 같은 진입점(SynergyEmblemVfx.Play)을 탄다.

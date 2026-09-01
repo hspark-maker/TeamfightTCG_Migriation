@@ -129,8 +129,8 @@ public readonly struct TutorialAnchorMeta
         new(A.DeckEditCollectionCard,     F.None,               "덱 편집(컬렉션 격자)",    "UI/Deck/DeckEditCollectionGrid.cs"),
 
         // 26 UI/Tournament/TournamentMapOverlayView.cs가 지금 도전할 정점 하나에만 등록(정점은 런타임 생성).
-        //    잠금은 로비의 토너먼트 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
-        new(A.TournamentNode,             F.Tournament,         "토너먼트 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
+        //    잠금은 로비의 모험 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
+        new(A.TournamentNode,             F.Tournament,         "모험 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
 
         // 27 MatchDeckPanel.prefab의 덱 파워 배지. 잠금 없음
         new(A.MatchDeckPowerBadge,        F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),

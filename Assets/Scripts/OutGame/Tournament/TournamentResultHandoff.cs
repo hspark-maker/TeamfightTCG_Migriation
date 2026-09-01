@@ -1,4 +1,4 @@
-// 전투 씬이 확정한 토너먼트 정점 결과를 로비 씬까지 실어 나르는 씬 캐리어(자체 세이브 없음)
+// 전투 씬이 확정한 모험 정점 결과를 로비 씬까지 실어 나르는 씬 캐리어(자체 세이브 없음)
 public static class TournamentResultHandoff
 {
     static string s_nodeId;

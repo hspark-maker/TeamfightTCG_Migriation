@@ -381,6 +381,16 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       expiresAt: Timestamp.fromMillis(now.toMillis() + LOCK_TTL_MS),
       updatedAt: FieldValue.serverTimestamp(),
     }, {merge: true});
+    // 2인 매치가 왜 승인 정원을 못 채웠는지는 서버에서만 보인다 — 클라 응답에는 status 밖에 없다.
+    // uid 는 앞 6자만 남긴다(로그에 계정 전체를 흘리지 않는다).
+    logger.info("lockDeck approval", {
+      matchId: data.matchId,
+      uid: uid.slice(0, 6),
+      ownerIndex: data.ownerIndex,
+      status,
+      approvals: Object.keys(nextApprovals).length,
+      expectedParticipants,
+    });
     return {status, idempotent: false};
   });
 });

@@ -516,22 +516,18 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Hold(SYNERGY_HOLD, _token);
     }
 
-    // 돌보미: 동료가 나오면 서로를 돌본다. 호출 모양은 힐러 키워드 대본과 같다.
+    // 돌보미: 동료가 나오면 서로를 돌본다. 게임 경로와 같은 그림 — 엠블럼이 돌보미 전원 위에 뜨고
+    // 회복 표기가 **같은 순간** 각자 자리에서 터진다(힐러 투사체는 쓰지 않는다).
     async UniTask PlayCaretaker(CardView _atk, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
         SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
+        if (_ally != null) SynergyEmblemVfx.Play(_ally, _syn, SynergyEmblemTiming.Triggered);
+
+        // 데모엔 유예된 표기가 없으므로 _consumeDeferred는 기본값(false) — 그래야 "+N"이 실제로 뜬다.
+        if (_atk.BoundCard != null) _atk.PlayHealEffect(CARETAKER_SHOW_HEAL);
+        if (_ally != null && _ally.BoundCard != null) _ally.PlayHealEffect(CARETAKER_SHOW_HEAL);
+
         await Hold(SynergyEmblemVfx.DurationOf(_syn, SynergyEmblemTiming.Triggered), _token);
-        if (_token.IsCancellationRequested) return;
-
-        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
-
-        if (_atk.BoundCard != null) t_targets.Add((_atk, _atk.BoundCard, CARETAKER_SHOW_HEAL));
-        if (_ally != null && _ally.BoundCard != null) t_targets.Add((_ally, _ally.BoundCard, CARETAKER_SHOW_HEAL));
-
-        if (t_targets.Count == 0) return;
-
-        HealVfx.PlayHealBurst(_atk, t_targets);
-        await Hold(HealVfx.BurstDuration(t_targets.Count), _token);
     }
 
     // 흐름: 동료가 늘수록 바람이 커진다. 스택이 1에서 2로 오르는 것을 크기로 읽게 한다.

@@ -20,7 +20,7 @@ public static class BattleGrowthBridge
         CardVisualRules.UnlockedKeywordProvider = _card => CardGrowthManager.GrowthOf(_card).UnlockedKeywords;
         CardVisualRules.EvolutionStageProvider = _card => CardGrowthManager.GrowthOf(_card).EvolutionStage;
 
-        // 싱글 AI 레벨. 토너먼트 정점 저작값만 남았고(랭크 티어로 적을 강화하던 축은 제거) 같은 성장 곡선에 태운다 —
+        // 싱글 AI 레벨. 모험 정점 저작값만 남았고(랭크 티어로 적을 강화하던 축은 제거) 같은 성장 곡선에 태운다 —
         // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
         // 레벨은 전투 시작 시점에 읽어야 한다(초기화에서 굳히면 진행 중 바뀐 정점 값이 안 따라온다).
         GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevel());
@@ -32,7 +32,7 @@ public static class BattleGrowthBridge
         GameInitializer.GrowthAtLevelProvider = CardGrowthManager.GrowthAtLevel;
     }
 
-    // 이번 전투에서 적 카드가 쓸 레벨. 우선순위는 토너먼트 정점 저작값 > AI 덱 저작 레벨 > 바닥이다
+    // 이번 전투에서 적 카드가 쓸 레벨. 우선순위는 모험 정점 저작값 > AI 덱 저작 레벨 > 바닥이다
     // (랭크 티어로 적 레벨을 올리던 축은 제거됐다). 곡선 밖 레벨은 보너스가 멈추므로 어느 쪽이든 만렙 클램프.
     //
     // 덱 레벨은 여기서 굴리지 않는다 — 이 함수는 카드 1장마다 불리므로 여기서 뽑으면 같은 덱 안에서

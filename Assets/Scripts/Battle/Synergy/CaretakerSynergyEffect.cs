@@ -25,9 +25,9 @@ public class CaretakerSynergyEffect : SynergyEffect
         if (_ctx.self == null || !_ctx.self.IsAlive || _ctx.field == null) return UniTask.CompletedTask;
         if (!SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return UniTask.CompletedTask;
 
-        // 회복/보너스는 **여기서 전부 즉시**(상태 = 동기), 표시는 투사체가 닿을 때(연출 = 비동기).
+        // 회복/보너스는 **여기서 전부 즉시**(상태 = 동기), 표시는 엠블럼과 같은 순간에(연출 = 비동기).
         // 상태 변경을 연출에 묶으면 프레임레이트 차이가 그대로 멀티 divergence가 된다(HealerEffect와 같은 규약).
-        // _showEffect: false — "+N"은 HealVfx가 도착 시점에 재생한다(즉시 재생하면 두 번 뜬다).
+        // _showEffect: false — "+N"과 HP 굴림은 아래 표시 묶음이 낸다(즉시 재생하면 두 번 뜬다).
         var t_healed = new List<(CardView view, CardInstance card, int amount)>();
         foreach (var t_card in _ctx.field.GetActiveCards())   // 자신 포함 라이브 슬롯 카드
         {
@@ -41,12 +41,28 @@ public class CaretakerSynergyEffect : SynergyEffect
             if (t_view != null) t_healed.Add((t_view, t_card, t_amount));
         }
 
-        SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스폰 주체(self) 기준 1회 배너+배지 pop(동료 전원 반복 금지)
+        // 표시는 전부 **등장 카드가 슬롯에 내려앉은 뒤**다. 규칙(NotifyEntered)은 뷰가 덱에서 날아오기 전에
+        // 끝나므로, 여기서 바로 내면 카드가 아직 중앙을 날고 있는데 엠블럼과 숫자만 슬롯에서 터진다.
+        // 엠블럼(Fire)과 회복 표기를 같은 예약에 담아 순서(엠블럼 → 숫자)와 시점을 함께 고정한다.
+        //
+        // 회복 투사체(HealVfx)는 쓰지 않는다 — 돌보미는 날아가 닿는 그림이 아니라 전원이 동시에 돌봄을
+        // 받는 그림이라 도착을 기다릴 대상이 없다.
+        CardInstance t_self    = _ctx.self;
+        SynergyData  t_synergy = _ctx.synergy;
+        BattleField  t_field   = _ctx.field;
+        var          t_shots   = t_healed;
 
-        // 힐러와 같은 연출을 재사용 — 회복이면 경로 불문 같은 그림이어야 한다.
-        // 발사 주체는 스폰한 돌보미(self). 자기 자신도 대상이라 짧은 호를 그리며 되돌아온다.
-        if (t_healed.Count > 0)
-            HealVfx.PlayHealBurst(CardView.GetView(_ctx.self), t_healed);
+        CardLandingPresentation.Enqueue(t_self, () =>
+        {
+            SynergyTriggers.Fire(t_self, t_synergy, t_field);   // 배너+배지 pop + 돌보미 전원 엠블럼
+
+            foreach (var (t_view, t_card, t_amount) in t_shots)
+            {
+                // 착지까지 사이에 슬롯이 바뀌었을 수 있다 — 예약 당시 카드를 그대로 들고 있을 때만.
+                if (t_view == null || t_view.BoundCard != t_card) continue;
+                t_view.PlayHealEffect(t_amount, _consumeDeferred: true);
+            }
+        });
 
         return UniTask.CompletedTask;
     }

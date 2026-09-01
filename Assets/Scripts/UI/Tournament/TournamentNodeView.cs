@@ -4,7 +4,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 보상 토너먼트 경로의 정점 하나(TournamentNode 프리팹 루트에 부착).
+// 모험 경로의 정점 하나(TournamentNode 프리팹 루트에 부착).
 // 인덱스만 들고 표시값은 매번 TournamentProgress에서 다시 받는다(스냅샷을 캐싱하면 클리어 후 stale).
 public class TournamentNodeView : MonoBehaviour
 {

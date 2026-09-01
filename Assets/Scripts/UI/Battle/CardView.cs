@@ -1050,6 +1050,10 @@ public class CardView : MonoBehaviour
             ? CardAppearVfx.PlayOrbCurve(this, _mid, _dest, _duration, _morphFromCard: true)
             : this.cardAnim.PlayDealToSlot(_dest, _duration));
         PlayPlacedEmblems();
+
+        // 등장 효과(돌보미 등)가 규칙 자리에서 붙잡아 둔 표시를 여기서 푼다 — 카드가 실제로 앉은 지금이
+        // "등장했다"의 화면상 시점이다. 예약이 없으면 무동작이라 다른 카드 경로엔 영향이 없다.
+        CardLandingPresentation.Flush(this.boundCard);
     }
 
     /// <summary>[Placed] 배치 상징 발화점. 카드가 슬롯에 <b>실제로 내려앉은 뒤</b> 한 번 —

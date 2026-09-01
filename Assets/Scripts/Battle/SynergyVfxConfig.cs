@@ -52,4 +52,16 @@ public abstract class SynergyVfxConfig : ScriptableObject
 
     /// <summary>이 타이밍에 엠블럼을 띄우는가.</summary>
     public bool PlaysEmblemAt(SynergyEmblemTiming _timing) => EntryFor(_timing) != null;
+
+    /// <summary>[Placed] 카드가 놓이는 순간의 연출 1회. 기본은 그 타이밍을 맡은 엠블럼 줄이다.
+    ///
+    /// virtual인 이유: 흐름처럼 엠블럼 대신 자기 전용 연출(바람)로 배치를 알리는 시너지가 있다.
+    /// 호출부(SynergyEmblemVfx.PlayPlaced)에 타입 분기를 두면 시너지를 늘릴 때마다 그 파일이 자라므로,
+    /// "무엇을 띄우는가"는 각 연출 에셋이 답한다.</summary>
+    public virtual void PlayPlaced(CardView _view, CardInstance _card, SynergyData _synergy)
+    {
+        SynergyEmblemEntry t_entry = EntryFor(SynergyEmblemTiming.Placed);
+        if (_view == null || t_entry == null) return;
+        t_entry.spec.Play(_view, _synergy);
+    }
 }

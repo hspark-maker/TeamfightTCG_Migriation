@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Firebase.Firestore;
 
-// 보상 토너먼트 낙인 세이브 값 객체 — 해금 진행은 저장하지 않는다(낙인 파생)
+// 모험 낙인 세이브 값 객체 — 해금 진행은 저장하지 않는다(낙인 파생)
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class TournamentSaveData
 {

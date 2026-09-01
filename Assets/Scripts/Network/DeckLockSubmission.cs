@@ -130,6 +130,9 @@ internal static class DeckLockSubmission
             return DeckLockResult.Unavailable;
         }
 
+        // 몇 번이나 물었는지가 진단의 축이다 — "폴을 못 돌고 만료"와 "계속 pending"은 원인이 다르다.
+        // catch 에서도 읽어야 하므로 try 밖에 둔다.
+        int t_pollCount = 0;
         try
         {
             HttpsCallableReference t_callable = FirebaseFunctions
@@ -140,6 +143,7 @@ internal static class DeckLockSubmission
                 if (!_ct.CanBeCanceled) t_lockTimeout.CancelAfter(LockFallbackTimeout);
                 while (true)
                 {
+                    t_pollCount++;
                     HttpsCallableResult t_response = await t_callable.CallAsync(t_payload)
                         .AsUniTask()
                         .AttachExternalCancellation(t_lockTimeout.Token);
@@ -166,7 +170,9 @@ internal static class DeckLockSubmission
         }
         catch (OperationCanceledException)
         {
-            Debug.LogError("[LockDeck] 서버 검증 응답 시간이 초과되었습니다.");
+            // 승인 정원(2명)이 안 찬 채로 데드라인이 온 것이다 — 상대가 같은 matchId 에 승인을 넣었는지가
+            // 유일한 갈림길이라 여기서 그 좌표를 찍는다(양쪽 콘솔의 matchId 를 눈으로 맞출 수 있게).
+            Debug.LogError($"[LockDeck] 서버 검증 응답 시간이 초과되었습니다. matchId={_matchId} owner={_ownerIndex} 폴={t_pollCount}");
             return DeckLockResult.Unavailable;
         }
         catch (Exception t_exception)

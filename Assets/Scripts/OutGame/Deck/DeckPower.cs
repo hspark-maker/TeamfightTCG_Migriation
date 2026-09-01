@@ -7,7 +7,7 @@ public static class DeckPower
 {
     /// <summary>상대 카드 _card가 서 있는 레벨. 늘 바닥이다 — 적을 랭크로 강화하던 축은 제거됐고,
     /// 멀티는 스탯을 와이어로 보내지 않는 lockstep이라 상대 강화분을 추측하면 표시가 거짓말이 된다.
-    /// 명시 레벨이 있는 토너먼트 정점만 예외이고, 그쪽은 OfAtLevel로 레벨을 직접 넘긴다.</summary>
+    /// 명시 레벨이 있는 모험 정점만 예외이고, 그쪽은 OfAtLevel로 레벨을 직접 넘긴다.</summary>
     public static int OpponentLevelOf(int _cardId) => CardGrowth.BaseLevel;
 
     /// <summary>표시용 레벨. _mine=false는 상대 덱이고, 적은 강화되지 않아 바닥으로 나온다.</summary>
@@ -43,7 +43,7 @@ public static class DeckPower
         => _cardId > 0 ? MaxHpOf(_cardId, _mine) : 0;
 
     /// <summary>지정한 레벨에 선 카드의 표시용 최대 체력. 레벨을 랭크 티어가 아니라 <b>저작이</b> 정하는
-    /// 상대(토너먼트 정점)를 위한 길이다 — LevelOf는 내 랭크를 읽으므로 그쪽으로 가면 정점마다 같은 수가 나온다.</summary>
+    /// 상대(모험 정점)를 위한 길이다 — LevelOf는 내 랭크를 읽으므로 그쪽으로 가면 정점마다 같은 수가 나온다.</summary>
     public static int MaxHpAtLevel(int _cardId, int _level)
         => _cardId > 0 ? CardCatalog.RequireSpec(_cardId).MaxHp + CardGrowthManager.GrowthAtLevel(_cardId, _level).HpBonus : 0;
 

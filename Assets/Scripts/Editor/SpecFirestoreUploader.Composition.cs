@@ -4,12 +4,12 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 토너먼트 구성(SO 저작)을 스펙 표로 옮겨 Firestore에 올린다.
+/// 모험 구성(SO 저작)을 스펙 표로 옮겨 Firestore에 올린다.
 /// 서버가 "챕터 완주"를 판정할 근거 표이며, 커밋 규약은 SpecData 표와 같은 경로를 그대로 탄다.
 /// </summary>
 public static partial class SpecFirestoreUploader
 {
-    /// <summary>토너먼트 구성 표 이름(챕터 → 정점).</summary>
+    /// <summary>모험 구성 표 이름(챕터 → 정점).</summary>
     public const string TOURNAMENT_CHAPTER_TABLE = "TournamentChapter";
 
     // 서버 tournamentTable.MAX_NODE_ID_LENGTH 와 같은 값이어야 한다 — 넘는 키는 서버 정제가
@@ -241,7 +241,7 @@ public static partial class SpecFirestoreUploader
 
         if (_rows.Count == 0)
         {
-            _error = "토너먼트 저작에서 올릴 정점을 하나도 찾지 못했다(챕터·정점 저작 확인).";
+            _error = "모험 저작에서 올릴 정점을 하나도 찾지 못했다(챕터·정점 저작 확인).";
             return false;
         }
         return true;

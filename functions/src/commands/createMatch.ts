@@ -1,4 +1,5 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {logger} from "firebase-functions/v2";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {randomBytes} from "node:crypto";
 import {db} from "../firebaseApp";
@@ -200,6 +201,17 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
       expiresAt: Timestamp.fromMillis(record.expiresAtMs),
       updatedAt: FieldValue.serverTimestamp(),
     }, {merge: true});
+    // 두 클라가 같은 페어링 문서에 붙었는지는 여기서만 대조할 수 있다(클라 응답에는 matchId 뿐).
+    logger.info("createMatch pairing", {
+      matchId: record.matchId,
+      uid: uid.slice(0, 6),
+      ownerIndex: data.ownerIndex,
+      mode: data.mode,
+      status: decision.status,
+      participants: record.participantUids.length,
+      expectedParticipants: record.expectedParticipants,
+      pairingKeyHash: pairingId,
+    });
     return response;
   });
 });

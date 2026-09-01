@@ -173,7 +173,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
 
         // 이 경로의 종료는 아무도 기다리지 않는다 — OnAnyFinished를 내면 그 신호를 기다리던 다른 스텝
-        // (튜토리얼 CardGain · 토너먼트 선물 등장)이 자기 차례로 오인해 조기 통과한다.
+        // (튜토리얼 CardGain · 모험 선물 등장)이 자기 차례로 오인해 조기 통과한다.
         Play(true);
     }
 

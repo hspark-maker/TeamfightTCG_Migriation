@@ -17,6 +17,6 @@ public readonly struct RewardLine
         Icon = _icon != null ? _icon : CurrencyLook.IconOf(_gain.Type);
     }
 
-    /// <summary>아이콘을 저작하지 않는 출처(앨범·토너먼트 보상)용 — 그림은 전적으로 재화 표가 정한다.</summary>
+    /// <summary>아이콘을 저작하지 않는 출처(앨범·모험 보상)용 — 그림은 전적으로 재화 표가 정한다.</summary>
     public RewardLine(CurrencyGain _gain) : this(_gain, null) { }
 }

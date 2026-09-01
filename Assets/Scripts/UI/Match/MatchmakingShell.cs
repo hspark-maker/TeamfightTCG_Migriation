@@ -13,7 +13,7 @@ using UnityEngine.UI;
 //
 // 무엇을 어떻게 움직일지는 전부 MatchmakingFx·MatchHandoffFx가 쥔다. 셸은 "언제"만 정한다.
 //
-// 진입점은 둘이다. RunMatchAsync는 랭크전(상대를 기다린다)이고, PlayVersusAsync는 토너먼트 정점 대치
+// 진입점은 둘이다. RunMatchAsync는 랭크전(상대를 기다린다)이고, PlayVersusAsync는 모험 정점 대치
 // (상대가 이미 정해져 있다)다. 대치는 상대를 구하지 않으므로 탐색 문구·점(...)·스캔 띠·취소 버튼·
 // 발견 슬램이 전부 없고, 배경 두 판에 두 프로필이 실려 떨어져 이음매에서 한 번 부딪히는 것이 전부다 —
 // 찾지 않은 상대를 찾은 척하면 그 자리에서 매칭 문법이 거짓이 된다.
@@ -47,7 +47,7 @@ public class MatchmakingShell : MonoBehaviour
     [Tooltip("랭크전에서 두 프로필이 서로에게 다가가는 거리(px). 0이면 이동 없이 VS만 뜬다.")]
     [SerializeField] float versusApproach = 60f;
 
-    [Header("대치 인트로(토너먼트) — 랭크전과 갈리는 값만")]
+    [Header("대치 인트로(모험) — 랭크전과 갈리는 값만")]
     [Tooltip("대치 문구. 이 진입점은 상대를 찾지 않으므로 탐색 문구가 없다 — 열리는 순간부터 이 한 줄이다.")]
     [SerializeField] string versusTitle = "도전";
 
@@ -266,7 +266,7 @@ public class MatchmakingShell : MonoBehaviour
     }
 
     /// <summary>
-    /// 대치 게이트(토너먼트 정점). 호스트가 덱 화면을 세우기 "전에" 이걸 await 한다. 취소 버튼이 없으므로
+    /// 대치 게이트(모험 정점). 호스트가 덱 화면을 세우기 "전에" 이걸 await 한다. 취소 버튼이 없으므로
     /// 끝은 하나뿐이다 — 끝까지 돌거나 씬이 내려간다. 물러나는 자리는 다음 화면(덱)의 취소 버튼이다.
     /// </summary>
     public async UniTask PlayVersusAsync(MatchOpponent _opponent, CancellationToken _ct)

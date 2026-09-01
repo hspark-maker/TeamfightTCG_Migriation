@@ -34,7 +34,7 @@ public sealed class CurrencyPendingTicket
         return t_ticket;
     }
 
-    /// <summary>표시용으로 정규화된 보상 줄을 건다(랭크·앨범·토너먼트가 쥐고 있는 모양).</summary>
+    /// <summary>표시용으로 정규화된 보상 줄을 건다(랭크·앨범·모험가 쥐고 있는 모양).</summary>
     public static CurrencyPendingTicket Hold(IReadOnlyList<RewardLine> _rewards)
     {
         var t_ticket = new CurrencyPendingTicket();

@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 /// 로비 PlayBtn → 매칭(실 상대 20초 탐색, 없으면 AI) → 전투 진입. 일반전은 덱 확인 화면을 거치지 않는다.
 ///
 /// 전투가 소비하는 DeckConfig.PlayerDeck은 씬 로드 전에 여기서 확정된다 — 일반전은 대표 덱
-/// (DeckSaveManager.SelectedSlot)을 싣고, 덱 화면이 남아 있는 두 경로(토너먼트 정점·튜토리얼 덱 게이트)는
+/// (DeckSaveManager.SelectedSlot)을 싣고, 덱 화면이 남아 있는 두 경로(모험 정점·튜토리얼 덱 게이트)는
 /// 그 화면(MatchDeckShell)이 싣는다. 배틀 씬은 확정된 값을 읽기만 한다.
 public class LobbyMatchLauncher : MonoBehaviour
 {
@@ -28,8 +28,8 @@ public class LobbyMatchLauncher : MonoBehaviour
              "미배선이면 잠김이 화면에 안 드러난다 — 진입 차단 자체는 StartAiBattle이 따로 막는다.")]
     [SerializeField] LobbyMatchTabPanel matchPanel;
 
-    [Header("보상 토너먼트")]
-    [Tooltip("토너먼트 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
+    [Header("모험")]
+    [Tooltip("모험 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
     [SerializeField] TournamentMapOverlayView tournamentPanel;
 
     const string BATTLE_SCENE = "BattleScene";
@@ -162,7 +162,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         RunEntryAsync().Forget();
     }
 
-    /// <summary>보상 토너먼트 정점 도전. 상대·덱·AI 레벨이 저작 고정이라 매칭을 태우지 않는다.
+    /// <summary>모험 정점 도전. 상대·덱·AI 레벨이 저작 고정이라 매칭을 태우지 않는다.
     /// TournamentRun.Begin은 모든 가드를 통과한 뒤에 온다 — 중간에 return하며 세워 두면 그게 곧 로비 누수다.</summary>
     public void StartTournamentBattle(int _nodeIndex)
     {
@@ -174,7 +174,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
         if (t_node.enemyDeckIds == null || t_node.enemyDeckIds.Count == 0)
         {
-            Debug.LogWarning($"[LobbyMatchLauncher] 토너먼트 정점 '{t_node.nodeId}'에 상대 덱이 없어 진입을 막는다 — 저작 검증 필요.");
+            Debug.LogWarning($"[LobbyMatchLauncher] 모험 정점 '{t_node.nodeId}'에 상대 덱이 없어 진입을 막는다 — 저작 검증 필요.");
             return;
         }
 
@@ -253,6 +253,16 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (TutorialConfig.IsActive) return true;
 
+        // 모험(모험) 정점도 제외한다. 상대·덱·AI 레벨이 저작 고정이라 이 경로는 findAiMatch를 태우지 않고
+        // (RunEntryChainAsync가 매칭 블록을 건너뛴다), 그래서 서버 매치 신원 자체가 없다 —
+        // SoloMatchSync는 그것을 "findAiMatch가 발급한 매치 신원이 없다"로 거절하므로 정점이 영영 시작되지 않는다.
+        //
+        // 여기서 통과시켜도 보상 자격은 클라가 못 만든다: 정점 격파는 reportTournamentWin이,
+        // 지급은 claimReward가 서버에서 선행 사슬·랭크 잠금을 다시 재고 결정한다(matchId를 쓰지 않는 경로).
+        // 남는 구멍은 정점 전투에 한해 출전 덱 소유·성장 대조가 빠진다는 것 — 그건 findAiMatch에
+        // 모험 모드를 여는 서버 작업이 필요하다.
+        if (TournamentRun.IsActive) return true;
+
         ESoloMatchSyncResult t_result = await SoloMatchSync.RunAsync(this.GetCancellationTokenOnDestroy());
 
         // 씬이 내려가는 중이면 화면을 세우지 않는다 — 호출부가 this == null 로 걸러 준다.
@@ -306,7 +316,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         var t_ct = this.GetCancellationTokenOnDestroy();
 
-        // 전투로 닫히지 않은 모든 끝(포기·취소·예외)에서 토너먼트 플래그를 끊는다. 그 경로엔 씬 전환이 없어
+        // 전투로 닫히지 않은 모든 끝(포기·취소·예외)에서 모험 플래그를 끊는다. 그 경로엔 씬 전환이 없어
         // TurnRunner.Cleanup이 영영 돌지 않는다 — 남겨 두면 다음 일반 전투의 AI 레벨이 정점 레벨로 굳고
         // 랭크 정산이 통째로 스킵된다. m_running과 같은 finally에 두는 이유도 같다(체인이 던져도 새지 않게).
         bool t_confirmed = false;
@@ -328,10 +338,10 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     // 일반전은 출전 덱 확정 → 매칭 연출 → 상대 확정 순서다. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
-    // 고정 상대(토너먼트)와 튜토리얼은 상대가 이미 정해져 있으므로 기존처럼 상대를 먼저 확정한다.
+    // 고정 상대(모험)와 튜토리얼은 상대가 이미 정해져 있으므로 기존처럼 상대를 먼저 확정한다.
     async UniTask<bool> RunEntryChainAsync(CancellationToken _ct, MatchOpponent? _preset = null)
     {
-        // 서버 매치 신원은 분기 **밖에서** 비운다. 고정 상대(토너먼트) 경로는 아래 블록을 건너뛰므로
+        // 서버 매치 신원은 분기 **밖에서** 비운다. 고정 상대(모험) 경로는 아래 블록을 건너뛰므로
         // 여기서 지우지 않으면 직전 AI 매칭이 남긴 시드·보드 순서가 정점 전투의 양 덱을 갈아끼운다.
         SoloMatchHandoff.Clear();
 
@@ -358,7 +368,7 @@ public class LobbyMatchLauncher : MonoBehaviour
             return true;
         }
 
-        // 고정 상대(토너먼트 정점)와 튜토리얼은 매칭을 타지 않는다.
+        // 고정 상대(모험 정점)와 튜토리얼은 매칭을 타지 않는다.
         MatchOpponent? t_opponent = _preset;
         ConfirmOpponent(t_opponent, _preset.HasValue);
 

@@ -23,7 +23,7 @@
 **커밋 19개**
 
 - `6c95b114a` C1·C2 — `functions-currency/` codebase · 미러 동기화 장치 · `walletStore.ts` · 룰 지갑 블록 · 순수 회귀 · 하네스 43케이스
-- `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 토너먼트 정점) + 클라 2곳 전환
+- `1d0d1aa31` C3 — `claimReward`(랭크 티어 · 모험 정점) + 클라 2곳 전환
 - `120110833` 스펙시트 `Reward` 표 복구 — 머지가 옛 굽기본을 택해 부팅이 막혔다
 - `6f6a8885c` `link.xml` 에 팩 개봉 응답 DTO — IL2CPP 스트리핑 방어
 - `d2a4fdc3c` `claimReward` 의 보상 영구 손실·계정 영구 잠김 경로 2건
@@ -56,7 +56,7 @@
 | `firestore.rules` 지갑 블록 · 무료 한 방(`grants`) 블록 | **배포됨** — 룰은 파일 통째로 릴리즈되므로 C6 완화분과 같이 올라갔다 |
 | **C8 전량**(영수증 코덱·멱등 게이트·클라 txId) | **배포됨**(2026-08-31) — 아래 참조 |
 
-**2026-08-31 배포 — C8 이후가 한 번에 나갔다.** `functions:default` 16함수 · `functions:currency` 2함수 · `firestore.rules` 1회. 누적으로 올라간 것은 **C8**(영수증 코덱·멱등 게이트·클라 txId) · **P2**(튜토리얼 지급을 CardPack 시트로) · **P4**(토너먼트 해금 사슬) · **P3**(한계돌파 `limitBreakCard` 신설)이다. 위 표의 `firestore.rules` 미배포 항목도 이때 함께 릴리즈됐다(룰은 파일 통째로 나간다).
+**2026-08-31 배포 — C8 이후가 한 번에 나갔다.** `functions:default` 16함수 · `functions:currency` 2함수 · `firestore.rules` 1회. 누적으로 올라간 것은 **C8**(영수증 코덱·멱등 게이트·클라 txId) · **P2**(튜토리얼 지급을 CardPack 시트로) · **P4**(모험 해금 사슬) · **P3**(한계돌파 `limitBreakCard` 신설)이다. 위 표의 `firestore.rules` 미배포 항목도 이때 함께 릴리즈됐다(룰은 파일 통째로 나간다).
 
 배포 후 URL POST 로 다시 찔러 **403 이 하나도 없었다** — 신규 생성된 `limitBreakCard` 도 invoker 바인딩을 상속했다(`ensureWallet` 때와 같다). `functions-currency` 는 `node_modules` 가 깨져 있어(`.bin` 비어 `eslint` 없음) predeploy 가 `ENOENT` 로 죽었고, `npm ci` 로 복구한 뒤에야 나갔다 — **미러 codebase 는 오래 안 건드리면 이 함정을 밟는다.**
 
@@ -107,7 +107,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 C3 왕복은 **통과했다**(2026-08-28). 항목 형태는 C4 이후에도 그대로 쓴다 — 명령 이름과 낙인 필드만 갈아끼운다.
 
 1. 랭크 티어 수령 → 잔액이 `Reward` 표 값만큼 늘고 `revision` 정확히 +1
-2. 토너먼트 정점 격파 → 수령 → 잔액 증가 **그리고** 그 정점이 Cleared 로 굳고 `pendingRewardNodeId` 가 빈다(콘솔 문서 확인)
+2. 모험 정점 격파 → 수령 → 잔액 증가 **그리고** 그 정점이 Cleared 로 굳고 `pendingRewardNodeId` 가 빈다(콘솔 문서 확인)
 3. **이미 받은 티어를 다시 수령 → 경고만, 로비 유지.** 재시작 모달이 뜨면 실패다(거절이 `permission-denied` 가 아니라는 뜻)
 4. 분출·잔액 롤업이 왕복 뒤로 밀렸으니 숫자가 뒤로 튀지 않는지
 
@@ -211,7 +211,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 1. 싱글 **승리** → 결과 팝업 금액이 `max(생존 × win.perCard, win.floor)` 와 일치하고, 로비 도착 시 획득 연출이 돌며 잔액이 그만큼 증가 · `revision` 정확히 +1
 2. 싱글 **패배** → `lose.flat` 만큼 증가(생존 수 무관)
-3. **토너먼트 전투** → 전투 골드가 붙지 않는다(정점 보상만)
+3. **모험 전투** → 전투 골드가 붙지 않는다(정점 보상만)
 4. **멀티 전투** → 기존 `PayoutInbox` 경로 그대로, 이중 지급 없음
 5. **튜토리얼 전투 직후** → 로비 안내(`CardGain` 스텝)가 조기 통과하지 않는다
 6. 디버그 오버레이 재화 버튼 → `test` env 에서 +1000 반영

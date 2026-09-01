@@ -12,7 +12,7 @@ public sealed class OutgameConfigStep : MainInitializer
     [SerializeField] CardAlbumConfig albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
     [SerializeField] CurrencyLook currencyLook;
-    // 보상 토너먼트 경로 SO. 미배선이면 정점이 0개라 토너먼트 진입이 열리지 않는다.
+    // 모험 경로 SO. 미배선이면 정점이 0개라 모험 진입이 열리지 않는다.
     [SerializeField] TournamentConfig tournamentConfig;
     // 프로필 아바타·프레임 표 SO. 미배선이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
     [SerializeField] ProfileConfig profileConfig;

@@ -24,8 +24,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [SerializeField] Button keywordGrowthButton;
 
-    [Header("보상 토너먼트")]
-    [Tooltip("보상 토너먼트 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
+    [Header("모험")]
+    [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
     [SerializeField] Button tournamentButton;
 
     public event Action PlayRequested;

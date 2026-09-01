@@ -50,6 +50,11 @@ public class CardDecorView
     // 키워드 → 그 키워드로 만든 아이콘 오브젝트. PlayKeywordGlow가 "어디에 글로우를 띄울지" 역참조한다.
     readonly Dictionary<CardKeyword, GameObject> iconMap = new Dictionary<CardKeyword, GameObject>();
 
+    // 저작된 첫 아이콘의 자리. **인스펙터에서 옮긴 위치가 곧 첫 칸**이라, 코드가 keywordIconStart로 덮지 않는다
+    // (덮으면 프리팹에서 아무리 옮겨도 실행하는 순간 다른 자리로 튄다). 저작 슬롯이 없을 때만 keywordIconStart를 쓴다.
+    readonly Vector3 iconSlotBase;
+    readonly bool    hasIconSlotBase;
+
     CardInstance lastBadgeCard;
     SynergyState lastBadgeState;
     #endregion
@@ -92,6 +97,13 @@ public class CardDecorView
         this.synergyMaxBadges           = _synergyMaxBadges;
         this.keywordGlowPrefab          = _keywordGlowPrefab;
         this.passiveGlowSystem          = _passiveGlowSystem;
+
+        // 첫 Refresh가 자리를 덮기 전에 저작값을 잡아 둔다 — 여기서 놓치면 되돌릴 원본이 없다.
+        if (_keywordIconRoot != null && _keywordIconRoot.childCount > 0)
+        {
+            this.iconSlotBase    = _keywordIconRoot.GetChild(0).localPosition;
+            this.hasIconSlotBase = true;
+        }
     }
 
     /// <summary>이 카드에 마지막으로 그려진 확정 시너지 스냅샷(없으면 null). 보유 장수 조회용 — 재계산 금지.
@@ -140,50 +152,104 @@ public class CardDecorView
         if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(!_hasSynergyBadge);
     }
 
+    /// <summary>아이콘 줄 갱신. <b>keywordIconRoot의 자식(저작된 아이콘)을 켜고 끄며 스프라이트만 갈아끼운다</b> —
+    /// 매 Refresh마다 파괴·생성하지 않는다. 예전 방식은 프리팹에 저작해 둔 아이콘까지 첫 Refresh에 지워 버려
+    /// 인스펙터에서 손본 것이 화면에 남지 않았고, 카드 한 장이 턴마다 오브젝트를 새로 만들었다.
+    ///
+    /// 저작 슬롯보다 띄울 아이콘이 많을 때만 프리팹으로 한 번 늘리고, 늘린 것도 다음부터는 재사용한다.</summary>
     void RefreshKeywordIcons(CardInstance _card)
     {
         Transform t_root = this.keywordIconRoot;
-        if (t_root == null || this.keywordIconPrefab == null || this.keywordIconConfig == null) return;
-
-        foreach (Transform t_child in t_root)
-        {
-            // 아이콘 스프라이트가 FadeView tween 대상일 수 있음. 파괴 전 DOKill (루트 SetLink는 안 걸림).
-            foreach (SpriteRenderer t_sr in t_child.GetComponentsInChildren<SpriteRenderer>(true))
-                t_sr.DOKill();
-            UnityEngine.Object.Destroy(t_child.gameObject);
-        }
+        if (t_root == null || this.keywordIconConfig == null) return;
 
         this.iconMap.Clear();
 
-        // 뒷면/빈 슬롯이면 아무것도 노출하지 않는다(정보 은닉).
-        if (_card == null || !_card.isRevealed) return;
-
-        // 여기 남는 건 월드좌표 배치와 스프라이트 주입뿐. None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
+        // 뒷면/빈 슬롯이면 아무것도 노출하지 않는다(정보 은닉) — 슬롯은 지우지 않고 끄기만 한다.
+        // None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
         List<CardVisualRules.KeywordIcon> t_icons =
-            CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
+            _card == null || !_card.isRevealed
+                ? null
+                : CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
+
+        int t_count = t_icons != null ? t_icons.Count : 0;
 
         // 배치는 한 가지. keywordIconRoot(= 배경판의 큰 칸) 기준으로 keywordIconStart에서 시작해
         // keywordIconStep만큼 밀며 나열한다. 시너지 배지 자리와는 서로 독립이다.
         float t_alpha = CurrentBodyAlpha;
-        for (int t_i = 0; t_i < t_icons.Count; t_i++)
+        for (int t_i = 0; t_i < t_count; t_i++)
         {
-            GameObject t_obj = UnityEngine.Object.Instantiate(this.keywordIconPrefab, t_root);
+            GameObject t_obj = SlotAt(t_root, t_i);
+            if (t_obj == null) break;   // 저작 슬롯도 없고 프리팹도 미배선 → 더 띄울 자리가 없다
+
+            // 기준점은 저작된 첫 슬롯이다(없을 때만 keywordIconStart). 간격만 코드가 준다.
+            Vector3 t_base = this.hasIconSlotBase
+                ? this.iconSlotBase
+                : new Vector3(this.keywordIconStart.x, this.keywordIconStart.y, 0f);
             t_obj.transform.localPosition = new Vector3(
-                this.keywordIconStart.x + this.keywordIconStep.x * t_i,
-                this.keywordIconStart.y + this.keywordIconStep.y * t_i, 0f);
+                t_base.x + this.keywordIconStep.x * t_i,
+                t_base.y + this.keywordIconStep.y * t_i, t_base.z);
+
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
                 ? t_obj.transform.GetChild(0).GetComponent<SpriteRenderer>()
                 : t_obj.GetComponent<SpriteRenderer>();
             if (t_iconSr != null) t_iconSr.sprite = t_icons[t_i].Icon;
 
-            // 아이콘은 **지금 막 생성**되므로 직전 페이드에 참여하지 못했다 → 프리팹 알파(1) 그대로다.
-            // 죽은 카드가 알파 0으로 사라진 자리에 새 카드가 렌더되면, 몸통은 아직 투명한데
-            // 아이콘만 불쑥 보인다. 태어나는 순간 카드 몸통 알파에 맞춰 둔다.
-            // (이후 페이드는 GetComponentsInChildren 캐시에 자동으로 잡히므로 여기 한 번이면 된다.)
-            ApplyAlpha(t_obj, t_alpha);
+            if (!t_obj.activeSelf) t_obj.SetActive(true);
+
+            // 재사용 슬롯은 직전 카드의 페이드 값을 그대로 들고 있다(알파 0으로 죽은 카드 자리일 수 있다) →
+            // 생성 시점만 맞추던 예전과 달리 **매번** 몸통 알파로 되돌린다. 트윈이 물려 있으면 먼저 끊는다.
+            KillTweens(t_obj);
+            ForceAlpha(t_obj, t_alpha);
 
             this.iconMap[t_icons[t_i].Keyword] = t_obj;
+        }
+
+        // 남는 슬롯은 끈다 — 저작된 아이콘을 파괴하지 않는다(꺼도 CardAnimator의 렌더러 캐시에는 남는다).
+        for (int t_i = t_count; t_i < t_root.childCount; t_i++)
+        {
+            GameObject t_slot = t_root.GetChild(t_i).gameObject;
+            KillTweens(t_slot);
+            if (t_slot.activeSelf) t_slot.SetActive(false);
+        }
+    }
+
+    /// <summary>_index번째 아이콘 슬롯. 저작 자식이 모자랄 때만 늘린다(늘린 것도 이후 재사용된다).
+    ///
+    /// 늘릴 때는 <b>프리팹이 아니라 저작된 첫 슬롯을 복제한다</b> — 프리팹 원본과 저작본은 크기·정렬 같은
+    /// 오버라이드가 다를 수 있어(예: SpriteRenderer size 0.5 vs 0.65) 프리팹으로 늘리면 둘째 칸만 다르게 보인다.</summary>
+    GameObject SlotAt(Transform _root, int _index)
+    {
+        if (_index < _root.childCount) return _root.GetChild(_index).gameObject;
+
+        if (_root.childCount > 0)
+            return UnityEngine.Object.Instantiate(_root.GetChild(0).gameObject, _root);
+
+        if (this.keywordIconPrefab == null) return null;
+
+        return UnityEngine.Object.Instantiate(this.keywordIconPrefab, _root);
+    }
+
+    // 슬롯 재사용 전 정리. 파괴하지 않으므로 SetLink가 아니라 여기서 직접 끊어야 옛 페이드가 새 카드에 남지 않는다.
+    static void KillTweens(GameObject _go)
+    {
+        if (_go == null) return;
+        foreach (SpriteRenderer t_sr in _go.GetComponentsInChildren<SpriteRenderer>(true)) t_sr.DOKill();
+        foreach (TMP_Text t_tmp in _go.GetComponentsInChildren<TMP_Text>(true)) t_tmp.DOKill();
+    }
+
+    // ApplyAlpha와 같은 규칙이되 알파 1도 실제로 쓴다 — 재사용 슬롯은 "기본값 그대로"가 보장되지 않는다.
+    static void ForceAlpha(GameObject _go, float _alpha)
+    {
+        if (_go == null) return;
+
+        foreach (SpriteRenderer t_sr in _go.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            Color t_c = t_sr.color; t_c.a = _alpha * CardFadeAlpha.Of(t_sr); t_sr.color = t_c;
+        }
+        foreach (TMP_Text t_tmp in _go.GetComponentsInChildren<TMP_Text>(true))
+        {
+            Color t_c = t_tmp.color; t_c.a = _alpha * CardFadeAlpha.Of(t_tmp); t_tmp.color = t_c;
         }
     }
 

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 토너먼트 저작 결함(챕터·키 안정성·상대 덱·보상) 로그 진단(에디터 수동 실행 전용)
+// 모험 저작 결함(챕터·키 안정성·상대 덱·보상) 로그 진단(에디터 수동 실행 전용)
 internal static class TournamentValidator
 {
     // TournamentConfig의 [ContextMenu]가 유일한 진입점
@@ -99,7 +99,7 @@ internal static class TournamentValidator
             if (t_i == 0 && t_chapter.requiredGrade != ERankGrade.Bronze)
             {
                 t_fault++;
-                Debug.LogError($"[Tournament] 첫 챕터의 requiredGrade가 {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 랭크에 오르기 전 유저는 토너먼트에 아예 못 들어간다.");
+                Debug.LogError($"[Tournament] 첫 챕터의 requiredGrade가 {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 랭크에 오르기 전 유저는 모험에 아예 못 들어간다.");
             }
 
             if (t_chapter.requiredGrade < t_prevGrade)

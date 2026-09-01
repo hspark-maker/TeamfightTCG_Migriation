@@ -7,7 +7,7 @@ using UnityEngine;
 /// </summary>
 public static class RewardService
 {
-    // 전투 보상 계수는 Reward 표(ownerType=Battle)가 소유한다 — 앨범·토너먼트·랭크와 같은 자리다.
+    // 전투 보상 계수는 Reward 표(ownerType=Battle)가 소유한다 — 앨범·모험·랭크와 같은 자리다.
     // 표가 비면 매판 0을 지급하게 되므로 부팅이 RewardSpec.TryValidateRequired로 먼저 막는다.
     static bool s_warnedMissing;
 

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EmblemOnlySynergyVfxConfig
   emblems:
   - timing: 2
-    scope: 0
+    scope: 1
     spec:
       rid: 3097494703106163097
   references:
