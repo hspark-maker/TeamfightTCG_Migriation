@@ -1,23 +1,23 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 // 카드 앨범 구조의 읽기전용 static 파사드 — 진행도(소유 파생)와 완성 판정 모수는 여기서만 산출한다
 public static class CardAlbum
 {
-    // 미배선이면 빈 앨범 — 앨범은 저작물이라 자동 생성 fallback을 두지 않는다
+    // 테마 그림(스킨)의 저작 원본. 구조·표시 텍스트의 진실원은 스펙시트다
     static CardAlbumConfig s_source;
 
-    static IReadOnlyList<AlbumTheme> s_themes;
-    static bool s_built;
+    static IReadOnlyList<AlbumTheme> s_themes = System.Array.Empty<AlbumTheme>();
 
-    // 테마 목록(읽기 전용, 순서 = 저작 순서)
-    public static IReadOnlyList<AlbumTheme> Themes
-    {
-        get { EnsureBuilt(); return s_themes; }
-    }
+    // 조립이 끝나기 전엔 거짓 — 부분 상태를 노출하지 않는다
+    public static bool IsReady { get; private set; }
+
+    // 테마 목록(읽기 전용, 순서 = AlbumThemeInfo.order)
+    public static IReadOnlyList<AlbumTheme> Themes => s_themes;
 
     public static int ThemeCount => Themes.Count;
 
-    // 앨범 전체 완성 보상. 값의 진실원은 스펙시트고, 시트에 없을 때만 저작값으로 떨어진다(미배선이면 빈 목록)
+    // 앨범 전체 완성 보상. 값의 진실원은 스펙시트 Reward 표뿐이다 — 저작 폴백이 없어 그 줄이 없으면 빈 목록이 된다
     public static IReadOnlyList<AlbumRewardDef> AlbumRewards
     {
         get
@@ -61,24 +61,23 @@ public static class CardAlbum
     // 분모는 열린 테마뿐이다 — 준비 중 테마가 하나라도 있으면 앨범이 영영 완성되지 않는다.
     public static bool IsAlbumComplete => UnlockedThemeCount > 0 && CompletedThemeCount == UnlockedThemeCount;
 
-    // 앨범 SO 주입 — null이면 빈 앨범
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => Clear();
+
+    // 스킨 SO 주입 + 즉시 조립. SpecSource·CardCatalog 뒤에 서야 한다(초기화 순서는 OutgameConfigStep이 보장)
     public static void SetSource(CardAlbumConfig _config)
     {
+        Clear();
         s_source = _config;
-        Invalidate();
+        s_themes = AlbumBuilder.Build(s_source);
+        IsReady = true;
     }
 
-    // 구조 캐시 무효화 — 다음 조회에서 재빌드
-    public static void Invalidate()
-    {
-        s_built = false;
-        s_themes = null;
-    }
-
-    // 배선된 앨범 SO일 때만 무효화 — 다른 저작 SO를 만졌다고 앨범을 재빌드하지 않는다
+    // 배선된 앨범 SO일 때만 재조립 — 다른 저작 SO를 만졌다고 앨범을 다시 세우지 않는다.
+    // SetSource 전(에디터 임포트 시점)에는 아무것도 하지 않는다 — 시트 로드 전에 빈 앨범을 굳히지 않기 위해서다
     public static void InvalidateIfSource(CardAlbumConfig _config)
     {
-        if (s_source == _config) Invalidate();
+        if (IsReady && s_source == _config) SetSource(_config);
     }
 
     public static int OwnedCountOf(AlbumSection _section)
@@ -95,12 +94,11 @@ public static class CardAlbum
         return t_total > 0 && OwnedCountOf(_section) == t_total;
     }
 
-    static void EnsureBuilt()
+    static void Clear()
     {
-        if (s_built) return;
-
-        s_themes = AlbumBuilder.Build(s_source);
-        s_built = true;
+        IsReady = false;
+        s_themes = System.Array.Empty<AlbumTheme>();
+        s_source = null;
     }
 
     static int OwnedIn(IReadOnlyList<int> _ids)

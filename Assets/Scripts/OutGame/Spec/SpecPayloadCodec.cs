@@ -21,6 +21,7 @@ public static class SpecPayloadCodec
     {
         "Card", "Card_Test", "CardPack", "CardPackDrop", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
+        "AlbumEntry", "AlbumThemeInfo",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -256,7 +257,9 @@ public static class SpecPayloadCodec
         "CardPackDrop" => typeof(CardPackDrop), "Reward" => typeof(Reward),
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
-        "CardLimitBreak" => typeof(CardLimitBreak), _ => null,
+        "CardLimitBreak" => typeof(CardLimitBreak),
+        "AlbumEntry" => typeof(AlbumEntry), "AlbumThemeInfo" => typeof(AlbumThemeInfo),
+        _ => null,
     };
 
     static string Text(object _value) => _value switch

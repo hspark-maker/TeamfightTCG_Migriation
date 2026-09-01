@@ -34,19 +34,22 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimReward = void 0;
+const node_crypto_1 = require("node:crypto");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
+const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
 const payout_1 = require("../payout");
 const rewardTable_1 = require("../rewardTable");
 const completionTable_1 = require("../completionTable");
+const tournamentTable_1 = require("../tournamentTable");
 const packSlots_1 = require("../packs/packSlots");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
 /** 소유자 키 하나의 최대 길이. 저작 키는 node_01 · p:Theme_Nature/P1 처럼 짧다. */
-const MAX_OWNER_ID_LENGTH = 64;
+const MAX_OWNER_ID_LENGTH = tournamentTable_1.MAX_NODE_ID_LENGTH;
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
  * @param {ClaimReject} reason 사유 코드
@@ -62,19 +65,8 @@ function reject(reason, message, context) {
  * @param {unknown} value 문서의 리스트 값
  * @return {string[]} 정리된 키 목록
  */
-function readIdList(value) {
-    if (!Array.isArray(value))
-        return [];
-    const seen = new Set();
-    for (const entry of value) {
-        if (typeof entry !== "string")
-            continue;
-        if (entry.length === 0 || entry.length > MAX_OWNER_ID_LENGTH)
-            continue;
-        seen.add(entry);
-    }
-    return [...seen];
-}
+// 정제 규약은 tournamentTable 이 소유한다 — 상한을 한쪽만 고치면 갈린다.
+const readIdList = tournamentTable_1.readNodeIdList;
 /**
  * 수령한 티어 목록. 티어 범위 밖 값을 걸러 낸다. 룰 상한(MAX_CLAIMED_TIERS)은 여기가 아니라
  * 쓰기 직전 appendClaimedTier 가 건다 — 읽기에서 잘라 내면 낙인이 조용히 사라진다.
@@ -133,13 +125,28 @@ async function loadAlbumEntries(context) {
     return entries;
 }
 /**
+ * 도감 테마 표. 준비 중(locked) 테마를 가리는 유일한 근거라 못 읽으면 NotEligible 로 떨어뜨린다
+ * — 여기서 통과시키면 전체 완성이 준비 중 테마의 칸까지 요구해 영영 수령할 수 없게 된다.
+ * @param {ClaimContext} context 요청 맥락
+ * @return {Promise<AlbumThemeRow[]>} 테마 목록
+ */
+async function loadAlbumThemes(context) {
+    const rows = await (0, packSpecReader_1.readSpecRows)(context.env, "AlbumThemeInfo");
+    const themes = (0, completionTable_1.parseAlbumThemeRows)(rows);
+    if (themes.length === 0) {
+        logger.error("AlbumThemeInfo spec is empty or unreadable", { ...context, rowCount: rows.length });
+        reject("NotEligible", "Album theme spec is unreadable.", { ...context, specRowCount: rows.length });
+    }
+    return themes;
+}
+/**
  * 챕터↔정점 대응 표. 못 읽으면 완주를 잴 수 없으므로 NotEligible 로 떨어뜨린다.
  * @param {ClaimContext} context 요청 맥락
  * @return {Promise<ChapterNodeRow[]>} 대응 목록
  */
 async function loadChapterNodes(context) {
     const rows = await (0, packSpecReader_1.readSpecRows)(context.env, "TournamentChapter");
-    const entries = (0, completionTable_1.parseChapterNodeRows)(rows);
+    const entries = (0, tournamentTable_1.parseChapterNodeRows)(rows);
     if (entries.length === 0) {
         logger.error("TournamentChapter spec is empty or unreadable", { ...context, rowCount: rows.length });
         reject("NotEligible", "Tournament chapter spec is unreadable.", { ...context, specRowCount: rows.length });
@@ -186,12 +193,15 @@ function claimRankTier(current, tier, required, tierCount, context) {
 }
 /**
  * 정점 수령 — 이 도메인은 "수령 = 클리어 확정"이라 낙인이 clearedNodeIds 하나다(별도 claimed 목록이 없다).
+ * 해금 사슬은 여기서 재지 않는다 — reportTournamentWin 이 낙인을 세울 때 이미 쟀고,
+ * 여기서 다시 재면 같은 판정이 두 곳에 생긴다. 이 자리가 보는 것은 그 낙인의 존재다.
  * 지급·클리어 낙인·미수령 해제가 한 트랜잭션이어야 지급됐는데 선물이 남는 상태가 저장되지 않는다.
  * @param {Record<string, unknown>} current 현재 문서
+ * @param {ChapterNodeRow[]} chapterRows 챕터↔정점 대응 표
  * @param {ClaimContext} context 요청 맥락
  * @return {object} tournament 슬롯 전체 값
  */
-function clearTournamentNode(current, context) {
+function claimTournamentNode(current, chapterRows, context) {
     const tournament = current.tournament;
     const cleared = readIdList(tournament?.clearedNodeIds);
     const pending = typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "";
@@ -200,6 +210,11 @@ function clearTournamentNode(current, context) {
     }
     if (pending !== context.ownerId) {
         reject("NotEligible", `Tournament node '${context.ownerId}' has no pending reward.`, { ...context, pending });
+    }
+    // 낙인이 표 밖 정점을 가리키면 거절한다 — 해금 판정이 서버로 오기 전(reportTournamentWin 이전)
+    // 클라가 스스로 찍어 둔 임의 낙인이 그대로 수령되는 창구를 막는다.
+    if (!(0, tournamentTable_1.hasNode)(chapterRows, context.ownerId)) {
+        reject("NotEligible", `Tournament node '${context.ownerId}' is not in the chapter spec.`, { ...context, pending, specRowCount: chapterRows.length });
     }
     return {
         clearedNodeIds: [...cleared, context.ownerId],
@@ -226,7 +241,7 @@ function claimTournamentChapter(current, chapterRows, context) {
     if (claimedChapters.includes(context.ownerId)) {
         reject("AlreadyClaimed", `Tournament chapter '${context.ownerId}' is already claimed.`, { ...context });
     }
-    const required = (0, completionTable_1.chapterNodeIds)(chapterRows, context.ownerId);
+    const required = (0, tournamentTable_1.chapterNodeIds)(chapterRows, context.ownerId);
     const cleared = readIdList(tournament?.clearedNodeIds);
     if (!(0, completionTable_1.isCompleted)(required, new Set(cleared))) {
         reject("NotEligible", `Tournament chapter '${context.ownerId}' is not complete.`, { ...context, requiredCount: required.length, missingCount: (0, completionTable_1.missingCount)(required, new Set(cleared)) });
@@ -244,10 +259,11 @@ function claimTournamentChapter(current, chapterRows, context) {
  * 서버가 매번 다시 잰다. 표에 그 범위 행이 하나도 없으면 완성이 아니라 미저작이다.
  * @param {Record<string, unknown>} current 현재 문서
  * @param {AlbumEntryRow[]} entryRows 도감 칸 표
+ * @param {AlbumThemeRow[]} themeRows 도감 테마 표(준비 중 테마를 가린다)
  * @param {ClaimContext} context 요청 맥락
  * @return {object} albumReward 슬롯 전체 값
  */
-function claimAlbumReward(current, entryRows, context) {
+function claimAlbumReward(current, entryRows, themeRows, context) {
     const album = current.albumReward;
     const claimedKeys = readIdList(album?.claimedKeys);
     // Claimed 검사가 완성 검사보다 먼저다(클라 AlbumRewardManager.StateOf 와 같은 순서).
@@ -255,7 +271,7 @@ function claimAlbumReward(current, entryRows, context) {
         reject("AlreadyClaimed", `Album reward '${context.ownerId}' is already claimed.`, { ...context });
     }
     const scope = (0, completionTable_1.parseAlbumScope)(context.ownerId);
-    const required = scope === null ? [] : (0, completionTable_1.albumScopeCardIds)(entryRows, scope);
+    const required = scope === null ? [] : (0, completionTable_1.albumScopeCardIds)(entryRows, scope, (0, completionTable_1.lockedThemeIds)(themeRows));
     const owned = new Set((0, packSlots_1.readOwnedIds)(current.ownership));
     if (!(0, completionTable_1.isCompleted)(required, owned)) {
         reject("NotEligible", `Album reward '${context.ownerId}' is not complete.`, { ...context, requiredCount: required.length, missingCount: (0, completionTable_1.missingCount)(required, owned) });
@@ -266,7 +282,7 @@ function claimAlbumReward(current, entryRows, context) {
  * 정적 보상 수령. 자격 판정·지급·낙인을 서버가 소유한다.
  *
  * 범위는 네 갈래다 — 랭크 티어 · 토너먼트 정점 · 토너먼트 챕터 완주 · 도감 완성.
- * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry) 표가 비면
+ * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry · AlbumThemeInfo) 표가 비면
  * fail-closed 로 거절한다. 지급은 지갑 문서로 나가고 세이브에는 낙인 슬롯만 남는다.
  */
 exports.claimReward = (0, https_1.onCall)(async (request) => {
@@ -290,6 +306,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     let tierCount = 0;
     let requiredPoints = 0;
     let albumEntries = [];
+    let albumThemes = [];
     let chapterNodes = [];
     if (ownerType === "Rank") {
         const grades = await loadRankGrades(context);
@@ -307,8 +324,10 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             reject("RewardNotFound", `Album owner '${ownerId}' is not a reward key.`, { ...context });
         }
         albumEntries = await loadAlbumEntries(context);
+        albumThemes = await loadAlbumThemes(context);
     }
-    else if (isChapter) {
+    else if (ownerType === "Tournament") {
+        // 챕터뿐 아니라 정점 수령도 읽는다 — 낙인이 표에 없는 정점을 가리키는지 대조하는 데 쓴다.
         chapterNodes = await loadChapterNodes(context);
     }
     // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
@@ -335,31 +354,48 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         // 랭크·도감·챕터는 여기까지 오지 않는다(judgeRewardClaim 이 RewardNotFound 로 끊었다).
         logger.warn("clearing a node with no authored reward", { ...context, specOwnerId, droppedCount: dropped.length });
     }
-    const result = await (0, saveDocument_1.mutateSave)("claimReward", env, uid, (current, _transaction, wallet) => {
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "claimReward", { kind: "client", txId }, (current, _transaction, wallet) => {
         // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
         // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
         // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
         const paid = gains.length === 0 ?
             undefined :
-            (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.grant)(wallet.balances, gains));
+            (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.grant)(wallet.balances, gains), "claimReward");
         if (ownerType === "Rank") {
             const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
             return { slots: { rank }, wallet: paid };
         }
         if (ownerType === "Album") {
-            return { slots: { albumReward: claimAlbumReward(current, albumEntries, context) }, wallet: paid };
+            return {
+                slots: { albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) },
+                wallet: paid,
+            };
         }
         if (isChapter) {
             return { slots: { tournament: claimTournamentChapter(current, chapterNodes, context) }, wallet: paid };
         }
-        return { slots: { tournament: clearTournamentNode(current, context) }, wallet: paid };
+        return { slots: { tournament: claimTournamentNode(current, chapterNodes, context) }, wallet: paid };
+    }, (adopted) => {
+        replayed = false;
+        return { ...adopted, granted: gains };
     });
-    logger.info("claimReward", {
-        uid, env, ownerType, ownerId: specOwnerId,
-        granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
-        droppedCount: dropped.length,
-        revision: result.revision,
-    });
-    return { ...result, granted: gains };
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "claimReward", txId, revision: result.revision });
+    }
+    else {
+        logger.info("claimReward", {
+            uid, env, ownerType, ownerId: specOwnerId,
+            granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
+            droppedCount: dropped.length,
+            revision: result.revision,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=claimReward.js.map
