@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 
 /// <summary>전투 결과의 1회 확정, 보상·랭크 적용, 서버 증거 제출을 소유한다.</summary>
@@ -50,7 +50,10 @@ public sealed class BattleOutcome
         Reward = RewardService.CalculateReward(_won, t_remaining);
 
         // 싱글 지급은 여기서 띄우기만 한다(기다리지 않는다) — 캐리어는 응답이 도착한 시점에 지급 경로가 세운다.
-        if (!t_serverPayout) RewardService.GrantBattleRewardAsync(_won, t_remaining);
+        // matchId는 **지금** 읽는다. 지급은 씬 밖에서 이어지는데 TurnRunner.Cleanup이 캐리어를 비우므로,
+        // 비동기 안에서 읽으면 이미 지워진 뒤일 수 있다.
+        if (!t_serverPayout)
+            RewardService.GrantBattleRewardAsync(_won, t_remaining, SoloMatchHandoff.MatchId);
 
         if (t_draw)
         {

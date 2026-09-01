@@ -4,14 +4,14 @@ int,string,string,string,int,string,int,string,int,int,int,int,string,string
 2,Data_Card_Waveri,파도리,Live,4,Ranged,0,Data_Synergy_Caretaker,0,5,4,3,파도 위를 누구보다 빠르게 달리는 구조대원. 구조가 끝나면 꼭 한 번은 멋진 턴을 보여줘야 직성이 풀린다.,Common
 3,Data_Card_Startori,별토리,Live,4,Healer,0,Data_Synergy_Caretaker,0,5,4,4,별빛으로 아군의 사기를 올리는 토끼. 응원은 눈부시지만 밤에 몰래 다가가는 임무에는 절대 못 쓴다.,Common
 4,Data_Card_Cloudmong,솜구름몽,Live,4,,0,Data_Synergy_Caretaker,0,5,4,3,"무거운 짐도 구름처럼 가볍게 나른다. 단, 바람 센 날에는 배송지가 조금 달라질 수 있다.",Common
-5,Data_Card_IronMongchi,철갑몽치,Live,5,Taunt,0,,0,5,4,6,철갑 등껍질로 모두를 지키는 든든한 탱커. 문이 좁으면 전투보다 입장이 더 오래 걸린다.,Rare
-6,Data_Card_Rockbean,바위콩,Live,5,,0,,0,5,4,3,위험하면 동그랗게 말아 완벽한 돌이 된다. 너무 완벽해서 동료들이 가끔 광물로 착각한다.,Rare
+5,Data_Card_IronMongchi,철갑몽치,Live,5,Taunt,0,Data_Synergy_Scale,0,5,4,6,철갑 등껍질로 모두를 지키는 든든한 탱커. 문이 좁으면 전투보다 입장이 더 오래 걸린다.,Rare
+6,Data_Card_Rockbean,바위콩,Live,5,,0,Data_Synergy_Bulk,0,5,4,3,위험하면 동그랗게 말아 완벽한 돌이 된다. 너무 완벽해서 동료들이 가끔 광물로 착각한다.,Rare
 7,Data_Card_KingChestnutHedgehog,왕밤도치,Live,6,Taunt,2,,0,3,4,6,밤송이 갑옷을 입고 농장을 지키는 거대한 고슴도치. 구르기 한 번이면 적도 수확물도 함께 사라진다.,Rare
-8,Data_Card_Nightchestnut,깜밤이,Live,5,Taunt,2,,0,3,4,6,밤길 안내를 맡은 올빼미 정찰병. 정작 낮 회의에서는 망토 속에서 꾸벅꾸벅 졸고 있다.,Rare
-9,Data_Card_MushroomCat,버섯냥,Live,4,Ranged,2,,0,4,4,4,등의 버섯으로 만능 약을 만든다는 고양이. 효과는 확실하지만 설명서를 읽으면 조금 불안해진다.,Common
-10,Data_Card_Dreameater,꿈먹이,Live,5,Execution,2,,0,4,3,7,나쁜 꿈과 스트레스를 먹어주는 다정한 맥. 너무 많이 먹은 날에는 본인이 월요일 출근 꿈을 꾼다.,Rare
+8,Data_Card_Nightchestnut,깜밤이,Live,5,Taunt,2,Data_Synergy_Trace,0,3,4,6,밤길 안내를 맡은 올빼미 정찰병. 정작 낮 회의에서는 망토 속에서 꾸벅꾸벅 졸고 있다.,Rare
+9,Data_Card_MushroomCat,버섯냥,Live,4,Ranged,2,Data_Synergy_Trace,0,4,4,4,등의 버섯으로 만능 약을 만든다는 고양이. 효과는 확실하지만 설명서를 읽으면 조금 불안해진다.,Common
+10,Data_Card_Dreameater,꿈먹이,Live,5,Execution,2,Data_Synergy_Trace,0,4,3,7,나쁜 꿈과 스트레스를 먹어주는 다정한 맥. 너무 많이 먹은 날에는 본인이 월요일 출근 꿈을 꾼다.,Rare
 11,Data_Card_Woodhorn,우드혼,Live,5,,0,Data_Synergy_Legacy,0,5,3,4,나무뿔로 숲을 돌보고 식물을 키우는 작은 사슴. 가지치기를 부탁하면 자신의 뿔부터 걱정한다.,Rare
-12,Data_Card_CaptainBeak,대장부리,Live,5,Peerless|Mark,2,Data_Synergy_Legacy,0,4,3,7,부리 하나로 최고의 무기를 만드는 딱따구리 대장장이. 새벽에도 두드려서 마을의 천적은 알람이 아니라 대장부리다.,Arcane
+12,Data_Card_CaptainBeak,대장부리,Live,5,Peerless,2,Data_Synergy_Legacy,0,4,3,7,부리 하나로 최고의 무기를 만드는 딱따구리 대장장이. 새벽에도 두드려서 마을의 천적은 알람이 아니라 대장부리다.,Arcane
 13,Data_Card_Swampfrog,늪꾸리,Live,4,Execution,2,Data_Synergy_Predator,0,4,4,4,진흙을 뿌려 적의 발을 묶는 개구리. 전투가 끝나면 가장 먼저 미끄러지는 것도 대개 본인이다.,Common
 14,Data_Card_DizzyOctopus,해롱문어,Live,5,Peerless,2,Data_Synergy_Predator,0,3,4,5,빙글빙글한 눈으로 적을 홀리는 문어 조수. 본인도 가끔 최면에 걸려 같은 부품을 여덟 개 만든다.,Rare
 15,Data_Card_WaterdropLong,물방울룽,Live,2,Cunning,2,Data_Synergy_Flow,0,6,4,3,불만 보면 몸부터 출동하는 젤리 수달. 불은 잘 끄지만 현장은 늘 물바다가 된다.,Common
@@ -28,15 +28,15 @@ int,string,string,string,int,string,int,string,int,int,int,int,string,string
 26,Data_Card_Thunderhorn,번개뿔,Live,6,,0,Data_Synergy_Flow,0,5,4,3,번개뿔로 전기를 모으는 돌격대장. 생각보다 몸이 먼저 나가서 작전명은 늘 ‘일단 돌진’이다.,Rare
 27,Data_Card_Campbean,모닥콩,Live,6,,0,,0,5,4,3,등의 화로로 모두의 저녁을 책임진다. 문제는 본인이 먼저 군고구마 냄새에 넘어간다는 것.,Rare
 28,Data_Card_Mapletail,단풍꼬리,Live,5,,0,,0,5,4,3,꼬리에 씨를 싣고 숲을 누비는 다람쥐. 벌목은 능숙하지만 낙엽철에는 꼬리 관리로 야근을 한다.,Rare
-29,Data_Card_Crystalhorn,수정뿔루,Live,2,,0,,0,5,5,3,수정 뿔로 보석을 찾고 보호막을 펼치는 산양. 빛나는 돌만 보면 임무를 잊고 얼마인지 감정부터 시작한다.,Common
+29,Data_Card_Crystahorn,수정뿔루,Live,2,,0,,0,5,5,3,수정 뿔로 보석을 찾고 보호막을 펼치는 산양. 빛나는 돌만 보면 임무를 잊고 얼마인지 감정부터 시작한다.,Common
 30,Data_Card_Bombbat,폭탄밤,Live,4,,0,,0,5,4,3,열매처럼 얌전히 매달려 자는 박쥐. 누가 깨우면 광산 하나가 사라질 만큼 요란하게 화낸다.,Common
-31,Data_Card_CrystalRhino,수정코뿔소,Live,5,Taunt,2,Data_Synergy_Scale,0,5,4,4,강력하고 아름다운 뿔을 지녔다. 반짝이는 건 좋아하지만 닦이는 건 싫어한다.,Arcane
+31,Data_Card_Crystalhorn,크리스탈혼,Live,5,Execution,2,Data_Synergy_Scale,0,5,4,4,강력하고 아름다운 뿔을 지녔다. 반짝이는 건 좋아하지만 닦이는 건 싫어한다.,Arcane
 32,Data_Card_Startail,별꼬리,Live,3,Cunning,2,Data_Synergy_Caretaker,0,4,4,5,긴 꼬리 끝에 별이 떠다니며 항상 분주하다. 멈추는 법을 배우는 중이다. 아직 성공한 적은 없다.,Arcane
 33,Data_Card_Lumielk,루미엘크,Live,3,Healer,2,Data_Synergy_Legacy,0,3,5,5,강력한 힐링 기술을 지녔다. 머리에 정원을 키우고 있지만 물은 주지 않는다.,Rare
-34,Data_Card_Magmole,마그몰,Live,5,Taunt,0,Data_Synergy_Bulk,0,6,4,3,화를 참는 편이다. 문제는 참으면 화산이 생긴다. 그리고 화산이 생기면 폭발한다.,Rare
+34,Data_Card_Magmole,마그몰,Live,5,Taunt,0,Data_Synergy_Flow,0,6,4,3,화를 참는 편이다. 문제는 참으면 화산이 생긴다. 그리고 화산이 생기면 폭발한다.,Rare
 35,Data_Card_Moonbite,문바이트,Live,4,Peerless,2,Data_Synergy_Predator,0,5,4,4,엄청난 식욕으로 모든것을 먹는다. 그러니 달이 매일 모양이 달라지는 이유에 대해 묻지 말자.,Common
-36,Data_Card_Ticktockgon,틱톡곤,Live,3,Execution,2,Data_Synergy_Flow,0,4,4,4,몸속에 거대한 태엽이 돌아가는 용. 시간 약속은 잘 지킨다. 가끔 너무 일찍 와서 심심해한다.,Arcane
-37,Data_Card_Magnetos,마그네토스,Live,4,Taunt,2,Data_Synergy_Scale,0,5,4,3,"강력한 자석 뿔로 친해지고 싶으면 끌어당기고, 싫으면 아주 멀리 보낸다.",Rare
+36,Data_Card_Ticktockgon,틱톡곤,Live,3,Immortal,2,Data_Synergy_Flow,0,4,4,4,몸속에 거대한 태엽이 돌아가는 용. 시간 약속은 잘 지킨다. 가끔 너무 일찍 와서 심심해한다.,Arcane
+37,Data_Card_Magnetos,마그네토스,Live,4,Peerless,2,Data_Synergy_Scale,0,5,4,3,"강력한 자석 뿔로 친해지고 싶으면 끌어당기고, 싫으면 아주 멀리 보낸다.",Rare
 38,Data_Card_Crackmon,크랙몬,Live,5,Execution,2,Data_Synergy_Bulk,0,6,4,3,현실의 틈에서 튀어나온 정체불명의 네발 생물. 문을 사용하지 않아 노크를 모른다.,Arcane
 39,Data_Card_Raigor,라이고르,Live,6,Peerless,2,Data_Synergy_Predator|Data_Synergy_Brand,0,4,4,6,"아주 오래전 하늘이 처음 천둥을 울렸을 때 태어났다고 전해지는 신수. 평소에는 느긋하게 구름 위에서 낮잠을 자지만, 화가 나면 주변 하늘이 통째로 검게 변한다.",Mythic
-40,Data_Card_Phoenixia,피닉시아,Live,6,Taunt,2,Data_Synergy_Legacy,0,3,5,6,죽음과 재생을 상징하는 전설의 신수지만 생각보다 성격은 꽤 수다스럽다. 오래된 숲이 불타거나 새로운 생명이 태어나는 순간 나타나 꽃잎처럼 빛을 흩뿌린다.,Mythic
+40,Data_Card_Phoenixia,피닉시아,Live,6,Immortal,2,Data_Synergy_Legacy|Data_Synergy_Trace,0,3,5,6,죽음과 재생을 상징하는 전설의 신수지만 생각보다 성격은 꽤 수다스럽다. 오래된 숲이 불타거나 새로운 생명이 태어나는 순간 나타나 꽃잎처럼 빛을 흩뿌린다.,Mythic

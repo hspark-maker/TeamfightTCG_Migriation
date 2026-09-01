@@ -1,6 +1,8 @@
 import {randomUUID} from "node:crypto";
+import {DocumentSnapshot, FieldValue} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {db} from "../firebaseApp";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -9,15 +11,16 @@ import {parseRewardRows, RewardRow} from "../rewardTable";
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
-import {mutateWallet} from "../currency/walletTransaction";
+import {mutateWallet, WalletGuard} from "../currency/walletTransaction";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
+import {HEX_32} from "../match/payloadGuards";
 import {LOCKED_DECK_SIZE} from "../deckValidation";
 
 /**
  * 도메인 거절 사유. **와이어 계약**이다 — 클라가 이 문자열을 그대로 대조한다.
  * permission-denied 로만 나간다(save/domainReject): 보상 지급 실패로 세션을 끊지 않는다.
  */
-type BattleRewardReject = "RewardUnavailable";
+type BattleRewardReject = "RewardUnavailable" | "MatchUnverified" | "AlreadyClaimed";
 
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
@@ -65,8 +68,80 @@ function resolvePayout(
 }
 
 /**
+ * 요청이 지목한 매치 id. **없거나 형식을 벗어나면 여기서 접는다** — matchId 없이는
+ * 자격을 소진시킬 문서가 없어서 `won`·`remaining` 이 클라 자유값이 되고, 새 txId 를 붙인
+ * 반복 호출이 그대로 무제한 지급이 된다(영수증은 같은 txId 만 막는다).
+ *
+ * invalid-argument 가 아니라 도메인 거절인 이유는 domainReject 의 계약이다 —
+ * 보상 지급 실패로 세션을 끊지 않는다. 클라는 경고 한 줄로 삼키고 획득 연출을 세우지 않는다.
+ * @param {unknown} raw 요청의 matchId
+ * @param {Record<string, unknown>} context 로그 맥락
+ * @return {string} 매치 id
+ */
+function requireMatchId(raw: unknown, context: Record<string, unknown>): string {
+  if (typeof raw === "string" && HEX_32.test(raw)) return raw;
+  reject("MatchUnverified", `Battle reward requires a match id: ${String(raw)}`, context);
+}
+
+/**
+ * 지급 자격을 매치 문서에 묶는다. 이 명령은 전투를 재시뮬하지 않으므로 `won`·`remaining` 의
+ * 진위는 여전히 클라 신고다 — 여기서 막는 것은 **같은 자격의 반복 청구**다.
+ * findAiMatch 가 연 solo 매치 하나당 지급도 하나로 끊는다.
+ *
+ * `phase === "locked"` 를 요구하는 이유: lockDeck 이 소유·성장을 세이브와 대조해 승인한
+ * 매치만 전투로 넘어간다. 봉인만 되고(pairing) 전투를 시작하지 않은 매치로는 청구할 수 없다.
+ * @param {string} env 환경 id
+ * @param {string} uid 유저 uid
+ * @param {string} matchId 매치 id
+ * @param {Record<string, unknown>} context 로그 맥락
+ * @return {WalletGuard} 지갑 트랜잭션이 같은 커밋에서 검사·낙인할 자격 문서
+ */
+function matchGuard(
+  env: string,
+  uid: string,
+  matchId: string,
+  context: Record<string, unknown>,
+): WalletGuard {
+  const ref = db.doc(`envs/${env}/matches/${matchId}`);
+  return {
+    ref,
+    verify: (snapshot: DocumentSnapshot) => {
+      const match = snapshot.exists ? snapshot.data() ?? {} : null;
+      if (match === null) {
+        reject("MatchUnverified", `Battle reward match is missing: ${matchId}`, context);
+      }
+      // 이미 받아 갔다. 사유를 MatchUnverified 와 가르는 이유는 로그다 —
+      // 하나는 위조 시도이고 하나는 응답을 잃은 정상 클라의 재청구라 대응이 다르다.
+      if (match.rewardClaimed === true) {
+        reject("AlreadyClaimed", `Battle reward was already claimed: ${matchId}`, context);
+      }
+      const participants = Array.isArray(match.participantUids) ? match.participantUids : [];
+      if (match.mode !== "solo" || !participants.includes(uid) || match.phase !== "locked") {
+        reject("MatchUnverified", `Battle reward match is not a locked solo match: ${matchId}`, {
+          ...context, mode: match.mode, phase: match.phase, participants: participants.length,
+        });
+      }
+    },
+    stamp: {
+      rewardClaimed: true,
+      rewardClaimedBy: uid,
+      rewardClaimedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+  };
+}
+
+/**
  * 싱글 전투 1판의 보상 지급. 금액 공식(perCard × 생존 수 vs floor · 패배는 flat)은 payout.ts 가 갖고,
  * 여기서는 표 읽기 · 클램프 · 지급만 한다.
+ *
+ * **자격은 matchId 하나로 끊는다.** findAiMatch 가 연 solo 매치 문서를 지갑과 같은 트랜잭션에서
+ * 낙인하므로(matchGuard) 매치 한 판당 지급은 한 번뿐이다. 영수증(txId)만으로는 못 막는다 —
+ * 클라가 새 txId 를 붙이면 매번 새 지급이 성립한다.
+ *
+ * 다만 `won`·`remaining` 자체는 아직 클라 신고다. 이 명령은 전투를 재시뮬하지 않는다
+ * (submitMatchResult 는 멀티 전용이다). 그래서 막히는 것은 "무한 반복"이고,
+ * "한 판에 대해 부풀린 신고" 는 남아 있다 — 그건 서버 재시뮬을 solo 로 넓혀야 닫힌다.
  *
  * 세이브 문서는 건드리지 않는다 — 이 명령이 움직이는 것은 잔액뿐이라 진행도 슬롯도 revision 도 오를 이유가 없다.
  * 지급량이 0 이하로 나오면 **아무것도 쓰지 않는다** — 빈 지급으로 지갑 rev 만 올리면
@@ -81,6 +156,8 @@ export const claimBattleReward = onCall(async (request) => {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
   }
 
+  const matchId = requireMatchId(request.data?.matchId, {uid, env, won});
+
   const requested = Number(request.data?.remaining ?? 0);
   const remaining = clampRemaining(requested);
   if (remaining !== requested) {
@@ -90,7 +167,7 @@ export const claimBattleReward = onCall(async (request) => {
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
   const rows = parseRewardRows(await readSpecRows(env, "Reward"));
   const context = {
-    uid, env, won, remaining,
+    uid, env, won, remaining, matchId,
     rowCount: rows.length,
     battleOwnerIds: rows.filter((r) => r.ownerType === "Battle").map((r) => r.ownerId),
   };
@@ -124,14 +201,15 @@ export const claimBattleReward = onCall(async (request) => {
     (wallet) => {
       replayed = false;
       return {wallet, granted: {currency, amount}};
-    });
+    },
+    matchGuard(env, uid, matchId, context));
 
   if (replayed) {
     logger.info("receipt replay",
-      {uid, env, source: "claimBattleReward", txId, rev: result.wallet.rev});
+      {uid, env, source: "claimBattleReward", txId, matchId, rev: result.wallet.rev});
   } else {
     logger.info("claimBattleReward", {
-      uid, env, won, remaining, currency, amount, rev: result.wallet.rev,
+      uid, env, won, remaining, matchId, currency, amount, rev: result.wallet.rev,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });
   }

@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 전투 보상 지급을 서버에 묻는 단일 창구.
@@ -9,21 +9,31 @@ internal static class BattleRewardCommand
     const string COMMAND_NAME = "claimBattleReward";
 
     /// <summary>싱글 전투 한 판의 보상 지급을 요청한다. 성공하면 <b>서버가 실제로 지급한 한 줄</b>이 돌아오고,
-    /// 실패·거절은 전부 <see cref="CurrencyGain.None"/> 이다.</summary>
+    /// 실패·거절은 전부 <see cref="CurrencyGain.None"/> 이다.
+    ///
+    /// <para><paramref name="_matchId"/> 는 findAiMatch 가 봉인한 매치 신원이다. 서버는 이것으로 지급 자격을
+    /// 한 판당 한 번으로 끊으므로 빠뜨리면 거절된다 — 부르는 쪽이 매치 없이 오지 않게 막아야 한다.</para></summary>
     // 부르는 쪽이 전투 종료 흐름이라 예외를 밖으로 내보내지 않는다 — 지급 실패가 결과 화면을 끊으면 안 된다.
-    internal static async UniTask<CurrencyGain> ClaimAsync(bool _won, int _remaining)
+    internal static async UniTask<CurrencyGain> ClaimAsync(bool _won, int _remaining, string _matchId)
     {
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<BattleRewardResult>(
                 COMMAND_NAME,
-                new { env = ContentProfileConfig.Active.CloudEnvId, won = _won, remaining = _remaining });
+                new
+                {
+                    env = ContentProfileConfig.Active.CloudEnvId,
+                    won = _won,
+                    remaining = _remaining,
+                    matchId = _matchId,
+                });
 
             return ToGain(t_result);
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            // 표가 비었거나(RewardUnavailable) 클라 캐시와 서버 표가 갈린 것이다 — 세션은 멀쩡하다.
+            // 표가 비었거나(RewardUnavailable) · 매치 자격이 없거나(MatchUnverified) · 이미 받아 간
+            // 판이다(AlreadyClaimed). 어느 쪽이든 세션은 멀쩡하고 이번 판의 지급만 없다.
             Debug.LogWarning($"[BattleRewardCommand] 전투 보상을 서버가 거절했다 — {t_rejected.Message}");
             return CurrencyGain.None;
         }

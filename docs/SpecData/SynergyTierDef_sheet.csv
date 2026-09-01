@@ -1,19 +1,20 @@
-﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,티어 인덱스(0부터 · 오름차순 저작),열리는 최소 카드 수,티어 라벨(시너지 이름과 같으면 표시 생략)
-id,synergyId,tierIndex,requiredCount,label
-int,string,int,int,string
-1,Brand,0,3,낙인
-2,Brand,1,5,낙인
-3,Bulk,0,2,덩치
-4,Bulk,1,4,덩치
-5,Caretaker,0,3,돌보미
-6,Caretaker,1,5,돌보미
-7,Flow,0,3,흐름
-8,Flow,1,5,흐름
-10,Legacy,0,2,유산
-11,Legacy,1,4,유산
-12,Predator,0,2,포식자
-13,Predator,1,4,포식자
-14,Scale,0,2,비늘
-15,Scale,1,4,비늘
-16,Trace,0,2,추적
-17,Trace,1,4,추적
+﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,티어 인덱스(0부터 · 오름차순 저작),열리는 최소 카드 수,티어 라벨(시너지 이름과 같으면 표시 생략),
+id,synergyId,tierIndex,requiredCount,label,effectSummary
+int,string,int,int,string,string
+1,Brand,0,3,낙인,1명당 1 피해
+2,Brand,1,5,낙인,1명당 2 피해
+3,Bulk,0,2,덩치,추가 생명력 +3
+4,Bulk,1,4,덩치,추가 생명력 +6
+5,Caretaker,0,3,돌보미,추가 생명력 +1
+6,Caretaker,1,5,돌보미,추가 생명력 +2
+7,Flow,0,3,흐름,등장 시 스택 +1
+8,Flow,1,5,흐름,등장 시 스택 +2
+9,Guardian,0,2,수호자,보호막 획득
+10,Legacy,0,2,유산,턴마다 스택 +1
+11,Legacy,1,4,유산,턴마다 스택 +2
+12,Predator,0,2,포식자,피해의 50% 회복
+13,Predator,1,4,포식자,피해의 75% 회복
+14,Scale,0,2,비늘,받는 피해 -1
+15,Scale,1,4,비늘,받는 피해 -2
+16,Trace,0,2,추적,표식 부여
+17,Trace,1,4,추적,표식 처치 시 생명력 +2

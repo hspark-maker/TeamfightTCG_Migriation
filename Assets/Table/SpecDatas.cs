@@ -367,4 +367,5 @@ public partial class SynergyTierDef
     public int requiredCount;
     /// 티어 라벨(시너지 이름과 같으면 표시 생략)
     public string label;
+    public string effectSummary;
 }
