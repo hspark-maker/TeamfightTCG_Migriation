@@ -72,7 +72,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 실 상대를 먼저 찾고, 못 만나면 안쪽 AI 매칭으로 내려간다. 멀티/싱글 판정은 이 결과가 소유한다 —
     // 여기서 갈리는 것이 DeckConfig.IsMultiplayer 이고, 씬 로드·랭크 정산·보상 경로가 전부 그 값을 따른다.
     IMatchmaker Matchmaker => m_matchmaker ??=
-        new PhotonRankedMatchmaker(new FakeMatchmaker(aiDeckConfig, profilePool));
+        new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
 
     // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄운다 — 로비 프리팹을 저장할 때마다 SafeArea가
     // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋된다. 부모는 덱 화면과 같은 SafeArea다.
@@ -426,7 +426,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (_preset && _matched.HasValue)
         {
             MatchOpponentHandoff.Set(_matched.Value);
-            DeckConfig.SetEnemyDeck(_matched.Value.Deck);
+            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
             return;
         }
 
@@ -443,13 +443,15 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 덱 없이 프로필만 온 상대(실제 매칭)는 덱만 폴백을 탄다 — 표시는 매칭한 상대를 그대로 유지한다.
         if (_matched.HasValue && _matched.Value.IsValid)
         {
-            DeckConfig.SetEnemyDeck(_matched.Value.Deck);
+            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
             return;
         }
 
-        DeckConfig.SetEnemyDeck(aiDeckConfig != null
-            ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex)
-            : new List<int>());
+        int t_cardLevel = 0;
+        List<int> t_deck = aiDeckConfig != null
+            ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex, out t_cardLevel)
+            : new List<int>();
+        DeckConfig.SetEnemyDeck(t_deck, t_cardLevel);
     }
 
     void ApplyPlayLock()

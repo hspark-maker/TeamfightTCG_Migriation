@@ -1,0 +1,5 @@
+﻿id,level,costCurrency,cost,successPermille
+int,int,string,long,int
+1,2,Shard,25,1000
+2,3,Shard,75,1000
+3,4,Shard,150,1000

@@ -120,38 +120,6 @@ public partial class CardPackDrop
 }
 
 [GeneratorSpecData]
-public partial class AIDeck
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// 덱 안정 키 — AIDeckCard 조인 키
-    public string deckId;
-    /// 검증·로그용 표시 이름
-    public string deckName;
-    /// 등장 시작 티어 인덱스
-    public int fromTier;
-    /// 등장 종료 티어(포함). 0은 제한 없음
-    public int toTier;
-    /// 같은 티어 안 등장 가중치. 0 이하는 1
-    public int weight;
-}
-
-[GeneratorSpecData]
-public partial class AIDeckCard
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// AIDeck.deckId 참조
-    public string deckId;
-    /// 덱 안 카드 순서(0~5)
-    public int slot;
-    /// Card.id 참조
-    public int cardId;
-}
-
-[GeneratorSpecData]
 public partial class RankGrade
 {
     /// 행 고유 번호(부여 후 변경 금지). id 오름차순이 곧 등급 순서이고, 티어 인덱스는 이 순서에서 파생된다

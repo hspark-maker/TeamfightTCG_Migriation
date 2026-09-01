@@ -312,44 +312,10 @@ public static partial class SpecFirestoreUploader
     }
 
     static bool TryLoadManager(out object _manager, out string _error)
-    {
-        _manager = null;
-        _error = null;
-
-        string t_json = SpecDataResourceLoader.LoadSpecData();
-        if (string.IsNullOrEmpty(t_json))
-        {
-            _error = "SpecData 리소스를 못 읽었다. CookApps > SpecData 창에서 '시트 적용 & CS 생성'을 먼저 실행할 것.";
-            return false;
-        }
-
-        var t_manager = new SpecDataManager();
-        if (!t_manager.Load(t_json))
-        {
-            _error = "SpecData 파싱 실패. 생성된 리소스가 손상됐을 수 있다(재생성 필요).";
-            return false;
-        }
-
-        _manager = t_manager;
-        return true;
-    }
+        => SpecLocalTables.TryLoadManager(out _manager, out _error);
 
     static IEnumerable<KeyValuePair<string, IEnumerable>> EnumerateTables(object _manager)
-    {
-        foreach (PropertyInfo t_property in _manager.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
-        {
-            if (t_property.GetIndexParameters().Length > 0) continue;
-
-            object t_container;
-            try { t_container = t_property.GetValue(_manager); }
-            catch (Exception) { continue; }
-            if (t_container == null) continue;
-
-            PropertyInfo t_all = t_container.GetType().GetProperty("All", BindingFlags.Public | BindingFlags.Instance);
-            if (t_all?.GetValue(t_container) is IEnumerable t_rows)
-                yield return new KeyValuePair<string, IEnumerable>(t_property.Name, t_rows);
-        }
-    }
+        => SpecLocalTables.Enumerate(_manager);
 
     static bool TryBuildSnapshot(object _manager, string _table, out TableSnapshot _snapshot, out string _error)
     {

@@ -18,48 +18,93 @@ public class AIDeckConfig : ScriptableObject
         [Tooltip("같은 티어 안에서의 등장 가중치. 0 이하면 1")]
         public int weight;
 
+        [Tooltip("이 덱 카드가 쓸 레벨의 하한. 0 = 미저작(바닥 레벨 고정)")]
+        public int fromLevel;
+        [Tooltip("이 덱 카드가 쓸 레벨의 상한(포함). 0 = 미저작(바닥 레벨 고정)")]
+        public int toLevel;
+
         public int ToTierOrMax => this.toTier == 0 ? int.MaxValue : this.toTier;
         public int WeightOrOne => this.weight > 0 ? this.weight : 1;
+
+        /// <summary>레벨 범위가 저작됐는가. 한쪽만 채운 반쪽 저작은 미저작으로 본다 —
+        /// 그래야 시트 빈칸이 조용히 1레벨 덱을 만렙으로 만들지 않는다.</summary>
+        public bool HasAuthoredLevel => this.fromLevel > 0 && this.toLevel > 0;
+
+        /// <summary>이번 판에 이 덱이 쓸 레벨 하나를 뽑는다. 미저작이면 0(= 호출부가 바닥으로 떨어뜨린다).
+        /// <see cref="UnityEngine.Random"/>이다 — MatchRandom을 소비하면 멀티 셔플 시드가 밀린다.</summary>
+        public int RollLevel()
+        {
+            if (!HasAuthoredLevel) return 0;
+
+            int t_min = Mathf.Min(this.fromLevel, this.toLevel);
+            int t_max = Mathf.Max(this.fromLevel, this.toLevel);
+            return Random.Range(t_min, t_max + 1);
+        }
     }
 
     public List<DeckEntry> decks;
 
-    public List<int> GetRandomDeck()
+    public List<int> GetRandomDeck() => GetRandomDeck(out _);
+
+    /// <summary><paramref name="_cardLevel"/>은 뽑힌 덱의 저작 레벨 범위에서 굴린 값 하나다.
+    /// 0이면 미저작 — 호출부가 바닥 레벨로 떨어뜨린다. 덱 하나당 한 번만 굴린다(카드마다 흔들리지 않게).</summary>
+    public List<int> GetRandomDeck(out int _cardLevel)
     {
         IReadOnlyList<DeckEntry> t_decks = ResolveDecks();
-        return PickRandom(t_decks);
+        DeckEntry t_entry = PickRandom(t_decks);
+        return TakeDeck(t_entry, out _cardLevel);
     }
 
-    List<int> PickRandom(IReadOnlyList<DeckEntry> _decks)
+    DeckEntry PickRandom(IReadOnlyList<DeckEntry> _decks)
     {
-        if (_decks == null || _decks.Count == 0) return new List<int>();
+        if (_decks == null || _decks.Count == 0) return null;
 
         var t_candidates = new List<DeckEntry>();
         foreach (DeckEntry t_entry in _decks)
             if (HasValidCards(t_entry)) t_candidates.Add(t_entry);
 
-        if (t_candidates.Count == 0) return new List<int>();
-        return new List<int>(t_candidates[Random.Range(0, t_candidates.Count)].cardIds);
+        if (t_candidates.Count == 0) return null;
+        return t_candidates[Random.Range(0, t_candidates.Count)];
     }
 
-    public List<int> GetDeckForTier(int _tier)
+    /// <summary>뽑힌 덱에서 카드 목록과 레벨을 함께 꺼낸다 — 레벨 추첨이 덱당 정확히 1회가 되는 지점.</summary>
+    static List<int> TakeDeck(DeckEntry _entry, out int _cardLevel)
+    {
+        if (_entry == null)
+        {
+            _cardLevel = 0;
+            return new List<int>();
+        }
+
+        _cardLevel = _entry.RollLevel();
+        return new List<int>(_entry.cardIds);
+    }
+
+    public List<int> GetDeckForTier(int _tier) => GetDeckForTier(_tier, out _);
+
+    /// <summary><paramref name="_cardLevel"/>은 뽑힌 덱의 저작 레벨 범위에서 굴린 값 하나다(0 = 미저작).</summary>
+    public List<int> GetDeckForTier(int _tier, out int _cardLevel)
     {
         IReadOnlyList<DeckEntry> t_decks = ResolveDecks();
-        if (t_decks == null || t_decks.Count == 0) return new List<int>();
+        if (t_decks == null || t_decks.Count == 0)
+        {
+            _cardLevel = 0;
+            return new List<int>();
+        }
 
         for (int t_tier = Mathf.Max(0, _tier); t_tier >= 0; t_tier--)
         {
-            List<int> t_deck = PickWeighted(t_decks, t_tier);
-            if (t_deck != null) return t_deck;
+            DeckEntry t_entry = PickWeighted(t_decks, t_tier);
+            if (t_entry != null) return TakeDeck(t_entry, out _cardLevel);
         }
 
-        return PickRandom(t_decks);
+        return TakeDeck(PickRandom(t_decks), out _cardLevel);
     }
 
     IReadOnlyList<DeckEntry> ResolveDecks()
         => AIDeckSpec.TryGetDecks(out IReadOnlyList<DeckEntry> t_spec) ? t_spec : this.decks;
 
-    static List<int> PickWeighted(IReadOnlyList<DeckEntry> _decks, int _tier)
+    static DeckEntry PickWeighted(IReadOnlyList<DeckEntry> _decks, int _tier)
     {
         int t_totalWeight = 0;
         foreach (DeckEntry t_entry in _decks)
@@ -76,7 +121,7 @@ public class AIDeckConfig : ScriptableObject
             if (!IsAvailableAt(t_entry, _tier)) continue;
 
             t_roll -= t_entry.WeightOrOne;
-            if (t_roll < 0) return new List<int>(t_entry.cardIds);
+            if (t_roll < 0) return t_entry;
         }
 
         return null;
