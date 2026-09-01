@@ -205,10 +205,13 @@ public class GameResultPopup : MonoBehaviour
         if (t_reveal == null) return null;
 
         Sequence t_line = DOTween.Sequence();
-        t_line.Insert(0f, t_reveal);
 
-        if (!_animate || this.m_gold.Total <= 0) return t_line;
-        if (_cards != null && _cards.Count == 0) return t_line;   // 카드 0장: 하한 보상이 이미 박혀 있다.
+        if (!_animate || this.m_gold.Total <= 0 || (_cards != null && _cards.Count == 0))
+        {
+            // 카드 0장은 하한 보상이 이미 박혀 있어 굴릴 것이 없다 — 수치가 팝하고 끝난다.
+            t_line.Insert(0f, t_reveal);
+            return t_line;
+        }
 
         RectTransform t_target = this.goldIconRect != null
                                ? this.goldIconRect
@@ -221,9 +224,15 @@ public class GameResultPopup : MonoBehaviour
         if (t_flight != null)
         {
             t_line.Insert(0f, t_flight);
+
+            // 수치는 카드가 골드에 닿는 순간에 맞춰 팝한다 — 줄이 서 있는 내내 "+0"이 떠 있으면
+            // 보상이 이미 정해진 것으로 읽혀 흡수가 원인으로 보이지 않는다(랭크 줄과 같은 순서다).
+            t_line.Insert(Mathf.Max(0f, this.cardFlight.ArriveAt - this.rewardRevealDuration), t_reveal);
             _cardsFlew = true;
             return t_line;
         }
+
+        t_line.Insert(0f, t_reveal);
 
         if (this.coinBurst != null)
         {

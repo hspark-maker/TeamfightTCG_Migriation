@@ -11240,6 +11240,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: VictoryBanner
       objectReference: {fileID: 0}
+    - target: {fileID: 6515223848412843459, guid: b4a14d060f73b854ba7d661086907523, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6969283276385830747, guid: b4a14d060f73b854ba7d661086907523, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.1
@@ -11261,11 +11265,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: b4a14d060f73b854ba7d661086907523, type: 3}
---- !u!224 &4660619419728618629 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 5748432713024055984, guid: b4a14d060f73b854ba7d661086907523, type: 3}
-  m_PrefabInstance: {fileID: 1111071565560057397}
-  m_PrefabAsset: {fileID: 0}
 --- !u!114 &1390036519774325773 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2026962237188899384, guid: b4a14d060f73b854ba7d661086907523, type: 3}
@@ -11277,3 +11276,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dc37d035a0f93c247b25e7745fa634c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VictoryBannerView
+--- !u!224 &4660619419728618629 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 5748432713024055984, guid: b4a14d060f73b854ba7d661086907523, type: 3}
+  m_PrefabInstance: {fileID: 1111071565560057397}
+  m_PrefabAsset: {fileID: 0}

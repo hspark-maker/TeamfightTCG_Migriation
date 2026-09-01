@@ -104,6 +104,9 @@ public class SurvivorGoldFlight
     readonly List<GameObject> m_tiles = new List<GameObject>();
     RectTransform m_layer;   // 자동 생성한 레이어. 타일만 걷고 레이어는 재사용한다.
 
+    /// <summary>직전 <see cref="Build"/> 안무에서 생존 카드가 목적지에 닿는 시각(시퀀스 시작 기준 초).</summary>
+    public float ArriveAt { get; private set; }
+
     float EnterSpan(int _count) => EnterStagger(_count) * EnterSteps(_count) + this.enterDuration;
 
     float HoldDuration(int _count) => this.holdBase + this.holdPerCard * Mathf.Max(0, _count);
@@ -154,6 +157,8 @@ public class SurvivorGoldFlight
         // 흡수도 파괴도 한 박이라 시작 시각이 하나뿐이다 — 줄이 한 번의 움직임으로 갈린다.
         float t_flyStart = EnterSpan(t_count) + HoldDuration(t_count);
         float t_flyEnd   = t_flyStart + this.flyDuration;
+
+        this.ArriveAt = t_flyEnd;
 
         var t_seq = DOTween.Sequence();
 
