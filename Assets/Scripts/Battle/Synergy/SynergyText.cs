@@ -26,7 +26,7 @@ public static class SynergyText
         {
             if (t_tier == null) continue;
             if (t_sb.Length > 0) t_sb.Append('/');
-            t_sb.Append(t_tier.requiredCount).Append('장');
+            t_sb.Append(TierRequirement(t_tier));
         }
 
         return t_sb.ToString();
@@ -39,6 +39,21 @@ public static class SynergyText
         return string.IsNullOrEmpty(_synergy.effectDescription) ? string.Empty : _synergy.effectDescription;
     }
 
+    /// <summary>티어 한 단계의 요구 장수("3장"). 티어를 줄로 세우는 화면이 쓴다.</summary>
+    public static string TierRequirement(SynergyTier _tier)
+        => _tier == null ? string.Empty : _tier.requiredCount + "장";
+
+    /// <summary>티어 한 단계가 무엇을 주는지 한 줄("추가 생명력 +1"). 요약이 비면 별칭(label)으로 폴백하고,
+    /// 그것마저 비거나 시너지 이름과 같으면 빈 문자열 — 이름이 이미 위에 있어 "2장 — 덩치"가 같은 말을 두 번 한다.</summary>
+    public static string TierEffect(SynergyData _synergy, SynergyTier _tier)
+    {
+        if (_tier == null) return string.Empty;
+        if (!string.IsNullOrEmpty(_tier.effectSummary)) return _tier.effectSummary;
+        if (string.IsNullOrEmpty(_tier.label)) return string.Empty;
+
+        return _tier.label == Name(_synergy) ? string.Empty : _tier.label;
+    }
+
     /// <summary>설명 + 티어 목록.
     /// _ownedCount &gt;= 0 이면 보유 수 기준으로 열림(●)/미달(○)을 표시하고,
     /// 음수면 덱 문맥이 없는 것으로 보고 마커 없이 요구치만 나열한다(카드 정보 팝업 용도).</summary>
@@ -46,8 +61,7 @@ public static class SynergyText
     {
         if (_synergy == null) return string.Empty;
 
-        string t_name = Name(_synergy);
-        var    t_sb   = new StringBuilder();
+        var t_sb = new StringBuilder();
         if (!string.IsNullOrEmpty(_synergy.effectDescription))
             t_sb.Append(_synergy.effectDescription);
 
@@ -63,11 +77,10 @@ public static class SynergyText
                 t_sb.Append('\n');
                 if (_ownedCount >= 0)
                     t_sb.Append(t_tier.requiredCount <= _ownedCount ? "● " : "○ ");
-                t_sb.Append(t_tier.requiredCount).Append('장');
+                t_sb.Append(TierRequirement(t_tier));
 
-                // 라벨이 시너지 이름과 같으면 적지 않는다 — 이름이 이미 위에 있어 "2장 — 덩치"가 같은 말을 두 번 한다.
-                if (!string.IsNullOrEmpty(t_tier.label) && t_tier.label != t_name)
-                    t_sb.Append(" — ").Append(t_tier.label);
+                string t_effect = TierEffect(_synergy, t_tier);
+                if (t_effect.Length > 0) t_sb.Append(" — ").Append(t_effect);
             }
         }
 

@@ -109,6 +109,7 @@ public static class SynergySpecSource
             {
                 requiredCount = t_row.requiredCount,
                 label         = t_row.label,
+                effectSummary = t_row.effectSummary,
                 effects       = t_tierEffects.ToArray(),
             });
         }

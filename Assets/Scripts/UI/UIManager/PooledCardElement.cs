@@ -286,9 +286,11 @@ public class PooledCardElement : PooledUIBase
         Sprite t_icon = _active ? _synergy.activeIcon
                                 : (_synergy.inactiveIcon != null ? _synergy.inactiveIcon : _synergy.activeIcon);
 
+        // 효과 설명문은 단계별 수치를 담지 않는다(그것은 티어 라벨이 쥔다) — 여기는 티어를 따로 세우는
+        // 자리가 없으므로 목록까지 함께 적는 Body를 쓴다.
         var t_row = Instantiate(this.keywordExplainItemPrefab, this.keywordListRoot);
         t_row.GetComponent<KeywordExplainItem>()?.Init(
-            t_icon, SynergyText.Name(_synergy), _synergy.effectDescription,
+            t_icon, SynergyText.Name(_synergy), SynergyText.Body(_synergy),
             SynergyIconStrip.IconPadCompensation,   // 시너지 PNG 투명 여백 보정(키워드 행과 크기 맞춤)
             _active);
     }
