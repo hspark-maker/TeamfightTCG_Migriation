@@ -952,6 +952,7 @@ GameObject:
   - component: {fileID: 3867891717272135405}
   - component: {fileID: 285337210513552691}
   - component: {fileID: 4048876516187565912}
+  - component: {fileID: 8104459237611028745}
   m_Layer: 0
   m_Name: PowerBadge
   m_TagString: Untagged
@@ -2521,6 +2522,7 @@ GameObject:
   - component: {fileID: 3426435657992405913}
   - component: {fileID: 6854664472983553879}
   - component: {fileID: 2798812992549317561}
+  - component: {fileID: 4471028836195510313}
   m_Layer: 0
   m_Name: BattleButton
   m_TagString: Untagged
@@ -2661,6 +2663,7 @@ GameObject:
   - component: {fileID: 4726054889253289704}
   - component: {fileID: 3227421550390395295}
   - component: {fileID: 1738279822080308828}
+  - component: {fileID: 4471028836195510327}
   m_Layer: 0
   m_Name: PowerBadge
   m_TagString: Untagged
@@ -5271,3 +5274,42 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
+--- !u!114 &4471028836195510313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7106232095072429103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 13
+--- !u!114 &4471028836195510327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7111215831560738556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 27
+--- !u!114 &8104459237611028745
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2956305767364865637}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 28

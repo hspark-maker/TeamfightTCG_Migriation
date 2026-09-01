@@ -129,6 +129,14 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     /// 이 신호로만 판정한다 — 클릭을 들으면 드래그로 넣은 경우를 놓친다.</summary>
     public static event Action<int> OnAnyCardEquipped;
 
+    /// <summary>덱 저장이 확정된 직후 발화. 튜토리얼은 "저장을 눌렀는가"가 아니라 "저장됐는가"를 이 신호로 판정한다 —
+    /// 미완성 덱에서는 눌러도 안내만 뜨고 저장은 일어나지 않는다.</summary>
+    public static event Action OnAnySaved;
+
+    // 지금 편집 중인 인스턴스. 풀에 묻지 않고 스스로 등록한다 — 세운 적 없는 화면을 GetUI로 물으면
+    // 상태 질의일 뿐인데도 풀이 "No Such UI" 오류를 남긴다.
+    static DeckEditController s_open;
+
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
     /// <summary>지금 편집 중인 저장 슬롯(신규 생성 중이거나 닫혀 있으면 -1).
@@ -334,6 +342,16 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     /// <summary>풀이 세워 둔 편집 화면을 닫는다. 저장 판정은 호스트가 <see cref="RequestLeave"/>로 이미 받았다고 본다.</summary>
     public static void HidePooled() => Pooled()?.Hide();
 
+    /// <summary>열려 있는 편집 화면에 이탈을 요청한다 — 저장·미완성 판정은 <see cref="RequestLeave"/>가 그대로 맡는다.
+    /// 튜토리얼이 유저 대신 화면을 걷는 자리다. 열려 있지 않으면 아무것도 하지 않고 false를 준다.</summary>
+    public static bool TryRequestExitOpen()
+    {
+        if (s_open == null || !s_open.IsOpen) return false;
+
+        s_open.RequestExit();
+        return true;
+    }
+
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
     public void Open(int _slotIndex)
     {
@@ -397,6 +415,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     public void Close()
     {
+        if (s_open == this) s_open = null;
+
         m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
         m_dirty     = false;
@@ -452,6 +472,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
         OutgameFeatureLock.OnChanged        -= OnFeatureLockChanged;
+
+        if (s_open == this) s_open = null;
 
         m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
@@ -514,6 +536,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 배선이 프리팹 인스턴스 오버라이드로만 존재한다(DragLayer가 이 프리팹 밖에 있다) — Revert 한 번에 조용히 사라진다.
         // 여기서 알리지 않으면 "롱프레스해도 아무 일 없음"으로만 드러난다. 패널을 열 때 한 번만 찍힌다.
         else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
+
+        s_open = this;
 
         RefreshAll();
         RebuildDeckStrip();
@@ -747,13 +771,10 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         m_working[_slotIndex] = _card;
         m_dirty = true;
 
-        // 빼 뒀던 카드가 제자리로 돌아오면 디스크와 같아진다 — dirty를 남기면 튜토리얼 한복판에 저장 확인 팝업이 낀다.
-        // 다른 칸에 끼웠다면 편성 순서만 달라진 것이라 그 차이는 버린다(전투 덱은 시나리오가 정한다).
-        if (_card == m_holdout)
-        {
-            m_holdout = 0;
-            if (CountFilled() == DeckSaveManager.DECK_SIZE) m_dirty = false;
-        }
+        // 빼 뒀던 카드가 돌아왔다. dirty는 내리지 않는다 — 튜토리얼이 이 뒤에 저장 버튼을 가르치는데,
+        // 내려 두면 그 버튼이 잠긴 채 지목당한다(예전에는 뒤로가기로 나가서 확인 팝업만 피하면 됐다).
+        // ⚠ 홀드아웃을 쓰는 화면에서 나가는 길이 저장 스텝을 거치지 않으면 그 자리에 이탈 확인 팝업이 낀다.
+        if (_card == m_holdout) m_holdout = 0;
 
         RefreshAll();
 
@@ -1102,6 +1123,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         // 저장이 목록을 바꾼다 — 신규는 맨 앞에 꽂혀 뒤 덱의 좌표를 전부 밀고, 이름 변경은 칸 라벨을 바꾼다.
         RebuildDeckStrip();
+
+        OnAnySaved?.Invoke();
     }
 
     // 신규 덱은 rename·dirty 판정이 없다 — 6/6이 채워졌으면 항상 저장 대상이다.

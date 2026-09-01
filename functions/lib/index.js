@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.ensureWallet = exports.ensureAccount = exports.devBumpRevision = exports.ping = void 0;
+exports.limitBreakCard = exports.reportTournamentWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.ensureWallet = exports.ensureAccount = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -27,4 +27,10 @@ var enhanceKeyword_1 = require("./commands/enhanceKeyword");
 Object.defineProperty(exports, "enhanceKeyword", { enumerable: true, get: function () { return enhanceKeyword_1.enhanceKeyword; } });
 var claimBattleReward_1 = require("./commands/claimBattleReward");
 Object.defineProperty(exports, "claimBattleReward", { enumerable: true, get: function () { return claimBattleReward_1.claimBattleReward; } });
+var grantTutorialCards_1 = require("./commands/grantTutorialCards");
+Object.defineProperty(exports, "grantTutorialCards", { enumerable: true, get: function () { return grantTutorialCards_1.grantTutorialCards; } });
+var reportTournamentWin_1 = require("./commands/reportTournamentWin");
+Object.defineProperty(exports, "reportTournamentWin", { enumerable: true, get: function () { return reportTournamentWin_1.reportTournamentWin; } });
+var limitBreakCard_1 = require("./commands/limitBreakCard");
+Object.defineProperty(exports, "limitBreakCard", { enumerable: true, get: function () { return limitBreakCard_1.limitBreakCard; } });
 //# sourceMappingURL=index.js.map

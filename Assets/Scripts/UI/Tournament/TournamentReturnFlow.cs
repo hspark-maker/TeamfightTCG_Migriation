@@ -3,65 +3,46 @@ using Cysharp.Threading.Tasks;
 
 // 정점 전투 결과를 로비에서 소비해 "떠났던 화면으로 돌아간다"로 잇는 진입점.
 //
-// 화면 복원과 선물 등장은 박자가 다르다 — 복원은 로비가 서는 즉시(첫 프레임부터 맵이 떠 있어야 한다),
-// 등장은 골드 흡입이 끝난 뒤다(두 사건이 겹치면 어느 쪽이 무엇인지 읽히지 않는다).
-// 보상 팝업은 여기서 열지 않는다. 맵에 선 선물을 눌러야 열린다.
+// 화면 복원과 보상 수령은 박자가 다르다 — 복원은 로비가 서는 즉시(첫 프레임부터 맵이 떠 있어야 한다),
+// 수령은 서버가 낙인을 세운 뒤다. 자격을 재는 쪽이 서버라, 그전에 팝업을 열면 눌러도 튕긴다.
+// 그 사이에 다른 연출을 끼우지 않는다 — 유저가 방금 이긴 정점의 보상은 복귀의 결말이지 별도의 사건이 아니다.
+//
+// 팝업을 세우는 일은 맵이 진다(TournamentMapOverlayView.OpenReturnReward).
 public static class TournamentReturnFlow
 {
     /// <summary>화면 복원 요청(탭 + 맵). (정점 키, 승리 여부)</summary>
     public static event Action<string, bool> ReturnRequested;
 
-    /// <summary>선물 등장 요청(승리만). 골드 흡입 뒤에 온다.</summary>
-    public static event Action<string> GiftRevealRequested;
+    /// <summary>보상 팝업 요청(승리만). 서버 낙인이 선 뒤에 온다.</summary>
+    public static event Action<string> RewardClaimRequested;
 
-    // 구독 멱등 가드. 로비를 드나들 때마다 Arm이 불리므로, 없으면 구독이 쌓여 등장이 그만큼 돈다.
-    static bool s_armed;
-
-    // 등장을 기다리는 정점(빈 값 = 없음). 복원 때 캐리어를 비우므로 여기 옮겨 든다.
-    static string s_giftNodeId;
-
-    public static void Arm()
-    {
-        if (s_armed) return;
-        s_armed = true;
-
-        // 구독을 풀지 않는다 — static 이벤트 + static 구독자라 씬 수명과 무관하고 죽은 오브젝트도 남지 않는다.
-        LobbyGainEffectDirector.OnAnyFinished += OnGainEffectFinished;
-    }
-
-    /// <summary>로비가 선 직후 1회. 캐리어를 비우고 화면을 되돌린다(선물 등장은 뒤로 미룬다).</summary>
+    /// <summary>로비가 선 직후 1회. 캐리어를 비우고 화면을 되돌린 뒤 곧바로 수령으로 잇는다.</summary>
     public static void Restore()
     {
         if (!TournamentResultHandoff.TryConsume(out string t_nodeId, out bool t_won)) return;
 
-        s_giftNodeId = t_won ? t_nodeId : null;
-
-        // 전투 씬이 이미 한 번 쐈다 — 그때 네트워크가 없었으면 이 두 번째가 낙인을 세운다.
-        // 서버가 재신고를 성공으로 답하고(AlreadyPending) 겹친 왕복은 창구가 합쳐 준다.
-        if (t_won) TournamentWinCommand.ReportWinAsync(t_nodeId).Forget();
-
         ReturnRequested?.Invoke(t_nodeId, t_won);
+
+        if (t_won) ClaimWhenReported(t_nodeId).Forget();
     }
 
-    // 보여줄 것이 없어 지나간 경우에도 오는 신호다(골드가 0이어도 여기까지 온다).
-    static void OnGainEffectFinished()
+    // 낙인이 서기 전에 팝업을 열면 수령이 튕긴다. 전투 씬이 이미 한 번 신고했으므로 대개 낙인은 서 있고,
+    // 그럴 때는 왕복을 걸지 않고 그 프레임에 연다 — 이것이 "복귀하면 곧바로"를 지키는 자리다.
+    // 서 있지 않다면 그때 네트워크가 없었다는 뜻이라, 이 두 번째 신고가 그 자리를 메운다.
+    static async UniTaskVoid ClaimWhenReported(string _nodeId)
     {
-        if (string.IsNullOrEmpty(s_giftNodeId)) return;
+        if (!IsRewardPending(_nodeId)) await TournamentWinCommand.ReportWinAsync(_nodeId);
 
-        string t_nodeId = s_giftNodeId;
-        s_giftNodeId = null;   // 남기면 다음 팩 개봉의 신호에 엉뚱하게 터진다
-
-        RevealWhenReported(t_nodeId).Forget();
+        // 신고가 실패해도 조건 없이 낸다 — 이 신호가 수령을 여는 유일한 열쇠라,
+        // 걸러 버리면 그 정점은 손으로 눌러야만 받을 수 있는 자리로 남는다.
+        RewardClaimRequested?.Invoke(_nodeId);
     }
 
-    // 낙인이 서기 전에 선물을 내면 눌러도 수령이 튕긴다 — 자격을 재는 쪽이 서버라
-    // 신고 왕복이 끝난 뒤에 낸다.
-    static async UniTaskVoid RevealWhenReported(string _nodeId)
+    // 진행도는 인덱스로 묻는다 — 캐리어가 나르는 것은 정점 키뿐이라 여기서 옮긴다.
+    static bool IsRewardPending(string _nodeId)
     {
-        await TournamentWinCommand.ReportWinAsync(_nodeId);
+        int t_index = TournamentProgress.IndexOf(_nodeId);
 
-        // 실패해도 조건 없이 낸다 — 이 신호가 맵의 등장 예약을 푸는 유일한 열쇠라,
-        // 걸러 버리면 선물이 감춰진 채 남는다. 낙인이 안 선 정점은 도전 대상으로 그려진다.
-        GiftRevealRequested?.Invoke(_nodeId);
+        return t_index >= 0 && TournamentProgress.IsRewardPending(t_index);
     }
 }

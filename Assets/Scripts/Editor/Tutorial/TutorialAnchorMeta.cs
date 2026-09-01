@@ -71,26 +71,26 @@ public readonly struct TutorialAnchorMeta
         new(A.DeckCreateSlot,             F.DeckCreate,         "로비/덱 탭(덱 목록)",    "UI/Deck/DeckSlotView.cs:115"),
 
         // 8  DeckEditPanel.prefab:1800(key: 8), GameObject 이름 CollectionArea. 이 오브젝트에 붙는 잠금 없음(화면 진입만 탭에 걸린다)
-        new(A.DeckCollectionArea,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab"),
+        new(A.DeckCollectionArea,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
         // 9  DeckEditPanel.prefab:3170(key: 9), GameObject 이름 DeckArea. 잠금 없음
-        new(A.DeckSlotArea,               F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab"),
+        new(A.DeckSlotArea,               F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
         // 10 DeckEditPanel.prefab:2424(key: 10)의 GameObject(5057038299696546900) = DeckEditController.autoEquipButton(DeckEditPanel.prefab:2980)
         //    → UI/Deck/DeckEditController.cs:94가 그 GameObject에 FeatureLockView.Attach(DeckAutoEquip)
-        new(A.DeckAutoEquipButton,        F.DeckAutoEquip,      "덱 편집",              "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab"),
+        new(A.DeckAutoEquipButton,        F.DeckAutoEquip,      "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
         // 11 DeckEditPanel.prefab:3116(key: 11) / MatchDeckEditPanel.prefab:479(key: 11, Btn_MatchBack) — 두 화면이 키를 공유. 잠금 없음
-        new(A.DeckEditBackButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab"),
+        new(A.DeckEditBackButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
-        // 12 MatchDeckRoot.prefab:1646(key: 12). UI/Match/ 전체에 EOutgameFeature 사용 0건 → 잠금 없음
-        new(A.MatchDeckEditButton,        F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckRoot.prefab"),
+        // 12 폐기 — 이 키를 등록하는 곳이 없다. 저작이 남아 있으면 검증기가 "미등록"으로 잡는다
+        new(A.MatchDeckEditButton,        F.None,               "매치 덱 화면",          null),
 
-        // 13 MatchDeckRoot.prefab:1698(key: 13). 잠금 없음
-        new(A.MatchDeckBattleButton,      F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckRoot.prefab"),
+        // 13 MatchDeckPanel.prefab(key: 13). UI/Match/ 전체에 EOutgameFeature 사용 0건 → 잠금 없음
+        new(A.MatchDeckBattleButton,      F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
 
         // 14 DeckEditPanel.prefab:2696(key: 14), GameObject 이름 Btn_UnequipAll. 잠금 없음
-        new(A.DeckUnequipAllButton,       F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab"),
+        new(A.DeckUnequipAllButton,       F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
         // 15 MatchDeckPanel.prefab:2577(key: 15, MySection) / MatchDeckRoot.prefab:1628. 잠금 없음
         new(A.MatchDeckMySection,         F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
@@ -127,6 +127,24 @@ public readonly struct TutorialAnchorMeta
 
         // 25 UI/Deck/DeckEditCollectionGrid.cs가 anchorCard로 지목된 카드 타일에만 등록(해제는 Clear). 잠금 없음
         new(A.DeckEditCollectionCard,     F.None,               "덱 편집(컬렉션 격자)",    "UI/Deck/DeckEditCollectionGrid.cs"),
+
+        // 26 UI/Tournament/TournamentMapOverlayView.cs가 지금 도전할 정점 하나에만 등록(정점은 런타임 생성).
+        //    잠금은 로비의 토너먼트 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
+        new(A.TournamentNode,             F.Tournament,         "토너먼트 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
+
+        // 27 MatchDeckPanel.prefab의 덱 파워 배지. 잠금 없음
+        new(A.MatchDeckPowerBadge,        F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
+
+        // 28 MatchDeckPanel.prefab의 상대 덱 파워 배지. 잠금 없음
+        new(A.MatchDeckEnemyPowerBadge,   F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
+
+        // 29 DeckEditPanel.prefab의 SaveButton(491162578235765114)에 key: 29 = DeckEditController.saveButton. 잠금 없음
+        //    (매치 배리언트에는 이 버튼이 없다 — 그 화면은 이탈 확인 팝업이 저장을 받는다)
+        new(A.DeckEditSaveButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+
+        // 30 UI/Growth/KeywordGrowthPanel.cs의 ApplyPanelAnchor(패널이 열려 있는 동안만). 누를 대상이 아니라
+        //    "함께 밝힐 영역" 전용이라 Button 없이 등록된다. 잠금 없음
+        new(A.KeywordGrowthPanel,         F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 부팅이 아니다).

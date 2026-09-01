@@ -9991,7 +9991,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   panel: {fileID: 3669285588173230799}
-  banner: {fileID: 1390036519774325773}
+  banner: {fileID: 0}
   mainMenuButton: {fileID: 3653734389269605131}
   mainMenuScene: LobbyScene
   dimGroup: {fileID: 7550376149298931392}
@@ -11265,17 +11265,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: b4a14d060f73b854ba7d661086907523, type: 3}
---- !u!114 &1390036519774325773 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 2026962237188899384, guid: b4a14d060f73b854ba7d661086907523, type: 3}
-  m_PrefabInstance: {fileID: 1111071565560057397}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc37d035a0f93c247b25e7745fa634c1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VictoryBannerView
 --- !u!224 &4660619419728618629 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5748432713024055984, guid: b4a14d060f73b854ba7d661086907523, type: 3}

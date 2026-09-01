@@ -26,4 +26,6 @@ public enum EOutgameTutorialAction
     PackNotice      = 19,   // 입력 없이 카드팩 예고 팝업을 세우고, 유저가 닫으면 팩 탭으로 데려간다(지급은 하지 않는다)
     CloseAlbumPage  = 20,   // 입력 없이 도감 페이지 오버레이를 걷어 그 아래 앨범 테마 화면을 드러낸다(CloseCardDetail의 도감 판)
     WaitDeckEquip   = 21,   // 지목한 카드가 덱에 장착될 때까지 대기(탭·드래그 어느 쪽으로 넣어도 완료)
+    WaitDeckSave    = 22,   // 덱 편집의 저장이 확정될 때까지 대기(누르는 것만으로는 끝나지 않는다 — 6장이 안 차면 안내만 뜬다)
+    CloseDeckEdit   = 23,   // 입력 없이 덱 편집을 닫아 로비 표면을 드러낸다(CloseCardDetail의 덱 편집 판)
 }

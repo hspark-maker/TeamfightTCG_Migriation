@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Coffee.UIEffects;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
@@ -73,9 +72,16 @@ public class PackAcquireController : MonoBehaviour
     // 획득이 2회 이상 눌려도 씬 전이는 1회만.
     bool m_left;
 
-    // 버튼 밑판의 흑백 효과. 자식(라벨·가격 숫자·재화 아이콘)은 UIEffectReplica로 이걸 따라오므로
-    // 코드가 쥐는 것은 이 하나뿐이다. 없으면 조작 여부만 바뀐다.
-    UIEffect m_retryTone;
+    // 잠긴 동안 걸어 둔 흑백 효과의 원복 목록. 밑판 하나에만 걸던 옛 방식은 RetryButton 프리팹에
+    // UIEffect 저작이 아예 없어 조작만 막히고 화면은 활성 그대로였다 — 자식까지 전수로 거는 UiGrayscale로 옮겼다.
+    List<UiGrayscale.Toned> m_retryToned;
+
+    // 지금 흑백이 걸려 있는가. 같은 판정이 두 번 와도 효과를 겹쳐 걸지 않게 막는다.
+    bool m_retryToneOn;
+
+    // 그때 가격 짝(숫자·재화 아이콘)을 색이 살아 있게 빼 두었는가. 잠김 이유가 바뀌면 제외 대상도 갈리므로
+    // 켜짐 여부만으로는 다시 걸어야 할 때를 못 가른다.
+    bool m_retryTonePriceKept;
 
     // 재개봉이 도는 중. 서버 왕복이 시작된 순간부터 임팩트가 화면을 덮고 세션을 갈아끼울 때까지를 통째로 덮는다
     // (상점의 s_transitioning과 같은 자리 — 그쪽은 오버레이를 열고, 여기는 세션을 갈아끼운다).
@@ -135,11 +141,6 @@ public class PackAcquireController : MonoBehaviour
 
     void OnEnable()
     {
-        // 흑백 효과는 여기서 잡는다. Awake에 두지 않는 이유 — 오버레이가 시작하자마자 content를
-        // 끄므로 이 컴포넌트의 Awake는 돌지 않을 수 있다. 열릴 때 반드시 도는 곳은 여기다.
-        if (m_retryTone == null && retryButton != null)
-            m_retryTone = retryButton.GetComponent<UIEffect>();
-
         if (view != null) view.OnRevealComplete += OnRevealComplete;
         if (acquireButton != null) acquireButton.onClick.AddListener(OnAcquirePressed);
         if (retryButton != null) retryButton.onClick.AddListener(OnRetryPressed);
@@ -154,6 +155,10 @@ public class PackAcquireController : MonoBehaviour
         // 화면이 꺼진 뒤 도착하는 임팩트 콜백은 세션을 되살릴 자리가 없다 — 여기서 미리 무효화한다.
         // 남겨 두면 다음에 열렸을 때 이 플래그가 그대로 남아 재구매가 영영 막힌다.
         m_retrying = false;
+
+        // 풀 UI라 같은 오브젝트가 다음 개봉에 다시 쓰인다 — 걸어 둔 흑백을 여기서 걷지 않으면
+        // 튜토리얼이 끝난 뒤 열린 화면에서도 버튼이 회색으로 남는다.
+        ApplyRetryTone(false, false);
 
         // 퇴장 중에 오버레이가 닫히면 완료 콜백이 오지 않는다 — 켜진 채 남으면 다음 개봉에서 유령 프레임이 뜬다.
         HideBar();
@@ -269,14 +274,40 @@ public class PackAcquireController : MonoBehaviour
 
         retryButton.interactable = t_allowed && t_afford;
 
-        // 못 누르는 동안 버튼이 **통째로** 흑백이 된다. 밑판만 무채색으로 갈아끼우면 자식(라벨·가격·동전)이
-        // 원색 그대로 남아 오히려 어수선해진다 — 색이 빠지는 일은 버튼 전체에 한 번에 걸려야 한다.
-        // 알파를 낮추지 않는 이유: 개봉 화면이 어두워 반투명은 곧 사라짐이 된다.
-        if (m_retryTone != null) m_retryTone.toneIntensity = retryButton.interactable ? 0f : 1f;
+        ApplyRetryTone(!retryButton.interactable, t_allowed && !t_afford);
 
         // 빨강은 "여기가 모자란다" 한 축에만 쓴다 — 튜토리얼·기능잠금은 모자란 것이 아니다.
         if (retryPriceText != null)
             retryPriceText.color = t_allowed && !t_afford ? shortPriceColor : normalPriceColor;
+    }
+
+    // 못 누르는 동안 버튼이 **통째로** 흑백이 된다. 밑판만 무채색으로 갈아끼우면 자식(라벨·가격·동전)이
+    // 원색 그대로 남아 오히려 어수선해진다 — 색이 빠지는 일은 버튼 전체에 한 번에 걸려야 한다.
+    // 알파를 낮추지 않는 이유: 개봉 화면이 어두워 반투명은 곧 사라짐이 된다.
+    //
+    // _keepPrice는 가격 숫자와 그 옆 재화 아이콘만 색을 살려 둔다. 흑백이 "못 누른다"를 말하고
+    // 그 빨강이 "어디가 모자란가"를 말하는 두 축 구성이라, 함께 눕히면 뒤의 축이 통째로 사라진다.
+    // 숫자만 살리고 아이콘을 눕히지 않는 이유 — 모자란 것이 어느 재화인지는 그 둘이 짝으로 말한다.
+    void ApplyRetryTone(bool _on, bool _keepPrice)
+    {
+        if (!_on) _keepPrice = false;   // 꺼진 상태에는 결이 없다
+
+        if (_on == m_retryToneOn && _keepPrice == m_retryTonePriceKept) return;
+
+        // 결이 바뀌는 경우(제외 대상이 늘거나 줄었다)엔 저작값까지 되돌린 뒤 다시 건다.
+        UiGrayscale.Restore(m_retryToned);
+
+        if (_on)
+        {
+            m_retryToned = _keepPrice
+                ? UiGrayscale.Apply(retryButton.gameObject,
+                                    retryPriceText != null ? retryPriceText.transform : null,
+                                    retryPriceIcon != null ? retryPriceIcon.transform : null)
+                : UiGrayscale.Apply(retryButton.gameObject);
+        }
+
+        m_retryToneOn        = _on;
+        m_retryTonePriceKept = _keepPrice;
     }
 
     // 한 번 더 버튼의 가격 표시. 세션당 한 번만 바뀐다(같은 팩을 되사므로 값이 움직이지 않는다).

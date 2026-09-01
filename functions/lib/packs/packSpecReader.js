@@ -15,6 +15,7 @@ exports.readDropRows = readDropRows;
 exports.readRankGradeRows = readRankGradeRows;
 const currencyKeys_1 = require("../currency/currencyKeys");
 const specBlobReader_1 = require("../specs/specBlobReader");
+const tutorialGrantPack_1 = require("./tutorialGrantPack");
 var specBlobReader_2 = require("../specs/specBlobReader");
 Object.defineProperty(exports, "clearSpecCache", { enumerable: true, get: function () { return specBlobReader_2.clearSpecCache; } });
 Object.defineProperty(exports, "readSpecRows", { enumerable: true, get: function () { return specBlobReader_2.readSpecRows; } });
@@ -33,6 +34,7 @@ async function readCardPackRow(env, packId) {
         packId,
         priceType: (0, currencyKeys_1.parseCurrency)(String(row.priceType ?? "")),
         price: Number(row.price ?? 0),
+        priceAuthored: (0, tutorialGrantPack_1.isPriceAuthored)(row.price),
         // 클라 CardPackData.DrawCount 가 Mathf.Max(1, …) 로 조인다.
         drawCount: Math.max(1, Number(row.drawCount ?? 0)),
         uniqueDraw: Number(row.uniqueDraw ?? 0) !== 0,

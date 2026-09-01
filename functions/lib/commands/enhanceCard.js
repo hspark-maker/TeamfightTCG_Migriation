@@ -41,6 +41,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
+const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
@@ -93,7 +94,12 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
     let currency = "";
     let cost = 0;
     let freeShotUsed = false;
-    const result = await (0, saveDocument_1.mutateSave)("enhanceCard", env, uid, async (current, transaction, wallet) => {
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceCard", { kind: "client", txId }, async (current, transaction, wallet) => {
         // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
         const entries = (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth);
         const currentLevel = (0, cardGrowth_1.levelOfCard)(entries, cardId);
@@ -129,14 +135,23 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
             slots: {
                 cardGrowth: (0, cardGrowth_1.growthSlot)(succeeded ? (0, cardGrowth_1.applyEnhanceLevel)(entries, cardId, step.level) : entries),
             },
-            wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged)),
+            wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged), "enhanceCard"),
         };
+    }, (adopted) => {
+        replayed = false;
+        return { ...adopted, outcome, level, currency, cost, freeShotUsed };
     });
-    logger.info("enhanceCard", {
-        uid, env, cardId, outcome, level, currency, cost,
-        freeShotRequested, freeShotUsed,
-        revision: result.revision,
-    });
-    return { ...result, outcome, level, currency, cost, freeShotUsed };
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "enhanceCard", txId, revision: result.revision });
+    }
+    else {
+        logger.info("enhanceCard", {
+            uid, env, cardId, outcome, level, currency, cost,
+            freeShotRequested, freeShotUsed,
+            revision: result.revision,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=enhanceCard.js.map

@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimBattleReward = void 0;
+const node_crypto_1 = require("node:crypto");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
@@ -45,6 +46,7 @@ const currencyKeys_1 = require("../currency/currencyKeys");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
 const walletTransaction_1 = require("../currency/walletTransaction");
+const receiptId_1 = require("../save/receiptId");
 const deckValidation_1 = require("../deckValidation");
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
@@ -129,8 +131,24 @@ exports.claimBattleReward = (0, https_1.onCall)(async (request) => {
         reject("RewardUnavailable", `Battle reward amount is not positive: ${payout.amount}`, context);
     }
     const amount = payout.amount;
-    const wallet = await (0, walletTransaction_1.mutateWallet)("claimBattleReward", env, uid, (current) => (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, [{ currency, amount }])));
-    logger.info("claimBattleReward", { uid, env, won, remaining, currency, amount, rev: wallet.rev });
-    return { wallet, granted: { currency, amount } };
+    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+    let replayed = true;
+    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    const result = await (0, walletTransaction_1.mutateWallet)(env, uid, "claimBattleReward", { kind: "client", txId }, (current) => (0, walletStore_1.nextWallet)(current, (0, wallet_1.grant)(current.balances, [{ currency, amount }]), "claimBattleReward"), (wallet) => {
+        replayed = false;
+        return { wallet, granted: { currency, amount } };
+    });
+    if (replayed) {
+        logger.info("receipt replay", { uid, env, source: "claimBattleReward", txId, rev: result.wallet.rev });
+    }
+    else {
+        logger.info("claimBattleReward", {
+            uid, env, won, remaining, currency, amount, rev: result.wallet.rev,
+            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=claimBattleReward.js.map

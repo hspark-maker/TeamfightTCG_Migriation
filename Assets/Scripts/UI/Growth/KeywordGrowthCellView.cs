@@ -69,8 +69,12 @@ public class KeywordGrowthCellView : MonoBehaviour
     {
         if (_on == this.m_anchored) return;
 
-        var t_rect = this.selectButton != null ? this.selectButton.transform as RectTransform : null;
-        if (t_rect == null) return;   // 미배선이면 플래그도 그대로 둔다(등록하지 않은 것을 등록했다고 기억하지 않게)
+        if (this.selectButton == null) return;   // 미배선이면 플래그도 그대로 둔다(등록하지 않은 것을 등록했다고 기억하지 않게)
+
+        // 딤 위로 올릴 영역은 칸 전체다 — 누르는 판(아이콘 원판)만 올리면 레벨·보너스·선택 테두리가 딤 아래 남아
+        // 어느 키워드를 고르라는 것인지 읽히지 않는다. 누르는 것은 그대로 selectButton 하나다.
+        var t_rect = transform as RectTransform;
+        if (t_rect == null) return;
 
         this.m_anchored = _on;
 
