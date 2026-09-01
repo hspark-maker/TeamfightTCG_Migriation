@@ -46,7 +46,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 08ec9e965eb22a94a84dddfdb7c124d4
-    m_Address: Image_Card_CrystalRhino_Stage2
+    m_Address: Image_Card_Crystalhorn_Stage2
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -478,7 +478,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 93940ea1ba9ccea45b1a4a525ebefce0
-    m_Address: Image_Card_CrystalRhino_Stage1
+    m_Address: Image_Card_Crystalhorn_Stage1
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -646,7 +646,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c7f9f74e17ae58148aeb88fb95465173
-    m_Address: Image_Card_CrystalRhino_Stage3
+    m_Address: Image_Card_Crystalhorn_Stage3
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards

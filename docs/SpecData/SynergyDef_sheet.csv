@@ -1,4 +1,4 @@
-﻿행 고유 번호(부여 후 변경 금지),시너지 논리 ID(코드·시트 참조용 · 변경 금지),화면 표시 이름,효과 설명문
+﻿행 고유 번호(부여 후 변경 금지),시너지 논리 ID(코드·시트 참조용 · 변경 금지),화면 표시 이름,효과 설명문(단계별 수치는 적지 않는다 · 그것은 SynergyTierDef.label 이 쥔다)
 id,synergyId,displayName,effectDescription
 int,string,string,string
 1,Brand,낙인,공격하기 전에 필드의 낙인 카드 수만큼 피해를 한 번에 입힙니다

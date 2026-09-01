@@ -21,6 +21,7 @@ public static class SpecPayloadCodec
     {
         "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
+        "AlbumEntry", "AlbumThemeInfo",
         "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
     };
 
@@ -259,6 +260,7 @@ public static class SpecPayloadCodec
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
         "CardLimitBreak" => typeof(CardLimitBreak),
+        "AlbumEntry" => typeof(AlbumEntry), "AlbumThemeInfo" => typeof(AlbumThemeInfo),
         "SynergyDef" => typeof(SynergyDef), "SynergyTierDef" => typeof(SynergyTierDef),
         "SynergyEffectDef" => typeof(SynergyEffectDef),
         _ => null,

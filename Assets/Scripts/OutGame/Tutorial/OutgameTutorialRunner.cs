@@ -87,9 +87,10 @@ public static class OutgameTutorialRunner
 
             if (t_def.Action != EOutgameTutorialAction.BattleEntry) continue;
 
-            // 게이트를 거치지 않는 진입은 그 자리에서 씬을 떠나고(LeavesScene), 시나리오가 비면 Begin이 End로
-            // 떨어져 애초에 게이트가 열리지 않는다 — 어느 쪽도 되감아 재생할 화면이 없다.
-            if (!t_def.ShowDeckGate || t_def.Scenario == null) return;
+            // 게이트를 거치지 않는 진입은 그 자리에서 씬을 떠난다(LeavesScene) — 되감아 재생할 화면이 없다.
+            // 시나리오 유무는 묻지 않는다: 토너먼트 구간의 진입은 대본 없이 덱 게이트만 켜므로,
+            // 그 항이 남으면 그 구간에서 앱을 다시 켰을 때 되감을 대상을 못 찾아 영구 정지한다.
+            if (!t_def.ShowDeckGate) return;
 
             Debug.LogWarning($"[OutgameTutorialRunner] 대본 전투 전에 앱이 닫혔습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 진입 스텝 {t_chapter}-{t_i}로 되감습니다.");
 
@@ -252,6 +253,10 @@ public static class OutgameTutorialRunner
     public static bool TryGetPendingEquipCard(out int _cardId)
     {
         _cardId = 0;
+
+        // 정지 fail-open으로 덱 탭이 좌표보다 먼저 열리면, 한참 앞 스텝의 카드가 빠진 5/6 덱이 떠 저장이 막힌다.
+        if (OutgameFeatureLock.AllUnlocked) return false;
+
         if (!IsRunning) return false;
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;

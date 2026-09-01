@@ -8,7 +8,7 @@ public sealed class OutgameConfigStep : MainInitializer
 {
     [FormerlySerializedAs("runtimeUiPrefabs")]
     [SerializeField] SyncUiPrefabCatalog syncUiPrefabs;
-    // 카드 앨범(신규 도감) SO. 미배선이면 CardAlbum이 빈 앨범(앨범도 저작물이라 자동 생성 fallback이 없다).
+    // 카드 앨범(신규 도감) 스킨 SO. 구조·표시 텍스트는 스펙시트가 정하고, 여기선 테마 그림 4종만 온다.
     [SerializeField] CardAlbumConfig albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
     [SerializeField] CurrencyLook currencyLook;
@@ -23,7 +23,7 @@ public sealed class OutgameConfigStep : MainInitializer
     {
         SyncUiPrefabs.SetSource(syncUiPrefabs);
 
-        // 앨범은 lazy 빌드라 첫 Themes 접근 전에만 꽂히면 된다(빌드가 CardCatalog의 카드 번호를 읽는다).
+        // 앨범 구조는 여기서 즉시 조립된다 — 스펙시트(AlbumThemeInfo·AlbumEntry)를 읽으므로 SpecSource 뒤에 서야 한다.
         CardAlbum.SetSource(albumConfig);
         CurrencyLook.SetActive(currencyLook);
         TournamentProgress.SetConfig(tournamentConfig);

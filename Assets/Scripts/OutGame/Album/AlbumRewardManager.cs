@@ -81,11 +81,12 @@ public static class AlbumRewardManager
         // 첫 await 이전에 걸어야 한다 — 뒤로 밀리면 팝업의 숫자 롤업이 옛 잔액을 목표로 잡아 역주행한다.
         var t_pending = CurrencyPendingTicket.Hold(ToGains(_rewards));
 
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerAlbum, _rewardKey, t_pending);
-        if (!t_outcome.Succeeded) return default;
+        // 통지는 창구가 왕복 시작·종료에 한 번씩 울려 준다 — 시작 통지가 상자를 즉시 수령 완료로 그리고,
+        // 종료 통지가 성공이면 서버 낙인으로 확정하고 거절이면 원래 상태로 되돌린다.
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerAlbum, _rewardKey,
+                                                           t_pending, () => OnChanged?.Invoke());
 
-        OnChanged?.Invoke();
-        return t_outcome;
+        return t_outcome.Succeeded ? t_outcome : default;
     }
 
     // 저작값 → 낙관 델타용 획득 목록. 예고와 실지급이 갈려도 보정하지 않는다 — 서버 절대값 채택이 최종 착지다.
@@ -118,6 +119,12 @@ public static class AlbumRewardManager
     {
         if (string.IsNullOrEmpty(_rewardKey)) return EAlbumRewardState.Locked;
         if (Slot.ClaimedKeys.Contains(_rewardKey)) return EAlbumRewardState.Claimed;
+
+        // 서버가 낙인을 돌려주기 전까지의 틈 — 이걸 안 보면 상자가 왕복 내내 "받을 수 있음"으로 남는다.
+        if (RewardClaimCommand.HasAnyInFlight
+            && RewardClaimCommand.IsInFlight(RewardClaimCommand.OwnerAlbum, _rewardKey))
+            return EAlbumRewardState.Claimed;
+
         return _complete && _hasReward ? EAlbumRewardState.Claimable : EAlbumRewardState.Locked;
     }
 }

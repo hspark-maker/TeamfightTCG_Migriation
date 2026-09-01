@@ -195,15 +195,14 @@ public class TournamentNodeView : MonoBehaviour
 
     Action<int> m_onTap;
 
-    // 선물 등장(1회)과 대기 흔들림(상시)은 같은 대상을 밀어 한 자리에 모아 죽인다.
-    Sequence m_giftSeq;
+    // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다
+    bool m_anchored;
+
+    // 수령 대기의 흔들림(상시).
     Tween m_giftIdle;
 
     // 그림의 프리팹 저작값. 보상이 0건이거나 아이콘이 비었을 때 원판이 비지 않게 여기로 떨어진다.
     Sprite m_rewardSprite0;
-
-    // 등장 연출을 기다리는 중 — 그때까진 흔들림을 재우다(먼저 흔들리고 있으면 등장이 사건이 아니다).
-    bool m_giftArmed;
 
     // 정점 인덱스 배선 + 리스너 1회 등록(재빌드마다 중복 방지).
     public void Bind(int _index, Action<int> _onTap)
@@ -326,39 +325,17 @@ public class TournamentNodeView : MonoBehaviour
         return null;
     }
 
-    /// <summary>등장 연출이 올 때까지 정점을 재워 둔다(Refresh보다 나중에 불려야 한다).</summary>
-    public void ArmGiftReveal()
+    /// <summary>이 정점을 튜토리얼 안내 타깃으로 켜고 끈다. 지목은 맵이 소유한다 — 정점은 스스로 켜지 않는다.</summary>
+    public void ApplyTutorialAnchor(bool _on)
     {
-        this.m_giftArmed = true;
+        if (_on == this.m_anchored) return;
+        this.m_anchored = _on;
 
-        this.KillGiftTweens();
-        this.Refresh();   // 예약을 세운 뒤 다시 그려야 흔들림이 다시 붙지 않는다
-    }
+        var t_rect = this.tapButton != null ? this.tapButton.transform as RectTransform : null;
+        if (t_rect == null) return;
 
-    /// <summary>선물 등장(복귀 직후 1회). 대기 흔들림은 Refresh가 따로 소유한다.</summary>
-    public void PlayGiftReveal()
-    {
-        this.m_giftArmed = false;
-
-        // 맵을 이미 떠났다면 예약만 풀고 끝낸다 — 꺼진 오브젝트 위에서 무한 루프 트윈을 돌리지 않는다.
-        if (!this.isActiveAndEnabled) return;
-
-        if (TournamentProgress.StateOf(this.m_index) != ETournamentNodeState.RewardPending) return;
-
-        this.KillGiftTweens();
-
-        RectTransform t_rect = this.giftPunchTarget;
-        if (t_rect == null) return;   // 연출 대상 미배선이면 조용히 접는다
-
-        // 원판을 통째로 밀어 등장을 만든다. 0에서 키우지 않는 이유: 정점이 사라졌다 나타나면
-        // "새로 생긴 정점"으로 읽힌다 — 여기서 말할 것은 "이 정점에 사건이 났다"다.
-        t_rect.localScale = Vector3.one;
-
-        this.m_giftSeq = DOTween.Sequence().SetLink(this.gameObject);
-        this.m_giftSeq.Append(t_rect.DOScale(1.18f, 0.18f).SetEase(Ease.OutBack));
-        this.m_giftSeq.Append(t_rect.DOScale(1f, 0.12f).SetEase(Ease.OutQuad));
-        this.m_giftSeq.Append(t_rect.DOPunchScale(Vector3.one * 0.12f, 0.30f, 8, 0.6f));
-        this.m_giftSeq.OnComplete(this.StartGiftIdle);
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.TournamentNode, t_rect, this.tapButton);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.TournamentNode, t_rect);
     }
 
     /// <summary>해금 직후 한 박 튄다(다음 정점이 열렸다는 신호).</summary>
@@ -381,6 +358,9 @@ public class TournamentNodeView : MonoBehaviour
 
     void OnDisable()
     {
+        // 꺼진 정점을 가리키는 등록이 남으면 안내 손가락이 화면 밖을 짚는다
+        this.ApplyTutorialAnchor(false);
+
         this.KillGiftTweens();
         this.KillIdleMotion();
 
@@ -648,22 +628,15 @@ public class TournamentNodeView : MonoBehaviour
         SetAlpha(this.shadowImage, _cleared ? this.clearedShadowAlpha : this.m_shadowAlpha0.Value);
     }
 
-    // 수령 대기의 상시 상태(흔들림). 등장 연출은 여기서 돌리지 않는다 —
-    // 재진입 때마다 다시 튀면 사건이 아니라 소음이다.
+    // 수령 대기의 상시 상태(흔들림). 1회짜리 등장 연출은 두지 않는다 —
+    // 복귀 직후의 보상은 팝업이 곧바로 말하고, 이 흔들림은 그것을 놓친 정점을 가리키는 자리다.
     void ApplyGift(bool _gift)
     {
         if (!_gift)
         {
-            this.m_giftArmed = false;
             this.KillGiftTweens();
             return;
         }
-
-        // 등장을 예약해 둔 정점은 그 연출이 시작한다.
-        if (this.m_giftArmed) return;
-
-        // 등장 연출이 도는 중이면 그 끝에서 흔들림이 이어진다(여기서 덮으면 등장이 끊긴다).
-        if (this.m_giftSeq != null && this.m_giftSeq.IsActive()) return;
 
         this.StartGiftIdle();
     }
@@ -684,10 +657,8 @@ public class TournamentNodeView : MonoBehaviour
 
     void KillGiftTweens()
     {
-        if (this.m_giftSeq != null && this.m_giftSeq.IsActive()) this.m_giftSeq.Kill();
         if (this.m_giftIdle != null && this.m_giftIdle.IsActive()) this.m_giftIdle.Kill();
 
-        this.m_giftSeq = null;
         this.m_giftIdle = null;
 
         // 도장 반동이 같은 원판을 쥐고 있다 — 여기서 되돌리면 그 한 프레임이 튄다.

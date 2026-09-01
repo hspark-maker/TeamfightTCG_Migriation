@@ -182,7 +182,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
             return;
         }
 

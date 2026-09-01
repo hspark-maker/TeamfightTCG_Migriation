@@ -77,6 +77,17 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
             if (this.items[i] != null) this.items[i].gameObject.SetActive(false);
     }
 
+    /// <summary>유저 입력과 무관하게 지정한 스크린 좌표에서 한 발 터뜨린다(튜토리얼 손가락 같은 유도 연출용).
+    ///
+    /// 설치 전이거나 <see cref="Enabled"/>가 내려가 있으면 <b>조용히 아무 일도 하지 않는다</b> —
+    /// 이 fx는 장식이지 진행 조건이 아니라, 프리팹 미배선·초기화 실패가 부르는 쪽을 막으면 안 된다.</summary>
+    public static void PlayAt(Vector2 _screenPos)
+    {
+        if (s_instance == null || !Enabled) return;
+
+        s_instance.Emit(_screenPos);
+    }
+
     void Update()
     {
         if (!Enabled) return;

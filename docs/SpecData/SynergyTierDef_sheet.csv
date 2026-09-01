@@ -1,4 +1,4 @@
-﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,티어 인덱스(0부터 · 오름차순 저작),열리는 최소 카드 수,티어 라벨(시너지 이름과 같으면 표시 생략),
+﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,티어 인덱스(0부터 · 오름차순 저작),열리는 최소 카드 수,티어 라벨(시너지 이름과 같으면 표시 생략),이 단계가 무엇을 주는지 한 줄 요약(비면 라벨로 폴백)
 id,synergyId,tierIndex,requiredCount,label,effectSummary
 int,string,int,int,string,string
 1,Brand,0,3,낙인,1명당 1 피해

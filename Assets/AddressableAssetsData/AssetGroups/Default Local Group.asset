@@ -16,7 +16,7 @@ MonoBehaviour:
   m_GUID: 14d31794b2ffd944c93f9d90b507687b
   m_SerializeEntries:
   - m_GUID: 033413085f3b87a42920a62c5ea7462c
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/EffectNotifyUI.prefab
+    m_Address: EffectNotifyUI
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -28,19 +28,19 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/ExplainPopup.prefab
+    m_Address: ExplainPopupUI
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/SimpleYNPopup.prefab
+    m_Address: SimpleYNPopup
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4124b08d48d20e947a8ce81242bc1032
-    m_Address: KeywordGrowthOverlay
+    m_Address: KeywordGrowthPanel
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -51,25 +51,25 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 61430c10ca6949a798ec10b366fae820
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab
+    m_Address: PackOddsPopup
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8134ddc58443c3348a644266ea3669ec
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab
+    m_Address: DeckEditController
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 846d825ba21303740ae41a6a317b231e
-    m_Address: KeywordDemoStage
+    m_Address: UnlockDemoStage
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
-    m_Address: RankRewardOverlay
+    m_Address: RankRewardPanel
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -110,13 +110,13 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d70eb0251677e1e469c2fd8e9f864c2f
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/ServerWaitOverlay.prefab
+    m_Address: ServerWaitOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dee8a2231ae459847a16e01635c0f514
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/TournamentNodePopup.prefab
+    m_Address: TournamentNodePopup
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
@@ -128,13 +128,13 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f1b37da6ebdd20e48954602bec574405
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab
+    m_Address: SettingsPanel
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
-    m_Address: Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab
+    m_Address: PooledCardElement
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

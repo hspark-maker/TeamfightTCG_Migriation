@@ -63,7 +63,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     // 지금 돌고 있는 데모 무대. 화면이 걷힐 때 반드시 함께 걷어야 한다 —
     // 남으면 안 보이는 자리에서 카메라가 계속 RenderTexture를 그린다.
-    KeywordDemoStage m_demo;
+    UnlockDemoStage m_demo;
 
     // 프리팹에 깔린 행이 모자란 것은 저작 문제다 — 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
@@ -76,7 +76,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     /// <summary>_intros를 세우고 [확인]을 기다린다. _onClose는 걷힌 뒤 정확히 한 번 온다.
     /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.
     ///
-    /// _card는 데모 무대의 공격자로 선다(<see cref="KeywordDemoStage"/>). null이면 데모 없이 글자만 —
+    /// _card는 데모 무대의 공격자로 선다(<see cref="UnlockDemoStage"/>). null이면 데모 없이 글자만 —
     /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.</summary>
     public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
     {
@@ -225,26 +225,29 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         return t_used;
     }
 
-    /// <summary>데모를 딱 한 줄에 세운다.
+    /// <summary>데모를 딱 한 줄에 세운다. 키워드 줄이면 그 키워드의 대본을, 시너지 줄이면 그 시너지의 대본을 돌린다.
     ///
-    /// ⚠ <b>무대·카메라가 하나뿐이라 동시에 두 개를 돌릴 수 없다.</b> 키워드가 둘 이상 열린 판에서는
-    /// 맨 위 키워드 행에만 띠가 뜨고 나머지는 글자로 남는다 — 무대를 행 수만큼 복제하면
-    /// 카메라와 RenderTexture가 그만큼 늘어나는데, 정작 눈은 한 번에 하나만 본다.
-    /// 시너지는 Keyword가 None이라 자연히 건너뛴다(덱 편성 규칙이라 보여줄 대본이 없다).</summary>
+    /// ⚠ <b>무대·카메라가 하나뿐이라 동시에 두 개를 돌릴 수 없다.</b> 여러 줄이 열린 판에서는
+    /// 맨 윗줄에만 띠가 뜨고 나머지는 글자로 남는다 — 무대를 행 수만큼 복제하면
+    /// 카메라와 RenderTexture가 그만큼 늘어나는데, 정작 눈은 한 번에 하나만 본다.</summary>
     void BeginDemo(IReadOnlyList<UnlockIntro> _intros, int _card)
     {
         if (_card <= 0 || this.rowRoot == null) return;
 
         for (int t_i = 0; t_i < this.m_shownRows && t_i < _intros.Count; t_i++)
         {
-            if (_intros[t_i].Keyword == CardKeyword.None) continue;
+            UnlockIntro t_intro = _intros[t_i];
+
+            // 시너지 줄인데 그 시너지를 못 받았다면 대본을 고를 수 없다 — 배지로 남긴다.
+            if (t_intro.IsSynergy && t_intro.Synergy == null) continue;
 
             var t_view = this.rowRoot.GetChild(t_i).GetComponent<UnlockIntroRow>();
             if (t_view == null) continue;
 
-            if (!KeywordDemoStage.TryGet(out KeywordDemoStage t_stage)) return;
+            if (!UnlockDemoStage.TryGet(out UnlockDemoStage t_stage)) return;
 
-            Texture t_tex = t_stage.Begin(_card, _intros[t_i].Keyword);
+            Texture t_tex = t_intro.IsSynergy ? t_stage.Begin(_card, t_intro.Synergy)
+                                              : t_stage.Begin(_card, t_intro.Keyword);
             if (t_tex == null) { t_stage.End(); return; }   // 저작이 덜 됐다 — 띠 없이 글자만 남긴다
 
             this.m_demo = t_stage;
@@ -257,7 +260,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     // 죽은 RenderTexture를 물고 있는 RawImage가 한 프레임 남는다.
     void EndDemo()
     {
-        KeywordDemoStage t_demo = this.m_demo;
+        UnlockDemoStage t_demo = this.m_demo;
         this.m_demo = null;
         if (t_demo == null) return;
 

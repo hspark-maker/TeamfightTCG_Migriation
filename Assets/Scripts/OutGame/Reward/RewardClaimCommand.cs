@@ -17,17 +17,31 @@ internal static class RewardClaimCommand
     const string COMMAND_NAME = "claimReward";
 
     // 날아가 있는 수령의 키(ownerType:ownerId). 팝업은 응답을 기다리지 않고 1초 안에 닫히는데,
-    // 도메인의 낙관 검사(CanClaim·StateOf)는 응답 채택 전까지 여전히 "받을 수 있음"으로 답한다 —
-    // 그 틈에 같은 보상을 다시 누르면 두 번째 요청이 나가고 가짜 롤업이 한 번 더 뜬다.
+    // 도메인의 수령 낙인은 응답 채택 뒤에야 서므로 그 사이 행이 "받을 수 있음"으로 남는다 —
+    // 도메인의 상태 판정이 이 집합을 함께 읽어 그 틈을 메우고, 같은 보상의 재클릭도 그 자리에서 막는다.
     static readonly HashSet<string> s_inFlight = new HashSet<string>();
 
     /// <summary>서버가 수령을 명시적으로 거절했을 때 한 번 울린다. 표면(팝업)은 UI 쪽 구독자가 그린다.</summary>
     internal static event Action OnRejected;
 
+    /// <summary>왕복 중인 수령이 하나라도 있는지. 도메인이 키 문자열을 짓기 전에 거르는 빠른 관문이다.</summary>
+    internal static bool HasAnyInFlight => s_inFlight.Count > 0;
+
+    /// <summary>이 보상이 왕복 중인지. 도메인의 수령 낙인이 아직 서지 않은 구간을 이 값이 메운다.</summary>
+    internal static bool IsInFlight(string _ownerType, string _ownerId)
+        => !string.IsNullOrEmpty(_ownerId) && s_inFlight.Contains(_ownerType + ":" + _ownerId);
+
+    // 도메인 리로드를 끈 플레이에서 옛 키가 남으면 그 보상이 영영 수령 완료로 굳는다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => s_inFlight.Clear();
+
     /// <summary>보상 수령을 요청한다. 성공하면 응답 채택으로 재화·해당 도메인 슬롯이 갈아끼워진 뒤
-    /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다.</summary>
+    /// <b>서버가 실제로 지급한 목록</b>과 함께 돌아온다. <paramref name="_onInFlightChanged"/> 는
+    /// 왕복이 시작될 때와 끝날 때 한 번씩 울려, 도메인이 낙관 상태를 그리고 되돌릴 자리를 준다.</summary>
     // 거절(자격 미달·이미 수령·보상 미저작)은 세션이 아니라 이 호출의 결과다 — 표면은 부른 도메인이 진다.
-    internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId, CurrencyPendingTicket _pending = null)
+    internal static async UniTask<RewardClaimOutcome> ClaimAsync(string _ownerType, string _ownerId,
+                                                                CurrencyPendingTicket _pending = null,
+                                                                Action _onInFlightChanged = null)
     {
         // InvokeAsync 에 닿지 못하는 갈래엔 걷어 줄 finally 가 없다 — 낙관분을 여기서 직접 되돌린다.
         if (string.IsNullOrEmpty(_ownerId))
@@ -44,6 +58,9 @@ internal static class RewardClaimCommand
             _pending?.Settle();
             return default;
         }
+
+        // 등록이 끝난 이 자리에서 울려야 도메인이 첫 await 이전에 낙관 상태를 그린다.
+        _onInFlightChanged?.Invoke();
 
         try
         {
@@ -75,7 +92,9 @@ internal static class RewardClaimCommand
         }
         finally
         {
+            // 거절·예외에도 반드시 온다 — 빠지면 낙관 상태가 수령 완료인 채 고착된다.
             s_inFlight.Remove(t_key);
+            _onInFlightChanged?.Invoke();
         }
     }
 

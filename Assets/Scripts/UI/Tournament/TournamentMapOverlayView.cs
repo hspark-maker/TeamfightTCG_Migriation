@@ -57,6 +57,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     /// <summary>맵이 화면에 떠 있는가.</summary>
     public bool IsOpen => this.gameObject.activeInHierarchy;
 
+    // 정점 앵커가 등록돼 있어도 되는 상태 — 켜져 있고 퇴장 중이 아닐 때만.
+    bool IsOnStage => this.IsOpen && !this.m_closing;
+
     // 타일 안에서 정점 자리·길 조각을 담고 있는 자식 이름(타일 프리팹 규약)
     const string PATH_ROOT_NAME = "PathRoot";
     const string LINK_ROOT_NAME = "LinkRoot";
@@ -79,6 +82,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 정점 생성 여부. 저작 정점 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
 
+    // 퇴장 트윈이 도는 동안 참. 그 사이에도 오브젝트는 켜져 있어 activeInHierarchy만으로는 화면에 서 있는지를 답할 수 없다.
+    bool m_closing;
+
     // 점등 연출이 도는 동안 진행 통지의 즉시 반영을 미룬다 — 안 그러면 수령 순간 결말이 먼저 나온다.
     bool m_suspendRefresh;
 
@@ -91,9 +97,6 @@ public class TournamentMapOverlayView : MonoBehaviour
     int m_litLink = -1;
 
     Sequence m_claimSeq;
-
-    // 등장 연출을 기다리는 정점(빈 값 = 없음). 그때까지 그 정점의 선물은 숨어 있다.
-    string m_armedGiftNodeId;
 
     void Awake()
     {
@@ -111,6 +114,10 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         // 세로 맵이 화면을 다 쓰도록 하단 탭바만 걷는다(재화 HUD는 남긴다).
         LobbyShellBars.Hide(this, this.transform, EShellBars.Bottom);
+
+        // Open()을 거치지 않고 부모가 되살린 경우에도 앵커가 선다 — 이 등록의 짝이 OnDisable의 해제다.
+        this.m_closing = false;
+        this.ApplyTutorialAnchor(true);
     }
 
     void OnDisable()
@@ -118,6 +125,9 @@ public class TournamentMapOverlayView : MonoBehaviour
         TournamentProgress.OnChanged -= this.RefreshNodes;
 
         this.AbortClaimSequence();
+        this.ApplyTutorialAnchor(false);
+
+        this.m_closing = false;
 
         LobbyShellBars.Show(this);            // 씬 이탈로 잘려도 바가 걷힌 채 굳지 않게
         this.transition.HandleDisabled(this.gameObject);
@@ -126,7 +136,10 @@ public class TournamentMapOverlayView : MonoBehaviour
     /// <summary>맵을 연다. 정점 세우기·스크롤은 활성화 뒤에 돈다 — rect가 0이면 스크롤 계산이 깨진다.</summary>
     public void Open()
     {
-        if (this.IsOpen) return;
+        // 퇴장 트윈 중에도 IsOpen은 참이다 — 여기서 물러나면 앵커가 해제된 채 맵만 되살아난다.
+        if (this.IsOnStage) return;
+
+        this.m_closing = false;
 
         // 억제 스위치가 켜진 채 남아 있으면 아래 RefreshNodes가 통째로 무시돼 맵이 옛 그림으로 굳는다.
         this.AbortClaimSequence();
@@ -136,36 +149,40 @@ public class TournamentMapOverlayView : MonoBehaviour
         if (this.m_built) this.RefreshNodes();
         else this.Build();
 
+        this.ApplyTutorialAnchor(true);   // Build 경로는 RefreshNodes를 거치지 않는다
         this.ScrollToCurrent();
     }
 
     /// <summary>맵을 닫는다. 하단바는 퇴장 트윈과 나란히 돌려준다 — OnDisable을 기다리면 늦는다.</summary>
     public void Close()
     {
+        // 퇴장 트윈이 도는 동안에도 오브젝트는 켜져 있다 — 그 사이 진행 통지가 앵커를 되살리지 않게 먼저 내린다.
+        this.m_closing = true;
+
         // OnDisable은 퇴장 트윈이 끝난 뒤에 온다 — 그 사이 억제가 살아 있으면 안 되므로 여기서 먼저 건다.
         this.AbortClaimSequence();
+        this.ApplyTutorialAnchor(false);
 
         LobbyShellBars.Show(this);
         this.transition.SetVisible(this.gameObject, false);
     }
 
-    /// <summary>등장 연출이 올 정점을 예약한다(Open보다 먼저 부른다). 그때까지 그 정점은 재워 둔다.</summary>
-    public void ArmGiftReveal(string _nodeId)
+    /// <summary>전투에서 막 돌아온 정점의 보상을 곧바로 연다(맵이 이미 열려 있어야 한다).
+    /// 방금 이긴 정점을 다시 찾아 누르게 하지 않는다 — 수령은 복귀의 결말이지 별도의 사건이 아니다.
+    /// 클릭 경로(OnNodeTapped)는 그대로 남는다: 맵을 먼저 떠났거나 신고가 실패한 경우의 회수 경로다.</summary>
+    public void OpenReturnReward(string _nodeId)
     {
-        this.m_armedGiftNodeId = _nodeId;
-        this.ApplyArmedGift();
-    }
-
-    /// <summary>예약해 둔 선물 등장을 1회 재생한다(맵이 이미 열려 있어야 한다).</summary>
-    public void PlayGiftReveal(string _nodeId)
-    {
-        this.m_armedGiftNodeId = null;
+        if (!this.IsOnStage) return;
+        if (this.m_claimSeq != null) return;             // 다른 정점의 수령 연출이 아직 돌고 있다
 
         int t_index = TournamentProgress.IndexOf(_nodeId);
         if (t_index < 0 || t_index >= this.m_nodes.Count) return;
+        if (!TournamentProgress.IsRewardPending(t_index)) return;
 
+        // 팝업이 걷히는 프레임에 도장이 그 자리에 꽂히므로, 그 자리가 화면 안에 있어야 결말이 보인다.
         this.ScrollToNode(t_index);
-        this.m_nodes[t_index]?.PlayGiftReveal();
+
+        this.OpenNodeReward(t_index);
     }
 
     // 챕터 타일을 쌓고 타일에 저작된 자리에만 정점을 세운다. 좌표를 코드가 만들지 않으므로 저작이 빠지면 그 정점은 안 나온다.
@@ -456,18 +473,26 @@ public class TournamentMapOverlayView : MonoBehaviour
             if (this.m_bands[t_i] != null) this.m_bands[t_i].Refresh();
 
         this.RefreshLinks();
-        this.ApplyArmedGift();
+        this.ApplyTutorialAnchor(this.IsOnStage);   // 닫히는 중에 온 통지가 사라질 화면의 정점을 다시 등록하지 않게
     }
 
-    // 예약을 정점 뷰에 옮긴다. Refresh 뒤에 와야 방금 켠 선물을 도로 감출 수 있다(같은 프레임이라 깜빡임은 없다).
-    void ApplyArmedGift()
+    // 안내 타깃은 정점 하나뿐이다 — 지목을 맵이 소유해야 여럿이 같은 키를 놓고 다투지 않는다.
+    // 수령 대기 정점은 제외한다: 그 자리에서 할 일은 도전이 아니라 수령이다.
+    void ApplyTutorialAnchor(bool _on)
     {
-        if (string.IsNullOrEmpty(this.m_armedGiftNodeId)) return;
+        int t_target = -1;
 
-        int t_index = TournamentProgress.IndexOf(this.m_armedGiftNodeId);
-        if (t_index < 0 || t_index >= this.m_nodes.Count) return;
+        if (_on)
+        {
+            int t_current = TournamentProgress.CurrentNodeIndex;
+            if (t_current >= 0
+                && TournamentProgress.CanEnter(t_current)
+                && !TournamentProgress.IsRewardPending(t_current))
+                t_target = t_current;
+        }
 
-        this.m_nodes[t_index]?.ArmGiftReveal();
+        for (int t_i = 0; t_i < this.m_nodes.Count; t_i++)
+            if (this.m_nodes[t_i] != null) this.m_nodes[t_i].ApplyTutorialAnchor(t_i == t_target);
     }
 
     // 받을 선물이 있으면 그 정점, 없으면 지금 도전할 정점을 화면 중앙에 둔다.

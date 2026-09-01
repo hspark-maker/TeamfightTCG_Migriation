@@ -68,6 +68,9 @@ public class KeywordGrowthPanel : PooledUIBase
     // 업그레이드 버튼이 안내 타깃으로 등록된 상태(자기 것만 해제하려고 들고 있다)
     bool m_upgradeAnchored;
 
+    // 패널 본체가 "함께 밝힐 영역"으로 등록된 상태(업그레이드 버튼과 같은 이유로 자기 것만 해제한다)
+    bool m_panelAnchored;
+
     // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
     Canvas m_sortingCanvas;
 
@@ -393,6 +396,7 @@ public class KeywordGrowthPanel : PooledUIBase
 
         // 안내 타깃은 이 화면이 서 있는 동안만 유효하다 — 닫히고도 남으면 로비 표면에 죽은 타깃이 남는다.
         this.ApplyUpgradeAnchor(_visible);
+        this.ApplyPanelAnchor(_visible);
         if (!_visible) this.ClearCellAnchors();
     }
 
@@ -408,6 +412,21 @@ public class KeywordGrowthPanel : PooledUIBase
 
         if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.KeywordGrowthUpgradeButton, t_rect, this.upgradeButton);
         else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.KeywordGrowthUpgradeButton, t_rect);
+    }
+
+    // 패널 본체를 "함께 밝힐 영역"으로 세우거나 내린다. 안내가 칸·버튼을 가리키는 동안에도 화면 전체가 딤 위에 남는다.
+    // 딤을 품은 root가 아니라 transition의 패널을 쓴다 — root를 올리면 전체화면 판이 게이트 딤을 덮어 암막이 사라진 것처럼 보인다.
+    void ApplyPanelAnchor(bool _on)
+    {
+        if (_on == this.m_panelAnchored) return;
+
+        var t_rect = this.transition.Panel;
+        if (t_rect == null) return;   // 패널 미배선이면 가리킬 영역이 없다(root로 대신하면 암막이 걷힌 것처럼 보인다)
+
+        this.m_panelAnchored = _on;
+
+        if (_on) TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.KeywordGrowthPanel, t_rect, null);
+        else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.KeywordGrowthPanel, t_rect);
     }
 
     // 칸도 스스로 놓지만(OnDisable) 퇴장 트윈이 끝나야 꺼진다 — 닫는 순간 바로 거둔다.

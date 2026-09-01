@@ -34,10 +34,12 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitLobbyReturn:
             case EOutgameTutorialAction.WaitCardDetailReturn:
             case EOutgameTutorialAction.WaitDeckEquip:
+            case EOutgameTutorialAction.WaitDeckSave:
                 return EOutgameTutorialStepResult.Gated;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);
             case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
+            case EOutgameTutorialAction.CloseDeckEdit: return EnterCloseDeckEdit(_context);
             case EOutgameTutorialAction.EnterFirstRank: return EnterFirstRank(_context);
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);
             case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
@@ -119,6 +121,19 @@ public static class TutorialStepExecutor
     static EOutgameTutorialStepResult EnterCloseAlbumPage(OutgameTutorialStepContext _context)
     {
         AlbumPageOverlayView.CloseOpen();
+
+        _context.CommitAdvance();
+        _context.CompleteIfLast();
+        return EOutgameTutorialStepResult.Advanced;
+    }
+
+    // 저장이 끝난 덱 편집을 걷어 그 아래 로비 표면을 드러낸다(다음 안내가 로비 위젯을 가리킨다).
+    // 이탈 확인 팝업은 끼지 않는다 — 앞선 저장 스텝이 변경사항을 이미 확정해 두었다.
+    static EOutgameTutorialStepResult EnterCloseDeckEdit(OutgameTutorialStepContext _context)
+    {
+        // 이미 닫혀 있으면 걷을 것이 없다(유저가 먼저 나갔거나 다른 화면에서 재생된 경우) — 실패가 아니라 정상 통과다.
+        if (!DeckEditController.TryRequestExitOpen())
+            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 덱 편집이 열려 있지 않아 닫기를 생략합니다.");
 
         _context.CommitAdvance();
         _context.CompleteIfLast();
@@ -209,8 +224,12 @@ public static class TutorialStepExecutor
         // 삽입이 왕복보다 앞선다 — ServerSaveCommands.InvokeAsync 안에서 시작되는 업로드 봉인 밖에서 저장을 끝내
         // 채택이 세우는 업로드 기준선과 경합하지 않고, 바로 다음 스텝(전투 진입)의 덱 게이트가 빈 슬롯을 보지 않는다.
         // 그 사이 덱 카드가 잠시 미소유일 수 있으나 덱 저장은 클라 권한이고 lockDeck 재검증은 멀티 진입에만 걸린다(튜토 전투는 싱글).
-        if (!DeckSaveManager.TryFindSlot(t_cards, out _) &&
-            !DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out _))
+        // 지급한 덱을 대표로 세운다 — TryInsertFront가 앞칸에 끼우며 대표 좌표를 옛 덱 쪽으로 밀어 두므로,
+        // 세우지 않으면 덱 탭이 엉뚱한 덱을 열고 뒤따르는 카드 장착 스텝이 영구 대기한다.
+        if (DeckSaveManager.TryFindSlot(t_cards, out int t_index) ||
+            DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out t_index))
+            DeckSaveManager.TrySelectSlot(t_index);
+        else
             Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 덱 삽입 실패 — 목록이 가득 찼거나 세이브 미로드(DeckSaveManager 로그 확인).");
 
         RequestGrant(GrantPackIdOf(_step, Where(_context)));

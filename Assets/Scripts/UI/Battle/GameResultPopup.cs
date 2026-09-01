@@ -5,7 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 전투 결과 팝업의 등장 연출 진행자.
-// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 박에 통째로 골드로 빨려들며 가산) → 랭크 줄 → 안내문.
+// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 장씩 골드로 빨려들며 가산) → 랭크 줄 → 안내문.
+// 골드와 랭크는 수치 연출을 한 벌(RollingCounter)로 공유한다 — 값을 실어 나르는 것만 카드와 별로 갈릴 뿐,
+// 팝하는 시점도 계단으로 오르는 리듬도 두 줄이 같다.
 // 패배 팝업은 라인 등장까지만 하고 분출·롤링을 접는다 — 같은 스크립트를 승패 플래그로 갈라 쓴다.
 public class GameResultPopup : MonoBehaviour
 {
@@ -55,8 +57,8 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] float dimAlpha = 0.94f;      // 암막 짙기(ScreenDim에 넘기는 값)
     [SerializeField] float enterDuration = 0.45f;
     [SerializeField] float rewardRevealDuration = 0.3f; // 패널 등장 뒤 보상 라인이 팝하는 시간.
-    [Tooltip("도착에 맞춰 수치가 굴러가는 시간(골드·랭크 공용). 생존 카드는 한 박에 다 닿으므로 골드는 "
-           + "이 시간 동안 0에서 확정값까지 한 번에 오른다 — 카드가 날아가는 시간(SurvivorGoldFlight의 "
+    [Tooltip("아이콘 하나가 닿을 때마다 그 몫만큼 수치가 굴러가는 시간(골드·랭크 공용). 생존 카드도 별도 "
+           + "한 장씩 닿으므로 두 줄 다 계단으로 오른다 — 카드가 날아가는 시간(SurvivorGoldFlight의 "
            + "flyDuration)보다 많이 짧으면 숫자가 카드보다 먼저 도착해 인과가 끊긴다.")]
     [SerializeField] float goldRollDuration = 0.15f;
     [SerializeField] float hintFadeDuration = 0.25f;
@@ -106,7 +108,7 @@ public class GameResultPopup : MonoBehaviour
     /// <summary>
     /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
-    /// _survivorCards는 승리 보상을 만든 생존 카드로, 한 박에 통째로 골드로 빨려든다.
+    /// _survivorCards는 승리 보상을 만든 생존 카드로, 왼쪽부터 한 장씩 차례로 골드로 빨려든다.
     /// null과 빈 리스트는 다른 뜻이다 — null은 "생존 수를 모른다"(코인 분출로 폴백),
     /// 빈 리스트는 "0장"(카드도 코인도 없이 하한 보상만). 합치면 카드 없이 코인이 터져 인과가 거꾸로 학습된다.
     /// _fallenCards는 이번 판에 잃은 카드로, 같은 줄 오른쪽에 흑백으로 서기만 한다 —
@@ -193,7 +195,7 @@ public class GameResultPopup : MonoBehaviour
     }
 
     // 골드 줄. 수치가 팝하는 동안 이번 판에 데리고 나간 카드가 나란히 서고(전사는 흑백으로 오른쪽),
-    // 살아남은 카드가 한 박에 통째로 골드로 빨려들며 그만큼 수치가 오른다.
+    // 살아남은 카드가 한 장씩 골드로 빨려들며 닿을 때마다 그만큼 수치가 오른다 — 랭크 줄과 같은 리듬이다.
     // 카드 축이 설 수 없으면(_cards == null) 예전 코인 분출로 폴백한다 — 값만 툭 뜨는 것보다 낫다.
     // _cardsFlew는 호출자가 랭크 줄을 뒤로 미룰지 판단하는 데 쓴다.
     Sequence BuildGoldLine(bool _animate, IReadOnlyList<int> _cards, IReadOnlyList<int> _fallen,
@@ -205,10 +207,13 @@ public class GameResultPopup : MonoBehaviour
         if (t_reveal == null) return null;
 
         Sequence t_line = DOTween.Sequence();
-        t_line.Insert(0f, t_reveal);
 
-        if (!_animate || this.m_gold.Total <= 0) return t_line;
-        if (_cards != null && _cards.Count == 0) return t_line;   // 카드 0장: 하한 보상이 이미 박혀 있다.
+        if (!_animate || this.m_gold.Total <= 0 || (_cards != null && _cards.Count == 0))
+        {
+            // 카드 0장은 하한 보상이 이미 박혀 있어 굴릴 것이 없다 — 수치가 팝하고 끝난다.
+            t_line.Insert(0f, t_reveal);
+            return t_line;
+        }
 
         RectTransform t_target = this.goldIconRect != null
                                ? this.goldIconRect
@@ -221,9 +226,15 @@ public class GameResultPopup : MonoBehaviour
         if (t_flight != null)
         {
             t_line.Insert(0f, t_flight);
+
+            // 수치는 줄이 서는 순간 함께 팝한다(랭크 줄과 같은 시점이다) — 카드가 한 장씩 닿을 때마다
+            // 계단으로 오르므로, "+0"이 먼저 떠 있어도 흡수가 원인이라는 것이 그 계단에서 읽힌다.
+            t_line.Insert(0f, t_reveal);
             _cardsFlew = true;
             return t_line;
         }
+
+        t_line.Insert(0f, t_reveal);
 
         if (this.coinBurst != null)
         {
