@@ -15,9 +15,12 @@ using UnityEngine.UI;
 //
 // 전사한 카드를 같은 줄에 흑백으로 세우는 이유는 분모를 보여주기 위해서다 — 생존만 서면 "4장 받았다"까지만
 // 읽히고 "6장 중 4장"이 안 읽힌다. 그래서 이 줄은 보상 표시가 아니라 그 판의 성적표다.
-// 흡수와 파괴는 장마다 엇물리지 않고 각자 한 박에 통째로 벌어진다 — 같은 순간에 왼쪽 무리는 골드로
-// 빨려들고 오른쪽 무리는 무너진다. 한 장씩 세는 리듬은 결과 화면을 장수만큼 늘리고,
-// 파괴를 흡수의 꼬리에 붙은 별개의 사건으로 읽히게 만든다.
+// 생존은 왼쪽부터 한 장씩 시차를 두고 빨려들고, 닿을 때마다 골드 수치가 그만큼 오른다 — 랭크 줄이
+// 별 하나하나에 맞춰 계단으로 오르는데 골드만 한 박에 확정값으로 뛰면 같은 화면에서 리듬이 어긋나고,
+// 무엇보다 그 숫자가 어느 카드에서 왔는지 세어지지 않는다. 시차 전체는 flyStagger·maxFlySpan이
+// 가두므로 장수가 늘어도 결과 화면이 그만큼 길어지지는 않는다.
+// 반면 파괴는 여전히 한 박이다 — 첫 흡수가 시작되는 순간 오른쪽 무리 전체가 함께 무너진다.
+// 잃은 것까지 한 장씩 세면 승리 화면이 손실을 헤아리는 시간이 된다.
 // 승리 화면의 마지막 그림이 시체로 남지 않게. 조용히 페이드로 걷히면 "지워졌다"로 읽히므로,
 // 잃은 것은 잃은 것처럼 무너뜨린다(UiCrumble). 전투의 사망 연출(흰 플래시 → 부풀었다 터짐)과 일부러 다른
 // 언어를 쓴다 — 같은 그림을 두 번 보여주면 결과 화면이 전투의 재방송이 된다.
@@ -63,10 +66,17 @@ public class SurvivorGoldFlight
     [SerializeField] float holdPerCard = 0.03f;
 
     [Header("흡수")]
-    [Tooltip("생존 카드 전체가 한 박에 빨려드는 시간. 장마다 엇물리지 않으므로 골드 수치도 계단 없이 "
-           + "한 번에 확정값까지 굴러간다 — GameResultPopup의 goldRollDuration을 이 시간 언저리로 "
-           + "맞춰야 숫자가 카드보다 먼저 도착하지 않는다.")]
+    [Tooltip("카드 한 장이 골드까지 날아가는 시간. 장마다 아래 간격만큼 어긋나 출발하므로, 골드 수치는 "
+           + "닿는 장수만큼 계단으로 오른다 — GameResultPopup의 goldRollDuration이 이 시간보다 많이 "
+           + "짧으면 숫자가 카드보다 먼저 도착해 인과가 끊긴다.")]
     [SerializeField] float flyDuration = 0.26f;
+
+    [Tooltip("생존 카드가 왼쪽부터 한 장씩 어긋나 출발하는 간격. 0이면 전체가 한 박에 빨려들고 "
+           + "골드 수치도 계단 없이 한 번에 확정값까지 굴러간다(옛 동작).")]
+    [SerializeField] float flyStagger = 0.06f;
+
+    [Tooltip("시차 전체의 상한. 넘치면 간격을 접는다 — 생존이 많은 판에서 결과 화면이 장수만큼 길어지지 않게.")]
+    [SerializeField] float maxFlySpan = 0.36f;
     [Tooltip("골드에 닿을 때의 배율 — 아이콘 안으로 삼켜지는 느낌.")]
     [SerializeField] float flyScale = 0.18f;
     [Tooltip("날아가는 동안 좌우로 기우는 각(도).")]
@@ -109,14 +119,14 @@ public class SurvivorGoldFlight
     float HoldDuration(int _count) => this.holdBase + this.holdPerCard * Mathf.Max(0, _count);
 
     /// <summary>
-    /// 등장 → 정지 → 일제 흡수 시퀀스를 만들어 돌려준다(재생은 호출자 시퀀스에 맡긴다).
+    /// 등장 → 정지 → 흡수 시퀀스를 만들어 돌려준다(재생은 호출자 시퀀스에 맡긴다).
     /// 줄은 <paramref name="_cards"/>(생존, 왼쪽) + <paramref name="_fallen"/>(전사, 오른쪽) 순으로 서고,
     /// 한가운데에 겹쳐 나타나 좌우로 밀려 자리를 잡는다.
-    /// 흡수와 파괴는 같은 순간에 각자 한 박으로 벌어진다 — 왼쪽 무리는 골드로, 오른쪽 무리는 부서짐으로.
-    /// _onArrived(도착 장수, <b>생존</b> 장수)는 생존이 전부 목적지에 닿은 한 순간에 한 번만 온다 —
-    /// 다 같이 도착하므로 골드는 계단이 아니라 한 번에 확정값까지 오른다.
+    /// 생존은 왼쪽부터 한 장씩 어긋나 골드로 빨려들고, 전사는 첫 흡수와 같은 순간에 통째로 부서진다.
+    /// _onArrived(도착 장수, <b>생존</b> 장수)는 생존 한 장이 목적지에 닿을 때마다 온다 —
+    /// 골드가 랭크 줄처럼 계단으로 오르고, 마지막 한 장에서 확정값에 안착한다.
     /// 전사 카드는 이 분모에 들어가지 않는다(보상을 만든 것은 생존뿐이다).
-    /// _onEachArrived는 같은 순간의 화면 반응(아이콘 펀치)용.
+    /// _onEachArrived는 그때마다의 화면 반응(아이콘 펀치)용.
     /// 날릴 것이 없거나 레이어를 확보하지 못하면 null — 호출자가 이 축을 통째로 건너뛴다.
     /// </summary>
     public Sequence Build(IReadOnlyList<int> _cards, IReadOnlyList<int> _fallen,
@@ -151,9 +161,9 @@ public class SurvivorGoldFlight
 
         float t_enterStagger = EnterStagger(t_count);
 
-        // 흡수도 파괴도 한 박이라 시작 시각이 하나뿐이다 — 줄이 한 번의 움직임으로 갈린다.
-        float t_flyStart = EnterSpan(t_count) + HoldDuration(t_count);
-        float t_flyEnd   = t_flyStart + this.flyDuration;
+        // 생존은 여기서부터 한 장씩 어긋나 출발하고, 파괴는 이 한 시각에 통째로 벌어진다.
+        float t_flyStagger = FlyStagger(t_live);
+        float t_flyStart   = EnterSpan(t_count) + HoldDuration(t_count);
 
         var t_seq = DOTween.Sequence();
 
@@ -208,26 +218,27 @@ public class SurvivorGoldFlight
                 continue;
             }
 
-            t_seq.Insert(t_flyStart, t_tile.DOAnchorPos(t_to, this.flyDuration).SetEase(Ease.InBack));
-            t_seq.Insert(t_flyStart, t_tile.DOScale(t_rest * this.flyScale, this.flyDuration).SetEase(Ease.InQuad));
+            // 왼쪽에 선 카드부터 차례로 떠난다 — 줄에 선 순서와 빨려드는 순서가 같아야 몇 장째인지 세어진다.
+            float t_liftAt = t_flyStart + t_flyStagger * t_i;
+            float t_landAt = t_liftAt + this.flyDuration;
+
+            t_seq.Insert(t_liftAt, t_tile.DOAnchorPos(t_to, this.flyDuration).SetEase(Ease.InBack));
+            t_seq.Insert(t_liftAt, t_tile.DOScale(t_rest * this.flyScale, this.flyDuration).SetEase(Ease.InQuad));
 
             if (!Mathf.Approximately(this.flySpin, 0f))
             {
                 // 좌우 번갈아 — 난수를 쓰면 같은 결과가 매번 다르게 보인다.
                 float t_spin = this.flySpin * (t_i % 2 == 0 ? 1f : -1f);
-                t_seq.Insert(t_flyStart, t_tile.DOLocalRotate(new Vector3(0f, 0f, t_spin), this.flyDuration));
+                t_seq.Insert(t_liftAt, t_tile.DOLocalRotate(new Vector3(0f, 0f, t_spin), this.flyDuration));
             }
 
-            var  t_item = t_tile;   // 클로저가 루프 변수를 붙잡지 않게 복사.
-            bool t_last = t_i == t_live - 1;
-            t_seq.InsertCallback(t_flyEnd, () =>
+            var t_item    = t_tile;   // 클로저가 루프 변수를 붙잡지 않게 복사.
+            int t_ordinal = t_i + 1;  // 생존 기준 몇 장째가 닿았는가(마지막 장에서 확정값에 안착한다).
+            t_seq.InsertCallback(t_landAt, () =>
             {
                 if (t_item != null) t_item.gameObject.SetActive(false);
 
-                // 다 같이 도착하므로 계단이 없다 — 마지막 한 장에서 확정값까지 한 번에 굴린다.
-                if (!t_last) return;
-
-                _onArrived?.Invoke(t_live, t_live);
+                _onArrived?.Invoke(t_ordinal, t_live);
                 _onEachArrived?.Invoke();
             });
         }
@@ -258,6 +269,14 @@ public class SurvivorGoldFlight
     {
         int t_steps = EnterSteps(_count);
         return t_steps <= 0 ? 0f : Mathf.Min(this.enterStagger, this.maxEnterSpan / t_steps);
+    }
+
+    // 생존이 늘면 간격을 접어 흡수 전체를 maxFlySpan 안에 가둔다(등장의 maxEnterSpan과 같은 규약).
+    // 등장과 달리 한 장이 한 단계다 — 좌우로 갈라지는 것이 아니라 왼쪽부터 차례로 떠나기 때문이다.
+    float FlyStagger(int _live)
+    {
+        int t_steps = Mathf.Max(0, _live - 1);
+        return t_steps <= 0 ? 0f : Mathf.Min(this.flyStagger, this.maxFlySpan / t_steps);
     }
 
     // CoinBurst·StarBurst와 같은 자리(팝업 루트 직하)에 둔다. 맨 뒤 자식이라 보상 줄 위에 그려진다.

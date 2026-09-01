@@ -161,6 +161,7 @@ public class DeckTabController : LobbyTabPanel
             onExit         = CloseEditor,
             dragController = m_dragController,
             showDeckStrip  = true,
+            holdoutCard    = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : 0,
         });
     }
 

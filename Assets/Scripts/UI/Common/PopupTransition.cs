@@ -19,6 +19,9 @@ public class PopupTransition
     /// <summary>등장이 끝나는 데 걸리는 시간 — 열림을 기다렸다 이어 붙이는 쪽이 값을 또 들고 있지 않게.</summary>
     public float OpenDuration => this.openDuration;
 
+    /// <summary>스케일 팝 대상(딤을 뺀 패널 본체). 튜토리얼이 "이 화면"을 밝힐 때 가리킬 영역이기도 하다.</summary>
+    public RectTransform Panel => this.panel;
+
     [SerializeField] float openFromScale = 0.9f;
     [SerializeField] float closeToScale = 0.9f;
 

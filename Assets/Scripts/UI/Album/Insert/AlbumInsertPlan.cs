@@ -49,20 +49,19 @@ public static class AlbumInsertPlan
             var t_theme = t_themes[t_t];
             if (t_theme.IsLocked) continue;   // 준비 중 테마는 열리지 않는다 — 잠금 뒤로 카드를 꽂으러 들어가지 않는다
 
-            // 도감 번호는 페이지가 아니라 테마 내 통번호다(AlbumPageOverlayView.RefreshPage와 같은 규칙).
-            int t_base = 0;
             for (int t_p = 0; t_p < t_theme.Pages.Count; t_p++)
             {
-                var t_pageCards = t_theme.Pages[t_p].CardIds;
+                // 도감 번호는 페이지가 아니라 테마 내 통번호다 — 조립 시점에 확정된 AlbumPage.FirstNumber를 읽는다
+                var t_page = t_theme.Pages[t_p];
+                var t_pageCards = t_page.CardIds;
                 for (int t_s = 0; t_s < t_pageCards.Count; t_s++)
                 {
                     var t_card = t_pageCards[t_s];
                     int t_id = t_card;
                     if (t_id <= 0 || !t_want.Remove(t_id)) continue;
 
-                    t_steps.Add(new AlbumInsertStep(t_theme, t_p, t_s, t_card, t_base + t_s + 1));
+                    t_steps.Add(new AlbumInsertStep(t_theme, t_p, t_s, t_card, t_page.FirstNumber + t_s));
                 }
-                t_base += t_pageCards.Count;
             }
         }
 

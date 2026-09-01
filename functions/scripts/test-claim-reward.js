@@ -25,6 +25,8 @@ const {
 } = require("../lib/rewardTable.js");
 const {
   parseAlbumEntryRows,
+  parseAlbumThemeRows,
+  lockedThemeIds,
   parseAlbumScope,
   albumScopeCardIds,
   isCompleted,
@@ -307,9 +309,10 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   ]);
   assert.equal(entries.length, 4, "빈 키·0 이하 카드 id 줄은 버린다");
 
-  const page = albumScopeCardIds(entries, parseAlbumScope("p:Theme_Nature/P1"));
-  const theme = albumScopeCardIds(entries, parseAlbumScope("t:Theme_Nature"));
-  const album = albumScopeCardIds(entries, parseAlbumScope("b"));
+  const open = new Set();
+  const page = albumScopeCardIds(entries, parseAlbumScope("p:Theme_Nature/P1"), open);
+  const theme = albumScopeCardIds(entries, parseAlbumScope("t:Theme_Nature"), open);
+  const album = albumScopeCardIds(entries, parseAlbumScope("b"), open);
   assert.deepEqual(page, [11, 12]);
   assert.deepEqual(theme, [11, 12, 13]);
   assert.deepEqual(album, [11, 12, 13, 14]);
@@ -321,9 +324,39 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.equal(isCompleted(album, new Set([11, 12, 13, 14])), true);
 
   // 표에 없는 범위는 모수 0 이고, 모수 0 은 완성이 아니다 — 빈 집합을 "다 모았다"로 읽으면 보상이 샌다.
-  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Void")), []);
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Void"), open), []);
   assert.equal(isCompleted([], new Set([11, 12, 13, 14])), false, "모수 0 은 완성이 아니다");
   assert.equal(isCompleted([], new Set()), false);
+
+  // ── 준비 중 테마: 클라와 같은 축으로 모수에서 빠진다 ──────────────────────
+  // AlbumThemeInfo 실제 컬럼 그대로(id | themeId | order | locked | displayName | description).
+  const themes = parseAlbumThemeRows([
+    {id: 1, themeId: "Theme_Nature", order: 1, locked: 0, displayName: "자연", description: ""},
+    {id: 2, themeId: "Theme_Fire", order: 2, locked: 1, displayName: "불꽃", description: "준비 중"},
+    // 테마 키가 빈 줄은 버린다 — 남기면 잠금 판정이 오염된다.
+    {id: 3, themeId: "", order: 3, locked: 1, displayName: "", description: ""},
+  ]);
+  assert.equal(themes.length, 2, "빈 테마 키 줄은 버린다");
+
+  const locked = lockedThemeIds(themes);
+  assert.deepEqual([...locked], ["Theme_Fire"]);
+
+  // 전체("b")는 준비 중 테마의 칸을 요구하지 않는다 — 요구하면 완성이 영영 불가능해진다.
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("b"), locked), [11, 12, 13],
+    "준비 중 테마 카드(14)는 전체 모수에서 빠진다");
+  assert.equal(isCompleted(albumScopeCardIds(entries, parseAlbumScope("b"), locked), new Set([11, 12, 13])),
+    true, "공개 테마만 다 모으면 전체 완성이다");
+
+  // 준비 중 테마를 직접 가리키는 키는 모수 0 이고, 모수 0 은 완성이 아니다 —
+  // 조작 호출로 준비 중 테마의 보상을 긁어 가는 길이 함께 닫힌다.
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Fire"), locked), []);
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("p:Theme_Fire/P1"), locked), []);
+  assert.equal(isCompleted(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Fire"), locked), new Set([14])),
+    false, "준비 중 테마는 카드를 다 가져도 완성이 아니다");
+
+  // 공개 테마 쪽 판정은 잠금 축이 생겨도 그대로다.
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("t:Theme_Nature"), locked), [11, 12, 13]);
+  assert.deepEqual(albumScopeCardIds(entries, parseAlbumScope("p:Theme_Nature/P1"), locked), [11, 12]);
 }
 
 // ── 챕터 완주 모수: 클리어 정점으로 잰다 ────────────────────────────────────

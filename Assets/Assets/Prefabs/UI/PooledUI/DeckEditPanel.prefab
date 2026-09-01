@@ -134,7 +134,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 0
+  key: 29
 --- !u!1 &519731273226247860
 GameObject:
   m_ObjectHideFlags: 0
@@ -4021,7 +4021,6 @@ GameObject:
   - component: {fileID: 1979263662337928916}
   - component: {fileID: 5962494252394883790}
   - component: {fileID: 3788090746314294078}
-  - component: {fileID: 419000003024438374}
   m_Layer: 0
   m_Name: PlayButton
   m_TagString: Untagged
@@ -4151,19 +4150,6 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
---- !u!114 &419000003024438374
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8218056442323605805}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 13
 --- !u!1 &8701493681954982882
 GameObject:
   m_ObjectHideFlags: 0

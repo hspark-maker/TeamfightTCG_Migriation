@@ -249,8 +249,12 @@ public static class TournamentProgress
         return true;
     }
 
+    /// <summary>완주 보상을 이미 받았는지. 서버 낙인이 아직 서지 않은 왕복 구간도 받은 것으로 답한다 —
+    /// 그래야 띠 버튼과 알림 점이 누른 프레임에 꺼진다.</summary>
     public static bool IsChapterRewardClaimed(string _chapterId)
-        => !string.IsNullOrEmpty(_chapterId) && ClaimedChapters.Contains(_chapterId);
+        => !string.IsNullOrEmpty(_chapterId)
+           && (ClaimedChapters.Contains(_chapterId)
+               || RewardClaimCommand.IsInFlight(RewardClaimCommand.OwnerTournament, _chapterId));
 
     /// <summary>완주 보상 수령 자격 = 안정 키 · 완주 · 미수령 · 받을 것이 있음. 띠의 [보상 받기] 표시와 알림 점이 이 판정만 본다.</summary>
     public static bool CanClaimChapterReward(int _chapterIndex)
@@ -281,11 +285,12 @@ public static class TournamentProgress
         var t_pending = CurrencyPendingTicket.Hold(t_rewards);
 
         // 챕터 id 를 그대로 ownerId 로 보낸다 — 서버가 chapter_ 접두사를 보고 정점과 가른다.
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId, t_pending);
-        if (!t_outcome.Succeeded) return default;
+        // 통지는 창구가 왕복 시작·종료에 한 번씩 울려 준다 — 시작 통지가 띠를 즉시 수령 완료로 그리고,
+        // 종료 통지가 성공이면 서버 낙인으로 확정하고 거절이면 원래 상태로 되돌린다.
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _chapterId,
+                                                           t_pending, () => OnChanged?.Invoke());
 
-        OnChanged?.Invoke();
-        return t_outcome;
+        return t_outcome.Succeeded ? t_outcome : default;
     }
 
     // 정점 _index의 보상 스냅샷(범위 밖·미저작이면 빈 목록)

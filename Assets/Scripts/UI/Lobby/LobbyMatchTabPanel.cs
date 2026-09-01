@@ -52,9 +52,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished += RefreshPlayLabel;
-
-        // 같은 이유로 여기서 무장한다(정점 보상 팝업은 탭 활성과 무관하게 떠야 한다). 내부에 멱등 가드가 있다.
-        TournamentReturnFlow.Arm();
     }
 
     // 첫 반영은 Awake가 아니라 여기다 — 디렉터의 Awake보다 먼저 물으면 "연출 없음"으로 읽혀 결말을 미리 말한다.

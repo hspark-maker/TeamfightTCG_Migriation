@@ -113,11 +113,12 @@ public static class RankRewardManager
         var t_pending = CurrencyPendingTicket.Hold(t_rewards);
 
         // 티어 인덱스 문자열이 스펙시트 Reward.ownerId 와 같은 키다(RankConfig.FillRewards와 같은 표기).
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString(), t_pending);
-        if (!t_outcome.Succeeded) return default;
+        // 통지는 창구가 왕복 시작·종료에 한 번씩 울려 준다 — 시작 통지가 행을 즉시 수령 완료로 그리고,
+        // 종료 통지가 성공이면 서버 낙인으로 확정하고 거절이면 원래 상태로 되돌린다.
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerRank, _tierIndex.ToString(),
+                                                           t_pending, () => OnChanged?.Invoke());
 
-        OnChanged?.Invoke();
-        return t_outcome;
+        return t_outcome.Succeeded ? t_outcome : default;
     }
 
     // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)
@@ -135,6 +136,12 @@ public static class RankRewardManager
     {
         if (_tierIndex < 0 || _tierIndex >= TierCount) return ERankRewardState.Locked;
         if (Slot.ClaimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
+
+        // 서버가 낙인을 돌려주기 전까지의 틈 — 이걸 안 보면 행이 왕복 내내 "받을 수 있음"으로 남는다.
+        // HasAnyInFlight 선검사가 평상시 문자열 할당을 막는다(GetInfo가 행마다 TopClaimableIndex를 돈다).
+        if (RewardClaimCommand.HasAnyInFlight
+            && RewardClaimCommand.IsInFlight(RewardClaimCommand.OwnerRank, _tierIndex.ToString()))
+            return ERankRewardState.Claimed;
 
         if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return ERankRewardState.Locked;
 

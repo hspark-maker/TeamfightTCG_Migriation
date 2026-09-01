@@ -221,14 +221,16 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// <paramref name="_atBottom"/>이면 문구의 홈이 하단이 된다 — 무대 한가운데를 비워야 하는 스텝용이다.
     /// <paramref name="_dim"/>을 끄면 판이 투명해진다(뒤 화면을 그대로 보여 주는 자리) — 다만 <b>입력은 그대로 막는다</b>.
     /// 이 모드의 완료가 화면 탭이라 그렇다: 안 막으면 탭이 뒤 화면으로 새어 안내가 넘어가지 않는다.
+    /// <paramref name="_spotlight"/>는 하이라이트와 함께 밝힐 또 하나의 영역이다(견주어 보라는 안내용).
     /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>
     public void ShowMessageGate(MonoBehaviour _owner, RectTransform _highlight, string _message, Action _onSatisfied,
-                                bool _atBottom = false, bool _dim = true)
+                                bool _atBottom = false, bool _dim = true, RectTransform _spotlight = null)
     {
         Release();
 
         m_owner        = _owner;
         m_target       = _highlight;
+        m_spotlight    = _spotlight;
         m_targetButton = null;
         m_targetCanvas = _highlight != null ? _highlight.GetComponentInParent<Canvas>() : null;
         m_onSatisfied  = _onSatisfied;

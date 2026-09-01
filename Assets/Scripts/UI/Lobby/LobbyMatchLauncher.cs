@@ -102,7 +102,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (tournamentPanel != null) tournamentPanel.NodeSelected += StartTournamentBattle;
 
         TournamentReturnFlow.ReturnRequested += HandleTournamentReturn;
-        TournamentReturnFlow.GiftRevealRequested += HandleGiftReveal;
+        TournamentReturnFlow.RewardClaimRequested += HandleRewardClaim;
 
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
@@ -119,7 +119,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (tournamentPanel != null) tournamentPanel.NodeSelected -= StartTournamentBattle;
 
         TournamentReturnFlow.ReturnRequested -= HandleTournamentReturn;
-        TournamentReturnFlow.GiftRevealRequested -= HandleGiftReveal;
+        TournamentReturnFlow.RewardClaimRequested -= HandleRewardClaim;
 
         OutgameFeatureLock.OnChanged -= ApplyPlayLock;
     }
@@ -494,22 +494,17 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.
-    // 선물 등장은 여기서 하지 않는다(골드 흡입 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
+    // 보상 팝업은 여기서 열지 않는다(서버 낙인이 선 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
     void HandleTournamentReturn(string _nodeId, bool _won)
     {
         // 탭 트리거는 끈다 — 탭 진입 튜토리얼이 방금 세운 맵을 덮으면 복귀가 무의미해진다.
         if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
-        if (tournamentPanel == null) return;
 
-        // 등장이 올 자리를 열기 전에 비워 둔다 — 순서를 뒤집으면 선물이 이미 서 있다가 다시 튀어나온다.
-        if (_won) tournamentPanel.ArmGiftReveal(_nodeId);
-
-        tournamentPanel.Open();
+        tournamentPanel?.Open();
     }
 
-    // 골드 흡입이 끝난 뒤의 선물 등장. PlayGiftReveal이 예약도 함께 푼다 — 맵을 떠났어도 반드시 불러야
-    // 선물이 감춰진 채 남지 않는다.
-    void HandleGiftReveal(string _nodeId) => tournamentPanel?.PlayGiftReveal(_nodeId);
+    // 낙인이 선 직후의 보상 수령. 승리 복귀에서만 온다.
+    void HandleRewardClaim(string _nodeId) => tournamentPanel?.OpenReturnReward(_nodeId);
 
     // 유저가 로비 덱 탭에서 정해 둔 대표 덱을 씬 전환 캐리어에 싣는다. 유효 덱이 하나도 없으면 false —
     // 진입 앞단(StartAiBattle)이 이미 걸러 내므로 여기까지 오는 일은 세이브가 도중에 비었을 때뿐이다.

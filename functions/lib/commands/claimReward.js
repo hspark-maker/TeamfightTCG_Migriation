@@ -125,6 +125,21 @@ async function loadAlbumEntries(context) {
     return entries;
 }
 /**
+ * 도감 테마 표. 준비 중(locked) 테마를 가리는 유일한 근거라 못 읽으면 NotEligible 로 떨어뜨린다
+ * — 여기서 통과시키면 전체 완성이 준비 중 테마의 칸까지 요구해 영영 수령할 수 없게 된다.
+ * @param {ClaimContext} context 요청 맥락
+ * @return {Promise<AlbumThemeRow[]>} 테마 목록
+ */
+async function loadAlbumThemes(context) {
+    const rows = await (0, packSpecReader_1.readSpecRows)(context.env, "AlbumThemeInfo");
+    const themes = (0, completionTable_1.parseAlbumThemeRows)(rows);
+    if (themes.length === 0) {
+        logger.error("AlbumThemeInfo spec is empty or unreadable", { ...context, rowCount: rows.length });
+        reject("NotEligible", "Album theme spec is unreadable.", { ...context, specRowCount: rows.length });
+    }
+    return themes;
+}
+/**
  * 챕터↔정점 대응 표. 못 읽으면 완주를 잴 수 없으므로 NotEligible 로 떨어뜨린다.
  * @param {ClaimContext} context 요청 맥락
  * @return {Promise<ChapterNodeRow[]>} 대응 목록
@@ -244,10 +259,11 @@ function claimTournamentChapter(current, chapterRows, context) {
  * 서버가 매번 다시 잰다. 표에 그 범위 행이 하나도 없으면 완성이 아니라 미저작이다.
  * @param {Record<string, unknown>} current 현재 문서
  * @param {AlbumEntryRow[]} entryRows 도감 칸 표
+ * @param {AlbumThemeRow[]} themeRows 도감 테마 표(준비 중 테마를 가린다)
  * @param {ClaimContext} context 요청 맥락
  * @return {object} albumReward 슬롯 전체 값
  */
-function claimAlbumReward(current, entryRows, context) {
+function claimAlbumReward(current, entryRows, themeRows, context) {
     const album = current.albumReward;
     const claimedKeys = readIdList(album?.claimedKeys);
     // Claimed 검사가 완성 검사보다 먼저다(클라 AlbumRewardManager.StateOf 와 같은 순서).
@@ -255,7 +271,7 @@ function claimAlbumReward(current, entryRows, context) {
         reject("AlreadyClaimed", `Album reward '${context.ownerId}' is already claimed.`, { ...context });
     }
     const scope = (0, completionTable_1.parseAlbumScope)(context.ownerId);
-    const required = scope === null ? [] : (0, completionTable_1.albumScopeCardIds)(entryRows, scope);
+    const required = scope === null ? [] : (0, completionTable_1.albumScopeCardIds)(entryRows, scope, (0, completionTable_1.lockedThemeIds)(themeRows));
     const owned = new Set((0, packSlots_1.readOwnedIds)(current.ownership));
     if (!(0, completionTable_1.isCompleted)(required, owned)) {
         reject("NotEligible", `Album reward '${context.ownerId}' is not complete.`, { ...context, requiredCount: required.length, missingCount: (0, completionTable_1.missingCount)(required, owned) });
@@ -266,7 +282,7 @@ function claimAlbumReward(current, entryRows, context) {
  * 정적 보상 수령. 자격 판정·지급·낙인을 서버가 소유한다.
  *
  * 범위는 네 갈래다 — 랭크 티어 · 토너먼트 정점 · 토너먼트 챕터 완주 · 도감 완성.
- * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry) 표가 비면
+ * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry · AlbumThemeInfo) 표가 비면
  * fail-closed 로 거절한다. 지급은 지갑 문서로 나가고 세이브에는 낙인 슬롯만 남는다.
  */
 exports.claimReward = (0, https_1.onCall)(async (request) => {
@@ -290,6 +306,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     let tierCount = 0;
     let requiredPoints = 0;
     let albumEntries = [];
+    let albumThemes = [];
     let chapterNodes = [];
     if (ownerType === "Rank") {
         const grades = await loadRankGrades(context);
@@ -307,6 +324,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             reject("RewardNotFound", `Album owner '${ownerId}' is not a reward key.`, { ...context });
         }
         albumEntries = await loadAlbumEntries(context);
+        albumThemes = await loadAlbumThemes(context);
     }
     else if (ownerType === "Tournament") {
         // 챕터뿐 아니라 정점 수령도 읽는다 — 낙인이 표에 없는 정점을 가리키는지 대조하는 데 쓴다.
@@ -353,7 +371,10 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             return { slots: { rank }, wallet: paid };
         }
         if (ownerType === "Album") {
-            return { slots: { albumReward: claimAlbumReward(current, albumEntries, context) }, wallet: paid };
+            return {
+                slots: { albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) },
+                wallet: paid,
+            };
         }
         if (isChapter) {
             return { slots: { tournament: claimTournamentChapter(current, chapterNodes, context) }, wallet: paid };

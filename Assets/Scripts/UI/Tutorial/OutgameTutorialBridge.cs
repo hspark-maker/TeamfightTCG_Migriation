@@ -248,7 +248,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
             return;
         }
 
@@ -257,6 +257,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Purchase
                             || m_step.Completion == EOutgameTutorialCompletion.Enhance
                             || m_step.Completion == EOutgameTutorialCompletion.DeckEquip
+                            || m_step.Completion == EOutgameTutorialCompletion.DeckSave
             ? null
             : (Action)OnGateSatisfied;
 
@@ -341,6 +342,15 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckEquip) return;
         if (m_step.AnchorCardId > 0 && _cardId != m_step.AnchorCardId) return;
+
+        OnGateSatisfied();
+    }
+
+    // 덱 저장이 확정됐다. 클릭이 아니라 저장이 완료인 이유는 구매·강화와 같다 —
+    // 6장이 안 찬 덱에서는 눌러도 저장되지 않고 안내 팝업만 뜬다.
+    void OnDeckSaved()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckSave) return;
 
         OnGateSatisfied();
     }
@@ -560,6 +570,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnClosed              += OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      += OnAlbumInsertFinished;
         DeckEditController.OnAnyCardEquipped  += OnDeckCardEquipped;
+        DeckEditController.OnAnySaved         += OnDeckSaved;
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
@@ -586,6 +597,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         PackOpenOverlay.OnClosed              -= OnPackOverlayClosed;
         AlbumInsertSession.OnAnyFinished      -= OnAlbumInsertFinished;
         DeckEditController.OnAnyCardEquipped  -= OnDeckCardEquipped;
+        DeckEditController.OnAnySaved         -= OnDeckSaved;
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;

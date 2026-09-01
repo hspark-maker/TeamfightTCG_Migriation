@@ -437,17 +437,15 @@ public class AlbumPageOverlayView : MonoBehaviour
                    AlbumTheme _theme, int _pageIndex, bool _interactive)
     {
         int t_pageIndex = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
-        var t_cards = _theme.Pages[t_pageIndex].CardIds;
+        var t_page = _theme.Pages[t_pageIndex];
+        var t_cards = t_page.CardIds;
 
         // 저작 칸이 모자란 페이지도 격자를 다 채운다 — 채움 칸은 카드도 번호도 없는 순수 빈 포켓이다
         int t_shown = Mathf.Max(t_cards.Count, Mathf.Max(0, this.pageSlotCount));
 
         EnsureSlotCapacity(_slots, _root, t_shown);
 
-        // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 페이지마다 1로 되돌아가면 번호가 자리를 못 가리킨다
-        int t_baseNumber = 0;
-        for (int t_p = 0; t_p < t_pageIndex; t_p++)
-            t_baseNumber += _theme.Pages[t_p].CardIds.Count;
+        // 빈 칸에 찍는 도감 번호는 페이지가 아니라 테마 내 통번호다 — 조립 시점에 확정된 AlbumPage.FirstNumber를 읽는다
 
         // 상세 목록은 확정된 current만 소유한다. under가 목록을 다시 만들면 보이는 버튼의 index가 틀어진다.
         int t_orderOffset = _interactive ? BuildOwnedOrder() : 0;
@@ -479,7 +477,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             var t_card = t_cards[t_i];
             bool t_owned = ShownAsOwned(t_card);
             t_slot.gameObject.SetActive(true);
-            t_slot.Bind(t_card, t_owned, t_baseNumber + t_i + 1);
+            t_slot.Bind(t_card, t_owned, t_page.FirstNumber + t_i);
 
             t_slot.ApplyTutorialAnchor(t_i == t_anchorSlot);
 

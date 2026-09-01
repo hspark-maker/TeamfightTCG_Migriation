@@ -87,7 +87,7 @@ public readonly struct TutorialActionMeta
     static readonly TutorialActionMeta[] s_table =
     {
         new(A.WaitClick,            C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight),
-        new(A.Message,              C.Confirm,          F.Anchor | F.GuideMessage | F.Dim | F.MessagePlacement),
+        new(A.Message,              C.Confirm,          F.Anchor | F.GuideMessage | F.Dim | F.MessagePlacement | F.Spotlight),
         new(A.WaitPurchase,         C.Purchase,         F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.Pack | F.PackPriceLabel, false, true),
         new(A.WaitPackOpen,         C.PackOpen,         F.GuideMessage),
         new(A.DeckAutoEquip,        C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.Pack),
@@ -109,6 +109,9 @@ public readonly struct TutorialActionMeta
         new(A.CloseAlbumPage,       C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
         // 장착으로 슬롯 내용이 갱신되는 스텝이라 F.Spotlight를 주지 않는다 — 승격은 첫 프레임에 한 번만 걸린다.
         new(A.WaitDeckEquip,        C.DeckEquip,        F.Anchor | F.GuideMessage | F.Dim),
+        // 저장 버튼은 바꾼 게 없으면 잠긴다 — 누른 순간이 아니라 저장이 확정된 순간이 완료다(WaitEnhance와 같은 규약).
+        new(A.WaitDeckSave,         C.DeckSave,         F.Anchor | F.GuideMessage | F.Dim | F.Spotlight),
+        new(A.CloseDeckEdit,        C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
     };
 
     // 이 구조의 조용한 실패 두 가지를 부팅 때 한 번 소리내어 잡는다.
