@@ -134,9 +134,17 @@ public static class BattleOverForecast
     }
 
     /// <summary>이 필드에 사망 결과를 뒤집을 수 있는 효과(부활·사망 시 회복)가 걸려 있는가.
-    /// 카드 패시브와 이 덱의 활성 시너지를 모두 본다.</summary>
+    /// 카드 키워드와 이 덱의 활성 시너지를 모두 본다.</summary>
     static bool HasLethalAlteringEffect(BattleField _field, List<CardInstance> _active)
     {
+        // 불사: 아직 부활을 안 쓴 카드가 한 장이라도 있으면 이 공격으로 전멸한다고 말할 수 없다.
+        // 시너지와 달리 카드 단위라 활성 목록이 아니라 보드의 카드를 직접 본다.
+        for (int i = 0; i < _active.Count; i++)
+        {
+            CardInstance t_c = _active[i];
+            if (t_c != null && !t_c.reviveUsed && t_c.HasKeyword(CardKeyword.Immortal)) return true;
+        }
+
         SynergyState t_state = _field.Synergy;
         if (t_state == null) return false;
 

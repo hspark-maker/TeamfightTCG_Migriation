@@ -16,4 +16,33 @@ using UnityEngine;
 /// </summary>
 public abstract class SynergyEffect : BattleEffect
 {
+    /// <summary>시트(SynergyEffectParamDef)의 한 줄을 이 효과에 꽂는다.
+    /// 키는 이 클래스의 필드명과 1:1이고, **모르는 키는 false** — 로더가 그 자리에서 던진다.
+    /// 리플렉션을 쓰지 않는 이유는 허용 키 목록의 진실원을 클래스 안에 두기 위해서다.</summary>
+    public virtual bool TrySetParam(string _key, string _value) => false;
+
+    protected static int ParseInt(string _value)
+        => int.TryParse(_value, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out int t_value)
+           ? t_value
+           : throw new System.FormatException($"정수가 아니다: '{_value}'");
+
+    /// <summary>시트는 bool을 0/1로 적는다. true/false 표기도 받아준다.</summary>
+    protected static bool ParseBool(string _value)
+        => _value == "1" || string.Equals(_value, "true", System.StringComparison.OrdinalIgnoreCase);
+
+    protected static CardKeyword ParseKeywords(string _value)
+    {
+        var t_flags = CardKeyword.None;
+        if (string.IsNullOrWhiteSpace(_value)) return t_flags;
+        foreach (string t_token in _value.Split(new[] { '|', '/' }, System.StringSplitOptions.RemoveEmptyEntries))
+        {
+            string t_name = t_token.Trim();
+            if (t_name.Length == 0) continue;
+            if (!System.Enum.TryParse(t_name, out CardKeyword t_keyword))
+                throw new System.FormatException($"알 수 없는 키워드: '{t_name}'");
+            t_flags |= t_keyword;
+        }
+        return t_flags;
+    }
 }

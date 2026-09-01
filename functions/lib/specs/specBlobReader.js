@@ -9,6 +9,10 @@
  *
  * 블롭이 없는 표(블롭 도입 전에 올라간 표)는 `rows/` 로 폴백한다 — 재업로드 전까지 서버가 멈추면
  * 안 되기 때문이다. 폴백은 로그를 남기므로 남은 표를 추적할 수 있다.
+ *
+ * 단 미러가 최신일 때만 폴백한다. 업로더는 `rows/` 미러를 끄고 올릴 수 있고(쓰기 비용 절감), 그때
+ * 메타의 `rowsRevision` 이 `revision` 보다 뒤에 남는다. 그 상태에서 폴백하면 **낡은 마스터 데이터로**
+ * 보상·추첨을 판정하게 되므로, 조용히 옛 값을 쓰는 대신 실패시킨다.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -155,6 +159,28 @@ async function readFromBlob(env, table) {
     return rows;
 }
 /**
+ * 미러(`rows/`)에서 표를 읽는다. 미러가 이번 revision 을 따라오지 못했으면(업로더가 미러를 끄고 올렸다)
+ * 읽지 않고 던진다 — 낡은 마스터로 판정하느니 그 callable 이 실패하는 편이 낫다.
+ * @param {string} env 환경 id
+ * @param {string} table 표 이름
+ * @return {Promise<SpecRow[]>} 행 배열
+ */
+async function readFromRowsMirror(env, table) {
+    // 미러 신선도는 메타에만 있다. 폴백은 드문 경로라 여기서 1건 더 읽는 값을 치를 만하다.
+    const meta = await firebaseApp_1.db.doc(`envs/${env}/specs/${table}`).get();
+    const revision = Number(meta.data()?.revision ?? -1);
+    // rowsRevision 이 없는 문서는 미러를 끌 수 없던 옛 업로더가 쓴 것이다 — 그때는 행 전량이 같은
+    // commit 에 실렸으므로 미러가 최신이다. 없다고 막으면 옛 표가 전부 폴백 불가가 된다.
+    const rowsRevision = Number(meta.data()?.rowsRevision ?? revision);
+    if (!meta.exists || revision !== rowsRevision) {
+        logger.error("spec rows mirror is stale", { env, table, revision, rowsRevision });
+        throw new Error(`spec table ${table} has no usable blob and its rows mirror is stale ` +
+            `(revision=${revision}, rowsRevision=${rowsRevision}). Re-upload the table.`);
+    }
+    const snapshot = await firebaseApp_1.db.collection(`envs/${env}/specs/${table}/rows`).get();
+    return snapshot.docs.map((document) => document.data());
+}
+/**
  * 표 하나를 통째로 읽는다(블롭 우선 · 캐시 경유). 행은 id 오름차순이고, id 를 못 읽는 행은 버린다
  * — 정렬 비교자가 NaN 을 뱉으면 순서가 미정의가 되어 클라와 다른 카드가 뽑힌다.
  * @param {string} env 환경 id
@@ -172,8 +198,7 @@ async function readSpecRows(env, table) {
     if (raw == null) {
         // 폴백은 행 수만큼 과금된다. 로그의 source=rows 가 남아 있으면 그 표를 다시 올려야 한다.
         source = "rows";
-        const snapshot = await firebaseApp_1.db.collection(`envs/${env}/specs/${table}/rows`).get();
-        raw = snapshot.docs.map((document) => document.data());
+        raw = await readFromRowsMirror(env, table);
     }
     const rows = raw
         .filter((row) => Number.isInteger(Number(row.id)))

@@ -127,7 +127,7 @@ public static class AttackProcessor
                     _attacker.ownerIndex, t_commandAttackerSlot, BattleEventFlags.Enhanced));
         }
 
-        // ★ 치사 래치는 반드시 RemoveDead 전. 언데드 부활이 RemoveDead 안에서 일어나므로
+        // ★ 치사 래치는 반드시 RemoveDead 전. 불사 부활이 RemoveDead 안에서 일어나므로
         //   뒤로 미루면 부활한 방어자에 대해 처형 재공격/AfterAttack 처치 판정(defenderKilled)이 사라진다.
         bool t_defKilled = _defender.hp == 0;
 
@@ -196,12 +196,12 @@ public static class AttackProcessor
         };
     }
 
-    /// <summary>필드의 사망 카드 정리. Lethal(언데드 부활 등)이 먼저 돌 기회를 갖는다.
+    /// <summary>필드의 사망 카드 정리. Lethal(유산 회복 등)이 먼저 돌 기회를 갖고, 그 뒤 불사 키워드가 판정된다.
     ///
     /// public인 이유는 디버그 도구(<c>Test/BattleDebugKill</c>) 하나 때문이다 — 그쪽이 카드를 강제로
     /// 죽인 뒤 **같은 순서**로 정리해야 훅(Lethal/Removed)이 전투와 똑같이 돈다.
     /// 전투 규칙 쪽에서 새로 부르지 마라: 호출 지점은 지금도 Resolve 하나뿐이고,
-    /// 치사 래치보다 먼저 부르면 언데드 부활 판정이 뒤집힌다.</summary>
+    /// 치사 래치보다 먼저 부르면 불사 부활 판정이 뒤집힌다.</summary>
     public static void RemoveDead(BattleField _field)
     {
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
@@ -209,11 +209,18 @@ public static class AttackProcessor
             CardInstance t_c = _field.GetSlot(i);
             if (t_c != null && !t_c.IsAlive)
             {
-                // [Lethal] 치사 트리거 먼저(언데드 부활 / 유산 아군 회복). 패시브 → 시너지 순.
+                // [Lethal] 치사 트리거 먼저(유산 아군 회복 등). 패시브 → 시너지 순.
                 // 둘 다 동기 완결 — 부활은 제자리 hp 복구이므로 아래 IsAlive 게이트가 양쪽 결과를 함께 본다.
                 var t_deathCtx = new DeathCtx(t_c, _field);
                 SynergyTriggers.Lethal(t_deathCtx);
-                // 부활(언데드)했으면 슬롯 유지 → Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
+                // [불사] 시너지 Lethal이 먼저 살릴 기회를 갖고, 그래도 죽어 있을 때만 발동한다 —
+                // 유산 회복으로 살아난 카드는 부활 횟수를 소비하지 않는다(피닉시아가 유일한 겸용 카드).
+                if (!t_c.IsAlive && t_c.HasKeyword(CardKeyword.Immortal) && t_c.ReviveAtHalf())
+                {
+                    CardInstance t_revived = t_c;   // 연출 큐가 나중에 읽으므로 루프 변수를 캡처하지 않는다
+                    BattlePresentationQueue.Run(() => CardPassive.Notify(t_revived, CardKeyword.Immortal));
+                }
+                // 부활(불사)했으면 슬롯 유지 → Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
                 if (t_c.IsAlive) continue;
                 BattleEventStream.Emit(new BattleEvent(BattleEventKind.Death,
                     t_c.ownerIndex, t_c.slotIndex));

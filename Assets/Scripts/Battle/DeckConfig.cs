@@ -18,16 +18,26 @@ public static class DeckConfig
     // 미설정이면 GameInitializer가 기존대로 aiDeckConfig.GetRandomDeck()로 폴백한다.
     public static List<int> EnemyDeck { get; private set; }
 
-    public static void SetEnemyDeck(IEnumerable<int> _deck)
+    /// <summary>확정된 상대 덱이 쓸 카드 레벨. 0 = 미저작이며 그때는 전투가 바닥 레벨로 떨어진다.
+    /// 값은 덱을 고르는 자리에서 <b>한 번만</b> 굴려 여기 싣는다 — 전투에서 다시 굴리면 카드마다 레벨이 흔들린다.
+    /// 토너먼트·튜토리얼은 각자 저작값이 우선이라 이 값을 보지 않는다(BattleGrowthBridgeStep 참고).</summary>
+    public static int EnemyCardLevel { get; private set; }
+
+    public static void SetEnemyDeck(IEnumerable<int> _deck, int _cardLevel = 0)
     {
         EnemyDeck = new List<int>(_deck.Where(CardCatalog.Contains));
+        EnemyCardLevel = _cardLevel > 0 ? _cardLevel : 0;
     }
 
 
     public static bool HasEnemyDeck => EnemyDeck != null && EnemyDeck.Count > 0;
 
     /// <summary>다음 전투에 상대 덱을 넘기지 않도록 홀더를 비운다(폴백 경로로 되돌림).</summary>
-    public static void ClearEnemyDeck() => EnemyDeck = null;
+    public static void ClearEnemyDeck()
+    {
+        EnemyDeck = null;
+        EnemyCardLevel = 0;
+    }
 
     public static bool IsMultiplayer { get; private set; }
     public static bool AiTakeover { get; private set; }

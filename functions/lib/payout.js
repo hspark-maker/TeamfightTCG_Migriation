@@ -4,6 +4,7 @@ exports.DIVISIONS_PER_GRADE = void 0;
 exports.parseRankGradeRows = parseRankGradeRows;
 exports.rankTierCount = rankTierCount;
 exports.requiredPointsForTier = requiredPointsForTier;
+exports.resolveTierIndex = resolveTierIndex;
 exports.computeDrawRankPayout = computeDrawRankPayout;
 exports.computeRankPayout = computeRankPayout;
 exports.computeCurrencyPayout = computeCurrencyPayout;

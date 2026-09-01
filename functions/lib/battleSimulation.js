@@ -37,7 +37,6 @@ exports.Rng = Rng;
 const SYNERGY_ALIASES = {
     "덩치": "Bulk", "돌보미": "Caretaker", "포식자": "Predator", "흐름": "Flow",
     "유산": "Legacy", "수호자": "Guardian", "비늘": "Scale", "낙인": "Brand",
-    "언데드": "Undead",
 };
 function synergyName(raw) {
     return SYNERGY_ALIASES[raw.trim()] ?? raw.trim();
@@ -53,8 +52,8 @@ function synergyAmount(name, count) {
         return count >= 4 ? 2 : count >= 2 ? 1 : 0;
     if (name === "Predator")
         return count >= 4 ? 75 : count >= 2 ? 50 : 0;
-    if (name === "Guardian" || name === "Undead")
-        return count >= (name === "Undead" ? 3 : 2) ? 1 : 0;
+    if (name === "Guardian")
+        return count >= 2 ? 1 : 0;
     return 0;
 }
 function has(card, keyword) {
@@ -270,11 +269,13 @@ function removeDead(field) {
                         if (ally != null && ally !== card && ally.hp > 0)
                             heal(ally, card.legacyStack, true);
                 }
-                if (active.name === "Undead" && !card.reviveUsed) {
-                    card.reviveUsed = true;
-                    card.hp = Math.max(1, Math.floor(card.maxHp / 2));
-                }
             }
+        }
+        // 불사 키워드. 시너지 Lethal 이 먼저 살릴 기회를 갖고 그래도 죽어 있을 때만 발동한다 —
+        // 클라 AttackProcessor.RemoveDead 와 같은 순서다(유산으로 살면 부활을 소비하지 않는다).
+        if (card.hp <= 0 && has(card, 512 /* Keyword.Immortal */) && !card.reviveUsed) {
+            card.reviveUsed = true;
+            card.hp = Math.max(1, Math.floor(card.maxHp / 2));
         }
         if (card.hp > 0)
             continue;

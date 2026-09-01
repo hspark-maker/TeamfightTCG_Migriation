@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleVfxLibrary
   entries:
   - id: 1
-    prefab: {fileID: 2536638742950671837, guid: 14d77752a60d7a24abd24047eaa54d12, type: 3}
+    prefab: {fileID: 7981779424996785731, guid: 14d77752a60d7a24abd24047eaa54d12, type: 3}
     localOffset: {x: 0, y: -0.15, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.2
@@ -36,7 +36,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 5
-    prefab: {fileID: 227207458835192764, guid: b990e46b2c253724bbcfd2805f3b8973, type: 3}
+    prefab: {fileID: 8213368537585737777, guid: b990e46b2c253724bbcfd2805f3b8973, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 2
@@ -80,7 +80,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 10
-    prefab: {fileID: 5320869421729719446, guid: 438f5c1f174e5e547833bc0fccc23818, type: 3}
+    prefab: {fileID: 6420397214202470370, guid: 438f5c1f174e5e547833bc0fccc23818, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
@@ -102,7 +102,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 16
-    prefab: {fileID: 2521560478900743221, guid: 6fc3e6f7a7cf11340bec94524f6b97e4, type: 3}
+    prefab: {fileID: 7718787357079319532, guid: 6fc3e6f7a7cf11340bec94524f6b97e4, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1
@@ -113,7 +113,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 4
-    prefab: {fileID: 2590653333717155793, guid: 03710823b1ef7ff4fbb331b2bba03199, type: 3}
+    prefab: {fileID: 7911398382167659362, guid: 03710823b1ef7ff4fbb331b2bba03199, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
@@ -124,7 +124,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 17
-    prefab: {fileID: 6566167575339027792, guid: 27858caa88e70bb46af5c5fe002aba3d, type: 3}
+    prefab: {fileID: 8196593851882873603, guid: 27858caa88e70bb46af5c5fe002aba3d, type: 3}
     localOffset: {x: 0, y: 0.6, z: -0.5}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 0
@@ -157,7 +157,7 @@ MonoBehaviour:
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
   - id: 21
-    prefab: {fileID: 3243629766246550057, guid: 084ba2c917e2be54fbd546c180faa982, type: 3}
+    prefab: {fileID: 2715401866262311950, guid: 084ba2c917e2be54fbd546c180faa982, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 3

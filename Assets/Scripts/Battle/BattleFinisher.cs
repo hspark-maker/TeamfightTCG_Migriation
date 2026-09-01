@@ -97,7 +97,7 @@ public static class BattleFinisher
     ///
     /// <para><see cref="BattleField.IsEmpty"/>는 필드뿐 아니라 대기열까지 본다. 그래서 이 시점의 판정이
     /// 나중에 충원까지 끝난 뒤의 BattleLoop.Run 종료 판정과 같은 답을 낸다 — 충원은 대기열에서 꺼내
-    /// 옮기는 것이라 "비었는가"를 바꾸지 않는다. 부활(언데드)도 RemoveDead 안에서 이미 반영됐다.</para></summary>
+    /// 옮기는 것이라 "비었는가"를 바꾸지 않는다. 부활(불사)도 RemoveDead 안에서 이미 반영됐다.</para></summary>
     public static void Arm(BattleField _attackerField, BattleField _defenderField)
     {
         s_loserOwner = NoOwner;

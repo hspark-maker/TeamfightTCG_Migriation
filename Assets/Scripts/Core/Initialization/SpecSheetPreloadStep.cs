@@ -9,6 +9,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
     public override UniTask Initialize(InitializationContext _context)
     {
         PackSpec.Init();
+        AIDeckSpec.Init();
         RewardSpec.Init();
         GrowthSpec.Init();
 

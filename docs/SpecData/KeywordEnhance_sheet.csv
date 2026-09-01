@@ -1,0 +1,8 @@
+﻿id,keyword,maxLevel,hpPerLevel,baseCost,costGrowthPerLevel,costCurrency
+int,string,int,int,long,long,string
+1,Ranged,10,1,5,5,Energy
+2,Peerless,10,1,5,5,Energy
+3,Execution,10,1,5,5,Energy
+4,Taunt,10,1,5,5,Energy
+5,Cunning,10,1,5,5,Energy
+6,Healer,10,1,5,5,Energy

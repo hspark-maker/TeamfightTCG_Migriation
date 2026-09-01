@@ -11,6 +11,14 @@ public class BrandSynergyEffect : SynergyEffect
 {
     [SerializeField, Min(1)] int damagePerMember = 1;
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        if (_key != nameof(damagePerMember)) return false;
+        this.damagePerMember = ParseInt(_value);
+        return true;
+    }
+
+
     public override async UniTask OnBeforeAttack(BeforeAttackCtx _ctx)
     {
         if (_ctx.defender == null || !_ctx.defender.IsAlive || _ctx.ownField == null) return;

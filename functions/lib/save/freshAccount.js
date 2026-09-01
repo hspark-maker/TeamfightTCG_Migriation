@@ -4,6 +4,7 @@ exports.STARTER_DECK_NAME = exports.STARTER_DECK_SIZE = exports.DECK_SLOT_COUNT 
 exports.buildFreshAccountBalances = buildFreshAccountBalances;
 exports.buildFreshAccountSlots = buildFreshAccountSlots;
 const wallet_1 = require("../currency/wallet");
+const generateNickname_1 = require("../profile/generateNickname");
 /**
  * 신규 계정 최초 지급 골드. 이 상수 하나가 진실원이다 — 클라 쪽 쌍둥이였던
  * CurrencyManager.STARTING_GOLD 는 C6.4 에서 삭제됐고, 잔액은 서버 지갑만 정한다.
@@ -31,9 +32,10 @@ function buildFreshAccountBalances() {
  * 모양의 진실원은 Tools/firestore-rules-tests/fixtures/saveDocument.js 의
  * serverFreshAccountDocument() 다 — 저기와 갈리면 신규 계정의 첫 클라 저장이 룰에 막힌다.
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
+ * @param {string} nickname 문서에 굳힐 기본 닉네임 (기본: 낱말표에서 한 벌 추첨)
  * @return {SlotPatch} 슬롯 9개
  */
-function buildFreshAccountSlots(starterCardIds) {
+function buildFreshAccountSlots(starterCardIds, nickname = (0, generateNickname_1.generateNickname)()) {
     const slots = [];
     for (let i = 0; i < exports.DECK_SLOT_COUNT; i++) {
         slots.push(i === 0 ?
@@ -61,9 +63,10 @@ function buildFreshAccountSlots(starterCardIds) {
             sameCoordBootCount: 0,
             completedTriggers: [],
         },
-        // 3필드 모두 null 이 설계다 — ProfileManager 가 IsNullOrEmpty 폴백으로 기본 아바타·프레임을 고른다.
-        // 빈 문자열을 넣어도 동작은 같지만 "저작된 적 없음"과 "빈 값으로 저작됨"이 구분되지 않는다.
-        profile: { nickname: null, avatarId: null, frameId: null },
+        // 닉네임만 값이 실린다 — 계정이 생기는 이 자리에서 한 번 뽑아 굳힌다. 클라가 폴백으로 만들면
+        // 저장 전 세션마다 이름이 달라지고, 서버(매칭·랭킹)가 이름을 쓸 때 빈 값을 보게 된다.
+        // 아바타·프레임은 null 이 설계다 — 기본 id 를 세이브에 굳히지 않고 ProfileManager 가 폴백한다.
+        profile: { nickname, avatarId: null, frameId: null },
     };
 }
 //# sourceMappingURL=freshAccount.js.map

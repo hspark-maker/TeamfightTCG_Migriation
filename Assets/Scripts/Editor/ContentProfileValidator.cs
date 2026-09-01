@@ -38,6 +38,10 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     /// 비차단 경고를 별도로 담아준다.</summary>
     public static List<string> Collect(List<string> _warnings = null, EContentRunMode? _mode = null)
     {
+        // 시트를 새로 생성한 직후에도 검사가 낡은 스냅샷을 보지 않게 매번 다시 읽는다.
+        // SpecSource의 자동 리셋은 플레이 진입 훅뿐이라 에디터 세션에서는 안 돈다.
+        SpecSource.Reload();
+
         var t_errors = new List<string>();
         ContentProfileConfig t_live = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(LIVE_PROFILE_PATH);
         ContentProfileConfig t_test = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(TEST_PROFILE_PATH);
@@ -68,7 +72,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             // Test 프로필은 IncludeTestCards로 TestOnly 카드를 **덤으로 더** 실을 뿐이라,
             // 0장이면 테스트 빌드가 Live와 같은 카드 목록을 쓰는 정상 상태다(전 카드 출시 = 이 상태).
             if (t_liveCount == 0) t_errors.Add("Live 카드가 없음");
-            ValidateLiveConsumers(t_liveIds, t_errors);
+            ValidateLiveConsumers(t_liveIds, t_errors, _warnings);
         }
 
         ValidateCardArtAddresses(t_errors, _warnings, _mode);
@@ -186,7 +190,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             throw new BuildFailedException("[ContentProfile] 검증 실패\n- " + string.Join("\n- ", t_errors));
     }
 
-    static void ValidateLiveConsumers(HashSet<int> _liveIds, List<string> _errors)
+    static void ValidateLiveConsumers(HashSet<int> _liveIds, List<string> _errors, List<string> _warnings)
     {
         foreach (CardPackData t_pack in LoadBuildDependencies<CardPackData>())
         {
@@ -195,16 +199,116 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
                 CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _liveIds, _errors);
         }
 
+        // 표가 불완전하면 AIDeckConfig가 이 SO로 원자 폴백한다 — 전환이 끝날 때까지 두 진실원을 함께 검증한다.
         foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
             if (t_ai.decks != null)
                 foreach (AIDeckConfig.DeckEntry t_deck in t_ai.decks)
                     CheckCards(t_deck?.CardIds, $"{t_ai.name}/{t_deck?.deckName}", _liveIds, _errors);
+
+        ValidateAIDeckSpec(_liveIds, _errors, _warnings);
 
         foreach (TutorialScenarioData t_scenario in LoadBuildDependencies<TutorialScenarioData>())
         {
             CheckCards(t_scenario.PlayerDeckIds, $"{t_scenario.name}/player", _liveIds, _errors);
             CheckCards(t_scenario.EnemyDeckIds, $"{t_scenario.name}/enemy", _liveIds, _errors);
         }
+    }
+
+    /// <summary>표가 아직 없으면 <b>경고</b>다 — 런타임이 구 SO로 원자 폴백하므로 빌드를 막을 이유가 없다.
+    /// 표가 있을 때만 정합성을 에러로 건다(반쪽 표가 실려 나가는 것이 진짜 사고다).</summary>
+    static void ValidateAIDeckSpec(HashSet<int> _liveIds, List<string> _errors, List<string> _warnings)
+    {
+        IReadOnlyList<AIDeck> t_decks = SpecSource.Manager?.AIDeck?.All;
+        if (t_decks == null || t_decks.Count == 0)
+        {
+            _warnings?.Add("AIDeck 표가 비어 있어 AI 덱이 구 AIDeckConfig.asset으로 폴백한다.");
+            return;
+        }
+
+        int t_tierCount = ResolveRankTierCount(_warnings);
+        var t_byId = new Dictionary<string, AIDeck>(StringComparer.Ordinal);
+        var t_invalid = new HashSet<string>(StringComparer.Ordinal);
+        foreach (AIDeck t_deck in t_decks)
+        {
+            if (t_deck == null || string.IsNullOrEmpty(t_deck.deckId))
+            {
+                _errors.Add("AIDeck에 빈 deckId가 있음");
+                continue;
+            }
+            if (t_byId.ContainsKey(t_deck.deckId))
+            {
+                _errors.Add($"AIDeck deckId 중복: {t_deck.deckId}");
+                t_invalid.Add(t_deck.deckId);
+                continue;
+            }
+            t_byId.Add(t_deck.deckId, t_deck);
+
+            int t_maxTier = t_tierCount > 0 ? t_tierCount - 1 : int.MaxValue;
+            if (t_deck.fromTier < 0 || t_deck.fromTier > t_maxTier ||
+                (t_deck.toTier != 0 && (t_deck.toTier < t_deck.fromTier || t_deck.toTier > t_maxTier)))
+            {
+                _errors.Add($"{t_deck.deckId} 티어 구간 오류: {t_deck.fromTier}~{t_deck.toTier}");
+                t_invalid.Add(t_deck.deckId);
+            }
+
+            // 레벨은 한쪽만 채우면 런타임이 미저작으로 보고 조용히 바닥으로 떨어진다 — 반쪽 저작을 여기서 잡는다.
+            bool t_hasFrom = t_deck.fromLevel > 0;
+            bool t_hasTo = t_deck.toLevel > 0;
+            if (t_hasFrom != t_hasTo)
+                _errors.Add($"{t_deck.deckId} 레벨 범위 반쪽 저작: {t_deck.fromLevel}~{t_deck.toLevel} " +
+                            "(둘 다 채우거나 둘 다 0이어야 한다)");
+            else if (t_hasFrom && (t_deck.toLevel < t_deck.fromLevel ||
+                                   t_deck.toLevel > GrowthSpec.CardMaxLevelCeiling))
+                _errors.Add($"{t_deck.deckId} 레벨 범위 오류: {t_deck.fromLevel}~{t_deck.toLevel} " +
+                            $"(유효 범위 {CardGrowth.BaseLevel}~{GrowthSpec.CardMaxLevelCeiling})");
+
+            foreach (int t_cardId in DeckCards(t_deck))
+                if (t_cardId <= 0 || !_liveIds.Contains(t_cardId))
+                {
+                    _errors.Add($"{t_deck.deckId}가 TestOnly/미존재 카드 ID '{t_cardId}' 참조");
+                    t_invalid.Add(t_deck.deckId);
+                }
+        }
+
+        for (int t_tier = 0; t_tier < t_tierCount; t_tier++)
+        {
+            bool t_covered = false;
+            foreach (AIDeck t_deck in t_byId.Values)
+            {
+                int t_toTier = t_deck.toTier == 0 ? int.MaxValue : t_deck.toTier;
+                if (!t_invalid.Contains(t_deck.deckId) && t_deck.fromTier <= t_tier && t_tier <= t_toTier)
+                {
+                    t_covered = true;
+                    break;
+                }
+            }
+            if (!t_covered) _errors.Add($"AI 덱 티어 커버리지 누락: {t_tier}");
+        }
+    }
+
+    /// <summary>덱 한 줄의 카드 칸을 저작 순서대로 편다. 칸 수가 <see cref="DeckSaveManager.DECK_SIZE"/>와
+    /// 어긋나면 시트 스키마가 낡은 것이라 에러로 잡는다.</summary>
+    static IEnumerable<int> DeckCards(AIDeck _deck)
+    {
+        var t_cards = new[] { _deck.card1, _deck.card2, _deck.card3, _deck.card4, _deck.card5, _deck.card6 };
+        if (t_cards.Length != DeckSaveManager.DECK_SIZE)
+            throw new BuildFailedException(
+                $"[ContentProfile] AIDeck 시트의 카드 칸 {t_cards.Length}개가 덱 크기 {DeckSaveManager.DECK_SIZE}와 다르다.");
+        return t_cards;
+    }
+
+    /// <summary>AI 덱의 fromTier/toTier 축은 <see cref="RankManager.TierIndex"/>다 — 상한을 여기에 박으면
+    /// 랭크 등급이 늘어난 날 커버리지 검사만 조용히 좁아진다. 0은 축을 못 찾았다는 뜻이고, 그때는
+    /// 상한·커버리지 검사를 건너뛴다 — 모르는 축으로 판정해 엉뚱한 빌드 실패를 내는 것보다 낫다.</summary>
+    static int ResolveRankTierCount(List<string> _warnings)
+    {
+        int t_count = 0;
+        foreach (RankConfig t_config in LoadBuildDependencies<RankConfig>())
+            if (t_config.TierCount > t_count) t_count = t_config.TierCount;
+
+        if (t_count <= 0)
+            _warnings?.Add("RankConfig를 빌드 의존성에서 찾지 못해 AI 덱 티어 상한·커버리지 검사를 건너뛴다.");
+        return t_count;
     }
 
     static IEnumerable<T> LoadBuildDependencies<T>() where T : UnityEngine.Object

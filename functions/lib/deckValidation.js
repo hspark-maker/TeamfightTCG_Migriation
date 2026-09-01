@@ -32,6 +32,7 @@ const KEYWORD_FLAGS = {
     Healer: 64,
     Invincible: 128,
     BonusHp: 256,
+    Immortal: 512,
 };
 const GROWABLE_KEYWORDS = [
     "Ranged",

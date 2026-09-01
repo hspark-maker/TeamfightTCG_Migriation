@@ -3505,6 +3505,11 @@ MonoBehaviour:
   editButton: {fileID: 6738030594151320104}
   backButton: {fileID: 9196322997711794374}
   battleButton: {fileID: 6854664472983553879}
+  enemySection: {fileID: 6870404034472247805}
+  mySection: {fileID: 6284538003045798158}
+  mySoloAnchoredPos: {x: 0, y: 1046}
+  battleLabel: {fileID: 0}
+  soloLabelText: "매칭 시작!"
   introFx:
     enemyInfoBar: {fileID: 6870404034472247805}
     myInfoBar: {fileID: 6284538003045798158}

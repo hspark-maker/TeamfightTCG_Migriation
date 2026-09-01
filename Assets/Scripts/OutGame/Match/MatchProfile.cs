@@ -55,6 +55,22 @@ public readonly struct MatchProfile
         return new MatchProfile(_nickname, t_rank.TierIndex, t_rank.DisplayName, t_rank.Badge, _avatar);
     }
 
+    public static MatchProfile OfOpponent(MatchmakingProfile _profile)
+    {
+        // 실매칭 상대는 자기 티어를 직접 보내온다. 그 값이 티어표에 없으면(구버전·손상·위장)
+        // **내 랭크로 대신 채우지 않는다** — 그러면 상대가 항상 나와 같은 등급으로 보이는
+        // 페이크 매칭 시절의 거짓 표시가 실매칭에서 되살아난다. 모르는 건 모르는 대로 비운다.
+        if (!RankManager.TryGetTier(_profile.TierIndex, out RankTier t_tier))
+            return new MatchProfile(_profile.Nickname, 0, string.Empty, null, null);
+
+        ProfileLook t_look = ProfileManager.Config != null
+            ? ProfileManager.Config.LookOf(_profile.AvatarId, _profile.FrameId)
+            : default;
+        return new MatchProfile(_profile.Nickname, t_tier.Index, t_tier.DisplayName, t_tier.Badge,
+                                t_look.Face, t_look.Ring, t_look.RingColor,
+                                t_look.Plate, t_look.PlateColor);
+    }
+
     // 토너먼트 정점의 고정 상대. 랭크를 비우는 이유: 덱도 카드 레벨도 정점 저작값이라 내 티어와 무관하고,
     // 이 전투는 랭크에 반영되지도 않는다 — 배지를 붙이면 없는 랭크전을 있는 것처럼 보이게 한다.
     public static MatchProfile OfTournamentNode(string _name, Sprite _avatar)

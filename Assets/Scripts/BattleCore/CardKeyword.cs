@@ -11,4 +11,5 @@ public enum CardKeyword
     Healer     = 1 << 6,
     Invincible = 1 << 7,
     BonusHp    = 1 << 8,
+    Immortal   = 1 << 9,   // 불사: 전투 중 1회, 치사 피해 시 최대 체력 50%로 부활(CardInstance.ReviveAtHalf)
 }

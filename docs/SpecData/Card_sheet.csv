@@ -8,9 +8,9 @@ int,string,string,string,int,string,int,string,int,int,int,int,string,string,str
 5,Data_Card_IronMongchi,철갑몽치,Live,5,Taunt,0,Data_Synergy_Guardian,0,5,4,6,철갑 등껍질로 모두를 지키는 든든한 탱커. 문이 좁으면 전투보다 입장이 더 오래 걸린다.,Rare,Default,
 6,Data_Card_Rockbean,바위콩,Live,5,,0,,0,5,4,3,위험하면 동그랗게 말아 완벽한 돌이 된다. 너무 완벽해서 동료들이 가끔 광물로 착각한다.,Rare,Default,
 7,Data_Card_KingChestnutHedgehog,왕밤도치,Live,6,Taunt,2,Data_Synergy_Guardian,0,3,4,6,밤송이 갑옷을 입고 농장을 지키는 거대한 고슴도치. 구르기 한 번이면 적도 수확물도 함께 사라진다.,Rare,Default,
-8,Data_Card_Nightchestnut,깜밤이,Live,5,Taunt,2,Data_Synergy_Undead,0,3,4,6,밤길 안내를 맡은 올빼미 정찰병. 정작 낮 회의에서는 망토 속에서 꾸벅꾸벅 졸고 있다.,Rare,Default,
-9,Data_Card_MushroomCat,버섯냥,Live,4,Ranged,2,Data_Synergy_Undead,0,4,4,4,등의 버섯으로 만능 약을 만든다는 고양이. 효과는 확실하지만 설명서를 읽으면 조금 불안해진다.,Common,Default,Effect_Attack_MushroomCat
-10,Data_Card_Dreameater,꿈먹이,Live,5,Execution,2,Data_Synergy_Undead,0,4,3,7,나쁜 꿈과 스트레스를 먹어주는 다정한 맥. 너무 많이 먹은 날에는 본인이 월요일 출근 꿈을 꾼다.,Rare,Default,
+8,Data_Card_Nightchestnut,깜밤이,Live,5,Taunt,2,,0,3,4,6,밤길 안내를 맡은 올빼미 정찰병. 정작 낮 회의에서는 망토 속에서 꾸벅꾸벅 졸고 있다.,Rare,Default,
+9,Data_Card_MushroomCat,버섯냥,Live,4,Ranged,2,,0,4,4,4,등의 버섯으로 만능 약을 만든다는 고양이. 효과는 확실하지만 설명서를 읽으면 조금 불안해진다.,Common,Default,Effect_Attack_MushroomCat
+10,Data_Card_Dreameater,꿈먹이,Live,5,Execution,2,,0,4,3,7,나쁜 꿈과 스트레스를 먹어주는 다정한 맥. 너무 많이 먹은 날에는 본인이 월요일 출근 꿈을 꾼다.,Rare,Default,
 11,Data_Card_Woodhorn,우드혼,Live,5,,0,Data_Synergy_Legacy,0,5,3,4,나무뿔로 숲을 돌보고 식물을 키우는 작은 사슴. 가지치기를 부탁하면 자신의 뿔부터 걱정한다.,Rare,Default,
 12,Data_Card_CaptainBeak,대장부리,Live,5,Peerless|Mark,2,Data_Synergy_Legacy,0,4,3,7,부리 하나로 최고의 무기를 만드는 딱따구리 대장장이. 새벽에도 두드려서 마을의 천적은 알람이 아니라 대장부리다.,Arcane,Default,
 13,Data_Card_Swampfrog,늪꾸리,Live,4,Execution,2,Data_Synergy_Predator,0,4,4,4,진흙을 뿌려 적의 발을 묶는 개구리. 전투가 끝나면 가장 먼저 미끄러지는 것도 대개 본인이다.,Common,Default,
@@ -40,4 +40,4 @@ int,string,string,string,int,string,int,string,int,int,int,int,string,string,str
 37,Data_Card_Magnetos,마그네토스,Live,4,Taunt,2,Data_Synergy_Scale,0,5,4,3,"강력한 자석 뿔로 친해지고 싶으면 끌어당기고, 싫으면 아주 멀리 보낸다.",Rare,Default,
 38,Data_Card_Crackmon,크랙몬,Live,5,Execution,2,Data_Synergy_Bulk,0,6,4,3,현실의 틈에서 튀어나온 정체불명의 네발 생물. 문을 사용하지 않아 노크를 모른다.,Arcane,Default,
 39,Data_Card_Raigor,라이고르,Live,6,Peerless,2,Data_Synergy_Predator|Data_Synergy_Brand,0,4,4,6,"아주 오래전 하늘이 처음 천둥을 울렸을 때 태어났다고 전해지는 신수. 평소에는 느긋하게 구름 위에서 낮잠을 자지만, 화가 나면 주변 하늘이 통째로 검게 변한다.",Mythic,Default,
-40,Data_Card_Phoenixia,피닉시아,Live,6,Taunt,2,Data_Synergy_Legacy|Data_Synergy_Undead,0,3,5,6,죽음과 재생을 상징하는 전설의 신수지만 생각보다 성격은 꽤 수다스럽다. 오래된 숲이 불타거나 새로운 생명이 태어나는 순간 나타나 꽃잎처럼 빛을 흩뿌린다.,Mythic,Default,
+40,Data_Card_Phoenixia,피닉시아,Live,6,Taunt,2,Data_Synergy_Legacy,0,3,5,6,죽음과 재생을 상징하는 전설의 신수지만 생각보다 성격은 꽤 수다스럽다. 오래된 숲이 불타거나 새로운 생명이 태어나는 순간 나타나 꽃잎처럼 빛을 흩뿌린다.,Mythic,Default,

@@ -8,6 +8,14 @@ public class PredatorSynergyEffect : SynergyEffect
 {
     [SerializeField, Range(0, 100)] int lifestealPercent = 50;
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        if (_key != nameof(lifestealPercent)) return false;
+        this.lifestealPercent = ParseInt(_value);
+        return true;
+    }
+
+
     public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
         int t_heal = Mathf.FloorToInt(_ctx.damageDealt * (this.lifestealPercent / 100f));

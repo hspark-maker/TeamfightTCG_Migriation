@@ -79,7 +79,7 @@ public class GameManager : MonoBehaviour
         // 저장된 흔들림 설정 복원(미저장이면 켬). 전투가 열리기 전에 확정돼 있어야 한다.
         SetScreenShake(LocalPrefs.GetInt(ScreenShakePrefsKey, 1) != 0, false);
 
-        BootFirebaseAsync(ContentProfileConfig.Active).Forget();
+        InitializeFirebaseAsync(ContentProfileConfig.Active).Forget();
     }
 
     /// <summary>계정이 정해진 뒤에 Firebase 를 세운다.
@@ -87,7 +87,7 @@ public class GameManager : MonoBehaviour
     /// <para>관문이 <b>여기</b>여야 하는 이유: <c>PlayerSaveCloud.AuthenticateAsync</c> 가 인증을
     /// 5초 상한으로 기다린다 — Firebase 를 먼저 세우고 그 안에서 사람을 기다리면 초기화가 타임아웃으로 죽고,
     /// 자동 익명 로그인이 이미 끝나 로그인 화면이 고를 것도 남지 않는다.</para></summary>
-    async UniTaskVoid BootFirebaseAsync(ContentProfileConfig _profile)
+    async UniTaskVoid InitializeFirebaseAsync(ContentProfileConfig _profile)
     {
         await SignInGate.WaitAsync();
         if (this == null) return;

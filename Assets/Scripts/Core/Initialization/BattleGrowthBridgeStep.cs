@@ -30,13 +30,18 @@ public sealed class BattleGrowthBridgeStep : MainInitializer
         return UniTask.CompletedTask;
     }
 
-    // 이번 전투에서 적 카드가 쓸 레벨. 토너먼트면 정점 저작값(곡선 밖 레벨은 보너스가 멈추므로 만렙 클램프),
-    // 아니면 바닥이다 — 랭크 티어로 적 레벨을 올리던 축은 제거됐다.
+    // 이번 전투에서 적 카드가 쓸 레벨. 우선순위는 토너먼트 정점 저작값 > AI 덱 저작 레벨 > 바닥이다
+    // (랭크 티어로 적 레벨을 올리던 축은 제거됐다). 곡선 밖 레벨은 보너스가 멈추므로 어느 쪽이든 만렙 클램프.
+    //
+    // 덱 레벨은 여기서 굴리지 않는다 — 이 함수는 카드 1장마다 불리므로 여기서 뽑으면 같은 덱 안에서
+    // 카드마다 레벨이 흔들린다. 추첨은 덱을 고르는 자리(AIDeckConfig.TakeDeck)에서 판당 1회다.
     static int EnemyCardLevel()
     {
-        if (!TournamentRun.IsActive) return CardGrowth.BaseLevel;
+        int t_level = TournamentRun.IsActive ? TournamentRun.AiCardLevel
+                    : DeckConfig.EnemyCardLevel > 0 ? DeckConfig.EnemyCardLevel
+                    : CardGrowth.BaseLevel;
 
         int t_max = CardGrowthManager.MaxLevel;
-        return t_max > 0 && TournamentRun.AiCardLevel > t_max ? t_max : TournamentRun.AiCardLevel;
+        return t_max > 0 && t_level > t_max ? t_max : t_level;
     }
 }

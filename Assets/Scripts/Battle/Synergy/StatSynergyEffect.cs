@@ -10,6 +10,18 @@ public class StatSynergyEffect : SynergyEffect
     [SerializeField] private CardKeyword grantedKeywords;
     [SerializeField] private int         dmgReduction;   // 비늘: 받는 피해 상시 -N (정적, 멱등)
 
+    public override bool TrySetParam(string _key, string _value)
+    {
+        switch (_key)
+        {
+            case nameof(bonusHp):         this.bonusHp = ParseInt(_value); return true;
+            case nameof(grantedKeywords): this.grantedKeywords = ParseKeywords(_value); return true;
+            case nameof(dmgReduction):    this.dmgReduction = ParseInt(_value); return true;
+            default: return false;
+        }
+    }
+
+
     public override void OnDeckResolved(DeckCtx _ctx)
     {
         if (_ctx.card == null) return;

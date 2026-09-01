@@ -81,26 +81,30 @@ public partial class CardPack
     /// 팩 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 안정 키(코드/SO 참조용
+    /// 안정 키(코드 참조용, 변경 금지)
     public string packId;
-    /// 변경 금지)
-    public string displayName;
     /// 화면 표시 이름
-    public string channel;
+    public string displayName;
     /// Live=실행 노출 / TestOnly=테스트만
-    public string priceType;
+    public string channel;
     /// 결제 재화(Gold/Diamond/Energy/Shard)
-    public long price;
+    public string priceType;
     /// 가격
-    public int drawCount;
+    public long price;
     /// 한 팩에서 뽑는 장수
-    public int uniqueDraw;
+    public int drawCount;
     /// 1=한 팩 안 중복 없음(비복원 추출)
-    public string refundType;
+    public int uniqueDraw;
     /// 중복 환급 재화
-    public long refundAmount;
+    public string refundType;
     /// 중복 1장당 환급량(0=환급 없음)
+    public long refundAmount;
+    /// 이 랭크 이상에서만 구매 가능(빈칸=제한 없음)
     public string minRankGrade;
+    /// 상점 진열 순서(1부터. 0=진열 안 함)
+    public int sortOrder;
+    /// 팩 이미지 Addressables 주소(Packs 라벨)
+    public string artKey;
 }
 
 [GeneratorSpecData]
@@ -137,6 +141,40 @@ public partial class RankGrade
     public long winPoints;
     /// 이 등급에서 패배 시 뺄 랭크 포인트 = 별 한 칸. 양수로 적는다(코드가 뺀다). 승급전 한 판은 이 값을 쓰지 않는다 — 승급전은 천장/중간 지점으로 직접 쓴다
     public long losePoints;
+}
+
+[GeneratorSpecData]
+public partial class AIDeck
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 덱 안정 키
+    public string deckId;
+    /// 검증·로그용 이름
+    public string deckName;
+    /// 등장 시작 티어 인덱스
+    public int fromTier;
+    /// 등장 종료 티어(포함·0은 제한 없음)
+    public int toTier;
+    /// 같은 티어 안 등장 가중치(0 이하는 1)
+    public int weight;
+    /// 카드 레벨 하한(0=미저작)
+    public int fromLevel;
+    /// 카드 레벨 상한·포함(0=미저작)
+    public int toLevel;
+    /// 1번 칸 Card.id 참조
+    public int card1;
+    /// 2번 칸
+    public int card2;
+    /// 3번 칸
+    public int card3;
+    /// 4번 칸
+    public int card4;
+    /// 5번 칸
+    public int card5;
+    /// 6번 칸
+    public int card6;
 }
 
 [GeneratorSpecData]
@@ -300,35 +338,19 @@ public partial class SynergyDef
 [GeneratorSpecData]
 public partial class SynergyEffectDef
 {
-    /// 행 고유 번호(부여 후 변경 금지)DeD
+    /// 행 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// Synergy.synergyId 참조
+    /// SynergyDef.synergyId 참조
     public string synergyId;
-    /// SynergyTier.tierIndex 참조
+    /// SynergyTierDef.tierIndex 참조
     public int tierIndex;
     /// 같은 티어 안 적용 순서(0부터)
     public int effectOrder;
     /// 효과 타입(코드 SynergyEffect 서브클래스와 1:1)
     public string effectType;
-}
-
-[GeneratorSpecData]
-public partial class SynergyEffectParamDef
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// Synergy.synergyId 참조
-    public string synergyId;
-    /// SynergyTier.tierIndex 참조
-    public int tierIndex;
-    /// SynergyEffect.effectOrder 참조
-    public int effectOrder;
-    /// 파라미터 키(효과 클래스 필드명과 동일)
-    public string paramKey;
-    /// 파라미터 값(정수 · bool은 0/1 · 키워드는 이름)
-    public string paramValue;
+    /// 파라미터(키=값
+    public string parameters;
 }
 
 [GeneratorSpecData]
@@ -337,7 +359,7 @@ public partial class SynergyTierDef
     /// 행 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// Synergy.synergyId 참조
+    /// SynergyDef.synergyId 참조
     public string synergyId;
     /// 티어 인덱스(0부터 · 오름차순 저작)
     public int tierIndex;

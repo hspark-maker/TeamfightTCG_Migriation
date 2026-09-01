@@ -19,9 +19,10 @@ public static class SpecPayloadCodec
     public const int SchemaVersion = 3;
     public static readonly string[] TableNames =
     {
-        "Card", "Card_Test", "CardPack", "CardPackDrop", "Reward",
+        "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
         "AlbumEntry", "AlbumThemeInfo",
+        "SynergyDef", "SynergyTierDef", "SynergyEffectDef", "SynergyEffectParamDef",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -156,8 +157,9 @@ public static class SpecPayloadCodec
     }
 
     /// <summary><see cref="AppendStringArray"/>가 만든 형태만 받는다 — 공백도 중첩도 없는 2단 문자열 배열.
-    /// 관대한 JSON 파서가 아니다. 형태가 어긋나면 조용히 넘기지 않고 실패시킨다.</summary>
-    static bool TryParseStringMatrix(string _text, out List<string[]> _matrix, out string _error)
+    /// 관대한 JSON 파서가 아니다. 형태가 어긋나면 조용히 넘기지 않고 실패시킨다.
+    /// 표 타입을 모르는 호출부(에디터 업로더의 행 대조)도 쓰므로 public이다 — payload 형식을 아는 곳은 여기 하나다.</summary>
+    public static bool TryParseStringMatrix(string _text, out List<string[]> _matrix, out string _error)
     {
         _matrix = new List<string[]>();
         _error = null;
@@ -254,11 +256,13 @@ public static class SpecPayloadCodec
     static Type RowTypeOf(string _table) => _table switch
     {
         "Card" => typeof(Card), "Card_Test" => typeof(Card_Test), "CardPack" => typeof(CardPack),
-        "CardPackDrop" => typeof(CardPackDrop), "Reward" => typeof(Reward),
+        "CardPackDrop" => typeof(CardPackDrop), "AIDeck" => typeof(AIDeck), "Reward" => typeof(Reward),
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),
         "CardLimitBreak" => typeof(CardLimitBreak),
         "AlbumEntry" => typeof(AlbumEntry), "AlbumThemeInfo" => typeof(AlbumThemeInfo),
+        "SynergyDef" => typeof(SynergyDef), "SynergyTierDef" => typeof(SynergyTierDef),
+        "SynergyEffectDef" => typeof(SynergyEffectDef), "SynergyEffectParamDef" => typeof(SynergyEffectParamDef),
         _ => null,
     };
 

@@ -142,8 +142,19 @@ public static class SpecSource
         return t_result.AsReadOnly();
     }
 
+    /// <summary>파싱 스냅샷을 버리고 그 자리에서 다시 읽는다.
+    /// 에디터 도구가 SpecData.bytes를 새로 만든 뒤 낡은 스냅샷으로 판정하지 않게 여는 문이다 —
+    /// 플레이 진입 전까지는 <see cref="ResetRuntimeState"/>가 안 돌아 스냅샷이 세션 내내 남는다.</summary>
+    public static void Reload()
+    {
+        Clear();
+        EnsureLoaded();
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetRuntimeState()
+    static void ResetRuntimeState() => Clear();
+
+    static void Clear()
     {
         s_loaded = false;
         s_manager = null;

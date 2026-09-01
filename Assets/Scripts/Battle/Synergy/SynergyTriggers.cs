@@ -186,7 +186,7 @@ public static class SynergyTriggers
         }
     }
 
-    // [Lethal] 치사 확정 시 self(죽는 카드) 소속 활성 시너지 효과 발화(언데드 부활/유산 회복).
+    // [Lethal] 치사 확정 시 self(죽는 카드) 소속 활성 시너지 효과 발화(유산 회복 등).
     // 동기 void — RemoveDead가 이 호출 직후 IsAlive로 부활 게이팅. RNG 미소비.
     public static void Lethal(DeathCtx ctx)
     {

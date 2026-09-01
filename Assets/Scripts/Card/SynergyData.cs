@@ -59,6 +59,25 @@ public class SynergyData : ScriptableObject
     /// 색을 실제로 지정한 시너지만 틴트가 먹는다.</summary>
     public Color TintOrWhite => this.color.a > 0f ? this.color : Color.white;
 
-    // 다중 티어 정의. requiredCount 오름차순 권장, Resolver가 만족하는 최고 티어 선택
-    public SynergyTier[] tiers;
+    [Tooltip("시트(SynergyDef.synergyId)와 맞물리는 논리 ID. 비우면 에셋 이름의 Data_Synergy_ 접두를 뗀 값을 쓴다.")]
+    public string synergyId;
+
+    /// <summary>시트 조인 키. 에셋 이름에 기대는 폴백을 남겨 둔 건 에셋 8개를 손대지 않고 넘어오기 위해서다.</summary>
+    public string SynergyId
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(this.synergyId)) return this.synergyId;
+            const string PREFIX = "Data_Synergy_";
+            return this.name.StartsWith(PREFIX, System.StringComparison.Ordinal)
+                 ? this.name.Substring(PREFIX.Length)
+                 : this.name;
+        }
+    }
+
+    // 다중 티어 정의. requiredCount 오름차순, Resolver가 만족하는 최고 티어 하나를 고른다.
+    //
+    // **저작하지 않는다 — SynergySpecSource가 스펙시트(SynergyTierDef/EffectDef/EffectParamDef)에서 만들어 꽂는다.**
+    // 직렬화하지 않으므로 에셋에는 값이 남지 않고, 주입 전에 조회하면 비어 있다(= 시너지 비활성).
+    [System.NonSerialized] public SynergyTier[] tiers;
 }

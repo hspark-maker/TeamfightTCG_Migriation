@@ -244,6 +244,20 @@ public partial class ReleaseManagerWindow
             }
         }
 
+        // 런타임은 블롭만 읽는다 — rows/ 미러는 콘솔에서 표를 눈으로 볼 때만 쓴다.
+        // 끄면 업로드 쓰기가 표당 2건(메타·블롭)으로 떨어지고, 대신 rows/ 는 그 시점에 멈춘다.
+        bool t_mirror = EditorGUILayout.ToggleLeft(
+            "rows/ 미러도 함께 쓰기 (끄면 업로드 비용 급감 · 콘솔 열람용 사본은 낡는다)",
+            SpecFirestoreUploader.MirrorRows);
+        if (t_mirror != SpecFirestoreUploader.MirrorRows) SpecFirestoreUploader.MirrorRows = t_mirror;
+        if (!t_mirror)
+            EditorGUILayout.HelpBox(
+                "rows/ 미러가 꺼져 있다. 게임은 블롭만 보므로 영향이 없지만, Firestore 콘솔의 rows/ 는 " +
+                "마지막으로 미러한 revision에 멈춘다. 서버 폴백도 낡은 미러는 읽지 않고 실패한다.",
+                MessageType.Info);
+
+        EditorGUILayout.Space(4f);
+
         foreach (string t_table in this.dataTables)
         {
             bool t_was = this.dataSelected.Contains(t_table);

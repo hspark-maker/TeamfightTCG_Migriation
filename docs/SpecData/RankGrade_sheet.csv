@@ -1,0 +1,7 @@
+﻿id,gradeKey,displayName,entryPoints,pointsPerDivision,winPoints,losePoints
+int,string,string,long,long,long,long
+1,Bronze,Bronze,100,40,10,10
+2,Silver,Silver,260,40,10,10
+3,Gold,Gold,420,40,10,10
+4,Platinum,Platinum,580,40,10,10
+5,Diamond,Diamond,740,40,10,10

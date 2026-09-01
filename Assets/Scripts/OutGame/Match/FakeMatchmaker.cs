@@ -36,8 +36,9 @@ public class FakeMatchmaker : IMatchmaker
             m_pool != null ? m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
             m_pool != null ? m_pool.PickAvatar() : null);
 
-        IReadOnlyList<int> t_deck = m_decks != null ? m_decks.GetDeckForTier(t_tier) : null;
+        int t_cardLevel = 0;
+        IReadOnlyList<int> t_deck = m_decks != null ? m_decks.GetDeckForTier(t_tier, out t_cardLevel) : null;
 
-        return new MatchOpponent(t_profile, t_deck);
+        return new MatchOpponent(t_profile, t_deck, t_cardLevel);
     }
 }

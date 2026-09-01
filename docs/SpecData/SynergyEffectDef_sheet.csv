@@ -1,0 +1,18 @@
+﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,SynergyTierDef.tierIndex 참조,같은 티어 안 적용 순서(0부터),효과 타입(코드 SynergyEffect 서브클래스와 1:1)
+id,synergyId,tierIndex,effectOrder,effectType
+int,string,int,int,string
+1,Brand,0,0,Brand
+2,Brand,1,0,Brand
+3,Bulk,0,0,Stat
+4,Bulk,1,0,Stat
+5,Caretaker,0,0,Caretaker
+6,Caretaker,1,0,Caretaker
+7,Flow,0,0,Flow
+8,Flow,1,0,Flow
+9,Guardian,0,0,Guardian
+10,Legacy,0,0,Legacy
+11,Legacy,1,0,Legacy
+12,Predator,0,0,Predator
+13,Predator,1,0,Predator
+14,Scale,0,0,Stat
+15,Scale,1,0,Stat

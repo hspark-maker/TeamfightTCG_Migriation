@@ -9,7 +9,7 @@ const FNV_PRIME = BigInt("1099511628211");
 
 const enum Keyword {
   Ranged = 1, Peerless = 2, Execution = 4, Taunt = 8, Cunning = 16,
-  Mark = 32, Healer = 64, Invincible = 128,
+  Mark = 32, Healer = 64, Invincible = 128, Immortal = 512,
 }
 
 type Card = {
@@ -80,7 +80,6 @@ export class Rng {
 const SYNERGY_ALIASES: Readonly<Record<string, string>> = {
   "덩치": "Bulk", "돌보미": "Caretaker", "포식자": "Predator", "흐름": "Flow",
   "유산": "Legacy", "수호자": "Guardian", "비늘": "Scale", "낙인": "Brand",
-  "언데드": "Undead",
 };
 
 function synergyName(raw: string): string {
@@ -93,7 +92,7 @@ function synergyAmount(name: string, count: number): number {
   if (name === "Scale") return count >= 4 ? 2 : count >= 2 ? 1 : 0;
   if (name === "Legacy") return count >= 4 ? 2 : count >= 2 ? 1 : 0;
   if (name === "Predator") return count >= 4 ? 75 : count >= 2 ? 50 : 0;
-  if (name === "Guardian" || name === "Undead") return count >= (name === "Undead" ? 3 : 2) ? 1 : 0;
+  if (name === "Guardian") return count >= 2 ? 1 : 0;
   return 0;
 }
 
@@ -284,10 +283,12 @@ function removeDead(field: Field): void {
         if (active.name === "Legacy" && card.legacyStack > 0) {
           for (const ally of field.slots) if (ally != null && ally !== card && ally.hp > 0) heal(ally, card.legacyStack, true);
         }
-        if (active.name === "Undead" && !card.reviveUsed) {
-          card.reviveUsed = true; card.hp = Math.max(1, Math.floor(card.maxHp / 2));
-        }
       }
+    }
+    // 불사 키워드. 시너지 Lethal 이 먼저 살릴 기회를 갖고 그래도 죽어 있을 때만 발동한다 —
+    // 클라 AttackProcessor.RemoveDead 와 같은 순서다(유산으로 살면 부활을 소비하지 않는다).
+    if (card.hp <= 0 && has(card, Keyword.Immortal) && !card.reviveUsed) {
+      card.reviveUsed = true; card.hp = Math.max(1, Math.floor(card.maxHp / 2));
     }
     if (card.hp > 0) continue;
     card.slot = -1; field.fallen.push(card.cardId); field.slots[slot] = null;

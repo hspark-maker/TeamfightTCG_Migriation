@@ -1,0 +1,17 @@
+﻿행 고유 번호(부여 후 변경 금지),SynergyDef.synergyId 참조,SynergyTierDef.tierIndex 참조,SynergyEffectDef.effectOrder 참조,파라미터 키(효과 클래스 필드명과 동일),파라미터 값(정수 · bool은 0/1 · 키워드는 이름)
+id,synergyId,tierIndex,effectOrder,paramKey,paramValue
+int,string,int,int,string,string
+1,Brand,0,0,damagePerMember,1
+2,Brand,1,0,damagePerMember,2
+3,Bulk,0,0,bonusHp,3
+4,Bulk,1,0,bonusHp,6
+5,Caretaker,0,0,amount,1
+6,Caretaker,1,0,amount,2
+7,Flow,0,0,amount,1
+8,Flow,1,0,amount,2
+9,Legacy,0,0,amount,1
+10,Legacy,1,0,amount,2
+11,Predator,0,0,lifestealPercent,50
+12,Predator,1,0,lifestealPercent,75
+13,Scale,0,0,dmgReduction,1
+14,Scale,1,0,dmgReduction,2

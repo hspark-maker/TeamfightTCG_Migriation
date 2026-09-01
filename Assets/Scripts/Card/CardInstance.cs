@@ -37,7 +37,7 @@ public class CardInstance
     // 양 클라가 동일 스폰/사망/턴종료 경로에서 순수 산술로 동일하게 파생 → 동기화 불필요.
     public int  flowBonus;     // 흐름: AttackDamage에 가산되는 흐름 스택(스택 1당 공격력 +1). 등장마다 성장(무제한).
     public int  legacyStack;   // 유산: 내 턴 종료마다 +1, 사망 시 아군 회복량.
-    public bool reviveUsed;    // 언데드: 게임당 1회 부활 소진 플래그.
+    public bool reviveUsed;    // 불사: 전투당 1회 부활 소진 플래그.
     public bool hasShield;      // 보호막: 다음 양수 피해 1회 무시. bool이라 재부여해도 중첩되지 않는다.
 
     // 교활 효과로 필드에서 물러난 뒤 재등장하는 카드인지 표시.
@@ -288,7 +288,7 @@ public class CardInstance
         BattleEventStream.Emit(new BattleEvent(BattleEventKind.ShieldChanged, this.ownerIndex, this.slotIndex));
     }
 
-    /// <summary>언데드: 파괴 순간 체력 50%(최소 1)로 게임당 1회 부활. 성공 시 true(제자리 hp 복구).
+    /// <summary>불사: 파괴 순간 체력 50%(최소 1)로 전투당 1회 부활. 성공 시 true(제자리 hp 복구).
     /// 무적 등과 무관한 순수 산술 — RemoveDead가 이 결과로 RemoveCard 게이팅.</summary>
     public bool ReviveAtHalf()
     {

@@ -183,7 +183,8 @@ public class GameInitializer : MonoBehaviour
         // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom(셔플 시드)을 소비하지 않으므로
         // 시드 설정(InitializeSinglePlayerFields)보다 앞에서 뽑아도 결정론에 영향이 없다.
         int t_tier = s_enemyTierProvider != null ? s_enemyTierProvider() : 0;
-        DeckConfig.SetEnemyDeck(this.aiDeckConfig.GetDeckForTier(t_tier));
+        var t_deck = this.aiDeckConfig.GetDeckForTier(t_tier, out int t_cardLevel);
+        DeckConfig.SetEnemyDeck(t_deck, t_cardLevel);
     }
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.
