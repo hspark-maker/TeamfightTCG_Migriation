@@ -129,7 +129,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         (EStepField.MessagePlacement, "messageAtBottom"),
         (EStepField.FreeOfCharge,     "freeOfCharge"),
         (EStepField.WaitUnlockIntro,  "waitUnlockIntro"),
-        (EStepField.Pack,             "pack"),
+        (EStepField.Pack,             "packId"),
         (EStepField.PackPriceLabel,   "packPriceLabel"),
         (EStepField.Scenario,         "scenario"),
         (EStepField.Card,             "cardId"),

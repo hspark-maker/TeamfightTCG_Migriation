@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.limitBreakCard = exports.reportTournamentWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.ensureWallet = exports.ensureAccount = exports.devBumpRevision = exports.ping = void 0;
+exports.limitBreakCard = exports.reportTournamentWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.ensureWallet = exports.ensureAccount = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -19,6 +19,8 @@ var lockDeck_1 = require("./commands/lockDeck");
 Object.defineProperty(exports, "lockDeck", { enumerable: true, get: function () { return lockDeck_1.lockDeck; } });
 var getRankSnapshot_1 = require("./commands/getRankSnapshot");
 Object.defineProperty(exports, "getRankSnapshot", { enumerable: true, get: function () { return getRankSnapshot_1.getRankSnapshot; } });
+var findAiMatch_1 = require("./commands/findAiMatch");
+Object.defineProperty(exports, "findAiMatch", { enumerable: true, get: function () { return findAiMatch_1.findAiMatch; } });
 var verifyMatchTicket_1 = require("./commands/verifyMatchTicket");
 Object.defineProperty(exports, "verifyMatchTicket", { enumerable: true, get: function () { return verifyMatchTicket_1.verifyMatchTicket; } });
 var submitMatchResult_1 = require("./commands/submitMatchResult");

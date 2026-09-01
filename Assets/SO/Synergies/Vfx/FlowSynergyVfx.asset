@@ -15,12 +15,19 @@ MonoBehaviour:
   emblems: []
   wind:
     id: 13
-    prefab: {fileID: 1140404083555214, guid: a3f61c94d27b4e0f8b5d9270e4c81fa6, type: 3}
-    localOffset: {x: 0, y: 0, z: 0}
-    initialRotation: {x: 0, y: 0, z: 0}
+    prefab: {fileID: 6284609396194754941, guid: 5971013c2c057734f944ef99fb358127, type: 3}
+    localOffset: {x: 0, y: -1.5, z: 0}
+    initialRotation: {x: -90, y: 0, z: 0}
     lifetime: 2
     sortingOrder: 20
+    scale: 0
     alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  windScaleBase: 1
+  windScalePerStack: 0.16
+  windScaleMax: 2.2
   references:
     version: 2
     RefIds: []

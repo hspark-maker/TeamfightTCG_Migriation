@@ -22,15 +22,13 @@ public enum SynergyEmblemScope
 // 엠블럼의 움직임 스타일은 enum이 아니라 **타입**이다 — SynergyEmblemSpec의 자식 하나가 몸짓 하나다.
 // (enum이면 몸짓을 늘릴 때 값 추가 + 재생부 switch + 안 쓰는 형태값 칸이 같이 늘어난다.)
 
-[System.Serializable]
+// 저작하지 않는다 — SynergySpecSource가 시트 행에서 만들어 꽂는다(인스펙터에 뜨지 않으므로 직렬화 속성도 없다).
 public class SynergyTier
 {
     public int requiredCount;
 
-    [Tooltip("이 단계의 별칭. 설명문에 '2장 — <라벨>'로 붙는다.\n\n" +
-             "· 비워 두면 요구 장수만 나온다.\n" +
-             "· 시너지 이름과 똑같이 적으면 표시하지 않는다 — 이름이 바로 위에 있어 같은 말이 두 번 나온다.\n" +
-             "  단계가 하나뿐인 시너지는 비워 두는 편이 맞다.")]
+    // 이 단계의 별칭(SynergyTierDef.label). 설명문에 '2장 — <라벨>'로 붙는다.
+    // 비면 요구 장수만 나오고, 시너지 이름과 같으면 표시하지 않는다.
     public string label;
 
     public SynergyEffect[] effects;
@@ -39,8 +37,6 @@ public class SynergyTier
 [CreateAssetMenu(fileName = "NewSynergy", menuName = "Card Battle/Synergy Data")]
 public class SynergyData : ScriptableObject
 {
-    public string displayName;
-    [TextArea] public string effectDescription;
     public Color  color;
     public Sprite activeIcon;   // 배지에 표시할 시너지 아이콘 스프라이트(SynergyBadgeView가 사용)
     public Sprite inactiveIcon;
@@ -74,6 +70,13 @@ public class SynergyData : ScriptableObject
                  : this.name;
         }
     }
+
+    // 화면 표시 이름(SynergyDef.displayName). 비면 SynergyText가 에셋 이름으로 폴백한다.
+    // **저작하지 않는다** — 아래 tiers와 같이 SynergySpecSource가 시트에서 꽂는다.
+    [System.NonSerialized] public string displayName;
+
+    // 효과 설명문(SynergyDef.effectDescription). 저작하지 않는다.
+    [System.NonSerialized] public string effectDescription;
 
     // 다중 티어 정의. requiredCount 오름차순, Resolver가 만족하는 최고 티어 하나를 고른다.
     //

@@ -55,7 +55,7 @@ public sealed class BattleGoldenCheckpoint
 [Serializable]
 public sealed class BattleGoldenDocument
 {
-    public int schemaVersion = 2;   // 2 = 무승부(draw) 기록
+    public int schemaVersion = 3;   // 3 = 서버 시드 파생 셔플 검증
     public int rulesetVersion;
     public string contentFingerprint;
     public string capturedAtUtc;

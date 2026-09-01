@@ -24,9 +24,13 @@ using UnityEngine;
 public enum SynergyPreviewKind
 {
     Emblem,          // 고른 시너지의 엠블럼(타이밍은 아래 emblemTiming)
-    SwarmVolley,     // 낙인: 아군 전원 → 적 슬롯0 선피해 볼리
+    BrandVolley,     // 낙인: 아군 전원 → 적 슬롯0 선피해 볼리
     FlowWind,        // 흐름: 아군 필드를 지나는 바람(중첩만큼 커진다)
     CaretakerHeal,   // 돌보미: 아군 전원 회복(힐러와 같은 연출)
+    PredatorDrain,   // 포식자: 피격자 자리 표식 + 공격자에게 돌아오는 흡수 궤적
+    TraceMark,       // 추적: 표식이 붙는 순간 피격자 자리 낙점
+    LegacyCrown,     // 유산: 턴 시작 왕관 스택 표시
+    LegacyCrownFly,  // 유산: 사망 시 왕관이 아군에게 날아가는 국면
 }
 
 /// <summary>키워드에서 따로 확인할 수 있는 연출 종류.</summary>
@@ -43,12 +47,18 @@ public enum AttackStep
 {
     PlacedEmblem,     // 배치 상징(고른 시너지의 Placed 엠블럼)
     FlowWind,         // 등장 바람(흐름)
-    SwarmVolley,      // 공격 전 선피해(낙인)
+    BrandVolley,      // 공격 전 선피해(낙인)
     Attack,           // 공격 시퀀스 — 무장·접근·접촉·피격·처형까지
     AfterAttackHeal,  // 공격 후 회복(포식자·돌보미가 쓰는 힐 연출)
     TriggeredEmblem,  // 발동 상징(고른 시너지의 Triggered 엠블럼)
     CunningSwap,      // 교활 퇴장 + 재등장
     Wait,             // 한 박자 쉬기
+
+    // **새 마디는 반드시 여기 끝에만 추가한다.** sequence 배열이 씬에 int로 저장돼 있어
+    // 중간에 끼워 넣으면 이미 저작된 시퀀스가 통째로 다른 연출로 밀린다(재생 순서는 배열이 정한다).
+    PredatorDrain,    // 포식 흡수(피격자 표식 → 공격자에게 궤적)
+    TraceMark,        // 추적 표식(피격자 자리)
+    LegacyCrown,      // 유산 왕관 스택 표시
 }
 
 public class AttackAnimTester : MonoBehaviour
@@ -111,16 +121,18 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("흐름 바람을 어느 중첩으로 볼지. 중첩이 클수록 크게 재생된다")]
     [Min(1)] [SerializeField] int flowStack = 3;
     [Tooltip("낙인 볼리 한 발당 표기 피해(연출용 숫자, 실제 피해 없음)")]
-    [SerializeField] int swarmDamagePerShot = 1;
+    [SerializeField] int brandDamagePerShot = 1;
     [Tooltip("돌보미 회복 표기량(연출용 숫자, 실제 회복 없음)")]
     [SerializeField] int caretakerHeal = 1;
+    [Tooltip("유산 왕관 표시 개수. 실제 legacyStack은 변경하지 않는다")]
+    [Min(1)] [SerializeField] int legacyCrownCount = 3;
 
     [Header("연결 재생 — 한 마디씩 순서대로")]
     [Tooltip("위에서 아래로 이어 재생한다. 순서를 바꾸거나 마디를 빼면 그대로 반영된다")]
     [SerializeField] AttackStep[] sequence =
     {
         AttackStep.PlacedEmblem,
-        AttackStep.SwarmVolley,
+        AttackStep.BrandVolley,
         AttackStep.Attack,
         AttackStep.AfterAttackHeal,
         AttackStep.TriggeredEmblem,
@@ -133,7 +145,7 @@ public class AttackAnimTester : MonoBehaviour
 
     [Header("자동 배선 (비워 두면 프로젝트에서 찾아 채운다)")]
     [SerializeField] SynergyData[] emblemSynergies;
-    [SerializeField] SwarmSynergyVfxConfig swarmVfx;
+    [SerializeField] BrandSynergyVfxConfig brandVfx;
     [SerializeField] FlowSynergyVfxConfig  flowVfx;
 
     bool busy;
@@ -348,8 +360,22 @@ public class AttackAnimTester : MonoBehaviour
                 await Hold(this.untimedStepHold);
                 break;
 
-            case AttackStep.SwarmVolley:
-                await PreviewSwarmVolley();   // 볼리는 착탄까지 기다릴 수 있다
+            case AttackStep.BrandVolley:
+                await PreviewBrandVolley();   // 볼리는 착탄까지 기다릴 수 있다
+                break;
+
+            case AttackStep.PredatorDrain:
+                await PreviewPredatorDrain();
+                break;
+
+            case AttackStep.TraceMark:
+                PlayTraceMark();
+                await Hold(this.untimedStepHold);
+                break;
+
+            case AttackStep.LegacyCrown:
+                PlayLegacyCrown();
+                await Hold(this.untimedStepHold);
                 break;
 
             case AttackStep.Attack:
@@ -542,9 +568,13 @@ public class AttackAnimTester : MonoBehaviour
         switch (this.synergyPreview)
         {
             case SynergyPreviewKind.Emblem:        PlayEmblem();                  break;
-            case SynergyPreviewKind.SwarmVolley:   PlaySwarmVolley();             break;
+            case SynergyPreviewKind.BrandVolley:   PlayBrandVolley();             break;
             case SynergyPreviewKind.FlowWind:      PlayFlowWind(this.flowStack);  break;
             case SynergyPreviewKind.CaretakerHeal: PlayCaretakerHeal();           break;
+            case SynergyPreviewKind.PredatorDrain: PlayPredatorDrain();            break;
+            case SynergyPreviewKind.TraceMark:     PlayTraceMark();                break;
+            case SynergyPreviewKind.LegacyCrown:   PlayLegacyCrown();              break;
+            case SynergyPreviewKind.LegacyCrownFly: PlayLegacyCrownFly();           break;
         }
     }
 
@@ -566,9 +596,20 @@ public class AttackAnimTester : MonoBehaviour
                          || t_syn.vfx.PlaysEmblemAt(SynergyEmblemTiming.Triggered));
         if (t_hasEmblem) t_list.Add(SynergyPreviewKind.Emblem);
 
-        if (HasEffect<BrandSynergyEffect>(t_syn))     t_list.Add(SynergyPreviewKind.SwarmVolley);
-        if (HasEffect<FlowSynergyEffect>(t_syn))      t_list.Add(SynergyPreviewKind.FlowWind);
+        if (HasEffect<BrandSynergyEffect>(t_syn) || t_syn.vfx is BrandSynergyVfxConfig)
+            t_list.Add(SynergyPreviewKind.BrandVolley);
+        if (HasEffect<FlowSynergyEffect>(t_syn) || t_syn.vfx is FlowSynergyVfxConfig)
+            t_list.Add(SynergyPreviewKind.FlowWind);
         if (HasEffect<CaretakerSynergyEffect>(t_syn)) t_list.Add(SynergyPreviewKind.CaretakerHeal);
+        if (HasEffect<PredatorSynergyEffect>(t_syn) || t_syn.vfx is PredatorSynergyVfxConfig)
+            t_list.Add(SynergyPreviewKind.PredatorDrain);
+        if (HasEffect<TraceSynergyEffect>(t_syn) || t_syn.vfx is TraceSynergyVfxConfig)
+            t_list.Add(SynergyPreviewKind.TraceMark);
+        if (HasEffect<LegacySynergyEffect>(t_syn) || t_syn.vfx is LegacySynergyVfxConfig)
+        {
+            t_list.Add(SynergyPreviewKind.LegacyCrown);
+            t_list.Add(SynergyPreviewKind.LegacyCrownFly);
+        }
 
         return t_list.ToArray();
     }
@@ -608,17 +649,109 @@ public class AttackAnimTester : MonoBehaviour
         {
             case SynergyPreviewKind.Emblem:
                 return new[] { "emblemSlot", "emblemTiming", "emblemAutoReplay", "emblemReplayGap" };
-            case SynergyPreviewKind.SwarmVolley:   return new[] { "swarmDamagePerShot" };
-            case SynergyPreviewKind.FlowWind:      return new[] { "flowStack" };
+            case SynergyPreviewKind.BrandVolley:   return new[] { "brandDamagePerShot" };
+            case SynergyPreviewKind.FlowWind:      return new[] { "emblemSlot", "flowStack" };
             case SynergyPreviewKind.CaretakerHeal: return new[] { "caretakerHeal" };
+            case SynergyPreviewKind.LegacyCrown:
+            case SynergyPreviewKind.LegacyCrownFly:
+                return new[] { "legacyCrownCount" };
             default:                           return new string[0];
         }
     }
 
-    /// <summary>낙인 선피해 볼리: 아군 라이브 슬롯 전원이 적 슬롯0에게 한 발씩.</summary>
-    public void PlaySwarmVolley() => PreviewSwarmVolley().Forget();
+    /// <summary>포식 흡수: 피격자(적 defenderSlot) 자리에서 표식이 터지고 공격자(아군 attackerSlot)에게
+    /// 궤적이 돌아온다. 게임과 같은 진입점(PredatorVfx.PlayDrain)이라 방향을 반대로 넘기면 안 된다.
+    /// 도착까지 기다리는 연출이라 재생 중에는 다른 재생을 막는다.</summary>
+    public void PlayPredatorDrain()
+    {
+        if (this.busy) return;
+        RunPredatorDrain().Forget();
+    }
 
-    async UniTask PreviewSwarmVolley()
+    async UniTask RunPredatorDrain()
+    {
+        this.busy = true;
+        TurnState.InputAllowed = false;
+        try { await PreviewPredatorDrain(); }
+        finally
+        {
+            TurnState.InputAllowed = true;
+            this.busy = false;
+        }
+    }
+
+    async UniTask PreviewPredatorDrain()
+    {
+        PredatorSynergyVfxConfig t_cfg = CurrentEmblemSynergy?.vfx as PredatorSynergyVfxConfig;
+        CardView t_attacker = this.playerFieldView?.GetSlotView(this.attackerSlot);
+        CardView t_victim = this.enemyFieldView?.GetSlotView(this.defenderSlot);
+        if (!WarnMissing(t_cfg != null, "PredatorSynergyVfxConfig 미배선")) return;
+        if (!WarnMissing(t_attacker?.BoundCard != null && t_victim?.BoundCard != null,
+                         $"카드 없음 (아군 슬롯{this.attackerSlot} / 적 슬롯{this.defenderSlot})")) return;
+
+        await PredatorVfx.PlayDrain(t_victim, t_attacker, t_cfg);
+    }
+
+    /// <summary>추적 표식: 표식이 붙는 순간 피격자(적 defenderSlot) 자리에 낙점.
+    /// 게임의 <c>TraceSynergyEffect.PlayMark</c>와 같은 자리(SlotPosition)·같은 진입점을 쓴다.</summary>
+    public void PlayTraceMark()
+    {
+        TraceSynergyVfxConfig t_cfg = CurrentEmblemSynergy?.vfx as TraceSynergyVfxConfig;
+        CardView t_victim = this.enemyFieldView?.GetSlotView(this.defenderSlot);
+        if (!WarnMissing(t_cfg != null, "TraceSynergyVfxConfig 미배선")) return;
+        if (!WarnMissing(t_cfg.mark.prefab != null, "mark 프리팹 미배선")) return;
+        if (!WarnMissing(t_victim?.BoundCard != null, $"적 슬롯{this.defenderSlot}에 카드 없음")) return;
+
+        BattleVfx.Play(t_cfg.mark, t_victim.SlotPosition, t_victim.VfxSortingLayerId);
+    }
+
+    /// <summary>유산 왕관 스택 표시(턴 시작 국면). 개수는 <c>legacyCrownCount</c>로만 정하고
+    /// <b>실제 legacyStack은 건드리지 않는다</b> — 미리보기가 규칙 값을 바꾸면 그 뒤 재생이 전부 오염된다.</summary>
+    public void PlayLegacyCrown()
+    {
+        SynergyData t_syn = CurrentEmblemSynergy;
+        CardInstance t_source = this.playerFieldView?.GetSlotView(this.attackerSlot)?.BoundCard;
+        if (!WarnMissing(t_syn?.vfx is LegacySynergyVfxConfig, "LegacySynergyVfxConfig 미배선")) return;
+        if (!WarnMissing(((LegacySynergyVfxConfig)t_syn.vfx).crown.prefab != null, "crown 프리팹 미배선")) return;
+        if (!WarnMissing(t_source != null, $"아군 슬롯{this.attackerSlot}에 카드 없음")) return;
+
+        LegacyCrownVfx.Show(t_source, t_syn, Mathf.Max(1, this.legacyCrownCount));
+    }
+
+    /// <summary>유산 왕관 비행(사망 국면). 회복 표기량은 0으로 넘긴다 — 미리보기는 체력을 올리지 않고,
+    /// 0이면 <c>HealLater</c>가 그 자리에서 빠져 표기 유예도 걸리지 않는다.</summary>
+    public void PlayLegacyCrownFly()
+    {
+        SynergyData t_syn = CurrentEmblemSynergy;
+        CardInstance t_source = this.playerFieldView?.GetSlotView(this.attackerSlot)?.BoundCard;
+        if (!WarnMissing(t_syn?.vfx is LegacySynergyVfxConfig, "LegacySynergyVfxConfig 미배선")) return;
+        if (!WarnMissing(((LegacySynergyVfxConfig)t_syn.vfx).crown.prefab != null, "crown 프리팹 미배선")) return;
+        if (!WarnMissing(t_source != null, $"아군 슬롯{this.attackerSlot}에 카드 없음")) return;
+
+        var t_targets = new List<CardInstance>();
+        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+        {
+            CardInstance t_card = this.playerFieldView?.GetSlotView(i)?.BoundCard;
+            if (t_card != null && t_card != t_source) t_targets.Add(t_card);
+        }
+        if (!WarnMissing(t_targets.Count > 0, "받을 아군이 없다 — 아군 슬롯을 2장 이상 채워라")) return;
+
+        LegacyCrownVfx.Fly(t_source, t_targets, 0, t_syn, Mathf.Max(1, this.legacyCrownCount));
+    }
+
+    /// <summary>재생을 접는 이유를 로그로 남긴다. 아무 반응이 없으면 "연출이 깨졌다"와 "배선이 없다"를
+    /// 구분할 수 없다(PlayEmblem이 쓰는 것과 같은 규약).</summary>
+    bool WarnMissing(bool _ok, string _reason)
+    {
+        if (_ok) return true;
+        Debug.LogWarning($"[AttackTest] {CurrentEmblemSynergy?.name ?? "(시너지 없음)"}: {_reason}");
+        return false;
+    }
+
+    /// <summary>낙인 선피해 볼리: 아군 라이브 슬롯 전원이 적 슬롯0에게 한 발씩.</summary>
+    public void PlayBrandVolley() => PreviewBrandVolley().Forget();
+
+    async UniTask PreviewBrandVolley()
     {
         CardView t_target = this.enemyFieldView?.GetSlotView(0);
         if (t_target == null || t_target.BoundCard == null) return;
@@ -632,15 +765,24 @@ public class AttackAnimTester : MonoBehaviour
         if (t_sources.Count == 0) return;
 
         var t_damages = new int[t_sources.Count];
-        for (int i = 0; i < t_damages.Length; i++) t_damages[i] = Mathf.Max(0, this.swarmDamagePerShot);
+        for (int i = 0; i < t_damages.Length; i++) t_damages[i] = Mathf.Max(0, this.brandDamagePerShot);
 
-        await SwarmVfx.PlayVolley(t_sources, t_target, t_damages,
-                                  t_target.BoundCard.hp, t_target.BoundCard.bonusHp, this.swarmVfx);
+        BrandSynergyVfxConfig t_cfg = CurrentEmblemSynergy?.vfx as BrandSynergyVfxConfig ?? this.brandVfx;
+        await BrandVolleyVfx.PlayVolley(t_sources, t_target, t_damages,
+                                  t_target.BoundCard.hp, t_target.BoundCard.bonusHp, t_cfg);
     }
 
-    /// <summary>흐름 바람(아군 필드). 중첩이 커질수록 커지는 연출이라 스택 값을 받는다.</summary>
+    /// <summary>흐름 바람. 게임과 같이 **그 카드 자리**에서 인다(발동 카드 = emblemSlot).
+    /// 중첩이 커질수록 커지는 연출이라 스택 값을 받는다.</summary>
     public void PlayFlowWind(int _stack = 1)
-        => SynergyVfx.PlayFlowWind(this.playerFieldView, this.flowVfx, _stack);
+    {
+        FlowSynergyVfxConfig t_cfg = CurrentEmblemSynergy?.vfx as FlowSynergyVfxConfig ?? this.flowVfx;
+        CardView t_view = this.playerFieldView?.GetSlotView(this.emblemSlot);
+        if (!WarnMissing(t_cfg != null, "FlowSynergyVfxConfig 미배선")) return;
+        if (!WarnMissing(t_view != null, $"아군 슬롯{this.emblemSlot} 뷰 없음")) return;
+
+        SynergyVfx.PlayFlowWind(t_view, t_cfg, _stack);
+    }
 
     /// <summary>돌보미: 힐러와 같은 연출(HealVfx)을 아군 전원에게. 발사 주체는 슬롯0.</summary>
     public void PlayCaretakerHeal()
@@ -732,23 +874,30 @@ public class AttackAnimTester : MonoBehaviour
     void ResolveSynergyAssets()
     {
 #if UNITY_EDITOR
-        if (this.emblemSynergies == null || this.emblemSynergies.Length == 0)
+        var t_all = new List<SynergyData>();
+        if (this.emblemSynergies != null)
         {
-            string[] t_guids = UnityEditor.AssetDatabase.FindAssets("t:SynergyData");
-            var t_list = new List<SynergyData>();
-            foreach (string t_guid in t_guids)
-            {
-                var t_so = UnityEditor.AssetDatabase.LoadAssetAtPath<SynergyData>(
-                    UnityEditor.AssetDatabase.GUIDToAssetPath(t_guid));
-                if (t_so != null) t_list.Add(t_so);
-            }
-            t_list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));   // 실행마다 순서가 흔들리지 않게
-            this.emblemSynergies = t_list.ToArray();
+            foreach (SynergyData t_syn in this.emblemSynergies)
+                if (t_syn != null && !t_all.Contains(t_syn)) t_all.Add(t_syn);
         }
+
+        // 씬에 저작된 순서는 그대로 두고 **빠진 것만 뒤에 붙인다** — 배열이 비었을 때만 채우면
+        // 시너지를 새로 추가해도 옛 배열이 남아 드롭다운에 영영 안 뜬다(추적이 그랬다).
+        string[] t_guids = UnityEditor.AssetDatabase.FindAssets("t:SynergyData");
+        var t_missing = new List<SynergyData>();
+        foreach (string t_guid in t_guids)
+        {
+            var t_so = UnityEditor.AssetDatabase.LoadAssetAtPath<SynergyData>(
+                UnityEditor.AssetDatabase.GUIDToAssetPath(t_guid));
+            if (t_so != null && !t_all.Contains(t_so)) t_missing.Add(t_so);
+        }
+        t_missing.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        t_all.AddRange(t_missing);
+        this.emblemSynergies = t_all.ToArray();
 
         foreach (SynergyData t_syn in this.emblemSynergies)
         {
-            if (this.swarmVfx == null) this.swarmVfx = t_syn?.vfx as SwarmSynergyVfxConfig;
+            if (this.brandVfx == null) this.brandVfx = t_syn?.vfx as BrandSynergyVfxConfig;
             if (this.flowVfx  == null) this.flowVfx  = t_syn?.vfx as FlowSynergyVfxConfig;
         }
 #endif

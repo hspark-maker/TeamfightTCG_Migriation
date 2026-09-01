@@ -148,7 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f3c1d2e4b5a6c7d8e9f0a1b2c3d4e5f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PackStandaloneInitializer
-  dummyPack: {fileID: 11400000, guid: 14ae3da35afdd404894e0b4b8eafd1cd, type: 2}
+  dummyPackId: UltraPack
   dummyCards: []
   alternateDuplicates: 1
   dummyRefund: 10

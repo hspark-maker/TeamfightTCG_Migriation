@@ -4,12 +4,12 @@ using System.Collections.Generic;
 public static class PackOdds
 {
     // 한 팩의 카드별 등장 확률(현재 랭크 기준). uniqueDraw 팩은 비복원이라 매회 잔여 풀이 줄지만, 고지 값은 첫 추첨 기준이다.
-    public static List<PackOddsEntry> Resolve(CardPackData _pack)
+    public static List<PackOddsEntry> Resolve(string _packId)
     {
         var t_result = new List<PackOddsEntry>();
-        if (_pack == null) return t_result;
+        if (!PackSpec.TryGetPack(_packId, out _)) return t_result;
 
-        IReadOnlyList<WeightedCard> t_pool = _pack.ResolvePool(RankManager.CurrentGrade);
+        IReadOnlyList<WeightedCard> t_pool = PackSpec.ResolveDrops(_packId, RankManager.CurrentGrade);
 
         int t_sum = 0;
         for (int t_i = 0; t_i < t_pool.Count; t_i++)

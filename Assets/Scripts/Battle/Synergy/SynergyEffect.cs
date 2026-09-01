@@ -16,7 +16,7 @@ using UnityEngine;
 /// </summary>
 public abstract class SynergyEffect : BattleEffect
 {
-    /// <summary>시트(SynergyEffectParamDef)의 한 줄을 이 효과에 꽂는다.
+    /// <summary>시트(SynergyEffectDef.parameters)의 키=값 한 쌍을 이 효과에 꽂는다.
     /// 키는 이 클래스의 필드명과 1:1이고, **모르는 키는 false** — 로더가 그 자리에서 던진다.
     /// 리플렉션을 쓰지 않는 이유는 허용 키 목록의 진실원을 클래스 안에 두기 위해서다.</summary>
     public virtual bool TrySetParam(string _key, string _value) => false;

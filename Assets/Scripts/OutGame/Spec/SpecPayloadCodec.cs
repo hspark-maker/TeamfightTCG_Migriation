@@ -16,13 +16,13 @@ public sealed class SpecTablePayload
 
 public static class SpecPayloadCodec
 {
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
     public static readonly string[] TableNames =
     {
         "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
         "AlbumEntry", "AlbumThemeInfo",
-        "SynergyDef", "SynergyTierDef", "SynergyEffectDef", "SynergyEffectParamDef",
+        "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -262,7 +262,7 @@ public static class SpecPayloadCodec
         "CardLimitBreak" => typeof(CardLimitBreak),
         "AlbumEntry" => typeof(AlbumEntry), "AlbumThemeInfo" => typeof(AlbumThemeInfo),
         "SynergyDef" => typeof(SynergyDef), "SynergyTierDef" => typeof(SynergyTierDef),
-        "SynergyEffectDef" => typeof(SynergyEffectDef), "SynergyEffectParamDef" => typeof(SynergyEffectParamDef),
+        "SynergyEffectDef" => typeof(SynergyEffectDef),
         _ => null,
     };
 

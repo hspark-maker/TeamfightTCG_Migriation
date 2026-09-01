@@ -265,6 +265,8 @@ public class LobbyMatchLauncher : MonoBehaviour
     void ShowEntryBlocked(string _message)
     {
         TournamentRun.End();
+        // 봉인만 되고 전투로 가지 못한 매치다. 남겨 두면 다음 진입이 그 시드·보드 순서를 소비한다.
+        SoloMatchHandoff.Clear();
         m_matchShell?.Close();
         m_running = false;
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
@@ -329,6 +331,10 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 고정 상대(토너먼트)와 튜토리얼은 상대가 이미 정해져 있으므로 기존처럼 상대를 먼저 확정한다.
     async UniTask<bool> RunEntryChainAsync(CancellationToken _ct, MatchOpponent? _preset = null)
     {
+        // 서버 매치 신원은 분기 **밖에서** 비운다. 고정 상대(토너먼트) 경로는 아래 블록을 건너뛰므로
+        // 여기서 지우지 않으면 직전 AI 매칭이 남긴 시드·보드 순서가 정점 전투의 양 덱을 갈아끼운다.
+        SoloMatchHandoff.Clear();
+
         if (!_preset.HasValue && UseMatchmaking)
         {
             // 직전 전투의 캐리어가 남아 있으면 새 상대처럼 읽힌다 — 매칭을 열기 전에 명시적으로 비운다.

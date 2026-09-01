@@ -62,9 +62,12 @@ MonoBehaviour:
   healLaunchStagger: 0.05
   healTravelDuration: 0.38
   healTrailLinger: 0.21
-  swarmLaunchStagger: 0.06
-  swarmTravelDuration: 0.22
-  swarmImpactHold: 0.08
+  brandLaunchStagger: 0.06
+  brandTravelDuration: 0.22
+  brandImpactHold: 0.08
+  predatorImpactLead: 0.3
+  predatorTravelDuration: 0.4
+  predatorArriveHold: 0.08
   approachSlow: 0.65
   approachFocusIn: 0.22
   approachFocusOut: 0.2

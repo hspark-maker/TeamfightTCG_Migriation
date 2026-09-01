@@ -594,7 +594,7 @@ MonoBehaviour:
   emblemAutoReplay: 0
   emblemReplayGap: 0.35
   flowStack: 3
-  swarmDamagePerShot: 1
+  brandDamagePerShot: 1
   caretakerHeal: 1
   sequence: 000000000200000003000000040000000500000006000000
   stepGap: 0.25
@@ -609,7 +609,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 9bff0080901fae44eb15d5dfea14a160, type: 2}
   - {fileID: 11400000, guid: 7e6c20c2bb8b5ad4c8b36ec6373665fa, type: 2}
   - {fileID: 11400000, guid: 6df69963cdc40944aacf02ccc9ff7fde, type: 2}
-  swarmVfx: {fileID: 0}
+  brandVfx: {fileID: 0}
   flowVfx: {fileID: 0}
 --- !u!4 &182972993
 Transform:

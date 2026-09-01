@@ -12,17 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
   m_Name: Data_Synergy_Predator
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  displayName: "포식자"
-  effectDescription: "공격 후 생존 시 실제로 준 기본 공격 피해의 50%/75%만큼 회복"
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 763e9b46d1a622641b325f242f859e28, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 2123fa51233d082408b2f6f50647a349, type: 3}
-  tiers:
-  - requiredCount: 2
-    label: "포식자"
-    effects:
-    - {fileID: 11400000, guid: 51c2d4ab814a5524e8e4e57fa142d644, type: 2}
-  - requiredCount: 4
-    label: "포식자"
-    effects:
-    - {fileID: 11400000, guid: b564bf6ace69403aba74852c090634d6, type: 2}
+  vfx: {fileID: 11400000, guid: 63149b223130d544ab04fae329706a79, type: 2}
+  synergyId: Predator

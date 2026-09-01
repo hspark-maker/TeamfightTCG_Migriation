@@ -61,7 +61,7 @@ public class PackAcquireController : MonoBehaviour
     bool m_startTutorial;
 
     // 방금 연 팩. 캐리어는 BeginSession에서 Consume돼 비므로, 되사려면 여기 쥐고 있어야 한다.
-    CardPackData m_pack;
+    string m_pack;
 
     // 이번 개봉에서 처음 얻은 카드만(로비 도감 연출 대상). Consume은 1회뿐이라 여기 캐시한다.
     // 중복은 팩 결제 재화로 환급돼 코인 연출로 나가므로 도감 연출거리가 없다.
@@ -117,7 +117,7 @@ public class PackAcquireController : MonoBehaviour
         // 목적지·팩 컨텍스트를 먼저 캡처한 뒤 Consume(캐리어를 통째로 비움 → 다음 개봉 세션 격리).
         m_nextScene = PackHandoff.NextScene;
         m_startTutorial = PackHandoff.StartTutorial;
-        m_pack = PackHandoff.Pack;
+        m_pack = PackHandoff.PackId;
         var t_opened = PackHandoff.Consume();
 
         if (t_opened == null || !t_opened.Success)
@@ -265,12 +265,12 @@ public class PackAcquireController : MonoBehaviour
     {
         if (retryButton == null) return;
 
-        bool t_allowed = m_pack != null
+        bool t_allowed = !string.IsNullOrEmpty(m_pack)
                       && !m_left
                       && !OutgameTutorialRunner.IsRunning
                       && PackUnlockRules.IsUnlocked(m_pack)
                       && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy);
-        bool t_afford = m_pack != null && CurrencyManager.CanAfford(m_pack.PriceType, m_pack.Price);
+        bool t_afford = !string.IsNullOrEmpty(m_pack) && CurrencyManager.CanAfford(PackSpec.PriceType(m_pack), PackSpec.Price(m_pack));
 
         retryButton.interactable = t_allowed && t_afford;
 
@@ -313,22 +313,22 @@ public class PackAcquireController : MonoBehaviour
     // 한 번 더 버튼의 가격 표시. 세션당 한 번만 바뀐다(같은 팩을 되사므로 값이 움직이지 않는다).
     void BindRetryPrice()
     {
-        if (retryPriceText != null) retryPriceText.text = m_pack != null ? $"{m_pack.Price:N0}" : string.Empty;
+        if (retryPriceText != null) retryPriceText.text = !string.IsNullOrEmpty(m_pack) ? $"{PackSpec.Price(m_pack):N0}" : string.Empty;
         if (retryPriceIcon == null) return;
 
         // 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
-        retryPriceIcon.enabled = m_pack != null;
+        retryPriceIcon.enabled = !string.IsNullOrEmpty(m_pack);
 
         var t_icon = ResolveCurrencyIcon(m_pack);
         if (t_icon != null) retryPriceIcon.sprite = t_icon;
     }
 
     // 결제 재화 아이콘. 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹 그림을 그대로 둔다.
-    static Sprite ResolveCurrencyIcon(CardPackData _pack)
+    static Sprite ResolveCurrencyIcon(string _packId)
     {
-        if (_pack == null) return null;
+        if (string.IsNullOrEmpty(_packId)) return null;
 
-        return CurrencyLook.IconOf(_pack.PriceType);
+        return CurrencyLook.IconOf(PackSpec.PriceType(_packId));
     }
 
     // 한 번 더 클릭: 같은 팩을 되사서 오버레이를 닫지 않고 세션만 갈아끼운다(팩 등장부터 다시).
@@ -338,7 +338,7 @@ public class PackAcquireController : MonoBehaviour
     //   튜토리얼 중엔 이 버튼이 잠겨 있다. 신호를 늘리면 "구매 1회 : 스텝 1칸"이 도리어 어긋난다.
     void OnRetryPressed()
     {
-        if (m_left || m_retrying || m_pack == null || view == null) return;
+        if (m_left || m_retrying || string.IsNullOrEmpty(m_pack) || view == null) return;
 
         RetryAsync().Forget();
     }

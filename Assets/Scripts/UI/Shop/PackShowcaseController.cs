@@ -37,8 +37,6 @@ public class PackShowcaseController : MonoBehaviour
            + "미배선이면 예전처럼 숫자 칸이 문구를 대신 쓴다(치우침도 그대로).")]
     [SerializeField] TextMeshProUGUI forcedPriceText;
     [Tooltip("캐러셀에 진열할 팩들. 순서가 곧 페이지 순서. 비어 있으면 구매 잠금.")]
-    [SerializeField] List<CardPackData> packs = new List<CardPackData>();
-    [Tooltip("좌우 넘김을 담당하는 캐러셀. 미배선이면 목록 첫 팩만 진열된다.")]
     [SerializeField] PackCarouselView carousel;
 
     // ScreenFlash·PackPurchaseImpact는 둘 다 런타임 자가설치라 프리팹에 배선할 자리가 없다 —
@@ -53,8 +51,8 @@ public class PackShowcaseController : MonoBehaviour
     // 왕복 실패·진열 소멸(BuyAsync), 오버레이 열기 실패(OpenOverlay), 그리고 굳은 잠금을 푸는 탭 재진입(OnEnable).
     static bool s_transitioning;
 
-    readonly List<CardPackData> m_display = new List<CardPackData>();   // 실제 진열 목록(해석 결과).
-    readonly List<CardPackData> m_built = new List<CardPackData>();     // 캐러셀에 마지막으로 넘긴 목록.
+    readonly List<string> m_display = new List<string>();   // 실제 진열 packId 목록.
+    readonly List<string> m_built = new List<string>();     // 캐러셀에 마지막으로 넘긴 목록.
     readonly List<Sprite> m_arts = new List<Sprite>();
 
     int m_index;
@@ -163,13 +161,14 @@ public class PackShowcaseController : MonoBehaviour
 
         if (m_forced)
         {
-            if (t_forced != null) m_display.Add(t_forced);
+            if (!string.IsNullOrEmpty(t_forced)) m_display.Add(t_forced);
             return;
         }
 
-        for (int t_i = 0; t_i < packs.Count; t_i++)
-            if (packs[t_i] != null && PackUnlockRules.IsUnlocked(packs[t_i]))
-                m_display.Add(packs[t_i]);   // 미할당 슬롯과 잠긴 팩은 페이지를 만들지 않는다.
+        IReadOnlyList<string> t_shopPackIds = PackSpec.ShopPackIds;
+        for (int t_i = 0; t_i < t_shopPackIds.Count; t_i++)
+            if (PackUnlockRules.IsUnlocked(t_shopPackIds[t_i]))
+                m_display.Add(t_shopPackIds[t_i]);
     }
 
     // 캐러셀 동기화. 목록이 실제로 달라졌을 때만 재구축한다 —
@@ -185,7 +184,7 @@ public class PackShowcaseController : MonoBehaviour
         if (!SameAsBuilt(carousel.PageCount))
         {
             m_arts.Clear();
-            for (int t_i = 0; t_i < m_display.Count; t_i++) m_arts.Add(m_display[t_i].PackArt);
+            for (int t_i = 0; t_i < m_display.Count; t_i++) m_arts.Add(PackSpec.Art(m_display[t_i]));
             carousel.Build(m_arts);
 
             m_built.Clear();
@@ -210,7 +209,7 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 구매 대상 해석. 캐러셀이 가리키는 페이지가 곧 결제 대상이다.
-    CardPackData ResolvePack()
+    string ResolvePack()
         => m_index >= 0 && m_index < m_display.Count ? m_display[m_index] : null;
 
     // 팩 미할당·잔액 부족이면 구매 잠금. 잔액을 버튼 상태로 드러내면 실패 팝업을 볼 일이 없고,
@@ -219,12 +218,12 @@ public class PackShowcaseController : MonoBehaviour
     {
         if (buyButton == null) return;
 
-        var t_pack = ResolvePack();
-        buyButton.interactable = t_pack != null
+        string t_pack = ResolvePack();
+        buyButton.interactable = !string.IsNullOrEmpty(t_pack)
                               && PackOpenOverlay.Instance != null
                               && OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackBuy)
                               && PackUnlockRules.IsUnlocked(t_pack)
-                              && CurrencyManager.CanAfford(t_pack.PriceType, t_pack.Price);
+                              && CurrencyManager.CanAfford(PackSpec.PriceType(t_pack), PackSpec.Price(t_pack));
     }
 
     // 중앙 팩의 표시명·가격·재화 아이콘을 UI에 반영(참조는 전부 옵션).
@@ -232,9 +231,9 @@ public class PackShowcaseController : MonoBehaviour
     {
         var t_pack = ResolvePack();
 
-        if (packNameText != null) packNameText.text = t_pack != null ? t_pack.DisplayName : string.Empty;
-        bool t_rankLocked = t_pack != null && !PackUnlockRules.IsUnlocked(t_pack);
-        if (oddsButton != null) oddsButton.interactable = t_pack != null && !t_rankLocked;
+        if (packNameText != null) packNameText.text = PackSpec.DisplayName(t_pack);
+        bool t_rankLocked = !string.IsNullOrEmpty(t_pack) && !PackUnlockRules.IsUnlocked(t_pack);
+        if (oddsButton != null) oddsButton.interactable = !string.IsNullOrEmpty(t_pack) && !t_rankLocked;
 
         if (t_rankLocked)
         {
@@ -249,7 +248,7 @@ public class PackShowcaseController : MonoBehaviour
         }
 
         // 튜토리얼 스텝이 가격 자리 문구를 저작했으면 숫자 대신 그 말을 띄운다(예: "무료").
-        bool t_labeled = t_pack != null && m_forced && !string.IsNullOrEmpty(m_forcedPriceLabel);
+        bool t_labeled = !string.IsNullOrEmpty(t_pack) && m_forced && !string.IsNullOrEmpty(m_forcedPriceLabel);
 
         // 문구가 설 자리. 별도 라벨이 배선돼 있으면 그쪽이 정본이고, 아이콘:숫자 쌍은 통째로 물러난다 —
         // 쌍은 아이콘 자리를 비워 둔 좌표에 손으로 박혀 있어(레이아웃 그룹 없음) 아이콘만 걷으면
@@ -268,10 +267,10 @@ public class PackShowcaseController : MonoBehaviour
         // 꺼진 쌍이 자리만 차지하고 있으면 라벨을 어디에 두든 화면에는 빈칸이 낀 줄로 남는다.
         if (priceText != null)
         {
-            bool t_showNumber = t_pack != null && t_host == null;
+            bool t_showNumber = !string.IsNullOrEmpty(t_pack) && t_host == null;
 
             priceText.gameObject.SetActive(t_showNumber || t_host == priceText);
-            if (t_showNumber)             priceText.text = $"{t_pack.Price:N0}";
+            if (t_showNumber)             priceText.text = $"{PackSpec.Price(t_pack):N0}";
             else if (t_host == priceText) priceText.text = m_forcedPriceLabel;
         }
 
@@ -279,7 +278,7 @@ public class PackShowcaseController : MonoBehaviour
         {
             // 가격 숫자가 비는 상태에선 아이콘도 함께 걷는다(숫자 없이 아이콘만 남는 칸 방지).
             // 문구로 갈아낀 자리도 마찬가지 — 결제 재화를 말하지 않는 표기에 재화 아이콘만 남으면 어긋난다.
-            priceIcon.gameObject.SetActive(t_pack != null && !t_labeled);
+            priceIcon.gameObject.SetActive(!string.IsNullOrEmpty(t_pack) && !t_labeled);
 
             var t_icon = ResolveCurrencyIcon(t_pack);
             if (t_icon != null) priceIcon.sprite = t_icon;
@@ -287,11 +286,11 @@ public class PackShowcaseController : MonoBehaviour
     }
 
     // 결제 재화 아이콘. 표에 그림이 없으면 null이고, 그때는 호출부가 프리팹 그림을 그대로 둔다.
-    static Sprite ResolveCurrencyIcon(CardPackData _pack)
+    static Sprite ResolveCurrencyIcon(string _packId)
     {
-        if (_pack == null) return null;
+        if (string.IsNullOrEmpty(_packId)) return null;
 
-        return CurrencyLook.IconOf(_pack.PriceType);
+        return CurrencyLook.IconOf(PackSpec.PriceType(_packId));
     }
 
     // 확률 고지 클릭: 지금 진열 중인 팩의 등장 확률을 연다. 구매 잠금(잔액·기능잠금)과 무관하게 항상 열린다 —
@@ -299,7 +298,7 @@ public class PackShowcaseController : MonoBehaviour
     void OnOddsPressed()
     {
         var t_pack = ResolvePack();
-        if (t_pack == null || !PackUnlockRules.IsUnlocked(t_pack)) return;
+        if (string.IsNullOrEmpty(t_pack) || !PackUnlockRules.IsUnlocked(t_pack)) return;
 
         UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
     }
@@ -310,7 +309,7 @@ public class PackShowcaseController : MonoBehaviour
         if (s_transitioning) return;
 
         var t_pack = ResolvePack();
-        if (t_pack == null) return;
+        if (string.IsNullOrEmpty(t_pack)) return;
 
         // 열 화면이 없으면 사지 않는다 — 구매는 원자 영속이라 되돌릴 수 없고, 튜토리얼 구매 스텝이면
         // 커밋만 남고 개봉 신호가 영영 오지 않아 진행이 막힌다. 결제 앞에서 끊는 것이 유일한 안전판이다.
@@ -336,7 +335,7 @@ public class PackShowcaseController : MonoBehaviour
     // 서버 왕복 구매. 잠금은 왕복 "전"에 세운다 — 대기 화면이 떠 있어도 같은 결제가 두 번 나갈 여지를 남기지 않는다.
     // 실패로 끝나는 갈래에서 반드시 되돌릴 것: 개봉 오버레이가 열리지 않으므로 잠금을 풀어 줄 닫힘 신호가 오지 않는다
     // (안 풀면 이 세션 내내 진열이 굳는다 — OpenOverlay 실패 갈래와 같은 처방).
-    async UniTaskVoid BuyAsync(CardPackData _pack)
+    async UniTaskVoid BuyAsync(string _pack)
     {
         s_transitioning = true;
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Build;
@@ -192,12 +192,15 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 
     static void ValidateLiveConsumers(HashSet<int> _liveIds, List<string> _errors, List<string> _warnings)
     {
-        foreach (CardPackData t_pack in LoadBuildDependencies<CardPackData>())
-        {
-            CheckCards(t_pack.Pool, t_pack.name, _liveIds, _errors);
-            foreach (RankPackPool t_rankPool in t_pack.RankPools)
-                CheckCards(RankPoolCards(t_rankPool), $"{t_pack.name}/{t_rankPool?.minGrade}", _liveIds, _errors);
-        }
+        // 드롭은 만족하는 가장 높은 minGrade 한 줄만 적용된다 — 한 등급만 물으면 하위 등급 전용 줄이 검사에서 샌다.
+        IReadOnlyList<CardPack> t_packs = SpecSource.Manager?.CardPack?.All;
+        if (t_packs != null)
+            foreach (CardPack t_pack in t_packs)
+            {
+                if (t_pack == null) continue;
+                foreach (ERankGrade t_grade in System.Enum.GetValues(typeof(ERankGrade)))
+                    CheckCards(PackSpec.ResolveCardIds(t_pack.packId, t_grade), $"{t_pack.packId}/{t_grade}", _liveIds, _errors);
+            }
 
         // 표가 불완전하면 AIDeckConfig가 이 SO로 원자 폴백한다 — 전환이 끝날 때까지 두 진실원을 함께 검증한다.
         foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
@@ -332,12 +335,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             T t_asset = AssetDatabase.LoadAssetAtPath<T>(AssetDatabase.GUIDToAssetPath(t_guid));
             if (t_asset != null) yield return t_asset;
         }
-    }
-
-    static IEnumerable<int> RankPoolCards(RankPackPool _pool)
-    {
-        if (_pool?.cards == null) yield break;
-        foreach (WeightedCard t_weighted in _pool.cards) yield return t_weighted.CardId;
     }
 
     static void CheckCards(IEnumerable<int> _cards, string _owner, HashSet<int> _liveIds, List<string> _errors)

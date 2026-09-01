@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c838a2244a457ba40b17a25642089e00, type: 3}
+  m_Name: TraceSynergyVfx
+  m_EditorClassIdentifier: Assembly-CSharp::TraceSynergyVfxConfig
+  emblems: []
+  mark:
+    id: 0
+    prefab: {fileID: 8219663256760598479, guid: 916c4e37374657747b61ade71e41d9e5, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 20
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
+  references:
+    version: 2
+    RefIds: []

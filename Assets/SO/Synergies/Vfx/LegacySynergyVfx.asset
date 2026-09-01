@@ -15,7 +15,7 @@ MonoBehaviour:
   emblems: []
   crown:
     id: 0
-    prefab: {fileID: 5631213263390450891, guid: 616766776ed882b4b9427c34cc41e591, type: 3}
+    prefab: {fileID: 3063231526160908144, guid: 616766776ed882b4b9427c34cc41e591, type: 3}
     localOffset: {x: 0, y: 0, z: 0}
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 0
@@ -53,3 +53,6 @@ MonoBehaviour:
   flyStagger: 0.07
   curveHeight: 0.6
   arriveHold: 0.12
+  references:
+    version: 2
+    RefIds: []

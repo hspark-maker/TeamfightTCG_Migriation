@@ -100,9 +100,15 @@ public class BattleTimingConfig : ScriptableObject
     [SerializeField] float healTrailLinger    = 0.25f;   // 도착 후 트레일 잔상 유지
 
     [Header("Brand Vfx (낙인 선피해 연출 — 프리팹/형태값은 BattleVfxLibrary)")]
-    [SerializeField] float swarmLaunchStagger  = 0.07f;   // 낙인 카드별 발사 간격(한 프레임에 겹치면 한 덩어리로 보인다)
-    [SerializeField] float swarmTravelDuration = 0.26f;   // 투사체 비행 시간. 본 공격 앞에 붙는 시간이라 짧게
-    [SerializeField] float swarmImpactHold     = 0.10f;   // 마지막 착탄 후 본 공격까지의 여운
+    [SerializeField] float brandLaunchStagger  = 0.07f;   // 낙인 카드별 발사 간격(한 프레임에 겹치면 한 덩어리로 보인다)
+    [SerializeField] float brandTravelDuration = 0.26f;   // 투사체 비행 시간. 본 공격 앞에 붙는 시간이라 짧게
+    [SerializeField] float brandImpactHold     = 0.10f;   // 마지막 착탄 후 본 공격까지의 여운
+
+    [Header("Predator Vfx (포식 흡수 연출 — 프리팹/형태값은 그 시너지의 PredatorSynergyVfxConfig)")]
+    [SerializeField] float predatorImpactLead    = 0.3f;   // 무는 표식 → 흡혈 줄기 출발 사이 간격(동시에 나가면 표식이 안 읽힌다)
+    [SerializeField] float predatorTravelDuration = 0.40f; // 피격자 → 공격자 비행 시간
+    [SerializeField] float predatorTrailStagger   = 0.06f; // 줄기별 출발 간격(0이면 한 덩어리로 나가 개수가 안 읽힌다)
+    [SerializeField] float predatorArriveHold    = 0.08f;  // 도착 후 공격자 쪽에 남는 여운
 
     // 시너지 엠블럼 길이는 여기 없다 — 몸짓/시너지마다 달라서 그 시너지의 연출 에셋
     // (SynergyEmblemSpec.duration, raw 초)이 쥔다. 배속은 Scaled()를 통과해 적용된다.
@@ -200,9 +206,13 @@ public class BattleTimingConfig : ScriptableObject
     public float HealLaunchStagger   => healLaunchStagger   * SpeedFactor;
     public float HealTravelDuration  => healTravelDuration  * SpeedFactor;
     public float HealTrailLinger     => healTrailLinger     * SpeedFactor;
-    public float SwarmLaunchStagger  => swarmLaunchStagger  * SpeedFactor;
-    public float SwarmTravelDuration => swarmTravelDuration * SpeedFactor;
-    public float SwarmImpactHold     => swarmImpactHold     * SpeedFactor;
+    public float BrandLaunchStagger  => brandLaunchStagger  * SpeedFactor;
+    public float BrandTravelDuration => brandTravelDuration * SpeedFactor;
+    public float BrandImpactHold     => brandImpactHold     * SpeedFactor;
+    public float PredatorImpactLead     => predatorImpactLead     * SpeedFactor;
+    public float PredatorTravelDuration => predatorTravelDuration * SpeedFactor;
+    public float PredatorTrailStagger    => predatorTrailStagger    * SpeedFactor;
+    public float PredatorArriveHold     => predatorArriveHold     * SpeedFactor;
     public float RangedFlightMin     => Mathf.Max(0f, rangedFlightMin) * SpeedFactor;
     public float RangedSpeedMul      => rangedSpeedMul > 0f ? rangedSpeedMul : 1f;
     public float CunningFogLead      => cunFogLead          * SpeedFactor;

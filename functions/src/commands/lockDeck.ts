@@ -255,6 +255,25 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         });
         throw new HttpsError("permission-denied", "server match identity is not registered");
       }
+
+      // 새 AI 매치는 findAiMatch가 플레이어 초기 보드 순서를 먼저 봉인한다. lockDeck이 승인할
+      // 카드 스냅샷과 그 순서의 멀티셋이 달라지면, 서버가 승인한 덱과 실제 시작 덱이 갈린다.
+      // serverBoardOrders가 없는 구 solo 문서는 종전대로 허용해 혼합 버전 배포를 깨지 않는다.
+      const boardOrders = objectRecord(match?.serverBoardOrders);
+      if (expectedParticipants === 1 && boardOrders != null) {
+        const playerOrder = boardOrders.owner0;
+        const lockedIds = data.cardSnapshots.map((card) => card.cardId).sort((a, b) => a - b);
+        const parsedOrder = Array.isArray(playerOrder) ?
+          playerOrder.map((cardId) => safeInteger(cardId)) : [];
+        if (parsedOrder.some((cardId) => cardId == null)) {
+          return rejectLock("server_board_order_mismatch");
+        }
+        const orderedIds = (parsedOrder as number[]).sort((a, b) => a - b);
+        if (orderedIds.length !== lockedIds.length ||
+            orderedIds.some((cardId, index) => cardId !== lockedIds[index])) {
+          return rejectLock("server_board_order_mismatch");
+        }
+      }
     }
     if (shapeError != null) return rejectLock(shapeError);
     // shapeError 가 없을 때만 곡선을 읽으므로 여기 도달하면 서 있다 — 못 읽었으면 위에서 이미 던졌다.

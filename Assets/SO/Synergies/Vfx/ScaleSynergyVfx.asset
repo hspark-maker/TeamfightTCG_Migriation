@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ScaleSynergyVfx
   m_EditorClassIdentifier: Assembly-CSharp::EmblemOnlySynergyVfxConfig
   emblems:
-  - timing: -1
+  - timing: 3
     scope: 0
     spec:
       rid: 5071191787478451177
@@ -28,6 +28,6 @@ MonoBehaviour:
         heightRatio: 0.95
         alpha: 1
         sortingOrder: 2
-        prefab: {fileID: 8113935365038023920, guid: e8c33a42994757b44819eb1ccfc9fcac, type: 3}
+        prefab: {fileID: 2826873596942568967, guid: e8c33a42994757b44819eb1ccfc9fcac, type: 3}
         offset: {x: 0, y: 0}
         scale: 1

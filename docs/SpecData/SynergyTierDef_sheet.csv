@@ -16,3 +16,5 @@ int,string,int,int,string
 13,Predator,1,4,포식자
 14,Scale,0,2,비늘
 15,Scale,1,4,비늘
+16,Trace,0,2,추적
+17,Trace,1,4,추적

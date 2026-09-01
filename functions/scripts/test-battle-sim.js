@@ -102,7 +102,7 @@ const SEED = BigInt("0x0123456789ABCDEF");
   for (const file of files) {
     const fullPath = path.join(goldenRoot, file);
     const golden = JSON.parse(fs.readFileSync(fullPath, "utf8"));
-    assert.ok(golden.schemaVersion === 1 || golden.schemaVersion === 2, `${file}: schemaVersion`);
+    assert.ok([1, 2, 3].includes(golden.schemaVersion), `${file}: schemaVersion`);
     assert.ok(Number.isInteger(golden.rulesetVersion) && golden.rulesetVersion > 0,
       `${file}: rulesetVersion`);
     assert.match(golden.contentFingerprint, /^[0-9a-f]{64}$/, `${file}: contentFingerprint`);
@@ -123,6 +123,7 @@ const SEED = BigInt("0x0123456789ABCDEF");
     // "셔플이 다른가 규칙이 다른가"를 구분하지 못하므로 검증 대상에서 뺀다.
     const boardOrders = golden.decks.map((deck) => deck.boardOrder);
     if (boardOrders.some((order) => !Array.isArray(order) || order.length === 0)) {
+      assert.ok(golden.schemaVersion < 3, `${file}: schemaVersion 3 requires boardOrder`);
       console.log(`  skip ${file}: boardOrder 없음(구 스키마) — 재캡처 필요`);
       continue;
     }
@@ -151,7 +152,11 @@ const SEED = BigInt("0x0123456789ABCDEF");
         const j = rng.range(i + 1);
         [ids[i], ids[j]] = [ids[j], ids[i]];
       }
-      if (JSON.stringify(ids) !== JSON.stringify(deck.boardOrder)) {
+      const shuffleMatches = JSON.stringify(ids) === JSON.stringify(deck.boardOrder);
+      if (golden.schemaVersion >= 3) {
+        assert.equal(shuffleMatches, true,
+          `${file} owner${deck.ownerIndex}: derived shuffle differs from client boardOrder`);
+      } else if (!shuffleMatches) {
         shuffleMismatches.push(`${file} owner${deck.ownerIndex}: ` +
           `replay=${JSON.stringify(ids)} client=${JSON.stringify(deck.boardOrder)}`);
       }
@@ -185,9 +190,8 @@ const SEED = BigInt("0x0123456789ABCDEF");
     assert.equal(replayed.size, 0,
       `${file}: 재생기가 골든에 없는 체크포인트를 만들었다 (turn:owner = ${[...replayed.keys()].join(", ")})`);
   }
-  // 참고 정보다. 클라 초기화 경로 일부가 ShufflePolicy.Local(UnityEngine.Random)로 섞어
-  // 보드가 매치 시드에서 나오지 않는다 — 그래서 보드 순서를 제출에 실어 보내는 쪽으로 정했다.
-  // 여기 불일치는 그 설계의 결과이지 결함이 아니다. 언젠가 셔플을 결정론으로 통일하면 0이 된다.
+  // schemaVersion 1~2는 Local 셔플 시절 캡처라 불일치를 참고 정보로만 남긴다.
+  // schemaVersion 3부터는 위에서 결정론 셔플 일치를 강제한다.
   if (shuffleMismatches.length > 0) {
     console.log(`참고: 시드 파생 셔플과 클라 보드가 다르다 (${shuffleMismatches.length}건). ` +
       "보드 순서는 제출값을 쓴다.");

@@ -43,7 +43,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     public string SeedHex => this.seedHex;
     public int RulesetVersion => this.rulesetVersion;
 
-    // 초기화 단계(SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
+    // 초기화 단계(서버 시드 확정 + SyncInitialDecks) 상대 이탈/연결실패 감지 플래그.
     // StartBattle 이전 구간이라 TurnRunner.HandlePlayerLeft가 아직 미구독 → 여기서 대기 TCS를 강제 해제.
     bool opponentLeftDuringInit;
     bool networkAbortRequested;
@@ -57,6 +57,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
     readonly Queue<CardInstance> enemySpawnBuffer = new Queue<CardInstance>();
     readonly Dictionary<int, CardGrowth> localGrowthByCardId = new Dictionary<int, CardGrowth>();
     IMatchGrowthSource matchGrowthSource;
+    int[] receivedEnemyBoardOrder;
+    int receivedEnemyOwnerIndex = -1;
+    int initAbortScopeDepth;
+    bool initAbortSubscribed;
 
     void Awake()
     {
@@ -67,7 +71,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     void OnDestroy()
     {
         // 파괴 시에도 초기화 구독이 남지 않도록 대칭 해제(예외/조기 파괴 안전장치).
-        UnsubscribeInitAbort();
+        ForceUnsubscribeInitAbort();
         this.matchGrowthSource = null;
 
         // 파괴된 인스턴스를 static에 남겨두면 재매치 때 늦게 도착한 RPC가 죽은 컴포넌트를 건드려
@@ -246,6 +250,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
                 return;
             }
 
+            this.receivedEnemyBoardOrder = (int[])_cardIds.Clone();
+            this.receivedEnemyOwnerIndex = _opponent.OwnerIndex;
             this.enemyField?.InitializeFromRemote(_cardIds, _growth, _opponent.OwnerIndex);
             this.enemyDeckReceived = true;
             this.initSyncTcs?.TrySetResult();
@@ -298,6 +304,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     public async UniTask<bool> SyncInitialDecks()
     {
         SubscribeInitAbort();
+        ArmInitDeadline();
         try
         {
             int[] t_myIds = this.playerField?.GetShuffledIds();
@@ -307,8 +314,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
                 AbortInitialDeck(EMatchEndReason.InitError, "셔플된 내 덱의 성장 스냅샷을 찾을 수 없다");
                 return false;
             }
-            this.myPairingNonce = NewPairingNonce();
-            NetworkGameController.Instance?.SendServerSeedCapability(this.myPairingNonce);
             if (NetworkGameController.Instance == null
                 || !NetworkGameController.Instance.SendInitialDeck(t_myIds, t_myGrowth, this.MyOwnerIndex))
             {
@@ -319,12 +324,10 @@ public class MultiplayerTurnRunner : MonoBehaviour
             if (!this.enemyDeckReceived)
                 await AwaitInitStep(this.initSyncTcs.Task, "상대 덱 수신");
             if (InitAborted) return false;
+            if (!ValidateRemoteBoardOrder()) return false;
 
             // 같은 경기에서 InitialDeck은 한 번만 허용한다. 완료 플래그를 유지해 지연/중복 패킷을 거부한다.
             this.initSyncTcs = null;
-
-        // 덱 동기화 이후 결정론 RNG 시드 합의 (commit-reveal)
-        if (!await SyncMatchSeed()) return false;
 
         NetworkGameController t_network = NetworkGameController.Instance;
         if (t_network == null)
@@ -369,11 +372,67 @@ public class MultiplayerTurnRunner : MonoBehaviour
         }
     }
 
+    /// <summary>필드 셔플 전에 서버 매치 시드를 확정한다.</summary>
+    public async UniTask<bool> AcquireMatchSeedAsync()
+    {
+        SubscribeInitAbort();
+        try
+        {
+            this.myPairingNonce = NewPairingNonce();
+            NetworkGameController.Instance?.SendServerSeedCapability(this.myPairingNonce);
+            return await SyncMatchSeed();
+        }
+        finally
+        {
+            UnsubscribeInitAbort();
+        }
+    }
+
     void ResetDeckSyncState()
     {
         this.enemyDeckReceived = false;
         this.enemyDeckProcessing = false;
+        this.receivedEnemyBoardOrder = null;
+        this.receivedEnemyOwnerIndex = -1;
         this.initSyncTcs = new UniTaskCompletionSource();
+    }
+
+    bool ValidateRemoteBoardOrder()
+    {
+        if (this.receivedEnemyBoardOrder == null || this.receivedEnemyOwnerIndex < 0)
+        {
+            AbortInitialDeck(EMatchEndReason.Desync, "상대 보드 순서 스냅샷이 없다");
+            return false;
+        }
+
+        if (this.receivedEnemyBoardOrder.Length == 0)
+        {
+            // 빈 배열은 파생값도 빈 배열이라 일치로 통과한다 — 검증이 아니라 무검증이 된다.
+            AbortInitialDeck(EMatchEndReason.Desync, "상대 보드 순서가 비어 있다");
+            return false;
+        }
+
+        var t_sorted = new List<int>(this.receivedEnemyBoardOrder);
+        DeckOrder.SortInPlace(t_sorted);
+        List<int> t_expected = DeckOrder.Derive(t_sorted, this.receivedEnemyOwnerIndex);
+        if (t_expected.Count == this.receivedEnemyBoardOrder.Length)
+        {
+            bool t_matches = true;
+            for (int i = 0; i < t_expected.Count; i++)
+            {
+                if (t_expected[i] == this.receivedEnemyBoardOrder[i]) continue;
+                t_matches = false;
+                break;
+            }
+            if (t_matches) return true;
+        }
+
+        // 두 배열을 안 찍으면 원인(구버전 클라·시드 불일치·정렬 규약 어긋남)을 로그만으로 못 가린다.
+        AbortInitialDeck(EMatchEndReason.Desync,
+            $"상대 보드 순서가 서버 시드 파생값과 다르다 — owner={this.receivedEnemyOwnerIndex} " +
+            $"seed={this.seedHex} expected=[{string.Join(",", t_expected)}] " +
+            $"received=[{string.Join(",", this.receivedEnemyBoardOrder)}]");
+        return false;
     }
 
     bool TryBuildGrowthForIds(int[] _ids, out CardGrowth[] _growth)
@@ -504,21 +563,45 @@ public class MultiplayerTurnRunner : MonoBehaviour
     // StartBattle 이전(덱교환·서버 시드 확정) 구간에서 상대 이탈 시 대기 TCS가
     // 아무도 해제 안 해 StartBattleAsync가 영구 정지되는 것을 방지.
 
+    public void BeginInitialSyncScope() => SubscribeInitAbort();
+    public void EndInitialSyncScope() => UnsubscribeInitAbort();
+
     void SubscribeInitAbort()
     {
-        this.opponentLeftDuringInit = false;
-        this.InitTimedOut  = false;
-        this.initDeadline  = Time.realtimeSinceStartup + InitSyncTimeoutSec;
-        if (NetworkSession.Instance == null) return;
+        if (this.initAbortScopeDepth++ == 0)
+        {
+            this.opponentLeftDuringInit = false;
+            this.InitTimedOut = false;
+        }
+        if (this.initAbortSubscribed || NetworkSession.Instance == null) return;
         NetworkSession.Instance.OnPlayerLeftRoom   += OnInitPlayerLeft;
         NetworkSession.Instance.OnConnectionFailed += OnInitConnectionFailed;
+        this.initAbortSubscribed = true;
     }
 
     void UnsubscribeInitAbort()
     {
-        if (NetworkSession.Instance == null) return;
-        NetworkSession.Instance.OnPlayerLeftRoom   -= OnInitPlayerLeft;
-        NetworkSession.Instance.OnConnectionFailed -= OnInitConnectionFailed;
+        if (this.initAbortScopeDepth <= 0) return;
+        this.initAbortScopeDepth--;
+        if (this.initAbortScopeDepth > 0) return;
+        RemoveInitAbortHandlers();
+    }
+
+    void ForceUnsubscribeInitAbort()
+    {
+        this.initAbortScopeDepth = 0;
+        RemoveInitAbortHandlers();
+    }
+
+    void RemoveInitAbortHandlers()
+    {
+        if (!this.initAbortSubscribed) return;
+        if (NetworkSession.Instance != null)
+        {
+            NetworkSession.Instance.OnPlayerLeftRoom   -= OnInitPlayerLeft;
+            NetworkSession.Instance.OnConnectionFailed -= OnInitConnectionFailed;
+        }
+        this.initAbortSubscribed = false;
     }
 
     void OnInitPlayerLeft(PlayerRef _p)        => HandleInitAbort();
@@ -529,9 +612,12 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// 아무도 TCS를 풀어주지 않아 전투가 영원히 시작되지 않는다. 그 마지막 구멍을 막는 벽시계 상한이다.</summary>
     public const float InitSyncTimeoutSec = NetTimeouts.InitSyncSec;
 
-    /// <summary>초기화 전체(덱 교환 + 시드 commit-reveal)에 걸리는 **하나의** 데드라인.
-    /// 단계마다 상한을 따로 걸면 최악 대기가 단계 수만큼 곱해져 사용자가 잠긴 화면에 몇 분씩 갇힌다.</summary>
+    /// <summary>덱 동기화 구간 **전체**에 걸리는 하나의 데드라인. <see cref="ArmInitDeadline"/>이 1회만 세운다 —
+    /// 대기 진입마다 다시 세우면 최악 대기가 단계 수만큼 곱해져 사용자가 잠긴 화면에 몇 분씩 갇힌다.
+    /// 이탈 감지 구독은 중첩되므로 그쪽에 얹으면 재진입마다 늘어난다 — 그래서 수명을 분리했다.</summary>
     float initDeadline;
+
+    void ArmInitDeadline() => this.initDeadline = Time.realtimeSinceStartup + InitSyncTimeoutSec;
 
     /// <summary>초기화가 상한 초과로 끝났는가. **상대 이탈과 구분해야 한다** —
     /// 이탈은 부전승(보상 지급)이지만 타임아웃은 내 쪽 문제일 수 있어 보상을 주면 안 된다.

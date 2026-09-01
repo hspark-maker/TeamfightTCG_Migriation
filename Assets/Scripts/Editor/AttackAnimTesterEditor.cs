@@ -18,7 +18,7 @@ public class AttackAnimTesterEditor : Editor
     {
         "m_Script", "synergyIndex", "synergyPreview", "keywordIndex", "keywordPreview",
         "emblemSlot", "emblemTiming", "emblemAutoReplay", "emblemReplayGap",
-        "flowStack", "swarmDamagePerShot", "caretakerHeal",
+        "flowStack", "brandDamagePerShot", "caretakerHeal", "legacyCrownCount",
         "sequence", "stepGap", "untimedStepHold",
     };
 
@@ -168,11 +168,21 @@ public class AttackAnimTesterEditor : Editor
 
         SerializedProperty t_kind = serializedObject.FindProperty("synergyPreview");
         var t_labels = new string[t_available.Length];
-        int t_kindIndex = 0;
+        int t_kindIndex = -1;
         for (int i = 0; i < t_available.Length; i++)
         {
             t_labels[i] = t_available[i].ToString();
             if ((int)t_available[i] == t_kind.enumValueIndex) t_kindIndex = i;
+        }
+
+        // 저장된 선택이 이 시너지에 없는 연출이면 **그 자리에서 첫 항목으로 굳힌다.**
+        // 표시만 첫 항목으로 맞추고 값을 두면 재생 버튼이 옛 값으로 분기해 "눌러도 아무 일이 없다"가 된다
+        // (ClampPreviewToAvailable은 시너지를 바꿀 때만 도므로 씬을 열자마자인 경우를 못 잡는다).
+        if (t_kindIndex < 0)
+        {
+            t_kindIndex = 0;
+            t_kind.enumValueIndex = (int)t_available[0];
+            serializedObject.ApplyModifiedProperties();
         }
 
         using (var t_kindCheck = new EditorGUI.ChangeCheckScope())

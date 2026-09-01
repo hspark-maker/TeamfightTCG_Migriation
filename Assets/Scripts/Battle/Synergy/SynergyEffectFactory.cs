@@ -21,13 +21,13 @@ public static class SynergyEffectFactory
         "Caretaker" => ScriptableObject.CreateInstance<CaretakerSynergyEffect>(),
         "Predator"  => ScriptableObject.CreateInstance<PredatorSynergyEffect>(),
         "Legacy"    => ScriptableObject.CreateInstance<LegacySynergyEffect>(),
-        "Tracking"  => ScriptableObject.CreateInstance<TrackingSynergyEffect>(),
+        "Trace"     => ScriptableObject.CreateInstance<TraceSynergyEffect>(),
         _           => null,
     };
 
     /// <summary>시트 오타를 로드 시점에 드러내기 위한 목록. 에디터 검증기가 이 목록으로 대조한다.</summary>
     public static readonly string[] SupportedTypes =
     {
-        "Stat", "Flow", "Brand", "Guardian", "Caretaker", "Predator", "Legacy", "Tracking",
+        "Stat", "Flow", "Brand", "Guardian", "Caretaker", "Predator", "Legacy", "Trace",
     };
 }

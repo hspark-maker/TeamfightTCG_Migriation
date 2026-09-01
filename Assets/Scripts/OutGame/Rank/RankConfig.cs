@@ -44,11 +44,11 @@ public class RankConfig : ScriptableObject
              "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>
     {
-        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 40, rewards = GoldOnly(100,  50) },
-        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 260, pointsPerDivision = 40, rewards = GoldOnly(300,  50) },
-        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 420, pointsPerDivision = 40, rewards = GoldOnly(500,  100) },
-        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 580, pointsPerDivision = 40, rewards = GoldOnly(900,  100) },
-        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 740, pointsPerDivision = 40, rewards = GoldOnly(1400, 200) },
+        new RankGradeConfig { grade = ERankGrade.Bronze,   displayName = "브론즈",     entryPoints = 100, pointsPerDivision = 40 },
+        new RankGradeConfig { grade = ERankGrade.Silver,   displayName = "실버",       entryPoints = 260, pointsPerDivision = 40 },
+        new RankGradeConfig { grade = ERankGrade.Gold,     displayName = "골드",       entryPoints = 420, pointsPerDivision = 40 },
+        new RankGradeConfig { grade = ERankGrade.Platinum, displayName = "플래티넘",   entryPoints = 580, pointsPerDivision = 40 },
+        new RankGradeConfig { grade = ERankGrade.Diamond,  displayName = "다이아몬드", entryPoints = 740, pointsPerDivision = 40 },
     };
 
     // 전체 티어 수(등급 수 × 단계 수). 소비처는 행 수를 이 값에서 파생한다
@@ -148,12 +148,6 @@ public class RankConfig : ScriptableObject
             _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
         }
     }
-
-    static List<RankRewardDef> GoldOnly(long _amount, long _amountPerDivision)
-        => new List<RankRewardDef>
-        {
-            new RankRewardDef { currency = ECurrencyType.Gold, amount = _amount, amountPerDivision = _amountPerDivision },
-        };
 }
 
 // 랭크 등급(단계와 무관한 상위 구분)
@@ -194,29 +188,6 @@ public class RankGradeConfig
              "승급전 패배 시 복귀선도 이 값에서 나온다: 4단계 임계치 + 이 값의 절반(= 별 두 칸)으로 스냅한다.")]
     public long pointsPerDivision;
 
-    // 이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다)
-    [Tooltip("이 등급 보상 목록(4단계 공용, 단계별로 액수만 늘어난다). 리스트 순서 = 표시 순서. " +
-             "비워두면 수령해도 지급이 없다(진행만 넘어간다).")]
-    public List<RankRewardDef> rewards = new List<RankRewardDef>();
-}
-
-// 보상 1건 저작값(등급 단위로 저작하고 단계 배율은 코드가 파생한다).
-// 그림은 담지 않는다 — 재화 아이콘의 진실원은 CurrencyLook 한 장이다.
-[Serializable]
-public struct RankRewardDef
-{
-    // 지급할 재화 종류
-    [Tooltip("지급할 재화 종류. 슬롯 그림은 이 값으로 CurrencyLook 표에서 정해진다 — 여기서 따로 저작하지 않는다.")]
-    public ECurrencyType currency;
-
-    // 이 등급 1단계 지급액
-    [Tooltip("이 등급 1단계 지급액. 0 이하면 이 항목은 4단계 전부에서 표시도 지급도 되지 않는다(단계 증가분이 있어도 마찬가지) — " +
-             "항목을 지우지 않고 잠시 끄고 싶을 때 쓴다. 1단계만 건너뛰고 2단계부터 주는 저작은 지원하지 않는다.")]
-    public long amount;
-
-    // 단계마다 늘어나는 증가분
-    [Tooltip("단계마다 늘어나는 증가분. 단계 N의 지급액 = amount + (N-1) * 이 값. 0이면 4단계 모두 같은 액수를 준다.")]
-    public long amountPerDivision;
 }
 
 // 티어 1개의 파생 스냅샷(RankConfig가 등급 행에서 계산해 내주는 값)

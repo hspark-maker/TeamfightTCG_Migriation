@@ -10,6 +10,7 @@ public sealed class AssetPreloadKickStep : MainInitializer
         // 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
         // 지금은 전 카드를 받는다 — 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다.
         StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        StartCoroutine(PackArtCache.Preload());
 
         UiPrefabCache.Preload().Forget();
         return UniTask.CompletedTask;

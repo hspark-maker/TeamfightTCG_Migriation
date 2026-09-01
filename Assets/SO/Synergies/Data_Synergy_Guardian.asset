@@ -12,14 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
   m_Name: Data_Synergy_Guardian
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  displayName: "수호자"
-  effectDescription: "배치 시 보호막 획득"
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: f76294d05aaa974498faf69479d58af0, type: 3}
   inactiveIcon: {fileID: 21300000, guid: f0e4ef862b2634f4395a9869e961c306, type: 3}
   vfx: {fileID: 11400000, guid: 7c1a4b9e2f3d40a4b8e5c60d71f2a3b9, type: 2}
-  tiers:
-  - requiredCount: 2
-    label: "수호자"
-    effects:
-    - {fileID: 11400000, guid: 7df0d6e04fff90345af21af4aa44fa22, type: 2}
+  synergyId: Guardian

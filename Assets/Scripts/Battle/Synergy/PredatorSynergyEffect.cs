@@ -22,6 +22,10 @@ public class PredatorSynergyEffect : SynergyEffect
         if (t_heal <= 0) return UniTask.CompletedTask;
         _ctx.self.Heal(t_heal);
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)
-        return UniTask.CompletedTask;
+
+        // 흡수 연출. 상태(회복)는 위에서 이미 끝났고 여기서부터는 표시뿐이라 await 해도 안전하다
+        // — 두 클라가 같은 지점에서 같은 시간을 기다린다(훅 계약: 첫 await 전에 상태변이 완결).
+        return PredatorVfx.PlayDrain(CardView.GetView(_ctx.target), CardView.GetView(_ctx.self),
+                                     _ctx.synergy?.vfx as PredatorSynergyVfxConfig);
     }
 }

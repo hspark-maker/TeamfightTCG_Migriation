@@ -55,6 +55,7 @@ public static partial class SpecFirestoreUploader
     [Serializable] sealed class FirestoreStringValue { public string stringValue; }
     [Serializable] sealed class MetaFields
     {
+        public FirestoreIntegerValue schemaVersion;
         public FirestoreIntegerValue revision;
         public FirestoreStringValue payloadHash;
         public FirestoreIntegerValue rowsRevision;
@@ -142,14 +143,15 @@ public static partial class SpecFirestoreUploader
 
         if (!TryReadMeta(t_client, _projectId, _apiKey, _envId, _table,
                          out long t_currentRevision, out string t_updateTime, out string t_remoteHash,
-                         out long t_rowsRevision, out bool t_metaExists, out _error))
+                         out long t_rowsRevision, out long t_remoteSchemaVersion,
+                         out bool t_metaExists, out _error))
             return null;
 
         // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 블롭을 받아 볼 이유도 없다.
         // 여기서 끊지 않으면 안 바뀐 표마다 read·write를 그대로 지불한다.
         // 단 미러를 켠 채로 rows/ 가 뒤처져 있으면(미러를 껐던 업로드가 있었다) 내용이 같아도 한 번은 밀어야 한다.
         bool t_mirrorBehind = t_mirrorRows && t_rowsRevision != t_currentRevision;
-        if (t_metaExists && !t_mirrorBehind &&
+        if (t_metaExists && t_remoteSchemaVersion == SCHEMA_VERSION && !t_mirrorBehind &&
             string.Equals(t_remoteHash, _snapshot.PayloadHash, StringComparison.Ordinal))
             return $"{_table}: 변경 없음 — 건너뜀 (rev {t_currentRevision}, {_snapshot.Rows.Count}행, hash {_snapshot.PayloadHash})";
 
@@ -458,12 +460,13 @@ public static partial class SpecFirestoreUploader
     static bool TryReadMeta(
         HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
         out long _revision, out string _updateTime, out string _payloadHash, out long _rowsRevision,
-        out bool _exists, out string _error)
+        out long _schemaVersion, out bool _exists, out string _error)
     {
         _revision = 0;
         _updateTime = null;
         _payloadHash = null;
         _rowsRevision = 0;
+        _schemaVersion = 0;
         _exists = false;
         _error = null;
 
@@ -489,6 +492,13 @@ public static partial class SpecFirestoreUploader
         _exists = true;
         _updateTime = t_document?.updateTime;
         _payloadHash = t_document?.fields?.payloadHash?.stringValue;
+        string t_schemaVersion = t_document?.fields?.schemaVersion?.integerValue;
+        if (!string.IsNullOrEmpty(t_schemaVersion) &&
+            !long.TryParse(t_schemaVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out _schemaVersion))
+        {
+            _error = $"기존 메타 schemaVersion '{t_schemaVersion}'을 읽을 수 없다.";
+            return false;
+        }
         string t_revision = t_document?.fields?.revision?.integerValue;
         if (!string.IsNullOrEmpty(t_revision) &&
             !long.TryParse(t_revision, NumberStyles.Integer, CultureInfo.InvariantCulture, out _revision))

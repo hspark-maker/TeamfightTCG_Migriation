@@ -49,7 +49,7 @@ internal static class DeckLockSubmission
         // deckHash까지 같이 계산해야 한다(전송 순서가 다른 레거시 경로 포함).
         int[] t_ids = (int[])_cardIds.Clone();
         CardGrowth[] t_growths = (CardGrowth[])_growth.Clone();
-        Array.Sort(t_ids, t_growths);
+        DeckOrder.SortInPlace(t_ids, t_growths);
         for (int i = 1; i < t_ids.Length; i++)
         {
             if (t_ids[i - 1] != t_ids[i]) continue;

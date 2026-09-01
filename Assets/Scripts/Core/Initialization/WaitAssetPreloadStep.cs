@@ -9,7 +9,7 @@ public sealed class WaitAssetPreloadStep : MainInitializer
         GameInitialization.SetState(EGameInitState.LoadingAssets);
 
         await UniTask.WaitUntil(() =>
-            (CardArtCache.IsComplete &&
+            (CardArtCache.IsComplete && PackArtCache.IsComplete &&
              (UiPrefabCache.IsComplete || UiPrefabCache.HasFailed)) ||
             GameInitialization.IsTerminated);
 
@@ -19,7 +19,7 @@ public sealed class WaitAssetPreloadStep : MainInitializer
             return;
         }
 
-        if (CardArtCache.HasFailed || UiPrefabCache.HasFailed)
+        if (CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed)
         {
             GameInitialization.MarkRecoveryRequired();
             _context.Abort();

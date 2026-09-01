@@ -59,16 +59,16 @@ public class PackOddsPopup : PooledUIBase
 
     void OnClosePressed() => Hide();
 
-    void Bind(CardPackData _pack)
+    void Bind(string _packId)
     {
         if (this.titleText != null)
-            this.titleText.text = _pack != null ? _pack.DisplayName : string.Empty;
+            this.titleText.text = PackSpec.DisplayName(_packId);
 
-        List<PackOddsEntry> t_entries = PackOdds.Resolve(_pack);
+        List<PackOddsEntry> t_entries = PackOdds.Resolve(_packId);
         FillRows(t_entries);
 
         if (this.footerText != null)
-            this.footerText.text = FooterFor(_pack, t_entries.Count);
+            this.footerText.text = FooterFor(_packId, t_entries.Count);
     }
 
     void FillRows(List<PackOddsEntry> _entries)
@@ -88,15 +88,15 @@ public class PackOddsPopup : PooledUIBase
     }
 
     // 뽑는 장수·중복 규칙까지 함께 고지한다 — 확률만 적으면 "6장 뽑는데 왜 같은 게 나오냐"가 남는다.
-    static string FooterFor(CardPackData _pack, int _count)
+    static string FooterFor(string _packId, int _count)
     {
-        if (_pack == null) return string.Empty;
+        if (!PackSpec.TryGetPack(_packId, out _)) return string.Empty;
 
-        string t_unique = _pack.UniqueDraw
+        string t_unique = PackSpec.UniqueDraw(_packId)
             ? "한 팩 안에서 같은 카드는 나오지 않습니다."
             : "한 팩 안에서 같은 카드가 중복될 수 있습니다.";
 
-        return $"1회 {_pack.DrawCount}장 획득 · 총 {_count}종\n"
+        return $"1회 {PackSpec.DrawCount(_packId)}장 획득 · 총 {_count}종\n"
              + $"{t_unique}\n"
              + "표기 확률은 1장 뽑을 때의 확률이며, 소수점 셋째 자리에서 반올림했습니다.";
     }
@@ -104,5 +104,5 @@ public class PackOddsPopup : PooledUIBase
 
 public class PackOddsData : UIData
 {
-    public CardPackData pack;
+    public string pack;
 }

@@ -12,20 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee5a314483f3b3409c3cd96e89f334c, type: 3}
   m_Name: Data_Synergy_Caretaker
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
-  displayName: "\uB3CC\uBCF4\uBBF8"
-  effectDescription: "\uB3CC\uBCF4\uBBF8 \uCE74\uB4DC\uAC00 \uB098\uC62C \uB54C \uD544\uB4DC
-    \uB3CC\uBCF4\uBBF8 \uC0DD\uBA85\uB825 \uD68C\uBCF5+\uCD94\uAC00\uC0DD\uBA85\uB825
-    \uBD80\uC5EC"
   color: {r: 0, g: 0, b: 0, a: 0}
   activeIcon: {fileID: 21300000, guid: 41b8d69778c346a438e8234a9d55d548, type: 3}
   inactiveIcon: {fileID: 21300000, guid: 3a4c16d21cdc99a4fbefbf03f3bf3f35, type: 3}
-  vfx: {fileID: 0}
-  tiers:
-  - requiredCount: 3
-    label: "\uB3CC\uBCF4\uBBF8"
-    effects:
-    - {fileID: 11400000, guid: 180216abb08b44947b486290b8276e51, type: 2}
-  - requiredCount: 5
-    label: "\uB3CC\uBCF4\uBBF8"
-    effects:
-    - {fileID: 11400000, guid: 6f10d34c28cc6be4299b89d3a5a8efac, type: 2}
+  vfx: {fileID: 11400000, guid: c936b924711f9454da2d9f10aedae691, type: 2}
+  synergyId: Caretaker

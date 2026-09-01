@@ -24,14 +24,14 @@ public class BrandSynergyEffect : SynergyEffect
         if (_ctx.defender == null || !_ctx.defender.IsAlive || _ctx.ownField == null) return;
 
         // 낙인 카드 수집. 슬롯 오름차순(GetActiveCards)이라 발사 순서도 양 클라 동일하다.
-        var t_swarm = new List<CardInstance>();
+        var t_brand = new List<CardInstance>();
         foreach (var t_card in _ctx.ownField.GetActiveCards())   // 슬롯 라이브 카드(공격자 포함)
         {
             if (t_card == null || !t_card.IsAlive) continue;
-            if (SynergyApplier.BelongsTo(t_card, _ctx.synergy)) t_swarm.Add(t_card);
+            if (SynergyApplier.BelongsTo(t_card, _ctx.synergy)) t_brand.Add(t_card);
         }
 
-        int t_count = Mathf.Min(t_swarm.Count, BattleField.SLOT_COUNT);   // 방어적 상한(아군 슬롯 ≤3 → 자연히 만족, 회귀 가드)
+        int t_count = Mathf.Min(t_brand.Count, BattleField.SLOT_COUNT);   // 방어적 상한(아군 슬롯 ≤3 → 자연히 만족, 회귀 가드)
         if (t_count <= 0) return;
         int t_totalDamage = t_count * Mathf.Max(1, this.damagePerMember);
 
@@ -62,14 +62,14 @@ public class BrandSynergyEffect : SynergyEffect
         var t_views = new List<CardView>(t_count);
         for (int i = 0; i < t_count; i++)
         {
-            CardView t_view = CardView.GetView(t_swarm[i]);
+            CardView t_view = CardView.GetView(t_brand[i]);
             if (t_view != null) t_views.Add(t_view);
         }
         // 연출 스펙은 그 시너지의 연출 에셋이 소유한다. 타입이 안 맞게 꽂혔으면 null → 볼리만 생략된다
         // (피해는 이미 적용된 뒤라 안전하다). 이 캐스트가 "낙인 데이터 ↔ 낙인 연출"의 유일한 접점이다.
-        await SwarmVfx.PlayVolley(t_views, CardView.GetView(_ctx.defender),
+        await BrandVolleyVfx.PlayVolley(t_views, CardView.GetView(_ctx.defender),
                                   SplitDamage(t_applied, t_views.Count), t_hpBefore, t_bonusBefore,
-                                  _ctx.synergy?.vfx as SwarmSynergyVfxConfig);
+                                  _ctx.synergy?.vfx as BrandSynergyVfxConfig);
     }
 
     /// <summary>실제 적용된 총 피해를 발수만큼 정수로 쪼갠다. 나머지는 <b>앞쪽 발</b>에 얹는다 —
