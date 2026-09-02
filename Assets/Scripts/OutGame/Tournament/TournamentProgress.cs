@@ -117,6 +117,17 @@ public static class TournamentProgress
         }
     }
 
+    // 해금 연출을 이미 보여준 챕터·정점의 표식(ClaimedChapters와 같은 null 보정)
+    static List<string> SeenUnlocks
+    {
+        get
+        {
+            TournamentSaveData t_slot = Slot;
+            if (t_slot.SeenUnlockIds == null) t_slot.SeenUnlockIds = new List<string>();
+            return t_slot.SeenUnlockIds;
+        }
+    }
+
     // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(TournamentConfig _config)
     {
@@ -174,6 +185,32 @@ public static class TournamentProgress
         return ETournamentNodeState.Locked;
     }
 
+    /// <summary>정점 뷰가 그릴 상태. 수령 왕복이 도는 동안 그 정점만 미리 Cleared 로 답한다 —
+    /// 팝업은 응답을 기다리지 않고 1초 안에 닫히므로, 낙관 표시가 없으면 연출이 끝난 뒤에도
+    /// 정점이 미수령으로 남아 있다가 응답이 오는 순간 툭 바뀐다(앨범·랭크와 같은 이유).
+    ///
+    /// <b>표시 전용이다.</b> 해금 사슬(<see cref="StateOf"/> 가 직전 정점을 되짚는 자리) · 진입 자격
+    /// (<see cref="CanEnter"/>) · 챕터 완주 판정은 이 값을 쓰지 않는다 —
+    /// 정점의 Cleared 는 자기 표시로 끝나지 않고 <b>다음 칸의 자격</b>이라, 낙관을 그쪽까지 태우면
+    /// 확정되지 않은 클리어가 다음 정점을 미리 열고 해금 연출 표식이 세이브에까지 남는다.
+    /// 그래서 낙관은 여기서 멈추고, 길 점등과 다음 정점 해금은 서버가 확정한 뒤에 따라온다.</summary>
+    public static ETournamentNodeState DisplayStateOf(int _index)
+    {
+        ETournamentNodeState t_state = StateOf(_index);
+        if (t_state != ETournamentNodeState.RewardPending) return t_state;
+
+        return IsNodeClaiming(_index) ? ETournamentNodeState.Cleared : t_state;
+    }
+
+    /// <summary>이 정점의 수령 왕복이 도는 중인가. 낙관 표시의 유일한 근거이며 세이브에는 남지 않는다.</summary>
+    public static bool IsNodeClaiming(int _index)
+    {
+        if (!RewardClaimCommand.HasAnyInFlight) return false;
+
+        return Config.TryGetNode(_index, out TournamentNodeDef t_node)
+               && RewardClaimCommand.IsInFlight(RewardClaimCommand.OwnerTournament, t_node.nodeId);
+    }
+
     // 진입 자격 — 아직 깨지 않은 정점만 도전할 수 있다. 클리어한 정점은 재진입을 막는다:
     // 재도전 승리는 서버가 중복 신고를 거절해 보상이 없어, 유저에게 남는 것이 헛걸음뿐이다.
     // 미수령 정점도 제외한다 — 진입이 아니라 수령이 남은 자리다.
@@ -212,11 +249,14 @@ public static class TournamentProgress
 
         // 보상 미저작 정점도 서버를 거친다 — 클라가 "받을 게 없다"고 판정해 스스로 낙인을 남기면
         // 변조된 클라가 정점을 마음대로 열 수 있다. 서버가 지급 0건이어도 클리어를 확정해 준다.
-        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId, t_pending);
-        if (!t_outcome.Succeeded) return default;
+        //
+        // 통지는 창구가 왕복 시작·종료에 한 번씩 울려 준다(앨범·랭크와 같은 배선) — 시작 통지가 도장을 찍고,
+        // 종료 통지가 성공이면 서버 낙인으로 확정하고 거절이면 되돌린다. 낙관이 닿는 것은 표시뿐이라
+        // 다음 정점의 해금은 이 왕복이 끝난 뒤에야 열린다(DisplayStateOf 주석 참고).
+        var t_outcome = await RewardClaimCommand.ClaimAsync(RewardClaimCommand.OwnerTournament, _nodeId,
+                                                            t_pending, () => OnChanged?.Invoke());
 
-        OnChanged?.Invoke();
-        return t_outcome;
+        return t_outcome.Succeeded ? t_outcome : default;
     }
 
     // 챕터의 모든 정점이 Cleared인가. 정점 0개 챕터는 완주로 통과시킨다 — 저작 실수로 진행이 영영 막히지 않게
@@ -306,15 +346,137 @@ public static class TournamentProgress
         Config.FillChapterRewards(t_chapter.chapterId, _sink);
     }
 
+    /// <summary>아직 연출을 보여주지 않은 해금을 모아 낸다(차분만 낸다 — 확정은 MarkUnlockSeen이 한다).</summary>
+    // 랭크 승급으로 열린 챕터도 여기서 잡힌다 — 판정이 IsChapterRankLocked 직독이라 통지가 없어도 다음 진입에서 드러난다
+    public static bool TryTakeUnlockShowcase(out TournamentUnlockShowcase _showcase)
+    {
+        List<string> t_seen = SeenUnlocks;
+        var t_chapters = new List<int>();
+        var t_nodes = new List<int>();
+
+        int t_chapterCount = ChapterCount;
+        for (int t_i = 0; t_i < t_chapterCount; t_i++)
+        {
+            if (IsChapterRankLocked(t_i)) continue;
+            if (!TryGetChapter(t_i, out TournamentChapterDef t_chapter) || !t_chapter.HasStableKey) continue;
+            if (t_seen.Contains(t_chapter.chapterId)) continue;
+
+            t_chapters.Add(t_i);
+        }
+
+        int t_nodeCount = NodeCount;
+        for (int t_i = 0; t_i < t_nodeCount; t_i++)
+        {
+            if (!IsNodeUnlocked(t_i)) continue;
+            if (!TryGetNode(t_i, out TournamentNodeDef t_node) || !t_node.HasStableKey) continue;
+            if (t_seen.Contains(t_node.nodeId)) continue;
+
+            t_nodes.Add(t_i);
+        }
+
+        _showcase = new TournamentUnlockShowcase(t_chapters, t_nodes);
+        return _showcase.HasAny;
+    }
+
+    /// <summary>연출을 보여준 챕터·정점을 한 번에 표식한다(저장은 한 번만 튄다).</summary>
+    public static void MarkUnlockSeen(in TournamentUnlockShowcase _showcase)
+    {
+        if (!_showcase.HasAny) return;
+
+        List<string> t_seen = SeenUnlocks;
+        bool t_marked = false;
+
+        if (_showcase.Chapters != null)
+        {
+            for (int t_i = 0; t_i < _showcase.Chapters.Count; t_i++)
+            {
+                if (!TryGetChapter(_showcase.Chapters[t_i], out TournamentChapterDef t_chapter)) continue;
+                if (!t_chapter.HasStableKey || t_seen.Contains(t_chapter.chapterId)) continue;
+
+                t_seen.Add(t_chapter.chapterId);
+                t_marked = true;
+            }
+        }
+
+        if (_showcase.Nodes != null)
+        {
+            for (int t_i = 0; t_i < _showcase.Nodes.Count; t_i++)
+            {
+                if (!TryGetNode(_showcase.Nodes[t_i], out TournamentNodeDef t_node)) continue;
+                if (!t_node.HasStableKey || t_seen.Contains(t_node.nodeId)) continue;
+
+                t_seen.Add(t_node.nodeId);
+                t_marked = true;
+            }
+        }
+
+        // 디바운스로 미루면 안 된다 — 표식이 올라가기 전에 유저가 띠에서 보상을 받으면
+        // 서버가 표식 없는 문서를 읽어 tournament 슬롯째 되돌려 쓰고, 채택이 방금 선 표식을 지운다.
+        if (t_marked) DataSaveManager.SaveImmediate();
+    }
+
+    /// <summary>정점 하나를 본 것으로 표식(맵이 한 칸씩 열어 보이는 자리에서 부른다).</summary>
+    public static void MarkNodeUnlockSeen(int _index)
+    {
+        if (!TryGetNode(_index, out TournamentNodeDef t_node) || !t_node.HasStableKey) return;
+
+        List<string> t_seen = SeenUnlocks;
+        if (t_seen.Contains(t_node.nodeId)) return;
+
+        t_seen.Add(t_node.nodeId);
+        DataSaveManager.SaveImmediate();   // MarkUnlockSeen과 같은 이유 — 서버 응답 채택이 표식을 되감는다
+    }
+
+    // 표식 없이 진행 흔적만 있는 기존 유저에게 연출이 무더기로 터지는 것을 막는다.
+    // null 여부로 가르지 않는다 — 서버가 모든 문서에 seenUnlockIds: [] 를 써 넣으면 "필드 없음" 신호가 사라져,
+    // 오염되지 않는 진행 흔적(ClearedNodeIds · PendingRewardNodeId)만이 믿을 수 있는 축이다.
+    internal static bool TryBackfillSeenUnlocks()
+    {
+        if (SeenUnlocks.Count > 0) return false;
+
+        List<string> t_cleared = Slot.ClearedNodeIds;
+        bool t_hasProgress = (t_cleared != null && t_cleared.Count > 0) || !string.IsNullOrEmpty(PendingRewardNodeId);
+        if (!t_hasProgress) return false;   // 온보딩 신규 유저 — 첫 챕터·첫 정점 연출이 정상적으로 터져야 한다
+
+        if (TryTakeUnlockShowcase(out TournamentUnlockShowcase t_showcase)) MarkUnlockSeen(t_showcase);
+
+        // 표식이 하나도 서지 않았으면 소급이 성립하지 않은 것이다 — true로 답하면 SeenUnlocks가 계속 0이라
+        // 이후 모든 진입이 영영 억제된다. 이때는 열려 있는 것 자체가 없어 되풀이될 연출도 없다.
+        return SeenUnlocks.Count > 0;
+    }
+
     // 클리어·수령 낙인만 지운다(디버그 전용, 지급된 재화는 회수하지 않는다)
     public static void ResetForDebug()
     {
         Slot.ClearedNodeIds.Clear();
         ClaimedChapters.Clear();
+        SeenUnlocks.Clear();
         Slot.PendingRewardNodeId = "";
         DataSaveManager.Save();
         OnChanged?.Invoke();
     }
+
+    // 정점이 열려 있는가 — 진행 사슬과 랭크 잠금을 곱한 해금 판정(진입 자격 CanEnter와 달리 클리어한 정점도 열린 것이다)
+    static bool IsNodeUnlocked(int _index)
+        => StateOf(_index) != ETournamentNodeState.Locked && !IsRankLocked(_index);
+}
+
+// 이번 진입에서 처음 열린 것들. 두 축이 한 사건이라 갈라 넘기지 않는다
+public readonly struct TournamentUnlockShowcase
+{
+    /// <summary>새로 열린 챕터 인덱스(오름차순).</summary>
+    public readonly List<int> Chapters;
+
+    /// <summary>새로 열린 평탄 정점 번호(오름차순).</summary>
+    public readonly List<int> Nodes;
+
+    public TournamentUnlockShowcase(List<int> _chapters, List<int> _nodes)
+    {
+        Chapters = _chapters;
+        Nodes = _nodes;
+    }
+
+    public bool HasAny => (Chapters != null && Chapters.Count > 0) || (Nodes != null && Nodes.Count > 0);
 }
 
 // 정점 상태(4종 배타)

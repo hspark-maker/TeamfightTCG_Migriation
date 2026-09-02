@@ -37,6 +37,7 @@ public static class TournamentChapterBandBuilder
         Sprite t_coin   = FindSprite("ResourceBar_Single_Icon_Coin");
         Sprite t_gem    = FindSprite("ResourceBar_Single_Icon_Gem");
         Sprite t_lock   = FindSprite("Image_UI_GUIPackCartoon_Icon_Lock_Silver");
+        Sprite t_mote   = FindSprite("Glow_Radial");   // 카드 상세 해금 연출과 같은 빛 알갱이
 
         // ⚠ 루트의 anchoredPosition은 맵이 '이음매로부터의 오프셋'으로 읽는다(TournamentMapOverlayView.bandPrefab 참고).
         //   여기서 (0,0)으로 뽑으므로 이 빌더를 다시 돌리면 손으로 맞춘 오프셋이 0으로 되돌아간다.
@@ -92,8 +93,18 @@ public static class TournamentChapterBandBuilder
         // 랭크 미달 — 이 장에 아직 들어갈 수 없다. 눈금·보상 미리보기를 대신해 요구 등급 하나만 말한다.
         // 자물쇠(잠겼다) · 배지(어느 등급) · 문구(무엇을 하면 열리나) 셋이 한 줄에 선다.
         GameObject t_rankLockMark = NewRect("RankLockMark", t_root, Vector2.zero, Vector2.zero);
-        AddImage(NewRect("Lock", t_rankLockMark, new Vector2(44f, 44f), new Vector2(-108f, -58f)), t_lock, Color.white)
-            .raycastTarget = false;
+
+        // 자물쇠보다 먼저 세운다 — uGUI는 형제 순서가 곧 그리는 순서라, 뒤에 세우면 빛이 자물쇠를 덮는다.
+        // 저작 알파는 0이다: SectionUnlockFx가 이 값을 원상복귀 기준으로 삼아 평상시엔 빛이 없다.
+        GameObject t_lockBackLight = NewRect("LockBackLight", t_rankLockMark, new Vector2(150f, 150f), new Vector2(-108f, -58f));
+        Image t_lockBackLightImage = AddImage(t_lockBackLight, t_glow, new Color(GOLD.r, GOLD.g, GOLD.b, 0f));
+        t_lockBackLightImage.raycastTarget = false;
+
+        GameObject t_lockGlyph = NewRect("Lock", t_rankLockMark, new Vector2(44f, 44f), new Vector2(-108f, -58f));
+        AddImage(t_lockGlyph, t_lock, Color.white).raycastTarget = false;
+
+        // 잠김 덮개(plate)는 비운다 — RankLockMark 노드에는 Graphic이 없고, 이 띠에서 걷을 판은 자물쇠 자체다.
+        var t_lockFx = t_rankLockMark.AddComponent<SectionUnlockFx>();
 
         // 배지는 등급이 정해질 때 코드가 켠다 — 스프라이트 없는 Image를 켜 두면 흰 사각형이 남는다.
         GameObject t_rankBadge = NewRect("Badge", t_rankLockMark, new Vector2(52f, 52f), new Vector2(-172f, -58f));
@@ -105,7 +116,9 @@ public static class TournamentChapterBandBuilder
             t_plateSmall, t_font, "실버 도달 시 해금", 28f);
 
         Wire(t_view, t_title, t_progress, t_buttonComp, t_slots, t_progressMark, t_claimableMark, t_clearedMark, t_endMark,
-             t_rankLockMark, t_rankLockText, t_rankBadgeImage, t_group);
+             t_rankLockMark, t_rankLockText, t_rankBadgeImage, t_group, t_lockFx);
+
+        WireLockFx(t_lockFx, (RectTransform)t_lockGlyph.transform, t_mote, t_lockBackLightImage);
 
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PREFAB_PATH));
         PrefabUtility.SaveAsPrefabAsset(t_root, PREFAB_PATH);
@@ -121,7 +134,7 @@ public static class TournamentChapterBandBuilder
     static void Wire(TournamentChapterBandView _view, TMP_Text _title, TMP_Text _progress, Button _claim,
                      List<SlotParts> _slots, GameObject _progressMark, GameObject _claimableMark,
                      GameObject _clearedMark, GameObject _endMark, GameObject _rankLockMark,
-                     TMP_Text _rankLockText, Image _rankLockBadge, CanvasGroup _group)
+                     TMP_Text _rankLockText, Image _rankLockBadge, CanvasGroup _group, SectionUnlockFx _lockFx)
     {
         var t_so = new SerializedObject(_view);
         t_so.FindProperty("titleText").objectReferenceValue = _title;
@@ -135,6 +148,7 @@ public static class TournamentChapterBandBuilder
         t_so.FindProperty("rankLockText").objectReferenceValue = _rankLockText;
         t_so.FindProperty("rankLockBadge").objectReferenceValue = _rankLockBadge;
         t_so.FindProperty("canvasGroup").objectReferenceValue = _group;
+        t_so.FindProperty("lockFx").objectReferenceValue = _lockFx;
 
         SerializedProperty t_array = t_so.FindProperty("rewardSlots");
         t_array.arraySize = _slots.Count;
@@ -146,6 +160,21 @@ public static class TournamentChapterBandBuilder
             t_slot.FindPropertyRelative("amountLabel").objectReferenceValue = _slots[t_i].Amount;
         }
 
+        t_so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // 자물쇠가 부서지는 연출의 내부 배선. plate는 비운다 — RankLockMark에 Graphic이 없어 걷을 덮개가 없다.
+    static void WireLockFx(SectionUnlockFx _fx, RectTransform _lockMark, Sprite _mote, Graphic _backLight)
+    {
+        var t_so = new SerializedObject(_fx);
+        t_so.FindProperty("lockMark").objectReferenceValue = _lockMark;
+        t_so.FindProperty("plate").objectReferenceValue = null;
+        t_so.FindProperty("moteSprite").objectReferenceValue = _mote;
+        t_so.FindProperty("backLight").objectReferenceValue = _backLight;
+
+        // 자물쇠 하나짜리 표식이라 카드 상세(판 전체)보다 좁게 모은다.
+        t_so.FindProperty("scatterRadius").floatValue = 120f;
+        t_so.FindProperty("moteSize").floatValue = 40f;
         t_so.ApplyModifiedPropertiesWithoutUndo();
     }
 

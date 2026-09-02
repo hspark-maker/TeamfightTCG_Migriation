@@ -56,6 +56,10 @@ public class LobbyGainEffectDirector : MonoBehaviour
     RectTransform m_cardOrigin;
     RectTransform m_collectionTarget;
 
+    // 도착 강조를 받을 자리. 목적지와 갈라 두는 이유는 탭 버튼에 자물쇠 배지 같은 런타임 자식이 붙어
+    // 자식 순서로 짚으면 그쪽이 대신 튀기 때문이다(잠금이 풀린 뒤에는 꺼진 배지가 남아 아무것도 안 튄다).
+    RectTransform m_collectionPunch;
+
     // 이번 재생분 식별자. 앞 연출을 강제 마무리(Complete)하면 그 시퀀스의 완료 콜백도 함께 터지는데,
     // 그것을 이번 재생의 종료로 오인하면 기다리던 안내가 카드가 날기도 전에 다음으로 넘어간다.
     int m_runId;
@@ -344,6 +348,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
     bool TryStageCards(Sequence _master, IReadOnlyList<int> _cards, RectTransform _origin)
     {
         m_collectionTarget = tabBar != null ? tabBar.GetVisualAnchor(collectionTabIndex) : null;
+        m_collectionPunch  = tabBar != null ? tabBar.GetPunchAnchor(collectionTabIndex) : null;
         if (m_collectionTarget == null)
         {
             Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭 앵커가 연결되지 않아 카드 연출을 건너뛴다.");
@@ -360,7 +365,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     void OnCardArrived()
     {
-        UiPunch.Play(PunchTargetOf(m_collectionTarget), this.tabPunch);
+        UiPunch.Play(m_collectionPunch, this.tabPunch);
     }
 
     // 팩 한 장짜리 비행. 카드 쪽과 달리 캐리어도 삽입 세션도 없다 — 만들고, 날리고, 지운다.
@@ -370,6 +375,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (transform is not RectTransform t_layer) return false;
 
         var t_target = this.tabBar != null ? this.tabBar.GetVisualAnchor(this.packTabIndex) : null;
+        var t_punch  = this.tabBar != null ? this.tabBar.GetPunchAnchor(this.packTabIndex) : null;
         if (t_target == null)
         {
             Debug.LogWarning("[LobbyGainEffectDirector] 팩 탭 앵커가 연결되지 않아 팩 비행을 건너뛴다.");
@@ -399,7 +405,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
                 return (RectTransform)t_flyer.transform;
             },
             _despawn: _rt => { if (_rt != null) _rt.gameObject.SetActive(false); },
-            _onArrived: (_arrived, _total) => UiPunch.Play(PunchTargetOf(t_target), this.tabPunch));
+            _onArrived: (_arrived, _total) => UiPunch.Play(t_punch, this.tabPunch));
 
         t_seq.SetLink(gameObject);
         t_seq.OnComplete(() =>
@@ -432,13 +438,4 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (m_cardFlight == null) m_cardFlight = gameObject.AddComponent<CardGainFlightEffect>();
         return m_cardFlight;
     }
-
-    // 탭 버튼은 레이아웃 그룹이 배치하므로 버튼 자체를 튀기면 형제 배치가 흔들려 보인다 — 아이콘 자식이 있으면 그쪽을 튀긴다.
-    static Transform PunchTargetOf(RectTransform _tab)
-    {
-        if (_tab == null) return null;
-        return _tab.childCount > 0 ? _tab.GetChild(0) : _tab;
-    }
-
-    // 도감 탭 RectTransform 탐색. 선택된 탭은 버튼이 꺼지고 Focus가 그 자리를 대신하므로 그때는 Focus를 쓴다.
 }

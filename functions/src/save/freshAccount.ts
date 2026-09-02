@@ -57,7 +57,7 @@ export function buildFreshAccountSlots(
     keywordGrowth: {levels: {}},
     rank: {points: 0, claimedTiers: []},
     albumReward: {claimedKeys: []},
-    tournament: {clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: ""},
+    tournament: {clearedNodeIds: [], claimedChapterIds: [], seenUnlockIds: [], pendingRewardNodeId: ""},
     tutorial: {
       outgameCompleted: false,
       chapterIndex: 0,

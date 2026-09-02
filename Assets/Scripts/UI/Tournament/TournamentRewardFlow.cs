@@ -7,17 +7,12 @@ using Cysharp.Threading.Tasks;
 // 지급은 하지 않는다 — 팝업의 확인이 _onConfirm을 부르고 그 안에서 TournamentProgress.ClearNodeAsync가
 // 자격 판정 · 지급 · 낙인을 서버 한 트랜잭션으로 끝낸다.
 //
-// 결말(도장·길 점등)의 신호는 팝업이 닫히는 것이 아니라 _onClaimed다 — 서버가 클리어를 확정한 프레임이다.
-// 그 왕복 동안은 ServerWaitOverlay가 화면을 덮고, 왕복이 도는 중인지는 IsClaiming이 답한다.
+// 수령 낙인은 낙관이다(앨범·랭크와 같은 축) — 딤을 누른 프레임에 도장이 꽂히고, 거절되면 되돌아온다.
+// 다만 낙관이 닿는 것은 그 정점의 표시뿐이라, 길 점등과 다음 정점 해금은 _onClaimed 뒤에 따라온다.
 public static class TournamentRewardFlow
 {
     const string TITLE_SUFFIX   = " 격파";
     const string TITLE_FALLBACK = "정점 클리어";
-
-    // 대기 표시의 owner. static 흐름이라 인스턴스가 없어 타입 자체를 키로 쓴다(ServerWaitOverlay가 Type을 다룬다).
-    // 키가 하나뿐이라 왕복이 겹치면 첫 Release가 남은 왕복의 차단막까지 걷는다 —
-    // 겹침을 막는 것은 호출부의 IsClaiming 가드다.
-    static readonly object WAIT_OWNER = typeof(TournamentRewardFlow);
 
     // 도는 중인 수령 왕복의 수. 카운트로 세는 것은 흐름이 static이라 중첩 호출을 구조적으로 막을 수 없기 때문이다.
     static int s_inFlight;
@@ -69,20 +64,19 @@ public static class TournamentRewardFlow
     {
         RewardClaimOutcome t_outcome;
 
-        // Release는 반드시 finally에서 — 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
+        // 카운트는 반드시 finally 에서 내린다 — 한 번이라도 새면 호출부의 가드가 영영 닫힌 채 남는다.
         s_inFlight++;
-        ServerWaitOverlay.Hold(WAIT_OWNER);
         try
         {
             t_outcome = await TournamentProgress.ClearNodeAsync(_nodeId);
         }
         finally
         {
-            ServerWaitOverlay.Release(WAIT_OWNER);
             s_inFlight--;
         }
 
-        // 대기를 걷은 "뒤"에 잇는다. 순서가 뒤집히면 차단막이 켜진 채 결말 연출이 돌아 손이 막힌다.
+        // 대기 표시를 두지 않는다 — 도장이 누른 프레임에 이미 꽂혀 화면이 답을 했다(낙관).
+        // 이 콜백은 그 뒤의 확정 사건(길 점등·다음 정점 해금)만 잇는다.
         _onClaimed?.Invoke();
         return t_outcome;
     }

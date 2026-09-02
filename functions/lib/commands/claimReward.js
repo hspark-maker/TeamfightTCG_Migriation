@@ -220,6 +220,8 @@ function claimTournamentNode(current, chapterRows, context) {
         clearedNodeIds: [...cleared, context.ownerId],
         // 챕터 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값을 쓰므로 그대로 실어 보내야 지워지지 않는다.
         claimedChapterIds: readIdList(tournament?.claimedChapterIds),
+        // 해금 안내 열람 낙인도 이 명령의 소관이 아니다 — 슬롯 전체 값이라 그대로 실어 보내야 지워지지 않는다.
+        seenUnlockIds: readIdList(tournament?.seenUnlockIds),
         pendingRewardNodeId: "",
     };
 }
@@ -249,6 +251,8 @@ function claimTournamentChapter(current, chapterRows, context) {
     return {
         clearedNodeIds: cleared,
         claimedChapterIds: [...claimedChapters, context.ownerId],
+        // 해금 안내 열람 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값이라 그대로 실어 보내야 지워지지 않는다.
+        seenUnlockIds: readIdList(tournament?.seenUnlockIds),
         pendingRewardNodeId: typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "",
     };
 }
