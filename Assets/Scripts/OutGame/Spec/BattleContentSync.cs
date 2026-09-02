@@ -283,17 +283,11 @@ public static class BattleContentSync
         FirebaseFirestore t_store = s_context.GetFirestore();
         string t_path = FirebaseRootPath.Environment(_envId) + "/specs/_index";
         DocumentSnapshot t_index = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
+        // 인덱스가 없으면 여기서 끊는다. 예전에는 표 메타 16건을 읽어 해시만 맞춰 봤지만,
+        // 이제 다운로드가 인덱스의 blobPath 를 요구해 그 벡터로는 한 표도 받지 못한다 —
+        // 읽기만 낭비하고 다운로드 단계에서 낯선 예외로 죽는다. 서버도 인덱스를 필수로 본다.
         if (!t_index.Exists)
-        {
-            return new RemoteSpecVector
-            {
-                Major = ContentVersion.Major,
-                Minor = -1,
-                FromIndex = false,
-                Hashes = await FetchLegacyMetaVectorAsync(_envId),
-                BlobPaths = new Dictionary<string, string>(StringComparer.Ordinal),
-            };
-        }
+            throw new InvalidOperationException($"Remote spec index is missing for env '{_envId}'.");
 
         IDictionary<string, object> t_fields = t_index.ToDictionary();
         if (!TryInteger(t_fields, "major", out long t_majorValue) ||
@@ -351,31 +345,6 @@ public static class BattleContentSync
                long.TryParse(Convert.ToString(t_value, System.Globalization.CultureInfo.InvariantCulture), out _value);
     }
 
-    static async Task<Dictionary<string, string>> FetchLegacyMetaVectorAsync(string _envId)
-    {
-        // async 람다는 반환형이 UniTask로 추론돼 Task.WhenAll에 넘길 수 없다 — 명시 메서드로 뺀다.
-        Task<KeyValuePair<string, string>>[] t_tasks =
-            SpecPayloadCodec.TableNames.Select(t_table => FetchMetaHashAsync(_envId, t_table)).ToArray();
-        KeyValuePair<string, string>[] t_results = await Task.WhenAll(t_tasks);
-        return t_results.ToDictionary(t => t.Key, t => t.Value, StringComparer.Ordinal);
-    }
-
-    static async Task<KeyValuePair<string, string>> FetchMetaHashAsync(string _envId, string _table)
-    {
-        FirebaseFirestore t_store = s_context.GetFirestore();
-        string t_path = FirebaseRootPath.Environment(_envId) + "/specs/" + _table;
-        DocumentSnapshot t_meta = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
-        if (!t_meta.Exists) throw new InvalidOperationException($"Remote spec '{_table}' is missing.");
-        IDictionary<string, object> t_fields = t_meta.ToDictionary();
-        int t_major = Convert.ToInt32(t_fields.TryGetValue("major", out object t_majorValue)
-            ? t_majorValue : t_fields["schemaVersion"]);
-        if (!ContentVersion.IsSupportedMajor(t_major))
-            throw new ContentUpdateRequiredException($"Remote spec '{_table}' major {t_major} is not supported.");
-        string t_hash = t_fields["payloadHash"] as string;
-        if (string.IsNullOrEmpty(t_hash)) throw new InvalidOperationException($"Remote spec '{_table}' hash is missing.");
-        return new KeyValuePair<string, string>(_table, t_hash);
-    }
-
     static void TrackLate(Task _task)
     {
         s_lateTask = _task;
@@ -413,10 +382,9 @@ public static class BattleContentSync
         string _envId, string _table, string _expectedHash, string _publishedPath)
     {
         FirebaseFirestore t_store = s_context.GetFirestore();
-        string t_path = string.IsNullOrEmpty(_publishedPath)
-            ? FirebaseRootPath.Environment(_envId) + "/specs/" + _table + "/blob/current"
-            : _publishedPath;
-        DocumentSnapshot t_blob = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
+        if (string.IsNullOrEmpty(_publishedPath))
+            throw new InvalidOperationException($"Remote spec index blob path '{_table}' is missing.");
+        DocumentSnapshot t_blob = await t_store.Document(_publishedPath).GetSnapshotAsync(Source.Server);
         if (!t_blob.Exists) throw new InvalidOperationException($"Remote spec blob '{_table}' is missing.");
 
         IDictionary<string, object> t_fields = t_blob.ToDictionary();

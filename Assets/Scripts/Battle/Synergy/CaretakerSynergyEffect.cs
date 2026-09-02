@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -17,6 +17,11 @@ public class CaretakerSynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.amount;
+        return _key == nameof(amount);
+    }
 
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환(디스패처 .Forget이라도 즉시 확정).
     public override UniTask OnEntered(SpawnCtx _ctx)

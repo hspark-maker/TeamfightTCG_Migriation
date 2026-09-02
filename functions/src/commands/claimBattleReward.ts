@@ -116,9 +116,11 @@ function matchGuard(
         reject("AlreadyClaimed", `Battle reward was already claimed: ${matchId}`, context);
       }
       const participants = Array.isArray(match.participantUids) ? match.participantUids : [];
-      if (match.mode !== "solo" || !participants.includes(uid) || match.phase !== "locked") {
+      if (match.mode !== "solo" || match.resultProtocol === 1 ||
+          !participants.includes(uid) || match.phase !== "locked") {
         reject("MatchUnverified", `Battle reward match is not a locked solo match: ${matchId}`, {
-          ...context, mode: match.mode, phase: match.phase, participants: participants.length,
+          ...context, mode: match.mode, phase: match.phase, resultProtocol: match.resultProtocol ?? 0,
+          participants: participants.length,
         });
       }
     },
@@ -139,8 +141,8 @@ function matchGuard(
  * 낙인하므로(matchGuard) 매치 한 판당 지급은 한 번뿐이다. 영수증(txId)만으로는 못 막는다 —
  * 클라가 새 txId 를 붙이면 매번 새 지급이 성립한다.
  *
- * 다만 `won`·`remaining` 자체는 아직 클라 신고다. 이 명령은 전투를 재시뮬하지 않는다
- * (submitMatchResult 는 멀티 전용이다). 그래서 막히는 것은 "무한 반복"이고,
+ * 다만 `won`·`remaining` 자체는 아직 클라 신고다. 이 명령은 전투를 재시뮬하지 않는다.
+ * resultProtocol=1 싱글은 submitMatchResult로 이동했고, 이 레거시 경로에서는 "무한 반복"만 막히며
  * "한 판에 대해 부풀린 신고" 는 남아 있다 — 그건 서버 재시뮬을 solo 로 넓혀야 닫힌다.
  *
  * 세이브 문서는 건드리지 않는다 — 이 명령이 움직이는 것은 잔액뿐이라 진행도 슬롯도 revision 도 오를 이유가 없다.

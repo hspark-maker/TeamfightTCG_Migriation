@@ -23,6 +23,11 @@ public class LegacySynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.amount;
+        return _key == nameof(amount);
+    }
 
     // 한 카드가 죽으며 아군을 회복시키면, RemoveDead의 같은 루프에서 hp 0으로 대기 중이던 다른 아군이
     // 되살아나 제거를 면할 수 있다 — 즉 전멸 예측이 틀릴 수 있다.

@@ -68,6 +68,40 @@ internal static class DeckLockSubmission
         return $"자체 상한 {_ownLimit.TotalSeconds:0}초 초과";
     }
 
+    /// <summary>덱 스냅샷 순서 규약: cardId 오름차순. 서버 validateDeckShape가 이 순서를 강제하고
+    /// computeDeckHash가 배열 순서를 그대로 직렬화하므로, 정규화한 배열로 deckHash까지 같이 만든다.
+    ///
+    /// <para>잠금 제출과 결과 제출(<c>submitMatchResult.myDeckHash</c>)이 <b>같은 값</b>이어야
+    /// 서버가 같은 덱으로 읽는다 — 그래서 정규화 규약은 이 자리 하나가 소유한다.
+    /// 정렬을 건너뛴 배열로 해시를 따로 만들면 편성 순서가 오름차순이 아닌 덱이 전부 거절된다.</para></summary>
+    internal static bool TryNormalize(int[] _cardIds, CardGrowth[] _growth,
+        out int[] _sortedIds, out CardGrowth[] _sortedGrowth, out string _deckHash)
+    {
+        _sortedIds = null;
+        _sortedGrowth = null;
+        _deckHash = null;
+        if (_cardIds == null || _growth == null || _cardIds.Length == 0 || _cardIds.Length != _growth.Length)
+        {
+            Debug.LogError("[LockDeck] 덱 성장 스냅샷이 유효하지 않습니다.");
+            return false;
+        }
+
+        int[] t_ids = (int[])_cardIds.Clone();
+        CardGrowth[] t_growths = (CardGrowth[])_growth.Clone();
+        DeckOrder.SortInPlace(t_ids, t_growths);
+        for (int i = 1; i < t_ids.Length; i++)
+        {
+            if (t_ids[i - 1] != t_ids[i]) continue;
+            Debug.LogError($"[LockDeck] 덱에 중복 카드가 있습니다(cardId={t_ids[i]}).");
+            return false;
+        }
+
+        _sortedIds = t_ids;
+        _sortedGrowth = t_growths;
+        _deckHash = NetworkGameController.ComputeDeckHash(t_ids, t_growths);
+        return true;
+    }
+
     internal static async UniTask<DeckLockResult> TryLockAsync(
         string _env,
         string _matchId,
@@ -87,19 +121,8 @@ internal static class DeckLockSubmission
             return DeckLockResult.Rejected;
         }
 
-        // 덱 스냅샷 순서 규약: cardId 오름차순. 서버 validateDeckShape가 이 순서를 강제하고
-        // computeDeckHash가 배열 순서를 그대로 직렬화하므로, 여기서 정규화한 배열로
-        // deckHash까지 같이 계산해야 한다(전송 순서가 다른 레거시 경로 포함).
-        int[] t_ids = (int[])_cardIds.Clone();
-        CardGrowth[] t_growths = (CardGrowth[])_growth.Clone();
-        DeckOrder.SortInPlace(t_ids, t_growths);
-        for (int i = 1; i < t_ids.Length; i++)
-        {
-            if (t_ids[i - 1] != t_ids[i]) continue;
-            Debug.LogError($"[LockDeck] 덱에 중복 카드가 있습니다(cardId={t_ids[i]}).");
+        if (!TryNormalize(_cardIds, _growth, out int[] t_ids, out CardGrowth[] t_growths, out string t_deckHash))
             return DeckLockResult.Rejected;
-        }
-        string t_deckHash = NetworkGameController.ComputeDeckHash(t_ids, t_growths);
 
         var t_cards = new List<object>(t_ids.Length);
         for (int i = 0; i < t_ids.Length; i++)

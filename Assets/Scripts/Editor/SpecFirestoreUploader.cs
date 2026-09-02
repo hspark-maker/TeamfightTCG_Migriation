@@ -1020,7 +1020,8 @@ public static partial class SpecFirestoreUploader
         AppendJsonString(t_builder, SpecAdminAuth.SignedInEmail ?? string.Empty);
         t_builder.Append("},\"tablesJson\":{\"stringValue\":");
         AppendJsonString(t_builder, t_tablesJson);
-        t_builder.Append("}},\"currentDocument\":{\"exists\":false}}");
+        // stringValue, fields, update 세 겹을 닫아야 currentDocument 가 write 의 형제가 된다.
+        t_builder.Append("}}},\"currentDocument\":{\"exists\":false}}");
 
         t_builder.Append(',');
         t_builder.Append("{\"update\":{\"name\":");
@@ -1041,7 +1042,8 @@ public static partial class SpecFirestoreUploader
             t_builder.Append('}');
         }
         t_builder.Append("]}},\"tables\":").Append(t_tablesJson);
-        t_builder.Append("},\"currentDocument\":{");
+        // fields, update 두 겹을 닫는다 - BuildRollbackCommitJson 과 같은 모양이다.
+        t_builder.Append("}},\"currentDocument\":{");
         if (_exists)
         {
             t_builder.Append("\"updateTime\":");

@@ -26,7 +26,6 @@ public class TraceSynergyEffect : SynergyEffect
         }
     }
 
-
     public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
         // self는 트리거가 IsAlive까지 걸러 준다. target은 아무도 안 보므로 여기서 막는다.

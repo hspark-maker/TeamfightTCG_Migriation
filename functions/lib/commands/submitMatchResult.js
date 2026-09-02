@@ -96,6 +96,10 @@ function authoritativeInputsAgree(a, b) {
         return "board_order_mismatch";
     return null;
 }
+function sameNumbers(left, right) {
+    return Array.isArray(left) && left.length === right.length &&
+        left.every((value, index) => value === right[index]);
+}
 function parseSubmitData(raw) {
     if (raw == null || typeof raw !== "object")
         throw new https_1.HttpsError("invalid-argument", "payload required");
@@ -253,7 +257,9 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
     }
     catch (error) {
         logger.error("payout_spec_invalid", { env: data.env, error });
-        throw new https_1.HttpsError("failed-precondition", "payout specs are unavailable");
+        // 스펙 블롭이 깨졌거나 못 읽은 것이라 **제출 잘못이 아니다** — 표를 고치면 같은 제출이 그대로 통과한다.
+        // failed-precondition 으로 내리면 클라가 이걸 영구 거절로 읽고 큐에서 버려 보상이 사라진다.
+        throw new https_1.HttpsError("unavailable", "payout specs are unavailable");
     }
     const result = await (0, countedTransaction_1.withCountedTransaction)("submitMatchResult", async (tx) => {
         const matchSnapshot = await tx.get(matchRef);
@@ -281,6 +287,42 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
         const entries = Object.values(submissions);
         const createdAt = match?.createdAt instanceof firestore_1.Timestamp ? match.createdAt : firestore_1.Timestamp.now();
         const expiresAt = firestore_1.Timestamp.fromMillis(createdAt.toMillis() + 7 * 24 * 60 * 60 * 1000);
+        const expectedParticipants = (0, payloadGuards_1.safeInteger)(match?.expectedParticipants) ?? 2;
+        const solo = match?.mode === "solo" && match?.resultProtocol === 1 && expectedParticipants === 1;
+        const participantUids = match?.participantUids;
+        const approvals = (0, payloadGuards_1.objectRecord)(match?.approvals);
+        const soloApproval = solo ? (0, payloadGuards_1.objectRecord)(approvals?.[uid]) : null;
+        const aiDeck = solo ? (0, payloadGuards_1.objectRecord)(match?.aiDeck) : null;
+        const aiCardIds = aiDeck?.cardIds;
+        const aiCardLevel = (0, payloadGuards_1.safeInteger)(aiDeck?.cardLevel);
+        const soloAiSnapshots = solo && Array.isArray(aiCardIds) && aiCardLevel != null ?
+            (0, deckValidation_1.buildAiDeckSnapshots)(aiCardIds, aiCardLevel, cardSpecs) : null;
+        let soloContractReason = null;
+        if (solo) {
+            const serverOrders = (0, payloadGuards_1.objectRecord)(match?.serverBoardOrders);
+            if (!Array.isArray(participantUids) || participantUids.length !== 1 || participantUids[0] !== uid ||
+                match?.phase !== "locked" || match?.lockStatus !== "approved") {
+                soloContractReason = "solo_match_contract_missing";
+            }
+            else if (soloApproval?.ownerIndex !== 0 || !Array.isArray(soloApproval?.cardSnapshots) ||
+                incoming.myDeckHash !== soloApproval?.deckHash) {
+                soloContractReason = "solo_player_deck_mismatch";
+            }
+            else if (soloAiSnapshots == null || incoming.opponentDeckHash !== (0, deckValidation_1.computeDeckHash)(soloAiSnapshots)) {
+                soloContractReason = "solo_ai_deck_mismatch";
+            }
+            else if (incoming.contentFingerprint !== match?.cardDataVersion) {
+                soloContractReason = "solo_content_mismatch";
+            }
+            else if ((incoming.commandLogVersion ?? 0) !== 1 || incoming.commandLogTruncated) {
+                soloContractReason = "solo_command_log_required";
+            }
+            else if (incoming.boardOrder == null ||
+                !sameNumbers(serverOrders?.owner0, incoming.boardOrder.owner0) ||
+                !sameNumbers(serverOrders?.owner1, incoming.boardOrder.owner1)) {
+                soloContractReason = "solo_board_order_mismatch";
+            }
+        }
         const rawRulesetVersion = match?.rulesetVersion;
         const rulesetVersion = Number.isInteger(rawRulesetVersion) ? rawRulesetVersion : 0;
         // 서버 재시뮬레이션은 ruleset 2부터 **돌지만**, 그 결과로 정산할지는 이 스위치가 정한다.
@@ -290,16 +332,20 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
         const simulateRules = rulesetVersion >= matchPairing_1.SERVER_AUTHORITATIVE_RULESET_VERSION;
         const authoritativeRules = SERVER_SIMULATION_AUTHORITATIVE && simulateRules;
         const nowMs = firestore_1.Timestamp.now().toMillis();
-        const decision = authoritativeRules ?
-            entries.length < 2 ?
-                (nowMs - createdAt.toMillis() > SUBMISSION_DEADLINE_MS ?
-                    { status: "flagged", reason: "single_submission" } : { status: "pending" }) :
-                entries.length > 2 ? { status: "flagged", reason: "too_many_submissions" } :
-                    (() => {
-                        const reason = authoritativeInputsAgree(entries[0], entries[1]);
-                        return reason ? { status: "flagged", reason } : { status: "confirmed" };
-                    })() :
-            (0, matchResult_1.decideMatch)(entries, createdAt.toMillis(), nowMs, SUBMISSION_DEADLINE_MS);
+        const decision = solo ?
+            entries.length > 1 ? { status: "flagged", reason: "too_many_submissions" } :
+                soloContractReason == null ? { status: "confirmed" } :
+                    { status: "flagged", reason: soloContractReason } :
+            authoritativeRules ?
+                entries.length < 2 ?
+                    (nowMs - createdAt.toMillis() > SUBMISSION_DEADLINE_MS ?
+                        { status: "flagged", reason: "single_submission" } : { status: "pending" }) :
+                    entries.length > 2 ? { status: "flagged", reason: "too_many_submissions" } :
+                        (() => {
+                            const reason = authoritativeInputsAgree(entries[0], entries[1]);
+                            return reason ? { status: "flagged", reason } : { status: "confirmed" };
+                        })() :
+                (0, matchResult_1.decideMatch)(entries, createdAt.toMillis(), nowMs, SUBMISSION_DEADLINE_MS);
         if (decision.status === "pending") {
             tx.set(matchRef, { status: "pending", submissions, createdAt, expiresAt,
                 deadlineAt: firestore_1.Timestamp.fromMillis(createdAt.toMillis() + SUBMISSION_DEADLINE_MS) }, { merge: true });
@@ -314,23 +360,30 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
         let clientDivergence = null;
         let ownerIndexByUid = null;
         if (simulateRules) {
-            const participantUids = match?.participantUids;
-            const approvals = match?.approvals;
             const seedHex = match?.seedHex;
-            if (!Array.isArray(participantUids) || participantUids.length !== 2 ||
+            if (!Array.isArray(participantUids) || participantUids.length !== expectedParticipants ||
                 typeof seedHex !== "string" || approvals == null) {
                 serverSimulation = { ok: false, reason: "server_match_contract_missing" };
             }
             else {
                 const decks = [null, null];
                 ownerIndexByUid = {};
-                for (const participant of participantUids) {
-                    const approval = approvals[participant];
-                    const ownerIndex = approval?.ownerIndex;
-                    if ((ownerIndex !== 0 && ownerIndex !== 1) || decks[ownerIndex] != null)
-                        continue;
-                    decks[ownerIndex] = approval.cardSnapshots;
-                    ownerIndexByUid[participant] = ownerIndex;
+                if (solo) {
+                    decks[0] = soloApproval?.cardSnapshots;
+                    decks[1] = soloAiSnapshots;
+                    ownerIndexByUid[uid] = 0;
+                }
+                else {
+                    for (const participant of participantUids) {
+                        const approval = (0, payloadGuards_1.objectRecord)(approvals[participant]);
+                        if (approval == null)
+                            continue;
+                        const ownerIndex = approval.ownerIndex;
+                        if ((ownerIndex !== 0 && ownerIndex !== 1) || decks[ownerIndex] != null)
+                            continue;
+                        decks[ownerIndex] = approval.cardSnapshots;
+                        ownerIndexByUid[participant] = ownerIndex;
+                    }
                 }
                 const commandLog = entries[0].commandLog ?? "";
                 if (!Array.isArray(decks[0]) || !Array.isArray(decks[1]) ||

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// 시너지 효과 1건. 활성 조건 = "덱에 이 시너지 카드가 requiredCount 이상"(덱 확정 시 1회 판정, 전투 중 불변).
@@ -20,6 +20,14 @@ public abstract class SynergyEffect : BattleEffect
     /// 키는 이 클래스의 필드명과 1:1이고, **모르는 키는 false** — 로더가 그 자리에서 던진다.
     /// 리플렉션을 쓰지 않는 이유는 허용 키 목록의 진실원을 클래스 안에 두기 위해서다.</summary>
     public virtual bool TrySetParam(string _key, string _value) => false;
+
+    /// <summary>같은 값을 대본·미리보기가 읽기 위한 역방향 조회. TrySetParam 과 키 목록이 같아야 한다 —
+    /// 리플렉션을 쓰지 않는 이유도 같다(허용 키의 진실원을 클래스 안에 둔다).</summary>
+    public virtual bool TryGetParam(string _key, out int _value)
+    {
+        _value = 0;
+        return false;
+    }
 
     protected static int ParseInt(string _value)
         => int.TryParse(_value, System.Globalization.NumberStyles.Integer,

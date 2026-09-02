@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 배선 데모용 선언형 효과: 생명력 가산 + 키워드 부여 + 피해 감소.
@@ -21,6 +21,15 @@ public class StatSynergyEffect : SynergyEffect
         }
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        switch (_key)
+        {
+            case nameof(bonusHp):      _value = this.bonusHp;      return true;
+            case nameof(dmgReduction): _value = this.dmgReduction; return true;
+            default:                   _value = 0;                 return false;
+        }
+    }
 
     public override void OnDeckResolved(DeckCtx _ctx)
     {

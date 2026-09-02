@@ -78,7 +78,7 @@ async function resolveStarterCardIds(env) {
             cardId: Number(row.cardId),
         }));
         // 카탈로그를 못 읽으면 존재 검사 없이 뽑는 대신 폴백으로 간다 — 검증 없이 지급하면
-        // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 부팅되고 복구 경로가 없다.
+        // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 초기화되고 복구 경로가 없다.
         const knownCardIds = rows.length > 0 ? await readKnownCardIds(env) : new Set();
         const cardIds = knownCardIds.size > 0 ?
             (0, starterPool_1.resolveStarterCardsFromRows)(rows, starterPool_1.FRESH_ACCOUNT_GRADE, knownCardIds) :
