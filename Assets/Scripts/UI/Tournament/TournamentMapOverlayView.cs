@@ -41,10 +41,6 @@ public class TournamentMapOverlayView : MonoBehaviour
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
-    [Tooltip("보상 팝업이 걷히고 길이 차오르기까지의 정박. 이 사이에 클리어 도장이 꽂힌다 —\n" +
-             "너무 짧으면 도장과 길이 겹쳐 사건이 둘 다 뭉갠다.")]
-    [SerializeField] float claimHoldIn = 0.45f;
-
     [Tooltip("길 점 하나가 금색으로 물드는 시간.")]
     [SerializeField] float linkDotDuration = 0.15f;
 
@@ -173,13 +169,14 @@ public class TournamentMapOverlayView : MonoBehaviour
     public void OpenReturnReward(string _nodeId)
     {
         if (!this.IsOnStage) return;
-        if (this.m_claimSeq != null) return;             // 다른 정점의 수령 연출이 아직 돌고 있다
+        // 다른 정점의 수령이 아직 끝나지 않았다 — 왕복 중도 포함한다(대기 owner가 하나뿐이라 겹치면 차단막이 어긋난다).
+        if (this.m_claimSeq != null || TournamentRewardFlow.IsClaiming) return;
 
         int t_index = TournamentProgress.IndexOf(_nodeId);
         if (t_index < 0 || t_index >= this.m_nodes.Count) return;
         if (!TournamentProgress.IsRewardPending(t_index)) return;
 
-        // 팝업이 걷히는 프레임에 도장이 그 자리에 꽂히므로, 그 자리가 화면 안에 있어야 결말이 보인다.
+        // 도장이 그 자리에 꽂히므로(서버가 클리어를 확정하는 프레임), 그 자리가 화면 안에 있어야 결말이 보인다.
         this.ScrollToNode(t_index);
 
         this.OpenNodeReward(t_index);
@@ -463,6 +460,11 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 진행 통지 → 전 정점 재바인딩 + 길 색 갱신. 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
     void RefreshNodes()
     {
+        // 억제가 잘못 남았다 — 결말을 쥔 주체(왕복·점등)가 둘 다 없으면 이 통지가 그대로 진실이다.
+        // 팝업 콜백이 유실되는 경로(공용 팝업을 다른 흐름이 덮어쓴다)에서 맵이 옛 그림으로 굳지 않게 스스로 푼다.
+        if (this.m_suspendRefresh && this.m_claimSeq == null && !TournamentRewardFlow.IsClaiming)
+            this.m_suspendRefresh = false;
+
         // 점등 연출이 결말을 손에 쥐고 있다 — 다 돌고 나서 스스로 푼다.
         if (this.m_suspendRefresh) return;
 
@@ -564,6 +566,9 @@ public class TournamentMapOverlayView : MonoBehaviour
         // 다만 도장이 꽂히는 중인 그 정점만은 막는다.
         if (this.m_claimSeq != null && _index == this.m_claimNode) return;
 
+        // 수령 왕복이 도는 동안은 두 번째 수령을 받지 않는다 — 대기 owner가 하나뿐이라 먼저 끝난 쪽이 남은 차단막을 걷는다.
+        if (TournamentRewardFlow.IsClaiming) return;
+
         // 선물은 도전이 아니라 수령이다 — 전투로 잇지 않고 보상 팝업으로 간다.
         if (TournamentProgress.IsRewardPending(_index))
         {
@@ -576,31 +581,35 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.NodeSelected?.Invoke(_index);
     }
 
-    // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.
+    // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야, 서버 채택이 보내는 통지가 결말을 앞질러 그리지 않는다.
     void OpenNodeReward(int _index)
     {
         if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)) return;
 
         this.m_suspendRefresh = true;
 
-        // 폴백(보상 0건·팝업 미배선)도 흐름이 콜백을 책임진다 — 여기서 곧바로 이으면 서버 왕복 전이라 클리어가 아직 없다.
+        // 결말은 팝업이 걷힐 때가 아니라 서버가 클리어를 확정한 프레임에 시작한다(_onClaimed).
+        // _onClosed는 수령 없이 닫힌 경로의 안전망일 뿐이라, 이미 시작한 사슬을 끊지 않는 AbortIfIdle이 받는다.
         // false는 수령을 시작조차 못 한 경우뿐이라 걸어 둔 억제만 푼다.
-        if (!TournamentRewardFlow.Open(t_node.nodeId, () => this.PlayClaimSequence(_index)))
+        if (!TournamentRewardFlow.Open(t_node.nodeId,
+                _onClaimed: () => this.PlayClaimSequence(_index),
+                _onClosed:  this.AbortIfIdle))
             this.AbortClaimSequence();
     }
 
-    // 팝업이 걷히는 프레임에 결말을 그리고, 길이 차오르는 것은 그 위에 얹는다.
+    // 서버가 클리어를 확정한 프레임에 결말을 그리고, 길이 차오르는 것을 곧바로 잇는다.
+    // 팝업의 분출·퇴장은 이 위에서 제 안무를 마저 돈다 — 그것을 기다리면 수령과 결말 사이가 통째로 빈다.
     // 해금을 점등 끝에 매달아 두면 상태를 보려고 길이 다 찰 때까지 기다려야 한다 — 길은 장식이지 관문이 아니다.
     void PlayClaimSequence(int _index)
     {
         // 맵을 떠난 뒤 콜백이 도착했다 — 다음 진입에서 진실이 그려진다.
-        if (!this.IsOpen)
+        if (!this.IsOnStage)
         {
             this.AbortClaimSequence();
             return;
         }
 
-        // 수령이 성사되지 않은 채 닫혔다면 보여줄 결말이 없다(외부 강제 Hide 경로).
+        // 수령이 성사되지 않았다면 보여줄 결말이 없다(서버 거절·외부 강제 Hide 경로).
         if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)
             || !TournamentProgress.IsCleared(t_node.nodeId))
         {
@@ -617,7 +626,8 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.m_claimNode = _index;
         this.m_claimSeq = DOTween.Sequence().SetLink(this.gameObject);
 
-        float t_at = this.claimHoldIn;
+        // 도장과 첫 길 점이 같은 프레임에서 출발한다 — 상태가 바뀌는 것과 길이 차는 것이 한 사건이어야 한다.
+        float t_at = 0f;
         t_at += t_slot >= 0 ? this.InsertLinkFill(this.m_links[t_slot], t_at)
                             : this.InsertChapterSeam(_index, t_at);
 
@@ -667,7 +677,7 @@ public class TournamentMapOverlayView : MonoBehaviour
         return 0.15f;
     }
 
-    // 억제를 풀어 진실을 그리고, 그 프레임에 도장이 꽂힌다(팝업이 걷히는 바로 그 프레임이다).
+    // 억제를 풀어 진실을 그리고, 그 프레임에 도장이 꽂힌다(서버가 클리어를 확정한 바로 그 프레임이다).
     void RevealClear(int _index)
     {
         this.m_suspendRefresh = false;
@@ -677,7 +687,7 @@ public class TournamentMapOverlayView : MonoBehaviour
     }
 
     // 사슬의 끝 — 길이 다 찬 자리에서 다음 정점이 튄다.
-    // 상태는 이미 팝업이 걷히던 프레임에 열렸고, 이 펀치는 "여기가 다음이다"를 가리키는 손짓이다.
+    // 상태는 이미 도장이 꽂히던 프레임에 열렸고, 이 펀치는 "여기가 다음이다"를 가리키는 손짓이다.
     void PunchNext(int _index)
     {
         int t_next = _index + 1;
@@ -707,6 +717,16 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         this.m_suspendRefresh = false;
         this.RefreshNodes();
+    }
+
+    // 수령 없이 팝업이 닫힌 경로의 안전망. 결말은 이제 팝업이 아니라 서버 응답이 데려오므로,
+    // 사슬이 이미 시작됐거나 왕복이 아직 도는 중이면 손대지 않는다 —
+    // 여기서 무조건 걷으면 아직 미수령인 정점이 한 박 드러났다가 뒤늦은 도장에 덮인다.
+    void AbortIfIdle()
+    {
+        if (TournamentRewardFlow.IsClaiming || this.m_claimSeq != null || !this.m_suspendRefresh) return;
+
+        this.AbortClaimSequence();
     }
 
     // 구간 하나의 길 조각. 평탄 인덱스·루트·틴트 대상이 늘 붙어 다녀야 해서 병렬 리스트로 흩지 않는다.

@@ -174,16 +174,15 @@ public static class TournamentProgress
         return ETournamentNodeState.Locked;
     }
 
-    // 진입 자격 — 클리어한 정점도 다시 도전할 수 있다(재도전 승리는 ClearNode가 중복으로 걸러 보상이 없다).
-    // 미수령 정점은 진입이 아니라 수령이 남은 자리라 제외한다.
+    // 진입 자격 — 아직 깨지 않은 정점만 도전할 수 있다. 클리어한 정점은 재진입을 막는다:
+    // 재도전 승리는 서버가 중복 신고를 거절해 보상이 없어, 유저에게 남는 것이 헛걸음뿐이다.
+    // 미수령 정점도 제외한다 — 진입이 아니라 수령이 남은 자리다.
     // 랭크 잠금을 여기서 곱한다 — 진입 게이트가 맵과 로비 둘로 갈려 있어 상태 판정에 섞는 것보다 여기가 단일 지점이다.
-    // 진입을 여기서 막는 것은 헛걸음을 줄이려는 것뿐이다 — 뚫고 들어가 이겨도 서버가 신고를 거절한다.
     public static bool CanEnter(int _index)
     {
         if (IsRankLocked(_index)) return false;
 
-        ETournamentNodeState t_state = StateOf(_index);
-        return t_state == ETournamentNodeState.Playable || t_state == ETournamentNodeState.Cleared;
+        return StateOf(_index) == ETournamentNodeState.Playable;
     }
 
     public static bool IsCleared(string _nodeId)

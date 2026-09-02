@@ -4,24 +4,8 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 개념(키워드·시너지)을 전면에서 가르치는 오버레이.
-// 무엇을 보여줄지는 호출부가 정하고(UnlockIntro 목록), 여기는 세우고 [확인]을 기다린다 —
-// 그래서 "처음 보는 것인가"라는 판정을 알 필요가 없다(CardRewardOverlay가 지급을 모르는 것과 같은 규약).
-//
-// 이 화면으로 오는 길은 둘이다: 강화로 능력이 열리는 순간의 **자동 안내**와,
-// 카드 상세창의 설명 줄을 눌러 여는 **다시 보기**(CardDetailOverlayView). 둘의 화면은 같아야 한다 —
-// 해금 때 본 것을 다시 찾는 자리라 다른 그림이 뜨면 같은 것을 본 줄 모른다.
-//
-// 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(CardRewardOverlay와 같은 규약) — 로비 캔버스에 중첩하면
-// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
-//
-// ⚠ 딤을 눌러 닫히지 않는다. 읽어야 넘어가는 자리라 나가는 문은 [확인] 하나뿐이다.
-//
-// 여러 개가 한 방에 열려도 화면은 한 장이다 — 한 장씩 넘기게 하면 확인 탭이 개수만큼 늘어나는데
-// 정작 읽는 시간은 늘지 않는다. 대신 행이 하나씩 들어와 "몇 개가 열렸는지"가 박자로 읽힌다.
-//
-// 행의 등장은 **자리가 아니라 배율**로 준다. 행은 레이아웃 그룹에 매달릴 물건이라
-// anchoredPosition을 밀면 리빌드가 매 프레임 되돌려 안무가 통째로 안 보인다(진화 연출의 stageFitter와 같은 함정).
+// 해금된 개념(키워드·시너지)을 전면에서 한 장으로 가르치고 [확인]을 기다리는 오버레이.
+// 딤을 눌러서는 닫히지 않고, 행의 등장은 자리 대신 배율로 준다(레이아웃 그룹이 자리를 되돌린다).
 public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
@@ -29,8 +13,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     [SerializeField] Button confirmButton;
 
-    [Tooltip("행이 깔리는 노드. 행은 프리팹에 미리 깔아 둔다 — 런타임 Instantiate 없음(상세창 칩과 같은 규약).\n" +
-             "자식은 UnlockIntroRow를 단 노드여야 한다.")]
+    [Tooltip("행이 깔리는 노드. 자식은 UnlockIntroRow를 단 노드여야 하고, 런타임 Instantiate는 없다.")]
     [SerializeField] Transform rowRoot;
 
     [Header("연출")]
@@ -45,48 +28,38 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     [Tooltip("행이 이 배율에서 출발해 제 크기로 앉는다. 1이면 페이드만 남는다.")]
     [SerializeField] float rowFromScale = 0.92f;
 
-    [Tooltip("행이 다 뜬 뒤 [확인]이 열리기까지의 뜸. 이 구간이 읽는 시간이다 — " +
-             "0이면 손이 글보다 빨라져 읽지 않고 넘어간다.")]
+    [Tooltip("행이 다 뜬 뒤 [확인]이 열리기까지의 뜸. 이 구간이 읽는 시간이다.")]
     [SerializeField] float confirmDelay = 0.5f;
     [SerializeField] float confirmFadeDuration = 0.16f;
 
-    // 진행 중 등장 안무. 확인·닫기가 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
 
-    // 확인 콜백. 한 번 쓰면 비워 연타를 막는다.
+    // 한 번 쓰면 비워 연타를 막는다.
     Action m_onClose;
 
     CanvasGroup m_confirmGroup;
 
-    // 이번에 세운 행 수. 등장 안무와 정리가 같은 수를 봐야 한다.
     int m_shownRows;
 
-    // 지금 돌고 있는 데모 무대. 화면이 걷힐 때 반드시 함께 걷어야 한다 —
-    // 남으면 안 보이는 자리에서 카메라가 계속 RenderTexture를 그린다.
+    // 화면이 걷힐 때 함께 걷지 않으면 안 보이는 자리에서 카메라가 계속 RenderTexture를 그린다.
     UnlockDemoStage m_demo;
 
-    // 프리팹에 깔린 행이 모자란 것은 저작 문제다 — 매 표시마다 경고하면 로그가 묻힌다.
+    // 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
 
-    /// <summary>안내 오버레이를 얻는다. 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다
-    /// (CardRewardOverlay와 같은 규약).</summary>
+    /// <summary>안내 오버레이를 얻는다(평소 꺼져 있는 노드라 비활성까지 뒤진다).</summary>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
         => TryGetOrCreate(RuntimeOverlayPrefabs.Get<UnlockIntroOverlay>, out _overlay);
 
-    /// <summary>_intros를 세우고 [확인]을 기다린다. _onClose는 걷힌 뒤 정확히 한 번 온다.
-    /// 세울 것이 하나도 없으면 뜨지 않고 _onClose를 곧바로 흘린다 — 호출부가 빈 목록을 걸러야 할 이유가 없다.
-    ///
-    /// _card는 데모 무대의 공격자로 선다(<see cref="UnlockDemoStage"/>). null이면 데모 없이 글자만 —
-    /// 배선·저작이 덜 된 상태에서도 안내 자체는 성립해야 한다.</summary>
+    /// <summary>_intros를 세우고 [확인]을 기다린다(_onClose는 걷힌 뒤 한 번, 빈 목록이면 곧바로 온다).</summary>
     public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
     {
-        // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
+        // 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
         EndDemo();
 
         this.m_shownRows = BuildRows(_intros);
 
-        // 세울 것이 없거나(빈 목록) 하나도 못 세웠으면(배선 실패) 닫을 수단만 남은 빈 판이 된다 — 그냥 흘려보낸다.
         if (this.m_shownRows == 0)
         {
             this.m_onClose = null;
@@ -105,7 +78,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         IsOpen = true;
         SetVisible(true);
 
-        // 등장이 도는 동안은 손을 막는다 — 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
+        // 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
         SetInputEnabled(false);
 
         BeginDemo(_intros, _card);
@@ -114,8 +87,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         this.m_intro.Play();
     }
 
-    /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다 —
-    /// 이 길로 닫는 쪽은 이미 자기 흐름을 쥐고 있다.</summary>
+    /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다.</summary>
     public void Hide()
     {
         this.m_onClose = null;
@@ -131,21 +103,18 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         if (t_wasOpen) RaiseClosed();
     }
 
-    // 이 화면이 서는 층은 프리팹 저작값이 아니라 표가 쥔다 — 상세(CardDetailLifted) 위여야 한다는 것이
-    // 두 파일에 흩어져 있으면 한쪽만 옮겨져도 아무도 모른다.
+    // 이 화면이 서는 층은 프리팹 저작값이 아니라 UiSortingOrder 표가 쥔다.
     void Awake()
     {
         UiSortingOrder.Stamp(GetComponent<Canvas>(), UiSortingOrder.Intro);
     }
 
-    // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
-    // [확인]이 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
+    // 잠금을 푸는 곳이 등장 안무뿐이라, Show를 거치지 않고 뜨면 [확인]이 잠긴 모달로 남는다.
     void OnEnable()
     {
         SetInputEnabled(true);
     }
 
-    // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     void OnDisable()
     {
         this.transition.HandleDisabled(ResolveTarget());
@@ -153,18 +122,16 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         EndDemo();
         ResetChoreography();
 
-        // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
-        // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 된다.
+        // Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서 이 플래그가 남으면 영영 열린 것으로 읽힌다.
         IsOpen = false;
     }
 
     void OnConfirmClicked()
     {
-        // 연타 차단은 **열려 있는가**로 판정한다. 콜백 유무로 막으면 뒤처리가 없는 호출부(_onClose = null,
-        // 상세창의 다시 보기)에서 [확인]이 아무 일도 안 하는 모달이 된다.
+        // 콜백 유무로 연타를 막으면 뒤처리가 없는 호출부에서 [확인]이 아무 일도 안 하는 모달이 된다.
         if (!IsOpen) return;
 
-        // 콜백은 먼저 비워 둔다 — 정리 도중 다시 들어와도 두 번 흐르지 않게.
+        // 정리 도중 다시 들어와도 두 번 흐르지 않게 먼저 비운다.
         var t_callback = this.m_onClose;
         this.m_onClose = null;
 
@@ -179,12 +146,11 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
         RaiseClosed();
 
-        // 넘겨주기는 정리가 다 끝난 뒤다 — 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 한다.
+        // 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 해서 정리가 끝난 뒤에 넘긴다.
         t_callback?.Invoke();
     }
 
-    // 행을 채운다. 프리팹에 미리 깔린 것을 꺼내 쓰고 남는 것은 끈다(상세창 칩 TryShowChip과 같은 규약).
-    // 돌려주는 값은 실제로 세운 수 — 모자라면 거기서 멈춘다(빈 칸을 세우느니 덜 보여주는 편이 낫다).
+    // 프리팹에 미리 깔린 행을 꺼내 쓰고 남는 것은 끈다. 돌려주는 값은 실제로 세운 수.
     int BuildRows(IReadOnlyList<UnlockIntro> _intros)
     {
         if (this.rowRoot == null)
@@ -211,7 +177,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
             Transform t_row  = this.rowRoot.GetChild(t_used);
             var       t_view = t_row.GetComponent<UnlockIntroRow>();
-            if (t_view == null) continue;   // 행이 아닌 장식 노드가 섞여 있어도 안무가 성립해야 한다
+            if (t_view == null) continue;   // 행이 아닌 장식 노드가 섞일 수 있다
 
             t_view.Bind(_intros[t_i]);
             t_view.SetDemo(null);           // 띠는 BeginDemo가 딱 한 줄에만 켠다
@@ -225,11 +191,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         return t_used;
     }
 
-    /// <summary>데모를 딱 한 줄에 세운다. 키워드 줄이면 그 키워드의 대본을, 시너지 줄이면 그 시너지의 대본을 돌린다.
-    ///
-    /// ⚠ <b>무대·카메라가 하나뿐이라 동시에 두 개를 돌릴 수 없다.</b> 여러 줄이 열린 판에서는
-    /// 맨 윗줄에만 띠가 뜨고 나머지는 글자로 남는다 — 무대를 행 수만큼 복제하면
-    /// 카메라와 RenderTexture가 그만큼 늘어나는데, 정작 눈은 한 번에 하나만 본다.</summary>
+    /// <summary>데모를 맨 윗줄 하나에만 세운다 — 무대·카메라가 하나뿐이라 동시에 둘을 돌릴 수 없다.</summary>
     void BeginDemo(IReadOnlyList<UnlockIntro> _intros, int _card)
     {
         if (_card <= 0 || this.rowRoot == null) return;
@@ -238,7 +200,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         {
             UnlockIntro t_intro = _intros[t_i];
 
-            // 시너지 줄인데 그 시너지를 못 받았다면 대본을 고를 수 없다 — 배지로 남긴다.
+            // 시너지를 못 받은 줄은 대본을 고를 수 없어 배지로 남긴다.
             if (t_intro.IsSynergy && t_intro.Synergy == null) continue;
 
             var t_view = this.rowRoot.GetChild(t_i).GetComponent<UnlockIntroRow>();
@@ -256,8 +218,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         }
     }
 
-    // 무대를 걷는다. 텍스처가 해제되므로 **띠에서 먼저 떼어야** 한다 — 순서가 뒤집히면
-    // 죽은 RenderTexture를 물고 있는 RawImage가 한 프레임 남는다.
+    // 텍스처가 해제되므로 띠에서 먼저 떼어야 한다 — 뒤집으면 죽은 RenderTexture가 한 프레임 남는다.
     void EndDemo()
     {
         UnlockDemoStage t_demo = this.m_demo;
@@ -271,7 +232,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         t_demo.End();
     }
 
-    // 등장 안무. 딤만 먼저 깔리고 행이 하나씩 앉은 뒤에야 [확인]이 열린다.
+    // 등장 안무. 행이 하나씩 앉은 뒤에야 [확인]이 열린다.
     Sequence BuildIntro()
     {
         PrimeIntro();
@@ -297,7 +258,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         if (this.m_confirmGroup != null)
             t_seq.Insert(t_confirmAt, this.m_confirmGroup.DOFade(1f, t_fade));
 
-        // 손은 버튼이 다 뜬 뒤에 돌려준다. 잠금을 푸는 곳이 여기뿐이라, 빠지면 [확인]이 영영 잠긴 모달이 된다.
+        // 잠금을 푸는 곳이 여기뿐이라, 빠지면 [확인]이 영영 잠긴 모달이 된다.
         t_seq.InsertCallback(t_confirmAt + t_fade, () => SetInputEnabled(true));
 
         t_seq.OnComplete(() => this.m_intro = null);
@@ -324,8 +285,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         }
     }
 
-    // 다음 표시가 중간값(줄어든 배율·반투명)에서 시작하지 않게 원복. 꺼진 행까지 훑는다 —
-    // 안무가 잘린 자리에서 꺼진 행은 그 상태 그대로 다음 표시에 다시 켜진다.
+    // 안무가 잘린 자리에서 꺼진 행도 그 상태로 다시 켜지므로 꺼진 행까지 훑어 원복한다.
     void ResetChoreography()
     {
         if (this.rowRoot != null)
