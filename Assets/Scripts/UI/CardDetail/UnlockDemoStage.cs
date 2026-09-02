@@ -16,7 +16,15 @@ using UnityEngine;
 //   시너지 대본은 여기에 한 줄을 더한다: SynergyEffect 파생 클래스와 SynergyTriggers 디스패처를
 //   부르지 않고, CardInstance의 **상태 변경 메서드**(Heal · GrantShield · ClearShield)도 부르지 않는다 —
 //   그것들은 BattleEventStream.Emit을 타므로, 로비에서 부르면 전투 이벤트 스트림에 로비발 사건이 흐른다.
-//   보여줄 숫자가 필요하면 CardView의 표시 전용 API(OverrideHpDisplay · SetShieldVisible)로만 낸다.
+//   보여줄 숫자가 필요하면 CardView의 표시 전용 API(OverrideHpDisplay · DeferHpDisplay ·
+//   PlayHealEffect · SetShieldVisible)로만 낸다.
+//
+//   딱 하나 예외가 비늘 대본이다(ShowReducedHit): 감쇄 수치를 데모 카드에 얹어 두고 감쇄 식 자체는
+//   CardInstance에 맡긴다 — ApplySynergy는 필드 가산이라 Emit을 타지 않고, 이 카드는 매 바퀴 새로 세워진다.
+//
+// 숫자로 보이는 축은 배틀과 같이 **체력과 추가 생명력 둘뿐이다**(CardView에 공격력 텍스트가 없다).
+// 그래서 공격력·스택 축의 시너지(흐름)는 배틀에서도 숫자가 안 나오므로 여기서도 내지 않는다.
+// 수치의 정본은 스펙시트(SynergyEffectDef.parameters)이고, 대본은 TierParam으로 그것을 되읽는다.
 //
 // 무대는 y = 20000에 선다. 로비 Main Camera(직교 size 5, 원점)가 물리적으로 못 보는 자리라
 // 씬의 cullingMask를 건드릴 필요도, 전용 레이어를 저작할 필요도 없다(UiRectCapture와 같은 자리).
@@ -44,10 +52,11 @@ public class UnlockDemoStage : SingletonOverlayBase
     [Tooltip("맞은편. 대개 맞는 쪽이고, 도발에서만 치러 오는 쪽이 된다.")]
     [SerializeField] CardView slotDefender;
 
-    [Tooltip("윗줄 곁자리(무쌍 광역 대상·도발이 지켜주는 아군·힐러가 살리는 아군). 키워드 대본 전용이다.")]
+    [Tooltip("윗줄 곁자리. **적 자리다** — 무쌍의 광역 대상이 여기 선다.")]
     [SerializeField] CardView slotNeighbor;
 
-    [Tooltip("아랫줄 곁자리. 같은 시너지를 가진 동료가 선다 — 시너지 대본 전용이다.\n" +
+    [Tooltip("아랫줄 곁자리. **아군 자리다** — 도발이 지켜주는 아군, 힐러가 살리는 아군, " +
+             "같은 시너지를 가진 동료가 여기 선다.\n" +
              "윗줄(slotNeighbor)을 돌려쓸 수 없다: CardAnimator가 첫 활성 프레임의 좌표를 슬롯 자리로 못 박아 " +
              "런타임에 못 옮기고, 이 화면에서 아군과 적을 가르는 단서는 줄(y)뿐이라 윗줄에 세우면 적으로 읽힌다.")]
     [SerializeField] CardView slotAlly;
@@ -91,14 +100,19 @@ public class UnlockDemoStage : SingletonOverlayBase
     bool m_disposePending;
 
     // 이번 무대의 배역. 매 바퀴 같은 배역을 다시 세우는 데 쓴다(ApplyRoles).
+    // 진영을 따로 들지 않는다 — **자리가 곧 진영이다**(윗줄은 적, 아랫줄은 아군).
+    // 진영만 뒤집고 자리를 그대로 두면 아군이 적 줄에 서서, 힐러가 적을 살리는 그림이 된다.
     int  m_cardId;
-    int  m_opponentId;
-    int  m_neighborId;
-    int  m_companionId;
-    int  m_defenderOwner;
-    int  m_neighborOwner;
+    int  m_opponentId;    // 윗줄 맞은편 — 언제나 적
+    int  m_neighborId;    // 윗줄 곁자리 — 언제나 적(무쌍의 광역 대상)
+    int  m_companionId;   // 아랫줄 곁자리 — 언제나 아군(도발이 지키는 쪽·힐러가 살리는 쪽·시너지 동료)
     bool m_useNeighbor;
     bool m_useAlly;
+
+    // 이번 무대가 안내하는 축. 대본 갈래에 따라 둘 중 하나만 찬다 —
+    // 배지는 배역과 달리 카드가 원래 가진 것이 아니라 **지금 열린 그것**을 가리켜야 한다.
+    CardKeyword  m_showKeyword;
+    SynergyState m_showSynergy;
 
     /// <summary>무대를 세운다. 위치를 Instantiate 인자로 주는 것이 중요하다 —
     /// <c>CardAnimator.Awake</c>가 그 프레임의 <c>transform.position</c>을 슬롯 자리로 못 박기 때문에,
@@ -223,13 +237,14 @@ public class UnlockDemoStage : SingletonOverlayBase
     // ── 배역 ────────────────────────────────────────────────────────────
 
     // 키워드 대본의 배역. 앞자리는 언제나 그 카드, 나머지는 저작(KeywordDemoConfig)이 정한다.
-    // 진영은 대본마다 갈린다 — 회복은 적에게 쏘지 않고, 도발은 아군을 대신 맞아주는 것이라
-    // 곁자리가 적이면 "누구를 지켰나"가 성립하지 않는다.
+    // 저작이 주는 곁자리 카드는 한 장이고, 그 카드를 **어느 줄에 세울지**를 여기서 가른다 —
+    // 회복은 적에게 쏘지 않고, 도발은 아군을 대신 맞아주는 것이라 곁자리가 적 줄에 서면
+    // "누구를 지켰나"도 "누구를 살렸나"도 성립하지 않는다.
     bool BindKeywordRoles(int _card, CardKeyword _keyword)
     {
         int t_opponent = 0;
-        int t_neighbor = 0;
-        this.config?.Roles(_keyword, out t_opponent, out t_neighbor);
+        int t_side     = 0;
+        this.config?.Roles(_keyword, out t_opponent, out t_side);
 
         if (t_opponent <= 0)
         {
@@ -239,22 +254,20 @@ public class UnlockDemoStage : SingletonOverlayBase
 
         this.m_cardId     = _card;
         this.m_opponentId = t_opponent;
-        this.m_neighborId = t_neighbor;
 
-        // 맞은편 진영. 힐러만 아군이다(회복 대상). 도발의 맞은편은 **치러 오는 적**이라 그대로 적 진영.
-        this.m_defenderOwner = _keyword == CardKeyword.Healer ? 0 : 1;
+        // 곁자리를 어느 줄에 세울지. 무쌍만 적이다(같이 휩쓸리는 대상) —
+        // 도발이 지켜주는 쪽과 힐러가 살리는 쪽은 아군이라 아랫줄에 선다.
+        // 나머지 키워드는 곁자리를 아예 쓰지 않는다: 세워두면 화면만 복잡해지고 시선이 갈린다.
+        bool t_enemySide = _keyword == CardKeyword.Peerless;
+        bool t_allySide  = _keyword == CardKeyword.Taunt || _keyword == CardKeyword.Healer;
 
-        // 곁자리 진영. 무쌍만 적이다(같이 휩쓸리는 대상) — 도발·힐러는 지키고 살리는 아군이다.
-        this.m_neighborOwner = _keyword == CardKeyword.Peerless ? 1 : 0;
+        this.m_neighborId  = t_enemySide ? t_side : 0;
+        this.m_companionId = t_allySide  ? t_side : 0;
+        this.m_useNeighbor = this.m_neighborId  > 0;
+        this.m_useAlly     = this.m_companionId > 0;
 
-        // 곁자리는 이 셋만 쓴다. 나머지 대본에서 세워두면 화면만 복잡해지고 시선이 갈린다.
-        this.m_useNeighbor = t_neighbor > 0
-                          && (_keyword == CardKeyword.Peerless
-                           || _keyword == CardKeyword.Taunt
-                           || _keyword == CardKeyword.Healer);
-
-        this.m_companionId = 0;
-        this.m_useAlly     = false;
+        this.m_showKeyword = _keyword;
+        this.m_showSynergy = null;
 
         ApplyRoles();
         return true;
@@ -276,14 +289,15 @@ public class UnlockDemoStage : SingletonOverlayBase
             return false;
         }
 
-        this.m_cardId        = _card;
-        this.m_opponentId    = t_opponent;
-        this.m_neighborId    = 0;
-        this.m_companionId   = FindSynergyCompanion(_card, _synergy, t_opponent);
-        this.m_defenderOwner = 1;
-        this.m_neighborOwner = 0;
-        this.m_useNeighbor   = false;
-        this.m_useAlly       = this.m_companionId > 0;
+        this.m_cardId      = _card;
+        this.m_opponentId  = t_opponent;
+        this.m_neighborId  = 0;
+        this.m_companionId = FindSynergyCompanion(_card, _synergy, t_opponent);
+        this.m_useNeighbor = false;
+        this.m_useAlly     = this.m_companionId > 0;
+
+        this.m_showKeyword = CardKeyword.None;
+        this.m_showSynergy = MakeShowState(_synergy);
 
         ApplyRoles();
         return true;
@@ -291,21 +305,27 @@ public class UnlockDemoStage : SingletonOverlayBase
 
     // 배역을 무대에 세운다. 매 바퀴 다시 부른다 — 표기 조작·보호막 표시가 앞 바퀴에서 넘어오면
     // 대본이 두 번째 판부터 거짓말을 한다(새 CardInstance로 Render하면 표기 상태가 카드째로 갈린다).
+    //
+    // 진영은 슬롯이 정한다(윗줄 1 · 아랫줄 0). 대본이 고르는 것은 **어느 자리에 세울지**뿐이다.
     void ApplyRoles()
     {
-        Render(this.slotAttacker, this.m_cardId,     0,                    0);
-        Render(this.slotDefender, this.m_opponentId, this.m_defenderOwner, 1);
+        Render(this.slotAttacker, this.m_cardId,     0, 0, this.m_showKeyword, this.m_showSynergy);
+        Render(this.slotDefender, this.m_opponentId, 1, 1);
 
         if (this.slotNeighbor != null)
         {
             this.slotNeighbor.gameObject.SetActive(this.m_useNeighbor);
-            if (this.m_useNeighbor) Render(this.slotNeighbor, this.m_neighborId, this.m_neighborOwner, 2);
+            if (this.m_useNeighbor) Render(this.slotNeighbor, this.m_neighborId, 1, 2);
         }
 
         if (this.slotAlly != null)
         {
             this.slotAlly.gameObject.SetActive(this.m_useAlly);
-            if (this.m_useAlly) Render(this.slotAlly, this.m_companionId, 0, 2);
+
+            // 시너지 축은 동료에게도 그대로 간다 — 같은 편이 모여야 성립하는 규칙이라
+            // 배지가 한 장만 켜져 있으면 "왜 켜졌나"가 화면에서 빠진다.
+            // 키워드 축은 넘기지 않는다: 도발이 지키는 쪽·힐러가 살리는 쪽은 그 능력의 주인이 아니다.
+            if (this.m_useAlly) Render(this.slotAlly, this.m_companionId, 0, 2, CardKeyword.None, this.m_showSynergy);
         }
 
         // 보호막은 카드가 아니라 뷰에 얹은 표시라 Render가 걷어가지 않는다(수호자 대본이 켠다).
@@ -313,12 +333,34 @@ public class UnlockDemoStage : SingletonOverlayBase
         if (this.m_useAlly && this.slotAlly != null) this.slotAlly.SetShieldVisible(false);
     }
 
-    static void Render(CardView _view, int _data, int _owner, int _slot)
+    /// <summary>이번 대본이 세운 아랫줄 곁자리(아군). 배역이 없으면 null.</summary>
+    CardView ActiveAlly => this.slotAlly != null && this.slotAlly.gameObject.activeSelf ? this.slotAlly : null;
+
+    // 카드 한 장을 세운다. _keyword·_synergy는 **표시할 능력**이지 이 카드가 가진 능력이 아니다 —
+    // 넘기지 않으면 카드가 스펙대로의 배지를 달고, 그러면 안내창이 말하는 것과 카드 위의 그림이 갈린다.
+    static void Render(CardView _view, int _data, int _owner, int _slot,
+                       CardKeyword _keyword = CardKeyword.None, SynergyState _synergy = null)
     {
         if (_view == null || _data <= 0) return;
 
+        var t_card = new CardInstance(_data, _owner) { isRevealed = true, slotIndex = _slot };
+
+        // 해금 안내는 방금 열린 그 하나만 말한다. 스펙에 저작된 나머지 키워드까지 뜨면
+        // 띠 위쪽의 아이콘·이름과 카드 위의 배지가 서로 다른 것을 가리킨다.
+        //
+        // 좁히기는 표시에서 그치지 않는다: Swing이 AttackFlow.Keywords(BoundCard)를,
+        // AttackSequence가 HasKeyword(Ranged/Peerless)를 읽으므로 **공격 모션까지 이 축을 따른다**.
+        // 대본이 말하는 능력만 남기는 것이 이 무대의 목적이라 의도한 결과다 —
+        // 원거리 카드가 처형을 안내받으면 이 화면에서는 붙어서 친다.
+        //
+        // 단, 아이콘 줄에서 빠지는 키워드로 좁히면 줄이 비어 KeywordIconConfig의 기본 아이콘이
+        // 대신 뜬다(CardVisualRules.CollectKeywordIcons의 0개 폴백) — 안내와 무관한 그림이라
+        // 막으려던 어긋남을 도로 만든다. 그때는 좁히지 않고 카드의 스펙 키워드를 그대로 둔다.
+        const CardKeyword ICONLESS = CardVisualRules.IconRowExcluded | CardVisualRules.AlwaysStatus;
+        if ((_keyword & ~ICONLESS) != CardKeyword.None) t_card.unlockedKeywords = _keyword;
+
         _view.InitializeAnimator();   // 초기화(GameInitializer)이 없는 씬이라 직접 깨운다
-        _view.Render(new CardInstance(_data, _owner) { isRevealed = true, slotIndex = _slot });
+        _view.Render(t_card, _synergy);
     }
 
     /// <summary>같은 시너지를 가진 다른 카드 중 가장 작은 ID. 없으면 0(곁자리를 비운다).
@@ -344,6 +386,29 @@ public class UnlockDemoStage : SingletonOverlayBase
         }
 
         return t_best;
+    }
+
+    /// <summary>배지를 켜기 위한 표시 전용 시너지 상태. 무대는 규칙을 돌리지 않으므로(SynergyResolver를
+    /// 부르지 않는다) 여기서 담는 것은 "이 시너지가 켜져 있다"는 사실 하나뿐이고, 배지가 읽는 것도 그것뿐이다.
+    /// 이 상태를 넘기지 않으면 <c>CardVisualRules.IsSynergyActive</c>가 전부 false를 돌려줘
+    /// 카드에 시너지 배지가 **한 장도** 뜨지 않는다.</summary>
+    static SynergyState MakeShowState(SynergyData _synergy)
+    {
+        if (_synergy == null) return null;
+
+        // 티어는 첫 단계로 둔다. 배지는 티어를 그리지 않고, 이 값은 카드가 시너지를 둘 이상 가질 때의
+        // 정렬(CardVisualRules.GetBadgeRequiredCount)에만 쓰인다 — 비어 있어도 그쪽이 null을 견딘다.
+        SynergyTier t_tier = _synergy.tiers != null && _synergy.tiers.Length > 0 ? _synergy.tiers[0] : null;
+
+        var t_active = new ActiveSynergy
+        {
+            Synergy   = _synergy,
+            Count     = SYNERGY_SHOW_COUNT,
+            TierIndex = 0,
+            Tier      = t_tier,
+        };
+
+        return new SynergyState(new List<ActiveSynergy> { t_active });
     }
 
     // ── 대본 ────────────────────────────────────────────────────────────
@@ -426,7 +491,7 @@ public class UnlockDemoStage : SingletonOverlayBase
         if (t_atk == null || t_def == null || t_atk.BoundCard == null || _synergy == null) return;
 
         // 동료를 못 찾았으면 곁자리 없이 1인 대본으로 줄인다 — 각 박자가 스스로 null을 견딘다.
-        CardView t_ally = this.slotAlly != null && this.slotAlly.gameObject.activeSelf ? this.slotAlly : null;
+        CardView t_ally = ActiveAlly;
 
         switch (_synergy.SynergyId)
         {
@@ -458,13 +523,13 @@ public class UnlockDemoStage : SingletonOverlayBase
         if (_token.IsCancellationRequested) return;
 
         SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
-        _atk.OverrideHpDisplay(_atk.BoundCard.hp, _atk.BoundCard.bonusHp + BULK_SHOW_BONUS);
+        ShowBonusHp(_atk, TierParam(_syn, "bonusHp", BULK_BONUS_FALLBACK));
 
         await Hold(SYNERGY_HOLD, _token);
     }
 
-    // 비늘: 맞아도 덜 아프다. **빈 이벤트 규약 자체가 대본이다** —
-    // 적이 치는데 피해 숫자가 안 뜨는 그림이 곧 "깎였다"이고, 접촉 순간의 엠블럼이 그 원인을 밝힌다.
+    // 비늘: 맞아도 덜 아프다. 피해 숫자가 아예 안 뜨면 "덜 아프다"가 아니라 "무적"으로 읽히므로,
+    // 배틀과 같이 **감쇄된 만큼만** 체력이 깎이는 그림을 낸다. 접촉 순간의 엠블럼이 그 원인을 밝힌다.
     async UniTask PlayScale(CardView _atk, CardView _def, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
         if (_ally != null) SynergyEmblemVfx.Play(_ally, _syn, SynergyEmblemTiming.Placed);
@@ -473,9 +538,14 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Hold(SynergyEmblemVfx.DurationOf(_syn, SynergyEmblemTiming.Placed), _token);
         if (_token.IsCancellationRequested) return;
 
+        int t_reduction = TierParam(_syn, "dmgReduction", SCALE_REDUCTION_FALLBACK);
+
         await Swing(_def, _atk, null, _token, _afterHit: () =>
         {
             SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
+
+            // 표기 조작은 반드시 공격 뒤다 — PlayHitAnim이 표기를 모델 값으로 되돌린다(_afterHit이 그 뒤에 온다).
+            ShowReducedHit(_atk, _def, t_reduction);
             return UniTask.CompletedTask;
         });
         if (_token.IsCancellationRequested) return;
@@ -518,16 +588,33 @@ public class UnlockDemoStage : SingletonOverlayBase
 
     // 돌보미: 동료가 나오면 서로를 돌본다. 게임 경로와 같은 그림 — 엠블럼이 돌보미 전원 위에 뜨고
     // 회복 표기가 **같은 순간** 각자 자리에서 터진다(힐러 투사체는 쓰지 않는다).
+    // 회복과 추가 생명력을 둘 다 낸다: CaretakerSynergyEffect가 같은 값으로 Heal + GrantBonusHp를 함께 한다.
     async UniTask PlayCaretaker(CardView _atk, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
+        int t_amount = TierParam(_syn, "amount", CARETAKER_AMOUNT_FALLBACK);
+
+        // 만피에서 회복하면 숫자가 움직이지 않는다 — 표기를 먼저 낮춰 그 한 칸이 도로 차오르게 한다(PlayHealer와 같은 이유).
+        WoundDisplay(_atk, t_amount);
+        WoundDisplay(_ally, t_amount);
+
+        await Hold(SYNERGY_STEP, _token);
+        if (_token.IsCancellationRequested) return;
+
         SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
         if (_ally != null) SynergyEmblemVfx.Play(_ally, _syn, SynergyEmblemTiming.Triggered);
 
         // 데모엔 유예된 표기가 없으므로 _consumeDeferred는 기본값(false) — 그래야 "+N"이 실제로 뜬다.
-        if (_atk.BoundCard != null) _atk.PlayHealEffect(CARETAKER_SHOW_HEAL);
-        if (_ally != null && _ally.BoundCard != null) _ally.PlayHealEffect(CARETAKER_SHOW_HEAL);
+        if (_atk.BoundCard != null) _atk.PlayHealEffect(t_amount);
+        if (_ally != null && _ally.BoundCard != null) _ally.PlayHealEffect(t_amount);
 
         await Hold(SynergyEmblemVfx.DurationOf(_syn, SynergyEmblemTiming.Triggered), _token);
+        if (_token.IsCancellationRequested) return;
+
+        // 추가 생명력은 회복 굴림이 끝난 뒤에 얹는다 — 같은 프레임에 내면 어느 숫자가 움직였는지 안 읽힌다.
+        ShowBonusHp(_atk, t_amount);
+        ShowBonusHp(_ally, t_amount);
+
+        await Hold(SYNERGY_HOLD, _token);
     }
 
     // 흐름: 동료가 늘수록 바람이 커진다. 스택이 1에서 2로 오르는 것을 크기로 읽게 한다.
@@ -578,8 +665,9 @@ public class UnlockDemoStage : SingletonOverlayBase
         var t_sources = new List<CardView> { _atk };
         if (_ally != null) t_sources.Add(_ally);
 
+        int t_damage  = TierParam(_syn, "damagePerMember", BRAND_DAMAGE_FALLBACK);
         var t_damages = new int[t_sources.Count];
-        for (int t_i = 0; t_i < t_damages.Length; t_i++) t_damages[t_i] = BRAND_SHOW_DAMAGE;
+        for (int t_i = 0; t_i < t_damages.Length; t_i++) t_damages[t_i] = t_damage;
 
         // 표기 전용 볼리다(착탄이 PlayHitAnim + OverrideHpDisplay만 부른다) — 실제 체력은 그대로다.
         await BrandVolleyVfx.PlayVolley(t_sources, _def, t_damages,
@@ -589,7 +677,7 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Swing(_atk, _def, null, _token);
     }
 
-    // 포식자: 때린 만큼 되마신다. 만피에서 시작하면 회복이 안 읽히므로 표기를 먼저 낮춰 둔다.
+    // 포식자: 때린 만큼 되마신다.
     // 곁자리는 세우지 않는다 — 흡혈은 개인 효과라 동료를 세워도 그 자리가 하는 일이 없다.
     async UniTask PlayPredator(CardView _atk, CardView _def, SynergyData _syn, CancellationToken _token)
     {
@@ -602,9 +690,17 @@ public class UnlockDemoStage : SingletonOverlayBase
 
         int t_hp    = _atk.BoundCard.hp;
         int t_bonus = _atk.BoundCard.bonusHp;
-        int t_drain = Mathf.Clamp(PREDATOR_SHOW_DRAIN, 1, Mathf.Max(1, t_hp - 1));
 
-        _atk.OverrideHpDisplay(t_hp - t_drain, t_bonus);
+        // 세 축 다 규칙 쪽이 진실원이다: 흡혈 식은 PredatorSynergyEffect.LifestealOf,
+        // 공격력은 AttackDamage, 그것이 대상에게 실제로 들어간 값은 ClampDamage.
+        int t_percent = TierParam(_syn, "lifestealPercent", PREDATOR_PERCENT_FALLBACK);
+        int t_dealt   = _def.BoundCard != null
+                      ? _def.BoundCard.ClampDamage(_atk.BoundCard.AttackDamage())
+                      : _atk.BoundCard.AttackDamage();
+
+        // 만피에서 시작하면 회복이 안 읽히므로 표기를 먼저 낮춰 둔다.
+        int t_drain = WoundDisplay(_atk, PredatorSynergyEffect.LifestealOf(t_dealt, t_percent));
+
         await Hold(SYNERGY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
@@ -648,8 +744,7 @@ public class UnlockDemoStage : SingletonOverlayBase
             if (_token.IsCancellationRequested) return;
         }
 
-        // 표기 조작은 반드시 공격 뒤다 — PlayHitAnim이 표기를 모델 값으로 되돌리므로 앞에 두면 조용히 지워진다.
-        _atk.OverrideHpDisplay(_atk.BoundCard.hp, _atk.BoundCard.bonusHp + TRACE_SHOW_BONUS);
+        // 숫자는 내지 않는다 — 1단계 표식이 주는 것은 "표식을 붙인다"뿐이고, 추가 생명력은 2단계 값이다.
         await Hold(SYNERGY_HOLD, _token);
     }
 
@@ -664,11 +759,16 @@ public class UnlockDemoStage : SingletonOverlayBase
             return;
         }
 
-        LegacyCrownVfx.Show(_atk.BoundCard, _syn, 1);
+        // 왕관 수 = 쌓인 스택이고, 회복량도 그 스택이다(LegacySynergyEffect.OnLethal) — 대본은 두 턴을 보여준다.
+        int t_amount = TierParam(_syn, "amount", LEGACY_AMOUNT_FALLBACK);
+        int t_stack  = t_amount;
+
+        LegacyCrownVfx.Show(_atk.BoundCard, _syn, t_stack);
         await Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
-        LegacyCrownVfx.Show(_atk.BoundCard, _syn, 2);
+        t_stack += t_amount;
+        LegacyCrownVfx.Show(_atk.BoundCard, _syn, t_stack);
         await Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
@@ -722,8 +822,8 @@ public class UnlockDemoStage : SingletonOverlayBase
     async UniTask PlayTaunt(CardView _taunter, CardView _enemy, CancellationToken _token)
     {
         // 지켜줄 아군. 없으면 노리는 박자를 통째로 건너뛴다 — 대신 맞아줄 상대가 없으면 도발이 성립하지 않는다.
-        CardView t_wanted = this.slotNeighbor != null && this.slotNeighbor.gameObject.activeSelf
-                                ? this.slotNeighbor : null;
+        // 아랫줄에서 고른다: 이 화면에서 편을 가르는 단서는 줄뿐이라 윗줄에 세우면 적을 지켜주는 그림이 된다.
+        CardView t_wanted = ActiveAlly;
 
         if (t_wanted != null)
         {
@@ -753,26 +853,108 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Swing(_enemy, _taunter, null, _token);
     }
 
-    // 힐러: 때리는 것이 아니라 아군을 살린다. 대상은 곁자리(있으면)와 맞는 쪽 둘 다.
+    // 힐러: 때리는 것이 아니라 아군을 살린다. 대상은 **아랫줄 곁자리 한 장**이다 —
+    // 맞은편(윗줄)은 적 자리라 그쪽으로 투사체를 보내면 적을 살리는 그림이 된다.
+    // 만피에서 회복하면 숫자가 움직이지 않으므로, 표기를 먼저 낮춰 두고 그 한 칸이 도로 차오르는 것을 보여준다.
     async UniTask PlayHealer(CardView _healer, CancellationToken _token)
     {
-        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
+        CardView t_target = ActiveAlly;
+        if (t_target == null || t_target.BoundCard == null) return;
 
-        Add(this.slotDefender);
-        if (this.slotNeighbor != null && this.slotNeighbor.gameObject.activeSelf) Add(this.slotNeighbor);
+        CardInstance t_card = t_target.BoundCard;
+        int          t_heal = WoundDisplay(t_target, HEALER_SHOW_HEAL);
 
-        void Add(CardView _v)
+        await Hold(SYNERGY_STEP, _token);
+        if (_token.IsCancellationRequested) return;
+
+        // 유예를 먼저 걸어야 숫자가 오른다: HealVfx의 도착 처리는 PlayHealEffect(_consumeDeferred: true)를 부르고,
+        // 그 분기는 **미리 예약된 몫만큼만** 표기를 올린다 — 예약이 0이면 투사체만 날고 숫자는 그대로 멈춘다.
+        // PlayCaretaker가 CardView 쪽을 기본값(false)으로 직접 부르는 것과 갈리는 자리다.
+        t_target.DeferHpDisplay(t_heal);
+
+        HealVfx.PlayHealBurst(_healer, new List<(CardView view, CardInstance card, int amount)>
         {
-            if (_v != null && _v.BoundCard != null) t_targets.Add((_v, _v.BoundCard, 1));
-        }
-
-        if (t_targets.Count == 0) return;
-
-        HealVfx.PlayHealBurst(_healer, t_targets);
+            (t_target, t_card, t_heal)
+        });
 
         // 이 연출은 스스로 끝을 알리지 않는다 — 길이는 HealVfx가 아는 값을 그대로 받아 쓴다.
-        await UniTask.Delay(Ms(HealVfx.BurstDuration(t_targets.Count)), cancellationToken: _token)
+        await UniTask.Delay(Ms(HealVfx.BurstDuration(1)), cancellationToken: _token)
                      .SuppressCancellationThrow();
+    }
+
+    // ── 표기 ────────────────────────────────────────────────────────────
+    //
+    // 전부 CardView의 표시 전용 API만 쓴다. 모델(CardInstance)의 체력·추가 생명력은 이 무대에서 변하지 않으므로,
+    // 다음 Render(ApplyRoles)나 PlayHitAnim이 표기를 저작 상태로 되돌린다.
+
+    /// <summary>이 시너지 1단계가 저작한 수치. 시트에 그 키가 없거나 값이 비었으면 _fallback.
+    /// <c>tiers</c>는 <c>[NonSerialized]</c>라 카탈로그 초기화(SynergySpecSource.Apply) 전에는 비어 있다.</summary>
+    static int TierParam(SynergyData _synergy, string _key, int _fallback)
+    {
+        SynergyTier t_tier = _synergy != null && _synergy.tiers != null && _synergy.tiers.Length > 0
+                           ? _synergy.tiers[0]
+                           : null;
+        if (t_tier?.effects == null) return _fallback;
+
+        // 0 이하는 "없는 값"으로 본다 — 시트 칸이 비면 효과 클래스가 미저작 필드(0)를 true와 함께
+        // 돌려주고, 그대로 쓰면 대본이 숫자를 못 내 통째로 무음이 된다.
+        foreach (SynergyEffect t_effect in t_tier.effects)
+            if (t_effect != null && t_effect.TryGetParam(_key, out int t_value) && t_value > 0) return t_value;
+
+        return _fallback;
+    }
+
+    /// <summary>회복을 보여주기 전에 표기를 그만큼 낮추고, 실제로 낮춘 양을 돌려준다.
+    /// 만피에서 회복하면 숫자가 한 칸도 움직이지 않아 무엇이 좋아졌는지 안 읽힌다.
+    /// 0까지 떨어뜨리지 않는다 — 죽은 것으로 읽힌다.</summary>
+    static int WoundDisplay(CardView _view, int _amount)
+    {
+        if (_view == null || _view.BoundCard == null) return 0;
+
+        CardInstance t_card  = _view.BoundCard;
+        int          t_wound = Mathf.Clamp(_amount, 1, Mathf.Max(1, t_card.hp - 1));
+
+        _view.OverrideHpDisplay(t_card.hp - t_wound, t_card.bonusHp);
+        return t_wound;
+    }
+
+    /// <summary>추가 생명력 "+N"만 표기에 얹는다(체력은 모델 값 그대로).</summary>
+    static void ShowBonusHp(CardView _view, int _amount)
+    {
+        if (_view == null || _view.BoundCard == null || _amount <= 0) return;
+        _view.OverrideHpDisplay(_view.BoundCard.hp, _view.BoundCard.bonusHp + _amount);
+    }
+
+    /// <summary>표기를 모델 값으로 되돌린다(유예해 둔 회복 표기도 함께 푼다).</summary>
+    static void SnapHpDisplay(CardView _view)
+    {
+        if (_view == null || _view.BoundCard == null) return;
+        _view.OverrideHpDisplay(_view.BoundCard.hp, _view.BoundCard.bonusHp);
+    }
+
+    // 비늘 감쇄를 반영한 피격 표기. 감쇄 식과 그 하한의 진실원은 CardInstance라 값을 카드에 얹어 두고
+    // PreviewAfterDamage에 맡긴다 — 여기서 raw - reduction을 다시 쓰면 하한 규칙이 두 곳으로 갈린다.
+    // ApplySynergy는 필드 가산이라 BattleEventStream을 타지 않고, 이 카드는 매 바퀴 새로 세워지는
+    // 데모 전용 인스턴스라 전투로 새어 나가지 않는다(그래도 이중 적용을 막으려 ClearSynergy를 먼저 건다).
+    static void ShowReducedHit(CardView _view, CardView _attacker, int _reduction)
+    {
+        if (_view == null || _view.BoundCard == null || _attacker == null || _attacker.BoundCard == null) return;
+        if (_reduction <= 0) return;
+
+        CardInstance t_card = _view.BoundCard;
+        t_card.ClearSynergy();
+        t_card.ApplySynergy(0, CardKeyword.None, _reduction);
+
+        // 공격력은 체력에서 나오므로(AttackDamage) 실제 값을 그대로 쓰면 데모 카드가 한 방에 0으로 표기된다 —
+        // 죽지 않는 최대 피해까지 한 칸씩 물러난다. "얼마면 죽는가"는 규칙(WouldDieFrom)에게만 묻는다:
+        // 감쇄가 뺄셈이 아니게 되거나 하한이 바뀌어도 이 자리가 따라 틀리지 않는다.
+        int t_raw = _attacker.BoundCard.AttackDamage();
+        while (t_raw > 0 && t_card.WouldDieFrom(t_raw)) t_raw--;
+        if (t_raw <= 0) return;
+
+        (int t_hp, int t_bonusHp) = t_card.PreviewAfterDamage(t_raw);
+
+        _view.OverrideHpDisplay(t_hp, t_bonusHp);
     }
 
     // ── 수명 ────────────────────────────────────────────────────────────
@@ -862,13 +1044,20 @@ public class UnlockDemoStage : SingletonOverlayBase
     const float LEGACY_STEP     = 0.55f;   // 왕관이 한 개 늘어나는 간격
     const float TRACE_MARK_HOLD = 0.35f;   // 표식이 붙고 동료가 달려들기까지
 
-    // 대본이 보여주는 숫자. 규칙에서 오는 값이 아니라 **읽히기 위한 값**이다 —
-    // 시트의 실제 수치를 끌어오면 티어에 따라 0이 되는 날 대본이 통째로 무음이 된다.
-    const int BULK_SHOW_BONUS     = 3;
-    const int CARETAKER_SHOW_HEAL = 2;
-    const int BRAND_SHOW_DAMAGE   = 1;
-    const int PREDATOR_SHOW_DRAIN = 3;
-    const int TRACE_SHOW_BONUS    = 2;
+    // 배지가 켜졌다는 사실만 나르므로 수치 자체는 화면에 안 나온다 — 무대에 아군이 둘 서는 데서 온 값이다.
+    const int SYNERGY_SHOW_COUNT  = 2;
+
+    // 시너지 수치의 정본은 스펙시트(SynergyEffectDef.parameters)다. 아래는 **그 키가 없을 때만** 쓰는 폴백 —
+    // 시트를 못 읽는 자리(카탈로그 초기화 전)에서 대본이 통째로 무음이 되지 않게 1단계 저작값을 그대로 적어 둔다.
+    const int BULK_BONUS_FALLBACK       = 3;    // Bulk.bonusHp
+    const int CARETAKER_AMOUNT_FALLBACK = 1;    // Caretaker.amount (회복 + 추가 생명력)
+    const int SCALE_REDUCTION_FALLBACK  = 1;    // Scale.dmgReduction
+    const int BRAND_DAMAGE_FALLBACK     = 1;    // Brand.damagePerMember
+    const int PREDATOR_PERCENT_FALLBACK = 50;   // Predator.lifestealPercent
+    const int LEGACY_AMOUNT_FALLBACK    = 1;    // Legacy.amount (턴마다 쌓이는 스택)
+
+    // 힐러는 시너지가 아니라 키워드 축이라 시트 조회 대상이 아니다(HealerEffect: 힐러 하나당 아군 1 회복).
+    const int HEALER_SHOW_HEAL    = 1;
 
     static int Ms(float _seconds) => Mathf.Max(0, (int)(_seconds * 1000f));
 }

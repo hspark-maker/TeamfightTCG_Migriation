@@ -21,7 +21,9 @@ public class KeywordDemoConfig : ScriptableObject
         [CardId] public int opponentId;
 
         [Tooltip("곁에 서는 쪽(무쌍의 광역 대상, 도발이 대신 맞아주는 아군, 힐러가 살리는 아군). 비우면 defaultNeighbor. " +
-                 "진영은 코드가 정한다 — 무쌍만 적이고 도발·힐러는 아군이라, 같은 칸에 어떤 카드를 넣어도 편이 뒤집히지 않는다.")]
+                 "이 카드가 설 자리는 코드가 정한다 — 무대에서는 줄이 곧 편이라, 무쌍의 대상은 윗줄(적 자리)에 " +
+                 "서고 도발이 지켜주는 아군과 힐러가 살리는 아군은 아랫줄(아군 자리)에 선다. " +
+                 "그러니 같은 칸에 어떤 카드를 넣어도 편이 뒤집히지 않는다.")]
         [CardId] public int neighborId;
     }
 
