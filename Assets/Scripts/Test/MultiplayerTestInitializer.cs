@@ -1,17 +1,12 @@
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
-using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>멀티플레이 테스트 전용 단독 초기화. 로비 UI·세이브·초기화(InitializationRunner) 없이
-/// 덱을 정하고 정식 랭크 매칭 또는 방 직행으로 전투 씬까지 넘긴다.
-/// 정식 버튼은 PhotonRankedMatchmaker와 서버 덱 검증을 그대로 사용하고, 방 직행은 연결 자체를 진단할 때만 쓴다.</summary>
+/// 테스트 계정과 덱을 준비하고, 전투 진입은 정식 로비 런처에 위임한다.</summary>
 public class MultiplayerTestInitializer : MonoBehaviour
 {
-    const int REQUIRED_PLAYERS = 2;
-
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 
     static bool s_commandLineSwitchConsumed;
@@ -27,12 +22,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
     }
 #endif
 
-    [Header("방")]
-    [Tooltip("두 클라이언트가 같은 값이어야 같은 방에 붙는다.")]
-    [SerializeField] string roomName = "TestRoom";
-    [Tooltip("켜면 방 이름 대신 랜덤 매칭(JoinRandomRoom)을 쓴다.")]
-    [SerializeField] bool useRandomMatch;
-
     [Header("덱")]
     [Tooltip("저장된 덱 슬롯 0 이 유효하면 그쪽이 우선한다. 슬롯 0 이 비었을 때만 이 목록을 쓰고, " +
              "그것도 비면 카탈로그 앞에서 6장을 채운다. 서버 lockDeck 이 소유·성장을 세이브와 대조하므로 " +
@@ -45,22 +34,22 @@ public class MultiplayerTestInitializer : MonoBehaviour
              "실행 인자 -testAccountId=값 과 ParrelSync 클론 인자가 이 필드보다 우선한다.")]
     [SerializeField] string testAccountId = string.Empty;
 
-    [Header("정식 매치메이킹")]
-    [SerializeField] OpponentProfilePool profilePool;
-
     string status = "대기";
     System.IDisposable bootReadyHandle;
-    bool connecting;
     bool switchingAccount;
-    int playerCount;
+    bool lastBusy;
     List<int> resolvedDeck;
     string resolvedAccountId = string.Empty;
+    LobbyMatchLauncher matchLauncher;
 
     public event System.Action<string> OnStatusChanged;
     public event System.Action OnStateChanged;
     public string Status => this.status;
     public IReadOnlyList<int> ResolvedDeck => this.resolvedDeck;
-    public bool IsBusy => this.connecting || this.switchingAccount;
+    LobbyMatchLauncher MatchLauncher =>
+        this.matchLauncher != null ? this.matchLauncher : this.matchLauncher = GetComponent<LobbyMatchLauncher>();
+
+    public bool IsBusy => this.switchingAccount || (MatchLauncher != null && MatchLauncher.IsRunning);
 
     void Start()
     {
@@ -132,25 +121,27 @@ public class MultiplayerTestInitializer : MonoBehaviour
     {
         this.bootReadyHandle?.Dispose();
         this.bootReadyHandle = null;
-
-        if (NetworkSession.Instance == null) return;
-        NetworkSession.Instance.OnPlayerJoinedRoom -= HandlePlayerJoined;
-        NetworkSession.Instance.OnPlayerLeftRoom -= HandlePlayerLeft;
-        NetworkSession.Instance.OnConnectionFailed -= HandleConnectionFailed;
     }
 
-    public void Connect()
+    // 바쁨 상태의 주인이 런처(m_running)로 옮겨갔는데 런처는 상태 변경을 알리지 않는다. 폴링하지 않으면
+    // 매칭이 취소·실패로 끝난 뒤 OnStateChanged 가 영영 안 와서 디버그 패널의 버튼이 잠긴 채로 남는다
+    // (예전에는 this.connecting 이 이쪽 소유라 모든 출구가 SetStatus 를 거쳤다).
+    void Update()
     {
-        if (this.connecting) return;
-        if (!DeckConfig.HasDeck) { SetStatus("덱이 없어 접속하지 않는다."); return; }
-        ConnectAsync().Forget();
+        bool t_busy = IsBusy;
+        if (t_busy == this.lastBusy) return;
+        this.lastBusy = t_busy;
+
+        if (t_busy) OnStateChanged?.Invoke();
+        else SetStatus("로비 진입 절차가 끝났습니다 — 다시 시도할 수 있습니다.");
     }
+
+    // 기존 디버그 버튼 배선을 보존하되 방 직행은 없앤다. 두 버튼 모두 정식 로비 진입점을 탄다.
+    public void Connect() => StartRankedMatchmaking();
 
     public void Disconnect()
     {
         if (NetworkSession.Instance != null) NetworkSession.Instance.Disconnect().Forget();
-        this.connecting = false;
-        this.playerCount = 0;
         SetStatus("연결 해제");
     }
 
@@ -185,7 +176,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
     void ReapplySavedDeckAfterBoot()
     {
         this.bootReadyHandle = null;
-        if (this.connecting || this.switchingAccount) return;
+        if (IsBusy) return;
 
         int t_slot = DeckSaveManager.SelectedSlot;
         if (t_slot < 0 || !DeckSaveManager.IsSlotValid(t_slot)) return;
@@ -208,9 +199,19 @@ public class MultiplayerTestInitializer : MonoBehaviour
 
     public void StartRankedMatchmaking()
     {
-        if (this.connecting || this.switchingAccount) return;
-        if (!DeckConfig.HasDeck) { SetStatus("덱을 먼저 설정하세요."); return; }
-        RankedMatchmakingAsync(this.GetCancellationTokenOnDestroy()).Forget();
+        if (IsBusy) return;
+
+        LobbyMatchLauncher t_launcher = MatchLauncher;
+        if (t_launcher == null)
+        {
+            SetStatus("정식 로비 런처가 배선되지 않았습니다.");
+            return;
+        }
+
+        t_launcher.StartAiBattle();
+        SetStatus(t_launcher.IsRunning
+            ? "정식 로비 진입 절차 시작"
+            : "정식 진입 조건을 충족하지 못했습니다(기능 잠금 또는 유효 덱 확인).");
     }
 
     public bool CanOpenDeckEditor =>
@@ -247,7 +248,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         this.switchingAccount = true;
-        this.connecting = false;
         SetStatus("새 테스트 계정 발급 중...");
 
         try
@@ -287,7 +287,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         this.switchingAccount = true;
-        this.connecting = false;
         SetStatus($"테스트 계정 '{_accountId}' 로그인 중...");
 
         try
@@ -373,107 +372,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         return false;
     }
 
-    // ── 접속 ─────────────────────────────────────────────────────────────
-
-    async UniTaskVoid ConnectAsync()
-    {
-        this.connecting = true;
-        SetStatus("연결 중...");
-
-        NetworkSession t_session = EnsureSession();
-
-        t_session.OnPlayerJoinedRoom -= HandlePlayerJoined;
-        t_session.OnPlayerLeftRoom -= HandlePlayerLeft;
-        t_session.OnConnectionFailed -= HandleConnectionFailed;
-        t_session.OnPlayerJoinedRoom += HandlePlayerJoined;
-        t_session.OnPlayerLeftRoom += HandlePlayerLeft;
-        t_session.OnConnectionFailed += HandleConnectionFailed;
-
-        bool t_ok = this.useRandomMatch
-            ? await t_session.JoinRandomRoom()
-            : await t_session.JoinOrCreateRoom(this.roomName);
-
-        if (!t_ok)
-        {
-            this.connecting = false;
-            SetStatus("연결 실패. Photon AppId·네트워크 확인.");
-            return;
-        }
-
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-
-        // 내가 늦게 들어와 이미 2인이면 OnPlayerJoined가 안 온다 — 여기서 한 번 더 판정한다.
-        if (this.playerCount >= REQUIRED_PLAYERS) BeginBattle();
-    }
-
-    /// <summary>씬에 NetworkSession이 없으면 만들어 준다(단독 실행 편의). 이미 있으면 그것을 쓴다.</summary>
-    static NetworkSession EnsureSession()
-    {
-        if (NetworkSession.Instance != null) return NetworkSession.Instance;
-        new GameObject("NetworkSession").AddComponent<NetworkSession>();
-        return NetworkSession.Instance;
-    }
-
-    void HandlePlayerJoined(PlayerRef _player)
-    {
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-        if (this.playerCount >= REQUIRED_PLAYERS) BeginBattle();
-    }
-
-    void HandlePlayerLeft(PlayerRef _player)
-    {
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-    }
-
-    void HandleConnectionFailed(string _reason)
-    {
-        this.connecting = false;
-        SetStatus($"연결 끊김: {_reason}");
-    }
-
-    void BeginBattle()
-    {
-        // 양쪽 클라가 각자 켠다. 씬 전환만 마스터가 건다(Fusion이 나머지를 따라오게 한다).
-        DeckConfig.SetMultiplayer(true);
-        SetStatus("전투 시작");
-
-        NetworkRunner t_runner = NetworkSession.Instance?.Runner;
-        if (t_runner == null)
-        {
-            // 멀티 플래그만 세운 채 러너가 없으면 아무도 씬을 로드하지 않아 "전투 시작"에서 멈춘다.
-            // 정식 경로(LobbyMatchLauncher.LoadBattleSceneOverNetwork)와 같이 싱글로 되돌려 전투는 살린다.
-            DeckConfig.ResetMode();
-            SetStatus("멀티 진입인데 러너가 없다 — 싱글 경로로 전투를 연다.");
-            SceneManager.LoadScene("BattleScene");
-            return;
-        }
-        if (!t_runner.IsSharedModeMasterClient) return;
-
-        string t_sceneName = NetworkSession.Instance.BattleSceneName;
-        int t_buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{t_sceneName}.unity");
-        if (t_buildIndex < 0) t_buildIndex = SceneUtility.GetBuildIndexByScenePath(t_sceneName);
-        if (t_buildIndex < 0)
-        {
-            SetStatus($"'{t_sceneName}'이 Build Settings에 없다.");
-            return;
-        }
-
-        t_runner.LoadScene(SceneRef.FromIndex(t_buildIndex));
-    }
-
-    int CountActivePlayers()
-    {
-        int t_count = 0;
-        if (NetworkSession.Instance?.Runner == null) return t_count;
-        foreach (PlayerRef _ in NetworkSession.Instance.Runner.ActivePlayers) t_count++;
-        return t_count;
-    }
-
-    void UpdateWaitingStatus() => SetStatus($"대기 중... ({this.playerCount}/{REQUIRED_PLAYERS})");
-
     void SetStatus(string _message)
     {
         this.status = _message;
@@ -482,67 +380,4 @@ public class MultiplayerTestInitializer : MonoBehaviour
         OnStateChanged?.Invoke();
     }
 
-    async UniTaskVoid RankedMatchmakingAsync(CancellationToken _ct)
-    {
-        this.connecting = true;
-        DeckConfig.SetMultiplayer(false);
-        MatchOpponentHandoff.Clear();
-        SoloMatchHandoff.Clear();
-        DeckConfig.ClearEnemyDeck();
-        EnsureSession();
-        SetStatus($"정식 매치메이킹 중... (테스트 티어 {RankManager.TierIndex})");
-
-        try
-        {
-            var t_matchmaker = new PhotonRankedMatchmaker(
-                new ServerMatchmaker(this.profilePool), RankManager.TierIndex);
-            MatchOpponent? t_matched = await t_matchmaker.FindOpponentAsync(_ct);
-            if (_ct.IsCancellationRequested || t_matched == null)
-            {
-                SetStatus("매치메이킹이 취소되었거나 실패했습니다.");
-                return;
-            }
-
-            MatchOpponentHandoff.Set(t_matched.Value);
-            if (t_matched.Value.IsValid)
-                DeckConfig.SetEnemyDeck(t_matched.Value.Deck, t_matched.Value.CardLevel);
-
-            bool t_multiplayer = DeckConfig.IsMultiplayer;
-            SetStatus(t_multiplayer ? "실제 상대 매칭 완료. 전투 데이터 확인 중..." : "AI 폴백 완료. 전투 데이터 확인 중...");
-
-            EBattleContentGateResult t_gate = await BattleContentSync.CheckBeforeBattleAsync(t_multiplayer, _ct);
-            if (_ct.IsCancellationRequested) return;
-            if (t_gate != EBattleContentGateResult.Current && t_gate != EBattleContentGateResult.OfflineAllowed)
-            {
-                SetStatus($"전투 콘텐츠 확인 실패: {t_gate}");
-                return;
-            }
-
-            if (t_multiplayer)
-            {
-                BeginBattle();
-                return;
-            }
-
-            ESoloMatchSyncResult t_solo = await SoloMatchSync.RunAsync(_ct);
-            if (t_solo != ESoloMatchSyncResult.Success)
-            {
-                SetStatus($"AI 덱 서버 검증 실패: {t_solo}");
-                return;
-            }
-
-            SetStatus("AI 전투 시작");
-            SceneManager.LoadScene("BattleScene");
-        }
-        catch (System.Exception _exception)
-        {
-            SetStatus($"매치메이킹 예외: {_exception.GetBaseException().Message}");
-            Debug.LogException(_exception);
-        }
-        finally
-        {
-            this.connecting = false;
-            OnStateChanged?.Invoke();
-        }
-    }
 }

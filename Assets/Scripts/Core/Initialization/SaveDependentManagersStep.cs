@@ -45,7 +45,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
         // 클라우드 채택이 끝난 뒤여야 한다 — 채택 전에 슬롯을 갈아엎으면 채택이 그대로 덮어써 무효가 된다.
         OutgameTutorialRewind.ApplyWipeIfScheduled();
 
-        // 정상 부팅의 스타터는 서버(ensureAccount)가 이미 문서에 넣어 왔다.
+        // 정상 초기화의 스타터는 서버(ensureAccount)가 이미 문서에 넣어 왔다.
         // 아래 Init과 GrantIfNoDeck은 위 되감기가 슬롯을 비웠을 때만 서는 안전망이다.
         ProfileManager.Init();
         OwnershipManager.Init();

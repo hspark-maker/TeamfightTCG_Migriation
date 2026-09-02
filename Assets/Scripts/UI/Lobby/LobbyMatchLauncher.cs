@@ -38,6 +38,8 @@ public class LobbyMatchLauncher : MonoBehaviour
     // Confirm 한 번에 두 await가 동시에 깨어 LoadScene이 두 번 돈다.
     bool m_running;
 
+    public bool IsRunning => m_running;
+
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
     LobbyOverlayHost m_overlayHost;
@@ -81,7 +83,19 @@ public class LobbyMatchLauncher : MonoBehaviour
         get
         {
             if (m_matchShell == null && matchShellPrefab != null)
+            {
+                // 부모가 곧 셸의 자리다. 런처를 캔버스 밖(=루트)에 두면 셸이 캔버스 없이 생성돼
+                // 아무것도 렌더되지 않는데, 매칭 로직은 그대로 돌아서 "매칭은 되는데 화면만 안 뜨는"
+                // 무증상 결함이 된다 — 조용히 넘기지 않고 여기서 끊는다.
+                if (transform.parent == null)
+                {
+                    Debug.LogError(
+                        "[LobbyMatchLauncher] 런처가 씬 루트에 있어 매칭 셸을 세울 자리가 없다 — "
+                      + "캔버스(SafeArea) 자식으로 배선할 것.", this);
+                    return null;
+                }
                 m_matchShell = Instantiate(matchShellPrefab, transform.parent);
+            }
 
             return m_matchShell;
         }
@@ -106,6 +120,15 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
+    }
+
+    // 셸은 이 런처가 만든 것이므로 이 런처와 함께 죽어야 한다. 부모가 이 씬 안에 있으면 어차피 같이
+    // 사라지지만, 부모를 잘못 잡아 상시 캔버스에 붙은 경우에는 씬을 넘어 살아남아 다음 화면을 덮는다.
+    // 성공 경로는 씬 전환이 셸을 치운다고 믿고 Close()를 부르지 않으므로, 그 믿음을 여기서 보증한다.
+    void OnDestroy()
+    {
+        if (m_matchShell != null) Destroy(m_matchShell.gameObject);
+        m_matchShell = null;
     }
 
     void OnDisable()
@@ -311,12 +334,9 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         SceneTransitionVideo.Instance?.PlayOverlay();
 
-        // 마스터가 아니면 부르지 않는다. 러너가 씬을 바꾸면 이쪽도 함께 넘어간다.
-        if (!t_runner.IsSharedModeMasterClient) return;
-
-        int t_buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{BATTLE_SCENE}.unity");
-        if (t_buildIndex < 0) t_buildIndex = SceneUtility.GetBuildIndexByScenePath(BATTLE_SCENE);
-        t_runner.LoadScene(SceneRef.FromIndex(t_buildIndex));
+        // 두 클라가 각자 연다. 마스터만 열고 Fusion 이 상대를 끌어오던 구조는 늦은 쪽의 로비 절차를
+        // 강제 종료시켰고, 마스터가 끊기면 상대가 영영 못 들어왔다 — BattleSceneEntry 설명 참조.
+        BattleSceneEntry.Load(BATTLE_SCENE);
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.

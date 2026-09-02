@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -70,7 +70,6 @@ public class CardView : MonoBehaviour
     [Header("Highlight / Glow")]
     [SerializeField] SpriteRenderer selectedHighlight;
     [SerializeField] ParticleSystem passiveGlowSystem;
-    [SerializeField] GameObject keywordGlowPrefab;
     [SerializeField] float targetFocusScale = 1.15f;   // 드래그 조준 시 타겟 적 카드 확대 배율.
     [SerializeField] float targetFocusDur   = 0.15f;
 
@@ -190,7 +189,6 @@ public class CardView : MonoBehaviour
         this.synergyBadgeYStart,
         this.synergyBadgeYStep,
         this.synergyMaxBadges,
-        this.keywordGlowPrefab,
         this.passiveGlowSystem);
 
     Color hpTextOriginalColor;
@@ -305,8 +303,6 @@ public class CardView : MonoBehaviour
         transform.DOPunchScale(Vector3.one * (this.targetFocusScale - 1f), this.targetFocusDur * 2f, vibrato: 4, elasticity: 0.4f)
                  .SetLink(gameObject)
                  .OnComplete(() => transform.localScale = Vector3.one);
-        if (BattleRules.IsTaunt(this.boundCard))
-            PlayKeywordGlow(CardKeyword.Taunt).Forget();
     }
 
     #endregion
@@ -786,7 +782,6 @@ public class CardView : MonoBehaviour
 
     /// <summary>키워드 글로우 재생(아이콘 pop 동반). 색·유지시간·프리팹은 KeywordIconConfig(SO)가 소유한다.</summary>
     // TODO: 호출부 이관 후 삭제
-    public UniTask PlayKeywordGlow(CardKeyword _kw) => Decor.PlayKeywordGlow(_kw);
     #endregion
 
     #region Animation delegates

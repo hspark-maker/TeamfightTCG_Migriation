@@ -9,7 +9,6 @@ int,string,int,int,string,string
 6,Caretaker,1,5,돌보미,추가 생명력 +2
 7,Flow,0,3,흐름,등장 시 스택 +1
 8,Flow,1,5,흐름,등장 시 스택 +2
-9,Guardian,0,2,수호자,보호막 획득
 10,Legacy,0,2,유산,턴마다 스택 +1
 11,Legacy,1,4,유산,턴마다 스택 +2
 12,Predator,0,2,포식자,피해의 50% 회복

@@ -12,7 +12,7 @@ public static class RewardSpec
     static readonly Dictionary<string, List<AlbumRewardDef>> s_rewards =
         new Dictionary<string, List<AlbumRewardDef>>(StringComparer.Ordinal);
 
-    /// <summary>전투 보상 계수의 ownerId. 이 셋은 없으면 게임이 매판 0을 지급하므로 부팅에서 존재를 검사한다.</summary>
+    /// <summary>전투 보상 계수의 ownerId. 이 셋은 없으면 게임이 매판 0을 지급하므로 초기화에서 존재를 검사한다.</summary>
     public const string BattleWinPerCard = "win.perCard";
     public const string BattleWinFloor   = "win.floor";
     public const string BattleLoseFlat   = "lose.flat";
@@ -31,7 +31,7 @@ public static class RewardSpec
         return true;
     }
 
-    /// <summary>표가 통째로 비었거나 전투 보상 계수가 빠졌는가. 부팅이 이걸 보고 복구 화면으로 보낸다 —
+    /// <summary>표가 통째로 비었거나 전투 보상 계수가 빠졌는가. 초기화가 이걸 보고 복구 화면으로 보낸다 —
     /// 조용히 0을 지급하면 유저 신고가 오기 전까지 아무도 모른다.</summary>
     public static bool TryValidateRequired(out string _error)
     {

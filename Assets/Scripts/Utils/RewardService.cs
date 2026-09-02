@@ -8,13 +8,13 @@ using UnityEngine;
 public static class RewardService
 {
     // 전투 보상 계수는 Reward 표(ownerType=Battle)가 소유한다 — 앨범·모험·랭크와 같은 자리다.
-    // 표가 비면 매판 0을 지급하게 되므로 부팅이 RewardSpec.TryValidateRequired로 먼저 막는다.
+    // 표가 비면 매판 0을 지급하게 되므로 초기화가 RewardSpec.TryValidateRequired로 먼저 막는다.
     static bool s_warnedMissing;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState() => s_warnedMissing = false;
 
-    // 계수 한 칸. 표에 없으면 0을 돌려주되 세션당 1회 소리를 낸다(부팅 검사를 통과했다면 여기 오지 않는다).
+    // 계수 한 칸. 표에 없으면 0을 돌려주되 세션당 1회 소리를 낸다(초기화 검사를 통과했다면 여기 오지 않는다).
     static long CoefficientOf(string _ownerId)
     {
         if (RewardSpec.TryGetSingle(ERewardOwnerType.Battle, _ownerId, out AlbumRewardDef t_def))

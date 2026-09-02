@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
@@ -501,7 +501,6 @@ public class PlayerTurn : TurnBase
         var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
             _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
 
-        var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker);
 
         await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
                                          t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
@@ -515,8 +514,8 @@ public class PlayerTurn : TurnBase
         }
 
         await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            t_result.events, t_preKw, t_atKw,
-            () => AttackFlow.RunAfterAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
+            t_result.events,
+            () => AttackFlow.RunAfterAttackPhase(t_attackerView, _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
 
         // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
         await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
@@ -527,8 +526,6 @@ public class PlayerTurn : TurnBase
         // 자유공격/자유플레이 결과는 재동기하지 않는다(뒤 스텝이 어긋남을 감지해야 하므로).
         if (TutorialConfig.IsActive && this.scriptedStepAttack)
             TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
-
-        await AttackFlow.PlayResultFlourish(t_attackerView, _attacker, _defender, t_result);
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {

@@ -203,8 +203,8 @@ public class GameInitializer : MonoBehaviour
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.
     ///
-    /// DeckConfig.IsMultiplayer는 로비 패널의 OnPlayerJoined 콜백에서 켜지는데, 전투 씬으로 끌고 가는
-    /// 주체는 마스터의 Runner.LoadScene이다 — 즉 플래그의 authority와 씬 로드의 authority가 다르다.
+    /// DeckConfig.IsMultiplayer는 로비 패널의 OnPlayerJoined 콜백에서 켜지는데, 전투 씬을 여는 주체는
+    /// 각 클라의 BattleSceneEntry.Load다 — 즉 플래그의 authority와 씬 로드의 authority가 다르다.
     /// 콜백을 놓친(패널이 비활성화돼 구독이 끊긴) 클라이언트는 IsMultiplayer=false인 채 전투에 들어와
     /// 싱글 턴 객체 + 로컬 시드로 진행한다 = commit-reveal 우회, 양쪽이 아예 다른 게임을 한다.
     ///

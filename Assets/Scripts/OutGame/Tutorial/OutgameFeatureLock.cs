@@ -29,7 +29,7 @@ public static class OutgameFeatureLock
 
     static bool s_forceUnlockAll;
 
-    // 진행이 막혔다는 판정(세이브하지 않는다 — 같은 좌표면 다음 부팅에 같은 판정이 다시 선다)
+    // 진행이 막혔다는 판정(세이브하지 않는다 — 같은 좌표면 다음 초기화에 같은 판정이 다시 선다)
     static bool s_stalled;
 
     static bool s_all;

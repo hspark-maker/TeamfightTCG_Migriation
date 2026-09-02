@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TeamfightTCG.BattleCore;
@@ -30,13 +30,11 @@ public enum SynergyPreviewKind
     PredatorDrain,   // 포식자: 피격자 자리 표식 + 공격자에게 돌아오는 흡수 궤적
     TraceMark,       // 추적: 표식이 붙는 순간 피격자 자리 낙점
     LegacyCrown,     // 유산: 턴 시작 왕관 스택 표시
-    LegacyCrownFly,  // 유산: 사망 시 왕관이 아군에게 날아가는 국면
 }
 
 /// <summary>키워드에서 따로 확인할 수 있는 연출 종류.</summary>
 public enum KeywordPreviewKind
 {
-    Glow,
     Attack,
     Vfx,
 
@@ -112,7 +110,7 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("연출을 확인할 키워드(실제 연출이 있는 키워드만 표시)")]
     [SerializeField] int keywordIndex = 0;
     [Tooltip("고른 키워드에서 확인할 연출")]
-    [SerializeField] KeywordPreviewKind keywordPreview = KeywordPreviewKind.Glow;
+    [SerializeField] KeywordPreviewKind keywordPreview = KeywordPreviewKind.Attack;
 
     [Header("연출별 값")]
     [Tooltip("엠블럼을 띄울 아군 슬롯")]
@@ -266,7 +264,6 @@ public class AttackAnimTester : MonoBehaviour
         // 테스터는 규칙 계층을 안 돌리므로 무쌍 광역 대상만 같은 규칙으로 직접 골라 넘긴다.
         CardView t_splash = _attacker.BoundCard.HasKeyword(CardKeyword.Peerless)
             ? FindSplashTarget(_defender) : null;
-        var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker.BoundCard);
 
         // 무장 VFX는 무장 시점에 켜진다. 버튼 공격은 무장 단계를 안 거치므로 여기서 대신 켜준다
         // (탭/드래그 공격은 FocusWeapon에서 이미 켜져 있고, SetArmedVfx는 중복 호출에 안전).
@@ -303,7 +300,6 @@ public class AttackAnimTester : MonoBehaviour
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
         await AttackSequence.PlaySplash(_attacker, _defender,
             _events: t_events, _splashView: t_splash,
-            _preEffectKw: t_preKw, _atEffectKw: t_atKw,
             _forceSpecial: this.useSpecialCinema);
 
         // 처형 연출. 인게임 조건과 같게 **처치 + 공격자 생존**일 때만 — 공격자가 반격에 같이 죽었으면 뜨면 안 된다.
@@ -469,13 +465,11 @@ public class AttackAnimTester : MonoBehaviour
         CardKeyword.Immortal,
     };
 
-    static readonly KeywordPreviewKind[] k_glowOnly = { KeywordPreviewKind.Glow };
-    static readonly KeywordPreviewKind[] k_glowAttack =
-        { KeywordPreviewKind.Glow, KeywordPreviewKind.Attack };
-    static readonly KeywordPreviewKind[] k_glowVfx =
-        { KeywordPreviewKind.Glow, KeywordPreviewKind.Vfx };
-    static readonly KeywordPreviewKind[] k_glowRevive =
-        { KeywordPreviewKind.Glow, KeywordPreviewKind.Revive };
+    // 글로우 연출이 폐기돼 그것만 있던 키워드(도발·표식 등)는 미리보기가 없다 — 빈 배열이면 에디터가 목록을 안 그린다.
+    static readonly KeywordPreviewKind[] k_none   = { };
+    static readonly KeywordPreviewKind[] k_attack = { KeywordPreviewKind.Attack };
+    static readonly KeywordPreviewKind[] k_vfx    = { KeywordPreviewKind.Vfx };
+    static readonly KeywordPreviewKind[] k_revive = { KeywordPreviewKind.Revive };
 
     public CardKeyword[] PreviewableKeywords() => k_previewableKeywords;
 
@@ -490,15 +484,15 @@ public class AttackAnimTester : MonoBehaviour
         {
             case CardKeyword.Ranged:
             case CardKeyword.Peerless:
-                return k_glowAttack;
+                return k_attack;
             case CardKeyword.Execution:
             case CardKeyword.Cunning:
             case CardKeyword.Healer:
-                return k_glowVfx;
+                return k_vfx;
             case CardKeyword.Immortal:
-                return k_glowRevive;
+                return k_revive;
             default:
-                return k_glowOnly;
+                return k_none;
         }
     }
 
@@ -554,9 +548,6 @@ public class AttackAnimTester : MonoBehaviour
 
             switch (this.keywordPreview)
             {
-                case KeywordPreviewKind.Glow:
-                    await t_view.PlayKeywordGlow(t_keyword);
-                    break;
                 case KeywordPreviewKind.Attack:
                 {
                     CardView t_defender = this.enemyFieldView?.GetSlotView(this.defenderSlot);
@@ -602,7 +593,6 @@ public class AttackAnimTester : MonoBehaviour
             case SynergyPreviewKind.PredatorDrain: PlayPredatorDrain();            break;
             case SynergyPreviewKind.TraceMark:     PlayTraceMark();                break;
             case SynergyPreviewKind.LegacyCrown:   PlayLegacyCrown();              break;
-            case SynergyPreviewKind.LegacyCrownFly: PlayLegacyCrownFly();           break;
         }
     }
 
@@ -634,10 +624,7 @@ public class AttackAnimTester : MonoBehaviour
         if (HasEffect<TraceSynergyEffect>(t_syn) || t_syn.vfx is TraceSynergyVfxConfig)
             t_list.Add(SynergyPreviewKind.TraceMark);
         if (HasEffect<LegacySynergyEffect>(t_syn) || t_syn.vfx is LegacySynergyVfxConfig)
-        {
             t_list.Add(SynergyPreviewKind.LegacyCrown);
-            t_list.Add(SynergyPreviewKind.LegacyCrownFly);
-        }
 
         return t_list.ToArray();
     }
@@ -681,7 +668,6 @@ public class AttackAnimTester : MonoBehaviour
             case SynergyPreviewKind.FlowWind:      return new[] { "emblemSlot", "flowStack" };
             case SynergyPreviewKind.CaretakerHeal: return new[] { "caretakerHeal" };
             case SynergyPreviewKind.LegacyCrown:
-            case SynergyPreviewKind.LegacyCrownFly:
                 return new[] { "legacyCrownCount" };
             default:                           return new string[0];
         }
@@ -744,27 +730,6 @@ public class AttackAnimTester : MonoBehaviour
         if (!WarnMissing(t_source != null, $"아군 슬롯{this.attackerSlot}에 카드 없음")) return;
 
         LegacyCrownVfx.Show(t_source, t_syn, Mathf.Max(1, this.legacyCrownCount));
-    }
-
-    /// <summary>유산 왕관 비행(사망 국면). 회복 표기량은 0으로 넘긴다 — 미리보기는 체력을 올리지 않고,
-    /// 0이면 <c>HealLater</c>가 그 자리에서 빠져 표기 유예도 걸리지 않는다.</summary>
-    public void PlayLegacyCrownFly()
-    {
-        SynergyData t_syn = CurrentEmblemSynergy;
-        CardInstance t_source = this.playerFieldView?.GetSlotView(this.attackerSlot)?.BoundCard;
-        if (!WarnMissing(t_syn?.vfx is LegacySynergyVfxConfig, "LegacySynergyVfxConfig 미배선")) return;
-        if (!WarnMissing(((LegacySynergyVfxConfig)t_syn.vfx).crown.prefab != null, "crown 프리팹 미배선")) return;
-        if (!WarnMissing(t_source != null, $"아군 슬롯{this.attackerSlot}에 카드 없음")) return;
-
-        var t_targets = new List<CardInstance>();
-        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
-        {
-            CardInstance t_card = this.playerFieldView?.GetSlotView(i)?.BoundCard;
-            if (t_card != null && t_card != t_source) t_targets.Add(t_card);
-        }
-        if (!WarnMissing(t_targets.Count > 0, "받을 아군이 없다 — 아군 슬롯을 2장 이상 채워라")) return;
-
-        LegacyCrownVfx.Fly(t_source, t_targets, 0, t_syn, Mathf.Max(1, this.legacyCrownCount));
     }
 
     /// <summary>재생을 접는 이유를 로그로 남긴다. 아무 반응이 없으면 "연출이 깨졌다"와 "배선이 없다"를

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -15,7 +15,7 @@ using TMPro;
 /// 그쪽은 CardInstance를 그대로 읽어 그리는 일이라 장식과 갱신 축이 다르다.
 ///
 /// MonoBehaviour가 아니라 순수 C# 객체다 — CardView가 필드로 들고 생성한다.
-/// 인스펙터 배선(keywordIcon*·synergyBadge*·keywordFrames·keywordGlowPrefab·passiveGlowSystem)은
+/// 인스펙터 배선(keywordIcon*·synergyBadge*·keywordFrames·passiveGlowSystem)은
 /// CardView의 SerializeField에 그대로 남고 값만 생성자로 주입된다(프리팹/씬 YAML 재직렬화 회피).
 ///
 /// 경계는 단방향이다: CardDecorView → CardVisualRules / GameTiming / TutorialConfig.
@@ -43,12 +43,9 @@ public class CardDecorView
     readonly float            synergyBadgeYStart;
     readonly float            synergyBadgeYStep;
     readonly int              synergyMaxBadges;
-    readonly GameObject       keywordGlowPrefab;
     readonly ParticleSystem   passiveGlowSystem;
 
     // ── 장식 상태 ──
-    // 키워드 → 그 키워드로 만든 아이콘 오브젝트. PlayKeywordGlow가 "어디에 글로우를 띄울지" 역참조한다.
-    readonly Dictionary<CardKeyword, GameObject> iconMap = new Dictionary<CardKeyword, GameObject>();
 
     // 저작된 첫 아이콘의 자리. **인스펙터에서 옮긴 위치가 곧 첫 칸**이라, 코드가 keywordIconStart로 덮지 않는다
     // (덮으면 프리팹에서 아무리 옮겨도 실행하는 순간 다른 자리로 튄다). 저작 슬롯이 없을 때만 keywordIconStart를 쓴다.
@@ -76,7 +73,6 @@ public class CardDecorView
         float                   _synergyBadgeYStart,
         float                   _synergyBadgeYStep,
         int                     _synergyMaxBadges,
-        GameObject              _keywordGlowPrefab,
         ParticleSystem          _passiveGlowSystem)
     {
         this.owner                      = _owner;
@@ -95,7 +91,6 @@ public class CardDecorView
         this.synergyBadgeYStart         = _synergyBadgeYStart;
         this.synergyBadgeYStep          = _synergyBadgeYStep;
         this.synergyMaxBadges           = _synergyMaxBadges;
-        this.keywordGlowPrefab          = _keywordGlowPrefab;
         this.passiveGlowSystem          = _passiveGlowSystem;
 
         // 첫 Refresh가 자리를 덮기 전에 저작값을 잡아 둔다 — 여기서 놓치면 되돌릴 원본이 없다.
@@ -131,7 +126,6 @@ public class CardDecorView
     {
         KillChildTweens(this.keywordIconRoot);
         if (this.synergyBadgeRoot != this.keywordIconRoot) KillChildTweens(this.synergyBadgeRoot);
-        this.iconMap.Clear();
         this.lastBadgeCard  = null;
         this.lastBadgeState = null;
     }
@@ -161,8 +155,6 @@ public class CardDecorView
     {
         Transform t_root = this.keywordIconRoot;
         if (t_root == null || this.keywordIconConfig == null) return;
-
-        this.iconMap.Clear();
 
         // 뒷면/빈 슬롯이면 아무것도 노출하지 않는다(정보 은닉) — 슬롯은 지우지 않고 끄기만 한다.
         // None/아이콘 미등록은 규칙 쪽에서 걸러져 빈 리스트가 온다.
@@ -201,8 +193,6 @@ public class CardDecorView
             // 생성 시점만 맞추던 예전과 달리 **매번** 몸통 알파로 되돌린다. 트윈이 물려 있으면 먼저 끊는다.
             KillTweens(t_obj);
             ForceAlpha(t_obj, t_alpha);
-
-            this.iconMap[t_icons[t_i].Keyword] = t_obj;
         }
 
         // 남는 슬롯은 끈다 — 저작된 아이콘을 파괴하지 않는다(꺼도 CardAnimator의 렌더러 캐시에는 남는다).
@@ -406,107 +396,5 @@ public class CardDecorView
         await UniTask.Delay((int)(t_dur * 1000), cancellationToken: this.owner.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
     }
 
-    /// <summary>키워드 글로우 재생. 색·유지시간·프리팹은 전부 KeywordIconConfig(SO)가 소유하고,
-    /// 미지정(hold 0 / prefab null)일 때만 전역 기본값(BattleTimingConfig.keywordGlowHold, CardView의 keywordGlowPrefab)으로 폴백한다.
-    ///
-    /// 키워드마다 유지시간이 다를 수 있으므로 <b>짧은 것부터 순서대로</b> 제거하고, await은 가장 긴 것 기준이다 —
-    /// 전부 최댓값까지 살려두면 SO에서 짧게 잡은 글로우가 그 값대로 안 사라진다.</summary>
-    public async UniTask PlayKeywordGlow(CardKeyword _kw)
-    {
-        if (_kw == CardKeyword.None) return;
-
-        var t_spawned = new List<(GameObject Go, float Hold)>();
-        foreach (CardKeyword t_flag in System.Enum.GetValues(typeof(CardKeyword)))
-        {
-            if (t_flag == CardKeyword.None) continue;
-            if (!_kw.HasFlag(t_flag)) continue;
-            if (!this.iconMap.TryGetValue(t_flag, out GameObject t_icon)) continue;
-
-            KeywordIconConfig.GlowSpec t_spec = this.keywordIconConfig != null
-                ? this.keywordIconConfig.GetGlow(t_flag)
-                : KeywordIconConfig.GlowSpec.Default;
-
-            GameObject t_prefab = t_spec.PrefabOverride != null ? t_spec.PrefabOverride : this.keywordGlowPrefab;
-            if (t_prefab == null) continue;   // 전용도 기본도 없으면 이 키워드는 글로우 없음
-
-            // SO 값은 raw 초 → 배속은 여기서 한 번만 먹인다(BattleTimingConfig.Scaled가 유일 출구).
-            float t_hold = t_spec.HoldOverride > 0f
-                ? GameTiming.Battle.Scaled(t_spec.HoldOverride)
-                : GameTiming.Battle.KeywordGlowHold;
-
-            GameObject t_glow = UnityEngine.Object.Instantiate(t_prefab, t_icon.transform.position, Quaternion.identity);
-
-            // 크기는 프리팹을 건드리지 않고 SO 배율로 키운다 — 프리팹을 키우면 이걸 재사용하는
-            // 다른 연출(시너지/힐 등)까지 같이 커진다.
-            float t_scale = t_spec.ScaleOverride > 0f
-                ? t_spec.ScaleOverride
-                : (this.keywordIconConfig != null ? this.keywordIconConfig.DefaultGlowScale : 1f);
-            if (!Mathf.Approximately(t_scale, 1f)) t_glow.transform.localScale *= t_scale;
-
-            PopKeywordIcon(t_icon);   // 글로우 스폰과 같은 프레임 — 둘이 한 타격으로 읽히게
-
-            var t_ps = t_glow.GetComponent<ParticleSystem>();
-            if (t_ps != null)
-            {
-                var t_col  = t_ps.colorOverLifetime;
-                t_col.enabled = true;
-                var t_grad = new Gradient();
-                t_grad.SetKeys(
-                    new GradientColorKey[] { new GradientColorKey(t_spec.Start, 0f), new GradientColorKey(t_spec.End, 1f) },
-                    new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-                );
-                t_col.color = new ParticleSystem.MinMaxGradient(t_grad);
-                t_ps.Play();
-            }
-            t_spawned.Add((t_glow, t_hold));
-        }
-
-        if (t_spawned.Count == 0) return;
-
-        t_spawned.Sort((_a, _b) => _a.Hold.CompareTo(_b.Hold));
-
-        try
-        {
-            CancellationToken t_ct = this.owner.GetCancellationTokenOnDestroy();
-            float t_elapsed = 0f;
-            foreach ((GameObject t_go, float t_hold) in t_spawned)
-            {
-                int t_wait = (int)((t_hold - t_elapsed) * 1000);
-                if (t_wait > 0)
-                {
-                    await UniTask.Delay(t_wait, cancellationToken: t_ct);
-                    t_elapsed = t_hold;
-                }
-                if (t_go != null) UnityEngine.Object.Destroy(t_go);
-            }
-            return;   // 정상 종료 — 아래 일괄 정리는 취소된 경우만.
-        }
-        catch (OperationCanceledException) { }
-
-        // 취소(씬/오브젝트 파괴)로 중간에 끊긴 경우 남은 글로우를 흘리지 않는다.
-        foreach ((GameObject t_go, float _) in t_spawned)
-            if (t_go != null) UnityEngine.Object.Destroy(t_go);
-    }
-
-    /// <summary>키워드 아이콘 튀기기. 글로우 스폰과 같은 프레임에 불러서 둘이 한 타격으로 읽히게 한다.
-    /// 기다리지 않는다 — 글로우 유지시간(hold)이 연출 길이의 단일 기준이라, Pop을 await 하면
-    /// SO의 hold 값과 무관하게 대기가 늘어난다.
-    ///
-    /// 펀치는 <b>현재</b> localScale 기준이라 이전 펀치가 살아 있으면 배율이 곱해져 계속 커진다 →
-    /// DOKill(complete: true)로 기준 스케일까지 되돌린 뒤 새로 건다.</summary>
-    void PopKeywordIcon(GameObject _icon)
-    {
-        if (_icon == null || this.keywordIconConfig == null) return;
-
-        float t_pop = this.keywordIconConfig.IconPopScale;
-        if (t_pop <= 1f) return;
-
-        Transform t_tr = _icon.transform;
-        t_tr.DOKill(complete: true);
-        t_tr.DOPunchScale(t_tr.localScale * (t_pop - 1f),
-                          GameTiming.Battle.Scaled(this.keywordIconConfig.IconPopDuration),
-                          vibrato: 1, elasticity: 0.6f)
-            .SetLink(_icon);
-    }
     #endregion
 }
