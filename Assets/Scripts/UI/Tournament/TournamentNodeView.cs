@@ -151,6 +151,17 @@ public class TournamentNodeView : MonoBehaviour
     [Min(0.02f)]
     [SerializeField] float stampImpactTime = 0.28f;
 
+    [Header("해금 연출 — 맵 진입 1회")]
+    [Tooltip("잠긴 모습으로 멈춰 서 있는 첫 박(초). 이 박이 없으면 무엇이 열렸는지는 못 보고 결과만 남는다.")]
+    [SerializeField] float unlockHold = 0.25f;
+
+    [Tooltip("베일이 걷히는 박(초). 자물쇠·딤·실루엣·무채색이 한 박에 함께 물러나야 '열렸다'로 읽힌다.")]
+    [SerializeField] float unlockShed = 0.3f;
+
+    [Tooltip("원판이 튀며 자리를 잡는 박(초). 이 박의 첫 프레임에 진실을 다시 세운다 —\n" +
+             "연출이 끝난 화면은 연출이 없을 때와 같아야 한다.")]
+    [SerializeField] float unlockSettle = 0.3f;
+
     [Header("정점 종류 표식")]
     [Tooltip("종류 표식이 앉는 칸. 상태 묶음 밖에 두어 잠겨도 보인다 — 잠긴 정점이 말할 수 있는 유일한 정보다.")]
     [SerializeField] Image kindBadge;
@@ -168,6 +179,9 @@ public class TournamentNodeView : MonoBehaviour
 
     // 표시 대상 정점. -1 = 미바인딩(Refresh 무시).
     int m_index = -1;
+
+    // 직전에 그린 클리어 여부. null = 아직 한 번도 안 그렸다 — 맵을 여는 첫 Refresh 는 도장을 치지 않는다.
+    bool? m_wasCleared;
 
     // 잠김 무채색화를 되돌릴 자리. null = 지금 색이 살아 있다.
     List<UiGrayscale.Toned> m_toned;
@@ -192,6 +206,12 @@ public class TournamentNodeView : MonoBehaviour
 
     // 클리어 도장(1회). 도는 동안 Refresh가 정지 상태로 덮지 않게 여기로 확인한다.
     Sequence m_stampSeq;
+
+    // 해금 선언(맵 진입 1회).
+    Sequence m_unlockSeq;
+
+    // 잠긴 모습을 일부러 세워 둔 구간. 이 동안의 Refresh는 진실로 덮어 첫 박을 지운다.
+    bool m_unlockHold;
 
     Action<int> m_onTap;
 
@@ -222,15 +242,22 @@ public class TournamentNodeView : MonoBehaviour
     // 상태 표시 갱신. 진행 통지(OnChanged)마다 맵이 전 정점에 호출한다.
     public void Refresh()
     {
+        if (this.m_unlockHold) return;
         if (this.m_index < 0) return;
 
         TournamentProgress.TryGetNode(this.m_index, out TournamentNodeDef t_node);
-        ETournamentNodeState t_state = TournamentProgress.StateOf(this.m_index);
+        ETournamentNodeState t_state = TournamentProgress.DisplayStateOf(this.m_index);
 
         // 랭크 잠금은 진행 낙인과 축이 다르다 — 정점 상태에 섞지 않고 여기서 곱한다.
         bool t_rankLocked = TournamentProgress.IsRankLocked(this.m_index);
 
         bool t_cleared = t_state == ETournamentNodeState.Cleared;
+
+        // 미수령에서 클리어로 넘어온 그 프레임에만 도장이 꽂힌다. 낙관 표시든 서버 확정이든 같은 자리를 지나므로
+        // 연출을 태우는 지점이 여기 하나다 — 맵이 정점을 지목해 부를 필요가 없다.
+        bool t_justCleared = this.m_wasCleared == false && t_cleared;
+        this.m_wasCleared  = t_cleared;
+
         bool t_playable = t_state == ETournamentNodeState.Playable && !t_rankLocked;
         bool t_gift = t_state == ETournamentNodeState.RewardPending && !t_rankLocked;
 
@@ -260,6 +287,8 @@ public class TournamentNodeView : MonoBehaviour
         this.ApplyFinalMark(t_final);
         this.ApplyIdleMotion(t_final);
         this.ApplyShadow(t_cleared);
+
+        if (t_justCleared) this.PlayClearStamp();
     }
 
     // 원판 한 자리. 이 정점을 깨면 무엇이 오는지를 그림으로 말한다. 상태가 갈려도 그림은 그대로다 —
@@ -356,17 +385,112 @@ public class TournamentNodeView : MonoBehaviour
         t_rect.DOPunchScale(Vector3.one * 0.15f, 0.35f, 8, 0.6f).SetLink(this.gameObject);
     }
 
+    /// <summary>해금 무대에 세운다 — 잠긴 모습으로 굳히고 진실 갱신을 막는다. 재생 없이 세우기만 한다.</summary>
+    public void StageUnlockLocked()
+    {
+        // 맵을 이미 떠났다면 그림만 진실로 남는다 — 꺼진 오브젝트 위에 무대를 세우지 않는다.
+        if (!this.isActiveAndEnabled) return;
+        if (this.m_index < 0) return;
+
+        // 이미 선 무대는 다시 세우지 않는다 — 도는 트윈의 시작값을 덮으면 그 프레임이 튄다.
+        if (this.m_unlockHold) return;
+
+        // 해금은 진실을 거슬러 잠긴 모습을 세우는 자리다 — 그동안의 Refresh를 막지 않으면 첫 박이 지워진다.
+        this.m_unlockHold = true;
+        this.HoldTapInput(true);
+        this.ApplyUnlockLocked();
+    }
+
+    /// <summary>정점 해금(맵 진입 1회). 잠긴 모습을 한 박 보여준 뒤 베일이 걷히고 원판이 튄다. 총 길이를 돌려준다.</summary>
+    public float PlayUnlockReveal()
+    {
+        // 맵을 이미 떠났다면 그림만 진실로 남는다 — 꺼진 오브젝트 위에서 시퀀스를 돌리지 않는다.
+        if (!this.isActiveAndEnabled) return 0f;
+        if (this.m_index < 0) return 0f;
+
+        // 걷는 것은 이전 안무뿐이다 — 미리 세워 둔 무대까지 되돌리면 진실이 한 프레임 새어 첫 박이 무너진다.
+        this.KillUnlockSeq();
+
+        // 미리 세워 두지 않았으면 여기서 세운다(멱등이라 이미 선 무대는 그대로 이어받는다).
+        this.StageUnlockLocked();
+
+        float t_shed   = Mathf.Max(0.01f, this.unlockShed);
+        float t_settle = Mathf.Max(0.01f, this.unlockSettle);
+        float t_shedAt = Mathf.Max(0f, this.unlockHold);
+
+        // 무대를 이어받는 경우 앞선 안무가 중간값을 남겼을 수 있어, 걷을 것들의 시작값을 손으로 세운다.
+        this.SetTonedIntensity(1f);
+        this.ResetUnlockRing();
+
+        // 베일은 자물쇠 묶음에 얹힌 CanvasGroup이 쥔다. 없으면 그 자리에서 즉시 걷는다(장식 축이라 부드러움만 빠진다).
+        CanvasGroup t_veil = this.lockedMark != null ? this.lockedMark.GetComponent<CanvasGroup>() : null;
+        if (t_veil != null) t_veil.alpha = 1f;
+
+        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
+
+        if (t_veil != null) t_seq.Insert(t_shedAt, t_veil.DOFade(0f, t_shed).SetEase(Ease.OutQuad));
+        t_seq.InsertCallback(t_shedAt + (t_veil != null ? t_shed : 0f), this.ShedUnlockVeil);
+
+        if (this.canvasGroup != null) t_seq.Insert(t_shedAt, this.canvasGroup.DOFade(1f, t_shed));
+
+        // 실루엣이 원색으로 돌아온다 — 이 정점이 무엇을 걸고 있는지가 여기서 처음 보인다.
+        if (this.rewardImage != null && this.m_rewardColor0 != null)
+            t_seq.Insert(t_shedAt, this.rewardImage.DOColor(this.m_rewardColor0.Value, t_shed).SetEase(Ease.OutQuad));
+
+        // 무채색은 손잡이를 걷어 되돌리면 한 프레임에 튀므로, 세기만 내려 두고 저작값 복원은 마지막 박에 맡긴다.
+        t_seq.Insert(t_shedAt, DOVirtual.Float(1f, 0f, t_shed, this.SetTonedIntensity));
+
+        this.InsertUnlockRing(t_seq, t_shedAt);
+
+        t_seq.InsertCallback(t_shedAt + t_shed, this.SettleUnlock);
+
+        this.m_unlockSeq = t_seq;
+        t_seq.OnComplete(() =>
+        {
+            this.m_unlockSeq = null;
+            this.ResetUnlockRing();
+        });
+
+        return t_shedAt + t_shed + t_settle;
+    }
+
+    /// <summary>해금 연출을 어디서 끊겨도 진실로 스냅시킨다(맵을 떠나거나 다시 그려질 때).</summary>
+    public void AbortUnlockReveal()
+    {
+        // 손잡이 상태와 무관하게 먼저 되돌린다 — 여기 아래로 내려가면 이른 return 하나가 정점을 영영 못 누르게 만든다.
+        this.HoldTapInput(false);
+
+        // 손잡이 둘 중 하나만 서 있어도 내려간다 — 재생 없이 세우기만 한 무대(시퀀스 없음 + hold 참)가 그 경우다.
+        if (this.m_unlockSeq == null && !this.m_unlockHold) return;
+
+        this.KillUnlockSeq();
+
+        this.ResetUnlockRing();
+        this.ShedUnlockVeil();
+        this.RestoreLockedTone();
+
+        this.m_unlockHold = false;
+        this.Refresh();
+    }
+
     void OnDisable()
     {
         // 꺼진 정점을 가리키는 등록이 남으면 안내 손가락이 화면 밖을 짚는다
         this.ApplyTutorialAnchor(false);
+
+        // 반쯤 걷힌 베일이 굳으면 다음에 맵을 열었을 때 이미 열린 정점이 잠겨 보인다.
+        // 뒤의 정리들보다 먼저 둔다 — 진실 스냅이 켜는 상시 모션을 그 줄들이 이어서 걷는다.
+        this.AbortUnlockReveal();
+
+        // 끊긴 연출이 버튼을 내린 채 굳으면 다음에 맵을 열었을 때 그 정점만 영영 안 눌린다.
+        this.HoldTapInput(false);
 
         this.KillGiftTweens();
         this.KillIdleMotion();
 
         // 반쯤 떨어진 도장이 그대로 굳으면 다음에 맵을 열었을 때 배지가 3배로 떠 있다.
         this.KillStampTweens();
-        if (this.m_index >= 0 && TournamentProgress.StateOf(this.m_index) == ETournamentNodeState.Cleared)
+        if (this.m_index >= 0 && TournamentProgress.DisplayStateOf(this.m_index) == ETournamentNodeState.Cleared)
             this.SetStampSettled(true);
     }
 
@@ -508,12 +632,13 @@ public class TournamentNodeView : MonoBehaviour
         this.m_shadowScale0 = this.shadowImage.rectTransform.localScale;
     }
 
-    /// <summary>클리어 도장(수령 직후 1회). 상태는 이미 커밋됐고, 이건 그 프레임에 얹는 사건이다.</summary>
-    public void PlayClearStamp()
+    // 클리어 도장(1회). 낙관 표시가 서는 프레임에 Refresh 가 스스로 태운다 —
+    // 서버 확정은 그보다 뒤라, 여기서 기다리면 팝업이 닫힌 뒤에야 꽂힌다.
+    void PlayClearStamp()
     {
         // 맵을 이미 떠났다면 그림만 진실로 남는다 — 꺼진 오브젝트 위에서 시퀀스를 돌리지 않는다.
         if (!this.isActiveAndEnabled) return;
-        if (TournamentProgress.StateOf(this.m_index) != ETournamentNodeState.Cleared) return;
+        if (TournamentProgress.DisplayStateOf(this.m_index) != ETournamentNodeState.Cleared) return;
         if (!this.HasStampRig) return;
 
         this.KillStampTweens();
@@ -697,10 +822,129 @@ public class TournamentNodeView : MonoBehaviour
         }
         else
         {
-            if (this.m_toned == null) return;
-            UiGrayscale.Restore(this.m_toned);
-            this.m_toned = null;
+            this.RestoreLockedTone();
         }
+    }
+
+    // 저작값 복원이라 손잡이를 비워야 다음 잠김이 다시 걸린다(Restore는 목록도 비운다).
+    void RestoreLockedTone()
+    {
+        if (this.m_toned == null) return;
+
+        UiGrayscale.Restore(this.m_toned);
+        this.m_toned = null;
+    }
+
+    // 걷히는 도중의 무채색. 손잡이는 그대로 두고 세기만 오간다.
+    void SetTonedIntensity(float _intensity)
+    {
+        if (this.m_toned == null) return;
+
+        for (int t_i = 0; t_i < this.m_toned.Count; t_i++)
+        {
+            var t_fx = this.m_toned[t_i].Effect;
+            if (t_fx == null) continue;
+
+            t_fx.toneIntensity = _intensity;
+        }
+    }
+
+    // 해금의 첫 박. 진실은 이미 열려 있으므로 잠긴 모습을 손으로 세운다 —
+    // Refresh의 꼬리와 같은 순서·같은 부품을 쓴다(그림이 갈리면 걷히는 것이 잠김으로 안 읽힌다).
+    void ApplyUnlockLocked()
+    {
+        TournamentProgress.TryGetNode(this.m_index, out TournamentNodeDef t_node);
+
+        this.ApplyRewardIcon();
+
+        if (this.tapButton != null) this.tapButton.interactable = false;
+        if (this.lockedMark != null) this.lockedMark.SetActive(true);
+        if (this.clearedMark != null) this.clearedMark.SetActive(false);
+        if (this.currentMark != null) this.currentMark.SetActive(false);
+        if (this.canvasGroup != null) this.canvasGroup.alpha = this.lockedAlpha;
+
+        this.ApplyKind(t_node.kind, false);
+        this.ApplyGift(false);
+        this.ApplyRewardTone(true, false);
+        this.ApplyLockedTone(true);
+        this.ApplyStateScale(false, false);
+        this.ApplyPlayableBlink(false);
+        this.ApplyFinalMark(false);
+        this.ApplyIdleMotion(false);
+        this.ApplyShadow(false);
+
+        this.ResetUnlockRing();
+    }
+
+    // 연출이 도는 동안 이 정점의 클릭을 통째로 흘려보낸다. interactable 로는 안 되는 이유는,
+    // uGUI가 컴포넌트의 isActiveAndEnabled만 보고 이벤트를 넘길지 정해 비활성 버튼도 클릭을 삼키기 때문이다 —
+    // 해금 연출이 화면 한가운데 세워 둔 바로 그 정점에서만 맵의 스킵 탭이 죽는다.
+    // interactable 축은 Refresh가 계속 소유한다(여기서 만지면 두 축이 서로를 덮는다).
+    void HoldTapInput(bool _held)
+    {
+        if (this.tapButton == null) return;
+
+        this.tapButton.enabled = !_held;
+    }
+
+    // 도장 링을 해금 링으로 다시 쓴다 — 밖으로 퍼지며 사라지는 그림 하나면 "열렸다"의 밀도가 한 눈금 오른다.
+    void InsertUnlockRing(Sequence _seq, float _at)
+    {
+        if (this.stampImpact == null) return;
+
+        _seq.Insert(_at, this.stampImpact.DOFade(this.stampImpactAlpha, 0.03f));
+        _seq.Insert(_at + 0.03f, this.stampImpact.DOFade(0f, this.stampImpactTime).SetEase(Ease.OutQuad));
+        _seq.Insert(_at, this.stampImpact.rectTransform
+            .DOScale(this.stampImpactScale, this.stampImpactTime + 0.03f).SetEase(Ease.OutCubic));
+    }
+
+    // 안무만 걷는다 — 무대(m_unlockHold)는 건드리지 않아 세우기와 재생을 따로 되돌릴 수 있다.
+    void KillUnlockSeq()
+    {
+        if (this.m_unlockSeq != null && this.m_unlockSeq.IsActive()) this.m_unlockSeq.Kill();
+        this.m_unlockSeq = null;
+    }
+
+    void ResetUnlockRing()
+    {
+        if (this.stampImpact == null) return;
+
+        // 도장이 도는 중이면 같은 링을 그쪽이 쥔다.
+        if (this.m_stampSeq != null && this.m_stampSeq.IsActive()) return;
+
+        SetAlpha(this.stampImpact, 0f);
+        this.stampImpact.rectTransform.localScale = Vector3.one;
+    }
+
+    // 끄는 프레임에 알파를 함께 세운다 — 걷힌 채로 굳으면 다음에 진짜 잠긴 정점의 베일이 투명하게 선다.
+    void ShedUnlockVeil()
+    {
+        if (this.lockedMark == null) return;
+
+        this.lockedMark.SetActive(false);
+
+        var t_veil = this.lockedMark.GetComponent<CanvasGroup>();
+        if (t_veil != null) t_veil.alpha = 1f;
+    }
+
+    // 마지막 박은 그리지 않는다 — 진실을 다시 세우고 그 프레임에 한 번 튄다.
+    // 끝난 화면이 연출 없을 때와 같음은 이 Refresh 한 번이 산술로 보장한다.
+    void SettleUnlock()
+    {
+        this.m_unlockHold = false;
+        this.HoldTapInput(false);
+        this.RestoreLockedTone();
+        this.Refresh();
+
+        if (this.giftPunchTarget == null) return;
+
+        // 수령 대기 흔들림이 같은 원판을 쥐고 있으면 손대지 않는다 — 그 상태는 흔들림이 스스로 말한다.
+        if (this.m_giftIdle != null && this.m_giftIdle.IsActive()) return;
+
+        this.giftPunchTarget.localScale = Vector3.one;
+        this.giftPunchTarget
+            .DOPunchScale(Vector3.one * 0.15f, Mathf.Max(0.01f, this.unlockSettle), 8, 0.6f)
+            .SetLink(this.gameObject);
     }
 
     // 도전 요청은 맵으로 올린다(정점은 씬 전환을 모른다). 잠김 판정은 맵이 한 번 더 본다.

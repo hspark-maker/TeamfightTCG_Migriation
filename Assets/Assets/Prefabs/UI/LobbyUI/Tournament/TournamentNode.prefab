@@ -1188,6 +1188,9 @@ MonoBehaviour:
   stampFallTime: 0.1
   stampImpactScale: 1.3
   stampImpactTime: 0.28
+  unlockHold: 0.25
+  unlockShed: 0.3
+  unlockSettle: 0.3
   kindBadge: {fileID: 7406187542064611526}
   kindLooks:
   - kind: 1
@@ -1858,6 +1861,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5912344583336132406}
+  - component: {fileID: 3534911054560984492}
   m_Layer: 0
   m_Name: LockedMark
   m_TagString: Untagged
@@ -1886,6 +1890,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 172, y: 172}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &3534911054560984492
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709414635420645286}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &8081845637913739532
 GameObject:
   m_ObjectHideFlags: 0
