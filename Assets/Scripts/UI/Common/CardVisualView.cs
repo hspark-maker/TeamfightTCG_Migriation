@@ -118,7 +118,7 @@ public class CardVisualView : MonoBehaviour
     bool ShowKeywords  => this.showKeywords  && !this.m_artOnly;
     bool ShowSynergies => this.showSynergies && !this.m_artOnly;
 
-    /// <summary>프레임·아트만 남기고 카드 위 정보(이름·HP·레벨·키워드 아이콘·프레임 장식·시너지 배지)를 전부 가린다.
+    /// <summary>프레임·아트만 남기고 카드 위 정보(이름·HP·레벨·키워드 아이콘·프레임 장식·시너지 배지·아이콘 줄 배경판)를 전부 가린다.
     /// 값만 세우고 다시 그리지는 않는다 — 아이콘/배지는 Destroy + Instantiate라 갱신 시점을 호출부가 쥐어야 한다
     /// (호출부는 이걸 세운 뒤 <see cref="Bind"/>를 다시 태운다).</summary>
     public void SetArtOnly(bool _on) => this.m_artOnly = _on;
@@ -502,6 +502,15 @@ public class CardVisualView : MonoBehaviour
     /// 배선이 없는 프리팹(고스트·작은 타일)은 조용히 건너뛴다.</summary>
     void RefreshKeywordBg(int _card, bool _show, bool _mine)
     {
+        // 프레임·아트만 남기는 화면에는 판도 없다 — 아이콘이 다 꺼진 자리에 홈만 남으면 그 빈 칸이 정보로 읽힌다.
+        // 미소유 은닉(_show=false)은 반대로 좁은 판을 켜 두는 것이 맞아서(도감 잠김 칸) 같은 축으로 합치지 않는다.
+        if (this.m_artOnly)
+        {
+            if (this.keywordBg     != null) this.keywordBg.SetActive(false);
+            if (this.keywordOnlyBg != null) this.keywordOnlyBg.SetActive(false);
+            return;
+        }
+
         bool t_synergy = _show && SynergyBadges(_card, _mine).Count > 0;
 
         if (this.keywordBg     != null) this.keywordBg.SetActive(t_synergy);
