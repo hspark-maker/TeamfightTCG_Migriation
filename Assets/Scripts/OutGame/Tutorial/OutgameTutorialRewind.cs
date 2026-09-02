@@ -74,6 +74,7 @@ public static class OutgameTutorialRewind
 
         // 슬롯을 통째로 새 인스턴스로 — UserSaveData의 슬롯 전부를 여기서 센다. 하나라도 빠지면 그 축만
         // 이전 세션 값으로 남아, 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
+        // 진행 흔적이 세이브 슬롯에만 있는 것도 아니다 — 기기 로컬에 사는 축은 아래에서 따로 민다.
         //
         // 재화는 없다 — 잔액은 세이브를 떠나 서버 지갑 문서로 갔고 클라는 그 문서를 쓰지 못한다.
         // 되감기 뒤에도 잔액이 그대로 남는다는 뜻이다. test env 디버그 경로라 그 차이를 수용한다.
@@ -90,6 +91,10 @@ public static class OutgameTutorialRewind
         t_data.Tutorial.ChapterIndex     = t_chapter;
         t_data.Tutorial.ChapterStepIndex = t_step;
 
+        // 세이브 슬롯 밖에 사는 진행 흔적도 함께 민다 — 슬롯만 밀면 그 축이 이전 세션 값으로 남아
+        // "되감았는데 그 연출만 안 나온다"가 된다(해금 연출 이력은 기기 로컬이라 슬롯 목록에 없다).
+        TournamentUnlockSeenStore.Clear();
+
         DataSaveManager.Save();
 
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 초기화가 세이브를 다시 밀지 않게 한다.
@@ -101,7 +106,7 @@ public static class OutgameTutorialRewind
         // 알아서 내리므로 no-op이고, 리로드를 끈 에디터 세션에서만 실효가 있다 — 그 한 경우를 위한 방어다.
         OutgameFeatureLock.ClearStall();
 
-        Debug.Log($"[TutorialRewind] 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(모든 슬롯 첫실행 · 정지 판정 해제).");
+        Debug.Log($"[TutorialRewind] 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(모든 슬롯 첫실행 · 해금 연출 이력 · 정지 판정 해제).");
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.

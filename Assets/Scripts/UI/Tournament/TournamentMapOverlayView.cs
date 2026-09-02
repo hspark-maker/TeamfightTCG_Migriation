@@ -886,8 +886,8 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_introChapterOpens.Clear();
         this.m_introSpent = 0f;
 
-        // 표식 없이 진행 흔적만 있던 세이브다 — 소급으로 조용히 덮였으니 이번엔 아무것도 재생하지 않는다.
-        if (TournamentProgress.TryBackfillSeenUnlocks()) return;
+        // 표식 없이 진행 흔적만 있던 세이브다 — 지나온 자리를 먼저 조용히 덮고, 남은 것만 아래에서 재생한다.
+        TournamentProgress.BackfillSeenUnlocks();
 
         if (!TournamentProgress.TryTakeUnlockShowcase(out TournamentUnlockShowcase t_showcase)) return;
 
