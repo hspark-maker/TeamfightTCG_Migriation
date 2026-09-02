@@ -38,10 +38,12 @@ public class AIDeckConfig : ScriptableObject
 
             int t_min = Mathf.Min(this.fromLevel, this.toLevel);
             int t_max = Mathf.Max(this.fromLevel, this.toLevel);
-            return Random.Range(t_min, t_max + 1);
+            long t_width = (long)t_max - t_min + 1L;
+            return (int)(t_min + RollBelow(t_width));
         }
     }
 
+    [Tooltip("레거시 저작값. 런타임은 AIDeck 서버 표만 사용하며 이 목록으로 폴백하지 않는다.")]
     public List<DeckEntry> decks;
 
     public List<int> GetRandomDeck() => GetRandomDeck(out _);
@@ -102,11 +104,14 @@ public class AIDeckConfig : ScriptableObject
     }
 
     IReadOnlyList<DeckEntry> ResolveDecks()
-        => AIDeckSpec.TryGetDecks(out IReadOnlyList<DeckEntry> t_spec) ? t_spec : this.decks;
+    {
+        AIDeckSpec.TryGetDecks(out IReadOnlyList<DeckEntry> t_spec);
+        return t_spec;
+    }
 
     static DeckEntry PickWeighted(IReadOnlyList<DeckEntry> _decks, int _tier)
     {
-        int t_totalWeight = 0;
+        long t_totalWeight = 0;
         foreach (DeckEntry t_entry in _decks)
         {
             if (!IsAvailableAt(t_entry, _tier)) continue;
@@ -115,7 +120,7 @@ public class AIDeckConfig : ScriptableObject
 
         if (t_totalWeight <= 0) return null;
 
-        int t_roll = Random.Range(0, t_totalWeight);
+        long t_roll = RollBelow(t_totalWeight);
         foreach (DeckEntry t_entry in _decks)
         {
             if (!IsAvailableAt(t_entry, _tier)) continue;
@@ -125,6 +130,24 @@ public class AIDeckConfig : ScriptableObject
         }
 
         return null;
+    }
+
+    /// <summary>Unity RNG만 사용해 [0, max) long을 뽑는다. float 경유 편향과 int inclusive 상한 overflow를 피한다.</summary>
+    static long RollBelow(long _maxExclusive)
+    {
+        if (_maxExclusive <= 0) return 0;
+        const ulong RANGE = 1UL << 63;
+        ulong t_bound = (ulong)_maxExclusive;
+        ulong t_limit = RANGE - RANGE % t_bound;
+        ulong t_value;
+        do
+        {
+            t_value = ((ulong)Random.Range(0, 1 << 21) << 42) |
+                      ((ulong)Random.Range(0, 1 << 21) << 21) |
+                       (ulong)Random.Range(0, 1 << 21);
+        }
+        while (t_value >= t_limit);
+        return (long)(t_value % t_bound);
     }
 
     static bool IsAvailableAt(DeckEntry _entry, int _tier)

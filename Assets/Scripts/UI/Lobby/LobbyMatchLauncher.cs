@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -237,6 +237,14 @@ public class LobbyMatchLauncher : MonoBehaviour
             }
 
             CurtainView.LoadScene(BATTLE_SCENE);
+            return;
+        }
+
+        // 전역 초기화 상태(MarkUpdateRequired)는 건드리지 않는다 — 로비에는 업데이트 화면이 없고,
+        // IsTerminated 를 켜면 PayoutInbox 같은 세션 배관만 조용히 멈춘다. 안내는 이 팝업이 한다.
+        if (t_result == EBattleContentGateResult.UpdateRequired)
+        {
+            ShowEntryBlocked("현재 앱이 지원하지 않는 새 콘텐츠가 배포되었습니다.\n앱을 업데이트해 주세요.");
             return;
         }
 

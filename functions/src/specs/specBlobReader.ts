@@ -19,7 +19,9 @@ import * as logger from "firebase-functions/logger";
 import {db} from "../firebaseApp";
 
 /** 업로더 `SpecPayloadCodec.SchemaVersion` 과 맞물린 값. 어긋나면 블롭을 믿지 않고 폴백한다. */
-const SCHEMA_VERSION = 4;
+const CONTENT_MAJOR = 4;
+// 새 major 배포 빌드에서는 실제로 해석 가능한 직전 major를 함께 넣어 pointer 롤백을 허용한다.
+const SUPPORTED_CONTENT_MAJORS = new Set<number>([CONTENT_MAJOR]);
 
 /** 캐시 수명. 스펙 업로드가 반영되기까지 최대 이만큼 늦는다. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -32,7 +34,58 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+interface PublishedSpec {
+  version: string;
+  major: number;
+  blobPath: string;
+  payloadHash: string;
+}
+
+interface IndexCacheEntry {
+  expiresAt: number;
+  tables: Record<string, PublishedSpec> | null;
+}
+
 const cache = new Map<string, CacheEntry>();
+const indexCache = new Map<string, IndexCacheEntry>();
+const INDEX_CACHE_TTL_MS = 30 * 1000;
+
+async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec | null> {
+  const now = Date.now();
+  let cached = indexCache.get(env);
+  if (cached === undefined || cached.expiresAt <= now) {
+    const snapshot = await db.doc(`envs/${env}/specs/_index`).get();
+    if (!snapshot.exists) {
+      cached = {expiresAt: now + INDEX_CACHE_TTL_MS, tables: null};
+    } else {
+      const data = snapshot.data() ?? {};
+      const major = Number(data.major);
+      const minor = Number(data.minor);
+      if (!SUPPORTED_CONTENT_MAJORS.has(major) || !Number.isInteger(minor) || minor < 0) {
+        throw new Error(`published content ${major}.${minor} is incompatible`);
+      }
+      const rawTables = data.tables;
+      if (rawTables == null || typeof rawTables !== "object") {
+        throw new Error("published content index has no tables map");
+      }
+      const tables: Record<string, PublishedSpec> = {};
+      for (const [name, raw] of Object.entries(rawTables as Record<string, unknown>)) {
+        if (raw == null || typeof raw !== "object") continue;
+        const entry = raw as Record<string, unknown>;
+        const blobPath = String(entry.blobPath ?? "");
+        const payloadHash = String(entry.payloadHash ?? "");
+        if (blobPath === "" || payloadHash === "") continue;
+        tables[name] = {version: `${major}.${minor}`, major, blobPath, payloadHash};
+      }
+      cached = {expiresAt: now + INDEX_CACHE_TTL_MS, tables};
+    }
+    indexCache.set(env, cached);
+  }
+  if (cached.tables == null) return null;
+  const published = cached.tables[table];
+  if (published === undefined) throw new Error(`published content index has no ${table} entry`);
+  return published;
+}
 
 /**
  * 블롭 payload 해시. 업로더 `HashOf` 와 같은 규칙 — MD5 앞 8바이트를 hex 로.
@@ -97,14 +150,20 @@ export function parseSpecPayload(payload: string): SpecRow[] {
  * @param {string} table 표 이름
  * @return {Promise<SpecRow[] | null>} 행 배열, 못 믿으면 null
  */
-async function readFromBlob(env: string, table: string): Promise<SpecRow[] | null> {
-  const snapshot = await db.doc(`envs/${env}/specs/${table}/blob/current`).get();
+async function readFromBlob(
+  env: string, table: string, published: PublishedSpec | null
+): Promise<SpecRow[] | null> {
+  const path = published?.blobPath ?? `envs/${env}/specs/${table}/blob/current`;
+  const snapshot = await db.doc(path).get();
   if (!snapshot.exists) return null;
 
   const data = snapshot.data() ?? {};
-  const schemaVersion = Number(data.schemaVersion);
-  if (schemaVersion !== SCHEMA_VERSION) {
-    logger.warn("spec blob schema mismatch", {env, table, schemaVersion, expected: SCHEMA_VERSION});
+  // major가 없는 기존 blob은 schemaVersion을 호환 필드로 읽는다.
+  const contentMajor = Number(data.major ?? data.schemaVersion);
+  if (!SUPPORTED_CONTENT_MAJORS.has(contentMajor)) {
+    logger.warn("spec blob content major mismatch", {
+      env, table, contentMajor, supported: [...SUPPORTED_CONTENT_MAJORS],
+    });
     return null;
   }
 
@@ -118,7 +177,8 @@ async function readFromBlob(env: string, table: string): Promise<SpecRow[] | nul
   // 보상·덱을 판정하지 않기 위해 서버도 같은 문턱을 넘긴다.
   const expectedHash = String(data.payloadHash ?? "");
   const actualHash = specPayloadHash(payload);
-  if (expectedHash !== actualHash) {
+  if (expectedHash !== actualHash ||
+      (published !== null && published.payloadHash !== actualHash)) {
     logger.warn("spec blob hash mismatch", {env, table, expectedHash, actualHash});
     return null;
   }
@@ -149,10 +209,15 @@ async function readFromBlob(env: string, table: string): Promise<SpecRow[] | nul
 async function readFromRowsMirror(env: string, table: string): Promise<SpecRow[]> {
   // 미러 신선도는 메타에만 있다. 폴백은 드문 경로라 여기서 1건 더 읽는 값을 치를 만하다.
   const meta = await db.doc(`envs/${env}/specs/${table}`).get();
-  const revision = Number(meta.data()?.revision ?? -1);
+  const metaData = meta.data() ?? {};
+  const contentMajor = Number(metaData.major ?? metaData.schemaVersion);
+  if (!SUPPORTED_CONTENT_MAJORS.has(contentMajor)) {
+    throw new Error(`spec table ${table} content major ${contentMajor} is incompatible`);
+  }
+  const revision = Number(metaData.revision ?? -1);
   // rowsRevision 이 없는 문서는 미러를 끌 수 없던 옛 업로더가 쓴 것이다 — 그때는 행 전량이 같은
   // commit 에 실렸으므로 미러가 최신이다. 없다고 막으면 옛 표가 전부 폴백 불가가 된다.
-  const rowsRevision = Number(meta.data()?.rowsRevision ?? revision);
+  const rowsRevision = Number(metaData.rowsRevision ?? revision);
   if (!meta.exists || revision !== rowsRevision) {
     logger.error("spec rows mirror is stale", {env, table, revision, rowsRevision});
     throw new Error(
@@ -172,14 +237,18 @@ async function readFromRowsMirror(env: string, table: string): Promise<SpecRow[]
  * @return {Promise<SpecRow[]>} id 오름차순 행
  */
 export async function readSpecRows(env: string, table: string): Promise<SpecRow[]> {
-  const key = `${env}/${table}`;
+  const published = await readPublishedSpec(env, table);
+  const key = `${env}/${published?.version ?? "legacy"}/${table}`;
   const cached = cache.get(key);
   const now = Date.now();
   if (cached !== undefined && cached.expiresAt > now) return cached.rows;
 
   let source = "blob";
-  let raw = await readFromBlob(env, table);
+  let raw = await readFromBlob(env, table, published);
   if (raw == null) {
+    if (published !== null) {
+      throw new Error(`published spec blob ${table} is missing or invalid`);
+    }
     // 폴백은 행 수만큼 과금된다. 로그의 source=rows 가 남아 있으면 그 표를 다시 올려야 한다.
     source = "rows";
     raw = await readFromRowsMirror(env, table);
@@ -197,4 +266,5 @@ export async function readSpecRows(env: string, table: string): Promise<SpecRow[
 /** 캐시를 비운다. 배포 직후 반영을 앞당기거나 테스트에서 격리할 때 쓴다. */
 export function clearSpecCache(): void {
   cache.clear();
+  indexCache.clear();
 }

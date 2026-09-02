@@ -14,8 +14,8 @@ public sealed class BattleConfigStep : MainInitializer
     public override UniTask Initialize(InitializationContext _context)
     {
         GameTiming.SetConfig(battleTimingConfig);
-        RankManager.SetConfig(rankConfig);
-        RankRewardManager.SetConfig(rankConfig);
+        // 이 스텝은 현재 스펙 동기화보다 먼저 돈다. 스킨만 등록하고 서버 수치 조립은 SpecSheetPreloadStep이 맡는다.
+        RankGradeSpec.SetAuthoredSkin(rankConfig);
         BattleVfx.SetLibrary(battleVfxLibrary);
         return UniTask.CompletedTask;
     }

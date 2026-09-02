@@ -8,7 +8,6 @@ public static class RankManager
 
     static RankConfig s_config;
     static bool s_configured;
-    static bool s_warnedDefault;
 
     public static bool IsConfigured => s_configured;
 
@@ -17,19 +16,18 @@ public static class RankManager
 
     /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
-    public static bool IsRanked => Points >= Config.FirstTierPoints;
+    public static bool IsRanked => s_configured && Points >= Config.FirstTierPoints;
 
     /// <summary>다음 판이 승급전(단판 관문)인가. 일반 전투 천장이 '등급 천장 - 1'이라
     /// "등급 마지막 단계를 꽉 채웠지만 아직 승급은 아닌" 상태가 points 하나로 표현된다(세이브 필드 없음).</summary>
-    public static bool IsPromoPending => PromoPendingAt(Points);
+    public static bool IsPromoPending => s_configured && PromoPendingAt(Points);
 
     static RankConfig Config
     {
         get
         {
             if (s_config != null) return s_config;
-            WarnDefaultConfig();
-            return s_config = ScriptableObject.CreateInstance<RankConfig>();
+            return RankGradeSpec.UninitializedConfig;
         }
     }
 
@@ -91,7 +89,7 @@ public static class RankManager
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
         // 미도달이면 표시명·배지·다음 목표를 언랭크 기준으로 바꿔 준다 — 등급은 첫 티어 것을 그대로 쓴다.
-        bool t_unranked = t_points < t_config.FirstTierPoints;
+        bool t_unranked = !s_configured || t_points < t_config.FirstTierPoints;
 
         // 언랭크 배지가 미저작이면 첫 등급 배지로 폴백한다(빈 배지보다 낫다).
         Sprite t_badge = t_unranked && t_config.unrankedBadge != null ? t_config.unrankedBadge : t_tier.Badge;
@@ -280,10 +278,10 @@ public static class RankManager
         return true;
     }
 
-    // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
+    // 초기화에서 서버 RankGrade 표와 UI 스킨을 합성한 설정만 주입한다.
     public static void SetConfig(RankConfig _config)
     {
-        if (_config == null) return;
+        if (_config == null) throw new ArgumentNullException(nameof(_config));
         s_config = _config;
         s_configured = true;
     }
@@ -293,15 +291,7 @@ public static class RankManager
     {
         s_config = null;
         s_configured = false;
-        s_warnedDefault = false;
         OnChanged = null;
-    }
-
-    static void WarnDefaultConfig()
-    {
-        if (s_warnedDefault) return;
-        s_warnedDefault = true;
-        Debug.LogWarning("[RankManager] RankConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     // 포인트만 0으로 되돌린다(디버그 전용)

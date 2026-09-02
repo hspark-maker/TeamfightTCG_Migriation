@@ -521,6 +521,23 @@ public partial class ReleaseManagerWindow
             EditorUtility.ClearProgressBar();
         }
 
+        // 선택한 표 중 하나라도 실패하거나 취소됐으면 새 콘텐츠 minor를 공개하지 않는다.
+        // 표 문서는 먼저 올라가도 구클라이언트의 레거시 경로만 볼 수 있고, 신클라이언트는 기존 _index를 유지한다.
+        if (!t_cancelled && t_failed == 0)
+        {
+            string t_publishLine = SpecFirestoreUploader.PublishIndex(_envId, out string t_publishError);
+            if (string.IsNullOrEmpty(t_publishError))
+            {
+                t_report.AppendLine($"PUBLISH {t_publishLine}");
+            }
+            else
+            {
+                t_report.AppendLine($"FAIL publish: {t_publishError}");
+                Debug.LogError($"[SpecFirestore] 콘텐츠 인덱스 공개 실패: {t_publishError}");
+                t_failed++;
+            }
+        }
+
         string t_cancelNote = t_cancelled ? " / 사용자 취소" : string.Empty;
         this.dataReport = $"성공 {t_done} / 실패 {t_failed}{t_cancelNote}\n\n{t_report}";
         Debug.Log($"[SpecFirestore] env={_envId}, 성공={t_done}, 실패={t_failed}, 취소={t_cancelled}");

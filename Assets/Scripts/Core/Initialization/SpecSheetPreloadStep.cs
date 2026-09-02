@@ -1,3 +1,4 @@
+using System;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -13,8 +14,30 @@ public sealed class SpecSheetPreloadStep : MainInitializer
         RewardSpec.Init();
         GrowthSpec.Init();
 
+        if (!RankGradeSpec.TryValidateRequired(out string t_rankError))
+        {
+            FailToRecovery(_context, new InvalidOperationException(t_rankError));
+            return UniTask.CompletedTask;
+        }
+
+        if (!RankGradeSpec.TryBuildRuntime(out RankConfig t_runtimeRank, out t_rankError))
+        {
+            FailToRecovery(_context, new InvalidOperationException(t_rankError));
+            return UniTask.CompletedTask;
+        }
+
+        if (!AIDeckSpec.TryValidateRequired(out string t_aiDeckError))
+        {
+            FailToRecovery(_context, new InvalidOperationException(t_aiDeckError));
+            return UniTask.CompletedTask;
+        }
+
+        // 필수 표가 모두 유효한 뒤에만 전역에 공개한다. 판정과 보상은 같은 서버 스냅샷을 본다.
+        RankManager.SetConfig(t_runtimeRank);
+        RankRewardManager.SetConfig(t_runtimeRank);
+
         // 보상 표가 비면 앨범·모험·랭크는 조용히 0을 표시하고, 전투는 매판 0을 지급한다.
-        // 그 사고는 유저 신고 전에는 드러나지 않으므로 부팅에서 세운다.
+        // 그 사고는 유저 신고 전에는 드러나지 않으므로 초기화에서 세운다.
         if (!RewardSpec.TryValidateRequired(out string t_rewardError))
         {
             Debug.LogError($"[SpecSheetPreloadStep] {t_rewardError}");

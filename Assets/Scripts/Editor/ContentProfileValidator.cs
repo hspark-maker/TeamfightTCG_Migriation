@@ -192,6 +192,9 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 
     static void ValidateLiveConsumers(HashSet<int> _liveIds, List<string> _errors, List<string> _warnings)
     {
+        if (!RankGradeSpec.TryValidateRequired(out string t_rankGradeError))
+            _errors.Add(t_rankGradeError);
+
         // 드롭은 만족하는 가장 높은 minGrade 한 줄만 적용된다 — 한 등급만 물으면 하위 등급 전용 줄이 검사에서 샌다.
         IReadOnlyList<CardPack> t_packs = SpecSource.Manager?.CardPack?.All;
         if (t_packs != null)
@@ -202,12 +205,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
                     CheckCards(PackSpec.ResolveCardIds(t_pack.packId, t_grade), $"{t_pack.packId}/{t_grade}", _liveIds, _errors);
             }
 
-        // 표가 불완전하면 AIDeckConfig가 이 SO로 원자 폴백한다 — 전환이 끝날 때까지 두 진실원을 함께 검증한다.
-        foreach (AIDeckConfig t_ai in LoadBuildDependencies<AIDeckConfig>())
-            if (t_ai.decks != null)
-                foreach (AIDeckConfig.DeckEntry t_deck in t_ai.decks)
-                    CheckCards(t_deck?.CardIds, $"{t_ai.name}/{t_deck?.deckName}", _liveIds, _errors);
-
         ValidateAIDeckSpec(_liveIds, _errors, _warnings);
 
         foreach (TutorialScenarioData t_scenario in LoadBuildDependencies<TutorialScenarioData>())
@@ -217,14 +214,13 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         }
     }
 
-    /// <summary>표가 아직 없으면 <b>경고</b>다 — 런타임이 구 SO로 원자 폴백하므로 빌드를 막을 이유가 없다.
-    /// 표가 있을 때만 정합성을 에러로 건다(반쪽 표가 실려 나가는 것이 진짜 사고다).</summary>
+    /// <summary>AIDeck 서버 표는 런타임의 유일한 AI 덱 진실원이다. 비거나 불완전하면 빌드를 막는다.</summary>
     static void ValidateAIDeckSpec(HashSet<int> _liveIds, List<string> _errors, List<string> _warnings)
     {
         IReadOnlyList<AIDeck> t_decks = SpecSource.Manager?.AIDeck?.All;
         if (t_decks == null || t_decks.Count == 0)
         {
-            _warnings?.Add("AIDeck 표가 비어 있어 AI 덱이 구 AIDeckConfig.asset으로 폴백한다.");
+            _errors.Add("AIDeck 서버 표가 비어 있다.");
             return;
         }
 
@@ -305,12 +301,11 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     /// 상한·커버리지 검사를 건너뛴다 — 모르는 축으로 판정해 엉뚱한 빌드 실패를 내는 것보다 낫다.</summary>
     static int ResolveRankTierCount(List<string> _warnings)
     {
-        int t_count = 0;
-        foreach (RankConfig t_config in LoadBuildDependencies<RankConfig>())
-            if (t_config.TierCount > t_count) t_count = t_config.TierCount;
+        int t_gradeCount = SpecSource.Manager?.RankGrade?.All?.Count ?? 0;
+        int t_count = t_gradeCount * RankConfig.DivisionsPerGrade;
 
         if (t_count <= 0)
-            _warnings?.Add("RankConfig를 빌드 의존성에서 찾지 못해 AI 덱 티어 상한·커버리지 검사를 건너뛴다.");
+            _warnings?.Add("RankGrade 서버 표가 비어 있어 AI 덱 티어 상한·커버리지 검사를 건너뛴다.");
         return t_count;
     }
 

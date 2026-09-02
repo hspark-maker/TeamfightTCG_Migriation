@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -53,12 +53,15 @@ public static partial class SpecFirestoreUploader
 
     [Serializable] sealed class FirestoreIntegerValue { public string integerValue; }
     [Serializable] sealed class FirestoreStringValue { public string stringValue; }
+    [Serializable] sealed class FirestoreArrayValue { public FirestoreStringValue[] values; }
+    [Serializable] sealed class FirestoreArrayField { public FirestoreArrayValue arrayValue; }
     [Serializable] sealed class MetaFields
     {
         public FirestoreIntegerValue schemaVersion;
         public FirestoreIntegerValue revision;
         public FirestoreStringValue payloadHash;
         public FirestoreIntegerValue rowsRevision;
+        public FirestoreArrayField columns;
     }
     [Serializable] sealed class MetaDocument
     {
@@ -67,6 +70,16 @@ public static partial class SpecFirestoreUploader
     }
     [Serializable] sealed class BlobFields { public FirestoreStringValue payload; }
     [Serializable] sealed class BlobDocument { public BlobFields fields; }
+    [Serializable] sealed class IndexFields
+    {
+        public FirestoreIntegerValue major;
+        public FirestoreIntegerValue minor;
+    }
+    [Serializable] sealed class IndexDocument
+    {
+        public IndexFields fields;
+        public string updateTime;
+    }
     [Serializable] sealed class ListedDocument { public string name; }
     [Serializable] sealed class ListDocumentsResponse
     {
@@ -131,6 +144,68 @@ public static partial class SpecFirestoreUploader
         return UploadSnapshot(t_projectId, t_apiKey, _envId, _table, t_snapshot, out _error);
     }
 
+    /// <summary>
+    /// 현재 표 메타 전체를 하나의 콘텐츠 minor로 묶어 공개한다. 표 업로드가 모두 성공한 뒤 마지막에만 호출한다.
+    /// `_index` 교체가 실제 배포 시점이며, 기존 표별 메타 경로는 구클라이언트 폴백을 위해 유지한다.
+    /// </summary>
+    public static string PublishIndex(string _envId, out string _error)
+    {
+        _error = null;
+        if (!SpecAdminAuth.IsSignedIn || !SpecAdminAuth.HasAdminClaim)
+        {
+            _error = "관리자 권한이 있어야 콘텐츠 인덱스를 공개할 수 있다.";
+            return null;
+        }
+        if (!TryReadFirebaseConfig(out string t_projectId, out string t_apiKey, out _error)) return null;
+
+        using var t_client = new HttpClient { Timeout = TimeSpan.FromSeconds(FirebaseTimeouts.RestRequestSeconds) };
+        var t_revisions = new Dictionary<string, long>(StringComparer.Ordinal);
+        var t_hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var t_snapshots = new Dictionary<string, TableSnapshot>(StringComparer.Ordinal);
+        if (!TryLoadManager(out object t_manager, out _error)) return null;
+        foreach (string t_table in SpecPayloadCodec.TableNames)
+        {
+            if (!TryBuildSnapshot(t_manager, t_table, out TableSnapshot t_snapshot, out _error)) return null;
+            if (!TryReadMeta(t_client, t_projectId, t_apiKey, _envId, t_table,
+                             out long t_revision, out _, out string t_hash, out _,
+                             out long t_major, out _, out bool t_exists, out _error))
+                return null;
+            if (!t_exists || t_major != ContentVersion.Major || string.IsNullOrEmpty(t_hash))
+            {
+                _error = $"'{t_table}' 메타가 없거나 major/hash가 현재 앱과 맞지 않아 인덱스를 공개할 수 없다.";
+                return null;
+            }
+            if (!string.Equals(t_hash, t_snapshot.PayloadHash, StringComparison.Ordinal))
+            {
+                _error = $"'{t_table}' 로컬 hash가 업로드된 메타와 다르다. 변경된 표를 모두 업로드한 뒤 공개할 것.";
+                return null;
+            }
+            t_revisions.Add(t_table, t_revision);
+            t_hashes.Add(t_table, t_hash);
+            t_snapshots.Add(t_table, t_snapshot);
+        }
+
+        if (!TryReadIndex(t_client, t_projectId, t_apiKey, _envId,
+                          out int t_currentMajor, out long t_currentMinor,
+                          out string t_updateTime, out bool t_existsIndex, out _error))
+            return null;
+        if (t_currentMajor == ContentVersion.Major && t_currentMinor == long.MaxValue)
+        {
+            _error = "콘텐츠 minor가 최댓값이라 증가시킬 수 없다.";
+            return null;
+        }
+        long t_minor = t_currentMajor == ContentVersion.Major ? t_currentMinor + 1 : 0;
+        string t_body = BuildIndexCommitJson(
+            t_projectId, _envId, t_minor, t_revisions, t_hashes, t_snapshots, t_updateTime, t_existsIndex);
+        if (Encoding.UTF8.GetByteCount(t_body) > MAX_COMMIT_BYTES)
+        {
+            _error = "콘텐츠 릴리스 commit이 Firestore 크기 한도를 넘는다.";
+            return null;
+        }
+        if (!TryCommit(t_client, t_projectId, t_apiKey, t_body, out _error)) return null;
+        return $"content {ContentVersion.Format(ContentVersion.Major, t_minor)} 공개 ({t_hashes.Count}표)";
+    }
+
     /// <summary>표 스냅샷 하나를 메타·행·블롭 문서로 원자 반영한다(자격 검사와 설정 읽기는 호출자 몫).</summary>
     static string UploadSnapshot(
         string _projectId, string _apiKey, string _envId, string _table, TableSnapshot _snapshot, out string _error)
@@ -144,8 +219,16 @@ public static partial class SpecFirestoreUploader
         if (!TryReadMeta(t_client, _projectId, _apiKey, _envId, _table,
                          out long t_currentRevision, out string t_updateTime, out string t_remoteHash,
                          out long t_rowsRevision, out long t_remoteSchemaVersion,
-                         out bool t_metaExists, out _error))
+                         out string[] t_remoteColumns, out bool t_metaExists, out _error))
             return null;
+
+        if (t_metaExists && t_remoteSchemaVersion == SCHEMA_VERSION &&
+            t_remoteColumns.Length > 0 && !SameColumns(t_remoteColumns, _snapshot.Columns))
+        {
+            _error = $"{_table} 컬럼 계약이 바뀌었지만 콘텐츠 major가 {ContentVersion.Major}로 그대로다. " +
+                     "major를 올리고 새 앱 빌드를 준비한 뒤 업로드할 것.";
+            return null;
+        }
 
         // 표 해시가 원격과 같으면 내용이 같다 — 행을 다시 쓸 이유도, 블롭을 받아 볼 이유도 없다.
         // 여기서 끊지 않으면 안 바뀐 표마다 read·write를 그대로 지불한다.
@@ -460,13 +543,14 @@ public static partial class SpecFirestoreUploader
     static bool TryReadMeta(
         HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
         out long _revision, out string _updateTime, out string _payloadHash, out long _rowsRevision,
-        out long _schemaVersion, out bool _exists, out string _error)
+        out long _schemaVersion, out string[] _columns, out bool _exists, out string _error)
     {
         _revision = 0;
         _updateTime = null;
         _payloadHash = null;
         _rowsRevision = 0;
         _schemaVersion = 0;
+        _columns = Array.Empty<string>();
         _exists = false;
         _error = null;
 
@@ -492,6 +576,13 @@ public static partial class SpecFirestoreUploader
         _exists = true;
         _updateTime = t_document?.updateTime;
         _payloadHash = t_document?.fields?.payloadHash?.stringValue;
+        FirestoreStringValue[] t_columnValues = t_document?.fields?.columns?.arrayValue?.values;
+        if (t_columnValues != null)
+        {
+            _columns = new string[t_columnValues.Length];
+            for (int i = 0; i < t_columnValues.Length; i++)
+                _columns[i] = t_columnValues[i]?.stringValue ?? string.Empty;
+        }
         string t_schemaVersion = t_document?.fields?.schemaVersion?.integerValue;
         if (!string.IsNullOrEmpty(t_schemaVersion) &&
             !long.TryParse(t_schemaVersion, NumberStyles.Integer, CultureInfo.InvariantCulture, out _schemaVersion))
@@ -526,6 +617,116 @@ public static partial class SpecFirestoreUploader
         }
         return true;
     }
+
+    static bool TryReadIndex(
+        HttpClient _client, string _projectId, string _apiKey, string _envId,
+        out int _major, out long _minor, out string _updateTime, out bool _exists, out string _error)
+    {
+        _major = 0;
+        _minor = -1;
+        _updateTime = null;
+        _exists = false;
+        _error = null;
+        string t_url = DocumentUrl(_projectId, _envId, "_index") + "?key=" + Uri.EscapeDataString(_apiKey);
+        if (!TrySend(_client, HttpMethod.Get, t_url, null,
+                     out HttpStatusCode t_status, out string t_text, out _error))
+            return false;
+        if (t_status == HttpStatusCode.NotFound) return true;
+        if ((int)t_status < 200 || (int)t_status >= 300)
+        {
+            _error = $"콘텐츠 인덱스 조회 실패 {(int)t_status}: {Shorten(t_text)}";
+            return false;
+        }
+
+        IndexDocument t_document;
+        try { t_document = JsonUtility.FromJson<IndexDocument>(t_text); }
+        catch (Exception t_exception)
+        {
+            _error = $"콘텐츠 인덱스 파싱 실패: {t_exception.Message}";
+            return false;
+        }
+        string t_majorText = t_document?.fields?.major?.integerValue;
+        string t_minorText = t_document?.fields?.minor?.integerValue;
+        if (!int.TryParse(t_majorText, NumberStyles.Integer, CultureInfo.InvariantCulture, out _major) ||
+            _major < 0 ||
+            !long.TryParse(t_minorText, NumberStyles.Integer, CultureInfo.InvariantCulture, out _minor) ||
+            _minor < 0 || string.IsNullOrEmpty(t_document.updateTime))
+        {
+            _error = "기존 콘텐츠 인덱스의 major/minor/updateTime이 올바르지 않다.";
+            return false;
+        }
+        _updateTime = t_document.updateTime;
+        _exists = true;
+        return true;
+    }
+
+    static bool SameColumns(IReadOnlyList<string> _remote, IReadOnlyList<string> _local)
+    {
+        if (_remote.Count != _local.Count) return false;
+        for (int i = 0; i < _remote.Count; i++)
+            if (!string.Equals(_remote[i], _local[i], StringComparison.Ordinal)) return false;
+        return true;
+    }
+
+    static string BuildIndexCommitJson(
+        string _projectId, string _envId, long _minor,
+        Dictionary<string, long> _revisions, Dictionary<string, string> _hashes,
+        Dictionary<string, TableSnapshot> _snapshots,
+        string _updateTime, bool _exists)
+    {
+        var t_builder = new StringBuilder(4096);
+        t_builder.Append("{\"writes\":[");
+        bool t_firstWrite = true;
+        foreach (string t_table in SpecPayloadCodec.TableNames)
+        {
+            if (!t_firstWrite) t_builder.Append(',');
+            t_firstWrite = false;
+            string t_documentId = ReleaseDocumentId(ContentVersion.Major, _minor, t_table);
+            t_builder.Append("{\"update\":{\"name\":");
+            AppendJsonString(t_builder, ResourceName(_projectId, _envId, t_documentId));
+            t_builder.Append(",\"fields\":");
+            AppendBlobFields(t_builder, _snapshots[t_table], _revisions[t_table]);
+            t_builder.Append("},\"currentDocument\":{\"exists\":false}}");
+        }
+
+        if (!t_firstWrite) t_builder.Append(',');
+        t_builder.Append("{\"update\":{\"name\":");
+        AppendJsonString(t_builder, ResourceName(_projectId, _envId, "_index"));
+        t_builder.Append(",\"fields\":{");
+        t_builder.Append("\"major\":{\"integerValue\":\"").Append(ContentVersion.Major).Append("\"}");
+        t_builder.Append(",\"minor\":{\"integerValue\":\"").Append(_minor).Append("\"}");
+        t_builder.Append(",\"contentVersion\":{\"stringValue\":");
+        AppendJsonString(t_builder, ContentVersion.Format(ContentVersion.Major, _minor));
+        t_builder.Append("},\"tables\":{\"mapValue\":{\"fields\":{");
+        bool t_first = true;
+        foreach (string t_table in SpecPayloadCodec.TableNames)
+        {
+            if (!t_first) t_builder.Append(',');
+            t_first = false;
+            AppendJsonString(t_builder, t_table);
+            t_builder.Append(":{\"mapValue\":{\"fields\":{");
+            t_builder.Append("\"revision\":{\"integerValue\":\"").Append(_revisions[t_table]).Append("\"},");
+            t_builder.Append("\"payloadHash\":{\"stringValue\":");
+            AppendJsonString(t_builder, _hashes[t_table]);
+            t_builder.Append("},\"blobPath\":{\"stringValue\":");
+            AppendJsonString(t_builder,
+                FirebaseRootPath.Environment(_envId) + "/" + SPEC_COLLECTION + "/" +
+                ReleaseDocumentId(ContentVersion.Major, _minor, t_table));
+            t_builder.Append("}}}}");
+        }
+        t_builder.Append("}}}}},\"currentDocument\":{");
+        if (_exists)
+        {
+            t_builder.Append("\"updateTime\":");
+            AppendJsonString(t_builder, _updateTime);
+        }
+        else t_builder.Append("\"exists\":false");
+        t_builder.Append("}}]}");
+        return t_builder.ToString();
+    }
+
+    static string ReleaseDocumentId(int _major, long _minor, string _table)
+        => $"_release_{_major}_{_minor}_{_table}";
 
     static bool TryListRemoteRowIds(
         HttpClient _client, string _projectId, string _apiKey, string _envId, string _table,
@@ -647,6 +848,7 @@ public static partial class SpecFirestoreUploader
         _builder.Append('{');
         AppendStringField(_builder, "table", _table);
         _builder.Append(",\"schemaVersion\":{\"integerValue\":\"").Append(SCHEMA_VERSION).Append("\"}");
+        _builder.Append(",\"major\":{\"integerValue\":\"").Append(ContentVersion.Major).Append("\"}");
         _builder.Append(",\"revision\":{\"integerValue\":\"").Append(_revision).Append("\"}");
 
         // rows/ 미러가 어느 revision까지 따라왔는지. revision과 다르면 미러는 낡은 것이고,
@@ -680,6 +882,7 @@ public static partial class SpecFirestoreUploader
     {
         _builder.Append('{');
         _builder.Append("\"schemaVersion\":{\"integerValue\":\"").Append(SCHEMA_VERSION).Append("\"}");
+        _builder.Append(",\"major\":{\"integerValue\":\"").Append(ContentVersion.Major).Append("\"}");
         _builder.Append(",\"revision\":{\"integerValue\":\"").Append(_revision).Append("\"}");
         _builder.Append(",\"rowCount\":{\"integerValue\":\"").Append(_snapshot.Rows.Count).Append("\"}");
         _builder.Append(',');

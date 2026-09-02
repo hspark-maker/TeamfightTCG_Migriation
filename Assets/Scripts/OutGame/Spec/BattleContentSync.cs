@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,7 +14,13 @@ public enum EBattleContentGateResult
     Current,
     OfflineAllowed,
     UpdatedRestartRequired,
+    UpdateRequired,
     Blocked,
+}
+
+public sealed class ContentUpdateRequiredException : Exception
+{
+    public ContentUpdateRequiredException(string _message) : base(_message) { }
 }
 
 public static class BattleContentSync
@@ -31,6 +37,20 @@ public static class BattleContentSync
     static Task s_lateTask;
     static DateTime s_lateTaskStartedUtc;
 
+    /// <summary>직전에 캐시로 갈아끼운 스냅샷 지문. 초기화 경로가 SpecSource가 실제로 그것을 물었는지 확인하는 데 쓴다.</summary>
+    static string s_adoptedFingerprint;
+
+    sealed class RemoteSpecVector
+    {
+        public int Major;
+        public long Minor;
+        public bool FromIndex;
+        public Dictionary<string, string> Hashes;
+        public Dictionary<string, string> BlobPaths;
+
+        public string VersionText => ContentVersion.Format(Major, Minor);
+    }
+
     public static void Initialize(in FirebaseContext _context)
     {
         s_context = _context;
@@ -45,6 +65,7 @@ public static class BattleContentSync
         s_lastLocalFingerprint = null;
         s_lateTask = null;
         s_lateTaskStartedUtc = default;
+        s_adoptedFingerprint = null;
     }
 
     public static async UniTask<EBattleContentGateResult> CheckBeforeBattleAsync(bool _multiplayer, CancellationToken _ct)
@@ -69,7 +90,7 @@ public static class BattleContentSync
         try
         {
             string t_envId = s_context.EnvId;
-            Debug.Log($"[BattleContent] 게이트 시작 env={t_envId} 모드={t_mode} schema=v{SpecPayloadCodec.SchemaVersion}");
+            Debug.Log($"[BattleContent] 게이트 시작 env={t_envId} 모드={t_mode} content-major={ContentVersion.Major}");
 
             var t_localTables = new List<SpecTablePayload>();
             foreach (string t_tableName in SpecPayloadCodec.TableNames)
@@ -103,13 +124,15 @@ public static class BattleContentSync
             if (!FirebaseAuthService.Instance.IsCurrentUserActive)
                 return Fallback("인증 사용자 비활성");
 
-            Task<Dictionary<string, string>> t_metaTask = FetchMetaVectorAsync(t_envId);
+            Task<RemoteSpecVector> t_metaTask = FetchRemoteVectorAsync(t_envId);
             if (await Task.WhenAny(t_metaTask, Task.Delay(FirebaseTimeouts.TransactionMilliseconds, _ct)) != t_metaTask)
             {
                 TrackLate(t_metaTask);
                 return Fallback($"서버 메타 조회 {FirebaseTimeouts.TransactionMilliseconds}ms 초과");
             }
-            Dictionary<string, string> t_remoteHashes = await t_metaTask;
+            RemoteSpecVector t_remote = await t_metaTask;
+            Dictionary<string, string> t_remoteHashes = t_remote.Hashes;
+            Debug.Log($"[BattleContent] 서버 콘텐츠={t_remote.VersionText} source={(t_remote.FromIndex ? "index" : "legacy-meta")}");
 
             int t_mismatch = 0;
             var t_compare = new StringBuilder();
@@ -131,7 +154,7 @@ public static class BattleContentSync
             }
 
             Debug.Log($"[BattleContent] 불일치 {t_mismatch}건 — 불일치 표만 내려받기 시작");
-            Task<string> t_downloadTask = DownloadSnapshotAsync(t_envId, t_remoteHashes, t_localTables);
+            Task<string> t_downloadTask = DownloadSnapshotAsync(t_envId, t_remote, t_localTables);
             if (await Task.WhenAny(t_downloadTask, Task.Delay(FirebaseTimeouts.TransactionMilliseconds, _ct)) != t_downloadTask)
             {
                 TrackLate(t_downloadTask);
@@ -150,11 +173,17 @@ public static class BattleContentSync
                 t_tables.Add(t_table);
             }
             string t_fingerprint = SpecPayloadCodec.CombinedHash(t_envId, t_tables);
-            if (!SpecSnapshotCache.TrySave(t_envId, t_payload, t_fingerprint, out string t_cacheError))
+            if (!SpecSnapshotCache.TrySave(
+                    t_envId, t_payload, t_fingerprint, t_remote.Major, t_remote.Minor, out string t_cacheError))
                 throw new IOException("Spec cache write failed: " + t_cacheError);
 
+            s_adoptedFingerprint = t_fingerprint;
             Debug.Log($"[BattleContent] 캐시 교체 완료 지문 {t_localFingerprint} -> {t_fingerprint} ({t_payload.Length:N0}자)");
             return Verdict(EBattleContentGateResult.UpdatedRestartRequired, "새 스냅샷 캐시 완료 — 재시작 후 적용");
+        }
+        catch (ContentUpdateRequiredException t_exception)
+        {
+            return Verdict(EBattleContentGateResult.UpdateRequired, t_exception.Message);
         }
         catch (OperationCanceledException) { return Verdict(EBattleContentGateResult.Blocked, "취소됨"); }
         catch (Exception t_exception)
@@ -164,11 +193,46 @@ public static class BattleContentSync
         }
     }
 
+    /// <summary>초기화 단계에서 최신 콘텐츠를 채택한다. 전투 게이트의 검증·다운로드 경로를 그대로 재사용한다.</summary>
+    public static async UniTask SyncForInitializationAsync(CancellationToken _ct)
+    {
+        var t_wait = System.Diagnostics.Stopwatch.StartNew();
+        while (!s_initialized)
+        {
+            _ct.ThrowIfCancellationRequested();
+            if (t_wait.ElapsedMilliseconds >= FirebaseTimeouts.AuthAndReadMilliseconds)
+                throw new TimeoutException("Firebase 콘텐츠 모듈 초기화 대기 시간이 초과됐다.");
+            await Task.Delay(50, _ct);
+        }
+
+        EBattleContentGateResult t_result = await CheckBeforeBattleAsync(false, _ct);
+        if (t_result == EBattleContentGateResult.UpdatedRestartRequired)
+        {
+            // Reload가 캐시를 못 믿고 내장본으로 떨어져도 예외는 나지 않는다 —
+            // 확인하지 않으면 서버와 다른 데이터로 초기화가 성공 처리된다.
+            string t_expected = s_adoptedFingerprint;
+            SpecSource.Reload();
+            if (!string.Equals(SpecSource.Fingerprint, t_expected, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"내려받은 스냅샷을 채택하지 못했다: 기대={t_expected} 실제={SpecSource.Fingerprint} 원본={SpecSource.Origin}");
+            Debug.Log($"[BattleContent] 초기화 중 새 콘텐츠 스냅샷 채택 완료 지문={t_expected}");
+            return;
+        }
+
+        if (t_result != EBattleContentGateResult.Current)
+        {
+            if (t_result == EBattleContentGateResult.UpdateRequired)
+                throw new ContentUpdateRequiredException("이 앱이 지원하지 않는 콘텐츠 major가 배포됐다.");
+            throw new InvalidOperationException($"콘텐츠 초기화에 실패했다: {t_result}");
+        }
+    }
+
     /// <summary>불일치 표만 서버에서 받고, 해시가 이미 같은 표는 로컬 것을 그대로 쓴다.
     /// 표 하나 바뀌었다고 여섯 표의 행 문서를 전부 다시 읽으면 read가 표 수만큼 곱해진다.</summary>
     static async Task<string> DownloadSnapshotAsync(
-        string _envId, Dictionary<string, string> _beforeHashes, List<SpecTablePayload> _localTables)
+        string _envId, RemoteSpecVector _before, List<SpecTablePayload> _localTables)
     {
+        Dictionary<string, string> _beforeHashes = _before.Hashes;
         var t_byTable = new Dictionary<string, SpecTablePayload>(StringComparer.Ordinal);
         var t_stale = new List<string>();
         foreach (SpecTablePayload t_local in _localTables)
@@ -181,13 +245,18 @@ public static class BattleContentSync
         }
 
         Task<SpecTablePayload>[] t_tasks = t_stale
-            .Select(t => FetchTableAsync(_envId, t, _beforeHashes.TryGetValue(t, out string t_hash) ? t_hash : null))
+            .Select(t => FetchTableAsync(
+                _envId, t,
+                _beforeHashes.TryGetValue(t, out string t_hash) ? t_hash : null,
+                _before.BlobPaths.TryGetValue(t, out string t_path) ? t_path : null))
             .ToArray();
         SpecTablePayload[] t_fetched = await Task.WhenAll(t_tasks);
         foreach (SpecTablePayload t_table in t_fetched) t_byTable[t_table.Table] = t_table;
 
-        Dictionary<string, string> t_afterHashes = await FetchMetaVectorAsync(_envId);
-        if (_beforeHashes.Count != t_afterHashes.Count ||
+        RemoteSpecVector t_after = await FetchRemoteVectorAsync(_envId);
+        Dictionary<string, string> t_afterHashes = t_after.Hashes;
+        if (_before.Major != t_after.Major || _before.Minor != t_after.Minor ||
+            _before.FromIndex != t_after.FromIndex || _beforeHashes.Count != t_afterHashes.Count ||
             _beforeHashes.Any(t => !t_afterHashes.TryGetValue(t.Key, out string t_hash) ||
                                    !string.Equals(t.Value, t_hash, StringComparison.Ordinal)))
             throw new InvalidOperationException("Remote spec changed during download. Retry the battle entry.");
@@ -209,7 +278,71 @@ public static class BattleContentSync
         return SpecPayloadCodec.BuildManagerJson(t_tables);
     }
 
-    static async Task<Dictionary<string, string>> FetchMetaVectorAsync(string _envId)
+    static async Task<RemoteSpecVector> FetchRemoteVectorAsync(string _envId)
+    {
+        FirebaseFirestore t_store = s_context.GetFirestore();
+        string t_path = FirebaseRootPath.Environment(_envId) + "/specs/_index";
+        DocumentSnapshot t_index = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
+        if (!t_index.Exists)
+        {
+            return new RemoteSpecVector
+            {
+                Major = ContentVersion.Major,
+                Minor = -1,
+                FromIndex = false,
+                Hashes = await FetchLegacyMetaVectorAsync(_envId),
+                BlobPaths = new Dictionary<string, string>(StringComparer.Ordinal),
+            };
+        }
+
+        IDictionary<string, object> t_fields = t_index.ToDictionary();
+        if (!TryInteger(t_fields, "major", out long t_majorValue) ||
+            t_majorValue < int.MinValue || t_majorValue > int.MaxValue)
+            throw new InvalidOperationException("Remote spec index major is missing or invalid.");
+        int t_major = (int)t_majorValue;
+        if (!ContentVersion.IsSupportedMajor(t_major))
+            throw new ContentUpdateRequiredException($"Remote content major {t_major} is not supported by this app.");
+        if (!TryInteger(t_fields, "minor", out long t_minor) || t_minor < 0)
+            throw new InvalidOperationException("Remote spec index minor is missing or invalid.");
+        if (!t_fields.TryGetValue("tables", out object t_tablesValue) ||
+            !(t_tablesValue is IDictionary<string, object> t_tables))
+            throw new InvalidOperationException("Remote spec index tables map is missing.");
+
+        var t_hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var t_blobPaths = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string t_table in SpecPayloadCodec.TableNames)
+        {
+            if (!t_tables.TryGetValue(t_table, out object t_entryValue) ||
+                !(t_entryValue is IDictionary<string, object> t_entry) ||
+                !t_entry.TryGetValue("payloadHash", out object t_hashValue) ||
+                !(t_hashValue is string t_hash) || string.IsNullOrEmpty(t_hash))
+                throw new InvalidOperationException($"Remote spec index entry '{t_table}' is missing or invalid.");
+            if (!t_entry.TryGetValue("blobPath", out object t_pathValue) ||
+                !(t_pathValue is string t_blobPath) || string.IsNullOrEmpty(t_blobPath))
+                throw new InvalidOperationException($"Remote spec index blob path '{t_table}' is missing or invalid.");
+            t_hashes.Add(t_table, t_hash);
+            t_blobPaths.Add(t_table, t_blobPath);
+        }
+
+        return new RemoteSpecVector
+        {
+            Major = t_major,
+            Minor = t_minor,
+            FromIndex = true,
+            Hashes = t_hashes,
+            BlobPaths = t_blobPaths,
+        };
+    }
+
+    static bool TryInteger(IDictionary<string, object> _fields, string _name, out long _value)
+    {
+        _value = 0;
+        return _fields.TryGetValue(_name, out object t_value) &&
+               t_value != null &&
+               long.TryParse(Convert.ToString(t_value, System.Globalization.CultureInfo.InvariantCulture), out _value);
+    }
+
+    static async Task<Dictionary<string, string>> FetchLegacyMetaVectorAsync(string _envId)
     {
         // async 람다는 반환형이 UniTask로 추론돼 Task.WhenAll에 넘길 수 없다 — 명시 메서드로 뺀다.
         Task<KeyValuePair<string, string>>[] t_tasks =
@@ -225,8 +358,10 @@ public static class BattleContentSync
         DocumentSnapshot t_meta = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
         if (!t_meta.Exists) throw new InvalidOperationException($"Remote spec '{_table}' is missing.");
         IDictionary<string, object> t_fields = t_meta.ToDictionary();
-        if (Convert.ToInt64(t_fields["schemaVersion"]) != SpecPayloadCodec.SchemaVersion)
-            throw new InvalidOperationException($"Remote spec '{_table}' metadata is incompatible.");
+        int t_major = Convert.ToInt32(t_fields.TryGetValue("major", out object t_majorValue)
+            ? t_majorValue : t_fields["schemaVersion"]);
+        if (!ContentVersion.IsSupportedMajor(t_major))
+            throw new ContentUpdateRequiredException($"Remote spec '{_table}' major {t_major} is not supported.");
         string t_hash = t_fields["payloadHash"] as string;
         if (string.IsNullOrEmpty(t_hash)) throw new InvalidOperationException($"Remote spec '{_table}' hash is missing.");
         return new KeyValuePair<string, string>(_table, t_hash);
@@ -265,16 +400,21 @@ public static class BattleContentSync
 
     /// <summary>표 하나를 블롭 문서 한 번으로 받는다. <c>rows/</c> 서브컬렉션은 콘솔 열람용 미러라 런타임은 읽지 않는다
     /// — 읽으면 read가 행 수에 비례한다. 블롭은 메타와 같은 commit에 실리므로 행 개수 경합 재시도가 필요 없다.</summary>
-    static async Task<SpecTablePayload> FetchTableAsync(string _envId, string _table, string _expectedHash)
+    static async Task<SpecTablePayload> FetchTableAsync(
+        string _envId, string _table, string _expectedHash, string _publishedPath)
     {
         FirebaseFirestore t_store = s_context.GetFirestore();
-        string t_path = FirebaseRootPath.Environment(_envId) + "/specs/" + _table + "/blob/current";
+        string t_path = string.IsNullOrEmpty(_publishedPath)
+            ? FirebaseRootPath.Environment(_envId) + "/specs/" + _table + "/blob/current"
+            : _publishedPath;
         DocumentSnapshot t_blob = await t_store.Document(t_path).GetSnapshotAsync(Source.Server);
         if (!t_blob.Exists) throw new InvalidOperationException($"Remote spec blob '{_table}' is missing.");
 
         IDictionary<string, object> t_fields = t_blob.ToDictionary();
-        if (Convert.ToInt64(t_fields["schemaVersion"]) != SpecPayloadCodec.SchemaVersion)
-            throw new InvalidOperationException($"Remote spec blob '{_table}' is incompatible.");
+        int t_major = Convert.ToInt32(t_fields.TryGetValue("major", out object t_majorValue)
+            ? t_majorValue : t_fields["schemaVersion"]);
+        if (!ContentVersion.IsSupportedMajor(t_major))
+            throw new ContentUpdateRequiredException($"Remote spec blob '{_table}' major {t_major} is not supported.");
         string t_payloadText = t_fields["payload"] as string;
         if (string.IsNullOrEmpty(t_payloadText))
             throw new InvalidOperationException($"Remote spec blob '{_table}' payload is empty.");
