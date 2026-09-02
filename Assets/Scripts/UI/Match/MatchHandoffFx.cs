@@ -114,6 +114,34 @@ public class MatchHandoffFx
                           Graphic _dim, RectTransform _matchRoot, RectTransform[] _riders,
                           Sprite _raySprite, in MatchHandoffTargets _targets)
     {
+        Sequence t_seq = this.BuildCore(_my, _opponent, _versus, _dim, _matchRoot, _riders,
+                                        _raySprite, _targets.VersusSeat);
+
+        // 넘겨줄 화면이 있는 경로에서만 도는 축들 — 카메라가 뒤로 빠지듯 이 화면이 줄고 저 화면이 당겨 들어온다.
+        this.StageZoom(t_seq, _matchRoot, _targets.DeckRoot);
+
+        if (_targets.Intro != null) t_seq.Insert(this.deckAt, _targets.Intro);
+
+        return t_seq;
+    }
+
+    /// <summary>화면을 통째로 데려가는 전환(씬 교체)용 안무. 부품이 실려 나가는 것은 <see cref="Build"/>와 같고,
+    /// 넘겨받을 다음 화면이 없어 덱 쪽 축(당겨 들이기·VS 교대 상대·등장 안무)만 빠진다.
+    ///
+    /// <para>⚠ 무엇보다 <b>루트를 줄이지 않는다</b>. 배경 두 판이 그 루트에 실려 있어서, 줄이는 순간
+    /// 기울어진 판 귀퉁이 뒤로 다음 씬이 샌다 — 덱 화면으로 넘어갈 때는 그 밑이 어차피 덱이라 문제가 없었다.</para></summary>
+    public Sequence BuildCarry(MatchProfileView _my, MatchProfileView _opponent, RectTransform _versus,
+                               Graphic _dim, RectTransform _matchRoot, RectTransform[] _riders,
+                               Sprite _raySprite)
+    {
+        return this.BuildCore(_my, _opponent, _versus, _dim, _matchRoot, _riders, _raySprite, null);
+    }
+
+    // 두 전환이 공유하는 몸통 — 부품을 VS 기준 위아래로 밀어내고 딤을 걷는다.
+    Sequence BuildCore(MatchProfileView _my, MatchProfileView _opponent, RectTransform _versus,
+                       Graphic _dim, RectTransform _matchRoot, RectTransform[] _riders,
+                       Sprite _raySprite, RectTransform _versusSeat)
+    {
         var t_seq = DOTween.Sequence();
 
         // 위/아래를 가르는 기준선은 VS다. 어느 배너가 위인지 프리팹을 몰라도 되는 이유가 이 한 줄이다.
@@ -128,8 +156,7 @@ public class MatchHandoffFx
 
         this.StageRiders(t_seq, _riders, t_axis);
 
-        this.StageZoom(t_seq, _matchRoot, _targets.DeckRoot);
-        this.StageVersusHandover(t_seq, _versus, _targets.VersusSeat);
+        this.StageVersusHandover(t_seq, _versus, _versusSeat);
 
         // ScreenDimTint는 밝기만 미는 축이라(알파는 저작값 고정) 걷어내는 일은 여기서 직접 한다.
         if (_dim != null)
@@ -137,8 +164,6 @@ public class MatchHandoffFx
             _dim.DOKill();
             t_seq.Insert(this.dimOutAt, _dim.DOFade(0f, this.dimOutFade).SetEase(Ease.InQuad));
         }
-
-        if (_targets.Intro != null) t_seq.Insert(this.deckAt, _targets.Intro);
 
         return t_seq;
     }

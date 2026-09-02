@@ -51,6 +51,14 @@ public static class UiSortingOrder
     /// 컨테이너 값을 내리는 것은 답이 아니다: 딤에 묻히면 안 되는 실패 팝업까지 함께 내려간다.</summary>
     public const int PooledOverlay = 300;
 
+    /// <summary>매칭·대치 화면(MatchmakingRoot.prefab). 로비를 전부 덮는 전면 화면이라 로비(<see cref="Lobby"/>) 위지만,
+    /// 진입이 막혔을 때 뜨는 안내는 이 화면 위에 서야 하므로 풀(<see cref="Pool"/>) 아래다 —
+    /// 안내를 띄우기 전에 화면을 먼저 닫는 순서에만 기대지 않으려고 층으로도 보장한다.
+    ///
+    /// 전투로 넘어가는 순간에는 이 화면이 곧 커튼이 되어 <see cref="Curtain"/>으로 승격한다(MatchSceneCarrier).
+    /// 그때 배틀 씬의 어떤 캔버스보다도 위여야 하는데, 이 층(320) 자체로도 이미 그 조건을 만족한다.</summary>
+    public const int Matchmaking = 320;
+
     /// <summary>덱 편집의 드래그 고스트(DragLayer). 끌고 있는 카드는 손가락을 따라다니므로 무엇에도 가리면 안 된다 —
     /// 특히 편집 화면이 <see cref="PooledOverlay"/>로 내려앉은 뒤에는 튜토리얼 게이트 딤(<see cref="TutorialGate"/>)
     /// 밑에서 끌리게 된다. 그래서 고스트만 게이트 위로 따로 올린다.</summary>
