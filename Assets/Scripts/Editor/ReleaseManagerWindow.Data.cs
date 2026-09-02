@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -9,12 +9,15 @@ public partial class ReleaseManagerWindow
 {
     const string DATA_SELECTION_PREF_KEY = "SpecFirestore.Selected";
     const string DATA_SELECTION_INITIALIZED_PREF_KEY = "SpecFirestore.Selected.Initialized";
+    const string DATA_PUBLISH_PREF_KEY = "SpecFirestore.PublishIndex";
 
     EContentRunMode dataUploadMode;
     List<string> dataTables;
     HashSet<string> dataSelected = new();
     string dataLoadError;
     string dataReport;
+    // 업로드가 끝나면 새 콘텐츠 버전을 공개할지. 끄면 표 문서만 올라가고 _index 포인터는 그대로다.
+    bool dataPublishIndex = true;
     Vector2 dataScroll;
     bool dataRulesOpen;
     bool dataRulesKnown;
@@ -74,14 +77,36 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.Space();
         DrawDataTableSelection();
 
+        EditorGUILayout.Space(6);
+        bool t_publish = EditorGUILayout.ToggleLeft(
+            "업로드 후 테이블 버전을 올린다 (_index 공개)", this.dataPublishIndex);
+        if (t_publish != this.dataPublishIndex)
+        {
+            this.dataPublishIndex = t_publish;
+            EditorPrefs.SetBool(DATA_PUBLISH_PREF_KEY, t_publish);
+        }
+        if (!this.dataPublishIndex)
+            EditorGUILayout.HelpBox(
+                "버전을 올리지 않으면 표 문서(blob/current · rows/ · 메타)만 최신이 되고 _index는 옛 버전을 가리킨 채 남는다." +
+                "\n그 사이 클라이언트는 옛 콘텐츠를 보지만 서버의 rows 폴백 경로는 새 데이터를 볼 수 있어 판정이 갈릴 수 있다." +
+                "\n확인이 끝나면 이 체크를 켜고 다시 실행해 공개하라 — 해시가 같은 표는 건너뛴다.",
+                MessageType.Warning);
+        else
+            EditorGUILayout.HelpBox(
+                "세대 체크: 새 카드 ID · 새 키워드 · 새 시너지 · 새 랭크 등급을 추가했다면 " +
+                "ContentVersion.MinAppMajor를 올리고 그 세대를 지원하는 앱 빌드를 먼저 배포해야 한다. " +
+                "누락하면 구 앱이 새 행을 해석하지 못해 초기화에 실패할 수 있다.",
+                MessageType.Info);
+
         string t_blocker = DataUploadBlocker(t_hasEnv, t_envError);
         if (!string.IsNullOrEmpty(t_blocker))
             EditorGUILayout.HelpBox(t_blocker, MessageType.Error);
 
         using (new EditorGUI.DisabledScope(t_blocker != null))
         {
-            if (GUILayout.Button($"{t_envId} 환경으로 업로드 ({this.dataSelected.Count}개)", GUILayout.Height(32)))
-                RunDataUpload(t_envId, t_modeMismatch);
+            string t_verb = this.dataPublishIndex ? "업로드 + 공개" : "업로드만";
+            if (GUILayout.Button($"{t_envId} 환경으로 {t_verb} ({this.dataSelected.Count}개)", GUILayout.Height(32)))
+                RunDataUpload(t_envId, t_modeMismatch, this.dataPublishIndex);
         }
 
         EditorGUILayout.Space(10);
@@ -339,6 +364,7 @@ public partial class ReleaseManagerWindow
         this.dataTables = SpecFirestoreUploader.ListTables(out this.dataLoadError);
         this.dataReport = null;
 
+        this.dataPublishIndex = EditorPrefs.GetBool(DATA_PUBLISH_PREF_KEY, true);
         bool t_initialized = EditorPrefs.GetBool(DATA_SELECTION_INITIALIZED_PREF_KEY, false);
         string t_saved = EditorPrefs.GetString(DATA_SELECTION_PREF_KEY, string.Empty);
         this.dataSelected = new HashSet<string>(t_saved.Split('|'));
@@ -363,6 +389,7 @@ public partial class ReleaseManagerWindow
     string DataUploadBlocker(bool _hasEnv, string _envError)
     {
         if (!_hasEnv) return _envError;
+        if (!ContentVersionConsistency.TryValidate(out string t_versionError)) return t_versionError;
         if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요하다.";
         if (!SpecAdminAuth.HasAdminClaim) return "로그인한 계정에 admin 클레임이 없어 스펙을 쓸 수 없다.";
         if (!string.IsNullOrEmpty(this.dataLoadError)) return "표 목록을 먼저 정상적으로 읽어야 한다.";
@@ -448,7 +475,7 @@ public partial class ReleaseManagerWindow
         _failed++;
     }
 
-    void RunDataUpload(string _envId, bool _modeMismatch)
+    void RunDataUpload(string _envId, bool _modeMismatch, bool _publish)
     {
         Revalidate();
         string t_blocker = DataUploadBlocker(true, null);
@@ -467,7 +494,12 @@ public partial class ReleaseManagerWindow
         if (!EditorUtility.DisplayDialog(
                 "스펙시트 업로드",
                 $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 표 {this.dataSelected.Count}개를 배포한다.\n" +
-                "표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
+                "표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다." +
+                (_publish
+                    ? "\n\n표가 모두 성공하면 새 테이블 버전을 공개한다(_index 갱신)." +
+                      "\n\n세대 확인: 새 카드 ID · 키워드 · 시너지 · 랭크 등급을 추가했다면 " +
+                      "ContentVersion.MinAppMajor를 올리고 새 앱을 먼저 배포했는지 확인할 것."
+                    : "\n\n버전은 올리지 않는다 — _index는 현재 버전을 계속 가리키고 표 문서만 최신이 된다."),
                 "업로드", "취소"))
             return;
 
@@ -523,7 +555,9 @@ public partial class ReleaseManagerWindow
 
         // 선택한 표 중 하나라도 실패하거나 취소됐으면 새 콘텐츠 minor를 공개하지 않는다.
         // 표 문서는 먼저 올라가도 구클라이언트의 레거시 경로만 볼 수 있고, 신클라이언트는 기존 _index를 유지한다.
-        if (!t_cancelled && t_failed == 0)
+        if (!_publish && !t_cancelled && t_failed == 0)
+            t_report.AppendLine("SKIP publish: 테이블 버전을 올리지 않는 업로드다 — _index는 그대로다.");
+        if (_publish && !t_cancelled && t_failed == 0)
         {
             string t_publishLine = SpecFirestoreUploader.PublishIndex(_envId, out string t_publishError);
             if (string.IsNullOrEmpty(t_publishError))

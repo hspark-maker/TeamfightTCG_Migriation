@@ -14,12 +14,21 @@ public static class AIDeckSpec
     static bool s_loaded;
     static bool s_ready;
     static string s_error;
+    // 실패가 '데이터 손상'인지 '앱이 콘텐츠보다 낡음'인지 가른다 — 후자는 재시도로 안 풀리므로
+    // 초기화가 복구 화면이 아니라 업데이트 안내로 가야 한다.
+    static bool s_updateRequired;
     // 조립에 쓴 스냅샷. SpecSource.Reload()가 새 스냅샷을 만들면 참조가 달라져 자동으로 다시 조립한다 —
     // 반대로 SpecSource가 이쪽을 부르게 하면 OutGame -> Battle 역참조가 생긴다.
     static SpecDataManager s_source;
     static readonly List<AIDeckConfig.DeckEntry> s_decks = new List<AIDeckConfig.DeckEntry>();
 
     public static void Init() => EnsureLoaded();
+
+    /// <summary>표가 이 앱이 모르는 카드를 참조해 실패했다 = 앱 업데이트가 필요하다.</summary>
+    public static bool UpdateRequired
+    {
+        get { EnsureLoaded(); return s_updateRequired; }
+    }
 
     public static bool TryGetDecks(out IReadOnlyList<AIDeckConfig.DeckEntry> _decks)
     {
@@ -51,6 +60,7 @@ public static class AIDeckSpec
         s_source = t_manager;
         s_ready = false;
         s_error = null;
+        s_updateRequired = false;
         s_decks.Clear();
 
         IReadOnlyList<AIDeck> t_rows = t_manager?.AIDeck?.All;
@@ -79,7 +89,6 @@ public static class AIDeckSpec
         var t_seenDeckIds = new HashSet<string>(System.StringComparer.Ordinal);
         foreach (AIDeck t_row in t_sorted)
         {
-            bool t_rowValid = true;
             if (string.IsNullOrEmpty(t_row.deckId) || !t_seenDeckIds.Add(t_row.deckId))
             {
                 Skip($"비어 있거나 중복인 deckId를 제외한다: '{t_row.deckId}'.");
@@ -97,14 +106,18 @@ public static class AIDeckSpec
                 Skip($"'{t_row.deckId}'의 카드 칸에 0 이하 id가 있어 제외한다.");
                 continue;
             }
-            else
-                foreach (int t_cardId in t_cardIds)
-                    if (!CardCatalog.Contains(t_cardId))
-                    {
-                        t_valid = false;
-                        t_rowValid = false;
-                        Fail($"'{t_row.deckId}'가 현재 콘텐츠에 없는 카드 ID {t_cardId}를 참조한다.");
-                    }
+
+            // 여기서 던지지 않는다 — EnsureLoaded는 전투 경로에서도 불리고, 던지면 s_loaded만 세운 채
+            // 빠져나가 같은 스냅샷에 대한 다음 호출이 이 실패를 손상(재시도 가능)으로 오분류한다.
+            bool t_rowValid = true;
+            foreach (int t_cardId in t_cardIds)
+                if (!CardCatalog.Contains(t_cardId))
+                {
+                    t_valid = false;
+                    t_rowValid = false;
+                    s_updateRequired = true;
+                    Fail($"'{t_row.deckId}'가 이 앱에 없는 카드 ID {t_cardId}를 참조한다.");
+                }
 
             if (!t_rowValid) continue;
 
@@ -150,6 +163,7 @@ public static class AIDeckSpec
         s_loaded = false;
         s_ready = false;
         s_error = null;
+        s_updateRequired = false;
         s_source = null;
         s_decks.Clear();
     }

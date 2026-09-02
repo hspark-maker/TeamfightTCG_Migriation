@@ -10,6 +10,8 @@ public static class RankGradeSpec
     static RankConfig s_authoredSkin;
     static RankConfig s_uninitialized;
     static RankConfig s_runtime;
+    // 마지막 표 읽기가 '앱이 콘텐츠보다 낡음'으로 실패했는지. 손상과 달리 재시도로 풀리지 않는다.
+    static bool s_updateRequired;
 
     internal static RankConfig UninitializedConfig
     {
@@ -28,6 +30,10 @@ public static class RankGradeSpec
     }
 
     public static void SetAuthoredSkin(RankConfig _authoredSkin) => s_authoredSkin = _authoredSkin;
+
+    /// <summary>직전 <see cref="TryValidateRequired"/>·<see cref="TryBuildRuntime"/> 실패가
+    /// 데이터 손상이 아니라 앱 업데이트 필요였는지.</summary>
+    public static bool UpdateRequired => s_updateRequired;
 
     public static bool TryValidateRequired(out string _error)
         => TryReadRows(out _, out _error);
@@ -81,6 +87,7 @@ public static class RankGradeSpec
     {
         _parsed = new List<ParsedGrade>();
         _error = null;
+        s_updateRequired = false;
         IReadOnlyList<RankGrade> t_source = SpecSource.Manager?.RankGrade?.All;
         if (t_source == null || t_source.Count == 0)
         {
@@ -98,7 +105,14 @@ public static class RankGradeSpec
         t_rows.Sort((a, b) => a.id.CompareTo(b.id));
 
         Array t_requiredGrades = Enum.GetValues(typeof(ERankGrade));
-        if (t_rows.Count != t_requiredGrades.Length)
+        if (t_rows.Count > t_requiredGrades.Length)
+        {
+            // 앱이 아는 등급보다 행이 많다 = 콘텐츠가 앱보다 새롭다. 재시도로 풀리지 않으니 업데이트로 분류한다.
+            s_updateRequired = true;
+            _error = $"RankGrade 행 수 {t_rows.Count}가 앱의 등급 수 {t_requiredGrades.Length}보다 많다 — 앱이 콘텐츠보다 낡았다.";
+            return false;
+        }
+        if (t_rows.Count < t_requiredGrades.Length)
         {
             _error = $"RankGrade 행 수 {t_rows.Count}가 앱의 등급 수 {t_requiredGrades.Length}와 다르다.";
             return false;

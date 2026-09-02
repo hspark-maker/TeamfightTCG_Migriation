@@ -43,6 +43,11 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         SpecSource.Reload();
 
         var t_errors = new List<string>();
+        // 테이블 세대 상수가 C#·content-version.json·서버 TS 세 곳에서 같은지 본다.
+        // 앱 빌드 버전은 여기서 보지 않는다 — 테이블 세대와 묶여 있지 않다.
+        if (!ContentVersionConsistency.TryValidate(out string t_versionError))
+            t_errors.Add(t_versionError);
+
         ContentProfileConfig t_live = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(LIVE_PROFILE_PATH);
         ContentProfileConfig t_test = AssetDatabase.LoadAssetAtPath<ContentProfileConfig>(TEST_PROFILE_PATH);
 

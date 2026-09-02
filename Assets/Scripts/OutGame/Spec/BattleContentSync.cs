@@ -302,6 +302,15 @@ public static class BattleContentSync
         int t_major = (int)t_majorValue;
         if (!ContentVersion.IsSupportedMajor(t_major))
             throw new ContentUpdateRequiredException($"Remote content major {t_major} is not supported by this app.");
+        if (t_fields.ContainsKey("minAppMajor"))
+        {
+            if (!TryInteger(t_fields, "minAppMajor", out long t_minAppMajor) ||
+                t_minAppMajor < 0 || t_minAppMajor > int.MaxValue)
+                throw new InvalidOperationException("Remote spec index minAppMajor is invalid.");
+            if (t_minAppMajor > ContentVersion.Major)
+                throw new ContentUpdateRequiredException(
+                    $"Remote content requires app major {t_minAppMajor} or newer (current {ContentVersion.Major}).");
+        }
         if (!TryInteger(t_fields, "minor", out long t_minor) || t_minor < 0)
             throw new InvalidOperationException("Remote spec index minor is missing or invalid.");
         if (!t_fields.TryGetValue("tables", out object t_tablesValue) ||

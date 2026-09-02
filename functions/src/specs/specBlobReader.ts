@@ -18,9 +18,11 @@ import {createHash} from "node:crypto";
 import * as logger from "firebase-functions/logger";
 import {db} from "../firebaseApp";
 
-/** 업로더 `SpecPayloadCodec.SchemaVersion` 과 맞물린 값. 어긋나면 블롭을 믿지 않고 폴백한다. */
+/** 앱이 해석할 수 있는 콘텐츠 세대. C# ContentVersion.Major 및 앱 버전 첫 자리와 같아야 한다. */
+// content-version:major
 const CONTENT_MAJOR = 4;
-// 새 major 배포 빌드에서는 실제로 해석 가능한 직전 major를 함께 넣어 pointer 롤백을 허용한다.
+// 새 테이블 세대 배포에서는 실제로 해석 가능한 직전 세대를 함께 넣어 pointer 롤백을 허용한다.
+// content-version:supported
 const SUPPORTED_CONTENT_MAJORS = new Set<number>([CONTENT_MAJOR]);
 
 /** 캐시 수명. 스펙 업로드가 반영되기까지 최대 이만큼 늦는다. */
