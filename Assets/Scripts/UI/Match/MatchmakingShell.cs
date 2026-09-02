@@ -140,9 +140,9 @@ public class MatchmakingShell : MonoBehaviour
 
     void Awake()
     {
-        // 이 화면은 자기 Canvas를 저작해 갖지만, 로비 아래 중첩으로 서는 동안에는 overrideSorting 없이
-        // sortingOrder 대입이 버려진다 — 프리팹 저작만으로는 로비와 같은 층(0)에 앉는다.
-        // 승격 문은 하나여야 한다는 규약대로 여기서 건다(Canvas·GraphicRaycaster는 프리팹에 이미 있어 재사용된다).
+        // 층의 주인은 표다 — 이 호출이 매번 UiSortingOrder.Matchmaking을 다시 찍으므로 프리팹 저작값은 읽기용 사본이고,
+        // 사본이 표와 갈리면 OnValidate가 잡는다. 승격 문은 하나여야 한다는 규약대로 여기서 걸고,
+        // Canvas·GraphicRaycaster가 빠진 채로 서는 경우까지 이 한 줄이 메운다(있으면 그대로 재사용된다).
         UiSortingOrder.LiftNested(gameObject, UiSortingOrder.Matchmaking);
 
         // 홈 좌표를 잡기 전에 와야 한다 — 아래에서 굳는 기준이 전부 이 rect 위에서 읽힌다.
@@ -165,6 +165,22 @@ public class MatchmakingShell : MonoBehaviour
         m_approach = versusApproach;
 
         EnsureWired();
+    }
+
+    // 저작 사본이 표와 갈리면 프리팹만 고친 사람은 자기 수정이 먹은 줄 안다 — 고치는 그 자리에서 알린다.
+    // 실행 시점으로 미루면 늦고, 로비 밑에 중첩으로 선 캔버스는 저작값을 되돌려 주지도 않는다
+    // (overrideSorting이 꺼져 있으면 getter가 부모 값을 준다 · UiSortingOrder.DropNested).
+    void OnValidate()
+    {
+#if UNITY_EDITOR
+        var t_canvas = GetComponent<Canvas>();
+        if (t_canvas == null || !t_canvas.isRootCanvas) return;
+
+        if (t_canvas.sortingOrder != UiSortingOrder.Matchmaking)
+            Debug.LogWarning(
+                $"[MatchmakingShell] 저작된 층이 표와 다릅니다(저작 {t_canvas.sortingOrder} ≠ 표 {UiSortingOrder.Matchmaking}) — "
+              + "런타임은 표를 따르므로 프리팹만 고쳐서는 바뀌지 않습니다. UiSortingOrder.Matchmaking을 고칠 것.", this);
+#endif
     }
 
     /// <summary>부모 아래에서 화면을 꽉 채우게 되돌린다. 부모를 얻은 직후 한 번만 부르면 된다 —

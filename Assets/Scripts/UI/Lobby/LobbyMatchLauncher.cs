@@ -16,7 +16,6 @@ public class LobbyMatchLauncher : MonoBehaviour
     [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
-    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭도 대치 인트로도 없이 구 동작
     [SerializeField] OpponentProfilePool profilePool;
 
     [Header("유효 덱 없음 안내")]
@@ -43,6 +42,8 @@ public class LobbyMatchLauncher : MonoBehaviour
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
     LobbyOverlayHost m_overlayHost;
+
+    GameObject m_matchShellPrefab;
 
     /// <summary>
     /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
@@ -76,8 +77,9 @@ public class LobbyMatchLauncher : MonoBehaviour
     IMatchmaker Matchmaker => m_matchmaker ??=
         new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
 
-    // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄운다 — 로비 프리팹을 저장할 때마다 SafeArea가
-    // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋된다.
+    // 프리팹 자체는 동기 UI 카탈로그의 의존성이라 부팅 때 이미 적재돼 있다 — 미루는 것은 생성뿐이다.
+    // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄우는 이유는 로비 프리팹을 저장할 때마다 SafeArea가
+    // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋되기 때문이다.
     //
     // 부모는 SafeArea가 아니라 로비 캔버스 자신이다. 셸은 로비를 전부 덮는 전면 화면이라 안전 영역 안으로
     // 들어갈 이유가 없고(덱 화면 LobbyOverlayHost도 같은 자리에 있다), 무엇보다 전투로 넘어갈 때
@@ -87,7 +89,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         get
         {
-            if (m_matchShell == null && matchShellPrefab != null)
+            if (m_matchShell == null && MatchShellPrefab != null)
             {
                 // 셸은 자기 Canvas를 저작해 갖고 있으므로 부모의 캔버스를 빌리지는 않는다. 그래도 로비 캔버스를
                 // 요구하는 이유는 자리다 — 캔버스 밖에 세우면 로비가 살아 있는 동안 셸만 다른 계층에 떠서
@@ -102,16 +104,33 @@ public class LobbyMatchLauncher : MonoBehaviour
                 }
                 // worldPositionStays를 끈다 — 켜 두면 프리팹의 월드 원점을 지키려고 로컬 좌표를 다시 계산하는데,
                 // 로비 캔버스는 Overlay라 그 원점이 화면 좌하단이다. 셸은 부모를 꽉 채우면 되므로 지킬 월드 자리가 없다.
-                m_matchShell = Instantiate(matchShellPrefab, t_canvas.transform, false);
+                GameObject t_instance = Instantiate(MatchShellPrefab, t_canvas.transform, false);
+
+                m_matchShell = t_instance.GetComponent<MatchmakingShell>();
+                if (m_matchShell == null)
+                {
+                    Debug.LogError(
+                        "[LobbyMatchLauncher] 카탈로그의 MatchmakingRoot에 MatchmakingShell이 없다 — "
+                      + "카탈로그가 다른 프리팹을 물고 있다.", this);
+                    Destroy(t_instance);
+                }
             }
 
             return m_matchShell;
         }
     }
 
+    // 카탈로그 미배선이면 매칭도 대치 인트로도 없이 구 동작으로 내려간다.
+    // 실패는 캐시하지 않는다 — 적재가 한 번 미끄러진 것뿐인데 캐시하면 그 로비 세션 내내 구 동작으로 굳는다.
+    // 대신 실패한 판마다 SyncUiPrefabs의 LogError가 진입 판정과 생성에서 두 줄 남는다.
+    GameObject MatchShellPrefab
+        => m_matchShellPrefab != null
+         ? m_matchShellPrefab
+         : m_matchShellPrefab = SyncUiPrefabs.Get(ESyncUiPrefab.MatchmakingRoot);
+
     // 튜토리얼 전투는 상대가 시나리오 고정이라 매칭을 태우지 않는다 —
     // 마지막 튜토 전투가 끝나며 TutorialConfig가 꺼지고, 그 다음 판부터 이 문이 열린다.
-    bool UseMatchmaking => !TutorialConfig.IsActive && matchShellPrefab != null;
+    bool UseMatchmaking => !TutorialConfig.IsActive && MatchShellPrefab != null;
 
     void OnEnable()
     {
@@ -451,7 +470,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         //
         // 셸을 여기서 붙잡아 넘긴다 — MatchShell은 비어 있으면 새로 만드는 프로퍼티라,
         // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
-        // 셸이 미배선(matchShellPrefab 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
+        // 셸이 미배선(카탈로그에 MatchmakingRoot 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
         if (_preset.HasValue)
         {
             MatchmakingShell t_versus = MatchShell;
